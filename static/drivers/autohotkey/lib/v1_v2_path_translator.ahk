@@ -641,6 +641,10 @@ TranslateV1ToV2(V1Path) {
 ;                ``letter`` / ``link`` / etc.).
 WriteV2Update(V1Path, Value) {
     global ConfigurationFile
+    ; TapHolds — delegate to the dedicated writer (tap_hold.toml).
+    if (StrLen(V1Path) >= 9 and SubStr(V1Path, 1, 9) == "TapHolds.") {
+        return WriteTapHoldBatch([Map("v1_path", V1Path, "value", Value)]) > 0
+    }
     Loc := TranslateV1ToV2(V1Path)
     if (Loc == false) {
         try LoggerWarn("V1V2Translator",
@@ -716,16 +720,31 @@ GetFeatureV2State(V1Path) {
     return State
 }
 
-; Apply a batch of v1-path mutations atomically (single TOML_BatchWrite).
+; Apply a batch of v1-path mutations atomically. Two persistence backends:
+;   * Most features go to the unified config.toml via TOML_BatchWrite.
+;   * TapHolds entries route to tap_hold.toml via the dedicated writer
+;     (lib/tap_hold/tap_hold_writer.ahk) because the v2 TapHold schema
+;     doesn't have a 1:1 mapping from the per-variant toggles emitted by
+;     the tray menu.
 ; Each entry is a Map("v1_path"=>"…", "value"=>…).
 WriteV2Batch(Entries) {
     global ConfigurationFile
     Updates := []
+    TapHoldEntries := []
     for Entry in Entries {
-        Loc := TranslateV1ToV2(Entry["v1_path"])
+        V1Path := Entry["v1_path"]
+        ; TapHolds writes get their own writer — the v2 schema condenses
+        ; mutually-exclusive variant groups into a single
+        ; ``[tap_hold.keys.<id>]`` block, so we batch them up and let
+        ; WriteTapHoldBatch resolve the active variant per key.
+        if (StrLen(V1Path) >= 9 and SubStr(V1Path, 1, 9) == "TapHolds.") {
+            TapHoldEntries.Push(Entry)
+            continue
+        }
+        Loc := TranslateV1ToV2(V1Path)
         if (Loc == false) {
             try LoggerWarn("V1V2Translator",
-                "WriteV2Batch: no v2 equivalent for '{1}' — skipped.", Entry["v1_path"])
+                "WriteV2Batch: no v2 equivalent for '{1}' — skipped.", V1Path)
             continue
         }
         V2Node := Loc["v2_node"]
@@ -741,5 +760,8 @@ WriteV2Batch(Entries) {
     if (Updates.Length > 0) {
         TOML_BatchWrite(ConfigurationFile, Updates)
     }
-    return Updates.Length
+    if (TapHoldEntries.Length > 0) {
+        WriteTapHoldBatch(TapHoldEntries)
+    }
+    return Updates.Length + TapHoldEntries.Length
 }

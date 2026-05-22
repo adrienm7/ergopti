@@ -131,6 +131,47 @@ MenuAddItemFromManifest(MenuParent, ManifestEntry, V1CategoryPath) {
 	}
 }
 
+; Add a clickable menu item with a pre-resolved label — bypasses the
+; manifest+i18n lookup chain in GetMenuTitleByPath. Used by render paths
+; that already hold the label string (e.g. personal hotstring sections
+; whose descriptions come from the user's personal_hotstrings.toml).
+;
+; ``MasterCategory`` is the v1 PascalCase top-level category whose
+; master-gate state controls greying for this item (``Hotstrings``,
+; ``Shortcuts``, ``Layout``, ``TapHolds``).
+MenuAddItemWithLabel(MenuParent, V1Path, MenuTitle, MasterCategory) {
+	RegisterMenuItem(MenuParent, MenuTitle, (*) => ToggleMenuVariableByPath(V1Path))
+
+	IsEnabled := _ResolveMenuItemEnabled(V1Path)
+	if IsEnabled {
+		MenuParent.Check(MenuTitle)
+	} else {
+		MenuParent.Uncheck(MenuTitle)
+	}
+
+	if !IsCategoryGated(MasterCategory) {
+		try MenuParent.Disable(MenuTitle)
+	}
+}
+
+; Resolve the .Enabled state of a v1-path feature, preferring the v2
+; FeaturesV2 location and falling back to the legacy Features Map's
+; ``.Enabled`` property for non-manifest features (TapHolds variants
+; especially). Used everywhere the tray menu needs to know whether
+; to draw a checkmark.
+_ResolveMenuItemEnabled(V1Path) {
+	State := GetFeatureV2State(V1Path)
+	if State.Has("Enabled") {
+		return (State["Enabled"] = true)
+	}
+	; Fall back to v1 Features.Enabled for features without a v2 mapping.
+	Feature := GetFeatureByPath(V1Path)
+	if (IsObject(Feature) and Feature.HasOwnProp("Enabled")) {
+		return (Feature.Enabled = true)
+	}
+	return false
+}
+
 MenuAddItem(MenuParent, FeatureCategoryPath, FeatureName) {
 	FullPath := FeatureCategoryPath "." FeatureName
 	MenuTitle := GetMenuTitleByPath(FullPath)
@@ -141,10 +182,11 @@ MenuAddItem(MenuParent, FeatureCategoryPath, FeatureName) {
 	; behavior as before in that case).
 	RegisterMenuItem(MenuParent, MenuTitle, (*) => ToggleMenuVariableByPath(FullPath))
 
-	; Read the runtime state from FeaturesV2 via the path translator —
-	; v1 Features Map is no longer the source of truth for .Enabled.
-	State := GetFeatureV2State(FullPath)
-	IsEnabled := State.Has("Enabled") and State["Enabled"]
+	; Runtime state — read FeaturesV2 via the path translator first; for
+	; features outside the manifest (TapHolds variants) fall back to the
+	; legacy ``Features[X].Enabled`` value which is still kept in sync by
+	; ToggleMenuVariableByPath's mutually-exclusive sub-Map handling.
+	IsEnabled := _ResolveMenuItemEnabled(FullPath)
 	if IsEnabled {
 		MenuParent.Check(MenuTitle)
 	} else {
@@ -202,7 +244,7 @@ MenuAddLetterPicker(MenuParent, FeatureCategoryPath, FeatureName) {
 	FullPath := FeatureCategoryPath "." FeatureName
 	MenuTitle := GetMenuTitleByPath(FullPath)
 	State := GetFeatureV2State(FullPath)
-	IsEnabled := State.Has("Enabled") and State["Enabled"]
+	IsEnabled := _ResolveMenuItemEnabled(FullPath)
 	CurrentLetter := State.Has("Letter") ? StrLower(State["Letter"]) : ""
 
 	LetterMenu := Menu()
@@ -396,8 +438,11 @@ GetFeatureByPath(FullPath) {
 }
 
 ToggleMenuVariableByPath(FullPath) {
-	State := GetFeatureV2State(FullPath)
-	CurrentEnabled := State.Has("Enabled") and State["Enabled"]
+	; Resolve current state via FeaturesV2 first, falling back to Features
+	; v1 for non-manifest features (TapHolds variants especially). Without
+	; the fallback, the FIRST click on a TapHolds variant would always see
+	; CurrentEnabled=false and try to "enable" what's already active.
+	CurrentEnabled := _ResolveMenuItemEnabled(FullPath)
 	NewValue := !CurrentEnabled
 
 	; Find position of the last dot
@@ -1116,22 +1161,15 @@ initMenu() {
 
 	; 3. Personal/custom hotstrings — separator + disabled header + entries
 	; personal_hotstrings.toml first, then extra TOMLs from hotstrings\ folder alphabetically.
+	; All data (section order, descriptions, entry counts) comes straight
+	; from the TOML file via ReadPersonalToml — Features["Personal"] is no
+	; longer consulted here.
 	TotalPersonal := 0
-	if Features.Has("Personal") {
-		; Read personal_hotstrings.toml once to get section order, descriptions, and counts
-		TomlData := ReadPersonalToml()
-		; Enrich Features["Personal"] descriptions with entry counts
-		for _, SecName in TomlData["sections_order"] {
-			SecData := TomlData["sections"][SecName]
-			Count := SecData["entries"].Length
-			BaseDesc := SecData["description"]
-			for FeatKey in Features["Personal"] {
-				if (FeatKey != "__Order" and StrLower(FeatKey) == SecName) {
-					Features["Personal"][FeatKey].Description := BaseDesc . " (" . FmtCount(Count) . ")"
-				}
-			}
-		}
-		for _, SecData in TomlData["sections"] {
+	PersonalTomlData := false
+	PersonalTomlPath := IsSet(ScriptInformation) ? ScriptInformation.Get("PersonalTomlPath", "") : ""
+	if (PersonalTomlPath != "" and FileExist(PersonalTomlPath)) {
+		PersonalTomlData := ReadPersonalToml()
+		for _, SecData in PersonalTomlData["sections"] {
 			TotalPersonal += SecData["entries"].Length
 		}
 	}
@@ -1154,7 +1192,8 @@ initMenu() {
 	PersonalHeader := MenuSectionTitle(t("menu.hotstrings.personal_header") . (TotalPersonal > 0 ? " (" . FmtCount(TotalPersonal) . ")" : ""))
 	HotstringsMenu.Add(PersonalHeader, (*) => NoAction())
 	HotstringsMenu.Disable(PersonalHeader)
-	if Features.Has("Personal") {
+	if (PersonalTomlData != false) {
+		TomlData := PersonalTomlData  ; local alias for downstream callbacks
 		; Build the unified personal submenu for personal_hotstrings.toml
 		PersonalMenu := Menu()
 		RegisterMenuItem(PersonalMenu, t("menu.hotstrings.open_editor"), (*) => OpenPersonalEditor())
@@ -1194,14 +1233,23 @@ initMenu() {
 		if (_EditorPrefGet("CloseOnAdd", "1") == "1") {
 			PersonalMenu.Check(_CloseOnAddLabel)
 		}
-		if (Features["Personal"].Has("__Order") and Features["Personal"]["__Order"].Length > 0) {
+		; Per-section entries — labels come from the TOML's section description
+		; + entry count, the toggle callback identifies the section by its
+		; lowercase TOML name (V1 path "Personal.<toml_section>") and reads
+		; the .Enabled state from FeaturesV2["hotstrings"]["personal"].
+		if (TomlData["sections_order"].Length > 0) {
 			PersonalMenu.Add()
-			for FeatName in Features["Personal"]["__Order"] {
-				if FeatName == "-" {
+			for _, SecName in TomlData["sections_order"] {
+				if (SecName == "-") {
 					PersonalMenu.Add()
-				} else if Features["Personal"].Has(FeatName) {
-					MenuAddItem(PersonalMenu, "Personal", FeatName)
+					continue
 				}
+				if !TomlData["sections"].Has(SecName) {
+					continue
+				}
+				SecData := TomlData["sections"][SecName]
+				SecLabel := SecData["description"] . " (" . FmtCount(SecData["entries"].Length) . ")"
+				MenuAddItemWithLabel(PersonalMenu, "Personal." . SecName, SecLabel, "Hotstrings")
 			}
 		}
 		PersonalCount := 0

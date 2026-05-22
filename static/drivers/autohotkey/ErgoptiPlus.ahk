@@ -135,6 +135,7 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 ; cause AHK to complain about the same script being included twice.
 #Include lib/first_boot.ahk
 #Include lib/tap_hold/tap_hold_loader.ahk
+#Include lib/tap_hold/tap_hold_writer.ahk
 #Include lib/master_gates.ahk
 #Include lib/manifest_descriptions.ahk
 #Include lib/menu_dispatcher.ahk
@@ -895,13 +896,10 @@ try {
 ; while the master is off.
 ApplyMasterGatesToFeaturesV2()
 
-; Bootstrap Features["Personal"] from personal_hotstrings.toml _meta.sections
-; so the menu builder sees the user's section list. The per-entry .Enabled
-; values come from FeaturesV2 at render time (no mutation needed here).
-BootstrapPersonalFeatures()
-if Features.Has("Personal") {
-    ApplyTomlMetadataToFeatures("Personal")
-}
+; Personal hotstring sections are read straight from personal_hotstrings.toml
+; by the tray-menu builder (ReadPersonalToml + the section block in initMenu).
+; FeaturesV2["hotstrings"]["personal"] carries the user's per-section enabled
+; state — no Features["Personal"] population is needed anymore.
 
 ; Gestures module included here — before menu build — so GESTURE_SLOTS,
 ; GESTURE_ACTIONS and GESTURE_SLOT_LABELS exist when BuildGesturesMenu runs.

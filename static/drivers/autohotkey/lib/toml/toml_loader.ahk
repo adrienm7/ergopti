@@ -379,61 +379,12 @@ FoldAsciiLower(Str) {
 ; by comparing their ``FoldAsciiLower`` form. The ``★`` placeholder in the
 ; TOML is swapped for the user's configured ``ScriptInformation["MagicKey"]``
 ; so that rebindings done via the tray menu are reflected in descriptions.
-; Bootstrap Features["Personal"] from the [_meta.sections] block of
-; personal_hotstrings.toml. Creates one feature entry per declared section,
-; enabled by default. Subsequent ApplyTomlMetadataToFeatures("Personal") will
-; then enrich those entries with descriptions and __Order from the same TOML.
-; Returns the list of section keys (lowercase) that were registered.
-BootstrapPersonalFeatures() {
-    global Features, ScriptInformation
-    Result := []
-    if !(IsSet(ScriptInformation) and ScriptInformation.Has("PersonalTomlPath")) {
-        return Result
-    }
-    FilePath := ScriptInformation["PersonalTomlPath"]
-    if !FileExist(FilePath) {
-        try LoggerInfo("TomlLoader", "Personal hotstrings file not found at '{1}' — skipping.",
-            FilePath)
-        return Result
-    }
-
-    if !Features.Has("Personal") {
-        Features["Personal"] := Map()
-    }
-
-    InMetaSections := false
-    FileContent := ReadTomlFile(FilePath)
-    loop parse, FileContent, "`n", "`r" {
-        Line := Trim(A_LoopField, " `t")
-        if (Line == "" or SubStr(Line, 1, 1) == "#") {
-            continue
-        }
-        if RegExMatch(Line, "^\[([^\[\]]+)\]$", &HeaderMatch) {
-            InMetaSections := (Trim(HeaderMatch[1]) == "_meta.sections")
-            continue
-        }
-        if (SubStr(Line, 1, 2) == "[[") {
-            break
-        }
-        if !InMetaSections {
-            continue
-        }
-        if RegExMatch(Line, "^([A-Za-z0-9_]+)\s*=\s*`"((?:[^`"\\]|\\.)*)`"\s*$", &SecMatch) {
-            SectionKey := SecMatch[1]
-            ; Use PascalCase for the Feature key (menu convention) but keep
-            ; the lowercase TOML key for the loader call.
-            FeatKey := StrUpper(SubStr(SectionKey, 1, 1)) . SubStr(SectionKey, 2)
-            if !Features["Personal"].Has(FeatKey) {
-                Features["Personal"][FeatKey] := { Enabled: true,
-                    Description: UnescapeTomlString(SecMatch[2]),
-                    TomlSection: StrLower(SectionKey) }
-            }
-            Result.Push(StrLower(SectionKey))
-            try LoggerDebug("TomlLoader", "Personal section registered: '{1}'.", FeatKey)
-        }
-    }
-    return Result
-}
+;
+; ``BootstrapPersonalFeatures`` was removed in slice 9 — the personal
+; hotstring submenu now reads ``personal_hotstrings.toml`` directly via
+; ``ReadPersonalToml`` at render time, and per-section enabled state lives
+; on FeaturesV2["hotstrings"]["personal"], so Features["Personal"] is no
+; longer populated or consulted by the driver.
 
 ApplyTomlMetadataToFeatures(CategoryName) {
     global ScriptInformation, _StaticDir
