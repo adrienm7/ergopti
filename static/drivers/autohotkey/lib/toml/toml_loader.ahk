@@ -13,22 +13,15 @@
 ; 2. LoadHotstringsSection: replays every ``[[section]]`` entry through the
 ;    exact same ``CreateHotstring`` / ``CreateCaseSensitiveHotstrings`` calls
 ;    that were used before the TOML migration, preserving behavior 1:1.
-; 3. ApplyTomlMetadataToFeatures: maps ``[_meta]`` / ``[_meta.sections]`` onto
-;    the runtime ``Features`` Map so menu titles and submenu ordering are driven
-;    by TOML files, with ``★`` substituted for the user's configured MagicKey.
-; 4. ApplyIndexTomlToDynamicHotstrings: reads ``[modules.dynamichotstrings.*]``
-;    from ``_index.toml`` and injects ``description`` fields into
-;    ``Features["DynamicHotstrings"]`` — single source of truth shared with HS.
-; 5. FoldAsciiLower: accent-folding helper that reconciles PascalCase Features
-;    keys containing French letters (e.g. ``IÉ``) with the lowercase TOML keys
-;    (e.g. ``ie``) used in ``sections_order`` and ``[_meta.sections]``.
+; 3. ParseTomlGroupConfig: reads ``[_meta]`` and ``[_meta.sections.*]`` blocks
+;    for per-group delay, tooltip color and description.
+; 4. FoldAsciiLower: accent-folding helper that reconciles identifiers
+;    containing French letters (e.g. ``IÉ``) with lowercase TOML keys.
 ; ==============================================================================
 
 ; Holds the raw UTF-8 content of every TOML file that has been read this
-; session, keyed by absolute file path. Both LoadHotstringsSection and
-; ApplyTomlMetadataToFeatures resolve content through ReadTomlFile so that
-; large category files (autocorrection.toml, magickey.toml) are read at most
-; once even when many sections are loaded from the same file.
+; session, keyed by absolute file path. Large category files (autocorrection.toml,
+; magickey.toml) are read at most once even when many sections are loaded.
 global _TomlFileCache    := Map()
 global _TomlCountCache   := Map()   ; key = CategoryName|SectionName → count
 

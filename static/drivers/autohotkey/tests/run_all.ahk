@@ -32,7 +32,7 @@ SetWorkingDir(A_ScriptDir)
 ; subsequent file registers its cases or invokes assertions inside lambdas.
 #Include test_framework.ahk
 
-; Stubs second — they define ScriptInformation, Features, SendNewResult,
+; Stubs second — they define ScriptInformation, FeaturesV2, SendNewResult,
 ; WrapTextIfSelected, DeadKey, ToggleCapsLock, etc., which lib/ files
 ; reference at definition (Bind) time or at call time during tests.
 #Include test_stubs.ahk
