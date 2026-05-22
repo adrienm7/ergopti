@@ -1431,6 +1431,17 @@ SaveFullConfig() {
         }
     }
 
+    ; [ahk.updater] — update channel and background-check cadence.
+    ; Both values live in the updater module's globals and must be written here
+    ; so SaveFullConfig (which rewrites the entire file from scratch) does not
+    ; silently erase the user's chosen frequency after every feature toggle.
+    global UPDATER_CHANNEL, UPDATER_CHECK_INTERVAL
+    global UPDATER_INI_SECTION, UPDATER_INI_KEY, UPDATER_INI_INTERVAL_KEY
+    if IsSet(UPDATER_CHECK_INTERVAL)
+        Updates.Push({ Section: UPDATER_INI_SECTION, Key: UPDATER_INI_INTERVAL_KEY, Value: UPDATER_CHECK_INTERVAL })
+    if IsSet(UPDATER_CHANNEL)
+        Updates.Push({ Section: UPDATER_INI_SECTION, Key: UPDATER_INI_KEY, Value: UPDATER_CHANNEL })
+
     ; Strict schema: rewrite from scratch so stale/unknown sections and keys
     ; are removed on each full save.
     if FileExist(ConfigurationFile) {
