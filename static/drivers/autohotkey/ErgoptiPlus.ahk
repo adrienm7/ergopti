@@ -125,7 +125,7 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 #Include lib/manifest_reader.ahk
 #Include lib/first_boot.ahk
 #Include lib/tap_hold/tap_hold_loader.ahk
-#Include lib/v2_v1_mirror.ahk
+#Include lib/master_gates.ahk
 #Include lib/v1_v2_path_translator.ahk
 #Include lib/menu_dispatcher.ahk
 #Include lib/menu_manifest.ahk
@@ -915,33 +915,21 @@ try {
 #Include *i %A_LocalAppData%\Ergopti\_generated\personal_shortcuts.ahk
 #InputLevel 0
 ; ``ApplyConfigTomlV2`` above hydrated ``FeaturesV2`` from the canonical
-; v2 sections of the user's config.toml. The reverse mirror below copies
-; that state onto the v1 ``Features`` Map so the tray-menu builder (which
-; still walks v1 to render submenus and checkmarks) reflects the user's
-; persisted choices. ``ApplyMasterGatesToFeaturesV2`` then short-circuits
-; gated categories on the v2 side without disturbing the per-feature
-; choices held in the v1 Map (so the menu still shows them ticked when
-; the master gate flips back on).
-MirrorV2ToV1_Layout()
-MirrorV2ToV1_Gestures()
-MirrorV2ToV1_Shortcuts()
-MirrorV2ToV1_Hotstrings()
+; v2 sections of the user's config.toml. The tray-menu builder still walks
+; the legacy ``Features`` Map for static structure (categories, __Order,
+; descriptions populated by ApplyTomlMetadataToFeatures + ApplyLocaleDescriptions
+; below), but every per-item .Enabled / .Letter / .Link read now goes
+; through ``GetFeatureV2State`` against FeaturesV2 — no reverse mirror needed.
+; ``ApplyMasterGatesToFeaturesV2`` short-circuits gated categories on the
+; v2 side so #HotIf evaluations all return false while the master is off.
 ApplyMasterGatesToFeaturesV2()
 
 ; Bootstrap Features["Personal"] from personal_hotstrings.toml _meta.sections
-; before applying TOML metadata, so the user's section toggles appear in the menu.
+; so the menu builder sees the user's section list. The per-entry .Enabled
+; values come from FeaturesV2 at render time (no mutation needed here).
 BootstrapPersonalFeatures()
 if Features.Has("Personal") {
     ApplyTomlMetadataToFeatures("Personal")
-    ; Personal hotstring sections are persisted at
-    ; [hotstrings.personal.<key>] in v2. The v2 reader has already populated
-    ; FeaturesV2["hotstrings"]["personal"] from the user's config.toml;
-    ; reverse-mirror it back onto Features["Personal"] so the menu renders
-    ; the right checkmarks. Runtime-discovered sections (added by the user
-    ; in personal_hotstrings.toml without a manifest counterpart) only appear
-    ; in v2 if they were previously persisted; otherwise the v1 default from
-    ; BootstrapPersonalFeatures wins until the user toggles the entry.
-    MirrorV2ToV1_HotstringsPersonal()
 }
 
 ; Gestures module included here — before menu build — so GESTURE_SLOTS,
