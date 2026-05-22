@@ -21,10 +21,10 @@ global SubMenus := Map()
 ; ``path`` (canonical v2), ``id``, ``description_key``, etc.
 ; ``V1CategoryPath`` is the dotted v1 prefix used by the tray-write
 ; callbacks (``Layout``, ``Shortcuts``, ``Autocorrection``, …); the v1 id
-; comes from the inverse rename table via ``V2PathToV1Path``.
+; comes from the inverse rename table via ``ManifestPathToLegacyPath``.
 MenuAddItemFromManifest(MenuParent, ManifestEntry, V1CategoryPath) {
 	V2Path := ManifestEntry["path"]
-	V1Path := V2PathToV1Path(V2Path)
+	V1Path := ManifestPathToLegacyPath(V2Path)
 	if (V1Path == "") {
 		try LoggerWarn("Menu", "MenuAddItemFromManifest: no v1 path for '{1}' — skipping.", V2Path)
 		return
@@ -37,7 +37,7 @@ MenuAddItemFromManifest(MenuParent, ManifestEntry, V1CategoryPath) {
 	MenuTitle := _ApplyMenuLabelDynamicSubstitutions(MenuTitle, V1Path)
 	RegisterMenuItem(MenuParent, MenuTitle, (*) => ToggleMenuVariableByPath(V1Path))
 
-	State := GetFeatureV2State(V1Path)
+	State := GetFeatureState(V1Path)
 	IsEnabled := State.Has("Enabled") and State["Enabled"]
 	if IsEnabled {
 		MenuParent.Check(MenuTitle)
@@ -78,12 +78,12 @@ MenuAddItemWithLabel(MenuParent, V1Path, MenuTitle, MasterCategory) {
 ; not in the manifest (their v2 schema condenses mutually-exclusive variant
 ; groups into a single resolved tuple), so they are resolved by comparing
 ; the variant's (tap, hold) tuple against TapHold["keys"][V2KeyId] via
-; IsTapHoldVariantActive. Everything else is read from FeaturesV2.
+; IsTapHoldVariantActive. Everything else is read from Features.
 _ResolveMenuItemEnabled(V1Path) {
 	if (StrLen(V1Path) >= 9 and SubStr(V1Path, 1, 9) == "TapHolds.") {
 		return IsTapHoldVariantActive(V1Path)
 	}
-	State := GetFeatureV2State(V1Path)
+	State := GetFeatureState(V1Path)
 	if State.Has("Enabled") {
 		return (State["Enabled"] = true)
 	}
@@ -100,7 +100,7 @@ MenuAddItem(MenuParent, FeatureCategoryPath, FeatureName) {
 	; behavior as before in that case).
 	RegisterMenuItem(MenuParent, MenuTitle, (*) => ToggleMenuVariableByPath(FullPath))
 
-	; Runtime state — read FeaturesV2 via the path translator first; for
+	; Runtime state — read Features via the path translator first; for
 	; features outside the manifest (TapHolds variants) fall back to the
 	; legacy ``Features[X].Enabled`` value which is still kept in sync by
 	; ToggleMenuVariableByPath's mutually-exclusive sub-Map handling.
@@ -114,8 +114,8 @@ MenuAddItem(MenuParent, FeatureCategoryPath, FeatureName) {
 	; Phase 7.5 (UX): grey out the item when its master category gate is
 	; off. The toggle is still visible (so the user can see what would be
 	; available if they re-enabled the master) but clicking it does
-	; nothing — ApplyMasterGatesToFeaturesV2 forces every feature in the
-	; category to false in FeaturesV2, so the HotIf evaluations all
+	; nothing — ApplyMasterGatesToFeatures forces every feature in the
+	; category to false in Features, so the HotIf evaluations all
 	; short-circuit regardless of the persisted per-feature state.
 	if !IsCategoryGated(_MasterCategoryFor(FeatureCategoryPath)) {
 		try MenuParent.Disable(MenuTitle)
@@ -161,7 +161,7 @@ _MasterCategoryFor(FeatureCategoryPath) {
 MenuAddLetterPicker(MenuParent, FeatureCategoryPath, FeatureName) {
 	FullPath := FeatureCategoryPath "." FeatureName
 	MenuTitle := GetMenuTitleByPath(FullPath)
-	State := GetFeatureV2State(FullPath)
+	State := GetFeatureState(FullPath)
 	IsEnabled := _ResolveMenuItemEnabled(FullPath)
 	CurrentLetter := State.Has("Letter") ? StrLower(State["Letter"]) : ""
 
@@ -204,10 +204,10 @@ MenuAddLetterPicker(MenuParent, FeatureCategoryPath, FeatureName) {
 ; Sets the remap target letter on a feature and enables it. Persists both
 ; flags via the v1->v2 path translator so the change survives reload, then
 ; reloads to wire the new shortcut at the layer level. The Reload runs
-; the boot pipeline which re-derives the v1 Features Map from FeaturesV2
-; via lib/v2_v1_mirror.ahk — no need to mutate v1 in-place.
+; the boot pipeline which re-derives the v1 Features Map from Features
+; via lib/master_gates.ahk — no need to mutate v1 in-place.
 SetFeatureLetter(FullPath, Letter) {
-	WriteV2Batch([
+	WriteFeatureBatch([
 		Map("v1_path", FullPath . ".Enabled", "value", true),
 		Map("v1_path", FullPath . ".Letter",  "value", Letter),
 	])
@@ -217,7 +217,7 @@ SetFeatureLetter(FullPath, Letter) {
 ; Disables a letter-picker feature without touching its Letter, so the
 ; previously-selected mapping is restored on the next picker selection.
 SetFeatureLetterOff(FullPath) {
-	WriteV2Update(FullPath . ".Enabled", false)
+	WriteFeatureUpdate(FullPath . ".Enabled", false)
 	Reload
 }
 
@@ -227,7 +227,7 @@ SetFeatureLetterOff(FullPath) {
 ; matching entry exists. Non-manifest features fall through to dedicated
 ; handlers: Personal shortcuts use _PersonalShortcutsRegistry descriptions;
 ; TapHolds variants use _TapHoldsConfig descriptions. The live ``Letter``
-; suffix appended for letter pickers is always read from FeaturesV2 so
+; suffix appended for letter pickers is always read from Features so
 ; the title reflects the user's persisted choice immediately after a Reload.
 ;
 ; Two runtime substitutions are layered on top of the i18n value so the
@@ -242,10 +242,10 @@ GetMenuTitleByPath(FullPath) {
 	; features. Non-manifest paths fall through to per-subsystem handlers:
 	; Personal shortcuts use _PersonalShortcutsRegistry; TapHolds variants
 	; use _TapHoldsConfig descriptions.
-	V2Path := V1PathToV2ManifestPath(FullPath)
+	V2Path := LegacyPathToManifestPath(FullPath)
 	Entry := false
 	if (V2Path != "") {
-		Entry := ManifestFindEntryByV2Path(V2Path)
+		Entry := ManifestFindEntryByPath(V2Path)
 		; Letter pickers (Modélisation α with split schema) have no bare
 		; section entry — only ``<section>.enabled`` and ``<section>.letter``
 		; children, with the picker's description_key carried by ``.enabled``.
@@ -255,7 +255,7 @@ GetMenuTitleByPath(FullPath) {
 		; way through to the raw FullPath sentinel and the menu shows
 		; "Shortcuts.EGrave" / "Shortcuts.AGrave" / etc.
 		if (Entry == false) {
-			Entry := ManifestFindEntryByV2Path(V2Path . ".enabled")
+			Entry := ManifestFindEntryByPath(V2Path . ".enabled")
 		}
 	}
 	if (Entry != false) {
@@ -263,7 +263,7 @@ GetMenuTitleByPath(FullPath) {
 		if (Label != "") {
 			Label := _ApplyMenuLabelDynamicSubstitutions(Label, FullPath)
 			if _ManifestEntryHasLetter(Entry) {
-				State := GetFeatureV2State(FullPath)
+				State := GetFeatureState(FullPath)
 				if (State.Has("Letter") and State["Letter"] != "") {
 					Label := Label StrUpper(State["Letter"])
 				}
@@ -316,7 +316,7 @@ GetMenuTitleByPath(FullPath) {
 ;   - Bare-α (default is a Map carrying the ``letter`` key directly).
 ;   - Split-α / letter pickers (the entry IS the section's ``.enabled``
 ;     child, and the letter lives in a sibling ``.letter`` entry). The
-;     resolver retrieves the sibling via ``ManifestFindEntryByV2Path``
+;     resolver retrieves the sibling via ``ManifestFindEntryByPath``
 ;     keyed on ``<section>.letter``; if it exists this is a letter
 ;     picker and the suffix should be appended.
 _ManifestEntryHasLetter(Entry) {
@@ -328,7 +328,7 @@ _ManifestEntryHasLetter(Entry) {
 		return true
 	}
 	if (Entry.Has("section") and Entry["section"] != "") {
-		Sibling := ManifestFindEntryByV2Path(Entry["section"] . ".letter")
+		Sibling := ManifestFindEntryByPath(Entry["section"] . ".letter")
 		if (Sibling != false) {
 			return true
 		}
@@ -379,7 +379,7 @@ _ApplyMenuLabelDynamicSubstitutions(Label, V1Path) {
 }
 
 ToggleMenuVariableByPath(FullPath) {
-	; Resolve current state via FeaturesV2 first, falling back to Features
+	; Resolve current state via Features first, falling back to Features
 	; v1 for non-manifest features (TapHolds variants especially). Without
 	; the fallback, the FIRST click on a TapHolds variant would always see
 	; CurrentEnabled=false and try to "enable" what's already active.
@@ -399,7 +399,7 @@ ToggleMenuVariableByPath(FullPath) {
 		Batch.Push(Map("v1_path", SiblingPath . ".Enabled", "value", false))
 	}
 	Batch.Push(Map("v1_path", FullPath . ".Enabled", "value", NewValue))
-	WriteV2Batch(Batch)
+	WriteFeatureBatch(Batch)
 	Reload
 }
 
@@ -407,7 +407,7 @@ ToggleMenuVariableByPath(FullPath) {
 ; when the user toggles ``FullPath`` to true. Empty list means no mutex
 ; semantics — each toggle in the group is independent.
 _MutexSiblingPathsFor(FullPath) {
-	global _V1V2_ShortcutsSubMapGroupMap, _V1V2_ShortcutsSubMapKeyMap
+	global _LegacyShortcutsSubMapGroupMap, _LegacyShortcutsSubMapKeyMap
 	Parts := StrSplit(FullPath, ".")
 
 	; Shortcuts sub-Map groups (AltGrLAlt / AltGrCapsLock / LAltCapsLock):
@@ -415,9 +415,9 @@ _MutexSiblingPathsFor(FullPath) {
 	; canonical rename table (the v2 schema is authoritative for which keys
 	; the group accepts).
 	if (Parts.Length == 3 and Parts[1] == "Shortcuts"
-		and _V1V2_ShortcutsSubMapGroupMap.Has(Parts[2])) {
+		and _LegacyShortcutsSubMapGroupMap.Has(Parts[2])) {
 		Siblings := []
-		for V1Key, _V2Key in _V1V2_ShortcutsSubMapKeyMap {
+		for V1Key, _V2Key in _LegacyShortcutsSubMapKeyMap {
 			if (V1Key != Parts[3]) {
 				Siblings.Push(Parts[1] . "." . Parts[2] . "." . V1Key)
 			}
@@ -467,12 +467,12 @@ GetCategoryTitle(Category) {
 ; ===================================
 
 BuildGesturesMenu() {
-	global FeaturesV2, GestureAssignments, GESTURE_SLOTS, GESTURE_ACTIONS, GESTURE_SLOT_LABELS
+	global Features, GestureAssignments, GESTURE_SLOTS, GESTURE_ACTIONS, GESTURE_SLOT_LABELS
 
 	GMenu := Menu()
 
 	; Canonical category toggle — inserted at position 1 with separator at 2.
-	GestEnabled := FeaturesV2["gestures"]["enabled"]
+	GestEnabled := Features["gestures"]["enabled"]
 	AddCategoryToggleItem(GMenu,
 		t("menu.gestures.on"),
 		t("menu.gestures.off"),
@@ -514,10 +514,10 @@ SetGestureSlotAction(Slot, ActionName) {
 
 ; Toggles the Gestures enabled state and reloads.
 ToggleGesturesEnabled() {
-	global FeaturesV2
-	NewVal := !(FeaturesV2.Has("gestures") and FeaturesV2["gestures"].Has("enabled")
-		and FeaturesV2["gestures"]["enabled"] = true)
-	WriteV2Update("Gestures.Enabled", NewVal)
+	global Features
+	NewVal := !(Features.Has("gestures") and Features["gestures"].Has("enabled")
+		and Features["gestures"]["enabled"] = true)
+	WriteFeatureUpdate("Gestures.Enabled", NewVal)
 	Reload
 }
 
@@ -910,14 +910,14 @@ global _DYNAMIC_HOTSTRINGS_ORDER := ["DateLongFr", "DateFr", "Date",
 ; intentionally absent. Layout is built straight into A_TrayMenu by
 ; initMenu's manifest iteration and also doesn't need a SubMenus slot.
 InitSubMenus() {
-	global SubMenus, _FLAT_HOTSTRING_V1_CATS, _V1V2_TopCategoryMap
+	global SubMenus, _FLAT_HOTSTRING_V1_CATS, _LegacyTopCategoryMap
 	SubMenus := Map()
 
 	; Flat hotstring categories — order = manifest declaration order
 	; (preserved by the codegen emitter).
 	for V1Cat in _FLAT_HOTSTRING_V1_CATS {
 		SubMenu := Menu()
-		V2Section := _V1V2_TopCategoryMap.Has(V1Cat) ? _V1V2_TopCategoryMap[V1Cat] : ""
+		V2Section := _LegacyTopCategoryMap.Has(V1Cat) ? _LegacyTopCategoryMap[V1Cat] : ""
 		if (V2Section != "") {
 			for Entry in ManifestFeaturesForSection(V2Section) {
 				MenuAddItemFromManifest(SubMenu, Entry, V1Cat)
@@ -941,20 +941,20 @@ InitSubMenus() {
 ; the curated render order in ``_DYNAMIC_HOTSTRINGS_ORDER`` and injecting
 ; the personal-info editor entry right after the text-expansion item.
 _BuildDynamicHotstringsSubmenu() {
-	global _V1V2_DynamicHotstringsKeyMap, _DYNAMIC_HOTSTRINGS_ORDER
+	global _LegacyDynamicHotstringsKeyMap, _DYNAMIC_HOTSTRINGS_ORDER
 	SubMenu := Menu()
 	for V1Id in _DYNAMIC_HOTSTRINGS_ORDER {
 		if (V1Id == "-") {
 			SubMenu.Add()
 			continue
 		}
-		if !_V1V2_DynamicHotstringsKeyMap.Has(V1Id) {
+		if !_LegacyDynamicHotstringsKeyMap.Has(V1Id) {
 			try LoggerWarn("Menu",
 				"DynamicHotstrings: no v2 id for '{1}' — skipped.", V1Id)
 			continue
 		}
-		V2Id := _V1V2_DynamicHotstringsKeyMap[V1Id]
-		Entry := ManifestFindEntryByV2Path("hotstrings.dynamic." . V2Id)
+		V2Id := _LegacyDynamicHotstringsKeyMap[V1Id]
+		Entry := ManifestFindEntryByPath("hotstrings.dynamic." . V2Id)
 		if (Entry == false) {
 			try LoggerWarn("Menu",
 				"DynamicHotstrings: no manifest entry for '{1}' — skipped.", V1Id)
@@ -1006,7 +1006,7 @@ _BuildShortcutsSubmenu() {
 	SubMenu.Add(t("menu.shortcuts.group_accented"), AccentsMenu)
 
 	; ── WrapTextIfSelected (plain bool) ──────────────────────
-	WrapEntry := ManifestFindEntryByV2Path("shortcuts.wrap_text_if_selected")
+	WrapEntry := ManifestFindEntryByPath("shortcuts.wrap_text_if_selected")
 	if (WrapEntry != false) {
 		MenuAddItemFromManifest(SubMenu, WrapEntry, "Shortcuts")
 	} else {
@@ -1210,7 +1210,7 @@ initMenu() {
 	; Master gate: the parent menu checkmark and the master toggle label
 	; both reflect IsCategoryGated, NOT a per-feature scan. A flipped
 	; gate keeps individual per-feature toggles intact on disk but
-	; neutralises the whole category via ApplyMasterGatesToFeaturesV2
+	; neutralises the whole category via ApplyMasterGatesToFeatures
 	; (lib/master_gates.ahk).
 	;
 	; Layout entries are rendered straight from the manifest — order, labels
@@ -1270,8 +1270,8 @@ initMenu() {
 		StdTotal += CountTomlHotstrings(_CCat)
 	}
 	DynTotalStd := 0
-	if FeaturesV2.Has("hotstrings") and FeaturesV2["hotstrings"].Has("dynamic") {
-		for _DKey, _DCfg in FeaturesV2["hotstrings"]["dynamic"] {
+	if Features.Has("hotstrings") and Features["hotstrings"].Has("dynamic") {
+		for _DKey, _DCfg in Features["hotstrings"]["dynamic"] {
 			if (IsObject(_DCfg) and _DCfg.Has("enabled") and _DCfg["enabled"]) {
 				DynTotalStd += CountDynamicSection(_DKey)
 			}
@@ -1289,11 +1289,11 @@ initMenu() {
 		}
 	}
 	; Dynamic hotstrings — date insertion and future rule-based expansions.
-	if FeaturesV2.Has("hotstrings") and FeaturesV2["hotstrings"].Has("dynamic")
+	if Features.Has("hotstrings") and Features["hotstrings"].Has("dynamic")
 		and SubMenus.Has("DynamicHotstrings") {
 		DynMenu := SubMenus["DynamicHotstrings"]
 		DynTotal := 0
-		for _DKey, _DCfg in FeaturesV2["hotstrings"]["dynamic"] {
+		for _DKey, _DCfg in Features["hotstrings"]["dynamic"] {
 			if (IsObject(_DCfg) and _DCfg.Has("enabled") and _DCfg["enabled"]) {
 				DynTotal += CountDynamicSection(_DKey)
 			}
@@ -1400,7 +1400,7 @@ initMenu() {
 		; Per-section entries — labels come from the TOML's section description
 		; + entry count, the toggle callback identifies the section by its
 		; lowercase TOML name (V1 path "Personal.<toml_section>") and reads
-		; the .Enabled state from FeaturesV2["hotstrings"]["personal"].
+		; the .Enabled state from Features["hotstrings"]["personal"].
 		if (TomlData["sections_order"].Length > 0) {
 			PersonalMenu.Add()
 			for _, SecName in TomlData["sections_order"] {
@@ -1535,28 +1535,28 @@ initMenu() {
 
 	; ── IA / LLM — sits right after Hotstrings, mirroring the Hammerspoon menu order ──
 	; Build the LLM_Tray_Init payload by reading the v2 nested LLM map
-	; (hydrated by ApplyConfigTomlV2 directly from the [llm.*] sections
+	; (hydrated by ApplyConfigToml directly from the [llm.*] sections
 	; of the user's config.toml). LLM_Tray_Init still expects a flat
 	; ``saved_opts`` Map with the legacy key names, so we read from the
 	; nested v2 paths and flatten back here. ``onboarding_seen`` and
 	; ``app_profile_overrides`` are runtime state read separately below.
 	_LlmSavedOpts := Map()
-	_LlmSavedOpts["enabled"]                := FeaturesV2["llm"]["enabled"]
-	_LlmSavedOpts["model"]                  := FeaturesV2["llm"]["models"]["ollama"]
-	_LlmSavedOpts["profile_id"]             := FeaturesV2["llm"]["profiles"]["active"]
-	_LlmSavedOpts["temperature"]            := FeaturesV2["llm"]["generation"]["temperature"]
-	_LlmSavedOpts["n_predictions"]          := FeaturesV2["llm"]["profiles"]["num_predictions"]
-	_LlmSavedOpts["min_words"]              := FeaturesV2["llm"]["generation"]["min_words"]
-	_LlmSavedOpts["max_words"]              := FeaturesV2["llm"]["generation"]["max_words"]
-	_LlmSavedOpts["debounce_ms"]            := FeaturesV2["llm"]["trigger"]["debounce_ms"]
-	_LlmSavedOpts["ctx_chars"]              := FeaturesV2["llm"]["generation"]["context_length"]
-	_LlmSavedOpts["instant_on_word_end"]    := FeaturesV2["llm"]["trigger"]["instant_on_word_end"]
-	_LlmSavedOpts["auto_profile_for_model"] := FeaturesV2["llm"]["profiles"]["auto_profile_for_model"]
-	_LlmSavedOpts["inline_autotype"]        := FeaturesV2["llm"]["trigger"]["inline_autotype"]
+	_LlmSavedOpts["enabled"]                := Features["llm"]["enabled"]
+	_LlmSavedOpts["model"]                  := Features["llm"]["models"]["ollama"]
+	_LlmSavedOpts["profile_id"]             := Features["llm"]["profiles"]["active"]
+	_LlmSavedOpts["temperature"]            := Features["llm"]["generation"]["temperature"]
+	_LlmSavedOpts["n_predictions"]          := Features["llm"]["profiles"]["num_predictions"]
+	_LlmSavedOpts["min_words"]              := Features["llm"]["generation"]["min_words"]
+	_LlmSavedOpts["max_words"]              := Features["llm"]["generation"]["max_words"]
+	_LlmSavedOpts["debounce_ms"]            := Features["llm"]["trigger"]["debounce_ms"]
+	_LlmSavedOpts["ctx_chars"]              := Features["llm"]["generation"]["context_length"]
+	_LlmSavedOpts["instant_on_word_end"]    := Features["llm"]["trigger"]["instant_on_word_end"]
+	_LlmSavedOpts["auto_profile_for_model"] := Features["llm"]["profiles"]["auto_profile_for_model"]
+	_LlmSavedOpts["inline_autotype"]        := Features["llm"]["trigger"]["inline_autotype"]
 
 	; Runtime state — onboarding_seen + per-app overrides — lives in [llm]
 	; alongside the manifest-declared keys. The v2 reader hydrates them onto
-	; FeaturesV2 when present; we read with IniCacheGet so missing keys fall
+	; Features when present; we read with IniCacheGet so missing keys fall
 	; back to the defaults baked into LLM_Tray_Init.
 	_LlmRawOnboarded := IniCacheGet(_IniCache, "llm", "onboarding_seen")
 	if (_LlmRawOnboarded != "_")
@@ -1615,7 +1615,7 @@ initMenu() {
 	; ── Gestes — custom submenu mirroring Hammerspoon's gesture picker ──
 	GesturesMenu := BuildGesturesMenu()
 	A_TrayMenu.Add(GetCategoryTitle("Gestures"), GesturesMenu)
-	if FeaturesV2["gestures"]["enabled"] {
+	if Features["gestures"]["enabled"] {
 		A_TrayMenu.Check(GetCategoryTitle("Gestures"))
 	}
 

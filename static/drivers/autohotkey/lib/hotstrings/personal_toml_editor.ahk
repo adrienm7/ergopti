@@ -748,13 +748,13 @@ _SaveData(W, LV, StatusText) {
     }
     ; Read autocorrection TimeActivationSeconds from the v2 hotstrings.personal
     ; sub-Map — hydrated at boot from the [hotstrings.personal.autocorrection]
-    ; section of the user's config.toml by ApplyConfigTomlV2.
+    ; section of the user's config.toml by ApplyConfigToml.
     FeatureConfig := { TimeActivationSeconds: 0 }
-    if (IsSet(FeaturesV2)
-        and FeaturesV2.Has("hotstrings")
-        and FeaturesV2["hotstrings"].Has("personal")
-        and FeaturesV2["hotstrings"]["personal"].Has("autocorrection")) {
-        FeatureConfig := FeaturesV2["hotstrings"]["personal"]["autocorrection"]
+    if (IsSet(Features)
+        and Features.Has("hotstrings")
+        and Features["hotstrings"].Has("personal")
+        and Features["hotstrings"]["personal"].Has("autocorrection")) {
+        FeatureConfig := Features["hotstrings"]["personal"]["autocorrection"]
     }
     ReloadPersonalSection(_PersonalEditorData, _PersonalEditorSection, FeatureConfig)
     _PopulateList(LV, _PersonalEditorData, _PersonalEditorSection)

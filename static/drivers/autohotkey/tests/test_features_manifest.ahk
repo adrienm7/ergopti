@@ -1,16 +1,16 @@
-﻿; static/drivers/autohotkey/tests/test_features_manifest_v2.ahk
+; static/drivers/autohotkey/tests/test_features_manifest.ahk
 
 ; ==============================================================================
-; MODULE: Features Manifest v2 Pipeline Tests
+; MODULE: Features Manifest Pipeline Tests
 ; DESCRIPTION:
 ; Validates the dormant v2 configuration pipeline ahead of the Scope C cut-over:
 ;
 ;     manifest.toml -> codegen -> features_manifest.ahk -> ManifestBuildFeaturesMap()
 ;                                                                |
-;                                ApplyConfigTomlV2(user config) modifies FeaturesV2
+;                                ApplyConfigToml(user config) modifies Features
 ;
 ; Every test in this file:
-;   1. Builds a fresh ``FeaturesV2`` Map from the manifest.
+;   1. Builds a fresh ``Features`` Map from the manifest.
 ;   2. Optionally writes a temporary v2 ``config.toml`` and applies it.
 ;   3. Asserts the resulting path/value matches what the migration document
 ;      promises at ``_shared/features/_migration_v1_to_v2.md``.
@@ -19,7 +19,7 @@
 ; 1. Codegen guard: if the manifest hasn't been built, ``ManifestEnsureLoaded``
 ;    returns false and the first test fails with a clear "run npm run build:manifest"
 ;    message. No spooky cascading failures from missing globals.
-; 2. Isolation: every test saves the global ``FeaturesV2``, replaces it with a
+; 2. Isolation: every test saves the global ``Features``, replaces it with a
 ;    fresh build from the manifest, runs its assertions, then restores.
 ; 3. The override tests write to ``A_Temp`` to avoid polluting the source tree
 ;    or the user's real config directory.
@@ -40,25 +40,25 @@
 ; ==================================
 ; ==================================
 
-; Swap ``FeaturesV2`` for a fresh manifest build and return the old value so
+; Swap ``Features`` for a fresh manifest build and return the old value so
 ; the test can restore it afterward. Isolates each test from the shared stub.
-_FMv2_BeginIsolated() {
-	global FeaturesV2
-	OldFeaturesV2 := FeaturesV2
-	FeaturesV2 := ManifestBuildFeaturesMap()
-	return OldFeaturesV2
+_FM_BeginIsolated() {
+	global Features
+	OldFeatures := Features
+	Features := ManifestBuildFeaturesMap()
+	return OldFeatures
 }
 
-; Restore the FeaturesV2 saved by _FMv2_BeginIsolated.
-_FMv2_EndIsolated(OldFeaturesV2) {
-	global FeaturesV2
-	FeaturesV2 := OldFeaturesV2
+; Restore the Features saved by _FM_BeginIsolated.
+_FM_EndIsolated(OldFeatures) {
+	global Features
+	Features := OldFeatures
 }
 
 ; Write the given content to ``A_Temp\ergopti_v2_test_<Tag>.toml`` and return
 ; the absolute path. Tag distinguishes between concurrent fixture files
 ; (one per test); the harness clears any stale copy first.
-_FMv2_WriteFixture(Tag, Content) {
+_FM_WriteFixture(Tag, Content) {
 	Path := A_Temp . "\ergopti_v2_test_" . Tag . ".toml"
 	if FileExist(Path) {
 		FileDelete(Path)
@@ -112,7 +112,7 @@ Test("manifest_v2: AHK manifest carries the platform's feature subset", TestFMv2
 TestFMv2_NoHsFeaturesInAhkManifest() {
 	; Codegen must filter out HS-only entries from the AHK manifest. If any
 	; ``hs.<...>`` entry leaks through, ``ManifestBuildFeaturesMap`` would
-	; create useless ``FeaturesV2["hs"][...]`` branches that confuse call sites.
+	; create useless ``Features["hs"][...]`` branches that confuse call sites.
 	ManifFeatures := ManifestFeatures()
 	for Entry in ManifFeatures {
 		Section := Entry["section"]
@@ -150,13 +150,13 @@ Test("ManifestBuildFeaturesMap: exposes section_order from the manifest",
 	TestFMv2_BuildHasSectionOrder)
 
 TestFMv2_AhkPrefixStripped() {
-	; ahk.layout.ergopti_base in the manifest must land at FeaturesV2[layout][ergopti_base]
-	; after the ahk. prefix strip. Call sites must NOT see FeaturesV2[ahk].
+	; ahk.layout.ergopti_base in the manifest must land at Features[layout][ergopti_base]
+	; after the ahk. prefix strip. Call sites must NOT see Features[ahk].
 	Built := ManifestBuildFeaturesMap()
 	AssertFalse(Built.Has("ahk"),
 		"ahk prefix must be stripped at build time; found stray ahk branch.")
 	AssertTrue(Built.Has("layout"),
-		"Layout (ahk.layout in manifest) must land at FeaturesV2[layout] after strip.")
+		"Layout (ahk.layout in manifest) must land at Features[layout] after strip.")
 }
 Test("ManifestBuildFeaturesMap: ahk. prefix is stripped from section paths",
 	TestFMv2_AhkPrefixStripped)
@@ -285,14 +285,14 @@ TestFMv2_GesturesStrippedFromAhk() {
 	AssertEqual("tab_close", Built["gestures"]["swipe_3_down"])
 	AssertEqual("left_click_toggle", Built["gestures"]["tap_3"])
 }
-Test("ManifestBuildFeaturesMap: ahk.gestures lands at FeaturesV2[gestures] with action defaults",
+Test("ManifestBuildFeaturesMap: ahk.gestures lands at Features[gestures] with action defaults",
 	TestFMv2_GesturesStrippedFromAhk)
 
 TestFMv2_NoTapHoldInFeatures() {
 	Built := ManifestBuildFeaturesMap()
 	AssertFalse(Built.Has("tap_hold"))
 }
-Test("ManifestBuildFeaturesMap: tap_hold is not a FeaturesV2 sub-tree",
+Test("ManifestBuildFeaturesMap: tap_hold is not a Features sub-tree",
 	TestFMv2_NoTapHoldInFeatures)
 
 
@@ -300,134 +300,134 @@ Test("ManifestBuildFeaturesMap: tap_hold is not a FeaturesV2 sub-tree",
 
 ; ====================================================
 ; ====================================================
-; ======= 4/ ApplyConfigTomlV2 override engine =======
+; ======= 4/ ApplyConfigToml override engine =======
 ; ====================================================
 ; ====================================================
 
 TestFMv2_ApplyNonexistentFileReturnsZero() {
-	OldFeaturesV2 := _FMv2_BeginIsolated()
+	OldFeatures := _FM_BeginIsolated()
 	try {
-		Applied := ApplyConfigTomlV2(FeaturesV2, A_Temp . "\nonexistent_ergopti_v2_test.toml")
+		Applied := ApplyConfigToml(Features, A_Temp . "\nonexistent_ergopti_v2_test.toml")
 		AssertEqual(0, Applied)
 	}
-	_FMv2_EndIsolated(OldFeaturesV2)
+	_FM_EndIsolated(OldFeatures)
 }
-Test("ApplyConfigTomlV2: missing file silently returns 0", TestFMv2_ApplyNonexistentFileReturnsZero)
+Test("ApplyConfigToml: missing file silently returns 0", TestFMv2_ApplyNonexistentFileReturnsZero)
 
 TestFMv2_ApplyUniversalScriptOverride() {
-	OldFeaturesV2 := _FMv2_BeginIsolated()
+	OldFeatures := _FM_BeginIsolated()
 	try {
-		Path := _FMv2_WriteFixture("script_locale",
+		Path := _FM_WriteFixture("script_locale",
 			"[script]`r`nlocale = `"en`"`r`n")
-		Applied := ApplyConfigTomlV2(FeaturesV2, Path)
+		Applied := ApplyConfigToml(Features, Path)
 		AssertEqual(1, Applied)
-		AssertEqual("en", FeaturesV2["script"]["locale"])
+		AssertEqual("en", Features["script"]["locale"])
 		FileDelete(Path)
 	}
-	_FMv2_EndIsolated(OldFeaturesV2)
+	_FM_EndIsolated(OldFeatures)
 }
-Test("ApplyConfigTomlV2: applies a [script] override", TestFMv2_ApplyUniversalScriptOverride)
+Test("ApplyConfigToml: applies a [script] override", TestFMv2_ApplyUniversalScriptOverride)
 
 TestFMv2_ApplyAhkLayoutOverrideStripsPrefix() {
-	OldFeaturesV2 := _FMv2_BeginIsolated()
+	OldFeatures := _FM_BeginIsolated()
 	try {
-		Path := _FMv2_WriteFixture("ahk_layout",
+		Path := _FM_WriteFixture("ahk_layout",
 			"[ahk.layout]`r`nergopti_base = false`r`n")
-		Applied := ApplyConfigTomlV2(FeaturesV2, Path)
+		Applied := ApplyConfigToml(Features, Path)
 		AssertEqual(1, Applied)
-		AssertEqual(false, FeaturesV2["layout"]["ergopti_base"])
+		AssertEqual(false, Features["layout"]["ergopti_base"])
 		FileDelete(Path)
 	}
-	_FMv2_EndIsolated(OldFeaturesV2)
+	_FM_EndIsolated(OldFeatures)
 }
-Test("ApplyConfigTomlV2: [ahk.layout] strips prefix to FeaturesV2[layout]",
+Test("ApplyConfigToml: [ahk.layout] strips prefix to Features[layout]",
 	TestFMv2_ApplyAhkLayoutOverrideStripsPrefix)
 
 TestFMv2_ApplyNestedSubSection() {
-	OldFeaturesV2 := _FMv2_BeginIsolated()
+	OldFeatures := _FM_BeginIsolated()
 	try {
-		Path := _FMv2_WriteFixture("autocorrection_accents",
+		Path := _FM_WriteFixture("autocorrection_accents",
 			"[hotstrings.autocorrection.accents]`r`n"
 			. "enabled = false`r`n"
 			. "time_activation_seconds = 1.25`r`n")
-		Applied := ApplyConfigTomlV2(FeaturesV2, Path)
+		Applied := ApplyConfigToml(Features, Path)
 		AssertEqual(2, Applied)
-		Entry := FeaturesV2["hotstrings"]["autocorrection"]["accents"]
+		Entry := Features["hotstrings"]["autocorrection"]["accents"]
 		AssertEqual(false, Entry["enabled"])
 		AssertEqual(1.25, Entry["time_activation_seconds"])
 		FileDelete(Path)
 	}
-	_FMv2_EndIsolated(OldFeaturesV2)
+	_FM_EndIsolated(OldFeatures)
 }
-Test("ApplyConfigTomlV2: applies a nested sub-section (modelisation alpha)",
+Test("ApplyConfigToml: applies a nested sub-section (modelisation alpha)",
 	TestFMv2_ApplyNestedSubSection)
 
 TestFMv2_ApplyHsSectionIsSilentlySkipped() {
-	OldFeaturesV2 := _FMv2_BeginIsolated()
+	OldFeatures := _FM_BeginIsolated()
 	try {
-		Path := _FMv2_WriteFixture("hs_section",
+		Path := _FM_WriteFixture("hs_section",
 			"[hs.gestures]`r`nswipe_2_left = `"arrow_down`"`r`n")
-		Applied := ApplyConfigTomlV2(FeaturesV2, Path)
+		Applied := ApplyConfigToml(Features, Path)
 		AssertEqual(0, Applied)
 		FileDelete(Path)
 	}
-	_FMv2_EndIsolated(OldFeaturesV2)
+	_FM_EndIsolated(OldFeatures)
 }
-Test("ApplyConfigTomlV2: [hs.*] sections are silently skipped", TestFMv2_ApplyHsSectionIsSilentlySkipped)
+Test("ApplyConfigToml: [hs.*] sections are silently skipped", TestFMv2_ApplyHsSectionIsSilentlySkipped)
 
 TestFMv2_ApplyUnknownSectionWarnsButDoesNotCrash() {
-	OldFeaturesV2 := _FMv2_BeginIsolated()
+	OldFeatures := _FM_BeginIsolated()
 	try {
-		Path := _FMv2_WriteFixture("unknown_section",
+		Path := _FM_WriteFixture("unknown_section",
 			"[hotstrings.no_such_group]`r`n"
 			. "foo = true`r`n"
 			. "[script]`r`n"
 			. "locale = `"es`"`r`n")
-		Applied := ApplyConfigTomlV2(FeaturesV2, Path)
+		Applied := ApplyConfigToml(Features, Path)
 		AssertEqual(1, Applied)
-		AssertEqual("es", FeaturesV2["script"]["locale"])
+		AssertEqual("es", Features["script"]["locale"])
 		FileDelete(Path)
 	}
-	_FMv2_EndIsolated(OldFeaturesV2)
+	_FM_EndIsolated(OldFeatures)
 }
-Test("ApplyConfigTomlV2: unknown sections warn but do not abort other overrides",
+Test("ApplyConfigToml: unknown sections warn but do not abort other overrides",
 	TestFMv2_ApplyUnknownSectionWarnsButDoesNotCrash)
 
 TestFMv2_ApplyArrayValue() {
-	OldFeaturesV2 := _FMv2_BeginIsolated()
+	OldFeatures := _FM_BeginIsolated()
 	try {
-		Path := _FMv2_WriteFixture("array_value",
+		Path := _FM_WriteFixture("array_value",
 			"[llm.navigation]`r`nval_modifiers = [`"alt`", `"ctrl`"]`r`n")
-		Applied := ApplyConfigTomlV2(FeaturesV2, Path)
+		Applied := ApplyConfigToml(Features, Path)
 		AssertEqual(1, Applied)
-		Arr := FeaturesV2["llm"]["navigation"]["val_modifiers"]
+		Arr := Features["llm"]["navigation"]["val_modifiers"]
 		AssertEqual("Array", Type(Arr))
 		AssertEqual(2, Arr.Length)
 		AssertEqual("alt", Arr[1])
 		AssertEqual("ctrl", Arr[2])
 		FileDelete(Path)
 	}
-	_FMv2_EndIsolated(OldFeaturesV2)
+	_FM_EndIsolated(OldFeatures)
 }
-Test("ApplyConfigTomlV2: coerces single-line array literals", TestFMv2_ApplyArrayValue)
+Test("ApplyConfigToml: coerces single-line array literals", TestFMv2_ApplyArrayValue)
 
 TestFMv2_ApplyEmptyFileNoChange() {
-	OldFeaturesV2 := _FMv2_BeginIsolated()
+	OldFeatures := _FM_BeginIsolated()
 	try {
-		Path := _FMv2_WriteFixture("empty", "")
-		Applied := ApplyConfigTomlV2(FeaturesV2, Path)
+		Path := _FM_WriteFixture("empty", "")
+		Applied := ApplyConfigToml(Features, Path)
 		AssertEqual(0, Applied)
-		AssertEqual("fr", FeaturesV2["script"]["locale"])
+		AssertEqual("fr", Features["script"]["locale"])
 		FileDelete(Path)
 	}
-	_FMv2_EndIsolated(OldFeaturesV2)
+	_FM_EndIsolated(OldFeatures)
 }
-Test("ApplyConfigTomlV2: empty file applies no overrides", TestFMv2_ApplyEmptyFileNoChange)
+Test("ApplyConfigToml: empty file applies no overrides", TestFMv2_ApplyEmptyFileNoChange)
 
 TestFMv2_ApplyCommentsAndBlanksIgnored() {
-	OldFeaturesV2 := _FMv2_BeginIsolated()
+	OldFeatures := _FM_BeginIsolated()
 	try {
-		Path := _FMv2_WriteFixture("comments",
+		Path := _FM_WriteFixture("comments",
 			"# Top-level comment`r`n"
 			. "`r`n"
 			. "[script]`r`n"
@@ -435,14 +435,14 @@ TestFMv2_ApplyCommentsAndBlanksIgnored() {
 			. "locale = `"de`"`r`n"
 			. "`r`n"
 			. "# trailing comment`r`n")
-		Applied := ApplyConfigTomlV2(FeaturesV2, Path)
+		Applied := ApplyConfigToml(Features, Path)
 		AssertEqual(1, Applied)
-		AssertEqual("de", FeaturesV2["script"]["locale"])
+		AssertEqual("de", Features["script"]["locale"])
 		FileDelete(Path)
 	}
-	_FMv2_EndIsolated(OldFeaturesV2)
+	_FM_EndIsolated(OldFeatures)
 }
-Test("ApplyConfigTomlV2: comments and blank lines are skipped",
+Test("ApplyConfigToml: comments and blank lines are skipped",
 	TestFMv2_ApplyCommentsAndBlanksIgnored)
 
 
@@ -450,44 +450,44 @@ Test("ApplyConfigTomlV2: comments and blank lines are skipped",
 
 ; =====================================================
 ; =====================================================
-; ======= 5/ TomlCoerceValueV2 primitive parser =======
+; ======= 5/ TomlCoerceValue primitive parser =======
 ; =====================================================
 ; =====================================================
 
 TestFMv2_CoerceArrayEmpty() {
-	Result := TomlCoerceValueV2("[]")
+	Result := TomlCoerceValueExt("[]")
 	AssertEqual("Array", Type(Result))
 	AssertEqual(0, Result.Length)
 }
-Test("TomlCoerceValueV2: empty array literal decodes to empty Array",
+Test("TomlCoerceValueExt: empty array literal decodes to empty Array",
 	TestFMv2_CoerceArrayEmpty)
 
 TestFMv2_CoerceArrayStrings() {
-	Result := TomlCoerceValueV2('["alt", "ctrl"]')
+	Result := TomlCoerceValueExt('["alt", "ctrl"]')
 	AssertEqual("Array", Type(Result))
 	AssertEqual(2, Result.Length)
 	AssertEqual("alt", Result[1])
 	AssertEqual("ctrl", Result[2])
 }
-Test("TomlCoerceValueV2: single-line string array decodes element-by-element",
+Test("TomlCoerceValueExt: single-line string array decodes element-by-element",
 	TestFMv2_CoerceArrayStrings)
 
 TestFMv2_CoerceArrayBooleans() {
-	Result := TomlCoerceValueV2("[true, false, true]")
+	Result := TomlCoerceValueExt("[true, false, true]")
 	AssertEqual(3, Result.Length)
 	AssertEqual(true, Result[1])
 	AssertEqual(false, Result[2])
 	AssertEqual(true, Result[3])
 }
-Test("TomlCoerceValueV2: array of booleans is coerced per-element",
+Test("TomlCoerceValueExt: array of booleans is coerced per-element",
 	TestFMv2_CoerceArrayBooleans)
 
 TestFMv2_CoercePrimitivesDelegateToV1() {
-	AssertEqual(true, TomlCoerceValueV2("true"))
-	AssertEqual(false, TomlCoerceValueV2("false"))
-	AssertEqual(42, TomlCoerceValueV2("42"))
-	AssertEqual("hello", TomlCoerceValueV2('"hello"'))
+	AssertEqual(true, TomlCoerceValue("true"))
+	AssertEqual(false, TomlCoerceValue("false"))
+	AssertEqual(42, TomlCoerceValue("42"))
+	AssertEqual("hello", TomlCoerceValue('"hello"'))
 }
-Test("TomlCoerceValueV2: primitives are delegated to the v1 coercer",
+Test("TomlCoerceValue: primitives — true/false/int/quoted-string",
 	TestFMv2_CoercePrimitivesDelegateToV1)
 

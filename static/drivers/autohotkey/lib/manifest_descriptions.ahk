@@ -51,7 +51,7 @@ MenuLabelFromManifestEntry(Entry) {
     ; path (``dynamichotstrings.datefr``) — pass it explicitly so the
     ; candidate generator can emit that variant too. V1Path may be empty
     ; when the v2 path doesn't map to a v1 equivalent.
-    V1Path := (Path == "") ? "" : V2PathToV1Path(Path)
+    V1Path := (Path == "") ? "" : ManifestPathToLegacyPath(Path)
     return MenuLabelFromDescriptionKey(DescKey, Path, V1Path)
 }
 
@@ -82,7 +82,7 @@ TryMenuLabelFromManifestEntry(Entry) {
     }
     DescKey := Entry.Has("description_key") ? Entry["description_key"] : ""
     Path    := Entry.Has("path")            ? Entry["path"]            : ""
-    V1Path  := (Path == "") ? "" : V2PathToV1Path(Path)
+    V1Path  := (Path == "") ? "" : ManifestPathToLegacyPath(Path)
     return TryMenuLabelFromDescriptionKey(DescKey, Path, V1Path)
 }
 

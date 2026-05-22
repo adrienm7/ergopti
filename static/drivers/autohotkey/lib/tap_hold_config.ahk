@@ -12,8 +12,8 @@
 ; 1. __Configuration objects carry per-key timing (TimeActivationSeconds).
 ; 2. Leaf entries (LShiftCopy, etc.) are plain objects with Enabled + optional
 ;    TimeActivationSeconds — no sub-map nesting needed.
-; 3. The TapHolds Map is injected into the global Features map by features_config.ahk
-;    via #Include so order of initialisation is deterministic.
+; 3. The TapHoldsConfig Map is loaded directly via #Include in ErgoptiPlus.ahk
+;    before the tap-hold loader and menu initialisation.
 ; ==============================================================================
 
 _TapHoldsConfig := Map(

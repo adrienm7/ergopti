@@ -1,11 +1,11 @@
-﻿; drivers/autohotkey/lib/tap_hold/tap_hold_loader.ahk
+; drivers/autohotkey/lib/tap_hold/tap_hold_loader.ahk
 
 ; ==============================================================================
-; MODULE: Tap-Hold Loader v2
+; MODULE: Tap-Hold Loader
 ; DESCRIPTION:
-; Loads the user's v2 ``tap_hold.toml`` file (bootstrapped at first boot from
+; Loads the user's ``tap_hold.toml`` file (bootstrapped at first boot from
 ; ``_generated/tap_hold_template.toml``) into a separate ``TapHold`` global,
-; distinct from the ``Features`` Map. The v2 schema is documented at
+; distinct from the ``Features`` Map. The schema is documented at
 ; ``_shared/tap_hold/defaults.toml``.
 ;
 ; FEATURES & RATIONALE:
@@ -67,7 +67,7 @@ LoadTapHoldToml(FilePath) {
 			continue
 		}
 		Key := KvMatch[1]
-		Value := TomlCoerceValueV2(KvMatch[2])
+		Value := TomlCoerceValue(KvMatch[2])
 
 		; tap_hold.keys.<id>
 		if RegExMatch(CurrentPath, "^tap_hold\.keys\.([A-Za-z0-9_]+)$", &KeyMatch) {

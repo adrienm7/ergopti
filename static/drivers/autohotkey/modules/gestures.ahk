@@ -656,13 +656,13 @@ GestureScreenshotInstant() {
 }
 
 GestureOpenConfiguredURL() {
-    global FeaturesV2
+    global Features
     URL := ""
-    if IsSet(FeaturesV2) and FeaturesV2.Has("shortcuts")
-        and FeaturesV2["shortcuts"].Has("gpt")
-        and IsObject(FeaturesV2["shortcuts"]["gpt"])
-        and FeaturesV2["shortcuts"]["gpt"].Has("link") {
-        URL := FeaturesV2["shortcuts"]["gpt"]["link"]
+    if IsSet(Features) and Features.Has("shortcuts")
+        and Features["shortcuts"].Has("gpt")
+        and IsObject(Features["shortcuts"]["gpt"])
+        and Features["shortcuts"]["gpt"].Has("link") {
+        URL := Features["shortcuts"]["gpt"]["link"]
     }
     if (URL = "")
         URL := "https://chatgpt.com/"
@@ -678,13 +678,13 @@ GesturePickColor() {
 }
 
 GestureTakeNote() {
-    global FeaturesV2
+    global Features
     DatedNotes := false
     DestFolder := A_Desktop
-    if IsSet(FeaturesV2) and FeaturesV2.Has("shortcuts")
-        and FeaturesV2["shortcuts"].Has("take_note")
-        and IsObject(FeaturesV2["shortcuts"]["take_note"]) {
-        TN := FeaturesV2["shortcuts"]["take_note"]
+    if IsSet(Features) and Features.Has("shortcuts")
+        and Features["shortcuts"].Has("take_note")
+        and IsObject(Features["shortcuts"]["take_note"]) {
+        TN := Features["shortcuts"]["take_note"]
         if TN.Has("dated_notes")
             DatedNotes := (TN["dated_notes"] = true)
         if TN.Has("destination_folder") and TN["destination_folder"] != ""
@@ -734,13 +734,13 @@ GestureSimulateActivity() {
 }
 
 GestureSearchWeb() {
-    global FeaturesV2
+    global Features
     EngineURL   := "https://www.google.com"
     EngineQuery := "https://www.google.com/search?q="
-    if IsSet(FeaturesV2) and FeaturesV2.Has("shortcuts")
-        and FeaturesV2["shortcuts"].Has("search")
-        and IsObject(FeaturesV2["shortcuts"]["search"]) {
-        S := FeaturesV2["shortcuts"]["search"]
+    if IsSet(Features) and Features.Has("shortcuts")
+        and Features["shortcuts"].Has("search")
+        and IsObject(Features["shortcuts"]["search"]) {
+        S := Features["shortcuts"]["search"]
         if S.Has("search_engine") and S["search_engine"] != ""
             EngineURL := S["search_engine"]
         if S.Has("search_engine_url_query") and S["search_engine_url_query"] != ""
@@ -1556,9 +1556,9 @@ GestureReleaseRightClick() {
 
 ; Executes the action assigned to a gesture slot.
 GestureDispatch(slot) {
-    global GestureAssignments, GESTURE_ACTIONS, FeaturesV2
+    global GestureAssignments, GESTURE_ACTIONS, Features
 
-    if !FeaturesV2["gestures"]["enabled"] {
+    if !Features["gestures"]["enabled"] {
         return
     }
 

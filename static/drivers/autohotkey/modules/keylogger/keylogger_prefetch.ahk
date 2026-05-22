@@ -274,7 +274,7 @@ KLPF_BuildApps(db) {
 ; ============================================
 
 ; Build the « scancode → printable label » map for the heatmap. When
-; the Ergopti base-layer emulation is enabled (FeaturesV2["layout"]
+; the Ergopti base-layer emulation is enabled (Features["layout"]
 ; ["ergopti_base"]), we read the canonical mapping from
 ; lib/layout_ergopti.ahk — the SAME data layout.ahk uses to install
 ; the actual remaps. Otherwise we resolve each scancode through the
@@ -284,13 +284,13 @@ KLPF_BuildApps(db) {
 ; return the precomposed character of the next call (« Ä » instead
 ; of « a »).
 KLPF_KeycodeLayout() {
-    global FeaturesV2
+    global Features
     out := Map()
 
-    ergopti_active := IsSet(FeaturesV2)
-    && FeaturesV2.Has("layout")
-    && FeaturesV2["layout"].Has("ergopti_base")
-    && FeaturesV2["layout"]["ergopti_base"] = true
+    ergopti_active := IsSet(Features)
+    && Features.Has("layout")
+    && Features["layout"].Has("ergopti_base")
+    && Features["layout"]["ergopti_base"] = true
     if ergopti_active {
         for sc, ch in ErgoptiBaseLabels()
             out[String(sc)] := ch

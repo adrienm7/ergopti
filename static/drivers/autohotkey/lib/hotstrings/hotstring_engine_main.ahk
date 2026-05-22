@@ -1,7 +1,7 @@
-; static/drivers/autohotkey/lib/hotstring_engine_v2.ahk
+; static/drivers/autohotkey/lib/hotstrings/hotstring_engine_main.ahk
 
 ; ==============================================================================
-; MODULE: Hotstring Engine V2
+; MODULE: Hotstring Engine
 ; DESCRIPTION:
 ; Custom hotstring engine that replaces AHK's built-in Hotstring() for
 ; ErgoptiPlus's hotstrings. The native engine maintains its own opaque buffer
