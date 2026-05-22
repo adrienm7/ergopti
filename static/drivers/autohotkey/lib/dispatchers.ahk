@@ -59,26 +59,6 @@ global SIMPLE_ACTIONS := Map(
 	"ToggleMetricsApps",   () => KLUI_ToggleApps(),
 )
 
-; AltGr tap-hold variant. ``{Blind}`` is appended to every Send so the still-held
-; AltGr modifier is not re-sent by AHK, and ``UpdateLastSentCharacter`` is paired
-; with each text-emitting action so deadkey / hotstring chains downstream see the
-; correct previous character (or the empty marker for editing actions).
-global TAPHOLD_ALTGR_ACTIONS := Map(
-	"BackSpace",     () => (SendEvent("{Blind}{BackSpace}"), UpdateLastSentCharacter("BackSpace")),
-	"CapsLock",      () => ToggleCapsLock(),
-	"CapsWord",      () => ToggleCapsWord(),
-	"CtrlBackSpace", () => (SendEvent("{Blind}^{BackSpace}"), UpdateLastSentCharacter("")),
-	"CtrlDelete",    () => (SendEvent("{Blind}^{Delete}"), UpdateLastSentCharacter("")),
-	"Delete",        () => (SendEvent("{Blind}{Delete}"), UpdateLastSentCharacter("Delete")),
-	"Enter",         () => (SendEvent("{Blind}{Enter}"), UpdateLastSentCharacter("Enter")),
-	"Escape",        () => SendEvent("{Escape}"),
-	"OneShotShift",  () => OneShotShift(),
-	"Tab",           () => (SendEvent("{Blind}{Tab}"), UpdateLastSentCharacter("Tab")),
-)
-
-
-
-
 ; ==================================================
 ; ==================================================
 ; ======= 2/ Dispatch and predicate helpers =======
@@ -91,12 +71,6 @@ global TAPHOLD_ALTGR_ACTIONS := Map(
 ; callers can decide whether to also run a fallback path.
 RunFirstSimpleAction(FeatureGroup) {
 	return _RunFirstActionFromMap(FeatureGroup, SIMPLE_ACTIONS)
-}
-
-; Same contract as RunFirstSimpleAction but using the {Blind}/last-character
-; variant tailored for AltGr tap-hold dispatch.
-RunFirstAltGrTapHoldAction(FeatureGroup) {
-	return _RunFirstActionFromMap(FeatureGroup, TAPHOLD_ALTGR_ACTIONS)
 }
 
 _RunFirstActionFromMap(FeatureGroup, ActionMap) {
