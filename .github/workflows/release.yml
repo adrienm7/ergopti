@@ -314,8 +314,17 @@ jobs:
                   $in   = "${{ github.workspace }}\static\drivers\autohotkey\ErgoptiPlus.ahk"
                   $out  = "${{ github.workspace }}\static\drivers\autohotkey\ErgoptiPlus.exe"
                   $icon = "${{ github.workspace }}\static\favicon.ico"
-                  & $ahk2exe /in $in /out $out /base $runtime /icon $icon
+                  # /silent suppresses any Ahk2Exe GUI dialogs that would block
+                  # indefinitely on a headless runner and cause a silent non-zero exit.
+                  & $ahk2exe /in $in /out $out /base $runtime /icon $icon /silent
                   if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+                  # Verify the EXE was actually produced — Ahk2Exe can exit 0 on a
+                  # compilation warning without writing the output file.
+                  if (-not (Test-Path $out)) {
+                      Write-Error "Ahk2Exe reported success but $out was not created."
+                      exit 1
+                  }
+                  Write-Host "Compiled: $out ($('{0:N0}' -f (Get-Item $out).Length) bytes)"
 
             - name: Rename Windows keyboard layout for upload
               shell: bash
