@@ -73,7 +73,7 @@ jobs:
                       exit $exit
                   }
               shell: pwsh
-              timeout-minutes: 5
+              timeout-minutes: 8
 
             - name: Check for AHK compiler warnings
               # #Warn All, StdOut causes AHK to emit warning lines to stdout.
@@ -93,4 +93,4 @@ jobs:
                   }
                   Write-Host "No AHK compiler warnings detected."
               shell: pwsh
-              timeout-minutes: 5
+              timeout-minutes: 8

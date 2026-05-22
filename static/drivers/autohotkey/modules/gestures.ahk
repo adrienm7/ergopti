@@ -28,7 +28,11 @@
 ;   - 4 finger swipe right: Ctrl + Win + Shift + F10
 ; ==============================================================================
 
-#InputLevel 2
+; #InputLevel 2 is intentionally NOT set here — ErgoptiPlus.ahk already sets
+; it before including this module, so the hotkeys below fire at the correct
+; level in production. Omitting it here lets the test runner include this file
+; without forcing the keyboard hook installation on a headless CI runner, which
+; would block the process indefinitely waiting for a system input device.
 
 
 
