@@ -98,6 +98,39 @@ CreateSubMenusRecursiveCommonCode(MenuParent, Key, Val, CategoryPath) {
 	}
 }
 
+; Add a clickable menu item driven entirely by a manifest feature entry —
+; no Features v1 lookup. Used by the menu builder for categories that have
+; been migrated to consume the manifest directly (Layout first).
+;
+; ``ManifestEntry`` is a Map from ``ManifestFeaturesForSection`` carrying
+; ``path`` (canonical v2), ``id``, ``description_key``, etc.
+; ``V1CategoryPath`` is the dotted v1 prefix used by the tray-write
+; callbacks (``Layout``, ``Shortcuts``, ``Autocorrection``, …); the v1 id
+; comes from the inverse rename table via ``V2PathToV1Path``.
+MenuAddItemFromManifest(MenuParent, ManifestEntry, V1CategoryPath) {
+	V2Path := ManifestEntry["path"]
+	V1Path := V2PathToV1Path(V2Path)
+	if (V1Path == "") {
+		try LoggerWarn("Menu", "MenuAddItemFromManifest: no v1 path for '{1}' — skipping.", V2Path)
+		return
+	}
+	MenuTitle := MenuLabelFromManifestEntry(ManifestEntry)
+	RegisterMenuItem(MenuParent, MenuTitle, (*) => ToggleMenuVariableByPath(V1Path))
+
+	State := GetFeatureV2State(V1Path)
+	IsEnabled := State.Has("Enabled") and State["Enabled"]
+	if IsEnabled {
+		MenuParent.Check(MenuTitle)
+	} else {
+		MenuParent.Uncheck(MenuTitle)
+	}
+
+	; Master-gate greying — same logic as MenuAddItem.
+	if !IsCategoryGated(_MasterCategoryFor(V1CategoryPath)) {
+		try MenuParent.Disable(MenuTitle)
+	}
+}
+
 MenuAddItem(MenuParent, FeatureCategoryPath, FeatureName) {
 	FullPath := FeatureCategoryPath "." FeatureName
 	MenuTitle := GetMenuTitleByPath(FullPath)
@@ -880,7 +913,12 @@ initMenu() {
 	; both reflect IsCategoryGated, NOT a per-feature scan. A flipped
 	; gate keeps individual per-feature toggles intact on disk but
 	; neutralises the whole category via ApplyMasterGatesToFeaturesV2
-	; (lib/v2_v1_mirror.ahk).
+	; (lib/master_gates.ahk).
+	;
+	; Layout entries are rendered straight from the manifest — order, labels
+	; and v1 path identifiers are all derived from the canonical declaration
+	; in static/drivers/_shared/features/manifest.toml. Features v1's
+	; ``Layout`` sub-Map is no longer consulted for the menu render.
 	LayoutMenu := Menu()
 	LayoutGated := IsCategoryGated("Layout")
 	AddCategoryToggleItem(LayoutMenu,
@@ -888,8 +926,8 @@ initMenu() {
 		t("menu.layout.off"),
 		LayoutGated,
 		(*) => ToggleCategoryAllFeatures("Layout", !LayoutGated))
-	for FeatureName in Features["Layout"]["__Order"] {
-		MenuAddItem(LayoutMenu, "Layout", FeatureName)
+	for LayoutEntry in ManifestFeaturesForSection("ahk.layout") {
+		MenuAddItemFromManifest(LayoutMenu, LayoutEntry, "Layout")
 	}
 	LayoutMenuTitle := t("menu.layout.title")
 	A_TrayMenu.Add(LayoutMenuTitle, LayoutMenu)

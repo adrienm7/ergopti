@@ -126,6 +126,7 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 #Include lib/first_boot.ahk
 #Include lib/tap_hold/tap_hold_loader.ahk
 #Include lib/master_gates.ahk
+#Include lib/manifest_descriptions.ahk
 #Include lib/v1_v2_path_translator.ahk
 #Include lib/menu_dispatcher.ahk
 #Include lib/menu_manifest.ahk

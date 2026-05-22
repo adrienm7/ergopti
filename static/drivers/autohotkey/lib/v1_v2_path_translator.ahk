@@ -213,6 +213,138 @@ global _V1V2_DynamicHotstringsKeyMap := Map(
 
 ; ==============================================================
 ; ==============================================================
+; ======= 1bis/ Inverse lookup helpers =======
+; ==============================================================
+; ==============================================================
+
+; Build the inverse of a v1->v2 rename Map by swapping keys and values once at
+; load time. The menu builder consumes the inverse direction to translate
+; manifest entries (snake_case v2 ids) back to the v1 PascalCase paths still
+; used as identifiers in tray-write callbacks.
+_BuildInverseRenameMap(Forward) {
+    Out := Map()
+    for K, V in Forward {
+        Out[V] := K
+    }
+    return Out
+}
+
+global _V2V1_LayoutKeyMap                := _BuildInverseRenameMap(_V1V2_LayoutKeyMap)
+global _V2V1_ShortcutsBoolKeyMap         := _BuildInverseRenameMap(_V1V2_ShortcutsBoolKeyMap)
+global _V2V1_ShortcutsAlphaKeyMap        := _BuildInverseRenameMap(_V1V2_ShortcutsAlphaKeyMap)
+global _V2V1_ShortcutsSubMapGroupMap     := _BuildInverseRenameMap(_V1V2_ShortcutsSubMapGroupMap)
+global _V2V1_ShortcutsSubMapKeyMap       := _BuildInverseRenameMap(_V1V2_ShortcutsSubMapKeyMap)
+global _V2V1_AutocorrectionKeyMap        := _BuildInverseRenameMap(_V1V2_AutocorrectionKeyMap)
+global _V2V1_DistancesReductionKeyMap    := _BuildInverseRenameMap(_V1V2_DistancesReductionKeyMap)
+global _V2V1_SFBsReductionKeyMap         := _BuildInverseRenameMap(_V1V2_SFBsReductionKeyMap)
+global _V2V1_RollsKeyMap                 := _BuildInverseRenameMap(_V1V2_RollsKeyMap)
+global _V2V1_MagicKeyKeyMap              := _BuildInverseRenameMap(_V1V2_MagicKeyKeyMap)
+global _V2V1_DynamicHotstringsKeyMap     := _BuildInverseRenameMap(_V1V2_DynamicHotstringsKeyMap)
+
+; Translate the v2 manifest path of a feature entry (e.g. ``ahk.layout.ergopti_base``,
+; ``shortcuts.microsoft_bold``, ``hotstrings.autocorrection.accents``) into the
+; v1 dotted feature path the tray-write callbacks expect
+; (``Layout.ErgoptiBase``, ``Shortcuts.MicrosoftBold``, ``Autocorrection.Accents``).
+;
+; Returns "" when the v2 path does not have a v1 counterpart in the rename
+; tables (e.g. runtime-discovered Personal entries — those keep their
+; lowercase id verbatim under ``Personal.<id>`` already).
+V2PathToV1Path(V2Path) {
+    global _V2V1_LayoutKeyMap, _V2V1_ShortcutsBoolKeyMap
+    global _V2V1_ShortcutsAlphaKeyMap, _V2V1_ShortcutsSubMapGroupMap
+    global _V2V1_ShortcutsSubMapKeyMap, _V2V1_AutocorrectionKeyMap
+    global _V2V1_DistancesReductionKeyMap, _V2V1_SFBsReductionKeyMap
+    global _V2V1_RollsKeyMap, _V2V1_MagicKeyKeyMap, _V2V1_DynamicHotstringsKeyMap
+
+    Parts := StrSplit(V2Path, ".")
+    if (Parts.Length < 2) {
+        return ""
+    }
+
+    ; Strip leading ``ahk.`` so the dispatch below works on both bare
+    ; ``layout.x`` and ``ahk.layout.x`` shapes.
+    if (Parts[1] == "ahk") {
+        NewParts := []
+        Loop Parts.Length - 1 {
+            NewParts.Push(Parts[A_Index + 1])
+        }
+        Parts := NewParts
+    }
+    if (Parts.Length < 2) {
+        return ""
+    }
+
+    Top := Parts[1]
+
+    ; ── Layout ────────────────────────────────────────────────
+    if (Top == "layout" and Parts.Length == 2 and _V2V1_LayoutKeyMap.Has(Parts[2])) {
+        return "Layout." . _V2V1_LayoutKeyMap[Parts[2]]
+    }
+
+    ; ── Gestures master toggle ────────────────────────────────
+    if (Top == "gestures" and Parts.Length == 2 and Parts[2] == "enabled") {
+        return "Gestures.Enabled"
+    }
+
+    ; ── Shortcuts ────────────────────────────────────────────
+    if (Top == "shortcuts") {
+        ; Plain bool: shortcuts.<id>
+        if (Parts.Length == 2 and _V2V1_ShortcutsBoolKeyMap.Has(Parts[2])) {
+            return "Shortcuts." . _V2V1_ShortcutsBoolKeyMap[Parts[2]]
+        }
+        ; Modélisation α: shortcuts.<alpha> (legacy callbacks toggle .Enabled)
+        if (Parts.Length == 2 and _V2V1_ShortcutsAlphaKeyMap.Has(Parts[2])) {
+            return "Shortcuts." . _V2V1_ShortcutsAlphaKeyMap[Parts[2]]
+        }
+        ; Sub-Map group: shortcuts.<group>.<key>
+        if (Parts.Length == 3 and _V2V1_ShortcutsSubMapGroupMap.Has(Parts[2])
+            and _V2V1_ShortcutsSubMapKeyMap.Has(Parts[3])) {
+            return "Shortcuts." . _V2V1_ShortcutsSubMapGroupMap[Parts[2]]
+                . "." . _V2V1_ShortcutsSubMapKeyMap[Parts[3]]
+        }
+        return ""
+    }
+
+    ; ── Hotstrings categories ────────────────────────────────
+    if (Top == "hotstrings" and Parts.Length == 3) {
+        V2Cat := Parts[2]
+        V2Id  := Parts[3]
+        switch V2Cat {
+            case "autocorrection":
+                if _V2V1_AutocorrectionKeyMap.Has(V2Id)
+                    return "Autocorrection." . _V2V1_AutocorrectionKeyMap[V2Id]
+            case "distances_reduction":
+                if _V2V1_DistancesReductionKeyMap.Has(V2Id)
+                    return "DistancesReduction." . _V2V1_DistancesReductionKeyMap[V2Id]
+            case "sfbs_reduction":
+                if _V2V1_SFBsReductionKeyMap.Has(V2Id)
+                    return "SFBsReduction." . _V2V1_SFBsReductionKeyMap[V2Id]
+            case "rolls":
+                if _V2V1_RollsKeyMap.Has(V2Id)
+                    return "Rolls." . _V2V1_RollsKeyMap[V2Id]
+            case "magic_key":
+                if _V2V1_MagicKeyKeyMap.Has(V2Id)
+                    return "MagicKey." . _V2V1_MagicKeyKeyMap[V2Id]
+            case "dynamic":
+                if _V2V1_DynamicHotstringsKeyMap.Has(V2Id)
+                    return "DynamicHotstrings." . _V2V1_DynamicHotstringsKeyMap[V2Id]
+            case "personal":
+                ; Runtime-discovered — the v2 id IS the v1 PascalCase tail
+                ; lowercased; keep it verbatim. The menu walker handles
+                ; runtime-only paths separately via ``Features["Personal"]``
+                ; for now.
+                return "Personal." . V2Id
+        }
+    }
+
+    return ""
+}
+
+
+
+
+; ==============================================================
+; ==============================================================
 ; ======= 2/ TranslateV1ToV2 =======
 ; ==============================================================
 ; ==============================================================
