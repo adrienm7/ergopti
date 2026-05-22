@@ -380,27 +380,6 @@ global KeyboardShortcutAssignments := Map()
 ; ParseTomlFile / IniCacheGet / ResolveConfigPath are defined in lib/ini_helpers.ahk
 ; (included above) so the test runner can exercise them in isolation.
 
-; Hotstring categories are grouped under a [Hotstrings] umbrella in the TOML,
-; matching the Hammerspoon config layout. Internal AHK category names stay
-; unchanged so no menu or hotstring code needs updating.
-_HOTSTRING_TOML_CATEGORIES := Map(
-    "Autocorrection",      "Hotstrings.Autocorrection",
-    "DistancesReduction",  "Hotstrings.DistancesReduction",
-    "DynamicHotstrings",   "Hotstrings.DynamicHotstrings",
-    "MagicKey",            "Hotstrings.MagicKey",
-    "Personal",            "Hotstrings.Personal",
-    "Rolls",               "Hotstrings.Rolls",
-    "SFBsReduction",       "Hotstrings.SFBsReduction",
-)
-
-; Map an internal AHK category name to its TOML section name.
-_TomlSection(Category) {
-    global _HOTSTRING_TOML_CATEGORIES
-    if _HOTSTRING_TOML_CATEGORIES.Has(Category)
-        return _HOTSTRING_TOML_CATEGORIES[Category]
-    return Category
-}
-
 ; Category-level gating state (Phase 7.4 master-toggle refactor).
 ;
 ; The master toggle at the top of every category submenu ("Activer la
@@ -787,9 +766,9 @@ RegisterPersonalFeature(Name, DefaultEnabled := false, Description := "") {
  * @returns {boolean} True if enabled, false if absent or disabled.
  */
 PersonalFeatureEnabled(name) {
-    global Features
+    global FeaturesV2
     try {
-        return Features["Shortcuts"]["Personal"][name].Enabled
+        return FeaturesV2["shortcuts"]["personal"][name] = true
     } catch {
         return false
     }
@@ -1275,15 +1254,22 @@ ProcessUserInput(gui, edits) {
 }
 
 GPTLinkEditor(*) {
+    global FeaturesV2
+    CurrentLink := ""
+    if IsSet(FeaturesV2) and FeaturesV2.Has("shortcuts")
+        and FeaturesV2["shortcuts"].Has("gpt")
+        and IsObject(FeaturesV2["shortcuts"]["gpt"])
+        and FeaturesV2["shortcuts"]["gpt"].Has("link") {
+        CurrentLink := FeaturesV2["shortcuts"]["gpt"]["link"]
+    }
     GuiToShow := Gui(, t("dialog.gpt_link.title"))
-    NewValue := GuiToShow.Add("Edit", "w300", Features["Shortcuts"]["GPT"].Link)
+    NewValue := GuiToShow.Add("Edit", "w300", CurrentLink)
 
     GuiToShow.Add("Button", "w100 Center", t("button.ok")).OnEvent("Click", (*) => ModifyLink(GuiToShow, NewValue.Text))
     GuiToShow.Show("Center")
 }
 ModifyLink(gui, NewValue) {
-    global Features, FeaturesV2, ConfigurationFile
-    Features["Shortcuts"]["GPT"].Link := NewValue
+    global FeaturesV2, ConfigurationFile
     if IsSet(FeaturesV2) and FeaturesV2.Has("shortcuts") and FeaturesV2["shortcuts"].Has("gpt") {
         FeaturesV2["shortcuts"]["gpt"]["link"] := NewValue
     }
