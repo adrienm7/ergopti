@@ -20,10 +20,11 @@
 ; 2. Per-feature runtime state on ``Features[X].Enabled / .Letter / ...``
 ;    is no longer the source of truth after slice 6 — the tray menu reads
 ;    those via ``GetFeatureV2State`` against FeaturesV2 directly. The
-;    defaults emitted here only need to preserve the Map shape so the
-;    structural walks (CreateSubMenusRecursive, the personal-feature
-;    register, ToggleMenuVariableByPath's mutually-exclusive sub-Map loop)
-;    keep finding the keys they iterate.
+;    defaults emitted here only need to preserve the Map shape for the
+;    remaining v1 consumers (RegisterPersonalFeature's mutation of
+;    Features["Shortcuts"]["Personal"], the manifest-miss fallbacks
+;    inside GetMenuTitleByPath / _ResolveMenuItemEnabled for runtime
+;    Personal entries).
 ; 3. TapHolds keeps its own dedicated literal in ``tap_hold_config.ahk``
 ;    — that subsystem isn't modelled in the manifest.
 ; ==============================================================================
