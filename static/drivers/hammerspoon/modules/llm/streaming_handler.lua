@@ -59,13 +59,8 @@ local _core_llm  = nil
 local _tooltip   = nil
 local _keylogger = nil
 
--- Consecutive on_fail callbacks without an intervening on_success.
--- Reset on every successful response; triggers a user notification when it
--- reaches CONSECUTIVE_FAIL_WARN_THRESHOLD.
-local _consecutive_llm_failures = 0
-
--- Active watchdog timer reference — stopped on final batch or reset
-local _stream_watchdog_timer = nil
+local _consecutive_llm_failures = 0  -- Reset on success; triggers notification at threshold
+local _stream_watchdog_timer    = nil
 
 
 -- =============================================
@@ -140,36 +135,11 @@ end
 -- =============================================
 -- =============================================
 
---- Builds the on_partial_cb, on_success, and on_fail callbacks for one LLM request.
----
---- All three closures share the same local state (fetch_id, pending_predictions, etc.)
---- so they stay in sync without shared module-level variables per request. The caller
---- (perform_check) passes a context table so the closures can read and mutate the
---- active prediction pool and visibility flag without coupling to global module state.
----
---- @param ctx table Request context:
----   - buffer string: the context buffer sent to the LLM.
----   - my_fetch_id number: the fetch counter value for this request (stale guard).
----   - get_fetch_id function: returns the current fetch_request_counter.
----   - is_streaming_enabled boolean: whether streaming is active.
----   - is_streaming_multi_enabled boolean: whether per-token streaming display is on.
----   - num_predictions number: configured prediction count.
----   - show_info_bar boolean: whether to render the info bar.
----   - streaming_info_bar string|nil: pre-built info bar for streaming frames.
----   - prediction_indent number: indentation for prediction display.
----   - validation_mods table: normalized validation modifier array.
----   - navigation_mods table: normalized navigation modifier array.
----   - model_to_use string: backend model identifier.
----   - llm_display_name string|nil: human-readable model label.
----   - profile_name string|nil: active profile label.
----   - build_info_bar_text function: assembles info bar text.
----   - resolve_backend_label function: returns the short backend label.
----   - is_noise_pred function(to_type): returns true for noise predictions.
----   - reset_llm_dismiss_timer function: syncs and resets the dismiss countdown.
----   - pending_predictions_ref table: {value = pending_predictions} — mutable ref.
----   - predictions_visible_ref table: {value = predictions_visible} — mutable ref.
----   - consecutive_failures_ref table: {value = _consecutive_llm_failures} — mutable ref.
---- @return function|nil on_partial_cb Partial callback, or nil when streaming multi is off.
+--- Builds the three LLM response callbacks (partial, success, fail) for one request.
+--- All closures share the same fetch_id and mutable prediction-pool references so they
+--- stay in sync without module-level per-request variables.
+--- @param ctx table Request context table (see source for full field list).
+--- @return function|nil on_partial_cb Nil when streaming multi is off.
 --- @return function on_success Final success callback.
 --- @return function on_fail Failure callback.
 function M.build_callbacks(ctx)
@@ -202,26 +172,16 @@ function M.build_callbacks(ctx)
 
 	-- ── Streaming partial callback ────────────────────────────────────────────
 
-	-- When streaming is enabled AND multi-streaming is on, parse each partial
-	-- accumulation through the full pipeline (so TAIL_CORRECTED/NEXT_WORDS labels
-	-- are stripped), apply the same noise filters as on_success, then display as a
-	-- single orange block (nw color, no diff markup). Diff coloring is applied only
-	-- once the final result arrives via on_success. When multi-streaming is off
-	-- ("all at once" mode), the partial callback is suppressed entirely so no tokens
-	-- appear before the final batch — streaming and all-at-once are mutually exclusive.
+	-- on_partial_cb: nil when streaming multi is off (all-at-once mode suppresses interim tokens)
 	local on_partial_cb = (ctx.is_streaming_enabled and is_streaming_multi) and function(partial_raw)
-		-- Discard if superseded by a newer request
 		if get_fetch_id() ~= my_fetch_id then return end
 		if type(partial_raw) ~= "string" or partial_raw:gsub("%s", "") == "" then return end
 
-		-- Strip any partial thinking block before attempting to parse
 		local stripped = Parser.strip_thinking(partial_raw)
 		if not stripped or stripped:gsub("%s", "") == "" then return end
 
-		-- Split on === to handle batch mode (all predictions in one prompt, separated by ===).
-		-- In single-prediction mode this returns one block; in batch mode each completed
-		-- block is a separate prediction. The last block is still streaming and may fail
-		-- to parse — that's fine, earlier complete blocks are shown immediately.
+		-- Split on === separator used in batch-mode prompts; each completed block is a prediction
+		-- and the last (still streaming) block may fail to parse — that's fine
 		local raw_blocks = {}
 		for b in (stripped .. "==="):gmatch("(.-)===") do
 			local clean = b:gsub("^%s+", ""):gsub("%s+$", "")
@@ -251,17 +211,13 @@ function M.build_callbacks(ctx)
 		end
 		if #stream_preds == 0 then return end
 
-		-- Preserve finalized predictions (non-placeholder) so earlier variants stay
-		-- in their slots while later ones are still streaming
-		local new_preds = {}
+		local new_preds = {}  -- Keep finalized slots; discard placeholders
 		for _, p in ipairs(pending_ref.value) do
 			if not p._is_stream_placeholder then
 				table.insert(new_preds, p)
 			end
 		end
 
-		-- Dedup stream preds against finalized and against each other so a duplicate
-		-- never appears as a separate slot (which would disappear at finalization)
 		local seen_to_type = {}
 		for _, fp in ipairs(new_preds) do
 			if fp.to_type and fp.to_type ~= "" then seen_to_type[fp.to_type] = true end
@@ -277,9 +233,7 @@ function M.build_callbacks(ctx)
 		pending_ref.value  = new_preds
 		visible_ref.value  = true
 
-		-- Keep cursor at its current position (or slot 1 at start); always reserve
-		-- num_predictions slots with "…" for empty ones so the tooltip height stays
-		-- constant throughout generation instead of growing slot by slot
+		-- Reserve num_predictions slots with "…" so tooltip height stays constant during streaming
 		local current     = _tooltip.get_current_index()
 		local display_idx = (current and math.min(math.max(1, current), #new_preds)) or 1
 		_tooltip.show_predictions(
@@ -293,18 +247,11 @@ function M.build_callbacks(ctx)
 	-- ── Success callback ──────────────────────────────────────────────────────
 
 	local function on_success(raw_predictions, elapsed_ms, is_final, is_batch_progressive)
-		-- LLM responded — reset the persistent-failure counter regardless of content
-		_consecutive_llm_failures = 0
-
-		-- Suppress intermediate batches unless streaming_multi is on or this is a
-		-- batch progressive reveal (fetch_batch emits these for streaming=OFF mode so
-		-- each prediction appears complete one by one rather than all at once)
+		_consecutive_llm_failures = 0  -- Reset on every response regardless of content
+		-- Suppress intermediate batches in all-at-once mode (batch_progressive = fetch_batch reveal)
 		if not is_final and not is_streaming_multi and not is_batch_progressive then return end
-
-		-- Discard if a newer request superseded this one while we were waiting
 		if get_fetch_id() ~= my_fetch_id then
-			Logger.debug(LOG, "Stale LLM callback ignored (expected fetch_id=%d, current=%d).",
-				my_fetch_id, get_fetch_id())
+			Logger.debug(LOG, "Stale LLM callback ignored (expected %d, current %d).", my_fetch_id, get_fetch_id())
 			return
 		end
 
@@ -337,21 +284,14 @@ function M.build_callbacks(ctx)
 			end
 		end
 
-		-- ── Evict streaming placeholders left by on_partial_cb ────────────────
-		-- Finalized results always supersede them, so they must be removed before
-		-- the merge to prevent ghost entries from accumulating and causing
-		-- slot-count jumps at the end
+		-- Evict streaming placeholders — finalized results always supersede them
 		for i = #pending_ref.value, 1, -1 do
 			if pending_ref.value[i] and pending_ref.value[i]._is_stream_placeholder then
 				table.remove(pending_ref.value, i)
 			end
 		end
 
-		-- ── Streaming merge: blend new batch with what is already on screen ──
-		-- valid_preds leads (authoritative order from backend); pending_predictions
-		-- fills in only what the new batch has not yet superseded, so already-visible
-		-- slots stay occupied while remaining variants are still loading.
-		-- Skipped on the final batch so streaming placeholders are always fully replaced.
+		-- Merge: valid_preds leads; pending fills slots the new batch hasn't yet superseded
 		if not is_final and visible_ref.value and #pending_ref.value > 0 then
 			local merged, merged_keys = {}, {}
 			for _, new_pred in ipairs(valid_preds) do
@@ -409,7 +349,6 @@ function M.build_callbacks(ctx)
 		end
 
 		local val_shortcut  = format_validation_shortcut(validation_mods)
-		-- Clamp selected index as the list grows during streaming
 		local selected_idx  = math.min(math.max(1, math.floor(_tooltip.get_current_index() or 1)), #valid_preds)
 		local slot_count    = is_final and #valid_preds or num_predictions
 
@@ -417,10 +356,6 @@ function M.build_callbacks(ctx)
 			val_shortcut, prediction_indent, navigation_mods, _tooltip.tint("ai_prediction"),
 			loading_text, slot_count)
 
-		-- Start the auto-dismiss countdown only once the full batch has arrived;
-		-- reset_llm_dismiss_timer() re-syncs the delay in case it changed mid-session.
-		-- Also publish the up-to-date TTLT so the user sees the full timing line as
-		-- soon as streaming concludes for the current chain link.
 		if is_final then
 			reset_llm_dismiss_timer()
 			pcall(_tooltip.mark_chain_complete)
@@ -453,26 +388,16 @@ function M.build_callbacks(ctx)
 		end
 
 		if not visible_ref.value then
-			-- Nothing on screen: dismiss the loading spinner entirely.
-			-- WARN (not ERROR) so the notify module does not pop a system notification
-			-- on every failure — LLM failures are expected during warm-up or model loading.
 			Logger.warn(LOG, "LLM request failed — loading indicator dismissed.")
 			_tooltip.hide()
 		else
-			-- N-gram (or prior) predictions are already on screen — the spinner "…"
-			-- placeholder is still in the last slot. Remove it so the tooltip looks
-			-- finalized and start the auto-dismiss countdown.
 			Logger.warn(LOG, "LLM request failed — n-gram placeholder retained, loading text cleared.")
 			local val_shortcut = format_validation_shortcut(validation_mods)
 			local selected_idx = math.max(1, _tooltip.get_current_index() or 1)
-			_tooltip.show_predictions(
-				pending_ref.value, selected_idx, ctx.is_ai_preview_enabled, nil,
+			_tooltip.show_predictions(pending_ref.value, selected_idx, ctx.is_ai_preview_enabled, nil,
 				val_shortcut, prediction_indent, navigation_mods,
-				_tooltip.tint("ai_prediction"), nil, #pending_ref.value
-			)
+				_tooltip.tint("ai_prediction"), nil, #pending_ref.value)
 			reset_llm_dismiss_timer()
-			-- Publish TTLT even on failure: the user still cares how long the
-			-- attempt took, especially during repeated backend stalls
 			pcall(_tooltip.mark_chain_complete)
 		end
 	end
@@ -491,10 +416,7 @@ end
 --- If the stream stalls for STREAM_WATCHDOG_SEC seconds, surfaces partial results.
 --- Stops any previously armed watchdog first.
 ---
---- @param ctx table Must contain: my_fetch_id, get_fetch_id, pending_predictions_ref,
----   predictions_visible_ref, validation_mods, navigation_mods, show_info_bar,
----   llm_display_name, prediction_indent, is_ai_preview_enabled, resolve_backend_label,
----   format_validation_shortcut (optional; falls back to local helper).
+--- @param ctx table Context table (see source for full field list).
 function M.arm_watchdog(ctx)
 	if not require_state("arm_watchdog") then return end
 
@@ -537,6 +459,8 @@ end
 -- =============================================
 -- =============================================
 -- ======= 6/ Module Lifecycle =================
+-- =============================================
+
 -- =============================================
 -- =============================================
 
