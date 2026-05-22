@@ -165,9 +165,11 @@ LLM_RemoteGenerate(Entry, SystemPrompt, UserText, Temperature := 0.1) {
     }
 }
 
-; ============================================
+
+
+; =========================
 ; ===== Async surface =====
-; ============================================
+; =========================
 
 ; Registry of in-flight async remote requests (parallel to _LLM_Ollama_Async).
 global _LLM_Remote_Async := Map()

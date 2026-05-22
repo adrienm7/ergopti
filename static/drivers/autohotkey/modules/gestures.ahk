@@ -1072,9 +1072,9 @@ global GestureKeyboardHook   := 0
 
 
 ; ===========================================
-; ===========================================
+; ==========================================
 ; ======= 2/ Right-Click Hold Toggle =======
-; ===========================================
+; ==========================================
 ; ===========================================
 
 ; Sends a shortcut while neutralising the Ctrl+Win+Shift modifiers that the
@@ -1147,9 +1147,11 @@ GestureGetCyclableWindows(ProcessFilter := "") {
     return Result
 }
 
-; ==========================================
+
+
+; ==============================
 ; ===== Screenshot helpers =====
-; ==========================================
+; ==============================
 
 ; Returns the absolute path to the screenshots directory, creating it if missing.
 ; Mirrors Hammerspoon's convention: %USERPROFILE%\Pictures\screenshots\
@@ -1597,9 +1599,9 @@ GestureDispatch(slot) {
 
 
 ; =============================================
-; =============================================
+; ==============================================
 ; ======= 4/ Hotkey Bindings (Listeners) =======
-; =============================================
+; ==============================================
 ; =============================================
 
 ; These shortcuts must be assigned in Windows Settings > Bluetooth & devices

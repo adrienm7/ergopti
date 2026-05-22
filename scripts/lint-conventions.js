@@ -13,14 +13,17 @@
 //   node scripts/lint-conventions.js [--fail-on-violations] [--warn-only]
 //   Exit code 0 = clean (or warn-only), 1 = violations found (when --fail-on-violations).
 
-import { readFileSync, readdirSync, statSync } from 'fs';
+import { readFileSync, writeFileSync, readdirSync, statSync } from 'fs';
 import { join, relative, extname } from 'path';
 import { execSync } from 'child_process';
 
 const REPO_ROOT = new URL('..', import.meta.url).pathname.replace(/\/$/, '').replace(/^\/([A-Z]:)/, '$1');
 
-const FAIL_ON_VIOLATIONS = process.argv.includes('--fail-on-violations');
-const WARN_ONLY          = process.argv.includes('--warn-only');
+const FAIL_ON_VIOLATIONS  = process.argv.includes('--fail-on-violations');
+const WARN_ONLY           = process.argv.includes('--warn-only');
+const FIX_BANNERS         = process.argv.includes('--fix-banners');
+const FIX_SPACING         = process.argv.includes('--fix-spacing');
+const FIX_UNBALANCED      = process.argv.includes('--fix-unbalanced');
 
 let totalViolations = 0;
 
@@ -215,6 +218,138 @@ function checkBannerAlignment(file) {
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
+// Fix — Banner alignment auto-fixer
+// ──────────────────────────────────────────────────────────────────────────────
+
+function fixBannersInFile(file) {
+	const ext    = extname(file);
+	const isAhk  = ext === '.ahk';
+	const prefix = isAhk ? '; ' : '--- ';
+	const raw    = readFileSync(file, 'utf8');
+	const hasBom = raw.startsWith('﻿');
+	const lines  = raw.replace(/^﻿/, '').replace(/\r\n/g, '\n').split('\n');
+	let changed  = false;
+
+	for (let i = 0; i < lines.length; i++) {
+		const m = lines[i].match(/^(;|---?) (={5,7}) (.+) (={5,7})$/);
+		if (!m) continue;
+		const leftEq = m[2].length;
+		const title  = m[3];
+		const rightEq = m[4].length;
+		if (leftEq !== rightEq) continue; // unbalanced — skip
+
+		const expectedLen = prefix.length + leftEq + 1 + title.length + 1 + rightEq;
+		const bannerBody  = '='.repeat(expectedLen - prefix.length);
+		const bannerLine  = prefix + bannerBody;
+
+		for (const adj of [i - 1, i + 1]) {
+			if (adj < 0 || adj >= lines.length) continue;
+			if (!/^(;|---?) =+$/.test(lines[adj])) continue;
+			if (lines[adj].length !== expectedLen) {
+				lines[adj] = bannerLine;
+				changed = true;
+			}
+		}
+	}
+
+	if (!changed) return false;
+
+	const enc     = isAhk ? 'utf8' : 'utf8'; // both UTF-8
+	const content = (hasBom ? '﻿' : '') + lines.join('\n');
+	// Preserve original line endings
+	const crlf = raw.includes('\r\n');
+	writeFileSync(file, crlf ? content.replace(/\n/g, '\r\n') : content, enc);
+	return true;
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Fix — Section spacing auto-fixer (insert missing blank lines before banners)
+// ──────────────────────────────────────────────────────────────────────────────
+
+function fixSpacingInFile(file) {
+	const ext   = extname(file);
+	const isAhk = ext === '.ahk';
+	const raw   = readFileSync(file, 'utf8');
+	const hasBom = raw.startsWith('﻿');
+	const lines = raw.replace(/^﻿/, '').replace(/\r\n/g, '\n').split('\n');
+	let changed = false;
+
+	// Walk backwards so insertions don't shift indices
+	for (let i = lines.length - 1; i >= 0; i--) {
+		const line = lines[i];
+		const isMajor = isAhk ? MAJOR_TITLE_AHK.test(line) : MAJOR_TITLE_LUA.test(line);
+		const isMinor = isAhk ? MINOR_TITLE_AHK.test(line) : MINOR_TITLE_LUA.test(line);
+		if (!isMajor && !isMinor) continue;
+
+		const bannerCount = isMajor ? 2 : 1;
+		const bannerIdx   = i - bannerCount;
+		if (bannerIdx < 0) continue;
+
+		const blanks   = countTrailingBlanks(lines, bannerIdx);
+		const required = isMajor ? 5 : 3;
+		if (blanks >= required) continue;
+
+		// Insert (required - blanks) empty lines before bannerIdx
+		const toInsert = required - blanks;
+		lines.splice(bannerIdx, 0, ...Array(toInsert).fill(''));
+		changed = true;
+	}
+
+	if (!changed) return false;
+
+	const content = (hasBom ? '﻿' : '') + lines.join('\n');
+	const crlf    = raw.includes('\r\n');
+	writeFileSync(file, crlf ? content.replace(/\n/g, '\r\n') : content, 'utf8');
+	return true;
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Fix — Unbalanced = counts (balance title lines, then fix adjacent banners)
+// ──────────────────────────────────────────────────────────────────────────────
+
+function fixUnbalancedInFile(file) {
+	const ext    = extname(file);
+	const isAhk  = ext === '.ahk';
+	const prefix = isAhk ? '; ' : '--- ';
+	const raw    = readFileSync(file, 'utf8');
+	const hasBom = raw.startsWith('﻿');
+	const lines  = raw.replace(/^﻿/, '').replace(/\r\n/g, '\n').split('\n');
+	let changed  = false;
+
+	for (let i = 0; i < lines.length; i++) {
+		const m = lines[i].match(/^(;|---?) (={5,7}) (.+) (={5,7})$/);
+		if (!m) continue;
+		const leftEq  = m[2].length;
+		const title   = m[3];
+		const rightEq = m[4].length;
+		if (leftEq === rightEq) continue; // already balanced
+
+		// Use the larger side as the canonical count
+		const eq = Math.max(leftEq, rightEq);
+		const newTitle = `${prefix}${'='.repeat(eq)} ${title} ${'='.repeat(eq)}`;
+		lines[i] = newTitle;
+
+		// Also fix adjacent banner lines
+		const expectedLen = prefix.length + eq + 1 + title.length + 1 + eq;
+		const bannerBody  = '='.repeat(expectedLen - prefix.length);
+		const bannerLine  = prefix + bannerBody;
+		for (const adj of [i - 1, i + 1]) {
+			if (adj < 0 || adj >= lines.length) continue;
+			if (!/^(;|---?) =+$/.test(lines[adj])) continue;
+			lines[adj] = bannerLine;
+		}
+		changed = true;
+	}
+
+	if (!changed) return false;
+
+	const content = (hasBom ? '﻿' : '') + lines.join('\n');
+	const crlf    = raw.includes('\r\n');
+	writeFileSync(file, crlf ? content.replace(/\n/g, '\r\n') : content, 'utf8');
+	return true;
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
 // Runner
 // ──────────────────────────────────────────────────────────────────────────────
 
@@ -254,6 +389,36 @@ console.log(`  AHK files : ${ahkAll.length}`);
 console.log(`  Lua files : ${luaAll.length}`);
 console.log(`  TOML files: ${tomlAll.length}`);
 console.log('');
+
+// Auto-fix banner alignment before linting
+if (FIX_BANNERS) {
+	let fixed = 0;
+	for (const f of [...ahkAll, ...luaAll]) {
+		if (fixBannersInFile(f)) fixed++;
+	}
+	console.log(`  Fixed banners in ${fixed} file(s).`);
+	console.log('');
+}
+
+// Auto-fix unbalanced = counts (balance title line, update adjacent banners)
+if (FIX_UNBALANCED) {
+	let fixed = 0;
+	for (const f of [...ahkAll, ...luaAll]) {
+		if (fixUnbalancedInFile(f)) fixed++;
+	}
+	console.log(`  Fixed unbalanced = counts in ${fixed} file(s).`);
+	console.log('');
+}
+
+// Auto-fix section spacing (insert missing blank lines before banners)
+if (FIX_SPACING) {
+	let fixed = 0;
+	for (const f of [...ahkAll, ...luaAll]) {
+		if (fixSpacingInFile(f)) fixed++;
+	}
+	console.log(`  Fixed section spacing in ${fixed} file(s).`);
+	console.log('');
+}
 
 // Run checks
 for (const f of ahkAll)  checkFileHeader(f);

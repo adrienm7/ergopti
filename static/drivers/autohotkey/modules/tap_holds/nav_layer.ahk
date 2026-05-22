@@ -14,6 +14,7 @@
 
 
 
+
 ; ====================================
 ; ====================================
 ; ======= 10/ NAVIGATION LAYER =======
@@ -86,6 +87,11 @@ SC007:: SetNumberOfRepetitions(6) ; On key 6
 SC008:: SetNumberOfRepetitions(7) ; On key 7
 SC009:: SetNumberOfRepetitions(8) ; On key 8
 SC00A:: SetNumberOfRepetitions(9) ; On key 9
+
+
+
+
+
 SC00B:: SetNumberOfRepetitions(10) ; On key 0
 
 ; ======= Left hand =======
@@ -114,6 +120,11 @@ SC02C:: ActionLayer("!{Up " . NumberOfRepetitions . "}") ; Move the line up
 SC02D:: ActionLayer("!{Down " . NumberOfRepetitions . "}") ; Move the line down
 SC02E:: ActionLayer("!+{Down " . NumberOfRepetitions . "}") ; Duplicate the line down
 SC02F:: ActionLayer("{End}{Enter " . NumberOfRepetitions . "}") ; Start a new line below the cursor
+
+
+
+
+
 ; SC030:: ; On K
 
 ; ======= Right hand =======

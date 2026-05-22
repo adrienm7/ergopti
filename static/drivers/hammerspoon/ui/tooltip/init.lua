@@ -24,9 +24,9 @@ local _on_show_callback = nil
 
 
 -- ===========================
--- ===========================
+--- ===========================
 -- ======= 1/ API Core =======
--- ===========================
+--- ===========================
 -- ===========================
 
 --- Setup general configuration parameters.
@@ -67,9 +67,9 @@ end
 
 
 
--- ==================================
+--- ==================================
 -- ===== 1.1) Sub API Functions =====
--- ==================================
+--- ==================================
 
 --- Displays a standard text tooltip (hotstring mode).
 --- @param content string|userdata The text to display.
@@ -134,9 +134,9 @@ function M.make_diff_styled(...) return TooltipLLM.make_diff_styled(...) end
 
 
 
--- ==================================
+--- ==================================
 -- ===== 1.2) Timer & Color API =====
--- ==================================
+--- ==================================
 
 --- Resets the AI prediction auto-dismiss countdown using the currently configured delay.
 --- Call this after final predictions arrive, or when the delay setting changes.
