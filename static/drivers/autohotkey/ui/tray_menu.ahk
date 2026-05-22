@@ -74,21 +74,11 @@ MenuAddItemWithLabel(MenuParent, V1Path, MenuTitle, MasterCategory) {
 	}
 }
 
-; Resolve the .Enabled state of a v1-path feature, preferring the v2
-; FeaturesV2 location and falling back to the legacy Features Map's
-; ``.Enabled`` property for non-manifest features (TapHolds variants
-; especially). Used everywhere the tray menu needs to know whether
-; to draw a checkmark.
-;
-; TapHolds variants are not in the manifest (their v2 schema condenses
-; mutually-exclusive variant groups into a single resolved tuple), so the
-; FeaturesV2 lookup misses. The v1 Features Map cannot be used either:
-; ``Features["TapHolds"]`` is rebuilt from the static ``_TapHoldsConfig``
-; defaults on every Reload, so it always reflects the hardcoded default
-; variant rather than the user's persisted choice. The authoritative
-; source is the ``TapHold`` global, loaded from ``tap_hold.toml`` at boot;
-; ``IsTapHoldVariantActive`` derives the checkmark by comparing the
-; variant's (tap, hold) tuple against ``TapHold["keys"][V2KeyId]``.
+; Resolve the .Enabled state of a v1-path feature. TapHolds variants are
+; not in the manifest (their v2 schema condenses mutually-exclusive variant
+; groups into a single resolved tuple), so they are resolved by comparing
+; the variant's (tap, hold) tuple against TapHold["keys"][V2KeyId] via
+; IsTapHoldVariantActive. Everything else is read from FeaturesV2.
 _ResolveMenuItemEnabled(V1Path) {
 	if (StrLen(V1Path) >= 9 and SubStr(V1Path, 1, 9) == "TapHolds.") {
 		return IsTapHoldVariantActive(V1Path)
@@ -96,11 +86,6 @@ _ResolveMenuItemEnabled(V1Path) {
 	State := GetFeatureV2State(V1Path)
 	if State.Has("Enabled") {
 		return (State["Enabled"] = true)
-	}
-	; Fall back to v1 Features.Enabled for features without a v2 mapping.
-	Feature := GetFeatureByPath(V1Path)
-	if (IsObject(Feature) and Feature.HasOwnProp("Enabled")) {
-		return (Feature.Enabled = true)
 	}
 	return false
 }
@@ -239,11 +224,11 @@ SetFeatureLetterOff(FullPath) {
 ; Retrieve a feature title by its path. The label is sourced from the
 ; canonical manifest entry's ``description_key`` (resolved against the
 ; current i18n locale via ``MenuLabelFromManifestEntry``) whenever a
-; matching entry exists; falls back to the legacy ``Feature.Description``
-; populated on the v1 Features Map for non-manifest features (TapHolds,
-; runtime-discovered Personal sections). The live ``Letter`` suffix
-; appended for letter pickers is always read from FeaturesV2 so the
-; title reflects the user's persisted choice immediately after a Reload.
+; matching entry exists. Non-manifest features fall through to dedicated
+; handlers: Personal shortcuts use _PersonalShortcutsRegistry descriptions;
+; TapHolds variants use _TapHoldsConfig descriptions. The live ``Letter``
+; suffix appended for letter pickers is always read from FeaturesV2 so
+; the title reflects the user's persisted choice immediately after a Reload.
 ;
 ; Two runtime substitutions are layered on top of the i18n value so the
 ; menu reflects live data:
@@ -254,11 +239,9 @@ SetFeatureLetterOff(FullPath) {
 ;     behaviour.
 GetMenuTitleByPath(FullPath) {
 	; Try the manifest+i18n first — single source of truth for declared
-	; features. When the locale JSON has no entry for the manifest
-	; description_key chain, fall through to Features.Description so user-
-	; defined Personal hotstring sections (whose descriptions live in
-	; their TOML's [_meta.sections] and are populated on Features at boot
-	; by ApplyTomlMetadataToFeatures) still render correctly.
+	; features. Non-manifest paths fall through to per-subsystem handlers:
+	; Personal shortcuts use _PersonalShortcutsRegistry; TapHolds variants
+	; use _TapHoldsConfig descriptions.
 	V2Path := V1PathToV2ManifestPath(FullPath)
 	Entry := false
 	if (V2Path != "") {
@@ -290,7 +273,7 @@ GetMenuTitleByPath(FullPath) {
 	}
 
 	; Personal shortcuts: description is stored in _PersonalShortcutsRegistry,
-	; not the manifest — resolve directly to avoid the Features v1 fallback.
+	; not the manifest.
 	Parts := StrSplit(FullPath, ".")
 	if (Parts.Length == 3 and Parts[1] == "Shortcuts" and Parts[2] == "Personal") {
 		global _PersonalShortcutsRegistry
@@ -302,22 +285,27 @@ GetMenuTitleByPath(FullPath) {
 		return Name
 	}
 
-	; Fall back to v1 Features.Description for features outside the manifest
-	; or that have no i18n entry (TapHolds variants).
-	Feature := GetFeatureByPath(FullPath)
-	if !IsObject(Feature)
-		return FullPath
-
-	if Feature.HasOwnProp("Description") {
-		MenuTitle := Feature.Description
-		if Feature.HasOwnProp("Letter") {
-			State := GetFeatureV2State(FullPath)
-			if (State.Has("Letter") and State["Letter"] != "") {
-				MenuTitle := MenuTitle StrUpper(State["Letter"])
+	; TapHolds variants: description lives on the _TapHoldsConfig object.
+	; Paths are either TapHolds.<FlatKey> (2 parts) or
+	; TapHolds.<GroupKey>.<Variant> (3 parts).
+	if (Parts[1] == "TapHolds") {
+		global _TapHoldsConfig
+		if (Parts.Length == 2 and _TapHoldsConfig.Has(Parts[2])) {
+			Obj := _TapHoldsConfig[Parts[2]]
+			if IsObject(Obj) and Obj.HasOwnProp("Description") {
+				return Obj.Description
+			}
+		} else if (Parts.Length == 3 and _TapHoldsConfig.Has(Parts[2])) {
+			Group := _TapHoldsConfig[Parts[2]]
+			if (Type(Group) == "Map" and Group.Has(Parts[3])) {
+				Obj := Group[Parts[3]]
+				if IsObject(Obj) and Obj.HasOwnProp("Description") {
+					return Obj.Description
+				}
 			}
 		}
-		return MenuTitle
 	}
+
 	return FullPath
 }
 
@@ -390,16 +378,6 @@ _ApplyMenuLabelDynamicSubstitutions(Label, V1Path) {
 	return Label
 }
 
-; Retrieve a feature object by its path
-GetFeatureByPath(FullPath) {
-	Keys := StrSplit(FullPath, ".")
-	Feature := Features
-	for K in Keys {
-		Feature := Feature[K]
-	}
-	return Feature
-}
-
 ToggleMenuVariableByPath(FullPath) {
 	; Resolve current state via FeaturesV2 first, falling back to Features
 	; v1 for non-manifest features (TapHolds variants especially). Without
@@ -427,11 +405,7 @@ ToggleMenuVariableByPath(FullPath) {
 
 ; Return the list of sibling v1 feature paths that must be force-set to false
 ; when the user toggles ``FullPath`` to true. Empty list means no mutex
-; semantics — each toggle in the group is independent. This replaces the
-; previous ``GetFeatureByPath(FeatureCategoryPath)`` walk which mistakenly
-; iterated metadata keys (``__Order``, ``__Label``, ``__Configuration``)
-; emitting warning-noise WriteV2Batch updates, and incorrectly disabled
-; every Personal shortcut whenever the user toggled one.
+; semantics — each toggle in the group is independent.
 _MutexSiblingPathsFor(FullPath) {
 	global _V1V2_ShortcutsSubMapGroupMap, _V1V2_ShortcutsSubMapKeyMap
 	Parts := StrSplit(FullPath, ".")
@@ -1135,7 +1109,7 @@ _AppendPersonalShortcutsSubmenuIfAny(ShortcutsMenu) {
 }
 
 initMenu() {
-	global Features, SubMenus, A_TrayMenu, HotstringCategories
+	global SubMenus, A_TrayMenu, HotstringCategories
 
 	A_TrayMenu.Delete()
 
