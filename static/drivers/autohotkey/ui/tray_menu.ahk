@@ -115,6 +115,11 @@ MenuAddItemFromManifest(MenuParent, ManifestEntry, V1CategoryPath) {
 		return
 	}
 	MenuTitle := MenuLabelFromManifestEntry(ManifestEntry)
+	; Apply the same runtime substitutions ``GetMenuTitleByPath`` does for
+	; the legacy path (count suffix " (N)" for hotstring categories, the
+	; live ``{date}`` for DynamicHotstrings entries) so the manifest-driven
+	; render is visually identical to the v1 Features-driven render.
+	MenuTitle := _ApplyMenuLabelDynamicSubstitutions(MenuTitle, V1Path)
 	RegisterMenuItem(MenuParent, MenuTitle, (*) => ToggleMenuVariableByPath(V1Path))
 
 	State := GetFeatureV2State(V1Path)
@@ -961,15 +966,53 @@ global HotstringCategories     := _HotstringGroups.all
 global HotstringCategoriesStd  := _HotstringGroups.standard
 global HotstringCategoriesErgopti := _HotstringGroups.ergopti
 
+; v1 category names for the flat hotstring categories that ship without
+; an ``__Order`` override and that have a 1:1 mapping to a manifest
+; section. These are rendered directly from the manifest instead of
+; going through CreateSubMenusRecursive — the v1 Features Map is no
+; longer consulted for them.
+global _FLAT_HOTSTRING_V1_CATS := ["Autocorrection", "DistancesReduction",
+	"SFBsReduction", "Rolls", "MagicKey"]
+
 InitSubMenus() {
-	global Features, SubMenus
+	global Features, SubMenus, _FLAT_HOTSTRING_V1_CATS, _V1V2_TopCategoryMap
 	SubMenus := Map()
+
+	; Build the flat hotstring categories directly from the manifest.
+	; Order of menu items inside each submenu = manifest declaration order
+	; (preserved by the codegen emitter; matches the previous Features Map
+	; iteration order since Features was itself built from the manifest).
+	for V1Cat in _FLAT_HOTSTRING_V1_CATS {
+		SubMenu := Menu()
+		V2Section := _V1V2_TopCategoryMap.Has(V1Cat) ? _V1V2_TopCategoryMap[V1Cat] : ""
+		if (V2Section != "") {
+			for Entry in ManifestFeaturesForSection(V2Section) {
+				MenuAddItemFromManifest(SubMenu, Entry, V1Cat)
+			}
+		}
+		SubMenus[V1Cat] := SubMenu
+	}
+
+	; Remaining categories still rely on the Features Map for structure —
+	; __Order arrays with virtual headers (DynamicHotstrings, Shortcuts),
+	; sub-Maps (Shortcuts.AltGrLAlt, TapHolds.<Key>), or runtime entries
+	; (Personal). These will migrate in subsequent slices.
 	for Category, Items in Features {
-		if Category = "Layout" {
+		if (Category == "Layout") {
+			continue
+		}
+		Already := false
+		for FlatCat in _FLAT_HOTSTRING_V1_CATS {
+			if (Category == FlatCat) {
+				Already := true
+				break
+			}
+		}
+		if Already {
 			continue
 		}
 		SubMenu := Menu()
-		SubMenus[Category] := SubMenu ; Only top-level category stored
+		SubMenus[Category] := SubMenu
 		CreateSubMenusRecursive(SubMenu, Items, Category)
 	}
 	; The legacy Personal sub-Map block — which used to build a
