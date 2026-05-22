@@ -22,13 +22,6 @@
 ; 5. FoldAsciiLower: accent-folding helper that reconciles PascalCase Features
 ;    keys containing French letters (e.g. ``IÉ``) with the lowercase TOML keys
 ;    (e.g. ``ie``) used in ``sections_order`` and ``[_meta.sections]``.
-; 6. ApplyLocaleDescriptions: reads ``static/locales/fr.json`` (or the active
-;    locale file) and injects descriptions into the Features Map for all
-;    categories that have no dedicated TOML (Layout, Shortcuts, Gestures,
-;    DynamicHotstrings flat entries). Flat JSON keys use dot notation:
-;    ``"category.featurekey"`` for top-level entries and
-;    ``"category.submap.featurekey"`` for nested sub-maps. The ``★``
-;    placeholder is substituted for the user's configured MagicKey.
 ; ==============================================================================
 
 ; Holds the raw UTF-8 content of every TOML file that has been read this
@@ -609,110 +602,16 @@ ApplyIndexTomlToDynamicHotstrings() {
     }
 }
 
-; Load ``static/locales/<Locale>.json`` and inject ``description`` fields into
-; the Features Map for categories that have no dedicated TOML file (Layout,
-; Shortcuts, Gestures, and the flat DynamicHotstrings entries). Keys follow dot
-; notation: ``"category.feature"`` for top-level entries and
-; ``"category.submap.feature"`` for sub-map entries (e.g. AltGrLAlt.*).
-; The ``★`` placeholder is substituted for the user's configured MagicKey.
-; Locale defaults to ``"fr"`` and maps to ``static/locales/fr.json``.
-ApplyLocaleDescriptions(Locale := "fr") {
-    global ScriptInformation
-    global _StaticDir
-    FilePath := _StaticDir . "\locales\" . Locale . ".json"
-    if !FileExist(FilePath) {
-        try LoggerWarn("TomlLoader", "Locale file not found: '{1}' — descriptions not injected.", FilePath)
-        return
-    }
-    try LoggerTrace("TomlLoader", "Applying locale descriptions from '{1}'…", FilePath)
-
-    FileContent := FileRead(FilePath, "UTF-8")
-
-    ; Minimal flat-JSON parser: extract every "key": "value" pair.
-    ; The JSON has no nesting — keys use dot notation to encode hierarchy.
-    LocaleMap := Map()
-    Pos := 1
-    FileLen := StrLen(FileContent)
-    while Pos <= FileLen {
-        ; Find next quoted key
-        if !RegExMatch(FileContent, '`"([^`"]+)`"\s*:\s*`"((?:[^`"\\]|\\.)*)`"', &KVMatch, Pos)
-            break
-        RawKey := KVMatch[1]
-        RawVal := KVMatch[2]
-        ; Unescape JSON string (\\, \", \n, \t, \r, \/)
-        Val := StrReplace(RawVal, "\\", Chr(1))
-        Val := StrReplace(Val, '\"', "`"")
-        Val := StrReplace(Val, "\n", "`n")
-        Val := StrReplace(Val, "\t", "`t")
-        Val := StrReplace(Val, "\r", "`r")
-        Val := StrReplace(Val, "\/", "/")
-        Val := StrReplace(Val, Chr(1), "\")
-        Val := StrReplace(Val, "★", ScriptInformation["MagicKey"])
-        LocaleMap[RawKey] := Val
-        Pos := KVMatch.Pos + KVMatch.Len
-    }
-
-    ; Inject each locale entry into the corresponding Features object.
-    ; Key format:
-    ;   "category.feature"            → Features[Category][Feature].Description
-    ;   "category.submap.feature"     → Features[Category][SubMap][Feature].Description
-    ; All segments are matched case-insensitively via FoldAsciiLower.
-    for RawKey, Desc in LocaleMap {
-        Parts := StrSplit(RawKey, ".")
-        if Parts.Length < 2
-            continue
-
-        ; Locate the category (case-insensitive)
-        CatLower := Parts[1]
-        CategoryKey := ""
-        for K, _ in Features {
-            if FoldAsciiLower(K) == CatLower {
-                CategoryKey := K
-                break
-            }
-        }
-        if CategoryKey == ""
-            continue
-
-        CategoryMap := Features[CategoryKey]
-        if !(Type(CategoryMap) == "Map")
-            continue
-
-        if Parts.Length == 2 {
-            ; Top-level feature: "category.feature"
-            FeatLower := Parts[2]
-            for K, V in CategoryMap {
-                if FoldAsciiLower(K) == FeatLower {
-                    if IsObject(V) and !(Type(V) == "Map")
-                        V.Description := Desc
-                    break
-                }
-            }
-        } else if Parts.Length == 3 {
-            ; Sub-map feature: "category.submap.feature"
-            SubLower  := Parts[2]
-            FeatLower := Parts[3]
-            SubMapKey := ""
-            for K, V in CategoryMap {
-                if FoldAsciiLower(K) == SubLower and Type(V) == "Map" {
-                    SubMapKey := K
-                    break
-                }
-            }
-            if SubMapKey == ""
-                continue
-            SubMap := CategoryMap[SubMapKey]
-            for K, V in SubMap {
-                if FoldAsciiLower(K) == FeatLower {
-                    if IsObject(V) and !(Type(V) == "Map")
-                        V.Description := Desc
-                    break
-                }
-            }
-        }
-    }
-    try LoggerDone("TomlLoader", "Locale descriptions applied (%d key(s)).", LocaleMap.Count)
-}
+; ``ApplyLocaleDescriptions`` was removed in slice 7. Its job — populating
+; ``.Description`` strings on Features v1 entries from the active locale
+; JSON — is now handled by the manifest-driven label resolver
+; ``MenuLabelFromManifestEntry`` (see lib/manifest_descriptions.ahk), which
+; the tray-menu builder calls via ``GetMenuTitleByPath``. The manifest
+; declares ``description_key`` for every feature, and the resolver tries
+; the canonical key then walks a fallback chain of legacy key formats so
+; the existing locale JSON entries keep matching with zero data migration.
+; Removing this function also shrinks the boot path by ~100 lines of
+; duplicate i18n-JSON parsing.
 
 
 ; Parse the ``[_meta]`` and ``[_meta.sections.<name>]`` blocks of a category

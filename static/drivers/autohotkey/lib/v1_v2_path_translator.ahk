@@ -241,6 +241,31 @@ global _V2V1_RollsKeyMap                 := _BuildInverseRenameMap(_V1V2_RollsKe
 global _V2V1_MagicKeyKeyMap              := _BuildInverseRenameMap(_V1V2_MagicKeyKeyMap)
 global _V2V1_DynamicHotstringsKeyMap     := _BuildInverseRenameMap(_V1V2_DynamicHotstringsKeyMap)
 
+; Translate a v1 dotted feature path (e.g. ``Layout.ErgoptiBase``,
+; ``Shortcuts.MicrosoftBold``, ``Shortcuts.AltGrLAlt.BackSpace``) into the
+; canonical v2 manifest path (``ahk.layout.ergopti_base``, ``shortcuts.microsoft_bold``,
+; ``ahk.shortcuts.alt_gr_lalt.backspace``). Used by the menu builder to
+; locate the corresponding manifest entry (for description_key resolution)
+; without going through the full TranslateV1ToV2 dispatcher which is
+; tailored for write ops.
+;
+; Returns "" when the v1 path has no manifest counterpart (e.g. TapHolds
+; or runtime-discovered Personal entries).
+V1PathToV2ManifestPath(V1Path) {
+    Loc := TranslateV1ToV2(V1Path . ".Enabled")
+    if (Loc == false) {
+        return ""
+    }
+    Section := Loc["section"]
+    K := Loc["key"]
+    if Loc["is_alpha"] {
+        ; Modélisation α — the section path already encodes the entry id.
+        return Section
+    }
+    ; Plain bool / sub-Map leaf — append the leaf key.
+    return Section . "." . K
+}
+
 ; Translate the v2 manifest path of a feature entry (e.g. ``ahk.layout.ergopti_base``,
 ; ``shortcuts.microsoft_bold``, ``hotstrings.autocorrection.accents``) into the
 ; v1 dotted feature path the tray-write callbacks expect
