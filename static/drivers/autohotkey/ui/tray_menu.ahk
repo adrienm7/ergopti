@@ -177,12 +177,15 @@ MenuAddLetterPicker(MenuParent, FeatureCategoryPath, FeatureName) {
 
 	LetterMenu.Add() ; Separator
 
-	; 26 letters a-z, displayed uppercase for menu legibility
+	; 26 letters a-z, displayed uppercase for menu legibility.
+	; RegisterMenuItem (instead of LetterMenu.Add) installs the OnMessage
+	; dispatcher bypass so clicks survive the AHK 2.0 menu-callback drop.
 	CurrentLetter := Feature.HasOwnProp("Letter") ? StrLower(Feature.Letter) : ""
 	loop 26 {
 		L := Chr(Ord("a") + A_Index - 1)
 		UpperL := StrUpper(L)
-		LetterMenu.Add(UpperL, ((p, l) => (*) => SetFeatureLetter(p, l))(FullPath, L))
+		RegisterMenuItem(LetterMenu, UpperL,
+			((p, l) => (*) => SetFeatureLetter(p, l))(FullPath, L))
 		if Feature.Enabled and CurrentLetter == L {
 			LetterMenu.Check(UpperL)
 		}

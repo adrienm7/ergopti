@@ -34,6 +34,34 @@
 ; ============================================
 ; ============================================
 
+; Reads the configurable target letter for an accented base-layer key from
+; ``FeaturesV2["shortcuts"][Key]["letter"]`` — falls back to ``Fallback``
+; when the v2 entry is unset or shape-mismatched. Kept as a named function
+; rather than an inline arrow lambda so the closure semantics around the
+; ``FeaturesV2`` global are unambiguous (the arrow form silently captured
+; ``FeaturesV2`` from the enclosing function's local scope, which in some
+; AHK v2 builds short-circuited the read and always returned the fallback).
+_ErgoptiLetterOr(Key, Fallback) {
+	global FeaturesV2
+	if !IsSet(FeaturesV2) {
+		return Fallback
+	}
+	if !FeaturesV2.Has("shortcuts") {
+		return Fallback
+	}
+	if !FeaturesV2["shortcuts"].Has(Key) {
+		return Fallback
+	}
+	Entry := FeaturesV2["shortcuts"][Key]
+	if !IsObject(Entry) {
+		return Fallback
+	}
+	if !Entry.Has("letter") {
+		return Fallback
+	}
+	return Entry["letter"]
+}
+
 ; Scancode (decimal) → output character on the Ergopti base layer.
 ; Hex equivalents shown alongside for cross-reference with the
 ; ``RemapKey("SC0xx", …)`` calls that used to live in layout.ahk.
@@ -43,22 +71,9 @@
 ; AND the historical fallback character that ``RemapKey`` keeps as the
 ; AlternativeCharacter argument. Plain strings are passed through.
 ErgoptiBaseMapping() {
-	global FeaturesV2
-	; Helper for the configurable letters. Reads the per-feature
-	; "letter" slot in FeaturesV2["shortcuts"][<snake_case_id>] —
-	; falls back to the historical default when v2 is unset or the
-	; entry shape is unexpected.
-	letter_or := (key, fallback) => (
-		IsSet(FeaturesV2) && FeaturesV2.Has("shortcuts")
-			&& FeaturesV2["shortcuts"].Has(key)
-			&& IsObject(FeaturesV2["shortcuts"][key])
-			&& FeaturesV2["shortcuts"][key].Has("letter")
-			? FeaturesV2["shortcuts"][key]["letter"]
-			: fallback
-	)
 	return Map(
 		; Top row (number row of physical AZERTY/QWERTY)
-		0x10, { c: letter_or("e_grave", "è"), alt: "è" }, ; SC010
+		0x10, { c: _ErgoptiLetterOr("e_grave", "è"), alt: "è" }, ; SC010
 		0x11, "y",                                        ; SC011
 		0x12, "o",                                        ; SC012
 		0x13, "w",                                        ; SC013
@@ -82,9 +97,9 @@ ErgoptiBaseMapping() {
 		0x27, "r",                                        ; SC027
 		0x28, "q",                                        ; SC028
 		; Bottom row
-		0x56, { c: letter_or("e_circ",  "ê"), alt: "ê" }, ; SC056
-		0x2C, { c: letter_or("e_acute", "é"), alt: "é" }, ; SC02C
-		0x2D, { c: letter_or("a_grave", "à"), alt: "à" }, ; SC02D
+		0x56, { c: _ErgoptiLetterOr("e_circ",  "ê"), alt: "ê" }, ; SC056
+		0x2C, { c: _ErgoptiLetterOr("e_acute", "é"), alt: "é" }, ; SC02C
+		0x2D, { c: _ErgoptiLetterOr("a_grave", "à"), alt: "à" }, ; SC02D
 		0x2E, "j",                                       ; SC02E
 		0x2F, ",",                                       ; SC02F
 		0x30, "k",                                       ; SC030
