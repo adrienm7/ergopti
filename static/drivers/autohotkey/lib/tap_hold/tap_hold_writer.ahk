@@ -259,7 +259,81 @@ _TH_ResolveTuple(V1KeyId, Variant) {
 
 ; ==============================================================
 ; ==============================================================
-; ======= 4/ tap_hold.toml writer =======
+; ======= 4/ Variant read-back =======
+; ==============================================================
+; ==============================================================
+
+; Return true when the v1 TapHolds variant path corresponds to the tuple
+; currently stored in ``TapHold["keys"][V2KeyId]``. Used by the tray menu
+; to draw a checkmark next to the active variant — the v1 Features Map is
+; rebuilt from static defaults on every Reload, so it cannot reflect the
+; user's persisted choice. ``TapHold`` itself IS loaded from tap_hold.toml
+; at boot, so it is the authoritative source of "what is currently active".
+;
+; Accepts paths in either ``TapHolds.<Key>.<Variant>`` (sub-Map) or
+; ``TapHolds.<FlatKey>`` (no variant) shape, with or without a trailing
+; ``.Enabled`` suffix.
+IsTapHoldVariantActive(V1Path) {
+    global TapHold, _TH_V1KeyIdToV2
+
+    if !IsSet(TapHold) {
+        return false
+    }
+    Parts := StrSplit(V1Path, ".")
+    if (Parts.Length >= 1 and Parts[Parts.Length] == "Enabled") {
+        Parts.Pop()
+    }
+    if (Parts.Length < 2 or Parts[1] != "TapHolds") {
+        return false
+    }
+    V1KeyId := Parts[2]
+    Variant := (Parts.Length >= 3) ? Parts[3] : ""
+
+    if !_TH_V1KeyIdToV2.Has(V1KeyId) {
+        return false
+    }
+    V2KeyId := _TH_V1KeyIdToV2[V1KeyId]
+
+    if !TapHold.Has("keys") or !TapHold["keys"].Has(V2KeyId) {
+        return false
+    }
+    Entry := TapHold["keys"][V2KeyId]
+    if !(IsObject(Entry) and Type(Entry) == "Map") {
+        return false
+    }
+
+    Tuple := _TH_ResolveTuple(V1KeyId, Variant)
+    if (Tuple == false) {
+        return false
+    }
+
+    ; Compare tap_action first — every tuple has a "tap" key.
+    if !Entry.Has("tap_action") {
+        return false
+    }
+    if (Entry["tap_action"] != Tuple["tap"]) {
+        return false
+    }
+
+    ; Then compare the hold side. The tuple has either "hold_mod"
+    ; (-> hold_modifier in the v2 entry), "hold_layer" (-> hold_layer),
+    ; or neither (tap-only variant — entry must also lack both for a match).
+    if Tuple.Has("hold_mod") {
+        return Entry.Has("hold_modifier") and (Entry["hold_modifier"] = Tuple["hold_mod"])
+    }
+    if Tuple.Has("hold_layer") {
+        return Entry.Has("hold_layer") and (Entry["hold_layer"] = Tuple["hold_layer"])
+    }
+    ; Tap-only variant — the entry must not declare any hold side.
+    return !Entry.Has("hold_modifier") and !Entry.Has("hold_layer")
+}
+
+
+
+
+; ==============================================================
+; ==============================================================
+; ======= 5/ tap_hold.toml writer =======
 ; ==============================================================
 ; ==============================================================
 
