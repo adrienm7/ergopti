@@ -1188,7 +1188,7 @@ ModifyLink(gui, NewValue) {
     if IsSet(Features) and Features.Has("shortcuts") and Features["shortcuts"].Has("gpt") {
         Features["shortcuts"]["gpt"]["link"] := NewValue
     }
-    TOML_Write(NewValue, ConfigurationFile, "shortcuts.gpt", "link")
+    TOML_Write(NewValue, ConfigurationFile, "ahk.shortcuts.gpt", "link")
 
     gui.Destroy()
     Reload
