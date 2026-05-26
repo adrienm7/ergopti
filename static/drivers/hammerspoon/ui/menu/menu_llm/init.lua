@@ -30,6 +30,7 @@ local ApiPanel         = require("ui.menu.menu_llm.api_panel")
 local ModelsSelector   = require("ui.menu.menu_llm.models_selector")
 local ModelSwitcher    = require("ui.menu.menu_llm.model_switcher")
 local StartupCtrl      = require("ui.menu.menu_llm.startup_controller")
+local TriggerOrch      = require("ui.menu.menu_llm.trigger_orchestrator")
 
 -- Deps checkers — kicked off on backend switch and on first menu activation
 -- so a fresh-out-of-the-box Mac auto-bootstraps the engine without any
@@ -333,129 +334,26 @@ function M.create(deps)
     local function get_startup_silence() return _startup_silence end
     local function set_startup_silence(v) _startup_silence = v end
     local function get_trigger_hk() return _llm_trigger_hk end
+    local function set_trigger_hk(v) _llm_trigger_hk = v end
     local function get_profile_hks() return _llm_profile_hks end
+    local function set_profile_hk(id, v) _llm_profile_hks[id] = v end
 
-    local function bind_hotkey(mods, key, callback)
-        Logger.debug(LOG, string.format("Attempting hotkey bind: mods=%s, key=%s",
-            type(mods) == "table" and table.concat(mods, "+") or tostring(mods),
-            key or "nil"))
-        local ok, hk = pcall(hs.hotkey.new, mods, key, callback)
-        if ok and hk then
-            Logger.debug(LOG, string.format("Hotkey created successfully: %s+%s",
-                type(mods) == "table" and table.concat(mods, "+") or "", key or ""))
-            return hk
-        else
-            Logger.error(LOG, string.format("Hotkey binding failed: ok=%s, err=%s", tostring(ok), tostring(hk)))
-            return nil
-        end
-    end
-    
-    local function activate_hotkey(hk)
-        if hk and type(hk.enable) == "function" then
-            pcall(function() hk:enable() end)
-            return true
-        end
-        return false
-    end
-
-    local function trigger_prediction_with_profile(profile_id)
-        if type(profile_id) ~= "string" or profile_id == "" then 
-            Logger.warn(LOG, string.format("trigger_prediction_with_profile: invalid profile_id: %s", tostring(profile_id)))
-            return 
-        end
-        if not keymap or type(keymap.trigger_prediction) ~= "function" then 
-            Logger.error(LOG, "trigger_prediction_with_profile: keymap or trigger_prediction is unavailable.")
-            return 
-        end
-
-        Logger.debug(LOG, string.format("Triggering prediction with profile '%s'", profile_id))
-        
-        if type(keymap.reset_predictions) == "function" then
-            pcall(keymap.reset_predictions)
-            Logger.debug(LOG, "Active predictions cancelled before profile trigger.")
-        end
-        
-        local previous_profile = state.llm_active_profile or "basic"
-        Logger.debug(LOG, string.format("Changing profile: %s -> %s", previous_profile, profile_id))
-        
-        local profile_label = profile_id
-        for _, profile in ipairs(llm_mod.BUILTIN_PROFILES or {}) do
-            if type(profile) == "table" and profile.id == profile_id and type(profile.label) == "string" then
-                profile_label = profile.label
-                break
-            end
-        end
-        if profile_label == profile_id then
-            for _, profile in ipairs(type(state.llm_user_profiles) == "table" and state.llm_user_profiles or {}) do
-                if type(profile) == "table" and profile.id == profile_id and type(profile.label) == "string" then
-                    profile_label = profile.label
-                    break
-                end
-            end
-        end
-        
-        llm_mod.set_active_profile(profile_id)
-        pcall(keymap.trigger_prediction, true, profile_label)
-        llm_mod.set_active_profile(previous_profile)
-        
-        Logger.debug(LOG, string.format("Profile restored: %s", previous_profile))
-    end
-
-    local function apply_llm_shortcut(mods, key)
-        if _llm_trigger_hk then pcall(function() _llm_trigger_hk:delete() end); _llm_trigger_hk = nil end
-
-        local normalized = shortcut_ui.normalize_shortcut(mods, key, {"ctrl"})
-        if normalized then
-            state.llm_trigger_shortcut = { mods = normalized.mods, key = normalized.key }
-            _llm_trigger_hk = bind_hotkey(normalized.mods, normalized.key, function()
-                if keymap and type(keymap.trigger_prediction) == "function" then pcall(keymap.trigger_prediction, true) end
-            end)
-            if _llm_trigger_hk and not _startup_silence then activate_hotkey(_llm_trigger_hk) end
-        else
-            state.llm_trigger_shortcut = false
-        end
-
-        save_prefs(); update_menu()
-    end
-
-    local function apply_llm_profile_shortcut(profile_id, mods, key, opts)
-        if type(profile_id) ~= "string" or profile_id == "" then return end
-        if _llm_profile_hks[profile_id] then
-            pcall(function() _llm_profile_hks[profile_id]:delete() end)
-            _llm_profile_hks[profile_id] = nil
-        end
-
-        if type(state.llm_profile_shortcuts) ~= "table" then state.llm_profile_shortcuts = {} end
-
-        local normalized = shortcut_ui.normalize_shortcut(mods, key, {"ctrl"})
-        Logger.debug(LOG, string.format("apply_llm_profile_shortcut('%s', mods=%s, key=%s) -> normalized=%s",
-            profile_id,
-            type(mods) == "table" and table.concat(mods, "+") or tostring(mods),
-            key or "nil",
-            normalized and (table.concat(normalized.mods, "+") .. "+" .. normalized.key) or "nil"))
-        
-        if normalized then
-            state.llm_profile_shortcuts[profile_id] = { mods = normalized.mods, key = normalized.key }
-            local hk = bind_hotkey(normalized.mods, normalized.key, function()
-                Logger.debug(LOG, string.format("Profile shortcut triggered: '%s'", profile_id))
-                trigger_prediction_with_profile(profile_id)
-            end)
-            if hk and not (type(opts) == "table" and opts.silent == true) then activate_hotkey(hk) end
-            _llm_profile_hks[profile_id] = hk
-            if hk then
-                Logger.debug(LOG, string.format("Shortcut bound successfully for profile '%s'", profile_id))
-            else
-                Logger.error(LOG, string.format("Shortcut binding failed for profile '%s'", profile_id))
-            end
-        else
-            state.llm_profile_shortcuts[profile_id] = nil
-            Logger.debug(LOG, string.format("Shortcut disabled for profile '%s'", profile_id))
-        end
-
-        if not (type(opts) == "table" and opts.silent == true) then
-            save_prefs(); update_menu()
-        end
-    end
+    local trigger_orch = TriggerOrch.new({
+        state              = state,
+        keymap             = keymap,
+        save_prefs         = save_prefs,
+        update_menu        = update_menu,
+        get_startup_silence = get_startup_silence,
+        set_startup_silence = set_startup_silence,
+        get_trigger_hk     = get_trigger_hk,
+        set_trigger_hk     = set_trigger_hk,
+        get_profile_hks    = get_profile_hks,
+        set_profile_hk     = set_profile_hk,
+    })
+    local bind_hotkey                  = trigger_orch.bind_hotkey
+    local activate_hotkey              = trigger_orch.activate_hotkey
+    local apply_llm_shortcut           = trigger_orch.apply_llm_shortcut
+    local apply_llm_profile_shortcut   = trigger_orch.apply_llm_profile_shortcut
 
     deps.apply_llm_profile_shortcut = apply_llm_profile_shortcut
 
