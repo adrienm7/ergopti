@@ -1,0 +1,104 @@
+{
+	"$schema": "https://ergopti.com/schema/corpus/tap_hold.v1.json",
+	"description": "Cross-driver regression corpus for tap-hold configuration parsing and accessor logic. Every vector must pass in both the AHK and Hammerspoon driver test suites. Vectors use driver-agnostic field names; each driver consumer maps them to its native representation.",
+	"version": "1.0.0",
+	"vectors": [
+		{
+			"id": "tap_action_and_hold_modifier",
+			"description": "Key with tap_action and hold_modifier: accessor returns both correctly.",
+			"key": "caps_lock",
+			"config": {
+				"tap_action": "enter",
+				"time_activation_seconds": 0.35,
+				"hold_modifier": "ctrl"
+			},
+			"expected": {
+				"configured": true,
+				"tap_action": "enter",
+				"duration": 0.35,
+				"hold_modifier": "ctrl",
+				"hold_layer": null
+			}
+		},
+		{
+			"id": "tap_action_and_hold_layer",
+			"description": "Key with hold_layer (not hold_modifier) is returned correctly.",
+			"key": "right_shift",
+			"config": {
+				"tap_action": "right_shift",
+				"time_activation_seconds": 0.4,
+				"hold_layer": "nav"
+			},
+			"expected": {
+				"configured": true,
+				"tap_action": "right_shift",
+				"duration": 0.4,
+				"hold_modifier": null,
+				"hold_layer": "nav"
+			}
+		},
+		{
+			"id": "disabled_key",
+			"description": "Key with enabled=false is parseable but reports enabled=false.",
+			"key": "caps_lock",
+			"config": {
+				"enabled": false,
+				"tap_action": "enter",
+				"time_activation_seconds": 0.35
+			},
+			"expected": {
+				"configured": true,
+				"enabled": false
+			}
+		},
+		{
+			"id": "unconfigured_key",
+			"description": "Querying a key not present in the config returns configured=false.",
+			"key": "f_key",
+			"config": null,
+			"expected": {
+				"configured": false
+			}
+		},
+		{
+			"id": "duration_minimum",
+			"description": "time_activation_seconds = 0.05 is preserved without coercion.",
+			"key": "left_ctrl",
+			"config": {
+				"tap_action": "left_ctrl",
+				"time_activation_seconds": 0.05
+			},
+			"expected": {
+				"configured": true,
+				"duration": 0.05
+			}
+		},
+		{
+			"id": "duration_one_second",
+			"description": "time_activation_seconds = 1.0 is preserved exactly.",
+			"key": "space",
+			"config": {
+				"tap_action": "space",
+				"time_activation_seconds": 1.0
+			},
+			"expected": {
+				"configured": true,
+				"duration": 1.0
+			}
+		},
+		{
+			"id": "hold_modifier_shift",
+			"description": "hold_modifier = shift is returned as the string 'shift'.",
+			"key": "caps_lock",
+			"config": {
+				"tap_action": "escape",
+				"time_activation_seconds": 0.3,
+				"hold_modifier": "shift"
+			},
+			"expected": {
+				"configured": true,
+				"hold_modifier": "shift"
+			}
+		}
+	]
+}
