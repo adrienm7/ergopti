@@ -44,6 +44,24 @@ static/drivers/_shared/
 │  ├── tint.js                      # Pure HSL tint-mixing algorithm + cross-driver test vectors
 │  ├── layout.js                    # Pure position resolution + canvas geometry + test vectors
 │  └── draw_calls.js                # draw_calls[] IR type definitions and composer functions
+├── ports/
+│  ├── SPEC.md                      # Hexagonal architecture step 1: 7 OS-facing port contracts
+│  ├── KeyboardHook.spec.js         # Keyboard event subscription contract + test vectors
+│  ├── TextSender.spec.js           # Text/keystroke injection contract + test vectors
+│  ├── TooltipRenderer.spec.js      # Tooltip show/hide/updateElement contract + test vectors
+│  ├── HttpClient.spec.js           # HTTP POST / cancel / isActive contract + test vectors
+│  ├── TimerScheduler.spec.js       # after / every / cancel / cancelAll contract + test vectors
+│  ├── Notifier.spec.js             # System notification contract (4 severity levels)
+│  └── TrayMenu.spec.js             # Tray icon + declarative menu contract + test vectors
+├── domain/
+│  ├── SPEC.md                      # Hexagonal architecture step 2: 7 pure domain modules
+│  ├── Registry.spec.js             # Hotstring data model + O(1) tail-char bucket lookup contract
+│  ├── Expander.spec.js             # Expansion decision engine contract + test vectors
+│  ├── Terminators.spec.js          # Terminator catalogue + enable/disable contract + TERMINATOR_DEFS
+│  ├── TokenParser.js               # Reference impl: LLM output diff coloring (green/orange/gray)
+│  ├── PromptBuilder.js             # Reference impl: context truncation + token budget + temperature
+│  ├── ProfileSelector.js           # Reference impl: profile resolve + template variable injection
+│  └── GestureRecognizer.spec.js    # Gesture slot catalogue + THRESHOLDS + recognizer contract
 ├── features/
 │  └── manifest.toml                # Single source of features (Scope C2)
 ├── llm/
