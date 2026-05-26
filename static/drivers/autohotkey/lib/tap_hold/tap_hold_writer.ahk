@@ -191,7 +191,9 @@ WriteTapHoldBatch(BatchEntries) {
         ; Find which variant ends up active. For flat keys, the only entry
         ; is the empty-string variant; for sub-Map keys, scan for the
         ; variant whose final value is true.
-        ActiveVariant := ""
+        ; ``ActiveVariant`` starts as false (unset sentinel) so it can be
+        ; distinguished from the empty-string variant used by flat keys.
+        ActiveVariant := false
         for V, Val in VariantValues {
             if Val {
                 ActiveVariant := V
@@ -200,7 +202,7 @@ WriteTapHoldBatch(BatchEntries) {
             }
         }
 
-        if (ActiveVariant == "") {
+        if (ActiveVariant == false) {
             ; No variant active for this key — remove the entry entirely.
             if TapHold["keys"].Has(V2KeyId) {
                 TapHold["keys"].Delete(V2KeyId)
