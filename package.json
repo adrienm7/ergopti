@@ -12,6 +12,7 @@
 		"format": "prettier --plugin-search-dir . --write .",
 		"prepare": "husky install",
 		"build:manifest": "node ./scripts/build-features-manifest.js",
+		"build:domain": "node ./scripts/build-domain.cjs",
 		"lint:banners": "node ./scripts/audit-banner-alignment.js static/drivers/_shared",
 		"lint:conventions": "node ./scripts/lint-conventions.js --warn-only",
 		"lint:conventions:strict": "node ./scripts/lint-conventions.js --fail-on-violations",

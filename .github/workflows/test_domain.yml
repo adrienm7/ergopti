@@ -1,0 +1,61 @@
+# .github/workflows/test_domain.yml
+#
+# Domain build pipeline CI gate.
+# Runs on every push / PR that touches domain sources, generated files,
+# or the build scripts themselves. Verifies that:
+#   1. build:manifest codegen succeeds from a clean state
+#   2. AHK ↔ HS manifest parity holds
+#   3. All 13 port adapter contracts are structurally compliant
+#   4. No generated file drifted from HEAD (would indicate someone edited a
+#      generated file directly instead of the source manifest)
+
+name: Domain pipeline
+
+on:
+  push:
+    branches: [main, dev]
+    paths:
+      - "static/drivers/_shared/features/**"
+      - "static/drivers/_shared/tap_hold/**"
+      - "static/drivers/_shared/ports/**"
+      - "static/drivers/_shared/domain/**"
+      - "static/drivers/autohotkey/_generated/**"
+      - "static/drivers/hammerspoon/_generated/**"
+      - "scripts/build-features-manifest.js"
+      - "scripts/build-domain.cjs"
+      - "scripts/test-manifest-parity.cjs"
+      - "scripts/test-port-compliance.cjs"
+  pull_request:
+    branches: [main, dev]
+    paths:
+      - "static/drivers/_shared/features/**"
+      - "static/drivers/_shared/tap_hold/**"
+      - "static/drivers/_shared/ports/**"
+      - "static/drivers/_shared/domain/**"
+      - "static/drivers/autohotkey/_generated/**"
+      - "static/drivers/hammerspoon/_generated/**"
+      - "scripts/build-features-manifest.js"
+      - "scripts/build-domain.cjs"
+      - "scripts/test-manifest-parity.cjs"
+      - "scripts/test-port-compliance.cjs"
+
+jobs:
+  domain-pipeline:
+    name: Domain build + drift detection
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Run domain build pipeline
+        run: npm run build:domain
