@@ -264,7 +264,8 @@ local CHAT_CANDIDATES = {
 }
 
 local DISCOVERY_MAX_WAIT_SEC        = 60   -- Stop polling /v1/models after this much real time
-local DISCOVERY_POLL_PERIOD_SEC     = 1.0  -- Wait between /v1/models probes during the wait phase
+local DISCOVERY_POLL_INITIAL_SEC    = 1.0  -- First inter-probe delay (doubles each miss, capped below)
+local DISCOVERY_POLL_MAX_SEC        = 10.0 -- Cap for the exponential backoff interval
 -- After this many seconds of persistent model-ID mismatch, bypass the check and
 -- proceed to POST probes. A mismatch beyond this window means either (a) the old
 -- server's socket lingered in CLOSE_WAIT and the zombie killer couldn't find the
@@ -394,7 +395,11 @@ local function discover_endpoints(on_done)
 	-- survives dropped asyncGet callbacks (which happen when the old server
 	-- process is killed mid-request — the connection resets and Hammerspoon
 	-- never fires the callback, leaving a recursive doAfter chain dead).
-	local poll_timer = nil
+	-- The inter-probe delay uses exponential backoff (1 s → 2 s → 4 s → … → 10 s)
+	-- so we react quickly on fast starts while not hammering the kernel during a
+	-- slow model load (weights can take 30 s+ to map into GPU memory).
+	local poll_timer       = nil
+	local poll_delay_sec   = DISCOVERY_POLL_INITIAL_SEC
 	local function do_poll()
 		-- Guard: if discovery was reset externally (model switch) while the
 		-- timer was in flight, stop quietly without firing callbacks.
@@ -456,8 +461,12 @@ local function discover_endpoints(on_done)
 				Logger.warn(LOG, "Endpoint discovery: server reachable on /v1/models — starting POST probes.")
 				run_post_probes()
 			else
-				-- Server not ready yet — restart the timer for the next poll tick
-				poll_timer = hs.timer.doAfter(DISCOVERY_POLL_PERIOD_SEC, do_poll)
+				-- Server not ready yet — apply exponential backoff before the next tick
+				-- so we back off gracefully during a slow model-weight load.
+				Logger.debug(LOG,
+					"Endpoint discovery: server not ready — next probe in %.1fs.", poll_delay_sec)
+				poll_timer   = hs.timer.doAfter(poll_delay_sec, do_poll)
+				poll_delay_sec = math.min(poll_delay_sec * 2, DISCOVERY_POLL_MAX_SEC)
 			end
 		end, {
 			"--silent", "--max-time", "5", "--no-keepalive",
