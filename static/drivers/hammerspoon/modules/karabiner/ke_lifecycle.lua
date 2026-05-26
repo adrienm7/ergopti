@@ -396,7 +396,7 @@ function M.launch_headless()
 		local ok_notif, notifications = pcall(require, "lib.notifications")
 		if ok_notif then
 			notifications.notify(
-				"Karabiner-Elements non disponible — vérifier l'installation.",
+				i18n.get("karabiner.lifecycle.unavailable"),
 				nil, "warning")
 		end
 		return false

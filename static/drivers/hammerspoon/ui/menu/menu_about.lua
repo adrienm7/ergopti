@@ -114,32 +114,32 @@ end
 --- @param channel string "main" or "dev"
 local function check_for_update(channel)
 	if is_local_source() then
-		hs.dialog.alert(nil, "Running from local source — update checking is only available for release builds.", "OK", "Informational")
+		hs.dialog.alert(nil, i18n.get("menu.about.update.local_source"), "OK", "Informational")
 		return
 	end
 	local current = current_version()
 	local url = api_url(channel)
 	hs.http.asyncGet(url, { ["User-Agent"] = "ErgoptiPlus-Updater/1.0" }, function(status, body, _)
 		if status ~= 200 or not body then
-			hs.dialog.alert(nil, "Could not reach GitHub.\nCheck your internet connection and try again.", "OK", "Warning")
+			hs.dialog.alert(nil, i18n.get("menu.about.update.network_error"), "OK", "Warning")
 			return
 		end
 		local latest = parse_tag(body)
 		if latest == "" then
-			hs.dialog.alert(nil, "Could not parse the latest release tag from GitHub.", "OK", "Warning")
+			hs.dialog.alert(nil, i18n.get("menu.about.update.parse_error"), "OK", "Warning")
 			return
 		end
 		if latest == current then
-			hs.dialog.alert(nil, "ErgoptiPlus is up to date.\n\nCurrent version: " .. current, "OK", "Informational")
+			local msg = i18n.get("menu.about.update.up_to_date"):gsub("{version}", current)
+			hs.dialog.alert(nil, msg, "OK", "Informational")
 			return
 		end
-		local btn = hs.dialog.alert(nil,
-			"A new version is available!\n\nCurrent: " .. current .. "\nLatest:  " .. latest
-			.. "\n\nOpen the releases page to download?",
-			"Open releases page",
-			"Dismiss",
-			"Informational")
-		if btn == "Open releases page" then
+		local msg = i18n.get("menu.about.update.new_version")
+			:gsub("{current}", current)
+			:gsub("{latest}",  latest)
+		local open_label = i18n.get("menu.about.update.open_releases")
+		local btn = hs.dialog.alert(nil, msg, open_label, "Dismiss", "Informational")
+		if btn == open_label then
 			hs.urlevent.openURL(releases_page_url())
 		end
 	end)
@@ -151,23 +151,23 @@ local function show_changelog(channel)
 	local url = api_url(channel)
 	hs.http.asyncGet(url, { ["User-Agent"] = "ErgoptiPlus-Updater/1.0" }, function(status, body, _)
 		if status ~= 200 or not body then
-			hs.dialog.alert(nil, "Could not reach GitHub.\nCheck your internet connection and try again.", "OK", "Warning")
+			hs.dialog.alert(nil, i18n.get("menu.about.update.network_error"), "OK", "Warning")
 			return
 		end
 		local tag   = parse_tag(body)
 		local notes = parse_notes(body)
 		if tag == "" then
-			hs.dialog.alert(nil, "Could not retrieve release information from GitHub.", "OK", "Warning")
+			hs.dialog.alert(nil, i18n.get("menu.about.update.changelog_error"), "OK", "Warning")
 			return
 		end
 		if notes == "" then notes = "(No release notes available for this version.)" end
 		if #notes > 2000 then notes = notes:sub(1, 2000) .. "\n…(truncated)" end
-		local btn = hs.dialog.alert(nil,
-			"Release notes for " .. tag .. ":\n\n" .. notes .. "\n\nOpen on GitHub?",
-			"Open on GitHub",
-			"Dismiss",
-			"Informational")
-		if btn == "Open on GitHub" then
+		local msg = i18n.get("menu.about.update.changelog_header")
+			:gsub("{tag}",   tag)
+			:gsub("{notes}", notes)
+		local open_label = i18n.get("menu.about.open_releases_page")
+		local btn = hs.dialog.alert(nil, msg, open_label, "Dismiss", "Informational")
+		if btn == open_label then
 			hs.urlevent.openURL(releases_page_url())
 		end
 	end)

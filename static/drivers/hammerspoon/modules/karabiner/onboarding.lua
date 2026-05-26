@@ -410,7 +410,7 @@ function M.install_karabiner_elements(callback)
 	end
 	if M.manifest_is_unpinned(manifest) then
 		Logger.warn(LOG, "Manifest unpinned (TODO placeholders) — auto-install disabled.")
-		callback(false, "Manifest non configuré (champs TODO).")
+		callback(false, i18n.get("karabiner.onboarding.error.manifest_unconfigured"))
 		return
 	end
 
@@ -427,7 +427,7 @@ function M.install_karabiner_elements(callback)
 		mount_dmg_async(cache_path, function(ok_mount, mount_or_err)
 			if not ok_mount then
 				Logger.error(LOG, "Mount failed: %s.", mount_or_err)
-				callback(false, "Mount échoué : " .. tostring(mount_or_err))
+				callback(false, i18n.get("karabiner.onboarding.error.mount_failed"):gsub("{error}", tostring(mount_or_err)))
 				return
 			end
 			local mount_point = mount_or_err
@@ -530,10 +530,10 @@ end
 local function summarize_missing(report)
 	if report.all_ok then return nil end
 	local lines = {}
-	if not report.ke_installed     then table.insert(lines, "• Karabiner-Elements n'est pas installé") end
-	if not report.grabber_present  then table.insert(lines, "• Le daemon karabiner_grabber est absent") end
-	if not report.sysext_activated then table.insert(lines, "• L'extension système (DriverKit) n'est pas activée") end
-	if not report.grabber_running  then table.insert(lines, "• Le daemon ne tourne pas (Surveillance des saisies ?)") end
+	if not report.ke_installed     then table.insert(lines, i18n.get("karabiner.onboarding.missing.ke_not_installed")) end
+	if not report.grabber_present  then table.insert(lines, i18n.get("karabiner.onboarding.missing.grabber_absent")) end
+	if not report.sysext_activated then table.insert(lines, i18n.get("karabiner.onboarding.missing.sysext_not_activated")) end
+	if not report.grabber_running  then table.insert(lines, i18n.get("karabiner.onboarding.missing.daemon_not_running")) end
 	return table.concat(lines, "\n")
 end
 
@@ -558,9 +558,7 @@ function M.run_first_run_wizard()
 		local choice = hs.dialog.blockAlert(
 			i18n.get("karabiner.onboarding.required_title"),
 			i18n.get("karabiner.onboarding.missing_prefix") .. summary
-				.. "\n\nL'application va être téléchargée depuis le dépôt officiel "
-				.. "(pqrs-org/Karabiner-Elements) et installée automatiquement. "
-				.. "Le mot de passe administrateur sera demandé.",
+				.. i18n.get("karabiner.onboarding.install_body_suffix"),
 			i18n.get("karabiner.onboarding.btn_install_now"), i18n.get("common.later"), "warning")
 		Logger.info(LOG, "Wizard step (install): user chose '%s'.", tostring(choice))
 		if choice ~= i18n.get("karabiner.onboarding.btn_install_now") then
