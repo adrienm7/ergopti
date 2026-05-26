@@ -79,8 +79,13 @@ InstallHotstringHooks()
 #Include ../adapters/tray_menu.ahk
 #Include ../adapters/text_sender.ahk
 #Include ../adapters/http_client.ahk
+#Include ../adapters/secure_field_detector.ahk
+#Include ../adapters/clipboard.ahk
+#Include ../adapters/storage.ahk
+#Include ../adapters/process_lifecycle.ahk
 
 ; ── Per-module test files (each registers Test() cases) ──
+#Include test_adapter_compliance_new.ahk
 #Include test_adapter_contract_vectors.ahk
 #Include test_logger.ahk
 #Include test_logger_contract.ahk
