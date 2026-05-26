@@ -61,10 +61,17 @@ pcall(function()
 	hs.settings.set(HS_BOOT_READY_SETTING_KEY, false)
 end)
 
--- Set our logger level. Uncomment one to enable:
-Logger.set_level("DEBUG")  -- Show all logs (DEBUG, INFO, WARNING, ERROR)
--- Logger.set_level("INFO")   -- Show INFO, WARNING, ERROR only
--- Default: WARNING (production mode)
+-- Restore persisted log level from settings, or default to DEBUG
+do
+	local saved_level = pcall(function() return hs.settings.get("ergopti.log_level") end)
+	       and hs.settings.get("ergopti.log_level")
+	local valid = { DEBUG = true, INFO = true, WARNING = true, ERROR = true }
+	if type(saved_level) == "string" and valid[saved_level] then
+		Logger.set_level(saved_level)
+	else
+		Logger.set_level("DEBUG")  -- Default: show all logs
+	end
+end
 
 -- Global user-notification logging bridge.
 -- Any module using hs.notify.new() will now be traced in Logger.info.

@@ -527,6 +527,7 @@
 	"menu.debug.open_today_log": "Відкрити журнал за сьогодні",
 	"menu.debug.title": "⚠ Налагодження",
 	"menu.debug.window_spy": "Спостерігач вікон",
+	"menu.debug.log_level": "Рівень логування",
 	"menu.extensions.empty": "Жодне розширення не встановлено",
 	"menu.extensions.header": "Розширення",
 	"menu.gestures.action_prefix": "Дія: ",

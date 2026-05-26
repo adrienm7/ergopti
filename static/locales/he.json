@@ -527,6 +527,7 @@
 	"menu.debug.open_today_log": "פתח קובץ יומן היום",
 	"menu.debug.title": "⚠ ניפוי שגיאות",
 	"menu.debug.window_spy": "Window Spy",
+	"menu.debug.log_level": "רמת יומן",
 	"menu.extensions.empty": "לא מותקנת הרחבה",
 	"menu.extensions.header": "הרחבות",
 	"menu.gestures.action_prefix": "פעולה: ",

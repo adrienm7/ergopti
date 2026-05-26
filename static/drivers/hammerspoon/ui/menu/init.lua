@@ -616,6 +616,13 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 					pcall(ob.run_from_menu, MenuPaths.get("ConfigTomlPath"))
 				end
 			end,
+			set_log_level             = function(level)
+				local L = require("lib.logger")
+				L.set_level(level)
+				pcall(function() hs.settings.set("ergopti.log_level", level) end)
+				L.info("menu", "Log level set to %s.", level)
+				if type(updateMenu) == "function" then updateMenu() end
+			end,
 		}
 
 		-- Wire those callbacks into script_control so the right-Alt key slots

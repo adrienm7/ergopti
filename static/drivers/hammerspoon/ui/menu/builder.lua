@@ -427,12 +427,28 @@ function M.generate(ctx, menu_mods, actions)
 	table.insert(items, { title = "↺ " .. i18n.get("menu.global.reload"):gsub("^%S+ ", ""),  fn = actions.reload })
 	table.insert(items, { title = "✕ " .. i18n.get("menu.global.quit"):gsub("^%S+ ", ""),    fn = actions.quit })
 
+	-- Build the log level submenu with a checkmark on the active level
+	local log_level_items = {}
+	local Logger_mod = require("lib.logger")
+	for _, lvl in ipairs({ "DEBUG", "INFO", "WARNING", "ERROR" }) do
+		local lvl_num = Logger_mod.LEVELS[lvl]
+		local is_active = (Logger_mod.current_level == lvl_num)
+		local lvl_capture = lvl
+		table.insert(log_level_items, {
+			title   = lvl,
+			checked = is_active,
+			fn      = function() actions.set_log_level(lvl_capture) end,
+		})
+	end
+
 	table.insert(items, {
 		title = i18n.get("menu.debug.title"),
 		menu = {
-			{ title = i18n.get("menu.debug.console"),   fn = actions.open_console },
+			{ title = i18n.get("menu.debug.console"),        fn = actions.open_console },
 			{ title = i18n.get("menu.debug.open_logs"),      fn = actions.open_logs },
 			{ title = i18n.get("menu.debug.open_today_log"), fn = actions.open_today_log },
+			{ title = "-" },
+			{ title = i18n.get("menu.debug.log_level"), menu = log_level_items },
 		}
 	})
 

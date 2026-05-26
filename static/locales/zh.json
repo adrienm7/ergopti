@@ -527,6 +527,7 @@
 	"menu.debug.open_today_log": "打开今日日志文件",
 	"menu.debug.title": "⚠ 调试",
 	"menu.debug.window_spy": "窗口侦察",
+	"menu.debug.log_level": "日志级别",
 	"menu.extensions.empty": "未安装扩展",
 	"menu.extensions.header": "扩展",
 	"menu.gestures.action_prefix": "动作：",

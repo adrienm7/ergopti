@@ -527,6 +527,7 @@
 	"menu.debug.open_today_log": "Abrir registro de hoy",
 	"menu.debug.title": "⚠ Depuración",
 	"menu.debug.window_spy": "Window Spy",
+	"menu.debug.log_level": "Nivel de log",
 	"menu.extensions.empty": "Ninguna extensión instalada",
 	"menu.extensions.header": "Extensiones",
 	"menu.gestures.action_prefix": "Acción: ",
