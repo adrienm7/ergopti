@@ -66,10 +66,11 @@ Test("KLAppCatConst.DEFAULTS: notepad.exe -> productive", _KLAppCat_Defaults_Not
 
 
 
+
 ; =============================================
-; =========================================
-; ======= 2/ KL_AppCat_Get — lookup =======
-; =========================================
+; =============================================
+; ======= 2/ KL_AppCat_Get — lookup ==========
+; =============================================
 ; =============================================
 
 ; Seed a clean in-memory map before each test group so tests are isolated.

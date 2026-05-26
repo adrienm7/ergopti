@@ -3,7 +3,7 @@
 # Builds Ergopti.app (macOS), ErgoptiPlus.exe (Windows), and packages keyboard
 # layout files for all three platforms, then attaches everything to a GitHub
 # Release. Three trigger paths:
-#   1. push to dev          — auto-creates a pre-release "dev-{date}-{sha7}".
+#   1. push of a tag v*     — created by version.yml on every push to main/dev.
 #   2. release: published   — fired by release-please after main is updated.
 #   3. workflow_dispatch    — manual, takes an explicit tag.
 #
@@ -13,7 +13,7 @@ name: Release Build
 
 on:
     push:
-        branches: [dev]
+        tags: ['v*']
     release:
         types: [published]
     workflow_dispatch:
@@ -40,7 +40,17 @@ concurrency:
 # ============================================================
 
 jobs:
+    gate-tests:
+        uses: ./.github/workflows/test_ahk.yml
+
+    gate-hammerspoon:
+        uses: ./.github/workflows/test_hammerspoon.yml
+
+    gate-hotstrings:
+        uses: ./.github/workflows/test_hotstrings.yml
+
     prepare-release:
+        needs: [gate-tests, gate-hammerspoon, gate-hotstrings]
         runs-on: ubuntu-latest
         outputs:
             tag:        ${{ steps.meta.outputs.tag }}
@@ -66,25 +76,15 @@ jobs:
                   prerelease="false"
                   case "$event" in
                       push)
-                          # Auto-tag for dev pushes. Format is intentionally
-                          # human-readable (dashes between date parts, an "h"
-                          # between hour and minute) so the GitHub releases
-                          # page shows "Ergopti dev 2026-05-19 19h02 — fab7976"
-                          # instead of the previous unintelligible
-                          # "dev-20260519-190225-fab7976". Git tags cannot
-                          # contain spaces, so dashes and underscores are the
-                          # readable substitutes we have.
-                          # Timestamps are in Europe/Paris time (CET/CEST).
-                          y="$(TZ='Europe/Paris' date +%Y)"
-                          m="$(TZ='Europe/Paris' date +%m)"
-                          d="$(TZ='Europe/Paris' date +%d)"
-                          h="$(TZ='Europe/Paris' date +%H)"
-                          n="$(TZ='Europe/Paris' date +%M)"
-                          sha="${GITHUB_SHA:0:7}"
-                          tag="dev-${y}-${m}-${d}-${h}h${n}-${sha}"
-                          title="Ergopti dev ${y}-${m}-${d} ${h}h${n} — ${sha}"
-                          prerelease="true"
+                          # Tag was created by version.yml — read it directly
+                          # from GITHUB_REF_NAME (e.g. v1.2.3-dev.42).
+                          tag="${GITHUB_REF_NAME}"
                           ref="${GITHUB_SHA}"
+                          # Tags containing '-' are pre-releases (dev, alpha, beta)
+                          if [[ "$tag" =~ - ]]; then
+                              prerelease="true"
+                          fi
+                          title="Ergopti ${tag}"
                           ;;
                       release)
                           tag="${GITHUB_REF_NAME}"
@@ -109,26 +109,6 @@ jobs:
                   echo "ref=$ref"               >> "$GITHUB_OUTPUT"
                   echo "Resolved tag=$tag title='$title' version=$version prerelease=$prerelease ref=$ref"
 
-            - name: Create git tag (push events only)
-              # For push-to-dev runs we need to plant the tag in the repo so
-              # ``gh release create --target $ref`` has something to point at.
-              # release: events already have a tag; workflow_dispatch targets
-              # an existing tag supplied by the caller.
-              if: ${{ github.event_name == 'push' }}
-              shell: bash
-              env:
-                  GH_TOKEN: ${{ github.token }}
-              run: |
-                  set -euo pipefail
-                  tag="${{ steps.meta.outputs.tag }}"
-                  ref="${{ steps.meta.outputs.ref }}"
-                  if git ls-remote --tags origin "refs/tags/$tag" | grep -q "$tag"; then
-                      echo "Tag '$tag' already exists on remote — skipping."
-                  else
-                      git tag "$tag" "$ref"
-                      git push origin "$tag"
-                      echo "Tag '$tag' pushed."
-                  fi
 
 
 
