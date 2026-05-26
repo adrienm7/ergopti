@@ -325,7 +325,7 @@ TestPE_PropertyRoundTripSpecialChars() {
 		"\`"",
 		"hello `"world`" \ done",
 	]
-	for _Unused, Src in SpecialSets {
+	for Src in SpecialSets {
 		Recovered := UnescapeTomlString(EscapeTomlValue(Src))
 		AssertEqual(Src, Recovered, "Round-trip failed for special string")
 	}

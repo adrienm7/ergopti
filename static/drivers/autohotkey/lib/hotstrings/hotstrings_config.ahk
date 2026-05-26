@@ -169,12 +169,12 @@ _SaveOverrides() {
         . "# ne doit apparaître qu'une seule fois.`n`n"
 
     Cats := []
-    for Cat, _Unused in _HotstringsOverrides {
+    for Cat in _HotstringsOverrides {
         Cats.Push(Cat)
     }
     _SortStringsInPlace(Cats)
 
-    for _Unused, Cat in Cats {
+    for Cat in Cats {
         Entry := _HotstringsOverrides[Cat]
         ; Extension keys are stored as "ext.name" — the header must be written
         ; as [ext.name] (2 segments), not [ext.name] which would be ambiguous
@@ -196,11 +196,11 @@ _SaveOverrides() {
         }
 
         Secs := []
-        for Sec, _Unused in Entry.Sections {
+        for Sec in Entry.Sections {
             Secs.Push(Sec)
         }
         _SortStringsInPlace(Secs)
-        for _Unused, Sec in Secs {
+        for Sec in Secs {
             S := Entry.Sections[Sec]
             if (S.Delay != "" or S.Color != "" or S.ShowTooltip != "") {
                 ; Extension: [ext.name.section] — Cat already contains the dot

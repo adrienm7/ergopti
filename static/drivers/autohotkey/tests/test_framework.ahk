@@ -160,7 +160,7 @@ RunTests() {
 	global TEST_REGISTRY, TEST_PASS_COUNT, TEST_FAIL_COUNT
 	_TestPrint("1.." . TEST_REGISTRY.Length)
 	Index := 0
-	for _Unused, TestEntry in TEST_REGISTRY {
+	for TestEntry in TEST_REGISTRY {
 		Index += 1
 		Status := "ok"
 		Detail := ""

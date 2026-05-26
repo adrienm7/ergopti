@@ -175,7 +175,7 @@ _LoggerFlush(ForceFlush := false) {
     Pending := _LOGGER_PENDING
     _LOGGER_PENDING := []
     Blob := ""
-    for _Unused, Line in Pending {
+    for Line in Pending {
         Blob .= Line . "`r`n"
     }
     if ForceFlush {
@@ -299,7 +299,7 @@ LoggerRingBufferSnapshot() {
     if LOGGER_RING_BUFFER.Length < LOGGER_RING_BUFFER_SIZE {
         ; Buffer not yet full — entries are already in order.
         Snapshot := []
-        for _Unused, Line in LOGGER_RING_BUFFER {
+        for Line in LOGGER_RING_BUFFER {
             Snapshot.Push(Line)
         }
         return Snapshot

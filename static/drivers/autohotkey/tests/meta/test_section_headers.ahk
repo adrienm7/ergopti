@@ -66,8 +66,8 @@ _MetaRunSectionHeaderTests() {
 	TotalFiles := 0
 	TotalWarns := 0
 
-	for _Unused, Sub in ["lib", "modules"] {
-		for _Unused, AbsPath in _MetaListAhkFilesSection(StrReplace(DriverRoot . Sub, "/", "\")) {
+	for Sub in ["lib", "modules"] {
+		for AbsPath in _MetaListAhkFilesSection(StrReplace(DriverRoot . Sub, "/", "\")) {
 			TotalFiles++
 			try {
 				Body := FileRead(StrReplace(AbsPath, "/", "\"))

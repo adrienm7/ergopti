@@ -477,8 +477,8 @@ HSE_FindMatchAtEnd(JustTypedChar) {
 
     ; ── STAR path ──────────────────────────────────────────────────
     Buckets := _HSE_BucketsFor(JustTypedChar)
-    for _Unused, Bucket in Buckets {
-        for _Unused, Spec in Bucket {
+    for Bucket in Buckets {
+        for Spec in Bucket {
             if !Spec.Star {
                 continue
             }
@@ -498,8 +498,8 @@ HSE_FindMatchAtEnd(JustTypedChar) {
     ; ── END-CHAR path ──────────────────────────────────────────────
     if IsTerminator and (BodyLastChar != "") {
         Buckets2 := _HSE_BucketsFor(BodyLastChar)
-        for _Unused, Bucket in Buckets2 {
-            for _Unused, Spec in Bucket {
+        for Bucket in Buckets2 {
+            for Spec in Bucket {
                 if Spec.Star {
                     continue
                 }

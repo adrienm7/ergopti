@@ -1682,12 +1682,12 @@ GestureAutoConfigureRegistry() {
     Errors := 0
 
     ; Master enables — turn the gesture families on
-    for _Unused, Name in GESTURE_REG_MASTER_ENABLES {
+    for Name in GESTURE_REG_MASTER_ENABLES {
         GestureRegWriteDword(Name, GESTURE_REG_CUSTOM_VALUE, &Errors)
     }
 
     ; Per-slot configuration
-    for _Unused, Slot in GESTURE_SLOTS {
+    for Slot in GESTURE_SLOTS {
         ; Direction enables (swipes only)
         if GESTURE_REG_ENABLE_NAMES.Has(Slot) {
             GestureRegWriteDword(GESTURE_REG_ENABLE_NAMES[Slot],
