@@ -4,9 +4,9 @@
 ; MODULE: First-Boot Configuration Bootstrap
 ; DESCRIPTION:
 ; On the very first launch (no user config files in _ConfigDir), copies the
-; codegen'd v2 templates into place so the driver always boots with a valid
-; configuration. After the initial copy, the user owns the files and edits
-; them freely — the bootstrap is a one-shot.
+; v2 config template and the shared tap-hold defaults into place so the driver
+; always boots with a valid configuration. After the initial copy, the user
+; owns the files and edits them freely — the bootstrap is a one-shot.
 ;
 ; FEATURES & RATIONALE:
 ; 1. Idempotent: each target file is only written when absent. Re-runs are
@@ -20,6 +20,9 @@
 ;    (``<_ConfigDir>/ahk/config.toml`` and ``<_ConfigDir>/ahk/tap_hold.toml``).
 ;    The universal files at the root of ``<_ConfigDir>`` (personal_info,
 ;    hotstrings_config) are handled separately.
+; 4. Shared source for tap-hold: ``tap_hold.toml`` is seeded from
+;    ``drivers/_shared/tap_hold/defaults.toml`` directly — no generated copy
+;    in ``_generated/`` is needed.
 ; ==============================================================================
 
 
@@ -40,7 +43,8 @@ EnsureUserConfigsExist() {
 	UserConfigPath  := UserAhkDir . "\config.toml"
 	UserTapHoldPath := UserAhkDir . "\tap_hold.toml"
 	TplConfigPath   := _StaticDir . "\_generated\config_template.toml"
-	TplTapHoldPath  := _StaticDir . "\_generated\tap_hold_template.toml"
+	; Point directly at the canonical shared defaults — no copy/generation needed
+	TplTapHoldPath  := _StaticDir . "\drivers\_shared\tap_hold\defaults.toml"
 
 	; Ensure the destination folder exists. DirCreate is recursive by default
 	; in AHK v2 and a no-op when the directory already exists.

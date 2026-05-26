@@ -3,9 +3,9 @@
 ; ==============================================================================
 ; MODULE: Tap-Hold Loader
 ; DESCRIPTION:
-; Loads the user's ``tap_hold.toml`` file (bootstrapped at first boot from
-; ``_generated/tap_hold_template.toml``) into a separate ``TapHold`` global,
-; distinct from the ``Features`` Map. The schema is documented at
+; Loads the user's ``tap_hold.toml`` file (seeded at first boot from
+; ``drivers/_shared/tap_hold/defaults.toml``) into a separate ``TapHold``
+; global, distinct from the ``Features`` Map. The schema is documented at
 ; ``_shared/tap_hold/defaults.toml``.
 ;
 ; FEATURES & RATIONALE:

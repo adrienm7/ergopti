@@ -34,7 +34,6 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, '..');
 
 const MANIFEST_PATH = resolve(REPO_ROOT, 'static/drivers/_shared/features/manifest.toml');
-const TAP_HOLD_PATH = resolve(REPO_ROOT, 'static/drivers/_shared/tap_hold/defaults.toml');
 
 const OUT_AHK_DIR   = resolve(REPO_ROOT, 'static/drivers/autohotkey/_generated');
 const OUT_HS_DIR    = resolve(REPO_ROOT, 'static/drivers/hammerspoon/_generated');
@@ -448,22 +447,6 @@ function renderConfigTemplate(manifest, sections, features, platform) {
 	return lines.join('\n');
 }
 
-// Pass-through copy of the shared tap_hold defaults into each driver's
-// _generated folder. The first-boot logic in each driver copies this file
-// into config/ergopti_plus/<driver>/tap_hold.toml on first run.
-function renderTapHoldTemplate(platform) {
-	const raw = readFileSync(TAP_HOLD_PATH, 'utf8');
-	const banner = `# _generated/tap_hold_template.toml
-# AUTO-GENERATED — copy of _shared/tap_hold/defaults.toml.
-# DO NOT EDIT BY HAND — run \`npm run build:manifest\` to refresh.
-# Copied verbatim into config/ergopti_plus/${platform}/tap_hold.toml on first
-# boot. After that, the user owns the copy.
-
-`;
-	return banner + raw;
-}
-
-
 
 
 
@@ -502,11 +485,6 @@ function main() {
 		resolve(OUT_AHK_DIR, 'config_template.toml'),
 		renderConfigTemplate(manifest, sections, features, 'ahk'),
 	);
-	writeOutput(
-		resolve(OUT_AHK_DIR, 'tap_hold_template.toml'),
-		renderTapHoldTemplate('ahk'),
-	);
-
 	// HS outputs
 	writeOutput(
 		resolve(OUT_HS_DIR, 'features_manifest.lua'),
@@ -516,11 +494,6 @@ function main() {
 		resolve(OUT_HS_DIR, 'config_template.toml'),
 		renderConfigTemplate(manifest, sections, features, 'hs'),
 	);
-	writeOutput(
-		resolve(OUT_HS_DIR, 'tap_hold_template.toml'),
-		renderTapHoldTemplate('hs'),
-	);
-
 	console.log('Done.');
 }
 
