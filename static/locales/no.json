@@ -1180,6 +1180,7 @@
 	"sg_actions.right_click_toggle": "🖱 H Høyre klikk (hold)",
 	"sg_actions.screen_capture": "📸 Selektiv opptak (Win+Shift+S)",
 	"sg_actions.screen_capture_instant": "📸 Øyeblikkelig opptak (vindu)",
+	"sg_actions.ocr_screenshot": "📷 OCR-skjermbilde (Win+Shift+T)",
 	"sg_actions.screen_record": "⏺ Skjermopptak",
 	"sg_actions.screenshot_fullscreen_clipboard": "📸 🖥 Kopier skjerm",
 	"sg_actions.screenshot_fullscreen_save": "📸 🖥 Lagre skjerm",

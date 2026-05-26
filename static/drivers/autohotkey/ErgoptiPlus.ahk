@@ -374,6 +374,7 @@ global KEYBOARD_SHORTCUT_DEFAULTS := Map(
     "win_a", "select_line",
     "win_d", "open_hotstrings_editor",
     "win_g", "open_url",
+    "win_c", "ocr_screenshot",
     "win_h", "screen_capture",
     "win_m", "activity_simulation",
     "win_n", "take_note",

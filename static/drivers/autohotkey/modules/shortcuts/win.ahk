@@ -40,11 +40,6 @@ if Features["shortcuts"]["screen"] {
     AddShortcut("#", "h", (*) => SendFinalResult("#+s"))
 }
 
-if Features["shortcuts"]["screen_ocr"] {
-    ; Win + C (oCr screenshot) — triggers Win+Shift+T (PowerToys OCR or built-in text extraction)
-    AddShortcut("#", "c", (*) => SendFinalResult("#+t"))
-}
-
 if Features["shortcuts"]["gpt"]["enabled"] {
     ; Win + G (GPT)
     AddShortcut("#", "g", (*) => Run(Features["shortcuts"]["gpt"]["link"]))

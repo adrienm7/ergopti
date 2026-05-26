@@ -1180,6 +1180,7 @@
 	"sg_actions.right_click_toggle": "🖱 H Högerklick (håll)",
 	"sg_actions.screen_capture": "📸 Selektiv skärmdump (Win+Shift+S)",
 	"sg_actions.screen_capture_instant": "📸 Omedelbar skärmdump (fönster)",
+	"sg_actions.ocr_screenshot": "📷 OCR-skärmdump (Win+Shift+T)",
 	"sg_actions.screen_record": "⏺ Skärminspegling",
 	"sg_actions.screenshot_fullscreen_clipboard": "📸 🖥 Kopiera skärm",
 	"sg_actions.screenshot_fullscreen_save": "📸 🖥 Spara skärm",
