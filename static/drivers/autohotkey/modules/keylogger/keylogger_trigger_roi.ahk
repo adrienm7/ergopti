@@ -98,6 +98,25 @@ class KLRoi {
 
 
 
+; =====================================
+; ===== 2.1) Initialization guard =====
+; =====================================
+
+; Returns false and logs an error if the keylogger has not been initialised yet.
+; Every public function that writes to the log or reads live session data must
+; call this first so pre-init calls fail loudly rather than silently doing nothing.
+KL_Roi_RequireInit(func_name) {
+	if !Keylogger.initialized {
+		LoggerError("KLRoi", "'%s' called before KL_Init() — keylogger not initialized.", func_name)
+		return false
+	}
+	return true
+}
+
+
+
+
+
 ; =========================================
 ; =======================================
 ; ======= 3/ Savings accumulation =======
@@ -106,6 +125,8 @@ class KLRoi {
 
 ; Called from KL_LogHotstring in keylogger.ahk after the event is logged.
 KL_Roi_OnHotstring(trigger, net_saved) {
+	if !KL_Roi_RequireInit("KL_Roi_OnHotstring")
+		return
     if (net_saved <= 0)
         return
     KLRoi.session_saved_chars += net_saved
@@ -137,6 +158,8 @@ KL_Roi_OnHotstring(trigger, net_saved) {
 ; Called from KL_Hook_OnChar on every character. Accumulates the current
 ; word and flushes it at word boundaries.
 KL_Roi_OnChar(c) {
+	if !KL_Roi_RequireInit("KL_Roi_OnChar")
+		return
     ; Word characters — accumulate
     if (c != " " and c != "`t" and c != "`n" and c != "`r"
             and c != "." and c != "," and c != "!" and c != "?") {
@@ -198,8 +221,8 @@ KL_Roi_ProcessWord(word) {
 ; ===================================================
 
 KL_Roi_HalflifeTick() {
-    if !Keylogger.initialized
-        return
+	if !KL_Roi_RequireInit("KL_Roi_HalflifeTick")
+		return
     ; We rely on the in-memory trigger_last_use map which only contains
     ; triggers seen THIS session. A full historical analysis would require
     ; querying data.sql; that is deferred to the dashboard SQL layer.
