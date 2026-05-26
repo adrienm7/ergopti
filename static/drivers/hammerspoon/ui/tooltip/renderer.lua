@@ -103,14 +103,18 @@ function M.apply_tint(requested_tint)
 	local min_c = math.min(r, g, b)
 	local delta = max_c - min_c
 
-	local hue = 0
-	if delta > 0.0001 then
-		if max_c == r then hue = ((g - b) / delta) % 6
-		elseif max_c == g then hue = (b - r) / delta + 2
-		else hue = (r - g) / delta + 4
-		end
-		hue = hue / 6
+	-- Achromatic accent carries no hue — fall back to the neutral dark background,
+	-- matching the JS reference (mixTint in tint.js checks delta < 0.0001).
+	if delta < 0.0001 then
+		return Config.colors.bg
 	end
+
+	local hue = 0
+	if max_c == r then hue = ((g - b) / delta) % 6
+	elseif max_c == g then hue = (b - r) / delta + 2
+	else hue = (r - g) / delta + 4
+	end
+	hue = hue / 6
 
 	local lightness = 0.10
 	local saturation = 0.40
