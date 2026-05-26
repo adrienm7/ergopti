@@ -276,16 +276,12 @@ KL_AV_PollFocusMode() {
         loop reg root, "KR" {
             if InStr(A_LoopRegName, "quiethoursstate") {
                 ; Data is a binary value; first DWORD is the state
-                try {
-                    raw := RegRead(root . "\" . A_LoopRegName . "\Current\InitialDownloadData",
-                        "Data")
-                    ; raw is the raw binary — state is encoded in the first 4 bytes
-                    ; For simplicity treat any value != "" as "focus active"
-                    if (raw != "")
-                        state_val := 1
-                } catch {
-                    ; Key not present = off
-                }
+                ; Absent key means Focus is off — REG_NOT_FOUND sentinel signals that cleanly
+                raw := Reg_Read(root . "\" . A_LoopRegName . "\Current\InitialDownloadData", "Data", REG_NOT_FOUND)
+                ; raw is the raw binary — state is encoded in the first 4 bytes;
+                ; any present value (even empty string) means Focus is active
+                if (raw != REG_NOT_FOUND and raw != "")
+                    state_val := 1
                 break
             }
         }
