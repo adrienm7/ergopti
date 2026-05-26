@@ -20,11 +20,13 @@
 		"test:manifest-parity": "node ./scripts/test-manifest-parity.cjs",
 		"test:ahk-encoding": "node ./scripts/test-ahk-encoding.cjs",
 		"test:manifest-equivalence": "node ./scripts/test-manifest-equivalence.cjs",
+		"test:properties": "node ./scripts/test-properties.cjs",
 		"fix:banners": "node ./scripts/lint-conventions.js --fix-banners --warn-only",
 		"fix:spacing": "node ./scripts/lint-conventions.js --fix-spacing --warn-only",
 		"fix:unbalanced": "node ./scripts/lint-conventions.js --fix-unbalanced --warn-only",
 		"fix:all": "node ./scripts/lint-conventions.js --fix-banners --fix-unbalanced --fix-spacing --warn-only",
-		"install:hammerspoon": "bash ./scripts/install-hammerspoon.sh"
+		"install:hammerspoon": "bash ./scripts/install-hammerspoon.sh",
+		"bench:hotstring": "node ./scripts/bench-hotstring.cjs"
 	},
 	"type": "module",
 	"dependencies": {
@@ -39,6 +41,7 @@
 		"@sveltejs/enhanced-img": "^0.8.1",
 		"@sveltejs/kit": "^2.53.4",
 		"@types/aos": "^3.0.7",
+		"fast-check": "^4.8.0",
 		"husky": "^8.0.0",
 		"lint-staged": "^16.1.5",
 		"pm2": "^5.4.3",
