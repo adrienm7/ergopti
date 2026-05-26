@@ -6,8 +6,8 @@
 # files in the working tree. Re-stages each file after formatting so the
 # commit includes the sorted version without requiring a manual git add.
 
-HOTSTRING_PATTERN="static/hotstrings/*.toml"
-STAGED=$(git diff --cached --name-only --diff-filter=ACM | grep -E '^static/hotstrings/[^/]+\.toml$' || true)
+HOTSTRING_PATTERN="static/drivers/_shared/hotstrings/*.toml"
+STAGED=$(git diff --cached --name-only --diff-filter=ACM | grep -E '^static/drivers/_shared/hotstrings/[^/]+\.toml$' || true)
 
 if [ -n "$STAGED" ]; then
     for f in $STAGED; do

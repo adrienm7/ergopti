@@ -43,8 +43,7 @@ from pathlib import Path
 # sibling of the EXE; everything under "vendor/..." sits next to the EXE so
 # DllCall(A_ScriptDir . "\vendor\sqlite3.dll", ...) keeps resolving.
 ASSET_TREES: list[tuple[str, str, tuple[str, ...]]] = [
-	# Hotstring TOMLs — the canonical source the driver loads at boot.
-	("static/hotstrings",                       "static/hotstrings",                       ()),
+	# Hotstring TOMLs live in _shared since item 1.3.5 — bundled via _shared tree below.
 	# Locale files for the i18n module and every WebView panel.
 	("static/locales",                          "static/locales",                          ()),
 	# Driver icons (on/off) and language flags.
