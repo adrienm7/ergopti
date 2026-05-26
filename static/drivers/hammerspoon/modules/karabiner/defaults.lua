@@ -4,7 +4,7 @@
 --- MODULE: Karabiner Defaults
 --- DESCRIPTION:
 --- Single source of truth for all user-configurable karabiner defaults.
---- Action IDs reference data/actions.json. Edit this file to change what
+--- Action IDs reference _shared/karabiner/actions.json. Edit this file to change what
 --- "Reset to defaults" restores.
 --- ==============================================================================
 

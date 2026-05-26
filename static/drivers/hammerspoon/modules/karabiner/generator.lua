@@ -10,9 +10,9 @@
 --- settings) and deploying the result to the KE config directory.
 ---
 --- FEATURES & RATIONALE:
---- 1. CapsWord Priority: capsword.json is loaded first so CapsWord activation
----    always takes precedence over any tap/hold or combo rule that shares the
----    same key — without this ordering, RCmd+CapsLock combos could steal the
+--- 1. CapsWord Priority: _shared/karabiner/capsword.json is loaded first so CapsWord
+---    activation always takes precedence over any tap/hold or combo rule that shares
+---    the same key — without this ordering, RCmd+CapsLock combos could steal the
 ---    event before CapsWord’s simultaneous matcher fires.
 --- 2. Physical State Tracking: every tap/hold rule sets ke_held_<key_code>=1
 ---    on key_down and clears it on key_up, letting combo and sentinel rules
@@ -657,9 +657,9 @@ end
 --- @param tap_hold_keys table List from Config.load_tap_hold_keys.
 --- @param mod_combos table List from Config.load_mod_combos.
 --- @param non_canonical table Set from Config.compute_non_canonical_combos.
---- @param self_dir string Directory containing data/ (init.lua's directory).
+--- @param shared_dir string Path to _shared/karabiner/ containing the JSON data files.
 --- @return table Karabiner config table ready for hs.json.encode.
-function M.build_karabiner_json(state, available_actions, tap_hold_keys, mod_combos, non_canonical, self_dir)
+function M.build_karabiner_json(state, available_actions, tap_hold_keys, mod_combos, non_canonical, shared_dir)
 	-- Inject F20 sentinel into every nav-layer-activating action BEFORE indexing,
 	-- so all downstream rule builders (tap/hold, combo, etc.) inherit the sentinel.
 	prepend_nav_layer_sentinel(available_actions)
@@ -672,7 +672,7 @@ function M.build_karabiner_json(state, available_actions, tap_hold_keys, mod_com
 	-- CapsWord must be first — it must match before any modifier combo or
 	-- tap/hold rule so that RCmd+CapsLock activates CapsWord regardless of
 	-- whatever else is mapped to those keys.
-	local capsword_rule = load_json_file(self_dir .. "data/capsword.json")
+	local capsword_rule = load_json_file(shared_dir .. "capsword.json")
 	if capsword_rule then
 		all_rules[#all_rules + 1] = capsword_rule
 	else
@@ -757,7 +757,7 @@ function M.build_karabiner_json(state, available_actions, tap_hold_keys, mod_com
 	-- Always-on rules (complex logic that cannot be expressed as tap / hold).
 	-- CapsWord is already at the top of all_rules — skipped here intentionally.
 	for _, fname in ipairs(ALWAYS_ON_RULES) do
-		local rule = load_json_file(self_dir .. "data/" .. fname)
+		local rule = load_json_file(shared_dir .. fname)
 		if rule then
 			all_rules[#all_rules + 1] = rule
 		else
