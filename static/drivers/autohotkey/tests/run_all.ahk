@@ -58,6 +58,7 @@ SetWorkingDir(A_ScriptDir)
 #Include ../lib/layout/layout_shift_caps.ahk
 #Include ../lib/tooltip.ahk
 ; json.ahk must precede i18n.ahk — _I18nLoadFile now delegates to JsonParse.
+#Include ../lib/registry.ahk
 #Include ../lib/json.ahk
 ; i18n is included here because gestures.ahk calls t() at the top level
 ; when building GESTURE_SLOT_LABELS; without this the process blocks on
@@ -98,6 +99,7 @@ InstallHotstringHooks()
 #Include test_i18n.ahk
 #Include test_window_utils.ahk
 #Include test_string_utils.ahk
+#Include test_registry.ahk
 #Include test_nav_layer_helpers.ahk
 
 ; Gestures module — included here because its pure logic (assignments, action
