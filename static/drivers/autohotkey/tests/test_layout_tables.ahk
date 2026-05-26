@@ -18,7 +18,7 @@ _BuildShiftCapsTables()
 
 ; ── Assertion helpers ──
 _AssertSCsPresent(M, SCs) {
-	for _, SC in SCs {
+	for _Unused, SC in SCs {
 		AssertTrue(M.Has(SC), "missing SC: " . SC)
 	}
 }
@@ -148,7 +148,7 @@ Test("CAPSLOCK_SYMBOLS: every entry is callable", TestLT_CapsLockSymbolsCallable
 ; tests fire every entry through the dispatcher to catch any regression.
 TestLT_RegressionBaseRows() {
 	ResetStubRecorders()
-	for SC, _ in ALTGR_BASE_ROWS {
+	for SC, _Unused in ALTGR_BASE_ROWS {
 		try {
 			AltGrShiftDispatch(SC, ALTGR_BASE_ROWS, "fake-hotkey-name")
 		} catch as e {
@@ -161,7 +161,7 @@ Test("AltGrShiftDispatch: no entry overflows the BoundFunc signature (base rows)
 
 TestLT_RegressionPlusOverrides() {
 	ResetStubRecorders()
-	for SC, _ in ALTGR_PLUS_OVERRIDES {
+	for SC, _Unused in ALTGR_PLUS_OVERRIDES {
 		try {
 			AltGrShiftDispatch(SC, ALTGR_PLUS_OVERRIDES, "fake-hotkey-name")
 		} catch as e {
@@ -174,7 +174,7 @@ Test("AltGrShiftDispatch: no entry overflows the BoundFunc signature (Plus)",
 
 TestLT_RegressionNumberRow() {
 	ResetStubRecorders()
-	for SC, _ in ALTGR_NUMBER_ROW {
+	for SC, _Unused in ALTGR_NUMBER_ROW {
 		try {
 			AltGrShiftDispatch(SC, ALTGR_NUMBER_ROW, "fake-hotkey-name")
 		} catch as e {
@@ -292,7 +292,7 @@ Test("ALTGR_NUMBER_ROW: SC029 (euro/currency) entry is present and callable",
 	TestLT_AltGrEuroKey)
 
 TestLT_AltGrSuperscriptRow() {
-	for _, SC in ["SC002", "SC003", "SC004", "SC005", "SC006",
+	for _Unused, SC in ["SC002", "SC003", "SC004", "SC005", "SC006",
 	              "SC007", "SC008", "SC009", "SC00A", "SC00B"] {
 		AssertTrue(ALTGR_NUMBER_ROW.Has(SC), "missing SC: " . SC)
 		Entry := ALTGR_NUMBER_ROW[SC]
@@ -316,7 +316,7 @@ Test("ALTGR_NUMBER_ROW: SC00D (degree sign) is present", TestLT_AltGrDegreeKey)
 ; ==========================
 TestLT_CtrlAltDispatchAllEntries() {
 	ResetHotstringRecorders()
-	for Combo, _ in CTRL_ALT_NUMPAD {
+	for Combo, _Unused in CTRL_ALT_NUMPAD {
 		try {
 			CtrlAltDispatch(Combo, "fake-hotkey-name")
 		} catch as e {

@@ -254,10 +254,10 @@ TOML_BatchWrite(Path, Updates) {
     ; ``for`` over the resulting Map preserves it; we rebuild the order
     ; explicitly to make new sections deterministic.
     order := []
-    for sec, _ in Sections
+    for sec, _Unused in Sections
         order.Push(sec)
 
-    for _, U in Updates {
+    for _Unused, U in Updates {
         Sec := U.Section
         K := U.Key
         V := U.Value
@@ -298,11 +298,11 @@ TOML_BatchWrite(Path, Updates) {
 
     ; Sort sections alphabetically for stable, readable output
     SortedSections := []
-    for _, sec in order
+    for _Unused, sec in order
         SortedSections.Push(sec)
     SortedSections := SortArray(SortedSections)
     FirstSection := true
-    for _, sec in SortedSections {
+    for _Unused, sec in SortedSections {
         if !FirstSection {
             EnsureTrailingBlankLines(5)
         }
@@ -313,7 +313,7 @@ TOML_BatchWrite(Path, Updates) {
         for k, v in Sections[sec]
             SortedKeys.Push(k)
         SortedKeys := SortArray(SortedKeys)
-        for _, k in SortedKeys
+        for _Unused, k in SortedKeys
             body .= TOML_RenderKey(k) . " = " . TOML_RenderValue(Sections[sec][k]) . "`n"
     }
 

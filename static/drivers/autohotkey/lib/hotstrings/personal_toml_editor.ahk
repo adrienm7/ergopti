@@ -166,7 +166,7 @@ ReadPersonalToml() {
     MetaDescriptions := Map()
 
     if RegExMatch(FileContent, "m)^sections_order\s*=\s*\[([^\]]+)\]", &OM) {
-        for _, Token in StrSplit(OM[1], ",") {
+        for _Unused, Token in StrSplit(OM[1], ",") {
             Token := Trim(Token, " `t`n" . Q)
             if (Token != "") {
                 MetaOrder.Push(StrLower(Token))
@@ -242,13 +242,13 @@ ReadPersonalToml() {
 
     ; ── Build final sections_order: meta order first, then unlisted sections ──
     Seen := Map()
-    for _, SecName in MetaOrder {
+    for _Unused, SecName in MetaOrder {
         if Result["sections"].Has(SecName) {
             Result["sections_order"].Push(SecName)
             Seen[SecName] := true
         }
     }
-    for _, SecName in FileSectionOrder {
+    for _Unused, SecName in FileSectionOrder {
         if !Seen.Has(SecName) {
             Result["sections_order"].Push(SecName)
         }
@@ -270,26 +270,26 @@ WritePersonalToml(Data) {
 
     ; Build sections_order as a TOML inline array
     OrderParts := []
-    for _, SecName in Data["sections_order"] {
+    for _Unused, SecName in Data["sections_order"] {
         OrderParts.Push(Q . EscapeTomlValue(SecName) . Q)
     }
     Lines.Push("sections_order = [" . ArrayJoin(OrderParts, ", ") . "]")
 
     Lines.Push("[_meta.sections]")
-    for _, SecName in Data["sections_order"] {
+    for _Unused, SecName in Data["sections_order"] {
         if Data["sections"].Has(SecName) {
             Desc := Data["sections"][SecName]["description"]
             Lines.Push(EscapeTomlValue(SecName) . " = " . Q . EscapeTomlValue(Desc) . Q)
         }
     }
 
-    for _, SecName in Data["sections_order"] {
+    for _Unused, SecName in Data["sections_order"] {
         if !Data["sections"].Has(SecName) {
             continue
         }
         Sec := Data["sections"][SecName]
         Lines.Push("[[" . SecName . "]]")
-        for _, E in Sec["entries"] {
+        for _Unused, E in Sec["entries"] {
             IsWord := E["is_word"] ? "true" : "false"
             AutoExp := E["auto_expand"] ? "true" : "false"
             IsCaseSens := E["is_case_sensitive"] ? "true" : "false"
@@ -391,7 +391,7 @@ WritePersonalInfoToml(FilePath) {
     }
 
     Content := ""
-    for _, L in Lines {
+    for _Unused, L in Lines {
         Content .= L . "`r`n"
     }
 
@@ -452,7 +452,7 @@ ReloadPersonalSection(Data, SectionName, FeatureConfig) {
     if !Data["sections"].Has(SectionName) {
         return
     }
-    for _, E in Data["sections"][SectionName]["entries"] {
+    for _Unused, E in Data["sections"][SectionName]["entries"] {
         Trigger := StrReplace(E["trigger"], "★", ScriptInformation["MagicKey"])
         Output := E["output"]
         Flags := ""
@@ -657,7 +657,7 @@ OpenPersonalEditor(DefaultSection := "") {
 ; DDL index always matches sections_order index 1:1.
 _BuildSectionList(Data) {
     List := []
-    for _, SecName in Data["sections_order"] {
+    for _Unused, SecName in Data["sections_order"] {
         Desc := Data["sections"].Has(SecName) ? Data["sections"][SecName]["description"] : SecName
         List.Push(Desc)
     }
@@ -706,7 +706,7 @@ _PopulateList(LV, Data, SectionName) {
     if (SectionName == "" or !Data["sections"].Has(SectionName)) {
         return
     }
-    for _, E in Data["sections"][SectionName]["entries"] {
+    for _Unused, E in Data["sections"][SectionName]["entries"] {
         LV.Add("",
             E["trigger"],
             StrReplace(E["output"], "`n", "↵"),
@@ -749,10 +749,10 @@ _ClearForm(TriggerEdit, OutputEdit, ChkIsWord, ChkAutoExp, ChkCaseSens, ChkFinal
 }
 
 _BuildEntry(TriggerEdit, OutputEdit, ChkIsWord, ChkAutoExp, ChkCaseSens, ChkFinal) {
-    T := Trim(TriggerEdit.Value)
+    TriggerVal := Trim(TriggerEdit.Value)
     O := NormaliseOutput(OutputEdit.Value)
     return Map(
-        "trigger", T,
+        "trigger", TriggerVal,
         "output", O,
         "is_word", ChkIsWord.Value == 1,
         "auto_expand", ChkAutoExp.Value == 1,
@@ -787,9 +787,9 @@ _SaveData(W, LV, StatusText) {
 
 _AddEntry(W, LV, TriggerEdit, OutputEdit, ChkIsWord, ChkAutoExp, ChkCaseSens, ChkFinal, CloseOnAddChk, StatusText) {
     global _PersonalEditorData, _PersonalEditorSection
-    T := Trim(TriggerEdit.Value)
+    TriggerVal := Trim(TriggerEdit.Value)
     O := Trim(OutputEdit.Value)
-    if (T == "" or O == "") {
+    if (TriggerVal == "" or O == "") {
         StatusText.Value := t("editor.hotstrings.err_trigger_required")
         return
     }
@@ -798,8 +798,8 @@ _AddEntry(W, LV, TriggerEdit, OutputEdit, ChkIsWord, ChkAutoExp, ChkCaseSens, Ch
         return
     }
     ; Check for duplicate trigger in this section
-    for _, E in _PersonalEditorData["sections"][_PersonalEditorSection]["entries"] {
-        if (E["trigger"] == T) {
+    for _Unused, E in _PersonalEditorData["sections"][_PersonalEditorSection]["entries"] {
+        if (E["trigger"] == TriggerVal) {
             StatusText.Value := t("editor.hotstrings.err_duplicate")
             return
         }
@@ -821,9 +821,9 @@ _SaveEntry(W, LV, TriggerEdit, OutputEdit, ChkIsWord, ChkAutoExp, ChkCaseSens, C
         StatusText.Value := t("editor.hotstrings.err_select_to_edit")
         return
     }
-    T := Trim(TriggerEdit.Value)
+    TriggerVal := Trim(TriggerEdit.Value)
     O := Trim(OutputEdit.Value)
-    if (T == "" or O == "") {
+    if (TriggerVal == "" or O == "") {
         StatusText.Value := t("editor.hotstrings.err_trigger_required")
         return
     }
@@ -947,7 +947,7 @@ _DeleteSection(W, SectionDrop, LV, TriggerEdit, OutputEdit, ChkIsWord, ChkAutoEx
     }
     ; Remove from order array
     NewOrder := []
-    for _, SecName in _PersonalEditorData["sections_order"] {
+    for _Unused, SecName in _PersonalEditorData["sections_order"] {
         if (SecName != _PersonalEditorSection) {
             NewOrder.Push(SecName)
         }

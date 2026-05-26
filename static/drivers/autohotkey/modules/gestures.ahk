@@ -1112,8 +1112,8 @@ GestureGetCyclableWindows(ProcessFilter := "") {
             if (ExStyle & 0x80) {
                 continue
             }
-            Class := WinGetClass("ahk_id " . HWnd)
-            if (Class = "Progman" || Class = "WorkerW" || Class = "Shell_TrayWnd") {
+            WinClass := WinGetClass("ahk_id " . HWnd)
+            if (WinClass = "Progman" || WinClass = "WorkerW" || WinClass = "Shell_TrayWnd") {
                 continue
             }
             ; DWMWA_CLOAKED = 14 — windows on other virtual desktops
@@ -1375,9 +1375,9 @@ GestureCycleWindows(Forward) {
         N, Index, Forward)
     for I, HWnd in Windows {
         try {
-            T := WinGetTitle("ahk_id " . HWnd)
+            WinTitle := WinGetTitle("ahk_id " . HWnd)
             C := WinGetClass("ahk_id " . HWnd)
-            LoggerDebug("gestures", "  [{1}] HWND={2} class='{3}' title='{4}'.", I, HWnd, C, T)
+            LoggerDebug("gestures", "  [{1}] HWND={2} class='{3}' title='{4}'.", I, HWnd, C, WinTitle)
         }
     }
 
@@ -1682,12 +1682,12 @@ GestureAutoConfigureRegistry() {
     Errors := 0
 
     ; Master enables — turn the gesture families on
-    for _, Name in GESTURE_REG_MASTER_ENABLES {
+    for _Unused, Name in GESTURE_REG_MASTER_ENABLES {
         GestureRegWriteDword(Name, GESTURE_REG_CUSTOM_VALUE, &Errors)
     }
 
     ; Per-slot configuration
-    for _, Slot in GESTURE_SLOTS {
+    for _Unused, Slot in GESTURE_SLOTS {
         ; Direction enables (swipes only)
         if GESTURE_REG_ENABLE_NAMES.Has(Slot) {
             GestureRegWriteDword(GESTURE_REG_ENABLE_NAMES[Slot],

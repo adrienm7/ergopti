@@ -282,7 +282,7 @@ RegisterAltGrLayer() {
 
     ; --- ErgoptiPlus overrides (registered first, lowest precedence) ---
     HotIf((*) => Features["layout"]["ergopti_plus"] and IsRealAltGrPress())
-    for SC, _ in ALTGR_PLUS_OVERRIDES {
+    for SC, _Unused in ALTGR_PLUS_OVERRIDES {
         Hotkey("SC138 & " . SC, AltGrShiftDispatch.Bind(SC, ALTGR_PLUS_OVERRIDES), "I2")
     }
 
@@ -290,7 +290,7 @@ RegisterAltGrLayer() {
     HotIf((*) => Features["layout"]["ergopti_alt_gr"]
         and Features["layout"]["ergopti_base"]
         and IsRealAltGrPress())
-    for SC, _ in ALTGR_NUMBER_ROW {
+    for SC, _Unused in ALTGR_NUMBER_ROW {
         Hotkey("SC138 & " . SC, AltGrShiftDispatch.Bind(SC, ALTGR_NUMBER_ROW), "I2")
     }
     for SC, Combo in CTRL_ALT_NUMPAD {
@@ -299,7 +299,7 @@ RegisterAltGrLayer() {
 
     ; --- ErgoptiAltGr base rows (registered last, highest precedence) ---
     HotIf((*) => Features["layout"]["ergopti_alt_gr"] and IsRealAltGrPress())
-    for SC, _ in ALTGR_BASE_ROWS {
+    for SC, _Unused in ALTGR_BASE_ROWS {
         Hotkey("SC138 & " . SC, AltGrShiftDispatch.Bind(SC, ALTGR_BASE_ROWS), "I2")
     }
 

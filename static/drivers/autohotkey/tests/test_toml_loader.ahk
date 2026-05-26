@@ -236,7 +236,7 @@ Test("FoldAsciiLower: pure ASCII input is just lowercased", TestTL_FoldNoAccents
 TestTL_ReadTomlTwoDifferentFiles() {
 	TmpA := A_ScriptDir . "\test_toml_a.toml"
 	TmpB := A_ScriptDir . "\test_toml_b.toml"
-	for _, P in [TmpA, TmpB] {
+	for _Unused, P in [TmpA, TmpB] {
 		if FileExist(P) {
 			FileDelete(P)
 		}

@@ -73,15 +73,15 @@ _MetaRunDuplicateDefaultsTests() {
 	; Map of "name=value" -> array of relative file paths
 	Seen := Map()
 
-	for _, Sub in ["lib", "modules"] {
-		for _, Abs in _MetaListAhkFilesDups(StrReplace(DriverRoot . Sub, "/", "\")) {
+	for _Unused, Sub in ["lib", "modules"] {
+		for _Unused, AbsPath in _MetaListAhkFilesDups(StrReplace(DriverRoot . Sub, "/", "\")) {
 			try {
-				Body := FileRead(StrReplace(Abs, "/", "\"))
+				Body := FileRead(StrReplace(AbsPath, "/", "\"))
 			} catch {
 				continue
 			}
 			NormRoot := StrReplace(DriverRoot, "\", "/")
-			Rel := SubStr(StrReplace(Abs, "\", "/"), StrLen(NormRoot) + 1)
+			Rel := SubStr(StrReplace(AbsPath, "\", "/"), StrLen(NormRoot) + 1)
 
 			; Scan for global constant declarations: `global NAME := VALUE`
 			Pos := 1
@@ -94,7 +94,7 @@ _MetaRunDuplicateDefaultsTests() {
 						Seen[Key] := []
 					}
 					AlreadyThere := false
-					for _, F in Seen[Key] {
+					for _Unused, F in Seen[Key] {
 						if F = Rel {
 							AlreadyThere := true
 							break
@@ -117,7 +117,7 @@ _MetaRunDuplicateDefaultsTests() {
 		if Files.Length > 1 {
 			DupCount++
 			FileList := ""
-			for _, F in Files {
+			for _Unused, F in Files {
 				FileList .= F . ", "
 			}
 			OutputDebug("WARN: constant " . Key . " declared in: " . SubStr(FileList, 1, -2))

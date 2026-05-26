@@ -160,12 +160,12 @@ RunTests() {
 	global TEST_REGISTRY, TEST_PASS_COUNT, TEST_FAIL_COUNT
 	_TestPrint("1.." . TEST_REGISTRY.Length)
 	Index := 0
-	for _, T in TEST_REGISTRY {
+	for _Unused, TestEntry in TEST_REGISTRY {
 		Index += 1
 		Status := "ok"
 		Detail := ""
 		try {
-			T.callback.Call()
+			TestEntry.callback.Call()
 		} catch as e {
 			Status := "not ok"
 			Detail := " — " . e.Message . " [" . e.File . ":" . e.Line . "]"
@@ -175,7 +175,7 @@ RunTests() {
 		} else {
 			TEST_FAIL_COUNT += 1
 		}
-		_TestPrint(Status . " " . Index . " - " . T.name . Detail)
+		_TestPrint(Status . " " . Index . " - " . TestEntry.name . Detail)
 	}
 	_TestPrint("# " . TEST_PASS_COUNT . " passed, " . TEST_FAIL_COUNT . " failed.")
 	ExitApp(TEST_FAIL_COUNT > 0 ? 1 : 0)
