@@ -496,25 +496,38 @@ SC00D:: SendNewResult("=")
 ; while the unshifted key already sends the digit via the block above.
 ; SC029, SC00C, SC00D (outside the 1-0 run) are intentionally left alone.
 if Features["layout"]["direct_access_digits"] and _OsLayoutDigitsAreShifted() {
-	_DIGIT_SCANCODES := ["SC002", "SC003", "SC004", "SC005", "SC006",
-	                     "SC007", "SC008", "SC009", "SC00A", "SC00B"]
-	for _, SC in _DIGIT_SCANCODES {
-		; Shift+key → passthrough to the OS layout (yields &, é, ", …)
-		; Use .Bind() to freeze the SC value per iteration — fat-arrow
-		; closures in AHK v2 capture by reference, which would leave every
-		; callback pointing at the last loop value.
-		Hotkey("+" SC, _DigitShiftDown.Bind(SC), "I2")
-		Hotkey("+" SC . " Up", _DigitShiftUp.Bind(SC), "I2")
+	; Scancodes SC002–SC00B in the order 1–0
+	_DIGIT_SCANCODES := [0x02, 0x03, 0x04, 0x05, 0x06,
+	                     0x07, 0x08, 0x09, 0x0A, 0x0B]
+	HKL := GetForegroundKeyboardLayout()
+	for SC in _DIGIT_SCANCODES {
+		; Resolve the VK for this scancode on the active OS layout, then ask
+		; Windows what Shift+VK produces as a Unicode character.
+		; We send that character directly with {Text} so it bypasses the
+		; SC002–SC00B hooks entirely (those only intercept physical scancodes,
+		; not synthesised VK events with {Text}).
+		VK     := DllCall("MapVirtualKeyExW", "UInt", SC, "UInt", 1, "Ptr", HKL, "UInt")
+		; ToUnicodeEx with shift flag (0x8000 on VK_SHIFT in key-state buffer)
+		KeyState := Buffer(256, 0)
+		NumPut("UChar", 0x80, KeyState, 0x10)   ; VK_SHIFT = 0x10, pressed
+		WChar  := Buffer(4, 0)
+		Len    := DllCall("ToUnicodeEx", "UInt", VK, "UInt", SC, "Ptr", KeyState,
+		                  "Ptr", WChar, "Int", 2, "UInt", 0, "Ptr", HKL, "Int")
+		if (Len > 0) {
+			Symbol := StrGet(WChar, Len, "UTF-16")
+			; Bind the resolved symbol so each closure captures its own value
+			Hotkey("+" Format("SC{:03X}", SC), _DigitShiftSend.Bind(Symbol), "I2")
+		}
 	}
 }
 
-; Top-level helpers for the shifted-symbol passthrough (must be at module
-; scope so AHK v2 hoists them before the if-block above executes).
-_DigitShiftDown(SC, *) {
-	SendEvent("{Blind}{" . SC . " Down}")
-}
-_DigitShiftUp(SC, *) {
-	SendEvent("{Blind}{" . SC . " Up}")
+; Top-level helper for the shifted-symbol send — must be at module scope so
+; AHK v2 hoists it before the if-block above executes.
+_DigitShiftSend(Symbol, *) {
+	; SendEvent {Text} bypasses the keyboard hook and sends the Unicode
+	; character directly, so the SC002–SC00B digit remaps never interfere.
+	SendEvent("{Text}" . Symbol)
+	UpdateLastSentCharacter(Symbol)
 }
 
 ; Cannot be HotIf because the remapping is done with Hotkey function and cannot be undone afterwards.
