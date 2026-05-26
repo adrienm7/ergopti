@@ -11,6 +11,23 @@
 --- 2. File Discovery: Dynamically loads private and public configuration files.
 --- ==============================================================================
 
+-- Inject the _shared/lua root into package.path so that lib/ shims for
+-- toml_codec, toml_reader, and toml_writer can resolve their shared modules.
+-- This must run before any require() that pulls in those libs.
+do
+	local _src = debug.getinfo(1, "S").source:gsub("^@", "")
+	-- Resolve absolute path when source is relative (Hammerspoon always provides abs)
+	local _abs = _src:match("^[/\\]") and _src or (hs.fs and hs.fs.currentDir and hs.fs.currentDir() .. "/" .. _src or _src)
+	-- Strip "init.lua" to get the HS driver root
+	local _hs_root = _abs:match("^(.*)[/\\][^/\\]+$") or _abs
+	-- _shared/ lives one level up from the HS driver root (in drivers/)
+	local _drivers  = _hs_root:match("^(.*)[/\\][^/\\]+$") or _hs_root
+	local _shared   = _drivers .. "/_shared/lua"
+	if not package.path:find(_shared, 1, true) then
+		package.path = _shared .. "/?.lua;" .. _shared .. "/?/init.lua;" .. package.path
+	end
+end
+
 
 
 

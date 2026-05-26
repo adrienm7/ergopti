@@ -20,11 +20,35 @@ local self_path = debug.getinfo(1, "S").source:gsub("^@", "")
 local driver_root = self_path:match("^(.*)[/\\]tests[/\\]run%.lua$") or "."
 driver_root = driver_root:gsub("\\", "/")
 
--- Search the driver root first (so `require("lib.x")` resolves), tests dir, and
--- the stubs dir. Order matters because we want our hs.lua stub to win.
+-- When launched as "lua tests/run.lua" from the HS root, self_path is a
+-- relative path and driver_root resolves to ".". Canonicalise it to an
+-- absolute path so downstream path arithmetic (for _shared/) is reliable.
+if driver_root == "." then
+	local cwd_handle = io.popen("cd")        -- Windows: "cd" prints CWD
+	if not cwd_handle then
+		cwd_handle = io.popen("pwd")         -- POSIX fallback
+	end
+	if cwd_handle then
+		local cwd = cwd_handle:read("*l") or "."
+		cwd_handle:close()
+		driver_root = cwd:gsub("\\", "/"):gsub("/$", "")
+	end
+end
+
+-- The _shared/ Lua libraries live one level above the HS driver root
+-- (i.e. in static/drivers/_shared/lua/). The shims in lib/ need this
+-- entry to resolve toml_codec, toml_reader, and toml_writer modules.
+local drivers_root  = driver_root:match("^(.*)/[^/]+$") or driver_root
+local shared_lua    = drivers_root .. "/_shared/lua"
+
+-- Search the driver root first (so `require("lib.x")` resolves), then the
+-- shared Lua libraries, then tests/ and stubs/. Order matters: hs.lua stub
+-- must win over any real hs module that might appear in the path.
 package.path = table.concat({
 	driver_root .. "/?.lua",
 	driver_root .. "/?/init.lua",
+	shared_lua  .. "/?.lua",
+	shared_lua  .. "/?/init.lua",
 	driver_root .. "/tests/?.lua",
 	driver_root .. "/tests/?/init.lua",
 	driver_root .. "/tests/stubs/?.lua",
