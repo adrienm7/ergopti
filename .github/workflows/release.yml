@@ -2,10 +2,9 @@
 #
 # Builds Ergopti.app (macOS), ErgoptiPlus.exe (Windows), and packages keyboard
 # layout files for all three platforms, then attaches everything to a GitHub
-# Release. Three trigger paths:
-#   1. push of a tag v*     — created by version.yml on every push to main/dev.
-#   2. release: published   — fired by release-please after main is updated.
-#   3. workflow_dispatch    — manual, takes an explicit tag.
+# Release. Two trigger paths:
+#   1. push of a tag v*  — created by version.yml on every push to main/dev.
+#   2. workflow_dispatch — manual, takes an explicit tag.
 #
 # The "prepare-release" job is the single source of truth for the tag and
 # release: every build job depends on it and reads its outputs.
@@ -14,8 +13,6 @@ name: Release Build
 on:
     push:
         tags: ['v*']
-    release:
-        types: [published]
     workflow_dispatch:
         inputs:
             tag:
@@ -84,11 +81,6 @@ jobs:
                           if [[ "$tag" =~ - ]]; then
                               prerelease="true"
                           fi
-                          title="Ergopti ${tag}"
-                          ;;
-                      release)
-                          tag="${GITHUB_REF_NAME}"
-                          ref="$tag"
                           title="Ergopti ${tag}"
                           ;;
                       workflow_dispatch)
@@ -411,22 +403,15 @@ jobs:
                   flags=()
                   [ "$prerelease" = "true" ] && flags+=("--prerelease")
 
-                  if [ "${{ github.event_name }}" = "release" ]; then
-                      # release: event — GitHub already created the release via
-                      # release-please; we only need to attach the assets.
-                      echo "Event is 'release' — uploading assets to existing release '$tag'."
-                      gh release upload "$tag" "${assets[@]}"
-                  else
-                      # push / workflow_dispatch — create fresh release with all
-                      # assets in one atomic call (gh release create accepts files).
-                      echo "Creating release '$tag' with ${#assets[@]} asset(s)…"
-                      gh release create "$tag" \
-                          --target "$ref" \
-                          --title "$title" \
-                          --notes "Changelog will appear below — updating now." \
-                          "${flags[@]}" \
-                          "${assets[@]}"
-                  fi
+                  # Create the release with all assets in one atomic call.
+                  # (gh release create accepts files as trailing arguments.)
+                  echo "Creating release '$tag' with ${#assets[@]} asset(s)…"
+                  gh release create "$tag" \
+                      --target "$ref" \
+                      --title "$title" \
+                      --notes "Changelog will appear below — updating now." \
+                      "${flags[@]}" \
+                      "${assets[@]}"
 
             # Build the changelog section. Delegates to tools/build_changelog.py
             # which aggregates every commit between the previous release tag

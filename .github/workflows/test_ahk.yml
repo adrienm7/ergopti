@@ -16,7 +16,6 @@ on:
             - "scripts/build-features-manifest.js"
             - ".github/workflows/test_ahk.yml"
     workflow_dispatch:
-    workflow_call:
 
 permissions:
     contents: read
