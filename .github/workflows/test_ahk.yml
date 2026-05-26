@@ -53,6 +53,13 @@ jobs:
               run: node ./scripts/build-features-manifest.js
               shell: pwsh
 
+            - name: Manifest parity (AHK ↔ HS codegen equivalence)
+              # Validates that the AHK and HS generated manifests expose identical
+              # version, section_order, cross-platform sections, and feature entries.
+              # Catches any divergence introduced by build-features-manifest.js.
+              run: node ./scripts/test-manifest-parity.cjs
+              shell: pwsh
+
             - name: Download AutoHotkey v2 runtime
               if: steps.cache-ahk.outputs.cache-hit != 'true'
               run: |
