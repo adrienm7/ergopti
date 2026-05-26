@@ -1,0 +1,35 @@
+# .github/workflows/bench.yml
+#
+# Hotstring scan performance benchmark.
+# Runs on every push to main; fails if p95 latency exceeds 5 ms or regresses
+# more than 20% versus the stored baseline in scripts/bench-baseline.json.
+# Not triggered on PRs to avoid slowing the review cycle.
+
+name: bench
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  hotstring-bench:
+    name: Hotstring scan (p95 < 5 ms)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run hotstring benchmark
+        run: npm run bench:hotstring
