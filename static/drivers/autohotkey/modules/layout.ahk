@@ -496,26 +496,26 @@ SC00D:: SendNewResult("=")
 ; while the unshifted key already sends the digit via the block above.
 ; SC029, SC00C, SC00D (outside the 1-0 run) are intentionally left alone.
 if Features["layout"]["direct_access_digits"] and _OsLayoutDigitsAreShifted() {
-	; Scancodes SC002–SC00B in the order 1–0
-	_DIGIT_SCANCODES := [0x02, 0x03, 0x04, 0x05, 0x06,
-	                     0x07, 0x08, 0x09, 0x0A, 0x0B]
-	HKL := GetForegroundKeyboardLayout()
-	for SC in _DIGIT_SCANCODES {
-		; Resolve the VK for this scancode on the active OS layout, then ask
-		; Windows what Shift+VK produces as a Unicode character.
-		; We send that character directly with {Text} so it bypasses the
-		; SC002–SC00B hooks entirely (those only intercept physical scancodes,
-		; not synthesised VK events with {Text}).
-		VK     := DllCall("MapVirtualKeyExW", "UInt", SC, "UInt", 1, "Ptr", HKL, "UInt")
-		; ToUnicodeEx with shift flag (0x8000 on VK_SHIFT in key-state buffer)
-		KeyState := Buffer(256, 0)
-		NumPut("UChar", 0x80, KeyState, 0x10)   ; VK_SHIFT = 0x10, pressed
-		WChar  := Buffer(4, 0)
-		Len    := DllCall("ToUnicodeEx", "UInt", VK, "UInt", SC, "Ptr", KeyState,
-		                  "Ptr", WChar, "Int", 2, "UInt", 0, "Ptr", HKL, "Int")
-		if (Len > 0) {
-			Symbol := StrGet(WChar, Len, "UTF-16")
-			; Bind the resolved symbol so each closure captures its own value
+	; VK codes for digits 1–0 (0x31–0x39 then 0x30) paired with scancodes SC002–SC00B.
+	; ToUnicodeEx does not work on KbdEdit/custom layouts (returns the digit, not the
+	; shifted symbol). GetKeyName("vkXXscYYY") queries the active layout correctly
+	; and returns a single-character string for printable keys — we use that instead.
+	_DIGIT_VK_SC := [
+		[0x31, 0x02], [0x32, 0x03], [0x33, 0x04], [0x34, 0x05], [0x35, 0x06],
+		[0x36, 0x07], [0x37, 0x08], [0x38, 0x09], [0x39, 0x0A], [0x30, 0x0B]
+	]
+	for Pair in _DIGIT_VK_SC {
+		VK := Pair[1]
+		SC := Pair[2]
+		; GetKeyName with the "vkXXscYYY" form queries whatever character the
+		; active layout assigns to this VK+SC combination under Shift.
+		Symbol := GetKeyName("vk" . Format("{:02X}", VK) . "sc" . Format("{:03X}", SC))
+		; Only bind when we got exactly one printable character back — a longer
+		; string means Windows returned a key name ("F1", "Enter"…) which would
+		; mean the layout does not assign a printable symbol here.
+		if (StrLen(Symbol) = 1) {
+			; {Text} sends the Unicode character directly, bypassing the AHK
+			; keyboard hook — so the SC002–SC00B digit remaps never fire again.
 			Hotkey("+" Format("SC{:03X}", SC), _DigitShiftSend.Bind(Symbol), "I2")
 		}
 	}
