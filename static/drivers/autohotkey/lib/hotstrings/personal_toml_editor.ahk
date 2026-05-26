@@ -551,7 +551,7 @@ OpenPersonalEditor(DefaultSection := "") {
     ; ── Top bar: section selector + section management buttons ──
     W.Add("Text", "xm y12 w70 h24 +0x200", t("editor.hotstrings.label_section"))
     SectionDrop := W.Add("DropDownList", "x+6 yp w360", _BuildSectionList(_PersonalEditorData))
-    W.Add("Button", "x+8 yp w110 h24", t("editor.hotstrings.btn_new")).OnEvent("Click", (*) => _NewSection(W, SectionDrop))
+    W.Add("Button", "x+8 yp w110 h24", t("editor.hotstrings.btn_new")).OnEvent("Click", (*) => _NewSection(W, SectionDrop, LV, TriggerEdit, OutputEdit, ChkIsWord, ChkAutoExp, ChkCaseSens, ChkFinal, StatusText))
     W.Add("Button", "x+4 yp w110 h24", t("editor.hotstrings.btn_rename")).OnEvent("Click", (*) => _RenameSection(W, SectionDrop))
     BtnDelSec := W.Add("Button", "x+4 yp w110 h24", t("editor.hotstrings.btn_delete"))
     BtnDelSec.OnEvent("Click", (*) => _DeleteSection(W, SectionDrop))
@@ -863,7 +863,7 @@ _OnSectionChange(SectionDrop, LV, TriggerEdit, OutputEdit, ChkIsWord, ChkAutoExp
     StatusText.Value := ""
 }
 
-_NewSection(W, SectionDrop) {
+_NewSection(W, SectionDrop, LV, TriggerEdit, OutputEdit, ChkIsWord, ChkAutoExp, ChkCaseSens, ChkFinal, StatusText) {
     global _PersonalEditorData, _PersonalEditorSection
     Res := InputBox(t("editor.hotstrings.new_section_prompt"), t("editor.hotstrings.new_section_title"), "w300 h120")
     if Res.Result != "OK" or Trim(Res.Value) == "" {
@@ -895,6 +895,11 @@ _NewSection(W, SectionDrop) {
     _SelectDropDown(SectionDrop, SecName)
     _PersonalEditorSection := SecName
     _EditorPrefSet("DefaultSection", SecName)
+    ; Refresh the list and form to reflect the (empty) new section —
+    ; without this the ListView keeps showing the previous section's entries
+    _PopulateList(LV, _PersonalEditorData, _PersonalEditorSection)
+    _ClearForm(TriggerEdit, OutputEdit, ChkIsWord, ChkAutoExp, ChkCaseSens, ChkFinal)
+    StatusText.Value := ""
 }
 
 _RenameSection(W, SectionDrop) {
