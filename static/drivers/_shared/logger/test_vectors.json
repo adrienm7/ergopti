@@ -174,7 +174,7 @@
       "description": "Format args: float substituted.",
       "variant": "debug",
       "module": "TapHoldLoader",
-      "message_ahk": "Threshold set to {1}s.",
+      "message_ahk": "Threshold set to {1:.2f}s.",
       "message_hs":  "Threshold set to %.2fs.",
       "args": [0.35],
       "expected_ahk": "TIMESTAMP [DEBUG] [TapHoldLoader] Threshold set to 0.35s.",

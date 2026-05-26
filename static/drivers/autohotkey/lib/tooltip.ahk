@@ -704,17 +704,21 @@ _TooltipMixTintHex(AccentHex) {
     MaxC := Max(R, G, B)
     MinC := Min(R, G, B)
     Delta := MaxC - MinC
-    Hue := 0.0
-    if (Delta > 0.0001) {
-        if (MaxC == R) {
-            Hue := Mod((G - B) / Delta + 6, 6)
-        } else if (MaxC == G) {
-            Hue := (B - R) / Delta + 2
-        } else {
-            Hue := (R - G) / Delta + 4
-        }
-        Hue := Hue / 6
+
+    ; Achromatic accent (gray/white/black) — no hue to carry, mirror JS fallback
+    if (Delta <= 0.0001) {
+        return _TOOLTIP_DEFAULT_BG_HEX
     }
+
+    Hue := 0.0
+    if (MaxC == R) {
+        Hue := Mod((G - B) / Delta + 6, 6)
+    } else if (MaxC == G) {
+        Hue := (B - R) / Delta + 2
+    } else {
+        Hue := (R - G) / Delta + 4
+    }
+    Hue := Hue / 6
 
     L := _TOOLTIP_LIGHTNESS
     S := _TOOLTIP_SATURATION

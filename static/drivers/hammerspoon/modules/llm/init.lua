@@ -383,7 +383,7 @@ end
 -- Flat index: { [label] = { ollama = "...", mlx = "..." } } — built once from JSON
 local _model_index = nil
 
---- Builds and caches a flat O(1) lookup index from llm_models.json.
+--- Builds and caches a flat O(1) lookup index from _shared/llm/models.json.
 --- @return table The index keyed by model label.
 local function get_model_index()
 	if _model_index then return _model_index end
@@ -425,7 +425,7 @@ end
 
 --- Translates a JSON model label to the backend-specific identifier in O(1).
 --- e.g., "gemma-4-E2B-it" -> "gemma4:e2b" (Ollama) or "gemma-4-e2b-it-mxfp4" (MLX)
---- @param label string The model label ("name" field from llm_models.json).
+--- @param label string The model label ("name" field from _shared/llm/models.json).
 --- @param backend string The target backend identifier.
 --- @return string The backend-specific identifier, or label unchanged if not found.
 local function resolve_model_for_backend(label, backend)
