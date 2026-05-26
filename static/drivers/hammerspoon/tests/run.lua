@@ -24,10 +24,11 @@ driver_root = driver_root:gsub("\\", "/")
 -- relative path and driver_root resolves to ".". Canonicalise it to an
 -- absolute path so downstream path arithmetic (for _shared/) is reliable.
 if driver_root == "." then
-	local cwd_handle = io.popen("cd")        -- Windows: "cd" prints CWD
-	if not cwd_handle then
-		cwd_handle = io.popen("pwd")         -- POSIX fallback
-	end
+	-- On Windows "cd" (no args) prints the current directory.
+	-- On POSIX "cd" prints nothing — use "pwd" instead.
+	local sep = package.config:sub(1, 1)
+	local cwd_cmd = (sep == "\\") and "cd" or "pwd"
+	local cwd_handle = io.popen(cwd_cmd)
 	if cwd_handle then
 		local cwd = cwd_handle:read("*l") or "."
 		cwd_handle:close()
