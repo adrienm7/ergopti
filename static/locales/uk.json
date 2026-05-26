@@ -1337,6 +1337,7 @@
 	"shortcuts.save": "Ctrl + J/★ = Ctrl + S. Увага: Ctrl + J недоступний",
 	"shortcuts.saved": "Збережено: %s",
 	"shortcuts.screen": "Win + H (screensHot) = Знімок екрана (запускає Win + Shift + S)",
+	"shortcuts.screenocr": "Win + C (OCR) = Знімок екрана з витяганням тексту (Win + Shift + T)",
 	"shortcuts.screeninstant": "Клавіша ² (SC029, ліворуч від 1) = Миттєвий знімок активного вікна, зберігається у Зображення з міткою часу",
 	"shortcuts.screenshot_copied": "Знімок екрана скопійовано до буфера обміну",
 	"shortcuts.screenshot_title": "Знімок екрана",

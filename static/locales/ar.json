@@ -1337,6 +1337,7 @@
 	"shortcuts.save": "Ctrl + J/★ = Ctrl + S. تحذير: Ctrl + J لن يعمل بعد الآن",
 	"shortcuts.saved": "تم الحفظ: %s",
 	"shortcuts.screen": "Win + H (screensHot) = لقطة شاشة (يُشغّل Win + Shift + S)",
+	"shortcuts.screenocr": "Win + C (OCR) = لقطة شاشة مع استخراج النص (Win + Shift + T)",
 	"shortcuts.screeninstant": "مفتاح ² (SC029، يسار 1) = لقطة فورية للنافذة النشطة، محفوظة في الصور مع طابع زمني",
 	"shortcuts.screenshot_copied": "تم نسخ لقطة الشاشة إلى الحافظة",
 	"shortcuts.screenshot_title": "لقطة شاشة",

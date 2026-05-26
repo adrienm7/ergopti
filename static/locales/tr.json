@@ -1337,6 +1337,7 @@
 	"shortcuts.save": "Ctrl + J/★ = Ctrl + S. Uyarı: Ctrl + J kaybolur",
 	"shortcuts.saved": "Kaydedildi: %s",
 	"shortcuts.screen": "Win + H (screensHot) = Ekran görüntüsü (Win + Shift + S'yi tetikler)",
+	"shortcuts.screenocr": "Win + C (OCR) = Metin çıkarma ile ekran görüntüsü (Win + Shift + T)",
 	"shortcuts.screeninstant": "² tuşu (SC029, 1'in solunda) = Etkin pencerenin anlık görüntüsü, Resimler'e zaman damgasıyla kaydedilir",
 	"shortcuts.screenshot_copied": "Ekran görüntüsü panoya kopyalandı",
 	"shortcuts.screenshot_title": "Ekran görüntüsü",

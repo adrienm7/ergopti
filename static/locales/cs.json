@@ -1337,6 +1337,7 @@
 	"shortcuts.save": "Ctrl + J/★ = Ctrl + S. Upozornění: Ctrl + J je ztraceno",
 	"shortcuts.saved": "Uloženo: %s",
 	"shortcuts.screen": "Win + H (screensHot) = Snímek obrazovky (spustí Win + Shift + S)",
+	"shortcuts.screenocr": "Win + C (OCR) = Snímek obrazovky s extrakcí textu (Win + Shift + T)",
 	"shortcuts.screeninstant": "Klávesa ² (SC029, vlevo od 1) = Okamžitý snímek aktivního okna, uložený v Obrázcích s časovým razítkem",
 	"shortcuts.screenshot_copied": "Snímek obrazovky zkopírován do schránky",
 	"shortcuts.screenshot_title": "Snímek obrazovky",

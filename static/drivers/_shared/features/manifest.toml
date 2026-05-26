@@ -1290,6 +1290,12 @@ type = "boolean"
 description_key = "menu.ahk.shortcuts.screen_instant"
 
 [[features.ahk.shortcuts]]
+id = "screen_ocr"
+default = true
+type = "boolean"
+description_key = "menu.ahk.shortcuts.screen_ocr"
+
+[[features.ahk.shortcuts]]
 id = "win_caps_lock"
 default = true
 type = "boolean"
