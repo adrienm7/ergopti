@@ -370,84 +370,16 @@ local ordered_names   = nil
 local module_sections = nil
 
 do
-	-- Minimal TOML parser for _index.toml: handles the flat structure produced
-	-- by this file (string arrays, [section.sub.key] headers, key = "value").
-	-- A full TOML library is not available in Hammerspoon, so we parse only
-	-- the constructs actually present in the index manifest.
-	local function parse_index_toml(raw)
-		local result = {}
-		local current_path = {}   -- active dotted-section path as a list
-
-		local function set_nested(tbl, path, key, val)
-			local node = tbl
-			for _, p in ipairs(path) do
-				if type(node[p]) ~= "table" then node[p] = {} end
-				node = node[p]
-			end
-			node[key] = val
-		end
-
-		for line in raw:gmatch("[^\n]+") do
-			-- Strip comments and trim
-			local stripped = line:gsub("%s*#.*$", ""):match("^%s*(.-)%s*$")
-			if stripped == "" then goto continue end
-
-			-- Section header: [a.b.c]
-			local header = stripped:match("^%[([^%]]+)%]$")
-			if header then
-				current_path = {}
-				for part in header:gmatch("[^%.]+") do
-					current_path[#current_path + 1] = part
-				end
-				-- Ensure the section table exists
-				set_nested(result, {}, table.concat(current_path, "."), nil)
-				local node = result
-				for _, p in ipairs(current_path) do
-					if type(node[p]) ~= "table" then node[p] = {} end
-					node = node[p]
-				end
-				goto continue
-			end
-
-			-- key = ["a", "b", ...] — inline string array
-			local arr_key, arr_body = stripped:match('^([%w_]+)%s*=%s*%[(.-)%]$')
-			if arr_key and arr_body then
-				local arr = {}
-				for item in arr_body:gmatch('"([^"]*)"') do
-					arr[#arr + 1] = item
-				end
-				set_nested(result, current_path, arr_key, arr)
-				goto continue
-			end
-
-			-- key = "value"
-			local str_key, str_val = stripped:match('^([%w_]+)%s*=%s*"([^"]*)"$')
-			if str_key then
-				set_nested(result, current_path, str_key, str_val)
-				goto continue
-			end
-
-			-- key = { lang = "val", … } — multilingual inline table
-			local tbl_key, tbl_body = stripped:match('^([%w_]+)%s*=%s*%{(.-)%}$')
-			if tbl_key then
-				local tbl = {}
-				for lang, val in tbl_body:gmatch('"?([%w_%-]+)"?%s*=%s*"([^"]*)"') do
-					tbl[lang] = val
-				end
-				set_nested(result, current_path, tbl_key, tbl)
-				goto continue
-			end
-
-			::continue::
-		end
-		return result
-	end
+	-- Use the shared toml_codec instead of a hand-rolled parser so _index.toml
+	-- gains full TOML support (multi-line strings, nested inline tables, etc.)
+	-- without maintaining a second parser that can drift from the codec.
+	local TomlCodec = require("toml_codec.codec")
 
 	local fh = io.open(hotstrings_dir .. "_index.toml", "r")
 	if fh then
 		local raw = fh:read("*a")
 		fh:close()
-		local ok, data = pcall(parse_index_toml, raw)
+		local ok, data = pcall(TomlCodec.decode, raw)
 		if ok and type(data) == "table" then
 			local menu = data.menu
 			if type(menu) == "table" and type(menu.categories_order) == "table" then

@@ -27,9 +27,10 @@
 
 local M = {}
 
-local hs       = hs
-local Logger   = require("lib.logger")
-local Keycodes = require("lib.keycodes")
+local hs         = hs
+local Logger     = require("lib.logger")
+local Keycodes   = require("lib.keycodes")
+local FileSystem = require("adapters.file_system")
 
 local LOG = "karabiner"
 
@@ -131,13 +132,11 @@ end
 --- @param path string Absolute path to the JSON file.
 --- @return table|nil Decoded table, or nil.
 local function load_json_file(path)
-	local fh = io.open(path, "r")
-	if not fh then
+	local raw = FileSystem.read(path)
+	if not raw then
 		Logger.error(LOG, "Cannot open file '%s'.", path)
 		return nil
 	end
-	local raw = fh:read("*a")
-	fh:close()
 	local ok, data = pcall(hs.json.decode, raw)
 	if not ok or type(data) ~= "table" then
 		Logger.error(LOG, "Cannot decode JSON from '%s': %s.", path, tostring(data))
@@ -850,14 +849,12 @@ end
 --- @param karabiner_out string Absolute path to the live karabiner.json.
 --- @return table The merged configuration ready to be JSON-encoded.
 function M.merge_into_existing_config(hs_config, karabiner_out)
-	local fh = io.open(karabiner_out, "r")
-	if not fh then
+	local raw = FileSystem.read(karabiner_out)
+	if not raw then
 		Logger.debug(LOG, "No existing karabiner.json — writing fresh HS config.")
 		enforce_headless_global(hs_config)
 		return hs_config
 	end
-	local raw = fh:read("*a")
-	fh:close()
 
 	local ok, existing = pcall(hs.json.decode, raw)
 	if not ok or type(existing) ~= "table" then
@@ -911,11 +908,8 @@ function M.deploy_string(content, dst)
 
 	local parent = dst:match("^(.*)/[^/]+$")
 
-	-- S1: direct write — works for regular paths and Unix symlinks
-	local dst_fh = io.open(dst, "w")
-	if dst_fh then
-		dst_fh:write(content)
-		dst_fh:close()
+	-- S1: direct write via port FileSystem — works for regular paths and symlinks
+	if FileSystem.write(dst, content) then
 		Logger.done(LOG, "Deploy S1 (direct write) succeeded: '%s'.", dst)
 		return true, "ok"
 	end
@@ -928,10 +922,7 @@ function M.deploy_string(content, dst)
 		)
 		Logger.debug(LOG, "Deploy S2 mkdir -p rc=%s: %s",
 			tostring(mkdir_rc), (mkdir_out or ""):gsub("%s+$", ""))
-		dst_fh = io.open(dst, "w")
-		if dst_fh then
-			dst_fh:write(content)
-			dst_fh:close()
+		if FileSystem.write(dst, content) then
 			Logger.done(LOG, "Deploy S2 (mkdir + write) succeeded: '%s'.", dst)
 			return true, "ok"
 		end
@@ -956,13 +947,11 @@ end
 function M.deploy_file(src, dst)
 	Logger.trace(LOG, "Deploy: '%s' → '%s'…", src, dst)
 
-	local src_fh = io.open(src, "r")
-	if not src_fh then
+	local content = FileSystem.read(src)
+	if not content then
 		Logger.error(LOG, "Deploy aborted — source not readable: '%s'.", src)
 		return false, "source file not found: " .. src
 	end
-	local content = src_fh:read("*a")
-	src_fh:close()
 	Logger.debug(LOG, "Deploy: read %d byte(s) from source.", #content)
 
 	return M.deploy_string(content, dst)
