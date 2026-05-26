@@ -4,8 +4,8 @@
 ; MODULE: KeyboardHook Adapter (AutoHotkey)
 ; DESCRIPTION:
 ; AHK v2 implementation of the KeyboardHook port contract defined in
-; static/drivers/_shared/ports/KeyboardHook.spec.js. Wraps AHK's InputHook
-; and WinGetActiveTitle / ProcessGetName APIs behind the five canonical
+; static/drivers/_shared/ports/KeyboardHook.spec.js. Wraps the unified
+; HookDispatcher (lib/hook_dispatcher.ahk) behind the five canonical
 ; functions (KHStart, KHStop, KHIsRunning, KHRefreshContext, KHGetContext).
 ;
 ; NAMING CONVENTION:
@@ -16,22 +16,27 @@
 ;   refreshContext()  → KHRefreshContext()
 ;   getContext()      → KHGetContext()
 ;
+; HOOK OWNERSHIP:
+; This adapter no longer creates its own InputHook. Instead it registers
+; _KH_DispatchChar and _KH_DispatchKey as subscribers with HookDispatcher so
+; the process has exactly one InputHook shared by all features. KHStart /
+; KHStop toggle the subscriber registration; the underlying hook lifecycle
+; is managed entirely by HookDispatcher.Start() / HookDispatcher.Stop().
+;
 ; INTERCEPT MODE:
-; When opts["intercept"] is true, the hook may suppress events before they
-; reach the OS. AHK's InputHook does not support real-time intercept in the
-; same way as hs.eventtap; the production keylogger module owns the real hook.
-; This adapter provides the contract interface; the intercept flag is stored
-; but has no effect at this layer — production modules read it separately.
+; When opts["intercept"] is true the flag is stored but has no effect at this
+; layer — AHK's shared InputHook runs in visible ("V") mode and cannot suppress
+; events selectively per subscriber.
 ; ==============================================================================
 
-; Active InputHook instance (0 = not running).
-global _KH_HOOK          := 0
 ; Cached context (appId = process name, windowTitle = window caption).
 global _KH_CONTEXT       := Map("appId", "", "windowTitle", "")
 ; User-registered callbacks stored by KHStart.
 global _KH_ON_CHAR       := 0
 global _KH_ON_KEY        := 0
 global _KH_INTERCEPT     := false
+; Whether this adapter's subscribers are currently registered with HookDispatcher.
+global _KH_RUNNING       := false
 
 
 
@@ -43,10 +48,12 @@ global _KH_INTERCEPT     := false
 ; ==========================================
 
 ; Starts the keyboard hook. Idempotent — safe to call while already running.
+; Registers this adapter's dispatch callbacks with HookDispatcher instead of
+; creating a separate InputHook, so the process keeps a single shared hook.
 ; @param Opts {Map|0} { intercept?: bool, onChar?: Func, onKey?: Func }
 KHStart(Opts) {
-	global _KH_HOOK, _KH_ON_CHAR, _KH_ON_KEY, _KH_INTERCEPT
-	if (_KH_HOOK != 0)
+	global _KH_RUNNING, _KH_ON_CHAR, _KH_ON_KEY, _KH_INTERCEPT
+	if _KH_RUNNING
 		return
 	if (Opts is Map) {
 		if Opts.Has("onChar") and Opts["onChar"] != 0
@@ -57,29 +64,29 @@ KHStart(Opts) {
 			_KH_INTERCEPT := Opts["intercept"] == true
 	}
 	KHRefreshContext()
-	; Construct an InputHook that captures all keys so onKey can fire.
-	IH := InputHook("V")
-	; OnChar fires for each printable character typed.
-	IH.OnChar := _KH_DispatchChar
-	IH.OnKeyDown := _KH_DispatchKey
-	IH.Start()
-	_KH_HOOK := IH
+	; Register with the central dispatcher — no separate InputHook needed
+	HookDispatcher.Register(HookDispatcherConst.EVT_KB_CHAR, _KH_DispatchChar.Bind())
+	HookDispatcher.Register(HookDispatcherConst.EVT_KB_DOWN, _KH_DispatchKey.Bind())
+	_KH_RUNNING := true
 }
 
 ; Stops the keyboard hook. Safe to call when not running.
+; Unregisters this adapter's subscribers from HookDispatcher; the shared
+; InputHook itself keeps running for other subscribers.
 KHStop() {
-	global _KH_HOOK
-	if (_KH_HOOK = 0)
+	global _KH_RUNNING
+	if !_KH_RUNNING
 		return
-	try _KH_HOOK.Stop()
-	_KH_HOOK := 0
+	HookDispatcher.Unregister(HookDispatcherConst.EVT_KB_CHAR, _KH_DispatchChar.Bind())
+	HookDispatcher.Unregister(HookDispatcherConst.EVT_KB_DOWN, _KH_DispatchKey.Bind())
+	_KH_RUNNING := false
 }
 
 ; Returns true if the hook is currently active.
 ; @return {Integer} 1 (true) or 0 (false) — AHK boolean convention.
 KHIsRunning() {
-	global _KH_HOOK
-	return _KH_HOOK != 0
+	global _KH_RUNNING
+	return _KH_RUNNING ? 1 : 0
 }
 
 ; Re-reads the foreground application identity and caches it.
@@ -112,7 +119,8 @@ KHGetContext() {
 ; ======================================================
 ; ======================================================
 
-; Called by the InputHook for each printable character.
+; Called by HookDispatcher for each printable character (keyboard_char event).
+; Signature matches HookDispatcher.Dispatch(EVT_KB_CHAR, ih, char).
 _KH_DispatchChar(IH, Char) {
 	global _KH_ON_CHAR, _KH_CONTEXT
 	if _KH_ON_CHAR = 0
@@ -121,7 +129,8 @@ _KH_DispatchChar(IH, Char) {
 	try _KH_ON_CHAR(Evt)
 }
 
-; Called by the InputHook for each key-down event.
+; Called by HookDispatcher for each key-down event (keyboard_down event).
+; Signature matches HookDispatcher.Dispatch(EVT_KB_DOWN, ih, vk, sc).
 _KH_DispatchKey(IH, VK, SC) {
 	global _KH_ON_KEY, _KH_CONTEXT
 	if _KH_ON_KEY = 0

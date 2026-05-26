@@ -31,9 +31,16 @@
 ; 6. Privacy filter — every event passes through MF_ShouldFilter() before
 ;    any allocation. Password fields and disabled apps are silently dropped.
 ;
+; HOOK OWNERSHIP:
+; Mouse button events are no longer registered directly with Hotkey() here.
+; Instead KL_Mouse_Start() subscribes each handler to HookDispatcher so the
+; process has only one set of mouse hotkeys, shared by all features. The park
+; timer and scroll-flush timer are still owned by this module because they are
+; purely internal concerns (no other module needs to listen to the poll tick).
+;
 ; LIFECYCLE:
 ; - KL_Mouse_Start() is called after KL_Hook_Start() / KL_Watchers_Start().
-; - KL_Mouse_Stop() releases all hotkeys and timers.
+; - KL_Mouse_Stop() unregisters subscribers and releases all timers.
 ; ==============================================================================
 
 #Requires Autohotkey v2.0+
@@ -470,13 +477,13 @@ KL_Mouse_Start() {
     ; Bind scroll-flush once so SetTimer can cancel by reference
     KLMouse.scroll_flush_fn := KL_Mouse_FlushScroll.Bind()
 
-    ; Park / distance poll
+    ; Park / distance poll — still owned here because no other module needs it
     KLMouse.park_timer_fn := KL_Mouse_ParkTick.Bind()
     SetTimer(KLMouse.park_timer_fn, KLMouseConst.PARK_CHECK_MS)
 
-    ; Bind hotkey callbacks — AHK v2 Hotkey() requires a function object,
-    ; not a bare name. Storing the refs also lets Stop() pass the exact
-    ; same object to disable the hotkey.
+    ; Register mouse event subscribers with HookDispatcher instead of calling
+    ; Hotkey() directly. HookDispatcher owns the single set of mouse hotkeys
+    ; for the whole process; all modules subscribe through it.
     KLMouse.hk_ldown   := KL_Mouse_OnLDown.Bind()
     KLMouse.hk_lup     := KL_Mouse_OnLUp.Bind()
     KLMouse.hk_rdown   := KL_Mouse_OnRDown.Bind()
@@ -488,18 +495,16 @@ KL_Mouse_Start() {
     KLMouse.hk_wright  := KL_Mouse_OnWheelRight.Bind()
     KLMouse.hk_wleft   := KL_Mouse_OnWheelLeft.Bind()
 
-    ; Wire button hooks. Using ``~`` prefix keeps AHK from consuming the
-    ; event so the target application still receives the click normally.
-    Hotkey("~LButton",    KLMouse.hk_ldown,  "On")
-    Hotkey("~LButton Up", KLMouse.hk_lup,    "On")
-    Hotkey("~RButton",    KLMouse.hk_rdown,  "On")
-    Hotkey("~RButton Up", KLMouse.hk_rup,    "On")
-    Hotkey("~MButton",    KLMouse.hk_mdown,  "On")
-    Hotkey("~MButton Up", KLMouse.hk_mup,    "On")
-    Hotkey("~WheelUp",    KLMouse.hk_wup,    "On")
-    Hotkey("~WheelDown",  KLMouse.hk_wdn,    "On")
-    Hotkey("~WheelRight", KLMouse.hk_wright, "On")
-    Hotkey("~WheelLeft",  KLMouse.hk_wleft,  "On")
+    HookDispatcher.Register(HookDispatcherConst.EVT_MS_LDOWN,  KLMouse.hk_ldown)
+    HookDispatcher.Register(HookDispatcherConst.EVT_MS_LUP,    KLMouse.hk_lup)
+    HookDispatcher.Register(HookDispatcherConst.EVT_MS_RDOWN,  KLMouse.hk_rdown)
+    HookDispatcher.Register(HookDispatcherConst.EVT_MS_RUP,    KLMouse.hk_rup)
+    HookDispatcher.Register(HookDispatcherConst.EVT_MS_MDOWN,  KLMouse.hk_mdown)
+    HookDispatcher.Register(HookDispatcherConst.EVT_MS_MUP,    KLMouse.hk_mup)
+    HookDispatcher.Register(HookDispatcherConst.EVT_MS_WUP,    KLMouse.hk_wup)
+    HookDispatcher.Register(HookDispatcherConst.EVT_MS_WDN,    KLMouse.hk_wdn)
+    HookDispatcher.Register(HookDispatcherConst.EVT_MS_WRIGHT, KLMouse.hk_wright)
+    HookDispatcher.Register(HookDispatcherConst.EVT_MS_WLEFT,  KLMouse.hk_wleft)
 }
 
 KL_Mouse_Stop() {
@@ -511,16 +516,18 @@ KL_Mouse_Stop() {
         try SetTimer(KLMouse.scroll_flush_fn, 0)
         try KL_Mouse_FlushScroll()   ; drain pending scroll burst
     }
+    ; Unregister subscribers from HookDispatcher — the shared Hotkeys
+    ; remain active for any other modules still listening.
     if KLMouse.HasOwnProp("hk_ldown") {
-        try Hotkey("~LButton",    KLMouse.hk_ldown,  "Off")
-        try Hotkey("~LButton Up", KLMouse.hk_lup,    "Off")
-        try Hotkey("~RButton",    KLMouse.hk_rdown,  "Off")
-        try Hotkey("~RButton Up", KLMouse.hk_rup,    "Off")
-        try Hotkey("~MButton",    KLMouse.hk_mdown,  "Off")
-        try Hotkey("~MButton Up", KLMouse.hk_mup,    "Off")
-        try Hotkey("~WheelUp",    KLMouse.hk_wup,    "Off")
-        try Hotkey("~WheelDown",  KLMouse.hk_wdn,    "Off")
-        try Hotkey("~WheelRight", KLMouse.hk_wright, "Off")
-        try Hotkey("~WheelLeft",  KLMouse.hk_wleft,  "Off")
+        try HookDispatcher.Unregister(HookDispatcherConst.EVT_MS_LDOWN,  KLMouse.hk_ldown)
+        try HookDispatcher.Unregister(HookDispatcherConst.EVT_MS_LUP,    KLMouse.hk_lup)
+        try HookDispatcher.Unregister(HookDispatcherConst.EVT_MS_RDOWN,  KLMouse.hk_rdown)
+        try HookDispatcher.Unregister(HookDispatcherConst.EVT_MS_RUP,    KLMouse.hk_rup)
+        try HookDispatcher.Unregister(HookDispatcherConst.EVT_MS_MDOWN,  KLMouse.hk_mdown)
+        try HookDispatcher.Unregister(HookDispatcherConst.EVT_MS_MUP,    KLMouse.hk_mup)
+        try HookDispatcher.Unregister(HookDispatcherConst.EVT_MS_WUP,    KLMouse.hk_wup)
+        try HookDispatcher.Unregister(HookDispatcherConst.EVT_MS_WDN,    KLMouse.hk_wdn)
+        try HookDispatcher.Unregister(HookDispatcherConst.EVT_MS_WRIGHT, KLMouse.hk_wright)
+        try HookDispatcher.Unregister(HookDispatcherConst.EVT_MS_WLEFT,  KLMouse.hk_wleft)
     }
 }

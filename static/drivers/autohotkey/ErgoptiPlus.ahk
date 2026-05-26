@@ -139,6 +139,7 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 #Include lib/master_gates.ahk
 #Include lib/manifest_descriptions.ahk
 #Include lib/menu_dispatcher.ahk
+#Include lib/hook_dispatcher.ahk
 #Include lib/menu_manifest.ahk
 #Include lib/llm_defaults.ahk
 #Include lib/updater.ahk
@@ -935,6 +936,10 @@ if MetricsShortcuts.enabled {
     ; metrics folder follows the user's relocated config when applicable.
     KL_Init(_ConfigDir . "metrics")
     MS_ApplyAll(KLUI_ToggleTyping, KLUI_ToggleApps)
+    ; Start the unified hook dispatcher BEFORE any module-specific hook
+    ; start functions so the shared InputHook and mouse Hotkeys are live
+    ; when modules subscribe via HookDispatcher.Register().
+    HookDispatcher.Start()
     ; Wire the InputHook AFTER KL_Init so Keylogger.initialized is true
     ; by the time the first OnChar fires.
     KL_Hook_Start()
