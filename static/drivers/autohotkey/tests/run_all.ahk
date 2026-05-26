@@ -70,7 +70,17 @@ SetWorkingDir(A_ScriptDir)
 ; UpdateLastSentCharacter (the hook only intercepts the lower-level emission).
 InstallHotstringHooks()
 
+; ── Adapter contract: include all port adapters so contract vector tests can call them ──
+#Include ../adapters/notifier.ahk
+#Include ../adapters/timer_scheduler.ahk
+#Include ../adapters/file_system.ahk
+#Include ../adapters/window_info.ahk
+#Include ../adapters/tray_menu.ahk
+#Include ../adapters/text_sender.ahk
+#Include ../adapters/http_client.ahk
+
 ; ── Per-module test files (each registers Test() cases) ──
+#Include test_adapter_contract_vectors.ahk
 #Include test_logger.ahk
 #Include test_logger_contract.ahk
 #Include test_tooltip_tint_contract.ahk
