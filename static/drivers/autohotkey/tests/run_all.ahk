@@ -70,6 +70,7 @@ InstallHotstringHooks()
 
 ; ── Per-module test files (each registers Test() cases) ──
 #Include test_logger.ahk
+#Include test_logger_contract.ahk
 #Include test_hotstring_engine.ahk
 #Include test_hotstring_engine_main.ahk
 #Include test_toml_loader.ahk
