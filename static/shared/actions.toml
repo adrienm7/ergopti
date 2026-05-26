@@ -456,6 +456,9 @@ platform = "ahk"
 [sg_actions.screen_capture_instant]
 platform = "ahk"
 
+[sg_actions.ocr_screenshot]
+platform = "ahk"
+
 [sg_actions.open_url]
 platform = "ahk"
 
@@ -689,6 +692,7 @@ items = [
     "select_line",
     "screen_capture",
     "screen_capture_instant",
+    "ocr_screenshot",
     "open_url",
     "pick_color",
     "take_note",
