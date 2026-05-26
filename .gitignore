@@ -55,8 +55,9 @@ static/drivers/_shared/ui/metrics_apps/prefetch.json
 *.luac
 luac.out
 
-# Auto-generated hotstrings file (built at runtime from TOML sources)
-static/drivers/autohotkey/lib/hotstrings_generated.ahk
+# Auto-generated hotstrings files (built from TOML sources via build-hotstrings.cjs)
+static/drivers/autohotkey/lib/hotstrings/hotstrings_generated.ahk
+static/drivers/autohotkey/lib/hotstrings/generated_*.ahk
 
 # Static asset bundle assembled by tools/build_static_bundle.py for the
 # compiled .exe — never committed; produced fresh on every CI build.
