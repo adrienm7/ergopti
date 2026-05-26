@@ -1,4 +1,4 @@
-; static/drivers/autohotkey/lib/registry.ahk
+﻿; static/drivers/autohotkey/lib/registry.ahk
 
 ; ==============================================================================
 ; MODULE: Windows Registry Abstraction

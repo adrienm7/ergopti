@@ -1,4 +1,4 @@
-; modules/llm/ollama_webview.ahk
+﻿; modules/llm/ollama_webview.ahk
 
 ; ==============================================================================
 ; MODULE: Ollama WebView2 Install/Download Window

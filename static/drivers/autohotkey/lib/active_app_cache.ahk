@@ -1,4 +1,4 @@
-; static/drivers/autohotkey/lib/active_app_cache.ahk
+﻿; static/drivers/autohotkey/lib/active_app_cache.ahk
 
 ; ==============================================================================
 ; MODULE: Active Application Cache

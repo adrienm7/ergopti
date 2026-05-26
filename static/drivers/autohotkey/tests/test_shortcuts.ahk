@@ -1,4 +1,4 @@
-; static/drivers/autohotkey/tests/test_shortcuts.ahk
+﻿; static/drivers/autohotkey/tests/test_shortcuts.ahk
 
 ; ==============================================================================
 ; MODULE: Test Shortcuts

@@ -1,4 +1,4 @@
-; lib/toml_helpers.ahk
+﻿; lib/toml_helpers.ahk
 
 ; ==============================================================================
 ; MODULE: TOML Helpers

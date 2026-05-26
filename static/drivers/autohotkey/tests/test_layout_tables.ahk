@@ -1,4 +1,4 @@
-; static/drivers/autohotkey/tests/test_layout_tables.ahk
+﻿; static/drivers/autohotkey/tests/test_layout_tables.ahk
 
 ; ==============================================================================
 ; MODULE: Layout Tables Tests

@@ -1,4 +1,4 @@
-; tests/test_tooltip_tint_contract.ahk
+﻿; tests/test_tooltip_tint_contract.ahk
 
 ; ==============================================================================
 ; MODULE: Tooltip Tint Contract Tests

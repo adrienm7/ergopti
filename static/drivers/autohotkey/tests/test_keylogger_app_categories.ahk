@@ -1,4 +1,4 @@
-; static/drivers/autohotkey/tests/test_keylogger_app_categories.ahk
+﻿; static/drivers/autohotkey/tests/test_keylogger_app_categories.ahk
 
 ; ==============================================================================
 ; MODULE: Keylogger App Categories Tests

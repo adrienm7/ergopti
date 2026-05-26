@@ -1,4 +1,4 @@
-; lib/metrics_shortcuts.ahk
+﻿; lib/metrics_shortcuts.ahk
 
 ; ==============================================================================
 ; MODULE: Metrics Shortcuts

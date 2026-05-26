@@ -1,4 +1,4 @@
-; tests/meta/test_port_adapter_coverage.ahk
+﻿; tests/meta/test_port_adapter_coverage.ahk
 
 ; ==============================================================================
 ; MODULE: Port-Adapter Coverage Meta-Test

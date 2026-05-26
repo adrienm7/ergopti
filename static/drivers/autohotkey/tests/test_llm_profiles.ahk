@@ -1,4 +1,4 @@
-; static/drivers/autohotkey/tests/test_llm_profiles.ahk
+﻿; static/drivers/autohotkey/tests/test_llm_profiles.ahk
 
 ; ==============================================================================
 ; MODULE: LLM Profiles Tests

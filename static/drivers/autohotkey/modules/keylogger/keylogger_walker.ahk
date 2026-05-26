@@ -1,4 +1,4 @@
-; modules/keylogger_walker.ahk
+﻿; modules/keylogger_walker.ahk
 
 ; ==============================================================================
 ; MODULE: Keylogger Aggregation Walker (AHK)

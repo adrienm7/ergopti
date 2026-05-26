@@ -1,4 +1,4 @@
-; lib/tap_hold/tap_hold_writer.ahk
+﻿; lib/tap_hold/tap_hold_writer.ahk
 
 ; ==============================================================================
 ; MODULE: Tap-Hold Writer

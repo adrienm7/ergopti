@@ -1,4 +1,4 @@
-; static/drivers/autohotkey/lib/logger.ahk
+﻿; static/drivers/autohotkey/lib/logger.ahk
 
 ; ==============================================================================
 ; MODULE: Logger

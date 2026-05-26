@@ -1,4 +1,4 @@
-; static/drivers/autohotkey/tests/test_hotstrings_config.ahk
+﻿; static/drivers/autohotkey/tests/test_hotstrings_config.ahk
 
 ; ==============================================================================
 ; MODULE: Hotstrings Config Tests

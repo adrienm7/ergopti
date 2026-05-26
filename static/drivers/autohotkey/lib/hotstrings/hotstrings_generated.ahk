@@ -1,4 +1,4 @@
-; static/drivers/autohotkey/lib/hotstrings/hotstrings_generated.ahk
+﻿; static/drivers/autohotkey/lib/hotstrings/hotstrings_generated.ahk
 
 ; ==============================================================================
 ; MODULE: Generated Hotstrings Registrar — Entry Point

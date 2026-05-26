@@ -1,4 +1,4 @@
-; drivers/autohotkey/lib/onboarding.ahk
+﻿; drivers/autohotkey/lib/onboarding.ahk
 
 ; ==============================================================================
 ; MODULE: Onboarding Wizard

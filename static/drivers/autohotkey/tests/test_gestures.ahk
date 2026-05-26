@@ -1,4 +1,4 @@
-; static/drivers/autohotkey/tests/test_gestures.ahk
+﻿; static/drivers/autohotkey/tests/test_gestures.ahk
 
 ; ==============================================================================
 ; MODULE: Test Gestures

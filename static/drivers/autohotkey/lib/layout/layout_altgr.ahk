@@ -1,4 +1,4 @@
-; static/drivers/autohotkey/lib/layout_altgr.ahk
+﻿; static/drivers/autohotkey/lib/layout_altgr.ahk
 
 ; ==============================================================================
 ; MODULE: AltGr Layer Tables

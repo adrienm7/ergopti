@@ -1,4 +1,4 @@
-; static/drivers/autohotkey/tests/test_keylogger_walker.ahk
+﻿; static/drivers/autohotkey/tests/test_keylogger_walker.ahk
 
 ; ==============================================================================
 ; MODULE: Keylogger Walker Tests

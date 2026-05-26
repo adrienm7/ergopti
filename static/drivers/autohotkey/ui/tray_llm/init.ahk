@@ -1,4 +1,4 @@
-; ui/tray_llm/init.ahk
+﻿; ui/tray_llm/init.ahk
 
 ; ==============================================================================
 ; MODULE: LLM Tray — Initialisation

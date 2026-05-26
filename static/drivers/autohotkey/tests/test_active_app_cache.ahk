@@ -1,4 +1,4 @@
-; static/drivers/autohotkey/tests/test_active_app_cache.ahk
+﻿; static/drivers/autohotkey/tests/test_active_app_cache.ahk
 
 ; ==============================================================================
 ; MODULE: Active App Cache Tests

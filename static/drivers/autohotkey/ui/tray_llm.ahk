@@ -1,4 +1,4 @@
-; ui/tray_llm.ahk
+﻿; ui/tray_llm.ahk
 
 ; ==============================================================================
 ; MODULE: LLM Tray Menu UI — Entry Point

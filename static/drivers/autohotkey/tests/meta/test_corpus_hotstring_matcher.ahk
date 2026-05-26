@@ -1,4 +1,4 @@
-; tests/meta/test_corpus_hotstring_matcher.ahk
+﻿; tests/meta/test_corpus_hotstring_matcher.ahk
 
 ; ==============================================================================
 ; MODULE: HotstringMatcher Corpus Consumer (AHK)

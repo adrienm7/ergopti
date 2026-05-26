@@ -1,4 +1,4 @@
-; ui/tray_llm/tab_accept.ahk
+﻿; ui/tray_llm/tab_accept.ahk
 
 ; ==============================================================================
 ; MODULE: LLM Tray — Tab Accept + Nav hotkeys

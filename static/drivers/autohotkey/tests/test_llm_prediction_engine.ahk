@@ -1,4 +1,4 @@
-; static/drivers/autohotkey/tests/test_llm_prediction_engine.ahk
+﻿; static/drivers/autohotkey/tests/test_llm_prediction_engine.ahk
 
 ; ==============================================================================
 ; MODULE: LLM Prediction Engine Tests

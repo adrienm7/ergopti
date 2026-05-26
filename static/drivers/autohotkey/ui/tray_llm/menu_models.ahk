@@ -1,4 +1,4 @@
-; ui/tray_llm/menu_models.ahk
+﻿; ui/tray_llm/menu_models.ahk
 
 ; ==============================================================================
 ; MODULE: LLM Tray — Backend + Model submenus

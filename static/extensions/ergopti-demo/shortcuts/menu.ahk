@@ -1,4 +1,4 @@
-; static/extensions/ergopti-demo/shortcuts/menu.ahk
+﻿; static/extensions/ergopti-demo/shortcuts/menu.ahk
 ;
 ; Ergopti Demo extension — AHK shortcuts menu.
 ; Must define BuildExtMenu_ergopti_demo(ExtMenu, ExtName) which the loader

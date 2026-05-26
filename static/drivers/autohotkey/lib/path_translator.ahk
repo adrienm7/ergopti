@@ -1,4 +1,4 @@
-; lib/path_translator.ahk
+﻿; lib/path_translator.ahk
 
 ; ==============================================================================
 ; MODULE: Path Translator

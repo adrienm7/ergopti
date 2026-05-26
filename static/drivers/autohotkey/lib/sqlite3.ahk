@@ -1,4 +1,4 @@
-; lib/sqlite3.ahk
+﻿; lib/sqlite3.ahk
 
 ; ==============================================================================
 ; MODULE: SQLite3 wrapper (winsqlite3.dll)

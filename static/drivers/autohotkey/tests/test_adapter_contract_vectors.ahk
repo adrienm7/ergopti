@@ -1,4 +1,4 @@
-; tests/test_adapter_contract_vectors.ahk
+﻿; tests/test_adapter_contract_vectors.ahk
 
 ; ==============================================================================
 ; MODULE: Adapter Contract Behaviour Tests (AutoHotkey)

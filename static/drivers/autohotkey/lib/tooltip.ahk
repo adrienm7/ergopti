@@ -1,4 +1,4 @@
-; drivers/autohotkey/lib/tooltip.ahk
+﻿; drivers/autohotkey/lib/tooltip.ahk
 
 ; ==============================================================================
 ; MODULE: Hotstring Tooltip

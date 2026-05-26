@@ -1,4 +1,4 @@
-; static/drivers/autohotkey/lib/hotstrings/generated_sfbsreduction.ahk
+﻿; static/drivers/autohotkey/lib/hotstrings/generated_sfbsreduction.ahk
 
 ; ==============================================================================
 ; MODULE: Generated Hotstrings — sfbsreduction

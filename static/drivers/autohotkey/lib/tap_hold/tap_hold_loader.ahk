@@ -1,4 +1,4 @@
-; drivers/autohotkey/lib/tap_hold/tap_hold_loader.ahk
+﻿; drivers/autohotkey/lib/tap_hold/tap_hold_loader.ahk
 
 ; ==============================================================================
 ; MODULE: Tap-Hold Loader

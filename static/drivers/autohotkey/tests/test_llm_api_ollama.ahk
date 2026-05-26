@@ -1,4 +1,4 @@
-; static/drivers/autohotkey/tests/test_llm_api_ollama.ahk
+﻿; static/drivers/autohotkey/tests/test_llm_api_ollama.ahk
 
 ; ==============================================================================
 ; MODULE: LLM API Ollama Tests

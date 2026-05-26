@@ -1,4 +1,4 @@
-; tests/meta/test_corpus_tap_hold.ahk
+﻿; tests/meta/test_corpus_tap_hold.ahk
 
 ; ==============================================================================
 ; MODULE: Tap-Hold Corpus Consumer (AHK)

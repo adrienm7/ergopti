@@ -1,4 +1,4 @@
-; tests/test_logger_contract.ahk
+﻿; tests/test_logger_contract.ahk
 
 ; ==============================================================================
 ; MODULE: Logger Contract Tests

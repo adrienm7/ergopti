@@ -1,4 +1,4 @@
-; modules/keylogger_window_topology.ahk
+﻿; modules/keylogger_window_topology.ahk
 
 ; ==============================================================================
 ; MODULE: Keylogger Window Topology

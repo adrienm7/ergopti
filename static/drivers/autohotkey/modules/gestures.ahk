@@ -1,4 +1,4 @@
-; drivers/autohotkey/modules/gestures.ahk
+﻿; drivers/autohotkey/modules/gestures.ahk
 
 ; ==============================================================================
 ; MODULE: Trackpad Gestures

@@ -1,4 +1,4 @@
-; modules/keylogger_reader.ahk
+﻿; modules/keylogger_reader.ahk
 
 ; ==============================================================================
 ; MODULE: Keylogger SQLite Reader (AHK)

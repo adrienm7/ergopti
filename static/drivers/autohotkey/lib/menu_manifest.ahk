@@ -1,4 +1,4 @@
-; lib/menu_manifest.ahk
+﻿; lib/menu_manifest.ahk
 
 
 

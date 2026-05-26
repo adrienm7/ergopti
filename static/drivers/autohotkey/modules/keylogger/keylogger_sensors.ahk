@@ -1,4 +1,4 @@
-; modules/keylogger_sensors.ahk
+﻿; modules/keylogger_sensors.ahk
 
 ; ==============================================================================
 ; MODULE: Keylogger System Sensors

@@ -1,4 +1,4 @@
-; static/drivers/autohotkey/lib/hotstrings/generated_distancesreduction.ahk
+﻿; static/drivers/autohotkey/lib/hotstrings/generated_distancesreduction.ahk
 
 ; ==============================================================================
 ; MODULE: Generated Hotstrings — distancesreduction

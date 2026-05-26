@@ -1,4 +1,4 @@
-; static/drivers/autohotkey/tests/test_logger.ahk
+﻿; static/drivers/autohotkey/tests/test_logger.ahk
 
 ; ==============================================================================
 ; MODULE: Logger Tests

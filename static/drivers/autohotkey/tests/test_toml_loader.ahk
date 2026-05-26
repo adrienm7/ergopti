@@ -1,4 +1,4 @@
-; static/drivers/autohotkey/tests/test_toml_loader.ahk
+﻿; static/drivers/autohotkey/tests/test_toml_loader.ahk
 
 ; ==============================================================================
 ; MODULE: TOML Loader Tests

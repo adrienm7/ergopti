@@ -1,4 +1,4 @@
-; modules/llm/ollama_deps_checker.ahk
+﻿; modules/llm/ollama_deps_checker.ahk
 
 ; ==============================================================================
 ; MODULE: Ollama Dependencies Checker

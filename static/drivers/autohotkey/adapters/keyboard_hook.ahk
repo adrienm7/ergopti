@@ -1,4 +1,4 @@
-; adapters/keyboard_hook.ahk
+﻿; adapters/keyboard_hook.ahk
 
 ; ==============================================================================
 ; MODULE: KeyboardHook Adapter (AutoHotkey)
