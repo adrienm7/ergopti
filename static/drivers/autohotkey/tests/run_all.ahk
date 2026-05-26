@@ -118,6 +118,7 @@ InstallHotstringHooks()
 ; ── Cross-driver corpus consumers ──
 #Include meta/test_corpus_hotstrings.ahk
 #Include meta/test_corpus_tap_hold.ahk
+#Include meta/test_corpus_hotstring_matcher.ahk
 
 ; Drive everything. RunTests prints a TAP-style report to stdout and exits
 ; with the appropriate code — control never returns from this call.
