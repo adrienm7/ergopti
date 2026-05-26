@@ -300,3 +300,99 @@ _TH_HoldLayerEmptyWhenAbsent() {
 	AssertEqual("", TapHoldHoldLayer(TH, "lalt"))
 }
 Test("TapHoldHoldLayer: returns empty string when hold_layer absent", _TH_HoldLayerEmptyWhenAbsent)
+
+
+
+
+
+; ====================================================================
+; ==================================================
+; ======= 7/ Runtime overlay (defaults+user) =======
+; ==================================================
+; ====================================================================
+
+; Helper: write a second temp file for defaults (path distinct from the user tmp)
+_TH_DefaultsTmpPath() => A_ScriptDir . "\test_tap_hold_defaults_tmp.toml"
+
+_TH_WriteDefaults(Content) {
+	Path := _TH_DefaultsTmpPath()
+	if FileExist(Path)
+		FileDelete(Path)
+	FileAppend(Content, Path, "UTF-8")
+	return Path
+}
+
+_TH_CleanDefaults() {
+	global _TomlFileCache
+	Path := _TH_DefaultsTmpPath()
+	if FileExist(Path)
+		FileDelete(Path)
+	if _TomlFileCache.Has(Path)
+		_TomlFileCache.Delete(Path)
+}
+
+; When no user file exists, the defaults file alone is returned
+_TH_OverlayDefaultsOnlyWhenUserMissing() {
+	DefPath := _TH_WriteDefaults(
+		"[tap_hold.keys.caps_lock]`r`n"
+		. "tap_action = `"escape`"`r`n"
+		. "time_activation_seconds = 0.35`r`n"
+	)
+	TH := LoadTapHoldToml(A_ScriptDir . "\does_not_exist_user.toml", DefPath)
+	_TH_CleanDefaults()
+	AssertTrue(TH["keys"].Has("caps_lock"))
+	AssertEqual("escape", TH["keys"]["caps_lock"]["tap_action"])
+	AssertEqual(0.35,     TH["keys"]["caps_lock"]["time_activation_seconds"])
+}
+Test("LoadTapHoldToml overlay: defaults used when user file missing", _TH_OverlayDefaultsOnlyWhenUserMissing)
+
+; User value takes precedence over the matching default field
+_TH_OverlayUserWinsOnConflict() {
+	DefPath := _TH_WriteDefaults(
+		"[tap_hold.keys.caps_lock]`r`n"
+		. "tap_action = `"escape`"`r`n"
+		. "time_activation_seconds = 0.35`r`n"
+	)
+	UserPath := _TH_Write(
+		"[tap_hold.keys.caps_lock]`r`n"
+		. "tap_action = `"enter`"`r`n"
+	)
+	TH := LoadTapHoldToml(UserPath, DefPath)
+	_TH_Clean()
+	_TH_CleanDefaults()
+	; User overrides tap_action; time_activation_seconds inherits from defaults
+	AssertEqual("enter", TH["keys"]["caps_lock"]["tap_action"])
+	AssertEqual(0.35,    TH["keys"]["caps_lock"]["time_activation_seconds"])
+}
+Test("LoadTapHoldToml overlay: user value wins on conflict", _TH_OverlayUserWinsOnConflict)
+
+; User file introduces a key absent from defaults — it is preserved as-is
+_TH_OverlayUserOnlyKeyPreserved() {
+	DefPath := _TH_WriteDefaults(
+		"[tap_hold.keys.caps_lock]`r`n"
+		. "tap_action = `"escape`"`r`n"
+	)
+	UserPath := _TH_Write(
+		"[tap_hold.keys.my_custom_key]`r`n"
+		. "hold_modifier = `"shift`"`r`n"
+	)
+	TH := LoadTapHoldToml(UserPath, DefPath)
+	_TH_Clean()
+	_TH_CleanDefaults()
+	AssertTrue(TH["keys"].Has("caps_lock"))
+	AssertTrue(TH["keys"].Has("my_custom_key"))
+	AssertEqual("shift", TH["keys"]["my_custom_key"]["hold_modifier"])
+}
+Test("LoadTapHoldToml overlay: user-only key is preserved alongside defaults", _TH_OverlayUserOnlyKeyPreserved)
+
+; Omitting DefaultsFilePath still works (no regression on existing callers)
+_TH_OverlayBackwardCompatNoDefaults() {
+	Path := _TH_Write(
+		"[tap_hold.keys.tab]`r`n"
+		. "tap_action = `"tab`"`r`n"
+	)
+	TH := LoadTapHoldToml(Path)
+	_TH_Clean()
+	AssertEqual("tab", TH["keys"]["tab"]["tap_action"])
+}
+Test("LoadTapHoldToml overlay: backward-compatible when DefaultsFilePath omitted", _TH_OverlayBackwardCompatNoDefaults)
