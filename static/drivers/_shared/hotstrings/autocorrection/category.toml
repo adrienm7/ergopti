@@ -1,0 +1,6 @@
+# _shared/hotstrings/autocorrection/category.toml
+[category]
+id          = "autocorrection"
+color       = "#00838f"
+delay       = 0.5
+description = "Automatic correction of common typos, accent errors, and punctuation."
