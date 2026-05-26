@@ -168,6 +168,25 @@ class KLAppCat {
 
 
 
+; =====================================
+; ===== 2.1) Initialization guard =====
+; =====================================
+
+; Returns false and logs an error if KL_AppCat_Init() has not yet been called.
+; Guards every public function that reads or writes KLAppCat.categories to
+; prevent silent no-ops when the module is used before the metrics dir is ready.
+KL_AppCat_RequireInit(func_name) {
+	if (KLAppCat.file_path = "") {
+		LoggerError("KLAppCat", "'%s' called before KL_AppCat_Init() — file_path not set.", func_name)
+		return false
+	}
+	return true
+}
+
+
+
+
+
 ; =========================================
 ; ==============================
 ; ======= 3/ Load / save =======
@@ -234,6 +253,8 @@ KL_AppCat_DeferredSave() {
 ; save is scheduled so it appears in app_categories.json for the user
 ; to classify.
 KL_AppCat_Get(app_name) {
+	if !KL_AppCat_RequireInit("KL_AppCat_Get")
+		return "unknown"
     if (app_name = "" or app_name = "Unknown")
         return "unknown"
     key := StrLower(app_name)
@@ -253,6 +274,8 @@ KL_AppCat_Get(app_name) {
 
 ; Allows the future settings UI or a user script to override a category.
 KL_AppCat_Set(app_name, category) {
+	if !KL_AppCat_RequireInit("KL_AppCat_Set")
+		return
     key := StrLower(app_name)
     KLAppCat.categories[key] := category
     KL_AppCat_Save()
