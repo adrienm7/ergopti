@@ -38,6 +38,12 @@ static/drivers/_shared/
 │  ├── SPEC.md                      # Cross-driver logger contract (8 variants, format, ring buffer, fan-out)
 │  ├── sub_files.toml               # Pattern → topical sub-file routing rules (ahk + hs)
 │  └── test_vectors.json            # (variant, module, message, args) → expected line pairs
+├── tooltip/
+│  ├── SPEC.md                      # Cross-driver tooltip contract (draw_calls IR, tint, layout, constants)
+│  ├── constants.toml               # Single source of truth for all visual constants (colors, fonts, layout, timing)
+│  ├── tint.js                      # Pure HSL tint-mixing algorithm + cross-driver test vectors
+│  ├── layout.js                    # Pure position resolution + canvas geometry + test vectors
+│  └── draw_calls.js                # draw_calls[] IR type definitions and composer functions
 ├── features/
 │  └── manifest.toml                # Single source of features (Scope C2)
 ├── llm/
