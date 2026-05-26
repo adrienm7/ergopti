@@ -34,6 +34,10 @@ static/drivers/_shared/
 ├── tap_hold/
 │  └── defaults.toml                # Canonical defaults — used only as the
 │                                   # one-shot generation source at first boot
+├── logger/
+│  ├── SPEC.md                      # Cross-driver logger contract (8 variants, format, ring buffer, fan-out)
+│  ├── sub_files.toml               # Pattern → topical sub-file routing rules (ahk + hs)
+│  └── test_vectors.json            # (variant, module, message, args) → expected line pairs
 ├── features/
 │  └── manifest.toml                # Single source of features (Scope C2)
 ├── llm/
