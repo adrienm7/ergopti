@@ -79,8 +79,8 @@ _MetaRunLoggerPairingTests() {
 	DriverRoot := StrReplace(_DriverRootRaw, "\", "/") . "/"
 	Imbalanced := 0
 
-	for _Unused, Sub in ["lib", "modules"] {
-		for _Unused, AbsPath in _MetaListAhkFilesLogger(StrReplace(DriverRoot . Sub, "/", "\")) {
+	for Sub in ["lib", "modules"] {
+		for AbsPath in _MetaListAhkFilesLogger(StrReplace(DriverRoot . Sub, "/", "\")) {
 			try {
 				Body := FileRead(StrReplace(AbsPath, "/", "\"))
 			} catch {

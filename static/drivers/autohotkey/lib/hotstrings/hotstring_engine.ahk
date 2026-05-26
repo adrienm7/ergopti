@@ -476,7 +476,7 @@ CreateCaseSensitiveHotstrings(Flags, Abbreviation, Replacement, options := unset
     }
 
     if (StrLen(Abbreviation) >= 2) {
-        for _Unused, variant in GenerateUppercaseVariants(AbbreviationUpperCase, UppercasedSymbols) {
+        for variant in GenerateUppercaseVariants(AbbreviationUpperCase, UppercasedSymbols) {
             RegisterVariant(variant, ReplacementUpperCase)
         }
 
@@ -537,7 +537,7 @@ _LSCResetFrom(Chars) {
     }
     _LSC_CURSOR := 0
     _LSC_LEN := 0
-    for _Unused, c in Chars {
+    for c in Chars {
         _LSCPush(c)
     }
 }
@@ -574,7 +574,7 @@ GenerateUppercaseVariants(AbbreviationUpperCase, UppercasedSymbols) {
     Variants := [AbbreviationUpperCase]
     for i, Char in StrSplit(AbbreviationUpperCase) {
         if UppercasedSymbols.Has(Char) {
-            for _Unused, UpperSymbol in UppercasedSymbols[Char] {
+            for UpperSymbol in UppercasedSymbols[Char] {
                 AbbreviationUpperCaseVariant :=
                     SubStr(AbbreviationUpperCase, 1, i - 1)
                     . UpperSymbol

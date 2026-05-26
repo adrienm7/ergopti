@@ -68,7 +68,7 @@ _MetaRunRequireStateTests() {
 	DriverRoot := StrReplace(_DriverRootRaw, "\", "/") . "/"
 	Missing := 0
 
-	for _Unused, AbsPath in _MetaListAhkFilesGuard(StrReplace(DriverRoot . "modules", "/", "\")) {
+	for AbsPath in _MetaListAhkFilesGuard(StrReplace(DriverRoot . "modules", "/", "\")) {
 		try {
 			Body := FileRead(StrReplace(AbsPath, "/", "\"))
 		} catch {

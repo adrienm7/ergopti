@@ -27,7 +27,7 @@
 ; AHK v2 fat-arrow lambdas do not support try/catch, for-with-break, or
 ; multi-statement if blocks — extract everything into named functions.
 _MetaResolveGitRange() {
-	for _Unused, Ref in ["origin/dev", "origin/main"] {
+	for Ref in ["origin/dev", "origin/main"] {
 		CheckFile := A_Temp . "\meta_git_ref.txt"
 		try FileDelete(CheckFile)
 		RunWait('cmd /c git rev-parse --verify ' . Ref . ' > "' . CheckFile . '" 2>nul', , "Hide")

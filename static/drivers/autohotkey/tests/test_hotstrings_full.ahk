@@ -218,7 +218,7 @@ Test("CreateHotstring: TimeActivationSeconds blocks expansion when expired",
 ; Helper: extract every recorded trigger spec into a flat Array.
 _CollectSpecs() {
     Specs := []
-    for _Unused, R in _Stub_HotstringRegistrations {
+    for R in _Stub_HotstringRegistrations {
         Specs.Push(R.spec)
     }
     return Specs
@@ -326,7 +326,7 @@ Test("CreateCaseSensitiveHotstrings: 3-char with comma inside produces 5 variant
 TestCS_AlwaysIncludesCFlag() {
     ResetHotstringRecorders()
     CreateCaseSensitiveHotstrings("*?", "ab", "xy")
-    for _Unused, R in _Stub_HotstringRegistrations {
+    for R in _Stub_HotstringRegistrations {
         AssertContains(R.spec, "C")
         AssertContains(R.spec, "B0O")
     }
@@ -1025,7 +1025,7 @@ TestCH_OptionFinalResultPropagates() {
     ResetHotstringRecorders()
     Cb()
     ; All sends must be SendFinalResult
-    for _Unused, S in _Stub_RecordedSends {
+    for S in _Stub_RecordedSends {
         AssertEqual("SendFinalResult", S.fn)
     }
 }
