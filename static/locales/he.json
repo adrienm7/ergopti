@@ -1337,6 +1337,7 @@
 	"shortcuts.save": "Ctrl + J/★ = Ctrl + S. אזהרה: Ctrl + J אובד",
 	"shortcuts.saved": "נשמר: %s",
 	"shortcuts.screen": "Win + H (screensHot) = צילום מסך (מפעיל Win + Shift + S)",
+	"shortcuts.screenocr": "Win + C (OCR) = צילום מסך עם חילוץ טקסט (Win + Shift + T)",
 	"shortcuts.screeninstant": "מקש ² (SC029, משמאל ל-1) = צילום מיידי של החלון הפעיל, נשמר ב-Pictures עם חותמת זמן",
 	"shortcuts.screenshot_copied": "צילום מסך הועתק ללוח",
 	"shortcuts.screenshot_title": "צילום מסך",

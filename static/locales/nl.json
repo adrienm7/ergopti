@@ -1337,6 +1337,7 @@
 	"shortcuts.save": "Ctrl + J/★ = Ctrl + S. Waarschuwing: Ctrl + J gaat verloren",
 	"shortcuts.saved": "Opgeslagen: %s",
 	"shortcuts.screen": "Win + H (screensHot) = Schermopname (activeert Win + Shift + S)",
+	"shortcuts.screenocr": "Win + C (OCR) = Schermafbeelding met tekstextractie (Win + Shift + T)",
 	"shortcuts.screeninstant": "²-toets (SC029, links van 1) = Directe opname van het actieve venster, opgeslagen in Afbeeldingen met tijdstempel",
 	"shortcuts.screenshot_copied": "Screenshot gekopieerd naar klembord",
 	"shortcuts.screenshot_title": "Schermafbeelding",

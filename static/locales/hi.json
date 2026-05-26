@@ -1337,6 +1337,7 @@
 	"shortcuts.save": "Ctrl + J/★ = Ctrl + S। चेतावनी: Ctrl + J खो जाता है",
 	"shortcuts.saved": "सहेजा गया: %s",
 	"shortcuts.screen": "Win + H (screensHot) = स्क्रीन कैप्चर (Win + Shift + S ट्रिगर करता है)",
+	"shortcuts.screenocr": "Win + C (OCR) = टेक्स्ट निष्कर्षण के साथ स्क्रीनशॉट (Win + Shift + T)",
 	"shortcuts.screeninstant": "² कुंजी (SC029, 1 के बाईं ओर) = सक्रिय विंडो का तुरंत कैप्चर, टाइमस्टैम्प के साथ चित्रों में सहेजा जाता है",
 	"shortcuts.screenshot_copied": "स्क्रीनशॉट क्लिपबोर्ड पर कॉपी किया",
 	"shortcuts.screenshot_title": "स्क्रीनशॉट",

@@ -1337,6 +1337,7 @@
 	"shortcuts.save": "Ctrl + J/★ = Ctrl + S. Uwaga: Ctrl + J zostaje utracony",
 	"shortcuts.saved": "Zapisano: %s",
 	"shortcuts.screen": "Win + H (screensHot) = Zrzut ekranu (uruchamia Win + Shift + S)",
+	"shortcuts.screenocr": "Win + C (OCR) = Zrzut ekranu z wyodrębnianiem tekstu (Win + Shift + T)",
 	"shortcuts.screeninstant": "Klawisz ² (SC029, na lewo od 1) = Natychmiastowe przechwycenie aktywnego okna, zapisane w Obrazach ze znacznikiem czasu",
 	"shortcuts.screenshot_copied": "Zrzut ekranu skopiowany do schowka",
 	"shortcuts.screenshot_title": "Zrzut ekranu",

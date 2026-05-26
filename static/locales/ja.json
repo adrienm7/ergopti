@@ -1337,6 +1337,7 @@
 	"shortcuts.save": "Ctrl + J/★ = Ctrl + S。注意: Ctrl + J は使用不可になります",
 	"shortcuts.saved": "保存しました：%s",
 	"shortcuts.screen": "Win + H (screensHot) = スクリーンショット (Win + Shift + S を起動)",
+	"shortcuts.screenocr": "Win + C (OCR) = テキスト抽出付きスクリーンショット (Win + Shift + T)",
 	"shortcuts.screeninstant": "²キー (SC029、1の左) = アクティブウィンドウの即時キャプチャ、タイムスタンプ付きでピクチャに保存",
 	"shortcuts.screenshot_copied": "スクリーンショットをクリップボードにコピーしました",
 	"shortcuts.screenshot_title": "スクリーンショット",

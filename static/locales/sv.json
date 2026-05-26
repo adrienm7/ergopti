@@ -1337,6 +1337,7 @@
 	"shortcuts.save": "Ctrl + J/★ = Ctrl + S. Varning: Ctrl + J försvinner",
 	"shortcuts.saved": "Sparat: %s",
 	"shortcuts.screen": "Win + H (screensHot) = Skärmfångst (utlöser Win + Shift + S)",
+	"shortcuts.screenocr": "Win + C (OCR) = Skärmdump med textutvinning (Win + Shift + T)",
 	"shortcuts.screeninstant": "²-tangenten (SC029, vänster om 1) = Omedelbar insamling av aktivt fönster, sparat i Bilder med tidsstämpel",
 	"shortcuts.screenshot_copied": "Skärmdump kopierad till urklipp",
 	"shortcuts.screenshot_title": "Skärmdump",

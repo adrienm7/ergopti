@@ -1337,6 +1337,7 @@
 	"shortcuts.save": "Ctrl + J/★ = Ctrl + S. Attenzione: Ctrl + J viene perso",
 	"shortcuts.saved": "Salvato: %s",
 	"shortcuts.screen": "Win + H (screensHot) = Cattura schermo (attiva Win + Shift + S)",
+	"shortcuts.screenocr": "Win + C (OCR) = Schermata con estrazione del testo (Win + Shift + T)",
 	"shortcuts.screeninstant": "Tasto ² (SC029, a sinistra di 1) = Cattura istantanea della finestra attiva, salvata in Immagini con timestamp",
 	"shortcuts.screenshot_copied": "Screenshot copiato negli appunti",
 	"shortcuts.screenshot_title": "Screenshot",

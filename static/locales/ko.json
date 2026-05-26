@@ -1337,6 +1337,7 @@
 	"shortcuts.save": "Ctrl + J/★ = Ctrl + S. 주의: Ctrl + J가 손실됩니다",
 	"shortcuts.saved": "저장됨: %s",
 	"shortcuts.screen": "Win + H (screensHot) = 화면 캡처 (Win + Shift + S 실행)",
+	"shortcuts.screenocr": "Win + C (OCR) = 텍스트 추출 스크린샷 (Win + Shift + T)",
 	"shortcuts.screeninstant": "² 키 (SC029, 1 왼쪽) = 활성 창의 즉시 캡처, 타임스탬프와 함께 사진에 저장",
 	"shortcuts.screenshot_copied": "스크린샷이 클립보드에 복사되었습니다",
 	"shortcuts.screenshot_title": "스크린샷",

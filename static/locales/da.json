@@ -1337,6 +1337,7 @@
 	"shortcuts.save": "Ctrl + J/★ = Ctrl + S. Advarsel: Ctrl + J går tabt",
 	"shortcuts.saved": "Gemt: %s",
 	"shortcuts.screen": "Win + H (screensHot) = Skærmbillede (aktiverer Win + Shift + S)",
+	"shortcuts.screenocr": "Win + C (OCR) = Skærmbillede med tekstudtræk (Win + Shift + T)",
 	"shortcuts.screeninstant": "² tast (SC029, til venstre for 1) = Øjeblikkelig capture af aktivt vindue, gemt i Billeder med tidsstempel",
 	"shortcuts.screenshot_copied": "Skærmbillede kopieret til udklipsholder",
 	"shortcuts.screenshot_title": "Skærmbillede",
