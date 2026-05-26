@@ -401,8 +401,8 @@ Updater_ParseBody(Json) {
 		return ""
 	if (SubStr(LTrim(Json), 1, 1) == "[")
 		Json := RegExReplace(Json, "^\s*\[", "")
-	; Limit match to 32 KB to avoid PCRE stack overflow on very long release bodies
-	if RegExMatch(Json, '"body"\s*:\s*"((?>(?:[^"\\]|\\.){0,32768}))"', &M) {
+	; Atomic group prevents backtracking — no bounded quantifier needed (PCRE rejects large bounds)
+	if RegExMatch(Json, '"body"\s*:\s*"((?>(?:[^"\\]|\\.)*?))"', &M) {
 		; Unescape the most common JSON escape sequences.
 		Body := M[1]
 		Body := StrReplace(Body, "\n",  "`n")
