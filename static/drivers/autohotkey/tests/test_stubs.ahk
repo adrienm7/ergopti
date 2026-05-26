@@ -535,3 +535,43 @@ SimulateMicrosoftOffice() {
     _ActiveAppCache.IsNotepad := false
     _ActiveAppCache.IsMicrosoftOffice := true
 }
+
+
+
+
+; =====================================================================
+; ====================================================================
+; ======= 5/ LLM prediction engine stubs =============================
+; ====================================================================
+; =====================================================================
+
+; These functions are called by modules/llm/prediction_engine.ahk at
+; runtime. In production they live in ui/tooltip_llm.ahk and
+; modules/keylogger/keylogger.ahk (which register hotkeys or OS hooks
+; and therefore cannot be #Included by the test runner). The stubs
+; below record calls so individual tests can assert on them.
+
+global _Stub_LlmTooltipCalls   := []   ; recorded LLM_Tooltip_Show calls
+global _Stub_LlmLogCalls       := []   ; recorded KL_LogLlm calls
+global _Stub_LlmLogFailedCalls := []   ; recorded KL_LogLlmFailed calls
+global _Stub_LlmSuggestedCalls := []   ; recorded KL_LogLlmSuggested calls
+
+LLM_Tooltip_Show(slots, active := 1, is_final := false) {
+    global _Stub_LlmTooltipCalls
+    _Stub_LlmTooltipCalls.Push({ slots: slots, active: active, is_final: is_final })
+}
+
+KL_LogLlm(event_type, evt) {
+    global _Stub_LlmLogCalls
+    _Stub_LlmLogCalls.Push({ event_type: event_type, evt: evt })
+}
+
+KL_LogLlmFailed(evt) {
+    global _Stub_LlmLogFailedCalls
+    _Stub_LlmLogFailedCalls.Push({ evt: evt })
+}
+
+KL_LogLlmSuggested(app_name, count) {
+    global _Stub_LlmSuggestedCalls
+    _Stub_LlmSuggestedCalls.Push({ app_name: app_name, count: count })
+}

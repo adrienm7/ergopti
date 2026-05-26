@@ -107,12 +107,26 @@ InstallHotstringHooks()
 #Include test_registry.ahk
 #Include test_nav_layer_helpers.ahk
 
-; LLM modules — pure-logic subset (profiles, models) included here to test
-; JSON parsing, profile lookup, and prompt resolution without any network calls.
+; Shortcuts modules — dispatcher logic is testable without real hotkeys firing;
+; the module files are #Include'd from within test_shortcuts.ahk itself so the
+; include paths are resolved relative to the tests/ directory.
+#Include test_shortcuts.ahk
+
+; LLM modules — pure-logic subset (profiles, models, api_common, api_ollama,
+; api_remote, prediction_engine) included here to test JSON parsing, profile
+; lookup, payload building, response parsing, cancel helpers, and engine
+; debounce / cache logic without any real network calls.
 ; models.ahk defines LLM_GetSharedPath which profiles.ahk depends on.
 #Include ../modules/llm/models.ahk
 #Include ../modules/llm/profiles.ahk
 #Include test_llm_profiles.ahk
+#Include ../modules/llm/api_common.ahk
+#Include ../modules/llm/api_ollama.ahk
+#Include ../modules/llm/api_remote.ahk
+#Include test_llm_api_ollama.ahk
+#Include test_llm_api_remote.ahk
+#Include ../modules/llm/prediction_engine.ahk
+#Include test_llm_prediction_engine.ahk
 
 ; Gestures module — included here because its pure logic (assignments, action
 ; registry, dispatch) is testable. The hotkeys it registers are harmless since
