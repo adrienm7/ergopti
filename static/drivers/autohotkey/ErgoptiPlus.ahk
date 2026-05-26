@@ -880,18 +880,18 @@ for _KbSlot, _KbAction in KeyboardShortcutAssignments {
         continue
     _KbSend := _KeyboardSlotSendCode(_KbSlot)
     if (_KbSend == "") {
-        LoggerWarn("KeyboardShortcuts", "Slot '%s' ignoré — code d'envoi introuvable.", _KbSlot)
+        LoggerWarn("KeyboardShortcuts", "Slot '%s' skipped — send code not found.", _KbSlot)
         continue
     }
     try {
         Hotkey(_KbSend, ((_s) => (*) => RunKeyboardShortcutAction(_s))(_KbSlot))
-        LoggerDebug("KeyboardShortcuts", "Hotkey '%s' → '%s' enregistré.", _KbSlot, _KbAction)
+        LoggerDebug("KeyboardShortcuts", "Hotkey '%s' → '%s' registered.", _KbSlot, _KbAction)
         _KbBoundCount++
     } catch as _KbErr {
-        LoggerWarn("KeyboardShortcuts", "Échec enregistrement hotkey '%s' : %s.", _KbSlot, _KbErr.Message)
+        LoggerWarn("KeyboardShortcuts", "Failed to register hotkey '%s': %s.", _KbSlot, _KbErr.Message)
     }
 }
-LoggerSuccess("KeyboardShortcuts", "Hotkeys configurables enregistrés (%d actif(s)).", _KbBoundCount)
+LoggerSuccess("KeyboardShortcuts", "Configurable hotkeys registered (%d active).", _KbBoundCount)
 
 ; Load every UI shortcut + privacy filter from the [shortcuts] section
 ; of ahk/config.toml. CS_Load() populates both MetricsShortcuts
@@ -1632,10 +1632,10 @@ ReadKeyboardShortcutsConfig() {
         if (Value != "_" and (Value == "none" or GESTURE_ACTIONS.Has(Value))) {
             KeyboardShortcutAssignments[Slot] := Value
             OverrideCount++
-            LoggerDebug("KeyboardShortcuts", "Surcharge TOML : '%s' → '%s'.", Slot, Value)
+            LoggerDebug("KeyboardShortcuts", "TOML override: '%s' → '%s'.", Slot, Value)
         }
     }
-    LoggerSuccess("KeyboardShortcuts", "Raccourcis clavier chargés (%d défaut(s), %d surcharge(s)).",
+    LoggerSuccess("KeyboardShortcuts", "Keyboard shortcuts loaded (%d default(s), %d override(s)).",
         KEYBOARD_SHORTCUT_DEFAULTS.Count, OverrideCount)
 }
 
@@ -1644,10 +1644,10 @@ RunKeyboardShortcutAction(SlotId) {
     global KeyboardShortcutAssignments, GESTURE_ACTIONS
     Action := KeyboardShortcutAssignments.Has(SlotId) ? KeyboardShortcutAssignments[SlotId] : "none"
     if (Action == "none" or !GESTURE_ACTIONS.Has(Action)) {
-        LoggerDebug("KeyboardShortcuts", "Raccourci '%s' ignoré (action : '%s').", SlotId, Action)
+        LoggerDebug("KeyboardShortcuts", "Shortcut '%s' skipped (action: '%s').", SlotId, Action)
         return
     }
-    LoggerDebug("KeyboardShortcuts", "Raccourci '%s' → '%s' déclenché.", SlotId, Action)
+    LoggerDebug("KeyboardShortcuts", "Shortcut '%s' → '%s' triggered.", SlotId, Action)
     GESTURE_ACTIONS[Action].Fn.Call()
 }
 
@@ -1807,7 +1807,7 @@ ShowKeyboardSlotPicker(Prefix) {
 ; OnConfirm : callback(ActionId) called when the user validates their pick
 ShowActionPicker(Title, Current, OnConfirm) {
     global GESTURE_ACTION_NAMES, GESTURE_ACTIONS
-    LoggerStart("ActionPicker", "Ouverture du sélecteur '%s'…", Title)
+    LoggerStart("ActionPicker", "Opening action picker '%s'…", Title)
 
     ; Build the source data: parallel arrays of ids and display labels.
     ; Category headers are stored with id="" so ConfirmPick can ignore them.
@@ -1921,7 +1921,7 @@ ShowActionPicker(Title, Current, OnConfirm) {
         if (ChosenId == "")
             return
         W.Destroy()
-        LoggerSuccess("ActionPicker", "Sélection confirmée → '%s'.", ChosenId)
+        LoggerSuccess("ActionPicker", "Selection confirmed → '%s'.", ChosenId)
         OnConfirm(ChosenId)
     }
 }
