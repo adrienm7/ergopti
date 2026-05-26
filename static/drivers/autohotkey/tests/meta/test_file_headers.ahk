@@ -71,10 +71,10 @@ _MetaRunFileHeaderTests() {
 	Checked := 0
 	Mismatches := 0
 
-	for _, Sub in SrcDirs {
-		for _, Abs in _MetaListAhkFiles(StrReplace(DriverRoot . Sub, "/", "\")) {
-			FileName := RegExReplace(Abs, ".*[/\\]")
-			AbsCopy := Abs
+	for _Unused, Sub in SrcDirs {
+		for _Unused, AbsPath in _MetaListAhkFiles(StrReplace(DriverRoot . Sub, "/", "\")) {
+			FileName := RegExReplace(AbsPath, ".*[/\\]")
+			AbsCopy := AbsPath
 			_MetaCheckFileHeader() {
 				Checked++
 				try {

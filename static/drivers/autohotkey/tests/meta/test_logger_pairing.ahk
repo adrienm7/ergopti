@@ -79,15 +79,15 @@ _MetaRunLoggerPairingTests() {
 	DriverRoot := StrReplace(_DriverRootRaw, "\", "/") . "/"
 	Imbalanced := 0
 
-	for _, Sub in ["lib", "modules"] {
-		for _, Abs in _MetaListAhkFilesLogger(StrReplace(DriverRoot . Sub, "/", "\")) {
+	for _Unused, Sub in ["lib", "modules"] {
+		for _Unused, AbsPath in _MetaListAhkFilesLogger(StrReplace(DriverRoot . Sub, "/", "\")) {
 			try {
-				Body := FileRead(StrReplace(Abs, "/", "\"))
+				Body := FileRead(StrReplace(AbsPath, "/", "\"))
 			} catch {
 				continue
 			}
 			NormRoot := StrReplace(DriverRoot, "\", "/")
-			Rel := SubStr(StrReplace(Abs, "\", "/"), StrLen(NormRoot) + 1)
+			Rel := SubStr(StrReplace(AbsPath, "\", "/"), StrLen(NormRoot) + 1)
 
 			NStart   := _MetaCountPattern(Body, "LoggerStart\(")
 			NSuccess := _MetaCountPattern(Body, "LoggerSuccess\(")

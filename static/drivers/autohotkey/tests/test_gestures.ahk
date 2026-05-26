@@ -121,6 +121,7 @@ TestGestures_RightClickStartsReleased() {
 Test("Gestures: right-click hold starts released", TestGestures_RightClickStartsReleased)
 
 TestGestures_ReleaseRightClickSafeWhenIdle() {
+    global GestureLeftClickHeld
     ; Should not throw even when nothing is held
     GestureLeftClickHeld := False
     GestureReleaseLeftClick()

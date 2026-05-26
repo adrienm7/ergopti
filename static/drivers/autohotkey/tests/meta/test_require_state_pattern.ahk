@@ -68,14 +68,14 @@ _MetaRunRequireStateTests() {
 	DriverRoot := StrReplace(_DriverRootRaw, "\", "/") . "/"
 	Missing := 0
 
-	for _, Abs in _MetaListAhkFilesGuard(StrReplace(DriverRoot . "modules", "/", "\")) {
+	for _Unused, AbsPath in _MetaListAhkFilesGuard(StrReplace(DriverRoot . "modules", "/", "\")) {
 		try {
-			Body := FileRead(StrReplace(Abs, "/", "\"))
+			Body := FileRead(StrReplace(AbsPath, "/", "\"))
 		} catch {
 			continue
 		}
 		NormRoot := StrReplace(DriverRoot, "\", "/")
-		Rel := SubStr(StrReplace(Abs, "\", "/"), StrLen(NormRoot) + 1)
+		Rel := SubStr(StrReplace(AbsPath, "\", "/"), StrLen(NormRoot) + 1)
 
 		; "Stateful" heuristic: file declares a global state Map at top level
 		IsStateful := Body ~= "global\s+\w+State\s*:=" or Body ~= "global\s+\w+Enabled\s*:="

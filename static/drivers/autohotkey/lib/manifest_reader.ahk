@@ -177,20 +177,20 @@ ManifestBuildFeaturesMap() {
 	}
 	global FEATURES_MANIFEST
 
-	Features := Map()
-	Features["section_order"] := FEATURES_MANIFEST["section_order"]
+	FeaturesMap := Map()
+	FeaturesMap["section_order"] := FEATURES_MANIFEST["section_order"]
 
 	for Entry in FEATURES_MANIFEST["features"] {
 		SectionPath := Entry["section"]
 
 		; Strip the ``ahk.`` prefix so call sites use a single nesting level
-		; (Features["layout"] rather than Features["ahk"]["layout"]).
+		; (FeaturesMap["layout"] rather than FeaturesMap["ahk"]["layout"]).
 		if (StrLen(SectionPath) >= 4 and SubStr(SectionPath, 1, 4) == "ahk.") {
 			SectionPath := SubStr(SectionPath, 5)
 		}
 
 		; Walk the section path, creating intermediate Maps as needed.
-		Cursor := Features
+		Cursor := FeaturesMap
 		Parts  := StrSplit(SectionPath, ".")
 		for Part in Parts {
 			if (Part == "") {
@@ -207,5 +207,5 @@ ManifestBuildFeaturesMap() {
 		Cursor[Entry["id"]] := Entry["default"]
 	}
 
-	return Features
+	return FeaturesMap
 }

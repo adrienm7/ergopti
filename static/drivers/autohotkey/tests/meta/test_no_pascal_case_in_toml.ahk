@@ -67,19 +67,19 @@ _MetaRunNoPascalCaseTomlTests() {
 	ScannedFiles := 0
 
 	CheckDir(DirPath) {
-		for _, Abs in _MetaListTomlFiles(StrReplace(DirPath, "/", "\")) {
+		for _Unused, AbsPath in _MetaListTomlFiles(StrReplace(DirPath, "/", "\")) {
 			; paths.toml is auto-generated and uses ConfigDirPath (PascalCase by
 			; historical convention) — exclude it from the snake_case check.
-			if Abs ~= "i)[\\/]paths\.toml$" {
+			if AbsPath ~= "i)[\\/]paths\.toml$" {
 				continue
 			}
 			ScannedFiles++
 			try {
-				Body := FileRead(StrReplace(Abs, "/", "\"))
+				Body := FileRead(StrReplace(AbsPath, "/", "\"))
 			} catch {
 				continue
 			}
-			NormAbs := StrReplace(Abs, "\", "/")
+			NormAbs := StrReplace(AbsPath, "\", "/")
 
 			LineNum := 0
 			for Line in StrSplit(Body, "`n", "`r") {
