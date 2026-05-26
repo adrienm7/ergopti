@@ -1,4 +1,5 @@
 ﻿; drivers/autohotkey/modules/gestures.ahk
+; Requires: TextSender, WindowManager, MouseControl
 
 ; ==============================================================================
 ; MODULE: Trackpad Gestures
@@ -176,52 +177,52 @@ global GESTURE_ACTIONS := Map(
         Fn: (*) => GestureToggleRightClick(),
     },
     "app_switcher", {
-        Fn: (*) => SendInput("!{Tab}"),
+        Fn: (*) => TextPressKey("Tab", ["Alt"]),
     },
     ; --- Editing ---
     "copy", {
-        Fn: (*) => SendInput("^c"),
+        Fn: (*) => TextPressKey("c", ["Ctrl"]),
     },
     "paste", {
-        Fn: (*) => SendInput("^v"),
+        Fn: (*) => TextPressKey("v", ["Ctrl"]),
     },
     "cut", {
-        Fn: (*) => SendInput("^x"),
+        Fn: (*) => TextPressKey("x", ["Ctrl"]),
     },
     "undo", {
-        Fn: (*) => SendInput("^z"),
+        Fn: (*) => TextPressKey("z", ["Ctrl"]),
     },
     "redo", {
-        Fn: (*) => SendInput("^y"),
+        Fn: (*) => TextPressKey("y", ["Ctrl"]),
     },
     "select_all", {
-        Fn: (*) => SendInput("^a"),
+        Fn: (*) => TextPressKey("a", ["Ctrl"]),
     },
     "find", {
-        Fn: (*) => SendInput("^f"),
+        Fn: (*) => TextPressKey("f", ["Ctrl"]),
     },
     ; --- Keys ---
     "enter", {
-        Fn: (*) => SendInput("{Enter}"),
+        Fn: (*) => TextPressKey("Enter", []),
     },
     "tab", {
-        Fn: (*) => SendInput("{Tab}"),
+        Fn: (*) => TextPressKey("Tab", []),
     },
     "escape", {
-        Fn: (*) => SendInput("{Escape}"),
+        Fn: (*) => TextPressKey("Escape", []),
     },
     "backspace", {
-        Fn: (*) => SendInput("{BackSpace}"),
+        Fn: (*) => TextPressKey("BackSpace", []),
     },
     "delete", {
-        Fn: (*) => SendInput("{Delete}"),
+        Fn: (*) => TextPressKey("Delete", []),
     },
     ; --- Tabs ---
     "tab_new", {
-        Fn: (*) => SendInput("^t"),
+        Fn: (*) => TextPressKey("t", ["Ctrl"]),
     },
     "tab_close", {
-        Fn: (*) => SendInput("^w"),
+        Fn: (*) => TextPressKey("w", ["Ctrl"]),
     },
     "tab_prev", {
         Fn: (*) => GestureSendShortcut("^+{Tab}"),
@@ -250,125 +251,125 @@ global GESTURE_ACTIONS := Map(
         Fn: (*) => GestureCycleAppWindows(True),
     },
     "close_window", {
-        Fn: (*) => SendInput("!{F4}"),
+        Fn: (*) => TextPressKey("F4", ["Alt"]),
     },
     "fullscreen", {
-        Fn: (*) => SendInput("{F11}"),
+        Fn: (*) => TextPressKey("F11", []),
     },
     "snap_left", {
-        Fn: (*) => SendInput("#{Left}"),
+        Fn: (*) => TextPressKey("Left", ["Win"]),
     },
     "snap_right", {
-        Fn: (*) => SendInput("#{Right}"),
+        Fn: (*) => TextPressKey("Right", ["Win"]),
     },
     "maximize", {
-        Fn: (*) => SendInput("#{Up}"),
+        Fn: (*) => TextPressKey("Up", ["Win"]),
     },
     "desktop_prev", {
-        Fn: (*) => SendInput("^#{Left}"),
+        Fn: (*) => TextPressKey("Left", ["Ctrl", "Win"]),
     },
     "desktop_next", {
-        Fn: (*) => SendInput("^#{Right}"),
+        Fn: (*) => TextPressKey("Right", ["Ctrl", "Win"]),
     },
     "desktop_new", {
-        Fn: (*) => SendInput("^#d"),
+        Fn: (*) => TextPressKey("d", ["Ctrl", "Win"]),
     },
     "desktop_close", {
-        Fn: (*) => SendInput("^#{F4}"),
+        Fn: (*) => TextPressKey("F4", ["Ctrl", "Win"]),
     },
     "task_view", {
-        Fn: (*) => SendInput("#{Tab}"),
+        Fn: (*) => TextPressKey("Tab", ["Win"]),
     },
     "minimize_all", {
-        Fn: (*) => SendInput("#d"),
+        Fn: (*) => TextPressKey("d", ["Win"]),
     },
     ; --- Cursor movement ---
     "word_prev", {
-        Fn: (*) => SendInput("^{Left}"),
+        Fn: (*) => TextPressKey("Left", ["Ctrl"]),
     },
     "word_next", {
-        Fn: (*) => SendInput("^{Right}"),
+        Fn: (*) => TextPressKey("Right", ["Ctrl"]),
     },
     "line_up", {
-        Fn: (*) => SendInput("{Up}"),
+        Fn: (*) => TextPressKey("Up", []),
     },
     "line_down", {
-        Fn: (*) => SendInput("{Down}"),
+        Fn: (*) => TextPressKey("Down", []),
     },
     "line_start", {
-        Fn: (*) => SendInput("{Home}"),
+        Fn: (*) => TextPressKey("Home", []),
     },
     "line_end", {
-        Fn: (*) => SendInput("{End}"),
+        Fn: (*) => TextPressKey("End", []),
     },
     "para_prev", {
-        Fn: (*) => SendInput("^{Up}"),
+        Fn: (*) => TextPressKey("Up", ["Ctrl"]),
     },
     "para_next", {
-        Fn: (*) => SendInput("^{Down}"),
+        Fn: (*) => TextPressKey("Down", ["Ctrl"]),
     },
     "doc_start", {
-        Fn: (*) => SendInput("^{Home}"),
+        Fn: (*) => TextPressKey("Home", ["Ctrl"]),
     },
     "doc_end", {
-        Fn: (*) => SendInput("^{End}"),
+        Fn: (*) => TextPressKey("End", ["Ctrl"]),
     },
     ; --- Arrows ---
     "arrow_up", {
-        Fn: (*) => SendInput("{Up}"),
+        Fn: (*) => TextPressKey("Up", []),
     },
     "arrow_down", {
-        Fn: (*) => SendInput("{Down}"),
+        Fn: (*) => TextPressKey("Down", []),
     },
     "arrow_left", {
-        Fn: (*) => SendInput("{Left}"),
+        Fn: (*) => TextPressKey("Left", []),
     },
     "arrow_right", {
-        Fn: (*) => SendInput("{Right}"),
+        Fn: (*) => TextPressKey("Right", []),
     },
     ; --- Selection ---
     "sel_up", {
-        Fn: (*) => SendInput("+{Up}"),
+        Fn: (*) => TextPressKey("Up", ["Shift"]),
     },
     "sel_down", {
-        Fn: (*) => SendInput("+{Down}"),
+        Fn: (*) => TextPressKey("Down", ["Shift"]),
     },
     "sel_left", {
-        Fn: (*) => SendInput("+{Left}"),
+        Fn: (*) => TextPressKey("Left", ["Shift"]),
     },
     "sel_right", {
-        Fn: (*) => SendInput("+{Right}"),
+        Fn: (*) => TextPressKey("Right", ["Shift"]),
     },
     "sel_word_prev", {
-        Fn: (*) => SendInput("^+{Left}"),
+        Fn: (*) => TextPressKey("Left", ["Ctrl", "Shift"]),
     },
     "sel_word_next", {
-        Fn: (*) => SendInput("^+{Right}"),
+        Fn: (*) => TextPressKey("Right", ["Ctrl", "Shift"]),
     },
     ; --- Media ---
     "vol_up", {
-        Fn: (*) => SendInput("{Volume_Up}"),
+        Fn: (*) => TextPressKey("Volume_Up", []),
     },
     "vol_down", {
-        Fn: (*) => SendInput("{Volume_Down}"),
+        Fn: (*) => TextPressKey("Volume_Down", []),
     },
     "mute", {
-        Fn: (*) => SendInput("{Volume_Mute}"),
+        Fn: (*) => TextPressKey("Volume_Mute", []),
     },
     "brightness_up", {
-        Fn: (*) => SendInput("{Brightness_Up}"),
+        Fn: (*) => TextPressKey("Brightness_Up", []),
     },
     "brightness_down", {
-        Fn: (*) => SendInput("{Brightness_Down}"),
+        Fn: (*) => TextPressKey("Brightness_Down", []),
     },
     "track_play", {
-        Fn: (*) => SendInput("{Media_Play_Pause}"),
+        Fn: (*) => TextPressKey("Media_Play_Pause", []),
     },
     "track_next", {
-        Fn: (*) => SendInput("{Media_Next}"),
+        Fn: (*) => TextPressKey("Media_Next", []),
     },
     "track_prev", {
-        Fn: (*) => SendInput("{Media_Prev}"),
+        Fn: (*) => TextPressKey("Media_Prev", []),
     },
     ; --- System ---
     ; Each capture target ships in two flavours: the *_clipboard variant
@@ -397,13 +398,13 @@ global GESTURE_ACTIONS := Map(
         Fn: (*) => GestureScreenshotFullscreen("save"),
     },
     "screen_record", {
-        Fn: (*) => SendInput("#!r"),
+        Fn: (*) => TextPressKey("r", ["Win", "Alt"]),
     },
     "lock_screen", {
         Fn: (*) => DllCall("LockWorkStation"),
     },
     "notification_center", {
-        Fn: (*) => SendInput("#n"),
+        Fn: (*) => TextPressKey("n", ["Win"]),
     },
     ; --- UI windows ---
     ; Each UI action follows the same three-state pattern: if the window is
@@ -603,13 +604,13 @@ GestureTakeNote() {
     PreviousTitleMatchMode := A_TitleMatchMode
     try {
         SetTitleMatchMode(2)
-        if WinExist(FileName) {
-            WinActivate(FileName)
+        if WMExists(FileName) {
+            WMActivate(FileName)
             WinWaitActive(FileName, , 3)
         } else {
             Run('notepad.exe "' . FilePath . '"')
             WinWait(FileName, , 7)
-            WinActivate(FileName)
+            WMActivate(FileName)
             WinWaitActive(FileName, , 3)
         }
         WinMaximize()
@@ -631,7 +632,7 @@ GestureSimulateActivity() {
     if !ActivitySimulation
         return
     loop Random(3, 8) {
-        DllCall("SetCursorPos", "int", Random(0, A_ScreenWidth), "int", Random(0, A_ScreenHeight))
+        MCSetPos(Random(0, A_ScreenWidth), Random(0, A_ScreenHeight))
         Sleep(Random(200, 800))
     }
     SendFinalResult("{VKFF}")
@@ -686,7 +687,7 @@ GestureTeleportMouse() {
     Target := Monitors[NextIndex]
     TargetX := Target.Left + (Target.Right - Target.Left) // 2
     TargetY := Target.Top + (Target.Bottom - Target.Top) // 2
-    DllCall("SetCursorPos", "int", TargetX, "int", TargetY)
+    MCSetPos(TargetX, TargetY)
     SpotlightMouseAt(TargetX, TargetY, 3000)
 }
 
@@ -831,13 +832,13 @@ GestureToggleOrFocusUI(which) {
 GestureGenericToggleUI(get_hwnd_fn, open_fn, close_fn) {
     hwnd := 0
     try hwnd := get_hwnd_fn.Call()
-    if (hwnd && WinExist("ahk_id " . hwnd)) {
+    if (hwnd && WMExists("ahk_id " . hwnd)) {
         focused := 0
         try focused := WinGetID("A")
         if (focused = hwnd) {
             try close_fn.Call()
         } else {
-            try WinActivate("ahk_id " . hwnd)
+            try WMActivate("ahk_id " . hwnd)
         }
         return
     }
@@ -847,7 +848,7 @@ GestureGenericToggleUI(get_hwnd_fn, open_fn, close_fn) {
 ; Save the active document with Ctrl+S then reload — mirrors the legacy
 ; AltGr+BackSpace shortcut that pre-dated the action registry.
 GestureSaveAndReload() {
-    SendInput("{LControl Down}s{LControl Up}")
+    TextPressKey("s", ["Ctrl"])
     Sleep(300)
     Reload()
 }
@@ -977,12 +978,46 @@ global GestureKeyboardHook   := 0
 ; ==========================================
 ; ===========================================
 
+; Parses an AHK v2 shortcut string (e.g. "^+{Tab}", "!{Left}", "^t") into a
+; TextPressKey-compatible (Key, Modifiers) pair and dispatches via the adapter.
+; Handles: ^ = Ctrl, + = Shift, ! = Alt, # = Win.
+; Bare letters (no braces) are passed as-is; {…} keys strip the braces.
+_GestureParseAndPressKey(Keys) {
+    Mods := []
+    Pos  := 1
+    ; Consume modifier prefix characters one by one
+    loop {
+        Ch := SubStr(Keys, Pos, 1)
+        switch Ch {
+            case "^":
+                Mods.Push("Ctrl")
+                Pos++
+            case "+":
+                Mods.Push("Shift")
+                Pos++
+            case "!":
+                Mods.Push("Alt")
+                Pos++
+            case "#":
+                Mods.Push("Win")
+                Pos++
+            default:
+                break 2
+        }
+    }
+    KeyPart := SubStr(Keys, Pos)
+    ; Strip braces from {Key} notation
+    if SubStr(KeyPart, 1, 1) = "{" and SubStr(KeyPart, -1) = "}"
+        KeyPart := SubStr(KeyPart, 2, StrLen(KeyPart) - 2)
+    TextPressKey(KeyPart, Mods)
+}
+
 ; Sends a shortcut while neutralising the Ctrl+Win+Shift modifiers that the
 ; touchpad gesture itself is still holding down at callback time. Without this,
 ; e.g. Ctrl+Shift+Tab sent on top of held Ctrl+Win+Shift collapses to plain Tab.
 GestureSendShortcut(Keys) {
     Send("{Blind}{LCtrl up}{RCtrl up}{LShift up}{RShift up}{LWin up}{RWin up}{LAlt up}{RAlt up}")
-    SendInput(Keys)
+    _GestureParseAndPressKey(Keys)
 }
 
 ; Returns the list of all visible, non-cloaked top-level windows on the
@@ -991,7 +1026,7 @@ GestureSendShortcut(Keys) {
 ; cycle stays on real user windows.
 GestureGetCyclableWindows(ProcessFilter := "") {
     Result := []
-    Ids := WinGetList()
+    Ids := WMGetList()
     for HWnd in Ids {
         try {
             Title := WinGetTitle("ahk_id " . HWnd)
@@ -1013,6 +1048,8 @@ GestureGetCyclableWindows(ProcessFilter := "") {
                 continue
             }
             ; DWMWA_CLOAKED = 14 — windows on other virtual desktops
+            ; TODO(item 2.1.3): route through a WindowManager adapter once
+            ; DwmGetWindowAttribute is covered by the port contract
             Cloaked := 0
             DllCall("dwmapi\DwmGetWindowAttribute", "Ptr", HWnd, "UInt", 14,
                 "Int*", &Cloaked, "UInt", 4)
@@ -1115,7 +1152,7 @@ GestureCaptureRegion(X, Y, W, H, Mode, Path := "") {
 ;   Mode = "save"      → write a PNG to disk and TrayTip the path.
 ;   Mode = "clipboard" → copy the bitmap to the Windows clipboard.
 GestureScreenshotWindow(Mode) {
-    HWnd := WinExist("A")
+    HWnd := WMExists("A")
     if (!HWnd) {
         LoggerWarn("gestures", "screenshot_window: no active window.")
         return
@@ -1173,7 +1210,7 @@ GestureScreenshotRegion(Mode) {
         ; Snip & Sketch already places the image on the clipboard — nothing
         ; further to do. Fire-and-forget so the user can keep typing.
         LoggerStart("gestures", "Region screenshot to clipboard — opening Snip & Sketch…")
-        SendInput("#+s")
+        TextPressKey("s", ["Shift", "Win"])
         LoggerSuccess("gestures", "Snip & Sketch invoked (clipboard mode).")
         return
     }
@@ -1226,7 +1263,7 @@ GestureActivateWindow(HWnd) {
         }
         DllCall("BringWindowToTop", "Ptr", HWnd)
         DllCall("SetForegroundWindow", "Ptr", HWnd)
-        WinActivate("ahk_id " . HWnd)
+        WMActivate("ahk_id " . HWnd)
         if (Attached) {
             DllCall("AttachThreadInput", "UInt", ForeThread, "UInt", TargThread, "Int", False)
         }
@@ -1259,7 +1296,7 @@ GestureCycleWindows(Forward) {
         LoggerDebug("gestures", "CycleWindows: only {1} window(s) — nothing to cycle.", N)
         return
     }
-    Active := WinExist("A")
+    Active := WMExists("A")
     Index := 0
     for I, HWnd in Windows {
         if (HWnd = Active) {
@@ -1292,7 +1329,7 @@ GestureCycleWindows(Forward) {
 ; Cycles through windows belonging to the same process as the active window.
 GestureCycleAppWindows(Forward) {
     Send("{Blind}{LCtrl up}{RCtrl up}{LShift up}{RShift up}{LWin up}{RWin up}{LAlt up}{RAlt up}")
-    Active := WinExist("A")
+    Active := WMExists("A")
     if (!Active) {
         return
     }
