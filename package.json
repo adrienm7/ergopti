@@ -31,7 +31,9 @@
 		"codegen:expander:ahk": "node ./scripts/codegen-expander-ahk.cjs",
 		"codegen:registry:hs": "node ./scripts/codegen-registry-hs.cjs",
 		"codegen:terminators": "node ./scripts/codegen-terminators.cjs",
-		"codegen:expander:hs": "node ./scripts/codegen-expander-hs.cjs"
+		"codegen:expander:hs": "node ./scripts/codegen-expander-hs.cjs",
+		"codegen:prompt-builder:ahk": "node ./scripts/codegen-prompt-builder-ahk.cjs",
+		"codegen:shortcuts": "node ./scripts/codegen-shortcuts.cjs"
 	},
 	"type": "module",
 	"dependencies": {
