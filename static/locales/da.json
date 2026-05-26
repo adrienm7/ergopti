@@ -527,6 +527,7 @@
 	"menu.debug.open_today_log": "Åbn dagens logfil",
 	"menu.debug.title": "⚠ Fejlfinding",
 	"menu.debug.window_spy": "Window Spy",
+	"menu.debug.log_level": "Logniveau",
 	"menu.extensions.empty": "Ingen udvidelse installeret",
 	"menu.extensions.header": "Udvidelser",
 	"menu.gestures.action_prefix": "Handling: ",

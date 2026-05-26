@@ -527,6 +527,7 @@
 	"menu.debug.open_today_log": "आज की लॉग फाइल खोलें",
 	"menu.debug.title": "⚠ डिबग",
 	"menu.debug.window_spy": "Window Spy",
+	"menu.debug.log_level": "लॉग स्तर",
 	"menu.extensions.empty": "कोई एक्सटेंशन स्थापित नहीं",
 	"menu.extensions.header": "एक्सटेंशन",
 	"menu.gestures.action_prefix": "क्रिया: ",

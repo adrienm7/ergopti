@@ -527,6 +527,7 @@
 	"menu.debug.open_today_log": "本日のログファイルを開く",
 	"menu.debug.title": "⚠ デバッグ",
 	"menu.debug.window_spy": "ウィンドウスパイ",
+	"menu.debug.log_level": "ログレベル",
 	"menu.extensions.empty": "拡張機能がインストールされていません",
 	"menu.extensions.header": "拡張機能",
 	"menu.gestures.action_prefix": "アクション: ",

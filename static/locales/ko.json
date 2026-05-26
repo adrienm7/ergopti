@@ -527,6 +527,7 @@
 	"menu.debug.open_today_log": "오늘의 로그 파일 열기",
 	"menu.debug.title": "⚠ 디버그",
 	"menu.debug.window_spy": "Window Spy",
+	"menu.debug.log_level": "로그 수준",
 	"menu.extensions.empty": "설치된 확장 기능 없음",
 	"menu.extensions.header": "확장 기능",
 	"menu.gestures.action_prefix": "동작: ",

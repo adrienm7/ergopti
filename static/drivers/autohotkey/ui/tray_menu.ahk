@@ -1703,6 +1703,8 @@ initMenu() {
 	RegisterMenuItem(DebuggingMenu, t("menu.debug.key_history"),   ActivateKeyHistory)
 	RegisterMenuItem(DebuggingMenu, t("menu.debug.open_logs"),     OpenLogsFolder)
 	RegisterMenuItem(DebuggingMenu, t("menu.debug.open_today_log"), OpenTodayLog)
+	DebuggingMenu.Add()
+	DebuggingMenu.Add(t("menu.debug.log_level"), _BuildLogLevelMenu())
 	A_TrayMenu.Add(t("menu.debug.title"), DebuggingMenu)
 }
 
@@ -1830,4 +1832,38 @@ RebuildTrayMenu() {
 	SubMenus := Map()
 	InitSubMenus()
 	initMenu()
+}
+
+; Sets the active log level at runtime without a full script restart.
+; Mutates LOGGER_MIN_LEVEL, refreshes the cached fast-path flags, and
+; persists the choice under [Script] LogLevel in the user's config.toml
+; so the level is restored on the next boot.
+LoggerSetLevel(Level) {
+	global LOGGER_MIN_LEVEL, LOGGER_SEVERITY, ConfigurationFile
+	if !LOGGER_SEVERITY.Has(Level) {
+		try LoggerWarn("Menu", "LoggerSetLevel: unknown level '{1}' — ignoring.", Level)
+		return
+	}
+	LOGGER_MIN_LEVEL := Level
+	_LoggerRefreshFastFlags()
+	try TOML_Write(Level, ConfigurationFile, "Script", "LogLevel")
+	try LoggerInfo("Menu", "Log level set to {1}.", Level)
+	RebuildTrayMenu()
+}
+
+; Build the log level submenu for the Debug entry. Returns a Menu object
+; with one item per severity level (DEBUG / INFO / WARNING / ERROR),
+; the currently active level pre-checked.
+_BuildLogLevelMenu() {
+	global LOGGER_MIN_LEVEL
+	LevelMenu := Menu()
+	for Level in ["DEBUG", "INFO", "WARNING", "ERROR"] {
+		; Capture loop variable for the callback closure
+		_Lvl := Level
+		RegisterMenuItem(LevelMenu, Level, ((_l) => (*) => LoggerSetLevel(_l))(Level))
+		if (LOGGER_MIN_LEVEL == Level) {
+			LevelMenu.Check(Level)
+		}
+	}
+	return LevelMenu
 }
