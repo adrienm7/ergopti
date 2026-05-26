@@ -441,6 +441,24 @@ WrapTextIfSelected(Symbol, LeftSymbol, RightSymbol) {
 ; =============================
 ; ============================
 
+
+; Returns true when digit keys 1-0 require Shift on the active OS keyboard
+; layout (e.g. AZERTY, bépo). Uses VkKeyScanExW to probe the virtual-key
+; binding for the character "1": a non-zero Shift bit in the high byte
+; confirms that the OS layout places digits behind Shift.
+_OsLayoutDigitsAreShifted() {
+	HKL := GetForegroundKeyboardLayout()
+	if (HKL = 0) {
+		return false
+	}
+	; VkKeyScanExW returns a WORD: low byte = VK code, high byte = modifier
+	; flags (bit 0 = Shift, bit 1 = Ctrl, bit 2 = Alt). A high byte of 1
+	; means Shift is required to produce the character "1".
+	Result := DllCall("VkKeyScanExW", "WStr", "1", "Ptr", HKL, "Short")
+	HighByte := (Result >> 8) & 0xFF
+	return (HighByte & 0x01) != 0
+}
+
 #HotIf Features["layout"]["direct_access_digits"]
 ; We need to use SendEvent for symbols, otherwise it may trigger and lock AltGr. This issue happens on AZERTY at least.
 ; For digits, it is better to remap with sending the down event instead of using the RemapKey function.
@@ -472,6 +490,32 @@ SC00B Up:: SendEvent("{0 Up}")
 SC00C:: SendNewResult("%")
 SC00D:: SendNewResult("=")
 #HotIf
+
+; On OS layouts where digits are behind Shift (e.g. AZERTY, bépo), swap
+; the layers: Shift+digit-key produces the OS native symbol (passthrough),
+; while the unshifted key already sends the digit via the block above.
+; SC029, SC00C, SC00D (outside the 1-0 run) are intentionally left alone.
+if Features["layout"]["direct_access_digits"] and _OsLayoutDigitsAreShifted() {
+	_DIGIT_SCANCODES := ["SC002", "SC003", "SC004", "SC005", "SC006",
+	                     "SC007", "SC008", "SC009", "SC00A", "SC00B"]
+	for _, SC in _DIGIT_SCANCODES {
+		; Shift+key → passthrough to the OS layout (yields &, é, ", …)
+		; Use .Bind() to freeze the SC value per iteration — fat-arrow
+		; closures in AHK v2 capture by reference, which would leave every
+		; callback pointing at the last loop value.
+		Hotkey("+" SC, _DigitShiftDown.Bind(SC), "I2")
+		Hotkey("+" SC . " Up", _DigitShiftUp.Bind(SC), "I2")
+	}
+}
+
+; Top-level helpers for the shifted-symbol passthrough (must be at module
+; scope so AHK v2 hoists them before the if-block above executes).
+_DigitShiftDown(SC, *) {
+	SendEvent("{Blind}{" . SC . " Down}")
+}
+_DigitShiftUp(SC, *) {
+	SendEvent("{Blind}{" . SC . " Up}")
+}
 
 ; Cannot be HotIf because the remapping is done with Hotkey function and cannot be undone afterwards.
 ; The character mapping itself lives in lib/layout_ergopti.ahk so the
