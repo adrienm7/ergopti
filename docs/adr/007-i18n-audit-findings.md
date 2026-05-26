@@ -1,7 +1,7 @@
 # ADR 007 — i18n Audit Findings (1.3.6)
 
 **Date:** 2026-05-26  
-**Status:** Open — violations documented, fixes pending
+**Status:** Resolved — all violations fixed (2026-05-26)
 
 ---
 
