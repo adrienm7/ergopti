@@ -496,3 +496,59 @@ TestFMv2_CoercePrimitivesDelegateToV1() {
 Test("TomlCoerceValue: primitives — true/false/int/quoted-string",
 	TestFMv2_CoercePrimitivesDelegateToV1)
 
+
+
+
+
+; =====================================================
+; =====================================================
+; ======= 6/ Snake-case key invariant (Scope C) =======
+; =====================================================
+; =====================================================
+
+; Recursively collect every Map key that contains an uppercase letter.
+; Returns an array of dot-separated paths like "hotstrings.MagicKey".
+_FM_CollectUppercaseKeys(M, Prefix) {
+	Result := []
+	if (Type(M) != "Map") {
+		return Result
+	}
+	for K, V in M {
+		Path := (Prefix != "") ? (Prefix . "." . K) : K
+		; Detect any uppercase letter in the key name.
+		if (K != StrLower(K)) {
+			Result.Push(Path)
+		}
+		; Recurse into nested Maps.
+		Sub := _FM_CollectUppercaseKeys(V, Path)
+		for Item in Sub {
+			Result.Push(Item)
+		}
+	}
+	return Result
+}
+
+TestFMv2_AllFeaturesKeysSnakeCase() {
+	OldFeatures := _FM_BeginIsolated()
+	ManifestEnsureLoaded()
+	Features := ManifestBuildFeaturesMap()
+	; Exclude the synthetic "section_order" list (its value is an array, not
+	; a Map, so the recurse does not visit it) and the reserved "__" prefix
+	; entries that codegen injects for internal bookkeeping.
+	Bad := _FM_CollectUppercaseKeys(Features, "")
+	Filtered := []
+	for Path in Bad {
+		; Skip paths that start with a double-underscore segment — these are
+		; internal codegen artefacts, not user-visible keys.
+		if SubStr(Path, 1, 2) != "__" {
+			Filtered.Push(Path)
+		}
+	}
+	AssertEqual(0, Filtered.Length,
+		"Features Map contains uppercase-letter keys (v1 residues): "
+		. (Filtered.Length > 0 ? Filtered[1] : ""))
+	_FM_EndIsolated(OldFeatures)
+}
+Test("ManifestBuildFeaturesMap: all keys are snake_case (no v1 PascalCase residue)",
+	TestFMv2_AllFeaturesKeysSnakeCase)
+
