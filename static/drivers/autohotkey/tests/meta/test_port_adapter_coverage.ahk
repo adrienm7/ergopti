@@ -5,16 +5,16 @@
 ; DESCRIPTION:
 ; Verifies three structural invariants of the hexagonal architecture:
 ;
-; 1. ADAPTER PRESENCE — Every port spec in _shared/ports/*.spec.js has a
+; 1. ADAPTER PRESENCE  --  Every port spec in _shared/ports/*.spec.js has a
 ;    matching adapter file in static/drivers/autohotkey/adapters/ and in
 ;    static/drivers/hammerspoon/adapters/. A missing adapter means a port
 ;    contract exists on paper but is not honoured by a driver.
 ;
-; 2. DOMAIN TEST COVERAGE — Every domain spec in _shared/domain/*.spec.js
+; 2. DOMAIN TEST COVERAGE  --  Every domain spec in _shared/domain/*.spec.js
 ;    has at least one corresponding test file in at least one driver's test
 ;    suite. An untested domain spec is a dead letter.
 ;
-; 3. SHARED PURITY — No file under _shared/ directly calls OS-level APIs
+; 3. SHARED PURITY  --  No file under _shared/ directly calls OS-level APIs
 ;    (io.open, hs., SendInput, SendEvent, TrayTip). Shared code must be
 ;    pure logic; OS access must go through port adapters.
 ; ==============================================================================
@@ -105,13 +105,13 @@ _MetaRunAdapterPresenceTests() {
 	}
 
 	_ResultAdapterAhk() {
-		Assert(SpecCount > 0, "no *.spec.js found in _shared/ports — check RepoRoot")
-		Assert(MissingAhk = 0, "meta: " . MissingAhk . " AHK adapter(s) missing — see OutputDebug")
+		Assert(SpecCount > 0, "no *.spec.js found in _shared/ports  --  check RepoRoot")
+		Assert(MissingAhk = 0, "meta: " . MissingAhk . " AHK adapter(s) missing  --  see OutputDebug")
 	}
 	Test("meta port coverage: every port spec has an AHK adapter (" . SpecCount . " specs)", _ResultAdapterAhk)
 
 	_ResultAdapterHs() {
-		Assert(MissingHs = 0, "meta: " . MissingHs . " HS adapter(s) missing — see OutputDebug")
+		Assert(MissingHs = 0, "meta: " . MissingHs . " HS adapter(s) missing  --  see OutputDebug")
 	}
 	Test("meta port coverage: every port spec has a HS adapter (" . SpecCount . " specs)", _ResultAdapterHs)
 }
@@ -177,7 +177,7 @@ _MetaRunDomainCoverageTests() {
 	}
 
 	_ResultDomainCoverage() {
-		Assert(SpecCount > 0, "no *.spec.js found in _shared/domain — check RepoRoot")
+		Assert(SpecCount > 0, "no *.spec.js found in _shared/domain  --  check RepoRoot")
 		Assert(Uncovered = 0, "meta: " . Uncovered . " domain spec(s) lack a driver test")
 	}
 	Test("meta domain coverage: every domain spec has a driver test (" . SpecCount . " specs)", _ResultDomainCoverage)
@@ -206,7 +206,7 @@ _MetaRunSharedPurityTests() {
 	ScannedFiles := 0
 
 	for FilePath in SharedFiles {
-		; Spec files may name patterns in doc comments — skip them
+		; Spec files may name patterns in doc comments  --  skip them
 		if FilePath ~= "i)\.spec\.js$" {
 			continue
 		}
@@ -235,7 +235,7 @@ _MetaRunSharedPurityTests() {
 	_ResultSharedPurity() {
 		Assert(ScannedFiles >= 0, "shared purity scanner failed to initialise")
 		if Violations > 0 {
-			OutputDebug("NOTE: " . Violations . " OS-API call(s) in _shared/ (warn-only — see WARNs above)")
+			OutputDebug("NOTE: " . Violations . " OS-API call(s) in _shared/ (warn-only  --  see WARNs above)")
 		}
 	}
 	Test("meta shared purity: no direct OS API in _shared/ (" . ScannedFiles . " files)", _ResultSharedPurity)
