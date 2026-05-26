@@ -44,7 +44,12 @@ local LOG = "karabiner"
 -- Works whether the file is symlinked, run from the project, or deployed.
 local _SELF_DIR = (debug.getinfo(1, "S").source:sub(2):match("^(.*[/\\])") or "./")
 
-local KARABINER_OUT   = os.getenv("HOME") .. "/.config/karabiner/karabiner.json"
+-- Standard Karabiner-Elements config path on macOS.
+-- This location is not user-configurable — KE always reads its config from here.
+-- The ERGOPTI_KARABINER_OUT environment variable overrides it in CI or testing
+-- environments where Karabiner-Elements is not installed.
+local KARABINER_KE_STANDARD_PATH = os.getenv("HOME") .. "/.config/karabiner/karabiner.json"
+local KARABINER_OUT = os.getenv("ERGOPTI_KARABINER_OUT") or KARABINER_KE_STANDARD_PATH
 
 -- The user-editable Karabiner config lives under the user's resolved
 -- config dir (paths.toml override honoured) at:
