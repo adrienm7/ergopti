@@ -35,11 +35,11 @@
 
 
 
-; ==============================================================
+; =================================
 ; =================================
 ; ======= 1/ Variant tables =======
 ; =================================
-; ==============================================================
+; =================================
 
 ; v1 PascalCase TapHolds key id -> v2 snake_case key id.
 global _TH_V1KeyIdToV2 := Map(
@@ -110,15 +110,40 @@ global _TH_FlatKeyTuples := Map(
     "TabAlt",     Map("tap", "alt_tab_monitor",  "hold_mod", "alt"),
 )
 
+; Display order for the tap-hold tray submenu — mirrors the v1 ``__Order``
+; list from ``tap_hold_config.ahk`` (now deleted). Controls both the key
+; group ordering and which entries are flat vs sub-Map.
+global _TH_GroupOrder := ["CapsLock", "LShiftCopy", "LCtrlPaste", "LAlt",
+    "Space", "AltGr", "RCtrl", "TabAlt"]
+
+; i18n keys for each key group (flat and sub-Map alike). Resolved at render
+; time via ``t()`` so labels honour the user's locale.
+global _TH_KeyI18nKeys := Map(
+    "CapsLock",   "tap_hold.group.caps_lock",
+    "LShiftCopy", "tap_hold.group.left_shift_copy",
+    "LCtrlPaste", "tap_hold.group.left_ctrl_paste",
+    "LAlt",       "tap_hold.group.left_alt",
+    "Space",      "tap_hold.group.space",
+    "AltGr",      "tap_hold.group.alt_gr",
+    "RCtrl",      "tap_hold.group.right_ctrl",
+    "TabAlt",     "tap_hold.group.tab_alt",
+)
+
+; Variant labels are derived at render time from the variant's (tap, hold) tuple
+; via ``TapHoldVariantLabel`` — no per-variant string table needed. The tuple
+; already contains the action and modifier ids, which are looked up in the
+; ``tap_hold.action.*`` and ``tap_hold.modifier.*`` / ``tap_hold.layer.*``
+; i18n keys and assembled with the ``tap_hold.template.*`` templates.
 
 
 
 
-; ==============================================================
+
+; ==================================
 ; ==================================
 ; ======= 2/ Variants lookup =======
 ; ==================================
-; ==============================================================
+; ==================================
 
 ; Resolve the variants table for a given v1 sub-Map key id. Returns ``false``
 ; when the key is a flat entry (or unknown).
@@ -139,11 +164,83 @@ _TH_VariantsForV1Key(V1KeyId) {
 
 
 
-; ==============================================================
+; ==============================
+; ==============================
+; ======= 3/ Menu labels =======
+; ==============================
+; ==============================
+
+; Return the i18n-resolved display label for a tap-hold key group (used as
+; the parent submenu title for sub-Map keys, or the single menu item label
+; for flat keys). Falls back to the raw ``V1KeyId`` when no i18n key exists.
+TapHoldGroupLabel(V1KeyId) {
+    global _TH_KeyI18nKeys
+    if _TH_KeyI18nKeys.Has(V1KeyId) {
+        return t(_TH_KeyI18nKeys[V1KeyId])
+    }
+    return V1KeyId
+}
+
+; Return the i18n-resolved display label for a tap-hold variant. Builds the
+; label dynamically from the variant's (tap_action, hold_modifier / hold_layer)
+; tuple and the generic ``tap_hold.template.*`` / ``tap_hold.action.*`` /
+; ``tap_hold.modifier.*`` / ``tap_hold.layer.*`` i18n keys. Falls back to the
+; raw ``"V1KeyId.Variant"`` string when the tuple cannot be resolved.
+TapHoldVariantLabel(V1KeyId, Variant) {
+    Tuple := _TH_ResolveTuple(V1KeyId, Variant)
+    if (Tuple == false) {
+        return V1KeyId . "." . Variant
+    }
+    GroupLabel := TapHoldGroupLabel(V1KeyId)
+    TapLabel   := t("tap_hold.action." . Tuple["tap"])
+    if Tuple.Has("hold_mod") {
+        ModLabel := t("tap_hold.modifier." . Tuple["hold_mod"])
+        return Format(t("tap_hold.template.tap_hold_mod"), GroupLabel, TapLabel, ModLabel)
+    }
+    if Tuple.Has("hold_layer") {
+        LayerLabel := t("tap_hold.layer." . Tuple["hold_layer"])
+        return Format(t("tap_hold.template.tap_hold_layer"), GroupLabel, TapLabel, LayerLabel)
+    }
+    ; Tap-only variant.
+    return Format(t("tap_hold.template.tap_only"), GroupLabel, TapLabel)
+}
+
+; Return true when ``V1KeyId`` is a sub-Map group (has variant entries), false
+; for flat keys. Used by the tray-menu builder to decide whether to create a
+; child submenu or a single toggle item.
+TapHoldIsSubMapGroup(V1KeyId) {
+    return (_TH_VariantsForV1Key(V1KeyId) != false)
+}
+
+; Return an ordered array of [VariantName, ...] for a sub-Map group.
+; Returns an empty array for flat keys.
+TapHoldVariantNames(V1KeyId) {
+    Variants := _TH_VariantsForV1Key(V1KeyId)
+    if (Variants == false) {
+        return []
+    }
+    Names := []
+    for Name, _ in Variants {
+        Names.Push(Name)
+    }
+    return Names
+}
+
+; Return the ordered array of v1 key ids for the tap-hold tray submenu.
+TapHoldGroupOrder() {
+    global _TH_GroupOrder
+    return _TH_GroupOrder
+}
+
+
+
+
+
 ; ===============================
-; ======= 3/ Batch writer =======
 ; ===============================
-; ==============================================================
+; ======= 4/ Batch writer =======
+; ===============================
+; ===============================
 
 ; Accept a sequence of ``Map("v1_path" => "TapHolds.<id>(.<variant>).Enabled",
 ; "value" => bool)`` entries and apply them to TapHold + tap_hold.toml.
@@ -263,11 +360,11 @@ _TH_ResolveTuple(V1KeyId, Variant) {
 
 
 
-; ==============================================================
 ; ====================================
-; ======= 4/ Variant read-back =======
 ; ====================================
-; ==============================================================
+; ======= 5/ Variant read-back =======
+; ====================================
+; ====================================
 
 ; Return true when the v1 TapHolds variant path corresponds to the tuple
 ; currently stored in ``TapHold["keys"][V2KeyId]``. Used by the tray menu
@@ -338,11 +435,11 @@ IsTapHoldVariantActive(V1Path) {
 
 
 
-; ==============================================================
 ; =======================================
-; ======= 5/ tap_hold.toml writer =======
 ; =======================================
-; ==============================================================
+; ======= 6/ tap_hold.toml writer =======
+; =======================================
+; =======================================
 
 ; Rewrite ``<config>/ahk/tap_hold.toml`` from scratch from the current
 ; in-memory ``TapHold`` global. Preserves the ``layers`` block verbatim
