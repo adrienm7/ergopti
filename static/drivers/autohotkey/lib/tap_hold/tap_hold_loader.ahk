@@ -3,10 +3,12 @@
 ; ==============================================================================
 ; MODULE: Tap-Hold Loader
 ; DESCRIPTION:
-; Loads the user's ``tap_hold.toml`` file (seeded at first boot from
-; ``drivers/_shared/tap_hold/defaults.toml``) into a separate ``TapHold``
-; global, distinct from the ``Features`` Map. The schema is documented at
-; ``_shared/tap_hold/defaults.toml``.
+; Loads tap-hold configuration into a hierarchical Map. Supports an optional
+; defaults overlay: when ``DefaultsFilePath`` is supplied, the shared
+; ``_shared/tap_hold/defaults.toml`` is parsed first, then the user file is
+; merged on top — user values win, absent user keys inherit the default. This
+; means editing ``defaults.toml`` takes effect on every reload even when the
+; user file exists, satisfying the cross-driver consistency goal.
 ;
 ; FEATURES & RATIONALE:
 ; 1. Single-pass TOML parser tailored to the tap_hold schema — supports
@@ -18,9 +20,12 @@
 ;        TapHold["keys"]["caps_lock"]["hold_modifier"]     = "ctrl"
 ;        TapHold["keys"]["caps_lock"]["time_activation_seconds"] = 0.35
 ;        TapHold["layers"]["nav"]["mappings"]["h"]         = "arrow_left"
-; 3. Missing keys silently default to no tap-hold being active for that key —
-;    the consumer (``modules/tap_holds.ahk``) checks ``.Has("tap_action")``
-;    before arming a hotkey.
+; 3. Runtime overlay: when DefaultsFilePath is given, defaults are loaded
+;    first and user values are merged on top. Absent user keys inherit the
+;    default so ``time_activation_seconds`` changes in defaults.toml take
+;    effect without requiring a user-file edit.
+; 4. Backward-compatible: callers that omit DefaultsFilePath behave exactly
+;    as before — only the user file is parsed.
 ; ==============================================================================
 
 
@@ -33,20 +38,61 @@
 ; =====================================
 ; ==============================================================
 
-; Read ``FilePath`` and return the hierarchical TapHold Map. On missing or
-; unreadable file, returns an empty Map with ``keys`` and ``layers`` slots
-; pre-initialised so consumers can safely call ``TapHold["keys"].Has(...)``.
-LoadTapHoldToml(FilePath) {
+; Read ``FilePath`` (user config) and return the hierarchical TapHold Map.
+; When ``DefaultsFilePath`` is supplied the shared defaults are loaded first
+; and the user file is merged on top — user values take precedence, absent
+; user keys inherit the default value.
+; On missing or unreadable user file the defaults (if provided) are returned
+; as-is so a fresh install still gets working defaults after first boot.
+LoadTapHoldToml(FilePath, DefaultsFilePath := "") {
 	Result := Map("keys", Map(), "layers", Map())
+
+	; Load shared defaults first when the caller supplies the path. Missing
+	; defaults file is non-fatal (logs a debug notice and continues).
+	if (DefaultsFilePath != "") {
+		if FileExist(DefaultsFilePath) {
+			try LoggerDebug("TapHoldLoader", "Loading tap-hold defaults from '{1}'…", DefaultsFilePath)
+			_TapHold_ParseFileInto(DefaultsFilePath, Result)
+		} else {
+			try LoggerDebug("TapHoldLoader", "Shared defaults not found at '{1}' — skipping.", DefaultsFilePath)
+		}
+	}
+
 	if !FileExist(FilePath) {
 		try LoggerDebug("TapHoldLoader", "tap_hold.toml not found at '{1}' — skipping.", FilePath)
+		try LoggerSuccess("TapHoldLoader", "Tap-hold config loaded ({1} key(s), {2} layer(s)) — defaults only.",
+			Result["keys"].Count, Result["layers"].Count)
 		return Result
 	}
 	try LoggerStart("TapHoldLoader", "Loading tap-hold config from '{1}'…", FilePath)
 
+	; Merge user file on top of defaults. Per-key fields overwrite default
+	; fields individually so a user entry that sets only tap_action still
+	; inherits time_activation_seconds from the default for that key.
+	_TapHold_ParseFileInto(FilePath, Result)
+
+	try LoggerSuccess("TapHoldLoader", "Tap-hold config loaded ({1} key(s), {2} layer(s)).",
+		Result["keys"].Count, Result["layers"].Count)
+	return Result
+}
+
+
+
+
+
+; ==============================================================
+; ========================================
+; ======= 2. Internal parse helper =======
+; ========================================
+; ==============================================================
+
+; Parse ``FilePath`` and merge its key/value pairs into ``Result`` in-place.
+; Existing entries are overwritten field-by-field so a user file that only
+; specifies some fields of a key still inherits the rest from a prior pass.
+_TapHold_ParseFileInto(FilePath, Result) {
 	; Track the current section header path (e.g. "tap_hold.keys.caps_lock" or
-	; "tap_hold.layers.nav.mappings"). Empty when outside any recognised
-	; section so unrelated TOML headers are skipped silently.
+	; "tap_hold.layers.nav.mappings"). Empty when outside any recognised section
+	; so unrelated TOML headers are skipped silently.
 	CurrentPath := ""
 
 	loop parse, ReadTomlFile(FilePath), "`n", "`r" {
@@ -103,10 +149,6 @@ LoadTapHoldToml(FilePath) {
 			continue
 		}
 	}
-
-	try LoggerSuccess("TapHoldLoader", "Tap-hold config loaded ({1} key(s), {2} layer(s)).",
-		Result["keys"].Count, Result["layers"].Count)
-	return Result
 }
 
 
@@ -115,7 +157,7 @@ LoadTapHoldToml(FilePath) {
 
 ; ==============================================================
 ; ========================================
-; ======= 2. Convenience accessors =======
+; ======= 3. Convenience accessors =======
 ; ========================================
 ; ==============================================================
 
