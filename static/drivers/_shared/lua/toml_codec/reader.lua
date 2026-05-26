@@ -20,7 +20,6 @@
 --- ==============================================================================
 
 local M = {}
-local hs     = hs
 local Logger = require("lib.logger")
 local LOG    = "toml_reader"
 

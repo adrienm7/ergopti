@@ -15,4 +15,4 @@
 --- any module is required, so this shim can delegate with a plain require().
 --- ==============================================================================
 
-return require("toml_codec.codec")
+return require("toml_codec")
