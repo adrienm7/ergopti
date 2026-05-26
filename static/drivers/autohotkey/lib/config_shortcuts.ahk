@@ -1,4 +1,4 @@
-; lib/config_shortcuts.ahk
+﻿; lib/config_shortcuts.ahk
 
 ; ==============================================================================
 ; MODULE: Config Shortcuts (TOML section)

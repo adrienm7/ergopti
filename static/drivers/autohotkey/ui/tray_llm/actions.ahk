@@ -1,4 +1,4 @@
-; ui/tray_llm/actions.ahk
+﻿; ui/tray_llm/actions.ahk
 
 ; ==============================================================================
 ; MODULE: LLM Tray — Action Handlers

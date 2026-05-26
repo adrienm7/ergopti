@@ -1,4 +1,4 @@
-; modules/llm/llm_bridge.ahk
+﻿; modules/llm/llm_bridge.ahk
 
 ; ==============================================================================
 ; MODULE: LLM Bridge

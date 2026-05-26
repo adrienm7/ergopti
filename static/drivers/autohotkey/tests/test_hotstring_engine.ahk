@@ -1,4 +1,4 @@
-; static/drivers/autohotkey/tests/test_hotstring_engine.ahk
+﻿; static/drivers/autohotkey/tests/test_hotstring_engine.ahk
 
 ; ==============================================================================
 ; MODULE: Hotstring Engine Tests

@@ -1,4 +1,4 @@
-; static/drivers/autohotkey/tests/test_framework.ahk
+﻿; static/drivers/autohotkey/tests/test_framework.ahk
 
 ; ==============================================================================
 ; MODULE: Test Framework

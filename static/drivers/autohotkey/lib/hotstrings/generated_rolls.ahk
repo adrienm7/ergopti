@@ -1,4 +1,4 @@
-; static/drivers/autohotkey/lib/hotstrings/generated_rolls.ahk
+﻿; static/drivers/autohotkey/lib/hotstrings/generated_rolls.ahk
 
 ; ==============================================================================
 ; MODULE: Generated Hotstrings — rolls

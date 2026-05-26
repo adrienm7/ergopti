@@ -1,4 +1,4 @@
-; modules/llm/api_remote.ahk
+﻿; modules/llm/api_remote.ahk
 
 ; ==============================================================================
 ; MODULE: LLM API — Remote API Backend

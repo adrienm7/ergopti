@@ -1,4 +1,4 @@
-; lib/bundle.ahk
+﻿; lib/bundle.ahk
 
 
 

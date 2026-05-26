@@ -1,4 +1,4 @@
-; static/drivers/autohotkey/lib/layout_shift_caps.ahk
+﻿; static/drivers/autohotkey/lib/layout_shift_caps.ahk
 
 ; ==============================================================================
 ; MODULE: Shift and CapsLock Layer Tables

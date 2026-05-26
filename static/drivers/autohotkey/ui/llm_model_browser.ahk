@@ -1,4 +1,4 @@
-; ui/llm_model_browser.ahk
+﻿; ui/llm_model_browser.ahk
 
 ; ==============================================================================
 ; MODULE: LLM Model Browser

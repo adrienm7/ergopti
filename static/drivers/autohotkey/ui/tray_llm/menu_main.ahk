@@ -1,4 +1,4 @@
-; ui/tray_llm/menu_main.ahk
+﻿; ui/tray_llm/menu_main.ahk
 
 ; ==============================================================================
 ; MODULE: LLM Tray — Main Menu Orchestrator

@@ -1,4 +1,4 @@
-; modules/llm/profiles.ahk
+﻿; modules/llm/profiles.ahk
 
 ; ==============================================================================
 ; MODULE: LLM Profiles

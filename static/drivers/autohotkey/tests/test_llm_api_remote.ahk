@@ -1,4 +1,4 @@
-; static/drivers/autohotkey/tests/test_llm_api_remote.ahk
+﻿; static/drivers/autohotkey/tests/test_llm_api_remote.ahk
 
 ; ==============================================================================
 ; MODULE: LLM API Remote Tests

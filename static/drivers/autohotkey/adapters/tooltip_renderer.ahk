@@ -1,4 +1,4 @@
-; adapters/tooltip_renderer.ahk
+﻿; adapters/tooltip_renderer.ahk
 
 ; ==============================================================================
 ; MODULE: TooltipRenderer Adapter (AutoHotkey)

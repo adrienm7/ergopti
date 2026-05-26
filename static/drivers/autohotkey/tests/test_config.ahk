@@ -1,4 +1,4 @@
-; static/drivers/autohotkey/tests/test_config.ahk
+﻿; static/drivers/autohotkey/tests/test_config.ahk
 
 ; ==============================================================================
 ; MODULE: Configuration Helpers Tests

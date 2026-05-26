@@ -1,4 +1,4 @@
-; static/drivers/autohotkey/lib/hotstrings/hotstring_engine_main.ahk
+﻿; static/drivers/autohotkey/lib/hotstrings/hotstring_engine_main.ahk
 
 ; ==============================================================================
 ; MODULE: Hotstring Engine

@@ -1,4 +1,4 @@
-; static/drivers/autohotkey/tests/test_personal_toml_editor.ahk
+﻿; static/drivers/autohotkey/tests/test_personal_toml_editor.ahk
 
 ; ==============================================================================
 ; MODULE: Personal TOML Editor Tests

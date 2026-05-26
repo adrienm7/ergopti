@@ -1,4 +1,4 @@
-; drivers/autohotkey/lib/manifest_reader.ahk
+﻿; drivers/autohotkey/lib/manifest_reader.ahk
 
 ; ==============================================================================
 ; MODULE: Features Manifest Reader

@@ -1,4 +1,4 @@
-; static/drivers/autohotkey/lib/hotstrings/generated_magickey.ahk
+﻿; static/drivers/autohotkey/lib/hotstrings/generated_magickey.ahk
 
 ; ==============================================================================
 ; MODULE: Generated Hotstrings — magickey

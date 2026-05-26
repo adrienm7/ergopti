@@ -1,4 +1,4 @@
-; modules/keylogger_trigger_roi.ahk
+﻿; modules/keylogger_trigger_roi.ahk
 
 ; ==============================================================================
 ; MODULE: Keylogger Trigger ROI & Candidate Detection

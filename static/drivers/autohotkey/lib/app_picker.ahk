@@ -1,4 +1,4 @@
-; lib/app_picker.ahk
+﻿; lib/app_picker.ahk
 
 ; ==============================================================================
 ; MODULE: App Picker (reusable Gui)

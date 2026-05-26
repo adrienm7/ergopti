@@ -1,4 +1,4 @@
-; static/drivers/autohotkey/lib/hotstrings/generated_autocorrection.ahk
+﻿; static/drivers/autohotkey/lib/hotstrings/generated_autocorrection.ahk
 
 ; ==============================================================================
 ; MODULE: Generated Hotstrings — autocorrection

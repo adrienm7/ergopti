@@ -1,4 +1,4 @@
-; lib/metrics/wpm_widget.ahk
+﻿; lib/metrics/wpm_widget.ahk
 
 ; ==============================================================================
 ; MODULE: Real-Time WPM Widget

@@ -1,4 +1,4 @@
-; modules/keylogger_clipboard.ahk
+﻿; modules/keylogger_clipboard.ahk
 
 ; ==============================================================================
 ; MODULE: Keylogger Clipboard

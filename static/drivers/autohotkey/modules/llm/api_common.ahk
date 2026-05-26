@@ -1,4 +1,4 @@
-; modules/llm/api_common.ahk
+﻿; modules/llm/api_common.ahk
 
 ; ==============================================================================
 ; MODULE: LLM API Common Helpers

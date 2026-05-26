@@ -1,4 +1,4 @@
-; ui/tray_llm/menu_settings.ahk
+﻿; ui/tray_llm/menu_settings.ahk
 
 ; ==============================================================================
 ; MODULE: LLM Tray — Settings submenus

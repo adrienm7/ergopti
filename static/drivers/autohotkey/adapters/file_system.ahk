@@ -1,4 +1,4 @@
-; adapters/file_system.ahk
+﻿; adapters/file_system.ahk
 
 ; ==============================================================================
 ; MODULE: FileSystem Adapter (AutoHotkey)

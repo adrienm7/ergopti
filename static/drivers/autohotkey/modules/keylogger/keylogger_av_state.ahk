@@ -1,4 +1,4 @@
-; modules/keylogger_av_state.ahk
+﻿; modules/keylogger_av_state.ahk
 
 ; ==============================================================================
 ; MODULE: Keylogger Audio/Video State

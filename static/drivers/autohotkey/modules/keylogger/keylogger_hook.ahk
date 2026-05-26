@@ -1,4 +1,4 @@
-; modules/keylogger_hook.ahk
+﻿; modules/keylogger_hook.ahk
 
 ; ==============================================================================
 ; MODULE: Keylogger Input Hook

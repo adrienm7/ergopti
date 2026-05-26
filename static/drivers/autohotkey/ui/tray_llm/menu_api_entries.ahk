@@ -1,4 +1,4 @@
-; ui/tray_llm/menu_api_entries.ahk
+﻿; ui/tray_llm/menu_api_entries.ahk
 
 ; ==============================================================================
 ; MODULE: LLM Tray — Remote API entries

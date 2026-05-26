@@ -1,4 +1,4 @@
-; modules/llm/models.ahk
+﻿; modules/llm/models.ahk
 
 ; ==============================================================================
 ; MODULE: LLM Models Registry

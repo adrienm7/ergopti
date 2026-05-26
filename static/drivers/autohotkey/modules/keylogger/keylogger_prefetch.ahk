@@ -1,4 +1,4 @@
-; modules/keylogger_prefetch.ahk
+﻿; modules/keylogger_prefetch.ahk
 
 ; ==============================================================================
 ; MODULE: Keylogger Prefetch (AHK)

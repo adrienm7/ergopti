@@ -1,4 +1,4 @@
-; modules/llm/api_ollama.ahk
+﻿; modules/llm/api_ollama.ahk
 
 ; ==============================================================================
 ; MODULE: LLM API — Ollama Backend

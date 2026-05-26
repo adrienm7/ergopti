@@ -1,4 +1,4 @@
-; modules/llm/api_token_crypto.ahk
+﻿; modules/llm/api_token_crypto.ahk
 
 ; ==============================================================================
 ; MODULE: API Token Crypto

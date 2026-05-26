@@ -1,4 +1,4 @@
-; modules/keylogger_network.ahk
+﻿; modules/keylogger_network.ahk
 
 ; ==============================================================================
 ; MODULE: Keylogger Network State

@@ -1,4 +1,4 @@
-; ui/tray_llm/menu_profiles.ahk
+﻿; ui/tray_llm/menu_profiles.ahk
 
 ; ==============================================================================
 ; MODULE: LLM Tray — Profile management

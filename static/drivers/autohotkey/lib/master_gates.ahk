@@ -1,4 +1,4 @@
-; lib/master_gates.ahk
+﻿; lib/master_gates.ahk
 
 ; ==============================================================================
 ; MODULE: Master Gates application

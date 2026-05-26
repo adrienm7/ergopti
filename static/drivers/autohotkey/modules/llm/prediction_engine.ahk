@@ -1,4 +1,4 @@
-; modules/llm/prediction_engine.ahk
+﻿; modules/llm/prediction_engine.ahk
 
 ; ==============================================================================
 ; MODULE: LLM Prediction Engine

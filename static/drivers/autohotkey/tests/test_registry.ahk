@@ -1,4 +1,4 @@
-; static/drivers/autohotkey/tests/test_registry.ahk
+﻿; static/drivers/autohotkey/tests/test_registry.ahk
 
 ; ==============================================================================
 ; MODULE: Windows Registry Abstraction Tests

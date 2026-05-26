@@ -1,4 +1,4 @@
-; modules/keylogger_ergonomics.ahk
+﻿; modules/keylogger_ergonomics.ahk
 
 ; ==============================================================================
 ; MODULE: Keylogger Ergonomics

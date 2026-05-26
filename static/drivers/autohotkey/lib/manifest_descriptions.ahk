@@ -1,4 +1,4 @@
-; lib/manifest_descriptions.ahk
+﻿; lib/manifest_descriptions.ahk
 
 ; ==============================================================================
 ; MODULE: Manifest Descriptions

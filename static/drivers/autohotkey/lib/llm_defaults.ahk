@@ -1,4 +1,4 @@
-; lib/llm_defaults.ahk
+﻿; lib/llm_defaults.ahk
 
 ; ==============================================================================
 ; MODULE: LLM Defaults Loader

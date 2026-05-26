@@ -1,4 +1,4 @@
-; drivers/autohotkey/lib/first_boot.ahk
+﻿; drivers/autohotkey/lib/first_boot.ahk
 
 ; ==============================================================================
 ; MODULE: First-Boot Configuration Bootstrap

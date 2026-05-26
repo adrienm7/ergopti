@@ -1,4 +1,4 @@
-; modules/keylogger_app_categories.ahk
+﻿; modules/keylogger_app_categories.ahk
 
 ; ==============================================================================
 ; MODULE: Keylogger App Categories

@@ -1,4 +1,4 @@
-; static/drivers/autohotkey/tests/test_features_manifest.ahk
+﻿; static/drivers/autohotkey/tests/test_features_manifest.ahk
 
 ; ==============================================================================
 ; MODULE: Features Manifest Pipeline Tests
