@@ -1,0 +1,189 @@
+{
+	"description": "Security invariant test vectors for keylogger privacy guarantees. Each vector describes a scenario and the expected outcome in terms of what is (or is not) persisted.",
+	"version": "1.0.0",
+	"categories": {
+		"secure_field": "Keystrokes typed into a password/secure field — nothing must reach today.log or data.sql.",
+		"normal_field": "Keystrokes typed in a normal field — only statistical metadata (n-grams, WPM, keycodes, delays) may be persisted. Plaintext in the 'text' column is an accepted design trade-off documented in docs/security/keylogger_privacy.md.",
+		"system_auth": "Keystrokes typed into an OS-level authentication dialog — must be dropped unconditionally.",
+		"private_browsing": "Keystrokes typed while a private/incognito browser window is focused — must be dropped."
+	},
+	"vectors": [
+		{
+			"id": "SEC-001",
+			"category": "secure_field",
+			"description": "Typing a password in a marked secure/password field must produce zero persisted events.",
+			"input": {
+				"is_secure_field": true,
+				"text": "password123",
+				"app": "Safari",
+				"field_role": "AXSecureTextField"
+			},
+			"expected": {
+				"events_persisted": 0,
+				"typing_entries": 0,
+				"text_in_log": null,
+				"rationale": "CoreState.is_secure_field=true causes handle_key to return before any buffer mutation."
+			}
+		},
+		{
+			"id": "SEC-002",
+			"category": "secure_field",
+			"description": "Typing an API key in a password field must produce zero persisted events.",
+			"input": {
+				"is_secure_field": true,
+				"text": "sk-abc123XYZ987",
+				"app": "Terminal",
+				"field_role": "AXSecureTextField"
+			},
+			"expected": {
+				"events_persisted": 0,
+				"typing_entries": 0,
+				"text_in_log": null,
+				"rationale": "Same secure-field guard — API key never enters buffer_events."
+			}
+		},
+		{
+			"id": "SEC-003",
+			"category": "secure_field",
+			"description": "Typing a 6-digit 2FA / TOTP code in a password field must produce zero persisted events.",
+			"input": {
+				"is_secure_field": true,
+				"text": "847291",
+				"app": "1Password",
+				"field_role": "AXSecureTextField"
+			},
+			"expected": {
+				"events_persisted": 0,
+				"typing_entries": 0,
+				"text_in_log": null,
+				"rationale": "2FA code is numeric; the field_role=AXSecureTextField guard blocks it unconditionally."
+			}
+		},
+		{
+			"id": "SEC-004",
+			"category": "system_auth",
+			"description": "Keystrokes in a macOS SecurityAgent dialog (sudo/admin password) must be dropped.",
+			"input": {
+				"is_secure_field": false,
+				"active_app_bundle": "com.apple.SecurityAgent",
+				"text": "adminpassword",
+				"app": "SecurityAgent"
+			},
+			"expected": {
+				"events_persisted": 0,
+				"typing_entries": 0,
+				"text_in_log": null,
+				"rationale": "SYSTEM_AUTH_BUNDLE_IDS lookup drops the event before handle_key proceeds."
+			}
+		},
+		{
+			"id": "SEC-005",
+			"category": "system_auth",
+			"description": "Keystrokes in a macOS CoreAuthUI dialog (Touch ID / biometric) must be dropped.",
+			"input": {
+				"is_secure_field": false,
+				"active_app_bundle": "com.apple.CoreAuthUI",
+				"text": "pin1234",
+				"app": "CoreAuthUI"
+			},
+			"expected": {
+				"events_persisted": 0,
+				"typing_entries": 0,
+				"text_in_log": null,
+				"rationale": "com.apple.CoreAuthUI is in SYSTEM_AUTH_BUNDLE_IDS — belt-and-suspenders guard."
+			}
+		},
+		{
+			"id": "SEC-006",
+			"category": "private_browsing",
+			"description": "Keystrokes while a private/incognito window is focused must be dropped.",
+			"input": {
+				"is_private_window": true,
+				"is_secure_field": false,
+				"text": "hello world",
+				"app": "Safari",
+				"win_title": "Nouvelle fenêtre privée - Safari"
+			},
+			"expected": {
+				"events_persisted": 0,
+				"typing_entries": 0,
+				"text_in_log": null,
+				"rationale": "CoreState.is_private_window=true short-circuits before buffer_events.Push()."
+			}
+		},
+		{
+			"id": "SEC-007",
+			"category": "normal_field",
+			"description": "Typing ordinary text in a normal field produces a typing entry with n-gram stats. The 'text' column holds the plaintext burst — this is an accepted design trade-off (see docs/security/keylogger_privacy.md §3).",
+			"input": {
+				"is_secure_field": false,
+				"is_private_window": false,
+				"active_app_bundle": "com.apple.Safari",
+				"text": "hello world",
+				"app": "Safari",
+				"field_role": "AXTextField"
+			},
+			"expected": {
+				"events_persisted": 1,
+				"typing_entries": 1,
+				"text_in_log": "hello world",
+				"ngrams_populated": true,
+				"wpm_computed": true,
+				"rationale": "Normal typing is logged for ergonomic metrics. The 'text' field is the documented plaintext trade-off."
+			}
+		},
+		{
+			"id": "SEC-008",
+			"category": "secure_field",
+			"description": "Switching from a normal field to a secure field mid-buffer: any buffered normal text must flush before the secure session begins, and then nothing from the secure field is logged.",
+			"input": {
+				"sequence": [
+					{ "is_secure_field": false, "text": "username@example.com", "field_role": "AXTextField" },
+					{ "field_transition": true, "is_secure_field": true, "field_role": "AXSecureTextField" },
+					{ "is_secure_field": true, "text": "mysecretpassword", "field_role": "AXSecureTextField" }
+				]
+			},
+			"expected": {
+				"typing_entries_for_normal": 1,
+				"typing_entries_for_secure": 0,
+				"text_from_secure_in_log": null,
+				"rationale": "flush_buffer is called on field transition; subsequent keystrokes in secure field are dropped."
+			}
+		},
+		{
+			"id": "SEC-009",
+			"category": "secure_field",
+			"description": "AHK: Win32 ES_PASSWORD style bit (0x20) triggers password detection and drops keystrokes.",
+			"input": {
+				"driver": "autohotkey",
+				"win32_style": "0x80000020",
+				"win32_class": "Edit",
+				"text": "winpassword99",
+				"app": "notepad.exe"
+			},
+			"expected": {
+				"events_persisted": 0,
+				"typing_entries": 0,
+				"text_in_log": null,
+				"rationale": "KL_DetectPasswordFor layer 1: ES_PASSWORD bit (0x20) set on Edit class → KL_IsFocusedFieldPassword returns true → MF_ShouldFilter returns true."
+			}
+		},
+		{
+			"id": "SEC-010",
+			"category": "secure_field",
+			"description": "AHK: UIA IsPassword property triggers password detection and drops keystrokes.",
+			"input": {
+				"driver": "autohotkey",
+				"uia_is_password": true,
+				"text": "electronapppassword",
+				"app": "slack.exe"
+			},
+			"expected": {
+				"events_persisted": 0,
+				"typing_entries": 0,
+				"text_in_log": null,
+				"rationale": "KL_DetectPasswordFor layer 3: UIA.IsPassword=true → MF_ShouldFilter returns true."
+			}
+		}
+	]
+}
