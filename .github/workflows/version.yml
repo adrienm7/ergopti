@@ -42,7 +42,16 @@ jobs:
                   set -euo pipefail
 
                   # ── 1. Find latest semver tag ──────────────────────────────
-                  last_tag=$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | head -1 || true)
+                  # On main: anchor on the last STABLE tag (vX.Y.Z, no suffix)
+                  # so the bump reflects all commits since the last release,
+                  # not just those since the last dev pre-release tag.
+                  # On dev: any tag (stable or pre-release) is a valid anchor.
+                  if [ "$BRANCH" = "main" ]; then
+                      last_tag=$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname \
+                          | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1 || true)
+                  else
+                      last_tag=$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | head -1 || true)
+                  fi
                   if [ -z "$last_tag" ]; then
                       last_tag="v0.0.0"
                       range="HEAD"
