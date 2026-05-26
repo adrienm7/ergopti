@@ -176,14 +176,7 @@ Every push to `main` or `dev` triggers [`version.yml`](.github/workflows/version
 | Any commit message contains `alpha` | `v0.6.7-alpha.{run}` | Pre-release |
 | Any commit message contains `beta` | `v0.6.7-beta.{run}` | Pre-release |
 | Branch is `dev` (default) | `v0.6.7-dev.{run}` | Pre-release |
-| Branch is `main` + a commit contains `(release)` | `v0.6.7` | **Stable release** |
-| Branch is `main` without `(release)` | `v0.6.7-dev.{run}` | Pre-release |
-
-To cut a stable release, merge to `main` with at least one commit whose message contains `(release)` — for example:
-
-```
-feat(keymap): add new rolling sequences (release)
-```
+| Branch is `main` | `v0.6.7` | **Stable release** |
 
 ### Release builds
 
