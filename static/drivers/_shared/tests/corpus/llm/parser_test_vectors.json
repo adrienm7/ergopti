@@ -1,0 +1,338 @@
+{
+	"$schema": "https://ergopti.com/schema/corpus/llm-parser.v1.json",
+	"description": "Cross-driver corpus for LLM response parser functions. Covers Ollama (non-streaming and streaming), OpenAI, Anthropic, and Gemini formats. Every vector must produce the same result in both the AHK regex-based parsers and the Hammerspoon JSON-based parsers.",
+	"version": "1.0.0",
+	"vectors": [
+		{
+			"id": "ollama_nonstream_basic",
+			"description": "Standard Ollama /api/generate non-streaming response with a simple text completion.",
+			"parser": "ollama_nonstream",
+			"input": "{\"model\":\"qwen2.5:3b\",\"created_at\":\"2024-01-01T00:00:00Z\",\"response\":\"bonjour monde\",\"done\":true}",
+			"expected": {
+				"text": "bonjour monde",
+				"ok": true
+			}
+		},
+		{
+			"id": "ollama_nonstream_with_escape",
+			"description": "Ollama response whose text contains a JSON-escaped newline and quote.",
+			"parser": "ollama_nonstream",
+			"input": "{\"response\":\"line one\\nline two\",\"done\":true}",
+			"expected": {
+				"text": "line one\nline two",
+				"ok": true
+			}
+		},
+		{
+			"id": "ollama_nonstream_empty_response",
+			"description": "Ollama response with an empty string value for the response field.",
+			"parser": "ollama_nonstream",
+			"input": "{\"response\":\"\",\"done\":true}",
+			"expected": {
+				"text": "",
+				"ok": false
+			}
+		},
+		{
+			"id": "ollama_nonstream_done_signal",
+			"description": "Ollama final done-only line has no response field — should produce empty.",
+			"parser": "ollama_nonstream",
+			"input": "{\"done\":true,\"done_reason\":\"stop\",\"eval_count\":42}",
+			"expected": {
+				"text": "",
+				"ok": false
+			}
+		},
+		{
+			"id": "ollama_nonstream_whitespace_response",
+			"description": "Ollama response where the response field is whitespace only.",
+			"parser": "ollama_nonstream",
+			"input": "{\"response\":\"   \",\"done\":true}",
+			"expected": {
+				"text": "   ",
+				"ok": true
+			}
+		},
+		{
+			"id": "ollama_stream_chunk_token",
+			"description": "Single Ollama streaming NDJSON line containing one token in the chat format.",
+			"parser": "ollama_stream_line",
+			"input": "{\"message\":{\"role\":\"assistant\",\"content\":\"bonjour\"},\"done\":false}",
+			"expected": {
+				"token": "bonjour",
+				"done": false,
+				"ok": true
+			}
+		},
+		{
+			"id": "ollama_stream_chunk_empty_token",
+			"description": "Streaming line with an empty content string — no token to accumulate.",
+			"parser": "ollama_stream_line",
+			"input": "{\"message\":{\"role\":\"assistant\",\"content\":\"\"},\"done\":false}",
+			"expected": {
+				"token": "",
+				"done": false,
+				"ok": false
+			}
+		},
+		{
+			"id": "ollama_stream_done_line",
+			"description": "Streaming done=true sentinel line — signals end of generation.",
+			"parser": "ollama_stream_line",
+			"input": "{\"done\":true,\"done_reason\":\"stop\",\"eval_count\":17}",
+			"expected": {
+				"token": "",
+				"done": true,
+				"ok": false
+			}
+		},
+		{
+			"id": "ollama_stream_multi_char_token",
+			"description": "Streaming line with a multi-character token including accented characters.",
+			"parser": "ollama_stream_line",
+			"input": "{\"message\":{\"role\":\"assistant\",\"content\":\" monde\"},\"done\":false}",
+			"expected": {
+				"token": " monde",
+				"done": false,
+				"ok": true
+			}
+		},
+		{
+			"id": "ollama_stream_escaped_token",
+			"description": "Streaming token containing a JSON-escaped backslash.",
+			"parser": "ollama_stream_line",
+			"input": "{\"message\":{\"role\":\"assistant\",\"content\":\"C:\\\\Users\"},\"done\":false}",
+			"expected": {
+				"token": "C:\\Users",
+				"done": false,
+				"ok": true
+			}
+		},
+		{
+			"id": "openai_basic",
+			"description": "Standard OpenAI Chat Completions response with a text completion.",
+			"parser": "remote",
+			"format": "openai",
+			"input": "{\"id\":\"chatcmpl-abc\",\"object\":\"chat.completion\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"bonjour monde\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":10,\"completion_tokens\":3,\"total_tokens\":13}}",
+			"expected": {
+				"text": "bonjour monde",
+				"ok": true
+			}
+		},
+		{
+			"id": "openai_empty_content",
+			"description": "OpenAI response where the content field is an empty string.",
+			"parser": "remote",
+			"format": "openai",
+			"input": "{\"choices\":[{\"message\":{\"role\":\"assistant\",\"content\":\"\"}}]}",
+			"expected": {
+				"text": "",
+				"ok": false
+			}
+		},
+		{
+			"id": "openai_null_content",
+			"description": "OpenAI response where content is null (tool-call-only turn).",
+			"parser": "remote",
+			"format": "openai",
+			"input": "{\"choices\":[{\"message\":{\"role\":\"assistant\",\"content\":null}}]}",
+			"expected": {
+				"text": "",
+				"ok": false
+			}
+		},
+		{
+			"id": "openai_missing_choices",
+			"description": "Malformed OpenAI response missing the choices array entirely.",
+			"parser": "remote",
+			"format": "openai",
+			"input": "{\"error\":{\"message\":\"Rate limit exceeded\",\"type\":\"rate_limit_error\"}}",
+			"expected": {
+				"text": "",
+				"ok": false
+			}
+		},
+		{
+			"id": "openai_escaped_content",
+			"description": "OpenAI response where content contains a JSON-escaped quote and newline.",
+			"parser": "remote",
+			"format": "openai",
+			"input": "{\"choices\":[{\"message\":{\"role\":\"assistant\",\"content\":\"il dit \\\"oui\\\"\\net continua\"}}]}",
+			"expected": {
+				"text": "il dit \"oui\"\net continua",
+				"ok": true
+			}
+		},
+		{
+			"id": "anthropic_basic",
+			"description": "Standard Anthropic Messages API response with a text content block.",
+			"parser": "remote",
+			"format": "anthropic",
+			"input": "{\"id\":\"msg_abc\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"bonjour monde\"}],\"model\":\"claude-haiku-4-5\",\"stop_reason\":\"end_turn\",\"usage\":{\"input_tokens\":10,\"output_tokens\":3}}",
+			"expected": {
+				"text": "bonjour monde",
+				"ok": true
+			}
+		},
+		{
+			"id": "anthropic_empty_text",
+			"description": "Anthropic response with an empty text content block.",
+			"parser": "remote",
+			"format": "anthropic",
+			"input": "{\"content\":[{\"type\":\"text\",\"text\":\"\"}]}",
+			"expected": {
+				"text": "",
+				"ok": false
+			}
+		},
+		{
+			"id": "anthropic_missing_content",
+			"description": "Anthropic error response missing the content array.",
+			"parser": "remote",
+			"format": "anthropic",
+			"input": "{\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"Invalid API key\"}}",
+			"expected": {
+				"text": "",
+				"ok": false
+			}
+		},
+		{
+			"id": "anthropic_multiblock_uses_first",
+			"description": "Anthropic response with multiple content blocks — parser must use only the first text block.",
+			"parser": "remote",
+			"format": "anthropic",
+			"input": "{\"content\":[{\"type\":\"text\",\"text\":\"premier bloc\"},{\"type\":\"text\",\"text\":\"second bloc\"}]}",
+			"expected": {
+				"text": "premier bloc",
+				"ok": true
+			}
+		},
+		{
+			"id": "anthropic_escaped_content",
+			"description": "Anthropic text block containing JSON-escaped characters.",
+			"parser": "remote",
+			"format": "anthropic",
+			"input": "{\"content\":[{\"type\":\"text\",\"text\":\"c\\'est \\\"top\\\"\"}]}",
+			"expected": {
+				"text": "c\\'est \"top\"",
+				"ok": true
+			}
+		},
+		{
+			"id": "gemini_basic",
+			"description": "Standard Gemini generateContent response with a text part.",
+			"parser": "remote",
+			"format": "gemini",
+			"input": "{\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"bonjour monde\"}],\"role\":\"model\"},\"finishReason\":\"STOP\"}],\"usageMetadata\":{\"promptTokenCount\":10,\"candidatesTokenCount\":3,\"totalTokenCount\":13}}",
+			"expected": {
+				"text": "bonjour monde",
+				"ok": true
+			}
+		},
+		{
+			"id": "gemini_empty_text",
+			"description": "Gemini response with an empty text part.",
+			"parser": "remote",
+			"format": "gemini",
+			"input": "{\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"\"}]}}]}",
+			"expected": {
+				"text": "",
+				"ok": false
+			}
+		},
+		{
+			"id": "gemini_missing_candidates",
+			"description": "Gemini error body missing the candidates array.",
+			"parser": "remote",
+			"format": "gemini",
+			"input": "{\"error\":{\"code\":403,\"message\":\"API key not valid.\"}}",
+			"expected": {
+				"text": "",
+				"ok": false
+			}
+		},
+		{
+			"id": "gemini_escaped_text",
+			"description": "Gemini text part containing a JSON-escaped newline.",
+			"parser": "remote",
+			"format": "gemini",
+			"input": "{\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"ligne un\\nligne deux\"}]}}]}",
+			"expected": {
+				"text": "ligne un\nligne deux",
+				"ok": true
+			}
+		},
+		{
+			"id": "malformed_json_empty_string",
+			"description": "Completely empty input body — all parsers must return empty.",
+			"parser": "all",
+			"input": "",
+			"expected": {
+				"text": "",
+				"ok": false
+			}
+		},
+		{
+			"id": "malformed_json_invalid_syntax",
+			"description": "Non-JSON garbage string — all parsers must return empty without crashing.",
+			"parser": "all",
+			"input": "Internal Server Error",
+			"expected": {
+				"text": "",
+				"ok": false
+			}
+		},
+		{
+			"id": "malformed_json_truncated",
+			"description": "Truncated JSON object — all parsers must return empty without crashing.",
+			"parser": "all",
+			"input": "{\"response\":\"bons",
+			"expected": {
+				"text": "",
+				"ok": false
+			}
+		},
+		{
+			"id": "malformed_json_null_body",
+			"description": "JSON null literal — all parsers must return empty.",
+			"parser": "all",
+			"input": "null",
+			"expected": {
+				"text": "",
+				"ok": false
+			}
+		},
+		{
+			"id": "openai_whitespace_only_content",
+			"description": "OpenAI content field contains only whitespace — ok=true since content is present but empty after trim is caller's concern.",
+			"parser": "remote",
+			"format": "openai",
+			"input": "{\"choices\":[{\"message\":{\"role\":\"assistant\",\"content\":\"  \"}}]}",
+			"expected": {
+				"text": "  ",
+				"ok": true
+			}
+		},
+		{
+			"id": "ollama_nonstream_backslash_in_response",
+			"description": "Ollama response whose text contains a literal backslash (JSON double-escaped).",
+			"parser": "ollama_nonstream",
+			"input": "{\"response\":\"chemin: C:\\\\Users\\\\test\",\"done\":true}",
+			"expected": {
+				"text": "chemin: C:\\Users\\test",
+				"ok": true
+			}
+		},
+		{
+			"id": "gemini_multipart_uses_first",
+			"description": "Gemini candidates array with a single candidate having multiple parts — uses first part.",
+			"parser": "remote",
+			"format": "gemini",
+			"input": "{\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"premiere partie\"},{\"text\":\"seconde partie\"}]}}]}",
+			"expected": {
+				"text": "premiere partie",
+				"ok": true
+			}
+		}
+	]
+}
