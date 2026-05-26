@@ -136,6 +136,22 @@ const HS_ADAPTERS = {
 		start:            function() {},            // arity 0
 		stop:             function() {},            // arity 0
 	},
+
+	WindowManager: {
+		activate:   function(hwndOrSpec) {},        // arity 1
+		exists:     function(spec) {},              // arity 1
+		kill:       function(spec) {},              // arity 1
+		getList:    function() {},                  // arity 0
+		getTitle:   function(hwndOrSpec) {},        // arity 1
+		getFocused: function() {},                  // arity 0
+	},
+
+	MouseControl: {
+		setPos:           function(x, y) {},        // arity 2
+		getPos:           function() {},            // arity 0
+		getMonitorCount:  function() {},            // arity 0
+		getMonitorBounds: function(n) {},           // arity 1
+	},
 };
 
 

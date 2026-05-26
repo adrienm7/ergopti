@@ -1,4 +1,4 @@
-﻿; modules/shortcuts/altgr.ahk
+; modules/shortcuts/altgr.ahk
 
 ; ==============================================================================
 ; MODULE: Shortcuts — AltGr Combos
@@ -10,6 +10,7 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+
 
 
 
@@ -61,9 +62,9 @@ AltGrLAltShortcut() {
         OneShotShiftFix()
         if GetKeyState("Shift", "P") {
             ; "Shift" + "AltGr" + "LAlt" = Ctrl + BackSpace (Can't use Ctrl because of AltGr = Ctrl + Alt)
-            SendInput("^{BackSpace}")
+            TextPressKey("BackSpace", ["Ctrl"])
         } else {
-            SendInput("{BackSpace}")
+            TextPressKey("BackSpace", [])
         }
     } else if Features["shortcuts"]["alt_gr_lalt"]["caps_lock"] {
         ToggleCapsLock()
@@ -73,34 +74,34 @@ AltGrLAltShortcut() {
         OneShotShiftFix()
         if GetKeyState("Shift", "P") {
             ; "Shift" + "AltGr" + "LAlt" = BackSpace (Can't use Ctrl because of AltGr = Ctrl + Alt)
-            SendInput("{BackSpace}")
+            TextPressKey("BackSpace", [])
         } else {
-            SendInput("^{BackSpace}")
+            TextPressKey("BackSpace", ["Ctrl"])
         }
     } else if Features["shortcuts"]["alt_gr_lalt"]["ctrl_delete"] {
         ; "Shift" + "AltGr" + "LAlt" = Delete (Can't use Ctrl because of AltGr = Ctrl + Alt)
         OneShotShiftFix()
         if GetKeyState("Shift", "P") {
-            SendInput("{Delete}")
+            TextPressKey("Delete", [])
         } else {
-            SendInput("^{Delete}")
+            TextPressKey("Delete", ["Ctrl"])
         }
     } else if Features["shortcuts"]["alt_gr_lalt"]["delete"] {
         ; "Shift" + "AltGr" + "LAlt" = Ctrl + Delete (Can't use Ctrl because of AltGr = Ctrl + Alt)
         OneShotShiftFix()
         if GetKeyState("Shift", "P") {
-            SendInput("^{Delete}")
+            TextPressKey("Delete", ["Ctrl"])
         } else {
-            SendInput("{Delete}")
+            TextPressKey("Delete", [])
         }
     } else if Features["shortcuts"]["alt_gr_lalt"]["enter"] {
-        SendInput("{Enter}")
+        TextPressKey("Enter", [])
     } else if Features["shortcuts"]["alt_gr_lalt"]["escape"] {
-        SendInput("{Escape}")
+        TextPressKey("Escape", [])
     } else if Features["shortcuts"]["alt_gr_lalt"]["one_shot_shift"] {
         OneShotShift()
     } else if Features["shortcuts"]["alt_gr_lalt"]["tab"] {
-        SendInput("{Tab}")
+        TextPressKey("Tab", [])
     }
 }
 
@@ -121,25 +122,25 @@ AltGrCapsLockShortcut() {
     ; Inline v2 if/else cascade -- same 10-action surface as LAltCapsLockShortcut
     ; but reads from the alt_gr_caps_lock sub-Map.
     if Features["shortcuts"]["alt_gr_caps_lock"]["backspace"] {
-        SendEvent("{BackSpace}")
+        TextPressKey("BackSpace", [])
     } else if Features["shortcuts"]["alt_gr_caps_lock"]["caps_lock"] {
         ToggleCapsLock()
     } else if Features["shortcuts"]["alt_gr_caps_lock"]["caps_word"] {
         ToggleCapsWord()
     } else if Features["shortcuts"]["alt_gr_caps_lock"]["ctrl_backspace"] {
-        SendInput("^{BackSpace}")
+        TextPressKey("BackSpace", ["Ctrl"])
     } else if Features["shortcuts"]["alt_gr_caps_lock"]["ctrl_delete"] {
-        SendInput("^{Delete}")
+        TextPressKey("Delete", ["Ctrl"])
     } else if Features["shortcuts"]["alt_gr_caps_lock"]["delete"] {
-        SendInput("{Delete}")
+        TextPressKey("Delete", [])
     } else if Features["shortcuts"]["alt_gr_caps_lock"]["enter"] {
-        SendInput("{Enter}")
+        TextPressKey("Enter", [])
     } else if Features["shortcuts"]["alt_gr_caps_lock"]["escape"] {
-        SendInput("{Escape}")
+        TextPressKey("Escape", [])
     } else if Features["shortcuts"]["alt_gr_caps_lock"]["one_shot_shift"] {
         OneShotShift()
     } else if Features["shortcuts"]["alt_gr_caps_lock"]["tab"] {
-        SendInput("{Tab}")
+        TextPressKey("Tab", [])
     }
 }
 
