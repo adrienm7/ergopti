@@ -100,6 +100,11 @@ const HS_ADAPTERS = {
 		exists: function(path) {},                  // arity 1
 		delete: function(path) {},                  // arity 1
 	},
+
+	WindowInfo: {
+		getFocused: function() {},                  // arity 0
+		getAll:     function() {},                  // arity 0
+	},
 };
 
 

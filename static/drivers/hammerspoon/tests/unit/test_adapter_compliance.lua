@@ -74,6 +74,10 @@ local PORT_CONTRACTS = {
 		{ name = "exists", arity = 1 },
 		{ name = "delete", arity = 1 },
 	},
+	window_info = {
+		{ name = "getFocused", arity = 0 },
+		{ name = "getAll",     arity = 0 },
+	},
 }
 
 
