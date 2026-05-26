@@ -226,7 +226,8 @@ SetFeatureLetterOff(FullPath) {
 ; current i18n locale via ``MenuLabelFromManifestEntry``) whenever a
 ; matching entry exists. Non-manifest features fall through to dedicated
 ; handlers: Personal shortcuts use _PersonalShortcutsRegistry descriptions;
-; TapHolds variants use _TapHoldsConfig descriptions. The live ``Letter``
+; TapHolds variants use TapHoldVariantLabel (dynamically built from the v2
+; tuple and locale-aware i18n keys). The live ``Letter``
 ; suffix appended for letter pickers is always read from Features so
 ; the title reflects the user's persisted choice immediately after a Reload.
 ;
@@ -241,7 +242,7 @@ GetMenuTitleByPath(FullPath) {
 	; Try the manifest+i18n first — single source of truth for declared
 	; features. Non-manifest paths fall through to per-subsystem handlers:
 	; Personal shortcuts use _PersonalShortcutsRegistry; TapHolds variants
-	; use _TapHoldsConfig descriptions.
+	; use TapHoldVariantLabel.
 	V2Path := LegacyPathToManifestPath(FullPath)
 	Entry := false
 	if (V2Path != "") {
@@ -285,24 +286,15 @@ GetMenuTitleByPath(FullPath) {
 		return Name
 	}
 
-	; TapHolds variants: description lives on the _TapHoldsConfig object.
-	; Paths are either TapHolds.<FlatKey> (2 parts) or
-	; TapHolds.<GroupKey>.<Variant> (3 parts).
+	; TapHolds variants: labels are built dynamically from the (tap_action,
+	; hold_modifier / hold_layer) tuple via TapHoldVariantLabel so they
+	; honour the active locale without a per-variant string table.
 	if (Parts[1] == "TapHolds") {
-		global _TapHoldsConfig
-		if (Parts.Length == 2 and _TapHoldsConfig.Has(Parts[2])) {
-			Obj := _TapHoldsConfig[Parts[2]]
-			if IsObject(Obj) and Obj.HasOwnProp("Description") {
-				return Obj.Description
-			}
-		} else if (Parts.Length == 3 and _TapHoldsConfig.Has(Parts[2])) {
-			Group := _TapHoldsConfig[Parts[2]]
-			if (Type(Group) == "Map" and Group.Has(Parts[3])) {
-				Obj := Group[Parts[3]]
-				if IsObject(Obj) and Obj.HasOwnProp("Description") {
-					return Obj.Description
-				}
-			}
+		if Parts.Length == 2 {
+			return TapHoldGroupLabel(Parts[2])
+		}
+		if Parts.Length == 3 {
+			return TapHoldVariantLabel(Parts[2], Parts[3])
 		}
 	}
 
@@ -935,8 +927,7 @@ InitSubMenus() {
 	; Shortcuts — Accents + WrapTextIfSelected + Modifier combos + transitional Personal.
 	SubMenus["Shortcuts"] := _BuildShortcutsSubmenu()
 
-	; TapHolds — direct iteration of ``_TapHoldsConfig`` (TapHolds entries
-	; live outside the manifest in tap_hold_config.ahk).
+	; TapHolds — built from the v2 variant tables in tap_hold_writer.ahk.
 	SubMenus["TapHolds"] := _BuildTapHoldsSubmenu()
 }
 
@@ -1036,10 +1027,10 @@ _BuildShortcutsSubmenu() {
 	return SubMenu
 }
 
-; Build the TapHolds submenu directly from ``_TapHoldsConfig``
-; (lib/tap_hold_config.ahk).
+; Build the TapHolds submenu from ``TapHoldGroupOrder()`` and the variant
+; tables in ``lib/tap_hold/tap_hold_writer.ahk``.
 ;
-; The render shape is dictated by ``_TapHoldsConfig["__Order"]``:
+; The render shape is:
 ;
 ;   ☰ Tap-Hold
 ;     ↳ CapsLock submenu (variant toggles BackSpace / CapsLockCtrl / …)
@@ -1051,37 +1042,20 @@ _BuildShortcutsSubmenu() {
 ;     ↳ RCtrl submenu
 ;     ↳ TabAlt (flat toggle)
 ;
-; Sub-Map keys (CapsLock/LAlt/AltGr/RCtrl/Space) carry variant Maps with
-; a ``__Configuration`` metadata key (skipped) and N variant entries.
-; Each variant has a v1 path ``TapHolds.<KeyId>.<Variant>``. Flat keys
-; have a single v1 path ``TapHolds.<KeyId>``. Labels (and check state)
-; both go through the existing MenuAddItem helper — no manifest lookup
-; happens for TapHolds (no entries in the manifest) so GetMenuTitleByPath
-; falls through to the Description carried on each ``_TapHoldsConfig``
-; entry. Sub-Map container labels stay as the raw v1 Key ("CapsLock",
-; "LAlt", …) because the legacy render had no ``__Label`` on these
-; sub-Maps — preserved verbatim.
+; Sub-Map groups (CapsLock/LAlt/AltGr/RCtrl/Space) produce a child submenu
+; with one item per variant. Flat groups (LShiftCopy/LCtrlPaste/TabAlt) add
+; a single toggle item directly. Labels and check state go through
+; ``MenuAddItem`` → ``GetMenuTitleByPath`` → ``TapHoldVariantLabel``.
 _BuildTapHoldsSubmenu() {
-	global _TapHoldsConfig
 	SubMenu := Menu()
-	if !_TapHoldsConfig.Has("__Order") {
-		return SubMenu
-	}
-	for Key in _TapHoldsConfig["__Order"] {
-		if !_TapHoldsConfig.Has(Key) {
-			continue
-		}
-		Val := _TapHoldsConfig[Key]
-		if (Type(Val) == "Map") {
+	for Key in TapHoldGroupOrder() {
+		if TapHoldIsSubMapGroup(Key) {
 			KeyMenu := Menu()
-			for VariantName, _VariantObj in Val {
-				if (VariantName == "__Configuration" or VariantName == "__Order") {
-					continue
-				}
+			for VariantName in TapHoldVariantNames(Key) {
 				MenuAddItem(KeyMenu, "TapHolds." . Key, VariantName)
 			}
-			SubMenu.Add(Key, KeyMenu)
-		} else if (IsObject(Val) and Val.HasOwnProp("Enabled")) {
+			SubMenu.Add(TapHoldGroupLabel(Key), KeyMenu)
+		} else {
 			MenuAddItem(SubMenu, "TapHolds", Key)
 		}
 	}

@@ -134,7 +134,6 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 ; any #HotIf expression is evaluated. Re-listing them here would cause AHK
 ; to complain about the same script being included twice.
 #Include lib/first_boot.ahk
-#Include lib/tap_hold_config.ahk
 #Include lib/tap_hold/tap_hold_loader.ahk
 #Include lib/tap_hold/tap_hold_writer.ahk
 #Include lib/master_gates.ahk
