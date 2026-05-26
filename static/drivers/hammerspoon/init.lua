@@ -125,6 +125,7 @@ menu_paths.init(base_dir, function() hs.timer.doAfter(0.25, function() pcall(hs.
 Logger.init_log_path(menu_paths.get_config_dir(), 14)
 
 -- Now safe to load modules that depend on config_dir
+local file_system        = require("adapters.file_system")
 local karabiner          = require("modules.karabiner")
 local menu               = require("ui.menu")
 local hotstring_editor   = require("ui.hotstring_editor")
@@ -543,8 +544,9 @@ Logger.info(LOG, string.format("Final mapping sort completed in %.1fms.",
 -- =============================
 
 -- Initialize the Karabiner bridge (starts trackpad watcher + loads feature flags)
--- The module self-resolves its directory at load time — no path argument needed
-karabiner.init()
+-- The FileSystem adapter is injected so KE config path resolution goes through
+-- the port boundary (hs.fs.pathToAbsolute) instead of raw os.getenv("HOME").
+karabiner.init(file_system)
 
 Logger.debug(LOG, "Starting user interface components…")
 menu.start(

@@ -149,6 +149,37 @@ function M.exists(path)
 	return false
 end
 
+--- Expands a path that may begin with "~" to an absolute path.
+--- Delegates to hs.fs.pathToAbsolute so the result follows macOS symlink
+--- resolution (important for ~/.config which may be a symlink on some setups).
+--- Falls back to naive HOME substitution when hs.fs is unavailable (unit tests).
+--- @param path string Path to expand (may start with "~").
+--- @return string Expanded absolute path.
+function M.expand_path(path)
+	if type(path) ~= "string" or path == "" then
+		Logger.error(LOG, "expand_path(): path must be a non-empty string.")
+		return path or ""
+	end
+
+	if hs and hs.fs and type(hs.fs.pathToAbsolute) == "function" then
+		local ok, abs = pcall(hs.fs.pathToAbsolute, path)
+		if ok and type(abs) == "string" and abs ~= "" then
+			return abs
+		end
+		-- pathToAbsolute returns nil when the path does not exist yet — fall
+		-- through to naive expansion so callers can still build paths for files
+		-- that have not been created yet.
+	end
+
+	-- Naive fallback: replace leading "~" with HOME env var
+	if path:sub(1, 1) == "~" then
+		local home = os.getenv("HOME") or ""
+		return home .. path:sub(2)
+	end
+	return path
+end
+
+
 --- Deletes a file. Returns true if the file was deleted or was already absent.
 --- @param path string Absolute path to the file to delete.
 --- @return boolean true on success or file-not-found, false on any other error.

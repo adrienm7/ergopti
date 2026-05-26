@@ -44,12 +44,16 @@ local LOG = "karabiner"
 -- Works whether the file is symlinked, run from the project, or deployed.
 local _SELF_DIR = (debug.getinfo(1, "S").source:sub(2):match("^(.*[/\\])") or "./")
 
--- Standard Karabiner-Elements config path on macOS.
--- This location is not user-configurable — KE always reads its config from here.
--- The ERGOPTI_KARABINER_OUT environment variable overrides it in CI or testing
--- environments where Karabiner-Elements is not installed.
-local KARABINER_KE_STANDARD_PATH = os.getenv("HOME") .. "/.config/karabiner/karabiner.json"
-local KARABINER_OUT = os.getenv("ERGOPTI_KARABINER_OUT") or KARABINER_KE_STANDARD_PATH
+-- Standard Karabiner-Elements config path, expressed as a tilde path so the
+-- FileSystem port adapter can resolve it through hs.fs.pathToAbsolute (which
+-- follows symlinks and honours any macOS path aliasing), rather than naively
+-- concatenating HOME ourselves.  The CI/test override is still honoured first.
+local KARABINER_KE_TILDE_PATH = "~/.config/karabiner/karabiner.json"
+
+-- Resolved at M.init() time via the injected FileSystem adapter.
+-- Kept as a module-level variable (not constant) so generator calls can
+-- reference it after init() has run; nil before init().
+local KARABINER_OUT = nil
 
 -- The user-editable Karabiner config lives under the user's resolved
 -- config dir (paths.toml override honoured) at:
@@ -520,13 +524,32 @@ end
 -- ============================
 
 --- Initializes the Karabiner bridge.
---- No arguments needed — the module resolves its own directory at load time.
-function M.init()
+--- @param file_system table FileSystem port adapter (adapters/file_system.lua).
+---   Used to resolve the KE config path through hs.fs.pathToAbsolute so the
+---   module never hard-codes OS path logic outside the port boundary.
+function M.init(file_system)
 	Logger.start(LOG, "Initializing Karabiner bridge…")
+
+	if type(file_system) ~= "table" or type(file_system.expand_path) ~= "function" then
+		Logger.error(LOG, "M.init(): file_system adapter is required and must implement expand_path — module non-functional.")
+		return
+	end
 
 	if _state then
 		Logger.warn(LOG, "M.init() called more than once — ignoring duplicate call.")
 		return
+	end
+
+	-- Resolve the KE output path through the FileSystem port so path logic is
+	-- centralised in the adapter and not duplicated across modules.
+	-- The env-var override is checked first to support CI and headless testing.
+	local env_override = os.getenv("ERGOPTI_KARABINER_OUT")
+	if env_override and env_override ~= "" then
+		KARABINER_OUT = env_override
+		Logger.info(LOG, "KE config path overridden by ERGOPTI_KARABINER_OUT: '%s'.", KARABINER_OUT)
+	else
+		KARABINER_OUT = file_system.expand_path(KARABINER_KE_TILDE_PATH)
+		Logger.info(LOG, "KE config path resolved: '%s'.", KARABINER_OUT)
 	end
 
 	-- Load shared data files first — required before load_user_config() can
