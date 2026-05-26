@@ -375,6 +375,11 @@ M.canvas = {
 	new = function(_) return setmetatable({}, {
 		__index = function() return function(self) return self end end,
 	}) end,
+	-- Level and behavior constants used by renderer.lua at load time; the stub
+	-- must expose them as plain numbers so the canvas:level() / :behavior() calls
+	-- on the mock canvas object do not crash on nil indexing.
+	windowLevels    = setmetatable({}, { __index = function() return 0 end }),
+	windowBehaviors = setmetatable({}, { __index = function() return 0 end }),
 }
 
 M.styledtext = { new = function(s, _) return s end }

@@ -38,6 +38,7 @@ SetWorkingDir(A_ScriptDir)
 #Include test_stubs.ahk
 
 ; ── Production lib files in dependency order ──
+#Include ../lib/ui_style.ahk
 #Include ../lib/logger.ahk
 #Include ../lib/toml/toml_helpers.ahk
 #Include ../lib/active_app_cache.ahk
@@ -55,6 +56,7 @@ SetWorkingDir(A_ScriptDir)
 #Include ../lib/hotstrings/personal_toml_editor.ahk
 #Include ../lib/layout/layout_altgr.ahk
 #Include ../lib/layout/layout_shift_caps.ahk
+#Include ../lib/tooltip.ahk
 ; json.ahk must precede i18n.ahk — _I18nLoadFile now delegates to JsonParse.
 #Include ../lib/json.ahk
 ; i18n is included here because gestures.ahk calls t() at the top level
@@ -71,6 +73,7 @@ InstallHotstringHooks()
 ; ── Per-module test files (each registers Test() cases) ──
 #Include test_logger.ahk
 #Include test_logger_contract.ahk
+#Include test_tooltip_tint_contract.ahk
 #Include test_hotstring_engine.ahk
 #Include test_hotstring_engine_main.ahk
 #Include test_toml_loader.ahk
