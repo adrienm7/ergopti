@@ -22,10 +22,12 @@ local i18n          = require("lib.i18n")
 local Models        = require("ui.menu.menu_llm.models_manager")
 local Profiles      = require("ui.menu.menu_llm.profiles_manager")
 local Settings      = require("ui.menu.menu_llm.settings_manager")
-local AppPickerLib  = require("lib.app_picker")
 local TempPanel     = require("ui.menu.menu_llm.temperature_panel")
 local StreamPanel   = require("ui.menu.menu_llm.streaming_panel")
 local WarmupCtrl    = require("ui.menu.menu_llm.warmup_controller")
+local BackendPanel  = require("ui.menu.menu_llm.backend_panel")
+local TriggerPanel  = require("ui.menu.menu_llm.trigger_panel")
+local ApiPanel      = require("ui.menu.menu_llm.api_panel")
 
 -- Deps checkers — kicked off on backend switch and on first menu activation
 -- so a fresh-out-of-the-box Mac auto-bootstraps the engine without any
@@ -1143,129 +1145,16 @@ function M.create(deps)
         local main_menu = {}
 
 
-        local backend_title_str = "Moteur IA (Backend) : "
-        if state.llm_backend == "mlx" then backend_title_str = backend_title_str .. "MLX 🚀"
-        elseif state.llm_backend == "ollama" then backend_title_str = backend_title_str .. "Ollama 🦙"
-        elseif state.llm_backend == "api" then backend_title_str = backend_title_str .. "API 🌐"
-        else backend_title_str = backend_title_str .. "Inconnu" end
-
-        local backend_title = backend_title_str
-        local backend_menu = {}
-
-        table.insert(backend_menu, {
-            title    = "MLX 🚀 — " .. i18n.get("menu.llm.backend_mlx_suffix"),
-            checked  = (state.llm_backend == "mlx"),
-            disabled = (not is_apple_silicon) or paused or nil,
-            fn       = not paused and function()
-                if state.llm_backend ~= "mlx" then
-                    Logger.info(LOG, "Activating MLX backend…")
-                    state.llm_backend = "mlx"
-                    llm_mod.set_backend("mlx")
-                    -- On-demand deps check: bootstrap the MLX venv if the
-                    -- user just switched and the engine is not ready.
-                    -- The call is non-blocking and silent on the fast path.
-                    check_backend_deps("mlx")
-
-                    if keymap and type(keymap.set_llm_backend_name) == "function" then
-                        pcall(keymap.set_llm_backend_name, "MLX 🚀")
-                    end
-
-                    -- Kill any stray ollama to free RAM
-                    os.execute("pkill -f '[o]llama serve' 2>/dev/null || true")
-
-                    local target_model = get_display_model_name(state.llm_model_mlx or M.DEFAULT_STATE.llm_model_mlx or "")
-                    if target_model and target_model ~= "" then
-                        switch_model(target_model)
-                        -- Force server to start to be certain
-                        if type(models_mgr.force_mlx_check) == "function" then
-                            hs.timer.doAfter(0.5, function()
-                                models_mgr.force_mlx_check(target_model, nil, nil, { silent_notifications = true })
-                            end)
-                        end
-                    else
-                        state.llm_model = ""
-                        if keymap and type(keymap.set_llm_model) == "function" then
-                            pcall(keymap.set_llm_model, "")
-                        end
-                        if keymap and type(keymap.set_llm_display_model_name) == "function" then
-                            pcall(keymap.set_llm_display_model_name, "")
-                        end
-                        save_prefs()
-                        update_menu()
-                    end
-                end
-            end or nil
-        })
-
-        table.insert(backend_menu, {
-            title    = "Ollama 🦙 — " .. i18n.get("menu.llm.backend_ollama_suffix"),
-            checked  = (state.llm_backend == "ollama"),
-            disabled = paused or nil,
-            fn       = not paused and function()
-                if state.llm_backend ~= "ollama" then
-                    Logger.info(LOG, "Deactivating MLX backend (switching to Ollama)…")
-                    state.llm_backend = "ollama"
-                    llm_mod.set_backend("ollama")
-                    -- On-demand deps check: install + start the Ollama
-                    -- server if the user just switched and the engine is
-                    -- not ready. Silent on the fast path.
-                    check_backend_deps("ollama")
-                    if models_mgr.stop_mlx_server_if_needed then models_mgr.stop_mlx_server_if_needed() end
-                    -- Hard kill just in case
-                    os.execute("pids=$(lsof -tiTCP:8080 -sTCP:LISTEN 2>/dev/null); [ -n \"$pids\" ] && kill -9 $pids 2>/dev/null")
-                    Logger.debug(LOG, "MLX server stopped.")
-
-                    if keymap and type(keymap.set_llm_backend_name) == "function" then
-                        pcall(keymap.set_llm_backend_name, "Ollama 🦙")
-                    end
-
-                    local target_model = get_display_model_name(state.llm_model_ollama or M.DEFAULT_STATE.llm_model_ollama or "")
-                    if target_model and target_model ~= "" then
-                        switch_model(target_model)
-                    else
-                        state.llm_model = ""
-                        if keymap and type(keymap.set_llm_model) == "function" then
-                            pcall(keymap.set_llm_model, "")
-                        end
-                        if keymap and type(keymap.set_llm_display_model_name) == "function" then
-                            pcall(keymap.set_llm_display_model_name, "")
-                        end
-                        save_prefs()
-                        update_menu()
-                    end
-                end
-            end or nil
-        })
-
-        -- Remote API backend — covers OpenAI / Anthropic / Gemini / OpenAI-compat.
-        -- The actual entry CRUD (provider, URL, token, model) lives in its own
-        -- top-level row built below: this entry only flips the backend so the
-        -- prediction engine routes through ApiRemote on the next request.
-        table.insert(backend_menu, {
-            title    = "API 🌐 — " .. i18n.get("menu.llm.backend_api_suffix"),
-            checked  = (state.llm_backend == "api"),
-            disabled = paused or nil,
-            fn       = not paused and function()
-                if state.llm_backend ~= "api" then
-                    Logger.info(LOG, "Activating remote API backend…")
-                    state.llm_backend = "api"
-                    llm_mod.set_backend("api")
-                    -- Kill any local server that would burn RAM / GPU for nothing now
-                    -- that predictions go over the network.
-                    if models_mgr.stop_mlx_server_if_needed then pcall(models_mgr.stop_mlx_server_if_needed) end
-                    os.execute("pkill -f '[o]llama serve' 2>/dev/null || true")
-                    if keymap and type(keymap.set_llm_backend_name) == "function" then
-                        pcall(keymap.set_llm_backend_name, "API 🌐")
-                    end
-                    -- Reload persisted entries (no-op when already in memory),
-                    -- then ping the active one so the health indicator reflects
-                    -- reality before the next prediction would fire.
-                    if type(llm_mod.load_api_entries) == "function" then pcall(llm_mod.load_api_entries) end
-                    WarmupCtrl.warmup("api_backend_switch")
-                    save_prefs()
-                    update_menu()
-                end
-            end or nil
+        local backend_title, backend_menu = BackendPanel.build({
+            state                = state,
+            keymap               = keymap,
+            paused               = paused,
+            models_mgr           = models_mgr,
+            get_display_model_name = get_display_model_name,
+            switch_model         = switch_model,
+            save_prefs           = save_prefs,
+            update_menu          = update_menu,
+            WarmupCtrl           = WarmupCtrl,
         })
 
         table.insert(main_menu, {
@@ -1274,211 +1163,22 @@ function M.create(deps)
             menu     = backend_menu
         })
 
-        -- API entries CRUD — only surfaced when the active backend is the
-        -- remote API. Mirrors the AHK tray menu: list configured entries
-        -- with a check mark on the active one, plus per-entry add / remove
-        -- actions. Sequential text prompts collect provider / URL / token /
-        -- model on add — hs.dialog has no native multi-field form, but the
-        -- three-step prompt is fast enough for a one-off setup.
-        if state.llm_backend == "api" then
-            local api_remote = llm_mod.api_remote
-            local entries    = (api_remote and api_remote.get_entries()) or {}
-            local active_id  = (api_remote and api_remote.get_active_entry_id()) or ""
-            local api_menu   = {}
-
-            -- One row per configured entry — clicking sets it as active and
-            -- triggers a warmup so the next prediction uses the new entry
-            -- immediately. The label puts the provider first so the user can
-            -- tell openai / anthropic / gemini apart at a glance even when
-            -- multiple share the same alias.
-            for _, e in ipairs(entries) do
-                local provider_label = (api_remote.PROVIDERS[e.provider] and api_remote.PROVIDERS[e.provider].label) or e.provider
-                local entry_title = string.format("%s — %s (%s)",
-                    tostring(e.label or e.id or "?"),
-                    tostring(e.model or "?"),
-                    provider_label)
-                table.insert(api_menu, {
-                    title    = entry_title,
-                    checked  = (e.id == active_id),
+        -- API entries CRUD — delegates entirely to ApiPanel.
+        do
+            local api_title, api_menu = ApiPanel.build({
+                state       = state,
+                paused      = paused,
+                update_menu = update_menu,
+                WarmupCtrl  = WarmupCtrl,
+            })
+            if api_title and api_menu then
+                table.insert(main_menu, {
+                    title    = api_title,
                     disabled = paused or nil,
-                    fn       = not paused and function()
-                        api_remote.set_active_entry_id(e.id)
-                        pcall_log("persist_api_entries(set_active)", llm_mod.persist_api_entries)
-                        WarmupCtrl.warmup("api_set_active")
-                        update_menu()
-                    end or nil
+                    menu     = api_menu,
                 })
             end
-
-            if #entries > 0 then
-                table.insert(api_menu, { title = "-" })
-            end
-
-            -- One "Add" entry per provider so the user picks the shape first
-            -- (Bearer auth vs x-api-key vs Gemini's URL token, plus the right
-            -- default model). Subsequent prompts collect the credentials.
-            local add_submenu = {}
-            for _, pid in ipairs(api_remote.PROVIDER_ORDER) do
-                local p = api_remote.PROVIDERS[pid]
-                if p then
-                    table.insert(add_submenu, {
-                        title    = string.format("➕ %s", p.label),
-                        disabled = paused or nil,
-                        fn       = not paused and function()
-                            local function trim(s) return (tostring(s or ""):gsub("^%s+", ""):gsub("%s+$", "")) end
-                            local function prompt_field(title_key, default_val, hint)
-                                local ok, ret_a, ret_b = pcall(dialog.text_prompt,
-                                    title_key, hint, default_val or "",
-                                    "OK", i18n.get("button.cancel"))
-                                if not ok then return nil end
-                                local picked_btn, picked_text
-                                if ret_a == "OK" or ret_a == i18n.get("button.cancel") then
-                                    picked_btn, picked_text = ret_a, ret_b
-                                else
-                                    picked_text, picked_btn = ret_a, ret_b
-                                end
-                                if picked_btn ~= "OK" then return nil end
-                                return trim(picked_text)
-                            end
-
-                            -- Use the existing i18n keys for prompt hints so
-                            -- non-French users see localized text. The title
-                            -- format ``API <provider> — <field>`` mixes a
-                            -- provider name with a field tag, so we localise
-                            -- the field tag via i18n.get and leave the
-                            -- composition pattern in place.
-                            local base_url = prompt_field(
-                                string.format("API %s — URL", p.label),
-                                p.base_url,
-                                i18n.get("menu.llm.api_prompt_url")) or ""
-                            local token = prompt_field(
-                                string.format("API %s — Token", p.label),
-                                "",
-                                i18n.get("menu.llm.api_prompt_token"))
-                            if not token or token == "" then return end
-                            local model = prompt_field(
-                                string.format("API %s — Model", p.label),
-                                p.default_model,
-                                i18n.get("menu.llm.api_prompt_model")) or p.default_model
-                            local label = prompt_field(
-                                string.format("API %s — Label", p.label),
-                                "",
-                                i18n.get("menu.llm.api_prompt_name")) or ""
-
-                            local id = string.format("%s-%d", pid, os.time())
-                            local new_entry = {
-                                id       = id,
-                                provider = pid,
-                                base_url = (base_url ~= "" and base_url ~= p.base_url) and base_url or "",
-                                token    = token,
-                                model    = (model ~= "" and model) or p.default_model,
-                                label    = (label ~= "" and label) or p.label,
-                            }
-                            local previous_active_id = api_remote.get_active_entry_id and api_remote.get_active_entry_id() or ""
-                            local list = api_remote.get_entries() or {}
-                            local clone = {}
-                            for _, x in ipairs(list) do table.insert(clone, x) end
-                            table.insert(clone, new_entry)
-                            -- Stage the entry in memory only — DO NOT persist
-                            -- yet. check_availability needs an active entry to
-                            -- probe credentials against, but we don't want to
-                            -- write a bad token into the Keychain. Persist
-                            -- only on success; on failure, roll the in-memory
-                            -- state back so the menu mirrors disk.
-                            api_remote.set_entries(clone)
-                            api_remote.set_active_entry_id(id)
-                            update_menu()
-                            api_remote.check_availability(new_entry.model,
-                                function()
-                                    -- Credentials accepted — NOW persist + warmup.
-                                    pcall_log("persist_api_entries(add_entry_ok)", llm_mod.persist_api_entries)
-                                    WarmupCtrl.warmup("api_add_entry")
-                                    pcall_log("notify(api_validated)", notifications.notify,
-                                        i18n.get("menu.llm.api_validated_title"),
-                                        string.format(i18n.get("menu.llm.api_validated_body"), new_entry.label),
-                                        "success")
-                                end,
-                                function(_unreachable)
-                                    -- Validation failed: roll the in-memory
-                                    -- list back so the bogus token never lands
-                                    -- in Keychain. The user sees the menu
-                                    -- snap back to its previous state and a
-                                    -- toast explaining why.
-                                    local rolled = {}
-                                    for _, x in ipairs(api_remote.get_entries() or {}) do
-                                        if x.id ~= id then table.insert(rolled, x) end
-                                    end
-                                    api_remote.set_entries(rolled)
-                                    api_remote.set_active_entry_id(previous_active_id)
-                                    pcall_log("notify(api_unreachable)", notifications.notify,
-                                        i18n.get("menu.llm.api_unreachable_title"),
-                                        string.format(i18n.get("menu.llm.api_unreachable_body"), new_entry.label),
-                                        "warning")
-                                    pcall_log("update_menu(rollback)", update_menu)
-                                end)
-                        end or nil,
-                    })
-                end
-            end
-
-            table.insert(api_menu, {
-                title    = "➕ " .. i18n.get("menu.llm.api_add_entry"),
-                disabled = paused or nil,
-                menu     = add_submenu,
-            })
-
-            -- Remove only the active entry — keeps the action unambiguous and
-            -- mirrors the AHK tray's "remove active" semantics. Disabled when
-            -- nothing is configured so the user does not chase a no-op click.
-            local active_entry = api_remote and api_remote.get_active_entry() or nil
-            local active_label = active_entry and (active_entry.label or active_entry.id or "") or ""
-            table.insert(api_menu, {
-                title    = active_entry
-                    and string.format("🗑️ %s (%s)", i18n.get("menu.llm.api_remove_entry"), active_label)
-                    or  "🗑️ " .. i18n.get("menu.llm.api_remove_entry"),
-                disabled = (paused or (active_entry == nil)) or nil,
-                fn       = (not paused and active_entry) and function()
-                    -- Confirm before destroying — the saved token is gone
-                    -- for good once we delete it. Worth one extra click,
-                    -- especially in a small menu where the user is one
-                    -- stray click away from the action.
-                    local ok_c, choice = pcall(dialog.block_alert,
-                        string.format(i18n.get("menu.llm.api_remove_confirm_title"), active_label),
-                        i18n.get("menu.llm.api_remove_confirm_body"),
-                        i18n.get("button.delete"), i18n.get("button.cancel"), "critical")
-                    if not (ok_c and choice == i18n.get("button.delete")) then
-                        return
-                    end
-                    local kept = {}
-                    for _, x in ipairs(api_remote.get_entries() or {}) do
-                        if x.id ~= active_entry.id then table.insert(kept, x) end
-                    end
-                    api_remote.set_entries(kept)
-                    api_remote.set_active_entry_id(kept[1] and kept[1].id or "")
-                    pcall_log("persist_api_entries(delete)", llm_mod.persist_api_entries)
-                    -- Purge the Keychain entry too; without this, deleted
-                    -- entries leave their token in the user's Keychain
-                    -- indefinitely.
-                    local ok_kc, TokenCrypto = pcall(require, "modules.llm.api_token_crypto")
-                    if ok_kc and TokenCrypto and active_entry.id then
-                        pcall_log("TokenCrypto.delete", TokenCrypto.delete, active_entry.id)
-                    end
-                    WarmupCtrl.warmup("api_delete_entry")
-                    update_menu()
-                end or nil,
-            })
-
-            local api_title = active_entry
-                and string.format("API — %s (%s)", active_label,
-                    (api_remote.PROVIDERS[active_entry.provider] and api_remote.PROVIDERS[active_entry.provider].label) or active_entry.provider)
-                or  "API — " .. i18n.get("menu.llm.api_no_entry")
-            table.insert(main_menu, {
-                title    = api_title,
-                disabled = paused or nil,
-                menu     = api_menu,
-            })
         end
-
         local active_display_model = get_display_model_name(state.llm_model)
         local info = models_mgr.get_model_info(active_display_model) or {}
         local ram = models_mgr.get_model_ram(active_display_model) or 0
@@ -1559,99 +1259,15 @@ function M.create(deps)
 
         -- ===== Trigger submenu =====
 
-        local trigger_menu = {}
-
-        local sc_label = shortcut_ui.shortcut_to_label(state.llm_trigger_shortcut, "Aucun")
-        table.insert(trigger_menu, {
-            title    = string.format(i18n.get("menu.llm.trigger_shortcut_label"), sc_label),
-            disabled = is_disabled or nil,
-            fn       = function()
-                shortcut_ui.prompt_shortcut({
-                    title = i18n.get("menu.llm.trigger_shortcut_title"),
-                    message = i18n.get("menu.llm.shortcut_prompt"),
-                    current_shortcut = state.llm_trigger_shortcut,
-                    default_mods = {"ctrl"},
-                    on_apply = apply_llm_shortcut,
-                })
-            end
+        local trigger_menu = TriggerPanel.build({
+            state              = state,
+            keymap             = keymap,
+            is_disabled        = is_disabled,
+            save_prefs         = save_prefs,
+            update_menu        = update_menu,
+            settings_mgr       = settings_mgr,
+            apply_llm_shortcut = apply_llm_shortcut,
         })
-
-        local debounce_val = tonumber(state.llm_debounce) or llm_mod.DEFAULT_STATE.llm_debounce
-        local debounce_display = (debounce_val <= 0) and i18n.get("menu.settings.never") or (math.floor(debounce_val * 1000) .. " ms…")
-
-        table.insert(trigger_menu, { title = string.format(i18n.get("menu.llm.debounce_label"), debounce_display), disabled = is_disabled or nil, fn = settings_mgr.set_debounce })
-        if state.llm_debounce ~= llm_mod.DEFAULT_STATE.llm_debounce then
-            table.insert(trigger_menu, { title = string.format(i18n.get("menu.llm.reset_label"), math.floor(llm_mod.DEFAULT_STATE.llm_debounce * 1000) .. " ms"), disabled = is_disabled or nil, fn = settings_mgr.reset_debounce })
-        end
-
-        table.insert(trigger_menu, {
-            title    = i18n.get("menu.llm.instant_on_word_end"),
-            checked  = state.llm_instant_on_word_end,
-            disabled = is_disabled or nil,
-            fn       = not is_disabled and function()
-                state.llm_instant_on_word_end = not state.llm_instant_on_word_end
-                if keymap and type(keymap.set_llm_instant_on_word_end) == "function" then
-                    pcall(keymap.set_llm_instant_on_word_end, state.llm_instant_on_word_end)
-                end
-                save_prefs(); update_menu()
-            end or nil,
-        })
-
-        table.insert(trigger_menu, {
-            title    = i18n.get("menu.llm.after_hotstring"),
-            checked  = state.llm_after_hotstring,
-            disabled = is_disabled or nil,
-            fn       = not is_disabled and function()
-                state.llm_after_hotstring = not state.llm_after_hotstring
-                if keymap and type(keymap.set_llm_after_hotstring) == "function" then
-                    pcall(keymap.set_llm_after_hotstring, state.llm_after_hotstring)
-                end
-                save_prefs(); update_menu()
-            end or nil,
-        })
-
-        table.insert(trigger_menu, { title = "-" })
-
-        local disabled_count = #(type(state.llm_disabled_apps) == "table" and state.llm_disabled_apps or {})
-        local disabled_label = string.format(i18n.get("menu.llm.disabled_in_label"), disabled_count, disabled_count > 1 and "s" or "")
-
-        local exclusion_menu = AppPickerLib.build_menu(
-            state.llm_disabled_apps,
-            function(new_list)
-                state.llm_disabled_apps = new_list
-                if keymap and type(keymap.set_llm_disabled_apps) == "function" then pcall(keymap.set_llm_disabled_apps, new_list) end
-                pcall(save_prefs); pcall(update_menu)
-            end,
-            i18n.get("menu.llm.exclude_from_ai")
-        )
-
-        table.insert(trigger_menu, {
-            title    = i18n.get("menu.llm.disable_url_bars"),
-            checked  = state.llm_url_bar_filter_enabled,
-            disabled = is_disabled or nil,
-            fn       = not is_disabled and function()
-                state.llm_url_bar_filter_enabled = not state.llm_url_bar_filter_enabled
-                if keymap and type(keymap.set_llm_url_bar_filter_enabled) == "function" then
-                    pcall(keymap.set_llm_url_bar_filter_enabled, state.llm_url_bar_filter_enabled)
-                end
-                save_prefs(); update_menu()
-            end or nil,
-        })
-
-        table.insert(trigger_menu, {
-            title    = i18n.get("menu.llm.disable_password_fields"),
-            checked  = state.llm_secure_field_filter_enabled,
-            disabled = is_disabled or nil,
-            fn       = not is_disabled and function()
-                state.llm_secure_field_filter_enabled = not state.llm_secure_field_filter_enabled
-                if keymap and type(keymap.set_llm_secure_field_filter_enabled) == "function" then
-                    pcall(keymap.set_llm_secure_field_filter_enabled, state.llm_secure_field_filter_enabled)
-                end
-                save_prefs(); update_menu()
-            end or nil,
-        })
-
-        table.insert(trigger_menu, { title = disabled_label, disabled = is_disabled or nil, menu = exclusion_menu })
 
         table.insert(main_menu, { title = i18n.get("menu.llm.trigger_menu_title"), disabled = is_disabled or nil, menu = trigger_menu })
 
