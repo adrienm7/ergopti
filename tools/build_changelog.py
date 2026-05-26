@@ -172,11 +172,19 @@ def classify(commit: dict[str, str]) -> tuple[str | None, str]:
 	if not m:
 		return None, f"- {commit['subject']}"
 	ctype, scope, breaking, rest = m.groups()
+	# Capitalize first letter of subject
+	rest = rest[0].upper() + rest[1:] if rest else rest
 	if breaking:
-		rest = f"⚠️ {rest}"
-	if scope:
-		rest = f"**{scope}:** {rest}"
-	return ctype, f"- {rest}"
+		if scope:
+			label = f"**⚠️ {scope.capitalize()}: {rest}**"
+		else:
+			label = f"**⚠️ {rest}**"
+	else:
+		if scope:
+			label = f"**{scope.capitalize()}: {rest}**"
+		else:
+			label = f"**{rest}**"
+	return ctype, f"- {label}"
 
 
 def render(prev_tag: str | None, commits: list[dict[str, str]]) -> str:

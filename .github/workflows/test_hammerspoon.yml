@@ -11,6 +11,7 @@ on:
     paths:
       - "static/drivers/hammerspoon/**"
       - ".github/workflows/test_hammerspoon.yml"
+  workflow_call:
 
 jobs:
   test:
