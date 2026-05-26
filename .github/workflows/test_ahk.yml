@@ -60,6 +60,38 @@ jobs:
                   Expand-Archive -Path "$env:TEMP\AHK.zip" -DestinationPath "C:\AutoHotkey" -Force
               shell: pwsh
 
+            - name: Verify AHK source encoding (UTF-8 BOM + CRLF)
+              # AHK v2 silently aborts mid-file when a source file is not UTF-8 BOM
+              # or uses LF-only line endings. This step catches encoding drift before
+              # it produces silent test failures with no error message.
+              run: |
+                  $ahkFiles = Get-ChildItem -Path "${{ github.workspace }}\static\drivers\autohotkey" `
+                      -Recurse -Filter "*.ahk" | Where-Object { -not $_.FullName.Contains("vendor") }
+                  $failures = @()
+                  foreach ($file in $ahkFiles) {
+                      $bytes = [System.IO.File]::ReadAllBytes($file.FullName)
+                      # Check UTF-8 BOM: first 3 bytes must be 0xEF 0xBB 0xBF
+                      if ($bytes.Length -lt 3 -or $bytes[0] -ne 0xEF -or $bytes[1] -ne 0xBB -or $bytes[2] -ne 0xBF) {
+                          $failures += "MISSING BOM : $($file.FullName)"
+                          continue
+                      }
+                      # Check CRLF: the file must not contain bare LF (0x0A not preceded by CR 0x0D)
+                      $content = [System.IO.File]::ReadAllText($file.FullName, [System.Text.Encoding]::UTF8)
+                      # Normalise CRLF then check for leftover LF
+                      $lfOnly = $content -replace "`r`n", "" -match "`n"
+                      if ($lfOnly) {
+                          $failures += "BARE LF (not CRLF) : $($file.FullName)"
+                      }
+                  }
+                  if ($failures.Count -gt 0) {
+                      Write-Host "AHK encoding violations detected ($($failures.Count) file(s)):"
+                      $failures | ForEach-Object { Write-Host "  $_" }
+                      Write-Error "All .ahk files must be UTF-8 with BOM and CRLF line endings."
+                      exit 1
+                  }
+                  Write-Host "Encoding check passed — $($ahkFiles.Count) .ahk file(s) verified (UTF-8 BOM + CRLF)."
+              shell: pwsh
+
             - name: Run AHK test suite
               id: tests
               run: |
