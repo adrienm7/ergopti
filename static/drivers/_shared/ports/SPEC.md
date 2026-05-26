@@ -37,14 +37,19 @@ sides never import each other directly.
 
 ```
 static/drivers/_shared/ports/
-├── SPEC.md                  ← This file
-├── KeyboardHook.spec.js     ← Keyboard event subscription contract
-├── TextSender.spec.js       ← Text/keystroke injection contract
-├── TooltipRenderer.spec.js  ← Tooltip show/hide contract
-├── HttpClient.spec.js       ← HTTP request/response contract
-├── TimerScheduler.spec.js   ← Delayed/repeating action contract
-├── Notifier.spec.js         ← System notification contract
-└── TrayMenu.spec.js         ← Tray icon/menu management contract
+├── SPEC.md                        ← This file
+├── KeyboardHook.spec.js           ← Keyboard event subscription contract
+├── TextSender.spec.js             ← Text/keystroke injection contract
+├── TooltipRenderer.spec.js        ← Tooltip show/hide contract
+├── HttpClient.spec.js             ← HTTP request/response contract
+├── TimerScheduler.spec.js         ← Delayed/repeating action contract
+├── Notifier.spec.js               ← System notification contract
+├── TrayMenu.spec.js               ← Tray icon/menu management contract
+├── FileSystem.spec.js             ← Synchronous file-system I/O contract
+├── SecureFieldDetector.spec.js    ← Secure field/app detection contract
+├── Clipboard.spec.js              ← OS clipboard read/write contract
+├── Storage.spec.js                ← Persistent key-value storage contract
+└── ProcessLifecycle.spec.js       ← OS process monitoring contract
 ```
 
 Each `.spec.js` file exports:
@@ -68,6 +73,11 @@ Each `.spec.js` file exports:
 | TimerScheduler | `SetTimer` wrapper (inline) | `hs.timer` wrapper (inline) |
 | Notifier | `TrayTip` (inline) | `lib/notifications.lua` |
 | TrayMenu | `ui/tray_menu.ahk` | `ui/menu/init.lua` |
+| FileSystem | `lib/filesystem.ahk` (TBD) | `lib/filesystem.lua` (TBD) |
+| SecureFieldDetector | `adapters/secure_field_detector.ahk` (TBD) | `adapters/secure_field_detector.lua` (TBD) |
+| Clipboard | `adapters/clipboard.ahk` (TBD) | `adapters/clipboard.lua` (TBD) |
+| Storage | `adapters/storage.ahk` (TBD) | `adapters/storage.lua` (TBD) |
+| ProcessLifecycle | `adapters/process_lifecycle.ahk` (TBD) | `adapters/process_lifecycle.lua` (TBD) |
 
 ---
 
@@ -133,5 +143,10 @@ adapters expose these methods under their own naming convention:
 - [TimerScheduler.spec.js](./TimerScheduler.spec.js)
 - [Notifier.spec.js](./Notifier.spec.js)
 - [TrayMenu.spec.js](./TrayMenu.spec.js)
+- [FileSystem.spec.js](./FileSystem.spec.js)
+- [SecureFieldDetector.spec.js](./SecureFieldDetector.spec.js)
+- [Clipboard.spec.js](./Clipboard.spec.js)
+- [Storage.spec.js](./Storage.spec.js)
+- [ProcessLifecycle.spec.js](./ProcessLifecycle.spec.js)
 - [Tooltip engine spec](../tooltip/SPEC.md)
 - [Config schema](../config_schema/SCHEMA.md)
