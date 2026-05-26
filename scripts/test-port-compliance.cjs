@@ -92,6 +92,14 @@ const HS_ADAPTERS = {
 		setTooltip: function(text) {},              // arity 1
 		destroy:    function() {},                  // arity 0
 	},
+
+	FileSystem: {
+		read:   function(path) {},                  // arity 1
+		write:  function(path, content) {},         // arity 2
+		append: function(path, content) {},         // arity 2
+		exists: function(path) {},                  // arity 1
+		delete: function(path) {},                  // arity 1
+	},
 };
 
 
