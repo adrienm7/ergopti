@@ -3,12 +3,45 @@
 --- ==============================================================================
 --- MODULE: Tooltip Configuration
 --- DESCRIPTION:
---- Centralizes all configuration, styling parameters, layout offsets, and 
---- constants for the tooltip UI.
+--- Hammerspoon-side mirror of the cross-driver tooltip visual constants.
+--- The canonical source of truth is
+--- static/drivers/_shared/tooltip/constants.toml — every value declared here
+--- MUST match the corresponding entry in that file. When constants.toml is
+--- updated, this file must be updated to match.
 ---
 --- FEATURES & RATIONALE:
---- 1. Single Source of Truth: Prevents magic numbers in UI code.
---- 2. Infinite Support: Values <= 0 seamlessly translate to infinite displays.
+--- 1. Cross-driver parity: every constant here has a named equivalent in
+---    constants.toml and in lib/ui_style.ahk (AHK side). Divergences between
+---    the three files are bugs.
+--- 2. No magic numbers: all tooltip renderer values originate here.
+--- 3. Future-proof: a Linux or web driver reads constants.toml directly;
+---    AHK and HS mirror it here as language-native tables for zero-cost access.
+---
+--- CROSS-REFERENCES (constants.toml key → Lua field):
+---   [typography]  font_main_hs           → M.fonts.main
+---   [typography]  font_bold_hs           → M.fonts.bold
+---   [typography]  font_size_main_hs      → M.sizes.main
+---   [typography]  font_size_hint_hs      → M.sizes.hint
+---   [typography]  font_size_info_hs      → M.sizes.info
+---   [layout]      pad_x                  → M.layout.pad_x
+---   [layout]      pad_y                  → M.layout.pad_y
+---   [layout]      line_spacing           → M.layout.line_spacing
+---   [layout]      hint_spacing           → M.layout.hint_spacing
+---   [layout]      corner_radius          → canvas element xRadius/yRadius
+---   [layout]      screen_margin          → M.layout.screen_margin
+---   [positioning] caret_offset_x         → M.layout.caret_offset_x
+---   [positioning] caret_offset_y         → M.layout.caret_offset_y
+---   [positioning] window_offset_y        → M.layout.window_offset_y
+---   [positioning] window_bottom_inset_hs → M.layout.window_bottom_inset
+---   [positioning] max_caret_height       → M.layout.max_caret_height
+---   [colors]      bg_white / bg_alpha    → M.colors.bg / M.colors.bg_alpha
+---   [colors]      sep_white / sep_alpha_hs → M.colors.sep
+---   [tint]        lightness              → lightness constant in apply_tint()
+---   [tint]        saturation             → saturation constant in apply_tint()
+---   [timing]      hotstring_timeout_sec  → DEFAULT_TIMEOUT_SEC
+---   [timing]      llm_timeout_sec        → DEFAULT_LLM_TIMEOUT_SEC
+---   [timing]      timeout_decrement_sec  → TIMEOUT_DECREMENT_SEC
+---   [timing]      timeout_floor_sec      → TIMEOUT_FLOOR_SEC
 --- ==============================================================================
 
 local M = {}

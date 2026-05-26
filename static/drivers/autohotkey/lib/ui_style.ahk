@@ -3,14 +3,38 @@
 ; ==============================================================================
 ; MODULE: UI Style Constants
 ; DESCRIPTION:
-; Single source of truth for all visual style constants shared across AHK UI
-; components. Mirrors the values defined in the Hammerspoon counterpart
-; ui/tooltip/config.lua so both drivers produce a visually identical tooltip.
+; AHK-side mirror of the cross-driver tooltip visual constants.  The canonical
+; source of truth is static/drivers/_shared/tooltip/constants.toml — every
+; value declared here MUST match the corresponding entry in that file.  When
+; constants.toml is updated, this file must be updated to match.
 ;
 ; FEATURES & RATIONALE:
 ; 1. Cross-driver parity: every constant here has a named equivalent in
-;    config.lua so divergences are immediately visible during review.
-; 2. No magic numbers: every tooltip.ahk layout value must originate here.
+;    constants.toml and in ui/tooltip/config.lua (Hammerspoon side).
+;    Divergences between these three files are bugs.
+; 2. No magic numbers: every tooltip.ahk layout value must originate here,
+;    never be inlined at the call site.
+; 3. Future-proof: a Linux or web driver reads constants.toml directly;
+;    AHK and HS mirror it here as language-native globals for zero-cost access.
+;
+; CROSS-REFERENCES (constants.toml key → AHK global):
+;   [typography]  font_main_ahk          → UI_FONT_NAME
+;   [typography]  font_size_main_ahk     → UI_FONT_SIZE_MAIN
+;   [typography]  font_size_hint_ahk     → UI_FONT_SIZE_HINT
+;   [layout]      pad_x                  → UI_PAD_X
+;   [layout]      pad_y                  → UI_PAD_Y
+;   [layout]      label_gap              → UI_LABEL_GAP
+;   [layout]      corner_radius × 2      → UI_CORNER_RADIUS (GDI diameter)
+;   [colors]      bg_hex                 → UI_BG_HEX
+;   [colors]      border_white/alpha_ahk → UI_BORDER_COLOR_HEX / UI_BORDER_ALPHA
+;   [colors]      border_width           → UI_BORDER_THICKNESS
+;   [colors]      label_hex              → UI_LABEL_COLOR_HEX
+;   [tint]        lightness              → UI_TINT_LIGHTNESS
+;   [tint]        saturation             → UI_TINT_SATURATION
+;   [positioning] caret_offset_y         → UI_OFFSET_BELOW
+;   [positioning] caret_offset_x         → UI_OFFSET_RIGHT
+;   [positioning] max_caret_height       → UI_MAX_CARET_HEIGHT_PX
+;   [positioning] window_bottom_inset_ahk→ UI_WINDOW_BOTTOM_INSET_PX
 ; ==============================================================================
 
 ; ── Typography ──────────────────────────────────────────────────────────────
