@@ -124,8 +124,10 @@ InstallHotstringHooks()
 ; lookup, character classification, and burst helpers without OS hooks or I/O.
 #Include ../modules/keylogger/keylogger_walker.ahk
 #Include ../modules/keylogger/keylogger_app_categories.ahk
+#Include ../modules/keylogger/keylogger_reader.ahk
 #Include test_keylogger_walker.ahk
 #Include test_keylogger_app_categories.ahk
+#Include test_keylogger_reader.ahk
 
 ; ── Meta tests (codebase hygiene, no production includes needed) ──
 #Include meta/test_file_headers.ahk
