@@ -11,6 +11,7 @@
 		"lint": "prettier --plugin-search-dir . --check . && eslint .",
 		"format": "prettier --plugin-search-dir . --write .",
 		"prepare": "husky install",
+		"build:hotstrings": "node ./scripts/build-hotstrings.cjs",
 		"build:manifest": "node ./scripts/build-features-manifest.js",
 		"build:domain": "node ./scripts/build-domain.cjs",
 		"lint:banners": "node ./scripts/audit-banner-alignment.js static/drivers/_shared",
