@@ -1,0 +1,218 @@
+{
+	"$schema": "https://ergopti.com/schema/corpus/prompt_builder.v1.json",
+	"description": "Cross-driver regression corpus for the LLM PromptBuilder algorithm. Vectors are derived from the canonical reference in _shared/domain/PromptBuilder.js. Every Lua and AHK driver implementation MUST produce matching output for these inputs.",
+	"version": "1.0.0",
+	"constants": {
+		"CONTEXT_TAIL_WORDS":      5,
+		"DEFAULT_MAX_TOKENS":      150,
+		"MIN_MAX_TOKENS":          15,
+		"WORDS_TO_TOKENS_RATIO":   6,
+		"TOKEN_BUDGET_OVERHEAD":   10,
+		"TEMP_DIVERSITY_CAP":      1.0,
+		"TEMP_INCREMENT_PER_PRED": 0.1,
+		"GREEDY_TEMP_THRESHOLD":   0.15,
+		"CONTEXT_CHARS_PER_WORD":  40,
+		"CONTEXT_MIN_CHARS":       100
+	},
+	"vectors": [
+		{
+			"id": "default_config",
+			"description": "Default config: token budget = DEFAULT_MAX_TOKENS (150), temperature snaps to 0 (single pred, temp <= greedy threshold).",
+			"buffer": "hello world",
+			"config": {
+				"max_words": 0,
+				"min_words": 1,
+				"num_predictions": 1,
+				"temperature": 0.1,
+				"auto_raise_temp": false,
+				"language": "fr"
+			},
+			"expected": {
+				"max_tokens": 150,
+				"temperature": 0,
+				"context_tail": "hello world",
+				"min_words": 1,
+				"num_predictions": 1,
+				"language": "fr"
+			}
+		},
+		{
+			"id": "token_budget_from_max_words",
+			"description": "max_words=5: budget = max(15, 5*6+10) = 40. Temperature 0.5 > greedy threshold → no snap.",
+			"buffer": "some context",
+			"config": {
+				"max_words": 5,
+				"min_words": 1,
+				"num_predictions": 1,
+				"temperature": 0.5,
+				"auto_raise_temp": false,
+				"language": "fr"
+			},
+			"expected": {
+				"max_tokens": 40,
+				"temperature": 0.5
+			}
+		},
+		{
+			"id": "min_token_floor",
+			"description": "max_words=1: budget = max(15, 1*6+10) = max(15,16) = 16.",
+			"buffer": "context",
+			"config": {
+				"max_words": 1,
+				"min_words": 1,
+				"num_predictions": 1,
+				"temperature": 0.1,
+				"auto_raise_temp": false,
+				"language": "fr"
+			},
+			"expected": {
+				"max_tokens": 16
+			}
+		},
+		{
+			"id": "auto_raise_temperature",
+			"description": "auto_raise_temp with 3 predictions: t = min(1.0, 0.2 + 0.1*2) = 0.4.",
+			"buffer": "le chat",
+			"config": {
+				"max_words": 3,
+				"min_words": 1,
+				"num_predictions": 3,
+				"temperature": 0.2,
+				"auto_raise_temp": true,
+				"language": "fr"
+			},
+			"expected": {
+				"temperature": 0.4
+			}
+		},
+		{
+			"id": "temperature_diversity_cap",
+			"description": "auto_raise_temp with high base: capped at TEMP_DIVERSITY_CAP = 1.0.",
+			"buffer": "le chat",
+			"config": {
+				"max_words": 5,
+				"min_words": 1,
+				"num_predictions": 10,
+				"temperature": 0.9,
+				"auto_raise_temp": true,
+				"language": "fr"
+			},
+			"expected": {
+				"temperature": 1.0
+			}
+		},
+		{
+			"id": "context_truncation",
+			"description": "Long buffer truncated to max(100, max_words*40) chars. max_words=2 → limit=max(100,80)=100.",
+			"buffer": "a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a ",
+			"config": {
+				"max_words": 2,
+				"min_words": 1,
+				"num_predictions": 1,
+				"temperature": 0.1,
+				"auto_raise_temp": false,
+				"language": "fr"
+			},
+			"expected": {
+				"context_length_max": 100
+			}
+		},
+		{
+			"id": "tail_extraction",
+			"description": "context_tail contains the last 5 words of the buffer.",
+			"buffer": "word1 word2 word3 word4 word5 word6 word7",
+			"config": {
+				"max_words": 0,
+				"min_words": 1,
+				"num_predictions": 1,
+				"temperature": 0.1,
+				"auto_raise_temp": false,
+				"language": "fr"
+			},
+			"expected": {
+				"context_tail": "word3 word4 word5 word6 word7"
+			}
+		},
+		{
+			"id": "language_passthrough",
+			"description": "Language from config is passed through unchanged.",
+			"buffer": "some text",
+			"config": {
+				"max_words": 0,
+				"min_words": 1,
+				"num_predictions": 1,
+				"temperature": 0.1,
+				"auto_raise_temp": false,
+				"language": "en"
+			},
+			"expected": {
+				"language": "en"
+			}
+		},
+		{
+			"id": "greedy_snap_boundary",
+			"description": "Single prediction, temperature exactly at GREEDY_TEMP_THRESHOLD (0.15) → snap to 0.",
+			"buffer": "text",
+			"config": {
+				"max_words": 0,
+				"min_words": 1,
+				"num_predictions": 1,
+				"temperature": 0.15,
+				"auto_raise_temp": false,
+				"language": "fr"
+			},
+			"expected": {
+				"temperature": 0
+			}
+		},
+		{
+			"id": "greedy_no_snap_above_threshold",
+			"description": "Single prediction, temperature just above threshold (0.16) → no snap.",
+			"buffer": "text",
+			"config": {
+				"max_words": 0,
+				"min_words": 1,
+				"num_predictions": 1,
+				"temperature": 0.16,
+				"auto_raise_temp": false,
+				"language": "fr"
+			},
+			"expected": {
+				"temperature": 0.16
+			}
+		},
+		{
+			"id": "empty_buffer_tail",
+			"description": "Empty buffer produces empty context_tail.",
+			"buffer": "",
+			"config": {
+				"max_words": 0,
+				"min_words": 1,
+				"num_predictions": 1,
+				"temperature": 0.1,
+				"auto_raise_temp": false,
+				"language": "fr"
+			},
+			"expected": {
+				"context_tail": "",
+				"max_tokens": 150
+			}
+		},
+		{
+			"id": "short_buffer_no_truncation",
+			"description": "Short buffer shorter than char limit is returned unchanged.",
+			"buffer": "hello world",
+			"config": {
+				"max_words": 5,
+				"min_words": 1,
+				"num_predictions": 1,
+				"temperature": 0.2,
+				"auto_raise_temp": false,
+				"language": "fr"
+			},
+			"expected": {
+				"context": "hello world"
+			}
+		}
+	]
+}
