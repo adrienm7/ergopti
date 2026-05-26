@@ -6,12 +6,14 @@
 --- Schedules and retries backend warmup requests until the model is confirmed
 --- ready to serve inference. The first request to a cold backend (e.g. an MLX
 --- server still loading weights) returns immediately without generating tokens;
---- this module re-primes on a fixed interval so the prediction engine can start
---- serving suggestions as soon as the model is loaded, without manual intervention.
+--- this module re-primes with exponential backoff so the prediction engine can
+--- start serving suggestions as soon as the model is loaded, without manual
+--- intervention.
 ---
 --- FEATURES & RATIONALE:
---- 1. Retry loop: re-schedules itself every WARMUP_RETRY_SEC until the backend
----    reports ready, so a 20-second model load does not silently strand the user.
+--- 1. Exponential backoff: retry interval doubles on each attempt (from
+---    WARMUP_RETRY_BASE_SEC) up to WARMUP_RETRY_CAP_SEC, preventing busy-waiting
+---    against a slow-loading backend while still converging quickly.
 --- 2. Lazy model resolution: always calls core_llm.get_current_model() at attempt
 ---    time rather than capturing the name at schedule time, so a backend swap
 ---    mid-flight hits the correct model ID.
@@ -36,8 +38,13 @@ local LOG = "llm.warmup_controller"
 -- warmup fires, so the resolved model name is always correct.
 local WARMUP_INITIAL_DELAY_SEC = 2
 
--- Gap between retry attempts when the backend is still loading weights.
-local WARMUP_RETRY_SEC = 5
+-- Starting retry interval; doubles on each failed attempt up to WARMUP_RETRY_CAP_SEC.
+-- A fast-loading backend (< 10 s) is caught within 1–2 attempts; a slow one
+-- (30+ s) is polled progressively less aggressively rather than every 5 seconds.
+local WARMUP_RETRY_BASE_SEC = 5
+
+-- Maximum retry interval — prevents the backoff from growing unbounded.
+local WARMUP_RETRY_CAP_SEC  = 60
 
 
 -- =====================================
@@ -75,14 +82,16 @@ end
 -- ============================================
 -- ============================================
 
---- Schedules a warmup attempt after a short delay and keeps retrying every
---- WARMUP_RETRY_SEC seconds until the backend reports ready.
+--- Schedules a warmup attempt after a short delay and keeps retrying with
+--- exponential backoff until the backend reports ready.
 ---
 --- The first request often hits a server that is still loading model weights
---- (10-30 s for a 2B model) and returns -1; this retry loop keeps re-priming
---- until the model is actually loaded. Model resolution is intentionally deferred
---- to each attempt so a backend swap mid-flight hits the correct model ID
---- (e.g. "gemma-4-e2b-it-mxfp4" rather than the display label "gemma-4-E2B-it").
+--- (10–30 s for a 2B model) and returns -1; this retry loop keeps re-priming
+--- until the model is actually loaded. The interval doubles after each attempt
+--- (capped at WARMUP_RETRY_CAP_SEC) to avoid busy-waiting against a slow backend.
+--- Model resolution is intentionally deferred to each attempt so a backend swap
+--- mid-flight hits the correct model ID (e.g. "gemma-4-e2b-it-mxfp4" rather
+--- than the display label "gemma-4-E2B-it").
 ---
 --- @param reason string Human-readable label for the log entry (who triggered warmup).
 function M.schedule_warmup_with_retry(reason)
@@ -96,31 +105,30 @@ function M.schedule_warmup_with_retry(reason)
 	Logger.debug(LOG, "Scheduling warmup for '%s' in %.0fs (from %s).",
 		resolved, WARMUP_INITIAL_DELAY_SEC, reason)
 
-	local function try_warmup()
+	local function try_warmup(current_interval)
 		if not _get_llm_enabled() then
-			Logger.warn(LOG, "[WARMUP-LOOP] try_warmup early-return: is_llm_enabled=false — chain ends here.")
+			Logger.debug(LOG, "[WARMUP-LOOP] LLM disabled — stopping retry chain.")
 			return
 		end
 		if _core_llm.is_backend_ready and _core_llm.is_backend_ready() then
-			Logger.warn(LOG, "[WARMUP-LOOP] try_warmup early-return: backend already ready — chain ends here.")
+			Logger.debug(LOG, "[WARMUP-LOOP] Backend ready — stopping retry chain.")
 			return
 		end
 		local current = _core_llm.get_current_model()
+		-- Compute next interval before the attempt so it is available in all branches.
+		local next_interval = math.min(current_interval * 2, WARMUP_RETRY_CAP_SEC)
 		if type(current) ~= "string" or current == "" then
-			Logger.warn(LOG, "[WARMUP-LOOP] try_warmup early-return: get_current_model returned %s — re-scheduling in %ds.",
-				tostring(current), WARMUP_RETRY_SEC)
-			-- Do NOT terminate the retry chain when the model is momentarily missing
-			-- (typical during a backend swap). Re-schedule so warmup eventually picks
-			-- up once set_llm_model has run.
-			hs.timer.doAfter(WARMUP_RETRY_SEC, try_warmup)
+			-- Model momentarily missing during a backend swap — keep the chain alive.
+			Logger.debug(LOG, "[WARMUP-LOOP] Model not resolved yet — retrying in %.0fs.", next_interval)
+			hs.timer.doAfter(next_interval, function() try_warmup(next_interval) end)
 			return
 		end
-		Logger.warn(LOG, "[WARMUP-LOOP] Warmup attempt for '%s' (backend: %s).",
-			current, tostring(_core_llm.get_backend()))
+		Logger.debug(LOG, "[WARMUP-LOOP] Warmup attempt for '%s' (backend: %s, next retry: %.0fs).",
+			current, tostring(_core_llm.get_backend()), next_interval)
 		pcall(_core_llm.warmup_model, current, _core_llm.get_active_profile())
-		hs.timer.doAfter(WARMUP_RETRY_SEC, try_warmup)
+		hs.timer.doAfter(next_interval, function() try_warmup(next_interval) end)
 	end
-	hs.timer.doAfter(WARMUP_INITIAL_DELAY_SEC, try_warmup)
+	hs.timer.doAfter(WARMUP_INITIAL_DELAY_SEC, function() try_warmup(WARMUP_RETRY_BASE_SEC) end)
 end
 
 
