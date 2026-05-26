@@ -373,7 +373,7 @@ const HALF_HEIGHT_KEYS = {
 
 // =================================================================================
 // Single source of truth for keycode → finger / hand / home assignments.
-// Mirrors `static/drivers/hammerspoon/data/keycodes_azerty.json` — both files must
+// Mirrors `static/drivers/_shared/data/keycodes/azerty.json` — both files must
 // stay in sync. The variante-en-A convention applies: the right hand types the
 // physical left columns and vice-versa (so kc 0, the QWERTY 'a' key on the
 // physical left, is assigned to r_pinky here). The `home: true` flag marks the
