@@ -67,6 +67,13 @@ local PORT_CONTRACTS = {
 		{ name = "setTooltip", arity = 1 },
 		{ name = "destroy",    arity = 0 },
 	},
+	file_system = {
+		{ name = "read",   arity = 1 },
+		{ name = "write",  arity = 2 },
+		{ name = "append", arity = 2 },
+		{ name = "exists", arity = 1 },
+		{ name = "delete", arity = 1 },
+	},
 }
 
 
