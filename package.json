@@ -29,7 +29,8 @@
 		"bench:hotstring": "node ./scripts/bench-hotstring.cjs",
 		"codegen:registry": "node ./scripts/codegen-registry-ahk.cjs",
 		"codegen:registry:hs": "node ./scripts/codegen-registry-hs.cjs",
-		"codegen:terminators": "node ./scripts/codegen-terminators.cjs"
+		"codegen:terminators": "node ./scripts/codegen-terminators.cjs",
+		"codegen:expander:hs": "node ./scripts/codegen-expander-hs.cjs"
 	},
 	"type": "module",
 	"dependencies": {
