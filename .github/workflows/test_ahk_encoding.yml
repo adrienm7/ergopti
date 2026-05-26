@@ -1,0 +1,48 @@
+name: Test AHK Encoding
+
+on:
+    push:
+        branches: [main, dev]
+        paths:
+            - "static/drivers/autohotkey/**/*.ahk"
+            - ".github/workflows/test_ahk_encoding.yml"
+            - "scripts/test-ahk-encoding.cjs"
+    pull_request:
+        branches: [main, dev]
+        paths:
+            - "static/drivers/autohotkey/**/*.ahk"
+            - ".github/workflows/test_ahk_encoding.yml"
+            - "scripts/test-ahk-encoding.cjs"
+    workflow_dispatch:
+
+permissions:
+    contents: read
+
+concurrency:
+    group: test-ahk-encoding-${{ github.ref }}
+    cancel-in-progress: true
+
+jobs:
+    encoding:
+        name: UTF-8 BOM + CRLF invariant
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
+
+            - name: Set up Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: "20"
+                  cache: "npm"
+
+            - name: Install Node dependencies
+              run: npm ci
+
+            - name: Verify AHK source encoding (UTF-8 BOM + CRLF)
+              # AHK v2 silently aborts mid-file when the UTF-8 BOM is absent or the
+              # file uses LF-only line endings. This check catches encoding drift
+              # before it produces silent failures with no error message in the
+              # headless test harness.
+              run: npm run test:ahk-encoding
