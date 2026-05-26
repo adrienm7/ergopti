@@ -28,7 +28,8 @@
 		"install:hammerspoon": "bash ./scripts/install-hammerspoon.sh",
 		"bench:hotstring": "node ./scripts/bench-hotstring.cjs",
 		"codegen:registry": "node ./scripts/codegen-registry-ahk.cjs",
-		"codegen:registry:hs": "node ./scripts/codegen-registry-hs.cjs"
+		"codegen:registry:hs": "node ./scripts/codegen-registry-hs.cjs",
+		"codegen:terminators": "node ./scripts/codegen-terminators.cjs"
 	},
 	"type": "module",
 	"dependencies": {
