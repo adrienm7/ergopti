@@ -1,0 +1,335 @@
+# _shared/tests/fixtures/test_config.toml
+# Fixture config used by test:manifest-equivalence to verify that the AHK and
+# HS drivers resolve identical feature values from the same TOML input.
+#
+# Intentional deviations from manifest defaults are used to exercise the
+# override logic — these are not valid user settings, only test inputs.
+
+[script]
+locale = "en"
+log_level = "DEBUG"
+
+[hotstrings]
+trigger_char = "★"
+
+[hotstrings.autocorrection.accents]
+enabled = false
+time_activation_seconds = 1.0
+
+[hotstrings.autocorrection.caps]
+enabled = true
+time_activation_seconds = 0.5
+
+[hotstrings.autocorrection.errors]
+enabled = false
+time_activation_seconds = 0.5
+
+[hotstrings.autocorrection.minus]
+enabled = true
+time_activation_seconds = 0.5
+
+[hotstrings.autocorrection.minus_apostrophe]
+enabled = true
+time_activation_seconds = 0.5
+
+[hotstrings.autocorrection.multiple_punctuation_marks]
+enabled = false
+time_activation_seconds = 0.5
+
+[hotstrings.autocorrection.names]
+enabled = true
+time_activation_seconds = 0.5
+
+[hotstrings.autocorrection.ou]
+enabled = true
+time_activation_seconds = 0.5
+
+[hotstrings.autocorrection.suffixes_a_chaining]
+enabled = true
+time_activation_seconds = 0.5
+
+[hotstrings.autocorrection.typographic_apostrophe]
+enabled = true
+time_activation_seconds = 0.5
+
+[hotstrings.distances_reduction.qu]
+enabled = false
+time_activation_seconds = 0.5
+
+[hotstrings.distances_reduction.suffixes_a]
+enabled = true
+time_activation_seconds = 0.5
+
+[hotstrings.distances_reduction.comma_j]
+enabled = true
+
+[hotstrings.distances_reduction.comma_far_letters]
+enabled = false
+
+[hotstrings.distances_reduction.dead_key_e_circumflex]
+enabled = true
+
+[hotstrings.distances_reduction.e_circumflex_e]
+enabled = true
+time_activation_seconds = 0.5
+
+[hotstrings.distances_reduction.space_around_symbols]
+enabled = true
+
+[hotstrings.sfbs_reduction.comma]
+enabled = true
+time_activation_seconds = 0.5
+
+[hotstrings.sfbs_reduction.e_circ]
+enabled = false
+time_activation_seconds = 0.5
+
+[hotstrings.sfbs_reduction.e_grave]
+enabled = true
+time_activation_seconds = 0.5
+
+[hotstrings.sfbs_reduction.bu]
+enabled = true
+
+[hotstrings.sfbs_reduction.i_e_acute]
+enabled = false
+
+[hotstrings.rolls.hc]
+enabled = true
+time_activation_seconds = 0.5
+
+[hotstrings.rolls.sx]
+enabled = true
+time_activation_seconds = 0.5
+
+[hotstrings.rolls.cx]
+enabled = false
+time_activation_seconds = 0.5
+
+[hotstrings.rolls.ct]
+enabled = true
+time_activation_seconds = 0.5
+
+[hotstrings.rolls.ez]
+enabled = true
+time_activation_seconds = 0.5
+
+[hotstrings.rolls.assign]
+enabled = true
+
+[hotstrings.rolls.assign_arrow_equal_left]
+enabled = true
+
+[hotstrings.rolls.assign_arrow_equal_right]
+enabled = true
+
+[hotstrings.rolls.assign_arrow_minus_left]
+enabled = true
+
+[hotstrings.rolls.assign_arrow_minus_right]
+enabled = true
+
+[hotstrings.rolls.bracket_quote]
+enabled = false
+
+[hotstrings.rolls.chevron_equal]
+enabled = true
+
+[hotstrings.rolls.chevron_greater]
+enabled = true
+
+[hotstrings.rolls.chevron_less]
+enabled = true
+
+[hotstrings.rolls.close_chevron_tag]
+enabled = true
+time_activation_seconds = 0.5
+
+[hotstrings.rolls.comment_close]
+enabled = true
+time_activation_seconds = 0.5
+
+[hotstrings.rolls.comment_open]
+enabled = true
+time_activation_seconds = 0.5
+
+[hotstrings.rolls.english_negation]
+enabled = false
+
+[hotstrings.rolls.equal_string]
+enabled = true
+
+[hotstrings.rolls.hashtag_close_bracket]
+enabled = true
+time_activation_seconds = 0.5
+
+[hotstrings.rolls.hashtag_open_bracket]
+enabled = true
+time_activation_seconds = 0.5
+
+[hotstrings.rolls.hashtag_parenthesis]
+enabled = true
+time_activation_seconds = 0.5
+
+[hotstrings.rolls.hashtag_quote]
+enabled = true
+
+[hotstrings.rolls.left_arrow]
+enabled = true
+
+[hotstrings.rolls.not_equal]
+enabled = true
+
+[hotstrings.rolls.paren_quote]
+enabled = true
+
+[hotstrings.magic_key.replace]
+enabled = true
+
+[hotstrings.magic_key.repeat_corrections]
+enabled = false
+time_activation_seconds = 2.0
+
+[hotstrings.magic_key.text_expansion]
+enabled = true
+time_activation_seconds = 2.0
+
+[hotstrings.magic_key.text_expansion_auto]
+enabled = false
+time_activation_seconds = 2.0
+
+[hotstrings.magic_key.text_expansion_emojis]
+enabled = true
+time_activation_seconds = 2.0
+
+[hotstrings.magic_key.text_expansion_symbols]
+enabled = true
+time_activation_seconds = 2.0
+
+[hotstrings.magic_key.text_expansion_symbols_typst]
+enabled = false
+time_activation_seconds = 2.0
+
+[hotstrings.dynamic.date]
+enabled = true
+
+[hotstrings.dynamic.date_fr]
+enabled = false
+
+[hotstrings.dynamic.date_long_fr]
+enabled = true
+
+[hotstrings.dynamic.iban_prefixes]
+enabled = true
+
+[hotstrings.dynamic.phone_prefixes]
+enabled = false
+
+[hotstrings.dynamic.ssn_prefixes]
+enabled = true
+
+[hotstrings.dynamic.text_expansion_personal_information]
+enabled = true
+pattern_max_length = 1
+
+[hotstrings.personal.autocorrection]
+enabled = false
+time_activation_seconds = 0.75
+
+[hotstrings.personal.code]
+enabled = true
+time_activation_seconds = 0.75
+
+[hotstrings.personal.email_shortcuts]
+enabled = true
+time_activation_seconds = 0.75
+
+[hotstrings.personal.professional_vocabulary]
+enabled = false
+time_activation_seconds = 0.75
+
+[hotstrings.personal.test]
+enabled = true
+time_activation_seconds = 0.75
+
+[llm]
+enabled = false
+
+[llm.display]
+pred_indent = 2
+show_info_bar = false
+streaming = true
+streaming_multi = false
+
+[llm.generation]
+context_length = 300
+min_words = 2
+max_words = 10
+temperature = 0.20
+auto_raise_temp = false
+reset_on_nav = true
+sequential_mode = true
+
+[llm.models]
+selected = "ollama"
+ollama = "mistral:7b"
+
+[llm.profiles]
+active = "basic"
+num_predictions = 2
+auto_profile_for_model = false
+
+[llm.trigger]
+debounce_ms = 300
+instant_on_word_end = false
+after_hotstring = true
+inline_autotype = true
+secure_filter_enabled = false
+url_bar_filter_enabled = true
+
+[llm.navigation]
+val_modifiers = ["ctrl"]
+
+[metrics]
+enabled = false
+private_filter_enabled = false
+secure_filter_enabled = true
+system_auth_filter_enabled = false
+show_wpm_menubar = true
+wpm_menubar_colors = true
+
+[metrics.shortcuts]
+apps = "ctrl+shift+m"
+typing = "ctrl+shift+t"
+
+[metrics.disabled_apps]
+list = []
+
+[shortcuts]
+get_hex_value = false
+microsoft_bold = false
+title_case = true
+uppercase = true
+paste_without_formatting = true
+save = true
+select_line = false
+spotlight_mouse = false
+surround_with_parentheses = true
+teleport_mouse = false
+wrap_text_if_selected = false
+
+[shortcuts.a_grave]
+enabled = false
+letter = "v"
+
+[shortcuts.e_acute]
+enabled = true
+letter = "c"
+
+[shortcuts.e_circ]
+enabled = false
+letter = "x"
+
+[shortcuts.e_grave]
+enabled = true
+letter = "z"

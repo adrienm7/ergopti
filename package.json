@@ -19,6 +19,7 @@
 		"test:port-compliance": "node ./scripts/test-port-compliance.cjs",
 		"test:manifest-parity": "node ./scripts/test-manifest-parity.cjs",
 		"test:ahk-encoding": "node ./scripts/test-ahk-encoding.cjs",
+		"test:manifest-equivalence": "node ./scripts/test-manifest-equivalence.cjs",
 		"fix:banners": "node ./scripts/lint-conventions.js --fix-banners --warn-only",
 		"fix:spacing": "node ./scripts/lint-conventions.js --fix-spacing --warn-only",
 		"fix:unbalanced": "node ./scripts/lint-conventions.js --fix-unbalanced --warn-only",
