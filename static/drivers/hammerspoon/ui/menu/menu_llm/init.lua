@@ -16,18 +16,19 @@ local hs            = hs
 local llm_mod       = require("modules.llm")
 local shortcut_ui   = require("ui.menu.shortcut_utils")
 local Logger        = require("lib.logger")
-local dialog        = require("lib.dialog_util")
 local notifications = require("lib.notifications")
 local i18n          = require("lib.i18n")
 local Models        = require("ui.menu.menu_llm.models_manager")
 local Profiles      = require("ui.menu.menu_llm.profiles_manager")
 local Settings      = require("ui.menu.menu_llm.settings_manager")
-local TempPanel     = require("ui.menu.menu_llm.temperature_panel")
-local StreamPanel   = require("ui.menu.menu_llm.streaming_panel")
-local WarmupCtrl    = require("ui.menu.menu_llm.warmup_controller")
-local BackendPanel  = require("ui.menu.menu_llm.backend_panel")
-local TriggerPanel  = require("ui.menu.menu_llm.trigger_panel")
-local ApiPanel      = require("ui.menu.menu_llm.api_panel")
+local TempPanel        = require("ui.menu.menu_llm.temperature_panel")
+local StreamPanel      = require("ui.menu.menu_llm.streaming_panel")
+local WarmupCtrl       = require("ui.menu.menu_llm.warmup_controller")
+local BackendPanel     = require("ui.menu.menu_llm.backend_panel")
+local TriggerPanel     = require("ui.menu.menu_llm.trigger_panel")
+local ApiPanel         = require("ui.menu.menu_llm.api_panel")
+local ModelsSelector   = require("ui.menu.menu_llm.models_selector")
+local ModelSwitcher    = require("ui.menu.menu_llm.model_switcher")
 
 -- Deps checkers — kicked off on backend switch and on first menu activation
 -- so a fresh-out-of-the-box Mac auto-bootstraps the engine without any
@@ -69,36 +70,6 @@ end
 -- Holds the active models manager so M.stop_mlx_server() can reach it from any context
 -- (e.g., the Hammerspoon shutdown callback) without requiring a reference chain.
 local _active_models_mgr = nil
-
-local MODEL_ADVANCED_PARAMS_THRESHOLD_B = 2
-local MODEL_BATCH_PARAMS_THRESHOLD_B = 4
-
-local PROFILE_POWER_RAW = 0
-local PROFILE_POWER_BASIC = 1
-local PROFILE_POWER_ADVANCED = 2
-local PROFILE_POWER_BATCH_ADVANCED = 3
-local PROFILE_POWER_BATCH = 2
-local PROFILE_POWER_PARALLEL = 1
-
-local PROFILE_POWER_LEVELS = {
-    raw = PROFILE_POWER_RAW,
-    basic = PROFILE_POWER_BASIC,
-    advanced = PROFILE_POWER_ADVANCED,
-    batch_advanced = PROFILE_POWER_BATCH_ADVANCED,
-    batch = PROFILE_POWER_BATCH,
-    parallel = PROFILE_POWER_PARALLEL,
-}
-
-local function normalize_profile_power_key(profile_id)
-    if type(profile_id) ~= "string" then return "basic" end
-    if profile_id == "raw" or profile_id == "base_completion" then return "raw" end
-    if profile_id == "basic" then return "basic" end
-    if profile_id == "advanced" then return "advanced" end
-    if profile_id == "batch_advanced" then return "batch_advanced" end
-    if profile_id == "batch" or profile_id:match("^batch_") then return "batch" end
-    if profile_id == "parallel" or profile_id:match("^parallel_") then return "parallel" end
-    return "basic"
-end
 
 -- Detect Apple Silicon via filesystem check (no shell spawn needed:
 -- Homebrew on ARM installs to /opt/homebrew, Intel uses /usr/local)
@@ -239,98 +210,37 @@ function M.create(deps)
     -- Register the manager so M.stop_mlx_server() can reach it from the shutdown callback
     _active_models_mgr = models_mgr
 
-    --- Calculates the raw power level of a model based on its size.
-    local function get_effective_model_params(info)
-        if type(info) ~= "table" then return 0, false, 0, 0 end
+    -- profiles_mgr is re-created after apply_llm_profile_shortcut is bound into deps
+    local profiles_mgr = nil
+    local settings_mgr = Settings.new(deps)
+    local keymap       = deps.keymap
+    local save_prefs   = deps.save_prefs
+    local update_menu  = deps.update_menu
 
-        local total_params = tonumber(info.params_total) or tonumber(info.params) or 0
-        local active_params = tonumber(info.params_active) or total_params
-        if active_params <= 0 then active_params = total_params end
+    local switcher = ModelSwitcher.new({
+        state       = state,
+        models_mgr  = models_mgr,
+        keymap      = keymap,
+        save_prefs  = save_prefs,
+        update_menu = update_menu,
+    })
+    local switch_model                     = switcher.switch_model
+    local get_display_model_name           = switcher.get_display_model_name
+    local get_model_power_level            = switcher.get_model_power_level
+    local apply_recommended_prompt_profile = switcher.apply_recommended_prompt_profile
+    local guarded_check_requirements       = switcher.guarded_check_requirements
 
-        local is_moe = info.is_moe == true or (total_params > 0 and active_params > 0 and active_params < total_params)
-        local effective_params = is_moe and active_params or total_params
-
-        return effective_params, is_moe, active_params, total_params
+    deps.set_llm_profile = switcher.set_llm_profile
+    deps.apply_recommended_prompt_profile = function(opts)
+        apply_recommended_prompt_profile(state.llm_model, opts)
     end
 
-    local function build_model_name_set(presets)
-        local names = {}
-        if type(presets) ~= "table" then return names end
-        for _, provider in ipairs(presets) do
-            for _, family in ipairs(provider.families or {}) do
-                for _, m in ipairs(family.models or {}) do
-                    local n = m and m.name
-                    if type(n) == "string" and n ~= "" then names[n:lower()] = true end
-                end
-            end
-        end
-        return names
-    end
-
-    local function infer_completion_from_name_pairs(model_name)
-        if type(model_name) ~= "string" or model_name == "" then return nil end
-        local presets = models_mgr.get_presets()
-        local names = build_model_name_set(presets)
-        local name_l = model_name:lower()
-
-        local base_no_it = name_l:gsub("[-_]it$", "")
-        if base_no_it ~= name_l and names[base_no_it] then
-            return false
-        end
-        if names[name_l .. "-it"] or names[name_l .. "_it"] then
-            return true
-        end
-
-        local base_no_base = name_l:gsub("[-_]base$", "")
-        if base_no_base ~= name_l and names[base_no_base] then
-            return true
-        end
-        if names[name_l .. "-base"] or names[name_l .. "_base"] then
-            return false
-        end
-
-        return nil
-    end
-
-    local function get_normalized_active_profile_id()
-        local profile_id = state.llm_active_profile or "basic"
-        if profile_id == "parallel" or profile_id == "parallel_simple" then return "basic" end
-        if profile_id == "batch" or profile_id == "batch_simple" then return "batch_advanced" end
-        if profile_id == "parallel_advanced" then return "advanced" end
-        if profile_id == "base_completion" then return "raw" end
-        return profile_id
-    end
-
-    --- Calculates the raw power level of a model based on its size.
-    local function get_model_power_level(model_name)
-        if type(model_name) ~= "string" or model_name == "" then return PROFILE_POWER_BASIC end
-        
-        local info = models_mgr.get_model_info(model_name) or {}
-        local effective_params, _, _, _ = get_effective_model_params(info)
-        local inferred_completion = infer_completion_from_name_pairs(model_name)
-        local is_completion_model = (inferred_completion ~= nil) and inferred_completion or (info.type == "completion")
-        
-        -- Power levels: raw=0, basic=1, advanced=2, batch_advanced=3
-        if is_completion_model then
-            return PROFILE_POWER_RAW
-        elseif effective_params > 0 then
-            if effective_params >= MODEL_BATCH_PARAMS_THRESHOLD_B then
-                return PROFILE_POWER_BATCH_ADVANCED
-            elseif effective_params >= MODEL_ADVANCED_PARAMS_THRESHOLD_B then
-                return PROFILE_POWER_ADVANCED
-            else
-                return PROFILE_POWER_BASIC
-            end
-        end
-        
-        return PROFILE_POWER_BASIC
-    end
-    
-    -- Resolve display model name to actual backend names on startup
+    -- Resolve display model name to actual backend names on startup —
+    -- older configs may have persisted a backend-native name; normalise to
+    -- the display name so the rest of the code sees a consistent value.
     if type(state.llm_model) == "string" and state.llm_model ~= "" then
-        -- Reverse-lookup: if llm_model is an actual backend name (e.g. 'gemma-4-e4b-it-mxfp4'), resolve to display name
         local presets_startup = models_mgr.get_presets()
-        local display_name = state.llm_model
+        local display_name    = state.llm_model
         if type(presets_startup) == "table" then
             for _, provider in ipairs(presets_startup) do
                 for _, family in ipairs(provider.families or {}) do
@@ -339,7 +249,7 @@ function M.create(deps)
                         if type(m_display) == "string" then
                             local actual = models_mgr.get_actual_model_name(m_display)
                             if actual == state.llm_model and m_display ~= state.llm_model then
-                                display_name = m_display  -- llm_model was a backend name; use its display name
+                                display_name = m_display
                             end
                         end
                     end
@@ -347,12 +257,12 @@ function M.create(deps)
             end
         end
         if display_name ~= state.llm_model then
-            Logger.debug(LOG, string.format("Correcting model name on startup (backend->display): '%s' -> '%s'", state.llm_model, display_name))
+            Logger.debug(LOG, string.format("Correcting model name on startup (backend->display): '%s' -> '%s'.", state.llm_model, display_name))
             state.llm_model = display_name
         end
 
         local actual_name = models_mgr.get_actual_model_name(display_name)
-        Logger.debug(LOG, string.format("Resolving model name on startup: '%s' -> '%s'", display_name, actual_name))
+        Logger.debug(LOG, string.format("Resolving model name on startup: '%s' -> '%s'.", display_name, actual_name))
         if state.llm_backend == "mlx" then
             state.llm_model_mlx = display_name
             llm_mod.set_llm_model_mlx(actual_name)
@@ -360,38 +270,11 @@ function M.create(deps)
             state.llm_model_ollama = display_name
             llm_mod.set_llm_model_ollama(actual_name)
         end
-        -- Notify keymap of display name immediately, before regular sync overwrites it
         if type(deps.keymap) == "table" and type(deps.keymap.set_llm_display_model_name) == "function" then
             pcall(deps.keymap.set_llm_display_model_name, display_name)
         end
-
-        -- Also cache the model power level for instant access
         state.llm_model_power = get_model_power_level(display_name)
-        Logger.debug(LOG, string.format("Model power on startup: %d", state.llm_model_power))
-    end
-    local profiles_mgr = Profiles.new(deps, models_mgr)
-    local settings_mgr = Settings.new(deps)
-    local keymap       = deps.keymap
-    local save_prefs   = deps.save_prefs
-    local update_menu  = deps.update_menu
-    local req_token    = 0
-
-    local function guarded_check_requirements(model_name, on_ok, on_fail, opts)
-        req_token = req_token + 1
-        local my_token = req_token
-        models_mgr.check_requirements(model_name, function(...)
-            if my_token ~= req_token then
-                Logger.debug(LOG, string.format("Obsolete check_requirements callback ignored (model=%s)", tostring(model_name)))
-                return
-            end
-            if type(on_ok) == "function" then on_ok(...) end
-        end, function(...)
-            if my_token ~= req_token then
-                Logger.debug(LOG, string.format("Obsolete check_requirements cancel ignored (model=%s)", tostring(model_name)))
-                return
-            end
-            if type(on_fail) == "function" then on_fail(...) end
-        end, opts)
+        Logger.debug(LOG, string.format("Model power on startup: %d.", state.llm_model_power))
     end
 
     if state.llm_num_predictions ~= nil and keymap and type(keymap.set_llm_num_predictions) == "function" then
@@ -411,563 +294,10 @@ function M.create(deps)
     end
 
 
-    -- ======================================
-    -- ===== 2.1) Model Switching Logic =====
-    -- ======================================
-
-    --- Calculates the recommended profile and power level for a model.
-    local function get_recommended_profile_info(model_name)
-        if type(model_name) ~= "string" or model_name == "" then return "basic", PROFILE_POWER_BASIC end
-
-        local info = models_mgr.get_model_info(model_name) or {}
-        local effective_params, _, _, _ = get_effective_model_params(info)
-        local inferred_completion = infer_completion_from_name_pairs(model_name)
-        local is_completion_model = (inferred_completion ~= nil) and inferred_completion or (info.type == "completion")
-        local rec_profile = "basic"
-
-        if is_completion_model then
-            rec_profile = "raw"
-        elseif effective_params > 0 then
-            if effective_params >= MODEL_BATCH_PARAMS_THRESHOLD_B then
-                rec_profile = "batch_advanced"
-            elseif effective_params >= MODEL_ADVANCED_PARAMS_THRESHOLD_B then
-                rec_profile = "advanced"
-            else
-                rec_profile = "basic"
-            end
-        end
-
-        return rec_profile, PROFILE_POWER_LEVELS[rec_profile] or PROFILE_POWER_BASIC
-    end
-
-    --- Gets a human-readable label for a profile.
-    local function get_profile_label(profile_id)
-        local current_preds = tonumber(state.llm_num_predictions) or llm_mod.DEFAULT_STATE.llm_num_predictions
-        local batch_suffix = current_preds > 1 and "s" or ""
-        
-        local labels = {
-            raw = i18n.get("llm.profile.raw.label"),
-            basic = i18n.get("llm.profile.basic.label"),
-            advanced = i18n.get("llm.profile.advanced.label"),
-            batch_advanced = string.format(i18n.get("llm.profile.batch_advanced.label"), current_preds, batch_suffix),
-            parallel_simple = i18n.get("llm.profile.basic.label"),
-            parallel = i18n.get("llm.profile.basic.label"),
-            batch_simple = i18n.get("llm.profile.basic.label"),
-            batch = string.format(i18n.get("llm.profile.batch_advanced.label"), current_preds, batch_suffix),
-            parallel_advanced = i18n.get("llm.profile.advanced.label"),
-            base_completion = i18n.get("llm.profile.raw.label"),
-        }
-        return labels[profile_id] or tostring(profile_id)
-    end
-
-    local function get_display_model_name(model_name, presets)
-        if type(model_name) ~= "string" or model_name == "" then return model_name end
-        presets = type(presets) == "table" and presets or models_mgr.get_presets()
-        if type(presets) ~= "table" then return model_name end
-
-        for _, provider in ipairs(presets) do
-            for _, family in ipairs(provider.families or {}) do
-                for _, m in ipairs(family.models or {}) do
-                    local display_name = m.name or m.repo
-                    if type(display_name) == "string" then
-                        if display_name == model_name then return display_name end
-                        local actual_name = models_mgr.get_actual_model_name(display_name)
-                        if actual_name == model_name then return display_name end
-                    end
-                end
-            end
-        end
-
-        return model_name
-    end
-
-    --- Checks if a profile is too powerful for the model and shows a non-blocking warning.
-    local function check_profile_power_mismatch(selected_profile_id, model_name)
-        -- Use already-calculated model power (set when model was selected)
-        local model_power = tonumber(state.llm_model_power) or PROFILE_POWER_BASIC
-        local selected_power = PROFILE_POWER_LEVELS[normalize_profile_power_key(selected_profile_id)] or PROFILE_POWER_BASIC
-
-        Logger.debug(LOG, string.format("Checking profile power mismatch: selected=%d vs model=%d", selected_power, model_power))
-        
-        -- Only warn if selected profile is significantly more powerful than model
-        if selected_power > model_power + 1 then
-            local rec_profile, _ = get_recommended_profile_info(model_name)
-            local rec_label = get_profile_label(rec_profile)
-            local selected_label = get_profile_label(selected_profile_id)
-            local msg = string.format(i18n.get("menu.llm.profile_power_warning"), rec_label, selected_label)
-            pcall(notifications.notify, msg, nil, "warning")
-        end
-    end
-
-    --- Changes the active profile and checks for power mismatch warnings.
-    --- @param profile_id string The profile ID to activate.
-    local function set_llm_profile(profile_id)
-        if type(profile_id) ~= "string" then return end
-        state.llm_active_profile = profile_id
-        llm_mod.set_active_profile(profile_id)
-        -- Check if selected profile is too powerful for current model
-        check_profile_power_mismatch(profile_id, state.llm_model)
-        save_prefs(); update_menu()
-    end
-
-    deps.set_llm_profile = set_llm_profile
-
-    local function apply_recommended_prompt_profile(model_name, opts)
-        if type(model_name) ~= "string" or model_name == "" then return end
-        opts = type(opts) == "table" and opts or {}
-        local force_dialog = opts.force_dialog == true
-
-        local rec_profile, _ = get_recommended_profile_info(model_name)
-        local rec_label = get_profile_label(rec_profile)
-        local model_info = models_mgr.get_model_info(model_name) or {}
-        local inferred_completion = infer_completion_from_name_pairs(model_name)
-        local is_completion_model = (inferred_completion ~= nil) and inferred_completion or (model_info.type == "completion")
-        local _, is_moe, active_params, total_params = get_effective_model_params(model_info)
-        local display_model_name = get_display_model_name(model_name)
-        local power_desc
-        if is_completion_model then
-            power_desc = "Profil de puissance détecté : complétion brute"
-        elseif is_moe and active_params > 0 and total_params > 0 then
-            power_desc = string.format("Puissance détectée (MoE) : %gB actifs / %gB total", active_params, total_params)
-        elseif active_params > 0 then
-            power_desc = string.format("Puissance détectée : %gB", active_params)
-        else
-            power_desc = "Puissance détectée : inconnue"
-        end
-
-        local cur_profile = get_normalized_active_profile_id()
-        local cur_label = get_profile_label(cur_profile)
-
-        Logger.debug(LOG, string.format("Recommended profile: %s (currently: %s)", rec_profile, cur_profile))
-        if cur_profile ~= rec_profile then
-            -- Completion models have a single correct profile (no prompt wrapper at all).
-            -- Silently switch without prompting the user — no ambiguity, no decision to make.
-            if is_completion_model then
-                Logger.info(LOG, string.format("Completion model detected: silently switching profile %s → %s.", cur_profile, rec_profile))
-                state.llm_active_profile = rec_profile
-                llm_mod.set_active_profile(rec_profile)
-                save_prefs(); update_menu()
-            else
-                local title = type(opts.dialog_title) == "string" and opts.dialog_title or i18n.get("menu.llm.model_change_title")
-                Logger.debug(LOG, "Displaying profile suggestion dialog…")
-                local msg = string.format(
-                    i18n.get("menu.llm.profile_change_msg"),
-                    display_model_name, power_desc, cur_label, rec_label
-                )
-                local ok, choice = pcall(dialog.block_alert, title, msg, i18n.get("button.confirm"), i18n.get("button.cancel"), "informational")
-                Logger.debug(LOG, string.format("Dialog response: %s, choice=%s", tostring(ok), tostring(choice)))
-                if ok and choice == i18n.get("button.confirm") then
-                    Logger.info(LOG, string.format("Profile changed to %s (dialog accepted).", rec_profile))
-                    state.llm_active_profile = rec_profile
-                    llm_mod.set_active_profile(rec_profile)
-                    save_prefs(); update_menu()
-                else
-                    Logger.info(LOG, string.format("Profile kept at %s (dialog refused).", cur_profile))
-                    state.llm_active_profile = cur_profile
-                    llm_mod.set_active_profile(cur_profile)
-                end
-            end
-        elseif force_dialog then
-            local title = type(opts.dialog_title) == "string" and opts.dialog_title or "Profil recommandé"
-            local msg = string.format(
-                i18n.get("menu.llm.profile_already_ok_msg"),
-                display_model_name, power_desc, cur_label, rec_label
-            )
-            pcall(dialog.block_alert, title, msg, i18n.get("button.confirm"), i18n.get("button.cancel"), "informational")
-        else
-            Logger.debug(LOG, "Recommended profile is already the current profile.")
-        end
-    end
-
-    deps.apply_recommended_prompt_profile = function(opts)
-        apply_recommended_prompt_profile(state.llm_model, opts)
-    end
-
-    local function switch_model(new_model)
-        Logger.debug(LOG, string.format("Executing switch_model('%s')…", new_model or "nil"))
-
-        -- For MLX backend, lock predictions while the server restarts — the old process
-        -- is killed immediately but weights can take 60–90 s to reload. Without the lock
-        -- every debounced request fires against a dead port, the user sees no feedback,
-        -- and repeated silent failures make the switch appear broken.
-        local mlx_was_enabled = state.llm_backend == "mlx" and state.llm_enabled
-        if mlx_was_enabled and keymap and type(keymap.set_llm_enabled) == "function" then
-            Logger.debug(LOG, "MLX model switch: locking predictions during server restart.")
-            pcall(keymap.set_llm_enabled, false)
-        end
-
-        local function unlock_predictions()
-            if mlx_was_enabled and keymap and type(keymap.set_llm_enabled) == "function" then
-                Logger.debug(LOG, "MLX model switch: predictions unlocked.")
-                pcall(keymap.set_llm_enabled, true)
-            end
-        end
-
-        guarded_check_requirements(new_model, function()
-            Logger.info(LOG, string.format("Model successfully switched to %s.", new_model))
-            state.llm_model = new_model
-
-            -- Calculate and store model power level for instant access
-            local model_power = get_model_power_level(new_model)
-            state.llm_model_power = model_power
-            Logger.debug(LOG, string.format("Model power cached: %d", model_power))
-
-            -- Resolve display name to actual backend model name and persist per backend
-            local actual_backend_name = models_mgr.get_actual_model_name(new_model)
-            if state.llm_backend == "mlx" then
-                state.llm_model_mlx = new_model
-                llm_mod.set_llm_model_mlx(actual_backend_name)
-                Logger.debug(LOG, string.format("Actual MLX model: %s -> %s", new_model, actual_backend_name))
-            else
-                state.llm_model_ollama = new_model
-                llm_mod.set_llm_model_ollama(actual_backend_name)
-                Logger.debug(LOG, string.format("Actual Ollama model: %s -> %s", new_model, actual_backend_name))
-            end
-
-            if keymap and type(keymap.set_llm_model) == "function" then
-                local ok = pcall(keymap.set_llm_model, actual_backend_name)
-                Logger.debug(LOG, string.format("keymap.set_llm_model() execution -> %s", tostring(ok)))
-            else
-                Logger.warn(LOG, "keymap.set_llm_model is unavailable.")
-            end
-
-            if keymap and type(keymap.set_llm_display_model_name) == "function" then
-                pcall(keymap.set_llm_display_model_name, new_model)
-            end
-
-            -- Always persist and refresh the menu so the active model is visible immediately
-            save_prefs(); update_menu()
-            unlock_predictions()
-            apply_recommended_prompt_profile(new_model, { dialog_title = i18n.get("menu.llm.model_change_title") })
-        end, function()
-            -- Requirements check failed (model not installed, cancelled, etc.) — restore
-            -- predictions with the previously running model so the user is not left stranded
-            Logger.warn(LOG, string.format("switch_model('%s') failed — restoring predictions.", tostring(new_model)))
-            unlock_predictions()
-        end)
-    end
-
-
 
     -- ======================================
     -- ===== 2.2) Dynamic Menu Builders =====
     -- ======================================
-
-    --- Returns the user-added models persisted in the config that match the
-    --- given backend. Defensive against malformed entries (older config
-    --- versions or hand edits).
-    --- @param backend string Either "ollama" or "mlx".
-    --- @return table List of { name = string } entries.
-    local function list_user_models_for_backend(backend)
-        local out = {}
-        local raw = state.llm_user_models
-        if type(raw) ~= "table" then return out end
-        for _, entry in ipairs(raw) do
-            if type(entry) == "table" and type(entry.name) == "string" and entry.name ~= "" and entry.backend == backend then
-                table.insert(out, { name = entry.name })
-            end
-        end
-        return out
-    end
-
-    --- Adds a user model to the persisted list, deduplicating on the
-    --- (backend, name) tuple so repeated additions are idempotent.
-    --- @param backend string Either "ollama" or "mlx".
-    --- @param name string Backend-native identifier ("qwen2.5:1.5b" or "mlx-community/Qwen…").
-    local function add_user_model(backend, name)
-        if type(state.llm_user_models) ~= "table" then state.llm_user_models = {} end
-        for _, entry in ipairs(state.llm_user_models) do
-            if type(entry) == "table" and entry.backend == backend and entry.name == name then
-                Logger.debug(LOG, string.format("User model already present (%s/%s) — no-op.", backend, name))
-                return
-            end
-        end
-        table.insert(state.llm_user_models, { backend = backend, name = name })
-        Logger.info(LOG, string.format("User model added: %s/%s.", backend, name))
-    end
-
-    --- Removes a user model from the persisted list.
-    --- @param backend string Either "ollama" or "mlx".
-    --- @param name string Backend-native identifier.
-    local function remove_user_model(backend, name)
-        if type(state.llm_user_models) ~= "table" then return end
-        for i, entry in ipairs(state.llm_user_models) do
-            if type(entry) == "table" and entry.backend == backend and entry.name == name then
-                table.remove(state.llm_user_models, i)
-                Logger.info(LOG, string.format("User model removed: %s/%s.", backend, name))
-                return
-            end
-        end
-    end
-
-    --- Prompts the user for a custom model identifier and persists it. The hint
-    --- text adapts to the active backend so the user knows what format is expected
-    --- (Ollama tag vs HuggingFace MLX path).
-    local function prompt_add_user_model()
-        local active_backend = state.llm_backend
-        local hint
-        if active_backend == "mlx" then
-            hint = i18n.get("menu.llm.mlx_model_hint")
-        else
-            hint = i18n.get("menu.llm.ollama_model_hint")
-        end
-        local ok, ret_a, ret_b = pcall(dialog.text_prompt,
-            i18n.get("menu.llm.add_custom_model"),
-            hint,
-            "", i18n.get("button.add"), i18n.get("button.cancel"))
-        if not ok then
-            Logger.warn(LOG, "Custom model dialog raised — aborting add.")
-            return
-        end
-        -- hs.dialog.textPrompt return order has varied across macOS builds —
-        -- accept both (button, text) and (text, button) without surprises.
-        local picked_btn, picked_text
-        if ret_a == i18n.get("button.add") or ret_a == i18n.get("button.cancel") then
-            picked_btn, picked_text = ret_a, ret_b
-        else
-            picked_text, picked_btn = ret_a, ret_b
-        end
-        if picked_btn ~= i18n.get("button.add") then return end
-        local name = (type(picked_text) == "string" and picked_text or ""):gsub("^%s+", ""):gsub("%s+$", "")
-        if name == "" then
-            pcall(dialog.alert, i18n.get("menu.llm.custom_model_title"), i18n.get("menu.llm.empty_model_id"), "OK")
-            return
-        end
-        add_user_model(active_backend, name)
-        save_prefs()
-        switch_model(name)
-    end
-
-    local function build_models_selection()
-        Logger.debug(LOG, "Building models selection menu…")
-        local menu = {}
-        local installed = models_mgr.get_installed_models()
-        Logger.debug(LOG, string.format("Installed models detected: %d", installed and (function() local c=0 for _ in pairs(installed) do c=c+1 end return c end)() or 0))
-        local presets = models_mgr.get_presets()
-        local active_backend = state.llm_backend
-        local active_display_model = get_display_model_name(state.llm_model, presets)
-
-        local hf_token_file = (os.getenv("HOME") or "") .. "/.huggingface/token"
-        local has_hf_token = false
-        local fh = io.open(hf_token_file, "r")
-        if fh then
-            local raw = fh:read("*a"); fh:close()
-            has_hf_token = type(raw) == "string" and raw:match("^%s*(.-)%s*$") ~= ""
-        end
-
-        table.insert(menu, {
-            title   = i18n.get("menu.llm.no_model"),
-            checked = (not state.llm_model or state.llm_model == ""),
-            fn      = function() 
-                Logger.info(LOG, "Switching model to None (disabled).")
-                state.llm_model = ""
-                if keymap and type(keymap.set_llm_model) == "function" then 
-                    local ok = pcall(keymap.set_llm_model, "")
-                    Logger.debug(LOG, string.format("keymap.set_llm_model('') execution -> %s", tostring(ok)))
-                end
-                save_prefs(); update_menu()
-            end
-        })
-
-        -- Reset to backend-specific default model
-        local backend_default_raw = (active_backend == "mlx") and M.DEFAULT_STATE.llm_model_mlx or M.DEFAULT_STATE.llm_model_ollama
-        local backend_default = get_display_model_name(backend_default_raw, presets)
-        if backend_default and backend_default ~= "" then
-            table.insert(menu, {
-                title   = string.format(i18n.get("menu.llm.backend_default_model"), backend_default),
-                checked = (active_display_model == backend_default),
-                fn      = function()
-                    Logger.info(LOG, string.format("Restoring backend default model -> %s", backend_default))
-                    switch_model(backend_default)
-                end
-            })
-        end
-
-        -- Only show HuggingFace token when using a backend that downloads from HuggingFace
-        if active_backend == "mlx" then
-            local token_status = has_hf_token and i18n.get("menu.llm.hf_token_set") or i18n.get("menu.llm.hf_token_unset")
-            table.insert(menu, {
-                title = string.format(i18n.get("menu.llm.hf_token_label"), token_status),
-                fn = function()
-                    if models_mgr and type(models_mgr.prompt_hf_login) == "function" then
-                        models_mgr.prompt_hf_login(function()
-                            save_prefs(); update_menu()
-                        end)
-                    end
-                end
-            })
-        end
-
-        table.insert(menu, { title = "-" })
-
-        -- User-added models for the active backend appear as their own provider
-        -- so they sit alongside the curated presets without polluting the JSON.
-        -- Each entry is a flat selectable line with a delete sub-option.
-        local user_models_for_backend = list_user_models_for_backend(active_backend)
-        if #user_models_for_backend > 0 then
-            local user_sub = {}
-            for _, entry in ipairs(user_models_for_backend) do
-                local m_name = entry.name
-                local prefix = (state.llm_model == m_name) and "✓ " or "  "
-                local model_submenu = {}
-                table.insert(model_submenu, {
-                    title   = i18n.get("menu.llm.select_model"),
-                    checked = (state.llm_model == m_name),
-                    fn      = function() switch_model(m_name) end
-                })
-                table.insert(model_submenu, {
-                    title = i18n.get("menu.llm.remove_user_model"),
-                    fn = function()
-                        local ok, choice = pcall(dialog.block_alert,
-                            i18n.get("menu.llm.remove_model_title"),
-                            string.format(i18n.get("menu.llm.remove_model_body"), m_name),
-                            i18n.get("button.remove"), i18n.get("button.cancel"), "warning")
-                        if ok and choice == i18n.get("button.remove") then
-                            remove_user_model(active_backend, m_name)
-                            if state.llm_model == m_name then state.llm_model = "" end
-                            save_prefs(); update_menu()
-                        end
-                    end
-                })
-                table.insert(user_sub, {
-                    title   = prefix .. m_name,
-                    menu    = model_submenu,
-                    fn      = function() pcall(function() switch_model(m_name) end) end
-                })
-            end
-            table.insert(menu, { title = i18n.get("menu.llm.my_models"), menu = user_sub })
-        end
-
-        for _, provider in ipairs(presets) do
-            local sub = {}
-            for _, family in ipairs(provider.families or {}) do
-                local family_sub = {}
-                for _, m in ipairs(family.models or {}) do
-                    local m_name = m.name or m.repo or "Inconnu"
-                    local info = models_mgr.get_model_info(m_name) or {}
-                    local ram = models_mgr.get_model_ram(m_name) or 0
-                    local is_inst = models_mgr.is_model_installed(m_name)
-                    
-                    local prefix = (active_display_model == m_name) and "✓ " or "  "
-                    local status = is_inst and "🟢 " or ""
-                    local type_str = (info.type == "completion") and " [📝 Complétion]" or " [💬 Chat]"
-                    local params_ram_str = (info.params and info.params > 0)
-                        and string.format(" (%gB params, ~%d Go RAM)", math.ceil(info.params * 10) / 10, math.ceil(ram))
-                        or string.format(" (~%d Go RAM)", math.ceil(ram))
-                    local title = string.format("%s%s%s%s%s", prefix, status, m_name, type_str, params_ram_str)
-
-                    local hw = m.hardware_requirements or {}
-                    local hw_active = hw[active_backend] or {}
-                    local display_backend = (active_backend == "mlx") and "MLX" or "Ollama"
-                    local active_source = m.urls and m.urls[active_backend]
-                    local has_active_source = (type(active_source) == "string" and active_source ~= "")
-
-                    if not has_active_source then
-                        goto continue_model
-                    end
-
-                    local model_submenu = {}
-
-                    table.insert(model_submenu, {
-                        title   = i18n.get("menu.llm.select_model"),
-                        checked = (active_display_model == m_name),
-                        fn      = function() switch_model(m_name) end
-                    })
-
-                    if is_inst then
-                        table.insert(model_submenu, {
-                            title = i18n.get("menu.llm.delete_model_cache"),
-                            fn = function()
-                                local ok, choice = pcall(dialog.block_alert, i18n.get("menu.llm.delete_model_title"), string.format(i18n.get("menu.llm.delete_model_body"), m_name), i18n.get("button.delete"), i18n.get("button.cancel"), "warning")
-                                if ok and choice == i18n.get("button.delete") then
-                                    models_mgr.delete_model(m_name)
-                                end
-                            end
-                        })
-                    end
-
-                    table.insert(model_submenu, { title = "-" })
-
-                    table.insert(model_submenu, { title = string.format(i18n.get("menu.llm.model_backend"), display_backend), fn = function() end })
-
-                    table.insert(model_submenu, {
-                        title = string.format(i18n.get("menu.llm.model_source"), active_source),
-                        fn = function()
-                            pcall(hs.urlevent.openURL, active_source)
-                        end
-                    })
-
-                    table.insert(model_submenu, { title = "-" })
-                    table.insert(model_submenu, { title = i18n.section("menu.llm.specs_header"), disabled = true })
-                    
-                    local m_type = m.type or info.type or "Inconnu"
-                    local type_label = (m_type == "completion") and "📝 Complétion" or "💬 Chat"
-                    table.insert(model_submenu, { title = string.format(i18n.get("menu.llm.model_type"), type_label), fn = function() end })
-                    
-                    if m.last_updated and m.last_updated ~= "Unknown" then
-                        local y, mo, d = m.last_updated:match("^(%d+)%-(%d+)%-(%d+)$")
-                        local formatted_date = (y and mo and d) and (d .. "/" .. mo .. "/" .. y) or m.last_updated
-                        table.insert(model_submenu, { title = string.format(i18n.get("menu.llm.model_date"), formatted_date), fn = function() end })
-                    end
-
-                    if m.parameters then
-                        if m.parameters.total and m.parameters.total ~= "N/A" then table.insert(model_submenu, { title = string.format(i18n.get("menu.llm.model_params_total"), m.parameters.total), fn = function() end }) end
-                        if m.parameters.active and m.parameters.active ~= "N/A" then table.insert(model_submenu, { title = string.format(i18n.get("menu.llm.model_params_active"), m.parameters.active), fn = function() end }) end
-                    end
-
-                    if m.capabilities then
-                        table.insert(model_submenu, { title = "-" })
-                        table.insert(model_submenu, { title = i18n.section("menu.llm.caps_header"), disabled = true })
-                        if m.capabilities.speed_tok_s then table.insert(model_submenu, { title = string.format(i18n.get("menu.llm.model_speed"), m.capabilities.speed_tok_s), fn = function() end }) end
-                        local tags = m.capabilities.tags
-                        if tags and type(tags) == "table" and #tags > 0 then
-                            table.insert(model_submenu, { title = string.format(i18n.get("menu.llm.model_tags"), table.concat(tags, ", ")), fn = function() end })
-                        end
-                    end
-
-                    if hw_active.download_gb or hw_active.disk_gb or hw_active.ram_gb then
-                        table.insert(model_submenu, { title = "-" })
-                        table.insert(model_submenu, { title = "— " .. string.format(i18n.get("menu.llm.hw_header"), display_backend) .. " —", disabled = true })
-                        if hw_active.download_gb then table.insert(model_submenu, { title = string.format(i18n.get("menu.llm.hw_download"), hw_active.download_gb), fn = function() end }) end
-                        if hw_active.disk_gb then table.insert(model_submenu, { title = string.format(i18n.get("menu.llm.hw_disk"), hw_active.disk_gb), fn = function() end }) end
-                        if hw_active.ram_gb then table.insert(model_submenu, { title = string.format(i18n.get("menu.llm.hw_ram"), hw_active.ram_gb), fn = function() end }) end
-                    end
-
-                    table.insert(family_sub, {
-                        title   = title,
-                        menu    = model_submenu,
-                        fn      = function()
-                            -- clicking the model title selects it and triggers the same flow
-                            pcall(function() switch_model(m_name) end)
-                        end
-                    })
-
-                    ::continue_model::
-                end
-
-                if #family_sub > 0 then
-                    if #sub > 0 then table.insert(sub, { title = "-" }) end
-                    for _, model_entry in ipairs(family_sub) do
-                        table.insert(sub, model_entry)
-                    end
-                end
-            end
-            if #sub > 0 then
-                table.insert(menu, { title = provider.label, menu = sub })
-            end
-        end
-
-        -- "+" entry that lets the user register an arbitrary backend-native
-        -- model identifier. Sits at the bottom so curated presets remain the
-        -- discoverable default — the custom entry is for power users.
-        table.insert(menu, { title = "-" })
-        table.insert(menu, {
-            title = i18n.get("menu.llm.add_model_entry"),
-            fn    = function() prompt_add_user_model() end,
-        })
-
-        return menu
-    end
 
     local function build_num_pred_menu()
         Logger.debug(LOG, "Building prediction count menu…")
@@ -1228,7 +558,14 @@ function M.create(deps)
         table.insert(main_menu, {
             title    = rich_model_title,
             disabled = paused or nil,
-            menu     = build_models_selection()
+            menu     = ModelsSelector.build({
+                state         = state,
+                models_mgr    = models_mgr,
+                switch_model  = switch_model,
+                save_prefs    = save_prefs,
+                update_menu   = update_menu,
+                DEFAULT_STATE = M.DEFAULT_STATE,
+            })
         })
 
         if info and info.emojis and info.emojis:find("🧠💭") then
