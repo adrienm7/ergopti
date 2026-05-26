@@ -1,0 +1,179 @@
+# _shared/logger/sub_files.toml
+#
+# ==============================================================================
+# SCHEMA: Logger Sub-file Routing Rules
+# DESCRIPTION:
+# Defines which topical log sub-files exist and which patterns route a log line
+# into each one. Every entry produces one ErgoptiPlus_<name>.log alongside the
+# main daily log file.
+#
+# FIELDS PER ENTRY:
+#   name      (string)   — filename suffix: ErgoptiPlus_<name>.log
+#   patterns  (array)    — substring patterns matched against the full log line.
+#                          A line is routed when ANY pattern matches.
+#                          Match is case-sensitive, against the complete line
+#                          including timestamp, level label, and module tag.
+#   platforms (array)    — drivers that write this sub-file: "ahk" | "hs".
+#                          Entries absent from a platform's list are silently
+#                          ignored by that driver.
+#   description (string) — human-readable purpose (not read at runtime).
+#
+# ROUTING SEMANTICS:
+#   A line may be routed to zero, one, or several sub-files simultaneously.
+#   It is ALWAYS also written to the main ErgoptiPlus_YYYY-MM-DD.log.
+#
+# AUTHORING RULES:
+#   - One [[sub_files]] entry per logical topic.
+#   - Patterns should be specific enough to avoid cross-topic pollution.
+#   - Prefer tag-based patterns (e.g. "[gestures") over keyword patterns.
+#   - Keep platforms lists in alphabetical order: ["ahk", "hs"].
+# ==============================================================================
+
+# ==================================================
+# ==================================================
+# ======= 1/ Cross-driver sub-files (ahk + hs) =======
+# ==================================================
+# ==================================================
+
+[[sub_files]]
+name        = "gestures"
+description = "Gesture recognition, probe loop, swipe events."
+platforms   = ["ahk", "hs"]
+patterns    = [
+    "[gestures",
+    "gesture",
+]
+
+# ================================================
+# ================================================
+# ======= 2/ AHK-only sub-files =======
+# ================================================
+# ================================================
+
+[[sub_files]]
+name        = "layout"
+description = "Ergopti keyboard layout shifts, caps, alt-gr processing."
+platforms   = ["ahk"]
+patterns    = [
+    "[LayoutShift]",
+    "[LayoutCaps]",
+    "[LayoutAltGr]",
+]
+
+[[sub_files]]
+name        = "dispatch"
+description = "AHK tray-menu dispatch, script shortcuts, TOML loader events."
+platforms   = ["ahk"]
+patterns    = [
+    "[Dispatch]",
+    "[ScriptShortcuts]",
+    "[TomlLoader]",
+]
+
+[[sub_files]]
+name        = "tray"
+description = "AHK tray-menu top-level lifecycle events."
+platforms   = ["ahk"]
+patterns    = [
+    "[ErgoptiPlus]",
+]
+
+# =============================================
+# =============================================
+# ======= 3/ HS-only sub-files =======
+# =============================================
+# =============================================
+
+[[sub_files]]
+name        = "mlx"
+description = "MLX backend server, API calls, dependency installer."
+platforms   = ["hs"]
+patterns    = [
+    "[mlx",
+    "[llm.api_mlx]",
+    "MLX-",
+    "[mlx_deps]",
+]
+
+[[sub_files]]
+name        = "ollama"
+description = "Ollama backend server, API calls, dependency installer."
+platforms   = ["hs"]
+patterns    = [
+    "[ollama",
+    "[llm.api_ollama]",
+    "[ollama_deps]",
+]
+
+[[sub_files]]
+name        = "llm"
+description = "LLM menu, model switching, warmup, toggle events."
+platforms   = ["hs"]
+patterns    = [
+    "[llm.",
+    "[menu_llm",
+    "[keymap.llm",
+    "WARMUP",
+    "[TOGGLE]",
+]
+
+[[sub_files]]
+name        = "hotstrings"
+description = "Keymap processing, dynamic hotstrings, personal info, TOML reader."
+platforms   = ["hs"]
+patterns    = [
+    "[keymap.",
+    "[dynamic_hotstring",
+    "[personal_info]",
+    "[toml_reader]",
+    "hotstring",
+]
+
+[[sub_files]]
+name        = "keylogger"
+description = "Keystroke logging, SQLite writes, rotation, export."
+platforms   = ["hs"]
+patterns    = [
+    "[keylogger",
+]
+
+[[sub_files]]
+name        = "karabiner"
+description = "Karabiner-Elements config generation and reload."
+platforms   = ["hs"]
+patterns    = [
+    "[karabiner",
+]
+
+[[sub_files]]
+name        = "menu"
+description = "Menu builder, UI components, app picker, download window."
+platforms   = ["hs"]
+patterns    = [
+    "[menu]",
+    "[menu_",
+    "[builder]",
+    "[ui_builder]",
+    "[app_picker]",
+    "[download_window]",
+]
+
+[[sub_files]]
+name        = "notify"
+description = "Notification toasts and the notifications module."
+platforms   = ["hs"]
+patterns    = [
+    "[notify",
+    "[notifications",
+]
+
+[[sub_files]]
+name        = "boot"
+description = "Driver initialisation, path resolution, config loading."
+platforms   = ["hs"]
+patterns    = [
+    "[init]",
+    "[menu_paths]",
+    "[paths]",
+    "[config",
+]
