@@ -8,105 +8,104 @@
 #   - fix / perf / ...        → patch bump
 #
 # Channel rules:
-#   - commit message contains "alpha" → vX.Y.Z-alpha.{run}
-#   - commit message contains "beta"  → vX.Y.Z-beta.{run}
-#   - branch is dev                   → vX.Y.Z-dev.{run}  (pre-release)
-#   - branch is main + at least one commit contains "(release)" → vX.Y.Z (stable)
-#   - branch is main without "(release)"                        → vX.Y.Z-dev.{run}
+#   - commit message contains "alpha" → vX.Y.Z-alpha.{run}  (pre-release)
+#   - commit message contains "beta"  → vX.Y.Z-beta.{run}   (pre-release)
+#   - branch is dev                   → vX.Y.Z-dev.{run}    (pre-release)
+#   - branch is main                  → vX.Y.Z              (stable release)
 name: Auto Version
 
 on:
-	push:
-		branches: [main, dev]
+    push:
+        branches: [main, dev]
 
 permissions:
-	contents: write
+    contents: write
 
 jobs:
-	version:
-		runs-on: ubuntu-latest
+    version:
+        runs-on: ubuntu-latest
 
-		steps:
-			- name: Checkout (full history)
-			  uses: actions/checkout@v4
-			  with:
-				  fetch-depth: 0
+        steps:
+            - name: Checkout (full history)
+              uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
 
-			- name: Calculate next version and create tag
-			  id: version
-			  shell: bash
-			  env:
-				  GH_TOKEN: ${{ github.token }}
-				  BRANCH:   ${{ github.ref_name }}
-				  RUN_NUM:  ${{ github.run_number }}
-			  run: |
-				  set -euo pipefail
+            - name: Calculate next version and create tag
+              id: version
+              shell: bash
+              env:
+                  GH_TOKEN: ${{ github.token }}
+                  BRANCH:   ${{ github.ref_name }}
+                  RUN_NUM:  ${{ github.run_number }}
+              run: |
+                  set -euo pipefail
 
-				  # ── 1. Find latest semver tag ──────────────────────────────
-				  last_tag=$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | head -1 || true)
-				  if [ -z "$last_tag" ]; then
-				      last_tag="v0.0.0"
-				      range="HEAD"
-				  else
-				      range="${last_tag}..HEAD"
-				  fi
-				  echo "Last tag: $last_tag"
-				  IFS='.' read -r maj min pat <<< "${last_tag#v}"
+                  # ── 1. Find latest semver tag ──────────────────────────────
+                  last_tag=$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | head -1 || true)
+                  if [ -z "$last_tag" ]; then
+                      last_tag="v0.0.0"
+                      range="HEAD"
+                  else
+                      range="${last_tag}..HEAD"
+                  fi
+                  echo "Last tag: $last_tag"
+                  IFS='.' read -r maj min pat <<< "${last_tag#v}"
 
-				  # ── 2. Determine bump from commits ──────────────────────────
-				  bump="patch"
-				  while IFS= read -r subject; do
-				      [ -z "$subject" ] && continue
-				      if echo "$subject" | grep -qE '(BREAKING|!):'; then
-				          bump="major"; break
-				      elif echo "$subject" | grep -qE '^feat(\([^)]+\))?!?:'; then
-				          [ "$bump" != "major" ] && bump="minor"
-				      fi
-				  done < <(git log "$range" --no-merges --pretty=format:"%s")
-				  echo "Bump type: $bump"
+                  # ── 2. Determine bump from commits ─────────────────────────
+                  bump="patch"
+                  while IFS= read -r subject; do
+                      [ -z "$subject" ] && continue
+                      if echo "$subject" | grep -qE '(BREAKING|!):'; then
+                          bump="major"; break
+                      elif echo "$subject" | grep -qE '^feat(\([^)]+\))?!?:'; then
+                          [ "$bump" != "major" ] && bump="minor"
+                      fi
+                  done < <(git log "$range" --no-merges --pretty=format:"%s")
+                  echo "Bump type: $bump"
 
-				  # ── 3. Compute new base version ────────────────────────────
-				  case "$bump" in
-				      major) maj=$((maj+1)); min=0; pat=0 ;;
-				      minor) min=$((min+1)); pat=0 ;;
-				      patch) pat=$((pat+1)) ;;
-				  esac
-				  base="v${maj}.${min}.${pat}"
+                  # ── 3. Compute new base version ────────────────────────────
+                  case "$bump" in
+                      major) maj=$((maj+1)); min=0; pat=0 ;;
+                      minor) min=$((min+1)); pat=0 ;;
+                      patch) pat=$((pat+1)) ;;
+                  esac
+                  base="v${maj}.${min}.${pat}"
 
-				  # ── 4. Detect channel keyword in commits ───────────────────
-				  commit_messages=$(git log "$range" --no-merges --pretty=format:"%s %b")
-				  channel=""
-				  if echo "$commit_messages" | grep -qi "alpha"; then
-				      channel="alpha"
-				  elif echo "$commit_messages" | grep -qi "beta"; then
-				      channel="beta"
-				  fi
+                  # ── 4. Detect channel keyword in commits (dev only) ────────
+                  # alpha/beta keywords only apply on dev; main is always stable.
+                  commit_messages=$(git log "$range" --no-merges --pretty=format:"%s %b")
+                  channel=""
+                  if [ "$BRANCH" != "main" ]; then
+                      if echo "$commit_messages" | grep -qi "alpha"; then
+                          channel="alpha"
+                      elif echo "$commit_messages" | grep -qi "beta"; then
+                          channel="beta"
+                      fi
+                  fi
 
-				  # ── 5. Build final tag ──────────────────────────────────────
-				  is_stable_release="false"
-				  if [ "$BRANCH" = "main" ] && echo "$commit_messages" | grep -q "(release)"; then
-				      # Stable release: no suffix (ignore alpha/beta keywords on main+release)
-				      tag="$base"
-				      prerelease="false"
-				      is_stable_release="true"
-				  elif [ -n "$channel" ]; then
-				      tag="${base}-${channel}.${RUN_NUM}"
-				      prerelease="true"
-				  else
-				      tag="${base}-dev.${RUN_NUM}"
-				      prerelease="true"
-				  fi
-				  echo "New tag: $tag (prerelease=$prerelease)"
+                  # ── 5. Build final tag ─────────────────────────────────────
+                  if [ "$BRANCH" = "main" ]; then
+                      # main is always a stable release — no suffix
+                      tag="$base"
+                      prerelease="false"
+                  elif [ -n "$channel" ]; then
+                      tag="${base}-${channel}.${RUN_NUM}"
+                      prerelease="true"
+                  else
+                      tag="${base}-dev.${RUN_NUM}"
+                      prerelease="true"
+                  fi
+                  echo "New tag: $tag (prerelease=$prerelease)"
 
-				  # ── 6. Push the tag ─────────────────────────────────────────
-				  if git ls-remote --tags origin "refs/tags/$tag" | grep -q "$tag"; then
-				      echo "Tag '$tag' already exists — skipping."
-				  else
-				      git tag "$tag"
-				      git push origin "$tag"
-				      echo "Tag '$tag' pushed."
-				  fi
+                  # ── 6. Push the tag ────────────────────────────────────────
+                  if git ls-remote --tags origin "refs/tags/$tag" | grep -q "$tag"; then
+                      echo "Tag '$tag' already exists — skipping."
+                  else
+                      git tag "$tag"
+                      git push origin "$tag"
+                      echo "Tag '$tag' pushed."
+                  fi
 
-				  echo "tag=$tag"               >> "$GITHUB_OUTPUT"
-				  echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
-				  echo "is_stable=$is_stable_release" >> "$GITHUB_OUTPUT"
+                  echo "tag=$tag"               >> "$GITHUB_OUTPUT"
+                  echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
