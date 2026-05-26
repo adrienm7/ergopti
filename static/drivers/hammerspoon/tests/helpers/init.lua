@@ -73,6 +73,24 @@ function M.load_with_stubs(module_name, hs_overrides)
 	end
 
 	_G.hs = hs_stub
+
+	-- Register sub-module aliases so that `require("hs.json")` etc. resolve to
+	-- the same tables as `hs.json`. Some production modules call require("hs.*")
+	-- directly rather than accessing the global `hs` table.
+	local hs_sub_modules = {
+		"json", "fs", "sqlite3", "timer", "http", "logger",
+		"settings", "keycodes", "eventtap", "canvas", "styledtext",
+		"notify", "dialog", "application", "window", "host",
+		"pathwatcher", "urlevent", "pasteboard", "osascript",
+		"spaces", "fnutils", "inspect", "task", "webview",
+		"distributednotifications", "image", "menubar", "hotkey",
+	}
+	for _, sub in ipairs(hs_sub_modules) do
+		if hs_stub[sub] ~= nil then
+			package.loaded["hs." .. sub] = hs_stub[sub]
+		end
+	end
+
 	return require(module_name)
 end
 

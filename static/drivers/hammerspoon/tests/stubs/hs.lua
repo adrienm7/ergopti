@@ -72,7 +72,21 @@ M.timer = {
 	doEvery = function(delay, fn) return make_timer(delay, fn, true) end,
 	new = function(delay, fn) return make_timer(delay, fn, true) end,
 	secondsSinceEpoch = function() return os.time() end,
+	-- absoluteTime returns nanoseconds since an arbitrary epoch, matching macOS semantics
+	absoluteTime = function() return math.floor(os.clock() * 1e9) end,
 	usleep = function(_) end,
+	-- delayed is a one-shot timer that can be restarted/stopped by the caller
+	delayed = {
+		new = function(delay, fn)
+			local t = make_timer(delay, fn, false)
+			t.running = false  -- delayed timers don't auto-run until setDelay/start
+			function t:setDelay(d) self.delay = d end
+			function t:start() self.running = true ; return self end
+			function t:stop()  self.running = false ; return self end
+			function t:running_() return self.running end
+			return t
+		end,
+	},
 	__timers = TIMERS,
 	__fire_all = function()
 		for _, t in ipairs(TIMERS) do if t.running then t:fire() end end
@@ -267,6 +281,49 @@ M.fs = {
 	mkdir = function(_) return true end,
 	pathToAbsolute = function(p) return p end,
 	displayName = function(p) return p end,
+}
+
+
+
+
+-- =================================
+--- ================================
+-- ======= 6b/ SQLite3 Stub =======
+--- ================================
+-- =================================
+
+-- Minimal stub for hs.sqlite3 — records open() calls; exec/prepare/close are no-ops.
+-- Real DB logic is tested via integration tests with a temp SQLite file.
+local SQLITE3_CALLS = {}
+
+M.sqlite3 = {
+	OK      = 0,
+	ERROR   = 1,
+	MISUSE  = 21,
+	ROW     = 100,
+	DONE    = 101,
+	open = function(path)
+		table.insert(SQLITE3_CALLS, { op = "open", path = path })
+		-- Returns a stub db handle that succeeds on all calls
+		local db = {
+			exec       = function(_, _sql) return 0 end,
+			prepare    = function(_, _sql)
+				return {
+					step        = function(_) return 101 end,  -- DONE
+					bind_values = function(_, ...) return 0 end,
+					finalize    = function(_) return 0 end,
+					nrows       = function(_) return function() return nil end end,
+				}
+			end,
+			-- nrows on the db handle itself: iterate over SELECT results
+			nrows      = function(_, _sql) return function() return nil end end,
+			close      = function(_) return 0 end,
+			errmsg     = function(_) return "" end,
+			last_insert_rowid = function(_) return 0 end,
+		}
+		return db, nil
+	end,
+	__calls = SQLITE3_CALLS,
 }
 
 
