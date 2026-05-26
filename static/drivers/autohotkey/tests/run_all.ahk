@@ -102,6 +102,13 @@ InstallHotstringHooks()
 #Include test_registry.ahk
 #Include test_nav_layer_helpers.ahk
 
+; LLM modules — pure-logic subset (profiles, models) included here to test
+; JSON parsing, profile lookup, and prompt resolution without any network calls.
+; models.ahk defines LLM_GetSharedPath which profiles.ahk depends on.
+#Include ../modules/llm/models.ahk
+#Include ../modules/llm/profiles.ahk
+#Include test_llm_profiles.ahk
+
 ; Gestures module — included here because its pure logic (assignments, action
 ; registry, dispatch) is testable. The hotkeys it registers are harmless since
 ; RunTests() calls ExitApp immediately after completion.
