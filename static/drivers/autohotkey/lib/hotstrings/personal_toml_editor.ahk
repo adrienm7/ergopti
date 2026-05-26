@@ -551,10 +551,9 @@ OpenPersonalEditor(DefaultSection := "") {
     ; ── Top bar: section selector + section management buttons ──
     W.Add("Text", "xm y12 w70 h24 +0x200", t("editor.hotstrings.label_section"))
     SectionDrop := W.Add("DropDownList", "x+6 yp w360", _BuildSectionList(_PersonalEditorData))
-    W.Add("Button", "x+8 yp w110 h24", t("editor.hotstrings.btn_new")).OnEvent("Click", (*) => _NewSection(W, SectionDrop, LV, TriggerEdit, OutputEdit, ChkIsWord, ChkAutoExp, ChkCaseSens, ChkFinal, StatusText))
-    W.Add("Button", "x+4 yp w110 h24", t("editor.hotstrings.btn_rename")).OnEvent("Click", (*) => _RenameSection(W, SectionDrop))
-    BtnDelSec := W.Add("Button", "x+4 yp w110 h24", t("editor.hotstrings.btn_delete"))
-    BtnDelSec.OnEvent("Click", (*) => _DeleteSection(W, SectionDrop))
+    BtnNewSec    := W.Add("Button", "x+8 yp w110 h24", t("editor.hotstrings.btn_new"))
+    BtnRenameSec := W.Add("Button", "x+4 yp w110 h24", t("editor.hotstrings.btn_rename"))
+    BtnDelSec    := W.Add("Button", "x+4 yp w110 h24", t("editor.hotstrings.btn_delete"))
 
     _SelectDropDown(SectionDrop, _PersonalEditorSection)
 
@@ -620,6 +619,14 @@ OpenPersonalEditor(DefaultSection := "") {
     StatusText := W.Add("Text", "xm y+10 w860 h20 cGray", "")
 
     ; ── Wiring ──
+    ; Section management — wired here (not inline at creation) so LV and all
+    ; form controls are already declared and in scope at the time of the call.
+    BtnNewSec.OnEvent("Click", (*) => _NewSection(W, SectionDrop, LV,
+        TriggerEdit, OutputEdit, ChkIsWord, ChkAutoExp, ChkCaseSens, ChkFinal, StatusText))
+    BtnRenameSec.OnEvent("Click", (*) => _RenameSection(W, SectionDrop))
+    BtnDelSec.OnEvent("Click", (*) => _DeleteSection(W, SectionDrop, LV,
+        TriggerEdit, OutputEdit, ChkIsWord, ChkAutoExp, ChkCaseSens, ChkFinal, StatusText))
+
     BtnAdd.OnEvent("Click", (*) => _AddEntry(W, LV, TriggerEdit, OutputEdit,
         ChkIsWord, ChkAutoExp, ChkCaseSens, ChkFinal, CloseOnAddChk, StatusText))
     BtnSave.OnEvent("Click", (*) => _SaveEntry(W, LV, TriggerEdit, OutputEdit,
@@ -922,7 +929,7 @@ _RenameSection(W, SectionDrop) {
     _SelectDropDown(SectionDrop, _PersonalEditorSection)
 }
 
-_DeleteSection(W, SectionDrop) {
+_DeleteSection(W, SectionDrop, LV, TriggerEdit, OutputEdit, ChkIsWord, ChkAutoExp, ChkCaseSens, ChkFinal, StatusText) {
     global _PersonalEditorData, _PersonalEditorSection
     if (_PersonalEditorSection == "") {
         MsgBox(t("editor.hotstrings.err_no_section_selected"), t("editor.hotstrings.title_error"), "Icon!")
@@ -953,6 +960,10 @@ _DeleteSection(W, SectionDrop) {
     if (_PersonalEditorSection != "") {
         _SelectDropDown(SectionDrop, _PersonalEditorSection)
     }
+    ; Refresh list and form to reflect the newly active section (or empty state)
+    _PopulateList(LV, _PersonalEditorData, _PersonalEditorSection)
+    _ClearForm(TriggerEdit, OutputEdit, ChkIsWord, ChkAutoExp, ChkCaseSens, ChkFinal)
+    StatusText.Value := ""
 }
 
 ; Switch the open editor to a different section (called when reopening with a target).
