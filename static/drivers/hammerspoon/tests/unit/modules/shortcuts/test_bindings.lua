@@ -15,6 +15,26 @@ local helpers = require("tests.helpers")
 package.loaded["lib.logger"] = nil
 local _ = helpers.load_with_stubs("lib.logger")
 
+-- Stub lib.keycodes: actions/system.lua calls Keycodes.to_name(F18_WAKE_OS)
+-- at module level. The real implementation iterates hs.keycodes.map, which
+-- is not populated in the unit-test stub, so to_name would error. We provide
+-- the two fields that system.lua actually needs.
+package.loaded["lib.keycodes"] = {
+	F18_WAKE_OS             = 79,
+	F19_VOLUME_SCROLL_MODIFIER = 80,
+	to_name = function(code)
+		local MAP = { [79] = "f18", [80] = "f19" }
+		return MAP[code] or ("keycode_" .. tostring(code))
+	end,
+}
+
+-- Stub lib.i18n: bindings.lua calls i18n.get() at module level for
+-- shortcut labels. The real module depends on locale JSON files unavailable
+-- in unit tests.
+package.loaded["lib.i18n"] = {
+	get = function(key) return key end,
+}
+
 local Bindings = helpers.load_with_stubs("modules.shortcuts.bindings")
 
 

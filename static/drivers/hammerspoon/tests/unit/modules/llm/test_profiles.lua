@@ -13,6 +13,14 @@ local helpers = require("tests.helpers")
 package.loaded["lib.logger"] = nil
 local _ = helpers.load_with_stubs("lib.logger")
 
+-- Stub lib.i18n: profiles.lua calls i18n.get() at module load time to
+-- decorate each built-in profile with its label. The real lib.i18n depends
+-- on hs.settings and locale JSON files that are unavailable in unit tests.
+package.loaded["lib.i18n"] = {
+	get        = function(key) return key end,
+	get_locale = function() return "fr" end,
+}
+
 local Profiles = helpers.load_with_stubs("modules.llm.profiles")
 
 
