@@ -105,6 +105,37 @@ const HS_ADAPTERS = {
 		getFocused: function() {},                  // arity 0
 		getAll:     function() {},                  // arity 0
 	},
+
+	SecureFieldDetector: {
+		isSecureField: function() {},               // arity 0
+		isSecureApp:   function(appId) {},          // arity 1
+		refresh:       function() {},               // arity 0
+	},
+
+	Clipboard: {
+		read:    function() {},                     // arity 0
+		write:   function(text) {},                 // arity 1
+		save:    function() {},                     // arity 0
+		restore: function(saved) {},                // arity 1
+	},
+
+	Storage: {
+		set:    function(key, value) {},            // arity 2
+		get:    function(key, defaultValue) {},     // arity 2
+		delete: function(key) {},                   // arity 1
+		has:    function(key) {},                   // arity 1
+		keys:   function() {},                      // arity 0
+		clear:  function() {},                      // arity 0
+	},
+
+	ProcessLifecycle: {
+		onFocusChange:    function(callback) {},    // arity 1
+		onAppLaunch:      function(callback) {},    // arity 1
+		onAppQuit:        function(callback) {},    // arity 1
+		getForegroundApp: function() {},            // arity 0
+		start:            function() {},            // arity 0
+		stop:             function() {},            // arity 0
+	},
 };
 
 
