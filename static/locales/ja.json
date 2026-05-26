@@ -1180,6 +1180,7 @@
 	"sg_actions.right_click_toggle": "🖱 右 右クリック（ホールド）",
 	"sg_actions.screen_capture": "📸 選択キャプチャ (Win+Shift+S)",
 	"sg_actions.screen_capture_instant": "📸 即時キャプチャ（ウィンドウ）",
+	"sg_actions.ocr_screenshot": "📷 OCRスクリーンショット (Win+Shift+T)",
 	"sg_actions.screen_record": "⏺ 画面録画",
 	"sg_actions.screenshot_fullscreen_clipboard": "📸 🖥 画面をコピー",
 	"sg_actions.screenshot_fullscreen_save": "📸 🖥 画面を保存",

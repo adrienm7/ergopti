@@ -1180,6 +1180,7 @@
 	"sg_actions.right_click_toggle": "🖱 R 오른쪽 클릭 (유지)",
 	"sg_actions.screen_capture": "📸 선택적 캡처 (Win+Shift+S)",
 	"sg_actions.screen_capture_instant": "📸 즉시 캡처 (창)",
+	"sg_actions.ocr_screenshot": "📷 OCR 스크린샷 (Win+Shift+T)",
 	"sg_actions.screen_record": "⏺ 화면 녹화",
 	"sg_actions.screenshot_fullscreen_clipboard": "📸 🖥 화면 복사",
 	"sg_actions.screenshot_fullscreen_save": "📸 🖥 화면 저장",

@@ -1180,6 +1180,7 @@
 	"sg_actions.right_click_toggle": "🖱 R Clic droit (maint.)",
 	"sg_actions.screen_capture": "📸 Capture sélective (Win+Shift+S)",
 	"sg_actions.screen_capture_instant": "📸 Capture instantanée (fenêtre)",
+	"sg_actions.ocr_screenshot": "📷 Capture OCR (Win+Shift+T)",
 	"sg_actions.screen_record": "⏺ Capture vidéo",
 	"sg_actions.screenshot_fullscreen_clipboard": "📸 🖥 Copier écran",
 	"sg_actions.screenshot_fullscreen_save": "📸 🖥 Sauver écran",

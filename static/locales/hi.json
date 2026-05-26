@@ -1180,6 +1180,7 @@
 	"sg_actions.right_click_toggle": "🖱 R दाईं क्लिक (होल्ड)",
 	"sg_actions.screen_capture": "📸 चयनात्मक कैप्चर (Win+Shift+S)",
 	"sg_actions.screen_capture_instant": "📸 तत्काल कैप्चर (विंडो)",
+	"sg_actions.ocr_screenshot": "📷 OCR स्क्रीनशॉट (Win+Shift+T)",
 	"sg_actions.screen_record": "⏺ स्क्रीन रिकॉर्डिंग",
 	"sg_actions.screenshot_fullscreen_clipboard": "📸 🖥 स्क्रीन कॉपी करें",
 	"sg_actions.screenshot_fullscreen_save": "📸 🖥 स्क्रीन सहेजें",

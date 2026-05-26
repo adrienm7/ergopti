@@ -1180,6 +1180,7 @@
 	"sg_actions.right_click_toggle": "🖱 R 鼠标右键（长按）",
 	"sg_actions.screen_capture": "📸 选区截图（Win+Shift+S）",
 	"sg_actions.screen_capture_instant": "📸 即时截图（窗口）",
+	"sg_actions.ocr_screenshot": "📷 OCR截图 (Win+Shift+T)",
 	"sg_actions.screen_record": "⏺ 录屏",
 	"sg_actions.screenshot_fullscreen_clipboard": "📸 🖥 复制全屏截图",
 	"sg_actions.screenshot_fullscreen_save": "📸 🖥 保存全屏截图",
