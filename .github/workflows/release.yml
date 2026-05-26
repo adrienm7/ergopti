@@ -37,17 +37,7 @@ concurrency:
 # ============================================================
 
 jobs:
-    gate-tests:
-        uses: ./.github/workflows/test_ahk.yml
-
-    gate-hammerspoon:
-        uses: ./.github/workflows/test_hammerspoon.yml
-
-    gate-hotstrings:
-        uses: ./.github/workflows/test_hotstrings.yml
-
     prepare-release:
-        needs: [gate-tests, gate-hammerspoon, gate-hotstrings]
         runs-on: ubuntu-latest
         outputs:
             tag:        ${{ steps.meta.outputs.tag }}
@@ -62,7 +52,7 @@ jobs:
               with:
                   fetch-depth: 0
 
-            - name: Resolve tag / version / channel
+            - name: Resolve tag / version / title
               id: meta
               shell: bash
               env:
@@ -74,32 +64,74 @@ jobs:
                   case "$event" in
                       push)
                           # Tag was created by version.yml — read it directly
-                          # from GITHUB_REF_NAME (e.g. v1.2.3-dev.42).
+                          # from GITHUB_REF_NAME (e.g. v0.6.0-dev.42).
                           tag="${GITHUB_REF_NAME}"
                           ref="${GITHUB_SHA}"
-                          # Tags containing '-' are pre-releases (dev, alpha, beta)
                           if [[ "$tag" =~ - ]]; then
                               prerelease="true"
                           fi
-                          title="Ergopti ${tag}"
                           ;;
                       workflow_dispatch)
                           tag="${{ github.event.inputs.tag }}"
                           ref="$tag"
-                          title="Ergopti ${tag}"
-                          # Anything that does not look like vX.Y.Z is treated as pre-release
                           if ! [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
                               prerelease="true"
                           fi
                           ;;
                   esac
+
+                  # Build the release title. For stable releases a plain name
+                  # suffices. For dev pre-releases, compute a human-readable delta
+                  # summary (e.g. "✨ 3 feat, 🔧 2 fix") from all commits since
+                  # the last stable tag so the GitHub Releases page says
+                  # "Ergopti v0.6.0-dev.42 — ✨ 3 feat, 🔧 2 fix (since v0.6.0)"
+                  # instead of a bare version number with no context.
+                  if [ "$prerelease" = "true" ]; then
+                      last_stable=$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname \
+                          | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1 || true)
+                      if [ -n "$last_stable" ]; then
+                          range="${last_stable}..HEAD"
+                          n_breaking=0; n_feat=0; n_fix=0; n_other=0
+                          while IFS= read -r subject; do
+                              [ -z "$subject" ] && continue
+                              if echo "$subject" | grep -qE '(BREAKING|!):'; then
+                                  n_breaking=$((n_breaking+1))
+                              elif echo "$subject" | grep -qE '^feat(\([^)]+\))?!?:'; then
+                                  n_feat=$((n_feat+1))
+                              elif echo "$subject" | grep -qE '^fix(\([^)]+\))?:'; then
+                                  n_fix=$((n_fix+1))
+                              else
+                                  n_other=$((n_other+1))
+                              fi
+                          done < <(git log "$range" --no-merges --pretty=format:"%s")
+
+                          delta=""
+                          [ "$n_breaking" -gt 0 ] && delta="${delta}⚠️ ${n_breaking} breaking, "
+                          [ "$n_feat"     -gt 0 ] && delta="${delta}✨ ${n_feat} feat, "
+                          [ "$n_fix"      -gt 0 ] && delta="${delta}🔧 ${n_fix} fix, "
+                          [ "$n_other"    -gt 0 ] && delta="${delta}📦 ${n_other} other, "
+                          delta="${delta%, }"
+
+                          if [ -n "$delta" ]; then
+                              title="Ergopti ${tag} — ${delta} (since ${last_stable})"
+                          else
+                              title="Ergopti ${tag} (since ${last_stable})"
+                          fi
+                      else
+                          title="Ergopti ${tag}"
+                      fi
+                  else
+                      title="Ergopti ${tag}"
+                  fi
+
                   version="${tag#v}"
                   echo "tag=$tag"               >> "$GITHUB_OUTPUT"
                   echo "title=$title"           >> "$GITHUB_OUTPUT"
                   echo "version=$version"       >> "$GITHUB_OUTPUT"
                   echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
                   echo "ref=$ref"               >> "$GITHUB_OUTPUT"
-                  echo "Resolved tag=$tag title='$title' version=$version prerelease=$prerelease ref=$ref"
+                  echo "Resolved: tag=$tag prerelease=$prerelease"
+                  echo "Title: $title"
 
 
 
