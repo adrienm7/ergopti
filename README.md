@@ -175,7 +175,7 @@ Every push to `main` or `dev` triggers [`version.yml`](.github/workflows/version
 |---|---|---|
 | Any commit message contains `alpha` | `v0.6.7-alpha.{run}` | Pre-release |
 | Any commit message contains `beta` | `v0.6.7-beta.{run}` | Pre-release |
-| Branch is `dev` (default) | `v0.6.7-dev.{run}` | Pre-release |
+| Branch is `dev` (default) | `v0.6.0-dev.{run}` | Pre-release — title shows delta vs last stable: `Ergopti v0.6.0-dev.42 — ✨ 3 feat, 🔧 2 fix (since v0.6.0)` |
 | Branch is `main` | `v0.6.7` | **Stable release** |
 
 ### Release builds
