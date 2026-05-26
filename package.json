@@ -26,7 +26,9 @@
 		"fix:unbalanced": "node ./scripts/lint-conventions.js --fix-unbalanced --warn-only",
 		"fix:all": "node ./scripts/lint-conventions.js --fix-banners --fix-unbalanced --fix-spacing --warn-only",
 		"install:hammerspoon": "bash ./scripts/install-hammerspoon.sh",
-		"bench:hotstring": "node ./scripts/bench-hotstring.cjs"
+		"bench:hotstring": "node ./scripts/bench-hotstring.cjs",
+		"codegen:registry": "node ./scripts/codegen-registry-ahk.cjs",
+		"codegen:registry:hs": "node ./scripts/codegen-registry-hs.cjs"
 	},
 	"type": "module",
 	"dependencies": {
