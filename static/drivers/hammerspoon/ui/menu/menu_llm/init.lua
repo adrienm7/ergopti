@@ -29,6 +29,7 @@ local TriggerPanel     = require("ui.menu.menu_llm.trigger_panel")
 local ApiPanel         = require("ui.menu.menu_llm.api_panel")
 local ModelsSelector   = require("ui.menu.menu_llm.models_selector")
 local ModelSwitcher    = require("ui.menu.menu_llm.model_switcher")
+local StartupCtrl      = require("ui.menu.menu_llm.startup_controller")
 
 -- Deps checkers — kicked off on backend switch and on first menu activation
 -- so a fresh-out-of-the-box Mac auto-bootstraps the engine without any
@@ -111,8 +112,6 @@ M.DEFAULT_STATE = {
     llm_streaming_multi     = llm_mod.DEFAULT_STATE.llm_streaming_multi,
     llm_instant_on_word_end = llm_mod.DEFAULT_STATE.llm_instant_on_word_end,
 }
-
-
 
 
 
@@ -328,9 +327,13 @@ function M.create(deps)
     -- ===== 2.3) Hotkeys & Triggers =======
     -- =====================================
 
-    local _llm_trigger_hk = nil
+    local _llm_trigger_hk  = nil
     local _llm_profile_hks = {}
     local _startup_silence = false
+    local function get_startup_silence() return _startup_silence end
+    local function set_startup_silence(v) _startup_silence = v end
+    local function get_trigger_hk() return _llm_trigger_hk end
+    local function get_profile_hks() return _llm_profile_hks end
 
     local function bind_hotkey(mods, key, callback)
         Logger.debug(LOG, string.format("Attempting hotkey bind: mods=%s, key=%s",
@@ -465,8 +468,6 @@ function M.create(deps)
     -- =========================================
 
     local check_startup
-    local _check_startup_attempts = nil
-
     local function build_item()
         Logger.debug(LOG, "Building LLM menu item (build_item)…")
         local paused = deps.script_control and type(deps.script_control.is_paused) == "function" and deps.script_control.is_paused() or false
@@ -754,173 +755,23 @@ function M.create(deps)
         }
     end
 
-    check_startup = function()
-        Logger.info(LOG, "═══════════════ Starting menu_llm ═══════════════")
-
-        -- Reattach a download that was running before a Hammerspoon reload
-        hs.timer.doAfter(0.5, function()
-            local sf = io.open("/tmp/hs_mlx_active_download.json", "r")
-            if sf then
-                local raw = sf:read("*a"); sf:close()
-                local ok_j, sess = pcall(hs.json.decode, raw)
-                if ok_j and type(sess) == "table" and type(sess.log_path) == "string" then
-                    Logger.info(LOG, "Active download session found after reload — reattaching.")
-                    if models_mgr and type(models_mgr.reattach_download) == "function" then
-                        pcall(models_mgr.reattach_download, sess)
-                        if type(deps.update_menu) == "function" then pcall(deps.update_menu) end
-                    end
-                end
-            end
-        end)
-
-        _startup_silence = true
-        
-        if type(state.llm_trigger_shortcut) == "table" then
-            Logger.debug(LOG, string.format("Restoring trigger shortcut: %s+%s",
-                table.concat(state.llm_trigger_shortcut.mods or {}, "+"),
-                state.llm_trigger_shortcut.key or "nil"))
-            apply_llm_shortcut(state.llm_trigger_shortcut.mods, state.llm_trigger_shortcut.key)
-        else
-            Logger.debug(LOG, "No global trigger shortcut configured.")
-        end
-
-        local valid_profile_ids = {}
-        local builtin_count = 0
-        for _, profile in ipairs(llm_mod.BUILTIN_PROFILES or {}) do
-            if type(profile) == "table" and type(profile.id) == "string" then
-                valid_profile_ids[profile.id] = true
-                builtin_count = builtin_count + 1
-            end
-        end
-        Logger.debug(LOG, string.format("Built-in profiles loaded: %d", builtin_count))
-        
-        local user_count = 0
-        for _, profile in ipairs(type(state.llm_user_profiles) == "table" and state.llm_user_profiles or {}) do
-            if type(profile) == "table" and type(profile.id) == "string" then
-                valid_profile_ids[profile.id] = true
-                user_count = user_count + 1
-            end
-        end
-        Logger.debug(LOG, string.format("User profiles loaded: %d", user_count))
-
-        local profile_shortcuts = type(state.llm_profile_shortcuts) == "table" and state.llm_profile_shortcuts or {}
-        local sc_count = 0
-        for _ in pairs(profile_shortcuts) do sc_count = sc_count + 1 end
-        Logger.info(LOG, string.format("Profile shortcuts loaded: %d entries", sc_count))
-        
-        for profile_id, sc in pairs(profile_shortcuts) do
-            local mods_str = (type(sc) == "table" and type(sc.mods) == "table") and table.concat(sc.mods, "+") or "nil"
-            local key_str = (type(sc) == "table" and type(sc.key) == "string") and sc.key or "nil"
-            Logger.debug(LOG, string.format("Profile '%s': mods=%s, key=%s", profile_id, mods_str, key_str))
-            
-            if valid_profile_ids[profile_id] and type(sc) == "table" then
-                Logger.debug(LOG, string.format("Binding shortcut for profile '%s' on startup.", profile_id))
-                apply_llm_profile_shortcut(profile_id, sc.mods, sc.key, { silent = true })
-            else
-                Logger.warn(LOG, string.format("Removing invalid shortcut for profile '%s'.", profile_id))
-                apply_llm_profile_shortcut(profile_id, nil, nil, { silent = true })
-            end
-        end
-
-        Logger.debug(LOG, "Activating bound hotkeys…")
-        if _llm_trigger_hk then activate_hotkey(_llm_trigger_hk) end
-        for _, hk in pairs(_llm_profile_hks) do
-            if hk then activate_hotkey(hk) end
-        end
-        
-        _startup_silence = false
-
-        if not state.llm_enabled then 
-            Logger.debug(LOG, "LLM disabled at startup.")
-            return 
-        end
-        
-        Logger.info(LOG, string.format("LLM enabled at startup, model: %s", state.llm_model or "nil"))
-        
-        local function disable_llm()
-            Logger.error(LOG, "Disabling LLM (requirements check failed).")
-            state.llm_enabled = false
-            if keymap and type(keymap.set_llm_enabled) == "function" then 
-                pcall(keymap.set_llm_enabled, false)
-            end
-            save_prefs(); update_menu()
-        end
-
-        if not state.llm_model or state.llm_model == "" then 
-            Logger.warn(LOG, "No model configured at startup.")
-            return 
-        end
-
-        if state.llm_backend == "mlx" then
-            Logger.debug(LOG, "MLX mode: locking predictions during initialization.")
-            if keymap and type(keymap.set_llm_enabled) == "function" then
-                pcall(keymap.set_llm_enabled, false)
-            end
-        end
-
-        if keymap and type(keymap.set_llm_backend_name) == "function" then
-            local startup_backend = ""
-            if state.llm_backend == "mlx" then startup_backend = "MLX 🚀"
-            elseif state.llm_backend == "ollama" then startup_backend = "Ollama 🦙" end
-            pcall(keymap.set_llm_backend_name, startup_backend)
-        end
-
-        Logger.debug(LOG, string.format("Checking model requirements: %s", state.llm_model))
-        -- Defer until the async installed-models cache is populated (refresh_installed_async
-        -- fires at doAfter(0)); polling here avoids a false "not installed" dialog at startup
-        local function do_check_requirements()
-            local installed = models_mgr.get_installed_models()
-            local count = 0; for _ in pairs(installed) do count = count + 1 end
-            Logger.debug(LOG, string.format("Startup installed-models cache count: %d", count))
-            if count == 0 then
-                -- Cache not yet ready — retry in 1s (max 10 attempts)
-                if not _check_startup_attempts then _check_startup_attempts = 0 end
-                _check_startup_attempts = _check_startup_attempts + 1
-                Logger.debug(LOG, string.format("Startup requirements deferred (attempt %d/10)", _check_startup_attempts))
-                if _check_startup_attempts < 10 then
-                    hs.timer.doAfter(1, do_check_requirements)
-                    return
-                end
-                -- After 10s, proceed anyway (Ollama may not be running)
-            end
-            _check_startup_attempts = nil
-
-            local check_fn = guarded_check_requirements
-            if state.llm_backend == "mlx" and type(models_mgr.force_mlx_check) == "function" then
-                Logger.debug(LOG, string.format("Startup MLX mode: forcing MLX requirements check for model %s", state.llm_model))
-                check_fn = function(model_name, on_ok, on_fail)
-                    models_mgr.force_mlx_check(model_name, on_ok, on_fail, { silent_notifications = false })
-                end
-            end
-
-            check_fn(state.llm_model, function()
-                Logger.info(LOG, string.format("Requirements verified for model %s.", state.llm_model))
-                if state.llm_backend == "mlx" and state.llm_enabled
-                    and keymap and type(keymap.set_llm_enabled) == "function" then
-                    Logger.debug(LOG, "Reactivating MLX predictions.")
-                    pcall(keymap.set_llm_enabled, true)
-                    end
-            end, disable_llm)
-        end
-        hs.timer.doAfter(1, do_check_requirements)
-
-        -- Backup startup path: ensure MLX boot is attempted even if requirements callback chain is skipped.
-        hs.timer.doAfter(3, function()
-            if state.llm_backend == "mlx" and state.llm_enabled and state.llm_model and state.llm_model ~= ""
-                and type(models_mgr.force_mlx_check) == "function" then
-                Logger.debug(LOG, string.format("Startup MLX backup check fired for model %s", state.llm_model))
-                models_mgr.force_mlx_check(state.llm_model, function()
-                    Logger.info(LOG, string.format("Startup MLX backup check succeeded for model %s", state.llm_model))
-                    if keymap and type(keymap.set_llm_enabled) == "function" then
-                        pcall(keymap.set_llm_enabled, true)
-                    end
-                end, function()
-                    Logger.warn(LOG, string.format("Startup MLX backup check failed for model %s", state.llm_model))
-                end, { silent_notifications = false })
-            end
-        end)
-        Logger.info(LOG, "═══════════════ Startup completed for menu_llm ═══════════════")
-    end
+    check_startup = StartupCtrl.new({
+        state                      = state,
+        keymap                     = keymap,
+        models_mgr                 = models_mgr,
+        guarded_check_requirements = guarded_check_requirements,
+        save_prefs                 = save_prefs,
+        update_menu                = update_menu,
+        apply_llm_shortcut         = apply_llm_shortcut,
+        apply_llm_profile_shortcut = apply_llm_profile_shortcut,
+        activate_hotkey            = activate_hotkey,
+        mlx_deps_checker           = mlx_deps_checker,
+        deps                       = deps,
+        get_startup_silence        = get_startup_silence,
+        set_startup_silence        = set_startup_silence,
+        get_trigger_hk             = get_trigger_hk,
+        get_profile_hks            = get_profile_hks,
+    })
 
     --- Returns a menu item for the active download progress shortcut, or nil if no download is running.
     --- @return table|nil The menu item, or nil.
