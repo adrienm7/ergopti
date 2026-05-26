@@ -344,8 +344,8 @@ if Features["shortcuts"]["search"]["enabled"] {
             }
         }
 
-        ; Set the last selected key in Regedit. When we will run Regedit, it will open directly to the target
-        RegWrite(RegPath, "REG_SZ", "HKCU\Software\Microsoft\Windows\CurrentVersion\Applets\Regedit", "LastKey")
+        ; Set the last selected key in Regedit so it opens directly to the target on launch
+        Reg_WriteString("HKCU\Software\Microsoft\Windows\CurrentVersion\Applets\Regedit", "LastKey", RegPath)
         Run("Regedit.exe")
     }
 

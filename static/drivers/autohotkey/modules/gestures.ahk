@@ -1549,17 +1549,12 @@ GestureSaveAssignment(slot, action) {
     TOML_Write(action, ConfigurationFile, "ahk.gestures", slot)
 }
 
-; Writes a single REG_DWORD value, logging and counting failures.
+; Writes a single REG_DWORD value via RegistryLib, counting failures.
 GestureRegWriteDword(ValueName, Value, &ErrorsRef) {
     global GESTURE_REG_PATH
 
-    try {
-        RegWrite(Value, "REG_DWORD", GESTURE_REG_PATH, ValueName)
-        LoggerDebug("gestures", "Wrote {1} = {2}.", ValueName, Value)
-    } catch as e {
+    if (!Reg_WriteDword(GESTURE_REG_PATH, ValueName, Value))
         ErrorsRef += 1
-        LoggerError("gestures", "Failed to write registry value {1}: {2}.", ValueName, e.Message)
-    }
 }
 
 ; Configures Windows touchpad gestures via the registry so that all 10 gesture

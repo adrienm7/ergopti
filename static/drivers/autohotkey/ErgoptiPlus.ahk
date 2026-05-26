@@ -107,6 +107,7 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 ; ``LoggerInit()`` is invoked after the configuration file is parsed so the
 ; minimum log level can be honoured from the very first INFO/START line.
 #Include lib/logger.ahk
+#Include lib/registry.ahk
 
 ; INI helpers extracted to their own lib so the test runner can ``#Include``
 ; them without bootstrapping the rest of the driver.

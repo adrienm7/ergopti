@@ -297,11 +297,9 @@ KL_EnsureGitignore() {
 KL_HostSignature() {
     ; Use HKLM\SOFTWARE\Microsoft\Cryptography\MachineGuid — stable per OS
     ; install, mirrors the macOS IOPlatformUUID role.
-    try {
-        guid := RegRead("HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Cryptography", "MachineGuid")
-        if (guid != "")
-            return guid
-    }
+    guid := Reg_Read("HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Cryptography", "MachineGuid", "")
+    if (guid != "")
+        return guid
     return "fallback:" . A_ComputerName
 }
 
