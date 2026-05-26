@@ -79,7 +79,9 @@ TestGestures_ActionsHaveProperties() {
         if !_GestureIsRealAction(ActionName)
             continue
         Action := GESTURE_ACTIONS[ActionName]
-        AssertTrue(Action.HasOwnProp("Label"), "missing Label for: " . ActionName)
+        ; Labels are no longer stored on the action object — they come from
+        ; _GestureActionLabel() (i18n), which falls back to the raw key name
+        AssertTrue(StrLen(_GestureActionLabel(ActionName)) > 0, "missing Label for: " . ActionName)
         AssertTrue(Action.HasOwnProp("Fn"), "missing Fn for: " . ActionName)
     }
 }
