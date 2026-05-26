@@ -3,7 +3,7 @@
 ==============================================================================
 MODULE: TOML Hotstrings Compiler
 DESCRIPTION:
-Reads the TOML hotstring files under ``static/hotstrings/`` and emits one
+Reads the TOML hotstring files under ``static/drivers/_shared/hotstrings/`` and emits one
 AHK file per category plus a thin ``hotstrings_generated.ahk`` entry-point
 that ``#Include``s all per-category files. This replaces the runtime
 regex-based TOML parser for the bundled categories — the driver boots without
@@ -70,7 +70,7 @@ def _category_file_header(category: str) -> str:
         "; DESCRIPTION:\n"
         "; AUTO-GENERATED FILE — DO NOT EDIT BY HAND.\n"
         "; Regenerate with ``python tools/compile_hotstrings.py`` from the repo root\n"
-        "; whenever the bundled TOML files under ``static/hotstrings/`` change.\n"
+        "; whenever the bundled TOML files under ``static/drivers/_shared/hotstrings/`` change.\n"
         ";\n"
         "; Contains the ``_GenLoad_*`` loader functions and the partial\n"
         "; ``_GENERATED_HOTSTRINGS`` map entries for the ``" + category + "`` category.\n"
@@ -116,7 +116,7 @@ ENTRY_POINT_HEADER: str = """\
 ; DESCRIPTION:
 ; AUTO-GENERATED FILE — DO NOT EDIT BY HAND.
 ; Regenerate with ``python tools/compile_hotstrings.py`` from the repo root
-; whenever the bundled TOML files under ``static/hotstrings/`` change.
+; whenever the bundled TOML files under ``static/drivers/_shared/hotstrings/`` change.
 ;
 ; This file is a thin entry-point that ``#Include``s one generated file per
 ; category. Consumers that already ``#Include`` this file require no change.
@@ -268,7 +268,7 @@ def compile_category(root: Path, category: str) -> tuple[str, list[tuple[str, st
         A 2-tuple of (ahk_file_content, registry_tuples). Returns an empty
         content string and empty list when the TOML file is absent.
     """
-    toml_path = root / "static" / "hotstrings" / f"{category}.toml"
+    toml_path = root / "static" / "drivers" / "_shared" / "hotstrings" / f"{category}.toml"
     if not toml_path.exists():
         print(f"[compile_hotstrings] skip (missing): {toml_path}", file=sys.stderr)
         return "", []
