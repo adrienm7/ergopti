@@ -1,4 +1,4 @@
-﻿; modules/shortcuts/base_modifier.ahk
+; modules/shortcuts/base_modifier.ahk
 
 ; ==============================================================================
 ; MODULE: Shortcuts — Base Modifier Combos
@@ -9,6 +9,7 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+
 
 
 
@@ -42,24 +43,24 @@ LAltCapsLockShortcut() {
     ; bracketing needed -- inline v2 if/else cascade (action table is the
     ; SIMPLE_ACTIONS Map that used to live in lib/dispatchers.ahk).
     if Features["shortcuts"]["lalt_caps_lock"]["backspace"] {
-        SendEvent("{BackSpace}")
+        TextPressKey("BackSpace", [])
     } else if Features["shortcuts"]["lalt_caps_lock"]["caps_lock"] {
         ToggleCapsLock()
     } else if Features["shortcuts"]["lalt_caps_lock"]["caps_word"] {
         ToggleCapsWord()
     } else if Features["shortcuts"]["lalt_caps_lock"]["ctrl_backspace"] {
-        SendInput("^{BackSpace}")
+        TextPressKey("BackSpace", ["Ctrl"])
     } else if Features["shortcuts"]["lalt_caps_lock"]["ctrl_delete"] {
-        SendInput("^{Delete}")
+        TextPressKey("Delete", ["Ctrl"])
     } else if Features["shortcuts"]["lalt_caps_lock"]["delete"] {
-        SendInput("{Delete}")
+        TextPressKey("Delete", [])
     } else if Features["shortcuts"]["lalt_caps_lock"]["enter"] {
-        SendInput("{Enter}")
+        TextPressKey("Enter", [])
     } else if Features["shortcuts"]["lalt_caps_lock"]["escape"] {
-        SendInput("{Escape}")
+        TextPressKey("Escape", [])
     } else if Features["shortcuts"]["lalt_caps_lock"]["one_shot_shift"] {
         OneShotShift()
     } else if Features["shortcuts"]["lalt_caps_lock"]["tab"] {
-        SendInput("{Tab}")
+        TextPressKey("Tab", [])
     }
 }
