@@ -64,16 +64,11 @@ luac.out
 # ===============================================
 # ===============================================
 
-# Machine-specific config-dir bootstrap, written at first launch
+# Runtime-only files dropped into _generated/ — not built from source
 static/ergopti_plus/windows/_generated/paths.toml
 static/ergopti_plus/macos/_generated/paths.toml
-
-# Forwarding stub written at runtime by EnsurePersonalShortcutsFile
 static/ergopti_plus/windows/_generated/personal_shortcuts.ahk
-
-# Dashboard prefetch sidecars, regenerated on every launch
-static/ergopti_plus/windows/_generated/prefetch_metrics_typing.json
-static/ergopti_plus/windows/_generated/prefetch_metrics_apps.json
+static/ergopti_plus/windows/_generated/prefetch_*.json
 
 # Corpus working copy produced by build scripts
 static/corpus/modifie/
