@@ -1,20 +1,30 @@
 <script>
+	import { onMount } from 'svelte';
 	import Ergopti from '$lib/components/Ergopti.svelte';
 	import ErgoptiPlus from '$lib/components/ErgoptiPlus.svelte';
 	import SFB from '$lib/components/SFB.svelte';
 	import BetaWarning from '$lib/components/BetaWarning.svelte';
-	import { version } from '$lib/stores_infos.js';
-	import { getLatestVersion } from '$lib/js/getVersions.js';
+	import { getRelease, getRawUrl } from '$lib/js/getGitHubRelease.js';
 	import { branchForInstall } from '$lib/js/isDev.js';
-	let versionValue, version_linux;
-	version.subscribe((value) => {
-		versionValue = value;
-		version_linux = getLatestVersion('linux', value)?.replaceAll('.', '_');
+
+	/** @type {Awaited<ReturnType<typeof getRelease>>} */
+	let release = null;
+	$: urlKanata = release?.url("kanata.kbd") ?? "#";
+
+	const branch = branchForInstall();
+
+	// Commande bash d'installation : pointe vers le bon branch selon le contexte
+	const cmd = `branch="${branch}"; curl -fsSL "https://raw.githubusercontent.com/adrienm7/ergopti/$branch/static/ergopti/linux/xkb_installation/install.sh" | BRANCH="$branch" bash`;
+
+	// URLs des scripts d'installation (servis depuis le raw du dépôt au bon branch)
+	const urlInstallSh = getRawUrl("static/ergopti/linux/xkb_installation/install.sh");
+	const urlDetectSh = getRawUrl("static/ergopti/linux/xkb_installation/detect_installation_method.sh");
+	const urlInstallerClean = getRawUrl("static/ergopti/linux/xkb_installation/xkb_files_installer_clean.py");
+	const urlInstallerLegacy = getRawUrl("static/ergopti/linux/xkb_installation/xkb_files_installer_legacy.py");
+
+	onMount(async () => {
+		release = await getRelease();
 	});
-
-	import { base } from '$app/paths';
-
-	const cmd = `branch="${branchForInstall()}"; curl -fsSL "https://raw.githubusercontent.com/adrienm7/ergopti/$branch/static/ergopti/linux/xkb_installation/install.sh" | BRANCH="$branch" bash`;
 </script>
 
 <h2 id="linux"><i class="icon-linux purple" style="margin-right:0.15em"></i>Installation Linux</h2>
@@ -92,18 +102,19 @@
 	L'installation nécessite <code>sudo</code>.
 </p>
 <div class="download-buttons">
-	<a href={base + '/ergopti/linux/xkb_installation/install.sh'} download>
+	<a href={urlInstallSh} download="install.sh">
 		<button class="alt-button"><i class="icon-linux"></i> Script complet d’installation</button>
 	</a>
-	<a href={base + '/ergopti/linux/xkb_installation/detect_installation_method.sh'} download>
+	<a href={urlDetectSh} download="detect_installation_method.sh">
 		<button class="alt-button"><i class="icon-linux"></i> Script de détection de méthode</button>
 	</a>
 </div>
 <div class="download-buttons" style="margin-top: 1em;">
-	<a href={base + '/ergopti/linux/xkb_installation/xkb_files_installer_clean.py'} download>
+	<a href={urlInstallerClean} download="xkb_files_installer_clean.py">
 		<button><i class="icon-linux"></i> Installateur Clean</button>
 	</a>
-	<a href={base + '/ergopti/linux/xkb_installation/xkb_files_installer_legacy.py'} download>
+	<a href={urlInstallerLegacy} download="xkb_files_installer_legacy.py">
+
 		<button><i class="icon-linux"></i> Installateur Legacy</button>
 	</a>
 </div>
@@ -230,8 +241,9 @@
 <tiny-space></tiny-space>
 
 <div class="download-buttons">
-	<a href={base + '/ergopti_plus/kanata/kanata.kbd'} download>
+	<a href={urlKanata} download={!!release}>
 		<button
+			disabled={!release}
 			><i class="icon-kanata" style="font-size:0.8em; vertical-align:0; margin-right:0.25em"
 				><span class="path1"></span><span class="path2"></span><span class="path3"></span></i
 			>
@@ -260,7 +272,7 @@
 <tiny-space></tiny-space>
 
 <div class="download-buttons">
-	<a href="https://github.com/adrienm7/ergopti/tree/main/static/ergopti_plus/espanso" target="_blank">
+	<a href="https://github.com/adrienm7/ergopti/tree/{branch}/static/ergopti_plus/espanso" target="_blank">
 		<button
 			><i class="icon-espanso" style="font-size:0.8em; vertical-align:0; margin-right:0.25em"></i>
 			Dossier de snippets Espanso</button

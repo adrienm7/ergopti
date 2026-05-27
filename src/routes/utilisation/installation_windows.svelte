@@ -1,14 +1,21 @@
 <script>
+	import { onMount } from 'svelte';
 	import Ergopti from '$lib/components/Ergopti.svelte';
 	import ErgoptiPlus from '$lib/components/ErgoptiPlus.svelte';
 	import SFB from '$lib/components/SFB.svelte';
-	import { version, discordLink } from '$lib/stores_infos.js';
-	import { getLatestVersion } from '$lib/js/getVersions.js';
-	let versionValue, version_mineure_kbdedit_exe, version_mineure_kbdedit_kbe;
-	version.subscribe((value) => {
-		versionValue = value;
-		version_mineure_kbdedit_exe = getLatestVersion('kbdedit_exe', versionValue);
-		version_mineure_kbdedit_kbe = getLatestVersion('kbdedit_kbe', versionValue);
+	import { discordLink } from '$lib/stores_infos.js';
+	import { getRelease, getRawUrl } from '$lib/js/getGitHubRelease.js';
+
+	/** @type {Awaited<ReturnType<typeof getRelease>>} */
+	let release = null;
+	// Extrait « 2.2.1 » depuis « v2.2.1 » ou « v2.2.1-dev.3 »
+	$: tag = release?.tag?.replace(/^v/, "") ?? "…";
+	$: urlKbdEdit = release?.url("Ergopti_windows.exe") ?? "#";
+	$: urlAhkExe = release?.url("ErgoptiPlus.exe") ?? "#";
+	const urlAhkSrc = getRawUrl("static/ergopti_plus/windows/ErgoptiPlus.ahk");
+
+	onMount(async () => {
+		release = await getRelease();
 	});
 </script>
 
@@ -25,28 +32,19 @@
 	supporté.
 </p>
 
-{#if version_mineure_kbdedit_exe !== undefined}
-	<div class="download-buttons">
-		<a href="ergopti/windows/Ergopti_v{version_mineure_kbdedit_exe}.exe" download>
-			<button
-				><i class="icon-windows" style="vertical-align:-0.05em"></i>
-				Installateur KbdEdit d’Ergopti v{version_mineure_kbdedit_exe}</button
-			>
-		</a>
-		<tiny-space></tiny-space>
-		<a href="ergopti/windows/Ergopti_v{version_mineure_kbdedit_kbe}.kbe" download>
-			<button class="alt-button"
-				><i class="icon-windows" style="vertical-align:-0.05em"></i> Fichier source KbdEdit
-				d’Ergopti v{version_mineure_kbdedit_kbe}</button
-			>
-		</a>
-	</div>
-{/if}
+<div class="download-buttons">
+	<a href={urlKbdEdit} download={!!release}>
+		<button disabled={!release}
+			><i class="icon-windows" style="vertical-align:-0.05em"></i>
+			Installateur KbdEdit d’Ergopti {tag}</button
+		>
+	</a>
+</div>
 
 <small-space></small-space>
 
 <p>
-	Il suffit d’exécuter le fichier <code>Ergopti_v{version_mineure_kbdedit_exe}.exe</code> et de cliquer
+	Il suffit d’exécuter le fichier <code>Ergopti_windows.exe</code> et de cliquer
 	sur le bouton d’installation pour installer le pilote sur Windows. Ensuite, il est conseillé de redémarrer
 	l’ordinateur pour être sûr que le pilote soit bien pris en compte.
 </p>
@@ -119,16 +117,16 @@
 <small-space></small-space>
 
 <div class="download-buttons">
-	<a href="ergopti_plus/windows/ErgoptiPlus.ahk" download>
+	<a href={urlAhkSrc} download="ErgoptiPlus.ahk">
 		<button
 			><i class="icon-autohotkey" style="vertical-align:-0.08em;"></i>
 			ErgoptiPlus.ahk</button
 		>
 	</a>
-	<a href="ergopti_plus/windows/ErgoptiPlus.exe" download>
-		<button class="alt-button"
+	<a href={urlAhkExe} download={!!release}>
+		<button class="alt-button" disabled={!release}
 			><i class="icon-autohotkey" style="vertical-align:-0.08em;"></i>
-			ErgoptiPlus compilé</button
+			ErgoptiPlus compilé {tag}</button
 		>
 	</a>
 </div>

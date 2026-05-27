@@ -1,4 +1,4 @@
-﻿﻿; adapters/window_info.ahk
+﻿; adapters/window_info.ahk
 
 ; ==============================================================================
 ; MODULE: WindowInfo Adapter (AutoHotkey)

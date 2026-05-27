@@ -1,4 +1,4 @@
-﻿﻿; adapters/timer_scheduler.ahk
+﻿; adapters/timer_scheduler.ahk
 
 ; ==============================================================================
 ; MODULE: TimerScheduler Adapter (AutoHotkey)
