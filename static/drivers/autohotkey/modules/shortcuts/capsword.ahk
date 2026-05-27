@@ -42,7 +42,7 @@ UpdateCapsLockLED() {
 #HotIf CapsWordEnabled
 SC039::
 {
-    SendEvent("{Space}")
+    TextPressKey("Space", [])
     Keywait("SC039") ; Solves bug of 2 sent Spaces when exiting CapsWord with a Space
     DisableCapsWord()
 }
@@ -50,7 +50,7 @@ SC039::
 ; Big Enter key
 SC01C::
 {
-    SendEvent("{Enter}")
+    TextPressKey("Enter", [])
     DisableCapsWord()
 }
 

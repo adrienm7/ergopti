@@ -1,4 +1,4 @@
-﻿; modules/shortcuts/win.ahk
+; modules/shortcuts/win.ahk
 
 ; ==============================================================================
 ; MODULE: Shortcuts — Win-key Combos
@@ -15,11 +15,11 @@
 
 
 
-; =================================
+; ================================
 ; ================================
 ; ======= 5/ WIN SHORTCUTS =======
 ; ================================
-; =================================
+; ================================
 
 #HotIf Features["shortcuts"]["win_caps_lock"]
 ; Win + "CapsLock" to toggle CapsLock
@@ -88,14 +88,14 @@ if Features["shortcuts"]["take_note"]["enabled"] {
             WinPattern := FileName
 
             WindowAlreadyOpen := False
-            if WinExist(WinPattern) {
+            if WMExists(WinPattern) {
                 WindowAlreadyOpen := True
-                WinActivate(WinPattern)
+                WMActivate(WinPattern)
                 WinWaitActive(WinPattern, , 3)
             } else {
                 Run('notepad.exe "' . FilePath . '"')
                 WinWait(FileName, , 7)
-                WinActivate(FileName)
+                WMActivate(FileName)
                 WinWaitActive(FileName, , 3)
             }
 
@@ -175,7 +175,7 @@ if Features["shortcuts"]["move"] {
     AwakeReturnToOrigin() {
         global ActivitySimulation, AwakeOriginX, AwakeOriginY
         if ActivitySimulation {
-            DllCall("SetCursorPos", "int", AwakeOriginX, "int", AwakeOriginY)
+            MCSetPos(AwakeOriginX, AwakeOriginY)
         }
     }
 
@@ -220,7 +220,7 @@ if Features["shortcuts"]["move"] {
         ; Move to a random offset around the captured origin (+-AWAKE_JITTER_PX)
         OffX := Random(-AWAKE_JITTER_PX, AWAKE_JITTER_PX)
         OffY := Random(-AWAKE_JITTER_PX, AWAKE_JITTER_PX)
-        DllCall("SetCursorPos", "int", AwakeOriginX + OffX, "int", AwakeOriginY + OffY)
+        MCSetPos(AwakeOriginX + OffX, AwakeOriginY + OffY)
 
         ; Signal OS activity without a visible keystroke
         SendFinalResult("{VKFF}")
@@ -315,8 +315,8 @@ if Features["shortcuts"]["search"]["enabled"] {
     ; RegPath accepts both HKEY_LOCAL_MACHINE and HKLM formats.
     RegJump(RegPath) {
         ; Close existing Registry Editor to ensure target key is selected next time
-        if WinExist("Registry Editor") {
-            WinKill("Registry Editor")
+        if WMExists("Registry Editor") {
+            WMKill("Registry Editor")
         }
 
         ; Normalize leading Computer\ prefix to French "Ordinateur\"
@@ -368,12 +368,12 @@ if Features["shortcuts"]["search"]["enabled"] {
         }
     }
     ChangeButtonNames() {
-        if not WinExist(t("dialog.path_copy.title"))
+        if not WMExists(t("dialog.path_copy.title"))
             return ; Keep waiting
         SetTimer ChangeButtonNames, 0
-        WinActivate()
-        ControlSetText(t("dialog.path_copy.btn_quit"), "Button1")
-        ControlSetText(t("dialog.path_copy.btn_backslash"), "Button2")
+        WMActivate()
+        ControlSetText(t("dialog.path_copy.btn_quit"), "Button1") ; TODO(2.1.3): no adapter yet
+        ControlSetText(t("dialog.path_copy.btn_backslash"), "Button2") ; TODO(2.1.3): no adapter yet
     }
 }
 
@@ -455,7 +455,7 @@ if Features["shortcuts"]["teleport_mouse"] {
         TargetX := Target.Left + (Target.Right - Target.Left) // 2
         TargetY := Target.Top + (Target.Bottom - Target.Top) // 2
 
-        DllCall("SetCursorPos", "int", TargetX, "int", TargetY)
+        MCSetPos(TargetX, TargetY)
         SpotlightMouseAt(TargetX, TargetY, 3000)
     }
 }
@@ -513,13 +513,13 @@ if Features["shortcuts"]["open_downloads"] {
         ; compare its location bar URL -- reliable across localisations
         ; (avoids matching "Téléchargements" vs "Downloads" titles).
         try {
-            for Win in ComObject("Shell.Application").Windows {
+            for Win in ComObject("Shell.Application").Windows { ; TODO(2.1.3): route through AppLauncher port
                 try {
                     LocalPath := DOMPathToFilesystem(Win.LocationURL)
                     if (LocalPath != "" and StrLower(LocalPath) == StrLower(DownloadsPath)) {
                         Hwnd := Win.HWND
-                        if WinExist("ahk_id " Hwnd) {
-                            WinActivate("ahk_id " Hwnd)
+                        if WMExists("ahk_id " Hwnd) {
+                            WMActivate("ahk_id " Hwnd)
                             WinShow("ahk_id " Hwnd)
                             return
                         }
@@ -534,7 +534,7 @@ if Features["shortcuts"]["open_downloads"] {
         ; as a drive letter.
         Run('explorer.exe "' DownloadsPath '"')
         if WinWait("ahk_class CabinetWClass", , 2) {
-            WinActivate
+            WMActivate("ahk_class CabinetWClass")
         }
     }
 
