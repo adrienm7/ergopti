@@ -78,6 +78,19 @@ function M.load_with_stubs(module_name, hs_overrides)
 
 	_G.hs = hs_stub
 
+	-- Inject a minimal lib.i18n stub when the cache is empty or stale so that
+	-- modules calling i18n.get() at require-time (terminators, conflicts, actions,
+	-- profiles …) never crash with "attempt to call a nil value (field 'get')".
+	-- Tests that need a richer stub can override package.loaded["lib.i18n"] before
+	-- calling load_with_stubs; this default is only applied when no entry exists.
+	if package.loaded["lib.i18n"] == nil then
+		package.loaded["lib.i18n"] = {
+			get        = function(key) return key end,
+			get_locale = function() return "fr" end,
+			set_locale = function() end,
+		}
+	end
+
 	-- Register sub-module aliases so that `require("hs.json")` etc. resolve to
 	-- the same tables as `hs.json`. Some production modules call require("hs.*")
 	-- directly rather than accessing the global `hs` table.
