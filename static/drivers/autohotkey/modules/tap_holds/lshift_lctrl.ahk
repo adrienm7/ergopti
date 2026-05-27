@@ -1,4 +1,5 @@
 ﻿; modules/tap_holds/lshift_lctrl.ahk
+; Requires: TextSender
 
 ; ==============================================================================
 ; MODULE: Tap-Holds — LShift and LCtrl
@@ -32,7 +33,7 @@
         and (TimeAfter - TimeBefore) >= TapMinDurationMs()
         and A_PriorKey == "LShift"
     ) { ; A_PriorKey is to be able to fire shortcuts very quickly, under the tap time
-        SendInput("{LCtrl Down}c{LCtrl Up}")
+        TextSend("^c", "")
     }
 }
 #HotIf
@@ -53,10 +54,10 @@
         tap
         and (TimeAfter - TimeBefore) >= TapMinDurationMs()
         and A_PriorKey == "LControl"
-        and not GetKeyState("SC03A", "P") ; "CapsLock"
-        and not GetKeyState("SC038", "P") ; "LAlt"
+        and not GetKeyState("SC03A", "P") ; TODO(2.1.3): route through KeyState port — "CapsLock"
+        and not GetKeyState("SC038", "P") ; TODO(2.1.3): route through KeyState port — "LAlt"
     ) {
-        SendInput("{LCtrl Down}v{LCtrl Up}")
+        TextSend("^v", "")
     }
 }
 #HotIf

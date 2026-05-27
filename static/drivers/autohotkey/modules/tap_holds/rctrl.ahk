@@ -1,4 +1,5 @@
 ﻿; modules/tap_holds/rctrl.ahk
+; Requires: TextSender
 
 ; ==============================================================================
 ; MODULE: Tap-Holds — RCtrl
@@ -23,16 +24,17 @@
 ; RCtrl becomes BackSpace, and Delete on Shift
 SC11D::
 {
-    if GetKeyState("LShift", "P") {
-        SendInput("{Delete}")
-    } else if TapHoldTapAction(TapHold, "left_alt") == "one_shot_shift" and GetKeyState("SC038", "P") {
+    if GetKeyState("LShift", "P") { ; TODO(2.1.3): route through KeyState port
+        TextPressKey("Delete", "")
+    } else if TapHoldTapAction(TapHold, "left_alt") == "one_shot_shift" and GetKeyState("SC038", "P") { ; TODO(2.1.3): route through KeyState port
         OneShotShiftFix()
-        SendInput("{Right}{BackSpace}") ; = Delete, but we cannot simply use Delete, as it would do Ctrl + Alt + Delete and Windows would interpret it
+        TextPressKey("Right", "")
+        TextPressKey("BackSpace", "") ; = Delete, but we cannot simply use Delete, as it would do Ctrl + Alt + Delete and Windows would interpret it
     } else {
-        SendEvent("{BackSpace}") ; Event to be able to correct hostrings and still trigger them afterwards
+        TextPressKey("BackSpace", "") ; Event to be able to correct hotstrings and still trigger them afterwards
         Sleep(KEY_REPEAT_INITIAL_DELAY_MS)
-        while GetKeyState("SC11D", "P") {
-            SendEvent("{BackSpace}")
+        while GetKeyState("SC11D", "P") { ; TODO(2.1.3): route through KeyState port
+            TextPressKey("BackSpace", "")
             Sleep(KEY_REPEAT_INTERVAL_MS)
         }
     }
@@ -44,23 +46,23 @@ SC11D::
 ~SC11D:: {
     tap := KeyWait("RControl", "T" . TapHoldDuration(TapHold, "right_ctrl"))
     if (tap and A_PriorKey == "RControl") {
-        SendEvent("{RCtrl Up}")
-        SendEvent("{Tab}") ; To be able to trigger hotstrings with a Tab ending character
+        TextPressKey("RCtrl", "Up")
+        TextPressKey("Tab", "") ; To be able to trigger hotstrings with a Tab ending character
     }
 }
 
-+SC11D:: SendInput("+{Tab}")
-^SC11D:: SendInput("^{Tab}")
-^+SC11D:: SendInput("^+{Tab}")
-#SC11D:: SendEvent("#{Tab}") ; SendInput doesn't work in that case
++SC11D:: TextPressKey("Tab", "Shift")
+^SC11D:: TextPressKey("Tab", "Ctrl")
+^+SC11D:: TextPressKey("Tab", "Ctrl Shift")
+#SC11D:: TextPressKey("Tab", "Win") ; TextPressKey must be used here — SendInput doesn't work in that case
 #HotIf
 
 #HotIf TapHoldTapAction(TapHold, "right_ctrl") == "one_shot_shift" and not LayerEnabled
 ; Tap-hold on "RCtrl" : OneShotShift on tap, Shift on hold
 SC11D:: {
     OneShotShift()
-    SendEvent("{LShift Down}")
+    TextPressKey("LShift", "Down")
     KeyWait("SC11D")
-    SendEvent("{LShift Up}")
+    TextPressKey("LShift", "Up")
 }
 #HotIf
