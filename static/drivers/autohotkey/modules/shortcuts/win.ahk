@@ -1,4 +1,4 @@
-; modules/shortcuts/win.ahk
+﻿; modules/shortcuts/win.ahk
 
 ; ==============================================================================
 ; MODULE: Shortcuts — Win-key Combos

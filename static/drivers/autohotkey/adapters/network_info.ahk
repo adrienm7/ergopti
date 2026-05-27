@@ -1,4 +1,4 @@
-; adapters/network_info.ahk
+﻿; adapters/network_info.ahk
 
 ; ==============================================================================
 ; MODULE: NetworkInfo Adapter (AutoHotkey)

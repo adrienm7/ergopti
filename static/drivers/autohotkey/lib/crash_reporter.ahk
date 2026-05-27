@@ -1,4 +1,4 @@
-; drivers/autohotkey/lib/crash_reporter.ahk
+﻿; drivers/autohotkey/lib/crash_reporter.ahk
 
 ; ==============================================================================
 ; MODULE: Crash Reporter

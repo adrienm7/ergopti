@@ -1,4 +1,4 @@
-; static/drivers/autohotkey/adapters/app_launcher.ahk
+﻿; static/drivers/autohotkey/adapters/app_launcher.ahk
 
 ; ==============================================================================
 ; MODULE: AppLauncher Adapter (AutoHotkey)

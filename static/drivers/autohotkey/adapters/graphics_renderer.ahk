@@ -1,4 +1,4 @@
-; adapters/graphics_renderer.ahk
+﻿; adapters/graphics_renderer.ahk
 
 ; ==============================================================================
 ; MODULE: GraphicsRenderer Adapter (AutoHotkey)
