@@ -166,6 +166,12 @@ local function make_vkb(trigger, replacement, opts)
 		expected_synthetic_deletes = 0,
 		groups                     = {},
 		current_group              = "e2e",
+		-- Required by word_boundary_blocks: treat start-of-buffer as a word
+		-- boundary so is_word triggers fire correctly when buffer = trigger.
+		start_is_word_boundary     = true,
+		-- No-op stubs for callbacks invoked by perform_text_replacement after a
+		-- successful expansion. The E2E harness does not exercise these paths.
+		suppress_rescan            = function() end,
 	}
 
 	Registry.init({
