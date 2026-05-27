@@ -84,7 +84,10 @@ static/ergopti_plus/windows/_generated/prefetch_*.json
 static/corpus/modifie/
 
 # Test files
-static/ergopti_plus/windows/tests/e2e/test_results.txt
+test_results.txt
+
+# Stryker mutation testing temporary directory
+.stryker-tmp/
 
 
 
