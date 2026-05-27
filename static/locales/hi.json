@@ -1956,5 +1956,9 @@
 	"updater.update_dialog_open": "GitHub पर खोलें",
 	"updater.update_dialog_title": "ErgoptiPlus — अपडेट इंस्टॉल करें",
 	"updater.version_message": "ErgoptiPlus {1}{2}\n\nGitHub पर रिलीज़ पेज खोलें?",
-	"vscode.reload_required": "टाइपिंग एक्सटेंशन सक्रिय करने के लिए VSCode पुनः लोड करें (Cmd+Shift+P > Reload Window)"
+	"vscode.reload_required": "टाइपिंग एक्सटेंशन सक्रिय करने के लिए VSCode पुनः लोड करें (Cmd+Shift+P > Reload Window)",
+	"crash.report.prompt_title": "क्रैश रिपोर्ट — ErgoptiPlus",
+	"crash.report.prompt_body": "एक अप्रत्याशित त्रुटि आई। क्या आप बाद की समीक्षा के लिए एक गुमनाम रिपोर्ट (संस्करण, OS, त्रुटि संदेश) स्थानीय रूप से सहेजना चाहते हैं?\n\nइंटरनेट पर कोई डेटा नहीं भेजा जाता और कोई कीस्ट्रोक रिकॉर्ड नहीं किया जाता।",
+	"crash.report.saved": "क्रैश रिपोर्ट सहेजी गई",
+	"crash.report.declined": "क्रैश रिपोर्ट अस्वीकृत"
 }

@@ -78,6 +78,13 @@ ErgoptiGlobalErrorHandler(Exc, Mode) {
     ; yet when an early-boot error fires the handler.
     try LoggerError("ErgoptiPlus", "Uncaught error: {1}",
         Exc.Message . (Exc.HasProp("Stack") ? " | " . Exc.Stack : ""))
+    ; Offer the user an opt-in crash report before surfacing the generic alert.
+    ; CrashReport_PromptUser is guarded internally so a failure here cannot
+    ; re-enter the error handler.
+    try {
+        Report := CrashReport_Build(Exc)
+        CrashReport_PromptUser(Report)
+    }
     ; Surface the error to the user once, without blocking subsequent keys
     try {
         MsgBox(t("ergopti.error_caught") . "`n`n" . Exc.Message . "`n`n" . (Exc.HasProp("Stack") ? Exc.Stack :
@@ -145,6 +152,7 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 #Include lib/llm_defaults.ahk
 #Include lib/updater.ahk
 #Include lib/healthcheck.ahk
+#Include lib/crash_reporter.ahk
 #Include lib/json.ahk
 ; i18n module — must come after toml_loader.ahk (TOML_BatchWrite), logger.ahk, and json.ahk
 #Include lib/i18n.ahk

@@ -1956,5 +1956,9 @@
 	"updater.update_dialog_open": "فتح على GitHub",
 	"updater.update_dialog_title": "ErgoptiPlus — تثبيت التحديث",
 	"updater.version_message": "ErgoptiPlus {1}{2}\n\nهل تريد فتح صفحة الإصدارات في GitHub؟",
-	"vscode.reload_required": "يرجى إعادة تحميل VSCode (Cmd+Shift+P > Reload Window) لتفعيل امتداد الكتابة"
+	"vscode.reload_required": "يرجى إعادة تحميل VSCode (Cmd+Shift+P > Reload Window) لتفعيل امتداد الكتابة",
+	"crash.report.prompt_title": "تقرير الأعطال — ErgoptiPlus",
+	"crash.report.prompt_body": "حدث خطأ غير متوقع. هل تريد حفظ تقرير مجهول الهوية (الإصدار، نظام التشغيل، رسالة الخطأ) محلياً لمراجعته لاحقاً؟\n\nلا يتم إرسال أي بيانات عبر الإنترنت ولا يتم تسجيل أي ضغطة مفتاح.",
+	"crash.report.saved": "تم حفظ تقرير الأعطال",
+	"crash.report.declined": "تم رفض تقرير الأعطال"
 }

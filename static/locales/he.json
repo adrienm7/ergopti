@@ -1956,5 +1956,9 @@
 	"updater.update_dialog_open": "פתח ב-GitHub",
 	"updater.update_dialog_title": "ErgoptiPlus — התקנת עדכון",
 	"updater.version_message": "ErgoptiPlus {1}{2}\n\nלפתוח את עמוד ההפצות ב-GitHub?",
-	"vscode.reload_required": "טען מחדש את VSCode (Cmd+Shift+P > Reload Window) להפעלת תוסף הכתיבה"
+	"vscode.reload_required": "טען מחדש את VSCode (Cmd+Shift+P > Reload Window) להפעלת תוסף הכתיבה",
+	"crash.report.prompt_title": "דוח קריסה — ErgoptiPlus",
+	"crash.report.prompt_body": "אירעה שגיאה בלתי צפויה. האם ברצונך לשמור דוח אנונימי (גרסה, מערכת הפעלה, הודעת שגיאה) מקומית לבדיקה מאוחרת?\n\nאין נתונים הנשלחים דרך האינטרנט ואין הקשות מקלדת נרשמות.",
+	"crash.report.saved": "דוח הקריסה נשמר",
+	"crash.report.declined": "דוח הקריסה נדחה"
 }

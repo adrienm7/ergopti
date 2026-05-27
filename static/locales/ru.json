@@ -1956,5 +1956,9 @@
 	"updater.update_dialog_open": "Открыть на GitHub",
 	"updater.update_dialog_title": "ErgoptiPlus — Установка обновления",
 	"updater.version_message": "ErgoptiPlus {1}{2}\n\nОткрыть страницу выпусков на GitHub?",
-	"vscode.reload_required": "Перезагрузите VSCode (Cmd+Shift+P > Reload Window), чтобы активировать расширение набора текста"
+	"vscode.reload_required": "Перезагрузите VSCode (Cmd+Shift+P > Reload Window), чтобы активировать расширение набора текста",
+	"crash.report.prompt_title": "Отчёт о сбое — ErgoptiPlus",
+	"crash.report.prompt_body": "Произошла непредвиденная ошибка. Хотите сохранить анонимный отчёт (версия, ОС, сообщение об ошибке) локально для последующего анализа?\n\nДанные не передаются через интернет и нажатия клавиш не записываются.",
+	"crash.report.saved": "Отчёт о сбое сохранён",
+	"crash.report.declined": "Отчёт о сбое отклонён"
 }

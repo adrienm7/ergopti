@@ -95,6 +95,7 @@ end
 
 local i18n               = require("lib.i18n")
 local locale_mod         = require("lib.locale")
+local crash_reporter     = require("lib.crash_reporter")
 
 -- Wire i18n → locale so set_locale() updates the JSON loader's active locale.
 -- Must run before any menu builder calls i18n.get() or locale_mod.get().
@@ -148,6 +149,20 @@ local ui_restore         = require("lib.ui_restore")
 Logger.set_error_notification_handler(function(module_name, message)
 	pcall(notifications.notify, i18n.get("common.error_prefix") .. tostring(module_name), message, "error")
 end)
+
+-- Global uncaught-error handler: offer the user an opt-in crash report.
+-- Hammerspoon surfaces unhandled errors via hs.crash.crashLog, but there is no
+-- official OnError hook; we register a message watcher on the HS console to
+-- catch errors bubbled up from coroutines and timers.
+-- The simplest cross-version approach is to wrap the protected-call pattern in
+-- every timer/callback, but we also expose a direct entry point here so any
+-- module can call it after a pcall failure it cannot recover from.
+_G.ergopti_report_crash = function(err, ctx)
+	pcall(function()
+		local report = crash_reporter.report(err, ctx)
+		crash_reporter.prompt_user(report)
+	end)
+end
 
 
 

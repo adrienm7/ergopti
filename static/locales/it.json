@@ -1956,5 +1956,9 @@
 	"updater.update_dialog_open": "Apri su GitHub",
 	"updater.update_dialog_title": "ErgoptiPlus — Installa aggiornamento",
 	"updater.version_message": "ErgoptiPlus {1}{2}\n\nAprire la pagina delle release su GitHub?",
-	"vscode.reload_required": "Ricaricare VSCode (Cmd+Shift+P > Reload Window) per attivare l’estensione di digitazione"
+	"vscode.reload_required": "Ricaricare VSCode (Cmd+Shift+P > Reload Window) per attivare l’estensione di digitazione",
+	"crash.report.prompt_title": "Rapporto di errore — ErgoptiPlus",
+	"crash.report.prompt_body": "Si è verificato un errore imprevisto. Desideri salvare un rapporto anonimo (versione, OS, messaggio di errore) in locale per una revisione successiva?\n\nNessun dato viene inviato via internet e nessun tasto viene registrato.",
+	"crash.report.saved": "Rapporto di errore salvato",
+	"crash.report.declined": "Rapporto di errore rifiutato"
 }

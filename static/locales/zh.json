@@ -1956,5 +1956,9 @@
 	"updater.update_dialog_open": "在 GitHub 上打开",
 	"updater.update_dialog_title": "ErgoptiPlus — 安装更新",
 	"updater.version_message": "ErgoptiPlus {1}{2}\n\n在 GitHub 上打开发布页面?",
-	"vscode.reload_required": "请重新加载 VSCode（Cmd+Shift+P > Reload Window）以激活输入扩展"
+	"vscode.reload_required": "请重新加载 VSCode（Cmd+Shift+P > Reload Window）以激活输入扩展",
+	"crash.report.prompt_title": "崩溃报告 — ErgoptiPlus",
+	"crash.report.prompt_body": "发生了意外错误。是否要将匿名报告（版本、操作系统、错误消息）保存到本地以供日后查看？\n\n不会通过互联网发送任何数据，也不会记录任何按键。",
+	"crash.report.saved": "崩溃报告已保存",
+	"crash.report.declined": "崩溃报告已拒绝"
 }
