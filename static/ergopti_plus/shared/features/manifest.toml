@@ -2648,7 +2648,7 @@ description_key = "menu.hs.hotstrings.preview_star_enabled"
 # Tap-hold defaults are NOT declared in this manifest. They live in their own
 # template file (one source, generates per-driver config files at first boot):
 #
-#   _shared/tap_hold/defaults.toml
+#   windows/data/tap_hold/defaults.toml
 #
 # Reason: tap_hold has its own schema (tap_hold.schema.json) with mutually
 # exclusive ``hold_layer`` and ``hold_modifier`` constraints that don't fit the

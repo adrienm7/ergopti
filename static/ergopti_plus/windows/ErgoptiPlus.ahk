@@ -606,7 +606,7 @@ if !ManifestEnsureLoaded() {
 global Features := ManifestBuildFeaturesMap()
 ApplyConfigToml(Features, _ConfigDir . "ahk\config.toml")
 global TapHold := LoadTapHoldToml(_ConfigDir . "ahk\tap_hold.toml",
-	_StaticDir . "\drivers\_shared\tap_hold\defaults.toml")
+	_StaticDir . "\ergopti_plus\windows\data\tap_hold\defaults.toml")
 
 ; Count the exact number of hotstrings that will be generated for a DynamicHotstrings
 ; section — mirrors the same threshold logic used in hotstrings.ahk section 5.
