@@ -533,3 +533,72 @@ jobs:
                       git push origin "$tag"
                       echo "Tag '$tag' pushed — release.yml will fire now."
                   fi
+
+
+# =================================================
+# =================================================
+# ======= 6/ Pre-release (dev branch only) =======
+# =================================================
+# =================================================
+
+    pre-release:
+        name: "Pre-release · auto-tag dev"
+        runs-on: ubuntu-latest
+        needs: [macos-ok, windows-ok, linux-ok]
+        # Only on push to dev (not PRs, not main) and only when all gates passed
+        if: >
+            always() &&
+            github.event_name == 'push' &&
+            github.ref == 'refs/heads/dev' &&
+            needs.macos-ok.result   == 'success' &&
+            needs.windows-ok.result == 'success' &&
+            needs.linux-ok.result   == 'success'
+        permissions:
+            contents: write
+
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+
+            - name: Calculate next dev tag and create GitHub pre-release
+              shell: bash
+              env:
+                  GH_TOKEN: ${{ github.token }}
+              run: |
+                  set -euo pipefail
+
+                  # Find the highest existing dev tag and increment it
+                  last_dev=$(git tag --list 'v0.0.0-dev.*' --sort=-v:refname | head -1 || true)
+                  if [ -z "$last_dev" ]; then
+                      next_n=1
+                  else
+                      last_n="${last_dev##*.}"
+                      next_n=$((last_n + 1))
+                  fi
+                  tag="v0.0.0-dev.${next_n}"
+                  echo "Last dev tag : ${last_dev:-none}"
+                  echo "New dev tag  : $tag"
+
+                  if git ls-remote --tags origin "refs/tags/$tag" | grep -q "$tag"; then
+                      echo "Tag '$tag' already exists — skipping."
+                      exit 0
+                  fi
+
+                  git tag "$tag"
+                  git push origin "$tag"
+
+                  # Build a changelog from commits since the previous dev tag
+                  if [ -n "$last_dev" ]; then
+                      range="${last_dev}..HEAD"
+                  else
+                      range="HEAD"
+                  fi
+                  notes=$(git log "$range" --no-merges --pretty=format:"- %s" | head -40)
+
+                  gh release create "$tag" \
+                      --title "$tag" \
+                      --notes "${notes:-No new commits.}" \
+                      --prerelease \
+                      --target dev
+                  echo "Pre-release '$tag' created."
