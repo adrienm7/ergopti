@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- Hammerspoon implementation of the TextSender port contract defined in
 --- static/drivers/_shared/ports/TextSender.spec.js. Bridges domain-level text
---- insertion requests to hs.eventtap.keyStroke, hs.pasteboard, and
+--- insertion requests to hs.eventtap.keyStroke, the Clipboard port adapter, and
 --- hs.eventtap.keyStrokes without coupling domain modules to any hs API.
 ---
 --- FEATURES & RATIONALE:
@@ -14,15 +14,20 @@
 ---    the overhead of simulating keystrokes for large insertions.
 --- 2. Direct mode: hs.eventtap.keyStrokes drives character-by-character
 ---    injection — required when clipboard is inaccessible (e.g., password fields).
---- 3. Callback semantics: the callback is always invoked synchronously (HS is
+--- 3. Clipboard port: the clipboard path delegates to the Clipboard adapter
+---    (adapters/clipboard.lua) via save/write/restore instead of touching
+---    hs.pasteboard directly — keeps the interaction testable and centralises
+---    all clipboard I/O in a single adapter.
+--- 4. Callback semantics: the callback is always invoked synchronously (HS is
 ---    event-driven but text injection is blocking at the macOS layer), matching
 ---    the contract's "called inline" note for sync adapters.
 --- ==============================================================================
 
 local M = {}
 
-local hs     = hs
-local Logger = require("lib.logger")
+local hs       = hs
+local Logger   = require("lib.logger")
+local Clipboard = require("adapters.clipboard")
 
 local LOG = "adapters.text_sender"
 
@@ -37,6 +42,10 @@ local LOG = "adapters.text_sender"
 -- Mirrors TextSender.spec.js CLIPBOARD_THRESHOLD = 1000.
 local CLIPBOARD_THRESHOLD = 1000
 
+-- Delay in seconds before the clipboard is restored after a paste injection.
+-- Long enough for the receiving application to process Cmd+V before we overwrite.
+local CLIPBOARD_RESTORE_DELAY_S = 0.15
+
 -- Paste keystroke on macOS.
 local PASTE_KEY      = "v"
 local PASTE_MODIFIER = { "cmd" }
@@ -49,6 +58,9 @@ local PASTE_MODIFIER = { "cmd" }
 -- =========================================
 
 --- Inserts text at the current insertion point.
+--- Uses the Clipboard port (Clipboard.save / Clipboard.write / Clipboard.restore)
+--- for the clipboard path so the interaction is mockable and the driver has one
+--- canonical clipboard code path.
 --- @param text     string       The Unicode text to insert.
 --- @param opts     table|nil    { mode?: "direct"|"clipboard"|"auto" }
 --- @param callback function|nil Called with no arguments on completion.
@@ -64,13 +76,14 @@ function M.send(text, opts, callback)
 	local ok, err
 	if mode == "clipboard" then
 		ok, err = pcall(function()
-			local prev = hs.pasteboard.getContents()
-			hs.pasteboard.setContents(text)
+			-- Save via the Clipboard port so the user's clipboard is restored
+			-- cleanly after the paste completes.
+			local saved = Clipboard.save()
+			Clipboard.write(text)
 			hs.eventtap.keyStroke(PASTE_MODIFIER, PASTE_KEY)
-			-- Restore previous clipboard after a short delay so the paste
-			-- completes before the clipboard is overwritten.
-			hs.timer.doAfter(0.15, function()
-				if prev then hs.pasteboard.setContents(prev) end
+			-- Restore after a short delay so the paste completes before we overwrite.
+			hs.timer.doAfter(CLIPBOARD_RESTORE_DELAY_S, function()
+				Clipboard.restore(saved)
 			end)
 		end)
 	else

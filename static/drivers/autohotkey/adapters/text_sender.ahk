@@ -1,13 +1,13 @@
-﻿; adapters/text_sender.ahk
+; adapters/text_sender.ahk
 
 ; ==============================================================================
 ; MODULE: TextSender Adapter (AutoHotkey)
 ; DESCRIPTION:
 ; AHK v2 implementation of the TextSender port contract defined in
 ; static/drivers/_shared/ports/TextSender.spec.js. Wraps AHK's SendText,
-; SendInput, and Clipboard behind the three canonical functions
-; (TextSend, TextEraseChars, TextPressKey) so domain modules can inject
-; text and keystrokes without coupling to AHK-specific send APIs.
+; SendInput, and the Clipboard port (adapters/clipboard.ahk) behind the three
+; canonical functions (TextSend, TextEraseChars, TextPressKey) so domain modules
+; can inject text and keystrokes without coupling to AHK-specific send APIs.
 ;
 ; NAMING CONVENTION:
 ; Port method → AHK name mapping:
@@ -19,11 +19,21 @@
 ; Payloads longer than TEXT_CLIPBOARD_THRESHOLD characters (1000, matching
 ; TextSender.spec.js) are injected via the clipboard to avoid the overhead
 ; of simulating keystrokes for large expansions.
+;
+; CLIPBOARD DEPENDENCY:
+; The clipboard path uses CB_Save / CB_Write / CB_Restore from the Clipboard
+; port adapter (adapters/clipboard.ahk) instead of accessing A_Clipboard directly.
+; This keeps clipboard interactions testable via a stub and ensures a single
+; code path for all clipboard operations in the driver.
 ; ==============================================================================
 
 ; Payload length threshold above which TextSend switches to clipboard injection.
 ; Mirrors TextSender.spec.js CLIPBOARD_THRESHOLD = 1000.
 global TEXT_CLIPBOARD_THRESHOLD := 1000
+
+; Delay in milliseconds before the clipboard is restored after a paste injection.
+; Long enough for the receiving application to process Ctrl+V before we overwrite.
+global TEXT_CLIPBOARD_RESTORE_DELAY_MS := 150
 
 
 
@@ -37,11 +47,11 @@ global TEXT_CLIPBOARD_THRESHOLD := 1000
 ; Maps the cross-platform modifier names from the spec to their AHK v2 prefix chars.
 _TextSenderModifierPrefix(ModName) {
 	switch ModName {
-		case "Ctrl", "ctrl":  return "^"
-		case "Shift", "shift": return "+"
-		case "Alt", "alt":    return "!"
+		case "Ctrl", "ctrl":      return "^"
+		case "Shift", "shift":    return "+"
+		case "Alt", "alt":        return "!"
 		case "Cmd", "Win", "win": return "#"
-		default: return ""
+		default:                  return ""
 	}
 }
 
@@ -55,27 +65,33 @@ _TextSenderModifierPrefix(ModName) {
 ; =======================================================
 
 ; Inserts text at the current insertion point.
+; Uses the Clipboard port (CB_Save / CB_Write / CB_Restore) for the clipboard
+; path so the interaction is mockable and the driver has one canonical clipboard
+; code path.
 ; @param Text     {String}   The Unicode text to insert.
 ; @param Opts     {Map|0}    { mode?: "direct"|"clipboard"|"auto" }
 ; @param Callback {Func|0}   Called with no arguments on completion.
 TextSend(Text, Opts, Callback) {
-	global TEXT_CLIPBOARD_THRESHOLD
+	global TEXT_CLIPBOARD_THRESHOLD, TEXT_CLIPBOARD_RESTORE_DELAY_MS
 	Mode := "auto"
 	if (Opts is Map) and Opts.Has("mode") and Opts["mode"] != ""
 		Mode := Opts["mode"]
 
-	; Resolve "auto" to a concrete strategy.
+	; Resolve "auto" to a concrete strategy based on payload length.
 	if Mode = "auto"
 		Mode := StrLen(Text) > TEXT_CLIPBOARD_THRESHOLD ? "clipboard" : "direct"
 
 	if Mode = "clipboard" {
-		Prev := A_Clipboard
-		A_Clipboard := Text
+		; Save the current clipboard via the Clipboard port so we can restore it
+		; cleanly after the paste — avoids losing the user's clipboard content.
+		Saved := CB_Save()
+		CB_Write(Text)
 		ClipWait(1)
 		SendInput("^v")
-		; Restore the previous clipboard after a short delay so the paste completes.
-		RestorePrev := Prev
-		SetTimer(() => (A_Clipboard := RestorePrev), -150)
+		; Restore after a short delay so the paste completes before we overwrite.
+		; Capture Saved in the closure so the timer lambda is self-contained.
+		SavedForTimer := Saved
+		SetTimer(() => CB_Restore(SavedForTimer), -TEXT_CLIPBOARD_RESTORE_DELAY_MS)
 	} else {
 		; SendText uses the "Text" mode that bypasses hotkey triggers and sends
 		; Unicode characters as raw keystrokes — the safest injection path.
