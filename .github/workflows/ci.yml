@@ -492,7 +492,6 @@ jobs:
               shell: bash
               env:
                   GH_TOKEN: ${{ github.token }}
-                  RUN_NUM:  ${{ github.run_number }}
               run: |
                   set -euo pipefail
 
