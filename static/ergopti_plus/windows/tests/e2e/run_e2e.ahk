@@ -43,6 +43,7 @@ SetWorkingDir(A_ScriptDir)
 #Include ../test_stubs.ahk
 
 ; Production engine dependencies (same order as run_all.ahk).
+#Include ../../lib/app_state.ahk
 #Include ../../lib/ui_style.ahk
 #Include ../../lib/logger.ahk
 #Include ../../lib/active_app_cache.ahk
@@ -167,8 +168,8 @@ E2E_RunScenarioPure(Scenario) {
     Repl     := Scenario["replacement"]
     IsWord   := Scenario["is_word"]
     IsCS     := Scenario["is_cs"]
-    Buffer   := Scenario["buffer"]
-    Term     := Scenario["terminator"]
+    InputBuffer := Scenario["buffer"]
+    Term        := Scenario["terminator"]
 
     ; Build HSE flags from the scenario options.
     Flags := ""
@@ -188,8 +189,8 @@ E2E_RunScenarioPure(Scenario) {
     HSE_Register(Flags, Trigger, 0, Map("Replacement", Repl, "OnlyText", true))
 
     ; Feed each character of the buffer into the engine.
-    Loop StrLen(Buffer) {
-        HSE_FeedChar(SubStr(Buffer, A_Index, 1))
+    Loop StrLen(InputBuffer) {
+        HSE_FeedChar(SubStr(InputBuffer, A_Index, 1))
     }
 
     ; Feed the terminator — this is what triggers the match check.
@@ -202,7 +203,7 @@ E2E_RunScenarioPure(Scenario) {
     BSCount     := 0
 
     for Entry in Sends {
-        Args := Entry["args"]
+        Args := Entry.args
         if (Args.Length >= 1) {
             Payload := Args[1]
             ; Backspace sequence looks like "{BackSpace N}".
