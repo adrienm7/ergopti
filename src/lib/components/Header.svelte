@@ -123,10 +123,10 @@
 				<span class="title">Ergopti</span>
 			</a>
 			<a
-				href="ergopti-plus"
+				href="ergoptiplus"
 				onclick={closeMenu}
 				aria-label="Accéder à la page Ergopti+"
-				aria-current={isCurrent('/ergopti-plus') ? 'page' : undefined}
+				aria-current={isCurrent('/ergoptiplus') ? 'page' : undefined}
 			>
 				<i class="icon-circle-star" style="margin-right:3px; margin-top:1px">
 					<span class="path1"></span><span class="path2"></span>

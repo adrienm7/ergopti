@@ -34,8 +34,11 @@ _MetaPACListFiles(Dir, Ext) {
 	TmpFile := A_Temp . "\meta_pac_" . A_TickCount . ".txt"
 	try FileDelete(TmpFile)
 	RunWait('cmd /c dir /b /s /a-d "' . StrReplace(Dir, "/", "\") . '" > "' . TmpFile . '"', , "Hide")
-	try Raw := FileRead(TmpFile)
-	catch { return Files }
+	try {
+		Raw := FileRead(TmpFile)
+	} catch {
+		return Files
+	}
 	for Line in StrSplit(Raw, "`n", "`r") {
 		Line := Trim(StrReplace(Line, "\", "/"))
 		if Line = "" {
