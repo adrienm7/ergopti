@@ -240,37 +240,41 @@ function M.new()
 			local tlen = mapping.tlen
 
 			-- 1. Buffer must be at least as long as the trigger.
-			if buf_len < tlen then goto continue end
+			if buf_len >= tlen then
 
-			-- 2. Suffix check (case-aware).
-			local buf_tail = tail_codepoints(_buf_cps, tlen)
-			local matched
-			if mapping.is_case_sensitive then
-				matched = buf_tail == mapping.trigger
-			else
-				matched = buf_tail:lower() == mapping.trigger:lower()
+				-- 2. Suffix check (case-aware).
+				local buf_tail = tail_codepoints(_buf_cps, tlen)
+				local matched
+				if mapping.is_case_sensitive then
+					matched = buf_tail == mapping.trigger
+				else
+					matched = buf_tail:lower() == mapping.trigger:lower()
+				end
+
+				if matched then
+
+					-- 3. Word-boundary check: the character preceding the trigger must not
+					--    be a word character (or the trigger fills the whole buffer).
+					local boundary_ok = true
+					if mapping.is_word and buf_len > tlen then
+						local preceding = _buf_cps[buf_len - tlen]
+						if is_word_char(preceding) then boundary_ok = false end
+					end
+
+					if boundary_ok then
+						-- 4. Match confirmed.
+						local bc = tlen + (terminator_consumed and 1 or 0)
+						Logger.debug(LOG, "Match: trigger='%s' backspaces=%d.", mapping.trigger, bc)
+						return {
+							trigger            = mapping.trigger,
+							replacement        = mapping.replacement,
+							backspace_count    = bc,
+							consume_terminator = terminator_consumed,
+							group              = mapping.group,
+						}
+					end
+				end
 			end
-			if not matched then goto continue end
-
-			-- 3. Word-boundary check: the character preceding the trigger must not
-			--    be a word character (or the trigger fills the whole buffer).
-			if mapping.is_word and buf_len > tlen then
-				local preceding = _buf_cps[buf_len - tlen]
-				if is_word_char(preceding) then goto continue end
-			end
-
-			-- 4. Match confirmed.
-			local bc = tlen + (terminator_consumed and 1 or 0)
-			Logger.debug(LOG, "Match: trigger='%s' backspaces=%d.", mapping.trigger, bc)
-			return {
-				trigger            = mapping.trigger,
-				replacement        = mapping.replacement,
-				backspace_count    = bc,
-				consume_terminator = terminator_consumed,
-				group              = mapping.group,
-			}
-
-			::continue::
 		end
 
 		return nil
