@@ -1,4 +1,4 @@
-﻿; adapters/secure_field_detector.ahk
+﻿﻿; adapters/secure_field_detector.ahk
 
 ; ==============================================================================
 ; MODULE: SecureFieldDetector Adapter (AutoHotkey)
@@ -87,3 +87,11 @@ SFD_Refresh() {
 	; Live queries require no pre-fetch on Windows — nothing to do here
 	return
 }
+; Machine-readable contract map - consumed by the generic adapter compliance test
+; (tests/test_adapter_compliance_new.ahk) to verify every required method exists
+; and is callable without manually listing functions per-adapter.
+global ADAPTER_SECURE_FIELD_DETECTOR := Map(
+    "isSecureField", Func("SFD_IsSecureField"),
+    "isSecureApp",   Func("SFD_IsSecureApp"),
+    "refresh",       Func("SFD_Refresh"),
+)

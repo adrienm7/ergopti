@@ -1,4 +1,4 @@
-﻿; adapters/window_info.ahk
+﻿﻿; adapters/window_info.ahk
 
 ; ==============================================================================
 ; MODULE: WindowInfo Adapter (AutoHotkey)
@@ -103,3 +103,11 @@ WIGetAll() {
 	}
 	return Results
 }
+
+; Machine-readable contract map - consumed by the generic adapter compliance test
+; (tests/test_adapter_compliance_new.ahk) to verify every required method exists
+; and is callable without manually listing functions per-adapter.
+global ADAPTER_WINDOW_INFO := Map(
+    "getFocused", Func("WIGetFocused"),
+    "getAll",     Func("WIGetAll"),
+)

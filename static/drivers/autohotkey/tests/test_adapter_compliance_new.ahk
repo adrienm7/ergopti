@@ -201,3 +201,45 @@ _PLC_OnFocusChange_WithFunc_NoCrash() {
 	AssertTrue(1)
 }
 Test("PLC_OnFocusChange: accepts a Func without crash", _PLC_OnFocusChange_WithFunc_NoCrash)
+
+
+
+
+
+; ============================================================
+; ============================================================
+; ======= 5/ Generic ADAPTER_* Contract Map Compliance =======
+; ============================================================
+; ============================================================
+
+; Each ADAPTER_* map is iterated; every declared Func() reference
+; must resolve to a non-null value, proving the function exists.
+
+_AdapterMap_AllFuncsResolvable() {
+	local adapterMaps := [
+		ADAPTER_CLIPBOARD,
+		ADAPTER_FILE_SYSTEM,
+		ADAPTER_APP_LAUNCHER,
+		ADAPTER_NOTIFIER,
+		ADAPTER_TIMER_SCHEDULER,
+		ADAPTER_WINDOW_INFO,
+		ADAPTER_TRAY_MENU,
+		ADAPTER_TEXT_SENDER,
+		ADAPTER_HTTP_CLIENT,
+		ADAPTER_SECURE_FIELD_DETECTOR,
+		ADAPTER_STORAGE,
+		ADAPTER_PROCESS_LIFECYCLE,
+		ADAPTER_KEY_STATE,
+	]
+	local allOk := true
+	for adapterMap in adapterMaps {
+		for methodName, fnRef in adapterMap {
+			if (fnRef = 0) {
+				OutputDebug("ADAPTER contract failure: Func(" . methodName . ") is null")
+				allOk := false
+			}
+		}
+	}
+	AssertTrue(allOk)
+}
+Test("ADAPTER_* maps: all declared Func() references resolve to non-null", _AdapterMap_AllFuncsResolvable)

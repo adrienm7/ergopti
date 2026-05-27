@@ -1,4 +1,4 @@
-﻿; static/drivers/autohotkey/adapters/key_state.ahk
+﻿﻿; static/drivers/autohotkey/adapters/key_state.ahk
 
 ; ==============================================================================
 ; MODULE: KeyState Adapter (AutoHotkey)
@@ -54,3 +54,11 @@ KS_IsUp(KeyName) {
 		return 1
 	}
 }
+
+; Machine-readable contract map - consumed by the generic adapter compliance test
+; (tests/test_adapter_compliance_new.ahk) to verify every required method exists
+; and is callable without manually listing functions per-adapter.
+global ADAPTER_KEY_STATE := Map(
+    "isDown", Func("KS_IsDown"),
+    "isUp",   Func("KS_IsUp"),
+)

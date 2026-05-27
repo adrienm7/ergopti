@@ -1,4 +1,4 @@
-﻿; adapters/tray_menu.ahk
+﻿﻿; adapters/tray_menu.ahk
 
 ; ==============================================================================
 ; MODULE: TrayMenu Adapter (AutoHotkey)
@@ -87,3 +87,13 @@ TrayMenuDestroy() {
 		A_IconTip := ""
 	}
 }
+
+; Machine-readable contract map - consumed by the generic adapter compliance test
+; (tests/test_adapter_compliance_new.ahk) to verify every required method exists
+; and is callable without manually listing functions per-adapter.
+global ADAPTER_TRAY_MENU := Map(
+    "setIcon",    Func("TrayMenuSetIcon"),
+    "setMenu",    Func("TrayMenuSetMenu"),
+    "setTooltip", Func("TrayMenuSetTooltip"),
+    "destroy",    Func("TrayMenuDestroy"),
+)
