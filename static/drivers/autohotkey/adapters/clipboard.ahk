@@ -22,7 +22,7 @@
 ;
 ; FAIL-SAFE:
 ; All A_Clipboard assignments are wrapped in try/catch. Any clipboard-access
-; failure (locked clipboard, restricted context) returns 0 rather than throwing.
+; failure (locked clipboard, restricted context) returns false rather than throwing.
 ; ==============================================================================
 
 
@@ -47,13 +47,13 @@ CB_Read() {
 
 ; Writes Text to the clipboard, replacing any previous content.
 ; @param Text {String} The text to place on the clipboard.
-; @return {Integer} 1 on success, 0 if the assignment raised an error.
+; @return {Boolean} True on success, false on error.
 CB_Write(Text) {
 	try {
 		A_Clipboard := Text
-		return 1
+		return true
 	} catch {
-		return 0
+		return false
 	}
 }
 
@@ -71,12 +71,12 @@ CB_Save() {
 ; Restores a previously saved clipboard snapshot.
 ; Passing  explicitly clears the clipboard rather than leaving stale content.
 ; @param Saved {String} Value previously returned by CB_Save(), or  to clear.
-; @return {Integer} 1 on success, 0 if the assignment raised an error.
+; @return {Boolean} True on success, false on error.
 CB_Restore(Saved) {
 	try {
 		A_Clipboard := Saved
-		return 1
+		return true
 	} catch {
-		return 0
+		return false
 	}
 }
