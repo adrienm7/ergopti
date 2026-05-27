@@ -361,6 +361,10 @@ local function _log(variant_key, module_name, msg, ...)
 		print(console_line)
 	end
 
+	-- Push to the in-memory ring buffer so ring_buffer_snapshot() is always
+	-- current without requiring a file read.
+	_push_ring(console_line)
+
 	_write_to_file(stamp, line)
 end
 
@@ -441,9 +445,61 @@ end
 
 
 
+-- ====================================
+--- ====================================
+-- ======= 5/ In-memory Ring Buffer ===
+--- ====================================
+-- ====================================
+
+-- Fixed-capacity circular array — 200 entries matching the AHK driver and the
+-- shared SPEC §5. Each slot stores the complete formatted line (post-substitution,
+-- with timestamp). On overflow the oldest slot is silently overwritten (O(1)).
+local RING_BUFFER_SIZE = 200
+local _ring_buffer     = {}
+local _ring_cursor     = 0
+
+--- Appends a fully-formatted line to the in-memory ring buffer.
+--- Called from _log() after every emitted line so the buffer always mirrors
+--- the most recent RING_BUFFER_SIZE entries of the main log file.
+--- @param line string The complete formatted log line (timestamp + level + tag + body).
+local function _push_ring(line)
+	if #_ring_buffer < RING_BUFFER_SIZE then
+		_ring_buffer[#_ring_buffer + 1] = line
+		_ring_cursor = #_ring_buffer
+	else
+		_ring_cursor = (_ring_cursor % RING_BUFFER_SIZE) + 1
+		_ring_buffer[_ring_cursor] = line
+	end
+end
+
+--- Returns a snapshot of the ring buffer in chronological order (oldest first).
+--- The most recent entry is last. Useful for a "Dump recent logs" menu entry
+--- without requiring a file read.
+--- @return table Flat list of formatted log line strings.
+function M.ring_buffer_snapshot()
+	if #_ring_buffer == 0 then return {} end
+	local snapshot = {}
+	if #_ring_buffer < RING_BUFFER_SIZE then
+		-- Buffer not yet full — entries are already in chronological order.
+		for i = 1, #_ring_buffer do
+			snapshot[#snapshot + 1] = _ring_buffer[i]
+		end
+		return snapshot
+	end
+	-- Buffer is full and wrapped — read from cursor+1 (oldest) to cursor (newest).
+	for i = 1, RING_BUFFER_SIZE do
+		local idx = (_ring_cursor + i - 1) % RING_BUFFER_SIZE + 1
+		snapshot[#snapshot + 1] = _ring_buffer[idx]
+	end
+	return snapshot
+end
+
+
+
+
 -- ==================================
 --- ==================================
--- ======= 5/ Utility Helpers =======
+-- ======= 6/ Utility Helpers =======
 --- ==================================
 -- ==================================
 
