@@ -92,7 +92,7 @@ KLWV_IsAvailable() {
 ; Resolve the absolute file:// URL of a dashboard’s index.html.
 KLWV_AssetUrl(which) {
     global _StaticDir
-    base := _StaticDir . "\drivers\_shared\ui\metrics_" . which . "\index.html"
+    base := _StaticDir . "\ergopti_plus\shared\ui\metrics_" . which . "\index.html"
     loop files, base
         base := A_LoopFileFullPath
     return "file:///" . StrReplace(base, "\", "/")
