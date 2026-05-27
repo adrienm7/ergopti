@@ -152,6 +152,14 @@ const HS_ADAPTERS = {
 		getMonitorCount:  function() {},            // arity 0
 		getMonitorBounds: function(n) {},           // arity 1
 	},
+
+	GraphicsRenderer: {
+		createWindow:  function(opts) {},           // arity 1
+		destroyWindow: function(handle) {},         // arity 1
+		drawBitmap:    function(handle, drawFn) {}, // arity 2
+		show:          function(handle) {},         // arity 1
+		hide:          function(handle) {},         // arity 1
+	},
 };
 
 
