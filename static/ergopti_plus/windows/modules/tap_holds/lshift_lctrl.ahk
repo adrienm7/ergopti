@@ -33,7 +33,7 @@
         and (TimeAfter - TimeBefore) >= TapMinDurationMs()
         and A_PriorKey == "LShift"
     ) { ; A_PriorKey is to be able to fire shortcuts very quickly, under the tap time
-        TextSend("^c", "", 0)
+        TextPressKey("c", ["Ctrl"])
     }
 }
 #HotIf
@@ -57,7 +57,7 @@
         and KS_IsUp("SC03A") ; "CapsLock" must not be physically held
         and KS_IsUp("SC038") ; "LAlt" must not be physically held
     ) {
-        TextSend("^v", "", 0)
+        TextPressKey("v", ["Ctrl"])
     }
 }
 #HotIf

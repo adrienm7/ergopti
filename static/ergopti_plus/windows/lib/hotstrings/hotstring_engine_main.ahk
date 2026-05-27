@@ -933,6 +933,15 @@ HSE_DispatchMatch(Spec, EndChar) {
     }
 
     HSE_Suppress(true)
+    ; Mirror _HotstringDispatch's PrefixWatcherSuppress guard: mute the
+    ; prefix watcher for the duration of the send burst so the backspaces
+    ; and replacement characters do not pollute _PrefixBuffer and stale the
+    ; tooltip state. Without this, calling HSE_DispatchMatch from outside the
+    ; InputHook callback (e.g. SpaceTapHold) leaves _PrefixBuffer pointing at
+    ; the pre-expansion context, causing incorrect tooltip lookups afterward.
+    if IsSet(PrefixWatcherSuppress) {
+        try PrefixWatcherSuppress(true)
+    }
     try {
         if _ALTGR_KANA_FIXUP {
             SendEvent("{SC138 Up}")
@@ -973,6 +982,9 @@ HSE_DispatchMatch(Spec, EndChar) {
         HSE_ApplyExpansion(Spec, Replacement, EndChar)
     } finally {
         SetTimer((*) => HSE_Suppress(false), -HSE_SUPPRESS_RELEASE_DELAY_MS)
+        if IsSet(PrefixWatcherSuppress) {
+            SetTimer((*) => PrefixWatcherSuppress(false), -HSE_SUPPRESS_RELEASE_DELAY_MS)
+        }
     }
 }
 
