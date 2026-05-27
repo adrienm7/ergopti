@@ -100,10 +100,13 @@ HotstringPrefixWatcherInit() {
 
     EntryCount := 0
     for _, Category in _PREFIX_WATCHER_CATEGORIES {
-        EntryCount += _RegisterCategoryTriggers(Category)
+        CatCount := _RegisterCategoryTriggers(Category)
+        LoggerDebug("PrefixWatcher", "DBG category '{1}': {2} trigger(s) indexed.", Category, CatCount)
+        EntryCount += CatCount
     }
 
     LoggerDebug("PrefixWatcher", "DBG index built: {1} trigger(s), {2} prefix bucket(s).", EntryCount, _PrefixIndex.Count)
+    LoggerDebug("PrefixWatcher", "DBG 'ct' in index: {1}.", _PrefixIndex.Has("ct") ? "YES" : "NO")
     _StartInputHook()
     _InstallMouseClickResetHooks()
     LoggerSuccess("PrefixWatcher", "Watcher started ({1} trigger(s) indexed).", EntryCount)
