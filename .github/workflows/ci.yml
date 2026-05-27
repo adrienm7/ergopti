@@ -633,7 +633,7 @@ jobs:
                   SPARKLE_PUBLIC_KEY: ${{ secrets.SPARKLE_PUBLIC_KEY }}
                   GH_OWNER:           ${{ github.repository_owner }}
                   GH_REPO:            ${{ github.event.repository.name }}
-              run: bash tools/build_macos_app.sh
+              run: bash tools/build/build_macos_app.sh
 
             - name: Install Sparkle signing tool
               if: ${{ env.SPARKLE_ED_PRIVATE_KEY != '' }}
@@ -671,7 +671,7 @@ jobs:
                   GH_OWNER:         ${{ github.repository_owner }}
                   GH_REPO:          ${{ github.event.repository.name }}
                   OUTPUT_PATH:      build/macos/appcast-main.xml
-              run: bash tools/generate_appcast.sh
+              run: bash tools/build/generate_appcast.sh
 
             - name: Package latest keylayout bundle
               shell: bash
@@ -734,11 +734,11 @@ jobs:
               shell: bash
 
             - name: Regenerate hotstrings_generated.ahk
-              run: python tools/compile_hotstrings.py
+              run: python tools/locale/compile_hotstrings.py
               shell: bash
 
             - name: Build static asset bundle
-              run: python tools/build_static_bundle.py
+              run: python tools/build/build_static_bundle.py
               shell: bash
 
             - name: Stamp BUNDLE_VERSION, BUNDLE_RELEASE_URL, BUNDLE_CHANNEL
@@ -842,6 +842,7 @@ jobs:
                   path: |
                       build/linux/Ergopti_xkb.zip
                       static/ergopti_plus/kanata/kanata.kbd
+                      static/ergopti_plus/linux/install.sh
 
 
 # ============================================================
@@ -911,7 +912,7 @@ jobs:
                   TAG:      ${{ needs.resolve-release-meta.outputs.tag }}
                   SHA:      ${{ github.sha }}
               run: |
-                  python3 tools/build_changelog.py > "$RUNNER_TEMP/changelog.md"
+                  python3 tools/build/build_changelog.py > "$RUNNER_TEMP/changelog.md"
                   echo "Changelog written ($(wc -l < "$RUNNER_TEMP/changelog.md") lines)."
 
             - name: Write release body with platform sections
