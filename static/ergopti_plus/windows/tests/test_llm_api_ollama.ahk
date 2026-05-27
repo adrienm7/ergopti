@@ -76,7 +76,9 @@ Test("LLM_BuildOllamaPayload: escapes newlines in system prompt", _OllamaPayload
 
 
 _OllamaPayload_StopSequencesIncluded() {
-	stops := ["```", "`n`n"]
+	; Chr(96) x3 = ``` — avoids AHK v2 backtick-escape ambiguity in double-quoted strings.
+	ThreeBackticks := Chr(96) . Chr(96) . Chr(96)
+	stops := [ThreeBackticks, "`n`n"]
 	payload := LLM_BuildOllamaPayload("m", "s", "u", 0.1, false, stops)
 	AssertContains(payload, '"stop"')
 	AssertContains(payload, '"```"')
@@ -172,7 +174,7 @@ _UnescapeJSON_EscapedQuote() {
 	result := LLM_UnescapeJSON('say \"hi\"')
 	AssertEqual('say "hi"', result)
 }
-Test("LLM_UnescapeJSON: converts \\\" to double quote", _UnescapeJSON_EscapedQuote)
+Test("LLM_UnescapeJSON: converts backslash-quote to double quote", _UnescapeJSON_EscapedQuote)
 
 
 _UnescapeJSON_EscapedBackslash() {

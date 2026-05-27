@@ -2,12 +2,18 @@
 	import { onMount } from 'svelte';
 	import { fly } from 'svelte/transition';
 	import ErgoptiPlus from '$lib/components/ErgoptiPlus.svelte';
+	import { getRelease, getRawUrl } from '$lib/js/getGitHubRelease.js';
 
 	// `data` is populated at build time by +page.server.js, which reads
 	// the Hammerspoon LLM catalog (static/ergopti_plus/macos/data/llm_models.json)
 	// and returns a compact per-provider summary. Adding a model to the
 	// driver's JSON automatically refreshes this page on the next deploy.
 	let { data } = $props();
+
+	/** @type {Awaited<ReturnType<typeof getRelease>>} */
+	let release = $state(null);
+	let urlAhkExe = $derived(release?.url("ErgoptiPlus.exe") ?? "#");
+	const urlAhkSrc = getRawUrl("static/ergopti_plus/windows/ErgoptiPlus.ahk");
 	const { aiProviders, aiTotalProviders, aiTotalModels, aiTotalFamilies } = data;
 
 	// Live typing demo — cycle through real expansions from the hotstring TOMLs.
@@ -187,7 +193,10 @@
 		step();
 	}
 
-	onMount(() => {
+	onMount(async () => {
+		// Fetch the GitHub release for driver download buttons.
+		release = await getRelease();
+
 		// Restore persisted choice if any, otherwise sniff the user agent.
 		let stored = null;
 		try {
@@ -720,6 +729,10 @@
 	<div id="page-toc-pc" style="display: none">
 		<div id="page-toc"></div>
 	</div>
+	<!-- Lien temporaire vers l'ancienne page Ergopti+ le temps que la nouvelle soit validée -->
+	<div class="legacy-banner">
+		<a href="ergopti-plus">← Ancienne version de cette page</a>
+	</div>
 	<main class="ep-main">
 		<div class="ep-root">
 			<!-- ────────────────────────── Hero ────────────────────────── -->
@@ -760,19 +773,27 @@
 				</p>
 
 				<div class="hero-cta">
-					<a
-						class={osStyle === 'macos' ? 'btn btn-primary' : 'btn btn-secondary'}
-						href="utilisation#macos"
-					>
-						<i class="icon-appleinc"></i>
-						<span>Installer sur macOS</span>
-					</a>
-					<a
-						class={osStyle === 'windows' ? 'btn btn-primary' : 'btn btn-secondary'}
-						href="utilisation#windows"
-					>
-						<i class="icon-windows"></i>
-						<span>Installer sur Windows</span>
+					{#if osStyle === 'macos'}
+						<a
+							class="btn btn-primary"
+							href={release?.url("Ergopti_macOS_HS.zip") ?? "#"}
+							download={!!release}
+						>
+							<i class="icon-hammerspoon"></i>
+							<span>Télécharger pour macOS</span>
+						</a>
+					{:else}
+						<a
+							class="btn btn-primary"
+							href={urlAhkExe}
+							download={!!release}
+						>
+							<i class="icon-autohotkey"></i>
+							<span>Télécharger pour Windows</span>
+						</a>
+					{/if}
+					<a class="btn btn-secondary" href="utilisation">
+						<span>Installer la disposition clavier</span>
 					</a>
 				</div>
 
@@ -2125,21 +2146,33 @@
 			<section class="final-cta">
 				<div class="cta-card">
 					<h2>Passez à la vitesse supérieure.</h2>
-					<p>Téléchargez le driver et la disposition pour votre OS, et tapez <code>ct★</code>.</p>
+					<p>Téléchargez le driver pour votre OS, et tapez <code>ct★</code>.</p>
 					<div class="hero-cta">
 						<a
-							class={osStyle === 'macos' ? 'btn btn-primary' : 'btn btn-secondary'}
-							href="utilisation#macos"
+							class={osStyle === 'windows' ? 'btn btn-primary' : 'btn btn-secondary'}
+							href={urlAhkExe}
+							download={!!release}
 						>
-							<i class="icon-appleinc"></i><span>macOS</span>
+							<i class="icon-autohotkey"></i><span>Windows (AHK)</span>
 						</a>
 						<a
-							class={osStyle === 'windows' ? 'btn btn-primary' : 'btn btn-secondary'}
-							href="utilisation#windows"
+							class={osStyle === 'macos' ? 'btn btn-primary' : 'btn btn-secondary'}
+							href={release?.url("Ergopti_macOS_HS.zip") ?? "#"}
+							download={!!release}
 						>
-							<i class="icon-windows"></i><span>Windows</span>
+							<i class="icon-hammerspoon"></i><span>macOS (HS)</span>
+						</a>
+						<a
+							class="btn btn-secondary"
+							href={release?.url("ErgoptiPlus_linux.tar.gz") ?? "#"}
+							download={!!release}
+						>
+							<i class="icon-linux"></i><span>Linux</span>
 						</a>
 					</div>
+					<p class="cta-sub">
+						<a href="utilisation" class="cta-link">Installer la disposition clavier →</a>
+					</p>
 				</div>
 			</section>
 		</div>
@@ -2150,6 +2183,21 @@
 	/* ============================================================
 	   Root + utilities — scoped to this page only.
 	   ============================================================ */
+
+	.legacy-banner {
+		background: rgba(255, 200, 0, 0.12);
+		border-bottom: 1px solid rgba(255, 200, 0, 0.3);
+		font-size: 0.85em;
+		padding: 0.5em 1.5em;
+		text-align: center;
+	}
+	.legacy-banner a {
+		color: #ffc800;
+		text-decoration: none;
+	}
+	.legacy-banner a:hover {
+		text-decoration: underline;
+	}
 
 	.ep-root {
 		--ink: #ffffff;

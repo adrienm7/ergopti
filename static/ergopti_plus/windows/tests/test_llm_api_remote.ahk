@@ -195,14 +195,14 @@ _RemoteJsonEscape_BackslashFirst() {
 	result := _LLMRemoteJsonEscape('path\file')
 	AssertContains(result, "\\")
 }
-Test("_LLMRemoteJsonEscape: backslash is escaped to \\", _RemoteJsonEscape_BackslashFirst)
+Test("_LLMRemoteJsonEscape: backslash is escaped to double-backslash", _RemoteJsonEscape_BackslashFirst)
 
 
 _RemoteJsonEscape_QuoteEscaped() {
 	result := _LLMRemoteJsonEscape('say "hi"')
 	AssertContains(result, '\"hi\"')
 }
-Test("_LLMRemoteJsonEscape: double quote is escaped to \\\"", _RemoteJsonEscape_QuoteEscaped)
+Test("_LLMRemoteJsonEscape: double quote is escaped to backslash-quote", _RemoteJsonEscape_QuoteEscaped)
 
 
 _RemoteJsonEscape_NewlineEscaped() {
@@ -223,7 +223,7 @@ _RemoteJsonUnescape_QuoteRestored() {
 	result := _LLMRemoteJsonUnescape('say \"hi\"')
 	AssertEqual('say "hi"', result)
 }
-Test("_LLMRemoteJsonUnescape: \\\" restored to double quote", _RemoteJsonUnescape_QuoteRestored)
+Test("_LLMRemoteJsonUnescape: backslash-quote restored to double quote", _RemoteJsonUnescape_QuoteRestored)
 
 
 _RemoteJsonUnescape_BackslashRestored() {

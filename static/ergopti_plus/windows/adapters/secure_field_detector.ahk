@@ -57,7 +57,7 @@ global SFD_SECURE_APPS := Map(
 SFD_IsSecureField() {
 	try {
 		local FocusedCtrl := ControlGetFocus(A)
-		if FocusedCtrl =
+		if FocusedCtrl = ""
 			return false
 		local Style := ControlGetStyle(FocusedCtrl, A)
 		; ES_PASSWORD = 0x20 — password edit field marker set by CreateWindowEx
@@ -72,7 +72,7 @@ SFD_IsSecureField() {
 ; @param AppId {String} Process name of the active application (e.g. KeePass.exe).
 ; @return {Boolean} True on success, false on error.
 SFD_IsSecureApp(AppId) {
-	if AppId =
+	if AppId = ""
 		return false
 	try {
 		return SFD_SECURE_APPS.Has(AppId) ? true : false
