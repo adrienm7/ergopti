@@ -2,7 +2,7 @@
 #
 # Unified CI pipeline — one workflow per push to main or dev.
 #
-# Architecture (one branch per driver, all independent, then converge):
+# Architecture:
 #
 #   ┌─────────────────────────────────┐
 #   │  validate (fast gates, ubuntu)  │
@@ -21,17 +21,25 @@
 #        │           │           │
 #        └─────────┬─┘───────────┘
 #                  ▼
-#          ┌───────────────┐
-#          │ release       │  (main branch only, all drivers green)
-#          │ auto-tag +    │
-#          │ trigger       │
-#          │ release.yml   │
-#          └───────────────┘
+#          ┌───────────────────────┐
+#          │  resolve-release-meta │  (main + dev, all drivers green)
+#          │  compute tag/version  │
+#          └───────────┬───────────┘
+#             ┌────────┼────────┐
+#             ▼        ▼        ▼
+#        ┌────────┐ ┌──────┐ ┌───────┐
+#        │ build  │ │build │ │ build │
+#        │ macos  │ │ win  │ │ linux │
+#        └────────┘ └──────┘ └───────┘
+#             └────────┬────────┘
+#                      ▼
+#             ┌─────────────────┐
+#             │ finalize-release│
+#             │ create release  │
+#             │ + upload assets │
+#             └─────────────────┘
 #
-# Workflows kept separate:
-#   release.yml  — heavy build jobs (macOS app, Windows exe, Linux packages)
-#                  triggered by the v* tag this pipeline pushes on main
-#   bench.yml    — perf benchmark (main only, independent cadence)
+# bench.yml — perf benchmark (main only, independent cadence)
 
 name: CI
 
@@ -50,9 +58,11 @@ concurrency:
     cancel-in-progress: true
 
 
+
+
 # ========================================================
 # ========================================================
-# ======= 1/ Validation — fast gates, always run =======
+# ======= 1/ Validation — fast gates, always run ========
 # ========================================================
 # ========================================================
 
@@ -99,7 +109,7 @@ jobs:
 
 # ==========================================
 # ==========================================
-# ======= 2/ macOS driver branch =======
+# ======= 2/ macOS driver branch ===========
 # ==========================================
 # ==========================================
 
@@ -195,7 +205,7 @@ jobs:
 
 # =============================================
 # =============================================
-# ======= 3/ Windows driver branch =======
+# ======= 3/ Windows driver branch ============
 # =============================================
 # =============================================
 
@@ -414,7 +424,7 @@ jobs:
 
 # ============================================
 # ============================================
-# ======= 4/ Linux driver branch =======
+# ======= 4/ Linux driver branch =============
 # ============================================
 # ============================================
 
@@ -459,140 +469,526 @@ jobs:
                   echo "  test-linux : ${{ needs.test-linux.result }}"
 
 
-# =========================================
-# =========================================
-# ======= 5/ Release (main only) =======
-# =========================================
-# =========================================
+# =============================================================
+# =============================================================
+# ======= 5/ Resolve release metadata (main + dev) ============
+# =============================================================
+# =============================================================
 
-    release:
-        name: "Release · auto-tag → release.yml"
+    resolve-release-meta:
+        name: "Release · resolve tag + version"
         runs-on: ubuntu-latest
         needs: [macos-ok, windows-ok, linux-ok]
-        # Only on push to main (not PRs, not dev) and only when all gates passed
+        # Runs on push to main or dev — not on PRs
         if: >
             always() &&
             github.event_name == 'push' &&
-            github.ref == 'refs/heads/main' &&
+            (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev') &&
             needs.macos-ok.result   == 'success' &&
             needs.windows-ok.result == 'success' &&
             needs.linux-ok.result   == 'success'
         permissions:
             contents: write
+        outputs:
+            tag:        ${{ steps.meta.outputs.tag }}
+            version:    ${{ steps.meta.outputs.version }}
+            title:      ${{ steps.meta.outputs.title }}
+            prerelease: ${{ steps.meta.outputs.prerelease }}
+            skip:       ${{ steps.meta.outputs.skip }}
 
         steps:
             - uses: actions/checkout@v4
               with:
                   fetch-depth: 0
-                  # PAT required: a tag pushed via GITHUB_TOKEN cannot trigger
-                  # downstream workflows (GitHub security restriction).
-                  token: ${{ secrets.PAT_ERGOPTI }}
 
-            - name: Calculate next version and push tag
-              # Computes the next SemVer from conventional commits since the last
-              # stable tag, then pushes the tag — which triggers release.yml.
-              # This step only runs after all three driver branches are green.
+            - name: Compute tag and version
+              id: meta
               shell: bash
-              env:
-                  GH_TOKEN: ${{ secrets.PAT_ERGOPTI }}
               run: |
                   set -euo pipefail
+                  branch="${GITHUB_REF_NAME}"
 
-                  last_stable=$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname \
-                      | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1 || true)
-                  if [ -z "$last_stable" ]; then
-                      last_stable="v0.0.0"
-                      range="HEAD"
-                  else
-                      range="${last_stable}..HEAD"
-                  fi
-                  echo "Last stable tag: $last_stable"
-                  IFS='.' read -r maj min pat <<< "${last_stable#v}"
-
-                  bump="patch"
-                  while IFS= read -r subject; do
-                      [ -z "$subject" ] && continue
-                      if echo "$subject" | grep -qE '(BREAKING|!):'; then
-                          bump="major"; break
-                      elif echo "$subject" | grep -qE '^feat(\([^)]+\))?!?:'; then
-                          [ "$bump" != "major" ] && bump="minor"
+                  if [ "$branch" = "main" ]; then
+                      last_stable=$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname \
+                          | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1 || true)
+                      if [ -z "$last_stable" ]; then
+                          last_stable="v0.0.0"
+                          range="HEAD"
+                      else
+                          range="${last_stable}..HEAD"
                       fi
-                  done < <(git log "$range" --no-merges --pretty=format:"%s")
-                  echo "Bump type: $bump"
-
-                  case "$bump" in
-                      major) maj=$((maj+1)); min=0; pat=0 ;;
-                      minor) min=$((min+1)); pat=0 ;;
-                      patch) pat=$((pat+1)) ;;
-                  esac
-                  tag="v${maj}.${min}.${pat}"
-                  echo "New tag: $tag"
-
-                  if git ls-remote --tags origin "refs/tags/$tag" | grep -q "$tag"; then
-                      echo "Tag '$tag' already exists — skipping push."
+                      IFS='.' read -r maj min pat <<< "${last_stable#v}"
+                      bump="patch"
+                      while IFS= read -r subject; do
+                          [ -z "$subject" ] && continue
+                          if echo "$subject" | grep -qE '(BREAKING|!):'; then
+                              bump="major"; break
+                          elif echo "$subject" | grep -qE '^feat(\([^)]+\))?!?:'; then
+                              [ "$bump" != "major" ] && bump="minor"
+                          fi
+                      done < <(git log "$range" --no-merges --pretty=format:"%s")
+                      case "$bump" in
+                          major) maj=$((maj+1)); min=0; pat=0 ;;
+                          minor) min=$((min+1)); pat=0 ;;
+                          patch) pat=$((pat+1)) ;;
+                      esac
+                      tag="v${maj}.${min}.${pat}"
+                      prerelease="false"
+                      title="Ergopti ${tag}"
                   else
-                      git tag "$tag"
-                      git push origin "$tag"
-                      echo "Tag '$tag' pushed — release.yml will fire now."
+                      # dev branch — v0.0.0-dev.N series
+                      last_dev=$(git tag --list 'v0.0.0-dev.*' --sort=-v:refname | head -1 || true)
+                      if [ -z "$last_dev" ]; then
+                          next_n=1
+                      else
+                          last_n="${last_dev##*.}"
+                          next_n=$((last_n + 1))
+                      fi
+                      tag="v0.0.0-dev.${next_n}"
+                      prerelease="true"
+
+                      # Human-readable delta since the last stable tag
+                      last_stable=$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname \
+                          | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1 || true)
+                      if [ -n "$last_stable" ]; then
+                          range="${last_stable}..HEAD"
+                          n_feat=0; n_fix=0; n_other=0; n_breaking=0
+                          while IFS= read -r subject; do
+                              [ -z "$subject" ] && continue
+                              if echo "$subject" | grep -qE '(BREAKING|!):'; then
+                                  n_breaking=$((n_breaking+1))
+                              elif echo "$subject" | grep -qE '^feat(\([^)]+\))?!?:'; then
+                                  n_feat=$((n_feat+1))
+                              elif echo "$subject" | grep -qE '^fix(\([^)]+\))?:'; then
+                                  n_fix=$((n_fix+1))
+                              else
+                                  n_other=$((n_other+1))
+                              fi
+                          done < <(git log "$range" --no-merges --pretty=format:"%s")
+                          delta=""
+                          [ "$n_breaking" -gt 0 ] && delta="${delta}!! ${n_breaking} breaking, "
+                          [ "$n_feat"     -gt 0 ] && delta="${delta}✨ ${n_feat} feat, "
+                          [ "$n_fix"      -gt 0 ] && delta="${delta}🔧 ${n_fix} fix, "
+                          [ "$n_other"    -gt 0 ] && delta="${delta}📦 ${n_other} other, "
+                          delta="${delta%, }"
+                          if [ -n "$delta" ]; then
+                              title="Ergopti ${tag} — ${delta} (since ${last_stable})"
+                          else
+                              title="Ergopti ${tag} (since ${last_stable})"
+                          fi
+                      else
+                          title="Ergopti ${tag}"
+                      fi
                   fi
 
-
-# =================================================
-# =================================================
-# ======= 6/ Pre-release (dev branch only) =======
-# =================================================
-# =================================================
-
-    pre-release:
-        name: "Pre-release · auto-tag dev"
-        runs-on: ubuntu-latest
-        needs: [macos-ok, windows-ok, linux-ok]
-        # Only on push to dev (not PRs, not main) and only when all gates passed
-        if: >
-            always() &&
-            github.event_name == 'push' &&
-            github.ref == 'refs/heads/dev' &&
-            needs.macos-ok.result   == 'success' &&
-            needs.windows-ok.result == 'success' &&
-            needs.linux-ok.result   == 'success'
-        permissions:
-            contents: write
-
-        steps:
-            - uses: actions/checkout@v4
-              with:
-                  fetch-depth: 0
-                  # PAT required: a tag pushed via GITHUB_TOKEN cannot trigger
-                  # downstream workflows (GitHub security restriction).
-                  token: ${{ secrets.PAT_ERGOPTI }}
-
-            - name: Calculate next dev tag and push
-              # Pushes the tag only — release.yml handles the full build
-              # (macOS app, Windows exe, Linux packages) and creates the
-              # GitHub release with all assets attached.
-              shell: bash
-              env:
-                  GH_TOKEN: ${{ secrets.PAT_ERGOPTI }}
-              run: |
-                  set -euo pipefail
-
-                  # Find the highest existing dev tag and increment it
-                  last_dev=$(git tag --list 'v0.0.0-dev.*' --sort=-v:refname | head -1) || true
-                  if [ -z "$last_dev" ]; then
-                      next_n=1
-                  else
-                      last_n="${last_dev##*.}"
-                      next_n=$((last_n + 1))
-                  fi
-                  tag="v0.0.0-dev.${next_n}"
-                  echo "Last dev tag : ${last_dev:-none}"
-                  echo "New dev tag  : $tag"
-
+                  # Skip if the tag already exists (duplicate push guard)
                   if git ls-remote --tags origin "refs/tags/$tag" | grep -q "$tag"; then
-                      echo "Tag '$tag' already exists — skipping."
+                      echo "Tag '$tag' already exists — skipping release."
+                      echo "skip=true" >> "$GITHUB_OUTPUT"
+                      echo "tag=$tag"               >> "$GITHUB_OUTPUT"
+                      echo "version=${tag#v}"       >> "$GITHUB_OUTPUT"
+                      echo "title=$title"           >> "$GITHUB_OUTPUT"
+                      echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
                       exit 0
                   fi
 
+                  version="${tag#v}"
+                  echo "tag=$tag"               >> "$GITHUB_OUTPUT"
+                  echo "version=$version"       >> "$GITHUB_OUTPUT"
+                  echo "title=$title"           >> "$GITHUB_OUTPUT"
+                  echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
+                  echo "skip=false"             >> "$GITHUB_OUTPUT"
+                  echo "Resolved: tag=$tag version=$version prerelease=$prerelease"
+                  echo "Title: $title"
+
+
+# =========================================================
+# =========================================================
+# ======= 6/ Build release assets (all three platforms) ===
+# =========================================================
+# =========================================================
+
+    # ─────────────────────────────────────────────────
+    # 6.1) macOS — ErgoptiPlus.app + Sparkle appcast
+    # ─────────────────────────────────────────────────
+    build-macos:
+        name: "Release · macOS build"
+        needs: resolve-release-meta
+        if: needs.resolve-release-meta.outputs.skip == 'false'
+        runs-on: macos-latest
+        env:
+            SPARKLE_ED_PRIVATE_KEY: ${{ secrets.SPARKLE_ED_PRIVATE_KEY }}
+
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+
+            - name: Build ErgoptiPlus.app
+              shell: bash
+              env:
+                  ERGOPTI_VERSION:    ${{ needs.resolve-release-meta.outputs.version }}
+                  ERGOPTI_BUILD:      ${{ github.run_number }}
+                  ERGOPTI_CHANNEL:    main
+                  SPARKLE_PUBLIC_KEY: ${{ secrets.SPARKLE_PUBLIC_KEY }}
+                  GH_OWNER:           ${{ github.repository_owner }}
+                  GH_REPO:            ${{ github.event.repository.name }}
+              run: bash tools/build_macos_app.sh
+
+            - name: Install Sparkle signing tool
+              if: ${{ env.SPARKLE_ED_PRIVATE_KEY != '' }}
+              shell: bash
+              env:
+                  SPARKLE_VERSION: "2.9.2"
+              run: |
+                  set -euo pipefail
+                  curl -fsSLo /tmp/Sparkle.tar.xz \
+                      "https://github.com/sparkle-project/Sparkle/releases/download/${SPARKLE_VERSION}/Sparkle-${SPARKLE_VERSION}.tar.xz"
+                  mkdir -p /tmp/sparkle-dist
+                  tar -xJf /tmp/Sparkle.tar.xz -C /tmp/sparkle-dist
+                  echo "SIGN_UPDATE=/tmp/sparkle-dist/bin/sign_update" >> "$GITHUB_ENV"
+
+            - name: Sign zip with Sparkle EdDSA key
+              if: ${{ env.SPARKLE_ED_PRIVATE_KEY != '' }}
+              shell: bash
+              run: |
+                  set -euo pipefail
+                  printf '%s' "$SPARKLE_ED_PRIVATE_KEY" > /tmp/sparkle_priv.key
+                  "$SIGN_UPDATE" -f /tmp/sparkle_priv.key build/macos/ErgoptiPlus.app.zip \
+                      > build/macos/_ErgoptiPlus.app.zip.sig
+                  rm -f /tmp/sparkle_priv.key
+                  echo "Sparkle EdDSA signature written to _ErgoptiPlus.app.zip.sig"
+
+            - name: Generate Sparkle appcast
+              if: ${{ env.SPARKLE_ED_PRIVATE_KEY != '' }}
+              shell: bash
+              env:
+                  ERGOPTI_VERSION:  ${{ needs.resolve-release-meta.outputs.version }}
+                  ERGOPTI_BUILD:    ${{ github.run_number }}
+                  ERGOPTI_CHANNEL:  main
+                  SPARKLE_SIG_FILE: build/macos/_ErgoptiPlus.app.zip.sig
+                  ZIP_PATH:         build/macos/ErgoptiPlus.app.zip
+                  GH_OWNER:         ${{ github.repository_owner }}
+                  GH_REPO:          ${{ github.event.repository.name }}
+                  OUTPUT_PATH:      build/macos/appcast-main.xml
+              run: bash tools/generate_appcast.sh
+
+            - name: Package latest keylayout bundle
+              shell: bash
+              # Released as Ergopti_macOS.zip — keyboard layout only, no app.
+              run: |
+                  set -euo pipefail
+                  latest=$(ls -d static/ergopti/macos/bundles/*.bundle | sort -V | tail -1)
+                  bundle_name=$(basename "$latest")
+                  (cd static/ergopti/macos/bundles && zip -r "../../../../build/macos/Ergopti_macOS.zip" "$bundle_name")
+                  echo "Packaged keylayout: $bundle_name → Ergopti_macOS.zip"
+
+            - name: Rename appcast for upload
+              shell: bash
+              run: |
+                  [ -f build/macos/appcast-main.xml ] && mv build/macos/appcast-main.xml build/macos/_appcast-main.xml || true
+
+            - name: Upload macOS artifacts
+              uses: actions/upload-artifact@v4
+              with:
+                  name: assets-macos
+                  retention-days: 1
+                  path: |
+                      build/macos/ErgoptiPlus.app.zip
+                      build/macos/Ergopti_macOS.zip
+                      build/macos/_ErgoptiPlus.app.zip.sig
+                      build/macos/_appcast-main.xml
+
+
+    # ─────────────────────────────────────────────────
+    # 6.2) Windows — ErgoptiPlus.exe + keyboard layout
+    # ─────────────────────────────────────────────────
+    build-windows:
+        name: "Release · Windows build"
+        needs: resolve-release-meta
+        if: needs.resolve-release-meta.outputs.skip == 'false'
+        runs-on: windows-latest
+
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+
+            - name: Set up Python
+              uses: actions/setup-python@v5
+              with:
+                  python-version: "3.12"
+
+            - name: Set up Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: "22"
+                  cache: "npm"
+
+            - name: Install Node dependencies
+              run: npm ci
+              shell: bash
+
+            - name: Generate features manifest
+              run: npm run build:manifest
+              shell: bash
+
+            - name: Regenerate hotstrings_generated.ahk
+              run: python tools/compile_hotstrings.py
+              shell: bash
+
+            - name: Build static asset bundle
+              run: python tools/build_static_bundle.py
+              shell: bash
+
+            - name: Stamp BUNDLE_VERSION, BUNDLE_RELEASE_URL, BUNDLE_CHANNEL
+              shell: pwsh
+              run: |
+                  $version = "${{ needs.resolve-release-meta.outputs.version }}"
+                  $tag     = "${{ needs.resolve-release-meta.outputs.tag }}"
+                  if (-not $tag) { $tag = $version }
+                  $prerelease = "${{ needs.resolve-release-meta.outputs.prerelease }}"
+                  $channel = if ($prerelease -eq 'true') { 'dev' } else { 'main' }
+                  $owner   = "${{ github.repository_owner }}"
+                  $repo    = "${{ github.event.repository.name }}"
+                  $releaseUrl = "https://github.com/$owner/$repo/releases/tag/$tag"
+                  $bundlePath = "${{ github.workspace }}\static\ergopti_plus\windows\lib\bundle.ahk"
+                  $text = Get-Content -Raw -Path $bundlePath
+                  $text = $text.Replace("__BUNDLE_VERSION__",     $version)
+                  $text = $text.Replace("__BUNDLE_RELEASE_URL__", $releaseUrl)
+                  $text = $text.Replace("__BUNDLE_CHANNEL__",     $channel)
+                  Set-Content -Path $bundlePath -Value $text -Encoding UTF8 -NoNewline
+                  Write-Host "BUNDLE_VERSION     stamped: $version"
+                  Write-Host "BUNDLE_RELEASE_URL stamped: $releaseUrl"
+                  Write-Host "BUNDLE_CHANNEL     stamped: $channel"
+
+            - name: Download AutoHotkey v2 runtime and Ahk2Exe
+              shell: pwsh
+              env:
+                  GH_TOKEN: ${{ github.token }}
+              run: |
+                  Invoke-WebRequest -Uri "https://github.com/AutoHotkey/AutoHotkey/releases/download/v2.0.19/AutoHotkey_2.0.19.zip" -OutFile "$env:TEMP\AHK.zip" -UseBasicParsing
+                  Expand-Archive -Path "$env:TEMP\AHK.zip" -DestinationPath "$env:TEMP\AutoHotkey" -Force
+                  gh release download --repo AutoHotkey/Ahk2Exe --pattern "*.zip" --dir "$env:TEMP\Ahk2ExeZip"
+                  $z = Get-ChildItem "$env:TEMP\Ahk2ExeZip" -Filter "*.zip" | Select-Object -First 1
+                  Expand-Archive -Path $z.FullName -DestinationPath "$env:TEMP\Ahk2Exe" -Force
+
+            - name: Compile ErgoptiPlus.ahk
+              shell: pwsh
+              run: |
+                  $ahk2exe = Get-ChildItem "$env:TEMP\Ahk2Exe" -Recurse -Filter "Ahk2Exe.exe" | Select-Object -First 1 -ExpandProperty FullName
+                  $runtime = Get-ChildItem "$env:TEMP\AutoHotkey" -Filter "AutoHotkey64.exe" | Select-Object -First 1 -ExpandProperty FullName
+                  $in   = "${{ github.workspace }}\static\ergopti_plus\windows\ErgoptiPlus.ahk"
+                  $out  = "${{ github.workspace }}\static\ergopti_plus\windows\ErgoptiPlus.exe"
+                  $icon = "${{ github.workspace }}\static\favicon.ico"
+                  # /silent suppresses any Ahk2Exe GUI dialogs that would block
+                  # indefinitely on a headless runner and cause a silent non-zero exit.
+                  & $ahk2exe /in $in /out $out /base $runtime /icon $icon /silent
+                  if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+                  # Verify the EXE was actually produced — Ahk2Exe can exit 0 on a
+                  # compilation warning without writing the output file.
+                  if (-not (Test-Path $out)) {
+                      Write-Error "Ahk2Exe reported success but $out was not created."
+                      exit 1
+                  }
+                  Write-Host "Compiled: $out ($('{0:N0}' -f (Get-Item $out).Length) bytes)"
+
+            - name: Rename Windows keyboard layout for upload
+              shell: bash
+              run: |
+                  set -euo pipefail
+                  latest_kbd=$(ls static/ergopti/windows/Ergopti_v*.exe | sort -V | tail -1)
+                  cp "$latest_kbd" static/ergopti/windows/Ergopti_windows.exe
+
+            - name: Upload Windows artifacts
+              uses: actions/upload-artifact@v4
+              with:
+                  name: assets-windows
+                  retention-days: 1
+                  path: |
+                      static/ergopti_plus/windows/ErgoptiPlus.exe
+                      static/ergopti/windows/Ergopti_windows.exe
+
+
+    # ─────────────────────────────────────────────────
+    # 6.3) Linux — XKB keyboard layouts
+    # ─────────────────────────────────────────────────
+    build-linux:
+        name: "Release · Linux build"
+        needs: resolve-release-meta
+        if: needs.resolve-release-meta.outputs.skip == 'false'
+        runs-on: ubuntu-latest
+
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+
+            - name: Package latest XKB files
+              shell: bash
+              run: |
+                  set -euo pipefail
+                  latest_dir=$(ls -d static/ergopti/linux/v*_* | sort -V | tail -1)
+                  dir_name=$(basename "$latest_dir")
+                  mkdir -p build/linux
+                  (cd static/ergopti/linux && zip -r "../../../build/linux/Ergopti_xkb.zip" "$dir_name")
+                  echo "Packaged XKB: $dir_name → Ergopti_xkb.zip"
+
+            - name: Upload Linux artifacts
+              uses: actions/upload-artifact@v4
+              with:
+                  name: assets-linux
+                  retention-days: 1
+                  path: |
+                      build/linux/Ergopti_xkb.zip
+                      static/ergopti_plus/kanata/kanata.kbd
+
+
+# ============================================================
+# ============================================================
+# ======= 7/ Finalize release — create + upload assets =======
+# ============================================================
+# ============================================================
+
+    finalize-release:
+        name: "Release · finalize"
+        needs: [resolve-release-meta, build-macos, build-windows, build-linux]
+        if: needs.resolve-release-meta.outputs.skip == 'false'
+        runs-on: ubuntu-latest
+        permissions:
+            contents: write
+
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+
+            - name: Download all build artifacts
+              uses: actions/download-artifact@v4
+              with:
+                  path: release-assets
+                  merge-multiple: true
+
+            - name: Create git tag
+              shell: bash
+              run: |
+                  set -euo pipefail
+                  tag="${{ needs.resolve-release-meta.outputs.tag }}"
                   git tag "$tag"
                   git push origin "$tag"
-                  echo "Tag '$tag' pushed — release.yml will build and publish the release."
+                  echo "Tag '$tag' pushed."
+
+            - name: Create release and upload all assets atomically
+              # The release is created here — after all three build jobs have
+              # succeeded — so it is never in a half-baked state.
+              shell: bash
+              env:
+                  GH_TOKEN: ${{ github.token }}
+              run: |
+                  set -euo pipefail
+                  tag="${{ needs.resolve-release-meta.outputs.tag }}"
+                  prerelease="${{ needs.resolve-release-meta.outputs.prerelease }}"
+                  title="${{ needs.resolve-release-meta.outputs.title }}"
+
+                  mapfile -t assets < <(find release-assets -type f)
+                  echo "Assets to attach (${#assets[@]}):"
+                  printf '  %s\n' "${assets[@]}"
+
+                  flags=()
+                  [ "$prerelease" = "true" ] && flags+=("--prerelease")
+
+                  gh release create "$tag" \
+                      --target "${{ github.sha }}" \
+                      --title "$title" \
+                      --notes "Changelog will appear below — updating now." \
+                      "${flags[@]}" \
+                      "${assets[@]}"
+
+            - name: Build changelog section
+              shell: bash
+              env:
+                  EVENT:    ${{ github.event_name }}
+                  TAG:      ${{ needs.resolve-release-meta.outputs.tag }}
+                  SHA:      ${{ github.sha }}
+              run: |
+                  python3 tools/build_changelog.py > "$RUNNER_TEMP/changelog.md"
+                  echo "Changelog written ($(wc -l < "$RUNNER_TEMP/changelog.md") lines)."
+
+            - name: Write release body with platform sections
+              shell: bash
+              env:
+                  GH_TOKEN: ${{ github.token }}
+                  TAG:      ${{ needs.resolve-release-meta.outputs.tag }}
+                  VERSION:  ${{ needs.resolve-release-meta.outputs.version }}
+              run: |
+                  set -euo pipefail
+                  body_file="$(mktemp)"
+                  if [ -s "$RUNNER_TEMP/changelog.md" ]; then
+                      cat "$RUNNER_TEMP/changelog.md" >> "$body_file"
+                  fi
+                  cat >> "$body_file" << EOF
+                  ## Ergopti $VERSION
+
+                  Select the platform below and download the corresponding file.
+                  > Timestamps are in **Paris time** (Europe/Paris, CET/CEST).
+
+                  ---
+
+                  ### macOS
+
+                  | Asset | Description |
+                  |---|---|
+                  | [ErgoptiPlus.app.zip](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/ErgoptiPlus.app.zip) | macOS application (Hammerspoon + Karabiner-Elements bundled) |
+                  | [Ergopti_macOS.zip](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/Ergopti_macOS.zip) | Keyboard layout bundle only — no app required |
+
+                  **Installation — app:**
+                  1. Unzip \`ErgoptiPlus.app.zip\` and move \`ErgoptiPlus.app\` to \`/Applications\`.
+                  2. Remove the quarantine flag (the app is not yet Apple-notarised):
+                  \`\`\`bash
+                  xattr -d com.apple.quarantine /Applications/ErgoptiPlus.app
+                  \`\`\`
+                  3. Launch the app. On first run, Karabiner-Elements will request a System Extension approval — required for key remapping.
+                  4. Your personal configuration is stored in \`~/.config/ergopti_plus/\`. If this folder does not exist yet (first launch), the setup wizard will open automatically.
+
+                  **Installation — keyboard layout only:**
+                  1. Unzip \`Ergopti_macOS.zip\`.
+                  2. Copy the \`.bundle\` folder to \`/Library/Keyboard Layouts/\`.
+                  3. Log out and back in, then add the layout in System Settings → Keyboard → Input Sources.
+
+                  ---
+
+                  ### 🪟 Windows
+
+                  | Asset | Description |
+                  |---|---|
+                  | [ErgoptiPlus.exe](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/ErgoptiPlus.exe) | Compiled AutoHotkey executable (AHK v2 runtime bundled) |
+                  | [Ergopti_windows.exe](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/Ergopti_windows.exe) | Windows keyboard layout installer — no app required |
+
+                  **Installation — app:**
+                  1. Download \`ErgoptiPlus.exe\`.
+                  2. Double-click to run. On first launch, resources are extracted to \`%LOCALAPPDATA%\Ergopti\`.
+                  3. Your personal configuration is stored in \`%USERPROFILE%\.config\ergopti_plus\`. If this folder does not exist yet (first launch), the setup wizard will open automatically.
+
+                  **Installation — keyboard layout only:**
+                  1. Download \`Ergopti_windows.exe\` and run it as Administrator.
+                  2. Log out and back in, then select the layout in Settings → Time & Language → Language & region.
+
+                  ---
+
+                  ### Linux
+
+                  | Asset | Description |
+                  |---|---|
+                  | [Ergopti_xkb.zip](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/Ergopti_xkb.zip) | XKB layout files (standard, ANSI, plus, plus-ANSI variants) |
+                  | [kanata.kbd](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/kanata.kbd) | Kanata config file (for Kanata users) |
+
+                  **Installation:**
+                  1. Unzip \`Ergopti_xkb.zip\`.
+                  2. Follow the [XKB installation guide](https://github.com/${GITHUB_REPOSITORY}/tree/main/static/ergopti/linux/xkb_installation) in the repository.
+
+                  ---
+
+                  _Generated by [CI](https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID})_
+                  EOF
+                  gh release edit "$TAG" --repo "${GITHUB_REPOSITORY}" --notes-file "$body_file"
+                  echo "Release notes updated for $TAG"
