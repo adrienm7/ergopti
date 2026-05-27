@@ -285,10 +285,10 @@ global _TOML_STRICT_CANON_IN_PROGRESS := false
 ; and re-extracted on every version change, so storing paths.toml there caused
 ; ConfigDirPath overrides to be lost on every update, which triggered the
 ; onboarding wizard again even for existing users. The dev-mode fallback keeps
-; using A_ScriptDir\paths.toml as before.
+; using A_ScriptDir\_generated\paths.toml.
 global _PathsFile := A_IsCompiled
     ? (A_AppData . "\Ergopti\paths.toml")
-    : (A_ScriptDir . "\paths.toml")
+    : (A_ScriptDir . "\_generated\paths.toml")
 global _PathsOverrides := ReadPathsToml(_PathsFile)
 
 ; ConfigDirPath is the single relocatable folder that holds all personal files.
