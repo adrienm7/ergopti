@@ -213,7 +213,7 @@ _CorpusHS_CaseSensitiveVectorsHaveCorrectMatchFlag() {
 		if not (Vec.Has("is_case_sensitive") and Vec["is_case_sensitive"] = true) {
 			continue
 		}
-		Exp     := Vec["expected"]
+		Expected := Vec["expected"]
 		Buf     := Vec.Has("buffer") ? Vec["buffer"] : ""
 		Trigger := Vec["trigger"]
 		TLen    := StrLen(Trigger)
