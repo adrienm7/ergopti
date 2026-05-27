@@ -168,6 +168,7 @@ global _VendorDir := A_ScriptDir . "\..\vendor"
 #Include meta/test_no_coauthor_in_commits.ahk
 #Include meta/test_no_pascal_case_in_toml.ahk
 #Include meta/test_port_adapter_coverage.ahk
+#Include meta/test_no_class_global_conflict.ahk
 ; ── Cross-driver corpus consumers ──
 #Include meta/test_corpus_hotstrings.ahk
 #Include meta/test_corpus_tap_hold.ahk
