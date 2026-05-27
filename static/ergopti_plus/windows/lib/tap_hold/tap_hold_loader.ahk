@@ -126,9 +126,9 @@ _TapHold_ParseFileInto(FilePath, Result) {
 			; must evict the other so a defaults entry with hold_layer is not
 			; left in place when the user file overrides with hold_modifier,
 			; which would make IsTapHoldVariantActive match both variants.
-			if (Key == "hold_modifier") {
+			if (Key == "hold_modifier") and Result["keys"][KeyId].Has("hold_layer") {
 				Result["keys"][KeyId].Delete("hold_layer")
-			} else if (Key == "hold_layer") {
+			} else if (Key == "hold_layer") and Result["keys"][KeyId].Has("hold_modifier") {
 				Result["keys"][KeyId].Delete("hold_modifier")
 			}
 			Result["keys"][KeyId][Key] := Value
