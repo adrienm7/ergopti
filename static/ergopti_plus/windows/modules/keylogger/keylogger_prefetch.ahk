@@ -40,7 +40,7 @@
 
 ; Resolve the dashboard assets folder for a given page key (« typing »
 ; or « apps »). The dashboards live under
-; ``<repo>/static/ergopti_plus/_shared/ui/metrics_<key>/``.
+; ``<repo>/static/ergopti_plus/shared/ui/metrics_<key>/``.
 KLPF_AssetsDir(which) {
     global _StaticDir
     base := _StaticDir . "\drivers\_shared\ui\metrics_" . which . "\"

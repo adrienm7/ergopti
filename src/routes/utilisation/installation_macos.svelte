@@ -112,7 +112,7 @@
 	verrouillage, ce qui peut carrément empêcher la saisie de son mot de passe. Enfin, la fermeture
 	automatique des parenthèses ne fonctionne pas dans les éditeurs de code. Pour toutes ces raisons,
 	il est donc conseillé de plutôt utiliser <strong>Ergopti+</strong> avec le driver
-	<a href="ergoptiplus" class="link"><ErgoptiPlus /></a> pour y définir ces roulements.
+	<a href="ergopti-plus" class="link"><ErgoptiPlus /></a> pour y définir ces roulements.
 </p>
 <p>
 	Des <strong>variantes ANSI</strong> de ces dispositions sont également disponibles. En effet, sur
@@ -138,7 +138,7 @@
 		Les touches mortes suivies d'<kbd>Entrée</kbd> nécessitent un double appui sur
 		<kbd>Entrée</kbd>. En effet, il faut un premier appui pour valider la touche morte, puis un
 		second appui pour envoyer <kbd>Entrée</kbd>. Ce problème peut se résoudre avec le driver
-		<a href="ergoptiplus" class="link"><ErgoptiPlus /></a>.
+		<a href="ergopti-plus" class="link"><ErgoptiPlus /></a>.
 	</li>
 	<li>
 		Les touches mortes ne fonctionnent pas sur l'écran de verrouillage, ni les touches envoyant plus

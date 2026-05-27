@@ -4,7 +4,7 @@
 --- MODULE: FileSystem Adapter (Hammerspoon)
 --- DESCRIPTION:
 --- Hammerspoon implementation of the FileSystem port contract defined in
---- static/ergopti_plus/_shared/ports/FileSystem.spec.js. Wraps Lua's io.open and
+--- static/ergopti_plus/shared/ports/FileSystem.spec.js. Wraps Lua's io.open and
 --- hs.fs behind the five canonical methods (read, write, append, exists, delete)
 --- so domain modules perform file I/O without coupling to OS-specific APIs.
 ---

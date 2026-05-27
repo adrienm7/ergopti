@@ -47,11 +47,11 @@ local _mode      = "download" -- "download" (model download) or "bootstrap" (eng
 
 local _src  = debug.getinfo(1, "S").source:sub(2)
 local _own_dir   = _src:match("^(.*[/\\])") or "./"
--- HTML/CSS/JS assets live in the cross-platform _shared/ folder so all
+-- HTML/CSS/JS assets live in the cross-platform shared/ folder so all
 -- drivers benefit from the same UI without duplication.
 local ASSETS_DIR = _own_dir:gsub(
 	"drivers/hammerspoon/ui/download_window/",
-	"drivers/_shared/ui/download_window/"
+	"drivers/shared/ui/download_window/"
 )
 
 

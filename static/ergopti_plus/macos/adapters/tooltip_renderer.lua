@@ -4,7 +4,7 @@
 --- MODULE: TooltipRenderer Adapter (Hammerspoon)
 --- DESCRIPTION:
 --- Hammerspoon implementation of the TooltipRenderer port contract defined in
---- static/ergopti_plus/_shared/ports/TooltipRenderer.spec.js. Wraps the existing
+--- static/ergopti_plus/shared/ports/TooltipRenderer.spec.js. Wraps the existing
 --- ui/tooltip/ subsystem (renderer.lua + config.lua) behind the four canonical
 --- port methods (show, hide, isVisible, updateElement) so domain modules can
 --- control tooltip display without a direct dependency on hs.canvas.

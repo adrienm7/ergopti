@@ -4,7 +4,7 @@
 ; MODULE: Registry Domain Contract Tests (AutoHotkey)
 ; DESCRIPTION:
 ; AHK translation of the contractTestVectors() scenarios defined in
-; static/ergopti_plus/_shared/domain/Registry.spec.js. Every vector
+; static/ergopti_plus/shared/domain/Registry.spec.js. Every vector
 ; exercises the same logical assertion as the JS spec so the AHK engine
 ; and the Hammerspoon engine are held to an identical standard.
 ;

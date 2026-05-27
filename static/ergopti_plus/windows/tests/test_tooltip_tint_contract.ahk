@@ -4,7 +4,7 @@
 ; MODULE: Tooltip Tint Contract Tests
 ; DESCRIPTION:
 ; Validates the AHK tooltip tint-mixing algorithm against the canonical test
-; vectors defined in static/ergopti_plus/_shared/tooltip/tint.js. Every vector
+; vectors defined in static/ergopti_plus/shared/tooltip/tint.js. Every vector
 ; describes an input accent color and its expected tinted output hex string;
 ; these tests assert that _TooltipMixTintHex() produces exactly that output.
 ;
@@ -33,10 +33,10 @@
 ; ==============================================
 
 ; Hard-coded cross-driver tint test vectors, mirroring tintTestVectors() from
-; static/ergopti_plus/_shared/tooltip/tint.js. Values are computed by the JS
+; static/ergopti_plus/shared/tooltip/tint.js. Values are computed by the JS
 ; reference at DEFAULT_LIGHTNESS=0.10 / DEFAULT_SATURATION=0.40.
 ; When the algorithm constants change, regenerate with:
-;   node -e "const t=require('./static/ergopti_plus/_shared/tooltip/tint.js'); ..."
+;   node -e "const t=require('./static/ergopti_plus/shared/tooltip/tint.js'); ..."
 _GetTintVectors() {
 	Vectors := []
 	Vectors.Push({ Id: "red_accent",    AccentHex: "#FF0000", ExpectedHex: "240F0F" })

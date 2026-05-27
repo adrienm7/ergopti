@@ -448,9 +448,9 @@ _LoggerFanOut(Tag, Line) {
 ; outside the scope of toml_helpers.ahk — this dedicated reader is intentionally minimal.
 _LoggerLoadSubFilesToml(ScriptDir) {
     global LOGGER_SUB_FILES, LOGGER_SUB_FILES_FALLBACK
-    ; Resolve path: ScriptDir\..\..\..\_shared\logger\sub_files.toml
-    ; (autohotkey/ → drivers/ → _shared/logger/)
-    TomlPath := ScriptDir . "..\..\..\_shared\logger\sub_files.toml"
+    ; Resolve path: ScriptDir\..\..\..\shared\logger\sub_files.toml
+    ; (autohotkey/ → ergopti_plus/ → shared/logger/)
+    TomlPath := ScriptDir . "..\..\..\shared\logger\sub_files.toml"
     if !FileExist(TomlPath) {
         LOGGER_SUB_FILES := LOGGER_SUB_FILES_FALLBACK
         return

@@ -8,7 +8,7 @@
 ; ``modules/llm/api_common.lua`` — same surface (get_diversity_temperature,
 ; get_retry_policy, get_rate_limit_min_interval_ms, insert_prediction,
 ; new_dedup_stats), same algorithm, and the same numeric tunables (loaded
-; from ``static/ergopti_plus/_shared/llm/inference.json``).
+; from ``static/ergopti_plus/shared/llm/inference.json``).
 ;
 ; FEATURES & RATIONALE:
 ; 1. Single source of truth for inference tunables: change a knob in

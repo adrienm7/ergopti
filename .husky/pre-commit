@@ -11,10 +11,10 @@ STAGED=$(git diff --cached --name-only --diff-filter=ACM | grep -E '^static/driv
 
 if [ -n "$STAGED" ]; then
     for f in $STAGED; do
-        python tools/format_toml.py --hotstrings "$f"
+        python tools/dev/format_toml.py --hotstrings "$f"
         git add "$f"
     done
 fi
 
 # Lint coding conventions — blocks commit on any violation.
-node scripts/lint-conventions.js --fail-on-violations
+node tools/lint/lint-conventions.js --fail-on-violations

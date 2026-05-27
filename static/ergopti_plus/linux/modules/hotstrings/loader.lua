@@ -4,9 +4,9 @@
 --- MODULE: Hotstring TOML Loader (Linux)
 --- DESCRIPTION:
 --- Loads hotstring definitions from TOML files that follow the schema defined
---- in static/ergopti_plus/_shared/hotstrings/schema.md. Implements a lightweight
+--- in static/ergopti_plus/shared/hotstrings/schema.md. Implements a lightweight
 --- line-by-line parser — no external TOML library is required — capable of
---- handling the [[entry]] array format used throughout _shared/hotstrings/.
+--- handling the [[entry]] array format used throughout shared/hotstrings/.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Zero-dependency: the parser handles the restricted subset of TOML actually

@@ -10,7 +10,7 @@
 --- settings) and deploying the result to the KE config directory.
 ---
 --- FEATURES & RATIONALE:
---- 1. CapsWord Priority: _shared/karabiner/capsword.json is loaded first so CapsWord
+--- 1. CapsWord Priority: shared/karabiner/capsword.json is loaded first so CapsWord
 ---    activation always takes precedence over any tap/hold or combo rule that shares
 ---    the same key — without this ordering, RCmd+CapsLock combos could steal the
 ---    event before CapsWord’s simultaneous matcher fires.
@@ -657,7 +657,7 @@ end
 --- @param tap_hold_keys table List from Config.load_tap_hold_keys.
 --- @param mod_combos table List from Config.load_mod_combos.
 --- @param non_canonical table Set from Config.compute_non_canonical_combos.
---- @param shared_dir string Path to _shared/karabiner/ containing the JSON data files.
+--- @param shared_dir string Path to shared/karabiner/ containing the JSON data files.
 --- @return table Karabiner config table ready for hs.json.encode.
 function M.build_karabiner_json(state, available_actions, tap_hold_keys, mod_combos, non_canonical, shared_dir)
 	-- Inject F20 sentinel into every nav-layer-activating action BEFORE indexing,

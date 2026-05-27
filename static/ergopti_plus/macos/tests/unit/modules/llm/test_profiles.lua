@@ -54,7 +54,7 @@ helpers.describe("Profiles.BUILTIN_PROFILES", function()
 		-- The legacy ``system_multi`` function field was replaced by the
 		-- JSON-shaped ``system_multi_template`` string (with a ``{n}``
 		-- placeholder) when profiles.lua started loading the shared
-		-- ``_shared/llm/profiles.json``. Only the batch profile defines it.
+		-- ``shared/llm/profiles.json``. Only the batch profile defines it.
 		for _, p in ipairs(Profiles.BUILTIN_PROFILES) do
 			if p.id == "batch_advanced" then
 				helpers.assert_eq(type(p.system_multi_template), "string")

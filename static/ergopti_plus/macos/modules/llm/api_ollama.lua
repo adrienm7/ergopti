@@ -22,7 +22,7 @@ if not ok_kl then keylogger = nil end
 local _req_counter = 0
 local _ollama_started = false
 local DEDUPLICATION_ENABLED = ApiCommon.DEFAULT_DEDUPLICATION_ENABLED
--- Retry policy lives in _shared/llm/inference.json so the AHK twin can read
+-- Retry policy lives in shared/llm/inference.json so the AHK twin can read
 -- the same numbers. ``max_mult`` is the upper bound on attempts as a
 -- multiple of requested_predictions; ``retry_temp_step`` is added on top of
 -- the diversity step for the 2nd attempt; ``retry_extra_tokens`` gives the

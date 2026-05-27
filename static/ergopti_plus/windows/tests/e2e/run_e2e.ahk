@@ -21,7 +21,7 @@
 ;
 ; CORPUS:
 ; Five scenarios are derived from the shared cross-driver corpus at
-; static/ergopti_plus/_shared/tests/corpus/hotstrings/vectors.json (the same
+; static/ergopti_plus/shared/tests/corpus/hotstrings/vectors.json (the same
 ; source the AHK unit meta-tests use). The vectors are reproduced inline
 ; here (as constants) so the harness is self-contained and does not require
 ; a JSON parser at E2E time.
@@ -73,7 +73,7 @@ global E2E_MAGIC_KEY := Chr(0x2605)  ; ★ U+2605
 
 
 ; Corpus scenario definitions — inline transcription of the 5 E2E vectors
-; from static/ergopti_plus/_shared/tests/corpus/hotstrings/vectors.json.
+; from static/ergopti_plus/shared/tests/corpus/hotstrings/vectors.json.
 ; Each entry is a Map with keys: id, trigger, replacement, is_word, is_cs,
 ; buffer, terminator, expect_match, expect_replacement, expect_bs_count.
 global E2E_SCENARIOS := [

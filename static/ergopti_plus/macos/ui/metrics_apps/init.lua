@@ -431,7 +431,7 @@ function M.show()
 		frame       = frame,
 		title       = "Temps sur les applications",
 		style_masks = 15,
-		assets_dir  = hs.configdir .. "/../_shared/ui/metrics_apps/",
+		assets_dir  = hs.configdir .. "/../shared/ui/metrics_apps/",
 		usercontent = ucc,
 		on_close    = function()
 			M._wv = nil

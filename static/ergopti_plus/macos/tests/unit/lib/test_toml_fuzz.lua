@@ -32,13 +32,13 @@ local toml_codec = helpers.load_with_stubs("lib.toml_codec")
 
 --- Resolves the absolute path to the shared fuzz corpus JSON file.
 --- We walk up from the driver root (tests/helpers resolves this) to reach
---- static/ergopti_plus/_shared/tests/corpus/toml/fuzz_corpus.json.
+--- static/ergopti_plus/shared/tests/corpus/toml/fuzz_corpus.json.
 --- @return string Absolute path to the corpus file.
 local function corpus_path()
 	local root = helpers.driver_root()
-	-- driver_root is .../static/ergopti_plus/macos/ — go two levels up for _shared/
+	-- driver_root is .../static/ergopti_plus/macos/ — go two levels up for shared/
 	local drivers = root:match("^(.*)/[^/]+/$") or root:gsub("/$", "")
-	return drivers .. "/_shared/tests/corpus/toml/fuzz_corpus.json"
+	return drivers .. "/shared/tests/corpus/toml/fuzz_corpus.json"
 end
 
 --- Loads the fuzz corpus from JSON and returns the decoded array.

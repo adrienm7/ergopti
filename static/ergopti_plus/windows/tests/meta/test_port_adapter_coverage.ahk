@@ -73,7 +73,7 @@ _MetaRunAdapterPresenceTests() {
 	; #Include'd file is executing — strip everything from /static/... onward.
 	RepoRoot := RegExReplace(RepoRoot, "/static/ergopti_plus/windows/tests(/meta)?$", "")
 
-	SharedPorts := RepoRoot . "/static/ergopti_plus/_shared/ports"
+	SharedPorts := RepoRoot . "/static/ergopti_plus/shared/ports"
 	AhkAdapters := RepoRoot . "/static/ergopti_plus/windows/adapters"
 	HsAdapters  := RepoRoot . "/static/ergopti_plus/macos/adapters"
 
@@ -130,7 +130,7 @@ _MetaRunDomainCoverageTests() {
 	; #Include'd file is executing — strip everything from /static/... onward.
 	RepoRoot := RegExReplace(RepoRoot, "/static/ergopti_plus/windows/tests(/meta)?$", "")
 
-	DomainDir  := RepoRoot . "/static/ergopti_plus/_shared/domain"
+	DomainDir  := RepoRoot . "/static/ergopti_plus/shared/domain"
 	AhkTests   := RepoRoot . "/static/ergopti_plus/windows/tests"
 	HsTests    := RepoRoot . "/static/ergopti_plus/macos/tests"
 
@@ -199,7 +199,7 @@ _MetaRunSharedPurityTests() {
 	; #Include'd file is executing — strip everything from /static/... onward.
 	RepoRoot := RegExReplace(RepoRoot, "/static/ergopti_plus/windows/tests(/meta)?$", "")
 
-	SharedDir := RepoRoot . "/static/ergopti_plus/_shared"
+	SharedDir := RepoRoot . "/static/ergopti_plus/shared"
 	ForbiddenPatterns := ["io\.open", "hs\.", "SendInput", "SendEvent", "TrayTip", "FileAppend", "FileRead"]
 
 	SharedFiles := _MetaPACListFiles(SharedDir, "js")

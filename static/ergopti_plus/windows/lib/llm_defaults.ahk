@@ -3,7 +3,7 @@
 ; ==============================================================================
 ; MODULE: LLM Defaults Loader
 ; DESCRIPTION:
-; Reads static/ergopti_plus/_shared/llm/defaults.json at boot and exposes a global
+; Reads static/ergopti_plus/shared/llm/defaults.json at boot and exposes a global
 ; LLM_Defaults Map so every LLM module reads its initial values from a single
 ; cross-platform source of truth instead of duplicating hardcoded constants.
 ;

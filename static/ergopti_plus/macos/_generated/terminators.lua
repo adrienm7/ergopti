@@ -1,5 +1,5 @@
 --- static/ergopti_plus/macos/_generated/terminators.lua
---- AUTO-GENERATED from _shared/domain/terminators.spec.js.
+--- AUTO-GENERATED from shared/domain/terminators.spec.js.
 --- DO NOT EDIT BY HAND — run `npm run codegen:terminators` to refresh.
 
 --- ==============================================================================

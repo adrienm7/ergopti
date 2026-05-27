@@ -106,7 +106,7 @@ else
 fi
 
 DRIVER_ROOT="${ERGOPTI_ROOT}/linux"
-SHARED_LUA="${ERGOPTI_ROOT}/_shared/lua"
+SHARED_LUA="${ERGOPTI_ROOT}/shared/lua"
 
 if [ ! -d "${DRIVER_ROOT}" ]; then
 	echo "Erreur : répertoire du driver Linux introuvable : ${DRIVER_ROOT}" >&2

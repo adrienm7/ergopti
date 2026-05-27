@@ -695,9 +695,9 @@ local LABELS = {
 
 -- Path to the shared gesture_actions.toml, resolved relative to this file.
 -- actions.lua lives at static/ergopti_plus/macos/modules/gestures/actions.lua
--- so we climb 4 levels to reach static/, then enter shared/.
+-- so we climb 3 levels to reach ergopti_plus/, then enter shared/.
 local _self_path = (debug.getinfo(1, "S").source:sub(2):match("^(.*[/\\])") or "./")
-local _shared_toml = _self_path .. "../../../../shared/actions.toml"
+local _shared_toml = _self_path .. "../../../shared/actions.toml"
 
 --- Parses the shared actions.toml using a lightweight line-by-line reader.
 --- Returns { sg_order = [...], ax_order = [...], sg_actions = {name={platform=...}}, ax_actions = {name={platform=...}} }

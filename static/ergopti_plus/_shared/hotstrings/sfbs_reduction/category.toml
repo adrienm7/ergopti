@@ -1,6 +1,0 @@
-# _shared/hotstrings/sfbs_reduction/category.toml
-[category]
-id          = "sfbs_reduction"
-color       = "#ef6c00"
-delay       = 0.5
-description = "Same-finger bigram reductions that eliminate awkward same-finger sequences."

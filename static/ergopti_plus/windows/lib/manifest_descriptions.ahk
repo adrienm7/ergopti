@@ -4,7 +4,7 @@
 ; MODULE: Manifest Descriptions
 ; DESCRIPTION:
 ; Resolves the localised label of a feature declared in the manifest
-; (``static/ergopti_plus/_shared/features/manifest.toml``) by trying its
+; (``static/ergopti_plus/shared/features/manifest.toml``) by trying its
 ; ``description_key`` against the current i18n locale, then falling back
 ; through a derived chain of legacy keys when the canonical key is not in the
 ; locale JSON yet. The output is the string the tray menu should display,

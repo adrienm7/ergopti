@@ -5,7 +5,7 @@
 ; DESCRIPTION:
 ; AUTO-GENERATED FILE — DO NOT EDIT BY HAND.
 ; Regenerate with ``node scripts/build-hotstrings.cjs`` from the repo root
-; whenever the bundled TOML files under ``static/ergopti_plus/_shared/hotstrings/`` change.
+; whenever the bundled TOML files under ``static/ergopti_plus/shared/hotstrings/`` change.
 ;
 ; Contains the ``_GenLoad_*`` loader functions and the partial
 ; ``_GENERATED_HOTSTRINGS`` map entries for the ``autocorrection`` category.

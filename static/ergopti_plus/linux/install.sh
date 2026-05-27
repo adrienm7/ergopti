@@ -251,18 +251,19 @@ echo "=== Installation des fichiers ==="
 
 # Create destination directories.
 install -d "${LIB_DIR}/linux"
-install -d "${LIB_DIR}/_shared"
+install -d "${LIB_DIR}/shared"
 install -d "${BIN_DIR}"
 install -d "${CONFIG_DIR}"
 
 # Copy driver Lua sources.
 cp -r "${SCRIPT_DIR}/." "${LIB_DIR}/linux/"
-cp -r "${DRIVERS_ROOT}/_shared/." "${LIB_DIR}/_shared/"
+cp -r "${DRIVERS_ROOT}/shared/." "${LIB_DIR}/shared/"
 
-# Copy default hotstring category TOMLs so the user has something to start with.
+# Copy default hotstring TOMLs so the user has something to start with.
 # We do NOT overwrite existing user config to preserve customisations.
-for toml in "${DRIVERS_ROOT}/_shared/hotstrings/"*"/category.toml"; do
-	category="$(basename "$(dirname "$toml")")"
+for toml in "${DRIVERS_ROOT}/shared/hotstrings/"*.toml; do
+	[[ "$(basename "${toml}")" == _* ]] && continue
+	category="$(basename "${toml}" .toml)"
 	dest="${CONFIG_DIR}/${category}.toml"
 	if [ ! -f "${dest}" ]; then
 		install -m 0644 "${toml}" "${dest}"
@@ -278,7 +279,7 @@ cat > "${BIN_DIR}/ergopti-hotstrings" << WRAPPER
 # Auto-généré par install.sh — ne pas éditer manuellement.
 set -euo pipefail
 DRIVER_ROOT="${LIB_DIR}/linux"
-SHARED_LUA="${LIB_DIR}/_shared/lua"
+SHARED_LUA="${LIB_DIR}/shared/lua"
 export LUA_PATH="\${DRIVER_ROOT}/?.lua;\${DRIVER_ROOT}/?/init.lua;\${SHARED_LUA}/?.lua;\${SHARED_LUA}/?/init.lua;;"
 exec luajit "\${DRIVER_ROOT}/ergopti_hotstrings.lua" "\$@"
 WRAPPER
@@ -313,14 +314,14 @@ fi
 
 # Generate espanso match YAML files from every TOML category
 GENERATOR="${LIB_DIR}/linux/modules/espanso/config_generator.lua"
-HOTSTRINGS_SRC="${LIB_DIR}/_shared/hotstrings"
+HOTSTRINGS_SRC="${LIB_DIR}/shared/hotstrings"
 
 if [ -f "${GENERATOR}" ]; then
-	for toml in "${HOTSTRINGS_SRC}/"*"/"*.toml; do
+	for toml in "${HOTSTRINGS_SRC}/"*.toml; do
 		[ -f "${toml}" ] || continue
-		# Skip category metadata files — only process hotstring entry files
-		[[ "$(basename "${toml}")" == "category.toml" ]] && continue
-		category="$(basename "$(dirname "${toml}")")"
+		# Skip index and schema files — only process hotstring entry files
+		[[ "$(basename "${toml}")" == _* ]] && continue
+		category="$(basename "${toml}" .toml)"
 		out="${ESPANSO_MATCH_DIR}/ergopti_${category}.yml"
 		echo "  →  génération : ${out}"
 		luajit "${GENERATOR}" "${toml}" "${out}"

@@ -16,7 +16,7 @@
 --- DEPENDENCIES:
 --- - lib.logger (project-wide logger).
 --- - hs.json, hs.sqlite3, hs.fs.
---- - Canonical SQLite schema: static/ergopti_plus/_shared/schema/schema.sql.
+--- - Canonical SQLite schema: static/ergopti_plus/shared/schema/schema.sql.
 --- ==============================================================================
 
 local M = {}
@@ -92,11 +92,11 @@ end
 
 --- Resolve the schema.sql path relative to this source file.
 --- This file lives at modules/keylogger/, so four levels up reaches
---- static/ergopti_plus/ → _shared/schema/.
+--- static/ergopti_plus/ → shared/schema/.
 local _SCHEMA_SQL_PATH = (function()
 	local src = debug.getinfo(1, "S").source:sub(2)
 	local dir = src:match("^(.*[/\\])")
-	return dir .. "../../../_shared/schema/schema.sql"
+	return dir .. "../../../shared/schema/schema.sql"
 end)()
 
 --- Read the canonical schema.sql from disk.

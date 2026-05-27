@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Shortcuts Bindings (Lua generated)
 --- DESCRIPTION:
---- Auto-generated from static/ergopti_plus/_shared/features/shortcuts.toml.
+--- Auto-generated from static/ergopti_plus/shared/features/shortcuts.toml.
 --- DO NOT EDIT MANUALLY — run `npm run codegen:shortcuts` to regenerate.
 ---
 --- Returns a table keyed by shortcut id, each entry containing:

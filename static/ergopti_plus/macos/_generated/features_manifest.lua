@@ -1,5 +1,5 @@
 --- _generated/features_manifest.lua
---- AUTO-GENERATED from _shared/features/manifest.toml.
+--- AUTO-GENERATED from shared/features/manifest.toml.
 --- DO NOT EDIT BY HAND — run `npm run build:manifest` to refresh.
 
 local M = {}

@@ -12,7 +12,7 @@
 ;
 ; MODULE: Menu Manifest Loader
 ; DESCRIPTION:
-; Reads ``static/menu_manifest.json`` at boot and exposes the hotstring group
+; Reads ``static/ergopti_plus/shared/menu_manifest.json`` at boot and exposes the hotstring group
 ; arrays so the rest of the driver never hard-codes category lists.
 ;
 ; FEATURES & RATIONALE:
@@ -74,7 +74,7 @@ _MM_ResolveIdArray(IdsArr, CategoryKeysMap, GroupName, Fallback) {
 ; ===== 1.2) Public loader =====
 ; ==============================
 
-; Loads ``static/menu_manifest.json`` and converts the hotstring group id lists
+; Loads ``static/ergopti_plus/shared/menu_manifest.json`` and converts the hotstring group id lists
 ; into arrays of AHK Features keys using ``hotstring_category_keys``.
 ;
 ; Returns an object with three properties:
@@ -88,7 +88,7 @@ MenuManifest_LoadHotstringGroups() {
 	global _StaticDir
 	global _MM_FALLBACK_STANDARD, _MM_FALLBACK_ERGOPTI, _MM_FALLBACK_DYNAMIC
 
-	FilePath := _StaticDir . "\menu_manifest.json"
+	FilePath := _StaticDir . "\ergopti_plus\shared\menu_manifest.json"
 
 	; Guard: file must exist before we attempt to read it
 	if !FileExist(FilePath) {

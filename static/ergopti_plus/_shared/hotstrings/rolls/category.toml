@@ -1,6 +1,0 @@
-# _shared/hotstrings/rolls/category.toml
-[category]
-id          = "rolls"
-color       = "#43a047"
-delay       = 0.5
-description = "Roll-based shortcuts for coding symbols, markup, and writing patterns."

@@ -1192,7 +1192,7 @@ initMenu() {
 	;
 	; Layout entries are rendered straight from the manifest — order, labels
 	; and v1 path identifiers are all derived from the canonical declaration
-	; in static/ergopti_plus/_shared/features/manifest.toml. Features v1's
+	; in static/ergopti_plus/shared/features/manifest.toml. Features v1's
 	; ``Layout`` sub-Map is no longer consulted for the menu render.
 	LayoutMenu := Menu()
 	LayoutGated := IsCategoryGated("Layout")

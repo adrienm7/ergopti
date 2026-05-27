@@ -1,2 +1,0 @@
-search_shortcut: off
-win32_exclude_orphan_events: false # Make Espanso work with Kanata, AutoHotkey, etc.

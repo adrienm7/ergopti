@@ -1,6 +1,6 @@
 --- drivers/hammerspoon/_generated/registry.lua
 --- AUTO-GENERATED — do not edit manually.
---- Source: static/ergopti_plus/_shared/domain/registry.spec.js
+--- Source: static/ergopti_plus/shared/domain/registry.spec.js
 --- Run: npm run codegen:registry:hs
 
 --- ==============================================================================

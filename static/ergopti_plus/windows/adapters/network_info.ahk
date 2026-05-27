@@ -4,7 +4,7 @@
 ; MODULE: NetworkInfo Adapter (AutoHotkey)
 ; DESCRIPTION:
 ; AHK v2 implementation of the NetworkInfo port contract defined in
-; static/ergopti_plus/_shared/ports/NetworkInfo.spec.js. Wraps native Win32 APIs
+; static/ergopti_plus/shared/ports/NetworkInfo.spec.js. Wraps native Win32 APIs
 ; (wlanapi.dll, wininet.dll, iphlpapi.dll) behind four canonical functions so
 ; domain modules can query network context without coupling to OS-specific APIs.
 ;
