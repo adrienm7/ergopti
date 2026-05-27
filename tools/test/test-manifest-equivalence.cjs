@@ -29,11 +29,11 @@
 const fs   = require("fs");
 const path = require("path");
 
-const REPO_ROOT = path.resolve(__dirname, "..");
+const REPO_ROOT = path.resolve(__dirname, "..", "..");
 
 const AHK_MANIFEST   = path.join(REPO_ROOT, "static/ergopti_plus/windows/_generated/features_manifest.ahk");
 const HS_MANIFEST    = path.join(REPO_ROOT, "static/ergopti_plus/macos/_generated/features_manifest.lua");
-const FIXTURE_CONFIG = path.join(REPO_ROOT, "static/ergopti_plus/_shared/tests/fixtures/test_config.toml");
+const FIXTURE_CONFIG = path.join(REPO_ROOT, "static/ergopti_plus/shared/tests/fixtures/test_config.toml");
 
 
 
@@ -571,7 +571,7 @@ const ahkSrc      = fs.readFileSync(AHK_MANIFEST, "utf8");
 const luaSrc      = fs.readFileSync(HS_MANIFEST, "utf8");
 const fixtureSrc  = fs.readFileSync(FIXTURE_CONFIG, "utf8");
 const manifestSrc = fs.readFileSync(
-	path.join(REPO_ROOT, "static/ergopti_plus/_shared/features/manifest.toml"),
+	path.join(REPO_ROOT, "static/ergopti_plus/shared/features/manifest.toml"),
 	"utf8"
 );
 

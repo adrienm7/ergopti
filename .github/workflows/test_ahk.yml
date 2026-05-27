@@ -6,14 +6,14 @@ on:
         paths:
             - "static/ergopti_plus/windows/**"
             - "static/ergopti_plus/_shared/features/manifest.toml"
-            - "scripts/build-features-manifest.js"
+            - "tools/build/build-features-manifest.js"
             - ".github/workflows/test_ahk.yml"
     pull_request:
         branches: [main, dev]
         paths:
             - "static/ergopti_plus/windows/**"
             - "static/ergopti_plus/_shared/features/manifest.toml"
-            - "scripts/build-features-manifest.js"
+            - "tools/build/build-features-manifest.js"
             - ".github/workflows/test_ahk.yml"
     workflow_dispatch:
 
@@ -50,14 +50,14 @@ jobs:
               shell: pwsh
 
             - name: Build features manifest
-              run: node ./scripts/build-features-manifest.js
+              run: npm run build:manifest
               shell: pwsh
 
             - name: Manifest parity (AHK ↔ HS codegen equivalence)
               # Validates that the AHK and HS generated manifests expose identical
               # version, section_order, cross-platform sections, and feature entries.
               # Catches any divergence introduced by build-features-manifest.js.
-              run: node ./scripts/test-manifest-parity.cjs
+              run: npm run test:manifest-parity
               shell: pwsh
 
             - name: Download AutoHotkey v2 runtime

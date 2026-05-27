@@ -1,4 +1,4 @@
-; static/ergopti_plus/windows/tests/test_domain_expander.ahk
+﻿; static/ergopti_plus/windows/tests/test_domain_expander.ahk
 
 ; ==============================================================================
 ; MODULE: Expander Domain Contract Tests (AutoHotkey)

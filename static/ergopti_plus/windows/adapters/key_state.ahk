@@ -1,4 +1,4 @@
-; static/ergopti_plus/windows/adapters/key_state.ahk
+﻿; static/ergopti_plus/windows/adapters/key_state.ahk
 
 ; ==============================================================================
 ; MODULE: KeyState Adapter (AutoHotkey)

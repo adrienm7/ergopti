@@ -1,4 +1,4 @@
-; adapters/secure_field_detector.ahk
+﻿; adapters/secure_field_detector.ahk
 
 ; ==============================================================================
 ; MODULE: SecureFieldDetector Adapter (AutoHotkey)

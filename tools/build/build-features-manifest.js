@@ -31,9 +31,9 @@ import { dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const REPO_ROOT = resolve(__dirname, '..');
+const REPO_ROOT = resolve(__dirname, '..', '..');
 
-const MANIFEST_PATH = resolve(REPO_ROOT, 'static/ergopti_plus/_shared/features/manifest.toml');
+const MANIFEST_PATH = resolve(REPO_ROOT, 'static/ergopti_plus/shared/features/manifest.toml');
 
 const OUT_AHK_DIR   = resolve(REPO_ROOT, 'static/ergopti_plus/windows/_generated');
 const OUT_HS_DIR    = resolve(REPO_ROOT, 'static/ergopti_plus/macos/_generated');

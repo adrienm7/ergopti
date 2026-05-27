@@ -30,7 +30,7 @@ const path = require("path");
 // ===================================
 // ===================================
 
-const ROOT = path.resolve(__dirname, "..", "static", "drivers", "autohotkey");
+const ROOT = path.resolve(__dirname, "..", "..", "static", "ergopti_plus", "windows");
 
 /**
  * Recursively collects all .ahk files under a directory, skipping vendor/.

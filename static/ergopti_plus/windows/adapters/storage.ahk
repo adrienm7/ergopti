@@ -1,4 +1,4 @@
-; adapters/storage.ahk
+﻿; adapters/storage.ahk
 
 ; ==============================================================================
 ; MODULE: Storage Adapter (AutoHotkey)

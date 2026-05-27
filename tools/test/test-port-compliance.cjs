@@ -29,7 +29,7 @@
 const path = require("path");
 const fs   = require("fs");
 
-const PORTS_DIR     = path.join(__dirname, "../static/ergopti_plus/_shared/ports");
+const PORTS_DIR     = path.join(__dirname, "../../static/ergopti_plus/shared/ports");
 const PASS_SYMBOL   = "✓";
 const FAIL_SYMBOL   = "✗";
 
