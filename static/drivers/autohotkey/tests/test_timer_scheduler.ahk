@@ -1,4 +1,4 @@
-; static/drivers/autohotkey/tests/test_timer_scheduler.ahk
+﻿; static/drivers/autohotkey/tests/test_timer_scheduler.ahk
 
 ; ==============================================================================
 ; MODULE: TimerScheduler Adapter Unit Tests
