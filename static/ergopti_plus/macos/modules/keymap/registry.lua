@@ -139,11 +139,9 @@ local function rebuild_tail_indexes()
 	local tail_idx = {}
 	local star_idx = {}
 	for _, m in ipairs(_state.mappings) do
-		-- Index by the lowercase tail codepoint so that the expander's hot-path
-		-- lookup (bucket_for, which always lowercases the tail) finds every mapping,
-		-- including case-sensitive triggers whose tail char is uppercase (e.g. "BTW").
-		-- The exact-match byte comparison inside try_terminator_expand still uses the
-		-- original trigger string, so case sensitivity is preserved at match time.
+		-- tail_char is already lowercased at add_raw() time; :lower() here is a
+		-- defensive no-op kept so a future direct mutation cannot silently break
+		-- bucket lookups. The expander's hot-path always queries lowercase tails.
 		local tc = m.tail_char:lower()
 		local bucket = tail_idx[tc]
 		if not bucket then
@@ -405,7 +403,7 @@ function M.add(trigger, replacement, opts)
 			-- Last UTF-8 codepoint of the trigger, used later to bucket mappings
 			-- by tail character so run_trigger_checks can skip any mapping whose
 			-- last char does not match the just-typed character
-			tail_char    = tail_codepoint(t),
+			tail_char    = tail_codepoint(t):lower(),
 			final_result = is_final,
 			has_magic    = has_magic,
 			star_base    = star_base,
@@ -903,7 +901,7 @@ function M.update_trigger_char(char)
 			local new_tr = base .. char
 			m.trigger             = new_tr
 			m.trigger_bytes       = #new_tr
-			m.tail_char           = tail_codepoint(new_tr)
+			m.tail_char           = tail_codepoint(new_tr):lower()
 			m.tlen                = text_utils.utf8_len(new_tr)
 			m.has_magic           = true
 			m.star_base           = base
