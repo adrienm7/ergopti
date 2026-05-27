@@ -315,4 +315,10 @@ if E2E_REAL_GUI {
 ; ==============================
 ; ==============================================
 
+; Safety watchdog: kill the process if RunTests does not exit within 30 s.
+; This prevents the CI job from hanging indefinitely if AHK's message loop
+; stays alive after ExitApp (e.g. a pending one-shot SetTimer keeps the
+; process persistent on some CI runners).
+SetTimer(() => (FileAppend("WATCHDOG: forced exit after 30 s`r`n", "*"), ExitApp(2)), -30000)
+
 RunTests()
