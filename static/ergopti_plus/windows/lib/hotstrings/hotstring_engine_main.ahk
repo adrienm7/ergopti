@@ -968,11 +968,16 @@ HSE_DispatchMatch(Spec, EndChar) {
                 SendFinalResult(EndChar, false)
             }
         } else {
-            SendNewResult(BackSpaceSeq, false)
-            SendNewResult(Replacement, OnlyText)
-            if (EndChar != "") {
-                SendNewResult(EndChar, false)
-            }
+            ; SendInput is atomic — the entire backspace+replacement+endchar
+            ; burst is injected as one unit, preventing physical keystrokes
+            ; typed just after the trigger from interleaving with our send
+            ; sequence (the race that produced "Cha[letter]tGPT"-style output).
+            ; SendEvent was only needed for AHK-native-engine cascade triggering,
+            ; which HSE handles itself via its own buffer — no cascade benefit here.
+            ReplacementPart := OnlyText ? ("{Text}" . Replacement) : Replacement
+            EndCharPart := (EndChar != "") ? EndChar : ""
+            SendInput(BackSpaceSeq . ReplacementPart . EndCharPart)
+            UpdateLastSentCharacter(SubStr(EndChar != "" ? EndChar : Replacement, -1))
         }
 
         ; Mirror the post-expansion screen state into the buffer so the
