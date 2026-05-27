@@ -88,7 +88,7 @@ global E2E_SCENARIOS := [
         "terminator",         " ",
         "expect_match",       true,
         "expect_replacement", "by the way",
-        "expect_bs_count",    3
+        "expect_bs_count",    4
     ),
     Map(
         "id",                 "no_match_unrelated_buffer",
@@ -124,7 +124,7 @@ global E2E_SCENARIOS := [
         "terminator",         " ",
         "expect_match",       true,
         "expect_replacement", "THE",
-        "expect_bs_count",    3
+        "expect_bs_count",    4
     ),
     Map(
         "id",                 "case_sensitive_no_match",
@@ -190,11 +190,17 @@ E2E_RunScenarioPure(Scenario) {
 
     ; Feed each character of the buffer into the engine.
     Loop StrLen(InputBuffer) {
-        HSE_FeedChar(SubStr(InputBuffer, A_Index, 1))
+        Match := HSE_FeedChar(SubStr(InputBuffer, A_Index, 1))
+        if (Match != "") {
+            HSE_DispatchMatch(Match, HSE_LastEndChar)
+        }
     }
 
     ; Feed the terminator — this is what triggers the match check.
-    HSE_FeedChar(Term)
+    Match := HSE_FeedChar(Term)
+    if (Match != "") {
+        HSE_DispatchMatch(Match, HSE_LastEndChar)
+    }
 
     ; Analyse what the send hook captured.
     Sends := _Stub_RecordedSends
