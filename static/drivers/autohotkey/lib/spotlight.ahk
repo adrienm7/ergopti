@@ -1,4 +1,5 @@
 ﻿; drivers/autohotkey/lib/spotlight.ahk
+; Requires: GraphicsRenderer
 
 ; ==============================================================================
 ; MODULE: Spotlight Overlay
@@ -56,69 +57,29 @@ SpotlightMouseAt(X, Y, DurationMs) {
 	DllCall("gdiplus\GdiplusStartup", "ptr*", &pToken := 0, "ptr", si, "ptr", 0)
 
 	; --- Helper: create a layered window, paint via GDI+ callback, return hwnd ---
+	; Delegates window lifecycle and bitmap upload to the GraphicsRenderer adapter.
+	; DrawCallback receives (pGfx, WinW, WinH) where pGfx is a GDI+ Graphics ptr.
 	CreateOverlayWindow(WinX, WinY, WinW, WinH, DrawCallback) {
-		; WS_EX_LAYERED | WS_EX_TRANSPARENT | WS_EX_TOPMOST | WS_EX_TOOLWINDOW
-		Hwnd := DllCall("CreateWindowEx",
-			"uint",  0x8009C,
-			"str",   "Static", "str", "",
-			"uint",  0x80000000,   ; WS_POPUP
-			"int",   WinX, "int", WinY, "int", WinW, "int", WinH,
-			"ptr",   0, "ptr", 0, "ptr", 0, "ptr", 0,
-			"ptr")
-		if not Hwnd
+		Opts := Map("x", WinX, "y", WinY, "w", WinW, "h", WinH,
+			"clickThrough", true, "alwaysOnTop", true)
+		Hwnd := GR_CreateWindow(Opts)
+		if !Hwnd
 			return 0
 
-		hScreenDC := DllCall("GetDC", "ptr", 0, "ptr")
-		hMemDC    := DllCall("CreateCompatibleDC", "ptr", hScreenDC, "ptr")
+		; The draw function receives the memory DC from GR_DrawBitmap and builds
+		; a GDI+ Graphics context from it, then delegates to the caller's DrawCallback.
+		; GDI+ was already started by the outer SpotlightMouseAt call.
+		GfxDrawFn(MemDC, W, H) {
+			DllCall("gdiplus\GdipCreateFromHDC",      "ptr", MemDC, "ptr*", &pGfx := 0)
+			DllCall("gdiplus\GdipSetSmoothingMode",   "ptr", pGfx, "int", 4)   ; AntiAlias
+			DllCall("gdiplus\GdipSetCompositingMode", "ptr", pGfx, "int", 0)   ; SourceOver
+			DllCall("gdiplus\GdipSetCompositingQuality", "ptr", pGfx, "int", 0)
+			DrawCallback(pGfx, W, H)
+			DllCall("gdiplus\GdipDeleteGraphics", "ptr", pGfx)
+		}
 
-		; 32-bpp DIB section -- required for per-pixel alpha in UpdateLayeredWindow
-		bi := Buffer(40, 0)
-		NumPut("int",   40,    bi,  0)   ; biSize
-		NumPut("int",   WinW,  bi,  4)   ; biWidth
-		NumPut("int",  -WinH,  bi,  8)   ; biHeight (negative = top-down)
-		NumPut("short", 1,     bi, 12)   ; biPlanes
-		NumPut("short", 32,    bi, 14)   ; biBitCount
-		hBitmap := DllCall("CreateDIBSection", "ptr", hMemDC, "ptr", bi, "uint", 0, "ptr*", 0, "ptr", 0, "uint", 0, "ptr")
-		DllCall("SelectObject", "ptr", hMemDC, "ptr", hBitmap)
-
-		; GDI+ Graphics on the memory DC
-		DllCall("gdiplus\GdipCreateFromHDC", "ptr", hMemDC, "ptr*", &pGfx := 0)
-		DllCall("gdiplus\GdipSetSmoothingMode",    "ptr", pGfx, "int", 4)   ; AntiAlias
-		DllCall("gdiplus\GdipSetCompositingMode",  "ptr", pGfx, "int", 0)   ; SourceOver
-		DllCall("gdiplus\GdipSetCompositingQuality","ptr", pGfx, "int", 0)  ; Default
-
-		DrawCallback(pGfx, WinW, WinH)
-
-		DllCall("gdiplus\GdipDeleteGraphics", "ptr", pGfx)
-
-		; Commit the bitmap to the layered window
-		ptDst  := Buffer(8, 0)
-		NumPut("int", WinX, ptDst, 0), NumPut("int", WinY, ptDst, 4)
-		szWin  := Buffer(8, 0)
-		NumPut("int", WinW, szWin, 0), NumPut("int", WinH, szWin, 4)
-		ptSrc  := Buffer(8, 0)
-		blend  := Buffer(4, 0)
-		NumPut("uchar", 0,   blend, 0)   ; BlendOp = AC_SRC_OVER
-		NumPut("uchar", 0,   blend, 1)   ; BlendFlags
-		NumPut("uchar", 255, blend, 2)   ; SourceConstantAlpha (per-pixel drives it)
-		NumPut("uchar", 1,   blend, 3)   ; AlphaFormat = AC_SRC_ALPHA
-
-		DllCall("UpdateLayeredWindow",
-			"ptr",  Hwnd,
-			"ptr",  hScreenDC,
-			"ptr",  ptDst,
-			"ptr",  szWin,
-			"ptr",  hMemDC,
-			"ptr",  ptSrc,
-			"uint", 0,
-			"ptr",  blend,
-			"uint", 2)          ; ULW_ALPHA
-
-		DllCall("ShowWindow", "ptr", Hwnd, "int", 4)   ; SW_SHOWNOACTIVATE
-
-		DllCall("DeleteObject", "ptr", hBitmap)
-		DllCall("DeleteDC",     "ptr", hMemDC)
-		DllCall("ReleaseDC",    "ptr", 0, "ptr", hScreenDC)
+		GR_DrawBitmap(Hwnd, GfxDrawFn)
+		GR_Show(Hwnd)
 
 		return Hwnd
 	}
@@ -208,10 +169,9 @@ SpotlightMouseAt(X, Y, DurationMs) {
 			break
 	}
 
-	if CircleHwnd
-		DllCall("DestroyWindow", "ptr", CircleHwnd)
+	GR_DestroyWindow(CircleHwnd)
 	for Hwnd in CrossHwnds
-		DllCall("DestroyWindow", "ptr", Hwnd)
+		GR_DestroyWindow(Hwnd)
 
 	DllCall("gdiplus\GdiplusShutdown", "ptr", pToken)
 }

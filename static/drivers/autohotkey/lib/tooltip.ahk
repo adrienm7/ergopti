@@ -1,4 +1,5 @@
 ﻿; drivers/autohotkey/lib/tooltip.ahk
+; Requires: GraphicsRenderer
 
 ; ==============================================================================
 ; MODULE: Hotstring Tooltip
@@ -180,7 +181,7 @@ TooltipShow(Items, DurationSec := 0) {
         ; the dropped Hwnd in case its Gui.Destroy silently failed.
         if (_TooltipShownHwnds.Length >= _TOOLTIP_HWND_TRACK_CAP) {
             DroppedHwnd := _TooltipShownHwnds.RemoveAt(1)
-            try DllCall("User32\DestroyWindow", "Ptr", DroppedHwnd)
+            GR_DestroyWindow(DroppedHwnd)
         }
         _TooltipShownHwnds.Push(Row.Gui.Hwnd)
         ; Arm the safety timer IMMEDIATELY after Show so any subsequent
@@ -236,12 +237,12 @@ TooltipHide() {
     global _TooltipShownHwnds, _TooltipShownBorderHwnds
     SetTimer(_TooltipTimerFn, 0)
 
-    ; Step 1 — make both windows invisible. SW_HIDE = 0.
+    ; Step 1 — make both windows invisible via the GraphicsRenderer adapter.
     if _TooltipBorderGui {
-        try DllCall("User32\ShowWindow", "Ptr", _TooltipBorderGui.Hwnd, "Int", 0)
+        GR_Hide(_TooltipBorderGui.Hwnd)
     }
     for _, Row in _TooltipRowGuis {
-        try DllCall("User32\ShowWindow", "Ptr", Row.Gui.Hwnd, "Int", 0)
+        GR_Hide(Row.Gui.Hwnd)
     }
 
     ; Step 2 — release Gui resources, same order.
@@ -262,10 +263,10 @@ TooltipHide() {
     ; Without this safety net, accumulated ghost tooltips would remain
     ; visible on screen until the script reloads.
     for _, Hwnd in _TooltipShownBorderHwnds {
-        try DllCall("User32\DestroyWindow", "Ptr", Hwnd)
+        GR_DestroyWindow(Hwnd)
     }
     for _, Hwnd in _TooltipShownHwnds {
-        try DllCall("User32\DestroyWindow", "Ptr", Hwnd)
+        GR_DestroyWindow(Hwnd)
     }
     _TooltipShownHwnds := []
     _TooltipShownBorderHwnds := []
@@ -654,9 +655,10 @@ _TooltipShowBorder(X, Y, W, H) {
     DllCall("Gdi32\DeleteDC", "Ptr", MemDC)
     DllCall("Gdi32\DeleteObject", "Ptr", HBmp)
 
-    ; ShowWindow after UpdateLayeredWindow — bitmap is already uploaded so the
-    ; window appears with the correct pixels on the first painted frame, no ghost.
-    DllCall("User32\ShowWindow", "Ptr", Hwnd, "Int", 4)   ; SW_SHOWNOACTIVATE=4
+    ; Show after UpdateLayeredWindow via the GraphicsRenderer adapter — bitmap is
+    ; already uploaded so the window appears with the correct pixels on the first
+    ; painted frame, with no ghost flash.
+    GR_Show(Hwnd)
 
     ; Track the new border Hwnd for TooltipHide's defensive sweep. Same
     ; cap-and-evict policy as the content tracker — when the cap is hit
@@ -665,7 +667,7 @@ _TooltipShowBorder(X, Y, W, H) {
     global _TooltipShownBorderHwnds, _TOOLTIP_HWND_TRACK_CAP
     if (_TooltipShownBorderHwnds.Length >= _TOOLTIP_HWND_TRACK_CAP) {
         DroppedHwnd := _TooltipShownBorderHwnds.RemoveAt(1)
-        try DllCall("User32\DestroyWindow", "Ptr", DroppedHwnd)
+        GR_DestroyWindow(DroppedHwnd)
     }
     _TooltipShownBorderHwnds.Push(Hwnd)
 }
