@@ -1,4 +1,4 @@
-{
+﻿{
 	"_meta.flag": "🇬🇧",
 	"_meta.locale": "en",
 	"_meta.name": "English",
@@ -527,6 +527,7 @@
 	"menu.debug.open_today_log": "Open today's log file",
 	"menu.debug.title": "⚠ Debug",
 	"menu.debug.window_spy": "Window Spy",
+	"menu.debug.healthcheck": "Healthcheck",
 	"menu.debug.log_level": "Log level",
 	"menu.extensions.empty": "No extension installed",
 	"menu.extensions.header": "Extensions",

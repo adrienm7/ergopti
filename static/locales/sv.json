@@ -1,4 +1,4 @@
-{
+﻿{
 	"_meta.flag": "🇸🇪",
 	"_meta.locale": "sv",
 	"_meta.name": "Svenska",
@@ -527,6 +527,7 @@
 	"menu.debug.open_today_log": "Öppna dagens loggfil",
 	"menu.debug.title": "⚠ Felsökning",
 	"menu.debug.window_spy": "Window Spy",
+	"menu.debug.healthcheck": "Systemkontroll",
 	"menu.debug.log_level": "Loggnivå",
 	"menu.extensions.empty": "Inget tillägg installerat",
 	"menu.extensions.header": "Tillägg",

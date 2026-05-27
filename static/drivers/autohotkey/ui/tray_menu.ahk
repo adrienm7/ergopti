@@ -1705,6 +1705,8 @@ initMenu() {
 	RegisterMenuItem(DebuggingMenu, t("menu.debug.open_today_log"), OpenTodayLog)
 	DebuggingMenu.Add()
 	DebuggingMenu.Add(t("menu.debug.log_level"), _BuildLogLevelMenu())
+	DebuggingMenu.Add()
+	RegisterMenuItem(DebuggingMenu, t("menu.debug.healthcheck"), ShowHealthCheck)
 	A_TrayMenu.Add(t("menu.debug.title"), DebuggingMenu)
 }
 

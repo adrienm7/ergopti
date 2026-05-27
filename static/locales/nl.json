@@ -1,4 +1,4 @@
-{
+﻿{
 	"_meta.flag": "🇳🇱",
 	"_meta.locale": "nl",
 	"_meta.name": "Nederlands",
@@ -527,6 +527,7 @@
 	"menu.debug.open_today_log": "Logbestand van vandaag openen",
 	"menu.debug.title": "⚠ Foutopsporing",
 	"menu.debug.window_spy": "Window Spy",
+	"menu.debug.healthcheck": "Statuscontrole",
 	"menu.debug.log_level": "Logniveau",
 	"menu.extensions.empty": "Geen extensie geïnstalleerd",
 	"menu.extensions.header": "Extensies",

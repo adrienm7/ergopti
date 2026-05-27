@@ -1,4 +1,4 @@
-{
+﻿{
 	"_meta.flag": "🇷🇺",
 	"_meta.locale": "ru",
 	"_meta.name": "Русский",
@@ -527,6 +527,7 @@
 	"menu.debug.open_today_log": "Открыть журнал за сегодня",
 	"menu.debug.title": "⚠ Отладка",
 	"menu.debug.window_spy": "Наблюдатель окон",
+	"menu.debug.healthcheck": "Диагностика системы",
 	"menu.debug.log_level": "Уровень лога",
 	"menu.extensions.empty": "Расширения не установлены",
 	"menu.extensions.header": "Расширения",

@@ -144,6 +144,7 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 #Include lib/menu_manifest.ahk
 #Include lib/llm_defaults.ahk
 #Include lib/updater.ahk
+#Include lib/healthcheck.ahk
 #Include lib/json.ahk
 ; i18n module — must come after toml_loader.ahk (TOML_BatchWrite), logger.ahk, and json.ahk
 #Include lib/i18n.ahk
@@ -2082,6 +2083,13 @@ ActivateListVars(*) {
 
 ActivateKeyHistory(*) {
     KeyHistory
+}
+
+; Opens a blocking dialog that displays the full healthcheck report.
+; Wired to the "Healthcheck" item in the Debug submenu of the tray menu.
+ShowHealthCheck(*) {
+    Report := HealthCheck_Format()
+    MsgBox(Report, t("menu.debug.healthcheck"), "OK")
 }
 
 ; ================================================

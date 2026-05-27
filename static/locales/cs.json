@@ -1,4 +1,4 @@
-{
+﻿{
 	"_meta.flag": "🇨🇿",
 	"_meta.locale": "cs",
 	"_meta.name": "Čeština",
@@ -527,6 +527,7 @@
 	"menu.debug.open_today_log": "Otevřít dnešní soubor protokolu",
 	"menu.debug.title": "⚠ Ladění",
 	"menu.debug.window_spy": "Sledování okna",
+	"menu.debug.healthcheck": "Kontrola stavu",
 	"menu.debug.log_level": "Úroveň logu",
 	"menu.extensions.empty": "Žádné rozšíření není nainstalováno",
 	"menu.extensions.header": "Rozšíření",

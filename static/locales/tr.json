@@ -1,4 +1,4 @@
-{
+﻿{
 	"_meta.flag": "🇹🇷",
 	"_meta.locale": "tr",
 	"_meta.name": "Türkçe",
@@ -527,6 +527,7 @@
 	"menu.debug.open_today_log": "Bugünün günlük dosyasını aç",
 	"menu.debug.title": "⚠ Hata ayıklama",
 	"menu.debug.window_spy": "Window Spy",
+	"menu.debug.healthcheck": "Sistem tanılaması",
 	"menu.debug.log_level": "Günlük seviyesi",
 	"menu.extensions.empty": "Yüklü uzantı yok",
 	"menu.extensions.header": "Uzantılar",
