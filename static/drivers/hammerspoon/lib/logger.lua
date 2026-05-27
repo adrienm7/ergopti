@@ -47,11 +47,13 @@ local _log_dir = "/tmp/"
 -- Topical sub-files: lines whose rendered "[tag]" matches any pattern are
 -- fan-out here in addition to the main unified file. Sub-files are ephemeral
 -- (today only) — they are a filtered view of the main log, not an archive.
--- Paths are resolved at runtime relative to _log_dir (set by init_log_path).
--- Declared up here (rather than alongside the file-sink state further down)
--- because init_log_path iterates this list to purge stale sub-files, and a
--- forward reference would resolve to nil at call time.
-local SUB_LOG_NAMES = {
+-- Populated by _load_sub_files_toml() during init_log_path; falls back to the
+-- hardcoded list below when the shared TOML is unavailable (stripped builds).
+local SUB_LOG_NAMES = {}
+
+-- Hardcoded fallback used when sub_files.toml cannot be found. Covers the
+-- minimum set of HS-only sub-files required for production log triage.
+local SUB_LOG_NAMES_FALLBACK = {
 	-- MLX inference server: startup, model loads, per-token latency
 	{ name = "ErgoptiPlus_mlx.log",        patterns = { "[mlx",        "[llm.api_mlx]",     "MLX-",        "[mlx_deps]"    } },
 	-- Ollama daemon: startup, model pulls, inference calls
@@ -73,6 +75,121 @@ local SUB_LOG_NAMES = {
 	-- Boot sequence, path resolution, config loading
 	{ name = "ErgoptiPlus_boot.log",        patterns = { "[init]",      "[menu_paths]",      "[paths]",     "[config"       } },
 }
+
+
+
+
+-- ==========================================
+--- ==========================================
+-- ======= 0/ Sub-file TOML Bootstrap =======
+--- ==========================================
+-- ==========================================
+
+--- Parses _shared/logger/sub_files.toml and populates SUB_LOG_NAMES with the
+--- entries whose platforms array includes "hs". Falls back to SUB_LOG_NAMES_FALLBACK
+--- when the file is absent or unreadable so the driver stays functional in stripped builds.
+---
+--- The parser handles the fixed [[sub_files]] schema; it is intentionally minimal
+--- because [[array_of_tables]] is outside the scope of the shared toml_codec and
+--- a full TOML library would be overkill for this single use case.
+--- @param driver_root string Absolute path to the hammerspoon/ driver directory (trailing slash).
+local function _load_sub_files_toml(driver_root)
+	-- Path: hammerspoon/ → drivers/ → _shared/logger/sub_files.toml
+	local toml_path = driver_root .. "../_shared/logger/sub_files.toml"
+	local fh = io.open(toml_path, "r")
+	if not fh then
+		SUB_LOG_NAMES = SUB_LOG_NAMES_FALLBACK
+		return
+	end
+	local raw = fh:read("*a")
+	fh:close()
+	if not raw or raw == "" then
+		SUB_LOG_NAMES = SUB_LOG_NAMES_FALLBACK
+		return
+	end
+
+	local result      = {}
+	local cur_name    = nil
+	local cur_plats   = {}
+	local cur_pats    = {}
+	local in_pats     = false   -- accumulating a multi-line patterns array
+	local in_plats    = false   -- accumulating a multi-line platforms array
+
+	--- Extracts all quoted strings from an array fragment like ["foo", "bar"]
+	local function extract_strings(fragment)
+		local out = {}
+		for s in fragment:gmatch('"([^"\\]*)"') do out[#out + 1] = s end
+		return out
+	end
+
+	--- Flushes the current entry into result (only if platforms includes "hs").
+	local function flush_entry()
+		if not cur_name then return end
+		local is_hs = false
+		for _, p in ipairs(cur_plats) do if p == "hs" then is_hs = true ; break end end
+		if is_hs and #cur_pats > 0 then
+			result[#result + 1] = {
+				name     = "ErgoptiPlus_" .. cur_name .. ".log",
+				patterns = cur_pats,
+			}
+		end
+		cur_name  = nil
+		cur_plats = {}
+		cur_pats  = {}
+		in_pats   = false
+		in_plats  = false
+	end
+
+	for line in raw:gmatch("[^\r\n]+") do
+		-- Strip inline comments and trim
+		line = line:gsub("%s*#.*$", ""):match("^%s*(.-)%s*$")
+		if line == "" then goto next_line end
+
+		if line == "[[sub_files]]" then
+			flush_entry()
+			goto next_line
+		end
+
+		-- Accumulate multi-line arrays
+		if in_pats then
+			for _, s in ipairs(extract_strings(line)) do cur_pats[#cur_pats + 1] = s end
+			if line:find("]", 1, true) then in_pats = false end
+			goto next_line
+		end
+		if in_plats then
+			for _, s in ipairs(extract_strings(line)) do cur_plats[#cur_plats + 1] = s end
+			if line:find("]", 1, true) then in_plats = false end
+			goto next_line
+		end
+
+		-- Key-value lines
+		local n = line:match('^name%s*=%s*"([^"]*)"')
+		if n then cur_name = n ; goto next_line end
+
+		local plat_frag = line:match("^platforms%s*=%s*%[(.*)$")
+		if plat_frag then
+			for _, s in ipairs(extract_strings(plat_frag)) do cur_plats[#cur_plats + 1] = s end
+			if not plat_frag:find("]", 1, true) then in_plats = true end
+			goto next_line
+		end
+
+		local pat_frag = line:match("^patterns%s*=%s*%[(.*)$")
+		if pat_frag then
+			for _, s in ipairs(extract_strings(pat_frag)) do cur_pats[#cur_pats + 1] = s end
+			if not pat_frag:find("]", 1, true) then in_pats = true end
+		end
+
+		::next_line::
+	end
+	flush_entry()
+
+	if #result > 0 then
+		SUB_LOG_NAMES = result
+	else
+		-- Parsed but no valid HS entries — fall back to avoid an empty fan-out table
+		SUB_LOG_NAMES = SUB_LOG_NAMES_FALLBACK
+	end
+end
 
 
 
@@ -152,6 +269,21 @@ function M.init_log_path(config_dir, max_age_days)
 
 	M.UNIFIED_LOG_FILE = log_dir .. "ErgoptiPlus_" .. os.date("%Y-%m-%d") .. ".log"
 
+	-- Load sub-file routing rules from _shared/logger/sub_files.toml so adding a
+	-- new topical log requires only a TOML edit, not a code change in both drivers.
+	-- Derive the driver root from this file's own source path (lib/logger.lua → driver root).
+	pcall(function()
+		local src = debug.getinfo(1, "S").source
+		if src and src:sub(1, 1) == "@" then
+			local file_path = src:sub(2)
+			-- Strip "lib/logger.lua" (or similar) to get the driver root
+			local driver_root = file_path:match("^(.*[/\\])lib[/\\]logger%.lua$")
+			if driver_root then
+				_load_sub_files_toml(driver_root)
+			end
+		end
+	end)
+
 	-- Purge main log files older than max_age_days by comparing the date in the
 	-- filename (YYYY-MM-DD) rather than mtime, so moved/copied files age correctly.
 	pcall(hs.execute, string.format(
@@ -216,6 +348,10 @@ end
 
 -- Deduplication state: suppresses consecutive identical log lines to prevent spam.
 local _dedup = { line = nil, count = 0, variant_key = nil }
+
+-- Forward declaration — implementation is in Section 5 (ring buffer).
+-- Must be declared here so _log() captures the variable by reference.
+local _push_ring
 
 
 --- ==================================
@@ -462,7 +598,7 @@ local _ring_cursor     = 0
 --- Called from _log() after every emitted line so the buffer always mirrors
 --- the most recent RING_BUFFER_SIZE entries of the main log file.
 --- @param line string The complete formatted log line (timestamp + level + tag + body).
-local function _push_ring(line)
+_push_ring = function(line)
 	if #_ring_buffer < RING_BUFFER_SIZE then
 		_ring_buffer[#_ring_buffer + 1] = line
 		_ring_cursor = #_ring_buffer
