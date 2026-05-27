@@ -247,7 +247,15 @@ Reg_EnumValues(keyPath) {
 	results := []
 	try {
 		Loop Reg, keyPath, "V" {
-			results.Push({ name: A_LoopRegName, type: A_LoopRegType, data: RegRead() })
+			; Wrap RegRead() individually — binary values (REG_BINARY, REG_MULTI_SZ)
+			; can throw on some runners; skip the value rather than aborting the loop.
+			local name := A_LoopRegName, type := A_LoopRegType
+			try {
+				local data := RegRead()
+				results.Push({ name: name, type: type, data: data })
+			} catch {
+				results.Push({ name: name, type: type, data: "" })
+			}
 		}
 	} catch as e {
 		LoggerDebug("registry", "Reg_EnumValues failed — {1}: {2}", keyPath, e.Message)

@@ -191,6 +191,9 @@ local function make_vkb(trigger, replacement, opts)
 		request          = function() end,
 		cancel           = function() end,
 		set_buffer       = function() end,
+		update_preview   = function() end,
+		get_llm_enabled  = function() return false end,
+		start_timer      = function() end,
 	}
 
 	Expander.init(state, Registry, llm_stub)
