@@ -13,7 +13,8 @@
 	/** @type {Awaited<ReturnType<typeof getRelease>>} */
 	let release = $state(null);
 	let urlAhkExe = $derived(release?.url("ErgoptiPlus.exe") ?? "#");
-	const urlAhkSrc = getRawUrl("static/ergopti_plus/windows/ErgoptiPlus.ahk");
+	let urlMacosApp = $derived(release?.url("ErgoptiPlus.app.zip") ?? "#");
+	let urlKanata = $derived(release?.url("kanata.kbd") ?? "#");
 	const { aiProviders, aiTotalProviders, aiTotalModels, aiTotalFamilies } = data;
 
 	// Live typing demo — cycle through real expansions from the hotstring TOMLs.
@@ -776,7 +777,7 @@
 					{#if osStyle === 'macos'}
 						<a
 							class="btn btn-primary"
-							href={release?.url("Ergopti_macOS_HS.zip") ?? "#"}
+							href={urlMacosApp}
 							download={!!release}
 						>
 							<i class="icon-hammerspoon"></i>
@@ -2157,17 +2158,17 @@
 						</a>
 						<a
 							class={osStyle === 'macos' ? 'btn btn-primary' : 'btn btn-secondary'}
-							href={release?.url("Ergopti_macOS_HS.zip") ?? "#"}
+							href={urlMacosApp}
 							download={!!release}
 						>
 							<i class="icon-hammerspoon"></i><span>macOS (HS)</span>
 						</a>
 						<a
 							class="btn btn-secondary"
-							href={release?.url("ErgoptiPlus_linux.tar.gz") ?? "#"}
+							href={urlKanata}
 							download={!!release}
 						>
-							<i class="icon-linux"></i><span>Linux</span>
+							<i class="icon-linux"></i><span>Linux (kanata.kbd)</span>
 						</a>
 					</div>
 					<p class="cta-sub">

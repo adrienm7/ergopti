@@ -176,10 +176,15 @@ _TSTest_EveryDoesNotFireAfterCancel() {
 }
 Test("TimerScheduler — every(): callback skipped after cancel()", _TSTest_EveryDoesNotFireAfterCancel)
 
+_TSTest_EveryExceptionIsolation_ThrowFn() {
+	throw Error("boom")
+}
 _TSTest_EveryExceptionIsolation() {
-	; Callback that throws must not propagate to the test runner
+	; Callback that throws must not propagate to the test runner.
+	; The throwing callback is a named function — fat-arrow lambdas with { }
+	; blocks are parsed as object literals in AHK v2, not code blocks.
 	_TS_ResetRegistry()
-	H := TimerEvery(1, () => { throw Error("boom") })
+	H := TimerEvery(1, _TSTest_EveryExceptionIsolation_ThrowFn)
 	try {
 		H["Fn"]()  ; wrapper must swallow the exception
 	} catch {

@@ -67,5 +67,5 @@ NotifierSend(Title, Opts) {
 ; (tests/test_adapter_compliance_new.ahk) to verify every required method exists
 ; and is callable without manually listing functions per-adapter.
 global ADAPTER_NOTIFIER := Map(
-    "notify", Func("NotifierSend"),
+    "notify", Func("NotifierSend")
 )

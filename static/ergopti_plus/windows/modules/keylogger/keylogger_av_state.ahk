@@ -246,16 +246,19 @@ _KL_AV_FindCaptureExeSnapshot() {
     NumPut("UInt", 560, entry, 0)   ; dwSize must be set before Process32First
     found := ""
     if DllCall("Process32FirstW", "Ptr", snap, "Ptr", entry) {
+        ; AHK v2 has no break N — use a flag to exit the outer loop.
+        FoundMatch := false
         loop {
             ; szExeFile starts at offset 44, MAX_PATH wchars
             exe_name := StrLower(StrGet(entry.Ptr + 44, 260, "UTF-16"))
             for _, cap_exe in KLAVConst.CAPTURE_EXES {
                 if (exe_name = cap_exe) {
                     found := exe_name
-                    break 2
+                    FoundMatch := true
+                    break
                 }
             }
-            if !DllCall("Process32NextW", "Ptr", snap, "Ptr", entry) {
+            if FoundMatch or !DllCall("Process32NextW", "Ptr", snap, "Ptr", entry) {
                 break
             }
         }
