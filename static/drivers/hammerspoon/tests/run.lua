@@ -20,10 +20,11 @@ local self_path = debug.getinfo(1, "S").source:gsub("^@", "")
 local driver_root = self_path:match("^(.*)[/\\]tests[/\\]run%.lua$") or "."
 driver_root = driver_root:gsub("\\", "/")
 
--- When launched as "lua tests/run.lua" from the HS root, self_path is a
--- relative path and driver_root resolves to ".". Canonicalise it to an
--- absolute path so downstream path arithmetic (for _shared/) is reliable.
-if driver_root == "." then
+-- When self_path is relative, driver_root may be "." or a relative path like
+-- "static/drivers/hammerspoon". In both cases we must canonicalise to an
+-- absolute path so that path arithmetic (strip_prefix matching) is reliable.
+local is_absolute = driver_root:match("^[A-Za-z]:") or driver_root:match("^/")
+if not is_absolute then
 	-- On Windows "cd" (no args) prints the current directory.
 	-- On POSIX "cd" prints nothing — use "pwd" instead.
 	local sep = package.config:sub(1, 1)
@@ -32,7 +33,12 @@ if driver_root == "." then
 	if cwd_handle then
 		local cwd = cwd_handle:read("*l") or "."
 		cwd_handle:close()
-		driver_root = cwd:gsub("\\", "/"):gsub("/$", "")
+		cwd = cwd:gsub("\\", "/"):gsub("/$", "")
+		if driver_root == "." then
+			driver_root = cwd
+		else
+			driver_root = cwd .. "/" .. driver_root
+		end
 	end
 end
 
@@ -52,6 +58,8 @@ package.path = table.concat({
 	shared_lua  .. "/?/init.lua",
 	driver_root .. "/tests/?.lua",
 	driver_root .. "/tests/?/init.lua",
+	driver_root .. "/tests/unit/?.lua",
+	driver_root .. "/tests/unit/?/init.lua",
 	driver_root .. "/tests/stubs/?.lua",
 	package.path,
 }, ";")

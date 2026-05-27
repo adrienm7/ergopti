@@ -240,26 +240,116 @@ local function nav(root, segments)
 	return cur
 end
 
+-- Forward declarations — implementations follow in the section below.
+-- coerce_value calls split_kv and parse_key for inline-table parsing.
+local split_kv, parse_key
+
+--- Validates and unescapes a TOML basic-string body (without surrounding quotes).
+--- Returns the unescaped string, or nil if it contains an invalid escape sequence
+--- or a null byte.
 local function unescape_string(s)
+	-- Reject null bytes anywhere in the value
+	if s:find("\0") then return nil end
+	-- Validate escape sequences before performing substitution
+	local i = 1
+	while i <= #s do
+		local c = s:sub(i, i)
+		if c == "\\" then
+			local e = s:sub(i + 1, i + 1)
+			if e == "" then return nil end -- Trailing backslash
+			if e == "u" then
+				-- \uXXXX — must be exactly 4 hex digits
+				local hex = s:sub(i + 2, i + 5)
+				if not hex:match("^%x%x%x%x$") then return nil end
+				i = i + 6
+			elseif e == "U" then
+				-- \UXXXXXXXX — must be exactly 8 hex digits
+				local hex = s:sub(i + 2, i + 9)
+				if not hex:match("^%x%x%x%x%x%x%x%x$") then return nil end
+				i = i + 10
+			elseif e == '"' or e == "\\" or e == "n" or e == "t" or e == "r"
+				or e == "b" or e == "f" then
+				i = i + 2
+			else
+				-- Any other escape sequence is invalid per the TOML spec
+				return nil
+			end
+		else
+			i = i + 1
+		end
+	end
 	s = s:gsub("\\\\", "\1"):gsub('\\"', '\2')
 	     :gsub("\\n", "\n"):gsub("\\t", "\t"):gsub("\\r", "\r")
+	     :gsub("\\b", "\8"):gsub("\\f", "\12")
+	     :gsub("\\u(%x%x%x%x)", function(h) return utf8.char(tonumber(h, 16)) end)
+	     :gsub("\\U(%x%x%x%x%x%x%x%x)", function(h) return utf8.char(tonumber(h, 16)) end)
 	     :gsub("\1", "\\"):gsub("\2", '"')
 	return s
 end
 
---- Coerce a raw RHS into a Lua value (string / boolean / number / array).
+-- Sentinel returned by coerce_value on parse failure; propagated to M.decode.
+local PARSE_ERROR = {}
+
+--- Coerce a raw RHS into a Lua value (string / boolean / number / array / inline-table).
+--- Returns PARSE_ERROR on malformed input so M.decode can return nil.
 local function coerce_value(raw)
 	raw = trim(raw)
-	if raw == "" then return "" end
+	if raw == "" then return PARSE_ERROR end  -- Missing value (e.g., "key =")
 	-- Booleans
 	if raw == "true"  then return true  end
 	if raw == "false" then return false end
-	-- Quoted string
-	if raw:sub(1, 1) == '"' and raw:sub(-1) == '"' then
-		return unescape_string(raw:sub(2, -2))
+	-- Single-quoted string — TOML literal strings are valid, but single-quoted
+	-- strings that are unclosed (no matching closing apostrophe) are an error.
+	if raw:sub(1, 1) == "'" then
+		if raw:sub(-1) ~= "'" or #raw < 2 then return PARSE_ERROR end
+		-- Literal string — no escape processing, just return the body
+		return raw:sub(2, -2)
+	end
+	-- Double-quoted string — require both opening and closing quote on the same value
+	if raw:sub(1, 1) == '"' then
+		if raw:sub(-1) ~= '"' or #raw < 2 then return PARSE_ERROR end  -- Unclosed string
+		local body = raw:sub(2, -2)
+		local unescaped = unescape_string(body)
+		if unescaped == nil then return PARSE_ERROR end
+		return unescaped
+	end
+	-- Inline table: { key = val, … } — reject trailing comma before closing brace
+	if raw:sub(1, 1) == "{" then
+		if raw:sub(-1) ~= "}" then return PARSE_ERROR end
+		-- Reject trailing comma: `,` followed only by optional whitespace then `}`
+		if raw:match(",%s*}$") then return PARSE_ERROR end
+		-- Parse the inline table's key-value pairs
+		local body = trim(raw:sub(2, -2))
+		local tbl = {}
+		if body == "" then return tbl end
+		local in_str, escape = false, false
+		local pairs_raw = {}
+		local cur = {}
+		for i = 1, #body do
+			local c = body:sub(i, i)
+			if escape then cur[#cur+1]=c; escape=false
+			elseif c=="\\" and in_str then cur[#cur+1]=c; escape=true
+			elseif c=='"' then cur[#cur+1]=c; in_str=not in_str
+			elseif not in_str and c=="," then
+				pairs_raw[#pairs_raw+1] = table.concat(cur); cur={}
+			else
+				cur[#cur+1]=c
+			end
+		end
+		if #cur>0 then pairs_raw[#pairs_raw+1]=table.concat(cur) end
+		for _, pair in ipairs(pairs_raw) do
+			local k, v_raw = split_kv(trim(pair))
+			if not k or k=="" then return PARSE_ERROR end
+			local v = coerce_value(v_raw or "")
+			if v == PARSE_ERROR then return PARSE_ERROR end
+			tbl[parse_key(k)] = v
+		end
+		return tbl
 	end
 	-- Array — split on commas at depth 0, ignoring quoted regions
-	if raw:sub(1, 1) == "[" and raw:sub(-1) == "]" then
+	if raw:sub(1, 1) == "[" then
+		-- Multi-line array: value does not close on the same line — skip gracefully
+		if raw:sub(-1) ~= "]" then return {} end
 		local body = trim(raw:sub(2, -2))
 		local out = {}
 		if body == "" then return out end
@@ -290,6 +380,17 @@ local function coerce_value(raw)
 			local final = trim(table.concat(cur))
 			if final ~= "" then out[#out + 1] = coerce_value(final) end
 		end
+		-- Propagate any element-level parse errors
+		for _, v in ipairs(out) do
+			if v == PARSE_ERROR then return PARSE_ERROR end
+		end
+		-- TOML forbids mixed-type arrays
+		if #out > 1 then
+			local first_type = type(out[1])
+			for i = 2, #out do
+				if type(out[i]) ~= first_type then return PARSE_ERROR end
+			end
+		end
 		return out
 	end
 	-- Numbers
@@ -303,7 +404,7 @@ end
 
 --- Parse a single key=value line, splitting on the FIRST '=' that is not
 --- inside a quoted region. Returns key, raw_value (or nil on malformed input).
-local function split_kv(line)
+split_kv = function(line)
 	local in_str, escape = false, false
 	for i = 1, #line do
 		local c = line:sub(i, i)
@@ -321,7 +422,7 @@ local function split_kv(line)
 end
 
 --- Parse a key — either a bare identifier or a quoted string.
-local function parse_key(raw)
+parse_key = function(raw)
 	if raw:sub(1, 1) == '"' and raw:sub(-1) == '"' then
 		return unescape_string(raw:sub(2, -2))
 	end
@@ -329,26 +430,93 @@ local function parse_key(raw)
 end
 
 --- Decode a TOML body into a nested Lua table.
+--- Returns nil on any spec violation (duplicate keys, invalid syntax, etc.).
 --- @param content string The TOML source.
---- @return table The decoded root table.
+--- @return table|nil The decoded root table, or nil on error.
 function M.decode(content)
 	local root = {}
 	local current = root
+	-- Track which keys have been set in each table to detect duplicates
+	local seen_keys = { [root] = {} }
+	-- Track which regular section paths have been declared (not array-of-tables)
+	local seen_sections = {}
 	if type(content) ~= "string" or content == "" then return root end
 	for line in (content .. "\n"):gmatch("([^\r\n]*)\r?\n") do
 		local trimmed = trim(line)
 		if trimmed == "" or trimmed:sub(1, 1) == "#" then
 			-- Comment / blank — skip
+
+		elseif trimmed:sub(1, 1) == "[" and trimmed:sub(-1) ~= "]" then
+			-- Line starts with '[' but does not close with ']' — malformed header
+			return nil
+
 		elseif trimmed:sub(1, 1) == "[" and trimmed:sub(-1) == "]" then
+			-- Section header — validate it
+			-- Detect array-of-tables header: [[name]]
+			local aot_path = trimmed:match("^%[%[(.-)%]%]$")
+			if aot_path ~= nil then
+				-- [[]] with empty name is invalid per the TOML spec
+				aot_path = trim(aot_path)
+				if aot_path == "" then return nil end
+				-- Array-of-tables: append a new table to the array; no duplicate check
+				local segments = split_section_path(aot_path)
+				local parent = nav(root, { table.unpack(segments, 1, #segments - 1) })
+				local last = segments[#segments]
+				if type(parent[last]) ~= "table" then parent[last] = {} end
+				local arr = parent[last]
+				local new_tbl = {}
+				arr[#arr + 1] = new_tbl
+				current = new_tbl
+				seen_keys[current] = {}
+				goto continue_decode
+			end
 			local path = trim(trimmed:sub(2, -2))
+			-- Empty section name → error
+			if path == "" then return nil end
+			-- Detect duplicate regular section header (TOML forbids re-opening a table)
+			if seen_sections[path] then return nil end
+			seen_sections[path] = true
 			local segments = split_section_path(path)
 			current = nav(root, segments)
+			if not seen_keys[current] then seen_keys[current] = {} end
+
 		else
-			local key, raw = split_kv(trimmed)
-			if key then
-				current[parse_key(key)] = coerce_value(raw)
+			-- Key-value line: strip inline comment before processing
+			-- Strip trailing `# comment` when not inside a quoted region
+			local trimmed_nc = trimmed
+			do
+				local in_str, escape = false, false
+				for ci = 1, #trimmed do
+					local c = trimmed:sub(ci, ci)
+					if escape then escape = false
+					elseif c == "\\" and in_str then escape = true
+					elseif c == '"' then in_str = not in_str
+					elseif not in_str and c == "#" then
+						trimmed_nc = trim(trimmed:sub(1, ci - 1))
+						break
+					end
+				end
 			end
+			local key, raw = split_kv(trimmed_nc)
+			-- Line with no '=' (e.g., multi-line string continuation) — skip
+			if not key then goto continue_decode end
+			-- Value with no key: line starts with '=' (key is empty string)
+			if trim(key) == "" then return nil end
+			-- Key with no value (raw is nil or empty after trimming)
+			local raw_trimmed = raw and trim(raw) or ""
+			if raw_trimmed == "" then return nil end
+			local v = coerce_value(raw_trimmed)
+			-- Propagate parse errors from coerce_value
+			if v == PARSE_ERROR then return nil end
+			local parsed_key = parse_key(key)
+			-- Duplicate key check within the current section
+			local sk = seen_keys[current]
+			if not sk then sk = {}; seen_keys[current] = sk end
+			if sk[parsed_key] then return nil end
+			sk[parsed_key] = true
+			current[parsed_key] = v
 		end
+		::continue_decode::
 	end
 	return root
 end

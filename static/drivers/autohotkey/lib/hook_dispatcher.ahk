@@ -1,4 +1,4 @@
-; lib/hook_dispatcher.ahk
+﻿; lib/hook_dispatcher.ahk
 
 ; ==============================================================================
 ; MODULE: Hook Dispatcher
@@ -225,16 +225,36 @@ class HookDispatcher {
 	; ========================================
 	; =====================================================
 
-	static _OnLDown(*)   { HookDispatcher.Dispatch(HookDispatcherConst.EVT_MS_LDOWN)  }
-	static _OnLUp(*)     { HookDispatcher.Dispatch(HookDispatcherConst.EVT_MS_LUP)    }
-	static _OnRDown(*)   { HookDispatcher.Dispatch(HookDispatcherConst.EVT_MS_RDOWN)  }
-	static _OnRUp(*)     { HookDispatcher.Dispatch(HookDispatcherConst.EVT_MS_RUP)    }
-	static _OnMDown(*)   { HookDispatcher.Dispatch(HookDispatcherConst.EVT_MS_MDOWN)  }
-	static _OnMUp(*)     { HookDispatcher.Dispatch(HookDispatcherConst.EVT_MS_MUP)    }
-	static _OnWheelUp(*)    { HookDispatcher.Dispatch(HookDispatcherConst.EVT_MS_WUP)    }
-	static _OnWheelDown(*)  { HookDispatcher.Dispatch(HookDispatcherConst.EVT_MS_WDN)    }
-	static _OnWheelRight(*) { HookDispatcher.Dispatch(HookDispatcherConst.EVT_MS_WRIGHT) }
-	static _OnWheelLeft(*)  { HookDispatcher.Dispatch(HookDispatcherConst.EVT_MS_WLEFT)  }
+	static _OnLDown(*) {
+		HookDispatcher.Dispatch(HookDispatcherConst.EVT_MS_LDOWN)
+	}
+	static _OnLUp(*) {
+		HookDispatcher.Dispatch(HookDispatcherConst.EVT_MS_LUP)
+	}
+	static _OnRDown(*) {
+		HookDispatcher.Dispatch(HookDispatcherConst.EVT_MS_RDOWN)
+	}
+	static _OnRUp(*) {
+		HookDispatcher.Dispatch(HookDispatcherConst.EVT_MS_RUP)
+	}
+	static _OnMDown(*) {
+		HookDispatcher.Dispatch(HookDispatcherConst.EVT_MS_MDOWN)
+	}
+	static _OnMUp(*) {
+		HookDispatcher.Dispatch(HookDispatcherConst.EVT_MS_MUP)
+	}
+	static _OnWheelUp(*) {
+		HookDispatcher.Dispatch(HookDispatcherConst.EVT_MS_WUP)
+	}
+	static _OnWheelDown(*) {
+		HookDispatcher.Dispatch(HookDispatcherConst.EVT_MS_WDN)
+	}
+	static _OnWheelRight(*) {
+		HookDispatcher.Dispatch(HookDispatcherConst.EVT_MS_WRIGHT)
+	}
+	static _OnWheelLeft(*) {
+		HookDispatcher.Dispatch(HookDispatcherConst.EVT_MS_WLEFT)
+	}
 
 
 

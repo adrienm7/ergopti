@@ -63,6 +63,10 @@ function M.load_with_stubs(module_name, hs_overrides)
 	-- Drop any previous instance so module-level state resets between tests.
 	package.loaded[module_name] = nil
 	package.loaded["hs"] = nil
+	-- Force a fresh stub table each call so overrides from one test never leak
+	-- into the next. Modules that override hs.execute or hs.timer with a partial
+	-- table would otherwise corrupt the shared singleton for all later tests.
+	package.loaded["tests.stubs.hs"] = nil
 
 	-- Fresh hs stub for this test
 	local hs_stub = require("tests.stubs.hs")

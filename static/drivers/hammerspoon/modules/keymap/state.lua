@@ -129,7 +129,8 @@ function M.new(defaults, delays_default)
 	-- buffer (used after an expansion) while suppress_rescan_keep_buffer
 	-- leaves it intact (used for sequential hotstring chains).
 	s.suppress_rescan = function(duration)
-		s.no_rescan_until = hs.timer.secondsSinceEpoch() + (tonumber(duration) or DEFAULT_SUPPRESS_SEC)
+		local epoch_fn = hs and hs.timer and hs.timer.secondsSinceEpoch or os.time
+		s.no_rescan_until = epoch_fn() + (tonumber(duration) or DEFAULT_SUPPRESS_SEC)
 		s.buffer = ""
 		-- Post-expansion: the replacement just landed on screen. Treat the
 		-- new cursor position as abutting a word boundary so the next typed
@@ -139,7 +140,8 @@ function M.new(defaults, delays_default)
 	end
 
 	s.suppress_rescan_keep_buffer = function(duration)
-		s.no_rescan_until = hs.timer.secondsSinceEpoch() + (tonumber(duration) or DEFAULT_SUPPRESS_KEEP_SEC)
+		local epoch_fn = hs and hs.timer and hs.timer.secondsSinceEpoch or os.time
+		s.no_rescan_until = epoch_fn() + (tonumber(duration) or DEFAULT_SUPPRESS_KEEP_SEC)
 	end
 
 	-- Seed the initial per-group delays from defaults and compute the

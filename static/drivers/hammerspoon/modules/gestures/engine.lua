@@ -470,7 +470,7 @@ local function commitGesture(now)
 	local total_delta = math.abs(dx) + math.abs(dy)
 	Logger.debug(LOG, "commitGesture: dx=%.2f dy=%.2f total_delta=%.2f TAP_MAX_DELTA=%.2f TAP_MAX_SEC=%.2f had_live_fire=%s",
 		dx, dy, total_delta, TAP_MAX_DELTA, TAP_MAX_SEC, tostring(had_live_fire))
-	if not had_live_fire and (gs.lockedDir == nil or total_delta < TAP_MAX_DELTA) then
+	if not had_live_fire and total_delta < TAP_MAX_DELTA then
 		Logger.debug(LOG, "commitGesture: classified as TAP candidate (lockedDir=%s, total_delta=%.2f < %.2f)",
 			tostring(gs.lockedDir), total_delta, TAP_MAX_DELTA)
 		if elapsed <= TAP_MAX_SEC then
@@ -639,6 +639,7 @@ function M.process_frame(touches)
 			gs.startPos       = pos
 			gs.endPos         = pos
 			gs.maxFingers     = n
+			gs.lastN          = n
 			gs.stepsCommitted = 0
 			gs.lifting        = false
 			gs.liveAxisSign   = nil

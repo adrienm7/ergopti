@@ -122,7 +122,8 @@ local function _json_decode(s)
 				if e == 'n' then buf[#buf + 1] = '\n'
 				elseif e == 't' then buf[#buf + 1] = '\t'
 				elseif e == 'r' then buf[#buf + 1] = '\r'
-				else buf[#buf + 1] = e end
+				elseif e == '"' or e == '\\' or e == '/' then buf[#buf + 1] = e
+				else buf[#buf + 1] = '\\' ; buf[#buf + 1] = e end
 				pos = pos + 2
 			else buf[#buf + 1] = c ; pos = pos + 1 end
 		end
