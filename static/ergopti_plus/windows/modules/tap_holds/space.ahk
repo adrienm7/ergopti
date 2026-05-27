@@ -34,8 +34,12 @@ SpaceTapHold(HoldFn) {
     if ih.EndReason != "Timeout" {
         ; Tap path: send the Space that was intercepted, then the captured character
         ; (omit it when it is itself a Space to avoid a double-space).
+        ; TextSend uses SendText (raw mode) — {Space} must go through TextPressKey
+        ; so AHK interprets the key name rather than typing the literal braces.
+        TextPressKey("Space", "")
         Text := (ih.Input == " ") ? "" : ih.Input
-        TextSend("{Space}" Text, "", 0)
+        if (Text != "")
+            TextSend(Text, "", 0)
         UpdateLastSentCharacter(" ")
         return False
     }
