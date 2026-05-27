@@ -24,16 +24,16 @@
 ; RCtrl becomes BackSpace, and Delete on Shift
 SC11D::
 {
-    if GetKeyState("LShift", "P") { ; TODO(2.1.3): route through KeyState port
+    if KS_IsDown("LShift") { ; LShift physically held
         TextPressKey("Delete", "")
-    } else if TapHoldTapAction(TapHold, "left_alt") == "one_shot_shift" and GetKeyState("SC038", "P") { ; TODO(2.1.3): route through KeyState port
+    } else if TapHoldTapAction(TapHold, "left_alt") == "one_shot_shift" and KS_IsDown("SC038") { ; LAlt physically held
         OneShotShiftFix()
         TextPressKey("Right", "")
         TextPressKey("BackSpace", "") ; = Delete, but we cannot simply use Delete, as it would do Ctrl + Alt + Delete and Windows would interpret it
     } else {
         TextPressKey("BackSpace", "") ; Event to be able to correct hotstrings and still trigger them afterwards
         Sleep(KEY_REPEAT_INITIAL_DELAY_MS)
-        while GetKeyState("SC11D", "P") { ; TODO(2.1.3): route through KeyState port
+        while KS_IsDown("SC11D") { ; RCtrl still physically held — key-repeat loop
             TextPressKey("BackSpace", "")
             Sleep(KEY_REPEAT_INTERVAL_MS)
         }
