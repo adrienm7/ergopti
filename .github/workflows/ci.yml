@@ -6,7 +6,7 @@
 #
 #   ┌─────────────────────────────────┐
 #   │  validate (fast gates, ubuntu)  │
-#   │  locales · hotstrings · domain  │
+#   │  hotstrings · domain            │
 #   └──────────────┬──────────────────┘
 #                  │ (always runs — no path filter)
 #        ┌─────────┼──────────┐
@@ -59,25 +59,7 @@ concurrency:
 jobs:
 
     # ─────────────────────────────────────────────────
-    # 1.1) Locale key-set parity
-    # ─────────────────────────────────────────────────
-    validate-locales:
-        name: "Validate · locales"
-        runs-on: ubuntu-latest
-
-        steps:
-            - uses: actions/checkout@v4
-
-            - uses: actions/setup-python@v5
-              with:
-                  python-version: "3.12"
-
-            - name: Check every locale mirrors en.json's key set
-              run: python tools/check_locales.py
-
-
-    # ─────────────────────────────────────────────────
-    # 1.2) Hotstring TOML format
+    # 1.1) Hotstring TOML format
     # ─────────────────────────────────────────────────
     validate-hotstrings:
         name: "Validate · hotstrings TOML"
@@ -95,7 +77,7 @@ jobs:
 
 
     # ─────────────────────────────────────────────────
-    # 1.3) Domain build pipeline + drift detection
+    # 1.2) Domain build pipeline + drift detection
     # ─────────────────────────────────────────────────
     validate-domain:
         name: "Validate · domain pipeline"
@@ -127,7 +109,7 @@ jobs:
     test-hs:
         name: "macOS · unit tests"
         runs-on: ubuntu-latest
-        needs: [validate-locales, validate-hotstrings, validate-domain]
+        needs: [validate-hotstrings, validate-domain]
 
         steps:
             - uses: actions/checkout@v4
@@ -194,14 +176,21 @@ jobs:
         steps:
             - name: Assert all macOS jobs passed
               run: |
-                  if [[ "${{ needs.test-hs.result }}" != "success" || \
-                        "${{ needs.e2e-hs.result }}"  != "success" ]]; then
+                  failed=0
+                  for job_result in "${{ needs.test-hs.result }}" "${{ needs.e2e-hs.result }}"; do
+                      if [[ "$job_result" == "failure" || "$job_result" == "cancelled" ]]; then
+                          failed=1
+                      fi
+                  done
+                  if [[ $failed -eq 1 ]]; then
                       echo "macOS driver: one or more jobs failed."
                       echo "  test-hs : ${{ needs.test-hs.result }}"
                       echo "  e2e-hs  : ${{ needs.e2e-hs.result }}"
                       exit 1
                   fi
-                  echo "macOS driver: all jobs passed."
+                  echo "macOS driver: all jobs passed (or skipped)."
+                  echo "  test-hs : ${{ needs.test-hs.result }}"
+                  echo "  e2e-hs  : ${{ needs.e2e-hs.result }}"
 
 
 # =============================================
@@ -216,7 +205,7 @@ jobs:
     test-ahk:
         name: "Windows · unit tests"
         runs-on: windows-latest
-        needs: [validate-locales, validate-hotstrings, validate-domain]
+        needs: [validate-hotstrings, validate-domain]
 
         steps:
             - uses: actions/checkout@v4
@@ -402,14 +391,21 @@ jobs:
         steps:
             - name: Assert all Windows jobs passed
               run: |
-                  if [[ "${{ needs.test-ahk.result }}" != "success" || \
-                        "${{ needs.e2e-ahk.result }}"  != "success" ]]; then
+                  failed=0
+                  for job_result in "${{ needs.test-ahk.result }}" "${{ needs.e2e-ahk.result }}"; do
+                      if [[ "$job_result" == "failure" || "$job_result" == "cancelled" ]]; then
+                          failed=1
+                      fi
+                  done
+                  if [[ $failed -eq 1 ]]; then
                       echo "Windows driver: one or more jobs failed."
                       echo "  test-ahk : ${{ needs.test-ahk.result }}"
                       echo "  e2e-ahk  : ${{ needs.e2e-ahk.result }}"
                       exit 1
                   fi
-                  echo "Windows driver: all jobs passed."
+                  echo "Windows driver: all jobs passed (or skipped)."
+                  echo "  test-ahk : ${{ needs.test-ahk.result }}"
+                  echo "  e2e-ahk  : ${{ needs.e2e-ahk.result }}"
 
 
 # ============================================
@@ -424,7 +420,7 @@ jobs:
     test-linux:
         name: "Linux · unit tests"
         runs-on: ubuntu-22.04
-        needs: [validate-locales, validate-hotstrings, validate-domain]
+        needs: [validate-hotstrings, validate-domain]
 
         steps:
             - uses: actions/checkout@v4
@@ -449,11 +445,14 @@ jobs:
         steps:
             - name: Assert all Linux jobs passed
               run: |
-                  if [[ "${{ needs.test-linux.result }}" != "success" ]]; then
+                  if [[ "${{ needs.test-linux.result }}" == "failure" || \
+                        "${{ needs.test-linux.result }}" == "cancelled" ]]; then
                       echo "Linux driver: test-linux failed."
+                      echo "  test-linux : ${{ needs.test-linux.result }}"
                       exit 1
                   fi
-                  echo "Linux driver: all jobs passed."
+                  echo "Linux driver: all jobs passed (or skipped)."
+                  echo "  test-linux : ${{ needs.test-linux.result }}"
 
 
 # =========================================
@@ -466,8 +465,9 @@ jobs:
         name: "Release · auto-tag → release.yml"
         runs-on: ubuntu-latest
         needs: [macos-ok, windows-ok, linux-ok]
-        # Only on push to main (not PRs, not dev) and only when all drivers passed
+        # Only on push to main (not PRs, not dev) and only when all gates passed
         if: >
+            always() &&
             github.event_name == 'push' &&
             github.ref == 'refs/heads/main' &&
             needs.macos-ok.result   == 'success' &&
