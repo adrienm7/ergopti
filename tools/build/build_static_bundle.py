@@ -145,8 +145,8 @@ def main() -> int:
 	parser.add_argument(
 		"--repo-root",
 		type=Path,
-		default=Path(__file__).resolve().parent.parent,
-		help="Repository root (default: parent of tools/).",
+		default=Path(__file__).resolve().parent.parent.parent,
+		help="Repository root (default: two levels above tools/build/).",
 	)
 	parser.add_argument(
 		"--output",
