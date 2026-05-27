@@ -95,9 +95,9 @@ jobs:
           # Driver Lua files (linux adapter layer + modules).
           cp -r static/ergopti_plus/linux/.           "${ROOT}/usr/lib/ergopti/linux/"
           # Shared Lua libraries and hotstring categories.
-          cp -r static/ergopti_plus/_shared/.         "${ROOT}/usr/lib/ergopti/_shared/"
+          cp -r static/ergopti_plus/shared/.         "${ROOT}/usr/lib/ergopti/_shared/"
           # Hotstring TOML categories exposed to the user config directory.
-          cp -r static/ergopti_plus/_shared/hotstrings/. "${ROOT}/usr/share/ergopti/hotstrings/"
+          cp -r static/ergopti_plus/shared/hotstrings/. "${ROOT}/usr/share/ergopti/hotstrings/"
 
           # Wrapper script that sets up LUA_PATH and launches the daemon.
           install -m 0755 static/ergopti_plus/linux/bin/ergopti-hotstrings \
@@ -242,7 +242,7 @@ jobs:
 
           # Driver and shared Lua sources.
           cp -r static/ergopti_plus/linux/.   "${APPDIR}/usr/lib/ergopti/linux/"
-          cp -r static/ergopti_plus/_shared/. "${APPDIR}/usr/lib/ergopti/_shared/"
+          cp -r static/ergopti_plus/shared/. "${APPDIR}/usr/lib/ergopti/_shared/"
 
           # AppRun — entry point invoked by the AppImage runtime.
           cat > "${APPDIR}/AppRun" << 'APPRUN'
