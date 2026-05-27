@@ -560,7 +560,10 @@ jobs:
               with:
                   fetch-depth: 0
 
-            - name: Calculate next dev tag and create GitHub pre-release
+            - name: Calculate next dev tag and push
+              # Pushes the tag only — release.yml handles the full build
+              # (macOS app, Windows exe, Linux packages) and creates the
+              # GitHub release with all assets attached.
               shell: bash
               env:
                   GH_TOKEN: ${{ github.token }}
@@ -586,18 +589,4 @@ jobs:
 
                   git tag "$tag"
                   git push origin "$tag"
-
-                  # Build a changelog from commits since the previous dev tag
-                  if [ -n "$last_dev" ]; then
-                      range="${last_dev}..HEAD"
-                  else
-                      range="HEAD"
-                  fi
-                  notes=$(git log "$range" --no-merges --pretty=format:"- %s" | head -40)
-
-                  gh release create "$tag" \
-                      --title "$tag" \
-                      --notes "${notes:-No new commits.}" \
-                      --prerelease \
-                      --target dev
-                  echo "Pre-release '$tag' created."
+                  echo "Tag '$tag' pushed — release.yml will build and publish the release."
