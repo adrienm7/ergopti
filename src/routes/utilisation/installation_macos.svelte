@@ -22,7 +22,7 @@
 	{#if version_mineure_macos !== undefined}
 		<a
 			href={base +
-				`/drivers/macos/bundles/zipped_bundles/Ergopti_v${version_mineure_macos}.bundle.zip`}
+				`/ergopti/macos/bundles/zipped_bundles/Ergopti_v${version_mineure_macos}.bundle.zip`}
 			download
 		>
 			<button
@@ -233,7 +233,7 @@
 		Pointer Hammerspoon vers le fichier de configuration du dépôt :<br />
 		<code
 			>defaults write org.hammerspoon.Hammerspoon MJConfigFile<br />
-			"/chemin/vers/ergopti/static/drivers/hammerspoon/init.lua"
+			"/chemin/vers/ergopti/static/ergopti_plus/macos/init.lua"
 		</code>
 		<br />
 		Remplacer <em>/chemin/vers/ergopti</em> par le chemin réel du dossier cloné.
@@ -251,7 +251,7 @@
 
 <div class="download-buttons">
 	<a
-		href="https://github.com/adrienm7/ergopti/tree/main/static/drivers/alfred/snippets"
+		href="https://github.com/adrienm7/ergopti/tree/main/static/ergopti_plus/alfred/snippets"
 		target="_blank"
 	>
 		<button
@@ -260,7 +260,7 @@
 		>
 	</a>
 	<a
-		href="https://github.com/adrienm7/ergopti/tree/main/static/drivers/alfred/workflows"
+		href="https://github.com/adrienm7/ergopti/tree/main/static/ergopti_plus/alfred/workflows"
 		target="_blank"
 	>
 		<button

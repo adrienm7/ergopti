@@ -33,7 +33,7 @@ jobs:
           sudo apt-get install -y luajit
 
       - name: Run Linux driver test suite
-        working-directory: static/drivers/linux
+        working-directory: static/ergopti_plus/linux
         # The runner script exits non-zero on any failure — CI picks that up
         # automatically, blocking all downstream packaging jobs.
         run: luajit tests/run.lua
@@ -93,18 +93,18 @@ jobs:
           install -d "${ROOT}/usr/share/ergopti/hotstrings"
 
           # Driver Lua files (linux adapter layer + modules).
-          cp -r static/drivers/linux/.           "${ROOT}/usr/lib/ergopti/linux/"
+          cp -r static/ergopti_plus/linux/.           "${ROOT}/usr/lib/ergopti/linux/"
           # Shared Lua libraries and hotstring categories.
-          cp -r static/drivers/_shared/.         "${ROOT}/usr/lib/ergopti/_shared/"
+          cp -r static/ergopti_plus/_shared/.         "${ROOT}/usr/lib/ergopti/_shared/"
           # Hotstring TOML categories exposed to the user config directory.
-          cp -r static/drivers/_shared/hotstrings/. "${ROOT}/usr/share/ergopti/hotstrings/"
+          cp -r static/ergopti_plus/_shared/hotstrings/. "${ROOT}/usr/share/ergopti/hotstrings/"
 
           # Wrapper script that sets up LUA_PATH and launches the daemon.
-          install -m 0755 static/drivers/linux/bin/ergopti-hotstrings \
+          install -m 0755 static/ergopti_plus/linux/bin/ergopti-hotstrings \
             "${ROOT}/usr/bin/ergopti-hotstrings"
 
           # README shipped as upstream documentation.
-          cp static/drivers/linux/README.md "${ROOT}/usr/share/doc/ergopti/README.md"
+          cp static/ergopti_plus/linux/README.md "${ROOT}/usr/share/doc/ergopti/README.md"
 
           # .desktop entry so the daemon appears in session startup managers.
           cat > "${ROOT}/usr/share/applications/ergopti.desktop" << 'DESKTOP'
@@ -241,8 +241,8 @@ jobs:
           done
 
           # Driver and shared Lua sources.
-          cp -r static/drivers/linux/.   "${APPDIR}/usr/lib/ergopti/linux/"
-          cp -r static/drivers/_shared/. "${APPDIR}/usr/lib/ergopti/_shared/"
+          cp -r static/ergopti_plus/linux/.   "${APPDIR}/usr/lib/ergopti/linux/"
+          cp -r static/ergopti_plus/_shared/. "${APPDIR}/usr/lib/ergopti/_shared/"
 
           # AppRun — entry point invoked by the AppImage runtime.
           cat > "${APPDIR}/AppRun" << 'APPRUN'

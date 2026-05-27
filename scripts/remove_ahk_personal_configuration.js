@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 
-const dirPath = 'static/drivers/autohotkey';
+const dirPath = 'static/ergopti_plus/windows';
 const files = fs.readdirSync(dirPath).filter((f) => f.endsWith('.ahk'));
 
 // This code removes the personal configuration (section 2) from AHK files

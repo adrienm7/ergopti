@@ -210,9 +210,9 @@ jobs:
               # Released as ``Ergopti_macOS.zip`` — keyboard layout only, no app.
               run: |
                   set -euo pipefail
-                  latest=$(ls -d static/drivers/macos/bundles/*.bundle | sort -V | tail -1)
+                  latest=$(ls -d static/ergopti/macos/bundles/*.bundle | sort -V | tail -1)
                   bundle_name=$(basename "$latest")
-                  (cd static/drivers/macos/bundles && zip -r "../../../../build/macos/Ergopti_macOS.zip" "$bundle_name")
+                  (cd static/ergopti/macos/bundles && zip -r "../../../../build/macos/Ergopti_macOS.zip" "$bundle_name")
                   echo "Packaged keylayout: $bundle_name → Ergopti_macOS.zip"
 
             - name: Rename appcast for upload
@@ -289,7 +289,7 @@ jobs:
                   $owner   = "${{ github.repository_owner }}"
                   $repo    = "${{ github.event.repository.name }}"
                   $releaseUrl = "https://github.com/$owner/$repo/releases/tag/$tag"
-                  $bundlePath = "${{ github.workspace }}\static\drivers\autohotkey\lib\bundle.ahk"
+                  $bundlePath = "${{ github.workspace }}\static\ergopti_plus\windows\lib\bundle.ahk"
                   $text = Get-Content -Raw -Path $bundlePath
                   $text = $text.Replace("__BUNDLE_VERSION__",     $version)
                   $text = $text.Replace("__BUNDLE_RELEASE_URL__", $releaseUrl)
@@ -315,8 +315,8 @@ jobs:
               run: |
                   $ahk2exe = Get-ChildItem "$env:TEMP\Ahk2Exe" -Recurse -Filter "Ahk2Exe.exe" | Select-Object -First 1 -ExpandProperty FullName
                   $runtime = Get-ChildItem "$env:TEMP\AutoHotkey" -Filter "AutoHotkey64.exe" | Select-Object -First 1 -ExpandProperty FullName
-                  $in   = "${{ github.workspace }}\static\drivers\autohotkey\ErgoptiPlus.ahk"
-                  $out  = "${{ github.workspace }}\static\drivers\autohotkey\ErgoptiPlus.exe"
+                  $in   = "${{ github.workspace }}\static\ergopti_plus\windows\ErgoptiPlus.ahk"
+                  $out  = "${{ github.workspace }}\static\ergopti_plus\windows\ErgoptiPlus.exe"
                   $icon = "${{ github.workspace }}\static\favicon.ico"
                   # /silent suppresses any Ahk2Exe GUI dialogs that would block
                   # indefinitely on a headless runner and cause a silent non-zero exit.
@@ -334,8 +334,8 @@ jobs:
               shell: bash
               run: |
                   set -euo pipefail
-                  latest_kbd=$(ls static/drivers/windows/Ergopti_v*.exe | sort -V | tail -1)
-                  cp "$latest_kbd" static/drivers/windows/Ergopti_windows.exe
+                  latest_kbd=$(ls static/ergopti/windows/Ergopti_v*.exe | sort -V | tail -1)
+                  cp "$latest_kbd" static/ergopti/windows/Ergopti_windows.exe
 
             - name: Upload Windows artifacts
               uses: actions/upload-artifact@v4
@@ -343,8 +343,8 @@ jobs:
                   name: assets-windows
                   retention-days: 1
                   path: |
-                      static/drivers/autohotkey/ErgoptiPlus.exe
-                      static/drivers/windows/Ergopti_windows.exe
+                      static/ergopti_plus/windows/ErgoptiPlus.exe
+                      static/ergopti/windows/Ergopti_windows.exe
 
 
 
@@ -370,10 +370,10 @@ jobs:
               shell: bash
               run: |
                   set -euo pipefail
-                  latest_dir=$(ls -d static/drivers/linux/v*_* | sort -V | tail -1)
+                  latest_dir=$(ls -d static/ergopti/linux/v*_* | sort -V | tail -1)
                   dir_name=$(basename "$latest_dir")
                   mkdir -p build/linux
-                  (cd static/drivers/linux && zip -r "../../../build/linux/Ergopti_xkb.zip" "$dir_name")
+                  (cd static/ergopti/linux && zip -r "../../../build/linux/Ergopti_xkb.zip" "$dir_name")
                   echo "Packaged XKB: $dir_name → Ergopti_xkb.zip"
 
             - name: Upload Linux artifacts
@@ -383,7 +383,7 @@ jobs:
                   retention-days: 1
                   path: |
                       build/linux/Ergopti_xkb.zip
-                      static/drivers/kanata/kanata.kbd
+                      static/ergopti_plus/kanata/kanata.kbd
 
 
 
@@ -534,7 +534,7 @@ jobs:
 
                   **Installation:**
                   1. Unzip \`Ergopti_xkb.zip\`.
-                  2. Follow the [XKB installation guide](https://github.com/${GITHUB_REPOSITORY}/tree/main/static/drivers/linux/xkb_installation) in the repository.
+                  2. Follow the [XKB installation guide](https://github.com/${GITHUB_REPOSITORY}/tree/main/static/ergopti/linux/xkb_installation) in the repository.
 
                   ---
 

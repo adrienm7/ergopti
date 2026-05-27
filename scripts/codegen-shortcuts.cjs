@@ -4,9 +4,9 @@
  * ==============================================================================
  * MODULE: Shortcuts Bindings Codegen
  * DESCRIPTION:
- * Reads `static/drivers/_shared/features/shortcuts.toml` and generates:
- *   - `static/drivers/autohotkey/_generated/shortcuts_bindings.ahk`
- *   - `static/drivers/hammerspoon/_generated/shortcuts_bindings.lua`
+ * Reads `static/ergopti_plus/_shared/features/shortcuts.toml` and generates:
+ *   - `static/ergopti_plus/windows/_generated/shortcuts_bindings.ahk`
+ *   - `static/ergopti_plus/macos/_generated/shortcuts_bindings.lua`
  *
  * FEATURES & RATIONALE:
  * 1. Single source of truth: shortcut ids, i18n keys and default chords live in
@@ -24,9 +24,9 @@ const fs   = require("fs");
 const path = require("path");
 
 const ROOT      = path.resolve(__dirname, "..");
-const TOML_PATH = path.resolve(ROOT, "static/drivers/_shared/features/shortcuts.toml");
-const OUT_AHK   = path.resolve(ROOT, "static/drivers/autohotkey/_generated/shortcuts_bindings.ahk");
-const OUT_LUA   = path.resolve(ROOT, "static/drivers/hammerspoon/_generated/shortcuts_bindings.lua");
+const TOML_PATH = path.resolve(ROOT, "static/ergopti_plus/_shared/features/shortcuts.toml");
+const OUT_AHK   = path.resolve(ROOT, "static/ergopti_plus/windows/_generated/shortcuts_bindings.ahk");
+const OUT_LUA   = path.resolve(ROOT, "static/ergopti_plus/macos/_generated/shortcuts_bindings.lua");
 
 
 
@@ -153,7 +153,7 @@ function buildAhk(shortcuts) {
 	lines.push(";");
 	lines.push("; MODULE: Shortcuts Bindings (AHK generated)");
 	lines.push("; DESCRIPTION:");
-	lines.push("; Auto-generated from static/drivers/_shared/features/shortcuts.toml.");
+	lines.push("; Auto-generated from static/ergopti_plus/_shared/features/shortcuts.toml.");
 	lines.push("; DO NOT EDIT MANUALLY — run `npm run codegen:shortcuts` to regenerate.");
 	lines.push(";");
 	lines.push("; Exposes SHORTCUTS_BINDINGS, a Map keyed by shortcut id.");
@@ -209,7 +209,7 @@ function buildLua(shortcuts) {
 	lines.push("--- ==============================================================================");
 	lines.push("--- MODULE: Shortcuts Bindings (Lua generated)");
 	lines.push("--- DESCRIPTION:");
-	lines.push("--- Auto-generated from static/drivers/_shared/features/shortcuts.toml.");
+	lines.push("--- Auto-generated from static/ergopti_plus/_shared/features/shortcuts.toml.");
 	lines.push("--- DO NOT EDIT MANUALLY — run `npm run codegen:shortcuts` to regenerate.");
 	lines.push("---");
 	lines.push("--- Returns a table keyed by shortcut id, each entry containing:");

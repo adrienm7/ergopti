@@ -4,9 +4,9 @@
  * ==============================================================================
  * MODULE: PromptBuilder AHK Codegen
  * DESCRIPTION:
- * Generates `static/drivers/autohotkey/_generated/prompt_builder.ahk` from the
+ * Generates `static/ergopti_plus/windows/_generated/prompt_builder.ahk` from the
  * canonical algorithm defined in
- * `static/drivers/_shared/lua/llm/prompt_builder.lua`.
+ * `static/ergopti_plus/_shared/lua/llm/prompt_builder.lua`.
  *
  * FEATURES & RATIONALE:
  * 1. Single source of truth: all constants are kept in sync with the Lua and JS
@@ -25,8 +25,8 @@ const fs   = require("fs");
 const path = require("path");
 
 const ROOT     = path.resolve(__dirname, "..");
-const OUT_PATH = path.resolve(ROOT, "static/drivers/autohotkey/_generated/prompt_builder.ahk");
-const SRC_REL  = "static/drivers/_shared/lua/llm/prompt_builder.lua";
+const OUT_PATH = path.resolve(ROOT, "static/ergopti_plus/windows/_generated/prompt_builder.ahk");
+const SRC_REL  = "static/ergopti_plus/_shared/lua/llm/prompt_builder.lua";
 
 
 
@@ -93,7 +93,7 @@ function buildAhkSource() {
 	const lines = [];
 
 	// File path header (first line, required by project convention)
-	lines.push("; static/drivers/autohotkey/_generated/prompt_builder.ahk");
+	lines.push("; static/ergopti_plus/windows/_generated/prompt_builder.ahk");
 	lines.push("");
 
 	// Auto-generated warning banner
@@ -113,8 +113,8 @@ function buildAhkSource() {
 	lines.push("; from the current typing buffer and a configuration Map.");
 	lines.push(";");
 	lines.push("; This module is the AHK counterpart of:");
-	lines.push(";   static/drivers/_shared/lua/llm/prompt_builder.lua");
-	lines.push(";   static/drivers/_shared/domain/PromptBuilder.js");
+	lines.push(";   static/ergopti_plus/_shared/lua/llm/prompt_builder.lua");
+	lines.push(";   static/ergopti_plus/_shared/domain/PromptBuilder.js");
 	lines.push("; All constants and algorithms MUST stay in sync with those references.");
 	lines.push(";");
 	lines.push("; CONSTANTS (canonical — all drivers MUST use these exact values):");

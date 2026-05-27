@@ -4,7 +4,7 @@
 	import ErgoptiPlus from '$lib/components/ErgoptiPlus.svelte';
 
 	// `data` is populated at build time by +page.server.js, which reads
-	// the Hammerspoon LLM catalog (static/drivers/hammerspoon/data/llm_models.json)
+	// the Hammerspoon LLM catalog (static/ergopti_plus/macos/data/llm_models.json)
 	// and returns a compact per-provider summary. Adding a model to the
 	// driver's JSON automatically refreshes this page on the next deploy.
 	let { data } = $props();

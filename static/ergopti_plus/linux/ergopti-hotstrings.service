@@ -1,0 +1,35 @@
+# static/ergopti_plus/linux/ergopti-hotstrings.service
+#
+# Systemd user unit for the ergopti LuaJIT hotstring daemon.
+# Reads raw evdev events, matches triggers, injects replacements via ydotool.
+#
+# Install as a user unit (not system-wide) so the daemon inherits the
+# graphical session environment without elevated privileges.
+#
+# Manual install:
+#   cp ergopti-hotstrings.service ~/.config/systemd/user/
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now ergopti-hotstrings
+#
+# The install.sh script does all of this automatically.
+
+[Unit]
+Description=Ergopti — expansion de texte et métriques clavier (LuaJIT)
+Documentation=https://github.com/ergopti/ergopti
+# Wait for the graphical session so notify-send and ydotool can reach the
+# compositor; evdev reading itself works without a display server.
+After=graphical-session.target
+
+[Service]
+Type=simple
+# The wrapper sets LUA_PATH and verifies ydotool before exec-ing luajit.
+ExecStart=%h/.local/bin/ergopti-hotstrings
+# Restart on transient failures (device not yet accessible at login, etc.).
+Restart=on-failure
+RestartSec=3s
+# Propagate the display session for notify-send and xdotool.
+Environment=DISPLAY=:0
+Environment=DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/%U/bus
+
+[Install]
+WantedBy=graphical-session.target

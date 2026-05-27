@@ -4,13 +4,13 @@ on:
     push:
         branches: [main, dev]
         paths:
-            - "static/drivers/autohotkey/**/*.ahk"
+            - "static/ergopti_plus/windows/**/*.ahk"
             - ".github/workflows/test_ahk_encoding.yml"
             - "scripts/test-ahk-encoding.cjs"
     pull_request:
         branches: [main, dev]
         paths:
-            - "static/drivers/autohotkey/**/*.ahk"
+            - "static/ergopti_plus/windows/**/*.ahk"
             - ".github/workflows/test_ahk_encoding.yml"
             - "scripts/test-ahk-encoding.cjs"
     workflow_dispatch:

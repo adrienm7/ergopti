@@ -6,7 +6,7 @@
  * DESCRIPTION:
  * CLI generator that creates the skeleton of a new ergopti driver from the
  * shared port and domain specifications. Running this tool produces a complete
- * directory tree under static/drivers/<name>/ with stub adapters for every
+ * directory tree under static/ergopti_plus/<name>/ with stub adapters for every
  * port contract, a README, and a checklist of what still needs implementing.
  *
  * FEATURES & RATIONALE:
@@ -97,8 +97,8 @@ function buildAdapterStub(driverName, portName, lang) {
 	const c = COMMENT_PREFIX[lang];
 	const ext = FILE_EXT[lang];
 	const snakeName = toSnakeCase(portName);
-	const filePath = `static/drivers/${driverName}/adapters/${snakeName}${ext}`;
-	const specRef = `static/drivers/_shared/ports/${portName}.spec.js`;
+	const filePath = `static/ergopti_plus/${driverName}/adapters/${snakeName}${ext}`;
+	const specRef = `static/ergopti_plus/_shared/ports/${portName}.spec.js`;
 
 	if (lang === "lua") {
 		return [
@@ -240,7 +240,7 @@ function buildAdaptersReadme(driverName, ports, lang) {
 		`# ${driverName} — Adapters`,
 		``,
 		`Each file in this directory implements one port contract from`,
-		`\`static/drivers/_shared/ports/\`.`,
+		`\`static/ergopti_plus/_shared/ports/\`.`,
 		``,
 		`| File | Port | Spec | Status |`,
 		`|------|------|------|--------|`,
@@ -333,23 +333,23 @@ function main() {
 	console.log(`
 Done. Next steps:
 ─────────────────────────────────────────────────────────────────
-  [ ] Implement each adapter stub in static/drivers/${driverName}/adapters/
+  [ ] Implement each adapter stub in static/ergopti_plus/${driverName}/adapters/
       (${ports.length} files — one per port contract in _shared/ports/)
 
-  [ ] Satisfy the domain specs listed in static/drivers/_shared/domain/
+  [ ] Satisfy the domain specs listed in static/ergopti_plus/_shared/domain/
       (${domains.length} specs: ${domains.join(", ")})
 
-  [ ] Add driver entry-point under static/drivers/${driverName}/
+  [ ] Add driver entry-point under static/ergopti_plus/${driverName}/
       (e.g. a main .${lang === "lua" ? "lua" : "ahk"} file equivalent to linux/ergopti_hotstrings.lua)
 
-  [ ] Add tests under static/drivers/${driverName}/tests/
+  [ ] Add tests under static/ergopti_plus/${driverName}/tests/
 
   [ ] Run: npm run test:port-compliance
       to verify every adapter satisfies its contract
 
-  [ ] Update static/drivers/${driverName}/README.md with real documentation
+  [ ] Update static/ergopti_plus/${driverName}/README.md with real documentation
 
-  [ ] Update static/drivers/${driverName}/adapters/README.md status column
+  [ ] Update static/ergopti_plus/${driverName}/adapters/README.md status column
 ─────────────────────────────────────────────────────────────────`);
 }
 

@@ -357,12 +357,12 @@ console.log('lint-conventions: scanning…');
 
 // AHK files — lib/ and modules/ only (skip vendor/, tests/ for header check)
 const ahkSourceDirs = [
-	join(REPO_ROOT, 'static/drivers/autohotkey/lib'),
-	join(REPO_ROOT, 'static/drivers/autohotkey/modules'),
-	join(REPO_ROOT, 'static/drivers/autohotkey/ui'),
+	join(REPO_ROOT, 'static/ergopti_plus/windows/lib'),
+	join(REPO_ROOT, 'static/ergopti_plus/windows/modules'),
+	join(REPO_ROOT, 'static/ergopti_plus/windows/ui'),
 ];
 const ahkTestDirs = [
-	join(REPO_ROOT, 'static/drivers/autohotkey/tests'),
+	join(REPO_ROOT, 'static/ergopti_plus/windows/tests'),
 ];
 const ahkAll = [
 	...ahkSourceDirs.flatMap(d => walkFiles(d, ['.ahk'])),
@@ -371,10 +371,10 @@ const ahkAll = [
 
 // Lua files — hammerspoon driver only (skip vendor/)
 const luaDirs = [
-	join(REPO_ROOT, 'static/drivers/hammerspoon/lib'),
-	join(REPO_ROOT, 'static/drivers/hammerspoon/modules'),
-	join(REPO_ROOT, 'static/drivers/hammerspoon/ui'),
-	join(REPO_ROOT, 'static/drivers/hammerspoon/tests'),
+	join(REPO_ROOT, 'static/ergopti_plus/macos/lib'),
+	join(REPO_ROOT, 'static/ergopti_plus/macos/modules'),
+	join(REPO_ROOT, 'static/ergopti_plus/macos/ui'),
+	join(REPO_ROOT, 'static/ergopti_plus/macos/tests'),
 ];
 const luaAll = luaDirs.flatMap(d => walkFiles(d, ['.lua']));
 

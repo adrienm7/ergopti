@@ -1,0 +1,459 @@
+# _generated/config_template.toml
+# AUTO-GENERATED from _shared/features/manifest.toml.
+# DO NOT EDIT BY HAND — run `npm run build:manifest` to refresh.
+# This is the default v2 config copied into config/ergopti_plus/ahk/
+# on first boot. After that, the user owns the copy.
+
+[script]
+locale = "fr"
+log_level = "INFO"
+alt_gr_is_kana_remap = "auto"
+
+[hotstrings]
+trigger_char = "★"
+repeat_key_enabled = true
+
+[hotstrings.autocorrection.accents]
+enabled = true
+time_activation_seconds = 0.5
+
+[hotstrings.autocorrection.caps]
+enabled = true
+time_activation_seconds = 0.5
+
+[hotstrings.autocorrection.errors]
+enabled = true
+time_activation_seconds = 0.5
+
+[hotstrings.autocorrection.minus]
+enabled = true
+time_activation_seconds = 0.5
+
+[hotstrings.autocorrection.minus_apostrophe]
+enabled = true
+time_activation_seconds = 0.5
+
+[hotstrings.autocorrection.multiple_punctuation_marks]
+enabled = true
+time_activation_seconds = 0.5
+
+[hotstrings.autocorrection.names]
+enabled = true
+time_activation_seconds = 0.5
+
+[hotstrings.autocorrection.ou]
+enabled = true
+time_activation_seconds = 0.5
+
+[hotstrings.autocorrection.suffixes_a_chaining]
+enabled = true
+time_activation_seconds = 0.5
+
+[hotstrings.autocorrection.typographic_apostrophe]
+enabled = true
+time_activation_seconds = 0.5
+
+[hotstrings.distances_reduction.qu]
+enabled = true
+time_activation_seconds = 0.5
+
+[hotstrings.distances_reduction.suffixes_a]
+enabled = true
+time_activation_seconds = 0.5
+
+[hotstrings.distances_reduction.comma_j]
+enabled = true
+
+[hotstrings.distances_reduction.comma_far_letters]
+enabled = true
+
+[hotstrings.distances_reduction.dead_key_e_circumflex]
+enabled = true
+
+[hotstrings.distances_reduction.e_circumflex_e]
+enabled = true
+time_activation_seconds = 0.5
+
+[hotstrings.distances_reduction.space_around_symbols]
+enabled = true
+
+[hotstrings.sfbs_reduction.comma]
+enabled = true
+time_activation_seconds = 0.5
+
+[hotstrings.sfbs_reduction.e_circ]
+enabled = true
+time_activation_seconds = 0.5
+
+[hotstrings.sfbs_reduction.e_grave]
+enabled = true
+time_activation_seconds = 0.5
+
+[hotstrings.sfbs_reduction.bu]
+enabled = true
+
+[hotstrings.sfbs_reduction.i_e_acute]
+enabled = true
+
+[hotstrings.rolls.hc]
+enabled = true
+time_activation_seconds = 0.5
+
+[hotstrings.rolls.sx]
+enabled = true
+time_activation_seconds = 0.5
+
+[hotstrings.rolls.cx]
+enabled = true
+time_activation_seconds = 0.5
+
+[hotstrings.rolls.ct]
+enabled = true
+time_activation_seconds = 0.5
+
+[hotstrings.rolls.ez]
+enabled = true
+time_activation_seconds = 0.5
+
+[hotstrings.rolls.assign]
+enabled = true
+
+[hotstrings.rolls.assign_arrow_equal_left]
+enabled = true
+
+[hotstrings.rolls.assign_arrow_equal_right]
+enabled = true
+
+[hotstrings.rolls.assign_arrow_minus_left]
+enabled = true
+
+[hotstrings.rolls.assign_arrow_minus_right]
+enabled = true
+
+[hotstrings.rolls.bracket_quote]
+enabled = true
+
+[hotstrings.rolls.chevron_equal]
+enabled = true
+
+[hotstrings.rolls.chevron_greater]
+enabled = true
+
+[hotstrings.rolls.chevron_less]
+enabled = true
+
+[hotstrings.rolls.close_chevron_tag]
+enabled = true
+time_activation_seconds = 0.5
+
+[hotstrings.rolls.comment_close]
+enabled = true
+time_activation_seconds = 0.5
+
+[hotstrings.rolls.comment_open]
+enabled = true
+time_activation_seconds = 0.5
+
+[hotstrings.rolls.english_negation]
+enabled = true
+
+[hotstrings.rolls.equal_string]
+enabled = true
+
+[hotstrings.rolls.hashtag_close_bracket]
+enabled = true
+time_activation_seconds = 0.5
+
+[hotstrings.rolls.hashtag_open_bracket]
+enabled = true
+time_activation_seconds = 0.5
+
+[hotstrings.rolls.hashtag_parenthesis]
+enabled = true
+time_activation_seconds = 0.5
+
+[hotstrings.rolls.hashtag_quote]
+enabled = true
+
+[hotstrings.rolls.left_arrow]
+enabled = true
+
+[hotstrings.rolls.not_equal]
+enabled = true
+
+[hotstrings.rolls.paren_quote]
+enabled = true
+
+[hotstrings.magic_key.replace]
+enabled = true
+
+[hotstrings.magic_key.repeat_corrections]
+enabled = true
+time_activation_seconds = 2
+
+[hotstrings.magic_key.text_expansion]
+enabled = true
+time_activation_seconds = 2
+
+[hotstrings.magic_key.text_expansion_auto]
+enabled = true
+time_activation_seconds = 2
+
+[hotstrings.magic_key.text_expansion_emojis]
+enabled = true
+time_activation_seconds = 2
+
+[hotstrings.magic_key.text_expansion_symbols]
+enabled = true
+time_activation_seconds = 2
+
+[hotstrings.magic_key.text_expansion_symbols_typst]
+enabled = true
+time_activation_seconds = 2
+
+[hotstrings.dynamic.date]
+enabled = true
+
+[hotstrings.dynamic.date_fr]
+enabled = true
+
+[hotstrings.dynamic.date_long_fr]
+enabled = true
+
+[hotstrings.dynamic.iban_prefixes]
+enabled = true
+
+[hotstrings.dynamic.phone_prefixes]
+enabled = true
+
+[hotstrings.dynamic.ssn_prefixes]
+enabled = true
+
+[hotstrings.dynamic.text_expansion_personal_information]
+enabled = true
+pattern_max_length = 1
+
+[hotstrings.personal.autocorrection]
+enabled = true
+time_activation_seconds = 0.75
+
+[hotstrings.personal.code]
+enabled = true
+time_activation_seconds = 0.75
+
+[hotstrings.personal.email_shortcuts]
+enabled = true
+time_activation_seconds = 0.75
+
+[hotstrings.personal.professional_vocabulary]
+enabled = true
+time_activation_seconds = 0.75
+
+[hotstrings.personal.test]
+enabled = true
+time_activation_seconds = 0.75
+
+[llm]
+enabled = false
+onboarding_seen = false
+app_profile_overrides = ""
+
+[llm.display]
+pred_indent = 0
+show_info_bar = true
+streaming = true
+streaming_multi = true
+
+[llm.generation]
+context_length = 500
+min_words = 3
+max_words = 15
+temperature = 0.1
+auto_raise_temp = true
+reset_on_nav = true
+sequential_mode = false
+
+[llm.models]
+selected = "ollama"
+ollama = "qwen2.5:3b"
+
+[llm.profiles]
+active = "basic"
+num_predictions = 3
+auto_profile_for_model = true
+
+[llm.trigger]
+debounce_ms = 500
+instant_on_word_end = true
+after_hotstring = true
+inline_autotype = false
+secure_filter_enabled = true
+url_bar_filter_enabled = true
+
+[llm.navigation]
+val_modifiers = ["alt"]
+
+[metrics]
+enabled = true
+private_filter_enabled = true
+secure_filter_enabled = true
+system_auth_filter_enabled = true
+
+[shortcuts]
+chatgpt_url = "https://chat.openai.com"
+get_hex_value = true
+microsoft_bold = true
+title_case = true
+uppercase = true
+paste_without_formatting = false
+save = false
+select_line = true
+spotlight_mouse = true
+surround_with_parentheses = true
+teleport_mouse = true
+wrap_text_if_selected = true
+
+[shortcuts.gpt]
+enabled = true
+link = "https://chatgpt.com/"
+
+[shortcuts.search]
+enabled = true
+search_engine = "https://www.google.com"
+search_engine_url_query = "https://www.google.com/search?q="
+
+[shortcuts.take_note]
+enabled = true
+dated_notes = false
+destination_folder = "D:\\Bureau"
+
+[shortcuts.a_grave]
+enabled = true
+letter = "v"
+
+[shortcuts.e_acute]
+enabled = true
+letter = "c"
+
+[shortcuts.e_circ]
+enabled = true
+letter = "x"
+
+[shortcuts.e_grave]
+enabled = true
+letter = "z"
+
+[ahk.layout]
+ergopti_base = true
+direct_access_digits = true
+ergopti_alt_gr = true
+ergopti_plus = true
+
+[ahk.shortcuts]
+ctrl_j = false
+open_downloads = true
+move = true
+screen = true
+screen_instant = true
+win_caps_lock = true
+
+[ahk.shortcuts.alt_gr_caps_lock]
+backspace = false
+caps_lock = false
+caps_word = false
+ctrl_backspace = false
+ctrl_delete = true
+delete = false
+enter = false
+escape = false
+one_shot_shift = false
+tab = false
+
+[ahk.gestures]
+enabled = true
+swipe_3_down = "tab_close"
+swipe_3_left = "tab_prev"
+swipe_3_right = "tab_next"
+swipe_3_up = "tab_new"
+swipe_4_down = "win_app_prev"
+swipe_4_left = "desktop_prev"
+swipe_4_right = "desktop_next"
+swipe_4_up = "win_app_next"
+tap_3 = "left_click_toggle"
+tap_4 = "screenshot_window_clipboard"
+
+[ahk.shortcuts.alt_gr_lalt]
+backspace = false
+caps_lock = false
+caps_word = false
+ctrl_backspace = true
+ctrl_delete = false
+delete = false
+enter = false
+escape = false
+one_shot_shift = false
+tab = false
+
+[ahk.shortcuts.lalt_caps_lock]
+backspace = false
+caps_lock = false
+caps_word = true
+ctrl_backspace = false
+ctrl_delete = false
+delete = false
+enter = false
+escape = false
+one_shot_shift = false
+tab = false
+
+[ahk.shortcuts.personal]
+laptop_broken_key = true
+mouse_drag_window = true
+mouse_tab_switching = true
+professional_environment = false
+programmable_keyboard = true
+
+[ahk.shortcuts.script_control]
+script_altgr_backspace = "script_save_reload"
+script_altgr_delete = "open_personal_shortcuts"
+script_altgr_enter = "script_pause_toggle"
+script_altgr_escape = "script_quit"
+
+[ahk.shortcuts.keyboard]
+ctrl_b = "microsoft_bold"
+ctrl_shift_v = "paste_plain"
+win_a = "select_line"
+win_d = "open_hotstrings_editor"
+win_g = "open_url"
+win_h = "screen_capture"
+win_m = "activity_simulation"
+win_n = "take_note"
+win_o = "surround_parens"
+win_s = "search_web"
+win_sc029 = "screen_capture_instant"
+win_t = "teleport_mouse"
+win_u = "uppercase_selection"
+win_w = "titlecase_selection"
+win_x = "pick_color"
+
+[ahk.metrics]
+filter_private_browsing = true
+metrics_enabled = true
+metrics_shortcut_typing = ""
+metrics_shortcut_apps = ""
+metrics_show_wpm_menubar = false
+metrics_wpm_menubar_colors = false
+metrics_filter_secure_field = true
+metrics_filter_system_auth = true
+metrics_disabled_apps = []
+wpm_widget_visible = false
+wpm_widget_x = -1
+wpm_widget_y = -1
+wpm_widget_colors = false
+wpm_widget_graph = false
+
+[ahk.category_enabled]
+hotstrings = true
+layout = true
+shortcuts = true
+tap_holds = true

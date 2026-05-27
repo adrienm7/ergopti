@@ -27,9 +27,9 @@ const config = {
 	},
 
 	mutate: [
-		"static/drivers/_shared/domain/**/*.js",
-		"static/drivers/_shared/ports/**/*.spec.js",
-		"!static/drivers/_shared/**/_generated/**",
+		"static/ergopti_plus/_shared/domain/**/*.js",
+		"static/ergopti_plus/_shared/ports/**/*.spec.js",
+		"!static/ergopti_plus/_shared/**/_generated/**",
 		"!**/node_modules/**",
 	],
 

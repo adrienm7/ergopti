@@ -14,7 +14,7 @@
 		"build:hotstrings": "node ./scripts/build-hotstrings.cjs",
 		"build:manifest": "node ./scripts/build-features-manifest.js",
 		"build:domain": "node ./scripts/build-domain.cjs",
-		"lint:banners": "node ./scripts/audit-banner-alignment.js static/drivers/_shared",
+		"lint:banners": "node ./scripts/audit-banner-alignment.js static/ergopti_plus/_shared",
 		"lint:conventions": "node ./scripts/lint-conventions.js --warn-only",
 		"lint:conventions:strict": "node ./scripts/lint-conventions.js --fail-on-violations",
 		"test:port-compliance": "node ./scripts/test-port-compliance.cjs",

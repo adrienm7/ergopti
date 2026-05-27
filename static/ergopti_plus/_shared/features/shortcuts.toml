@@ -1,0 +1,420 @@
+# _shared/features/shortcuts.toml
+# Companion manifest defining keyboard shortcut bindings for each driver.
+# Single source of truth for shortcut ids, i18n keys and default key chords.
+#
+# Consumed by `scripts/codegen-shortcuts.cjs` which generates:
+#   static/ergopti_plus/windows/_generated/shortcuts_bindings.ahk
+#   static/ergopti_plus/macos/_generated/shortcuts_bindings.lua
+#
+# Fields:
+#   id               Unique shortcut identifier (matches bindings.lua / ErgoptiPlus.ahk).
+#   label_key        i18n key for the user-facing label.
+#   description_key  i18n key for the longer description / tooltip.
+#   default_key_ahk  Default trigger chord in AHK v2 notation (empty string = N/A).
+#   default_key_hs   Default trigger chord in Hammerspoon notation (empty string = N/A).
+#   platforms        Drivers that expose this shortcut.
+
+
+
+
+# ======================================
+# ======================================
+# ======= 1/ Script-control slots =======
+# ======================================
+# ======================================
+
+[[shortcuts]]
+id = "script_altgr_enter"
+label_key = "sg_labels.script_altgr_enter"
+description_key = "menu.ahk.shortcuts.script_control.script_altgr_enter"
+default_key_ahk = "RAlt & Enter"
+default_key_hs = ""
+platforms = ["ahk"]
+
+[[shortcuts]]
+id = "script_altgr_backspace"
+label_key = "sg_labels.script_altgr_backspace"
+description_key = "menu.ahk.shortcuts.script_control.script_altgr_backspace"
+default_key_ahk = "RAlt & BackSpace"
+default_key_hs = ""
+platforms = ["ahk"]
+
+[[shortcuts]]
+id = "script_altgr_delete"
+label_key = "sg_labels.script_altgr_delete"
+description_key = "menu.ahk.shortcuts.script_control.script_altgr_delete"
+default_key_ahk = "RAlt & Delete"
+default_key_hs = ""
+platforms = ["ahk"]
+
+[[shortcuts]]
+id = "script_altgr_escape"
+label_key = "sg_labels.script_altgr_escape"
+description_key = "menu.ahk.shortcuts.script_control.script_altgr_escape"
+default_key_ahk = "RAlt & Escape"
+default_key_hs = ""
+platforms = ["ahk"]
+
+
+
+
+# ======================================================
+# ======================================================
+# ======= 2/ Script-control slots (HS right-opt) =======
+# ======================================================
+# ======================================================
+
+[[shortcuts]]
+id = "right_opt_return"
+label_key = "menu.shortcuts.right_opt_return"
+description_key = "menu.shortcuts.right_opt_return"
+default_key_ahk = ""
+default_key_hs = "rightalt+return"
+platforms = ["hs"]
+
+[[shortcuts]]
+id = "right_opt_backspace"
+label_key = "menu.shortcuts.right_opt_back"
+description_key = "menu.shortcuts.right_opt_back"
+default_key_ahk = ""
+default_key_hs = "rightalt+delete"
+platforms = ["hs"]
+
+[[shortcuts]]
+id = "right_opt_escape"
+label_key = "menu.shortcuts.right_opt_escape"
+description_key = "menu.shortcuts.right_opt_escape"
+default_key_ahk = ""
+default_key_hs = "rightalt+escape"
+platforms = ["hs"]
+
+
+
+
+# ============================================
+# ============================================
+# ======= 3/ Configurable Win/* shortcuts =======
+# ============================================
+# ============================================
+
+[[shortcuts]]
+id = "win_a"
+label_key = "menu.ahk.shortcuts.keyboard.win_a"
+description_key = "menu.ahk.shortcuts.keyboard.win_a"
+default_key_ahk = "#a"
+default_key_hs = ""
+platforms = ["ahk"]
+
+[[shortcuts]]
+id = "win_d"
+label_key = "menu.ahk.shortcuts.keyboard.win_d"
+description_key = "menu.ahk.shortcuts.keyboard.win_d"
+default_key_ahk = "#d"
+default_key_hs = ""
+platforms = ["ahk"]
+
+[[shortcuts]]
+id = "win_g"
+label_key = "menu.ahk.shortcuts.keyboard.win_g"
+description_key = "menu.ahk.shortcuts.keyboard.win_g"
+default_key_ahk = "#g"
+default_key_hs = ""
+platforms = ["ahk"]
+
+[[shortcuts]]
+id = "win_h"
+label_key = "menu.ahk.shortcuts.keyboard.win_h"
+description_key = "menu.ahk.shortcuts.keyboard.win_h"
+default_key_ahk = "#h"
+default_key_hs = ""
+platforms = ["ahk"]
+
+[[shortcuts]]
+id = "win_m"
+label_key = "menu.ahk.shortcuts.keyboard.win_m"
+description_key = "menu.ahk.shortcuts.keyboard.win_m"
+default_key_ahk = "#m"
+default_key_hs = ""
+platforms = ["ahk"]
+
+[[shortcuts]]
+id = "win_n"
+label_key = "menu.ahk.shortcuts.keyboard.win_n"
+description_key = "menu.ahk.shortcuts.keyboard.win_n"
+default_key_ahk = "#n"
+default_key_hs = ""
+platforms = ["ahk"]
+
+[[shortcuts]]
+id = "win_o"
+label_key = "menu.ahk.shortcuts.keyboard.win_o"
+description_key = "menu.ahk.shortcuts.keyboard.win_o"
+default_key_ahk = "#o"
+default_key_hs = ""
+platforms = ["ahk"]
+
+[[shortcuts]]
+id = "win_s"
+label_key = "menu.ahk.shortcuts.keyboard.win_s"
+description_key = "menu.ahk.shortcuts.keyboard.win_s"
+default_key_ahk = "#s"
+default_key_hs = ""
+platforms = ["ahk"]
+
+[[shortcuts]]
+id = "win_t"
+label_key = "menu.ahk.shortcuts.keyboard.win_t"
+description_key = "menu.ahk.shortcuts.keyboard.win_t"
+default_key_ahk = "#t"
+default_key_hs = ""
+platforms = ["ahk"]
+
+[[shortcuts]]
+id = "win_u"
+label_key = "menu.ahk.shortcuts.keyboard.win_u"
+description_key = "menu.ahk.shortcuts.keyboard.win_u"
+default_key_ahk = "#u"
+default_key_hs = ""
+platforms = ["ahk"]
+
+[[shortcuts]]
+id = "win_w"
+label_key = "menu.ahk.shortcuts.keyboard.win_w"
+description_key = "menu.ahk.shortcuts.keyboard.win_w"
+default_key_ahk = "#w"
+default_key_hs = ""
+platforms = ["ahk"]
+
+[[shortcuts]]
+id = "win_x"
+label_key = "menu.ahk.shortcuts.keyboard.win_x"
+description_key = "menu.ahk.shortcuts.keyboard.win_x"
+default_key_ahk = "#x"
+default_key_hs = ""
+platforms = ["ahk"]
+
+[[shortcuts]]
+id = "win_sc029"
+label_key = "menu.ahk.shortcuts.keyboard.win_sc029"
+description_key = "menu.ahk.shortcuts.keyboard.win_sc029"
+default_key_ahk = "#SC029"
+default_key_hs = ""
+platforms = ["ahk"]
+
+[[shortcuts]]
+id = "ctrl_b"
+label_key = "menu.ahk.shortcuts.keyboard.ctrl_b"
+description_key = "menu.ahk.shortcuts.keyboard.ctrl_b"
+default_key_ahk = "^b"
+default_key_hs = ""
+platforms = ["ahk"]
+
+[[shortcuts]]
+id = "ctrl_shift_v"
+label_key = "menu.ahk.shortcuts.keyboard.ctrl_shift_v"
+description_key = "menu.ahk.shortcuts.keyboard.ctrl_shift_v"
+default_key_ahk = "^+v"
+default_key_hs = ""
+platforms = ["ahk"]
+
+
+
+
+# ============================================================
+# ============================================================
+# ======= 4/ Cross-platform Ctrl/* and Cmd/* shortcuts =======
+# ============================================================
+# ============================================================
+
+[[shortcuts]]
+id = "ctrl_a"
+label_key = "shortcuts.label_ctrl_a"
+description_key = "shortcuts.label_ctrl_a"
+default_key_ahk = ""
+default_key_hs = "ctrl+a"
+platforms = ["hs"]
+
+[[shortcuts]]
+id = "ctrl_d"
+label_key = "shortcuts.label_ctrl_d"
+description_key = "shortcuts.label_ctrl_d"
+default_key_ahk = ""
+default_key_hs = "ctrl+d"
+platforms = ["hs"]
+
+[[shortcuts]]
+id = "ctrl_e"
+label_key = "shortcuts.label_ctrl_e"
+description_key = "shortcuts.label_ctrl_e"
+default_key_ahk = ""
+default_key_hs = "ctrl+e"
+platforms = ["hs"]
+
+[[shortcuts]]
+id = "ctrl_g"
+label_key = "shortcuts.label_ctrl_g"
+description_key = "shortcuts.label_ctrl_g"
+default_key_ahk = ""
+default_key_hs = "ctrl+g"
+platforms = ["hs"]
+
+[[shortcuts]]
+id = "ctrl_h"
+label_key = "shortcuts.label_ctrl_h"
+description_key = "shortcuts.label_ctrl_h"
+default_key_ahk = ""
+default_key_hs = "ctrl+h"
+platforms = ["hs"]
+
+[[shortcuts]]
+id = "ctrl_i"
+label_key = "shortcuts.label_ctrl_i"
+description_key = "shortcuts.label_ctrl_i"
+default_key_ahk = ""
+default_key_hs = "ctrl+i"
+platforms = ["hs"]
+
+[[shortcuts]]
+id = "ctrl_l"
+label_key = "shortcuts.label_ctrl_l"
+description_key = "shortcuts.label_ctrl_l"
+default_key_ahk = ""
+default_key_hs = "ctrl+l"
+platforms = ["hs"]
+
+[[shortcuts]]
+id = "ctrl_m"
+label_key = "shortcuts.label_ctrl_m"
+description_key = "shortcuts.label_ctrl_m"
+default_key_ahk = ""
+default_key_hs = "ctrl+m"
+platforms = ["hs"]
+
+[[shortcuts]]
+id = "ctrl_o"
+label_key = "shortcuts.label_ctrl_o"
+description_key = "shortcuts.label_ctrl_o"
+default_key_ahk = ""
+default_key_hs = "ctrl+o"
+platforms = ["hs"]
+
+[[shortcuts]]
+id = "ctrl_p"
+label_key = "shortcuts.label_ctrl_p"
+description_key = "shortcuts.label_ctrl_p"
+default_key_ahk = ""
+default_key_hs = "ctrl+p"
+platforms = ["hs"]
+
+[[shortcuts]]
+id = "ctrl_s"
+label_key = "shortcuts.label_ctrl_s"
+description_key = "shortcuts.label_ctrl_s"
+default_key_ahk = ""
+default_key_hs = "ctrl+s"
+platforms = ["hs"]
+
+[[shortcuts]]
+id = "ctrl_t"
+label_key = "shortcuts.label_ctrl_t"
+description_key = "shortcuts.label_ctrl_t"
+default_key_ahk = ""
+default_key_hs = "ctrl+t"
+platforms = ["hs"]
+
+[[shortcuts]]
+id = "ctrl_u"
+label_key = "shortcuts.label_ctrl_u"
+description_key = "shortcuts.label_ctrl_u"
+default_key_ahk = ""
+default_key_hs = "ctrl+u"
+platforms = ["hs"]
+
+[[shortcuts]]
+id = "ctrl_w"
+label_key = "shortcuts.label_ctrl_w"
+description_key = "shortcuts.label_ctrl_w"
+default_key_ahk = ""
+default_key_hs = "ctrl+w"
+platforms = ["hs"]
+
+[[shortcuts]]
+id = "ctrl_x"
+label_key = "shortcuts.label_ctrl_x"
+description_key = "shortcuts.label_ctrl_x"
+default_key_ahk = ""
+default_key_hs = "ctrl+x"
+platforms = ["hs"]
+
+[[shortcuts]]
+id = "ctrl_capslock"
+label_key = "shortcuts.label_ctrl_capslock"
+description_key = "shortcuts.label_ctrl_capslock"
+default_key_ahk = ""
+default_key_hs = "ctrl+capslock"
+platforms = ["hs"]
+
+[[shortcuts]]
+id = "ctrl_period"
+label_key = "shortcuts.label_ctrl_period"
+description_key = "shortcuts.label_ctrl_period"
+default_key_ahk = ""
+default_key_hs = "ctrl+."
+platforms = ["hs"]
+
+[[shortcuts]]
+id = "ctrl_quote"
+label_key = "shortcuts.label_ctrl_quote"
+description_key = "shortcuts.label_ctrl_quote"
+default_key_ahk = ""
+default_key_hs = "ctrl+'"
+platforms = ["hs"]
+
+[[shortcuts]]
+id = "cmd_shift_v"
+label_key = "shortcuts.label_cmd_shift_v"
+description_key = "shortcuts.label_cmd_shift_v"
+default_key_ahk = ""
+default_key_hs = "cmd+shift+v"
+platforms = ["hs"]
+
+[[shortcuts]]
+id = "cmd_star"
+label_key = "shortcuts.label_cmd_star"
+description_key = "shortcuts.label_cmd_star"
+default_key_ahk = ""
+default_key_hs = "cmd+*"
+platforms = ["hs"]
+
+
+
+
+# =======================================================
+# =======================================================
+# ======= 5/ Special / eventtap-based shortcuts =======
+# =======================================================
+# =======================================================
+
+[[shortcuts]]
+id = "at_hash"
+label_key = "shortcuts.label_at_hash"
+description_key = "shortcuts.label_at_hash"
+default_key_ahk = ""
+default_key_hs = "at_hash"
+platforms = ["hs"]
+
+[[shortcuts]]
+id = "layer_scroll"
+label_key = "shortcuts.label_layer_scroll"
+description_key = "shortcuts.label_layer_scroll"
+default_key_ahk = ""
+default_key_hs = "layer_scroll"
+platforms = ["hs"]
+
+[[shortcuts]]
+id = "wrap_text_if_selected"
+label_key = "shortcuts.label_wrap_text"
+description_key = "shortcuts.label_wrap_text"
+default_key_ahk = ""
+default_key_hs = "wrap_text_if_selected"
+platforms = ["hs"]

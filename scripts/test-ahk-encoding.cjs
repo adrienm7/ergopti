@@ -4,7 +4,7 @@
  * ==============================================================================
  * MODULE: AHK Encoding Guard
  * DESCRIPTION:
- * Validates that every .ahk file under static/drivers/autohotkey/ is encoded
+ * Validates that every .ahk file under static/ergopti_plus/windows/ is encoded
  * as UTF-8 with BOM and uses CRLF line endings.
  *
  * FEATURES & RATIONALE:

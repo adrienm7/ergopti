@@ -4,14 +4,14 @@ on:
     push:
         branches: [main, dev]
         paths:
-            - "static/drivers/autohotkey/**"
-            - "static/drivers/_shared/tests/corpus/hotstrings/**"
+            - "static/ergopti_plus/windows/**"
+            - "static/ergopti_plus/_shared/tests/corpus/hotstrings/**"
             - ".github/workflows/e2e_ahk.yml"
     pull_request:
         branches: [main, dev]
         paths:
-            - "static/drivers/autohotkey/**"
-            - "static/drivers/_shared/tests/corpus/hotstrings/**"
+            - "static/ergopti_plus/windows/**"
+            - "static/ergopti_plus/_shared/tests/corpus/hotstrings/**"
             - ".github/workflows/e2e_ahk.yml"
     workflow_dispatch:
 
@@ -51,7 +51,7 @@ jobs:
               # AHK v2 silently aborts mid-file when encoding is wrong; check
               # the new E2E file before running it to catch encoding regressions.
               run: |
-                  $file = "${{ github.workspace }}\static\drivers\autohotkey\tests\e2e\run_e2e.ahk"
+                  $file = "${{ github.workspace }}\static\ergopti_plus\windows\tests\e2e\run_e2e.ahk"
                   $bytes = [System.IO.File]::ReadAllBytes($file)
                   if ($bytes[0] -ne 0xEF -or $bytes[1] -ne 0xBB -or $bytes[2] -ne 0xBF) {
                       Write-Error "run_e2e.ahk is missing UTF-8 BOM."
@@ -84,7 +84,7 @@ jobs:
                       Write-Error "AutoHotkey64.exe not found in C:\AutoHotkey"
                       exit 2
                   }
-                  $runner = "${{ github.workspace }}\static\drivers\autohotkey\tests\e2e\run_e2e.ahk"
+                  $runner = "${{ github.workspace }}\static\ergopti_plus\windows\tests\e2e\run_e2e.ahk"
                   Write-Host "AHK runtime : $ahk"
                   Write-Host "E2E runner  : $runner"
                   Write-Host "------------------------------------------------------------"

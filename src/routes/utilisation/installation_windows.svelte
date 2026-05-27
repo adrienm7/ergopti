@@ -27,14 +27,14 @@
 
 {#if version_mineure_kbdedit_exe !== undefined}
 	<div class="download-buttons">
-		<a href="drivers/windows/Ergopti_v{version_mineure_kbdedit_exe}.exe" download>
+		<a href="ergopti/windows/Ergopti_v{version_mineure_kbdedit_exe}.exe" download>
 			<button
 				><i class="icon-windows" style="vertical-align:-0.05em"></i>
 				Installateur KbdEdit d’Ergopti v{version_mineure_kbdedit_exe}</button
 			>
 		</a>
 		<tiny-space></tiny-space>
-		<a href="drivers/windows/Ergopti_v{version_mineure_kbdedit_kbe}.kbe" download>
+		<a href="ergopti/windows/Ergopti_v{version_mineure_kbdedit_kbe}.kbe" download>
 			<button class="alt-button"
 				><i class="icon-windows" style="vertical-align:-0.05em"></i> Fichier source KbdEdit
 				d’Ergopti v{version_mineure_kbdedit_kbe}</button
@@ -119,13 +119,13 @@
 <small-space></small-space>
 
 <div class="download-buttons">
-	<a href="drivers/autohotkey/ErgoptiPlus.ahk" download>
+	<a href="ergopti_plus/windows/ErgoptiPlus.ahk" download>
 		<button
 			><i class="icon-autohotkey" style="vertical-align:-0.08em;"></i>
 			ErgoptiPlus.ahk</button
 		>
 	</a>
-	<a href="drivers/autohotkey/ErgoptiPlus.exe" download>
+	<a href="ergopti_plus/windows/ErgoptiPlus.exe" download>
 		<button class="alt-button"
 			><i class="icon-autohotkey" style="vertical-align:-0.08em;"></i>
 			ErgoptiPlus compilé</button

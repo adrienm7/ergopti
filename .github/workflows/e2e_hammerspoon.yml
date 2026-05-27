@@ -6,21 +6,21 @@ name: E2E Hammerspoon
 # injection is not possible in GitHub Actions because the macOS runners do not
 # expose a Quartz WindowServer session to background jobs.
 #
-# See static/drivers/hammerspoon/tests/e2e/PLAN_E2E_REAL_HS.md for the full
+# See static/ergopti_plus/macos/tests/e2e/PLAN_E2E_REAL_HS.md for the full
 # architecture of a real-device E2E run and the unblocking path.
 
 on:
     push:
         branches: [main, dev]
         paths:
-            - "static/drivers/hammerspoon/**"
-            - "static/drivers/_shared/tests/corpus/hotstrings/**"
+            - "static/ergopti_plus/macos/**"
+            - "static/ergopti_plus/_shared/tests/corpus/hotstrings/**"
             - ".github/workflows/e2e_hammerspoon.yml"
     pull_request:
         branches: [main, dev]
         paths:
-            - "static/drivers/hammerspoon/**"
-            - "static/drivers/_shared/tests/corpus/hotstrings/**"
+            - "static/ergopti_plus/macos/**"
+            - "static/ergopti_plus/_shared/tests/corpus/hotstrings/**"
             - ".github/workflows/e2e_hammerspoon.yml"
     workflow_dispatch:
 
@@ -53,6 +53,6 @@ jobs:
               #   1. Executes 5 hardcoded scenarios (self-validating the harness).
               #   2. Runs all corpus vectors from _shared/tests/corpus/hotstrings/vectors.json.
               # Exit code 0 = all pass, 1 = at least one failure.
-              working-directory: static/drivers/hammerspoon
+              working-directory: static/ergopti_plus/macos
               run: lua5.4 tests/e2e/run_e2e.lua
               timeout-minutes: 5

@@ -6,7 +6,7 @@
  * DESCRIPTION:
  * Generates both the AHK v2 and Hammerspoon Lua implementations of the
  * Terminators port contract from the single source of truth defined in
- * static/drivers/_shared/domain/terminators.spec.js. Running this script
+ * static/ergopti_plus/_shared/domain/terminators.spec.js. Running this script
  * ensures both drivers start from identical catalogue data and expose the
  * same isTerminator / isConsumed / setEnabled / isEnabled / updateMagicKey /
  * addCustom / all() API surface.
@@ -32,7 +32,7 @@ const ROOT = path.resolve(__dirname, "..");
 // module.exports but the package is type:module (ESM). We inline the CJS
 // wrapper so require() works without needing a .cjs copy of the spec.
 const specSource = fs.readFileSync(
-	path.join(ROOT, "static/drivers/_shared/domain/terminators.spec.js"),
+	path.join(ROOT, "static/ergopti_plus/_shared/domain/terminators.spec.js"),
 	"utf8"
 );
 const specModule = { exports: {} };
@@ -41,8 +41,8 @@ new Function("require", "module", "exports", "__dirname", "__filename", specSour
 	require,
 	specModule,
 	specModule.exports,
-	path.join(ROOT, "static/drivers/_shared/domain"),
-	path.join(ROOT, "static/drivers/_shared/domain/terminators.spec.js")
+	path.join(ROOT, "static/ergopti_plus/_shared/domain"),
+	path.join(ROOT, "static/ergopti_plus/_shared/domain/terminators.spec.js")
 );
 const { TERMINATOR_DEFS } = specModule.exports;
 
@@ -136,7 +136,7 @@ function generateAhk() {
 	}).join(",\n");
 
 	return [
-		`; static/drivers/autohotkey/_generated/terminators.ahk`,
+		`; static/ergopti_plus/windows/_generated/terminators.ahk`,
 		`; AUTO-GENERATED from _shared/domain/terminators.spec.js.`,
 		`; DO NOT EDIT BY HAND — run \`npm run codegen:terminators\` to refresh.`,
 		``,
@@ -331,7 +331,7 @@ function generateLua() {
 	}).join(",\n");
 
 	return [
-		`--- static/drivers/hammerspoon/_generated/terminators.lua`,
+		`--- static/ergopti_plus/macos/_generated/terminators.lua`,
 		`--- AUTO-GENERATED from _shared/domain/terminators.spec.js.`,
 		`--- DO NOT EDIT BY HAND — run \`npm run codegen:terminators\` to refresh.`,
 		``,
@@ -540,10 +540,10 @@ function generateLua() {
 // ==================================================
 
 const AHK_OUT = path.join(
-	ROOT, "static/drivers/autohotkey/_generated/terminators.ahk"
+	ROOT, "static/ergopti_plus/windows/_generated/terminators.ahk"
 );
 const LUA_OUT = path.join(
-	ROOT, "static/drivers/hammerspoon/_generated/terminators.lua"
+	ROOT, "static/ergopti_plus/macos/_generated/terminators.lua"
 );
 
 console.log("codegen:terminators — generating from terminators.spec.js…");

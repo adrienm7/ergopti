@@ -25,19 +25,19 @@ export function getFilteredFileVersions(name, versionPrefix = null) {
 
 	switch (name) {
 		case 'kbdedit_exe':
-			files = import.meta.glob('/static/drivers/windows/*.exe', { as: 'url' });
+			files = import.meta.glob('/static/ergopti/windows/*.exe', { as: 'url' });
 			break;
 		case 'kbdedit_kbe':
-			files = import.meta.glob('/static/drivers/windows/*.kbe', { as: 'url' });
+			files = import.meta.glob('/static/ergopti/windows/*.kbe', { as: 'url' });
 			break;
 		case 'macos_keylayout':
-			files = import.meta.glob('/static/drivers/macos/bundles/zipped_bundles/*.zip', { as: 'url' });
+			files = import.meta.glob('/static/ergopti/macos/bundles/zipped_bundles/*.zip', { as: 'url' });
 			break;
 		case 'autohotkey':
-			files = import.meta.glob('/static/drivers/autohotkey/*.ahk', { as: 'url' });
+			files = import.meta.glob('/static/ergopti_plus/windows/*.ahk', { as: 'url' });
 			break;
 		case 'autohotkey_exe':
-			files = import.meta.glob('/static/drivers/autohotkey/compiled/*.exe', { as: 'url' });
+			files = import.meta.glob('/static/ergopti_plus/windows/compiled/*.exe', { as: 'url' });
 			break;
 		case 'kla_iso':
 			files = import.meta.glob('/static/layouts/kla_iso/*.json');
@@ -49,13 +49,13 @@ export function getFilteredFileVersions(name, versionPrefix = null) {
 			files = import.meta.glob('/static/layouts/kla_ergodox/*.json');
 			break;
 		case 'kalamine_1dk':
-			files = import.meta.glob('/static/drivers/old/kalamine/1dk/*.toml');
+			files = import.meta.glob('/static/ergopti_plus/old/kalamine/1dk/*.toml');
 			break;
 		case 'kalamine_analyse':
-			files = import.meta.glob('/static/drivers/old/kalamine/standard/*_analyse.toml');
+			files = import.meta.glob('/static/ergopti_plus/old/kalamine/standard/*_analyse.toml');
 			break;
 		case 'kalamine_standard':
-			files = import.meta.glob('/static/drivers/old/kalamine/standard/*.toml', { as: 'url' });
+			files = import.meta.glob('/static/ergopti_plus/old/kalamine/standard/*.toml', { as: 'url' });
 			files = Object.fromEntries(
 				Object.entries(files).filter(([key]) => !key.endsWith('_analyse.toml'))
 			);

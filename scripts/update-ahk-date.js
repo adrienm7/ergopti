@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { execSync } from 'child_process';
 
-const AHK_FILE = 'static/drivers/autohotkey/ErgoptiPlus.ahk';
+const AHK_FILE = 'static/ergopti_plus/windows/ErgoptiPlus.ahk';
 
 if (!existsSync(AHK_FILE)) process.exit(0);
 

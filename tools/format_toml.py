@@ -31,11 +31,11 @@ from collections import OrderedDict
 from pathlib import Path
 
 HOTSTRING_FILES = [
-    "static/drivers/_shared/hotstrings/distancesreduction.toml",
-    "static/drivers/_shared/hotstrings/sfbsreduction.toml",
-    "static/drivers/_shared/hotstrings/rolls.toml",
-    "static/drivers/_shared/hotstrings/autocorrection.toml",
-    "static/drivers/_shared/hotstrings/magickey.toml",
+    "static/ergopti_plus/_shared/hotstrings/distancesreduction.toml",
+    "static/ergopti_plus/_shared/hotstrings/sfbsreduction.toml",
+    "static/ergopti_plus/_shared/hotstrings/rolls.toml",
+    "static/ergopti_plus/_shared/hotstrings/autocorrection.toml",
+    "static/ergopti_plus/_shared/hotstrings/magickey.toml",
 ]
 
 _REPO_ROOT = Path(__file__).parent.parent
