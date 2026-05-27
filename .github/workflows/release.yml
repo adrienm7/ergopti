@@ -1,10 +1,10 @@
-# .github/workflows/release.yml
+﻿# .github/workflows/release.yml
 #
 # Builds Ergopti.app (macOS), ErgoptiPlus.exe (Windows), and packages keyboard
 # layout files for all three platforms, then attaches everything to a GitHub
 # Release. Two trigger paths:
-#   1. push of a tag v*  — created by version.yml on every push to main/dev.
-#   2. workflow_dispatch — manual, takes an explicit tag.
+#   1. push of a tag v*  â€” created by version.yml on every push to main/dev.
+#   2. workflow_dispatch â€” manual, takes an explicit tag.
 #
 # The "prepare-release" job is the single source of truth for the tag and
 # release: every build job depends on it and reads its outputs.
@@ -63,7 +63,7 @@ jobs:
                   prerelease="false"
                   case "$event" in
                       push)
-                          # Tag was created by version.yml — read it directly
+                          # Tag was created by version.yml â€” read it directly
                           # from GITHUB_REF_NAME (e.g. v0.6.0-dev.42).
                           tag="${GITHUB_REF_NAME}"
                           ref="${GITHUB_SHA}"
@@ -82,9 +82,9 @@ jobs:
 
                   # Build the release title. For stable releases a plain name
                   # suffices. For dev pre-releases, compute a human-readable delta
-                  # summary (e.g. "✨ 3 feat, 🔧 2 fix") from all commits since
+                  # summary (e.g. "âœ¨ 3 feat, ðŸ”§ 2 fix") from all commits since
                   # the last stable tag so the GitHub Releases page says
-                  # "Ergopti v0.6.0-dev.42 — ✨ 3 feat, 🔧 2 fix (since v0.6.0)"
+                  # "Ergopti v0.6.0-dev.42 â€” âœ¨ 3 feat, ðŸ”§ 2 fix (since v0.6.0)"
                   # instead of a bare version number with no context.
                   if [ "$prerelease" = "true" ]; then
                       last_stable=$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname \
@@ -106,14 +106,14 @@ jobs:
                           done < <(git log "$range" --no-merges --pretty=format:"%s")
 
                           delta=""
-                          [ "$n_breaking" -gt 0 ] && delta="${delta}⚠️ ${n_breaking} breaking, "
-                          [ "$n_feat"     -gt 0 ] && delta="${delta}✨ ${n_feat} feat, "
-                          [ "$n_fix"      -gt 0 ] && delta="${delta}🔧 ${n_fix} fix, "
-                          [ "$n_other"    -gt 0 ] && delta="${delta}📦 ${n_other} other, "
+                          [ "$n_breaking" -gt 0 ] && delta="${delta}âš ï¸ ${n_breaking} breaking, "
+                          [ "$n_feat"     -gt 0 ] && delta="${delta}âœ¨ ${n_feat} feat, "
+                          [ "$n_fix"      -gt 0 ] && delta="${delta}ðŸ”§ ${n_fix} fix, "
+                          [ "$n_other"    -gt 0 ] && delta="${delta}ðŸ“¦ ${n_other} other, "
                           delta="${delta%, }"
 
                           if [ -n "$delta" ]; then
-                              title="Ergopti ${tag} — ${delta} (since ${last_stable})"
+                              title="Ergopti ${tag} â€” ${delta} (since ${last_stable})"
                           else
                               title="Ergopti ${tag} (since ${last_stable})"
                           fi
@@ -139,7 +139,7 @@ jobs:
 
 # ============================================================
 # ============================================================
-# ======= 2/ macOS — ErgoptiPlus.app + Sparkle appcast =======
+# ======= 2/ macOS â€” ErgoptiPlus.app + Sparkle appcast =======
 # ============================================================
 # ============================================================
 
@@ -207,13 +207,13 @@ jobs:
 
             - name: Package latest keylayout bundle
               shell: bash
-              # Released as ``Ergopti_macOS.zip`` — keyboard layout only, no app.
+              # Released as ``Ergopti_macOS.zip`` â€” keyboard layout only, no app.
               run: |
                   set -euo pipefail
                   latest=$(ls -d static/ergopti/macos/bundles/*.bundle | sort -V | tail -1)
                   bundle_name=$(basename "$latest")
                   (cd static/ergopti/macos/bundles && zip -r "../../../../build/macos/Ergopti_macOS.zip" "$bundle_name")
-                  echo "Packaged keylayout: $bundle_name → Ergopti_macOS.zip"
+                  echo "Packaged keylayout: $bundle_name â†’ Ergopti_macOS.zip"
 
             - name: Rename appcast for upload
               shell: bash
@@ -236,7 +236,7 @@ jobs:
 
 # ============================================================
 # ============================================================
-# ======= 3/ Windows — ErgoptiPlus.exe + keyboard layout =====
+# ======= 3/ Windows â€” ErgoptiPlus.exe + keyboard layout =====
 # ============================================================
 # ============================================================
 
@@ -259,7 +259,7 @@ jobs:
             - name: Set up Node.js
               uses: actions/setup-node@v4
               with:
-                  node-version: "20"
+                  node-version: "22"
                   cache: "npm"
 
             - name: Install Node dependencies
@@ -322,7 +322,7 @@ jobs:
                   # indefinitely on a headless runner and cause a silent non-zero exit.
                   & $ahk2exe /in $in /out $out /base $runtime /icon $icon /silent
                   if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-                  # Verify the EXE was actually produced — Ahk2Exe can exit 0 on a
+                  # Verify the EXE was actually produced â€” Ahk2Exe can exit 0 on a
                   # compilation warning without writing the output file.
                   if (-not (Test-Path $out)) {
                       Write-Error "Ahk2Exe reported success but $out was not created."
@@ -351,7 +351,7 @@ jobs:
 
 # ============================================================
 # ============================================================
-# ======= 4/ Linux — XKB keyboard layouts ====================
+# ======= 4/ Linux â€” XKB keyboard layouts ====================
 # ============================================================
 # ============================================================
 
@@ -374,7 +374,7 @@ jobs:
                   dir_name=$(basename "$latest_dir")
                   mkdir -p build/linux
                   (cd static/ergopti/linux && zip -r "../../../build/linux/Ergopti_xkb.zip" "$dir_name")
-                  echo "Packaged XKB: $dir_name → Ergopti_xkb.zip"
+                  echo "Packaged XKB: $dir_name â†’ Ergopti_xkb.zip"
 
             - name: Upload Linux artifacts
               uses: actions/upload-artifact@v4
@@ -413,8 +413,8 @@ jobs:
                   merge-multiple: true
 
             - name: Create release and upload all assets atomically
-              # The release is created here — after all three build jobs have
-              # succeeded — so it is never in a half-baked state. GitHub's
+              # The release is created here â€” after all three build jobs have
+              # succeeded â€” so it is never in a half-baked state. GitHub's
               # immutable-release policy means an asset cannot be replaced once
               # uploaded; by creating the release only once and uploading
               # everything in a single call we avoid any conflict.
@@ -437,18 +437,18 @@ jobs:
 
                   # Create the release with all assets in one atomic call.
                   # (gh release create accepts files as trailing arguments.)
-                  echo "Creating release '$tag' with ${#assets[@]} asset(s)…"
+                  echo "Creating release '$tag' with ${#assets[@]} asset(s)â€¦"
                   gh release create "$tag" \
                       --target "$ref" \
                       --title "$title" \
-                      --notes "Changelog will appear below — updating now." \
+                      --notes "Changelog will appear below â€” updating now." \
                       "${flags[@]}" \
                       "${assets[@]}"
 
             # Build the changelog section. Delegates to tools/build_changelog.py
             # which aggregates every commit between the previous release tag
             # and the current one, then groups them by Conventional Commits
-            # type into h3 sections (Features → Fix → Performance → … → Other).
+            # type into h3 sections (Features â†’ Fix â†’ Performance â†’ â€¦ â†’ Other).
             # See that script's docstring for the full rationale.
             - name: Build changelog section
               shell: bash
@@ -484,48 +484,48 @@ jobs:
 
                   ---
 
-                  ### 🍎 macOS
+                  ### ðŸŽ macOS
 
                   | Asset | Description |
                   |---|---|
                   | [ErgoptiPlus.app.zip](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/ErgoptiPlus.app.zip) | macOS application (Hammerspoon + Karabiner-Elements bundled) |
-                  | [Ergopti_macOS.zip](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/Ergopti_macOS.zip) | Keyboard layout bundle only — no app required |
+                  | [Ergopti_macOS.zip](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/Ergopti_macOS.zip) | Keyboard layout bundle only â€” no app required |
 
-                  **Installation — app:**
+                  **Installation â€” app:**
                   1. Unzip \`ErgoptiPlus.app.zip\` and move \`ErgoptiPlus.app\` to \`/Applications\`.
                   2. Remove the quarantine flag (the app is not yet Apple-notarised):
                   \`\`\`bash
                   xattr -d com.apple.quarantine /Applications/ErgoptiPlus.app
                   \`\`\`
-                  3. Launch the app. On first run, Karabiner-Elements will request a System Extension approval — required for key remapping.
+                  3. Launch the app. On first run, Karabiner-Elements will request a System Extension approval â€” required for key remapping.
                   4. Your personal configuration is stored in \`~/.config/ergopti_plus/\`. If this folder does not exist yet (first launch), the setup wizard will open automatically.
 
-                  **Installation — keyboard layout only:**
+                  **Installation â€” keyboard layout only:**
                   1. Unzip \`Ergopti_macOS.zip\`.
                   2. Copy the \`.bundle\` folder to \`/Library/Keyboard Layouts/\`.
-                  3. Log out and back in, then add the layout in System Settings → Keyboard → Input Sources.
+                  3. Log out and back in, then add the layout in System Settings â†’ Keyboard â†’ Input Sources.
 
                   ---
 
-                  ### 🪟 Windows
+                  ### ðŸªŸ Windows
 
                   | Asset | Description |
                   |---|---|
                   | [ErgoptiPlus.exe](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/ErgoptiPlus.exe) | Compiled AutoHotkey executable (AHK v2 runtime bundled) |
-                  | [Ergopti_windows.exe](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/Ergopti_windows.exe) | Windows keyboard layout installer — no app required |
+                  | [Ergopti_windows.exe](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/Ergopti_windows.exe) | Windows keyboard layout installer â€” no app required |
 
-                  **Installation — app:**
+                  **Installation â€” app:**
                   1. Download \`ErgoptiPlus.exe\`.
                   2. Double-click to run. On first launch, resources are extracted to \`%LOCALAPPDATA%\Ergopti\`.
                   3. Your personal configuration is stored in \`%USERPROFILE%\.config\ergopti_plus\`. If this folder does not exist yet (first launch), the setup wizard will open automatically.
 
-                  **Installation — keyboard layout only:**
+                  **Installation â€” keyboard layout only:**
                   1. Download \`Ergopti_windows.exe\` and run it as Administrator.
-                  2. Log out and back in, then select the layout in Settings → Time & Language → Language & region.
+                  2. Log out and back in, then select the layout in Settings â†’ Time & Language â†’ Language & region.
 
                   ---
 
-                  ### 🐧 Linux
+                  ### ðŸ§ Linux
 
                   | Asset | Description |
                   |---|---|
@@ -559,7 +559,7 @@ jobs:
 # 1. Users browsing releases see a broken entry.
 # 2. The NEXT run's changelog uses this broken tag as the "previous"
 #    tag, so the commit that introduced the failure (and any commits
-#    pushed in the same batch) disappear from the next changelog —
+#    pushed in the same batch) disappear from the next changelog â€”
 #    they're filed under a release that nobody can read.
 #
 # This job deletes both the release AND the underlying git tag so the
@@ -581,7 +581,7 @@ jobs:
                   TAG:      ${{ needs.prepare-release.outputs.tag }}
               run: |
                   set -euo pipefail
-                  echo "Build failed — deleting half-baked release '$TAG' so the next run's changelog can pick up from the previous good tag."
+                  echo "Build failed â€” deleting half-baked release '$TAG' so the next run's changelog can pick up from the previous good tag."
                   # ``--cleanup-tag`` removes the underlying git tag in the
                   # same call. ``|| true`` because the release may not have
                   # been created yet (prepare-release itself can fail) and
@@ -591,3 +591,4 @@ jobs:
                       --yes \
                       --cleanup-tag || true
                   echo "Cleanup attempted for tag $TAG."
+
