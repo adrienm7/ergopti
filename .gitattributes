@@ -1,8 +1,11 @@
 * text=auto
 
-# Force LF for shell scripts — macOS execution modifies timestamps/mode bits
-# causing false-positive git diffs on Windows hosts
+# Force LF for shell scripts and macOS/Linux source files
 *.sh text eol=lf
 *.applescript text eol=lf
 *.lua text eol=lf
 *.py text eol=lf
+
+# AHK v2 requires UTF-8 BOM + CRLF — enforce CRLF on all platforms so the
+# encoding invariant holds whether the file is checked out on Linux CI or Windows
+*.ahk text eol=crlf
