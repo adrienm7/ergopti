@@ -342,16 +342,15 @@ assemble_app() {
 		"$REPO_ROOT/static/ergopti_plus/macos/" \
 		"$static_root/drivers/hammerspoon/"
 
-	# Sibling _shared/ tree (WebView HTML/CSS/JS, LLM defaults, DB schema).
-	cp -R "$REPO_ROOT/static/ergopti_plus/_shared"     "$static_root/drivers/_shared"
+	# Shared tree (WebView HTML/CSS/JS, LLM defaults, DB schema, locales, hotstrings).
+	cp -R "$REPO_ROOT/static/ergopti_plus/shared"      "$static_root/drivers/shared"
 
-	# Static assets at the repo's static/ root.
-	cp -R "$REPO_ROOT/static/menu_manifest.json"  "$static_root/"
+	# Static assets.
+	cp -R "$REPO_ROOT/static/ergopti_plus/shared/menu_manifest.json" "$static_root/"
 	cp -R "$REPO_ROOT/static/version.json"        "$static_root/" 2>/dev/null || true
-	cp -R "$REPO_ROOT/static/locales"             "$static_root/"
-	cp -R "$REPO_ROOT/static/hotstrings"          "$static_root/"
+	cp -R "$REPO_ROOT/static/ergopti_plus/shared/locales"            "$static_root/"
+	cp -R "$REPO_ROOT/static/ergopti_plus/shared/hotstrings"         "$static_root/"
 	cp -R "$REPO_ROOT/static/img"                 "$static_root/"
-	cp -R "$REPO_ROOT/static/shared"              "$static_root/"
 
 	# Bundle third-party tools so they are available on first launch with no
 	# runtime download. KE remains an installer app (a one-time system-extension
