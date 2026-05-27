@@ -83,9 +83,15 @@ _MetaRunClassGlobalConflictTests() {
 			NormRoot := StrReplace(DriverRoot, "\", "/")
 			Rel := SubStr(StrReplace(AbsPath, "\", "/"), StrLen(NormRoot) + 1)
 
+			; Strip full-line comments before scanning so that comment text
+			; like "; declaring `global Keylogger` here …" or
+			; "; … the class is not yet initialized" never produces false
+			; positives in the class/global regex passes below.
+			ScanBody := RegExReplace(Body, "m)^\s*;[^\n]*\n?", "")
+
 			; Collect `class Name` definitions (at any indentation level)
 			Pos := 1
-			while RegExMatch(Body, "i)\bclass\s+(\w+)\b", &M, Pos) {
+			while RegExMatch(ScanBody, "i)\bclass\s+(\w+)\b", &M, Pos) {
 				Name := M[1]
 				if not ClassNames.Has(Name) {
 					ClassNames[Name] := []
@@ -101,7 +107,7 @@ _MetaRunClassGlobalConflictTests() {
 			; We look for `global <Word>` NOT followed by `[` or `:=` (those are
 			; variable assignments, not class-alias declarations).
 			Pos := 1
-			while RegExMatch(Body, "i)\bglobal\s+(\w+)(?!\s*\[|\s*:=)", &M, Pos) {
+			while RegExMatch(ScanBody, "i)\bglobal\s+(\w+)(?!\s*\[|\s*:=)", &M, Pos) {
 				Decl := {name: M[1], file: Rel}
 				GlobalDecls.Push(Decl)
 				Pos := M.Pos + StrLen(M[0])

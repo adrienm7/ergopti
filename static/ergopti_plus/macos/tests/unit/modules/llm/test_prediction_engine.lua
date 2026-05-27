@@ -95,6 +95,7 @@ package.loaded["modules.llm.app_filter"] = {
 -- Stub api_common (required inline at module level).
 package.loaded["modules.llm.api_common"] = {
 	MIN_CALL_INTERVAL_SEC = 0.5,
+	get_retry_policy      = function() return 2, 0.18, 5 end,
 }
 
 -- Stub lib.i18n.
