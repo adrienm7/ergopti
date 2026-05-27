@@ -1,4 +1,4 @@
-; _generated/features_manifest.ahk
+﻿; _generated/features_manifest.ahk
 ; AUTO-GENERATED from _shared/features/manifest.toml.
 ; DO NOT EDIT BY HAND — run `npm run build:manifest` to refresh.
 
