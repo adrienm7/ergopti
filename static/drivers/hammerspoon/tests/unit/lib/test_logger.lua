@@ -247,3 +247,48 @@ helpers.describe("Logger: init_log_path", function()
 		helpers.assert_eq(Logger.UNIFIED_LOG_FILE, before)
 	end)
 end)
+
+helpers.describe("Logger: test sink", function()
+	helpers.it("receives every emitted line", function()
+		local Logger = helpers.load_with_stubs("lib.logger")
+		local captured = {}
+		Logger.set_sink(function(line) captured[#captured + 1] = line end)
+		Logger.set_level("INFO")
+		Logger.info("SinkTag", "hello-sink")
+		Logger.set_sink(nil)
+		helpers.assert_eq(#captured, 1)
+		helpers.assert_true(captured[1]:find("hello%-sink") ~= nil,
+			"captured line must contain the message")
+	end)
+
+	helpers.it("captured line contains the level label", function()
+		local Logger = helpers.load_with_stubs("lib.logger")
+		local captured = {}
+		Logger.set_sink(function(line) captured[#captured + 1] = line end)
+		Logger.set_level("INFO")
+		Logger.info("SinkTag", "level-check")
+		Logger.set_sink(nil)
+		helpers.assert_true(captured[1]:find("INFO") ~= nil,
+			"line must contain INFO level label")
+	end)
+
+	helpers.it("sink is not called when message is filtered out", function()
+		local Logger = helpers.load_with_stubs("lib.logger")
+		local calls = 0
+		Logger.set_sink(function() calls = calls + 1 end)
+		Logger.set_level("WARNING")
+		Logger.debug("SinkTag", "dropped")
+		Logger.set_sink(nil)
+		helpers.assert_eq(calls, 0)
+	end)
+
+	helpers.it("sink is removed after set_sink(nil)", function()
+		local Logger = helpers.load_with_stubs("lib.logger")
+		local calls = 0
+		Logger.set_sink(function() calls = calls + 1 end)
+		Logger.set_sink(nil)
+		Logger.set_level("INFO")
+		Logger.info("SinkTag", "after-clear")
+		helpers.assert_eq(calls, 0)
+	end)
+end)
