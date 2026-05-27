@@ -1,4 +1,4 @@
-; adapters/tray_menu.ahk
+﻿; adapters/tray_menu.ahk
 
 ; ==============================================================================
 ; MODULE: TrayMenu Adapter (AutoHotkey)

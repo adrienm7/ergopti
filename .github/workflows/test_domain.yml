@@ -15,29 +15,29 @@ on:
   push:
     branches: [main, dev]
     paths:
-      - "static/ergopti_plus/_shared/features/**"
-      - "static/ergopti_plus/_shared/tap_hold/**"
-      - "static/ergopti_plus/_shared/ports/**"
-      - "static/ergopti_plus/_shared/domain/**"
+      - "static/ergopti_plus/shared/features/**"
+      - "static/ergopti_plus/shared/tap_hold/**"
+      - "static/ergopti_plus/shared/ports/**"
+      - "static/ergopti_plus/shared/domain/**"
       - "static/ergopti_plus/windows/_generated/**"
       - "static/ergopti_plus/macos/_generated/**"
-      - "scripts/build-features-manifest.js"
-      - "scripts/build-domain.cjs"
-      - "scripts/test-manifest-parity.cjs"
-      - "scripts/test-port-compliance.cjs"
+      - "tools/build/build-features-manifest.js"
+      - "tools/build/build-domain.cjs"
+      - "tools/test/test-manifest-parity.cjs"
+      - "tools/test/test-port-compliance.cjs"
   pull_request:
     branches: [main, dev]
     paths:
-      - "static/ergopti_plus/_shared/features/**"
-      - "static/ergopti_plus/_shared/tap_hold/**"
-      - "static/ergopti_plus/_shared/ports/**"
-      - "static/ergopti_plus/_shared/domain/**"
+      - "static/ergopti_plus/shared/features/**"
+      - "static/ergopti_plus/shared/tap_hold/**"
+      - "static/ergopti_plus/shared/ports/**"
+      - "static/ergopti_plus/shared/domain/**"
       - "static/ergopti_plus/windows/_generated/**"
       - "static/ergopti_plus/macos/_generated/**"
-      - "scripts/build-features-manifest.js"
-      - "scripts/build-domain.cjs"
-      - "scripts/test-manifest-parity.cjs"
-      - "scripts/test-port-compliance.cjs"
+      - "tools/build/build-features-manifest.js"
+      - "tools/build/build-domain.cjs"
+      - "tools/test/test-manifest-parity.cjs"
+      - "tools/test/test-port-compliance.cjs"
 
 jobs:
   domain-pipeline:

@@ -1,4 +1,4 @@
-; adapters/http_client.ahk
+﻿; adapters/http_client.ahk
 
 ; ==============================================================================
 ; MODULE: HttpClient Adapter (AutoHotkey)

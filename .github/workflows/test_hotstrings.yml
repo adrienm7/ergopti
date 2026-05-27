@@ -5,13 +5,13 @@ on:
         branches: [dev, main]
         paths:
             - "static/ergopti_plus/_shared/hotstrings/*.toml"
-            - "tools/format_toml.py"
+            - "tools/dev/format_toml.py"
             - ".github/workflows/lint_hotstrings.yml"
     pull_request:
         branches: [dev, main]
         paths:
             - "static/ergopti_plus/_shared/hotstrings/*.toml"
-            - "tools/format_toml.py"
+            - "tools/dev/format_toml.py"
             - ".github/workflows/lint_hotstrings.yml"
     workflow_dispatch:
 
@@ -37,5 +37,5 @@ jobs:
 
             - name: Check hotstring TOML files are sorted and formatted
               # Exits 1 if any file differs from its sorted/formatted form.
-              # Fix locally with: python tools/format_toml.py --hotstrings --all
-              run: python tools/format_toml.py --hotstrings --all --check
+              # Fix locally with: python tools/dev/format_toml.py --hotstrings --all
+              run: python tools/dev/format_toml.py --hotstrings --all --check

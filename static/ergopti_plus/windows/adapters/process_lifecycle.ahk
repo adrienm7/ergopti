@@ -1,4 +1,4 @@
-; adapters/process_lifecycle.ahk
+﻿; adapters/process_lifecycle.ahk
 
 ; ==============================================================================
 ; MODULE: ProcessLifecycle Adapter (AutoHotkey)

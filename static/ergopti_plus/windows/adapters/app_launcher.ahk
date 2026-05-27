@@ -1,4 +1,4 @@
-; static/ergopti_plus/windows/adapters/app_launcher.ahk
+﻿; static/ergopti_plus/windows/adapters/app_launcher.ahk
 
 ; ==============================================================================
 ; MODULE: AppLauncher Adapter (AutoHotkey)

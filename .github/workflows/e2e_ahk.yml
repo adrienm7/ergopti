@@ -70,7 +70,7 @@ jobs:
               # _generated/features_manifest.ahk; build it first.
               run: |
                   npm ci
-                  node ./scripts/build-features-manifest.js
+                  npm run build:manifest
               shell: pwsh
 
             - name: Run E2E suite (Strategy A — pure engine injection)

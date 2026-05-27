@@ -8,7 +8,7 @@ const path = require("path");
 const { execSync } = require("child_process");
 
 const BOM = Buffer.from([0xef, 0xbb, 0xbf]);
-const PROJECT_ROOT = path.resolve(__dirname, "..");
+const PROJECT_ROOT = path.resolve(__dirname, "..", "..");
 
 // Collect all .ahk files recursively
 function collectAhkFiles(dir, results = []) {

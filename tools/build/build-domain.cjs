@@ -31,7 +31,7 @@ const { execSync, spawnSync } = require("child_process");
 const path   = require("path");
 const fs     = require("fs");
 
-const ROOT        = path.resolve(__dirname, "..");
+const ROOT        = path.resolve(__dirname, "..", "..");
 const PASS_SYMBOL = "✓";
 const FAIL_SYMBOL = "✗";
 const WARN_SYMBOL = "⚠";

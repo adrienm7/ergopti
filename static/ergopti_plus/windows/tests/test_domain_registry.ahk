@@ -1,4 +1,4 @@
-; static/ergopti_plus/windows/tests/test_domain_registry.ahk
+﻿; static/ergopti_plus/windows/tests/test_domain_registry.ahk
 
 ; ==============================================================================
 ; MODULE: Registry Domain Contract Tests (AutoHotkey)

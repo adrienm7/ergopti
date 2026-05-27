@@ -1,4 +1,4 @@
-; drivers/autohotkey/lib/app_state.ahk
+﻿; drivers/autohotkey/lib/app_state.ahk
 
 ; ==============================================================================
 ; MODULE: Application State

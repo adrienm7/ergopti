@@ -1,4 +1,4 @@
-; adapters/text_sender.ahk
+﻿; adapters/text_sender.ahk
 
 ; ==============================================================================
 ; MODULE: TextSender Adapter (AutoHotkey)
