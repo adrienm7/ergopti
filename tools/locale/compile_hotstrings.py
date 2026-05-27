@@ -268,7 +268,7 @@ def compile_category(root: Path, category: str) -> tuple[str, list[tuple[str, st
         A 2-tuple of (ahk_file_content, registry_tuples). Returns an empty
         content string and empty list when the TOML file is absent.
     """
-    toml_path = root / "static" / "drivers" / "_shared" / "hotstrings" / f"{category}.toml"
+    toml_path = root / "static" / "ergopti_plus" / "shared" / "hotstrings" / f"{category}.toml"
     if not toml_path.exists():
         print(f"[compile_hotstrings] skip (missing): {toml_path}", file=sys.stderr)
         return "", []
@@ -372,9 +372,9 @@ def main() -> int:
     Returns:
         Exit code (0 on success).
     """
-    root = Path(__file__).resolve().parent.parent
+    root = Path(__file__).resolve().parent.parent.parent
     hotstrings_dir = (
-        root / "static" / "drivers" / "autohotkey" / "lib" / "hotstrings"
+        root / "static" / "ergopti_plus" / "windows" / "lib" / "hotstrings"
     )
     per_category, entry_point = build(root)
 

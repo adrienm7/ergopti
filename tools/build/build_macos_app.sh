@@ -77,7 +77,7 @@ GH_REPO="${GH_REPO:-Ergopti}"
 # in ~/Library/Preferences/com.ergoptiplus.app.plist, isolated from stock HS.
 BUNDLE_ID="com.ergoptiplus.app"
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 BUILD_DIR="$REPO_ROOT/build/macos"
 APP_PATH="$BUILD_DIR/ErgoptiPlus.app"
 ZIP_PATH="$BUILD_DIR/ErgoptiPlus.app.zip"
