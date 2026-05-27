@@ -875,12 +875,17 @@ jobs:
 
             - name: Create git tag
               shell: bash
+              env:
+                  GH_TOKEN: ${{ secrets.PAT_ERGOPTI }}
               run: |
                   set -euo pipefail
                   tag="${{ needs.resolve-release-meta.outputs.tag }}"
-                  git tag "$tag"
-                  git push origin "$tag"
-                  echo "Tag '$tag' pushed."
+                  sha="${{ github.sha }}"
+                  gh api repos/${{ github.repository }}/git/refs \
+                      --method POST \
+                      --field ref="refs/tags/${tag}" \
+                      --field sha="${sha}"
+                  echo "Tag '$tag' created via API."
 
             - name: Create release and upload all assets atomically
               # The release is created here — after all three build jobs have
