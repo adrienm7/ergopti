@@ -46,6 +46,11 @@ global _SpaceHeldInput  := ""
 ; e.g. Space+a on a remapped layout produces ih.Input="-" but _SpaceHeldVK=30
 ; (VK for 'a'), and SendInput("{vk1e}") with Shift active yields "A" correctly.
 global _SpaceHeldVK     := 0
+; Guard against SC039 auto-repeat: set True from the moment SpaceTapHold starts
+; until HoldFn returns, so repeated SC039 keydown events (OS key-repeat while
+; Space is physically held) are silently dropped rather than launching a second
+; SpaceTapHold invocation that would corrupt state and produce spurious output.
+global _SpaceHoldActive := False
 
 ; Shared tap logic for all Space tap-hold variants. Reads the next character
 ; via InputHook; on tap it forwards the Space + next character (avoiding a
@@ -57,7 +62,12 @@ global _SpaceHeldVK     := 0
 ; TextPressKey uses SendInput which bypasses the prefix-watcher InputHook —
 ; without this call, end-char-gated hotstrings never fire on Space.
 SpaceTapHold(HoldFn) {
-    global _SpaceInputHook, _SpaceIHActive, _SpaceTapSent, _SpaceHoldFired, _SpaceHeldInput, _SpaceHeldVK
+    global _SpaceInputHook, _SpaceIHActive, _SpaceTapSent, _SpaceHoldFired, _SpaceHeldInput, _SpaceHeldVK, _SpaceHoldActive
+    ; SC039 auto-repeat while Space is physically held fires this hotkey again —
+    ; drop silently to avoid a second SpaceTapHold invocation corrupting state.
+    if _SpaceHoldActive
+        return
+    _SpaceHoldActive := True
     _SpaceTapSent   := False
     _SpaceHoldFired := False
     _SpaceHeldInput := ""
@@ -81,7 +91,8 @@ SpaceTapHold(HoldFn) {
     ;             as tap (the old behaviour) caused Space-hold+A to produce
     ;             "Space A" instead of Ctrl+A.
     if ih.EndReason == "Stopped" {
-        _SpaceTapSent := True
+        _SpaceTapSent    := True
+        _SpaceHoldActive := False
         TextPressKey("Space", "")
         ; TextPressKey uses SendInput which bypasses the prefix-watcher InputHook.
         ; Feed Space into HSE manually so end-char-gated hotstrings can fire,
@@ -113,6 +124,7 @@ SpaceTapHold(HoldFn) {
     _SpaceHoldFired  := True
     _SpaceHeldInput  := ih.Input
     HoldFn()
+    _SpaceHoldActive := False
     return True
 }
 
