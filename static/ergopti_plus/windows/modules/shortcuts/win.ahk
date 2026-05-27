@@ -371,7 +371,7 @@ if Features["shortcuts"]["search"]["enabled"] {
         if not WMExists(t("dialog.path_copy.title"))
             return ; Keep waiting
         SetTimer ChangeButtonNames, 0
-        WMActivate()
+        WMActivate(t("dialog.path_copy.title"))
         ControlSetText(t("dialog.path_copy.btn_quit"), "Button1") ; Note: ControlSetText has no port adapter — AHK-specific UI manipulation
         ControlSetText(t("dialog.path_copy.btn_backslash"), "Button2") ; Note: ControlSetText has no port adapter — AHK-specific UI manipulation
     }
