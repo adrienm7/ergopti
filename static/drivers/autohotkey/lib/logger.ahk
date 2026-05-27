@@ -93,7 +93,15 @@ global _LOGGER_FLUSH_TIMER_STARTED := False
 ; Lines whose [Tag] matches any pattern are appended to that sub-file in addition
 ; to the main unified log. Sub-files are ephemeral (today only) — stale ones from
 ; previous days are deleted at init time. Paths are resolved relative to LogDir.
-global LOGGER_SUB_FILES := [
+;
+; Populated by _LoggerLoadSubFilesToml() at LoggerInit time from the canonical
+; _shared/logger/sub_files.toml; falls back to the hardcoded list when the
+; shared file is unavailable (e.g. stripped builds, running from a temp copy).
+global LOGGER_SUB_FILES := []
+
+; Hardcoded fallback used when sub_files.toml cannot be found. Covers the
+; minimum set of AHK-only sub-files required for production log triage.
+global LOGGER_SUB_FILES_FALLBACK := [
     Map("name", "ErgoptiPlus_gestures.log", "tags", ["gestures"]),
     Map("name", "ErgoptiPlus_layout.log", "tags", ["LayoutShift", "LayoutCaps", "LayoutAltGr"]),
     Map("name", "ErgoptiPlus_dispatch.log", "tags", ["Dispatch", "ScriptShortcuts", "TomlLoader"]),
@@ -130,6 +138,9 @@ LoggerInit() {
     }
     LOGGER_LOG_PATH := LogDir . "ErgoptiPlus_" . FormatTime(, "yyyy-MM-dd") . ".log"
     _LoggerPurgeOldLogs(LogDir, 14)
+    ; Load sub-file routing rules from _shared/logger/sub_files.toml so adding a
+    ; new topical log requires only a TOML edit, not a code change in both drivers.
+    _LoggerLoadSubFilesToml(A_ScriptDir . "\")
     _LoggerInitSubFiles(LogDir)
     LOGGER_MIN_LEVEL := LOGGER_DEFAULT_LEVEL
     if IsSet(ConfigurationFile) and FileExist(ConfigurationFile) {
@@ -396,6 +407,155 @@ _LoggerFanOut(Tag, Line) {
                 break
             }
         }
+    }
+}
+
+; Parses _shared/logger/sub_files.toml and populates LOGGER_SUB_FILES with the
+; entries whose platforms array includes "ahk". Falls back to LOGGER_SUB_FILES_FALLBACK
+; when the file is absent or unreadable so the driver stays functional in stripped builds.
+;
+; The parser handles the fixed schema:
+;   [[sub_files]]
+;   name     = "gestures"
+;   platforms = ["ahk", "hs"]
+;   patterns = ["[gestures", "gesture"]
+;
+; Unknown keys (description) are silently skipped. Arrays may span multiple lines.
+; The file is NOT the general-purpose TOML parser because [[array_of_tables]] is
+; outside the scope of toml_helpers.ahk — this dedicated reader is intentionally minimal.
+_LoggerLoadSubFilesToml(ScriptDir) {
+    global LOGGER_SUB_FILES, LOGGER_SUB_FILES_FALLBACK
+    ; Resolve path: ScriptDir\..\..\..\_shared\logger\sub_files.toml
+    ; (autohotkey/ → drivers/ → _shared/logger/)
+    TomlPath := ScriptDir . "..\..\..\_shared\logger\sub_files.toml"
+    if !FileExist(TomlPath) {
+        LOGGER_SUB_FILES := LOGGER_SUB_FILES_FALLBACK
+        return
+    }
+    Raw := ""
+    try {
+        Raw := FileRead(TomlPath, "UTF-8")
+    } catch {
+        LOGGER_SUB_FILES := LOGGER_SUB_FILES_FALLBACK
+        return
+    }
+    if Raw = "" {
+        LOGGER_SUB_FILES := LOGGER_SUB_FILES_FALLBACK
+        return
+    }
+
+    ; Collapse CRLF and LF to a single line-break token for uniform processing
+    Raw := StrReplace(Raw, "`r`n", "`n")
+    Raw := StrReplace(Raw, "`r", "`n")
+
+    Result := []
+    CurrentEntry := ""       ; "name" string while inside a [[sub_files]] block
+    CurrentPlatforms := []   ; platforms array for the current entry
+    CurrentPatterns  := []   ; patterns array for the current entry
+    InPatternsArray := false ; true while accumulating a multi-line array value
+    InPlatformsArray := false
+
+    _FlushEntry() {
+        if CurrentEntry = "" {
+            return
+        }
+        ; Only include entries that list "ahk" in their platforms array
+        IsAhk := false
+        for P in CurrentPlatforms {
+            if (P = "ahk") {
+                IsAhk := true
+                break
+            }
+        }
+        if IsAhk and CurrentPatterns.Length > 0 {
+            Result.Push(Map(
+                "name", "ErgoptiPlus_" . CurrentEntry . ".log",
+                "tags", CurrentPatterns
+            ))
+        }
+        CurrentEntry := ""
+        CurrentPlatforms := []
+        CurrentPatterns  := []
+        InPatternsArray  := false
+        InPlatformsArray := false
+    }
+
+    ; Extracts all quoted strings from an array fragment like ["foo", "bar"]
+    _ExtractStrings(Fragment) {
+        Strings := []
+        Pos := 1
+        loop {
+            if !RegExMatch(Fragment, '"([^"\\]*(?:\\.[^"\\]*)*)"', &M, Pos) {
+                break
+            }
+            Strings.Push(M[1])
+            Pos := M.Pos + M.Len
+        }
+        return Strings
+    }
+
+    Lines := StrSplit(Raw, "`n")
+    for Line in Lines {
+        ; Strip inline comments and trim
+        Line := Trim(RegExReplace(Line, "\s*#.*$", ""))
+        if Line = "" {
+            continue
+        }
+        if (Line = "[[sub_files]]") {
+            _FlushEntry()
+            continue
+        }
+        ; Accumulate multi-line arrays
+        if InPatternsArray {
+            Extracted := _ExtractStrings(Line)
+            for S in Extracted {
+                CurrentPatterns.Push(S)
+            }
+            if InStr(Line, "]") {
+                InPatternsArray := false
+            }
+            continue
+        }
+        if InPlatformsArray {
+            Extracted := _ExtractStrings(Line)
+            for S in Extracted {
+                CurrentPlatforms.Push(S)
+            }
+            if InStr(Line, "]") {
+                InPlatformsArray := false
+            }
+            continue
+        }
+        ; Key-value lines
+        if RegExMatch(Line, '^name\s*=\s*"([^"]*)"', &M) {
+            CurrentEntry := M[1]
+        } else if RegExMatch(Line, '^platforms\s*=\s*\[(.*)$', &M) {
+            Fragment := M[1]
+            Extracted := _ExtractStrings(Fragment)
+            for S in Extracted {
+                CurrentPlatforms.Push(S)
+            }
+            if !InStr(Fragment, "]") {
+                InPlatformsArray := true
+            }
+        } else if RegExMatch(Line, '^patterns\s*=\s*\[(.*)$', &M) {
+            Fragment := M[1]
+            Extracted := _ExtractStrings(Fragment)
+            for S in Extracted {
+                CurrentPatterns.Push(S)
+            }
+            if !InStr(Fragment, "]") {
+                InPatternsArray := true
+            }
+        }
+    }
+    _FlushEntry()
+
+    if Result.Length > 0 {
+        LOGGER_SUB_FILES := Result
+    } else {
+        ; Parsed but no valid entries — fall back to avoid an empty fan-out table
+        LOGGER_SUB_FILES := LOGGER_SUB_FILES_FALLBACK
     }
 }
 
