@@ -87,6 +87,7 @@ InstallHotstringHooks()
 ; ── Per-module test files (each registers Test() cases) ──
 #Include test_adapter_compliance_new.ahk
 #Include test_adapter_contract_vectors.ahk
+#Include test_timer_scheduler.ahk
 #Include test_logger.ahk
 #Include test_logger_contract.ahk
 #Include test_tooltip_tint_contract.ahk
