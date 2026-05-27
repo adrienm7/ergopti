@@ -1048,8 +1048,7 @@ GestureGetCyclableWindows(ProcessFilter := "") {
                 continue
             }
             ; DWMWA_CLOAKED = 14 — windows on other virtual desktops
-            ; TODO(item 2.1.3): route through a WindowManager adapter once
-            ; DwmGetWindowAttribute is covered by the port contract
+            ; Note: DwmGetWindowAttribute is Windows-only DWM API — no cross-platform port defined
             Cloaked := 0
             DllCall("dwmapi\DwmGetWindowAttribute", "Ptr", HWnd, "UInt", 14,
                 "Int*", &Cloaked, "UInt", 4)
