@@ -703,7 +703,7 @@ LLM_BuildOllamaPayload(model, system_prompt, user_text, temperature, streaming :
 	}
 
 	stream_field := streaming ? "true" : "false"
-	options := '"temperature":' temperature
+	options := '"temperature":' . Format("{:g}", temperature)
 	if (stop_sequences != "" and Type(stop_sequences) == "Array" and stop_sequences.Length > 0) {
 		stops_json := ""
 		for s in stop_sequences {

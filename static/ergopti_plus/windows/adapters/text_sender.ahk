@@ -35,6 +35,12 @@ global TEXT_CLIPBOARD_THRESHOLD := 1000
 ; Long enough for the receiving application to process Ctrl+V before we overwrite.
 global TEXT_CLIPBOARD_RESTORE_DELAY_MS := 150
 
+; Injectable send primitives — point at the real AHK built-ins by default.
+; The test runner replaces these globals with no-op lambdas so no keystroke
+; ever reaches the OS during a dry run (mirrors the _SendHook pattern).
+global _AHK_SendText  := (Text) => SendText(Text)
+global _AHK_SendInput := (Keys) => SendInput(Keys)
+
 
 
 
@@ -87,7 +93,7 @@ TextSend(Text, Opts, Callback) {
 		Saved := CB_Save()
 		CB_Write(Text)
 		ClipWait(1)
-		SendInput("^v")
+		_AHK_SendInput.Call("^v")
 		; Restore after a short delay so the paste completes before we overwrite.
 		; Capture Saved in the closure so the timer lambda is self-contained.
 		SavedForTimer := Saved
@@ -95,7 +101,7 @@ TextSend(Text, Opts, Callback) {
 	} else {
 		; SendText uses the "Text" mode that bypasses hotkey triggers and sends
 		; Unicode characters as raw keystrokes — the safest injection path.
-		SendText(Text)
+		_AHK_SendText.Call(Text)
 	}
 
 	if Callback != 0
@@ -108,7 +114,7 @@ TextEraseChars(Count) {
 	if Count < 1
 		return
 	loop Count
-		SendInput("{Backspace}")
+		_AHK_SendInput.Call("{Backspace}")
 }
 
 ; Emits a single keystroke with optional modifiers.
@@ -120,7 +126,7 @@ TextPressKey(Key, Modifiers) {
 		for Mod in Modifiers
 			Prefix .= _TextSenderModifierPrefix(Mod)
 	}
-	SendInput(Prefix . "{" . Key . "}")
+	_AHK_SendInput.Call(Prefix . "{" . Key . "}")
 }
 
 ; Machine-readable contract map - consumed by the generic adapter compliance test
