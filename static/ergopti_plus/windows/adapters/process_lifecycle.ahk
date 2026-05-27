@@ -161,6 +161,7 @@ PLC_Stop() {
 ; the window closed between the SetTimer tick and the WinGet call) cannot
 ; permanently disrupt subsequent poll cycles.
 PLC_Poll() {
+	global PLC_LastAppId, PLC_LastWindowTitle
 	try {
 		local NewApp   := WinGetProcessName("A")
 		local NewTitle := WinGetTitle("A")

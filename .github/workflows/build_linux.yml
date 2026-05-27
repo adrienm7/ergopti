@@ -61,33 +61,6 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y luajit ydotool libnotify-bin
 
-      - name: Download kanata binary
-        run: |
-          # Try jq first (available on ubuntu-22.04 runners), fall back to grep.
-          API_RESP=$(curl -fsSL https://api.github.com/repos/jtroo/kanata/releases/latest)
-          if command -v jq >/dev/null 2>&1; then
-            KANATA_URL=$(echo "$API_RESP" \
-              | jq -r '.assets[]
-                  | select(.name == "kanata_linux_x86_64")
-                  | .browser_download_url' \
-              | head -1)
-          fi
-          # Fallback: legacy grep path (handles the rare non-jq case).
-          if [ -z "$KANATA_URL" ]; then
-            KANATA_URL=$(echo "$API_RESP" \
-              | grep -o '"browser_download_url": "[^"]*kanata_linux_x86_64"' \
-              | head -1 \
-              | cut -d'"' -f4)
-          fi
-          if [ -z "$KANATA_URL" ]; then
-            echo "Impossible de trouver le binaire kanata dans les releases GitHub." >&2
-            echo "API response preview:" >&2
-            echo "$API_RESP" | head -20 >&2
-            exit 1
-          fi
-          curl -fsSL "$KANATA_URL" -o /tmp/kanata
-          chmod +x /tmp/kanata
-
       - name: Assemble package tree
         env:
           VERSION: ${{ steps.version.outputs.version }}

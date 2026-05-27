@@ -1,4 +1,4 @@
-﻿# .github/workflows/release.yml
+# .github/workflows/release.yml
 #
 # Builds Ergopti.app (macOS), ErgoptiPlus.exe (Windows), and packages keyboard
 # layout files for all three platforms, then attaches everything to a GitHub
@@ -106,7 +106,7 @@ jobs:
                           done < <(git log "$range" --no-merges --pretty=format:"%s")
 
                           delta=""
-                          [ "$n_breaking" -gt 0 ] && delta="${delta}âš ï¸ ${n_breaking} breaking, "
+                          [ "$n_breaking" -gt 0 ] && delta="${delta}!! ${n_breaking} breaking, "
                           [ "$n_feat"     -gt 0 ] && delta="${delta}âœ¨ ${n_feat} feat, "
                           [ "$n_fix"      -gt 0 ] && delta="${delta}ðŸ”§ ${n_fix} fix, "
                           [ "$n_other"    -gt 0 ] && delta="${delta}ðŸ“¦ ${n_other} other, "
@@ -484,7 +484,7 @@ jobs:
 
                   ---
 
-                  ### ðŸŽ macOS
+                  ### macOS
 
                   | Asset | Description |
                   |---|---|
@@ -525,7 +525,7 @@ jobs:
 
                   ---
 
-                  ### ðŸ§ Linux
+                  ### Linux
 
                   | Asset | Description |
                   |---|---|
