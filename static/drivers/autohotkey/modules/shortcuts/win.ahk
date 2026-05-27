@@ -372,8 +372,8 @@ if Features["shortcuts"]["search"]["enabled"] {
             return ; Keep waiting
         SetTimer ChangeButtonNames, 0
         WMActivate()
-        ControlSetText(t("dialog.path_copy.btn_quit"), "Button1") ; TODO(2.1.3): no adapter yet
-        ControlSetText(t("dialog.path_copy.btn_backslash"), "Button2") ; TODO(2.1.3): no adapter yet
+        ControlSetText(t("dialog.path_copy.btn_quit"), "Button1") ; Note: ControlSetText has no port adapter — AHK-specific UI manipulation
+        ControlSetText(t("dialog.path_copy.btn_backslash"), "Button2") ; Note: ControlSetText has no port adapter — AHK-specific UI manipulation
     }
 }
 
@@ -513,7 +513,7 @@ if Features["shortcuts"]["open_downloads"] {
         ; compare its location bar URL -- reliable across localisations
         ; (avoids matching "Téléchargements" vs "Downloads" titles).
         try {
-            for Win in ComObject("Shell.Application").Windows { ; TODO(2.1.3): route through AppLauncher port
+            for Win in ComObject("Shell.Application").Windows { ; COM window enumeration — not routable through AppLauncher port
                 try {
                     LocalPath := DOMPathToFilesystem(Win.LocationURL)
                     if (LocalPath != "" and StrLower(LocalPath) == StrLower(DownloadsPath)) {
