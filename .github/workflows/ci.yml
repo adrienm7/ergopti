@@ -484,6 +484,9 @@ jobs:
             - uses: actions/checkout@v4
               with:
                   fetch-depth: 0
+                  # PAT required: a tag pushed via GITHUB_TOKEN cannot trigger
+                  # downstream workflows (GitHub security restriction).
+                  token: ${{ secrets.PAT_ERGOPTI }}
 
             - name: Calculate next version and push tag
               # Computes the next SemVer from conventional commits since the last
@@ -491,7 +494,7 @@ jobs:
               # This step only runs after all three driver branches are green.
               shell: bash
               env:
-                  GH_TOKEN: ${{ github.token }}
+                  GH_TOKEN: ${{ secrets.PAT_ERGOPTI }}
               run: |
                   set -euo pipefail
 
@@ -559,6 +562,9 @@ jobs:
             - uses: actions/checkout@v4
               with:
                   fetch-depth: 0
+                  # PAT required: a tag pushed via GITHUB_TOKEN cannot trigger
+                  # downstream workflows (GitHub security restriction).
+                  token: ${{ secrets.PAT_ERGOPTI }}
 
             - name: Calculate next dev tag and push
               # Pushes the tag only — release.yml handles the full build
@@ -566,7 +572,7 @@ jobs:
               # GitHub release with all assets attached.
               shell: bash
               env:
-                  GH_TOKEN: ${{ github.token }}
+                  GH_TOKEN: ${{ secrets.PAT_ERGOPTI }}
               run: |
                   set -euo pipefail
 
