@@ -1,4 +1,4 @@
-; tests/meta/test_no_class_global_conflict.ahk
+﻿; tests/meta/test_no_class_global_conflict.ahk
 
 ; ==============================================================================
 ; MODULE: Class/Global Conflict Meta Test
