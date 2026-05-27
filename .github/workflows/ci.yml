@@ -568,7 +568,7 @@ jobs:
                   set -euo pipefail
 
                   # Find the highest existing dev tag and increment it
-                  last_dev=$(git tag --list 'v0.0.0-dev.*' --sort=-v:refname | head -1 || true)
+                  last_dev=$(git tag --list 'v0.0.0-dev.*' --sort=-v:refname | head -1) || true
                   if [ -z "$last_dev" ]; then
                       next_n=1
                   else
