@@ -93,6 +93,8 @@ InstallHotstringHooks()
 #Include test_tooltip_tint_contract.ahk
 #Include test_hotstring_engine.ahk
 #Include test_hotstring_engine_main.ahk
+#Include test_domain_registry.ahk
+#Include test_domain_expander.ahk
 #Include test_toml_loader.ahk
 #Include test_hotstrings_config.ahk
 #Include test_personal_toml_editor.ahk
