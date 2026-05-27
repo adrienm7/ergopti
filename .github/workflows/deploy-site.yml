@@ -22,8 +22,21 @@ on:
     push:
         branches: [main, dev]
         paths:
+            # Svelte app source
             - "src/**"
-            - "static/**"
+            # Site-only assets in static/ — driver folders are excluded:
+            #   static/ergopti_plus/  → macOS / Windows / Linux drivers
+            #   static/drivers/       → downloadable driver bundles
+            # Everything else in static/ is a site asset.
+            - "static/benchmarks/**"
+            - "static/corpus/**"
+            - "static/documents/**"
+            - "static/ergopti/**"
+            - "static/img/**"
+            - "static/layouts/**"
+            - "static/favicon.ico"
+            - "static/version.json"
+            # Build config
             - "svelte.config.js"
             - "vite.config.js"
             - "package.json"
