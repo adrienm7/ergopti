@@ -139,7 +139,12 @@ local function rebuild_tail_indexes()
 	local tail_idx = {}
 	local star_idx = {}
 	for _, m in ipairs(_state.mappings) do
-		local tc = m.tail_char
+		-- Index by the lowercase tail codepoint so that the expander's hot-path
+		-- lookup (bucket_for, which always lowercases the tail) finds every mapping,
+		-- including case-sensitive triggers whose tail char is uppercase (e.g. "BTW").
+		-- The exact-match byte comparison inside try_terminator_expand still uses the
+		-- original trigger string, so case sensitivity is preserved at match time.
+		local tc = m.tail_char:lower()
 		local bucket = tail_idx[tc]
 		if not bucket then
 			bucket = {}

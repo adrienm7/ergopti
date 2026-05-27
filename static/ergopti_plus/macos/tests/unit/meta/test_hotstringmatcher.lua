@@ -230,10 +230,14 @@ helpers.describe("hotstringmatcher — case sensitivity", function()
 		local R = make_registry({
 			{ trigger = "BTW", repl = "by the way", group = "g", is_case_sensitive = true }
 		})
-		local candidates = (R.mappings_for_tail("W") or {})
-		helpers.assert_true(#candidates > 0, "bucket for 'W' must not be empty")
-		-- is_case_sensitive is not part of the standard Mapping fields in HS
-		-- but the trigger is stored with its original case
+		-- rebuild_tail_indexes normalises all bucket keys to lowercase so that the
+		-- expander's bucket_for() — which always lowercases the tail — can find
+		-- case-sensitive uppercase triggers (e.g. "BTW") at match time.
+		-- The mapping itself still stores the original-case trigger.
+		local candidates = (R.mappings_for_tail("w") or {})
+		helpers.assert_true(#candidates > 0, "bucket for 'w' must not be empty")
+		-- The trigger is preserved in its original uppercase form inside the mapping
+		-- so that try_terminator_expand performs an exact byte comparison correctly.
 		helpers.assert_eq("BTW", candidates[1].trigger, "uppercase trigger stored as-is")
 	end)
 end)

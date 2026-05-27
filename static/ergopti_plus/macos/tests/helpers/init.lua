@@ -77,6 +77,14 @@ function M.load_with_stubs(module_name, hs_overrides)
 	end
 
 	_G.hs = hs_stub
+	-- Anchor the stub under the bare "hs" key so that any subsequent
+	-- `require("hs")` call in the harness or cascaded modules returns
+	-- exactly this same stub — not a fresh reload. Without this, Lua
+	-- re-executes tests/stubs/hs.lua and creates a second KEYSTROKES
+	-- table; keyStroke/keyStrokes closures captured by utils and expander
+	-- would then write to the first table while the harness reads from the
+	-- second, making all keystroke assertions see 0 entries.
+	package.loaded["hs"] = hs_stub
 
 	-- Always inject a minimal lib.i18n stub so that modules calling i18n.get()
 	-- at require-time (terminators, conflicts, actions, profiles …) never crash
