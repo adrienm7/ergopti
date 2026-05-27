@@ -307,7 +307,7 @@ OllamaWV_HtmlUrl() {
 	; _StaticDir already resolves to <repo>/static in dev and to the extracted
 	; A_ScriptDir/static in compiled mode, so the _shared tree lives at the
 	; same relative offset in both layouts.
-	base := _StaticDir . "\drivers\_shared\ui\download_window\index.html"
+	base := _StaticDir . "\ergopti_plus\shared\ui\download_window\index.html"
 	loop files, base
 		base := A_LoopFileFullPath
 	return "file:///" . StrReplace(base, "\", "/")
