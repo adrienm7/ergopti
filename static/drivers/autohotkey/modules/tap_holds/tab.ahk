@@ -1,4 +1,5 @@
 ﻿; modules/tap_holds/tab.ahk
+; Requires: TextSender
 
 ; ==============================================================================
 ; MODULE: Tap-Holds — Tab
@@ -25,26 +26,26 @@
 SC00F::LAlt
 SC00F::
 {
-    SendInput("{LAlt Down}")
+    TextPressKey("LAlt", "Down")
     tap := KeyWait("SC00F", "T" . TapHoldDuration(TapHold, "tab"))
     if tap {
-        if TapHoldTapAction(TapHold, "left_alt") == "tab" and GetKeyState("SC038", "P") {
-            SendInput("!{Tab}")
+        if TapHoldTapAction(TapHold, "left_alt") == "tab" and GetKeyState("SC038", "P") { ; TODO(2.1.3): route through KeyState port
+            TextPressKey("Tab", "Alt")
         } else {
-            SendInput("{LAlt Up}")
+            TextPressKey("LAlt", "Up")
             AltTabMonitor()
         }
 
     }
 }
-SC00F Up:: SendInput("{LAlt Up}")
+SC00F Up:: TextPressKey("LAlt", "Up")
 
 ; Pass-through for Tab with modifiers so Ctrl+Tab, Shift+Tab etc. still work
 ; despite the tap-hold intercepting the bare key
-^SC00F:: SendEvent("^{Tab}")
-^+SC00F:: SendEvent("^+{Tab}")
-+SC00F:: SendInput("+{Tab}")
-#SC00F:: SendEvent("#{Tab}")
+^SC00F:: TextPressKey("Tab", "Ctrl")
+^+SC00F:: TextPressKey("Tab", "Ctrl Shift")
++SC00F:: TextPressKey("Tab", "Shift")
+#SC00F:: TextPressKey("Tab", "Win")
 #HotIf
 
 ; AltTabMonitor and GetMonitorFromPoint live in lib/window_utils.ahk so they

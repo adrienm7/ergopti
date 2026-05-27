@@ -1,4 +1,5 @@
 ﻿; modules/tap_holds/capslock.ahk
+; Requires: TextSender
 
 ; ==============================================================================
 ; MODULE: Tap-Holds — CapsLock
@@ -27,7 +28,7 @@
     and not LayerEnabled
 )
 SC03A:: {
-    if (GetKeyState("SC038", "P")) {
+    if (GetKeyState("SC038", "P")) { ; TODO(2.1.3): route through KeyState port
         LAltCapsLockShortcut()
         return
     }
@@ -37,12 +38,12 @@ SC03A:: {
 
 #HotIf _CapsLockIsPlainBackspace() and not LayerEnabled
 *SC03A:: {
-    if (GetKeyState("SC038", "P")) {
+    if (GetKeyState("SC038", "P")) { ; TODO(2.1.3): route through KeyState port
         LAltCapsLockShortcut()
         return
     }
 
-    SendEvent("{Blind}{BackSpace}")
+    TextPressKey("BackSpace", "Blind")
 }
 #HotIf
 
@@ -63,29 +64,29 @@ CapsLockRemappedCondition() {
 #HotIf CapsLockRemappedCondition() and not LayerEnabled
 *SC03A:: {
     CtrlActivated := False
-    if (GetKeyState("SC01D", "P")) {
+    if (GetKeyState("SC01D", "P")) { ; TODO(2.1.3): route through KeyState port
         CtrlActivated := True
     }
 
-    if (GetKeyState("SC038", "P")) {
+    if (GetKeyState("SC038", "P")) { ; TODO(2.1.3): route through KeyState port
         ; Fix for using the LAltCapsLockShortcut with LAlt remapped to OneShotShift and CapsLock remapped
         LAltCapsLockShortcut()
         return
     }
 
-    SendEvent("{LCtrl Down}")
+    TextPressKey("LCtrl", "Down")
     tap := KeyWait("CapsLock", "T" . TapHoldDuration(TapHold, "caps_lock"))
     if (tap and A_PriorKey == "LControl") {
-        SendEvent("{LCtrl Up}")
+        TextPressKey("LCtrl", "Up")
         CapsLockShortcut(CtrlActivated)
     }
-    SendEvent("{LCtrl Up}")
+    TextPressKey("LCtrl", "Up")
 }
 #HotIf
 
 CapsLockShortcut(CtrlActivated) {
     if CtrlActivated {
-        SendEvent("{LCtrl Down}")
+        TextPressKey("LCtrl", "Down")
     }
 
     ; Dispatch on the v2 tap_action -- only reachable when hold_modifier
@@ -93,27 +94,27 @@ CapsLockShortcut(CtrlActivated) {
     ; we get here).
     switch TapHoldTapAction(TapHold, "caps_lock") {
         case "backspace":
-            SendEvent("{Blind}{BackSpace}")
+            TextPressKey("BackSpace", "Blind")
         case "caps_lock":
             ToggleCapsLock()
         case "caps_word":
             ToggleCapsWord()
         case "ctrl_backspace":
-            SendInput("^{BackSpace}")
+            TextPressKey("BackSpace", "Ctrl")
         case "ctrl_delete":
-            SendInput("^{Delete}")
+            TextPressKey("Delete", "Ctrl")
         case "delete":
-            SendEvent("{Blind}{Delete}")
+            TextPressKey("Delete", "Blind")
         case "enter":
-            SendEvent("{Blind}{Enter}")
+            TextPressKey("Enter", "Blind")
             DisableCapsWord()
         case "escape":
-            SendEvent("{Blind}{Escape}")
+            TextPressKey("Escape", "Blind")
         case "one_shot_shift":
             OneShotShift()
         case "tab":
-            SendEvent("{Blind}{Tab}")
+            TextPressKey("Tab", "Blind")
     }
 
-    SendEvent("{LCtrl Up}")
+    TextPressKey("LCtrl", "Up")
 }

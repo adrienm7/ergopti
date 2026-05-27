@@ -1,4 +1,5 @@
 ﻿; modules/tap_holds/space.ahk
+; Requires: TextSender
 
 ; ==============================================================================
 ; MODULE: Tap-Holds — Space
@@ -34,7 +35,7 @@ SpaceTapHold(HoldFn) {
         ; Tap path: send the Space that was intercepted, then the captured character
         ; (omit it when it is itself a Space to avoid a double-space).
         Text := (ih.Input == " ") ? "" : ih.Input
-        SendEvent("{Space}" Text)
+        TextSend("{Space}" Text, "")
         UpdateLastSentCharacter(" ")
         return False
     }
@@ -47,9 +48,9 @@ SpaceTapHold(HoldFn) {
 ; before the InputHook timeout elapsed and no tap was already sent.
 
 _SpaceHoldCtrl() {
-    SendEvent("{LCtrl Down}")
+    TextPressKey("LCtrl", "Down")
     KeyWait("SC039")
-    SendEvent("{LCtrl Up}")
+    TextPressKey("LCtrl", "Up")
 }
 _SpaceHoldLayer() {
     ActivateLayer()
@@ -57,9 +58,9 @@ _SpaceHoldLayer() {
     DisableLayer()
 }
 _SpaceHoldShift() {
-    SendEvent("{LShift Down}")
+    TextPressKey("LShift", "Down")
     KeyWait("SC039")
-    SendEvent("{LShift Up}")
+    TextPressKey("LShift", "Up")
 }
 
 #HotIf TapHoldHoldModifier(TapHold, "space") == "ctrl" and not LayerEnabled
@@ -71,7 +72,7 @@ SC039 Up:: {
         and not CapsWordEnabled
         and A_TimeSinceThisHotkey <= TapHoldDuration(TapHold, "space")
     ) {
-        SendEvent("{Space}")
+        TextPressKey("Space", "")
     }
 }
 #HotIf
@@ -85,7 +86,7 @@ SC039 Up:: {
         and not CapsWordEnabled
         and A_TimeSinceThisHotkey <= TapHoldDuration(TapHold, "space")
     ) {
-        SendEvent("{Space}")
+        TextPressKey("Space", "")
         UpdateLastSentCharacter(" ")
     }
 }
@@ -100,7 +101,7 @@ SC039 Up:: {
         and not CapsWordEnabled
         and A_TimeSinceThisHotkey <= TapHoldDuration(TapHold, "space")
     ) {
-        SendEvent("{Space}")
+        TextPressKey("Space", "")
     }
 }
 #HotIf

@@ -1,4 +1,5 @@
 ﻿; modules/tap_holds/altgr.ahk
+; Requires: TextSender
 
 ; ==============================================================================
 ; MODULE: Tap-Holds — AltGr
@@ -52,30 +53,30 @@ RAlt Up:: {
 AltGrTapHoldDispatchV2() {
     switch TapHoldTapAction(TapHold, "alt_gr") {
         case "backspace":
-            SendEvent("{Blind}{BackSpace}")
+            TextPressKey("BackSpace", "Blind")
             UpdateLastSentCharacter("BackSpace")
         case "caps_lock":
             ToggleCapsLock()
         case "caps_word":
             ToggleCapsWord()
         case "ctrl_backspace":
-            SendEvent("{Blind}^{BackSpace}")
+            TextPressKey("BackSpace", "Blind Ctrl")
             UpdateLastSentCharacter("")
         case "ctrl_delete":
-            SendEvent("{Blind}^{Delete}")
+            TextPressKey("Delete", "Blind Ctrl")
             UpdateLastSentCharacter("")
         case "delete":
-            SendEvent("{Blind}{Delete}")
+            TextPressKey("Delete", "Blind")
             UpdateLastSentCharacter("Delete")
         case "enter":
-            SendEvent("{Blind}{Enter}")
+            TextPressKey("Enter", "Blind")
             UpdateLastSentCharacter("Enter")
         case "escape":
-            SendEvent("{Escape}")
+            TextPressKey("Escape", "")
         case "one_shot_shift":
             OneShotShift()
         case "tab":
-            SendEvent("{Blind}{Tab}")
+            TextPressKey("Tab", "Blind")
             UpdateLastSentCharacter("Tab")
     }
 }

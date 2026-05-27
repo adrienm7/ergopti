@@ -1,4 +1,5 @@
 ﻿; modules/tap_holds/lalt.ahk
+; Requires: TextSender
 
 ; ==============================================================================
 ; MODULE: Tap-Holds — LAlt
@@ -40,20 +41,20 @@ _LAltIsBackspaceLayer() {
 ; Tap-hold on "LAlt" : OneShotShift on tap, Shift on hold
 SC038:: {
     if (
-        GetKeyState("SC11D", "P")
-        or GetKeyState("SC03A", "P")
-        or GetKeyState("LShift", "P")
-        or GetKeyState("LCtrl", "P")
+        GetKeyState("SC11D", "P") ; TODO(2.1.3): route through KeyState port
+        or GetKeyState("SC03A", "P") ; TODO(2.1.3): route through KeyState port
+        or GetKeyState("LShift", "P") ; TODO(2.1.3): route through KeyState port
+        or GetKeyState("LCtrl", "P") ; TODO(2.1.3): route through KeyState port
     ) {
         ; Solves a problem where shorcuts consisting of another key (pressed first) + SC038 (pressed second) triggers the shortcut, but also OneShotShift()
         return
     }
 
-    SendEvent("{LAlt Up}")
+    TextPressKey("LAlt", "Up")
     OneShotShift()
-    SendInput("{LShift Down}")
+    TextPressKey("LShift", "Down")
     KeyWait("SC038")
-    SendInput("{LShift Up}")
+    TextPressKey("LShift", "Up")
 }
 #HotIf
 
@@ -71,33 +72,33 @@ SC038::
     CharacterSentTime := LastSentCharacterKeyTime.Has("LAlt") ? LastSentCharacterKeyTime["LAlt"] : Now
     tap := (Now - CharacterSentTime <= TapHoldDuration(TapHold, "left_alt") * 1000)
     if tap {
-        SendEvent("{Tab}")
+        TextPressKey("Tab", "")
     }
 }
 
-SC02A & SC038:: SendInput("+{Tab}") ; On "LShift"
+SC02A & SC038:: TextPressKey("Tab", "Shift") ; On "LShift"
 if TapHoldTapAction(TapHold, "right_ctrl") == "one_shot_shift" {
     SC11D & SC038:: {
         OneShotShiftFix()
-        SendInput("+{Tab}")
+        TextPressKey("Tab", "Shift")
     }
 }
-#SC038:: SendEvent("#{Tab}") ; Doesn't fire when SendInput is used
-!SC038:: SendInput("!{Tab}")
+#SC038:: TextPressKey("Tab", "Win") ; Doesn't fire when SendInput is used
+!SC038:: TextPressKey("Tab", "Alt")
 #HotIf
 
 #HotIf TapHoldTapAction(TapHold, "left_alt") == "alt_tab_monitor" and not LayerEnabled
 ; Tap-hold on "LAlt" : AltTabMonitor on tap, Alt on hold
 SC038::
 {
-    Send("{LAlt Down}")
+    TextPressKey("LAlt", "Down")
     tap := KeyWait("SC038", "T" . TapHoldDuration(TapHold, "left_alt"))
     if tap {
-        Send("{LAlt Up}")
+        TextPressKey("LAlt", "Up")
         AltTabMonitor()
     } else {
         KeyWait("SC038")
-        Send("{LAlt Up}")
+        TextPressKey("LAlt", "Up")
     }
 }
 #HotIf
@@ -109,10 +110,10 @@ SC038::
     BackSpaceActionWithModifiers := BackSpaceLogic()
     if not BackSpaceActionWithModifiers {
         ; If no modifier was pressed
-        SendEvent("{BackSpace}") ; Event to be able to correct hostrings and still trigger them afterwards
+        TextPressKey("BackSpace", "") ; Event to be able to correct hotstrings and still trigger them afterwards
         Sleep(KEY_REPEAT_INITIAL_DELAY_MS)
-        while GetKeyState("SC038", "P") {
-            SendEvent("{BackSpace}")
+        while GetKeyState("SC038", "P") { ; TODO(2.1.3): route through KeyState port
+            TextPressKey("BackSpace", "")
             Sleep(KEY_REPEAT_INTERVAL_MS)
         }
     }
@@ -136,12 +137,12 @@ SC038::
     if (
         tap
         and A_PriorKey == "LAlt" ; Prevents triggering BackSpace when the layer is quickly used and then released
-        and not GetKeyState("SC03A", "P") ; Fix a sent BackSpace when triggering quickly "LAlt" + "CapsLock"
+        and not GetKeyState("SC03A", "P") ; TODO(2.1.3): route through KeyState port — Fix a sent BackSpace when triggering quickly "LAlt" + "CapsLock"
     ) {
         BackSpaceActionWithModifiers := BackSpaceLogic()
         if not BackSpaceActionWithModifiers {
             ; If no modifier was pressed
-            SendEvent("{BackSpace}")
+            TextPressKey("BackSpace", "")
         }
     }
 }
@@ -151,51 +152,53 @@ BackSpaceLogic() {
     RCtrlIsOneShotShift := TapHoldTapAction(TapHold, "right_ctrl") == "one_shot_shift"
 
     if (
-        GetKeyState("SC01D", "P")
-        and GetKeyState("Shift", "P")
+        GetKeyState("SC01D", "P") ; TODO(2.1.3): route through KeyState port
+        and GetKeyState("Shift", "P") ; TODO(2.1.3): route through KeyState port
     ) {
         ; "LCtrl" and Shift
-        SendInput("^{Delete}")
+        TextPressKey("Delete", "Ctrl")
         return True
     } else if (
-        GetKeyState("SC11D", "P")
+        GetKeyState("SC11D", "P") ; TODO(2.1.3): route through KeyState port
         and not RCtrlIsOneShotShift
-        and GetKeyState("Shift", "P")
+        and GetKeyState("Shift", "P") ; TODO(2.1.3): route through KeyState port
     ) {
         ; "RCtrl" when it stays RCtrl and Shift
-        SendInput("^{Delete}")
+        TextPressKey("Delete", "Ctrl")
         return True
     } else if (
-        GetKeyState("SC01D", "P")
+        GetKeyState("SC01D", "P") ; TODO(2.1.3): route through KeyState port
         and RCtrlIsOneShotShift
-        and GetKeyState("SC11D", "P")
+        and GetKeyState("SC11D", "P") ; TODO(2.1.3): route through KeyState port
     ) {
         ; "LCtrl" and Shift on "RCtrl"
         OneShotShiftFix()
-        SendInput("^{Right}^{BackSpace}") ; = ^Delete, but we cannot simply use Delete, as it would do Ctrl + Alt + Delete and Windows would interpret it
+        TextPressKey("Right", "Ctrl")
+        TextPressKey("BackSpace", "Ctrl") ; = ^Delete, but we cannot simply use Delete, as it would do Ctrl + Alt + Delete and Windows would interpret it
         return True
     } else if (
         RCtrlIsOneShotShift
-        and GetKeyState("SC11D", "P")
+        and GetKeyState("SC11D", "P") ; TODO(2.1.3): route through KeyState port
     ) {
         ; Shift on "RCtrl"
         OneShotShiftFix()
-        SendInput("{Right}{BackSpace}") ; = Delete, but we cannot simply use Delete, as it would do Ctrl + Alt + Delete and Windows would interpret it
+        TextPressKey("Right", "")
+        TextPressKey("BackSpace", "") ; = Delete, but we cannot simply use Delete, as it would do Ctrl + Alt + Delete and Windows would interpret it
         return True
-    } else if GetKeyState("Shift", "P") {
+    } else if GetKeyState("Shift", "P") { ; TODO(2.1.3): route through KeyState port
         ; Shift
-        SendInput("{Delete}")
+        TextPressKey("Delete", "")
         return True
-    } else if GetKeyState("SC01D", "P") {
+    } else if GetKeyState("SC01D", "P") { ; TODO(2.1.3): route through KeyState port
         ; "LCtrl"
-        SendInput("^{BackSpace}")
+        TextPressKey("BackSpace", "Ctrl")
         return True
     } else if (
         not RCtrlIsOneShotShift
-        and GetKeyState("SC11D", "P")
+        and GetKeyState("SC11D", "P") ; TODO(2.1.3): route through KeyState port
     ) {
         ; "RCtrl" when it stays RCtrl
-        SendInput("^{BackSpace}")
+        TextPressKey("BackSpace", "Ctrl")
         return True
     }
     return False
