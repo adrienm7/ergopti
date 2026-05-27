@@ -4,9 +4,9 @@
  * ==============================================================================
  * MODULE: Expander AHK Codegen
  * DESCRIPTION:
- * Generates `static/drivers/autohotkey/_generated/expander.ahk` from the
+ * Generates `static/ergopti_plus/windows/_generated/expander.ahk` from the
  * Expander domain contract defined in
- * `static/drivers/_shared/domain/expander.spec.js`.
+ * `static/ergopti_plus/_shared/domain/expander.spec.js`.
  *
  * FEATURES & RATIONALE:
  * 1. Single source of truth: the generated file derives its class contract
@@ -25,8 +25,8 @@ const fs   = require("fs");
 const path = require("path");
 
 const ROOT     = path.resolve(__dirname, "..");
-const OUT_PATH = path.resolve(ROOT, "static/drivers/autohotkey/_generated/expander.ahk");
-const SPEC_REL = "static/drivers/_shared/domain/expander.spec.js";
+const OUT_PATH = path.resolve(ROOT, "static/ergopti_plus/windows/_generated/expander.ahk");
+const SPEC_REL = "static/ergopti_plus/_shared/domain/expander.spec.js";
 
 
 
@@ -88,7 +88,7 @@ function buildAhkSource() {
 	const lines = [];
 
 	// File path header (first line, required by project convention)
-	lines.push("; static/drivers/autohotkey/_generated/expander.ahk");
+	lines.push("; static/ergopti_plus/windows/_generated/expander.ahk");
 	lines.push("");
 
 	// Auto-generated warning banner

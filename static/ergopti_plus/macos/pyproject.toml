@@ -1,0 +1,36 @@
+# static/ergopti_plus/macos/pyproject.toml
+#
+# Pinned Python dependencies for the Hammerspoon driver. The local virtualenv
+# at static/ergopti_plus/macos/.venv is the ONLY interpreter used by the
+# Hammerspoon scripts at runtime — there is no system-Python fallback. The
+# venv is provisioned by modules/llm/ensure-mlx-deps.sh which calls
+# `uv pip sync pyproject.toml` so this file is the single source of truth
+# for which package versions ship to the user's machine.
+#
+# IMPORTANT: every dependency MUST be pinned with `==` so a fresh `uv sync`
+# is reproducible. Use `>=` only as a temporary measure during a known-good
+# version search.
+
+[project]
+name = "ergopti-hammerspoon"
+version = "0.1.0"
+description = "Pinned Python deps for the Ergopti+ Hammerspoon driver."
+requires-python = ">=3.11"
+
+dependencies = [
+	# MLX inference server. PINNED to 0.31.3 — known-good in this environment.
+	# Note: 0.31.2 looks safer on paper (better gemma-4 weight loader) but
+	# triggers the BatchGenerator threading bug on Apple Silicon
+	# ("RuntimeError: There is no Stream(gpu, 0) in current thread") on the
+	# very first POST. 0.31.3 sidesteps that path. gemma-4 is broken either
+	# way — Qwen / Llama / Mistral / NVIDIA-Nemotron all work on 0.31.3.
+	"mlx-lm==0.31.3",
+
+	# Used by data/generate_models.py to scrape the HuggingFace MLX
+	# community organization page when refreshing data/llm_models.json.
+	"requests==2.32.3",
+	"beautifulsoup4==4.12.3",
+]
+
+[tool.uv]
+package = false

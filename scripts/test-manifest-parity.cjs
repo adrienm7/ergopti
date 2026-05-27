@@ -30,8 +30,8 @@ const path = require("path");
 
 const REPO_ROOT = path.resolve(__dirname, "..");
 
-const AHK_MANIFEST = path.join(REPO_ROOT, "static/drivers/autohotkey/_generated/features_manifest.ahk");
-const HS_MANIFEST  = path.join(REPO_ROOT, "static/drivers/hammerspoon/_generated/features_manifest.lua");
+const AHK_MANIFEST = path.join(REPO_ROOT, "static/ergopti_plus/windows/_generated/features_manifest.ahk");
+const HS_MANIFEST  = path.join(REPO_ROOT, "static/ergopti_plus/macos/_generated/features_manifest.lua");
 
 
 // ==============================================================

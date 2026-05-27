@@ -5,7 +5,7 @@
  * MODULE: Port Adapter Structural Compliance Tests
  * DESCRIPTION:
  * Validates every Hammerspoon adapter against the corresponding port contract
- * defined in static/drivers/_shared/ports/. Each adapter module is loaded as a
+ * defined in static/ergopti_plus/_shared/ports/. Each adapter module is loaded as a
  * CommonJS module and passed to the contract's validateAdapter() function; any
  * structural violation (missing method, wrong arity) causes this script to exit
  * with code 1 so CI catches regressions immediately.
@@ -29,7 +29,7 @@
 const path = require("path");
 const fs   = require("fs");
 
-const PORTS_DIR     = path.join(__dirname, "../static/drivers/_shared/ports");
+const PORTS_DIR     = path.join(__dirname, "../static/ergopti_plus/_shared/ports");
 const PASS_SYMBOL   = "✓";
 const FAIL_SYMBOL   = "✗";
 

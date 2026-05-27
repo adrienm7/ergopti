@@ -4,9 +4,9 @@
  * ==============================================================================
  * MODULE: Registry AHK Codegen
  * DESCRIPTION:
- * Generates `static/drivers/autohotkey/_generated/registry.ahk` from the
+ * Generates `static/ergopti_plus/windows/_generated/registry.ahk` from the
  * Registry domain contract defined in
- * `static/drivers/_shared/domain/registry.spec.js`.
+ * `static/ergopti_plus/_shared/domain/registry.spec.js`.
  *
  * FEATURES & RATIONALE:
  * 1. Single source of truth: the generated file derives its class contract
@@ -25,8 +25,8 @@ const fs   = require("fs");
 const path = require("path");
 
 const ROOT     = path.resolve(__dirname, "..");
-const OUT_PATH = path.resolve(ROOT, "static/drivers/autohotkey/_generated/registry.ahk");
-const SPEC_REL = "static/drivers/_shared/domain/registry.spec.js";
+const OUT_PATH = path.resolve(ROOT, "static/ergopti_plus/windows/_generated/registry.ahk");
+const SPEC_REL = "static/ergopti_plus/_shared/domain/registry.spec.js";
 
 
 
@@ -83,7 +83,7 @@ function buildAhkSource() {
 	const lines = [];
 
 	// File path header (first line)
-	lines.push("; static/drivers/autohotkey/_generated/registry.ahk");
+	lines.push("; static/ergopti_plus/windows/_generated/registry.ahk");
 	lines.push("");
 
 	// Auto-generated banner

@@ -3,7 +3,7 @@
 ==============================================================================
 MODULE: TOML Hotstrings Compiler
 DESCRIPTION:
-Reads the TOML hotstring files under ``static/drivers/_shared/hotstrings/`` and emits one
+Reads the TOML hotstring files under ``static/ergopti_plus/_shared/hotstrings/`` and emits one
 AHK file per category plus a thin ``hotstrings_generated.ahk`` entry-point
 that ``#Include``s all per-category files. This replaces the runtime
 regex-based TOML parser for the bundled categories — the driver boots without
@@ -63,14 +63,14 @@ MAGIC_KEY_MARKER: str = "★"  # ★
 def _category_file_header(category: str) -> str:
     """Return the file-path comment + module docstring for a per-category file."""
     return (
-        f"; static/drivers/autohotkey/lib/hotstrings/generated_{category}.ahk\n"
+        f"; static/ergopti_plus/windows/lib/hotstrings/generated_{category}.ahk\n"
         "\n"
         "; ==============================================================================\n"
         f"; MODULE: Generated Hotstrings — {category}\n"
         "; DESCRIPTION:\n"
         "; AUTO-GENERATED FILE — DO NOT EDIT BY HAND.\n"
         "; Regenerate with ``python tools/compile_hotstrings.py`` from the repo root\n"
-        "; whenever the bundled TOML files under ``static/drivers/_shared/hotstrings/`` change.\n"
+        "; whenever the bundled TOML files under ``static/ergopti_plus/_shared/hotstrings/`` change.\n"
         ";\n"
         "; Contains the ``_GenLoad_*`` loader functions and the partial\n"
         "; ``_GENERATED_HOTSTRINGS`` map entries for the ``" + category + "`` category.\n"
@@ -109,14 +109,14 @@ _LOADERS_BANNER: str = _make_major_banner("2/ Generated loaders")
 
 # Header for the thin entry-point hotstrings_generated.ahk.
 ENTRY_POINT_HEADER: str = """\
-; static/drivers/autohotkey/lib/hotstrings/hotstrings_generated.ahk
+; static/ergopti_plus/windows/lib/hotstrings/hotstrings_generated.ahk
 
 ; ==============================================================================
 ; MODULE: Generated Hotstrings Registrar — Entry Point
 ; DESCRIPTION:
 ; AUTO-GENERATED FILE — DO NOT EDIT BY HAND.
 ; Regenerate with ``python tools/compile_hotstrings.py`` from the repo root
-; whenever the bundled TOML files under ``static/drivers/_shared/hotstrings/`` change.
+; whenever the bundled TOML files under ``static/ergopti_plus/_shared/hotstrings/`` change.
 ;
 ; This file is a thin entry-point that ``#Include``s one generated file per
 ; category. Consumers that already ``#Include`` this file require no change.

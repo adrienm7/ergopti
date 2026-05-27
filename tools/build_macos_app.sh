@@ -6,7 +6,7 @@
 # DESCRIPTION:
 # Assembles Ergopti.app — a self-contained macOS bundle that embeds a vendored
 # Hammerspoon.app plus our entire Lua config tree, fronted by a Swift launcher
-# (compiled from static/drivers/hammerspoon/launcher) that hosts Sparkle and
+# (compiled from static/ergopti_plus/macos/launcher) that hosts Sparkle and
 # spawns the embedded Hammerspoon under a rebranded bundle id.
 #
 # OUTPUT:
@@ -81,7 +81,7 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BUILD_DIR="$REPO_ROOT/build/macos"
 APP_PATH="$BUILD_DIR/ErgoptiPlus.app"
 ZIP_PATH="$BUILD_DIR/ErgoptiPlus.app.zip"
-LAUNCHER_DIR="$REPO_ROOT/static/drivers/hammerspoon/launcher"
+LAUNCHER_DIR="$REPO_ROOT/static/ergopti_plus/macos/launcher"
 
 
 
@@ -325,9 +325,9 @@ assemble_app() {
 
 	# Mirror the dev tree under Contents/Resources/ so every Lua path that
 	# walks up from hs.configdir (e.g. ``hs.configdir .. "/../_shared/..."``,
-	# ``locale.lua``'s gsub("/static/drivers/hammerspoon$"), etc.) resolves
+	# ``locale.lua``'s gsub("/static/ergopti_plus/macos$"), etc.) resolves
 	# correctly without any code change. The MJConfigDir we point Hammerspoon
-	# at is the embedded ``static/drivers/hammerspoon`` subtree.
+	# at is the embedded ``static/ergopti_plus/macos`` subtree.
 	local res="$APP_PATH/Contents/Resources"
 	local static_root="$res/static"
 	mkdir -p "$static_root/drivers"
@@ -339,11 +339,11 @@ assemble_app() {
 		--exclude='tests' \
 		--exclude='paths.toml' \
 		--exclude='launcher' \
-		"$REPO_ROOT/static/drivers/hammerspoon/" \
+		"$REPO_ROOT/static/ergopti_plus/macos/" \
 		"$static_root/drivers/hammerspoon/"
 
 	# Sibling _shared/ tree (WebView HTML/CSS/JS, LLM defaults, DB schema).
-	cp -R "$REPO_ROOT/static/drivers/_shared"     "$static_root/drivers/_shared"
+	cp -R "$REPO_ROOT/static/ergopti_plus/_shared"     "$static_root/drivers/_shared"
 
 	# Static assets at the repo's static/ root.
 	cp -R "$REPO_ROOT/static/menu_manifest.json"  "$static_root/"

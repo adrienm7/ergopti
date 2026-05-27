@@ -43,7 +43,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
-DRIVER_DIR="${REPO_ROOT}/static/drivers/hammerspoon"
+DRIVER_DIR="${REPO_ROOT}/static/ergopti_plus/macos"
 HS_CONFIG_DIR="${HOME}/.hammerspoon"
 HS_INIT="${HS_CONFIG_DIR}/init.lua"
 

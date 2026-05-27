@@ -4,12 +4,12 @@ on:
   push:
     branches: [main, dev]
     paths:
-      - "static/drivers/hammerspoon/**"
+      - "static/ergopti_plus/macos/**"
       - ".github/workflows/test_hammerspoon.yml"
   pull_request:
     branches: [main, dev]
     paths:
-      - "static/drivers/hammerspoon/**"
+      - "static/ergopti_plus/macos/**"
       - ".github/workflows/test_hammerspoon.yml"
 
 jobs:
@@ -36,11 +36,11 @@ jobs:
 
       - name: Run luacheck
         run: |
-          luacheck static/drivers/hammerspoon/tests static/drivers/hammerspoon/lib \
-            static/drivers/hammerspoon/modules || true
+          luacheck static/ergopti_plus/macos/tests static/ergopti_plus/macos/lib \
+            static/ergopti_plus/macos/modules || true
         # luacheck failures should not break CI yet — surface them as warnings
         # so pre-existing style issues do not block the test run.
 
       - name: Run unit + meta tests
-        working-directory: static/drivers/hammerspoon
+        working-directory: static/ergopti_plus/macos
         run: lua5.4 tests/run.lua

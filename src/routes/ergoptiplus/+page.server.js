@@ -1,21 +1,19 @@
 // src/routes/ergoptiplus/+page.server.js
 //
 // Build-time loader that parses the Hammerspoon LLM catalog
-// (static/drivers/hammerspoon/data/llm_models.json) and exposes a compact
+// (static/ergopti_plus/_shared/llm/models.json) and exposes a compact
 // per-provider summary to the page. Running this server-side keeps the
 // 200 KB raw JSON out of the client bundle — only the trimmed summary is
 // serialized into the prerendered HTML.
 
 import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import { dirname, resolve } from 'node:path';
+import { resolve } from 'node:path';
 
 export const prerender = true;
 
-// Resolve the JSON path relative to this file so the build works regardless
-// of where SvelteKit is invoked from.
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const MODELS_PATH = resolve(__dirname, '../../../static/drivers/hammerspoon/data/llm_models.json');
+// Resolve the JSON path from the repo root (process.cwd() at build time) so
+// the path survives SvelteKit server-side compilation regardless of __dirname.
+const MODELS_PATH = resolve(process.cwd(), 'static/ergopti_plus/_shared/llm/models.json');
 
 /**
  * Parse a parameter count string like "30.53B", "350M" or "1.2B" into a

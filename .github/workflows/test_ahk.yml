@@ -4,15 +4,15 @@ on:
     push:
         branches: [main, dev]
         paths:
-            - "static/drivers/autohotkey/**"
-            - "static/drivers/_shared/features/manifest.toml"
+            - "static/ergopti_plus/windows/**"
+            - "static/ergopti_plus/_shared/features/manifest.toml"
             - "scripts/build-features-manifest.js"
             - ".github/workflows/test_ahk.yml"
     pull_request:
         branches: [main, dev]
         paths:
-            - "static/drivers/autohotkey/**"
-            - "static/drivers/_shared/features/manifest.toml"
+            - "static/ergopti_plus/windows/**"
+            - "static/ergopti_plus/_shared/features/manifest.toml"
             - "scripts/build-features-manifest.js"
             - ".github/workflows/test_ahk.yml"
     workflow_dispatch:
@@ -72,7 +72,7 @@ jobs:
               # or uses LF-only line endings. This step catches encoding drift before
               # it produces silent test failures with no error message.
               run: |
-                  $ahkFiles = Get-ChildItem -Path "${{ github.workspace }}\static\drivers\autohotkey" `
+                  $ahkFiles = Get-ChildItem -Path "${{ github.workspace }}\static\ergopti_plus\windows" `
                       -Recurse -Filter "*.ahk" | Where-Object { -not $_.FullName.Contains("vendor") }
                   $failures = @()
                   foreach ($file in $ahkFiles) {
@@ -107,7 +107,7 @@ jobs:
                       Write-Error "AutoHotkey64.exe not found in C:\AutoHotkey"
                       exit 2
                   }
-                  $runner = "${{ github.workspace }}\static\drivers\autohotkey\tests\run_all.ahk"
+                  $runner = "${{ github.workspace }}\static\ergopti_plus\windows\tests\run_all.ahk"
                   if (-not (Test-Path $runner)) {
                       Write-Error "Test runner not found at $runner"
                       exit 2
@@ -139,7 +139,7 @@ jobs:
               # other static-analysis issues before they reach production.
               run: |
                   $ahk = Get-ChildItem "C:\AutoHotkey" -Filter "AutoHotkey64.exe" | Select-Object -First 1 -ExpandProperty FullName
-                  $runner = "${{ github.workspace }}\static\drivers\autohotkey\tests\run_all.ahk"
+                  $runner = "${{ github.workspace }}\static\ergopti_plus\windows\tests\run_all.ahk"
                   $output = & cmd /c "`"$ahk`" `"$runner`" 2>&1"
                   $warnings = $output | Where-Object { $_ -match "^Warning:" }
                   if ($warnings) {

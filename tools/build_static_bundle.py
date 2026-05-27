@@ -56,9 +56,9 @@ ASSET_TREES: list[tuple[str, str, tuple[str, ...]]] = [
 	# _shared driver assets: WebView HTML/CSS/JS, LLM defaults, DB schema.
 	# prefetch.json is regenerated at runtime by the dashboards, so we leave
 	# any stale snapshot behind rather than shipping a frozen copy.
-	("static/drivers/_shared",                  "static/drivers/_shared",                  ("prefetch.json",)),
+	("static/ergopti_plus/_shared",                  "static/ergopti_plus/_shared",                  ("prefetch.json",)),
 	# Vendor DLLs that DllCall expects to find next to the EXE.
-	("static/drivers/autohotkey/vendor",        "vendor",                                  ("*.ahk",)),
+	("static/ergopti_plus/windows/vendor",        "vendor",                                  ("*.ahk",)),
 ]
 
 # Single-file assets pulled in alongside the trees above.
@@ -152,7 +152,7 @@ def main() -> int:
 		"--output",
 		type=Path,
 		default=None,
-		help="Output zip path (default: <repo>/static/drivers/autohotkey/build/static_bundle.zip).",
+		help="Output zip path (default: <repo>/static/ergopti_plus/windows/build/static_bundle.zip).",
 	)
 	args = parser.parse_args()
 

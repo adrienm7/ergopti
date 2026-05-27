@@ -4,13 +4,13 @@ on:
     push:
         branches: [dev, main]
         paths:
-            - "static/drivers/_shared/hotstrings/*.toml"
+            - "static/ergopti_plus/_shared/hotstrings/*.toml"
             - "tools/format_toml.py"
             - ".github/workflows/lint_hotstrings.yml"
     pull_request:
         branches: [dev, main]
         paths:
-            - "static/drivers/_shared/hotstrings/*.toml"
+            - "static/ergopti_plus/_shared/hotstrings/*.toml"
             - "tools/format_toml.py"
             - ".github/workflows/lint_hotstrings.yml"
     workflow_dispatch:

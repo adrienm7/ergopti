@@ -6,16 +6,16 @@
 //      directory on first boot.
 //
 // Inputs:
-//   static/drivers/_shared/features/manifest.toml
-//   static/drivers/_shared/tap_hold/defaults.toml
+//   static/ergopti_plus/_shared/features/manifest.toml
+//   static/ergopti_plus/_shared/tap_hold/defaults.toml
 //
 // Outputs:
-//   static/drivers/autohotkey/_generated/features_manifest.ahk
-//   static/drivers/autohotkey/_generated/config_template.toml
-//   static/drivers/autohotkey/_generated/tap_hold_template.toml
-//   static/drivers/hammerspoon/_generated/features_manifest.lua
-//   static/drivers/hammerspoon/_generated/config_template.toml
-//   static/drivers/hammerspoon/_generated/tap_hold_template.toml
+//   static/ergopti_plus/windows/_generated/features_manifest.ahk
+//   static/ergopti_plus/windows/_generated/config_template.toml
+//   static/ergopti_plus/windows/_generated/tap_hold_template.toml
+//   static/ergopti_plus/macos/_generated/features_manifest.lua
+//   static/ergopti_plus/macos/_generated/config_template.toml
+//   static/ergopti_plus/macos/_generated/tap_hold_template.toml
 //
 // Usage:
 //   npm run build:manifest
@@ -33,10 +33,10 @@ import { fileURLToPath } from 'url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, '..');
 
-const MANIFEST_PATH = resolve(REPO_ROOT, 'static/drivers/_shared/features/manifest.toml');
+const MANIFEST_PATH = resolve(REPO_ROOT, 'static/ergopti_plus/_shared/features/manifest.toml');
 
-const OUT_AHK_DIR   = resolve(REPO_ROOT, 'static/drivers/autohotkey/_generated');
-const OUT_HS_DIR    = resolve(REPO_ROOT, 'static/drivers/hammerspoon/_generated');
+const OUT_AHK_DIR   = resolve(REPO_ROOT, 'static/ergopti_plus/windows/_generated');
+const OUT_HS_DIR    = resolve(REPO_ROOT, 'static/ergopti_plus/macos/_generated');
 
 const PLATFORMS = ['ahk', 'hs'];
 
