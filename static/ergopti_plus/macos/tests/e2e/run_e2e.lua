@@ -145,16 +145,26 @@ local function make_vkb(trigger, replacement, opts)
 	opts = opts or {}
 
 	-- Fresh stub environment for each scenario to prevent cross-test leakage.
-	package.loaded["lib.logger"]             = nil
-	package.loaded["modules.keymap.registry"] = nil
-	package.loaded["modules.keymap.utils"]    = nil
-	package.loaded["modules.keymap.expander"] = nil
-	package.loaded["lib.text_utils"]          = nil
+	-- All keymap modules are cleared so they reload together under a single
+	-- fresh hs stub (the one created by the final load_with_stubs call below).
+	-- modules.keymap.utils captures hs.eventtap.keyStrokes at module-load time,
+	-- so it MUST be in the same load wave as expander to guarantee that the
+	-- KEYSTROKES table written by utils and the __keystrokes table read by the
+	-- harness are the same object.
+	package.loaded["lib.logger"]                 = nil
+	package.loaded["lib.text_utils"]             = nil
+	package.loaded["lib.i18n"]                   = nil
+	package.loaded["modules.keymap.terminators"] = nil
+	package.loaded["modules.keymap.utils"]       = nil
+	package.loaded["modules.keymap.registry"]    = nil
+	package.loaded["modules.keymap.expander"]    = nil
 
-	helpers.load_with_stubs("lib.logger")
-	local text_utils = helpers.load_with_stubs("lib.text_utils")
-	local Registry   = helpers.load_with_stubs("modules.keymap.registry")
-	local Expander   = helpers.load_with_stubs("modules.keymap.expander")
+	-- One load_with_stubs call — establishes the canonical hs stub for this
+	-- scenario; all dependencies (registry, utils, terminators) cascade from
+	-- the same require chain and share the same KEYSTROKES table.
+	local Expander = helpers.load_with_stubs("modules.keymap.expander")
+	local Registry = require("modules.keymap.registry")
+	local text_utils = require("lib.text_utils")
 
 	-- Magic key sentinel — same value as the live driver.
 	local MAGIC_KEY = "\xe2\x98\x85"
