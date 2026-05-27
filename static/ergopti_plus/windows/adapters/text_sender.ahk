@@ -1,4 +1,4 @@
-﻿; adapters/text_sender.ahk
+; adapters/text_sender.ahk
 
 ; ==============================================================================
 ; MODULE: TextSender Adapter (AutoHotkey)
@@ -127,7 +127,7 @@ TextPressKey(Key, Modifiers) {
 ; (tests/test_adapter_compliance_new.ahk) to verify every required method exists
 ; and is callable without manually listing functions per-adapter.
 global ADAPTER_TEXT_SENDER := Map(
-    "send",       Func("TextSend"),
-    "eraseChars", Func("TextEraseChars"),
-    "pressKey",   Func("TextPressKey"),
+    "send",       TextSend,
+    "eraseChars", TextEraseChars,
+    "pressKey",   TextPressKey,
 )
