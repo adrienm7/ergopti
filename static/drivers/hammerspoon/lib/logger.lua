@@ -235,6 +235,11 @@ M.current_level = M.LEVELS.WARNING
 -- Called with (module_name, formatted_message) on every Logger.error call.
 local _error_notification_handler = nil
 
+-- Optional test sink registered by unit tests to capture formatted log lines
+-- without touching the filesystem or hs.console. Set via M.set_sink() and
+-- cleared by passing nil.
+local _test_sink = nil
+
 
 
 
@@ -318,6 +323,13 @@ end
 --- @param fn function|nil Callback with signature fn(module_name, message).
 function M.set_error_notification_handler(fn)
 	_error_notification_handler = (type(fn) == "function") and fn or nil
+end
+
+--- Registers (or clears) a callable test sink that receives every formatted
+--- log line as a plain string. Pass nil to remove. Intended for unit tests only.
+--- @param fn function|nil One-arity function receiving the line string, or nil to clear.
+function M.set_sink(fn)
+	_test_sink = (type(fn) == "function") and fn or nil
 end
 
 --- Sets the active log level. Messages below this threshold are silently dropped.
@@ -502,6 +514,9 @@ local function _log(variant_key, module_name, msg, ...)
 	-- Push to the in-memory ring buffer so ring_buffer_snapshot() is always
 	-- current without requiring a file read.
 	_push_ring(console_line)
+
+	-- Forward to the test sink when registered (never in production builds).
+	if _test_sink then pcall(_test_sink, console_line) end
 
 	_write_to_file(stamp, line)
 end
