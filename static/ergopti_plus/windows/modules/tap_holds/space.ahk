@@ -35,7 +35,7 @@ SpaceTapHold(HoldFn) {
         ; Tap path: send the Space that was intercepted, then the captured character
         ; (omit it when it is itself a Space to avoid a double-space).
         Text := (ih.Input == " ") ? "" : ih.Input
-        TextSend("{Space}" Text, "")
+        TextSend("{Space}" Text, "", 0)
         UpdateLastSentCharacter(" ")
         return False
     }
