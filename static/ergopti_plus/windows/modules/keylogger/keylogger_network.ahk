@@ -95,35 +95,40 @@ KL_Net_WifiTick() {
     if !Keylogger.initialized
         return
 
-    ; Delegate to the NetworkInfo adapter — no DllCall plumbing in this module
-    ssid_hash  := NI_GetSsidHash()
-    signal_pct := NI_GetSignalStrength()
+    ; Wrap the entire poll in try so a transient WLAN API failure (unavailable
+    ; adapter, mid-suspend state) never surfaces as an uncaught error that would
+    ; cascade into PrefixWatcher and other per-keystroke callbacks.
+    try {
+        ; Delegate to the NetworkInfo adapter — no DllCall plumbing in this module
+        ssid_hash  := NI_GetSsidHash()
+        signal_pct := NI_GetSignalStrength()
 
-    ; NI_GetSsidHash() returns "" when no Wi-Fi is connected
-    if (ssid_hash = "")
-        return
+        ; NI_GetSsidHash() returns "" when no Wi-Fi is connected
+        if (ssid_hash = "")
+            return
 
-    ; signal_pct is 0-100 from the WLAN API signal quality field
-    signal := "poor"
-    if (signal_pct >= 80)
-        signal := "excellent"
-    else if (signal_pct >= 60)
-        signal := "good"
-    else if (signal_pct >= 40)
-        signal := "fair"
+        ; signal_pct is 0-100 from the WLAN API signal quality field
+        signal := "poor"
+        if (signal_pct >= 80)
+            signal := "excellent"
+        else if (signal_pct >= 60)
+            signal := "good"
+        else if (signal_pct >= 40)
+            signal := "fair"
 
-    if (ssid_hash != KLNet.last_ssid_hash or signal != KLNet.last_signal) {
-        meta := Map("ssid_hash", ssid_hash, "signal", signal)
-        if (KLNet.last_ssid_hash != "")
-            meta["prev_ssid_hash"] := KLNet.last_ssid_hash
-        KL_AppendLog(Map(
-            "type", "network_change",
-            "app",  Keylogger.session_app,
-            "ssid_hash", ssid_hash,
-            "signal",    signal
-        ))
-        KLNet.last_ssid_hash := ssid_hash
-        KLNet.last_signal    := signal
+        if (ssid_hash != KLNet.last_ssid_hash or signal != KLNet.last_signal) {
+            entry := Map(
+                "type",      "network_change",
+                "app",       Keylogger.session_app,
+                "ssid_hash", ssid_hash,
+                "signal",    signal
+            )
+            if (KLNet.last_ssid_hash != "")
+                entry["prev_ssid_hash"] := KLNet.last_ssid_hash
+            KL_AppendLog(entry)
+            KLNet.last_ssid_hash := ssid_hash
+            KLNet.last_signal    := signal
+        }
     }
 }
 
