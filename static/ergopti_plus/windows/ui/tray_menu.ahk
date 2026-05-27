@@ -1704,7 +1704,7 @@ initMenu() {
 	RegisterMenuItem(DebuggingMenu, t("menu.debug.open_logs"),     OpenLogsFolder)
 	RegisterMenuItem(DebuggingMenu, t("menu.debug.open_today_log"), OpenTodayLog)
 	DebuggingMenu.Add()
-	DebuggingMenu.Add(t("menu.debug.log_level"), _BuildLogLevelMenu())
+	DebuggingMenu.Add(_LogLevelMenuLabel(), _BuildLogLevelMenu())
 	DebuggingMenu.Add()
 	RegisterMenuItem(DebuggingMenu, t("menu.debug.healthcheck"), ShowHealthCheck)
 	A_TrayMenu.Add(t("menu.debug.title"), DebuggingMenu)
@@ -1848,9 +1848,16 @@ LoggerSetLevel(Level) {
 	}
 	LOGGER_MIN_LEVEL := Level
 	_LoggerRefreshFastFlags()
-	try TOML_Write(Level, ConfigurationFile, "Script", "LogLevel")
+	try TOML_Write(Level, ConfigurationFile, "script", "log_level")
 	try LoggerInfo("Menu", "Log level set to {1}.", Level)
 	RebuildTrayMenu()
+}
+
+; Returns the label shown for the log-level submenu entry, including the
+; active level so the user can see the current setting without opening the submenu.
+_LogLevelMenuLabel() {
+	global LOGGER_MIN_LEVEL
+	return t("menu.debug.log_level") . " : " . LOGGER_MIN_LEVEL
 }
 
 ; Build the log level submenu for the Debug entry. Returns a Menu object

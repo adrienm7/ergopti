@@ -70,6 +70,14 @@ global _KLLastShownSuggestion := ""
 global _MIN_PREFIX_LEN := 2
 global _MAX_BUFFER_LEN := 64    ; longest trigger we expect, with margin
 
+; Extended word-boundary set for tooltip lookup. Superset of HSE_WORD_TERMINATORS:
+; we add typographic double-quotes (U+201C " and U+201D ") and the straight
+; double-quote (U+0022 ") so that typing inside a quoted phrase (e.g. `cher"mais`)
+; still anchors the SearchKey to the word after the quote. HSE does NOT treat
+; double-quotes as hotstring terminators (they can appear inside trigger bodies),
+; so this constant must stay separate from HSE_WORD_TERMINATORS.
+global _PREFIX_WORD_BOUNDARIES := HSE_WORD_TERMINATORS . Chr(0x22) . Chr(0x201C) . Chr(0x201D)
+
 ; Categories scanned at boot. The order matches Hammerspoon's default load
 ; order so a tie on the prefix index returns the same first-match across
 ; both drivers.
@@ -199,25 +207,23 @@ _ResolveFireHType(Spec) {
     return (Spec.HasOwnProp("Star") and Spec.Star) ? "star" : "endchar"
 }
 
-; Toggle the suppression flag. The hotstring engine wraps its SendEvent
-; bursts in ``PrefixWatcherSuppress(true)`` / ``PrefixWatcherSuppress(false)``
+; Toggle the suppression flag. The hotstring engine wraps its send bursts
+; in ``PrefixWatcherSuppress(true)`` / ``PrefixWatcherSuppress(false)``
 ; pairs (with a small SetTimer delay on the release) so the InputHook
-; ignores AHK-generated characters. Releasing the flag also wipes the
-; live buffer and hides any leftover tooltip — by the time we re-enable
-; observation, the user is starting a fresh keystroke run.
+; ignores AHK-generated characters during the backspace+replacement burst.
+; The buffer reset is now done synchronously by HSE_DispatchMatch's finally
+; block (via _ResetPrefixBuffer) before this deferred release fires, so we
+; must NOT wipe _PrefixBuffer here — doing so would erase the first
+; keystrokes of the next word if the user types quickly after the expansion.
 PrefixWatcherSuppress(YesNo) {
-    global _PrefixWatcherSuppressed, _PrefixBuffer
+    global _PrefixWatcherSuppressed
     _PrefixWatcherSuppressed := !!YesNo
     ; Mirror the suppression into HSE so its parallel buffer stays aligned
-    ; with the prefix watcher during SendEvent bursts. HSE_Suppress only
+    ; with the prefix watcher during send bursts. HSE_Suppress only
     ; flips the flag — the HSE buffer is NOT wiped here; HSE_DispatchMatch
     ; already called HSE_ApplyExpansion before deferring this release,
     ; so the buffer already reflects the post-expansion screen state.
     HSE_Suppress(YesNo)
-    if !YesNo {
-        _PrefixBuffer := ""
-        TooltipHide()
-    }
 }
 
 ; Stop the InputHook and clear the index. Useful when the user disables the
@@ -443,7 +449,11 @@ _AddTriggerToIndex(Trigger, Output, Category, Section) {
 ; until HotstringPrefixWatcherStop is called.
 _StartInputHook() {
     global _PrefixInputHook
-    Hook := InputHook("V L0 I0")
+    ; No I0 flag — injected keystrokes (tap-hold space, AltGr combos, etc.)
+    ; must reach the watcher so the buffer resets on synthetic spaces. The
+    ; HSE_Suppressed / _PrefixWatcherSuppressed guards in the callbacks filter
+    ; out chars injected by the hotstring engine itself.
+    Hook := InputHook("V L0")
     Hook.KeyOpt("{All}", "+N")            ; notify OnKeyDown for every key
     Hook.OnChar    := _OnPrefixChar
     Hook.OnKeyDown := _OnPrefixKeyDown
@@ -458,7 +468,7 @@ _StartInputHook() {
 ; does not silently kill the InputHook callback chain — AHK v2 stops invoking
 ; the OnChar callback permanently if an unhandled error propagates out of it.
 _OnPrefixChar(IH, Char) {
-    global _PrefixBuffer, _MAX_BUFFER_LEN, _PrefixWatcherSuppressed, HSE_Suppressed
+    global _PrefixBuffer, _MAX_BUFFER_LEN, _PrefixWatcherSuppressed, HSE_Suppressed, _PrefixIndex
     ; Honour BOTH suppression flags. _PrefixWatcherSuppressed is set by
     ; PrefixWatcherSuppress (manual / tray toggles); HSE_Suppressed is
     ; set by HSE_DispatchMatch while it is replaying its SendEvent burst.
@@ -531,6 +541,13 @@ _OnPrefixChar(IH, Char) {
                 if (StrLen(_PrefixBuffer) > _MAX_BUFFER_LEN) {
                     _PrefixBuffer := SubStr(_PrefixBuffer, -_MAX_BUFFER_LEN)
                 }
+                ; Trim the buffer to only the suffix that could be a live trigger
+                ; prefix. The suffix after the last boundary is what _LookupAndRender
+                ; would use as its SearchKey. If that SearchKey has no entry in the
+                ; index the replacement is not a cascade seed — wipe to empty so the
+                ; next keystroke starts fresh rather than accumulating "maism" etc.
+                Suffix := _SuffixAfterLastBoundary(_PrefixBuffer)
+                _PrefixBuffer := (Suffix != "" and _PrefixIndex.Has(Suffix)) ? Suffix : ""
                 ; The roll/cascade injected new text into the buffer — check
                 ; if it prefixes a registered trigger and show the tooltip
                 ; immediately. This handles « p'★ → c'était »: the roll fires
@@ -546,14 +563,13 @@ _OnPrefixChar(IH, Char) {
             return
         }
 
-        ; Space and other non-word characters reset the buffer — the trigger
-        ; index only contains word-internal sequences, and a leading space
-        ; would prevent any match from being found. OnKeyDown handles the VK
-        ; path for keys that produce no character (arrows, Escape…); this
-        ; guard covers keys that do produce a character (Space via tap-hold
-        ; or AltGr layers) but whose VK event may be swallowed by AHK before
-        ; reaching the InputHook.
-        if (Char == " " or Char == "`t") {
+        ; Word-terminator characters reset the buffer — the trigger index only
+        ; contains word-internal sequences, and a leading terminator would
+        ; prevent any match. OnKeyDown handles VK-only keys (arrows, Escape…);
+        ; this guard covers printable terminators (space, punctuation, …) that
+        ; produce a char event — including those arriving via tap-hold or AltGr
+        ; layers whose VK event may be swallowed before reaching the InputHook.
+        if InStr(_PREFIX_WORD_BOUNDARIES, Char) {
             _ResetPrefixBuffer()
             return
         }
@@ -649,6 +665,22 @@ _OnPrefixKeyDown(IH, VK, SC) {
     } catch as Err {
         LoggerError("PrefixWatcher", "OnKeyDown error for VK {1}: {2}.", VK, Err.Message)
     }
+}
+
+; Return the suffix of Buf that follows the last word-boundary character.
+; Uses _PREFIX_WORD_BOUNDARIES so the result is the same SearchKey that
+; _LookupAndRender would compute. Returns Buf unchanged when no boundary
+; is present (the whole string is one word).
+_SuffixAfterLastBoundary(Buf) {
+    global _PREFIX_WORD_BOUNDARIES
+    Idx := StrLen(Buf)
+    while (Idx >= 1) {
+        if (InStr(_PREFIX_WORD_BOUNDARIES, SubStr(Buf, Idx, 1)) > 0) {
+            return SubStr(Buf, Idx + 1)
+        }
+        Idx -= 1
+    }
+    return Buf
 }
 
 ; ConsumedByFire ─ true when the reset is the consequence of a hotstring
@@ -763,12 +795,12 @@ KL_LogHotstringNearMiss(kind, trigger, replacement, h_type) {
 ; (apostrophes for French contractions, punctuation, …) even though the
 ; HSE engine itself fires those triggers correctly via suffix matching.
 ;
-; We slide a cursor across HSE_WORD_TERMINATORS to find the rightmost
-; terminator in the buffer; everything to its right is the effective "word
-; under typing", and that is what we look up. When no terminator is present
+; We slide a cursor across _PREFIX_WORD_BOUNDARIES to find the rightmost
+; boundary in the buffer; everything to its right is the effective "word
+; under typing", and that is what we look up. When no boundary is present
 ; we fall back to the full buffer.
 _LookupAndRender() {
-    global _PrefixBuffer, _PrefixIndex, _MIN_PREFIX_LEN, HSE_WORD_TERMINATORS, ScriptInformation
+    global _PrefixBuffer, _PrefixIndex, _MIN_PREFIX_LEN, _PREFIX_WORD_BOUNDARIES, ScriptInformation
     Buffer := _PrefixBuffer
     Len := StrLen(Buffer)
     LoggerDebug("PrefixWatcher", "DBG _LookupAndRender: buf='{1}' len={2} indexSize={3}.", Buffer, Len, _PrefixIndex.Count)
@@ -794,7 +826,7 @@ _LookupAndRender() {
     BufScanIdx := StrLen(Buffer)
     while (BufScanIdx >= 1) {
         ScanChar := SubStr(Buffer, BufScanIdx, 1)
-        if (InStr(HSE_WORD_TERMINATORS, ScanChar) > 0) {
+        if (InStr(_PREFIX_WORD_BOUNDARIES, ScanChar) > 0) {
             LastTermPos := BufScanIdx
             break
         }

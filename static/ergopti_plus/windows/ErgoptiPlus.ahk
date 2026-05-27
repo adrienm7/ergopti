@@ -1426,6 +1426,11 @@ SaveFullConfig() {
 
     ; [script] section — locale and other script-level settings.
     Updates.Push({ Section: "script", Key: "locale", Value: I18nGetLocale() })
+    ; Persist the active log level so it survives a reload. LOGGER_MIN_LEVEL
+    ; is mutated in-memory by LoggerSetLevel; SaveFullConfig is the only path
+    ; that keeps config.toml consistent, so the value must be included here.
+    global LOGGER_MIN_LEVEL, LOGGER_DEFAULT_LEVEL
+    Updates.Push({ Section: "script", Key: "log_level", Value: IsSet(LOGGER_MIN_LEVEL) ? LOGGER_MIN_LEVEL : LOGGER_DEFAULT_LEVEL })
 
     ; [hotstrings] root — MagicKey lives at hotstrings.trigger_char.
     Updates.Push({ Section: "hotstrings", Key: "trigger_char", Value: ScriptInformation["MagicKey"] })

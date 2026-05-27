@@ -67,7 +67,8 @@ SpaceTapHold(HoldFn) {
         _SpaceTapSent := True
         TextPressKey("Space", "")
         ; TextPressKey uses SendInput which bypasses the prefix-watcher InputHook.
-        ; Feed Space into HSE manually so end-char-gated hotstrings can fire.
+        ; Feed Space into HSE manually so end-char-gated hotstrings can fire,
+        ; and reset the prefix watcher buffer (also bypassed by SendInput).
         global HSE_LastEndChar
         HSEMatch := HSE_FeedChar(" ")
         if (HSEMatch != "") {
@@ -81,6 +82,11 @@ SpaceTapHold(HoldFn) {
                 TextSend(ih.Input, "", 0)
             return False
         }
+        ; No hotstring fired — still need to reset the prefix buffer so the
+        ; next word starts fresh (SendInput bypasses the InputHook, so the
+        ; watcher never sees this Space otherwise).
+        if IsSet(_ResetPrefixBuffer)
+            try _ResetPrefixBuffer()
         if (ih.Input != "")
             TextSend(ih.Input, "", 0)
         UpdateLastSentCharacter(" ")

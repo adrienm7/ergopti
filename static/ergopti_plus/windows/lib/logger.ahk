@@ -151,7 +151,7 @@ LoggerInit() {
     LOGGER_MIN_LEVEL := LOGGER_DEFAULT_LEVEL
     if IsSet(ConfigurationFile) and FileExist(ConfigurationFile) {
         try {
-            Value := TOML_Read(ConfigurationFile, "Script", "LogLevel", LOGGER_DEFAULT_LEVEL)
+            Value := TOML_Read(ConfigurationFile, "script", "log_level", LOGGER_DEFAULT_LEVEL)
             if LOGGER_SEVERITY.Has(Value) {
                 LOGGER_MIN_LEVEL := Value
             }

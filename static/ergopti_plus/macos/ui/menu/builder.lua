@@ -430,9 +430,11 @@ function M.generate(ctx, menu_mods, actions)
 	-- Build the log level submenu with a checkmark on the active level
 	local log_level_items = {}
 	local Logger_mod = require("lib.logger")
+	local active_level_name = "INFO"
 	for _, lvl in ipairs({ "DEBUG", "INFO", "WARNING", "ERROR" }) do
 		local lvl_num = Logger_mod.LEVELS[lvl]
 		local is_active = (Logger_mod.current_level == lvl_num)
+		if is_active then active_level_name = lvl end
 		local lvl_capture = lvl
 		table.insert(log_level_items, {
 			title   = lvl,
@@ -449,7 +451,7 @@ function M.generate(ctx, menu_mods, actions)
 			{ title = i18n.get("menu.debug.open_logs"),      fn = actions.open_logs },
 			{ title = i18n.get("menu.debug.open_today_log"), fn = actions.open_today_log },
 			{ title = "-" },
-			{ title = i18n.get("menu.debug.log_level"), menu = log_level_items },
+			{ title = i18n.get("menu.debug.log_level") .. " : " .. active_level_name, menu = log_level_items },
 			{ title = "-" },
 			{
 				title = i18n.get("menu.debug.healthcheck"),

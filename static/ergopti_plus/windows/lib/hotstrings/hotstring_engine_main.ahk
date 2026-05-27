@@ -986,6 +986,14 @@ HSE_DispatchMatch(Spec, EndChar) {
         ; race with us.
         HSE_ApplyExpansion(Spec, Replacement, EndChar)
     } finally {
+        ; Reset the prefix watcher buffer synchronously so the post-expansion
+        ; state is immediately clean. This must happen before the deferred
+        ; Suppress(false) fires so that PrefixWatcherSuppress(false) does not
+        ; find a stale buffer and clear it 60 ms later — which would erase the
+        ; first keystrokes of the next word if the user types quickly.
+        if IsSet(_ResetPrefixBuffer) {
+            try _ResetPrefixBuffer(true)
+        }
         SetTimer((*) => HSE_Suppress(false), -HSE_SUPPRESS_RELEASE_DELAY_MS)
         if IsSet(PrefixWatcherSuppress) {
             SetTimer((*) => PrefixWatcherSuppress(false), -HSE_SUPPRESS_RELEASE_DELAY_MS)
