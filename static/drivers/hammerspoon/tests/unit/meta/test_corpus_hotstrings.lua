@@ -196,6 +196,35 @@ seq_counter             = 0,
 		end
 	end)
 
+	helpers.it("case-sensitive vectors: buffer casing determines match flag", function()
+		if not corpus then return end
+		for _, v in ipairs(corpus.vectors) do
+			if v.is_case_sensitive ~= true then goto continue end
+			local R = helpers.load_with_stubs("modules.keymap.registry")
+			R.init({
+				magic_key               = "★",
+				mappings                = {},
+				mappings_lookup         = {},
+				mappings_by_tail_char   = {},
+				mappings_by_star_tail_char = {},
+				groups                  = {},
+				seq_counter             = 0,
+				current_group           = "corpus",
+				start_is_word_boundary  = true,
+			})
+			R.add(v.trigger, v.replacement or "", { is_case_sensitive = true, is_word = v.is_word == true })
+			local buf  = v.buffer or v.trigger
+			local tlen = #v.trigger
+			local buf_tail = buf:sub(-tlen)
+			-- Case-sensitive: only an exact byte-for-byte match of the tail triggers.
+			local actually_matches = (buf_tail == v.trigger)
+			local expected_matches = (v.expected and v.expected.matched == true)
+			helpers.assert_eq(expected_matches, actually_matches,
+				"vector '" .. v.id .. "': case-sensitive match flag inconsistency")
+			::continue::
+		end
+	end)
+
 	helpers.it("non-matching buffers do not produce suffix hits", function()
 		if not corpus then return end
 		for _, v in ipairs(corpus.vectors) do

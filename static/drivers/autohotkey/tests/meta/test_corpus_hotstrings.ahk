@@ -172,6 +172,34 @@ _CorpusHS_NonMatchedBuffersDontEndWithTrigger() {
 }
 Test("hotstring corpus  --  non-matched vectors: buffer does not end with trigger", _CorpusHS_NonMatchedBuffersDontEndWithTrigger)
 
+_CorpusHS_Utf8BackspaceCountUsesCodepoints() {
+	; For UTF-8 triggers the corpus records backspace_count as the codepoint count,
+	; not the byte count. AHK v2 StrLen() counts UTF-16 code units (which collapses
+	; to codepoints for the BMP characters used in our triggers), so this test pins
+	; that StrLen equals the corpus backspace_count for all matched vectors --
+	; catching any future drift if AHK changes its string model.
+	Corpus := _CorpusHS_Parse()
+	if Corpus = "" {
+		return
+	}
+	for V in Corpus["vectors"] {
+		Exp := V["expected"]
+		if not (Exp.Has("matched") and Exp["matched"] = true) {
+			continue
+		}
+		if not Exp.Has("backspace_count") {
+			continue
+		}
+		Trigger    := V["trigger"]
+		Consumed   := V.Has("terminator_consumed") and V["terminator_consumed"] = true
+		TrigLen    := StrLen(Trigger)
+		ExpectedBC := TrigLen + (Consumed ? 1 : 0)
+		AssertEqual(ExpectedBC, Exp["backspace_count"],
+			"vector '" . V["id"] . "': StrLen-based backspace_count must equal corpus value")
+	}
+}
+Test("hotstring corpus  --  UTF-8 triggers: StrLen-based backspace_count matches corpus", _CorpusHS_Utf8BackspaceCountUsesCodepoints)
+
 _CorpusHS_CaseSensitiveVectorsHaveCorrectMatchFlag() {
 	; Validates that case_sensitive=true vectors correctly reflect whether the
 	; buffer casing matches the trigger casing.

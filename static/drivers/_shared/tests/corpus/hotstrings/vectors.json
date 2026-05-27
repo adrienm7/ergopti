@@ -192,6 +192,66 @@
 			"expected": {
 				"matched": false
 			}
+		},
+
+		{
+			"id": "utf8_trigger_two_codepoints",
+			"description": "Trigger containing a 2-byte UTF-8 character (é): backspace_count must equal codepoint count, not byte count.",
+			"trigger": "cé",
+			"replacement": "c'est",
+			"is_word": false,
+			"buffer": "cé",
+			"terminator": " ",
+			"expected": {
+				"matched": true,
+				"replacement": "c'est",
+				"backspace_count": 2
+			}
+		},
+
+		{
+			"id": "utf8_trigger_three_codepoints",
+			"description": "Trigger with 3 multi-byte UTF-8 codepoints (àèù): backspace_count = 3 (codepoints), not 6 (bytes).",
+			"trigger": "àèù",
+			"replacement": "accent test",
+			"is_word": false,
+			"buffer": "àèù",
+			"terminator": " ",
+			"expected": {
+				"matched": true,
+				"replacement": "accent test",
+				"backspace_count": 3
+			}
+		},
+
+		{
+			"id": "word_boundary_after_newline",
+			"description": "is_word trigger fires when preceded by a newline (\\n is a word boundary).",
+			"trigger": "the",
+			"replacement": "THE",
+			"is_word": true,
+			"buffer": "line\nthe",
+			"terminator": " ",
+			"expected": {
+				"matched": true,
+				"replacement": "THE",
+				"backspace_count": 3
+			}
+		},
+
+		{
+			"id": "word_boundary_after_tab",
+			"description": "is_word trigger fires when preceded by a tab (\\t is a word boundary).",
+			"trigger": "the",
+			"replacement": "THE",
+			"is_word": true,
+			"buffer": "\tthe",
+			"terminator": " ",
+			"expected": {
+				"matched": true,
+				"replacement": "THE",
+				"backspace_count": 3
+			}
 		}
 	]
 }
