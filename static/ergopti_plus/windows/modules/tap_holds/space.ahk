@@ -40,6 +40,12 @@ global _SpaceHoldFired  := False
 ; Character captured by the InputHook when EndReason == "Max" (key typed while
 ; Space was held). HoldFn reads this and injects it with the modifier active.
 global _SpaceHeldInput  := ""
+; VK of the key captured during the hold window (set by OnKeyDown alongside
+; _SpaceHeldInput). Used instead of ih.Input so HoldFn can replay the physical
+; key with a modifier rather than re-sending the already-translated character —
+; e.g. Space+a on a remapped layout produces ih.Input="-" but _SpaceHeldVK=30
+; (VK for 'a'), and SendInput("{vk1e}") with Shift active yields "A" correctly.
+global _SpaceHeldVK     := 0
 
 ; Shared tap logic for all Space tap-hold variants. Reads the next character
 ; via InputHook; on tap it forwards the Space + next character (avoiding a
@@ -51,12 +57,17 @@ global _SpaceHeldInput  := ""
 ; TextPressKey uses SendInput which bypasses the prefix-watcher InputHook —
 ; without this call, end-char-gated hotstrings never fire on Space.
 SpaceTapHold(HoldFn) {
-    global _SpaceInputHook, _SpaceIHActive, _SpaceTapSent, _SpaceHoldFired, _SpaceHeldInput
+    global _SpaceInputHook, _SpaceIHActive, _SpaceTapSent, _SpaceHoldFired, _SpaceHeldInput, _SpaceHeldVK
     _SpaceTapSent   := False
     _SpaceHoldFired := False
     _SpaceHeldInput := ""
+    _SpaceHeldVK    := 0
     TimeoutSec := TapHoldDuration(TapHold, "space")
     ih := InputHook("L1 T" . TimeoutSec)
+    ; Capture the physical VK alongside the translated character so HoldFn can
+    ; replay the raw key with a modifier instead of re-sending ih.Input (which
+    ; is already translated by the current layout and would double-translate).
+    ih.OnKeyDown := _SpaceCaptureVK
     ih.Start()
     _SpaceInputHook := ih
     _SpaceIHActive  := True
@@ -113,34 +124,41 @@ SpaceTapHold(HoldFn) {
 ; already resolved (_SpaceIHActive false), the Up handler is a no-op because
 ; _SpaceTapSent or _SpaceHoldFired will be set.
 
+_SpaceCaptureVK(ih, vk, sc) {
+    global _SpaceHeldVK
+    _SpaceHeldVK := vk
+}
+
 _SpaceHoldCtrl() {
-    global _SpaceHeldInput
+    global _SpaceHeldVK
     ; {LCtrl Down} physically holds Ctrl so any keys typed while Space is held
-    ; arrive with Ctrl active. When EndReason was "Max" a char was already
-    ; captured — inject it with Ctrl now before waiting for Space release.
+    ; arrive with Ctrl active. When EndReason was "Max" a key was already
+    ; captured — replay its VK with Ctrl so Space+A → Ctrl+A regardless of layout.
     SendInput("{LCtrl Down}")
-    if (_SpaceHeldInput != "")
-        SendInput("^" . _SpaceHeldInput)
+    if (_SpaceHeldVK != 0)
+        SendInput("^{vk" . Format("{:x}", _SpaceHeldVK) . "}")
     KeyWait("SC039")
     SendInput("{LCtrl Up}")
 }
 _SpaceHoldLayer() {
     global _SpaceHeldInput
     ActivateLayer()
-    ; Char captured while Space was held — inject it inside the layer context.
+    ; Layer remaps keys via hotkeys, so the raw char from ih.Input is correct here —
+    ; the layer mappings are not applied to ih.Input (IH runs before hotkeys).
     if (_SpaceHeldInput != "")
         SendInput("{Text}" . _SpaceHeldInput)
     KeyWait("SC039")
     DisableLayer()
 }
 _SpaceHoldShift() {
-    global _SpaceHeldInput
+    global _SpaceHeldVK
     ; {LShift Down} physically holds Shift so any keys typed while Space is held
-    ; arrive capitalised. When EndReason was "Max" a char was already captured —
-    ; inject it with Shift now before waiting for Space release.
+    ; arrive capitalised. When EndReason was "Max" a key was already captured —
+    ; replay its physical VK with Shift so Space+A → A regardless of layout
+    ; (avoids double-translation: ih.Input already reflects the remapped char).
     SendInput("{LShift Down}")
-    if (_SpaceHeldInput != "")
-        SendInput("+" . _SpaceHeldInput)
+    if (_SpaceHeldVK != 0)
+        SendInput("+{vk" . Format("{:x}", _SpaceHeldVK) . "}")
     KeyWait("SC039")
     SendInput("{LShift Up}")
 }
