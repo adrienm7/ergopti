@@ -171,6 +171,17 @@ const HS_ADAPTERS = {
 	Crypto: {
 		sha256: function(data) {},                  // arity 1
 	},
+
+	KeyState: {
+		KS_IsDown: function(keyName) {},            // arity 1
+		KS_IsUp:   function(keyName) {},            // arity 1
+	},
+
+	AppLauncher: {
+		AL_Launch:         function(appPath) {},         // arity 1
+		AL_LaunchWithArgs: function(appPath, args) {},   // arity 2
+		AL_IsRunning:      function(processName) {},     // arity 1
+	},
 };
 
 

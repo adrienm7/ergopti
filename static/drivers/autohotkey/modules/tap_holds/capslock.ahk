@@ -28,7 +28,7 @@
     and not LayerEnabled
 )
 SC03A:: {
-    if (GetKeyState("SC038", "P")) { ; TODO(2.1.3): route through KeyState port
+    if (KS_IsDown("SC038")) { ; LAlt physically held
         LAltCapsLockShortcut()
         return
     }
@@ -38,7 +38,7 @@ SC03A:: {
 
 #HotIf _CapsLockIsPlainBackspace() and not LayerEnabled
 *SC03A:: {
-    if (GetKeyState("SC038", "P")) { ; TODO(2.1.3): route through KeyState port
+    if (KS_IsDown("SC038")) { ; LAlt physically held
         LAltCapsLockShortcut()
         return
     }
@@ -64,11 +64,11 @@ CapsLockRemappedCondition() {
 #HotIf CapsLockRemappedCondition() and not LayerEnabled
 *SC03A:: {
     CtrlActivated := False
-    if (GetKeyState("SC01D", "P")) { ; TODO(2.1.3): route through KeyState port
+    if (KS_IsDown("SC01D")) { ; LCtrl physically held
         CtrlActivated := True
     }
 
-    if (GetKeyState("SC038", "P")) { ; TODO(2.1.3): route through KeyState port
+    if (KS_IsDown("SC038")) { ; LAlt physically held
         ; Fix for using the LAltCapsLockShortcut with LAlt remapped to OneShotShift and CapsLock remapped
         LAltCapsLockShortcut()
         return

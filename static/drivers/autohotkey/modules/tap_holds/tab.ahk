@@ -29,7 +29,7 @@ SC00F::
     TextPressKey("LAlt", "Down")
     tap := KeyWait("SC00F", "T" . TapHoldDuration(TapHold, "tab"))
     if tap {
-        if TapHoldTapAction(TapHold, "left_alt") == "tab" and GetKeyState("SC038", "P") { ; TODO(2.1.3): route through KeyState port
+        if TapHoldTapAction(TapHold, "left_alt") == "tab" and KS_IsDown("SC038") { ; LAlt physically held
             TextPressKey("Tab", "Alt")
         } else {
             TextPressKey("LAlt", "Up")

@@ -41,10 +41,10 @@ _LAltIsBackspaceLayer() {
 ; Tap-hold on "LAlt" : OneShotShift on tap, Shift on hold
 SC038:: {
     if (
-        GetKeyState("SC11D", "P") ; TODO(2.1.3): route through KeyState port
-        or GetKeyState("SC03A", "P") ; TODO(2.1.3): route through KeyState port
-        or GetKeyState("LShift", "P") ; TODO(2.1.3): route through KeyState port
-        or GetKeyState("LCtrl", "P") ; TODO(2.1.3): route through KeyState port
+        KS_IsDown("SC11D") ; RCtrl physically held
+        or KS_IsDown("SC03A") ; CapsLock physically held
+        or KS_IsDown("LShift") ; LShift physically held
+        or KS_IsDown("LCtrl") ; LCtrl physically held
     ) {
         ; Solves a problem where shorcuts consisting of another key (pressed first) + SC038 (pressed second) triggers the shortcut, but also OneShotShift()
         return
@@ -112,7 +112,7 @@ SC038::
         ; If no modifier was pressed
         TextPressKey("BackSpace", "") ; Event to be able to correct hotstrings and still trigger them afterwards
         Sleep(KEY_REPEAT_INITIAL_DELAY_MS)
-        while GetKeyState("SC038", "P") { ; TODO(2.1.3): route through KeyState port
+        while KS_IsDown("SC038") { ; LAlt still physically held — key-repeat loop
             TextPressKey("BackSpace", "")
             Sleep(KEY_REPEAT_INTERVAL_MS)
         }
@@ -137,7 +137,7 @@ SC038::
     if (
         tap
         and A_PriorKey == "LAlt" ; Prevents triggering BackSpace when the layer is quickly used and then released
-        and not GetKeyState("SC03A", "P") ; TODO(2.1.3): route through KeyState port — Fix a sent BackSpace when triggering quickly "LAlt" + "CapsLock"
+        and KS_IsUp("SC03A") ; Prevents spurious BackSpace when "LAlt" + "CapsLock" is triggered quickly
     ) {
         BackSpaceActionWithModifiers := BackSpaceLogic()
         if not BackSpaceActionWithModifiers {
@@ -152,24 +152,24 @@ BackSpaceLogic() {
     RCtrlIsOneShotShift := TapHoldTapAction(TapHold, "right_ctrl") == "one_shot_shift"
 
     if (
-        GetKeyState("SC01D", "P") ; TODO(2.1.3): route through KeyState port
-        and GetKeyState("Shift", "P") ; TODO(2.1.3): route through KeyState port
+        KS_IsDown("SC01D") ; LCtrl physically held
+        and KS_IsDown("Shift") ; Shift physically held
     ) {
         ; "LCtrl" and Shift
         TextPressKey("Delete", "Ctrl")
         return True
     } else if (
-        GetKeyState("SC11D", "P") ; TODO(2.1.3): route through KeyState port
+        KS_IsDown("SC11D") ; RCtrl physically held
         and not RCtrlIsOneShotShift
-        and GetKeyState("Shift", "P") ; TODO(2.1.3): route through KeyState port
+        and KS_IsDown("Shift") ; Shift physically held
     ) {
         ; "RCtrl" when it stays RCtrl and Shift
         TextPressKey("Delete", "Ctrl")
         return True
     } else if (
-        GetKeyState("SC01D", "P") ; TODO(2.1.3): route through KeyState port
+        KS_IsDown("SC01D") ; LCtrl physically held
         and RCtrlIsOneShotShift
-        and GetKeyState("SC11D", "P") ; TODO(2.1.3): route through KeyState port
+        and KS_IsDown("SC11D") ; RCtrl physically held (acting as Shift)
     ) {
         ; "LCtrl" and Shift on "RCtrl"
         OneShotShiftFix()
@@ -178,24 +178,24 @@ BackSpaceLogic() {
         return True
     } else if (
         RCtrlIsOneShotShift
-        and GetKeyState("SC11D", "P") ; TODO(2.1.3): route through KeyState port
+        and KS_IsDown("SC11D") ; RCtrl physically held (acting as Shift)
     ) {
         ; Shift on "RCtrl"
         OneShotShiftFix()
         TextPressKey("Right", "")
         TextPressKey("BackSpace", "") ; = Delete, but we cannot simply use Delete, as it would do Ctrl + Alt + Delete and Windows would interpret it
         return True
-    } else if GetKeyState("Shift", "P") { ; TODO(2.1.3): route through KeyState port
+    } else if KS_IsDown("Shift") { ; Shift physically held
         ; Shift
         TextPressKey("Delete", "")
         return True
-    } else if GetKeyState("SC01D", "P") { ; TODO(2.1.3): route through KeyState port
+    } else if KS_IsDown("SC01D") { ; LCtrl physically held
         ; "LCtrl"
         TextPressKey("BackSpace", "Ctrl")
         return True
     } else if (
         not RCtrlIsOneShotShift
-        and GetKeyState("SC11D", "P") ; TODO(2.1.3): route through KeyState port
+        and KS_IsDown("SC11D") ; RCtrl physically held
     ) {
         ; "RCtrl" when it stays RCtrl
         TextPressKey("BackSpace", "Ctrl")

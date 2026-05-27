@@ -54,8 +54,8 @@
         tap
         and (TimeAfter - TimeBefore) >= TapMinDurationMs()
         and A_PriorKey == "LControl"
-        and not GetKeyState("SC03A", "P") ; TODO(2.1.3): route through KeyState port — "CapsLock"
-        and not GetKeyState("SC038", "P") ; TODO(2.1.3): route through KeyState port — "LAlt"
+        and KS_IsUp("SC03A") ; "CapsLock" must not be physically held
+        and KS_IsUp("SC038") ; "LAlt" must not be physically held
     ) {
         TextSend("^v", "")
     }
