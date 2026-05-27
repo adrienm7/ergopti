@@ -88,7 +88,7 @@ local DEFAULT_LLM_TIMEOUT_SEC = 12.0
 -- caller-provided value is reduced by TIMEOUT_DECREMENT_SEC so back-to-back
 -- tooltips do not visually overlap, but never below TIMEOUT_FLOOR_SEC.
 local TIMEOUT_FLOOR_SEC     = 0.05
-local TIMEOUT_DECREMENT_SEC = 0.1
+local TIMEOUT_DECREMENT_SEC = 0.2
 
 M.settings = {
 	timeout_sec          = DEFAULT_TIMEOUT_SEC,

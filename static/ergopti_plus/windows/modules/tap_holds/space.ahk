@@ -33,10 +33,13 @@
 ; _SpaceHoldFired — set on the hold path so SC039 Up never sends a trailing
 ;                   Space after a long press (A_TimeSinceThisHotkey is ~0 ms
 ;                   right after HoldFn returns, making the timing guard useless).
-global _SpaceInputHook := 0
-global _SpaceIHActive  := False
-global _SpaceTapSent   := False
-global _SpaceHoldFired := False
+global _SpaceInputHook  := 0
+global _SpaceIHActive   := False
+global _SpaceTapSent    := False
+global _SpaceHoldFired  := False
+; Character captured by the InputHook when EndReason == "Max" (key typed while
+; Space was held). HoldFn reads this and injects it with the modifier active.
+global _SpaceHeldInput  := ""
 
 ; Shared tap logic for all Space tap-hold variants. Reads the next character
 ; via InputHook; on tap it forwards the Space + next character (avoiding a
@@ -48,9 +51,10 @@ global _SpaceHoldFired := False
 ; TextPressKey uses SendInput which bypasses the prefix-watcher InputHook —
 ; without this call, end-char-gated hotstrings never fire on Space.
 SpaceTapHold(HoldFn) {
-    global _SpaceInputHook, _SpaceIHActive, _SpaceTapSent, _SpaceHoldFired
-    _SpaceTapSent  := False
+    global _SpaceInputHook, _SpaceIHActive, _SpaceTapSent, _SpaceHoldFired, _SpaceHeldInput
+    _SpaceTapSent   := False
     _SpaceHoldFired := False
+    _SpaceHeldInput := ""
     TimeoutSec := TapHoldDuration(TapHold, "space")
     ih := InputHook("L1 T" . TimeoutSec)
     ih.Start()
@@ -59,11 +63,13 @@ SpaceTapHold(HoldFn) {
     ih.Wait()
     _SpaceIHActive  := False
     _SpaceInputHook := 0
-    if ih.EndReason != "Timeout" {
-        ; Tap path: flag first so SC039 Up cannot race between the flag set
-        ; and the actual send. TextSend uses SendText (raw mode) — {Space}
-        ; must go through TextPressKey so AHK interprets the key name rather
-        ; than typing the literal braces.
+    ; "Stopped" = SC039 Up fired before any char or timeout → plain tap.
+    ; "Timeout" = Space held past the threshold with no char → hold.
+    ; "Max"     = a character arrived while Space was still held → hold:
+    ;             the user wants the modifier + that character. Treating Max
+    ;             as tap (the old behaviour) caused Space-hold+A to produce
+    ;             "Space A" instead of Ctrl+A.
+    if ih.EndReason == "Stopped" {
         _SpaceTapSent := True
         TextPressKey("Space", "")
         ; TextPressKey uses SendInput which bypasses the prefix-watcher InputHook.
@@ -73,13 +79,9 @@ SpaceTapHold(HoldFn) {
         HSEMatch := HSE_FeedChar(" ")
         if (HSEMatch != "") {
             ; A hotstring fired on Space — dispatch handles the full send
-            ; (backspaces + replacement + end-char re-emit). Send ih.Input
-            ; afterward so the character captured during the tap window is
-            ; not silently dropped.
+            ; (backspaces + replacement + end-char re-emit).
             HSE_DispatchMatch(HSEMatch, HSE_LastEndChar)
             UpdateLastSentCharacter(" ")
-            if (ih.Input != "")
-                TextSend(ih.Input, "", 0)
             return False
         }
         ; No hotstring fired — still need to reset the prefix buffer so the
@@ -87,12 +89,18 @@ SpaceTapHold(HoldFn) {
         ; watcher never sees this Space otherwise).
         if IsSet(_ResetPrefixBuffer)
             try _ResetPrefixBuffer()
+        ; ih.Input holds any char that arrived in the capture window before
+        ; SC039 Up stopped the hook — re-emit it so it is not silently dropped.
         if (ih.Input != "")
             TextSend(ih.Input, "", 0)
         UpdateLastSentCharacter(" ")
         return False
     }
-    _SpaceHoldFired := True
+    ; Timeout or Max → hold path. When EndReason is "Max" a character was
+    ; captured while Space was held; pass it to HoldFn via _SpaceHeldInput
+    ; so the hold action can inject it with the modifier active.
+    _SpaceHoldFired  := True
+    _SpaceHeldInput  := ih.Input
     HoldFn()
     return True
 }
@@ -106,17 +114,31 @@ SpaceTapHold(HoldFn) {
 ; _SpaceTapSent or _SpaceHoldFired will be set.
 
 _SpaceHoldCtrl() {
+    global _SpaceHeldInput
     TextPressKey("LCtrl", "Down")
+    ; If a character was captured while Space was held (EndReason="Max"),
+    ; send it as a keystroke with Ctrl active so Space+A → Ctrl+A, etc.
+    ; SendInput with ^ prefix applies Ctrl to the following key.
+    if (_SpaceHeldInput != "")
+        SendInput("^" . _SpaceHeldInput)
     KeyWait("SC039")
     TextPressKey("LCtrl", "Up")
 }
 _SpaceHoldLayer() {
+    global _SpaceHeldInput
     ActivateLayer()
+    ; Char captured while Space was held — inject it inside the layer context.
+    if (_SpaceHeldInput != "")
+        SendInput("{Text}" . _SpaceHeldInput)
     KeyWait("SC039")
     DisableLayer()
 }
 _SpaceHoldShift() {
+    global _SpaceHeldInput
     TextPressKey("LShift", "Down")
+    ; Send captured char with Shift active.
+    if (_SpaceHeldInput != "")
+        SendInput("+" . _SpaceHeldInput)
     KeyWait("SC039")
     TextPressKey("LShift", "Up")
 }
@@ -125,7 +147,10 @@ _SpaceHoldShift() {
 ; Tap-hold on "Space" : Space on tap, Ctrl on hold
 SC039:: SpaceTapHold(_SpaceHoldCtrl)
 SC039 Up:: {
-    if _SpaceIHActive {
+    ; Only stop the InputHook when no character has been captured yet.
+    ; If ih.Input != "" a char arrived while Space was held — Stop() here
+    ; would flip EndReason to "Stopped" and lose the hold path entirely.
+    if _SpaceIHActive and _SpaceInputHook.Input == "" {
         _SpaceInputHook.Stop()
     }
 }
@@ -135,7 +160,7 @@ SC039 Up:: {
 ; Tap-hold on "Space" : Space on tap, Layer on hold
 SC039:: SpaceTapHold(_SpaceHoldLayer)
 SC039 Up:: {
-    if _SpaceIHActive {
+    if _SpaceIHActive and _SpaceInputHook.Input == "" {
         _SpaceInputHook.Stop()
     }
 }
@@ -145,7 +170,7 @@ SC039 Up:: {
 ; Tap-hold on "Space" : Space on tap, Shift on hold
 SC039:: SpaceTapHold(_SpaceHoldShift)
 SC039 Up:: {
-    if _SpaceIHActive {
+    if _SpaceIHActive and _SpaceInputHook.Input == "" {
         _SpaceInputHook.Stop()
     }
 }
