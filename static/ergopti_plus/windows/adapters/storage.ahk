@@ -1,4 +1,4 @@
-﻿; adapters/storage.ahk
+; adapters/storage.ahk
 
 ; ==============================================================================
 ; MODULE: Storage Adapter (AutoHotkey)
@@ -133,10 +133,10 @@ ST_Clear() {
 ; (tests/test_adapter_compliance_new.ahk) to verify every required method exists
 ; and is callable without manually listing functions per-adapter.
 global ADAPTER_STORAGE := Map(
-    "set",    Func("ST_Set"),
-    "get",    Func("ST_Get"),
-    "delete", Func("ST_Delete"),
-    "has",    Func("ST_Has"),
-    "keys",   Func("ST_Keys"),
-    "clear",  Func("ST_Clear"),
+    "set",    ST_Set,
+    "get",    ST_Get,
+    "delete", ST_Delete,
+    "has",    ST_Has,
+    "keys",   ST_Keys,
+    "clear",  ST_Clear,
 )

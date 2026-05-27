@@ -1,4 +1,4 @@
-﻿; adapters/clipboard.ahk
+; adapters/clipboard.ahk
 
 ; ==============================================================================
 ; MODULE: Clipboard Adapter (AutoHotkey)
@@ -84,8 +84,8 @@ CB_Restore(Saved) {
 ; (tests/test_adapter_compliance_new.ahk) to verify every required method exists
 ; and is callable without manually listing functions per-adapter.
 global ADAPTER_CLIPBOARD := Map(
-    "read",    Func("CB_Read"),
-    "write",   Func("CB_Write"),
-    "save",    Func("CB_Save"),
-    "restore", Func("CB_Restore"),
+    "read",    CB_Read,
+    "write",   CB_Write,
+    "save",    CB_Save,
+    "restore", CB_Restore,
 )

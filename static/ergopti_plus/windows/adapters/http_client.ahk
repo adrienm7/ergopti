@@ -1,4 +1,4 @@
-﻿; adapters/http_client.ahk
+; adapters/http_client.ahk
 
 ; ==============================================================================
 ; MODULE: HttpClient Adapter (AutoHotkey)
@@ -98,7 +98,7 @@ HTTPIsActive() {
 ; (tests/test_adapter_compliance_new.ahk) to verify every required method exists
 ; and is callable without manually listing functions per-adapter.
 global ADAPTER_HTTP_CLIENT := Map(
-    "post",     Func("HTTPPost"),
-    "cancel",   Func("HTTPCancel"),
-    "isActive", Func("HTTPIsActive"),
+    "post",     HTTPPost,
+    "cancel",   HTTPCancel,
+    "isActive", HTTPIsActive,
 )

@@ -1,4 +1,4 @@
-﻿; adapters/file_system.ahk
+; adapters/file_system.ahk
 
 ; ==============================================================================
 ; MODULE: FileSystem Adapter (AutoHotkey)
@@ -121,9 +121,9 @@ FSDelete(Path) {
 ; (tests/test_adapter_compliance_new.ahk) to verify every required method exists
 ; and is callable without manually listing functions per-adapter.
 global ADAPTER_FILE_SYSTEM := Map(
-    "read",   Func("FSRead"),
-    "write",  Func("FSWrite"),
-    "append", Func("FSAppend"),
-    "exists", Func("FSExists"),
-    "delete", Func("FSDelete"),
+    "read",   FSRead,
+    "write",  FSWrite,
+    "append", FSAppend,
+    "exists", FSExists,
+    "delete", FSDelete,
 )
