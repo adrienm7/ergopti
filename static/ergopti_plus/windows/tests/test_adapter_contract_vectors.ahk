@@ -65,8 +65,11 @@ _RunNotifierContractVectors() {
 	; send_info — does not throw
 	_Result_send_info() {
 		Err := ""
-		try NotifierSend("Configuration loaded.", Map("kind", "info"))
-		catch as E { Err := E.Message }
+		try {
+			NotifierSend("Configuration loaded.", Map("kind", "info"))
+		} catch as E {
+			Err := E.Message
+		}
 		Assert(Err = "", "Notifier send_info must not throw: " . Err)
 	}
 	Test("Notifier: send_info does not throw", _Result_send_info)
@@ -74,8 +77,11 @@ _RunNotifierContractVectors() {
 	; send_warning — does not throw
 	_Result_send_warning() {
 		Err := ""
-		try NotifierSend("API key not set.", Map("kind", "warn"))
-		catch as E { Err := E.Message }
+		try {
+			NotifierSend("API key not set.", Map("kind", "warn"))
+		} catch as E {
+			Err := E.Message
+		}
 		Assert(Err = "", "Notifier send_warning must not throw: " . Err)
 	}
 	Test("Notifier: send_warning does not throw", _Result_send_warning)
@@ -83,8 +89,11 @@ _RunNotifierContractVectors() {
 	; send_error — does not throw
 	_Result_send_error() {
 		Err := ""
-		try NotifierSend("Config missing.", Map("kind", "error"))
-		catch as E { Err := E.Message }
+		try {
+			NotifierSend("Config missing.", Map("kind", "error"))
+		} catch as E {
+			Err := E.Message
+		}
 		Assert(Err = "", "Notifier send_error must not throw: " . Err)
 	}
 	Test("Notifier: send_error does not throw", _Result_send_error)
@@ -92,8 +101,11 @@ _RunNotifierContractVectors() {
 	; send with no opts — does not throw
 	_Result_send_no_opts() {
 		Err := ""
-		try NotifierSend("Hello.", 0)
-		catch as E { Err := E.Message }
+		try {
+			NotifierSend("Hello.", 0)
+		} catch as E {
+			Err := E.Message
+		}
 		Assert(Err = "", "Notifier send with opts=0 must not throw: " . Err)
 	}
 	Test("Notifier: send with no opts does not throw", _Result_send_no_opts)
@@ -130,8 +142,11 @@ _RunTimerSchedulerContractVectors() {
 	_Result_cancel_valid() {
 		Handle := TimerAfter(10.0, (*) => "")
 		Err := ""
-		try TimerCancel(Handle)
-		catch as E { Err := E.Message }
+		try {
+			TimerCancel(Handle)
+		} catch as E {
+			Err := E.Message
+		}
 		Assert(Err = "", "TimerCancel on valid handle must not throw: " . Err)
 	}
 	Test("TimerScheduler: cancel(handle) does not throw", _Result_cancel_valid)
@@ -139,8 +154,11 @@ _RunTimerSchedulerContractVectors() {
 	; cancel on 0 (null handle) does not throw
 	_Result_cancel_null() {
 		Err := ""
-		try TimerCancel(0)
-		catch as E { Err := E.Message }
+		try {
+			TimerCancel(0)
+		} catch as E {
+			Err := E.Message
+		}
 		Assert(Err = "", "TimerCancel(0) must not throw: " . Err)
 	}
 	Test("TimerScheduler: cancel(0) is safe", _Result_cancel_null)
@@ -150,8 +168,11 @@ _RunTimerSchedulerContractVectors() {
 		TimerAfter(10.0, (*) => "")
 		TimerAfter(10.0, (*) => "")
 		Err := ""
-		try TimerCancelAll()
-		catch as E { Err := E.Message }
+		try {
+			TimerCancelAll()
+		} catch as E {
+			Err := E.Message
+		}
 		Assert(Err = "", "TimerCancelAll must not throw: " . Err)
 	}
 	Test("TimerScheduler: cancelAll() does not throw", _Result_cancel_all)
@@ -237,8 +258,11 @@ _RunFileSystemContractVectors() {
 	_Result_delete_missing() {
 		try FileDelete(TmpPath)
 		Err := ""
-		try FSDelete(TmpPath)
-		catch as E { Err := E.Message }
+		try {
+			FSDelete(TmpPath)
+		} catch as E {
+			Err := E.Message
+		}
 		Assert(Err = "", "FSDelete on missing file must not throw: " . Err)
 	}
 	Test("FileSystem: delete missing file is a no-op", _Result_delete_missing)
@@ -275,8 +299,11 @@ _RunWindowInfoContractVectors() {
 	; WIGetFocused does not throw
 	_Result_get_focused_no_throw() {
 		Err := ""
-		try WIGetFocused()
-		catch as E { Err := E.Message }
+		try {
+			WIGetFocused()
+		} catch as E {
+			Err := E.Message
+		}
 		Assert(Err = "", "WIGetFocused must not throw: " . Err)
 	}
 	Test("WindowInfo: WIGetFocused does not throw", _Result_get_focused_no_throw)
@@ -291,8 +318,11 @@ _RunWindowInfoContractVectors() {
 	; WIGetAll does not throw
 	_Result_get_all_no_throw() {
 		Err := ""
-		try WIGetAll()
-		catch as E { Err := E.Message }
+		try {
+			WIGetAll()
+		} catch as E {
+			Err := E.Message
+		}
 		Assert(Err = "", "WIGetAll must not throw: " . Err)
 	}
 	Test("WindowInfo: WIGetAll does not throw", _Result_get_all_no_throw)
@@ -312,8 +342,11 @@ _RunTrayMenuContractVectors() {
 	; setTooltip does not throw
 	_Result_set_tooltip() {
 		Err := ""
-		try TrayMenuSetTooltip("Test tooltip")
-		catch as E { Err := E.Message }
+		try {
+			TrayMenuSetTooltip("Test tooltip")
+		} catch as E {
+			Err := E.Message
+		}
 		Assert(Err = "", "TrayMenuSetTooltip must not throw: " . Err)
 	}
 	Test("TrayMenu: setTooltip does not throw", _Result_set_tooltip)
@@ -321,8 +354,11 @@ _RunTrayMenuContractVectors() {
 	; setMenu with empty array does not throw
 	_Result_set_menu_empty() {
 		Err := ""
-		try TrayMenuSetMenu([])
-		catch as E { Err := E.Message }
+		try {
+			TrayMenuSetMenu([])
+		} catch as E {
+			Err := E.Message
+		}
 		Assert(Err = "", "TrayMenuSetMenu([]) must not throw: " . Err)
 	}
 	Test("TrayMenu: setMenu([]) does not throw", _Result_set_menu_empty)
@@ -330,8 +366,11 @@ _RunTrayMenuContractVectors() {
 	; destroy does not throw
 	_Result_destroy() {
 		Err := ""
-		try TrayMenuDestroy()
-		catch as E { Err := E.Message }
+		try {
+			TrayMenuDestroy()
+		} catch as E {
+			Err := E.Message
+		}
 		Assert(Err = "", "TrayMenuDestroy must not throw: " . Err)
 	}
 	Test("TrayMenu: destroy does not throw", _Result_destroy)
@@ -351,8 +390,11 @@ _RunTextSenderContractVectors() {
 	; eraseChars(0) is a no-op — does not throw (no keystroke emitted)
 	_Result_erase_zero() {
 		Err := ""
-		try TextEraseChars(0)
-		catch as E { Err := E.Message }
+		try {
+			TextEraseChars(0)
+		} catch as E {
+			Err := E.Message
+		}
 		Assert(Err = "", "TextEraseChars(0) must not throw: " . Err)
 	}
 	Test("TextSender: eraseChars(0) is a no-op", _Result_erase_zero)
@@ -368,8 +410,11 @@ _RunTextSenderContractVectors() {
 			return
 		}
 		Err := ""
-		try TextPressKey("Return", [])
-		catch as E { Err := E.Message }
+		try {
+			TextPressKey("Return", [])
+		} catch as E {
+			Err := E.Message
+		}
 		Assert(Err = "", "TextPressKey must not throw: " . Err)
 	}
 	Test("TextSender: pressKey('Return', []) does not throw", _Result_press_key)
@@ -380,8 +425,11 @@ _RunTextSenderContractVectors() {
 			return
 		}
 		Err := ""
-		try TextSend("hello", Map(), 0)
-		catch as E { Err := E.Message }
+		try {
+			TextSend("hello", Map(), 0)
+		} catch as E {
+			Err := E.Message
+		}
 		Assert(Err = "", "TextSend short text must not throw: " . Err)
 	}
 	Test("TextSender: send short text does not throw", _Result_send_short)
@@ -409,8 +457,11 @@ _RunHttpClientContractVectors() {
 	; cancel is safe when idle
 	_Result_cancel_idle() {
 		Err := ""
-		try HTTPCancel()
-		catch as E { Err := E.Message }
+		try {
+			HTTPCancel()
+		} catch as E {
+			Err := E.Message
+		}
 		Assert(Err = "", "HTTPCancel when idle must not throw: " . Err)
 	}
 	Test("HttpClient: cancel when idle does not throw", _Result_cancel_idle)

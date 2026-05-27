@@ -30,16 +30,16 @@
 
 ; Known password-manager process names — expansion welcome, never shrink.
 global SFD_SECURE_APPS := Map(
-	1Password.exe,          1,
-	KeePass.exe,            1,
-	KeePassXC.exe,          1,
-	Bitwarden.exe,          1,
-	LastPass.exe,           1,
-	Dashlane.exe,           1,
-	RoboForm.exe,           1,
-	Authy.exe,              1,
-	keepass2.exe,           1,
-	credential_guard,       1
+	"1Password.exe",        true,
+	"KeePass.exe",          true,
+	"KeePassXC.exe",        true,
+	"Bitwarden.exe",        true,
+	"LastPass.exe",         true,
+	"Dashlane.exe",         true,
+	"RoboForm.exe",         true,
+	"Authy.exe",            true,
+	"keepass2.exe",         true,
+	"credential_guard",     true
 )
 
 

@@ -985,8 +985,12 @@ global GestureKeyboardHook   := 0
 _GestureParseAndPressKey(Keys) {
     Mods := []
     Pos  := 1
-    ; Consume modifier prefix characters one by one
+    ; Consume modifier prefix characters one by one. AHK v2 has no break N;
+    ; use a flag to exit the outer loop when a non-modifier char is encountered.
+    FoundKey := false
     loop {
+        if FoundKey
+            break
         Ch := SubStr(Keys, Pos, 1)
         switch Ch {
             case "^":
@@ -1002,7 +1006,7 @@ _GestureParseAndPressKey(Keys) {
                 Mods.Push("Win")
                 Pos++
             default:
-                break 2
+                FoundKey := true
         }
     }
     KeyPart := SubStr(Keys, Pos)
