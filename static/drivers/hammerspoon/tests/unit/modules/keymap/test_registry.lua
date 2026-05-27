@@ -260,6 +260,9 @@ helpers.describe("Registry.update_trigger_char", function()
 			if m.trigger:sub(- #"§") == "§" then found = true ; break end
 		end
 		helpers.assert_true(found, "expected a trigger renamed to end in §")
+		-- Restore the canonical magic key so later tests that check the
+		-- default terminator state ("★" is enabled) are not affected.
+		Registry.update_trigger_char("★")
 	end)
 end)
 

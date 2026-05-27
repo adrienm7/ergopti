@@ -413,3 +413,60 @@ TestLogger_PurgeMissingDir() {
 }
 Test("LoggerPurgeOldLogs: missing directory is silently ignored",
 	TestLogger_PurgeMissingDir)
+
+
+
+
+
+; ==================================================
+; =================================================
+; ======= 5/ Test sink (injectable capture) =======
+; =================================================
+; ==================================================
+
+TestLogger_SinkReceivesLine() {
+	_ResetLogger()
+	Captured := []
+	LoggerSetTestSink((Line) => Captured.Push(Line))
+	LoggerInfo("Sink", "hello-sink")
+	AssertEqual(1, Captured.Length)
+	AssertContains(Captured[1], "hello-sink")
+	LoggerClearTestSink()
+}
+Test("Test sink: sink receives the emitted line", TestLogger_SinkReceivesLine)
+
+TestLogger_SinkReceivesLevel() {
+	_ResetLogger()
+	Captured := []
+	LoggerSetTestSink((Line) => Captured.Push(Line))
+	LoggerInfo("Sink", "level-check")
+	AssertEqual(1, Captured.Length)
+	AssertContains(Captured[1], "[INFO]")
+	LoggerClearTestSink()
+}
+Test("Test sink: emitted line contains the level name", TestLogger_SinkReceivesLevel)
+
+TestLogger_SinkNotCalledWhenFiltered() {
+	global LOGGER_MIN_LEVEL
+	_ResetLogger()
+	LOGGER_MIN_LEVEL := "INFO"
+	_LoggerRefreshFastFlags()
+	Captured := []
+	LoggerSetTestSink((Line) => Captured.Push(Line))
+	LoggerDebug("Sink", "should-be-filtered")
+	AssertEqual(0, Captured.Length)
+	LoggerClearTestSink()
+}
+Test("Test sink: sink is not called for filtered-out messages",
+	TestLogger_SinkNotCalledWhenFiltered)
+
+TestLogger_SinkClearedByReset() {
+	_ResetLogger()
+	Captured := []
+	LoggerSetTestSink((Line) => Captured.Push(Line))
+	LoggerClearTestSink()
+	LoggerInfo("Sink", "should-not-reach-sink")
+	AssertEqual(0, Captured.Length)
+}
+Test("Test sink: cleared sink does not receive subsequent lines",
+	TestLogger_SinkClearedByReset)

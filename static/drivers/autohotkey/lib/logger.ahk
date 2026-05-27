@@ -111,6 +111,12 @@ global LOGGER_SUB_FILES_FALLBACK := [
 ; Resolved absolute paths for each sub-file (populated by LoggerInit).
 global _LOGGER_SUB_PATHS := Map()
 
+; Optional test sink — when set to a Callable, every emitted line is forwarded
+; to it in addition to the ring buffer and pending-queue paths. Lets unit tests
+; capture log output without filesystem I/O. Set via LoggerSetTestSink() and
+; cleared via LoggerClearTestSink().
+global _LOGGER_TEST_SINK := 0
+
 
 
 
@@ -300,6 +306,20 @@ LoggerError(Tag, Msg, Args*) {
     _LoggerEmit("ERROR", Tag, Msg, Args*)
 }
 
+; Registers a callable that receives every formatted log line (as a string).
+; Used exclusively by tests — never call from production code.
+; @param Fn {Callable} One-arity function receiving the formatted line string.
+LoggerSetTestSink(Fn) {
+	global _LOGGER_TEST_SINK
+	_LOGGER_TEST_SINK := Fn
+}
+
+; Removes the registered test sink. Call in test cleanup to avoid bleed.
+LoggerClearTestSink() {
+	global _LOGGER_TEST_SINK
+	_LOGGER_TEST_SINK := 0
+}
+
 ; Return a snapshot of the in-memory ring buffer in chronological order, so
 ; the most recent line is last. Useful for a "Dump recent logs" menu entry.
 LoggerRingBufferSnapshot() {
@@ -357,6 +377,9 @@ _LoggerEmit(Level, Tag, Msg, Args*) {
     Stamp := FormatTime(, "yyyy-MM-dd HH:mm:ss") . ":" . Format("{:03}", A_MSec)
     Line := Format("{1} [{2}] [{3}] {4}", Stamp, Level, Tag, Body)
     _LoggerPushRing(Line)
+    if _LOGGER_TEST_SINK != 0 {
+        try _LOGGER_TEST_SINK(Line)
+    }
     if LOGGER_LOG_PATH != "" {
         _LOGGER_PENDING.Push(Line)
         ; Force a synchronous, file-handle-closed flush for diagnostics that
