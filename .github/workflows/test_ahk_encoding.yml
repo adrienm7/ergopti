@@ -1,4 +1,4 @@
-name: Test AHK Encoding
+﻿name: Test AHK Encoding
 
 on:
     push:
@@ -34,7 +34,7 @@ jobs:
             - name: Set up Node.js
               uses: actions/setup-node@v4
               with:
-                  node-version: "20"
+                  node-version: "22"
                   cache: "npm"
 
             - name: Install Node dependencies
@@ -46,3 +46,4 @@ jobs:
               # before it produces silent failures with no error message in the
               # headless test harness.
               run: npm run test:ahk-encoding
+
