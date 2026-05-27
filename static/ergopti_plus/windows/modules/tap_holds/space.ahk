@@ -115,14 +115,14 @@ SpaceTapHold(HoldFn) {
 
 _SpaceHoldCtrl() {
     global _SpaceHeldInput
-    TextPressKey("LCtrl", "Down")
-    ; If a character was captured while Space was held (EndReason="Max"),
-    ; send it as a keystroke with Ctrl active so Space+A → Ctrl+A, etc.
-    ; SendInput with ^ prefix applies Ctrl to the following key.
+    ; {LCtrl Down} physically holds Ctrl so any keys typed while Space is held
+    ; arrive with Ctrl active. When EndReason was "Max" a char was already
+    ; captured — inject it with Ctrl now before waiting for Space release.
+    SendInput("{LCtrl Down}")
     if (_SpaceHeldInput != "")
         SendInput("^" . _SpaceHeldInput)
     KeyWait("SC039")
-    TextPressKey("LCtrl", "Up")
+    SendInput("{LCtrl Up}")
 }
 _SpaceHoldLayer() {
     global _SpaceHeldInput
@@ -135,12 +135,14 @@ _SpaceHoldLayer() {
 }
 _SpaceHoldShift() {
     global _SpaceHeldInput
-    TextPressKey("LShift", "Down")
-    ; Send captured char with Shift active.
+    ; {LShift Down} physically holds Shift so any keys typed while Space is held
+    ; arrive capitalised. When EndReason was "Max" a char was already captured —
+    ; inject it with Shift now before waiting for Space release.
+    SendInput("{LShift Down}")
     if (_SpaceHeldInput != "")
         SendInput("+" . _SpaceHeldInput)
     KeyWait("SC039")
-    TextPressKey("LShift", "Up")
+    SendInput("{LShift Up}")
 }
 
 #HotIf TapHoldHoldModifier(TapHold, "space") == "ctrl" and not LayerEnabled
