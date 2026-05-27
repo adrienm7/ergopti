@@ -88,6 +88,127 @@ helpers.describe("Logger: build wrapper", function()
 	end)
 end)
 
+helpers.describe("Logger: ring buffer", function()
+	helpers.it("ring_buffer_snapshot returns empty table when no lines emitted", function()
+		-- Fresh logger state — reload to reset internal ring buffer.
+		local FreshLogger = helpers.load_with_stubs("lib.logger")
+		FreshLogger.set_level("DEBUG")
+		local snap = FreshLogger.ring_buffer_snapshot()
+		helpers.assert_true(type(snap) == "table", "snapshot must be a table")
+		helpers.assert_eq(#snap, 0)
+	end)
+
+	helpers.it("ring_buffer_snapshot contains emitted lines in order", function()
+		local FreshLogger = helpers.load_with_stubs("lib.logger")
+		FreshLogger.set_level("DEBUG")
+		FreshLogger.info("ring_test", "Line A.")
+		FreshLogger.info("ring_test", "Line B.")
+		FreshLogger.info("ring_test", "Line C.")
+		local snap = FreshLogger.ring_buffer_snapshot()
+		helpers.assert_eq(#snap, 3)
+		-- Order: oldest first, newest last
+		helpers.assert_true(snap[1]:find("Line A", 1, true) ~= nil, "first entry should be Line A")
+		helpers.assert_true(snap[3]:find("Line C", 1, true) ~= nil, "last entry should be Line C")
+	end)
+
+	helpers.it("ring_buffer_snapshot respects the 200-entry cap (circular overwrite)", function()
+		local FreshLogger = helpers.load_with_stubs("lib.logger")
+		FreshLogger.set_level("DEBUG")
+		-- Emit 205 lines — the first 5 should be overwritten.
+		for i = 1, 205 do
+			FreshLogger.info("ring_test", "Entry %d.", i)
+		end
+		local snap = FreshLogger.ring_buffer_snapshot()
+		helpers.assert_eq(#snap, 200, "snapshot must be capped at 200 entries")
+		-- Entry 1-5 are gone; entry 6 is now the oldest.
+		helpers.assert_true(snap[1]:find("Entry 6", 1, true) ~= nil,
+			"oldest visible entry should be #6 after 205 total")
+		helpers.assert_true(snap[200]:find("Entry 205", 1, true) ~= nil,
+			"newest entry should be #205")
+	end)
+
+	helpers.it("lines suppressed by dedup are NOT pushed to the ring buffer", function()
+		local FreshLogger = helpers.load_with_stubs("lib.logger")
+		FreshLogger.set_level("DEBUG")
+		-- Emit the same line 5 times — dedup should suppress lines 2-5.
+		for _ = 1, 5 do
+			FreshLogger.info("dedup_test", "Repeated line.")
+		end
+		local snap = FreshLogger.ring_buffer_snapshot()
+		-- Only the first occurrence and the dedup summary should be in the buffer;
+		-- the 4 suppressed lines must NOT appear as individual entries.
+		local repeated_count = 0
+		for _, line in ipairs(snap) do
+			if line:find("Repeated line", 1, true) and not line:find("suppressed", 1, true) then
+				repeated_count = repeated_count + 1
+			end
+		end
+		helpers.assert_eq(repeated_count, 1, "only one 'Repeated line' entry (dedup active)")
+	end)
+end)
+
+helpers.describe("Logger: deduplication", function()
+	helpers.it("does not suppress the first occurrence of a repeated line", function()
+		local FreshLogger = helpers.load_with_stubs("lib.logger")
+		FreshLogger.set_level("DEBUG")
+		-- First call must always emit.
+		local snap_before = FreshLogger.ring_buffer_snapshot()
+		FreshLogger.info("dedup_test", "Unique line.")
+		local snap_after = FreshLogger.ring_buffer_snapshot()
+		helpers.assert_eq(#snap_after, #snap_before + 1, "first occurrence must be pushed to ring buffer")
+	end)
+
+	helpers.it("suppresses consecutive identical lines (count > 1)", function()
+		local FreshLogger = helpers.load_with_stubs("lib.logger")
+		FreshLogger.set_level("DEBUG")
+		FreshLogger.info("dedup_test", "Repeated.")
+		local snap_after_first = FreshLogger.ring_buffer_snapshot()
+		-- Second identical call — should be suppressed (no new ring entry yet).
+		FreshLogger.info("dedup_test", "Repeated.")
+		local snap_after_second = FreshLogger.ring_buffer_snapshot()
+		helpers.assert_eq(#snap_after_second, #snap_after_first,
+			"duplicate line must not add an entry to the ring buffer")
+	end)
+
+	helpers.it("flushes a dedup summary when a different line breaks the run", function()
+		local FreshLogger = helpers.load_with_stubs("lib.logger")
+		FreshLogger.set_level("DEBUG")
+		FreshLogger.info("dedup_test", "AAA.")
+		FreshLogger.info("dedup_test", "AAA.")  -- suppressed
+		FreshLogger.info("dedup_test", "AAA.")  -- suppressed
+		local snap_before_break = FreshLogger.ring_buffer_snapshot()
+		-- A different line breaks the run and must flush the summary.
+		FreshLogger.info("dedup_test", "BBB.")
+		local snap_after_break = FreshLogger.ring_buffer_snapshot()
+		-- snap must have grown by at least 2: the dedup summary + "BBB."
+		helpers.assert_true(#snap_after_break >= #snap_before_break + 2,
+			"breaking a dedup run must flush a summary then add the new line")
+		-- The summary line must contain the word 'suppressed'.
+		local found_summary = false
+		for _, line in ipairs(snap_after_break) do
+			if line:find("suppressed", 1, true) then found_summary = true ; break end
+		end
+		helpers.assert_true(found_summary, "dedup summary line must contain 'suppressed'")
+	end)
+
+	helpers.it("does not suppress lines of different levels even with same text", function()
+		local FreshLogger = helpers.load_with_stubs("lib.logger")
+		FreshLogger.set_level("DEBUG")
+		FreshLogger.info("dedup_test", "Same text.")
+		FreshLogger.warn("dedup_test", "Same text.")
+		local snap = FreshLogger.ring_buffer_snapshot()
+		-- Both lines must appear: INFO then WARNING — different level means different formatted line.
+		helpers.assert_true(#snap >= 2, "lines with different levels must both be emitted")
+		local info_found, warn_found = false, false
+		for _, line in ipairs(snap) do
+			if line:find("%[INFO%]",    1, false) and line:find("Same text", 1, true) then info_found = true end
+			if line:find("%[WARNING%]", 1, false) and line:find("Same text", 1, true) then warn_found = true end
+		end
+		helpers.assert_true(info_found,  "INFO variant of 'Same text.' must be in ring buffer")
+		helpers.assert_true(warn_found,  "WARNING variant of 'Same text.' must be in ring buffer")
+	end)
+end)
+
 helpers.describe("Logger: init_log_path", function()
 	helpers.it("re-points UNIFIED_LOG_FILE under <config_dir>/hammerspoon/logs/", function()
 		Logger.init_log_path("/tmp/ergopti_test_config/", 14)
