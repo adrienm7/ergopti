@@ -36,7 +36,8 @@
 		"codegen:terminators": "node ./scripts/codegen-terminators.cjs",
 		"codegen:expander:hs": "node ./scripts/codegen-expander-hs.cjs",
 		"codegen:prompt-builder:ahk": "node ./scripts/codegen-prompt-builder-ahk.cjs",
-		"codegen:shortcuts": "node ./scripts/codegen-shortcuts.cjs"
+		"codegen:shortcuts": "node ./scripts/codegen-shortcuts.cjs",
+		"test:mutation": "stryker run"
 	},
 	"type": "module",
 	"dependencies": {
@@ -46,6 +47,7 @@
 	},
 	"devDependencies": {
 		"@samkirkland/ftp-deploy": "^1.2.4",
+		"@stryker-mutator/core": "^9.6.1",
 		"@sveltejs/adapter-auto": "^6.1.0",
 		"@sveltejs/adapter-static": "^3.0.9",
 		"@sveltejs/enhanced-img": "^0.8.1",
