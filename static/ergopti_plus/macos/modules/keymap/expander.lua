@@ -489,9 +489,15 @@ function M.try_expand(chars, is_ignored)
 		local saved_buf = _state.buffer
 		-- Append the terminator so try_terminator_expand finds trigger + term suffix.
 		_state.buffer = saved_buf .. chars
-		-- Look up mappings by the last character of the buffer before the terminator
-		-- (i.e., the last char of the trigger itself).
-		local pre_term_tail = saved_buf:sub(-1)  -- single-byte fallback
+		-- Look up mappings by the last UTF-8 codepoint of the buffer before the
+		-- terminator (i.e., the last codepoint of the trigger itself). Using the
+		-- full codepoint is essential for multi-byte triggers (e.g. "cé"): sub(-1)
+		-- would return only the trailing continuation byte, missing the bucket.
+		local pre_term_tail
+		do
+			local ok, off = pcall(utf8.offset, saved_buf, -1)
+			pre_term_tail = (ok and off) and saved_buf:sub(off) or saved_buf:sub(-1)
+		end
 		for _, m in ipairs(bucket_for(pre_term_tail)) do
 			if M.try_terminator_expand(m, chars, char_len, is_ignored) then
 				return true
@@ -503,7 +509,13 @@ function M.try_expand(chars, is_ignored)
 
 	-- 2. Auto-expand path — trigger at the very end, no terminator.
 	_state.buffer = _state.buffer .. chars
-	local tail = _state.buffer:sub(-1)
+	-- Use the last full UTF-8 codepoint of the updated buffer; sub(-1) would
+	-- return only the trailing continuation byte for multi-byte codepoints.
+	local tail
+	do
+		local ok, off = pcall(utf8.offset, _state.buffer, -1)
+		tail = (ok and off) and _state.buffer:sub(off) or _state.buffer:sub(-1)
+	end
 	for _, m in ipairs(bucket_for(tail)) do
 		if M.try_auto_expand(m, char_len, is_ignored) then
 			return true

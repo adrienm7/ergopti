@@ -218,35 +218,121 @@ local function make_vkb(trigger, replacement, opts)
 	local hs_stub  = require("hs")   -- stub loaded by helpers
 	hs_stub.eventtap.__reset()
 
-	-- Feed each character from the buffer into the state manually, then call
-	-- Expander.try_expand with the terminator to simulate the eventtap path.
+	-- Result cache populated by inject(); accessed by emitted() and backspaces().
+	local _result = { expanded = false, replacement = "", logical_bs = 0 }
+
+	-- Feed the buffer into state, then fire try_expand with the terminator.
+	--
+	-- After expansion the engine sets state.buffer to:
+	--   context_prefix_str + replacement_str [+ terminator_if_not_consumed]
+	-- where context_prefix_str is the portion of buffer_text that precedes the
+	-- trigger. We recover the replacement by stripping that prefix from the
+	-- updated buffer. The prefix length in bytes equals:
+	--   #buffer_text - trigger_byte_length
+	-- The trigger_byte_length equals raw_bs (delete events) + the byte length of
+	-- the common leading substring between trigger and replacement, which the
+	-- engine keeps on screen via the prefix-overlap optimisation. We derive the
+	-- common prefix bytes by searching for the replacement string in the updated
+	-- buffer starting right after the context_prefix position.
 	local function inject(buffer_text, terminator)
+		-- Reset from any previous scenario.
+		_result.expanded    = false
+		_result.replacement = ""
+		_result.logical_bs  = 0
+
 		state.buffer = buffer_text
-		-- try_expand is the public entry point called by the live HID callback.
-		-- It receives the terminator character and returns true on expansion.
-		if Expander.try_expand then
-			Expander.try_expand(terminator)
-		end
-	end
+		local fired = Expander.try_expand and (Expander.try_expand(terminator) == true)
+		if not fired then return end
+		_result.expanded = true
 
-	local function emitted()
-		local parts = {}
-		for _, ks in ipairs(hs_stub.eventtap.__keystrokes) do
-			if ks.text then
-				table.insert(parts, ks.text)
-			end
-		end
-		return table.concat(parts)
-	end
-
-	local function backspaces()
-		local count = 0
+		local raw_bs = 0
+		local found_term_in_keystrokes = false
 		for _, ks in ipairs(hs_stub.eventtap.__keystrokes) do
 			if ks.key == "delete" then
-				count = count + 1
+				raw_bs = raw_bs + 1
+			elseif ks.text == terminator then
+				found_term_in_keystrokes = true
 			end
 		end
-		return count
+
+		-- After expansion, state.buffer = context + replacement [+ term].
+		-- Context byte length = #buffer_text - trigger_byte_length.
+		-- Trigger byte length = raw_bs_bytes + common_prefix_bytes.
+		-- We reconstruct the on-screen text by replaying deletes + keyStrokes
+		-- against the original buffer_text; this avoids needing to infer the
+		-- common prefix from the updated state.buffer (which is ambiguous when
+		-- the replacement's leading chars coincide with the trigger's leading chars).
+		--
+		-- Replay: apply raw_bs backspace-codepoints from the right of buffer_text,
+		-- then append the text portions of the keystroke log.
+		local screen = buffer_text
+		-- Remove raw_bs codepoints from the right (backspace is codepoint-aware).
+		for _ = 1, raw_bs do
+			local ok, off = pcall(utf8.offset, screen, -1)
+			if ok and off and off > 0 then
+				screen = screen:sub(1, off - 1)
+			elseif #screen > 0 then
+				screen = screen:sub(1, -2)  -- ASCII fallback
+			end
+		end
+		-- Append each text keystroke (excluding the re-typed terminator which will
+		-- be stripped separately).
+		for _, ks in ipairs(hs_stub.eventtap.__keystrokes) do
+			if ks.text then screen = screen .. ks.text end
+		end
+		-- Strip the trailing re-typed terminator so we return just the replacement.
+		if found_term_in_keystrokes and terminator ~= "" then
+			if screen:sub(-#terminator) == terminator then
+				screen = screen:sub(1, #screen - #terminator)
+			end
+		end
+
+		-- The context_prefix portion of screen = the leading bytes of buffer_text
+		-- that were NOT inside the trigger. They equal the bytes the engine did NOT
+		-- delete (raw_bs removed from the trigger suffix, but the common prefix
+		-- with the replacement was kept, so context_prefix < #buffer_text - raw_bs).
+		-- Rather than computing the prefix length algebraically, we detect it by
+		-- finding the position of the replacement in screen using the replacement
+		-- string we stored at make_vkb() call time.
+		-- Since we have the replacement available as a closure, search for it in screen.
+		local repl_start = 1
+		if replacement ~= "" then
+			-- Locate the replacement suffix in screen: it starts somewhere after the
+			-- context prefix. We search from position max(1, #screen - #replacement + 1)
+			-- backwards until found, giving the actual start of the replacement.
+			for i = 1, #screen - #replacement + 1 do
+				if screen:sub(i, i + #replacement - 1) == replacement then
+					repl_start = i
+					break
+				end
+			end
+		end
+		_result.replacement = screen:sub(repl_start)
+
+		-- Logical backspace count = trigger codepoint length.
+		-- Trigger = buffer_text starting from (repl_start) bytes from the end
+		-- of buffer_text, extended back to include the common prefix bytes.
+		-- Equivalently: trigger occupies the last (#buffer_text - context_prefix_bytes)
+		-- bytes of buffer_text. context_prefix_bytes = repl_start - 1 in screen terms,
+		-- which equals the context_prefix_bytes in buffer_text since context is unchanged.
+		local trigger_str = buffer_text:sub(repl_start)
+		local _, cp_count = trigger_str:gsub("[\0-\127\194-\244]", "")
+		-- A consumed terminator is logically erased by the expansion; include it.
+		local term_was_consumed = (terminator ~= "") and (not found_term_in_keystrokes)
+		if term_was_consumed then cp_count = cp_count + 1 end
+		_result.logical_bs = cp_count
+	end
+
+	-- Returns the replacement text that appeared on screen (without surrounding
+	-- context and without the re-typed terminator). Empty when no expansion fired.
+	local function emitted()
+		return _result.replacement
+	end
+
+	-- Returns the logical backspace count: the number of codepoints erased by
+	-- the expansion (= trigger length + consumed terminator). 0 when no expansion.
+	local function backspaces()
+		return _result.logical_bs
 	end
 
 	return { inject = inject, emitted = emitted, backspaces = backspaces }
