@@ -1162,6 +1162,8 @@ KL_ReadNewTodayLog() {
             entry := KL_JsonDecode(line)
             if (entry is Map && entry.Has("type"))
                 entries.Push(entry)
+        } catch {
+            ; Malformed JSONL line — skip silently, do not crash the ingest loop
         }
         lines += 1
     }

@@ -171,8 +171,9 @@ NI_GetSsidHash() {
         if (info.Count = 0)
             return ""   ; no Wi-Fi — return empty string (null equivalent in AHK)
         return CryptoSha256(info["ssid"])
+    } catch {
+        return ""
     }
-    return ""
 }
 
 
@@ -184,8 +185,9 @@ NI_GetSignalStrength() {
         if (info.Count = 0)
             return ""
         return info["signal_pct"]
+    } catch {
+        return ""
     }
-    return ""
 }
 
 
@@ -198,8 +200,9 @@ NI_IsInternetReachable() {
         flags := 0
         return !!DllCall("Wininet\InternetGetConnectedState",
             "UInt*", &flags, "UInt", 0, "Int")
+    } catch {
+        return false
     }
-    return false
 }
 
 
@@ -241,6 +244,7 @@ NI_IsVpnActive() {
             }
             p := NumGet(p, NI_ADAPTER_OFFSET_NEXT, "Ptr")
         }
+    } catch {
+        return false
     }
-    return false
 }
