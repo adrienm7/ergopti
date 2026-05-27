@@ -31,31 +31,23 @@
 
 _MetaPACListFiles(Dir, Ext) {
 	Files := []
-	TmpFile := A_Temp . "\meta_pac_" . A_TickCount . ".txt"
-	try FileDelete(TmpFile)
-	RunWait('cmd /c dir /b /s /a-d "' . StrReplace(Dir, "/", "\") . '" > "' . TmpFile . '"', , "Hide")
+	; Use AHK's built-in Loop Files instead of cmd /c dir so the function works
+	; in any execution context without shell-redirection quirks.
+	WinDir := StrReplace(Dir, "/", "\")
 	try {
-		Raw := FileRead(TmpFile)
-	} catch {
-		return Files
-	}
-	for Line in StrSplit(Raw, "`n", "`r") {
-		Line := Trim(StrReplace(Line, "\", "/"))
-		if Line = "" {
-			continue
+		Loop Files, WinDir . "\*." . Ext, "R" {
+			Files.Push(StrReplace(A_LoopFileFullPath, "\", "/"))
 		}
-		if not Line ~= "i)\." . Ext . "$" {
-			continue
-		}
-		Files.Push(Line)
 	}
 	return Files
 }
 
 ; Returns the base name without ALL extensions (e.g. "foo.spec.js" -> "foo").
 _MetaPACBaseName(Path) {
-	SplitPath(Path, &Name)
-	Name := RegExReplace(Name, "\.spec$", "")
+	; SplitPath only splits on backslashes — normalise forward slashes first.
+	SplitPath(StrReplace(Path, "/", "\"), &Name)
+	; Strip compound extension .spec.js in one pass, then any remaining extension
+	Name := RegExReplace(Name, "\.spec\.[^.]+$", "")
 	return RegExReplace(Name, "\.[^.]+$", "")
 }
 
@@ -77,7 +69,9 @@ _MetaPACToSnake(S) {
 
 _MetaRunAdapterPresenceTests() {
 	RepoRoot := StrReplace(A_ScriptDir, "\", "/")
-	RepoRoot := RegExReplace(RepoRoot, "/static/ergopti_plus/windows/tests/meta$", "")
+	; A_ScriptDir is always the main script's dir (tests/) regardless of which
+	; #Include'd file is executing — strip everything from /static/... onward.
+	RepoRoot := RegExReplace(RepoRoot, "/static/ergopti_plus/windows/tests(/meta)?$", "")
 
 	SharedPorts := RepoRoot . "/static/ergopti_plus/_shared/ports"
 	AhkAdapters := RepoRoot . "/static/ergopti_plus/windows/adapters"
@@ -132,7 +126,9 @@ _MetaRunAdapterPresenceTests()
 
 _MetaRunDomainCoverageTests() {
 	RepoRoot := StrReplace(A_ScriptDir, "\", "/")
-	RepoRoot := RegExReplace(RepoRoot, "/static/ergopti_plus/windows/tests/meta$", "")
+	; A_ScriptDir is always the main script's dir (tests/) regardless of which
+	; #Include'd file is executing — strip everything from /static/... onward.
+	RepoRoot := RegExReplace(RepoRoot, "/static/ergopti_plus/windows/tests(/meta)?$", "")
 
 	DomainDir  := RepoRoot . "/static/ergopti_plus/_shared/domain"
 	AhkTests   := RepoRoot . "/static/ergopti_plus/windows/tests"
@@ -199,7 +195,9 @@ _MetaRunDomainCoverageTests()
 
 _MetaRunSharedPurityTests() {
 	RepoRoot := StrReplace(A_ScriptDir, "\", "/")
-	RepoRoot := RegExReplace(RepoRoot, "/static/ergopti_plus/windows/tests/meta$", "")
+	; A_ScriptDir is always the main script's dir (tests/) regardless of which
+	; #Include'd file is executing — strip everything from /static/... onward.
+	RepoRoot := RegExReplace(RepoRoot, "/static/ergopti_plus/windows/tests(/meta)?$", "")
 
 	SharedDir := RepoRoot . "/static/ergopti_plus/_shared"
 	ForbiddenPatterns := ["io\.open", "hs\.", "SendInput", "SendEvent", "TrayTip", "FileAppend", "FileRead"]

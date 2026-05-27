@@ -75,6 +75,8 @@ Test("KLAppCatConst.DEFAULTS: notepad.exe -> productive", _KLAppCat_Defaults_Not
 
 ; Seed a clean in-memory map before each test group so tests are isolated.
 _KLAppCat_SeedMap() {
+	; Set file_path to a non-empty sentinel so KL_AppCat_RequireInit passes
+	KLAppCat.file_path := "stub"
 	KLAppCat.categories := Map(
 		"code.exe",     "productive",
 		"discord.exe",  "communication",

@@ -35,7 +35,7 @@ _HMBuildRegistry(Specs) {
 	Registry := Map()
 	for Spec in Specs {
 		Trig    := Spec["trigger"]
-		TailCh  := SubStr(Trig, -1 + 1)   ; last character
+		TailCh  := SubStr(Trig, -1)   ; last character
 		if not Registry.Has(TailCh) {
 			Registry[TailCh] := []
 		}
@@ -76,10 +76,16 @@ _HMMatch(Buffer, TailChar, Registry, TerminatorConsumed := false) {
 	if Buffer = "" or TailChar = "" {
 		return ""
 	}
-	if not Registry.Has(TailChar) {
+	; Registry is keyed by the trigger's last char; for case-insensitive matching
+	; try both the provided tail char and its lowercase equivalent.
+	LookupKey := TailChar
+	if not Registry.Has(LookupKey) {
+		LookupKey := StrLower(TailChar)
+	}
+	if not Registry.Has(LookupKey) {
 		return ""
 	}
-	Candidates := Registry[TailChar]
+	Candidates := Registry[LookupKey]
 	BufLen     := StrLen(Buffer)
 
 	for Mapping in Candidates {
@@ -92,7 +98,7 @@ _HMMatch(Buffer, TailChar, Registry, TerminatorConsumed := false) {
 		}
 
 		; Suffix check (case-aware)
-		BufTail := SubStr(Buffer, -TLen + 1)
+		BufTail := SubStr(Buffer, -TLen)
 		if Mapping["is_case_sensitive"] {
 			if BufTail != Trig {
 				continue

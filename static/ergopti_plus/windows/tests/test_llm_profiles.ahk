@@ -62,10 +62,12 @@ Test("LLM_ParseProfileObject: missing optional fields return empty/false default
 
 
 _LLMP_ParseObjectExtractsStopSequences() {
-	; Three backticks via Chr(96) — a literal ``` in a double-quoted AHK string
-	; would be parsed as backtick-escape + backtick-escape-quote, which is invalid.
+	; Three backticks via Chr(96) — backtick is AHK's escape char so it cannot
+	; appear literally in either a double-quoted or single-quoted AHK string.
+	; Build the JSON programmatically to avoid any AHK string-escape processing.
 	ThreeBackticks := Chr(96) . Chr(96) . Chr(96)
-	obj := '{"id": "code", "label": "Code", "system_single": "", "batch": false, "stop_sequences": ["```", "\n\n"]}'
+	obj := '{"id": "code", "label": "Code", "system_single": "", "batch": false, "stop_sequences": ["'
+		. ThreeBackticks . '", "\n\n"]}'
 	m := LLM_ParseProfileObject(obj)
 	AssertEqual(2, m["stop_sequences"].Length)
 	AssertEqual(ThreeBackticks, m["stop_sequences"][1])

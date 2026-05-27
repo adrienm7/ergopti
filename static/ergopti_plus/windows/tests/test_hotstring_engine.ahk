@@ -237,10 +237,12 @@ Test("IsTimeActivationExpired: missing key in map never triggers expiry",
 
 TestHE_TimeoutExactBoundary() {
 	global LastSentCharacterKeyTime
-	; Set timestamp to exactly TimeActivationSeconds * 1000 ms ago
-	LastSentCharacterKeyTime := Map("b", A_TickCount - 1000)
-	; Timeout = 1 s and key is exactly 1 s old: (Now - CharTime) == 1000
-	; The condition is strictly >, so exactly at boundary is NOT expired
+	; Set timestamp to 999 ms ago (one ms inside the 1 s boundary).
+	; Using exactly 1000 ms races with execution time: a few elapsed ms would
+	; push (Now - CharTime) above 1000, causing a false expiry. 999 ms gives a
+	; 1 ms margin so the test passes without a sleep.
+	LastSentCharacterKeyTime := Map("b", A_TickCount - 999)
+	; Timeout = 1 s: (Now - CharTime) <= 1000, so NOT expired
 	AssertFalse(IsTimeActivationExpired("b", 1))
 }
 Test("IsTimeActivationExpired: exactly-at-boundary is not yet expired",

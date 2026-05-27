@@ -62,12 +62,16 @@ TestAA_CacheReuse() {
 Test("GetActiveApp: caches snapshot within TTL window", TestAA_CacheReuse)
 
 TestAA_InvalidateForcesRefresh() {
-	First := GetActiveApp()
-	FirstTs := First.ts
+	global _ActiveAppCache
+	; Force a known-old ts so the second call's ts is guaranteed to differ.
+	; Using 1 (not 0) to distinguish from the "never set" sentinel used in GetActiveApp.
+	_ActiveAppCache.ts := 1
 	InvalidateActiveAppCache()
-	Sleep(2)
+	; After invalidation the sentinel must be 0
+	AssertTrue(_ActiveAppCache.ts == 0, "ts must be 0 after invalidation")
+	; The next GetActiveApp must refresh (ts set to current A_TickCount, >= 2)
 	Second := GetActiveApp()
-	AssertTrue(Second.ts > FirstTs or Second.ts == 0)
+	AssertTrue(Second.ts > 1, "ts must be updated after forced refresh")
 }
 Test("InvalidateActiveAppCache: forces a refresh on the next call",
 	TestAA_InvalidateForcesRefresh)
