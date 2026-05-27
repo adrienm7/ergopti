@@ -119,4 +119,17 @@ function M.cancelAll()
 	end
 end
 
+--- Returns the number of currently live (non-cancelled, non-fired) timers
+--- tracked by this adapter instance. Intended for diagnostics and tests.
+--- @return integer Count of active timer handles.
+function M.activeCount()
+	local count = 0
+	for _, handle in pairs(_live_timers) do
+		if handle and not handle.fired then
+			count = count + 1
+		end
+	end
+	return count
+end
+
 return M

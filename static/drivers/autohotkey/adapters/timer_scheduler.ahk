@@ -114,6 +114,20 @@ TimerCancelAll() {
 	}
 }
 
+; Returns the count of currently live (non-fired, non-cancelled) timer handles
+; tracked by this adapter. Intended for diagnostics and tests.
+; @return {Integer} Number of active timer handles.
+TimerActiveCount() {
+	global _TIMER_ADAPTER_REGISTRY
+	Count := 0
+	for Id, Handle in _TIMER_ADAPTER_REGISTRY {
+		if Handle is Map and !(Handle.Has("Fired") and Handle["Fired"]) {
+			Count += 1
+		}
+	}
+	return Count
+}
+
 
 
 
@@ -158,8 +172,9 @@ _TimerAdapterMakeRepeating(Handle, Fn) {
 ; (tests/test_adapter_compliance_new.ahk) to verify every required method exists
 ; and is callable without manually listing functions per-adapter.
 global ADAPTER_TIMER_SCHEDULER := Map(
-    "after",     Func("TimerAfter"),
-    "every",     Func("TimerEvery"),
-    "cancel",    Func("TimerCancel"),
-    "cancelAll", Func("TimerCancelAll"),
+    "after",       Func("TimerAfter"),
+    "every",       Func("TimerEvery"),
+    "cancel",      Func("TimerCancel"),
+    "cancelAll",   Func("TimerCancelAll"),
+    "activeCount", Func("TimerActiveCount"),
 )
