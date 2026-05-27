@@ -1956,5 +1956,9 @@
 	"updater.update_dialog_open": "Otevřít na GitHubu",
 	"updater.update_dialog_title": "ErgoptiPlus — Instalace aktualizace",
 	"updater.version_message": "ErgoptiPlus {1}{2}\n\nOtevřít stránku vydání na GitHubu?",
-	"vscode.reload_required": "Přenačtěte VSCode (Cmd+Shift+P > Reload Window) pro aktivaci rozšíření psaní"
+	"vscode.reload_required": "Přenačtěte VSCode (Cmd+Shift+P > Reload Window) pro aktivaci rozšíření psaní",
+	"crash.report.prompt_title": "Hlášení pádu — ErgoptiPlus",
+	"crash.report.prompt_body": "Došlo k neočekávané chybě. Chcete uložit anonymní hlášení (verze, OS, chybová zpráva) lokálně pro pozdější kontrolu?\n\nŽádná data nejsou odesílána přes internet a klávesy nejsou zaznamenávány.",
+	"crash.report.saved": "Hlášení pádu uloženo",
+	"crash.report.declined": "Hlášení pádu odmítnuto"
 }

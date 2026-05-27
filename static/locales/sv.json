@@ -1956,5 +1956,9 @@
 	"updater.update_dialog_open": "Öppna på GitHub",
 	"updater.update_dialog_title": "ErgoptiPlus — Installera uppdatering",
 	"updater.version_message": "ErgoptiPlus {1}{2}\n\nÖppna utgåvesidan på GitHub?",
-	"vscode.reload_required": "Ladda om VSCode (Cmd+Shift+P > Reload Window) för att aktivera skrivtillägget"
+	"vscode.reload_required": "Ladda om VSCode (Cmd+Shift+P > Reload Window) för att aktivera skrivtillägget",
+	"crash.report.prompt_title": "Kraschrapport — ErgoptiPlus",
+	"crash.report.prompt_body": "Ett oväntat fel inträffade. Vill du spara en anonym rapport (version, OS, felmeddelande) lokalt för senare granskning?\n\nInga data skickas via internet och inga tangentryckningar registreras.",
+	"crash.report.saved": "Kraschrapport sparad",
+	"crash.report.declined": "Kraschrapport avvisad"
 }

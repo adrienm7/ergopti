@@ -1956,5 +1956,9 @@
 	"updater.update_dialog_open": "Auf GitHub öffnen",
 	"updater.update_dialog_title": "ErgoptiPlus — Update installieren",
 	"updater.version_message": "ErgoptiPlus {1}{2}\n\nReleases-Seite auf GitHub öffnen?",
-	"vscode.reload_required": "Bitte VSCode neu laden (Cmd+Shift+P > Reload Window), um die Tipp-Erweiterung zu aktivieren"
+	"vscode.reload_required": "Bitte VSCode neu laden (Cmd+Shift+P > Reload Window), um die Tipp-Erweiterung zu aktivieren",
+	"crash.report.prompt_title": "Absturzbericht — ErgoptiPlus",
+	"crash.report.prompt_body": "Ein unerwarteter Fehler ist aufgetreten. Möchten Sie einen anonymen Bericht (Version, OS, Fehlermeldung) lokal speichern?\n\nEs werden keine Daten über das Internet gesendet und keine Tastenanschläge aufgezeichnet.",
+	"crash.report.saved": "Absturzbericht gespeichert",
+	"crash.report.declined": "Absturzbericht abgelehnt"
 }

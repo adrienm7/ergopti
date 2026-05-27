@@ -1956,5 +1956,9 @@
 	"updater.update_dialog_open": "Ouvrir sur GitHub",
 	"updater.update_dialog_title": "ErgoptiPlus — Installer la mise à jour",
 	"updater.version_message": "ErgoptiPlus {1}{2}\n\nOuvrir la page des releases sur GitHub ?",
-	"vscode.reload_required": "Veuillez recharger VSCode (Cmd+Shift+P > Reload Window) pour activer l’extension de frappe"
+	"vscode.reload_required": "Veuillez recharger VSCode (Cmd+Shift+P > Reload Window) pour activer l’extension de frappe",
+	"crash.report.prompt_title": "Rapport d'erreur — ErgoptiPlus",
+	"crash.report.prompt_body": "Une erreur inattendue s'est produite. Souhaitez-vous enregistrer un rapport anonyme (version, OS, message d'erreur) localement pour une analyse ultérieure ?\n\nAucune donnée n'est envoyée sur internet et aucune frappe n'est enregistrée.",
+	"crash.report.saved": "Rapport d'erreur enregistré",
+	"crash.report.declined": "Rapport d'erreur refusé"
 }

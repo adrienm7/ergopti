@@ -1956,5 +1956,9 @@
 	"updater.update_dialog_open": "GitHub'da aç",
 	"updater.update_dialog_title": "ErgoptiPlus — Güncellemeyi yükle",
 	"updater.version_message": "ErgoptiPlus {1}{2}\n\nGitHub’da sürümler sayfasını açayım mı?",
-	"vscode.reload_required": "Yazım uzantısını etkinleştirmek için VSCode’u yeniden yükleyin (Cmd+Shift+P > Reload Window)"
+	"vscode.reload_required": "Yazım uzantısını etkinleştirmek için VSCode’u yeniden yükleyin (Cmd+Shift+P > Reload Window)",
+	"crash.report.prompt_title": "Çökme raporu — ErgoptiPlus",
+	"crash.report.prompt_body": "Beklenmeyen bir hata oluştu. Daha sonra incelemek üzere anonim bir raporu (sürüm, OS, hata mesajı) yerel olarak kaydetmek ister misiniz?\n\nİnternet üzerinden veri gönderilmez ve tuş vuruşları kaydedilmez.",
+	"crash.report.saved": "Çökme raporu kaydedildi",
+	"crash.report.declined": "Çökme raporu reddedildi"
 }

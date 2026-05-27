@@ -1956,5 +1956,9 @@
 	"updater.update_dialog_open": "GitHub で開く",
 	"updater.update_dialog_title": "ErgoptiPlus — アップデートのインストール",
 	"updater.version_message": "ErgoptiPlus {1}{2}\n\nGitHub のリリースページを開きますか?",
-	"vscode.reload_required": "タイピング拡張機能を有効にするには VSCode を再読込してください (Cmd+Shift+P > Reload Window)"
+	"vscode.reload_required": "タイピング拡張機能を有効にするには VSCode を再読込してください (Cmd+Shift+P > Reload Window)",
+	"crash.report.prompt_title": "クラッシュレポート — ErgoptiPlus",
+	"crash.report.prompt_body": "予期しないエラーが発生しました。後で確認できるよう、匿名レポート（バージョン、OS、エラーメッセージ）をローカルに保存しますか？\n\nインターネットにデータは送信されず、キーストロークも記録されません。",
+	"crash.report.saved": "クラッシュレポートを保存しました",
+	"crash.report.declined": "クラッシュレポートを拒否しました"
 }
