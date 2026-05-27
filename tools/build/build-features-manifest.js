@@ -462,7 +462,12 @@ function ensureDir(p) {
 
 function writeOutput(absPath, content) {
 	ensureDir(dirname(absPath));
-	writeFileSync(absPath, content, 'utf8');
+	// AHK v2 requires UTF-8 BOM + CRLF line endings; enforce both regardless of the
+	// host OS so the generated file passes the encoding guard on Linux CI runners.
+	const payload = absPath.endsWith('.ahk')
+		? '﻿' + content.replace(/\r\n/g, '\n').replace(/\n/g, '\r\n')
+		: content;
+	writeFileSync(absPath, payload, 'utf8');
 	console.log(`Wrote ${absPath} (${content.length} chars)`);
 }
 
