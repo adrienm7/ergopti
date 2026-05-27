@@ -16,7 +16,7 @@
 ;
 ; FAIL-SAFE:
 ; All AHK control-inspection calls are wrapped in try/catch. Any failure
-; (UAC-elevated window, locked screen, restricted process) returns 0 rather
+; (UAC-elevated window, locked screen, restricted process) returns false rather
 ; than throwing, so callers never need to guard against exceptions.
 ; ==============================================================================
 
@@ -50,34 +50,34 @@ global SFD_SECURE_APPS := Map(
 ; ======================================
 ; ======================================
 
-; Returns 1 if the focused control carries the ES_PASSWORD style, 0 otherwise.
+; Returns true if the focused control carries the ES_PASSWORD style, false otherwise.
 ; Uses ControlGetStyle which inspects the Win32 ES_PASSWORD flag (0x20) — the
 ; most reliable heuristic without full UIAutomation COM registration.
-; @return {Integer} 1 = secure field, 0 = normal field or query failed.
+; @return {Boolean} True on success, false on error.
 SFD_IsSecureField() {
 	try {
 		local FocusedCtrl := ControlGetFocus(A)
-		if FocusedCtrl = 
-			return 0
+		if FocusedCtrl =
+			return false
 		local Style := ControlGetStyle(FocusedCtrl, A)
 		; ES_PASSWORD = 0x20 — password edit field marker set by CreateWindowEx
-		return (Style & 0x20) ? 1 : 0
+		return (Style & 0x20) ? true : false
 	} catch {
-		return 0
+		return false
 	}
 }
 
-; Returns 1 if AppId matches any entry in the SFD_SECURE_APPS constant Map.
+; Returns true if AppId matches any entry in the SFD_SECURE_APPS constant Map.
 ; An empty or missing AppId is treated as non-secure to avoid false positives.
 ; @param AppId {String} Process name of the active application (e.g. KeePass.exe).
-; @return {Integer} 1 = known password-manager app, 0 = unknown or empty AppId.
+; @return {Boolean} True on success, false on error.
 SFD_IsSecureApp(AppId) {
-	if AppId = 
-		return 0
+	if AppId =
+		return false
 	try {
-		return SFD_SECURE_APPS.Has(AppId) ? 1 : 0
+		return SFD_SECURE_APPS.Has(AppId) ? true : false
 	} catch {
-		return 0
+		return false
 	}
 }
 

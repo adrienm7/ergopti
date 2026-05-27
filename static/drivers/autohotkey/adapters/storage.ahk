@@ -54,13 +54,13 @@ global STORAGE_REG_NOT_FOUND := "__NOT_FOUND__"
 ; Writes Value to the registry under Key, converting it to a string first.
 ; @param Key   {String} The value name to write under STORAGE_REG_BASE.
 ; @param Value {Any}    The value to persist; coerced to String via String().
-; @return {Integer} 1 on success, 0 on any error.
+; @return {Boolean} True on success, false on error.
 ST_Set(Key, Value) {
 	try {
 		Reg_WriteString(STORAGE_REG_BASE, Key, String(Value))
-		return 1
+		return true
 	} catch {
-		return 0
+		return false
 	}
 }
 
@@ -80,28 +80,28 @@ ST_Get(Key, DefaultValue) {
 	}
 }
 
-; Deletes a value from the registry. Returns 1 even when the key is absent.
+; Deletes a value from the registry. Returns true even when the key is absent.
 ; @param Key {String} The value name to remove under STORAGE_REG_BASE.
-; @return {Integer} 1 always (deletion of absent keys is a no-op success).
+; @return {Boolean} True always (deletion of absent keys is a no-op success).
 ST_Delete(Key) {
 	try {
 		Reg_DeleteValue(STORAGE_REG_BASE, Key)
-		return 1
+		return true
 	} catch {
-		; Key absent or already deleted - contract treats this as success
-		return 1
+		; Key absent or already deleted — contract treats this as success
+		return true
 	}
 }
 
-; Returns 1 if Key exists in the registry store, 0 if absent.
+; Returns true if Key exists in the registry store, false if absent.
 ; @param Key {String} The value name to probe under STORAGE_REG_BASE.
-; @return {Integer} 1 if present, 0 if absent.
+; @return {Boolean} True on success, false on error.
 ST_Has(Key) {
 	try {
 		local Result := Reg_Read(STORAGE_REG_BASE, Key, STORAGE_REG_NOT_FOUND)
-		return Result != STORAGE_REG_NOT_FOUND ? 1 : 0
+		return Result != STORAGE_REG_NOT_FOUND ? true : false
 	} catch {
-		return 0
+		return false
 	}
 }
 
@@ -116,15 +116,15 @@ ST_Keys() {
 }
 
 ; Deletes every value under STORAGE_REG_BASE by iterating ST_Keys().
-; @return {Integer} 1 on success, 0 if iteration itself throws.
+; @return {Boolean} True on success, false on error.
 ST_Clear() {
 	try {
 		local Keys := ST_Keys()
 		for K in Keys {
 			ST_Delete(K)
 		}
-		return 1
+		return true
 	} catch {
-		return 0
+		return false
 	}
 }

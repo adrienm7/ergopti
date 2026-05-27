@@ -34,16 +34,16 @@
 
 ; Reads the entire contents of a file as a UTF-8 string.
 ; @param Path {String} Absolute path to the file.
-; @return {String|0} File contents on success, 0 on any error.
+; @return {String|false} File contents on success, false on any error.
 FSRead(Path) {
 	if !(Path is String) or Path = ""
-		return 0
+		return false
 	try {
 		local Content := ""
 		FileRead(Content, "UTF-8:" . Path)
 		return Content
 	} catch {
-		return 0
+		return false
 	}
 }
 
@@ -51,68 +51,68 @@ FSRead(Path) {
 ; Creates the file if it does not exist.
 ; @param Path    {String} Absolute path to the file.
 ; @param Content {String} UTF-8 content to write.
-; @return {Integer} 1 on success, 0 on any error.
+; @return {Boolean} True on success, false on error.
 FSWrite(Path, Content) {
 	if !(Path is String) or Path = ""
-		return 0
+		return false
 	if !(Content is String)
 		Content := ""
 	try {
 		local FH := FileOpen(Path, "w", "UTF-8")
 		if !IsObject(FH)
-			return 0
+			return false
 		FH.Write(Content)
 		FH.Close()
-		return 1
+		return true
 	} catch {
-		return 0
+		return false
 	}
 }
 
 ; Appends content to a file, creating it if it does not exist.
 ; @param Path    {String} Absolute path to the file.
 ; @param Content {String} UTF-8 content to append.
-; @return {Integer} 1 on success, 0 on any error.
+; @return {Boolean} True on success, false on error.
 FSAppend(Path, Content) {
 	if !(Path is String) or Path = ""
-		return 0
+		return false
 	if !(Content is String)
 		Content := ""
 	try {
 		local FH := FileOpen(Path, "a", "UTF-8")
 		if !IsObject(FH)
-			return 0
+			return false
 		FH.Write(Content)
 		FH.Close()
-		return 1
+		return true
 	} catch {
-		return 0
+		return false
 	}
 }
 
-; Returns 1 if a file or directory exists at the given path, 0 otherwise.
+; Returns true if a file or directory exists at the given path, false otherwise.
 ; @param Path {String} Absolute path to test.
-; @return {Integer} 1 if exists, 0 otherwise.
+; @return {Boolean} True on success, false on error.
 FSExists(Path) {
 	if !(Path is String) or Path = ""
-		return 0
+		return false
 	; FileExist returns a non-empty attribute string on match, "" on miss
-	return FileExist(Path) != "" ? 1 : 0
+	return FileExist(Path) != "" ? true : false
 }
 
-; Deletes a file. Returns 1 if deleted or already absent, 0 on error.
+; Deletes a file. Returns true if deleted or already absent, false on error.
 ; @param Path {String} Absolute path to the file to delete.
-; @return {Integer} 1 on success or file-not-found, 0 on any other error.
+; @return {Boolean} True on success, false on error.
 FSDelete(Path) {
 	if !(Path is String) or Path = ""
-		return 0
+		return false
 	; Already absent — contract says this is a no-op success
 	if !FSExists(Path)
-		return 1
+		return true
 	try {
 		FileDelete(Path)
-		return 1
+		return true
 	} catch {
-		return 0
+		return false
 	}
 }

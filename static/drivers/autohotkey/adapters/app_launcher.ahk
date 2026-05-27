@@ -20,7 +20,7 @@
 ; contract's fire-and-forget semantics.
 ;
 ; FAIL-SAFE:
-; All OS calls are wrapped in try/catch. AL_IsRunning returns 0 on any error
+; All OS calls are wrapped in try/catch. AL_IsRunning returns false on any error
 ; rather than propagating an exception to the caller.
 ; ==============================================================================
 
@@ -57,13 +57,13 @@ AL_LaunchWithArgs(AppPath, Args) {
 	}
 }
 
-; Returns 1 when at least one process with the given name is currently running.
+; Returns true when at least one process with the given name is currently running.
 ; @param ProcessName {String} Process name as shown in the OS task list (e.g. "notepad.exe").
-; @return {Integer} 1 if the process exists, 0 otherwise.
+; @return {Boolean} True on success, false on error.
 AL_IsRunning(ProcessName) {
 	try {
-		return ProcessExist(ProcessName) ? 1 : 0
+		return ProcessExist(ProcessName) ? true : false
 	} catch {
-		return 0
+		return false
 	}
 }

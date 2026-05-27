@@ -66,37 +66,37 @@ _WMResolveSpec(HwndOrSpec) {
 
 ; Brings the specified window to the foreground and gives it focus.
 ; @param HwndOrSpec {Integer|String} HWND integer or AHK WinTitle spec.
-; @return {Integer} 1 on success, 0 if the window was not found or could not be activated.
+; @return {Boolean} True on success, false on error.
 WMActivate(HwndOrSpec) {
 	local Spec := _WMResolveSpec(HwndOrSpec)
 	try {
 		WinActivate(Spec)
-		return 1
+		return true
 	} catch {
-		return 0
+		return false
 	}
 }
 
 ; Checks whether at least one window matching Spec currently exists.
 ; @param Spec {String} AHK WinTitle spec (e.g. "ahk_exe notepad.exe").
-; @return {Integer} 1 if a matching window exists, 0 otherwise.
+; @return {Boolean} True on success, false on error.
 WMExists(Spec) {
 	try {
-		return WinExist(Spec) ? 1 : 0
+		return WinExist(Spec) ? true : false
 	} catch {
-		return 0
+		return false
 	}
 }
 
 ; Forcefully terminates all windows matching Spec.
 ; @param Spec {String} AHK WinTitle spec.
-; @return {Integer} 1 if the kill was issued, 0 on any error.
+; @return {Boolean} True on success, false on error.
 WMKill(Spec) {
 	try {
 		WinKill(Spec)
-		return 1
+		return true
 	} catch {
-		return 0
+		return false
 	}
 }
 
