@@ -90,7 +90,8 @@ _DE_SimpleMatch() {
 	R := _DE_Decide("btw", " ")
 	AssertTrue(R["not_null"], "simple_match: result must not be null")
 	AssertEqual("by the way", R["replacement"], "simple_match: replacement must be 'by the way'")
-	AssertEqual(3, R["backspace_count"], "simple_match: backspace_count must be 3 (trigger length)")
+	; Trigger "btw" (3 chars) + terminator " " (1 char) = 4 backspaces total
+	AssertEqual(4, R["backspace_count"], "simple_match: backspace_count must be 4 (trigger + end char)")
 	AssertTrue(R["consume_terminator"] = false, "simple_match: consume_terminator must be false")
 }
 Test("Expander: buffer ending with trigger + terminator returns correct expansion", _DE_SimpleMatch)

@@ -33,9 +33,10 @@
 ; ============================================
 
 _CorpusHS_Root() {
-	; Resolve the corpus path relative to this test file's directory:
-	; tests/meta/ ? tests/ ? autohotkey/ ? drivers/ ? _shared/
-	return A_ScriptDir . "\..\..\..\_shared\tests\corpus\hotstrings\vectors.json"
+	; Resolve the corpus path relative to the main script's directory (tests/).
+	; A_ScriptDir is always the dir of run_all.ahk, i.e. windows/tests/.
+	; Two levels up from tests/ reaches ergopti_plus/ where _shared/ lives.
+	return A_ScriptDir . "\..\..\_shared\tests\corpus\hotstrings\vectors.json"
 }
 
 _CorpusHS_Load() {
@@ -135,7 +136,7 @@ _CorpusHS_TriggerLengthMatchesBuffer() {
 		Buf     := V.Has("buffer") ? V["buffer"] : V["trigger"]
 		Trigger := V["trigger"]
 		TLen    := StrLen(Trigger)
-		BufTail := SubStr(Buf, -TLen + 1)
+		BufTail := SubStr(Buf, -TLen)
 		AssertEqual(Trigger, BufTail,
 			"vector '" . V["id"] . "': buffer must end with trigger for matched=true")
 	}
@@ -165,8 +166,9 @@ _CorpusHS_NonMatchedBuffersDontEndWithTrigger() {
 		if Buf = "" {
 			continue
 		}
-		BufTail := SubStr(Buf, -TLen + 1)
-		AssertTrue(BufTail != Trigger,
+		BufTail := SubStr(Buf, -TLen)
+		; Use !== (case-sensitive) so "btw" and "BTW" are treated as distinct
+		AssertTrue(BufTail !== Trigger,
 			"vector '" . V["id"] . "': non-matched buffer must not end with trigger")
 	}
 }
@@ -215,9 +217,9 @@ _CorpusHS_CaseSensitiveVectorsHaveCorrectMatchFlag() {
 		Buf     := V.Has("buffer") ? V["buffer"] : ""
 		Trigger := V["trigger"]
 		TLen    := StrLen(Trigger)
-		BufTail := SubStr(Buf, -TLen + 1)
-		; Exact (case-sensitive) match ? expected matched flag
-		ActualMatch := (BufTail = Trigger)
+		BufTail := SubStr(Buf, -TLen)
+		; Exact (case-sensitive) match — use == for case-sensitive comparison
+		ActualMatch := (BufTail == Trigger)
 		ExpMatch    := Exp.Has("matched") and Exp["matched"] = true
 		AssertEqual(ExpMatch, ActualMatch,
 			"vector '" . V["id"] . "': case-sensitive match flag inconsistency")

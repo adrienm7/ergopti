@@ -313,7 +313,9 @@ Test("_LLM_Engine_MaxAttempts: scales up with larger n", _MaxAttempts_ScalesWith
 
 _ResolveProfileForApp_ReturnsDefaultWhenNoOverrides() {
 	global _LLM_Engine
-	_LLM_Engine.Delete("app_profile_overrides")
+	; Use try in case the key is absent — Map.Delete() throws "Item has no value"
+	; when the key does not exist in some AHK v2 builds.
+	try _LLM_Engine.Delete("app_profile_overrides")
 	result := _LLM_Engine_ResolveProfileIdForApp("basic")
 	AssertEqual("basic", result)
 }
@@ -444,12 +446,14 @@ Test("LLM_Engine_FirePrediction: exact cache hit bumps request_id", _CacheHit_Ex
 
 _CacheHit_PrefixMatchSlicesResults() {
 	global _LLM_Engine
-	; Cache: context "intelligen", prediction "intelligence "
+	; Cache: context "intelligen", predicted suffix "ce alone" (starts with "ce ").
+	; Firing with ctx="intelligence " gives typed_delta="ce " which matches the
+	; start of the cached slot — prefix-cache hits and slices to "alone".
 	LLM_Engine_Init(Map())
 	_LLM_Engine["last_ctx"]     := "intelligen"
-	_LLM_Engine["last_results"] := ["intelligence "]
+	_LLM_Engine["last_results"] := ["ce alone"]
 	; Now fire with a context that extends the cache by "ce " — prefix match
-	; should slice the cached prediction to the remaining suffix ""
+	; should slice the cached prediction to the remaining suffix "alone"
 	id_before := _LLM_Engine["request_id"]
 	LLM_Engine_FirePrediction("intelligence ")
 	; request_id must have been bumped (prefix-cache path)

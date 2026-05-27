@@ -35,9 +35,10 @@
 ; ============================================
 
 _CorpusTH_Root() {
-	; Resolve the corpus path relative to this test file's directory:
-	; tests/meta/ -> tests/ -> autohotkey/ -> drivers/ -> _shared/
-	return A_ScriptDir . "\..\..\..\_shared\tests\corpus\tap_hold\vectors.json"
+	; Resolve the corpus path relative to the main script's directory (tests/).
+	; A_ScriptDir is always the dir of run_all.ahk, i.e. windows/tests/.
+	; Two levels up from tests/ reaches ergopti_plus/ where _shared/ lives.
+	return A_ScriptDir . "\..\..\_shared\tests\corpus\tap_hold\vectors.json"
 }
 
 _CorpusTH_Load() {
@@ -99,7 +100,8 @@ _CorpusTH_ConfiguredTrueHasNonNullConfig() {
 	for V in Corpus["vectors"] {
 		Exp := V["expected"]
 		if Exp.Has("configured") and Exp["configured"] = true {
-			AssertTrue(V.Has("config") and V["config"] != "",
+			; JSON null parses to JSON_NULL (an Object, not a Map); use type check
+			AssertTrue(V.Has("config") and Type(V["config"]) = "Map",
 				"vector '" . V["id"] . "' has configured=true but config is null")
 		}
 	}
@@ -114,9 +116,9 @@ _CorpusTH_ConfiguredFalseHasNullConfig() {
 	for V in Corpus["vectors"] {
 		Exp := V["expected"]
 		if Exp.Has("configured") and Exp["configured"] = false {
-			; In JSON null maps to "" after JsonParse when the key exists,
-			; or the key may be absent  --  both are acceptable for config=null.
-			HasConfig := V.Has("config") and V["config"] != ""
+			; JSON null parses to JSON_NULL (Object type, not Map); treat it as absent.
+			; An empty string or JSON_NULL are both acceptable representations of null.
+			HasConfig := V.Has("config") and Type(V["config"]) = "Map"
 			AssertTrue(!HasConfig,
 				"vector '" . V["id"] . "' has configured=false but config is non-null")
 		}
@@ -183,7 +185,8 @@ _CorpusTH_ConfiguredVectorsRoundTrip() {
 		return
 	}
 	for V in Corpus["vectors"] {
-		if not (V.Has("config") and V["config"] != "") {
+		; JSON null parses to JSON_NULL (Object), not a Map — skip null configs
+		if not (V.Has("config") and Type(V["config"]) = "Map") {
 			continue
 		}
 		Cfg     := V["config"]
@@ -205,7 +208,8 @@ _CorpusTH_TapActionPreserved() {
 		return
 	}
 	for V in Corpus["vectors"] {
-		if not (V.Has("config") and V["config"] != "") {
+		; JSON null parses to JSON_NULL (Object), not a Map — skip null configs
+		if not (V.Has("config") and Type(V["config"]) = "Map") {
 			continue
 		}
 		Exp := V["expected"]
@@ -231,7 +235,8 @@ _CorpusTH_DurationPreserved() {
 		return
 	}
 	for V in Corpus["vectors"] {
-		if not (V.Has("config") and V["config"] != "") {
+		; JSON null parses to JSON_NULL (Object), not a Map — skip null configs
+		if not (V.Has("config") and Type(V["config"]) = "Map") {
 			continue
 		}
 		Exp := V["expected"]
@@ -257,15 +262,17 @@ _CorpusTH_HoldModifierPreserved() {
 		return
 	}
 	for V in Corpus["vectors"] {
-		if not (V.Has("config") and V["config"] != "") {
+		; JSON null parses to JSON_NULL (Object), not a Map — skip null configs
+		if not (V.Has("config") and Type(V["config"]) = "Map") {
 			continue
 		}
 		Exp := V["expected"]
 		if not Exp.Has("hold_modifier") {
 			continue
 		}
-		; Skip null hold_modifier  --  AHK accessor returns "" for absent field
-		if Exp["hold_modifier"] = "" {
+		; Skip null hold_modifier — JSON null parses to JSON_NULL (Object) and
+		; the AHK accessor returns "" for an absent field; both are skipped here.
+		if Exp["hold_modifier"] = "" or Type(Exp["hold_modifier"]) != "String" {
 			continue
 		}
 		Cfg     := V["config"]

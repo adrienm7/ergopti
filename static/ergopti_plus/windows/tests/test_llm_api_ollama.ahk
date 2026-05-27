@@ -76,12 +76,13 @@ Test("LLM_BuildOllamaPayload: escapes newlines in system prompt", _OllamaPayload
 
 
 _OllamaPayload_StopSequencesIncluded() {
-	; Chr(96) x3 = ``` — avoids AHK v2 backtick-escape ambiguity in double-quoted strings.
+	; Chr(96) x3 = ``` — backtick is AHK's escape char and cannot appear literally
+	; in a string literal; use Chr(96) for each backtick to avoid escape processing.
 	ThreeBackticks := Chr(96) . Chr(96) . Chr(96)
 	stops := [ThreeBackticks, "`n`n"]
 	payload := LLM_BuildOllamaPayload("m", "s", "u", 0.1, false, stops)
 	AssertContains(payload, '"stop"')
-	AssertContains(payload, '"```"')
+	AssertContains(payload, '"' . ThreeBackticks . '"')
 }
 Test("LLM_BuildOllamaPayload: stop_sequences included when provided", _OllamaPayload_StopSequencesIncluded)
 
