@@ -83,6 +83,9 @@ static/ergopti_plus/windows/_generated/prefetch_*.json
 # Corpus working copy produced by build scripts
 static/corpus/modifie/
 
+# Test files
+static/ergopti_plus/windows/tests/e2e/test_results.txt
+
 
 
 
