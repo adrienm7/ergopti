@@ -27,6 +27,7 @@
 SetWorkingDir(A_ScriptDir)
 #Warn All, StdOut
 #Warn VarUnset, Off
+global _AHK_DRY_RUN := (A_Args.Length > 0 && A_Args[1] == "--dry-run")
 
 ; Test framework first — Assert / Test / RunTests must exist before any
 ; subsequent file registers its cases or invokes assertions inside lambdas.
@@ -38,6 +39,7 @@ SetWorkingDir(A_ScriptDir)
 #Include test_stubs.ahk
 
 ; ── Production lib files in dependency order ──
+#Include ../lib/app_state.ahk
 #Include ../lib/ui_style.ahk
 #Include ../lib/logger.ahk
 #Include ../lib/toml/toml_helpers.ahk
@@ -83,6 +85,13 @@ InstallHotstringHooks()
 #Include ../adapters/clipboard.ahk
 #Include ../adapters/storage.ahk
 #Include ../adapters/process_lifecycle.ahk
+#Include ../adapters/key_state.ahk
+#Include ../adapters/app_launcher.ahk
+
+; Lock _AHK_SendText / _AHK_SendInput to no-ops AFTER the adapter has been
+; included (the adapter sets them to real lambdas; InstallSendNoOps overwrites
+; them so no keystroke can escape into the OS during test execution).
+InstallSendNoOps()
 
 ; ── Per-module test files (each registers Test() cases) ──
 #Include test_adapter_compliance_new.ahk
@@ -139,6 +148,10 @@ InstallHotstringHooks()
 
 ; Keylogger sub-modules — pure-logic subsets included here to test category
 ; lookup, character classification, and burst helpers without OS hooks or I/O.
+; sqlite3.ahk needs _VendorDir (set by ErgoptiPlus.ahk at runtime); stub it
+; here so the class static initialiser does not crash the test runner.
+global _VendorDir := A_ScriptDir . "\..\vendor"
+#Include ../lib/sqlite3.ahk
 #Include ../modules/keylogger/keylogger_walker.ahk
 #Include ../modules/keylogger/keylogger_app_categories.ahk
 #Include ../modules/keylogger/keylogger_reader.ahk

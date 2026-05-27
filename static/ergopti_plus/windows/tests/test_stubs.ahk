@@ -420,6 +420,9 @@ UpdateLastSentCharacter(Character) {
     _Stub_LastChars.Push(Character)
     _LSCPush(Character)
     LastSentCharacterKeyTime[Character] := A_TickCount
+    ; Also mirror into AppState so modules that read AppState["last_sent_key_time"]
+    ; observe the same timestamp as modules that read LastSentCharacterKeyTime.
+    AppState_TouchLastSentKey(Character)
 }
 
 DeadKey(Mapping) {
@@ -539,9 +542,37 @@ SimulateMicrosoftOffice() {
 
 
 
+; =============================================
+; =============================================
+; ======= 5/ Dry-run OS guard ================
+; =============================================
+; =============================================
+
+; Replaces the injectable send primitives from adapters/text_sender.ahk with
+; no-ops so no real keystroke ever reaches the OS while tests are running.
+; This mirrors the _SendHook pattern used for hotstring engine tests.
+; _AHK_SendText and _AHK_SendInput are declared as globals in text_sender.ahk
+; and re-assigned here (test_stubs.ahk is loaded before the adapter in run_all.ahk,
+; so these globals are declared here first and overwritten when text_sender.ahk
+; loads — we therefore install the no-op AFTER the adapter is included, via a
+; dedicated function called from run_all.ahk's body).
+global _AHK_SendText  := (Text) => 0   ; no-op — never reaches SendText()
+global _AHK_SendInput := (Keys) => 0   ; no-op — never reaches SendInput()
+
+; InstallSendNoOps must be called AFTER #Include text_sender.ahk in run_all.ahk
+; to win the last-assignment race and lock both globals to no-ops.
+InstallSendNoOps() {
+    global _AHK_SendText, _AHK_SendInput
+    _AHK_SendText  := (Text) => 0
+    _AHK_SendInput := (Keys) => 0
+}
+
+
+
+
 ; =====================================================================
 ; ====================================================================
-; ======= 5/ LLM prediction engine stubs =============================
+; ======= 6/ LLM prediction engine stubs =============================
 ; ====================================================================
 ; =====================================================================
 
