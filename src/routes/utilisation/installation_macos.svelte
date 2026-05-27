@@ -1,16 +1,19 @@
 <script>
+	import { onMount } from 'svelte';
 	import Ergopti from '$lib/components/Ergopti.svelte';
 	import ErgoptiPlus from '$lib/components/ErgoptiPlus.svelte';
 	import SFB from '$lib/components/SFB.svelte';
 	import BetaWarning from '$lib/components/BetaWarning.svelte';
-	import { version } from '$lib/stores_infos.js';
-	import { getLatestVersion } from '$lib/js/getVersions.js';
-	let versionValue, version_mineure_macos;
-	version.subscribe((value) => {
-		versionValue = value;
-		version_mineure_macos = getLatestVersion('macos_keylayout', versionValue);
+	import { getRelease } from '$lib/js/getGitHubRelease.js';
+
+	/** @type {Awaited<ReturnType<typeof getRelease>>} */
+	let release = null;
+	$: tag = release?.tag?.replace(/^v/, "") ?? "…";
+	$: urlMacosBundle = release?.url("Ergopti_macOS.zip") ?? "#";
+
+	onMount(async () => {
+		release = await getRelease();
 	});
-	import { base } from '$app/paths';
 </script>
 
 <h2 id="macos">
@@ -19,18 +22,12 @@
 </h2>
 <tiny-space></tiny-space>
 <div class="download-buttons">
-	{#if version_mineure_macos !== undefined}
-		<a
-			href={base +
-				`/ergopti/macos/bundles/zipped_bundles/Ergopti_v${version_mineure_macos}.bundle.zip`}
-			download
+	<a href={urlMacosBundle} download={!!release}>
+		<button disabled={!release}
+			><i class="icon-appleinc" style="font-size:0.8em; vertical-align:0"></i>
+			Ergopti {tag}.bundle</button
 		>
-			<button
-				><i class="icon-appleinc" style="font-size:0.8em; vertical-align:0"></i>
-				Ergopti v{version_mineure_macos}.bundle</button
-			>
-		</a>
-	{/if}
+	</a>
 </div>
 
 <tiny-space></tiny-space>

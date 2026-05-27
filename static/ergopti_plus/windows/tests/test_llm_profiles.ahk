@@ -62,10 +62,13 @@ Test("LLM_ParseProfileObject: missing optional fields return empty/false default
 
 
 _LLMP_ParseObjectExtractsStopSequences() {
+	; Three backticks via Chr(96) — a literal ``` in a double-quoted AHK string
+	; would be parsed as backtick-escape + backtick-escape-quote, which is invalid.
+	ThreeBackticks := Chr(96) . Chr(96) . Chr(96)
 	obj := '{"id": "code", "label": "Code", "system_single": "", "batch": false, "stop_sequences": ["```", "\n\n"]}'
 	m := LLM_ParseProfileObject(obj)
 	AssertEqual(2, m["stop_sequences"].Length)
-	AssertEqual("```", m["stop_sequences"][1])
+	AssertEqual(ThreeBackticks, m["stop_sequences"][1])
 }
 Test("LLM_ParseProfileObject: extracts stop_sequences array", _LLMP_ParseObjectExtractsStopSequences)
 

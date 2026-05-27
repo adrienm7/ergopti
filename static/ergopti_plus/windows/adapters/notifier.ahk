@@ -1,4 +1,4 @@
-﻿﻿; adapters/notifier.ahk
+﻿; adapters/notifier.ahk
 
 ; ==============================================================================
 ; MODULE: Notifier Adapter (AutoHotkey)
