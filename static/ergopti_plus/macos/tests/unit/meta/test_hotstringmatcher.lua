@@ -4,7 +4,7 @@
 --- MODULE: HotstringMatcher — Domain Spec Coverage (Hammerspoon)
 --- DESCRIPTION:
 --- Validates the Hammerspoon hotstring matching logic against the cross-driver
---- contract vectors defined in _shared/domain/HotstringMatcher.spec.js.
+--- contract vectors defined in shared/domain/HotstringMatcher.spec.js.
 ---
 --- The canonical matching algorithm is specified in HotstringMatcher.spec.js.
 --- The HS implementation is split between modules/keymap/registry.lua

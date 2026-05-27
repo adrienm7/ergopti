@@ -30,19 +30,19 @@ M.BUILTIN_PROFILES = Profiles.BUILTIN_PROFILES
 --- =======================================
 -- =======================================
 
---- Loads the cross-platform defaults.json from _shared/llm/ and merges its
+--- Loads the cross-platform defaults.json from shared/llm/ and merges its
 --- values into the provided base table. Values present in the JSON override the
 --- base; missing values keep the base value. HS-specific keys (model names,
 --- llm_debounce in seconds) are NOT in the JSON and keep their base values.
 --- @param base table Hardcoded fallback defaults to merge into.
 --- @return table Merged defaults table.
 local function load_shared_defaults(base)
-	-- Resolve path: hammerspoon/ is two levels above _shared/
+	-- Resolve path: hammerspoon/ is two levels above shared/
 	local script_dir = (hs.processInfo and hs.processInfo.bundlePath) or ""
 	local candidates = {
-		(os.getenv("HOME") or "") .. "/Library/Application Support/Hammerspoon/../../../static/ergopti_plus/_shared/llm/defaults.json",
-		hs.configdir .. "/../../static/ergopti_plus/_shared/llm/defaults.json",
-		hs.configdir .. "/../_shared/llm/defaults.json",
+		(os.getenv("HOME") or "") .. "/Library/Application Support/Hammerspoon/../../../static/ergopti_plus/shared/llm/defaults.json",
+		hs.configdir .. "/../../static/ergopti_plus/shared/llm/defaults.json",
+		hs.configdir .. "/../shared/llm/defaults.json",
 	}
 
 	local raw = nil
@@ -383,13 +383,13 @@ end
 -- Flat index: { [label] = { ollama = "...", mlx = "..." } } — built once from JSON
 local _model_index = nil
 
---- Builds and caches a flat O(1) lookup index from _shared/llm/models.json.
+--- Builds and caches a flat O(1) lookup index from shared/llm/models.json.
 --- @return table The index keyed by model label.
 local function get_model_index()
 	if _model_index then return _model_index end
 	local candidates = {
-		hs.configdir .. "/../_shared/llm/models.json",
-		hs.configdir .. "/../../_shared/llm/models.json",
+		hs.configdir .. "/../shared/llm/models.json",
+		hs.configdir .. "/../../shared/llm/models.json",
 		hs.configdir .. "/data/llm_models.json",
 		hs.configdir .. "/../hammerspoon/data/llm_models.json",
 	}
@@ -425,7 +425,7 @@ end
 
 --- Translates a JSON model label to the backend-specific identifier in O(1).
 --- e.g., "gemma-4-E2B-it" -> "gemma4:e2b" (Ollama) or "gemma-4-e2b-it-mxfp4" (MLX)
---- @param label string The model label ("name" field from _shared/llm/models.json).
+--- @param label string The model label ("name" field from shared/llm/models.json).
 --- @param backend string The target backend identifier.
 --- @return string The backend-specific identifier, or label unchanged if not found.
 local function resolve_model_for_backend(label, backend)

@@ -58,7 +58,7 @@ class KLReadConst {
 ; ===================================
 
 ; Resolve the canonical schema.sql path. The shared schema lives at
-; `<repo>/static/ergopti_plus/_shared/schema/schema.sql`; _StaticDir already
+; `<repo>/static/ergopti_plus/shared/schema/schema.sql`; _StaticDir already
 ; resolves to the right root in both dev and compiled modes.
 KLR_ResolveSchemaPath() {
     global _StaticDir

@@ -4,7 +4,7 @@
 --- MODULE: GraphicsRenderer Adapter (Hammerspoon)
 --- DESCRIPTION:
 --- Hammerspoon implementation of the GraphicsRenderer port contract defined in
---- static/ergopti_plus/_shared/ports/GraphicsRenderer.spec.js. Wraps hs.canvas to
+--- static/ergopti_plus/shared/ports/GraphicsRenderer.spec.js. Wraps hs.canvas to
 --- create and manage layered native windows for overlay graphics without
 --- coupling domain modules to the hs.canvas API.
 ---

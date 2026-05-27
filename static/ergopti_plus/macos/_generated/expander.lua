@@ -1,6 +1,6 @@
 --- drivers/hammerspoon/_generated/expander.lua
 --- AUTO-GENERATED — do not edit manually.
---- Source: static/ergopti_plus/_shared/domain/expander.spec.js
+--- Source: static/ergopti_plus/shared/domain/expander.spec.js
 --- Run: npm run codegen:expander:hs
 
 --- ==============================================================================

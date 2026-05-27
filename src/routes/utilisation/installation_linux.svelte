@@ -222,6 +222,6 @@
 		où pour tapper <kbd-output>PP</kbd-output>, il faut appuyer quatre fois sur la touche
 		<kbd>P</kbd>. Par conséquent, il est plutôt recommandé d'utiliser la version standard d'<Ergopti
 		></Ergopti> ou « Ergopti+ » (un seul +) avec le driver
-		<a href="ergoptiplus" class="link"><ErgoptiPlus /></a>.
+		<a href="ergopti-plus" class="link"><ErgoptiPlus /></a>.
 	</li>
 </ul>

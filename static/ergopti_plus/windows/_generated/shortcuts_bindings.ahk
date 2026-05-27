@@ -2,7 +2,7 @@
 ;
 ; MODULE: Shortcuts Bindings (AHK generated)
 ; DESCRIPTION:
-; Auto-generated from static/ergopti_plus/_shared/features/shortcuts.toml.
+; Auto-generated from static/ergopti_plus/shared/features/shortcuts.toml.
 ; DO NOT EDIT MANUALLY — run `npm run codegen:shortcuts` to regenerate.
 ;
 ; Exposes SHORTCUTS_BINDINGS, a Map keyed by shortcut id.

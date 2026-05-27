@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- Hammerspoon-side mirror of the cross-driver tooltip visual constants.
 --- The canonical source of truth is
---- static/ergopti_plus/_shared/tooltip/constants.toml — every value declared here
+--- static/ergopti_plus/shared/tooltip/constants.toml — every value declared here
 --- MUST match the corresponding entry in that file. When constants.toml is
 --- updated, this file must be updated to match.
 ---

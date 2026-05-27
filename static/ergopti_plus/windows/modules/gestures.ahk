@@ -870,7 +870,7 @@ global GESTURE_AX_NAMES := []
 
 ; Path to the shared cross-platform action registry.
 ; Resolved from _StaticDir which is already set in ErgoptiPlus.ahk.
-_GestureSharedToml := _StaticDir . "\shared\actions.toml"
+_GestureSharedToml := _StaticDir . "\ergopti_plus\shared\actions.toml"
 
 _GestureTomlData := ParseTomlFile(_GestureSharedToml)
 

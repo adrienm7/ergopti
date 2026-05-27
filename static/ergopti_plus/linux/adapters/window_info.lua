@@ -4,7 +4,7 @@
 --- MODULE: WindowInfo Adapter (Linux)
 --- DESCRIPTION:
 --- Linux implementation of the WindowInfo port contract defined in
---- static/ergopti_plus/_shared/ports/WindowInfo.spec.js. Wraps the X11/Wayland
+--- static/ergopti_plus/shared/ports/WindowInfo.spec.js. Wraps the X11/Wayland
 --- window stack (via xdotool or xprop on X11, or ydotool/swaymsg on Wayland)
 --- behind the two canonical methods (getFocused, getAll) so domain modules
 --- can query the focused window without coupling to any display-server API.

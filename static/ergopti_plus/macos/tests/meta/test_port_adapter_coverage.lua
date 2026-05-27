@@ -5,16 +5,16 @@
 --- DESCRIPTION:
 --- Verifies three structural invariants of the hexagonal architecture:
 ---
---- 1. ADAPTER PRESENCE — Every port spec in _shared/ports/*.spec.js has a
+--- 1. ADAPTER PRESENCE — Every port spec in shared/ports/*.spec.js has a
 ---    matching adapter file in static/ergopti_plus/windows/adapters/ and in
 ---    static/ergopti_plus/macos/adapters/. A missing adapter means a port
 ---    contract exists on paper but is not honoured by a driver.
 ---
---- 2. DOMAIN TEST COVERAGE — Every domain spec in _shared/domain/*.spec.js
+--- 2. DOMAIN TEST COVERAGE — Every domain spec in shared/domain/*.spec.js
 ---    has at least one corresponding test file in at least one driver's test
 ---    suite. An untested domain spec is a dead letter.
 ---
---- 3. SHARED PURITY — No file under _shared/ directly calls OS-level APIs
+--- 3. SHARED PURITY — No file under shared/ directly calls OS-level APIs
 ---    (io.open, hs., SendInput, SendEvent, TrayTip). Shared code must be
 ---    pure logic; OS access must go through port adapters.
 --- ==============================================================================
@@ -22,8 +22,8 @@
 local helpers = require("tests.helpers")
 
 local DRIVER_ROOT = helpers.driver_root()
--- Climb from hammerspoon/ root up to repo root (static/ergopti_plus/macos -> repo)
-local REPO_ROOT = DRIVER_ROOT:gsub("[/\\]static[/\\]drivers[/\\]hammerspoon[/\\]?$", "")
+-- Climb from macos/ root up to repo root (static/ergopti_plus/macos/ -> repo root)
+local REPO_ROOT = DRIVER_ROOT:gsub("[/\\]static[/\\]ergopti_plus[/\\]macos[/\\]?$", "")
 
 
 
@@ -83,7 +83,7 @@ end
 -- =============================================
 
 helpers.describe("meta: port-adapter coverage", function()
-	local shared_ports = REPO_ROOT .. "/static/ergopti_plus/_shared/ports"
+	local shared_ports = REPO_ROOT .. "/static/ergopti_plus/shared/ports"
 	local ahk_adapters = REPO_ROOT .. "/static/ergopti_plus/windows/adapters"
 	local hs_adapters  = REPO_ROOT .. "/static/ergopti_plus/macos/adapters"
 
@@ -121,7 +121,7 @@ helpers.describe("meta: port-adapter coverage", function()
 	end
 
 	helpers.it(string.format("every port spec has an AHK adapter (%d specs)", spec_count), function()
-		helpers.assert_true(spec_count > 0, "no *.spec.js files found in _shared/ports — check REPO_ROOT")
+		helpers.assert_true(spec_count > 0, "no *.spec.js files found in shared/ports — check REPO_ROOT")
 		helpers.assert_true(missing_ahk == 0,
 			string.format("%d AHK adapter(s) missing for port specs", missing_ahk))
 	end)
@@ -142,7 +142,7 @@ end)
 -- =================================================
 
 helpers.describe("meta: domain spec test coverage", function()
-	local domain_dir = REPO_ROOT .. "/static/ergopti_plus/_shared/domain"
+	local domain_dir = REPO_ROOT .. "/static/ergopti_plus/shared/domain"
 	local ahk_tests  = REPO_ROOT .. "/static/ergopti_plus/windows/tests"
 	local hs_tests   = REPO_ROOT .. "/static/ergopti_plus/macos/tests"
 
@@ -189,7 +189,7 @@ helpers.describe("meta: domain spec test coverage", function()
 	end
 
 	helpers.it(string.format("every domain spec has a driver test (%d specs)", spec_count), function()
-		helpers.assert_true(spec_count > 0, "no *.spec.js files found in _shared/domain — check REPO_ROOT")
+		helpers.assert_true(spec_count > 0, "no *.spec.js files found in shared/domain — check REPO_ROOT")
 		helpers.assert_true(uncovered == 0,
 			string.format("%d domain spec(s) have no driver test", uncovered))
 	end)
@@ -204,8 +204,8 @@ end)
 --- ===============================================
 -- ===============================================
 
-helpers.describe("meta: _shared/ code purity", function()
-	local shared_dir = REPO_ROOT .. "/static/ergopti_plus/_shared"
+helpers.describe("meta: shared/ code purity", function()
+	local shared_dir = REPO_ROOT .. "/static/ergopti_plus/shared"
 
 	-- Patterns that indicate direct OS-API usage forbidden in shared code
 	local forbidden_patterns = {
@@ -239,7 +239,7 @@ helpers.describe("meta: _shared/ code purity", function()
 			for _, entry in ipairs(forbidden_patterns) do
 				if line:find(entry.pat) then
 					violations = violations + 1
-					print(string.format("  WARN: %s in _shared/ file: %s line %d",
+					print(string.format("  WARN: %s in shared/ file: %s line %d",
 						entry.desc, rel, line_num))
 				end
 			end
@@ -248,14 +248,14 @@ helpers.describe("meta: _shared/ code purity", function()
 		::continue::
 	end
 
-	-- Warn-only: pre-existing _shared/ files that use hs. for UI rendering are
+	-- Warn-only: pre-existing shared/ files that use hs. for UI rendering are
 	-- architectural gaps tracked separately. The invariant is informational until
 	-- those files are refactored to route through port adapters.
-	helpers.it(string.format("no direct OS API calls in _shared/ source files (%d scanned)", scanned), function()
+	helpers.it(string.format("no direct OS API calls in shared/ source files (%d scanned)", scanned), function()
 		helpers.assert_true(scanned >= 0,  -- always passes — violations logged above as WARNs
 			"shared purity scanner failed to initialise")
 		if violations > 0 then
-			print(string.format("  NOTE: %d OS-API call(s) in _shared/ (warn-only — see WARNs above)", violations))
+			print(string.format("  NOTE: %d OS-API call(s) in shared/ (warn-only — see WARNs above)", violations))
 		end
 	end)
 end)

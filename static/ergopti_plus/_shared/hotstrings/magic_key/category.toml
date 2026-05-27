@@ -1,6 +1,0 @@
-# _shared/hotstrings/magic_key/category.toml
-[category]
-id          = "magic_key"
-color       = "#e91e63"
-delay       = 0.0
-description = "Magic-key cycling sequences for text expansion, emoji, and symbols."

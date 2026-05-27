@@ -4,7 +4,7 @@
 ; MODULE: KeyboardHook Adapter (AutoHotkey)
 ; DESCRIPTION:
 ; AHK v2 implementation of the KeyboardHook port contract defined in
-; static/ergopti_plus/_shared/ports/KeyboardHook.spec.js. Wraps the unified
+; static/ergopti_plus/shared/ports/KeyboardHook.spec.js. Wraps the unified
 ; HookDispatcher (lib/hook_dispatcher.ahk) behind the five canonical
 ; functions (KHStart, KHStop, KHIsRunning, KHRefreshContext, KHGetContext).
 ;

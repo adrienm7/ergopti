@@ -60,7 +60,7 @@ class KLUI {
 
 KLUI_ResolveAssetUrl(which) {
     global _StaticDir
-    ; The shared UI assets live under static/ergopti_plus/_shared/. _StaticDir
+    ; The shared UI assets live under static/ergopti_plus/shared/. _StaticDir
     ; already resolves to <repo>/static (dev) or A_ScriptDir\static
     ; (compiled), so the same offset works in both modes.
     base := _StaticDir . "\drivers\_shared\ui\" . which . "\index.html"

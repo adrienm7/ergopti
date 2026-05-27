@@ -211,12 +211,12 @@ function M.build(ctx)
 				end
 				-- Resolve the locales directory relative to the Hammerspoon config root.
 				-- hs.configdir resolves to .../static/ergopti_plus/macos/;
-				-- the shared locales live two levels up at .../static/locales/.
+				-- the shared locales live at .../static/ergopti_plus/shared/locales/.
 				-- AppleScript apps read this to load UI strings for any locale without
-				-- hardcoding translations; adding a new locale to static/locales/
+				-- hardcoding translations; adding a new locale to shared/locales/
 				-- automatically works in the apps.
-				local config_base = (hs.configdir or ""):match("^(.*)/drivers/hammerspoon") or ""
-				local locales_dir = config_base .. "/locales"
+				local config_base = (hs.configdir or ""):match("^(.*)/ergopti_plus/macos") or ""
+				local locales_dir = config_base .. "/ergopti_plus/shared/locales"
 				-- Launch the .app bundle via `open --env` so the locale variables
 				-- are injected directly into the launched app's environment.
 				-- `setEnvironment` on the `open` process itself does not propagate

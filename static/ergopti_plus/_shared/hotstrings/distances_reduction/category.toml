@@ -1,6 +1,0 @@
-# _shared/hotstrings/distances_reduction/category.toml
-[category]
-id          = "distances_reduction"
-color       = "#7e57c2"
-delay       = 0.5
-description = "Typing-distance optimisations that reduce finger travel on AZERTY/Ergopti."

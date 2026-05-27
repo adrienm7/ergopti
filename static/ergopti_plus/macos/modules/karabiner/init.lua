@@ -14,9 +14,9 @@
 ---    On first launch it is created from defaults; after that it is the full
 ---    persisted state — defaults are never recomputed at runtime except when
 ---    the user explicitly clicks "Reset to defaults".
---- 3. Shared Action Dictionary: Loads _shared/karabiner/actions.json so the menu
+--- 3. Shared Action Dictionary: Loads shared/karabiner/actions.json so the menu
 ---    always lists exactly the same actions, with zero duplication.
---- 4. Modifier Combos: _shared/karabiner/mod_combos.json defines all available
+--- 4. Modifier Combos: shared/karabiner/mod_combos.json defines all available
 ---    two-modifier combos. Each combo maps to tap, hold, and chord slots.
 --- 5. Inline Generation: karabiner.json is built directly in Lua from in-memory
 ---    state — no Python subprocess, no external dependency.
@@ -44,9 +44,9 @@ local LOG = "karabiner"
 -- Works whether the file is symlinked, run from the project, or deployed.
 local _SELF_DIR = (debug.getinfo(1, "S").source:sub(2):match("^(.*[/\\])") or "./")
 
--- Walk up three levels (karabiner/ → modules/ → hammerspoon/ → drivers/) then
--- enter _shared/karabiner/ so data files can be shared across drivers.
-local _SHARED_KARABINER_DIR = _SELF_DIR .. "../../../_shared/karabiner/"
+-- Walk up three levels (karabiner/ → modules/ → hammerspoon/ → ergopti_plus/) then
+-- enter shared/karabiner/ so data files can be shared across drivers.
+local _SHARED_KARABINER_DIR = _SELF_DIR .. "../../../shared/karabiner/"
 
 -- Standard Karabiner-Elements config path, expressed as a tilde path so the
 -- FileSystem port adapter can resolve it through hs.fs.pathToAbsolute (which
@@ -83,14 +83,14 @@ M.DEFAULT_COMBO_SYMMETRIC           = Defaults.combo_symmetric
 --- appears earlier in MOD_COMBOS. Used to hide redundant entries in symmetric mode.
 M.NON_CANONICAL_COMBOS = {}
 
---- Populated by M.init() from _shared/karabiner/actions.json.
+--- Populated by M.init() from shared/karabiner/actions.json.
 M.AVAILABLE_ACTIONS = {}
 
---- Populated by M.init() from _shared/karabiner/tap_hold_keys.json.
+--- Populated by M.init() from shared/karabiner/tap_hold_keys.json.
 --- Each entry carries default_tap and default_hold for first-launch init and reset.
 M.TAP_HOLD_KEYS = {}
 
---- Populated by M.init() from _shared/karabiner/mod_combos.json.
+--- Populated by M.init() from shared/karabiner/mod_combos.json.
 --- Each entry defines a two-modifier simultaneous combo the user can map to an action.
 M.MOD_COMBOS = {}
 

@@ -29,7 +29,7 @@ local ERGOPTI_GROUPS_FALLBACK = { sfbsreduction = true, rolls = true }
 --- Falls back to the hardcoded set if the file cannot be read or parsed.
 --- @return table<string,boolean> Set of group IDs specific to the Ergopti layout.
 local function load_ergopti_groups()
-	local manifest_path = Paths.find_from_configdir("menu_manifest.json") or ""
+	local manifest_path = Paths.find_from_configdir("shared/menu_manifest.json") or ""
 	local ok_r, fh = pcall(io.open, manifest_path, "r")
 	if not ok_r or not fh then
 		Logger.warn(LOG, "Cannot open menu_manifest.json at '%s' — using hardcoded fallback.", manifest_path)

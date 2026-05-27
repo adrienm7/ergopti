@@ -4,7 +4,7 @@
 --- MODULE: TooltipRenderer Adapter (Linux)
 --- DESCRIPTION:
 --- Linux implementation of the TooltipRenderer port contract defined in
---- static/ergopti_plus/_shared/ports/TooltipRenderer.spec.js. Renders floating
+--- static/ergopti_plus/shared/ports/TooltipRenderer.spec.js. Renders floating
 --- tooltip overlays using a lightweight X11 window (via xdotool + xlib) or
 --- a GTK popup (via zenity --info in non-interactive mode) without coupling
 --- domain modules to any display-server API.

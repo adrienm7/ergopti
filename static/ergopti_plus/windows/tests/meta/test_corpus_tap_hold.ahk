@@ -37,8 +37,8 @@
 _CorpusTH_Root() {
 	; Resolve the corpus path relative to the main script's directory (tests/).
 	; A_ScriptDir is always the dir of run_all.ahk, i.e. windows/tests/.
-	; Two levels up from tests/ reaches ergopti_plus/ where _shared/ lives.
-	return A_ScriptDir . "\..\..\_shared\tests\corpus\tap_hold\vectors.json"
+	; Two levels up from tests/ (windows/tests/ → windows/ → ergopti_plus/) where shared/ lives.
+	return A_ScriptDir . "\..\..\shared\tests\corpus\tap_hold\vectors.json"
 }
 
 _CorpusTH_Load() {

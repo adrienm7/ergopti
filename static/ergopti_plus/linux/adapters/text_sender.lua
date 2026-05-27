@@ -4,7 +4,7 @@
 --- MODULE: TextSender Adapter (Linux)
 --- DESCRIPTION:
 --- Linux implementation of the TextSender port contract defined in
---- static/ergopti_plus/_shared/ports/TextSender.spec.js. Bridges domain-level text
+--- static/ergopti_plus/shared/ports/TextSender.spec.js. Bridges domain-level text
 --- insertion requests to uinput (via ydotool) and the X11 clipboard (via
 --- xdotool / xclip) without coupling domain modules to any OS API.
 ---

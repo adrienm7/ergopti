@@ -22,7 +22,7 @@ if not ok_kl then keylogger = nil end
 
 local _req_counter = 0
 local DEDUPLICATION_ENABLED = false
--- Retry policy comes from _shared/llm/inference.json (see api_common.lua).
+-- Retry policy comes from shared/llm/inference.json (see api_common.lua).
 local _RETRY_MAX_MULT, _RETRY_TEMP_STEP, _RETRY_EXTRA_TOKENS = ApiCommon.get_retry_policy()
 local RETRY_FAILED_PREDICTION_ENABLED        = (_RETRY_MAX_MULT or 0) > 1
 local RETRY_FAILED_PREDICTION_MAX_MULTIPLIER = _RETRY_MAX_MULT

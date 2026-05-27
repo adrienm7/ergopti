@@ -49,8 +49,8 @@ if driver_root == "." then
 end
 
 local drivers_root = driver_root:match("^(.*)/[^/]+$") or driver_root
-local shared_lua   = drivers_root .. "/_shared/lua"
-local corpus_path  = drivers_root .. "/_shared/tests/corpus/hotstrings/vectors.json"
+local shared_lua   = drivers_root .. "/shared/lua"
+local corpus_path  = drivers_root .. "/shared/tests/corpus/hotstrings/vectors.json"
 
 package.path = table.concat({
 	driver_root .. "/?.lua",
@@ -105,7 +105,7 @@ end
 
 
 --- Reads and JSON-decodes the shared corpus file.
---- Requires the _shared/lua json module (tiny pure-Lua JSON parser).
+--- Requires the shared/lua json module (tiny pure-Lua JSON parser).
 --- @return table Array of vector tables.
 local function load_corpus()
 	local f, err = io.open(corpus_path, "r")
@@ -117,7 +117,7 @@ local function load_corpus()
 	-- Use the tiny JSON decoder available in the shared Lua library.
 	local ok, json = pcall(require, "json")
 	if not ok then
-		error("Cannot load shared json module — check _shared/lua/json.lua exists.")
+		error("Cannot load shared json module — check shared/lua/json.lua exists.")
 	end
 	local decoded = json.decode(raw)
 	return decoded.vectors

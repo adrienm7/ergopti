@@ -85,7 +85,7 @@ global ScriptInformation := Map(
 ; Features directly.
 ;
 ; The fixture below mirrors the manifest defaults — extend it alongside
-; any new feature added to static/ergopti_plus/_shared/features/manifest.toml
+; any new feature added to static/ergopti_plus/shared/features/manifest.toml
 ; so existing tests don't break when a new HotIf reads Features["…"].
 global Features := Map(
     "layout", Map(

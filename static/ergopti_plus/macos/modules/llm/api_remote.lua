@@ -136,7 +136,7 @@ M.PROVIDER_ORDER = { "openai", "anthropic", "gemini", "xai", "mistral", "deepsee
 local REQUEST_TIMEOUT_S = 30
 
 local DEDUPLICATION_ENABLED      = ApiCommon.DEFAULT_DEDUPLICATION_ENABLED
--- Retry policy from _shared/llm/inference.json (api_common.lua) so the
+-- Retry policy from shared/llm/inference.json (api_common.lua) so the
 -- remote backend tracks the same retry budget as Ollama / MLX.
 local _R_MAX_MULT, _R_TEMP_STEP, _R_EXTRA_TOKENS = ApiCommon.get_retry_policy()
 local RETRY_FAILED_PREDICTION    = (_R_MAX_MULT or 0) > 1

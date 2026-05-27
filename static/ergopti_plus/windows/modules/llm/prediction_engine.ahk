@@ -76,7 +76,7 @@ global _LLM_Engine := Map(
 )
 
 ; Per-backend minimum interval (ms) between two prediction requests is now
-; defined in ``static/ergopti_plus/_shared/llm/inference.json`` and read via
+; defined in ``static/ergopti_plus/shared/llm/inference.json`` and read via
 ; ``LLM_ApiCommon_GetRateLimitMs(backend)``. The shared JSON keeps the AHK
 ; and HS drivers in lockstep — changing a floor in one place applies to
 ; both backends with no risk of drift.

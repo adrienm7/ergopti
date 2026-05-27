@@ -39,11 +39,9 @@ end)
 
 helpers.describe("menu_keyboard_layout.pick_latest_bundle", function()
 	helpers.it("returns the highest version present in the bundles directory", function()
-		-- The repository ships with at least 2.2.0 and 2.2.1 — verify the picker
-		-- selects the highest one. We resolve the directory relative to the
-		-- driver root so the test is location-independent.
-		local driver_root = helpers.driver_root()
-		local bundles_dir = driver_root .. "../macos/bundles/"
+		-- Use the checked-in fixture directory so the test is self-contained and
+		-- does not depend on a real macOS build artefact being present on disk.
+		local bundles_dir = helpers.fixtures_dir() .. "bundles/"
 		local latest = kbd.pick_latest_bundle(bundles_dir)
 		helpers.assert_true(type(latest) == "string" and latest:match("^Ergopti_v[%d%.]+%.bundle$") ~= nil,
 			"expected a bundle name, got " .. tostring(latest))

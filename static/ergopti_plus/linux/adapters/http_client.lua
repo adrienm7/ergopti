@@ -4,7 +4,7 @@
 --- MODULE: HttpClient Adapter (Linux)
 --- DESCRIPTION:
 --- Linux implementation of the HttpClient port contract defined in
---- static/ergopti_plus/_shared/ports/HttpClient.spec.js. Wraps luv (libuv) async
+--- static/ergopti_plus/shared/ports/HttpClient.spec.js. Wraps luv (libuv) async
 --- TCP/TLS streams or the lua-http library behind the three canonical port
 --- methods (post, cancel, isActive) so domain modules can make HTTP requests
 --- without a direct dependency on any OS networking API.

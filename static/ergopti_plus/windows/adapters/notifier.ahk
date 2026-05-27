@@ -4,7 +4,7 @@
 ; MODULE: Notifier Adapter (AutoHotkey)
 ; DESCRIPTION:
 ; AHK v2 implementation of the Notifier port contract defined in
-; static/ergopti_plus/_shared/ports/Notifier.spec.js. Wraps Windows TrayTip
+; static/ergopti_plus/shared/ports/Notifier.spec.js. Wraps Windows TrayTip
 ; behind the canonical NotifierSend function so domain modules can surface
 ; system notifications without calling TrayTip directly.
 ;

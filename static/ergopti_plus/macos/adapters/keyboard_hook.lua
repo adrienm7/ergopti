@@ -4,7 +4,7 @@
 --- MODULE: KeyboardHook Adapter (Hammerspoon)
 --- DESCRIPTION:
 --- Hammerspoon implementation of the KeyboardHook port contract defined in
---- static/ergopti_plus/_shared/ports/KeyboardHook.spec.js. Wraps hs.eventtap to
+--- static/ergopti_plus/shared/ports/KeyboardHook.spec.js. Wraps hs.eventtap to
 --- intercept (or passively observe) keyboard events and deliver them to domain
 --- module callbacks (onChar, onKey) without exposing the hs.eventtap API.
 ---

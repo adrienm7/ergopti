@@ -4,7 +4,7 @@
 --- MODULE: MouseControl Adapter (Hammerspoon)
 --- DESCRIPTION:
 --- Hammerspoon implementation of the MouseControl port contract defined in
---- static/ergopti_plus/_shared/ports/MouseControl.spec.js. Wraps hs.mouse and
+--- static/ergopti_plus/shared/ports/MouseControl.spec.js. Wraps hs.mouse and
 --- hs.screen to move the cursor and query monitor geometry without coupling
 --- domain modules to hs APIs.
 ---

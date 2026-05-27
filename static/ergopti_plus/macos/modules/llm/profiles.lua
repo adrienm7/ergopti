@@ -4,7 +4,7 @@
 --- MODULE: LLM Profiles
 --- DESCRIPTION:
 --- Loads built-in prompt profiles from the shared JSON registry
---- (``static/ergopti_plus/_shared/llm/profiles.json``) and merges them with the
+--- (``static/ergopti_plus/shared/llm/profiles.json``) and merges them with the
 --- user-defined profiles. The JSON file is the single source of truth so a
 --- prompt tweak applies to both the Hammerspoon and AutoHotkey drivers
 --- with no risk of drift; the hardcoded constants below are kept as a
@@ -30,7 +30,7 @@ local LOG    = "llm.profiles"
 
 -- These constants ARE the fallback used when profiles.json can't be loaded.
 -- They MUST stay in lockstep with the strings in
--- ``static/ergopti_plus/_shared/llm/profiles.json`` so the driver still produces
+-- ``static/ergopti_plus/shared/llm/profiles.json`` so the driver still produces
 -- usable predictions even if the shared file is missing.
 
 local RAW_PROMPT_SINGLE = [[{context}]]
@@ -93,16 +93,16 @@ NEXT_WORDS: <prediction 2>
 -- ========================================
 -- ========================================
 
---- Locates and parses ``profiles.json`` from ``_shared/llm/``. Mirrors the
+--- Locates and parses ``profiles.json`` from ``shared/llm/``. Mirrors the
 --- path probe order in api_common.lua / load_inference_constants. Returns an
 --- array of profile tables on success or nil on failure (file missing or
 --- malformed); the caller falls back to the hardcoded constants.
 --- @return table|nil Array of profile tables, or nil on failure.
 local function load_profiles_json()
 	local candidates = {
-		hs.configdir .. "/../_shared/llm/profiles.json",
-		hs.configdir .. "/../../static/ergopti_plus/_shared/llm/profiles.json",
-		(os.getenv("HOME") or "") .. "/Library/Application Support/Hammerspoon/../../../static/ergopti_plus/_shared/llm/profiles.json",
+		hs.configdir .. "/../shared/llm/profiles.json",
+		hs.configdir .. "/../../static/ergopti_plus/shared/llm/profiles.json",
+		(os.getenv("HOME") or "") .. "/Library/Application Support/Hammerspoon/../../../static/ergopti_plus/shared/llm/profiles.json",
 	}
 	for _, p in ipairs(candidates) do
 		local fh = io.open(p, "r")

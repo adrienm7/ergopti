@@ -42,11 +42,11 @@ if not is_absolute then
 	end
 end
 
--- The _shared/ Lua libraries live one level above the HS driver root
--- (i.e. in static/ergopti_plus/_shared/lua/). The shims in lib/ need this
+-- The shared/ Lua libraries live one level above the HS driver root
+-- (i.e. in static/ergopti_plus/shared/lua/). The shims in lib/ need this
 -- entry to resolve toml_codec, toml_reader, and toml_writer modules.
 local drivers_root  = driver_root:match("^(.*)/[^/]+$") or driver_root
-local shared_lua    = drivers_root .. "/_shared/lua"
+local shared_lua    = drivers_root .. "/shared/lua"
 
 -- Search the driver root first (so `require("lib.x")` resolves), then the
 -- shared Lua libraries, then tests/ and stubs/. Order matters: hs.lua stub

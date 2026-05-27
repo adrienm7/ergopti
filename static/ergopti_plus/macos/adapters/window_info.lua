@@ -4,7 +4,7 @@
 --- MODULE: WindowInfo Adapter (Hammerspoon)
 --- DESCRIPTION:
 --- Hammerspoon implementation of the WindowInfo port contract defined in
---- static/ergopti_plus/_shared/ports/WindowInfo.spec.js. Wraps hs.window and
+--- static/ergopti_plus/shared/ports/WindowInfo.spec.js. Wraps hs.window and
 --- hs.application behind the two canonical methods (getFocused, getAll) so
 --- domain modules can query the focused window without coupling to hs APIs.
 ---

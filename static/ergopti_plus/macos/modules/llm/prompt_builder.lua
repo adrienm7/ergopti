@@ -4,7 +4,7 @@
 --- MODULE: LLM Prompt Builder (Hammerspoon shim)
 --- DESCRIPTION:
 --- Thin adapter over the shared pure-Lua implementation located at
---- ``_shared/lua/llm/prompt_builder.lua``. Delegates all deterministic
+--- ``shared/lua/llm/prompt_builder.lua``. Delegates all deterministic
 --- computation (token budget, temperature, context truncation, tail extraction)
 --- to the shared module and adds only the Hammerspoon-specific concerns that
 --- cannot live in the shared layer:

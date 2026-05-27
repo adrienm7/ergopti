@@ -4,7 +4,7 @@
 --- MODULE: FileSystem Adapter (Linux)
 --- DESCRIPTION:
 --- Linux implementation of the FileSystem port contract defined in
---- static/ergopti_plus/_shared/ports/FileSystem.spec.js. Wraps Lua's standard
+--- static/ergopti_plus/shared/ports/FileSystem.spec.js. Wraps Lua's standard
 --- io.open behind the five canonical methods (read, write, append, exists,
 --- delete) so domain modules perform file I/O without coupling to OS APIs.
 ---

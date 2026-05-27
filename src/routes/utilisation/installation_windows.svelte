@@ -98,7 +98,7 @@
 		<kbd>P</kbd>
 		cause des problèmes d'édition de la cellule : tout ce qui est tapé avant disparaît et est remplacé
 		par un <kbd-output>+</kbd-output>.<br />➜ Ce problème se résout en utilisant le driver
-		<a href="ergoptiplus" class="link"><ErgoptiPlus /></a>
+		<a href="ergopti-plus" class="link"><ErgoptiPlus /></a>
 		pour émuler la disposition et garantir que ce soit bien un symbole <kbd-output>+</kbd-output> qui
 		soit envoyé et non un raccourci interne d'Excel qui interfère.
 	</li>

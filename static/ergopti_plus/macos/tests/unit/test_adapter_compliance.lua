@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- Validates that every Hammerspoon adapter in adapters/ exposes the correct
 --- method surface required by the corresponding port contract in
---- static/ergopti_plus/_shared/ports/. Each adapter is loaded with the hs stub,
+--- static/ergopti_plus/shared/ports/. Each adapter is loaded with the hs stub,
 --- and each required method is checked for existence and correct arity.
 ---
 --- RATIONALE:
@@ -27,7 +27,7 @@ local helpers = require("tests.helpers")
 -- ============================================
 
 --- Port method contracts: { method_name → required_arity }
---- Mirrors the portContract.methods fields in each _shared/ports/*.spec.js.
+--- Mirrors the portContract.methods fields in each shared/ports/*.spec.js.
 local PORT_CONTRACTS = {
 	keyboard_hook = {
 		{ name = "start",          arity = 1 },
