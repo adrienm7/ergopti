@@ -441,6 +441,7 @@ function M.generate(ctx, menu_mods, actions)
 		})
 	end
 
+	local healthcheck = require("lib.healthcheck")
 	table.insert(items, {
 		title = i18n.get("menu.debug.title"),
 		menu = {
@@ -449,6 +450,15 @@ function M.generate(ctx, menu_mods, actions)
 			{ title = i18n.get("menu.debug.open_today_log"), fn = actions.open_today_log },
 			{ title = "-" },
 			{ title = i18n.get("menu.debug.log_level"), menu = log_level_items },
+			{ title = "-" },
+			{
+				title = i18n.get("menu.debug.healthcheck"),
+				fn    = function()
+					local report = healthcheck.format()
+					pcall(hs.focus)
+					hs.dialog.blockAlert(i18n.get("menu.debug.healthcheck"), report, "OK")
+				end,
+			},
 		}
 	})
 

@@ -1,4 +1,4 @@
-{
+﻿{
 	"_meta.flag": "🇩🇪",
 	"_meta.locale": "de",
 	"_meta.name": "Deutsch",
@@ -527,6 +527,7 @@
 	"menu.debug.open_today_log": "Heutiges Protokoll öffnen",
 	"menu.debug.title": "⚠ Debugging",
 	"menu.debug.window_spy": "Window Spy",
+	"menu.debug.healthcheck": "Systemcheck",
 	"menu.debug.log_level": "Log-Stufe",
 	"menu.extensions.empty": "Keine Erweiterung installiert",
 	"menu.extensions.header": "Erweiterungen",
