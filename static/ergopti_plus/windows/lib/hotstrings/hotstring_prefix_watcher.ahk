@@ -762,7 +762,7 @@ KL_LogHotstringNearMiss(kind, trigger, replacement, h_type) {
 ; under typing", and that is what we look up. When no terminator is present
 ; we fall back to the full buffer.
 _LookupAndRender() {
-    global _PrefixBuffer, _PrefixIndex, _MIN_PREFIX_LEN, HSE_WORD_TERMINATORS
+    global _PrefixBuffer, _PrefixIndex, _MIN_PREFIX_LEN, HSE_WORD_TERMINATORS, ScriptInformation
     Buffer := _PrefixBuffer
     Len := StrLen(Buffer)
     ; Short buffers are only skipped when they have no entry in the index.
