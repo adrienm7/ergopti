@@ -102,6 +102,20 @@ global HSE_StartIsWordBoundary := true
 ; the literal last char.
 global HSE_RegistryByLastChar := Map()
 
+; Map(GroupName -> Array of Spec objects). Parallel index by group name
+; so HSE_EnableGroup / HSE_DisableGroup can atomically splice their specs
+; back into or out of HSE_RegistryByLastChar without re-running HSE_Register.
+global HSE_RegistryByGroup := Map()
+
+; Map(GroupName -> true) for disabled groups. Specs whose group appears
+; here are absent from HSE_RegistryByLastChar until re-enabled.
+global HSE_DisabledGroups := Map()
+
+; Monotonically increasing insertion counter. Stored in each Spec as .Seq
+; so that mappings registered later can be distinguished from earlier ones
+; when length and group_order are equal (stable sort tiebreaker).
+global HSE_SeqCounter := 0
+
 ; Flat array of all star-trigger Spec objects. Maintained alongside
 ; HSE_RegistryByLastChar so _HSE_StarTriggerCoversBody can scan only star
 ; triggers without iterating the full registry — avoids an O(all_triggers)
@@ -168,41 +182,111 @@ global HSE_RepeatEnabled := true
 ; Without « * » the trigger only fires when an end character (one of
 ; HSE_WORD_TERMINATORS) is typed right after — that end character is
 ; consumed by the dispatch and re-injected by HSE_ApplyExpansion.
+; Register a mapping and return the created Spec object. The returned Spec
+; has all domain-contract fields populated (Trigger, Repl, PlainRepl, IsWord,
+; Auto, Seq, TLen, TriggerBytes, TailChar, HasMagic, StarBase, StarBaseBytes,
+; StarBaseTail, Group, GroupOrder, FinalResult, Color) so callers that implement
+; the Registry.spec.js contract can forward the return value directly.
+;
+; The optional Meta map is used by the production hotstring loader to inject
+; dispatch metadata (Replacement, OnlyText, FinalResult, TimeActivationSeconds,
+; PrevCharKey, IsRepeat, Category, Section). When absent the Spec can still
+; be exercised by unit tests that pass a bare Callback.
 HSE_Register(Flags, Trigger, Callback, Meta := unset) {
     global HSE_RegistryByLastChar, HSE_StarSpecs, HSE_StarPrefixSetCI, HSE_StarPrefixSetCS
+    global HSE_RegistryByGroup, HSE_DisabledGroups, HSE_SeqCounter
     if (Trigger == "") {
         return
     }
+    HSE_SeqCounter++
+    Group := "default"
+    GroupOrder := 0
+    if IsSet(Meta) and Meta is Map and Meta.Has("group") {
+        Group := Meta["group"]
+    }
+    if IsSet(Meta) and Meta is Map and Meta.Has("group_order") {
+        GroupOrder := Meta["group_order"]
+    }
+    IsStar := InStr(Flags, "*") > 0
+    ; StarBase: trigger without trailing magic key (for magic-key cycling).
+    ; Computed here once so the Spec is self-contained.
+    StarBase := IsStar ? SubStr(Trigger, 1, StrLen(Trigger) - 1) : ""
+    TailChar := SubStr(Trigger, -1)
     Spec := {
         Trigger:       Trigger,
         Length:        StrLen(Trigger),
         Callback:      Callback,
-        Star:          InStr(Flags, "*") > 0,
+        Star:          IsStar,
         InWord:        InStr(Flags, "?") > 0,
-        CaseSensitive: InStr(Flags, "C") > 0
+        CaseSensitive: InStr(Flags, "C") > 0,
+        ; Registry.spec.js domain-contract fields
+        Repl:          "",
+        PlainRepl:     "",
+        IsWord:        InStr(Flags, "?") == 0,
+        Auto:          IsStar,
+        Seq:           HSE_SeqCounter,
+        TLen:          StrLen(Trigger),
+        TriggerBytes:  StrLen(Trigger),   ; AHK StrLen is codepoint-based; good enough
+        TailChar:      TailChar,
+        HasMagic:      IsStar,
+        StarBase:      StarBase,
+        StarBaseBytes: StrLen(StarBase),
+        StarBaseTail:  (StarBase != "") ? SubStr(StarBase, -1) : "",
+        Group:         Group,
+        GroupOrder:    GroupOrder,
+        FinalResult:   false,
+        Color:         ""
     }
-    ; Optional dispatch metadata. When present, HSE_DispatchMatch performs
-    ; the BackSpace/Replacement/EndChar burst itself and ignores Callback.
-    ; When absent (e.g. unit tests passing a bare lambda), HSE_DispatchMatch
-    ; falls through to invoking Callback so existing test harnesses keep
-    ; working unchanged.
+    ; Optional dispatch metadata injected by the production loader.
     if IsSet(Meta) {
-        for Key, Val in Meta.OwnProps() {
-            Spec.%Key% := Val
+        if Meta is Map {
+            for Key, Val in Meta {
+                Spec.%Key% := Val
+            }
+        } else {
+            ; Support legacy object-literal Meta (older callers).
+            for Key, Val in Meta.OwnProps() {
+                Spec.%Key% := Val
+            }
         }
     }
-    LastChar := SubStr(Trigger, -1)
-    LookupKey := Spec.CaseSensitive ? LastChar : StrLower(LastChar)
-    if !HSE_RegistryByLastChar.Has(LookupKey) {
-        HSE_RegistryByLastChar[LookupKey] := []
+    ; Propagate Repl → PlainRepl when the caller set Repl directly.
+    if (Spec.PlainRepl == "" and Spec.Repl != "") {
+        Spec.PlainRepl := Spec.Repl
     }
-    HSE_RegistryByLastChar[LookupKey].Push(Spec)
-    ; Maintain the flat star-spec index and the O(1) prefix set so
-    ; _HSE_StarTriggerCoversBody never has to scan on every terminator keystroke.
-    if Spec.Star {
-        HSE_StarSpecs.Push(Spec)
-        _HSE_IndexStarPrefixes(Spec)
+    ; Propagate Replacement (dispatch key) → Repl / PlainRepl for the
+    ; contract fields when the loader used the old Replacement key name.
+    if Spec.HasOwnProp("Replacement") and (Spec.Repl == "") {
+        Spec.Repl := Spec.Replacement
+        if (Spec.PlainRepl == "") {
+            Spec.PlainRepl := Spec.Replacement
+        }
     }
+
+    ; Only insert into the live index when the group is not disabled.
+    if !HSE_DisabledGroups.Has(Group) {
+        LastChar := TailChar
+        LookupKey := Spec.CaseSensitive ? LastChar : StrLower(LastChar)
+        if !HSE_RegistryByLastChar.Has(LookupKey) {
+            HSE_RegistryByLastChar[LookupKey] := []
+        }
+        HSE_RegistryByLastChar[LookupKey].Push(Spec)
+        ; Maintain the flat star-spec index and the O(1) prefix set so
+        ; _HSE_StarTriggerCoversBody never has to scan on every terminator keystroke.
+        if Spec.Star {
+            HSE_StarSpecs.Push(Spec)
+            _HSE_IndexStarPrefixes(Spec)
+        }
+    }
+
+    ; Always store in the group index regardless of enabled/disabled state
+    ; so HSE_EnableGroup can restore them without re-registration.
+    if !HSE_RegistryByGroup.Has(Group) {
+        HSE_RegistryByGroup[Group] := []
+    }
+    HSE_RegistryByGroup[Group].Push(Spec)
+
+    return Spec
 }
 
 ; Erase the entire registry. Tests rely on this between cases; the live
@@ -210,10 +294,157 @@ HSE_Register(Flags, Trigger, Callback, Meta := unset) {
 ; scratch with a fresh module state.
 HSE_RegistryClear() {
     global HSE_RegistryByLastChar, HSE_StarSpecs, HSE_StarPrefixSetCI, HSE_StarPrefixSetCS
+    global HSE_RegistryByGroup, HSE_DisabledGroups, HSE_SeqCounter
     HSE_RegistryByLastChar := Map()
     HSE_StarSpecs := []
-    HSE_StarPrefixSetCI := Map()   ; prefix → Map(nextChar → true), CI
-    HSE_StarPrefixSetCS := Map()   ; prefix → Map(nextChar → true), CS
+    HSE_StarPrefixSetCI := Map()
+    HSE_StarPrefixSetCS := Map()
+    HSE_RegistryByGroup := Map()
+    HSE_DisabledGroups := Map()
+    HSE_SeqCounter := 0
+}
+
+; Return all active mappings whose trigger ends with TailChar, sorted
+; longest-trigger-first (then GroupOrder ascending, then Seq ascending).
+; Mirrors Registry.spec.js mappingsForTail(tailChar).
+HSE_MappingsForTail(TailChar) {
+    global HSE_RegistryByLastChar
+    ; Collect from both the case-sensitive and case-insensitive buckets.
+    Out := []
+    LowerKey := StrLower(TailChar)
+    if HSE_RegistryByLastChar.Has(TailChar) {
+        for Spec in HSE_RegistryByLastChar[TailChar] {
+            Out.Push(Spec)
+        }
+    }
+    ; Avoid double-adding when TailChar is already lowercase.
+    if (TailChar !== LowerKey) and HSE_RegistryByLastChar.Has(LowerKey) {
+        for Spec in HSE_RegistryByLastChar[LowerKey] {
+            Out.Push(Spec)
+        }
+    }
+    ; Sort: longest trigger first, then GroupOrder asc, then Seq asc.
+    ; Bubble sort is fine — registry size is small and this is called rarely.
+    Len := Out.Length
+    loop (Len - 1) {
+        i := A_Index
+        loop (Len - i) {
+            j := A_Index
+            A := Out[j]
+            B := Out[j + 1]
+            Swap := false
+            if (A.Length < B.Length) {
+                Swap := true
+            } else if (A.Length == B.Length) {
+                if (A.GroupOrder > B.GroupOrder) {
+                    Swap := true
+                } else if (A.GroupOrder == B.GroupOrder and A.Seq > B.Seq) {
+                    Swap := true
+                }
+            }
+            if Swap {
+                Out[j]     := B
+                Out[j + 1] := A
+            }
+        }
+    }
+    return Out
+}
+
+; Remove all mappings in Group from the live index. They remain stored in
+; HSE_RegistryByGroup so HSE_EnableGroup can restore them later.
+HSE_DisableGroup(Group) {
+    global HSE_RegistryByLastChar, HSE_StarSpecs, HSE_StarPrefixSetCI, HSE_StarPrefixSetCS
+    global HSE_RegistryByGroup, HSE_DisabledGroups
+    if !HSE_RegistryByGroup.Has(Group) {
+        HSE_DisabledGroups[Group] := true
+        return
+    }
+    HSE_DisabledGroups[Group] := true
+    ; Remove each spec from the live index.
+    for Spec in HSE_RegistryByGroup[Group] {
+        LookupKey := Spec.CaseSensitive ? Spec.TailChar : StrLower(Spec.TailChar)
+        if HSE_RegistryByLastChar.Has(LookupKey) {
+            Bucket := HSE_RegistryByLastChar[LookupKey]
+            NewBucket := []
+            for S in Bucket {
+                if (S.Seq !== Spec.Seq) {
+                    NewBucket.Push(S)
+                }
+            }
+            HSE_RegistryByLastChar[LookupKey] := NewBucket
+        }
+        ; Remove from star index if applicable.
+        if Spec.Star {
+            NewStarSpecs := []
+            for S in HSE_StarSpecs {
+                if (S.Seq !== Spec.Seq) {
+                    NewStarSpecs.Push(S)
+                }
+            }
+            HSE_StarSpecs := NewStarSpecs
+        }
+    }
+    ; Rebuild the prefix sets from the remaining star specs.
+    HSE_StarPrefixSetCI := Map()
+    HSE_StarPrefixSetCS := Map()
+    for S in HSE_StarSpecs {
+        _HSE_IndexStarPrefixes(S)
+    }
+}
+
+; Restore all mappings in Group to the live index.
+HSE_EnableGroup(Group) {
+    global HSE_RegistryByLastChar, HSE_StarSpecs, HSE_StarPrefixSetCI, HSE_StarPrefixSetCS
+    global HSE_RegistryByGroup, HSE_DisabledGroups
+    if HSE_DisabledGroups.Has(Group) {
+        HSE_DisabledGroups.Delete(Group)
+    }
+    if !HSE_RegistryByGroup.Has(Group) {
+        return
+    }
+    ; Re-insert each spec into the live index.
+    for Spec in HSE_RegistryByGroup[Group] {
+        LookupKey := Spec.CaseSensitive ? Spec.TailChar : StrLower(Spec.TailChar)
+        if !HSE_RegistryByLastChar.Has(LookupKey) {
+            HSE_RegistryByLastChar[LookupKey] := []
+        }
+        ; Avoid duplicates (idempotent enable).
+        AlreadyIn := false
+        for S in HSE_RegistryByLastChar[LookupKey] {
+            if (S.Seq == Spec.Seq) {
+                AlreadyIn := true
+                break
+            }
+        }
+        if !AlreadyIn {
+            HSE_RegistryByLastChar[LookupKey].Push(Spec)
+        }
+        if Spec.Star {
+            AlreadyStar := false
+            for S in HSE_StarSpecs {
+                if (S.Seq == Spec.Seq) {
+                    AlreadyStar := true
+                    break
+                }
+            }
+            if !AlreadyStar {
+                HSE_StarSpecs.Push(Spec)
+                _HSE_IndexStarPrefixes(Spec)
+            }
+        }
+    }
+}
+
+; Return the total number of active mappings across all groups.
+; Mirrors Registry.spec.js size().
+HSE_Size() {
+    global HSE_RegistryByLastChar
+    Total := 0
+    for _, Bucket in HSE_RegistryByLastChar {
+        Total += Bucket.Length
+    }
+    return Total
 }
 
 
