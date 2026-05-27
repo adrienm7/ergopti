@@ -278,20 +278,26 @@ E2E_RunScenarioGui(Trigger, Terminator) {
 ; ====================================
 ; =====================================================================
 
+; Named helper used by the loop below — receives the scenario Map directly
+; so each Test() callback is bound to a specific scenario via .Bind().
+_E2E_RunPureTest(Sc) {
+    Result      := E2E_RunScenarioPure(Sc)
+    ExpectMatch := Sc["expect_match"]
+    ExpectRepl  := Sc["expect_replacement"]
+    ExpectBS    := Sc["expect_bs_count"]
+    if ExpectMatch {
+        AssertEqual(ExpectRepl, Result["replacement"])
+        AssertEqual(ExpectBS,   Result["backspace_count"])
+    } else {
+        AssertEqual(false, Result["matched"])
+    }
+}
+
 ; Register one Test() case per scenario for Strategy A (pure engine).
+; .Bind(Sc) creates a new callable with Sc pre-filled as the first argument,
+; avoiding the closure-over-loop-variable capture problem.
 for _Sc in E2E_SCENARIOS {
-    ; Capture loop variable in a closure-local copy.
-    _ScLocal := _Sc
-    Test("e2e[pure] " . _ScLocal["id"], () => (
-        (Result := E2E_RunScenarioPure(_ScLocal)),
-        (ExpectMatch := _ScLocal["expect_match"]),
-        (ExpectRepl  := _ScLocal["expect_replacement"]),
-        (ExpectBS    := _ScLocal["expect_bs_count"]),
-        (ExpectMatch
-            ? (AssertEqual(ExpectRepl, Result["replacement"]) and AssertEqual(ExpectBS, Result["backspace_count"]))
-            : AssertEqual(false, Result["matched"])
-        )
-    ))
+    Test("e2e[pure] " . _Sc["id"], _E2E_RunPureTest.Bind(_Sc))
 }
 
 
@@ -299,10 +305,12 @@ for _Sc in E2E_SCENARIOS {
 ; In that mode the test creates a visible Edit control, types the trigger,
 ; and asserts the expansion appeared in the text. Skipped in headless CI.
 if E2E_REAL_GUI {
-    Test("e2e[gui] simple_expansion — btw expands in Edit control", () => (
-        (Text := E2E_RunScenarioGui("btw", " ")),
-        AssertEqual("by the way ", Text)
-    ))
+    Test("e2e[gui] simple_expansion — btw expands in Edit control", _E2E_RunGuiTest)
+}
+
+_E2E_RunGuiTest() {
+    Text := E2E_RunScenarioGui("btw", " ")
+    AssertEqual("by the way ", Text)
 }
 
 
@@ -319,6 +327,11 @@ if E2E_REAL_GUI {
 ; This prevents the CI job from hanging indefinitely if AHK's message loop
 ; stays alive after ExitApp (e.g. a pending one-shot SetTimer keeps the
 ; process persistent on some CI runners).
-SetTimer(() => (FileAppend("WATCHDOG: forced exit after 30 s`r`n", "*"), ExitApp(2)), -30000)
+SetTimer(_E2E_Watchdog, -30000)
+
+_E2E_Watchdog() {
+    FileAppend("WATCHDOG: forced exit after 30 s`r`n", "*")
+    ExitApp(2)
+}
 
 RunTests()
