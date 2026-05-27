@@ -27,6 +27,7 @@
 		"fix:unbalanced": "node ./scripts/lint-conventions.js --fix-unbalanced --warn-only",
 		"fix:all": "node ./scripts/lint-conventions.js --fix-banners --fix-unbalanced --fix-spacing --warn-only",
 		"install:hammerspoon": "bash ./scripts/install-hammerspoon.sh",
+		"gen:diagram": "node ./scripts/gen-architecture-diagram.cjs",
 		"bench:hotstring": "node ./scripts/bench-hotstring.cjs",
 		"codegen:registry": "node ./scripts/codegen-registry-ahk.cjs",
 		"codegen:expander:ahk": "node ./scripts/codegen-expander-ahk.cjs",
