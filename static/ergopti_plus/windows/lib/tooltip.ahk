@@ -45,6 +45,13 @@ _TooltipTimerFn() {
     if (_TooltipTimerGeneration != _TooltipGeneration)
         return
     TooltipHide()
+    ; The timer fires when the user has not typed anything new since the
+    ; tooltip appeared — they have effectively abandoned the current word.
+    ; Reset the prefix buffer so the next keystroke starts a fresh lookup
+    ; rather than accumulating onto the stale word (which would prevent any
+    ; subsequent tooltip from showing for that trigger).
+    if IsSet(_ResetPrefixBuffer)
+        try _ResetPrefixBuffer()
 }
 
 ; Style constants — sourced from lib/ui_style.ahk (included before this file
@@ -93,7 +100,7 @@ global _TOOLTIP_HWND_TRACK_CAP := 32
 ; otherwise the user can still see the preview and press the magic key
 ; just past the deadline, where the expansion silently does not fire.
 ; Mirrors Hammerspoon's TIMEOUT_DECREMENT_SEC / TIMEOUT_FLOOR_SEC.
-global _TOOLTIP_TIMEOUT_DECREMENT_SEC := 0.15
+global _TOOLTIP_TIMEOUT_DECREMENT_SEC := 0.2
 global _TOOLTIP_TIMEOUT_FLOOR_SEC := 0.05
 
 ; Safety deadline applied whenever the caller passes DurationSec = 0

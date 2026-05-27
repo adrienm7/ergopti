@@ -285,7 +285,7 @@ safety_timeout_sec = 3.0
 
 # Each tooltip's effective duration is shortened by this amount so the visual
 # disappears slightly before the expansion window closes.
-timeout_decrement_sec = 0.15
+timeout_decrement_sec = 0.2
 
 # Hard floor below which the effective duration is never reduced.
 timeout_floor_sec = 0.05
