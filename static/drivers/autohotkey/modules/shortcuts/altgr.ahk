@@ -1,4 +1,4 @@
-; modules/shortcuts/altgr.ahk
+﻿; modules/shortcuts/altgr.ahk
 
 ; ==============================================================================
 ; MODULE: Shortcuts — AltGr Combos

@@ -1,4 +1,4 @@
-; modules/shortcuts/base_modifier.ahk
+﻿; modules/shortcuts/base_modifier.ahk
 
 ; ==============================================================================
 ; MODULE: Shortcuts — Base Modifier Combos

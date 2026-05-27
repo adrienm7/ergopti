@@ -1,4 +1,4 @@
-; static/drivers/autohotkey/adapters/key_state.ahk
+﻿; static/drivers/autohotkey/adapters/key_state.ahk
 
 ; ==============================================================================
 ; MODULE: KeyState Adapter (AutoHotkey)

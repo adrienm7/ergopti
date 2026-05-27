@@ -1,4 +1,4 @@
-; adapters/crypto.ahk
+﻿; adapters/crypto.ahk
 
 ; ==============================================================================
 ; MODULE: Crypto Adapter (AutoHotkey)

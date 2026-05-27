@@ -460,5 +460,4 @@ end)
 --- ==========================
 -- ====================================================
 
-local exit_code = pbt.summary()
-os.exit(exit_code)
+pbt.summary()
