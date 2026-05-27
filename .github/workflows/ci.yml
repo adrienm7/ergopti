@@ -1,19 +1,37 @@
 # .github/workflows/ci.yml
 #
-# Unified CI pipeline — one workflow per push, replaces the 9 individual
-# test/e2e/build workflows. Stages run sequentially so a fast validation
-# failure (linting, encoding) never wastes a Windows or macOS runner slot.
+# Unified CI pipeline — one workflow per push to main or dev.
 #
-# Stage 1 — Validation  (ubuntu, parallel jobs, path-filtered)
-# Stage 2 — Tests       (ubuntu + windows, parallel, depends on stage-1)
-# Stage 3 — E2E         (ubuntu + windows, parallel, depends on stage-2)
-# Stage 4 — Linux build (ubuntu, depends on stage-3, all branches)
-# Stage 5 — Release     (main branch only, depends on stage-3)
+# Architecture (one branch per driver, all independent, then converge):
+#
+#   ┌─────────────────────────────────┐
+#   │  validate (fast gates, ubuntu)  │
+#   │  locales · hotstrings · domain  │
+#   └──────────────┬──────────────────┘
+#                  │ (always runs — no path filter)
+#        ┌─────────┼──────────┐
+#        ▼         ▼          ▼
+#   ┌─────────┐ ┌──────────┐ ┌──────────┐
+#   │ macOS   │ │ Windows  │ │  Linux   │
+#   │  branch │ │  branch  │ │  branch  │
+#   │         │ │          │ │          │
+#   │ test-hs │ │ test-ahk │ │test-linux│
+#   │  e2e-hs │ │  e2e-ahk │ └──────────┘
+#   └────┬────┘ └────┬─────┘
+#        │           │           │
+#        └─────────┬─┘───────────┘
+#                  ▼
+#          ┌───────────────┐
+#          │ release       │  (main branch only, all drivers green)
+#          │ auto-tag +    │
+#          │ trigger       │
+#          │ release.yml   │
+#          └───────────────┘
 #
 # Workflows kept separate:
-#   version.yml  — auto-tags on every push; must fire independently
-#   release.yml  — triggered by version.yml via tag push
-#   bench.yml    — performance benchmark (main only, independent cadence)
+#   release.yml  — heavy build jobs (macOS app, Windows exe, Linux packages)
+#                  triggered by the v* tag this pipeline pushes on main
+#   bench.yml    — perf benchmark (main only, independent cadence)
 
 name: CI
 
@@ -32,25 +50,20 @@ concurrency:
     cancel-in-progress: true
 
 
-# ==========================================================
-# ==========================================================
-# ======= Stage 1 — Validation (fast, path-filtered) =======
-# ==========================================================
-# ==========================================================
+# ========================================================
+# ========================================================
+# ======= 1/ Validation — fast gates, always run =======
+# ========================================================
+# ========================================================
 
 jobs:
 
-    # ─────────────────────────────────────────────────────
+    # ─────────────────────────────────────────────────
     # 1.1) Locale key-set parity
-    # ─────────────────────────────────────────────────────
+    # ─────────────────────────────────────────────────
     validate-locales:
-        name: "Validate: locales"
+        name: "Validate · locales"
         runs-on: ubuntu-latest
-        if: >
-            github.event_name == 'workflow_dispatch' ||
-            contains(toJson(github.event.commits.*.modified), 'static/locales/') ||
-            contains(toJson(github.event.commits.*.modified), 'tools/check_locales.py') ||
-            github.event_name == 'pull_request'
 
         steps:
             - uses: actions/checkout@v4
@@ -63,17 +76,12 @@ jobs:
               run: python tools/check_locales.py
 
 
-    # ─────────────────────────────────────────────────────
+    # ─────────────────────────────────────────────────
     # 1.2) Hotstring TOML format
-    # ─────────────────────────────────────────────────────
+    # ─────────────────────────────────────────────────
     validate-hotstrings:
-        name: "Validate: hotstrings TOML"
+        name: "Validate · hotstrings TOML"
         runs-on: ubuntu-latest
-        if: >
-            github.event_name == 'workflow_dispatch' ||
-            contains(toJson(github.event.commits.*.modified), 'static/ergopti_plus/_shared/hotstrings/') ||
-            contains(toJson(github.event.commits.*.modified), 'tools/dev/format_toml.py') ||
-            github.event_name == 'pull_request'
 
         steps:
             - uses: actions/checkout@v4
@@ -86,67 +94,12 @@ jobs:
               run: python tools/dev/format_toml.py --hotstrings --all --check
 
 
-    # ─────────────────────────────────────────────────────
-    # 1.3) AHK source encoding (UTF-8 BOM + CRLF)
-    # ─────────────────────────────────────────────────────
-    validate-ahk-encoding:
-        name: "Validate: AHK encoding"
-        runs-on: ubuntu-latest
-        if: >
-            github.event_name == 'workflow_dispatch' ||
-            contains(toJson(github.event.commits.*.modified), 'static/ergopti_plus/windows/') ||
-            github.event_name == 'pull_request'
-
-        steps:
-            - uses: actions/checkout@v4
-
-            - name: Verify UTF-8 BOM + CRLF on all .ahk files
-              # AHK v2 silently aborts mid-file on encoding drift — catch it early
-              # before it causes silent test failures with no error message.
-              shell: pwsh
-              run: |
-                  $ahkFiles = Get-ChildItem -Path "${{ github.workspace }}\static\ergopti_plus\windows" `
-                      -Recurse -Filter "*.ahk" | Where-Object { -not $_.FullName.Contains("vendor") }
-                  $failures = @()
-                  foreach ($file in $ahkFiles) {
-                      $bytes = [System.IO.File]::ReadAllBytes($file.FullName)
-                      if ($bytes.Length -lt 3 -or $bytes[0] -ne 0xEF -or $bytes[1] -ne 0xBB -or $bytes[2] -ne 0xBF) {
-                          $failures += "MISSING BOM : $($file.FullName)"
-                          continue
-                      }
-                      $content = [System.IO.File]::ReadAllText($file.FullName, [System.Text.Encoding]::UTF8)
-                      if (($content -replace "`r`n", "") -match "`n") {
-                          $failures += "BARE LF (not CRLF) : $($file.FullName)"
-                      }
-                  }
-                  if ($failures.Count -gt 0) {
-                      Write-Host "AHK encoding violations ($($failures.Count) file(s)):"
-                      $failures | ForEach-Object { Write-Host "  $_" }
-                      Write-Error "All .ahk files must be UTF-8 with BOM and CRLF line endings."
-                      exit 1
-                  }
-                  Write-Host "Encoding OK — $($ahkFiles.Count) .ahk file(s) verified."
-
-
-    # ─────────────────────────────────────────────────────
-    # 1.4) Domain build pipeline + drift detection
-    # ─────────────────────────────────────────────────────
+    # ─────────────────────────────────────────────────
+    # 1.3) Domain build pipeline + drift detection
+    # ─────────────────────────────────────────────────
     validate-domain:
-        name: "Validate: domain pipeline"
+        name: "Validate · domain pipeline"
         runs-on: ubuntu-latest
-        if: >
-            github.event_name == 'workflow_dispatch' ||
-            contains(toJson(github.event.commits.*.modified), 'static/ergopti_plus/shared/features/') ||
-            contains(toJson(github.event.commits.*.modified), 'static/ergopti_plus/windows/data/tap_hold/') ||
-            contains(toJson(github.event.commits.*.modified), 'static/ergopti_plus/shared/ports/') ||
-            contains(toJson(github.event.commits.*.modified), 'static/ergopti_plus/shared/domain/') ||
-            contains(toJson(github.event.commits.*.modified), 'static/ergopti_plus/windows/_generated/') ||
-            contains(toJson(github.event.commits.*.modified), 'static/ergopti_plus/macos/_generated/') ||
-            contains(toJson(github.event.commits.*.modified), 'tools/build/build-features-manifest.js') ||
-            contains(toJson(github.event.commits.*.modified), 'tools/build/build-domain.cjs') ||
-            contains(toJson(github.event.commits.*.modified), 'tools/test/test-manifest-parity.cjs') ||
-            contains(toJson(github.event.commits.*.modified), 'tools/test/test-port-compliance.cjs') ||
-            github.event_name == 'pull_request'
 
         steps:
             - uses: actions/checkout@v4
@@ -162,20 +115,19 @@ jobs:
               run: npm run build:domain
 
 
-# ============================================
-# ============================================
-# ======= Stage 2 — Tests (per platform) =======
-# ============================================
-# ============================================
+# ==========================================
+# ==========================================
+# ======= 2/ macOS driver branch =======
+# ==========================================
+# ==========================================
 
-    # ─────────────────────────────────────────────────────
-    # 2.1) Hammerspoon unit tests (macOS Lua, ubuntu runner)
-    # ─────────────────────────────────────────────────────
+    # ─────────────────────────────────────────────────
+    # 2.1) Hammerspoon unit tests
+    # ─────────────────────────────────────────────────
     test-hs:
-        name: "Test: Hammerspoon"
+        name: "macOS · unit tests"
         runs-on: ubuntu-latest
-        needs: [validate-locales, validate-hotstrings, validate-ahk-encoding, validate-domain]
-        if: always() && !failure() && !cancelled()
+        needs: [validate-locales, validate-hotstrings, validate-domain]
 
         steps:
             - uses: actions/checkout@v4
@@ -186,15 +138,15 @@ jobs:
                   sudo apt-get install -y lua5.4 liblua5.4-dev luarocks
 
             - name: Install luacheck + luafilesystem
-              # lfs is required by tests/run.lua for recursive test discovery.
+              # lfs is required by tests/run.lua for recursive test discovery;
               # --lua-version 5.4 ensures luarocks links the correct runtime.
               run: |
                   sudo luarocks --lua-version 5.4 install luacheck
                   sudo luarocks --lua-version 5.4 install luafilesystem
 
             - name: Run luacheck (non-blocking)
-              # Surface warnings without blocking; pre-existing style issues
-              # should not prevent the test run from reaching the test step.
+              # Surface warnings without failing — pre-existing style issues
+              # must not block the test step.
               run: |
                   luacheck static/ergopti_plus/macos/tests static/ergopti_plus/macos/lib \
                     static/ergopti_plus/macos/modules || true
@@ -204,14 +156,67 @@ jobs:
               run: lua5.4 tests/run.lua
 
 
-    # ─────────────────────────────────────────────────────
-    # 2.2) AHK unit tests (Windows runner)
-    # ─────────────────────────────────────────────────────
+    # ─────────────────────────────────────────────────
+    # 2.2) Hammerspoon E2E (virtual-keyboard harness)
+    # ─────────────────────────────────────────────────
+    e2e-hs:
+        name: "macOS · E2E"
+        runs-on: ubuntu-latest
+        needs: [test-hs]
+
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Install Lua 5.4 + luafilesystem
+              run: |
+                  sudo apt-get update
+                  sudo apt-get install -y lua5.4 liblua5.4-dev luarocks
+                  sudo luarocks --lua-version 5.4 install luafilesystem
+
+            - name: Run E2E virtual-keyboard harness
+              # Exercises Registry + Expander via the stub layer against
+              # hardcoded scenarios and all corpus vectors.
+              # Exit 0 = all pass, 1 = at least one failure.
+              working-directory: static/ergopti_plus/macos
+              run: lua5.4 tests/e2e/run_e2e.lua
+              timeout-minutes: 5
+
+
+    # ─────────────────────────────────────────────────
+    # 2.3) Gate: macOS driver fully green
+    # ─────────────────────────────────────────────────
+    macos-ok:
+        name: "macOS · ✅ all green"
+        runs-on: ubuntu-latest
+        needs: [test-hs, e2e-hs]
+        if: always()
+
+        steps:
+            - name: Assert all macOS jobs passed
+              run: |
+                  if [[ "${{ needs.test-hs.result }}" != "success" || \
+                        "${{ needs.e2e-hs.result }}"  != "success" ]]; then
+                      echo "macOS driver: one or more jobs failed."
+                      echo "  test-hs : ${{ needs.test-hs.result }}"
+                      echo "  e2e-hs  : ${{ needs.e2e-hs.result }}"
+                      exit 1
+                  fi
+                  echo "macOS driver: all jobs passed."
+
+
+# =============================================
+# =============================================
+# ======= 3/ Windows driver branch =======
+# =============================================
+# =============================================
+
+    # ─────────────────────────────────────────────────
+    # 3.1) AHK unit tests
+    # ─────────────────────────────────────────────────
     test-ahk:
-        name: "Test: AHK"
+        name: "Windows · unit tests"
         runs-on: windows-latest
-        needs: [validate-locales, validate-hotstrings, validate-ahk-encoding, validate-domain]
-        if: always() && !failure() && !cancelled()
+        needs: [validate-locales, validate-hotstrings, validate-domain]
 
         steps:
             - uses: actions/checkout@v4
@@ -249,20 +254,25 @@ jobs:
                   Expand-Archive -Path "$env:TEMP\AHK.zip" -DestinationPath "C:\AutoHotkey" -Force
 
             - name: Verify AHK source encoding (UTF-8 BOM + CRLF)
+              # AHK v2 silently aborts mid-file on encoding drift — catch it
+              # before it causes silent test failures with no error message.
               shell: pwsh
               run: |
-                  $ahkFiles = Get-ChildItem -Path "${{ github.workspace }}\static\ergopti_plus\windows" `
-                      -Recurse -Filter "*.ahk" | Where-Object { -not $_.FullName.Contains("vendor") }
+                  $ahkFiles = Get-ChildItem `
+                      -Path "${{ github.workspace }}\static\ergopti_plus\windows" `
+                      -Recurse -Filter "*.ahk" |
+                      Where-Object { -not $_.FullName.Contains("vendor") }
                   $failures = @()
                   foreach ($file in $ahkFiles) {
                       $bytes = [System.IO.File]::ReadAllBytes($file.FullName)
-                      if ($bytes.Length -lt 3 -or $bytes[0] -ne 0xEF -or $bytes[1] -ne 0xBB -or $bytes[2] -ne 0xBF) {
-                          $failures += "MISSING BOM : $($file.FullName)"
-                          continue
+                      if ($bytes.Length -lt 3 -or
+                          $bytes[0] -ne 0xEF -or $bytes[1] -ne 0xBB -or $bytes[2] -ne 0xBF) {
+                          $failures += "MISSING BOM : $($file.FullName)"; continue
                       }
-                      $content = [System.IO.File]::ReadAllText($file.FullName, [System.Text.Encoding]::UTF8)
+                      $content = [System.IO.File]::ReadAllText(
+                          $file.FullName, [System.Text.Encoding]::UTF8)
                       if (($content -replace "`r`n", "") -match "`n") {
-                          $failures += "BARE LF (not CRLF) : $($file.FullName)"
+                          $failures += "BARE LF : $($file.FullName)"
                       }
                   }
                   if ($failures.Count -gt 0) {
@@ -273,7 +283,6 @@ jobs:
                   Write-Host "Encoding OK — $($ahkFiles.Count) file(s) verified."
 
             - name: Run AHK test suite
-              id: tests
               shell: pwsh
               timeout-minutes: 8
               run: |
@@ -281,16 +290,22 @@ jobs:
                       Select-Object -First 1 -ExpandProperty FullName
                   if (-not $ahk) { Write-Error "AutoHotkey64.exe not found."; exit 2 }
                   $runner = "${{ github.workspace }}\static\ergopti_plus\windows\tests\run_all.ahk"
-                  if (-not (Test-Path $runner)) { Write-Error "Test runner not found."; exit 2 }
+                  if (-not (Test-Path $runner)) {
+                      Write-Error "Test runner not found at $runner"; exit 2
+                  }
                   Write-Host "AHK runtime : $ahk"
                   Write-Host "Test runner : $runner"
                   Write-Host "------------------------------------------------------------"
+                  # AHK does not write to the parent shell's stdout natively; wrap
+                  # via cmd.exe so FileAppend("*") output reaches the Actions log.
                   $output = & cmd /c "`"$ahk`" `"$runner`" 2>&1"
                   $exit = $LASTEXITCODE
                   $output | ForEach-Object { Write-Host $_ }
                   Write-Host "------------------------------------------------------------"
                   Write-Host "AHK exit code: $exit"
-                  if ($exit -ne 0) { Write-Error "Test suite failed (exit $exit)."; exit $exit }
+                  if ($exit -ne 0) {
+                      Write-Error "Test suite failed (exit $exit)."; exit $exit
+                  }
 
             - name: Check for AHK compiler warnings
               shell: pwsh
@@ -309,65 +324,11 @@ jobs:
                   Write-Host "No AHK compiler warnings."
 
 
-    # ─────────────────────────────────────────────────────
-    # 2.3) Linux Lua driver tests
-    # ─────────────────────────────────────────────────────
-    test-linux:
-        name: "Test: Linux driver"
-        runs-on: ubuntu-22.04
-        needs: [validate-locales, validate-hotstrings, validate-ahk-encoding, validate-domain]
-        if: always() && !failure() && !cancelled()
-
-        steps:
-            - uses: actions/checkout@v4
-
-            - name: Install LuaJIT
-              run: |
-                  sudo apt-get update -qq
-                  sudo apt-get install -y luajit
-
-            - name: Run Linux driver test suite
-              working-directory: static/ergopti_plus/linux
-              run: luajit tests/run.lua
-
-
-# ==========================================
-# ==========================================
-# ======= Stage 3 — E2E (per platform) =======
-# ==========================================
-# ==========================================
-
-    # ─────────────────────────────────────────────────────
-    # 3.1) E2E Hammerspoon (virtual-keyboard harness)
-    # ─────────────────────────────────────────────────────
-    e2e-hs:
-        name: "E2E: Hammerspoon"
-        runs-on: ubuntu-latest
-        needs: [test-hs]
-
-        steps:
-            - uses: actions/checkout@v4
-
-            - name: Install Lua 5.4 + luafilesystem
-              run: |
-                  sudo apt-get update
-                  sudo apt-get install -y lua5.4 liblua5.4-dev luarocks
-                  sudo luarocks --lua-version 5.4 install luafilesystem
-
-            - name: Run E2E virtual-keyboard harness
-              # Runs hardcoded scenarios + all corpus vectors from
-              # _shared/tests/corpus/hotstrings/vectors.json.
-              # Exit 0 = all pass, 1 = at least one failure.
-              working-directory: static/ergopti_plus/macos
-              run: lua5.4 tests/e2e/run_e2e.lua
-              timeout-minutes: 5
-
-
-    # ─────────────────────────────────────────────────────
-    # 3.2) E2E AHK (pure engine injection, no real window)
-    # ─────────────────────────────────────────────────────
+    # ─────────────────────────────────────────────────
+    # 3.2) AHK E2E (pure engine injection, headless)
+    # ─────────────────────────────────────────────────
     e2e-ahk:
-        name: "E2E: AHK"
+        name: "Windows · E2E"
         runs-on: windows-latest
         needs: [test-ahk]
 
@@ -406,9 +367,7 @@ jobs:
 
             - name: Build features manifest
               shell: pwsh
-              run: |
-                  npm ci
-                  npm run build:manifest
+              run: npm ci; npm run build:manifest
 
             - name: Run E2E suite (Strategy A — pure engine injection)
               shell: pwsh
@@ -426,217 +385,94 @@ jobs:
                   $output | ForEach-Object { Write-Host $_ }
                   Write-Host "------------------------------------------------------------"
                   Write-Host "Exit code: $exit"
-                  if ($exit -ne 0) { Write-Error "E2E suite failed (exit $exit)."; exit $exit }
+                  if ($exit -ne 0) {
+                      Write-Error "E2E suite failed (exit $exit)."; exit $exit
+                  }
 
 
-# ==============================================
-# ==============================================
-# ======= Stage 4 — Linux build packages =======
-# ==============================================
-# ==============================================
-
-    build-linux-deb:
-        name: "Build: .deb"
-        runs-on: ubuntu-22.04
-        needs: [e2e-hs, e2e-ahk, test-linux]
-        if: always() && !failure() && !cancelled()
-
-        steps:
-            - uses: actions/checkout@v4
-
-            - name: Read version from package.json
-              id: version
-              run: |
-                  VERSION=$(node -p "require('./package.json').version")
-                  echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-
-            - name: Install runtime dependencies
-              run: |
-                  sudo apt-get update -qq
-                  sudo apt-get install -y luajit ydotool libnotify-bin
-
-            - name: Assemble package tree
-              env:
-                  VERSION: ${{ steps.version.outputs.version }}
-              run: |
-                  PKG="ergopti-linux-${VERSION}"
-                  install -d "${PKG}/DEBIAN"
-                  install -d "${PKG}/usr/bin"
-                  install -d "${PKG}/usr/lib/ergopti/linux"
-                  install -d "${PKG}/usr/lib/ergopti/_shared"
-                  install -d "${PKG}/usr/share/applications"
-                  install -d "${PKG}/usr/share/doc/ergopti"
-                  install -d "${PKG}/usr/share/ergopti/hotstrings"
-                  cp -r static/ergopti_plus/linux/.            "${PKG}/usr/lib/ergopti/linux/"
-                  cp -r static/ergopti_plus/shared/.           "${PKG}/usr/lib/ergopti/_shared/"
-                  cp -r static/ergopti_plus/shared/hotstrings/. "${PKG}/usr/share/ergopti/hotstrings/"
-                  install -m 0755 static/ergopti_plus/linux/bin/ergopti-hotstrings \
-                    "${PKG}/usr/bin/ergopti-hotstrings"
-                  cp static/ergopti_plus/linux/README.md "${PKG}/usr/share/doc/ergopti/README.md"
-                  cat > "${PKG}/usr/share/applications/ergopti.desktop" << 'DESKTOP'
-                  [Desktop Entry]
-                  Type=Application
-                  Name=Ergopti Hotstrings
-                  Comment=Daemon d'expansion de raccourcis clavier Ergopti
-                  Exec=/usr/bin/ergopti-hotstrings
-                  Icon=input-keyboard
-                  Categories=Utility;
-                  NoDisplay=true
-                  X-GNOME-Autostart-enabled=true
-                  DESKTOP
-                  cat > "${PKG}/DEBIAN/control" << CONTROL
-                  Package: ergopti-hotstrings
-                  Version: ${VERSION}
-                  Architecture: amd64
-                  Depends: luajit (>= 2.0), ydotool, libnotify-bin
-                  Maintainer: Ergopti <moyaux.adrien@gmail.com>
-                  Description: Ergopti hotstring expansion daemon
-                   Daemon that monitors keyboard input and expands user-defined
-                   hotstrings using the Ergopti layout engine.
-                  Section: utils
-                  Priority: optional
-                  CONTROL
-                  echo "PKG=${PKG}" >> "$GITHUB_ENV"
-
-            - name: Build .deb
-              run: dpkg-deb --build "$PKG" "ergopti_${{ steps.version.outputs.version }}_amd64.deb"
-
-            - name: Upload .deb artifact
-              uses: actions/upload-artifact@v4
-              with:
-                  name: ergopti-deb-${{ steps.version.outputs.version }}
-                  path: "ergopti_${{ steps.version.outputs.version }}_amd64.deb"
-                  retention-days: 30
-
-
-    build-linux-rpm:
-        name: "Build: .rpm"
-        runs-on: ubuntu-22.04
-        needs: [build-linux-deb]
-
-        steps:
-            - uses: actions/checkout@v4
-
-            - name: Read version from package.json
-              id: version
-              run: |
-                  VERSION=$(node -p "require('./package.json').version")
-                  echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-
-            - name: Install alien
-              run: sudo apt-get update -qq && sudo apt-get install -y alien
-
-            - uses: actions/download-artifact@v4
-              with:
-                  name: ergopti-deb-${{ steps.version.outputs.version }}
-
-            - name: Convert .deb to .rpm
-              run: |
-                  sudo alien --to-rpm --scripts \
-                    "ergopti_${{ steps.version.outputs.version }}_amd64.deb"
-
-            - name: Upload .rpm artifact
-              uses: actions/upload-artifact@v4
-              with:
-                  name: ergopti-rpm-${{ steps.version.outputs.version }}
-                  path: "*.rpm"
-                  retention-days: 30
-
-
-    build-linux-appimage:
-        name: "Build: AppImage"
-        runs-on: ubuntu-22.04
-        needs: [e2e-hs, e2e-ahk, test-linux]
-        if: always() && !failure() && !cancelled()
-
-        steps:
-            - uses: actions/checkout@v4
-
-            - name: Read version from package.json
-              id: version
-              run: |
-                  VERSION=$(node -p "require('./package.json').version")
-                  echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-
-            - name: Install LuaJIT and AppImage tools
-              run: sudo apt-get update -qq && sudo apt-get install -y luajit libluajit-5.1-dev
-
-            - name: Download appimagetool
-              run: |
-                  curl -fsSL \
-                    "https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage" \
-                    -o /tmp/appimagetool
-                  chmod +x /tmp/appimagetool
-                  # Extract instead of mounting — FUSE is not available on CI runners
-                  /tmp/appimagetool --appimage-extract
-                  sudo mv squashfs-root /opt/appimagetool
-                  sudo ln -sf /opt/appimagetool/AppRun /usr/local/bin/appimagetool
-
-            - name: Assemble AppDir
-              env:
-                  VERSION: ${{ steps.version.outputs.version }}
-              run: |
-                  APPDIR="Ergopti.AppDir"
-                  install -d "${APPDIR}/usr/bin"
-                  install -d "${APPDIR}/usr/lib/ergopti/linux"
-                  install -d "${APPDIR}/usr/lib/ergopti/_shared"
-                  LUAJIT_BIN=$(which luajit)
-                  install -m 0755 "$LUAJIT_BIN" "${APPDIR}/usr/bin/luajit"
-                  for lib in $(ldd "$LUAJIT_BIN" | grep libluajit | awk '{print $3}'); do
-                    [ -f "$lib" ] && cp "$lib" "${APPDIR}/usr/bin/"
-                  done
-                  cp -r static/ergopti_plus/linux/.    "${APPDIR}/usr/lib/ergopti/linux/"
-                  cp -r static/ergopti_plus/shared/.  "${APPDIR}/usr/lib/ergopti/_shared/"
-                  cat > "${APPDIR}/AppRun" << 'APPRUN'
-                  #!/usr/bin/env bash
-                  set -euo pipefail
-                  DRIVER_ROOT="${APPDIR}/usr/lib/ergopti/linux"
-                  SHARED_ROOT="${APPDIR}/usr/lib/ergopti/_shared/lua"
-                  LUAJIT="${APPDIR}/usr/bin/luajit"
-                  export LUA_PATH="${DRIVER_ROOT}/?.lua;${DRIVER_ROOT}/?/init.lua;${SHARED_ROOT}/?.lua;${SHARED_ROOT}/?/init.lua;;"
-                  export LD_LIBRARY_PATH="${APPDIR}/usr/bin:${LD_LIBRARY_PATH:-}"
-                  exec "$LUAJIT" "${DRIVER_ROOT}/ergopti_hotstrings.lua" "$@"
-                  APPRUN
-                  chmod +x "${APPDIR}/AppRun"
-                  cat > "${APPDIR}/ergopti.desktop" << 'DESKTOP'
-                  [Desktop Entry]
-                  Type=Application
-                  Name=Ergopti Hotstrings
-                  Exec=AppRun
-                  Icon=ergopti
-                  Categories=Utility;
-                  DESKTOP
-                  printf '\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\nIDATx\x9cc\x00\x01\x00\x00\x05\x00\x01\r\n-\xb4\x00\x00\x00\x00IEND\xaeB`\x82' \
-                    > "${APPDIR}/ergopti.png"
-
-            - name: Package AppImage
-              env:
-                  VERSION: ${{ steps.version.outputs.version }}
-              run: ARCH=x86_64 appimagetool Ergopti.AppDir "Ergopti-${VERSION}-x86_64.AppImage"
-
-            - name: Upload AppImage artifact
-              uses: actions/upload-artifact@v4
-              with:
-                  name: ergopti-appimage-${{ steps.version.outputs.version }}
-                  path: "Ergopti-*-x86_64.AppImage"
-                  retention-days: 30
-
-
-# ============================================
-# ============================================
-# ======= Stage 5 — Release (main only) =======
-# ============================================
-# ============================================
-
-    trigger-release:
-        name: "Trigger: release"
+    # ─────────────────────────────────────────────────
+    # 3.3) Gate: Windows driver fully green
+    # ─────────────────────────────────────────────────
+    windows-ok:
+        name: "Windows · ✅ all green"
         runs-on: ubuntu-latest
-        needs: [e2e-hs, e2e-ahk, test-linux]
-        # Only auto-release on push to main — not PRs, not dev
+        needs: [test-ahk, e2e-ahk]
+        if: always()
+
+        steps:
+            - name: Assert all Windows jobs passed
+              run: |
+                  if [[ "${{ needs.test-ahk.result }}" != "success" || \
+                        "${{ needs.e2e-ahk.result }}"  != "success" ]]; then
+                      echo "Windows driver: one or more jobs failed."
+                      echo "  test-ahk : ${{ needs.test-ahk.result }}"
+                      echo "  e2e-ahk  : ${{ needs.e2e-ahk.result }}"
+                      exit 1
+                  fi
+                  echo "Windows driver: all jobs passed."
+
+
+# ============================================
+# ============================================
+# ======= 4/ Linux driver branch =======
+# ============================================
+# ============================================
+
+    # ─────────────────────────────────────────────────
+    # 4.1) Linux Lua driver tests
+    # ─────────────────────────────────────────────────
+    test-linux:
+        name: "Linux · unit tests"
+        runs-on: ubuntu-22.04
+        needs: [validate-locales, validate-hotstrings, validate-domain]
+
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Install LuaJIT
+              run: sudo apt-get update -qq && sudo apt-get install -y luajit
+
+            - name: Run Linux driver test suite
+              working-directory: static/ergopti_plus/linux
+              run: luajit tests/run.lua
+
+
+    # ─────────────────────────────────────────────────
+    # 4.2) Gate: Linux driver fully green
+    # ─────────────────────────────────────────────────
+    linux-ok:
+        name: "Linux · ✅ all green"
+        runs-on: ubuntu-latest
+        needs: [test-linux]
+        if: always()
+
+        steps:
+            - name: Assert all Linux jobs passed
+              run: |
+                  if [[ "${{ needs.test-linux.result }}" != "success" ]]; then
+                      echo "Linux driver: test-linux failed."
+                      exit 1
+                  fi
+                  echo "Linux driver: all jobs passed."
+
+
+# =========================================
+# =========================================
+# ======= 5/ Release (main only) =======
+# =========================================
+# =========================================
+
+    release:
+        name: "Release · auto-tag → release.yml"
+        runs-on: ubuntu-latest
+        needs: [macos-ok, windows-ok, linux-ok]
+        # Only on push to main (not PRs, not dev) and only when all drivers passed
         if: >
-            always() && !failure() && !cancelled() &&
             github.event_name == 'push' &&
-            github.ref == 'refs/heads/main'
+            github.ref == 'refs/heads/main' &&
+            needs.macos-ok.result   == 'success' &&
+            needs.windows-ok.result == 'success' &&
+            needs.linux-ok.result   == 'success'
         permissions:
             contents: write
 
@@ -646,32 +482,48 @@ jobs:
                   fetch-depth: 0
 
             - name: Calculate next version and push tag
-              # Inline of version.yml logic so we don't need a cross-workflow
-              # dependency. This step only runs after all tests pass on main.
+              # Computes the next SemVer from conventional commits since the last
+              # stable tag, then pushes the tag — which triggers release.yml.
+              # This step only runs after all three driver branches are green.
               shell: bash
               env:
                   GH_TOKEN: ${{ github.token }}
                   RUN_NUM:  ${{ github.run_number }}
               run: |
                   set -euo pipefail
+
                   last_stable=$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname \
                       | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1 || true)
-                  [ -z "$last_stable" ] && last_stable="v0.0.0" && range="HEAD" || range="${last_stable}..HEAD"
+                  if [ -z "$last_stable" ]; then
+                      last_stable="v0.0.0"
+                      range="HEAD"
+                  else
+                      range="${last_stable}..HEAD"
+                  fi
+                  echo "Last stable tag: $last_stable"
                   IFS='.' read -r maj min pat <<< "${last_stable#v}"
+
                   bump="patch"
                   while IFS= read -r subject; do
                       [ -z "$subject" ] && continue
-                      if echo "$subject" | grep -qE '(BREAKING|!):'; then bump="major"; break
-                      elif echo "$subject" | grep -qE '^feat(\([^)]+\))?!?:'; then [ "$bump" != "major" ] && bump="minor"; fi
+                      if echo "$subject" | grep -qE '(BREAKING|!):'; then
+                          bump="major"; break
+                      elif echo "$subject" | grep -qE '^feat(\([^)]+\))?!?:'; then
+                          [ "$bump" != "major" ] && bump="minor"
+                      fi
                   done < <(git log "$range" --no-merges --pretty=format:"%s")
+                  echo "Bump type: $bump"
+
                   case "$bump" in
                       major) maj=$((maj+1)); min=0; pat=0 ;;
                       minor) min=$((min+1)); pat=0 ;;
                       patch) pat=$((pat+1)) ;;
                   esac
                   tag="v${maj}.${min}.${pat}"
+                  echo "New tag: $tag"
+
                   if git ls-remote --tags origin "refs/tags/$tag" | grep -q "$tag"; then
-                      echo "Tag '$tag' already exists — skipping."
+                      echo "Tag '$tag' already exists — skipping push."
                   else
                       git tag "$tag"
                       git push origin "$tag"

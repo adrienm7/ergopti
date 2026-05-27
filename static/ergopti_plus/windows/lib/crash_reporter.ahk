@@ -126,7 +126,10 @@ CrashReport_Build(ErrorObj) {
 	KeyloggerInit := "unknown"
 	ConfigDir     := ""
 	try {
-		global Keylogger
+		; AHK v2 class names are globally accessible without a `global` declaration —
+		; declaring `global Keylogger` here would conflict with the class definition
+		; in keylogger.ahk and cause a startup crash. The try block already handles
+		; the case where the class is not yet initialized.
 		KeyloggerInit := Keylogger.initialized ? "true" : "false"
 	}
 	try {
