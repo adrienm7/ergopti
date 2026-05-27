@@ -14,13 +14,13 @@ on:
         branches: [main, dev]
         paths:
             - "static/ergopti_plus/macos/**"
-            - "static/ergopti_plus/_shared/tests/corpus/hotstrings/**"
+            - "static/ergopti_plus/shared/tests/corpus/hotstrings/**"
             - ".github/workflows/e2e_hammerspoon.yml"
     pull_request:
         branches: [main, dev]
         paths:
             - "static/ergopti_plus/macos/**"
-            - "static/ergopti_plus/_shared/tests/corpus/hotstrings/**"
+            - "static/ergopti_plus/shared/tests/corpus/hotstrings/**"
             - ".github/workflows/e2e_hammerspoon.yml"
     workflow_dispatch:
 

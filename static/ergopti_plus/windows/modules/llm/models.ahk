@@ -122,7 +122,7 @@ LLM_GetModelIndex() {
 LLM_GetAllModelNames() {
 	index := LLM_GetModelIndex()
 	names := []
-	for name, _ in index
+	for name, in index
 		names.Push(name)
 	; Tiny n (~50 entries) — bubble sort keeps the dependency surface
 	; minimal and the cost is invisible.
@@ -395,8 +395,8 @@ _LLM_IsNumber(v) {
 	if (v == "")
 		return false
 	; Use Type() — AHK v2 reports "Integer" or "Float" for numeric values.
-	t := Type(v)
-	return (t == "Integer" or t == "Float")
+	typeStr := Type(v)
+	return (typeStr == "Integer" or typeStr == "Float")
 }
 
 

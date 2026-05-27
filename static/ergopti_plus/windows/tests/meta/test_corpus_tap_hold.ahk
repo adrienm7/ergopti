@@ -81,13 +81,13 @@ _CorpusTH_EveryVectorHasRequiredFields() {
 	if Corpus = "" {
 		return
 	}
-	for V in Corpus["vectors"] {
-		AssertTrue(V.Has("id") and V["id"] != "",
+	for Vec in Corpus["vectors"] {
+		AssertTrue(Vec.Has("id") and Vec["id"] != "",
 			"vector missing id")
-		AssertTrue(V.Has("key") and V["key"] != "",
-			"vector '" . (V.Has("id") ? V["id"] : "?") . "' missing key")
-		AssertTrue(V.Has("expected"),
-			"vector '" . (V.Has("id") ? V["id"] : "?") . "' missing expected")
+		AssertTrue(Vec.Has("key") and Vec["key"] != "",
+			"vector '" . (Vec.Has("id") ? Vec["id"] : "?") . "' missing key")
+		AssertTrue(Vec.Has("expected"),
+			"vector '" . (Vec.Has("id") ? Vec["id"] : "?") . "' missing expected")
 	}
 }
 Test("tap_hold corpus  --  every vector has required fields: id, key, expected", _CorpusTH_EveryVectorHasRequiredFields)
@@ -97,12 +97,12 @@ _CorpusTH_ConfiguredTrueHasNonNullConfig() {
 	if Corpus = "" {
 		return
 	}
-	for V in Corpus["vectors"] {
-		Exp := V["expected"]
-		if Exp.Has("configured") and Exp["configured"] = true {
+	for Vec in Corpus["vectors"] {
+		Expected := Vec["expected"]
+		if Expected.Has("configured") and Expected["configured"] = true {
 			; JSON null parses to JSON_NULL (an Object, not a Map); use type check
-			AssertTrue(V.Has("config") and Type(V["config"]) = "Map",
-				"vector '" . V["id"] . "' has configured=true but config is null")
+			AssertTrue(Vec.Has("config") and Type(Vec["config"]) = "Map",
+				"vector '" . Vec["id"] . "' has configured=true but config is null")
 		}
 	}
 }
@@ -113,14 +113,14 @@ _CorpusTH_ConfiguredFalseHasNullConfig() {
 	if Corpus = "" {
 		return
 	}
-	for V in Corpus["vectors"] {
-		Exp := V["expected"]
-		if Exp.Has("configured") and Exp["configured"] = false {
+	for Vec in Corpus["vectors"] {
+		Expected := Vec["expected"]
+		if Expected.Has("configured") and Expected["configured"] = false {
 			; JSON null parses to JSON_NULL (Object type, not Map); treat it as absent.
 			; An empty string or JSON_NULL are both acceptable representations of null.
-			HasConfig := V.Has("config") and Type(V["config"]) = "Map"
+			HasConfig := Vec.Has("config") and Type(Vec["config"]) = "Map"
 			AssertTrue(!HasConfig,
-				"vector '" . V["id"] . "' has configured=false but config is non-null")
+				"vector '" . Vec["id"] . "' has configured=false but config is non-null")
 		}
 	}
 }
@@ -184,20 +184,20 @@ _CorpusTH_ConfiguredVectorsRoundTrip() {
 	if Corpus = "" {
 		return
 	}
-	for V in Corpus["vectors"] {
+	for Vec in Corpus["vectors"] {
 		; JSON null parses to JSON_NULL (Object), not a Map — skip null configs
-		if not (V.Has("config") and Type(V["config"]) = "Map") {
+		if not (Vec.Has("config") and Type(Vec["config"]) = "Map") {
 			continue
 		}
-		Cfg     := V["config"]
-		KeyId   := V["key"]
+		Cfg     := Vec["config"]
+		KeyId   := Vec["key"]
 		Content := _CorpusTH_BuildToml(KeyId, Cfg)
 		Path    := _CorpusTH_WriteToml(Content)
 		TH      := LoadTapHoldToml(Path)
 		_CorpusTH_CleanToml()
 
 		AssertTrue(TapHoldIsConfigured(TH, KeyId),
-			"vector '" . V["id"] . "': key '" . KeyId . "' must be configured after load")
+			"vector '" . Vec["id"] . "': key '" . KeyId . "' must be configured after load")
 	}
 }
 Test("tap_hold corpus  --  configured vectors: TapHoldIsConfigured returns true", _CorpusTH_ConfiguredVectorsRoundTrip)
@@ -207,24 +207,24 @@ _CorpusTH_TapActionPreserved() {
 	if Corpus = "" {
 		return
 	}
-	for V in Corpus["vectors"] {
+	for Vec in Corpus["vectors"] {
 		; JSON null parses to JSON_NULL (Object), not a Map — skip null configs
-		if not (V.Has("config") and Type(V["config"]) = "Map") {
+		if not (Vec.Has("config") and Type(Vec["config"]) = "Map") {
 			continue
 		}
-		Exp := V["expected"]
-		if not Exp.Has("tap_action") {
+		Expected := Vec["expected"]
+		if not Expected.Has("tap_action") {
 			continue
 		}
-		Cfg     := V["config"]
-		KeyId   := V["key"]
+		Cfg     := Vec["config"]
+		KeyId   := Vec["key"]
 		Content := _CorpusTH_BuildToml(KeyId, Cfg)
 		Path    := _CorpusTH_WriteToml(Content)
 		TH      := LoadTapHoldToml(Path)
 		_CorpusTH_CleanToml()
 
-		AssertEqual(Exp["tap_action"], TapHoldTapAction(TH, KeyId),
-			"vector '" . V["id"] . "': tap_action mismatch after round-trip")
+		AssertEqual(Expected["tap_action"], TapHoldTapAction(TH, KeyId),
+			"vector '" . Vec["id"] . "': tap_action mismatch after round-trip")
 	}
 }
 Test("tap_hold corpus  --  tap_action is preserved after TOML round-trip", _CorpusTH_TapActionPreserved)
@@ -234,24 +234,24 @@ _CorpusTH_DurationPreserved() {
 	if Corpus = "" {
 		return
 	}
-	for V in Corpus["vectors"] {
+	for Vec in Corpus["vectors"] {
 		; JSON null parses to JSON_NULL (Object), not a Map — skip null configs
-		if not (V.Has("config") and Type(V["config"]) = "Map") {
+		if not (Vec.Has("config") and Type(Vec["config"]) = "Map") {
 			continue
 		}
-		Exp := V["expected"]
-		if not Exp.Has("duration") {
+		Expected := Vec["expected"]
+		if not Expected.Has("duration") {
 			continue
 		}
-		Cfg     := V["config"]
-		KeyId   := V["key"]
+		Cfg     := Vec["config"]
+		KeyId   := Vec["key"]
 		Content := _CorpusTH_BuildToml(KeyId, Cfg)
 		Path    := _CorpusTH_WriteToml(Content)
 		TH      := LoadTapHoldToml(Path)
 		_CorpusTH_CleanToml()
 
-		AssertEqual(Exp["duration"], TapHoldDuration(TH, KeyId),
-			"vector '" . V["id"] . "': time_activation_seconds mismatch after round-trip")
+		AssertEqual(Expected["duration"], TapHoldDuration(TH, KeyId),
+			"vector '" . Vec["id"] . "': time_activation_seconds mismatch after round-trip")
 	}
 }
 Test("tap_hold corpus  --  time_activation_seconds is preserved after TOML round-trip", _CorpusTH_DurationPreserved)
@@ -261,29 +261,29 @@ _CorpusTH_HoldModifierPreserved() {
 	if Corpus = "" {
 		return
 	}
-	for V in Corpus["vectors"] {
+	for Vec in Corpus["vectors"] {
 		; JSON null parses to JSON_NULL (Object), not a Map — skip null configs
-		if not (V.Has("config") and Type(V["config"]) = "Map") {
+		if not (Vec.Has("config") and Type(Vec["config"]) = "Map") {
 			continue
 		}
-		Exp := V["expected"]
-		if not Exp.Has("hold_modifier") {
+		Expected := Vec["expected"]
+		if not Expected.Has("hold_modifier") {
 			continue
 		}
 		; Skip null hold_modifier — JSON null parses to JSON_NULL (Object) and
 		; the AHK accessor returns "" for an absent field; both are skipped here.
-		if Exp["hold_modifier"] = "" or Type(Exp["hold_modifier"]) != "String" {
+		if Expected["hold_modifier"] = "" or Type(Expected["hold_modifier"]) != "String" {
 			continue
 		}
-		Cfg     := V["config"]
-		KeyId   := V["key"]
+		Cfg     := Vec["config"]
+		KeyId   := Vec["key"]
 		Content := _CorpusTH_BuildToml(KeyId, Cfg)
 		Path    := _CorpusTH_WriteToml(Content)
 		TH      := LoadTapHoldToml(Path)
 		_CorpusTH_CleanToml()
 
-		AssertEqual(Exp["hold_modifier"], TapHoldHoldModifier(TH, KeyId),
-			"vector '" . V["id"] . "': hold_modifier mismatch after round-trip")
+		AssertEqual(Expected["hold_modifier"], TapHoldHoldModifier(TH, KeyId),
+			"vector '" . Vec["id"] . "': hold_modifier mismatch after round-trip")
 	}
 }
 Test("tap_hold corpus  --  hold_modifier is preserved after TOML round-trip", _CorpusTH_HoldModifierPreserved)
@@ -293,9 +293,9 @@ _CorpusTH_UnconfiguredKeyReturnsNotConfigured() {
 	if Corpus = "" {
 		return
 	}
-	for V in Corpus["vectors"] {
-		Exp := V["expected"]
-		if not (Exp.Has("configured") and Exp["configured"] = false) {
+	for Vec in Corpus["vectors"] {
+		Expected := Vec["expected"]
+		if not (Expected.Has("configured") and Expected["configured"] = false) {
 			continue
 		}
 		; Build an empty config that does not contain the queried key
@@ -304,8 +304,8 @@ _CorpusTH_UnconfiguredKeyReturnsNotConfigured() {
 		TH      := LoadTapHoldToml(Path)
 		_CorpusTH_CleanToml()
 
-		AssertTrue(!TapHoldIsConfigured(TH, V["key"]),
-			"vector '" . V["id"] . "': absent key must return configured=false")
+		AssertTrue(!TapHoldIsConfigured(TH, Vec["key"]),
+			"vector '" . Vec["id"] . "': absent key must return configured=false")
 	}
 }
 Test("tap_hold corpus  --  unconfigured key: TapHoldIsConfigured returns false", _CorpusTH_UnconfiguredKeyReturnsNotConfigured)

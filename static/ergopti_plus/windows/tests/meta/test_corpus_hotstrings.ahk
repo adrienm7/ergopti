@@ -79,13 +79,13 @@ _CorpusHS_EveryVectorHasRequiredFields() {
 	if Corpus = "" {
 		return
 	}
-	for V in Corpus["vectors"] {
-		AssertTrue(V.Has("id") and V["id"] != "",
+	for Vec in Corpus["vectors"] {
+		AssertTrue(Vec.Has("id") and Vec["id"] != "",
 			"vector missing id")
-		AssertTrue(V.Has("trigger") and V["trigger"] != "",
-			"vector '" . (V.Has("id") ? V["id"] : "?") . "' missing trigger")
-		AssertTrue(V.Has("expected"),
-			"vector '" . (V.Has("id") ? V["id"] : "?") . "' missing expected")
+		AssertTrue(Vec.Has("trigger") and Vec["trigger"] != "",
+			"vector '" . (Vec.Has("id") ? Vec["id"] : "?") . "' missing trigger")
+		AssertTrue(Vec.Has("expected"),
+			"vector '" . (Vec.Has("id") ? Vec["id"] : "?") . "' missing expected")
 	}
 }
 Test("hotstring corpus  --  every vector has required fields: id, trigger, expected", _CorpusHS_EveryVectorHasRequiredFields)
@@ -95,19 +95,19 @@ _CorpusHS_BackspaceCountFormula() {
 	if Corpus = "" {
 		return
 	}
-	for V in Corpus["vectors"] {
-		Exp := V["expected"]
-		if not (Exp.Has("matched") and Exp["matched"] = true) {
+	for Vec in Corpus["vectors"] {
+		Expected := Vec["expected"]
+		if not (Expected.Has("matched") and Expected["matched"] = true) {
 			continue
 		}
-		if not Exp.Has("backspace_count") {
+		if not Expected.Has("backspace_count") {
 			continue
 		}
-		TrigLen    := StrLen(V["trigger"])
-		Consumed   := V.Has("terminator_consumed") and V["terminator_consumed"] = true
+		TrigLen    := StrLen(Vec["trigger"])
+		Consumed   := Vec.Has("terminator_consumed") and Vec["terminator_consumed"] = true
 		ExpectedBC := TrigLen + (Consumed ? 1 : 0)
-		AssertEqual(ExpectedBC, Exp["backspace_count"],
-			"vector '" . V["id"] . "' backspace_count mismatch")
+		AssertEqual(ExpectedBC, Expected["backspace_count"],
+			"vector '" . Vec["id"] . "' backspace_count mismatch")
 	}
 }
 Test("hotstring corpus  --  backspace_count equals trigger_length [+ 1 if consumed]", _CorpusHS_BackspaceCountFormula)
@@ -128,17 +128,17 @@ _CorpusHS_TriggerLengthMatchesBuffer() {
 	if Corpus = "" {
 		return
 	}
-	for V in Corpus["vectors"] {
-		Exp := V["expected"]
-		if not (Exp.Has("matched") and Exp["matched"] = true) {
+	for Vec in Corpus["vectors"] {
+		Expected := Vec["expected"]
+		if not (Expected.Has("matched") and Expected["matched"] = true) {
 			continue
 		}
-		Buf     := V.Has("buffer") ? V["buffer"] : V["trigger"]
-		Trigger := V["trigger"]
+		Buf     := Vec.Has("buffer") ? Vec["buffer"] : Vec["trigger"]
+		Trigger := Vec["trigger"]
 		TLen    := StrLen(Trigger)
 		BufTail := SubStr(Buf, -TLen)
 		AssertEqual(Trigger, BufTail,
-			"vector '" . V["id"] . "': buffer must end with trigger for matched=true")
+			"vector '" . Vec["id"] . "': buffer must end with trigger for matched=true")
 	}
 }
 Test("hotstring corpus  --  matched vectors: buffer ends with trigger", _CorpusHS_TriggerLengthMatchesBuffer)
@@ -150,18 +150,18 @@ _CorpusHS_NonMatchedBuffersDontEndWithTrigger() {
 	if Corpus = "" {
 		return
 	}
-	for V in Corpus["vectors"] {
-		Exp := V["expected"]
-		if not (Exp.Has("matched") and Exp["matched"] = false) {
+	for Vec in Corpus["vectors"] {
+		Expected := Vec["expected"]
+		if not (Expected.Has("matched") and Expected["matched"] = false) {
 			continue
 		}
 		; Skip word-boundary vectors  --  their buffer may end with the trigger
 		; but the word-boundary rule blocks the expansion.
-		if V.Has("is_word") and V["is_word"] = true {
+		if Vec.Has("is_word") and Vec["is_word"] = true {
 			continue
 		}
-		Buf     := V.Has("buffer") ? V["buffer"] : ""
-		Trigger := V["trigger"]
+		Buf     := Vec.Has("buffer") ? Vec["buffer"] : ""
+		Trigger := Vec["trigger"]
 		TLen    := StrLen(Trigger)
 		if Buf = "" {
 			continue
@@ -169,7 +169,7 @@ _CorpusHS_NonMatchedBuffersDontEndWithTrigger() {
 		BufTail := SubStr(Buf, -TLen)
 		; Use !== (case-sensitive) so "btw" and "BTW" are treated as distinct
 		AssertTrue(BufTail !== Trigger,
-			"vector '" . V["id"] . "': non-matched buffer must not end with trigger")
+			"vector '" . Vec["id"] . "': non-matched buffer must not end with trigger")
 	}
 }
 Test("hotstring corpus  --  non-matched vectors: buffer does not end with trigger", _CorpusHS_NonMatchedBuffersDontEndWithTrigger)
@@ -184,20 +184,20 @@ _CorpusHS_Utf8BackspaceCountUsesCodepoints() {
 	if Corpus = "" {
 		return
 	}
-	for V in Corpus["vectors"] {
-		Exp := V["expected"]
-		if not (Exp.Has("matched") and Exp["matched"] = true) {
+	for Vec in Corpus["vectors"] {
+		Expected := Vec["expected"]
+		if not (Expected.Has("matched") and Expected["matched"] = true) {
 			continue
 		}
-		if not Exp.Has("backspace_count") {
+		if not Expected.Has("backspace_count") {
 			continue
 		}
-		Trigger    := V["trigger"]
-		Consumed   := V.Has("terminator_consumed") and V["terminator_consumed"] = true
+		Trigger    := Vec["trigger"]
+		Consumed   := Vec.Has("terminator_consumed") and Vec["terminator_consumed"] = true
 		TrigLen    := StrLen(Trigger)
 		ExpectedBC := TrigLen + (Consumed ? 1 : 0)
-		AssertEqual(ExpectedBC, Exp["backspace_count"],
-			"vector '" . V["id"] . "': StrLen-based backspace_count must equal corpus value")
+		AssertEqual(ExpectedBC, Expected["backspace_count"],
+			"vector '" . Vec["id"] . "': StrLen-based backspace_count must equal corpus value")
 	}
 }
 Test("hotstring corpus  --  UTF-8 triggers: StrLen-based backspace_count matches corpus", _CorpusHS_Utf8BackspaceCountUsesCodepoints)
@@ -209,20 +209,20 @@ _CorpusHS_CaseSensitiveVectorsHaveCorrectMatchFlag() {
 	if Corpus = "" {
 		return
 	}
-	for V in Corpus["vectors"] {
-		if not (V.Has("is_case_sensitive") and V["is_case_sensitive"] = true) {
+	for Vec in Corpus["vectors"] {
+		if not (Vec.Has("is_case_sensitive") and Vec["is_case_sensitive"] = true) {
 			continue
 		}
-		Exp     := V["expected"]
-		Buf     := V.Has("buffer") ? V["buffer"] : ""
-		Trigger := V["trigger"]
+		Exp     := Vec["expected"]
+		Buf     := Vec.Has("buffer") ? Vec["buffer"] : ""
+		Trigger := Vec["trigger"]
 		TLen    := StrLen(Trigger)
 		BufTail := SubStr(Buf, -TLen)
 		; Exact (case-sensitive) match — use == for case-sensitive comparison
 		ActualMatch := (BufTail == Trigger)
-		ExpMatch    := Exp.Has("matched") and Exp["matched"] = true
+		ExpMatch    := Expected.Has("matched") and Expected["matched"] = true
 		AssertEqual(ExpMatch, ActualMatch,
-			"vector '" . V["id"] . "': case-sensitive match flag inconsistency")
+			"vector '" . Vec["id"] . "': case-sensitive match flag inconsistency")
 	}
 }
 Test("hotstring corpus  --  case-sensitive vectors: exact match flag is consistent", _CorpusHS_CaseSensitiveVectorsHaveCorrectMatchFlag)

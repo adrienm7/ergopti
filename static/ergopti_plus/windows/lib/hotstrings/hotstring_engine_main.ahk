@@ -441,7 +441,7 @@ HSE_EnableGroup(Group) {
 HSE_Size() {
     global HSE_RegistryByLastChar
     Total := 0
-    for _, Bucket in HSE_RegistryByLastChar {
+    for , Bucket in HSE_RegistryByLastChar {
         Total += Bucket.Length
     }
     return Total

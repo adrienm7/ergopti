@@ -134,7 +134,7 @@ AppState_PruneLastSentKeyTime() {
 			ToDelete.Push(Char)
 		}
 	}
-	for _, Char in ToDelete {
+	for , Char in ToDelete {
 		AppState["last_sent_key_time"].Delete(Char)
 	}
 }

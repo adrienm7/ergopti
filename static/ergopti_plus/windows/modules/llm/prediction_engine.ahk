@@ -832,7 +832,7 @@ _LLM_Engine_GetActiveApiEntry() {
 		return ""
 	active_id := _LLM_Engine.Has("api_entry_id") ? _LLM_Engine["api_entry_id"] : ""
 	if (active_id != "") {
-		for _, e in entries {
+		for , e in entries {
 			id := (e is Map and e.Has("Id")) ? e["Id"] : (e.HasOwnProp("Id") ? e.Id : "")
 			if (id == active_id)
 				return e

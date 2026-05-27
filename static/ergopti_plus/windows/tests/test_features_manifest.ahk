@@ -531,11 +531,11 @@ _FM_CollectUppercaseKeys(M, Prefix) {
 TestFMv2_AllFeaturesKeysSnakeCase() {
 	OldFeatures := _FM_BeginIsolated()
 	ManifestEnsureLoaded()
-	Features := ManifestBuildFeaturesMap()
+	FeatMap := ManifestBuildFeaturesMap()
 	; Exclude the synthetic "section_order" list (its value is an array, not
 	; a Map, so the recurse does not visit it) and the reserved "__" prefix
 	; entries that codegen injects for internal bookkeeping.
-	Bad := _FM_CollectUppercaseKeys(Features, "")
+	Bad := _FM_CollectUppercaseKeys(FeatMap, "")
 	Filtered := []
 	for Path in Bad {
 		; Skip paths that start with a double-underscore segment — these are

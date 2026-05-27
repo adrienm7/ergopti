@@ -123,8 +123,8 @@ TextEraseChars(Count) {
 TextPressKey(Key, Modifiers) {
 	Prefix := ""
 	if (Modifiers is Array) {
-		for Mod in Modifiers
-			Prefix .= _TextSenderModifierPrefix(Mod)
+		for ModStr in Modifiers
+			Prefix .= _TextSenderModifierPrefix(ModStr)
 	}
 	_AHK_SendInput.Call(Prefix . "{" . Key . "}")
 }

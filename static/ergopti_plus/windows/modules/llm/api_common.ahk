@@ -191,9 +191,9 @@ LLM_ApiCommon_DefaultDedupEnabled() {
  */
 LLM_ApiCommon_GetRateLimitMs(backend_id) {
 	cfg := _LLM_Common_GetInference()
-	map := cfg.Has("rate_limit_min_interval_ms") ? cfg["rate_limit_min_interval_ms"] : LLM_COMMON_FALLBACK["rate_limit_min_interval_ms"]
-	if map.Has(backend_id)
-		return map[backend_id]
+	rateMap := cfg.Has("rate_limit_min_interval_ms") ? cfg["rate_limit_min_interval_ms"] : LLM_COMMON_FALLBACK["rate_limit_min_interval_ms"]
+	if rateMap.Has(backend_id)
+		return rateMap[backend_id]
 	return 300
 }
 
@@ -261,8 +261,8 @@ LLM_ApiCommon_GetDiversityTemp(base_temp, variant_index, step := "") {
 	if (idx > 1 and effective_base < floor_val)
 		effective_base := floor_val
 
-	t := effective_base + (idx - 1) * delta
-	return (t > max_val) ? max_val : t
+	tempVal := effective_base + (idx - 1) * delta
+	return (tempVal > max_val) ? max_val : tempVal
 }
 
 
