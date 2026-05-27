@@ -8,9 +8,9 @@
 --- construction, and reading/writing config_karabiner.toml.
 ---
 --- FEATURES & RATIONALE:
---- 1. Shared Data Files: shared/karabiner/ hosts actions.json, tap_hold_keys.json
----    and mod_combos.json — single source of truth for available actions and keys,
----    loaded once at startup and on every layout change.
+--- 1. Driver-Local Data Files: modules/karabiner/data/ hosts actions.json,
+---    tap_hold_keys.json and mod_combos.json — single source of truth for
+---    available actions and keys, loaded once at startup and on every layout change.
 --- 2. Layout-Aware Actions: Actions with a "logical_char" field are resolved
 ---    to a physical key_code via lib.layout at load time, so the KE config
 ---    always references the correct physical key regardless of the OS layout.
@@ -75,7 +75,7 @@ local function load_json_file(path)
 	return data
 end
 
---- Loads all action definitions from shared/karabiner/actions.json.
+--- Loads all action definitions from modules/karabiner/data/actions.json.
 --- Entries with a "logical_char" field have their "karabiner_to" resolved at load
 --- time via lib.layout, so the physical key_code always matches the current OS
 --- keyboard layout — no hardcoded QWERTY positions.
@@ -107,7 +107,7 @@ function M.load_available_actions(actions_file)
 	return list
 end
 
---- Loads configurable key definitions from shared/karabiner/tap_hold_keys.json.
+--- Loads configurable key definitions from modules/karabiner/data/tap_hold_keys.json.
 --- @param tap_hold_file string Absolute path to tap_hold_keys.json.
 --- @return table|nil List of key definitions, or nil on failure.
 function M.load_tap_hold_keys(tap_hold_file)
@@ -120,7 +120,7 @@ function M.load_tap_hold_keys(tap_hold_file)
 	return list
 end
 
---- Loads modifier combo definitions from shared/karabiner/mod_combos.json.
+--- Loads modifier combo definitions from modules/karabiner/data/mod_combos.json.
 --- @param mod_combos_file string Absolute path to mod_combos.json.
 --- @return table|nil List of combo definitions, or nil on failure.
 function M.load_mod_combos(mod_combos_file)

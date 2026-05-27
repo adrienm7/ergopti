@@ -20,8 +20,8 @@
 ;    (``<_ConfigDir>/ahk/config.toml`` and ``<_ConfigDir>/ahk/tap_hold.toml``).
 ;    The universal files at the root of ``<_ConfigDir>`` (personal_info,
 ;    hotstrings_config) are handled separately.
-; 4. Shared source for tap-hold: ``tap_hold.toml`` is seeded from
-;    ``drivers/_shared/tap_hold/defaults.toml`` directly — no generated copy
+; 4. Driver-local tap-hold source: ``tap_hold.toml`` is seeded from
+;    ``windows/data/tap_hold/defaults.toml`` directly — no generated copy
 ;    in ``_generated/`` is needed.
 ; ==============================================================================
 
@@ -42,9 +42,9 @@ EnsureUserConfigsExist() {
 	UserAhkDir      := _ConfigDir . "\ahk"
 	UserConfigPath  := UserAhkDir . "\config.toml"
 	UserTapHoldPath := UserAhkDir . "\tap_hold.toml"
-	TplConfigPath   := _StaticDir . "\_generated\config_template.toml"
-	; Point directly at the canonical shared defaults — no copy/generation needed
-	TplTapHoldPath  := _StaticDir . "\drivers\_shared\tap_hold\defaults.toml"
+	TplConfigPath   := _StaticDir . "\ergopti_plus\windows\_generated\config_template.toml"
+	; Point directly at the driver-local tap-hold defaults — no copy/generation needed
+	TplTapHoldPath  := _StaticDir . "\ergopti_plus\windows\data\tap_hold\defaults.toml"
 
 	; Ensure the destination folder exists. DirCreate is recursive by default
 	; in AHK v2 and a no-op when the directory already exists.
@@ -72,8 +72,8 @@ _FirstBoot_CopyIfMissing(SrcPath, DstPath, Label) {
 		return
 	}
 	if !FileExist(SrcPath) {
-		; A missing template is a build-pipeline failure: ``npm run build:manifest``
-		; must be run after editing ``_shared/features/manifest.toml``. The driver
+		; A missing config_template is a build-pipeline failure: ``npm run build:manifest``
+		; must be run after editing ``shared/features/manifest.toml``. The driver
 		; cannot synthesize a default v2 config on its own.
 		try LoggerError("FirstBoot",
 			"Template '{1}' not found at '{2}' — cannot bootstrap user config. "

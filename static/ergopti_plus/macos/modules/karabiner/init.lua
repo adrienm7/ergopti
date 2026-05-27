@@ -14,9 +14,9 @@
 ---    On first launch it is created from defaults; after that it is the full
 ---    persisted state — defaults are never recomputed at runtime except when
 ---    the user explicitly clicks "Reset to defaults".
---- 3. Shared Action Dictionary: Loads shared/karabiner/actions.json so the menu
+--- 3. Local Action Dictionary: Loads modules/karabiner/data/actions.json so the menu
 ---    always lists exactly the same actions, with zero duplication.
---- 4. Modifier Combos: shared/karabiner/mod_combos.json defines all available
+--- 4. Modifier Combos: modules/karabiner/data/mod_combos.json defines all available
 ---    two-modifier combos. Each combo maps to tap, hold, and chord slots.
 --- 5. Inline Generation: karabiner.json is built directly in Lua from in-memory
 ---    state — no Python subprocess, no external dependency.
@@ -44,9 +44,9 @@ local LOG = "karabiner"
 -- Works whether the file is symlinked, run from the project, or deployed.
 local _SELF_DIR = (debug.getinfo(1, "S").source:sub(2):match("^(.*[/\\])") or "./")
 
--- Walk up three levels (karabiner/ → modules/ → hammerspoon/ → ergopti_plus/) then
--- enter shared/karabiner/ so data files can be shared across drivers.
-local _SHARED_KARABINER_DIR = _SELF_DIR .. "../../../shared/karabiner/"
+-- Data JSONs live alongside this module under data/; Karabiner-Elements is
+-- macOS-exclusive so there is no reason to put these files in shared/.
+local _DATA_DIR = _SELF_DIR .. "data/"
 
 -- Standard Karabiner-Elements config path, expressed as a tilde path so the
 -- FileSystem port adapter can resolve it through hs.fs.pathToAbsolute (which
@@ -67,9 +67,9 @@ local function resolve_user_config()
 	local MenuPaths = require("ui.menu.menu_paths")
 	return MenuPaths.get("KarabinerConfigPath")
 end
-local ACTIONS_FILE    = _SHARED_KARABINER_DIR .. "actions.json"
-local TAP_HOLD_FILE   = _SHARED_KARABINER_DIR .. "tap_hold_keys.json"
-local MOD_COMBOS_FILE = _SHARED_KARABINER_DIR .. "mod_combos.json"
+local ACTIONS_FILE    = _DATA_DIR .. "actions.json"
+local TAP_HOLD_FILE   = _DATA_DIR .. "tap_hold_keys.json"
+local MOD_COMBOS_FILE = _DATA_DIR .. "mod_combos.json"
 
 -- Re-export defaults as module constants so callers (e.g. the menu) have a
 -- single import path and never need to require defaults.lua themselves.
@@ -83,14 +83,14 @@ M.DEFAULT_COMBO_SYMMETRIC           = Defaults.combo_symmetric
 --- appears earlier in MOD_COMBOS. Used to hide redundant entries in symmetric mode.
 M.NON_CANONICAL_COMBOS = {}
 
---- Populated by M.init() from shared/karabiner/actions.json.
+--- Populated by M.init() from modules/karabiner/data/actions.json.
 M.AVAILABLE_ACTIONS = {}
 
---- Populated by M.init() from shared/karabiner/tap_hold_keys.json.
+--- Populated by M.init() from modules/karabiner/data/tap_hold_keys.json.
 --- Each entry carries default_tap and default_hold for first-launch init and reset.
 M.TAP_HOLD_KEYS = {}
 
---- Populated by M.init() from shared/karabiner/mod_combos.json.
+--- Populated by M.init() from modules/karabiner/data/mod_combos.json.
 --- Each entry defines a two-modifier simultaneous combo the user can map to an action.
 M.MOD_COMBOS = {}
 
@@ -413,7 +413,7 @@ function M.regenerate()
 
 	local ok_build, result = pcall(
 		Generator.build_karabiner_json,
-		_state, M.AVAILABLE_ACTIONS, M.TAP_HOLD_KEYS, M.MOD_COMBOS, M.NON_CANONICAL_COMBOS, _SHARED_KARABINER_DIR
+		_state, M.AVAILABLE_ACTIONS, M.TAP_HOLD_KEYS, M.MOD_COMBOS, M.NON_CANONICAL_COMBOS, _DATA_DIR
 	)
 	if not ok_build then
 		Logger.error(LOG, "JSON generation failed: %s.", tostring(result))
