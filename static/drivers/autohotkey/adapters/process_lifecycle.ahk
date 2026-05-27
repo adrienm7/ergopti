@@ -1,4 +1,4 @@
-﻿; adapters/process_lifecycle.ahk
+﻿﻿; adapters/process_lifecycle.ahk
 
 ; ==============================================================================
 ; MODULE: ProcessLifecycle Adapter (AutoHotkey)
@@ -173,3 +173,15 @@ PLC_Poll() {
 		; Silently ignore errors (window may have closed between poll calls)
 	}
 }
+
+; Machine-readable contract map - consumed by the generic adapter compliance test
+; (tests/test_adapter_compliance_new.ahk) to verify every required method exists
+; and is callable without manually listing functions per-adapter.
+global ADAPTER_PROCESS_LIFECYCLE := Map(
+    "onFocusChange",    Func("PLC_OnFocusChange"),
+    "onAppLaunch",      Func("PLC_OnAppLaunch"),
+    "onAppQuit",        Func("PLC_OnAppQuit"),
+    "getForegroundApp", Func("PLC_GetForegroundApp"),
+    "start",            Func("PLC_Start"),
+    "stop",             Func("PLC_Stop"),
+)

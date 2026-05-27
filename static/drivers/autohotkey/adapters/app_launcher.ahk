@@ -1,4 +1,4 @@
-﻿; static/drivers/autohotkey/adapters/app_launcher.ahk
+﻿﻿; static/drivers/autohotkey/adapters/app_launcher.ahk
 
 ; ==============================================================================
 ; MODULE: AppLauncher Adapter (AutoHotkey)
@@ -67,3 +67,12 @@ AL_IsRunning(ProcessName) {
 		return false
 	}
 }
+
+; Machine-readable contract map - consumed by the generic adapter compliance test
+; (tests/test_adapter_compliance_new.ahk) to verify every required method exists
+; and is callable without manually listing functions per-adapter.
+global ADAPTER_APP_LAUNCHER := Map(
+    "launch",         Func("AL_Launch"),
+    "launchWithArgs", Func("AL_LaunchWithArgs"),
+    "isRunning",      Func("AL_IsRunning"),
+)

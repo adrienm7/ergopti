@@ -1,4 +1,4 @@
-﻿; adapters/notifier.ahk
+﻿﻿; adapters/notifier.ahk
 
 ; ==============================================================================
 ; MODULE: Notifier Adapter (AutoHotkey)
@@ -62,3 +62,10 @@ NotifierSend(Title, Opts) {
 	Flag := _NotifierKindToFlag(Kind)
 	try TrayTip(Body, Title, Flag)
 }
+
+; Machine-readable contract map - consumed by the generic adapter compliance test
+; (tests/test_adapter_compliance_new.ahk) to verify every required method exists
+; and is callable without manually listing functions per-adapter.
+global ADAPTER_NOTIFIER := Map(
+    "notify", Func("NotifierSend"),
+)
