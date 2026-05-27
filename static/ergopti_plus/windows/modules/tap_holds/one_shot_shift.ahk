@@ -23,7 +23,8 @@
 
 OneShotShift() {
     global OneShotShiftEnabled := True
-    ihvText := InputHook("L1 T" . ONE_SHOT_SHIFT_TIMEOUT_SEC . " E", "=%$.', " . ScriptInformation["MagicKey"])
+    TimeoutSec := IsSet(ONE_SHOT_SHIFT_TIMEOUT_SEC) ? ONE_SHOT_SHIFT_TIMEOUT_SEC : 2
+    ihvText := InputHook("L1 T" . TimeoutSec . " E", "=%$.', " . ScriptInformation["MagicKey"])
     ihvText.KeyOpt("{BackSpace}{Enter}{Delete}", "E") ; End keys to not swallow
     ihvText.Start()
     ihvText.Wait()
