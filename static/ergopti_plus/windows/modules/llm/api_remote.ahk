@@ -258,7 +258,7 @@ _LLMRemote_PollRequest(req_id) {
     }
     on_success := entry["on_success"]
     on_fail    := entry["on_fail"]
-    format     := entry["format"]
+    entryFormat := entry["format"]
     _LLM_Remote_Async.Delete(req_id)
     try {
         status := http.Status
@@ -271,7 +271,7 @@ _LLMRemote_PollRequest(req_id) {
         try on_fail()
         return
     }
-    text := _LLMRemoteParseResponse(format, body)
+    text := _LLMRemoteParseResponse(entryFormat, body)
     if (text == "") {
         try on_fail()
         return
@@ -398,7 +398,7 @@ _LLMRemoteResolveEntry(Entry) {
     if !LLM_API_PROVIDERS.Has(ProviderId)
         return ""
     Provider := LLM_API_PROVIDERS[ProviderId]
-    Format   := Provider["Format"]
+    ProvFmt  := Provider["Format"]
     BaseUrl  := _LLMRemoteEntryGet(Entry, "BaseUrl", "")
     if (BaseUrl == "")
         BaseUrl := Provider["BaseUrl"]
@@ -408,7 +408,7 @@ _LLMRemoteResolveEntry(Entry) {
     Model := _LLMRemoteEntryGet(Entry, "Model", Provider["DefaultModel"])
     if (Model == "")
         return ""
-    return Map("Provider", ProviderId, "Format", Format, "BaseUrl", BaseUrl, "Token", Token, "Model", Model)
+    return Map("Provider", ProviderId, "Format", ProvFmt, "BaseUrl", BaseUrl, "Token", Token, "Model", Model)
 }
 
 ; Probes the API endpoint with a lightweight call (the providers' canonical
@@ -432,11 +432,11 @@ LLM_RemoteIsReady(Entry) {
     ; The cheap-ping URL per provider: ``/models`` for OpenAI-shaped APIs, the
     ; same path for Anthropic, ``/models?key=...`` for Gemini. A 200 confirms
     ; both reachability and auth.
-    Format := Provider["Format"]
+    ProvFmt := Provider["Format"]
     PingUrl := ""
-    if (Format == "openai" or Format == "anthropic") {
+    if (ProvFmt == "openai" or ProvFmt == "anthropic") {
         PingUrl := RTrim(BaseUrl, "/") . "/models"
-    } else if (Format == "gemini") {
+    } else if (ProvFmt == "gemini") {
         PingUrl := RTrim(BaseUrl, "/") . "/models?key=" . Token
     }
     if (PingUrl == "") {

@@ -152,18 +152,18 @@ _MetaRunDomainCoverageTests() {
 		HasTest   := false
 
 		for TestPath in AllAhkTests {
-			T       := StrLower(_MetaPACBaseName(TestPath))
-			Keyword := RegExReplace(T, "^test_", "")
-			if InStr(T, LowerName) or InStr(T, ShortName) or (Keyword != "" and InStr(LowerName, Keyword)) {
+			TName   := StrLower(_MetaPACBaseName(TestPath))
+			Keyword := RegExReplace(TName, "^test_", "")
+			if InStr(TName, LowerName) or InStr(TName, ShortName) or (Keyword != "" and InStr(LowerName, Keyword)) {
 				HasTest := true
 				break
 			}
 		}
 		if not HasTest {
 			for TestPath in AllHsTests {
-				T       := StrLower(_MetaPACBaseName(TestPath))
-				Keyword := RegExReplace(T, "^test_", "")
-				if InStr(T, LowerName) or InStr(T, ShortName) or (Keyword != "" and InStr(LowerName, Keyword)) {
+				TName   := StrLower(_MetaPACBaseName(TestPath))
+				Keyword := RegExReplace(TName, "^test_", "")
+				if InStr(TName, LowerName) or InStr(TName, ShortName) or (Keyword != "" and InStr(LowerName, Keyword)) {
 					HasTest := true
 					break
 				}

@@ -112,9 +112,9 @@ KLR_BuildDatabase(metrics_dir) {
     if !RegExMatch(md, "[\\/]$")
         md .= "\"
     global _ConfigDir
-    log := _ConfigDir . "ahk\logs\prefetch.log"
-    try FileAppend("[" . A_Now . "] KLR PtrSize=" . A_PtrSize . " DLL=" . SQLiteConst.DLL . "`r`n", log, "UTF-8")
-    try FileAppend("[" . A_Now . "] KLR DLL exists=" . (FileExist(SQLiteConst.DLL) ? "yes" : "NO!") . "`r`n", log,
+    logPath := _ConfigDir . "ahk\logs\prefetch.log"
+    try FileAppend("[" . A_Now . "] KLR PtrSize=" . A_PtrSize . " DLL=" . SQLiteConst.DLL . "`r`n", logPath, "UTF-8")
+    try FileAppend("[" . A_Now . "] KLR DLL exists=" . (FileExist(SQLiteConst.DLL) ? "yes" : "NO!") . "`r`n", logPath,
     "UTF-8")
     ; Explicit LoadLibrary so we know whether the DLL even maps into the
     ; process. A nullptr from LoadLibrary means a dependency is missing
@@ -122,48 +122,48 @@ KLR_BuildDatabase(metrics_dir) {
     ; but it does so silently and a load failure on some hosts comes
     ; back as a hard process crash rather than an exception.
     hmod := DllCall("kernel32\LoadLibraryW", "WStr", SQLiteConst.DLL, "Ptr")
-    try FileAppend("[" . A_Now . "] LoadLibrary returned hmod=" . hmod . "`r`n", log, "UTF-8")
+    try FileAppend("[" . A_Now . "] LoadLibrary returned hmod=" . hmod . "`r`n", logPath, "UTF-8")
     if !hmod {
         gle := DllCall("kernel32\GetLastError", "UInt")
-        try FileAppend("[" . A_Now . "] LoadLibrary FAILED, GetLastError=" . gle . "`r`n", log, "UTF-8")
+        try FileAppend("[" . A_Now . "] LoadLibrary FAILED, GetLastError=" . gle . "`r`n", logPath, "UTF-8")
         return 0
     }
     proc := DllCall("kernel32\GetProcAddress", "Ptr", hmod, "AStr", "sqlite3_libversion", "Ptr")
-    try FileAppend("[" . A_Now . "] GetProcAddress(libversion)=" . proc . "`r`n", log, "UTF-8")
+    try FileAppend("[" . A_Now . "] GetProcAddress(libversion)=" . proc . "`r`n", logPath, "UTF-8")
     if !proc {
-        try FileAppend("[" . A_Now . "] symbol not found — wrong DLL?`r`n", log, "UTF-8")
+        try FileAppend("[" . A_Now . "] symbol not found — wrong DLL?`r`n", logPath, "UTF-8")
         return 0
     }
     try {
         ver_ptr := DllCall(proc, "Ptr")
         ver := ver_ptr ? StrGet(ver_ptr, "UTF-8") : "(null)"
-        FileAppend("[" . A_Now . "] pre-open libversion=" . ver . "`r`n", log, "UTF-8")
+        FileAppend("[" . A_Now . "] pre-open libversion=" . ver . "`r`n", logPath, "UTF-8")
     } catch as err {
-        FileAppend("[" . A_Now . "] pre-open libversion FAILED: " . err.Message . "`r`n", log, "UTF-8")
+        FileAppend("[" . A_Now . "] pre-open libversion FAILED: " . err.Message . "`r`n", logPath, "UTF-8")
         return 0
     }
-    try FileAppend("[" . A_Now . "] KLR opening :memory:`r`n", log, "UTF-8")
+    try FileAppend("[" . A_Now . "] KLR opening :memory:`r`n", logPath, "UTF-8")
     ; Reuse the cached DB when present — only the new bytes of each
     ; device's data.sql get exec'd this round. First call (cache empty)
     ; loads the schema + the entire current contents.
     if KLRCache.db {
-        try FileAppend("[" . A_Now . "] KLR reusing cached db=" . KLRCache.db . "`r`n", log, "UTF-8")
+        try FileAppend("[" . A_Now . "] KLR reusing cached db=" . KLRCache.db . "`r`n", logPath, "UTF-8")
         ; Only need to exec deltas; skip the libversion / schema loads.
-        if !KLR_ApplyIncremental(KLRCache.db, md, log)
+        if !KLR_ApplyIncremental(KLRCache.db, md, logPath)
             return 0
         return KLRCache.db
     }
     db := SQLite_Open(":memory:")
-    try FileAppend("[" . A_Now . "] KLR open returned db=" . db . "`r`n", log, "UTF-8")
+    try FileAppend("[" . A_Now . "] KLR open returned db=" . db . "`r`n", logPath, "UTF-8")
     if !db
         return 0
-    try FileAppend("[" . A_Now . "] KLR loading schema…`r`n", log, "UTF-8")
+    try FileAppend("[" . A_Now . "] KLR loading schema…`r`n", logPath, "UTF-8")
     if !KLR_LoadSchema(db) {
-        try FileAppend("[" . A_Now . "] KLR schema load FAILED`r`n", log, "UTF-8")
+        try FileAppend("[" . A_Now . "] KLR schema load FAILED`r`n", logPath, "UTF-8")
         SQLite_Close(db)
         return 0
     }
-    try FileAppend("[" . A_Now . "] KLR schema OK`r`n", log, "UTF-8")
+    try FileAppend("[" . A_Now . "] KLR schema OK`r`n", logPath, "UTF-8")
 
     ; Fan out: every per-device folder under by_device/<uuid>/data.sql
     ; gets exec()-ed in. The schema's INSERT OR IGNORE / UPSERT clauses
@@ -190,7 +190,7 @@ KLR_BuildDatabase(metrics_dir) {
 ; previous KLR_BuildDatabase / KLR_ApplyIncremental pass. Returns true
 ; on success (regardless of whether anything actually changed); false
 ; on a hard read failure.
-KLR_ApplyIncremental(db, md, log) {
+KLR_ApplyIncremental(db, md, logPath) {
     by_root := md . "by_device\"
     if !DirExist(by_root)
         return true
@@ -219,7 +219,7 @@ KLR_ApplyIncremental(db, md, log) {
         KLRCache.last_sizes[sql_path] := size
         total_new += size - prev
     }
-    try FileAppend("[" . A_Now . "] KLR incremental: " . total_new . " new byte(s) exec'd`r`n", log, "UTF-8")
+    try FileAppend("[" . A_Now . "] KLR incremental: " . total_new . " new byte(s) exec'd`r`n", logPath, "UTF-8")
     return true
 }
 

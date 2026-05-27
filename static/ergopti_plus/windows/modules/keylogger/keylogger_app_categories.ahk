@@ -305,7 +305,7 @@ KL_JsonEncodeObject(obj) {
     keys := KL_SortArray(keys)
 
     parts := []
-    for _, k in keys {
+    for , k in keys {
         v := obj[k]
         parts.Push("  " . KL_JsonStr(k) . ": " . KL_JsonStr(v))
     }

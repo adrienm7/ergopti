@@ -166,9 +166,9 @@ KLW_GC(tbl, k, default_map) {
 ; =========================================
 
 KLW_BucketAdd(target_map, delay, value) {
-    for t in KLWConst.UI_PAUSE_BUCKETS_MS {
-        if (delay <= t) {
-            k := String(t)
+    for bucketMs in KLWConst.UI_PAUSE_BUCKETS_MS {
+        if (delay <= bucketMs) {
+            k := String(bucketMs)
             target_map[k] := (target_map.Has(k) ? target_map[k] : 0) + value
         }
     }
@@ -634,12 +634,12 @@ KLW_WalkTypingEntry(entry) {
                             KLW_BumpAppDay(date_str, app, "time_ms", record_delay)
                         }
                         ; time / credited buckets.
-                        for t in KLWConst.UI_PAUSE_BUCKETS_MS {
-                            if (record_delay <= t) {
-                                bkey := app_day_key . Chr(1) . String(t)
+                        for bucketMs in KLWConst.UI_PAUSE_BUCKETS_MS {
+                            if (record_delay <= bucketMs) {
+                                bkey := app_day_key . Chr(1) . String(bucketMs)
                                 if !KLW.batch["app_buckets"].Has(bkey) {
                                     KLW.batch["app_buckets"][bkey] := Map(
-                                        "date", date_str, "app", app, "bucket_ms", t,
+                                        "date", date_str, "app", app, "bucket_ms", bucketMs,
                                         "time_sum", 0, "credited", 0,
                                         "hs_in_t", 0, "hs_in_c", 0,
                                         "llm_in_t", 0, "llm_in_c", 0
@@ -817,12 +817,12 @@ KLW_WalkTypingEntry(entry) {
 }
 
 KLW_BumpInputBuckets(date_str, app, trigger_delay, kind, app_day_key) {
-    for t in KLWConst.UI_PAUSE_BUCKETS_MS {
-        if (trigger_delay <= t) {
-            bkey := app_day_key . Chr(1) . String(t)
+    for bucketMs in KLWConst.UI_PAUSE_BUCKETS_MS {
+        if (trigger_delay <= bucketMs) {
+            bkey := app_day_key . Chr(1) . String(bucketMs)
             if !KLW.batch["app_buckets"].Has(bkey) {
                 KLW.batch["app_buckets"][bkey] := Map(
-                    "date", date_str, "app", app, "bucket_ms", t,
+                    "date", date_str, "app", app, "bucket_ms", bucketMs,
                     "time_sum", 0, "credited", 0,
                     "hs_in_t", 0, "hs_in_c", 0,
                     "llm_in_t", 0, "llm_in_c", 0

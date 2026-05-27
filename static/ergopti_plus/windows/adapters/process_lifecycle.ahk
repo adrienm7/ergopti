@@ -120,6 +120,7 @@ PLC_GetForegroundApp() {
 ; Starts the focus-change polling timer. Idempotent - safe to call repeatedly.
 ; @return {void}
 PLC_Start() {
+	global PLC_Running
 	try {
 		if PLC_Running
 			return
@@ -133,6 +134,7 @@ PLC_Start() {
 ; Stops the focus-change polling timer. Idempotent - safe to call repeatedly.
 ; @return {void}
 PLC_Stop() {
+	global PLC_Running
 	try {
 		if !PLC_Running
 			return

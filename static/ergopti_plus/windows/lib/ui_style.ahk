@@ -122,8 +122,8 @@ global UI_BTN_MIN_W := 90
 Gui_HarmoniseButtonWidths(buttons, minWidth := unset) {
 	if (buttons.Length == 0)
 		return 0
-	floor := IsSet(minWidth) ? minWidth : UI_BTN_MIN_W
-	sharedW := floor
+	floorW := IsSet(minWidth) ? minWidth : UI_BTN_MIN_W
+	sharedW := floorW
 	for btn in buttons {
 		btn.GetPos(, , &w, )
 		if (w > sharedW)

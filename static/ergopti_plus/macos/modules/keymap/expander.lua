@@ -450,6 +450,69 @@ end
 --- =============================
 -- =============================
 
+--- Convenience entry point for testing and simple integration: attempts to
+--- expand the hotstring at the current buffer tail using `chars` as the last
+--- typed character. When `chars` is a registered terminator the terminator
+--- expansion path is tried first; if that finds no match the auto-expand path
+--- (trigger-only, no terminator) is tried as a fallback.
+---
+--- This mirrors the logic performed by the live eventtap callback without
+--- requiring callers to drive the full keymap init chain. Used by the E2E
+--- virtual-keyboard harness (tests/e2e/run_e2e.lua).
+---
+--- @param chars string The last typed character(s) (potential terminator).
+--- @param is_ignored boolean|nil Optional — defaults to false.
+--- @return boolean True when any expansion fired.
+function M.try_expand(chars, is_ignored)
+	if not require_state("try_expand") then return false end
+	is_ignored = is_ignored == true
+
+	local char_len = 1  -- ASCII fallback; accurate enough for the E2E corpus
+	local ok_len, n = pcall(function()
+		local text_u = require("lib.text_utils")
+		return text_u.utf8_len(chars)
+	end)
+	if ok_len and type(n) == "number" and n > 0 then char_len = n end
+
+	-- Helper: iterate the bucket whose tail char matches the given last char.
+	-- Falls back to an empty table when the registry has no matching bucket.
+	local function bucket_for(tail)
+		if type(_registry.mappings_for_tail) == "function" then
+			return _registry.mappings_for_tail(tail:lower()) or {}
+		end
+		return {}
+	end
+
+	-- 1. Terminator path — only when chars is a known terminator.
+	if type(_registry.is_terminator) == "function" and _registry.is_terminator(chars) then
+		local saved_buf = _state.buffer
+		-- Append the terminator so try_terminator_expand finds trigger + term suffix.
+		_state.buffer = saved_buf .. chars
+		-- Look up mappings by the last character of the buffer before the terminator
+		-- (i.e., the last char of the trigger itself).
+		local pre_term_tail = saved_buf:sub(-1)  -- single-byte fallback
+		for _, m in ipairs(bucket_for(pre_term_tail)) do
+			if M.try_terminator_expand(m, chars, char_len, is_ignored) then
+				return true
+			end
+		end
+		-- Restore buffer on no match.
+		_state.buffer = saved_buf
+	end
+
+	-- 2. Auto-expand path — trigger at the very end, no terminator.
+	_state.buffer = _state.buffer .. chars
+	local tail = _state.buffer:sub(-1)
+	for _, m in ipairs(bucket_for(tail)) do
+		if M.try_auto_expand(m, char_len, is_ignored) then
+			return true
+		end
+	end
+
+	return false
+end
+
+
 --- Injects the shared dependencies from keymap/init.lua.
 --- Must be called exactly once before any expansion function.
 --- @param core_state table The shared CoreState object.

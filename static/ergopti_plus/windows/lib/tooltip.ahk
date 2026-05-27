@@ -201,7 +201,7 @@ TooltipShow(Items, DurationSec := 0) {
     ; timer set above stays armed unless we replace it with a stricter
     ; caller-specified deadline below.
     EffectiveDur := DurationSec
-    for _, Item in Items {
+    for , Item in Items {
         D := Item.HasOwnProp("DurationSec") ? Item.DurationSec : 0
         if (D > 0 and (EffectiveDur == 0 or D < EffectiveDur))
             EffectiveDur := D
@@ -241,7 +241,7 @@ TooltipHide() {
     if _TooltipBorderGui {
         GR_Hide(_TooltipBorderGui.Hwnd)
     }
-    for _, Row in _TooltipRowGuis {
+    for , Row in _TooltipRowGuis {
         GR_Hide(Row.Gui.Hwnd)
     }
 
@@ -250,7 +250,7 @@ TooltipHide() {
         try _TooltipBorderGui.Destroy()
         _TooltipBorderGui := 0
     }
-    for _, Row in _TooltipRowGuis {
+    for , Row in _TooltipRowGuis {
         try Row.Gui.Destroy()
     }
     _TooltipGui := 0
@@ -262,10 +262,10 @@ TooltipHide() {
     ; gets a last-chance kill here via the raw Win32 DestroyWindow.
     ; Without this safety net, accumulated ghost tooltips would remain
     ; visible on screen until the script reloads.
-    for _, Hwnd in _TooltipShownBorderHwnds {
+    for , Hwnd in _TooltipShownBorderHwnds {
         GR_DestroyWindow(Hwnd)
     }
-    for _, Hwnd in _TooltipShownHwnds {
+    for , Hwnd in _TooltipShownHwnds {
         GR_DestroyWindow(Hwnd)
     }
     _TooltipShownHwnds := []
@@ -310,7 +310,7 @@ _TooltipBuildGui(Items) {
     ; case they remain visible long enough for either to notice.
     Sizes := []
     MaxW := 0
-    for _, Item in Items {
+    for , Item in Items {
         ProbeGui := Gui("-Caption +E0x80 +LastFound")
         try {
             ProbeGui.MarginX := 0
@@ -331,7 +331,7 @@ _TooltipBuildGui(Items) {
 
     MaxLabelW := 0
     LabelSizes := []
-    for _, Item in Items {
+    for , Item in Items {
         Label := Item.HasOwnProp("TriggerLabel") ? Item.TriggerLabel : ""
         if (Label != "") {
             ProbeL := Gui("-Caption +E0x80 +LastFound")
