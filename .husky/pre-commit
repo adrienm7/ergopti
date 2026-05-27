@@ -16,5 +16,19 @@ if [ -n "$STAGED" ]; then
     done
 fi
 
+# AHK encoding — add UTF-8 BOM + CRLF to any staged .ahk file that is missing
+# them. AHK v2 silently aborts mid-file on encoding drift, which causes silent
+# CI failures with no error message. The fixer runs on all .ahk files in the
+# repo (fast — only reads/writes what needs changing), then re-stages any file
+# it touched so the corrected bytes land in the commit automatically.
+STAGED_AHK=$(git diff --cached --name-only --diff-filter=ACM | grep -i '\.ahk$' || true)
+if [ -n "$STAGED_AHK" ]; then
+    echo "[pre-commit] Fixing AHK encoding (BOM + CRLF) on staged files…"
+    node tools/deploy/fix-ahk-encoding.cjs
+    echo "$STAGED_AHK" | while IFS= read -r f; do
+        [ -f "$f" ] && git add "$f"
+    done
+fi
+
 # Lint coding conventions — blocks commit on any violation.
 node tools/lint/lint-conventions.js --fail-on-violations
