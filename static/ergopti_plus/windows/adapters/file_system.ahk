@@ -39,8 +39,11 @@ FSRead(Path) {
 	if !(Path is String) or Path = ""
 		return false
 	try {
-		local Content := ""
-		FileRead(Content, "UTF-8:" . Path)
+		local FH := FileOpen(Path, "r", "UTF-8-RAW")
+		if !IsObject(FH)
+			return false
+		local Content := FH.Read()
+		FH.Close()
 		return Content
 	} catch {
 		return false
@@ -58,7 +61,7 @@ FSWrite(Path, Content) {
 	if !(Content is String)
 		Content := ""
 	try {
-		local FH := FileOpen(Path, "w", "UTF-8")
+		local FH := FileOpen(Path, "w", "UTF-8-RAW")
 		if !IsObject(FH)
 			return false
 		FH.Write(Content)
@@ -79,7 +82,7 @@ FSAppend(Path, Content) {
 	if !(Content is String)
 		Content := ""
 	try {
-		local FH := FileOpen(Path, "a", "UTF-8")
+		local FH := FileOpen(Path, "a", "UTF-8-RAW")
 		if !IsObject(FH)
 			return false
 		FH.Write(Content)

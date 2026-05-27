@@ -220,14 +220,14 @@ LLM_Engine_OnKeystroke(buffer) {
  */
 LLM_Engine_CancelTimer() {
 	global _LLM_Engine
-	if _LLM_Engine["timer_active"] {
-		; Cancel by reference so the right closure is actually disarmed.
-		; SetTimer(, 0) without a target only works inside a timer thread.
-		if _LLM_Engine.Has("pending_timer") and _LLM_Engine["pending_timer"]
-			SetTimer(_LLM_Engine["pending_timer"], 0)
-		_LLM_Engine["pending_timer"] := ""
-		_LLM_Engine["timer_active"]  := false
-	}
+	; Always clear state so callers that pre-delete pending_timer still get a clean
+	; result. The timer_active guard is skipped intentionally — an extra no-op
+	; SetTimer(0) on an already-elapsed timer is harmless and avoids subtle
+	; state divergence when the guard and the actual timer state disagree.
+	if _LLM_Engine.Has("pending_timer") and IsObject(_LLM_Engine["pending_timer"])
+		SetTimer(_LLM_Engine["pending_timer"], 0)
+	_LLM_Engine["pending_timer"] := ""
+	_LLM_Engine["timer_active"]  := false
 }
 
 

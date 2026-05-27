@@ -115,6 +115,31 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 ; minimum log level can be honoured from the very first INFO/START line.
 #Include lib/logger.ahk
 #Include lib/registry.ahk
+#Include lib/app_state.ahk
+
+; Port adapters — thin OS wrappers that isolate every DllCall, Send*, and
+; WinGet* from the domain modules. Loaded before any lib/ or module/ file
+; that references adapter functions (e.g. NI_GetSsidHash in keylogger_network).
+#Include adapters/crypto.ahk
+#Include adapters/clipboard.ahk
+#Include adapters/timer_scheduler.ahk
+#Include adapters/file_system.ahk
+#Include adapters/window_info.ahk
+#Include adapters/notifier.ahk
+#Include adapters/tray_menu.ahk
+#Include adapters/text_sender.ahk
+#Include adapters/http_client.ahk
+#Include adapters/secure_field_detector.ahk
+#Include adapters/storage.ahk
+#Include adapters/process_lifecycle.ahk
+#Include adapters/key_state.ahk
+#Include adapters/app_launcher.ahk
+#Include adapters/network_info.ahk
+#Include adapters/keyboard_hook.ahk
+#Include adapters/mouse_control.ahk
+#Include adapters/window_manager.ahk
+#Include adapters/graphics_renderer.ahk
+#Include adapters/tooltip_renderer.ahk
 
 ; INI helpers extracted to their own lib so the test runner can ``#Include``
 ; them without bootstrapping the rest of the driver.

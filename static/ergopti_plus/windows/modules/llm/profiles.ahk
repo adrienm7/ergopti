@@ -68,8 +68,9 @@ LLM_GetActiveProfile(active_id, user_profiles := []) {
 			return p
 	}
 
-	; Fallback: return basic profile
-	for p in LLM_GetAllProfiles()
+	; Fallback: search basic in both user-provided and built-in profiles so the
+	; fallback works even when the JSON file is absent (e.g. in tests).
+	for p in LLM_GetAllProfiles(user_profiles)
 		if (p.Has("id") && p["id"] == "basic")
 			return p
 

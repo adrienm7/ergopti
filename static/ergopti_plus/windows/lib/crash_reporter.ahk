@@ -6,15 +6,17 @@
 ; Opt-in crash report builder and persistence layer for the AutoHotkey driver.
 ; When the global error handler fires, this module offers the user a choice to
 ; save a sanitized report to disk for later inspection or support. No network
-; calls are made -- the report is written locally only. A future version could
-; offer an upload path once a backend exists.
+; calls are made -- the report is written locally only.
 ;
 ; FEATURES & RATIONALE:
-; 1. Privacy-first: the report contains only version, OS, driver, error message,
-;    and stack trace. Keystrokes, personal data, and file contents are never
-;    included, not even in debug fields.
+; 1. Privacy-first: keystrokes, file contents, SSID, and raw usernames are
+;    never included. The username is hashed (CRC32-like fold) so incidents from
+;    the same user can be correlated without revealing the identity.
 ; 2. Opt-in: the user is always prompted before anything is written to disk.
-; 3. Structured output: reports are written as JSON for easy machine and human
+; 3. Rich diagnostics: the report includes AHK runtime details, system
+;    environment, active-window context, stuck modifiers, and module state so
+;    a bug report alone is often enough to reproduce and fix the crash.
+; 4. Structured output: reports are written as JSON for easy machine and human
 ;    readability, one file per incident under crash_reports/.
 ; ==============================================================================
 
@@ -30,52 +32,143 @@
 ; ============================
 ; ============================
 
+
 ; Subdirectory under the user config dir that receives all crash report files.
 ; Created on demand -- never fails if the parent dir does not exist yet.
 global _CrashReporter_Subdir := "crash_reports"
 
+; Modifier keys to inspect for stuck state at crash time.
+; Listed in the order they appear in the AHK documentation.
+global _CrashReporter_Modifiers := [
+	"LControl", "RControl",
+	"LShift",   "RShift",
+	"LAlt",     "RAlt",
+	"LWin",     "RWin",
+]
 
 
 
 
-; ============================
+
+; =============================
 ; =============================
 ; ======= 2/ Public API =======
 ; =============================
-; ============================
+; =============================
 
-; Builds a sanitized crash report Map from an AHK Error object.
-; The report never contains keystrokes, personal data, or file content.
+; Builds a rich crash report Map from an AHK Error object.
+; Captures error details, system environment, AHK runtime, active-window
+; context, stuck modifiers, and best-effort module state.
+; Keystrokes, file contents, SSID, and raw usernames are never included.
 ; @param ErrorObj {Error} The AHK v2 Error object caught by the global handler.
-; @return {Map} Report with fields: version, os, driver, timestamp, error_msg, stack_trace.
+; @return {Map} Report with all diagnostic fields documented below.
 CrashReport_Build(ErrorObj) {
 	try LoggerTrace("CrashReporter", "Building crash report...")
 
+	; ---- Error fields (direct from the Error object) ----
 	ErrorMsg   := ""
 	StackTrace := ""
+	ErrorType  := ""
+	ErrorExtra := ""
+	ErrorWhat  := ""
+	ErrorLine  := ""
+	ErrorFile  := ""
+
 	try ErrorMsg   := ErrorObj.Message
 	try StackTrace := ErrorObj.HasProp("Stack") ? ErrorObj.Stack : ""
+	try ErrorType  := Type(ErrorObj)
+	try ErrorExtra := ErrorObj.HasProp("Extra") ? String(ErrorObj.Extra) : ""
+	try ErrorWhat  := ErrorObj.HasProp("What")  ? String(ErrorObj.What)  : ""
+	try ErrorLine  := ErrorObj.HasProp("Line")  ? String(ErrorObj.Line)  : ""
+	try ErrorFile  := ErrorObj.HasProp("File")  ? String(ErrorObj.File)  : ""
 
-	; Driver version -- best-effort via Updater module (may not be initialised)
+	; ---- Driver version ----
 	Version := "unknown"
 	try Version := Updater_CurrentVersion()
 
-	; OS version via AHK built-in
-	OsVersion := A_OSVersion
+	; ---- System environment ----
+	OsVersion      := A_OSVersion
+	AhkVersion     := A_AhkVersion
+	AhkBitness     := (A_PtrSize = 8) ? "64-bit" : "32-bit"
+	ScreenRes       := A_ScreenWidth . "x" . A_ScreenHeight
+	Locale          := A_Language
+	ScriptDir       := A_ScriptDir
 
-	; ISO-8601 UTC timestamp compatible with the Lua reporter format
+	; Hash the username so same-user incidents can be correlated without
+	; exposing the actual Windows account name (privacy rule: no PII in reports)
+	UsernameHash := _CrashReport_FoldHash(A_UserName)
+
+	; ---- Uptime ----
+	UptimeSec := 0
+	try {
+		global _HealthCheckStartMs
+		UptimeSec := (A_TickCount - _HealthCheckStartMs) // 1000
+	}
+
+	; ---- Active window context (helps reproduce the crash) ----
+	ActiveWindowTitle   := ""
+	ActiveWindowProcess := ""
+	try ActiveWindowTitle   := WinGetTitle("A")
+	try ActiveWindowProcess := WinGetProcessName("A")
+
+	; ---- Stuck modifiers snapshot (state at the moment the handler ran) ----
+	StuckMods := []
+	try {
+		global _CrashReporter_Modifiers
+		for _, ModKey in _CrashReporter_Modifiers {
+			if GetKeyState(ModKey, "P")
+				StuckMods.Push(ModKey)
+		}
+	}
+	StuckModsStr := (StuckMods.Length > 0) ? _CrashReport_JoinArr(StuckMods) : "none"
+
+	; ---- Module state (best-effort -- modules may not be initialised yet) ----
+	KeyloggerInit := "unknown"
+	ConfigDir     := ""
+	try {
+		global Keylogger
+		KeyloggerInit := Keylogger.initialized ? "true" : "false"
+	}
+	try {
+		global _ConfigDir
+		ConfigDir := _ConfigDir
+	}
+
+	; ---- ISO-8601 timestamp ----
 	Ts := _CrashReport_IsoTimestamp()
 
 	Report := Map(
-		"version",     Version,
-		"os",          OsVersion,
-		"driver",      "autohotkey",
-		"timestamp",   Ts,
-		"error_msg",   ErrorMsg,
-		"stack_trace", StackTrace
+		; -- Identification --
+		"version",              Version,
+		"driver",               "autohotkey",
+		"timestamp",            Ts,
+		; -- Error details --
+		"error_type",           ErrorType,
+		"error_msg",            ErrorMsg,
+		"error_extra",          ErrorExtra,
+		"error_what",           ErrorWhat,
+		"error_file",           ErrorFile,
+		"error_line",           ErrorLine,
+		"stack_trace",          StackTrace,
+		; -- System environment --
+		"os",                   OsVersion,
+		"ahk_version",          AhkVersion,
+		"ahk_bitness",          AhkBitness,
+		"screen_resolution",    ScreenRes,
+		"locale",               Locale,
+		"script_dir",           ScriptDir,
+		"username_hash",        UsernameHash,
+		; -- Runtime context --
+		"uptime_sec",           String(UptimeSec),
+		"active_window_title",  ActiveWindowTitle,
+		"active_window_process", ActiveWindowProcess,
+		"stuck_modifiers",      StuckModsStr,
+		; -- Module state --
+		"keylogger_initialized", KeyloggerInit,
+		"config_dir",           ConfigDir,
 	)
 
-	try LoggerDone("CrashReporter", "Crash report built (ts={1}).", Ts)
+	try LoggerDone("CrashReporter", "Crash report built (ts={1}, type={2}).", Ts, ErrorType)
 	return Report
 }
 
@@ -89,7 +182,7 @@ CrashReport_Save(Report) {
 
 	try LoggerStart("CrashReporter", "Saving crash report to disk...")
 
-	; Resolve directory -- fall back to APPDATA if _ConfigDir is not set
+	; Resolve directory -- fall back to USERPROFILE if _ConfigDir is not set
 	BaseDir := ""
 	try BaseDir := _ConfigDir
 	if (BaseDir == "") {
@@ -162,31 +255,61 @@ CrashReport_PromptUser(Report) {
 
 ; Returns an ISO-8601 UTC timestamp string matching the Lua reporter format.
 ; AHK does not expose UTC time directly via A_Now, so we compute it from
-; A_TickCount drift vs the local clock -- best-effort, good enough for crash IDs.
+; FormatTime which uses local time -- "Z" is appended as an approximation
+; since AHK v2 has no native UTC formatter without a DLL call.
 ; @return {String} Timestamp in the form "YYYY-MM-DDTHH:MM:SSZ".
 _CrashReport_IsoTimestamp() {
-	; FormatTime defaults to local time; we append "Z" as an approximation
-	; since AHK v2 has no native UTC formatter without a DLL call.
 	return FormatTime(, "yyyy-MM-ddTHH:mm:ssZ")
 }
 
-; Serialises a crash report Map to a minimal JSON string.
-; Only the six canonical report fields are emitted; unknown keys are ignored.
+; Produces a short, stable, non-reversible hex digest of a string by folding
+; each character code into a 32-bit accumulator. Not cryptographic -- the goal
+; is stable cross-session correlation of incidents from the same machine user
+; without storing the raw value (privacy rule).
+; @param Str {String} The input string to hash.
+; @return {String} Eight-character lowercase hex string (e.g. "3f8a1c22").
+_CrashReport_FoldHash(Str) {
+	Acc := 0x811C9DC5  ; FNV-1a 32-bit offset basis
+	Loop StrLen(Str) {
+		; XOR-fold with FNV prime then rotate right by 3 to increase avalanche
+		Acc := ((Acc ^ Ord(SubStr(Str, A_Index, 1))) * 0x01000193) & 0xFFFFFFFF
+		Acc := ((Acc >> 3) | (Acc << 29)) & 0xFFFFFFFF
+	}
+	return Format("{:08x}", Acc)
+}
+
+; Serialises a crash report Map to a formatted JSON string.
+; String fields are emitted as JSON strings; the field order is fixed for
+; consistent diff-ability across versions. Unknown keys are ignored.
 ; @param Report {Map} The report Map.
-; @return {String} JSON string.
+; @return {String} Pretty-printed JSON string.
 _CrashReport_ToJson(Report) {
-	; Field order matches the Lua reporter for consistent diff-ability
-	Fields := ["version", "os", "driver", "timestamp", "error_msg", "stack_trace"]
-	Parts  := []
-	Q      := Chr(34)
+	Fields := [
+		; Identification
+		"version", "driver", "timestamp",
+		; Error details
+		"error_type", "error_msg", "error_extra", "error_what",
+		"error_file", "error_line", "stack_trace",
+		; System environment
+		"os", "ahk_version", "ahk_bitness", "screen_resolution",
+		"locale", "script_dir", "username_hash",
+		; Runtime context
+		"uptime_sec", "active_window_title", "active_window_process",
+		"stuck_modifiers",
+		; Module state
+		"keylogger_initialized", "config_dir",
+	]
+	Parts := []
+	Q     := Chr(34)
 
 	for _, Key in Fields {
 		Val := Report.Has(Key) ? String(Report[Key]) : ""
-		; Escape backslash, double-quote, and newline for minimal JSON safety
-		Val := StrReplace(Val, "\", "\\")
-		Val := StrReplace(Val, Q, "\" . Q)
-		Val := StrReplace(Val, "`n", "\n")
+		; Minimal JSON string escaping: backslash, double-quote, CR, LF, tab
+		Val := StrReplace(Val, "\",  "\\")
+		Val := StrReplace(Val, Q,   "\" . Q)
 		Val := StrReplace(Val, "`r", "\r")
+		Val := StrReplace(Val, "`n", "\n")
+		Val := StrReplace(Val, "`t", "\t")
 		Parts.Push("  " . Q . Key . Q . ": " . Q . Val . Q)
 	}
 
@@ -201,6 +324,18 @@ _CrashReport_JoinParts(Parts) {
 	Result := ""
 	for Idx, Item in Parts {
 		Result .= (Idx > 1 ? ",`r`n" : "") . Item
+	}
+	return Result
+}
+
+; Joins an array of strings with ", " separator for inline display.
+; Used to format the stuck_modifiers list as a compact comma-separated value.
+; @param Arr {Array} String array.
+; @return {String} Joined string.
+_CrashReport_JoinArr(Arr) {
+	Result := ""
+	for Idx, Item in Arr {
+		Result .= (Idx > 1 ? ", " : "") . Item
 	}
 	return Result
 }
