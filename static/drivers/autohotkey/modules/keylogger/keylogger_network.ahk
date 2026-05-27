@@ -1,4 +1,5 @@
 ﻿; modules/keylogger_network.ahk
+; Requires: NetworkInfo, Crypto
 
 ; ==============================================================================
 ; MODULE: Keylogger Network State
@@ -54,13 +55,6 @@ class KLNetConst {
     static RSSI_FAIR        := -75
     ; Below RSSI_FAIR → "poor"
 
-    ; Substring fragments in VPN adapter names (lower-cased)
-    static VPN_NAME_HINTS := [
-        "vpn", "wireguard", "nordvpn", "expressvpn", "protonvpn",
-        "openvpn", "fortinet", "cisco anyconnect", "globalprotect",
-        "zscaler", "tailscale", "mullvad"
-    ]
-
     ; Windows NCSI hostname — always resolves when internet is up
     static NCSI_HOST := "dns.msftncsi.com"
 }
@@ -97,128 +91,19 @@ class KLNet {
 ; ====================================
 ; =========================================
 
-; Queries the active Wi-Fi connection via the Win32 WLAN API. Returns a Map
-; with "ssid" and "signal_pct" (0-100) on success, or an empty Map when no
-; Wi-Fi adapter is connected / the API is unavailable.
-;
-; Why this rather than ``netsh wlan show interfaces``: the WScript.Shell.Exec
-; path spawned a visible cmd.exe console window every NETWORK_TICK_MS — a
-; flash + brief input freeze on every poll, completely unacceptable on a
-; keyboard driver. wlanapi.dll is a native API, no subprocess, no console.
-;
-; Layout of the structures we touch (see wlantypes.h on Microsoft Learn):
-;   WLAN_INTERFACE_INFO_LIST = { dwNumberOfItems: DWORD, dwIndex: DWORD,
-;       InterfaceInfo: WLAN_INTERFACE_INFO[] }
-;   WLAN_INTERFACE_INFO      = { InterfaceGuid: 16 bytes,
-;       strInterfaceDescription: 256 WCHAR, isState: DWORD }
-;   WLAN_CONNECTION_ATTRIBUTES = { isState: 4, wlanConnectionMode: 4,
-;       strProfileName: 256 WCHAR (=512 bytes), wlanAssociationAttributes: 152,
-;       wlanSecurityAttributes: 16 }
-;   WLAN_ASSOCIATION_ATTRIBUTES (152 bytes) starts with:
-;       dot11Ssid (DOT11_SSID = uLength DWORD + ucSSID 32 bytes), …
-;       wlanSignalQuality DWORD at offset 132
-KL_Net_QueryWifi() {
-    static WLAN_API_VERSION                   := 2
-    static WLAN_INTF_OPCODE_CURRENT_CONNECTION := 7
-    static ERROR_SUCCESS                       := 0
-
-    result := Map()
-
-    hClient   := 0
-    pdwNeg    := 0
-    rc := DllCall("Wlanapi\WlanOpenHandle",
-        "UInt", WLAN_API_VERSION, "Ptr", 0,
-        "UInt*", &pdwNeg, "Ptr*", &hClient, "UInt")
-    if (rc != ERROR_SUCCESS or hClient = 0) {
-        return result
-    }
-
-    pIfaceList := 0
-    rc := DllCall("Wlanapi\WlanEnumInterfaces",
-        "Ptr", hClient, "Ptr", 0, "Ptr*", &pIfaceList, "UInt")
-    if (rc != ERROR_SUCCESS or pIfaceList = 0) {
-        DllCall("Wlanapi\WlanCloseHandle", "Ptr", hClient, "Ptr", 0)
-        return result
-    }
-
-    nItems := NumGet(pIfaceList, 0, "UInt")
-    ; First WLAN_INTERFACE_INFO sits 8 bytes in (dwNumberOfItems + dwIndex).
-    ; Each entry is GUID(16) + WCHAR[256](512) + isState(4) = 532 bytes; we
-    ; only inspect the first connected interface — sufficient for the
-    ; common single-radio laptop case.
-    Loop nItems {
-        pIface := pIfaceList + 8 + (A_Index - 1) * 532
-        ; isState lives at offset 16 + 512 = 528. State 1 = connected.
-        if (NumGet(pIface, 528, "UInt") != 1) {
-            continue
-        }
-        ; Copy the 16-byte interface GUID for the query call.
-        guid := Buffer(16, 0)
-        DllCall("RtlMoveMemory", "Ptr", guid, "Ptr", pIface, "UPtr", 16)
-
-        pData     := 0
-        cbData    := 0
-        valueType := 0
-        rc := DllCall("Wlanapi\WlanQueryInterface",
-            "Ptr",   hClient,
-            "Ptr",   guid,
-            "UInt",  WLAN_INTF_OPCODE_CURRENT_CONNECTION,
-            "Ptr",   0,
-            "UInt*", &cbData,
-            "Ptr*",  &pData,
-            "UInt*", &valueType,
-            "UInt")
-        if (rc = ERROR_SUCCESS and pData) {
-            ; pData → WLAN_CONNECTION_ATTRIBUTES.
-            ; isState(4) + wlanConnectionMode(4) + strProfileName(512)
-            ;   = 520 → start of WLAN_ASSOCIATION_ATTRIBUTES.
-            ; DOT11_SSID = uSSIDLength(4) + ucSSID(32 bytes).
-            ssid_len := NumGet(pData, 520, "UInt")
-            if (ssid_len > 0 and ssid_len <= 32) {
-                ssid := StrGet(pData + 524, ssid_len, "UTF-8")
-                ; wlanSignalQuality offset within WLAN_ASSOCIATION_ATTRIBUTES:
-                ;   DOT11_SSID            36 bytes  (uLength 4 + ucSSID 32)
-                ;   DOT11_BSS_TYPE         4 bytes
-                ;   DOT11_MAC_ADDRESS      6 bytes  (+2 padding to 4-byte align)
-                ;   DOT11_PHY_TYPE         4 bytes
-                ;   uDot11PhyIndex         4 bytes
-                ;   = 56 → assoc base is 520 → 520 + 56 = 576.
-                signal_pct := NumGet(pData, 576, "UInt")
-                if (signal_pct > 100) {
-                    signal_pct := 100
-                }
-                result["ssid"]       := ssid
-                result["signal_pct"] := signal_pct
-            }
-            DllCall("Wlanapi\WlanFreeMemory", "Ptr", pData)
-        }
-        if (result.Count > 0) {
-            break
-        }
-    }
-
-    DllCall("Wlanapi\WlanFreeMemory", "Ptr", pIfaceList)
-    DllCall("Wlanapi\WlanCloseHandle", "Ptr", hClient, "Ptr", 0)
-    return result
-}
-
 KL_Net_WifiTick() {
     if !Keylogger.initialized
         return
 
-    info := Map()
-    try info := KL_Net_QueryWifi()
-    if (info.Count = 0)
-        return   ; not on Wi-Fi or API unavailable
+    ; Delegate to the NetworkInfo adapter — no DllCall plumbing in this module
+    ssid_hash  := NI_GetSsidHash()
+    signal_pct := NI_GetSignalStrength()
 
-    ssid       := info["ssid"]
-    signal_pct := info["signal_pct"]
+    ; NI_GetSsidHash() returns "" when no Wi-Fi is connected
+    if (ssid_hash = "")
+        return
 
-    ; Hash SSID
-    ssid_hash := KL_Net_HashStr(ssid)
-
-    ; Signal bracket (signal_pct is 0-100, not dBm, so the brackets here
-    ; differ from KLNetConst.RSSI_* which target the netsh dBm output).
+    ; signal_pct is 0-100 from the WLAN API signal quality field
     signal := "poor"
     if (signal_pct >= 80)
         signal := "excellent"
@@ -256,16 +141,9 @@ KL_Net_ReachTick() {
     if !Keylogger.initialized
         return
 
-    ; InternetGetConnectedState is part of wininet.dll and resolves
-    ; instantly from the Network List service's cached state — no socket
-    ; opened, no DNS lookup, no risk of freezing the AHK thread. The
-    ; previous WinHttpRequest.Send(bAsync=false) blocked the entire
-    ; script for up to 4 × 3 s on a flaky link, which is unacceptable on
-    ; a keyboard driver.
-    flags := 0
-    up    := false
-    try up := !!DllCall("Wininet\InternetGetConnectedState",
-        "UInt*", &flags, "UInt", 0, "Int")
+    ; Delegate to the NetworkInfo adapter — reads cached OS state, no socket.
+    up := false
+    try up := NI_IsInternetReachable()
 
     if (up and !KLNet.internet_up) {
         KLNet.internet_up := true
@@ -286,86 +164,15 @@ KL_Net_ReachTick() {
 ; ========================================
 ; ==========================================
 
-; Walks the Win32 GetAdaptersAddresses linked list looking for an enabled
-; adapter whose FriendlyName contains a known VPN substring. Returns the
-; adapter's friendly name on hit, "" otherwise.
-;
-; Why this rather than WMI Win32_NetworkAdapter: ComObjGet("winmgmts:")
-; followed by ExecQuery is notoriously slow on cold-start (WMI service
-; spinning up: 1-3 s on a typical machine) and synchronous on the AHK
-; main thread, so every poll could starve keyboard input. iphlpapi is
-; native, in-process, microsecond latency.
-;
-; IP_ADAPTER_ADDRESSES layout (only the fields we read):
-;   ULONG          Length;             // 0  (or 8 on 64-bit due to union)
-;   IF_INDEX       IfIndex;            // 4
-;   PIP_ADAPTER_ADDRESSES Next;        // 8
-;   PCHAR          AdapterName;        // 16
-;   ...
-;   PWCHAR         FriendlyName;       // offset varies — see below
-;   ...
-;   IF_OPER_STATUS OperStatus;         // 4 bytes, see PSDK
-; The FriendlyName offset depends on alignment / version, so we use the
-; documented offset for the v1 base structure on 64-bit Windows: 64.
-KL_Net_FindVpnAdapter() {
-    static GAA_FLAG_SKIP_UNICAST       := 0x0001
-    static GAA_FLAG_SKIP_ANYCAST       := 0x0002
-    static GAA_FLAG_SKIP_MULTICAST     := 0x0004
-    static GAA_FLAG_SKIP_DNS_SERVER    := 0x0008
-    static GAA_FLAG_SKIP_FRIENDLY_NAME := 0x0020
-    static AF_UNSPEC                   := 0
-    static ERROR_BUFFER_OVERFLOW       := 111
-    static IF_OPER_STATUS_UP           := 1
-
-    flags := GAA_FLAG_SKIP_UNICAST | GAA_FLAG_SKIP_ANYCAST
-          | GAA_FLAG_SKIP_MULTICAST | GAA_FLAG_SKIP_DNS_SERVER
-
-    ; Two-call idiom — first call sizes the buffer, second fills it.
-    cb := 0
-    DllCall("Iphlpapi\GetAdaptersAddresses",
-        "UInt", AF_UNSPEC, "UInt", flags, "Ptr", 0,
-        "Ptr",  0,         "UInt*", &cb, "UInt")
-    if (cb = 0) {
-        return ""
-    }
-    buf := Buffer(cb, 0)
-    rc := DllCall("Iphlpapi\GetAdaptersAddresses",
-        "UInt", AF_UNSPEC, "UInt", flags, "Ptr", 0,
-        "Ptr",  buf,       "UInt*", &cb, "UInt")
-    if (rc != 0) {
-        return ""
-    }
-
-    ; Walk the linked list. ``Next`` lives at offset 8.
-    p := buf.Ptr
-    while (p) {
-        ; Skip adapters that are not currently up. OperStatus is at offset
-        ; 56 on 64-bit Windows (after the v1 base header).
-        oper_status := NumGet(p, 56, "UInt")
-        if (oper_status = IF_OPER_STATUS_UP) {
-            ; FriendlyName (PWCHAR) sits at offset 64 on 64-bit Windows.
-            pname := NumGet(p, 64, "Ptr")
-            if (pname) {
-                name       := StrGet(pname, "UTF-16")
-                lower_name := StrLower(name)
-                for _, hint in KLNetConst.VPN_NAME_HINTS {
-                    if InStr(lower_name, hint) {
-                        return name
-                    }
-                }
-            }
-        }
-        p := NumGet(p, 8, "Ptr")
-    }
-    return ""
-}
-
 KL_Net_VpnTick() {
     if !Keylogger.initialized
         return
-    found_name := ""
-    try found_name := KL_Net_FindVpnAdapter()
-    now_active := (found_name != "")
+    ; Delegate to the NetworkInfo adapter — returns true when a VPN adapter is up.
+    ; The adapter name is not exposed by the port contract; we use a stable
+    ; sentinel so the log field is always present and non-empty.
+    now_active := false
+    try now_active := NI_IsVpnActive()
+    found_name := now_active ? "vpn" : ""
     if (now_active and !KLNet.vpn_active) {
         KLNet.vpn_active       := true
         KLNet.vpn_adapter_name := found_name
@@ -387,43 +194,6 @@ KL_Net_VpnTick() {
 
 
 
-
-
-; ======================================
-; ======================================
-; ======= 6/ Privacy hash helper =======
-; ======================================
-; ======================================
-
-; Returns a truncated hex SHA-256 of a string (first 16 hex chars = 64 bits).
-; Not cryptographic — just enough entropy to distinguish different networks
-; without storing the raw SSID.
-KL_Net_HashStr(s) {
-    try {
-        stream := ComObject("ADODB.Stream")
-        stream.Open()
-        stream.Type := 2   ; text
-        stream.WriteText(s)
-        stream.Position := 0
-        stream.Type := 1   ; binary
-        data := stream.Read()
-        stream.Close()
-
-        sha := ComObject("System.Security.Cryptography.SHA256Managed")
-        hash_bytes := sha.ComputeHash_2(data)
-        out := ""
-        for b in hash_bytes
-            out .= Format("{:02X}", b)
-        return SubStr(out, 1, 16)
-    }
-    ; Fallback: simple DJB2 hash when COM SHA is unavailable
-    h := 5381
-    loop StrLen(s) {
-        h := ((h << 5) + h) + Ord(SubStr(s, A_Index, 1))
-        h := h & 0xFFFFFFFF
-    }
-    return Format("{:08X}", h)
-}
 
 
 

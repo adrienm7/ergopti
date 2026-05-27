@@ -160,6 +160,17 @@ const HS_ADAPTERS = {
 		show:          function(handle) {},         // arity 1
 		hide:          function(handle) {},         // arity 1
 	},
+
+	NetworkInfo: {
+		getSsidHash:         function() {},         // arity 0
+		getSignalStrength:   function() {},         // arity 0
+		isInternetReachable: function() {},         // arity 0
+		isVpnActive:         function() {},         // arity 0
+	},
+
+	Crypto: {
+		sha256: function(data) {},                  // arity 1
+	},
 };
 
 
