@@ -178,13 +178,11 @@ global _VendorDir := A_ScriptDir . "\..\vendor"
 #Include meta/test_corpus_llm_parser.ahk
 ; Security / keylogger privacy corpus -- tests ES_PASSWORD detection and
 ; Win32 known-class lookup logic in isolation (OS-level paths are headless-safe stubs).
-; BISECT: temporarily disabled to isolate AHK 8-minute timeout root cause.
-; #Include meta/test_corpus_security_keylogger.ahk
+#Include meta/test_corpus_security_keylogger.ahk
 ; PromptBuilder corpus -- tests the generated PromptBuilder class against the
 ; shared cross-driver vectors.
-; BISECT: temporarily disabled to isolate AHK 8-minute timeout root cause.
-; #Include ../_generated/prompt_builder.ahk
-; #Include meta/test_corpus_prompt_builder.ahk
+#Include ../_generated/prompt_builder.ahk
+#Include meta/test_corpus_prompt_builder.ahk
 
 ; Drive everything. RunTests prints a TAP-style report to stdout and exits
 ; with the appropriate code — control never returns from this call.

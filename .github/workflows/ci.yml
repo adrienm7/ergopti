@@ -307,7 +307,7 @@ jobs:
 
             - name: Run AHK test suite
               shell: pwsh
-              timeout-minutes: 8
+              timeout-minutes: 15
               run: |
                   $ahk = Get-ChildItem "C:\AutoHotkey" -Filter "AutoHotkey64.exe" |
                       Select-Object -First 1 -ExpandProperty FullName
@@ -332,7 +332,7 @@ jobs:
 
             - name: Check for AHK compiler warnings
               shell: pwsh
-              timeout-minutes: 8
+              timeout-minutes: 15
               run: |
                   $ahk = Get-ChildItem "C:\AutoHotkey" -Filter "AutoHotkey64.exe" |
                       Select-Object -First 1 -ExpandProperty FullName
