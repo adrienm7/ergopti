@@ -212,12 +212,28 @@ E2E_RunScenarioPure(Scenario) {
         Args := Entry.args
         if (Args.Length >= 1) {
             Payload := Args[1]
-            ; Backspace sequence looks like "{BackSpace N}".
-            if RegExMatch(Payload, "^\{BackSpace (\d+)\}$", &M) {
+            ; Atomic format: "{BackSpace N}{Text}replacement endchar" or
+            ; "{BackSpace N}replacement endchar" — produced by SendInput after
+            ; the atomic-burst refactor (f7d69826c).
+            if RegExMatch(Payload, "^\{BackSpace (\d+)\}(.*)", &M) {
+                BSCount  := Integer(M[1])
+                Matched  := true
+                Rest     := M[2]
+                ; Strip optional {Text} prefix injected for OnlyText=true entries.
+                Rest     := RegExReplace(Rest, "^\{Text\}", "")
+                ; The replacement is everything except the trailing end-char (1 char).
+                ; If Rest is empty the expansion had no replacement text.
+                if (StrLen(Rest) > 1) {
+                    Replacement := SubStr(Rest, 1, StrLen(Rest) - 1)
+                } else if (StrLen(Rest) == 1) {
+                    ; Only one char: it is the end-char, no replacement text.
+                    Replacement := ""
+                }
+            ; Legacy two-send format: backspace-only entry followed by replacement.
+            } else if RegExMatch(Payload, "^\{BackSpace (\d+)\}$", &M) {
                 BSCount := Integer(M[1])
                 Matched := true
             } else if Matched and Payload != "" {
-                ; The replacement text is the first non-backspace send after match.
                 if (Replacement == "") {
                     Replacement := Payload
                 }
