@@ -42,10 +42,10 @@
 LLM_GetSharedPath(filename) {
 	global _StaticDir
 	; _StaticDir resolves to <repo>/static (dev) or A_ScriptDir\static
-	; (compiled). _shared lives under drivers/_shared in both layouts so a
-	; single canonical path is enough; the legacy multi-candidate fallback
+	; (compiled). Shared assets live under ergopti_plus/shared/ in both layouts
+	; so a single canonical path is enough; the legacy multi-candidate fallback
 	; was only useful when the script could be invoked from arbitrary cwds.
-	canonical := _StaticDir . "\drivers\_shared\llm\" . filename
+	canonical := _StaticDir . "\ergopti_plus\shared\llm\" . filename
 	if FileExist(canonical)
 		return canonical
 	return ""
