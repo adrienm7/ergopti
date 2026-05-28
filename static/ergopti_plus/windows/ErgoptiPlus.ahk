@@ -1279,7 +1279,7 @@ ToggleAllFeaturesOff(*) {
 ;                   per-key state so a "Enable all" doesn't simultaneously
 ;                   enable every variant of a one-of-N picker.
 ToggleAllFeatures(Value) {
-    global Features, ConfigurationFile
+    global Features, CategoryEnabled, ConfigurationFile
     if !IsSet(Features) {
         return
     }
@@ -1341,6 +1341,16 @@ ToggleAllFeatures(Value) {
             }
         }
     }
+
+    ; CategoryEnabled holds the per-category master gates (Layout, Shortcuts,
+    ; Hotstrings, TapHolds). ToggleAllFeatures must flip these too so the
+    ; parent-menu checkmarks reflect the new state — Features mutations alone
+    ; are not enough when a category gate was off.
+    for Category, _ in CategoryEnabled {
+        CategoryEnabled[Category] := Bool
+        Updates.Push({ Section: "category_enabled", Key: _CategoryEnabledKey(Category), Value: Bool })
+    }
+
     TOML_BatchWrite(ConfigurationFile, Updates)
     Reload
 }
