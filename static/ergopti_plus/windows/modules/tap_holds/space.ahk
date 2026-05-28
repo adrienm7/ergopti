@@ -20,33 +20,60 @@
 ; ========================
 ; ==============================
 
-; Design: pure KeyWait-based tap/hold, no InputHook.
+; Design: two-phase tap/hold without holding a modifier during KeyWait.
 ;
-; On Space down: activate modifier immediately (Down), then KeyWait with T timeout.
-;   - KeyWait returns 1 (timeout not reached) → Space released within threshold → TAP:
-;     release modifier, send Space tap action.
-;   - KeyWait returns 0 (timeout reached) → Space held past threshold → HOLD:
-;     modifier stays active, second KeyWait waits for Space release, then release modifier.
+; Phase 1 — tap/hold discrimination via KeyWait with timeout:
+;   KeyWait returns 1 (key released before timeout) → TAP: send Space.
+;   KeyWait returns 0 (timeout reached, Space still held) → HOLD.
 ;
-; No SC039 Up hotkey — KeyWait sees the Up event directly. This matches the
-; pattern used by capslock.ahk and lalt.ahk which work reliably for the same reason.
+; Phase 2 (hold only) — wait for the next keydown via InputHook (L1, no KeyOpt
+; so keys are NOT suppressed and reach the application normally). The IH runs
+; with {LShift Down} NOT active yet, so Space auto-repeat only produces spaces
+; in the app (or nothing, since SC039 is intercepted). When a real key is
+; detected (or the IH times out after a long wait), activate the modifier,
+; inject the captured key if any, then wait for Space Up via a second KeyWait.
+; Shift is active only for that brief window — no auto-repeat of Shift+Space.
+;
+; No SC039 Up hotkey — both KeyWaits see the Up event directly (no hotkey
+; to steal it). This matches the pattern used by capslock.ahk and lalt.ahk.
 ;
 ; After sending Space, HSE_FeedChar(" ") is called explicitly because SendInput
 ; bypasses the prefix-watcher InputHook.
 
-SpaceTapHold(DownFn, TapFn, UpFn) {
+global _SpaceHeldVK := 0
+
+_SpaceCaptureVK(ih, vk, sc) {
+    global _SpaceHeldVK
+    ; Ignore Space auto-repeat (VK 32) — only a real key ends the hold window.
+    if (vk == 32)
+        return
+    _SpaceHeldVK := vk
+    ih.Stop()
+}
+
+SpaceTapHold(ModDownFn, ModUpFn) {
+    global _SpaceHeldVK
     TimeoutSec := TapHoldDuration(TapHold, "space")
-    DownFn.Call()
     tap := KeyWait("SC039", "T" . TimeoutSec)
     if tap {
-        ; Released before timeout — tap path: undo the modifier and send Space.
-        UpFn.Call()
-        TapFn.Call()
-    } else {
-        ; Held past threshold — hold path: wait for release then undo modifier.
-        KeyWait("SC039")
-        UpFn.Call()
+        ; Released before timeout → tap: send Space.
+        _SpaceTap()
+        return
     }
+    ; Held past threshold → hold: wait for a real key via IH before activating
+    ; the modifier. L1 without KeyOpt so keys pass through to the app normally.
+    _SpaceHeldVK := 0
+    ih := InputHook("L1 T3")
+    ih.OnKeyDown := _SpaceCaptureVK
+    ih.Start()
+    ih.Wait()
+    ; Activate modifier only now — Space auto-repeat cannot have produced
+    ; Shift+Space during the IH window because modifier was not active.
+    ModDownFn.Call()
+    if (_SpaceHeldVK != 0)
+        SendInput("{vk" . Format("{:x}", _SpaceHeldVK) . "}")
+    KeyWait("SC039")
+    ModUpFn.Call()
 }
 
 _SpaceTap() {
@@ -66,23 +93,17 @@ _SpaceTap() {
 #HotIf TapHoldHoldModifier(TapHold, "space") == "ctrl" and not LayerEnabled
 SC039:: SpaceTapHold(
     () => SendInput("{LCtrl Down}"),
-    _SpaceTap,
     () => SendInput("{LCtrl Up}")
 )
 #HotIf
 
 #HotIf TapHoldHoldLayer(TapHold, "space") == "nav" and not LayerEnabled
-SC039:: SpaceTapHold(
-    ActivateLayer,
-    _SpaceTap,
-    DisableLayer
-)
+SC039:: SpaceTapHold(ActivateLayer, DisableLayer)
 #HotIf
 
 #HotIf TapHoldHoldModifier(TapHold, "space") == "shift" and not LayerEnabled
 SC039:: SpaceTapHold(
     () => SendInput("{LShift Down}"),
-    _SpaceTap,
     () => SendInput("{LShift Up}")
 )
 #HotIf
