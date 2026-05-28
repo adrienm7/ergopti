@@ -593,7 +593,7 @@ _Updater_OpenChangelogWindow(Channel) {
 	ChannelBadge := (Channel == "dev") ? " — dev" : " — stable"
 	WinTitle     := t("updater.title_changelog") . ChannelBadge
 
-	G := Gui("+Resize +MinSize960x540", WinTitle)
+	G := Gui("+Resize +MinSize960x600", WinTitle)
 	G.SetFont("s10", "Segoe UI")
 	G.MarginX := 10
 	G.MarginY := 10
@@ -617,7 +617,7 @@ _Updater_OpenChangelogWindow(Channel) {
 	G.Add("Text", "xm y+8 w260", t("updater.changelog_select_release"))
 
 	; ── Two-pane area ─────────────────────────────────────────────────────────
-	ListHeight := IsLocal ? 400 : 420
+	ListHeight := IsLocal ? 460 : 480
 
 	Lb := G.Add("ListBox", "xm y+4 w260 h" . ListHeight . " vRelLb", Labels)
 
@@ -728,7 +728,7 @@ _Updater_OpenChangelogWindow(Channel) {
 	G.OnEvent("Close",  (*) => G.Destroy())
 	G.OnEvent("Escape", (*) => G.Destroy())
 
-	G.Show("w930 h560")
+	G.Show("w930 h620")
 
 	; Spin up the WebView2 controller now that the window Hwnd is valid.
 	if (UseWV) {
