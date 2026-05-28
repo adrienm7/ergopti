@@ -327,6 +327,8 @@ function M.build_management(ctx)
 	local bubble_item = nil
 	local exp_item = nil
 	local delays_item = nil
+	local magic_item = nil
+	local magic_reset_item = nil
 
 	local c_star        = M.DEFAULT_STATE.preview_star_color
 	local c_autocorrect = M.DEFAULT_STATE.preview_autocorrect_color
@@ -587,24 +589,7 @@ function M.build_management(ctx)
 
 	delays_item = { title = i18n.get("menu.hotstrings.delays_colors"), disabled = paused or nil, menu = delay_menu }
 
-	if exp_item then table.insert(menu, exp_item) end
-	if delays_item then table.insert(menu, delays_item) end
-	table.insert(menu, { title = "-" })
-	if bubble_item then table.insert(menu, bubble_item) end
-
-	return { title = i18n.get("menu.hotstrings.params"), menu = menu }
-end
-
---- Builds the magic-key config items shown at the top of the Ergopti hotstrings block.
---- These items are Ergopti-specific because ★ is a dedicated key on the Ergopti layout.
---- @param ctx table Context.
---- @return table List of menu items (magic key editor, optional reset, repeat toggle).
-function M.build_ergopti_magic_config(ctx)
-	local state  = ctx.state
-	local paused = ctx.paused
-	local items  = {}
-
-	local magic_item = {
+	magic_item = {
 		title    = i18n.get("menu.hotstrings.magic_key_item_prefix") .. state.trigger_char,
 		disabled = paused or nil,
 		fn       = not paused and function()
@@ -629,10 +614,9 @@ function M.build_ergopti_magic_config(ctx)
 			end
 		end or nil,
 	}
-	table.insert(items, magic_item)
 
 	if state.trigger_char ~= "★" then
-		table.insert(items, {
+		magic_reset_item = {
 			title    = i18n.get("menu.hotstrings.reset_magic_key"),
 			disabled = paused or nil,
 			fn       = not paused and function()
@@ -640,26 +624,33 @@ function M.build_ergopti_magic_config(ctx)
 				if ctx.keymap and type(ctx.keymap.set_trigger_char) == "function" then pcall(ctx.keymap.set_trigger_char, "★") end
 				ctx.save_prefs(); ctx.do_reload("menu")
 			end or nil,
-		})
+		}
 	end
 
 	local repeat_enabled = ctx.keymap and type(ctx.keymap.is_repeat_feature_enabled) == "function"
 		and ctx.keymap.is_repeat_feature_enabled()
-	table.insert(items, {
-		title    = i18n.get("menu.hotstrings.repeat_key_toggle"),
-		checked  = repeat_enabled,
+	local repeat_toggle_item = {
+		title   = i18n.get("menu.hotstrings.repeat_key_toggle"),
+		checked = repeat_enabled,
 		disabled = paused or nil,
-		fn       = not paused and function()
+		fn      = not paused and function()
 			if ctx.keymap and type(ctx.keymap.set_repeat_feature_enabled) == "function" then
 				pcall(ctx.keymap.set_repeat_feature_enabled, not repeat_enabled)
 			end
 			ctx.do_reload("menu")
 		end or nil,
-	})
+	}
 
-	return items
+	if magic_item then table.insert(menu, magic_item) end
+	if magic_reset_item then table.insert(menu, magic_reset_item) end
+	table.insert(menu, repeat_toggle_item)
+	if exp_item then table.insert(menu, exp_item) end
+	if delays_item then table.insert(menu, delays_item) end
+	table.insert(menu, { title = "-" })
+	if bubble_item then table.insert(menu, bubble_item) end
+
+	return { title = i18n.get("menu.hotstrings.params"), menu = menu }
 end
-
 
 --- Returns the list of personal extension group names present in hotfiles,
 --- sorted alphabetically (excludes "personal" itself and "custom").

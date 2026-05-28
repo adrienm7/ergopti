@@ -29,8 +29,8 @@
 ; Hard-coded fallback values — kept here as the single recovery point if the
 ; manifest file cannot be read; they mirror the former global declarations in
 ; ui/tray_menu.ahk
-global _MM_FALLBACK_STANDARD  := ["DistancesReduction", "Autocorrection"]
-global _MM_FALLBACK_ERGOPTI   := ["SFBsReduction", "Rolls", "MagicKey"]
+global _MM_FALLBACK_STANDARD  := ["DistancesReduction", "Autocorrection", "MagicKey"]
+global _MM_FALLBACK_ERGOPTI   := ["SFBsReduction", "Rolls"]
 global _MM_FALLBACK_DYNAMIC   := ["DynamicHotstrings"]
 
 
