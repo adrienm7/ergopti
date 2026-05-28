@@ -1961,7 +1961,7 @@
 	"ui_typing.unit_sessions": "økter",
 	"updater.changelog_empty": "(Ingen versjonsmerknader tilgjengelig for denne versjonen.)",
 	"updater.changelog_release_notes": "Versjonsmerknader for {1}:\n\n{2}\n\nÅpne på GitHub?",
-	"updater.changelog_select_release": "Velg en versjon:",
+	"updater.changelog_select_release": "Versjonsvalg :",
 	"updater.changelog_truncated": "\n…(forkortet)",
 	"updater.changelog_unreachable": "Kunne ikke hente utgivelsesinformasjon fra GitHub.",
 	"updater.channel_dev_suffix": " (forhåndskanal)",

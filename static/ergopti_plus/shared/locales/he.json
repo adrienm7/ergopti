@@ -1961,7 +1961,7 @@
 	"ui_typing.unit_sessions": "פעילויות",
 	"updater.changelog_empty": "(אין הערות גרסה זמינות עבור גרסה זו.)",
 	"updater.changelog_release_notes": "הערות גרסה עבור {1}:\n\n{2}\n\nלפתוח ב-GitHub?",
-	"updater.changelog_select_release": "בחר גרסה:",
+	"updater.changelog_select_release": "בחירת גרסה :",
 	"updater.changelog_truncated": "\n…(נחתך)",
 	"updater.changelog_unreachable": "לא ניתן לאחזר את פרטי הגרסה מ-GitHub.",
 	"updater.channel_dev_suffix": " (ערוץ קדם-הפצה)",

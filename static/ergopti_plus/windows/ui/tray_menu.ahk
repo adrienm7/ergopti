@@ -1616,8 +1616,10 @@ initMenu() {
 		RegisterMenuItem(AboutMenu, UpdateLabel, Updater_OneClickUpdate)
 		if (Updater_GetUpdateState() == "checking")
 			AboutMenu.Disable(UpdateLabel)
-		RegisterMenuItem(AboutMenu, t("menu.about.changelog"), Updater_ShowChangelog)
 	}
+	; Changelog is always accessible — including in local-source mode — so the
+	; user can browse published releases regardless of how they are running.
+	RegisterMenuItem(AboutMenu, t("menu.about.changelog"), Updater_ShowChangelog)
 	RegisterMenuItem(AboutMenu, t("menu.about.open_releases_page"), (*) => Run(Updater_ReleasesPageUrl()))
 	A_TrayMenu.Add(t("menu.about.title"), AboutMenu)
 

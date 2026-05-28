@@ -155,8 +155,11 @@ LLM_Tray_Build() {
 	}
 
 	; Check the parent tray entry only when enabled AND Ollama is confirmed ready.
-	if (_LLM_Tray["enabled"] && LLM_Deps_IsReady())
-		A_TrayMenu.Check(t("menu.llm.title"))
-	else
+	; Both branches are guarded with try: the item may not exist yet if the updater
+	; timer fires LLM_Tray_Build() before initMenu has had a chance to register it.
+	if (_LLM_Tray["enabled"] && LLM_Deps_IsReady()) {
+		try A_TrayMenu.Check(t("menu.llm.title"))
+	} else {
 		try A_TrayMenu.Uncheck(t("menu.llm.title"))
+	}
 }

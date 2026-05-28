@@ -1961,7 +1961,7 @@
 	"ui_typing.unit_sessions": "सत्र",
 	"updater.changelog_empty": "(इस संस्करण के लिए कोई रिलीज़ नोट्स उपलब्ध नहीं हैं।)",
 	"updater.changelog_release_notes": "{1} के रिलीज़ नोट्स:\n\n{2}\n\nGitHub पर खोलें?",
-	"updater.changelog_select_release": "एक संस्करण चुनें:",
+	"updater.changelog_select_release": "संस्करण चयन :",
 	"updater.changelog_truncated": "\n…(छाँटा गया)",
 	"updater.changelog_unreachable": "GitHub से रिलीज़ की जानकारी नहीं मिल सकी।",
 	"updater.channel_dev_suffix": " (प्री-रिलीज़ चैनल)",

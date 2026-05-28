@@ -1961,7 +1961,7 @@
 	"ui_typing.unit_sessions": "Sitzungen",
 	"updater.changelog_empty": "(Keine Versionshinweise für diese Version verfügbar.)",
 	"updater.changelog_release_notes": "Versionshinweise zu {1}:\n\n{2}\n\nAuf GitHub öffnen?",
-	"updater.changelog_select_release": "Version auswählen:",
+	"updater.changelog_select_release": "Versionsauswahl :",
 	"updater.changelog_truncated": "\n…(gekürzt)",
 	"updater.changelog_unreachable": "Release-Informationen konnten nicht von GitHub abgerufen werden.",
 	"updater.channel_dev_suffix": " (Vorab-Kanal)",

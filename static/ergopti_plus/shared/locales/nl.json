@@ -1961,7 +1961,7 @@
 	"ui_typing.unit_sessions": "sessies",
 	"updater.changelog_empty": "(Geen release-notities beschikbaar voor deze versie.)",
 	"updater.changelog_release_notes": "Release-notities voor {1}:\n\n{2}\n\nOpenen op GitHub?",
-	"updater.changelog_select_release": "Selecteer een versie:",
+	"updater.changelog_select_release": "Versiekeuze :",
 	"updater.changelog_truncated": "\n…(afgekapt)",
 	"updater.changelog_unreachable": "Kan release-informatie niet ophalen van GitHub.",
 	"updater.channel_dev_suffix": " (preview-kanaal)",

@@ -400,13 +400,19 @@ Updater_ParseTagName(Json) {
 }
 
 ; Extracts the "body" field (release notes markdown) from a GitHub release JSON.
+; Returns "" when the field is absent, null, or an empty string — callers
+; display t("updater.changelog_empty") in that case.
 Updater_ParseBody(Json) {
 	if (Json == "")
 		return ""
 	if (SubStr(LTrim(Json), 1, 1) == "[")
 		Json := RegExReplace(Json, "^\s*\[", "")
-	; Atomic group prevents backtracking — no bounded quantifier needed (PCRE rejects large bounds)
-	if RegExMatch(Json, '"body"\s*:\s*"((?>(?:[^"\\]|\\.)*?))"', &M) {
+	; GitHub sets "body": null (not "") when a release has no description.
+	; Detect null before trying the quoted-string pattern.
+	if RegExMatch(Json, '"body"\s*:\s*null', &_)
+		return ""
+	; [^"\\]* is possessive by nature — no backtracking risk, no atomic group needed
+	if RegExMatch(Json, '"body"\s*:\s*"((?:[^"\\]|\\.)*)"', &M) {
 		; Unescape the most common JSON escape sequences.
 		Body := M[1]
 		Body := StrReplace(Body, "\n",  "`n")
@@ -544,81 +550,228 @@ Updater_OneClickUpdate(*) {
 	Updater_DownloadAndInstall(UPDATER_LATEST_RELEASE)
 }
 
-; Opens a window that lists every release on the active channel and lets the
-; user expand any one of them to read its full notes. Two-pane layout: the
-; left ListBox lists tags (newest first, mirroring the API order), the right
-; Edit shows the selected release's body. "Open on GitHub" jumps to the
-; selected release in the browser. Replaces the previous single-MsgBox UX
-; which only ever surfaced the latest release.
+; Opens a window that lists every release and lets the user read its notes.
+; Layout: header bar (channel badge + switch button), left ListBox of releases,
+; right Edit with the selected release body, bottom action buttons.
+; Available in all run modes — local-source users see published releases too.
 Updater_ShowChangelog(*) {
 	global UPDATER_CHANNEL
-	; In local-source mode the channel is meaningless (the tray menu also
-	; hides the entry there) — fall back to "main" defensively so a manual
-	; invocation never surfaces dev-only nightlies to a source-tree user.
-	EffectiveChannel := Updater_IsLocalSource() ? "main" : UPDATER_CHANNEL
-	Json := Updater_FetchReleasesListJson(EffectiveChannel)
+
+	; In local-source mode we still fetch published releases so the user can
+	; browse the changelog. Channel selection is read from the global state;
+	; for local-source builds the switch button does not persist the change.
+	_Updater_OpenChangelogWindow(UPDATER_CHANNEL)
+}
+
+; Internal helper — builds (or rebuilds) the changelog GUI for a given channel.
+; The notes pane uses WebView2 (NavigateToString) to render Markdown so the
+; user sees formatted headings, bold text, lists and links instead of raw text.
+; Falls back to a plain-text Edit when WebView2 is unavailable.
+_Updater_OpenChangelogWindow(Channel) {
+	global _VendorDir
+	Json := Updater_FetchReleasesListJson(Channel)
 	if (Json == "") {
 		MsgBox(t("updater.no_connection"), t("updater.title_changelog"), "Icon!")
 		return
 	}
-	; Main-channel users only ever see stable releases; the dev channel folds
-	; every nightly into the list so the user can read the per-commit notes.
-	MainOnly := (EffectiveChannel != "dev")
-	Releases := Updater_ParseReleasesList(Json, MainOnly)
-	if (Releases.Length == 0) {
-		MsgBox(t("updater.changelog_empty"), t("updater.title_changelog"), "Icon!")
-		return
-	}
 
-	; Build the ListBox labels: tag + short date when present. The publish
-	; date is sliced from the ISO timestamp so the row stays compact.
+	; Dev channel shows everything; main channel shows stable releases only.
+	; When there are no releases we still open the window: the empty-state is
+	; shown inside the notes pane so the user can switch channel without a popup.
+	MainOnly := (Channel != "dev")
+	Releases := Updater_ParseReleasesList(Json, MainOnly)
+
+	HasReleases := (Releases.Length > 0)
 	Labels := []
 	for _, R in Releases {
-		Date := SubStr(R.PublishedAt, 1, 10)   ; "YYYY-MM-DD" or empty
-		Marker := R.Prerelease ? "  (dev)" : ""
-		Label := (Date != "") ? (R.Tag . "  —  " . Date . Marker) : (R.Tag . Marker)
+		Date   := SubStr(R.PublishedAt, 1, 10)
+		Marker := R.Prerelease ? "  [dev]" : ""
+		Label  := (Date != "") ? (R.Tag . "  —  " . Date . Marker) : (R.Tag . Marker)
 		Labels.Push(Label)
 	}
 
-	G := Gui("+Resize +MinSize900x500", t("updater.title_changelog"))
+	ChannelBadge := (Channel == "dev") ? " — dev" : " — stable"
+	WinTitle     := t("updater.title_changelog") . ChannelBadge
+
+	G := Gui("+Resize +MinSize960x540", WinTitle)
 	G.SetFont("s10", "Segoe UI")
 	G.MarginX := 10
 	G.MarginY := 10
 
-	G.Add("Text", "xm w260", t("updater.changelog_select_release"))
-	Lb := G.Add("ListBox", "xm y+4 w260 h440 vRelLb", Labels)
-	BodyEdit := G.Add("Edit", "x+10 yp w620 h440 ReadOnly +HScroll +Multi -Wrap vBodyEdit", "")
-	BtnOpen := G.Add("Button", "xm y+10 w260", t("updater.open_on_github"))
-	BtnClose := G.Add("Button", "x+10 yp w620 Default", t("updater.close"))
+	; ── Header bar ────────────────────────────────────────────────────────────
+	IsLocal := Updater_IsLocalSource()
+	BadgeText := IsLocal
+		? (t("menu.about.channel_local_source") . "  |  " . t("updater.changelog_channel_label") . "  " . Channel)
+		: (t("updater.changelog_channel_label") . "  " . Channel)
+	OtherChannel := (Channel == "dev") ? "main" : "dev"
+	SwitchLabel  := (Channel == "dev")
+		? t("updater.changelog_switch_to_main")
+		: t("updater.changelog_switch_to_dev")
 
-	; Helper closure: refresh the right pane each time the selection moves.
-	; Falls back to a localised "no notes available" string when the body is
-	; empty so the user is never left staring at a blank pane.
-	RefreshBody := (*) => (
-		(Idx := Lb.Value) > 0 ? (
-			BodyEdit.Value := (Releases[Idx].Body != "")
-				? Releases[Idx].Body
-				: t("updater.changelog_empty")
-		) : ""
+	G.Add("Text", "xm yp+4 w580 +0x200", BadgeText)
+	BtnSwitch := G.Add("Button", "x+10 yp w300", SwitchLabel)
+
+	if (IsLocal)
+		G.Add("Text", "xm y+4 w890 cGray", t("updater.changelog_local_source_note"))
+
+	G.Add("Text", "xm y+8 w260", t("updater.changelog_select_release"))
+
+	; ── Two-pane area ─────────────────────────────────────────────────────────
+	ListHeight := IsLocal ? 400 : 420
+
+	Lb := G.Add("ListBox", "xm y+4 w260 h" . ListHeight . " vRelLb", Labels)
+
+	; Decide whether to use WebView2 for Markdown rendering.
+	UseWV := IsSet(WebView2) && FileExist(_VendorDir . "\64bit\WebView2Loader.dll")
+
+	; Placeholder control that occupies the right-pane slot; the WebView2
+	; control will be positioned on top of it after Gui.Show().
+	RightPane := G.Add("Text", "x+10 yp w630 h" . ListHeight, "")
+
+	; ── Bottom action button (no Close — window chrome handles dismiss) ────────
+	BtnOpen := G.Add("Button", "xm y+10 w260", t("updater.open_on_github"))
+	if (!HasReleases)
+		BtnOpen.Enabled := false
+
+	; ── WebView2 controller (created after Show so the Hwnd is valid) ─────────
+	WVC := unset   ; controller reference, kept in closure scope
+
+	; Builds a self-contained HTML page that renders the given Markdown string.
+	; The JS renderer covers the Markdown subset used in GitHub release notes:
+	; ATX headings (#/##/###), **bold**, *italic*, `code`, [links](url),
+	; unordered/ordered lists, blockquotes, horizontal rules, tables, and
+	; fenced code blocks. No external dependencies — everything is inline.
+	MakeHtml := (md) => (
+		"<!DOCTYPE html><html><head><meta charset='utf-8'>"
+		. "<style>"
+		. "html,body{margin:0;padding:0;height:100%;font-family:'Segoe UI',sans-serif;font-size:13px;color:#1a1a1a;background:#fff;}"
+		. "body{padding:14px 18px;box-sizing:border-box;overflow-y:auto;}"
+		. "h1{font-size:1.35em;margin:.6em 0 .3em;}h2{font-size:1.2em;margin:.6em 0 .25em;border-bottom:1px solid #ddd;padding-bottom:.2em;}"
+		. "h3{font-size:1.05em;margin:.5em 0 .2em;}h4,h5,h6{font-size:1em;margin:.4em 0 .15em;}"
+		. "p{margin:.35em 0;}ul,ol{margin:.3em 0 .3em 1.4em;padding:0;}li{margin:.15em 0;}"
+		. "code{background:#f3f3f3;border-radius:3px;padding:.1em .35em;font-family:Consolas,monospace;font-size:.92em;}"
+		. "pre{background:#f3f3f3;border-radius:4px;padding:.7em 1em;overflow-x:auto;}"
+		. "pre code{background:none;padding:0;}"
+		. "blockquote{border-left:3px solid #ccc;margin:.4em 0 .4em 0;padding:.2em .8em;color:#555;}"
+		. "hr{border:none;border-top:1px solid #ddd;margin:.6em 0;}"
+		. "a{color:#0969da;}a:hover{text-decoration:underline;}"
+		. "table{border-collapse:collapse;margin:.4em 0;}th,td{border:1px solid #ddd;padding:.25em .6em;text-align:left;}"
+		. "th{background:#f5f5f5;font-weight:600;}"
+		. ".empty{display:flex;align-items:center;justify-content:center;height:100%;color:#888;font-size:1.05em;}"
+		. "</style></head><body>"
+		. "<script>"
+		. "function mdToHtml(s){"
+		. "if(!s)return '<div class=empty>' + emptyMsg + '</div>';"
+		. "var lines=s.split('\n'),out=[],inPre=false,inUl=false,inOl=false,inBq=false,inTbl=false;"
+		. "function closeBlocks(){if(inUl){out.push('</ul>');inUl=false;}if(inOl){out.push('</ol>');inOl=false;}if(inBq){out.push('</blockquote>');inBq=false;}if(inTbl){out.push('</table>');inTbl=false;}}"
+		. "function inline(t){t=t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');"
+		. "t=t.replace(/`([^`]+)`/g,'<code>$1</code>');"
+		. "t=t.replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>');"
+		. "t=t.replace(/\*([^*]+)\*/g,'<em>$1</em>');"
+		. "t=t.replace(/!\[([^\]]*)\]\(([^)]+)\)/g,'<img alt=`"$1`" src=`"$2`" style=`"max-width:100%`">');"
+		. "t=t.replace(/\[([^\]]+)\]\(([^)]+)\)/g,'<a href=`"$2`" target=`"_blank`">$1</a>');"
+		. "return t;}"
+		. "for(var i=0;i<lines.length;i++){"
+		. "var l=lines[i];"
+		. "if(/^```/.test(l)){if(inPre){out.push('</code></pre>');inPre=false;}else{closeBlocks();out.push('<pre><code>');inPre=true;}continue;}"
+		. "if(inPre){out.push(l.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'));continue;}"
+		. "if(/^\s*$/.test(l)){closeBlocks();continue;}"
+		. "var hm=l.match(/^(#{1,6})\s+(.*)/);if(hm){closeBlocks();var n=hm[1].length;out.push('<h'+n+'>'+inline(hm[2])+'</h'+n+'>');continue;}"
+		. "if(/^---+$/.test(l.trim())||/^\*\*\*+$/.test(l.trim())){closeBlocks();out.push('<hr>');continue;}"
+		. "if(/^\|/.test(l)&&/\|/.test(l)){if(!inTbl){closeBlocks();out.push('<table>');inTbl=true;}"
+		. "if(/^[\s|:-]+$/.test(l))continue;"
+		. "var cells=l.replace(/^\||\|$/g,'').split('|');"
+		. "var tag=(!inTbl||out[out.length-1]==='<table>')?'th':'td';"
+		. "out.push('<tr>'+cells.map(function(c){return'<'+tag+'>'+inline(c.trim())+'</'+tag+'>';}).join('')+'</tr>');continue;}"
+		. "var bq=l.match(/^>\s?(.*)/);if(bq){if(!inBq){closeBlocks();out.push('<blockquote>');inBq=true;}out.push('<p>'+inline(bq[1])+'</p>');continue;}"
+		. "var ul=l.match(/^[-*+]\s+(.*)/);if(ul){if(!inUl){closeBlocks();out.push('<ul>');inUl=true;}out.push('<li>'+inline(ul[1])+'</li>');continue;}"
+		. "var ol=l.match(/^\d+\.\s+(.*)/);if(ol){if(!inOl){closeBlocks();out.push('<ol>');inOl=true;}out.push('<li>'+inline(ol[1])+'</li>');continue;}"
+		. "closeBlocks();out.push('<p>'+inline(l)+'</p>');}"
+		. "if(inPre)out.push('</code></pre>');closeBlocks();"
+		. "return out.join('\n');}"
+		. "var emptyMsg=" . _Updater_JsStr(t("updater.changelog_empty")) . ";"
+		. "var md=" . _Updater_JsStr(md) . ";"
+		. "document.body.innerHTML=mdToHtml(md);"
+		. "</script></body></html>"
 	)
+
+	; Navigates the WebView2 pane to a rendered Markdown page.
+	; Falls back to a plain string assignment when WebView2 is not used.
+	ShowBody := (md) => (
+		UseWV && IsSet(WVC)
+			? WVC.CoreWebView2.NavigateToString(MakeHtml(md))
+			: 0
+	)
+
 	OpenSelected := (*) => (
 		(Idx := Lb.Value) > 0 ? Run(Releases[Idx].HtmlUrl != ""
 			? Releases[Idx].HtmlUrl
 			: Updater_ReleasesPageUrl()) : ""
 	)
 
+	RefreshBody := (*) => (
+		(Idx := Lb.Value) > 0
+			? ShowBody(Releases[Idx].Body)
+			: 0
+	)
+
+	BtnSwitch.OnEvent("Click", (*) => (
+		G.Destroy(),
+		IsLocal
+			? _Updater_OpenChangelogWindow(OtherChannel)
+			: Updater_SetChannel(OtherChannel)
+	))
+
 	Lb.OnEvent("Change", RefreshBody)
-	; Double-click on a release opens it in the browser — the standard
-	; affordance for "this is the actionable element of a list".
 	Lb.OnEvent("DoubleClick", OpenSelected)
 	BtnOpen.OnEvent("Click", OpenSelected)
-	BtnClose.OnEvent("Click", (*) => G.Destroy())
-	G.OnEvent("Close",        (*) => G.Destroy())
-	G.OnEvent("Escape",       (*) => G.Destroy())
+	G.OnEvent("Close",  (*) => G.Destroy())
+	G.OnEvent("Escape", (*) => G.Destroy())
 
-	Lb.Choose(1)
-	RefreshBody()
-	G.Show("w900 h510")
+	G.Show("w930 h560")
+
+	; Spin up the WebView2 controller now that the window Hwnd is valid.
+	if (UseWV) {
+		loader := _VendorDir . "\64bit\WebView2Loader.dll"
+		udir   := A_Temp . "\ergopti_changelog_wv_" . A_TickCount
+		try DirCreate(udir)
+		try {
+			WVC := WebView2.create(G.Hwnd, , 0, udir, "", 0, loader)
+		} catch as Err {
+			try LoggerWarn("Updater", "WebView2 create failed: {1} — falling back.", Err.Message)
+			UseWV := false
+		}
+		if (UseWV) {
+			try {
+				s := WVC.CoreWebView2.Settings
+				s.AreDevToolsEnabled              := false
+				s.AreDefaultContextMenusEnabled   := false
+				s.IsStatusBarEnabled              := false
+				s.AreBrowserAcceleratorKeysEnabled := false
+			}
+			; Position and size the WebView to overlap the RightPane placeholder.
+			RightPane.GetPos(&rpx, &rpy, &rpw, &rph)
+			WVC.Fill()
+			; NavigateToString is synchronous enough here — no "ready" handshake needed.
+			if (HasReleases) {
+				Lb.Choose(1)
+				ShowBody(Releases[1].Body)
+			} else {
+				; Empty-state: pass an empty string so the JS renderer shows the centred message.
+				ShowBody("")
+			}
+		}
+	}
+}
+
+; Escapes a string for safe embedding as a JS string literal (single-quoted).
+_Updater_JsStr(s) {
+	s := StrReplace(s, "\",  "\\")
+	s := StrReplace(s, "'",  "\'")
+	s := StrReplace(s, "`n", "\n")
+	s := StrReplace(s, "`r", "")
+	s := StrReplace(s, "`t", "\t")
+	return "'" . s . "'"
 }
 
 

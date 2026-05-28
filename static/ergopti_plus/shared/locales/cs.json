@@ -1961,7 +1961,7 @@
 	"ui_typing.unit_sessions": "sezení",
 	"updater.changelog_empty": "(Pro tuto verzi nejsou k dispozici žádné poznámky.)",
 	"updater.changelog_release_notes": "Poznámky k verzi {1}:\n\n{2}\n\nOtevřít na GitHubu?",
-	"updater.changelog_select_release": "Vyberte verzi:",
+	"updater.changelog_select_release": "Výběr verze :",
 	"updater.changelog_truncated": "\n…(zkráceno)",
 	"updater.changelog_unreachable": "Nepodařilo se získat informace o vydání z GitHubu.",
 	"updater.channel_dev_suffix": " (předběžný kanál)",

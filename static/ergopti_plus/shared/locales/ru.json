@@ -1961,7 +1961,7 @@
 	"ui_typing.unit_sessions": "сессий",
 	"updater.changelog_empty": "(Для этой версии нет описания изменений.)",
 	"updater.changelog_release_notes": "Изменения версии {1}:\n\n{2}\n\nОткрыть на GitHub?",
-	"updater.changelog_select_release": "Выберите версию:",
+	"updater.changelog_select_release": "Выбор версии :",
 	"updater.changelog_truncated": "\n…(обрезано)",
 	"updater.changelog_unreachable": "Не удалось получить информацию о выпуске с GitHub.",
 	"updater.channel_dev_suffix": " (предварительный канал)",

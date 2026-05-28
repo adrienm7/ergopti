@@ -1961,7 +1961,7 @@
 	"ui_typing.unit_sessions": "جلسات",
 	"updater.changelog_empty": "(لا تتوفر ملاحظات إصدار لهذه النسخة.)",
 	"updater.changelog_release_notes": "ملاحظات الإصدار {1}:\n\n{2}\n\nفتح في GitHub؟",
-	"updater.changelog_select_release": "اختر إصدارًا:",
+	"updater.changelog_select_release": "اختيار الإصدار :",
 	"updater.changelog_truncated": "\n…(مقتطع)",
 	"updater.changelog_unreachable": "تعذر استرداد معلومات الإصدار من GitHub.",
 	"updater.channel_dev_suffix": " (قناة ما قبل الإطلاق)",
