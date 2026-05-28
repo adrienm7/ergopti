@@ -861,6 +861,7 @@
 	"menu.metrics.filter_secure": "Ігнорувати поля паролів",
 	"menu.metrics.filter_sysauth": "Ігнорувати діалоги аутентифікації системи",
 	"menu.metrics.include_realtime": "    ↳ Включити графік у реальному часі",
+	"menu.metrics.reset_wpm_position": "    ↳ Скинути позицію",
 	"menu.metrics.off": "❌ Метрики вимкнено (натисніть для увімкнення)",
 	"menu.metrics.on": "✅ Метрики увімкнено (натисніть для вимкнення)",
 	"menu.metrics.open_encryptor": "↳ Відкрити автономний шифрувальник…",

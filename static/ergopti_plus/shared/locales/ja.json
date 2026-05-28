@@ -861,6 +861,7 @@
 	"menu.metrics.filter_secure": "パスワードフィールドを無視",
 	"menu.metrics.filter_sysauth": "システム認証ダイアログを無視",
 	"menu.metrics.include_realtime": "    ↳ リアルタイムグラフを含める",
+	"menu.metrics.reset_wpm_position": "    ↳ 位置をリセット",
 	"menu.metrics.off": "❌ 指標無効（クリックで有効化）",
 	"menu.metrics.on": "✅ 指標有効（クリックで無効化）",
 	"menu.metrics.open_encryptor": "↳ スタンドアロン暗号化ツールを開く…",

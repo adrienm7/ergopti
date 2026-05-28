@@ -861,6 +861,7 @@
 	"menu.metrics.filter_secure": "Passwortfelder ignorieren",
 	"menu.metrics.filter_sysauth": "Systemdialoge zur Authentifizierung ignorieren",
 	"menu.metrics.include_realtime": "    ↳ Echtzeit-Diagramm einbeziehen",
+	"menu.metrics.reset_wpm_position": "    ↳ Position zurücksetzen",
 	"menu.metrics.off": "❌ Metriken inaktiv (klicken zum Aktivieren)",
 	"menu.metrics.on": "✅ Metriken aktiv (klicken zum Deaktivieren)",
 	"menu.metrics.open_encryptor": "↳ Eigenständigen Encryptor öffnen…",
