@@ -43,33 +43,36 @@ from pathlib import Path
 # sibling of the EXE; everything under "vendor/..." sits next to the EXE so
 # DllCall(A_ScriptDir . "\vendor\sqlite3.dll", ...) keeps resolving.
 ASSET_TREES: list[tuple[str, str, tuple[str, ...]]] = [
-	# Hotstring TOMLs live in _shared since item 1.3.5 — bundled via _shared tree below.
-	# Locale files for the i18n module and every WebView panel.
-	("static/locales",                          "static/locales",                          ()),
-	# Driver icons (on/off) and language flags.
-	("static/img/logo",                         "static/img/logo",                         ()),
-	("static/img/flags",                        "static/img/flags",                        ()),
-	# Gestures shared definitions (Hammerspoon + AHK).
-	("static/shared",                           "static/shared",                           ()),
-	# Extensions tree (read-only enumeration by the tray menu).
-	("static/extensions",                       "static/extensions",                       (".git*",)),
-	# _shared driver assets: WebView HTML/CSS/JS, LLM defaults, DB schema.
-	# prefetch.json is regenerated at runtime by the dashboards, so we leave
-	# any stale snapshot behind rather than shipping a frozen copy.
-	("static/ergopti_plus/_shared",                  "static/ergopti_plus/_shared",                  ("prefetch.json",)),
-	# Vendor DLLs that DllCall expects to find next to the EXE.
-	("static/ergopti_plus/windows/vendor",        "vendor",                                  ("*.ahk",)),
+	# Shared assets tree: locales, hotstrings TOMLs, WebView UI, LLM defaults,
+	# DB schema, actions.toml, menu_manifest.json. The AHK driver reads all of
+	# these via _SharedDir = _StaticDir + "\ergopti_plus\shared".
+	# prefetch.json is regenerated at runtime by the dashboards — skip it.
+	(
+		"static/ergopti_plus/shared",
+		"static/ergopti_plus/shared",
+		("prefetch.json",),
+	),
+	# Windows-driver data files (tap_hold defaults, generated config template).
+	# Read via _DriverDir = _StaticDir + "\ergopti_plus\windows".
+	("static/ergopti_plus/windows/_generated", "static/ergopti_plus/windows/_generated", ()),
+	("static/ergopti_plus/windows/data",       "static/ergopti_plus/windows/data",       ()),
+	# Extensions tree: read-only enumeration by the tray menu via _StaticDir + "\extensions\".
+	("static/extensions",                      "static/extensions",                      (".git*",)),
+	# Driver icons and language flags read via _StaticDir + "\img\...".
+	("static/img/logo",                        "static/img/logo",                        ()),
+	("static/img/flags",                       "static/img/flags",                       ()),
+	# Vendor DLLs that DllCall expects at _VendorDir (extracted as "vendor/").
+	("static/ergopti_plus/windows/vendor",     "vendor",                                 ("*.ahk",)),
 ]
 
 # Single-file assets pulled in alongside the trees above.
 ASSET_FILES: list[tuple[str, str]] = [
-	("static/menu_manifest.json", "static/menu_manifest.json"),
-	("static/version.json",       "static/version.json"),
-	("static/favicon.ico",        "static/favicon.ico"),
+	("static/version.json",    "static/version.json"),
+	("static/favicon.ico",     "static/favicon.ico"),
 	# Layout preview shown on the onboarding wizard's Step 2 (AHK + HS). The
 	# rest of the ergopti_*.jpg variants are web-only marketing assets and
 	# stay out of the bundle per the size-filter rationale above.
-	("static/img/ergopti.jpg",    "static/img/ergopti.jpg"),
+	("static/img/ergopti.jpg", "static/img/ergopti.jpg"),
 ]
 
 
@@ -157,7 +160,7 @@ def main() -> int:
 	args = parser.parse_args()
 
 	repo_root = args.repo_root.resolve()
-	output = (args.output or (repo_root / "static" / "drivers" / "autohotkey" / "build" / "static_bundle.zip")).resolve()
+	output = (args.output or (repo_root / "static" / "ergopti_plus" / "windows" / "build" / "static_bundle.zip")).resolve()
 
 	print(f"[bundle] Repo root  : {repo_root}")
 	print(f"[bundle] Output     : {output}")
