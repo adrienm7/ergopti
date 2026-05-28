@@ -195,7 +195,6 @@ def render(prev_tag: str | None, commits: list[dict[str, str]]) -> str:
 		ctype, bullet = classify(commit)
 		body_block = clean_body(commit["body"])
 		entry = bullet + (("\n" + body_block) if body_block else "")
-		entry += "\n"
 		if ctype and ctype in HEADINGS:
 			groups[ctype].append(entry)
 		else:
@@ -216,12 +215,12 @@ def render(prev_tag: str | None, commits: list[dict[str, str]]) -> str:
 			continue
 		out_lines.append(f"### {HEADINGS[t]}")
 		out_lines.append("")
-		out_lines.append("".join(entries))
+		out_lines.extend(entries)
 
 	if other:
 		out_lines.append("### Other")
 		out_lines.append("")
-		out_lines.append("".join(other))
+		out_lines.extend(other)
 
 	out_lines.append("---")
 	out_lines.append("")
