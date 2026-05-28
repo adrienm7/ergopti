@@ -73,6 +73,7 @@ SpaceTapHold(HoldFn) {
     ; This prevents Space auto-repeat (VK 32) from triggering EndReason="Max"
     ; and being replayed with the modifier, which produced spurious output.
     ih := InputHook("L0 T" . TimeoutSec)
+    ih.KeyOpt("{All}", "+N")  ; required for OnKeyDown to fire on any key
     ih.OnKeyDown := _SpaceCaptureVK
     ih.Start()
     _SpaceInputHook := ih
