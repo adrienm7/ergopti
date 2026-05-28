@@ -107,6 +107,30 @@ jobs:
               run: npm run build:domain
 
 
+    # ─────────────────────────────────────────────────
+    # 1.3) JS shared layer — port compliance + PBT
+    # ─────────────────────────────────────────────────
+    validate-js:
+        name: "Validate · JS ports + properties"
+        runs-on: ubuntu-latest
+
+        steps:
+            - uses: actions/checkout@v4
+
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: "22"
+                  cache: "npm"
+
+            - run: npm ci
+
+            - name: Port compliance (all 20 ports covered by adapters)
+              run: npm run test:port-compliance
+
+            - name: Property-based tests (fast-check, 26 × 1000 runs)
+              run: npm run test:properties
+
+
 # ==========================================
 # ==========================================
 # ======= 2/ macOS driver branch ===========
@@ -119,7 +143,7 @@ jobs:
     test-hs:
         name: "macOS · unit tests"
         runs-on: ubuntu-latest
-        needs: [validate-hotstrings, validate-domain]
+        needs: [validate-hotstrings, validate-domain, validate-js]
 
         steps:
             - uses: actions/checkout@v4
@@ -215,7 +239,7 @@ jobs:
     test-ahk:
         name: "Windows · unit tests"
         runs-on: windows-latest
-        needs: [validate-hotstrings, validate-domain]
+        needs: [validate-hotstrings, validate-domain, validate-js]
 
         steps:
             - uses: actions/checkout@v4
@@ -434,7 +458,7 @@ jobs:
     test-linux:
         name: "Linux · unit tests"
         runs-on: ubuntu-22.04
-        needs: [validate-hotstrings, validate-domain]
+        needs: [validate-hotstrings, validate-domain, validate-js]
 
         steps:
             - uses: actions/checkout@v4
