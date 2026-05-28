@@ -621,17 +621,23 @@ _Updater_OpenChangelogWindow(Channel) {
 
 	Lb := G.Add("ListBox", "xm y+4 w260 h" . ListHeight . " vRelLb", Labels)
 
+	; ── Bottom action button — created before RightPane so we can measure it ──
+	BtnOpen := G.Add("Button", "xm y+10 w260", t("updater.open_on_github"))
+	if (!HasReleases)
+		BtnOpen.Enabled := false
+
+	; RightPane spans from the top of Lb down to the bottom of BtnOpen so the
+	; WebView2 child fills exactly that column, flush with the button baseline.
+	Lb.GetPos(&lbx, &lby, , )
+	BtnOpen.GetPos(, &btny, , &btnh)
+	RightPaneH := (btny + btnh) - lby
+
 	; Decide whether to use WebView2 for Markdown rendering.
 	UseWV := IsSet(WebView2) && FileExist(_VendorDir . "\64bit\WebView2Loader.dll")
 
 	; Placeholder control that occupies the right-pane slot; the WebView2
 	; control will be positioned on top of it after Gui.Show().
-	RightPane := G.Add("Text", "x+10 yp w630 h" . ListHeight, "")
-
-	; ── Bottom action button (no Close — window chrome handles dismiss) ────────
-	BtnOpen := G.Add("Button", "xm y+10 w260", t("updater.open_on_github"))
-	if (!HasReleases)
-		BtnOpen.Enabled := false
+	RightPane := G.Add("Text", "x+10 y" . lby . " w630 h" . RightPaneH, "")
 
 	; ── WebView2 controller (created after Show so the Hwnd is valid) ─────────
 	WVC := unset   ; controller reference, kept in closure scope
