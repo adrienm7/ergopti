@@ -37,11 +37,8 @@ global _SpaceInputHook  := 0
 global _SpaceIHActive   := False
 global _SpaceTapSent    := False
 global _SpaceHoldFired  := False
-; Character captured by the InputHook when EndReason == "Max" (key typed while
-; Space was held). HoldFn reads this and injects it with the modifier active.
-global _SpaceHeldInput  := ""
-; VK of the key captured during the hold window (set by OnKeyDown alongside
-; _SpaceHeldInput). Used instead of ih.Input so HoldFn can replay the physical
+; VK of the key captured during the hold window (set by _SpaceCaptureVK).
+; Used by HoldFn to replay the physical
 ; key with a modifier rather than re-sending the already-translated character —
 ; e.g. Space+a on a remapped layout produces ih.Input="-" but _SpaceHeldVK=30
 ; (VK for 'a'), and SendInput("{vk1e}") with Shift active yields "A" correctly.
@@ -62,7 +59,7 @@ global _SpaceHoldActive := False
 ; TextPressKey uses SendInput which bypasses the prefix-watcher InputHook —
 ; without this call, end-char-gated hotstrings never fire on Space.
 SpaceTapHold(HoldFn) {
-    global _SpaceInputHook, _SpaceIHActive, _SpaceTapSent, _SpaceHoldFired, _SpaceHeldInput, _SpaceHeldVK, _SpaceHoldActive
+    global _SpaceInputHook, _SpaceIHActive, _SpaceTapSent, _SpaceHoldFired, _SpaceHeldVK, _SpaceHoldActive
     ; SC039 auto-repeat while Space is physically held fires this hotkey again —
     ; drop silently to avoid a second SpaceTapHold invocation corrupting state.
     if (IsSet(_SpaceHoldActive) and _SpaceHoldActive)
@@ -70,13 +67,12 @@ SpaceTapHold(HoldFn) {
     _SpaceHoldActive := True
     _SpaceTapSent   := False
     _SpaceHoldFired := False
-    _SpaceHeldInput := ""
     _SpaceHeldVK    := 0
     TimeoutSec := TapHoldDuration(TapHold, "space")
-    ih := InputHook("L1 T" . TimeoutSec)
-    ; Capture the physical VK alongside the translated character so HoldFn can
-    ; replay the raw key with a modifier instead of re-sending ih.Input (which
-    ; is already translated by the current layout and would double-translate).
+    ; L0: capture no characters via ih.Input — OnKeyDown handles everything.
+    ; This prevents Space auto-repeat (VK 32) from triggering EndReason="Max"
+    ; and being replayed with the modifier, which produced spurious output.
+    ih := InputHook("L0 T" . TimeoutSec)
     ih.OnKeyDown := _SpaceCaptureVK
     ih.Start()
     _SpaceInputHook := ih
@@ -84,13 +80,16 @@ SpaceTapHold(HoldFn) {
     ih.Wait()
     _SpaceIHActive  := False
     _SpaceInputHook := 0
-    ; "Stopped" = SC039 Up fired before any char or timeout → plain tap.
-    ; "Timeout" = Space held past the threshold with no char → hold.
-    ; "Max"     = a character arrived while Space was still held → hold:
-    ;             the user wants the modifier + that character. Treating Max
-    ;             as tap (the old behaviour) caused Space-hold+A to produce
-    ;             "Space A" instead of Ctrl+A.
-    if ih.EndReason == "Stopped" {
+    ; "Stopped" = SC039 Up fired (plain tap), or _SpaceCaptureVK stopped the IH
+    ;             after capturing a real non-Space key.
+    ; "Timeout" = Space held past the threshold with no other key pressed.
+    ; With L0 there is no "Max" EndReason — _SpaceCaptureVK stops the IH itself
+    ; when a real key is detected, which produces EndReason="Stopped".
+    ; Distinguish tap from captured-key-while-held via _SpaceHeldVK:
+    ;   _SpaceHeldVK == 0 and EndReason=="Stopped" → plain tap (Space Up fired)
+    ;   _SpaceHeldVK != 0 and EndReason=="Stopped" → key captured during hold
+    ;   EndReason == "Timeout"                     → pure hold, no key typed
+    if (ih.EndReason == "Stopped" and _SpaceHeldVK == 0) {
         _SpaceTapSent    := True
         _SpaceHoldActive := False
         TextPressKey("Space", "")
@@ -111,21 +110,11 @@ SpaceTapHold(HoldFn) {
         ; watcher never sees this Space otherwise).
         if IsSet(_ResetPrefixBuffer)
             try _ResetPrefixBuffer()
-        ; ih.Input holds any char that arrived in the capture window before
-        ; SC039 Up stopped the hook — re-emit it so it is not silently dropped.
-        if (ih.Input != "")
-            TextSend(ih.Input, "", 0)
         UpdateLastSentCharacter(" ")
         return False
     }
-    ; Timeout or Max → hold path. When EndReason is "Max" a character was
-    ; captured while Space was held; pass it to HoldFn via _SpaceHeldInput
-    ; so the hold action can inject it with the modifier active.
-    ; Exception: if ih.Input is a Space (VK 32 auto-repeat of SC039 itself),
-    ; treat it as a pure Timeout hold — _SpaceHeldVK was already zeroed by
-    ; _SpaceCaptureVK so HoldFn will correctly skip the captured-char injection.
+    ; Timeout or Stopped-with-VK → hold path.
     _SpaceHoldFired  := True
-    _SpaceHeldInput  := (ih.Input == " ") ? "" : ih.Input
     HoldFn()
     _SpaceHoldActive := False
     return True
@@ -141,12 +130,13 @@ SpaceTapHold(HoldFn) {
 
 _SpaceCaptureVK(ih, vk, sc) {
     global _SpaceHeldVK
-    ; VK 32 is Space itself — auto-repeat of SC039 while held generates a Space
-    ; keydown that the InputHook sees as a character. Ignore it so a pure hold
-    ; (no other key typed) stays on the Timeout path rather than Max+Space.
+    ; VK 32 is Space itself (SC039 auto-repeat while held) — ignore it entirely.
+    ; With L0 the IH never produces EndReason="Max", so we stop it manually here
+    ; when a real key is detected, giving EndReason="Stopped" with _SpaceHeldVK set.
     if (vk == 32)
         return
     _SpaceHeldVK := vk
+    ih.Stop()
 }
 
 _SpaceHoldCtrl() {
@@ -161,12 +151,11 @@ _SpaceHoldCtrl() {
     SendInput("{LCtrl Up}")
 }
 _SpaceHoldLayer() {
-    global _SpaceHeldInput
+    global _SpaceHeldVK
     ActivateLayer()
-    ; Layer remaps keys via hotkeys, so the raw char from ih.Input is correct here —
-    ; the layer mappings are not applied to ih.Input (IH runs before hotkeys).
-    if (_SpaceHeldInput != "")
-        SendInput("{Text}" . _SpaceHeldInput)
+    ; Replay the captured VK inside the layer so it receives the layer mapping.
+    if (_SpaceHeldVK != 0)
+        SendInput("{vk" . Format("{:x}", _SpaceHeldVK) . "}")
     KeyWait("SC039")
     DisableLayer()
 }
@@ -190,11 +179,10 @@ SC039 Up:: {
     ; Only stop the InputHook when no character has been captured yet.
     ; If ih.Input != "" a char arrived while Space was held — Stop() here
     ; would flip EndReason to "Stopped" and lose the hold path entirely.
-    ; Stop the IH when it is live and no real (non-Space) character has been
-    ; captured yet. ih.Input == " " means only a Space auto-repeat was seen —
-    ; treat that the same as empty so we still take the tap or pure-hold path.
-    if (IsSet(_SpaceIHActive) and _SpaceIHActive
-        and (_SpaceInputHook.Input == "" or _SpaceInputHook.Input == " ")) {
+    ; With L0 the IH never accumulates input, so Stop() here always means tap.
+    ; _SpaceCaptureVK may have already stopped it (key captured while held) —
+    ; calling Stop() on an already-stopped IH is a safe no-op in AHK v2.
+    if (IsSet(_SpaceIHActive) and _SpaceIHActive) {
         _SpaceInputHook.Stop()
     }
 }
@@ -204,11 +192,10 @@ SC039 Up:: {
 ; Tap-hold on "Space" : Space on tap, Layer on hold
 SC039:: SpaceTapHold(_SpaceHoldLayer)
 SC039 Up:: {
-    ; Stop the IH when it is live and no real (non-Space) character has been
-    ; captured yet. ih.Input == " " means only a Space auto-repeat was seen —
-    ; treat that the same as empty so we still take the tap or pure-hold path.
-    if (IsSet(_SpaceIHActive) and _SpaceIHActive
-        and (_SpaceInputHook.Input == "" or _SpaceInputHook.Input == " ")) {
+    ; With L0 the IH never accumulates input, so Stop() here always means tap.
+    ; _SpaceCaptureVK may have already stopped it (key captured while held) —
+    ; calling Stop() on an already-stopped IH is a safe no-op in AHK v2.
+    if (IsSet(_SpaceIHActive) and _SpaceIHActive) {
         _SpaceInputHook.Stop()
     }
 }
@@ -218,11 +205,10 @@ SC039 Up:: {
 ; Tap-hold on "Space" : Space on tap, Shift on hold
 SC039:: SpaceTapHold(_SpaceHoldShift)
 SC039 Up:: {
-    ; Stop the IH when it is live and no real (non-Space) character has been
-    ; captured yet. ih.Input == " " means only a Space auto-repeat was seen —
-    ; treat that the same as empty so we still take the tap or pure-hold path.
-    if (IsSet(_SpaceIHActive) and _SpaceIHActive
-        and (_SpaceInputHook.Input == "" or _SpaceInputHook.Input == " ")) {
+    ; With L0 the IH never accumulates input, so Stop() here always means tap.
+    ; _SpaceCaptureVK may have already stopped it (key captured while held) —
+    ; calling Stop() on an already-stopped IH is a safe no-op in AHK v2.
+    if (IsSet(_SpaceIHActive) and _SpaceIHActive) {
         _SpaceInputHook.Stop()
     }
 }
