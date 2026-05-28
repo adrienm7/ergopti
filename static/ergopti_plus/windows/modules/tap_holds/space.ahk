@@ -77,7 +77,8 @@ SpaceTapHold(ModDownFn, ModUpFn) {
     ModDownFn.Call()
     if (_SpaceHeldVK != 0)
         SendInput("{vk" . Format("{:x}", _SpaceHeldVK) . "}")
-    KeyWait("SC039")
+    ; "U" returns immediately if SC039 is already up (released during IH window).
+    KeyWait("SC039", "U T2")
     ModUpFn.Call()
 }
 
