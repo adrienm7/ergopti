@@ -327,8 +327,6 @@ function M.build_management(ctx)
 	local bubble_item = nil
 	local exp_item = nil
 	local delays_item = nil
-	local magic_item = nil
-	local magic_reset_item = nil
 
 	local c_star        = M.DEFAULT_STATE.preview_star_color
 	local c_autocorrect = M.DEFAULT_STATE.preview_autocorrect_color
@@ -589,61 +587,6 @@ function M.build_management(ctx)
 
 	delays_item = { title = i18n.get("menu.hotstrings.delays_colors"), disabled = paused or nil, menu = delay_menu }
 
-	magic_item = {
-		title    = i18n.get("menu.hotstrings.magic_key_item_prefix") .. state.trigger_char,
-		disabled = paused or nil,
-		fn       = not paused and function()
-			local ok_p, btn, raw = pcall(dialog.text_prompt,
-				i18n.get("menu.hotstrings.magic_key_title"),
-				i18n.get("menu.hotstrings.magic_key_prompt"),
-				state.trigger_char, "OK", i18n.get("common.cancel")
-			)
-			if ok_p and btn == "OK" and type(raw) == "string" and raw ~= "" then
-				local new_char = raw:match("^([%z\1-\127\194-\244][\128-\191]*)") or raw:sub(1,1)
-				if new_char and new_char ~= state.trigger_char then
-					state.trigger_char = new_char
-					if ctx.keymap and type(ctx.keymap.set_trigger_char) == "function" then
-						pcall(ctx.keymap.set_trigger_char, new_char)
-					end
-					if ctx.hotstring_editor and type(ctx.hotstring_editor.set_trigger_char) == "function" then
-						pcall(ctx.hotstring_editor.set_trigger_char, new_char)
-					end
-					ctx.save_prefs()
-					ctx.do_reload("menu")
-				end
-			end
-		end or nil,
-	}
-
-	if state.trigger_char ~= "★" then
-		magic_reset_item = {
-			title    = i18n.get("menu.hotstrings.reset_magic_key"),
-			disabled = paused or nil,
-			fn       = not paused and function()
-				state.trigger_char = "★"
-				if ctx.keymap and type(ctx.keymap.set_trigger_char) == "function" then pcall(ctx.keymap.set_trigger_char, "★") end
-				ctx.save_prefs(); ctx.do_reload("menu")
-			end or nil,
-		}
-	end
-
-	local repeat_enabled = ctx.keymap and type(ctx.keymap.is_repeat_feature_enabled) == "function"
-		and ctx.keymap.is_repeat_feature_enabled()
-	local repeat_toggle_item = {
-		title   = i18n.get("menu.hotstrings.repeat_key_toggle"),
-		checked = repeat_enabled,
-		disabled = paused or nil,
-		fn      = not paused and function()
-			if ctx.keymap and type(ctx.keymap.set_repeat_feature_enabled) == "function" then
-				pcall(ctx.keymap.set_repeat_feature_enabled, not repeat_enabled)
-			end
-			ctx.do_reload("menu")
-		end or nil,
-	}
-
-	if magic_item then table.insert(menu, magic_item) end
-	if magic_reset_item then table.insert(menu, magic_reset_item) end
-	table.insert(menu, repeat_toggle_item)
 	if exp_item then table.insert(menu, exp_item) end
 	if delays_item then table.insert(menu, delays_item) end
 	table.insert(menu, { title = "-" })

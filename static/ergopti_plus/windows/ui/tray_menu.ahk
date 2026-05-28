@@ -1301,12 +1301,6 @@ initMenu() {
 	ParamsMenu := Menu()
 	RegisterMenuItem(ParamsMenu, t("menu.hotstrings.delays_colors"),
 		(*) => OpenHotstringsConfigWindow())
-	RegisterMenuItem(ParamsMenu, t("menu.hotstrings.magic_key_prefix") . ScriptInformation["MagicKey"], MagicKeyEditor)
-	RepeatToggleLabel := t("menu.hotstrings.repeat_key_toggle")
-	RegisterMenuItem(ParamsMenu, RepeatToggleLabel, ToggleRepeatKeyEnabled)
-	if HSE_RepeatEnabled {
-		ParamsMenu.Check(RepeatToggleLabel)
-	}
 	HotstringsMenu.Add(t("menu.hotstrings.params"), ParamsMenu)
 	HotstringsMenu.Add() ; Separator after paramètres block
 
