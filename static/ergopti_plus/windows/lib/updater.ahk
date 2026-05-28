@@ -595,8 +595,15 @@ _Updater_OpenChangelogWindow(Channel) {
 
 	G := Gui("+Resize +MinSize960x600", WinTitle)
 	G.SetFont("s10", "Segoe UI")
-	G.MarginX := 5
-	G.MarginY := 5
+	G.MarginX := 10
+	G.MarginY := 8
+
+	; Inner width available for controls (window w930 minus left+right margins).
+	; MarginX=10 → usable band: x=10 … x=920 → 910 px wide.
+	InnerW    := 910
+	LeftColW  := 260
+	ColGap    := 10
+	RightColW := InnerW - LeftColW - ColGap   ; 640
 
 	; ── Header bar ────────────────────────────────────────────────────────────
 	IsLocal := Updater_IsLocalSource()
@@ -608,21 +615,23 @@ _Updater_OpenChangelogWindow(Channel) {
 		? t("updater.changelog_switch_to_main")
 		: t("updater.changelog_switch_to_dev")
 
-	G.Add("Text", "xm yp+4 w580 +0x200", BadgeText)
-	BtnSwitch := G.Add("Button", "x+10 yp w330", SwitchLabel)
+	BadgeW    := InnerW - ColGap - (InnerW - LeftColW - ColGap)   ; 260 = LeftColW
+	BtnSwitchW := InnerW - BadgeW - ColGap                         ; 640
+	G.Add("Text", "xm yp+4 w" . BadgeW . " +0x200", BadgeText)
+	BtnSwitch := G.Add("Button", "x+10 yp w" . BtnSwitchW, SwitchLabel)
 
 	if (IsLocal)
-		G.Add("Text", "xm y+4 w890 cGray", t("updater.changelog_local_source_note"))
+		G.Add("Text", "xm y+4 w" . InnerW . " cGray", t("updater.changelog_local_source_note"))
 
-	G.Add("Text", "xm y+8 w260", t("updater.changelog_select_release"))
+	G.Add("Text", "xm y+8 w" . LeftColW, t("updater.changelog_select_release"))
 
 	; ── Two-pane area ─────────────────────────────────────────────────────────
 	ListHeight := IsLocal ? 460 : 480
 
-	Lb := G.Add("ListBox", "xm y+4 w260 h" . ListHeight . " vRelLb", Labels)
+	Lb := G.Add("ListBox", "xm y+4 w" . LeftColW . " h" . ListHeight . " vRelLb", Labels)
 
 	; ── Bottom action button — created before RightPane so we can measure it ──
-	BtnOpen := G.Add("Button", "xm y+10 w260", t("updater.open_on_github"))
+	BtnOpen := G.Add("Button", "xm y+10 w" . LeftColW, t("updater.open_on_github"))
 	if (!HasReleases)
 		BtnOpen.Enabled := false
 
@@ -637,7 +646,7 @@ _Updater_OpenChangelogWindow(Channel) {
 
 	; Placeholder control that occupies the right-pane slot; the WebView2
 	; control will be positioned on top of it after Gui.Show().
-	RightPane := G.Add("Text", "x+10 y" . lby . " w630 h" . RightPaneH, "")
+	RightPane := G.Add("Text", "x+10 y" . lby . " w" . RightColW . " h" . RightPaneH, "")
 
 	; ── WebView2 controller (created after Show so the Hwnd is valid) ─────────
 	WVC := unset   ; controller reference, kept in closure scope
