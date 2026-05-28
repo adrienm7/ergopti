@@ -91,8 +91,8 @@ KLWV_IsAvailable() {
 
 ; Resolve the absolute file:// URL of a dashboard’s index.html.
 KLWV_AssetUrl(which) {
-    global _StaticDir
-    base := _StaticDir . "\ergopti_plus\shared\ui\metrics_" . which . "\index.html"
+    global _SharedDir
+    base := _SharedDir . "\ui\metrics_" . which . "\index.html"
     loop files, base
         base := A_LoopFileFullPath
     return "file:///" . StrReplace(base, "\", "/")
@@ -101,8 +101,8 @@ KLWV_AssetUrl(which) {
 ; Resolve the absolute file:// URL of the shared locales directory.
 ; Matches the convention used by OllamaWV_LocalesUrl in ollama_webview.ahk.
 KLWV_LocalesUrl() {
-    global _StaticDir
-    base := _StaticDir . "\ergopti_plus\shared\locales\"
+    global _SharedDir
+    base := _SharedDir . "\locales\"
     return "file:///" . StrReplace(base, "\", "/")
 }
 
@@ -402,13 +402,13 @@ KLWV_PushPrefetch(which) {
 ; pre-parsed strings into window._i18n_strings, then call i18n_apply() to
 ; populate all data-i18n attributes immediately.
 KLWV_InjectI18n(which) {
-    global _StaticDir, _ConfigDir
+    global _SharedDir, _ConfigDir
     log := _ConfigDir . "ahk\logs\webview.log"
     try FileAppend("[" . A_Now . "] InjectI18n(" . which . "): called, has_window=" . (KLWV.windows.Has(which) ? "1" : "0") . "`r`n", log, "UTF-8")
     if !KLWV.windows.Has(which)
         return
     locale_code := I18nGetLocale()
-    json_path := _StaticDir . "\ergopti_plus\shared\locales\" . locale_code . ".json"
+    json_path := _SharedDir . "\locales\" . locale_code . ".json"
     json_str := "{}"
     if FileExist(json_path)
         try json_str := FileRead(json_path, "UTF-8")

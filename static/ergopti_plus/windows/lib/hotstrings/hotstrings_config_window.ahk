@@ -763,7 +763,7 @@ _HCW_GetSections(Entry) {
 				and ScriptInformation.Has("PersonalTomlPath")) {
 			Path := ScriptInformation["PersonalTomlPath"]
 		} else {
-			Path := _StaticDir . "\ergopti_plus\shared\hotstrings\" . StrLower(Cat) . ".toml"
+			Path := _SharedDir . "\hotstrings\" . StrLower(Cat) . ".toml"
 		}
 	}
 	Sections := []

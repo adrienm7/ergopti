@@ -83,8 +83,8 @@ global _I18nCacheFrLoaded := false
 ; Resolve the absolute path to a locale JSON file given a locale code.
 ; Uses _StaticDir (computed in ErgoptiPlus.ahk) to reach static/ergopti_plus/shared/locales/.
 _I18nLocalePath(Code) {
-	global _StaticDir
-	return _StaticDir . "\ergopti_plus\shared\locales\" . Code . ".json"
+	global _SharedDir
+	return _SharedDir . "\locales\" . Code . ".json"
 }
 
 ; Detect the Windows UI language via GetLocaleInfoEx(LOCALE_SISO639LANGNAME)

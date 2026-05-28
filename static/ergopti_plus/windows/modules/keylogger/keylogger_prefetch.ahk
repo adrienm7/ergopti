@@ -42,8 +42,8 @@
 ; or « apps »). The dashboards live under
 ; ``<repo>/static/ergopti_plus/shared/ui/metrics_<key>/``.
 KLPF_AssetsDir(which) {
-    global _StaticDir
-    base := _StaticDir . "\ergopti_plus\shared\ui\metrics_" . which . "\"
+    global _SharedDir
+    base := _SharedDir . "\ui\metrics_" . which . "\"
     loop files, base, "D"
         return A_LoopFileFullPath . "\"
     return base

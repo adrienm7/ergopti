@@ -263,7 +263,7 @@ _PrefixWatcherTomlPath(Category) {
             and ScriptInformation.Has("PersonalTomlPath")) {
         return ScriptInformation["PersonalTomlPath"]
     }
-    return _StaticDir . "\ergopti_plus\shared\hotstrings\" . LowerCat . ".toml"
+    return _SharedDir . "\hotstrings\" . LowerCat . ".toml"
 }
 
 ; Scan a category TOML and add every (trigger, output) pair to the prefix

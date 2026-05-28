@@ -85,10 +85,10 @@ _MM_ResolveIdArray(IdsArr, CategoryKeysMap, GroupName, Fallback) {
 ;
 ; On any read or parse failure the fallback hard-coded arrays are returned.
 MenuManifest_LoadHotstringGroups() {
-	global _StaticDir
+	global _SharedDir
 	global _MM_FALLBACK_STANDARD, _MM_FALLBACK_ERGOPTI, _MM_FALLBACK_DYNAMIC
 
-	FilePath := _StaticDir . "\ergopti_plus\shared\menu_manifest.json"
+	FilePath := _SharedDir . "\menu_manifest.json"
 
 	; Guard: file must exist before we attempt to read it
 	if !FileExist(FilePath) {
