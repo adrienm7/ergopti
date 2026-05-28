@@ -93,15 +93,84 @@ global UI_MAX_CARET_HEIGHT_PX      := 80
 ; Mirrors: Config.layout.window_bottom_inset = 40  (AHK uses a larger inset)
 global UI_WINDOW_BOTTOM_INSET_PX   := 60
 
+; ── Timing defaults (from shared/tooltip/constants.toml [timing]) ─────────────
+; Overwritten by UiStyle_LoadSharedConst() at startup; hardcoded here as
+; compile-time fallbacks in case the TOML file is absent.
+global UI_HOTSTRING_TIMEOUT_SEC := 2.5
+global UI_LLM_TIMEOUT_SEC       := 12.0
+global UI_TIMEOUT_DECREMENT_SEC := 0.2
+global UI_TIMEOUT_FLOOR_SEC     := 0.05
 
 
 
 
-; ===========================================
-; ===========================================
-; ======= 2/ Dynamic button width helper ====
-; ===========================================
-; ===========================================
+
+; ====================================================================
+; ====================================================================
+; ======= 2/ Runtime loader from shared/tooltip/constants.toml =======
+; ====================================================================
+; =================================================================
+
+/**
+ * Reads shared/tooltip/constants.toml at startup and overwrites the compile-
+ * time fallback globals declared in section 1. Uses _SharedDir (set by the
+ * main entry point) + ParseTomlFile + IniCacheGet (same helpers as WPMWidget).
+ * On any read failure the compile-time fallbacks remain active and an error
+ * is logged so divergence is immediately visible.
+ * @returns void
+ */
+UiStyle_LoadSharedConst() {
+	global _SharedDir
+	path := _SharedDir . "\tooltip\constants.toml"
+	c := ParseTomlFile(path)
+	if !c.Count {
+		LoggerError("UiStyle", "shared/tooltip/constants.toml not found — UI constants remain at compile-time defaults.")
+		return
+	}
+
+	; [typography] — platform-specific keys only (font names are AHK-specific)
+	global UI_FONT_SIZE_MAIN       := Integer(IniCacheGet(c, "typography", "font_size_main_ahk", "11"))
+	global UI_FONT_SIZE_HINT       := Integer(IniCacheGet(c, "typography", "font_size_hint_ahk", "11"))
+
+	; [layout]
+	global UI_PAD_X                := Integer(IniCacheGet(c, "layout", "pad_x",        "14"))
+	global UI_PAD_Y                := Integer(IniCacheGet(c, "layout", "pad_y",         "7"))
+	global UI_LABEL_GAP            := Integer(IniCacheGet(c, "layout", "label_gap",    "16"))
+	; GDI nWidth/nHeight = full ellipse diameter = 2 × corner_radius.
+	global UI_CORNER_RADIUS        := Integer(IniCacheGet(c, "layout", "corner_radius", "7")) * 2
+
+	; [colors]
+	global UI_BG_HEX               := SubStr(IniCacheGet(c, "colors", "bg_hex", "#1A1A1A"), 2)   ; strip leading #
+	global UI_LABEL_COLOR_HEX      := SubStr(IniCacheGet(c, "colors", "label_hex", "#AAAAAA"), 2)
+	global UI_BORDER_ALPHA         := Float(IniCacheGet(c, "colors", "border_alpha_ahk", "0.25"))
+
+	; [tint]
+	global UI_TINT_LIGHTNESS       := Float(IniCacheGet(c, "tint", "lightness",  "0.10"))
+	global UI_TINT_SATURATION      := Float(IniCacheGet(c, "tint", "saturation", "0.40"))
+
+	; [positioning]
+	global UI_OFFSET_BELOW         := Integer(IniCacheGet(c, "positioning", "caret_offset_y",          "18"))
+	global UI_MAX_CARET_HEIGHT_PX  := Integer(IniCacheGet(c, "positioning", "max_caret_height",         "80"))
+	global UI_WINDOW_BOTTOM_INSET_PX := Integer(IniCacheGet(c, "positioning", "window_bottom_inset_ahk","60"))
+
+	; [timing]
+	global UI_HOTSTRING_TIMEOUT_SEC := Float(IniCacheGet(c, "timing", "hotstring_timeout_sec", "2.5"))
+	global UI_LLM_TIMEOUT_SEC       := Float(IniCacheGet(c, "timing", "llm_timeout_sec",       "12.0"))
+	global UI_TIMEOUT_DECREMENT_SEC := Float(IniCacheGet(c, "timing", "timeout_decrement_sec", "0.2"))
+	global UI_TIMEOUT_FLOOR_SEC     := Float(IniCacheGet(c, "timing", "timeout_floor_sec",     "0.05"))
+
+	LoggerDone("UiStyle", "Shared tooltip constants loaded (pad_x={1} corner_r={2} bg={3} tmo={4}s).",
+		UI_PAD_X, UI_CORNER_RADIUS, UI_BG_HEX, UI_HOTSTRING_TIMEOUT_SEC)
+}
+
+
+
+
+; ==============================================
+; ==============================================
+; ======= 3/ Dynamic button width helper =======
+; ==============================================
+; ==============================================
 
 ; Minimum dynamic button width applied across the codebase. Matches the
 ; historical `w90` used in onboarding — short labels (OK / Yes / No) keep

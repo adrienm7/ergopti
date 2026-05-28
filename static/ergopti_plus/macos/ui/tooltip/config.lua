@@ -233,4 +233,101 @@ function M.set_accent_color(key, color)
 	M.accent_colors[key] = color
 end
 
+
+
+
+-- =====================================================================
+--- =====================================================================
+-- ======= 3/ Bootstrap: load from shared/tooltip/constants.toml =======
+--- =====================================================================
+-- =====================================================================
+
+--- Reads shared/tooltip/constants.toml at require-time and overwrites the
+--- hardcoded defaults declared above so the Lua driver stays in sync with the
+--- TOML single source of truth. Any read failure is logged at WARN and the
+--- hardcoded defaults remain active — the tooltip is always functional.
+local function load_from_shared()
+	local ok_reader, toml_reader = pcall(require, "lib.toml_reader")
+	if not ok_reader or not toml_reader then
+		Logger.warn(LOG, "lib.toml_reader not available — tooltip constants using compile-time defaults.")
+		return
+	end
+
+	-- Locate shared dir by walking up from this file:
+	-- macos/ui/tooltip/config.lua → macos/ui/tooltip → macos/ui → macos → ergopti_plus → shared
+	local ok_path, shared_path = pcall(function()
+		local src = debug.getinfo(1, "S").source:gsub("^@", "")
+		-- Strip 3 path components (config.lua, tooltip/, ui/) to reach macos/
+		local dir = src:match("^(.*)[/\\][^/\\]+$") or src      -- tooltip/
+		dir = dir:match("^(.*)[/\\][^/\\]+$") or dir            -- ui/
+		dir = dir:match("^(.*)[/\\][^/\\]+$") or dir            -- macos/
+		local ergopti_plus = dir:match("^(.*)[/\\][^/\\]+$") or dir -- ergopti_plus/
+		return ergopti_plus .. "/shared"
+	end)
+	if not ok_path or not shared_path then
+		Logger.warn(LOG, "Cannot resolve shared dir — tooltip constants using compile-time defaults.")
+		return
+	end
+
+	local toml_path = shared_path .. "/tooltip/constants.toml"
+	local ok_c, c = pcall(toml_reader.parse, toml_path)
+	if not ok_c or type(c) ~= "table" then
+		Logger.warn(LOG, "shared/tooltip/constants.toml not readable — using compile-time defaults.")
+		return
+	end
+
+	local function get(section, key, default)
+		local s = c[section]
+		if type(s) ~= "table" then return default end
+		local v = s[key]
+		return (v ~= nil) and v or default
+	end
+
+	-- [typography]
+	M.sizes.main = get("typography", "font_size_main_hs",  M.sizes.main)
+	M.sizes.hint = get("typography", "font_size_hint_hs",  M.sizes.hint)
+	M.sizes.info = get("typography", "font_size_info_hs",  M.sizes.info)
+
+	-- [layout]
+	M.layout.pad_x               = get("layout", "pad_x",             M.layout.pad_x)
+	M.layout.pad_y               = get("layout", "pad_y",             M.layout.pad_y)
+	M.layout.line_spacing        = get("layout", "line_spacing",       M.layout.line_spacing)
+	M.layout.hint_spacing        = get("layout", "hint_spacing",       M.layout.hint_spacing)
+	M.layout.screen_margin       = get("layout", "screen_margin",      M.layout.screen_margin)
+	-- corner_radius passed directly as xRadius/yRadius on canvas element (no ×2)
+	M.layout.corner_radius       = get("layout", "corner_radius",      7)
+
+	-- [positioning]
+	M.layout.caret_offset_x      = get("positioning", "caret_offset_x",         M.layout.caret_offset_x)
+	M.layout.caret_offset_y      = get("positioning", "caret_offset_y",         M.layout.caret_offset_y)
+	M.layout.window_offset_y     = get("positioning", "window_offset_y",        M.layout.window_offset_y)
+	M.layout.window_bottom_inset = get("positioning", "window_bottom_inset_hs", M.layout.window_bottom_inset)
+	M.layout.max_caret_height    = get("positioning", "max_caret_height",       M.layout.max_caret_height)
+
+	-- [colors]
+	local bg_w = get("colors", "bg_white",     0.10)
+	local bg_a = get("colors", "bg_alpha",     1.0)
+	M.colors.bg       = { white = bg_w, alpha = bg_a }
+	M.colors.bg_alpha = get("colors", "canvas_alpha_hs", M.colors.bg_alpha)
+
+	local sep_w = get("colors", "sep_white",     1.0)
+	local sep_a = get("colors", "sep_alpha_hs",  0.09)
+	M.colors.sep      = { white = sep_w, alpha = sep_a }
+
+	-- [timing]
+	DEFAULT_TIMEOUT_SEC     = get("timing", "hotstring_timeout_sec", DEFAULT_TIMEOUT_SEC)
+	DEFAULT_LLM_TIMEOUT_SEC = get("timing", "llm_timeout_sec",       DEFAULT_LLM_TIMEOUT_SEC)
+	TIMEOUT_DECREMENT_SEC   = get("timing", "timeout_decrement_sec", TIMEOUT_DECREMENT_SEC)
+	TIMEOUT_FLOOR_SEC       = get("timing", "timeout_floor_sec",     TIMEOUT_FLOOR_SEC)
+	-- Re-apply to settings table so the live values reflect the TOML.
+	M.settings.timeout_sec     = DEFAULT_TIMEOUT_SEC
+	M.settings.llm_timeout_sec = DEFAULT_LLM_TIMEOUT_SEC
+
+	Logger.done(LOG, "Shared tooltip constants loaded (pad_x=%d corner=%d tmo=%.1fs llm=%.1fs).",
+		M.layout.pad_x, M.layout.corner_radius or 7,
+		M.settings.timeout_sec, M.settings.llm_timeout_sec)
+end
+
+load_from_shared()
+
 return M
