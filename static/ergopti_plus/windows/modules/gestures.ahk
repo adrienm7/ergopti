@@ -968,6 +968,13 @@ global GestureLeftClickHeld  := False
 global GestureRightClickHeld := False
 global GestureKeyboardHook   := 0
 
+; Window cycle tracker — ordered by manual user activation (most-recent first).
+; _GestureCycling is set True while our own WinActivate runs so the WinEvent
+; hook ignores the synthetic focus change and keeps the list stable.
+global _GestureWinOrder   := []   ; Array of HWNDs, index 1 = most recently manually focused
+global _GestureCycling    := False
+global _GestureWinHook    := 0    ; DllCall hook handle
+
 
 
 
@@ -1069,9 +1076,8 @@ GestureGetCyclableWindows(ProcessFilter := "") {
         }
     }
 
-    ; Stable order independent of focus — HWNDs are monotonic creation IDs.
-    ; Without this sort, WinGetList()'s Z-order makes the cycle ping-pong
-    ; between the 2 last-used windows (Alt+Tab behaviour).
+    ; Sort by HWND ascending (monotonic creation order) for a stable cycle
+    ; that does not shift when the active window changes Z-order position.
     N := Result.Length
     loop N - 1 {
         I := A_Index
@@ -1087,6 +1093,83 @@ GestureGetCyclableWindows(ProcessFilter := "") {
     return Result
 }
 
+
+
+
+; ====================================================
+; ====================================================
+; ======= X/ Manual-activation window tracker =======
+; ====================================================
+; ====================================================
+
+; WinEvent callback fired by Windows whenever a window gains foreground focus.
+; Ignored when _GestureCycling is True so our own WinActivate calls do not
+; corrupt the manually-built recency order.
+_GestureOnForeground(hWinEventHook, Event, HWnd, IdObject, IdChild, Thread, Time) {
+    global _GestureWinOrder, _GestureCycling
+    if (_GestureCycling) {
+        return
+    }
+    ; Skip non-window objects (menus, scroll bars, etc.)
+    if (IdObject != 0) {
+        return
+    }
+    ; Remove existing entry for this HWND, then prepend it (most-recent first)
+    NewOrder := [HWnd]
+    for H in _GestureWinOrder {
+        if (H != HWnd) {
+            NewOrder.Push(H)
+        }
+    }
+    _GestureWinOrder := NewOrder
+}
+
+; Cleans up the WinEvent hook on script exit.
+_GestureUnhook(*) {
+    global _GestureWinHook
+    if (_GestureWinHook) {
+        DllCall("UnhookWinEvent", "Ptr", _GestureWinHook)
+        _GestureWinHook := 0
+    }
+}
+
+; Returns _GestureWinOrder pruned to only currently-cyclable windows,
+; preserving manual-activation recency order (most-recent at index 1).
+; If the list is empty (first use before any manual activation was recorded),
+; falls back to GestureGetCyclableWindows() so the feature still works on
+; first launch. Accepts an optional ProcessFilter to restrict to one app.
+_GestureOrderedWindows(ProcessFilter := "") {
+    global _GestureWinOrder
+    Cyclable := GestureGetCyclableWindows(ProcessFilter)
+    ; Build a Set for O(1) membership check
+    CyclableSet := Map()
+    for H in Cyclable {
+        CyclableSet[H] := True
+    }
+    ; Retain only HWNDs still alive and cyclable, in recency order
+    Result := []
+    for H in _GestureWinOrder {
+        if CyclableSet.Has(H) {
+            Result.Push(H)
+        }
+    }
+    ; If nothing was tracked yet, fall back to creation-order list
+    if (Result.Length = 0) {
+        return Cyclable
+    }
+    ; Append any cyclable windows not yet seen in the tracker
+    ; (e.g. opened before ErgoptiPlus was running)
+    TrackedSet := Map()
+    for H in Result {
+        TrackedSet[H] := True
+    }
+    for H in Cyclable {
+        if !TrackedSet.Has(H) {
+            Result.Push(H)
+        }
+    }
+    return Result
+}
 
 
 ; ==============================
@@ -1287,19 +1370,23 @@ GestureNextIndex(Current, N, Forward) {
 
 ; Cycles through every window across all applications on the current desktop.
 ; Forward=True selects the next window, Forward=False the previous one.
+; Order follows manual user activation history (_GestureWinOrder), not Z-order.
 ; If the target window can't be activated, falls back to the next one in the
 ; cycle so the user never gets "stuck" at an unactivatable slot.
 GestureCycleWindows(Forward) {
+    global _GestureCycling
+    ; Capture the active HWND before releasing modifiers — the Send below can
+    ; briefly shift focus. WinExist returns the HWND directly (WMExists returns bool).
+    Active := WinExist("A")
     ; Release modifiers still held by the touchpad gesture (Ctrl+Win+Shift)
     ; so WinActivate doesn't trigger the Start menu or other system shortcuts.
     Send("{Blind}{LCtrl up}{RCtrl up}{LShift up}{RShift up}{LWin up}{RWin up}{LAlt up}{RAlt up}")
-    Windows := GestureGetCyclableWindows()
+    Windows := _GestureOrderedWindows()
     N := Windows.Length
     if (N < 2) {
         LoggerDebug("gestures", "CycleWindows: only {1} window(s) — nothing to cycle.", N)
         return
     }
-    Active := WMExists("A")
     Index := 0
     for I, HWnd in Windows {
         if (HWnd = Active) {
@@ -1309,19 +1396,17 @@ GestureCycleWindows(Forward) {
     }
     LoggerDebug("gestures", "CycleWindows: {1} window(s), active idx={2}, forward={3}.",
         N, Index, Forward)
-    for I, HWnd in Windows {
-        try {
-            WinTitle := WinGetTitle("ahk_id " . HWnd)
-            C := WinGetClass("ahk_id " . HWnd)
-            LoggerDebug("gestures", "  [{1}] HWND={2} class='{3}' title='{4}'.", I, HWnd, C, WinTitle)
-        }
-    }
 
     ; Try up to N-1 candidates so we wrap around even if some windows refuse activation.
     Target := Index
     loop N - 1 {
         Target := GestureNextIndex(Target, N, Forward)
-        if GestureActivateWindow(Windows[Target]) {
+        ; Suppress the WinEvent hook so this programmatic activation does not
+        ; reorder the manual history.
+        _GestureCycling := True
+        Activated := GestureActivateWindow(Windows[Target])
+        _GestureCycling := False
+        if Activated {
             LoggerDebug("gestures", "Activated HWND {1} (idx={2}).", Windows[Target], Target)
             return
         }
@@ -1330,9 +1415,12 @@ GestureCycleWindows(Forward) {
 }
 
 ; Cycles through windows belonging to the same process as the active window.
+; Order follows manual user activation history, same as GestureCycleWindows.
 GestureCycleAppWindows(Forward) {
+    global _GestureCycling
+    ; Capture the active HWND before releasing modifiers — same race as CycleWindows.
+    Active := WinExist("A")
     Send("{Blind}{LCtrl up}{RCtrl up}{LShift up}{RShift up}{LWin up}{RWin up}{LAlt up}{RAlt up}")
-    Active := WMExists("A")
     if (!Active) {
         return
     }
@@ -1340,7 +1428,7 @@ GestureCycleAppWindows(Forward) {
     catch {
         return
     }
-    Windows := GestureGetCyclableWindows(ProcName)
+    Windows := _GestureOrderedWindows(ProcName)
     N := Windows.Length
     if (N < 2) {
         LoggerDebug("gestures", "CycleAppWindows: only {1} window(s) for '{2}'.", N, ProcName)
@@ -1359,7 +1447,10 @@ GestureCycleAppWindows(Forward) {
     Target := Index
     loop N - 1 {
         Target := GestureNextIndex(Target, N, Forward)
-        if GestureActivateWindow(Windows[Target]) {
+        _GestureCycling := True
+        Activated := GestureActivateWindow(Windows[Target])
+        _GestureCycling := False
+        if Activated {
             LoggerDebug("gestures", "Activated HWND {1} (idx={2}).", Windows[Target], Target)
             return
         }
@@ -1792,5 +1883,17 @@ if (RawAutoConfig == "1" or RawAutoConfig == "true") {
 
     LoggerSuccess("gestures", "AutoConfigureOnNextStart flag cleared — touchpad config deferred to T+2s.")
 }
+
+; Arm the WinEvent hook that tracks manual window activations.
+_GestureWinOrder := []
+_GestureWinHook  := DllCall("SetWinEventHook",
+    "UInt", 0x0003,           ; EVENT_SYSTEM_FOREGROUND
+    "UInt", 0x0003,
+    "Ptr",  0,
+    "Ptr",  CallbackCreate(_GestureOnForeground, "F", 7),
+    "UInt", 0,
+    "UInt", 0,
+    "UInt", 0x0000)           ; WINEVENT_OUTOFCONTEXT
+OnExit(_GestureUnhook)
 
 LoggerSuccess("gestures", "Gestures module initialised — ready.")
