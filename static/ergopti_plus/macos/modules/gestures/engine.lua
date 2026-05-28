@@ -58,19 +58,19 @@ local LIVE_REVERSE_FAST_MIN       = 1.5   -- Signed distance threshold to unlock
 -- 50 ms is still long enough to filter out genuine palm-spike noise (which
 -- typically lasts <30 ms / 1-2 frames at 60 Hz).
 local FINGER_CONFIRM_FRAMES = 4
-local FINGER_CONFIRM_MS     = 0.05
+local FINGER_CONFIRM_SEC     = 0.05
 
 -- Candidate confirmation for noisy multi-finger drops (flickering)
 -- We are more aggressive in keeping a higher finger count active.
 local FINGER_DROP_CONFIRM_FRAMES = 8
-local FINGER_DROP_CONFIRM_MS     = 0.20
+local FINGER_DROP_CONFIRM_SEC     = 0.20
 
 -- Finger count stability gate before allowing ANY live trigger.
 -- Without this, a 4-finger swipe whose first frames register only 2-3 contacts
 -- fires the WRONG action (e.g., swipe_2_left=arrow_up) before the engine
 -- upgrades maxFingers to 4. Holding live fires for a short grace period gives
 -- the rest of the fingers time to land and the centroid time to stabilise.
-local FINGER_COUNT_STABLE_MS = 0.06   -- 60 ms — fast enough to feel instant, slow enough to absorb staggered contact
+local FINGER_COUNT_STABLE_SEC = 0.06   -- 60 ms — fast enough to feel instant, slow enough to absorb staggered contact
 
 -- Minimum time a peak finger count must have been seen before we treat it as
 -- the user's true intent (used to override a lower maxFingers at commit time
@@ -315,7 +315,7 @@ local function triggerLiveAxisIfNeeded(slot, pos, now, axis)
 
 	-- Pending finger-spike confirmation gate. While the engine is still
 	-- confirming whether the finger count just jumped (e.g., 2→4 takes up to
-	-- FINGER_CONFIRM_MS to confirm), maxFingers reflects the OLD count. Firing
+	-- FINGER_CONFIRM_SEC to confirm), maxFingers reflects the OLD count. Firing
 	-- a live trigger here would target the wrong slot — typically swipe_2_<dir>
 	-- instead of swipe_4_<dir> for a 4-finger swipe whose first contacts land
 	-- staggered. Hold all live fires until the candidate resolves.
@@ -329,9 +329,9 @@ local function triggerLiveAxisIfNeeded(slot, pos, now, axis)
 	-- centroid a brief moment to stabilise before firing — quick single-finger
 	-- joins (2→3, 3→4) skip the candidate path above so this catches them too.
 	local stable_elapsed = now - (gs.fingerCountChangedAt or 0)
-	if stable_elapsed < FINGER_COUNT_STABLE_MS then
+	if stable_elapsed < FINGER_COUNT_STABLE_SEC then
 		Logger.debug(LOG, "live blocked: finger count unstable (%.0fms since change, need %.0fms) slot=%s",
-			stable_elapsed * 1000, FINGER_COUNT_STABLE_MS * 1000, slot)
+			stable_elapsed * 1000, FINGER_COUNT_STABLE_SEC * 1000, slot)
 		return
 	end
 
@@ -689,7 +689,7 @@ function M.process_frame(touches)
 				else
 					gs.tentativeLiftingFrames = gs.tentativeLiftingFrames + 1
 					local elapsed = now - gs.tentativeLiftingSince
-					if gs.tentativeLiftingFrames >= FINGER_DROP_CONFIRM_FRAMES or elapsed >= FINGER_DROP_CONFIRM_MS then
+					if gs.tentativeLiftingFrames >= FINGER_DROP_CONFIRM_FRAMES or elapsed >= FINGER_DROP_CONFIRM_SEC then
 						if not gs.lifting then
 							Logger.info(LOG, string.format("Confirmed finger drop: %d -> %d (frames=%d, %.3fs).", gs.maxFingers, n, gs.tentativeLiftingFrames, elapsed))
 						end
@@ -725,12 +725,12 @@ function M.process_frame(touches)
 					if gs.candidateFingers == n then
 						gs.candidateFrames = gs.candidateFrames + 1
 						local elapsed = now - (gs.candidateSince or now)
-						if gs.candidateFrames >= FINGER_CONFIRM_FRAMES and elapsed >= FINGER_CONFIRM_MS then
+						if gs.candidateFrames >= FINGER_CONFIRM_FRAMES and elapsed >= FINGER_CONFIRM_SEC then
 							Logger.info(LOG, string.format("Confirmed multi-finger join: %d → %d (frames=%d, %.3fs).", gs.maxFingers, n, gs.candidateFrames, elapsed))
 							gs.maxFingers = n
 							gs.lifting    = false
 							-- The candidate-confirmation period already enforced stability:
-							-- the user has held this finger count for >= FINGER_CONFIRM_MS.
+							-- the user has held this finger count for >= FINGER_CONFIRM_SEC.
 							-- Zero out fingerCountChangedAt so the live-fire stability gate
 							-- does not impose an ADDITIONAL 60 ms wait on top of that.
 							gs.fingerCountChangedAt = 0
