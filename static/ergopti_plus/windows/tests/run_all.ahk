@@ -175,8 +175,7 @@ global _VendorDir := A_ScriptDir . "\..\vendor"
 #Include meta/test_corpus_hotstring_matcher.ahk
 ; LLM parser corpus -- tests LLM_ParseOllamaResponse and _LLMRemoteParseResponse
 ; against the shared cross-driver vectors (already included above via api_ollama/api_remote).
-; BISECT: temporarily disabled to isolate AHK 8-minute timeout root cause.
-; #Include meta/test_corpus_llm_parser.ahk
+#Include meta/test_corpus_llm_parser.ahk
 ; Security / keylogger privacy corpus -- tests ES_PASSWORD detection and
 ; Win32 known-class lookup logic in isolation (OS-level paths are headless-safe stubs).
 ; BISECT: temporarily disabled to isolate AHK 8-minute timeout root cause.
