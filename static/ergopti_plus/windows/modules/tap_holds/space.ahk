@@ -72,7 +72,7 @@ SpaceTapHold(ModDownFn, ModUpFn) {
     ih.OnKeyDown := _SpaceCaptureVK
     ih.Start()
     ih.Wait()
-    try LoggerDebug("SpaceTapHold", "Hold path: EndReason='%s' HeldVK=%d.", ih.EndReason, _SpaceHeldVK)
+    try LoggerDebug("SpaceTapHold", "Hold path: EndReason='{1}' HeldVK={2}.", ih.EndReason, _SpaceHeldVK)
     ; Activate modifier only now — modifier was not active during the IH window
     ; so Space auto-repeat could only produce unmodified spaces (or nothing).
     ModDownFn.Call()
