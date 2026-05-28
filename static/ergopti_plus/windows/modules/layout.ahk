@@ -413,8 +413,14 @@ WrapTextIfSelected(Symbol, LeftSymbol, RightSymbol) {
 	) {
 		try {
 			el := UIA.GetFocusedElement()
-			if (el.IsTextPatternAvailable) {
-				Selection := el.GetSelection()[1].GetText()
+			; Check both TextPattern and SelectionPattern availability before querying selection;
+			; SelectionPattern2 (used internally by UIA) is absent on many controls and causes
+			; a ptr-not-found crash in the pattern wrapper's destructor, which escapes try/catch
+			if (el.IsTextPatternAvailable and el.IsSelectionPatternAvailable) {
+				selections := el.GetSelection()
+				if (selections.Length > 0) {
+					Selection := selections[1].GetText()
+				}
 			}
 		}
 	}
