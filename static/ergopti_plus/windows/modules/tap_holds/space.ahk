@@ -61,7 +61,7 @@ SpaceTapHoldLayer() {
     ; was used) and send Space retroactively if so.
     UpdateLastSentCharacter("Space")
     ActivateLayer()
-    KeyWait("SC039", "U T2")
+    KeyWait("SC039", "U")
     DisableLayer()
 
     Now := A_TickCount
