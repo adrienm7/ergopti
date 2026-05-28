@@ -36,6 +36,7 @@
 		"codegen:terminators": "node ./tools/codegen/codegen-terminators.cjs",
 		"codegen:expander:hs": "node ./tools/codegen/codegen-expander-hs.cjs",
 		"codegen:prompt-builder:ahk": "node ./tools/codegen/codegen-prompt-builder-ahk.cjs",
+		"codegen:prompt-builder:hs": "node ./tools/codegen/codegen-prompt-builder-hs.cjs",
 		"codegen:shortcuts": "node ./tools/codegen/codegen-shortcuts.cjs",
 		"test:mutation": "stryker run"
 	},
