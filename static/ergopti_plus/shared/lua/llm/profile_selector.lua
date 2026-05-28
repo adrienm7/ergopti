@@ -81,13 +81,13 @@ function M.load_built_in_profiles()
 	if not fh then return {} end
 	local raw = fh:read("*a")
 	fh:close()
-	-- Use hs.json if available (Hammerspoon), fall back to a simple parser.
-	local ok, hs = pcall(require, "hs")
-	if ok and hs and hs.json then
-		local ok2, decoded = pcall(hs.json.decode, raw)
-		if ok2 and type(decoded) == "table" then
-			return decoded
-		end
+	-- Use the platform-agnostic shared JSON decoder so this module stays
+	-- usable outside Hammerspoon (hs.json is HS-only and must not leak here).
+	local ok_json, json = pcall(require, "json")
+	if not ok_json or not json then return {} end
+	local ok2, decoded = pcall(json.decode, raw)
+	if ok2 and type(decoded) == "table" then
+		return decoded
 	end
 	return {}
 end
