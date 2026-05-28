@@ -1,0 +1,121 @@
+# static/ergopti_plus/shared/wpm_widget/constants.toml
+
+# ==============================================================================
+# SCHEMA: WPM Widget Visual Constants — Cross-Driver Canon
+# DESCRIPTION:
+# Single source of truth for every visual constant used by the Ergopti+
+# WPM floating widget across all drivers (AutoHotkey, Hammerspoon).
+# When a value changes here, the driver-side files must be updated to match.
+#
+# HOW EACH DRIVER CONSUMES THIS FILE:
+#   AHK         — lib/metrics/wpm_widget.ahk WPMWidgetConst class mirrors
+#                 every entry here. Comments cross-reference the key names below.
+#   Hammerspoon — ui/wpm/wpm_widget.lua CONFIG table mirrors every entry here.
+#                 Comments cross-reference the key names below.
+#
+# COLOR FORMAT:
+#   Colors are stored as hex strings in "#RRGGBB" form.
+#   The unit_strip_darken_factor controls how much the lower strip is darkened
+#   relative to the main pill background (applied per-channel, range 0.0-1.0).
+# ==============================================================================
+
+
+# ==============================================================================
+# ==============================================================================
+# ======= 1/ Compact mode layout =======
+# ==============================================================================
+# ==============================================================================
+
+[compact]
+
+# Pill width in logical pixels.
+# AHK: WPMWidgetConst.W  HS: computed from number width + compact_padding_x * 2.
+width = 80
+
+# Total pill height in logical pixels.
+# AHK: WPMWidgetConst.H  HS: h_number + h_gap + h_unit.
+height = 68
+
+# Height of the upper zone that holds the WPM number.
+# AHK: WPMWidgetConst.H_NUMBER  HS: compact_height_number.
+height_number = 44
+
+# Vertical gap between the number zone and the unit strip.
+# AHK: WPMWidgetConst.H_GAP  HS: compact_height_gap.
+height_gap = 4
+
+# Height of the lower strip that holds the unit acronym label.
+# AHK: WPMWidgetConst.H_UNIT  HS: compact_height_unit.
+height_unit = 20
+
+# Font size of the WPM number.
+# AHK: s20 (Segoe UI)  HS: compact_number_size.
+number_font_size = 20
+
+# Font size of the unit label (MPM / WPM …).
+# AHK: s8 (Segoe UI)  HS: compact_unit_size.
+unit_font_size = 8
+
+# Horizontal padding inside the pill (left and right of the number).
+# HS only — AHK uses a fixed width.
+padding_x = 14
+
+# How much to darken the unit strip background relative to the pill background
+# (multiplied per RGB channel; 0.40 = 60 % darker).
+# AHK: _WPMWidget_DarkenHex factor  HS: darken_factor in compact rendering.
+unit_strip_darken_factor = 0.40
+
+
+# ==============================================================================
+# ==============================================================================
+# ======= 2/ Colors =======
+# ==============================================================================
+# ==============================================================================
+
+[colors]
+
+# Default blue background for manual keystrokes.
+# AHK: WPMWidgetConst.COLOR_BG_MANUAL  HS: WPMShared.COLOR_FALLBACK.manual.
+bg_manual = "#0055cc"
+
+# Purple fallback for AI-generated keystrokes (no TOML source).
+# AHK: WPMWidgetConst.COLOR_BG_AI  HS: WPMShared.COLOR_FALLBACK.llm.
+bg_ai = "#7a30b0"
+
+# Near-black used when the widget is in the idle state.
+# AHK: WPMWidgetConst.COLOR_BG_IDLE  HS: (computed from CONFIG.bg_color).
+bg_idle = "#1a1a2e"
+
+# Active text color (white).
+# AHK: WPMWidgetConst.COLOR_TXT_ACTIVE  HS: CONFIG.text_color.
+text_active = "#ffffff"
+
+# Idle / dimmed text color.
+# AHK: WPMWidgetConst.COLOR_TXT_IDLE  HS: (dimmed white alpha).
+text_idle = "#555577"
+
+# HSL parameters used to normalise hotstring/AI/AC accent colors so they are
+# all as bright as bg_manual (#0055cc → HSL L=0.40 S=1.00).
+# Any accent hue is re-projected onto this L/S target, keeping its hue but
+# making the pill as vivid and readable as the manual blue.
+# AHK: WPMWidgetConst.COLOR_WIDGET_L / COLOR_WIDGET_S
+# HS:  CONFIG.widget_hsl_l / CONFIG.widget_hsl_s
+widget_hsl_l = 0.40
+widget_hsl_s = 1.00
+
+
+# ==============================================================================
+# ==============================================================================
+# ======= 3/ Transparency =======
+# ==============================================================================
+# ==============================================================================
+
+[transparency]
+
+# Opacity when the widget is active and displaying a non-zero WPM (0-255).
+# AHK: WPMWidgetConst.ALPHA_ACTIVE  HS: bg_color alpha ≈ 0.86.
+alpha_active = 220
+
+# Opacity when the widget is in the idle / fading state.
+# AHK: WPMWidgetConst.ALPHA_IDLE  HS: not currently used.
+alpha_idle = 140
