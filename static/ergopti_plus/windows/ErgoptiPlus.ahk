@@ -463,7 +463,7 @@ global CategoryEnabled := Map(
 ReadCategoryEnabled(Cache) {
     global CategoryEnabled
     for Category, _Default in CategoryEnabled {
-        Raw := IniCacheGet(Cache, "category_enabled", _CategoryEnabledKey(Category))
+        Raw := IniCacheGet(Cache, "ahk.category_enabled", _CategoryEnabledKey(Category))
         if (Raw == "_") {
             continue
         }
@@ -1348,7 +1348,7 @@ ToggleAllFeatures(Value) {
     ; are not enough when a category gate was off.
     for Category, _ in CategoryEnabled {
         CategoryEnabled[Category] := Bool
-        Updates.Push({ Section: "category_enabled", Key: _CategoryEnabledKey(Category), Value: Bool })
+        Updates.Push({ Section: "ahk.category_enabled", Key: _CategoryEnabledKey(Category), Value: Bool })
     }
 
     TOML_BatchWrite(ConfigurationFile, Updates)
@@ -1370,7 +1370,7 @@ ToggleAllHotstrings(Value) {
     global CategoryEnabled, ConfigurationFile
     Bool := (Value = true or Value = 1)
     CategoryEnabled["Hotstrings"] := Bool
-    TOML_Write(Bool, ConfigurationFile, "category_enabled", "hotstrings")
+    TOML_Write(Bool, ConfigurationFile, "ahk.category_enabled", "hotstrings")
     Reload
 }
 
@@ -1397,7 +1397,7 @@ ToggleCategoryAllFeatures(Category, Value) {
     Bool := (Value = true or Value = 1)
     CategoryEnabled[Category] := Bool
     ; v2 uses lowercase snake_case for the keys too (Layout -> layout, TapHolds -> tap_holds).
-    TOML_Write(Bool, ConfigurationFile, "category_enabled", _CategoryEnabledKey(Category))
+    TOML_Write(Bool, ConfigurationFile, "ahk.category_enabled", _CategoryEnabledKey(Category))
     Reload
 }
 
