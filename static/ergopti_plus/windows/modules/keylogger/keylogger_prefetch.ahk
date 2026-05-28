@@ -43,7 +43,7 @@
 ; ``<repo>/static/ergopti_plus/shared/ui/metrics_<key>/``.
 KLPF_AssetsDir(which) {
     global _StaticDir
-    base := _StaticDir . "\drivers\_shared\ui\metrics_" . which . "\"
+    base := _StaticDir . "\ergopti_plus\shared\ui\metrics_" . which . "\"
     loop files, base, "D"
         return A_LoopFileFullPath . "\"
     return base

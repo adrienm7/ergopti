@@ -12,6 +12,11 @@
  * ==============================================================================
  */
 
+// Shared i18n helper — reads from window._i18n_strings populated by i18n.js.
+function _t(key) {
+	return (window._i18n_strings && window._i18n_strings[key]) || key;
+}
+
 let manifestData = window.ManifestData || {};
 let userCategories = window.UserCategories || {};
 let appIcons = window.AppIcons || {};
