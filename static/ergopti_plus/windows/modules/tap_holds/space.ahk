@@ -148,7 +148,7 @@ _SpaceHoldCtrl() {
     SendInput("{LCtrl Down}")
     if (_SpaceHeldVK != 0)
         SendInput("^{vk" . Format("{:x}", _SpaceHeldVK) . "}")
-    KeyWait("SC039")
+    KeyWait("SC039", "T2")
     SendInput("{LCtrl Up}")
 }
 _SpaceHoldLayer() {
@@ -157,7 +157,7 @@ _SpaceHoldLayer() {
     ; Replay the captured VK inside the layer so it receives the layer mapping.
     if (_SpaceHeldVK != 0)
         SendInput("{vk" . Format("{:x}", _SpaceHeldVK) . "}")
-    KeyWait("SC039")
+    KeyWait("SC039", "T2")
     DisableLayer()
 }
 _SpaceHoldShift() {
@@ -169,7 +169,7 @@ _SpaceHoldShift() {
     SendInput("{LShift Down}")
     if (_SpaceHeldVK != 0)
         SendInput("+{vk" . Format("{:x}", _SpaceHeldVK) . "}")
-    KeyWait("SC039")
+    KeyWait("SC039", "T2")
     SendInput("{LShift Up}")
 }
 
