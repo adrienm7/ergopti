@@ -845,3 +845,321 @@ _TooltipResolvePosition() {
     try MouseGetPos(&Mx, &My)
     return { X: Mx, Y: My + _TOOLTIP_OFFSET_BELOW }
 }
+
+
+
+
+; ==========================================
+; ==========================================
+; ======= 3/ LLM Multi-slot Tooltip =======
+; ==========================================
+; ==========================================
+
+; Global state for the LLM multi-slot tooltip — backed by the shared Gui
+; engine instead of the monochrome built-in ToolTip() function.
+global _LLM_Tooltip_Slots    := []
+global _LLM_Tooltip_ActiveIdx := 1
+global _LLM_Tooltip_Visible  := false
+
+; Show the LLM multi-slot tooltip using the shared Gui engine.
+; Each slot may be a plain string (streaming) or a diff object:
+;   { Text, Chunks: [{type:"equal"|"insert", text}], NextWords, HasCorrections }
+; Active slot: equal chunks in green, NextWords in orange, insert in white.
+; Inactive slots: full Text in gray.
+LLM_TooltipShow(payload, active := 1, is_final := false) {
+	global _LLM_Tooltip_Slots, _LLM_Tooltip_ActiveIdx, _LLM_Tooltip_Visible
+
+	slots := []
+	if (Type(payload) == "Array") {
+		for s in payload
+			slots.Push(s)
+	} else if (Type(payload) == "String") {
+		if (payload == "")
+			return
+		slots.Push(payload)
+	} else {
+		return
+	}
+
+	while (slots.Length > 0 and _LLM_SlotIsEmpty(slots[slots.Length]))
+		slots.Pop()
+	if is_final {
+		filtered := []
+		for s in slots {
+			if !_LLM_SlotIsEmpty(s)
+				filtered.Push(s)
+		}
+		slots := filtered
+	}
+	if (slots.Length == 0) {
+		LLM_TooltipHide()
+		return
+	}
+
+	_LLM_Tooltip_Slots    := slots
+	_LLM_Tooltip_ActiveIdx := Max(1, Min(Integer(active), slots.Length))
+	_LLM_Tooltip_Visible  := true
+
+	; Detect whether any slot carries diff chunks — if so use the rich Gui path.
+	has_chunks := false
+	for s in slots {
+		if IsObject(s) and s.HasOwnProp("Chunks") and s.Chunks.Length > 0 {
+			has_chunks := true
+			break
+		}
+	}
+
+	if has_chunks {
+		_TooltipBuildGuiLlm(slots, _LLM_Tooltip_ActiveIdx)
+	} else {
+		; Streaming / plain-string path: fall back to the shared TooltipShow
+		; with text-only items (no per-chunk coloring).
+		Items := []
+		for i, slot in slots {
+			is_active := (i == _LLM_Tooltip_ActiveIdx)
+			Item := { Text: _LLM_SlotBuildText(slot, is_active), ColorHex: "", IsDimmed: !is_active, DurationSec: 0 }
+			Items.Push(Item)
+		}
+		TooltipShow(Items, 0)
+	}
+
+	; Arm the LLM-specific auto-hide timer.
+	global _TooltipTimerGeneration, _TooltipGeneration, UI_LLM_TIMEOUT_SEC
+	_TooltipTimerGeneration := _TooltipGeneration
+	timeout_ms := Round(Max(0.05, UI_LLM_TIMEOUT_SEC - 0.2) * 1000)
+	SetTimer(_TooltipTimerFn, -timeout_ms)
+}
+
+LLM_TooltipHide(accepted := false) {
+	global _LLM_Tooltip_Visible, _LLM_Tooltip_Slots
+	_LLM_Tooltip_Visible := false
+	_LLM_Tooltip_Slots   := []
+	TooltipHide()
+}
+
+LLM_TooltipGetText() {
+	global _LLM_Tooltip_Visible, _LLM_Tooltip_Slots, _LLM_Tooltip_ActiveIdx
+	if !_LLM_Tooltip_Visible or _LLM_Tooltip_Slots.Length == 0
+		return ""
+	idx := _LLM_Tooltip_ActiveIdx
+	if (idx < 1 or idx > _LLM_Tooltip_Slots.Length)
+		return ""
+	text := _LLM_SlotGetText(_LLM_Tooltip_Slots[idx])
+	if (text != "")
+		return text
+	for s in _LLM_Tooltip_Slots {
+		t := _LLM_SlotGetText(s)
+		if (t != "")
+			return t
+	}
+	return ""
+}
+
+LLM_TooltipGetSlots() {
+	global _LLM_Tooltip_Slots
+	return IsSet(_LLM_Tooltip_Slots) ? _LLM_Tooltip_Slots : []
+}
+
+LLM_TooltipGetActiveIdx() {
+	global _LLM_Tooltip_ActiveIdx
+	return IsSet(_LLM_Tooltip_ActiveIdx) ? _LLM_Tooltip_ActiveIdx : 1
+}
+
+LLM_TooltipIsVisible() {
+	global _LLM_Tooltip_Visible
+	return IsSet(_LLM_Tooltip_Visible) and _LLM_Tooltip_Visible
+}
+
+LLM_TooltipSetActiveIdx(idx) {
+	global _LLM_Tooltip_Visible, _LLM_Tooltip_Slots, _LLM_Tooltip_ActiveIdx
+	if !_LLM_Tooltip_Visible or _LLM_Tooltip_Slots.Length == 0
+		return
+	_LLM_Tooltip_ActiveIdx := Max(1, Min(idx, _LLM_Tooltip_Slots.Length))
+	LLM_TooltipShow(_LLM_Tooltip_Slots, _LLM_Tooltip_ActiveIdx, false)
+}
+
+
+; =============================================
+; ===== 3.1) LLM slot helpers =====
+; =============================================
+
+_LLM_SlotIsEmpty(slot) {
+	if (Type(slot) == "String")
+		return slot == ""
+	if IsObject(slot) and slot.HasOwnProp("Text")
+		return slot.Text == ""
+	return true
+}
+
+_LLM_SlotGetText(slot) {
+	if (Type(slot) == "String")
+		return slot
+	if IsObject(slot) and slot.HasOwnProp("Text")
+		return slot.Text
+	return ""
+}
+
+; Build the display string for a slot row (used by the plain-string path).
+_LLM_SlotBuildText(slot, is_active) {
+	global LLM_TOOLTIP_ACTIVE_PREFIX, LLM_TOOLTIP_INACTIVE_PREFIX
+	global LLM_TOOLTIP_PLACEHOLDER, LLM_TOOLTIP_TAB_SUFFIX
+	if _LLM_SlotIsEmpty(slot)
+		return (is_active ? LLM_TOOLTIP_ACTIVE_PREFIX : LLM_TOOLTIP_INACTIVE_PREFIX) . LLM_TOOLTIP_PLACEHOLDER
+	txt    := _LLM_SlotGetText(slot)
+	prefix := is_active ? LLM_TOOLTIP_ACTIVE_PREFIX : LLM_TOOLTIP_INACTIVE_PREFIX
+	suffix := is_active ? LLM_TOOLTIP_TAB_SUFFIX : ""
+	return prefix . txt . suffix
+}
+
+
+; =============================================
+; ===== 3.2) Rich Gui LLM renderer =====
+; =============================================
+
+; Build a single Gui that renders all LLM slots with per-chunk coloring.
+; Active slot: equal chunks in corr_sel (green), insert/NextWords in nw_sel
+; (orange). Inactive slots: full text in unsel_gray. Each slot is one row;
+; within a row, segment coloring is achieved by multiple Text controls placed
+; side-by-side (same Y, X incremented by measured segment width).
+_TooltipBuildGuiLlm(slots, active_idx) {
+	global _TooltipGui, _TooltipRowGuis
+	global _TOOLTIP_FONT_NAME, _TOOLTIP_FONT_SIZE, _TOOLTIP_PADDING_X, _TOOLTIP_PADDING_Y
+	global LLM_TOOLTIP_ACTIVE_PREFIX, LLM_TOOLTIP_INACTIVE_PREFIX
+	global LLM_TOOLTIP_PLACEHOLDER, LLM_TOOLTIP_TAB_SUFFIX
+	global UI_LLM_CORR_SEL_HEX, UI_LLM_NW_SEL_HEX, UI_LLM_UNSEL_GRAY_HEX, UI_LLM_LOADING_HEX
+
+	if _TooltipGui
+		try _TooltipGui.Destroy()
+	_TooltipGui    := 0
+	_TooltipRowGuis := []
+
+	DpiScale := A_ScreenDPI / 96
+	SEP_H    := 1
+	Count    := slots.Length
+
+	; ── Measure all row texts to find max width ──────────────────────────────
+	; Each row's text = prefix + full slot text + suffix (for width budget).
+	Sizes := []
+	MaxW  := 0
+	for i, slot in slots {
+		is_active := (i == active_idx)
+		display := _LLM_SlotBuildText(slot, is_active)
+		S := _TooltipMeasureText(display)
+		Sizes.Push(S)
+		if (S.W > MaxW)
+			MaxW := S.W
+	}
+
+	TotalW := _TOOLTIP_PADDING_X + MaxW + _TOOLTIP_PADDING_X
+	RowMeta := []
+	TotalH  := 0
+	for Idx, slot in slots {
+		RowH := _TOOLTIP_PADDING_Y + Sizes[Idx].H + _TOOLTIP_PADDING_Y
+		RowMeta.Push({ H: RowH, Y: TotalH })
+		TotalH += RowH
+		if (Idx < Count)
+			TotalH += SEP_H
+	}
+
+	G := Gui("+AlwaysOnTop -Caption +E0x20 +E0x80 +LastFound")
+	G.BackColor := _TOOLTIP_DEFAULT_BG_HEX
+	G.MarginX := 0
+	G.MarginY := 0
+
+	for Idx, slot in slots {
+		is_active := (Idx == active_idx)
+		Meta := RowMeta[Idx]
+		RowY := Meta.Y
+		RowH := Meta.H
+		S    := Sizes[Idx]
+		TextY := RowY + _TOOLTIP_PADDING_Y
+
+		; Full-width background band.
+		G.SetFont("norm s1", _TOOLTIP_FONT_NAME)
+		G.Add("Text", Format("Background{1} x0 y{2} w{3} h{4}", _TOOLTIP_DEFAULT_BG_HEX, RowY, TotalW, RowH), "")
+
+		if _LLM_SlotIsEmpty(slot) {
+			; Placeholder for in-flight slot.
+			color := UI_LLM_LOADING_HEX
+			G.SetFont("norm c" . color . " s" . _TOOLTIP_FONT_SIZE, _TOOLTIP_FONT_NAME)
+			prefix := is_active ? LLM_TOOLTIP_ACTIVE_PREFIX : LLM_TOOLTIP_INACTIVE_PREFIX
+			G.Add("Text", Format("BackgroundTrans x{1} y{2} w{3} h{4}",
+				_TOOLTIP_PADDING_X, TextY, MaxW, S.H), prefix . LLM_TOOLTIP_PLACEHOLDER)
+		} else if !is_active {
+			; Inactive slot: plain gray.
+			G.SetFont("norm c" . UI_LLM_UNSEL_GRAY_HEX . " s" . _TOOLTIP_FONT_SIZE, _TOOLTIP_FONT_NAME)
+			display := LLM_TOOLTIP_INACTIVE_PREFIX . _LLM_SlotGetText(slot)
+			G.Add("Text", Format("BackgroundTrans x{1} y{2} w{3} h{4}",
+				_TOOLTIP_PADDING_X, TextY, MaxW, S.H), display)
+		} else {
+			; Active slot with per-chunk coloring.
+			; Prefix "▶ " in white.
+			CurX := _TOOLTIP_PADDING_X
+			PrefixSz := _TooltipMeasureText(LLM_TOOLTIP_ACTIVE_PREFIX)
+			G.SetFont("norm cFFFFFF s" . _TOOLTIP_FONT_SIZE, _TOOLTIP_FONT_NAME)
+			G.Add("Text", Format("BackgroundTrans x{1} y{2} w{3} h{4}",
+				CurX, TextY, PrefixSz.W + 2, S.H), LLM_TOOLTIP_ACTIVE_PREFIX)
+			CurX += PrefixSz.W
+
+			has_chunks := IsObject(slot) and slot.HasOwnProp("Chunks") and slot.Chunks.Length > 0
+			if has_chunks {
+				for , chunk in slot.Chunks {
+					chunk_txt := chunk.HasOwnProp("text") ? chunk.text : ""
+					if (chunk_txt == "")
+						continue
+					chunk_color := (chunk.type == "equal") ? UI_LLM_CORR_SEL_HEX : UI_LLM_NW_SEL_HEX
+					CSz := _TooltipMeasureText(chunk_txt)
+					G.SetFont("norm c" . chunk_color . " s" . _TOOLTIP_FONT_SIZE, _TOOLTIP_FONT_NAME)
+					G.Add("Text", Format("BackgroundTrans x{1} y{2} w{3} h{4}",
+						CurX, TextY, CSz.W + 4, S.H), chunk_txt)
+					CurX += CSz.W
+				}
+			} else {
+				; Plain text active slot (streaming).
+				plain := _LLM_SlotGetText(slot)
+				G.SetFont("norm cFFFFFF s" . _TOOLTIP_FONT_SIZE, _TOOLTIP_FONT_NAME)
+				G.Add("Text", Format("BackgroundTrans x{1} y{2} w{3} h{4}",
+					CurX, TextY, MaxW, S.H), plain)
+				CurX += _TooltipMeasureText(plain).W
+			}
+
+			; Tab suffix in label color.
+			G.SetFont("norm c" . _TOOLTIP_LABEL_COLOR_HEX . " s" . _TOOLTIP_FONT_SIZE, _TOOLTIP_FONT_NAME)
+			G.Add("Text", Format("BackgroundTrans x{1} y{2} w{3} h{4}",
+				CurX, TextY, _TooltipMeasureText(LLM_TOOLTIP_TAB_SUFFIX).W + 4, S.H), LLM_TOOLTIP_TAB_SUFFIX)
+		}
+
+		; Separator.
+		if (Idx < Count) {
+			SepY := RowY + RowH
+			G.SetFont("s1", _TOOLTIP_FONT_NAME)
+			G.Add("Text", Format("Background545454 x0 y{1} w{2} h{3}", SepY, TotalW, SEP_H), "")
+		}
+	}
+
+	_TooltipGui := G
+	_TooltipRowGuis := [{ Gui: G, H: TotalH, W: TotalW, IsSep: false }]
+
+	; Show via the same path as TooltipShow.
+	global _TooltipGeneration, _TooltipShownHwnds, _TOOLTIP_HWND_TRACK_CAP
+	_TooltipGeneration += 1
+	SetTimer(_TooltipTimerFn, 0)
+
+	Pos := _TooltipResolvePosition()
+	Row := _TooltipRowGuis[1]
+	_TooltipTimerGeneration := _TooltipGeneration
+	try {
+		_TooltipDisableDwmRounding(Row.Gui.Hwnd)
+		Row.Gui.Show(Format("w{1} h{2} x{3} y{4} NoActivate", Row.W, Row.H, Pos.X, Pos.Y))
+		if (_TooltipShownHwnds.Length >= _TOOLTIP_HWND_TRACK_CAP) {
+			DroppedHwnd := _TooltipShownHwnds.RemoveAt(1)
+			GR_DestroyWindow(DroppedHwnd)
+		}
+		_TooltipShownHwnds.Push(Row.Gui.Hwnd)
+		SetTimer(_TooltipTimerFn, -Round(_TOOLTIP_SAFETY_SEC * 1000))
+		_TooltipApplyStackedCorners()
+		_TooltipShowBorder(Pos.X, Pos.Y, Row.W, Row.H)
+	} catch {
+		TooltipHide()
+	}
+}

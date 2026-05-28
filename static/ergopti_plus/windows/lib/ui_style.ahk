@@ -93,6 +93,17 @@ global UI_MAX_CARET_HEIGHT_PX      := 80
 ; Mirrors: Config.layout.window_bottom_inset = 40  (AHK uses a larger inset)
 global UI_WINDOW_BOTTOM_INSET_PX   := 60
 
+; ── LLM diff-coloring (from shared/tooltip/constants.toml [llm_colors]) ────────
+; Overwritten by UiStyle_LoadSharedConst() at startup.
+; corr_sel  — corrected text in the active slot (green).   Mirrors: corr_sel  { r=0.25 g=0.90 b=0.40 }
+; nw_sel    — next-words text in the active slot (orange).  Mirrors: nw_sel   { r=1.00 g=0.62 b=0.10 }
+; unsel_gray — all text in non-active slots (mid-gray).     Mirrors: unsel_gray { white=0.50 }
+; loading   — placeholder text while a slot is generating.  Mirrors: loading  { r=0.94 g=0.78 b=0.28 }
+global UI_LLM_CORR_SEL_HEX   := "40E666"   ; #40E666  ≈ green
+global UI_LLM_NW_SEL_HEX     := "FF9E1A"   ; #FF9E1A  ≈ orange
+global UI_LLM_UNSEL_GRAY_HEX := "808080"   ; #808080  ≈ mid-gray
+global UI_LLM_LOADING_HEX    := "F0C747"   ; #F0C747  ≈ yellow-amber
+
 ; ── Timing defaults (from shared/tooltip/constants.toml [timing]) ─────────────
 ; Overwritten by UiStyle_LoadSharedConst() at startup; hardcoded here as
 ; compile-time fallbacks in case the TOML file is absent.
@@ -159,8 +170,15 @@ UiStyle_LoadSharedConst() {
 	global UI_TIMEOUT_DECREMENT_SEC := Float(IniCacheGet(c, "timing", "timeout_decrement_sec", "0.2"))
 	global UI_TIMEOUT_FLOOR_SEC     := Float(IniCacheGet(c, "timing", "timeout_floor_sec",     "0.05"))
 
-	LoggerDone("UiStyle", "Shared tooltip constants loaded (pad_x={1} corner_r={2} bg={3} tmo={4}s).",
-		UI_PAD_X, UI_CORNER_RADIUS, UI_BG_HEX, UI_HOTSTRING_TIMEOUT_SEC)
+	; [llm_colors] — diff-chunk rendering colors for the LLM multi-slot tooltip.
+	; The TOML carries *_hex aliases (no leading #) for drivers that only accept hex.
+	global UI_LLM_CORR_SEL_HEX   := SubStr(IniCacheGet(c, "llm_colors", "corr_sel_hex",   "#40E666"), 2)
+	global UI_LLM_NW_SEL_HEX     := SubStr(IniCacheGet(c, "llm_colors", "nw_sel_hex",     "#FF9E1A"), 2)
+	global UI_LLM_UNSEL_GRAY_HEX := SubStr(IniCacheGet(c, "llm_colors", "unsel_gray_hex", "#808080"), 2)
+	global UI_LLM_LOADING_HEX    := SubStr(IniCacheGet(c, "llm_colors", "loading_hex",    "#F0C747"), 2)
+
+	LoggerDone("UiStyle", "Shared tooltip constants loaded (pad_x={1} corner_r={2} bg={3} tmo={4}s corr={5} nw={6}).",
+		UI_PAD_X, UI_CORNER_RADIUS, UI_BG_HEX, UI_HOTSTRING_TIMEOUT_SEC, UI_LLM_CORR_SEL_HEX, UI_LLM_NW_SEL_HEX)
 }
 
 

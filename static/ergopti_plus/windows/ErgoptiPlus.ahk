@@ -190,6 +190,7 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 #Include lib/hotstrings/hotstrings_config_window.ahk
 #Include lib/ui_style.ahk
 #Include lib/tooltip.ahk
+#Include lib/llm_diff.ahk
 #Include lib/hotstrings/hotstring_prefix_watcher.ahk
 ; Auto-generated registrar for the bundled hotstring TOMLs. ``*i`` keeps the
 ; driver runnable from a fresh clone before ``tools/compile_hotstrings.py`` has

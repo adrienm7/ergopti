@@ -875,7 +875,28 @@ LLM_Engine_OnResults(slots, ctx, active := 1, is_final := false) {
 			}
 		}
 	}
-	LLM_Tooltip_Show(slots, active, is_final)
+
+	; On the final render, enrich each completed slot with diff chunks so the
+	; Gui-based tooltip can colourise corrections (green) vs. next-words
+	; (orange). Streaming / intermediate renders pass plain strings — diff
+	; against a partial token would be meaningless.
+	display_slots := slots
+	if (is_final and IsSet(LLM_Diff_Compute)) {
+		buf_tail := _LLM_Engine.Has("last_ctx") ? _LLM_Engine["last_ctx"] : ""
+		; Use only the last 200 chars of the context as the diff anchor — the
+		; full context is too long and makes prefix-matching meaningless.
+		if (StrLen(buf_tail) > 200)
+			buf_tail := SubStr(buf_tail, -199)
+		display_slots := []
+		for s in slots {
+			if (s != "")
+				display_slots.Push(LLM_Diff_Compute(buf_tail, s))
+			else
+				display_slots.Push(s)
+		}
+	}
+
+	LLM_Tooltip_Show(display_slots, active, is_final)
 }
 
 /**
