@@ -39,8 +39,8 @@
 	},
 
 	"hotstring_groups": {
-		"standard": ["distances_reduction", "autocorrection", "magic_key"],
-		"ergopti":  ["sfbs_reduction", "rolls"],
+		"standard": ["distances_reduction", "autocorrection"],
+		"ergopti":  ["sfbs_reduction", "rolls", "magic_key"],
 		"dynamic":  ["dynamic_hotstrings"]
 	},
 
