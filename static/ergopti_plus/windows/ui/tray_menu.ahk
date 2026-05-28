@@ -849,6 +849,16 @@ global _V1CatToV2CatMap := Map(
 	"MagicKey",           "magic_key",
 )
 
+; Per-category inverse maps (v2 snake_case id -> v1 PascalCase) so that
+; _CountEnabledForCategory can resolve the TOML section name via FoldAsciiLower(v1).
+global _V1CatToInverseKeyMap := Map(
+	"Autocorrection",     _ManifestToLegacyAutocorrectionKeyMap,
+	"DistancesReduction", _ManifestToLegacyDistancesReductionKeyMap,
+	"SFBsReduction",      _ManifestToLegacySFBsReductionKeyMap,
+	"Rolls",              _ManifestToLegacyRollsKeyMap,
+	"MagicKey",           _ManifestToLegacyMagicKeyKeyMap,
+)
+
 ; Custom render order for the ``DynamicHotstrings`` submenu — the manifest
 ; doesn't yet model menu order or separators, so the curated UX layout is
 ; pinned here as a sidecar. Each entry is either a v1 PascalCase feature id
@@ -950,7 +960,7 @@ _IsCategoryFullyEnabled(V1Cat) {
 ; counting only the sections whose feature toggle is enabled in Features.
 ; Uses CountTomlSection per v2 section id so disabled sections contribute 0.
 _CountEnabledForCategory(V1Cat) {
-	global Features, _V1CatToV2CatMap
+	global Features, _V1CatToV2CatMap, _V1CatToInverseKeyMap
 	if !_V1CatToV2CatMap.Has(V1Cat) {
 		return 0
 	}
@@ -958,10 +968,13 @@ _CountEnabledForCategory(V1Cat) {
 	if !Features["hotstrings"].Has(V2Cat) {
 		return 0
 	}
+	InvMap := _V1CatToInverseKeyMap.Has(V1Cat) ? _V1CatToInverseKeyMap[V1Cat] : false
 	Total := 0
 	for V2SecId, FNode in Features["hotstrings"][V2Cat] {
 		if (IsObject(FNode) and FNode.Has("enabled") and FNode["enabled"]) {
-			Total += CountTomlSection(V1Cat, V2SecId)
+			; v2 snake_case -> v1 PascalCase -> lowercase = TOML section name
+			V1Key := (InvMap and InvMap.Has(V2SecId)) ? InvMap[V2SecId] : V2SecId
+			Total += CountTomlSection(V1Cat, FoldAsciiLower(V1Key))
 		}
 	}
 	return Total
@@ -1328,6 +1341,18 @@ initMenu() {
 		}
 		DynTitle := GetCategoryTitle("DynamicHotstrings") . " (" . FmtCount(DynTotal) . ")"
 		HotstringsMenu.Add(DynTitle, DynMenu)
+		; Check if all dynamic sections are enabled
+		_DynAllEnabled := true
+		_DynCount := 0
+		for _, _DCfg2 in Features["hotstrings"]["dynamic"] {
+			_DynCount++
+			if (IsObject(_DCfg2) and _DCfg2.Has("enabled") and !_DCfg2["enabled"]) {
+				_DynAllEnabled := false
+			}
+		}
+		if HotstringsAllEnabled and _DynAllEnabled and _DynCount > 0 {
+			HotstringsMenu.Check(DynTitle)
+		}
 	}
 
 	; 2b. Ergopti-layout-specific groups — separated from the standard block
@@ -1446,13 +1471,29 @@ initMenu() {
 				MenuAddItemWithLabel(PersonalMenu, "Personal." . SecName, SecLabel, "Hotstrings")
 			}
 		}
-		PersonalCount := 0
-		for _, SecData in TomlData["sections"] {
-			PersonalCount += SecData["entries"].Length
+		PersonalActiveCount := 0
+		PersonalAllEnabled := true
+		PersonalSectionCount := 0
+		for _, SecName2 in TomlData["sections_order"] {
+			if (SecName2 == "-" or !TomlData["sections"].Has(SecName2)) {
+				continue
+			}
+			PersonalSectionCount++
+			_PV2Id := StrLower(SecName2)
+			_PEnabled := Features["hotstrings"].Has("personal")
+				and Features["hotstrings"]["personal"].Has(_PV2Id)
+				and Features["hotstrings"]["personal"][_PV2Id]["enabled"]
+			if _PEnabled {
+				PersonalActiveCount += TomlData["sections"][SecName2]["entries"].Length
+			} else {
+				PersonalAllEnabled := false
+			}
 		}
-		PersonalTitle := GetCategoryTitle("Personal")
-			. (PersonalCount > 0 ? " (" . FmtCount(PersonalCount) . ")" : "")
+		PersonalTitle := GetCategoryTitle("Personal") . " (" . FmtCount(PersonalActiveCount) . ")"
 		HotstringsMenu.Add(PersonalTitle, PersonalMenu)
+		if HotstringsAllEnabled and PersonalAllEnabled and PersonalSectionCount > 0 {
+			HotstringsMenu.Check(PersonalTitle)
+		}
 	}
 	; Extension TOML files — one submenu entry per file, alphabetically sorted
 	for _, ExtPath in ExtTomlFiles {
