@@ -106,6 +106,8 @@ function M.count_all(ctx, ergopti_groups)
 	local common_has_count, ergopti_has_count = false, false
 	if ctx and ctx.hotfiles and type(ctx.hotfiles) == "table"
 	and ctx.keymap and type(ctx.keymap.get_sections) == "function" then
+		local is_sec_enabled = type(ctx.keymap.is_section_enabled) == "function"
+			and ctx.keymap.is_section_enabled or nil
 		for _, f in ipairs(ctx.hotfiles) do
 			local name = ctx.get_group_name and ctx.get_group_name(f) or f
 			if name ~= "custom" and name ~= "personal" and name:sub(1, 13) ~= "personal_ext_" then
@@ -114,13 +116,17 @@ function M.count_all(ctx, ergopti_groups)
 					for _, sec in ipairs(secs) do
 						if type(sec) == "table" and sec.name ~= "-" and not sec.is_module_placeholder
 						and sec.count ~= nil then
-							local cnt = tonumber(sec.count)
-							if ergopti_groups[name] then
-								ergopti_has_count = true
-								ergopti_total = ergopti_total + cnt
-							else
-								common_has_count = true
-								common_total = common_total + cnt
+							-- Only count sections that are currently enabled
+							local active = not is_sec_enabled or is_sec_enabled(name, sec.name)
+							if active then
+								local cnt = tonumber(sec.count)
+								if ergopti_groups[name] then
+									ergopti_has_count = true
+									ergopti_total = ergopti_total + cnt
+								else
+									common_has_count = true
+									common_total = common_total + cnt
+								end
 							end
 						end
 					end
@@ -132,6 +138,8 @@ function M.count_all(ctx, ergopti_groups)
 	-- Count hotstrings for personal/custom groups (includes personal_ext_* extensions)
 	local personal_total, personal_has_count = 0, false
 	if ctx and ctx.keymap and type(ctx.keymap.get_sections) == "function" then
+		local is_sec_enabled = type(ctx.keymap.is_section_enabled) == "function"
+			and ctx.keymap.is_section_enabled or nil
 		local personal_group_names = {"personal", "custom"}
 		if ctx.hotfiles then
 			for _, f in ipairs(ctx.hotfiles) do
@@ -147,8 +155,12 @@ function M.count_all(ctx, ergopti_groups)
 				for _, sec in ipairs(secs) do
 					if type(sec) == "table" and sec.name ~= "-" and not sec.is_module_placeholder
 					and sec.count ~= nil then
-						personal_has_count = true
-						personal_total = personal_total + tonumber(sec.count)
+						-- Only count sections that are currently enabled
+						local active = not is_sec_enabled or is_sec_enabled(gname, sec.name)
+						if active then
+							personal_has_count = true
+							personal_total = personal_total + tonumber(sec.count)
+						end
 					end
 				end
 			end

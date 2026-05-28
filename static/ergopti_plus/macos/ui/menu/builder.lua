@@ -140,7 +140,23 @@ function M.generate(ctx, menu_mods, actions)
 				local name = ctx.get_group_name and ctx.get_group_name(f) or f
 				if name ~= "custom" and name ~= "personal" then
 					if ctx.keymap and type(ctx.keymap.enable_group) == "function" and type(ctx.keymap.disable_group) == "function" then
-						if enable then pcall(ctx.keymap.enable_group, name) else pcall(ctx.keymap.disable_group, name) end
+						if enable then
+							-- Also enable every individual section so sub-menus appear checked
+							if type(ctx.keymap.get_sections) == "function"
+							and type(ctx.keymap.enable_section) == "function" then
+								local secs = ctx.keymap.get_sections(name)
+								if type(secs) == "table" then
+									for _, sec in ipairs(secs) do
+										if type(sec) == "table" and sec.name and sec.name ~= "-" then
+											pcall(ctx.keymap.enable_section, name, sec.name)
+										end
+									end
+								end
+							end
+							pcall(ctx.keymap.enable_group, name)
+						else
+							pcall(ctx.keymap.disable_group, name)
+						end
 					end
 					if ctx.state and ctx.state.hotstrings then ctx.state.hotstrings[name] = enable end
 				end
@@ -150,9 +166,7 @@ function M.generate(ctx, menu_mods, actions)
 			ctx.updateMenu()
 		end
 
-		local hotstrings_title = grand_has_count
-			and ("⚡ Hotstrings (" .. fmt_grand(grand_total) .. ")")
-			or  "⚡ Hotstrings"
+		local hotstrings_title = "⚡ Hotstrings (" .. fmt_grand(grand_total) .. ")"
 
 		-- Build the three groups in order: paramètres, communs, personnels
 		local hotstrings_menu = {}
@@ -194,9 +208,7 @@ function M.generate(ctx, menu_mods, actions)
 
 		local std_groups = collect_groups(non_ergopti_filter)
 		if #std_groups > 0 then
-			local common_header = common_has_count
-				and "— " .. string.format(i18n.get("menu.hotstrings.header_common_count"), fmt_grand(common_total)) .. " —"
-				or  i18n.section("menu.hotstrings.header_common")
+			local common_header = "— " .. string.format(i18n.get("menu.hotstrings.header_common_count"), fmt_grand(common_total)) .. " —"
 			table.insert(hotstrings_menu, { title = common_header, disabled = true })
 			for _, it in ipairs(std_groups) do table.insert(hotstrings_menu, it) end
 		end
@@ -205,9 +217,7 @@ function M.generate(ctx, menu_mods, actions)
 		local ergopti_groups = collect_groups(ERGOPTI_GROUPS)
 		if #ergopti_groups > 0 then
 			if #std_groups > 0 then table.insert(hotstrings_menu, { title = "-" }) end
-			local ergopti_header = ergopti_has_count
-				and "— " .. string.format(i18n.get("menu.hotstrings.header_ergopti_count"), fmt_grand(ergopti_total)) .. " —"
-				or  i18n.section("menu.hotstrings.header_ergopti")
+			local ergopti_header = "— " .. string.format(i18n.get("menu.hotstrings.header_ergopti_count"), fmt_grand(ergopti_total)) .. " —"
 			table.insert(hotstrings_menu, { title = ergopti_header, disabled = true })
 			for _, it in ipairs(ergopti_groups) do table.insert(hotstrings_menu, it) end
 		end
@@ -218,9 +228,7 @@ function M.generate(ctx, menu_mods, actions)
 			and Logger.build(LOG, "hotstrings.build_custom", menu_mods.hotstrings.build_custom, ctx)
 		if custom_item then
 			table.insert(hotstrings_menu, { title = "-" })
-			local personal_header = personal_has_count
-				and "— " .. string.format(i18n.get("menu.hotstrings.header_personal_count"), fmt_grand(personal_total)) .. " —"
-				or  i18n.section("menu.hotstrings.header_personal")
+			local personal_header = "— " .. string.format(i18n.get("menu.hotstrings.header_personal_count"), fmt_grand(personal_total)) .. " —"
 			table.insert(hotstrings_menu, { title = personal_header, disabled = true })
 			table.insert(hotstrings_menu, custom_item)
 		end
