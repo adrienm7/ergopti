@@ -182,7 +182,7 @@ SC039 Up:: {
     ; Only stop the InputHook when no character has been captured yet.
     ; If ih.Input != "" a char arrived while Space was held — Stop() here
     ; would flip EndReason to "Stopped" and lose the hold path entirely.
-    if _SpaceIHActive and _SpaceInputHook.Input == "" {
+    if (IsSet(_SpaceIHActive) and _SpaceIHActive and _SpaceInputHook.Input == "") {
         _SpaceInputHook.Stop()
     }
 }
@@ -192,7 +192,7 @@ SC039 Up:: {
 ; Tap-hold on "Space" : Space on tap, Layer on hold
 SC039:: SpaceTapHold(_SpaceHoldLayer)
 SC039 Up:: {
-    if _SpaceIHActive and _SpaceInputHook.Input == "" {
+    if (IsSet(_SpaceIHActive) and _SpaceIHActive and _SpaceInputHook.Input == "") {
         _SpaceInputHook.Stop()
     }
 }
@@ -202,7 +202,7 @@ SC039 Up:: {
 ; Tap-hold on "Space" : Space on tap, Shift on hold
 SC039:: SpaceTapHold(_SpaceHoldShift)
 SC039 Up:: {
-    if _SpaceIHActive and _SpaceInputHook.Input == "" {
+    if (IsSet(_SpaceIHActive) and _SpaceIHActive and _SpaceInputHook.Input == "") {
         _SpaceInputHook.Stop()
     }
 }
