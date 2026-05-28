@@ -363,122 +363,28 @@ KLR_ClearAggregates(db) {
 KLR_RebuildAggregates(db) {
 	; agg_app_day — core typing metrics from events_typing.
 	; json_each on events_json sums keystroke dur_ms for precise time_ms.
-	try SQLite_Exec(db, "
-	(
-	INSERT INTO agg_app_day (device_id, date, app, chars, pauses, time_ms, think_time_ms)
-	SELECT device_id, date, app,
-	    SUM(LENGTH(text)),
-	    SUM(CASE WHEN pause_before_ms > 2000 THEN 1 ELSE 0 END),
-	    SUM((SELECT COALESCE(SUM(CAST(json_extract(ev.value,'$.dur_ms') AS INTEGER)),0)
-	         FROM json_each(events_json) AS ev)),
-	    SUM(CASE WHEN pause_before_ms > 2000 THEN COALESCE(pause_before_ms,0) ELSE 0 END)
-	FROM events_typing
-	GROUP BY device_id, date, app
-	ON CONFLICT(device_id, date, app) DO UPDATE SET
-	    chars=chars+excluded.chars,
-	    pauses=pauses+excluded.pauses,
-	    time_ms=time_ms+excluded.time_ms,
-	    think_time_ms=think_time_ms+excluded.think_time_ms;
-	)")
+	try SQLite_Exec(db, "INSERT INTO agg_app_day (device_id, date, app, chars, pauses, time_ms, think_time_ms) SELECT device_id, date, app, SUM(LENGTH(text)), SUM(CASE WHEN pause_before_ms > 2000 THEN 1 ELSE 0 END), SUM((SELECT COALESCE(SUM(CAST(json_extract(ev.value,'$.dur_ms') AS INTEGER)),0) FROM json_each(events_json) AS ev)), SUM(CASE WHEN pause_before_ms > 2000 THEN COALESCE(pause_before_ms,0) ELSE 0 END) FROM events_typing GROUP BY device_id, date, app ON CONFLICT(device_id, date, app) DO UPDATE SET chars=chars+excluded.chars, pauses=pauses+excluded.pauses, time_ms=time_ms+excluded.time_ms, think_time_ms=think_time_ms+excluded.think_time_ms;")
 
 	; agg_app_day — hotstring metrics from events_hotstring.
-	try SQLite_Exec(db, "
-	(
-	INSERT INTO agg_app_day (device_id, date, app, hs_chars, hs_triggers, hs_input_chars)
-	SELECT device_id, date, app,
-	    SUM(COALESCE(net_saved_chars,0)),
-	    COUNT(*),
-	    SUM(LENGTH(COALESCE(trigger,'')))
-	FROM events_hotstring WHERE kind = 'fired'
-	GROUP BY device_id, date, app
-	ON CONFLICT(device_id, date, app) DO UPDATE SET
-	    hs_chars=hs_chars+excluded.hs_chars,
-	    hs_triggers=hs_triggers+excluded.hs_triggers,
-	    hs_input_chars=hs_input_chars+excluded.hs_input_chars;
-	)")
+	try SQLite_Exec(db, "INSERT INTO agg_app_day (device_id, date, app, hs_chars, hs_triggers, hs_input_chars) SELECT device_id, date, app, SUM(COALESCE(net_saved_chars,0)), COUNT(*), SUM(LENGTH(COALESCE(trigger,''))) FROM events_hotstring WHERE kind = 'fired' GROUP BY device_id, date, app ON CONFLICT(device_id, date, app) DO UPDATE SET hs_chars=hs_chars+excluded.hs_chars, hs_triggers=hs_triggers+excluded.hs_triggers, hs_input_chars=hs_input_chars+excluded.hs_input_chars;")
 
 	; agg_app_day — app foreground time from events_app_switch.
-	try SQLite_Exec(db, "
-	(
-	INSERT INTO agg_app_day (device_id, date, app, app_time_ms)
-	SELECT device_id, date, prev_app, SUM(COALESCE(duration_ms,0))
-	FROM events_app_switch
-	WHERE prev_app IS NOT NULL AND prev_app != ''
-	GROUP BY device_id, date, prev_app
-	ON CONFLICT(device_id, date, app) DO UPDATE SET
-	    app_time_ms=app_time_ms+excluded.app_time_ms;
-	)")
+	try SQLite_Exec(db, "INSERT INTO agg_app_day (device_id, date, app, app_time_ms) SELECT device_id, date, prev_app, SUM(COALESCE(duration_ms,0)) FROM events_app_switch WHERE prev_app IS NOT NULL AND prev_app != '' GROUP BY device_id, date, prev_app ON CONFLICT(device_id, date, app) DO UPDATE SET app_time_ms=app_time_ms+excluded.app_time_ms;")
 
 	; agg_app_day_hourly — chars typed per hour from events_typing.
-	try SQLite_Exec(db, "
-	(
-	INSERT INTO agg_app_day_hourly (device_id, date, app, hour, c)
-	SELECT device_id, date, app, substr(ts,12,2) AS hour, SUM(LENGTH(text))
-	FROM events_typing
-	GROUP BY device_id, date, app, hour
-	ON CONFLICT(device_id, date, app, hour) DO UPDATE SET c=c+excluded.c;
-	)")
+	try SQLite_Exec(db, "INSERT INTO agg_app_day_hourly (device_id, date, app, hour, c) SELECT device_id, date, app, substr(ts,12,2) AS hour, SUM(LENGTH(text)) FROM events_typing GROUP BY device_id, date, app, hour ON CONFLICT(device_id, date, app, hour) DO UPDATE SET c=c+excluded.c;")
 
 	; agg_app_day_hourly_min5 — chars typed per 5-min slot from events_typing.
-	try SQLite_Exec(db, "
-	(
-	INSERT INTO agg_app_day_hourly_min5 (device_id, date, app, slot, c)
-	SELECT device_id, date, app,
-	    substr(ts,12,2) || ':' ||
-	    CASE WHEN (CAST(substr(ts,15,2) AS INTEGER)/5)*5 < 10
-	         THEN '0' ELSE '' END ||
-	    CAST((CAST(substr(ts,15,2) AS INTEGER)/5)*5 AS TEXT) AS slot,
-	    SUM(LENGTH(text))
-	FROM events_typing
-	GROUP BY device_id, date, app, slot
-	ON CONFLICT(device_id, date, app, slot) DO UPDATE SET c=c+excluded.c;
-	)")
+	try SQLite_Exec(db, "INSERT INTO agg_app_day_hourly_min5 (device_id, date, app, slot, c) SELECT device_id, date, app, substr(ts,12,2) || ':' || CASE WHEN (CAST(substr(ts,15,2) AS INTEGER)/5)*5 < 10 THEN '0' ELSE '' END || CAST((CAST(substr(ts,15,2) AS INTEGER)/5)*5 AS TEXT) AS slot, SUM(LENGTH(text)) FROM events_typing GROUP BY device_id, date, app, slot ON CONFLICT(device_id, date, app, slot) DO UPDATE SET c=c+excluded.c;")
 
 	; agg_app_day_titles — window titles seen per app from events_window_switch.
-	try SQLite_Exec(db, "
-	(
-	INSERT INTO agg_app_day_titles (device_id, date, app, title, c)
-	SELECT device_id, date, app, next_title, COUNT(*)
-	FROM events_window_switch
-	WHERE next_title IS NOT NULL AND next_title != ''
-	GROUP BY device_id, date, app, next_title
-	ON CONFLICT(device_id, date, app, title) DO UPDATE SET c=c+excluded.c;
-	)")
+	try SQLite_Exec(db, "INSERT INTO agg_app_day_titles (device_id, date, app, title, c) SELECT device_id, date, app, next_title, COUNT(*) FROM events_window_switch WHERE next_title IS NOT NULL AND next_title != '' GROUP BY device_id, date, app, next_title ON CONFLICT(device_id, date, app, title) DO UPDATE SET c=c+excluded.c;")
 
 	; agg_app_day_switches_to — app switch destinations from events_app_switch.
-	try SQLite_Exec(db, "
-	(
-	INSERT INTO agg_app_day_switches_to (device_id, date, app, switched_to, c)
-	SELECT device_id, date, prev_app, next_app, COUNT(*)
-	FROM events_app_switch
-	WHERE prev_app IS NOT NULL AND next_app IS NOT NULL
-	GROUP BY device_id, date, prev_app, next_app
-	ON CONFLICT(device_id, date, app, switched_to) DO UPDATE SET c=c+excluded.c;
-	)")
+	try SQLite_Exec(db, "INSERT INTO agg_app_day_switches_to (device_id, date, app, switched_to, c) SELECT device_id, date, prev_app, next_app, COUNT(*) FROM events_app_switch WHERE prev_app IS NOT NULL AND next_app IS NOT NULL GROUP BY device_id, date, prev_app, next_app ON CONFLICT(device_id, date, app, switched_to) DO UPDATE SET c=c+excluded.c;")
 
 	; agg_system_day — system events (wifi, lock, sleep) from events_system.
-	try SQLite_Exec(db, "
-	(
-	INSERT INTO agg_system_day (device_id, date, wifi_changes, locked_ms, sleep_ms, awake_ms)
-	SELECT device_id, date,
-	    SUM(CASE WHEN action='wifi_change' THEN 1 ELSE 0 END),
-	    SUM(CASE WHEN action='lock'
-	             THEN CAST(json_extract(metadata_json,'$.duration_ms') AS INTEGER)
-	             ELSE 0 END),
-	    SUM(CASE WHEN action='sleep'
-	             THEN CAST(json_extract(metadata_json,'$.duration_ms') AS INTEGER)
-	             ELSE 0 END),
-	    SUM(CASE WHEN action='wake'
-	             THEN CAST(json_extract(metadata_json,'$.duration_ms') AS INTEGER)
-	             ELSE 0 END)
-	FROM events_system
-	GROUP BY device_id, date
-	ON CONFLICT(device_id, date) DO UPDATE SET
-	    wifi_changes=wifi_changes+excluded.wifi_changes,
-	    locked_ms=locked_ms+excluded.locked_ms,
-	    sleep_ms=sleep_ms+excluded.sleep_ms,
-	    awake_ms=awake_ms+excluded.awake_ms;
-	)")
+	try SQLite_Exec(db, "INSERT INTO agg_system_day (device_id, date, wifi_changes, locked_ms, sleep_ms, awake_ms) SELECT device_id, date, SUM(CASE WHEN action='wifi_change' THEN 1 ELSE 0 END), SUM(CASE WHEN action='lock' THEN CAST(json_extract(metadata_json,'$.duration_ms') AS INTEGER) ELSE 0 END), SUM(CASE WHEN action='sleep' THEN CAST(json_extract(metadata_json,'$.duration_ms') AS INTEGER) ELSE 0 END), SUM(CASE WHEN action='wake' THEN CAST(json_extract(metadata_json,'$.duration_ms') AS INTEGER) ELSE 0 END) FROM events_system GROUP BY device_id, date ON CONFLICT(device_id, date) DO UPDATE SET wifi_changes=wifi_changes+excluded.wifi_changes, locked_ms=locked_ms+excluded.locked_ms, sleep_ms=sleep_ms+excluded.sleep_ms, awake_ms=awake_ms+excluded.awake_ms;")
 }
 
 ; Drain KLW.batch (the in-RAM walker accumulator) into the in-memory DB.
