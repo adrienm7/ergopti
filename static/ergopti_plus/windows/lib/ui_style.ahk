@@ -60,7 +60,7 @@ global UI_LABEL_GAP       := 16
 ; radius of UI_CORNER_RADIUS / 2.  Setting this to 14 gives a 7 px radius per
 ; corner, matching Hammerspoon's xRadius=7 canvas pts exactly.  Fixed size —
 ; not proportional to window dimensions.
-global UI_CORNER_RADIUS   := 8
+global UI_CORNER_RADIUS   := 14
 
 ; ── Colors ───────────────────────────────────────────────────────────────────
 ; Near-black default background.  Mirrors: Config.colors.bg = { white=0.10 }
