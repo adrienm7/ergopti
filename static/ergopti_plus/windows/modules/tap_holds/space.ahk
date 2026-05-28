@@ -65,7 +65,7 @@ SpaceTapHold(HoldFn) {
     global _SpaceInputHook, _SpaceIHActive, _SpaceTapSent, _SpaceHoldFired, _SpaceHeldInput, _SpaceHeldVK, _SpaceHoldActive
     ; SC039 auto-repeat while Space is physically held fires this hotkey again —
     ; drop silently to avoid a second SpaceTapHold invocation corrupting state.
-    if _SpaceHoldActive
+    if (IsSet(_SpaceHoldActive) and _SpaceHoldActive)
         return
     _SpaceHoldActive := True
     _SpaceTapSent   := False
