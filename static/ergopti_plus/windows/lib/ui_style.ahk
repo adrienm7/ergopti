@@ -81,7 +81,11 @@ global UI_TINT_LIGHTNESS   := 0.10
 global UI_TINT_SATURATION  := 0.40
 
 ; ── Positioning offsets ──────────────────────────────────────────────────────
-; Mirrors: Config.layout.caret_offset_y = 18, caret_offset_x = 15
+; Mirrors: Config.layout.caret_offset_y = 18 (identical on both platforms).
+; UI_OFFSET_RIGHT is intentionally different from macOS caret_offset_x = 15:
+; Windows GDI positioning uses screen coordinates relative to the caret bounding
+; box, whereas macOS canvas offsets are in logical points — 4 px here produces
+; the same perceived clearance as 15 pts on macOS at typical display densities.
 global UI_OFFSET_BELOW    := 18
 global UI_OFFSET_RIGHT    := 4
 ; Mirrors: Config.layout.max_caret_height = 80
