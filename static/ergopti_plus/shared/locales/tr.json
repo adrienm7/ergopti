@@ -1961,7 +1961,7 @@
 	"ui_typing.unit_sessions": "oturumlar",
 	"updater.changelog_empty": "(Bu sürüm için sürüm notu bulunmuyor.)",
 	"updater.changelog_release_notes": "{1} sürüm notları:\n\n{2}\n\nGitHub’da açayım mı?",
-	"updater.changelog_select_release": "Bir sürüm seçin:",
+	"updater.changelog_select_release": "Sürüm seçimi :",
 	"updater.changelog_truncated": "\n…(kısaltıldı)",
 	"updater.changelog_unreachable": "GitHub’dan sürüm bilgileri alınamadı.",
 	"updater.channel_dev_suffix": " (ön sürüm kanalı)",

@@ -1961,7 +1961,7 @@
 	"ui_typing.unit_sessions": "sessioner",
 	"updater.changelog_empty": "(Der er ingen versionsnoter tilgængelige for denne version.)",
 	"updater.changelog_release_notes": "Versionsnoter for {1}:\n\n{2}\n\nÅbn på GitHub?",
-	"updater.changelog_select_release": "Vælg en version:",
+	"updater.changelog_select_release": "Valg af version :",
 	"updater.changelog_truncated": "\n…(forkortet)",
 	"updater.changelog_unreachable": "Kunne ikke hente udgivelsesinformation fra GitHub.",
 	"updater.channel_dev_suffix": " (forhåndskanal)",

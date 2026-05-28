@@ -1961,7 +1961,7 @@
 	"ui_typing.unit_sessions": "sesje",
 	"updater.changelog_empty": "(Brak informacji o zmianach dla tej wersji.)",
 	"updater.changelog_release_notes": "Lista zmian dla {1}:\n\n{2}\n\nOtworzyć na GitHubie?",
-	"updater.changelog_select_release": "Wybierz wersję:",
+	"updater.changelog_select_release": "Wybór wersji :",
 	"updater.changelog_truncated": "\n…(skrócono)",
 	"updater.changelog_unreachable": "Nie udało się pobrać informacji o wydaniu z GitHuba.",
 	"updater.channel_dev_suffix": " (kanał wstępny)",

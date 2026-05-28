@@ -1961,7 +1961,7 @@
 	"ui_typing.unit_sessions": "сесій",
 	"updater.changelog_empty": "(Для цієї версії немає опису змін.)",
 	"updater.changelog_release_notes": "Зміни версії {1}:\n\n{2}\n\nВідкрити на GitHub?",
-	"updater.changelog_select_release": "Виберіть версію:",
+	"updater.changelog_select_release": "Вибір версії :",
 	"updater.changelog_truncated": "\n…(обрізано)",
 	"updater.changelog_unreachable": "Не вдалося отримати інформацію про реліз із GitHub.",
 	"updater.channel_dev_suffix": " (попередній канал)",

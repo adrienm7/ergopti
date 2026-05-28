@@ -1961,7 +1961,7 @@
 	"ui_typing.unit_sessions": "次会话",
 	"updater.changelog_empty": "(此版本暂无发布说明。)",
 	"updater.changelog_release_notes": "{1} 的发布说明:\n\n{2}\n\n在 GitHub 上打开?",
-	"updater.changelog_select_release": "选择一个版本:",
+	"updater.changelog_select_release": "版本选择 :",
 	"updater.changelog_truncated": "\n…(已截断)",
 	"updater.changelog_unreachable": "无法从 GitHub 获取发布信息。",
 	"updater.channel_dev_suffix": " (预发布通道)",

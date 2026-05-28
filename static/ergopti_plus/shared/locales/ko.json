@@ -1961,7 +1961,7 @@
 	"ui_typing.unit_sessions": "세션",
 	"updater.changelog_empty": "(이 버전의 릴리스 노트가 없습니다.)",
 	"updater.changelog_release_notes": "{1}의 릴리스 노트:\n\n{2}\n\nGitHub에서 열까요?",
-	"updater.changelog_select_release": "버전을 선택하세요:",
+	"updater.changelog_select_release": "버전 선택 :",
 	"updater.changelog_truncated": "\n…(잘림)",
 	"updater.changelog_unreachable": "GitHub에서 릴리스 정보를 가져올 수 없습니다.",
 	"updater.channel_dev_suffix": " (사전 릴리스 채널)",

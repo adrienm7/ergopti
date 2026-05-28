@@ -1961,7 +1961,7 @@
 	"ui_typing.unit_sessions": "sessioni",
 	"updater.changelog_empty": "(Nessuna nota di versione disponibile per questa versione.)",
 	"updater.changelog_release_notes": "Note di versione per {1}:\n\n{2}\n\nAprire su GitHub?",
-	"updater.changelog_select_release": "Seleziona una versione:",
+	"updater.changelog_select_release": "Selezione della versione :",
 	"updater.changelog_truncated": "\n…(troncato)",
 	"updater.changelog_unreachable": "Impossibile recuperare le informazioni di release da GitHub.",
 	"updater.channel_dev_suffix": " (canale pre-release)",
