@@ -151,6 +151,11 @@ KLR_BuildDatabase(metrics_dir) {
         ; Only need to exec deltas; skip the libversion / schema loads.
         if !KLR_ApplyIncremental(KLRCache.db, md, logPath)
             return 0
+        ; Rebuild aggregates from events_* on every cycle — agg_* are no
+        ; longer stored in data.sql so they must be recomputed in memory.
+        KLR_ClearAggregates(KLRCache.db)
+        KLR_RebuildAggregates(KLRCache.db)
+        KLR_InjectKlwBatch(KLRCache.db)
         return KLRCache.db
     }
     db := SQLite_Open(":memory:")
@@ -185,6 +190,11 @@ KLR_BuildDatabase(metrics_dir) {
         try KLRCache.last_sizes[sql_path] := FileGetSize(sql_path)
     }
     KLRCache.db := db
+    ; Rebuild aggregates from events_* — agg_* are no longer persisted in
+    ; data.sql, so they must be computed in memory on every full load too.
+    KLR_ClearAggregates(db)
+    KLR_RebuildAggregates(db)
+    KLR_InjectKlwBatch(db)
     return db
 }
 
@@ -319,9 +329,178 @@ KLR_ApplyIncremental(db, md, logPath) {
 
 
 
+; =================================================================
+; =================================================================
+; ======= 4/ Aggregate rebuild from raw events (in-memory) =======
+; =================================================================
+; =================================================================
+
+; Delete all agg_* and ngram_* rows from the in-memory DB so that
+; KLR_RebuildAggregates can recalculate them cleanly from events_*.
+; Called once per refresh cycle before KLR_RebuildAggregates.
+KLR_ClearAggregates(db) {
+	for tbl in ["agg_app_day", "agg_app_day_buckets", "agg_app_day_burst",
+	            "agg_app_day_session", "agg_app_day_chars_class",
+	            "agg_app_day_errors", "agg_app_day_ergo", "agg_app_day_layouts",
+	            "agg_app_day_kc_hold", "agg_app_day_titles",
+	            "agg_app_day_hourly", "agg_app_day_hourly_min5",
+	            "agg_app_day_switches_to", "agg_system_day",
+	            "ngram_chars", "ngram_bigrams", "ngram_trigrams",
+	            "ngram_quadgrams", "ngram_pentagrams", "ngram_hexagrams",
+	            "ngram_heptagrams", "ngram_words", "ngram_word_bigrams",
+	            "ngram_shortcuts", "ngram_shortcut_bigrams",
+	            "ngram_keycodes", "ngram_scancodes"]
+		try SQLite_Exec(db, "DELETE FROM " . tbl . ";")
+}
+
+; Reconstruct the primary agg_* tables from raw events_* rows using SQL
+; GROUP BY. This is called after loading events_* from data.sql so the
+; reader never depends on pre-computed aggregates being stored in the file.
+; Tables that require character-level iteration or ring-buffer logic
+; (chars_class, errors, ergo, burst, session, kc_hold, buckets, layouts,
+; all ngrams) are left empty here and populated by KLR_InjectKlwBatch
+; which drains the in-RAM KLW.batch accumulated by the ingest walker.
+KLR_RebuildAggregates(db) {
+	; agg_app_day — core typing metrics from events_typing.
+	; json_each on events_json sums keystroke dur_ms for precise time_ms.
+	try SQLite_Exec(db, "
+	(
+	INSERT INTO agg_app_day (device_id, date, app, chars, pauses, time_ms, think_time_ms)
+	SELECT device_id, date, app,
+	    SUM(LENGTH(text)),
+	    SUM(CASE WHEN pause_before_ms > 2000 THEN 1 ELSE 0 END),
+	    SUM((SELECT COALESCE(SUM(CAST(json_extract(ev.value,'$.dur_ms') AS INTEGER)),0)
+	         FROM json_each(events_json) AS ev)),
+	    SUM(CASE WHEN pause_before_ms > 2000 THEN COALESCE(pause_before_ms,0) ELSE 0 END)
+	FROM events_typing
+	GROUP BY device_id, date, app
+	ON CONFLICT(device_id, date, app) DO UPDATE SET
+	    chars=chars+excluded.chars,
+	    pauses=pauses+excluded.pauses,
+	    time_ms=time_ms+excluded.time_ms,
+	    think_time_ms=think_time_ms+excluded.think_time_ms;
+	)")
+
+	; agg_app_day — hotstring metrics from events_hotstring.
+	try SQLite_Exec(db, "
+	(
+	INSERT INTO agg_app_day (device_id, date, app, hs_chars, hs_triggers, hs_input_chars)
+	SELECT device_id, date, app,
+	    SUM(COALESCE(net_saved_chars,0)),
+	    COUNT(*),
+	    SUM(LENGTH(COALESCE(trigger,'')))
+	FROM events_hotstring WHERE kind = 'fired'
+	GROUP BY device_id, date, app
+	ON CONFLICT(device_id, date, app) DO UPDATE SET
+	    hs_chars=hs_chars+excluded.hs_chars,
+	    hs_triggers=hs_triggers+excluded.hs_triggers,
+	    hs_input_chars=hs_input_chars+excluded.hs_input_chars;
+	)")
+
+	; agg_app_day — app foreground time from events_app_switch.
+	try SQLite_Exec(db, "
+	(
+	INSERT INTO agg_app_day (device_id, date, app, app_time_ms)
+	SELECT device_id, date, prev_app, SUM(COALESCE(duration_ms,0))
+	FROM events_app_switch
+	WHERE prev_app IS NOT NULL AND prev_app != ''
+	GROUP BY device_id, date, prev_app
+	ON CONFLICT(device_id, date, app) DO UPDATE SET
+	    app_time_ms=app_time_ms+excluded.app_time_ms;
+	)")
+
+	; agg_app_day_hourly — chars typed per hour from events_typing.
+	try SQLite_Exec(db, "
+	(
+	INSERT INTO agg_app_day_hourly (device_id, date, app, hour, c)
+	SELECT device_id, date, app, substr(ts,12,2) AS hour, SUM(LENGTH(text))
+	FROM events_typing
+	GROUP BY device_id, date, app, hour
+	ON CONFLICT(device_id, date, app, hour) DO UPDATE SET c=c+excluded.c;
+	)")
+
+	; agg_app_day_hourly_min5 — chars typed per 5-min slot from events_typing.
+	try SQLite_Exec(db, "
+	(
+	INSERT INTO agg_app_day_hourly_min5 (device_id, date, app, slot, c)
+	SELECT device_id, date, app,
+	    substr(ts,12,2) || ':' ||
+	    CASE WHEN (CAST(substr(ts,15,2) AS INTEGER)/5)*5 < 10
+	         THEN '0' ELSE '' END ||
+	    CAST((CAST(substr(ts,15,2) AS INTEGER)/5)*5 AS TEXT) AS slot,
+	    SUM(LENGTH(text))
+	FROM events_typing
+	GROUP BY device_id, date, app, slot
+	ON CONFLICT(device_id, date, app, slot) DO UPDATE SET c=c+excluded.c;
+	)")
+
+	; agg_app_day_titles — window titles seen per app from events_window_switch.
+	try SQLite_Exec(db, "
+	(
+	INSERT INTO agg_app_day_titles (device_id, date, app, title, c)
+	SELECT device_id, date, app, next_title, COUNT(*)
+	FROM events_window_switch
+	WHERE next_title IS NOT NULL AND next_title != ''
+	GROUP BY device_id, date, app, next_title
+	ON CONFLICT(device_id, date, app, title) DO UPDATE SET c=c+excluded.c;
+	)")
+
+	; agg_app_day_switches_to — app switch destinations from events_app_switch.
+	try SQLite_Exec(db, "
+	(
+	INSERT INTO agg_app_day_switches_to (device_id, date, app, switched_to, c)
+	SELECT device_id, date, prev_app, next_app, COUNT(*)
+	FROM events_app_switch
+	WHERE prev_app IS NOT NULL AND next_app IS NOT NULL
+	GROUP BY device_id, date, prev_app, next_app
+	ON CONFLICT(device_id, date, app, switched_to) DO UPDATE SET c=c+excluded.c;
+	)")
+
+	; agg_system_day — system events (wifi, lock, sleep) from events_system.
+	try SQLite_Exec(db, "
+	(
+	INSERT INTO agg_system_day (device_id, date, wifi_changes, locked_ms, sleep_ms, awake_ms)
+	SELECT device_id, date,
+	    SUM(CASE WHEN action='wifi_change' THEN 1 ELSE 0 END),
+	    SUM(CASE WHEN action='lock'
+	             THEN CAST(json_extract(metadata_json,'$.duration_ms') AS INTEGER)
+	             ELSE 0 END),
+	    SUM(CASE WHEN action='sleep'
+	             THEN CAST(json_extract(metadata_json,'$.duration_ms') AS INTEGER)
+	             ELSE 0 END),
+	    SUM(CASE WHEN action='wake'
+	             THEN CAST(json_extract(metadata_json,'$.duration_ms') AS INTEGER)
+	             ELSE 0 END)
+	FROM events_system
+	GROUP BY device_id, date
+	ON CONFLICT(device_id, date) DO UPDATE SET
+	    wifi_changes=wifi_changes+excluded.wifi_changes,
+	    locked_ms=locked_ms+excluded.locked_ms,
+	    sleep_ms=sleep_ms+excluded.sleep_ms,
+	    awake_ms=awake_ms+excluded.awake_ms;
+	)")
+}
+
+; Drain KLW.batch (the in-RAM walker accumulator) into the in-memory DB.
+; This populates the tables that cannot be reconstructed by SQL GROUP BY
+; alone: agg_app_day_chars_class, agg_app_day_errors, agg_app_day_ergo,
+; agg_app_day_burst, agg_app_day_session, agg_app_day_kc_hold,
+; agg_app_day_layouts, agg_app_day_buckets, and all ngram_* tables.
+; KLW_BuildBatchSql() resets KLW.batch after generating the SQL — so the
+; next ingest tick starts with a clean accumulator.
+KLR_InjectKlwBatch(db) {
+	agg_sql := ""
+	try agg_sql := KLW_BuildBatchSql()
+	if (agg_sql != "")
+		SQLite_Exec(db, "BEGIN TRANSACTION;`n" . agg_sql . "`nCOMMIT;")
+}
+
+
+
+
 ; ===============================================
 ; ======================================
-; ======= 4/ Manifest projection =======
+; ======= 5/ Manifest projection =======
 ; ======================================
 ; ===============================================
 
@@ -1013,158 +1192,3 @@ KLR_PrevDay(yyyy_mm_dd) {
 
 
 
-; ======================================
-; ======================================
-; ======= 8/ data.sql compaction =======
-; ======================================
-; ======================================
-;
-; KLR_CompactDataSql replaces a device's data.sql with a semantically
-; equivalent but much smaller file by:
-;   1. Loading the DB (via the chunked reader already implemented).
-;   2. Exporting every table as a single INSERT OR REPLACE/IGNORE per row
-;      (so each (PK) appears exactly once instead of once per ingest tick).
-;   3. Writing the compact SQL atomically via a .tmp rename.
-;
-; Typical reduction: 10-50× for a mature data.sql where the same agg_*/
-; ngram_* rows were UPSERTed thousands of times. Raw events_* rows are
-; also deduplicated (INSERT OR IGNORE with PK, so re-running is safe).
-;
-; WHEN TO CALL: once per week at a quiet moment (e.g. after midnight
-; rollover). The operation is O(rows) in the DB, typically < 30 s on
-; a few months of data.  KLR_ResetCache() is called afterwards so the
-; next dashboard open rebuilds from the new compact file.
-
-; Quote a single SQL value: numbers stay bare, strings are single-quoted
-; with internal quotes doubled, NULLs become SQL NULL.
-KLR_CompactQuoteVal(v) {
-    if (v = "")
-        return "NULL"
-    if IsInteger(v) || IsFloat(v)
-        return String(v)
-    ; Escape internal single-quotes by doubling them.
-    return "'" . StrReplace(String(v), "'", "''") . "'"
-}
-
-; Export all rows of `tbl` as INSERT statements into `fh`. Uses
-; INSERT OR IGNORE for immutable event tables (UNIQUE PRIMARY KEY
-; already guards duplicates) and INSERT OR REPLACE for mutable
-; aggregate / ngram tables (last value wins, which is what a compacted
-; DB represents after all ON CONFLICT updates have been applied).
-KLR_CompactDumpTable(db, fh, tbl, replace := false) {
-    verb := replace ? "INSERT OR REPLACE" : "INSERT OR IGNORE"
-    rows := SQLite_Query(db, "SELECT * FROM " . tbl)
-    if (rows.Length = 0)
-        return
-    ; Derive column list from first row.
-    col_names := []
-    for k, _ in rows[1]
-        col_names.Push(k)
-    col_list := ""
-    for i, c in col_names
-        col_list .= (i = 1 ? "" : ", ") . c
-    for row in rows {
-        vals := ""
-        for i, c in col_names
-            vals .= (i = 1 ? "" : ", ") . KLR_CompactQuoteVal(row[c])
-        fh.Write(verb . " INTO " . tbl . " (" . col_list . ") VALUES (" . vals . ");`n")
-    }
-}
-
-; Compact all devices' data.sql files found under metrics_dir.
-; Returns a Map(path → true/false) with per-file outcomes.
-KLR_CompactAllDevices(metrics_dir) {
-    md := metrics_dir
-    if !RegExMatch(md, "[\\/]$")
-        md .= "\"
-    by_root := md . "by_device\"
-    results := Map()
-    loop files, by_root . "*", "D" {
-        sql_path := A_LoopFileFullPath . "\data.sql"
-        if !FileExist(sql_path)
-            continue
-        device_id := A_LoopFileName
-        results[sql_path] := KLR_CompactDataSql(sql_path, device_id)
-    }
-    return results
-}
-
-; Compact a single data.sql file identified by `sql_path`.
-; `device_id` is used only for the file header comment.
-; Returns true on success, false on any failure (leaves the original intact).
-KLR_CompactDataSql(sql_path, device_id) {
-    ; Build in-memory DB from the current (possibly large) file.
-    ; KLR_ExecLargeFile reads in 4 MB chunks so no OOM risk.
-    db := SQLite_Open(":memory:")
-    if !db
-        return false
-    if !KLR_LoadSchema(db) {
-        SQLite_Close(db)
-        return false
-    }
-    KLR_ExecLargeFile(db, sql_path)
-
-    tmp := sql_path . ".compact.tmp"
-    try FileDelete(tmp)
-    fh := FileOpen(tmp, "w", "UTF-8")
-    if !fh {
-        SQLite_Close(db)
-        return false
-    }
-
-    ; File header — matches the format written by KL_Init().
-    fh.Write("-- ergopti metrics — device " . device_id . " — schema_version 1`n")
-    fh.Write("-- This file is APPEND-ONLY. Do not edit by hand.`n")
-    fh.Write("-- Compacted by KLR_CompactDataSql on " . A_Now . "`n")
-    fh.Write("PRAGMA foreign_keys = OFF;`n")
-    fh.Write("`nBEGIN TRANSACTION;`n")
-
-    ; ── Immutable raw event tables (INSERT OR IGNORE). ──────────────────────
-    for tbl in ["devices", "events_typing", "events_app_switch",
-                "events_window_switch", "events_shortcut", "events_system",
-                "events_hotstring", "events_llm", "events_session",
-                "events_mouse", "events_ergo", "events_window_topo"] {
-        KLR_CompactDumpTable(db, fh, tbl, false)
-    }
-
-    ; ── Mutable aggregate tables (INSERT OR REPLACE = last value wins). ─────
-    for tbl in ["agg_app_day", "agg_app_day_buckets", "agg_app_day_burst",
-                "agg_app_day_session", "agg_app_day_chars_class",
-                "agg_app_day_errors", "agg_app_day_ergo", "agg_app_day_layouts",
-                "agg_app_day_kc_hold", "agg_app_day_titles",
-                "agg_app_day_hourly", "agg_app_day_hourly_min5",
-                "agg_app_day_switches_to", "agg_system_day"] {
-        KLR_CompactDumpTable(db, fh, tbl, true)
-    }
-
-    ; ── N-gram tables (INSERT OR REPLACE). ──────────────────────────────────
-    for tbl in ["ngram_chars", "ngram_bigrams", "ngram_trigrams",
-                "ngram_quadgrams", "ngram_pentagrams", "ngram_hexagrams",
-                "ngram_heptagrams", "ngram_words", "ngram_word_bigrams",
-                "ngram_shortcuts", "ngram_shortcut_bigrams",
-                "ngram_keycodes", "ngram_scancodes"] {
-        KLR_CompactDumpTable(db, fh, tbl, true)
-    }
-
-    ; ── Meta (INSERT OR REPLACE). ────────────────────────────────────────────
-    KLR_CompactDumpTable(db, fh, "meta", true)
-
-    fh.Write("COMMIT;`n")
-    fh.Close()
-    SQLite_Close(db)
-
-    ; Atomic rename: .compact.tmp → data.sql. On success the old bloated
-    ; file is gone; on failure the original is untouched.
-    static MOVEFILE_REPLACE_EXISTING := 0x1
-    static MOVEFILE_WRITE_THROUGH    := 0x8
-    static MV_FLAGS := MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH
-    ok := DllCall("Kernel32\MoveFileExW", "Str", tmp, "Str", sql_path,
-        "UInt", MV_FLAGS, "Int")
-    if !ok {
-        try FileDelete(tmp)
-        return false
-    }
-    ; The cached in-memory DB is now stale (file was replaced).
-    KLR_ResetCache()
-    return true
-}
