@@ -411,8 +411,8 @@ Updater_ParseBody(Json) {
 	; Detect null before trying the quoted-string pattern.
 	if RegExMatch(Json, '"body"\s*:\s*null', &_)
 		return ""
-	; [^"\\]* is possessive by nature — no backtracking risk, no atomic group needed
-	if RegExMatch(Json, '"body"\s*:\s*"((?:[^"\\]|\\.)*)"', &M) {
+	; Possessive quantifier (*+) prevents catastrophic backtracking on large bodies.
+	if RegExMatch(Json, '"body"\s*:\s*"((?:[^"\\]++|\\.)*+)"', &M) {
 		; Unescape the most common JSON escape sequences.
 		Body := M[1]
 		Body := StrReplace(Body, "\n",  "`n")
@@ -593,7 +593,7 @@ _Updater_OpenChangelogWindow(Channel) {
 	ChannelBadge := (Channel == "dev") ? " — dev" : " — stable"
 	WinTitle     := t("updater.title_changelog") . ChannelBadge
 
-	G := Gui("+Resize +MinSize960x600", WinTitle)
+	G := Gui("+Resize +MinSize930x400", WinTitle)
 	G.SetFont("s10", "Segoe UI")
 	G.MarginX := 10
 	G.MarginY := 8
