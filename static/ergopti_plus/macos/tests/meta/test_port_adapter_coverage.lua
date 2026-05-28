@@ -204,11 +204,18 @@ end)
 --- ===============================================
 -- ===============================================
 
+-- Baseline violation counts captured when this check was tightened.
+-- The tests fail only if the count INCREASES beyond these thresholds, preventing
+-- regressions while allowing incremental clean-up of the backlog.
+-- TODO: drive all baselines to zero as modules are refactored to use port adapters.
+local LUA_HS_BASELINE       = 912  -- hs.* calls in macos/modules/ and macos/lib/
+local LUA_IO_OS_BASELINE    = 60   -- io.open / os.execute calls in macos/modules/ and macos/lib/
+
 helpers.describe("meta: shared/ code purity", function()
 	local shared_dir = REPO_ROOT .. "/static/ergopti_plus/shared"
 
 	-- Patterns that indicate direct OS-API usage forbidden in shared code
-	local forbidden_patterns = {
+	local forbidden_js_patterns = {
 		{ pat = "io%.open",   desc = "direct Lua file I/O" },
 		{ pat = "hs%.",       desc = "direct Hammerspoon API" },
 		{ pat = "SendInput",  desc = "direct AHK keyboard injection" },
@@ -218,9 +225,9 @@ helpers.describe("meta: shared/ code purity", function()
 		{ pat = "FileRead",   desc = "direct AHK built-in file read" },
 	}
 
-	local shared_files = list_files(shared_dir, "js")
-	local violations   = 0
-	local scanned      = 0
+	local shared_files  = list_files(shared_dir, "js")
+	local js_violations = 0
+	local scanned       = 0
 
 	for _, file_path in ipairs(shared_files) do
 		-- Skip spec files — they may reference pattern names in documentation strings
@@ -236,10 +243,10 @@ helpers.describe("meta: shared/ code purity", function()
 		local line_num = 0
 		for line in (body .. "\n"):gmatch("([^\n]*)\n") do
 			line_num = line_num + 1
-			for _, entry in ipairs(forbidden_patterns) do
+			for _, entry in ipairs(forbidden_js_patterns) do
 				if line:find(entry.pat) then
-					violations = violations + 1
-					print(string.format("  WARN: %s in shared/ file: %s line %d",
+					js_violations = js_violations + 1
+					print(string.format("  WARN: %s in shared/ file: %s:%d",
 						entry.desc, rel, line_num))
 				end
 			end
@@ -248,14 +255,96 @@ helpers.describe("meta: shared/ code purity", function()
 		::continue::
 	end
 
-	-- Warn-only: pre-existing shared/ files that use hs. for UI rendering are
-	-- architectural gaps tracked separately. The invariant is informational until
-	-- those files are refactored to route through port adapters.
-	helpers.it(string.format("no direct OS API calls in shared/ source files (%d scanned)", scanned), function()
-		helpers.assert_true(scanned >= 0,  -- always passes — violations logged above as WARNs
-			"shared purity scanner failed to initialise")
-		if violations > 0 then
-			print(string.format("  NOTE: %d OS-API call(s) in shared/ (warn-only — see WARNs above)", violations))
-		end
+	helpers.it(string.format("no direct OS API calls in shared/ JS source files (%d scanned)", scanned), function()
+		helpers.assert_true(scanned >= 0,
+			"shared JS purity scanner failed to initialise")
+		helpers.assert_true(js_violations == 0,
+			string.format("%d OS-API call(s) found in shared/ JS — shared code must be pure logic", js_violations))
 	end)
+end)
+
+
+
+
+-- ======================================================
+--- ======================================================
+-- ======= 5/ Lua module OS-API purity (baseline) =======
+--- ======================================================
+-- ======================================================
+
+helpers.describe("meta: lua module OS-API purity baseline", function()
+	local macos_root    = DRIVER_ROOT
+	local modules_dir   = macos_root .. "modules"
+	local lib_dir       = macos_root .. "lib"
+	local adapters_dir  = macos_root .. "adapters"
+
+	-- Count violations in a list of Lua files, excluding adapter files
+	-- (adapters are allowed — and expected — to call OS APIs directly).
+	local function count_lua_pattern(files, pattern, adapters_prefix)
+		local count = 0
+		local details = {}
+		for _, file_path in ipairs(files) do
+			-- Adapters are the boundary layer; OS calls there are intentional
+			if file_path:find(adapters_prefix, 1, true) then goto continue end
+			local fh = io.open(file_path, "r")
+			if not fh then goto continue end
+			local body = fh:read("*a")
+			fh:close()
+			local line_num = 0
+			for line in (body .. "\n"):gmatch("([^\n]*)\n") do
+				line_num = line_num + 1
+				if line:find(pattern) then
+					count = count + 1
+					details[#details + 1] = string.format("    %s:%d", file_path, line_num)
+				end
+			end
+			::continue::
+		end
+		return count, details
+	end
+
+	local lua_module_files = list_files(modules_dir, "lua")
+	local lua_lib_files    = list_files(lib_dir, "lua")
+	local all_lua_files    = {}
+	for _, f in ipairs(lua_module_files) do all_lua_files[#all_lua_files + 1] = f end
+	for _, f in ipairs(lua_lib_files)    do all_lua_files[#all_lua_files + 1] = f end
+
+	local hs_count, hs_details   = count_lua_pattern(all_lua_files, "hs%.",    adapters_dir)
+	local io_count, io_details   = count_lua_pattern(all_lua_files, "io%.open", adapters_dir)
+	local os_count, os_details   = count_lua_pattern(all_lua_files, "os%.execute", adapters_dir)
+	local total_io_os            = io_count + os_count
+
+	-- Print violation details so CI logs show exactly which lines regressed
+	if hs_count > LUA_HS_BASELINE then
+		print(string.format("  REGRESSION: hs.* calls increased from %d to %d — new violations:", LUA_HS_BASELINE, hs_count))
+		for _, d in ipairs(hs_details) do print(d) end
+	else
+		print(string.format("  INFO: %d hs.* call(s) in modules+lib (baseline %d) — TODO: drive to zero", hs_count, LUA_HS_BASELINE))
+	end
+
+	if total_io_os > LUA_IO_OS_BASELINE then
+		print(string.format("  REGRESSION: io.open/os.execute calls increased from %d to %d — new violations:", LUA_IO_OS_BASELINE, total_io_os))
+		for _, d in ipairs(io_details) do print(d) end
+		for _, d in ipairs(os_details) do print(d) end
+	else
+		print(string.format("  INFO: %d io.open/os.execute call(s) in modules+lib (baseline %d) — TODO: drive to zero", total_io_os, LUA_IO_OS_BASELINE))
+	end
+
+	helpers.it(
+		string.format("hs.* usage in lua modules has not increased beyond baseline (%d)", LUA_HS_BASELINE),
+		function()
+			helpers.assert_true(hs_count <= LUA_HS_BASELINE,
+				string.format(
+					"hs.* call count regressed: %d > baseline %d — move new OS calls into adapters/",
+					hs_count, LUA_HS_BASELINE))
+		end)
+
+	helpers.it(
+		string.format("io.open/os.execute usage in lua modules has not increased beyond baseline (%d)", LUA_IO_OS_BASELINE),
+		function()
+			helpers.assert_true(total_io_os <= LUA_IO_OS_BASELINE,
+				string.format(
+					"io.open/os.execute count regressed: %d > baseline %d — move new OS calls into adapters/",
+					total_io_os, LUA_IO_OS_BASELINE))
+		end)
 end)

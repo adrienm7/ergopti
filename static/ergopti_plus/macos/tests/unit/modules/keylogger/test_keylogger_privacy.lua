@@ -137,9 +137,96 @@ end
 
 
 
+-- ==============================================
+-- ==============================================
+-- ======= 2/ Corpus JSON vector runner =========
+-- ==============================================
+-- ==============================================
+
+-- Load the shared security corpus so vector definitions stay in one place.
+-- The corpus path is two levels above the HS driver root: shared/ lives at
+-- static/ergopti_plus/shared/ while we are under static/ergopti_plus/macos/.
+local _corpus_path = helpers.driver_root() .. "../shared/tests/corpus/security/keylogger_no_persist_vectors.json"
+
+--- Reads and JSON-decodes the corpus file.
+--- @return table|nil corpus, string|nil err
+local function load_corpus()
+	local fh = io.open(_corpus_path, "r")
+	if not fh then
+		return nil, "cannot open corpus at " .. _corpus_path
+	end
+	local raw = fh:read("*a")
+	fh:close()
+	-- Reuse the hs.json.decode stub that the test harness provides
+	helpers.load_with_stubs("lib.logger")
+	local ok, decoded = pcall(require("hs").json.decode, raw)
+	if not ok then return nil, "JSON parse error: " .. tostring(decoded) end
+	return decoded, nil
+end
+
+local _corpus, _corpus_err = load_corpus()
+
+helpers.describe("corpus: keylogger_no_persist_vectors.json — guard invariants", function()
+
+	helpers.it("corpus file loaded successfully", function()
+		helpers.assert_true(_corpus ~= nil,
+			"failed to load corpus: " .. tostring(_corpus_err))
+		helpers.assert_true(type(_corpus.vectors) == "table",
+			"corpus.vectors must be a table")
+	end)
+
+	if not _corpus then return end
+
+	for _, vec in ipairs(_corpus.vectors) do
+		local id  = vec.id  or "?"
+		local inp = vec.input or {}
+		local exp = vec.expected or {}
+
+		-- Skip AHK-only vectors (no Hammerspoon equivalent)
+		if inp.driver == "autohotkey" then goto next_vec end
+
+		-- Skip sequence vectors — SEC-008 has a multi-step input handled by the
+		-- dedicated inline test below; the corpus entry serves as documentation only
+		if type(inp.sequence) == "table" then goto next_vec end
+
+		do
+			local vec_id   = id
+			local vec_inp  = inp
+			local vec_exp  = exp
+
+			helpers.it(string.format("%s — %s", vec_id, vec.description or ""), function()
+				local overrides = {}
+				if vec_inp.is_secure_field    ~= nil then overrides.is_secure_field    = vec_inp.is_secure_field    end
+				if vec_inp.is_private_window  ~= nil then overrides.is_private_window  = vec_inp.is_private_window  end
+				if vec_inp.active_app_bundle  ~= nil then overrides.active_app_bundle  = vec_inp.active_app_bundle  end
+
+				local state = make_core_state(overrides)
+				local text  = vec_inp.text or ""
+				for char in text:gmatch(".") do push_char(state, char, 80) end
+
+				if vec_exp.events_persisted == 0 then
+					helpers.assert_eq(#state.buffer_events, 0,
+						string.format("%s: expected 0 buffered events but got %d", vec_id, #state.buffer_events))
+					helpers.assert_eq(state.buffer_text, "",
+						string.format("%s: expected empty buffer_text but got %q", vec_id, state.buffer_text))
+				else
+					-- events_persisted > 0 means the text SHOULD enter the buffer
+					helpers.assert_true(#state.buffer_events > 0,
+						string.format("%s: expected buffered events but buffer is empty", vec_id))
+				end
+			end)
+		end
+
+		::next_vec::
+	end
+end)
+
+
+
+
 -- ==========================================================
 -- ==========================================================
--- ======= 2/ SEC-001 to SEC-003: Secure Field Guard ========
+-- ======= 3/ SEC-001 to SEC-003: Secure Field Guard ========
 -- ==========================================================
 -- ==========================================================
 
@@ -179,7 +266,7 @@ end)
 
 -- ===============================================================
 --- ===============================================================
--- ======= 3/ SEC-004 to SEC-005: System Auth Dialog Guard =======
+-- ======= 4/ SEC-004 to SEC-005: System Auth Dialog Guard =======
 --- ===============================================================
 -- ===============================================================
 
@@ -216,7 +303,7 @@ end)
 
 -- ===========================================================
 -- ===========================================================
--- ======= 4/ SEC-006: Private Browsing Guard ================
+-- ======= 5/ SEC-006: Private Browsing Guard ================
 -- ===========================================================
 -- ===========================================================
 
@@ -241,7 +328,7 @@ end)
 
 -- ============================================================
 --- ============================================================
--- ======= 5/ SEC-007: Normal Field — Events Are Logged =======
+-- ======= 6/ SEC-007: Normal Field — Events Are Logged =======
 --- ============================================================
 -- ============================================================
 
@@ -265,7 +352,7 @@ end)
 
 -- ==============================================================
 -- ==============================================================
--- ======= 6/ SEC-008: Buffer Flush on Field Transition =========
+-- ======= 7/ SEC-008: Buffer Flush on Field Transition =========
 -- ==============================================================
 -- ==============================================================
 
@@ -315,7 +402,7 @@ end)
 
 -- ==================================================================
 -- ==================================================================
--- ======= 7/ Filter Toggle Integrity — Disabled Guards ==============
+-- ======= 8/ Filter Toggle Integrity — Disabled Guards ==============
 -- ==================================================================
 -- ==================================================================
 
