@@ -9,7 +9,7 @@ the constants, algorithms, and draw_calls[] IR defined here.
 ## 1. Folder Contents
 
 ```
-static/drivers/_shared/tooltip/
+static/ergopti_plus/shared/tooltip/
 ├── SPEC.md          ← This file — canonical contract
 ├── constants.toml   ← All numeric and color constants (canonical source)
 ├── tint.js          ← Pure HSL tint-mixing algorithm + test vectors
@@ -78,8 +78,9 @@ This communicates "this option exists but is not active" without hiding it.
 ## 3. Tint Mixing Algorithm
 
 The canonical algorithm is implemented in `tint.js:mixTint()`. Every driver
-MUST use this exact formula. A cross-driver test in `scripts/test-tooltip-tint.js`
-validates all implementations against the shared test vectors in `tint.js:tintTestVectors()`.
+MUST use this exact formula. Test coverage is provided via
+`macos/tests/unit/ui/test_tooltip_tint_contract.lua` on the Hammerspoon side;
+the reference vectors live in `tint.js:tintTestVectors()`.
 
 ### Algorithm
 
@@ -317,9 +318,9 @@ A driver is considered compliant with this spec when:
 - Tint algorithm: [`tint.js`](./tint.js)
 - Layout engine: [`layout.js`](./layout.js)
 - Draw-call IR: [`draw_calls.js`](./draw_calls.js)
-- AHK implementation: [`lib/tooltip.ahk`](../../autohotkey/lib/tooltip.ahk),
-  [`ui/tooltip_llm.ahk`](../../autohotkey/ui/tooltip_llm.ahk),
-  [`lib/ui_style.ahk`](../../autohotkey/lib/ui_style.ahk)
-- HS implementation: [`ui/tooltip/renderer.lua`](../../hammerspoon/ui/tooltip/renderer.lua),
-  [`ui/tooltip/config.lua`](../../hammerspoon/ui/tooltip/config.lua),
-  [`ui/tooltip/tooltip_llm.lua`](../../hammerspoon/ui/tooltip/tooltip_llm.lua)
+- AHK implementation: [`lib/tooltip.ahk`](../../windows/lib/tooltip.ahk),
+  [`ui/tooltip_llm.ahk`](../../windows/ui/tooltip_llm.ahk),
+  [`lib/ui_style.ahk`](../../windows/lib/ui_style.ahk)
+- HS implementation: [`ui/tooltip/renderer.lua`](../../macos/ui/tooltip/renderer.lua),
+  [`ui/tooltip/config.lua`](../../macos/ui/tooltip/config.lua),
+  [`ui/tooltip/tooltip_llm.lua`](../../macos/ui/tooltip/tooltip_llm.lua)

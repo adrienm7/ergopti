@@ -25,7 +25,7 @@ throughout the feature modules. This created three problems:
    (Espanso) required rewriting all OS interactions from scratch.
 
 The team also observed that the domain logic (hotstring matching, tap-hold
-detection, config parsing) is platform-agnostic — only the nine OS-facing
+detection, config parsing) is platform-agnostic — only the twenty OS-facing
 surfaces differ between drivers.
 
 ## Decision
@@ -33,25 +33,27 @@ surfaces differ between drivers.
 Adopt a **hexagonal (ports-and-adapters) architecture** across all drivers.
 
 - **Ports** are formal JavaScript interface contracts stored in
-  `static/drivers/_shared/ports/`. Each port `.spec.js` file documents
+  `static/ergopti_plus/shared/ports/`. Each port `.spec.js` file documents
   the exact method signatures, parameter types, and return values that
   every adapter must implement.
 - **Adapters** are driver-specific implementations of those contracts. The
   macOS driver provides Hammerspoon adapters; the Linux driver provides
   LuaJIT/POSIX adapters; the Windows driver provides AHK COM adapters.
-- **Domain modules** in `static/drivers/_shared/domain/` depend only on
+- **Domain modules** in `static/ergopti_plus/shared/domain/` depend only on
   port interfaces, never on concrete OS APIs.
 
-The nine port contracts are: `FileSystem`, `HttpClient`, `KeyboardHook`,
+The twenty port contracts are: `FileSystem`, `HttpClient`, `KeyboardHook`,
 `Notifier`, `TextSender`, `TimerScheduler`, `TooltipRenderer`, `TrayMenu`,
-`WindowInfo`.
+`SecureFieldDetector`, `Clipboard`, `Storage`, `ProcessLifecycle`, `KeyState`,
+`MouseControl`, `NetworkInfo`, `WindowInfo`, `WindowManager`, `AppLauncher`,
+`Crypto`, `GraphicsRenderer`.
 
 ## Consequences
 
 ### Positive
 
 - Domain logic can be unit-tested without any OS runtime.
-- Adding a new driver requires only implementing the nine port adapters.
+- Adding a new driver requires only implementing the twenty port adapters.
 - Port compliance is enforced by `npm run test:port-compliance`.
 - Cross-driver divergence is caught at the spec level, not discovered at runtime.
 
@@ -59,7 +61,7 @@ The nine port contracts are: `FileSystem`, `HttpClient`, `KeyboardHook`,
 
 - Adapters introduce an indirection layer; contributors must understand which
   port to extend rather than calling OS APIs directly.
-- The nine port specs must be kept in sync with every adapter as APIs evolve.
+- The twenty port specs must be kept in sync with every adapter as APIs evolve.
 
 ### Neutral
 
@@ -76,8 +78,8 @@ The nine port contracts are: `FileSystem`, `HttpClient`, `KeyboardHook`,
 
 ## Evidence in the codebase
 
-- Port contracts: `static/drivers/_shared/ports/*.spec.js` (9 files: `FileSystem.spec.js`, `HttpClient.spec.js`, `KeyboardHook.spec.js`, `Notifier.spec.js`, `TextSender.spec.js`, `TimerScheduler.spec.js`, `TooltipRenderer.spec.js`, `TrayMenu.spec.js`, `WindowInfo.spec.js`)
-- Port spec documentation: `static/drivers/_shared/ports/SPEC.md`
-- Linux adapter implementations: `static/drivers/linux/adapters/`
-- Compliance enforcement script: `scripts/test-port-compliance.cjs` (`npm run test:port-compliance`)
-- Domain module specs: `static/drivers/_shared/domain/SPEC.md`
+- Port contracts: `static/ergopti_plus/shared/ports/*.spec.js` (20 files: `FileSystem.spec.js`, `HttpClient.spec.js`, `KeyboardHook.spec.js`, `Notifier.spec.js`, `TextSender.spec.js`, `TimerScheduler.spec.js`, `TooltipRenderer.spec.js`, `TrayMenu.spec.js`, `SecureFieldDetector.spec.js`, `Clipboard.spec.js`, `Storage.spec.js`, `ProcessLifecycle.spec.js`, `KeyState.spec.js`, `MouseControl.spec.js`, `NetworkInfo.spec.js`, `WindowInfo.spec.js`, `WindowManager.spec.js`, `AppLauncher.spec.js`, `Crypto.spec.js`, `GraphicsRenderer.spec.js`)
+- Port spec documentation: `static/ergopti_plus/shared/ports/SPEC.md`
+- Linux adapter implementations: `static/ergopti_plus/linux/adapters/`
+- Compliance enforcement script: `tools/test/test-port-compliance.cjs` (`npm run test:port-compliance`)
+- Domain module specs: `static/ergopti_plus/shared/domain/SPEC.md`

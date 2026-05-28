@@ -11,7 +11,7 @@
 ## Context
 
 Ergopti currently ships functional drivers for macOS (Hammerspoon/Lua) and
-Windows (AutoHotkey). The Linux driver directory (`static/drivers/linux/`)
+Windows (AutoHotkey). The Linux driver directory (`static/ergopti_plus/linux/`)
 exists and contains filesystem, timer, and notifier adapters written in Lua,
 but no keyboard interception layer has been selected yet.
 
@@ -24,7 +24,7 @@ Three implementation paths were evaluated:
    domain modules are Lua. A Python runtime would require rewriting the
    domain layer or bridging two runtimes, both expensive and error-prone.
 3. **LuaJIT + libinput + uinput** — the Hammerspoon driver is already
-   written in Lua; `static/drivers/_shared/lua/` contains portable Lua
+   written in Lua; `static/ergopti_plus/shared/lua/` contains portable Lua
    modules (TOML codec, LLM bridge utilities) that work under plain Lua 5.4
    or LuaJIT without modification. The Linux kernel exposes keyboard events
    via `libinput` (read path) and `uinput` (write path), both accessible
@@ -36,20 +36,21 @@ The Linux driver will use **LuaJIT** as its runtime, **libinput** for
 intercepting raw keyboard and pointer events, and **uinput** for injecting
 synthetic key events.
 
-The three existing Linux adapters (`file_system.lua`, `notifier.lua`,
-`timer_scheduler.lua`) are already written to this assumption and use only
-the standard Lua I/O and `os` libraries. The remaining six port adapters
-(`HttpClient`, `KeyboardHook`, `TextSender`, `TimerScheduler`, `TooltipRenderer`,
-`TrayMenu`, `WindowInfo`) will be implemented as LuaJIT FFI bindings.
+All nine Linux adapters (`file_system.lua`, `http_client.lua`,
+`keyboard_hook.lua`, `notifier.lua`, `text_sender.lua`, `timer_scheduler.lua`,
+`tooltip_renderer.lua`, `tray_menu.lua`, `window_info.lua`) are written to
+this assumption. The core I/O adapters use only the standard Lua I/O and `os`
+libraries; the keyboard and injection adapters use LuaJIT FFI bindings to
+libinput and uinput respectively.
 
-The shared Lua modules in `static/drivers/_shared/lua/` (TOML codec, LLM
+The shared Lua modules in `static/ergopti_plus/shared/lua/` (TOML codec, LLM
 utilities) are the canonical implementations for the Linux driver — no rewrite.
 
 ## Consequences
 
 ### Positive
 
-- Domain modules in `_shared/lua/` are reused directly; zero code duplication.
+- Domain modules in `shared/lua/` are reused directly; zero code duplication.
 - LuaJIT's FFI removes the need for a C extension module for libinput/uinput.
 - A single Lua version (5.4-compatible subset) spans macOS, Linux, and shared
   modules — contributors need to learn only one language.
@@ -79,7 +80,7 @@ utilities) are the canonical implementations for the Linux driver — no rewrite
 
 ## Evidence in the codebase
 
-- Existing Linux adapters: `static/drivers/linux/adapters/file_system.lua`, `notifier.lua`, `timer_scheduler.lua`
-- Shared portable Lua modules: `static/drivers/_shared/lua/toml_codec/`, `static/drivers/_shared/lua/llm/`
-- Port contracts to be implemented: `static/drivers/_shared/ports/KeyboardHook.spec.js`, `TextSender.spec.js`, etc.
-- Linux tests skeleton: `static/drivers/linux/tests/`
+- Linux adapter implementations (9 adapters): `static/ergopti_plus/linux/adapters/`
+- Shared portable Lua modules: `static/ergopti_plus/shared/lua/toml_codec/`, `static/ergopti_plus/shared/lua/llm/`
+- Port contracts: `static/ergopti_plus/shared/ports/KeyboardHook.spec.js`, `TextSender.spec.js`, etc.
+- Linux tests: `static/ergopti_plus/linux/tests/`

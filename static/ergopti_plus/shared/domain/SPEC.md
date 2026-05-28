@@ -23,7 +23,7 @@ By extracting pure domain logic into this folder:
 ## 2. Folder Contents
 
 ```
-static/drivers/_shared/domain/
+static/ergopti_plus/shared/domain/
 ├── SPEC.md                  ← This file
 ├── Registry.spec.js         ← Hotstring data model + lookup contract
 ├── Expander.spec.js         ← Expansion decision contract
@@ -56,9 +56,9 @@ TrayMenu     ◀──────────  GestureRecognizer (spec)
 ```
 
 Domain modules:
-- **MUST NOT** import from `static/drivers/autohotkey/` or `static/drivers/hammerspoon/`.
+- **MUST NOT** import from `static/ergopti_plus/windows/` or `static/ergopti_plus/macos/`.
 - **MUST NOT** call any OS API directly.
-- **MAY** import from `static/drivers/_shared/` (tooltip, ports, llm JSON files).
+- **MAY** import from `static/ergopti_plus/shared/` (tooltip, ports, llm JSON files).
 
 ---
 

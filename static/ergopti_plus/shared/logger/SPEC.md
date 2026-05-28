@@ -299,7 +299,7 @@ Test-runner integration:
 
 ## References
 
-- AHK implementation: [`static/drivers/autohotkey/lib/logger.ahk`](../../autohotkey/lib/logger.ahk)
-- HS implementation:  [`static/drivers/hammerspoon/lib/logger.lua`](../../hammerspoon/lib/logger.lua)
+- AHK implementation: [`static/ergopti_plus/windows/lib/logger.ahk`](../../windows/lib/logger.ahk)
+- HS implementation:  [`static/ergopti_plus/macos/lib/logger.lua`](../../macos/lib/logger.lua)
 - Sub-file routing:   [`sub_files.toml`](./sub_files.toml)
 - Test vectors:       [`test_vectors.json`](./test_vectors.json)

@@ -1,6 +1,6 @@
 # Ergopti+ — Ports & Adapters Specification (Hexagonal Architecture — Step 1)
 
-This folder defines the **port contracts** for the seven OS-facing interfaces that
+This folder defines the **port contracts** for the twenty OS-facing port interfaces that
 every Ergopti+ driver must implement. A "port" is a pure, platform-agnostic
 interface description. A "driver adapter" is the OS-specific implementation that
 satisfies it.
@@ -36,7 +36,7 @@ sides never import each other directly.
 ## 2. Folder Contents
 
 ```
-static/drivers/_shared/ports/
+static/ergopti_plus/shared/ports/
 ├── SPEC.md                        ← This file
 ├── KeyboardHook.spec.js           ← Keyboard event subscription contract
 ├── TextSender.spec.js             ← Text/keystroke injection contract
@@ -49,7 +49,15 @@ static/drivers/_shared/ports/
 ├── SecureFieldDetector.spec.js    ← Secure field/app detection contract
 ├── Clipboard.spec.js              ← OS clipboard read/write contract
 ├── Storage.spec.js                ← Persistent key-value storage contract
-└── ProcessLifecycle.spec.js       ← OS process monitoring contract
+├── ProcessLifecycle.spec.js       ← OS process monitoring contract
+├── KeyState.spec.js               ← Keyboard state query contract
+├── MouseControl.spec.js           ← Mouse movement/click injection contract
+├── NetworkInfo.spec.js            ← Network interface information contract
+├── WindowInfo.spec.js             ← Focused window metadata contract
+├── WindowManager.spec.js          ← Window move/resize/focus contract
+├── AppLauncher.spec.js            ← Application launch contract
+├── Crypto.spec.js                 ← Cryptographic utilities contract
+└── GraphicsRenderer.spec.js       ← Off-screen graphics rendering contract
 ```
 
 Each `.spec.js` file exports:
@@ -66,18 +74,26 @@ Each `.spec.js` file exports:
 
 | Port | AHK Adapter | HS Adapter |
 |---|---|---|
-| KeyboardHook | `modules/keylogger/keylogger_hook.ahk` | `modules/keymap/init.lua` |
-| TextSender | `lib/hotstrings/hotstring_engine.ahk` | `modules/shortcuts/actions/text.lua` |
-| TooltipRenderer | `lib/tooltip.ahk` | `ui/tooltip/init.lua` |
-| HttpClient | `modules/llm/api_remote.ahk` | `modules/llm/api_remote.lua` |
-| TimerScheduler | `SetTimer` wrapper (inline) | `hs.timer` wrapper (inline) |
-| Notifier | `TrayTip` (inline) | `lib/notifications.lua` |
-| TrayMenu | `ui/tray_menu.ahk` | `ui/menu/init.lua` |
-| FileSystem | `lib/filesystem.ahk` (TBD) | `lib/filesystem.lua` (TBD) |
-| SecureFieldDetector | `adapters/secure_field_detector.ahk` (TBD) | `adapters/secure_field_detector.lua` (TBD) |
-| Clipboard | `adapters/clipboard.ahk` (TBD) | `adapters/clipboard.lua` (TBD) |
-| Storage | `adapters/storage.ahk` (TBD) | `adapters/storage.lua` (TBD) |
-| ProcessLifecycle | `adapters/process_lifecycle.ahk` (TBD) | `adapters/process_lifecycle.lua` (TBD) |
+| KeyboardHook | `adapters/keyboard_hook.ahk` | `adapters/keyboard_hook.lua` |
+| TextSender | `adapters/text_sender.ahk` | `adapters/text_sender.lua` |
+| TooltipRenderer | `adapters/tooltip_renderer.ahk` | `adapters/tooltip_renderer.lua` |
+| HttpClient | `adapters/http_client.ahk` | `adapters/http_client.lua` |
+| TimerScheduler | `adapters/timer_scheduler.ahk` | `adapters/timer_scheduler.lua` |
+| Notifier | `adapters/notifier.ahk` | `adapters/notifier.lua` |
+| TrayMenu | `adapters/tray_menu.ahk` | `adapters/tray_menu.lua` |
+| FileSystem | `adapters/file_system.ahk` | `adapters/file_system.lua` |
+| SecureFieldDetector | `adapters/secure_field_detector.ahk` | `adapters/secure_field_detector.lua` |
+| Clipboard | `adapters/clipboard.ahk` | `adapters/clipboard.lua` |
+| Storage | `adapters/storage.ahk` | `adapters/storage.lua` |
+| ProcessLifecycle | `adapters/process_lifecycle.ahk` | `adapters/process_lifecycle.lua` |
+| KeyState | `adapters/key_state.ahk` | `adapters/key_state.lua` |
+| MouseControl | `adapters/mouse_control.ahk` | `adapters/mouse_control.lua` |
+| NetworkInfo | `adapters/network_info.ahk` | `adapters/network_info.lua` |
+| WindowInfo | `adapters/window_info.ahk` | `adapters/window_info.lua` |
+| WindowManager | `adapters/window_manager.ahk` | `adapters/window_manager.lua` |
+| AppLauncher | `adapters/app_launcher.ahk` | `adapters/app_launcher.lua` |
+| Crypto | `adapters/crypto.ahk` | `adapters/crypto.lua` |
+| GraphicsRenderer | `adapters/graphics_renderer.ahk` | `adapters/graphics_renderer.lua` |
 
 ---
 
@@ -148,5 +164,13 @@ adapters expose these methods under their own naming convention:
 - [Clipboard.spec.js](./Clipboard.spec.js)
 - [Storage.spec.js](./Storage.spec.js)
 - [ProcessLifecycle.spec.js](./ProcessLifecycle.spec.js)
+- [KeyState.spec.js](./KeyState.spec.js)
+- [MouseControl.spec.js](./MouseControl.spec.js)
+- [NetworkInfo.spec.js](./NetworkInfo.spec.js)
+- [WindowInfo.spec.js](./WindowInfo.spec.js)
+- [WindowManager.spec.js](./WindowManager.spec.js)
+- [AppLauncher.spec.js](./AppLauncher.spec.js)
+- [Crypto.spec.js](./Crypto.spec.js)
+- [GraphicsRenderer.spec.js](./GraphicsRenderer.spec.js)
 - [Tooltip engine spec](../tooltip/SPEC.md)
 - [Config schema](../config_schema/SCHEMA.md)

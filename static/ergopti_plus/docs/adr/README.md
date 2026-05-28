@@ -38,3 +38,4 @@ Files are named `NNN-short-slug.md` where `NNN` is a zero-padded three-digit seq
 | [004](004-linux-backend-luajit.md) | Linux driver uses LuaJIT + libinput + uinput | Proposed |
 | [005](005-hotstring-engine-ownership.md) | Hotstring engine canonical spec lives in `_shared/domain/` | Accepted |
 | [006](006-cross-driver-corpus-testing.md) | Shared test-vector corpus consumed by all drivers | Accepted |
+| [007](007-i18n-audit-findings.md) | i18n audit findings (1.3.6) | Partially resolved |

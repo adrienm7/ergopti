@@ -12,9 +12,9 @@
 
 The hotstring expansion pipeline has two concrete implementations:
 
-- **AHK driver**: `static/drivers/autohotkey/modules/keymap/hotstring_engine.ahk`
+- **AHK driver**: `static/ergopti_plus/windows/lib/hotstrings/hotstring_engine.ahk`
   — handles trigger detection, expansion dispatch, and caret positioning.
-- **Hammerspoon driver**: `static/drivers/hammerspoon/modules/keymap/registry.lua`
+- **Hammerspoon driver**: `static/ergopti_plus/macos/modules/keymap/registry.lua`
   + `expander.lua` — implements the same pipeline in Lua.
 
 Both implementations evolved independently and diverged in edge-case handling:
@@ -30,7 +30,7 @@ specification existed that both drivers could be validated against.
 ## Decision
 
 The **canonical behavioural specification** for the hotstring engine lives in
-`static/drivers/_shared/domain/` as a set of JavaScript spec files
+`static/ergopti_plus/shared/domain/` as a set of JavaScript spec files
 (`HotstringMatcher.spec.js`, `Expander.spec.js`, `Registry.spec.js`,
 `Terminators.spec.js`). These specs define the expected input/output
 behaviour for every component of the pipeline via test vectors.
@@ -40,7 +40,7 @@ logical assertions expressed in those specs (either directly or via the
 cross-driver corpus — see ADR-006). If a driver's behaviour diverges from the
 spec, the driver is wrong, not the spec.
 
-New algorithm changes must first update the `_shared/domain/` spec, then be
+New algorithm changes must first update the `shared/domain/` spec, then be
 propagated to both driver implementations.
 
 ## Consequences
@@ -77,6 +77,6 @@ propagated to both driver implementations.
 
 ## Evidence in the codebase
 
-- Domain specs: `static/drivers/_shared/domain/HotstringMatcher.spec.js`, `Expander.spec.js`, `Registry.spec.js`, `Terminators.spec.js`
-- Hammerspoon driver tests: `static/drivers/hammerspoon/tests/unit/modules/keymap/test_expander.lua`, `test_registry.lua`, `test_terminators.lua`
-- Domain spec documentation: `static/drivers/_shared/domain/SPEC.md`
+- Domain specs: `static/ergopti_plus/shared/domain/HotstringMatcher.spec.js`, `Expander.spec.js`, `Registry.spec.js`, `Terminators.spec.js`
+- Hammerspoon driver tests: `static/ergopti_plus/macos/tests/unit/modules/keymap/test_expander.lua`, `test_registry.lua`, `test_terminators.lua`
+- Domain spec documentation: `static/ergopti_plus/shared/domain/SPEC.md`

@@ -1,7 +1,7 @@
 # ADR 007 — i18n Audit Findings (1.3.6)
 
 **Date:** 2026-05-26  
-**Status:** Resolved — all violations fixed (2026-05-26)
+**Status:** Partially resolved — AHK startup MsgBox still pending (see Cluster C)
 
 ---
 
@@ -59,14 +59,18 @@ The Karabiner onboarding error-path calls `callback(false, "…")` and
 
 ### Cluster C — `ErgoptiPlus.ahk` (1 MsgBox + 3–4 French log messages)
 
-| Line | Issue |
-|------|-------|
-| 565–566 | `MsgBox(…"Erreur de démarrage : …", "ErgoptiPlus — manifest manquant"…)` — hardcoded French UI |
-| 883–894 | Log messages in French ("ignoré", "enregistré", "Échec") — violates log rule (§4.4: English-only logs) |
+| Line | Issue | Status |
+|------|-------|--------|
+| 603–605 | `MsgBox(…"Erreur de démarrage : …", "ErgoptiPlus — manifest manquant"…)` — hardcoded French UI | **Pending** — will be fixed in a dedicated commit |
+| 883–894 | Log messages in French ("ignoré", "enregistré", "Échec") — violates log rule (§4.4: English-only logs) | Fixed |
 
 **Fix for MsgBox:** move to a dedicated startup error handler; use i18n key
 `startup.manifest_missing`. **Fix for logs:** translate to English in place
 (no i18n needed — logs are developer-facing).
+
+> **Note (2026-05-28):** The French `MsgBox` at `windows/ErgoptiPlus.ahk:603–605`
+> is the sole remaining violation. It will be resolved in a follow-up commit
+> once the startup error handler is in place.
 
 ---
 
