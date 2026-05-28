@@ -144,17 +144,13 @@ LLM_LoadProfilesJSON() {
 	profiles_path := LLM_GetSharedPath("profiles.json")
 	profiles := []
 
-	try {
-		fh := FileOpen(profiles_path, "r", "UTF-8")
-		if !IsObject(fh)
-			return profiles
-		raw := fh.Read()
-		fh.Close()
-
-		parsed := LLM_ParseProfilesJSON(raw)
-		profiles := parsed
-	} catch {
-		; File missing or malformed — return empty, callers fall back to raw
+	raw := FSRead(profiles_path)
+	if (raw != false) {
+		try {
+			profiles := LLM_ParseProfilesJSON(raw)
+		} catch {
+			; File malformed — return empty, callers fall back to raw
+		}
 	}
 	return profiles
 }

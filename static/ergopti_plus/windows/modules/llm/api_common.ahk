@@ -80,14 +80,12 @@ _LLM_Common_GetInference() {
 		_LLM_COMMON_INFERENCE := LLM_COMMON_FALLBACK
 		return _LLM_COMMON_INFERENCE
 	}
+	raw := FSRead(path)
+	if (raw == false) {
+		_LLM_COMMON_INFERENCE := LLM_COMMON_FALLBACK
+		return _LLM_COMMON_INFERENCE
+	}
 	try {
-		fh := FileOpen(path, "r", "UTF-8")
-		if !IsObject(fh) {
-			_LLM_COMMON_INFERENCE := LLM_COMMON_FALLBACK
-			return _LLM_COMMON_INFERENCE
-		}
-		raw := fh.Read()
-		fh.Close()
 		parsed := _LLM_Common_ParseInferenceJson(raw)
 		_LLM_COMMON_INFERENCE := parsed.Count > 0 ? parsed : LLM_COMMON_FALLBACK
 	} catch {

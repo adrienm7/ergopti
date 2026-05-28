@@ -481,11 +481,7 @@ LLM_OllamaGenerate_Streaming(model, system_prompt, user_text, temperature, on_pa
 	_LLM_Ollama_StreamCleanupOrphans()
 	uid := _LLM_Ollama_NextStreamUid()
 	tmp_payload := A_Temp . "\ergopti_ollama_" . uid . ".json"
-	try {
-		fh := FileOpen(tmp_payload, "w", "UTF-8")
-		fh.Write(payload)
-		fh.Close()
-	} catch {
+	if !FSWrite(tmp_payload, payload) {
 		try on_fail()
 		return { Pid: 0, Cancelled: false }
 	}
@@ -625,8 +621,8 @@ LLM_OllamaCancelStream(handle) {
 _LLM_Ollama_CleanupStreamFiles(handle) {
 	if (handle == "" or !IsObject(handle))
 		return
-	try FileDelete(handle.TmpPayload)
-	try FileDelete(handle.TmpStdout)
+	FSDelete(handle.TmpPayload)
+	FSDelete(handle.TmpStdout)
 }
 
 ; Per-call counter so two streams fired in the same millisecond cannot
@@ -657,7 +653,7 @@ _LLM_Ollama_TryDeleteIfOld(path, file_time, now) {
 	try {
 		age_s := DateDiff(now, file_time, "Seconds")
 		if (age_s > 60)
-			try FileDelete(path)
+			FSDelete(path)
 	} catch {
 	}
 }
