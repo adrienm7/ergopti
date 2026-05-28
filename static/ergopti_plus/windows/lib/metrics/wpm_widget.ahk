@@ -211,6 +211,7 @@ WPMWidget_Push(is_hs := false, is_ai := false, is_ac := false, category := "", s
         WPMWidget._last_hs_tick     := now_t
         WPMWidget._last_hs_category := (category != "") ? category : "magickey"
         WPMWidget._last_hs_section  := section
+        LoggerDebug("WPMWidget", "Push hs: category='{1}' section='{2}' stored='{3}'", category, section, WPMWidget._last_hs_category)
     }
     if is_ai
         WPMWidget._last_ai_tick := now_t
@@ -320,7 +321,6 @@ _WPMWidget_NormaliseHex(AccentHex, FallbackHex) {
 WPMWidget_CategoryBgColor(CategoryName, FallbackHex, SectionHint := "") {
     try {
         raw := _WPMWidget_ReadTomlColor(CategoryName)
-        LoggerDebug("WPMWidget", "CategoryBgColor('%s'): raw='%s' fallback='%s'", CategoryName, raw, FallbackHex)
         if (raw != "") {
             return (SubStr(raw, 1, 1) == "#") ? SubStr(raw, 2) : raw
         }
