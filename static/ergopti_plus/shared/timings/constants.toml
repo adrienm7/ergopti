@@ -112,7 +112,12 @@ min_visible_ms = 50
 
 # Step size used when decrementing the remaining TTL on each poll tick.
 # HS: tooltip/config.lua TIMEOUT_DECREMENT_SEC.
-ttl_decrement_ms = 100
+# AHK: lib/tooltip.ahk _TOOLTIP_TIMEOUT_DECREMENT_SEC.
+# Authoritative value: shared/tooltip/constants.toml [timing] timeout_decrement_sec = 0.2
+# (200 ms). If the two TOML files ever disagree again, tooltip/constants.toml wins —
+# it is the visual-layer canon; timings/constants.toml mirrors it for cross-module
+# discovery only.
+ttl_decrement_ms = 200
 
 # Stand-in for "never auto-dismiss" (24 h).
 # HS: keymap/llm_bridge.lua INFINITE_TOOLTIP_SEC.
