@@ -621,6 +621,7 @@ BuildMetricsMenu() {
 	WpmWidgetLabel        := t("menu.metrics.show_wpm_widget")
 	WpmWidgetColorsLabel  := t("menu.metrics.colors_by_source")
 	WpmWidgetGraphLabel   := t("menu.metrics.include_realtime")
+	WpmWidgetResetLabel   := t("menu.metrics.reset_wpm_position")
 
 	; Fat-arrow lambdas capture their enclosing locals by reference in AHK v2,
 	; so passing them directly is simpler and more reliable than IIFE patterns,
@@ -631,6 +632,7 @@ BuildMetricsMenu() {
 	RegisterMenuItem(MetricsMenu, WpmWidgetLabel,        (*) => _ToggleWpmWidget(MetricsMenu, WpmWidgetLabel, WpmWidgetColorsLabel, WpmWidgetGraphLabel))
 	RegisterMenuItem(MetricsMenu, WpmWidgetColorsLabel,  (*) => _ToggleWpmWidgetColors(MetricsMenu, WpmWidgetColorsLabel))
 	RegisterMenuItem(MetricsMenu, WpmWidgetGraphLabel,   (*) => _ToggleWpmWidgetGraph(MetricsMenu, WpmWidgetGraphLabel))
+	RegisterMenuItem(MetricsMenu, WpmWidgetResetLabel,   (*) => WPMWidget_ResetPosition())
 
 	if MetricsShortcuts.show_wpm_menubar
 		MetricsMenu.Check(WpmMenubarLabel)
@@ -649,6 +651,7 @@ BuildMetricsMenu() {
 	if !WPMWidget.visible {
 		MetricsMenu.Disable(WpmWidgetColorsLabel)
 		MetricsMenu.Disable(WpmWidgetGraphLabel)
+		MetricsMenu.Disable(WpmWidgetResetLabel)
 	}
 
 	if !enabled {
@@ -665,6 +668,7 @@ BuildMetricsMenu() {
 		MetricsMenu.Disable(WpmWidgetLabel)
 		MetricsMenu.Disable(WpmWidgetColorsLabel)
 		MetricsMenu.Disable(WpmWidgetGraphLabel)
+		MetricsMenu.Disable(WpmWidgetResetLabel)
 	}
 
 	A_TrayMenu.Add(t("menu.metrics.title"), MetricsMenu)
