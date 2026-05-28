@@ -62,13 +62,18 @@ SpaceTapHold(ModDownFn, ModUpFn) {
     }
     ; Held past threshold → hold: wait for a real key via IH before activating
     ; the modifier. L1 without KeyOpt so keys pass through to the app normally.
+    ; OnKeyDown fires only with +N, so use ih.Input (the captured char) to detect
+    ; what was typed — but also track VK via OnKeyDown+KeyOpt for the modifier
+    ; injection. Since we need both: use KeyOpt only for notification (not suppress),
+    ; then re-send the captured VK with the modifier active.
     _SpaceHeldVK := 0
     ih := InputHook("L1 T3")
+    ih.KeyOpt("{All}", "+N")
     ih.OnKeyDown := _SpaceCaptureVK
     ih.Start()
     ih.Wait()
-    ; Activate modifier only now — Space auto-repeat cannot have produced
-    ; Shift+Space during the IH window because modifier was not active.
+    ; Activate modifier only now — modifier was not active during the IH window
+    ; so Space auto-repeat could only produce unmodified spaces (or nothing).
     ModDownFn.Call()
     if (_SpaceHeldVK != 0)
         SendInput("{vk" . Format("{:x}", _SpaceHeldVK) . "}")
