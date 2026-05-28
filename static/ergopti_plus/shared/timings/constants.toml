@@ -483,6 +483,12 @@ wpm_widget_update_ms = 200
 # HS:  ui/wpm/wpm_widget.lua IDLE_HIDE_MS.
 wpm_widget_idle_hide_ms = 3000
 
+# How long the WPM widget keeps showing the hotstring source color after the
+# last expansion before fading back to the manual-keystroke color.
+# AHK: lib/metrics/wpm_widget.ahk WPMWidgetConst.COLOR_HOLD_MS.
+# HS:  ui/wpm/wpm_widget.lua COLOR_HOLD_S (converted from ms at load time).
+wpm_color_hold_ms = 1000
+
 # WPM menubar update interval.
 # HS: ui/wpm/wpm_menubar.lua 0.5 s timer.
 wpm_menubar_update_ms = 500

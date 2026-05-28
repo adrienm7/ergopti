@@ -98,11 +98,11 @@ local function _load_shared_const()
 		widget_hsl_l          = tonumber(colors.widget_hsl_l) or 0.40,
 		widget_hsl_s          = tonumber(colors.widget_hsl_s) or 1.00,
 
-		-- Idle hide duration (shared/timings/constants.toml)
-		idle_hide_s           = (tc.wpm_widget_idle_hide_ms or 3000) / 1000,
+		-- Idle hide and color-hold durations (shared/timings/constants.toml [ui])
+		idle_hide_s           = ((tc.ui and tc.ui.wpm_widget_idle_hide_ms) or 3000) / 1000,
+		source_color_duration = ((tc.ui and tc.ui.wpm_color_hold_ms)       or 1000) / 1000,
 
 		-- Graph mode (HS-only, not in shared TOML)
-		source_color_duration = 1.0,
 		use_fixed_scale       = true,
 		fixed_scale_max       = 120,
 		bg_color              = { white = 0, alpha = 0.8 },
