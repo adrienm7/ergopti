@@ -20,7 +20,7 @@
  *    assert the full draw_calls[] output without rendering anything.
  * 4. Streaming-friendly: partial updates are expressed as a separate
  *    patch_draw_call() that replaces a single element by its stable id.
- *    Drivers that support indexed element mutation (hs.canvas) use this path
+ *    Drivers that support indexed element mutation (Hammerspoon canvas) use this path
  *    to avoid full redraws during token streaming.
  *
  * DRAW CALL TYPES:
@@ -32,7 +32,7 @@
  *   "text"
  *     A text block (plain or styled).
  *     { type, id, frame, text, font_name, font_size, color, alignment, styled }
- *     `styled` is a driver-opaque object (hs.styledtext on HS, ignored on AHK).
+ *     `styled` is a driver-opaque object (Hammerspoon StyledText on HS, ignored on AHK).
  *
  *   "separator"
  *     A 1 px horizontal rule between stacked rows.
