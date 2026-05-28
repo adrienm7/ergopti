@@ -249,18 +249,25 @@ ai_loading = { red = 0.68, green = 0.38, blue = 1.00, alpha = 1.0 }
 # Colors used for diff-chunk rendering inside LLM predictions.
 # "sel" = the currently selected prediction slot.
 # "unsel" = all other (non-active) slots.
+#
+# AHK hex aliases (no leading #) mirror the RGBA tables for drivers that only
+# accept hex strings. Keep the hex aliases in sync whenever the RGBA values change.
 
 # Corrected text (equal diff chunks, selected slot) — green.
 corr_sel = { red = 0.25, green = 0.90, blue = 0.40, alpha = 1.0 }
+corr_sel_hex = "#40E666"
 
 # Next-words text (insert diff chunks, selected slot) — orange.
 nw_sel = { red = 1.00, green = 0.62, blue = 0.10, alpha = 1.0 }
+nw_sel_hex = "#FF9E1A"
 
 # Unselected slot text — mid-gray.
 unsel_gray = { white = 0.50, alpha = 1.0 }
+unsel_gray_hex = "#808080"
 
 # Loading placeholder color — yellow-amber.
 loading = { red = 0.94, green = 0.78, blue = 0.28, alpha = 1.0 }
+loading_hex = "#F0C747"
 
 
 # ==================================================
