@@ -203,18 +203,24 @@ function M.build_groups(ctx, only)
 		local sections = ctx.keymap and type(ctx.keymap.get_sections) == "function" and ctx.keymap.get_sections(name) or nil
 		local has_secs = type(sections) == "table" and #sections > 0
 
-		local total, has_count = 0, false
+		local total = 0
+		local is_sec_enabled = ctx.keymap and type(ctx.keymap.is_section_enabled) == "function"
+			and ctx.keymap.is_section_enabled or nil
 		if has_secs then
 			for _, sec in ipairs(sections) do
 				if type(sec) == "table" and sec.name ~= "-" and not sec.is_module_placeholder then
-					if sec.count ~= nil then has_count = true; total = total + tonumber(sec.count) end
+					if sec.count ~= nil then
+						local active = not is_sec_enabled or is_sec_enabled(name, sec.name)
+						if active then total = total + tonumber(sec.count) end
+					end
 				end
 			end
 		end
 
 		local base_label = groupLabel(ctx, name)
 		local item = {
-			title   = has_count and (base_label .. " (" .. fmt_count(total) .. ")") or base_label,
+			-- Always show count (even 0) — only enabled sections contribute
+			title   = base_label .. " (" .. fmt_count(total) .. ")",
 			checked = (enabled and not ctx.paused) or nil,
 			fn      = toggleGroupFn(ctx, name),
 		}
@@ -694,28 +700,33 @@ function M.build_custom(ctx)
 	-- Keep the personal group's sections for the default-section picker (personal only)
 	local personal_secs = all_personal_secs_by_group["personal"]
 
-	-- Total count across all personal groups + custom (for the top-level title)
+	-- Total count across all personal groups + custom (for the top-level title).
+	-- Only enabled sections contribute so the count reflects what is active.
 	local total_count, has_count = 0, false
-	local function add_counts(secs)
+	local is_sec_enabled_fn = ctx.keymap and type(ctx.keymap.is_section_enabled) == "function"
+		and ctx.keymap.is_section_enabled or nil
+	local function add_counts(secs, gname)
 		if type(secs) ~= "table" then return end
 		for _, sec in ipairs(secs) do
 			if type(sec) == "table" and sec.name ~= "-" and not sec.is_module_placeholder
 				and sec.count ~= nil then
-				has_count = true
-				total_count = total_count + tonumber(sec.count)
+				local active = not is_sec_enabled_fn or is_sec_enabled_fn(gname, sec.name)
+				if active then
+					has_count = true
+					total_count = total_count + tonumber(sec.count)
+				end
 			end
 		end
 	end
 	for _, gname in ipairs(personal_group_names) do
-		add_counts(all_personal_secs_by_group[gname])
+		add_counts(all_personal_secs_by_group[gname], gname)
 	end
-	add_counts(custom_secs)
+	add_counts(custom_secs, "custom")
 
 	-- Strip leading "— " section marker for use as a plain notification label
 	local base_title = (i18n.get("menu.hotstrings.personal_header"):gsub("^— ", ""))
-	local title_str  = has_count
-		and (base_title .. " (" .. fmt_count(total_count) .. ")")
-		or  base_title
+	-- Always show count (even 0) — only enabled sections contribute
+	local title_str  = base_title .. " (" .. fmt_count(total_count) .. ")"
 
 
 	-- =====================

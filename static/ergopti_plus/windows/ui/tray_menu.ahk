@@ -840,6 +840,15 @@ global HotstringCategoriesErgopti := _HotstringGroups.ergopti
 global _FLAT_HOTSTRING_V1_CATS := ["Autocorrection", "DistancesReduction",
 	"SFBsReduction", "Rolls", "MagicKey"]
 
+; v1 -> v2 category name map used by _CountEnabledForCategory
+global _V1CatToV2CatMap := Map(
+	"Autocorrection",     "autocorrection",
+	"DistancesReduction", "distances_reduction",
+	"SFBsReduction",      "sfbs_reduction",
+	"Rolls",              "rolls",
+	"MagicKey",           "magic_key",
+)
+
 ; Custom render order for the ``DynamicHotstrings`` submenu — the manifest
 ; doesn't yet model menu order or separators, so the curated UX layout is
 ; pinned here as a sidecar. Each entry is either a v1 PascalCase feature id
@@ -916,6 +925,91 @@ _BuildDynamicHotstringsSubmenu() {
 	}
 	return SubMenu
 }
+
+; Returns true when every section in the flat category has its feature enabled.
+; Used to drive the checkmark on the category sub-menu entry.
+_IsCategoryFullyEnabled(V1Cat) {
+	global Features, _V1CatToV2CatMap
+	if !_V1CatToV2CatMap.Has(V1Cat) {
+		return false
+	}
+	V2Cat := _V1CatToV2CatMap[V1Cat]
+	if !Features["hotstrings"].Has(V2Cat) {
+		return false
+	}
+	for _, FNode in Features["hotstrings"][V2Cat] {
+		if (IsObject(FNode) and FNode.Has("enabled") and !FNode["enabled"]) {
+			return false
+		}
+	}
+	return Features["hotstrings"][V2Cat].Count > 0
+}
+
+
+; Sum hotstring entries for a flat category (Autocorrection, Rolls, …)
+; counting only the sections whose feature toggle is enabled in Features.
+; Uses CountTomlSection per v2 section id so disabled sections contribute 0.
+_CountEnabledForCategory(V1Cat) {
+	global Features, _V1CatToV2CatMap
+	if !_V1CatToV2CatMap.Has(V1Cat) {
+		return 0
+	}
+	V2Cat := _V1CatToV2CatMap[V1Cat]
+	if !Features["hotstrings"].Has(V2Cat) {
+		return 0
+	}
+	Total := 0
+	for V2SecId, FNode in Features["hotstrings"][V2Cat] {
+		if (IsObject(FNode) and FNode.Has("enabled") and FNode["enabled"]) {
+			Total += CountTomlSection(V1Cat, V2SecId)
+		}
+	}
+	return Total
+}
+
+
+; Collect every v1 feature path that belongs to the Hotstrings category:
+; flat TOML categories (Autocorrection, DistancesReduction, …), dynamic
+; hotstrings, and personal TOML sections. Used by ToggleAllHotstrings to
+; activate every individual feature when the user clicks "tout activer".
+_CollectAllHotstringsV1Paths() {
+	global _FLAT_HOTSTRING_V1_CATS, _LegacyTopCategoryMap
+	global _LegacyDynamicHotstringsKeyMap
+	Paths := []
+
+	; Flat categories — read entries from the manifest
+	for V1Cat in _FLAT_HOTSTRING_V1_CATS {
+		V2Section := _LegacyTopCategoryMap.Has(V1Cat) ? _LegacyTopCategoryMap[V1Cat] : ""
+		if (V2Section == "") {
+			continue
+		}
+		for Entry in ManifestFeaturesForSection(V2Section) {
+			V1Path := ManifestPathToLegacyPath(Entry["path"])
+			if (V1Path != "") {
+				Paths.Push(V1Path)
+			}
+		}
+	}
+
+	; Dynamic hotstrings — one toggle per entry in the key map
+	for V1Id, _V2Id in _LegacyDynamicHotstringsKeyMap {
+		Paths.Push("DynamicHotstrings." . V1Id)
+	}
+
+	; Personal TOML sections
+	PersonalTomlPath := IsSet(ScriptInformation) ? ScriptInformation.Get("PersonalTomlPath", "") : ""
+	if (PersonalTomlPath != "" and FileExist(PersonalTomlPath)) {
+		PersonalTomlData := ReadPersonalToml()
+		for _, SecName in PersonalTomlData["sections_order"] {
+			if (SecName != "-") {
+				Paths.Push("Personal." . SecName)
+			}
+		}
+	}
+
+	return Paths
+}
+
 
 ; v1 group id -> v2 manifest section path for the three Shortcuts sub-Maps
 ; (AltGrLAlt / AltGrCapsLock / LAltCapsLock). Each sub-Map renders as a
@@ -1198,7 +1292,7 @@ initMenu() {
 	; 2a. Standard hotstring groups + dynamic — "Hotstrings communs" header
 	StdTotal := 0
 	for _CCat in HotstringCategoriesStd {
-		StdTotal += CountTomlHotstrings(_CCat)
+		StdTotal += _CountEnabledForCategory(_CCat)
 	}
 	DynTotalStd := 0
 	if Features.Has("hotstrings") and Features["hotstrings"].Has("dynamic") {
@@ -1209,14 +1303,17 @@ initMenu() {
 		}
 	}
 	StdTotal += DynTotalStd
-	StdHeader := MenuSectionTitle(t("menu.hotstrings.common_header") . (StdTotal > 0 ? " (" . FmtCount(StdTotal) . ")" : ""))
+	StdHeader := MenuSectionTitle(t("menu.hotstrings.common_header") . " (" . FmtCount(StdTotal) . ")")
 	HotstringsMenu.Add(StdHeader, (*) => NoAction())
 	HotstringsMenu.Disable(StdHeader)
 	for Category in HotstringCategoriesStd {
 		if SubMenus.Has(Category) {
-			Total := CountTomlHotstrings(Category)
-			Title := GetCategoryTitle(Category) . (Total > 0 ? " (" . FmtCount(Total) . ")" : "")
+			Total := _CountEnabledForCategory(Category)
+			Title := GetCategoryTitle(Category) . " (" . FmtCount(Total) . ")"
 			HotstringsMenu.Add(Title, SubMenus[Category])
+			if HotstringsAllEnabled and _IsCategoryFullyEnabled(Category) {
+				HotstringsMenu.Check(Title)
+			}
 		}
 	}
 	; Dynamic hotstrings — date insertion and future rule-based expansions.
@@ -1229,8 +1326,7 @@ initMenu() {
 				DynTotal += CountDynamicSection(_DKey)
 			}
 		}
-		DynTitle := GetCategoryTitle("DynamicHotstrings")
-		. (DynTotal > 0 ? " (" . FmtCount(DynTotal) . ")" : "")
+		DynTitle := GetCategoryTitle("DynamicHotstrings") . " (" . FmtCount(DynTotal) . ")"
 		HotstringsMenu.Add(DynTitle, DynMenu)
 	}
 
@@ -1238,16 +1334,19 @@ initMenu() {
 	HotstringsMenu.Add() ; Separator between communs and Ergopti blocks
 	ErgoptiTotal := 0
 	for _ECat in HotstringCategoriesErgopti {
-		ErgoptiTotal += CountTomlHotstrings(_ECat)
+		ErgoptiTotal += _CountEnabledForCategory(_ECat)
 	}
-	ErgoptiHeader := MenuSectionTitle(t("menu.hotstrings.ergopti_header") . (ErgoptiTotal > 0 ? " (" . FmtCount(ErgoptiTotal) . ")" : ""))
+	ErgoptiHeader := MenuSectionTitle(t("menu.hotstrings.ergopti_header") . " (" . FmtCount(ErgoptiTotal) . ")")
 	HotstringsMenu.Add(ErgoptiHeader, (*) => NoAction())
 	HotstringsMenu.Disable(ErgoptiHeader)
 	for Category in HotstringCategoriesErgopti {
 		if SubMenus.Has(Category) {
-			Total := CountTomlHotstrings(Category)
-			Title := GetCategoryTitle(Category) . (Total > 0 ? " (" . FmtCount(Total) . ")" : "")
+			Total := _CountEnabledForCategory(Category)
+			Title := GetCategoryTitle(Category) . " (" . FmtCount(Total) . ")"
 			HotstringsMenu.Add(Title, SubMenus[Category])
+			if HotstringsAllEnabled and _IsCategoryFullyEnabled(Category) {
+				HotstringsMenu.Check(Title)
+			}
 		}
 	}
 
@@ -1456,9 +1555,34 @@ initMenu() {
 		}
 	}
 
-	; Compute grand total = common + personal + extensions
-	GrandTotal := CommonTotal + TotalPersonal + ExtTotal
-	HotstringsMenuTitle := t("menu.hotstrings.title") . (GrandTotal > 0 ? " (" . FmtCount(GrandTotal) . ")" : "")
+	; Grand total for the menu title = sum of entries from enabled features only.
+	; We walk Features["hotstrings"] directly to avoid the lazy-seed side-effect
+	; in TranslateLegacyPath for Personal sections.
+	; - Flat cats (autocorrection, distances_reduction, …): one TOML file per cat;
+	;   include its count only when at least one feature in the cat is enabled.
+	; - Dynamic: already computed in DynTotalStd (only enabled entries).
+	; - Personal: one entry per section, count only if section is enabled in Features.
+	; - Extensions: no toggle, always included (ExtTotal already computed).
+	; Grand total uses the same helper as the sub-menu titles
+	ActiveCommonTotal := StdTotal + ErgoptiTotal
+	; Personal sections — count entries only for enabled sections
+	ActivePersonalTotal := 0
+	if (PersonalTomlData != false) {
+		for _, _PSecName in PersonalTomlData["sections_order"] {
+			if (_PSecName == "-") {
+				continue
+			}
+			_PV2Id := StrLower(_PSecName)
+			_PEnabled := Features["hotstrings"].Has("personal")
+				and Features["hotstrings"]["personal"].Has(_PV2Id)
+				and Features["hotstrings"]["personal"][_PV2Id]["enabled"]
+			if _PEnabled and PersonalTomlData["sections"].Has(_PSecName) {
+				ActivePersonalTotal += PersonalTomlData["sections"][_PSecName]["entries"].Length
+			}
+		}
+	}
+	GrandTotal := ActiveCommonTotal + ActivePersonalTotal + ExtTotal
+	HotstringsMenuTitle := t("menu.hotstrings.title") . " (" . FmtCount(GrandTotal) . ")"
 	A_TrayMenu.Add(HotstringsMenuTitle, HotstringsMenu)
 	if HotstringsAllEnabled {
 		A_TrayMenu.Check(HotstringsMenuTitle)

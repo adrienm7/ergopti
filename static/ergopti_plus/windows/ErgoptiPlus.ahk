@@ -1361,6 +1361,18 @@ ToggleAllFeatures(Value) {
     Updates.Push({ Section: "ahk.metrics", Key: WPMWidgetConst.CFG_GRAPH,   Value: Bool ? "1" : "0" })
 
     TOML_BatchWrite(ConfigurationFile, Updates)
+    ; Hotstrings features are nested 3 levels deep (hotstrings.cat.id.enabled)
+    ; so EmitFlip's single-level descent misses them. Delegate to the dedicated
+    ; helper which iterates every section via _CollectAllHotstringsV1Paths.
+    if Bool {
+        HsBatch := []
+        for V1Path in _CollectAllHotstringsV1Paths() {
+            HsBatch.Push(Map("v1_path", V1Path . ".Enabled", "value", true))
+        }
+        if (HsBatch.Length > 0) {
+            WriteFeatureBatch(HsBatch)
+        }
+    }
     Reload
 }
 
@@ -1370,16 +1382,27 @@ ToggleAllHotstringsOn(*) {
 ToggleAllHotstringsOff(*) {
     ToggleAllHotstrings(0)
 }
-; Master Hotstrings gate — flips the category-level enabled flag without
-; touching individual hotstring entries. ApplyMasterGatesToFeatures
-; (lib/master_gates.ahk) applies the gate at boot so every HotIf check
-; evaluates false while the gate is off; per-feature toggles stay
-; preserved on disk for when the user re-enables the master.
+; Master Hotstrings gate — flips the category-level enabled flag. When
+; enabling (Value=1), also activates every individual hotstring feature
+; so "tout activer" actually checks all sub-items, not just the gate.
+; ApplyMasterGatesToFeatures (lib/master_gates.ahk) applies the gate at
+; boot so every HotIf check evaluates false while the gate is off.
 ToggleAllHotstrings(Value) {
     global CategoryEnabled, ConfigurationFile
     Bool := (Value = true or Value = 1)
     CategoryEnabled["Hotstrings"] := Bool
     TOML_Write(Bool, ConfigurationFile, "ahk.category_enabled", "hotstrings")
+    ; When enabling, also flip every individual feature to true so the
+    ; sub-menu items appear checked after the reload.
+    if Bool {
+        Batch := []
+        for V1Path in _CollectAllHotstringsV1Paths() {
+            Batch.Push(Map("v1_path", V1Path . ".Enabled", "value", true))
+        }
+        if (Batch.Length > 0) {
+            WriteFeatureBatch(Batch)
+        }
+    }
     Reload
 }
 
