@@ -95,25 +95,25 @@ class PromptBuilder {
 	; Param buffer - The current typing buffer string.
 	; Returns string - The tail words joined with single spaces.
 	_ExtractTail(buffer) {
-		if (!buffer || RegExMatch(buffer, `"^\s*$`")) {
-			return `"`"
+		if (!buffer || RegExMatch(buffer, "^\s*$")) {
+			return ""
 		}
 
 		; Split on any whitespace run to get all tokens
-		local parts := StrSplit(Trim(buffer), [` , `"`t`", `"`n`", `"`r`"])
+		local parts := StrSplit(Trim(buffer), [" ", "`t", "`n", "`r"])
 		local words  := []
 		for p in parts {
-			if (p != `"`") {
+			if (p != "") {
 				words.Push(p)
 			}
 		}
 
 		local total    := words.Length
 		local startIdx := Max(1, total - PB_CONTEXT_TAIL_WORDS + 1)
-		local tail     := `"`"
+		local tail     := ""
 		loop (total - startIdx + 1) {
 			local w := words[startIdx + A_Index - 1]
-			tail    := (tail = `"`") ? w : tail . `" `" . w
+			tail    := (tail = "") ? w : tail . " " . w
 		}
 		return tail
 	}
@@ -194,29 +194,29 @@ class PromptBuilder {
 	;   num_predictions (integer, default 1)
 	;   temperature     (float,   default 0.1)
 	;   auto_raise_temp (boolean, default false)
-	;   language        (string,  default `"fr`")
+	;   language        (string,  default "fr")
 	; Returns Map - Keys: context, context_tail, max_tokens, temperature,
 	;   min_words, max_words, language, num_predictions.
 	Build(buffer, config := Map()) {
-		local maxWords       := config.Has(`"max_words`")       ? config[`"max_words`"]       : 0
-		local minWords       := config.Has(`"min_words`")       ? config[`"min_words`"]       : 1
-		local numPredictions := config.Has(`"num_predictions`") ? config[`"num_predictions`"] : 1
-		local temperature    := config.Has(`"temperature`")     ? config[`"temperature`"]     : 0.1
-		local autoRaise      := config.Has(`"auto_raise_temp`") ? config[`"auto_raise_temp`"] : false
-		local language       := config.Has(`"language`")        ? config[`"language`"]        : `"fr`"
+		local maxWords       := config.Has("max_words")       ? config["max_words"]       : 0
+		local minWords       := config.Has("min_words")       ? config["min_words"]       : 1
+		local numPredictions := config.Has("num_predictions") ? config["num_predictions"] : 1
+		local temperature    := config.Has("temperature")     ? config["temperature"]     : 0.1
+		local autoRaise      := config.Has("auto_raise_temp") ? config["auto_raise_temp"] : false
+		local language       := config.Has("language")        ? config["language"]        : "fr"
 
 		local tail    := this._ExtractTail(buffer)
 		local context := this._CapContext(buffer, maxWords)
 
 		return Map(
-			`"context`",          context,
-			`"context_tail`",     tail,
-			`"max_tokens`",       this._ComputeMaxTokens(maxWords),
-			`"temperature`",      this._ComputeTemperature(temperature, numPredictions, autoRaise),
-			`"min_words`",        minWords,
-			`"max_words`",        maxWords,
-			`"language`",         language,
-			`"num_predictions`",  numPredictions
+			"context",          context,
+			"context_tail",     tail,
+			"max_tokens",       this._ComputeMaxTokens(maxWords),
+			"temperature",      this._ComputeTemperature(temperature, numPredictions, autoRaise),
+			"min_words",        minWords,
+			"max_words",        maxWords,
+			"language",         language,
+			"num_predictions",  numPredictions
 		)
 	}
 

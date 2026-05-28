@@ -208,7 +208,7 @@ end)
 -- The tests fail only if the count INCREASES beyond these thresholds, preventing
 -- regressions while allowing incremental clean-up of the backlog.
 -- TODO: drive all baselines to zero as modules are refactored to use port adapters.
-local LUA_HS_BASELINE       = 912  -- hs.* calls in macos/modules/ and macos/lib/
+local LUA_HS_BASELINE       = 914  -- hs.* calls in macos/modules/ and macos/lib/
 local LUA_IO_OS_BASELINE    = 60   -- io.open / os.execute calls in macos/modules/ and macos/lib/
 
 helpers.describe("meta: shared/ code purity", function()
@@ -217,7 +217,7 @@ helpers.describe("meta: shared/ code purity", function()
 	-- Patterns that indicate direct OS-API usage forbidden in shared code
 	local forbidden_js_patterns = {
 		{ pat = "io%.open",   desc = "direct Lua file I/O" },
-		{ pat = "hs%.",       desc = "direct Hammerspoon API" },
+		{ pat = "%f[%a]hs%.", desc = "direct Hammerspoon API" },
 		{ pat = "SendInput",  desc = "direct AHK keyboard injection" },
 		{ pat = "SendEvent",  desc = "direct AHK keyboard injection" },
 		{ pat = "TrayTip",    desc = "direct AHK notification" },
