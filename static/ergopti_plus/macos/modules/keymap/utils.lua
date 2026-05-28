@@ -50,7 +50,7 @@ local PASTE_THRESHOLD = 50
 
 -- How long the clipboard is left with the pasted value before restoring the
 -- user's previous contents. Large enough to let the target app receive the paste.
-local CLIPBOARD_RESTORE_SEC = 1.5
+local CLIPBOARD_RESTORE_SEC = 0.15
 
 -- Safety TTL (seconds) for the ignored-window cache. The cache is normally
 -- invalidated on focus-change events (hs.application.watcher + hs.window.filter),
