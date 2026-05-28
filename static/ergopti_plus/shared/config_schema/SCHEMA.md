@@ -21,7 +21,7 @@ config/ergopti_plus/
 And on the repo's shared-resources side:
 
 ```
-static/drivers/_shared/
+static/ergopti_plus/shared/
 ├── config_schema/                  # THIS FOLDER
 │  ├── config.schema.json           # Strict JSON Schema (draft 2020-12)
 │  ├── tap_hold.schema.json         # Sub-schema for tap-hold
@@ -142,9 +142,9 @@ Each driver loads its own `config.toml`, parses it, then validates against `conf
 
 ### In CI
 
-A `scripts/validate-config-schema.js` script runs validation on every `examples/*.toml` in the repo. Wired up as a pre-commit hook via husky.
+Config schema validation against `examples/*.toml` is not yet automated — TODO.
 
-A companion `scripts/audit-banner-alignment.js` enforces the CLAUDE.md banner-comment alignment in every `*.toml`. Run it manually with `--fix` to auto-correct, or in pre-commit without it to detect regressions.
+A companion `tools/lint/audit-banner-alignment.js` enforces the CLAUDE.md banner-comment alignment in every `*.toml`. Run it manually with `--fix` to auto-correct, or in pre-commit without it to detect regressions.
 
 ## Codegen pipeline
 
@@ -154,7 +154,7 @@ A companion `scripts/audit-banner-alignment.js` enforces the CLAUDE.md banner-co
 npm run build:manifest
 ```
 
-It calls [`scripts/build-features-manifest.js`](../../../../scripts/build-features-manifest.js), which:
+It calls [`tools/build/build-features-manifest.js`](../../../../tools/build/build-features-manifest.js), which:
 
 1. Pre-processes the manifest source — every `[[features.X.Y.Z]]` header is rewritten in memory to `[[entries]]` with a synthetic `path_prefix = "X.Y.Z"` field, so the TOML parser sees a single flat array-of-tables instead of nested AoTs (which TOML would otherwise interpret as sub-arrays of the parent entry).
 2. Flattens features, inherits `platforms` from ancestor sections when absent, resolves `default_per_platform` to the active platform.
@@ -175,7 +175,7 @@ It calls [`scripts/build-features-manifest.js`](../../../../scripts/build-featur
 
 If `config/ergopti_plus/<driver>/config.toml` does not exist at first boot:
 
-1. The driver reads `static/drivers/_shared/features/manifest.toml` (the single source of truth).
+1. The driver reads `static/ergopti_plus/shared/features/manifest.toml` (the single source of truth).
 2. It filters entries whose `platforms` includes the current driver.
 3. It renders a clean `config.toml` with:
    - Section banners (CLAUDE.md `# =====` format).

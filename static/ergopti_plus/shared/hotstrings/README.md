@@ -7,7 +7,7 @@ consume data from this directory, either directly or via the code-generator.
 ## Directory layout
 
 ```
-_shared/hotstrings/
+shared/hotstrings/
   autocorrection/          Pure substitution rules (typos, accents, names, etc.)
     accents.toml
     caps.toml
@@ -64,8 +64,8 @@ flags       = ["word"]
 ## Code generation
 
 Run `npm run build:hotstrings` to regenerate:
-- `static/drivers/autohotkey/lib/hotstrings/hotstrings_generated.ahk`
-- (future) `static/drivers/hammerspoon/_generated/hotstrings_registry.lua`
-- (future) `static/drivers/linux/_generated/hotstrings_registry.lua`
+- `static/ergopti_plus/windows/lib/hotstrings/hotstrings_generated.ahk`
+- (future) `static/ergopti_plus/macos/_generated/hotstrings_registry.lua`
+- (future) `static/ergopti_plus/linux/_generated/hotstrings_registry.lua`
 
 Never edit `hotstrings_generated.ahk` by hand — all changes go in the TOML files.
