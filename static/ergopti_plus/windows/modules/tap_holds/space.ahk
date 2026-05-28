@@ -79,6 +79,13 @@ _SpaceTap() {
     HSEMatch := HSE_FeedChar(" ")
     if (HSEMatch != "") {
         HSE_DispatchMatch(HSEMatch, HSE_LastEndChar)
+        HotstringCategory := HSEMatch.HasOwnProp("IsRepeat") && HSEMatch.IsRepeat
+            ? "repeat_key"
+            : (HSEMatch.HasOwnProp("Category") ? HSEMatch.Category : "")
+        HotstringSection := HSEMatch.HasOwnProp("Section") ? HSEMatch.Section : ""
+        HotstringRepl := HSEMatch.HasOwnProp("Replacement") ? HSEMatch.Replacement : HSEMatch.Trigger
+        if IsSet(KL_LogHotstring)
+            try KL_LogHotstring(HSEMatch.Trigger, HotstringRepl, "endchar", "", HotstringCategory, HotstringSection)
         UpdateLastSentCharacter(" ")
         return
     }

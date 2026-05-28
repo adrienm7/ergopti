@@ -76,6 +76,10 @@ class WPMWidgetConst {
     static WINDOW_MS          := 15000
     ; Timer tick — how often the display refreshes (ms).
     static TICK_MS            := 500
+    ; How long the hotstring source color stays visible after the last fire (ms).
+    ; Must be > TICK_MS so even a burst expansion that fires just after a tick
+    ; is still caught by the next tick.
+    static COLOR_HOLD_MS      := 3000
     ; Graph mode dimensions (wider to show history).
     static GRAPH_W            := 220
     static GRAPH_H            := 100
@@ -322,20 +326,25 @@ WPMWidget_CategoryBgColor(CategoryName, FallbackHex, SectionHint := "") {
     try {
         raw := _WPMWidget_ReadTomlColor(CategoryName)
         if (raw != "") {
-            return (SubStr(raw, 1, 1) == "#") ? SubStr(raw, 2) : raw
+            result := (SubStr(raw, 1, 1) == "#") ? SubStr(raw, 2) : raw
+            LoggerDebug("WPMWidget", "CategoryBgColor '{1}' → '{2}'", CategoryName, result)
+            return result
         }
         if (SectionHint != "") {
             Basecat := _WPMWidget_SectionBaseCategory(SectionHint)
             if (Basecat != "") {
                 raw2 := _WPMWidget_ReadTomlColor(Basecat)
                 if (raw2 != "") {
-                    return (SubStr(raw2, 1, 1) == "#") ? SubStr(raw2, 2) : raw2
+                    result2 := (SubStr(raw2, 1, 1) == "#") ? SubStr(raw2, 2) : raw2
+                    LoggerDebug("WPMWidget", "CategoryBgColor '{1}' via section '{2}' → '{3}'", CategoryName, Basecat, result2)
+                    return result2
                 }
             }
         }
     } catch as e {
-        LoggerError("WPMWidget", "CategoryBgColor failed for '%s': %s", CategoryName, e.Message)
+        LoggerError("WPMWidget", "CategoryBgColor failed for '{1}': {2}", CategoryName, e.Message)
     }
+    LoggerDebug("WPMWidget", "CategoryBgColor '{1}' → fallback '{2}'", CategoryName, FallbackHex)
     return FallbackHex
 }
 
@@ -346,8 +355,10 @@ WPMWidget_CategoryBgColor(CategoryName, FallbackHex, SectionHint := "") {
 _WPMWidget_ReadTomlColor(CategoryName) {
     global _SharedDir, GLOBAL_DEFAULT_COLOR
     FilePath := _SharedDir . "\hotstrings\" . StrLower(CategoryName) . ".toml"
-    if !FileExist(FilePath)
+    if !FileExist(FilePath) {
+        LoggerDebug("WPMWidget", "ReadTomlColor: file not found for '{1}': {2}", CategoryName, FilePath)
         return ""
+    }
     FileContent := FileRead(FilePath, "UTF-8")
     InMeta := false
     loop parse, FileContent, "`n", "`r" {
@@ -366,10 +377,12 @@ _WPMWidget_ReadTomlColor(CategoryName) {
         }
         if InMeta and RegExMatch(Line, "^color\s*=\s*`"([^`"]+)`"", &M) {
             c := M[1]
+            LoggerDebug("WPMWidget", "ReadTomlColor: '{1}' → raw='{2}' default='{3}'", CategoryName, c, GLOBAL_DEFAULT_COLOR)
             ; Skip the global blue fallback — it means "no category color set"
             return (c != GLOBAL_DEFAULT_COLOR) ? c : ""
         }
     }
+    LoggerDebug("WPMWidget", "ReadTomlColor: no color key found for '{1}'", CategoryName)
     return ""
 }
 
@@ -418,11 +431,14 @@ WPMWidget_ResolveBgColor(idle, has_hs, has_ai, has_ac, use_colors) {
     if use_colors {
         if has_ai
             return WPMWidgetConst.COLOR_BG_AI
-        if has_hs
+        if has_hs {
+            LoggerDebug("WPMWidget", "ResolveBgColor: has_hs cat='{1}'", WPMWidget._last_hs_category)
             return WPMWidget_CategoryBgColor(WPMWidget._last_hs_category, WPMWidgetConst.COLOR_BG_MANUAL, WPMWidget._last_hs_section)
+        }
         if has_ac
             return WPMWidget_CategoryBgColor("autocorrection", WPMWidgetConst.COLOR_BG_MANUAL)
     }
+    LoggerDebug("WPMWidget", "ResolveBgColor: no color — use_colors={1} has_hs={2} has_ai={3} has_ac={4}", use_colors, has_hs, has_ai, has_ac)
     return WPMWidgetConst.COLOR_BG_MANUAL
 }
 
@@ -596,7 +612,7 @@ WPMWidget_OnControllerReady(wvc) {
         scale := dpi / 96
         w := Round(WPMWidgetConst.GRAPH_W / scale)
         h := Round(WPMWidgetConst.GRAPH_H / scale)
-        LoggerInfo("WPMWidget", "DPI=%d scale=%.2f logical w=%d h=%d.", dpi, scale, w, h)
+        LoggerInfo("WPMWidget", "DPI={1} scale={2} logical w={3} h={4}.", dpi, scale, w, h)
 
         ; Register WebMessageReceived BEFORE NavigateToString so the handler is
         ; in place before the inline HTML script runs and posts "ready". If the
@@ -732,7 +748,7 @@ WPMWidget_DragEnd(*) {
 ; ============================================
 
 WPMWidget_Show() {
-    LoggerStart("WPMWidget", "Showing widget (graph=%s, pos_x=%d, pos_y=%d)…",
+    LoggerStart("WPMWidget", "Showing widget (graph={1}, pos_x={2}, pos_y={3})…",
         WPMWidget.show_graph, WPMWidget.pos_x, WPMWidget.pos_y)
     if WPMWidget.show_graph {
         if !WPMWidget._graph_gui
@@ -770,7 +786,7 @@ WPMWidget_Show() {
         WPMWidget_AttachWebView()
 
     SetTimer(WPMWidget_Tick, WPMWidgetConst.TICK_MS)
-    LoggerSuccess("WPMWidget", "Widget shown at (%d, %d) mode=%s, wv_ready=%s.",
+    LoggerSuccess("WPMWidget", "Widget shown at ({1}, {2}) mode={3}, wv_ready={4}.",
         WPMWidget.pos_x, WPMWidget.pos_y, WPMWidget.show_graph ? "graph" : "compact",
         WPMWidget._graph_wv_ready)
 }
@@ -810,10 +826,11 @@ WPMWidget_Tick() {
     now    := A_TickCount
     result := WPMWidget_Calc()
     wpm    := result["wpm"]
-    ; Source color only active for 1 s after the last event of that type.
-    has_hs := (now - WPMWidget._last_hs_tick) < 1000
-    has_ai := (now - WPMWidget._last_ai_tick) < 1000
-    has_ac := (now - WPMWidget._last_ac_tick) < 1000
+    ; Source color active for COLOR_HOLD_MS after the last event — long enough
+    ; for the 500 ms tick to always catch even very short burst expansions.
+    has_hs := (now - WPMWidget._last_hs_tick) < WPMWidgetConst.COLOR_HOLD_MS
+    has_ai := (now - WPMWidget._last_ai_tick) < WPMWidgetConst.COLOR_HOLD_MS
+    has_ac := (now - WPMWidget._last_ac_tick) < WPMWidgetConst.COLOR_HOLD_MS
 
     ; Update graph history.
     WPMWidget._graph_hist.Push(wpm)
@@ -869,6 +886,7 @@ WPMWidget_Tick() {
             try {
                 WPMWidget._gui.BackColor := bg_color
                 WinSetTransparent(alpha, WPMWidget._gui)
+                WinRedraw(WPMWidget._gui)
                 dark_bg := _WPMWidget_DarkenHex(bg_color)
                 if WPMWidget._lbl_strip
                     WPMWidget._lbl_strip.Opt("Background" . dark_bg)
@@ -988,7 +1006,7 @@ WPMWidget_LoadSharedConst() {
     else
         LoggerError("WPMWidget", "shared/timings/constants.toml not found — IDLE_HIDE_MS defaulting to 3000.")
 
-    LoggerDone("WPMWidget", "Shared constants loaded (W=%d H=%d darken=%.2f idle=%dms).",
+    LoggerDone("WPMWidget", "Shared constants loaded (W={1} H={2} darken={3} idle={4}ms).",
         WPMWidgetConst.W, WPMWidgetConst.H, WPMWidgetConst.UNIT_DARKEN, WPMWidgetConst.IDLE_HIDE_MS)
 }
 
@@ -1019,7 +1037,7 @@ WPMWidget_LoadConfig(Cache) {
 
     if (raw_vis = "1" || raw_vis = true)
         WPMWidget.visible := true
-    LoggerDone("WPMWidget", "Config loaded — raw_vis=[%s] visible=%s, x=%d, y=%d, colors=%s, graph=%s.",
+    LoggerDone("WPMWidget", "Config loaded — raw_vis=[{1}] visible={2}, x={3}, y={4}, colors={5}, graph={6}.",
         raw_vis, WPMWidget.visible, WPMWidget.pos_x, WPMWidget.pos_y,
         WPMWidget.use_colors, WPMWidget.show_graph)
 }
