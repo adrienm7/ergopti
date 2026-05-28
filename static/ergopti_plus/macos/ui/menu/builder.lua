@@ -22,7 +22,7 @@ local CanvasBadge = require("ui.menu.canvas_badge")
 
 
 -- Fallback used when the manifest cannot be loaded
-local ERGOPTI_GROUPS_FALLBACK = { sfbsreduction = true, rolls = true, magickey = true }
+local ERGOPTI_GROUPS_FALLBACK = { sfbsreduction = true, rolls = true }
 
 
 --- Loads hotstring group classification from the shared menu_manifest.json.
@@ -215,19 +215,10 @@ function M.generate(ctx, menu_mods, actions)
 
 		-- 2b. Ergopti-layout-specific groups — separated from the standard block
 		local ergopti_groups = collect_groups(ERGOPTI_GROUPS)
-		local ergopti_magic_items = type(menu_mods.hotstrings.build_ergopti_magic_config) == "function"
-			and Logger.build(LOG, "hotstrings.build_ergopti_magic_config",
-				menu_mods.hotstrings.build_ergopti_magic_config, ctx) or {}
-		if #ergopti_groups > 0 or (type(ergopti_magic_items) == "table" and #ergopti_magic_items > 0) then
+		if #ergopti_groups > 0 then
 			if #std_groups > 0 then table.insert(hotstrings_menu, { title = "-" }) end
 			local ergopti_header = "— " .. string.format(i18n.get("menu.hotstrings.header_ergopti_count"), fmt_grand(ergopti_total)) .. " —"
 			table.insert(hotstrings_menu, { title = ergopti_header, disabled = true })
-			if type(ergopti_magic_items) == "table" then
-				for _, it in ipairs(ergopti_magic_items) do table.insert(hotstrings_menu, it) end
-				if #ergopti_magic_items > 0 and #ergopti_groups > 0 then
-					table.insert(hotstrings_menu, { title = "-" })
-				end
-			end
 			for _, it in ipairs(ergopti_groups) do table.insert(hotstrings_menu, it) end
 		end
 

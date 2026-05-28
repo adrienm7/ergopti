@@ -23,6 +23,7 @@ local M = {}
 
 local hs            = hs
 local Logger        = require("lib.logger")
+local dialog        = require("lib.dialog_util")
 local notifications = require("lib.notifications")
 local i18n          = require("lib.i18n")
 local LOG           = "menu.keyboard_layout"
@@ -1227,6 +1228,51 @@ function M.build(ctx)
 			}
 		end
 	end
+
+	-- Magic key config items — specific to the Ergopti layout (★ is a dedicated Ergopti key)
+	local hs_state  = ctx and ctx.state
+	local hs_paused = ctx and ctx.paused
+	submenu[#submenu + 1] = { title = "-" }
+	submenu[#submenu + 1] = {
+		title    = i18n.get("menu.hotstrings.magic_key_item_prefix") .. (hs_state and hs_state.trigger_char or "★"),
+		disabled = hs_paused or nil,
+		fn       = not hs_paused and function()
+			if not hs_state then return end
+			local ok_p, btn, raw = pcall(dialog.text_prompt,
+				i18n.get("menu.hotstrings.magic_key_title"),
+				i18n.get("menu.hotstrings.magic_key_prompt"),
+				hs_state.trigger_char, "OK", i18n.get("common.cancel")
+			)
+			if ok_p and btn == "OK" and type(raw) == "string" and raw ~= "" then
+				local new_char = raw:match("^([%z\1-\127\194-\244][\128-\191]*)") or raw:sub(1,1)
+				if new_char and new_char ~= hs_state.trigger_char then
+					hs_state.trigger_char = new_char
+					if ctx.keymap and type(ctx.keymap.set_trigger_char) == "function" then
+						pcall(ctx.keymap.set_trigger_char, new_char)
+					end
+					if ctx.hotstring_editor and type(ctx.hotstring_editor.set_trigger_char) == "function" then
+						pcall(ctx.hotstring_editor.set_trigger_char, new_char)
+					end
+					ctx.save_prefs()
+					ctx.do_reload("menu")
+				end
+			end
+		end or nil,
+	}
+	local repeat_enabled = ctx and ctx.keymap
+		and type(ctx.keymap.is_repeat_feature_enabled) == "function"
+		and ctx.keymap.is_repeat_feature_enabled()
+	submenu[#submenu + 1] = {
+		title    = i18n.get("menu.hotstrings.repeat_key_toggle"),
+		checked  = repeat_enabled,
+		disabled = hs_paused or nil,
+		fn       = not hs_paused and function()
+			if ctx and ctx.keymap and type(ctx.keymap.set_repeat_feature_enabled) == "function" then
+				pcall(ctx.keymap.set_repeat_feature_enabled, not repeat_enabled)
+			end
+			ctx.do_reload("menu")
+		end or nil,
+	}
 
 	return {
 		title = i18n.get("menu.layout.title"),

@@ -542,7 +542,13 @@ function recompute_speed_kpi() {
 		trig_hs_time_ms: 0,
 		trig_hs_trans: 0,
 		trig_llm_time_ms: 0,
-		trig_llm_trans: 0
+		trig_llm_trans: 0,
+		// Fallback when buckets are absent (historical data pre-dating bucket
+		// support, or data from a device that never wrote agg_app_day_buckets).
+		// Uses app.time (active typing time as measured by log_manager) and
+		// raw char counts, mirroring compute_manifest_metrics()'s formula.
+		fallback_time_ms: 0,
+		fallback_wpm_chars: 0
 	};
 	const start_val = document.getElementById('date_start').value;
 	const end_val = document.getElementById('date_end').value;
@@ -551,9 +557,12 @@ function recompute_speed_kpi() {
 			? app_state.manifest_dates_sorted
 			: Object.keys(window.metrics_manifest).sort();
 	const accumulate = (app) => {
-		totals.manual_chars += app.chars || 0;
-		totals.hs_chars += app.hs_chars || 0;
-		totals.llm_chars += app.llm_chars || 0;
+		const manual_c = app.chars || 0;
+		const hs_c = app.hs_chars || 0;
+		const llm_c = app.llm_chars || 0;
+		totals.manual_chars += manual_c;
+		totals.hs_chars += hs_c;
+		totals.llm_chars += llm_c;
 		totals.hs_input_chars += app.hs_input_chars || 0;
 		totals.llm_input_chars += app.llm_input_chars || 0;
 		totals.active_time_ms += app.time_buckets?.[bucket_key] || 0;
@@ -562,6 +571,9 @@ function recompute_speed_kpi() {
 		totals.trig_hs_trans += app.hs_input_credited_buckets?.[bucket_key] || 0;
 		totals.trig_llm_time_ms += app.llm_input_time_buckets?.[bucket_key] || 0;
 		totals.trig_llm_trans += app.llm_input_credited_buckets?.[bucket_key] || 0;
+		// Fallback accumulators — always collected regardless of bucket presence
+		totals.fallback_time_ms += app.time || 0;
+		totals.fallback_wpm_chars += manual_c + (show_hs ? hs_c : 0) + (show_llm ? llm_c : 0);
 	};
 	manifest_dates.forEach((date_str) => {
 		if (start_val && date_str < start_val) return;
@@ -591,7 +603,17 @@ function recompute_speed_kpi() {
 
 	// Guard against divide-by-zero. A small floor (1 ms) would let bogus 0-time
 	// data emit a finite huge speed; explicit zero is more honest.
-	const output_cpm = pure_time_ms > 0 && chars_total > 0 ? (chars_total * 60000) / pure_time_ms : 0;
+	// When bucket data is absent (agg_app_day_buckets not yet built for historical
+	// entries), fall back to the app.time-based formula used by compute_manifest_metrics
+	// so the KPI is never stuck at 0 and the HS toggle still has a visible effect.
+	let output_cpm;
+	if (pure_time_ms > 0 && chars_total > 0) {
+		output_cpm = (chars_total * 60000) / pure_time_ms;
+	} else if (totals.fallback_time_ms > 0 && totals.fallback_wpm_chars > 0) {
+		output_cpm = totals.fallback_wpm_chars / (totals.fallback_time_ms / 60000);
+	} else {
+		output_cpm = 0;
+	}
 	const output_wpm = output_cpm / 5;
 
 	const wpm_val_elem = document.getElementById('wpm_val');
@@ -613,13 +635,15 @@ function recompute_speed_kpi() {
 					: _t('ui_typing.cpm_mode_manual');
 	const NBSP = String.fromCharCode(160);
 
-	const formula_tooltip =
-		_t('ui_typing.tooltip_cpm_formula')
+	const using_fallback = pure_time_ms === 0 && totals.fallback_time_ms > 0;
+	const formula_tooltip = using_fallback
+		? `${mode_label} — ${_t('ui_typing.tooltip_cpm_simple')}`
+		: _t('ui_typing.tooltip_cpm_formula')
 			.replace('{mode}', mode_label)
 			.replace('{pure_trans}', format_number(pure_trans))
 			.replace('{thresh}', thresh_label)
-			.replace('{add_hs}', show_hs ? ` • + HS : ${format_number(add_hs)} ${_t('ui_typing.tooltip_cpm_hs_chars')}<br>` : '')
-			.replace('{add_llm}', show_llm ? ` • + IA : ${format_number(add_llm)} ${_t('ui_typing.tooltip_cpm_llm_chars')}<br>` : '')
+			.replace('{add_hs}', show_hs ? `  • + HS : ${format_number(add_hs)} ${_t('ui_typing.tooltip_cpm_hs_chars')}<br>` : '')
+			.replace('{add_llm}', show_llm ? `  • + IA : ${format_number(add_llm)} ${_t('ui_typing.tooltip_cpm_llm_chars')}<br>` : '')
 			.replace('{chars_total}', format_number(chars_total));
 
 	wpm_val_elem.innerHTML =
