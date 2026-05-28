@@ -912,7 +912,7 @@ global HSE_SUPPRESS_RELEASE_DELAY_MS := 60
 ; path) fall through to invoking Spec.Callback for backwards
 ; compatibility with the test-only registrations.
 HSE_DispatchMatch(Spec, EndChar) {
-    global HSE_SUPPRESS_RELEASE_DELAY_MS
+    global HSE_SUPPRESS_RELEASE_DELAY_MS, _SendHook
     if !Spec.HasOwnProp("Replacement") {
         if Spec.HasOwnProp("Callback") and Spec.Callback {
             try (Spec.Callback)(EndChar)
