@@ -976,7 +976,16 @@ HSE_DispatchMatch(Spec, EndChar) {
             ; which HSE handles itself via its own buffer — no cascade benefit here.
             ReplacementPart := OnlyText ? ("{Text}" . Replacement) : Replacement
             EndCharPart := (EndChar != "") ? EndChar : ""
-            SendInput(BackSpaceSeq . ReplacementPart . EndCharPart)
+            Burst := BackSpaceSeq . ReplacementPart . EndCharPart
+            ; Route through _SendHook when present (test harness) so the
+            ; entire atomic burst is recorded and assertions can inspect it.
+            ; In production _SendHook is unset and SendInput fires directly.
+            if _SendHook {
+                Hook := _SendHook
+                Hook("SendFinalResult", Burst, false)
+            } else {
+                SendInput(Burst)
+            }
             UpdateLastSentCharacter(SubStr(EndChar != "" ? EndChar : Replacement, -1))
         }
 
