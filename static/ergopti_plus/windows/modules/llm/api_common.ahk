@@ -75,7 +75,7 @@ _LLM_Common_GetInference() {
 	if IsSet(_LLM_COMMON_INFERENCE)
 		return _LLM_COMMON_INFERENCE
 	; Try the canonical path next to defaults.json / models.json.
-	path := _StaticDir . "\drivers\_shared\llm\inference.json"
+	path := _StaticDir . "\ergopti_plus\shared\llm\inference.json"
 	if !FileExist(path) {
 		_LLM_COMMON_INFERENCE := LLM_COMMON_FALLBACK
 		return _LLM_COMMON_INFERENCE
