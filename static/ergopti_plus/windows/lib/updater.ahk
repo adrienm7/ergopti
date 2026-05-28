@@ -595,8 +595,8 @@ _Updater_OpenChangelogWindow(Channel) {
 
 	G := Gui("+Resize +MinSize960x600", WinTitle)
 	G.SetFont("s10", "Segoe UI")
-	G.MarginX := 10
-	G.MarginY := 10
+	G.MarginX := 5
+	G.MarginY := 5
 
 	; ── Header bar ────────────────────────────────────────────────────────────
 	IsLocal := Updater_IsLocalSource()
