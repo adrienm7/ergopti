@@ -28,9 +28,10 @@
 ;
 ; Phase 2 (hold) — InputHook L1 captures the next key without any modifier
 ; active, so Space auto-repeat cannot produce Shift+Space or Ctrl+Space.
-; After the IH resolves, HoldFn receives ih.Input (the captured char, or ""
-; on pure hold/timeout) and is responsible for activating the modifier,
-; injecting the char correctly, and releasing the modifier.
+; After the IH resolves, HoldFn receives (ih.Input, A_PriorKey): the captured
+; char (or "" on pure hold/timeout) and the physical key name. The modifier
+; variants use ih.Input to send the correct char; the layer variant uses
+; A_PriorKey to replay the physical key through the now-active layer hotkeys.
 ; KeyWait("SC039", "U") then waits for Space release (returns immediately
 ; if already released during the IH window).
 ;
@@ -47,7 +48,10 @@ SpaceTapHold(HoldFn) {
     ih := InputHook("L1 T3")
     ih.Start()
     ih.Wait()
-    HoldFn.Call(ih.Input)
+    ; Capture physical key name before HoldFn consumes context — needed by
+    ; _SpaceHoldLayer to replay the key through the layer hotkeys after activation.
+    priorKey := A_PriorKey
+    HoldFn.Call(ih.Input, priorKey)
     KeyWait("SC039", "U T2")
 }
 
@@ -65,7 +69,7 @@ _SpaceTap() {
     UpdateLastSentCharacter(" ")
 }
 
-_SpaceHoldCtrl(captured) {
+_SpaceHoldCtrl(captured, priorKey) {
     SendInput("{LCtrl Down}")
     ; Use ^ prefix so the key is sent as Ctrl+<key> regardless of layout.
     ; captured is already the translated char (e.g. 'a'), ^ applies Ctrl to it.
@@ -75,7 +79,7 @@ _SpaceHoldCtrl(captured) {
     SendInput("{LCtrl Up}")
 }
 
-_SpaceHoldShift(captured) {
+_SpaceHoldShift(captured, priorKey) {
     SendInput("{LShift Down}")
     ; captured is already layout-translated — re-sending it with + would
     ; double-translate (Shift applied to the already-shifted char). Drop it:
@@ -85,10 +89,12 @@ _SpaceHoldShift(captured) {
     SendInput("{LShift Up}")
 }
 
-_SpaceHoldLayer(captured) {
+_SpaceHoldLayer(captured, priorKey) {
     ActivateLayer()
-    if (captured != "" and captured != " ")
-        SendInput("{Text}" . captured)
+    ; Replay the physical key through the now-active layer hotkeys instead of
+    ; sending the raw translated char — the layer maps scan codes to nav actions.
+    if (priorKey != "" and priorKey != "Space")
+        Send("{" . priorKey . "}")
     KeyWait("SC039", "U T2")
     DisableLayer()
 }
