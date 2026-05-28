@@ -189,46 +189,93 @@ KLR_BuildDatabase(metrics_dir) {
 }
 
 ; Stream a potentially multi-GB SQL file into `db` in 4 MB chunks.
-; Each read accumulates into a carry buffer; when a complete transaction
-; boundary (COMMIT followed by newline) is found the accumulated SQL is
-; exec'd and the carry is reset. Any trailing bytes after the last COMMIT
-; are exec'd at the end so incomplete (open) transactions still land.
+; Reads raw UTF-8 bytes to avoid AHK string size limits and passes each
+; chunk directly to SQLite_ExecBuf. A carry buffer (≤ one SQL line) holds
+; any incomplete statement that was split across a chunk boundary —
+; sqlite3_prepare_v2 consumes one statement per call via the tail pointer,
+; so it is safe to split between complete statements at any semicolon.
 KLR_ExecLargeFile(db, path) {
-    static CHUNK := 4 * 1024 * 1024   ; 4 MB per read
-    fh := FileOpen(path, "r", "UTF-8")
+    static CHUNK_BYTES := 4 * 1024 * 1024   ; 4 MB per read
+    ; Open in binary mode (no encoding conversion). The raw bytes are UTF-8
+    ; exactly as SQLite expects — StrPut inside SQLite_ExecBuf handles the
+    ; AHK-side conversion only for the tiny carry string.
+    fh := FileOpen(path, "r`n", "UTF-8")
     if !fh
         return
     carry := ""
     loop {
-        chunk := fh.Read(CHUNK)
+        chunk := fh.Read(CHUNK_BYTES)
         if (chunk = "")
             break
-        carry .= chunk
-        ; Flush every complete transaction. SQLite needs the full
-        ; BEGIN…COMMIT block; splitting mid-transaction would error.
-        ; We scan for "COMMIT;" followed by newline as the boundary.
-        last_commit := 0
-        pos := 1
-        loop {
-            ; FileOpen in text mode normalises CRLF to LF, so we match LF only.
-            found := InStr(carry, "COMMIT;`n", true, pos)
-            if !found
-                break
-            ; found is 1-based; "COMMIT;\n" is 8 chars, so the boundary ends
-            ; at found+7 (inclusive). The next chunk starts at found+8.
-            last_commit := found + 7
-            pos := found + 8
-        }
-        if (last_commit > 0) {
-            SQLite_Exec(db, SubStr(carry, 1, last_commit))
-            carry := SubStr(carry, last_commit + 1)
-        }
+        ; Append the previous carry (incomplete statement tail) and exec.
+        ; The carry is at most one SQL line (a few hundred bytes) so
+        ; concatenation cost is negligible.
+        sql := carry . chunk
+        carry := SQLite_ExecReturnCarry(db, sql)
     }
     fh.Close()
-    ; Flush any trailing SQL after the last COMMIT (e.g. the open batch
-    ; currently being written by the keylogger).
+    ; Flush any trailing SQL (open transaction being written by keylogger,
+    ; or a compacted file whose last COMMIT has no trailing newline).
     if (carry != "")
         SQLite_Exec(db, carry)
+}
+
+; Execute as many complete SQL statements from `sql` as sqlite3_prepare_v2
+; can parse, and return whatever tail bytes remain (the start of an
+; incomplete statement that was cut at the chunk boundary). This lets
+; KLR_ExecLargeFile keep a carry of ≤ 1 statement rather than the entire
+; pre-COMMIT block (which can be 170 MB for compacted files).
+SQLite_ExecReturnCarry(db, sql) {
+    if !db
+        return sql
+    n := StrPut(sql, "UTF-8")
+    if (n <= 1)
+        return ""
+    sql_buf := Buffer(n, 0)
+    StrPut(sql, sql_buf, "UTF-8")
+
+    cur  := sql_buf.Ptr
+    tail := cur
+    end_ := cur + n - 1   ; exclude trailing NUL
+    pstmt_buf := Buffer(8, 0)
+    ptail_buf := Buffer(8, 0)
+    while (cur < end_) {
+        NumPut("Ptr", 0, pstmt_buf, 0)
+        NumPut("Ptr", 0, ptail_buf, 0)
+        rc := DllCall(SQLiteConst.DLL . "\sqlite3_prepare_v2",
+            "Ptr",  db,
+            "Ptr",  cur,
+            "Int",  -1,
+            "Ptr",  pstmt_buf.Ptr,
+            "Ptr",  ptail_buf.Ptr,
+            "Int")
+        pstmt := NumGet(pstmt_buf, 0, "Ptr")
+        ptail := NumGet(ptail_buf, 0, "Ptr")
+        if (rc != SQLiteConst.OK) {
+            ; Incomplete statement (syntax error OR statement cut at boundary).
+            ; Return remainder as carry so the caller can prepend the next chunk.
+            break
+        }
+        if pstmt {
+            Loop {
+                step_rc := DllCall(SQLiteConst.DLL . "\sqlite3_step", "Ptr", pstmt, "Int")
+                if (step_rc != SQLiteConst.ROW)
+                    break
+            }
+            DllCall(SQLiteConst.DLL . "\sqlite3_finalize", "Ptr", pstmt)
+        }
+        if (!ptail || ptail <= cur)
+            break
+        tail := ptail
+        cur  := ptail
+    }
+    ; Return the unparsed tail as a UTF-16 AHK string so the caller can
+    ; prepend it to the next chunk. The tail is at most one SQL statement
+    ; (typically a single INSERT line), so StrGet cost is negligible.
+    remaining_bytes := end_ - cur
+    if (remaining_bytes <= 0)
+        return ""
+    return StrGet(cur, remaining_bytes, "UTF-8")
 }
 
 ; Apply only the bytes appended to each device's data.sql since the
