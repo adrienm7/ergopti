@@ -523,6 +523,11 @@ Updater_LoadCheckInterval()
 try Updater_StartBackgroundChecks()
 LoggerStart("ErgoptiPlus", "Booting ErgoptiPlus driver…")
 
+; Load tooltip visual constants from shared/tooltip/constants.toml so the
+; runtime values stay in sync with the TOML single source of truth.
+; Must run after _SharedDir is set (line ~51) and ParseTomlFile is available.
+UiStyle_LoadSharedConst()
+
 ; Log both the raw reverse-probe result (VK_RMENU → SC) and the resolved
 ; Kana-remap flag so future regressions on exotic layouts surface immediately.
 ; SC=0 means VK_RMENU is not mapped → Kana-like remap; non-zero means RAlt
