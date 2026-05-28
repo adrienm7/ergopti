@@ -1162,6 +1162,8 @@
 	"prompt_editor.title_new": "Yeni profil",
 	"script_control.paused": "Betik duraklatıldı",
 	"script_control.resumed": "Betik devam etti",
+	"startup.manifest_missing": "Başlangıç hatası: _generated/features_manifest.ahk dosyası eksik veya bozuk.\n\nProje dizininden `npm run build:manifest` komutunu çalıştırın ve betiği yeniden başlatın.",
+	"startup.manifest_title": "ErgoptiPlus — manifest eksik",
 	"sfbsreduction.bu": "À + ★ → BU",
 	"sfbsreduction.comma": "Virgül aynı parmak bigramlarını azaltır",
 	"sfbsreduction.ecirc": "Ê aynı parmak bigramlarını azaltır",

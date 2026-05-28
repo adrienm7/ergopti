@@ -1162,6 +1162,8 @@
 	"prompt_editor.title_new": "Новый профиль",
 	"script_control.paused": "Скрипт приостановлен",
 	"script_control.resumed": "Скрипт возобновлён",
+	"startup.manifest_missing": "Ошибка запуска: файл _generated/features_manifest.ahk отсутствует или повреждён.\n\nЗапустите `npm run build:manifest` из каталога проекта и перезапустите скрипт.",
+	"startup.manifest_title": "ErgoptiPlus — manifest отсутствует",
 	"sfbsreduction.bu": "À + ★ → BU",
 	"sfbsreduction.comma": "Запятая уменьшает биграммы одного пальца",
 	"sfbsreduction.ecirc": "Ê уменьшает биграммы одного пальца",

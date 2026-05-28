@@ -600,9 +600,7 @@ EnsureUserConfigsExist()
 ; Map and every downstream Features["llm"]["enabled"] access throws a
 ; cryptic "Item has no value" error. Fail loudly here instead.
 if !ManifestEnsureLoaded() {
-	MsgBox("Erreur de démarrage : le fichier _generated/features_manifest.ahk est absent ou corrompu."
-		. "`n`nLancez ``npm run build:manifest`` depuis le répertoire du projet, puis relancez le script.",
-		"ErgoptiPlus — manifest manquant", "OK Iconx")
+	MsgBox(t("startup.manifest_missing"), t("startup.manifest_title"), "OK Iconx")
 	ExitApp(1)
 }
 global Features := ManifestBuildFeaturesMap()
