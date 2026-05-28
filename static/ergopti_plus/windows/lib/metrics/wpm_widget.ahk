@@ -70,16 +70,15 @@ class WPMWidgetConst {
 
     ; ── Values loaded from shared/timings/constants.toml ────────────────────────
     static IDLE_HIDE_MS       := 0
+    ; How long the hotstring source color stays visible after the last fire.
+    ; Loaded from shared/timings/constants.toml [ui] wpm_color_hold_ms.
+    static COLOR_HOLD_MS      := 0
 
     ; ── AHK-only constants (no shared TOML equivalent needed) ───────────────────
     ; Rolling window over which WPM is averaged (matches Hammerspoon 15 s).
     static WINDOW_MS          := 15000
     ; Timer tick — how often the display refreshes (ms).
     static TICK_MS            := 500
-    ; How long the hotstring source color stays visible after the last fire (ms).
-    ; Must be > TICK_MS so even a burst expansion that fires just after a tick
-    ; is still caught by the next tick.
-    static COLOR_HOLD_MS      := 3000
     ; Graph mode dimensions (wider to show history).
     static GRAPH_W            := 220
     static GRAPH_H            := 100
@@ -1001,13 +1000,17 @@ WPMWidget_LoadSharedConst() {
 
     ; shared/timings/constants.toml
     tim_c := ParseTomlFile(timings_path)
-    if tim_c.Count
-        WPMWidgetConst.IDLE_HIDE_MS := Integer(IniCacheGet(tim_c, "", "wpm_widget_idle_hide_ms", "3000"))
-    else
-        LoggerError("WPMWidget", "shared/timings/constants.toml not found — IDLE_HIDE_MS defaulting to 3000.")
+    if tim_c.Count {
+        WPMWidgetConst.IDLE_HIDE_MS  := Integer(IniCacheGet(tim_c, "ui", "wpm_widget_idle_hide_ms", "3000"))
+        WPMWidgetConst.COLOR_HOLD_MS := Integer(IniCacheGet(tim_c, "ui", "wpm_color_hold_ms",       "1000"))
+    } else {
+        LoggerError("WPMWidget", "shared/timings/constants.toml not found — IDLE_HIDE_MS and COLOR_HOLD_MS defaulting.")
+        WPMWidgetConst.IDLE_HIDE_MS  := 3000
+        WPMWidgetConst.COLOR_HOLD_MS := 1000
+    }
 
-    LoggerDone("WPMWidget", "Shared constants loaded (W={1} H={2} darken={3} idle={4}ms).",
-        WPMWidgetConst.W, WPMWidgetConst.H, WPMWidgetConst.UNIT_DARKEN, WPMWidgetConst.IDLE_HIDE_MS)
+    LoggerDone("WPMWidget", "Shared constants loaded (W={1} H={2} darken={3} idle={4}ms color_hold={5}ms).",
+        WPMWidgetConst.W, WPMWidgetConst.H, WPMWidgetConst.UNIT_DARKEN, WPMWidgetConst.IDLE_HIDE_MS, WPMWidgetConst.COLOR_HOLD_MS)
 }
 
 
