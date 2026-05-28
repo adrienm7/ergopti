@@ -609,7 +609,7 @@ _Updater_OpenChangelogWindow(Channel) {
 		: t("updater.changelog_switch_to_dev")
 
 	G.Add("Text", "xm yp+4 w580 +0x200", BadgeText)
-	BtnSwitch := G.Add("Button", "x+10 yp w300", SwitchLabel)
+	BtnSwitch := G.Add("Button", "x+10 yp w330", SwitchLabel)
 
 	if (IsLocal)
 		G.Add("Text", "xm y+4 w890 cGray", t("updater.changelog_local_source_note"))
@@ -734,7 +734,7 @@ _Updater_OpenChangelogWindow(Channel) {
 	G.OnEvent("Close",  (*) => G.Destroy())
 	G.OnEvent("Escape", (*) => G.Destroy())
 
-	G.Show("w930 h620")
+	G.Show("w930 AutoSize")
 
 	; Spin up the WebView2 controller now that the window Hwnd is valid.
 	if (UseWV) {
