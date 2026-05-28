@@ -16,6 +16,7 @@ SetWorkingDir(A_ScriptDir) ; Set the working directory where the script is locat
 ; well-formed.
 global CapsWordEnabled := False
 global LayerEnabled := False
+global TapHold := Map("keys", Map(), "layers", Map())
 ; Registry for runtime-registered personal shortcuts (personal_shortcuts.ahk).
 ; Stores ordered names + per-name descriptions so the tray menu can render them.
 global _PersonalShortcutsRegistry := Map("__Order", [])
