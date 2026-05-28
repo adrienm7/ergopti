@@ -615,9 +615,9 @@ BuildMetricsMenu() {
 	RegisterMenuItem(MetricsMenu, excl_label, OpenMetricsAppPicker)
 
 	; ── Real-time WPM display ──────────────────────────────────────────────
+	; Note: "Show WPM in menu bar" is macOS-only — Windows has no system menu
+	; bar. The floating widget below is the Windows equivalent.
 	MetricsMenu.Add()
-	WpmMenubarLabel       := t("menu.metrics.show_wpm_menubar")
-	WpmMenubarColorsLabel := t("menu.metrics.colors_by_source") . Chr(0x200B)
 	WpmWidgetLabel        := t("menu.metrics.show_wpm_widget")
 	WpmWidgetColorsLabel  := t("menu.metrics.colors_by_source")
 	WpmWidgetGraphLabel   := t("menu.metrics.include_realtime")
@@ -626,18 +626,11 @@ BuildMetricsMenu() {
 	; Fat-arrow lambdas capture their enclosing locals by reference in AHK v2,
 	; so passing them directly is simpler and more reliable than IIFE patterns,
 	; which AHK does not support across line breaks.
-	RegisterMenuItem(MetricsMenu, WpmMenubarLabel,       (*) => _ToggleWpmMenubar(MetricsMenu, WpmMenubarLabel, WpmMenubarColorsLabel))
-	RegisterMenuItem(MetricsMenu, WpmMenubarColorsLabel, (*) => _ToggleWpmMenubarColors(MetricsMenu, WpmMenubarColorsLabel))
-	MetricsMenu.Add()
 	RegisterMenuItem(MetricsMenu, WpmWidgetLabel,        (*) => _ToggleWpmWidget(MetricsMenu, WpmWidgetLabel, WpmWidgetColorsLabel, WpmWidgetGraphLabel))
 	RegisterMenuItem(MetricsMenu, WpmWidgetColorsLabel,  (*) => _ToggleWpmWidgetColors(MetricsMenu, WpmWidgetColorsLabel))
 	RegisterMenuItem(MetricsMenu, WpmWidgetGraphLabel,   (*) => _ToggleWpmWidgetGraph(MetricsMenu, WpmWidgetGraphLabel))
 	RegisterMenuItem(MetricsMenu, WpmWidgetResetLabel,   (*) => WPMWidget_ResetPosition())
 
-	if MetricsShortcuts.show_wpm_menubar
-		MetricsMenu.Check(WpmMenubarLabel)
-	if MetricsShortcuts.show_wpm_menubar && MetricsShortcuts.wpm_menubar_colors
-		MetricsMenu.Check(WpmMenubarColorsLabel)
 	if WPMWidget.visible
 		MetricsMenu.Check(WpmWidgetLabel)
 	if WPMWidget.visible && WPMWidget.use_colors
@@ -646,8 +639,6 @@ BuildMetricsMenu() {
 		MetricsMenu.Check(WpmWidgetGraphLabel)
 
 	; Sub-options are disabled when their parent toggle is off.
-	if !MetricsShortcuts.show_wpm_menubar
-		MetricsMenu.Disable(WpmMenubarColorsLabel)
 	if !WPMWidget.visible {
 		MetricsMenu.Disable(WpmWidgetColorsLabel)
 		MetricsMenu.Disable(WpmWidgetGraphLabel)
@@ -663,8 +654,6 @@ BuildMetricsMenu() {
 		MetricsMenu.Disable(secure_label)
 		MetricsMenu.Disable(sysauth_label)
 		MetricsMenu.Disable(excl_label)
-		MetricsMenu.Disable(WpmMenubarLabel)
-		MetricsMenu.Disable(WpmMenubarColorsLabel)
 		MetricsMenu.Disable(WpmWidgetLabel)
 		MetricsMenu.Disable(WpmWidgetColorsLabel)
 		MetricsMenu.Disable(WpmWidgetGraphLabel)
@@ -708,26 +697,6 @@ ToggleFilterSystemAuth(*) {
 
 ; ── WPM toggle helpers — closures capture the menu reference and label strings
 ; from BuildMetricsMenu locals, so no global state is needed. ──────────────────
-
-_ToggleWpmMenubar(menu, label, colors_label) {
-	MetricsShortcuts.show_wpm_menubar := !MetricsShortcuts.show_wpm_menubar
-	CS_Save()
-	try menu.ToggleCheck(label)
-	if MetricsShortcuts.show_wpm_menubar {
-		SetTimer(WpmMenubar_Tick, 1000)
-		try menu.Enable(colors_label)
-	} else {
-		SetTimer(WpmMenubar_Tick, 0)
-		A_IconTip := "ErgoptiPlus"
-		try menu.Disable(colors_label)
-	}
-}
-
-_ToggleWpmMenubarColors(menu, label) {
-	MetricsShortcuts.wpm_menubar_colors := !MetricsShortcuts.wpm_menubar_colors
-	CS_Save()
-	try menu.ToggleCheck(label)
-}
 
 _ToggleWpmWidget(menu, widget_lbl, colors_lbl, graph_lbl) {
 	WPMWidget_Toggle()
@@ -773,25 +742,6 @@ _ToggleWpmWidgetGraph(menu, label) {
 	try menu.ToggleCheck(label)
 	if was_visible
 		WPMWidget_Show()
-}
-
-; Updates A_IconTip with the current live WPM every second.
-; When colors are enabled, appends the keystroke-origin tag [HS] or [IA].
-WpmMenubar_Tick() {
-	result := WPMWidget_Calc()
-	wpm    := result["wpm"]
-	if (wpm > 0) {
-		suffix := ""
-		if MetricsShortcuts.wpm_menubar_colors {
-			if result["has_ai"]
-				suffix := " [IA]"
-			else if result["has_hs"]
-				suffix := " [HS]"
-		}
-		A_IconTip := "ErgoptiPlus  |  " . wpm . " " . t("menu.metrics.wpm_unit") . suffix
-	} else {
-		A_IconTip := "ErgoptiPlus"
-	}
 }
 
 OpenMetricsAppPicker(*) {
