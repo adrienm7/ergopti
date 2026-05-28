@@ -173,6 +173,16 @@ global _VendorDir := A_ScriptDir . "\..\vendor"
 #Include meta/test_corpus_hotstrings.ahk
 #Include meta/test_corpus_tap_hold.ahk
 #Include meta/test_corpus_hotstring_matcher.ahk
+; LLM parser corpus -- tests LLM_ParseOllamaResponse and _LLMRemoteParseResponse
+; against the shared cross-driver vectors (already included above via api_ollama/api_remote).
+#Include meta/test_corpus_llm_parser.ahk
+; Security / keylogger privacy corpus -- tests ES_PASSWORD detection and
+; Win32 known-class lookup logic in isolation (OS-level paths are headless-safe stubs).
+#Include meta/test_corpus_security_keylogger.ahk
+; PromptBuilder corpus -- tests the generated PromptBuilder class against the
+; shared cross-driver vectors.
+#Include ../_generated/prompt_builder.ahk
+#Include meta/test_corpus_prompt_builder.ahk
 
 ; Drive everything. RunTests prints a TAP-style report to stdout and exits
 ; with the appropriate code — control never returns from this call.
