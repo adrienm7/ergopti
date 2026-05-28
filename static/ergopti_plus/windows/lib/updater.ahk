@@ -749,9 +749,14 @@ _Updater_OpenChangelogWindow(Channel) {
 				s.IsStatusBarEnabled              := false
 				s.AreBrowserAcceleratorKeysEnabled := false
 			}
-			; Position and size the WebView to overlap the RightPane placeholder.
-			RightPane.GetPos(&rpx, &rpy, &rpw, &rph)
-			WVC.Fill()
+			; Position the WebView exactly over the RightPane placeholder.
+			; Fill() uses GetClientRect on the parent window (full client area),
+			; so we set Bounds explicitly from the placeholder's own position instead.
+			_Updater_WVPlace(WVC, RightPane)
+
+			; Reposition the WebView whenever the window is resized so the pane
+			; always tracks the right half of the layout.
+			G.OnEvent("Size", (*) => _Updater_WVPlace(WVC, RightPane))
 			; NavigateToString is synchronous enough here — no "ready" handshake needed.
 			if (HasReleases) {
 				Lb.Choose(1)
@@ -762,6 +767,21 @@ _Updater_OpenChangelogWindow(Channel) {
 			}
 		}
 	}
+}
+
+; Positions a WebView2 controller to exactly cover a GUI control's rectangle.
+; AHK Gui.Control.GetPos returns coordinates relative to the client area of the
+; parent window, which is exactly what WebView2.Controller.Bounds expects.
+_Updater_WVPlace(WVC, Ctrl) {
+	if !WVC.ptr
+		return
+	Ctrl.GetPos(&cx, &cy, &cw, &ch)
+	RECT := WebView2.RECT()
+	RECT.left   := cx
+	RECT.top    := cy
+	RECT.right  := cx + cw
+	RECT.bottom := cy + ch
+	WVC.Bounds := RECT
 }
 
 ; Escapes a string for safe embedding as a JS string literal (single-quoted).
