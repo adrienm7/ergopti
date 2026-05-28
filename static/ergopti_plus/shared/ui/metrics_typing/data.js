@@ -571,9 +571,13 @@ function recompute_speed_kpi() {
 		totals.trig_hs_trans += app.hs_input_credited_buckets?.[bucket_key] || 0;
 		totals.trig_llm_time_ms += app.llm_input_time_buckets?.[bucket_key] || 0;
 		totals.trig_llm_trans += app.llm_input_credited_buckets?.[bucket_key] || 0;
-		// Fallback accumulators — always collected regardless of bucket presence
-		totals.fallback_time_ms += app.time || 0;
-		totals.fallback_wpm_chars += manual_c + (show_hs ? hs_c : 0) + (show_llm ? llm_c : 0);
+		// Fallback accumulators — only for entries that have a measured app.time,
+		// otherwise chars without a matching time denominator inflate CPM to absurdity.
+		const entry_time = app.time || 0;
+		if (entry_time > 0) {
+			totals.fallback_time_ms += entry_time;
+			totals.fallback_wpm_chars += manual_c + (show_hs ? hs_c : 0) + (show_llm ? llm_c : 0);
+		}
 	};
 	manifest_dates.forEach((date_str) => {
 		if (start_val && date_str < start_val) return;
@@ -604,15 +608,18 @@ function recompute_speed_kpi() {
 	// Guard against divide-by-zero. A small floor (1 ms) would let bogus 0-time
 	// data emit a finite huge speed; explicit zero is more honest.
 	// When bucket data is absent (agg_app_day_buckets not yet built for historical
-	// entries), fall back to the app.time-based formula used by compute_manifest_metrics
-	// so the KPI is never stuck at 0 and the HS toggle still has a visible effect.
+	// entries), fall back to the app.time-based formula using only entries that
+	// have a measured app.time (prevents chars-without-time inflating CPM to absurdity).
+	// If no timing data at all is available, bail out without overwriting the value
+	// already written by compute_manifest_metrics() — its estimate is better than 0.
 	let output_cpm;
 	if (pure_time_ms > 0 && chars_total > 0) {
 		output_cpm = (chars_total * 60000) / pure_time_ms;
 	} else if (totals.fallback_time_ms > 0 && totals.fallback_wpm_chars > 0) {
 		output_cpm = totals.fallback_wpm_chars / (totals.fallback_time_ms / 60000);
 	} else {
-		output_cpm = 0;
+		// No timing data available — keep whatever compute_manifest_metrics() wrote
+		return;
 	}
 	const output_wpm = output_cpm / 5;
 
