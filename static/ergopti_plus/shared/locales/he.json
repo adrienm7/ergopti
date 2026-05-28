@@ -861,6 +861,7 @@
 	"menu.metrics.filter_secure": "התעלם משדות סיסמה",
 	"menu.metrics.filter_sysauth": "התעלם מדיאלוגי אימות מערכת",
 	"menu.metrics.include_realtime": "    ↳ כלול גרף בזמן אמת",
+	"menu.metrics.reset_wpm_position": "    ↳ אפס מיקום",
 	"menu.metrics.off": "❌ מטריקות מושבתות (לחץ להפעלה)",
 	"menu.metrics.on": "✅ מטריקות מופעלות (לחץ להשבתה)",
 	"menu.metrics.open_encryptor": "↳ פתח Encryptor עצמאי…",

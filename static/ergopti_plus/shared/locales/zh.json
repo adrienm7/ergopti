@@ -861,6 +861,7 @@
 	"menu.metrics.filter_secure": "忽略密码字段",
 	"menu.metrics.filter_sysauth": "忽略系统身份验证对话框",
 	"menu.metrics.include_realtime": "    ↳ 包含实时图表",
+	"menu.metrics.reset_wpm_position": "    ↳ 重置位置",
 	"menu.metrics.off": "❌ 统计数据已禁用（点击启用）",
 	"menu.metrics.on": "✅ 统计数据已启用（点击禁用）",
 	"menu.metrics.open_encryptor": "↳ 打开独立加密器…",

@@ -861,6 +861,7 @@
 	"menu.metrics.filter_secure": "पासवर्ड फील्ड को अनदेखा करें",
 	"menu.metrics.filter_sysauth": "सिस्टम प्रमाणीकरण संवादों को अनदेखा करें",
 	"menu.metrics.include_realtime": "    ↳ रीयल-टाइम ग्राफ शामिल करें",
+	"menu.metrics.reset_wpm_position": "    ↳ स्थिति रीसेट करें",
 	"menu.metrics.off": "❌ मेट्रिक्स अक्षम (सक्षम करने के लिए क्लिक करें)",
 	"menu.metrics.on": "✅ मेट्रिक्स सक्षम (अक्षम करने के लिए क्लिक करें)",
 	"menu.metrics.open_encryptor": "↳ स्टैंडअलोन एन्क्रिप्टर खोलें…",

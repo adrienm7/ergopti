@@ -861,6 +861,7 @@
 	"menu.metrics.filter_secure": "تجاهل حقول كلمة المرور",
 	"menu.metrics.filter_sysauth": "تجاهل مربعات حوار مصادقة النظام",
 	"menu.metrics.include_realtime": "    ↳ تضمين الرسم البياني الآني",
+	"menu.metrics.reset_wpm_position": "    ↳ إعادة تعيين الموضع",
 	"menu.metrics.off": "❌ المقاييس مُعطَّلة (انقر للتفعيل)",
 	"menu.metrics.on": "✅ المقاييس مُفعَّلة (انقر للتعطيل)",
 	"menu.metrics.open_encryptor": "↳ فتح أداة التشفير المستقلة…",

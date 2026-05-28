@@ -861,6 +861,7 @@
 	"menu.metrics.filter_secure": "비밀번호 필드 무시",
 	"menu.metrics.filter_sysauth": "시스템 인증 대화상자 무시",
 	"menu.metrics.include_realtime": "    ↳ 실시간 그래프 포함",
+	"menu.metrics.reset_wpm_position": "    ↳ 위치 재설정",
 	"menu.metrics.off": "❌ 지표 비활성화됨 (클릭하여 활성화)",
 	"menu.metrics.on": "✅ 지표 활성화됨 (클릭하여 비활성화)",
 	"menu.metrics.open_encryptor": "↳ 독립 실행형 암호화기 열기…",
