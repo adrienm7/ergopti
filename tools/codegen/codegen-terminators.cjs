@@ -1,4 +1,4 @@
-// scripts/codegen-terminators.cjs
+// tools/codegen/codegen-terminators.cjs
 
 /**
  * ==============================================================================
@@ -6,7 +6,7 @@
  * DESCRIPTION:
  * Generates both the AHK v2 and Hammerspoon Lua implementations of the
  * Terminators port contract from the single source of truth defined in
- * static/ergopti_plus/_shared/domain/terminators.spec.js. Running this script
+ * static/ergopti_plus/shared/domain/Terminators.spec.js. Running this script
  * ensures both drivers start from identical catalogue data and expose the
  * same isTerminator / isConsumed / setEnabled / isEnabled / updateMagicKey /
  * addCustom / all() API surface.
@@ -26,13 +26,13 @@
 const fs   = require("fs");
 const path = require("path");
 
-const ROOT = path.resolve(__dirname, "..");
+const ROOT = path.resolve(__dirname, "../..");
 
 // Load the spec by reading and eval-ing it as CommonJS, since the file uses
 // module.exports but the package is type:module (ESM). We inline the CJS
 // wrapper so require() works without needing a .cjs copy of the spec.
 const specSource = fs.readFileSync(
-	path.join(ROOT, "static/ergopti_plus/_shared/domain/terminators.spec.js"),
+	path.join(ROOT, "static/ergopti_plus/shared/domain/Terminators.spec.js"),
 	"utf8"
 );
 const specModule = { exports: {} };
@@ -41,8 +41,8 @@ new Function("require", "module", "exports", "__dirname", "__filename", specSour
 	require,
 	specModule,
 	specModule.exports,
-	path.join(ROOT, "static/ergopti_plus/_shared/domain"),
-	path.join(ROOT, "static/ergopti_plus/_shared/domain/terminators.spec.js")
+	path.join(ROOT, "static/ergopti_plus/shared/domain"),
+	path.join(ROOT, "static/ergopti_plus/shared/domain/Terminators.spec.js")
 );
 const { TERMINATOR_DEFS } = specModule.exports;
 
@@ -137,7 +137,7 @@ function generateAhk() {
 
 	return [
 		`; static/ergopti_plus/windows/_generated/terminators.ahk`,
-		`; AUTO-GENERATED from _shared/domain/terminators.spec.js.`,
+		`; AUTO-GENERATED from shared/domain/Terminators.spec.js.`,
 		`; DO NOT EDIT BY HAND — run \`npm run codegen:terminators\` to refresh.`,
 		``,
 		`; ==============================================================================`,
@@ -332,7 +332,7 @@ function generateLua() {
 
 	return [
 		`--- static/ergopti_plus/macos/_generated/terminators.lua`,
-		`--- AUTO-GENERATED from _shared/domain/terminators.spec.js.`,
+		`--- AUTO-GENERATED from shared/domain/Terminators.spec.js.`,
 		`--- DO NOT EDIT BY HAND — run \`npm run codegen:terminators\` to refresh.`,
 		``,
 		`--- ==============================================================================`,

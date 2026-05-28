@@ -1,4 +1,4 @@
-// scripts/codegen-expander-ahk.cjs
+// tools/codegen/codegen-expander-ahk.cjs
 
 /**
  * ==============================================================================
@@ -6,7 +6,7 @@
  * DESCRIPTION:
  * Generates `static/ergopti_plus/windows/_generated/expander.ahk` from the
  * Expander domain contract defined in
- * `static/ergopti_plus/_shared/domain/expander.spec.js`.
+ * `static/ergopti_plus/shared/domain/Expander.spec.js`.
  *
  * FEATURES & RATIONALE:
  * 1. Single source of truth: the generated file derives its class contract
@@ -24,9 +24,9 @@
 const fs   = require("fs");
 const path = require("path");
 
-const ROOT     = path.resolve(__dirname, "..");
+const ROOT     = path.resolve(__dirname, "../..");
 const OUT_PATH = path.resolve(ROOT, "static/ergopti_plus/windows/_generated/expander.ahk");
-const SPEC_REL = "static/ergopti_plus/_shared/domain/expander.spec.js";
+const SPEC_REL = "static/ergopti_plus/shared/domain/Expander.spec.js";
 
 
 
