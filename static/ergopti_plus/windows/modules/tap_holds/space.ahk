@@ -55,17 +55,23 @@ SpaceTapHold(HoldFn) {
 }
 
 SpaceTapHoldLayer() {
-    TimeoutSec := TapHoldDuration(TapHold, "space")
-    tap := KeyWait("SC039", "T" . TimeoutSec)
-    if tap {
-        _SpaceTap()
-        return
-    }
-    ; Activate layer immediately — physical keys now hit #HotIf LayerEnabled
-    ; hotkeys directly, matching the LAlt layer pattern.
+    ; Mirror the LAlt layer pattern exactly: activate the layer at keydown so
+    ; every subsequent physical key lands on #HotIf LayerEnabled hotkeys.
+    ; After Space is released, check whether it was a quick tap (no layer key
+    ; was used) and send Space retroactively if so.
+    UpdateLastSentCharacter("Space")
     ActivateLayer()
     KeyWait("SC039", "U T2")
     DisableLayer()
+
+    Now := A_TickCount
+    CharacterSentTime := LastSentCharacterKeyTime.Has("Space") ? LastSentCharacterKeyTime["Space"] : Now
+    tap := (Now - CharacterSentTime <= TapHoldDuration(TapHold, "space") * 1000)
+    ; Only send Space on tap when no layer key was consumed — A_PriorKey stays
+    ; "Space" (SC039) when the user releases without pressing anything else.
+    if (tap and A_PriorKey == "Space") {
+        _SpaceTap()
+    }
 }
 
 _SpaceTap() {
