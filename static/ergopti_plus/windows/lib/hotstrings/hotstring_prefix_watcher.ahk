@@ -569,7 +569,21 @@ _OnPrefixChar(IH, Char) {
         ; this guard covers printable terminators (space, punctuation, …) that
         ; produce a char event — including those arriving via tap-hold or AltGr
         ; layers whose VK event may be swallowed before reaching the InputHook.
+        ; Feed the terminator to HSE first so end-char hotstrings can match
+        ; (e.g. "ia"+space → "IA"). Only reset if no match fired; if a match
+        ; fired, HSE_DispatchMatch already called HSE_FeedReset via its finally.
         if InStr(_PREFIX_WORD_BOUNDARIES, Char) {
+            HSEMatch := HSE_FeedChar(Char)
+            if (HSEMatch != "") {
+                HSE_DispatchMatch(HSEMatch, HSE_LastEndChar)
+                HotstringHType := _ResolveFireHType(HSEMatch)
+                HotstringRepl := HSEMatch.HasOwnProp("Replacement") ? HSEMatch.Replacement : HSEMatch.Trigger
+                HotstringCategory := HSEMatch.HasOwnProp("IsRepeat") && HSEMatch.IsRepeat
+                    ? "repeat_key"
+                    : (HSEMatch.HasOwnProp("Category") ? HSEMatch.Category : "")
+                HotstringSection := HSEMatch.HasOwnProp("Section") ? HSEMatch.Section : ""
+                try KL_LogHotstring(HSEMatch.Trigger, HotstringRepl, HotstringHType, "", HotstringCategory, HotstringSection)
+            }
             _ResetPrefixBuffer()
             return
         }

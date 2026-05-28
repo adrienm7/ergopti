@@ -745,6 +745,7 @@ KL_LogSystemEvent(action, metadata := unset) {
 ;   - falls back to the session app when the caller omits ``app_name``,
 ;   - emits the same ``tag`` marker (`<hotstring>…</hotstring>`) HS writes.
 KL_LogHotstring(trigger, replacement, h_type := "unknown", app_name := "", category := "", section := "") {
+    LoggerDebug("WPMWidget", "KL_LogHotstring: trigger='{1}' cat='{2}' sec='{3}' init={4}", trigger, category, section, Keylogger.initialized)
     if !Keylogger.initialized
         return
     KL_FlushBuffer()

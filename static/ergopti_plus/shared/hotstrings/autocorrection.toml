@@ -5,7 +5,7 @@
 # ====================
 
 [_meta]
-color = "#43a047"
+color = "#2e7d32"
 delay = 1.0
 show_tooltip = true
 description = { fr = "Autocorrection", en = "Autocorrection", de = "Autokorrektur", es = "Autocorrección", zh = "自动纠错", ar = "تصحيح تلقائي", cs = "Automatická oprava", da = "Autokorrektur", he = "תיקון אוטומטי", hi = "स्वत: सुधार", it = "Correzione automatica", ja = "自動修正", ko = "자동 수정", nl = "Autocorrectie", no = "Autokorrektur", pl = "Autokorekta", pt = "Autocorreção", ru = "Автокоррекция", sv = "Autokorrigering", tr = "Otomatik düzeltme", uk = "Автовиправлення" }

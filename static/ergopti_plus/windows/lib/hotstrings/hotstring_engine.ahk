@@ -315,7 +315,7 @@ CreateHotstring(Flags, Abbreviation, Replacement, options := unset) {
     FlagsPortion := ":" Flags "B0O:" ; O omits the ending character from the abbreviation
     _RegisterHotstring(
         FlagsPortion Abbreviation,
-        _MakeHotstringCallback(Replacement, Abbreviation, OnlyText, FinalResult, TimeActivationSeconds),
+        _MakeHotstringCallback(Replacement, Abbreviation, OnlyText, FinalResult, TimeActivationSeconds, Category, Section),
         _MakeHotstringMeta(Replacement, Abbreviation, OnlyText, FinalResult, TimeActivationSeconds, IsRepeat, Category, Section)
     )
 }
@@ -340,18 +340,18 @@ _MakeHotstringMeta(Replacement, Abbreviation, OnlyText, FinalResult, TimeActivat
 ; ``BackSpaceSeq`` / ``PrevCharKey`` once at registration time and closes
 ; over both plus the positional option booleans. Each call produces a fresh
 ; closure with its own captures — safe to call in a loop over variants.
-_MakeHotstringCallback(Replacement, Abbreviation, OnlyText, FinalResult, TimeActivationSeconds) {
+_MakeHotstringCallback(Replacement, Abbreviation, OnlyText, FinalResult, TimeActivationSeconds, Category := "", Section := "") {
     BackSpaceSeq := "{BackSpace " . StrLen(Abbreviation) . "}"
     AbbreviationLen := StrLen(Abbreviation)
     PrevCharKey := SubStr(Abbreviation, -2, 1)
     return (*) => _HotstringDispatch(Replacement, A_EndChar, BackSpaceSeq, PrevCharKey, OnlyText, FinalResult,
-        TimeActivationSeconds, AbbreviationLen)
+        TimeActivationSeconds, AbbreviationLen, Abbreviation, Category, Section)
 }
 
 ; Hot path — runs on every hotstring firing. ``BackSpaceSeq`` and
 ; ``PrevCharKey`` are pre-computed at registration time so this function
 ; does zero allocation / string work before dispatching the three sends.
-_HotstringDispatch(Replacement, EndChar, BackSpaceSeq, PrevCharKey, OnlyText, FinalResult, TimeActivationSeconds, AbbreviationLen := 0) {
+_HotstringDispatch(Replacement, EndChar, BackSpaceSeq, PrevCharKey, OnlyText, FinalResult, TimeActivationSeconds, AbbreviationLen := 0, Trigger := "", Category := "", Section := "") {
     if IsTimeActivationExpired(PrevCharKey, TimeActivationSeconds) {
         return
     }
@@ -414,6 +414,19 @@ _HotstringDispatch(Replacement, EndChar, BackSpaceSeq, PrevCharKey, OnlyText, Fi
             SetTimer((*) => PrefixWatcherSuppress(false), -60)
         }
     }
+    ; Notify the WPM widget for end-char fires only — star (immediate) fires
+    ; are already logged by the prefix watcher via HSE_DispatchMatch.
+    ; KL_LogHotstring is guarded by Keylogger.initialized — safe to call here.
+    if (EndChar != "") and (Trigger != "") and (Category != "") {
+        repl_str := HasMethod(Replacement) ? "" : Replacement
+        if IsSet(KL_LogHotstring) {
+            try KL_LogHotstring(Trigger, repl_str, "endchar", "", Category, Section)
+        } else if IsSet(WPMWidget_Push) {
+            repl_len := HasMethod(Replacement) ? 1 : StrLen(repl_str)
+            Loop repl_len
+                try WPMWidget_Push(true, false, false, Category, Section)
+        }
+    }
 }
 
 IsTimeActivationExpired(PreviousCharacter, OptionTimeActivationSeconds) {
@@ -463,7 +476,7 @@ CreateCaseSensitiveHotstrings(Flags, Abbreviation, Replacement, options := unset
     ; ``f() {}`` functions in AHK v2 do not capture the enclosing scope.
     RegisterVariant := (Abbr, Repl) => _RegisterHotstring(
         FlagsPortion Abbr,
-        _MakeHotstringCallback(Repl, Abbr, OnlyText, FinalResult, TimeActivationSeconds),
+        _MakeHotstringCallback(Repl, Abbr, OnlyText, FinalResult, TimeActivationSeconds, Category, Section),
         _MakeHotstringMeta(Repl, Abbr, OnlyText, FinalResult, TimeActivationSeconds, IsRepeat, Category, Section)
     )
 
