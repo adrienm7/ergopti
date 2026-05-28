@@ -236,12 +236,10 @@ _LLM_LoadPresets() {
 	models_path := LLM_GetSharedPath("models.json")
 	if (models_path == "")
 		return []
+	raw := FSRead(models_path)
+	if (raw == false)
+		return []
 	try {
-		fh := FileOpen(models_path, "r", "UTF-8")
-		if !IsObject(fh)
-			return []
-		raw := fh.Read()
-		fh.Close()
 		parsed := JsonParse(raw)
 		; Defensive: the file MUST be an Array at the top level. If not,
 		; return [] rather than handing a Map to the menu builder which

@@ -868,7 +868,7 @@ LLM_Engine_OnResults(slots, ctx, active := 1, is_final := false) {
 			text := slots[idx]
 			if (text != "") {
 				_LLM_Engine["inline_last_typed"] := text
-				SendText(text)
+				TextSend(text, 0, 0)
 				; Don't fall through to the tooltip — inline mode owns
 				; the entire UI surface for this prediction.
 				return

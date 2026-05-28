@@ -134,7 +134,7 @@ LLM_Bridge_OnFlush() {
  */
 LLM_Bridge_OnAccept(text) {
 	global _LLM_Bridge_Buffer
-	SendText(text)
+	TextSend(text, 0, 0)
 	_LLM_Bridge_Buffer .= text
 	; Audit event — pairs with the llm_suggested event the engine emitted
 	; when the tooltip first rendered. The pair lets a log tail compute
