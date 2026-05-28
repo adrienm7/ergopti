@@ -1255,6 +1255,11 @@ KL_IngestOnce() {
     try KLWV_NotifyIngest()
 }
 
+; Threshold above which KL_DayRollover triggers a background compaction
+; of data.sql. 200 MB is the practical point where the chunked initial
+; load begins to take several seconds.
+global KL_COMPACT_THRESHOLD_MB := 200
+
 KL_DayRollover() {
     if !Keylogger.initialized
         return
@@ -1270,6 +1275,45 @@ KL_DayRollover() {
     ; word / streak / current_burst is meaningless at midnight.
     try KLW_DayRolloverReset()
     KL_SaveState()
+    ; Schedule a background compaction when data.sql has grown past the
+    ; threshold. Run 5 s after rollover so the midnight flush is done first.
+    try KL_MaybeScheduleCompact()
+}
+
+; Trigger a compaction of every device's data.sql when any file exceeds
+; KL_COMPACT_THRESHOLD_MB. Runs asynchronously via a one-shot SetTimer
+; so it never delays the midnight rollover or the keystroke hot path.
+KL_MaybeScheduleCompact() {
+    global KL_COMPACT_THRESHOLD_MB
+    threshold_bytes := KL_COMPACT_THRESHOLD_MB * 1024 * 1024
+    by_root := Keylogger.metrics_dir . "by_device\"
+    needs_compact := false
+    loop files, by_root . "*", "D" {
+        sql_path := A_LoopFileFullPath . "\data.sql"
+        if !FileExist(sql_path)
+            continue
+        if FileGetSize(sql_path) > threshold_bytes {
+            needs_compact := true
+            break
+        }
+    }
+    if !needs_compact
+        return
+    ; One-shot timer: fire once after 5 s, do not repeat.
+    SetTimer(KL_RunCompact, -5000)
+}
+
+KL_RunCompact() {
+    metrics_dir := Keylogger.metrics_dir
+    if (metrics_dir = "")
+        return
+    if Keylogger.HasProp("log") && IsObject(Keylogger.log)
+        Keylogger.log.Info("data.sql compaction started…")
+    results := KLR_CompactAllDevices(metrics_dir)
+    if Keylogger.HasProp("log") && IsObject(Keylogger.log) {
+        for path, ok in results
+            Keylogger.log.Info("Compacted %s: %s.", path, ok ? "ok" : "FAILED")
+    }
 }
 
 KL_MidnightCheck() {
