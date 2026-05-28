@@ -358,6 +358,15 @@ function M.build(ctx)
 		end
 	})
 
+	table.insert(menu, {
+		title    = i18n.get("menu.metrics.reset_wpm_position"),
+		disabled = not state.keylogger_enabled or not state.keylogger_float_wpm,
+		fn       = function()
+			local WpmWidget = require("ui.wpm.wpm_widget")
+			if type(WpmWidget.reset_position) == "function" then WpmWidget.reset_position() end
+		end
+	})
+
 	table.insert(menu, { title = "-" })
 	table.insert(menu, { title = "-" })
 	table.insert(menu, { title = i18n.section("menu.metrics.privacy_header"), disabled = true })
