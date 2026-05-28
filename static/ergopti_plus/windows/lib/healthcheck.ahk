@@ -42,22 +42,22 @@ global _HealthCheckLastError := ""
 ; finished its #Include phase.
 _HealthCheck_AdapterSpecs() {
 	Specs := Map()
-	Specs["clipboard"]             := ["Clipboard_Read", "Clipboard_Write"]
-	Specs["file_system"]           := ["FileSystem_Read", "FileSystem_Write", "FileSystem_Exists"]
-	Specs["http_client"]           := ["HttpClient_Get", "HttpClient_Post"]
-	Specs["keyboard_hook"]         := ["KeyboardHook_Start", "KeyboardHook_Stop"]
-	Specs["mouse_control"]         := ["MouseControl_Move", "MouseControl_Click"]
-	Specs["network_info"]          := ["NetworkInfo_GetSSID"]
-	Specs["notifier"]              := ["Notifier_Notify"]
-	Specs["process_lifecycle"]     := ["ProcessLifecycle_Launch", "ProcessLifecycle_Kill"]
-	Specs["secure_field_detector"] := ["SecureFieldDetector_IsSecure"]
-	Specs["storage"]               := ["Storage_Get", "Storage_Set"]
-	Specs["text_sender"]           := ["TextSender_Send"]
-	Specs["timer_scheduler"]       := ["TimerScheduler_After", "TimerScheduler_Every"]
-	Specs["tooltip_renderer"]      := ["TooltipRenderer_Show", "TooltipRenderer_Hide"]
+	Specs["clipboard"]             := ["CB_Read", "CB_Write"]
+	Specs["file_system"]           := ["FSRead", "FSWrite", "FSExists"]
+	Specs["http_client"]           := ["HTTPPost", "HTTPCancel"]
+	Specs["keyboard_hook"]         := ["KHStart", "KHStop"]
+	Specs["mouse_control"]         := ["MCSetPos", "MCGetPos"]
+	Specs["network_info"]          := ["NI_GetSsidHash"]
+	Specs["notifier"]              := ["NotifierSend"]
+	Specs["process_lifecycle"]     := ["PLC_Start", "PLC_Stop"]
+	Specs["secure_field_detector"] := ["SFD_IsSecureField"]
+	Specs["storage"]               := ["ST_Get", "ST_Set"]
+	Specs["text_sender"]           := ["TextSend", "TextEraseChars"]
+	Specs["timer_scheduler"]       := ["TimerAfter", "TimerEvery"]
+	Specs["tooltip_renderer"]      := ["TooltipRShow", "TooltipRHide"]
 	Specs["tray_menu"]             := ["TrayMenuSetIcon", "TrayMenuSetMenu", "TrayMenuSetTooltip", "TrayMenuDestroy"]
-	Specs["window_info"]           := ["WindowInfo_FocusedApp", "WindowInfo_FocusedTitle"]
-	Specs["window_manager"]        := ["WindowManager_Move", "WindowManager_Resize"]
+	Specs["window_info"]           := ["WIGetFocused", "WIGetAll"]
+	Specs["window_manager"]        := ["WMActivate", "WMExists"]
 	return Specs
 }
 
