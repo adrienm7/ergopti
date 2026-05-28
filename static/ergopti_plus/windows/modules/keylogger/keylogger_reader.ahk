@@ -176,14 +176,59 @@ KLR_BuildDatabase(metrics_dir) {
         sql_path := A_LoopFileFullPath . "\data.sql"
         if !FileExist(sql_path)
             continue
-        sql := FileRead(sql_path, "UTF-8")
-        if (sql = "")
-            continue
-        SQLite_Exec(db, sql)
+        ; Read in 4 MB chunks to avoid OOM on large data.sql files (can be
+        ; several GB after months of capture). SQLite_Exec handles partial
+        ; statements gracefully — each chunk ends on a COMMIT boundary so we
+        ; accumulate a carry buffer of any trailing incomplete transaction and
+        ; prepend it to the next chunk.
+        KLR_ExecLargeFile(db, sql_path)
         try KLRCache.last_sizes[sql_path] := FileGetSize(sql_path)
     }
     KLRCache.db := db
     return db
+}
+
+; Stream a potentially multi-GB SQL file into `db` in 4 MB chunks.
+; Each read accumulates into a carry buffer; when a complete transaction
+; boundary (COMMIT followed by newline) is found the accumulated SQL is
+; exec'd and the carry is reset. Any trailing bytes after the last COMMIT
+; are exec'd at the end so incomplete (open) transactions still land.
+KLR_ExecLargeFile(db, path) {
+    static CHUNK := 4 * 1024 * 1024   ; 4 MB per read
+    fh := FileOpen(path, "r", "UTF-8")
+    if !fh
+        return
+    carry := ""
+    loop {
+        chunk := fh.Read(CHUNK)
+        if (chunk = "")
+            break
+        carry .= chunk
+        ; Flush every complete transaction. SQLite needs the full
+        ; BEGIN…COMMIT block; splitting mid-transaction would error.
+        ; We scan for "COMMIT;" followed by newline as the boundary.
+        last_commit := 0
+        pos := 1
+        loop {
+            ; FileOpen in text mode normalises CRLF to LF, so we match LF only.
+            found := InStr(carry, "COMMIT;`n", true, pos)
+            if !found
+                break
+            ; found is 1-based; "COMMIT;\n" is 8 chars, so the boundary ends
+            ; at found+7 (inclusive). The next chunk starts at found+8.
+            last_commit := found + 7
+            pos := found + 8
+        }
+        if (last_commit > 0) {
+            SQLite_Exec(db, SubStr(carry, 1, last_commit))
+            carry := SubStr(carry, last_commit + 1)
+        }
+    }
+    fh.Close()
+    ; Flush any trailing SQL after the last COMMIT (e.g. the open batch
+    ; currently being written by the keylogger).
+    if (carry != "")
+        SQLite_Exec(db, carry)
 }
 
 ; Apply only the bytes appended to each device's data.sql since the
@@ -916,4 +961,163 @@ KLR_PrevDay(yyyy_mm_dd) {
     flat := SubStr(yyyy_mm_dd, 1, 4) . SubStr(yyyy_mm_dd, 6, 2) . SubStr(yyyy_mm_dd, 9, 2)
     flat := DateAdd(flat, -1, "Days")
     return SubStr(flat, 1, 4) . "-" . SubStr(flat, 5, 2) . "-" . SubStr(flat, 7, 2)
+}
+
+
+
+
+; ======================================
+; ======================================
+; ======= 8/ data.sql compaction =======
+; ======================================
+; ======================================
+;
+; KLR_CompactDataSql replaces a device's data.sql with a semantically
+; equivalent but much smaller file by:
+;   1. Loading the DB (via the chunked reader already implemented).
+;   2. Exporting every table as a single INSERT OR REPLACE/IGNORE per row
+;      (so each (PK) appears exactly once instead of once per ingest tick).
+;   3. Writing the compact SQL atomically via a .tmp rename.
+;
+; Typical reduction: 10-50× for a mature data.sql where the same agg_*/
+; ngram_* rows were UPSERTed thousands of times. Raw events_* rows are
+; also deduplicated (INSERT OR IGNORE with PK, so re-running is safe).
+;
+; WHEN TO CALL: once per week at a quiet moment (e.g. after midnight
+; rollover). The operation is O(rows) in the DB, typically < 30 s on
+; a few months of data.  KLR_ResetCache() is called afterwards so the
+; next dashboard open rebuilds from the new compact file.
+
+; Quote a single SQL value: numbers stay bare, strings are single-quoted
+; with internal quotes doubled, NULLs become SQL NULL.
+KLR_CompactQuoteVal(v) {
+    if (v = "")
+        return "NULL"
+    if IsInteger(v) || IsFloat(v)
+        return String(v)
+    ; Escape internal single-quotes by doubling them.
+    return "'" . StrReplace(String(v), "'", "''") . "'"
+}
+
+; Export all rows of `tbl` as INSERT statements into `fh`. Uses
+; INSERT OR IGNORE for immutable event tables (UNIQUE PRIMARY KEY
+; already guards duplicates) and INSERT OR REPLACE for mutable
+; aggregate / ngram tables (last value wins, which is what a compacted
+; DB represents after all ON CONFLICT updates have been applied).
+KLR_CompactDumpTable(db, fh, tbl, replace := false) {
+    verb := replace ? "INSERT OR REPLACE" : "INSERT OR IGNORE"
+    rows := SQLite_Query(db, "SELECT * FROM " . tbl)
+    if (rows.Length = 0)
+        return
+    ; Derive column list from first row.
+    col_names := []
+    for k, _ in rows[1]
+        col_names.Push(k)
+    col_list := ""
+    for i, c in col_names
+        col_list .= (i = 1 ? "" : ", ") . c
+    for row in rows {
+        vals := ""
+        for i, c in col_names
+            vals .= (i = 1 ? "" : ", ") . KLR_CompactQuoteVal(row[c])
+        fh.Write(verb . " INTO " . tbl . " (" . col_list . ") VALUES (" . vals . ");`n")
+    }
+}
+
+; Compact all devices' data.sql files found under metrics_dir.
+; Returns a Map(path → true/false) with per-file outcomes.
+KLR_CompactAllDevices(metrics_dir) {
+    md := metrics_dir
+    if !RegExMatch(md, "[\\/]$")
+        md .= "\"
+    by_root := md . "by_device\"
+    results := Map()
+    loop files, by_root . "*", "D" {
+        sql_path := A_LoopFileFullPath . "\data.sql"
+        if !FileExist(sql_path)
+            continue
+        device_id := A_LoopFileName
+        results[sql_path] := KLR_CompactDataSql(sql_path, device_id)
+    }
+    return results
+}
+
+; Compact a single data.sql file identified by `sql_path`.
+; `device_id` is used only for the file header comment.
+; Returns true on success, false on any failure (leaves the original intact).
+KLR_CompactDataSql(sql_path, device_id) {
+    ; Build in-memory DB from the current (possibly large) file.
+    ; KLR_ExecLargeFile reads in 4 MB chunks so no OOM risk.
+    db := SQLite_Open(":memory:")
+    if !db
+        return false
+    if !KLR_LoadSchema(db) {
+        SQLite_Close(db)
+        return false
+    }
+    KLR_ExecLargeFile(db, sql_path)
+
+    tmp := sql_path . ".compact.tmp"
+    try FileDelete(tmp)
+    fh := FileOpen(tmp, "w", "UTF-8")
+    if !fh {
+        SQLite_Close(db)
+        return false
+    }
+
+    ; File header — matches the format written by KL_Init().
+    fh.Write("-- ergopti metrics — device " . device_id . " — schema_version 1`n")
+    fh.Write("-- This file is APPEND-ONLY. Do not edit by hand.`n")
+    fh.Write("-- Compacted by KLR_CompactDataSql on " . A_Now . "`n")
+    fh.Write("PRAGMA foreign_keys = OFF;`n")
+    fh.Write("`nBEGIN TRANSACTION;`n")
+
+    ; ── Immutable raw event tables (INSERT OR IGNORE). ──────────────────────
+    for tbl in ["devices", "events_typing", "events_app_switch",
+                "events_window_switch", "events_shortcut", "events_system",
+                "events_hotstring", "events_llm", "events_session",
+                "events_mouse", "events_ergo", "events_window_topo"] {
+        KLR_CompactDumpTable(db, fh, tbl, false)
+    }
+
+    ; ── Mutable aggregate tables (INSERT OR REPLACE = last value wins). ─────
+    for tbl in ["agg_app_day", "agg_app_day_buckets", "agg_app_day_burst",
+                "agg_app_day_session", "agg_app_day_chars_class",
+                "agg_app_day_errors", "agg_app_day_ergo", "agg_app_day_layouts",
+                "agg_app_day_kc_hold", "agg_app_day_titles",
+                "agg_app_day_hourly", "agg_app_day_hourly_min5",
+                "agg_app_day_switches_to", "agg_system_day"] {
+        KLR_CompactDumpTable(db, fh, tbl, true)
+    }
+
+    ; ── N-gram tables (INSERT OR REPLACE). ──────────────────────────────────
+    for tbl in ["ngram_chars", "ngram_bigrams", "ngram_trigrams",
+                "ngram_quadgrams", "ngram_pentagrams", "ngram_hexagrams",
+                "ngram_heptagrams", "ngram_words", "ngram_word_bigrams",
+                "ngram_shortcuts", "ngram_shortcut_bigrams",
+                "ngram_keycodes", "ngram_scancodes"] {
+        KLR_CompactDumpTable(db, fh, tbl, true)
+    }
+
+    ; ── Meta (INSERT OR REPLACE). ────────────────────────────────────────────
+    KLR_CompactDumpTable(db, fh, "meta", true)
+
+    fh.Write("COMMIT;`n")
+    fh.Close()
+    SQLite_Close(db)
+
+    ; Atomic rename: .compact.tmp → data.sql. On success the old bloated
+    ; file is gone; on failure the original is untouched.
+    static MOVEFILE_REPLACE_EXISTING := 0x1
+    static MOVEFILE_WRITE_THROUGH    := 0x8
+    static MV_FLAGS := MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH
+    ok := DllCall("Kernel32\MoveFileExW", "Str", tmp, "Str", sql_path,
+        "UInt", MV_FLAGS, "Int")
+    if !ok {
+        try FileDelete(tmp)
+        return false
+    }
+    ; The cached in-memory DB is now stale (file was replaced).
+    KLR_ResetCache()
+    return true
 }
