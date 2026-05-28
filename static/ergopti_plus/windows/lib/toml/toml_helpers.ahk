@@ -136,6 +136,14 @@ ParseTomlFile(Path) {
         if (Section = "")
             continue
 
+        ; Strip inline comments (# …) unless the value is a quoted string.
+        ; Must scan character-by-character to skip # inside quoted strings.
+        if (SubStr(val, 1, 1) != '"') {
+            hash_pos := InStr(val, "#")
+            if (hash_pos > 0)
+                val := Trim(SubStr(val, 1, hash_pos - 1))
+        }
+
         ; Detect opening of a multi-line array: value starts with [ but has no ]
         if (SubStr(val, 1, 1) = "[" && !InStr(val, "]")) {
             PendingKey := key
@@ -185,6 +193,9 @@ TOML_CoerceValue(raw) {
     }
     if RegExMatch(raw, "^-?\d+$")
         return Integer(raw)
+    ; Float literals: 0.25, -1.5, 3.14, etc.
+    if RegExMatch(raw, "^-?\d+\.\d+$")
+        return Float(raw)
     return raw
 }
 
