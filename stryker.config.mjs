@@ -23,13 +23,13 @@
 const config = {
 	testRunner:  "command",
 	commandRunner: {
-		command: "node scripts/test-mutation-targets.cjs",
+		command: "node tools/test/test-mutation-targets.cjs",
 	},
 
 	mutate: [
-		"static/ergopti_plus/_shared/domain/**/*.js",
-		"static/ergopti_plus/_shared/ports/**/*.spec.js",
-		"!static/ergopti_plus/_shared/**/_generated/**",
+		"static/ergopti_plus/shared/domain/**/*.js",
+		"static/ergopti_plus/shared/ports/**/*.spec.js",
+		"!static/ergopti_plus/shared/**/_generated/**",
 		"!**/node_modules/**",
 	],
 
