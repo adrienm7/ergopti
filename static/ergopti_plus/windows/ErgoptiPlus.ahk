@@ -1351,6 +1351,15 @@ ToggleAllFeatures(Value) {
         Updates.Push({ Section: "ahk.category_enabled", Key: _CategoryEnabledKey(Category), Value: Bool })
     }
 
+    ; WPM widget lives outside Features — its three flags are persisted
+    ; under [ahk.metrics] and must be flipped explicitly.
+    WPMWidget.visible    := Bool
+    WPMWidget.use_colors := Bool
+    WPMWidget.show_graph := Bool
+    Updates.Push({ Section: "ahk.metrics", Key: WPMWidgetConst.CFG_VISIBLE, Value: Bool ? "1" : "0" })
+    Updates.Push({ Section: "ahk.metrics", Key: WPMWidgetConst.CFG_COLORS,  Value: Bool ? "1" : "0" })
+    Updates.Push({ Section: "ahk.metrics", Key: WPMWidgetConst.CFG_GRAPH,   Value: Bool ? "1" : "0" })
+
     TOML_BatchWrite(ConfigurationFile, Updates)
     Reload
 }
