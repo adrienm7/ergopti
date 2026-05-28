@@ -1293,12 +1293,6 @@ initMenu() {
 	ParamsMenu := Menu()
 	RegisterMenuItem(ParamsMenu, t("menu.hotstrings.delays_colors"),
 		(*) => OpenHotstringsConfigWindow())
-	RegisterMenuItem(ParamsMenu, t("menu.hotstrings.magic_key_prefix") . ScriptInformation["MagicKey"], MagicKeyEditor)
-	RepeatToggleLabel := t("menu.hotstrings.repeat_key_toggle")
-	RegisterMenuItem(ParamsMenu, RepeatToggleLabel, ToggleRepeatKeyEnabled)
-	if HSE_RepeatEnabled {
-		ParamsMenu.Check(RepeatToggleLabel)
-	}
 	HotstringsMenu.Add(t("menu.hotstrings.params"), ParamsMenu)
 	HotstringsMenu.Add() ; Separator after paramètres block
 
@@ -1364,6 +1358,14 @@ initMenu() {
 	ErgoptiHeader := MenuSectionTitle(t("menu.hotstrings.ergopti_header") . " (" . FmtCount(ErgoptiTotal) . ")")
 	HotstringsMenu.Add(ErgoptiHeader, (*) => NoAction())
 	HotstringsMenu.Disable(ErgoptiHeader)
+	; Magic key config items — live here because they are Ergopti-specific (★ is a dedicated Ergopti key)
+	RegisterMenuItem(HotstringsMenu, t("menu.hotstrings.magic_key_prefix") . ScriptInformation["MagicKey"], MagicKeyEditor)
+	RepeatToggleLabel := t("menu.hotstrings.repeat_key_toggle")
+	RegisterMenuItem(HotstringsMenu, RepeatToggleLabel, ToggleRepeatKeyEnabled)
+	if HSE_RepeatEnabled {
+		HotstringsMenu.Check(RepeatToggleLabel)
+	}
+	HotstringsMenu.Add() ; Separator before Ergopti category groups
 	for Category in HotstringCategoriesErgopti {
 		if SubMenus.Has(Category) {
 			Total := _CountEnabledForCategory(Category)
