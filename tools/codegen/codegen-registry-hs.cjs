@@ -1,13 +1,13 @@
-// scripts/codegen-registry-hs.cjs
+// tools/codegen/codegen-registry-hs.cjs
 // Generates static/ergopti_plus/macos/_generated/registry.lua from
-// static/ergopti_plus/_shared/domain/registry.spec.js.
+// static/ergopti_plus/shared/domain/Registry.spec.js.
 
 "use strict";
 
 const fs   = require("fs");
 const path = require("path");
 
-const OUT_DIR  = path.resolve(__dirname, "../static/ergopti_plus/macos/_generated");
+const OUT_DIR  = path.resolve(__dirname, "../../static/ergopti_plus/macos/_generated");
 const OUT_FILE = path.join(OUT_DIR, "registry.lua");
 
 
@@ -63,7 +63,7 @@ function generate() {
 	// -- File path header + auto-generated notice
 	L("--- drivers/hammerspoon/_generated/registry.lua");
 	L("--- AUTO-GENERATED — do not edit manually.");
-	L("--- Source: static/ergopti_plus/_shared/domain/registry.spec.js");
+	L("--- Source: static/ergopti_plus/shared/domain/Registry.spec.js");
 	L("--- Run: npm run codegen:registry:hs");
 	L();
 	L("--- ==============================================================================");

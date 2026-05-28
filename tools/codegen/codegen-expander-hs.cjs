@@ -1,13 +1,13 @@
-// scripts/codegen-expander-hs.cjs
+// tools/codegen/codegen-expander-hs.cjs
 // Generates static/ergopti_plus/macos/_generated/expander.lua from
-// static/ergopti_plus/_shared/domain/expander.spec.js.
+// static/ergopti_plus/shared/domain/Expander.spec.js.
 
 "use strict";
 
 const fs   = require("fs");
 const path = require("path");
 
-const OUT_DIR  = path.resolve(__dirname, "../static/ergopti_plus/macos/_generated");
+const OUT_DIR  = path.resolve(__dirname, "../../static/ergopti_plus/macos/_generated");
 const OUT_FILE = path.join(OUT_DIR, "expander.lua");
 
 
@@ -63,7 +63,7 @@ function generate() {
 	// -- File path header + auto-generated notice
 	L("--- drivers/hammerspoon/_generated/expander.lua");
 	L("--- AUTO-GENERATED — do not edit manually.");
-	L("--- Source: static/ergopti_plus/_shared/domain/expander.spec.js");
+	L("--- Source: static/ergopti_plus/shared/domain/Expander.spec.js");
 	L("--- Run: npm run codegen:expander:hs");
 	L();
 	L("--- ==============================================================================");
