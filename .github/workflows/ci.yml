@@ -920,6 +920,10 @@ jobs:
                   TAG:      ${{ needs.resolve-release-meta.outputs.tag }}
                   SHA:      ${{ github.sha }}
               run: |
+                  # Fetch tags so git-describe can resolve the previous release tag.
+                  # The tag for the current release was just created via the API and
+                  # is not yet present in the shallow clone.
+                  git fetch --tags --quiet
                   python3 tools/build/build_changelog.py > "$RUNNER_TEMP/changelog.md"
                   echo "Changelog written ($(wc -l < "$RUNNER_TEMP/changelog.md") lines)."
 

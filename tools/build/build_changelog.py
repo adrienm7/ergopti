@@ -261,10 +261,14 @@ def main() -> int:
 		sys.stdout.write(render_first_release(sha))
 		return 0
 
-	commits = collect_commits(prev_tag, tag)
+	# Use SHA instead of TAG as the end revision: the tag is created via the
+	# GitHub API just before this script runs and is not fetched into the local
+	# clone, so ``git log prev..TAG`` silently returns nothing. SHA is always
+	# present (it's the checkout ref), so the range resolves correctly.
+	end_rev = sha if sha else tag
+	commits = collect_commits(prev_tag, end_rev)
 	if not commits:
-		# Tag exists but no commits between it and HEAD — emit an empty block
-		# so the next step's concatenation is a no-op.
+		# No commits in range — emit an empty block so the concatenation is a no-op.
 		return 0
 
 	sys.stdout.write(render(prev_tag, commits))
