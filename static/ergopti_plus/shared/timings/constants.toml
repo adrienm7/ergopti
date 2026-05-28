@@ -478,6 +478,11 @@ ui_restore_poll_ms = 1000
 # HS: ui/wpm/wpm_widget.lua 0.2 s timer.
 wpm_widget_update_ms = 200
 
+# Inactivity duration before the WPM widget hides itself.
+# AHK: lib/metrics/wpm_widget.ahk WPMWidgetConst.IDLE_HIDE_MS.
+# HS:  ui/wpm/wpm_widget.lua IDLE_HIDE_MS.
+wpm_widget_idle_hide_ms = 3000
+
 # WPM menubar update interval.
 # HS: ui/wpm/wpm_menubar.lua 0.5 s timer.
 wpm_menubar_update_ms = 500
