@@ -40,12 +40,10 @@
  * @returns {string} Absolute path, or "" if not found.
  */
 LLM_GetSharedPath(filename) {
-	global _StaticDir
-	; _StaticDir resolves to <repo>/static (dev) or A_ScriptDir\static
-	; (compiled). Shared assets live under ergopti_plus/shared/ in both layouts
+	global _SharedDir
 	; so a single canonical path is enough; the legacy multi-candidate fallback
 	; was only useful when the script could be invoked from arbitrary cwds.
-	canonical := _StaticDir . "\ergopti_plus\shared\llm\" . filename
+	canonical := _SharedDir . "\llm\" . filename
 	if FileExist(canonical)
 		return canonical
 	return ""

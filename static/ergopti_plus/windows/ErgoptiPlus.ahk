@@ -316,10 +316,14 @@ global ConfigurationFile := _ConfigDir . "ahk\config.toml"
 HotstringsConfigInit(_ConfigDir . "hotstrings_config.toml")
 
 ; _StaticDir was already resolved at the top of the script (compiled vs dev
-; aware), so here we only derive _LogoDir from it. Building a fully-normalized
-; absolute path avoids any '..' traversal that TraySetIcon may refuse to
-; resolve on some Windows configurations.
-global _LogoDir := _StaticDir . "\img\logo"
+; aware), so here we only derive sub-root constants from it. Building
+; fully-normalized absolute paths avoids any '..' traversal that TraySetIcon
+; may refuse to resolve on some Windows configurations.
+; Single source of truth for the two shared asset roots — update here only
+; if the project layout ever changes.
+global _SharedDir  := _StaticDir . "\ergopti_plus\shared"
+global _DriverDir  := _StaticDir . "\ergopti_plus\windows"
+global _LogoDir    := _StaticDir . "\img\logo"
 
 ; Tray icon paths are deliberately NOT part of ScriptInformation so that
 ; ReadScriptConfig() cannot override them from a user's [Script] section in
@@ -606,7 +610,7 @@ if !ManifestEnsureLoaded() {
 global Features := ManifestBuildFeaturesMap()
 ApplyConfigToml(Features, _ConfigDir . "ahk\config.toml")
 global TapHold := LoadTapHoldToml(_ConfigDir . "ahk\tap_hold.toml",
-	_StaticDir . "\ergopti_plus\windows\data\tap_hold\defaults.toml")
+	_DriverDir . "\data\tap_hold\defaults.toml")
 
 ; Count the exact number of hotstrings that will be generated for a DynamicHotstrings
 ; section — mirrors the same threshold logic used in hotstrings.ahk section 5.

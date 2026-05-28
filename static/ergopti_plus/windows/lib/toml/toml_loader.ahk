@@ -179,7 +179,7 @@ LoadHotstringsSection(CategoryName, SectionName, FeatureConfig, ExtraOptions := 
     and ScriptInformation.Has("PersonalTomlPath")) {
         FilePath := ScriptInformation["PersonalTomlPath"]
     } else {
-        FilePath := _StaticDir . "\ergopti_plus\shared\hotstrings\" . CategoryName . ".toml"
+        FilePath := _SharedDir . "\hotstrings\" . CategoryName . ".toml"
     }
     if !FileExist(FilePath) {
         try LoggerWarn("TomlLoader", "Section [{1}.{2}]: file {3} not found.",
@@ -402,7 +402,7 @@ ParseTomlGroupConfig(CategoryName, FilePath := "") {
             and ScriptInformation.Has("PersonalTomlPath")) {
             FilePath := ScriptInformation["PersonalTomlPath"]
         } else {
-            FilePath := _StaticDir . "\ergopti_plus\shared\hotstrings\" . LowerCat . ".toml"
+            FilePath := _SharedDir . "\hotstrings\" . LowerCat . ".toml"
         }
     }
 
@@ -490,7 +490,7 @@ CountTomlSection(CategoryName, SectionName, FilePath := "") {
         and ScriptInformation.Has("PersonalTomlPath")) {
             FilePath := ScriptInformation["PersonalTomlPath"]
         } else {
-            FilePath := _StaticDir . "\ergopti_plus\shared\hotstrings\" . StrLower(CategoryName) . ".toml"
+            FilePath := _SharedDir . "\hotstrings\" . StrLower(CategoryName) . ".toml"
         }
     }
     if !FileExist(FilePath) {
@@ -539,7 +539,7 @@ CountTomlHotstrings(CategoryName, FilePath := "") {
         and ScriptInformation.Has("PersonalTomlPath")) {
             FilePath := ScriptInformation["PersonalTomlPath"]
         } else {
-            FilePath := _StaticDir . "\ergopti_plus\shared\hotstrings\" . StrLower(CategoryName) . ".toml"
+            FilePath := _SharedDir . "\hotstrings\" . StrLower(CategoryName) . ".toml"
         }
     }
     if !FileExist(FilePath) {

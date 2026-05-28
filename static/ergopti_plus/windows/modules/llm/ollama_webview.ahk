@@ -303,11 +303,8 @@ OllamaWV_WebView2Available() {
  * @returns {string}
  */
 OllamaWV_HtmlUrl() {
-	global _StaticDir
-	; _StaticDir already resolves to <repo>/static in dev and to the extracted
-	; A_ScriptDir/static in compiled mode, so the _shared tree lives at the
-	; same relative offset in both layouts.
-	base := _StaticDir . "\ergopti_plus\shared\ui\download_window\index.html"
+	global _SharedDir
+	base := _SharedDir . "\ui\download_window\index.html"
 	loop files, base
 		base := A_LoopFileFullPath
 	return "file:///" . StrReplace(base, "\", "/")
@@ -319,8 +316,8 @@ OllamaWV_HtmlUrl() {
  * @returns {string}
  */
 OllamaWV_LocalesUrl() {
-	global _StaticDir
-	base := _StaticDir . "\ergopti_plus\shared\locales\"
+	global _SharedDir
+	base := _SharedDir . "\locales\"
 	return "file:///" . StrReplace(base, "\", "/")
 }
 
@@ -332,8 +329,8 @@ OllamaWV_LocalesUrl() {
  * @returns {string} JS expression to pass to ExecuteScript.
  */
 OllamaWV_I18nApplyScript(locale_code) {
-	global _StaticDir
-	json_path := _StaticDir . "\ergopti_plus\shared\locales\" . locale_code . ".json"
+	global _SharedDir
+	json_path := _SharedDir . "\locales\" . locale_code . ".json"
 	json_str  := ""
 	if FileExist(json_path)
 		try json_str := FileRead(json_path, "UTF-8")

@@ -61,8 +61,8 @@ class KLReadConst {
 ; `static/ergopti_plus/shared/schema/schema.sql`; _StaticDir already
 ; resolves to the right root in both dev and compiled modes.
 KLR_ResolveSchemaPath() {
-    global _StaticDir
-    base := _StaticDir . "\ergopti_plus\shared\schema\schema.sql"
+    global _SharedDir
+    base := _SharedDir . "\schema\schema.sql"
     loop files, base
         return A_LoopFileFullPath
     return base

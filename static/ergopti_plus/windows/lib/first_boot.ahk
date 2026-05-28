@@ -38,13 +38,13 @@
 ; Ensure both driver-local user config files exist. Safe to call on every boot;
 ; behaves as a no-op when the files are already present.
 EnsureUserConfigsExist() {
-	global _StaticDir, _ConfigDir
+	global _DriverDir, _ConfigDir
 	UserAhkDir      := _ConfigDir . "\ahk"
 	UserConfigPath  := UserAhkDir . "\config.toml"
 	UserTapHoldPath := UserAhkDir . "\tap_hold.toml"
-	TplConfigPath   := _StaticDir . "\ergopti_plus\windows\_generated\config_template.toml"
+	TplConfigPath   := _DriverDir . "\_generated\config_template.toml"
 	; Point directly at the driver-local tap-hold defaults — no copy/generation needed
-	TplTapHoldPath  := _StaticDir . "\ergopti_plus\windows\data\tap_hold\defaults.toml"
+	TplTapHoldPath  := _DriverDir . "\data\tap_hold\defaults.toml"
 
 	; Ensure the destination folder exists. DirCreate is recursive by default
 	; in AHK v2 and a no-op when the directory already exists.
