@@ -121,8 +121,11 @@ SpaceTapHold(HoldFn) {
     ; Timeout or Max → hold path. When EndReason is "Max" a character was
     ; captured while Space was held; pass it to HoldFn via _SpaceHeldInput
     ; so the hold action can inject it with the modifier active.
+    ; Exception: if ih.Input is a Space (VK 32 auto-repeat of SC039 itself),
+    ; treat it as a pure Timeout hold — _SpaceHeldVK was already zeroed by
+    ; _SpaceCaptureVK so HoldFn will correctly skip the captured-char injection.
     _SpaceHoldFired  := True
-    _SpaceHeldInput  := ih.Input
+    _SpaceHeldInput  := (ih.Input == " ") ? "" : ih.Input
     HoldFn()
     _SpaceHoldActive := False
     return True
@@ -138,6 +141,11 @@ SpaceTapHold(HoldFn) {
 
 _SpaceCaptureVK(ih, vk, sc) {
     global _SpaceHeldVK
+    ; VK 32 is Space itself — auto-repeat of SC039 while held generates a Space
+    ; keydown that the InputHook sees as a character. Ignore it so a pure hold
+    ; (no other key typed) stays on the Timeout path rather than Max+Space.
+    if (vk == 32)
+        return
     _SpaceHeldVK := vk
 }
 
@@ -182,7 +190,11 @@ SC039 Up:: {
     ; Only stop the InputHook when no character has been captured yet.
     ; If ih.Input != "" a char arrived while Space was held — Stop() here
     ; would flip EndReason to "Stopped" and lose the hold path entirely.
-    if (IsSet(_SpaceIHActive) and _SpaceIHActive and _SpaceInputHook.Input == "") {
+    ; Stop the IH when it is live and no real (non-Space) character has been
+    ; captured yet. ih.Input == " " means only a Space auto-repeat was seen —
+    ; treat that the same as empty so we still take the tap or pure-hold path.
+    if (IsSet(_SpaceIHActive) and _SpaceIHActive
+        and (_SpaceInputHook.Input == "" or _SpaceInputHook.Input == " ")) {
         _SpaceInputHook.Stop()
     }
 }
@@ -192,7 +204,11 @@ SC039 Up:: {
 ; Tap-hold on "Space" : Space on tap, Layer on hold
 SC039:: SpaceTapHold(_SpaceHoldLayer)
 SC039 Up:: {
-    if (IsSet(_SpaceIHActive) and _SpaceIHActive and _SpaceInputHook.Input == "") {
+    ; Stop the IH when it is live and no real (non-Space) character has been
+    ; captured yet. ih.Input == " " means only a Space auto-repeat was seen —
+    ; treat that the same as empty so we still take the tap or pure-hold path.
+    if (IsSet(_SpaceIHActive) and _SpaceIHActive
+        and (_SpaceInputHook.Input == "" or _SpaceInputHook.Input == " ")) {
         _SpaceInputHook.Stop()
     }
 }
@@ -202,7 +218,11 @@ SC039 Up:: {
 ; Tap-hold on "Space" : Space on tap, Shift on hold
 SC039:: SpaceTapHold(_SpaceHoldShift)
 SC039 Up:: {
-    if (IsSet(_SpaceIHActive) and _SpaceIHActive and _SpaceInputHook.Input == "") {
+    ; Stop the IH when it is live and no real (non-Space) character has been
+    ; captured yet. ih.Input == " " means only a Space auto-repeat was seen —
+    ; treat that the same as empty so we still take the tap or pure-hold path.
+    if (IsSet(_SpaceIHActive) and _SpaceIHActive
+        and (_SpaceInputHook.Input == "" or _SpaceInputHook.Input == " ")) {
         _SpaceInputHook.Stop()
     }
 }
