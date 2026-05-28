@@ -1162,6 +1162,8 @@
 	"prompt_editor.title_new": "新建配置",
 	"script_control.paused": "脚本已暂停",
 	"script_control.resumed": "脚本已恢复",
+	"startup.manifest_missing": "启动错误：_generated/features_manifest.ahk 文件缺失或已损坏。\n\n从项目目录运行 `npm run build:manifest`，然后重新启动脚本。",
+	"startup.manifest_title": "ErgoptiPlus — manifest 缺失",
 	"sfbsreduction.bu": "À + ★ → BU",
 	"sfbsreduction.comma": "逗号减少同指二合字母",
 	"sfbsreduction.ecirc": "Ê 减少同指二合字母",

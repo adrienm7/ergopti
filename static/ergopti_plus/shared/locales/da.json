@@ -1162,6 +1162,8 @@
 	"prompt_editor.title_new": "Ny profil",
 	"script_control.paused": "Sat på pause",
 	"script_control.resumed": "Script genoptaget",
+	"startup.manifest_missing": "Opstartsfejl: filen _generated/features_manifest.ahk mangler eller er beskadiget.\n\nKør `npm run build:manifest` fra projektmappen og genstart scriptet.",
+	"startup.manifest_title": "ErgoptiPlus — manifest mangler",
 	"sfbsreduction.bu": "À + ★ → BU",
 	"sfbsreduction.comma": "Komma reducerer bigrammer for samme finger",
 	"sfbsreduction.ecirc": "Ê reducerer bigrammer for samme finger",

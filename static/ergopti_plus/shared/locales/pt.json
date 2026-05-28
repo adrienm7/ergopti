@@ -1162,6 +1162,8 @@
 	"prompt_editor.title_new": "Novo perfil",
 	"script_control.paused": "Script pausado",
 	"script_control.resumed": "Script retomado",
+	"startup.manifest_missing": "Erro de início: o arquivo _generated/features_manifest.ahk está ausente ou corrompido.\n\nExecute `npm run build:manifest` a partir do diretório do projeto e reinicie o script.",
+	"startup.manifest_title": "ErgoptiPlus — manifest ausente",
 	"sfbsreduction.bu": "À + ★ → BU",
 	"sfbsreduction.comma": "Vírgula reduz bigramas do mesmo dedo",
 	"sfbsreduction.ecirc": "Ê reduz bigramas do mesmo dedo",

@@ -1162,6 +1162,8 @@
 	"prompt_editor.title_new": "새 프로필",
 	"script_control.paused": "스크립트 일시 정지됨",
 	"script_control.resumed": "스크립트 재개됨",
+	"startup.manifest_missing": "시작 오류: _generated/features_manifest.ahk 파일이 없거나 손상되었습니다.\n\n프로젝트 디렉터리에서 `npm run build:manifest`를 실행한 후 스크립트를 다시 시작하세요.",
+	"startup.manifest_title": "ErgoptiPlus — manifest 누락",
 	"sfbsreduction.bu": "À + ★ → BU",
 	"sfbsreduction.comma": "쉼표가 같은 손가락 바이그램을 줄입니다",
 	"sfbsreduction.ecirc": "Ê가 같은 손가락 바이그램을 줄입니다",

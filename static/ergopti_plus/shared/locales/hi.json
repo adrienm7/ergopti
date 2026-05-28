@@ -1162,6 +1162,8 @@
 	"prompt_editor.title_new": "नई प्रोफ़ाइल",
 	"script_control.paused": "रुका हुआ",
 	"script_control.resumed": "स्क्रिप्ट फिर से शुरू की गई",
+	"startup.manifest_missing": "स्टार्टअप त्रुटि: _generated/features_manifest.ahk फ़ाइल अनुपस्थित या दूषित है।\n\nप्रोजेक्ट डायरेक्टरी से `npm run build:manifest` चलाएं, फिर स्क्रिप्ट को पुनः प्रारंभ करें।",
+	"startup.manifest_title": "ErgoptiPlus — manifest अनुपस्थित",
 	"sfbsreduction.bu": "À + ★ → BU",
 	"sfbsreduction.comma": "कॉमा एक ही उंगली के बाइग्राम को कम करता है",
 	"sfbsreduction.ecirc": "Ê एक ही उंगली के बाइग्राम को कम करता है",
