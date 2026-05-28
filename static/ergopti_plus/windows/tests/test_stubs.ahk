@@ -359,6 +359,8 @@ global SpaceAroundSymbols := ""
 ; rolls.toml / autocorrection.toml metadata by pre-caching empty entries in
 ; ``HotstringGroupConfig`` from ``_HCfgTestReset`` — see test_hotstrings_config.ahk.
 global _StaticDir := A_ScriptDir . "\..\..\.."
+global _SharedDir := _StaticDir . "\ergopti_plus\shared"
+global _DriverDir := _StaticDir . "\ergopti_plus\windows"
 
 ; Strict-canonicalisation guard read by TOML_RunStrictCanonicalization in
 ; lib/toml/toml_helpers.ahk. Production declares this in ErgoptiPlus.ahk
