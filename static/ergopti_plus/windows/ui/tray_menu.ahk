@@ -1577,15 +1577,10 @@ initMenu() {
 	} else {
 		RegisterMenuItem(AboutMenu, VerLabel, Updater_OpenCurrentRelease)
 	}
-	AboutMenu.Add() ; Separator
 	global UPDATER_CHANNEL, UPDATER_CHECK_INTERVAL, UPDATER_INTERVAL_PRESETS
 	global UPDATER_LATEST_RELEASE
-	if Updater_IsLocalSource() {
-		; Local source build — channel selection is meaningless, show a grayed info item.
-		LocalSourceLabel := t("menu.about.channel_local_source")
-		AboutMenu.Add(LocalSourceLabel, (*) => NoAction())
-		AboutMenu.Disable(LocalSourceLabel)
-	} else {
+	if not Updater_IsLocalSource() {
+		AboutMenu.Add() ; Separator — only shown for release builds (channel/frequency items follow)
 		; Update channel as a SUBMENU rather than two siblings with check marks.
 		; Reduces vertical noise in the parent menu and groups the mutually-
 		; exclusive choice under a single header.
@@ -1611,18 +1606,17 @@ initMenu() {
 		AboutMenu.Add(t("menu.about.frequency_menu"), FreqMenu)
 	}
 	AboutMenu.Add() ; Separator
-	; In local-source mode the user is running from a working copy; there are no
-	; "release notes" to surface and update checks would be misleading. Skip
-	; both rows entirely in that case — what is hidden cannot confuse.
+	; In local-source mode the user is running from a working copy — update
+	; actions are meaningless, skip them entirely.
 	if !Updater_IsLocalSource() {
-		RegisterMenuItem(AboutMenu, t("menu.about.check_for_updates"), Updater_CheckForUpdate)
-		RegisterMenuItem(AboutMenu, t("menu.about.changelog"),         Updater_ShowChangelog)
-		; "Install update" — visible only when the background poller has
-		; detected a new version (cache populated). One click opens the
-		; install prompt with release notes + the binary-swap button.
-		if IsSet(UPDATER_LATEST_RELEASE) and Type(UPDATER_LATEST_RELEASE) == "Object" {
-			RegisterMenuItem(AboutMenu, t("menu.about.install_update"), Updater_ShowAvailableUpdate)
-		}
+		; Dynamic one-click item: label reflects current state (idle / checking /
+		; update available). Disabled while a check is in progress so two
+		; concurrent WinHttp calls cannot race.
+		UpdateLabel := Updater_GetUpdateMenuLabel()
+		RegisterMenuItem(AboutMenu, UpdateLabel, Updater_OneClickUpdate)
+		if (Updater_GetUpdateState() == "checking")
+			AboutMenu.Disable(UpdateLabel)
+		RegisterMenuItem(AboutMenu, t("menu.about.changelog"), Updater_ShowChangelog)
 	}
 	RegisterMenuItem(AboutMenu, t("menu.about.open_releases_page"), (*) => Run(Updater_ReleasesPageUrl()))
 	A_TrayMenu.Add(t("menu.about.title"), AboutMenu)

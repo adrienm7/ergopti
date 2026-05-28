@@ -3,17 +3,21 @@
 ; ==============================================================================
 ; MODULE: Updater
 ; DESCRIPTION:
-; Provides version display and update checking against GitHub Releases.
-; Exposes menu-ready actions: show current version, open changelog, switch
-; update channel (main vs dev), and check for updates.
+; Provides version display, one-click self-update, and background polling
+; against GitHub Releases. The "Check / Update" menu item is dynamic: it
+; reads as "Vérifier les mises à jour" at rest, "Mettre à jour vers vX.Y.Z"
+; when a newer version is cached, and is disabled while a check is in
+; progress. Clicking it always does the right thing in one action.
 ;
 ; FEATURES & RATIONALE:
-; 1. No background polling: checks are always user-initiated from the tray menu
-;    so the driver never makes unexpected network calls.
-; 2. Channel-aware: the user can switch between the "main" (stable) and "dev"
+; 1. One-click update: a single menu item handles check → download → swap.
+;    No intermediate dialog is shown when an update is already cached.
+; 2. Background polling: optional periodic silent check; surfaces a TrayTip
+;    on new releases and updates the menu label immediately.
+; 3. Channel-aware: the user can switch between the "main" (stable) and "dev"
 ;    (pre-release) channels. The setting is persisted in the shared config TOML.
-; 3. GitHub Releases API: uses a synchronous WinHttp call so no async plumbing
-;    is needed. The call is gated behind the user clicking "Check for updates".
+; 4. GitHub Releases API: WinHttp synchronous call gated behind user click or
+;    background timer — never on startup.
 ; ==============================================================================
 
 
@@ -421,6 +425,38 @@ Updater_ParseBody(Json) {
 ; ===== 1.5) Menu actions =============
 ; ====================================
 
+; Tracks whether a background check is currently in progress, to disable the
+; menu item and avoid overlapping WinHttp calls.
+global _UpdaterCheckInProgress := false
+
+; Returns a symbol indicating the current update state:
+;   "checking"   — a check is running right now (disable menu item)
+;   "available"  — a newer version is cached from a previous check
+;   "idle"       — no cached update, ready to check
+Updater_GetUpdateState() {
+	global _UpdaterCheckInProgress, UPDATER_LATEST_RELEASE
+	if _UpdaterCheckInProgress
+		return "checking"
+	if IsSet(UPDATER_LATEST_RELEASE) and Type(UPDATER_LATEST_RELEASE) == "Object"
+		return "available"
+	return "idle"
+}
+
+; Returns the localised label for the one-click update menu item.
+; Callers rebuild the menu after any state change so this is always fresh.
+Updater_GetUpdateMenuLabel() {
+	State := Updater_GetUpdateState()
+	if (State == "checking")
+		return t("menu.about.update_checking")
+	if (State == "available") {
+		global UPDATER_LATEST_RELEASE
+		Tag := UPDATER_LATEST_RELEASE.HasProp("Tag") ? UPDATER_LATEST_RELEASE.Tag : ""
+		if (Tag != "")
+			return Format(t("menu.about.update_now"), Tag)
+	}
+	return t("menu.about.check_for_updates")
+}
+
 ; Displays the current version in a MsgBox and offers to open the releases page.
 Updater_ShowVersion(*) {
 	Ver := Updater_CurrentVersion()
@@ -440,38 +476,72 @@ Updater_ShowVersion(*) {
 		Run(Updater_ReleasesPageUrl())
 }
 
-; Checks GitHub for a newer release and shows the result.
-Updater_CheckForUpdate(*) {
-	global UPDATER_CHANNEL
-	if Updater_IsLocalSource() {
-		MsgBox(t("updater.local_source"), t("updater.title_update"), "Iconi")
+; One-click update entry point wired to the dynamic tray menu item.
+;
+; State machine:
+;   idle      → fetch latest, compare, cache if newer, rebuild menu, then install
+;   available → install immediately from cache (no extra network call)
+;   checking  → no-op (item is disabled in the menu, but guard here too)
+;
+; The item is always enabled when state == "idle" or "available"; disabled when
+; "checking". A single click therefore always does the right thing.
+Updater_OneClickUpdate(*) {
+	global UPDATER_CHANNEL, UPDATER_LATEST_RELEASE, _UpdaterCheckInProgress
+	if Updater_IsLocalSource()
+		return
+	State := Updater_GetUpdateState()
+	if (State == "checking")
+		return
+
+	; Fast path: update already cached by background poller — install straight away.
+	if (State == "available") {
+		Updater_DownloadAndInstall(UPDATER_LATEST_RELEASE)
 		return
 	}
+
+	; Slow path: need to check first. Mark in-progress and rebuild the menu so the
+	; item shows "Vérification…" and is disabled while the network call runs.
+	_UpdaterCheckInProgress := true
+	try SetTimer((*) => initMenu(), -50)
+
 	Current := Updater_CurrentVersion()
-	MsgBox(Format(t("updater.checking"), UPDATER_CHANNEL),
-		t("updater.title_update"), "Iconi T2")
+	try LoggerStart("Updater", "One-click update check (channel: %s, current: %s)…", UPDATER_CHANNEL, Current)
 	Json := Updater_FetchLatestJson(UPDATER_CHANNEL)
+	_UpdaterCheckInProgress := false
+
 	if (Json == "") {
-		MsgBox(t("updater.no_connection"), t("updater.title_update"), "Icon!")
+		try LoggerWarn("Updater", "One-click check: network unreachable.")
+		try SetTimer((*) => initMenu(), -50)
+		TrayTip(t("updater.no_connection"), t("updater.title_update"))
 		return
 	}
 	Latest := Updater_ParseTagName(Json)
 	if (Latest == "") {
-		MsgBox(t("updater.parse_failed"), t("updater.title_update"), "Icon!")
+		try LoggerWarn("Updater", "One-click check: tag parse failed.")
+		try SetTimer((*) => initMenu(), -50)
+		TrayTip(t("updater.parse_failed"), t("updater.title_update"))
 		return
 	}
 	if (Latest == Current) {
-		MsgBox(Format(t("updater.up_to_date"), Current),
-			t("updater.title_update"), "Iconi")
+		try LoggerInfo("Updater", "One-click check: already up to date (%s).", Current)
+		try SetTimer((*) => initMenu(), -50)
+		TrayTip(Format(t("updater.up_to_date"), Current), t("updater.title_update"))
 		return
 	}
-	Res := MsgBox(
-		Format(t("updater.new_version"), Current, Latest),
-		t("updater.title_update_available"),
-		"YesNo Iconi"
-	)
-	if (Res == "Yes")
-		Run(Updater_ReleasesPageUrl())
+
+	; New version found — cache it, rebuild menu (label becomes "Mettre à jour vers vX"),
+	; then install immediately since the user explicitly clicked.
+	UPDATER_LATEST_RELEASE := {
+		Tag:         Latest,
+		Body:        Updater_ParseBody(Json),
+		RawJson:     Json,
+		HtmlUrl:     _Updater_ParseHtmlUrl(Json),
+		PublishedAt: _Updater_ParsePublishedAt(Json),
+		Prerelease:  _Updater_ParsePrerelease(Json)
+	}
+	try LoggerSuccess("Updater", "One-click check: new version %s found — installing.", Latest)
+	try SetTimer((*) => initMenu(), -50)
+	Updater_DownloadAndInstall(UPDATER_LATEST_RELEASE)
 }
 
 ; Opens a window that lists every release on the active channel and lets the
@@ -707,6 +777,9 @@ Updater_BackgroundTick(*) {
 		Prerelease:  _Updater_ParsePrerelease(Json)
 	}
 	try LoggerInfo("Updater", "New release available: {1} (current: {2}).", Latest, Current)
+	; Rebuild the tray menu so the one-click item label changes to
+	; "Mettre à jour vers vX.Y.Z" without requiring a manual open.
+	try SetTimer((*) => initMenu(), -50)
 	; The TrayTip is the user's entry point: clicking the icon opens the
 	; full changelog + install UI. AHK v2 routes TrayTip clicks through
 	; OnNotify (NIN_BALLOONUSERCLICK) — wired below in Updater_InitTrayTipHandler.
