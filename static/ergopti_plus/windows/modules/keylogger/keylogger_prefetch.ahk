@@ -49,12 +49,12 @@ KLPF_AssetsDir(which) {
     return base
 }
 
-; The prefetch file lives alongside index.html and is loaded via fetch()
-; on page boot. Earlier crashes against fetch() turned out to be caused
-; by a query-string cache-buster on the URL; without it fetch works
-; fine cross file:// in Edge --app= mode.
+; The prefetch file is written to the system temp folder to avoid
+; polluting the repository with generated runtime data. The page reads
+; it via a file:// URL extracted from the #prefetch= hash fragment
+; injected into the --app= URL by KLUI_ResolveAssetUrl.
 KLPF_PrefetchPath(which) {
-    return KLPF_AssetsDir(which) . "prefetch.json"
+    return A_Temp . "\ergopti_metrics_prefetch_" . which . ".json"
 }
 
 

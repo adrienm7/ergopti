@@ -994,7 +994,12 @@
 				// state.js initialises metrics_manifest to {} so a plain
 				// truthy check would always bail; require non-empty.
 				if (window.metrics_manifest && Object.keys(window.metrics_manifest).length) return;
-				fetch("./prefetch.json")
+				// The prefetch file lives in %TEMP% (not the repo dir) to avoid
+				// polluting version control. The AHK launcher embeds its file://
+				// URL in the hash fragment as "#prefetch=file:///...".
+				const _hash_params = new URLSearchParams(location.hash.slice(1));
+				const _prefetch_url = _hash_params.get("prefetch") || "./prefetch.json";
+				fetch(_prefetch_url)
 					.then((r) => (r.ok ? r.json() : null))
 					.then((blob) => {
 						if (!blob) {
