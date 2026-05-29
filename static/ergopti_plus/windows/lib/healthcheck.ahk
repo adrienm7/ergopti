@@ -497,6 +497,16 @@ _HealthCheck_SysInfo() {
 	}
 	Info["config_dir"] := ConfigDir
 
+	; Short git commit hash of the running source tree
+	GitHash := ""
+	try {
+		TmpFile := A_Temp . "\ergopti_githash_" . A_TickCount . ".txt"
+		RunWait(A_ComSpec . " /c git -C " . Chr(34) . A_ScriptDir . Chr(34) . " rev-parse --short HEAD > " . Chr(34) . TmpFile . Chr(34), , "Hide")
+		GitHash := Trim(FileRead(TmpFile, "UTF-8"))
+		FileDelete(TmpFile)
+	}
+	Info["git_hash"] := GitHash
+
 	return Info
 }
 
@@ -582,6 +592,7 @@ _HealthCheck_SnapshotToHtml(Snapshot, BtnLabel) {
 		"<table>"
 		. "<tr><th>Field</th><th>Value</th></tr>"
 		. "<tr><td>ErgoptiPlus version</td><td>" . _HealthCheck_Code(Snapshot["version"])           . "</td></tr>"
+		. "<tr><td>Git commit</td><td>"         . _HealthCheck_Code(Sys["git_hash"] != "" ? Sys["git_hash"] : "unknown") . "</td></tr>"
 		. "<tr><td>Uptime</td><td>"              . _HealthCheck_HE(_HealthCheck_FormatUptime(Snapshot["uptime_sec"])) . "</td></tr>"
 		. "<tr><td>AutoHotkey</td><td>"          . _HealthCheck_HE(Sys["ahk_version"] . " " . Sys["ahk_bitness"])    . "</td></tr>"
 		. "<tr><td>Windows</td><td>"             . _HealthCheck_HE(Sys["os_name"])                  . "</td></tr>"
