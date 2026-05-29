@@ -343,11 +343,16 @@ jobs:
                   $sw = [System.Diagnostics.Stopwatch]::StartNew()
                   while (-not $proc.HasExited) {
                       if ($null -eq $fstream -and (Test-Path $resultsFile)) {
-                          $fstream = [System.IO.FileStream]::new($resultsFile,
-                              [System.IO.FileMode]::Open,
-                              [System.IO.FileAccess]::Read,
-                              [System.IO.FileShare]::ReadWrite)
-                          $reader = [System.IO.StreamReader]::new($fstream)
+                          try {
+                              $fstream = [System.IO.FileStream]::new($resultsFile,
+                                  [System.IO.FileMode]::Open,
+                                  [System.IO.FileAccess]::Read,
+                                  [System.IO.FileShare]::ReadWrite)
+                              $reader = [System.IO.StreamReader]::new($fstream)
+                          } catch {
+                              # AHK may still hold an exclusive write lock; retry next tick
+                              Start-Sleep -Milliseconds 100
+                          }
                       }
                       if ($null -ne $reader) {
                           $line = $reader.ReadLine()
@@ -457,11 +462,16 @@ jobs:
                   $fstream = $null; $reader = $null
                   while (-not $proc.HasExited) {
                       if ($null -eq $fstream -and (Test-Path $resultsFile)) {
-                          $fstream = [System.IO.FileStream]::new($resultsFile,
-                              [System.IO.FileMode]::Open,
-                              [System.IO.FileAccess]::Read,
-                              [System.IO.FileShare]::ReadWrite)
-                          $reader = [System.IO.StreamReader]::new($fstream)
+                          try {
+                              $fstream = [System.IO.FileStream]::new($resultsFile,
+                                  [System.IO.FileMode]::Open,
+                                  [System.IO.FileAccess]::Read,
+                                  [System.IO.FileShare]::ReadWrite)
+                              $reader = [System.IO.StreamReader]::new($fstream)
+                          } catch {
+                              # AHK may still hold an exclusive write lock; retry next tick
+                              Start-Sleep -Milliseconds 100
+                          }
                       }
                       if ($null -ne $reader) {
                           $line = $reader.ReadLine()
