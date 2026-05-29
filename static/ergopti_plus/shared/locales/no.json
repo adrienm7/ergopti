@@ -1966,6 +1966,8 @@
 	"updater.changelog_empty": "(Ingen versjonsmerknader tilgjengelig for denne versjonen.)",
 	"updater.changelog_local_source_note": "Lokal kildemodus — kanalendringer lagres ikke.",
 	"updater.changelog_release_notes": "Versjonsmerknader for {1}:\n\n{2}\n\nÅpne på GitHub?",
+	"updater.changelog_install": "Installer denne versjonen",
+	"updater.changelog_install_current": "Gjeldende versjon",
 	"updater.changelog_select_release": "Versjonsvalg :",
 	"updater.changelog_switch_to_dev": "Bytt til forhåndsversjonskanal (dev)",
 	"updater.changelog_switch_to_main": "Bytt til stabil kanal (main)",

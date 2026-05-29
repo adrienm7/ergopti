@@ -1966,6 +1966,8 @@
 	"updater.changelog_empty": "(このバージョンのリリースノートはありません。)",
 	"updater.changelog_local_source_note": "ローカルソースモード — チャンネル変更は保存されません。",
 	"updater.changelog_release_notes": "{1} のリリースノート:\n\n{2}\n\nGitHub で開きますか?",
+	"updater.changelog_install": "このバージョンをインストール",
+	"updater.changelog_install_current": "現在のバージョン",
 	"updater.changelog_select_release": "バージョン選択 :",
 	"updater.changelog_switch_to_dev": "プレリリースチャンネルに切り替え (dev)",
 	"updater.changelog_switch_to_main": "安定版チャンネルに切り替え (main)",

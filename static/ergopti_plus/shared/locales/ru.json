@@ -1966,6 +1966,8 @@
 	"updater.changelog_empty": "(Для этой версии нет описания изменений.)",
 	"updater.changelog_local_source_note": "Режим локального источника — изменения канала не сохраняются.",
 	"updater.changelog_release_notes": "Изменения версии {1}:\n\n{2}\n\nОткрыть на GitHub?",
+	"updater.changelog_install": "Установить эту версию",
+	"updater.changelog_install_current": "Текущая версия",
 	"updater.changelog_select_release": "Выбор версии :",
 	"updater.changelog_switch_to_dev": "Переключиться на канал предварительных версий (dev)",
 	"updater.changelog_switch_to_main": "Переключиться на стабильный канал (main)",

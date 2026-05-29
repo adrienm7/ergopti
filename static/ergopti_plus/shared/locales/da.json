@@ -1966,6 +1966,8 @@
 	"updater.changelog_empty": "(Der er ingen versionsnoter tilgængelige for denne version.)",
 	"updater.changelog_local_source_note": "Lokal kildetilstand — kanalændringer gemmes ikke.",
 	"updater.changelog_release_notes": "Versionsnoter for {1}:\n\n{2}\n\nÅbn på GitHub?",
+	"updater.changelog_install": "Installer denne version",
+	"updater.changelog_install_current": "Nuværende version",
 	"updater.changelog_select_release": "Valg af version :",
 	"updater.changelog_switch_to_dev": "Skift til forudversionkanal (dev)",
 	"updater.changelog_switch_to_main": "Skift til stabilt kanal (main)",

@@ -1966,6 +1966,8 @@
 	"updater.changelog_empty": "(אין הערות גרסה זמינות עבור גרסה זו.)",
 	"updater.changelog_local_source_note": "מצב מקור מקומי — שינויי ערוץ אינם נשמרים.",
 	"updater.changelog_release_notes": "הערות גרסה עבור {1}:\n\n{2}\n\nלפתוח ב-GitHub?",
+	"updater.changelog_install": "התקן גרסה זו",
+	"updater.changelog_install_current": "גרסה נוכחית",
 	"updater.changelog_select_release": "בחירת גרסה :",
 	"updater.changelog_switch_to_dev": "עבור לערוץ הגרסה המוקדמת (dev)",
 	"updater.changelog_switch_to_main": "עבור לערוץ היציב (main)",

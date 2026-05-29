@@ -194,6 +194,42 @@ Updater_CurrentVersion() {
 	return BUNDLE_VERSION
 }
 
+; Strips a leading "v" so "v2.1.2" and "2.1.2" compare equal.
+; GitHub tag_name always carries the prefix; BUNDLE_VERSION is stamped without
+; it (the CI strips it with `${tag#v}`). Without this normalisation the
+; background poller fires a spurious "update available" notification even when
+; the user is already on the latest release.
+_Updater_NormalizeTag(Tag) {
+	return (SubStr(Tag, 1, 1) == "v") ? SubStr(Tag, 2) : Tag
+}
+
+; Returns true when Latest is strictly newer than Current (semver comparison).
+; Both inputs are normalised before comparison so mixed "v"-prefixed and
+; unprefixed strings work correctly. Returns false when equal or when Current
+; is newer (downgrade guard prevents the background poller from offering a
+; "rollback" as an update).
+_Updater_IsNewerVersion(Latest, Current) {
+	L := _Updater_NormalizeTag(Latest)
+	C := _Updater_NormalizeTag(Current)
+	if (L == C)
+		return false
+	; Parse each dot-separated segment as an integer for correct numeric ordering.
+	; Non-numeric suffixes (e.g. "-dev.3") are stripped — semver pre-release
+	; ordering is not needed here; any tagged release is treated as a release.
+	LParts := StrSplit(RegExReplace(L, "-.*$", ""), ".")
+	CParts := StrSplit(RegExReplace(C, "-.*$", ""), ".")
+	MaxLen := Max(LParts.Length, CParts.Length)
+	loop MaxLen {
+		lv := (A_Index <= LParts.Length) ? Integer(LParts[A_Index]) : 0
+		cv := (A_Index <= CParts.Length) ? Integer(CParts[A_Index]) : 0
+		if (lv > cv)
+			return true
+		if (lv < cv)
+			return false
+	}
+	return false
+}
+
 ; Returns the GitHub Releases API URL for the chosen channel.
 Updater_ReleaseApiUrl(Channel) {
 	global UPDATER_GH_OWNER, UPDATER_GH_REPO
@@ -528,7 +564,7 @@ Updater_OneClickUpdate(*) {
 		TrayTip(t("updater.parse_failed"), t("updater.title_update"))
 		return
 	}
-	if (Latest == Current) {
+	if !_Updater_IsNewerVersion(Latest, Current) {
 		try LoggerInfo("Updater", "One-click check: already up to date (%s).", Current)
 		try SetTimer((*) => initMenu(), -50)
 		TrayTip(Format(t("updater.up_to_date"), Current), t("updater.title_update"))
@@ -561,6 +597,21 @@ Updater_ShowChangelog(*) {
 	; browse the changelog. Channel selection is read from the global state;
 	; for local-source builds the switch button does not persist the change.
 	_Updater_OpenChangelogWindow(UPDATER_CHANNEL)
+}
+
+; Updates the "Install this version" button label and enabled state to reflect
+; the currently selected release. Disabled when: no release is selected, the
+; app is running from local source, or the selected tag is already the running
+; version (installing it would be a no-op). Called on every ListBox Change event.
+_Updater_RefreshInstallBtn(BtnInstall, Releases, Idx, IsLocal) {
+	if (IsLocal or Idx <= 0) {
+		BtnInstall.Enabled := false
+		BtnInstall.Text    := t("updater.changelog_install")
+		return
+	}
+	IsCurrent := (_Updater_NormalizeTag(Releases[Idx].Tag) == _Updater_NormalizeTag(Updater_CurrentVersion()))
+	BtnInstall.Enabled := !IsCurrent
+	BtnInstall.Text    := IsCurrent ? t("updater.changelog_install_current") : t("updater.changelog_install")
 }
 
 ; Internal helper — builds (or rebuilds) the changelog GUI for a given channel.
@@ -630,10 +681,17 @@ _Updater_OpenChangelogWindow(Channel) {
 
 	Lb := G.Add("ListBox", "xm y+4 w" . LeftColW . " h" . ListHeight . " vRelLb", Labels)
 
-	; ── Bottom action button — created before RightPane so we can measure it ──
-	BtnOpen := G.Add("Button", "xm y+10 w" . LeftColW, t("updater.open_on_github"))
-	if (!HasReleases)
-		BtnOpen.Enabled := false
+	; ── Bottom action buttons — created before RightPane so we can measure them ──
+	; "Install this version" lets the user switch to any release, not just the latest.
+	; Disabled when: no selection, local-source mode, or the selected tag is already
+	; the running version (nothing to install).
+	BtnInstall := G.Add("Button", "xm y+10 w" . LeftColW, t("updater.changelog_install"))
+	BtnInstall.Enabled := false
+	BtnOpen := G.Add("Button", "xm y+6 w" . LeftColW, t("updater.open_on_github"))
+	if (!HasReleases) {
+		BtnInstall.Enabled := false
+		BtnOpen.Enabled    := false
+	}
 
 	; RightPane spans from the top of Lb down to the bottom of BtnOpen so the
 	; WebView2 child fills exactly that column, flush with the button baseline.
@@ -728,8 +786,17 @@ _Updater_OpenChangelogWindow(Channel) {
 
 	RefreshBody := (*) => (
 		(Idx := Lb.Value) > 0
-			? ShowBody(Releases[Idx].Body)
-			: 0
+			? (_Updater_RefreshInstallBtn(BtnInstall, Releases, Lb.Value, IsLocal),
+			   ShowBody(Releases[Idx].Body))
+			: _Updater_RefreshInstallBtn(BtnInstall, Releases, 0, IsLocal)
+	)
+
+	; Capture Idx before G.Destroy() — Lb.Value returns 0 once the window is gone.
+	InstallSelected := (*) => (
+		((Idx2 := Lb.Value) > 0 and !IsLocal)
+			? (G.Destroy(),
+			   Updater_ShowUpdatePrompt(Releases[Idx2]))
+			: ""
 	)
 
 	BtnSwitch.OnEvent("Click", (*) => (
@@ -741,6 +808,7 @@ _Updater_OpenChangelogWindow(Channel) {
 
 	Lb.OnEvent("Change", RefreshBody)
 	Lb.OnEvent("DoubleClick", OpenSelected)
+	BtnInstall.OnEvent("Click", InstallSelected)
 	BtnOpen.OnEvent("Click", OpenSelected)
 	G.OnEvent("Close",  (*) => G.Destroy())
 	G.OnEvent("Escape", (*) => G.Destroy())
@@ -774,6 +842,7 @@ _Updater_OpenChangelogWindow(Channel) {
 			if (HasReleases) {
 				Lb.Choose(1)
 				ShowBody(Releases[1].Body)
+				_Updater_RefreshInstallBtn(BtnInstall, Releases, 1, IsLocal)
 			} else {
 				; Empty-state: pass an empty string so the JS renderer shows the centred message.
 				ShowBody("")
@@ -930,11 +999,11 @@ Updater_BackgroundTick(*) {
 		return
 	}
 	Latest := Updater_ParseTagName(Json)
-	if (Latest == "" or Latest == Current) {
+	if (Latest == "" or !_Updater_IsNewerVersion(Latest, Current)) {
 		try LoggerDebug("Updater", "Background check: up to date ({1}).", Current)
 		return
 	}
-	if (UPDATER_LAST_NOTIFIED_TAG == Latest) {
+	if (_Updater_NormalizeTag(UPDATER_LAST_NOTIFIED_TAG) == _Updater_NormalizeTag(Latest)) {
 		try LoggerDebug("Updater", "Background check: {1} already notified — skipping ping.", Latest)
 		return
 	}
@@ -951,10 +1020,30 @@ Updater_BackgroundTick(*) {
 	; Rebuild the tray menu so the one-click item label changes to
 	; "Mettre à jour vers vX.Y.Z" without requiring a manual open.
 	try SetTimer((*) => initMenu(), -50)
-	; The TrayTip is the user's entry point: clicking the icon opens the
-	; full changelog + install UI. AHK v2 routes TrayTip clicks through
-	; OnNotify (NIN_BALLOONUSERCLICK) — wired below in Updater_InitTrayTipHandler.
+	; The TrayTip is the user's entry point: clicking the notification bubble opens
+	; the full update prompt. The click is intercepted via OnMessage below.
 	try TrayTip(Format(t("updater.tray_new_version_body"), Latest), t("updater.tray_new_version_title"))
+}
+
+; Wires an OnMessage handler so clicking a Windows balloon notification fires
+; Updater_ShowAvailableUpdate. AHK v2 does not expose a dedicated TrayTip-click
+; callback, but Windows posts WM_TRAYICON (0x404) with lParam == 0x405
+; (NIN_BALLOONUSERCLICK) when the user clicks the notification body.
+; Safe to call multiple times — the handler is idempotent (OnMessage replaces
+; any prior registration for the same message + function pair).
+Updater_InitTrayNotifyHandler() {
+	; maxThreads=1: no reentrant update prompts.
+	OnMessage(0x404, _Updater_OnTrayMsg, 1)
+	try LoggerDebug("Updater", "Tray notification click handler registered.")
+}
+
+; OnMessage handler for WM_TRAYICON (0x404).
+; lParam 0x405 = NIN_BALLOONUSERCLICK — user clicked the notification body.
+; Returns "" to let AHK continue its own tray processing.
+_Updater_OnTrayMsg(wParam, lParam, msg, hwnd) {
+	if (lParam == 0x405)
+		try Updater_ShowAvailableUpdate()
+	return ""
 }
 
 

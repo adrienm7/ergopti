@@ -1966,6 +1966,8 @@
 	"updater.changelog_empty": "(이 버전의 릴리스 노트가 없습니다.)",
 	"updater.changelog_local_source_note": "로컬 소스 모드 — 채널 변경이 저장되지 않습니다.",
 	"updater.changelog_release_notes": "{1}의 릴리스 노트:\n\n{2}\n\nGitHub에서 열까요?",
+	"updater.changelog_install": "이 버전 설치",
+	"updater.changelog_install_current": "현재 버전",
 	"updater.changelog_select_release": "버전 선택 :",
 	"updater.changelog_switch_to_dev": "사전 출시 채널로 전환 (dev)",
 	"updater.changelog_switch_to_main": "안정 채널로 전환 (main)",

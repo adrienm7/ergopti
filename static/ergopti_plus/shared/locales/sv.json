@@ -1966,6 +1966,8 @@
 	"updater.changelog_empty": "(Ingen versionsinformation tillgänglig för den här versionen.)",
 	"updater.changelog_local_source_note": "Lokalt källäge — kanaländringar sparas inte.",
 	"updater.changelog_release_notes": "Versionsinformation för {1}:\n\n{2}\n\nÖppna på GitHub?",
+	"updater.changelog_install": "Installera den här versionen",
+	"updater.changelog_install_current": "Aktuell version",
 	"updater.changelog_select_release": "Versionsval :",
 	"updater.changelog_switch_to_dev": "Byt till förhandsversionskanal (dev)",
 	"updater.changelog_switch_to_main": "Byt till stabilt kanal (main)",

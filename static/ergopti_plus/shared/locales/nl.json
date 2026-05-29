@@ -1966,6 +1966,8 @@
 	"updater.changelog_empty": "(Geen release-notities beschikbaar voor deze versie.)",
 	"updater.changelog_local_source_note": "Lokale bronmodus — kanaalwijzigingen worden niet opgeslagen.",
 	"updater.changelog_release_notes": "Release-notities voor {1}:\n\n{2}\n\nOpenen op GitHub?",
+	"updater.changelog_install": "Deze versie installeren",
+	"updater.changelog_install_current": "Huidige versie",
 	"updater.changelog_select_release": "Versiekeuze :",
 	"updater.changelog_switch_to_dev": "Overschakelen naar pre-releasekanaal (dev)",
 	"updater.changelog_switch_to_main": "Overschakelen naar stabiel kanaal (main)",

@@ -1966,6 +1966,8 @@
 	"updater.changelog_empty": "(此版本暂无发布说明。)",
 	"updater.changelog_local_source_note": "本地源模式 — 频道更改不会保存。",
 	"updater.changelog_release_notes": "{1} 的发布说明:\n\n{2}\n\n在 GitHub 上打开?",
+	"updater.changelog_install": "安装此版本",
+	"updater.changelog_install_current": "当前版本",
 	"updater.changelog_select_release": "版本选择 :",
 	"updater.changelog_switch_to_dev": "切换到预发布频道 (dev)",
 	"updater.changelog_switch_to_main": "切换到稳定频道 (main)",
