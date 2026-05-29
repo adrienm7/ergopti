@@ -183,6 +183,18 @@ global _VendorDir := A_ScriptDir . "\..\vendor"
 #Include ../_generated/prompt_builder.ahk
 #Include meta/test_corpus_prompt_builder.ahk
 
+; Watchdog: kill the process if RunTests() never returns (e.g. a corpus
+; consumer blocks on a synchronous HTTP call, an InputHook with no timeout,
+; or a blocking dialog in a headless CI context). The CI-level timeout is
+; 5 min; this fires at 4 min so the log message reaches stdout before the
+; runner is killed externally.
+global _SUITE_TIMEOUT_MS := 240000
+_WatchdogFire() {
+	FileAppend("`n[WATCHDOG] Test suite timed out after " . _SUITE_TIMEOUT_MS . " ms — force-exiting.`n", "*")
+	ExitApp(2)
+}
+SetTimer(_WatchdogFire, -_SUITE_TIMEOUT_MS)
+
 ; Drive everything. RunTests prints a TAP-style report to stdout and exits
 ; with the appropriate code — control never returns from this call.
 RunTests()
