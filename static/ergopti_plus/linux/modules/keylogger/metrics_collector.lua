@@ -28,7 +28,8 @@ local M = {}
 -- =========================================
 -- =========================================
 
-local Logger = require("logger.shim")
+local Logger  = require("logger.shim")
+local Metrics = require("keylogger.metrics")
 
 local LOG = "modules.keylogger.metrics_collector"
 
@@ -49,7 +50,6 @@ local DEFAULT_WPM_WINDOW_MS = 10000   -- 10 s sliding window
 -- Default n-gram length (bigrams by default).
 local DEFAULT_NGRAM_SIZE = 2
 
--- Average word length used for WPM conversion (standard typing measurement).
 -- Characters per word: 5 is the accepted convention in typing tests.
 local CHARS_PER_WORD = 5
 
@@ -93,30 +93,17 @@ end
 -- =========================================
 
 --- Removes timestamps from the front of the ring buffer that have fallen
---- outside the WPM sliding window.
+--- outside the WPM sliding window. Delegates to shared Metrics helper.
 --- @param now_ms number Current time in milliseconds.
 local function prune_wpm_ring(now_ms)
-	local cutoff = now_ms - _state.wpm_window_ms
-	while _state.wpm_ring[1] and _state.wpm_ring[1] < cutoff do
-		table.remove(_state.wpm_ring, 1)
-	end
+	Metrics.prune_wpm_ring(_state.wpm_ring, now_ms, _state.wpm_window_ms)
 end
 
---- Updates the n-gram frequency table with the most recent char appended to the
---- rolling char-window.
+--- Updates the n-gram frequency table with the most recent char typed.
+--- Delegates to shared Metrics helper.
 --- @param ch string The character just typed.
 local function record_ngram(ch)
-	local win = _state.char_window
-	win[#win + 1] = ch
-	-- Keep the window at exactly n characters — no need to store more.
-	while #win > _state.ngram_size do
-		table.remove(win, 1)
-	end
-	-- Only record when the window is full (n chars accumulated).
-	if #win == _state.ngram_size then
-		local gram = table.concat(win)
-		_state.ngrams[gram] = (_state.ngrams[gram] or 0) + 1
-	end
+	Metrics.record_ngram(_state.char_window, _state.ngram_size, _state.ngrams, ch)
 end
 
 
@@ -202,19 +189,8 @@ end
 function M.get_wpm()
 	if not require_state("get_wpm") then return 0.0 end
 
-	local ring = _state.wpm_ring
-	local n    = #ring
-	-- Need at least two timestamps to compute a rate.
-	if n < 2 then return 0.0 end
-
-	local elapsed_s = (ring[n] - ring[1]) / 1000.0
-	if elapsed_s <= 0 then return 0.0 end
-
-	-- Characters per second → words per minute.
-	local cps = (n - 1) / elapsed_s
-	local wpm = (cps / CHARS_PER_WORD) * 60.0
-
-	Logger.debug(LOG, "get_wpm(): %d chars in %.2fs → %.1f WPM.", n, elapsed_s, wpm)
+	local wpm = Metrics.compute_wpm_from_ring(_state.wpm_ring, CHARS_PER_WORD)
+	Logger.debug(LOG, "get_wpm(): %.1f WPM from %d ring entries.", wpm, #_state.wpm_ring)
 	return wpm
 end
 
@@ -239,6 +215,7 @@ function M.get_session_stats()
 end
 
 --- Returns the top N n-grams from the current session sorted by frequency.
+--- Delegates ranking to the shared Metrics helper.
 --- @param n integer  Maximum number of n-gram entries to return.
 --- @return table  Array of {gram, count} tables in descending frequency order.
 function M.get_ngrams(n)
@@ -246,24 +223,7 @@ function M.get_ngrams(n)
 
 	if type(n) ~= "number" or n < 1 then n = 10 end
 
-	-- Collect into a sortable array.
-	local list = {}
-	for gram, count in pairs(_state.ngrams) do
-		list[#list + 1] = { gram = gram, count = count }
-	end
-
-	-- Sort descending by count, then alphabetically for deterministic output.
-	table.sort(list, function(a, b)
-		if a.count ~= b.count then return a.count > b.count end
-		return a.gram < b.gram
-	end)
-
-	-- Trim to the requested limit.
-	local result = {}
-	for i = 1, math.min(n, #list) do
-		result[i] = list[i]
-	end
-
+	local result = Metrics.get_top_ngrams(_state.ngrams, n)
 	Logger.debug(LOG, "get_ngrams(%d): returning %d entry(ies).", n, #result)
 	return result
 end
