@@ -7,14 +7,17 @@
 --- ==============================================================================
 
 local M = {}
-local hs = hs
 local Logger  = require("lib.logger")
 local Notifications = require("lib.notifications")
 local i18n    = require("lib.i18n")
-local Parser  = require("modules.llm.parser")
-local Profiles = require("modules.llm.profiles")
-local ApiCommon = require("modules.llm.api_common")
-local LOG     = "llm.api_ollama"
+local Parser         = require("modules.llm.parser")
+local Profiles       = require("modules.llm.profiles")
+local ApiCommon      = require("modules.llm.api_common")
+local HttpClient     = require("adapters.http_client").new()
+local JsonCodec      = require("adapters.json_codec")
+local TimerScheduler = require("adapters.timer_scheduler")
+local ShellRunner    = require("adapters.shell_runner")
+local LOG            = "llm.api_ollama"
 
 local ok_kl, keylogger = pcall(require, "modules.keylogger")
 if not ok_kl then keylogger = nil end
@@ -51,8 +54,8 @@ local function ensure_ollama_running()
 	if _ollama_started then return end
 	_ollama_started = true
 	pcall(function()
-		hs.execute("pkill -f '[o]llama serve' 2>/dev/null || true")
-		hs.timer.usleep(50 * 1000)
+		ShellRunner.exec("pkill -f '[o]llama serve' 2>/dev/null || true")
+		TimerScheduler.sleep_us(50 * 1000)
 		-- Funnel Ollama stdout/stderr into the unified Ergopti log behind an
 		-- [OLLAMA-SERVER] prefix so the user has a single tail target for the
 		-- whole stack (HS + MLX + Ollama land in the same rotating daily file).
@@ -61,7 +64,7 @@ local function ensure_ollama_running()
 		-- so the previous awk pipeline crashed on the first line and killed
 		-- the ollama subprocess on SIGPIPE.
 		local log_path = Logger.UNIFIED_LOG_FILE
-		hs.execute(
+		ShellRunner.exec(
 			"nohup bash -c \"/opt/homebrew/bin/ollama serve 2>&1 | " ..
 			"while IFS= read -r LINE; do " ..
 			"printf '%s [OLLAMA-SERVER] %s\\n' \\\"\\$(date +%H:%M:%S)\\\" \\\"\\$LINE\\\" " ..
@@ -72,7 +75,7 @@ local function ensure_ollama_running()
 end
 
 -- Deferred off the synchronous require path to avoid blocking Hammerspoon startup
-hs.timer.doAfter(0, function() pcall(ensure_ollama_running) end)
+TimerScheduler.after(0, function() pcall(ensure_ollama_running) end)
 
 --- Sends a minimal 1-token inference to load model weights into GPU memory.
 --- Called once after the model is configured; subsequent real requests then
@@ -81,20 +84,23 @@ hs.timer.doAfter(0, function() pcall(ensure_ollama_running) end)
 function M.warmup(model_name)
 	if type(model_name) ~= "string" or model_name == "" then return end
 	Logger.debug(LOG, "Warming up model '%s'…", model_name)
-	local ok, encoded = pcall(hs.json.encode, {
+	local encoded, enc_err = JsonCodec.encode({
 		model      = model_name,
 		messages   = { { role = "user", content = " " } },
 		stream     = false,
 		keep_alive = "30m",
 		options    = { num_predict = 1, temperature = 0 },
 	})
-	if not ok then return end
-	hs.http.asyncPost(
+	if not encoded then
+		Logger.error(LOG, "warmup: encode failed — %s", tostring(enc_err))
+		return
+	end
+	HttpClient.post(
 		"http://127.0.0.1:11434/api/chat",
-		encoded,
 		{ ["Content-Type"] = "application/json" },
-		function(status, _)
-			if status == 200 then
+		encoded,
+		function(r)
+			if r.status == 200 then
 				local became_ready = (_is_ready ~= true)
 				_is_ready = true
 				Logger.info(LOG, "Model '%s' warmed up — GPU cache ready.", model_name)
@@ -103,7 +109,7 @@ function M.warmup(model_name)
 				end
 			else
 				_is_ready = false
-				Logger.debug(LOG, "Warmup request returned %s — model may not be loaded yet.", tostring(status))
+				Logger.debug(LOG, "Warmup request returned %s — model may not be loaded yet.", tostring(r.status))
 			end
 		end
 	)
@@ -115,7 +121,7 @@ function M.cancel_streaming()
 	-- Bump generation so any stale on_done from a terminated stream becomes a no-op
 	_stream_generation = _stream_generation + 1
 	if _active_stream_task then
-		pcall(function() _active_stream_task:terminate() end)
+		_active_stream_task.terminate()
 		_active_stream_task = nil
 		Logger.debug(LOG, "Active Ollama stream cancelled.")
 	end
@@ -150,15 +156,15 @@ function M.check_availability(model_name, on_available, on_missing)
 	if type(model_name) ~= "string" then return end
 	Logger.debug(LOG, "Checking Ollama server availability…")
 	
-	hs.http.asyncGet("http://127.0.0.1:11434/api/tags", {}, function(status, body)
-		if status ~= 200 then
+	HttpClient.get("http://127.0.0.1:11434/api/tags", {}, function(r)
+		if r.status ~= 200 then
 			Logger.warn(LOG, "Ollama server is unreachable.")
 			if type(on_missing) == "function" then pcall(on_missing, true) end
 			return
 		end
-		
-		local ok, tags = pcall(hs.json.decode, body)
-		if ok and type(tags) == "table" and type(tags.models) == "table" then
+		local body = r.body
+		local tags, _ = JsonCodec.decode(body)
+		if type(tags) == "table" and type(tags.models) == "table" then
 			local found = false
 			for _, m in ipairs(tags.models) do
 				if type(m.name) == "string" and m.name:find(model_name, 1, true) then
@@ -283,7 +289,7 @@ local function post_and_parse(model_name, system_prompt, full_text, tail_text,
     local messages, line_mode, user_prompt = build_request_context(
         system_prompt, full_text, tail_text, num_predictions, is_batch)
 
-    local t0_req = hs.timer.secondsSinceEpoch()
+    local t0_req = TimerScheduler.now()
     Logger.debug(LOG, "[%s] #%d PROMPT (%d chars) mode_line=%s -> %s", model_name, req_id, #user_prompt, tostring(line_mode), user_prompt:sub(1, 250))
 
     local payload = {
@@ -295,37 +301,38 @@ local function post_and_parse(model_name, system_prompt, full_text, tail_text,
         options    = build_options(temperature, num_predict_tokens, model_name, is_batch, line_mode),
     }
 
-	local ok, encoded = pcall(hs.json.encode, payload)
-	if not ok or not encoded then
-		Logger.error(LOG, "Failed to encode Ollama payload.")
+	local encoded, enc_err = JsonCodec.encode(payload)
+	if not encoded then
+		Logger.error(LOG, "Failed to encode Ollama payload — %s", tostring(enc_err))
 		if type(on_fail) == "function" then pcall(on_fail) end
 		return
 	end
 
-    hs.http.asyncPost("http://127.0.0.1:11434/api/chat", encoded, { ["Content-Type"] = "application/json" },
-        function(status, body, _)
-            pcall(function()
-                Logger.debug(LOG, "[%s] #%d HTTP_RESPONSE status=%d, body_len=%d", model_name, req_id, status or -1, #(body or ""))
+	HttpClient.post("http://127.0.0.1:11434/api/chat", { ["Content-Type"] = "application/json" }, encoded,
+		function(r)
+			local status, body = r.status, r.body
+			pcall(function()
+				Logger.debug(LOG, "[%s] #%d HTTP_RESPONSE status=%d, body_len=%d", model_name, req_id, status or -1, #(body or ""))
 
-                if not status or status ~= 200 then
-                    Logger.error(LOG, "[%s] #%d HTTP_ERROR status=%d: %s", model_name, req_id, status or -1, (body or ""):sub(1, 200))
-                    if keylogger and type(keylogger.log_llm_failed) == "function" then
-                        pcall(keylogger.log_llm_failed, full_text, nil, {
-                            backend        = "ollama",
-                            model          = tostring(model_name),
-                            system_prompt  = system_prompt,
-                            user_prompt    = user_prompt,
-                            failure_reason = "http_" .. tostring(status or "unknown"),
-                        })
-                    end
-                    if type(on_fail) == "function" then pcall(on_fail) end
-                    return
-                end
-                
-                local ok_dec, resp = pcall(hs.json.decode, body)
-                if not ok_dec then
-                    Logger.error(LOG, "[%s] #%d JSON_DECODE_ERROR: %s", model_name, req_id, tostring(resp))
-                    if type(on_fail) == "function" then pcall(on_fail) end
+				if not status or status ~= 200 then
+					Logger.error(LOG, "[%s] #%d HTTP_ERROR status=%d: %s", model_name, req_id, status or -1, (body or ""):sub(1, 200))
+					if keylogger and type(keylogger.log_llm_failed) == "function" then
+						pcall(keylogger.log_llm_failed, full_text, nil, {
+							backend        = "ollama",
+							model          = tostring(model_name),
+							system_prompt  = system_prompt,
+							user_prompt    = user_prompt,
+							failure_reason = "http_" .. tostring(status or "unknown"),
+						})
+					end
+					if type(on_fail) == "function" then pcall(on_fail) end
+					return
+				end
+
+				local resp, dec_err = JsonCodec.decode(body)
+				if not resp then
+					Logger.error(LOG, "[%s] #%d JSON_DECODE_ERROR: %s", model_name, req_id, tostring(dec_err))
+					if type(on_fail) == "function" then pcall(on_fail) end
                     return
                 end
                 
@@ -354,7 +361,7 @@ local function post_and_parse(model_name, system_prompt, full_text, tail_text,
                 end
 
                 local raw     = Parser.strip_thinking(content)
-                local ms_req  = math.floor((hs.timer.secondsSinceEpoch() - t0_req) * 1000)
+                local ms_req  = math.floor((TimerScheduler.now() - t0_req) * 1000)
                 Logger.debug(LOG, "[%s] #%d RAW (%dms, %d chars) -> %s", model_name, req_id, ms_req, #raw, raw:sub(1, 250))
                 local results = {}
 
@@ -382,10 +389,10 @@ local function post_and_parse(model_name, system_prompt, full_text, tail_text,
                         user_prompt   = user_prompt,
                     })
                 end
-                if type(on_success) == "function" then pcall(on_success, results) end
-            end)
-        end
-    )
+			if type(on_success) == "function" then pcall(on_success, results) end
+			end)
+		end
+	)
 end
 
 --- Streaming variant of post_and_parse using hs.task + curl -N.
@@ -409,7 +416,7 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
                                          on_success, on_fail, dedup_stats, on_partial)
 	-- Terminate any previous stream so resources are not leaked
 	if _active_stream_task then
-		pcall(function() _active_stream_task:terminate() end)
+		_active_stream_task.terminate()
 		_active_stream_task = nil
 	end
 
@@ -422,7 +429,7 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 	local messages, line_mode, user_prompt = build_request_context(
 		system_prompt, full_text, tail_text, num_predictions, is_batch)
 
-	local t0_req = hs.timer.secondsSinceEpoch()
+	local t0_req = TimerScheduler.now()
 	Logger.debug(LOG, "[%s] #%d STREAM_PROMPT (%d chars) -> %s",
 		model_name, req_id, #user_prompt, user_prompt:sub(1, 250))
 
@@ -435,9 +442,9 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 		options    = build_options(temperature, num_predict_tokens, model_name, is_batch, line_mode),
 	}
 
-	local ok, encoded = pcall(hs.json.encode, payload)
-	if not ok or not encoded then
-		Logger.error(LOG, "Failed to encode Ollama streaming payload.")
+	local encoded, enc_err = JsonCodec.encode(payload)
+	if not encoded then
+		Logger.error(LOG, "Failed to encode Ollama streaming payload — %s", tostring(enc_err))
 		if type(on_fail) == "function" then pcall(on_fail) end
 		return
 	end
@@ -447,8 +454,8 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 
 	-- Parse one complete NDJSON line and append its content to accumulated
 	local function process_line(line)
-		local ok_dec, obj = pcall(hs.json.decode, line)
-		if not ok_dec or type(obj) ~= "table" then return end
+		local obj, _ = JsonCodec.decode(line)
+		if type(obj) ~= "table" then return end
 		if type(obj.message) == "table" and type(obj.message.content) == "string" then
 			local token = obj.message.content
 			if token ~= "" then
@@ -500,7 +507,7 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 		end
 
 		local raw    = Parser.strip_thinking(accumulated)
-		local ms_req = math.floor((hs.timer.secondsSinceEpoch() - t0_req) * 1000)
+		local ms_req = math.floor((TimerScheduler.now() - t0_req) * 1000)
 		Logger.debug(LOG, "[%s] #%d STREAM_DONE (%dms) -> %s", model_name, req_id, ms_req, raw:sub(1, 250))
 
 		local results = {}
@@ -544,18 +551,18 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 	fh:write(encoded)
 	fh:close()
 
-	local task = hs.task.new("/usr/bin/curl", on_done, on_chunk, {
+	local task = ShellRunner.spawn("/usr/bin/curl", {
 		"-s", "-N", "-X", "POST",
 		"-H", "Content-Type: application/json",
 		"--data-binary", "@" .. tmp_path,
 		"http://127.0.0.1:11434/api/chat",
-	})
-	task:start()
+	}, on_done, on_chunk)
+	task.start()
 	_active_stream_task = task
 	Logger.debug(LOG, "[%s] #%d STREAM task started (payload: %s).", model_name, req_id, tmp_path)
 
 	-- Clean up the temp file once the task has had time to read it
-	hs.timer.doAfter(10, function()
+	TimerScheduler.after(10, function()
 		os.remove(tmp_path)
 	end)
 end
@@ -594,11 +601,11 @@ function M.fetch_batch(full_text, tail_text, model_name, temperature,
 	local dedup_stats    = ApiCommon.new_dedup_stats()
 	local post_fn        = streaming and post_and_parse_streaming or post_and_parse
 
-	local t0 = hs.timer.secondsSinceEpoch()
+	local t0 = TimerScheduler.now()
 	post_fn(model_name, system_prompt, full_text, tail_text,
 		effective_temp, tokens, num_predictions, is_batch,
 		function(results)
-			local ms = math.floor((hs.timer.secondsSinceEpoch() - t0) * 1000)
+			local ms = math.floor((TimerScheduler.now() - t0) * 1000)
 			ApiCommon.log_prediction_summary(Logger, LOG, "batch", num_predictions, dedup_stats, #results)
 			-- With streaming OFF: reveal each prediction one by one (complete, no animation) so
 			-- the user sees slot 1 fill, then slot 2, etc. rather than all appearing at once.
@@ -614,7 +621,7 @@ function M.fetch_batch(full_text, tail_text, model_name, temperature,
 					-- Pass is_batch_progressive=true so prediction_engine bypasses the
 					-- streaming_multi early-return for these intermediate calls
 					if type(on_success) == "function" then pcall(on_success, subset, ms, is_final, not is_final) end
-					if not is_final then hs.timer.doAfter(0, function() reveal_next(idx + 1) end) end
+					if not is_final then TimerScheduler.after(0, function() reveal_next(idx + 1) end) end
 				end
 				reveal_next(1)
 			else
@@ -655,7 +662,7 @@ function M.fetch_sequential(full_text, tail_text, model_name, temperature,
                              on_success, on_fail, request_id_provider, streaming, on_partial)
 
 	local system_prompt = Profiles.resolve_system_prompt(profile, 1)
-	local t0            = hs.timer.secondsSinceEpoch()
+	local t0            = TimerScheduler.now()
 	local results       = {}
 	local base_temp     = tonumber(temperature) or 0.1
 	local requested_predictions = math.max(1, math.floor(tonumber(num_predictions) or 1))
@@ -681,7 +688,7 @@ function M.fetch_sequential(full_text, tail_text, model_name, temperature,
 		if #results >= requested_predictions or attempt_index > max_attempts then
 			if #results == 0 then if type(on_fail) == "function" then pcall(on_fail) end return end
 			ApiCommon.log_prediction_summary(Logger, LOG, "sequential", requested_predictions, dedup_stats, #results)
-			local ms = math.floor((hs.timer.secondsSinceEpoch() - t0) * 1000)
+			local ms = math.floor((TimerScheduler.now() - t0) * 1000)
 			if type(on_success) == "function" then pcall(on_success, results, ms, true) end
 			return
 		end
@@ -703,7 +710,7 @@ function M.fetch_sequential(full_text, tail_text, model_name, temperature,
 					if type(preds) == "table" and type(preds[1]) == "table" then
 						if #results < requested_predictions then
 							ApiCommon.insert_prediction(results, preds[1], dedup_stats, DEDUPLICATION_ENABLED, Logger, LOG)
-							local ms = math.floor((hs.timer.secondsSinceEpoch() - t0) * 1000)
+							local ms = math.floor((TimerScheduler.now() - t0) * 1000)
 							if type(on_success) == "function" then pcall(on_success, results, ms, false) end
 						end
 					end

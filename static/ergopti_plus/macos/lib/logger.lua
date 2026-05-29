@@ -12,8 +12,8 @@
 ---    detail in development — just lower the level once and all modules comply.
 --- 2. Module Tagging: Every call includes a short module identifier so log triage
 ---    never requires grepping the source.
---- 3. Colored Output: Each variant has a distinct console color — errors in red,
----    warnings in orange, successes in green, debug in gray, etc.
+--- 3. Plain Console Output: each variant is printed with its label tag via
+---    print() — hs.styledtext/hs.console are no longer a dependency.
 --- 4. Two-axis Lifecycle Logs:
 ---    - DEBUG axis: Logger.trace (start) / Logger.done (end) — fine-grained ops
 ---    - INFO  axis: Logger.start (start) / Logger.success (end) — significant ops
@@ -30,7 +30,6 @@
 --- ==============================================================================
 
 local M = {}
-local hs = hs
 
 -- socket.gettime() gives sub-second precision for the millisecond component.
 -- Loaded via pcall so headless unit tests that lack the hs sandbox still work.
@@ -216,16 +215,16 @@ M.LEVELS = {
 --
 local VARIANTS = {
 	-- ── Debug axis ──────────────────────────────────────────────────────────
-	DEBUG   = { level = 1, label = "DEBUG",   color = { white = 0.65, alpha = 1.0 } },
-	TRACE   = { level = 1, label = "TRACE",   color = { red = 0.20, green = 0.55, blue = 0.75, alpha = 1.0 } },
-	DONE    = { level = 1, label = "DONE",    color = { red = 0.10, green = 0.50, blue = 0.18, alpha = 1.0 } },
+	DEBUG   = { level = 1, label = "DEBUG"   },
+	TRACE   = { level = 1, label = "TRACE"   },
+	DONE    = { level = 1, label = "DONE"    },
 	-- ── Info axis ───────────────────────────────────────────────────────────
-	INFO    = { level = 2, label = "INFO",    color = { white = 0.20, alpha = 1.0 } },
-	START   = { level = 2, label = "START",   color = { red = 0.40, green = 0.80, blue = 1.00, alpha = 1.0 } },
-	SUCCESS = { level = 2, label = "SUCCESS", color = { red = 0.15, green = 0.65, blue = 0.22, alpha = 1.0 } },
+	INFO    = { level = 2, label = "INFO"    },
+	START   = { level = 2, label = "START"   },
+	SUCCESS = { level = 2, label = "SUCCESS" },
 	-- ── Warning / Error ─────────────────────────────────────────────────────
-	WARNING = { level = 3, label = "WARNING", color = { red = 1.00, green = 0.60, blue = 0.00, alpha = 1.0 } },
-	ERROR   = { level = 4, label = "ERROR",   color = { red = 1.00, green = 0.20, blue = 0.20, alpha = 1.0 } },
+	WARNING = { level = 3, label = "WARNING" },
+	ERROR   = { level = 4, label = "ERROR"   },
 }
 
 --- Current active level — only messages at or above this level are emitted.
@@ -260,8 +259,14 @@ function M.init_log_path(config_dir, max_age_days)
 	if type(config_dir) ~= "string" or config_dir == "" then return end
 	if not config_dir:match("[/\\]$") then config_dir = config_dir .. "/" end
 
+	-- Lazy-require avoids a circular dependency: ShellRunner requires Logger,
+	-- but Logger is a foundational module loaded before adapters. By deferring
+	-- the require to init_log_path() (called post-startup, not at require time)
+	-- both modules are fully loaded before either references the other.
+	local ShellRunner = require("adapters.shell_runner")
+
 	local log_dir = config_dir .. "hammerspoon/logs/"
-	pcall(hs.execute, string.format("mkdir -p %q", log_dir))
+	ShellRunner.exec(string.format("mkdir -p %q", log_dir))
 	_log_dir = log_dir
 
 	-- Close any handle open on the old path so the next write re-opens cleanly
@@ -291,7 +296,7 @@ function M.init_log_path(config_dir, max_age_days)
 
 	-- Purge main log files older than max_age_days by comparing the date in the
 	-- filename (YYYY-MM-DD) rather than mtime, so moved/copied files age correctly.
-	pcall(hs.execute, string.format(
+	ShellRunner.exec(string.format(
 		"find %q -name 'ErgoptiPlus_*.log' -type f | while read f; do"
 		.. " d=$(basename \"$f\" .log | sed 's/ErgoptiPlus_//'); "
 		.. " [ \"$(date -j -f '%%Y-%%m-%%d' \"$d\" '+%%s' 2>/dev/null)\" -lt"
@@ -306,7 +311,7 @@ function M.init_log_path(config_dir, max_age_days)
 		local sub_path = log_dir .. sub.name
 		-- Read the file's last-modified date via stat; delete if it differs from today
 		pcall(function()
-			local stat_out = hs.execute(string.format(
+			local stat_out = ShellRunner.exec(string.format(
 				"stat -f '%%Sm' -t '%%Y-%%m-%%d' %q 2>/dev/null", sub_path))
 			if stat_out then
 				local file_date = stat_out:match("^(%d%d%d%d%-%d%d%-%d%d)")
@@ -458,11 +463,7 @@ local function _flush_dedup_summary()
 	local indent  = (variant.level == 1) and string.rep(" ", 10) or ""
 	local summary = string.format("[%s] [logger] %s\u{2191} %d identical %s suppressed",
 		variant.label, indent, _dedup.count, word)
-	if hs and hs.styledtext and hs.console and hs.console.printStyledtext then
-		pcall(hs.console.printStyledtext, hs.styledtext.new(summary, { color = variant.color }))
-	else
-		print(summary)
-	end
+	print(summary)
 	local stamp = _timestamp()
 	-- Push to ring buffer before writing so the snapshot reflects dedup summaries
 	_push_ring(stamp .. " " .. summary)
@@ -503,13 +504,9 @@ local function _log(variant_key, module_name, msg, ...)
 
 	local stamp = _timestamp()
 
-	-- Console output: styled (colors) when hs is available, plain print otherwise
+	-- Console output: plain print (colors removed — hs.styledtext/console no longer a dependency).
 	local console_line = stamp .. " " .. line
-	if hs and hs.styledtext and hs.console and hs.console.printStyledtext then
-		pcall(hs.console.printStyledtext, hs.styledtext.new(console_line, { color = variant.color }))
-	else
-		print(console_line)
-	end
+	print(console_line)
 
 	-- Push to the in-memory ring buffer so ring_buffer_snapshot() is always
 	-- current without requiring a file read.
