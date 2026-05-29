@@ -265,7 +265,6 @@ HealthCheck_ShowWindow() {
 	global _VendorDir, _HC_WIN_W, _HC_MARGIN, _HC_BTN_H, _HC_BTN_PAD
 
 	Snapshot  := HealthCheck_Run()
-	Md        := HealthCheck_FormatMarkdown(Snapshot)
 	PlainText := HealthCheck_FormatPlain(Snapshot)
 
 	WinTitle := t("menu.debug.healthcheck") . " — ErgoptiPlus"
@@ -309,7 +308,6 @@ HealthCheck_ShowWindow() {
 
 		if WVC {
 			WV := WVC.CoreWebView2
-			try LoggerInfo("Healthcheck", "WebView2 controller obtained — wiring up.")
 			try {
 				s := WV.Settings
 				s.AreDevToolsEnabled              := false
@@ -320,13 +318,9 @@ HealthCheck_ShowWindow() {
 			OnMsg := (wv2, args) => _HealthCheck_OnWebMsg(wv2, args, PlainText, G)
 			try WV.WebMessageReceived(OnMsg)
 			WVC.Fill()
-			Html := _HealthCheck_MakeHtml(Md, BtnLabel)
-			try LoggerInfo("Healthcheck", "Calling NavigateToString (html len={1}).", StrLen(Html))
-			; Dump HTML to temp file for inspection when content is blank
-			try FileDelete(A_Temp . "\ergopti_hc_debug.html")
-			try FileAppend(Html, A_Temp . "\ergopti_hc_debug.html", "UTF-8")
+			Html := _HealthCheck_SnapshotToHtml(Snapshot, BtnLabel)
 			try WV.NavigateToString(Html)
-			try LoggerDone("Healthcheck", "NavigateToString called — debug HTML at: {1}.", A_Temp . "\ergopti_hc_debug.html")
+			try LoggerDone("Healthcheck", "NavigateToString called.")
 			; Button still copies plain-text even with WebView2 active.
 			return
 		}
@@ -538,75 +532,133 @@ _HealthCheck_RecentIssues(MaxLines) {
 	return Result
 }
 
-; Builds a self-contained HTML page from a Markdown string.
-; BtnLabel is injected as a sticky footer button that posts "copy_and_close" to AHK.
-_HealthCheck_MakeHtml(Md, BtnLabel) {
-	; Escape Markdown for a JS single-quoted string literal
-	Safe := StrReplace(Md,   "\",  "\\")
-	Safe := StrReplace(Safe, "'",  "\'")
-	Safe := StrReplace(Safe, "`n", "\n")
-	Safe := StrReplace(Safe, "`r", "")
-	Safe := StrReplace(Safe, "`t", "\t")
-	JsSrc := "'" . Safe . "'"
+; Escapes a string for safe inclusion as HTML text content.
+_HealthCheck_HE(s) {
+	s := StrReplace(s, "&",  "&amp;")
+	s := StrReplace(s, "<",  "&lt;")
+	s := StrReplace(s, ">",  "&gt;")
+	s := StrReplace(s, "`"", "&quot;")
+	return s
+}
 
-	; Escape button label for HTML
-	SafeBtn := StrReplace(BtnLabel, "&", "&amp;")
-	SafeBtn := StrReplace(SafeBtn, "<", "&lt;")
-	SafeBtn := StrReplace(SafeBtn, ">", "&gt;")
-	SafeBtn := StrReplace(SafeBtn, "'", "&#39;")
+; Wraps a value in a <code> element with HTML-escaped content.
+_HealthCheck_Code(s) => "<code>" . _HealthCheck_HE(s) . "</code>"
 
-	return (
-		"<!DOCTYPE html><html><head><meta charset='utf-8'>"
-		. "<style>"
-		. "html,body{margin:0;padding:0;font-family:'Segoe UI',sans-serif;font-size:13px;color:#1a1a1a;background:#fff;}"
-		. "body{padding:16px 20px 60px;overflow-y:auto;}"
-		. "#footer{position:fixed;bottom:0;left:0;right:0;padding:8px 16px;border-top:1px solid #e0e0e0;background:#f8f8f8;}"
-		. "#btnCopy{width:100%;padding:7px 16px;font-family:'Segoe UI',sans-serif;font-size:13px;background:#0078d4;color:#fff;border:none;border-radius:4px;cursor:pointer;}"
-		. "#btnCopy:hover{background:#106ebe;}"
+; Builds a self-contained HTML page directly from the snapshot Map.
+; No runtime JS conversion — the HTML is fully rendered before NavigateToString.
+_HealthCheck_SnapshotToHtml(Snapshot, BtnLabel) {
+	Sys       := Snapshot["sys"]
+	OkList    := Snapshot["ports_validated"]
+	FailList  := Snapshot["failed_adapters"]
+	Total     := OkList.Length + FailList.Length
+	WarnCount := Snapshot["warn_count"]
+	ErrCount  := Snapshot["err_count"]
+	LastErr   := Snapshot["last_error"]
+	Issues    := Snapshot["recent_issues"]
+	SafeBtn   := _HealthCheck_HE(BtnLabel)
+
+	; ── CSS ───────────────────────────────────────────────────────────────────
+	Css := (
+		"html,body{margin:0;padding:0;font-family:'Segoe UI',sans-serif;font-size:13px;color:#1a1a1a;background:#fff;}"
+		. "body{padding:16px 20px 64px;overflow-y:auto;}"
+		. "#footer{position:fixed;bottom:0;left:0;right:0;padding:8px 16px;"
+			. "border-top:1px solid #e0e0e0;background:#f8f8f8;z-index:999;}"
+		. "button{width:100%;padding:7px 16px;font-family:'Segoe UI',sans-serif;font-size:13px;"
+			. "background:#0078d4;color:#fff;border:none;border-radius:4px;cursor:pointer;}"
+		. "button:hover{background:#106ebe;}"
 		. "h1{font-size:1.25em;margin:0 0 .6em;}"
-		. "h2{font-size:1.05em;margin:1.2em 0 .3em;border-bottom:1px solid #e0e0e0;padding-bottom:.2em;color:#333;}"
-		. "table{border-collapse:collapse;width:100%;margin:.4em 0 .8em;}th,td{border:1px solid #e0e0e0;padding:.3em .65em;text-align:left;}"
-		. "th{background:#f6f6f6;font-weight:600;}td:first-child{white-space:nowrap;color:#555;font-weight:500;}"
+		. "h2{font-size:1.05em;margin:1.2em 0 .3em;border-bottom:1px solid #e0e0e0;"
+			. "padding-bottom:.2em;color:#333;}"
+		. "table{border-collapse:collapse;width:100%;margin:.4em 0 .8em;}"
+		. "th,td{border:1px solid #e0e0e0;padding:.3em .65em;text-align:left;}"
+		. "th{background:#f6f6f6;font-weight:600;}"
+		. "td:first-child{white-space:nowrap;color:#555;font-weight:500;}"
 		. "ul{margin:.3em 0 .3em 1.2em;padding:0;}li{margin:.2em 0;}"
-		. "code{background:#f3f3f3;border-radius:3px;padding:.1em .35em;font-family:Consolas,monospace;font-size:.88em;}"
-		. "pre{background:#1e1e1e;color:#d4d4d4;border-radius:4px;padding:.7em 1em;overflow-x:auto;white-space:pre-wrap;word-break:break-all;font-family:Consolas,'Courier New',monospace;font-size:.82em;line-height:1.45;}"
-		. "pre code{background:none;padding:0;color:inherit;}"
+		. "code{background:#f3f3f3;border-radius:3px;padding:.1em .35em;"
+			. "font-family:Consolas,monospace;font-size:.88em;}"
+		. "pre{background:#1e1e1e;color:#d4d4d4;border-radius:4px;padding:.7em 1em;"
+			. "overflow-x:auto;white-space:pre-wrap;word-break:break-all;"
+			. "font-family:Consolas,'Courier New',monospace;font-size:.82em;line-height:1.45;}"
 		. "em{font-style:italic;color:#666;}"
 		. ".ok{color:#1a7f37;font-weight:600;}.fail{color:#cf222e;font-weight:600;}"
-		. "</style></head>"
-		. "<body>"
-		. "<div id='footer'><button id='btnCopy' onclick=`"window.chrome.webview.postMessage('copy_and_close')`">" . SafeBtn . "</button></div>"
-		. "<script>"
-		. "function mdToHtml(s){"
-		. "var lines=s.split('\n'),out=[],inPre=false,inUl=false,inOl=false,inTbl=false;"
-		. "function closeBlocks(){if(inUl){out.push('</ul>');inUl=false;}if(inOl){out.push('</ol>');inOl=false;}if(inTbl){out.push('</table>');inTbl=false;}}"
-		. "function inline(t){t=t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');"
-		. "t=t.replace(/``([^``]+)``/g,'<code>$1</code>');"
-		. "t=t.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>');"
-		. "t=t.replace(/__(.+?)__/g,'<strong>$1</strong>');"
-		. "t=t.replace(/\*(.+?)\*/g,'<em>$1</em>');"
-		. "t=t.replace(/_(.+?)_/g,'<em>$1</em>');"
-		. "t=t.replace(/✓/g,'<span class=ok>✓</span>');"
-		. "t=t.replace(/✗/g,'<span class=fail>✗</span>');"
-		. "return t;}"
-		. "for(var i=0;i<lines.length;i++){"
-		. "var l=lines[i];"
-		. "if(/^``````/.test(l)){if(inPre){out.push('</code></pre>');inPre=false;}else{closeBlocks();out.push('<pre><code>');inPre=true;}continue;}"
-		. "if(inPre){out.push(l.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'));continue;}"
-		. "if(/^\s*$/.test(l)){closeBlocks();continue;}"
-		. "var hm=l.match(/^(#{1,6})\s+(.*)/);if(hm){closeBlocks();var n=hm[1].length;out.push('<h'+n+'>'+inline(hm[2])+'</h'+n+'>');continue;}"
-		. "if(/^\|/.test(l)&&/\|/.test(l)){if(!inTbl){closeBlocks();out.push('<table>');inTbl=true;}"
-		. "if(/^[\s|:-]+$/.test(l))continue;"
-		. "var cells=l.replace(/^\||\|$/g,'').split('|');"
-		. "var isHeader=(out.length>0&&out[out.length-1]==='<table>');"
-		. "var tag=isHeader?'th':'td';"
-		. "out.push('<tr>'+cells.map(function(c){return'<'+tag+'>'+inline(c.trim())+'</'+tag+'>';}).join('')+'</tr>');continue;}"
-		. "var ul=l.match(/^[-*+]\s+(.*)/);if(ul){if(!inUl){closeBlocks();out.push('<ul>');inUl=true;}out.push('<li>'+inline(ul[1])+'</li>');continue;}"
-		. "var ol=l.match(/^\d+\.\s+(.*)/);if(ol){if(!inOl){closeBlocks();out.push('<ol>');inOl=true;}out.push('<li>'+inline(ol[1])+'</li>');continue;}"
-		. "closeBlocks();out.push('<p>'+inline(l)+'</p>');}"
-		. "if(inPre)out.push('</code></pre>');closeBlocks();"
-		. "return out.join('\n');}"
-		. "document.body.insertAdjacentHTML('afterbegin',mdToHtml(" . JsSrc . "));"
-		. "</script></body></html>"
+	)
+
+	; ── System table ──────────────────────────────────────────────────────────
+	SysTbl := (
+		"<table>"
+		. "<tr><th>Field</th><th>Value</th></tr>"
+		. "<tr><td>ErgoptiPlus version</td><td>" . _HealthCheck_Code(Snapshot["version"])           . "</td></tr>"
+		. "<tr><td>Uptime</td><td>"              . _HealthCheck_HE(_HealthCheck_FormatUptime(Snapshot["uptime_sec"])) . "</td></tr>"
+		. "<tr><td>AutoHotkey</td><td>"          . _HealthCheck_HE(Sys["ahk_version"] . " " . Sys["ahk_bitness"])    . "</td></tr>"
+		. "<tr><td>Windows</td><td>"             . _HealthCheck_HE(Sys["os_name"])                  . "</td></tr>"
+		. "<tr><td>Windows build</td><td>"       . _HealthCheck_HE(Sys["os_build"])                 . "</td></tr>"
+		. "<tr><td>Architecture</td><td>"        . _HealthCheck_HE(Sys["os_arch"])                  . "</td></tr>"
+		. "<tr><td>CPU</td><td>"                 . _HealthCheck_HE(Sys["cpu_name"])                 . "</td></tr>"
+		. "<tr><td>Logical cores</td><td>"       . _HealthCheck_HE(String(Sys["cpu_cores"]))        . "</td></tr>"
+		. "<tr><td>Total RAM</td><td>"           . _HealthCheck_HE(Sys["ram_total_gb"] . " GB")     . "</td></tr>"
+		. "<tr><td>Available RAM</td><td>"       . _HealthCheck_HE(Sys["ram_free_gb"]  . " GB")     . "</td></tr>"
+		. "<tr><td>Screen resolution</td><td>"   . _HealthCheck_HE(Sys["screen_res"])               . "</td></tr>"
+		. "<tr><td>DPI</td><td>"                 . _HealthCheck_HE(Sys["dpi"] . " (" . Sys["dpi_scale"] . "%)") . "</td></tr>"
+		. "<tr><td>Locale</td><td>"              . _HealthCheck_HE(Sys["locale"])                   . "</td></tr>"
+	)
+	if Sys["config_dir"] != ""
+		SysTbl .= "<tr><td>Config dir</td><td>" . _HealthCheck_Code(Sys["config_dir"]) . "</td></tr>"
+	SysTbl .= "</table>"
+
+	; ── Session counters table ────────────────────────────────────────────────
+	WarnOk  := WarnCount = 0 ? "<span class=ok>✓</span>" : "<span class=fail>✗</span>"
+	ErrOk   := ErrCount  = 0 ? "<span class=ok>✓</span>" : "<span class=fail>✗</span>"
+	CtrTbl  := (
+		"<table>"
+		. "<tr><th>Type</th><th>Count</th></tr>"
+		. "<tr><td>" . WarnOk . " Warnings</td><td>" . WarnCount . "</td></tr>"
+		. "<tr><td>" . ErrOk  . " Errors</td><td>"   . ErrCount  . "</td></tr>"
+		. "</table>"
+	)
+
+	; ── Adapters list ─────────────────────────────────────────────────────────
+	AdapHtml := "<ul>"
+	for _, Name in OkList
+		AdapHtml .= "<li><span class=ok>✓</span> " . _HealthCheck_Code(Name) . "</li>"
+	for _, Name in FailList
+		AdapHtml .= "<li><span class=fail>✗</span> " . _HealthCheck_Code(Name) . "</li>"
+	AdapHtml .= "</ul>"
+
+	; ── Last error ────────────────────────────────────────────────────────────
+	if LastErr != ""
+		LastErrHtml := "<pre>" . _HealthCheck_HE(LastErr) . "</pre>"
+	else
+		LastErrHtml := "<em>No error recorded.</em>"
+
+	; ── Recent issues ─────────────────────────────────────────────────────────
+	if Issues.Length = 0 {
+		IssuesHtml := "<em>No warnings or errors since startup.</em>"
+	} else {
+		IssuesLines := ""
+		for _, L in Issues
+			IssuesLines .= _HealthCheck_HE(L) . "`n"
+		IssuesHtml := "<pre>" . IssuesLines . "</pre>"
+	}
+
+	; ── Assemble full page ────────────────────────────────────────────────────
+	; The footer button posts "copy_and_close" to the AHK WebMessageReceived handler.
+	; Using window.onload to bind the click ensures the WebView2 channel is ready.
+	return (
+		"<!DOCTYPE html><html><head><meta charset='utf-8'>"
+		. "<style>" . Css . "</style>"
+		. "</head><body>"
+		. "<h1>System Diagnostic — ErgoptiPlus</h1>"
+		. "<h2>System</h2>" . SysTbl
+		. "<h2>Session counters</h2>" . CtrTbl
+		. "<h2>Adapters (" . OkList.Length . "/" . Total . " OK)</h2>" . AdapHtml
+		. "<h2>Last recorded error</h2>" . LastErrHtml
+		. "<h2>Recent warnings / errors (" . Issues.Length . "/100)</h2>" . IssuesHtml
+		. "<div id='footer'><button id='btnCopy'>" . SafeBtn . "</button></div>"
+		. "<script>window.onload=function(){"
+			. "document.getElementById('btnCopy').onclick=function(){"
+				. "window.chrome.webview.postMessage('copy_and_close');"
+			. "};"
+		. "};</script>"
+		. "</body></html>"
 	)
 }
