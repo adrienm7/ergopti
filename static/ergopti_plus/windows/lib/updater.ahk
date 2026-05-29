@@ -1075,7 +1075,7 @@ Updater_ShowUpdatePrompt(Release) {
 	G.SetFont("s10 norm")
 	G.Add("Text", "xm y+10 w700", t("updater.update_dialog_changelog"))
 	BodyText := (Release.Body != "") ? Release.Body : t("updater.changelog_empty")
-	G.Add("Edit", "xm y+4 w700 h300 ReadOnly +Multi +Wrap", BodyText)
+	G.Add("Edit", "xm y+4 w700 h300 ReadOnly +Multi -Wrap +VScroll", BodyText)
 
 	BtnInstall := G.Add("Button", "xm y+12 Default", t("updater.update_dialog_install"))
 	BtnOpen    := G.Add("Button", "x+8 yp",          t("updater.update_dialog_open"))
