@@ -316,32 +316,46 @@ jobs:
                   if (-not (Test-Path $runner)) {
                       Write-Error "Test runner not found at $runner"; exit 2
                   }
+                  $resultsFile = "${{ github.workspace }}\static\ergopti_plus\windows\tests\test_results.txt"
+                  Remove-Item $resultsFile -Force -ErrorAction SilentlyContinue
                   Write-Host "AHK runtime : $ahk"
                   Write-Host "Test runner : $runner"
                   Write-Host "------------------------------------------------------------"
-                  # Route AHK stdout to a temp file, then tail-read it while the
-                  # process runs. This makes CI logs show TAP progress in real time
-                  # instead of buffering everything until exit — a 15-min run was
-                  # indistinguishable from a silent hang in the old buffered approach.
-                  $outFile = "$env:TEMP\ahk_out_$([System.IO.Path]::GetRandomFileName()).txt"
-                  New-Item -ItemType File -Path $outFile -Force | Out-Null
-                  $proc = Start-Process -FilePath cmd -ArgumentList "/c `"`"$ahk`" `"$runner`"`" > `"$outFile`" 2>&1" `
-                      -NoNewWindow -PassThru
-                  $fstream = [System.IO.FileStream]::new($outFile,
-                      [System.IO.FileMode]::Open,
-                      [System.IO.FileAccess]::Read,
-                      [System.IO.FileShare]::ReadWrite)
-                  $reader = [System.IO.StreamReader]::new($fstream)
+                  # AHK writes TAP output to test_results.txt (FileAppend to "*"/stdout
+                  # blocks when AHK runs without an inherited console handle, so the
+                  # file is the only reliable output channel in CI).
+                  # Tail-read the results file while AHK runs for real-time CI log output.
+                  $proc = Start-Process -FilePath $ahk -ArgumentList $runner -NoNewWindow -PassThru
+                  $fstream = $null
+                  $reader  = $null
+                  $sw = [System.Diagnostics.Stopwatch]::StartNew()
                   while (-not $proc.HasExited) {
-                      $line = $reader.ReadLine()
-                      if ($null -ne $line) { Write-Host $line } else { Start-Sleep -Milliseconds 100 }
+                      if ($null -eq $fstream -and (Test-Path $resultsFile)) {
+                          $fstream = [System.IO.FileStream]::new($resultsFile,
+                              [System.IO.FileMode]::Open,
+                              [System.IO.FileAccess]::Read,
+                              [System.IO.FileShare]::ReadWrite)
+                          $reader = [System.IO.StreamReader]::new($fstream)
+                      }
+                      if ($null -ne $reader) {
+                          $line = $reader.ReadLine()
+                          if ($null -ne $line) { Write-Host $line } else { Start-Sleep -Milliseconds 100 }
+                      } else {
+                          Start-Sleep -Milliseconds 100
+                      }
                   }
-                  while ($null -ne ($line = $reader.ReadLine())) { Write-Host $line }
-                  $reader.Close(); $fstream.Close()
-                  Remove-Item $outFile -Force -ErrorAction SilentlyContinue
+                  if ($null -ne $reader) {
+                      while ($null -ne ($line = $reader.ReadLine())) { Write-Host $line }
+                      $reader.Close(); $fstream.Close()
+                  }
                   $exit = $proc.ExitCode
                   Write-Host "------------------------------------------------------------"
                   Write-Host "AHK exit code: $exit"
+                  if (-not (Test-Path $resultsFile)) {
+                      Write-Error "test_results.txt not created — AHK may have crashed at startup."; exit 2
+                  }
+                  $summary = Get-Content $resultsFile | Select-String "^#" | Select-Object -Last 1
+                  Write-Host $summary
                   if ($exit -ne 0) {
                       Write-Error "Test suite failed (exit $exit)."; exit $exit
                   }
