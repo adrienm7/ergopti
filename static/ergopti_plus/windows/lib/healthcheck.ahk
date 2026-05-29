@@ -171,54 +171,48 @@ HealthCheck_FormatMarkdown(Snapshot := 0) {
 	Sys := Snapshot["sys"]
 
 	Lines := []
-	Lines.Push("# Diagnostic système — ErgoptiPlus")
+	Lines.Push("# System Diagnostic — ErgoptiPlus")
 	Lines.Push("")
 
-	; ── Système ───────────────────────────────────────────────────────────────
-	Lines.Push("## Système")
+	; ── System info ───────────────────────────────────────────────────────────
+	Lines.Push("## System")
 	Lines.Push("")
-	Lines.Push("| Champ | Valeur |")
+	Lines.Push("| Field | Value |")
 	Lines.Push("|---|---|")
-	Lines.Push("| Version ErgoptiPlus | ``" . Snapshot["version"] . "`` |")
-	Lines.Push("| Durée de fonctionnement | " . _HealthCheck_FormatUptime(Snapshot["uptime_sec"]) . " |")
+	Lines.Push("| ErgoptiPlus version | ``" . Snapshot["version"] . "`` |")
+	Lines.Push("| Uptime | " . _HealthCheck_FormatUptime(Snapshot["uptime_sec"]) . " |")
 	Lines.Push("| AutoHotkey | " . Sys["ahk_version"] . " " . Sys["ahk_bitness"] . " |")
 	Lines.Push("| Windows | " . Sys["os_name"] . " |")
-	Lines.Push("| Build Windows | " . Sys["os_build"] . " |")
+	Lines.Push("| Windows build | " . Sys["os_build"] . " |")
 	Lines.Push("| Architecture | " . Sys["os_arch"] . " |")
 	Lines.Push("| CPU | " . Sys["cpu_name"] . " |")
-	Lines.Push("| Cœurs logiques | " . Sys["cpu_cores"] . " |")
-	Lines.Push("| RAM totale | " . Sys["ram_total_gb"] . " Go |")
-	Lines.Push("| RAM disponible | " . Sys["ram_free_gb"] . " Go |")
-	Lines.Push("| Résolution écran | " . Sys["screen_res"] . " |")
+	Lines.Push("| Logical cores | " . Sys["cpu_cores"] . " |")
+	Lines.Push("| Total RAM | " . Sys["ram_total_gb"] . " GB |")
+	Lines.Push("| Available RAM | " . Sys["ram_free_gb"] . " GB |")
+	Lines.Push("| Screen resolution | " . Sys["screen_res"] . " |")
 	Lines.Push("| DPI | " . Sys["dpi"] . " (" . Sys["dpi_scale"] . "%) |")
 	Lines.Push("| Locale | " . Sys["locale"] . " |")
 	if Sys["config_dir"] != ""
-		Lines.Push("| Dossier config | ``" . Sys["config_dir"] . "`` |")
+		Lines.Push("| Config dir | ``" . Sys["config_dir"] . "`` |")
 	Lines.Push("")
 
-	; ── Compteurs de session ──────────────────────────────────────────────────
+	; ── Session counters ──────────────────────────────────────────────────────
 	WarnCount := Snapshot["warn_count"]
 	ErrCount  := Snapshot["err_count"]
-	Lines.Push("## Compteurs de session")
+	Lines.Push("## Session counters")
 	Lines.Push("")
-	Lines.Push("| Type | Nombre |")
+	Lines.Push("| Type | Count |")
 	Lines.Push("|---|---|")
-	if WarnCount = 0
-		Lines.Push("| ✓ Avertissements | 0 |")
-	else
-		Lines.Push("| ✗ Avertissements | " . WarnCount . " |")
-	if ErrCount = 0
-		Lines.Push("| ✓ Erreurs | 0 |")
-	else
-		Lines.Push("| ✗ Erreurs | " . ErrCount . " |")
+	Lines.Push("| " . (WarnCount = 0 ? "✓" : "✗") . " Warnings | " . WarnCount . " |")
+	Lines.Push("| " . (ErrCount  = 0 ? "✓" : "✗") . " Errors   | " . ErrCount  . " |")
 	Lines.Push("")
 
-	; ── Adaptateurs ───────────────────────────────────────────────────────────
+	; ── Adapters ──────────────────────────────────────────────────────────────
 	OkList   := Snapshot["ports_validated"]
 	FailList := Snapshot["failed_adapters"]
 	Total    := OkList.Length + FailList.Length
 
-	Lines.Push("## Adaptateurs (" . OkList.Length . "/" . Total . " OK)")
+	Lines.Push("## Adapters (" . OkList.Length . "/" . Total . " OK)")
 	Lines.Push("")
 	for _, Name in OkList
 		Lines.Push("- ✓ ``" . Name . "``")
@@ -226,23 +220,23 @@ HealthCheck_FormatMarkdown(Snapshot := 0) {
 		Lines.Push("- ✗ ``" . Name . "``")
 	Lines.Push("")
 
-	; ── Dernière erreur ───────────────────────────────────────────────────────
-	Lines.Push("## Dernière erreur enregistrée")
+	; ── Last recorded error ───────────────────────────────────────────────────
+	Lines.Push("## Last recorded error")
 	Lines.Push("")
 	LastErr := Snapshot["last_error"]
 	Fence   := Chr(96) . Chr(96) . Chr(96)
 	if LastErr != ""
 		Lines.Push(Fence . "`n" . LastErr . "`n" . Fence)
 	else
-		Lines.Push("_Aucune erreur enregistrée._")
+		Lines.Push("_No error recorded._")
 	Lines.Push("")
 
-	; ── Derniers avertissements / erreurs ─────────────────────────────────────
+	; ── Recent warnings / errors ──────────────────────────────────────────────
 	RecentIssues := Snapshot["recent_issues"]
-	Lines.Push("## Derniers avertissements / erreurs (" . RecentIssues.Length . "/100)")
+	Lines.Push("## Recent warnings / errors (" . RecentIssues.Length . "/100)")
 	Lines.Push("")
 	if RecentIssues.Length = 0 {
-		Lines.Push("_Aucun avertissement ni erreur depuis le démarrage._")
+		Lines.Push("_No warnings or errors since startup._")
 	} else {
 		Lines.Push(Fence)
 		for _, L in RecentIssues
@@ -369,7 +363,7 @@ _HealthCheck_AddFallbackEdit(G, HostCtl, Text) {
 HealthCheck_FormatPlain(Snapshot) {
 	Sys   := Snapshot["sys"]
 	Lines := []
-	Lines.Push("=== ErgoptiPlus — Diagnostic système ===")
+	Lines.Push("=== ErgoptiPlus — System Diagnostic ===")
 	Lines.Push("")
 	Lines.Push("Version         : " . Snapshot["version"])
 	Lines.Push("Uptime          : " . _HealthCheck_FormatUptime(Snapshot["uptime_sec"]))
@@ -378,41 +372,41 @@ HealthCheck_FormatPlain(Snapshot) {
 	Lines.Push("Build           : " . Sys["os_build"])
 	Lines.Push("Architecture    : " . Sys["os_arch"])
 	Lines.Push("CPU             : " . Sys["cpu_name"])
-	Lines.Push("Coeurs logiques : " . Sys["cpu_cores"])
-	Lines.Push("RAM totale      : " . Sys["ram_total_gb"] . " Go")
-	Lines.Push("RAM disponible  : " . Sys["ram_free_gb"] . " Go")
+	Lines.Push("Logical cores   : " . Sys["cpu_cores"])
+	Lines.Push("Total RAM       : " . Sys["ram_total_gb"] . " GB")
+	Lines.Push("Available RAM   : " . Sys["ram_free_gb"] . " GB")
 	Lines.Push("Resolution      : " . Sys["screen_res"])
 	Lines.Push("DPI             : " . Sys["dpi"] . " (" . Sys["dpi_scale"] . "%)")
 	Lines.Push("Locale          : " . Sys["locale"])
 	if Sys["config_dir"] != ""
 		Lines.Push("Config dir      : " . Sys["config_dir"])
 	Lines.Push("")
-	Lines.Push("Avertissements  : " . Snapshot["warn_count"])
-	Lines.Push("Erreurs         : " . Snapshot["err_count"])
+	Lines.Push("Warnings        : " . Snapshot["warn_count"])
+	Lines.Push("Errors          : " . Snapshot["err_count"])
 	Lines.Push("")
 
 	OkList := Snapshot["ports_validated"]
-	Lines.Push("Adaptateurs OK (" . OkList.Length . ") :")
+	Lines.Push("Adapters OK (" . OkList.Length . ") :")
 	for _, Name in OkList
 		Lines.Push("  + " . Name)
 
 	FailList := Snapshot["failed_adapters"]
 	if FailList.Length > 0 {
-		Lines.Push("Echecs (" . FailList.Length . ") :")
+		Lines.Push("Failed (" . FailList.Length . ") :")
 		for _, Name in FailList
 			Lines.Push("  x " . Name)
 	} else {
-		Lines.Push("Echecs : aucun")
+		Lines.Push("Failed : none")
 	}
 
 	Lines.Push("")
 	LastErr := Snapshot["last_error"]
-	Lines.Push("Derniere erreur : " . (LastErr != "" ? LastErr : "aucune"))
+	Lines.Push("Last error      : " . (LastErr != "" ? LastErr : "none"))
 
 	RecentIssues := Snapshot["recent_issues"]
 	if RecentIssues.Length > 0 {
 		Lines.Push("")
-		Lines.Push("--- Derniers avertissements / erreurs (" . RecentIssues.Length . ") ---")
+		Lines.Push("--- Recent warnings / errors (" . RecentIssues.Length . ") ---")
 		for _, L in RecentIssues
 			Lines.Push(L)
 	}
@@ -564,11 +558,9 @@ _HealthCheck_MakeHtml(Md, BtnLabel) {
 	return (
 		"<!DOCTYPE html><html><head><meta charset='utf-8'>"
 		. "<style>"
-		. "*{box-sizing:border-box;}"
-		. "html{height:100%;margin:0;padding:0;}"
-		. "body{height:100%;margin:0;padding:0;font-family:'Segoe UI',sans-serif;font-size:13px;color:#1a1a1a;background:#fff;display:flex;flex-direction:column;}"
-		. "#content{flex:1;overflow-y:auto;padding:16px 20px;}"
-		. "#footer{flex-shrink:0;padding:8px 16px;border-top:1px solid #e0e0e0;background:#f8f8f8;}"
+		. "html,body{margin:0;padding:0;font-family:'Segoe UI',sans-serif;font-size:13px;color:#1a1a1a;background:#fff;}"
+		. "body{padding:16px 20px 60px;overflow-y:auto;}"
+		. "#footer{position:fixed;bottom:0;left:0;right:0;padding:8px 16px;border-top:1px solid #e0e0e0;background:#f8f8f8;}"
 		. "#btnCopy{width:100%;padding:7px 16px;font-family:'Segoe UI',sans-serif;font-size:13px;background:#0078d4;color:#fff;border:none;border-radius:4px;cursor:pointer;}"
 		. "#btnCopy:hover{background:#106ebe;}"
 		. "h1{font-size:1.25em;margin:0 0 .6em;}"
@@ -583,7 +575,6 @@ _HealthCheck_MakeHtml(Md, BtnLabel) {
 		. ".ok{color:#1a7f37;font-weight:600;}.fail{color:#cf222e;font-weight:600;}"
 		. "</style></head>"
 		. "<body>"
-		. "<div id='content'></div>"
 		. "<div id='footer'><button id='btnCopy' onclick=`"window.chrome.webview.postMessage('copy_and_close')`">" . SafeBtn . "</button></div>"
 		. "<script>"
 		. "function mdToHtml(s){"
@@ -615,7 +606,7 @@ _HealthCheck_MakeHtml(Md, BtnLabel) {
 		. "closeBlocks();out.push('<p>'+inline(l)+'</p>');}"
 		. "if(inPre)out.push('</code></pre>');closeBlocks();"
 		. "return out.join('\n');}"
-		. "document.getElementById('content').innerHTML=mdToHtml(" . JsSrc . ");"
+		. "document.body.insertAdjacentHTML('afterbegin',mdToHtml(" . JsSrc . "));"
 		. "</script></body></html>"
 	)
 }
