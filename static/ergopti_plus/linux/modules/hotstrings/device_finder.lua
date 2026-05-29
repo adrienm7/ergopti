@@ -30,24 +30,7 @@ local M = {}
 -- =========================================
 -- =========================================
 
-local Logger = (function()
-	local ok, lib = pcall(require, "lib.logger")
-	if ok and lib then return lib end
-	local function _log(level, tag, fmt, ...)
-		local msg = select("#", ...) > 0 and string.format(fmt, ...) or fmt
-		print(string.format("[%s] [%s] %s", level, tag, msg))
-	end
-	return {
-		debug   = function(t, f, ...) _log("DEBUG",   t, f, ...) end,
-		trace   = function(t, f, ...) _log("TRACE",   t, f, ...) end,
-		done    = function(t, f, ...) _log("DONE",    t, f, ...) end,
-		info    = function(t, f, ...) _log("INFO",    t, f, ...) end,
-		start   = function(t, f, ...) _log("START",   t, f, ...) end,
-		success = function(t, f, ...) _log("SUCCESS", t, f, ...) end,
-		warn    = function(t, f, ...) _log("WARN",    t, f, ...) end,
-		error   = function(t, f, ...) _log("ERROR",   t, f, ...) end,
-	}
-end)()
+local Logger = require("logger.shim")
 
 local LOG = "modules.hotstrings.device_finder"
 
