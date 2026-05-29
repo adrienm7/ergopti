@@ -146,10 +146,11 @@ Test(Name, Callback) {
 ; Path of the TAP results file written alongside the test runner.
 global TEST_RESULTS_FILE := A_ScriptDir . "\test_results.txt"
 
-; Print a line to stdout and append it to TEST_RESULTS_FILE so the output
-; is readable even when AHK64 does not inherit the shell's stdout handle.
+; Append a TAP line to TEST_RESULTS_FILE. Writing to "*" (stdout) blocks when
+; AHK is launched via cmd redirection without an inherited console handle, so
+; the file is the single output channel. CI reads this file via tail-read while
+; the process runs.
 _TestPrint(Line) {
-	try FileAppend(Line . "`r`n", "*")
 	try FileAppend(Line . "`r`n", TEST_RESULTS_FILE)
 }
 
