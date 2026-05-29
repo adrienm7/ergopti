@@ -127,8 +127,20 @@ jobs:
             - name: Port compliance (all 20 ports covered by adapters)
               run: npm run test:port-compliance
 
-            - name: Property-based tests (fast-check, 26 × 1000 runs)
+            - name: Property-based tests (fast-check, 27 × 1000 runs)
               run: npm run test:properties
+
+            - name: Mutation tests — domain layer (Stryker, break=50)
+              # Guards the shared domain spec files (Registry, HotstringMatcher,
+              # Expander) by running the real spec exports through Stryker.
+              # A mutation score below 50% fails the build.
+              run: npm run test:mutation
+
+            - name: Convention lint (strict — banners, spacing, section headers)
+              # lint:conventions:strict fails on any violation. The --warn-only
+              # variant runs locally for developer convenience; CI uses strict
+              # mode to prevent convention drift from merging undetected.
+              run: npm run lint:conventions:strict
 
 
 # ==========================================
