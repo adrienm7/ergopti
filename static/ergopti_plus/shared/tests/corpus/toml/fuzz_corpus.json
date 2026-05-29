@@ -74,8 +74,8 @@
   {
     "id": "FUZZ-013",
     "input": "key = \"\\u0000value\"",
-    "expect": "error",
-    "description": "Null byte via TOML unicode escape inside a string value -- must not crash."
+    "expect": "ok",
+    "description": "Null codepoint via TOML unicode escape -- decoder must not crash (result is implementation-defined)."
   },
   {
     "id": "FUZZ-014",

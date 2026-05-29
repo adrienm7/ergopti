@@ -168,7 +168,7 @@ function M.resolve_system_prompt(profile, n)
 	local max_w = tonumber(hs.settings.get("llm_max_words")) or def_max
 	if max_w > 0 and max_w < min_w then max_w = min_w end
 
-	prompt = prompt:gsub("{max_words}", (max_w > 0) and tostring(max_w) or "illimite")
+	prompt = prompt:gsub("{max_words}", (max_w > 0) and tostring(max_w) or "illimité")
 	prompt = prompt:gsub("{min_words}", tostring(min_w))
 
 	-- Inject the active UI locale so the model replies in the user's language.
