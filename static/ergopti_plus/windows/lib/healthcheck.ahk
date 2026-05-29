@@ -328,8 +328,11 @@ HealthCheck_ShowWindow() {
 			WVC.Fill()
 			Html := _HealthCheck_MakeHtml(Md, BtnLabel)
 			try LoggerInfo("Healthcheck", "Calling NavigateToString (html len={1}).", StrLen(Html))
+			; Dump HTML to temp file for inspection when content is blank
+			try FileDelete(A_Temp . "\ergopti_hc_debug.html")
+			try FileAppend(Html, A_Temp . "\ergopti_hc_debug.html", "UTF-8")
 			try WV.NavigateToString(Html)
-			try LoggerDone("Healthcheck", "NavigateToString called.")
+			try LoggerDone("Healthcheck", "NavigateToString called — debug HTML at: {1}.", A_Temp . "\ergopti_hc_debug.html")
 			; Button still copies plain-text even with WebView2 active.
 			return
 		}
