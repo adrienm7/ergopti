@@ -317,10 +317,11 @@ HealthCheck_ShowWindow() {
 			}
 			OnMsg := (wv2, args) => _HealthCheck_OnWebMsg(wv2, args, PlainText, G)
 			try WV.WebMessageReceived(OnMsg)
-			WVC.Fill()
-			Html := "<!DOCTYPE html><html><body><h1>TEST</h1><p>Si tu vois ce texte WebView2 fonctionne.</p></body></html>"
-			try WV.NavigateToString(Html)
-			try LoggerDone("Healthcheck", "NavigateToString called — TEST page.")
+			; Defer Fill+NavigateToString so the message loop has painted the
+			; window and GetClientRect returns a valid non-zero rect.
+			Html := _HealthCheck_SnapshotToHtml(Snapshot, BtnLabel)
+			SetTimer(() => (WVC.Fill(), WV.NavigateToString(Html)), -50)
+			try LoggerDone("Healthcheck", "NavigateToString scheduled.")
 			; Button still copies plain-text even with WebView2 active.
 			return
 		}
