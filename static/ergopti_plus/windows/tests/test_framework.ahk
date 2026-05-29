@@ -156,9 +156,15 @@ _TestPrint(Line) {
 ; Execute every registered test, print TAP-style results and exit with
 ; code 0 (all green) or 1 (any failure). Designed to be called from the
 ; bottom of ``run_all.ahk`` after every test file has been #Included.
+; When --dry-run is passed on the command line, exits immediately after
+; printing the plan line so the CI warning-check step stays fast.
 RunTests() {
-	global TEST_REGISTRY, TEST_PASS_COUNT, TEST_FAIL_COUNT
+	global TEST_REGISTRY, TEST_PASS_COUNT, TEST_FAIL_COUNT, _AHK_DRY_RUN
 	_TestPrint("1.." . TEST_REGISTRY.Length)
+	if _AHK_DRY_RUN {
+		_TestPrint("# dry-run — skipping execution.")
+		ExitApp(0)
+	}
 	Index := 0
 	for TestEntry in TEST_REGISTRY {
 		Index += 1
