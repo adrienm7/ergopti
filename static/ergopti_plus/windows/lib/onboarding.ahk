@@ -154,12 +154,6 @@ Onboarding_ShowFromMenu(*) {
 ; =======================================
 ; ===============================================
 
-; Thin alias kept for backwards-compatibility with existing callers in this
-; wizard. The real detector lives in lib/i18n.ahk so I18nInit can use it too.
-_Onboarding_DetectSystemLocale() {
-	return _I18nDetectSystemLocale()
-}
-
 ; Resolve a translation key in a target locale WITHOUT touching the active
 ; locale cache. Used by step 1 so the heading/title/button can be re-rendered
 ; in the language being previewed while the rest of the running script keeps
@@ -213,7 +207,7 @@ _Onboarding_Step1() {
 	; same spot here. Detect the Windows UI language and pre-select it when
 	; it is in our supported list; otherwise fall back to English.
 	SortedLocales := _I18nSortedLocales()
-	DetectedCode := _Onboarding_DetectSystemLocale()
+	DetectedCode := _I18nDetectSystemLocale()
 	DefaultIndex := 1
 	for _i, _loc in SortedLocales {
 		if _loc.Code = DetectedCode {
@@ -221,8 +215,7 @@ _Onboarding_Step1() {
 			break
 		}
 	}
-	; Safety net: if detected code not found (shouldn't happen given the logic
-	; in _Onboarding_DetectSystemLocale), fall back to English.
+	; Safety net: if detected code not found, fall back to English.
 	if DefaultIndex = 1 and SortedLocales[1].Code != DetectedCode {
 		for _i, _loc in SortedLocales {
 			if _loc.Code = "en" {

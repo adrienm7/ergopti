@@ -901,12 +901,3 @@ LLM_Engine_OnResults(slots, ctx, active := 1, is_final := false) {
 	LLM_Tooltip_Show(display_slots, active, is_final)
 }
 
-/**
- * Backwards-compat alias used by external call sites that still feed a
- * single completion string. New code should use LLM_Engine_OnResults.
- * @param {string} text - Generated completion text.
- * @param {string} ctx  - The context that produced this result.
- */
-LLM_Engine_OnResult(text, ctx) {
-	LLM_Engine_OnResults([text], ctx, 1, true)
-}
