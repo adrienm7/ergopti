@@ -555,6 +555,9 @@ _HealthCheck_Code(s) => "<code>" . _HealthCheck_HE(s) . "</code>"
 
 ; Builds a self-contained HTML page directly from the snapshot Map.
 ; No runtime JS conversion — the HTML is fully rendered before NavigateToString.
+; NOTE: All labels and section titles in this function are intentionally in English
+; and must NOT go through the i18n system. Diagnostic output targets developers,
+; not end users — a consistent language makes cross-platform log comparison possible.
 _HealthCheck_SnapshotToHtml(Snapshot, BtnLabel) {
 	Sys       := Snapshot["sys"]
 	OkList    := Snapshot["ports_validated"]
@@ -592,7 +595,7 @@ _HealthCheck_SnapshotToHtml(Snapshot, BtnLabel) {
 		"<table>"
 		. "<tr><th>Field</th><th>Value</th></tr>"
 		. "<tr><td>ErgoptiPlus version</td><td>" . _HealthCheck_Code(Snapshot["version"])           . "</td></tr>"
-		. "<tr><td>Git commit</td><td>"         . _HealthCheck_Code(Sys["git_hash"] != "" ? Sys["git_hash"] : "unknown") . "</td></tr>"
+		. "<tr><td>Last git commit</td><td>"    . _HealthCheck_Code(Sys["git_hash"] != "" ? Sys["git_hash"] : "unknown") . "</td></tr>"
 		. "<tr><td>Uptime</td><td>"              . _HealthCheck_HE(_HealthCheck_FormatUptime(Snapshot["uptime_sec"])) . "</td></tr>"
 		. "<tr><td>AutoHotkey</td><td>"          . _HealthCheck_HE(Sys["ahk_version"] . " " . Sys["ahk_bitness"])    . "</td></tr>"
 		. "<tr><td>Windows</td><td>"             . _HealthCheck_HE(Sys["os_name"])                  . "</td></tr>"
