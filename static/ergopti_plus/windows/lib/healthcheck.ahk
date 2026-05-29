@@ -315,6 +315,7 @@ HealthCheck_ShowWindow() {
 
 		if WVC {
 			WV := WVC.CoreWebView2
+			try LoggerInfo("Healthcheck", "WebView2 controller obtained — wiring up.")
 			try {
 				s := WV.Settings
 				s.AreDevToolsEnabled              := false
@@ -325,11 +326,14 @@ HealthCheck_ShowWindow() {
 			OnMsg := (wv2, args) => _HealthCheck_OnWebMsg(wv2, args, PlainText, G)
 			try WV.WebMessageReceived(OnMsg)
 			WVC.Fill()
-			WV.NavigateToString(_HealthCheck_MakeHtml(Md, BtnLabel))
-			try LoggerDone("Healthcheck", "WebView2 diagnostic page loaded.")
+			Html := _HealthCheck_MakeHtml(Md, BtnLabel)
+			try LoggerInfo("Healthcheck", "Calling NavigateToString (html len={1}).", StrLen(Html))
+			try WV.NavigateToString(Html)
+			try LoggerDone("Healthcheck", "NavigateToString called.")
 			; Button still copies plain-text even with WebView2 active.
 			return
 		}
+		try LoggerWarn("Healthcheck", "WVC is falsy after create — falling back to Edit.")
 	}
 
 	; Fallback — overlay a selectable Edit over the Text placeholder.
