@@ -718,7 +718,7 @@ _Updater_OpenChangelogWindow(Channel) {
 		"<!DOCTYPE html><html><head><meta charset='utf-8'>"
 		. "<style>"
 		. "html,body{margin:0;padding:0;height:100%;font-family:'Segoe UI',sans-serif;font-size:13px;color:#1a1a1a;background:#fff;}"
-		. "body{padding:14px 18px;box-sizing:border-box;overflow-y:auto;}"
+		. "body{padding:14px 18px;box-sizing:border-box;overflow-y:auto;overflow-x:hidden;}"
 		. "h1{font-size:1.35em;margin:.6em 0 .3em;}h2{font-size:1.2em;margin:.6em 0 .25em;border-bottom:1px solid #ddd;padding-bottom:.2em;}"
 		. "h3{font-size:1.05em;margin:.5em 0 .2em;}h4,h5,h6{font-size:1em;margin:.4em 0 .15em;}"
 		. "p{margin:.35em 0;}ul,ol{margin:.3em 0 .3em 1.4em;padding:0;}li{margin:.15em 0;}"
@@ -836,6 +836,7 @@ _Updater_OpenChangelogWindow(Channel) {
 				s.AreDefaultContextMenusEnabled   := false
 				s.IsStatusBarEnabled              := false
 				s.AreBrowserAcceleratorKeysEnabled := false
+				s.IsSwipeNavigationEnabled         := false
 			}
 			WVC.Fill()
 			; NavigateToString is synchronous enough here — no "ready" handshake needed.
