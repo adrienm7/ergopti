@@ -948,9 +948,9 @@ LLM_TooltipGetText() {
 	if (text != "")
 		return text
 	for s in _LLM_Tooltip_Slots {
-		t := _LLM_SlotGetText(s)
-		if (t != "")
-			return t
+		SlotText := _LLM_SlotGetText(s)
+		if (SlotText != "")
+			return SlotText
 	}
 	return ""
 }
@@ -1141,7 +1141,7 @@ _TooltipBuildGuiLlm(slots, active_idx) {
 	_TooltipRowGuis := [{ Gui: G, H: TotalH, W: TotalW, IsSep: false }]
 
 	; Show via the same path as TooltipShow.
-	global _TooltipGeneration, _TooltipShownHwnds, _TOOLTIP_HWND_TRACK_CAP
+	global _TooltipGeneration, _TooltipShownHwnds, _TOOLTIP_HWND_TRACK_CAP, _TooltipTimerGeneration
 	_TooltipGeneration += 1
 	SetTimer(_TooltipTimerFn, 0)
 

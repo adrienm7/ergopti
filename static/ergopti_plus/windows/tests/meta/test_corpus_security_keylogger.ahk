@@ -69,7 +69,7 @@ _KL_ClassAndStyleIsPassword(Win32Class, Win32StyleHex) {
 ; ==================================================
 
 _SecurityCorpus_RunAll() {
-	CorpusPath := A_ScriptDir . "\..\..\..\shared\tests\corpus\security\keylogger_no_persist_vectors.json"
+	CorpusPath := A_ScriptDir . "\..\..\shared\tests\corpus\security\keylogger_no_persist_vectors.json"
 	_SecurityCorpus_Load() {
 		AssertTrue(FileExist(CorpusPath) != "", "Security corpus file must exist at: " . CorpusPath)
 	}
