@@ -33,7 +33,7 @@
 ; ======================================
 
 _TomlFuzz_RunAll() {
-	CorpusPath := A_ScriptDir . "\..\..\..\shared\tests\corpus\toml\fuzz_corpus.json"
+	CorpusPath := A_ScriptDir . "\..\..\shared\tests\corpus\toml\fuzz_corpus.json"
 
 	_TomlFuzz_FileExists() {
 		AssertTrue(FileExist(CorpusPath) != "", "TOML fuzz corpus must exist at: " . CorpusPath)

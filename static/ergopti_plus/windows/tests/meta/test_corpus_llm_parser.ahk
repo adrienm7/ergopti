@@ -32,16 +32,16 @@
 ; Dispatch a corpus vector to the correct AHK parser and return the result.
 ; Returns a Map with keys "text" (string) and "ok" (bool).
 _LLMCorpusDispatch(Vec) {
-	Parser := Vec.Has("parser") ? Vec["parser"] : ""
-	Input  := Vec.Has("input")  ? Vec["input"]  : ""
-	Format := Vec.Has("format") ? Vec["format"]  : ""
+	Parser    := Vec.Has("parser") ? Vec["parser"] : ""
+	Input     := Vec.Has("input")  ? Vec["input"]  : ""
+	FmtName   := Vec.Has("format") ? Vec["format"]  : ""
 
 	if (Parser = "ollama_nonstream") {
 		Text := LLM_ParseOllamaResponse(Input)
 		return Map("text", Text, "ok", Text != "")
 	}
 	if (Parser = "remote") {
-		Text := _LLMRemoteParseResponse(Format, Input)
+		Text := _LLMRemoteParseResponse(FmtName, Input)
 		return Map("text", Text, "ok", Text != "")
 	}
 	if (Parser = "all") {

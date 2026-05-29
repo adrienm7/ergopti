@@ -53,6 +53,14 @@ _REQUIRE_STATE_ALLOWLIST := Map(
 	; prevents re-entrant installs. `_LLM_Deps_PollTimer := unset` is a timer
 	; handle, not a lifecycle state. Architecture intentional; reviewed safe.
 	"modules/llm/ollama_deps_checker.ahk", true,
+
+	; gestures.ahk: `_GestureCycling := False` is a re-entrancy mutex that
+	; prevents the WinEvent hook from reacting to synthetic activations it
+	; triggers itself. The `if (_GestureCycling)` check is an early-exit on
+	; the mutex being SET (truthy), not a guard that blocks access when state
+	; is absent — the opposite polarity of a lifecycle init flag. Architecture
+	; reviewed safe; no public functions depend on a single init call.
+	"modules/gestures.ahk", true,
 )
 
 
