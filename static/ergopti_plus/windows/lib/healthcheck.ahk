@@ -318,9 +318,9 @@ HealthCheck_ShowWindow() {
 			OnMsg := (wv2, args) => _HealthCheck_OnWebMsg(wv2, args, PlainText, G)
 			try WV.WebMessageReceived(OnMsg)
 			WVC.Fill()
-			Html := _HealthCheck_SnapshotToHtml(Snapshot, BtnLabel)
+			Html := "<!DOCTYPE html><html><body><h1>TEST</h1><p>Si tu vois ce texte WebView2 fonctionne.</p></body></html>"
 			try WV.NavigateToString(Html)
-			try LoggerDone("Healthcheck", "NavigateToString called.")
+			try LoggerDone("Healthcheck", "NavigateToString called — TEST page.")
 			; Button still copies plain-text even with WebView2 active.
 			return
 		}
