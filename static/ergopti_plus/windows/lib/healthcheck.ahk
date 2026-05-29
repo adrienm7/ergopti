@@ -267,7 +267,7 @@ HealthCheck_ShowWindow() {
 	Snapshot  := HealthCheck_Run()
 	PlainText := HealthCheck_FormatPlain(Snapshot)
 
-	WinTitle := t("menu.debug.healthcheck") . " — ErgoptiPlus"
+	WinTitle := "ErgoptiPlus — " . t("menu.debug.healthcheck")
 	BtnLabel := t("healthcheck.copy_and_close")
 
 	InnerW   := _HC_WIN_W - _HC_MARGIN * 2

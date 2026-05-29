@@ -429,7 +429,7 @@ function M.show()
 
 	M._wv = ui_builder.show_webview({
 		frame       = frame,
-		title       = "Temps sur les applications",
+		title       = i18n.get("metrics_apps.window_title"),
 		style_masks = 15,
 		assets_dir  = hs.configdir .. "/../shared/ui/metrics_apps/",
 		usercontent = ucc,
