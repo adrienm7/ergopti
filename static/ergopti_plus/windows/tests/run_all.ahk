@@ -182,6 +182,9 @@ global _VendorDir := A_ScriptDir . "\..\vendor"
 ; shared cross-driver vectors.
 #Include ../_generated/prompt_builder.ahk
 #Include meta/test_corpus_prompt_builder.ahk
+; TOML fuzz corpus -- exercises ParseTomlFile() against 50 adversarial inputs.
+; Asserts the loader never crashes on any input (valid or invalid TOML).
+#Include meta/test_corpus_toml_fuzz.ahk
 
 ; Watchdog: kill the process if RunTests() never returns (e.g. a corpus
 ; consumer blocks on a synchronous HTTP call, an InputHook with no timeout,
