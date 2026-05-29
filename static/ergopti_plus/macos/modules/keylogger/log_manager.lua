@@ -48,6 +48,7 @@ local SqliteWriter = require("modules.keylogger.sqlite_writer")
 local Aggregator   = require("modules.keylogger.aggregator")
 local Rotation     = require("modules.keylogger.rotation")
 local Export       = require("modules.keylogger.export")
+local Metrics      = require("keylogger.metrics")
 
 
 
@@ -289,7 +290,7 @@ function M.flush_buffer()
 			total_chars   = total_chars + 1
 		end
 	end
-	local wpm = total_time_ms > 0 and ((total_chars / 5) / (total_time_ms / 60000)) or 0
+	local wpm = Metrics.compute_wpm_from_events(total_chars, total_time_ms)
 
 	-- Build a rich-text representation from rich_chunks.
 	local rich_str, cur_type, cur_text = "", nil, ""
