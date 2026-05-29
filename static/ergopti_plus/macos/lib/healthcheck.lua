@@ -221,14 +221,17 @@ function M.show_window()
 		_window = nil
 	end
 
-	local snapshot = M.run()
-	local html     = _snapshot_to_html(snapshot)
-	local plain    = M.format_plain(snapshot)
+	local snapshot  = M.run()
+	local plain     = M.format_plain(snapshot)
 
 	local i18n_ok, i18n = pcall(require, "lib.i18n")
-	local title = (i18n_ok and type(i18n) == "table" and type(i18n.get) == "function")
-		and i18n.get("menu.debug.healthcheck")
-		or "System Diagnostic"
+	local t = (i18n_ok and type(i18n) == "table" and type(i18n.get) == "function")
+		and function(k) return i18n.get(k) end
+		or  function(_) return nil end
+
+	local title     = t("menu.debug.healthcheck") or "System Diagnostic"
+	local btn_label = t("healthcheck.copy_and_close") or "Copy to clipboard and close"
+	local html      = _snapshot_to_html(snapshot, btn_label)
 
 	local screen = hs.screen.mainScreen()
 	local sf     = screen and type(screen.frame) == "function" and screen:frame()
@@ -265,19 +268,28 @@ function M.show_window()
 		end)
 	end)
 
-	-- Handle the copy-to-clipboard message posted by the in-page button
+	-- Wire up the copy-and-close button once the page is fully loaded.
+	-- The button navigates to ergopti://copy_and_close; the navigationCallback
+	-- intercepts that URL, copies the plain-text to the clipboard, and closes
+	-- the window — returning false cancels the navigation so no error page loads.
 	pcall(function()
-		wv:navigationCallback(function(action, _, _, _)
+		wv:navigationCallback(function(action, _, nav)
 			if action == "didFinishNavigation" then
-				-- Wire up the copy button now that the page is fully loaded
 				wv:evaluateJavaScript(
-					"document.getElementById('btnCopy').addEventListener('click',function(){"
-					.. "var el=document.createElement('textarea');"
-					.. "el.value=" .. _js_str(plain) .. ";"
-					.. "document.body.appendChild(el);el.select();"
-					.. "document.execCommand('copy');document.body.removeChild(el);"
-					.. "});"
+					"document.getElementById('btnCopy').onclick=function(){"
+					.. "window.location='ergopti://copy_and_close';"
+					.. "};"
 				)
+			elseif action == "willNavigate" then
+				local url = (type(nav) == "string") and nav or ""
+				if url:find("ergopti://copy_and_close") then
+					hs.pasteboard.setContents(plain)
+					if _window then
+						pcall(function() _window:delete() end)
+						_window = nil
+					end
+					return false  -- cancel navigation — no error page
+				end
 			end
 		end)
 	end)
@@ -482,12 +494,14 @@ end
 
 
 --- Builds a self-contained HTML page directly from the snapshot table.
---- NOTE: All labels are intentionally in English and must NOT be translated.
+--- NOTE: All section labels are intentionally in English and must NOT be translated.
 --- Diagnostic output is developer-facing — a consistent language makes
---- cross-platform log comparison straightforward.
+--- cross-platform log comparison straightforward. Only the button label (btn_label)
+--- is translated, as it is the sole user-facing element.
 --- @param snapshot table Result from M.run().
+--- @param btn_label string Translated label for the copy-and-close button.
 --- @return string Complete HTML document.
-function _snapshot_to_html(snapshot)
+function _snapshot_to_html(snapshot, btn_label)
 	local s         = snapshot
 	local sys       = s.sys or {}
 	local ok_list   = s.ports_validated or {}
@@ -579,7 +593,7 @@ function _snapshot_to_html(snapshot)
 		.. "<h2>Adapters (" .. #ok_list .. "/" .. total .. " OK)</h2>" .. adap_html
 		.. "<h2>Last recorded error</h2>" .. last_err_html
 		.. "<h2>Recent warnings / errors (" .. #issues .. "/100)</h2>" .. issues_html
-		.. "<button id='btnCopy'>Copy to clipboard</button>"
+		.. "<button id='btnCopy'>" .. _he(btn_label) .. "</button>"
 		.. "</body></html>"
 end
 
