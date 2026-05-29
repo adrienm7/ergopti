@@ -279,7 +279,6 @@ function M.new(deps, presets)
 				style_masks       = {"titled", "closable", "nonactivating"},
 				level             = hs.drawing.windowLevels.floating,
 				allow_text_entry  = true,
-				allow_gestures    = false,
 				allow_new_windows = false,
 				usercontent       = _ucc,
 				assets_dir        = ASSETS_DIR .. "../../token_prompt/",

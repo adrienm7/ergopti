@@ -270,7 +270,7 @@ function M.show_webview(opts)
 	pcall(function() wv:level(opts.level or hs.drawing.windowLevels.normal) end)
 	pcall(function() wv:allowTextEntry(opts.allow_text_entry ~= false) end)
 	
-	if opts.allow_gestures ~= nil then pcall(function() wv:allowGestures(opts.allow_gestures) end) end
+	pcall(function() wv:allowGestures(opts.allow_gestures == true) end)
 	if opts.allow_new_windows ~= nil then pcall(function() wv:allowNewWindows(opts.allow_new_windows) end) end
 
 	-- Bind closing cleanup callback
