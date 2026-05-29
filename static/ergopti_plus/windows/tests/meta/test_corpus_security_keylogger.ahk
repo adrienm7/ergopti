@@ -62,7 +62,7 @@ _KLDetectPasswordLogic(Win32Class, Win32Style) {
 ; ===================================================
 
 _SecurityCorpus_StructureCheck() {
-	CorpusPath := A_ScriptDir . "\..\..\..\..\..\shared\tests\corpus\security\keylogger_no_persist_vectors.json"
+	CorpusPath := A_ScriptDir . "\..\..\shared\tests\corpus\security\keylogger_no_persist_vectors.json"
 	AssertTrue(FileExist(CorpusPath) != "", "Security corpus file must exist")
 	if !FileExist(CorpusPath)
 		return

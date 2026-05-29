@@ -23,7 +23,6 @@
 ; ==============================================================================
 
 #Requires Autohotkey v2.0+
-#SingleInstance Force
 SetWorkingDir(A_ScriptDir)
 #Warn All, StdOut
 #Warn VarUnset, Off
@@ -127,19 +126,18 @@ InstallSendNoOps()
 ; LLM modules — pure-logic subset (profiles, models, api_common, api_ollama,
 ; api_remote, prediction_engine) included here to test JSON parsing, profile
 ; lookup, payload building, response parsing, cancel helpers, and engine
-; BISECT: LLM modules temporarily disabled to isolate hang
 ; debounce / cache logic without any real network calls.
 ; models.ahk defines LLM_GetSharedPath which profiles.ahk depends on.
-;#Include ../modules/llm/models.ahk
-;#Include ../modules/llm/profiles.ahk
-;#Include test_llm_profiles.ahk
-;#Include ../modules/llm/api_common.ahk
-;#Include ../modules/llm/api_ollama.ahk
-;#Include ../modules/llm/api_remote.ahk
-;#Include test_llm_api_ollama.ahk
-;#Include test_llm_api_remote.ahk
-;#Include ../modules/llm/prediction_engine.ahk
-;#Include test_llm_prediction_engine.ahk
+#Include ../modules/llm/models.ahk
+#Include ../modules/llm/profiles.ahk
+#Include test_llm_profiles.ahk
+#Include ../modules/llm/api_common.ahk
+#Include ../modules/llm/api_ollama.ahk
+#Include ../modules/llm/api_remote.ahk
+#Include test_llm_api_ollama.ahk
+#Include test_llm_api_remote.ahk
+#Include ../modules/llm/prediction_engine.ahk
+#Include test_llm_prediction_engine.ahk
 
 ; Gestures module — included here because its pure logic (assignments, action
 ; registry, dispatch) is testable. The hotkeys it registers are harmless since

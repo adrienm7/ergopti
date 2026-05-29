@@ -69,7 +69,7 @@ _LLMCorpusDispatch(Vec) {
 ; ===================================================
 
 _LLMParserCorpus_RegisterAll() {
-	CorpusPath := A_ScriptDir . "\..\..\..\..\..\shared\tests\corpus\llm\parser_test_vectors.json"
+	CorpusPath := A_ScriptDir . "\..\..\shared\tests\corpus\llm\parser_test_vectors.json"
 
 	if !FileExist(CorpusPath) {
 		; Register a single failing test so the missing corpus is visible in CI.
@@ -105,7 +105,7 @@ _LLMParserCorpus_RegisterAll() {
 		ExpOk      := VecCopy.Has("expected") && VecCopy["expected"].Has("ok")
 		             ? VecCopy["expected"]["ok"] : false
 
-		Test(NameCopy, [VecCopy, ExpText, ExpOk](*) => _RunLLMParserVector(VecCopy, ExpText, ExpOk))
+		Test(NameCopy, () => _RunLLMParserVector(VecCopy, ExpText, ExpOk))
 	}
 }
 
@@ -114,8 +114,8 @@ _RunLLMParserVector(Vec, ExpText, ExpOk) {
 	ActText  := Result["text"]
 	ActOk    := Result["ok"]
 
-	AssertEq(ActText, ExpText)
-	AssertEq(ActOk, ExpOk)
+	AssertEqual(ExpText, ActText)
+	AssertEqual(ExpOk, ActOk)
 }
 
 _LLMParserCorpus_RegisterAll()
