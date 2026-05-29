@@ -254,7 +254,6 @@ local function ensure_webview(title)
         style_masks       = {"titled", "closable", "miniaturizable", "resizable", "nonactivating"},
         level             = hs.drawing.windowLevels.floating,
         allow_text_entry  = false,
-        allow_gestures    = false,
         allow_new_windows = false,
         usercontent       = _ucc,
         assets_dir        = ASSETS_DIR,

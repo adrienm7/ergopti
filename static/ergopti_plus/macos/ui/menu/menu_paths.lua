@@ -548,13 +548,12 @@ function M.open_editor()
 		title       = i18n.get("menu.paths.window_title"),
 		style_masks = style_masks,
 		usercontent = _usercontent,
-		assets_dir     = ASSETS_DIR,
-		allow_gestures = false,
-		on_close       = function()
+		assets_dir    = ASSETS_DIR,
+		on_close      = function()
 			_webview     = nil
 			_usercontent = nil
 		end,
-		on_navigation  = function(action)
+		on_navigation = function(action)
 			if action == "didFinishNavigation" then
 				Logger.debug(LOG, "Navigation finished — injecting initData.")
 				hs.timer.doAfter(0.05, inject_init_data)

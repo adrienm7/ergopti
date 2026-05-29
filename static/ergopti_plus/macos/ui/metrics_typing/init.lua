@@ -344,9 +344,8 @@ function M.show()
 		frame       = frame,
 		title       = i18n.get("metrics_apps.title"),
 		style_masks = 15,
-		assets_dir     = hs.configdir .. "/../shared/ui/metrics_typing/",
-		allow_gestures = false,
-		on_close       = function()
+		assets_dir = hs.configdir .. "/../shared/ui/metrics_typing/",
+		on_close   = function()
 			M._wv = nil
 			if M._timer then M._timer:stop(); M._timer = nil end
 			Logger.info(LOG, "Typing metrics dashboard closed.")
