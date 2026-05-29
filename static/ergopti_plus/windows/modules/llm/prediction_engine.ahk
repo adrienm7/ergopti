@@ -711,7 +711,7 @@ _LLM_Engine_FinalizeRequest(state) {
 		; dropping. The tooltip auto-dismisses via its own timer.
 		try {
 			app_name := ""
-			try app_name := WinGetProcessName("A")
+			try app_name := WIGetFocused()["appId"]
 			KL_LogLlmFailed(Map(
 				"app",            app_name,
 				"context",        state["ctx"],
@@ -743,7 +743,7 @@ _LLM_Engine_FinalizeRequest(state) {
 	; response (OpenAI's ``usage`` block, Anthropic's ``usage`` block).
 	try {
 		app_name := ""
-		try app_name := WinGetProcessName("A")
+		try app_name := WIGetFocused()["appId"]
 		evt := Map(
 			"app",           app_name,
 			"context",       state["ctx"],
@@ -781,7 +781,7 @@ _LLM_Engine_FinalizeRequest(state) {
 	; both the tooltip flow and the inline-autotype flow contribute.
 	try {
 		app_name := ""
-		try app_name := WinGetProcessName("A")
+		try app_name := WIGetFocused()["appId"]
 		KL_LogLlmSuggested(app_name, state["slots"].Length)
 	}
 
@@ -807,11 +807,11 @@ _LLM_Engine_ResolveProfileIdForApp(default_id) {
 	overrides := _LLM_Engine["app_profile_overrides"]
 	if !(overrides is Map) or overrides.Count == 0
 		return default_id
-	; Pull the focused process. WinGetProcessName can throw when no
+	; Pull the focused process via the WindowInfo adapter. WIGetFocused() can throw when no
 	; window is focused (lock screen, transient menu); fall back to the
 	; default in that case rather than blowing up the prediction.
 	app := ""
-	try app := StrLower(WinGetProcessName("A"))
+	try app := StrLower(WIGetFocused()["appId"])
 	if (app == "")
 		return default_id
 	; Drop any trailing ``.exe`` so user-entered overrides ("slack") match

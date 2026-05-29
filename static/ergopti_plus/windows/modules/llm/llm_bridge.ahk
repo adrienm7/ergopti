@@ -144,7 +144,7 @@ LLM_Bridge_OnAccept(text) {
 	; process name (``WINWORD.EXE``) does not.
 	try {
 		app_name := ""
-		try app_name := WinGetProcessName("A")
+		try app_name := WIGetFocused()["appId"]
 		slots := LLM_Tooltip_GetSlots()
 		idx   := LLM_Tooltip_GetActiveIdx()
 		KL_LogLlmAccepted(text, app_name, slots, idx)
