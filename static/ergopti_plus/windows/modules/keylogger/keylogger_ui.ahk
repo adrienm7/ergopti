@@ -68,6 +68,11 @@ KLUI_ResolveAssetUrl(which) {
         base := A_LoopFileFullPath
     ; file:// URL: replace backslashes with forward slashes.
     url := "file:///" . StrReplace(base, "\", "/")
+    ; Embed the prefetch file path in the hash so the page bootstrap can
+    ; fetch from %TEMP% instead of the repo directory. Hash fragments are
+    ; safe on file:// URLs in Chromium (no request, no cache-buster issue).
+    prefetch_path := StrReplace(KLPF_PrefetchPath(which), "\", "/")
+    url .= "#prefetch=file:///" . prefetch_path
     return url
 }
 

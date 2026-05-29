@@ -79,6 +79,8 @@ static/ergopti_plus/windows/_generated/paths.toml
 static/ergopti_plus/macos/_generated/paths.toml
 static/ergopti_plus/windows/_generated/personal_shortcuts.ahk
 static/ergopti_plus/windows/_generated/prefetch_*.json
+static/ergopti_plus/shared/ui/metrics_typing/prefetch.json
+static/ergopti_plus/shared/ui/metrics_apps/prefetch.json
 
 # Corpus working copy produced by build scripts
 static/corpus/modifie/
