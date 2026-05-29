@@ -257,8 +257,10 @@ HealthCheck_FormatMarkdown(Snapshot := 0) {
 }
 
 ; Opens a dedicated window displaying the healthcheck report.
-; Uses WebView2 (parented to G.Hwnd with manual Bounds) for selectable rich HTML.
-; Falls back to a selectable Edit control when WebView2 is unavailable.
+; WebView2 fills the entire Gui (G.Hwnd parent + Fill()) so no Bounds calculation is
+; needed. The copy button lives inside the HTML and posts "copy_and_close" via
+; chrome.webview.postMessage so JS→AHK communication replaces an AHK button.
+; Falls back to a native Edit + Button when WebView2 is unavailable.
 HealthCheck_ShowWindow() {
 	global _VendorDir
 
@@ -266,61 +268,61 @@ HealthCheck_ShowWindow() {
 	Md        := HealthCheck_FormatMarkdown(Snapshot)
 	PlainText := HealthCheck_FormatPlain(Snapshot)
 
-	WinTitle := t("menu.debug.healthcheck") . " — ErgoptiPlus"
-
-	InnerW   := 720
-	Margin   := 12
-	ContentH := 560
-	BtnH     := 32
-
-	G := Gui("+Resize +MinSize540x420", WinTitle)
-	G.SetFont("s10", "Segoe UI")
-	G.MarginX := Margin
-	G.MarginY := 10
-
-	; Invisible placeholder so AutoSize accounts for the content area height.
-	; WebView2 will be parented to G.Hwnd and positioned over this slot.
-	ContentCtl := G.Add("Text", "xm ym w" . InnerW . " h" . ContentH, "")
-
-	BtnLabel := t("healthcheck.copy_and_close")
-	BtnCopy  := G.Add("Button", "xm y+10 w" . InnerW . " h" . BtnH . " Default", BtnLabel)
-
-	CloseAndCopy := (*) => (A_Clipboard := PlainText, G.Destroy())
-	G.OnEvent("Close",  (*) => G.Destroy())
-	G.OnEvent("Escape", (*) => G.Destroy())
-	BtnCopy.OnEvent("Click", CloseAndCopy)
-
-	G.Show("w" . (InnerW + Margin * 2) . " AutoSize")
+	WinTitle  := t("menu.debug.healthcheck") . " — ErgoptiPlus"
+	BtnLabel  := t("healthcheck.copy_and_close")
 
 	UseWV := IsSet(WebView2) && IsSet(_VendorDir) && FileExist(_VendorDir . "\64bit\WebView2Loader.dll")
+
 	if UseWV {
+		; WebView2 path — button is rendered inside HTML, no native AHK button needed.
+		WinW := 740
+		WinH := 640
+		G := Gui("+Resize +MinSize540x420", WinTitle)
+		G.MarginX := 0
+		G.MarginY := 0
+		G.OnEvent("Close",  (*) => G.Destroy())
+		G.OnEvent("Escape", (*) => G.Destroy())
+		G.Show("w" . WinW . " h" . WinH)
+
 		loader := _VendorDir . "\64bit\WebView2Loader.dll"
 		udir   := A_Temp . "\ergopti_hc_wv_" . A_TickCount
 		try DirCreate(udir)
 
-		Html := _HealthCheck_MakeHtml(Md)
+		Html := _HealthCheck_MakeHtml(Md, BtnLabel)
 
-		; Get the content slot position to compute Bounds for the WebView2 controller.
-		; Must be read after G.Show() so client-rect coordinates are final.
-		ContentCtl.GetPos(&CX, &CY, &CW, &CH)
-
-		OnReady := (WVC) => _HealthCheck_OnWVReady(WVC, Html, CX, CY, CW, CH)
+		OnMsg := (WV, MsgArgs) => _HealthCheck_OnWebMsg(WV, MsgArgs, PlainText, G)
+		OnReady := (WVC) => _HealthCheck_OnWVReady(WVC, Html, OnMsg)
 
 		try {
 			WebView2.create(G.Hwnd, OnReady, 0, udir, "", 0, loader)
+			return
 		} catch as Err {
 			try LoggerWarn("Healthcheck", "WebView2 create failed: {1} — falling back.", Err.Message)
-			UseWV := false
+			G.Destroy()
 		}
 	}
 
-	if !UseWV
-		_HealthCheck_AddFallbackEdit(G, ContentCtl, PlainText)
+	; Fallback — native AHK controls (plain text, selectable Edit + native button).
+	InnerW := 700
+	Margin := 12
+	BtnH   := 32
+	G := Gui("+Resize +MinSize540x420", WinTitle)
+	G.SetFont("s10", "Segoe UI")
+	G.MarginX := Margin
+	G.MarginY := 10
+	ContentCtl := G.Add("Text", "xm ym w" . InnerW . " h560", "")
+	BtnCopy    := G.Add("Button", "xm y+10 w" . InnerW . " h" . BtnH . " Default", BtnLabel)
+	CloseAndCopy := (*) => (A_Clipboard := PlainText, G.Destroy())
+	G.OnEvent("Close",  (*) => G.Destroy())
+	G.OnEvent("Escape", (*) => G.Destroy())
+	BtnCopy.OnEvent("Click", CloseAndCopy)
+	G.Show("w" . (InnerW + Margin * 2) . " AutoSize")
+	_HealthCheck_AddFallbackEdit(G, ContentCtl, PlainText)
 }
 
 ; Called by WebView2 once the controller COM object is fully ready.
-; Sets explicit Bounds over the content slot so the WebView fills only that area.
-_HealthCheck_OnWVReady(WVC, Html, CX, CY, CW, CH) {
+; Fill() covers the entire Gui client area — no manual Bounds needed.
+_HealthCheck_OnWVReady(WVC, Html, OnMsg) {
 	try {
 		s := WVC.CoreWebView2.Settings
 		s.AreDevToolsEnabled              := false
@@ -328,14 +330,22 @@ _HealthCheck_OnWVReady(WVC, Html, CX, CY, CW, CH) {
 		s.IsStatusBarEnabled              := false
 		s.AreBrowserAcceleratorKeysEnabled := false
 	}
-	; Position the WebView over the content slot (excludes button row).
-	try {
-		R := WebView2.RECT()
-		NumPut("int", CX, "int", CY, "int", CX + CW, "int", CY + CH, R)
-		WVC.Bounds := R
-	}
+	try WVC.CoreWebView2.WebMessageReceived(OnMsg)
+	try WVC.Fill()
 	try WVC.CoreWebView2.NavigateToString(Html)
 	try LoggerDone("Healthcheck", "WebView2 ready — diagnostic page loaded.")
+}
+
+; Handles messages posted from the HTML page via chrome.webview.postMessage.
+; "copy_and_close" copies the plain-text report to the clipboard then destroys the window.
+_HealthCheck_OnWebMsg(WV, MsgArgs, PlainText, G) {
+	try {
+		Msg := MsgArgs.TryGetWebMessageAsString()
+		if Msg = "copy_and_close" {
+			A_Clipboard := PlainText
+			G.Destroy()
+		}
+	}
 }
 
 ; Overlays a selectable read-only Edit on the same slot as the given placeholder control.
@@ -528,9 +538,9 @@ _HealthCheck_RecentIssues(MaxLines) {
 }
 
 ; Builds a self-contained HTML page from a Markdown string.
-; Shares the same inline MD renderer used by the changelog window.
-_HealthCheck_MakeHtml(Md) {
-	; Escape for embedding as a JS single-quoted string literal
+; BtnLabel is injected as a sticky footer button that posts "copy_and_close" to AHK.
+_HealthCheck_MakeHtml(Md, BtnLabel) {
+	; Escape Markdown for a JS single-quoted string literal
 	Safe := StrReplace(Md,   "\",  "\\")
 	Safe := StrReplace(Safe, "'",  "\'")
 	Safe := StrReplace(Safe, "`n", "\n")
@@ -538,11 +548,22 @@ _HealthCheck_MakeHtml(Md) {
 	Safe := StrReplace(Safe, "`t", "\t")
 	JsSrc := "'" . Safe . "'"
 
+	; Escape button label for HTML
+	SafeBtn := StrReplace(BtnLabel, "&", "&amp;")
+	SafeBtn := StrReplace(SafeBtn, "<", "&lt;")
+	SafeBtn := StrReplace(SafeBtn, ">", "&gt;")
+	SafeBtn := StrReplace(SafeBtn, "'", "&#39;")
+
 	return (
 		"<!DOCTYPE html><html><head><meta charset='utf-8'>"
 		. "<style>"
-		. "html,body{margin:0;padding:0;font-family:'Segoe UI',sans-serif;font-size:13px;color:#1a1a1a;background:#fff;}"
-		. "body{padding:16px 20px;box-sizing:border-box;overflow-y:auto;}"
+		. "*{box-sizing:border-box;}"
+		. "html{height:100%;margin:0;padding:0;}"
+		. "body{height:100%;margin:0;padding:0;font-family:'Segoe UI',sans-serif;font-size:13px;color:#1a1a1a;background:#fff;display:flex;flex-direction:column;}"
+		. "#content{flex:1;overflow-y:auto;padding:16px 20px;}"
+		. "#footer{flex-shrink:0;padding:8px 16px;border-top:1px solid #e0e0e0;background:#f8f8f8;}"
+		. "#btnCopy{width:100%;padding:7px 16px;font-family:'Segoe UI',sans-serif;font-size:13px;background:#0078d4;color:#fff;border:none;border-radius:4px;cursor:pointer;}"
+		. "#btnCopy:hover{background:#106ebe;}"
 		. "h1{font-size:1.25em;margin:0 0 .6em;}"
 		. "h2{font-size:1.05em;margin:1.2em 0 .3em;border-bottom:1px solid #e0e0e0;padding-bottom:.2em;color:#333;}"
 		. "table{border-collapse:collapse;width:100%;margin:.4em 0 .8em;}th,td{border:1px solid #e0e0e0;padding:.3em .65em;text-align:left;}"
@@ -553,7 +574,10 @@ _HealthCheck_MakeHtml(Md) {
 		. "pre code{background:none;padding:0;color:inherit;}"
 		. "em{font-style:italic;color:#666;}"
 		. ".ok{color:#1a7f37;font-weight:600;}.fail{color:#cf222e;font-weight:600;}"
-		. "</style></head><body>"
+		. "</style></head>"
+		. "<body>"
+		. "<div id='content'></div>"
+		. "<div id='footer'><button id='btnCopy' onclick=`"window.chrome.webview.postMessage('copy_and_close')`">" . SafeBtn . "</button></div>"
 		. "<script>"
 		. "function mdToHtml(s){"
 		. "var lines=s.split('\n'),out=[],inPre=false,inUl=false,inOl=false,inTbl=false;"
@@ -584,7 +608,7 @@ _HealthCheck_MakeHtml(Md) {
 		. "closeBlocks();out.push('<p>'+inline(l)+'</p>');}"
 		. "if(inPre)out.push('</code></pre>');closeBlocks();"
 		. "return out.join('\n');}"
-		. "document.body.innerHTML=mdToHtml(" . JsSrc . ");"
+		. "document.getElementById('content').innerHTML=mdToHtml(" . JsSrc . ");"
 		. "</script></body></html>"
 	)
 }
