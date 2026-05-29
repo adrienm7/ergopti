@@ -307,7 +307,7 @@ jobs:
 
             - name: Run AHK test suite
               shell: pwsh
-              timeout-minutes: 15
+              timeout-minutes: 5
               run: |
                   $ahk = Get-ChildItem "C:\AutoHotkey" -Filter "AutoHotkey64.exe" |
                       Select-Object -First 1 -ExpandProperty FullName

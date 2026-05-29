@@ -28,7 +28,7 @@
 ; ===================================================
 
 _PromptBuilderCorpus_RegisterAll() {
-	CorpusPath := A_ScriptDir . "\..\..\..\..\..\shared\tests\corpus\prompt_builder\vectors.json"
+	CorpusPath := A_ScriptDir . "\..\..\shared\tests\corpus\prompt_builder\vectors.json"
 
 	if !FileExist(CorpusPath) {
 		Test("PromptBuilder corpus: file exists", () => AssertTrue(false,
@@ -65,7 +65,7 @@ _PromptBuilderCorpus_RegisterAll() {
 		CfgCopy    := AhkCfg
 		PBRef      := PB
 
-		Test(NameCopy, [PBRef, BufCopy, CfgCopy, ExpCopy](*) =>
+		Test(NameCopy, () =>
 			_RunPromptBuilderVector(PBRef, BufCopy, CfgCopy, ExpCopy))
 	}
 }
