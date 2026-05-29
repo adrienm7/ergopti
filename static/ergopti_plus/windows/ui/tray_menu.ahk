@@ -1088,39 +1088,165 @@ _BuildShortcutsSubmenu() {
 	return SubMenu
 }
 
-; Build the TapHolds submenu from ``TapHoldGroupOrder()`` and the variant
-; tables in ``lib/tap_hold/tap_hold_writer.ahk``.
+; Build the TapHolds submenu — one entry per physical key, each with a
+; tap picker submenu and a hold picker submenu, mirroring the macOS Karabiner
+; menu design.
 ;
-; The render shape is:
+; Render shape:
 ;
 ;   ☰ Tap-Hold
-;     ↳ CapsLock submenu (variant toggles BackSpace / CapsLockCtrl / …)
-;     ↳ LShiftCopy (flat toggle at top level)
-;     ↳ LCtrlPaste (flat toggle)
-;     ↳ LAlt submenu (variant toggles)
-;     ↳ Space submenu
-;     ↳ AltGr submenu
-;     ↳ RCtrl submenu
-;     ↳ TabAlt (flat toggle)
+;     ↳ Tab  :  Alt-Tab / Alt          [checkmark when configured]
+;       ↳ Rien (désactiver)
+;       ↳ ---
+;       ↳ Tap  → "Alt-Tab"             [opens tap picker]
+;       ↳ Hold → "Alt"                 [opens hold picker]
+;     ↳ CapsLock  :  Entrée / Ctrl
+;     ↳ …
 ;
-; Sub-Map groups (CapsLock/LAlt/AltGr/RCtrl/Space) produce a child submenu
-; with one item per variant. Flat groups (LShiftCopy/LCtrlPaste/TabAlt) add
-; a single toggle item directly. Labels and check state go through
-; ``MenuAddItem`` → ``GetMenuTitleByPath`` → ``TapHoldVariantLabel``.
+; Tap picker: all GESTURE_ACTIONS ids, labelled via sg_actions.* locale keys.
+; Hold picker: fixed set from _TH_HoldOptions (modifiers + nav layer + none).
+; Both pickers persist immediately via WriteTapHoldTap / WriteTapHoldHold and
+; reload the script to refresh the menu.
 _BuildTapHoldsSubmenu() {
 	SubMenu := Menu()
-	for Key in TapHoldGroupOrder() {
-		if TapHoldIsSubMapGroup(Key) {
-			KeyMenu := Menu()
-			for VariantName in TapHoldVariantNames(Key) {
-				MenuAddItem(KeyMenu, "TapHolds." . Key, VariantName)
-			}
-			SubMenu.Add(TapHoldGroupLabel(Key), KeyMenu)
-		} else {
-			MenuAddItem(SubMenu, "TapHolds", Key)
+	for KeyDef in TapHoldKeyDefs() {
+		KeyId    := KeyDef["id"]
+		KeyLabel := t(KeyDef["i18n"])
+		TapLbl   := TapHoldCurrentTapLabel(KeyId)
+		HoldLbl  := TapHoldCurrentHoldLabel(KeyId)
+
+		; Determine whether this key has any configuration.
+		global TapHold
+		IsConfigured := IsSet(TapHold) and TapHoldIsConfigured(TapHold, KeyId)
+
+		; Parent entry label: "KeyLabel  :  TapLabel / HoldLabel" or "—"
+		NoneLabel := t("tap_hold.tap.none")
+		NoneHold  := t("tap_hold.hold.none")
+		ComboLabel := (TapLbl == NoneLabel and HoldLbl == NoneHold)
+			? "—"
+			: (TapLbl . "  /  " . HoldLbl)
+		ParentLabel := KeyLabel . "  :  " . ComboLabel
+
+		KeyMenu := Menu()
+
+		; "Nothing / disable" item — clears both slots.
+		DisableLabel := t("tap_hold.action.disable")
+		KeyMenu.Add(DisableLabel, _TH_MakeDisableFn(KeyId))
+		if !IsConfigured {
+			KeyMenu.Disable(DisableLabel)
+		}
+
+		KeyMenu.Add()  ; separator
+
+		; "Tap → [current]" item — opens the tap picker submenu.
+		TapPickerLabel := StrReplace(t("tap_hold.picker.tap"), "%s", TapLbl)
+		TapPickerMenu  := _BuildTapPickerSubmenu(KeyId)
+		KeyMenu.Add(TapPickerLabel, TapPickerMenu)
+
+		; "Hold → [current]" item — opens the hold picker submenu.
+		HoldPickerLabel := StrReplace(t("tap_hold.picker.hold"), "%s", HoldLbl)
+		HoldPickerMenu  := _BuildHoldPickerSubmenu(KeyId)
+		KeyMenu.Add(HoldPickerLabel, HoldPickerMenu)
+
+		SubMenu.Add(ParentLabel, KeyMenu)
+		if IsConfigured {
+			SubMenu.Check(ParentLabel)
 		}
 	}
 	return SubMenu
+}
+
+; Return the "none" hold option map (first entry in _TH_HoldOptions).
+_TH_NoneHoldOpt() {
+	global _TH_HoldOptions
+	return _TH_HoldOptions[1]
+}
+
+; ---- Callback classes ---------------------------------------------------------
+; AHK v2 fat-arrow closures cannot contain multiple statements. These classes
+; capture (KeyId, ActionId, HoldOpt) by value and expose a Call() method
+; bound via ObjBindMethod so AHK's Menu.Add() receives a valid callable.
+
+class _TH_DisableFnObj {
+	KeyId := ""
+	Call(*) {
+		WriteTapHoldTap(this.KeyId, "")
+		WriteTapHoldHold(this.KeyId, _TH_NoneHoldOpt())
+		Reload
+	}
+}
+
+class _TH_TapFnObj {
+	KeyId    := ""
+	ActionId := ""
+	Call(*) {
+		WriteTapHoldTap(this.KeyId, this.ActionId)
+		Reload
+	}
+}
+
+class _TH_HoldFnObj {
+	KeyId   := ""
+	HoldOpt := ""
+	Call(*) {
+		WriteTapHoldHold(this.KeyId, this.HoldOpt)
+		Reload
+	}
+}
+
+; Build a bound callback that clears both tap and hold for a key.
+_TH_MakeDisableFn(KeyId) {
+	obj := _TH_DisableFnObj()
+	obj.KeyId := KeyId
+	return ObjBindMethod(obj, "Call")
+}
+
+; Build the tap picker submenu for a given key. Shows all GESTURE_ACTIONS
+; ids labelled via sg_actions.* locale keys; current selection is checked.
+_BuildTapPickerSubmenu(KeyId) {
+	global GESTURE_ACTIONS
+	PickerMenu := Menu()
+	for ActionId, _ in GESTURE_ACTIONS {
+		Label    := _GestureActionLabel(ActionId)
+		IsActive := IsTapHoldTapActive(KeyId, ActionId)
+		PickerMenu.Add(Label, _TH_MakeTapFn(KeyId, ActionId))
+		if IsActive {
+			PickerMenu.Check(Label)
+		}
+	}
+	return PickerMenu
+}
+
+; Build a bound callback that writes a tap action for a key, then reloads.
+_TH_MakeTapFn(KeyId, ActionId) {
+	obj := _TH_TapFnObj()
+	obj.KeyId    := KeyId
+	obj.ActionId := ActionId
+	return ObjBindMethod(obj, "Call")
+}
+
+; Build the hold picker submenu for a given key. Shows the fixed hold options
+; from _TH_HoldOptions; current selection is checked.
+_BuildHoldPickerSubmenu(KeyId) {
+	global _TH_HoldOptions
+	PickerMenu := Menu()
+	for HoldOpt in _TH_HoldOptions {
+		Label    := t(HoldOpt["i18n"])
+		IsActive := IsTapHoldHoldActive(KeyId, HoldOpt)
+		PickerMenu.Add(Label, _TH_MakeHoldFn(KeyId, HoldOpt))
+		if IsActive {
+			PickerMenu.Check(Label)
+		}
+	}
+	return PickerMenu
+}
+
+; Build a bound callback that writes a hold option for a key, then reloads.
+_TH_MakeHoldFn(KeyId, HoldOpt) {
+	obj := _TH_HoldFnObj()
+	obj.KeyId   := KeyId
+	obj.HoldOpt := HoldOpt
+	return ObjBindMethod(obj, "Call")
 }
 
 ; Render the runtime-registered personal shortcuts at the bottom of the

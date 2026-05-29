@@ -519,6 +519,30 @@ global GESTURE_ACTIONS := Map(
     "paste_plain", {
         Fn: (*) => GesturePastePlain(),
     },
+    ; --- Tap-hold tap actions (exposed here so the tap picker can list them) ---
+    ; These are dispatched by the tap-hold runtime directly; the Fn below fires
+    ; when the action is triggered via a gesture slot instead.
+    "one_shot_shift", {
+        Fn: (*) => OneShotShift(),
+    },
+    "caps_word", {
+        Fn: (*) => ToggleCapsWord(),
+    },
+    "ctrl_backspace", {
+        Fn: (*) => TextPressKey("BackSpace", ["Ctrl"]),
+    },
+    "ctrl_delete", {
+        Fn: (*) => TextPressKey("Delete", ["Ctrl"]),
+    },
+    "alt_tab_monitor", {
+        Fn: (*) => AltTabMonitor(),
+    },
+    "space", {
+        Fn: (*) => TextPressKey("Space", []),
+    },
+    "caps_lock", {
+        Fn: (*) => ToggleCapsLock(),
+    },
 )
 
 ; Returns the translated label for a gesture action.
