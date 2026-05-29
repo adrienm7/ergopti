@@ -433,18 +433,39 @@ jobs:
                       Select-Object -First 1 -ExpandProperty FullName
                   if (-not $ahk) { Write-Error "AutoHotkey64.exe not found."; exit 2 }
                   $runner = "${{ github.workspace }}\static\ergopti_plus\windows\tests\e2e\run_e2e.ahk"
+                  $resultsFile = "${{ github.workspace }}\static\ergopti_plus\windows\tests\e2e\test_results.txt"
+                  Remove-Item $resultsFile -Force -ErrorAction SilentlyContinue
                   Write-Host "AHK runtime : $ahk"
                   Write-Host "E2E runner  : $runner"
                   Write-Host "------------------------------------------------------------"
-                  # AHK does not write to the parent shell's stdout natively;
-                  # wrap via cmd.exe so FileAppend("*") output reaches the log.
-                  # run_e2e.ahk has a 30-s watchdog that calls ExitApp(2) if
-                  # RunTests does not return in time, preventing a silent hang.
-                  $output = & cmd /c "`"$ahk`" `"$runner`" 2>&1"
-                  $exit = $LASTEXITCODE
-                  $output | ForEach-Object { Write-Host $_ }
+                  # Same approach as the unit test suite: AHK writes TAP output to
+                  # test_results.txt (FileAppend to "*" blocks without a console handle).
+                  # Tail-read the file for real-time CI log output.
+                  $proc = Start-Process -FilePath $ahk -ArgumentList $runner -NoNewWindow -PassThru
+                  $fstream = $null; $reader = $null
+                  while (-not $proc.HasExited) {
+                      if ($null -eq $fstream -and (Test-Path $resultsFile)) {
+                          $fstream = [System.IO.FileStream]::new($resultsFile,
+                              [System.IO.FileMode]::Open,
+                              [System.IO.FileAccess]::Read,
+                              [System.IO.FileShare]::ReadWrite)
+                          $reader = [System.IO.StreamReader]::new($fstream)
+                      }
+                      if ($null -ne $reader) {
+                          $line = $reader.ReadLine()
+                          if ($null -ne $line) { Write-Host $line } else { Start-Sleep -Milliseconds 100 }
+                      } else { Start-Sleep -Milliseconds 100 }
+                  }
+                  if ($null -ne $reader) {
+                      while ($null -ne ($line = $reader.ReadLine())) { Write-Host $line }
+                      $reader.Close(); $fstream.Close()
+                  }
+                  $exit = $proc.ExitCode
                   Write-Host "------------------------------------------------------------"
                   Write-Host "Exit code: $exit"
+                  if (-not (Test-Path $resultsFile)) {
+                      Write-Error "test_results.txt not created — AHK may have crashed at startup."; exit 2
+                  }
                   if ($exit -ne 0) {
                       Write-Error "E2E suite failed (exit $exit)."; exit $exit
                   }
