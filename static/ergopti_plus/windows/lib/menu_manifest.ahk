@@ -1,30 +1,27 @@
 ﻿; lib/menu_manifest.ahk
-
-
-
-
-
-; =======================================
-; =======================================
-; ======= 1/ Menu Manifest Loader =======
-; =======================================
-; =======================================
 ;
+; ==============================================================================
 ; MODULE: Menu Manifest Loader
 ; DESCRIPTION:
-; Reads ``static/ergopti_plus/shared/menu_manifest.json`` at boot and exposes the hotstring group
-; arrays so the rest of the driver never hard-codes category lists.
+; Reads ``static/ergopti_plus/shared/menu_manifest.json`` at boot and exposes
+; ordered menu structures so the rest of the driver never hard-codes menu layout.
 ;
 ; FEATURES & RATIONALE:
-; 1. Single Source of Truth: the manifest is shared with the SvelteKit front-end,
-;    so adding a new hotstring category only requires editing one JSON file.
-; 2. Canonical Parser: delegates all JSON parsing to lib/json.ahk (JsonParse),
-;    eliminating the former regex micro-parser and ensuring correctness on any
-;    valid manifest shape.
-; 3. Safe Fallback: if the file is missing or unparseable, the function returns
-;    the hard-coded lists that were in place before this refactor, guaranteeing
-;    zero regression at runtime.
+; 1. Single Source of Truth: the manifest is shared with the Hammerspoon driver
+;    and the SvelteKit front-end — changing menu order requires editing one file.
+; 2. Canonical Parser: delegates all JSON parsing to lib/json.ahk (JsonParse).
+; 3. Safe Fallback: returns hard-coded lists on any read or parse failure.
 ; ==============================================================================
+
+
+
+
+
+; =============================================
+; =============================================
+; ======= 1/ Hotstring Groups Loader ==========
+; =============================================
+; =============================================
 
 ; Hard-coded fallback values — kept here as the single recovery point if the
 ; manifest file cannot be read; they mirror the former global declarations in
@@ -154,4 +151,85 @@ _MM_BuildResult(Standard, Ergopti, Dynamic) {
 		dynamic:  Dynamic,
 		all:      All
 	}
+}
+
+
+
+
+; ============================================
+; ============================================
+; ======= 2/ Debug Menu Order Loader =========
+; ============================================
+; ============================================
+
+; Loads the ``debug_menu`` array from the shared manifest and returns it as an
+; Array of Maps, each with "id" and optionally "platforms".
+; Filters out any entry whose ``platforms`` list exists and does not include "ahk".
+; Returns a hard-coded fallback array on any read or parse failure.
+MenuManifest_LoadDebugMenu() {
+	global _SharedDir
+
+	FilePath := _SharedDir . "\menu_manifest.json"
+
+	if !FileExist(FilePath) {
+		try LoggerWarn("MenuManifest", "manifest not found — using fallback debug menu order.")
+		return _MM_DebugFallback()
+	}
+
+	FileContent := ""
+	try FileContent := FileRead(FilePath, "UTF-8")
+	if FileContent == ""
+		return _MM_DebugFallback()
+
+	Root := ""
+	try Root := JsonParse(FileContent)
+	if !(Root is Map)
+		return _MM_DebugFallback()
+
+	RawItems := _MM_MapGet(Root, "debug_menu")
+	if !(RawItems is Array) || RawItems.Length == 0
+		return _MM_DebugFallback()
+
+	Result := []
+	for Entry in RawItems {
+		if !(Entry is Map)
+			continue
+		Id := _MM_MapGet(Entry, "id")
+		if Id == ""
+			continue
+
+		; Filter by platform: skip entries that explicitly exclude "ahk"
+		Platforms := _MM_MapGet(Entry, "platforms", 0)
+		if Platforms is Array {
+			IsForAhk := false
+			for P in Platforms {
+				if P == "ahk" {
+					IsForAhk := true
+					break
+				}
+			}
+			if !IsForAhk
+				continue
+		}
+
+		Result.Push(Map("id", Id))
+	}
+
+	try LoggerDone("MenuManifest", "Debug menu order loaded (%d item(s)).", Result.Length)
+	return Result.Length > 0 ? Result : _MM_DebugFallback()
+}
+
+; Hard-coded fallback — mirrors the canonical order defined in menu_manifest.json.
+_MM_DebugFallback() {
+	return [
+		Map("id", "window_spy"),
+		Map("id", "list_vars"),
+		Map("id", "key_history"),
+		Map("id", "---"),
+		Map("id", "log_level"),
+		Map("id", "open_logs"),
+		Map("id", "open_today_log"),
+		Map("id", "---"),
+		Map("id", "healthcheck"),
+	]
 }

@@ -537,6 +537,7 @@
 	"menu.debug.open_logs": "Protokollordner öffnen",
 	"menu.debug.open_today_log": "Heutiges Protokoll öffnen",
 	"menu.debug.title": "⚠ Debugging",
+	"healthcheck.copy_and_close": "In Zwischenablage kopieren und schließen",
 	"menu.debug.window_spy": "Window Spy",
 	"menu.extensions.empty": "Keine Erweiterung installiert",
 	"menu.extensions.header": "Erweiterungen",

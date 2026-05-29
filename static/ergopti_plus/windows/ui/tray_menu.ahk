@@ -1815,15 +1815,27 @@ initMenu() {
 	; Mirrors Hammerspoon's "⚠ Debug" entry (Console + log shortcuts);
 	; Window Spy / List Vars / Key History are AutoHotkey-specific particulars. ──
 	DebuggingMenu := Menu()
-	RegisterMenuItem(DebuggingMenu, t("menu.debug.window_spy"),    WindowSpy)
-	RegisterMenuItem(DebuggingMenu, t("menu.debug.list_vars"),     ActivateListVars)
-	RegisterMenuItem(DebuggingMenu, t("menu.debug.key_history"),   ActivateKeyHistory)
-	RegisterMenuItem(DebuggingMenu, t("menu.debug.open_logs"),     OpenLogsFolder)
-	RegisterMenuItem(DebuggingMenu, t("menu.debug.open_today_log"), OpenTodayLog)
-	DebuggingMenu.Add()
-	DebuggingMenu.Add(_LogLevelMenuLabel(), _BuildLogLevelMenu())
-	DebuggingMenu.Add()
-	RegisterMenuItem(DebuggingMenu, t("menu.debug.healthcheck"), ShowHealthCheck)
+	DebugOrder    := MenuManifest_LoadDebugMenu()
+	for Entry in DebugOrder {
+		Id := Entry["id"]
+		if Id == "---" {
+			DebuggingMenu.Add()
+		} else if Id == "window_spy" {
+			RegisterMenuItem(DebuggingMenu, t("menu.debug.window_spy"),    WindowSpy)
+		} else if Id == "list_vars" {
+			RegisterMenuItem(DebuggingMenu, t("menu.debug.list_vars"),     ActivateListVars)
+		} else if Id == "key_history" {
+			RegisterMenuItem(DebuggingMenu, t("menu.debug.key_history"),   ActivateKeyHistory)
+		} else if Id == "log_level" {
+			DebuggingMenu.Add(_LogLevelMenuLabel(), _BuildLogLevelMenu())
+		} else if Id == "open_logs" {
+			RegisterMenuItem(DebuggingMenu, t("menu.debug.open_logs"),     OpenLogsFolder)
+		} else if Id == "open_today_log" {
+			RegisterMenuItem(DebuggingMenu, t("menu.debug.open_today_log"), OpenTodayLog)
+		} else if Id == "healthcheck" {
+			RegisterMenuItem(DebuggingMenu, t("menu.debug.healthcheck"),   ShowHealthCheck)
+		}
+	}
 	A_TrayMenu.Add(t("menu.debug.title"), DebuggingMenu)
 }
 

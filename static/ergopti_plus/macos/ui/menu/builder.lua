@@ -24,6 +24,17 @@ local CanvasBadge = require("ui.menu.canvas_badge")
 -- Fallback used when the manifest cannot be loaded
 local ERGOPTI_GROUPS_FALLBACK = { sfbsreduction = true, rolls = true }
 
+-- Fallback debug menu order — mirrors menu_manifest.json debug_menu.
+local DEBUG_MENU_FALLBACK = {
+	{ id = "console" },
+	{ id = "---" },
+	{ id = "log_level" },
+	{ id = "open_logs" },
+	{ id = "open_today_log" },
+	{ id = "---" },
+	{ id = "healthcheck" },
+}
+
 
 --- Loads hotstring group classification from the shared menu_manifest.json.
 --- Falls back to the hardcoded set if the file cannot be read or parsed.
@@ -48,6 +59,45 @@ local function load_ergopti_groups()
 	end
 	Logger.debug(LOG, "Ergopti groups loaded from manifest (%d group(s)).", #(data.hotstring_groups.ergopti or {}))
 	return groups
+end
+
+
+--- Loads the debug_menu ordered array from the shared menu_manifest.json.
+--- Filters out entries whose platforms list does not include "hs".
+--- Falls back to DEBUG_MENU_FALLBACK on any read or parse failure.
+--- @return table Array of {id} entries in display order.
+local function load_debug_menu()
+	local manifest_path = Paths.find_from_configdir("shared/menu_manifest.json") or ""
+	local ok_r, fh = pcall(io.open, manifest_path, "r")
+	if not ok_r or not fh then
+		Logger.warn(LOG, "Cannot open menu_manifest.json for debug menu — using fallback.")
+		return DEBUG_MENU_FALLBACK
+	end
+	local content = fh:read("*a")
+	fh:close()
+	local ok_j, data = pcall(hs.json.decode, content)
+	if not ok_j or type(data) ~= "table" or type(data.debug_menu) ~= "table" then
+		Logger.warn(LOG, "Failed to parse debug_menu from manifest — using fallback.")
+		return DEBUG_MENU_FALLBACK
+	end
+
+	local result = {}
+	for _, entry in ipairs(data.debug_menu) do
+		if type(entry) ~= "table" or type(entry.id) ~= "string" then goto continue end
+		-- Filter by platform: skip entries that explicitly exclude "hs"
+		if type(entry.platforms) == "table" then
+			local for_hs = false
+			for _, p in ipairs(entry.platforms) do
+				if p == "hs" then for_hs = true; break end
+			end
+			if not for_hs then goto continue end
+		end
+		table.insert(result, { id = entry.id })
+		::continue::
+	end
+
+	Logger.debug(LOG, "Debug menu order loaded from manifest (%d item(s)).", #result)
+	return #result > 0 and result or DEBUG_MENU_FALLBACK
 end
 
 
@@ -451,25 +501,28 @@ function M.generate(ctx, menu_mods, actions)
 		})
 	end
 
-	local healthcheck = require("lib.healthcheck")
+	local healthcheck  = require("lib.healthcheck")
+	local debug_order  = load_debug_menu()
+	local debug_items  = {}
+	for _, entry in ipairs(debug_order) do
+		local id = entry.id
+		if id == "---" then
+			table.insert(debug_items, { title = "-" })
+		elseif id == "console" then
+			table.insert(debug_items, { title = i18n.get("menu.debug.console"), fn = actions.open_console })
+		elseif id == "log_level" then
+			table.insert(debug_items, { title = i18n.get("menu.debug.log_level") .. " : " .. active_level_name, menu = log_level_items })
+		elseif id == "open_logs" then
+			table.insert(debug_items, { title = i18n.get("menu.debug.open_logs"), fn = actions.open_logs })
+		elseif id == "open_today_log" then
+			table.insert(debug_items, { title = i18n.get("menu.debug.open_today_log"), fn = actions.open_today_log })
+		elseif id == "healthcheck" then
+			table.insert(debug_items, { title = i18n.get("menu.debug.healthcheck"), fn = function() healthcheck.show_window() end })
+		end
+	end
 	table.insert(items, {
 		title = i18n.get("menu.debug.title"),
-		menu = {
-			{ title = i18n.get("menu.debug.console"),        fn = actions.open_console },
-			{ title = i18n.get("menu.debug.open_logs"),      fn = actions.open_logs },
-			{ title = i18n.get("menu.debug.open_today_log"), fn = actions.open_today_log },
-			{ title = "-" },
-			{ title = i18n.get("menu.debug.log_level") .. " : " .. active_level_name, menu = log_level_items },
-			{ title = "-" },
-			{
-				title = i18n.get("menu.debug.healthcheck"),
-				fn    = function()
-					local report = healthcheck.format()
-					pcall(hs.focus)
-					hs.dialog.blockAlert(i18n.get("menu.debug.healthcheck"), report, "OK")
-				end,
-			},
-		}
+		menu  = debug_items,
 	})
 
 	-- Collect the download item now so it participates in canvas width calculation below

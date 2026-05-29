@@ -537,6 +537,7 @@
 	"menu.debug.open_logs": "Відкрити папку журналів",
 	"menu.debug.open_today_log": "Відкрити журнал за сьогодні",
 	"menu.debug.title": "⚠ Налагодження",
+	"healthcheck.copy_and_close": "Скопіювати до буфера обміну та закрити",
 	"menu.debug.window_spy": "Спостерігач вікон",
 	"menu.extensions.empty": "Жодне розширення не встановлено",
 	"menu.extensions.header": "Розширення",

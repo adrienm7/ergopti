@@ -32,11 +32,18 @@
 		{ "id": "language" }
 	],
 
-	"debug_items": {
-		"common":   ["open_logs", "open_today_log"],
-		"ahk_only": ["window_spy", "list_vars", "key_history"],
-		"hs_only":  ["console"]
-	},
+	"debug_menu": [
+		{ "id": "window_spy",    "platforms": ["ahk"] },
+		{ "id": "list_vars",     "platforms": ["ahk"] },
+		{ "id": "key_history",   "platforms": ["ahk"] },
+		{ "id": "console",       "platforms": ["hs"] },
+		{ "id": "---" },
+		{ "id": "log_level" },
+		{ "id": "open_logs" },
+		{ "id": "open_today_log" },
+		{ "id": "---" },
+		{ "id": "healthcheck" }
+	],
 
 	"hotstring_groups": {
 		"standard": ["distances_reduction", "autocorrection", "magic_key"],

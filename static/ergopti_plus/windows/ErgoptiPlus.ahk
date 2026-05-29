@@ -2174,8 +2174,7 @@ ActivateKeyHistory(*) {
 ; Opens a blocking dialog that displays the full healthcheck report.
 ; Wired to the "Healthcheck" item in the Debug submenu of the tray menu.
 ShowHealthCheck(*) {
-    Report := HealthCheck_Format()
-    MsgBox(Report, t("menu.debug.healthcheck"), "OK")
+    HealthCheck_ShowWindow()
 }
 
 ; ================================================

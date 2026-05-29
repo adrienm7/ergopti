@@ -537,6 +537,7 @@
 	"menu.debug.open_logs": "Apri cartella log",
 	"menu.debug.open_today_log": "Apri file log di oggi",
 	"menu.debug.title": "⚠ Debug",
+	"healthcheck.copy_and_close": "Copia negli appunti e chiudi",
 	"menu.debug.window_spy": "Window Spy",
 	"menu.extensions.empty": "Nessuna estensione installata",
 	"menu.extensions.header": "Estensioni",

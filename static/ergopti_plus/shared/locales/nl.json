@@ -537,6 +537,7 @@
 	"menu.debug.open_logs": "Logmap openen",
 	"menu.debug.open_today_log": "Logbestand van vandaag openen",
 	"menu.debug.title": "⚠ Foutopsporing",
+	"healthcheck.copy_and_close": "Kopiëren naar klembord en sluiten",
 	"menu.debug.window_spy": "Window Spy",
 	"menu.extensions.empty": "Geen extensie geïnstalleerd",
 	"menu.extensions.header": "Extensies",

@@ -537,6 +537,7 @@
 	"menu.debug.open_logs": "פתח תיקיית יומנים",
 	"menu.debug.open_today_log": "פתח קובץ יומן היום",
 	"menu.debug.title": "⚠ ניפוי שגיאות",
+	"healthcheck.copy_and_close": "העתק ללוח ולסגור",
 	"menu.debug.window_spy": "Window Spy",
 	"menu.extensions.empty": "לא מותקנת הרחבה",
 	"menu.extensions.header": "הרחבות",
