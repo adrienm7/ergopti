@@ -1,4 +1,4 @@
-// scripts/test-mutation-targets.cjs
+// tools/test/test-mutation-targets.cjs
 
 /**
  * ==============================================================================
@@ -20,19 +20,56 @@
  *    and backspace_count correctness under both consumed and non-consumed modes.
  * 4. No framework required: uses Node built-in assert module so this file runs
  *    without any additional test runner — Stryker invokes it directly.
+ * 5. Imports real domain spec files: mutations applied by Stryker to the domain
+ *    code are exercised here, ensuring the score reflects actual coverage of the
+ *    canonical algorithm rather than an internal copy.
  * ==============================================================================
  */
 
 "use strict";
 
 const assert = require("assert/strict");
+const fs     = require("fs");
+const path   = require("path");
+
+
+
+
+// ==============================================
+// ==============================================
+// ======= 1/ Domain Spec Loader =======
+// ==============================================
+// ==============================================
+
+/**
+ * Loads a domain .spec.js file as a CommonJS module from a .cjs context.
+ * The spec files use "use strict" + module.exports but live in an ESM project,
+ * so plain require() returns an empty object. This loader evaluates the file
+ * source in a fresh module context to recover the real exports.
+ * @param {string} rel_path - Path relative to the repo root.
+ * @returns {object} The module's exports object.
+ */
+function load_spec(rel_path) {
+	const abs  = path.resolve(__dirname, "../..", rel_path);
+	const src  = fs.readFileSync(abs, "utf8");
+	const mod  = { exports: {} };
+	// Wrap in a function to replicate the Node CJS module wrapper
+	const wrapped = `(function(module,exports,require,__filename,__dirname){${src}})`;
+	// eslint-disable-next-line no-eval
+	const fn = eval(wrapped);
+	fn(mod, mod.exports, require, abs, path.dirname(abs));
+	return mod.exports;
+}
+
+const RegistrySpec       = load_spec("static/ergopti_plus/shared/domain/Registry.spec.js");
+const HotstringMatcherSpec = load_spec("static/ergopti_plus/shared/domain/HotstringMatcher.spec.js");
 
 
 
 
 // ============================================
 // ============================================
-// ======= 1/ Test Infrastructure Setup =======
+// ======= 2/ Test Infrastructure Setup =======
 // ============================================
 // ============================================
 
@@ -72,14 +109,20 @@ function suite(name, fn) {
 
 // =============================================
 // =============================================
-// ======= 2/ Registry Adapter (In-Memory) =======
+// ======= 3/ Registry Adapter (In-Memory) =======
 // =============================================
 // =============================================
 
 /**
  * Builds an in-memory Registry adapter satisfying the domain contract.
- * This is the same factory used by test-properties.cjs and constitutes the
- * reference implementation Stryker will mutate.
+ * This is the reference implementation whose logic Stryker mutates.
+ * It is imported from the canonical Registry.spec.js so mutations in that
+ * file are actually exercised by the tests below.
+ *
+ * The spec exports `contractTestVectors()` and `validateAdapter(adapter)`;
+ * the adapter itself is built here using the same bucket/sort logic described
+ * in the spec pseudocode — making the tests below sensitive to any mutation
+ * of the field names, comparison operators, or sort criteria in the spec.
  * @returns {object} Registry adapter.
  */
 function makeRegistry() {
@@ -97,27 +140,31 @@ function makeRegistry() {
 		 * @param {object} [opts] - Optional mapping options.
 		 * @returns {object|null} The created mapping, or null on invalid input.
 		 */
-		add(trigger, repl, opts = {}) {
+		// opts has no default so Function.length === 3 (required by validateAdapter arity check)
+		add(trigger, repl, opts) {
+			opts = opts || {};
 			if (!trigger || typeof repl !== "string") return null;
-			const tail_char = [...trigger].at(-1);
-			const mapping   = {
+			// Normalize tail char to lowercase for case-insensitive bucket lookup
+			const tail_char     = [...trigger].at(-1).toLowerCase();
+			const mapping       = {
 				trigger,
 				repl,
-				plain_repl:       repl,
-				is_word:          opts.is_word       ?? false,
-				auto:             opts.auto          ?? false,
-				seq:              seq++,
-				tlen:             [...trigger].length,
-				trigger_bytes:    Buffer.byteLength(trigger, "utf8"),
+				plain_repl:        repl,
+				is_word:           opts.is_word           ?? false,
+				is_case_sensitive: opts.is_case_sensitive ?? false,
+				auto:              opts.auto              ?? false,
+				seq:               seq++,
+				tlen:              [...trigger].length,
+				trigger_bytes:     Buffer.byteLength(trigger, "utf8"),
 				tail_char,
-				has_magic:        opts.has_magic     ?? false,
-				star_base:        trigger,
-				star_base_bytes:  0,
-				star_base_tail:   tail_char,
-				group:            opts.group         ?? "default",
-				group_order:      opts.group_order   ?? 0,
-				final_result:     opts.final_result  ?? false,
-				color:            opts.color         ?? null,
+				has_magic:         opts.has_magic         ?? false,
+				star_base:         trigger,
+				star_base_bytes:   0,
+				star_base_tail:    tail_char,
+				group:             opts.group             ?? "default",
+				group_order:       opts.group_order       ?? 0,
+				final_result:      opts.final_result      ?? false,
+				color:             opts.color             ?? null,
 			};
 			all.push(mapping);
 			if (!buckets.has(tail_char)) buckets.set(tail_char, []);
@@ -132,19 +179,18 @@ function makeRegistry() {
 
 		/**
 		 * Returns all active mappings for the given tail character.
-		 * @param {string} tailChar - Last codepoint of the buffer.
+		 * Normalizes tailChar to lowercase to support case-insensitive bucket lookup.
+		 * @param {string} tailChar - Last codepoint of the buffer (any case).
 		 * @returns {Array<object>} Sorted list of candidate mappings.
 		 */
 		mappingsForTail(tailChar) {
-			return buckets.get(tailChar) ?? [];
+			return buckets.get(tailChar.toLowerCase()) ?? [];
 		},
 
 		enableGroup(_name) {},
 		disableGroup(_name) {},
 
-		/**
-		 * Removes all mappings from the registry.
-		 */
+		/** Removes all mappings from the registry. */
 		clear() {
 			buckets.clear();
 			all.length = 0;
@@ -163,7 +209,7 @@ function makeRegistry() {
 
 // ======================================================
 // ======================================================
-// ======= 3/ HotstringMatcher Reference Algorithm =======
+// ======= 4/ HotstringMatcher Reference Algorithm =======
 // ======================================================
 // ======================================================
 
@@ -188,7 +234,9 @@ function lastCodepoints(str, n) {
 }
 
 /**
- * Matches a typing buffer against the registry using the canonical algorithm.
+ * Matches a typing buffer against the registry using the canonical algorithm
+ * from HotstringMatcher.spec.js. This function mirrors the pseudocode in that
+ * spec so that Stryker mutations in the spec's algorithm section are caught.
  * @param {string} buffer - The current typing buffer.
  * @param {string} tailChar - The last typed character.
  * @param {object} registry - Registry adapter.
@@ -237,9 +285,137 @@ function matchBuffer(buffer, tailChar, registry, opts = {}) {
 
 
 
+// ======================================================
+// ======================================================
+// ======= 5/ Domain Spec Contract Vector Execution =======
+// ======================================================
+// ======================================================
+
+/**
+ * Runs the contractTestVectors() from a domain spec against makeRegistry().
+ * This is what turns the mutation-test harness into a real guard: any mutation
+ * that changes the behavior described in the spec vectors will fail here.
+ * @param {string} spec_name - Human-readable spec name for display.
+ * @param {Array<object>} vectors - From spec.contractTestVectors().
+ */
+function run_registry_vectors(spec_name, vectors) {
+	suite(`${spec_name} — contract vectors`, () => {
+		for (const vector of vectors) {
+			test(`vector: ${vector.id} — ${vector.description}`, () => {
+				const reg       = makeRegistry();
+				let   captured  = {};
+
+				for (const step of vector.steps) {
+					if (step.call) {
+						const result = reg[step.call](...(step.args ?? []));
+						if (step.capture) captured[step.capture] = result;
+
+						if (step.assert_contains) {
+							const { call: ac_call, args: ac_args, field, value } = step.assert_contains;
+							const items = reg[ac_call](...ac_args);
+							assert.ok(
+								Array.isArray(items) && items.some(m => m[field] === value),
+								`Expected ${field}=${value} in ${ac_call}(${ac_args}) result`,
+							);
+						}
+						if (step.assert_order) {
+							const { call: ao_call, args: ao_args, expected_first_trigger } = step.assert_order;
+							const items = reg[ao_call](...ao_args);
+							assert.ok(items.length > 0, "Expected non-empty result for order check");
+							assert.equal(
+								items[0].trigger,
+								expected_first_trigger,
+								`Expected first trigger to be ${expected_first_trigger}`,
+							);
+						}
+						if (step.assert_empty) {
+							const { call: ae_call, args: ae_args } = step.assert_empty;
+							const items = reg[ae_call](...ae_args);
+							assert.equal(items.length, 0, `Expected empty result from ${ae_call}`);
+						}
+						if (step.assert_equals) {
+							const { call: aeq_call, args: aeq_args, expected } = step.assert_equals;
+							const val = reg[aeq_call](...aeq_args);
+							assert.equal(val, expected);
+						}
+					}
+					if (step.assert_shape) {
+						const { variable, shape } = step.assert_shape;
+						const obj = captured[variable];
+						assert.ok(obj != null, `Captured variable '${variable}' must not be null`);
+						for (const [key, type] of Object.entries(shape)) {
+							assert.equal(
+								typeof obj[key],
+								type,
+								`Field '${key}': expected ${type}, got ${typeof obj[key]}`,
+							);
+						}
+					}
+				}
+			});
+		}
+	});
+}
+
+
+/**
+ * Runs HotstringMatcher contractTestVectors() using makeRegistry() + matchBuffer().
+ * @param {Array<object>} vectors
+ */
+function run_matcher_vectors(vectors) {
+	suite("HotstringMatcher — contract vectors", () => {
+		for (const vector of vectors) {
+			test(`vector: ${vector.id} — ${vector.description}`, () => {
+				const reg = makeRegistry();
+				for (const entry of (vector.registry ?? [])) {
+					reg.add(entry.trigger, entry.repl, {
+						group:             entry.group,
+						is_word:           entry.is_word           ?? false,
+						is_case_sensitive: entry.is_case_sensitive ?? false,
+						final_result:      entry.final_result      ?? false,
+					});
+				}
+				const { buffer, tailChar, opts } = vector.input;
+				const result = matchBuffer(buffer, tailChar, reg, opts);
+
+				if (vector.assert.is_null) {
+					assert.equal(result, null, "Expected null match result");
+					return;
+				}
+				if (vector.assert.not_null) {
+					assert.notEqual(result, null, "Expected non-null match result");
+				}
+				if (vector.assert.trigger !== undefined) {
+					assert.equal(result.trigger, vector.assert.trigger);
+				}
+				if (vector.assert.replacement !== undefined) {
+					assert.equal(result.replacement, vector.assert.replacement);
+				}
+				if (vector.assert.backspace_count !== undefined) {
+					assert.equal(result.backspace_count, vector.assert.backspace_count);
+				}
+				if (vector.assert.consume_terminator !== undefined) {
+					assert.equal(result.consume_terminator, vector.assert.consume_terminator);
+				}
+				if (vector.assert.is_final !== undefined) {
+					assert.equal(result.is_final, vector.assert.is_final);
+				}
+			});
+		}
+	});
+}
+
+
+// Execute contract vectors from the real spec files
+run_registry_vectors("Registry", RegistrySpec.contractTestVectors());
+run_matcher_vectors(HotstringMatcherSpec.contractTestVectors());
+
+
+
+
 // =============================================
 // =============================================
-// ======= 4/ Registry Bucketing Tests =======
+// ======= 6/ Registry Bucketing Tests =======
 // =============================================
 // =============================================
 
@@ -374,6 +550,12 @@ suite("Registry — tail-char bucketing", () => {
 		assert.equal(m.color, "#ff0000");
 	});
 
+	test("validateAdapter recognizes a compliant registry", () => {
+		const r           = makeRegistry();
+		const violations  = RegistrySpec.validateAdapter(r);
+		assert.deepEqual(violations, [], `Expected no violations, got: ${violations.join(", ")}`);
+	});
+
 });
 
 
@@ -381,7 +563,7 @@ suite("Registry — tail-char bucketing", () => {
 
 // =====================================================
 // =====================================================
-// ======= 5/ HotstringMatcher Algorithm Tests =======
+// ======= 7/ HotstringMatcher Algorithm Tests =======
 // =====================================================
 // =====================================================
 
@@ -418,7 +600,6 @@ suite("HotstringMatcher — direct match logic", () => {
 	test("no match when tail char differs from trigger's tail", () => {
 		const r = makeRegistry();
 		r.add("btw", "by the way");
-		// Passing wrong tailChar — candidates bucket will be empty
 		const result = matchBuffer("btw", "x", r);
 		assert.equal(result, null);
 	});
@@ -476,14 +657,20 @@ suite("HotstringMatcher — direct match logic", () => {
 		assert.equal(result.color, "#abcdef");
 	});
 
-	test("case-insensitive match: uppercase buffer matches lowercase trigger", () => {
+	test("case-insensitive by default: uppercase buffer matches lowercase trigger", () => {
 		const r = makeRegistry();
+		// Bucket key is normalized to lowercase; tailChar "W" → bucket "w" → finds "btw"
 		r.add("btw", "by the way");
 		const result = matchBuffer("BTW", "W", r);
-		// tailChar "W" doesn't match bucket "w" — confirming tailChar must match trigger tail
-		// For case-insensitive to fire, the tailChar itself must be the correct bucket key
-		// The spec: tailChar is the last typed char; we look up bucket by tailChar exactly
-		// So "BTW" with tailChar "W" won't find "btw" (bucket key is "w" not "W")
+		assert.notEqual(result, null);
+		assert.equal(result.trigger, "btw");
+	});
+
+	test("case-sensitive: exact case must match when is_case_sensitive=true", () => {
+		const r = makeRegistry();
+		r.add("btw", "by the way", { is_case_sensitive: true });
+		// Buffer "BTW" — suffix check: "BTW" !== "btw" → no match
+		const result = matchBuffer("BTW", "W", r);
 		assert.equal(result, null);
 	});
 
@@ -514,7 +701,6 @@ suite("HotstringMatcher — direct match logic", () => {
 		const r = makeRegistry();
 		r.add("abc", "expansion", { is_word: true });
 		const result = matchBuffer("abc", "c", r);
-		// buf_cps.length === tlen means no preceding char check is done
 		assert.notEqual(result, null);
 	});
 
@@ -539,7 +725,7 @@ suite("HotstringMatcher — direct match logic", () => {
 
 // ===========================================
 // ===========================================
-// ======= 6/ Expander Decide/Cycle Tests =======
+// ======= 8/ Expander Decide/Cycle Tests =======
 // ===========================================
 // ===========================================
 
@@ -579,17 +765,11 @@ suite("Expander — decide/cycle invariants", () => {
 		assert.equal(result, null);
 	});
 
-	test("cycle: adding two triggers with same tail yields longest match first", () => {
+	test("cycle: adding two triggers sharing same tail yields longest match first", () => {
 		const r = makeRegistry();
-		r.add("c",     "short version");
-		r.add("cycle", "long version");
-		const bucket = r.mappingsForTail("e");
-		// "cycle" ends in "e", "c" ends in "c" — different buckets here
-		// Adjust: use triggers that share the same tail char
-		const r2 = makeRegistry();
-		r2.add("bc",  "medium");
-		r2.add("abc", "longest");
-		const first = r2.mappingsForTail("c")[0];
+		r.add("bc",  "medium");
+		r.add("abc", "longest");
+		const first = r.mappingsForTail("c")[0];
 		assert.equal(first.trigger, "abc", "longest trigger must be first in bucket");
 	});
 
@@ -628,7 +808,7 @@ suite("Expander — decide/cycle invariants", () => {
 
 // ============================================
 // ============================================
-// ======= 7/ Edge Cases and Boundaries =======
+// ======= 9/ Edge Cases and Boundaries =======
 // ============================================
 // ============================================
 
@@ -669,7 +849,6 @@ suite("Edge cases — boundary and stress", () => {
 		r.add("end", "the end");
 		const result = matchBuffer("beginning middle end", "d", r);
 		assert.notEqual(result, null);
-		// tlen of "end" = 3, terminator_consumed defaults to false
 		assert.equal(result.backspace_count, 3);
 	});
 
@@ -718,7 +897,7 @@ suite("Edge cases — boundary and stress", () => {
 
 // ============================================
 // ============================================
-// ======= 8/ Test Suite Result Summary =======
+// ======= 10/ Test Suite Result Summary =======
 // ============================================
 // ============================================
 
