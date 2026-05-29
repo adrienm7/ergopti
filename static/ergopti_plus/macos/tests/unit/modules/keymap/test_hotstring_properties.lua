@@ -208,7 +208,8 @@ pbt.suite("Registry — structural invariants", function()
 					or (R.get_for_tail and R.get_for_tail(tail))
 					or {}
 				for _, entry in ipairs(bucket) do
-					local entry_tail = entry.trigger:sub(-1)
+					-- tail_char is stored lowercased in the registry; compare lower to lower
+					local entry_tail = entry.trigger:sub(-1):lower()
 					if entry_tail ~= tail then return false end
 				end
 			end
