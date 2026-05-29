@@ -256,84 +256,84 @@ HealthCheck_FormatMarkdown(Snapshot := 0) {
 	return Out
 }
 
+; Exact dimensions for the diagnostic window — mirrors the updater layout approach.
+global _HC_WIN_W    := 740
+global _HC_MARGIN   := 12
+global _HC_BTN_H    := 32
+global _HC_BTN_PAD  := 8    ; vertical gap above and below the button row
+
 ; Opens a dedicated window displaying the healthcheck report.
-; WebView2 fills the entire Gui (G.Hwnd parent + Fill()) so no Bounds calculation is
-; needed. The copy button lives inside the HTML and posts "copy_and_close" via
-; chrome.webview.postMessage so JS→AHK communication replaces an AHK button.
-; Falls back to a native Edit + Button when WebView2 is unavailable.
+; Mirrors the updater changelog pane pattern exactly: synchronous WebView2.create,
+; Text control as host (same as RightPane in updater), Fill(), NavigateToString.
+; The button is a native AHK control placed below the WebView pane.
+; Falls back to a selectable Edit + native button when WebView2 is unavailable.
 HealthCheck_ShowWindow() {
-	global _VendorDir
+	global _VendorDir, _HC_WIN_W, _HC_MARGIN, _HC_BTN_H, _HC_BTN_PAD
 
 	Snapshot  := HealthCheck_Run()
 	Md        := HealthCheck_FormatMarkdown(Snapshot)
 	PlainText := HealthCheck_FormatPlain(Snapshot)
 
-	WinTitle  := t("menu.debug.healthcheck") . " — ErgoptiPlus"
-	BtnLabel  := t("healthcheck.copy_and_close")
+	WinTitle := t("menu.debug.healthcheck") . " — ErgoptiPlus"
+	BtnLabel := t("healthcheck.copy_and_close")
 
-	UseWV := IsSet(WebView2) && IsSet(_VendorDir) && FileExist(_VendorDir . "\64bit\WebView2Loader.dll")
+	InnerW   := _HC_WIN_W - _HC_MARGIN * 2
+	ContentH := 560
 
-	if UseWV {
-		; WebView2 path — button is rendered inside HTML, no native AHK button needed.
-		WinW := 740
-		WinH := 640
-		G := Gui("+Resize +MinSize540x420", WinTitle)
-		G.MarginX := 0
-		G.MarginY := 0
-		G.OnEvent("Close",  (*) => G.Destroy())
-		G.OnEvent("Escape", (*) => G.Destroy())
-		G.Show("w" . WinW . " h" . WinH)
-
-		loader := _VendorDir . "\64bit\WebView2Loader.dll"
-		udir   := A_Temp . "\ergopti_hc_wv_" . A_TickCount
-		try DirCreate(udir)
-
-		Html := _HealthCheck_MakeHtml(Md, BtnLabel)
-
-		OnMsg := (WV, MsgArgs) => _HealthCheck_OnWebMsg(WV, MsgArgs, PlainText, G)
-		OnReady := (WVC) => _HealthCheck_OnWVReady(WVC, Html, OnMsg)
-
-		try {
-			WebView2.create(G.Hwnd, OnReady, 0, udir, "", 0, loader)
-			return
-		} catch as Err {
-			try LoggerWarn("Healthcheck", "WebView2 create failed: {1} — falling back.", Err.Message)
-			G.Destroy()
-		}
-	}
-
-	; Fallback — native AHK controls (plain text, selectable Edit + native button).
-	InnerW := 700
-	Margin := 12
-	BtnH   := 32
 	G := Gui("+Resize +MinSize540x420", WinTitle)
 	G.SetFont("s10", "Segoe UI")
-	G.MarginX := Margin
-	G.MarginY := 10
-	ContentCtl := G.Add("Text", "xm ym w" . InnerW . " h560", "")
-	BtnCopy    := G.Add("Button", "xm y+10 w" . InnerW . " h" . BtnH . " Default", BtnLabel)
+	G.MarginX := _HC_MARGIN
+	G.MarginY := _HC_MARGIN
+
+	; Content pane — same Text control pattern as updater's RightPane.
+	ContentCtl := G.Add("Text", "xm ym w" . InnerW . " h" . ContentH, "")
+
+	BtnCopy := G.Add("Button",
+		"xm y+" . _HC_BTN_PAD . " w" . InnerW . " h" . _HC_BTN_H . " Default",
+		BtnLabel)
+
 	CloseAndCopy := (*) => (A_Clipboard := PlainText, G.Destroy())
 	G.OnEvent("Close",  (*) => G.Destroy())
 	G.OnEvent("Escape", (*) => G.Destroy())
 	BtnCopy.OnEvent("Click", CloseAndCopy)
-	G.Show("w" . (InnerW + Margin * 2) . " AutoSize")
-	_HealthCheck_AddFallbackEdit(G, ContentCtl, PlainText)
-}
 
-; Called by WebView2 once the controller COM object is fully ready.
-; Fill() covers the entire Gui client area — no manual Bounds needed.
-_HealthCheck_OnWVReady(WVC, Html, OnMsg) {
-	try {
-		s := WVC.CoreWebView2.Settings
-		s.AreDevToolsEnabled              := false
-		s.AreDefaultContextMenusEnabled   := false
-		s.IsStatusBarEnabled              := false
-		s.AreBrowserAcceleratorKeysEnabled := false
+	G.Show("w" . _HC_WIN_W . " AutoSize")
+
+	UseWV := IsSet(WebView2) && IsSet(_VendorDir) && FileExist(_VendorDir . "\64bit\WebView2Loader.dll")
+	if UseWV {
+		loader := _VendorDir . "\64bit\WebView2Loader.dll"
+		udir   := A_Temp . "\ergopti_hc_wv_" . A_TickCount
+		try DirCreate(udir)
+
+		WVC := 0
+		try {
+			; Parent to ContentCtl.Hwnd — identical to updater's RightPane.Hwnd pattern.
+			WVC := WebView2.create(ContentCtl.Hwnd, , 0, udir, "", 0, loader)
+		} catch as Err {
+			try LoggerWarn("Healthcheck", "WebView2 create failed: {1} — falling back.", Err.Message)
+		}
+
+		if WVC {
+			WV := WVC.CoreWebView2
+			try {
+				s := WV.Settings
+				s.AreDevToolsEnabled              := false
+				s.AreDefaultContextMenusEnabled   := false
+				s.IsStatusBarEnabled              := false
+				s.AreBrowserAcceleratorKeysEnabled := false
+			}
+			OnMsg := (wv2, args) => _HealthCheck_OnWebMsg(wv2, args, PlainText, G)
+			try WV.WebMessageReceived(OnMsg)
+			WVC.Fill()
+			WV.NavigateToString(_HealthCheck_MakeHtml(Md, BtnLabel))
+			try LoggerDone("Healthcheck", "WebView2 diagnostic page loaded.")
+			; Button still copies plain-text even with WebView2 active.
+			return
+		}
 	}
-	try WVC.CoreWebView2.WebMessageReceived(OnMsg)
-	try WVC.Fill()
-	try WVC.CoreWebView2.NavigateToString(Html)
-	try LoggerDone("Healthcheck", "WebView2 ready — diagnostic page loaded.")
+
+	; Fallback — overlay a selectable Edit over the Text placeholder.
+	_HealthCheck_AddFallbackEdit(G, ContentCtl, PlainText)
 }
 
 ; Handles messages posted from the HTML page via chrome.webview.postMessage.
