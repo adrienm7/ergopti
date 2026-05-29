@@ -351,8 +351,9 @@ function M.open(open_mode)
 		title       = i18n.get("editor.hotstrings.window_title"),
 		style_masks = window_style,
 		usercontent = _usercontent,
-		assets_dir  = ASSETS_DIR,
-		on_close    = function()
+		assets_dir     = ASSETS_DIR,
+		allow_gestures = false,
+		on_close       = function()
 			_is_focused = false
 			if type(_on_focus_change) == "function" then pcall(_on_focus_change, false) end
 			_webview     = nil

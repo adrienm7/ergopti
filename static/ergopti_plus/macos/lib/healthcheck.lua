@@ -260,6 +260,7 @@ function M.show_window()
 	pcall(function() wv:windowTitle(title) end)
 	pcall(function() wv:allowTextEntry(true) end)
 	pcall(function() wv:allowNewWindows(false) end)
+	pcall(function() wv:allowGestures(false) end)
 	pcall(function() wv:level(hs.drawing.windowLevels.normal) end)
 
 	pcall(function()

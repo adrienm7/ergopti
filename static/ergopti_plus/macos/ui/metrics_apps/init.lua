@@ -431,9 +431,10 @@ function M.show()
 		frame       = frame,
 		title       = i18n.get("metrics_apps.window_title"),
 		style_masks = 15,
-		assets_dir  = hs.configdir .. "/../shared/ui/metrics_apps/",
-		usercontent = ucc,
-		on_close    = function()
+		assets_dir     = hs.configdir .. "/../shared/ui/metrics_apps/",
+		usercontent    = ucc,
+		allow_gestures = false,
+		on_close       = function()
 			M._wv = nil
 			Logger.info(LOG, "Apps time dashboard closed.")
 		end,

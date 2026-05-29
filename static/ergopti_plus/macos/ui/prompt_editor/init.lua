@@ -107,8 +107,9 @@ function M.open(existing, on_save)
 		title         = title_str,
 		style_masks   = {"titled", "closable", "utility"},
 		usercontent   = _usercontent,
-		assets_dir    = ASSETS_DIR,
-		on_navigation = function(action)
+		assets_dir     = ASSETS_DIR,
+		allow_gestures = false,
+		on_navigation  = function(action)
 			if action == "didFinishNavigation" then
 				local payload = {
 					title  = title_str,
