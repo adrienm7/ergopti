@@ -118,7 +118,7 @@ LLM_Deps_GetFailureMessage() {
  * @param {boolean} show_ui      - When false, suppresses the install window on auto-boot.
  *                                 Pass true only when the user explicitly triggered the install.
  */
-LLM_Deps_CheckAndInstall(default_model := "qwen2.5:3b", on_ready := unset, on_failed := unset, show_ui := true) {
+LLM_Deps_CheckAndInstall(default_model := "", on_ready := unset, on_failed := unset, show_ui := true) {
 	global _LLM_Deps_Checking, _LLM_Deps_State
 
 	LoggerInfo("LLM", "CheckAndInstall — state: " _LLM_Deps_State ", checking: " (_LLM_Deps_Checking ? "true" : "false") " show_ui=" (show_ui ? "true" : "false") ".")

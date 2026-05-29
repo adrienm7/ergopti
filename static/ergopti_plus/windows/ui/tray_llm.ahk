@@ -90,10 +90,11 @@ _LLMTrayBuildIndentRange() {
 
 ; Initial values are replaced at startup by LLM_Tray_ApplySharedDefaults()
 ; which reads from the shared defaults.json via LLM_Defaults (lib/llm_defaults.ahk).
+; String fields use "" as placeholder — ApplySharedDefaults() overwrites them.
 global _LLM_Tray := Map(
 	"enabled",                    false,
 	"backend",                    "ollama",
-	"model",                      "qwen2.5:3b",
+	"model",                      "",
 	"profile_id",                 "basic",
 	"user_profiles",              [],
 	"n_predictions",              3,

@@ -30,9 +30,11 @@
 ; (loaded by lib/llm_defaults.ahk at boot) so all values come from the shared
 ; defaults.json rather than being hardcoded here.
 ; Timer/cache keys are always initialised to their zero values regardless.
+; String/numeric placeholder values — always overwritten by LLM_Engine_ApplySharedDefaults()
+; which reads from LLM_Defaults (lib/llm_defaults.ahk → shared/llm/defaults.json).
 global _LLM_Engine := Map(
 	"enabled",                    false,
-	"model",                      "qwen2.5:3b",
+	"model",                      "",
 	"profile_id",                 "basic",
 	"user_profiles",              [],
 	"n_predictions",              3,
