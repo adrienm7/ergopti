@@ -1966,6 +1966,8 @@
 	"updater.changelog_empty": "(Brak informacji o zmianach dla tej wersji.)",
 	"updater.changelog_local_source_note": "Tryb źródła lokalnego — zmiany kanału nie są zapisywane.",
 	"updater.changelog_release_notes": "Lista zmian dla {1}:\n\n{2}\n\nOtworzyć na GitHubie?",
+	"updater.changelog_install": "Zainstaluj tę wersję",
+	"updater.changelog_install_current": "Bieżąca wersja",
 	"updater.changelog_select_release": "Wybór wersji :",
 	"updater.changelog_switch_to_dev": "Przełącz na kanał wersji wstępnej (dev)",
 	"updater.changelog_switch_to_main": "Przełącz na stabilny kanał (main)",

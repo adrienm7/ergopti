@@ -1966,6 +1966,8 @@
 	"updater.changelog_empty": "(Keine Versionshinweise für diese Version verfügbar.)",
 	"updater.changelog_local_source_note": "Lokaler Quellmodus — Kanaländerungen werden nicht gespeichert.",
 	"updater.changelog_release_notes": "Versionshinweise zu {1}:\n\n{2}\n\nAuf GitHub öffnen?",
+	"updater.changelog_install": "Diese Version installieren",
+	"updater.changelog_install_current": "Aktuelle Version",
 	"updater.changelog_select_release": "Versionsauswahl :",
 	"updater.changelog_switch_to_dev": "Zum Vorabversionskanal wechseln (dev)",
 	"updater.changelog_switch_to_main": "Zum stabilen Kanal wechseln (main)",

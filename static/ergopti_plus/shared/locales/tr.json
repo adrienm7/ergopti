@@ -1966,6 +1966,8 @@
 	"updater.changelog_empty": "(Bu sürüm için sürüm notu bulunmuyor.)",
 	"updater.changelog_local_source_note": "Yerel kaynak modu — kanal değişiklikleri kaydedilmez.",
 	"updater.changelog_release_notes": "{1} sürüm notları:\n\n{2}\n\nGitHub’da açayım mı?",
+	"updater.changelog_install": "Bu sürümü yükle",
+	"updater.changelog_install_current": "Mevcut sürüm",
 	"updater.changelog_select_release": "Sürüm seçimi :",
 	"updater.changelog_switch_to_dev": "Ön sürüm kanalına geç (dev)",
 	"updater.changelog_switch_to_main": "Kararlı kanala geç (main)",

@@ -1966,6 +1966,8 @@
 	"updater.changelog_empty": "(इस संस्करण के लिए कोई रिलीज़ नोट्स उपलब्ध नहीं हैं।)",
 	"updater.changelog_local_source_note": "स्थानीय स्रोत मोड — चैनल परिवर्तन सहेजे नहीं जाते।",
 	"updater.changelog_release_notes": "{1} के रिलीज़ नोट्स:\n\n{2}\n\nGitHub पर खोलें?",
+	"updater.changelog_install": "यह संस्करण स्थापित करें",
+	"updater.changelog_install_current": "वर्तमान संस्करण",
 	"updater.changelog_select_release": "संस्करण चयन :",
 	"updater.changelog_switch_to_dev": "पूर्व-रिलीज़ चैनल पर जाएं (dev)",
 	"updater.changelog_switch_to_main": "स्थिर चैनल पर जाएं (main)",

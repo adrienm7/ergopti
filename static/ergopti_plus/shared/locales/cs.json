@@ -1966,6 +1966,8 @@
 	"updater.changelog_empty": "(Pro tuto verzi nejsou k dispozici žádné poznámky.)",
 	"updater.changelog_local_source_note": "Lokální zdrojový režim — změny kanálu nejsou uloženy.",
 	"updater.changelog_release_notes": "Poznámky k verzi {1}:\n\n{2}\n\nOtevřít na GitHubu?",
+	"updater.changelog_install": "Nainstalovat tuto verzi",
+	"updater.changelog_install_current": "Aktuální verze",
 	"updater.changelog_select_release": "Výběr verze :",
 	"updater.changelog_switch_to_dev": "Přepnout na kanál předběžné verze (dev)",
 	"updater.changelog_switch_to_main": "Přepnout na stabilní kanál (main)",

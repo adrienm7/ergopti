@@ -522,6 +522,7 @@ Updater_LoadCheckInterval()
 ; Schedule the background update poller. No-op in dev / source mode, or
 ; when the user has chosen "never" — those checks happen inside the helper.
 try Updater_StartBackgroundChecks()
+try Updater_InitTrayNotifyHandler()
 LoggerStart("ErgoptiPlus", "Booting ErgoptiPlus driver…")
 
 ; Load tooltip visual constants from shared/tooltip/constants.toml so the

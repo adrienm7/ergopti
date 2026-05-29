@@ -1966,6 +1966,8 @@
 	"updater.changelog_empty": "(لا تتوفر ملاحظات إصدار لهذه النسخة.)",
 	"updater.changelog_local_source_note": "وضع المصدر المحلي — لا يتم حفظ تغييرات القناة.",
 	"updater.changelog_release_notes": "ملاحظات الإصدار {1}:\n\n{2}\n\nفتح في GitHub؟",
+	"updater.changelog_install": "تثبيت هذا الإصدار",
+	"updater.changelog_install_current": "الإصدار الحالي",
 	"updater.changelog_select_release": "اختيار الإصدار :",
 	"updater.changelog_switch_to_dev": "التبديل إلى قناة الإصدار التجريبي (dev)",
 	"updater.changelog_switch_to_main": "التبديل إلى القناة المستقرة (main)",

@@ -1966,6 +1966,8 @@
 	"updater.changelog_empty": "(Nessuna nota di versione disponibile per questa versione.)",
 	"updater.changelog_local_source_note": "Modalità sorgente locale — le modifiche al canale non vengono salvate.",
 	"updater.changelog_release_notes": "Note di versione per {1}:\n\n{2}\n\nAprire su GitHub?",
+	"updater.changelog_install": "Installa questa versione",
+	"updater.changelog_install_current": "Versione corrente",
 	"updater.changelog_select_release": "Selezione della versione :",
 	"updater.changelog_switch_to_dev": "Passa al canale pre-release (dev)",
 	"updater.changelog_switch_to_main": "Passa al canale stabile (main)",
