@@ -537,6 +537,7 @@
 	"menu.debug.open_logs": "Günlük klasörünü aç",
 	"menu.debug.open_today_log": "Bugünün günlük dosyasını aç",
 	"menu.debug.title": "⚠ Hata ayıklama",
+	"healthcheck.copy_and_close": "Panoya kopyala ve kapat",
 	"menu.debug.window_spy": "Window Spy",
 	"menu.extensions.empty": "Yüklü uzantı yok",
 	"menu.extensions.header": "Uzantılar",

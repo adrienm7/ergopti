@@ -537,6 +537,7 @@
 	"menu.debug.open_logs": "Abrir carpeta de registros",
 	"menu.debug.open_today_log": "Abrir registro de hoy",
 	"menu.debug.title": "⚠ Depuración",
+	"healthcheck.copy_and_close": "Copiar al portapapeles y cerrar",
 	"menu.debug.window_spy": "Window Spy",
 	"menu.extensions.empty": "Ninguna extensión instalada",
 	"menu.extensions.header": "Extensiones",

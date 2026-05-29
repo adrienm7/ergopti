@@ -537,6 +537,7 @@
 	"menu.debug.open_logs": "Ouvrir le dossier de logs",
 	"menu.debug.open_today_log": "Ouvrir le fichier de log du jour",
 	"menu.debug.title": "⚠ Débogage",
+	"healthcheck.copy_and_close": "Copier dans le presse-papiers et fermer",
 	"menu.debug.window_spy": "Window Spy",
 	"menu.extensions.empty": "Aucune extension installée",
 	"menu.extensions.header": "Extensions",

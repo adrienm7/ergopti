@@ -537,6 +537,7 @@
 	"menu.debug.open_logs": "Abrir pasta de logs",
 	"menu.debug.open_today_log": "Abrir log de hoje",
 	"menu.debug.title": "⚠ Depuração",
+	"healthcheck.copy_and_close": "Copiar para a área de transferência e fechar",
 	"menu.debug.window_spy": "Espião de Janela",
 	"menu.extensions.empty": "Nenhuma extensão instalada",
 	"menu.extensions.header": "Extensões",

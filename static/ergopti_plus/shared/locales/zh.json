@@ -537,6 +537,7 @@
 	"menu.debug.open_logs": "打开日志文件夹",
 	"menu.debug.open_today_log": "打开今日日志文件",
 	"menu.debug.title": "⚠ 调试",
+	"healthcheck.copy_and_close": "复制到剪贴板并关闭",
 	"menu.debug.window_spy": "窗口侦察",
 	"menu.extensions.empty": "未安装扩展",
 	"menu.extensions.header": "扩展",

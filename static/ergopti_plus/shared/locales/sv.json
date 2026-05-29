@@ -537,6 +537,7 @@
 	"menu.debug.open_logs": "Öppna loggmapp",
 	"menu.debug.open_today_log": "Öppna dagens loggfil",
 	"menu.debug.title": "⚠ Felsökning",
+	"healthcheck.copy_and_close": "Kopiera till urklipp och stäng",
 	"menu.debug.window_spy": "Window Spy",
 	"menu.extensions.empty": "Inget tillägg installerat",
 	"menu.extensions.header": "Tillägg",

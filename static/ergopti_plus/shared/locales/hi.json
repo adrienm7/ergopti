@@ -537,6 +537,7 @@
 	"menu.debug.open_logs": "लॉग फोल्डर खोलें",
 	"menu.debug.open_today_log": "आज की लॉग फाइल खोलें",
 	"menu.debug.title": "⚠ डिबग",
+	"healthcheck.copy_and_close": "क्लिपबोर्ड में कॉपी करें और बंद करें",
 	"menu.debug.window_spy": "Window Spy",
 	"menu.extensions.empty": "कोई एक्सटेंशन स्थापित नहीं",
 	"menu.extensions.header": "एक्सटेंशन",

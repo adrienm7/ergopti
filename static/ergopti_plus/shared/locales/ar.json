@@ -537,6 +537,7 @@
 	"menu.debug.open_logs": "فتح مجلد السجلات",
 	"menu.debug.open_today_log": "فتح ملف سجل اليوم",
 	"menu.debug.title": "⚠ تشخيص",
+	"healthcheck.copy_and_close": "نسخ إلى الحافظة وإغلاق",
 	"menu.debug.window_spy": "Window Spy",
 	"menu.extensions.empty": "لا توجد إضافة مثبتة",
 	"menu.extensions.header": "الإضافات",

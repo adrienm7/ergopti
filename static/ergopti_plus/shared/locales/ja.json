@@ -537,6 +537,7 @@
 	"menu.debug.open_logs": "ログフォルダーを開く",
 	"menu.debug.open_today_log": "本日のログファイルを開く",
 	"menu.debug.title": "⚠ デバッグ",
+	"healthcheck.copy_and_close": "クリップボードにコピーして閉じる",
 	"menu.debug.window_spy": "ウィンドウスパイ",
 	"menu.extensions.empty": "拡張機能がインストールされていません",
 	"menu.extensions.header": "拡張機能",

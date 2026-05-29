@@ -537,6 +537,7 @@
 	"menu.debug.open_logs": "로그 폴더 열기",
 	"menu.debug.open_today_log": "오늘의 로그 파일 열기",
 	"menu.debug.title": "⚠ 디버그",
+	"healthcheck.copy_and_close": "클립보드에 복사하고 닫기",
 	"menu.debug.window_spy": "Window Spy",
 	"menu.extensions.empty": "설치된 확장 기능 없음",
 	"menu.extensions.header": "확장 기능",

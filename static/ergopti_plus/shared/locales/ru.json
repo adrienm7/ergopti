@@ -537,6 +537,7 @@
 	"menu.debug.open_logs": "Открыть папку журналов",
 	"menu.debug.open_today_log": "Открыть журнал за сегодня",
 	"menu.debug.title": "⚠ Отладка",
+	"healthcheck.copy_and_close": "Скопировать в буфер обмена и закрыть",
 	"menu.debug.window_spy": "Наблюдатель окон",
 	"menu.extensions.empty": "Расширения не установлены",
 	"menu.extensions.header": "Расширения",

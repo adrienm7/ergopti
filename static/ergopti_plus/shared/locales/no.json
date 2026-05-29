@@ -537,6 +537,7 @@
 	"menu.debug.open_logs": "Åpne loggmappe",
 	"menu.debug.open_today_log": "Åpne dagens loggfil",
 	"menu.debug.title": "⚠ Feilsøking",
+	"healthcheck.copy_and_close": "Kopier til utklippstavle og lukk",
 	"menu.debug.window_spy": "Window Spy",
 	"menu.extensions.empty": "Ingen utvidelse installert",
 	"menu.extensions.header": "Utvidelser",

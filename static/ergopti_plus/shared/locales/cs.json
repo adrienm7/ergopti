@@ -537,6 +537,7 @@
 	"menu.debug.open_logs": "Otevřít složku protokolů",
 	"menu.debug.open_today_log": "Otevřít dnešní soubor protokolu",
 	"menu.debug.title": "⚠ Ladění",
+	"healthcheck.copy_and_close": "Zkopírovat do schránky a zavřít",
 	"menu.debug.window_spy": "Sledování okna",
 	"menu.extensions.empty": "Žádné rozšíření není nainstalováno",
 	"menu.extensions.header": "Rozšíření",
