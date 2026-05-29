@@ -12,17 +12,17 @@
 --- 1. Adapter probing: iterates the canonical adapter list, attempts a require()
 ---    for each module, and verifies the presence of its public contract methods —
 ---    without side effects.
---- 2. Port validation: checks that each port adapter responds to the four
----    canonical port methods (setIcon, setMenu, setTooltip, destroy for TrayMenu,
----    etc.) and records pass/fail per port.
+--- 2. Port validation: records pass/fail per adapter contract.
 --- 3. Last error capture: reads the last Logger ERROR entry stored in module
 ---    state so callers can surface the most recent failure without parsing logs.
---- 4. Uptime: computes seconds since the module was first required, giving a
----    lightweight proxy for driver uptime.
---- 5. System info: captures macOS version, Hammerspoon version, screen resolution,
----    locale, and config path for a complete at-a-glance snapshot.
---- 6. Selectable window: M.show_window() renders the report in an hs.webview so
----    the user can select and copy any part of the diagnostic text.
+--- 4. Uptime: computes seconds since the module was first required.
+--- 5. System info: captures macOS version, Hammerspoon version, git hash,
+---    screen resolution, locale, and config path for a complete snapshot.
+--- 6. Session counters: counts WARNING and ERROR lines from the in-memory ring
+---    buffer, and surfaces the last 100 for at-a-glance diagnosis.
+--- 7. Selectable window: M.show_window() renders the report in an hs.webview.
+---    HTML is generated directly from the snapshot — no JS conversion step.
+---    All diagnostic labels are in English (developer-facing, not translated).
 --- ==============================================================================
 
 local M = {}
@@ -172,6 +172,27 @@ function M.run()
 
 	local uptime_sec = os.time() - _load_time
 
+	-- Collect recent WARNING/ERROR lines from the in-memory ring buffer
+	local recent_issues = {}
+	local warn_count    = 0
+	local err_count     = 0
+	local all_lines     = Logger.ring_buffer_snapshot()
+	for _, line in ipairs(all_lines) do
+		if line:find("%[WARNING%]") or line:find("%[ERROR%]") then
+			table.insert(recent_issues, line)
+			if line:find("%[WARNING%]") then warn_count = warn_count + 1 end
+			if line:find("%[ERROR%]")   then err_count  = err_count  + 1 end
+		end
+	end
+	-- Keep only the last 100
+	if #recent_issues > 100 then
+		local trimmed = {}
+		for i = #recent_issues - 99, #recent_issues do
+			table.insert(trimmed, recent_issues[i])
+		end
+		recent_issues = trimmed
+	end
+
 	local result = {
 		version         = version,
 		loaded_adapters = loaded_adapters,
@@ -179,6 +200,9 @@ function M.run()
 		failed_adapters = failed_adapters,
 		last_error      = _last_error,
 		uptime_sec      = uptime_sec,
+		warn_count      = warn_count,
+		err_count       = err_count,
+		recent_issues   = recent_issues,
 		sys             = _sys_info(),
 	}
 
@@ -189,89 +213,28 @@ function M.run()
 end
 
 
---- Formats a healthcheck result table as a Markdown string for WebView rendering.
---- Calls M.run() internally if no snapshot is provided.
---- @param snapshot table|nil Result from M.run(), or nil to run fresh.
---- @return string Formatted Markdown diagnostic string.
-function M.format(snapshot)
-	local s   = snapshot or M.run()
-	local sys = s.sys or {}
-
-	local lines = {}
-
-	-- Header
-	table.insert(lines, "# Diagnostic système — ErgoptiPlus")
-	table.insert(lines, "")
-
-	-- System info table
-	table.insert(lines, "## Système")
-	table.insert(lines, "")
-	table.insert(lines, "| Champ | Valeur |")
-	table.insert(lines, "|---|---|")
-	table.insert(lines, "| Version ErgoptiPlus | `" .. tostring(s.version) .. "` |")
-	table.insert(lines, "| Durée de fonctionnement | " .. _format_uptime(s.uptime_sec) .. " |")
-	table.insert(lines, "| Hammerspoon | " .. tostring(sys.hs_version or "?") .. " |")
-	table.insert(lines, "| macOS | " .. tostring(sys.os_version or "?") .. " |")
-	table.insert(lines, "| Résolution écran | " .. tostring(sys.screen_res or "?") .. " |")
-	table.insert(lines, "| Locale | " .. tostring(sys.locale or "?") .. " |")
-	if sys.config_dir and sys.config_dir ~= "" then
-		table.insert(lines, "| Dossier config | `" .. sys.config_dir .. "` |")
-	end
-	table.insert(lines, "")
-
-	-- Adapter status
-	local ok_list   = s.ports_validated or {}
-	local fail_list = s.failed_adapters or {}
-	local total     = #ok_list + #fail_list
-
-	table.insert(lines, "## Adaptateurs (" .. #ok_list .. "/" .. total .. " OK)")
-	table.insert(lines, "")
-	for _, name in ipairs(ok_list) do
-		table.insert(lines, "- ✓ `" .. name .. "`")
-	end
-	for _, name in ipairs(fail_list) do
-		table.insert(lines, "- ✗ `" .. name .. "`")
-	end
-	table.insert(lines, "")
-
-	-- Last error
-	table.insert(lines, "## Dernière erreur")
-	table.insert(lines, "")
-	if s.last_error then
-		table.insert(lines, "```")
-		table.insert(lines, s.last_error)
-		table.insert(lines, "```")
-	else
-		table.insert(lines, "_Aucune erreur enregistrée._")
-	end
-
-	return table.concat(lines, "\n")
-end
-
-
 --- Opens a dedicated webview window displaying the healthcheck report.
---- Text is fully selectable and copyable. Re-uses the existing window if already open.
+--- Text is fully selectable and copyable. Replaces any existing window (singleton).
 function M.show_window()
-	-- Close any stale window before rebuilding
 	if _window then
 		pcall(function() _window:delete() end)
 		_window = nil
 	end
 
 	local snapshot = M.run()
-	local md       = M.format(snapshot)
-	local html     = _make_html(md)
+	local html     = _snapshot_to_html(snapshot)
+	local plain    = M.format_plain(snapshot)
 
 	local i18n_ok, i18n = pcall(require, "lib.i18n")
 	local title = (i18n_ok and type(i18n) == "table" and type(i18n.get) == "function")
 		and i18n.get("menu.debug.healthcheck")
-		or "Diagnostic système"
+		or "System Diagnostic"
 
 	local screen = hs.screen.mainScreen()
 	local sf     = screen and type(screen.frame) == "function" and screen:frame()
 		or { x = 0, y = 0, w = 1440, h = 900 }
 
-	local W, H = 700, 560
+	local W, H = 700, 600
 	local frame = {
 		x = math.floor(sf.x + (sf.w - W) / 2),
 		y = math.floor(sf.y + (sf.h - H) / 2),
@@ -282,9 +245,8 @@ function M.show_window()
 	local ok_wv, wv = pcall(hs.webview.new, frame, { developerExtrasEnabled = false })
 	if not ok_wv or not wv then
 		Logger.error(LOG, "Failed to create healthcheck webview: %s.", tostring(wv))
-		-- Last-resort fallback: blocking alert (non-selectable but always works)
 		pcall(hs.focus)
-		hs.dialog.blockAlert(title, M.format_plain(snapshot), "OK")
+		hs.dialog.blockAlert(title, plain, "OK")
 		return
 	end
 
@@ -299,8 +261,23 @@ function M.show_window()
 
 	pcall(function()
 		wv:windowCallback(function(action)
-			if action == "closing" or action == "closed" then
-				_window = nil
+			if action == "closing" or action == "closed" then _window = nil end
+		end)
+	end)
+
+	-- Handle the copy-to-clipboard message posted by the in-page button
+	pcall(function()
+		wv:navigationCallback(function(action, _, _, _)
+			if action == "didFinishNavigation" then
+				-- Wire up the copy button now that the page is fully loaded
+				wv:evaluateJavaScript(
+					"document.getElementById('btnCopy').addEventListener('click',function(){"
+					.. "var el=document.createElement('textarea');"
+					.. "el.value=" .. _js_str(plain) .. ";"
+					.. "document.body.appendChild(el);el.select();"
+					.. "document.execCommand('copy');document.body.removeChild(el);"
+					.. "});"
+				)
 			end
 		end)
 	end)
@@ -308,7 +285,6 @@ function M.show_window()
 	pcall(function() wv:html(html) end)
 	pcall(function() wv:show() end)
 
-	-- Bring to front after a short delay so WebKit finishes compositing
 	hs.timer.doAfter(0.08, function()
 		pcall(hs.focus)
 		local ok_win, win = pcall(function() return wv:hswindow() end)
@@ -323,49 +299,61 @@ function M.show_window()
 end
 
 
---- Formats a snapshot as plain text (used as last-resort fallback when webview fails).
+--- Formats a snapshot as plain text (last-resort fallback when webview fails).
+--- All labels are in English — diagnostic output is developer-facing, not user-facing.
 --- @param snapshot table|nil Result from M.run(), or nil to run fresh.
 --- @return string Plain-text diagnostic string.
 function M.format_plain(snapshot)
-	local s   = snapshot or M.run()
-	local sys = s.sys or {}
+	local s      = snapshot or M.run()
+	local sys    = s.sys or {}
+	local lines  = {}
 
-	local lines = {}
-	table.insert(lines, "=== ErgoptiPlus — Diagnostic système ===")
+	table.insert(lines, "=== ErgoptiPlus — System Diagnostic ===")
 	table.insert(lines, "")
-	table.insert(lines, string.format("Version     : %s", s.version))
-	table.insert(lines, string.format("Uptime      : %s", _format_uptime(s.uptime_sec)))
-	table.insert(lines, string.format("Hammerspoon : %s", tostring(sys.hs_version or "?")))
-	table.insert(lines, string.format("macOS       : %s", tostring(sys.os_version or "?")))
-	table.insert(lines, string.format("Résolution  : %s", tostring(sys.screen_res or "?")))
-	table.insert(lines, string.format("Locale      : %s", tostring(sys.locale or "?")))
+	table.insert(lines, string.format("Version          : %s", s.version))
+	table.insert(lines, string.format("Last git commit  : %s", tostring(sys.git_hash or "unknown")))
+	table.insert(lines, string.format("Uptime           : %s", _format_uptime(s.uptime_sec)))
+	table.insert(lines, string.format("Hammerspoon      : %s", tostring(sys.hs_version or "?")))
+	table.insert(lines, string.format("macOS            : %s", tostring(sys.os_version or "?")))
+	table.insert(lines, string.format("Screen           : %s", tostring(sys.screen_res or "?")))
+	table.insert(lines, string.format("Locale           : %s", tostring(sys.locale or "?")))
 	if sys.config_dir and sys.config_dir ~= "" then
-		table.insert(lines, string.format("Config dir  : %s", sys.config_dir))
+		table.insert(lines, string.format("Config dir       : %s", sys.config_dir))
 	end
+	table.insert(lines, "")
+	table.insert(lines, string.format("Warnings         : %d", s.warn_count or 0))
+	table.insert(lines, string.format("Errors           : %d", s.err_count  or 0))
 	table.insert(lines, "")
 
 	local ok_list   = s.ports_validated or {}
 	local fail_list = s.failed_adapters or {}
-
-	table.insert(lines, string.format("Adaptateurs OK (%d) :", #ok_list))
+	table.insert(lines, string.format("Adapters OK (%d):", #ok_list))
 	for _, name in ipairs(ok_list) do
-		table.insert(lines, "  ✓ " .. name)
+		table.insert(lines, "  + " .. name)
 	end
-
 	if #fail_list > 0 then
-		table.insert(lines, string.format("Échecs (%d) :", #fail_list))
+		table.insert(lines, string.format("Failed (%d):", #fail_list))
 		for _, name in ipairs(fail_list) do
-			table.insert(lines, "  ✗ " .. name)
+			table.insert(lines, "  x " .. name)
 		end
 	else
-		table.insert(lines, "Échecs : aucun")
+		table.insert(lines, "Failed : none")
 	end
 
 	table.insert(lines, "")
 	if s.last_error then
-		table.insert(lines, "Dernière erreur : " .. s.last_error)
+		table.insert(lines, "Last error : " .. s.last_error)
 	else
-		table.insert(lines, "Dernière erreur : aucune")
+		table.insert(lines, "Last error : none")
+	end
+
+	local issues = s.recent_issues or {}
+	if #issues > 0 then
+		table.insert(lines, "")
+		table.insert(lines, string.format("--- Recent warnings / errors (%d) ---", #issues))
+		for _, l in ipairs(issues) do
+			table.insert(lines, l)
+		end
 	end
 
 	return table.concat(lines, "\n")
@@ -421,12 +409,20 @@ function _sys_info()
 	end
 	info.locale = locale
 
-	-- Config directory (Hammerspoon config path)
+	-- Config directory
 	local config_dir = ""
 	if hs and type(hs.configdir) == "string" then
 		config_dir = hs.configdir
 	end
 	info.config_dir = config_dir
+
+	-- Short git commit hash of the running source tree
+	local git_hash = "unknown"
+	local ok_git, out = pcall(hs.execute, "git -C " .. hs.configdir .. " rev-parse --short HEAD 2>/dev/null")
+	if ok_git and type(out) == "string" and out ~= "" then
+		git_hash = out:match("^%s*(.-)%s*$")  -- trim whitespace
+	end
+	info.git_hash = git_hash
 
 	return info
 end
@@ -450,71 +446,141 @@ function _format_uptime(sec)
 end
 
 
---- Builds a self-contained HTML page from a Markdown string.
---- The inline JS renderer handles headings, tables, bold, italic, code, lists.
---- @param md string Markdown source.
---- @return string HTML document.
-function _make_html(md)
-	-- Escape for embedding as a JS template literal
-	local safe = md
-		:gsub("\\", "\\\\")
-		:gsub("`",  "\\`")
-		:gsub("${", "\\${")
+--- Escapes a string for safe embedding as a JS single-quoted string literal.
+--- @param s string Raw value.
+--- @return string JS-safe single-quoted literal (including the surrounding quotes).
+function _js_str(s)
+	s = tostring(s)
+	s = s:gsub("\\", "\\\\")
+	s = s:gsub("'",  "\\'")
+	s = s:gsub("\n", "\\n")
+	s = s:gsub("\r", "")
+	s = s:gsub("\t", "\\t")
+	return "'" .. s .. "'"
+end
 
-	return [[<!DOCTYPE html><html><head><meta charset="utf-8">
-<style>
-html,body{margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:13px;color:#1a1a1a;background:#fff;}
-body{padding:16px 20px;box-sizing:border-box;overflow-y:auto;}
-h1{font-size:1.2em;margin:0 0 .6em;}
-h2{font-size:1em;font-weight:600;margin:1em 0 .3em;border-bottom:1px solid #e0e0e0;padding-bottom:.2em;}
-table{border-collapse:collapse;width:100%;margin:.4em 0;}
-th,td{border:1px solid #e0e0e0;padding:.3em .65em;text-align:left;}
-th{background:#f6f6f6;font-weight:600;}
-td:first-child{white-space:nowrap;color:#555;}
-ul{margin:.3em 0 .3em 1.2em;padding:0;}li{margin:.2em 0;}
-code{background:#f3f3f3;border-radius:3px;padding:.1em .35em;font-family:'SF Mono',Menlo,monospace;font-size:.88em;}
-pre{background:#f3f3f3;border-radius:4px;padding:.6em 1em;overflow-x:auto;white-space:pre-wrap;word-break:break-all;}
-pre code{background:none;padding:0;}
-em{font-style:italic;color:#666;}
-.ok{color:#1a7f37;}.fail{color:#cf222e;}
-</style></head><body>
-<script>
-(function(){
-var md=`]] .. safe .. [[`;
-function esc(t){return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
-function inline(t){
-  t=esc(t);
-  t=t.replace(/`([^`]+)`/g,'<code>$1</code>');
-  t=t.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>');
-  t=t.replace(/__(.+?)__/g,'<strong>$1</strong>');
-  t=t.replace(/\*(.+?)\*/g,'<em>$1</em>');
-  t=t.replace(/_(.+?)_/g,'<em>$1</em>');
-  t=t.replace(/✓/g,'<span class=ok>✓</span>');
-  t=t.replace(/✗/g,'<span class=fail>✗</span>');
-  return t;
-}
-var lines=md.split('\n'),out=[],inPre=false,inUl=false,inOl=false,inTbl=false;
-function closeBlocks(){if(inUl){out.push('</ul>');inUl=false;}if(inOl){out.push('</ol>');inOl=false;}if(inTbl){out.push('</table>');inTbl=false;}}
-for(var i=0;i<lines.length;i++){
-  var l=lines[i];
-  if(/^```/.test(l)){if(inPre){out.push('</code></pre>');inPre=false;}else{closeBlocks();out.push('<pre><code>');inPre=true;}continue;}
-  if(inPre){out.push(esc(l));continue;}
-  if(/^\s*$/.test(l)){closeBlocks();continue;}
-  var hm=l.match(/^(#{1,6})\s+(.*)/);if(hm){closeBlocks();var n=hm[1].length;out.push('<h'+n+'>'+inline(hm[2])+'</h'+n+'>');continue;}
-  if(/^\|/.test(l)&&/\|/.test(l)){if(!inTbl){closeBlocks();out.push('<table>');inTbl=true;}
-    if(/^[\s|:-]+$/.test(l))continue;
-    var cells=l.replace(/^\||\|$/g,'').split('|');
-    var isHdr=(out.length>0&&out[out.length-1]==='<table>');
-    var tag=isHdr?'th':'td';
-    out.push('<tr>'+cells.map(function(c){return'<'+tag+'>'+inline(c.trim())+'</'+tag+'>';}).join('')+'</tr>');continue;}
-  var ul=l.match(/^[-*+]\s+(.*)/);if(ul){if(!inUl){closeBlocks();out.push('<ul>');inUl=true;}out.push('<li>'+inline(ul[1])+'</li>');continue;}
-  var ol=l.match(/^\d+\.\s+(.*)/);if(ol){if(!inOl){closeBlocks();out.push('<ol>');inOl=true;}out.push('<li>'+inline(ol[1])+'</li>');continue;}
-  closeBlocks();out.push('<p>'+inline(l)+'</p>');
-}
-if(inPre)out.push('</code></pre>');closeBlocks();
-document.body.innerHTML=out.join('\n');
-})();
-</script></body></html>]]
+
+--- Escapes a string for safe HTML text content.
+--- @param s string Raw value.
+--- @return string HTML-safe string.
+function _he(s)
+	s = tostring(s)
+	s = s:gsub("&",  "&amp;")
+	s = s:gsub("<",  "&lt;")
+	s = s:gsub(">",  "&gt;")
+	s = s:gsub('"',  "&quot;")
+	return s
+end
+
+
+--- Wraps a value in a <code> tag with HTML-escaped content.
+--- @param s string Raw value.
+--- @return string HTML fragment.
+function _hcode(s)
+	return "<code>" .. _he(s) .. "</code>"
+end
+
+
+--- Builds a self-contained HTML page directly from the snapshot table.
+--- NOTE: All labels are intentionally in English and must NOT be translated.
+--- Diagnostic output is developer-facing — a consistent language makes
+--- cross-platform log comparison straightforward.
+--- @param snapshot table Result from M.run().
+--- @return string Complete HTML document.
+function _snapshot_to_html(snapshot)
+	local s         = snapshot
+	local sys       = s.sys or {}
+	local ok_list   = s.ports_validated or {}
+	local fail_list = s.failed_adapters or {}
+	local total     = #ok_list + #fail_list
+	local warn_count = s.warn_count or 0
+	local err_count  = s.err_count  or 0
+	local issues     = s.recent_issues or {}
+
+	-- CSS — mirrors the Windows healthcheck UI for consistency across platforms
+	local css = table.concat({
+		"html,body{margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:13px;color:#1a1a1a;background:#fff;}",
+		"body{padding:16px 20px;overflow-x:hidden;overflow-y:auto;word-break:break-word;}",
+		"h1{font-size:1.25em;margin:0 0 .6em;}",
+		"h2{font-size:1.05em;margin:1.2em 0 .3em;border-bottom:1px solid #e0e0e0;padding-bottom:.2em;color:#333;}",
+		"table{border-collapse:collapse;width:100%;margin:.4em 0 .8em;}",
+		"th,td{border:1px solid #e0e0e0;padding:.3em .65em;text-align:left;}",
+		"th{background:#f6f6f6;font-weight:600;}",
+		"td:first-child{white-space:nowrap;color:#555;font-weight:500;}",
+		"ul{margin:.3em 0 .3em 1.2em;padding:0;}li{margin:.2em 0;}",
+		"code{background:#f3f3f3;border-radius:3px;padding:.1em .35em;font-family:'SF Mono',Menlo,monospace;font-size:.88em;}",
+		"pre{background:#1e1e1e;color:#d4d4d4;border-radius:4px;padding:.7em 1em;overflow-x:hidden;white-space:pre-wrap;word-break:break-all;font-family:'SF Mono',Menlo,monospace;font-size:.82em;line-height:1.45;}",
+		"button{padding:7px 20px;font-family:-apple-system,sans-serif;font-size:13px;background:#0078d4;color:#fff;border:none;border-radius:4px;cursor:pointer;margin-top:1em;}",
+		"button:hover{background:#106ebe;}",
+		"em{font-style:italic;color:#666;}",
+		".ok{color:#1a7f37;font-weight:600;}.fail{color:#cf222e;font-weight:600;}",
+	}, "")
+
+	-- System table
+	local sys_rows = {
+		"<tr><td>ErgoptiPlus version</td><td>" .. _hcode(tostring(s.version)) .. "</td></tr>",
+		"<tr><td>Last git commit</td><td>"      .. _hcode(tostring(sys.git_hash or "unknown")) .. "</td></tr>",
+		"<tr><td>Uptime</td><td>"               .. _he(_format_uptime(s.uptime_sec)) .. "</td></tr>",
+		"<tr><td>Hammerspoon</td><td>"          .. _he(tostring(sys.hs_version or "?")) .. "</td></tr>",
+		"<tr><td>macOS</td><td>"                .. _he(tostring(sys.os_version or "?")) .. "</td></tr>",
+		"<tr><td>Screen resolution</td><td>"    .. _he(tostring(sys.screen_res or "?")) .. "</td></tr>",
+		"<tr><td>Locale</td><td>"               .. _he(tostring(sys.locale or "?")) .. "</td></tr>",
+	}
+	if sys.config_dir and sys.config_dir ~= "" then
+		table.insert(sys_rows, "<tr><td>Config dir</td><td>" .. _hcode(sys.config_dir) .. "</td></tr>")
+	end
+	local sys_tbl = "<table><tr><th>Field</th><th>Value</th></tr>"
+		.. table.concat(sys_rows) .. "</table>"
+
+	-- Session counters table
+	local w_icon = warn_count == 0 and "<span class=ok>✓</span>" or "<span class=fail>✗</span>"
+	local e_icon = err_count  == 0 and "<span class=ok>✓</span>" or "<span class=fail>✗</span>"
+	local ctr_tbl = "<table><tr><th>Type</th><th>Count</th></tr>"
+		.. "<tr><td>" .. w_icon .. " Warnings</td><td>" .. warn_count .. "</td></tr>"
+		.. "<tr><td>" .. e_icon .. " Errors</td><td>"   .. err_count  .. "</td></tr>"
+		.. "</table>"
+
+	-- Adapters list
+	local adap_items = {}
+	for _, name in ipairs(ok_list) do
+		table.insert(adap_items, "<li><span class=ok>✓</span> " .. _hcode(name) .. "</li>")
+	end
+	for _, name in ipairs(fail_list) do
+		table.insert(adap_items, "<li><span class=fail>✗</span> " .. _hcode(name) .. "</li>")
+	end
+	local adap_html = "<ul>" .. table.concat(adap_items) .. "</ul>"
+
+	-- Last error
+	local last_err_html
+	if s.last_error then
+		last_err_html = "<pre>" .. _he(s.last_error) .. "</pre>"
+	else
+		last_err_html = "<em>No error recorded.</em>"
+	end
+
+	-- Recent issues
+	local issues_html
+	if #issues == 0 then
+		issues_html = "<em>No warnings or errors since startup.</em>"
+	else
+		local lines_esc = {}
+		for _, l in ipairs(issues) do
+			table.insert(lines_esc, _he(l))
+		end
+		issues_html = "<pre>" .. table.concat(lines_esc, "\n") .. "</pre>"
+	end
+
+	return "<!DOCTYPE html><html><head><meta charset='utf-8'>"
+		.. "<style>" .. css .. "</style>"
+		.. "</head><body>"
+		.. "<h1>System Diagnostic — ErgoptiPlus</h1>"
+		.. "<h2>System</h2>"         .. sys_tbl
+		.. "<h2>Session counters</h2>" .. ctr_tbl
+		.. "<h2>Adapters (" .. #ok_list .. "/" .. total .. " OK)</h2>" .. adap_html
+		.. "<h2>Last recorded error</h2>" .. last_err_html
+		.. "<h2>Recent warnings / errors (" .. #issues .. "/100)</h2>" .. issues_html
+		.. "<button id='btnCopy'>Copy to clipboard</button>"
+		.. "</body></html>"
 end
 
 return M
