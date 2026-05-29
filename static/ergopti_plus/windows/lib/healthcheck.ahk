@@ -315,8 +315,6 @@ HealthCheck_ShowWindow() {
 				s.IsStatusBarEnabled              := false
 				s.AreBrowserAcceleratorKeysEnabled := false
 			}
-			OnMsg := (wv2, args) => _HealthCheck_OnWebMsg(wv2, args, PlainText, G)
-			try WV.WebMessageReceived(OnMsg)
 			; Defer Fill+NavigateToString so the message loop has painted the
 			; window and GetClientRect returns a valid non-zero rect.
 			Html := _HealthCheck_SnapshotToHtml(Snapshot, BtnLabel)
@@ -561,12 +559,7 @@ _HealthCheck_SnapshotToHtml(Snapshot, BtnLabel) {
 	; ── CSS ───────────────────────────────────────────────────────────────────
 	Css := (
 		"html,body{margin:0;padding:0;font-family:'Segoe UI',sans-serif;font-size:13px;color:#1a1a1a;background:#fff;}"
-		. "body{padding:16px 20px 64px;overflow-y:auto;}"
-		. "#footer{position:fixed;bottom:0;left:0;right:0;padding:8px 16px;"
-			. "border-top:1px solid #e0e0e0;background:#f8f8f8;z-index:999;}"
-		. "button{width:100%;padding:7px 16px;font-family:'Segoe UI',sans-serif;font-size:13px;"
-			. "background:#0078d4;color:#fff;border:none;border-radius:4px;cursor:pointer;}"
-		. "button:hover{background:#106ebe;}"
+		. "body{padding:16px 20px;overflow-x:hidden;overflow-y:auto;word-break:break-word;}"
 		. "h1{font-size:1.25em;margin:0 0 .6em;}"
 		. "h2{font-size:1.05em;margin:1.2em 0 .3em;border-bottom:1px solid #e0e0e0;"
 			. "padding-bottom:.2em;color:#333;}"
@@ -578,7 +571,7 @@ _HealthCheck_SnapshotToHtml(Snapshot, BtnLabel) {
 		. "code{background:#f3f3f3;border-radius:3px;padding:.1em .35em;"
 			. "font-family:Consolas,monospace;font-size:.88em;}"
 		. "pre{background:#1e1e1e;color:#d4d4d4;border-radius:4px;padding:.7em 1em;"
-			. "overflow-x:auto;white-space:pre-wrap;word-break:break-all;"
+			. "overflow-x:hidden;white-space:pre-wrap;word-break:break-all;"
 			. "font-family:Consolas,'Courier New',monospace;font-size:.82em;line-height:1.45;}"
 		. "em{font-style:italic;color:#666;}"
 		. ".ok{color:#1a7f37;font-weight:600;}.fail{color:#cf222e;font-weight:600;}"
@@ -642,8 +635,6 @@ _HealthCheck_SnapshotToHtml(Snapshot, BtnLabel) {
 	}
 
 	; ── Assemble full page ────────────────────────────────────────────────────
-	; The footer button posts "copy_and_close" to the AHK WebMessageReceived handler.
-	; Using window.onload to bind the click ensures the WebView2 channel is ready.
 	return (
 		"<!DOCTYPE html><html><head><meta charset='utf-8'>"
 		. "<style>" . Css . "</style>"
@@ -654,12 +645,6 @@ _HealthCheck_SnapshotToHtml(Snapshot, BtnLabel) {
 		. "<h2>Adapters (" . OkList.Length . "/" . Total . " OK)</h2>" . AdapHtml
 		. "<h2>Last recorded error</h2>" . LastErrHtml
 		. "<h2>Recent warnings / errors (" . Issues.Length . "/100)</h2>" . IssuesHtml
-		. "<div id='footer'><button id='btnCopy'>" . SafeBtn . "</button></div>"
-		. "<script>window.onload=function(){"
-			. "document.getElementById('btnCopy').onclick=function(){"
-				. "window.chrome.webview.postMessage('copy_and_close');"
-			. "};"
-		. "};</script>"
 		. "</body></html>"
 	)
 }
