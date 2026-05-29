@@ -36,7 +36,7 @@
 
 [tap_hold.keys.caps_lock]
 time_activation_seconds = 0.35
-tap_action = "escape"
+tap_action = "enter"
 hold_modifier = "ctrl"
 
 
@@ -47,7 +47,7 @@ hold_modifier = "ctrl"
 
 [tap_hold.keys.left_shift]
 time_activation_seconds = 0.35
-tap_action = "one_shot_shift"
+tap_action = "copy"
 hold_modifier = "shift"
 
 
@@ -69,19 +69,9 @@ hold_modifier = "ctrl"
 
 [tap_hold.keys.left_alt]
 time_activation_seconds = 0.20
-hold_layer = "nav_secondary"
-# no tap_action → bare tap emits alt
-
-
-
-# =====================
-# ===== 1.5 space =====
-# =====================
-
-[tap_hold.keys.space]
-time_activation_seconds = 0.15
+tap_action = "backspace"
 hold_layer = "nav"
-# bare tap emits space (default)
+
 
 
 
@@ -92,7 +82,7 @@ hold_layer = "nav"
 [tap_hold.keys.right_ctrl]
 time_activation_seconds = 0.20
 tap_action = "one_shot_shift"
-hold_modifier = "ctrl"
+hold_modifier = "shift"
 
 
 
@@ -113,7 +103,7 @@ hold_modifier = "alt_gr"
 
 [tap_hold.keys.tab]
 time_activation_seconds = 0.20
-tap_action = "tab"
+tap_action = "alt_tab_monitor"
 hold_modifier = "alt"
 
 
