@@ -132,4 +132,21 @@ function M.activeCount()
 	return count
 end
 
+--- Returns the current wall-clock time in seconds since the Unix epoch.
+--- Fractional seconds are included (e.g. 1716000000.123). Wraps
+--- hs.timer.secondsSinceEpoch() so callers have no direct hs.timer dependency.
+--- @return number Seconds since epoch as a floating-point value.
+function M.now()
+	local ok, t = pcall(hs.timer.secondsSinceEpoch)
+	return ok and t or os.time()
+end
+
+--- Suspends execution for the given number of microseconds.
+--- Wraps hs.timer.usleep(). Use sparingly — this blocks the Lua thread.
+--- @param microseconds integer Number of microseconds to sleep.
+function M.sleep_us(microseconds)
+	if type(microseconds) ~= "number" or microseconds <= 0 then return end
+	pcall(hs.timer.usleep, math.floor(microseconds))
+end
+
 return M

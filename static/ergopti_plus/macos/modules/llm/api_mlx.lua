@@ -8,14 +8,17 @@
 
 local M = {}
 
-local hs       = hs
-local Logger   = require("lib.logger")
-local Notifications = require("lib.notifications")
-local i18n     = require("lib.i18n")
-local Parser   = require("modules.llm.parser")
-local Profiles = require("modules.llm.profiles")
-local ApiCommon = require("modules.llm.api_common")
-local LOG      = "llm.api_mlx"
+local Logger         = require("lib.logger")
+local Notifications  = require("lib.notifications")
+local i18n           = require("lib.i18n")
+local Parser         = require("modules.llm.parser")
+local Profiles       = require("modules.llm.profiles")
+local ApiCommon      = require("modules.llm.api_common")
+local HttpClient     = require("adapters.http_client").new()
+local JsonCodec      = require("adapters.json_codec")
+local TimerScheduler = require("adapters.timer_scheduler")
+local ShellRunner    = require("adapters.shell_runner")
+local LOG            = "llm.api_mlx"
 
 local ok_kl, keylogger = pcall(require, "modules.keylogger")
 if not ok_kl then keylogger = nil end
@@ -92,7 +95,7 @@ local FRESH_LAUNCH_GRACE_SEC     = 90  -- 8B-class models can take up to ~60s to
 function M.set_active_server_pgid(pgid)
 	_active_server_pgid  = tonumber(pgid) or nil
 	_server_pgid_pending = false  -- PGID now known; zombie kills can safely use the guard
-	_active_server_pgid_set_at = hs.timer.secondsSinceEpoch()
+	_active_server_pgid_set_at = TimerScheduler.now()
 	Logger.debug(LOG, "Active server PGID guard set to %s.", tostring(_active_server_pgid))
 	-- Immediately fire a guarded kill now that we know which PGID to protect. Any
 	-- zombie that was deferred during the pending window is still alive at this point;
@@ -120,7 +123,7 @@ kill_zombie_on_port_8080 = function()
 		Logger.debug(LOG, "Zombie kill deferred — new server PGID not yet known.")
 		return
 	end
-	local now = hs.timer.secondsSinceEpoch()
+	local now = TimerScheduler.now()
 	if now - _last_zombie_kill_at < ZOMBIE_KILL_MIN_INTERVAL_SEC then
 		Logger.debug(LOG, "Zombie kill skipped — last attempt was %.1fs ago (min interval %.1fs).",
 			now - _last_zombie_kill_at, ZOMBIE_KILL_MIN_INTERVAL_SEC)
@@ -163,14 +166,14 @@ kill_zombie_on_port_8080 = function()
 		"  [ -n \"$PG\" ] && [ \"$PG\" != \"" .. pgid_str .. "\" ] && echo \"$P\"; " ..
 		"done); " ..
 		"[ -n \"$ZOMBIES\" ] && echo \"$ZOMBIES\" | xargs kill -9 2>/dev/null && echo \"killed: $ZOMBIES\" || echo 'none'"
-	local kill_task = hs.task.new("/bin/bash", function(exit_code, stdout, _stderr)
+	local kill_task = ShellRunner.spawn("/bin/bash", {"-c", cmd}, function(exit_code, stdout, _stderr)
 		if exit_code == 0 then
 			Logger.warn(LOG, "Zombie kill completed; stdout: %s", tostring(stdout):gsub("\n", " "))
 		else
 			Logger.debug(LOG, "Zombie kill exit %d.", exit_code)
 		end
-	end, {"-c", cmd})
-	pcall(function() kill_task:start() end)
+	end, nil)
+	kill_task.start()
 end
 
 -- Holds the current in-flight hs.task; cancelled when a new streaming request starts.
@@ -299,13 +302,13 @@ local function discover_endpoints(on_done)
 	if _endpoint_probe_in_flight then return end
 	_endpoint_probe_in_flight = true
 
-	local probe_completions = hs.json.encode({ prompt = " ", max_tokens = 1 })
-	local probe_chat        = hs.json.encode({
+	local probe_completions = JsonCodec.encode({ prompt = " ", max_tokens = 1 })
+	local probe_chat        = JsonCodec.encode({
 		messages   = { { role = "user", content = " " } },
 		max_tokens = 1,
 	})
 	local headers    = { ["Content-Type"] = "application/json" }
-	local started_at = hs.timer.secondsSinceEpoch()
+	local started_at = TimerScheduler.now()
 
 	local function finish_discovery(success)
 		-- Stop the poll timer before firing callbacks so a callback that calls
@@ -338,14 +341,14 @@ local function discover_endpoints(on_done)
 			end
 			local path = candidates[idx]
 			local payload = probe_by_kind[kind] or probe_completions
-			hs.http.asyncPost(MLX_BASE_URL .. path, payload, headers, function(status, _)
-				if status and status ~= 404 and status ~= -1 then
+			HttpClient.post(MLX_BASE_URL .. path, headers, payload, function(r)
+				if r.status ~= 404 and r.status ~= 0 then
 					Logger.info(LOG, "Endpoint discovery (%s): %s -> HTTP %s — accepted as live route.",
-						kind, path, tostring(status))
+						kind, path, tostring(r.status))
 					pcall(on_resolved, MLX_BASE_URL .. path)
 				else
 					Logger.debug(LOG, "Endpoint discovery (%s): %s -> %s, trying next candidate.",
-						kind, path, tostring(status))
+						kind, path, tostring(r.status))
 					probe_one(candidates, idx + 1, found_so_far, kind, on_resolved)
 				end
 			end)
@@ -404,13 +407,13 @@ local function discover_endpoints(on_done)
 		-- Guard: if discovery was reset externally (model switch) while the
 		-- timer was in flight, stop quietly without firing callbacks.
 		if not _endpoint_probe_in_flight then
-			if poll_timer then pcall(function() poll_timer:stop() end) end
+			if poll_timer then TimerScheduler.cancel(poll_timer) end
 			poll_timer = nil
 			return
 		end
-		local elapsed = hs.timer.secondsSinceEpoch() - started_at
+		local elapsed = TimerScheduler.now() - started_at
 		if elapsed >= DISCOVERY_MAX_WAIT_SEC then
-			if poll_timer then pcall(function() poll_timer:stop() end) end
+			if poll_timer then TimerScheduler.cancel(poll_timer) end
 			poll_timer = nil
 			Logger.warn(LOG,
 				"Endpoint discovery: gave up waiting for MLX server after %.1fs. " ..
@@ -425,8 +428,12 @@ local function discover_endpoints(on_done)
 		-- lingers in CLOSE_WAIT), making the poll see the zombie's stale model ID
 		-- indefinitely. curl --no-keepalive forces a fresh TCP handshake every call,
 		-- so the moment the zombie's socket closes the next poll reaches the new server.
-		local curl_task = hs.task.new("/usr/bin/curl", function(exit_code, stdout, _stderr)
-			if poll_timer then pcall(function() poll_timer:stop() end) end
+		local curl_task = ShellRunner.spawn("/usr/bin/curl", {
+			"--silent", "--max-time", "5", "--no-keepalive",
+			"-H", "Connection: close",
+			MLX_BASE_URL .. "/v1/models",
+		}, function(exit_code, stdout, _stderr)
+			if poll_timer then TimerScheduler.cancel(poll_timer) end
 			poll_timer = nil
 			local status = (exit_code == 0) and 200 or -1
 			local body   = stdout or ""
@@ -465,18 +472,14 @@ local function discover_endpoints(on_done)
 				-- so we back off gracefully during a slow model-weight load.
 				Logger.debug(LOG,
 					"Endpoint discovery: server not ready — next probe in %.1fs.", poll_delay_sec)
-				poll_timer   = hs.timer.doAfter(poll_delay_sec, do_poll)
+				poll_timer   = TimerScheduler.after(poll_delay_sec, do_poll)
 				poll_delay_sec = math.min(poll_delay_sec * 2, DISCOVERY_POLL_MAX_SEC)
 			end
-		end, {
-			"--silent", "--max-time", "5", "--no-keepalive",
-			"-H", "Connection: close",
-			MLX_BASE_URL .. "/v1/models",
-		})
-		pcall(function() curl_task:start() end)
+		end)
+		curl_task.start()
 	end
 
-	poll_timer = hs.timer.doAfter(0, do_poll)
+	poll_timer = TimerScheduler.after(0, do_poll)
 end
 
 -- M.is_thinking_model is injected by init.lua
@@ -524,7 +527,7 @@ end
 --- Called when a newer request supersedes the current one.
 function M.cancel_streaming()
 	if _active_stream_timeout then
-		pcall(function() _active_stream_timeout:stop() end)
+		TimerScheduler.cancel(_active_stream_timeout)
 		_active_stream_timeout = nil
 	end
 	-- Bump generation so all callbacks from the old stream become no-ops
@@ -533,7 +536,7 @@ function M.cancel_streaming()
 	if _active_stream_task then
 		-- Always terminate to free the MLX server connection; leaving prefill-phase
 		-- curls running blocks the server from answering the next request
-		pcall(function() _active_stream_task:terminate() end)
+		_active_stream_task.terminate()
 		local phase = _active_stream_has_chunks and "mid-flight" or "prefill"
 		Logger.debug(LOG, "Active MLX stream terminated (%s).", phase)
 		_active_stream_task    = nil
@@ -617,38 +620,41 @@ function M.warmup(model_name, profile)
 			local user_msg = uses_pf_tail and 'PREFIX: "Bonjour"\nTAIL: "Bonjour"' or "Bonjour"
 			local merged   = sys .. "\n\n" .. user_msg
 			endpoint = _chat_endpoint
-			local ok_enc, enc = pcall(hs.json.encode, {
+			local enc, _ = JsonCodec.encode({
 				model       = effective_model,
 				messages    = { { role = "user", content = merged } },
 				max_tokens  = 1,
 				temperature = 0,
 				stream      = false,
 			})
-			if ok_enc then payload = enc end
+			if enc then payload = enc end
 		else
 			-- Basic / raw profiles fold the context into the system prompt; only the
 			-- static prefix before {context} is shared, so a completions ping suffices.
-			local ok_enc, enc = pcall(hs.json.encode, {
+			local enc, _ = JsonCodec.encode({
 				model       = effective_model,
 				prompt      = sys,
 				max_tokens  = 1,
 				temperature = 0,
 				stream      = false,
 			})
-			if ok_enc then payload = enc end
+			if enc then payload = enc end
 		end
 	end
 
 	-- Fallback: if profile resolution failed, send a minimal ping to confirm the model
 	-- is loaded without risking a crash.
 	if not payload then
-		local ok_enc, enc = pcall(hs.json.encode, {
+		local enc, enc_err = JsonCodec.encode({
 			model       = effective_model,
 			prompt      = " ",
 			max_tokens  = 1,
 			temperature = 0,
 		})
-		if not ok_enc then return end
+		if not enc then
+			Logger.error(LOG, "warmup: fallback encode failed — %s", tostring(enc_err))
+			return
+		end
 		payload = enc
 	end
 
@@ -658,18 +664,20 @@ function M.warmup(model_name, profile)
 	-- weight loading or a stale GPU stream), _warmup_in_flight would stay true
 	-- forever, silently blocking every subsequent warmup call.
 	if _warmup_timeout then pcall(function() _warmup_timeout:stop() end) end
-	_warmup_timeout = hs.timer.doAfter(WARMUP_POST_TIMEOUT_SEC, function()
+	local _wt_handle = TimerScheduler.after(WARMUP_POST_TIMEOUT_SEC, function()
 		_warmup_timeout = nil
 		if not _warmup_in_flight then return end
 		_warmup_in_flight = false
 		Logger.warn(LOG, "Warmup POST timed out after %.0fs — unblocking and retrying in 2s.",
 			WARMUP_POST_TIMEOUT_SEC)
-		hs.timer.doAfter(2, function() M.warmup(model_name, profile) end)
+		TimerScheduler.after(2, function() M.warmup(model_name, profile) end)
 	end)
-	hs.http.asyncPost(endpoint, payload, { ["Content-Type"] = "application/json" },
-		function(status, body)
+	_warmup_timeout = _wt_handle
+	HttpClient.post(endpoint, { ["Content-Type"] = "application/json" }, payload,
+		function(r)
+			local status, body = r.status, r.body
 			if _warmup_timeout then
-				pcall(function() _warmup_timeout:stop() end)
+				TimerScheduler.cancel(_warmup_timeout)
 				_warmup_timeout = nil
 			end
 			_warmup_in_flight = false
@@ -707,7 +715,7 @@ function M.warmup(model_name, profile)
 				-- Retry automatically so the user does not have to manually trigger
 				-- set_llm_enabled / set_llm_model after a slow model load or a
 				-- generation-thread crash during the server hot-swap window.
-				hs.timer.doAfter(2, function()
+				TimerScheduler.after(2, function()
 					M.warmup(model_name, profile)
 				end)
 			end
@@ -731,8 +739,8 @@ end
 --- @param on_missing function Callback if server fails to answer.
 function M.check_availability(model_name, on_available, on_missing)
 	Logger.debug(LOG, "Checking MLX server availability…")
-	hs.http.asyncGet("http://127.0.0.1:8080/v1/models", {}, function(status, body)
-		if status == 200 then
+	HttpClient.get("http://127.0.0.1:8080/v1/models", {}, function(r)
+		if r.status == 200 then
 			Logger.info(LOG, "MLX server is available.")
 			if type(on_available) == "function" then pcall(on_available) end
 		else
@@ -819,7 +827,7 @@ local function post_and_parse(model_name, system_prompt, full_text, tail_text,
     -- chat_template_kwargs.
     table.insert(messages, { role = "user", content = merged_prompt .. "\n\n/no_think" })
 
-    local t0_req = hs.timer.secondsSinceEpoch()
+    local t0_req = TimerScheduler.now()
 
     -- Advanced mode is only the strict correction profile
     local is_advanced_prompt = type(final_sys) == "string" and final_sys:find("TAIL_CORRECTED", 1, true) ~= nil
@@ -864,35 +872,36 @@ local function post_and_parse(model_name, system_prompt, full_text, tail_text,
     Logger.debug(LOG, "[%s] #%d PROMPT (%d chars) -> %s", model_name, req_id, #prompt_preview, prompt_preview:sub(1, 250))
     Logger.debug(LOG, "[%s] #%d MODE is_batch=%s line_mode=%s max_tokens=%s endpoint=%s", model_name, req_id, tostring(is_batch), tostring(line_mode), tostring(opts.max_tokens), endpoint)
 
-	local ok, encoded = pcall(hs.json.encode, payload)
-	if not ok or not encoded then
-		Logger.error(LOG, "Failed to encode MLX payload.")
+	local encoded, enc_err = JsonCodec.encode(payload)
+	if not encoded then
+		Logger.error(LOG, "Failed to encode MLX payload — %s", tostring(enc_err))
 		if type(on_fail) == "function" then pcall(on_fail) end
 		return
 	end
 
-    local done = false
-    local timeout_timer = hs.timer.doAfter(8, function()
-        if done then return end
-        done = true
-        Logger.warn(LOG, "[%s] #%d TIMEOUT after 8s", model_name, req_id)
-        if type(on_fail) == "function" then pcall(on_fail) end
-    end)
+	local done = false
+	local timeout_handle = TimerScheduler.after(8, function()
+		if done then return end
+		done = true
+		Logger.warn(LOG, "[%s] #%d TIMEOUT after 8s", model_name, req_id)
+		if type(on_fail) == "function" then pcall(on_fail) end
+	end)
 
-    hs.http.asyncPost(endpoint, encoded, { ["Content-Type"] = "application/json" },
-        function(status, body, _)
-            if done then return end
-            done = true
-            if timeout_timer and type(timeout_timer.stop) == "function" then timeout_timer:stop() end
+	HttpClient.post(endpoint, { ["Content-Type"] = "application/json" }, encoded,
+		function(r)
+			local status, body = r.status, r.body
+			if done then return end
+			done = true
+			TimerScheduler.cancel(timeout_handle)
 
-            if status ~= 200 then
-                Logger.error(LOG, "MLX HTTP %s :: %s", tostring(status), tostring((body or ""):sub(1, 260)))
-                if type(on_fail) == "function" then pcall(on_fail) end
-                return
-            end
-            
-            local ok_dec, resp = pcall(hs.json.decode, body)
-            if not ok_dec or type(resp) ~= "table" or type(resp.choices) ~= "table" or not resp.choices[1] then
+			if status ~= 200 then
+				Logger.error(LOG, "MLX HTTP %s :: %s", tostring(status), tostring((body or ""):sub(1, 260)))
+				if type(on_fail) == "function" then pcall(on_fail) end
+				return
+			end
+
+			local resp, _ = JsonCodec.decode(body)
+			if type(resp) ~= "table" or type(resp.choices) ~= "table" or not resp.choices[1] then
                 Logger.debug(LOG, "[%s] #%d Unusable response (decode/choices), body='%s'", model_name, req_id, tostring((body or ""):sub(1, 220)))
 				if type(on_fail) == "function" then pcall(on_fail) end
 				return
@@ -934,7 +943,7 @@ local function post_and_parse(model_name, system_prompt, full_text, tail_text,
             end
 
             local raw     = Parser.strip_thinking(content)
-            local ms_req  = math.floor((hs.timer.secondsSinceEpoch() - t0_req) * 1000)
+            local ms_req  = math.floor((TimerScheduler.now() - t0_req) * 1000)
             Logger.debug(LOG, "[%s] #%d RAW (%dms, %d chars) -> %s", model_name, req_id, ms_req, #raw, raw:sub(1, 250))
             local results = {}
 
@@ -962,9 +971,9 @@ local function post_and_parse(model_name, system_prompt, full_text, tail_text,
                     user_prompt   = user_prompt,
                 })
             end
-            if type(on_success) == "function" then pcall(on_success, results) end
-        end
-    )
+			if type(on_success) == "function" then pcall(on_success, results) end
+		end
+	)
 end
 
 
@@ -992,7 +1001,7 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
                                          on_success, on_fail, dedup_stats, on_partial)
 	-- Supersede any previous stream: always terminate to free the MLX server connection
 	if _active_stream_task then
-		pcall(function() _active_stream_task:terminate() end)
+		_active_stream_task.terminate()
 		_active_stream_task    = nil
 		_active_stream_has_chunks = false
 	end
@@ -1082,9 +1091,9 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 	Logger.debug(LOG, "[%s] #%d STREAM_PROMPT (%d chars) -> %s",
 		model_name, req_id, #prompt_preview, prompt_preview:sub(1, 250))
 
-	local ok, encoded = pcall(hs.json.encode, payload)
-	if not ok or not encoded then
-		Logger.error(LOG, "Failed to encode MLX streaming payload.")
+	local encoded, enc_err = JsonCodec.encode(payload)
+	if not encoded then
+		Logger.error(LOG, "Failed to encode MLX streaming payload — %s", tostring(enc_err))
 		if type(on_fail) == "function" then pcall(on_fail) end
 		return
 	end
@@ -1092,7 +1101,7 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 	local accumulated   = ""
 	local line_buf      = ""
 	local in_reasoning  = false  -- Currently accumulating delta.reasoning(_content) tokens — close </think> on transition or end
-	local t0_req        = hs.timer.secondsSinceEpoch()
+	local t0_req        = TimerScheduler.now()
 
 	-- Parse one SSE line (data: {...} or data: [DONE]) and append its token to accumulated
 	local function process_sse_line(line)
@@ -1100,10 +1109,10 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 		if line:sub(1, 6) ~= "data: " then return end
 		local json_str = line:sub(7)
 		if json_str == "[DONE]" then return end
-		local ok_dec, obj = pcall(hs.json.decode, json_str)
-		if not ok_dec or type(obj) ~= "table" or type(obj.choices) ~= "table" or not obj.choices[1] then
-			Logger.debug(LOG, "[%s] #%d SSE decode fail: ok=%s type_obj=%s",
-				model_name, req_id, tostring(ok_dec), type(obj))
+		local obj, _ = JsonCodec.decode(json_str)
+		if type(obj) ~= "table" or type(obj.choices) ~= "table" or not obj.choices[1] then
+			Logger.debug(LOG, "[%s] #%d SSE decode fail: type_obj=%s",
+				model_name, req_id, type(obj))
 			return
 		end
 		local choice = obj.choices[1]
@@ -1174,7 +1183,7 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 		if not _active_stream_has_chunks then
 			_active_stream_has_chunks = true
 			if _active_stream_timeout then
-				pcall(function() _active_stream_timeout:stop() end)
+				TimerScheduler.cancel(_active_stream_timeout)
 				_active_stream_timeout = nil
 			end
 		end
@@ -1206,7 +1215,7 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 		_active_stream_task    = nil
 		_active_stream_has_chunks = false
 		if _active_stream_timeout then
-			pcall(function() _active_stream_timeout:stop() end)
+			TimerScheduler.cancel(_active_stream_timeout)
 			_active_stream_timeout = nil
 		end
 
@@ -1237,7 +1246,7 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 		end
 
 		local raw    = Parser.strip_thinking(accumulated)
-		local ms_req = math.floor((hs.timer.secondsSinceEpoch() - t0_req) * 1000)
+		local ms_req = math.floor((TimerScheduler.now() - t0_req) * 1000)
 		Logger.debug(LOG, "[%s] #%d STREAM_DONE (%dms) -> %s", model_name, req_id, ms_req, raw:sub(1, 250))
 
 		local results = {}
@@ -1287,18 +1296,18 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 	fh:close()
 
 	if _active_stream_timeout then
-		pcall(function() _active_stream_timeout:stop() end)
+		TimerScheduler.cancel(_active_stream_timeout)
 		_active_stream_timeout = nil
 	end
 
-	local task = hs.task.new("/usr/bin/curl", on_done, on_chunk, {
+	local task = ShellRunner.spawn("/usr/bin/curl", {
 		"-s", "-N", "-X", "POST",
 		"-H", "Content-Type: application/json",
 		"--connect-timeout", tostring(STREAM_CONNECT_TIMEOUT_SEC),
 		"--data-binary", "@" .. tmp_path,
 		endpoint,
-	})
-	task:start()
+	}, on_done, on_chunk)
+	task.start()
 	_active_stream_task    = task
 	_active_stream_has_chunks = false
 	Logger.debug(LOG, "[%s] #%d STREAM task started (payload: %s).", model_name, req_id, tmp_path)
@@ -1306,14 +1315,14 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 	-- Hard-timeout: if no token has arrived within STREAM_HARD_TIMEOUT_SEC, the server
 	-- accepted the connection but is hung — terminate the task and fire on_fail so the
 	-- UI does not freeze indefinitely showing the loading spinner.
-	_active_stream_timeout = hs.timer.doAfter(STREAM_HARD_TIMEOUT_SEC, function()
+	_active_stream_timeout = TimerScheduler.after(STREAM_HARD_TIMEOUT_SEC, function()
 		_active_stream_timeout = nil
 		-- Only fire if this stream is still the current one
 		if my_generation ~= _stream_generation then return end
 		if _active_stream_task then
 			Logger.warn(LOG, "[%s] #%d STREAM hard timeout (%gs) — terminating hung task.",
 				model_name, req_id, STREAM_HARD_TIMEOUT_SEC)
-			pcall(function() _active_stream_task:terminate() end)
+			_active_stream_task.terminate()
 			_active_stream_task    = nil
 			_active_stream_has_chunks = false
 			if type(on_fail) == "function" then pcall(on_fail) end
@@ -1321,7 +1330,7 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 	end)
 
 	-- Clean up the temp file once the task has had time to read it
-	hs.timer.doAfter(10, function()
+	TimerScheduler.after(10, function()
 		os.remove(tmp_path)
 	end)
 end
@@ -1359,11 +1368,11 @@ function M.fetch_batch(full_text, tail_text, model_name, temperature,
 	local dedup_stats    = ApiCommon.new_dedup_stats()
 	local post_fn        = streaming and post_and_parse_streaming or post_and_parse
 
-	local t0 = hs.timer.secondsSinceEpoch()
+	local t0 = TimerScheduler.now()
 	post_fn(model_name, system_prompt, full_text, tail_text,
 		effective_temp, tokens, num_predictions, is_batch,
 		function(results)
-			local ms = math.floor((hs.timer.secondsSinceEpoch() - t0) * 1000)
+			local ms = math.floor((TimerScheduler.now() - t0) * 1000)
 			ApiCommon.log_prediction_summary(Logger, LOG, "batch", num_predictions, dedup_stats, #results)
 			-- With streaming OFF: reveal each prediction one by one (complete, no animation) so
 			-- the user sees slot 1 fill, then slot 2, etc. rather than all appearing at once.
@@ -1379,7 +1388,7 @@ function M.fetch_batch(full_text, tail_text, model_name, temperature,
 					-- Pass is_batch_progressive=true so prediction_engine bypasses the
 					-- streaming_multi early-return for these intermediate calls
 					if type(on_success) == "function" then pcall(on_success, subset, ms, is_final, not is_final) end
-					if not is_final then hs.timer.doAfter(0, function() reveal_next(idx + 1) end) end
+					if not is_final then TimerScheduler.after(0, function() reveal_next(idx + 1) end) end
 				end
 				reveal_next(1)
 			else
@@ -1432,7 +1441,7 @@ function M.fetch_sequential(full_text, tail_text, model_name, temperature,
                              on_success, on_fail, request_id_provider, streaming, on_partial)
 
 	local system_prompt = Profiles.resolve_system_prompt(profile, 1)
-	local t0            = hs.timer.secondsSinceEpoch()
+	local t0            = TimerScheduler.now()
 	local results       = {}
 	local base_temp     = tonumber(temperature) or 0.1
 	local requested_predictions = math.max(1, math.floor(tonumber(num_predictions) or 1))
@@ -1458,7 +1467,7 @@ function M.fetch_sequential(full_text, tail_text, model_name, temperature,
 		if #results >= requested_predictions or attempt_index > max_attempts then
 			if #results == 0 then if type(on_fail) == "function" then pcall(on_fail) end return end
 			ApiCommon.log_prediction_summary(Logger, LOG, "sequential", requested_predictions, dedup_stats, #results)
-			local ms = math.floor((hs.timer.secondsSinceEpoch() - t0) * 1000)
+			local ms = math.floor((TimerScheduler.now() - t0) * 1000)
 			if type(on_success) == "function" then pcall(on_success, results, ms, true) end
 			return
 		end
@@ -1480,7 +1489,7 @@ function M.fetch_sequential(full_text, tail_text, model_name, temperature,
 					if type(preds) == "table" and type(preds[1]) == "table" then
 						if #results < requested_predictions then
 							ApiCommon.insert_prediction(results, preds[1], dedup_stats, DEDUPLICATION_ENABLED, Logger, LOG)
-							local ms = math.floor((hs.timer.secondsSinceEpoch() - t0) * 1000)
+							local ms = math.floor((TimerScheduler.now() - t0) * 1000)
 							if type(on_success) == "function" then pcall(on_success, results, ms, false) end
 						end
 					end

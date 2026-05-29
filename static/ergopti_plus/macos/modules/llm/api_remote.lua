@@ -32,12 +32,14 @@
 
 local M = {}
 
-local hs        = hs
-local Logger    = require("lib.logger")
-local Profiles  = require("modules.llm.profiles")
-local Parser    = require("modules.llm.parser")
-local ApiCommon = require("modules.llm.api_common")
-local LOG       = "llm.api_remote"
+local Logger         = require("lib.logger")
+local Profiles       = require("modules.llm.profiles")
+local Parser         = require("modules.llm.parser")
+local ApiCommon      = require("modules.llm.api_common")
+local HttpClient     = require("adapters.http_client").new()
+local JsonCodec      = require("adapters.json_codec")
+local TimerScheduler = require("adapters.timer_scheduler")
+local LOG            = "llm.api_remote"
 
 local ok_kl, keylogger = pcall(require, "modules.keylogger")
 if not ok_kl then keylogger = nil end
@@ -228,7 +230,7 @@ local function build_url(base_url, format, model, token)
 	end
 	if format == "gemini" then
 		-- Gemini: /models/<model>:generateContent?key=<token>
-		local enc = hs.http.encodeForQuery and hs.http.encodeForQuery(token) or token
+		local enc = HttpClient.encodeForQuery(token)
 		return base .. "/models/" .. model .. ":generateContent?key=" .. enc
 	end
 	-- OpenAI / OpenAI-compatible
@@ -373,8 +375,8 @@ end
 --- (no tooltip) rather than a crash.
 local function parse_response(format, body)
 	if type(body) ~= "string" or body == "" then return "" end
-	local ok, resp = pcall(hs.json.decode, body)
-	if not ok or type(resp) ~= "table" then return "" end
+	local resp, _ = JsonCodec.decode(body)
+	if type(resp) ~= "table" then return "" end
 
 	if format == "anthropic" then
 		local content = resp.content
@@ -456,21 +458,21 @@ function M.warmup(_model_name, _profile)
 	local format = provider.format
 	local ping_url
 	if format == "gemini" then
-		local enc = hs.http.encodeForQuery and hs.http.encodeForQuery(token) or token
+		local enc = HttpClient.encodeForQuery(token)
 		ping_url = rtrim_slash(base) .. "/models?key=" .. enc
 	else
 		ping_url = rtrim_slash(base) .. "/models"
 	end
 
-	hs.http.asyncGet(ping_url, build_headers(format, token), function(status, _body, _h)
+	HttpClient.get(ping_url, build_headers(format, token), function(r)
 		local was_ready = _is_ready
-		_is_ready = (type(status) == "number" and status >= 200 and status < 300)
+		_is_ready = r.ok
 		if _is_ready and not was_ready then
 			Logger.info(LOG, "Remote API ready (provider=%s, model=%s).",
 				tostring(entry.provider), tostring(entry.model))
 		elseif not _is_ready then
 			Logger.warn(LOG, "Remote API ping failed (status=%s) for provider=%s.",
-				tostring(status), tostring(entry.provider))
+				tostring(r.status), tostring(entry.provider))
 		end
 	end)
 end
@@ -506,17 +508,17 @@ function M.check_availability(_model_name, on_available, on_missing)
 	local format = provider.format
 	local url
 	if format == "gemini" then
-		local enc = hs.http.encodeForQuery and hs.http.encodeForQuery(entry.token) or entry.token
+		local enc = HttpClient.encodeForQuery(entry.token)
 		url = rtrim_slash(base) .. "/models?key=" .. enc
 	else
 		url = rtrim_slash(base) .. "/models"
 	end
 
-	hs.http.asyncGet(url, build_headers(format, entry.token), function(status, _b, _h)
-		if status and status >= 200 and status < 300 then
+	HttpClient.get(url, build_headers(format, entry.token), function(r)
+		if r.ok then
 			if type(on_available) == "function" then pcall(on_available) end
 		else
-			if type(on_missing) == "function" then pcall(on_missing, status == nil or status == 0) end
+			if type(on_missing) == "function" then pcall(on_missing, r.status == 0) end
 		end
 	end)
 end
@@ -586,24 +588,25 @@ local function post_and_parse(model_name, system_prompt, full_text, tail_text,
 	end
 
 	local payload = build_payload(provider.format, model, final_sys or "", user_prompt, temperature, max_tokens)
-	local ok_enc, encoded = pcall(hs.json.encode, payload)
-	if not ok_enc or not encoded then
-		Logger.error(LOG, "[%s] #%d Payload encode failed.", model, req_id)
+	local encoded, enc_err = JsonCodec.encode(payload)
+	if not encoded then
+		Logger.error(LOG, "[%s] #%d Payload encode failed — %s", model, req_id, tostring(enc_err))
 		if type(on_fail) == "function" then pcall(on_fail) end
 		return
 	end
 
 	local url     = build_url(base, provider.format, model, entry.token or "")
 	local headers = build_headers(provider.format, entry.token or "")
-	local t0      = hs.timer.secondsSinceEpoch()
+	local t0      = TimerScheduler.now()
 
 	Logger.debug(LOG, "[%s] #%d POST -> %s (provider=%s, %d chars prompt)",
 		model, req_id, url, provider.format, #(user_prompt or ""))
 
-	hs.http.asyncPost(url, encoded, headers, function(status, body, _h)
+	HttpClient.post(url, headers, encoded, function(r)
+		local status, body = r.status, r.body
 		pcall(function()
-			local ms = math.floor((hs.timer.secondsSinceEpoch() - t0) * 1000)
-			if not status or status < 200 or status >= 300 then
+			local ms = math.floor((TimerScheduler.now() - t0) * 1000)
+			if not r.ok then
 				Logger.error(LOG, "[%s] #%d HTTP_ERROR status=%s body=%s",
 					model, req_id, tostring(status), (body or ""):sub(1, 200))
 				-- Log the failure so the audit trail shows it instead of
@@ -717,12 +720,12 @@ function M.fetch_batch(full_text, tail_text, model_name, temperature,
 	local tokens         = (tonumber(max_predict) or 32) * num_predictions + (num_predictions * 5)
 	local is_batch       = profile.batch
 	local dedup_stats    = ApiCommon.new_dedup_stats()
-	local t0             = hs.timer.secondsSinceEpoch()
+	local t0             = TimerScheduler.now()
 
 	post_and_parse(model_name, system_prompt, full_text, tail_text,
 		effective_temp, tokens, num_predictions, is_batch,
 		function(results)
-			local ms = math.floor((hs.timer.secondsSinceEpoch() - t0) * 1000)
+			local ms = math.floor((TimerScheduler.now() - t0) * 1000)
 			ApiCommon.log_prediction_summary(Logger, LOG, "batch", num_predictions, dedup_stats, #results)
 			if not is_batch and #results > 1 then
 				local function reveal_next(idx)
@@ -731,7 +734,7 @@ function M.fetch_batch(full_text, tail_text, model_name, temperature,
 					for j = 1, idx do subset[j] = results[j] end
 					local is_final = (idx == #results)
 					if type(on_success) == "function" then pcall(on_success, subset, ms, is_final, not is_final) end
-					if not is_final then hs.timer.doAfter(0, function() reveal_next(idx + 1) end) end
+					if not is_final then TimerScheduler.after(0, function() reveal_next(idx + 1) end) end
 				end
 				reveal_next(1)
 			else
@@ -747,7 +750,7 @@ function M.fetch_sequential(full_text, tail_text, model_name, temperature,
                              max_predict, num_predictions, profile,
                              on_success, on_fail, request_id_provider, _streaming, _on_partial)
 	local system_prompt          = Profiles.resolve_system_prompt(profile, 1)
-	local t0                     = hs.timer.secondsSinceEpoch()
+	local t0                     = TimerScheduler.now()
 	local results                = {}
 	local base_temp              = tonumber(temperature) or 0.1
 	local requested_predictions  = math.max(1, math.floor(tonumber(num_predictions) or 1))
@@ -773,7 +776,7 @@ function M.fetch_sequential(full_text, tail_text, model_name, temperature,
 				return
 			end
 			ApiCommon.log_prediction_summary(Logger, LOG, "sequential", requested_predictions, dedup_stats, #results)
-			local ms = math.floor((hs.timer.secondsSinceEpoch() - t0) * 1000)
+			local ms = math.floor((TimerScheduler.now() - t0) * 1000)
 			if type(on_success) == "function" then pcall(on_success, results, ms, true) end
 			return
 		end
@@ -789,7 +792,7 @@ function M.fetch_sequential(full_text, tail_text, model_name, temperature,
 					if type(preds) == "table" and type(preds[1]) == "table" then
 						if #results < requested_predictions then
 							ApiCommon.insert_prediction(results, preds[1], dedup_stats, DEDUPLICATION_ENABLED, Logger, LOG)
-							local ms = math.floor((hs.timer.secondsSinceEpoch() - t0) * 1000)
+							local ms = math.floor((TimerScheduler.now() - t0) * 1000)
 							if type(on_success) == "function" then pcall(on_success, results, ms, false) end
 						end
 					end
