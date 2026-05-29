@@ -319,11 +319,27 @@ jobs:
                   Write-Host "AHK runtime : $ahk"
                   Write-Host "Test runner : $runner"
                   Write-Host "------------------------------------------------------------"
-                  # AHK does not write to the parent shell's stdout natively; wrap
-                  # via cmd.exe so FileAppend("*") output reaches the Actions log.
-                  $output = & cmd /c "`"$ahk`" `"$runner`" 2>&1"
-                  $exit = $LASTEXITCODE
-                  $output | ForEach-Object { Write-Host $_ }
+                  # Route AHK stdout to a temp file, then tail-read it while the
+                  # process runs. This makes CI logs show TAP progress in real time
+                  # instead of buffering everything until exit — a 15-min run was
+                  # indistinguishable from a silent hang in the old buffered approach.
+                  $outFile = "$env:TEMP\ahk_out_$([System.IO.Path]::GetRandomFileName()).txt"
+                  New-Item -ItemType File -Path $outFile -Force | Out-Null
+                  $proc = Start-Process -FilePath cmd -ArgumentList "/c `"`"$ahk`" `"$runner`"`" > `"$outFile`" 2>&1" `
+                      -NoNewWindow -PassThru
+                  $fstream = [System.IO.FileStream]::new($outFile,
+                      [System.IO.FileMode]::Open,
+                      [System.IO.FileAccess]::Read,
+                      [System.IO.FileShare]::ReadWrite)
+                  $reader = [System.IO.StreamReader]::new($fstream)
+                  while (-not $proc.HasExited) {
+                      $line = $reader.ReadLine()
+                      if ($null -ne $line) { Write-Host $line } else { Start-Sleep -Milliseconds 100 }
+                  }
+                  while ($null -ne ($line = $reader.ReadLine())) { Write-Host $line }
+                  $reader.Close(); $fstream.Close()
+                  Remove-Item $outFile -Force -ErrorAction SilentlyContinue
+                  $exit = $proc.ExitCode
                   Write-Host "------------------------------------------------------------"
                   Write-Host "AHK exit code: $exit"
                   if ($exit -ne 0) {
@@ -332,12 +348,15 @@ jobs:
 
             - name: Check for AHK compiler warnings
               shell: pwsh
-              timeout-minutes: 15
+              timeout-minutes: 5
               run: |
                   $ahk = Get-ChildItem "C:\AutoHotkey" -Filter "AutoHotkey64.exe" |
                       Select-Object -First 1 -ExpandProperty FullName
                   $runner = "${{ github.workspace }}\static\ergopti_plus\windows\tests\run_all.ahk"
-                  $output = & cmd /c "`"$ahk`" `"$runner`" 2>&1"
+                  # Pass --dry-run so AHK parses all files and emits warnings, then
+                  # exits immediately without running any Test() callbacks. This keeps
+                  # the warning check fast (~seconds) regardless of corpus size.
+                  $output = & cmd /c "`"$ahk`" `"$runner`" --dry-run 2>&1"
                   $warnings = $output | Where-Object { $_ -match "^Warning:" }
                   if ($warnings) {
                       $warnings | ForEach-Object { Write-Host "  $_" }
