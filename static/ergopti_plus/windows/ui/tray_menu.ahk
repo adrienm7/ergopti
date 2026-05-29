@@ -1755,35 +1755,42 @@ initMenu() {
 		RegisterMenuItem(ChannelMenu, t("menu.about.channel_main"), (*) => Updater_SetChannel("main"))
 		RegisterMenuItem(ChannelMenu, t("menu.about.channel_dev"),  (*) => Updater_SetChannel("dev"))
 		ChannelMenu.Check((UPDATER_CHANNEL == "dev") ? t("menu.about.channel_dev") : t("menu.about.channel_main"))
-		AboutMenu.Add(t("menu.about.channel_menu"), ChannelMenu)
+		; Show the active channel value directly in the submenu title so the user
+		; does not need to open it to see the current setting.
+		ChannelDisplay := (UPDATER_CHANNEL == "dev") ? t("menu.about.channel_dev") : t("menu.about.channel_main")
+		AboutMenu.Add(t("menu.about.channel_menu") . ": " . ChannelDisplay, ChannelMenu)
 
 		; Frequency submenu: 12 presets, current cadence pre-checked.
 		; ``Updater_SetCheckInterval`` re-arms the background timer immediately
 		; so the user feels the change without waiting for the next tick.
 		FreqMenu := Menu()
 		CurrentLabel := ""
+		CurrentCode  := ""
 		for Preset in UPDATER_INTERVAL_PRESETS {
 			Label := t("menu.about.frequency." . Preset.Code)
 			RegisterMenuItem(FreqMenu, Label, _MakeFreqSetter(Preset.Seconds))
-			if (Preset.Seconds == UPDATER_CHECK_INTERVAL)
+			if (Preset.Seconds == UPDATER_CHECK_INTERVAL) {
 				CurrentLabel := Label
+				CurrentCode  := Preset.Code
+			}
 		}
 		if (CurrentLabel != "")
 			FreqMenu.Check(CurrentLabel)
-		AboutMenu.Add(t("menu.about.frequency_menu"), FreqMenu)
-	}
-	AboutMenu.Add() ; Separator
-	; In local-source mode the user is running from a working copy — update
-	; actions are meaningless, skip them entirely.
-	if !Updater_IsLocalSource() {
+		; Show the active frequency code directly in the submenu title.
+		FreqDisplay := (CurrentCode != "") ? CurrentCode : "?"
+		AboutMenu.Add(t("menu.about.frequency_menu") . ": " . FreqDisplay, FreqMenu)
+
 		; Dynamic one-click item: label reflects current state (idle / checking /
 		; update available). Disabled while a check is in progress so two
 		; concurrent WinHttp calls cannot race.
+		; Kept in the same group as channel/frequency so all update settings are
+		; together and not split by a separator.
 		UpdateLabel := Updater_GetUpdateMenuLabel()
 		RegisterMenuItem(AboutMenu, UpdateLabel, Updater_OneClickUpdate)
 		if (Updater_GetUpdateState() == "checking")
 			AboutMenu.Disable(UpdateLabel)
 	}
+	AboutMenu.Add() ; Separator
 	; Changelog is always accessible — including in local-source mode — so the
 	; user can browse published releases regardless of how they are running.
 	RegisterMenuItem(AboutMenu, t("menu.about.changelog"), Updater_ShowChangelog)

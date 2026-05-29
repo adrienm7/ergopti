@@ -420,9 +420,14 @@ function M.build(ctx)
 	-- Channel items: shown and selectable only for release builds.
 	-- In local-source mode the version label already signals "local", so no extra channel item is needed.
 	local channel_items
+	local channel_display
 	if local_src then
-		channel_items = {}
+		channel_items   = {}
+		channel_display = nil
 	else
+		channel_display = (channel == "dev")
+			and i18n.get("menu.about.channel_dev")
+			or  i18n.get("menu.about.channel_main")
 		channel_items = {
 			{
 				title   = i18n.get("menu.about.channel_main"),
@@ -444,12 +449,16 @@ function M.build(ctx)
 	table.insert(menu_items, { title = ver_label, disabled = true })
 	if #channel_items > 0 then
 		table.insert(menu_items, { title = "-" })
-		for _, it in ipairs(channel_items) do table.insert(menu_items, it) end
+		-- Show the active channel value in the submenu title so the user can see
+		-- the current setting without having to open it — mirrors AHK behaviour.
+		local channel_title = i18n.get("menu.about.channel_menu") .. ": " .. (channel_display or "")
+		table.insert(menu_items, { title = channel_title, menu = channel_items })
 	end
-	table.insert(menu_items, { title = "-" })
 
 	if not local_src then
 		-- Dynamic one-click update item: label and enabled state reflect _update_state.
+		-- Kept in the same group as the channel selector (no separator between them)
+		-- so all update-related controls are visually grouped.
 		local is_busy = (_update_state == "checking" or _update_state == "installing")
 		table.insert(menu_items, {
 			title    = get_update_menu_label(),
@@ -460,6 +469,7 @@ function M.build(ctx)
 			end or nil,
 		})
 	end
+	table.insert(menu_items, { title = "-" })
 
 	table.insert(menu_items, {
 		title = i18n.get("menu.about.changelog"),
