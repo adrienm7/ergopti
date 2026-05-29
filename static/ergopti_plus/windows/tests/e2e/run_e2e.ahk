@@ -33,10 +33,10 @@
 ; ==============================================================================
 
 #Requires Autohotkey v2.0+
-#SingleInstance Force
 SetWorkingDir(A_ScriptDir)
 #Warn All, StdOut
 #Warn VarUnset, Off
+global _AHK_DRY_RUN := false
 
 ; Load the test framework first so Assert / Test / RunTests are available.
 #Include ../test_framework.ahk
