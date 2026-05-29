@@ -25,23 +25,10 @@
 local M   = {}
 local LOG = "keymap.terminators"
 
--- Graceful fallback: if lib.logger is absent (e.g. Linux daemon without the
--- Hammerspoon environment), map every level to a plain print so the rest of
--- the code never needs nil-guards around Logger calls.
-local Logger = (function()
-	local ok, lib = pcall(require, "lib.logger")
-	if ok and lib then return lib end
-	local function _log(level, tag, fmt, ...)
-		local msg = select("#", ...) > 0 and string.format(fmt, ...) or fmt
-		print(string.format("[%s] [%s] %s", level, tag, msg))
-	end
-	return {
-		debug = function(t, f, ...) _log("DEBUG", t, f, ...) end,
-		info  = function(t, f, ...) _log("INFO",  t, f, ...) end,
-		warn  = function(t, f, ...) _log("WARN",  t, f, ...) end,
-		error = function(t, f, ...) _log("ERROR", t, f, ...) end,
-	}
-end)()
+-- Use the canonical logger shim so shared code never reaches for a platform-
+-- specific module name (lib.logger is macOS-only; logger.shim is platform-neutral
+-- and falls back to print when no real logger is on the search path).
+local Logger = require("logger.shim")
 
 
 

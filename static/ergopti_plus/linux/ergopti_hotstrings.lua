@@ -41,38 +41,7 @@
 
 -- =========================================
 -- =========================================
--- ======= 1/ Logger Shim ==================
--- =========================================
--- =========================================
-
--- The daemon runs as a standalone process; lib.logger may not be on the path.
--- Fall back to plain print so every module that does the same shim produces
--- consistent output.
-local Logger = (function()
-	local ok, lib = pcall(require, "lib.logger")
-	if ok and lib then return lib end
-	local function _log(level, tag, fmt, ...)
-		local msg = select("#", ...) > 0 and string.format(fmt, ...) or fmt
-		print(string.format("[%s] [%s] %s", level, tag, msg))
-	end
-	return {
-		debug   = function(t, f, ...) _log("DEBUG",   t, f, ...) end,
-		trace   = function(t, f, ...) _log("TRACE",   t, f, ...) end,
-		done    = function(t, f, ...) _log("DONE",    t, f, ...) end,
-		info    = function(t, f, ...) _log("INFO",    t, f, ...) end,
-		start   = function(t, f, ...) _log("START",   t, f, ...) end,
-		success = function(t, f, ...) _log("SUCCESS", t, f, ...) end,
-		warn    = function(t, f, ...) _log("WARN",    t, f, ...) end,
-		error   = function(t, f, ...) _log("ERROR",   t, f, ...) end,
-	}
-end)()
-
-local LOG = "ergopti_hotstrings"
-
-
--- =========================================
--- =========================================
--- ======= 2/ Module Imports ===============
+-- ======= 1/ Module Search Path ===========
 -- =========================================
 -- =========================================
 
@@ -84,10 +53,34 @@ local SCRIPT_DIR = (function()
 	return path:match("^(.*)[/\\][^/\\]+$") or "."
 end)()
 
--- Prepend the script directory to the Lua module search path.
+-- Prepend the script directory and the shared Lua library to the search path.
+-- Must be done before any require() so logger.shim and keymap.terminators resolve.
+local SHARED_LUA_DIR = SCRIPT_DIR .. "/../shared/lua"
 package.path = SCRIPT_DIR .. "/?.lua;" ..
                SCRIPT_DIR .. "/modules/hotstrings/?.lua;" ..
+               SHARED_LUA_DIR .. "/?.lua;" ..
+               SHARED_LUA_DIR .. "/?/init.lua;" ..
                package.path
+
+
+-- =========================================
+-- =========================================
+-- ======= 2/ Logger =======================
+-- =========================================
+-- =========================================
+
+-- Use the canonical shared logger shim. It tries the shared logger core and
+-- the macOS driver logger before falling back to plain print.
+local Logger = require("logger.shim")
+
+local LOG = "ergopti_hotstrings"
+
+
+-- =========================================
+-- =========================================
+-- ======= 3/ Imports ======================
+-- =========================================
+-- =========================================
 
 local engine_mod  = require("modules.hotstrings.engine")
 local loader      = require("modules.hotstrings.loader")
@@ -99,27 +92,31 @@ local metrics     = require("modules.keylogger.metrics_collector")
 
 -- =========================================
 -- =========================================
--- ======= 3/ Constants ====================
+-- ======= 4/ Constants ====================
 -- =========================================
 -- =========================================
 
 -- Default hotstring data location (XDG-compliant user config).
 local DEFAULT_CONFIG_DIR = (os.getenv("HOME") or "~") .. "/.config/ergopti/hotstrings"
 
--- Terminator keys whose press triggers a match attempt with the terminator
--- counted as consumed (backspace_count includes the terminator character).
--- Space is the classic terminator; period and comma end sentences.
-local TERMINATORS = {
-	[" "]  = true,
-	["."]  = true,
-	[","]  = true,
-	["\n"] = true,
-}
+-- Terminator catalogue: loaded from the shared module so Linux and macOS
+-- recognise exactly the same set of terminator characters. The shared module
+-- owns the single source of truth (TERMINATOR_DEFS) and exposes is_terminator()
+-- as an O(1) lookup against its pre-built hash set.
+local terminators_mod = (function()
+	local ok, mod = pcall(require, "keymap.terminators")
+	if ok and mod then return mod end
+	-- Graceful fallback: if the shared module is absent (e.g. stripped install),
+	-- fall back to the minimal set to avoid a hard crash.
+	Logger.warn(LOG, "shared keymap.terminators not found — falling back to minimal terminator set.")
+	local _fallback = { [" "] = true, ["."] = true, [","] = true, ["\n"] = true }
+	return { is_terminator = function(ch) return _fallback[ch] == true end }
+end)()
 
 
 -- =========================================
 -- =========================================
--- ======= 4/ CLI Argument Parser ==========
+-- ======= 5/ CLI Argument Parser ==========
 -- =========================================
 -- =========================================
 
@@ -171,7 +168,7 @@ end
 
 -- =========================================
 -- =========================================
--- ======= 5/ Config Resolution ============
+-- ======= 6/ Config Resolution ============
 -- =========================================
 -- =========================================
 
@@ -217,7 +214,7 @@ end
 
 -- =========================================
 -- =========================================
--- ======= 6/ Signal Handler Setup =========
+-- ======= 7/ Signal Handler Setup =========
 -- =========================================
 -- =========================================
 
@@ -251,7 +248,7 @@ end
 
 -- =========================================
 -- =========================================
--- ======= 7/ Main Daemon Loop =============
+-- ======= 8/ Main Daemon Loop =============
 -- =========================================
 -- =========================================
 
@@ -304,7 +301,7 @@ local function main()
 		local now_ms = math.floor(os.clock() * 1000)
 		metrics.on_keydown(ch, now_ms)
 
-		local terminator_consumed = TERMINATORS[ch] == true
+		local terminator_consumed = terminators_mod.is_terminator(ch)
 
 		local result = engine:on_char(ch, { terminator_consumed = terminator_consumed })
 

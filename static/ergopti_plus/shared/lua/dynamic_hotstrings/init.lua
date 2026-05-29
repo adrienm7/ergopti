@@ -26,20 +26,7 @@
 
 local M = {}
 
-local ok_logger, Logger = pcall(require, "lib.logger")
-if not ok_logger then
-	-- Minimal shim so the engine works outside Hammerspoon
-	Logger = {
-		debug   = function(_, fmt, ...) print("[DEBUG] " .. string.format(fmt, ...)) end,
-		info    = function(_, fmt, ...) print("[INFO]  " .. string.format(fmt, ...)) end,
-		warn    = function(_, fmt, ...) print("[WARN]  " .. string.format(fmt, ...)) end,
-		error   = function(_, fmt, ...) print("[ERROR] " .. string.format(fmt, ...)) end,
-		trace   = function(_, fmt, ...) print("[TRACE] " .. string.format(fmt, ...)) end,
-		done    = function(_, fmt, ...) print("[DONE]  " .. string.format(fmt, ...)) end,
-		start   = function(_, fmt, ...) print("[START] " .. string.format(fmt, ...)) end,
-		success = function(_, fmt, ...) print("[OK]    " .. string.format(fmt, ...)) end,
-	}
-end
+local Logger = require("logger.shim")
 
 local LOG = "dynamic_hotstrings.shared"
 
