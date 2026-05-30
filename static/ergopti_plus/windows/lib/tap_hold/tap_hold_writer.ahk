@@ -53,6 +53,7 @@ global _TH_HoldOptions := [
 	Map("id", "shift", "kind", "modifier", "i18n", "tap_hold.hold.shift"),
 	Map("id", "alt",   "kind", "modifier", "i18n", "tap_hold.hold.alt"),
 	Map("id", "alt_gr","kind", "modifier", "i18n", "tap_hold.hold.alt_gr"),
+	Map("id", "win",   "kind", "modifier", "i18n", "tap_hold.hold.win"),
 	Map("id", "nav",   "kind", "layer",    "i18n", "tap_hold.hold.nav_layer"),
 ]
 
