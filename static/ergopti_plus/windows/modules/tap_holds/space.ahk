@@ -40,10 +40,20 @@
 ; After sending Space on tap, HSE_FeedChar(" ") is called explicitly because
 ; SendInput bypasses the prefix-watcher InputHook.
 
+; Reentrancy guard — AHK runs hotkey threads concurrently so OS auto-repeat
+; can fire a second SpaceTapHold while the first is blocked in KeyWait.
+; The flag is set on entry and cleared after the physical key is released.
+global _SpaceActive := false
+
 SpaceTapHold(HoldFn) {
+    global _SpaceActive
+    if _SpaceActive
+        return
+    _SpaceActive := true
     TimeoutSec := TapHoldDuration(TapHold, "space")
     tap := KeyWait("SC039", "T" . TimeoutSec)
     if tap {
+        _SpaceActive := false
         _SpaceTapOrDispatch()
         return
     }
@@ -52,9 +62,14 @@ SpaceTapHold(HoldFn) {
     ih.Wait()
     HoldFn.Call(ih.Input)
     KeyWait("SC039", "U T2")
+    _SpaceActive := false
 }
 
 SpaceTapHoldLayer() {
+    global _SpaceActive
+    if _SpaceActive
+        return
+    _SpaceActive := true
     ; Two-phase detection to avoid a CapsLock LED flash on tap:
     ; Phase 1 — wait for the hold threshold; if Space is released first it was
     ;            a tap, so send Space and return without ever activating the layer.
@@ -64,6 +79,7 @@ SpaceTapHoldLayer() {
     TimeoutSec := TapHoldDuration(TapHold, "space")
     tap := KeyWait("SC039", "T" . TimeoutSec)
     if tap {
+        _SpaceActive := false
         _SpaceTapOrDispatch()
         return
     }
@@ -71,6 +87,7 @@ SpaceTapHoldLayer() {
     ActivateLayer()
     KeyWait("SC039", "U")
     DisableLayer()
+    _SpaceActive := false
 }
 
 ; Tap: send the configured tap action, or native Space if none / "space".
@@ -163,7 +180,7 @@ _SpaceHoldWin(captured) {
 ; No ~ prefix: space tap is intercepted entirely (no OS passthrough needed for
 ; a custom action; the action itself sends whatever output is configured).
 #HotIf TapHoldTapAction(TapHold, "space") != "" and TapHoldTapAction(TapHold, "space") != "space" and TapHoldHoldModifier(TapHold, "space") == "" and TapHoldHoldLayer(TapHold, "space") == "" and not LayerEnabled
-SC039:: _SpaceDispatch()
+$SC039:: _SpaceDispatch()
 #HotIf
 
 #HotIf TapHoldHoldModifier(TapHold, "space") == "ctrl" and not LayerEnabled
