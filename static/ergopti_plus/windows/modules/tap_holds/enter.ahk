@@ -91,20 +91,10 @@ _EnterHoldModKey() {
 
 ; ======= 9.3) Tap-only (hold=none, tap action set) =======
 
+; ~ passes Enter to the OS; $ prevents re-entry. Fire immediately on key-down —
+; no KeyWait or A_PriorKey guard needed since there is no hold behaviour.
 #HotIf TapHoldTapAction(TapHold, "enter") != "" and TapHoldTapAction(TapHold, "enter") != "enter" and TapHoldHoldModifier(TapHold, "enter") == "" and TapHoldHoldLayer(TapHold, "enter") == "" and not LayerEnabled
-~$SC01C:: {
-	TimeBefore := A_TickCount
-	KeyWait("SC01C")
-	TimeAfter := A_TickCount
-	tap := ((TimeAfter - TimeBefore) <= TapHoldDuration(TapHold, "enter") * 1000)
-	if (
-		tap
-		and (TimeAfter - TimeBefore) >= TapMinDurationMs()
-		and A_PriorKey == "Enter"
-	) {
-		_EnterDispatch()
-	}
-}
+~$SC01C:: _EnterDispatch()
 #HotIf
 
 

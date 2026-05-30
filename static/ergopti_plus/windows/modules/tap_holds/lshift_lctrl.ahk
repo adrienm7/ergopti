@@ -90,15 +90,20 @@ $SC01D::
 $SC01D::
 {
 	UpdateLastSentCharacter("LControl")
-	if (KS_IsUp("SC03A") and KS_IsUp("SC038")) {
-		ModKey := _LCtrlHoldModKey()
-		TextPressKey(ModKey, "Down")
-		tap := KeyWait("SC01D", "T" . TapHoldDuration(TapHold, "left_ctrl"))
+	ModKey := _LCtrlHoldModKey()
+	TextPressKey(ModKey, "Down")
+	tap := KeyWait("SC01D", "T" . TapHoldDuration(TapHold, "left_ctrl"))
+	if tap {
+		; Short press — release modifier then fire tap action.
 		TextPressKey(ModKey, "Up")
-		if tap {
+		if (KS_IsUp("SC03A") and KS_IsUp("SC038")) {
 			_LCtrlDispatch()
 		}
+		return
 	}
+	; Long press — modifier already held by OS; wait for physical release then lift.
+	KeyWait("SC01D")
+	TextPressKey(ModKey, "Up")
 }
 #HotIf
 

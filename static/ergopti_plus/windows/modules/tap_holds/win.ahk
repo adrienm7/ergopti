@@ -92,20 +92,11 @@ SC15B:: {
 
 ; ======= 12.3) Tap-only (hold=none, tap action set) =======
 
+; Fire immediately on key-down — no KeyWait or A_PriorKey guard needed since
+; there is no hold behaviour. No ~ needed: Win tap action suppresses Start menu
+; by intercepting the key entirely (no passthrough required).
 #HotIf TapHoldTapAction(TapHold, "win") != "" and TapHoldHoldModifier(TapHold, "win") == "" and TapHoldHoldLayer(TapHold, "win") == "" and not LayerEnabled
-SC15B:: {
-	TimeBefore := A_TickCount
-	KeyWait("SC15B")
-	TimeAfter := A_TickCount
-	tap := ((TimeAfter - TimeBefore) <= TapHoldDuration(TapHold, "win") * 1000)
-	if (
-		tap
-		and (TimeAfter - TimeBefore) >= TapMinDurationMs()
-		and A_PriorKey == "LWin"
-	) {
-		_WinDispatch()
-	}
-}
+SC15B:: _WinDispatch()
 #HotIf
 
 
