@@ -1432,6 +1432,7 @@
 	"tap_hold.group.left_ctrl": "LCtrl",
 	"tap_hold.group.left_shift": "LShift",
 	"tap_hold.group.right_ctrl": "RCtrl",
+	"tap_hold.group.right_shift": "RShift",
 	"tap_hold.group.space": "Mellanslag",
 	"tap_hold.group.tab": "Tab",
 	"tap_hold.group.win": "Win",

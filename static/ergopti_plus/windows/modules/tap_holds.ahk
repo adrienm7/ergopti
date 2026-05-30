@@ -4,8 +4,9 @@
 ; MODULE: Tap-Holds, One-Shot Shift and Navigation Layer
 ; DESCRIPTION:
 ; Implements tap-hold behaviours for CapsLock, LShift, LCtrl, LAlt, Space,
-; AltGr, RCtrl and Tab keys. Also contains the One-Shot Shift mechanism and
-; the full navigation layer (arrows, window management, volume...).
+; AltGr, RCtrl, RShift, Tab, Enter, Backspace, Escape, Delete and Win keys.
+; Also contains the One-Shot Shift mechanism and the full navigation layer
+; (arrows, window management, volume...).
 ;
 ; ARCHITECTURE:
 ; This file is the entry-point only. Implementation is split across sub-modules
@@ -32,6 +33,7 @@
 #Include tap_holds/space.ahk
 #Include tap_holds/altgr.ahk
 #Include tap_holds/rctrl.ahk
+#Include tap_holds/rshift.ahk
 #Include tap_holds/tab.ahk
 #Include tap_holds/enter.ahk
 #Include tap_holds/backspace.ahk

@@ -1432,6 +1432,7 @@
 	"tap_hold.group.left_ctrl": "SolCtrl",
 	"tap_hold.group.left_shift": "SolShift",
 	"tap_hold.group.right_ctrl": "RCtrl",
+	"tap_hold.group.right_shift": "RShift",
 	"tap_hold.group.space": "Boşluk",
 	"tap_hold.group.tab": "Tab",
 	"tap_hold.group.win": "Win",
