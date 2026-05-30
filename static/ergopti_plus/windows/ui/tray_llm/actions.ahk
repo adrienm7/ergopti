@@ -98,12 +98,54 @@ LLM_Tray_OnToggle(*) {
 }
 
 /**
+ * Mirrors _LLM_Tray runtime state back into Features["llm"] so that
+ * _CollectFeatureUpdates() (called by SaveFullConfig) picks up the current
+ * user choices. Without this sync every save would re-emit the boot-time
+ * snapshot and silently roll back all in-session changes on the next reload.
+ */
+_LLM_Tray_SyncToFeatures() {
+	global _LLM_Tray, Features
+	if !IsSet(Features) or !IsSet(_LLM_Tray)
+		return
+	if !Features.Has("llm")
+		return
+	llm := Features["llm"]
+	; llm root
+	llm["enabled"]                                  := _LLM_Tray["enabled"]
+	; llm.models
+	llm["models"]["ollama"]                         := _LLM_Tray["model"]
+	; llm.profiles
+	llm["profiles"]["active"]                       := _LLM_Tray["profile_id"]
+	llm["profiles"]["num_predictions"]              := _LLM_Tray["n_predictions"]
+	llm["profiles"]["auto_profile_for_model"]       := _LLM_Tray["auto_profile_for_model"]
+	; llm.generation
+	llm["generation"]["temperature"]                := _LLM_Tray["temperature"]
+	llm["generation"]["min_words"]                  := _LLM_Tray["min_words"]
+	llm["generation"]["max_words"]                  := _LLM_Tray["max_words"]
+	llm["generation"]["context_length"]             := _LLM_Tray["ctx_chars"]
+	llm["generation"]["auto_raise_temp"]            := _LLM_Tray["auto_raise_temp"]
+	llm["generation"]["reset_on_nav"]               := _LLM_Tray["reset_on_nav"]
+	; llm.display
+	llm["display"]["show_info_bar"]                 := _LLM_Tray["show_info_bar"]
+	llm["display"]["streaming"]                     := _LLM_Tray["streaming"]
+	llm["display"]["streaming_multi"]               := _LLM_Tray["show_all_at_once"]
+	llm["display"]["pred_indent"]                   := _LLM_Tray["pred_indent"]
+	; llm.trigger
+	llm["trigger"]["debounce_ms"]                   := _LLM_Tray["debounce_ms"]
+	llm["trigger"]["instant_on_word_end"]           := _LLM_Tray["instant_on_word_end"]
+	llm["trigger"]["after_hotstring"]               := _LLM_Tray["after_hotstring"]
+	llm["trigger"]["inline_autotype"]               := _LLM_Tray["inline_autotype"]
+}
+
+/**
  * Persists the current LLM tray state to the shared config TOML.
  */
 LLM_Tray_SaveConfig() {
 	global _SaveFullConfigReady
-	if IsSet(_SaveFullConfigReady) && _SaveFullConfigReady
+	if IsSet(_SaveFullConfigReady) && _SaveFullConfigReady {
+		_LLM_Tray_SyncToFeatures()
 		SaveFullConfig()
+	}
 }
 
 LLM_Tray_OnInstantToggle(*) {
