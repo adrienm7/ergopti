@@ -1912,15 +1912,21 @@ ShowActionPicker(Title, Current, OnConfirm) {
         AllItems.Push({ Id: Id, Label: Label, Cat: Cat })
     }
 
-    ; "Désactivé" entry (no category)
+    ; "Désactivé" entry (no category) — always first, before any group
     _PushItem("none", t("dialog.action_picker.disabled"), "")
 
     CurrentCat := ""
     for ActionName in GESTURE_ACTION_NAMES {
         if (ActionName == "--")
             continue
+        ; "none" is already pushed above — skip it to avoid a duplicate entry
+        if (ActionName == "none")
+            continue
         if (SubStr(ActionName, 1, 1) = "#") {
-            CurrentCat := SubStr(ActionName, 2)
+            ; Header keys are i18n keys (e.g. "#mouse_nav" → "sg_actions.sg_order.header.mouse_nav").
+            ; The i18n value itself starts with "#" (e.g. "#Souris et Navigation") — strip it.
+            local TranslatedHeader := t("sg_actions.sg_order.header." . SubStr(ActionName, 2))
+            CurrentCat := SubStr(TranslatedHeader, 1, 1) = "#" ? SubStr(TranslatedHeader, 2) : TranslatedHeader
             continue
         }
         if !GESTURE_ACTIONS.Has(ActionName)
