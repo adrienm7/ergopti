@@ -14,10 +14,12 @@
 ;    remain relevant to the current editing context.
 ; 3. AcceptChar filter: only printable ASCII + accented Latin chars are buffered;
 ;    navigation keys (arrows, F-keys) are ignored to keep context clean.
+; 4. HookDispatcher integration: Start/Stop register/unregister the char and
+;    key-down callbacks with the central dispatcher so the bridge shares the
+;    single process-wide InputHook instead of creating its own.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
-
 
 
 
@@ -31,6 +33,12 @@
 global _LLM_Bridge_Buffer := ""
 global _LLM_Bridge_Active := false
 
+; Bound callback references kept at module scope so Unregister() receives
+; the exact same function object that was passed to Register(). A bare
+; ``Func.Bind()`` creates a new object every call — without storing the
+; reference the dispatcher can never find the matching entry to remove.
+global _LLM_Bridge_OnCharCb    := _LLM_Bridge_DispatchChar.Bind()
+global _LLM_Bridge_OnKeyDownCb := _LLM_Bridge_DispatchKeyDown.Bind()
 
 
 
@@ -43,21 +51,32 @@ global _LLM_Bridge_Active := false
 
 /**
  * Starts the LLM bridge with the given configuration.
+ * Registers char/key-down subscribers with HookDispatcher so the bridge
+ * receives every keystroke from the single shared InputHook.
  * @param {Map} opts - Configuration passed through to LLM_Engine_Init().
  */
 LLM_Bridge_Start(opts) {
-	global _LLM_Bridge_Active
+	global _LLM_Bridge_Active, _LLM_Bridge_OnCharCb, _LLM_Bridge_OnKeyDownCb
+	if _LLM_Bridge_Active
+		return
 	_LLM_Bridge_Active := true
+	HookDispatcher.Register(HookDispatcherConst.EVT_KB_CHAR, _LLM_Bridge_OnCharCb)
+	HookDispatcher.Register(HookDispatcherConst.EVT_KB_DOWN, _LLM_Bridge_OnKeyDownCb)
 	LLM_Engine_Init(opts)
 }
 
 /**
  * Stops the bridge and hides any visible tooltip.
+ * Unregisters from HookDispatcher so no callbacks fire while disabled.
  */
 LLM_Bridge_Stop() {
-	global _LLM_Bridge_Active, _LLM_Bridge_Buffer
+	global _LLM_Bridge_Active, _LLM_Bridge_Buffer, _LLM_Bridge_OnCharCb, _LLM_Bridge_OnKeyDownCb
+	if !_LLM_Bridge_Active
+		return
 	_LLM_Bridge_Active := false
 	_LLM_Bridge_Buffer := ""
+	try HookDispatcher.Unregister(HookDispatcherConst.EVT_KB_CHAR, _LLM_Bridge_OnCharCb)
+	try HookDispatcher.Unregister(HookDispatcherConst.EVT_KB_DOWN, _LLM_Bridge_OnKeyDownCb)
 	LLM_Engine_SetEnabled(false)
 	LLM_Tooltip_Hide()
 }
@@ -65,10 +84,32 @@ LLM_Bridge_Stop() {
 
 
 
+; ============================================================
+; ===================================================
+; ======= 3/ HookDispatcher subscriber callbacks =======
+; ===================================================
+; ============================================================
+
+; Receives (ih, char) from HookDispatcher — routes to the bridge char handler.
+_LLM_Bridge_DispatchChar(ih, char) {
+	LLM_Bridge_OnChar(char)
+}
+
+; Receives (ih, vk, sc) from HookDispatcher — routes special keys to the bridge.
+; VK codes: 0x08 = Backspace, 0x09 = Tab, 0x0D = Enter, 0x1B = Escape.
+_LLM_Bridge_DispatchKeyDown(ih, vk, sc) {
+	if (vk = 0x08)
+		LLM_Bridge_OnBackspace()
+	else if (vk = 0x09 or vk = 0x0D or vk = 0x1B)
+		LLM_Bridge_OnFlush()
+}
+
+
+
 
 ; =========================================
 ; =========================================
-; ======= 3/ Keyboard Hook Handlers =======
+; ======= 4/ Keyboard Hook Handlers =======
 ; =========================================
 ; =========================================
 
