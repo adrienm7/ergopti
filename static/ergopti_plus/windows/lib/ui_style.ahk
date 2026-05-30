@@ -134,8 +134,9 @@ UiStyle_LoadSharedConst() {
 	path := _SharedDir . "\tooltip\constants.toml"
 	c := ParseTomlFile(path)
 	if !c.Count {
-		LoggerError("UiStyle", "shared/tooltip/constants.toml not found — UI constants remain at compile-time defaults.")
-		return
+		LoggerError("UiStyle", "shared/tooltip/constants.toml not found — cannot start.")
+		MsgBox("Erreur fatale : shared/tooltip/constants.toml introuvable.`nErgopti+ ne peut pas démarrer.", "ErgoptiPlus", 16)
+		ExitApp()
 	}
 
 	; [typography] — platform-specific keys only (font names are AHK-specific)
