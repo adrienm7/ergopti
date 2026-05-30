@@ -114,6 +114,30 @@ _SpaceHoldShift(captured) {
     SendInput("{LShift Up}")
 }
 
+_SpaceHoldAlt(captured) {
+    SendInput("{LAlt Down}")
+    if (captured != "" and captured != " ")
+        SendInput("!" . captured)
+    KeyWait("SC039", "U T2")
+    SendInput("{LAlt Up}")
+}
+
+_SpaceHoldAltGr(captured) {
+    SendInput("{RAlt Down}")
+    if (captured != "" and captured != " ")
+        SendInput("{RAlt Down}" . captured)
+    KeyWait("SC039", "U T2")
+    SendInput("{RAlt Up}")
+}
+
+_SpaceHoldWin(captured) {
+    SendInput("{LWin Down}")
+    if (captured != "" and captured != " ")
+        SendInput("#" . captured)
+    KeyWait("SC039", "U T2")
+    SendInput("{LWin Up}")
+}
+
 #HotIf TapHoldHoldModifier(TapHold, "space") == "ctrl" and not LayerEnabled
 SC039:: SpaceTapHold(_SpaceHoldCtrl)
 #HotIf
@@ -124,4 +148,16 @@ SC039:: SpaceTapHoldLayer()
 
 #HotIf TapHoldHoldModifier(TapHold, "space") == "shift" and not LayerEnabled
 SC039:: SpaceTapHold(_SpaceHoldShift)
+#HotIf
+
+#HotIf TapHoldHoldModifier(TapHold, "space") == "alt" and not LayerEnabled
+SC039:: SpaceTapHold(_SpaceHoldAlt)
+#HotIf
+
+#HotIf TapHoldHoldModifier(TapHold, "space") == "alt_gr" and not LayerEnabled
+SC039:: SpaceTapHold(_SpaceHoldAltGr)
+#HotIf
+
+#HotIf TapHoldHoldModifier(TapHold, "space") == "win" and not LayerEnabled
+SC039:: SpaceTapHold(_SpaceHoldWin)
 #HotIf
