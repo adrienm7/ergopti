@@ -17,7 +17,7 @@
 ;    fallback — running ``npm run build:manifest`` is part of the install
 ;    workflow and must not be skipped.
 ; 3. Driver-local scope: this module bootstraps only the AHK-side files
-;    (``<_ConfigDir>/ahk/config.toml`` and ``<_ConfigDir>/ahk/tap_hold.toml``).
+;    (``<_ConfigDir>/autohotkey/config.toml`` and ``<_ConfigDir>/autohotkey/tap_hold.toml``).
 ;    The universal files at the root of ``<_ConfigDir>`` (personal_info,
 ;    hotstrings_config) are handled separately.
 ; 4. Driver-local tap-hold source: ``tap_hold.toml`` is seeded from
@@ -39,7 +39,7 @@
 ; behaves as a no-op when the files are already present.
 EnsureUserConfigsExist() {
 	global _DriverDir, _ConfigDir
-	UserAhkDir      := _ConfigDir . "\ahk"
+	UserAhkDir      := _ConfigDir . "autohotkey"
 	UserConfigPath  := UserAhkDir . "\config.toml"
 	UserTapHoldPath := UserAhkDir . "\tap_hold.toml"
 	TplConfigPath   := _DriverDir . "\_generated\config_template.toml"

@@ -45,7 +45,8 @@ CS_GetTomlPath() {
     ; worrying about ENOENT on a fresh install.
     global _ConfigDir
     base := (IsSet(_ConfigDir) && _ConfigDir != "") ? _ConfigDir : A_ScriptDir . "\"
-    dir := base . "autohotkey\"
+    global _AhkSubDir
+    dir := base . _AhkSubDir
     try DirCreate(dir)
     return dir . "config.toml"
 }

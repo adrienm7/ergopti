@@ -122,9 +122,9 @@ KLUI_LaunchWindow(url, title) {
     else if InStr(url, "metrics_apps")
         which := "apps"
     if (which != "") {
-        global _ConfigDir
-        log_path := _ConfigDir . "autohotkey\logs\prefetch.log"
-        try DirCreate(_ConfigDir . "autohotkey\logs")
+        global _ConfigDir, _AhkSubDir
+        log_path := _ConfigDir . _AhkSubDir . "logs\prefetch.log"
+        try DirCreate(_ConfigDir . _AhkSubDir . "logs")
         try FileAppend("[" . A_Now . "] KLUI calling KLPF_BuildAndWrite(" . which . ", " . _ConfigDir . "metrics)`r`n",
             log_path, "UTF-8")
         try {

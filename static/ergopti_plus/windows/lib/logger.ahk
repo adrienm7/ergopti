@@ -132,12 +132,12 @@ global _LOGGER_TEST_SINK := 0
 ; minimum level (e.g. after the user changes it via the menu).
 LoggerInit() {
     global LOGGER_LOG_PATH, LOGGER_MIN_LEVEL, LOGGER_DEFAULT_LEVEL, ConfigurationFile
-    global _LOGGER_FLUSH_TIMER_STARTED, LOGGER_FLUSH_INTERVAL_MS, _ConfigDir
+    global _LOGGER_FLUSH_TIMER_STARTED, LOGGER_FLUSH_INTERVAL_MS, _ConfigDir, _AhkSubDir
 
-    ; Daily-rotating log file under <ConfigDir>/ahk/logs/. Resolves _ConfigDir
-    ; at call time so any later override (paths.toml) is picked up
+    ; Daily-rotating log file under <ConfigDir>/autohotkey/logs/. Resolves
+    ; _ConfigDir at call time so any later override (paths.toml) is picked up.
     LogDir := (IsSet(_ConfigDir) and _ConfigDir != "")
-        ? _ConfigDir . "autohotkey\logs\"
+        ? _ConfigDir . _AhkSubDir . "logs\"
         : A_ScriptDir . "\logs\"
     if !DirExist(LogDir) {
         try DirCreate(LogDir)

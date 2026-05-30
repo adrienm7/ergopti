@@ -1176,8 +1176,8 @@ _TH_NoneHoldOpt() {
 ; Reset all configured keys back to factory defaults by deleting the user
 ; tap_hold.toml (the loader will fall back to defaults.toml on next reload).
 _TH_ResetAllToDefaults(*) {
-	global _ConfigDir
-	Path := _ConfigDir . "autohotkey\tap_hold.toml"
+	global _ConfigDir, _AhkSubDir
+	Path := _ConfigDir . _AhkSubDir . "tap_hold.toml"
 	try {
 		if FileExist(Path) {
 			FileDelete(Path)
@@ -2033,11 +2033,12 @@ OpenPersonalShortcuts(*) {
 	Run('notepad.exe "' . Path . '"')
 }
 
-; Opens the per-user log directory (under <ConfigDir>/ahk/logs/) in Explorer.
+; Opens the per-user log directory (under <ConfigDir>/autohotkey/logs/) in Explorer.
 ; Creates it on first use so the user never sees an "introuvable" dialog
 OpenLogsFolder(*) {
+	global _AhkSubDir
 	LogDir := (IsSet(_ConfigDir) and _ConfigDir != "")
-		? _ConfigDir . "autohotkey\logs\"
+		? _ConfigDir . _AhkSubDir . "logs\"
 		: A_ScriptDir . "\logs\"
 	if !DirExist(LogDir) {
 		try DirCreate(LogDir)
@@ -2053,10 +2054,10 @@ OpenTodayLog(*) {
 		? LOGGER_LOG_PATH
 		: ""
 	if Path = "" or !FileExist(Path) {
-		; Fall back to the day-stamped path under <ConfigDir>/ahk/logs/ even if the
+		; Fall back to the day-stamped path under <ConfigDir>/autohotkey/logs/ when the
 		; logger hasn't initialised yet (very early boot, edge case)
 		LogDir := (IsSet(_ConfigDir) and _ConfigDir != "")
-			? _ConfigDir . "autohotkey\logs\"
+			? _ConfigDir . _AhkSubDir . "logs\"
 			: A_ScriptDir . "\logs\"
 		Path := LogDir . "ErgoptiPlus_" . FormatTime(, "yyyy-MM-dd") . ".log"
 	}
