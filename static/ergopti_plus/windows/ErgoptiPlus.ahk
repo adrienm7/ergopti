@@ -1897,9 +1897,10 @@ ShowKeyboardSlotPicker(Prefix) {
 
 ; Generic action picker GUI — shows a searchable list of all available actions.
 ; Title     : window title string
-; Current   : currently assigned action id (or "none")
-; OnConfirm : callback(ActionId) called when the user validates their pick
-ShowActionPicker(Title, Current, OnConfirm) {
+; Current    : currently assigned action id (or "none")
+; OnConfirm  : callback(ActionId) called when the user validates their pick
+; ShowNative : when true, prepend a "Natif" entry (id="") that clears the tap action
+ShowActionPicker(Title, Current, OnConfirm, ShowNative := false) {
     global GESTURE_ACTION_NAMES, GESTURE_ACTIONS
     LoggerStart("ActionPicker", "Opening action picker '%s'…", Title)
 
@@ -1912,7 +1913,10 @@ ShowActionPicker(Title, Current, OnConfirm) {
         AllItems.Push({ Id: Id, Label: Label, Cat: Cat })
     }
 
-    ; "Désactivé" entry (no category) — always first, before any group
+    ; "Natif" entry — only for tap-hold pickers where the physical key behaviour is meaningful
+    if ShowNative
+        _PushItem("__native__", t("tap_hold.tap.none"), "")
+    ; "∅ Rien" entry — absorbs the tap (no-op action), always before any group
     _PushItem("none", t("dialog.action_picker.disabled"), "")
 
     CurrentCat := ""
@@ -1956,10 +1960,11 @@ ShowActionPicker(Title, Current, OnConfirm) {
     Rows        := BuildListRows(AllItems)
     FilteredIds := Rows.Ids
 
-    ; Pre-select current action
+    ; Pre-select current action ("" means native → map to __native__ sentinel for lookup)
     SelectedIdx := 0
+    LookupId    := (Current == "") ? "__native__" : Current
     for i, Id in FilteredIds {
-        if (Id == Current) {
+        if (Id == LookupId) {
             SelectedIdx := i
             break
         }
@@ -1989,13 +1994,8 @@ ShowActionPicker(Title, Current, OnConfirm) {
             Matched := AllItems
         } else {
             for Item in AllItems {
-                ; id="" is the "none" entry — keep it if it matches
-                if (Item.Id == "none") {
-                    if InStr(StrLower(Item.Label), Query)
-                        Matched.Push(Item)
-                } else if InStr(StrLower(Item.Label), Query) {
+                if InStr(StrLower(Item.Label), Query)
                     Matched.Push(Item)
-                }
             }
         }
         NewRows     := BuildListRows(Matched)
@@ -2016,12 +2016,14 @@ ShowActionPicker(Title, Current, OnConfirm) {
         if (Idx = 0)
             return
         ChosenId := FilteredIds[Idx]
-        ; Ignore clicks on category headers
+        ; Ignore clicks on category headers (id="" marks a non-selectable header row)
         if (ChosenId == "")
             return
         W.Destroy()
-        LoggerSuccess("ActionPicker", "Selection confirmed → '%s'.", ChosenId)
-        OnConfirm(ChosenId)
+        ; "__native__" sentinel clears the tap action so the key passes through to the OS
+        ResolvedId := (ChosenId == "__native__") ? "" : ChosenId
+        LoggerSuccess("ActionPicker", "Selection confirmed → '%s'.", ResolvedId)
+        OnConfirm(ResolvedId)
     }
 }
 

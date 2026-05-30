@@ -1222,13 +1222,11 @@ class _TH_TapPickerFnObj {
 	Call(*) {
 		global TapHold
 		; Current tap action at call time (not at menu-build time).
+		; "" means native (unconfigured) — pass as-is; ShowNative:=true adds the entry.
 		Current := IsSet(TapHold) ? TapHoldTapAction(TapHold, this.KeyId) : ""
-		if (Current == "") {
-			Current := "none"
-		}
 		Title := t("tap_hold.picker.title_prefix") . this.KeyLabel
 		_KeyId := this.KeyId
-		ShowActionPicker(Title, Current, (Id) => _TH_ApplyTap(_KeyId, Id))
+		ShowActionPicker(Title, Current, (Id) => _TH_ApplyTap(_KeyId, Id), true)
 	}
 }
 
@@ -1256,11 +1254,10 @@ _TH_MakeTapPickerFn(KeyId, KeyLabel, TapLbl) {
 	return ObjBindMethod(obj, "Call")
 }
 
-; Apply a tap action chosen from the modal picker; "none" means clear the slot.
+; Apply a tap action chosen from the modal picker.
+; ActionId="" (from the "Natif" sentinel) clears the slot so the key passes through natively.
+; ActionId="none" sets the absorb no-op action.
 _TH_ApplyTap(KeyId, ActionId) {
-	if (ActionId == "none") {
-		ActionId := ""
-	}
 	WriteTapHoldTap(KeyId, ActionId)
 	Reload
 }
