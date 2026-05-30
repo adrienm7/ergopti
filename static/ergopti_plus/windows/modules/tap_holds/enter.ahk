@@ -42,7 +42,7 @@ _EnterHoldModKey() {
 ; ======= 9.1) Hold-modifier variant =======
 
 #HotIf TapHoldHoldModifier(TapHold, "enter") != "" and not LayerEnabled
-~$SC01C:: {
+$SC01C:: {
 	ModKey := _EnterHoldModKey()
 	TextPressKey(ModKey, "Down")
 	TimeBefore := A_TickCount
@@ -66,7 +66,7 @@ _EnterHoldModKey() {
 ; ======= 9.2) Hold-layer variant =======
 
 #HotIf TapHoldHoldLayer(TapHold, "enter") != "" and TapHoldHoldModifier(TapHold, "enter") == "" and not LayerEnabled
-~$SC01C:: {
+$SC01C:: {
 	UpdateLastSentCharacter("Enter")
 
 	ActivateLayer()
