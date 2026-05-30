@@ -270,15 +270,13 @@ local function load_from_shared()
 		return ergopti_plus .. "/shared"
 	end)
 	if not ok_path or not shared_path then
-		Logger.warn(LOG, "Cannot resolve shared dir — tooltip constants using compile-time defaults.")
-		return
+		error("[tooltip/config] Cannot resolve shared dir — tooltip constants not loaded.")
 	end
 
 	local toml_path = shared_path .. "/tooltip/constants.toml"
 	local ok_c, c = pcall(toml_reader.parse, toml_path)
 	if not ok_c or type(c) ~= "table" then
-		Logger.warn(LOG, "shared/tooltip/constants.toml not readable — using compile-time defaults.")
-		return
+		error("[tooltip/config] shared/tooltip/constants.toml not readable: " .. tostring(c))
 	end
 
 	local function get(section, key, default)
