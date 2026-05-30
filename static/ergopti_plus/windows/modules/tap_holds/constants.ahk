@@ -40,3 +40,24 @@ global KEY_REPEAT_INTERVAL_MS := 100
 ; Timeout (s) for the OneShotShift InputHook: how long to wait for the next
 ; character before giving up and leaving the shift state active.
 global ONE_SHOT_SHIFT_TIMEOUT_SEC := 2
+
+
+
+
+; ======================================================
+; =====================================
+; ======= 2/ Generic tap dispatch =======
+; =====================================
+; ======================================================
+
+; Fire the tap action configured for KeyId by delegating to GESTURE_ACTIONS.
+; This is the single dispatch point for all simple tap-hold keys — no per-action
+; switch needed. capslock.ahk and altgr.ahk keep their own dispatch because they
+; require Blind modifiers, UpdateLastSentCharacter, or CtrlActivated wrapping.
+_TapHoldFireAction(KeyId) {
+	global GESTURE_ACTIONS
+	ActionId := TapHoldTapAction(TapHold, KeyId)
+	if GESTURE_ACTIONS.Has(ActionId) {
+		GESTURE_ACTIONS[ActionId].Fn.Call()
+	}
+}

@@ -114,30 +114,10 @@ _BackspaceHoldModKey() {
 
 _BackspaceDispatch() {
 	local action := TapHoldTapAction(TapHold, "backspace")
+	; No tap configured or tap = backspace itself → native key behaviour.
 	if (action == "" or action == "backspace") {
 		TextPressKey("BackSpace", [])
 		return
 	}
-	switch action {
-		case "alt_tab_monitor":  AltTabMonitor()
-		case "caps_lock":        ToggleCapsLock()
-		case "caps_word":        ToggleCapsWord()
-		case "copy":             TextPressKey("c", ["Ctrl"])
-		case "ctrl_backspace":   TextPressKey("BackSpace", ["Ctrl"])
-		case "ctrl_delete":      TextPressKey("Delete", ["Ctrl"])
-		case "cut":              TextPressKey("x", ["Ctrl"])
-		case "delete":           TextPressKey("Delete", [])
-		case "enter":            TextPressKey("Enter", [])
-		case "escape":           TextPressKey("Escape", [])
-		case "find":             TextPressKey("f", ["Ctrl"])
-		case "one_shot_shift":   OneShotShift()
-		case "paste":            TextPressKey("v", ["Ctrl"])
-		case "paste_plain":      GesturePastePlain()
-		case "redo":             TextPressKey("y", ["Ctrl"])
-		case "select_all":       TextPressKey("a", ["Ctrl"])
-		case "space":            TextPressKey("Space", [])
-		case "tab":              TextPressKey("Tab", [])
-		case "toggle_capslock":  ToggleCapsLock()
-		case "undo":             TextPressKey("z", ["Ctrl"])
-	}
+	_TapHoldFireAction("backspace")
 }
