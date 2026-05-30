@@ -113,6 +113,15 @@ ApplyConfigToml(Features, FilePath) {
 				continue
 			}
 
+			; ``[_meta]`` and any ``[_*]`` section are TOML metadata blocks, not
+			; driver features. ``[updater]`` is consumed by the updater module at
+			; start-up independently of the Features Map. Both skip silently.
+			if (SubStr(Header, 1, 1) == "_" or Header == "updater") {
+				CurrentSection := ""
+				SkippingForeign := true
+				continue
+			}
+
 			; Strip the ``ahk.`` prefix so the in-memory path matches the
 			; Features Map built by ManifestBuildFeaturesMap (which also strips).
 			if (StrLen(Header) >= 4 and SubStr(Header, 1, 4) == "ahk.") {
