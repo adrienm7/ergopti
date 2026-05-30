@@ -8,7 +8,7 @@
 ; ``<config_dir>/ahk/config.toml``. All driver configuration (features,
 ; script settings, gestures, expert overrides) lives in this single file.
 ;
-; SECTION LAYOUT inside ahk/config.toml:
+; SECTION LAYOUT inside autohotkey/config.toml:
 ;
 ;   [Metrics]
 ;   metrics_enabled                 = true
@@ -45,7 +45,7 @@ CS_GetTomlPath() {
     ; worrying about ENOENT on a fresh install.
     global _ConfigDir
     base := (IsSet(_ConfigDir) && _ConfigDir != "") ? _ConfigDir : A_ScriptDir . "\"
-    dir := base . "ahk\"
+    dir := base . "autohotkey\"
     try DirCreate(dir)
     return dir . "config.toml"
 }

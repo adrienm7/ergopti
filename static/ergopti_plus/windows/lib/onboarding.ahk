@@ -491,7 +491,7 @@ _Onboarding_PreloadFromExistingConfig(ChosenDir) {
 	Dir := (ChosenDir != "") ? ChosenDir : (IsSet(_DefaultConfigDir) ? _DefaultConfigDir : "")
 	if (Dir == "")
 		return
-	CfgPath := Dir . "ahk\config.toml"
+	CfgPath := Dir . "autohotkey\config.toml"
 	if !FileExist(CfgPath) {
 		try LoggerDebug("onboarding", "No existing config at '{1}' — wizard keeps defaults.", CfgPath)
 		return
@@ -1175,8 +1175,8 @@ _Onboarding_Commit() {
 			try DirCreate(newDir)
 			_WritePathsToml(newDir)
 			_ConfigDir := newDir
-			ConfigurationFile := newDir . "ahk\config.toml"
-			try DirCreate(newDir . "ahk")
+			ConfigurationFile := newDir . "autohotkey\config.toml"
+			try DirCreate(newDir . "autohotkey")
 		}
 	}
 

@@ -312,7 +312,7 @@ if !DirExist(_ConfigDir) {
 ; All AHK driver configuration lives in a single unified TOML under the
 ; driver subfolder: features, script settings, shortcuts, gestures, and
 ; expert overrides ([script] / [features]) are sections of this one file.
-global ConfigurationFile := _ConfigDir . "ahk\config.toml"
+global ConfigurationFile := _ConfigDir . "autohotkey\config.toml"
 
 ; Initialise the hotstrings_config module so per-group delays and tooltip
 ; colors can be resolved from the TOML metadata + the shared user override
@@ -340,7 +340,7 @@ if FileExist(IconPath)
 ; Auto-create driver and shared subfolders under _ConfigDir on first launch.
 ; ahk/ holds driver-specific files; hotstrings/ holds the shared TOML files
 ; so a Mac+PC setup can keep both side by side without name collision.
-DirCreate(_ConfigDir . "ahk")
+DirCreate(_ConfigDir . "autohotkey")
 DirCreate(_ConfigDir . "hotstrings")
 ; Bootstrap an empty personal_hotstrings.toml if it does not exist yet so the
 ; user always has a file to open rather than a confusing error.
@@ -362,7 +362,7 @@ global ScriptInformation := Map(
     ; folder can be safely shared with the Hammerspoon driver via cloud
     ; sync. Shared neutral files (hotstrings TOML, personal info) stay
     ; at the root of _ConfigDir.
-    "PersonalAhkPath", _ConfigDir . "ahk\personal_shortcuts.ahk",
+    "PersonalAhkPath", _ConfigDir . "autohotkey\personal_shortcuts.ahk",
     "PersonalTomlPath", _ConfigDir . "hotstrings\personal_hotstrings.toml",
     "PersonalHotstringsDir", _ConfigDir . "hotstrings\",
     "PersonalInfoTomlPath", _ConfigDir . "personal_info.toml",
@@ -611,8 +611,8 @@ if !ManifestEnsureLoaded() {
 	ExitApp(1)
 }
 global Features := ManifestBuildFeaturesMap()
-ApplyConfigToml(Features, _ConfigDir . "ahk\config.toml")
-global TapHold := LoadTapHoldToml(_ConfigDir . "ahk\tap_hold.toml",
+ApplyConfigToml(Features, _ConfigDir . "autohotkey\config.toml")
+global TapHold := LoadTapHoldToml(_ConfigDir . "autohotkey\tap_hold.toml",
 	_DriverDir . "\data\tap_hold\defaults.toml")
 
 ; Count the exact number of hotstrings that will be generated for a DynamicHotstrings
@@ -937,7 +937,7 @@ for _KbSlot, _KbAction in KeyboardShortcutAssignments {
 LoggerSuccess("KeyboardShortcuts", "Configurable hotkeys registered (%d active).", _KbBoundCount)
 
 ; Load every UI shortcut + privacy filter from the [shortcuts] section
-; of ahk/config.toml. CS_Load() populates both MetricsShortcuts
+; of autohotkey/config.toml. CS_Load() populates both MetricsShortcuts
 ; and MetricsFilters in one pass.
 CS_Load()
 
@@ -1451,7 +1451,7 @@ _CategoryEnabledKey(Category) {
     }
 }
 
-; Persist the complete in-memory state to the unified ahk/config.toml.
+; Persist the complete in-memory state to the unified autohotkey/config.toml.
 ; Every feature flag, script setting, script shortcut assignment, and
 ; gesture assignment is written — not just the delta from defaults.
 ; Sections and keys within sections are sorted alphabetically by the
