@@ -801,7 +801,7 @@ _Onboarding_Step4() {
 	; both drivers and avoids the visual clutter of Windows backslashes inside
 	; the red warning block.
 	metrics_path := StrReplace(_ConfigDir . "metrics", "\", "/")
-	warning := StrReplace(t("dialog.metrics.enable_warning"), "%s", metrics_path)
+	warning := Format(t("dialog.metrics.enable_warning"), metrics_path)
 	g.SetFont("s8 italic")
 	g.AddText("w" ONBOARDING_WIN_W - 40 " y+10 cRed", warning)
 	g.SetFont("s10 norm")
