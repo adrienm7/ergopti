@@ -520,6 +520,7 @@ function M.update_preview(buf)
 					tint          = tooltip.tint(tint_key),
 					trigger_label = is_star and magic_key or "↵",
 					dimmed        = not is_primary,
+					duration      = row_timeout,
 				}
 			end
 

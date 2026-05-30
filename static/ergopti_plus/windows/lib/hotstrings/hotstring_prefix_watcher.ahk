@@ -236,7 +236,7 @@ HotstringPrefixWatcherStop() {
     }
     _PrefixIndex := Map()
     _PrefixBuffer := ""
-    TooltipHide()
+    TooltipHide("WatcherStop")
     ; Close out any tooltip that was on screen — the user disabling the
     ; watcher mid-suggestion is functionally a dismissal, not a fire.
     _NotifySuggestionDismissed()
@@ -584,7 +584,9 @@ _OnPrefixChar(IH, Char) {
                 HotstringSection := HSEMatch.HasOwnProp("Section") ? HSEMatch.Section : ""
                 try KL_LogHotstring(HSEMatch.Trigger, HotstringRepl, HotstringHType, "", HotstringCategory, HotstringSection)
             }
-            _ResetPrefixBuffer()
+            ; Pass ConsumedByFire=true when a match fired so TooltipHide skips
+            ; killing an active dequeue cycle — the dequeue manages its own end.
+            _ResetPrefixBuffer(HSEMatch != "")
             return
         }
         _PrefixBuffer .= Char
@@ -705,10 +707,27 @@ _SuffixAfterLastBoundary(Buf) {
 ; terminator, mouse click, navigation key, prefix lost) leaves the default
 ; in place so the tooltip's disappearance is properly logged.
 _ResetPrefixBuffer(ConsumedByFire := false) {
-    global _PrefixBuffer, _TriggerSet
+    global _PrefixBuffer, _TriggerSet, _TooltipDequeueActive
     Buf := _PrefixBuffer
     _PrefixBuffer := ""
-    TooltipHide()
+    ; When a hotstring just fired, the tooltip showing the expansion result is
+    ; managed independently (dequeue or simple timer) — never hide it here.
+    ; Only hide when the buffer is reset due to a navigation key, mouse click,
+    ; or other non-fire event, where the tooltip preview is no longer relevant.
+    if !ConsumedByFire {
+        TooltipHide("ResetBuf")
+    } else {
+        ; Pre-arm the dequeue guard so that any LookupNoMatch / ResetBuf calls
+        ; arriving before TooltipShow (which sets _TooltipDequeueActive itself)
+        ; are blocked. The guard is cleared by TooltipHide(Force=true) if the
+        ; tooltip turns out not to need a dequeue cycle.
+        _TooltipDequeueActive := true
+        ; Re-arm the timer from zero so the tooltip stays visible for its full
+        ; declared duration starting from the moment of fire, not from when the
+        ; preview was first shown (which may have been seconds earlier).
+        if IsSet(TooltipRearmTimer)
+            try TooltipRearmTimer()
+    }
     if ConsumedByFire {
         _NotifySuggestionConsumed()
     } else {
@@ -823,7 +842,7 @@ _LookupAndRender() {
     ; is the body of "c★"), so we let the lookup below decide — the early
     ; exit here only avoids the Map lookup for guaranteed-empty cases.
     if (Len < 1) {
-        TooltipHide()
+        TooltipHide("LookupLen0")
         _NotifySuggestionDismissed()
         return
     }
@@ -848,7 +867,7 @@ _LookupAndRender() {
     }
     SearchKey := (LastTermPos > 0) ? SubStr(Buffer, LastTermPos + 1) : Buffer
     if (SearchKey == "") {
-        TooltipHide()
+        TooltipHide("LookupKeyEmpty")
         _NotifySuggestionDismissed()
         return
     }
@@ -857,7 +876,7 @@ _LookupAndRender() {
     ; with its pre-cased output, exactly mirroring CreateCaseSensitiveHotstrings.
     if !_PrefixIndex.Has(SearchKey) {
         LoggerDebug("PrefixWatcher", "DBG no prefix match for '{1}'.", SearchKey)
-        TooltipHide()
+        TooltipHide("LookupNoMatch")
         _NotifySuggestionDismissed()
         return
     }
@@ -882,7 +901,15 @@ _LookupAndRender() {
             continue
         }
         Color := (Cfg.Color != "") ? Cfg.Color : ""
-        Delay := (Cfg.Delay != "") ? Cfg.Delay : 0
+        ; The tooltip must stay visible as long as the expansion is still
+        ; armed — so the display duration equals the expansion window exactly.
+        ; When Delay = 0 the hotstring has no expiry window (DurationSec = 0
+        ; leaves the tooltip up until the safety timer fires), mirroring the
+        ; HS INFINITE_TOOLTIP_SEC convention. Each row carries its own delay
+        ; so rows with distinct delays activate the dequeue path in TooltipShow,
+        ; which removes each row individually as its deadline passes.
+        ExpansionDelay := (Cfg.Delay != "") ? Cfg.Delay : 0
+        TooltipDuration := ExpansionDelay
         IsMagic := InStr(Entry.Trigger, MK) > 0
         ; Trigger label shown on the right side of the row:
         ;   ★ (or the configured magic key) for star triggers,
@@ -890,7 +917,7 @@ _LookupAndRender() {
         TriggerLabel := IsMagic ? MK : "↵"
         Bucket := IsMagic ? StarItems : EndItems
         Item := { Text: Entry.Output, TriggerLabel: TriggerLabel,
-                  ColorHex: Color, DurationSec: Delay,
+                  ColorHex: Color, DurationSec: TooltipDuration,
                   Trigger: Entry.Trigger, Category: Entry.Category,
                   IsDimmed: Bucket.Length > 0 }
         Bucket.Push(Item)
@@ -904,7 +931,7 @@ _LookupAndRender() {
     }
     if (Items.Length == 0) {
         LoggerDebug("PrefixWatcher", "DBG all candidates have ShowTooltip=false, hiding.")
-        TooltipHide()
+        TooltipHide("LookupNoItems")
         _NotifySuggestionDismissed()
         return
     }
