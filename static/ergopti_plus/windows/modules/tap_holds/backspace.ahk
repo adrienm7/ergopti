@@ -7,6 +7,11 @@
 ; Backspace tap-hold: any action from GESTURE_ACTIONS on tap (default:
 ; backspace), any hold modifier or nav layer on hold. Scancode SC00E.
 ;
+; Two-phase design (mirrors space.ahk) to prevent auto-repeat during long hold:
+; Phase 1 — KeyWait with timeout discriminates tap from hold.
+; Phase 2 (modifier) — arm modifier, capture next key, release on key-up.
+; Phase 2 (layer) — activate layer until key-up.
+;
 ; Note: the physical Backspace key is also used by CapsLock and LAlt modules
 ; as their tap output — those are output actions, not remappings of the
 ; physical Backspace key. This module remaps the physical Backspace key itself.
@@ -43,20 +48,21 @@ _BackspaceHoldModKey() {
 
 #HotIf TapHoldHoldModifier(TapHold, "backspace") != "" and not LayerEnabled
 $SC00E:: {
+	tap := KeyWait("SC00E", "T" . TapHoldDuration(TapHold, "backspace"))
+	if tap {
+		if (A_PriorKey == "BackSpace")
+			_BackspaceDispatch()
+		return
+	}
 	ModKey := _BackspaceHoldModKey()
 	TextPressKey(ModKey, "Down")
-	TimeBefore := A_TickCount
-	KeyWait("SC00E")
-	TimeAfter := A_TickCount
-	tap := ((TimeAfter - TimeBefore) <= TapHoldDuration(TapHold, "backspace") * 1000)
+	ih := InputHook("L1 T3")
+	ih.Start()
+	ih.Wait()
+	if (ih.Input != "")
+		SendInput("{" . ModKey . " down}" . ih.Input . "{" . ModKey . " up}")
+	KeyWait("SC00E", "U T2")
 	TextPressKey(ModKey, "Up")
-	if (
-		tap
-		and (TimeAfter - TimeBefore) >= TapMinDurationMs()
-		and A_PriorKey == "BackSpace"
-	) {
-		_BackspaceDispatch()
-	}
 }
 #HotIf
 
@@ -67,22 +73,15 @@ $SC00E:: {
 
 #HotIf TapHoldHoldLayer(TapHold, "backspace") != "" and TapHoldHoldModifier(TapHold, "backspace") == "" and not LayerEnabled
 $SC00E:: {
-	UpdateLastSentCharacter("BackSpace")
-
-	ActivateLayer()
-	KeyWait("SC00E")
-	DisableLayer()
-
-	Now := A_TickCount
-	CharacterSentTime := LastSentCharacterKeyTime.Has("BackSpace") ? LastSentCharacterKeyTime["BackSpace"] : Now
-	tap := (Now - CharacterSentTime <= TapHoldDuration(TapHold, "backspace") * 1000)
-	if (
-		tap
-		and (Now - CharacterSentTime) >= TapMinDurationMs()
-		and A_PriorKey == "BackSpace"
-	) {
-		_BackspaceDispatch()
+	tap := KeyWait("SC00E", "T" . TapHoldDuration(TapHold, "backspace"))
+	if tap {
+		if (A_PriorKey == "BackSpace")
+			_BackspaceDispatch()
+		return
 	}
+	ActivateLayer()
+	KeyWait("SC00E", "U")
+	DisableLayer()
 }
 #HotIf
 

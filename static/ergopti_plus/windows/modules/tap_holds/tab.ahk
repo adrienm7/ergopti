@@ -87,7 +87,7 @@ $SC00F:: {
 		_TabDispatch()
 		return
 	}
-	KeyWait("SC00F")
+	KeyWait("SC00F", "U")
 	TextPressKey(ModKey, "Up")
 }
 #HotIf
@@ -99,18 +99,15 @@ $SC00F:: {
 
 #HotIf TapHoldTapAction(TapHold, "tab") != "alt_tab_monitor" and TapHoldHoldLayer(TapHold, "tab") != "" and TapHoldTapAction(TapHold, "tab") != "" and not LayerEnabled
 $SC00F:: {
-	UpdateLastSentCharacter("Tab")
-
-	ActivateLayer()
-	KeyWait("SC00F")
-	DisableLayer()
-
-	Now := A_TickCount
-	CharacterSentTime := LastSentCharacterKeyTime.Has("Tab") ? LastSentCharacterKeyTime["Tab"] : Now
-	tap := (Now - CharacterSentTime <= TapHoldDuration(TapHold, "tab") * 1000)
-	if (tap and A_PriorKey == "Tab") {
-		_TabDispatch()
+	tap := KeyWait("SC00F", "T" . TapHoldDuration(TapHold, "tab"))
+	if tap {
+		if (A_PriorKey == "Tab")
+			_TabDispatch()
+		return
 	}
+	ActivateLayer()
+	KeyWait("SC00F", "U")
+	DisableLayer()
 }
 #HotIf
 
