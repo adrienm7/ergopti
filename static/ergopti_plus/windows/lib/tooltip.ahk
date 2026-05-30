@@ -215,6 +215,13 @@ TooltipShow(Items, DurationSec := 0) {
         Items := [Items]
     }
 
+    ; Destroy any currently visible tooltip before rebuilding — ensures the old
+    ; window is gone even if its auto-hide timer has not fired yet. Without this,
+    ; a tooltip that was shown at a different screen position can remain visible
+    ; as a ghost while the new one appears elsewhere.
+    ; Force=true bypasses the dequeue guard — a new TooltipShow always supersedes.
+    TooltipHide("NewShow", true)
+
     ; Bump the generation counter so any in-flight timer from the previous
     ; tooltip knows it is stale and must not call TooltipHide().
     global _TooltipGeneration, _TooltipTimerGeneration
@@ -224,10 +231,8 @@ TooltipShow(Items, DurationSec := 0) {
     _TooltipGeneration += 1
     _TooltipLastItems := Items
 
-    ; Cancel any pending auto-hide timer BEFORE rebuilding the Gui.
-    ; _TooltipTimerFn is a stable named function — SetTimer identifies timers
-    ; by function reference, so this reliably cancels the previously scheduled
-    ; call regardless of how many TooltipShow calls were made before it fired.
+    ; Timer already cancelled by TooltipHide("NewShow") above — this is a
+    ; belt-and-suspenders guard in case TooltipHide returned early for any reason.
     SetTimer(_TooltipTimerFn, 0)
 
     try {
@@ -409,22 +414,18 @@ TooltipHide(DbgTag := "?", Force := false) {
     ; SWP flags: NOSIZE|NOMOVE|NOZORDER|NOACTIVATE|HIDEWINDOW.
     SWP_HIDE_FLAGS := 0x0001 | 0x0002 | 0x0004 | 0x0010 | 0x0080
     HideCount := _TooltipRowGuis.Length
-    HDWP := HideCount > 0 ? DllCall("User32\BeginDeferWindowPos", "Int", HideCount, "Ptr") : 0
-    if HDWP {
-        for , Row in _TooltipRowGuis {
+    if HideCount > 0 {
+        HDWP := DllCall("User32\BeginDeferWindowPos", "Int", HideCount, "Ptr")
+        if HDWP {
+            for , Row in _TooltipRowGuis {
+                if HDWP
+                    HDWP := DllCall("User32\DeferWindowPos",
+                        "Ptr", HDWP, "Ptr", Row.Gui.Hwnd,
+                        "Ptr", 0, "Int", 0, "Int", 0, "Int", 0, "Int", 0,
+                        "UInt", SWP_HIDE_FLAGS, "Ptr")
+            }
             if HDWP
-                try HDWP := DllCall("User32\DeferWindowPos",
-                    "Ptr", HDWP, "Ptr", Row.Gui.Hwnd,
-                    "Ptr", 0, "Int", 0, "Int", 0, "Int", 0, "Int", 0,
-                    "UInt", SWP_HIDE_FLAGS, "Ptr")
-        }
-        if HDWP
-            try DllCall("User32\EndDeferWindowPos", "Ptr", HDWP)
-    }
-    ; Fallback: individual SW_HIDE when DeferWindowPos fails.
-    if !HDWP {
-        for , Row in _TooltipRowGuis {
-            try GR_Hide(Row.Gui.Hwnd)
+                DllCall("User32\EndDeferWindowPos", "Ptr", HDWP)
         }
     }
 

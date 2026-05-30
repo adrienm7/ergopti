@@ -63,8 +63,8 @@ global UI_LABEL_GAP       := 16
 global UI_CORNER_RADIUS   := 14
 
 ; ── Colors ───────────────────────────────────────────────────────────────────
-; Near-black default background.  Mirrors: Config.colors.bg = { white=0.10 }
-global UI_BG_HEX          := "1A1A1A"
+; Near-black default background.  Mirrors: constants.toml bg_hex = "#242424"
+global UI_BG_HEX          := "242424"
 ; Border ring color and opacity.  Mirrors: strokeColor = { white=1, alpha=0.25 }
 global UI_BORDER_COLOR_HEX := "FFFFFF"
 global UI_BORDER_ALPHA     := 0.25
@@ -76,9 +76,9 @@ global UI_LABEL_COLOR_HEX  := "AAAAAA"
 
 ; ── Tint mixing ─────────────────────────────────────────────────────────────
 ; HSL target when mixing an accent hue into the background.
-; Mirrors: renderer.lua — lightness 0.10, saturation 0.40.
-global UI_TINT_LIGHTNESS   := 0.10
-global UI_TINT_SATURATION  := 0.40
+; Mirrors: constants.toml lightness = 0.18, saturation = 0.65.
+global UI_TINT_LIGHTNESS   := 0.18
+global UI_TINT_SATURATION  := 0.65
 
 ; ── Positioning offsets ──────────────────────────────────────────────────────
 ; Mirrors: Config.layout.caret_offset_y = 18 (identical on both platforms).
@@ -94,19 +94,18 @@ global UI_MAX_CARET_HEIGHT_PX      := 80
 global UI_WINDOW_BOTTOM_INSET_PX   := 60
 
 ; ── LLM diff-coloring (from shared/tooltip/constants.toml [llm_colors]) ────────
-; Overwritten by UiStyle_LoadSharedConst() at startup.
-; corr_sel  — corrected text in the active slot (green).   Mirrors: corr_sel  { r=0.25 g=0.90 b=0.40 }
-; nw_sel    — next-words text in the active slot (orange).  Mirrors: nw_sel   { r=1.00 g=0.62 b=0.10 }
-; unsel_gray — all text in non-active slots (mid-gray).     Mirrors: unsel_gray { white=0.50 }
-; loading   — placeholder text while a slot is generating.  Mirrors: loading  { r=0.94 g=0.78 b=0.28 }
+; Overwritten by UiStyle_LoadSharedConst() at startup; must mirror the TOML.
+; corr_sel  — corrected text in the active slot (green).
+; nw_sel    — next-words text in the active slot (orange).
+; unsel_gray — all text in non-active slots (mid-gray).
+; loading   — placeholder text while a slot is generating.
 global UI_LLM_CORR_SEL_HEX   := "40E666"   ; #40E666  ≈ green
 global UI_LLM_NW_SEL_HEX     := "FF9E1A"   ; #FF9E1A  ≈ orange
 global UI_LLM_UNSEL_GRAY_HEX := "808080"   ; #808080  ≈ mid-gray
 global UI_LLM_LOADING_HEX    := "F0C747"   ; #F0C747  ≈ yellow-amber
 
 ; ── Timing defaults (from shared/tooltip/constants.toml [timing]) ─────────────
-; Overwritten by UiStyle_LoadSharedConst() at startup; hardcoded here as
-; compile-time fallbacks in case the TOML file is absent.
+; Overwritten by UiStyle_LoadSharedConst() at startup; must mirror the TOML.
 global UI_HOTSTRING_TIMEOUT_SEC := 2.5
 global UI_LLM_TIMEOUT_SEC       := 12.0
 global UI_TIMEOUT_DECREMENT_SEC := 0.2
@@ -140,42 +139,42 @@ UiStyle_LoadSharedConst() {
 	}
 
 	; [typography] — platform-specific keys only (font names are AHK-specific)
-	global UI_FONT_SIZE_MAIN       := Integer(IniCacheGet(c, "typography", "font_size_main_ahk", "11"))
-	global UI_FONT_SIZE_HINT       := Integer(IniCacheGet(c, "typography", "font_size_hint_ahk", "11"))
+	global UI_FONT_SIZE_MAIN       := Integer(IniCacheGet(c, "typography", "font_size_main_ahk", UI_FONT_SIZE_MAIN))
+	global UI_FONT_SIZE_HINT       := Integer(IniCacheGet(c, "typography", "font_size_hint_ahk", UI_FONT_SIZE_HINT))
 
 	; [layout]
-	global UI_PAD_X                := Integer(IniCacheGet(c, "layout", "pad_x",        "14"))
-	global UI_PAD_Y                := Integer(IniCacheGet(c, "layout", "pad_y",         "7"))
-	global UI_LABEL_GAP            := Integer(IniCacheGet(c, "layout", "label_gap",    "16"))
+	global UI_PAD_X                := Integer(IniCacheGet(c, "layout", "pad_x",        UI_PAD_X))
+	global UI_PAD_Y                := Integer(IniCacheGet(c, "layout", "pad_y",        UI_PAD_Y))
+	global UI_LABEL_GAP            := Integer(IniCacheGet(c, "layout", "label_gap",    UI_LABEL_GAP))
 	; GDI nWidth/nHeight = full ellipse diameter = 2 × corner_radius.
-	global UI_CORNER_RADIUS        := Integer(IniCacheGet(c, "layout", "corner_radius", "7")) * 2
+	global UI_CORNER_RADIUS        := Integer(IniCacheGet(c, "layout", "corner_radius", UI_CORNER_RADIUS // 2)) * 2
 
 	; [colors]
-	global UI_BG_HEX               := SubStr(IniCacheGet(c, "colors", "bg_hex", "#1A1A1A"), 2)   ; strip leading #
-	global UI_LABEL_COLOR_HEX      := SubStr(IniCacheGet(c, "colors", "label_hex", "#AAAAAA"), 2)
-	global UI_BORDER_ALPHA         := Float(IniCacheGet(c, "colors", "border_alpha_ahk", "0.25"))
+	global UI_BG_HEX               := SubStr(IniCacheGet(c, "colors", "bg_hex",           "#" . UI_BG_HEX), 2)
+	global UI_LABEL_COLOR_HEX      := SubStr(IniCacheGet(c, "colors", "label_hex",        "#" . UI_LABEL_COLOR_HEX), 2)
+	global UI_BORDER_ALPHA         := Float(IniCacheGet(c,  "colors", "border_alpha_ahk",  UI_BORDER_ALPHA))
 
 	; [tint]
-	global UI_TINT_LIGHTNESS       := Float(IniCacheGet(c, "tint", "lightness",  "0.10"))
-	global UI_TINT_SATURATION      := Float(IniCacheGet(c, "tint", "saturation", "0.40"))
+	global UI_TINT_LIGHTNESS       := Float(IniCacheGet(c, "tint", "lightness",  UI_TINT_LIGHTNESS))
+	global UI_TINT_SATURATION      := Float(IniCacheGet(c, "tint", "saturation", UI_TINT_SATURATION))
 
 	; [positioning]
-	global UI_OFFSET_BELOW         := Integer(IniCacheGet(c, "positioning", "caret_offset_y",          "18"))
-	global UI_MAX_CARET_HEIGHT_PX  := Integer(IniCacheGet(c, "positioning", "max_caret_height",         "80"))
-	global UI_WINDOW_BOTTOM_INSET_PX := Integer(IniCacheGet(c, "positioning", "window_bottom_inset_ahk","60"))
+	global UI_OFFSET_BELOW           := Integer(IniCacheGet(c, "positioning", "caret_offset_y",           UI_OFFSET_BELOW))
+	global UI_MAX_CARET_HEIGHT_PX    := Integer(IniCacheGet(c, "positioning", "max_caret_height",          UI_MAX_CARET_HEIGHT_PX))
+	global UI_WINDOW_BOTTOM_INSET_PX := Integer(IniCacheGet(c, "positioning", "window_bottom_inset_ahk",   UI_WINDOW_BOTTOM_INSET_PX))
 
 	; [timing]
-	global UI_HOTSTRING_TIMEOUT_SEC := Float(IniCacheGet(c, "timing", "hotstring_timeout_sec", "2.5"))
-	global UI_LLM_TIMEOUT_SEC       := Float(IniCacheGet(c, "timing", "llm_timeout_sec",       "12.0"))
-	global UI_TIMEOUT_DECREMENT_SEC := Float(IniCacheGet(c, "timing", "timeout_decrement_sec", "0.2"))
-	global UI_TIMEOUT_FLOOR_SEC     := Float(IniCacheGet(c, "timing", "timeout_floor_sec",     "0.05"))
+	global UI_HOTSTRING_TIMEOUT_SEC := Float(IniCacheGet(c, "timing", "hotstring_timeout_sec", UI_HOTSTRING_TIMEOUT_SEC))
+	global UI_LLM_TIMEOUT_SEC       := Float(IniCacheGet(c, "timing", "llm_timeout_sec",       UI_LLM_TIMEOUT_SEC))
+	global UI_TIMEOUT_DECREMENT_SEC := Float(IniCacheGet(c, "timing", "timeout_decrement_sec", UI_TIMEOUT_DECREMENT_SEC))
+	global UI_TIMEOUT_FLOOR_SEC     := Float(IniCacheGet(c, "timing", "timeout_floor_sec",     UI_TIMEOUT_FLOOR_SEC))
 
 	; [llm_colors] — diff-chunk rendering colors for the LLM multi-slot tooltip.
 	; The TOML carries *_hex aliases (no leading #) for drivers that only accept hex.
-	global UI_LLM_CORR_SEL_HEX   := SubStr(IniCacheGet(c, "llm_colors", "corr_sel_hex",   "#40E666"), 2)
-	global UI_LLM_NW_SEL_HEX     := SubStr(IniCacheGet(c, "llm_colors", "nw_sel_hex",     "#FF9E1A"), 2)
-	global UI_LLM_UNSEL_GRAY_HEX := SubStr(IniCacheGet(c, "llm_colors", "unsel_gray_hex", "#808080"), 2)
-	global UI_LLM_LOADING_HEX    := SubStr(IniCacheGet(c, "llm_colors", "loading_hex",    "#F0C747"), 2)
+	global UI_LLM_CORR_SEL_HEX   := SubStr(IniCacheGet(c, "llm_colors", "corr_sel_hex",   "#" . UI_LLM_CORR_SEL_HEX), 2)
+	global UI_LLM_NW_SEL_HEX     := SubStr(IniCacheGet(c, "llm_colors", "nw_sel_hex",     "#" . UI_LLM_NW_SEL_HEX), 2)
+	global UI_LLM_UNSEL_GRAY_HEX := SubStr(IniCacheGet(c, "llm_colors", "unsel_gray_hex", "#" . UI_LLM_UNSEL_GRAY_HEX), 2)
+	global UI_LLM_LOADING_HEX    := SubStr(IniCacheGet(c, "llm_colors", "loading_hex",    "#" . UI_LLM_LOADING_HEX), 2)
 
 	LoggerDone("UiStyle", "Shared tooltip constants loaded (pad_x={1} corner_r={2} bg={3} tmo={4}s corr={5} nw={6}).",
 		UI_PAD_X, UI_CORNER_RADIUS, UI_BG_HEX, UI_HOTSTRING_TIMEOUT_SEC, UI_LLM_CORR_SEL_HEX, UI_LLM_NW_SEL_HEX)
