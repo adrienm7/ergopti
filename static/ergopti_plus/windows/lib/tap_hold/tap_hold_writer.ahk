@@ -37,6 +37,7 @@ global _TH_KeyDefs := [
 	Map("id", "caps_lock",    "i18n", "tap_hold.group.caps_lock"),
 	Map("id", "left_shift",   "i18n", "tap_hold.group.left_shift"),
 	Map("id", "left_ctrl",    "i18n", "tap_hold.group.left_ctrl"),
+	Map("id", "win",          "i18n", "tap_hold.group.win"),
 	Map("id", "left_alt",     "i18n", "tap_hold.group.left_alt"),
 	Map("id", "space",        "i18n", "tap_hold.group.space"),
 	Map("id", "alt_gr",       "i18n", "tap_hold.group.alt_gr"),
@@ -45,7 +46,6 @@ global _TH_KeyDefs := [
 	Map("id", "enter",        "i18n", "tap_hold.group.enter"),
 	Map("id", "backspace",    "i18n", "tap_hold.group.backspace"),
 	Map("id", "delete",       "i18n", "tap_hold.group.delete"),
-	Map("id", "win",          "i18n", "tap_hold.group.win"),
 ]
 
 ; Ordered hold options — value stored as hold_modifier or hold_layer in TOML.
