@@ -221,8 +221,11 @@ WriteTapHoldHold(KeyId, HoldOpt) {
 
 	; Always clear both hold fields before writing the new one — they are
 	; mutually exclusive and a stale field would confuse IsTapHoldVariantActive.
-	Entry.Delete("hold_modifier")
-	Entry.Delete("hold_layer")
+	; Map.Delete() throws if the key is absent, so guard with Has().
+	if Entry.Has("hold_modifier")
+		Entry.Delete("hold_modifier")
+	if Entry.Has("hold_layer")
+		Entry.Delete("hold_layer")
 
 	Kind := HoldOpt["kind"]
 	Id   := HoldOpt["id"]
