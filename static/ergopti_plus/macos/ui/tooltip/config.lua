@@ -65,7 +65,7 @@ M.layout = {
 }
 
 M.colors = {
-	bg         = { white = 0.14, alpha = 1.0 },
+	bg         = { white = 0, alpha = 1.0 },
 	bg_alpha   = 0.97,
 	corr_sel   = { red = 0.25, green = 0.90, blue = 0.40, alpha = 1.0 },
 	nw_sel     = { red = 1.00, green = 0.62, blue = 0.10, alpha = 1.0 },
@@ -81,8 +81,8 @@ M.colors = {
 }
 
 M.tint = {
-	lightness  = 0.18,
-	saturation = 0.65,
+	lightness  = 0,
+	saturation = 0,
 }
 
 -- Default tooltip durations (seconds). 0 means "infinite display".
