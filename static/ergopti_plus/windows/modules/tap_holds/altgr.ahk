@@ -45,69 +45,9 @@ RAlt Up:: {
 }
 #HotIf
 
-; Dispatch the single v2 tap_action configured for "alt_gr". Each AltGr
-; variant carries the still-held AltGr modifier on its Send (``{Blind}``
-; prefix) and pairs the keystroke with an explicit UpdateLastSentCharacter
-; so the deadkey / hotstring chain downstream sees the correct previous
-; character marker.
+; Dispatch the configured tap action for "alt_gr".
+; AltGr is already released when this fires (tap=true means key-up occurred),
+; so no Blind prefix is needed — actions run clean without AltGr held.
 AltGrTapHoldDispatchV2() {
-    switch TapHoldTapAction(TapHold, "alt_gr") {
-        case "alt_tab_monitor":
-            UpdateLastSentCharacter("")
-            AltTabMonitor()
-        case "backspace":
-            TextPressKey("BackSpace", "Blind")
-            UpdateLastSentCharacter("BackSpace")
-        case "caps_lock":
-            ToggleCapsLock()
-        case "caps_word":
-            ToggleCapsWord()
-        case "copy":
-            TextPressKey("c", "Blind Ctrl")
-            UpdateLastSentCharacter("")
-        case "ctrl_backspace":
-            TextPressKey("BackSpace", "Blind Ctrl")
-            UpdateLastSentCharacter("")
-        case "ctrl_delete":
-            TextPressKey("Delete", "Blind Ctrl")
-            UpdateLastSentCharacter("")
-        case "cut":
-            TextPressKey("x", "Blind Ctrl")
-            UpdateLastSentCharacter("")
-        case "delete":
-            TextPressKey("Delete", "Blind")
-            UpdateLastSentCharacter("Delete")
-        case "enter":
-            TextPressKey("Enter", "Blind")
-            UpdateLastSentCharacter("Enter")
-        case "escape":
-            TextPressKey("Escape", "")
-        case "find":
-            TextPressKey("f", "Blind Ctrl")
-            UpdateLastSentCharacter("")
-        case "one_shot_shift":
-            OneShotShift()
-        case "paste":
-            TextPressKey("v", "Blind Ctrl")
-            UpdateLastSentCharacter("")
-        case "paste_plain":
-            GesturePastePlain()
-        case "redo":
-            TextPressKey("y", "Blind Ctrl")
-            UpdateLastSentCharacter("")
-        case "select_all":
-            TextPressKey("a", "Blind Ctrl")
-            UpdateLastSentCharacter("")
-        case "space":
-            TextPressKey("Space", "Blind")
-            UpdateLastSentCharacter(" ")
-        case "tab":
-            TextPressKey("Tab", "Blind")
-            UpdateLastSentCharacter("Tab")
-        case "toggle_capslock":
-            ToggleCapsLock()
-        case "undo":
-            TextPressKey("z", "Blind Ctrl")
-            UpdateLastSentCharacter("")
-    }
+    _TapHoldFireAction("alt_gr")
 }
