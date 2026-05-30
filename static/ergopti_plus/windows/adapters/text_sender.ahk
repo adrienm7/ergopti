@@ -117,10 +117,17 @@ TextEraseChars(Count) {
 		_AHK_SendInput.Call("{Backspace}")
 }
 
-; Emits a single keystroke with optional modifiers.
-; @param Key       {String} Key name (e.g., "Return", "Escape", "F1").
-; @param Modifiers {Array}  Array of modifier name strings.
+; Emits a keystroke with optional modifiers, or a key-down/key-up event.
+; @param Key       {String} Key name (e.g., "LCtrl", "Return", "Escape").
+; @param Modifiers {Array|String} Array of modifier name strings for a full
+;                  keystroke, OR the string "Down"/"Up" to emit a sustained
+;                  press/release event (e.g. hold a modifier across a KeyWait).
 TextPressKey(Key, Modifiers) {
+	; "Down" / "Up" — sustained press or release for hold-modifier patterns.
+	if (Modifiers == "Down" or Modifiers == "Up") {
+		_AHK_SendInput.Call("{" . Key . " " . Modifiers . "}")
+		return
+	}
 	Prefix := ""
 	if (Modifiers is Array) {
 		for ModStr in Modifiers

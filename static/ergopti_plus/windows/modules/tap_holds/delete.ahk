@@ -41,7 +41,7 @@ _DeleteHoldModKey() {
 ; ======= 13.1) Hold-modifier variant =======
 
 #HotIf TapHoldHoldModifier(TapHold, "delete") != "" and not LayerEnabled
-~$SC053:: {
+$SC053:: {
 	ModKey := _DeleteHoldModKey()
 	TextPressKey(ModKey, "Down")
 	TimeBefore := A_TickCount
@@ -65,7 +65,7 @@ _DeleteHoldModKey() {
 ; ======= 13.2) Hold-layer variant =======
 
 #HotIf TapHoldHoldLayer(TapHold, "delete") != "" and TapHoldHoldModifier(TapHold, "delete") == "" and not LayerEnabled
-~$SC053:: {
+$SC053:: {
 	UpdateLastSentCharacter("Delete")
 
 	ActivateLayer()
@@ -90,10 +90,11 @@ _DeleteHoldModKey() {
 
 ; ======= 13.3) Tap-only (tap action set to something other than delete) =======
 
-; ~ passes Delete to the OS; $ prevents re-entry. Fire immediately on key-down —
-; no KeyWait or A_PriorKey guard needed since there is no hold behaviour.
+; $ prevents re-entry. Fire immediately on key-down — no KeyWait or A_PriorKey
+; guard needed since there is no hold behaviour. No ~ needed: the action replaces
+; the native key entirely; ~ would send both Delete and the action.
 #HotIf TapHoldTapAction(TapHold, "delete") != "" and TapHoldTapAction(TapHold, "delete") != "delete" and TapHoldHoldModifier(TapHold, "delete") == "" and TapHoldHoldLayer(TapHold, "delete") == "" and not LayerEnabled
-~$SC053:: _DeleteDispatch()
+$SC053:: _DeleteDispatch()
 #HotIf
 
 
