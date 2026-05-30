@@ -60,97 +60,33 @@ _LShiftDispatch() {
 
 
 
-; ======= 3.1) LCtrl — tap-only (hold=none) =======
+; ======= 3.1) LCtrl =======
 
-; ~ must NOT be used on SC01D — AltGr = LCtrl+RAlt in AHK; ~ would latch LCtrl
-; on every AltGr press. $ suppresses keyboard-hook re-entry.
-;
-; Without ~, LCtrl never reaches the OS — so Ctrl+X combos would be broken if we
-; fire on key-down. Instead: KeyWait with timeout, then check A_PriorKey.
-; - Relâché seul sous le timeout (A_PriorKey == "LControl") → tap action.
-; - Autre touche pressée pendant l'attente (A_PriorKey != "LControl") → combo:
-;   re-send LCtrl+that key so the OS sees the real shortcut.
-; - Timeout expiré sans autre touche → long hold with no action configured, pass
-;   LCtrl through to the OS for any subsequent combo keys.
-#HotIf TapHoldTapAction(TapHold, "left_ctrl") != "" and TapHoldHoldModifier(TapHold, "left_ctrl") == "" and TapHoldHoldLayer(TapHold, "left_ctrl") == "" and not LayerEnabled
-$SC01D::
+; ~$SC01D: ~ passes LCtrl through to the OS during KeyWait so Ctrl+X combos
+; still work. $ prevents keyboard-hook re-entry. The AltGr (LCtrl+RAlt) case is
+; handled by altgr.ahk which intercepts RAlt before this block fires.
+; A_PriorKey == "LControl" guard: blocks the tap when another key was pressed
+; during the hold window (combo use), while still allowing intentional taps.
+; KS_IsUp guards: prevent spurious tap on CapsLock+LCtrl or LAlt+LCtrl release.
+#HotIf TapHoldTapAction(TapHold, "left_ctrl") != "" and not LayerEnabled
+~$SC01D::
 {
 	UpdateLastSentCharacter("LControl")
-	tap := KeyWait("SC01D", "T" . TapHoldDuration(TapHold, "left_ctrl"))
-	if tap {
-		; Key released within timeout.
-		if (A_PriorKey == "LControl" and KS_IsUp("SC03A") and KS_IsUp("SC038")) {
-			_LCtrlDispatch()
-		} else {
-			; Another key was pressed during the wait — pass LCtrl through so the
-			; combo reaches the OS (e.g. LCtrl was already released alongside that key).
-			Send("{LCtrl Down}{LCtrl Up}")
-		}
-	} else {
-		; Timeout expired — hold with no configured hold action. Keep LCtrl down
-		; for the OS until the physical key is released, then lift it.
-		Send("{LCtrl Down}")
-		KeyWait("SC01D")
-		Send("{LCtrl Up}")
-	}
-}
-#HotIf
-
-
-; ======= 3.2) LCtrl — hold-modifier =======
-
-#HotIf TapHoldTapAction(TapHold, "left_ctrl") != "" and TapHoldHoldModifier(TapHold, "left_ctrl") != "" and not LayerEnabled
-$SC01D::
-{
-	UpdateLastSentCharacter("LControl")
-	ModKey := _LCtrlHoldModKey()
-	TextPressKey(ModKey, "Down")
-	tap := KeyWait("SC01D", "T" . TapHoldDuration(TapHold, "left_ctrl"))
-	if tap {
-		; Short press — release modifier then fire tap action.
-		TextPressKey(ModKey, "Up")
-		if (KS_IsUp("SC03A") and KS_IsUp("SC038")) {
-			_LCtrlDispatch()
-		}
-		return
-	}
-	; Long press — modifier already held by OS; wait for physical release then lift.
+	TimeBefore := A_TickCount
 	KeyWait("SC01D")
-	TextPressKey(ModKey, "Up")
-}
-#HotIf
-
-
-; ======= 3.3) LCtrl — hold-layer =======
-
-#HotIf TapHoldTapAction(TapHold, "left_ctrl") != "" and TapHoldHoldLayer(TapHold, "left_ctrl") != "" and not LayerEnabled
-$SC01D::
-{
-	UpdateLastSentCharacter("LControl")
-	ActivateLayer()
-	KeyWait("SC01D")
-	DisableLayer()
-
-	Now := A_TickCount
-	CharacterSentTime := LastSentCharacterKeyTime.Has("LControl") ? LastSentCharacterKeyTime["LControl"] : Now
-	tap := (Now - CharacterSentTime <= TapHoldDuration(TapHold, "left_ctrl") * 1000)
-	if (tap and KS_IsUp("SC03A") and KS_IsUp("SC038")) {
+	TimeAfter := A_TickCount
+	tap := ((TimeAfter - TimeBefore) <= TapHoldDuration(TapHold, "left_ctrl") * 1000)
+	if (
+		tap
+		and (TimeAfter - TimeBefore) >= TapMinDurationMs()
+		and A_PriorKey == "LControl"
+		and KS_IsUp("SC03A") ; CapsLock must not be physically held
+		and KS_IsUp("SC038") ; LAlt must not be physically held
+	) {
 		_LCtrlDispatch()
 	}
 }
 #HotIf
-
-; Return the AHK key name for the configured hold modifier on LCtrl.
-_LCtrlHoldModKey() {
-	switch TapHoldHoldModifier(TapHold, "left_ctrl") {
-		case "ctrl":   return "LCtrl"
-		case "shift":  return "LShift"
-		case "alt":    return "LAlt"
-		case "alt_gr": return "RAlt"
-		case "win":    return "LWin"
-		default:       return ""
-	}
-}
 
 ; Dispatch the configured tap action for LCtrl.
 _LCtrlDispatch() {
