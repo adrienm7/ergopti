@@ -47,8 +47,8 @@ _BackspaceHoldModKey() {
 ; ======= 10.1) Hold-modifier variant =======
 
 #HotIf TapHoldHoldModifier(TapHold, "backspace") != "" and not LayerEnabled
-$SC00E:: {
-	tap := KeyWait("SC00E", "T" . TapHoldDuration(TapHold, "backspace"))
+*$SC00E:: {
+	tap := KeyWait("BackSpace", "T" . TapHoldDuration(TapHold, "backspace"))
 	if tap {
 		if (A_PriorKey == "BackSpace")
 			_BackspaceDispatch()
@@ -56,12 +56,7 @@ $SC00E:: {
 	}
 	ModKey := _BackspaceHoldModKey()
 	TextPressKey(ModKey, "Down")
-	ih := InputHook("L1 T3")
-	ih.Start()
-	ih.Wait()
-	if (ih.Input != "")
-		SendInput("{" . ModKey . " down}" . ih.Input . "{" . ModKey . " up}")
-	KeyWait("SC00E", "U T2")
+	KeyWait("BackSpace", "U")
 	TextPressKey(ModKey, "Up")
 }
 #HotIf
@@ -72,15 +67,15 @@ $SC00E:: {
 ; ======= 10.2) Hold-layer variant =======
 
 #HotIf TapHoldHoldLayer(TapHold, "backspace") != "" and TapHoldHoldModifier(TapHold, "backspace") == "" and not LayerEnabled
-$SC00E:: {
-	tap := KeyWait("SC00E", "T" . TapHoldDuration(TapHold, "backspace"))
+*$SC00E:: {
+	tap := KeyWait("BackSpace", "T" . TapHoldDuration(TapHold, "backspace"))
 	if tap {
 		if (A_PriorKey == "BackSpace")
 			_BackspaceDispatch()
 		return
 	}
 	ActivateLayer()
-	KeyWait("SC00E", "U")
+	KeyWait("BackSpace", "U")
 	DisableLayer()
 }
 #HotIf

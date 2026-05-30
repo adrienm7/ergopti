@@ -43,8 +43,8 @@ _EscapeHoldModKey() {
 ; ======= 11.1) Hold-modifier variant =======
 
 #HotIf TapHoldHoldModifier(TapHold, "escape") != "" and not LayerEnabled
-$SC001:: {
-	tap := KeyWait("SC001", "T" . TapHoldDuration(TapHold, "escape"))
+*$SC001:: {
+	tap := KeyWait("Escape", "T" . TapHoldDuration(TapHold, "escape"))
 	if tap {
 		if (A_PriorKey == "Escape")
 			_EscapeDispatch()
@@ -52,12 +52,7 @@ $SC001:: {
 	}
 	ModKey := _EscapeHoldModKey()
 	TextPressKey(ModKey, "Down")
-	ih := InputHook("L1 T3")
-	ih.Start()
-	ih.Wait()
-	if (ih.Input != "")
-		SendInput("{" . ModKey . " down}" . ih.Input . "{" . ModKey . " up}")
-	KeyWait("SC001", "U T2")
+	KeyWait("Escape", "U")
 	TextPressKey(ModKey, "Up")
 }
 #HotIf
@@ -68,15 +63,15 @@ $SC001:: {
 ; ======= 11.2) Hold-layer variant =======
 
 #HotIf TapHoldHoldLayer(TapHold, "escape") != "" and TapHoldHoldModifier(TapHold, "escape") == "" and not LayerEnabled
-$SC001:: {
-	tap := KeyWait("SC001", "T" . TapHoldDuration(TapHold, "escape"))
+*$SC001:: {
+	tap := KeyWait("Escape", "T" . TapHoldDuration(TapHold, "escape"))
 	if tap {
 		if (A_PriorKey == "Escape")
 			_EscapeDispatch()
 		return
 	}
 	ActivateLayer()
-	KeyWait("SC001", "U")
+	KeyWait("Escape", "U")
 	DisableLayer()
 }
 #HotIf

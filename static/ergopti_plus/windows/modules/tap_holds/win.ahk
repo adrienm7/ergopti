@@ -43,8 +43,8 @@ _WinHoldModKey() {
 ; ======= 12.1) Hold-modifier variant =======
 
 #HotIf TapHoldHoldModifier(TapHold, "win") != "" and not LayerEnabled
-$SC15B:: {
-	tap := KeyWait("SC15B", "T" . TapHoldDuration(TapHold, "win"))
+*$SC15B:: {
+	tap := KeyWait("LWin", "T" . TapHoldDuration(TapHold, "win"))
 	if tap {
 		if (A_PriorKey == "LWin")
 			_WinDispatch()
@@ -52,12 +52,7 @@ $SC15B:: {
 	}
 	ModKey := _WinHoldModKey()
 	TextPressKey(ModKey, "Down")
-	ih := InputHook("L1 T3")
-	ih.Start()
-	ih.Wait()
-	if (ih.Input != "")
-		SendInput("{" . ModKey . " down}" . ih.Input . "{" . ModKey . " up}")
-	KeyWait("SC15B", "U T2")
+	KeyWait("LWin", "U")
 	TextPressKey(ModKey, "Up")
 }
 #HotIf
@@ -68,15 +63,15 @@ $SC15B:: {
 ; ======= 12.2) Hold-layer variant =======
 
 #HotIf TapHoldHoldLayer(TapHold, "win") != "" and TapHoldHoldModifier(TapHold, "win") == "" and not LayerEnabled
-$SC15B:: {
-	tap := KeyWait("SC15B", "T" . TapHoldDuration(TapHold, "win"))
+*$SC15B:: {
+	tap := KeyWait("LWin", "T" . TapHoldDuration(TapHold, "win"))
 	if tap {
 		if (A_PriorKey == "LWin")
 			_WinDispatch()
 		return
 	}
 	ActivateLayer()
-	KeyWait("SC15B", "U")
+	KeyWait("LWin", "U")
 	DisableLayer()
 }
 #HotIf

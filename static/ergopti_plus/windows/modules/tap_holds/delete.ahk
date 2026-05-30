@@ -46,8 +46,8 @@ _DeleteHoldModKey() {
 ; ======= 13.1) Hold-modifier variant =======
 
 #HotIf TapHoldHoldModifier(TapHold, "delete") != "" and not LayerEnabled
-$SC053:: {
-	tap := KeyWait("SC053", "T" . TapHoldDuration(TapHold, "delete"))
+*$SC053:: {
+	tap := KeyWait("Delete", "T" . TapHoldDuration(TapHold, "delete"))
 	if tap {
 		if (A_PriorKey == "Delete")
 			_DeleteDispatch()
@@ -55,12 +55,7 @@ $SC053:: {
 	}
 	ModKey := _DeleteHoldModKey()
 	TextPressKey(ModKey, "Down")
-	ih := InputHook("L1 T3")
-	ih.Start()
-	ih.Wait()
-	if (ih.Input != "")
-		SendInput("{" . ModKey . " down}" . ih.Input . "{" . ModKey . " up}")
-	KeyWait("SC053", "U T2")
+	KeyWait("Delete", "U")
 	TextPressKey(ModKey, "Up")
 }
 #HotIf
@@ -71,15 +66,15 @@ $SC053:: {
 ; ======= 13.2) Hold-layer variant =======
 
 #HotIf TapHoldHoldLayer(TapHold, "delete") != "" and TapHoldHoldModifier(TapHold, "delete") == "" and not LayerEnabled
-$SC053:: {
-	tap := KeyWait("SC053", "T" . TapHoldDuration(TapHold, "delete"))
+*$SC053:: {
+	tap := KeyWait("Delete", "T" . TapHoldDuration(TapHold, "delete"))
 	if tap {
 		if (A_PriorKey == "Delete")
 			_DeleteDispatch()
 		return
 	}
 	ActivateLayer()
-	KeyWait("SC053", "U")
+	KeyWait("Delete", "U")
 	DisableLayer()
 }
 #HotIf
