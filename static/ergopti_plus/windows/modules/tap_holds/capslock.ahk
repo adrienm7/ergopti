@@ -131,7 +131,7 @@ SC03A:: {
 	ModKey := _CapsLockHoldModKey()
 	TextPressKey(ModKey, "Down")
 	tap := KeyWait("CapsLock", "T" . TapHoldDuration(TapHold, "caps_lock"))
-	if (tap and A_PriorKey == "LControl") {
+	if tap {
 		; Short press — release modifier then dispatch tap action.
 		TextPressKey(ModKey, "Up")
 		_CapsLockDispatch(CtrlActivated)
@@ -164,7 +164,7 @@ SC03A:: {
 	Now           := A_TickCount
 	CharTime      := LastSentCharacterKeyTime.Has("CapsLock") ? LastSentCharacterKeyTime["CapsLock"] : Now
 	tap           := (Now - CharTime <= TapHoldDuration(TapHold, "caps_lock") * 1000)
-	if (tap and A_PriorKey == "LControl") {
+	if tap {
 		_CapsLockDispatch(False)
 	}
 }
@@ -198,28 +198,14 @@ _CapsLockDispatch(CtrlActivated) {
 	if CtrlActivated {
 		TextPressKey("LCtrl", "Down")
 	}
-	switch TapHoldTapAction(TapHold, "caps_lock") {
-		case "alt_tab_monitor":  AltTabMonitor()
-		case "backspace":        TextPressKey("BackSpace", "Blind")
-		case "caps_lock":        ToggleCapsLock()
-		case "caps_word":        ToggleCapsWord()
-		case "copy":             TextPressKey("c", ["Ctrl"])
-		case "ctrl_backspace":   TextPressKey("BackSpace", "Ctrl")
-		case "ctrl_delete":      TextPressKey("Delete", "Ctrl")
-		case "cut":              TextPressKey("x", ["Ctrl"])
-		case "delete":           TextPressKey("Delete", "Blind")
-		case "enter":            TextPressKey("Enter", "Blind") ; DisableCapsWord kept intentionally
-		case "escape":           TextPressKey("Escape", "Blind")
-		case "find":             TextPressKey("f", ["Ctrl"])
-		case "one_shot_shift":   OneShotShift()
-		case "paste":            TextPressKey("v", ["Ctrl"])
-		case "paste_plain":      GesturePastePlain()
-		case "redo":             TextPressKey("y", ["Ctrl"])
-		case "select_all":       TextPressKey("a", ["Ctrl"])
-		case "space":            TextPressKey("Space", [])
-		case "tab":              TextPressKey("Tab", "Blind")
-		case "toggle_capslock":  ToggleCapsLock()
-		case "undo":             TextPressKey("z", ["Ctrl"])
+	; Special cases that cannot be handled by GESTURE_ACTIONS.Fn.Call() directly.
+	local action := TapHoldTapAction(TapHold, "caps_lock")
+	if (action == "backspace") {
+		TextPressKey("BackSpace", "Blind")
+	} else if (action == "caps_lock" or action == "toggle_capslock") {
+		ToggleCapsLock()
+	} else {
+		_TapHoldFireAction("caps_lock")
 	}
 	if CtrlActivated {
 		TextPressKey("LCtrl", "Up")
