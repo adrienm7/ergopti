@@ -76,7 +76,7 @@ global UI_LABEL_COLOR_HEX  := "AAAAAA"
 
 ; ── Tint mixing ─────────────────────────────────────────────────────────────
 ; HSL target when mixing an accent hue into the background.
-; Mirrors: constants.toml lightness = 0.18, saturation = 0.65.
+; Overwritten at startup by UiStyle_LoadSharedConst() from constants.toml [tint].
 global UI_TINT_LIGHTNESS   := 0.18
 global UI_TINT_SATURATION  := 0.65
 
