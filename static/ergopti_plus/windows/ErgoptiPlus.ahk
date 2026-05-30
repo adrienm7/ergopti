@@ -309,10 +309,14 @@ if !DirExist(_ConfigDir) {
     try DirCreate(_ConfigDir)
 }
 
+; Subfolder name for AHK-specific user files under _ConfigDir. Centralised so
+; a future rename only requires changing this one constant.
+global _AhkSubDir := "autohotkey\"
+
 ; All AHK driver configuration lives in a single unified TOML under the
 ; driver subfolder: features, script settings, shortcuts, gestures, and
 ; expert overrides ([script] / [features]) are sections of this one file.
-global ConfigurationFile := _ConfigDir . "autohotkey\config.toml"
+global ConfigurationFile := _ConfigDir . _AhkSubDir . "config.toml"
 
 ; Initialise the hotstrings_config module so per-group delays and tooltip
 ; colors can be resolved from the TOML metadata + the shared user override
@@ -338,9 +342,9 @@ if FileExist(IconPath)
     TraySetIcon(IconPath)
 
 ; Auto-create driver and shared subfolders under _ConfigDir on first launch.
-; ahk/ holds driver-specific files; hotstrings/ holds the shared TOML files
-; so a Mac+PC setup can keep both side by side without name collision.
-DirCreate(_ConfigDir . "autohotkey")
+; autohotkey/ holds driver-specific files; hotstrings/ holds the shared TOML
+; files so a Mac+PC setup can keep both side by side without name collision.
+DirCreate(_ConfigDir . _AhkSubDir)
 DirCreate(_ConfigDir . "hotstrings")
 ; Bootstrap an empty personal_hotstrings.toml if it does not exist yet so the
 ; user always has a file to open rather than a confusing error.
@@ -358,11 +362,11 @@ global ScriptInformation := Map(
     ; exotic layout.
     "AltGrIsKanaRemap", "auto",
     ; Configurable file paths — all derived from _ConfigDir set above.
-    ; AHK-specific files (.ahk, AHK config.toml) go under ``ahk/`` so the
-    ; folder can be safely shared with the Hammerspoon driver via cloud
+    ; AHK-specific files (.ahk, AHK config.toml) go under ``autohotkey/`` so
+    ; the folder can be safely shared with the Hammerspoon driver via cloud
     ; sync. Shared neutral files (hotstrings TOML, personal info) stay
     ; at the root of _ConfigDir.
-    "PersonalAhkPath", _ConfigDir . "autohotkey\personal_shortcuts.ahk",
+    "PersonalAhkPath", _ConfigDir . _AhkSubDir . "personal_shortcuts.ahk",
     "PersonalTomlPath", _ConfigDir . "hotstrings\personal_hotstrings.toml",
     "PersonalHotstringsDir", _ConfigDir . "hotstrings\",
     "PersonalInfoTomlPath", _ConfigDir . "personal_info.toml",
@@ -611,8 +615,8 @@ if !ManifestEnsureLoaded() {
 	ExitApp(1)
 }
 global Features := ManifestBuildFeaturesMap()
-ApplyConfigToml(Features, _ConfigDir . "autohotkey\config.toml")
-global TapHold := LoadTapHoldToml(_ConfigDir . "autohotkey\tap_hold.toml",
+ApplyConfigToml(Features, _ConfigDir . _AhkSubDir . "config.toml")
+global TapHold := LoadTapHoldToml(_ConfigDir . _AhkSubDir . "tap_hold.toml",
 	_DriverDir . "\data\tap_hold\defaults.toml")
 
 ; Count the exact number of hotstrings that will be generated for a DynamicHotstrings

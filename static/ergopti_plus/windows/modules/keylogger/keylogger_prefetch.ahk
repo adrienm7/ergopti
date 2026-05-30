@@ -77,9 +77,9 @@ KLPF_PrefetchPath(which) {
 ;       paying the ~2-3 s n-gram projection + ~1 s JSON encode cost.
 KLPF_BuildAndWrite(which, metrics_dir, dbg := "", mode := "full") {
     if (dbg = "") {
-        global _ConfigDir
-        try DirCreate(_ConfigDir . "autohotkey\logs")
-        dbg := _ConfigDir . "autohotkey\logs\prefetch_debug.log"
+        global _ConfigDir, _AhkSubDir
+        try DirCreate(_ConfigDir . _AhkSubDir . "logs")
+        dbg := _ConfigDir . _AhkSubDir . "logs\prefetch_debug.log"
     }
     KLPF_DbgWrite(dbg, "=== " . A_Now . " — which=" . which . " mode=" . mode)
     t0 := A_TickCount

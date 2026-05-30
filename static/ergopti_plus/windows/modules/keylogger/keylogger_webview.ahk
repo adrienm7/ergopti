@@ -117,9 +117,9 @@ KLWV_LocalesUrl() {
 ; ============================================
 
 KLWV_Open(which, metrics_dir) {
-    global _ConfigDir
-    log := _ConfigDir . "autohotkey\logs\webview.log"
-    try DirCreate(_ConfigDir . "autohotkey\logs")
+    global _ConfigDir, _AhkSubDir
+    log := _ConfigDir . _AhkSubDir . "logs\webview.log"
+    try DirCreate(_ConfigDir . _AhkSubDir . "logs")
     try FileAppend("[" . A_Now . "] KLWV_Open(" . which . ") begin`r`n", log, "UTF-8")
 
     if !KLWV_IsAvailable() {
@@ -321,8 +321,8 @@ KLWV_OnGuiClose(which, *) {
 ; The wrapper exposes the payload as a UTF-16 string; we treat it as a
 ; JSON command of the form {"action":"...", ...}.
 KLWV_OnWebMessage(which, sender, args) {
-    global _ConfigDir
-    log := _ConfigDir . "autohotkey\logs\webview.log"
+    global _ConfigDir, _AhkSubDir
+    log := _ConfigDir . _AhkSubDir . "logs\webview.log"
     msg := ""
     try msg := args.TryGetWebMessageAsString()
     try FileAppend("[" . A_Now . "] OnWebMessage(" . which . "): " . SubStr(msg, 1, 100) . "`r`n", log, "UTF-8")
@@ -362,8 +362,8 @@ KLWV_OnWebMessage(which, sender, args) {
 ; structured WebView2 message. The page bootstrap dispatches it to
 ; process_manifest just like the initial fetch.
 KLWV_PushPrefetch(which) {
-    global _ConfigDir
-    log := _ConfigDir . "autohotkey\logs\webview.log"
+    global _ConfigDir, _AhkSubDir
+    log := _ConfigDir . _AhkSubDir . "logs\webview.log"
     if !KLWV.windows.Has(which) {
         try FileAppend("[" . A_Now . "] PushPrefetch(" . which . "): no window`r`n", log, "UTF-8")
         return
@@ -402,8 +402,8 @@ KLWV_PushPrefetch(which) {
 ; pre-parsed strings into window._i18n_strings, then call i18n_apply() to
 ; populate all data-i18n attributes immediately.
 KLWV_InjectI18n(which) {
-    global _SharedDir, _ConfigDir
-    log := _ConfigDir . "autohotkey\logs\webview.log"
+    global _SharedDir, _ConfigDir, _AhkSubDir
+    log := _ConfigDir . _AhkSubDir . "logs\webview.log"
     try FileAppend("[" . A_Now . "] InjectI18n(" . which . "): called, has_window=" . (KLWV.windows.Has(which) ? "1" : "0") . "`r`n", log, "UTF-8")
     if !KLWV.windows.Has(which)
         return
@@ -440,8 +440,8 @@ KLWV_MonitorFromPoint(x, y) {
 }
 
 KLWV_DelayedFirstPush(which) {
-    global _ConfigDir
-    log := _ConfigDir . "autohotkey\logs\webview.log"
+    global _ConfigDir, _AhkSubDir
+    log := _ConfigDir . _AhkSubDir . "logs\webview.log"
     try FileAppend("[" . A_Now . "] DelayedFirstPush(" . which . "): fired, has_window=" . (KLWV.windows.Has(which) ? "1" : "0") . "`r`n", log, "UTF-8")
     if !KLWV.windows.Has(which)
         return
@@ -487,8 +487,8 @@ KLWV_DelayedFullBuild(which) {
 ;   "full"     — full projection including historical. Used at first
 ;                paint to seed the cached historical block.
 KLWV_NotifyIngest(mode := "live") {
-    global _ConfigDir
-    log := _ConfigDir . "autohotkey\logs\webview.log"
+    global _ConfigDir, _AhkSubDir
+    log := _ConfigDir . _AhkSubDir . "logs\webview.log"
     if !KLWV.metrics_dir {
         return
     }

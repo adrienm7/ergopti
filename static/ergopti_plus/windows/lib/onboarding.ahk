@@ -491,7 +491,8 @@ _Onboarding_PreloadFromExistingConfig(ChosenDir) {
 	Dir := (ChosenDir != "") ? ChosenDir : (IsSet(_DefaultConfigDir) ? _DefaultConfigDir : "")
 	if (Dir == "")
 		return
-	CfgPath := Dir . "autohotkey\config.toml"
+	global _AhkSubDir
+	CfgPath := Dir . _AhkSubDir . "config.toml"
 	if !FileExist(CfgPath) {
 		try LoggerDebug("onboarding", "No existing config at '{1}' — wizard keeps defaults.", CfgPath)
 		return
@@ -1166,7 +1167,7 @@ _Onboarding_Commit() {
 	; ``ConfigurationFile`` so the TOML_BatchWrite below lands in the
 	; right spot, not the stale default. An empty ``_ob_config_dir``
 	; means "keep the default" — paths.toml is left untouched.
-	global _ob_config_dir, _ConfigDir, _DefaultConfigDir, _PathsFile, ConfigurationFile
+	global _ob_config_dir, _ConfigDir, _DefaultConfigDir, _PathsFile, ConfigurationFile, _AhkSubDir
 	if (IsSet(_ob_config_dir) and _ob_config_dir != "") {
 		newDir := _ob_config_dir
 		if !RegExMatch(newDir, "\\$")
@@ -1175,8 +1176,8 @@ _Onboarding_Commit() {
 			try DirCreate(newDir)
 			_WritePathsToml(newDir)
 			_ConfigDir := newDir
-			ConfigurationFile := newDir . "autohotkey\config.toml"
-			try DirCreate(newDir . "autohotkey")
+			ConfigurationFile := newDir . _AhkSubDir . "config.toml"
+			try DirCreate(newDir . _AhkSubDir)
 		}
 	}
 
