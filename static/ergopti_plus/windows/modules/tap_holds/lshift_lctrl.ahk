@@ -65,20 +65,33 @@ _LShiftDispatch() {
 ; ~ must NOT be used on SC01D — AltGr = LCtrl+RAlt in AHK; ~ would latch LCtrl
 ; on every AltGr press. $ suppresses keyboard-hook re-entry.
 ;
-; Tap-only variant: fire the action immediately on key-down, no KeyWait needed.
-; CapsLock and LAlt guards prevent spurious fires on CapsLock+LCtrl or
-; LAlt+LCtrl combos. No A_PriorKey guard — it is unreliable without ~ because
-; AHK updates A_PriorKey only when the hook sees the key, and mid-combo presses
-; can change it before KeyWait returns.
+; Without ~, LCtrl never reaches the OS — so Ctrl+X combos would be broken if we
+; fire on key-down. Instead: KeyWait with timeout, then check A_PriorKey.
+; - Relâché seul sous le timeout (A_PriorKey == "LControl") → tap action.
+; - Autre touche pressée pendant l'attente (A_PriorKey != "LControl") → combo:
+;   re-send LCtrl+that key so the OS sees the real shortcut.
+; - Timeout expiré sans autre touche → long hold with no action configured, pass
+;   LCtrl through to the OS for any subsequent combo keys.
 #HotIf TapHoldTapAction(TapHold, "left_ctrl") != "" and TapHoldHoldModifier(TapHold, "left_ctrl") == "" and TapHoldHoldLayer(TapHold, "left_ctrl") == "" and not LayerEnabled
 $SC01D::
 {
 	UpdateLastSentCharacter("LControl")
-	if (
-		KS_IsUp("SC03A") ; CapsLock must not be physically held
-		and KS_IsUp("SC038") ; LAlt must not be physically held
-	) {
-		_LCtrlDispatch()
+	tap := KeyWait("SC01D", "T" . TapHoldDuration(TapHold, "left_ctrl"))
+	if tap {
+		; Key released within timeout.
+		if (A_PriorKey == "LControl" and KS_IsUp("SC03A") and KS_IsUp("SC038")) {
+			_LCtrlDispatch()
+		} else {
+			; Another key was pressed during the wait — pass LCtrl through so the
+			; combo reaches the OS (e.g. LCtrl was already released alongside that key).
+			Send("{LCtrl Down}{LCtrl Up}")
+		}
+	} else {
+		; Timeout expired — hold with no configured hold action. Keep LCtrl down
+		; for the OS until the physical key is released, then lift it.
+		Send("{LCtrl Down}")
+		KeyWait("SC01D")
+		Send("{LCtrl Up}")
 	}
 }
 #HotIf
