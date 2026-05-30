@@ -192,7 +192,7 @@ Default level: **10** (all variants active).
 | Retention      | Files older than **14 days** are deleted on the next rotation |
 | Purge strategy | Based on date in filename, not file modification time |
 
-AHK path: `<ConfigDir>/ahk/logs/ErgoptiPlus_YYYY-MM-DD.log`
+AHK path: `<ConfigDir>/autohotkey/logs/ErgoptiPlus_YYYY-MM-DD.log`
 HS  path:  `<ConfigDir>/hammerspoon/logs/ErgoptiPlus_YYYY-MM-DD.log`
 
 ### 6.2 Fan-out sub-files

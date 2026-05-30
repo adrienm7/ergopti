@@ -78,8 +78,8 @@ KLPF_PrefetchPath(which) {
 KLPF_BuildAndWrite(which, metrics_dir, dbg := "", mode := "full") {
     if (dbg = "") {
         global _ConfigDir
-        try DirCreate(_ConfigDir . "ahk\logs")
-        dbg := _ConfigDir . "ahk\logs\prefetch_debug.log"
+        try DirCreate(_ConfigDir . "autohotkey\logs")
+        dbg := _ConfigDir . "autohotkey\logs\prefetch_debug.log"
     }
     KLPF_DbgWrite(dbg, "=== " . A_Now . " — which=" . which . " mode=" . mode)
     t0 := A_TickCount

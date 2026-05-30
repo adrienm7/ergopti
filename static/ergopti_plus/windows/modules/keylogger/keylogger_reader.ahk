@@ -112,7 +112,7 @@ KLR_BuildDatabase(metrics_dir) {
     if !RegExMatch(md, "[\\/]$")
         md .= "\"
     global _ConfigDir
-    logPath := _ConfigDir . "ahk\logs\prefetch.log"
+    logPath := _ConfigDir . "autohotkey\logs\prefetch.log"
     try FileAppend("[" . A_Now . "] KLR PtrSize=" . A_PtrSize . " DLL=" . SQLiteConst.DLL . "`r`n", logPath, "UTF-8")
     try FileAppend("[" . A_Now . "] KLR DLL exists=" . (FileExist(SQLiteConst.DLL) ? "yes" : "NO!") . "`r`n", logPath,
     "UTF-8")

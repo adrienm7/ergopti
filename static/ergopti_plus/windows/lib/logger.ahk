@@ -137,7 +137,7 @@ LoggerInit() {
     ; Daily-rotating log file under <ConfigDir>/ahk/logs/. Resolves _ConfigDir
     ; at call time so any later override (paths.toml) is picked up
     LogDir := (IsSet(_ConfigDir) and _ConfigDir != "")
-        ? _ConfigDir . "ahk\logs\"
+        ? _ConfigDir . "autohotkey\logs\"
         : A_ScriptDir . "\logs\"
     if !DirExist(LogDir) {
         try DirCreate(LogDir)
@@ -434,13 +434,13 @@ _LoggerFanOut(Tag, Line) {
 }
 
 ; Parses _shared/logger/sub_files.toml and populates LOGGER_SUB_FILES with the
-; entries whose platforms array includes "ahk". Falls back to LOGGER_SUB_FILES_FALLBACK
+; entries whose platforms array includes "autohotkey". Falls back to LOGGER_SUB_FILES_FALLBACK
 ; when the file is absent or unreadable so the driver stays functional in stripped builds.
 ;
 ; The parser handles the fixed schema:
 ;   [[sub_files]]
 ;   name     = "gestures"
-;   platforms = ["ahk", "hs"]
+;   platforms = ["autohotkey", "hs"]
 ;   patterns = ["[gestures", "gesture"]
 ;
 ; Unknown keys (description) are silently skipped. Arrays may span multiple lines.
@@ -482,10 +482,10 @@ _LoggerLoadSubFilesToml(ScriptDir) {
         if CurrentEntry = "" {
             return
         }
-        ; Only include entries that list "ahk" in their platforms array
+        ; Only include entries that list "autohotkey" in their platforms array
         IsAhk := false
         for P in CurrentPlatforms {
-            if (P = "ahk") {
+            if (P = "autohotkey") {
                 IsAhk := true
                 break
             }

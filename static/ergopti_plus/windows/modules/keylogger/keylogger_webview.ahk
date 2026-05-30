@@ -118,8 +118,8 @@ KLWV_LocalesUrl() {
 
 KLWV_Open(which, metrics_dir) {
     global _ConfigDir
-    log := _ConfigDir . "ahk\logs\webview.log"
-    try DirCreate(_ConfigDir . "ahk\logs")
+    log := _ConfigDir . "autohotkey\logs\webview.log"
+    try DirCreate(_ConfigDir . "autohotkey\logs")
     try FileAppend("[" . A_Now . "] KLWV_Open(" . which . ") begin`r`n", log, "UTF-8")
 
     if !KLWV_IsAvailable() {
@@ -322,7 +322,7 @@ KLWV_OnGuiClose(which, *) {
 ; JSON command of the form {"action":"...", ...}.
 KLWV_OnWebMessage(which, sender, args) {
     global _ConfigDir
-    log := _ConfigDir . "ahk\logs\webview.log"
+    log := _ConfigDir . "autohotkey\logs\webview.log"
     msg := ""
     try msg := args.TryGetWebMessageAsString()
     try FileAppend("[" . A_Now . "] OnWebMessage(" . which . "): " . SubStr(msg, 1, 100) . "`r`n", log, "UTF-8")
@@ -363,7 +363,7 @@ KLWV_OnWebMessage(which, sender, args) {
 ; process_manifest just like the initial fetch.
 KLWV_PushPrefetch(which) {
     global _ConfigDir
-    log := _ConfigDir . "ahk\logs\webview.log"
+    log := _ConfigDir . "autohotkey\logs\webview.log"
     if !KLWV.windows.Has(which) {
         try FileAppend("[" . A_Now . "] PushPrefetch(" . which . "): no window`r`n", log, "UTF-8")
         return
@@ -403,7 +403,7 @@ KLWV_PushPrefetch(which) {
 ; populate all data-i18n attributes immediately.
 KLWV_InjectI18n(which) {
     global _SharedDir, _ConfigDir
-    log := _ConfigDir . "ahk\logs\webview.log"
+    log := _ConfigDir . "autohotkey\logs\webview.log"
     try FileAppend("[" . A_Now . "] InjectI18n(" . which . "): called, has_window=" . (KLWV.windows.Has(which) ? "1" : "0") . "`r`n", log, "UTF-8")
     if !KLWV.windows.Has(which)
         return
@@ -441,7 +441,7 @@ KLWV_MonitorFromPoint(x, y) {
 
 KLWV_DelayedFirstPush(which) {
     global _ConfigDir
-    log := _ConfigDir . "ahk\logs\webview.log"
+    log := _ConfigDir . "autohotkey\logs\webview.log"
     try FileAppend("[" . A_Now . "] DelayedFirstPush(" . which . "): fired, has_window=" . (KLWV.windows.Has(which) ? "1" : "0") . "`r`n", log, "UTF-8")
     if !KLWV.windows.Has(which)
         return
@@ -488,7 +488,7 @@ KLWV_DelayedFullBuild(which) {
 ;                paint to seed the cached historical block.
 KLWV_NotifyIngest(mode := "live") {
     global _ConfigDir
-    log := _ConfigDir . "ahk\logs\webview.log"
+    log := _ConfigDir . "autohotkey\logs\webview.log"
     if !KLWV.metrics_dir {
         return
     }

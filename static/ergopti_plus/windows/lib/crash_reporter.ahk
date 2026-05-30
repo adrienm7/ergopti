@@ -19,9 +19,9 @@
 ;    system (OS, CPU, RAM, DPI, adapter status, session counters) PLUS the full
 ;    in-memory log ring buffer (up to 200 lines) so a single report is almost
 ;    always enough to reproduce and fix the crash.
-; 4. Driver-scoped directory: reports live under <config_dir>/ahk/crash_reports/
-;    so they are co-located with the AHK logs and config, not mixed with any
-;    Hammerspoon reports at the config root.
+; 4. Driver-scoped directory: reports live under <config_dir>/autohotkey/crash_reports/
+;    so they are co-located with the AHK logs and config under the autohotkey/
+;    subfolder, separate from any Hammerspoon reports.
 ; 5. Structured output: reports are written as JSON for easy machine and human
 ;    readability, one file per incident.
 ; ==============================================================================
@@ -37,9 +37,10 @@
 ; ============================
 ; ============================
 
-; Subdirectory under <config_dir>/ahk/ that receives all crash report files.
-; Mirrors the log directory layout so reports and logs sit side-by-side.
-global _CrashReporter_Subdir := "ahk\crash_reports"
+; Subdirectory under the config dir that receives all AHK crash report files.
+; Nested under autohotkey/ to mirror the driver folder layout and stay separate
+; from any Hammerspoon reports under hammerspoon/.
+global _CrashReporter_Subdir := "autohotkey\crash_reports"
 
 ; Modifier keys to inspect for stuck state at crash time.
 global _CrashReporter_Modifiers := [

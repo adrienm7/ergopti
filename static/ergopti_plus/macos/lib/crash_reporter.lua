@@ -41,8 +41,9 @@ local LOG = "crash_reporter"
 -- ===========================
 
 -- Subdirectory under the user config dir that receives all Hammerspoon crash
--- report files. Co-located with Hammerspoon logs, separate from AHK reports.
-local CRASH_REPORTS_SUBDIR = "crash_reports"
+-- report files. Nested under hammerspoon/ to mirror the driver folder layout
+-- and stay separate from AHK reports.
+local CRASH_REPORTS_SUBDIR = "hammerspoon/crash_reports"
 
 -- File encoding for JSON output.
 local JSON_FILE_FLAGS = "w"
@@ -89,84 +90,6 @@ local function _driver_version()
 		return info.version
 	end
 	return "unknown"
-end
-
---- Returns a human-readable OS version string.
---- @return string OS version or "unknown".
-local function _os_version()
-	local ok, ver = pcall(function()
-		return hs.host.operatingSystemVersionString()
-	end)
-	if ok and type(ver) == "string" and ver ~= "" then
-		return ver
-	end
-	return "unknown"
-end
-
---- Collects a full system snapshot (mirrors healthcheck _sys_info).
---- @return table Flat key/value table.
-local function _sys_info()
-	local info = {}
-
-	-- Hammerspoon version
-	info.hs_version = "unknown"
-	if hs and hs.processInfo and type(hs.processInfo) == "table" then
-		local v = hs.processInfo.version
-		if type(v) == "string" and v ~= "" then info.hs_version = v end
-	end
-
-	-- macOS version
-	info.os_version = _os_version()
-
-	-- Screen resolution
-	info.screen_res = "unknown"
-	local ok_scr, scr = pcall(function() return hs.screen.mainScreen() end)
-	if ok_scr and scr and type(scr.currentMode) == "function" then
-		local ok_m, m = pcall(function() return scr:currentMode() end)
-		if ok_m and m and m.w and m.h then
-			info.screen_res = m.w .. "×" .. m.h
-		end
-	end
-
-	-- Locale
-	info.locale = "unknown"
-	local ok_host, hs_host = pcall(require, "hs.host")
-	if ok_host and hs_host and type(hs_host.locale) == "function" then
-		local ok_l, l = pcall(hs_host.locale)
-		if ok_l and type(l) == "string" then info.locale = l end
-	end
-
-	-- Config directory
-	info.config_dir = ""
-	if hs and type(hs.configdir) == "string" then
-		info.config_dir = hs.configdir
-	end
-
-	-- Short git commit hash
-	info.git_hash = "unknown"
-	if hs and type(hs.configdir) == "string" then
-		local ok_git, out = pcall(hs.execute,
-			"git -C " .. hs.configdir .. " rev-parse --short HEAD 2>/dev/null")
-		if ok_git and type(out) == "string" and out ~= "" then
-			info.git_hash = out:match("^%s*(.-)%s*$")
-		end
-	end
-
-	-- Active application (focused window context)
-	info.active_app   = "unknown"
-	info.active_title = "unknown"
-	local ok_fw, fw = pcall(function() return hs.application.frontmostApplication() end)
-	if ok_fw and fw then
-		local ok_name, name = pcall(function() return fw:name() end)
-		if ok_name and type(name) == "string" then info.active_app = name end
-		local ok_win, win = pcall(function() return fw:focusedWindow() end)
-		if ok_win and win then
-			local ok_t, title = pcall(function() return win:title() end)
-			if ok_t and type(title) == "string" then info.active_title = title end
-		end
-	end
-
-	return info
 end
 
 --- Serialises a report table to a compact JSON string.
@@ -235,22 +158,26 @@ function M.report(err, context)
 		driver = context.driver
 	end
 
-	local sys       = _sys_info()
 	local timestamp = os.date("!%Y-%m-%dT%H:%M:%SZ")
 
-	-- Uptime since module load (best-effort)
-	local uptime_sec = 0
-	local ok_hc, hc = pcall(require, "lib.healthcheck")
-	local adapters_ok     = ""
+	-- Run the healthcheck once to collect system info, adapter status, session
+	-- counters, and uptime — reusing the existing collection logic in healthcheck
+	-- avoids duplicating hs.* OS calls in this module (which would raise the
+	-- port-adapter purity baseline).
+	local sys            = {}
+	local uptime_sec     = 0
+	local adapters_ok    = ""
 	local adapters_failed = ""
 	local session_warnings = "0"
 	local session_errors   = "0"
+	local ok_hc, hc = pcall(require, "lib.healthcheck")
 	if ok_hc and hc and type(hc.run) == "function" then
 		local ok_run, snap = pcall(hc.run)
 		if ok_run and type(snap) == "table" then
-			uptime_sec      = snap.uptime_sec or 0
-			adapters_ok     = table.concat(snap.ports_validated or {}, ", ")
-			adapters_failed = table.concat(snap.failed_adapters or {}, ", ")
+			sys              = snap.sys or {}
+			uptime_sec       = snap.uptime_sec or 0
+			adapters_ok      = table.concat(snap.ports_validated or {}, ", ")
+			adapters_failed  = table.concat(snap.failed_adapters or {}, ", ")
 			session_warnings = tostring(snap.warn_count or 0)
 			session_errors   = tostring(snap.err_count  or 0)
 		end
@@ -272,16 +199,13 @@ function M.report(err, context)
 		-- Error details
 		error_msg   = error_msg,
 		stack_trace = stack_trace,
-		-- System environment
-		os_version  = sys.os_version,
-		hs_version  = sys.hs_version,
-		screen_res  = sys.screen_res,
-		locale      = sys.locale,
-		config_dir  = sys.config_dir,
-		git_hash    = sys.git_hash,
-		-- Active window context
-		active_app   = sys.active_app,
-		active_title = sys.active_title,
+		-- System environment (from healthcheck.run().sys)
+		os_version  = sys.os_version  or "unknown",
+		hs_version  = sys.hs_version  or "unknown",
+		screen_res  = sys.screen_res  or "unknown",
+		locale      = sys.locale      or "unknown",
+		config_dir  = sys.config_dir  or "",
+		git_hash    = sys.git_hash    or "unknown",
 		-- Runtime context
 		uptime_sec   = tostring(uptime_sec),
 		-- Adapter / session health

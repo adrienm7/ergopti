@@ -1177,7 +1177,7 @@ _TH_NoneHoldOpt() {
 ; tap_hold.toml (the loader will fall back to defaults.toml on next reload).
 _TH_ResetAllToDefaults(*) {
 	global _ConfigDir
-	Path := _ConfigDir . "ahk\tap_hold.toml"
+	Path := _ConfigDir . "autohotkey\tap_hold.toml"
 	try {
 		if FileExist(Path) {
 			FileDelete(Path)
@@ -2037,7 +2037,7 @@ OpenPersonalShortcuts(*) {
 ; Creates it on first use so the user never sees an "introuvable" dialog
 OpenLogsFolder(*) {
 	LogDir := (IsSet(_ConfigDir) and _ConfigDir != "")
-		? _ConfigDir . "ahk\logs\"
+		? _ConfigDir . "autohotkey\logs\"
 		: A_ScriptDir . "\logs\"
 	if !DirExist(LogDir) {
 		try DirCreate(LogDir)
@@ -2056,7 +2056,7 @@ OpenTodayLog(*) {
 		; Fall back to the day-stamped path under <ConfigDir>/ahk/logs/ even if the
 		; logger hasn't initialised yet (very early boot, edge case)
 		LogDir := (IsSet(_ConfigDir) and _ConfigDir != "")
-			? _ConfigDir . "ahk\logs\"
+			? _ConfigDir . "autohotkey\logs\"
 			: A_ScriptDir . "\logs\"
 		Path := LogDir . "ErgoptiPlus_" . FormatTime(, "yyyy-MM-dd") . ".log"
 	}
