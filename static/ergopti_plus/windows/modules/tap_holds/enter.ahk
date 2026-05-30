@@ -47,23 +47,18 @@ _EnterHoldModKey() {
 ; ======= 9.1) Hold-modifier variant =======
 
 #HotIf TapHoldHoldModifier(TapHold, "enter") != "" and not LayerEnabled
-$SC01C:: {
-	tap := KeyWait("SC01C", "T" . TapHoldDuration(TapHold, "enter"))
+*$SC01C:: {
+	tap := KeyWait("Enter", "T" . TapHoldDuration(TapHold, "enter"))
 	if tap {
 		; Short press — tap action.
 		if (A_PriorKey == "Enter")
 			_EnterDispatch()
 		return
 	}
-	; Long press — arm modifier, capture next keystroke, release on key-up.
+	; Long press — arm modifier, stay armed until key-up.
 	ModKey := _EnterHoldModKey()
 	TextPressKey(ModKey, "Down")
-	ih := InputHook("L1 T3")
-	ih.Start()
-	ih.Wait()
-	if (ih.Input != "" and ih.Input != "`r")
-		SendInput("{" . ModKey . " down}" . ih.Input . "{" . ModKey . " up}")
-	KeyWait("SC01C", "U T2")
+	KeyWait("Enter", "U")
 	TextPressKey(ModKey, "Up")
 }
 #HotIf
@@ -74,8 +69,8 @@ $SC01C:: {
 ; ======= 9.2) Hold-layer variant =======
 
 #HotIf TapHoldHoldLayer(TapHold, "enter") != "" and TapHoldHoldModifier(TapHold, "enter") == "" and not LayerEnabled
-$SC01C:: {
-	tap := KeyWait("SC01C", "T" . TapHoldDuration(TapHold, "enter"))
+*$SC01C:: {
+	tap := KeyWait("Enter", "T" . TapHoldDuration(TapHold, "enter"))
 	if tap {
 		if (A_PriorKey == "Enter")
 			_EnterDispatch()
@@ -83,7 +78,7 @@ $SC01C:: {
 	}
 	; Long press — activate layer until key-up.
 	ActivateLayer()
-	KeyWait("SC01C", "U")
+	KeyWait("Enter", "U")
 	DisableLayer()
 }
 #HotIf
