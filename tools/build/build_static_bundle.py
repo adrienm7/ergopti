@@ -54,7 +54,18 @@ ASSET_TREES: list[tuple[str, str, tuple[str, ...]]] = [
 	),
 	# Windows-driver data files (tap_hold defaults, generated config template).
 	# Read via _DriverDir = _StaticDir + "\ergopti_plus\windows".
-	("static/ergopti_plus/windows/_generated", "static/ergopti_plus/windows/_generated", ()),
+	# personal_shortcuts.ahk is a machine-specific forwarding stub written at
+	# runtime by EnsurePersonalShortcutsFile() into %LOCALAPPDATA%\Ergopti\_generated\.
+	# Bundling the dev-tree copy would embed a hardcoded absolute path valid only
+	# on the developer's machine; every other install would boot with a stale
+	# #Include pointing at a non-existent path. The stub is never read from the
+	# extracted bundle (ErgoptiPlus.ahk loads it from %LOCALAPPDATA% via line 895),
+	# so excluding it here is safe. paths.toml is similarly machine-specific.
+	(
+		"static/ergopti_plus/windows/_generated",
+		"static/ergopti_plus/windows/_generated",
+		("personal_shortcuts.ahk", "paths.toml"),
+	),
 	("static/ergopti_plus/windows/data",       "static/ergopti_plus/windows/data",       ()),
 	# Extensions tree: read-only enumeration by the tray menu via _StaticDir + "\extensions\".
 	("static/extensions",                      "static/extensions",                      (".git*",)),
