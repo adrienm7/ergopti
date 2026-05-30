@@ -38,7 +38,7 @@ _EscapeHoldModKey() {
 ; ======= 11.1) Hold-modifier variant =======
 
 #HotIf TapHoldHoldModifier(TapHold, "escape") != "" and not LayerEnabled
-~$SC001:: {
+$SC001:: {
 	ModKey := _EscapeHoldModKey()
 	TextPressKey(ModKey, "Down")
 	TimeBefore := A_TickCount
@@ -62,7 +62,7 @@ _EscapeHoldModKey() {
 ; ======= 11.2) Hold-layer variant =======
 
 #HotIf TapHoldHoldLayer(TapHold, "escape") != "" and TapHoldHoldModifier(TapHold, "escape") == "" and not LayerEnabled
-~$SC001:: {
+$SC001:: {
 	UpdateLastSentCharacter("Escape")
 
 	ActivateLayer()
@@ -87,10 +87,11 @@ _EscapeHoldModKey() {
 
 ; ======= 11.3) Tap-only (tap action set to something other than escape) =======
 
-; ~ passes Escape to the OS; $ prevents re-entry. Fire immediately on key-down —
-; no KeyWait or A_PriorKey guard needed since there is no hold behaviour.
+; $ prevents re-entry. Fire immediately on key-down — no KeyWait or A_PriorKey
+; guard needed since there is no hold behaviour. No ~ needed: the action replaces
+; the native key entirely; ~ would send both Escape and the action.
 #HotIf TapHoldTapAction(TapHold, "escape") != "" and TapHoldTapAction(TapHold, "escape") != "escape" and TapHoldHoldModifier(TapHold, "escape") == "" and TapHoldHoldLayer(TapHold, "escape") == "" and not LayerEnabled
-~$SC001:: _EscapeDispatch()
+$SC001:: _EscapeDispatch()
 #HotIf
 
 

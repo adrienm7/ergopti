@@ -42,7 +42,7 @@ _BackspaceHoldModKey() {
 ; ======= 10.1) Hold-modifier variant =======
 
 #HotIf TapHoldHoldModifier(TapHold, "backspace") != "" and not LayerEnabled
-~$SC00E:: {
+$SC00E:: {
 	ModKey := _BackspaceHoldModKey()
 	TextPressKey(ModKey, "Down")
 	TimeBefore := A_TickCount
@@ -66,7 +66,7 @@ _BackspaceHoldModKey() {
 ; ======= 10.2) Hold-layer variant =======
 
 #HotIf TapHoldHoldLayer(TapHold, "backspace") != "" and TapHoldHoldModifier(TapHold, "backspace") == "" and not LayerEnabled
-~$SC00E:: {
+$SC00E:: {
 	UpdateLastSentCharacter("BackSpace")
 
 	ActivateLayer()
@@ -91,10 +91,11 @@ _BackspaceHoldModKey() {
 
 ; ======= 10.3) Tap-only (tap action set to something other than backspace) =======
 
-; ~ passes BackSpace to the OS; $ prevents re-entry. Fire immediately on key-down —
-; no KeyWait or A_PriorKey guard needed since there is no hold behaviour.
+; $ prevents re-entry. Fire immediately on key-down — no KeyWait or A_PriorKey
+; guard needed since there is no hold behaviour. No ~ needed: the action replaces
+; the native key entirely; ~ would send both BackSpace and the action.
 #HotIf TapHoldTapAction(TapHold, "backspace") != "" and TapHoldTapAction(TapHold, "backspace") != "backspace" and TapHoldHoldModifier(TapHold, "backspace") == "" and TapHoldHoldLayer(TapHold, "backspace") == "" and not LayerEnabled
-~$SC00E:: _BackspaceDispatch()
+$SC00E:: _BackspaceDispatch()
 #HotIf
 
 
