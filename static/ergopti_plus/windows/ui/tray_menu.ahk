@@ -1795,6 +1795,12 @@ initMenu() {
 	}
 
 	; ── IA / LLM — sits right after Hotstrings, mirroring the Hammerspoon menu order ──
+	; Reset _LLM_Tray_InTray before calling LLM_Tray_Init so the entry is always
+	; placed at the correct tray position by LLM_Tray_Build() below, even if a
+	; background health-probe timer fired LLM_Tray_Build() during boot before
+	; initMenu() ran and set the flag prematurely.
+	global _LLM_Tray_InTray
+	_LLM_Tray_InTray := false
 	; Build the LLM_Tray_Init payload by reading the v2 nested LLM map
 	; (hydrated by ApplyConfigToml directly from the [llm.*] sections
 	; of the user's config.toml). LLM_Tray_Init still expects a flat
