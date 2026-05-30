@@ -1,5 +1,4 @@
-﻿{
-	"_meta.flag": "🇯🇵",
+﻿	"_meta.flag": "🇯🇵",
 	"_meta.locale": "ja",
 	"_meta.name": "日本語",
 	"app_category.business": "ビジネス",
@@ -1423,8 +1422,11 @@
 	"tap_hold.action.disable": "なし（無効）",
 		"tap_hold.disable_all": "すべて無効にする",
 	"tap_hold.group.alt_gr": "AltGr",
+		"tap_hold.group.backspace": "バックスペース",
 	"tap_hold.group.caps_lock": "CapsLock",
 	"tap_hold.group.delete": "Delete",
+		"tap_hold.group.enter": "エンター",
+		"tap_hold.group.escape": "エスケープ",
 	"tap_hold.group.left_alt": "LAlt",
 	"tap_hold.group.left_ctrl": "LCtrl",
 	"tap_hold.group.left_shift": "LShift",

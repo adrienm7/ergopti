@@ -33,4 +33,9 @@
 #Include tap_holds/altgr.ahk
 #Include tap_holds/rctrl.ahk
 #Include tap_holds/tab.ahk
+#Include tap_holds/enter.ahk
+#Include tap_holds/backspace.ahk
+#Include tap_holds/escape.ahk
+#Include tap_holds/delete.ahk
+#Include tap_holds/win.ahk
 #Include tap_holds/nav_layer.ahk

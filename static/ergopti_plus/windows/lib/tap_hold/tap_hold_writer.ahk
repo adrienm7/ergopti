@@ -32,12 +32,15 @@
 ; Ordered list of physical keys exposed in the tap-hold tray submenu.
 ; Each entry: Map("id" => v2_key_id, "i18n" => group_i18n_key).
 global _TH_KeyDefs := [
+	Map("id", "escape",      "i18n", "tap_hold.group.escape"),
 	Map("id", "tab",         "i18n", "tap_hold.group.tab"),
 	Map("id", "caps_lock",   "i18n", "tap_hold.group.caps_lock"),
 	Map("id", "left_shift",  "i18n", "tap_hold.group.left_shift"),
 	Map("id", "left_ctrl",   "i18n", "tap_hold.group.left_ctrl"),
 	Map("id", "left_alt",    "i18n", "tap_hold.group.left_alt"),
 	Map("id", "space",       "i18n", "tap_hold.group.space"),
+	Map("id", "enter",       "i18n", "tap_hold.group.enter"),
+	Map("id", "backspace",   "i18n", "tap_hold.group.backspace"),
 	Map("id", "alt_gr",      "i18n", "tap_hold.group.alt_gr"),
 	Map("id", "right_ctrl",  "i18n", "tap_hold.group.right_ctrl"),
 	Map("id", "delete",      "i18n", "tap_hold.group.delete"),

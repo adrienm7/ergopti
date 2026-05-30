@@ -1,5 +1,4 @@
-﻿{
-	"_meta.flag": "🇫🇷",
+﻿	"_meta.flag": "🇫🇷",
 	"_meta.locale": "fr",
 	"_meta.name": "Français",
 	"app_category.business": "Affaires",
@@ -1424,8 +1423,11 @@
 	"tap_hold.reset_defaults": "Réinitialiser les valeurs par défaut",
 	"tap_hold.disable_all": "Tout désactiver",
 	"tap_hold.group.alt_gr": "AltGr",
+		"tap_hold.group.backspace": "Ret. arrière",
 	"tap_hold.group.caps_lock": "CapsLock",
 	"tap_hold.group.delete": "Suppr.",
+		"tap_hold.group.enter": "Entrée",
+		"tap_hold.group.escape": "Échap",
 	"tap_hold.group.left_alt": "LAlt",
 	"tap_hold.group.left_ctrl": "LCtrl",
 	"tap_hold.group.left_shift": "LShift",

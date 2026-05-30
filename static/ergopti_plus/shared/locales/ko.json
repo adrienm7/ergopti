@@ -1,5 +1,4 @@
-﻿{
-	"_meta.flag": "🇰🇷",
+﻿	"_meta.flag": "🇰🇷",
 	"_meta.locale": "ko",
 	"_meta.name": "한국어",
 	"app_category.business": "비즈니스",
@@ -1423,8 +1422,11 @@
 	"tap_hold.action.disable": "없음 (비활성화)",
 		"tap_hold.disable_all": "모두 비활성화",
 	"tap_hold.group.alt_gr": "AltGr",
+		"tap_hold.group.backspace": "백스페이스",
 	"tap_hold.group.caps_lock": "CapsLock",
 	"tap_hold.group.delete": "Delete",
+		"tap_hold.group.enter": "엔터",
+		"tap_hold.group.escape": "이스케이프",
 	"tap_hold.group.left_alt": "LAlt",
 	"tap_hold.group.left_ctrl": "LCtrl",
 	"tap_hold.group.left_shift": "LShift",
