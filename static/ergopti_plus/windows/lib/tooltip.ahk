@@ -36,15 +36,36 @@ global _TooltipRowGuis := []
 global _TooltipGeneration := 0
 global _TooltipTimerGeneration := 0
 
-; Stable function reference used as the auto-hide timer. A single named
-; function (not a fresh closure per call) is mandatory so SetTimer can
-; cancel it by identity — each closure literal produces a distinct object
-; that SetTimer treats as a different timer, making cancellation impossible.
+; Dequeue state — items that have per-row expiry deadlines. When any item
+; has a non-zero DurationSec, TooltipShow stores the full item list here
+; with absolute expiry timestamps (A_TickCount + duration_ms). The dequeue
+; timer fires at the next expiry, removes items whose deadline has passed,
+; and re-renders the remaining stack. This gives each row its own lifetime
+; so a short row disappears first and longer rows stay visible.
+; Shape: Array of { ..item fields.., ExpireMs: integer }
+; 0 when no dequeue cycle is active (all items have DurationSec = 0).
+global _TooltipDequeueItems := 0
+
+; When true, TooltipHide() calls from external sources (prefix watcher resets,
+; lookup misses, renderer) are silently ignored — the dequeue poll timer owns
+; the tooltip lifecycle and will hide it at the right time. Only the poll timer
+; and the safety timer (via _TooltipTimerFn) are authorised to call
+; TooltipHide() during an active dequeue cycle.
+global _TooltipDequeueActive := false
+
+; Last items passed to TooltipShow, kept so that after a hotstring fires the
+; timer can be re-armed for the full duration from the moment of fire rather
+; than counting down from when the preview was first shown.
+global _TooltipLastItems := 0
+
+; Stable function references. A single named function per timer is mandatory
+; so SetTimer can cancel it by identity — each closure literal produces a
+; distinct object that SetTimer treats as a different timer.
 _TooltipTimerFn() {
     global _TooltipGeneration, _TooltipTimerGeneration
     if (_TooltipTimerGeneration != _TooltipGeneration)
         return
-    TooltipHide()
+    TooltipHide("TimerFn", true)
     ; The timer fires when the user has not typed anything new since the
     ; tooltip appeared — they have effectively abandoned the current word.
     ; Reset the prefix buffer so the next keystroke starts a fresh lookup
@@ -52,6 +73,61 @@ _TooltipTimerFn() {
     ; subsequent tooltip from showing for that trigger).
     if IsSet(_ResetPrefixBuffer)
         try _ResetPrefixBuffer()
+}
+
+; Dequeue poll timer — runs every 100 ms while a dequeue cycle is active.
+; Polling avoids the AHK v2 issue where one-shot timers armed from an
+; InputHook OnChar thread never fire: the repeating timer is registered
+; from the main script body at startup and always runs in the main thread.
+_TooltipDequeuePollFn() {
+    global _TooltipDequeueItems, _TooltipGeneration, _TooltipTimerGeneration
+    static _PollCount := 0
+    _PollCount += 1
+    if (_TooltipDequeueItems == 0 or !IsObject(_TooltipDequeueItems))
+        return
+    if (_TooltipTimerGeneration != _TooltipGeneration)
+        return
+    Now := A_TickCount
+    ; Check if the earliest deadline has passed.
+    NeedDequeue := false
+    for , Item in _TooltipDequeueItems {
+        if (Item.ExpireMs > 0 and Now >= Item.ExpireMs) {
+            NeedDequeue := true
+            break
+        }
+    }
+    if !NeedDequeue
+        return
+    Remaining := []
+    for , Item in _TooltipDequeueItems {
+        if (Item.ExpireMs == 0 or Now < Item.ExpireMs)
+            Remaining.Push(Item)
+    }
+    if (Remaining.Length == 0) {
+        TooltipHide("PollEmpty", true)
+        if IsSet(_ResetPrefixBuffer)
+            try _ResetPrefixBuffer()
+        return
+    }
+    ; Rebuild without the expired rows. Preserve ExpireMs so the poll
+    ; timer continues tracking the remaining deadlines correctly.
+    RebuildItems := []
+    for , Item in Remaining {
+        Copy := {}
+        for k, v in Item.OwnProps()
+            Copy.%k% := v
+        Copy.DurationSec := 0
+        RebuildItems.Push(Copy)
+    }
+    _TooltipDequeueItems := Remaining
+    TooltipShow(RebuildItems, 0)
+}
+
+; TooltipDequeueInit() must be called once at script startup (from ErgoptiPlus.ahk)
+; to arm the poll timer. Code at file scope in #Include'd files does not execute
+; in AHK v2 when the include appears after the auto-execute section has ended.
+TooltipDequeueInit() {
+    SetTimer(_TooltipDequeuePollFn, 100)
 }
 
 ; Style constants — sourced from lib/ui_style.ahk (included before this file
@@ -131,13 +207,6 @@ global _TOOLTIP_SAFETY_SEC := 3.0
 ; The shortest DurationSec across all items drives the auto-hide timer
 ; (0 / omitted means "stay until TooltipHide()").
 TooltipShow(Items, DurationSec := 0) {
-    ; Block other threads (input hook callbacks, timers) from preempting
-    ; this routine. Without Critical, a keystroke or timer firing
-    ; mid-build could enter a nested TooltipShow that destroys the very
-    ; Gui this call is about to display — the outer call would then
-    ; operate on stale Gui references and either crash or leak a window.
-    ; Critical is per-thread and auto-clears when the thread ends.
-    Critical
 
     ; Normalise to an Array of { Text, ColorHex } objects.
     if !IsObject(Items) {
@@ -151,7 +220,9 @@ TooltipShow(Items, DurationSec := 0) {
     global _TooltipGeneration, _TooltipTimerGeneration
     global _TooltipShownHwnds, _TOOLTIP_HWND_TRACK_CAP
     global _TOOLTIP_TIMEOUT_DECREMENT_SEC, _TOOLTIP_TIMEOUT_FLOOR_SEC, _TOOLTIP_SAFETY_SEC
+    global _TooltipDequeueItems, _TooltipDequeueActive, _TooltipLastItems
     _TooltipGeneration += 1
+    _TooltipLastItems := Items
 
     ; Cancel any pending auto-hide timer BEFORE rebuilding the Gui.
     ; _TooltipTimerFn is a stable named function — SetTimer identifies timers
@@ -162,12 +233,12 @@ TooltipShow(Items, DurationSec := 0) {
     try {
         _TooltipBuildGui(Items)
     } catch {
-        TooltipHide()
+        TooltipHide("BuildFail", true)
         return
     }
 
     if (_TooltipRowGuis.Length == 0) {
-        TooltipHide()
+        TooltipHide("NoRows", true)
         return
     }
 
@@ -178,48 +249,121 @@ TooltipShow(Items, DurationSec := 0) {
     ; the timer correctly and the ghost cannot outlive the safety deadline.
     _TooltipTimerGeneration := _TooltipGeneration
     try {
-        _TooltipDisableDwmRounding(Row.Gui.Hwnd)
         Row.Gui.Show(Format("w{1} h{2} x{3} y{4} NoActivate", Row.W, Row.H, Pos.X, Pos.Y))
+        ; Disable DWM rounded corners AFTER Show — .Hwnd is only valid once the
+        ; window has been shown for the first time; calling it before raises
+        ; "Gui has no window" and crashes the entire show path.
+        _TooltipDisableDwmRounding(Row.Gui.Hwnd)
         ; Track the Hwnd RIGHT AFTER Show — from this point on, the window
         ; exists on screen and must be tracked so TooltipHide's defensive
-        ; sweep can clean it up even if subsequent code fails. The cap
-        ; prevents the array from growing unbounded across a long typing
-        ; session; when we evict, we also issue a final DestroyWindow on
-        ; the dropped Hwnd in case its Gui.Destroy silently failed.
+        ; sweep can clean it up even if subsequent code fails.
         if (_TooltipShownHwnds.Length >= _TOOLTIP_HWND_TRACK_CAP) {
             DroppedHwnd := _TooltipShownHwnds.RemoveAt(1)
             GR_DestroyWindow(DroppedHwnd)
         }
         _TooltipShownHwnds.Push(Row.Gui.Hwnd)
-        ; Arm the safety timer IMMEDIATELY after Show so any subsequent
-        ; failure (corner region, border construction, duration math)
-        ; still has an auto-hide path — the tooltip cannot outlive the
-        ; safety deadline. The actual caller-specified duration overrides
-        ; this timer below if applicable.
+        ; Arm the safety timer IMMEDIATELY so any subsequent failure (corner
+        ; region, border construction, duration math) still has an auto-hide
+        ; path — the tooltip cannot outlive the safety deadline.
         SetTimer(_TooltipTimerFn, -Round(_TOOLTIP_SAFETY_SEC * 1000))
         _TooltipApplyStackedCorners()
+        ; Build border DIB, upload via UpdateLayeredWindow, and show border.
+        ; _TooltipShowBorder now calls GR_Show itself — the DWM pixel-loop
+        ; is pre-computed before GR_Show so both windows appear near-simultaneously.
         _TooltipShowBorder(Pos.X, Pos.Y, Row.W, Row.H)
-    } catch as e {
-        TooltipHide()
+    } catch {
+        TooltipHide("ShowFail", true)
         return
     }
 
-    ; Use the shortest non-zero DurationSec across all items. The safety
-    ; timer set above stays armed unless we replace it with a stricter
-    ; caller-specified deadline below.
-    EffectiveDur := DurationSec
+    ; Collect per-item durations. When items carry distinct non-zero durations,
+    ; we run the dequeue path so each row gets its own lifetime. When all
+    ; durations are identical (or zero), we fall back to the simple single-timer
+    ; path — which is the LLM tooltip case (all slots share one timeout).
+    global _TooltipDequeueItems
+
+    HasAnyDur := false
+    HasMixedDur := false
+    FirstDur := 0
     for , Item in Items {
         D := Item.HasOwnProp("DurationSec") ? Item.DurationSec : 0
-        if (D > 0 and (EffectiveDur == 0 or D < EffectiveDur))
-            EffectiveDur := D
+        if (D > 0) {
+            HasAnyDur := true
+            if (FirstDur == 0)
+                FirstDur := D
+            else if (D != FirstDur)
+                HasMixedDur := true
+        }
     }
-    if (EffectiveDur > 0) {
-        Effective := Max(_TOOLTIP_TIMEOUT_FLOOR_SEC,
-            EffectiveDur - _TOOLTIP_TIMEOUT_DECREMENT_SEC)
-        SetTimer(_TooltipTimerFn, -Round(Effective * 1000))
+    ; When rebuilding from the poll timer the items already carry ExpireMs
+    ; and DurationSec = 0 — detect that via the ExpireMs field.
+    IsDequeueRebuild := false
+    for , Item in Items {
+        if Item.HasOwnProp("ExpireMs") {
+            IsDequeueRebuild := true
+            break
+        }
     }
-    ; else: the safety timer armed inside the try block above remains
-    ; the auto-hide deadline — no further action needed here.
+
+    if (IsDequeueRebuild or (HasAnyDur and HasMixedDur)) {
+        ; Dequeue path — each item tracks its own absolute expiry.
+        ; The poll timer (_TooltipDequeuePollFn, 100 ms) checks these
+        ; deadlines and rebuilds the stack when any row expires.
+        Now := A_TickCount
+        _TooltipDequeueItems := []
+        MaxMs := 0
+        for , Item in Items {
+            D := Item.HasOwnProp("DurationSec") ? Item.DurationSec : 0
+            if IsDequeueRebuild and Item.HasOwnProp("ExpireMs") {
+                ExpMs := Item.ExpireMs
+            } else if (D > 0) {
+                Eff := Max(_TOOLTIP_TIMEOUT_FLOOR_SEC, D - _TOOLTIP_TIMEOUT_DECREMENT_SEC)
+                ExpMs := Now + Round(Eff * 1000)
+            } else {
+                ExpMs := 0   ; no expiry for this row
+            }
+            Copy := {}
+            for k, v in Item.OwnProps()
+                Copy.%k% := v
+            Copy.ExpireMs := ExpMs
+            _TooltipDequeueItems.Push(Copy)
+            ; MaxMs = latest expiry — drives the safety timer fallback.
+            if (ExpMs > 0) {
+                Remaining := Max(50, ExpMs - Now)
+                if (Remaining > MaxMs)
+                    MaxMs := Remaining
+            }
+        }
+        ; Safety net: arm on the LONGEST duration so the tooltip cannot
+        ; outlive the last item even if the poll timer never fires.
+        if (MaxMs > 0)
+            SetTimer(_TooltipTimerFn, -MaxMs)
+        _TooltipDequeueActive := true
+    } else {
+        ; Simple single-timer path (all durations identical, or zero).
+        _TooltipDequeueItems := 0
+        EffectiveDur := DurationSec
+        for , Item in Items {
+            D := Item.HasOwnProp("DurationSec") ? Item.DurationSec : 0
+            if (D > 0 and (EffectiveDur == 0 or D < EffectiveDur))
+                EffectiveDur := D
+        }
+        if (EffectiveDur > 0) {
+            Effective := Max(_TOOLTIP_TIMEOUT_FLOOR_SEC,
+                EffectiveDur - _TOOLTIP_TIMEOUT_DECREMENT_SEC)
+            SetTimer(_TooltipTimerFn, -Round(Effective * 1000))
+            ; Guard the tooltip for its declared duration — same protection as
+            ; the dequeue path. Without this, LookupNoMatch / ResetBuf events
+            ; arriving before the timer fires would kill the tooltip instantly.
+            _TooltipDequeueActive := true
+        } else {
+            ; No declared duration — tooltip stays until explicitly hidden,
+            ; so no guard is needed (and we must not block future hides).
+            _TooltipDequeueActive := false
+        }
+        ; else: the safety timer armed inside the try block above remains
+        ; the auto-hide deadline — no further action needed here.
+    }
 }
 
 ; Hide all tooltip rows and the border overlay immediately.
@@ -228,31 +372,63 @@ TooltipShow(Items, DurationSec := 0) {
 ;
 ; Sequence:
 ;   1. Cancel pending auto-hide timer.
-;   2. Flip BOTH windows invisible via SW_HIDE in one compositor pass
-;      so they disappear in the same frame — preventing the « bordure
-;      orpheline » flash that the previous content-then-border destroy
-;      order produced. Border is hidden FIRST so even on slow compositors
-;      the worst visible interleave is « content alone » (a correct
-;      rounded fill) instead of an empty outline floating over the editor.
-;   3. Destroy the Gui objects (border first, same rationale).
+;   2. Hide border first, then rows. The border is a layered window composited
+;      on top; hiding rows first leaves a ghost outline for one or more
+;      compositor frames. Hiding the border first ensures the worst-case
+;      interleave is « content alone » (correct rounded fill), never
+;      « border alone » (empty outline floating over the editor).
+;   3. Destroy the Gui objects in the same order (border first, then rows).
 ;   4. Defensive sweep through every tracked Hwnd in case a Gui.Destroy
 ;      silently failed earlier — DestroyWindow on a stale handle is a
 ;      harmless no-op so this is safe to run unconditionally.
-TooltipHide() {
-    Critical
+TooltipHide(DbgTag := "?", Force := false) {
     global _TooltipGui, _TooltipRowGuis, _TooltipBorderGui
     global _TooltipShownHwnds, _TooltipShownBorderHwnds
+    global _TooltipDequeueItems, _TooltipDequeueActive
+    ; During an active dequeue cycle the poll timer owns the tooltip lifecycle.
+    ; External callers (prefix watcher resets, lookup misses) must not interrupt
+    ; it — they would hide the post-expansion rows before their time.
+    if (!Force and _TooltipDequeueActive)
+        return
     SetTimer(_TooltipTimerFn, 0)
+    _TooltipDequeueItems := 0
+    _TooltipDequeueActive := false
 
-    ; Step 1 — make both windows invisible via the GraphicsRenderer adapter.
+    ; Step 1 — hide border first (direct SW_HIDE), then content via DeferWindowPos.
+    ; WS_EX_LAYERED windows do not reliably respond to SWP_HIDEWINDOW inside a
+    ; DeferWindowPos batch — the compositor can still composit the border for an
+    ; extra frame after EndDeferWindowPos returns, causing a visible ghost outline.
+    ; Hiding the border with a direct ShowWindow(SW_HIDE=0) before scheduling the
+    ; content hide ensures the border is already invisible when DWM composites the
+    ; next frame that removes the content — worst case is "content alone" (rounded
+    ; fill, correct), never "border alone" (empty ghost outline).
     if _TooltipBorderGui {
-        GR_Hide(_TooltipBorderGui.Hwnd)
+        try GR_Hide(_TooltipBorderGui.Hwnd)
     }
-    for , Row in _TooltipRowGuis {
-        GR_Hide(Row.Gui.Hwnd)
+    ; Hide content rows atomically — all rows disappear in the same DWM frame.
+    ; SWP flags: NOSIZE|NOMOVE|NOZORDER|NOACTIVATE|HIDEWINDOW.
+    SWP_HIDE_FLAGS := 0x0001 | 0x0002 | 0x0004 | 0x0010 | 0x0080
+    HideCount := _TooltipRowGuis.Length
+    HDWP := HideCount > 0 ? DllCall("User32\BeginDeferWindowPos", "Int", HideCount, "Ptr") : 0
+    if HDWP {
+        for , Row in _TooltipRowGuis {
+            if HDWP
+                try HDWP := DllCall("User32\DeferWindowPos",
+                    "Ptr", HDWP, "Ptr", Row.Gui.Hwnd,
+                    "Ptr", 0, "Int", 0, "Int", 0, "Int", 0, "Int", 0,
+                    "UInt", SWP_HIDE_FLAGS, "Ptr")
+        }
+        if HDWP
+            try DllCall("User32\EndDeferWindowPos", "Ptr", HDWP)
+    }
+    ; Fallback: individual SW_HIDE when DeferWindowPos fails.
+    if !HDWP {
+        for , Row in _TooltipRowGuis {
+            try GR_Hide(Row.Gui.Hwnd)
+        }
     }
 
-    ; Step 2 — release Gui resources, same order.
+    ; Step 2 — release Gui resources: border first, then rows.
     if _TooltipBorderGui {
         try _TooltipBorderGui.Destroy()
         _TooltipBorderGui := 0
@@ -285,6 +461,40 @@ TooltipHide() {
 TooltipIsVisible() {
     global _TooltipGui
     return IsSet(_TooltipGui) and _TooltipGui != 0
+}
+
+; Re-arm the auto-hide timer from zero using the durations stored in
+; _TooltipLastItems. Called after a hotstring fires so the timer counts
+; from the moment of fire, not from when the preview was first shown
+; (which may have been seconds earlier when the user was still typing).
+; Only applies to the simple single-timer path — the dequeue path manages
+; its own deadlines and is not affected by this call.
+TooltipRearmTimer() {
+    global _TooltipLastItems
+    global _TOOLTIP_TIMEOUT_DECREMENT_SEC, _TOOLTIP_TIMEOUT_FLOOR_SEC
+    global _TooltipGeneration, _TooltipTimerGeneration
+
+    if (!IsObject(_TooltipLastItems) or _TooltipLastItems.Length == 0)
+        return
+
+    ; Find the shortest non-zero duration among the displayed items.
+    ; Rows with DurationSec = 0 are "infinite" — if ALL rows are infinite,
+    ; no timer is needed and we leave the safety timer in place.
+    EffectiveDur := 0
+    for , Item in _TooltipLastItems {
+        D := Item.HasOwnProp("DurationSec") ? Item.DurationSec : 0
+        if (D > 0 and (EffectiveDur == 0 or D < EffectiveDur))
+            EffectiveDur := D
+    }
+    if (EffectiveDur == 0)
+        return
+
+    Effective := Max(_TOOLTIP_TIMEOUT_FLOOR_SEC,
+        EffectiveDur - _TOOLTIP_TIMEOUT_DECREMENT_SEC)
+    ; Cancel any stale timer and arm a fresh one from now.
+    SetTimer(_TooltipTimerFn, 0)
+    _TooltipTimerGeneration := _TooltipGeneration
+    SetTimer(_TooltipTimerFn, -Round(Effective * 1000))
 }
 
 
@@ -670,15 +880,11 @@ _TooltipShowBorder(X, Y, W, H) {
     DllCall("Gdi32\DeleteDC", "Ptr", MemDC)
     DllCall("Gdi32\DeleteObject", "Ptr", HBmp)
 
-    ; Show after UpdateLayeredWindow via the GraphicsRenderer adapter — bitmap is
-    ; already uploaded so the window appears with the correct pixels on the first
-    ; painted frame, with no ghost flash.
+    ; Show the border window. The pixel loop above is fast (RtlFillMemory-style
+    ; write) so the border appears within the same DWM composition cycle as the
+    ; content window — no perceptible gap on the way in.
     GR_Show(Hwnd)
 
-    ; Track the new border Hwnd for TooltipHide's defensive sweep. Same
-    ; cap-and-evict policy as the content tracker — when the cap is hit
-    ; the oldest tracked Hwnd is dropped AND issued a final DestroyWindow
-    ; in case its Gui.Destroy silently failed.
     global _TooltipShownBorderHwnds, _TOOLTIP_HWND_TRACK_CAP
     if (_TooltipShownBorderHwnds.Length >= _TOOLTIP_HWND_TRACK_CAP) {
         DroppedHwnd := _TooltipShownBorderHwnds.RemoveAt(1)
@@ -1157,8 +1363,8 @@ _TooltipBuildGuiLlm(slots, active_idx) {
 	Row := _TooltipRowGuis[1]
 	_TooltipTimerGeneration := _TooltipGeneration
 	try {
-		_TooltipDisableDwmRounding(Row.Gui.Hwnd)
 		Row.Gui.Show(Format("w{1} h{2} x{3} y{4} NoActivate", Row.W, Row.H, Pos.X, Pos.Y))
+		_TooltipDisableDwmRounding(Row.Gui.Hwnd)
 		if (_TooltipShownHwnds.Length >= _TOOLTIP_HWND_TRACK_CAP) {
 			DroppedHwnd := _TooltipShownHwnds.RemoveAt(1)
 			GR_DestroyWindow(DroppedHwnd)

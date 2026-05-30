@@ -323,6 +323,7 @@ global ConfigurationFile := _ConfigDir . _AhkSubDir . "config.toml"
 ; file. The override file lives in the same shared config directory used by
 ; Hammerspoon, so edits made from either menu apply to both at next reload.
 HotstringsConfigInit(_ConfigDir . "hotstrings_config.toml")
+TooltipDequeueInit()
 
 ; _LogoDir: fully-normalized absolute path avoids any '..' traversal that
 ; TraySetIcon may refuse to resolve on some Windows configurations.

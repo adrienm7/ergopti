@@ -27,6 +27,15 @@ local _state = {
 local _watchers = {}
 local _idle_timer = nil
 
+-- Dequeue state for per-row expiry (destacking). When rows carry distinct
+-- durations, each row's expire_at is tracked separately. The dequeue timer
+-- fires at the earliest deadline, prunes expired rows, and re-renders the
+-- remaining stack. nil means no dequeue cycle is active.
+local _dequeue_rows  = nil
+local _dequeue_timer = nil
+-- Forward declaration — assigned after M.hide and M.show_stacked are defined.
+local _dequeue_tick
+
 
 
 
@@ -38,26 +47,41 @@ local _idle_timer = nil
 -- ================================
 
 --- Clears active timers and sets a new idle timeout if applicable.
+--- When a dequeue cycle is running the timer is suppressed — the dequeue
+--- manages its own end and an idle timer would kill the surviving rows early.
 local function reset_idle_timer()
 	if _idle_timer and type(_idle_timer.stop) == "function" then _idle_timer:stop() end
+	-- Suppress the idle timer during a dequeue cycle; _dequeue_timer owns
+	-- the hide lifecycle and fires exactly when the last row expires.
+	if _dequeue_rows then return end
 	local active_timeout = Config.settings.timeout_sec
-	
 	if active_timeout > 0 then
 		_idle_timer = hs.timer.doAfter(active_timeout, M.hide)
 	end
 end
 
+--- Stops the dequeue timer and clears dequeue state.
+local function stop_dequeue()
+	if _dequeue_timer then
+		pcall(function() _dequeue_timer:stop() end)
+		_dequeue_timer = nil
+	end
+	_dequeue_rows = nil
+end
+
+
 --- Terminates all active keyboard and mouse watchers.
 local function stop_watchers()
-	for _, watcher in ipairs(_watchers) do 
-		if watcher and type(watcher.stop) == "function" then watcher:stop() end 
+	for _, watcher in ipairs(_watchers) do
+		if watcher and type(watcher.stop) == "function" then watcher:stop() end
 	end
 	_watchers = {}
-	
-	if _idle_timer and type(_idle_timer.stop) == "function" then 
+
+	if _idle_timer and type(_idle_timer.stop) == "function" then
 		_idle_timer:stop()
-		_idle_timer = nil 
+		_idle_timer = nil
 	end
+	stop_dequeue()
 end
 
 --- Starts OS-level interception to hide the tooltip upon any simple interaction.
@@ -191,18 +215,70 @@ function M.is_visible()
 end
 
 --- Shows a stacked multi-row tooltip where each row has its own tint.
---- Rows are { text: string, tint: table|nil, trigger_label: string|nil }.
---- The tooltip stays until explicitly hidden (no per-row auto-hide on HS side —
---- the overall timeout is driven by the shortest delay across rows, set by the
---- caller via tooltip.set_timeout before calling show_stacked).
---- @param rows table Array of row descriptor objects.
+--- Rows are { text, tint, trigger_label, dimmed, duration }.
+--- When rows carry distinct non-zero duration values the dequeue path activates:
+--- each row tracks its own expire_at timestamp and a timer prunes expired rows
+--- and re-renders the remaining stack, so a short row disappears first and
+--- longer rows stay visible. When all durations are identical (or zero) the
+--- simple single-timer path (set by tooltip.set_timeout before this call) is
+--- used unchanged — this is the common case when all categories share a delay.
+--- @param rows table Array of row descriptor objects (may contain expire_at for rebuild calls).
 --- @param is_enabled boolean Guard clause — skips render if false.
 function M.show_stacked(rows, is_enabled)
 	local ok, err = pcall(function()
 		if not is_enabled then return end
 		if not rows or #rows == 0 then M.hide(); return end
+		stop_dequeue()
 		_state.is_visible = true
-		Renderer.render_stacked(rows, _state, start_watchers)
+
+		-- Detect whether this is a dequeue rebuild (rows already carry expire_at)
+		-- or a fresh first show (duration fields present, no expire_at yet).
+		local is_rebuild = rows[1] and rows[1].expire_at ~= nil
+
+		-- For fresh shows: detect mixed durations to decide which path to use.
+		local first_dur, mixed, any_dur = nil, false, false
+		if not is_rebuild then
+			for _, row in ipairs(rows) do
+				local d = (type(row.duration) == "number" and row.duration > 0) and row.duration or nil
+				if d then
+					any_dur = true
+					if first_dur == nil then first_dur = d
+					elseif d ~= first_dur then mixed = true end
+				end
+			end
+		end
+
+		if is_rebuild or (any_dur and mixed) then
+			-- Dequeue path — stamp expiry times (or reuse existing ones for rebuilds).
+			local FLOOR, DEC = 0.05, 0.2
+			local now = hs.timer.secondsSinceEpoch()
+			_dequeue_rows = {}
+			local next_expire = nil
+			for _, row in ipairs(rows) do
+				local copy = {}
+				for k, v in pairs(row) do copy[k] = v end
+				if not copy.expire_at then
+					local d = (type(row.duration) == "number" and row.duration > 0) and row.duration or nil
+					copy.expire_at = d and (now + math.max(FLOOR, d - DEC)) or nil
+				end
+				table.insert(_dequeue_rows, copy)
+				if copy.expire_at and (not next_expire or copy.expire_at < next_expire) then
+					next_expire = copy.expire_at
+				end
+			end
+			-- Pass nil for start_watchers on rebuild so start_watchers() does
+			-- not call stop_dequeue() and erase _dequeue_rows mid-cycle.
+			-- The watchers from the initial show are still running.
+			local watcher_cb = is_rebuild and nil or start_watchers
+			Renderer.render_stacked(rows, _state, watcher_cb)
+			if next_expire then
+				local delay = math.max(0.05, next_expire - hs.timer.secondsSinceEpoch())
+				_dequeue_timer = hs.timer.doAfter(delay, _dequeue_tick)
+			end
+		else
+			-- Simple path — global timeout already set by caller via tooltip.set_timeout.
+			Renderer.render_stacked(rows, _state, start_watchers)
+		end
 	end)
 	if not ok then Logger.error(LOG, "Crash during stacked tooltip rendering: " .. tostring(err) .. ".") end
 end
@@ -212,6 +288,29 @@ local _original_hide = M.hide
 M.hide = function()
 	_original_hide()
 	pcall(Renderer.hide_stacked)
+end
+
+-- Assign the dequeue tick function now that M.hide and M.show_stacked exist.
+-- Prunes expired rows and re-renders the surviving stack, or hides when empty.
+_dequeue_tick = function()
+	pcall(function()
+		if not _dequeue_rows then return end
+		local remaining = {}
+		local t = hs.timer.secondsSinceEpoch()
+		for _, row in ipairs(_dequeue_rows) do
+			if not row.expire_at or t < row.expire_at then
+				table.insert(remaining, row)
+			end
+		end
+		if #remaining == 0 then
+			M.hide()
+			return
+		end
+		-- Pass remaining rows back through show_stacked so the dequeue timer
+		-- re-arms itself for the next expiry. expire_at fields are preserved
+		-- so the rebuild branch is detected and existing timestamps reused.
+		M.show_stacked(remaining, true)
+	end)
 end
 
 return M
