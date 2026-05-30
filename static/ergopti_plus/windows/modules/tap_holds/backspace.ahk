@@ -91,20 +91,10 @@ _BackspaceHoldModKey() {
 
 ; ======= 10.3) Tap-only (tap action set to something other than backspace) =======
 
+; ~ passes BackSpace to the OS; $ prevents re-entry. Fire immediately on key-down —
+; no KeyWait or A_PriorKey guard needed since there is no hold behaviour.
 #HotIf TapHoldTapAction(TapHold, "backspace") != "" and TapHoldTapAction(TapHold, "backspace") != "backspace" and TapHoldHoldModifier(TapHold, "backspace") == "" and TapHoldHoldLayer(TapHold, "backspace") == "" and not LayerEnabled
-~$SC00E:: {
-	TimeBefore := A_TickCount
-	KeyWait("SC00E")
-	TimeAfter := A_TickCount
-	tap := ((TimeAfter - TimeBefore) <= TapHoldDuration(TapHold, "backspace") * 1000)
-	if (
-		tap
-		and (TimeAfter - TimeBefore) >= TapMinDurationMs()
-		and A_PriorKey == "BackSpace"
-	) {
-		_BackspaceDispatch()
-	}
-}
+~$SC00E:: _BackspaceDispatch()
 #HotIf
 
 

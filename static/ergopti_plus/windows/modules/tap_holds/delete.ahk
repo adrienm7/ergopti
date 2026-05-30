@@ -90,20 +90,10 @@ _DeleteHoldModKey() {
 
 ; ======= 13.3) Tap-only (tap action set to something other than delete) =======
 
+; ~ passes Delete to the OS; $ prevents re-entry. Fire immediately on key-down —
+; no KeyWait or A_PriorKey guard needed since there is no hold behaviour.
 #HotIf TapHoldTapAction(TapHold, "delete") != "" and TapHoldTapAction(TapHold, "delete") != "delete" and TapHoldHoldModifier(TapHold, "delete") == "" and TapHoldHoldLayer(TapHold, "delete") == "" and not LayerEnabled
-~$SC053:: {
-	TimeBefore := A_TickCount
-	KeyWait("SC053")
-	TimeAfter := A_TickCount
-	tap := ((TimeAfter - TimeBefore) <= TapHoldDuration(TapHold, "delete") * 1000)
-	if (
-		tap
-		and (TimeAfter - TimeBefore) >= TapMinDurationMs()
-		and A_PriorKey == "Delete"
-	) {
-		_DeleteDispatch()
-	}
-}
+~$SC053:: _DeleteDispatch()
 #HotIf
 
 
