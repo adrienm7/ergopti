@@ -1,5 +1,4 @@
-﻿{
-	"_meta.flag": "🇩🇰",
+﻿	"_meta.flag": "🇩🇰",
 	"_meta.locale": "da",
 	"_meta.name": "Dansk",
 	"app_category.business": "Forretning",
@@ -1423,8 +1422,11 @@
 	"tap_hold.action.disable": "Intet (deaktiver)",
 		"tap_hold.disable_all": "Deaktiver alle",
 	"tap_hold.group.alt_gr": "AltGr",
+		"tap_hold.group.backspace": "Slet",
 	"tap_hold.group.caps_lock": "CapsLock",
 	"tap_hold.group.delete": "Delete",
+		"tap_hold.group.enter": "Enter",
+		"tap_hold.group.escape": "Escape",
 	"tap_hold.group.left_alt": "LAlt",
 	"tap_hold.group.left_ctrl": "LCtrl",
 	"tap_hold.group.left_shift": "LShift",

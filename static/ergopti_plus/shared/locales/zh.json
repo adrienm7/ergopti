@@ -1,5 +1,4 @@
-﻿{
-	"_meta.flag": "🇨🇳",
+﻿	"_meta.flag": "🇨🇳",
 	"_meta.locale": "zh",
 	"_meta.name": "中文",
 	"app_category.business": "商务",
@@ -1423,8 +1422,11 @@
 	"tap_hold.action.disable": "无（禁用）",
 		"tap_hold.disable_all": "全部禁用",
 	"tap_hold.group.alt_gr": "AltGr",
+		"tap_hold.group.backspace": "退格",
 	"tap_hold.group.caps_lock": "CapsLock",
 	"tap_hold.group.delete": "Delete",
+		"tap_hold.group.enter": "回车",
+		"tap_hold.group.escape": "退出",
 	"tap_hold.group.left_alt": "LAlt",
 	"tap_hold.group.left_ctrl": "LCtrl",
 	"tap_hold.group.left_shift": "LShift",

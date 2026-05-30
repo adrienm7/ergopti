@@ -1,5 +1,4 @@
-﻿{
-	"_meta.flag": "🇸🇦",
+﻿	"_meta.flag": "🇸🇦",
 	"_meta.locale": "ar",
 	"_meta.name": "العربية",
 	"app_category.business": "الأعمال",
@@ -1423,8 +1422,11 @@
 	"tap_hold.action.disable": "لا شيء (تعطيل)",
 		"tap_hold.disable_all": "تعطيل الكل",
 	"tap_hold.group.alt_gr": "AltGr",
+		"tap_hold.group.backspace": "مسافة للخلف",
 	"tap_hold.group.caps_lock": "CapsLock",
 	"tap_hold.group.delete": "Delete",
+		"tap_hold.group.enter": "إدخال",
+		"tap_hold.group.escape": "إلغاء",
 	"tap_hold.group.left_alt": "LAlt",
 	"tap_hold.group.left_ctrl": "LCtrl",
 	"tap_hold.group.left_shift": "LShift",

@@ -1,5 +1,4 @@
-﻿{
-	"_meta.flag": "🇮🇳",
+﻿	"_meta.flag": "🇮🇳",
 	"_meta.locale": "hi",
 	"_meta.name": "हिन्दी",
 	"app_category.business": "व्यवसाय",
@@ -1423,8 +1422,11 @@
 	"tap_hold.action.disable": "कुछ नहीं (अक्षम करें)",
 		"tap_hold.disable_all": "सब अक्षम करें",
 	"tap_hold.group.alt_gr": "AltGr",
+		"tap_hold.group.backspace": "बैकस्पेस",
 	"tap_hold.group.caps_lock": "CapsLock",
 	"tap_hold.group.delete": "Delete",
+		"tap_hold.group.enter": "एंटर",
+		"tap_hold.group.escape": "एस्केप",
 	"tap_hold.group.left_alt": "LAlt",
 	"tap_hold.group.left_ctrl": "LCtrl",
 	"tap_hold.group.left_shift": "LShift",

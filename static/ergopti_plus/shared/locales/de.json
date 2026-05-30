@@ -1,5 +1,4 @@
-﻿{
-	"_meta.flag": "🇩🇪",
+﻿	"_meta.flag": "🇩🇪",
 	"_meta.locale": "de",
 	"_meta.name": "Deutsch",
 	"app_category.business": "Geschäft",
@@ -1423,8 +1422,11 @@
 	"tap_hold.action.disable": "Nichts (deaktivieren)",
 		"tap_hold.disable_all": "Alles deaktivieren",
 	"tap_hold.group.alt_gr": "AltGr",
+		"tap_hold.group.backspace": "Rücktaste",
 	"tap_hold.group.caps_lock": "CapsLock",
 	"tap_hold.group.delete": "Entf",
+		"tap_hold.group.enter": "Eingabe",
+		"tap_hold.group.escape": "Escape",
 	"tap_hold.group.left_alt": "LAlt",
 	"tap_hold.group.left_ctrl": "LStrg",
 	"tap_hold.group.left_shift": "LShift",
