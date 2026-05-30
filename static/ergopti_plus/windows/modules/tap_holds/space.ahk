@@ -158,6 +158,14 @@ _SpaceHoldWin(captured) {
     SendInput("{LWin Up}")
 }
 
+; Tap-only (hold=none, tap action is set to something other than space).
+; Fire immediately on key-down — no hold phase, no KeyWait needed.
+; No ~ prefix: space tap is intercepted entirely (no OS passthrough needed for
+; a custom action; the action itself sends whatever output is configured).
+#HotIf TapHoldTapAction(TapHold, "space") != "" and TapHoldTapAction(TapHold, "space") != "space" and TapHoldHoldModifier(TapHold, "space") == "" and TapHoldHoldLayer(TapHold, "space") == "" and not LayerEnabled
+SC039:: _SpaceDispatch()
+#HotIf
+
 #HotIf TapHoldHoldModifier(TapHold, "space") == "ctrl" and not LayerEnabled
 SC039:: SpaceTapHold(_SpaceHoldCtrl)
 #HotIf

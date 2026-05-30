@@ -18,7 +18,8 @@
 ;   paste when CapsLock+LCtrl or LAlt+LCtrl combinations are released.
 ; - LCtrl: UpdateLastSentCharacter("LControl") keeps the hotstring engine in
 ;   sync with the physical key stream.
-; - LCtrl: ~ must NOT be used on SC01D — see the comment below.
+; - LCtrl: ~ IS used on SC01D so Ctrl+X combos still reach the OS during KeyWait.
+;   The AltGr collision (LCtrl+RAlt) is handled upstream by altgr.ahk.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
