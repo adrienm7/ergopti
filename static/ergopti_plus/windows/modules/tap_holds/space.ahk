@@ -40,9 +40,6 @@
 ; After sending Space on tap, HSE_FeedChar(" ") is called explicitly because
 ; SendInput bypasses the prefix-watcher InputHook.
 
-; SpaceTapHold: used only when tap=space (native space on tap).
-; Uses InputHook to capture the first key typed while Space is held and sends
-; it with the modifier — e.g. Space+Ctrl then typing "a" sends Ctrl+A.
 SpaceTapHold(HoldFn) {
     TimeoutSec := TapHoldDuration(TapHold, "space")
     tap := KeyWait("SC039", "T" . TimeoutSec)
@@ -55,22 +52,6 @@ SpaceTapHold(HoldFn) {
     ih.Wait()
     HoldFn.Call(ih.Input)
     KeyWait("SC039", "U T2")
-}
-
-; SpaceTapHoldMod: used when tap=custom action and hold=modifier.
-; Pre-arms the modifier immediately on key-down, waits for key-up.
-; On short press: releases modifier and fires the tap action.
-; On long press: keeps modifier held until key-up (standard hold behaviour).
-SpaceTapHoldMod(ModKey) {
-    TextPressKey(ModKey, "Down")
-    tap := KeyWait("SC039", "T" . TapHoldDuration(TapHold, "space"))
-    if tap {
-        TextPressKey(ModKey, "Up")
-        _SpaceTapOrDispatch()
-        return
-    }
-    KeyWait("SC039")
-    TextPressKey(ModKey, "Up")
 }
 
 SpaceTapHoldLayer() {
@@ -177,58 +158,33 @@ _SpaceHoldWin(captured) {
     SendInput("{LWin Up}")
 }
 
-; Tap-only (hold=none, tap action is set to something other than space).
-; Fire immediately on key-down — no hold phase, no KeyWait needed.
-; No ~ prefix: space tap is intercepted entirely (no OS passthrough needed for
-; a custom action; the action itself sends whatever output is configured).
+; Tap-only (hold=none, tap action set to something other than space).
+; No $ needed: AHK v2 defaults to #MaxThreadsPerHotkey 1 so auto-repeat
+; cannot spawn a second thread while this handler is still executing.
 #HotIf TapHoldTapAction(TapHold, "space") != "" and TapHoldTapAction(TapHold, "space") != "space" and TapHoldHoldModifier(TapHold, "space") == "" and TapHoldHoldLayer(TapHold, "space") == "" and not LayerEnabled
-$SC039:: _SpaceDispatch()
+SC039:: _SpaceDispatch()
 #HotIf
 
-; When tap=space (native), use InputHook pattern to capture next key with Ctrl.
-#HotIf TapHoldHoldModifier(TapHold, "space") == "ctrl" and (TapHoldTapAction(TapHold, "space") == "" or TapHoldTapAction(TapHold, "space") == "space") and not LayerEnabled
-$SC039:: SpaceTapHold(_SpaceHoldCtrl)
-#HotIf
-
-; When tap=custom action, use pre-arm pattern so hold works as a normal modifier.
-#HotIf TapHoldHoldModifier(TapHold, "space") == "ctrl" and TapHoldTapAction(TapHold, "space") != "" and TapHoldTapAction(TapHold, "space") != "space" and not LayerEnabled
-$SC039:: SpaceTapHoldMod("LCtrl")
+#HotIf TapHoldHoldModifier(TapHold, "space") == "ctrl" and not LayerEnabled
+SC039:: SpaceTapHold(_SpaceHoldCtrl)
 #HotIf
 
 #HotIf TapHoldHoldLayer(TapHold, "space") == "nav" and not LayerEnabled
-$SC039:: SpaceTapHoldLayer()
+SC039:: SpaceTapHoldLayer()
 #HotIf
 
-; When tap=space (native), use InputHook pattern.
-#HotIf TapHoldHoldModifier(TapHold, "space") == "shift" and (TapHoldTapAction(TapHold, "space") == "" or TapHoldTapAction(TapHold, "space") == "space") and not LayerEnabled
-$SC039:: SpaceTapHold(_SpaceHoldShift)
+#HotIf TapHoldHoldModifier(TapHold, "space") == "shift" and not LayerEnabled
+SC039:: SpaceTapHold(_SpaceHoldShift)
 #HotIf
 
-; When tap=custom action, use pre-arm pattern.
-#HotIf TapHoldHoldModifier(TapHold, "space") == "shift" and TapHoldTapAction(TapHold, "space") != "" and TapHoldTapAction(TapHold, "space") != "space" and not LayerEnabled
-$SC039:: SpaceTapHoldMod("LShift")
+#HotIf TapHoldHoldModifier(TapHold, "space") == "alt" and not LayerEnabled
+SC039:: SpaceTapHold(_SpaceHoldAlt)
 #HotIf
 
-#HotIf TapHoldHoldModifier(TapHold, "space") == "alt" and (TapHoldTapAction(TapHold, "space") == "" or TapHoldTapAction(TapHold, "space") == "space") and not LayerEnabled
-$SC039:: SpaceTapHold(_SpaceHoldAlt)
+#HotIf TapHoldHoldModifier(TapHold, "space") == "alt_gr" and not LayerEnabled
+SC039:: SpaceTapHold(_SpaceHoldAltGr)
 #HotIf
 
-#HotIf TapHoldHoldModifier(TapHold, "space") == "alt" and TapHoldTapAction(TapHold, "space") != "" and TapHoldTapAction(TapHold, "space") != "space" and not LayerEnabled
-$SC039:: SpaceTapHoldMod("LAlt")
-#HotIf
-
-#HotIf TapHoldHoldModifier(TapHold, "space") == "alt_gr" and (TapHoldTapAction(TapHold, "space") == "" or TapHoldTapAction(TapHold, "space") == "space") and not LayerEnabled
-$SC039:: SpaceTapHold(_SpaceHoldAltGr)
-#HotIf
-
-#HotIf TapHoldHoldModifier(TapHold, "space") == "alt_gr" and TapHoldTapAction(TapHold, "space") != "" and TapHoldTapAction(TapHold, "space") != "space" and not LayerEnabled
-$SC039:: SpaceTapHoldMod("RAlt")
-#HotIf
-
-#HotIf TapHoldHoldModifier(TapHold, "space") == "win" and (TapHoldTapAction(TapHold, "space") == "" or TapHoldTapAction(TapHold, "space") == "space") and not LayerEnabled
-$SC039:: SpaceTapHold(_SpaceHoldWin)
-#HotIf
-
-#HotIf TapHoldHoldModifier(TapHold, "space") == "win" and TapHoldTapAction(TapHold, "space") != "" and TapHoldTapAction(TapHold, "space") != "space" and not LayerEnabled
-$SC039:: SpaceTapHoldMod("LWin")
+#HotIf TapHoldHoldModifier(TapHold, "space") == "win" and not LayerEnabled
+SC039:: SpaceTapHold(_SpaceHoldWin)
 #HotIf
