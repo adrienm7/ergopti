@@ -209,7 +209,7 @@ SC038::
 ; ======= 4.6) Generic — hold-modifier, any other tap =======
 
 #HotIf not _LAltIsSpecialTap() and TapHoldHoldModifier(TapHold, "left_alt") != "" and TapHoldTapAction(TapHold, "left_alt") != "" and not LayerEnabled
-SC038:: {
+$SC038:: {
 	ModKey := _LAltHoldModKey()
 	TextPressKey(ModKey, "Down")
 	tap := KeyWait("SC038", "T" . TapHoldDuration(TapHold, "left_alt"))
@@ -229,7 +229,7 @@ SC038:: {
 ; ======= 4.7) Generic — hold-layer, any other tap =======
 
 #HotIf not _LAltIsSpecialTap() and TapHoldHoldLayer(TapHold, "left_alt") != "" and TapHoldTapAction(TapHold, "left_alt") != "" and not LayerEnabled
-SC038:: {
+$SC038:: {
 	UpdateLastSentCharacter("LAlt")
 
 	ActivateLayer()

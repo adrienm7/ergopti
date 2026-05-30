@@ -120,7 +120,7 @@ SC11D:: {
 ; ======= 7.4) Generic — hold-modifier, any other tap =======
 
 #HotIf not _RCtrlIsSpecialTap() and TapHoldHoldModifier(TapHold, "right_ctrl") != "" and TapHoldTapAction(TapHold, "right_ctrl") != "" and not LayerEnabled
-SC11D:: {
+$SC11D:: {
 	ModKey := _RCtrlHoldModKey()
 	TextPressKey(ModKey, "Down")
 	tap := KeyWait("SC11D", "T" . TapHoldDuration(TapHold, "right_ctrl"))
@@ -140,7 +140,7 @@ SC11D:: {
 ; ======= 7.5) Generic — hold-layer, any other tap =======
 
 #HotIf not _RCtrlIsSpecialTap() and TapHoldHoldLayer(TapHold, "right_ctrl") != "" and TapHoldTapAction(TapHold, "right_ctrl") != "" and not LayerEnabled
-SC11D:: {
+$SC11D:: {
 	UpdateLastSentCharacter("RControl")
 
 	ActivateLayer()
