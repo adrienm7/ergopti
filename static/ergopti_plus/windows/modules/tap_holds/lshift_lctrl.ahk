@@ -60,30 +60,79 @@ _LShiftDispatch() {
 
 
 
-; ======= 3.1) LCtrl =======
+; ======= 3.1) LCtrl — tap-only (hold=none) =======
 
-; ~ must NOT be used here — with ~SC01D, a sequence of [AltGr] presses
-; (which AHK sees as LCtrl+RAlt) would suddenly block and keep LCtrl latched.
-; The $ prefix suppresses keyboard-hook re-entry, preventing infinite loops.
-#HotIf TapHoldTapAction(TapHold, "left_ctrl") != "" and not LayerEnabled
+; ~ must NOT be used on SC01D — AltGr = LCtrl+RAlt in AHK; ~ would latch LCtrl
+; on every AltGr press. $ suppresses keyboard-hook re-entry.
+;
+; Tap-only variant: fire the action immediately on key-down, no KeyWait needed.
+; CapsLock and LAlt guards prevent spurious fires on CapsLock+LCtrl or
+; LAlt+LCtrl combos. No A_PriorKey guard — it is unreliable without ~ because
+; AHK updates A_PriorKey only when the hook sees the key, and mid-combo presses
+; can change it before KeyWait returns.
+#HotIf TapHoldTapAction(TapHold, "left_ctrl") != "" and TapHoldHoldModifier(TapHold, "left_ctrl") == "" and TapHoldHoldLayer(TapHold, "left_ctrl") == "" and not LayerEnabled
 $SC01D::
 {
 	UpdateLastSentCharacter("LControl")
-	TimeBefore := A_TickCount
-	KeyWait("SC01D")
-	TimeAfter := A_TickCount
-	tap := ((TimeAfter - TimeBefore) <= TapHoldDuration(TapHold, "left_ctrl") * 1000)
 	if (
-		tap
-		and (TimeAfter - TimeBefore) >= TapMinDurationMs()
-		and A_PriorKey == "LControl"
-		and KS_IsUp("SC03A") ; "CapsLock" must not be physically held
-		and KS_IsUp("SC038") ; "LAlt" must not be physically held
+		KS_IsUp("SC03A") ; CapsLock must not be physically held
+		and KS_IsUp("SC038") ; LAlt must not be physically held
 	) {
 		_LCtrlDispatch()
 	}
 }
 #HotIf
+
+
+; ======= 3.2) LCtrl — hold-modifier =======
+
+#HotIf TapHoldTapAction(TapHold, "left_ctrl") != "" and TapHoldHoldModifier(TapHold, "left_ctrl") != "" and not LayerEnabled
+$SC01D::
+{
+	UpdateLastSentCharacter("LControl")
+	if (KS_IsUp("SC03A") and KS_IsUp("SC038")) {
+		ModKey := _LCtrlHoldModKey()
+		TextPressKey(ModKey, "Down")
+		tap := KeyWait("SC01D", "T" . TapHoldDuration(TapHold, "left_ctrl"))
+		TextPressKey(ModKey, "Up")
+		if tap {
+			_LCtrlDispatch()
+		}
+	}
+}
+#HotIf
+
+
+; ======= 3.3) LCtrl — hold-layer =======
+
+#HotIf TapHoldTapAction(TapHold, "left_ctrl") != "" and TapHoldHoldLayer(TapHold, "left_ctrl") != "" and not LayerEnabled
+$SC01D::
+{
+	UpdateLastSentCharacter("LControl")
+	ActivateLayer()
+	KeyWait("SC01D")
+	DisableLayer()
+
+	Now := A_TickCount
+	CharacterSentTime := LastSentCharacterKeyTime.Has("LControl") ? LastSentCharacterKeyTime["LControl"] : Now
+	tap := (Now - CharacterSentTime <= TapHoldDuration(TapHold, "left_ctrl") * 1000)
+	if (tap and KS_IsUp("SC03A") and KS_IsUp("SC038")) {
+		_LCtrlDispatch()
+	}
+}
+#HotIf
+
+; Return the AHK key name for the configured hold modifier on LCtrl.
+_LCtrlHoldModKey() {
+	switch TapHoldHoldModifier(TapHold, "left_ctrl") {
+		case "ctrl":   return "LCtrl"
+		case "shift":  return "LShift"
+		case "alt":    return "LAlt"
+		case "alt_gr": return "RAlt"
+		case "win":    return "LWin"
+		default:       return ""
+	}
+}
 
 ; Dispatch the configured tap action for LCtrl.
 _LCtrlDispatch() {
