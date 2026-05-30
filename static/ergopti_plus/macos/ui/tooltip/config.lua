@@ -80,6 +80,11 @@ M.colors = {
 	loading    = { red = 0.94, green = 0.78, blue = 0.28, alpha = 1.0 }
 }
 
+M.tint = {
+	lightness  = 0.18,
+	saturation = 0.65,
+}
+
 -- Default tooltip durations (seconds). 0 means "infinite display".
 local DEFAULT_TIMEOUT_SEC     = 2.5
 local DEFAULT_LLM_TIMEOUT_SEC = 12.0
@@ -313,6 +318,10 @@ local function load_from_shared()
 	local sep_w = get("colors", "sep_white",    M.colors.sep.white)
 	local sep_a = get("colors", "sep_alpha_hs", M.colors.sep.alpha)
 	M.colors.sep      = { white = sep_w, alpha = sep_a }
+
+	-- [tint]
+	M.tint.lightness  = get("tint", "lightness",  M.tint.lightness)
+	M.tint.saturation = get("tint", "saturation", M.tint.saturation)
 
 	-- [timing]
 	DEFAULT_TIMEOUT_SEC     = get("timing", "hotstring_timeout_sec", DEFAULT_TIMEOUT_SEC)
