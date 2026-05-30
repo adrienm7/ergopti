@@ -37,79 +37,50 @@
 ;   [positioning] window_bottom_inset_ahk→ UI_WINDOW_BOTTOM_INSET_PX
 ; ==============================================================================
 
+; All globals below are uninitialized sentinels — UiStyle_LoadSharedConst()
+; MUST run at startup and will overwrite every value from constants.toml.
+; If the TOML is absent the script exits immediately (fail fast).
+
 ; ── Typography ──────────────────────────────────────────────────────────────
-; Mirrors: Config.fonts.main = ".AppleSystemUIFont"  (system UI font on macOS)
-global UI_FONT_NAME       := "Segoe UI"   ; system UI font on Windows
-; Mirrors: Config.sizes.main = 14
-global UI_FONT_SIZE_MAIN  := 11           ; AHK logical px ≈ HS pt 14 on 125 % DPI
-; Mirrors: Config.sizes.hint = 11
-global UI_FONT_SIZE_HINT  := 11           ; trigger-label / hint font size
+global UI_FONT_NAME       := "Segoe UI"   ; AHK-only constant, not in TOML
+global UI_FONT_SIZE_MAIN  := 0
+global UI_FONT_SIZE_HINT  := 0
 
 ; ── Layout ──────────────────────────────────────────────────────────────────
-; Mirrors: Config.layout.pad_x = 14
-global UI_PAD_X           := 14
-; Mirrors: Config.layout.pad_y = 7
-global UI_PAD_Y           := 7
-; Gap between the expansion text column and the trigger-label column.
-; Mirrors: label_gap = 16 in renderer.lua
-global UI_LABEL_GAP       := 16
-
-; ── Rounded corners ─────────────────────────────────────────────────────────
-; Corner ellipse diameter passed to GDI CreateRoundRectRgn (nWidth/nHeight).
-; GDI nWidth/nHeight = full ellipse diameter, so the arc at each corner has a
-; radius of UI_CORNER_RADIUS / 2.  Setting this to 14 gives a 7 px radius per
-; corner, matching Hammerspoon's xRadius=7 canvas pts exactly.  Fixed size —
-; not proportional to window dimensions.
-global UI_CORNER_RADIUS   := 14
+global UI_PAD_X           := 0
+global UI_PAD_Y           := 0
+global UI_LABEL_GAP       := 0
+global UI_CORNER_RADIUS   := 0
 
 ; ── Colors ───────────────────────────────────────────────────────────────────
-; Near-black default background.  Mirrors: constants.toml bg_hex = "#242424"
-global UI_BG_HEX          := "242424"
-; Border ring color and opacity.  Mirrors: strokeColor = { white=1, alpha=0.25 }
-global UI_BORDER_COLOR_HEX := "FFFFFF"
-global UI_BORDER_ALPHA     := 0.25
-; 1 px logical border drawn via a layered Gui overlay.
-global UI_BORDER_THICKNESS := 1
-; Trigger-label symbol color (★, ↵) — lighter than mid-gray, dimmer than the
-; expansion text (FFFFFF) so the symbol reads as secondary information.
-global UI_LABEL_COLOR_HEX  := "AAAAAA"
+global UI_BG_HEX          := ""
+global UI_BORDER_COLOR_HEX := "FFFFFF"   ; AHK-only constant, not in TOML
+global UI_BORDER_ALPHA     := 0
+global UI_BORDER_THICKNESS := 1          ; AHK-only constant, not in TOML
+global UI_LABEL_COLOR_HEX  := ""
 
 ; ── Tint mixing ─────────────────────────────────────────────────────────────
-; HSL target when mixing an accent hue into the background.
-; Overwritten at startup by UiStyle_LoadSharedConst() from constants.toml [tint].
-global UI_TINT_LIGHTNESS   := 0.18
-global UI_TINT_SATURATION  := 0.65
+global UI_TINT_LIGHTNESS   := 0
+global UI_TINT_SATURATION  := 0
 
 ; ── Positioning offsets ──────────────────────────────────────────────────────
-; Mirrors: Config.layout.caret_offset_y = 18 (identical on both platforms).
-; UI_OFFSET_RIGHT is intentionally different from macOS caret_offset_x = 15:
-; Windows GDI positioning uses screen coordinates relative to the caret bounding
-; box, whereas macOS canvas offsets are in logical points — 4 px here produces
-; the same perceived clearance as 15 pts on macOS at typical display densities.
-global UI_OFFSET_BELOW    := 18
-global UI_OFFSET_RIGHT    := 4
-; Mirrors: Config.layout.max_caret_height = 80
-global UI_MAX_CARET_HEIGHT_PX      := 80
-; Mirrors: Config.layout.window_bottom_inset = 40  (AHK uses a larger inset)
-global UI_WINDOW_BOTTOM_INSET_PX   := 60
+; UI_OFFSET_RIGHT is AHK-only (Windows GDI vs macOS canvas coordinate systems).
+global UI_OFFSET_BELOW           := 0
+global UI_OFFSET_RIGHT           := 4
+global UI_MAX_CARET_HEIGHT_PX    := 0
+global UI_WINDOW_BOTTOM_INSET_PX := 0
 
-; ── LLM diff-coloring (from shared/tooltip/constants.toml [llm_colors]) ────────
-; Overwritten by UiStyle_LoadSharedConst() at startup; must mirror the TOML.
-; corr_sel  — corrected text in the active slot (green).
-; nw_sel    — next-words text in the active slot (orange).
-; unsel_gray — all text in non-active slots (mid-gray).
-; loading   — placeholder text while a slot is generating.
-global UI_LLM_CORR_SEL_HEX   := "40E666"   ; #40E666  ≈ green
-global UI_LLM_NW_SEL_HEX     := "FF9E1A"   ; #FF9E1A  ≈ orange
-global UI_LLM_UNSEL_GRAY_HEX := "808080"   ; #808080  ≈ mid-gray
-global UI_LLM_LOADING_HEX    := "F0C747"   ; #F0C747  ≈ yellow-amber
+; ── LLM diff-coloring ────────────────────────────────────────────────────────
+global UI_LLM_CORR_SEL_HEX   := ""
+global UI_LLM_NW_SEL_HEX     := ""
+global UI_LLM_UNSEL_GRAY_HEX := ""
+global UI_LLM_LOADING_HEX    := ""
 
-; ── Timing defaults (from shared/tooltip/constants.toml [timing]) ─────────────
-; Overwritten by UiStyle_LoadSharedConst() at startup; must mirror the TOML.
-global UI_HOTSTRING_TIMEOUT_SEC := 2.5
-global UI_LLM_TIMEOUT_SEC       := 12.0
-global UI_TIMEOUT_DECREMENT_SEC := 0.2
-global UI_TIMEOUT_FLOOR_SEC     := 0.05
+; ── Timing ───────────────────────────────────────────────────────────────────
+global UI_HOTSTRING_TIMEOUT_SEC := 0
+global UI_LLM_TIMEOUT_SEC       := 0
+global UI_TIMEOUT_DECREMENT_SEC := 0
+global UI_TIMEOUT_FLOOR_SEC     := 0
 
 
 
