@@ -43,7 +43,7 @@ _WinHoldModKey() {
 ; ======= 12.1) Hold-modifier variant =======
 
 #HotIf TapHoldHoldModifier(TapHold, "win") != "" and not LayerEnabled
-SC15B:: {
+$SC15B:: {
 	ModKey := _WinHoldModKey()
 	TextPressKey(ModKey, "Down")
 	TimeBefore := A_TickCount
@@ -67,7 +67,7 @@ SC15B:: {
 ; ======= 12.2) Hold-layer variant =======
 
 #HotIf TapHoldHoldLayer(TapHold, "win") != "" and TapHoldHoldModifier(TapHold, "win") == "" and not LayerEnabled
-SC15B:: {
+$SC15B:: {
 	UpdateLastSentCharacter("LWin")
 
 	ActivateLayer()

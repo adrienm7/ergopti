@@ -78,7 +78,7 @@ SC00F Up:: TextPressKey("LAlt", "Up")
 ; ======= 8.2) Generic — hold-modifier, any other tap =======
 
 #HotIf TapHoldTapAction(TapHold, "tab") != "alt_tab_monitor" and TapHoldHoldModifier(TapHold, "tab") != "" and TapHoldTapAction(TapHold, "tab") != "" and not LayerEnabled
-SC00F:: {
+$SC00F:: {
 	ModKey := _TabHoldModKey()
 	TextPressKey(ModKey, "Down")
 	tap := KeyWait("SC00F", "T" . TapHoldDuration(TapHold, "tab"))
@@ -98,7 +98,7 @@ SC00F:: {
 ; ======= 8.3) Generic — hold-layer, any other tap =======
 
 #HotIf TapHoldTapAction(TapHold, "tab") != "alt_tab_monitor" and TapHoldHoldLayer(TapHold, "tab") != "" and TapHoldTapAction(TapHold, "tab") != "" and not LayerEnabled
-SC00F:: {
+$SC00F:: {
 	UpdateLastSentCharacter("Tab")
 
 	ActivateLayer()

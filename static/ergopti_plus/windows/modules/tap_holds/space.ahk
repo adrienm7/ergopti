@@ -167,25 +167,25 @@ SC039:: _SpaceDispatch()
 #HotIf
 
 #HotIf TapHoldHoldModifier(TapHold, "space") == "ctrl" and not LayerEnabled
-SC039:: SpaceTapHold(_SpaceHoldCtrl)
+$SC039:: SpaceTapHold(_SpaceHoldCtrl)
 #HotIf
 
 #HotIf TapHoldHoldLayer(TapHold, "space") == "nav" and not LayerEnabled
-SC039:: SpaceTapHoldLayer()
+$SC039:: SpaceTapHoldLayer()
 #HotIf
 
 #HotIf TapHoldHoldModifier(TapHold, "space") == "shift" and not LayerEnabled
-SC039:: SpaceTapHold(_SpaceHoldShift)
+$SC039:: SpaceTapHold(_SpaceHoldShift)
 #HotIf
 
 #HotIf TapHoldHoldModifier(TapHold, "space") == "alt" and not LayerEnabled
-SC039:: SpaceTapHold(_SpaceHoldAlt)
+$SC039:: SpaceTapHold(_SpaceHoldAlt)
 #HotIf
 
 #HotIf TapHoldHoldModifier(TapHold, "space") == "alt_gr" and not LayerEnabled
-SC039:: SpaceTapHold(_SpaceHoldAltGr)
+$SC039:: SpaceTapHold(_SpaceHoldAltGr)
 #HotIf
 
 #HotIf TapHoldHoldModifier(TapHold, "space") == "win" and not LayerEnabled
-SC039:: SpaceTapHold(_SpaceHoldWin)
+$SC039:: SpaceTapHold(_SpaceHoldWin)
 #HotIf

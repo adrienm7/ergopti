@@ -120,7 +120,7 @@ SC03A:: {
 ; The modifier is always released before the tap action fires so the action
 ; itself runs clean (e.g. Enter without Ctrl).
 #HotIf _CapsLockHasHoldModifier() and not LayerEnabled
-*SC03A:: {
+*$SC03A:: {
 	CtrlActivated := KS_IsDown("SC01D") ; LCtrl physically held at press time
 
 	if (KS_IsDown("SC038")) { ; LAlt physically held — shortcut intercept
@@ -150,7 +150,7 @@ SC03A:: {
 
 ; Mirrors the LAlt layer approach: activate layer on hold, tap action on release.
 #HotIf _CapsLockHasHoldLayer() and not LayerEnabled
-SC03A:: {
+$SC03A:: {
 	if (KS_IsDown("SC038")) { ; LAlt physically held
 		LAltCapsLockShortcut()
 		return
