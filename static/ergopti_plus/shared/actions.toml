@@ -498,6 +498,29 @@ platform = "ahk"
 [sg_actions.paste_plain]
 platform = "ahk"
 
+# --- Tap-Hold (actions disponibles uniquement comme valeur au tap d'une touche remappée) ---
+
+[sg_actions.one_shot_shift]
+platform = "ahk"
+
+[sg_actions.caps_word]
+platform = "ahk"
+
+[sg_actions.ctrl_backspace]
+platform = "ahk"
+
+[sg_actions.ctrl_delete]
+platform = "ahk"
+
+[sg_actions.alt_tab_monitor]
+platform = "ahk"
+
+[sg_actions.space]
+platform = "ahk"
+
+[sg_actions.caps_lock]
+platform = "ahk"
+
 # --- Debug ---
 
 [sg_actions.open_console]
@@ -706,6 +729,15 @@ items = [
     "toggle_capslock",
     "microsoft_bold",
     "paste_plain",
+    "--",
+    "#tapholds",
+    "one_shot_shift",
+    "caps_word",
+    "ctrl_backspace",
+    "ctrl_delete",
+    "alt_tab_monitor",
+    "space",
+    "caps_lock",
     "--",
     "#ui",
     "open_metrics_typing",
