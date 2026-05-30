@@ -1,27 +1,32 @@
-﻿; drivers/autohotkey/lib/crash_reporter.ahk
+﻿; static/ergopti_plus/windows/lib/crash_reporter.ahk
 
 ; ==============================================================================
 ; MODULE: Crash Reporter
 ; DESCRIPTION:
-; Opt-in crash report builder and persistence layer for the AutoHotkey driver.
-; When the global error handler fires, this module offers the user a choice to
-; save a sanitized report to disk for later inspection or support. No network
-; calls are made -- the report is written locally only.
+; Automatic crash report builder and persistence layer for the AutoHotkey driver.
+; When the global error handler fires, this module saves a full diagnostic report
+; to disk immediately — no confirmation step — and shows the user the file path.
+; No network calls are ever made.
 ;
 ; FEATURES & RATIONALE:
 ; 1. Privacy-first: keystrokes, file contents, SSID, and raw usernames are
-;    never included. The username is hashed (CRC32-like fold) so incidents from
+;    never included. The username is hashed (FNV-1a fold) so incidents from
 ;    the same user can be correlated without revealing the identity.
-; 2. Opt-in: the user is always prompted before anything is written to disk.
-; 3. Rich diagnostics: the report includes AHK runtime details, system
-;    environment, active-window context, stuck modifiers, and module state so
-;    a bug report alone is often enough to reproduce and fix the crash.
-; 4. Structured output: reports are written as JSON for easy machine and human
-;    readability, one file per incident under crash_reports/.
+; 2. No confirmation: the old opt-in prompt added friction with zero privacy
+;    benefit — the report is local-only and contains no PII. The user sees a
+;    single dialog showing the path of the saved file.
+; 3. Rich diagnostics: the report includes everything from the Debug > Diagnostic
+;    system (OS, CPU, RAM, DPI, adapter status, session counters) PLUS the full
+;    in-memory log ring buffer (up to 200 lines) so a single report is almost
+;    always enough to reproduce and fix the crash.
+; 4. Driver-scoped directory: reports live under <config_dir>/ahk/crash_reports/
+;    so they are co-located with the AHK logs and config, not mixed with any
+;    Hammerspoon reports at the config root.
+; 5. Structured output: reports are written as JSON for easy machine and human
+;    readability, one file per incident.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
-
 
 
 
@@ -32,20 +37,17 @@
 ; ============================
 ; ============================
 
-
-; Subdirectory under the user config dir that receives all crash report files.
-; Created on demand -- never fails if the parent dir does not exist yet.
-global _CrashReporter_Subdir := "crash_reports"
+; Subdirectory under <config_dir>/ahk/ that receives all crash report files.
+; Mirrors the log directory layout so reports and logs sit side-by-side.
+global _CrashReporter_Subdir := "ahk\crash_reports"
 
 ; Modifier keys to inspect for stuck state at crash time.
-; Listed in the order they appear in the AHK documentation.
 global _CrashReporter_Modifiers := [
 	"LControl", "RControl",
 	"LShift",   "RShift",
 	"LAlt",     "RAlt",
 	"LWin",     "RWin",
 ]
-
 
 
 
@@ -57,15 +59,14 @@ global _CrashReporter_Modifiers := [
 ; =============================
 
 ; Builds a rich crash report Map from an AHK Error object.
-; Captures error details, system environment, AHK runtime, active-window
-; context, stuck modifiers, and best-effort module state.
-; Keystrokes, file contents, SSID, and raw usernames are never included.
+; Captures error details, full system info (mirrors healthcheck), stuck modifiers,
+; adapter status, session counters, and the complete in-memory log ring buffer.
 ; @param ErrorObj {Error} The AHK v2 Error object caught by the global handler.
 ; @return {Map} Report with all diagnostic fields documented below.
 CrashReport_Build(ErrorObj) {
-	try LoggerTrace("CrashReporter", "Building crash report...")
+	try LoggerTrace("CrashReporter", "Building crash report…")
 
-	; ---- Error fields (direct from the Error object) ----
+	; ── Error fields ─────────────────────────────────────────────────────────
 	ErrorMsg   := ""
 	StackTrace := ""
 	ErrorType  := ""
@@ -82,36 +83,30 @@ CrashReport_Build(ErrorObj) {
 	try ErrorLine  := ErrorObj.HasProp("Line")  ? String(ErrorObj.Line)  : ""
 	try ErrorFile  := ErrorObj.HasProp("File")  ? String(ErrorObj.File)  : ""
 
-	; ---- Driver version ----
+	; ── Driver version ────────────────────────────────────────────────────────
 	Version := "unknown"
 	try Version := Updater_CurrentVersion()
 
-	; ---- System environment ----
-	OsVersion      := A_OSVersion
-	AhkVersion     := A_AhkVersion
-	AhkBitness     := (A_PtrSize = 8) ? "64-bit" : "32-bit"
-	ScreenRes       := A_ScreenWidth . "x" . A_ScreenHeight
-	Locale          := A_Language
-	ScriptDir       := A_ScriptDir
+	; ── Timestamp ────────────────────────────────────────────────────────────
+	Ts := _CrashReport_IsoTimestamp()
 
-	; Hash the username so same-user incidents can be correlated without
-	; exposing the actual Windows account name (privacy rule: no PII in reports)
-	UsernameHash := _CrashReport_FoldHash(A_UserName)
+	; ── Full system info (mirrors healthcheck _HealthCheck_SysInfo) ──────────
+	Sys := _CrashReport_SysInfo()
 
-	; ---- Uptime ----
+	; ── Uptime ────────────────────────────────────────────────────────────────
 	UptimeSec := 0
 	try {
 		global _HealthCheckStartMs
 		UptimeSec := (A_TickCount - _HealthCheckStartMs) // 1000
 	}
 
-	; ---- Active window context (helps reproduce the crash) ----
+	; ── Active window context ─────────────────────────────────────────────────
 	ActiveWindowTitle   := ""
 	ActiveWindowProcess := ""
 	try ActiveWindowTitle   := WinGetTitle("A")
 	try ActiveWindowProcess := WinGetProcessName("A")
 
-	; ---- Stuck modifiers snapshot (state at the moment the handler ran) ----
+	; ── Stuck modifiers ───────────────────────────────────────────────────────
 	StuckMods := []
 	try {
 		global _CrashReporter_Modifiers
@@ -122,30 +117,47 @@ CrashReport_Build(ErrorObj) {
 	}
 	StuckModsStr := (StuckMods.Length > 0) ? _CrashReport_JoinArr(StuckMods) : "none"
 
-	; ---- Module state (best-effort -- modules may not be initialised yet) ----
+	; ── Adapter / port status (mirrors healthcheck HealthCheck_Run) ──────────
+	AdaptersOk     := ""
+	AdaptersFailed := ""
+	WarnCount      := "0"
+	ErrCount       := "0"
+	try {
+		HC := HealthCheck_Run()
+		AdaptersOk     := _CrashReport_JoinArr(HC["ports_validated"])
+		AdaptersFailed := _CrashReport_JoinArr(HC["failed_adapters"])
+		WarnCount      := String(HC["warn_count"])
+		ErrCount       := String(HC["err_count"])
+	}
+
+	; ── Module state ──────────────────────────────────────────────────────────
 	KeyloggerInit := "unknown"
 	ConfigDir     := ""
-	try {
-		; AHK v2 class names are globally accessible without a `global` declaration —
-		; declaring `global Keylogger` here would conflict with the class definition
-		; in keylogger.ahk and cause a startup crash. The try block already handles
-		; the case where the class is not yet initialized.
-		KeyloggerInit := Keylogger.initialized ? "true" : "false"
-	}
+	try KeyloggerInit := Keylogger.initialized ? "true" : "false"
 	try {
 		global _ConfigDir
 		ConfigDir := _ConfigDir
 	}
 
-	; ---- ISO-8601 timestamp ----
-	Ts := _CrashReport_IsoTimestamp()
+	; ── In-memory log ring buffer (all 200 lines, most recent last) ───────────
+	; This is the single most valuable diagnostic field: it captures the full
+	; sequence of events leading up to the crash without requiring the user to
+	; locate a log file. The ring buffer never contains keystrokes or PII.
+	LogLines := ""
+	try {
+		Snapshot := LoggerRingBufferSnapshot()
+		Parts    := []
+		for _, Line in Snapshot
+			Parts.Push(Line)
+		LogLines := _CrashReport_JoinNewlines(Parts)
+	}
 
 	Report := Map(
-		; -- Identification --
+		; ── Identification ──
 		"version",              Version,
 		"driver",               "autohotkey",
 		"timestamp",            Ts,
-		; -- Error details --
+		; ── Error details ──
 		"error_type",           ErrorType,
 		"error_msg",            ErrorMsg,
 		"error_extra",          ErrorExtra,
@@ -153,60 +165,68 @@ CrashReport_Build(ErrorObj) {
 		"error_file",           ErrorFile,
 		"error_line",           ErrorLine,
 		"stack_trace",          StackTrace,
-		; -- System environment --
-		"os",                   OsVersion,
-		"ahk_version",          AhkVersion,
-		"ahk_bitness",          AhkBitness,
-		"screen_resolution",    ScreenRes,
-		"locale",               Locale,
-		"script_dir",           ScriptDir,
-		"username_hash",        UsernameHash,
-		; -- Runtime context --
+		; ── System environment (full, mirrors healthcheck) ──
+		"os_name",              Sys["os_name"],
+		"os_build",             Sys["os_build"],
+		"os_arch",              Sys["os_arch"],
+		"ahk_version",          Sys["ahk_version"],
+		"ahk_bitness",          Sys["ahk_bitness"],
+		"cpu_name",             Sys["cpu_name"],
+		"cpu_cores",            String(Sys["cpu_cores"]),
+		"ram_total_gb",         String(Sys["ram_total_gb"]),
+		"ram_free_gb",          String(Sys["ram_free_gb"]),
+		"screen_resolution",    Sys["screen_res"],
+		"dpi",                  String(Sys["dpi"]),
+		"dpi_scale",            String(Sys["dpi_scale"]),
+		"locale",               Sys["locale"],
+		"script_dir",           A_ScriptDir,
+		"git_hash",             Sys["git_hash"],
+		"username_hash",        _CrashReport_FoldHash(A_UserName),
+		; ── Runtime context ──
 		"uptime_sec",           String(UptimeSec),
 		"active_window_title",  ActiveWindowTitle,
 		"active_window_process", ActiveWindowProcess,
 		"stuck_modifiers",      StuckModsStr,
-		; -- Module state --
+		; ── Adapter / session health ──
+		"adapters_ok",          AdaptersOk,
+		"adapters_failed",      AdaptersFailed,
+		"session_warnings",     WarnCount,
+		"session_errors",       ErrCount,
+		; ── Module state ──
 		"keylogger_initialized", KeyloggerInit,
 		"config_dir",           ConfigDir,
+		; ── Full log ring buffer (up to 200 lines) ──
+		"log_tail",             LogLines,
 	)
 
 	try LoggerDone("CrashReporter", "Crash report built (ts={1}, type={2}).", Ts, ErrorType)
 	return Report
 }
 
-; Writes a crash report Map to disk as a JSON file under the crash_reports
-; directory. Creates the directory on demand. Returns the file path on
-; success, or an empty string on failure.
+; Writes a crash report Map to disk as a JSON file under ahk/crash_reports/.
+; Creates the directory on demand. Returns the file path on success, or "" on failure.
 ; @param Report {Map} The report Map returned by CrashReport_Build().
 ; @return {String} Absolute path to the written file, or "" on failure.
 CrashReport_Save(Report) {
 	global _ConfigDir, _CrashReporter_Subdir
 
-	try LoggerStart("CrashReporter", "Saving crash report to disk...")
+	try LoggerStart("CrashReporter", "Saving crash report to disk…")
 
-	; Resolve directory -- fall back to USERPROFILE if _ConfigDir is not set
 	BaseDir := ""
 	try BaseDir := _ConfigDir
-	if (BaseDir == "") {
+	if (BaseDir == "")
 		try BaseDir := EnvGet("USERPROFILE") . "\.config\ergopti_plus\"
-	}
-	if (!BaseDir ~= "[/\\]$") {
+	if (!BaseDir ~= "[/\\]$")
 		BaseDir .= "\"
-	}
 	ReportDir := BaseDir . _CrashReporter_Subdir . "\"
 
-	; Create the directory tree (best-effort)
 	try DirCreate(ReportDir)
 
-	; Build a timestamped filename (colons replaced for NTFS compatibility)
 	Ts    := Report.Has("timestamp") ? Report["timestamp"] : _CrashReport_IsoTimestamp()
 	FName := ReportDir . StrReplace(Ts, ":", "-") . ".json"
 
-	; Serialise to JSON
 	JsonStr := _CrashReport_ToJson(Report)
 
-	; Write to disk
 	try {
 		FileAppend(JsonStr, FName, "UTF-8-RAW")
 		try LoggerSuccess("CrashReporter", "Crash report saved: {1}.", FName)
@@ -217,35 +237,24 @@ CrashReport_Save(Report) {
 	}
 }
 
-; Displays a MsgBox asking the user whether to save the crash report.
-; If the user confirms, calls CrashReport_Save() and shows the outcome.
-; Safe to call from within ErgoptiGlobalErrorHandler -- all calls are guarded.
+; Saves the crash report immediately (no confirmation) then shows the user a
+; single dialog with the path of the saved file. If saving fails, shows an error.
+; Safe to call from within ErgoptiGlobalErrorHandler — all calls are guarded.
 ; @param Report {Map} The report Map returned by CrashReport_Build().
 CrashReport_PromptUser(Report) {
-	try LoggerStart("CrashReporter", "Prompting user for crash report opt-in...")
+	try LoggerStart("CrashReporter", "Saving crash report…")
 
-	Title   := t("crash.report.prompt_title")
-	Body    := t("crash.report.prompt_body")
-	OkBtn   := t("button.ok")
-	Cancel  := t("button.cancel")
+	FilePath := CrashReport_Save(Report)
 
-	; MsgBox returns the button label pressed
-	Choice := MsgBox(Body, Title, "OC Icon!")
-
-	if (Choice == "OK") {
-		FilePath := CrashReport_Save(Report)
-		if (FilePath != "") {
-			MsgBox(FilePath, t("crash.report.saved"), "OK Iconi")
-			try LoggerSuccess("CrashReporter", "User accepted crash report opt-in.")
-		} else {
-			try LoggerWarn("CrashReporter", "Crash report save failed after user accepted prompt.")
-		}
+	if (FilePath != "") {
+		try LoggerSuccess("CrashReporter", "Crash report saved at '{1}'.", FilePath)
+		; Show only the path — no confirmation needed, report is local-only
+		MsgBox(FilePath, t("crash.report.saved_title"), "OK Iconi")
 	} else {
-		try LoggerInfo("CrashReporter", "User declined crash report opt-in.")
-		MsgBox(t("crash.report.declined"), "ErgoptiPlus", "OK Iconi")
+		try LoggerWarn("CrashReporter", "Crash report could not be saved.")
+		MsgBox(t("crash.report.save_failed"), t("crash.report.saved_title"), "OK Icon!")
 	}
 }
-
 
 
 
@@ -256,25 +265,86 @@ CrashReport_PromptUser(Report) {
 ; ==========================
 ; ===========================
 
-; Returns an ISO-8601 UTC timestamp string matching the Lua reporter format.
-; AHK does not expose UTC time directly via A_Now, so we compute it from
-; FormatTime which uses local time -- "Z" is appended as an approximation
-; since AHK v2 has no native UTC formatter without a DLL call.
+; Returns a Map with full OS, CPU, RAM, screen, AHK, and git fields.
+; Mirrors _HealthCheck_SysInfo() so the crash report is a superset of the
+; healthcheck diagnostic without duplicating the collection logic.
+_CrashReport_SysInfo() {
+	Info := Map()
+
+	OsName  := A_OSVersion
+	OsBuild := ""
+	OsArch  := A_Is64bitOS ? "64 bits" : "32 bits"
+	try {
+		OsName  := RegRead("HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion", "ProductName")
+		OsBuild := RegRead("HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion", "CurrentBuildNumber")
+		UBR     := RegRead("HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion", "UBR")
+		OsBuild := OsBuild . "." . UBR
+	}
+	Info["os_name"]  := OsName
+	Info["os_build"] := OsBuild
+	Info["os_arch"]  := OsArch
+
+	CpuName  := "unknown"
+	CpuCores := ""
+	try {
+		WMI  := ComObject("WbemScripting.SWbemLocator").ConnectServer()
+		Qry  := WMI.ExecQuery("SELECT Name, NumberOfLogicalProcessors FROM Win32_Processor")
+		Enum := Qry._NewEnum()
+		if Enum.Next(&Item) {
+			CpuName  := Trim(Item.Name)
+			CpuCores := Item.NumberOfLogicalProcessors
+		}
+	}
+	Info["cpu_name"]  := CpuName
+	Info["cpu_cores"] := CpuCores
+
+	RamTotalGb := "?"
+	RamFreeGb  := "?"
+	try {
+		MemStatus := Buffer(64, 0)
+		NumPut("UInt", 64, MemStatus, 0)
+		if DllCall("GlobalMemoryStatusEx", "Ptr", MemStatus) {
+			TotalBytes := NumGet(MemStatus, 8,  "UInt64")
+			AvailBytes := NumGet(MemStatus, 16, "UInt64")
+			RamTotalGb := Format("{:.1f}", TotalBytes / 1073741824)
+			RamFreeGb  := Format("{:.1f}", AvailBytes / 1073741824)
+		}
+	}
+	Info["ram_total_gb"] := RamTotalGb
+	Info["ram_free_gb"]  := RamFreeGb
+
+	Info["screen_res"] := A_ScreenWidth . "x" . A_ScreenHeight
+	Info["dpi"]        := A_ScreenDPI
+	Info["dpi_scale"]  := Round(A_ScreenDPI / 96 * 100)
+	Info["ahk_version"] := A_AhkVersion
+	Info["ahk_bitness"] := (A_PtrSize = 8) ? "64-bit" : "32-bit"
+	Info["locale"]      := A_Language
+
+	GitHash := ""
+	try {
+		TmpFile := A_Temp . "\ergopti_cr_hash_" . A_TickCount . ".txt"
+		RunWait(A_ComSpec . " /c git -C " . Chr(34) . A_ScriptDir . Chr(34)
+			. " rev-parse --short HEAD > " . Chr(34) . TmpFile . Chr(34), , "Hide")
+		GitHash := Trim(FileRead(TmpFile, "UTF-8"))
+		FileDelete(TmpFile)
+	}
+	Info["git_hash"] := GitHash
+
+	return Info
+}
+
+; Returns an ISO-8601 UTC timestamp string.
 ; @return {String} Timestamp in the form "YYYY-MM-DDTHH:MM:SSZ".
 _CrashReport_IsoTimestamp() {
 	return FormatTime(, "yyyy-MM-ddTHH:mm:ssZ")
 }
 
-; Produces a short, stable, non-reversible hex digest of a string by folding
-; each character code into a 32-bit accumulator. Not cryptographic -- the goal
-; is stable cross-session correlation of incidents from the same machine user
-; without storing the raw value (privacy rule).
-; @param Str {String} The input string to hash.
-; @return {String} Eight-character lowercase hex string (e.g. "3f8a1c22").
+; FNV-1a 32-bit fold: stable, non-reversible hex digest of a string.
+; @param Str {String}
+; @return {String} Eight-character lowercase hex string.
 _CrashReport_FoldHash(Str) {
-	Acc := 0x811C9DC5  ; FNV-1a 32-bit offset basis
+	Acc := 0x811C9DC5
 	Loop StrLen(Str) {
-		; XOR-fold with FNV prime then rotate right by 3 to increase avalanche
 		Acc := ((Acc ^ Ord(SubStr(Str, A_Index, 1))) * 0x01000193) & 0xFFFFFFFF
 		Acc := ((Acc >> 3) | (Acc << 29)) & 0xFFFFFFFF
 	}
@@ -282,9 +352,7 @@ _CrashReport_FoldHash(Str) {
 }
 
 ; Serialises a crash report Map to a formatted JSON string.
-; String fields are emitted as JSON strings; the field order is fixed for
-; consistent diff-ability across versions. Unknown keys are ignored.
-; @param Report {Map} The report Map.
+; @param Report {Map}
 ; @return {String} Pretty-printed JSON string.
 _CrashReport_ToJson(Report) {
 	Fields := [
@@ -294,20 +362,28 @@ _CrashReport_ToJson(Report) {
 		"error_type", "error_msg", "error_extra", "error_what",
 		"error_file", "error_line", "stack_trace",
 		; System environment
-		"os", "ahk_version", "ahk_bitness", "screen_resolution",
-		"locale", "script_dir", "username_hash",
+		"os_name", "os_build", "os_arch",
+		"ahk_version", "ahk_bitness",
+		"cpu_name", "cpu_cores",
+		"ram_total_gb", "ram_free_gb",
+		"screen_resolution", "dpi", "dpi_scale",
+		"locale", "script_dir", "git_hash", "username_hash",
 		; Runtime context
 		"uptime_sec", "active_window_title", "active_window_process",
 		"stuck_modifiers",
+		; Adapter / session health
+		"adapters_ok", "adapters_failed",
+		"session_warnings", "session_errors",
 		; Module state
 		"keylogger_initialized", "config_dir",
+		; Log tail
+		"log_tail",
 	]
 	Parts := []
 	Q     := Chr(34)
 
 	for _, Key in Fields {
 		Val := Report.Has(Key) ? String(Report[Key]) : ""
-		; Minimal JSON string escaping: backslash, double-quote, CR, LF, tab
 		Val := StrReplace(Val, "\",  "\\")
 		Val := StrReplace(Val, Q,   "\" . Q)
 		Val := StrReplace(Val, "`r", "\r")
@@ -320,25 +396,31 @@ _CrashReport_ToJson(Report) {
 }
 
 ; Joins an array of strings with ",`r`n" separators.
-; Extracted so the serialiser body stays readable.
-; @param Parts {Array} String array.
-; @return {String} Joined string.
+; @param Parts {Array}
+; @return {String}
 _CrashReport_JoinParts(Parts) {
 	Result := ""
-	for Idx, Item in Parts {
+	for Idx, Item in Parts
 		Result .= (Idx > 1 ? ",`r`n" : "") . Item
-	}
 	return Result
 }
 
 ; Joins an array of strings with ", " separator for inline display.
-; Used to format the stuck_modifiers list as a compact comma-separated value.
-; @param Arr {Array} String array.
-; @return {String} Joined string.
+; @param Arr {Array}
+; @return {String}
 _CrashReport_JoinArr(Arr) {
 	Result := ""
-	for Idx, Item in Arr {
+	for Idx, Item in Arr
 		Result .= (Idx > 1 ? ", " : "") . Item
-	}
+	return Result
+}
+
+; Joins an array of strings with newline separators for the log_tail field.
+; @param Lines {Array}
+; @return {String}
+_CrashReport_JoinNewlines(Lines) {
+	Result := ""
+	for Idx, Item in Lines
+		Result .= (Idx > 1 ? "`n" : "") . Item
 	return Result
 }
