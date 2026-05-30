@@ -88,7 +88,7 @@ _LShiftDispatch() {
 ; (which AHK sees as LCtrl+RAlt) would suddenly block and keep LCtrl latched.
 ; The $ prefix suppresses keyboard-hook re-entry, preventing infinite loops.
 #HotIf TapHoldTapAction(TapHold, "left_ctrl") != "" and not LayerEnabled
-~$SC01D::
+$SC01D::
 {
 	UpdateLastSentCharacter("LControl")
 	TimeBefore := A_TickCount
