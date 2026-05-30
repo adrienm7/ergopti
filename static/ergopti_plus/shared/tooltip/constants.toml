@@ -145,9 +145,9 @@ anchor_cascade = ["caret", "ax_element", "window_frame", "screen_center"]
 [colors]
 
 # Near-black default tooltip background (no tint applied).
-# rgba: white=0.10, alpha=1.0 → #1A1A1A at full opacity.
-bg_hex    = "#1A1A1A"
-bg_white  = 0.10    # normalized luminance shorthand for gray backgrounds
+# rgba: white=0.14, alpha=1.0 → #242424 at full opacity.
+bg_hex    = "#242424"
+bg_white  = 0.14    # normalized luminance shorthand for gray backgrounds
 bg_alpha  = 1.0     # canvas background panel alpha (fully opaque panel)
 
 # Canvas-level alpha applied to the background element in HS (gives the slight
@@ -207,8 +207,8 @@ invis_alpha = 0.0
 #   1. Convert accent RGB → HSL, keep only the hue (H).
 #   2. Reconstruct RGB from (H, tint_saturation, tint_lightness).
 #   3. Use the result as the tooltip background fill.
-lightness  = 0.10
-saturation = 0.40
+lightness  = 0.18
+saturation = 0.65
 
 
 # ==================================================

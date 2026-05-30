@@ -116,8 +116,8 @@ function M.apply_tint(requested_tint)
 	end
 	hue = hue / 6
 
-	local lightness = 0.10
-	local saturation = 0.40
+	local lightness = 0.18
+	local saturation = 0.65
 
 	local c = (1 - math.abs(2 * lightness - 1)) * saturation
 	local x = c * (1 - math.abs((hue * 6) % 2 - 1))

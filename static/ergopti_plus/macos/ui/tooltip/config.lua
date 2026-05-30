@@ -65,7 +65,7 @@ M.layout = {
 }
 
 M.colors = {
-	bg         = { white = 0.10, alpha = 1.0 },
+	bg         = { white = 0.14, alpha = 1.0 },
 	bg_alpha   = 0.97,
 	corr_sel   = { red = 0.25, green = 0.90, blue = 0.40, alpha = 1.0 },
 	nw_sel     = { red = 1.00, green = 0.62, blue = 0.10, alpha = 1.0 },
@@ -295,7 +295,7 @@ local function load_from_shared()
 	M.layout.hint_spacing        = get("layout", "hint_spacing",       M.layout.hint_spacing)
 	M.layout.screen_margin       = get("layout", "screen_margin",      M.layout.screen_margin)
 	-- corner_radius passed directly as xRadius/yRadius on canvas element (no ×2)
-	M.layout.corner_radius       = get("layout", "corner_radius",      7)
+	M.layout.corner_radius       = get("layout", "corner_radius",      M.layout.corner_radius)
 
 	-- [positioning]
 	M.layout.caret_offset_x      = get("positioning", "caret_offset_x",         M.layout.caret_offset_x)
@@ -305,13 +305,13 @@ local function load_from_shared()
 	M.layout.max_caret_height    = get("positioning", "max_caret_height",       M.layout.max_caret_height)
 
 	-- [colors]
-	local bg_w = get("colors", "bg_white",     0.10)
-	local bg_a = get("colors", "bg_alpha",     1.0)
+	local bg_w = get("colors", "bg_white",    M.colors.bg.white)
+	local bg_a = get("colors", "bg_alpha",    M.colors.bg.alpha)
 	M.colors.bg       = { white = bg_w, alpha = bg_a }
 	M.colors.bg_alpha = get("colors", "canvas_alpha_hs", M.colors.bg_alpha)
 
-	local sep_w = get("colors", "sep_white",     1.0)
-	local sep_a = get("colors", "sep_alpha_hs",  0.09)
+	local sep_w = get("colors", "sep_white",    M.colors.sep.white)
+	local sep_a = get("colors", "sep_alpha_hs", M.colors.sep.alpha)
 	M.colors.sep      = { white = sep_w, alpha = sep_a }
 
 	-- [timing]
