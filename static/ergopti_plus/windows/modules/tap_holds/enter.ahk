@@ -7,9 +7,14 @@
 ; Enter tap-hold: any action from GESTURE_ACTIONS on tap (default: enter),
 ; any hold modifier or nav layer on hold. Scancode SC01C.
 ;
-; Architecture mirrors lshift_lctrl: ~$ prefix so Enter still reaches the OS
-; during KeyWait (Shift+Enter, Ctrl+Enter etc. keep working). The tap action
-; defaults to sending Enter when the key is unconfigured.
+; Two-phase design (mirrors space.ahk) to prevent auto-repeat from
+; triggering multiple Enter strokes during a long hold:
+; Phase 1 — KeyWait with timeout discriminates tap from hold.
+;   tap=1 (released before threshold) → dispatch tap action.
+;   tap=0 (still held at threshold) → enter hold phase.
+; Phase 2 (modifier) — arm modifier, capture next keystroke via InputHook,
+;   then release modifier on key-up.
+; Phase 2 (layer) — activate layer, keep active until key-up.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -43,20 +48,23 @@ _EnterHoldModKey() {
 
 #HotIf TapHoldHoldModifier(TapHold, "enter") != "" and not LayerEnabled
 $SC01C:: {
+	tap := KeyWait("SC01C", "T" . TapHoldDuration(TapHold, "enter"))
+	if tap {
+		; Short press — tap action.
+		if (A_PriorKey == "Enter")
+			_EnterDispatch()
+		return
+	}
+	; Long press — arm modifier, capture next keystroke, release on key-up.
 	ModKey := _EnterHoldModKey()
 	TextPressKey(ModKey, "Down")
-	TimeBefore := A_TickCount
-	KeyWait("SC01C")
-	TimeAfter := A_TickCount
-	tap := ((TimeAfter - TimeBefore) <= TapHoldDuration(TapHold, "enter") * 1000)
+	ih := InputHook("L1 T3")
+	ih.Start()
+	ih.Wait()
+	if (ih.Input != "" and ih.Input != "`r")
+		SendInput("{" . ModKey . " down}" . ih.Input . "{" . ModKey . " up}")
+	KeyWait("SC01C", "U T2")
 	TextPressKey(ModKey, "Up")
-	if (
-		tap
-		and (TimeAfter - TimeBefore) >= TapMinDurationMs()
-		and A_PriorKey == "Enter"
-	) {
-		_EnterDispatch()
-	}
 }
 #HotIf
 
@@ -67,22 +75,16 @@ $SC01C:: {
 
 #HotIf TapHoldHoldLayer(TapHold, "enter") != "" and TapHoldHoldModifier(TapHold, "enter") == "" and not LayerEnabled
 $SC01C:: {
-	UpdateLastSentCharacter("Enter")
-
-	ActivateLayer()
-	KeyWait("SC01C")
-	DisableLayer()
-
-	Now := A_TickCount
-	CharacterSentTime := LastSentCharacterKeyTime.Has("Enter") ? LastSentCharacterKeyTime["Enter"] : Now
-	tap := (Now - CharacterSentTime <= TapHoldDuration(TapHold, "enter") * 1000)
-	if (
-		tap
-		and (Now - CharacterSentTime) >= TapMinDurationMs()
-		and A_PriorKey == "Enter"
-	) {
-		_EnterDispatch()
+	tap := KeyWait("SC01C", "T" . TapHoldDuration(TapHold, "enter"))
+	if tap {
+		if (A_PriorKey == "Enter")
+			_EnterDispatch()
+		return
 	}
+	; Long press — activate layer until key-up.
+	ActivateLayer()
+	KeyWait("SC01C", "U")
+	DisableLayer()
 }
 #HotIf
 
@@ -91,10 +93,10 @@ $SC01C:: {
 
 ; ======= 9.3) Tap-only (hold=none, tap action set) =======
 
-; ~ passes Enter to the OS; $ prevents re-entry. Fire immediately on key-down —
-; no KeyWait or A_PriorKey guard needed since there is no hold behaviour.
+; $ prevents re-entry. Fire immediately on key-down — no KeyWait needed since
+; there is no hold behaviour. No ~ so the native Enter is not also sent.
 #HotIf TapHoldTapAction(TapHold, "enter") != "" and TapHoldTapAction(TapHold, "enter") != "enter" and TapHoldHoldModifier(TapHold, "enter") == "" and TapHoldHoldLayer(TapHold, "enter") == "" and not LayerEnabled
-~$SC01C:: _EnterDispatch()
+$SC01C:: _EnterDispatch()
 #HotIf
 
 

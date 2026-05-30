@@ -107,9 +107,14 @@ SC11D::
 
 #HotIf TapHoldTapAction(TapHold, "right_ctrl") == "one_shot_shift" and not LayerEnabled
 SC11D:: {
-	OneShotShift()
+	tap := KeyWait("SC11D", "T" . TapHoldDuration(TapHold, "right_ctrl"))
+	if tap {
+		OneShotShift()
+		return
+	}
+	; Long press — arm Shift until key-up.
 	TextPressKey("LShift", "Down")
-	KeyWait("SC11D")
+	KeyWait("SC11D", "U")
 	TextPressKey("LShift", "Up")
 }
 #HotIf
@@ -129,7 +134,7 @@ $SC11D:: {
 		_RCtrlDispatch()
 		return
 	}
-	KeyWait("SC11D")
+	KeyWait("SC11D", "U")
 	TextPressKey(ModKey, "Up")
 }
 #HotIf
@@ -141,18 +146,15 @@ $SC11D:: {
 
 #HotIf not _RCtrlIsSpecialTap() and TapHoldHoldLayer(TapHold, "right_ctrl") != "" and TapHoldTapAction(TapHold, "right_ctrl") != "" and not LayerEnabled
 $SC11D:: {
-	UpdateLastSentCharacter("RControl")
-
-	ActivateLayer()
-	KeyWait("SC11D")
-	DisableLayer()
-
-	Now := A_TickCount
-	CharacterSentTime := LastSentCharacterKeyTime.Has("RControl") ? LastSentCharacterKeyTime["RControl"] : Now
-	tap := (Now - CharacterSentTime <= TapHoldDuration(TapHold, "right_ctrl") * 1000)
-	if (tap and A_PriorKey == "RControl") {
-		_RCtrlDispatch()
+	tap := KeyWait("SC11D", "T" . TapHoldDuration(TapHold, "right_ctrl"))
+	if tap {
+		if (A_PriorKey == "RControl")
+			_RCtrlDispatch()
+		return
 	}
+	ActivateLayer()
+	KeyWait("SC11D", "U")
+	DisableLayer()
 }
 #HotIf
 

@@ -137,8 +137,8 @@ SC03A:: {
 		_CapsLockDispatch(CtrlActivated)
 		return
 	}
-	; Long press — modifier stays armed until key-up (already held by OS via Down).
-	KeyWait("CapsLock")
+	; Long press — modifier stays armed until key-up.
+	KeyWait("CapsLock", "U")
 	TextPressKey(ModKey, "Up")
 }
 #HotIf

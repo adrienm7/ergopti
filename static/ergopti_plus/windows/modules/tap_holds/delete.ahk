@@ -7,6 +7,11 @@
 ; Delete tap-hold: any action from GESTURE_ACTIONS on tap (default: delete),
 ; any hold modifier or nav layer on hold. Scancode SC053.
 ;
+; Two-phase design (mirrors space.ahk) to prevent auto-repeat during long hold:
+; Phase 1 — KeyWait with timeout discriminates tap from hold.
+; Phase 2 (modifier) — arm modifier, capture next key, release on key-up.
+; Phase 2 (layer) — activate layer until key-up.
+;
 ; Note: this remaps the physical Delete/Suppr key (SC053). The LAlt and RCtrl
 ; modules emit Delete as an *output* action — that is unrelated to this module.
 ; ==============================================================================
@@ -42,20 +47,21 @@ _DeleteHoldModKey() {
 
 #HotIf TapHoldHoldModifier(TapHold, "delete") != "" and not LayerEnabled
 $SC053:: {
+	tap := KeyWait("SC053", "T" . TapHoldDuration(TapHold, "delete"))
+	if tap {
+		if (A_PriorKey == "Delete")
+			_DeleteDispatch()
+		return
+	}
 	ModKey := _DeleteHoldModKey()
 	TextPressKey(ModKey, "Down")
-	TimeBefore := A_TickCount
-	KeyWait("SC053")
-	TimeAfter := A_TickCount
-	tap := ((TimeAfter - TimeBefore) <= TapHoldDuration(TapHold, "delete") * 1000)
+	ih := InputHook("L1 T3")
+	ih.Start()
+	ih.Wait()
+	if (ih.Input != "")
+		SendInput("{" . ModKey . " down}" . ih.Input . "{" . ModKey . " up}")
+	KeyWait("SC053", "U T2")
 	TextPressKey(ModKey, "Up")
-	if (
-		tap
-		and (TimeAfter - TimeBefore) >= TapMinDurationMs()
-		and A_PriorKey == "Delete"
-	) {
-		_DeleteDispatch()
-	}
 }
 #HotIf
 
@@ -66,22 +72,15 @@ $SC053:: {
 
 #HotIf TapHoldHoldLayer(TapHold, "delete") != "" and TapHoldHoldModifier(TapHold, "delete") == "" and not LayerEnabled
 $SC053:: {
-	UpdateLastSentCharacter("Delete")
-
-	ActivateLayer()
-	KeyWait("SC053")
-	DisableLayer()
-
-	Now := A_TickCount
-	CharacterSentTime := LastSentCharacterKeyTime.Has("Delete") ? LastSentCharacterKeyTime["Delete"] : Now
-	tap := (Now - CharacterSentTime <= TapHoldDuration(TapHold, "delete") * 1000)
-	if (
-		tap
-		and (Now - CharacterSentTime) >= TapMinDurationMs()
-		and A_PriorKey == "Delete"
-	) {
-		_DeleteDispatch()
+	tap := KeyWait("SC053", "T" . TapHoldDuration(TapHold, "delete"))
+	if tap {
+		if (A_PriorKey == "Delete")
+			_DeleteDispatch()
+		return
 	}
+	ActivateLayer()
+	KeyWait("SC053", "U")
+	DisableLayer()
 }
 #HotIf
 

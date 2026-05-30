@@ -44,20 +44,21 @@ _WinHoldModKey() {
 
 #HotIf TapHoldHoldModifier(TapHold, "win") != "" and not LayerEnabled
 $SC15B:: {
+	tap := KeyWait("SC15B", "T" . TapHoldDuration(TapHold, "win"))
+	if tap {
+		if (A_PriorKey == "LWin")
+			_WinDispatch()
+		return
+	}
 	ModKey := _WinHoldModKey()
 	TextPressKey(ModKey, "Down")
-	TimeBefore := A_TickCount
-	KeyWait("SC15B")
-	TimeAfter := A_TickCount
-	tap := ((TimeAfter - TimeBefore) <= TapHoldDuration(TapHold, "win") * 1000)
+	ih := InputHook("L1 T3")
+	ih.Start()
+	ih.Wait()
+	if (ih.Input != "")
+		SendInput("{" . ModKey . " down}" . ih.Input . "{" . ModKey . " up}")
+	KeyWait("SC15B", "U T2")
 	TextPressKey(ModKey, "Up")
-	if (
-		tap
-		and (TimeAfter - TimeBefore) >= TapMinDurationMs()
-		and A_PriorKey == "LWin"
-	) {
-		_WinDispatch()
-	}
 }
 #HotIf
 
@@ -68,22 +69,15 @@ $SC15B:: {
 
 #HotIf TapHoldHoldLayer(TapHold, "win") != "" and TapHoldHoldModifier(TapHold, "win") == "" and not LayerEnabled
 $SC15B:: {
-	UpdateLastSentCharacter("LWin")
-
-	ActivateLayer()
-	KeyWait("SC15B")
-	DisableLayer()
-
-	Now := A_TickCount
-	CharacterSentTime := LastSentCharacterKeyTime.Has("LWin") ? LastSentCharacterKeyTime["LWin"] : Now
-	tap := (Now - CharacterSentTime <= TapHoldDuration(TapHold, "win") * 1000)
-	if (
-		tap
-		and (Now - CharacterSentTime) >= TapMinDurationMs()
-		and A_PriorKey == "LWin"
-	) {
-		_WinDispatch()
+	tap := KeyWait("SC15B", "T" . TapHoldDuration(TapHold, "win"))
+	if tap {
+		if (A_PriorKey == "LWin")
+			_WinDispatch()
+		return
 	}
+	ActivateLayer()
+	KeyWait("SC15B", "U")
+	DisableLayer()
 }
 #HotIf
 

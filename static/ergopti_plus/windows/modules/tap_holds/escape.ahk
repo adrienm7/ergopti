@@ -6,6 +6,11 @@
 ; DESCRIPTION:
 ; Escape tap-hold: any action from GESTURE_ACTIONS on tap (default: escape),
 ; any hold modifier or nav layer on hold. Scancode SC001.
+;
+; Two-phase design (mirrors space.ahk) to prevent auto-repeat during long hold:
+; Phase 1 — KeyWait with timeout discriminates tap from hold.
+; Phase 2 (modifier) — arm modifier, capture next key, release on key-up.
+; Phase 2 (layer) — activate layer until key-up.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -39,20 +44,21 @@ _EscapeHoldModKey() {
 
 #HotIf TapHoldHoldModifier(TapHold, "escape") != "" and not LayerEnabled
 $SC001:: {
+	tap := KeyWait("SC001", "T" . TapHoldDuration(TapHold, "escape"))
+	if tap {
+		if (A_PriorKey == "Escape")
+			_EscapeDispatch()
+		return
+	}
 	ModKey := _EscapeHoldModKey()
 	TextPressKey(ModKey, "Down")
-	TimeBefore := A_TickCount
-	KeyWait("SC001")
-	TimeAfter := A_TickCount
-	tap := ((TimeAfter - TimeBefore) <= TapHoldDuration(TapHold, "escape") * 1000)
+	ih := InputHook("L1 T3")
+	ih.Start()
+	ih.Wait()
+	if (ih.Input != "")
+		SendInput("{" . ModKey . " down}" . ih.Input . "{" . ModKey . " up}")
+	KeyWait("SC001", "U T2")
 	TextPressKey(ModKey, "Up")
-	if (
-		tap
-		and (TimeAfter - TimeBefore) >= TapMinDurationMs()
-		and A_PriorKey == "Escape"
-	) {
-		_EscapeDispatch()
-	}
 }
 #HotIf
 
@@ -63,22 +69,15 @@ $SC001:: {
 
 #HotIf TapHoldHoldLayer(TapHold, "escape") != "" and TapHoldHoldModifier(TapHold, "escape") == "" and not LayerEnabled
 $SC001:: {
-	UpdateLastSentCharacter("Escape")
-
-	ActivateLayer()
-	KeyWait("SC001")
-	DisableLayer()
-
-	Now := A_TickCount
-	CharacterSentTime := LastSentCharacterKeyTime.Has("Escape") ? LastSentCharacterKeyTime["Escape"] : Now
-	tap := (Now - CharacterSentTime <= TapHoldDuration(TapHold, "escape") * 1000)
-	if (
-		tap
-		and (Now - CharacterSentTime) >= TapMinDurationMs()
-		and A_PriorKey == "Escape"
-	) {
-		_EscapeDispatch()
+	tap := KeyWait("SC001", "T" . TapHoldDuration(TapHold, "escape"))
+	if tap {
+		if (A_PriorKey == "Escape")
+			_EscapeDispatch()
+		return
 	}
+	ActivateLayer()
+	KeyWait("SC001", "U")
+	DisableLayer()
 }
 #HotIf
 

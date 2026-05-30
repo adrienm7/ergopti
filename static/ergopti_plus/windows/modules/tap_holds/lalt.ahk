@@ -146,7 +146,7 @@ SC038::
 		TextPressKey("LAlt", "Up")
 		AltTabMonitor()
 	} else {
-		KeyWait("SC038")
+		KeyWait("SC038", "U")
 		TextPressKey("LAlt", "Up")
 	}
 }
@@ -180,26 +180,22 @@ SC038::
 #HotIf _LAltIsBackspaceLayer() and not LayerEnabled
 *SC038::
 {
-	UpdateLastSentCharacter("LAlt")
-
-	ActivateLayer()
-	KeyWait("SC038")
-	DisableLayer()
-
-	Now := A_TickCount
-	CharacterSentTime := LastSentCharacterKeyTime.Has("LAlt") ? LastSentCharacterKeyTime["LAlt"] : Now
-	tap := (Now - CharacterSentTime <= TapHoldDuration(TapHold, "left_alt") * 1000)
-
-	if (
-		tap
-		and A_PriorKey == "LAlt" ; Prevents spurious BackSpace when layer key was actually used
-		and KS_IsUp("SC03A") ; Prevents spurious BackSpace on quick LAlt+CapsLock release
-	) {
-		BackSpaceActionWithModifiers := BackSpaceLogic()
-		if not BackSpaceActionWithModifiers {
-			TextPressKey("BackSpace", "")
+	tap := KeyWait("SC038", "T" . TapHoldDuration(TapHold, "left_alt"))
+	if tap {
+		if (
+			A_PriorKey == "LAlt" ; Prevents spurious BackSpace when layer key was actually used
+			and KS_IsUp("SC03A") ; Prevents spurious BackSpace on quick LAlt+CapsLock release
+		) {
+			BackSpaceActionWithModifiers := BackSpaceLogic()
+			if not BackSpaceActionWithModifiers {
+				TextPressKey("BackSpace", "")
+			}
 		}
+		return
 	}
+	ActivateLayer()
+	KeyWait("SC038", "U")
+	DisableLayer()
 }
 #HotIf
 
@@ -218,7 +214,7 @@ $SC038:: {
 		_LAltDispatch()
 		return
 	}
-	KeyWait("SC038")
+	KeyWait("SC038", "U")
 	TextPressKey(ModKey, "Up")
 }
 #HotIf
