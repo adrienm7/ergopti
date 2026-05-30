@@ -124,13 +124,18 @@ LLM_Bridge_OnChar(ch) {
 		return
 
 	_LLM_Bridge_Buffer .= ch
-	; Pass ``silent := true`` so the bridge's natural "tooltip is stale,
-	; new keystroke incoming" hide does NOT emit an llm_dismissed event.
-	; Otherwise every keystroke while a tooltip is on screen produces a
-	; bogus dismissed event before the next suggestion arrives, flooding
-	; the keylogger with spurious dismiss / suggest pairs that ruin the
-	; acceptance-rate metric.
-	LLM_Tooltip_Hide(true)
+	; Hotstring tooltip priority: if the PrefixWatcher's tooltip is visible,
+	; update the buffer but do NOT arm the LLM timer — the prediction must
+	; wait until the overlay is gone, exactly like the HS chain-delay logic
+	; (modules/keymap/llm_bridge.lua: engine.start_timer(tooltip_timeout +
+	; HOTSTRING_CHAIN_OFFSET_SEC)). The next keystroke after the tooltip
+	; closes will re-arm the debounce timer and fire the prediction normally.
+	if TooltipIsVisible()
+		return
+	; Only hide OUR tooltip — never dismiss a hotstring overlay.
+	; Silent=true so no llm_dismissed event is emitted for a stale hide.
+	if LLM_Tooltip_IsVisible()
+		LLM_Tooltip_Hide(true)
 	LLM_Engine_OnKeystroke(_LLM_Bridge_Buffer)
 }
 
@@ -146,9 +151,11 @@ LLM_Bridge_OnBackspace() {
 	if (StrLen(_LLM_Bridge_Buffer) > 0)
 		_LLM_Bridge_Buffer := SubStr(_LLM_Bridge_Buffer, 1, -1)
 
-	; Same reasoning as LLM_Bridge_OnChar — typing past a suggestion is a
-	; "stale" hide, not a "user said no" hide.
-	LLM_Tooltip_Hide(true)
+	; Same hotstring-priority guard as OnChar.
+	if TooltipIsVisible()
+		return
+	if LLM_Tooltip_IsVisible()
+		LLM_Tooltip_Hide(true)
 	LLM_Engine_OnKeystroke(_LLM_Bridge_Buffer)
 }
 

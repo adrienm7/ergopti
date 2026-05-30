@@ -279,6 +279,14 @@ TooltipHide() {
     _TooltipShownBorderHwnds := []
 }
 
+; Returns true when a hotstring-style tooltip (built by TooltipShow) is
+; currently visible. Used by the LLM bridge to avoid firing predictions while
+; a hotstring overlay is on screen — mirrors the HS tooltip.is_visible() check.
+TooltipIsVisible() {
+    global _TooltipGui
+    return IsSet(_TooltipGui) and _TooltipGui != 0
+}
+
 
 
 
