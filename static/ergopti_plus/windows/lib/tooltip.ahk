@@ -419,7 +419,11 @@ TooltipHide(DbgTag := "?", Force := false) {
         if HDWP {
             for , Row in _TooltipRowGuis {
                 if HDWP
-                    HDWP := DllCall("User32\DeferWindowPos",
+                    ; .Hwnd throws "Gui has no window" if the Gui was already
+                    ; destroyed by a concurrent hide (e.g. LLM_TooltipHide ran
+                    ; immediately before this call). Skip destroyed Guis silently —
+                    ; Destroy() below will confirm they are already gone.
+                    try HDWP := DllCall("User32\DeferWindowPos",
                         "Ptr", HDWP, "Ptr", Row.Gui.Hwnd,
                         "Ptr", 0, "Int", 0, "Int", 0, "Int", 0, "Int", 0,
                         "UInt", SWP_HIDE_FLAGS, "Ptr")
