@@ -2001,8 +2001,7 @@ ShowActionPicker(Title, Current, OnConfirm) {
         NewRows     := BuildListRows(Matched)
         FilteredIds := NewRows.Ids
         LB.Delete()
-        for Lbl in NewRows.Labels
-            LB.Add(Lbl)
+        LB.Add(NewRows.Labels)
         ; Skip headers when pre-selecting first result
         for i, Id in FilteredIds {
             if (Id != "") {
