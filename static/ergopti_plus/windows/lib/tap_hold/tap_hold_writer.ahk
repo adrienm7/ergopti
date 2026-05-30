@@ -190,7 +190,8 @@ WriteTapHoldTap(KeyId, ActionId) {
 
 	if (ActionId == "") {
 		; Clear the tap slot. If hold is also clear, remove the entry entirely.
-		Entry.Delete("tap_action")
+		if Entry.Has("tap_action")
+			Entry.Delete("tap_action")
 		if (!Entry.Has("hold_modifier") and !Entry.Has("hold_layer")) {
 			TapHold["keys"].Delete(KeyId)
 		}
