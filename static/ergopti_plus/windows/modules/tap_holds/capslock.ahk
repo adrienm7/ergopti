@@ -4,12 +4,26 @@
 ; ==============================================================================
 ; MODULE: Tap-Holds — CapsLock
 ; DESCRIPTION:
-; Handles CapsLock tap-hold variants: plain backspace, Ctrl-on-hold variants
-; (v1 *Ctrl keys), and the LAlt+CapsLock shortcut integration.
+; CapsLock tap-hold: any action from GESTURE_ACTIONS on tap, any hold modifier
+; (Ctrl/Shift/Alt/AltGr/Win) or nav layer on hold.
+;
+; Preserved subtleties:
+; - LAlt+CapsLock shortcut is intercepted in every branch that remaps CapsLock,
+;   so the LAltCapsLockShortcut() combo keeps working regardless of tap/hold config.
+; - "plain backspace" variant (tap=backspace, hold=none): uses *SC03A with Blind
+;   so modifiers are passed through — identical to the original v1 behaviour.
+; - Hold-modifier variants (Ctrl/Shift/Alt/Win): pre-arm the modifier on key-down,
+;   then release immediately if it was a tap so the tap action fires clean.
+; - Hold-layer (nav): mirrors LAlt — activate layer on press, tap action fires on
+;   release if under threshold, no modifier ever sent.
+; - "no remapping" fallback: when CapsLock has no tap action AND no hold action,
+;   and LAlt is remapped to one_shot_shift, the LAltCapsLockShortcut must still
+;   be reachable — handled by the dedicated first #HotIf block.
+; - CtrlActivated guard: when LCtrl is physically held while CapsLock fires,
+;   the tap action is sent inside Ctrl so shortcuts like Ctrl+CapsLock still work.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
-
 
 
 
@@ -20,101 +34,194 @@
 ; ===========================
 ; ==============================
 
-; Fix for using the LAltCapsLockShortcut with LAlt remapped to OneShotShift and CapsLock not remapped
+; Helper predicates -------------------------------------------------------
+
+; True when CapsLock has a tap action or hold action configured.
+_CapsLockIsRemapped() {
+	return TapHoldIsConfigured(TapHold, "caps_lock")
+}
+
+; True when tap=backspace and hold=none (the plain-backspace variant that
+; needs *SC03A with Blind passthrough — no modifier pre-arming needed).
+_CapsLockIsPlainBackspace() {
+	return TapHoldTapAction(TapHold, "caps_lock") == "backspace"
+		and TapHoldHoldModifier(TapHold, "caps_lock") == ""
+		and TapHoldHoldLayer(TapHold, "caps_lock") == ""
+}
+
+; True when CapsLock has any hold modifier configured (Ctrl/Shift/Alt/Win/AltGr).
+_CapsLockHasHoldModifier() {
+	return TapHoldHoldModifier(TapHold, "caps_lock") != ""
+}
+
+; True when CapsLock has the nav layer as hold.
+_CapsLockHasHoldLayer() {
+	return TapHoldHoldLayer(TapHold, "caps_lock") != ""
+}
+
+; Return the AHK key name for the configured hold modifier.
+_CapsLockHoldModKey() {
+	switch TapHoldHoldModifier(TapHold, "caps_lock") {
+		case "ctrl":   return "LCtrl"
+		case "shift":  return "LShift"
+		case "alt":    return "LAlt"
+		case "alt_gr": return "RAlt"
+		case "win":    return "LWin"
+		default:       return ""
+	}
+}
+
+
+
+
+; ======= 2.1) No-remap LAlt+CapsLock rescue =======
+
+; When CapsLock is not remapped at all but LAlt is on one_shot_shift, the
+; LAlt+CapsLock shortcut must still fire. Without this block AHK would let
+; CapsLock pass to the OS and LAltCapsLockShortcut() would never be called.
 #HotIf (
-    TapHoldTapAction(TapHold, "left_alt") == "one_shot_shift"
-    and not _CapsLockIsPlainBackspace()
-    and not CapsLockRemappedCondition()
-    and not LayerEnabled
+	TapHoldTapAction(TapHold, "left_alt") == "one_shot_shift"
+	and not _CapsLockIsRemapped()
+	and not LayerEnabled
 )
 SC03A:: {
-    if (KS_IsDown("SC038")) { ; LAlt physically held
-        LAltCapsLockShortcut()
-        return
-    }
-    ToggleCapsLock()
+	if (KS_IsDown("SC038")) { ; LAlt physically held
+		LAltCapsLockShortcut()
+		return
+	}
+	ToggleCapsLock()
 }
 #HotIf
 
+
+
+
+; ======= 2.2) Plain-backspace variant (tap=backspace, hold=none) =======
+
+; Uses *SC03A (wildcard = pass modifiers through Blind) so Shift/Ctrl+CapsLock
+; still produce Shift+BackSpace / Ctrl+BackSpace as expected.
 #HotIf _CapsLockIsPlainBackspace() and not LayerEnabled
 *SC03A:: {
-    if (KS_IsDown("SC038")) { ; LAlt physically held
-        LAltCapsLockShortcut()
-        return
-    }
-
-    TextPressKey("BackSpace", "Blind")
+	if (KS_IsDown("SC038")) { ; LAlt physically held
+		LAltCapsLockShortcut()
+		return
+	}
+	TextPressKey("BackSpace", "Blind")
 }
 #HotIf
 
-; "BackSpace" variant: tap_action="backspace" without any hold modifier
-; (the v1 *SC03A handler is a plain BackSpace, no Ctrl-on-hold dance).
-_CapsLockIsPlainBackspace() {
-    return TapHoldTapAction(TapHold, "caps_lock") == "backspace"
-        and TapHoldHoldModifier(TapHold, "caps_lock") == ""
-}
 
-; Returns true when the CapsLock tap-hold has Ctrl on hold -- i.e. one of
-; the v1 *Ctrl variants (BackSpaceCtrl, CapsLockCtrl, EnterCtrl, ...) is
-; active. Drives the *SC03A handler that pre-arms LCtrl Down on press.
-CapsLockRemappedCondition() {
-    return TapHoldHoldModifier(TapHold, "caps_lock") == "ctrl"
-}
 
-#HotIf CapsLockRemappedCondition() and not LayerEnabled
+
+; ======= 2.3) Hold-modifier variant =======
+
+; Pre-arms the configured modifier on key-down, waits for key-up, then either
+; sends the tap action (short press) or keeps the modifier held until release.
+; The modifier is always released before the tap action fires so the action
+; itself runs clean (e.g. Enter without Ctrl).
+#HotIf _CapsLockHasHoldModifier() and not LayerEnabled
 *SC03A:: {
-    CtrlActivated := False
-    if (KS_IsDown("SC01D")) { ; LCtrl physically held
-        CtrlActivated := True
-    }
+	CtrlActivated := KS_IsDown("SC01D") ; LCtrl physically held at press time
 
-    if (KS_IsDown("SC038")) { ; LAlt physically held
-        ; Fix for using the LAltCapsLockShortcut with LAlt remapped to OneShotShift and CapsLock remapped
-        LAltCapsLockShortcut()
-        return
-    }
+	if (KS_IsDown("SC038")) { ; LAlt physically held — shortcut intercept
+		LAltCapsLockShortcut()
+		return
+	}
 
-    TextPressKey("LCtrl", "Down")
-    tap := KeyWait("CapsLock", "T" . TapHoldDuration(TapHold, "caps_lock"))
-    if (tap and A_PriorKey == "LControl") {
-        TextPressKey("LCtrl", "Up")
-        CapsLockShortcut(CtrlActivated)
-    }
-    TextPressKey("LCtrl", "Up")
+	ModKey := _CapsLockHoldModKey()
+	TextPressKey(ModKey, "Down")
+	tap := KeyWait("CapsLock", "T" . TapHoldDuration(TapHold, "caps_lock"))
+	if (tap and A_PriorKey == "LControl") {
+		; Short press — release modifier then dispatch tap action.
+		TextPressKey(ModKey, "Up")
+		_CapsLockDispatch(CtrlActivated)
+		return
+	}
+	; Long press — modifier stays armed until key-up (already held by OS via Down).
+	KeyWait("CapsLock")
+	TextPressKey(ModKey, "Up")
 }
 #HotIf
 
-CapsLockShortcut(CtrlActivated) {
-    if CtrlActivated {
-        TextPressKey("LCtrl", "Down")
-    }
 
-    ; Dispatch on the v2 tap_action -- only reachable when hold_modifier
-    ; is "ctrl" (otherwise CapsLockRemappedCondition gates us out before
-    ; we get here).
-    switch TapHoldTapAction(TapHold, "caps_lock") {
-        case "backspace":
-            TextPressKey("BackSpace", "Blind")
-        case "caps_lock":
-            ToggleCapsLock()
-        case "caps_word":
-            ToggleCapsWord()
-        case "ctrl_backspace":
-            TextPressKey("BackSpace", "Ctrl")
-        case "ctrl_delete":
-            TextPressKey("Delete", "Ctrl")
-        case "delete":
-            TextPressKey("Delete", "Blind")
-        case "enter":
-            TextPressKey("Enter", "Blind")
-            DisableCapsWord()
-        case "escape":
-            TextPressKey("Escape", "Blind")
-        case "one_shot_shift":
-            OneShotShift()
-        case "tab":
-            TextPressKey("Tab", "Blind")
-    }
 
-    TextPressKey("LCtrl", "Up")
+
+; ======= 2.4) Hold-layer variant =======
+
+; Mirrors the LAlt layer approach: activate layer on hold, tap action on release.
+#HotIf _CapsLockHasHoldLayer() and not LayerEnabled
+SC03A:: {
+	if (KS_IsDown("SC038")) { ; LAlt physically held
+		LAltCapsLockShortcut()
+		return
+	}
+
+	UpdateLastSentCharacter("CapsLock")
+	ActivateLayer()
+	KeyWait("CapsLock")
+	DisableLayer()
+
+	Now           := A_TickCount
+	CharTime      := LastSentCharacterKeyTime.Has("CapsLock") ? LastSentCharacterKeyTime["CapsLock"] : Now
+	tap           := (Now - CharTime <= TapHoldDuration(TapHold, "caps_lock") * 1000)
+	if (tap and A_PriorKey == "LControl") {
+		_CapsLockDispatch(False)
+	}
+}
+#HotIf
+
+
+
+
+; ======= 2.5) Tap-only variant (tap action set, hold=none, not plain backspace) =======
+
+; Simple gate: fire the tap action on every press (no hold behaviour).
+#HotIf TapHoldTapAction(TapHold, "caps_lock") != "" and not _CapsLockHasHoldModifier() and not _CapsLockHasHoldLayer() and not _CapsLockIsPlainBackspace() and not LayerEnabled
+SC03A:: {
+	if (KS_IsDown("SC038")) { ; LAlt physically held
+		LAltCapsLockShortcut()
+		return
+	}
+	_CapsLockDispatch(False)
+}
+#HotIf
+
+
+
+
+; ======= 2.6) Tap dispatch =======
+
+; Dispatch the configured tap action for CapsLock.
+; CtrlActivated: true when LCtrl was physically held at key-down time — the
+; tap action is then wrapped in LCtrl so Ctrl+CapsLock combos still work.
+_CapsLockDispatch(CtrlActivated) {
+	if CtrlActivated {
+		TextPressKey("LCtrl", "Down")
+	}
+	switch TapHoldTapAction(TapHold, "caps_lock") {
+		case "alt_tab_monitor":  AltTabMonitor()
+		case "backspace":        TextPressKey("BackSpace", "Blind")
+		case "caps_lock":        ToggleCapsLock()
+		case "caps_word":        ToggleCapsWord()
+		case "copy":             TextPressKey("c", ["Ctrl"])
+		case "ctrl_backspace":   TextPressKey("BackSpace", "Ctrl")
+		case "ctrl_delete":      TextPressKey("Delete", "Ctrl")
+		case "cut":              TextPressKey("x", ["Ctrl"])
+		case "delete":           TextPressKey("Delete", "Blind")
+		case "enter":            TextPressKey("Enter", "Blind") ; DisableCapsWord kept intentionally
+		case "escape":           TextPressKey("Escape", "Blind")
+		case "find":             TextPressKey("f", ["Ctrl"])
+		case "one_shot_shift":   OneShotShift()
+		case "paste":            TextPressKey("v", ["Ctrl"])
+		case "paste_plain":      GesturePastePlain()
+		case "redo":             TextPressKey("y", ["Ctrl"])
+		case "select_all":       TextPressKey("a", ["Ctrl"])
+		case "space":            TextPressKey("Space", [])
+		case "tab":              TextPressKey("Tab", "Blind")
+		case "toggle_capslock":  ToggleCapsLock()
+		case "undo":             TextPressKey("z", ["Ctrl"])
+	}
+	if CtrlActivated {
+		TextPressKey("LCtrl", "Up")
+	}
 }

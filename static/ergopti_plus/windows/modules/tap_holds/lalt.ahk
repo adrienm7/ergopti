@@ -4,13 +4,31 @@
 ; ==============================================================================
 ; MODULE: Tap-Holds — LAlt
 ; DESCRIPTION:
-; LAlt tap-hold variants: OneShotShift, Tab+Layer, AltTabMonitor, BackSpace,
-; and BackSpace+Layer. The BackSpace variants include key-repeat and
-; Shift/Ctrl modifier logic shared via BackSpaceLogic().
+; LAlt tap-hold: any action from GESTURE_ACTIONS on tap, any hold modifier or
+; nav layer on hold.
+;
+; Architecture: specific variants that need special hold mechanics are handled
+; by dedicated #HotIf blocks (higher priority, matched first). A generic
+; fallback block covers every other tap+hold combination so the dispatcher
+; does not need to be updated when new actions are added to the picker.
+;
+; Preserved subtleties:
+; - one_shot_shift tap: 4-key guard prevents firing mid-shortcut when another
+;   modifier is already held (RCtrl, CapsLock, LShift, LCtrl).
+; - tab+layer: layer activated immediately on press, Tab emitted only if tap.
+;   SC02A&SC038 and SC11D&SC038 hotkeys for Shift+Tab via LShift/RCtrl hold.
+; - backspace plain: key-repeat loop with KEY_REPEAT_INITIAL_DELAY_MS / INTERVAL.
+;   BackSpaceLogic() handles Ctrl+BS, Shift+BS, RCtrl-as-Shift combinations.
+; - backspace+layer: same BackSpaceLogic(), but gated by A_PriorKey==LAlt and
+;   KS_IsUp(CapsLock) to prevent spurious fires on LAlt+CapsLock quick release.
+; - alt_tab_monitor+alt: pre-arms LAlt Down so the OS sees Alt held during the
+;   hold phase; released immediately on tap to let AltTabMonitor() fire clean.
+; - Generic hold-modifier fallback: pre-arms the modifier, releases on tap.
+; - Generic hold-layer fallback: same layer pattern as tab+layer.
+; - Generic tap-only fallback (hold=none): fires action immediately on press.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
-
 
 
 
@@ -21,185 +39,297 @@
 ; =======================
 ; ==============================
 
-; LAlt v2 variants share two tap-actions and a hold-layer slot:
-;   OneShotShift  -> tap=one_shot_shift, hold_mod=alt
-;   TabLayer      -> tap=tab,            hold_layer=nav
-;   AltTabMonitor -> tap=alt_tab_monitor, hold_mod=alt
-;   BackSpace     -> tap=backspace       (key-repeat, no hold)
-;   BackSpaceLayer-> tap=backspace,      hold_layer=nav
-; The two backspace variants are distinguished by hold_layer presence.
+; Helper predicates -------------------------------------------------------
+
 _LAltIsPlainBackspace() {
-    return TapHoldTapAction(TapHold, "left_alt") == "backspace"
-        and TapHoldHoldLayer(TapHold, "left_alt") == ""
+	return TapHoldTapAction(TapHold, "left_alt") == "backspace"
+		and TapHoldHoldLayer(TapHold, "left_alt") == ""
+		and TapHoldHoldModifier(TapHold, "left_alt") == ""
 }
+
 _LAltIsBackspaceLayer() {
-    return TapHoldTapAction(TapHold, "left_alt") == "backspace"
-        and TapHoldHoldLayer(TapHold, "left_alt") == "nav"
+	return TapHoldTapAction(TapHold, "left_alt") == "backspace"
+		and TapHoldHoldLayer(TapHold, "left_alt") == "nav"
 }
+
+; True when the tap action is handled by a dedicated block above (special mechanics).
+; Everything else falls through to the generic block.
+_LAltIsSpecialTap() {
+	local action := TapHoldTapAction(TapHold, "left_alt")
+	return action == "one_shot_shift"
+		or action == "tab"
+		or action == "alt_tab_monitor"
+		or action == "backspace"
+}
+
+; Return the AHK key name for the configured hold modifier.
+_LAltHoldModKey() {
+	switch TapHoldHoldModifier(TapHold, "left_alt") {
+		case "ctrl":   return "LCtrl"
+		case "shift":  return "LShift"
+		case "alt":    return "LAlt"
+		case "alt_gr": return "RAlt"
+		case "win":    return "LWin"
+		default:       return ""
+	}
+}
+
+
+
+
+; ======= 4.1) one_shot_shift tap =======
 
 #HotIf TapHoldTapAction(TapHold, "left_alt") == "one_shot_shift" and not LayerEnabled
-; Tap-hold on "LAlt" : OneShotShift on tap, Shift on hold
 SC038:: {
-    if (
-        KS_IsDown("SC11D") ; RCtrl physically held
-        or KS_IsDown("SC03A") ; CapsLock physically held
-        or KS_IsDown("LShift") ; LShift physically held
-        or KS_IsDown("LCtrl") ; LCtrl physically held
-    ) {
-        ; Solves a problem where shorcuts consisting of another key (pressed first) + SC038 (pressed second) triggers the shortcut, but also OneShotShift()
-        return
-    }
+	if (
+		KS_IsDown("SC11D") ; RCtrl physically held
+		or KS_IsDown("SC03A") ; CapsLock physically held
+		or KS_IsDown("LShift") ; LShift physically held
+		or KS_IsDown("LCtrl") ; LCtrl physically held
+	) {
+		; Another modifier already held — let the shortcut through without also firing OneShotShift
+		return
+	}
 
-    TextPressKey("LAlt", "Up")
-    OneShotShift()
-    TextPressKey("LShift", "Down")
-    KeyWait("SC038")
-    TextPressKey("LShift", "Up")
+	TextPressKey("LAlt", "Up")
+	OneShotShift()
+	TextPressKey("LShift", "Down")
+	KeyWait("SC038")
+	TextPressKey("LShift", "Up")
 }
 #HotIf
 
+
+
+
+; ======= 4.2) tab+layer tap =======
+
 #HotIf TapHoldTapAction(TapHold, "left_alt") == "tab" and not LayerEnabled
-; Tap-hold on "LAlt" : Tab on tap, Layer on hold
 SC038::
 {
-    UpdateLastSentCharacter("LAlt")
+	UpdateLastSentCharacter("LAlt")
 
-    ActivateLayer()
-    KeyWait("SC038")
-    DisableLayer()
+	ActivateLayer()
+	KeyWait("SC038")
+	DisableLayer()
 
-    Now := A_TickCount
-    CharacterSentTime := LastSentCharacterKeyTime.Has("LAlt") ? LastSentCharacterKeyTime["LAlt"] : Now
-    tap := (Now - CharacterSentTime <= TapHoldDuration(TapHold, "left_alt") * 1000)
-    if tap {
-        TextPressKey("Tab", "")
-    }
+	Now := A_TickCount
+	CharacterSentTime := LastSentCharacterKeyTime.Has("LAlt") ? LastSentCharacterKeyTime["LAlt"] : Now
+	tap := (Now - CharacterSentTime <= TapHoldDuration(TapHold, "left_alt") * 1000)
+	if tap {
+		TextPressKey("Tab", "")
+	}
 }
 
-SC02A & SC038:: TextPressKey("Tab", "Shift") ; On "LShift"
+SC02A & SC038:: TextPressKey("Tab", "Shift") ; LShift held
 if TapHoldTapAction(TapHold, "right_ctrl") == "one_shot_shift" {
-    SC11D & SC038:: {
-        OneShotShiftFix()
-        TextPressKey("Tab", "Shift")
-    }
+	SC11D & SC038:: {
+		OneShotShiftFix()
+		TextPressKey("Tab", "Shift")
+	}
 }
 #SC038:: TextPressKey("Tab", "Win") ; Doesn't fire when SendInput is used
 !SC038:: TextPressKey("Tab", "Alt")
 #HotIf
 
+
+
+
+; ======= 4.3) alt_tab_monitor tap =======
+
 #HotIf TapHoldTapAction(TapHold, "left_alt") == "alt_tab_monitor" and not LayerEnabled
-; Tap-hold on "LAlt" : AltTabMonitor on tap, Alt on hold
 SC038::
 {
-    TextPressKey("LAlt", "Down")
-    tap := KeyWait("SC038", "T" . TapHoldDuration(TapHold, "left_alt"))
-    if tap {
-        TextPressKey("LAlt", "Up")
-        AltTabMonitor()
-    } else {
-        KeyWait("SC038")
-        TextPressKey("LAlt", "Up")
-    }
+	TextPressKey("LAlt", "Down")
+	tap := KeyWait("SC038", "T" . TapHoldDuration(TapHold, "left_alt"))
+	if tap {
+		TextPressKey("LAlt", "Up")
+		AltTabMonitor()
+	} else {
+		KeyWait("SC038")
+		TextPressKey("LAlt", "Up")
+	}
 }
 #HotIf
+
+
+
+
+; ======= 4.4) backspace plain (key-repeat, no hold) =======
 
 #HotIf _LAltIsPlainBackspace() and not LayerEnabled
-; "LAlt" becomes BackSpace, and Delete on Shift
 *SC038::
 {
-    BackSpaceActionWithModifiers := BackSpaceLogic()
-    if not BackSpaceActionWithModifiers {
-        ; If no modifier was pressed
-        TextPressKey("BackSpace", "") ; Event to be able to correct hotstrings and still trigger them afterwards
-        Sleep(KEY_REPEAT_INITIAL_DELAY_MS)
-        while KS_IsDown("SC038") { ; LAlt still physically held — key-repeat loop
-            TextPressKey("BackSpace", "")
-            Sleep(KEY_REPEAT_INTERVAL_MS)
-        }
-    }
+	BackSpaceActionWithModifiers := BackSpaceLogic()
+	if not BackSpaceActionWithModifiers {
+		TextPressKey("BackSpace", "") ; Event keeps hotstring engine in sync
+		Sleep(KEY_REPEAT_INITIAL_DELAY_MS)
+		while KS_IsDown("SC038") { ; key-repeat loop while LAlt physically held
+			TextPressKey("BackSpace", "")
+			Sleep(KEY_REPEAT_INTERVAL_MS)
+		}
+	}
 }
 #HotIf
+
+
+
+
+; ======= 4.5) backspace+layer tap =======
 
 #HotIf _LAltIsBackspaceLayer() and not LayerEnabled
-; Tap-hold on "LAlt" : BackSpace on tap, Layer on hold
 *SC038::
 {
-    UpdateLastSentCharacter("LAlt")
+	UpdateLastSentCharacter("LAlt")
 
-    ActivateLayer()
-    KeyWait("SC038")
-    DisableLayer()
+	ActivateLayer()
+	KeyWait("SC038")
+	DisableLayer()
 
-    Now := A_TickCount
-    CharacterSentTime := LastSentCharacterKeyTime.Has("LAlt") ? LastSentCharacterKeyTime["LAlt"] : Now
-    tap := (Now - CharacterSentTime <= TapHoldDuration(TapHold, "left_alt") * 1000)
+	Now := A_TickCount
+	CharacterSentTime := LastSentCharacterKeyTime.Has("LAlt") ? LastSentCharacterKeyTime["LAlt"] : Now
+	tap := (Now - CharacterSentTime <= TapHoldDuration(TapHold, "left_alt") * 1000)
 
-    if (
-        tap
-        and A_PriorKey == "LAlt" ; Prevents triggering BackSpace when the layer is quickly used and then released
-        and KS_IsUp("SC03A") ; Prevents spurious BackSpace when "LAlt" + "CapsLock" is triggered quickly
-    ) {
-        BackSpaceActionWithModifiers := BackSpaceLogic()
-        if not BackSpaceActionWithModifiers {
-            ; If no modifier was pressed
-            TextPressKey("BackSpace", "")
-        }
-    }
+	if (
+		tap
+		and A_PriorKey == "LAlt" ; Prevents spurious BackSpace when layer key was actually used
+		and KS_IsUp("SC03A") ; Prevents spurious BackSpace on quick LAlt+CapsLock release
+	) {
+		BackSpaceActionWithModifiers := BackSpaceLogic()
+		if not BackSpaceActionWithModifiers {
+			TextPressKey("BackSpace", "")
+		}
+	}
 }
 #HotIf
 
-BackSpaceLogic() {
-    RCtrlIsOneShotShift := TapHoldTapAction(TapHold, "right_ctrl") == "one_shot_shift"
 
-    if (
-        KS_IsDown("SC01D") ; LCtrl physically held
-        and KS_IsDown("Shift") ; Shift physically held
-    ) {
-        ; "LCtrl" and Shift
-        TextPressKey("Delete", "Ctrl")
-        return True
-    } else if (
-        KS_IsDown("SC11D") ; RCtrl physically held
-        and not RCtrlIsOneShotShift
-        and KS_IsDown("Shift") ; Shift physically held
-    ) {
-        ; "RCtrl" when it stays RCtrl and Shift
-        TextPressKey("Delete", "Ctrl")
-        return True
-    } else if (
-        KS_IsDown("SC01D") ; LCtrl physically held
-        and RCtrlIsOneShotShift
-        and KS_IsDown("SC11D") ; RCtrl physically held (acting as Shift)
-    ) {
-        ; "LCtrl" and Shift on "RCtrl"
-        OneShotShiftFix()
-        TextPressKey("Right", "Ctrl")
-        TextPressKey("BackSpace", "Ctrl") ; = ^Delete, but we cannot simply use Delete, as it would do Ctrl + Alt + Delete and Windows would interpret it
-        return True
-    } else if (
-        RCtrlIsOneShotShift
-        and KS_IsDown("SC11D") ; RCtrl physically held (acting as Shift)
-    ) {
-        ; Shift on "RCtrl"
-        OneShotShiftFix()
-        TextPressKey("Right", "")
-        TextPressKey("BackSpace", "") ; = Delete, but we cannot simply use Delete, as it would do Ctrl + Alt + Delete and Windows would interpret it
-        return True
-    } else if KS_IsDown("Shift") { ; Shift physically held
-        ; Shift
-        TextPressKey("Delete", "")
-        return True
-    } else if KS_IsDown("SC01D") { ; LCtrl physically held
-        ; "LCtrl"
-        TextPressKey("BackSpace", "Ctrl")
-        return True
-    } else if (
-        not RCtrlIsOneShotShift
-        and KS_IsDown("SC11D") ; RCtrl physically held
-    ) {
-        ; "RCtrl" when it stays RCtrl
-        TextPressKey("BackSpace", "Ctrl")
-        return True
-    }
-    return False
+
+
+; ======= 4.6) Generic — hold-modifier, any other tap =======
+
+#HotIf not _LAltIsSpecialTap() and TapHoldHoldModifier(TapHold, "left_alt") != "" and TapHoldTapAction(TapHold, "left_alt") != "" and not LayerEnabled
+SC038:: {
+	ModKey := _LAltHoldModKey()
+	TextPressKey(ModKey, "Down")
+	tap := KeyWait("SC038", "T" . TapHoldDuration(TapHold, "left_alt"))
+	if tap {
+		TextPressKey(ModKey, "Up")
+		_LAltDispatch()
+		return
+	}
+	KeyWait("SC038")
+	TextPressKey(ModKey, "Up")
+}
+#HotIf
+
+
+
+
+; ======= 4.7) Generic — hold-layer, any other tap =======
+
+#HotIf not _LAltIsSpecialTap() and TapHoldHoldLayer(TapHold, "left_alt") != "" and TapHoldTapAction(TapHold, "left_alt") != "" and not LayerEnabled
+SC038:: {
+	UpdateLastSentCharacter("LAlt")
+
+	ActivateLayer()
+	KeyWait("SC038")
+	DisableLayer()
+
+	Now := A_TickCount
+	CharacterSentTime := LastSentCharacterKeyTime.Has("LAlt") ? LastSentCharacterKeyTime["LAlt"] : Now
+	tap := (Now - CharacterSentTime <= TapHoldDuration(TapHold, "left_alt") * 1000)
+	if (tap and A_PriorKey == "LAlt") {
+		_LAltDispatch()
+	}
+}
+#HotIf
+
+
+
+
+; ======= 4.8) Generic — tap-only (hold=none, not a special tap) =======
+
+#HotIf not _LAltIsSpecialTap() and TapHoldHoldModifier(TapHold, "left_alt") == "" and TapHoldHoldLayer(TapHold, "left_alt") == "" and TapHoldTapAction(TapHold, "left_alt") != "" and not LayerEnabled
+SC038:: _LAltDispatch()
+#HotIf
+
+
+
+
+; ======= 4.9) Tap dispatch + BackSpaceLogic =======
+
+_LAltDispatch() {
+	switch TapHoldTapAction(TapHold, "left_alt") {
+		case "alt_tab_monitor":  AltTabMonitor()
+		case "backspace":        TextPressKey("BackSpace", [])
+		case "caps_lock":        ToggleCapsLock()
+		case "caps_word":        ToggleCapsWord()
+		case "copy":             TextPressKey("c", ["Ctrl"])
+		case "ctrl_backspace":   TextPressKey("BackSpace", ["Ctrl"])
+		case "ctrl_delete":      TextPressKey("Delete", ["Ctrl"])
+		case "cut":              TextPressKey("x", ["Ctrl"])
+		case "delete":           TextPressKey("Delete", [])
+		case "enter":            TextPressKey("Enter", [])
+		case "escape":           TextPressKey("Escape", [])
+		case "find":             TextPressKey("f", ["Ctrl"])
+		case "one_shot_shift":   OneShotShift()
+		case "paste":            TextPressKey("v", ["Ctrl"])
+		case "paste_plain":      GesturePastePlain()
+		case "redo":             TextPressKey("y", ["Ctrl"])
+		case "select_all":       TextPressKey("a", ["Ctrl"])
+		case "space":            TextPressKey("Space", [])
+		case "tab":              TextPressKey("Tab", [])
+		case "toggle_capslock":  ToggleCapsLock()
+		case "undo":             TextPressKey("z", ["Ctrl"])
+	}
+}
+
+BackSpaceLogic() {
+	RCtrlIsOneShotShift := TapHoldTapAction(TapHold, "right_ctrl") == "one_shot_shift"
+
+	if (
+		KS_IsDown("SC01D") ; LCtrl physically held
+		and KS_IsDown("Shift") ; Shift physically held
+	) {
+		TextPressKey("Delete", "Ctrl")
+		return True
+	} else if (
+		KS_IsDown("SC11D") ; RCtrl physically held
+		and not RCtrlIsOneShotShift
+		and KS_IsDown("Shift") ; Shift physically held
+	) {
+		TextPressKey("Delete", "Ctrl")
+		return True
+	} else if (
+		KS_IsDown("SC01D") ; LCtrl physically held
+		and RCtrlIsOneShotShift
+		and KS_IsDown("SC11D") ; RCtrl physically held (acting as Shift)
+	) {
+		OneShotShiftFix()
+		TextPressKey("Right", "Ctrl")
+		TextPressKey("BackSpace", "Ctrl") ; = ^Delete without triggering Ctrl+Alt+Delete
+		return True
+	} else if (
+		RCtrlIsOneShotShift
+		and KS_IsDown("SC11D") ; RCtrl physically held (acting as Shift)
+	) {
+		OneShotShiftFix()
+		TextPressKey("Right", "")
+		TextPressKey("BackSpace", "") ; = Delete without triggering Ctrl+Alt+Delete
+		return True
+	} else if KS_IsDown("Shift") {
+		TextPressKey("Delete", "")
+		return True
+	} else if KS_IsDown("SC01D") { ; LCtrl physically held
+		TextPressKey("BackSpace", "Ctrl")
+		return True
+	} else if (
+		not RCtrlIsOneShotShift
+		and KS_IsDown("SC11D") ; RCtrl physically held
+	) {
+		TextPressKey("BackSpace", "Ctrl")
+		return True
+	}
+	return False
 }
