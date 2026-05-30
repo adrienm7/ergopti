@@ -912,7 +912,7 @@ if _GestureTomlData.Has("sg_order") && _GestureTomlData["sg_order"].Has("items")
         ; by the dynamic ctrl_* block inserted below — skip them here
         if (SubStr(_Item, 1, 1) = "_") {
             if (_Item = "_ctrl_placeholder") {
-                GESTURE_ACTION_NAMES.Push("#Raccourcis ^ (Ctrl)")
+                GESTURE_ACTION_NAMES.Push("#ctrl")
                 _CtrlKeys := "abcdefghijklmnopqrstuvwxyz"
                 loop StrLen(_CtrlKeys)
                     GESTURE_ACTION_NAMES.Push("ctrl_" . SubStr(_CtrlKeys, A_Index, 1))
@@ -921,12 +921,12 @@ if _GestureTomlData.Has("sg_order") && _GestureTomlData["sg_order"].Has("items")
                 for _Sk, _ in _GestureSpecialKeys
                     GESTURE_ACTION_NAMES.Push("ctrl_" . _Sk)
             } else if (_Item = "_ctrl_shift_placeholder") {
-                GESTURE_ACTION_NAMES.Push("#Raccourcis ^⇧ (Ctrl+Shift)")
+                GESTURE_ACTION_NAMES.Push("#ctrl_shift")
                 _CtrlShiftKeys := "abcdefghijklmnopqrstuvwxyz"
                 loop StrLen(_CtrlShiftKeys)
                     GESTURE_ACTION_NAMES.Push("ctrl_shift_" . SubStr(_CtrlShiftKeys, A_Index, 1))
             } else if (_Item = "_win_placeholder") {
-                GESTURE_ACTION_NAMES.Push("#Raccourcis ⊞ (Win)")
+                GESTURE_ACTION_NAMES.Push("#win")
                 _WinKeys := "abcdefghijklmnopqrstuvwxyz"
                 loop StrLen(_WinKeys)
                     GESTURE_ACTION_NAMES.Push("win_" . SubStr(_WinKeys, A_Index, 1))
@@ -935,7 +935,7 @@ if _GestureTomlData.Has("sg_order") && _GestureTomlData["sg_order"].Has("items")
                 for _Sk, _ in _GestureSpecialKeys
                     GESTURE_ACTION_NAMES.Push("win_" . _Sk)
             } else if (_Item = "_alt_placeholder") {
-                GESTURE_ACTION_NAMES.Push("#Raccourcis ⎇ (Alt)")
+                GESTURE_ACTION_NAMES.Push("#alt")
                 _AltKeys := "abcdefghijklmnopqrstuvwxyz"
                 loop StrLen(_AltKeys)
                     GESTURE_ACTION_NAMES.Push("alt_" . SubStr(_AltKeys, A_Index, 1))

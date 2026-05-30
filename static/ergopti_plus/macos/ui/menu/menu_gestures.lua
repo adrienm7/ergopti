@@ -109,6 +109,8 @@ function M.build(ctx)
 			for _, aname in ipairs(names) do
 				if aname == "-" or aname == "--" then
 					-- skip separators — categories provide visual grouping
+				elseif aname == "none" then
+					-- "none" is already inserted above — skip to avoid a duplicate entry
 				elseif aname:sub(1, 1) == "#" then
 					current_cat = aname:sub(2)
 				else
