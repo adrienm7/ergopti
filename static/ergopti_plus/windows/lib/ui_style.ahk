@@ -43,34 +43,34 @@
 
 ; ── Typography ──────────────────────────────────────────────────────────────
 global UI_FONT_NAME       := "Segoe UI"   ; AHK-only constant, not in TOML
-global UI_FONT_SIZE_MAIN  := 0
-global UI_FONT_SIZE_HINT  := 0
+global UI_FONT_SIZE_MAIN  := 11
+global UI_FONT_SIZE_HINT  := 9
 
 ; ── Layout ──────────────────────────────────────────────────────────────────
-global UI_PAD_X           := 0
-global UI_PAD_Y           := 0
-global UI_LABEL_GAP       := 0
-global UI_CORNER_RADIUS   := 0
+global UI_PAD_X           := 14
+global UI_PAD_Y           := 7
+global UI_LABEL_GAP       := 4
+global UI_CORNER_RADIUS   := 14
 
 ; ── Colors ───────────────────────────────────────────────────────────────────
-global UI_BG_HEX          := ""
+global UI_BG_HEX          := "242424"
 global UI_SEP_COLOR_HEX     := "545454"   ; AHK-only constant, blended at runtime
-global UI_DIM_COLOR_HEX     := ""
+global UI_DIM_COLOR_HEX     := "666666"
 global UI_BORDER_COLOR_HEX := "FFFFFF"   ; AHK-only constant, not in TOML
-global UI_BORDER_ALPHA     := 0
+global UI_BORDER_ALPHA     := 0.25
 global UI_BORDER_THICKNESS := 1          ; AHK-only constant, not in TOML
-global UI_LABEL_COLOR_HEX  := ""
+global UI_LABEL_COLOR_HEX  := "FFFFFF"
 
 ; ── Tint mixing ─────────────────────────────────────────────────────────────
-global UI_TINT_LIGHTNESS   := 0
-global UI_TINT_SATURATION  := 0
+global UI_TINT_LIGHTNESS   := 0.13
+global UI_TINT_SATURATION  := 0.85
 
 ; ── Positioning offsets ──────────────────────────────────────────────────────
 ; UI_OFFSET_RIGHT is AHK-only (Windows GDI vs macOS canvas coordinate systems).
-global UI_OFFSET_BELOW           := 0
-global UI_OFFSET_RIGHT           := 4
-global UI_MAX_CARET_HEIGHT_PX    := 0
-global UI_WINDOW_BOTTOM_INSET_PX := 0
+global UI_OFFSET_BELOW           := 18
+global UI_OFFSET_RIGHT           := 15
+global UI_MAX_CARET_HEIGHT_PX    := 80
+global UI_WINDOW_BOTTOM_INSET_PX := 40
 
 ; ── LLM diff-coloring ────────────────────────────────────────────────────────
 global UI_LLM_CORR_SEL_HEX   := ""
