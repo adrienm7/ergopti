@@ -329,8 +329,6 @@ local function parse_kv_value(line)
 end
 
 
-
-
 -- =============================
 -- ==============================
 -- ======= 3/ Public API =======
@@ -414,6 +412,7 @@ function M.parse(path)
 				goto continue
 			end
 
+			-- Hotstring table array: [[name]]
 			local sec_name = line:match("^%[%[(.-)%]%]$")
 			if sec_name then
 				mode        = "section"
@@ -430,7 +429,22 @@ function M.parse(path)
 				goto continue
 			end
 
-			-- Any other [table] header resets mode
+			-- Simple table header: [name]
+			local simple_sec_name = line:match("^%[([%w_%-]+)%]$")
+			if simple_sec_name then
+				mode        = "section"
+				current_sec = simple_sec_name
+				if not result.sections[current_sec] then
+					table.insert(file_order, current_sec)
+					result.sections[current_sec] = {
+						description = "",
+						entries     = {},
+					}
+				end
+				goto continue
+			end
+
+			-- Any other [table] header resets mode (safety)
 			if line:sub(1, 1) == "[" then
 				mode = "top"
 				goto continue
@@ -487,6 +501,12 @@ function M.parse(path)
 				local entry = parse_entry(line)
 				if entry then
 					table.insert(result.sections[current_sec].entries, entry)
+				else
+					-- Try parsing as a plain key-value pair (e.g. constants.toml)
+					local key, val = parse_kv_value(line)
+					if key then
+						result.sections[current_sec][key] = val
+					end
 				end
 			end
 
