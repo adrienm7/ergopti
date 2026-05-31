@@ -288,7 +288,7 @@ llm_timeout_sec = 12.0
 
 # Safety cap applied when the caller requests duration = 0 (infinite).
 # Prevents ghost tooltips if the normal hide path is skipped due to an error.
-safety_timeout_sec = 2.0
+safety_timeout_sec = 3.0
 
 # Each tooltip's effective duration is shortened by this amount so the visual
 # disappears slightly before the expansion window closes.
