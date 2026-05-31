@@ -81,8 +81,8 @@ M.colors = {
 }
 
 M.tint_config = {
-	lightness  = 0,
-	saturation = 0,
+	lightness  = 0.13,
+	saturation = 0.85,
 }
 
 -- Default tooltip durations (seconds). 0 means "infinite display".

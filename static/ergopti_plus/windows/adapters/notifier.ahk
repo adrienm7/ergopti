@@ -60,6 +60,11 @@ NotifierSend(Message, Opts) {
 			Level := Opts["level"]
 	}
 	Flag := _NotifierKindToFlag(Level)
+
+	; Skip actual OS display in CI to avoid environment-specific hangs or failures.
+	if (EnvGet("GITHUB_ACTIONS") = "true")
+		return
+
 	try TrayTip(Message, Title, Flag)
 }
 
