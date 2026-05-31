@@ -1,0 +1,7 @@
+[_meta]
+description = "Test"
+sections_order = ["greetings"]
+[_meta.sections]
+greetings = "Greetings"
+[[greetings]]
+"hi★" = { output = "Hello!", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }

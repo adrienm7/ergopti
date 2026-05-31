@@ -1,0 +1,4 @@
+﻿[tap_hold.keys.caps_lock]
+tap_action = "enter"
+time_activation_seconds = 0.34999999999999998
+hold_modifier = "ctrl"

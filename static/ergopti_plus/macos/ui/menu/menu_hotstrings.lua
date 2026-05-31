@@ -64,6 +64,28 @@ M.DEFAULT_STATE = {
 	dynamichotstrings_enabled     = dh_mod.DEFAULT_STATE.dynamichotstrings_enabled,
 }
 
+local function open_toml_path(path)
+	if type(path) ~= "string" or path == "" then return end
+	hs.timer.doAfter(0, function()
+		pcall(hs.execute, string.format("open %q", path))
+	end)
+end
+
+local function toml_path_for_group(ctx, group_name)
+	local paths = type(ctx.hotfile_paths) == "table" and ctx.hotfile_paths or {}
+	local path = paths[group_name]
+	return type(path) == "string" and path ~= "" and path or nil
+end
+
+local function split_personal_ext_stem(stem)
+	local parts = {}
+	if type(stem) ~= "string" or stem == "" then return parts end
+	for part in (stem .. "__"):gmatch("(.-)__") do
+		if part ~= "" then table.insert(parts, part) end
+	end
+	return parts
+end
+
 
 
 
@@ -250,6 +272,14 @@ function M.build_groups(ctx, only)
 			end
 
 			local sec_menu = {}
+			local toml_path = toml_path_for_group(ctx, name)
+			if toml_path then
+				sec_menu[#sec_menu + 1] = {
+					title = i18n.get("menu.hotstrings.open_file"),
+					fn    = function() open_toml_path(toml_path) end,
+				}
+				sec_menu[#sec_menu + 1] = { title = "-" }
+			end
 			for _, sec in ipairs(ordered_secs) do
 				if type(sec) == "table" then
 					if sec.name == "-" then
@@ -841,8 +871,6 @@ function M.build_custom(ctx)
 
 	-- =====================
 	-- Assemble menu items
-	-- =====================
-
 	local menu_items = {
 		{
 			title    = i18n.get("menu.hotstrings.open_editor"),
@@ -851,6 +879,12 @@ function M.build_custom(ctx)
 				hs.timer.doAfter(0, function() pcall(ctx.hotstring_editor.open) end)
 			end or nil,
 		},
+		{
+			title    = i18n.get("menu.hotstrings.open_file"),
+			disabled = paused or nil,
+			fn       = not paused and function() open_toml_path(toml_path_for_group(ctx, "personal")) end or nil,
+		},
+		{ title = "-" },
 		{
 			-- Clicking this item directly opens the shortcut customisation dialog
 			title    = i18n.get("menu.hotstrings.shortcut_prefix") .. sc_label(),
@@ -875,16 +909,76 @@ function M.build_custom(ctx)
 		},
 	}
 
+	local ext_tree = { folders = {}, files = {} }
+	local function file_rows_for_group(gname, rows)
+		local result = {}
+		local path = toml_path_for_group(ctx, gname)
+		if path then
+			result[#result + 1] = {
+				title = i18n.get("menu.hotstrings.open_file"),
+				fn    = function() open_toml_path(path) end,
+			}
+			result[#result + 1] = { title = "-" }
+		end
+		for _, row in ipairs(rows) do result[#result + 1] = row end
+		return result
+	end
+	local function sorted_keys(tbl)
+		local keys = {}
+		for key in pairs(type(tbl) == "table" and tbl or {}) do keys[#keys + 1] = key end
+		table.sort(keys)
+		return keys
+	end
+	local function render_ext_tree(node, target, separate_files)
+		if separate_files == nil then separate_files = true end
+		local folder_names = sorted_keys(node.folders)
+		for _, folder_name in ipairs(folder_names) do
+			local folder_menu = {}
+			render_ext_tree(node.folders[folder_name], folder_menu, true)
+			target[#target + 1] = { title = folder_name, menu = folder_menu }
+		end
+		if separate_files and #folder_names > 0 and #node.files > 0 then
+			target[#target + 1] = { title = "-" }
+		end
+		table.sort(node.files, function(a, b) return a.title < b.title end)
+		for _, file in ipairs(node.files) do
+			target[#target + 1] = { title = file.title, menu = file.menu }
+		end
+	end
+
 	-- All personal groups in order: personal first, then extensions alphabetically
 	for _, gname in ipairs(personal_group_names) do
 		local g_enabled = groupEnabled(ctx, gname)
 		local g_secs    = all_personal_secs_by_group[gname]
 		local g_rows    = {}
 		append_section_rows(g_rows, gname, g_secs, g_enabled)
+
 		if #g_rows > 0 then
-			table.insert(menu_items, { title = "-" })
-			for _, row in ipairs(g_rows) do table.insert(menu_items, row) end
+			if gname == "personal" then
+				table.insert(menu_items, { title = "-" })
+				for _, row in ipairs(g_rows) do table.insert(menu_items, row) end
+			else
+				local stem = gname:sub(14)
+				local parts = split_personal_ext_stem(stem)
+				if #parts > 0 then
+					local node = ext_tree
+					for i = 1, #parts - 1 do
+						local folder = parts[i]
+						node.folders[folder] = node.folders[folder] or { folders = {}, files = {} }
+						node = node.folders[folder]
+					end
+					node.files[#node.files + 1] = {
+						title = parts[#parts],
+						menu  = file_rows_for_group(gname, g_rows),
+					}
+				end
+			end
 		end
+	end
+
+	if #ext_tree.files > 0 or next(ext_tree.folders) ~= nil then
+		table.insert(menu_items, { title = "-" })
+		render_ext_tree(ext_tree, menu_items, false)
 	end
 
 	-- Custom/dynamic hotstrings sections (group "custom")

@@ -833,15 +833,24 @@ if Features.Has("hotstrings") and Features["hotstrings"].Has("personal") {
 
 ; Extension personal TOML files — any *.toml in the hotstrings\ folder other than
 ; personal_hotstrings.toml is loaded as an extension pack (all sections enabled,
-; no per-section toggle). Files are sorted alphabetically by the OS loop order.
+; no per-section toggle). Sub-folders generate hierarchical category labels.
 if IsSet(ScriptInformation) and ScriptInformation.Has("PersonalHotstringsDir") {
-    HsExtDir := ScriptInformation["PersonalHotstringsDir"]
-    if DirExist(HsExtDir) {
-        Loop Files HsExtDir . "*.toml" {
-            if (A_LoopFileName != "personal_hotstrings.toml") {
-                SplitPath A_LoopFileFullPath, , , , &_ExtStem
-                LoadExtTomlFile(A_LoopFileFullPath, _ExtStem)
-            }
-        }
-    }
+	HsExtDir := ScriptInformation["PersonalHotstringsDir"]
+	if DirExist(HsExtDir) {
+		_LoadPersonalExtRecursive(dir, prefix) {
+			Loop Files dir . "\*", "DF" {
+				if (A_LoopFileAttrib ~= "D") {
+					; Recurse into sub-folder
+					_LoadPersonalExtRecursive(A_LoopFileFullPath, (prefix == "" ? "" : prefix . " / ") . A_LoopFileName)
+				} else if (A_LoopFileName ~= "i)\.toml$") {
+					if (prefix == "" and A_LoopFileName == "personal_hotstrings.toml")
+						continue
+					SplitPath A_LoopFileFullPath, , , , &_ExtStem
+					FullLabel := (prefix == "" ? "" : prefix . " / ") . _ExtStem
+					LoadExtTomlFile(A_LoopFileFullPath, FullLabel)
+				}
+			}
+		}
+		_LoadPersonalExtRecursive(RegExReplace(HsExtDir, "[/\\]+$"), "")
+	}
 }

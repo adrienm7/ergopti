@@ -289,6 +289,7 @@ LoadExtTomlFile(FilePath, CategoryLabel) {
     try LoggerStart("TomlLoader", "Loading extension TOML '{1}'…", FilePath)
     TotalLoaded := 0
     CurrentSection := ""
+    SplitPath FilePath, , , , &CategoryName
     FeatConf := { Enabled: true, TimeActivationSeconds: 0 }
     FileContent := ReadTomlFile(FilePath)
     loop parse, FileContent, "`n", "`r" {
@@ -331,7 +332,8 @@ LoadExtTomlFile(FilePath, CategoryLabel) {
         ; Only flag as repeat when the trigger contains the magic-key marker — plain
         ; text corrections in repeatcorrections (e.g. "ccê" → "ccu") must bypass
         ; the repeat-specific word-position check that blocks 1st-letter firing.
-        IsRepeat := (StrLower(CategoryName) == "magickey" and StrLower(SectionName) == "repeatcorrections"
+        SectionName := CurrentSection
+        IsRepeat := (StrLower(CategoryName) == "magickey" and SectionName == "repeatcorrections"
             and InStr(Trigger, ScriptInformation["MagicKey"]) > 0)
         Options := Map("TimeActivationSeconds", 0, "FinalResult", FinalResult, "IsRepeat", IsRepeat)
         if IsCaseSens {

@@ -1,0 +1,10 @@
+[_meta]
+description = "Test two sections"
+sections_order = ["alpha", "beta"]
+[_meta.sections]
+alpha = "Alpha"
+beta = "Beta"
+[[alpha]]
+"aa" = { output = "Alpha!", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+[[beta]]
+"bb" = { output = "Beta!", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }

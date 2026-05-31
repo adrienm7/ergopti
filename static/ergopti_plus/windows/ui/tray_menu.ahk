@@ -736,8 +736,8 @@ _ToggleWpmWidgetGraph(menu, label) {
 		WPMWidget._graph_wv_ready := false
 	}
 	; Reset saved position so default bottom-right is recalculated for new size.
-	WPMWidget.pos_x := -1
-	WPMWidget.pos_y := -1
+	WpmWidget.pos_x := -1
+	WpmWidget.pos_y := -1
 	WPMWidget_SaveConfig()
 	try menu.ToggleCheck(label)
 	if was_visible
@@ -878,13 +878,18 @@ global _DYNAMIC_HOTSTRINGS_ORDER := ["DateLongFr", "DateFr", "Date",
 ; intentionally absent. Layout is built straight into A_TrayMenu by
 ; initMenu's manifest iteration and also doesn't need a SubMenus slot.
 InitSubMenus() {
-	global SubMenus, _FLAT_HOTSTRING_V1_CATS, _LegacyTopCategoryMap
+	global SubMenus, _FLAT_HOTSTRING_V1_CATS, _LegacyTopCategoryMap, _SharedDir
 	SubMenus := Map()
 
 	; Flat hotstring categories — order = manifest declaration order
 	; (preserved by the codegen emitter).
 	for V1Cat in _FLAT_HOTSTRING_V1_CATS {
 		SubMenu := Menu()
+		TomlPath := _SharedDir . "\hotstrings\" . StrLower(V1Cat) . ".toml"
+		if FileExist(TomlPath) {
+			RegisterMenuItem(SubMenu, t("menu.hotstrings.open_file"), _MakeOpenFileFn(TomlPath))
+			SubMenu.Add()
+		}
 		V2Section := _LegacyTopCategoryMap.Has(V1Cat) ? _LegacyTopCategoryMap[V1Cat] : ""
 		if (V2Section != "") {
 			for Entry in ManifestFeaturesForSection(V2Section) {
@@ -1318,16 +1323,6 @@ initMenu() {
 	; mirrors the HS pattern where clicking the parent title toggles the
 	; category. AHK does not support clickable parent titles, so the first
 	; item is the toggle.
-	;
-	; The checkbox reflects « at least one shortcut enabled » rather than
-	; « every shortcut enabled »: several built-ins (Save, CtrlJ, the AltGr
-	; combo variants, …) ship as off-by-default on purpose, so an « all
-	; enabled » metric would always render the toggle unchecked at first
-	; launch and falsely suggest the category is inactive. With « any
-	; enabled », the toggle ships checked for a fresh install (where most
-	; leaf features default to true) and the click action remains intuitive
-	; — when checked, click disables every shortcut; when unchecked, click
-	; re-enables every shortcut.
 	if SubMenus.Has("Shortcuts") {
 		; Master gate (Phase 7.4) — see comment in the Layout block below.
 		ShortcutsGated := IsCategoryGated("Shortcuts")
@@ -1380,7 +1375,7 @@ initMenu() {
 				if FileExist(ManifestPath) {
 					try {
 						MC := FileRead(ManifestPath, "UTF-8")
-						if RegExMatch(MC, "name\s*=\s*`"([^`"]+)`"", &MN)
+						if RegExMatch(MC, "name\s*=\s*`"([^`"]+)`"", &NM)
 							ExtName := MN[1]
 					}
 				}
@@ -1408,16 +1403,6 @@ initMenu() {
 	}
 
 	; ── 🌐 Disposition clavier — mirrors the HS layout submenu naming ──
-	; Master gate: the parent menu checkmark and the master toggle label
-	; both reflect IsCategoryGated, NOT a per-feature scan. A flipped
-	; gate keeps individual per-feature toggles intact on disk but
-	; neutralises the whole category via ApplyMasterGatesToFeatures
-	; (lib/master_gates.ahk).
-	;
-	; Layout entries are rendered straight from the manifest — order, labels
-	; and v1 path identifiers are all derived from the canonical declaration
-	; in static/ergopti_plus/shared/features/manifest.toml. Features v1's
-	; ``Layout`` sub-Map is no longer consulted for the menu render.
 	LayoutMenu := Menu()
 	LayoutGated := IsCategoryGated("Layout")
 	AddCategoryToggleItem(LayoutMenu,
@@ -1428,7 +1413,6 @@ initMenu() {
 	for LayoutEntry in ManifestFeaturesForSection("ahk.layout") {
 		MenuAddItemFromManifest(LayoutMenu, LayoutEntry, "Layout")
 	}
-	; Magic key config items — specific to the Ergopti layout (★ is a dedicated Ergopti key)
 	LayoutMenu.Add() ; Separator before magic key config
 	RegisterMenuItem(LayoutMenu, t("menu.hotstrings.magic_key_prefix") . ScriptInformation["MagicKey"], MagicKeyEditor)
 	LayoutRepeatToggleLabel := t("menu.hotstrings.repeat_key_toggle")
@@ -1443,16 +1427,7 @@ initMenu() {
 	}
 
 	; ── Hotstrings ⚡ — single submenu grouping all hotstring categories ──
-	; Layout mirrors Hammerspoon builder.lua:
-	;   1. Global toggle + separator
-	;   2. Paramètres (config items) + separator
-	;   3. "— Hotstrings communs —" header + common TOML groups + dynamic
-	;   4. Separator + "— Hotstrings personnels —" header + personal TOML(s) + extensions
 	HotstringsMenu := Menu()
-	; Master gate (Phase 7.4): IsCategoryAllEnabled returns the gated
-	; state (not a per-feature scan) so the master toggle and parent
-	; menu checkmark reflect the user's master choice rather than the
-	; aggregated state of every hotstring entry.
 	HotstringsAllEnabled := IsCategoryGated("Hotstrings")
 	AddCategoryToggleItem(HotstringsMenu,
 		t("menu.hotstrings.on"),
@@ -1460,7 +1435,6 @@ initMenu() {
 		HotstringsAllEnabled,
 		HotstringsAllEnabled ? ToggleAllHotstringsOff : ToggleAllHotstringsOn)
 
-	; 1. Paramètres — mirrors HS "⚙️ Paramètres hotstrings" submenu
 	ParamsMenu := Menu()
 	RegisterMenuItem(ParamsMenu, t("menu.hotstrings.delays_colors"),
 		(*) => OpenHotstringsConfigWindow())
@@ -1494,7 +1468,6 @@ initMenu() {
 			}
 		}
 	}
-	; Dynamic hotstrings — date insertion and future rule-based expansions.
 	if Features.Has("hotstrings") and Features["hotstrings"].Has("dynamic")
 		and SubMenus.Has("DynamicHotstrings") {
 		DynMenu := SubMenus["DynamicHotstrings"]
@@ -1506,7 +1479,6 @@ initMenu() {
 		}
 		DynTitle := GetCategoryTitle("DynamicHotstrings") . " (" . FmtCount(DynTotal) . ")"
 		HotstringsMenu.Add(DynTitle, DynMenu)
-		; Check if all dynamic sections are enabled
 		_DynAllEnabled := true
 		_DynCount := 0
 		for _, _DCfg2 in Features["hotstrings"]["dynamic"] {
@@ -1520,7 +1492,6 @@ initMenu() {
 		}
 	}
 
-	; 2b. Ergopti-layout-specific groups — separated from the standard block
 	HotstringsMenu.Add() ; Separator between communs and Ergopti blocks
 	ErgoptiTotal := 0
 	for _ECat in HotstringCategoriesErgopti {
@@ -1540,14 +1511,7 @@ initMenu() {
 		}
 	}
 
-	; CommonTotal = all groups (std + ergopti) used for GrandTotal
-	CommonTotal := StdTotal + ErgoptiTotal
-
 	; 3. Personal/custom hotstrings — separator + disabled header + entries
-	; personal_hotstrings.toml first, then extra TOMLs from hotstrings\ folder alphabetically.
-	; All data (section order, descriptions, entry counts) comes straight
-	; from the TOML file via ReadPersonalToml — Features["Personal"] is no
-	; longer consulted here.
 	TotalPersonal := 0
 	PersonalTomlData := false
 	PersonalTomlPath := IsSet(ScriptInformation) ? ScriptInformation.Get("PersonalTomlPath", "") : ""
@@ -1557,30 +1521,72 @@ initMenu() {
 			TotalPersonal += SecData["entries"].Length
 		}
 	}
-	; Count extra extension TOMLs
-	ExtTomlFiles := []
+
+	; Recursive scan of the hotstrings/ folder for extra TOMLs
+	_ExtTotalPersonalCounter := { value: 0 }
+	PersonalExtTree := Map()
+
+	_GetOrCreateFolderNode(Root, PathParts) {
+		if (PathParts.Length == 0) {
+			if !Root.Has("") {
+				Root[""] := Map("subfolders", Map(), "tomls", [])
+			}
+			return Root[""]
+		}
+
+		Tree := Root
+		for Part in PathParts {
+			if !Tree.Has(Part) {
+				Tree[Part] := Map("subfolders", Map(), "tomls", [])
+			}
+			Node := Tree[Part]
+			Tree := Node["subfolders"]
+		}
+		return Node
+	}
+
 	if IsSet(ScriptInformation) and ScriptInformation.Has("PersonalHotstringsDir") {
 		HsDir := ScriptInformation["PersonalHotstringsDir"]
 		if DirExist(HsDir) {
-			Loop Files HsDir . "*.toml" {
-				if (A_LoopFileName != "personal_hotstrings.toml") {
-					ExtTomlFiles.Push(A_LoopFileFullPath)
-					for _, _ESec in _ParseExtTomlSections(A_LoopFileFullPath) {
-						TotalPersonal += _ESec["count"]
+			_ScanPersonalExtRecursive(CurrentDir, PathParts) {
+				Loop Files CurrentDir . "\*", "DF" {
+					if (A_LoopFileAttrib ~= "D") {
+						NewParts := PathParts.Clone()
+						NewParts.Push(A_LoopFileName)
+						_ScanPersonalExtRecursive(A_LoopFileFullPath, NewParts)
+					} else if (A_LoopFileName ~= "i)\.toml$") {
+						if (PathParts.Length == 0 and A_LoopFileName == "personal_hotstrings.toml")
+							continue
+
+						SplitPath A_LoopFileFullPath, , , , &_ExtStem
+						FileSections := _ParseExtTomlSections(A_LoopFileFullPath)
+						FileCount := 0
+						for _, _FS in FileSections {
+							FileCount += _FS["count"]
+						}
+
+						Node := _GetOrCreateFolderNode(PersonalExtTree, PathParts)
+						Node["tomls"].Push({ path: A_LoopFileFullPath, stem: _ExtStem, sections: FileSections, count: FileCount })
+						_ExtTotalPersonalCounter.value += FileCount
 					}
 				}
 			}
+			_ScanPersonalExtRecursive(RegExReplace(HsDir, "[/\\]+$"), [])
 		}
 	}
+
 	HotstringsMenu.Add() ; Separator before personal group
-	PersonalHeader := MenuSectionTitle(t("menu.hotstrings.personal_header") . (TotalPersonal > 0 ? " (" . FmtCount(TotalPersonal) . ")" : ""))
+	PersonalHeader := MenuSectionTitle(t("menu.hotstrings.personal_header") . ((TotalPersonal + _ExtTotalPersonalCounter.value) > 0 ? " (" . FmtCount(TotalPersonal + _ExtTotalPersonalCounter.value) . ")" : ""))
 	HotstringsMenu.Add(PersonalHeader, (*) => NoAction())
 	HotstringsMenu.Disable(PersonalHeader)
+
 	if (PersonalTomlData != false) {
-		TomlData := PersonalTomlData  ; local alias for downstream callbacks
+		TomlData := PersonalTomlData
 		; Build the unified personal submenu for personal_hotstrings.toml
 		PersonalMenu := Menu()
 		RegisterMenuItem(PersonalMenu, t("menu.hotstrings.open_editor"), (*) => OpenPersonalEditor())
+		RegisterMenuItem(PersonalMenu, t("menu.hotstrings.open_file"), _MakeOpenFileFn(PersonalTomlPath))
+		PersonalMenu.Add()
 		; Shortcut item — not yet customisable from AHK (HS handles it on macOS)
 		_ShortcutLabel := t("menu.hotstrings.shortcut_prefix") . ScriptInformation["MagicKey"]
 		PersonalMenu.Add(_ShortcutLabel, (*) => NoAction())
@@ -1588,8 +1594,7 @@ initMenu() {
 		; Default section — submenu with "Aucune" + one item per TOML section
 		CurDefaultSec := _EditorPrefGet("DefaultSection", "")
 		DefaultSectionMenu := Menu()
-		RegisterMenuItem(DefaultSectionMenu, t("menu.hotstrings.default_none"), (*) => _SetPersonalDefaultSection("", PersonalMenu, TomlData,
-			DefaultSectionMenu))
+		RegisterMenuItem(DefaultSectionMenu, t("menu.hotstrings.default_none"), (*) => _SetPersonalDefaultSection("", PersonalMenu, TomlData, DefaultSectionMenu))
 		if (CurDefaultSec == "") {
 			DefaultSectionMenu.Check(t("menu.hotstrings.default_none"))
 		}
@@ -1600,15 +1605,13 @@ initMenu() {
 			}
 			SecData := TomlData["sections"][SecName]
 			SecLabel := SecData["description"]
-			RegisterMenuItem(DefaultSectionMenu, SecLabel, _MakeSetDefaultSectionFn(SecName, PersonalMenu, TomlData,
-				DefaultSectionMenu))
+			RegisterMenuItem(DefaultSectionMenu, SecLabel, _MakeSetDefaultSectionFn(SecName, PersonalMenu, TomlData, DefaultSectionMenu))
 			if (CurDefaultSec == SecName) {
 				DefaultSectionMenu.Check(SecLabel)
 			}
 		}
 		CurDefaultLabel := (CurDefaultSec == "") ? t("menu.hotstrings.default_none")
-			: (TomlData["sections"].Has(CurDefaultSec) ? TomlData["sections"][CurDefaultSec]["description"] :
-				CurDefaultSec)
+			: (TomlData["sections"].Has(CurDefaultSec) ? TomlData["sections"][CurDefaultSec]["description"] : CurDefaultSec)
 		global _PrevDefaultLabel := CurDefaultLabel
 		_DefaultCatLabel := t("menu.hotstrings.default_category_prefix") . CurDefaultLabel
 		PersonalMenu.Add(_DefaultCatLabel, DefaultSectionMenu)
@@ -1617,10 +1620,7 @@ initMenu() {
 		if (_EditorPrefGet("CloseOnAdd", "1") == "1") {
 			PersonalMenu.Check(_CloseOnAddLabel)
 		}
-		; Per-section entries — labels come from the TOML's section description
-		; + entry count, the toggle callback identifies the section by its
-		; lowercase TOML name (V1 path "Personal.<toml_section>") and reads
-		; the .Enabled state from Features["hotstrings"]["personal"].
+		; Per-section entries
 		if (TomlData["sections_order"].Length > 0) {
 			PersonalMenu.Add()
 			for _, SecName in TomlData["sections_order"] {
@@ -1660,40 +1660,120 @@ initMenu() {
 			HotstringsMenu.Check(PersonalTitle)
 		}
 	}
-	; Extension TOML files — one submenu entry per file, alphabetically sorted
-	for _, ExtPath in ExtTomlFiles {
-		SplitPath ExtPath, &ExtFileName, , , &ExtStem
-		ExtSections := _ParseExtTomlSections(ExtPath)
-		ExtCount := 0
-		for _, _ES in ExtSections {
-			ExtCount += _ES["count"]
-		}
-		ExtMenu := Menu()
-		RegisterMenuItem(ExtMenu, t("menu.hotstrings.open_file"), _MakeOpenFileFn(ExtPath))
-		if (ExtSections.Length > 0) {
-			ExtMenu.Add()
-			for _, _ES in ExtSections {
-				SecLabel := _ES["description"] . " (" . FmtCount(_ES["count"]) . ")"
-				ExtMenu.Add(SecLabel, (*) => NoAction())
-				ExtMenu.Disable(SecLabel)
+
+	; Render the recursive tree for extra TOMLs
+	_RenderExtTree(Tree, ParentMenu) {
+		FolderNames := []
+		for FolderName in Tree
+			FolderNames.Push(FolderName)
+
+		; Alpha sort folder names (manual bubble sort)
+		loop FolderNames.Length {
+			i := A_Index
+			loop FolderNames.Length - i {
+				j := A_Index
+				if (StrCompare(FolderNames[j], FolderNames[j+1]) > 0) {
+					tmp := FolderNames[j]
+					FolderNames[j] := FolderNames[j+1]
+					FolderNames[j+1] := tmp
+				}
 			}
 		}
-		ExtTitle := ExtStem . (ExtCount > 0 ? " (" . FmtCount(ExtCount) . ")" : "")
-		HotstringsMenu.Add(ExtTitle, ExtMenu)
+
+		for FolderName in FolderNames {
+			Node := Tree[FolderName]
+			FolderMenu := Menu()
+
+			; Alpha sort TOMLs in this folder (manual bubble sort)
+			FileNodeList := Node["tomls"]
+			loop FileNodeList.Length {
+				i := A_Index
+				loop FileNodeList.Length - i {
+					j := A_Index
+					if (StrCompare(FileNodeList[j].stem, FileNodeList[j+1].stem) > 0) {
+						tmp := FileNodeList[j]
+						FileNodeList[j] := FileNodeList[j+1]
+						FileNodeList[j+1] := tmp
+					}
+				}
+			}
+
+			if (Node["subfolders"].Count > 0) {
+				_RenderExtTree(Node["subfolders"], FolderMenu)
+			}
+
+			if (Node["subfolders"].Count > 0 and FileNodeList.Length > 0)
+				FolderMenu.Add()
+
+			for TF in FileNodeList {
+				TFMenu := Menu()
+				RegisterMenuItem(TFMenu, t("menu.hotstrings.open_file"), _MakeOpenFileFn(TF.path))
+				if (TF.sections.Length > 0) {
+					TFMenu.Add()
+					for _, _ES in TF.sections {
+						SecLabel := _ES["description"] . " (" . FmtCount(_ES["count"]) . ")"
+						TFMenu.Add(SecLabel, (*) => NoAction())
+						TFMenu.Disable(SecLabel)
+					}
+				}
+				TFTitle := TF.stem . (TF.count > 0 ? " (" . FmtCount(TF.count) . ")" : "")
+				FolderMenu.Add(TFTitle, TFMenu)
+			}
+			ParentMenu.Add(FolderName, FolderMenu)
+		}
 	}
-	; 4. Bundled Extensions — one submenu per extension folder, then one sub-submenu
-	;    per TOML file inside that extension's hotstrings/ sub-folder.
-	;    The extensions directory lives at static/extensions/ next to the drivers.
+
+	; Add nested subfolders before root-level TOMLs
+	RootNode := false
+	if PersonalExtTree.Has("") {
+		RootNode := PersonalExtTree[""]
+		PersonalExtTree.Delete("")
+	}
+	HasNestedPersonalExt := PersonalExtTree.Count > 0
+	_RenderExtTree(PersonalExtTree, HotstringsMenu)
+
+		; Add root-level TOMLs directly to HotstringsMenu
+		if (RootNode != false) {
+			; Alpha sort root TOMLs
+			FileNodeList := RootNode["tomls"]
+		loop FileNodeList.Length {
+			i := A_Index
+			loop FileNodeList.Length - i {
+				j := A_Index
+				if (StrCompare(FileNodeList[j].stem, FileNodeList[j+1].stem) > 0) {
+					tmp := FileNodeList[j]
+					FileNodeList[j] := FileNodeList[j+1]
+					FileNodeList[j+1] := tmp
+				}
+			}
+		}
+
+		for TF in FileNodeList {
+			TFMenu := Menu()
+			RegisterMenuItem(TFMenu, t("menu.hotstrings.open_file"), _MakeOpenFileFn(TF.path))
+			if (TF.sections.Length > 0) {
+				TFMenu.Add()
+				for _, _ES in TF.sections {
+					SecLabel := _ES["description"] . " (" . FmtCount(_ES["count"]) . ")"
+					TFMenu.Add(SecLabel, (*) => NoAction())
+					TFMenu.Disable(SecLabel)
+				}
+			}
+			TFTitle := TF.stem . (TF.count > 0 ? " (" . FmtCount(TF.count) . ")" : "")
+			HotstringsMenu.Add(TFTitle, TFMenu)
+		}
+	}
+
+	; 4. Bundled Extensions — one submenu per extension folder
 	global _StaticDir
 	ExtensionsBaseDir := _StaticDir . "\extensions\"
-	BundledExtensions := []   ; [{id, name, toml_files: [{path, stem, sections, count}]}]
+	BundledExtensions := []
 	ExtTotal := 0
 	if DirExist(ExtensionsBaseDir) {
 		Loop Files ExtensionsBaseDir . "*", "D" {
 			ExtId   := A_LoopFileName
 			ExtDir  := A_LoopFileFullPath
 			ManifestPath := ExtDir . "\manifest.toml"
-			; Read extension display name from manifest (fall back to folder id)
 			ExtDisplayName := ExtId
 			if FileExist(ManifestPath) {
 				try {
@@ -1741,11 +1821,14 @@ initMenu() {
 			} else {
 				for _, TF in Ext.toml_files {
 					TFMenu := Menu()
+					RegisterMenuItem(TFMenu, t("menu.hotstrings.open_file"), _MakeOpenFileFn(TF.path))
 					if (TF.sections.Length == 0) {
+						TFMenu.Add()
 						NoSecLabel := t("menu.extensions.empty")
 						TFMenu.Add(NoSecLabel, (*) => NoAction())
 						TFMenu.Disable(NoSecLabel)
 					} else {
+						TFMenu.Add()
 						for _, Sec in TF.sections {
 							SecLabel := Sec["description"] . " (" . FmtCount(Sec["count"]) . ")"
 							TFMenu.Add(SecLabel, (*) => NoAction())
@@ -1761,17 +1844,7 @@ initMenu() {
 		}
 	}
 
-	; Grand total for the menu title = sum of entries from enabled features only.
-	; We walk Features["hotstrings"] directly to avoid the lazy-seed side-effect
-	; in TranslateLegacyPath for Personal sections.
-	; - Flat cats (autocorrection, distances_reduction, …): one TOML file per cat;
-	;   include its count only when at least one feature in the cat is enabled.
-	; - Dynamic: already computed in DynTotalStd (only enabled entries).
-	; - Personal: one entry per section, count only if section is enabled in Features.
-	; - Extensions: no toggle, always included (ExtTotal already computed).
-	; Grand total uses the same helper as the sub-menu titles
 	ActiveCommonTotal := StdTotal + ErgoptiTotal
-	; Personal sections — count entries only for enabled sections
 	ActivePersonalTotal := 0
 	if (PersonalTomlData != false) {
 		for _, _PSecName in PersonalTomlData["sections_order"] {
@@ -1787,26 +1860,15 @@ initMenu() {
 			}
 		}
 	}
-	GrandTotal := ActiveCommonTotal + ActivePersonalTotal + ExtTotal
+	GrandTotal := ActiveCommonTotal + ActivePersonalTotal + _ExtTotalPersonalCounter.value
 	HotstringsMenuTitle := t("menu.hotstrings.title") . " (" . FmtCount(GrandTotal) . ")"
 	A_TrayMenu.Add(HotstringsMenuTitle, HotstringsMenu)
 	if HotstringsAllEnabled {
 		A_TrayMenu.Check(HotstringsMenuTitle)
 	}
 
-	; ── IA / LLM — sits right after Hotstrings, mirroring the Hammerspoon menu order ──
-	; Reset _LLM_Tray_InTray before calling LLM_Tray_Init so the entry is always
-	; placed at the correct tray position by LLM_Tray_Build() below, even if a
-	; background health-probe timer fired LLM_Tray_Build() during boot before
-	; initMenu() ran and set the flag prematurely.
 	global _LLM_Tray_InTray
 	_LLM_Tray_InTray := false
-	; Build the LLM_Tray_Init payload by reading the v2 nested LLM map
-	; (hydrated by ApplyConfigToml directly from the [llm.*] sections
-	; of the user's config.toml). LLM_Tray_Init still expects a flat
-	; ``saved_opts`` Map with the legacy key names, so we read from the
-	; nested v2 paths and flatten back here. ``onboarding_seen`` and
-	; ``app_profile_overrides`` are runtime state read separately below.
 	_LlmSavedOpts := Map()
 	_LlmSavedOpts["enabled"]                := Features["llm"]["enabled"]
 	_LlmSavedOpts["model"]                  := Features["llm"]["models"]["ollama"]
@@ -1821,10 +1883,6 @@ initMenu() {
 	_LlmSavedOpts["auto_profile_for_model"] := Features["llm"]["profiles"]["auto_profile_for_model"]
 	_LlmSavedOpts["inline_autotype"]        := Features["llm"]["trigger"]["inline_autotype"]
 
-	; Runtime state — onboarding_seen + per-app overrides — lives in [llm]
-	; alongside the manifest-declared keys. The v2 reader hydrates them onto
-	; Features when present; we read with IniCacheGet so missing keys fall
-	; back to the defaults baked into LLM_Tray_Init.
 	_LlmRawOnboarded := IniCacheGet(_IniCache, "llm", "onboarding_seen")
 	if (_LlmRawOnboarded != "_")
 		_LlmSavedOpts["onboarding_seen"] := (_LlmRawOnboarded = true or _LlmRawOnboarded == 1
@@ -1844,27 +1902,17 @@ initMenu() {
 	}
 	LLM_Tray_Init(_LlmSavedOpts)
 
-	; ── 📊 Métriques — mirrors the HS Métriques submenu position exactly:
-	; sits between Hotstrings + AI and the Shortcuts (Raccourcis) submenu.
-	; The parent entry doubles as a
-	; global ON/OFF toggle for the keylogger feature. OFF by default — it
-	; *is* a keylogger — and only flips ON after the user explicitly
-	; acknowledges the security warning. While OFF, the sub-items remain
-	; visible but greyed out so the menu shape stays familiar.
 	BuildMetricsMenu()
 	if MetricsShortcuts.enabled {
 		A_TrayMenu.Check(t("menu.metrics.title"))
 	}
 
-	; ── Raccourcis and Tap-Holds — standalone, like HS Raccourcis and Karabiner ──
 	if SubMenus.Has("Shortcuts") {
 		A_TrayMenu.Add(GetCategoryTitle("Shortcuts"), SubMenus["Shortcuts"])
 		if ShortcutsGated {
 			A_TrayMenu.Check(GetCategoryTitle("Shortcuts"))
 		}
 	}
-	; TapHolds: prepend a global on/off toggle before adding to the tray.
-	; Master gate (Phase 7.4) — see comment in the Layout block above.
 	if SubMenus.Has("TapHolds") {
 		TapHoldsAllEnabled := IsCategoryGated("TapHolds")
 		AddCategoryToggleItem(SubMenus["TapHolds"],
@@ -1873,40 +1921,28 @@ initMenu() {
 			TapHoldsAllEnabled,
 			(*) => ToggleCategoryAllFeatures("TapHolds", !TapHoldsAllEnabled))
 		A_TrayMenu.Add(GetCategoryTitle("TapHolds"), SubMenus["TapHolds"])
-		; Check the parent title when all tap-holds are enabled — mirrors HS checked submenu.
 		if TapHoldsAllEnabled {
 			A_TrayMenu.Check(GetCategoryTitle("TapHolds"))
 		}
 	}
 
-	; ── Gestes — custom submenu mirroring Hammerspoon's gesture picker ──
 	GesturesMenu := BuildGesturesMenu()
 	A_TrayMenu.Add(GetCategoryTitle("Gestures"), GesturesMenu)
 	if Features["gestures"]["enabled"] {
 		A_TrayMenu.Check(GetCategoryTitle("Gestures"))
 	}
 
-	; ── Actions globales — last item of the features block (sits right above the
-	; separator that closes the block), grouped with the other user-facing toggles
-	; rather than with the version / channel / language items.
 	GlobalActionsMenu := Menu()
 	RegisterMenuItem(GlobalActionsMenu, t("menu.global.enable_all"),  ToggleAllFeaturesOn)
 	RegisterMenuItem(GlobalActionsMenu, t("menu.global.disable_all"), ToggleAllFeaturesOff)
 	RegisterMenuItem(GlobalActionsMenu, t("menu.global.reset_defaults"), ReloadWithDefaultConfig)
 	A_TrayMenu.Add(t("menu.global.title"), GlobalActionsMenu)
 
-	A_TrayMenu.Add() ; Single separator between feature submenus and configuration items
+	A_TrayMenu.Add()
 
 	AboutMenu := Menu()
 	Ver := Updater_CurrentVersion()
 	VerLabel := "ErgoptiPlus " . Ver
-	; First item: clicking the version label opens the release page DIRECTLY,
-	; with no intermediate dialog. The URL is the build-stamped
-	; BUNDLE_RELEASE_URL (deep-links to the exact running version) when
-	; available, the channel "latest" page otherwise. In local-source mode
-	; there is no meaningful release page (the running code is whatever the
-	; dev tree happens to have on disk, not anything published) so the click
-	; handler is a no-op and the item is greyed out to hint at that.
 	if Updater_IsLocalSource() {
 		AboutMenu.Add(VerLabel, (*) => NoAction())
 		AboutMenu.Disable(VerLabel)
@@ -1916,22 +1952,14 @@ initMenu() {
 	global UPDATER_CHANNEL, UPDATER_CHECK_INTERVAL, UPDATER_INTERVAL_PRESETS
 	global UPDATER_LATEST_RELEASE
 	if not Updater_IsLocalSource() {
-		AboutMenu.Add() ; Separator — only shown for release builds (channel/frequency items follow)
-		; Update channel as a SUBMENU rather than two siblings with check marks.
-		; Reduces vertical noise in the parent menu and groups the mutually-
-		; exclusive choice under a single header.
+		AboutMenu.Add()
 		ChannelMenu := Menu()
 		RegisterMenuItem(ChannelMenu, t("menu.about.channel_main"), (*) => Updater_SetChannel("main"))
 		RegisterMenuItem(ChannelMenu, t("menu.about.channel_dev"),  (*) => Updater_SetChannel("dev"))
 		ChannelMenu.Check((UPDATER_CHANNEL == "dev") ? t("menu.about.channel_dev") : t("menu.about.channel_main"))
-		; Show the active channel value directly in the submenu title so the user
-		; does not need to open it to see the current setting.
 		ChannelDisplay := (UPDATER_CHANNEL == "dev") ? t("menu.about.channel_dev") : t("menu.about.channel_main")
 		AboutMenu.Add(t("menu.about.channel_menu") . ": " . ChannelDisplay, ChannelMenu)
 
-		; Frequency submenu: 12 presets, current cadence pre-checked.
-		; ``Updater_SetCheckInterval`` re-arms the background timer immediately
-		; so the user feels the change without waiting for the next tick.
 		FreqMenu := Menu()
 		CurrentLabel := ""
 		CurrentCode  := ""
@@ -1945,36 +1973,21 @@ initMenu() {
 		}
 		if (CurrentLabel != "")
 			FreqMenu.Check(CurrentLabel)
-		; Show the active frequency code directly in the submenu title.
 		FreqDisplay := (CurrentCode != "") ? CurrentCode : "?"
 		AboutMenu.Add(t("menu.about.frequency_menu") . ": " . FreqDisplay, FreqMenu)
 
-		; Dynamic one-click item: label reflects current state (idle / checking /
-		; update available). Disabled while a check is in progress so two
-		; concurrent WinHttp calls cannot race.
-		; Kept in the same group as channel/frequency so all update settings are
-		; together and not split by a separator.
 		UpdateLabel := Updater_GetUpdateMenuLabel()
 		RegisterMenuItem(AboutMenu, UpdateLabel, Updater_OneClickUpdate)
 		if (Updater_GetUpdateState() == "checking")
 			AboutMenu.Disable(UpdateLabel)
 	}
-	AboutMenu.Add() ; Separator
-	; Changelog is always accessible — including in local-source mode — so the
-	; user can browse published releases regardless of how they are running.
+	AboutMenu.Add()
 	RegisterMenuItem(AboutMenu, t("menu.about.changelog"), Updater_ShowChangelog)
 	RegisterMenuItem(AboutMenu, t("menu.about.open_releases_page"), (*) => Run(Updater_ReleasesPageUrl()))
 	A_TrayMenu.Add(t("menu.about.title"), AboutMenu)
 
-	; "Setup wizard" sits first — it is the only way to re-trigger onboarding
-	; and is also what users look for when something feels off, so it gets the
-	; top slot. "Config folder" comes next (it answers the very next question
-	; the user typically has: "where are my settings stored?"), and the
-	; language picker sits underneath the config folder rather than between
-	; the wizard and folder where it interrupted the natural reading flow.
 	RegisterMenuItem(A_TrayMenu, t("menu.global.setup_wizard"), Onboarding_ShowFromMenu)
 
-	; ── Script management ──
 	global MenuSuspend
 	MenuSuspend := t("menu.global.suspend")
 	RegisterMenuItem(A_TrayMenu, t("menu.global.config_folder"), FilePathsEditor)
@@ -1982,14 +1995,11 @@ initMenu() {
 	LangMenu := Menu()
 	I18nBuildLanguageMenu(LangMenu)
 	A_TrayMenu.Add(t("menu.global.language"), LangMenu)
-	A_TrayMenu.Add() ; Separator before lifecycle actions
+	A_TrayMenu.Add()
 	RegisterMenuItem(A_TrayMenu, MenuSuspend, ToggleSuspend)
 	RegisterMenuItem(A_TrayMenu, t("menu.global.reload"), ActivateReload)
 	RegisterMenuItem(A_TrayMenu, t("menu.global.quit"), ActivateExitApp)
 
-	; ── Debug tools — grouped in a submenu to keep the top-level menu tidy.
-	; Mirrors Hammerspoon's "⚠ Debug" entry (Console + log shortcuts);
-	; Window Spy / List Vars / Key History are AutoHotkey-specific particulars. ──
 	DebuggingMenu := Menu()
 	DebugOrder    := MenuManifest_LoadDebugMenu()
 	for Entry in DebugOrder {

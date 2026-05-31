@@ -1,0 +1,2 @@
+﻿[[greet]]
+"yo" = { output = "yo!", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
