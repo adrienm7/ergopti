@@ -80,7 +80,7 @@ M.colors = {
 	loading    = { red = 0.94, green = 0.78, blue = 0.28, alpha = 1.0 }
 }
 
-M.tint = {
+M.tint_config = {
 	lightness  = 0,
 	saturation = 0,
 }
@@ -313,13 +313,15 @@ local function load_from_shared()
 	M.colors.bg       = { white = bg_w, alpha = bg_a }
 	M.colors.bg_alpha = get("colors", "canvas_alpha_hs", M.colors.bg_alpha)
 
+	-- [sep]
 	local sep_w = get("colors", "sep_white",    M.colors.sep.white)
 	local sep_a = get("colors", "sep_alpha_hs", M.colors.sep.alpha)
 	M.colors.sep      = { white = sep_w, alpha = sep_a }
 
 	-- [tint]
-	M.tint.lightness  = get("tint", "lightness",  M.tint.lightness)
-	M.tint.saturation = get("tint", "saturation", M.tint.saturation)
+	M.tint_config = M.tint_config or {}
+	M.tint_config.lightness  = get("tint", "lightness",  0)
+	M.tint_config.saturation = get("tint", "saturation", 0)
 
 	-- [timing]
 	DEFAULT_TIMEOUT_SEC     = get("timing", "hotstring_timeout_sec", DEFAULT_TIMEOUT_SEC)
