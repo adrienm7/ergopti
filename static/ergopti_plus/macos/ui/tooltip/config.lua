@@ -280,7 +280,7 @@ local function load_from_shared()
 	end
 
 	local function get(section, key, default)
-		local s = c[section]
+		local s = c.sections[section]
 		if type(s) ~= "table" then return default end
 		local v = s[key]
 		return (v ~= nil) and v or default
