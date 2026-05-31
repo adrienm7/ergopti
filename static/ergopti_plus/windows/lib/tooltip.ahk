@@ -133,6 +133,9 @@ TooltipDequeueInit() {
 ; Style constants — sourced from lib/ui_style.ahk (included before this file
 ; in ErgoptiPlus.ahk). All visual values are defined there and mapped to
 ; module-local aliases below so the rest of this file reads naturally.
+;
+; NOTE: These aliases are refreshed at runtime by Tooltip_UpdateStyles()
+; once UiStyle_LoadSharedConst() has finished reading the shared TOML.
 global _TOOLTIP_FONT_NAME := UI_FONT_NAME
 global _TOOLTIP_FONT_SIZE := UI_FONT_SIZE_MAIN
 global _TOOLTIP_PADDING_X := UI_PAD_X
@@ -140,6 +143,8 @@ global _TOOLTIP_PADDING_Y := UI_PAD_Y
 global _TOOLTIP_OFFSET_BELOW := UI_OFFSET_BELOW
 global _TOOLTIP_OFFSET_RIGHT := UI_OFFSET_RIGHT
 global _TOOLTIP_DEFAULT_BG_HEX := UI_BG_HEX
+global _TOOLTIP_SEP_COLOR_HEX := UI_SEP_COLOR_HEX
+global _TOOLTIP_DIM_COLOR_HEX := UI_DIM_COLOR_HEX
 global _TOOLTIP_BORDER_COLOR_HEX := UI_BORDER_COLOR_HEX
 global _TOOLTIP_BORDER_ALPHA := UI_BORDER_ALPHA
 global _TOOLTIP_BORDER_THICKNESS := UI_BORDER_THICKNESS
@@ -151,6 +156,38 @@ global _TOOLTIP_LIGHTNESS := UI_TINT_LIGHTNESS
 global _TOOLTIP_SATURATION := UI_TINT_SATURATION
 global _TOOLTIP_MAX_CARET_HEIGHT_PX := UI_MAX_CARET_HEIGHT_PX
 global _TOOLTIP_WINDOW_BOTTOM_INSET_PX := UI_WINDOW_BOTTOM_INSET_PX
+
+/**
+ * Refreshes module-local style aliases from the UI_* globals. Called at boot
+ * after the shared TOML has been parsed, ensuring that capture-at-include-time
+ * doesn't leave the tooltip with zeroed-out defaults.
+ */
+Tooltip_UpdateStyles() {
+    global
+    _TOOLTIP_FONT_NAME := UI_FONT_NAME
+    _TOOLTIP_FONT_SIZE := UI_FONT_SIZE_MAIN
+    _TOOLTIP_PADDING_X := UI_PAD_X
+    _TOOLTIP_PADDING_Y := UI_PAD_Y
+    _TOOLTIP_OFFSET_BELOW := UI_OFFSET_BELOW
+    _TOOLTIP_OFFSET_RIGHT := UI_OFFSET_RIGHT
+    _TOOLTIP_DEFAULT_BG_HEX := UI_BG_HEX
+    _TOOLTIP_SEP_COLOR_HEX := UI_SEP_COLOR_HEX
+    _TOOLTIP_DIM_COLOR_HEX := UI_DIM_COLOR_HEX
+    _TOOLTIP_BORDER_COLOR_HEX := UI_BORDER_COLOR_HEX
+    _TOOLTIP_BORDER_ALPHA := UI_BORDER_ALPHA
+    _TOOLTIP_BORDER_THICKNESS := UI_BORDER_THICKNESS
+    _TOOLTIP_CORNER_RADIUS := UI_CORNER_RADIUS
+    _TOOLTIP_LABEL_FONT_SIZE := UI_FONT_SIZE_HINT
+    _TOOLTIP_LABEL_GAP := UI_LABEL_GAP
+    _TOOLTIP_LABEL_COLOR_HEX := UI_LABEL_COLOR_HEX
+    _TOOLTIP_LIGHTNESS := UI_TINT_LIGHTNESS
+    _TOOLTIP_SATURATION := UI_TINT_SATURATION
+    _TOOLTIP_MAX_CARET_HEIGHT_PX := UI_MAX_CARET_HEIGHT_PX
+    _TOOLTIP_WINDOW_BOTTOM_INSET_PX := UI_WINDOW_BOTTOM_INSET_PX
+    _TOOLTIP_TIMEOUT_DECREMENT_SEC := UI_TIMEOUT_DECREMENT_SEC
+    _TOOLTIP_TIMEOUT_FLOOR_SEC := UI_TIMEOUT_FLOOR_SEC
+}
+Tooltip_UpdateStyles()
 
 ; Border overlay Gui — single frameless window covering the entire stack.
 global _TooltipBorderGui := 0
@@ -242,14 +279,17 @@ TooltipShow(Items, DurationSec := 0) {
         return
     }
 
-    if (_TooltipRowGuis.Length == 0) {
+    ; Cache in a local variable to prevent "Invalid index" crashes if a
+    ; concurrent TooltipHide clears the global array during the
+    ; _TooltipResolvePosition yield point.
+    Rows := _TooltipRowGuis
+    if (Rows.Length == 0) {
         TooltipHide("NoRows", true)
         return
     }
 
     Pos := _TooltipResolvePosition()
-    ; _TooltipRowGuis[1] holds the single unified Gui metadata.
-    Row := _TooltipRowGuis[1]
+    Row := Rows[1]
     ; Snapshot generation before Show so any exception after Show still arms
     ; the timer correctly and the ghost cannot outlive the safety deadline.
     _TooltipTimerGeneration := _TooltipGeneration
@@ -632,7 +672,7 @@ _TooltipBuildGui(Items) {
         ; available without confusing it with the actual outcome. ``norm``
         ; resets any prior Strike/Bold/Italic before applying this row's style.
         if IsDimmed {
-            G.SetFont("norm c8C8C8C strike s" . _TOOLTIP_FONT_SIZE, _TOOLTIP_FONT_NAME)
+            G.SetFont("norm c" . _TOOLTIP_DIM_COLOR_HEX . " strike s" . _TOOLTIP_FONT_SIZE, _TOOLTIP_FONT_NAME)
         } else {
             G.SetFont("norm cFFFFFF s" . _TOOLTIP_FONT_SIZE, _TOOLTIP_FONT_NAME)
         }
@@ -661,12 +701,12 @@ _TooltipBuildGui(Items) {
                 LabelX + RightFix, LabelY, MaxLabelW, LS.H), Label)
         }
 
-        ; 1 px separator — same opacity as the tooltip border (white alpha=0.25):
-        ; 0x1A * (1-0.25) + 0xFF * 0.25 ≈ 0x54 → #545454
+        ; 1 px separator — same opacity as the tooltip border (white alpha=0.25).
+        ; Colors are pre-blended in UI_SEP_COLOR_HEX during UiStyle_LoadSharedConst.
         if (Idx < Count) {
             SepY := RowY + RowH
             G.SetFont("s1", _TOOLTIP_FONT_NAME)
-            G.Add("Text", Format("Background545454 x0 y{1} w{2} h{3}", SepY, TotalW, SEP_H), "")
+            G.Add("Text", Format("Background{1} x0 y{2} w{3} h{4}", _TOOLTIP_SEP_COLOR_HEX, SepY, TotalW, SEP_H), "")
         }
     }
 
@@ -736,10 +776,11 @@ _TooltipMeasureTextSize(Text, FontSize) {
 ; rounded — no top/middle/bottom split needed.
 _TooltipApplyStackedCorners() {
     global _TooltipRowGuis, _TOOLTIP_CORNER_RADIUS
-    if (_TooltipRowGuis.Length == 0)
+    Rows := _TooltipRowGuis
+    if (Rows.Length == 0)
         return
 
-    Row := _TooltipRowGuis[1]
+    Row := Rows[1]
     G := Row.Gui
 
     ; SetWindowRgn operates in physical pixels.
@@ -838,7 +879,7 @@ _TooltipShowBorder(X, Y, W, H) {
     ; Pre-multiplied: R=G=B = Round(255 * 0.25) = 64 = 0x40.
     ; DIB memory layout: B G R A (little-endian UInt = 0xAARRGGBB).
     TotalPx := Wp * Hp
-    AlphaByte := 0x40   ; 25 % opacity
+    AlphaByte := Round(_TOOLTIP_BORDER_ALPHA * 255)
     PremulPx := (AlphaByte << 24) | (AlphaByte << 16) | (AlphaByte << 8) | AlphaByte
     loop TotalPx {
         Offset := (A_Index - 1) * 4
@@ -1352,7 +1393,7 @@ _TooltipBuildGuiLlm(slots, active_idx) {
 		if (Idx < Count) {
 			SepY := RowY + RowH
 			G.SetFont("s1", _TOOLTIP_FONT_NAME)
-			G.Add("Text", Format("Background545454 x0 y{1} w{2} h{3}", SepY, TotalW, SEP_H), "")
+			G.Add("Text", Format("Background{1} x0 y{2} w{3} h{4}", _TOOLTIP_SEP_COLOR_HEX, SepY, TotalW, SEP_H), "")
 		}
 	}
 
@@ -1364,8 +1405,17 @@ _TooltipBuildGuiLlm(slots, active_idx) {
 	_TooltipGeneration += 1
 	SetTimer(_TooltipTimerFn, 0)
 
+	; Cache in a local variable to prevent "Invalid index" crashes if a
+	; concurrent TooltipHide clears the global array during the
+	; _TooltipResolvePosition yield point.
+	Rows := _TooltipRowGuis
+	if (Rows.Length == 0) {
+		TooltipHide("LlmLateNoRows", true)
+		return
+	}
+
 	Pos := _TooltipResolvePosition()
-	Row := _TooltipRowGuis[1]
+	Row := Rows[1]
 	_TooltipTimerGeneration := _TooltipGeneration
 	try {
 		Row.Gui.Show(Format("w{1} h{2} x{3} y{4} NoActivate", Row.W, Row.H, Pos.X, Pos.Y))

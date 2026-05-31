@@ -54,6 +54,8 @@ global UI_CORNER_RADIUS   := 0
 
 ; ── Colors ───────────────────────────────────────────────────────────────────
 global UI_BG_HEX          := ""
+global UI_SEP_COLOR_HEX     := "545454"   ; AHK-only constant, blended at runtime
+global UI_DIM_COLOR_HEX     := ""
 global UI_BORDER_COLOR_HEX := "FFFFFF"   ; AHK-only constant, not in TOML
 global UI_BORDER_ALPHA     := 0
 global UI_BORDER_THICKNESS := 1          ; AHK-only constant, not in TOML
@@ -124,7 +126,15 @@ UiStyle_LoadSharedConst() {
 	; [colors]
 	global UI_BG_HEX               := SubStr(IniCacheGet(c, "colors", "bg_hex",           "#" . UI_BG_HEX), 2)
 	global UI_LABEL_COLOR_HEX      := SubStr(IniCacheGet(c, "colors", "label_hex",        "#" . UI_LABEL_COLOR_HEX), 2)
+	global UI_DIM_COLOR_HEX        := SubStr(IniCacheGet(c, "colors", "dim_hex",          "#" . UI_DIM_COLOR_HEX), 2)
 	global UI_BORDER_ALPHA         := Float(IniCacheGet(c,  "colors", "border_alpha_ahk",  UI_BORDER_ALPHA))
+
+	; Separator blending: TOML gives sep_alpha_ahk. AHK cannot do per-control
+	; transparency, so we pre-blend white onto the background color here.
+	sep_alpha := Float(IniCacheGet(c, "colors", "sep_alpha_ahk", 0.25))
+	bg_v := Integer("0x" . SubStr(UI_BG_HEX, 1, 2))
+	sep_v := Round(bg_v * (1 - sep_alpha) + 255 * sep_alpha)
+	global UI_SEP_COLOR_HEX := Format("{1:02X}{2:02X}{3:02X}", sep_v, sep_v, sep_v)
 
 	; [tint]
 	global UI_TINT_LIGHTNESS       := Float(IniCacheGet(c, "tint", "lightness",  UI_TINT_LIGHTNESS))
@@ -150,6 +160,10 @@ UiStyle_LoadSharedConst() {
 
 	LoggerDone("UiStyle", "Shared tooltip constants loaded (pad_x={1} corner_r={2} bg={3} tmo={4}s corr={5} nw={6}).",
 		UI_PAD_X, UI_CORNER_RADIUS, UI_BG_HEX, UI_HOTSTRING_TIMEOUT_SEC, UI_LLM_CORR_SEL_HEX, UI_LLM_NW_SEL_HEX)
+
+	; Refresh dependent modules that captured these values at include-time.
+	if IsSet(Tooltip_UpdateStyles)
+		Tooltip_UpdateStyles()
 }
 
 
