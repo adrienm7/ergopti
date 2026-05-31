@@ -39,14 +39,14 @@
 ;   node -e "const t=require('./static/ergopti_plus/shared/tooltip/tint.js'); ..."
 _GetTintVectors() {
 	Vectors := []
-	Vectors.Push({ Id: "red_accent",    AccentHex: "#FF0000", ExpectedHex: "240F0F" })
-	Vectors.Push({ Id: "green_accent",  AccentHex: "#00CC00", ExpectedHex: "0F240F" })
-	Vectors.Push({ Id: "blue_accent",   AccentHex: "#3388FF", ExpectedHex: "0F1824" })
-	Vectors.Push({ Id: "purple_accent", AccentHex: "#AE61FF", ExpectedHex: "190F24" })
-	Vectors.Push({ Id: "yellow_accent", AccentHex: "#FFCC00", ExpectedHex: "24200F" })
-	Vectors.Push({ Id: "achromatic",    AccentHex: "#808080", ExpectedHex: "1A1A1A" })
+	Vectors.Push({ Id: "red_accent",    AccentHex: "#FF0000", ExpectedHex: "3D0505" })
+	Vectors.Push({ Id: "green_accent",  AccentHex: "#00CC00", ExpectedHex: "053D05" })
+	Vectors.Push({ Id: "blue_accent",   AccentHex: "#3388FF", ExpectedHex: "051C3D" })
+	Vectors.Push({ Id: "purple_accent", AccentHex: "#AE61FF", ExpectedHex: "20053D" })
+	Vectors.Push({ Id: "yellow_accent", AccentHex: "#FFCC00", ExpectedHex: "3D3205" })
+	Vectors.Push({ Id: "achromatic",    AccentHex: "#808080", ExpectedHex: "242424" })
 	; no_accent: empty string triggers the fallback to _TOOLTIP_DEFAULT_BG_HEX
-	Vectors.Push({ Id: "no_accent",     AccentHex: "",        ExpectedHex: "1A1A1A" })
+	Vectors.Push({ Id: "no_accent",     AccentHex: "",        ExpectedHex: "242424" })
 	return Vectors
 }
 

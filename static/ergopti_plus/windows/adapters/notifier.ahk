@@ -30,9 +30,9 @@
 ; A missing or unknown kind defaults to Info (1).
 _NotifierKindToFlag(Kind) {
 	switch Kind {
-		case "warn":  return 2
-		case "error": return 3
-		default:      return 1
+		case "warning": return 2
+		case "error":   return 3
+		default:        return 1
 	}
 }
 
@@ -46,26 +46,26 @@ _NotifierKindToFlag(Kind) {
 ; =======================================================
 
 ; Sends a system notification via Windows TrayTip.
-; @param Title {String} The notification title (bold text in balloon).
-; @param Opts  {Map|0}  Options Map: { body?, kind? }
-;                         body  {String} Notification body text.
-;                         kind  {String} "info" | "warn" | "error" (default "info").
-NotifierSend(Title, Opts) {
-	Body := ""
-	Kind := "info"
+; @param Message {String} The notification body text.
+; @param Opts    {Map|0}  Options Map: { title?, level? }
+;                           title {String} Notification title (bold text).
+;                           level {String} "info" | "success" | "warning" | "error".
+NotifierSend(Message, Opts) {
+	Title := "Ergopti+"
+	Level := "info"
 	if (Opts is Map) {
-		if Opts.Has("body") and Opts["body"] != ""
-			Body := Opts["body"]
-		if Opts.Has("kind") and Opts["kind"] != ""
-			Kind := Opts["kind"]
+		if Opts.Has("title") and Opts["title"] != ""
+			Title := Opts["title"]
+		if Opts.Has("level") and Opts["level"] != ""
+			Level := Opts["level"]
 	}
-	Flag := _NotifierKindToFlag(Kind)
-	try TrayTip(Body, Title, Flag)
+	Flag := _NotifierKindToFlag(Level)
+	try TrayTip(Message, Title, Flag)
 }
 
 ; Machine-readable contract map - consumed by the generic adapter compliance test
 ; (tests/test_adapter_compliance_new.ahk) to verify every required method exists
 ; and is callable without manually listing functions per-adapter.
 global ADAPTER_NOTIFIER := Map(
-    "notify", NotifierSend
+    "send", NotifierSend
 )

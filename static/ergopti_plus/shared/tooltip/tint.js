@@ -35,14 +35,14 @@
  * Default tint parameters, mirroring constants.toml [tint].
  * Drivers that deviate from these must document the divergence explicitly.
  */
-const DEFAULT_LIGHTNESS  = 0.10;
-const DEFAULT_SATURATION = 0.40;
+const DEFAULT_LIGHTNESS = 0.13;
+const DEFAULT_SATURATION = 0.85;
 
 /**
  * Default background color used when no accent is provided or when the
  * accent color cannot be parsed. Mirrors constants.toml colors.bg_hex.
  */
-const DEFAULT_BG = { r: 0x1A / 255, g: 0x1A / 255, b: 0x1A / 255 };
+const DEFAULT_BG = { r: 0x24 / 255, g: 0x24 / 255, b: 0x24 / 255 };
 
 
 

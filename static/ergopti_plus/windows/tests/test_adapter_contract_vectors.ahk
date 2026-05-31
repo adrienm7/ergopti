@@ -66,7 +66,7 @@ _RunNotifierContractVectors() {
 	_Result_send_info() {
 		Err := ""
 		try {
-			NotifierSend("Configuration loaded.", Map("kind", "info"))
+			NotifierSend("Configuration loaded.", Map("level", "info"))
 		} catch as E {
 			Err := E.Message
 		}
@@ -78,7 +78,7 @@ _RunNotifierContractVectors() {
 	_Result_send_warning() {
 		Err := ""
 		try {
-			NotifierSend("API key not set.", Map("kind", "warn"))
+			NotifierSend("API key not set.", Map("level", "warning"))
 		} catch as E {
 			Err := E.Message
 		}
@@ -90,7 +90,7 @@ _RunNotifierContractVectors() {
 	_Result_send_error() {
 		Err := ""
 		try {
-			NotifierSend("Config missing.", Map("kind", "error"))
+			NotifierSend("Config missing.", Map("level", "error"))
 		} catch as E {
 			Err := E.Message
 		}
