@@ -391,6 +391,25 @@ TestTL_LoadHotstringsMultipleEntries() {
 Test("LoadHotstringsSection: registers all three entries from a three-entry section",
 	TestTL_LoadHotstringsMultipleEntries)
 
+TestTL_LoadExtTomlFileUsesCurrentSection() {
+	TmpPath := A_ScriptDir . "\test_ext_loader.toml"
+	if FileExist(TmpPath) {
+		FileDelete(TmpPath)
+	}
+	Content := "[[custom]]`r`n"
+	         . '"aa" = { output = "alpha", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }`r`n'
+	FileAppend(Content, TmpPath, "UTF-8")
+
+	ResetHotstringRecorders()
+	LoadExtTomlFile(TmpPath, "Custom")
+
+	AssertEqual(1, _Stub_HotstringRegistrations.Length)
+
+	FileDelete(TmpPath)
+}
+Test("LoadExtTomlFile: registers entries without undefined category/section locals",
+	TestTL_LoadExtTomlFileUsesCurrentSection)
+
 
 
 

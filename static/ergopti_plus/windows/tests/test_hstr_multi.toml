@@ -1,0 +1,4 @@
+﻿[[words]]
+"aa" = { output = "alpha", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"bb" = { output = "beta",  is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"cc" = { output = "gamma", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }

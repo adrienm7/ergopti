@@ -361,7 +361,19 @@ function M.generate(ctx, menu_mods, actions)
 						local toml_path = hs_dir .. stem .. ".toml"
 						local total, sections = count_toml_hotstrings(toml_path)
 						ext_hs_total = ext_hs_total + total
-						local sec_menu = {}
+						local sec_menu = {
+							{
+								title = i18n.get("menu.hotstrings.open_file"),
+								fn    = (function(path)
+									return function()
+										hs.timer.doAfter(0, function()
+											pcall(hs.execute, string.format("open %q", path))
+										end)
+									end
+								end)(toml_path),
+							},
+						}
+						if #sections > 0 then table.insert(sec_menu, { title = "-" }) end
 						for _, sec in ipairs(sections) do
 							table.insert(sec_menu, {
 								title    = sec.name .. " (" .. fmt_grand(sec.count) .. ")",
@@ -369,11 +381,7 @@ function M.generate(ctx, menu_mods, actions)
 							})
 						end
 						local toml_label = stem .. (total > 0 and (" (" .. fmt_grand(total) .. ")") or "")
-						if #sec_menu > 0 then
-							table.insert(toml_submenus, { title = toml_label, menu = sec_menu })
-						else
-							table.insert(toml_submenus, { title = toml_label, disabled = true })
-						end
+						table.insert(toml_submenus, { title = toml_label, menu = sec_menu })
 					end
 
 					local ext_label = ext_name .. (ext_hs_total > 0 and (" (" .. fmt_grand(ext_hs_total) .. ")") or "")

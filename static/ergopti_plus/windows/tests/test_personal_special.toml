@@ -1,0 +1,7 @@
+[_meta]
+description = ""
+sections_order = ["test"]
+[_meta.sections]
+test = "Test"
+[[test]]
+"q" = { output = "He said \"hello\" and goodbye", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }

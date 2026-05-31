@@ -87,7 +87,7 @@ M._active_tasks = {}
 --- @param module_sections table Extra module sections definitions.
 --- @return table|nil myMenu The created menubar object.
 --- @return table|nil configWatcher The file watcher object.
-function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, module_sections, karabiner)
+function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, module_sections, karabiner, hotfile_paths)
 	base_dir = type(base_dir) == "string" and base_dir or (hs.configdir .. "/")
 	-- MenuPaths was already initialized by init.lua before menu.start() is called;
 	-- call init() again only as a no-op safety net in case of standalone testing.
@@ -505,6 +505,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			get_group_name           = Preferences.get_group_name,
 			keymap                   = keymap,
 			hotfiles                 = hotfiles,
+			hotfile_paths            = type(hotfile_paths) == "table" and hotfile_paths or {},
 			module_sections          = module_sections,
 			hotstring_editor         = hotstring_editor,
 			personal_info            = core_mods.dyn_hot_mod,

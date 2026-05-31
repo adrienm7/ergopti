@@ -309,7 +309,7 @@ do
 			-- Extension personal TOML groups: personal_ext_<stem> → hotstrings/<stem>.toml
 			local ext_stem = category:match("^personal_ext_(.+)$")
 			if ext_stem then
-				return menu_paths.get("PersonalHotstringsDir") .. ext_stem .. ".toml"
+				return menu_paths.get("PersonalHotstringsDir") .. ext_stem:gsub("__", "/") .. ".toml"
 			end
 			return hotstrings_dir .. category .. ".toml"
 		end,
@@ -472,6 +472,7 @@ table.sort(remaining)
 for _, fname in ipairs(remaining) do table.insert(toml_fnames, fname) end
 
 local hotfiles = {}
+local hotfile_paths = {}
 -- Defer sorting for the entire startup load: personal, dynamic, and TOML files all
 -- feed into the same mappings list. A single flush_sort() at the end collapses
 -- what used to be 8+ full O(N log N) passes into one.
@@ -505,29 +506,51 @@ do
 	hotstring_editor.init(personal_path, keymap)
 	keymap.load_toml("personal", personal_path)
 	table.insert(hotfiles, "personal")
+	hotfile_paths["personal"] = personal_path
 
-	-- Scan for extra TOML files in the hotstrings folder
+	-- Recursively scan for extra TOML files in the hotstrings folder
 	local hs_dir = menu_paths.get("PersonalHotstringsDir")
-	local ok_attr, attr = pcall(hs.fs.attributes, hs_dir)
-	if ok_attr and type(attr) == "table" and attr.mode == "directory" then
-		local extra_stems = {}
-		for fname in hs.fs.dir(hs_dir) do
-			if fname:match("%.toml$") and fname ~= "personal_hotstrings.toml" and not fname:match("^_") then
-				local stem = fname:match("^(.-)%.toml$")
-				if stem and stem ~= "" then
-					table.insert(extra_stems, stem)
+	local function scan_recursive(dir, prefix)
+		local ok_attr, attr = pcall(hs.fs.attributes, dir)
+		if not (ok_attr and type(attr) == "table" and attr.mode == "directory") then return end
+
+		local items = {}
+		for fname in hs.fs.dir(dir) do
+			if fname ~= "." and fname ~= ".." and not fname:match("^_") then
+				local fpath = dir .. "/" .. fname
+				local ok_a, a = pcall(hs.fs.attributes, fpath)
+				if ok_a and type(a) == "table" then
+					if a.mode == "directory" then
+						table.insert(items, { type = "dir", name = fname, path = fpath })
+					elseif a.mode == "file" and fname:match("%.toml$") and (prefix ~= "" or fname ~= "personal_hotstrings.toml") then
+						local stem = fname:match("^(.-)%.toml$")
+						if stem and stem ~= "" then
+							table.insert(items, { type = "file", name = fname, stem = stem, path = fpath })
+						end
+					end
 				end
 			end
 		end
-		table.sort(extra_stems)
-		for _, stem in ipairs(extra_stems) do
-			local ext_path  = hs_dir .. stem .. ".toml"
-			local group_name = "personal_ext_" .. stem
-			keymap.load_toml(group_name, ext_path)
-			table.insert(hotfiles, group_name)
-			Logger.info(LOG, "Loaded extra personal hotstrings group '%s' from '%s'.", group_name, ext_path)
+
+		table.sort(items, function(a, b) return a.name < b.name end)
+
+		for _, item in ipairs(items) do
+			if item.type == "file" then
+				local new_prefix = (prefix == "") and item.stem or (prefix .. "__" .. item.stem)
+				local group_name = "personal_ext_" .. new_prefix
+				keymap.load_toml(group_name, item.path)
+				table.insert(hotfiles, group_name)
+				hotfile_paths[group_name] = item.path
+				Logger.info(LOG, "Loaded extra personal hotstrings group '%s' from '%s'.", group_name, item.path)
+			else
+				-- Recurse into subdirectory
+				local new_prefix = (prefix == "") and item.name or (prefix .. "__" .. item.name)
+				scan_recursive(item.path, new_prefix)
+			end
 		end
 	end
+
+	scan_recursive(hs_dir:gsub("[/\\]+$", ""), "")
 end
 
 -- Dynamic hotstrings (personal info, date triggers, etc.) — after personal,
@@ -545,6 +568,7 @@ for _, fname in ipairs(toml_fnames) do
 	Logger.debug(LOG, string.format("Loading TOML file: %s…", name))
 	keymap.load_toml(name, hotstrings_dir .. fname)
 	table.insert(hotfiles, name)
+	hotfile_paths[name] = hotstrings_dir .. fname
 end
 Logger.info(LOG, string.format("Loaded %d TOML hotstring file(s) in %.1fms.",
 	#toml_fnames, (hs.timer.secondsSinceEpoch() - _toml_load_t0) * 1000))
@@ -574,7 +598,7 @@ Logger.debug(LOG, "Starting user interface components…")
 menu.start(
 	base_dir, hotfiles, gestures,
 	keymap, dynamic_hotstrings, module_sections,
-	karabiner
+	karabiner, hotfile_paths
 )
 
 -- Script control is now managed through the shortcuts module
@@ -652,6 +676,42 @@ do
 	end)
 	dir_watcher:start()
 	table.insert(_G.script_watchers, dir_watcher)
+
+	local function watch_personal_hotstrings_dir(dir)
+		local ok_attr, attr = pcall(hs.fs.attributes, dir)
+		if not (ok_attr and type(attr) == "table" and attr.mode == "directory") then return end
+
+		local w = hs.pathwatcher.new(dir, function(paths)
+			for _, p in ipairs(paths) do
+				if not p:match("^/tmp/") then
+					schedule_reload(i18n.get("init.reload_hotstrings"))
+					return
+				end
+			end
+		end)
+		w:start()
+		table.insert(_G.script_watchers, w)
+
+		for fname in hs.fs.dir(dir) do
+			if fname ~= "." and fname ~= ".." then
+				local path = dir .. "/" .. fname
+				local ok_a, a = pcall(hs.fs.attributes, path)
+				if ok_a and type(a) == "table" then
+					if a.mode == "directory" then
+						watch_personal_hotstrings_dir(path)
+					elseif a.mode == "file" and fname:match("%.toml$") then
+						local fw = hs.pathwatcher.new(path, function()
+							schedule_reload(i18n.get("init.reload_hotstrings"))
+						end)
+						fw:start()
+						table.insert(_G.script_watchers, fw)
+					end
+				end
+			end
+		end
+	end
+
+	watch_personal_hotstrings_dir((menu_paths.get("PersonalHotstringsDir") or ""):gsub("[/\\]+$", ""))
 
 	-- HTML/CSS/JS are webview assets loaded at open-time — only .lua changes
 	-- drive Hammerspoon runtime behavior and warrant a reload
