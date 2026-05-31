@@ -189,12 +189,12 @@ local function parse_entry(line)
 	}
 end
 
---- Parses a TOML inline table whose values are all double-quoted strings.
---- Expected format: { key = "val", key2 = "val2", … }
+--- Parses a TOML inline table.
+--- Expected format: { key = "val", key2 = 1.0, key3 = true, … }
 --- @param s string The input string.
 --- @param i number The starting index (must point at '{').
 --- @return table|nil, number Returns parsed table and next index, or nil on failure.
-local function parse_inline_string_table(s, i)
+local function parse_inline_table(s, i)
 	if type(s) ~= "string" or s:sub(i, i) ~= "{" then return nil, i end
 	local result = {}
 	i = skip_ws(s, i + 1)
@@ -205,17 +205,40 @@ local function parse_inline_string_table(s, i)
 		if s:sub(i, i) == "," then
 			i = skip_ws(s, i + 1)
 		end
+
 		-- Parse the key (unquoted identifier)
 		local ks = i
 		while i <= #s and s:sub(i, i):match("[%w_%-]") do i = i + 1 end
 		local key = s:sub(ks, i - 1)
 		if key == "" then return nil, ks end
+
 		i = skip_ws(s, i)
 		if s:sub(i, i) ~= "=" then return nil, ks end
 		i = skip_ws(s, i + 1)
-		if s:sub(i, i) ~= "\"" then return nil, ks end
-		local val, ni = parse_dq_string(s, i)
-		if not val then return nil, ks end
+
+		-- Parse the value (quoted string, number, or boolean)
+		local val, ni
+		local c = s:sub(i, i)
+		if c == "\"" then
+			val, ni = parse_dq_string(s, i)
+		elseif s:sub(i, i + 3) == "true" then
+			val, ni = true, i + 4
+		elseif s:sub(i, i + 4) == "false" then
+			val, ni = false, i + 5
+		else
+			-- Numeric value
+			local k = i
+			while k <= #s do
+				local cc = s:sub(k, k)
+				if cc:match("[%s,}]") or cc == "#" then break end
+				k = k + 1
+			end
+			local raw = s:sub(i, k - 1)
+			val = tonumber(raw)
+			ni = k
+		end
+
+		if val == nil and s:sub(i, i) ~= "}" then return nil, ks end
 		result[key] = val
 		i = skip_ws(s, ni)
 	end
@@ -246,7 +269,7 @@ local function parse_kv_string(line)
 
 	i = skip_ws(line, i + 1)
 	if line:sub(i, i) == "{" then
-		local tbl = select(1, parse_inline_string_table(line, i))
+		local tbl = select(1, parse_inline_table(line, i))
 		return key, tbl
 	end
 	if line:sub(i, i) ~= "\"" then return nil, nil end
@@ -281,7 +304,7 @@ local function parse_kv_value(line)
 
 	local c = line:sub(i, i)
 	if c == "{" then
-		local tbl = select(1, parse_inline_string_table(line, i))
+		local tbl = select(1, parse_inline_table(line, i))
 		return key, tbl
 	elseif c == "\"" then
 		local val = select(1, parse_dq_string(line, i))
