@@ -653,6 +653,15 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		if ok and type(ps.load) == "function" then ps.load() end
 	end)
 
+	-- Suppress pathwatcher events for the first few seconds after boot.
+	-- macOS FSEvents buffers events across process restarts and delivers them
+	-- all at once when the new watcher registers — without this window, any
+	-- file changes that occurred during the previous (possibly cascading) boot
+	-- would immediately trigger another hs.reload(), causing an infinite loop.
+	local BOOT_SUPPRESS_SEC = 5
+	_suppress_watcher_until = hs.timer.secondsSinceEpoch() + BOOT_SUPPRESS_SEC
+	Logger.debug(LOG, "Pathwatcher boot suppression active for %.0f s.", BOOT_SUPPRESS_SEC)
+
 	local configWatcher = MenuWatchers.start_config_watcher(
 		base_dir,
 		function() do_reload("watcher") end,
