@@ -739,61 +739,7 @@ _Updater_OpenChangelogWindow(Channel) {
 	; ATX headings (#/##/###), **bold**, *italic*, `code`, [links](url),
 	; unordered/ordered lists, blockquotes, horizontal rules, tables, and
 	; fenced code blocks. No external dependencies — everything is inline.
-	MakeHtml := (md) => (
-		"<!DOCTYPE html><html><head><meta charset='utf-8'>"
-		. "<style>"
-		. "html,body{margin:0;padding:0;height:100%;font-family:'Segoe UI',sans-serif;font-size:13px;color:#1a1a1a;background:#fff;}"
-		. "body{padding:14px 18px;box-sizing:border-box;overflow-y:auto;overflow-x:hidden;}"
-		. "h1{font-size:1.35em;margin:.6em 0 .3em;}h2{font-size:1.2em;margin:.6em 0 .25em;border-bottom:1px solid #ddd;padding-bottom:.2em;}"
-		. "h3{font-size:1.05em;margin:.5em 0 .2em;}h4,h5,h6{font-size:1em;margin:.4em 0 .15em;}"
-		. "p{margin:.35em 0;}ul,ol{margin:.3em 0 .3em 1.4em;padding:0;}li{margin:.15em 0;}"
-		. "code{background:#f3f3f3;border-radius:3px;padding:.1em .35em;font-family:Consolas,monospace;font-size:.92em;}"
-		. "pre{background:#f3f3f3;border-radius:4px;padding:.7em 1em;overflow-x:auto;}"
-		. "pre code{background:none;padding:0;}"
-		. "blockquote{border-left:3px solid #ccc;margin:.4em 0 .4em 0;padding:.2em .8em;color:#555;}"
-		. "hr{border:none;border-top:1px solid #ddd;margin:.6em 0;}"
-		. "a{color:#0969da;}a:hover{text-decoration:underline;}"
-		. "table{border-collapse:collapse;margin:.4em 0;}th,td{border:1px solid #ddd;padding:.25em .6em;text-align:left;}"
-		. "th{background:#f5f5f5;font-weight:600;}"
-		. ".empty{display:flex;align-items:center;justify-content:center;height:100%;color:#888;font-size:1.05em;}"
-		. "</style></head><body>"
-		. "<script>"
-		. "function mdToHtml(s){"
-		. "if(!s)return '<div class=empty>' + emptyMsg + '</div>';"
-		. "var lines=s.split('\n'),out=[],inPre=false,inUl=false,inOl=false,inBq=false,inTbl=false;"
-		. "function closeBlocks(){if(inUl){out.push('</ul>');inUl=false;}if(inOl){out.push('</ol>');inOl=false;}if(inBq){out.push('</blockquote>');inBq=false;}if(inTbl){out.push('</table>');inTbl=false;}}"
-		. "function inline(t){t=t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');"
-		. "t=t.replace(/``([^``]+)``/g,'<code>$1</code>');"
-		. "t=t.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>');"
-		. "t=t.replace(/__(.+?)__/g,'<strong>$1</strong>');"
-		. "t=t.replace(/\*(.+?)\*/g,'<em>$1</em>');"
-		. "t=t.replace(/_(.+?)_/g,'<em>$1</em>');"
-		. "t=t.replace(/!\[([^\]]*)\]\(([^)]+)\)/g,'<img alt=`"$1`" src=`"$2`" style=`"max-width:100%`">');"
-		. "t=t.replace(/\[([^\]]+)\]\(([^)]+)\)/g,'<a href=`"$2`" target=`"_blank`">$1</a>');"
-		. "return t;}"
-		. "for(var i=0;i<lines.length;i++){"
-		. "var l=lines[i];"
-		. "if(/^``````/.test(l)){if(inPre){out.push('</code></pre>');inPre=false;}else{closeBlocks();out.push('<pre><code>');inPre=true;}continue;}"
-		. "if(inPre){out.push(l.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'));continue;}"
-		. "if(/^\s*$/.test(l)){closeBlocks();continue;}"
-		. "var hm=l.match(/^(#{1,6})\s+(.*)/);if(hm){closeBlocks();var n=hm[1].length;out.push('<h'+n+'>'+inline(hm[2])+'</h'+n+'>');continue;}"
-		. "if(/^---+$/.test(l.trim())||/^\*\*\*+$/.test(l.trim())){closeBlocks();out.push('<hr>');continue;}"
-		. "if(/^\|/.test(l)&&/\|/.test(l)){if(!inTbl){closeBlocks();out.push('<table>');inTbl=true;}"
-		. "if(/^[\s|:-]+$/.test(l))continue;"
-		. "var cells=l.replace(/^\||\|$/g,'').split('|');"
-		. "var tag=(!inTbl||out[out.length-1]==='<table>')?'th':'td';"
-		. "out.push('<tr>'+cells.map(function(c){return'<'+tag+'>'+inline(c.trim())+'</'+tag+'>';}).join('')+'</tr>');continue;}"
-		. "var bq=l.match(/^>\s?(.*)/);if(bq){if(!inBq){closeBlocks();out.push('<blockquote>');inBq=true;}out.push('<p>'+inline(bq[1])+'</p>');continue;}"
-		. "var ul=l.match(/^[-*+]\s+(.*)/);if(ul){if(!inUl){closeBlocks();out.push('<ul>');inUl=true;}out.push('<li>'+inline(ul[1])+'</li>');continue;}"
-		. "var ol=l.match(/^\d+\.\s+(.*)/);if(ol){if(!inOl){closeBlocks();out.push('<ol>');inOl=true;}out.push('<li>'+inline(ol[1])+'</li>');continue;}"
-		. "closeBlocks();out.push('<p>'+inline(l)+'</p>');}"
-		. "if(inPre)out.push('</code></pre>');closeBlocks();"
-		. "return out.join('\n');}"
-		. "var emptyMsg=" . _Updater_JsStr(t("updater.changelog_empty")) . ";"
-		. "var md=" . _Updater_JsStr(md) . ";"
-		. "document.body.innerHTML=mdToHtml(md);"
-		. "</script></body></html>"
-	)
+	MakeHtml := (md) => _Updater_MakeMarkdownHtml(md)
 
 	; Navigates the WebView2 pane to a rendered Markdown page.
 	; Falls back to a plain string assignment when WebView2 is not used.
@@ -885,6 +831,69 @@ _Updater_JsStr(s) {
 	s := StrReplace(s, "`r", "")
 	s := StrReplace(s, "`t", "\t")
 	return "'" . s . "'"
+}
+
+; Builds a self-contained HTML page that renders the given Markdown string.
+; The JS renderer covers the Markdown subset used in GitHub release notes:
+; ATX headings, **bold**, *italic*, `code`, [links](url), lists, blockquotes,
+; horizontal rules, tables, and fenced code blocks. No external dependencies.
+; Used by both _Updater_OpenChangelogWindow and Updater_ShowUpdatePrompt.
+_Updater_MakeMarkdownHtml(md) {
+	return (
+		"<!DOCTYPE html><html><head><meta charset='utf-8'>"
+		. "<style>"
+		. "html,body{margin:0;padding:0;height:100%;font-family:'Segoe UI',sans-serif;font-size:13px;color:#1a1a1a;background:#fff;}"
+		. "body{padding:14px 18px;box-sizing:border-box;overflow-y:auto;overflow-x:hidden;}"
+		. "h1{font-size:1.35em;margin:.6em 0 .3em;}h2{font-size:1.2em;margin:.6em 0 .25em;border-bottom:1px solid #ddd;padding-bottom:.2em;}"
+		. "h3{font-size:1.05em;margin:.5em 0 .2em;}h4,h5,h6{font-size:1em;margin:.4em 0 .15em;}"
+		. "p{margin:.35em 0;}ul,ol{margin:.3em 0 .3em 1.4em;padding:0;}li{margin:.15em 0;}"
+		. "code{background:#f3f3f3;border-radius:3px;padding:.1em .35em;font-family:Consolas,monospace;font-size:.92em;}"
+		. "pre{background:#f3f3f3;border-radius:4px;padding:.7em 1em;overflow-x:auto;}"
+		. "pre code{background:none;padding:0;}"
+		. "blockquote{border-left:3px solid #ccc;margin:.4em 0 .4em 0;padding:.2em .8em;color:#555;}"
+		. "hr{border:none;border-top:1px solid #ddd;margin:.6em 0;}"
+		. "a{color:#0969da;}a:hover{text-decoration:underline;}"
+		. "table{border-collapse:collapse;margin:.4em 0;}th,td{border:1px solid #ddd;padding:.25em .6em;text-align:left;}"
+		. "th{background:#f5f5f5;font-weight:600;}"
+		. ".empty{display:flex;align-items:center;justify-content:center;height:100%;color:#888;font-size:1.05em;}"
+		. "</style></head><body>"
+		. "<script>"
+		. "function mdToHtml(s){"
+		. "if(!s)return '<div class=empty>' + emptyMsg + '</div>';"
+		. "var lines=s.split('\n'),out=[],inPre=false,inUl=false,inOl=false,inBq=false,inTbl=false;"
+		. "function closeBlocks(){if(inUl){out.push('</ul>');inUl=false;}if(inOl){out.push('</ol>');inOl=false;}if(inBq){out.push('</blockquote>');inBq=false;}if(inTbl){out.push('</table>');inTbl=false;}}"
+		. "function inline(t){t=t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');"
+		. "t=t.replace(/``([^``]+)``/g,'<code>$1</code>');"
+		. "t=t.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>');"
+		. "t=t.replace(/__(.+?)__/g,'<strong>$1</strong>');"
+		. "t=t.replace(/\*(.+?)\*/g,'<em>$1</em>');"
+		. "t=t.replace(/_(.+?)_/g,'<em>$1</em>');"
+		. "t=t.replace(/!\[([^\]]*)\]\(([^)]+)\)/g,'<img alt=`"$1`" src=`"$2`" style=`"max-width:100%`">');"
+		. "t=t.replace(/\[([^\]]+)\]\(([^)]+)\)/g,'<a href=`"$2`" target=`"_blank`">$1</a>');"
+		. "return t;}"
+		. "for(var i=0;i<lines.length;i++){"
+		. "var l=lines[i];"
+		. "if(/^``````/.test(l)){if(inPre){out.push('</code></pre>');inPre=false;}else{closeBlocks();out.push('<pre><code>');inPre=true;}continue;}"
+		. "if(inPre){out.push(l.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'));continue;}"
+		. "if(/^\s*$/.test(l)){closeBlocks();continue;}"
+		. "var hm=l.match(/^(#{1,6})\s+(.*)/);if(hm){closeBlocks();var n=hm[1].length;out.push('<h'+n+'>'+inline(hm[2])+'</h'+n+'>');continue;}"
+		. "if(/^---+$/.test(l.trim())||/^\*\*\*+$/.test(l.trim())){closeBlocks();out.push('<hr>');continue;}"
+		. "if(/^\|/.test(l)&&/\|/.test(l)){if(!inTbl){closeBlocks();out.push('<table>');inTbl=true;}"
+		. "if(/^[\s|:-]+$/.test(l))continue;"
+		. "var cells=l.replace(/^\||\|$/g,'').split('|');"
+		. "var tag=(!inTbl||out[out.length-1]==='<table>')?'th':'td';"
+		. "out.push('<tr>'+cells.map(function(c){return'<'+tag+'>'+inline(c.trim())+'</'+tag+'>';}).join('')+'</tr>');continue;}"
+		. "var bq=l.match(/^>\s?(.*)/);if(bq){if(!inBq){closeBlocks();out.push('<blockquote>');inBq=true;}out.push('<p>'+inline(bq[1])+'</p>');continue;}"
+		. "var ul=l.match(/^[-*+]\s+(.*)/);if(ul){if(!inUl){closeBlocks();out.push('<ul>');inUl=true;}out.push('<li>'+inline(ul[1])+'</li>');continue;}"
+		. "var ol=l.match(/^\d+\.\s+(.*)/);if(ol){if(!inOl){closeBlocks();out.push('<ol>');inOl=true;}out.push('<li>'+inline(ol[1])+'</li>');continue;}"
+		. "closeBlocks();out.push('<p>'+inline(l)+'</p>');}"
+		. "if(inPre)out.push('</code></pre>');closeBlocks();"
+		. "return out.join('\n');}"
+		. "var emptyMsg=" . _Updater_JsStr(t("updater.changelog_empty")) . ";"
+		. "var md=" . _Updater_JsStr(md) . ";"
+		. "document.body.innerHTML=mdToHtml(md);"
+		. "</script></body></html>"
+	)
 }
 
 
@@ -1084,6 +1093,7 @@ _Updater_OnTrayMsg(wParam, lParam, msg, hwnd) {
 ; and ``Later`` (close). Used both from the TrayTip click and from the
 ; explicit "Show update" menu item that appears on new-version availability.
 Updater_ShowUpdatePrompt(Release) {
+	global _VendorDir
 	if (Type(Release) != "Object")
 		return
 	G := Gui("+Resize +MinSize720x420 +AlwaysOnTop", t("updater.update_dialog_title"))
@@ -1100,8 +1110,9 @@ Updater_ShowUpdatePrompt(Release) {
 	}
 	G.SetFont("s10 norm")
 	G.Add("Text", "xm y+10 w700", t("updater.update_dialog_changelog"))
-	BodyText := (Release.Body != "") ? Release.Body : t("updater.changelog_empty")
-	G.Add("Edit", "xm y+4 w700 h300 ReadOnly +Multi -Wrap +VScroll", BodyText)
+
+	; Placeholder that WebView2 overlays — same height as the former Edit control.
+	BodyPane := G.Add("Text", "xm y+4 w700 h300", "")
 
 	BtnInstall := G.Add("Button", "xm y+12 Default", t("updater.update_dialog_install"))
 	BtnOpen    := G.Add("Button", "x+8 yp",          t("updater.update_dialog_open"))
@@ -1114,6 +1125,39 @@ Updater_ShowUpdatePrompt(Release) {
 	G.OnEvent("Close",  (*) => G.Destroy())
 	G.OnEvent("Escape", (*) => G.Destroy())
 	G.Show("w740 AutoSize")
+
+	; Spin up WebView2 for Markdown rendering after Show() (Hwnd is valid then).
+	UseWV := IsSet(WebView2) && FileExist(_VendorDir . "\64bit\WebView2Loader.dll")
+	if UseWV {
+		loader := _VendorDir . "\64bit\WebView2Loader.dll"
+		udir   := A_Temp . "\ergopti_update_wv_" . A_TickCount
+		try DirCreate(udir)
+		WVC := unset
+		try {
+			WVC := WebView2.create(BodyPane.Hwnd, , 0, udir, "", 0, loader)
+		} catch as Err {
+			try LoggerWarn("Updater", "WebView2 create failed in update prompt: {1}.", Err.Message)
+			UseWV := false
+		}
+		if UseWV and IsSet(WVC) {
+			try {
+				s := WVC.CoreWebView2.Settings
+				s.AreDevToolsEnabled              := false
+				s.AreDefaultContextMenusEnabled   := false
+				s.IsStatusBarEnabled              := false
+				s.AreBrowserAcceleratorKeysEnabled := false
+			}
+			WVC.Fill()
+			WVC.CoreWebView2.NavigateToString(_Updater_MakeMarkdownHtml(Release.Body))
+		}
+	}
+	if (!UseWV or !IsSet(WVC)) {
+		; Fallback: replace the placeholder with a plain read-only Edit.
+		BodyPane.GetPos(&bx, &by, &bw, &bh)
+		BodyText := (Release.Body != "") ? Release.Body : t("updater.changelog_empty")
+		G.Add("Edit", "x" . bx . " y" . by . " w" . bw . " h" . bh
+			. " ReadOnly +Multi -Wrap +VScroll", BodyText)
+	}
 }
 
 ; Menu/notification entry point — pulls the cached release record from the
