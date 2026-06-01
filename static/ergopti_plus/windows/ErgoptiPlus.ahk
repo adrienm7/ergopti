@@ -1632,6 +1632,38 @@ ReadScriptShortcutsConfig() {
     }
 }
 
+; Clean up after a script-management combo (AltGr+Enter/BackSpace/Delete/Escape)
+; has fired its action. Two problems are solved here, and ONLY together — fixing
+; one without the other reintroduces the other:
+;
+;   1. Stuck prefix: on an AltGr-as-Kana driver remap (_ALTGR_KANA_FIXUP) SC138
+;      IS the Kana virtual key, kept by AHK as the held prefix for the
+;      "S"-suspend-exempt script combos. After the un-suspend action the
+;      layout's SC138 hotkeys come back on with that prefix still latched, so
+;      every following keystroke lands on the AltGr/Kana layer (« AltGr bloqué »).
+;      We clear it by injecting an SC138 up.
+;   2. Leaked suffix: the custom combo already suppresses the suffix key-down,
+;      but injecting the SC138 up WHILE the suffix is still physically held makes
+;      AHK replay that suppressed key into the app — the « ça envoie enter puis
+;      sort de la pause » bug. So we first wait (bounded) for the suffix to
+;      physically lift, and only inject the prefix release once it is confirmed
+;      up. If the wait times out with the key still down we skip the inject — a
+;      possibly-latched prefix (one AltGr tap to clear) is far less bad than a
+;      stray Enter/BackSpace landing in the document.
+;
+; On non-Kana layouts the prefix is physical RAlt; nothing is injected and
+; natural key release already does the right thing, so this is a no-op.
+ResetScriptComboKeys(SuffixSC) {
+    global _ALTGR_KANA_FIXUP
+    if !(IsSet(_ALTGR_KANA_FIXUP) and _ALTGR_KANA_FIXUP) {
+        return
+    }
+    KeyWait(SuffixSC, "T2")
+    if !GetKeyState(SuffixSC, "P") {
+        SendEvent("{SC138 Up}")
+    }
+}
+
 ; Dispatch the configured action for a script-shortcut slot. ``none`` lets the
 ; underlying key fall through (the hotkey handler already SendInputs the
 ; fallback in its else-branch — here we additionally return early so a slot
@@ -2220,9 +2252,15 @@ ShowHealthCheck(*) {
 ; reference them. Each handler double-checks the modifier state via
 ; GetKeyState — same defensive guard as the original blocks — so a stale
 ; AltGr+key ghost cannot replay the action on the next isolated keystroke.
+; After RunScriptShortcutAction returns (for actions that do — e.g. the pause
+; toggle), ResetScriptComboKeys waits for the suffix to lift then clears the
+; SC138/Kana prefix, so the combo neither leaks its key into the app nor leaves
+; AltGr stuck. Reload/ExitApp actions never return, so the reset is skipped —
+; a fresh process (or a closed one) has no latched prefix to clear anyway.
 _ScriptAltGrEnterHandler(*) {
     if (GetKeyState("SC138", "P") and GetKeyState("SC01C", "P")) {
         RunScriptShortcutAction("script_altgr_enter")
+        ResetScriptComboKeys("SC01C")
     } else {
         SendInput("{Enter}")
     }
@@ -2231,6 +2269,7 @@ _ScriptAltGrEnterHandler(*) {
 _ScriptAltGrBackSpaceHandler(*) {
     if (GetKeyState("SC138", "P") and GetKeyState("SC00E", "P")) {
         RunScriptShortcutAction("script_altgr_backspace")
+        ResetScriptComboKeys("SC00E")
     } else {
         SendInput("{BackSpace}")
     }
@@ -2239,6 +2278,7 @@ _ScriptAltGrBackSpaceHandler(*) {
 _ScriptAltGrDeleteHandler(*) {
     if (GetKeyState("SC138", "P") and GetKeyState("SC153", "P")) {
         RunScriptShortcutAction("script_altgr_delete")
+        ResetScriptComboKeys("SC153")
     } else {
         SendInput("{Delete}")
     }
@@ -2247,6 +2287,7 @@ _ScriptAltGrDeleteHandler(*) {
 _ScriptAltGrEscapeHandler(*) {
     if (GetKeyState("SC138", "P") and GetKeyState("SC001", "P")) {
         RunScriptShortcutAction("script_altgr_escape")
+        ResetScriptComboKeys("SC001")
     } else {
         SendInput("{Escape}")
     }
