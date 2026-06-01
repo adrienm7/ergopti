@@ -2091,7 +2091,7 @@
 	"ui_typing.unit_richness": "% rikdom",
 	"ui_typing.unit_sessions": "økter",
 	"updater.changelog_channel_label": "Kanal:",
-	"updater.changelog_empty": "(Ingen versjonsmerknader tilgjengelig for denne versjonen.)",
+	"updater.changelog_empty": "(Ingen versjonsmerknader tilgjengelig for denne kanalen.)",
 	"updater.changelog_install": "Installer denne versjonen",
 	"updater.changelog_install_current": "Gjeldende versjon",
 	"updater.changelog_local_source_note": "Lokal kildemodus — kanalendringer lagres ikke.",

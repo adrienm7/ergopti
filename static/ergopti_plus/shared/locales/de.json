@@ -2091,7 +2091,7 @@
 	"ui_typing.unit_richness": "% Reichhaltigkeit",
 	"ui_typing.unit_sessions": "Sitzungen",
 	"updater.changelog_channel_label": "Kanal:",
-	"updater.changelog_empty": "(Keine Versionshinweise für diese Version verfügbar.)",
+	"updater.changelog_empty": "(Keine Versionshinweise für diesen Kanal verfügbar.)",
 	"updater.changelog_install": "Diese Version installieren",
 	"updater.changelog_install_current": "Aktuelle Version",
 	"updater.changelog_local_source_note": "Lokaler Quellmodus — Kanaländerungen werden nicht gespeichert.",

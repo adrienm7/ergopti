@@ -2091,7 +2091,7 @@
 	"ui_typing.unit_richness": "% עושר",
 	"ui_typing.unit_sessions": "פעילויות",
 	"updater.changelog_channel_label": "ערוץ:",
-	"updater.changelog_empty": "(אין הערות גרסה זמינות עבור גרסה זו.)",
+	"updater.changelog_empty": "(אין הערות גרסה זמינות עבור ערוץ זה.)",
 	"updater.changelog_install": "התקן גרסה זו",
 	"updater.changelog_install_current": "גרסה נוכחית",
 	"updater.changelog_local_source_note": "מצב מקור מקומי — שינויי ערוץ אינם נשמרים.",

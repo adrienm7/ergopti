@@ -2091,7 +2091,7 @@
 	"ui_typing.unit_richness": "% 丰富度",
 	"ui_typing.unit_sessions": "次会话",
 	"updater.changelog_channel_label": "频道：",
-	"updater.changelog_empty": "(此版本暂无发布说明。)",
+	"updater.changelog_empty": "(此频道暂无发布说明。)",
 	"updater.changelog_install": "安装此版本",
 	"updater.changelog_install_current": "当前版本",
 	"updater.changelog_local_source_note": "本地源模式 — 频道更改不会保存。",

@@ -2091,7 +2091,7 @@
 	"ui_typing.unit_richness": "% rijkheid",
 	"ui_typing.unit_sessions": "sessies",
 	"updater.changelog_channel_label": "Kanaal:",
-	"updater.changelog_empty": "(Geen release-notities beschikbaar voor deze versie.)",
+	"updater.changelog_empty": "(Geen release-notities beschikbaar voor dit kanaal.)",
 	"updater.changelog_install": "Deze versie installeren",
 	"updater.changelog_install_current": "Huidige versie",
 	"updater.changelog_local_source_note": "Lokale bronmodus — kanaalwijzigingen worden niet opgeslagen.",

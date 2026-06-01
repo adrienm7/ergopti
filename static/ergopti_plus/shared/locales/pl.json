@@ -2091,7 +2091,7 @@
 	"ui_typing.unit_richness": "% bogactwo",
 	"ui_typing.unit_sessions": "sesje",
 	"updater.changelog_channel_label": "Kanał:",
-	"updater.changelog_empty": "(Brak informacji o zmianach dla tej wersji.)",
+	"updater.changelog_empty": "(Brak informacji o zmianach dla tego kanału.)",
 	"updater.changelog_install": "Zainstaluj tę wersję",
 	"updater.changelog_install_current": "Bieżąca wersja",
 	"updater.changelog_local_source_note": "Tryb źródła lokalnego — zmiany kanału nie są zapisywane.",

@@ -2091,7 +2091,7 @@
 	"ui_typing.unit_richness": "% багатства",
 	"ui_typing.unit_sessions": "сесій",
 	"updater.changelog_channel_label": "Канал:",
-	"updater.changelog_empty": "(Для цієї версії немає опису змін.)",
+	"updater.changelog_empty": "(Для цього каналу немає опису змін.)",
 	"updater.changelog_install": "Встановити цю версію",
 	"updater.changelog_install_current": "Поточна версія",
 	"updater.changelog_local_source_note": "Режим локального джерела — зміни каналу не зберігаються.",
