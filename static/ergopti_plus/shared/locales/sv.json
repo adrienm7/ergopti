@@ -2091,7 +2091,7 @@
 	"ui_typing.unit_richness": "% rikedom",
 	"ui_typing.unit_sessions": "sessioner",
 	"updater.changelog_channel_label": "Kanal:",
-	"updater.changelog_empty": "(Ingen versionsinformation tillgänglig för den här versionen.)",
+	"updater.changelog_empty": "(Ingen versionsinformation tillgänglig för den här kanalen.)",
 	"updater.changelog_install": "Installera den här versionen",
 	"updater.changelog_install_current": "Aktuell version",
 	"updater.changelog_local_source_note": "Lokalt källäge — kanaländringar sparas inte.",

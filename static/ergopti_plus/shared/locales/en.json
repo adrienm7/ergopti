@@ -2091,7 +2091,7 @@
 	"ui_typing.unit_richness": "% richness",
 	"ui_typing.unit_sessions": "sessions",
 	"updater.changelog_channel_label": "Channel:",
-	"updater.changelog_empty": "(No release notes available for this version.)",
+	"updater.changelog_empty": "(No release notes available for this channel.)",
 	"updater.changelog_install": "Install this version",
 	"updater.changelog_install_current": "Current version",
 	"updater.changelog_local_source_note": "Local source mode — channel changes are not persisted.",

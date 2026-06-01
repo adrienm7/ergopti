@@ -641,8 +641,7 @@ _Updater_OpenChangelogWindow(Channel) {
 		Labels.Push(Label)
 	}
 
-	ChannelBadge := (Channel == "dev") ? " — dev" : " — stable"
-	WinTitle     := t("updater.title_changelog") . ChannelBadge
+	WinTitle := t("updater.title_changelog")
 
 	G := Gui("+Resize +MinSize930x400", WinTitle)
 	G.SetFont("s10", "Segoe UI")

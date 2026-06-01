@@ -2091,7 +2091,7 @@
 	"ui_typing.unit_richness": "% bohatost",
 	"ui_typing.unit_sessions": "sezení",
 	"updater.changelog_channel_label": "Kanál:",
-	"updater.changelog_empty": "(Pro tuto verzi nejsou k dispozici žádné poznámky.)",
+	"updater.changelog_empty": "(Pro tento kanál nejsou k dispozici žádné poznámky k verzi.)",
 	"updater.changelog_install": "Nainstalovat tuto verzi",
 	"updater.changelog_install_current": "Aktuální verze",
 	"updater.changelog_local_source_note": "Lokální zdrojový režim — změny kanálu nejsou uloženy.",

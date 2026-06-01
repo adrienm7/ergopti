@@ -2091,7 +2091,7 @@
 	"ui_typing.unit_richness": "% विविधता",
 	"ui_typing.unit_sessions": "सत्र",
 	"updater.changelog_channel_label": "चैनल:",
-	"updater.changelog_empty": "(इस संस्करण के लिए कोई रिलीज़ नोट्स उपलब्ध नहीं हैं।)",
+	"updater.changelog_empty": "(इस चैनल के लिए कोई रिलीज़ नोट्स उपलब्ध नहीं हैं।)",
 	"updater.changelog_install": "यह संस्करण स्थापित करें",
 	"updater.changelog_install_current": "वर्तमान संस्करण",
 	"updater.changelog_local_source_note": "स्थानीय स्रोत मोड — चैनल परिवर्तन सहेजे नहीं जाते।",

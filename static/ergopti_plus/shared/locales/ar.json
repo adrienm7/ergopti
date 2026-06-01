@@ -2091,7 +2091,7 @@
 	"ui_typing.unit_richness": "% ثراء",
 	"ui_typing.unit_sessions": "جلسات",
 	"updater.changelog_channel_label": "القناة:",
-	"updater.changelog_empty": "(لا تتوفر ملاحظات إصدار لهذه النسخة.)",
+	"updater.changelog_empty": "(لا تتوفر ملاحظات إصدار لهذه القناة.)",
 	"updater.changelog_install": "تثبيت هذا الإصدار",
 	"updater.changelog_install_current": "الإصدار الحالي",
 	"updater.changelog_local_source_note": "وضع المصدر المحلي — لا يتم حفظ تغييرات القناة.",

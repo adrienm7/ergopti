@@ -2096,7 +2096,7 @@
 	"ui_typing.unit_richness": "% richesse",
 	"ui_typing.unit_sessions": "séances",
 	"updater.changelog_channel_label": "Canal :",
-	"updater.changelog_empty": "(Aucune note de version disponible pour cette version.)",
+	"updater.changelog_empty": "(Aucune note de version disponible pour ce canal.)",
 	"updater.changelog_install": "Installer cette version",
 	"updater.changelog_install_current": "Version actuelle",
 	"updater.changelog_local_source_note": "Mode source locale — les changements de canal ne sont pas enregistrés.",

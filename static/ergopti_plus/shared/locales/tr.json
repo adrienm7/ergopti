@@ -2091,7 +2091,7 @@
 	"ui_typing.unit_richness": "% zenginlik",
 	"ui_typing.unit_sessions": "oturumlar",
 	"updater.changelog_channel_label": "Kanal:",
-	"updater.changelog_empty": "(Bu sürüm için sürüm notu bulunmuyor.)",
+	"updater.changelog_empty": "(Bu kanal için sürüm notu bulunmuyor.)",
 	"updater.changelog_install": "Bu sürümü yükle",
 	"updater.changelog_install_current": "Mevcut sürüm",
 	"updater.changelog_local_source_note": "Yerel kaynak modu — kanal değişiklikleri kaydedilmez.",

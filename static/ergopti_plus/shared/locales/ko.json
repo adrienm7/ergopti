@@ -2091,7 +2091,7 @@
 	"ui_typing.unit_richness": "% 풍부도",
 	"ui_typing.unit_sessions": "세션",
 	"updater.changelog_channel_label": "채널:",
-	"updater.changelog_empty": "(이 버전의 릴리스 노트가 없습니다.)",
+	"updater.changelog_empty": "(이 채널의 릴리스 노트가 없습니다.)",
 	"updater.changelog_install": "이 버전 설치",
 	"updater.changelog_install_current": "현재 버전",
 	"updater.changelog_local_source_note": "로컬 소스 모드 — 채널 변경이 저장되지 않습니다.",

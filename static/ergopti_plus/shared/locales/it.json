@@ -2091,7 +2091,7 @@
 	"ui_typing.unit_richness": "% ricchezza",
 	"ui_typing.unit_sessions": "sessioni",
 	"updater.changelog_channel_label": "Canale:",
-	"updater.changelog_empty": "(Nessuna nota di versione disponibile per questa versione.)",
+	"updater.changelog_empty": "(Nessuna nota di versione disponibile per questo canale.)",
 	"updater.changelog_install": "Installa questa versione",
 	"updater.changelog_install_current": "Versione corrente",
 	"updater.changelog_local_source_note": "Modalità sorgente locale — le modifiche al canale non vengono salvate.",
