@@ -24,6 +24,54 @@ local Paths      = require("lib.paths")
 
 local LOG = "wpm_widget"
 
+--- Returns true when the given path exists and is a readable file.
+--- @param path string File path.
+--- @return boolean
+local function file_exists(path)
+	if type(path) ~= "string" or path == "" then return false end
+	local f = io.open(path, "r")
+	if not f then return false end
+	f:close()
+	return true
+end
+
+--- Resolves an absolute shared constants path.
+--- Priority: module-relative -> hs.configdir-relative -> upward search.
+--- @param rel string Relative path under static/ergopti_plus/shared/.
+--- @return string|nil
+local function resolve_shared_constants_path(rel)
+	-- Primary path: resolve from this module's source directory for dev/runtime parity.
+	local source = debug.getinfo(1, "S").source or ""
+	source = source:sub(1, 1) == "@" and source:sub(2) or source
+	local this_dir = source:match("^(.*)/[^/]+$") or ""
+	if this_dir ~= "" then
+		local by_module = this_dir .. "/../../shared/" .. rel
+		if file_exists(by_module) then
+			Logger.debug(LOG, "resolve_shared_constants_path('%s'): module path '%s'.", rel, by_module)
+			return by_module
+		end
+	end
+
+	-- Fast fallback for layouts where hs.configdir sits in .../ergopti_plus/macos.
+	local cfg = (hs.configdir or ""):gsub("[/\\]+$", "")
+	if cfg ~= "" then
+		local by_cfg = cfg .. "/../shared/" .. rel
+		if file_exists(by_cfg) then
+			Logger.debug(LOG, "resolve_shared_constants_path('%s'): hs.configdir path '%s'.", rel, by_cfg)
+			return by_cfg
+		end
+	end
+
+	-- Last fallback for non-standard installations.
+	local by_find = Paths.find_from_configdir("static/ergopti_plus/shared/" .. rel)
+	if by_find and file_exists(by_find) then
+		Logger.debug(LOG, "resolve_shared_constants_path('%s'): upward path '%s'.", rel, by_find)
+		return by_find
+	end
+
+	return nil
+end
+
 
 
 
@@ -43,8 +91,8 @@ end
 -- Loads shared/wpm_widget/constants.toml and shared/timings/constants.toml at runtime.
 -- Returns a config table; logs an error and returns a safe-default stub on failure.
 local function _load_shared_const()
-	local wpm_path     = Paths.find_from_configdir("static/ergopti_plus/shared/wpm_widget/constants.toml")
-	local timings_path = Paths.find_from_configdir("static/ergopti_plus/shared/timings/constants.toml")
+	local wpm_path     = resolve_shared_constants_path("wpm_widget/constants.toml")
+	local timings_path = resolve_shared_constants_path("timings/constants.toml")
 
 	local function read_toml(path)
 		if not path then return {} end
