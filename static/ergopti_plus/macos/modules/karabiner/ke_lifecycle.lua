@@ -548,13 +548,13 @@ end
 --- reliably operational until both are alive.
 --- @return boolean
 is_ipc_bridge_fully_ready = function()
+	-- KE v16+ dropped karabiner_session_monitor — console_user_server alone is
+	-- sufficient to confirm the IPC bridge is up. Requiring session_monitor
+	-- caused an infinite polling timeout on v16 (process absent → always false).
 	local _, ok = hs.execute(
 		"( /usr/bin/pgrep -fq 'Karabiner-Elements/bin/karabiner_console_user_server' 2>/dev/null"
 		.. " || /usr/bin/pgrep -qx org.pqrs.karabiner_console_user_server 2>/dev/null"
 		.. " || /usr/bin/pgrep -qx karabiner_console_user_server 2>/dev/null )"
-		.. " && ( /usr/bin/pgrep -fq 'Karabiner-Elements/bin/karabiner_session_monitor' 2>/dev/null"
-		.. " || /usr/bin/pgrep -qx org.pqrs.karabiner_session_monitor 2>/dev/null"
-		.. " || /usr/bin/pgrep -qx karabiner_session_monitor 2>/dev/null )"
 	)
 	return ok == true
 end
