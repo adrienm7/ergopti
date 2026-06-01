@@ -90,8 +90,12 @@ global DeadkeyMappingDiaresis := Map(
 	"e", "ë", "E", "Ë",
 	"h", "ḧ", "H", "Ḧ",
 	"i", "ï", "I", "Ï",
+	; ¨+n → narrow no-break space (U+202F) — mnemonic: N for Narrow nbsp
+	"n", Chr(0x202F), "N", Chr(0x202F),
 	"o", "ö", "O", "Ö",
 	"r", "®", "R", "®",
+	; ¨+s → no-break space (U+00A0) — mnemonic: S for Space (insécable)
+	"s", Chr(0x00A0), "S", Chr(0x00A0),
 	"t", "™", "T", "™",
 	"u", "ü", "U", "Ü",
 	"w", "ẅ", "W", "Ẅ",
