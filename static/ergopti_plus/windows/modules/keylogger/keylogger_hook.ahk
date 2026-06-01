@@ -192,6 +192,10 @@ KL_Hook_RefreshContext() {
 ; =========================================
 
 KL_Hook_OnChar(ih, c) {
+    ; The keylogger records nothing while the script is paused — its InputHook is
+    ; separate from HookDispatcher, so it needs its own guard.
+    if A_IsSuspended
+        return
     ; Privacy filters short-circuit before any allocation.
     filtered := false
     try filtered := MF_ShouldFilter()
@@ -232,6 +236,8 @@ KL_Hook_OnChar(ih, c) {
 }
 
 KL_Hook_OnKeyDown(ih, vk, sc) {
+    if A_IsSuspended
+        return
     ; Always stash (vk, sc) for the next OnChar callback — printable
     ; characters reach OnChar after this fires, and we need the sc to
     ; populate the heatmap. Wrap defensively: an uncaught error inside

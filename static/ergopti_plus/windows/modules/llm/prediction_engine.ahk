@@ -251,6 +251,11 @@ LLM_Engine_FirePrediction(ctx) {
 	global _LLM_Engine
 	_LLM_Engine["timer_active"] := false
 
+	; A debounce timer armed just before the user paused must not fire an HTTP
+	; request or paint a prediction — « pause = tout éteint ».
+	if A_IsSuspended
+		return
+
 	if !_LLM_Engine["enabled"] || ctx == ""
 		return
 
