@@ -131,8 +131,8 @@ local function list_bundles(dir)
 	end
 	local p = io.popen(cmd)
 	if not p then return out end
-	for line in p:lines() do
-		line = line:gsub("[\r\n]+$", "")
+	for raw_line in p:lines() do
+		local line = raw_line:gsub("[\r\n]+$", "")
 		if line:match("^Ergopti_v[%d%.]+%.bundle$") then
 			out[#out + 1] = line
 		end
@@ -216,8 +216,8 @@ local function find_installed_bundles(dir)
 	local p = io.popen(cmd)
 	if not p then return out end
 	local dir_with_slash = dir:match("[/\\]$") and dir or (dir .. "/")
-	for line in p:lines() do
-		line = line:gsub("[\r\n]+$", "")
+	for raw_line in p:lines() do
+		local line = raw_line:gsub("[\r\n]+$", "")
 		if line:match("^Ergopti_v[%d%.]+%.bundle$") then
 			local v = parse_version(line)
 			local info_plist = dir_with_slash .. line .. "/Contents/Info.plist"

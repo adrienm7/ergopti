@@ -44,8 +44,8 @@ local function list_toml_files(dir)
 	end
 	local pipe = io.popen(cmd)
 	if not pipe then return files end
-	for line in pipe:lines() do
-		line = line:gsub("\\", "/")
+	for raw_line in pipe:lines() do
+		local line = raw_line:gsub("\\", "/")
 		if line:match("%.toml$") then
 			files[#files + 1] = line
 		end
@@ -81,9 +81,9 @@ helpers.describe("meta: no PascalCase in TOML", function()
 		local rel = abs_path:sub(#DRIVER_ROOT + 1)
 		local line_num = 0
 
-		for line in (body .. "\n"):gmatch("([^\n]*)\n") do
+		for raw_line in (body .. "\n"):gmatch("([^\n]*)\n") do
 			line_num = line_num + 1
-			line = line:match("^%s*(.-)%s*$")  -- trim whitespace
+			local line = raw_line:match("^%s*(.-)%s*$")  -- trim whitespace
 			-- Skip blank lines, comments (#), and section headers ([...)
 			if line == "" or line:sub(1, 1) == "#" or line:sub(1, 1) == "[" then
 				goto continue_line

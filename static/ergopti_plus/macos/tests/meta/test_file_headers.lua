@@ -42,8 +42,8 @@ local function list_files(dir)
 	end
 	local pipe = io.popen(cmd)
 	if not pipe then return files end
-	for line in pipe:lines() do
-		line = line:gsub("\\", "/")
+	for raw_line in pipe:lines() do
+		local line = raw_line:gsub("\\", "/")
 		if is_target_file(line) then files[#files + 1] = line end
 	end
 	pipe:close()
