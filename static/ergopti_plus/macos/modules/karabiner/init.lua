@@ -423,20 +423,10 @@ function M.regenerate()
 	local merged   = Generator.merge_into_existing_config(result, KARABINER_OUT)
 	local json_str = hs.json.encode(merged, true)
 
-	-- Kill the bridge before writing so no live daemon can overwrite our deploy.
-	-- KILL_FAST_CMD is a plain pkill with no sleep loops, so it takes ~50 ms.
-	-- prime_ke_for_session restarts the daemon immediately after.
-	local prime_in_progress = type(KeLifecycle.is_priming) == "function"
-		and KeLifecycle.is_priming() or false
-	if prime_in_progress then
-		-- A concurrent regenerate can happen during startup; killing here can race
-		-- with the in-flight prime and leave the bridge down intermittently.
-		Logger.warn(LOG, "Skipping fast bridge kill — prime already in progress…")
-	else
-		Logger.trace(LOG, "Stopping KE bridge before deploy…")
-		pcall(function() hs.execute(KeLifecycle.KILL_FAST_CMD) end)
-		Logger.done(LOG, "KE bridge stopped.")
-	end
+	-- Stability-first strategy: never kill the bridge before deploy.
+	-- On this setup, a failed/late re-prime after kill can leave keyboard input
+	-- partially blocked system-wide. Keeping the bridge alive avoids that outage.
+	Logger.info(LOG, "Keeping KE bridge alive during deploy (stability mode).")
 
 	local ok_copy, cp_detail = Generator.deploy_string(json_str, KARABINER_OUT)
 	if not ok_copy then
@@ -470,11 +460,8 @@ function M.regenerate()
 		"Karabiner config regenerated: %d combo(s) + %d tap/hold key(s) deployed.",
 		active_combos, #M.TAP_HOLD_KEYS)
 
-	-- Re-prime so Core-Service receives the newly written rules.
-	-- Always force=true after an explicit bridge kill: pkill is async and the
-	-- dying process can still be visible to pgrep for ~50-150 ms. Without force,
-	-- prime_ke_for_session would see it as "already running", mark the session
-	-- primed, and return — leaving the bridge dead a moment later with no relaunch.
+	-- Re-prime in non-forced mode: if bridge is already healthy, this becomes a
+	-- cheap no-op; if missing, lifecycle will still launch it.
 	KeLifecycle.prime_ke_for_session(function(ok)
 		if ok then
 			Logger.success(LOG, "Karabiner bridge primed after regeneration.")
@@ -490,7 +477,7 @@ function M.regenerate()
 				end, true)
 			end)
 		end
-	end, true)  -- force=true: bridge was just killed, always re-launch regardless of pgrep state
+	end, false)
 end
 
 --- Deploys an empty Karabiner config so remapping stops without killing any process.
