@@ -19,8 +19,22 @@ local notifications = require("lib.notifications")
 local Logger        = require("lib.logger")
 local LOG           = "gestures"
 
-local ok_td, touchdevice = pcall(require, "vendor.hs_asm.undocumented.touchdevice")
-if not ok_td then touchdevice = nil end
+local function load_touchdevice_module()
+	local candidates = {
+		"hs._asm.undocumented.touchdevice",
+		"vendor.hs_asm.undocumented.touchdevice",
+	}
+	for _, module_name in ipairs(candidates) do
+		local ok, module_ref = pcall(require, module_name)
+		if ok and module_ref then
+			Logger.info(LOG, "Touchdevice module loaded from '%s'.", module_name)
+			return module_ref
+		end
+	end
+	return nil
+end
+
+local touchdevice = load_touchdevice_module()
 
 local Engine    = require("modules.gestures.engine")
 local Actions   = require("modules.gestures.actions")
@@ -587,7 +601,7 @@ function M.start()
 	Logger.info(LOG, "Hammerspoon timestamp: %.3f", hs.timer.secondsSinceEpoch())
 	Logger.info(LOG, "touchdevice module available: %s", tostring(touchdevice ~= nil))
 	if not touchdevice then
-		Logger.error(LOG, "Touchdevice API is not available — gestures module DISABLED.")
+		Logger.warn(LOG, "Touchdevice API is not available — gestures module disabled on this runtime.")
 		return
 	end
 
