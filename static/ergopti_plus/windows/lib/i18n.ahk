@@ -60,6 +60,11 @@ global I18N_LOCALES := [
 ; Active locale code — read from config.toml at boot, then kept in memory.
 global _I18nLocale := "fr"
 
+; Debounce delay for locale-change reloads (ms).
+; Rapid language switches cancel the pending reload so only the last
+; selected locale triggers a script restart.
+global _I18nReloadDebounceMs := 150
+
 ; Flat map of key → translated string for the active locale. Populated lazily.
 global _I18nCache := Map()
 global _I18nCacheLoaded := false
@@ -287,15 +292,26 @@ I18nPreload() {
 
 ; Change the active locale, persist it to config.toml, then reload the script
 ; so all menus are rebuilt in the new language.
+; The reload is debounced: rapid successive calls cancel the pending reload
+; so only the last selected locale triggers a script restart, preventing a
+; stale intermediate language from landing when the user switches quickly.
 I18nSetLocale(Code) {
-	global _I18nLocale, _I18nCacheLoaded, ConfigurationFile
+	global _I18nLocale, _I18nCacheLoaded, ConfigurationFile, _I18nReloadDebounceMs
 	if _I18nLocale == Code
 		return
 	try LoggerStart("i18n", "Switching locale to '{1}'…", Code)
 	_I18nLocale      := Code
 	_I18nCacheLoaded := false
 	try TOML_BatchWrite(ConfigurationFile, [{ Section: "script", Key: "locale", Value: Code }])
-	try LoggerSuccess("i18n", "Locale set to '{1}' — reloading script.", Code)
+	; Cancel any previously scheduled reload, then arm a new one.
+	; Using a negative period makes SetTimer fire once after the delay.
+	SetTimer(_I18nDoReload, -_I18nReloadDebounceMs)
+}
+
+; Called by the debounce timer — performs the actual script reload.
+_I18nDoReload() {
+	global _I18nLocale
+	try LoggerSuccess("i18n", "Locale set to '{1}' — reloading script.", _I18nLocale)
 	Reload
 }
 

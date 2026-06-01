@@ -68,6 +68,13 @@ local SETTINGS_KEY = "i18n_locale"
 --- Currently active locale code.
 local _locale = "fr"
 
+--- Pending reload timer — cancelled and replaced on every rapid locale switch
+--- so only the last selection triggers a reload.
+local _reload_timer = nil
+
+--- Delay before reloading after a locale change (seconds).
+local RELOAD_DEBOUNCE_SEC = 0.15
+
 
 
 
@@ -161,6 +168,9 @@ end
 
 --- Changes the active locale, persists it, and triggers a Hammerspoon reload
 --- so all menus are rebuilt in the new language.
+--- The reload is debounced: rapid successive calls cancel the pending reload
+--- so only the last selected locale is applied, preventing stale reloads from
+--- landing on an intermediate language when the user switches quickly.
 --- @param code string A known locale code.
 function M.set_locale(code)
 	if not is_known(code) then
@@ -171,8 +181,16 @@ function M.set_locale(code)
 	Logger.start(LOG, "Switching locale to '%s'…", code)
 	_locale = code
 	hs.settings.set(SETTINGS_KEY, code)
-	Logger.success(LOG, "Locale set to '%s' — reloading.", code)
-	hs.reload()
+	-- Cancel any pending reload from a previous rapid switch
+	if _reload_timer then
+		_reload_timer:stop()
+		_reload_timer = nil
+	end
+	_reload_timer = hs.timer.doAfter(RELOAD_DEBOUNCE_SEC, function()
+		_reload_timer = nil
+		Logger.success(LOG, "Locale set to '%s' — reloading.", code)
+		hs.reload()
+	end)
 end
 
 --- Changes the active locale in memory only, without triggering a reload.
