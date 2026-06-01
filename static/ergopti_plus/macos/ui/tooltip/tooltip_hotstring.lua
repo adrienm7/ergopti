@@ -91,6 +91,8 @@ local function start_watchers()
 	
 	local event_types = hs.eventtap.event.types
 	
+	-- Mouse events use hide() which respects the dequeue guard: a mouse move
+	-- during a dequeue cycle does not interrupt stacked rows with longer durations.
 	local ok_mouse, watcher_mouse = pcall(hs.eventtap.new, { event_types.mouseMoved, event_types.leftMouseDown, event_types.rightMouseDown, event_types.scrollWheel }, function()
 		M.hide()
 		return false
@@ -119,8 +121,8 @@ local function start_watchers()
 		for _, ignored_code in ipairs(ignored_keycodes) do
 			if keycode == ignored_code then return false end
 		end
-		
-		M.hide()
+		-- A real keystroke is an authoritative dismissal — bypass dequeue guard.
+		M.hide_forced()
 		return false
 	end)
 	
@@ -142,7 +144,25 @@ end
 --- =============================
 -- =============================
 
+--- Forces the tooltip to hide regardless of any active dequeue cycle.
+--- Only call this when an authoritative dismissal is required (e.g. the
+--- keyboard watcher detected a real typing key, or an explicit hide() call
+--- from outside the tooltip subsystem).
+function M.hide_forced()
+	pcall(function()
+		stop_watchers()
+		_state.bg_color = nil
+		_state.is_visible = false
+		Renderer.hide()
+	end)
+end
+
 function M.hide()
+	-- Mirror AHK's _TooltipDequeueActive guard: while a dequeue cycle is
+	-- running, external hide() calls from mouse/scroll watchers are ignored
+	-- so that rows with longer durations survive past the first row's expiry.
+	-- The dequeue tick itself calls hide_forced() when the last row expires.
+	if _dequeue_rows then return end
 	pcall(function()
 		stop_watchers()
 		_state.bg_color = nil
@@ -283,11 +303,17 @@ function M.show_stacked(rows, is_enabled)
 	if not ok then Logger.error(LOG, "Crash during stacked tooltip rendering: " .. tostring(err) .. ".") end
 end
 
---- Hides the stacked canvas alongside the standard one.
-local _original_hide = M.hide
-M.hide = function()
-	_original_hide()
+--- Hides the stacked canvas alongside the standard one (authoritative).
+local _original_hide_forced = M.hide_forced
+M.hide_forced = function()
+	_original_hide_forced()
 	pcall(Renderer.hide_stacked)
+end
+
+--- Hides both canvases unless a dequeue cycle is active (respects guard).
+M.hide = function()
+	if _dequeue_rows then return end
+	M.hide_forced()
 end
 
 -- Assign the dequeue tick function now that M.hide and M.show_stacked exist.
@@ -303,7 +329,7 @@ _dequeue_tick = function()
 			end
 		end
 		if #remaining == 0 then
-			M.hide()
+			M.hide_forced()
 			return
 		end
 		-- Pass remaining rows back through show_stacked so the dequeue timer
