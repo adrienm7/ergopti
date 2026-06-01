@@ -46,9 +46,20 @@ function M.set_llm_timeout(seconds) Config.set_llm_timeout(seconds) end
 function M.set_colorization_enabled(enabled) Config.set_colorization_enabled(enabled) end
 
 --- Safely hides any currently active tooltip.
+--- Respects the hotstring dequeue guard: if a stacked multi-row tooltip is
+--- currently cycling through its rows, mouse/scroll events are ignored so
+--- longer-lived rows survive past the first row's expiry deadline.
 function M.hide()
 	TooltipLLM.hide()
 	TooltipHotstring.hide()
+end
+
+--- Bypasses all guards and hides both tooltip types immediately.
+--- Use for keyboard-triggered dismissals or when the caller needs an
+--- authoritative hide regardless of any active dequeue cycle.
+function M.hide_forced()
+	TooltipLLM.hide()
+	TooltipHotstring.hide_forced()
 end
 
 --- Checks if any tooltip is currently rendered on screen.
