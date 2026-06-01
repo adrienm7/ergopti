@@ -128,12 +128,13 @@ function M.build(ctx)
 	}
 
 	-- Buckets for each display group
-	local top_items  = {}   -- at_hash, layer_scroll, wrap_text_if_selected (in order)
+	-- Note: wrap_text_if_selected moved to Disposition clavier (keyboard emulation)
+	local top_items  = {}   -- at_hash, layer_scroll (in order)
 	local ctrl_items = {}
 	local cmd_items  = {}
 
 	-- Preserve insertion order for top-level items
-	local TOP_ORDER = { "at_hash", "layer_scroll", "wrap_text_if_selected" }
+	local TOP_ORDER = { "at_hash", "layer_scroll" }
 	local top_map   = {}
 
 	if type(shortcuts.list_shortcuts) == "function" then
@@ -143,8 +144,10 @@ function M.build(ctx)
 				if type(s) == "table" and s.id then
 					local mi = make_shortcut_item(s, shortcuts, ctx)
 
-					if s.id == "at_hash" or s.id == "layer_scroll" or s.id == "wrap_text_if_selected" then
+					if s.id == "at_hash" or s.id == "layer_scroll" then
 						top_map[s.id] = mi
+					elseif s.id == "wrap_text_if_selected" then
+						-- Moved to Disposition clavier — skip here
 
 					elseif s.id:sub(1, 5) == "ctrl_" then
 						table.insert(ctrl_items, mi)
