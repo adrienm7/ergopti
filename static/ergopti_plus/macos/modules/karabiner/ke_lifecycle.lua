@@ -807,6 +807,19 @@ function M.prime_ke_for_session(callback, force)
 	end
 
 	if bridge_running and force then
+		-- Fast path: in some environments the bridge is already fully responsive
+		-- right after regenerate(). Avoid the async settle/relaunch path and mark
+		-- primed immediately to prevent getting stuck in an unmarked state.
+		if is_cli_roundtrip_ready() then
+			mark_session_primed()
+			mark_hs_owned_bridge()
+			_prime_in_progress = false
+			Logger.success(LOG, "KE bridge already responsive (force path) — primed immediately.")
+			notify_karabiner_ready()
+			resolve_prime_callbacks(true)
+			return
+		end
+
 		-- pkill is async; give it 200 ms to propagate before checking again.
 		Logger.info(LOG, "Bridge alive but force=true — waiting 200 ms for pkill to settle…")
 		_prime_settle_timer = hs.timer.doAfter(0.2, function()
