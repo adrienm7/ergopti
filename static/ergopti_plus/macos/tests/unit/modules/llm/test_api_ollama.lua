@@ -85,3 +85,87 @@ helpers.describe("ApiOllama.cancel_streaming", function()
 		ApiOllama.cancel_streaming()
 	end)
 end)
+
+
+
+
+-- ============================================================
+-- ============================================================
+-- ======= 4/ Run-loop safety (no synchronous blocking) =======
+-- ============================================================
+-- ============================================================
+
+helpers.describe("ApiOllama run-loop safety", function()
+	helpers.it("ensure_ollama_running does not use ShellRunner.exec (synchronous)", function()
+		-- ShellRunner.exec wraps hs.execute which blocks the Lua thread.
+		-- When called inside a timer callback (even doAfter(0)), this permanently
+		-- kills the Cocoa CFRunLoop — destroying timers, menubar, and eventtaps.
+		local src_path = helpers.driver_root() .. "modules/llm/api_ollama.lua"
+		local fh = io.open(src_path, "r")
+		helpers.assert_true(fh, "could not open api_ollama.lua source")
+		local source = fh:read("*a")
+		fh:close()
+
+		-- Extract the ensure_ollama_running function body (multiline match)
+		local fn_body = source:match("local function ensure_ollama_running%(%)\n(.-)\nend\n")
+		helpers.assert_true(fn_body, "could not locate ensure_ollama_running function body")
+
+		local has_sync_exec = fn_body:find("ShellRunner%.exec") ~= nil
+		helpers.assert_true(not has_sync_exec,
+			"ensure_ollama_running must not use ShellRunner.exec (synchronous) — " ..
+			"use ShellRunner.spawn (async) instead to avoid killing the Cocoa run loop")
+	end)
+
+	helpers.it("ensure_ollama_running does not use TimerScheduler.sleep_us", function()
+		-- TimerScheduler.sleep_us wraps hs.timer.usleep which blocks the thread
+		local src_path = helpers.driver_root() .. "modules/llm/api_ollama.lua"
+		local fh = io.open(src_path, "r")
+		helpers.assert_true(fh, "could not open api_ollama.lua source")
+		local source = fh:read("*a")
+		fh:close()
+
+		local fn_body = source:match("local function ensure_ollama_running%(%)\n(.-)\nend\n")
+		helpers.assert_true(fn_body, "could not locate ensure_ollama_running function body")
+
+		local has_sleep = fn_body:find("TimerScheduler%.sleep_us") ~= nil
+		helpers.assert_true(not has_sleep,
+			"ensure_ollama_running must not use TimerScheduler.sleep_us — " ..
+			"this blocks the Lua thread and corrupts the CFRunLoop")
+	end)
+
+	helpers.it("ensure_ollama_running uses ShellRunner.spawn for async launch", function()
+		-- ShellRunner.spawn wraps hs.task (non-blocking subprocess)
+		local src_path = helpers.driver_root() .. "modules/llm/api_ollama.lua"
+		local fh = io.open(src_path, "r")
+		helpers.assert_true(fh, "could not open api_ollama.lua source")
+		local source = fh:read("*a")
+		fh:close()
+
+		local fn_body = source:match("local function ensure_ollama_running%(%)\n(.-)\nend\n")
+		helpers.assert_true(fn_body, "could not locate ensure_ollama_running function body")
+
+		local has_spawn = fn_body:find("ShellRunner%.spawn") ~= nil
+		helpers.assert_true(has_spawn,
+			"ensure_ollama_running must use ShellRunner.spawn for async subprocess launch")
+	end)
+
+	helpers.it("module top-level never calls ShellRunner.exec directly", function()
+		-- Verify no synchronous shell call happens outside of function bodies
+		-- (i.e. at require-time). Only function definitions and deferred calls
+		-- (TimerScheduler.after) are allowed at top level.
+		local src_path = helpers.driver_root() .. "modules/llm/api_ollama.lua"
+		local fh = io.open(src_path, "r")
+		helpers.assert_true(fh, "could not open api_ollama.lua source")
+		local source = fh:read("*a")
+		fh:close()
+
+		-- Remove all function bodies to isolate top-level code
+		local top_level = source:gsub("local function [^\n]-%).-\nend\n", "")
+		top_level = top_level:gsub("function M%.[^\n]-%).-\nend\n", "")
+
+		local has_top_exec = top_level:find("ShellRunner%.exec%(") ~= nil
+		helpers.assert_true(not has_top_exec,
+			"api_ollama must never call ShellRunner.exec at top-level (require-time) — " ..
+			"this blocks the Cocoa run loop and kills the menubar/timers")
+	end)
+end)

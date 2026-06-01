@@ -49,32 +49,42 @@ function M.is_ready()
 	return _is_ready
 end
 
--- Ensure Ollama daemon is running with optimized background start
+-- Delay before launching Ollama after killing a stale instance (seconds)
+local OLLAMA_KILL_SETTLE_SEC = 0.1
+
+-- Ensure Ollama daemon is running — fully async to avoid blocking the Cocoa
+-- run loop. Previous implementation used synchronous hs.execute + usleep which
+-- permanently corrupted the CFRunLoop and killed timers/menubar/eventtaps.
 local function ensure_ollama_running()
 	if _ollama_started then return end
 	_ollama_started = true
-	pcall(function()
-		ShellRunner.exec("pkill -f '[o]llama serve' 2>/dev/null || true")
-		TimerScheduler.sleep_us(50 * 1000)
-		-- Funnel Ollama stdout/stderr into the unified Ergopti log behind an
-		-- [OLLAMA-SERVER] prefix so the user has a single tail target for the
-		-- whole stack (HS + MLX + Ollama land in the same rotating daily file).
-		-- Uses a `while read` loop instead of awk: macOS' default BWK awk
-		-- does not implement the gawk-only strftime() / fflush(file) builtins,
-		-- so the previous awk pipeline crashed on the first line and killed
-		-- the ollama subprocess on SIGPIPE.
-		local log_path = Logger.UNIFIED_LOG_FILE
-		ShellRunner.exec(
-			"nohup bash -c \"/opt/homebrew/bin/ollama serve 2>&1 | " ..
-			"while IFS= read -r LINE; do " ..
-			"printf '%s [OLLAMA-SERVER] %s\\n' \\\"\\$(date +%H:%M:%S)\\\" \\\"\\$LINE\\\" " ..
-			">> " .. string.format("%q", log_path) .. "; " ..
-			"done\" &"
-		)
+
+	-- Step 1: kill any stale Ollama process (async via hs.task)
+	local kill_handle = ShellRunner.spawn("/bin/sh", {
+		"-c", "pkill -f '[o]llama serve' 2>/dev/null || true"
+	}, function()
+		-- Step 2: after kill finishes, wait a short beat then launch the server
+		TimerScheduler.after(OLLAMA_KILL_SETTLE_SEC, function()
+			-- Funnel Ollama stdout/stderr into the unified Ergopti log behind an
+			-- [OLLAMA-SERVER] prefix so the user has a single tail target for the
+			-- whole stack (HS + MLX + Ollama land in the same rotating daily file)
+			local log_path = Logger.UNIFIED_LOG_FILE
+			local launch_cmd = "/opt/homebrew/bin/ollama serve 2>&1 | " ..
+				"while IFS= read -r LINE; do " ..
+				"printf '%s [OLLAMA-SERVER] %s\\n' \"$(date +%H:%M:%S)\" \"$LINE\" " ..
+				">> " .. string.format("%q", log_path) .. "; " ..
+				"done"
+			local serve_handle = ShellRunner.spawn("/bin/sh", {
+				"-c", launch_cmd
+			}, nil)
+			serve_handle.start()
+			Logger.debug(LOG, "Ollama server launched asynchronously.")
+		end)
 	end)
+	kill_handle.start()
 end
 
--- Deferred off the synchronous require path to avoid blocking Hammerspoon startup
+-- Deferred off the synchronous require path; fires on next run loop iteration
 TimerScheduler.after(0, function() pcall(ensure_ollama_running) end)
 
 --- Sends a minimal 1-token inference to load model weights into GPU memory.
