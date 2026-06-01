@@ -881,8 +881,9 @@ InitSubMenus() {
 	global SubMenus, _FLAT_HOTSTRING_V1_CATS, _LegacyTopCategoryMap, _SharedDir
 	SubMenus := Map()
 
-	; Flat hotstring categories — order = manifest declaration order
-	; (preserved by the codegen emitter).
+	; Flat hotstring categories — order = sections_order from the TOML (which
+	; includes "-" separators); falls back to manifest declaration order when
+	; the TOML has no sections_order.
 	for V1Cat in _FLAT_HOTSTRING_V1_CATS {
 		SubMenu := Menu()
 		TomlPath := _SharedDir . "\hotstrings\" . StrLower(V1Cat) . ".toml"
@@ -892,8 +893,33 @@ InitSubMenus() {
 		}
 		V2Section := _LegacyTopCategoryMap.Has(V1Cat) ? _LegacyTopCategoryMap[V1Cat] : ""
 		if (V2Section != "") {
-			for Entry in ManifestFeaturesForSection(V2Section) {
-				MenuAddItemFromManifest(SubMenu, Entry, V1Cat)
+			Entries := ManifestFeaturesForSection(V2Section)
+			; Build a map from the section-name part of the v2 path to its entry
+			; so we can look up entries by TOML section name while iterating
+			; sections_order (which preserves visual separators).
+			EntryBySectionId := Map()
+			for Entry in Entries {
+				; path looks like "hotstrings.rolls.hc" — last segment is the id
+				Parts := StrSplit(Entry["path"], ".")
+				EntryBySectionId[Parts[Parts.Length]] := Entry
+			}
+			SectionsOrder := ReadTomlSectionsOrder(V1Cat, TomlPath)
+			if (SectionsOrder.Length > 0) {
+				; Render following TOML sections_order, honouring "-" separators
+				for _, SecId in SectionsOrder {
+					if (SecId == "-") {
+						SubMenu.Add()
+						continue
+					}
+					if EntryBySectionId.Has(SecId) {
+						MenuAddItemFromManifest(SubMenu, EntryBySectionId[SecId], V1Cat)
+					}
+				}
+			} else {
+				; No sections_order in TOML — fall back to manifest order
+				for Entry in Entries {
+					MenuAddItemFromManifest(SubMenu, Entry, V1Cat)
+				}
 			}
 		}
 		SubMenus[V1Cat] := SubMenu
