@@ -43,13 +43,27 @@ local APP_DESCRIPTIONS = {
 -- ==========================================
 
 --- Resolves the absolute path to the apps/ directory bundled with the driver.
+--- @param ctx table|nil Menu build context.
 --- @return string|nil The path, or nil if it cannot be determined.
-local function apps_dir()
-	-- hs.configdir points to the loaded Hammerspoon config root
-	local base = hs.configdir
-	if not base then return nil end
-	-- The apps/ folder sits at the same level as init.lua
-	return base .. "/apps"
+local function apps_dir(ctx)
+	-- Primary source: menu context base_dir points at .../static/ergopti_plus/macos/
+	-- in both repo and deployed setups where the apps bundles are colocated.
+	local base = ctx and type(ctx.base_dir) == "string" and ctx.base_dir or nil
+	if base and base ~= "" then
+		base = base:gsub("[/\\]+$", "")
+		local candidate = base .. "/apps"
+		local ok, attr = pcall(hs.fs.attributes, candidate)
+		if ok and type(attr) == "table" and attr.mode == "directory" then
+			return candidate
+		end
+	end
+
+	-- Fallback for legacy layouts where hs.configdir directly contains apps/.
+	if hs and hs.configdir and hs.configdir ~= "" then
+		return hs.configdir:gsub("[/\\]+$", "") .. "/apps"
+	end
+
+	return nil
 end
 
 --- Draws an image into a 16×16 canvas to guarantee pixel-accurate menu sizing.
@@ -123,9 +137,10 @@ local function load_icon(app_path, info)
 end
 
 --- Scans the apps/ directory and returns a list of discovered bundles.
+--- @param ctx table|nil Menu build context.
 --- @return table List of {name, description, path, icon} entries.
-local function discover_bundled_apps()
-	local dir = apps_dir()
+local function discover_bundled_apps(ctx)
+	local dir = apps_dir(ctx)
 	if not dir then
 		Logger.warn(LOG, "Could not resolve apps/ directory path.")
 		return {}
@@ -179,7 +194,7 @@ function M.build(ctx)
 	Logger.trace(LOG, "Building applications submenu…")
 	local paused = ctx and ctx.paused
 
-	local apps = discover_bundled_apps()
+	local apps = discover_bundled_apps(ctx)
 	local rows = {}
 
 	for _, app in ipairs(apps) do
