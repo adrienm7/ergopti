@@ -139,9 +139,9 @@ local function _load_sub_files_toml(driver_root)
 		in_plats  = false
 	end
 
-	for line in raw:gmatch("[^\r\n]+") do
+	for raw_line in raw:gmatch("[^\r\n]+") do
 		-- Strip inline comments and trim
-		line = line:gsub("%s*#.*$", ""):match("^%s*(.-)%s*$")
+		local line = raw_line:gsub("%s*#.*$", ""):match("^%s*(.-)%s*$")
 		if line == "" then goto next_line end
 
 		if line == "[[sub_files]]" then

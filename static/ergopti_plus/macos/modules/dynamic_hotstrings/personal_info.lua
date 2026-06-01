@@ -103,8 +103,8 @@ local function parse_toml_section(content, section)
 	local result = {}
 	-- Find the section header, then collect lines until the next header
 	local in_section = false
-	for line in (content .. "\n"):gmatch("([^\n]*)\n") do
-		line = line:match("^%s*(.-)%s*$")
+	for raw_line in (content .. "\n"):gmatch("([^\n]*)\n") do
+		local line = raw_line:match("^%s*(.-)%s*$")
 		if line:match("^%[") then
 			in_section = (line == "[" .. section .. "]")
 		elseif in_section then

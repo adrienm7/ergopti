@@ -135,8 +135,8 @@ local function discover_tests(dir)
 	else
 		strip_prefix = driver_root
 	end
-	for line in pipe:lines() do
-		line = line:gsub("\\", "/")
+	for raw_line in pipe:lines() do
+		local line = raw_line:gsub("\\", "/")
 		-- Match suffix that starts after the driver root and ends in .lua
 		local rel
 		if strip_prefix ~= "" and line:sub(1, #strip_prefix):lower() == strip_prefix:lower() then
