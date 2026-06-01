@@ -52,7 +52,11 @@ function M.start_config_watcher(base_dir, on_reload, get_suppress_until, ui_rest
 			for _, file in pairs(files) do
 				if type(file) == "string"
 					and (file:match("%.lua$") or file:match("%.toml$"))
-					and not file:match("logs/") then
+					and not file:match("logs/")
+					-- paths.toml is auto-generated at each boot — treating it as a
+					-- source change would cause an infinite reload loop (HS writes
+					-- it → watcher fires → reload → HS writes it again → …)
+					and not file:match("paths%.toml$") then
 					Logger.debug(LOG, "File change detected: %s — debounce armed.", file)
 					-- Cancel any pending debounce and restart it; the reload
 					-- fires only once the burst settles
