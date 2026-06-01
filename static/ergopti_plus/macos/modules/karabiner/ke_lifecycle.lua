@@ -295,6 +295,9 @@ local HS_OWNER_MARKER_PATH = "/tmp/ergopti_ke_hs_owner_v1.txt"
 local _prime_in_progress = false
 local _hs_owned_runtime = false
 local _prime_callbacks = {}
+local _prime_settle_timer = nil
+local _prime_poll_timer = nil
+local _prime_probe_timer = nil
 local _last_karabiner_ready_notify_at = 0
 local _pending_karabiner_ready_notify = false
 local _karabiner_ready_notify_timer = nil
@@ -729,7 +732,8 @@ function M.prime_ke_for_session(callback, force)
 			Logger.debug(LOG, "IPC probe not ready (attempt %d/%d) — retrying in %.0f ms…",
 				probe_attempt, PRIME_RULES_PROBE_RETRY_ATTEMPTS,
 				PRIME_RULES_PROBE_RETRY_INTERVAL_SEC * 1000)
-			hs.timer.doAfter(PRIME_RULES_PROBE_RETRY_INTERVAL_SEC, function()
+			_prime_probe_timer = hs.timer.doAfter(PRIME_RULES_PROBE_RETRY_INTERVAL_SEC, function()
+				_prime_probe_timer = nil
 				probe_and_commit(outer_attempt, probe_attempt + 1)
 			end)
 		else
@@ -738,7 +742,8 @@ function M.prime_ke_for_session(callback, force)
 			Logger.debug(LOG,
 				"Bridge up but IPC probe still failing after %d retries — resuming outer poll…",
 				PRIME_RULES_PROBE_RETRY_ATTEMPTS)
-			hs.timer.doAfter(PRIME_POLL_INTERVAL_SEC, function()
+			_prime_poll_timer = hs.timer.doAfter(PRIME_POLL_INTERVAL_SEC, function()
+				_prime_poll_timer = nil
 				poll_attempt(outer_attempt + 1)
 			end)
 		end
@@ -781,7 +786,8 @@ function M.prime_ke_for_session(callback, force)
 			Logger.warn(LOG, "Primary headless launch not yet visible — GUI fallback disabled, continuing…")
 		end
 
-		hs.timer.doAfter(PRIME_POLL_INTERVAL_SEC, function()
+		_prime_poll_timer = hs.timer.doAfter(PRIME_POLL_INTERVAL_SEC, function()
+			_prime_poll_timer = nil
 			poll_attempt(attempt + 1)
 		end)
 	end
@@ -794,7 +800,8 @@ function M.prime_ke_for_session(callback, force)
 			fallback_attempted = true
 			Logger.error(LOG, "Headless bridge binary missing — GUI fallback is disabled by design.")
 		end
-		hs.timer.doAfter(PRIME_POLL_INTERVAL_SEC, function()
+		_prime_poll_timer = hs.timer.doAfter(PRIME_POLL_INTERVAL_SEC, function()
+			_prime_poll_timer = nil
 			poll_attempt(1)
 		end)
 	end
@@ -802,7 +809,9 @@ function M.prime_ke_for_session(callback, force)
 	if bridge_running and force then
 		-- pkill is async; give it 200 ms to propagate before checking again.
 		Logger.info(LOG, "Bridge alive but force=true — waiting 200 ms for pkill to settle…")
-		hs.timer.doAfter(0.2, function()
+		_prime_settle_timer = hs.timer.doAfter(0.2, function()
+			_prime_settle_timer = nil
+			Logger.debug(LOG, "Prime settle callback fired.")
 			if is_ipc_bridge_running() then
 				-- On KE v16+, the bridge may intentionally stay alive despite fast kill.
 				-- If IPC is already responsive, mark as primed immediately instead of
@@ -819,7 +828,10 @@ function M.prime_ke_for_session(callback, force)
 
 				Logger.warn(LOG, "Bridge still alive after settle but IPC probe failed — firing extra kill before re-prime…")
 				pcall(function() hs.execute(KARABINER_KILL_FAST_CMD) end)
-				hs.timer.doAfter(0.2, start_launch_and_poll)
+				_prime_settle_timer = hs.timer.doAfter(0.2, function()
+					_prime_settle_timer = nil
+					start_launch_and_poll()
+				end)
 			else
 				start_launch_and_poll()
 			end
