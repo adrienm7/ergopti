@@ -1673,7 +1673,11 @@ BuildScriptShortcutsMenu() {
         Current      := ScriptShortcutAssignments.Has(Slot) ? ScriptShortcutAssignments[Slot] : "none"
         CurrentLabel := GESTURE_ACTIONS.Has(Current) ? _GestureActionLabel(Current) : t("dialog.action_picker.disabled")
         SlotLabel    := SCRIPT_SHORTCUT_LABELS[Slot]
-        SMenu.Add(SlotLabel . " : " . CurrentLabel,
+        ; RegisterMenuItem (not raw SMenu.Add) routes the click through the
+        ; WM_COMMAND retry dispatcher. Raw SMenu.Add inherits AHK 2.0's flaky
+        ; native menu dispatch, which silently drops the click so the action
+        ; picker never opens — exactly the gesture-slot pattern at GMenu.
+        RegisterMenuItem(SMenu, SlotLabel . " : " . CurrentLabel,
             ((_s, _l) => (*) => ShowActionPicker(_l, ScriptShortcutAssignments.Has(_s) ? ScriptShortcutAssignments[_s] : "none", (Id) => SetScriptShortcutAction(_s, Id)))(Slot, SlotLabel))
     }
     return SMenu
