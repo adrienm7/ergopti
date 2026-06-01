@@ -38,6 +38,35 @@ M._wv             = nil
 M._timer          = nil
 M._app_icon_cache = {}
 
+
+
+--- Resolves the path to shared UI assets (fail-fast).
+--- Priority: module-relative > upward search > ERROR
+--- @param subdir string Subdirectory name under static/ergopti_plus/shared/ui/.
+--- @return string|nil Absolute path if found, nil if missing (ERROR logged).
+local function resolve_ui_assets_dir(subdir)
+	local source = debug.getinfo(1, "S").source or ""
+	source = source:sub(1, 1) == "@" and source:sub(2) or source
+	local this_dir = source:match("^(.*)/[^/]+$") or ""
+	if this_dir ~= "" then
+		local by_module = this_dir .. "/../../shared/ui/" .. subdir
+		if fs.dir(by_module) then
+			Logger.debug(LOG, "resolve_ui_assets_dir('%s'): module path OK.", subdir)
+			return by_module .. "/"
+		end
+	end
+
+	local Paths = require("lib.paths")
+	local base = Paths.find_from_configdir("static/ergopti_plus/shared/ui/" .. subdir)
+	if base and fs.dir(base) then
+		Logger.debug(LOG, "resolve_ui_assets_dir('%s'): upward search OK.", subdir)
+		return base .. "/"
+	end
+
+	Logger.error(LOG, "resolve_ui_assets_dir('%s'): directory not found after all attempts.", subdir)
+	return nil
+end
+
 --- rev-keyed projection caches.
 M._manifest_cache    = nil
 M._manifest_rev      = -1
@@ -340,11 +369,17 @@ function M.show()
 	local sf    = hs.screen.mainScreen():frame()
 	local frame = { x = sf.x + 50, y = sf.y + 50, w = sf.w - 100, h = sf.h - 100 }
 
+	local assets_dir = resolve_ui_assets_dir("metrics_typing")
+	if not assets_dir then
+		Logger.error(LOG, "Cannot open dashboard — shared UI assets not found.")
+		return
+	end
+
 	M._wv = ui_builder.show_webview({
 		frame       = frame,
 		title       = i18n.get("metrics_apps.title"),
 		style_masks = 15,
-		assets_dir = hs.configdir .. "/../shared/ui/metrics_typing/",
+		assets_dir = assets_dir,
 		on_close   = function()
 			M._wv = nil
 			if M._timer then M._timer:stop(); M._timer = nil end

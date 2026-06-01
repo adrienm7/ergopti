@@ -37,38 +37,35 @@ end
 
 --- Resolves an absolute shared constants path.
 --- Priority: module-relative -> hs.configdir-relative -> upward search.
+--- Resolves the absolute path to a shared resource file (fail-fast).
+--- Priority: module-relative > upward search > ERROR
+--- Passes the first path that exists; logs ERROR and returns nil if none found.
 --- @param rel string Relative path under static/ergopti_plus/shared/.
---- @return string|nil
+--- @return string|nil Absolute path if found, nil if missing (ERROR logged).
 local function resolve_shared_constants_path(rel)
-	-- Primary path: resolve from this module's source directory for dev/runtime parity.
+	-- Primary: resolve from this module's source directory for dev/runtime parity.
 	local source = debug.getinfo(1, "S").source or ""
 	source = source:sub(1, 1) == "@" and source:sub(2) or source
 	local this_dir = source:match("^(.*)/[^/]+$") or ""
 	if this_dir ~= "" then
-		local by_module = this_dir .. "/../../shared/" .. rel
+		-- ui/wpm sits under macos/ui/wpm, so shared is three levels up.
+		local by_module = this_dir .. "/../../../shared/" .. rel
 		if file_exists(by_module) then
-			Logger.debug(LOG, "resolve_shared_constants_path('%s'): module path '%s'.", rel, by_module)
+			Logger.debug(LOG, "resolve_shared_constants_path('%s'): module path OK.", rel)
 			return by_module
 		end
 	end
 
-	-- Fast fallback for layouts where hs.configdir sits in .../ergopti_plus/macos.
-	local cfg = (hs.configdir or ""):gsub("[/\\]+$", "")
-	if cfg ~= "" then
-		local by_cfg = cfg .. "/../shared/" .. rel
-		if file_exists(by_cfg) then
-			Logger.debug(LOG, "resolve_shared_constants_path('%s'): hs.configdir path '%s'.", rel, by_cfg)
-			return by_cfg
-		end
-	end
-
-	-- Last fallback for non-standard installations.
+	-- Secondary: walk up from driver base for non-standard layouts.
+	-- This is a pragmatic fallback but will fail loudly if not found.
 	local by_find = Paths.find_from_configdir("static/ergopti_plus/shared/" .. rel)
 	if by_find and file_exists(by_find) then
-		Logger.debug(LOG, "resolve_shared_constants_path('%s'): upward path '%s'.", rel, by_find)
+		Logger.debug(LOG, "resolve_shared_constants_path('%s'): upward search OK.", rel)
 		return by_find
 	end
 
+	-- FAIL FAST: path not found — do not silently degrade.
+	Logger.error(LOG, "resolve_shared_constants_path('%s'): file not found after all attempts.", rel)
 	return nil
 end
 

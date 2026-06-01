@@ -49,41 +49,38 @@ end
 -- =====================================
 -- =====================================
 
---- Resolves the absolute path to a locale JSON file.
+--- Resolves the absolute path to a locale JSON file (fail-fast).
+--- Priority: module-relative > upward search > ERROR
+--- Passes the first path that exists; logs ERROR and returns empty string if none found.
 --- @param code string Locale code, e.g. ``"fr"``.
---- @return string Absolute path to the JSON file.
+--- @return string Absolute path to the JSON file, or empty string if not found (ERROR logged).
 local function locale_path(code)
-	-- Primary path: resolve from this module's location, not hs.configdir.
-	-- In stock Hammerspoon dev mode, hs.configdir is ~/.hammerspoon and cannot
-	-- locate repository assets; module-local resolution is stable in both dev
-	-- and packaged app runtimes.
+	-- Primary: resolve from this module's location, not hs.configdir.
+	-- Module-local resolution is stable in both dev and packaged app runtimes.
 	local source = debug.getinfo(1, "S").source or ""
 	source = source:sub(1, 1) == "@" and source:sub(2) or source
 	local this_dir = source:match("^(.*)/[^/]+$") or ""
 	if this_dir ~= "" then
 		local by_module = this_dir .. "/../../shared/locales/" .. code .. ".json"
 		if file_exists(by_module) then
-			Logger.debug(LOG, "locale_path: resolved via module path '%s'.", by_module)
+			Logger.debug(LOG, "locale_path('%s'): module path OK.", code)
 			return by_module
 		end
 	end
 
-	-- Fast path for packaged .app layouts where hs.configdir points inside the
-	-- driver tree and shared/locales sits one level above.
-	local cfg = (hs.configdir or ""):gsub("[/\\]+$", "")
-	local cfg_direct = cfg .. "/../shared/locales/" .. code .. ".json"
-	if file_exists(cfg_direct) then
-		Logger.debug(LOG, "locale_path: resolved via hs.configdir path '%s'.", cfg_direct)
-		return cfg_direct
+	-- Secondary: walk up from hs.configdir for non-standard layouts.
+	local dir = Paths.find_from_configdir("static/ergopti_plus/shared/locales")
+	if dir then
+		local by_find = dir .. "/" .. code .. ".json"
+		if file_exists(by_find) then
+			Logger.debug(LOG, "locale_path('%s'): upward search OK.", code)
+			return by_find
+		end
 	end
 
-	-- Last fallback: walk up from hs.configdir for non-standard layouts.
-	local dir = Paths.find_from_configdir("static/ergopti_plus/shared/locales")
-	if not dir then
-		Logger.error(LOG, "locale_path: static/ergopti_plus/shared/locales/ not found — translations unavailable.")
-		return ""
-	end
-	return dir .. "/" .. code .. ".json"
+	-- FAIL FAST: locale file not found — do not silently degrade.
+	Logger.error(LOG, "locale_path('%s'): file not found after all attempts (hs.configdir='%s').", code, hs.configdir or "nil")
+	return ""
 end
 
 --- Loads a JSON locale file and returns a flat key→string table, or {}.
