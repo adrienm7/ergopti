@@ -804,7 +804,20 @@ function M.prime_ke_for_session(callback, force)
 		Logger.info(LOG, "Bridge alive but force=true — waiting 200 ms for pkill to settle…")
 		hs.timer.doAfter(0.2, function()
 			if is_ipc_bridge_running() then
-				Logger.warn(LOG, "Bridge still alive after settle — firing extra kill before re-prime…")
+				-- On KE v16+, the bridge may intentionally stay alive despite fast kill.
+				-- If IPC is already responsive, mark as primed immediately instead of
+				-- forcing a kill/relaunch cycle that can deadlock the polling path.
+				if is_cli_roundtrip_ready() then
+					mark_session_primed()
+					mark_hs_owned_bridge()
+					_prime_in_progress = false
+					Logger.success(LOG, "KE bridge already responsive after settle — primed without relaunch.")
+					notify_karabiner_ready()
+					resolve_prime_callbacks(true)
+					return
+				end
+
+				Logger.warn(LOG, "Bridge still alive after settle but IPC probe failed — firing extra kill before re-prime…")
 				pcall(function() hs.execute(KARABINER_KILL_FAST_CMD) end)
 				hs.timer.doAfter(0.2, start_launch_and_poll)
 			else
