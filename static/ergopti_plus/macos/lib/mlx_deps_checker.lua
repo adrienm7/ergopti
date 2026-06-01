@@ -42,6 +42,7 @@ local M = {}
 local hs           = hs
 local Logger       = require("lib.logger")
 local i18n         = require("lib.i18n")
+local Paths        = require("lib.paths")
 local llm_progress = require("ui.download_window")
 
 local LOG = "mlx_deps"
@@ -102,18 +103,40 @@ local _pending_callbacks = {}
 -- =====================================
 -- =====================================
 
---- Resolves the project root from this file's own path. Returns nil if the
---- expected layout is not found.
---- @return string|nil project_root Absolute path or nil.
-local function resolve_project_root()
+--- Resolves the HS driver root from this file path.
+--- @return string|nil hs_root Absolute path or nil.
+local function resolve_hs_root()
 	local source = debug.getinfo(1, "S").source or ""
 	source = source:sub(1, 1) == "@" and source:sub(2) or source
-	-- Expected suffix: .../static/ergopti_plus/macos/lib/mlx_deps_checker.lua
-	local root = source:match("^(.*)/static/ergopti_plus/macos/lib/mlx_deps_checker%.lua$")
+	local root = source:match("^(.*)/lib/mlx_deps_checker%.lua$")
 	if root and root ~= "" and hs.fs.attributes(root, "mode") then
 		return root
 	end
 	return nil
+end
+
+--- Resolves the absolute path to ensure-mlx-deps.sh in both dev and bundled
+--- layouts by first using this module's own location, then falling back to an
+--- upward search from hs.configdir.
+--- @return string|nil script_path Absolute script path, or nil if not found.
+local function resolve_bootstrap_script_path()
+	local hs_root = resolve_hs_root()
+	if hs_root then
+		local script_path = hs_root .. "/modules/llm/ensure-mlx-deps.sh"
+		if hs.fs.attributes(script_path, "mode") then
+			return script_path
+		end
+	end
+
+	return Paths.find_from_configdir("modules/llm/ensure-mlx-deps.sh", 12)
+end
+
+--- Shell-quotes an arbitrary string for safe insertion into /bin/bash -c.
+--- @param value string Raw string.
+--- @return string quoted Shell-safe quoted string.
+local function shell_quote(value)
+	local s = tostring(value or "")
+	return "'" .. s:gsub("'", "'\\''") .. "'"
 end
 
 
@@ -356,32 +379,30 @@ function M.check_and_install_deps(on_complete)
 	end
 
 	Logger.start(LOG, "Bootstrapping MLX virtualenv…")
-	local project_root = resolve_project_root()
-	if not project_root then
-		Logger.error(LOG, "Project root introuvable depuis mlx_deps_checker.lua — bootstrap aborted.")
+	local script_path = resolve_bootstrap_script_path()
+	if not script_path then
+		Logger.error(LOG, "Unable to resolve ensure-mlx-deps.sh from current runtime paths — bootstrap aborted.")
 		_bootstrap_state = "failed"
-		_last_failure_message = "Project root introuvable."
+		_last_failure_message = "ensure-mlx-deps.sh introuvable."
 		fire_pending_callbacks(false)
 		return
 	end
 
-	-- The script lives next to the LLM module (modules/llm/) so all
-	-- MLX-related code stays co-located.
-	local script_path = project_root .. "/static/ergopti_plus/macos/modules/llm/ensure-mlx-deps.sh"
-	if not hs.fs.attributes(script_path, "mode") then
-		Logger.error(LOG, "Script ensure-mlx-deps.sh introuvable à %s — bootstrap aborted.", script_path)
+	local hs_root = script_path:match("^(.*)/modules/llm/ensure%-mlx%-deps%.sh$") or ""
+	if hs_root == "" then
+		Logger.error(LOG, "Could not derive HS root from script path '%s' — bootstrap aborted.", script_path)
 		_bootstrap_state = "failed"
-		_last_failure_message = "Script ensure-mlx-deps.sh introuvable."
+		_last_failure_message = "Chemin du script MLX invalide."
 		fire_pending_callbacks(false)
 		return
 	end
 
 	-- Forward the project root so the script knows where to find .venv even
 	-- when launched outside the project directory (e.g. from launchd).
-	local env_prefix = "PROJECT_ROOT=" .. project_root .. " "
-	local bash_cmd = env_prefix .. "/bin/bash " .. script_path
+	local env_prefix = "PROJECT_ROOT=" .. shell_quote(hs_root) .. " "
+	local bash_cmd = env_prefix .. "/bin/bash " .. shell_quote(script_path)
 
-	Logger.debug(LOG, "Executing dependency validation script in background (root=%s)…", project_root)
+	Logger.debug(LOG, "Executing dependency validation script in background (root=%s)…", hs_root)
 
 	-- Surface the launched command in the terminal area so the user has
 	-- visible proof that work has started — even before uv emits its first
@@ -400,6 +421,7 @@ function M.check_and_install_deps(on_complete)
 		Logger.error(LOG, "Failed to write PTY wrapper to %s — aborting bootstrap.", pty_wrapper_path)
 		_bootstrap_state = "failed"
 		_last_failure_message = i18n.get("mlx.deps_pty_write_failed")
+		fire_pending_callbacks(false)
 		return
 	end
 	-- pty.spawn() alone doesn't forward PTY output to stdout (the Python
@@ -506,6 +528,7 @@ function M.check_and_install_deps(on_complete)
 		_bootstrap_state = "failed"
 		_last_failure_message = i18n.get("mlx.deps_task_create_failed")
 		os.execute("rm -f " .. pty_wrapper_path)
+		fire_pending_callbacks(false)
 		return
 	end
 	Logger.debug(LOG, "hs.task created successfully")
