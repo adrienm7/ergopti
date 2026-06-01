@@ -81,12 +81,19 @@ _TooltipTimerFn() {
 ; from the main script body at startup and always runs in the main thread.
 _TooltipDequeuePollFn() {
     global _TooltipDequeueItems, _TooltipGeneration, _TooltipTimerGeneration
+    global _TooltipDequeueActive
     static _PollCount := 0
     _PollCount += 1
     if (_TooltipDequeueItems == 0 or !IsObject(_TooltipDequeueItems))
         return
-    if (_TooltipTimerGeneration != _TooltipGeneration)
+    if (_TooltipTimerGeneration != _TooltipGeneration) {
+        ; Generation mismatch while dequeue is still flagged active — a new
+        ; TooltipShow superseded this cycle.  Clear the active flag so
+        ; subsequent TooltipHide calls are no longer gated.
+        if _TooltipDequeueActive
+            _TooltipDequeueActive := false
         return
+    }
     Now := A_TickCount
     ; Check if the earliest deadline has passed.
     NeedDequeue := false
