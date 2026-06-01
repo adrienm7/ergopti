@@ -25,6 +25,11 @@ local LOG    = "menu_watchers"
 --- ======================================
 -- =====================================
 
+-- Debounce delay (seconds): absorbs rapid bursts of file-change events
+-- (e.g. a git commit touching several .lua files at once) so that only a
+-- single hs.reload() fires instead of one per changed file.
+local DEBOUNCE_SEC = 0.5
+
 --- Creates and starts a pathwatcher on base_dir that triggers a reload on .lua/.toml changes.
 --- Ignores changes that arrive while the suppress window is active (e.g. after opening a file
 --- for editing from within the menu itself).
@@ -34,6 +39,11 @@ local LOG    = "menu_watchers"
 --- @param ui_restore table lib.ui_restore module (provides defer_reload).
 --- @return userdata|nil The hs.pathwatcher object, or nil on failure.
 function M.start_config_watcher(base_dir, on_reload, get_suppress_until, ui_restore)
+	-- Single debounce timer shared across all pathwatcher callbacks; cancelled
+	-- and restarted on every new event so that a burst of changes produces only
+	-- one reload fired DEBOUNCE_SEC after the last event in the burst.
+	local _debounce_timer = nil
+
 	local function reload_config(files)
 		-- HTML/CSS/JS are webview assets loaded at open-time — changing them
 		-- never requires hs.reload(); only .lua and .toml affect runtime behavior
@@ -43,8 +53,16 @@ function M.start_config_watcher(base_dir, on_reload, get_suppress_until, ui_rest
 				if type(file) == "string"
 					and (file:match("%.lua$") or file:match("%.toml$"))
 					and not file:match("logs/") then
-					Logger.debug(LOG, "File change detected: %s", file)
-					ui_restore.defer_reload(on_reload)
+					Logger.debug(LOG, "File change detected: %s — debounce armed.", file)
+					-- Cancel any pending debounce and restart it; the reload
+					-- fires only once the burst settles
+					if _debounce_timer then
+						pcall(function() _debounce_timer:stop() end)
+					end
+					_debounce_timer = hs.timer.doAfter(DEBOUNCE_SEC, function()
+						_debounce_timer = nil
+						ui_restore.defer_reload(on_reload)
+					end)
 					return
 				end
 			end
