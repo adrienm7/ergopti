@@ -231,11 +231,15 @@ _Updater_IsNewerVersion(Latest, Current) {
 }
 
 ; Returns the GitHub Releases API URL for the chosen channel.
+; For the dev channel we fetch the last 10 releases and pick the first one
+; whose "prerelease" flag is true.  Using per_page=1 was insufficient because
+; GitHub returns releases in reverse-chronological order: if the most recent
+; publish is a stable release it lands at position 1 and any newer prerelease
+; hiding behind it would go undetected.
 Updater_ReleaseApiUrl(Channel) {
 	global UPDATER_GH_OWNER, UPDATER_GH_REPO
 	if (Channel == "dev")
-		; Latest pre-release: list releases and pick the first one.
-		return "https://api.github.com/repos/" . UPDATER_GH_OWNER . "/" . UPDATER_GH_REPO . "/releases?per_page=1"
+		return "https://api.github.com/repos/" . UPDATER_GH_OWNER . "/" . UPDATER_GH_REPO . "/releases?per_page=10"
 	; Stable: the dedicated "latest" endpoint always returns the newest non-pre-release.
 	return "https://api.github.com/repos/" . UPDATER_GH_OWNER . "/" . UPDATER_GH_REPO . "/releases/latest"
 }
@@ -294,6 +298,28 @@ Updater_FetchLatestJson(Channel) {
 			Json := Req.ResponseText
 	} catch as Err {
 		LoggerWarn("Updater", "HTTP request failed: {1}.", Err.Message)
+	}
+	; Array response (dev channel) — unwrap to the first prerelease object so
+	; every downstream parser receives a single-object JSON string.
+	if (Json != "" and SubStr(LTrim(Json), 1, 1) == "[") {
+		Json := _Updater_UnwrapFirstPrerelease(Json)
+	}
+	return Json
+}
+
+; Given a GitHub releases array JSON string, return the JSON object of the
+; first entry whose "prerelease" flag is true.  Falls back to the first entry
+; when no prerelease is found (matches the previous per_page=1 behaviour).
+_Updater_UnwrapFirstPrerelease(Json) {
+	Chunks := _Updater_SplitReleasesArray(Json)
+	for _, Chunk in Chunks {
+		if _Updater_ParsePrerelease(Chunk) {
+			return Chunk
+		}
+	}
+	; No prerelease found — return the first element as fallback
+	if (Chunks.Length > 0) {
+		return Chunks[1]
 	}
 	return Json
 }
@@ -425,11 +451,10 @@ Updater_ParseReleasesList(Json, MainOnly := false) {
 Updater_ParseTagName(Json) {
 	if (Json == "")
 		return ""
-	; Array response (dev channel: [{...}, ...]) — unwrap the first element.
-	if (SubStr(LTrim(Json), 1, 1) == "[") {
-		; Strip the leading "[" and grab the first object.
+	; Unwrap array if callers pass raw list JSON (defensive — normally already
+	; unwrapped by Updater_FetchLatestJson or Updater_ParseReleasesList).
+	if (SubStr(LTrim(Json), 1, 1) == "[")
 		Json := RegExReplace(Json, "^\s*\[", "")
-	}
 	if RegExMatch(Json, '"tag_name"\s*:\s*"([^"]+)"', &M)
 		return M[1]
 	return ""
@@ -441,6 +466,7 @@ Updater_ParseTagName(Json) {
 Updater_ParseBody(Json) {
 	if (Json == "")
 		return ""
+	; Unwrap array defensively — normally already done by Updater_FetchLatestJson.
 	if (SubStr(LTrim(Json), 1, 1) == "[")
 		Json := RegExReplace(Json, "^\s*\[", "")
 	; GitHub sets "body": null (not "") when a release has no description.
