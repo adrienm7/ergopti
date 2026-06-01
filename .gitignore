@@ -77,6 +77,11 @@ luac.out
 # Runtime-only files dropped into _generated/ — not built from source
 static/ergopti_plus/windows/_generated/paths.toml
 static/ergopti_plus/macos/_generated/paths.toml
+# Bootstrap config auto-generated at runtime — gitignored at driver root too
+static/ergopti_plus/macos/paths.toml
+static/ergopti_plus/windows/paths.toml
+# Artefact Windows (résidu de redirection shell)
+static/ergopti_plus/macos/nul
 static/ergopti_plus/windows/_generated/personal_shortcuts.ahk
 static/ergopti_plus/windows/_generated/prefetch_*.json
 static/ergopti_plus/shared/ui/metrics_typing/prefetch.json

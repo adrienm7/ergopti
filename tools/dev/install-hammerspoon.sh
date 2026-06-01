@@ -1,112 +1,63 @@
 #!/usr/bin/env bash
-# scripts/install-hammerspoon.sh
+# tools/dev/install-hammerspoon.sh
 
 # ==============================================================================
 # MODULE: Hammerspoon dev-bootstrap installer
 # DESCRIPTION:
 # Configures stock Hammerspoon to boot the Ergopti+ driver directly from this
-# repo clone, with zero copying. Writes a 5-line ``~/.hammerspoon/init.lua``
-# that extends ``package.path`` to the driver folder and delegates execution
-# to its ``init.lua``. ``git pull`` + reload Hammerspoon = picks up changes.
-#
-# Stock Hammerspoon (bundle id ``org.hammerspoon.Hammerspoon``) and the
-# production ErgoptiPlus.app (bundle id ``com.ergoptiplus.app``, ships its own
-# vendored Hammerspoon with an isolated ``MJConfigDir``) coexist by design —
-# they read entirely separate preferences and config directories. Only one
-# of the two should be the active menubar process at any time, because both
-# would otherwise compete for the same OS-level event taps and hotkeys.
-#
-# FEATURES & RATIONALE:
-# 1. Self-locating: the script discovers its own repo root via
-#    ``dirname(scriptdir)``, so the install bootstrap embeds the absolute
-#    path of THIS clone — moving the repo means re-running the script.
-# 2. Non-destructive: any pre-existing ``~/.hammerspoon/init.lua`` is moved
-#    to ``init.lua.backup.<UTC-timestamp>`` before the new one is written.
-#    The user can ``mv`` it back to revert.
-# 3. Auto-reload: if the ``hs`` CLI is installed (Hammerspoon menubar >
-#    Console > File > Install Command Line Tool), the script triggers a
-#    reload at the end so the change takes effect immediately.
-# 4. Convenience hotkey: the generated bootstrap binds ``Cmd+Ctrl+R`` to
-#    ``hs.reload()`` so the dev iteration loop is one keypress.
+# repo clone, with zero copying.
 # ==============================================================================
 
 set -euo pipefail
 
-
-
-
-# ==================================
-# ==================================
-# ======= 1/ Path resolution =======
-# ==================================
-# ==================================
-
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+REPO_ROOT="${SCRIPT_DIR}"
+
+while [ "${REPO_ROOT}" != "/" ] && [ ! -f "${REPO_ROOT}/static/ergopti_plus/macos/init.lua" ]; do
+	REPO_ROOT="$(cd "${REPO_ROOT}/.." && pwd)"
+done
+
 DRIVER_DIR="${REPO_ROOT}/static/ergopti_plus/macos"
 HS_CONFIG_DIR="${HOME}/.hammerspoon"
 HS_INIT="${HS_CONFIG_DIR}/init.lua"
+XDG_HS_CONFIG_DIR="${XDG_CONFIG_HOME:-${HOME}/.config}/hammerspoon"
+XDG_HS_INIT="${XDG_HS_CONFIG_DIR}/init.lua"
 
 if [ ! -f "${DRIVER_DIR}/init.lua" ]; then
-    echo "ERROR: cannot find Ergopti+ driver at ${DRIVER_DIR}/init.lua" >&2
-    echo "       this script must live at <repo>/scripts/install-hammerspoon.sh" >&2
-    exit 1
+	echo "ERROR: cannot find Ergopti+ driver at ${DRIVER_DIR}/init.lua" >&2
+	echo "       expected to find repo root containing static/ergopti_plus/macos/init.lua" >&2
+	exit 1
 fi
-
-
-
-
-# ===========================================
-# ===========================================
-# ======= 2/ Hammerspoon presence check =======
-# ===========================================
-# ===========================================
 
 if [ ! -d "/Applications/Hammerspoon.app" ]; then
-    echo "WARNING: Hammerspoon.app not found in /Applications."
-    echo "         Download stock Hammerspoon from https://www.hammerspoon.org/"
-    echo "         before the bootstrap will be picked up."
-    echo
+	echo "WARNING: Hammerspoon.app not found in /Applications."
+	echo "         Download stock Hammerspoon from https://www.hammerspoon.org/"
+	echo "         before the bootstrap will be picked up."
+	echo
 fi
 
+backup_init_if_needed() {
+	local init_path="$1"
 
+	if [ -f "${init_path}" ]; then
+		if grep -q "Ergopti+ dev bootstrap" "${init_path}" 2>/dev/null \
+			&& grep -q "${DRIVER_DIR}" "${init_path}" 2>/dev/null; then
+			echo "Existing bootstrap already points at this clone — refreshing in place (${init_path})."
+		else
+			local backup_path="${init_path}.backup.$(date -u +%Y%m%dT%H%M%SZ)"
+			mv "${init_path}" "${backup_path}"
+			echo "Previous Hammerspoon init backed up to:"
+			echo "  ${backup_path}"
+		fi
+	fi
+}
 
+write_bootstrap_init() {
+	local init_path="$1"
 
-# ============================================
-# ============================================
-# ======= 3/ Backup existing init.lua =======
-# ============================================
-# ============================================
-
-mkdir -p "${HS_CONFIG_DIR}"
-
-if [ -f "${HS_INIT}" ]; then
-    # Skip backup if the file is already an Ergopti bootstrap pointing at THIS
-    # clone — re-running the installer should be idempotent, not generate an
-    # endless trail of .backup files.
-    if grep -q "Ergopti+ dev bootstrap" "${HS_INIT}" 2>/dev/null \
-        && grep -q "${DRIVER_DIR}" "${HS_INIT}" 2>/dev/null; then
-        echo "Existing bootstrap already points at this clone — refreshing in place."
-    else
-        BACKUP_PATH="${HS_INIT}.backup.$(date -u +%Y%m%dT%H%M%SZ)"
-        mv "${HS_INIT}" "${BACKUP_PATH}"
-        echo "Previous ~/.hammerspoon/init.lua backed up to:"
-        echo "  ${BACKUP_PATH}"
-    fi
-fi
-
-
-
-
-# ============================================
-# ============================================
-# ======= 4/ Write bootstrap init.lua =======
-# ============================================
-# ============================================
-
-cat > "${HS_INIT}" <<EOF
--- ~/.hammerspoon/init.lua
--- Ergopti+ dev bootstrap (auto-generated by scripts/install-hammerspoon.sh)
+	cat > "${init_path}" <<EOF
+-- ${init_path}
+-- Ergopti+ dev bootstrap (auto-generated by tools/dev/install-hammerspoon.sh)
 -- Edits to this file will be overwritten the next time the installer runs.
 -- To revert: delete this file and rename the most recent init.lua.backup.* back.
 
@@ -117,33 +68,42 @@ package.path = DRIVER .. "/?.lua;" .. DRIVER .. "/?/init.lua;" .. package.path
 -- One-keypress dev reload. Bound BEFORE the driver loads so a broken driver
 -- can still be reloaded after editing the offending file.
 hs.hotkey.bind({ "cmd", "ctrl" }, "R", function()
-    hs.reload()
+	hs.reload()
 end)
 
 dofile(DRIVER .. "/init.lua")
 EOF
+}
+
+mkdir -p "${HS_CONFIG_DIR}" "${XDG_HS_CONFIG_DIR}"
+
+backup_init_if_needed "${HS_INIT}"
+backup_init_if_needed "${XDG_HS_INIT}"
+
+write_bootstrap_init "${HS_INIT}"
+write_bootstrap_init "${XDG_HS_INIT}"
 
 echo "Wrote bootstrap to ${HS_INIT}"
+echo "Wrote bootstrap to ${XDG_HS_INIT}"
 echo "  → delegates to ${DRIVER_DIR}/init.lua"
 echo "  → Cmd+Ctrl+R triggers hs.reload() during dev"
 
-
-
-
-# ==========================================
-# ==========================================
-# ======= 5/ Auto-reload if possible =======
-# ==========================================
-# ==========================================
+# Old setups may force Hammerspoon to a stale config path via MJConfigFile.
+# Pin it to the freshly generated bootstrap and clear MJConfigDir override.
+if command -v defaults >/dev/null 2>&1; then
+	defaults write org.hammerspoon.Hammerspoon MJConfigFile "${HS_INIT}" >/dev/null 2>&1 || true
+	defaults delete org.hammerspoon.Hammerspoon MJConfigDir >/dev/null 2>&1 || true
+	echo "  → normalized org.hammerspoon.Hammerspoon MJConfigFile to ${HS_INIT}"
+fi
 
 if command -v hs >/dev/null 2>&1; then
-    echo
-    echo "Triggering hs.reload() via the ``hs`` CLI…"
-    hs -c "hs.reload()" >/dev/null 2>&1 || true
-    echo "Done. Watch the Hammerspoon Console (menubar > Console) for boot logs."
+	echo
+	echo "Triggering hs.reload() via the hs CLI…"
+	hs -c "hs.reload()" >/dev/null 2>&1 || true
+	echo "Done. Watch the Hammerspoon Console (menubar > Console) for boot logs."
 else
-    echo
-    echo "Hammerspoon CLI not installed — open Hammerspoon's menubar > Console,"
-    echo "then File > Install Command Line Tool to enable auto-reload next time."
-    echo "For now: click 'Reload Config' in the Hammerspoon menubar manually."
+	echo
+	echo "Hammerspoon CLI not installed — open Hammerspoon's menubar > Console,"
+	echo "then File > Install Command Line Tool to enable auto-reload next time."
+	echo "For now: click 'Reload Config' in the Hammerspoon menubar manually."
 fi

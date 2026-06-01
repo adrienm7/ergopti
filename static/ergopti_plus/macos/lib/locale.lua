@@ -29,6 +29,17 @@ local _strings_fr  = nil   -- French second-fallback strings
 local _locale      = "fr"
 local _get_trigger = nil   -- injected by init.lua after keymap is ready
 
+--- Returns true when the given path exists and is a readable file.
+--- @param path string File path.
+--- @return boolean
+local function file_exists(path)
+	if type(path) ~= "string" or path == "" then return false end
+	local f = io.open(path, "r")
+	if not f then return false end
+	f:close()
+	return true
+end
+
 
 
 
@@ -42,18 +53,31 @@ local _get_trigger = nil   -- injected by init.lua after keymap is ready
 --- @param code string Locale code, e.g. ``"fr"``.
 --- @return string Absolute path to the JSON file.
 local function locale_path(code)
-	-- Fast path: in both dev and packaged .app, hs.configdir is always
-	-- {root}/static/ergopti_plus/macos so shared/locales sits one level up.
-	-- We try this direct path first to avoid the walk-up overhead and to
-	-- stay resilient against symlink canonicalization inside the .app bundle.
-	local cfg = (hs.configdir or ""):gsub("[/\\]+$", "")
-	local direct = cfg .. "/../shared/locales"
-	local ok_direct, attr_direct = pcall(hs.fs.attributes, direct)
-	if ok_direct and type(attr_direct) == "table" then
-		Logger.debug(LOG, "locale_path: resolved via direct path '%s'.", direct)
-		return direct .. "/" .. code .. ".json"
+	-- Primary path: resolve from this module's location, not hs.configdir.
+	-- In stock Hammerspoon dev mode, hs.configdir is ~/.hammerspoon and cannot
+	-- locate repository assets; module-local resolution is stable in both dev
+	-- and packaged app runtimes.
+	local source = debug.getinfo(1, "S").source or ""
+	source = source:sub(1, 1) == "@" and source:sub(2) or source
+	local this_dir = source:match("^(.*)/[^/]+$") or ""
+	if this_dir ~= "" then
+		local by_module = this_dir .. "/../../shared/locales/" .. code .. ".json"
+		if file_exists(by_module) then
+			Logger.debug(LOG, "locale_path: resolved via module path '%s'.", by_module)
+			return by_module
+		end
 	end
-	-- Fallback: walk up the directory tree for non-standard layouts.
+
+	-- Fast path for packaged .app layouts where hs.configdir points inside the
+	-- driver tree and shared/locales sits one level above.
+	local cfg = (hs.configdir or ""):gsub("[/\\]+$", "")
+	local cfg_direct = cfg .. "/../shared/locales/" .. code .. ".json"
+	if file_exists(cfg_direct) then
+		Logger.debug(LOG, "locale_path: resolved via hs.configdir path '%s'.", cfg_direct)
+		return cfg_direct
+	end
+
+	-- Last fallback: walk up from hs.configdir for non-standard layouts.
 	local dir = Paths.find_from_configdir("static/ergopti_plus/shared/locales")
 	if not dir then
 		Logger.error(LOG, "locale_path: static/ergopti_plus/shared/locales/ not found — translations unavailable.")
