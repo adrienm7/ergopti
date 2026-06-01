@@ -185,6 +185,11 @@ class HookDispatcher {
 	; @param event_type {String} The event type to dispatch.
 	; @param args* Variadic — forwarded as-is to each subscriber.
 	static Dispatch(event_type, args*) {
+		; Native Suspend only disarms hotkeys/hotstrings — this InputHook fan-out
+		; keeps firing while paused, driving the LLM bridge and keylogger. Gate the
+		; whole shared pipeline here so « pause = tout éteint » in one place.
+		if A_IsSuspended
+			return
 		if !HookDispatcher._subscribers.Has(event_type)
 			return
 		for cb in HookDispatcher._subscribers[event_type] {

@@ -655,6 +655,9 @@ GestureSimulateActivity() {
     global ActivitySimulation
     if !ActivitySimulation
         return
+    ; No mouse jiggle / synthetic key while the script is paused.
+    if A_IsSuspended
+        return
     loop Random(3, 8) {
         MCSetPos(Random(0, A_ScreenWidth), Random(0, A_ScreenHeight))
         Sleep(Random(200, 800))

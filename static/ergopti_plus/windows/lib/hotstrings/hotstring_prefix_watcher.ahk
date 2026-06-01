@@ -469,6 +469,11 @@ _StartInputHook() {
 ; the OnChar callback permanently if an unhandled error propagates out of it.
 _OnPrefixChar(IH, Char) {
     global _PrefixBuffer, _MAX_BUFFER_LEN, _PrefixWatcherSuppressed, HSE_Suppressed, _PrefixIndex
+    ; No hotstring preview tooltip and no expansion dispatch while the script is
+    ; paused — this watcher uses its OWN InputHook, so the HookDispatcher guard
+    ; does not cover it.
+    if A_IsSuspended
+        return
     ; Honour BOTH suppression flags. _PrefixWatcherSuppressed is set by
     ; PrefixWatcherSuppress (manual / tray toggles); HSE_Suppressed is
     ; set by HSE_DispatchMatch while it is replaying its SendEvent burst.
@@ -607,6 +612,10 @@ _OnPrefixChar(IH, Char) {
 ; tooltip's auto-hide timer for that case.
 _OnPrefixKeyDown(IH, VK, SC) {
     global _PrefixWatcherSuppressed, HSE_Suppressed
+    ; Inert while paused — pairs with the _OnPrefixChar guard so this watcher's
+    ; private InputHook is fully silent during suspend.
+    if A_IsSuspended
+        return
     ; Same dual-flag guard as _OnPrefixChar — the BackSpace events the
     ; dispatcher fires via SendEvent reach this callback as VK 0x08 events.
     ; Without the HSE_Suppressed check the watcher would call

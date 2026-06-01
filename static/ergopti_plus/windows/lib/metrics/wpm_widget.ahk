@@ -822,6 +822,17 @@ WPMWidget_Tick() {
     if !WPMWidget.visible
         return
 
+    ; While the script is paused the widget must show nothing. Hide the surface
+    ; directly (not via WPMWidget_Hide, which would clear .visible and stop this
+    ; timer) so it reappears on resume with no restore bookkeeping.
+    if A_IsSuspended {
+        gui_ref := WPMWidget.show_graph ? WPMWidget._graph_gui : WPMWidget._gui
+        if gui_ref {
+            try (WPMWidget.show_graph ? WinSetTransparent(0, gui_ref) : gui_ref.Hide())
+        }
+        return
+    }
+
     now    := A_TickCount
     result := WPMWidget_Calc()
     wpm    := result["wpm"]

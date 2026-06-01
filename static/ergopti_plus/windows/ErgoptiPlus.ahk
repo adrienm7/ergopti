@@ -325,6 +325,13 @@ global ConfigurationFile := _ConfigDir . _AhkSubDir . "config.toml"
 HotstringsConfigInit(_ConfigDir . "hotstrings_config.toml")
 TooltipDequeueInit()
 
+; Arm the suspend watchdog so the pause reactor (Ergopti_OnSuspendEnter/Resume)
+; fires even when suspend is toggled outside ToggleSuspend. 500 ms is well under
+; human perception for the tear-down yet costs nothing while idle.
+SUSPEND_WATCHDOG_MS := 500
+global _LastSuspendState := A_IsSuspended
+SetTimer(_SuspendStateWatchdog, SUSPEND_WATCHDOG_MS)
+
 ; _LogoDir: fully-normalized absolute path avoids any '..' traversal that
 ; TraySetIcon may refuse to resolve on some Windows configurations.
 global _LogoDir := _StaticDir . "\img\logo"
@@ -2159,13 +2166,63 @@ ActivateEdit(*) {
 }
 
 ToggleSuspend(*) {
+    global _LastSuspendState
     if A_IsSuspended {
         Suspend(0)
     } else {
         Suspend(1)
     }
     UpdateTrayIcon()
+    ; Drive the pause reactor from the authoritative toggle. _LastSuspendState is
+    ; updated here too so the watchdog (which catches transitions that bypass
+    ; this function) sees the new state and does not double-fire the handlers.
+    _LastSuspendState := A_IsSuspended
+    if A_IsSuspended {
+        Ergopti_OnSuspendEnter()
+    } else {
+        Ergopti_OnSuspendResume()
+    }
     LoggerInfo("ErgoptiPlus", "Suspend toggled: {1}.", A_IsSuspended ? "ON" : "OFF")
+}
+
+; Pause reactor — entered when the script becomes suspended. Native Suspend only
+; disarms hotkeys/hotstrings; every InputHook, timer and OnMessage keeps running,
+; so the user still sees tooltips, LLM predictions, the WPM widget, etc. The
+; per-callback ``if A_IsSuspended`` guards stop NEW activity; this handler tears
+; down whatever was already live so the paused state is truly « AHK éteint ».
+Ergopti_OnSuspendEnter() {
+    try TooltipHide("Suspend", true)
+    try LLM_Tooltip_Hide(true)
+    try LLM_Engine_CancelTimer()
+}
+
+; Pause reactor — entered when the script resumes. The guards simply stop
+; early-returning once A_IsSuspended is false and the WPM tick repaints itself,
+; so the only cleanup needed is to drop any stale prefix-watcher context so
+; typing restarts at a clean word boundary instead of matching pre-pause input.
+Ergopti_OnSuspendResume() {
+    if IsSet(_ResetPrefixBuffer) {
+        try _ResetPrefixBuffer()
+    }
+}
+
+; Catches suspend transitions that bypass ToggleSuspend (a native Pause/Suspend
+; command, an external trigger, the AltGr+Enter pause-bug edge) and runs the same
+; reactor so « pause = tout éteint » holds no matter how suspend was toggled.
+; Timer callbacks are never affected by Suspend, so this keeps polling while
+; suspended — exactly what is needed to detect the resume edge.
+_SuspendStateWatchdog() {
+    global _LastSuspendState
+    if (A_IsSuspended == _LastSuspendState) {
+        return
+    }
+    _LastSuspendState := A_IsSuspended
+    UpdateTrayIcon()
+    if A_IsSuspended {
+        Ergopti_OnSuspendEnter()
+    } else {
+        Ergopti_OnSuspendResume()
+    }
 }
 
 UpdateTrayIcon() {

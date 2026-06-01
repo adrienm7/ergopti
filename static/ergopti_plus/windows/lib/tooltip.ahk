@@ -252,6 +252,15 @@ global _TOOLTIP_SAFETY_SEC := 3.0
 ; (0 / omitted means "stay until TooltipHide()").
 TooltipShow(Items, DurationSec := 0) {
 
+    ; While the script is suspended nothing may paint — « pause = AHK éteint ».
+    ; The per-callback input guards normally prevent reaching here, but the
+    ; dequeue poll timer and async LLM callers can still land mid-pause, so tear
+    ; down anything still up and refuse the show.
+    if A_IsSuspended {
+        TooltipHide("Suspend", true)
+        return
+    }
+
     ; Normalise to an Array of { Text, ColorHex } objects.
     if !IsObject(Items) {
         Items := [{ Text: Items, ColorHex: "", DurationSec: DurationSec }]
@@ -1135,6 +1144,11 @@ global _LLM_Tooltip_Visible  := false
 ; Inactive slots: full Text in gray.
 LLM_TooltipShow(payload, active := 1, is_final := false) {
 	global _LLM_Tooltip_Slots, _LLM_Tooltip_ActiveIdx, _LLM_Tooltip_Visible
+
+	; No prediction tooltip while paused — Ergopti_OnSuspendEnter already hid any
+	; visible one, this refuses late async renders.
+	if A_IsSuspended
+		return
 
 	slots := []
 	if (Type(payload) == "Array") {
