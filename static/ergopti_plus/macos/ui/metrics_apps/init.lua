@@ -39,6 +39,36 @@ M._app_icon_cache = {}
 M._manifest_cache  = nil
 M._manifest_rev    = -1
 
+
+
+
+--- Resolves the path to shared UI assets (fail-fast).
+--- Priority: module-relative > upward search > ERROR
+--- @param subdir string Subdirectory name under static/ergopti_plus/shared/ui/.
+--- @return string|nil Absolute path if found, nil if missing (ERROR logged).
+local function resolve_ui_assets_dir(subdir)
+	local source = debug.getinfo(1, "S").source or ""
+	source = source:sub(1, 1) == "@" and source:sub(2) or source
+	local this_dir = source:match("^(.*)/[^/]+$") or ""
+	if this_dir ~= "" then
+		local by_module = this_dir .. "/../../shared/ui/" .. subdir
+		if fs.dir(by_module) then
+			Logger.debug(LOG, "resolve_ui_assets_dir('%s'): module path OK.", subdir)
+			return by_module .. "/"
+		end
+	end
+
+	local Paths = require("lib.paths")
+	local base = Paths.find_from_configdir("static/ergopti_plus/shared/ui/" .. subdir)
+	if base and fs.dir(base) then
+		Logger.debug(LOG, "resolve_ui_assets_dir('%s'): upward search OK.", subdir)
+		return base .. "/"
+	end
+
+	Logger.error(LOG, "resolve_ui_assets_dir('%s'): directory not found after all attempts.", subdir)
+	return nil
+end
+
 local MAX_ICON_LOOKUPS_PER_OPEN = 30
 
 local CONFIG_DIR      = hs.configdir .. "/data"
@@ -424,6 +454,12 @@ function M.show()
 	local sf    = hs.screen.mainScreen():frame()
 	local frame = { x = sf.x + 50, y = sf.y + 50, w = sf.w - 100, h = sf.h - 100 }
 
+	local assets_dir = resolve_ui_assets_dir("metrics_apps")
+	if not assets_dir then
+		Logger.error(LOG, "Cannot open dashboard — shared UI assets not found.")
+		return
+	end
+
 	local ucc = hs.webview.usercontent.new("metrics_apps_bridge")
 	ucc:setCallback(handle_bridge_message)
 
@@ -431,7 +467,7 @@ function M.show()
 		frame       = frame,
 		title       = i18n.get("metrics_apps.window_title"),
 		style_masks = 15,
-		assets_dir  = hs.configdir .. "/../shared/ui/metrics_apps/",
+		assets_dir  = assets_dir,
 		usercontent = ucc,
 		on_close    = function()
 			M._wv = nil
