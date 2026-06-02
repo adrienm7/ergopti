@@ -619,7 +619,7 @@
 	"menu.gestures.title": "🖐️ Gestos",
 	"menu.global.config_folder": "📂 Pasta de configuração…",
 	"menu.global.disable_all": "☐ Desativar todos os recursos",
-	"menu.global.edit_shortcuts": "✎ Editar atalhos pessoais",
+	"menu.global.edit_shortcuts": "↳ Editar atalhos pessoais",
 	"menu.global.enable_all": "☑ Ativar todos os recursos",
 	"menu.global.language": "🌐 Idioma",
 	"menu.global.quit": "⏹ Sair",

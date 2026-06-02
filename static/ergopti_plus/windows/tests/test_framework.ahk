@@ -143,8 +143,10 @@ Test(Name, Callback) {
 	TEST_REGISTRY.Push({ name: Name, callback: Callback })
 }
 
-; Path of the TAP results file written alongside the test runner.
-global TEST_RESULTS_FILE := A_ScriptDir . "\test_results.txt"
+; Path of the TAP results file. A_Temp is used so Windows Defender real-time
+; scanning on CI runners cannot hold a write lock on a file inside the repo
+; checkout and cause FileAppend to block indefinitely between test lines.
+global TEST_RESULTS_FILE := A_Temp . "\ergopti_test_results.txt"
 
 ; Append a TAP line to TEST_RESULTS_FILE. Writing to "*" (stdout) blocks when
 ; AHK is launched via cmd redirection without an inherited console handle, so

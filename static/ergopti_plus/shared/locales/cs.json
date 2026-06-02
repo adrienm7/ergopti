@@ -619,7 +619,7 @@
 	"menu.gestures.title": "🖐️ Gesta",
 	"menu.global.config_folder": "📂 Konfigurační složka…",
 	"menu.global.disable_all": "☐ Zakázat všechny funkce",
-	"menu.global.edit_shortcuts": "✎ Upravit osobní zkratky",
+	"menu.global.edit_shortcuts": "↳ Upravit osobní zkratky",
 	"menu.global.enable_all": "☑ Povolit všechny funkce",
 	"menu.global.language": "🌐 Jazyk",
 	"menu.global.quit": "⏹ Ukončit",

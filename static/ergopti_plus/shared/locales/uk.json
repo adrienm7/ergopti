@@ -619,7 +619,7 @@
 	"menu.gestures.title": "🖐️ Жести",
 	"menu.global.config_folder": "📂 Папка конфігурації…",
 	"menu.global.disable_all": "☐ Вимкнути всі функції",
-	"menu.global.edit_shortcuts": "✎ Редагувати особисті скорочення",
+	"menu.global.edit_shortcuts": "↳ Редагувати особисті скорочення",
 	"menu.global.enable_all": "☑ Увімкнути всі функції",
 	"menu.global.language": "🌐 Мова",
 	"menu.global.quit": "⏹ Вийти",

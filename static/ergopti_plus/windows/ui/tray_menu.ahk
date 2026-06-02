@@ -1149,11 +1149,6 @@ _BuildShortcutsSubmenu() {
 	}
 	SubMenu.Add(t("menu.shortcuts.group_modifiers"), ModifiersMenu)
 
-	; ── Personal shortcuts ───────────────────────────────────
-	; Appends a separator + nested submenu when personal_shortcuts.ahk has
-	; registered at least one toggle via RegisterPersonalFeature.
-	_AppendPersonalShortcutsSubmenuIfAny(SubMenu)
-
 	return SubMenu
 }
 
@@ -1403,8 +1398,9 @@ initMenu() {
 	; Then append « Raccourcis de gestion du script » at the bottom.
 	if SubMenus.Has("Shortcuts") {
 		InsertKeyboardShortcutGroups(SubMenus["Shortcuts"], t("menu.shortcuts.group_modifiers"))
+		; Personal shortcuts before script-control, matching the macOS menu order.
+		_AppendPersonalShortcutsSubmenuIfAny(SubMenus["Shortcuts"])
 		SubMenus["Shortcuts"].Add(t("menu.shortcuts.script_shortcuts"), BuildScriptShortcutsMenu())
-		SubMenus["Shortcuts"].Add() ; Separator before edit personal shortcuts
 		RegisterMenuItem(SubMenus["Shortcuts"], t("menu.global.edit_shortcuts"), OpenPersonalShortcuts)
 
 		; Extensions shortcuts — one submenu per bundled extension that ships a

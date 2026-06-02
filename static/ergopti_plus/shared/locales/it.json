@@ -619,7 +619,7 @@
 	"menu.gestures.title": "🖐️ Gesti",
 	"menu.global.config_folder": "📂 Cartella configurazione…",
 	"menu.global.disable_all": "☐ Disabilita tutte le funzionalità",
-	"menu.global.edit_shortcuts": "✎ Modifica le scorciatoie personali",
+	"menu.global.edit_shortcuts": "↳ Modifica le scorciatoie personali",
 	"menu.global.enable_all": "☑ Abilita tutte le funzionalità",
 	"menu.global.language": "🌐 Lingua",
 	"menu.global.quit": "⏹ Esci",

@@ -619,7 +619,7 @@
 	"menu.gestures.title": "🖐️ إيماءات",
 	"menu.global.config_folder": "📂 مجلد الإعدادات…",
 	"menu.global.disable_all": "☐ تعطيل جميع الميزات",
-	"menu.global.edit_shortcuts": "✎ تعديل الاختصارات الشخصية",
+	"menu.global.edit_shortcuts": "↳ تعديل الاختصارات الشخصية",
 	"menu.global.enable_all": "☑ تفعيل جميع الميزات",
 	"menu.global.language": "🌐 اللغة",
 	"menu.global.quit": "⏹ إنهاء",

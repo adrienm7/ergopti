@@ -619,7 +619,7 @@
 	"menu.gestures.title": "🖐️ 제스처",
 	"menu.global.config_folder": "📂 설정 폴더…",
 	"menu.global.disable_all": "☐ 모든 기능 비활성화",
-	"menu.global.edit_shortcuts": "✎ 개인 단축키 편집",
+	"menu.global.edit_shortcuts": "↳ 개인 단축키 편집",
 	"menu.global.enable_all": "☑ 모든 기능 활성화",
 	"menu.global.language": "🌐 언어",
 	"menu.global.quit": "⏹ 종료",

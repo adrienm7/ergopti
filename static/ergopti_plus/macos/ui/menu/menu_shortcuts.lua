@@ -359,7 +359,6 @@ function M.build(ctx)
 
 	-- Edit personal shortcuts — sits at the bottom of the shortcuts submenu,
 	-- the most logical place since it directly relates to configuring shortcuts
-	table.insert(s_menu, { title = "-" })
 	table.insert(s_menu, {
 		title = i18n.get("menu.global.edit_shortcuts"),
 		fn    = function()

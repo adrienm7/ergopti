@@ -619,7 +619,7 @@
 	"menu.gestures.title": "🖐️ Gesten",
 	"menu.global.config_folder": "📂 Konfigurationsordner…",
 	"menu.global.disable_all": "☐ Alle Funktionen deaktivieren",
-	"menu.global.edit_shortcuts": "✎ Persönliche Tastenkürzel bearbeiten",
+	"menu.global.edit_shortcuts": "↳ Persönliche Tastenkürzel bearbeiten",
 	"menu.global.enable_all": "☑ Alle Funktionen aktivieren",
 	"menu.global.language": "🌐 Sprache",
 	"menu.global.quit": "⏹ Beenden",

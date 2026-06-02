@@ -619,7 +619,7 @@
 	"menu.gestures.title": "🖐️ ジェスチャー",
 	"menu.global.config_folder": "📂 設定フォルダー…",
 	"menu.global.disable_all": "☐ すべての機能を無効化",
-	"menu.global.edit_shortcuts": "✎ 個人ショートカットを編集",
+	"menu.global.edit_shortcuts": "↳ 個人ショートカットを編集",
 	"menu.global.enable_all": "☑ すべての機能を有効化",
 	"menu.global.language": "🌐 言語",
 	"menu.global.quit": "⏹ 終了",
