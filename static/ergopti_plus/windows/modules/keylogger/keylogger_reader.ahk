@@ -385,6 +385,10 @@ KLR_RebuildAggregates(db) {
 	; hs_chars - hs_input_chars, so feeding the already-net net_saved_chars
 	; here would subtract the trigger twice and understate the savings.
 	try SQLite_Exec(db, "INSERT INTO agg_app_day (device_id, date, app, hs_chars, hs_triggers, hs_input_chars) SELECT device_id, date, app, SUM(COALESCE(net_saved_chars,0) + LENGTH(COALESCE(trigger,''))), COUNT(*), SUM(LENGTH(COALESCE(trigger,''))) FROM events_hotstring WHERE kind = 'fired' GROUP BY device_id, date, app ON CONFLICT(device_id, date, app) DO UPDATE SET hs_chars=hs_chars+excluded.hs_chars, hs_triggers=hs_triggers+excluded.hs_triggers, hs_input_chars=hs_input_chars+excluded.hs_input_chars;")
+	; agg_app_day — hotstring suggestion count (denominator for the acceptance rate KPI).
+	; fired / suggested are separate rows; we join them here rather than duplicating the
+	; fired INSERT above so each kind gets a clean COUNT(*).
+	try SQLite_Exec(db, "INSERT INTO agg_app_day (device_id, date, app, hs_suggested) SELECT device_id, date, app, COUNT(*) FROM events_hotstring WHERE kind = 'suggested' GROUP BY device_id, date, app ON CONFLICT(device_id, date, app) DO UPDATE SET hs_suggested=hs_suggested+excluded.hs_suggested;")
 
 	; agg_app_day — app foreground time from events_app_switch.
 	try SQLite_Exec(db, "INSERT INTO agg_app_day (device_id, date, app, app_time_ms) SELECT device_id, date, prev_app, SUM(COALESCE(duration_ms,0)) FROM events_app_switch WHERE prev_app IS NOT NULL AND prev_app != '' GROUP BY device_id, date, prev_app ON CONFLICT(device_id, date, app) DO UPDATE SET app_time_ms=app_time_ms+excluded.app_time_ms;")
@@ -479,6 +483,7 @@ KLR_NewAppEntry() {
         "chars", 0, "pauses", 0, "time", 0, "think_time", 0,
         "hs_chars", 0, "llm_chars", 0,
         "hs_triggers", 0, "llm_triggers", 0,
+        "hs_suggested", 0, "llm_suggested", 0,
         "hs_input_chars", 0, "llm_input_chars", 0,
         "app_time", 0, "category", "",
         "burst_count_total", 0, "burst_max_cpm", 0, "burst_max_chars", 0,
@@ -515,6 +520,7 @@ KLR__SumAppDay(db, manifest, where) {
         . " SUM(time_ms) AS time_ms, SUM(think_time_ms) AS think_time_ms,"
         . " SUM(hs_chars) AS hs_chars, SUM(llm_chars) AS llm_chars,"
         . " SUM(hs_triggers) AS hs_triggers, SUM(llm_triggers) AS llm_triggers,"
+        . " SUM(hs_suggested) AS hs_suggested, SUM(llm_suggested) AS llm_suggested,"
         . " SUM(hs_input_chars) AS hs_input_chars, SUM(llm_input_chars) AS llm_input_chars,"
         . " SUM(app_time_ms) AS app_time, MAX(category) AS category"
         . " FROM agg_app_day" . where . " GROUP BY date, app"
@@ -528,6 +534,8 @@ KLR__SumAppDay(db, manifest, where) {
         a["llm_chars"] := r["llm_chars"]
         a["hs_triggers"] := r["hs_triggers"]
         a["llm_triggers"] := r["llm_triggers"]
+        a["hs_suggested"] := r["hs_suggested"]
+        a["llm_suggested"] := r["llm_suggested"]
         a["hs_input_chars"] := r["hs_input_chars"]
         a["llm_input_chars"] := r["llm_input_chars"]
         a["app_time"] := r["app_time"]
