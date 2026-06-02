@@ -459,43 +459,74 @@ GetCategoryTitle(Category) {
 ; ===================================
 
 BuildGesturesMenu() {
-	global Features, GestureAssignments, GESTURE_SLOTS, GESTURE_ACTIONS, GESTURE_SLOT_LABELS
+	global Features
 
-	GMenu := Menu()
+	GestEnabled := Features.Has("gestures") and Features["gestures"].Has("enabled")
+		and Features["gestures"]["enabled"] = true
 
-	; Canonical category toggle — inserted at position 1 with separator at 2.
-	GestEnabled := Features["gestures"]["enabled"]
-	AddCategoryToggleItem(GMenu,
-		t("menu.gestures.on"),
-		t("menu.gestures.off"),
-		GestEnabled,
-		(*) => ToggleGesturesEnabled())
+	DynHandlers := Map(
+		"auto_configure",    _GES_AutoConfigure,
+		"manual_tutorial",   _GES_ManualTutorial,
+		"gesture_slots_2",   _GES_Slots2,
+		"gesture_slots_3",   _GES_Slots3,
+		"gesture_slots_4",   _GES_Slots4,
+		"gesture_slots_5",   _GES_Slots5,
+	)
 
-	RegisterMenuItem(GMenu, t("menu.gestures.auto_configure"),  (*) => GestureAutoConfigureAction())
-	; Single tutorial entry — combines the previous "Show instructions" and
-	; "Open touchpad settings" items into one popup with the tutorial text
-	; plus an in-panel button that opens Settings. The two-item flow forced
-	; the user to bounce between menus to copy a shortcut and then go open
-	; Settings; one panel keeps the whole walkthrough in front of them.
-	RegisterMenuItem(GMenu, t("menu.gestures.manual_tutorial"), (*) => GestureShowManualTutorialDialog())
+	return MenuRenderer_Build("gestures_menu", "Gestures", DynHandlers)
+}
 
-	GMenu.Add()
+; Dynamic handler: auto-configure button.
+_GES_AutoConfigure(M, _Cat) {
+	RegisterMenuItem(M, t("menu.gestures.auto_configure"), (*) => GestureAutoConfigureAction())
+}
 
-	; Each slot becomes a single clickable item that opens a lazy GUI picker —
-	; avoids pre-building hundreds of submenus (N slots × M actions).
-	for Slot in GESTURE_SLOTS {
-		if (Slot == "tap_4")
-			GMenu.Add()
+; Dynamic handler: manual tutorial button.
+_GES_ManualTutorial(M, _Cat) {
+	RegisterMenuItem(M, t("menu.gestures.manual_tutorial"), (*) => GestureShowManualTutorialDialog())
+}
+
+; Render a group of gesture slots from the manifest gesture_slots table.
+_GES_RenderSlots(M, FingerCount) {
+	global GestureAssignments, GESTURE_ACTIONS, Features
+	Root := _MR_GetManifestRoot()
+	if (Root == false)
+		return
+	Slots := []
+	if (Root is Map) and Root.Has("gesture_slots") {
+		GS := Root["gesture_slots"]
+		if (GS is Map) and GS.Has(FingerCount)
+			Slots := GS[FingerCount]
+	}
+	GestEnabled := Features.Has("gestures") and Features["gestures"].Has("enabled")
+		and Features["gestures"]["enabled"] = true
+	for Slot in Slots {
 		SlotLabel     := t("gesture.slots." . Slot)
 		CurrentAction := GestureAssignments.Has(Slot) ? GestureAssignments[Slot] : "none"
-		CurrentLabel  := GESTURE_ACTIONS.Has(CurrentAction) ? _GestureActionLabel(CurrentAction) : t("dialog.action_picker.disabled")
-		EntryLabel    := SlotLabel . " : " . CurrentLabel
-		RegisterMenuItem(GMenu, EntryLabel, ((_s, _l) => (*) => ShowActionPicker(_l, GestureAssignments.Has(_s) ? GestureAssignments[_s] : "none", (Id) => SetGestureSlotAction(_s, Id)))(Slot, SlotLabel))
+		CurrentLabel  := GESTURE_ACTIONS.Has(CurrentAction)
+			? _GestureActionLabel(CurrentAction)
+			: t("dialog.action_picker.disabled")
+		EntryLabel := SlotLabel . " : " . CurrentLabel
+		RegisterMenuItem(M, EntryLabel, ((_s, _l) => (*) => ShowActionPicker(_l,
+			GestureAssignments.Has(_s) ? GestureAssignments[_s] : "none",
+			(Id) => SetGestureSlotAction(_s, Id)))(Slot, SlotLabel))
 		if !GestEnabled
-			GMenu.Disable(EntryLabel)
+			M.Disable(EntryLabel)
 	}
+}
 
-	return GMenu
+; Dynamic handlers for each finger group.
+_GES_Slots2(M, _Cat) {
+	_GES_RenderSlots(M, "2")
+}
+_GES_Slots3(M, _Cat) {
+	_GES_RenderSlots(M, "3")
+}
+_GES_Slots4(M, _Cat) {
+	_GES_RenderSlots(M, "4")
+}
+_GES_Slots5(M, _Cat) {
+	_GES_RenderSlots(M, "5")
 }
 
 ; Applies a new action to a gesture slot and reloads.
@@ -565,112 +596,669 @@ AddCategoryToggleItem(menu, on_label, off_label, is_enabled, on_click) {
 ; open, no shortcut binding takes effect.
 BuildMetricsMenu() {
 	global A_TrayMenu
-	MetricsMenu := Menu()
-
 	enabled := MetricsShortcuts.enabled
-	typing_label := t("menu.metrics.show_typing")
-	apps_label   := t("menu.metrics.show_apps")
-	; A trailing zero-width space differentiates the second « ↳ Raccourci :
-	; Aucun » entry from the first — AHK's tray menu uses the label as a
-	; unique key and would silently merge two identical strings into one.
-	typing_sc := t("menu.metrics.shortcut_prefix") . MS_GetDisplayLabel("typing")
-	apps_sc   := t("menu.metrics.shortcut_prefix") . MS_GetDisplayLabel("apps") . Chr(0x200B)
 
-	; Route the Metrics typing/apps toggles through the menu-dispatcher
-	; bypass (lib/menu_dispatcher.ahk) so AHK's random callback drops are
-	; auto-recovered via the WM_COMMAND retry timer — these rows are
-	; clicked often enough that the drop is user-visible.
-	RegisterMenuItem(MetricsMenu, typing_label, (*) => KLUI_ToggleTyping())
-	RegisterMenuItem(MetricsMenu, typing_sc, (*) => MS_PromptShortcut("typing", KLUI_ToggleTyping))
-	MetricsMenu.Add() ; separator
-	RegisterMenuItem(MetricsMenu, apps_label, (*) => KLUI_ToggleApps())
-	RegisterMenuItem(MetricsMenu, apps_sc, (*) => MS_PromptShortcut("apps", KLUI_ToggleApps))
+	; Dynamic handlers — each populates the MetricsMenu in place.
+	; Closures over ``enabled`` and the label locals below capture the state
+	; at build time, matching the previous per-item Disable() calls.
 
-	MetricsMenu.Add()
-	privacy_header := MenuSectionTitle(t("menu.metrics.privacy_header"))
-	MetricsMenu.Add(privacy_header, (*) => "")
-	MetricsMenu.Disable(privacy_header)
+	DynHandlers := Map(
+		"show_typing", _MET_ShowTyping,
+		"shortcut_typing", _MET_ShortcutTyping,
+		"show_apps", _MET_ShowApps,
+		"shortcut_apps", _MET_ShortcutApps,
+		"filter_private", _MET_FilterPrivate,
+		"filter_secure", _MET_FilterSecure,
+		"filter_sysauth", _MET_FilterSysauth,
+		"exclude_apps", _MET_ExcludeApps,
+		"wpm_widget", _MET_WpmWidget,
+		"widget_colors", _MET_WpmWidgetColors,
+		"include_realtime", _MET_WpmWidgetGraph,
+		"reset_wpm_position", _MET_WpmWidgetReset,
+		"encryption", _MET_Encryption,
+	)
 
-	private_label := t("menu.metrics.filter_private")
-	RegisterMenuItem(MetricsMenu, private_label, ToggleFilterPrivate)
-	if MetricsFilters.private_browsing
-		MetricsMenu.Check(private_label)
-
-	secure_label := t("menu.metrics.filter_secure")
-	RegisterMenuItem(MetricsMenu, secure_label, ToggleFilterSecureField)
-	if MetricsFilters.secure_field
-		MetricsMenu.Check(secure_label)
-
-	sysauth_label := t("menu.metrics.filter_sysauth")
-	RegisterMenuItem(MetricsMenu, sysauth_label, ToggleFilterSystemAuth)
-	if MetricsFilters.system_auth
-		MetricsMenu.Check(sysauth_label)
-
-	; App exclusion entry — label reflects the count, click opens the
-	; reusable AppPicker Gui. Mirror of HS « Désactivé dans N application(s) ».
-	n := MF_DisabledCount()
-	excl_label := (n > 0)
-		? t("menu.metrics.disabled_in_prefix") . n . (n > 1 ? t("menu.metrics.disabled_in_suffix_p") : t("menu.metrics.disabled_in_suffix_s"))
-		: t("menu.metrics.exclude_apps")
-	RegisterMenuItem(MetricsMenu, excl_label, OpenMetricsAppPicker)
-
-	; ── Real-time WPM display ──────────────────────────────────────────────
-	; Note: "Show WPM in menu bar" is macOS-only — Windows has no system menu
-	; bar. The floating widget below is the Windows equivalent.
-	MetricsMenu.Add()
-	WpmWidgetLabel        := t("menu.metrics.show_wpm_widget")
-	WpmWidgetColorsLabel  := t("menu.metrics.colors_by_source")
-	WpmWidgetGraphLabel   := t("menu.metrics.include_realtime")
-	WpmWidgetResetLabel   := t("menu.metrics.reset_wpm_position")
-
-	; Fat-arrow lambdas capture their enclosing locals by reference in AHK v2,
-	; so passing them directly is simpler and more reliable than IIFE patterns,
-	; which AHK does not support across line breaks.
-	RegisterMenuItem(MetricsMenu, WpmWidgetLabel,        (*) => _ToggleWpmWidget(MetricsMenu, WpmWidgetLabel, WpmWidgetColorsLabel, WpmWidgetGraphLabel))
-	RegisterMenuItem(MetricsMenu, WpmWidgetColorsLabel,  (*) => _ToggleWpmWidgetColors(MetricsMenu, WpmWidgetColorsLabel))
-	RegisterMenuItem(MetricsMenu, WpmWidgetGraphLabel,   (*) => _ToggleWpmWidgetGraph(MetricsMenu, WpmWidgetGraphLabel))
-	RegisterMenuItem(MetricsMenu, WpmWidgetResetLabel,   (*) => WPMWidget_ResetPosition())
-
-	if WPMWidget.visible
-		MetricsMenu.Check(WpmWidgetLabel)
-	if WPMWidget.visible && WPMWidget.use_colors
-		MetricsMenu.Check(WpmWidgetColorsLabel)
-	if WPMWidget.visible && WPMWidget.show_graph
-		MetricsMenu.Check(WpmWidgetGraphLabel)
-
-	; Sub-options are disabled when their parent toggle is off.
-	if !WPMWidget.visible {
-		MetricsMenu.Disable(WpmWidgetColorsLabel)
-		MetricsMenu.Disable(WpmWidgetGraphLabel)
-		MetricsMenu.Disable(WpmWidgetResetLabel)
-	}
-
-	if !enabled {
-		MetricsMenu.Disable(typing_label)
-		MetricsMenu.Disable(typing_sc)
-		MetricsMenu.Disable(apps_label)
-		MetricsMenu.Disable(apps_sc)
-		MetricsMenu.Disable(private_label)
-		MetricsMenu.Disable(secure_label)
-		MetricsMenu.Disable(sysauth_label)
-		MetricsMenu.Disable(excl_label)
-		MetricsMenu.Disable(WpmWidgetLabel)
-		MetricsMenu.Disable(WpmWidgetColorsLabel)
-		MetricsMenu.Disable(WpmWidgetGraphLabel)
-		MetricsMenu.Disable(WpmWidgetResetLabel)
-	}
+	MetricsMenu := MenuRenderer_Build("metrics_menu", "Metrics", DynHandlers)
 
 	A_TrayMenu.Add(t("menu.metrics.title"), MetricsMenu)
-	; Aligned with the canonical ✅/❌ pattern used by every other
-	; category submenu. The security-warning dialog still fires inside
-	; ToggleMetricsEnabled() before flipping ON, so the privacy
-	; safeguard stays in place — the icon change is purely cosmetic.
+	; Category toggle appended last so it lands at position 1 via Insert.
 	AddCategoryToggleItem(MetricsMenu,
 		t("menu.metrics.on"),
 		t("menu.metrics.off"),
 		MetricsShortcuts.enabled,
 		(*) => ToggleMetricsEnabled())
 }
+
+; Dynamic handler: Show Typing button.
+_MET_ShowTyping(M, _Cat) {
+	Label := t("menu.metrics.show_typing")
+	RegisterMenuItem(M, Label, (*) => KLUI_ToggleTyping())
+	if !MetricsShortcuts.enabled
+		M.Disable(Label)
+}
+
+; Dynamic handler: Typing shortcut picker (label with ZWS to avoid duplicate key clash).
+_MET_ShortcutTyping(M, _Cat) {
+	Label := t("menu.metrics.shortcut_prefix") . MS_GetDisplayLabel("typing")
+	RegisterMenuItem(M, Label, (*) => MS_PromptShortcut("typing", KLUI_ToggleTyping))
+	if !MetricsShortcuts.enabled
+		M.Disable(Label)
+}
+
+; Dynamic handler: Show Apps button.
+_MET_ShowApps(M, _Cat) {
+	Label := t("menu.metrics.show_apps")
+	RegisterMenuItem(M, Label, (*) => KLUI_ToggleApps())
+	if !MetricsShortcuts.enabled
+		M.Disable(Label)
+}
+
+; Dynamic handler: Apps shortcut picker (ZWS differentiates from typing sc label).
+_MET_ShortcutApps(M, _Cat) {
+	Label := t("menu.metrics.shortcut_prefix") . MS_GetDisplayLabel("apps") . Chr(0x200B)
+	RegisterMenuItem(M, Label, (*) => MS_PromptShortcut("apps", KLUI_ToggleApps))
+	if !MetricsShortcuts.enabled
+		M.Disable(Label)
+}
+
+; Dynamic handler: Filter private browsing toggle.
+_MET_FilterPrivate(M, _Cat) {
+	Label := t("menu.metrics.filter_private")
+	RegisterMenuItem(M, Label, ToggleFilterPrivate)
+	if MetricsFilters.private_browsing
+		M.Check(Label)
+	if !MetricsShortcuts.enabled
+		M.Disable(Label)
+}
+
+; Dynamic handler: Filter secure field toggle.
+_MET_FilterSecure(M, _Cat) {
+	Label := t("menu.metrics.filter_secure")
+	RegisterMenuItem(M, Label, ToggleFilterSecureField)
+	if MetricsFilters.secure_field
+		M.Check(Label)
+	if !MetricsShortcuts.enabled
+		M.Disable(Label)
+}
+
+; Dynamic handler: Filter system auth toggle.
+_MET_FilterSysauth(M, _Cat) {
+	Label := t("menu.metrics.filter_sysauth")
+	RegisterMenuItem(M, Label, ToggleFilterSystemAuth)
+	if MetricsFilters.system_auth
+		M.Check(Label)
+	if !MetricsShortcuts.enabled
+		M.Disable(Label)
+}
+
+; Dynamic handler: App exclusion — label reflects current count.
+_MET_ExcludeApps(M, _Cat) {
+	n := MF_DisabledCount()
+	Label := (n > 0)
+		? t("menu.metrics.disabled_in_prefix") . n . (n > 1 ? t("menu.metrics.disabled_in_suffix_p") : t("menu.metrics.disabled_in_suffix_s"))
+		: t("menu.metrics.exclude_apps")
+	RegisterMenuItem(M, Label, OpenMetricsAppPicker)
+	if !MetricsShortcuts.enabled
+		M.Disable(Label)
+}
+
+; Dynamic handler: WPM floating widget toggle.
+_MET_WpmWidget(M, _Cat) {
+	Label := t("menu.metrics.show_wpm_widget")
+	ColorsLabel := t("menu.metrics.colors_by_source")
+	GraphLabel  := t("menu.metrics.include_realtime")
+	RegisterMenuItem(M, Label, (*) => _ToggleWpmWidget(M, Label, ColorsLabel, GraphLabel))
+	if WPMWidget.visible
+		M.Check(Label)
+	if !MetricsShortcuts.enabled
+		M.Disable(Label)
+}
+
+; Dynamic handler: Widget colors-by-source sub-option.
+_MET_WpmWidgetColors(M, _Cat) {
+	Label := t("menu.metrics.colors_by_source")
+	RegisterMenuItem(M, Label, (*) => _ToggleWpmWidgetColors(M, Label))
+	if WPMWidget.visible && WPMWidget.use_colors
+		M.Check(Label)
+	if !WPMWidget.visible or !MetricsShortcuts.enabled
+		M.Disable(Label)
+}
+
+; Dynamic handler: Include realtime graph sub-option.
+_MET_WpmWidgetGraph(M, _Cat) {
+	Label := t("menu.metrics.include_realtime")
+	RegisterMenuItem(M, Label, (*) => _ToggleWpmWidgetGraph(M, Label))
+	if WPMWidget.visible && WPMWidget.show_graph
+		M.Check(Label)
+	if !WPMWidget.visible or !MetricsShortcuts.enabled
+		M.Disable(Label)
+}
+
+; Dynamic handler: Reset WPM widget position.
+_MET_WpmWidgetReset(M, _Cat) {
+	Label := t("menu.metrics.reset_wpm_position")
+	RegisterMenuItem(M, Label, (*) => WPMWidget_ResetPosition())
+	if !WPMWidget.visible or !MetricsShortcuts.enabled
+		M.Disable(Label)
+}
+
+; Dynamic handler: encryption toggle + open encryptor app.
+; Ported from macOS (previously absent on Windows).
+_MET_Encryption(M, _Cat) {
+	EncLabel     := t("menu.metrics.encrypt_toggle")
+	EncOpenLabel := t("menu.metrics.open_encryptor")
+
+	; Encryption toggle
+	RegisterMenuItem(M, EncLabel, (*) => _MET_DoEncryptionToggle())
+	if MetricsEncryption.enabled
+		M.Check(EncLabel)
+	if !MetricsShortcuts.enabled
+		M.Disable(EncLabel)
+
+	; Open Encryptor application
+	RegisterMenuItem(M, EncOpenLabel, (*) => _MET_OpenEncryptorApp())
+	if !MetricsShortcuts.enabled
+		M.Disable(EncOpenLabel)
+}
+
+; Toggle encryption state — prompts for confirmation and password, then
+; batch-processes existing log files. Mirrors the macOS implementation.
+_MET_DoEncryptionToggle() {
+	global MetricsEncryption, _LogDir
+
+	if !MetricsEncryption.enabled {
+		; Confirm intent before encrypting
+		Res := MetricsEncryptionConfirmDialog("encrypt")
+		if (Res != "encrypt")
+			return
+
+		Pwd := MetricsEncryptionPromptPassword("encrypt")
+		if (Pwd == "")
+			return
+
+		MetricsEncryption.enabled := true
+		WriteFeatureUpdate("Metrics.Encrypt", true)
+
+		Files := _MET_CollectLogFiles("\.log\.gz$", "\.enc$")
+		if (Files.Length > 0) {
+			MetricsEncryptFiles(Files, Pwd)
+		}
+	} else {
+		; Confirm intent before decrypting
+		Res := MetricsEncryptionConfirmDialog("decrypt")
+		if (Res != "decrypt")
+			return
+
+		Pwd := MetricsEncryptionPromptPassword("decrypt")
+		if (Pwd == "")
+			return
+
+		MetricsEncryption.enabled := false
+		WriteFeatureUpdate("Metrics.Encrypt", false)
+
+		Files := _MET_CollectLogFiles("\.enc$", "")
+		if (Files.Length > 0) {
+			MetricsEncryptFiles(Files, Pwd, false)
+		}
+	}
+	Reload
+}
+
+; Collect files in the log directory matching Pattern and not matching Exclude.
+; Returns an Array of full file paths.
+_MET_CollectLogFiles(Pattern, Exclude) {
+	global _LogDir
+	Files := []
+	if !DirExist(_LogDir)
+		return Files
+	Loop Files _LogDir . "\*", "F" {
+		if !RegExMatch(A_LoopFileName, Pattern)
+			continue
+		if (Exclude != "" and RegExMatch(A_LoopFileName, Exclude))
+			continue
+		Files.Push(A_LoopFileFullPath)
+	}
+	return Files
+}
+
+; Open the standalone Encryptor application if it exists.
+_MET_OpenEncryptorApp() {
+	global _StaticDir
+	AppPath := _StaticDir . "\utils\encryptor\Encryptor.exe"
+	if FileExist(AppPath) {
+		try Run(AppPath)
+	} else {
+		MsgBox(t("dialog.metrics.encryptor_error_body"), t("dialog.metrics.encryptor_error_title"), "OK Icon!")
+	}
+}
+
+
+; ── Layout dynamic handlers ────────────────────────────────────────────────────
+
+; Dynamic handler: iterate ``ahk.layout`` manifest section and add each entry.
+_LAY_LayoutFeatures(M, _Cat) {
+	for LayoutEntry in ManifestFeaturesForSection("ahk.layout") {
+		MenuAddItemFromManifest(M, LayoutEntry, "Layout")
+	}
+}
+
+
+; ── Hotstrings dynamic handlers ────────────────────────────────────────────────
+
+; Compute the grand total count used in the tray menu title label.
+; Sums enabled standard, ergopti, dynamic, personal and extension entries.
+_HS_ComputeGrandTotal() {
+	global Features, HotstringCategoriesStd, HotstringCategoriesErgopti
+	global ScriptInformation, _ExtTotalPersonalCounterGlobal
+	IsGated := IsCategoryGated("Hotstrings")
+	CountFn := IsGated ? _CountEnabledForCategory : _CountAllForCategory
+	Total := 0
+	for Cat in HotstringCategoriesStd
+		Total += CountFn(Cat)
+	for Cat in HotstringCategoriesErgopti
+		Total += CountFn(Cat)
+	if Features.Has("hotstrings") and Features["hotstrings"].Has("dynamic") {
+		for DKey, DCfg in Features["hotstrings"]["dynamic"] {
+			if IsGated {
+				if (IsObject(DCfg) and DCfg.Has("enabled") and DCfg["enabled"])
+					Total += CountDynamicSection(DKey)
+			} else {
+				if IsObject(DCfg)
+					Total += CountDynamicSection(DKey)
+			}
+		}
+	}
+	PersonalTomlPath := IsSet(ScriptInformation) ? ScriptInformation.Get("PersonalTomlPath", "") : ""
+	if (PersonalTomlPath != "" and FileExist(PersonalTomlPath)) {
+		TomlData := ReadPersonalToml()
+		for _, SecData in TomlData["sections"]
+			Total += SecData["entries"].Length
+	}
+	Total += IsObject(_ExtTotalPersonalCounterGlobal) ? _ExtTotalPersonalCounterGlobal.value : 0
+	return Total
+}
+
+; Dynamic handler: magic key config entry (prefix + current char + editor).
+_HS_MagicKeyConfig(M, _Cat) {
+	RegisterMenuItem(M, t("menu.hotstrings.magic_key_prefix") . ScriptInformation["MagicKey"], MagicKeyEditor)
+}
+
+; Dynamic handler: standard hotstring categories.
+_HS_CategoriesStandard(M, _Cat) {
+	global HotstringCategoriesStd, SubMenus, Features
+	IsGated := IsCategoryGated("Hotstrings")
+	CountFn := IsGated ? _CountEnabledForCategory : _CountAllForCategory
+	StdTotal := 0
+	for Cat in HotstringCategoriesStd
+		StdTotal += CountFn(Cat)
+	DynTotal := 0
+	if Features.Has("hotstrings") and Features["hotstrings"].Has("dynamic") {
+		for DKey, DCfg in Features["hotstrings"]["dynamic"] {
+			if IsGated {
+				if (IsObject(DCfg) and DCfg.Has("enabled") and DCfg["enabled"])
+					DynTotal += CountDynamicSection(DKey)
+			} else {
+				if IsObject(DCfg)
+					DynTotal += CountDynamicSection(DKey)
+			}
+		}
+	}
+	StdTotal += DynTotal
+	; Section header is rendered by the manifest (section_header type), so
+	; we only need to add the actual category submenus here.
+	for Category in HotstringCategoriesStd {
+		if !SubMenus.Has(Category)
+			continue
+		Total := CountFn(Category)
+		Title := GetCategoryTitle(Category) . " (" . FmtCount(Total) . ")"
+		M.Add(Title, SubMenus[Category])
+		if IsGated and _IsCategoryFullyEnabled(Category)
+			M.Check(Title)
+	}
+}
+
+; Dynamic handler: dynamic hotstrings category.
+_HS_CategoriesDynamic(M, _Cat) {
+	global SubMenus, Features
+	if !Features.Has("hotstrings") or !Features["hotstrings"].Has("dynamic")
+		return
+	if !SubMenus.Has("DynamicHotstrings")
+		return
+	IsGated := IsCategoryGated("Hotstrings")
+	DynMenu := SubMenus["DynamicHotstrings"]
+	DynTotal := 0
+	for DKey, DCfg in Features["hotstrings"]["dynamic"] {
+		if IsGated {
+			if (IsObject(DCfg) and DCfg.Has("enabled") and DCfg["enabled"])
+				DynTotal += CountDynamicSection(DKey)
+		} else {
+			if IsObject(DCfg)
+				DynTotal += CountDynamicSection(DKey)
+		}
+	}
+	DynTitle := GetCategoryTitle("DynamicHotstrings") . " (" . FmtCount(DynTotal) . ")"
+	M.Add(DynTitle, DynMenu)
+	DynAllEnabled := true
+	DynCount := 0
+	for _, DCfg2 in Features["hotstrings"]["dynamic"] {
+		DynCount++
+		if (IsObject(DCfg2) and DCfg2.Has("enabled") and !DCfg2["enabled"])
+			DynAllEnabled := false
+	}
+	if IsGated and DynAllEnabled and DynCount > 0
+		M.Check(DynTitle)
+}
+
+; Dynamic handler: Ergopti-specific hotstring categories.
+_HS_CategoriesErgopti(M, _Cat) {
+	global HotstringCategoriesErgopti, SubMenus
+	IsGated := IsCategoryGated("Hotstrings")
+	CountFn := IsGated ? _CountEnabledForCategory : _CountAllForCategory
+	for Category in HotstringCategoriesErgopti {
+		if !SubMenus.Has(Category)
+			continue
+		Total := CountFn(Category)
+		Title := GetCategoryTitle(Category) . " (" . FmtCount(Total) . ")"
+		M.Add(Title, SubMenus[Category])
+		if IsGated and _IsCategoryFullyEnabled(Category)
+			M.Check(Title)
+	}
+}
+
+; Dynamic handler: personal hotstrings (personal_hotstrings.toml + ext tree).
+_HS_Personal(M, _Cat) {
+	global ScriptInformation, Features
+	IsGated := IsCategoryGated("Hotstrings")
+	TotalPersonal := 0
+	PersonalTomlData := false
+	PersonalTomlPath := IsSet(ScriptInformation) ? ScriptInformation.Get("PersonalTomlPath", "") : ""
+	if (PersonalTomlPath != "" and FileExist(PersonalTomlPath)) {
+		PersonalTomlData := ReadPersonalToml()
+		for _, SecData in PersonalTomlData["sections"]
+			TotalPersonal += SecData["entries"].Length
+	}
+
+	ExtTotalCounter := { value: 0 }
+	PersonalExtTree := Map()
+
+	_HS_GetOrCreateNode(Root, PathParts) {
+		if (PathParts.Length == 0) {
+			if !Root.Has("")
+				Root[""] := Map("subfolders", Map(), "tomls", [])
+			return Root[""]
+		}
+		Tree := Root
+		for Part in PathParts {
+			if !Tree.Has(Part)
+				Tree[Part] := Map("subfolders", Map(), "tomls", [])
+			Node := Tree[Part]
+			Tree := Node["subfolders"]
+		}
+		return Node
+	}
+
+	if IsSet(ScriptInformation) and ScriptInformation.Has("PersonalHotstringsDir") {
+		HsDir := ScriptInformation["PersonalHotstringsDir"]
+		if DirExist(HsDir) {
+			_HS_ScanExt(CurrentDir, PathParts) {
+				Loop Files CurrentDir . "\*", "DF" {
+					if (A_LoopFileAttrib ~= "D") {
+						NewParts := PathParts.Clone()
+						NewParts.Push(A_LoopFileName)
+						_HS_ScanExt(A_LoopFileFullPath, NewParts)
+					} else if (A_LoopFileName ~= "i)\.toml$") {
+						if (PathParts.Length == 0 and A_LoopFileName == "personal_hotstrings.toml")
+							continue
+						SplitPath A_LoopFileFullPath, , , , &ExtStem
+						FileSections := _ParseExtTomlSections(A_LoopFileFullPath)
+						FileCount := 0
+						for _, FS in FileSections
+							FileCount += FS["count"]
+						Node := _HS_GetOrCreateNode(PersonalExtTree, PathParts)
+						Node["tomls"].Push({ path: A_LoopFileFullPath, stem: ExtStem, sections: FileSections, count: FileCount })
+						ExtTotalCounter.value += FileCount
+					}
+				}
+			}
+			_HS_ScanExt(RegExReplace(HsDir, "[/\\]+$"), [])
+		}
+	}
+
+	global _ExtTotalPersonalCounterGlobal := ExtTotalCounter
+
+	if (PersonalTomlData != false) {
+		TomlData := PersonalTomlData
+		PersonalMenu := Menu()
+		RegisterMenuItem(PersonalMenu, t("menu.hotstrings.open_editor"), (*) => OpenPersonalEditor())
+		RegisterMenuItem(PersonalMenu, t("menu.hotstrings.open_file"), _MakeOpenFileFn(PersonalTomlPath))
+		PersonalMenu.Add()
+		ShortcutLabel := t("menu.hotstrings.shortcut_prefix") . ScriptInformation["MagicKey"]
+		PersonalMenu.Add(ShortcutLabel, (*) => NoAction())
+		PersonalMenu.Disable(ShortcutLabel)
+		CurDefaultSec := _EditorPrefGet("DefaultSection", "")
+		DefaultSectionMenu := Menu()
+		RegisterMenuItem(DefaultSectionMenu, t("menu.hotstrings.default_none"),
+			(*) => _SetPersonalDefaultSection("", PersonalMenu, TomlData, DefaultSectionMenu))
+		if (CurDefaultSec == "")
+			DefaultSectionMenu.Check(t("menu.hotstrings.default_none"))
+		DefaultSectionMenu.Add()
+		for _, SecName in TomlData["sections_order"] {
+			if (SecName == "-")
+				continue
+			SecData  := TomlData["sections"][SecName]
+			SecLabel := SecData["description"]
+			RegisterMenuItem(DefaultSectionMenu, SecLabel,
+				_MakeSetDefaultSectionFn(SecName, PersonalMenu, TomlData, DefaultSectionMenu))
+			if (CurDefaultSec == SecName)
+				DefaultSectionMenu.Check(SecLabel)
+		}
+		CurDefaultLabel := (CurDefaultSec == "") ? t("menu.hotstrings.default_none")
+			: (TomlData["sections"].Has(CurDefaultSec) ? TomlData["sections"][CurDefaultSec]["description"] : CurDefaultSec)
+		global _PrevDefaultLabel := CurDefaultLabel
+		PersonalMenu.Add(t("menu.hotstrings.default_category_prefix") . CurDefaultLabel, DefaultSectionMenu)
+		CloseOnAddLabel := t("menu.hotstrings.close_on_add")
+		RegisterMenuItem(PersonalMenu, CloseOnAddLabel, (*) => _TogglePersonalCloseOnAdd(PersonalMenu))
+		if (_EditorPrefGet("CloseOnAdd", "1") == "1")
+			PersonalMenu.Check(CloseOnAddLabel)
+		if (TomlData["sections_order"].Length > 0) {
+			PersonalMenu.Add()
+			for _, SecName in TomlData["sections_order"] {
+				if (SecName == "-") {
+					PersonalMenu.Add()
+					continue
+				}
+				if !TomlData["sections"].Has(SecName)
+					continue
+				SecData  := TomlData["sections"][SecName]
+				SecLabel := SecData["description"] . " (" . FmtCount(SecData["entries"].Length) . ")"
+				MenuAddItemWithLabel(PersonalMenu, "Personal." . SecName, SecLabel, "Hotstrings")
+			}
+		}
+		PersonalActiveCount := 0
+		PersonalAllEnabled  := true
+		PersonalSectionCount := 0
+		for _, SecName2 in TomlData["sections_order"] {
+			if (SecName2 == "-" or !TomlData["sections"].Has(SecName2))
+				continue
+			PersonalSectionCount++
+			PV2Id    := StrLower(SecName2)
+			PEnabled := Features["hotstrings"].Has("personal")
+				and Features["hotstrings"]["personal"].Has(PV2Id)
+				and Features["hotstrings"]["personal"][PV2Id]["enabled"]
+			if PEnabled
+				PersonalActiveCount += TomlData["sections"][SecName2]["entries"].Length
+			else
+				PersonalAllEnabled := false
+		}
+		PersonalTitle := GetCategoryTitle("Personal") . " (" . FmtCount(PersonalActiveCount) . ")"
+		M.Add(PersonalTitle, PersonalMenu)
+		if IsGated and PersonalAllEnabled and PersonalSectionCount > 0
+			M.Check(PersonalTitle)
+	}
+
+	; Render recursive ext tree (nested folder structure)
+	_HS_RenderTree(Tree, ParentMenu) {
+		FolderNames := []
+		for FolderName in Tree
+			FolderNames.Push(FolderName)
+		loop FolderNames.Length {
+			i := A_Index
+			loop FolderNames.Length - i {
+				j := A_Index
+				if (StrCompare(FolderNames[j], FolderNames[j+1]) > 0) {
+					tmp := FolderNames[j]
+					FolderNames[j] := FolderNames[j+1]
+					FolderNames[j+1] := tmp
+				}
+			}
+		}
+		for FolderName in FolderNames {
+			Node := Tree[FolderName]
+			FolderMenu := Menu()
+			FileNodeList := Node["tomls"]
+			loop FileNodeList.Length {
+				i := A_Index
+				loop FileNodeList.Length - i {
+					j := A_Index
+					if (StrCompare(FileNodeList[j].stem, FileNodeList[j+1].stem) > 0) {
+						tmp := FileNodeList[j]
+						FileNodeList[j] := FileNodeList[j+1]
+						FileNodeList[j+1] := tmp
+					}
+				}
+			}
+			if (Node["subfolders"].Count > 0)
+				_HS_RenderTree(Node["subfolders"], FolderMenu)
+			if (Node["subfolders"].Count > 0 and FileNodeList.Length > 0)
+				FolderMenu.Add()
+			for TF in FileNodeList {
+				TFMenu := Menu()
+				RegisterMenuItem(TFMenu, t("menu.hotstrings.open_file"), _MakeOpenFileFn(TF.path))
+				if (TF.sections.Length > 0) {
+					TFMenu.Add()
+					for _, ES in TF.sections {
+						SecLabel := ES["description"] . " (" . FmtCount(ES["count"]) . ")"
+						TFMenu.Add(SecLabel, (*) => NoAction())
+						TFMenu.Disable(SecLabel)
+					}
+				}
+				FolderMenu.Add(TF.stem . (TF.count > 0 ? " (" . FmtCount(TF.count) . ")" : ""), TFMenu)
+			}
+			ParentMenu.Add(FolderName, FolderMenu)
+		}
+	}
+
+	RootNode := false
+	if PersonalExtTree.Has("") {
+		RootNode := PersonalExtTree[""]
+		PersonalExtTree.Delete("")
+	}
+	_HS_RenderTree(PersonalExtTree, M)
+	if (RootNode != false) {
+		FileNodeList := RootNode["tomls"]
+		loop FileNodeList.Length {
+			i := A_Index
+			loop FileNodeList.Length - i {
+				j := A_Index
+				if (StrCompare(FileNodeList[j].stem, FileNodeList[j+1].stem) > 0) {
+					tmp := FileNodeList[j]
+					FileNodeList[j] := FileNodeList[j+1]
+					FileNodeList[j+1] := tmp
+				}
+			}
+		}
+		for TF in FileNodeList {
+			TFMenu := Menu()
+			RegisterMenuItem(TFMenu, t("menu.hotstrings.open_file"), _MakeOpenFileFn(TF.path))
+			if (TF.sections.Length > 0) {
+				TFMenu.Add()
+				for _, ES in TF.sections {
+					SecLabel := ES["description"] . " (" . FmtCount(ES["count"]) . ")"
+					TFMenu.Add(SecLabel, (*) => NoAction())
+					TFMenu.Disable(SecLabel)
+				}
+			}
+			M.Add(TF.stem . (TF.count > 0 ? " (" . FmtCount(TF.count) . ")" : ""), TFMenu)
+		}
+	}
+}
+
+; Dynamic handler: bundled extension hotstrings.
+_HS_Extensions(M, _Cat) {
+	global _StaticDir
+	ExtensionsBaseDir := _StaticDir . "\extensions\"
+	BundledExtensions := []
+	ExtTotal := 0
+	if DirExist(ExtensionsBaseDir) {
+		Loop Files ExtensionsBaseDir . "*", "D" {
+			ExtId          := A_LoopFileName
+			ExtDir         := A_LoopFileFullPath
+			ManifestPath   := ExtDir . "\manifest.toml"
+			ExtDisplayName := ExtId
+			if FileExist(ManifestPath) {
+				try {
+					MC := FileRead(ManifestPath, "UTF-8")
+					if RegExMatch(MC, "name\s*=\s*`"([^`"]+)`"", &NM)
+						ExtDisplayName := NM[1]
+				}
+			}
+			HsDir     := ExtDir . "\hotstrings\"
+			TomlFiles := []
+			if DirExist(HsDir) {
+				Loop Files HsDir . "*.toml" {
+					FileSections := _ParseExtTomlSections(A_LoopFileFullPath)
+					FileCount := 0
+					for _, FS in FileSections
+						FileCount += FS["count"]
+					ExtTotal += FileCount
+					SplitPath A_LoopFileFullPath, , , , &FileStem
+					TomlFiles.Push({ path: A_LoopFileFullPath, stem: FileStem
+						, sections: FileSections, count: FileCount })
+				}
+			}
+			BundledExtensions.Push({ id: ExtId, name: ExtDisplayName, toml_files: TomlFiles })
+		}
+	}
+	if (BundledExtensions.Length == 0) {
+		EmptyLabel := t("menu.extensions.empty")
+		M.Add(EmptyLabel, (*) => NoAction())
+		M.Disable(EmptyLabel)
+	} else {
+		for _, Ext in BundledExtensions {
+			ExtHsMenu    := Menu()
+			ExtTotalForExt := 0
+			for _, TF in Ext.toml_files
+				ExtTotalForExt += TF.count
+			if (Ext.toml_files.Length == 0) {
+				NoHsLabel := t("menu.extensions.empty")
+				ExtHsMenu.Add(NoHsLabel, (*) => NoAction())
+				ExtHsMenu.Disable(NoHsLabel)
+			} else {
+				for _, TF in Ext.toml_files {
+					TFMenu := Menu()
+					RegisterMenuItem(TFMenu, t("menu.hotstrings.open_file"), _MakeOpenFileFn(TF.path))
+					if (TF.sections.Length == 0) {
+						TFMenu.Add()
+						NoSecLabel := t("menu.extensions.empty")
+						TFMenu.Add(NoSecLabel, (*) => NoAction())
+						TFMenu.Disable(NoSecLabel)
+					} else {
+						TFMenu.Add()
+						for _, Sec in TF.sections {
+							SecLabel := Sec["description"] . " (" . FmtCount(Sec["count"]) . ")"
+							TFMenu.Add(SecLabel, (*) => NoAction())
+							TFMenu.Disable(SecLabel)
+						}
+					}
+					TFTitle := TF.stem . (TF.count > 0 ? " (" . FmtCount(TF.count) . ")" : "")
+					ExtHsMenu.Add(TFTitle, TFMenu)
+				}
+			}
+			M.Add(Ext.name . (ExtTotalForExt > 0 ? " (" . FmtCount(ExtTotalForExt) . ")" : ""), ExtHsMenu)
+		}
+	}
+}
+
 
 ; ── Filter toggles. Each persists + flips the corresponding flag and
 ; triggers a Reload so the menu rerenders with the new checkmark state
@@ -1105,51 +1693,89 @@ global _SHORTCUTS_SUBMAP_V1V2 := Map(
 	"LAltCapsLock",  "ahk.shortcuts.lalt_caps_lock",
 )
 
-; Build the Shortcuts submenu directly from the manifest:
-;
-;   ⌨️ Raccourcis
-;     ↳ Accents (4 letter pickers — EGrave/ECirc/EAcute/AGrave)
-;     ↳ WrapTextIfSelected (plain bool toggle)
-;     ↳ Modifier combos (3 sub-Maps × 10 plain bools each)
-;     ↳ (Personal — only when user has personal shortcuts)
-;
-; The "Modifier combos" submenu must use the exact i18n label
-; ``t("menu.shortcuts.group_modifiers")`` — initMenu's
-; InsertKeyboardShortcutGroups call uses it as the InsertBefore anchor
-; when splicing the Alt/Ctrl/Ctrl+Shift/Win shortcut groups into the
-; Shortcuts menu.
+; Build the Shortcuts submenu from the manifest-driven renderer.
+; Dynamic handlers supply the platform-specific blocks (personal shortcuts,
+; script control, extensions, edit action) that cannot be described in JSON.
 _BuildShortcutsSubmenu() {
-	global _SHORTCUTS_SUBMAP_V1V2
-	SubMenu := Menu()
+	global _StaticDir
 
-	; ── Instant screenshot toggle (bare ² key = SC029) ──────
-	; Controlled by the screen_instant feature flag, not a modifier-combo slot.
-	ScreenInstantEntry := ManifestFindEntryByPath("ahk.shortcuts.screen_instant")
-	if (ScreenInstantEntry != false) {
-		MenuAddItemFromManifest(SubMenu, ScreenInstantEntry, "Shortcuts")
-	}
+	DynHandlers := Map(
+		"personal_shortcuts",         _SC_Personal,
+		"script_control_shortcuts",   _SC_ScriptControl,
+		"extensions_shortcuts",       _SC_Extensions,
+		"edit_shortcuts",             _SC_EditAction,
+	)
 
-	; ── UIA symbol-wrap toggle ────────────────────────────────
-	; Independent of keyboard emulation — works via the InputHook pass-through.
-	WrapEntry := ManifestFindEntryByPath("shortcuts.wrap_text_if_selected")
-	if (WrapEntry != false) {
-		MenuAddItemFromManifest(SubMenu, WrapEntry, "Shortcuts")
-		; No separator here — InsertKeyboardShortcutGroups already inserts one
-		; just before the modifier combos anchor, which produces the visual break.
-	}
+	return MenuRenderer_Build("shortcuts_menu", "Shortcuts", DynHandlers)
+}
 
-	; ── Modifier combos virtual group ────────────────────────
-	ModifiersMenu := Menu()
-	for V1Group, V2Section in _SHORTCUTS_SUBMAP_V1V2 {
-		GroupSubmenu := Menu()
-		for Entry in ManifestFeaturesForSection(V2Section) {
-			MenuAddItemFromManifest(GroupSubmenu, Entry, "Shortcuts." . V1Group)
+; Dynamic handler: personal shortcuts submenu (if any registered).
+_SC_Personal(SubMenu, _Cat) {
+	_AppendPersonalShortcutsSubmenuIfAny(SubMenu)
+}
+
+; Dynamic handler: script control shortcuts submenu.
+_SC_ScriptControl(SubMenu, _Cat) {
+	SubMenu.Add(t("menu.shortcuts.script_shortcuts"), BuildScriptShortcutsMenu())
+}
+
+; Dynamic handler: extensions shortcuts submenus.
+_SC_Extensions(SubMenu, _Cat) {
+	global _StaticDir
+	ExtShortcutsBaseDir := _StaticDir . "\extensions\"
+	HasExtShortcuts := false
+	if DirExist(ExtShortcutsBaseDir) {
+		Loop Files ExtShortcutsBaseDir . "*", "D" {
+			MenuAhkPath := A_LoopFileFullPath . "\shortcuts\menu.ahk"
+			if FileExist(MenuAhkPath) {
+				HasExtShortcuts := true
+				break
+			}
 		}
-		ModifiersMenu.Add(V1Group, GroupSubmenu)
 	}
-	SubMenu.Add(t("menu.shortcuts.group_modifiers"), ModifiersMenu)
+	if !HasExtShortcuts {
+		return
+	}
+	SubMenu.Add()
+	ExtShortcutsHeader := MenuSectionTitle(t("menu.extensions.header"))
+	SubMenu.Add(ExtShortcutsHeader, (*) => NoAction())
+	SubMenu.Disable(ExtShortcutsHeader)
+	Loop Files ExtShortcutsBaseDir . "*", "D" {
+		ExtId       := A_LoopFileName
+		ExtDir      := A_LoopFileFullPath
+		MenuAhkPath := ExtDir . "\shortcuts\menu.ahk"
+		if !FileExist(MenuAhkPath)
+			continue
+		ExtName      := ExtId
+		ManifestPath := ExtDir . "\manifest.toml"
+		if FileExist(ManifestPath) {
+			try {
+				MC := FileRead(ManifestPath, "UTF-8")
+				if RegExMatch(MC, "name\s*=\s*`"([^`"]+)`"", &NM)
+					ExtName := NM[1]
+			}
+		}
+		ExtMenu   := Menu()
+		BuilderFn := "BuildExtMenu_" . StrReplace(ExtId, "-", "_")
+		if IsSet(%BuilderFn%) and HasMethod(%BuilderFn%) {
+			try {
+				%BuilderFn%(ExtMenu, ExtName)
+			} catch as Err {
+				LoggerWarn("Extensions", "BuildExtMenu for '{1}' threw: {2}.", ExtId, Err.Message)
+			}
+		} else {
+			LoggerWarn("Extensions", "No BuildExtMenu_{1} function found — menu.ahk not loaded?", StrReplace(ExtId, "-", "_"))
+			NaLabel := t("menu.extensions.empty")
+			ExtMenu.Add(NaLabel, (*) => NoAction())
+			ExtMenu.Disable(NaLabel)
+		}
+		SubMenu.Add(ExtName, ExtMenu)
+	}
+}
 
-	return SubMenu
+; Dynamic handler: edit personal shortcuts action button.
+_SC_EditAction(SubMenu, _Cat) {
+	RegisterMenuItem(SubMenu, t("menu.global.edit_shortcuts"), OpenPersonalShortcuts)
 }
 
 ; Build the TapHolds submenu — one entry per physical key, each with a
@@ -1175,26 +1801,37 @@ _BuildShortcutsSubmenu() {
 ; Both pickers persist immediately via WriteTapHoldTap / WriteTapHoldHold and
 ; reload the script to refresh the menu.
 _BuildTapHoldsSubmenu() {
+	DynHandlers := Map(
+		"reset_defaults", _TH_DynResetDefaults,
+		"disable_all",    _TH_DynDisableAll,
+		"tap_hold_keys",  _TH_DynKeys,
+	)
+	return MenuRenderer_Build("tap_holds_menu", "TapHolds", DynHandlers)
+}
+
+; Dynamic handler: reset-defaults action button.
+_TH_DynResetDefaults(M, _Cat) {
+	M.Add(t("tap_hold.reset_defaults"), _TH_ResetAllToDefaults)
+}
+
+; Dynamic handler: disable-all action button.
+_TH_DynDisableAll(M, _Cat) {
+	M.Add(t("tap_hold.disable_all"), _TH_DisableAll)
+}
+
+; Dynamic handler: per-key tap/hold entries.
+_TH_DynKeys(M, _Cat) {
 	global TapHold
-	SubMenu := Menu()
-
-	; Global actions at the top — reset all keys to defaults, or clear all.
-	SubMenu.Add(t("tap_hold.reset_defaults"), _TH_ResetAllToDefaults)
-	SubMenu.Add(t("tap_hold.disable_all"),    _TH_DisableAll)
-	SubMenu.Add()  ; separator
-
 	for KeyDef in TapHoldKeyDefs() {
 		KeyId    := KeyDef["id"]
 		KeyLabel := t(KeyDef["i18n"])
 		TapLbl   := TapHoldCurrentTapLabel(KeyId)
 		HoldLbl  := TapHoldCurrentHoldLabel(KeyId)
 
-		; Determine whether this key has any configuration.
 		IsConfigured := IsSet(TapHold) and TapHoldIsConfigured(TapHold, KeyId)
 
-		; Parent entry label: "KeyLabel  :  TapLabel / HoldLabel" or "—"
-		NoneLabel := t("tap_hold.tap.none")
-		NoneHold  := t("tap_hold.hold.none")
+		NoneLabel  := t("tap_hold.tap.none")
+		NoneHold   := t("tap_hold.hold.none")
 		ComboLabel := (TapLbl == NoneLabel and HoldLbl == NoneHold)
 			? "—"
 			: (TapLbl . "  /  " . HoldLbl)
@@ -1202,31 +1839,24 @@ _BuildTapHoldsSubmenu() {
 
 		KeyMenu := Menu()
 
-		; "Nothing / disable" item — clears both slots.
 		DisableLabel := t("tap_hold.action.disable")
 		KeyMenu.Add(DisableLabel, _TH_MakeDisableFn(KeyId))
-		if !IsConfigured {
+		if !IsConfigured
 			KeyMenu.Disable(DisableLabel)
-		}
 
-		KeyMenu.Add()  ; separator
+		KeyMenu.Add()
 
-		; "Tap → [current]" item — opens the searchable modal action picker.
-		; Uses the same ShowActionPicker GUI as gesture slots and keyboard shortcuts.
 		TapPickerLabel := StrReplace(t("tap_hold.picker.tap"), "%s", TapLbl)
 		KeyMenu.Add(TapPickerLabel, _TH_MakeTapPickerFn(KeyId, KeyLabel, TapLbl))
 
-		; "Hold → [current]" item — opens the hold picker submenu.
 		HoldPickerLabel := StrReplace(t("tap_hold.picker.hold"), "%s", HoldLbl)
 		HoldPickerMenu  := _BuildHoldPickerSubmenu(KeyId)
 		KeyMenu.Add(HoldPickerLabel, HoldPickerMenu)
 
-		SubMenu.Add(ParentLabel, KeyMenu)
-		if IsConfigured {
-			SubMenu.Check(ParentLabel)
-		}
+		M.Add(ParentLabel, KeyMenu)
+		if IsConfigured
+			M.Check(ParentLabel)
 	}
-	return SubMenu
 }
 
 ; Return the "none" hold option map (first entry in _TH_HoldOptions).
@@ -1378,580 +2008,51 @@ initMenu() {
 
 	A_TrayMenu.Delete()
 
-	; Prepend a global on/off toggle at the top of the Raccourcis submenu —
-	; mirrors the HS pattern where clicking the parent title toggles the
-	; category. AHK does not support clickable parent titles, so the first
-	; item is the toggle.
-	if SubMenus.Has("Shortcuts") {
-		; Master gate (Phase 7.4) — see comment in the Layout block below.
-		ShortcutsGated := IsCategoryGated("Shortcuts")
-		AddCategoryToggleItem(SubMenus["Shortcuts"],
-			t("menu.shortcuts.on"),
-			t("menu.shortcuts.off"),
-			ShortcutsGated,
-			(*) => ToggleCategoryAllFeatures("Shortcuts", !ShortcutsGated))
-	}
-
-	; Insert the configurable keyboard shortcut groups just before the
-	; « Combinaison de modificateurs » group ``_BuildShortcutsSubmenu``
-	; added — keeping the modifier combos visually grouped together.
-	; Then append « Raccourcis de gestion du script » at the bottom.
+	; Shortcuts submenu — built by MenuRenderer_Build("shortcuts_menu", …).
+	; The renderer handles the category toggle, feature toggles, separator
+	; placement, modifier-combos group, and dynamic blocks (personal
+	; shortcuts, script control, extensions, edit action) via the handler
+	; Map injected by _BuildShortcutsSubmenu's dynamic handlers.
+	; InsertKeyboardShortcutGroups still splices the Alt/Ctrl/Win groups
+	; in before the modifier-combos anchor after the renderer runs.
+	ShortcutsGated := IsCategoryGated("Shortcuts")
 	if SubMenus.Has("Shortcuts") {
 		InsertKeyboardShortcutGroups(SubMenus["Shortcuts"], t("menu.shortcuts.group_modifiers"))
-		; Personal shortcuts before script-control, matching the macOS menu order.
-		_AppendPersonalShortcutsSubmenuIfAny(SubMenus["Shortcuts"])
-		SubMenus["Shortcuts"].Add(t("menu.shortcuts.script_shortcuts"), BuildScriptShortcutsMenu())
-		RegisterMenuItem(SubMenus["Shortcuts"], t("menu.global.edit_shortcuts"), OpenPersonalShortcuts)
-
-		; Extensions shortcuts — one submenu per bundled extension that ships a
-		; shortcuts/menu.ahk. The script is run in a sandboxed #Include context
-		; receiving a pre-created Menu object named ExtMenu and the string ExtName.
-		global _StaticDir
-		ExtShortcutsBaseDir := _StaticDir . "\extensions\"
-		HasExtShortcuts := false
-		if DirExist(ExtShortcutsBaseDir) {
-			Loop Files ExtShortcutsBaseDir . "*", "D" {
-				MenuAhkPath := A_LoopFileFullPath . "\shortcuts\menu.ahk"
-				if FileExist(MenuAhkPath) {
-					HasExtShortcuts := true
-					break
-				}
-			}
-		}
-		if HasExtShortcuts {
-			SubMenus["Shortcuts"].Add() ; Separator before Extensions block
-			ExtShortcutsHeader := MenuSectionTitle(t("menu.extensions.header"))
-			SubMenus["Shortcuts"].Add(ExtShortcutsHeader, (*) => NoAction())
-			SubMenus["Shortcuts"].Disable(ExtShortcutsHeader)
-			Loop Files ExtShortcutsBaseDir . "*", "D" {
-				ExtId        := A_LoopFileName
-				ExtDir       := A_LoopFileFullPath
-				MenuAhkPath  := ExtDir . "\shortcuts\menu.ahk"
-				if !FileExist(MenuAhkPath)
-					continue
-				; Read display name from manifest
-				ExtName      := ExtId
-				ManifestPath := ExtDir . "\manifest.toml"
-				if FileExist(ManifestPath) {
-					try {
-						MC := FileRead(ManifestPath, "UTF-8")
-						if RegExMatch(MC, "name\s*=\s*`"([^`"]+)`"", &NM)
-							ExtName := MN[1]
-					}
-				}
-				; Build the extension's submenu. menu.ahk must define a function
-				; named BuildExtMenu(ExtMenu, ExtName) that populates the menu.
-				; The file is sourced by the extension loader at startup via
-				; #Include; here we just call the registered builder function.
-				ExtMenu   := Menu()
-				BuilderFn := "BuildExtMenu_" . StrReplace(ExtId, "-", "_")
-				if IsSet(%BuilderFn%) and HasMethod(%BuilderFn%) {
-					try {
-						%BuilderFn%(ExtMenu, ExtName)
-					} catch as Err {
-						LoggerWarn("Extensions", "BuildExtMenu for '{1}' threw: {2}.", ExtId, Err.Message)
-					}
-				} else {
-					LoggerWarn("Extensions", "No BuildExtMenu_{1} function found — menu.ahk not loaded?", StrReplace(ExtId, "-", "_"))
-					NaLabel := t("menu.extensions.empty")
-					ExtMenu.Add(NaLabel, (*) => NoAction())
-					ExtMenu.Disable(NaLabel)
-				}
-				SubMenus["Shortcuts"].Add(ExtName, ExtMenu)
-			}
-		}
 	}
 
-	; ── 🌐 Disposition clavier — keyboard emulation features ──
-	LayoutMenu := Menu()
+	; ── 🌐 Disposition clavier — built from manifest via MenuRenderer_Build.
+	; Dynamic handler ``layout_features`` iterates ``ahk.layout`` entries;
+	; ``active_layouts`` is macOS-only and skipped by the AHK platform filter.
+	LayoutDynHandlers := Map(
+		"layout_features", _LAY_LayoutFeatures,
+	)
+	LayoutMenu  := MenuRenderer_Build("layout_menu", "Layout", LayoutDynHandlers)
 	LayoutGated := IsCategoryGated("Layout")
-	AddCategoryToggleItem(LayoutMenu,
-		t("menu.layout.on"),
-		t("menu.layout.off"),
-		LayoutGated,
-		(*) => ToggleCategoryAllFeatures("Layout", !LayoutGated))
-	for LayoutEntry in ManifestFeaturesForSection("ahk.layout") {
-		MenuAddItemFromManifest(LayoutMenu, LayoutEntry, "Layout")
-	}
-	; J→★ remapping lives here because it configures the physical key, not hotstring behaviour
-	ReplaceEntry := ManifestFindEntryByPath("hotstrings.magic_key.replace")
-	if (ReplaceEntry != false) {
-		LayoutMenu.Add() ; Separator before J→★ remapping
-		MenuAddItemFromManifest(LayoutMenu, ReplaceEntry, "MagicKey")
-	}
-	; Accented letters stay in Disposition clavier (keyboard emulation feature)
-	AccentsMenuLayout := Menu()
-	for V1LetterId in ["EGrave", "ECirc", "EAcute", "AGrave"] {
-		MenuAddLetterPicker(AccentsMenuLayout, "Shortcuts", V1LetterId)
-	}
-	LayoutMenu.Add(t("menu.shortcuts.group_accented"), AccentsMenuLayout)
 	LayoutMenuTitle := t("menu.layout.title")
 	A_TrayMenu.Add(LayoutMenuTitle, LayoutMenu)
 	if LayoutGated {
 		A_TrayMenu.Check(LayoutMenuTitle)
 	}
 
-	; ── Hotstrings ⚡ — single submenu grouping all hotstring categories ──
-	HotstringsMenu := Menu()
+	; ── Hotstrings ⚡ — built from manifest via MenuRenderer_Build.
+	; Dynamic handlers supply the runtime-dependent blocks (params, categories,
+	; personal tree, extensions). The toggle is rendered by the manifest toggle
+	; type entry but uses the ToggleAllHostrings* pattern for hotstrings.
 	HotstringsAllEnabled := IsCategoryGated("Hotstrings")
-	AddCategoryToggleItem(HotstringsMenu,
-		t("menu.hotstrings.on"),
-		t("menu.hotstrings.off"),
-		HotstringsAllEnabled,
-		HotstringsAllEnabled ? ToggleAllHotstringsOff : ToggleAllHotstringsOn)
-
-	ParamsMenu := Menu()
-	RegisterMenuItem(ParamsMenu, t("menu.hotstrings.delays_colors"),
-		(*) => OpenHotstringsConfigWindow())
-	ParamsMenu.Add() ; Separator before magic key / repeat settings
-	RegisterMenuItem(ParamsMenu, t("menu.hotstrings.magic_key_prefix") . ScriptInformation["MagicKey"], MagicKeyEditor)
-	LayoutRepeatToggleLabel := t("menu.hotstrings.repeat_key_toggle")
-	RegisterMenuItem(ParamsMenu, LayoutRepeatToggleLabel, ToggleRepeatKeyEnabled)
-	if HSE_RepeatEnabled {
-		ParamsMenu.Check(LayoutRepeatToggleLabel)
-	}
-	HotstringsMenu.Add(t("menu.hotstrings.params"), ParamsMenu)
-	HotstringsMenu.Add() ; Separator after paramètres block
-
-	; 2a. Standard hotstring groups + dynamic — "Hotstrings communs" header
-	; When the master gate is off, ApplyMasterGatesToFeatures zeroes Features in
-	; memory so _CountEnabledForCategory returns 0. Use _CountAllForCategory instead
-	; so the menu still shows the persisted counts the user set before disabling.
 	_CountFn := HotstringsAllEnabled ? _CountEnabledForCategory : _CountAllForCategory
-	StdTotal := 0
-	for _CCat in HotstringCategoriesStd {
-		StdTotal += _CountFn(_CCat)
-	}
-	DynTotalStd := 0
-	if Features.Has("hotstrings") and Features["hotstrings"].Has("dynamic") {
-		for _DKey, _DCfg in Features["hotstrings"]["dynamic"] {
-			; When gate is off every _DCfg["enabled"] is false in memory — count
-			; all dynamic sections unconditionally so the header total stays correct.
-			if HotstringsAllEnabled {
-				if (IsObject(_DCfg) and _DCfg.Has("enabled") and _DCfg["enabled"]) {
-					DynTotalStd += CountDynamicSection(_DKey)
-				}
-			} else {
-				if IsObject(_DCfg) {
-					DynTotalStd += CountDynamicSection(_DKey)
-				}
-			}
-		}
-	}
-	StdTotal += DynTotalStd
-	StdHeader := MenuSectionTitle(t("menu.hotstrings.common_header") . " (" . FmtCount(StdTotal) . ")")
-	HotstringsMenu.Add(StdHeader, (*) => NoAction())
-	HotstringsMenu.Disable(StdHeader)
-	for Category in HotstringCategoriesStd {
-		if SubMenus.Has(Category) {
-			Total := _CountFn(Category)
-			Title := GetCategoryTitle(Category) . " (" . FmtCount(Total) . ")"
-			HotstringsMenu.Add(Title, SubMenus[Category])
-			if HotstringsAllEnabled and _IsCategoryFullyEnabled(Category) {
-				HotstringsMenu.Check(Title)
-			}
-		}
-	}
-	if Features.Has("hotstrings") and Features["hotstrings"].Has("dynamic")
-		and SubMenus.Has("DynamicHotstrings") {
-		DynMenu := SubMenus["DynamicHotstrings"]
-		DynTotal := 0
-		for _DKey, _DCfg in Features["hotstrings"]["dynamic"] {
-			if HotstringsAllEnabled {
-				if (IsObject(_DCfg) and _DCfg.Has("enabled") and _DCfg["enabled"]) {
-					DynTotal += CountDynamicSection(_DKey)
-				}
-			} else {
-				if IsObject(_DCfg) {
-					DynTotal += CountDynamicSection(_DKey)
-				}
-			}
-		}
-		DynTitle := GetCategoryTitle("DynamicHotstrings") . " (" . FmtCount(DynTotal) . ")"
-		HotstringsMenu.Add(DynTitle, DynMenu)
-		_DynAllEnabled := true
-		_DynCount := 0
-		for _, _DCfg2 in Features["hotstrings"]["dynamic"] {
-			_DynCount++
-			if (IsObject(_DCfg2) and _DCfg2.Has("enabled") and !_DCfg2["enabled"]) {
-				_DynAllEnabled := false
-			}
-		}
-		if HotstringsAllEnabled and _DynAllEnabled and _DynCount > 0 {
-			HotstringsMenu.Check(DynTitle)
-		}
-	}
 
-	HotstringsMenu.Add() ; Separator between communs and Ergopti blocks
-	ErgoptiTotal := 0
-	for _ECat in HotstringCategoriesErgopti {
-		ErgoptiTotal += _CountFn(_ECat)
-	}
-	ErgoptiHeader := MenuSectionTitle(t("menu.hotstrings.ergopti_header") . " (" . FmtCount(ErgoptiTotal) . ")")
-	HotstringsMenu.Add(ErgoptiHeader, (*) => NoAction())
-	HotstringsMenu.Disable(ErgoptiHeader)
-	for Category in HotstringCategoriesErgopti {
-		if SubMenus.Has(Category) {
-			Total := _CountFn(Category)
-			Title := GetCategoryTitle(Category) . " (" . FmtCount(Total) . ")"
-			HotstringsMenu.Add(Title, SubMenus[Category])
-			if HotstringsAllEnabled and _IsCategoryFullyEnabled(Category) {
-				HotstringsMenu.Check(Title)
-			}
-		}
-	}
+	_HotDynHandlers := Map(
+		"hotstring_categories_standard", _HS_CategoriesStandard,
+		"hotstring_categories_dynamic",  _HS_CategoriesDynamic,
+		"hotstring_categories_ergopti",  _HS_CategoriesErgopti,
+		"hotstring_personal",            _HS_Personal,
+		"hotstring_extensions",          _HS_Extensions,
+		"magic_key_config",              _HS_MagicKeyConfig,
+	)
 
-	; 3. Personal/custom hotstrings — separator + disabled header + entries
-	TotalPersonal := 0
-	PersonalTomlData := false
-	PersonalTomlPath := IsSet(ScriptInformation) ? ScriptInformation.Get("PersonalTomlPath", "") : ""
-	if (PersonalTomlPath != "" and FileExist(PersonalTomlPath)) {
-		PersonalTomlData := ReadPersonalToml()
-		for _, SecData in PersonalTomlData["sections"] {
-			TotalPersonal += SecData["entries"].Length
-		}
-	}
+	HotstringsMenu := MenuRenderer_Build("hotstrings_menu", "Hotstrings", _HotDynHandlers)
 
-	; Recursive scan of the hotstrings/ folder for extra TOMLs
-	_ExtTotalPersonalCounter := { value: 0 }
-	PersonalExtTree := Map()
-
-	_GetOrCreateFolderNode(Root, PathParts) {
-		if (PathParts.Length == 0) {
-			if !Root.Has("") {
-				Root[""] := Map("subfolders", Map(), "tomls", [])
-			}
-			return Root[""]
-		}
-
-		Tree := Root
-		for Part in PathParts {
-			if !Tree.Has(Part) {
-				Tree[Part] := Map("subfolders", Map(), "tomls", [])
-			}
-			Node := Tree[Part]
-			Tree := Node["subfolders"]
-		}
-		return Node
-	}
-
-	if IsSet(ScriptInformation) and ScriptInformation.Has("PersonalHotstringsDir") {
-		HsDir := ScriptInformation["PersonalHotstringsDir"]
-		if DirExist(HsDir) {
-			_ScanPersonalExtRecursive(CurrentDir, PathParts) {
-				Loop Files CurrentDir . "\*", "DF" {
-					if (A_LoopFileAttrib ~= "D") {
-						NewParts := PathParts.Clone()
-						NewParts.Push(A_LoopFileName)
-						_ScanPersonalExtRecursive(A_LoopFileFullPath, NewParts)
-					} else if (A_LoopFileName ~= "i)\.toml$") {
-						if (PathParts.Length == 0 and A_LoopFileName == "personal_hotstrings.toml")
-							continue
-
-						SplitPath A_LoopFileFullPath, , , , &_ExtStem
-						FileSections := _ParseExtTomlSections(A_LoopFileFullPath)
-						FileCount := 0
-						for _, _FS in FileSections {
-							FileCount += _FS["count"]
-						}
-
-						Node := _GetOrCreateFolderNode(PersonalExtTree, PathParts)
-						Node["tomls"].Push({ path: A_LoopFileFullPath, stem: _ExtStem, sections: FileSections, count: FileCount })
-						_ExtTotalPersonalCounter.value += FileCount
-					}
-				}
-			}
-			_ScanPersonalExtRecursive(RegExReplace(HsDir, "[/\\]+$"), [])
-		}
-	}
-
-	HotstringsMenu.Add() ; Separator before personal group
-	PersonalHeader := MenuSectionTitle(t("menu.hotstrings.personal_header") . ((TotalPersonal + _ExtTotalPersonalCounter.value) > 0 ? " (" . FmtCount(TotalPersonal + _ExtTotalPersonalCounter.value) . ")" : ""))
-	HotstringsMenu.Add(PersonalHeader, (*) => NoAction())
-	HotstringsMenu.Disable(PersonalHeader)
-
-	if (PersonalTomlData != false) {
-		TomlData := PersonalTomlData
-		; Build the unified personal submenu for personal_hotstrings.toml
-		PersonalMenu := Menu()
-		RegisterMenuItem(PersonalMenu, t("menu.hotstrings.open_editor"), (*) => OpenPersonalEditor())
-		RegisterMenuItem(PersonalMenu, t("menu.hotstrings.open_file"), _MakeOpenFileFn(PersonalTomlPath))
-		PersonalMenu.Add()
-		; Shortcut item — not yet customisable from AHK (HS handles it on macOS)
-		_ShortcutLabel := t("menu.hotstrings.shortcut_prefix") . ScriptInformation["MagicKey"]
-		PersonalMenu.Add(_ShortcutLabel, (*) => NoAction())
-		PersonalMenu.Disable(_ShortcutLabel)
-		; Default section — submenu with "Aucune" + one item per TOML section
-		CurDefaultSec := _EditorPrefGet("DefaultSection", "")
-		DefaultSectionMenu := Menu()
-		RegisterMenuItem(DefaultSectionMenu, t("menu.hotstrings.default_none"), (*) => _SetPersonalDefaultSection("", PersonalMenu, TomlData, DefaultSectionMenu))
-		if (CurDefaultSec == "") {
-			DefaultSectionMenu.Check(t("menu.hotstrings.default_none"))
-		}
-		DefaultSectionMenu.Add()
-		for _, SecName in TomlData["sections_order"] {
-			if (SecName == "-") {
-				continue
-			}
-			SecData := TomlData["sections"][SecName]
-			SecLabel := SecData["description"]
-			RegisterMenuItem(DefaultSectionMenu, SecLabel, _MakeSetDefaultSectionFn(SecName, PersonalMenu, TomlData, DefaultSectionMenu))
-			if (CurDefaultSec == SecName) {
-				DefaultSectionMenu.Check(SecLabel)
-			}
-		}
-		CurDefaultLabel := (CurDefaultSec == "") ? t("menu.hotstrings.default_none")
-			: (TomlData["sections"].Has(CurDefaultSec) ? TomlData["sections"][CurDefaultSec]["description"] : CurDefaultSec)
-		global _PrevDefaultLabel := CurDefaultLabel
-		_DefaultCatLabel := t("menu.hotstrings.default_category_prefix") . CurDefaultLabel
-		PersonalMenu.Add(_DefaultCatLabel, DefaultSectionMenu)
-		_CloseOnAddLabel := t("menu.hotstrings.close_on_add")
-		RegisterMenuItem(PersonalMenu, _CloseOnAddLabel, (*) => _TogglePersonalCloseOnAdd(PersonalMenu))
-		if (_EditorPrefGet("CloseOnAdd", "1") == "1") {
-			PersonalMenu.Check(_CloseOnAddLabel)
-		}
-		; Per-section entries
-		if (TomlData["sections_order"].Length > 0) {
-			PersonalMenu.Add()
-			for _, SecName in TomlData["sections_order"] {
-				if (SecName == "-") {
-					PersonalMenu.Add()
-					continue
-				}
-				if !TomlData["sections"].Has(SecName) {
-					continue
-				}
-				SecData := TomlData["sections"][SecName]
-				SecLabel := SecData["description"] . " (" . FmtCount(SecData["entries"].Length) . ")"
-				MenuAddItemWithLabel(PersonalMenu, "Personal." . SecName, SecLabel, "Hotstrings")
-			}
-		}
-		PersonalActiveCount := 0
-		PersonalAllEnabled := true
-		PersonalSectionCount := 0
-		for _, SecName2 in TomlData["sections_order"] {
-			if (SecName2 == "-" or !TomlData["sections"].Has(SecName2)) {
-				continue
-			}
-			PersonalSectionCount++
-			_PV2Id := StrLower(SecName2)
-			_PEnabled := Features["hotstrings"].Has("personal")
-				and Features["hotstrings"]["personal"].Has(_PV2Id)
-				and Features["hotstrings"]["personal"][_PV2Id]["enabled"]
-			if _PEnabled {
-				PersonalActiveCount += TomlData["sections"][SecName2]["entries"].Length
-			} else {
-				PersonalAllEnabled := false
-			}
-		}
-		PersonalTitle := GetCategoryTitle("Personal") . " (" . FmtCount(PersonalActiveCount) . ")"
-		HotstringsMenu.Add(PersonalTitle, PersonalMenu)
-		if HotstringsAllEnabled and PersonalAllEnabled and PersonalSectionCount > 0 {
-			HotstringsMenu.Check(PersonalTitle)
-		}
-	}
-
-	; Render the recursive tree for extra TOMLs
-	_RenderExtTree(Tree, ParentMenu) {
-		FolderNames := []
-		for FolderName in Tree
-			FolderNames.Push(FolderName)
-
-		; Alpha sort folder names (manual bubble sort)
-		loop FolderNames.Length {
-			i := A_Index
-			loop FolderNames.Length - i {
-				j := A_Index
-				if (StrCompare(FolderNames[j], FolderNames[j+1]) > 0) {
-					tmp := FolderNames[j]
-					FolderNames[j] := FolderNames[j+1]
-					FolderNames[j+1] := tmp
-				}
-			}
-		}
-
-		for FolderName in FolderNames {
-			Node := Tree[FolderName]
-			FolderMenu := Menu()
-
-			; Alpha sort TOMLs in this folder (manual bubble sort)
-			FileNodeList := Node["tomls"]
-			loop FileNodeList.Length {
-				i := A_Index
-				loop FileNodeList.Length - i {
-					j := A_Index
-					if (StrCompare(FileNodeList[j].stem, FileNodeList[j+1].stem) > 0) {
-						tmp := FileNodeList[j]
-						FileNodeList[j] := FileNodeList[j+1]
-						FileNodeList[j+1] := tmp
-					}
-				}
-			}
-
-			if (Node["subfolders"].Count > 0) {
-				_RenderExtTree(Node["subfolders"], FolderMenu)
-			}
-
-			if (Node["subfolders"].Count > 0 and FileNodeList.Length > 0)
-				FolderMenu.Add()
-
-			for TF in FileNodeList {
-				TFMenu := Menu()
-				RegisterMenuItem(TFMenu, t("menu.hotstrings.open_file"), _MakeOpenFileFn(TF.path))
-				if (TF.sections.Length > 0) {
-					TFMenu.Add()
-					for _, _ES in TF.sections {
-						SecLabel := _ES["description"] . " (" . FmtCount(_ES["count"]) . ")"
-						TFMenu.Add(SecLabel, (*) => NoAction())
-						TFMenu.Disable(SecLabel)
-					}
-				}
-				TFTitle := TF.stem . (TF.count > 0 ? " (" . FmtCount(TF.count) . ")" : "")
-				FolderMenu.Add(TFTitle, TFMenu)
-			}
-			ParentMenu.Add(FolderName, FolderMenu)
-		}
-	}
-
-	; Add nested subfolders before root-level TOMLs
-	RootNode := false
-	if PersonalExtTree.Has("") {
-		RootNode := PersonalExtTree[""]
-		PersonalExtTree.Delete("")
-	}
-	HasNestedPersonalExt := PersonalExtTree.Count > 0
-	_RenderExtTree(PersonalExtTree, HotstringsMenu)
-
-		; Add root-level TOMLs directly to HotstringsMenu
-		if (RootNode != false) {
-			; Alpha sort root TOMLs
-			FileNodeList := RootNode["tomls"]
-		loop FileNodeList.Length {
-			i := A_Index
-			loop FileNodeList.Length - i {
-				j := A_Index
-				if (StrCompare(FileNodeList[j].stem, FileNodeList[j+1].stem) > 0) {
-					tmp := FileNodeList[j]
-					FileNodeList[j] := FileNodeList[j+1]
-					FileNodeList[j+1] := tmp
-				}
-			}
-		}
-
-		for TF in FileNodeList {
-			TFMenu := Menu()
-			RegisterMenuItem(TFMenu, t("menu.hotstrings.open_file"), _MakeOpenFileFn(TF.path))
-			if (TF.sections.Length > 0) {
-				TFMenu.Add()
-				for _, _ES in TF.sections {
-					SecLabel := _ES["description"] . " (" . FmtCount(_ES["count"]) . ")"
-					TFMenu.Add(SecLabel, (*) => NoAction())
-					TFMenu.Disable(SecLabel)
-				}
-			}
-			TFTitle := TF.stem . (TF.count > 0 ? " (" . FmtCount(TF.count) . ")" : "")
-			HotstringsMenu.Add(TFTitle, TFMenu)
-		}
-	}
-
-	; 4. Bundled Extensions — one submenu per extension folder
-	global _StaticDir
-	ExtensionsBaseDir := _StaticDir . "\extensions\"
-	BundledExtensions := []
-	ExtTotal := 0
-	if DirExist(ExtensionsBaseDir) {
-		Loop Files ExtensionsBaseDir . "*", "D" {
-			ExtId   := A_LoopFileName
-			ExtDir  := A_LoopFileFullPath
-			ManifestPath := ExtDir . "\manifest.toml"
-			ExtDisplayName := ExtId
-			if FileExist(ManifestPath) {
-				try {
-					ManifestContent := FileRead(ManifestPath, "UTF-8")
-					if RegExMatch(ManifestContent, "name\s*=\s*`"([^`"]+)`"", &NM)
-						ExtDisplayName := NM[1]
-				}
-			}
-			HsDir := ExtDir . "\hotstrings\"
-			TomlFiles := []
-			if DirExist(HsDir) {
-				Loop Files HsDir . "*.toml" {
-					FileSections := _ParseExtTomlSections(A_LoopFileFullPath)
-					FileCount := 0
-					for _, _FS in FileSections
-						FileCount += _FS["count"]
-					ExtTotal += FileCount
-					SplitPath A_LoopFileFullPath, , , , &FileStem
-					TomlFiles.Push({ path: A_LoopFileFullPath, stem: FileStem
-						, sections: FileSections, count: FileCount })
-				}
-			}
-			BundledExtensions.Push({ id: ExtId, name: ExtDisplayName, toml_files: TomlFiles })
-		}
-	}
-
-	HotstringsMenu.Add() ; Separator before Extensions block
-	ExtHeader := MenuSectionTitle(t("menu.extensions.header") . (ExtTotal > 0 ? " (" . FmtCount(ExtTotal) . ")" : ""))
-	HotstringsMenu.Add(ExtHeader, (*) => NoAction())
-	HotstringsMenu.Disable(ExtHeader)
-	if (BundledExtensions.Length == 0) {
-		EmptyLabel := t("menu.extensions.empty")
-		HotstringsMenu.Add(EmptyLabel, (*) => NoAction())
-		HotstringsMenu.Disable(EmptyLabel)
-	} else {
-		for _, Ext in BundledExtensions {
-			ExtHsMenu := Menu()
-			ExtTotalForExt := 0
-			for _, TF in Ext.toml_files
-				ExtTotalForExt += TF.count
-			if (Ext.toml_files.Length == 0) {
-				NoHsLabel := t("menu.extensions.empty")
-				ExtHsMenu.Add(NoHsLabel, (*) => NoAction())
-				ExtHsMenu.Disable(NoHsLabel)
-			} else {
-				for _, TF in Ext.toml_files {
-					TFMenu := Menu()
-					RegisterMenuItem(TFMenu, t("menu.hotstrings.open_file"), _MakeOpenFileFn(TF.path))
-					if (TF.sections.Length == 0) {
-						TFMenu.Add()
-						NoSecLabel := t("menu.extensions.empty")
-						TFMenu.Add(NoSecLabel, (*) => NoAction())
-						TFMenu.Disable(NoSecLabel)
-					} else {
-						TFMenu.Add()
-						for _, Sec in TF.sections {
-							SecLabel := Sec["description"] . " (" . FmtCount(Sec["count"]) . ")"
-							TFMenu.Add(SecLabel, (*) => NoAction())
-							TFMenu.Disable(SecLabel)
-						}
-					}
-					TFTitle := TF.stem . (TF.count > 0 ? " (" . FmtCount(TF.count) . ")" : "")
-					ExtHsMenu.Add(TFTitle, TFMenu)
-				}
-			}
-			ExtMenuTitle := Ext.name . (ExtTotalForExt > 0 ? " (" . FmtCount(ExtTotalForExt) . ")" : "")
-			HotstringsMenu.Add(ExtMenuTitle, ExtHsMenu)
-		}
-	}
-
-	ActiveCommonTotal := StdTotal + ErgoptiTotal
-	ActivePersonalTotal := 0
-	if (PersonalTomlData != false) {
-		for _, _PSecName in PersonalTomlData["sections_order"] {
-			if (_PSecName == "-") {
-				continue
-			}
-			_PV2Id := StrLower(_PSecName)
-			_PEnabled := Features["hotstrings"].Has("personal")
-				and Features["hotstrings"]["personal"].Has(_PV2Id)
-				and Features["hotstrings"]["personal"][_PV2Id]["enabled"]
-			if _PEnabled and PersonalTomlData["sections"].Has(_PSecName) {
-				ActivePersonalTotal += PersonalTomlData["sections"][_PSecName]["entries"].Length
-			}
-		}
-	}
-	GrandTotal := ActiveCommonTotal + ActivePersonalTotal + _ExtTotalPersonalCounter.value
-	HotstringsMenuTitle := t("menu.hotstrings.title") . " (" . FmtCount(GrandTotal) . ")"
+	HotstringsMenuTitle := t("menu.hotstrings.title") . " (" . FmtCount(_HS_ComputeGrandTotal()) . ")"
 	A_TrayMenu.Add(HotstringsMenuTitle, HotstringsMenu)
 	if HotstringsAllEnabled {
 		A_TrayMenu.Check(HotstringsMenuTitle)

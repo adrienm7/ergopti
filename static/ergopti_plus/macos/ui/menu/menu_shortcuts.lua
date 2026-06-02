@@ -6,9 +6,10 @@
 --- Builds the shortcuts sub-menu for the Hammerspoon tray menu.
 ---
 --- FEATURES & RATIONALE:
---- 1. Grouped Layout: Top-level items (screenshot, volume, wrap) appear first;
----    Ctrl, Cmd, and script-control shortcuts are nested in labelled submenus,
----    mirroring the AHK tray menu structure for consistency across platforms.
+--- 1. Manifest-Driven: Structure (order, separators, groups) is read from
+---    ``shared/menu_manifest.json`` via ``lib/manifest_menu``.  Dynamic
+---    blocks (ctrl group, cmd group, script control, extensions, edit action)
+---    are supplied as handlers so platform-specific logic stays in Lua.
 --- ==============================================================================
 
 local M = {}
@@ -17,6 +18,7 @@ local Logger        = require("lib.logger")
 local dialog        = require("lib.dialog_util")
 local shortcuts_mod = require("modules.shortcuts")
 local i18n          = require("lib.i18n")
+local ManifestMenu  = require("lib.manifest_menu")
 local LOG           = "menu_shortcuts"
 
 
@@ -127,15 +129,17 @@ function M.build(ctx)
 		end,
 	}
 
-	-- Buckets for each display group
-	local top_items  = {}   -- at_hash, layer_scroll (in order)
-	local wrap_item  = nil  -- wrap_text_if_selected (UIA symbol-on-selection)
-	local ctrl_items = {}
-	local cmd_items  = {}
 
-	-- Preserve insertion order for top-level items
+	-- ==============================================
+	-- ===== 2.1) Shortcut Item Factory Helpers =====
+	-- ==============================================
+
+	-- Build shortcut item buckets by iterating the shortcuts module list once.
 	local TOP_ORDER = { "at_hash", "layer_scroll" }
 	local top_map   = {}
+	local wrap_item = nil
+	local ctrl_items = {}
+	local cmd_items  = {}
 
 	if type(shortcuts.list_shortcuts) == "function" then
 		local ok, list = pcall(shortcuts.list_shortcuts)
@@ -143,12 +147,10 @@ function M.build(ctx)
 			for _, s in ipairs(list) do
 				if type(s) == "table" and s.id then
 					local mi = make_shortcut_item(s, shortcuts, ctx)
-
 					if s.id == "at_hash" or s.id == "layer_scroll" then
 						top_map[s.id] = mi
 					elseif s.id == "wrap_text_if_selected" then
 						wrap_item = mi
-
 					elseif s.id:sub(1, 5) == "ctrl_" then
 						table.insert(ctrl_items, mi)
 						-- Inject ChatGPT URL editor inline below ctrl_g
@@ -157,7 +159,8 @@ function M.build(ctx)
 								title    = i18n.get("menu.shortcuts.chatgpt_url_item"),
 								disabled = paused or nil,
 								fn       = not paused and function()
-									local ok_p, clicked, url = pcall(dialog.text_prompt, i18n.get("dialog.shortcuts.chatgpt_title"),
+									local ok_p, clicked, url = pcall(dialog.text_prompt,
+										i18n.get("dialog.shortcuts.chatgpt_title"),
 										i18n.get("dialog.shortcuts.chatgpt_prompt"),
 										state.chatgpt_url, i18n.get("button.ok"), i18n.get("button.cancel"))
 									if ok_p and clicked == i18n.get("button.ok") and type(url) == "string" and url ~= "" then
@@ -168,7 +171,6 @@ function M.build(ctx)
 								end or nil,
 							})
 						end
-
 					elseif s.id:sub(1, 4) == "cmd_" then
 						table.insert(cmd_items, mi)
 					end
@@ -177,44 +179,34 @@ function M.build(ctx)
 		end
 	end
 
-	-- Assemble top items in canonical order
-	for _, id in ipairs(TOP_ORDER) do
-		if top_map[id] then table.insert(top_items, top_map[id]) end
-	end
 
-	-- Build the final menu
-	local s_menu = {}
+	-- =====================================================
+	-- ===== 2.2) Dynamic Handlers for Manifest Items =====
+	-- =====================================================
 
-	for _, mi in ipairs(top_items) do
-		table.insert(s_menu, mi)
-	end
-	if wrap_item then
-		if #s_menu > 0 then table.insert(s_menu, { title = "-" }) end
-		table.insert(s_menu, wrap_item)
-	end
+	-- Each handler appends its items into the ``items`` list it receives.
 
-	-- Ctrl submenu
-	if #ctrl_items > 0 then
-		table.insert(s_menu, { title = "-" })
-		table.insert(s_menu, {
+	local function dyn_ctrl_shortcuts(items, _ctx)
+		if #ctrl_items == 0 then return end
+		table.insert(items, {
 			title    = i18n.get("menu.shortcuts.submenu_ctrl"),
 			disabled = not state.shortcuts or paused or nil,
 			menu     = ctrl_items,
 		})
 	end
 
-	-- Cmd submenu
-	if #cmd_items > 0 then
-		table.insert(s_menu, {
+	local function dyn_cmd_shortcuts(items, _ctx)
+		if #cmd_items == 0 then return end
+		table.insert(items, {
 			title    = i18n.get("menu.shortcuts.submenu_cmd"),
 			disabled = not state.shortcuts or paused or nil,
 			menu     = cmd_items,
 		})
 	end
 
-	-- Script control submenu
-	local script_control = ctx.script_control
-	if script_control then
+	local function dyn_script_control(items, _ctx)
+		local script_control = ctx.script_control
+		if not script_control then return end
 		local enabled = state.script_control_enabled
 		local actions = type(script_control.ACTIONS) == "table" and script_control.ACTIONS or {}
 
@@ -243,7 +235,9 @@ function M.build(ctx)
 						disabled = not enabled or paused or nil,
 						fn       = (enabled and not paused) and (function(a) return function()
 							state.script_control_shortcuts[keyname] = a
-							if type(script_control.set_shortcut_action) == "function" then pcall(script_control.set_shortcut_action, keyname, a) end
+							if type(script_control.set_shortcut_action) == "function" then
+								pcall(script_control.set_shortcut_action, keyname, a)
+							end
 							ctx.save_prefs()
 							ctx.updateMenu()
 						end end)(act) or nil,
@@ -257,117 +251,145 @@ function M.build(ctx)
 		local cur_back   = state.script_control_shortcuts.backspace  or "none"
 		local cur_escape = state.script_control_shortcuts.escape     or "none"
 
-		local script_items = {
-			{
-				title    = string.format(i18n.get("menu.shortcuts.right_opt_return"), get_label(cur_return)),
-				disabled = not enabled or paused or nil,
-				menu     = key_submenu("return_key"),
-			},
-			{
-				title    = string.format(i18n.get("menu.shortcuts.right_opt_back"), get_label(cur_back)),
-				disabled = not enabled or paused or nil,
-				menu     = key_submenu("backspace"),
-			},
-			{
-				title    = string.format(i18n.get("menu.shortcuts.right_opt_escape"), get_label(cur_escape)),
-				disabled = not enabled or paused or nil,
-				menu     = key_submenu("escape"),
-			},
-		}
-
-		table.insert(s_menu, { title = "-" })
-		table.insert(s_menu, {
+		table.insert(items, {
 			title    = i18n.get("menu.shortcuts.script_shortcuts"),
 			disabled = not enabled or paused or nil,
-			menu     = script_items,
+			menu     = {
+				{
+					title    = string.format(i18n.get("menu.shortcuts.right_opt_return"), get_label(cur_return)),
+					disabled = not enabled or paused or nil,
+					menu     = key_submenu("return_key"),
+				},
+				{
+					title    = string.format(i18n.get("menu.shortcuts.right_opt_back"), get_label(cur_back)),
+					disabled = not enabled or paused or nil,
+					menu     = key_submenu("backspace"),
+				},
+				{
+					title    = string.format(i18n.get("menu.shortcuts.right_opt_escape"), get_label(cur_escape)),
+					disabled = not enabled or paused or nil,
+					menu     = key_submenu("escape"),
+				},
+			},
 		})
 	end
 
-	-- Extensions shortcuts section
-	do
-		local ext_root = ctx and ctx.base_dir and (ctx.base_dir .. "../../extensions/")
+	local function dyn_extensions_shortcuts(items, _ctx)
+		local ext_root = ctx.base_dir and (ctx.base_dir .. "../../extensions/")
 		local ok_attr, attr = ext_root and pcall(hs.fs.attributes, ext_root) or false
-		if ok_attr and type(attr) == "table" and attr.mode == "directory" then
-			local ext_ids = {}
-			for fname in hs.fs.dir(ext_root) do
-				if fname ~= "." and fname ~= ".." then
-					local ok_a2, a2 = pcall(hs.fs.attributes, ext_root .. fname)
-					if ok_a2 and type(a2) == "table" and a2.mode == "directory" then
-						table.insert(ext_ids, fname)
-					end
+		if not (ok_attr and type(attr) == "table" and attr.mode == "directory") then return end
+
+		local ext_ids = {}
+		for fname in hs.fs.dir(ext_root) do
+			if fname ~= "." and fname ~= ".." then
+				local ok_a2, a2 = pcall(hs.fs.attributes, ext_root .. fname)
+				if ok_a2 and type(a2) == "table" and a2.mode == "directory" then
+					table.insert(ext_ids, fname)
 				end
 			end
-			table.sort(ext_ids)
+		end
+		table.sort(ext_ids)
 
-			local ext_menu_items = {}
-			for _, ext_id in ipairs(ext_ids) do
-				local ext_dir      = ext_root .. ext_id .. "/"
-				local menu_lua     = ext_dir .. "shortcuts/menu.lua"
-				local manifest     = ext_dir .. "manifest.toml"
-				local ok_ml, aml   = pcall(hs.fs.attributes, menu_lua)
-				if not (ok_ml and type(aml) == "table" and aml.mode == "file") then goto continue_sc_ext end
+		local ext_menu_items = {}
+		for _, ext_id in ipairs(ext_ids) do
+			local ext_dir  = ext_root .. ext_id .. "/"
+			local menu_lua = ext_dir .. "shortcuts/menu.lua"
+			local manifest = ext_dir .. "manifest.toml"
+			local ok_ml, aml = pcall(hs.fs.attributes, menu_lua)
+			if not (ok_ml and type(aml) == "table" and aml.mode == "file") then goto continue_sc_ext end
 
-				local ext_name = ext_id
-				local ok_m, am = pcall(hs.fs.attributes, manifest)
-				if ok_m and type(am) == "table" and am.mode == "file" then
-					local fh = io.open(manifest, "r")
-					if fh then
-						for line in fh:lines() do
-							local v = line:match('^name%s*=%s*"(.-)"')
-							if v then ext_name = v; break end
-						end
-						fh:close()
+			local ext_name = ext_id
+			local ok_m, am = pcall(hs.fs.attributes, manifest)
+			if ok_m and type(am) == "table" and am.mode == "file" then
+				local fh = io.open(manifest, "r")
+				if fh then
+					for line in fh:lines() do
+						local v = line:match('^name%s*=%s*"(.-)"')
+						if v then ext_name = v; break end
 					end
+					fh:close()
 				end
-
-				local collected = {}
-				-- Sandbox: expose only add_item(), t() and a safe hs reference
-				local sandbox = {
-					add_item  = function(item) if type(item) == "table" then table.insert(collected, item) end end,
-					t         = function(k) return i18n.get(k) end,
-					ext_name  = ext_name,
-					hs        = hs,
-				}
-				sandbox._G = sandbox
-
-				local ok_load, chunk_or_err = pcall(loadfile, menu_lua)
-				if ok_load and type(chunk_or_err) == "function" then
-					setfenv(chunk_or_err, sandbox)
-					local ok_run, run_err = pcall(chunk_or_err)
-					if not ok_run then
-						Logger.warn(LOG, "Extension '%s' menu.lua error: %s.", ext_id, tostring(run_err))
-					end
-				else
-					Logger.warn(LOG, "Could not load '%s': %s.", menu_lua, tostring(chunk_or_err))
-				end
-
-				if #collected > 0 then
-					table.insert(ext_menu_items, { title = ext_name, menu = collected })
-				end
-				::continue_sc_ext::
 			end
 
-			if #ext_menu_items > 0 then
-				table.insert(s_menu, { title = "-" })
-				table.insert(s_menu, { title = "— " .. i18n.get("menu.extensions.header") .. " —", disabled = true })
-				for _, it in ipairs(ext_menu_items) do
-					table.insert(s_menu, it)
+			local collected = {}
+			local sandbox = {
+				add_item = function(it) if type(it) == "table" then table.insert(collected, it) end end,
+				t        = function(k) return i18n.get(k) end,
+				ext_name = ext_name,
+				hs       = hs,
+			}
+			sandbox._G = sandbox
+
+			local ok_load, chunk_or_err = pcall(loadfile, menu_lua)
+			if ok_load and type(chunk_or_err) == "function" then
+				setfenv(chunk_or_err, sandbox)
+				local ok_run, run_err = pcall(chunk_or_err)
+				if not ok_run then
+					Logger.warn(LOG, "Extension '%s' menu.lua error: %s.", ext_id, tostring(run_err))
 				end
+			else
+				Logger.warn(LOG, "Could not load '%s': %s.", menu_lua, tostring(chunk_or_err))
+			end
+
+			if #collected > 0 then
+				table.insert(ext_menu_items, { title = ext_name, menu = collected })
+			end
+			::continue_sc_ext::
+		end
+
+		if #ext_menu_items > 0 then
+			table.insert(items, { title = "— " .. i18n.get("menu.extensions.header") .. " —", disabled = true })
+			for _, it in ipairs(ext_menu_items) do
+				table.insert(items, it)
 			end
 		end
 	end
 
-	-- Edit personal shortcuts — sits at the bottom of the shortcuts submenu,
-	-- the most logical place since it directly relates to configuring shortcuts
-	table.insert(s_menu, {
-		title = i18n.get("menu.global.edit_shortcuts"),
-		fn    = function()
-			local actions = ctx.actions
-			if type(actions) == "table" and type(actions.open_personal_shortcuts) == "function" then
-				pcall(actions.open_personal_shortcuts)
-			end
-		end,
-	})
+	local function dyn_edit_shortcuts(items, _ctx)
+		table.insert(items, {
+			title = i18n.get("menu.global.edit_shortcuts"),
+			fn    = function()
+				local acts = ctx.actions
+				if type(acts) == "table" and type(acts.open_personal_shortcuts) == "function" then
+					pcall(acts.open_personal_shortcuts)
+				end
+			end,
+		})
+	end
+
+	-- Top-level items (at_hash, layer_scroll) are not in the manifest list yet;
+	-- prepend them before the manifest-driven items for backward compatibility.
+	local top_items = {}
+	for _, id in ipairs(TOP_ORDER) do
+		if top_map[id] then table.insert(top_items, top_map[id]) end
+	end
+	if wrap_item then
+		if #top_items > 0 then table.insert(top_items, { title = "-" }) end
+		table.insert(top_items, wrap_item)
+	end
+
+
+	-- =============================================
+	-- ===== 2.3) Manifest-Driven Menu Assembly =====
+	-- =============================================
+
+	local dyn_handlers = {
+		ctrl_shortcuts          = dyn_ctrl_shortcuts,
+		cmd_shortcuts           = dyn_cmd_shortcuts,
+		script_control_shortcuts = dyn_script_control,
+		extensions_shortcuts    = dyn_extensions_shortcuts,
+		edit_shortcuts          = dyn_edit_shortcuts,
+	}
+
+	local s_menu = ManifestMenu.build("shortcuts_menu", "Shortcuts", dyn_handlers, nil, ctx)
+
+	-- Prepend the top-level feature items before the manifest section
+	for i, it in ipairs(top_items) do
+		table.insert(s_menu, i, it)
+	end
+	if #top_items > 0 and #s_menu > #top_items then
+		table.insert(s_menu, #top_items + 1, { title = "-" })
+	end
 
 	item.menu = s_menu
 	return item

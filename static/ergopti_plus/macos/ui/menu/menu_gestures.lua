@@ -4,14 +4,21 @@
 --- MODULE: Menu Gestures
 --- DESCRIPTION:
 --- Orchestrates the gestures submenu interface.
+---
+--- FEATURES & RATIONALE:
+--- 1. Manifest-Driven: Structure (slot groups, separators, action buttons) is
+---    read from ``shared/menu_manifest.json`` via ``lib/manifest_menu``.
+---    Dynamic blocks (slot items, disable_all, restore_defaults) are supplied
+---    as handlers so runtime state stays in Lua.
 --- ==============================================================================
 
 local M = {}
 local hs = hs
 
-local gestures_mod = require("modules.gestures")
-local dialog       = require("lib.dialog_util")
-local i18n         = require("lib.i18n")
+local gestures_mod  = require("modules.gestures")
+local dialog        = require("lib.dialog_util")
+local i18n          = require("lib.i18n")
+local ManifestMenu  = require("lib.manifest_menu")
 
 
 
@@ -254,78 +261,82 @@ function M.build(ctx)
 		return its
 	end
 
-	local gm = {}
+	-- Dynamic handlers — each appends its items to the list it receives.
 
-	-- Quick-action buttons at the top, mirroring the karabiner menu pattern
-	table.insert(gm, {
-		title = i18n.get("menu.gestures.disable_all"),
-		fn    = function()
-			local gestures_enabled = state.gestures == true
-			local all_slots = gestures_mod.SINGLE_SLOTS or {}
-			for _, slot in ipairs(all_slots) do
-				if type(gestures.set_action) == "function" then pcall(gestures.set_action, slot, DISABLED_GESTURE_ACTION) end
-			end
-			state.gestures = gestures_enabled
-			if gestures_enabled then
-				if type(gestures.enable_all) == "function" then pcall(gestures.enable_all) end
-			else
-				if type(gestures.disable_all) == "function" then pcall(gestures.disable_all) end
-			end
-			ctx.save_prefs()
-			ctx.updateMenu()
-		end,
-	})
-	table.insert(gm, {
-		title = i18n.get("menu.gestures.restore_defaults"),
-		fn    = function()
-			local defaults = gestures_mod.DEFAULT_GESTURES or {}
-			for slot, action in pairs(defaults) do
-				if type(gestures.set_action) == "function" then pcall(gestures.set_action, slot, action) end
-			end
-			ctx.save_prefs()
-			ctx.updateMenu()
-		end,
-	})
-	table.insert(gm, { title = "-" })
-
-	-- Global Settings
-	table.insert(gm, {
-		title = i18n.get("menu.gestures.circular_spaces"),
-		checked = (type(gestures.get_space_wrap) == "function" and gestures.get_space_wrap()) or nil,
-		disabled = not state.gestures or paused or nil,
-		fn = function()
-			if type(gestures.get_space_wrap) == "function" and type(gestures.set_space_wrap) == "function" then
-				pcall(gestures.set_space_wrap, not gestures.get_space_wrap())
+	local function dyn_disable_all(items, _ctx)
+		table.insert(items, {
+			title = i18n.get("menu.gestures.disable_all"),
+			fn    = function()
+				local gestures_enabled = state.gestures == true
+				local all_slots = gestures_mod.SINGLE_SLOTS or {}
+				for _, slot in ipairs(all_slots) do
+					if type(gestures.set_action) == "function" then pcall(gestures.set_action, slot, DISABLED_GESTURE_ACTION) end
+				end
+				state.gestures = gestures_enabled
+				if gestures_enabled then
+					if type(gestures.enable_all) == "function" then pcall(gestures.enable_all) end
+				else
+					if type(gestures.disable_all) == "function" then pcall(gestures.disable_all) end
+				end
 				ctx.save_prefs()
 				ctx.updateMenu()
+			end,
+		})
+	end
+
+	local function dyn_restore_defaults(items, _ctx)
+		table.insert(items, {
+			title = i18n.get("menu.gestures.restore_defaults"),
+			fn    = function()
+				local defaults = gestures_mod.DEFAULT_GESTURES or {}
+				for slot, action in pairs(defaults) do
+					if type(gestures.set_action) == "function" then pcall(gestures.set_action, slot, action) end
+				end
+				ctx.save_prefs()
+				ctx.updateMenu()
+			end,
+		})
+	end
+
+	local function dyn_circular_spaces(items, _ctx)
+		table.insert(items, {
+			title    = i18n.get("menu.gestures.circular_spaces"),
+			checked  = (type(gestures.get_space_wrap) == "function" and gestures.get_space_wrap()) or nil,
+			disabled = not state.gestures or paused or nil,
+			fn       = function()
+				if type(gestures.get_space_wrap) == "function" and type(gestures.set_space_wrap) == "function" then
+					pcall(gestures.set_space_wrap, not gestures.get_space_wrap())
+					ctx.save_prefs()
+					ctx.updateMenu()
+				end
+			end,
+		})
+	end
+
+	-- Build a slot group from the manifest gesture_slots table.
+	local function dyn_slots_group(finger_count)
+		return function(items, _ctx)
+			local root = ManifestMenu.get_root()
+			local slots = (type(root) == "table"
+				and type(root.gesture_slots) == "table"
+				and root.gesture_slots[tostring(finger_count)]) or {}
+			for _, slot_id in ipairs(slots) do
+				table.insert(items, slotItem(slot_id))
 			end
 		end
-	})
-	table.insert(gm, { title = "-" })
+	end
 
-	-- 2 Fingers
-	table.insert(gm, slotItem("tap_2"))
-	for _, it in ipairs(section({"swipe_2_left", "swipe_2_right", "swipe_2_up", "swipe_2_down"})) do table.insert(gm, it) end
-	for _, it in ipairs(section({"swipe_2_left_up", "swipe_2_right_up", "swipe_2_left_down", "swipe_2_right_down"})) do table.insert(gm, it) end
-	table.insert(gm, { title = "-" })
+	local dyn_handlers = {
+		disable_all      = dyn_disable_all,
+		restore_defaults = dyn_restore_defaults,
+		circular_spaces  = dyn_circular_spaces,
+		gesture_slots_2  = dyn_slots_group(2),
+		gesture_slots_3  = dyn_slots_group(3),
+		gesture_slots_4  = dyn_slots_group(4),
+		gesture_slots_5  = dyn_slots_group(5),
+	}
 
-	-- 3 Fingers
-	table.insert(gm, slotItem("tap_3"))
-	for _, it in ipairs(section({"swipe_3_left", "swipe_3_right", "swipe_3_up", "swipe_3_down"})) do table.insert(gm, it) end
-	for _, it in ipairs(section({"swipe_3_left_up", "swipe_3_right_up", "swipe_3_left_down", "swipe_3_right_down"})) do table.insert(gm, it) end
-	table.insert(gm, { title = "-" })
-	
-	-- 4 Fingers
-	table.insert(gm, slotItem("tap_4"))
-	for _, it in ipairs(section({"swipe_4_left", "swipe_4_right", "swipe_4_up", "swipe_4_down"})) do table.insert(gm, it) end
-	for _, it in ipairs(section({"swipe_4_left_up", "swipe_4_right_up", "swipe_4_left_down", "swipe_4_right_down"})) do table.insert(gm, it) end
-	table.insert(gm, { title = "-" })
-	
-	-- 5 Fingers
-	table.insert(gm, slotItem("tap_5"))
-	for _, it in ipairs(section({"swipe_5_left", "swipe_5_right", "swipe_5_up", "swipe_5_down"})) do table.insert(gm, it) end
-	for _, it in ipairs(section({"swipe_5_left_up", "swipe_5_right_up", "swipe_5_left_down", "swipe_5_right_down"})) do table.insert(gm, it) end
-	
+	local gm = ManifestMenu.build("gestures_menu", "Gestures", dyn_handlers, nil, ctx)
 	item.menu = gm
 	return item
 end

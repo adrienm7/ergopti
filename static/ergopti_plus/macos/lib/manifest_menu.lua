@@ -1,0 +1,254 @@
+--- lib/manifest_menu.lua
+
+--- ==============================================================================
+--- MODULE: Manifest Menu Renderer
+--- DESCRIPTION:
+--- Generic manifest-driven menu builder shared by all submenu builders on macOS.
+--- Reads a ``*_menu`` array from ``menu_manifest.json`` and constructs an
+--- hs.menubar-compatible items table, dispatching each item type to the
+--- appropriate render function.
+---
+--- FEATURES & RATIONALE:
+--- 1. Single renderer: every submenu (shortcuts, metrics, layout, hotstrings,
+---    gestures) is built by the same loop — structure lives in the manifest,
+---    not in per-submenu Lua code.
+--- 2. Dynamic escape hatch: items whose ``type`` is ``"dynamic"`` are routed
+---    to a caller-supplied table of handler functions so platform-specific UI
+---    (file trees, dialogs, runtime state) stays in the caller.
+--- 3. Platform filtering: entries with a ``platforms`` array that does not
+---    include ``"hs"`` are silently skipped.
+--- ==============================================================================
+
+local M = {}
+local hs     = hs
+local Logger = require("lib.logger")
+local Paths  = require("lib.paths")
+local i18n   = require("lib.i18n")
+local LOG    = "manifest_menu"
+
+-- Module-level manifest cache — invalidated by M.invalidate_cache().
+local _cache = nil
+
+
+
+
+-- ==============================================
+-- ==============================================
+-- ======= 1/ Manifest Root Access Layer =======
+-- ==============================================
+-- ==============================================
+
+--- Loads and caches the shared manifest JSON.
+--- Returns the parsed root table, or nil on failure.
+--- @return table|nil
+local function get_manifest_root()
+	if _cache ~= nil then
+		return _cache
+	end
+	local path = Paths.find_from_configdir("shared/menu_manifest.json") or ""
+	local ok_r, fh = pcall(io.open, path, "r")
+	if not ok_r or not fh then
+		Logger.error(LOG, "Cannot open menu_manifest.json at '%s'.", path)
+		return nil
+	end
+	local content = fh:read("*a")
+	fh:close()
+	local ok_j, data = pcall(hs.json.decode, content)
+	if not ok_j or type(data) ~= "table" then
+		Logger.error(LOG, "Failed to parse menu_manifest.json.")
+		return nil
+	end
+	_cache = data
+	return _cache
+end
+
+--- Invalidates the manifest cache.
+--- Call after a locale change or hot-reload so the next build re-reads the file.
+function M.invalidate_cache()
+	_cache = nil
+end
+
+--- Returns the menu definition array at ``key`` in the manifest.
+--- Returns an empty table if the key is absent or the manifest failed to load.
+--- @param key string Top-level key in menu_manifest.json (e.g. "shortcuts_menu").
+--- @return table
+local function get_menu_def(key)
+	local root = get_manifest_root()
+	if type(root) ~= "table" then
+		return {}
+	end
+	local arr = root[key]
+	if type(arr) ~= "table" then
+		Logger.warn(LOG, "menu key '%s' not found in manifest.", key)
+		return {}
+	end
+	return arr
+end
+
+
+
+
+-- ============================================
+-- ============================================
+-- ======= 2/ Platform Filter Helpers =========
+-- ============================================
+-- ============================================
+
+--- Returns true when the entry has no ``platforms`` restriction or when
+--- ``"hs"`` appears in its ``platforms`` array.
+--- @param entry table Manifest item entry.
+--- @return boolean
+local function is_for_hs(entry)
+	if type(entry) ~= "table" then return false end
+	if type(entry.platforms) ~= "table" then return true end
+	for _, p in ipairs(entry.platforms) do
+		if p == "hs" then return true end
+	end
+	return false
+end
+
+
+
+
+-- ============================================
+-- ============================================
+-- ======= 3/ Core Renderer ===================
+-- ============================================
+-- ============================================
+
+--- Build an hs.menubar items table from a manifest menu definition array.
+---
+--- ``manifest_key``      — key in menu_manifest.json (e.g. ``"shortcuts_menu"``)
+--- ``category``          — human-readable category name for debug logs
+--- ``dynamic_handlers``  — table of id → function(items, ctx) for ``type:"dynamic"`` entries.
+---   Each handler receives ``(items_list, ctx)`` and appends its items in place.
+--- ``group_builders``    — optional table of group_id → function(ctx) → table|nil for
+---   ``type:"group"`` entries. Returns a table ``{title, menu}`` or nil to skip.
+--- ``ctx``               — the menu context table passed through to dynamic handlers.
+---
+--- Returns the populated items list (array of hs.menubar item tables).
+--- @param manifest_key string
+--- @param category string
+--- @param dynamic_handlers table
+--- @param group_builders table|nil
+--- @param ctx table
+--- @return table
+function M.build(manifest_key, category, dynamic_handlers, group_builders, ctx)
+	group_builders = group_builders or {}
+	local menu_def = get_menu_def(manifest_key)
+	local result   = {}
+
+	for _, item in ipairs(menu_def) do
+		if not is_for_hs(item) then
+			goto continue
+		end
+
+		local t = item.type
+
+		if t == "---" then
+			table.insert(result, { title = "-" })
+
+		elseif t == "toggle" then
+			-- Category toggles are rendered by the caller (they need ctx state);
+			-- insert a placeholder sentinel so callers that want the toggle
+			-- inline can detect it. Most callers prepend the toggle themselves.
+
+		elseif t == "feature" then
+			-- Feature items are state-bearing and need ctx; skip here — the
+			-- dynamic handler for the enclosing submenu manages them. Feature
+			-- items in flat submenus are rendered via dedicated dynamic handlers.
+
+		elseif t == "action" then
+			-- Actions are platform-specific callbacks; rendered via dynamic
+			-- handlers keyed by the action id.
+			local action_id = type(item.id) == "string" and item.id or ""
+			if action_id ~= "" and type(dynamic_handlers[action_id]) == "function" then
+				dynamic_handlers[action_id](result, ctx)
+			end
+
+		elseif t == "section_header" then
+			local i18n_key = type(item.i18n) == "string" and item.i18n or ""
+			if i18n_key ~= "" then
+				table.insert(result, { title = "— " .. i18n.section(i18n_key) .. " —", disabled = true })
+			end
+
+		elseif t == "group" then
+			local group_id  = type(item.id)   == "string" and item.id   or ""
+			local i18n_key  = type(item.i18n) == "string" and item.i18n or ""
+			if group_id == "" or i18n_key == "" then
+				Logger.warn(LOG, "group item missing id or i18n in '%s' — skipped.", manifest_key)
+				goto continue
+			end
+			local label = i18n.get(i18n_key)
+			-- Try caller-supplied builder first, then built-in groups.
+			local built = nil
+			if type(group_builders[group_id]) == "function" then
+				built = group_builders[group_id](ctx)
+			else
+				built = M.build_builtin_group(group_id, ctx)
+			end
+			if type(built) == "table" then
+				table.insert(result, { title = label, menu = built })
+			end
+
+		elseif t == "dynamic" then
+			local dyn_id = type(item.id) == "string" and item.id or ""
+			if dyn_id ~= "" and type(dynamic_handlers[dyn_id]) == "function" then
+				dynamic_handlers[dyn_id](result, ctx)
+			end
+
+		else
+			Logger.warn(LOG, "Unknown item type '%s' in '%s' — skipped.", tostring(t), manifest_key)
+		end
+
+		::continue::
+	end
+
+	return result
+end
+
+
+
+
+-- ============================================
+-- ============================================
+-- ======= 4/ Built-in Group Builders =========
+-- ============================================
+-- ============================================
+
+--- Builds a built-in named group that is always rendered the same way.
+--- Returns the items table for the group submenu, or nil when unknown.
+--- @param group_id string
+--- @param ctx table
+--- @return table|nil
+function M.build_builtin_group(group_id, ctx)
+	-- ctrl_shortcuts and cmd_shortcuts are rendered by menu_shortcuts.lua
+	-- which has full access to ctx; no built-in here.
+	Logger.warn(LOG, "Unknown built-in group '%s' — skipped.", group_id)
+	return nil
+end
+
+
+
+
+-- ============================================
+-- ============================================
+-- ======= 5/ Manifest Data Accessors =========
+-- ============================================
+-- ============================================
+
+--- Returns the full parsed manifest root, or nil on failure.
+--- Useful for callers that need to access arbitrary manifest keys.
+--- @return table|nil
+function M.get_root()
+	return get_manifest_root()
+end
+
+--- Returns the array at ``key`` in the manifest, or an empty table.
+--- @param key string
+--- @return table
+function M.get_array(key)
+	return get_menu_def(key)
+end
+
+return M
