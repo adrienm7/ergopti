@@ -670,7 +670,7 @@
 	"menu.hotstrings.params": "⚙️ 热字符串设置",
 	"menu.hotstrings.personal_header": "个人热字符串",
 	"menu.hotstrings.preview_bubbles": "预览气泡",
-	"menu.hotstrings.repeat_key_toggle": "   ↳ 使用 ★ 键重复字符",
+	"menu.hotstrings.repeat_key_toggle": "★ 键重复上一次按键",
 	"menu.hotstrings.reset_magic_key": "   ↳ 重置（默认：★）",
 	"menu.hotstrings.rolls.assign": "#! ➜ :=",
 	"menu.hotstrings.rolls.assign_arrow_equal_left": "=$ ➜ <=",

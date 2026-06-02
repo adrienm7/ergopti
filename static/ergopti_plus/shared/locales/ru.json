@@ -670,7 +670,7 @@
 	"menu.hotstrings.params": "⚙️ Настройки хотстрингов",
 	"menu.hotstrings.personal_header": "Личные хотстринги",
 	"menu.hotstrings.preview_bubbles": "Пузырьки предпросмотра",
-	"menu.hotstrings.repeat_key_toggle": "   ↳ Повтор символа клавишей ★",
+	"menu.hotstrings.repeat_key_toggle": "Клавиша ★ повторяет последнее нажатие",
 	"menu.hotstrings.reset_magic_key": "   ↳ Сбросить (по умолчанию: ★)",
 	"menu.hotstrings.rolls.assign": "#! ➜ :=",
 	"menu.hotstrings.rolls.assign_arrow_equal_left": "=$ ➜ <=",

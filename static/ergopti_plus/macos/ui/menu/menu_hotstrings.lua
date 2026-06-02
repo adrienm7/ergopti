@@ -630,9 +630,6 @@ function M.build_management(ctx)
 	if delays_item then table.insert(menu, delays_item) end
 	table.insert(menu, { title = "-" })
 	if bubble_item then table.insert(menu, bubble_item) end
-
-	-- Magic key and repeat toggle moved here from keyboard layout (they govern
-	-- hotstring behaviour, not the physical key mapping).
 	table.insert(menu, { title = "-" })
 	local hs_state  = ctx and ctx.state
 	local hs_paused = ctx and ctx.paused

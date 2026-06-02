@@ -670,7 +670,7 @@
 	"menu.hotstrings.params": "⚙️ Hotstring-instellingen",
 	"menu.hotstrings.personal_header": "Persoonlijke hotstrings",
 	"menu.hotstrings.preview_bubbles": "Voorbeeldballonnen",
-	"menu.hotstrings.repeat_key_toggle": "   ↳ Teken herhalen met ★-toets",
+	"menu.hotstrings.repeat_key_toggle": "★-toets herhaalt de laatste toetsaanslag",
 	"menu.hotstrings.reset_magic_key": "   ↳ Herstellen (standaard: ★)",
 	"menu.hotstrings.rolls.assign": "#! ➜ :=",
 	"menu.hotstrings.rolls.assign_arrow_equal_left": "=$ ➜ <=",

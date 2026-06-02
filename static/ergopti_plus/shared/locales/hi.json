@@ -670,7 +670,7 @@
 	"menu.hotstrings.params": "⚙️ Hotstring सेटिंग्स",
 	"menu.hotstrings.personal_header": "व्यक्तिगत hotstrings",
 	"menu.hotstrings.preview_bubbles": "बबल का पूर्वावलोकन करें",
-	"menu.hotstrings.repeat_key_toggle": "   ↳ ★ कुंजी से वर्ण दोहराएं",
+	"menu.hotstrings.repeat_key_toggle": "★ कुंजी अंतिम कीस्ट्रोक दोहराती है",
 	"menu.hotstrings.reset_magic_key": "   ↳ रीसेट करें (डिफ़ॉल्ट: ★)",
 	"menu.hotstrings.rolls.assign": "#! ➜ :=",
 	"menu.hotstrings.rolls.assign_arrow_equal_left": "=$ ➜ <=",

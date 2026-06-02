@@ -670,7 +670,7 @@
 	"menu.hotstrings.params": "⚙️ Configurações de hotstring",
 	"menu.hotstrings.personal_header": "Hotstrings pessoais",
 	"menu.hotstrings.preview_bubbles": "Bolhas de prévia",
-	"menu.hotstrings.repeat_key_toggle": "   ↳ Repetir caractere com tecla ★",
+	"menu.hotstrings.repeat_key_toggle": "A tecla ★ repete a última tecla pressionada",
 	"menu.hotstrings.reset_magic_key": "   ↳ Redefinir (padrão: ★)",
 	"menu.hotstrings.rolls.assign": "#! ➜ :=",
 	"menu.hotstrings.rolls.assign_arrow_equal_left": "=$ ➜ <=",

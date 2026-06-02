@@ -670,7 +670,7 @@
 	"menu.hotstrings.params": "⚙️ Hotstring-innstillinger",
 	"menu.hotstrings.personal_header": "Personlige hotstrings",
 	"menu.hotstrings.preview_bubbles": "Forhåndsvis bobler",
-	"menu.hotstrings.repeat_key_toggle": "   ↳ Gjenta tegn med ★-tasten",
+	"menu.hotstrings.repeat_key_toggle": "★-tasten gjentar siste tastetrykk",
 	"menu.hotstrings.reset_magic_key": "   ↳ Tilbakestill (standard: ★)",
 	"menu.hotstrings.rolls.assign": "#! ➜ :=",
 	"menu.hotstrings.rolls.assign_arrow_equal_left": "=$ ➜ <=",
