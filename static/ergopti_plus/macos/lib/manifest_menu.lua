@@ -136,7 +136,16 @@ end
 function M.build(manifest_key, category, dynamic_handlers, group_builders, ctx)
 	group_builders = group_builders or {}
 	local menu_def = get_menu_def(manifest_key)
-	local result   = {}
+	local result      = {}
+	local item_count  = 0     -- real items added so far
+	local pending_sep = false -- separator deferred until next real item
+
+	local function flush_sep()
+		if pending_sep and item_count > 0 then
+			table.insert(result, { title = "-" })
+		end
+		pending_sep = false
+	end
 
 	for _, item in ipairs(menu_def) do
 		if not is_for_hs(item) then
@@ -146,30 +155,30 @@ function M.build(manifest_key, category, dynamic_handlers, group_builders, ctx)
 		local t = item.type
 
 		if t == "---" then
-			table.insert(result, { title = "-" })
+			-- Defer separator — only flush when a real item follows.
+			pending_sep = true
+			goto continue
 
 		elseif t == "toggle" then
-			-- Category toggles are rendered by the caller (they need ctx state);
-			-- insert a placeholder sentinel so callers that want the toggle
-			-- inline can detect it. Most callers prepend the toggle themselves.
+			-- Category toggles rendered by caller; skip silently.
 
 		elseif t == "feature" then
-			-- Feature items are state-bearing and need ctx; skip here — the
-			-- dynamic handler for the enclosing submenu manages them. Feature
-			-- items in flat submenus are rendered via dedicated dynamic handlers.
+			-- Feature items rendered by caller or dynamic handlers; skip silently.
 
 		elseif t == "action" then
-			-- Actions are platform-specific callbacks; rendered via dynamic
-			-- handlers keyed by the action id.
 			local action_id = type(item.id) == "string" and item.id or ""
 			if action_id ~= "" and type(dynamic_handlers[action_id]) == "function" then
+				flush_sep()
 				dynamic_handlers[action_id](result, ctx)
+				item_count = item_count + 1
 			end
 
 		elseif t == "section_header" then
 			local i18n_key = type(item.i18n) == "string" and item.i18n or ""
 			if i18n_key ~= "" then
+				flush_sep()
 				table.insert(result, { title = "— " .. i18n.section(i18n_key) .. " —", disabled = true })
+				item_count = item_count + 1
 			end
 
 		elseif t == "group" then
@@ -180,7 +189,6 @@ function M.build(manifest_key, category, dynamic_handlers, group_builders, ctx)
 				goto continue
 			end
 			local label = i18n.get(i18n_key)
-			-- Try caller-supplied builder first, then built-in groups.
 			local built = nil
 			if type(group_builders[group_id]) == "function" then
 				built = group_builders[group_id](ctx)
@@ -188,13 +196,17 @@ function M.build(manifest_key, category, dynamic_handlers, group_builders, ctx)
 				built = M.build_builtin_group(group_id, ctx)
 			end
 			if type(built) == "table" then
+				flush_sep()
 				table.insert(result, { title = label, menu = built })
+				item_count = item_count + 1
 			end
 
 		elseif t == "dynamic" then
 			local dyn_id = type(item.id) == "string" and item.id or ""
 			if dyn_id ~= "" and type(dynamic_handlers[dyn_id]) == "function" then
+				flush_sep()
 				dynamic_handlers[dyn_id](result, ctx)
+				item_count = item_count + 1
 			end
 
 		else

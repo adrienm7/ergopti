@@ -140,8 +140,10 @@ MenuRenderer_Build(ManifestKey, CategoryName, DynamicHandlers, GroupBuilders := 
 		GroupBuilders := Map()
 	}
 
-	MenuDef := _MR_GetMenuDef(ManifestKey)
-	Result  := Menu()
+	MenuDef    := _MR_GetMenuDef(ManifestKey)
+	Result     := Menu()
+	ItemCount  := 0      ; real items added so far
+	PendingSep := false  ; separator deferred until next real item
 
 	for Item in MenuDef {
 		if !_MR_IsForAhk(Item) {
@@ -151,31 +153,50 @@ MenuRenderer_Build(ManifestKey, CategoryName, DynamicHandlers, GroupBuilders := 
 		ItemType := _MR_Get(Item, "type", "")
 
 		if ItemType == "---" {
-			Result.Add()
+			; Defer separator — only flush when a real item follows.
+			PendingSep := true
+			continue
+		}
 
-		} else if ItemType == "toggle" {
+		; Flush deferred separator before any real item (never at position 0).
+		if PendingSep and ItemCount > 0 {
+			Result.Add()
+		}
+		PendingSep := false
+
+		if ItemType == "toggle" {
 			_MR_RenderToggle(Result, Item, CategoryName)
+			ItemCount++
 
 		} else if ItemType == "feature" {
 			_MR_RenderFeature(Result, Item, CategoryName)
+			ItemCount++
 
 		} else if ItemType == "action" {
-			; Actions are platform-specific callbacks — skip here; caller inserts
-			; them via dynamic handler with id matching the action id.
+			; Actions rendered via dynamic handler keyed by action id.
+			Id := _MR_Get(Item, "id")
+			if (Id != "" and DynamicHandlers is Map and DynamicHandlers.Has(Id)) {
+				(DynamicHandlers[Id])(Result, CategoryName)
+				ItemCount++
+			}
 
 		} else if ItemType == "section_header" {
 			_MR_RenderSectionHeader(Result, Item)
+			ItemCount++
 
 		} else if ItemType == "group" {
 			_MR_RenderGroup(Result, Item, CategoryName, GroupBuilders)
+			ItemCount++
 
 		} else if ItemType == "letter_picker" {
 			_MR_RenderLetterPicker(Result, Item, CategoryName)
+			ItemCount++
 
 		} else if ItemType == "dynamic" {
 			Id := _MR_Get(Item, "id")
 			if (Id != "" and DynamicHandlers is Map and DynamicHandlers.Has(Id)) {
-				try (DynamicHandlers[Id])(Result, CategoryName)
+				(DynamicHandlers[Id])(Result, CategoryName)
+				ItemCount++
 			}
 
 		} else {
