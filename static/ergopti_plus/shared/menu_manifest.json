@@ -1,6 +1,7 @@
 {
-	"_comment": "Single source of truth for menu structure shared across AHK and Hammerspoon drivers.",
+	"_comment":  "Single source of truth for menu structure shared across AHK and Hammerspoon drivers.",
 	"_comment2": "platforms field: omit or 'both' = all platforms, 'ahk' = Windows only, 'hs' = macOS only.",
+	"_comment3": "item types: 'toggle' = category on/off gate, 'feature' = manifest-path toggle, 'action' = stateless button, 'dynamic' = rendered by platform code, 'group' = named submenu, 'section_header' = disabled label, '---' = separator.",
 
 	"top_level": [
 		{ "id": "keyboard_layout" },
@@ -44,6 +45,146 @@
 		{ "id": "---" },
 		{ "id": "healthcheck" }
 	],
+
+
+	"shortcuts_menu": [
+		{ "type": "toggle",         "i18n_on": "menu.shortcuts.on",  "i18n_off": "menu.shortcuts.off",  "category": "Shortcuts" },
+		{ "type": "---" },
+		{ "type": "feature",        "path": "ahk.shortcuts.screen_instant",        "platforms": ["ahk"] },
+		{ "type": "feature",        "path": "shortcuts.wrap_text_if_selected" },
+		{ "type": "---" },
+		{ "type": "group",          "id": "modifier_combos",   "i18n": "menu.shortcuts.group_modifiers", "platforms": ["ahk"] },
+		{ "type": "group",          "id": "ctrl_shortcuts",    "i18n": "menu.shortcuts.submenu_ctrl",    "platforms": ["hs"] },
+		{ "type": "group",          "id": "cmd_shortcuts",     "i18n": "menu.shortcuts.submenu_cmd",     "platforms": ["hs"] },
+		{ "type": "---" },
+		{ "type": "dynamic",        "id": "personal_shortcuts" },
+		{ "type": "dynamic",        "id": "script_control_shortcuts" },
+		{ "type": "dynamic",        "id": "extensions_shortcuts" },
+		{ "type": "action",         "id": "edit_shortcuts",    "i18n": "menu.global.edit_shortcuts" }
+	],
+
+	"modifier_combos_group": [
+		{ "type": "feature",  "path": "ahk.shortcuts.alt_gr_lalt",      "platforms": ["ahk"] },
+		{ "type": "feature",  "path": "ahk.shortcuts.alt_gr_caps_lock",  "platforms": ["ahk"] },
+		{ "type": "feature",  "path": "ahk.shortcuts.lalt_caps_lock",    "platforms": ["ahk"] }
+	],
+
+
+	"metrics_menu": [
+		{ "type": "toggle",         "i18n_on": "menu.metrics.on",  "i18n_off": "menu.metrics.off",  "category": "Metrics" },
+		{ "type": "---" },
+		{ "type": "action",         "id": "show_typing",       "i18n": "menu.metrics.show_typing" },
+		{ "type": "action",         "id": "shortcut_typing",   "i18n_dynamic": "menu.metrics.shortcut_prefix" },
+		{ "type": "---" },
+		{ "type": "action",         "id": "show_apps",         "i18n": "menu.metrics.show_apps" },
+		{ "type": "action",         "id": "shortcut_apps",     "i18n_dynamic": "menu.metrics.shortcut_prefix" },
+		{ "type": "---" },
+		{ "type": "---" },
+		{ "type": "section_header", "i18n": "menu.metrics.privacy_header" },
+		{ "type": "feature",        "id": "filter_private",    "i18n": "menu.metrics.filter_private" },
+		{ "type": "feature",        "id": "filter_secure",     "i18n": "menu.metrics.filter_secure" },
+		{ "type": "feature",        "id": "filter_sysauth",    "i18n": "menu.metrics.filter_sysauth" },
+		{ "type": "dynamic",        "id": "exclude_apps" },
+		{ "type": "---" },
+		{ "type": "---" },
+		{ "type": "feature",        "id": "wpm_menubar",       "i18n": "menu.metrics.show_wpm_menubar",  "platforms": ["hs"] },
+		{ "type": "feature",        "id": "menubar_colors",    "i18n": "menu.metrics.colors_by_source",  "platforms": ["hs"], "depends_on": "wpm_menubar" },
+		{ "type": "feature",        "id": "wpm_widget",        "i18n": "menu.metrics.show_wpm_widget" },
+		{ "type": "feature",        "id": "widget_colors",     "i18n": "menu.metrics.colors_by_source",  "depends_on": "wpm_widget" },
+		{ "type": "feature",        "id": "include_realtime",  "i18n": "menu.metrics.include_realtime",  "depends_on": "wpm_widget" },
+		{ "type": "action",         "id": "reset_wpm_position","i18n": "menu.metrics.reset_wpm_position","depends_on": "wpm_widget" },
+		{ "type": "---" },
+		{ "type": "---" },
+		{ "type": "dynamic",        "id": "encryption" }
+	],
+
+
+	"layout_menu": [
+		{ "type": "toggle",         "i18n_on": "menu.layout.on",  "i18n_off": "menu.layout.off",  "category": "Layout" },
+		{ "type": "---" },
+		{ "type": "dynamic",        "id": "layout_features" },
+		{ "type": "---" },
+		{ "type": "feature",        "path": "hotstrings.magic_key.replace",  "i18n": "menu.layout.replace" },
+		{ "type": "group",          "id": "accented_letters",  "i18n": "menu.shortcuts.group_accented",  "platforms": ["ahk"] },
+		{ "type": "dynamic",        "id": "active_layouts",                                               "platforms": ["hs"] }
+	],
+
+	"accented_letters_group": [
+		{ "type": "letter_picker",  "id": "EGrave",  "platforms": ["ahk"] },
+		{ "type": "letter_picker",  "id": "ECirc",   "platforms": ["ahk"] },
+		{ "type": "letter_picker",  "id": "EAcute",  "platforms": ["ahk"] },
+		{ "type": "letter_picker",  "id": "AGrave",  "platforms": ["ahk"] }
+	],
+
+
+	"hotstrings_menu": [
+		{ "type": "toggle",         "i18n_on": "menu.hotstrings.on",  "i18n_off": "menu.hotstrings.off",  "category": "Hotstrings" },
+		{ "type": "---" },
+		{ "type": "group",          "id": "hotstrings_params",    "i18n": "menu.hotstrings.parameters" },
+		{ "type": "---" },
+		{ "type": "section_header", "i18n": "menu.hotstrings.group_standard" },
+		{ "type": "dynamic",        "id": "hotstring_categories_standard" },
+		{ "type": "dynamic",        "id": "hotstring_categories_dynamic" },
+		{ "type": "---" },
+		{ "type": "section_header", "i18n": "menu.hotstrings.group_ergopti" },
+		{ "type": "dynamic",        "id": "hotstring_categories_ergopti" },
+		{ "type": "---" },
+		{ "type": "section_header", "i18n": "menu.hotstrings.group_personal" },
+		{ "type": "dynamic",        "id": "hotstring_personal" },
+		{ "type": "---" },
+		{ "type": "section_header", "i18n": "menu.extensions.header" },
+		{ "type": "dynamic",        "id": "hotstring_extensions" }
+	],
+
+	"hotstrings_params_group": [
+		{ "type": "action",   "id": "delays_colors",  "i18n": "menu.hotstrings.delays_colors" },
+		{ "type": "---" },
+		{ "type": "dynamic",  "id": "magic_key_config" },
+		{ "type": "feature",  "id": "repeat_key",     "i18n": "menu.hotstrings.repeat_key" }
+	],
+
+	"dynamic_hotstrings_order": [
+		"DateLongFr", "DateFr", "Date",
+		"PhonePrefixes", "SsnPrefixes", "IbanPrefixes",
+		"---",
+		"TextExpansionPersonalInformation"
+	],
+
+
+	"gestures_menu": [
+		{ "type": "toggle",   "i18n_on": "menu.gestures.on",  "i18n_off": "menu.gestures.off",  "category": "Gestures" },
+		{ "type": "action",   "id": "auto_configure",    "i18n": "menu.gestures.auto_configure",   "platforms": ["ahk"] },
+		{ "type": "action",   "id": "manual_tutorial",   "i18n": "menu.gestures.manual_tutorial",  "platforms": ["ahk"] },
+		{ "type": "action",   "id": "disable_all",       "i18n": "menu.gestures.disable_all",      "platforms": ["hs"] },
+		{ "type": "action",   "id": "restore_defaults",  "i18n": "menu.gestures.restore_defaults", "platforms": ["hs"] },
+		{ "type": "---" },
+		{ "type": "feature",  "id": "circular_spaces",   "i18n": "menu.gestures.circular_spaces",  "platforms": ["hs"] },
+		{ "type": "---" },
+		{ "type": "dynamic",  "id": "gesture_slots_2" },
+		{ "type": "---" },
+		{ "type": "dynamic",  "id": "gesture_slots_3" },
+		{ "type": "---" },
+		{ "type": "dynamic",  "id": "gesture_slots_4" },
+		{ "type": "---" },
+		{ "type": "dynamic",  "id": "gesture_slots_5" }
+	],
+
+	"gesture_slots": {
+		"2": ["tap_2", "swipe_2_left", "swipe_2_right", "swipe_2_up", "swipe_2_down", "swipe_2_left_up", "swipe_2_right_up", "swipe_2_left_down", "swipe_2_right_down"],
+		"3": ["tap_3", "swipe_3_left", "swipe_3_right", "swipe_3_up", "swipe_3_down", "swipe_3_left_up", "swipe_3_right_up", "swipe_3_left_down", "swipe_3_right_down"],
+		"4": ["tap_4", "swipe_4_left", "swipe_4_right", "swipe_4_up", "swipe_4_down", "swipe_4_left_up", "swipe_4_right_up", "swipe_4_left_down", "swipe_4_right_down"],
+		"5": ["tap_5", "swipe_5_left", "swipe_5_right", "swipe_5_up", "swipe_5_down", "swipe_5_left_up", "swipe_5_right_up", "swipe_5_left_down", "swipe_5_right_down"]
+	},
+
+
+	"tap_holds_menu": [
+		{ "type": "toggle",   "i18n_on": "menu.tapholds.on",  "i18n_off": "menu.tapholds.off",  "category": "TapHolds",  "platforms": ["ahk"] },
+		{ "type": "action",   "id": "reset_defaults",  "i18n": "tap_hold.reset_defaults",  "platforms": ["ahk"] },
+		{ "type": "action",   "id": "disable_all",     "i18n": "tap_hold.disable_all",     "platforms": ["ahk"] },
+		{ "type": "---",      "platforms": ["ahk"] },
+		{ "type": "dynamic",  "id": "tap_hold_keys",   "platforms": ["ahk"] }
+	],
+
 
 	"hotstring_groups": {
 		"standard": ["distances_reduction", "autocorrection", "magic_key"],
