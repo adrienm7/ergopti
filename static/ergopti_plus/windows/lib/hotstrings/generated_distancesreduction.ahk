@@ -357,6 +357,11 @@ _GenLoad_distancesreduction_deadkeyecircumflex(FeatureConfig, ExtraOptions := un
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
+	CreateHotstring("*", "ê★", "j", _GenOpts)
+	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "distancesreduction", "Section", "deadkeyecircumflex")
+	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
+		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
+	}
 	CreateHotstring("*", "êK", "☻", _GenOpts)
 	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "distancesreduction", "Section", "deadkeyecircumflex")
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {

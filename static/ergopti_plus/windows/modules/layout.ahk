@@ -51,6 +51,7 @@ global DeadkeyMappingCircumflex := Map(
 	"h", "ĥ", "H", "Ĥ",
 	"i", "î", "I", "Î",
 	"j", "j", "J", "J",
+	"★", "j", 
 	"k", "☺", "K", "☻",
 	"l", "†", "L", "‡",
 	"m", "✅", "M", "☑",
