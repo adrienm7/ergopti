@@ -128,8 +128,8 @@ function M.build(ctx)
 	}
 
 	-- Buckets for each display group
-	-- Note: wrap_text_if_selected moved to Disposition clavier (keyboard emulation)
 	local top_items  = {}   -- at_hash, layer_scroll (in order)
+	local wrap_item  = nil  -- wrap_text_if_selected (UIA symbol-on-selection)
 	local ctrl_items = {}
 	local cmd_items  = {}
 
@@ -147,7 +147,7 @@ function M.build(ctx)
 					if s.id == "at_hash" or s.id == "layer_scroll" then
 						top_map[s.id] = mi
 					elseif s.id == "wrap_text_if_selected" then
-						-- Moved to Disposition clavier — skip here
+						wrap_item = mi
 
 					elseif s.id:sub(1, 5) == "ctrl_" then
 						table.insert(ctrl_items, mi)
@@ -187,6 +187,10 @@ function M.build(ctx)
 
 	for _, mi in ipairs(top_items) do
 		table.insert(s_menu, mi)
+	end
+	if wrap_item then
+		if #s_menu > 0 then table.insert(s_menu, { title = "-" }) end
+		table.insert(s_menu, wrap_item)
 	end
 
 	-- Ctrl submenu
