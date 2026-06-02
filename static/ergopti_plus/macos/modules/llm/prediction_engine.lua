@@ -494,6 +494,18 @@ end
 --- @param profile_name string|nil Optional profile label override shown in the info bar.
 function M.perform_check(force_trigger, profile_name)
 	if not require_state("perform_check") then return end
+
+	-- Defence-in-depth: a debounce/chain timer armed in the moment before the
+	-- user paused must not fire an HTTP request or paint a prediction. pause_all
+	-- already calls reset_predictions() to stop these timers, but this closes the
+	-- race window. Read script_control via package.loaded to avoid a circular
+	-- require. Mirrors the AHK LLM_Engine_FirePrediction A_IsSuspended guard.
+	local sc = package.loaded["modules.shortcuts.script_control"]
+	if sc and type(sc.is_paused) == "function" and sc.is_paused() then
+		Logger.debug(LOG, "Paused — LLM request skipped.")
+		return
+	end
+
 	force_trigger = force_trigger == true
 
 	if not is_llm_enabled then

@@ -121,6 +121,20 @@ local function pause_all()
 	if _keymap and type(_keymap.pause_processing) == "function" then
 		pcall(function() _keymap.pause_processing() end)
 	end
+	-- Quiesce the LLM engine and tear down any visible tooltip. pause_processing
+	-- only gates the keymap eventtap; the prediction engine's inactivity/chain
+	-- timers and an in-flight streaming response are independent of it, so a
+	-- prediction armed in the moment before pause would still paint and hit the
+	-- backend. reset_predictions() hides the tooltip, stops those timers and
+	-- bumps the fetch counter so stale streaming callbacks self-discard. This
+	-- mirrors the AHK Ergopti_OnSuspendEnter reactor (« pause = tout éteint »).
+	if _keymap and type(_keymap.reset_predictions) == "function" then
+		pcall(function() _keymap.reset_predictions() end)
+	end
+	local ok_tt, tt = pcall(require, "ui.tooltip")
+	if ok_tt and tt and type(tt.hide_forced) == "function" then
+		pcall(function() tt.hide_forced() end)
+	end
 	if _shortcuts and type(_shortcuts.stop) == "function" then
 		pcall(function() _shortcuts.stop() end)
 	end
