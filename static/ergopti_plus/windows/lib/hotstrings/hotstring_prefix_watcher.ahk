@@ -470,9 +470,11 @@ _StartInputHook() {
 _OnPrefixChar(IH, Char) {
     global _PrefixBuffer, _MAX_BUFFER_LEN, _PrefixWatcherSuppressed, HSE_Suppressed, _PrefixIndex
     ; No hotstring preview tooltip and no expansion dispatch while the script is
-    ; paused — this watcher uses its OWN InputHook, so the HookDispatcher guard
-    ; does not cover it.
+    ; paused or the Hotstrings master gate is off — this watcher uses its OWN
+    ; InputHook, so the HookDispatcher guard does not cover it.
     if A_IsSuspended
+        return
+    if !IsCategoryGated("Hotstrings")
         return
     ; Honour BOTH suppression flags. _PrefixWatcherSuppressed is set by
     ; PrefixWatcherSuppress (manual / tray toggles); HSE_Suppressed is
