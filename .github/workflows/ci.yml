@@ -320,11 +320,16 @@ jobs:
             - name: Disable Windows Defender real-time scanning for AHK tests
               shell: pwsh
               run: |
-                  # Defender holds intermittent exclusive scan locks on any file written
-                  # inside the runner (checkout or A_Temp), causing FileAppend calls in
-                  # the AHK test suite to block for the full 240 s watchdog window.
-                  # Disable real-time monitoring for the duration of the test run.
-                  Set-MpPreference -DisableRealtimeMonitoring $true
+                  # Defender holds intermittent exclusive scan locks on any file the AHK
+                  # test suite writes — including temp files in A_Temp — causing FileRead /
+                  # FileAppend calls to block for the full 240 s watchdog window.
+                  # -DisableRealtimeMonitoring requires admin; add path exclusions as a
+                  # belt-and-suspenders fallback that works even without that flag.
+                  Set-MpPreference -DisableRealtimeMonitoring $true -ErrorAction SilentlyContinue
+                  Add-MpPreference -ExclusionPath "$env:TEMP"           -ErrorAction SilentlyContinue
+                  Add-MpPreference -ExclusionPath "${{ github.workspace }}" -ErrorAction SilentlyContinue
+                  Add-MpPreference -ExclusionProcess "AutoHotkey64.exe" -ErrorAction SilentlyContinue
+                  Write-Host "Defender exclusions applied."
 
             - name: Run AHK test suite
               shell: pwsh
