@@ -56,7 +56,6 @@
 		{ "type": "group",          "id": "modifier_combos",   "i18n": "menu.shortcuts.group_modifiers", "platforms": ["ahk"] },
 		{ "type": "group",          "id": "ctrl_shortcuts",    "i18n": "menu.shortcuts.submenu_ctrl",    "platforms": ["hs"] },
 		{ "type": "group",          "id": "cmd_shortcuts",     "i18n": "menu.shortcuts.submenu_cmd",     "platforms": ["hs"] },
-		{ "type": "---" },
 		{ "type": "dynamic",        "id": "personal_shortcuts" },
 		{ "type": "dynamic",        "id": "script_control_shortcuts" },
 		{ "type": "dynamic",        "id": "extensions_shortcuts" },
@@ -159,14 +158,15 @@
 		{ "type": "action",   "id": "restore_defaults",  "i18n": "menu.gestures.restore_defaults", "platforms": ["hs"] },
 		{ "type": "---" },
 		{ "type": "feature",  "id": "circular_spaces",   "i18n": "menu.gestures.circular_spaces",  "platforms": ["hs"] },
-		{ "type": "---" },
+		{ "type": "---",      "platforms": ["hs"] },
 		{ "type": "dynamic",  "id": "gesture_slots_2",  "platforms": ["hs"] },
-		{ "type": "---" },
+		{ "type": "---",      "platforms": ["hs"] },
 		{ "type": "dynamic",  "id": "gesture_slots_3",  "platforms": ["hs"] },
-		{ "type": "---" },
+		{ "type": "---",      "platforms": ["hs"] },
 		{ "type": "dynamic",  "id": "gesture_slots_4",  "platforms": ["hs"] },
-		{ "type": "---" },
-		{ "type": "dynamic",  "id": "gesture_slots_5",  "platforms": ["hs"] }
+		{ "type": "---",      "platforms": ["hs"] },
+		{ "type": "dynamic",  "id": "gesture_slots_5",  "platforms": ["hs"] },
+		{ "type": "dynamic",  "id": "gesture_slots_ahk", "platforms": ["ahk"] }
 	],
 
 	"gesture_slots": {

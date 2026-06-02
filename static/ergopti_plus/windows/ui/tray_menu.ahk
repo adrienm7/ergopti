@@ -459,20 +459,15 @@ GetCategoryTitle(Category) {
 ; ===================================
 
 BuildGesturesMenu() {
-	global Features
-
-	GestEnabled := Features.Has("gestures") and Features["gestures"].Has("enabled")
-		and Features["gestures"]["enabled"] = true
-
 	DynHandlers := Map(
-		"auto_configure",    (M, C) => _GES_AutoConfigure(M, C),
-		"manual_tutorial",   (M, C) => _GES_ManualTutorial(M, C),
-		"gesture_slots_2",   (M, C) => _GES_Slots2(M, C),
-		"gesture_slots_3",   (M, C) => _GES_Slots3(M, C),
-		"gesture_slots_4",   (M, C) => _GES_Slots4(M, C),
-		"gesture_slots_5",   (M, C) => _GES_Slots5(M, C),
+		"auto_configure",     (M, C) => _GES_AutoConfigure(M, C),
+		"manual_tutorial",    (M, C) => _GES_ManualTutorial(M, C),
+		"gesture_slots_ahk",  (M, C) => _GES_SlotsAhk(M, C),
+		"gesture_slots_2",    (M, C) => _GES_Slots2(M, C),
+		"gesture_slots_3",    (M, C) => _GES_Slots3(M, C),
+		"gesture_slots_4",    (M, C) => _GES_Slots4(M, C),
+		"gesture_slots_5",    (M, C) => _GES_Slots5(M, C),
 	)
-
 	return MenuRenderer_Build("gestures_menu", "Gestures", DynHandlers)
 }
 
@@ -486,21 +481,15 @@ _GES_ManualTutorial(M, _Cat) {
 	RegisterMenuItem(M, t("menu.gestures.manual_tutorial"), (*) => GestureShowManualTutorialDialog())
 }
 
-; Render a group of gesture slots from the manifest gesture_slots table.
-_GES_RenderSlots(M, FingerCount) {
-	global GestureAssignments, GESTURE_ACTIONS, Features
-	Root := _MR_GetManifestRoot()
-	if (Root == false)
-		return
-	Slots := []
-	if (Root is Map) and Root.Has("gesture_slots") {
-		GS := Root["gesture_slots"]
-		if (GS is Map) and GS.Has(FingerCount)
-			Slots := GS[FingerCount]
-	}
+; Dynamic handler: flat slot list for AHK (mirrors pre-refactor BuildGesturesMenu).
+; Iterates GESTURE_SLOTS in order, inserting a separator before tap_4 as before.
+_GES_SlotsAhk(M, _Cat) {
+	global GestureAssignments, GESTURE_ACTIONS, GESTURE_SLOTS, Features
 	GestEnabled := Features.Has("gestures") and Features["gestures"].Has("enabled")
 		and Features["gestures"]["enabled"] = true
-	for Slot in Slots {
+	for Slot in GESTURE_SLOTS {
+		if (Slot == "tap_4")
+			M.Add()
 		SlotLabel     := t("gesture.slots." . Slot)
 		CurrentAction := GestureAssignments.Has(Slot) ? GestureAssignments[Slot] : "none"
 		CurrentLabel  := GESTURE_ACTIONS.Has(CurrentAction)
@@ -515,18 +504,18 @@ _GES_RenderSlots(M, FingerCount) {
 	}
 }
 
-; Dynamic handlers for each finger group.
+; Dynamic handlers for HS finger groups (unused on AHK — manifest filters them out).
 _GES_Slots2(M, _Cat) {
-	_GES_RenderSlots(M, "2")
+	return
 }
 _GES_Slots3(M, _Cat) {
-	_GES_RenderSlots(M, "3")
+	return
 }
 _GES_Slots4(M, _Cat) {
-	_GES_RenderSlots(M, "4")
+	return
 }
 _GES_Slots5(M, _Cat) {
-	_GES_RenderSlots(M, "5")
+	return
 }
 
 ; Applies a new action to a gesture slot and reloads.
