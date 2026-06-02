@@ -21,10 +21,11 @@
 
 
 
+
 ; ==============================
-; =========================
+; ==========================
 ; ======= 13/ DELETE =======
-; =========================
+; ==========================
 ; ==============================
 
 ; Helper predicates -------------------------------------------------------
@@ -39,6 +40,9 @@ _DeleteHoldModKey() {
 		default:       return ""
 	}
 }
+
+
+
 
 
 
@@ -63,6 +67,9 @@ _DeleteHoldModKey() {
 
 
 
+
+
+
 ; ======= 13.2) Hold-layer variant =======
 
 #HotIf TapHoldHoldLayer(TapHold, "delete") != "" and TapHoldHoldModifier(TapHold, "delete") == "" and not LayerEnabled
@@ -82,6 +89,9 @@ _DeleteHoldModKey() {
 
 
 
+
+
+
 ; ======= 13.3) Tap-only (tap action set to something other than delete) =======
 
 ; $ prevents re-entry. Fire immediately on key-down — no KeyWait or A_PriorKey
@@ -90,6 +100,9 @@ _DeleteHoldModKey() {
 #HotIf TapHoldTapAction(TapHold, "delete") != "" and TapHoldTapAction(TapHold, "delete") != "delete" and TapHoldHoldModifier(TapHold, "delete") == "" and TapHoldHoldLayer(TapHold, "delete") == "" and not LayerEnabled
 $SC053:: _DeleteDispatch()
 #HotIf
+
+
+
 
 
 

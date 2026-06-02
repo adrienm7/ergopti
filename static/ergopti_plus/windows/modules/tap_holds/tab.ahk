@@ -23,6 +23,7 @@
 
 
 
+
 ; ==============================
 ; ======================
 ; ======= 8/ TAB =======
@@ -42,6 +43,9 @@ _TabHoldModKey() {
 		default:       return ""
 	}
 }
+
+
+
 
 
 
@@ -75,6 +79,9 @@ SC00F Up:: TextPressKey("LAlt", "Up")
 
 
 
+
+
+
 ; ======= 8.2) Generic — hold-modifier, any other tap =======
 
 #HotIf TapHoldTapAction(TapHold, "tab") != "alt_tab_monitor" and TapHoldHoldModifier(TapHold, "tab") != "" and TapHoldTapAction(TapHold, "tab") != "" and not LayerEnabled
@@ -91,6 +98,9 @@ $SC00F:: {
 	TextPressKey(ModKey, "Up")
 }
 #HotIf
+
+
+
 
 
 
@@ -114,11 +124,17 @@ $SC00F:: {
 
 
 
+
+
+
 ; ======= 8.4) Generic — tap-only (hold=none) =======
 
 #HotIf TapHoldTapAction(TapHold, "tab") != "alt_tab_monitor" and TapHoldHoldModifier(TapHold, "tab") == "" and TapHoldHoldLayer(TapHold, "tab") == "" and TapHoldTapAction(TapHold, "tab") != "" and not LayerEnabled
 SC00F:: _TabDispatch()
 #HotIf
+
+
+
 
 
 

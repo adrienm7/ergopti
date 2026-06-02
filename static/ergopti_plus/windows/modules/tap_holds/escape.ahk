@@ -18,10 +18,11 @@
 
 
 
+
 ; ==============================
-; ========================
+; ==========================
 ; ======= 11/ ESCAPE =======
-; ========================
+; ==========================
 ; ==============================
 
 ; Helper predicates -------------------------------------------------------
@@ -36,6 +37,9 @@ _EscapeHoldModKey() {
 		default:       return ""
 	}
 }
+
+
+
 
 
 
@@ -60,6 +64,9 @@ _EscapeHoldModKey() {
 
 
 
+
+
+
 ; ======= 11.2) Hold-layer variant =======
 
 #HotIf TapHoldHoldLayer(TapHold, "escape") != "" and TapHoldHoldModifier(TapHold, "escape") == "" and not LayerEnabled
@@ -79,6 +86,9 @@ _EscapeHoldModKey() {
 
 
 
+
+
+
 ; ======= 11.3) Tap-only (tap action set to something other than escape) =======
 
 ; $ prevents re-entry. Fire immediately on key-down — no KeyWait or A_PriorKey
@@ -87,6 +97,9 @@ _EscapeHoldModKey() {
 #HotIf TapHoldTapAction(TapHold, "escape") != "" and TapHoldTapAction(TapHold, "escape") != "escape" and TapHoldHoldModifier(TapHold, "escape") == "" and TapHoldHoldLayer(TapHold, "escape") == "" and not LayerEnabled
 $SC001:: _EscapeDispatch()
 #HotIf
+
+
+
 
 
 

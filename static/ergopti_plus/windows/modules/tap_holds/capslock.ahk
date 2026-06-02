@@ -28,6 +28,7 @@
 
 
 
+
 ; ==============================
 ; ===========================
 ; ======= 2/ CAPSLOCK =======
@@ -74,6 +75,9 @@ _CapsLockHoldModKey() {
 
 
 
+
+
+
 ; ======= 2.1) No-remap LAlt+CapsLock rescue =======
 
 ; When CapsLock is not remapped at all but LAlt is on one_shot_shift, the
@@ -96,6 +100,9 @@ SC03A:: {
 
 
 
+
+
+
 ; ======= 2.2) Plain-backspace variant (tap=backspace, hold=none) =======
 
 ; Uses *SC03A (wildcard = pass modifiers through Blind) so Shift/Ctrl+CapsLock
@@ -109,6 +116,9 @@ SC03A:: {
 	TextPressKey("BackSpace", "Blind")
 }
 #HotIf
+
+
+
 
 
 
@@ -146,6 +156,9 @@ SC03A:: {
 
 
 
+
+
+
 ; ======= 2.4) Hold-layer variant =======
 
 ; Mirrors the LAlt layer approach: activate layer on hold, tap action on release.
@@ -173,6 +186,9 @@ $SC03A:: {
 
 
 
+
+
+
 ; ======= 2.5) Tap-only variant (tap action set, hold=none, not plain backspace) =======
 
 ; Simple gate: fire the tap action on every press (no hold behaviour).
@@ -185,6 +201,9 @@ SC03A:: {
 	_CapsLockDispatch(False)
 }
 #HotIf
+
+
+
 
 
 

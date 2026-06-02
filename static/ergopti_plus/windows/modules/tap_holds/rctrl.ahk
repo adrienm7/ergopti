@@ -24,6 +24,7 @@
 
 
 
+
 ; ==============================
 ; ========================
 ; ======= 7/ RCTRL =======
@@ -55,6 +56,9 @@ _RCtrlHoldModKey() {
 
 
 
+
+
+
 ; ======= 7.1) backspace tap (key-repeat) =======
 
 #HotIf TapHoldTapAction(TapHold, "right_ctrl") == "backspace" and not LayerEnabled
@@ -81,6 +85,9 @@ SC11D::
 
 
 
+
+
+
 ; ======= 7.2) tab tap =======
 
 ; ~ prefix: RCtrl passthrough so the OS still sees Ctrl during KeyWait.
@@ -103,6 +110,9 @@ SC11D::
 
 
 
+
+
+
 ; ======= 7.3) one_shot_shift tap =======
 
 #HotIf TapHoldTapAction(TapHold, "right_ctrl") == "one_shot_shift" and not LayerEnabled
@@ -118,6 +128,9 @@ SC11D:: {
 	TextPressKey("LShift", "Up")
 }
 #HotIf
+
+
+
 
 
 
@@ -142,6 +155,9 @@ $SC11D:: {
 
 
 
+
+
+
 ; ======= 7.5) Generic — hold-layer, any other tap =======
 
 #HotIf not _RCtrlIsSpecialTap() and TapHoldHoldLayer(TapHold, "right_ctrl") != "" and TapHoldTapAction(TapHold, "right_ctrl") != "" and not LayerEnabled
@@ -161,11 +177,17 @@ $SC11D:: {
 
 
 
+
+
+
 ; ======= 7.6) Generic — tap-only (hold=none) =======
 
 #HotIf not _RCtrlIsSpecialTap() and TapHoldHoldModifier(TapHold, "right_ctrl") == "" and TapHoldHoldLayer(TapHold, "right_ctrl") == "" and TapHoldTapAction(TapHold, "right_ctrl") != "" and not LayerEnabled
 SC11D:: _RCtrlDispatch()
 #HotIf
+
+
+
 
 
 

@@ -22,6 +22,7 @@
 
 
 
+
 ; ==============================
 ; ========================
 ; ======= 9/ ENTER =======
@@ -40,6 +41,9 @@ _EnterHoldModKey() {
 		default:       return ""
 	}
 }
+
+
+
 
 
 
@@ -66,6 +70,9 @@ _EnterHoldModKey() {
 
 
 
+
+
+
 ; ======= 9.2) Hold-layer variant =======
 
 #HotIf TapHoldHoldLayer(TapHold, "enter") != "" and TapHoldHoldModifier(TapHold, "enter") == "" and not LayerEnabled
@@ -86,6 +93,9 @@ _EnterHoldModKey() {
 
 
 
+
+
+
 ; ======= 9.3) Tap-only (hold=none, tap action set) =======
 
 ; $ prevents re-entry. Fire immediately on key-down — no KeyWait needed since
@@ -93,6 +103,9 @@ _EnterHoldModKey() {
 #HotIf TapHoldTapAction(TapHold, "enter") != "" and TapHoldTapAction(TapHold, "enter") != "enter" and TapHoldHoldModifier(TapHold, "enter") == "" and TapHoldHoldLayer(TapHold, "enter") == "" and not LayerEnabled
 $SC01C:: _EnterDispatch()
 #HotIf
+
+
+
 
 
 
