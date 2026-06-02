@@ -1125,10 +1125,11 @@ _TooltipResolvePosition() {
 
 
 
+
 ; ==========================================
-; ==========================================
+; =========================================
 ; ======= 3/ LLM Multi-slot Tooltip =======
-; ==========================================
+; =========================================
 ; ==========================================
 
 ; Global state for the LLM multi-slot tooltip — backed by the shared Gui
@@ -1260,9 +1261,10 @@ LLM_TooltipSetActiveIdx(idx) {
 }
 
 
-; =============================================
+
+; =================================
 ; ===== 3.1) LLM slot helpers =====
-; =============================================
+; =================================
 
 _LLM_SlotIsEmpty(slot) {
 	if (Type(slot) == "String")
@@ -1293,9 +1295,10 @@ _LLM_SlotBuildText(slot, is_active) {
 }
 
 
-; =============================================
+
+; ======================================
 ; ===== 3.2) Rich Gui LLM renderer =====
-; =============================================
+; ======================================
 
 ; Build a single Gui that renders all LLM slots with per-chunk coloring.
 ; Active slot: equal chunks in corr_sel (green), insert/NextWords in nw_sel

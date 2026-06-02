@@ -22,10 +22,11 @@
 
 
 
+
 ; ==============================
-; ============================
+; =============================
 ; ======= 10/ BACKSPACE =======
-; ============================
+; =============================
 ; ==============================
 
 ; Helper predicates -------------------------------------------------------
@@ -40,6 +41,9 @@ _BackspaceHoldModKey() {
 		default:       return ""
 	}
 }
+
+
+
 
 
 
@@ -64,6 +68,9 @@ _BackspaceHoldModKey() {
 
 
 
+
+
+
 ; ======= 10.2) Hold-layer variant =======
 
 #HotIf TapHoldHoldLayer(TapHold, "backspace") != "" and TapHoldHoldModifier(TapHold, "backspace") == "" and not LayerEnabled
@@ -83,6 +90,9 @@ _BackspaceHoldModKey() {
 
 
 
+
+
+
 ; ======= 10.3) Tap-only (tap action set to something other than backspace) =======
 
 ; $ prevents re-entry. Fire immediately on key-down — no KeyWait or A_PriorKey
@@ -91,6 +101,9 @@ _BackspaceHoldModKey() {
 #HotIf TapHoldTapAction(TapHold, "backspace") != "" and TapHoldTapAction(TapHold, "backspace") != "backspace" and TapHoldHoldModifier(TapHold, "backspace") == "" and TapHoldHoldLayer(TapHold, "backspace") == "" and not LayerEnabled
 $SC00E:: _BackspaceDispatch()
 #HotIf
+
+
+
 
 
 

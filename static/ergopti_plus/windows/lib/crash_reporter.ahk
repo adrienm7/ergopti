@@ -31,6 +31,7 @@
 
 
 
+
 ; ============================
 ; ============================
 ; ======= 1/ Constants =======
@@ -49,6 +50,7 @@ global _CrashReporter_Modifiers := [
 	"LAlt",     "RAlt",
 	"LWin",     "RWin",
 ]
+
 
 
 
@@ -256,6 +258,7 @@ CrashReport_PromptUser(Report) {
 		MsgBox(t("crash.report.save_failed"), t("crash.report.saved_title"), "OK Icon!")
 	}
 }
+
 
 
 

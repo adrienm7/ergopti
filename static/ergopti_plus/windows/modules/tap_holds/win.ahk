@@ -18,6 +18,7 @@
 
 
 
+
 ; ==============================
 ; =======================
 ; ======= 12/ WIN =======
@@ -36,6 +37,9 @@ _WinHoldModKey() {
 		default:       return ""
 	}
 }
+
+
+
 
 
 
@@ -60,6 +64,9 @@ _WinHoldModKey() {
 
 
 
+
+
+
 ; ======= 12.2) Hold-layer variant =======
 
 #HotIf TapHoldHoldLayer(TapHold, "win") != "" and TapHoldHoldModifier(TapHold, "win") == "" and not LayerEnabled
@@ -79,6 +86,9 @@ _WinHoldModKey() {
 
 
 
+
+
+
 ; ======= 12.3) Tap-only (hold=none, tap action set) =======
 
 ; Fire immediately on key-down — no KeyWait or A_PriorKey guard needed since
@@ -87,6 +97,9 @@ _WinHoldModKey() {
 #HotIf TapHoldTapAction(TapHold, "win") != "" and TapHoldHoldModifier(TapHold, "win") == "" and TapHoldHoldLayer(TapHold, "win") == "" and not LayerEnabled
 SC15B:: _WinDispatch()
 #HotIf
+
+
+
 
 
 

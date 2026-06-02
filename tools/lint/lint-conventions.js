@@ -17,7 +17,8 @@ import { readFileSync, writeFileSync, readdirSync, statSync } from 'fs';
 import { join, relative, extname } from 'path';
 import { execSync } from 'child_process';
 
-const REPO_ROOT = new URL('..', import.meta.url).pathname.replace(/\/$/, '').replace(/^\/([A-Z]:)/, '$1');
+// This script lives at <repo>/tools/lint/, so the repo root is two levels up.
+const REPO_ROOT = new URL('../..', import.meta.url).pathname.replace(/\/$/, '').replace(/^\/([A-Z]:)/, '$1');
 
 const FAIL_ON_VIOLATIONS  = process.argv.includes('--fail-on-violations');
 const WARN_ONLY           = process.argv.includes('--warn-only');

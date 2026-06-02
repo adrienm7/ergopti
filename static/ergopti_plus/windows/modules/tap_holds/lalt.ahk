@@ -33,6 +33,7 @@
 
 
 
+
 ; ==============================
 ; =======================
 ; ======= 4/ LALT =======
@@ -77,6 +78,9 @@ _LAltHoldModKey() {
 
 
 
+
+
+
 ; ======= 4.1) one_shot_shift tap =======
 
 #HotIf TapHoldTapAction(TapHold, "left_alt") == "one_shot_shift" and not LayerEnabled
@@ -98,6 +102,9 @@ SC038:: {
 	TextPressKey("LShift", "Up")
 }
 #HotIf
+
+
+
 
 
 
@@ -135,6 +142,9 @@ if TapHoldTapAction(TapHold, "right_ctrl") == "one_shot_shift" {
 
 
 
+
+
+
 ; ======= 4.3) alt_tab_monitor tap =======
 
 #HotIf TapHoldTapAction(TapHold, "left_alt") == "alt_tab_monitor" and not LayerEnabled
@@ -155,6 +165,9 @@ SC038::
 
 
 
+
+
+
 ; ======= 4.4) backspace plain (key-repeat, no hold) =======
 
 #HotIf _LAltIsPlainBackspace() and not LayerEnabled
@@ -171,6 +184,9 @@ SC038::
 	}
 }
 #HotIf
+
+
+
 
 
 
@@ -198,6 +214,9 @@ SC038::
 	DisableLayer()
 }
 #HotIf
+
+
+
 
 
 
@@ -233,6 +252,9 @@ $SC038:: {
 
 
 
+
+
+
 ; ======= 4.7) Generic — hold-modifier, any other tap =======
 
 #HotIf not _LAltIsSpecialTap() and TapHoldHoldModifier(TapHold, "left_alt") != "" and TapHoldTapAction(TapHold, "left_alt") != "" and not LayerEnabled
@@ -249,6 +271,9 @@ $SC038:: {
 	TextPressKey(ModKey, "Up")
 }
 #HotIf
+
+
+
 
 
 
@@ -275,11 +300,17 @@ $SC038:: {
 
 
 
+
+
+
 ; ======= 4.9) Generic — tap-only (hold=none, not a special tap) =======
 
 #HotIf not _LAltIsSpecialTap() and TapHoldHoldModifier(TapHold, "left_alt") == "" and TapHoldHoldLayer(TapHold, "left_alt") == "" and TapHoldTapAction(TapHold, "left_alt") != "" and not LayerEnabled
 SC038:: _LAltDispatch()
 #HotIf
+
+
+
 
 
 

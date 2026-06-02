@@ -26,6 +26,7 @@
 
 
 
+
 ; ===================================
 ; ====================================
 ; ======= 1/ Tooltip Constants =======
@@ -39,6 +40,7 @@ LLM_TOOLTIP_INACTIVE_PREFIX := "·  "
 LLM_TOOLTIP_TAB_SUFFIX      := "   [Tab]"
 ; Placeholder shown while a slot is still being generated.
 LLM_TOOLTIP_PLACEHOLDER     := "⏳ …"
+
 
 
 
