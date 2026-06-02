@@ -202,7 +202,38 @@ SC038::
 
 
 
-; ======= 4.6) Generic — hold-modifier, any other tap =======
+; ======= 4.6) backspace tap + hold-modifier =======
+
+; LAlt's default tap is "backspace", which _LAltIsSpecialTap() excludes from the
+; generic hold-modifier block (4.7). Without this dedicated block, choosing
+; tap=backspace with hold=<ctrl/shift/alt/alt_gr/win> matched NO #HotIf variant,
+; so the chosen hold modifier silently did nothing and only hold=none (4.4) and
+; hold=nav (4.5) worked — the « le hold ne peut être que la couche navigation »
+; symptom. This mirrors block 4.7 but fires the backspace tap via BackSpaceLogic()
+; instead of _LAltDispatch(), preserving the Ctrl+BS / Shift+Del tap semantics
+; while honouring the configured hold modifier (CapsLock/Win already work this way).
+#HotIf TapHoldTapAction(TapHold, "left_alt") == "backspace" and TapHoldHoldModifier(TapHold, "left_alt") != "" and not LayerEnabled
+$SC038:: {
+	ModKey := _LAltHoldModKey()
+	TextPressKey(ModKey, "Down")
+	tap := KeyWait("SC038", "T" . TapHoldDuration(TapHold, "left_alt"))
+	if tap {
+		TextPressKey(ModKey, "Up")
+		BackSpaceActionWithModifiers := BackSpaceLogic()
+		if not BackSpaceActionWithModifiers {
+			TextPressKey("BackSpace", "")
+		}
+		return
+	}
+	KeyWait("SC038", "U")
+	TextPressKey(ModKey, "Up")
+}
+#HotIf
+
+
+
+
+; ======= 4.7) Generic — hold-modifier, any other tap =======
 
 #HotIf not _LAltIsSpecialTap() and TapHoldHoldModifier(TapHold, "left_alt") != "" and TapHoldTapAction(TapHold, "left_alt") != "" and not LayerEnabled
 $SC038:: {
@@ -222,7 +253,7 @@ $SC038:: {
 
 
 
-; ======= 4.7) Generic — hold-layer, any other tap =======
+; ======= 4.8) Generic — hold-layer, any other tap =======
 
 #HotIf not _LAltIsSpecialTap() and TapHoldHoldLayer(TapHold, "left_alt") != "" and TapHoldTapAction(TapHold, "left_alt") != "" and not LayerEnabled
 $SC038:: {
@@ -244,7 +275,7 @@ $SC038:: {
 
 
 
-; ======= 4.8) Generic — tap-only (hold=none, not a special tap) =======
+; ======= 4.9) Generic — tap-only (hold=none, not a special tap) =======
 
 #HotIf not _LAltIsSpecialTap() and TapHoldHoldModifier(TapHold, "left_alt") == "" and TapHoldHoldLayer(TapHold, "left_alt") == "" and TapHoldTapAction(TapHold, "left_alt") != "" and not LayerEnabled
 SC038:: _LAltDispatch()
@@ -253,7 +284,7 @@ SC038:: _LAltDispatch()
 
 
 
-; ======= 4.9) Tap dispatch + BackSpaceLogic =======
+; ======= 4.10) Tap dispatch + BackSpaceLogic =======
 
 _LAltDispatch() {
 	_TapHoldFireAction("left_alt")
