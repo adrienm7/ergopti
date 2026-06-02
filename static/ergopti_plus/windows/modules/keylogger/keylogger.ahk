@@ -1334,9 +1334,11 @@ KL_MidnightCheck() {
 ;
 ; The result is cached per-HWND for ``KLPW_CACHE_TTL_MS`` because UIA
 ; round-trips can take 5-15 ms; the focused control is unlikely to flip
-; password-vs-not within a few hundred milliseconds.
+; password-vs-not within a typing burst. 2000 ms avoids cache misses at
+; high keystroke rate (8+ keys/s) while still detecting field transitions
+; within 2 s — more than adequate for a privacy filter.
 
-global KLPW_CACHE_TTL_MS := 500
+global KLPW_CACHE_TTL_MS := 2000
 
 class KLPasswordCache {
     static last_hwnd := 0
