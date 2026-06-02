@@ -608,3 +608,9 @@ KL_LogLlmSuggested(app_name, count) {
     global _Stub_LlmSuggestedCalls
     _Stub_LlmSuggestedCalls.Push({ app_name: app_name, count: count })
 }
+
+; Clears the synthetic-keystroke flag after a hotstring burst. In production
+; this lives in keylogger.ahk (not included by the test runner). The variadic
+; signature matches the real function so SetTimer can pass it directly.
+KL_ClearSynthetic(*) {
+}
