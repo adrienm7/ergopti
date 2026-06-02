@@ -1631,7 +1631,6 @@ _SC_Extensions(SubMenu, _Cat) {
 	if !HasExtShortcuts {
 		return
 	}
-	SubMenu.Add()
 	ExtShortcutsHeader := MenuSectionTitle(t("menu.extensions.header"))
 	SubMenu.Add(ExtShortcutsHeader, (*) => NoAction())
 	SubMenu.Disable(ExtShortcutsHeader)
@@ -1890,7 +1889,6 @@ _AppendPersonalShortcutsSubmenuIfAny(ShortcutsMenu) {
 		return
 	}
 
-	ShortcutsMenu.Add()  ; visual separator before the Personal block
 	PersonalMenu := Menu()
 	for Name in Names {
 		MenuAddItem(PersonalMenu, "Shortcuts.Personal", Name)
