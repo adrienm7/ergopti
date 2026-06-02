@@ -1005,6 +1005,16 @@ _HS_Personal(M, _Cat) {
 			M.Check(PersonalTitle)
 	}
 
+	; Sum all hotstring counts inside a node and its sub-nodes recursively.
+	_HS_NodeTotal(Node) {
+		Total := 0
+		for TF in Node["tomls"]
+			Total += TF.count
+		for _, Sub in Node["subfolders"]
+			Total += _HS_NodeTotal(Sub)
+		return Total
+	}
+
 	; Render recursive ext tree (nested folder structure)
 	_HS_RenderTree(Tree, ParentMenu) {
 		FolderNames := []
@@ -1053,7 +1063,9 @@ _HS_Personal(M, _Cat) {
 				}
 				FolderMenu.Add(TF.stem . (TF.count > 0 ? " (" . FmtCount(TF.count) . ")" : ""), TFMenu)
 			}
-			ParentMenu.Add(FolderName, FolderMenu)
+			FolderTotal := _HS_NodeTotal(Node)
+			FolderLabel := FolderName . (FolderTotal > 0 ? " (" . FmtCount(FolderTotal) . ")" : "")
+			ParentMenu.Add(FolderLabel, FolderMenu)
 		}
 	}
 
