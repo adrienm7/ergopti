@@ -349,11 +349,22 @@ function _post(msg) {
 
 /**
  * Called by Lua to inject translated strings for the selected locale.
- * After receiving strings we re-render the current step so labels update live.
- * @param {Object} strings - Flat key→value map from the locale JSON.
+ * Accepts either a raw flat map (legacy initData path) or a {locale, strings}
+ * envelope. When an envelope is received, the locale is compared against
+ * _selectedLocale to discard stale out-of-order responses from rapid switching.
+ * @param {Object} payload - Flat key→value map, or {locale: string, strings: Object}.
  */
-window.applyStrings = function (strings) {
-	_strings = strings || {};
+window.applyStrings = function (payload) {
+	var strings;
+	if (payload && typeof payload.strings === "object" && typeof payload.locale === "string") {
+		// Envelope form — guard against stale rapid-switch responses
+		if (payload.locale !== _selectedLocale) return;
+		strings = payload.strings;
+	} else {
+		// Legacy flat-map form (initData path) — always apply
+		strings = payload || {};
+	}
+	_strings = strings;
 	// Re-render the current step with the new strings
 	if (_currentStep === 1) renderStep1();
 	else if (_currentStep === "config") renderStepConfig();

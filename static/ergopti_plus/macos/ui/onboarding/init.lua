@@ -122,7 +122,10 @@ local function inject_strings(code)
 
 	i18n.set_locale_no_reload(prev_code)
 
-	local ok_enc, json = pcall(hs.json.encode, strings)
+	-- Wrap strings + the locale code together so the JS side can discard
+	-- responses that arrived out of order (stale rapid-switch results).
+	local payload = { locale = code, strings = strings }
+	local ok_enc, json = pcall(hs.json.encode, payload)
 	if not ok_enc or not json then
 		Logger.error(LOG, "inject_strings: failed to encode strings for '%s'.", code)
 		return
