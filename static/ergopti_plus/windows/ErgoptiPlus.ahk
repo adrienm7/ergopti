@@ -178,6 +178,7 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 #Include lib/menu_dispatcher.ahk
 #Include lib/hook_dispatcher.ahk
 #Include lib/menu_manifest.ahk
+#Include lib/menu_renderer.ahk
 #Include lib/llm_defaults.ahk
 #Include lib/updater.ahk
 #Include lib/healthcheck.ahk
