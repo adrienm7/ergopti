@@ -272,34 +272,31 @@ _Onboarding_Step1() {
 	}
 	; Subtract scrollbar width (~17 px) so the column never triggers horizontal overflow
 	lv.ModifyCol(1, ContentW - 20)
-	; Resize the ListView so it shows exactly min(N, 8) rows with no partial
-	; row and no white stripe at the bottom when scrolled to the end.
-	; LVM_APPROXIMATEVIEWRECT (0x1041) asks Windows for the precise outer
-	; dimensions (borders included) needed to display exactly wParam items.
-	; wParam = desired item count, lParam = MAKELPARAM(-1, -1) ("use default
-	; column width / height"). Return value = MAKELPARAM(cxOut, cyOut) — we
-	; extract cyOut from the high word. CRITICAL: we ALSO have to relocate
-	; the Next button by hand below because AHK's "next control" position
-	; tracker is set when the LV is *added* (with the initial h240) and is
-	; NOT updated by ``Move()`` — so a relative ``y+16`` on the button would
-	; land it on top of the (now-shorter) LV instead of below it.
-	maxRows := 8
-	visRows := Min(SortedLocales.Length, maxRows)
-	; MAKELPARAM(-1, -1) = 0xFFFFFFFF — "use the control's current width and
-	; default row height" — so we only constrain the row count via wParam.
-	approxResult := SendMessage(0x1041, visRows, 0xFFFFFFFF, lv)
-	approxH := (approxResult >> 16) & 0xFFFF
-	if (approxH > 0) {
-		lv.Move(,, , approxH)
-	} else {
-		; Fallback: measure row height manually via LVM_GETITEMRECT
-		RECT := Buffer(16, 0)
-		SendMessage(0x100E, 0, RECT.Ptr, lv)  ; LVM_GETITEMRECT, item 0
-		rowH := NumGet(RECT, 12, "Int") - NumGet(RECT, 4, "Int")
-		if (rowH > 0) {
-			borderPx := 2 * DllCall("GetSystemMetrics", "Int", 13, "Int")
-			lv.Move(,, , visRows * rowH + borderPx)
-		}
+	; Resize the ListView so it shows exactly min(N, 8) rows with no bottom
+	; "white stripe" when scrolled to the end. We measure the control's natural
+	; row height via LVM_GETITEMRECT (0x100E), then set the outer height to
+	; ``visRows × rowH + 2 × SM_CYEDGE`` so the client area is an exact multiple
+	; of the row height (no partial row).
+	; ROOT CAUSE of the historical white stripe: the border term used
+	; GetSystemMetrics(13) — that is SM_CXCURSOR (~32 px), NOT the 3D client
+	; edge. It padded the control by ~64 px instead of ~4 px, leaving a blank
+	; band below the last row. The correct index is SM_CYEDGE (46).
+	; NOTE: LVM_APPROXIMATEVIEWRECT (0x1041) was also tried for this, but sending
+	; it to the not-yet-shown ListView crashed the script on this AHK build — the
+	; index fix below removes the stripe without that message.
+	; CRITICAL: we ALSO relocate the Next button by hand below because AHK's
+	; "next control" position tracker is set when the LV is *added* (with the
+	; initial h240) and is NOT updated by ``Move()`` — so a relative ``y+16`` on
+	; the button would land it on top of the (now-shorter) LV.
+	SM_CYEDGE := 46  ; GetSystemMetrics index for the 3D client-edge height
+	RECT := Buffer(16, 0)
+	SendMessage(0x100E, 0, RECT.Ptr, lv)  ; LVM_GETITEMRECT, item 0, LVIR_BOUNDS
+	rowH := NumGet(RECT, 12, "Int") - NumGet(RECT, 4, "Int")  ; bottom - top
+	if (rowH > 0) {
+		maxRows := 8
+		visRows := Min(SortedLocales.Length, maxRows)
+		borderPx := 2 * DllCall("GetSystemMetrics", "Int", SM_CYEDGE, "Int")
+		lv.Move(,, , visRows * rowH + borderPx)
 	}
 	; Pre-select the default locale row
 	lv.Modify(DefaultIndex, "Select Focus Vis")
