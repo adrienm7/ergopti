@@ -280,10 +280,17 @@ function M.build_groups(ctx, only)
 				}
 				sec_menu[#sec_menu + 1] = { title = "-" }
 			end
+			-- "replace" (J→★ key remapping) is shown in Disposition Ergopti instead.
+			local prev_was_sep = true -- Suppress a potential leading separator
 			for _, sec in ipairs(ordered_secs) do
 				if type(sec) == "table" then
 					if sec.name == "-" then
-						sec_menu[#sec_menu + 1] = { title = "-" }
+						if not prev_was_sep then
+							sec_menu[#sec_menu + 1] = { title = "-" }
+							prev_was_sep = true
+						end
+					elseif name == "magic_key" and sec.name == "replace" then
+						-- Skip: shown in Disposition Ergopti
 					elseif sec.is_module_placeholder then
 						local ms       = type(ctx.module_sections) == "table" and ctx.module_sections[name]
 						local ms_entry = type(ms) == "table" and ms[sec.name]
@@ -295,6 +302,7 @@ function M.build_groups(ctx, only)
 								for _, pi in ipairs(pi_items) do
 									sec_menu[#sec_menu + 1] = pi
 								end
+								prev_was_sep = false
 							end
 						end
 					else
@@ -309,6 +317,7 @@ function M.build_groups(ctx, only)
 									   and toggleSectionFn(ctx, name, sec.name, lbl) or nil,
 							disabled = not enabled or ctx.paused or nil,
 						}
+						prev_was_sep = false
 					end
 				end
 			end
