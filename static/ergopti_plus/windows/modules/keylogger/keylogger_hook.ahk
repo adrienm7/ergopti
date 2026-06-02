@@ -227,6 +227,14 @@ KL_Hook_OnChar(ih, c) {
             meta["sk"] := KLHook.last_sc
     }
 
+    ; Stamp the synthetic source while the script is auto-typing (hotstring
+    ; expansion / LLM acceptance) so this keystroke is kept out of the manual
+    ; `chars` count and attributed correctly in the n-gram source histogram.
+    if Keylogger.synth_active {
+        meta["s"] := 1
+        meta["st"] := Keylogger.synth_type
+    }
+
     Keylogger.buffer_events.Push([c, delay, meta])
     Keylogger.buffer_text .= c
     try KL_Ergo_OnKeystroke(delay, KLHook.last_vk)
@@ -290,6 +298,12 @@ KL_Hook_OnKeyDown(ih, vk, sc) {
 
     bracket := KLHOOK_SPECIAL[vk]
     meta := Map("kc", vk, "sk", sc)
+    ; Synthetic backspaces emitted by an expansion correcting its own output
+    ; carry the source too, so the walker can net them out of hs/llm chars.
+    if Keylogger.synth_active {
+        meta["s"] := 1
+        meta["st"] := Keylogger.synth_type
+    }
 
     Keylogger.buffer_events.Push([bracket, delay, meta])
     try KL_Ergo_OnKeystroke(delay, vk, vk = 0x08)

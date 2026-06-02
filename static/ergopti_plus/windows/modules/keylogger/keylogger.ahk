@@ -121,6 +121,15 @@ class Keylogger {
     static mouse_distance   := 0
     static current_pause_ms := 0
 
+    ; Synthetic keystroke tagging. When the script auto-types (hotstring
+    ; expansion, LLM acceptance) the resulting keystrokes still flow through
+    ; the InputHook. KL_MarkSynthetic flags the hook so it stamps s=1 and
+    ; st=<source> into each captured keystroke's meta; the reader keeps that
+    ; output out of the manual `chars` count and the walker attributes the
+    ; n-gram source (esrc). Cleared shortly after the burst (KL_ClearSynthetic).
+    static synth_active     := false
+    static synth_type       := "none"
+
     ; Timers (lifecycle).
     static _ingest_timer    := unset
     static _midnight_timer  := unset
@@ -144,6 +153,28 @@ class Keylogger {
     ; Pre-escaped device_id literal — avoids re-running KL_SqlStr on every
     ; INSERT (the device_id never changes during a process lifetime).
     static _device_id_lit   := ""
+}
+
+
+
+; ============================================
+; ===== 2.1) Synthetic keystroke tagging =====
+; ============================================
+
+; Flag the hook so the keystrokes the script is about to auto-type (hotstring
+; expansion, LLM acceptance) are stamped synthetic in their per-keystroke meta.
+; `source` is "hotstring" or "llm". Always pair with a deferred KL_ClearSynthetic
+; so the flag can never leak onto subsequent manual typing.
+KL_MarkSynthetic(source) {
+    Keylogger.synth_active := true
+    Keylogger.synth_type := source
+}
+
+; Clear the synthetic flag once the auto-typed burst has been captured. Takes a
+; variadic param so it can be passed directly as a SetTimer callback.
+KL_ClearSynthetic(*) {
+    Keylogger.synth_active := false
+    Keylogger.synth_type := "none"
 }
 
 

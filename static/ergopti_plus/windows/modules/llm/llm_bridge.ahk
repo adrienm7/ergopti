@@ -24,6 +24,7 @@
 
 
 
+
 ; ==============================
 ; ===============================
 ; ======= 1/ Buffer State =======
@@ -39,6 +40,7 @@ global _LLM_Bridge_Active := false
 ; reference the dispatcher can never find the matching entry to remove.
 global _LLM_Bridge_OnCharCb    := _LLM_Bridge_DispatchChar.Bind()
 global _LLM_Bridge_OnKeyDownCb := _LLM_Bridge_DispatchKeyDown.Bind()
+
 
 
 
@@ -84,10 +86,11 @@ LLM_Bridge_Stop() {
 
 
 
+
 ; ============================================================
-; ===================================================
+; ======================================================
 ; ======= 3/ HookDispatcher subscriber callbacks =======
-; ===================================================
+; ======================================================
 ; ============================================================
 
 ; Receives (ih, char) from HookDispatcher — routes to the bridge char handler.
@@ -103,6 +106,7 @@ _LLM_Bridge_DispatchKeyDown(ih, vk, sc) {
 	else if (vk = 0x09 or vk = 0x0D or vk = 0x1B)
 		LLM_Bridge_OnFlush()
 }
+
 
 
 
@@ -182,7 +186,15 @@ LLM_Bridge_OnFlush() {
  */
 LLM_Bridge_OnAccept(text) {
 	global _LLM_Bridge_Buffer
+	; Delay (ms) before clearing the synthetic flag. The TextSend below is
+	; asynchronous, so its keystrokes reach the InputHook a few ms later;
+	; clearing inline would unflag them before the keylogger captures them.
+	static SYNTH_CLEAR_DELAY_MS := 80
+	; Tag the auto-typed prediction as synthetic so the keylogger keeps it out
+	; of the manual `chars` count and attributes it to the LLM source (esrc).
+	try KL_MarkSynthetic("llm")
 	TextSend(text, 0, 0)
+	SetTimer((*) => KL_ClearSynthetic(), -SYNTH_CLEAR_DELAY_MS)
 	_LLM_Bridge_Buffer .= text
 	; Audit event — pairs with the llm_suggested event the engine emitted
 	; when the tooltip first rendered. The pair lets a log tail compute
