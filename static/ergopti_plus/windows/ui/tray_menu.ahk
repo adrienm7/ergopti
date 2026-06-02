@@ -1127,7 +1127,8 @@ _BuildShortcutsSubmenu() {
 	WrapEntry := ManifestFindEntryByPath("shortcuts.wrap_text_if_selected")
 	if (WrapEntry != false) {
 		MenuAddItemFromManifest(SubMenu, WrapEntry, "Shortcuts")
-		SubMenu.Add() ; Separator after the UIA toggle
+		; No separator here — InsertKeyboardShortcutGroups already inserts one
+		; just before the modifier combos anchor, which produces the visual break.
 	}
 
 	; ── Modifier combos virtual group ────────────────────────
