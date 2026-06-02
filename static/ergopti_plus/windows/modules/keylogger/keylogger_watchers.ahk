@@ -155,6 +155,17 @@ KL_Watchers_OnKeystroke() {
 
     if (last > 0) {
         gap := now - last
+        ; Exclude idle / away time from per-app focus durations. The app/title
+        ; focus-entry timestamps advance by any gap long enough to count as a
+        ; micro-idle or a session break, so the next app_switch / window_switch
+        ; duration measures active-focus wall-clock only. Without this, an
+        ; overnight or away gap (A_TickCount keeps advancing while asleep)
+        ; produced multi-hour garbage app_time_ms / titles.ms (#17). The advance
+        ; can never overshoot now: app_entered_at <= last, so +gap <= now.
+        if (KLWatch.is_idle or gap >= KLWatchConst.SESSION_TIMEOUT_MS) {
+            KLHook.app_entered_at   += gap
+            KLHook.title_entered_at += gap
+        }
         if KLWatch.is_idle {
             KLWatch.is_idle := false
             try KL_LogSession("idle_end", gap)
