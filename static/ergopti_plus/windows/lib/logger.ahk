@@ -242,6 +242,16 @@ LoggerDebug(Tag, Msg, Args*) {
     _LoggerEmit("DEBUG", Tag, Msg, Args*)
 }
 
+; Cheap predicate for hot-path call sites (per-keystroke dispatch) that want to
+; skip building a debug line entirely — its variadic argument array and string
+; interpolation — when DEBUG is off. LoggerDebug already short-circuits inside,
+; but the call + arg-array build still costs something per keystroke; gating at
+; the call site removes even that. Mirrors the macOS Logger.is_enabled(DEBUG).
+LoggerIsDebugEnabled() {
+    global _LOGGER_DEBUG_ENABLED
+    return _LOGGER_DEBUG_ENABLED
+}
+
 ; Start of a routine internal operation (debug granularity). Pair with Done.
 LoggerTrace(Tag, Msg, Args*) {
     global _LOGGER_DEBUG_ENABLED
@@ -374,7 +384,19 @@ _LoggerEmit(Level, Tag, Msg, Args*) {
             Body := Msg
         }
     }
-    Stamp := FormatTime(, "yyyy-MM-dd HH:mm:ss") . ":" . Format("{:03}", A_MSec)
+    ; FormatTime of the full date string is the dominant per-emit cost and is
+    ; identical for every line within the same second. On the DEBUG path it runs
+    ; several times per keystroke (the prefix-watcher hot path), which is the
+    ; source of the « debug mode lag ». Cache the second-resolution part keyed on
+    ; A_Now and only recompute the millisecond suffix.
+    static _StampSecKey := ""
+    static _StampSecStr := ""
+    SecKey := A_Now
+    if (SecKey != _StampSecKey) {
+        _StampSecKey := SecKey
+        _StampSecStr := FormatTime(SecKey, "yyyy-MM-dd HH:mm:ss")
+    }
+    Stamp := _StampSecStr . ":" . Format("{:03}", A_MSec)
     Line := Format("{1} [{2}] [{3}] {4}", Stamp, Level, Tag, Body)
     _LoggerPushRing(Line)
     if _LOGGER_TEST_SINK != 0 {

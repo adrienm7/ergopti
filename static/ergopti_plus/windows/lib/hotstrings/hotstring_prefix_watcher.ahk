@@ -484,7 +484,8 @@ _OnPrefixChar(IH, Char) {
         return
     }
     try {
-        LoggerDebug("PrefixWatcher", "DBG OnChar: char='{1}' buf='{2}' suppressed={3}/{4}.", Char, _PrefixBuffer, _PrefixWatcherSuppressed, HSE_Suppressed)
+        if LoggerIsDebugEnabled()
+            LoggerDebug("PrefixWatcher", "DBG OnChar: char='{1}' buf='{2}' suppressed={3}/{4}.", Char, _PrefixBuffer, _PrefixWatcherSuppressed, HSE_Suppressed)
         ; Feed HSE — when HSE_FeedChar reports a match, fire the
         ; expansion right here. HSE_LastEndChar is the authoritative end
         ; character: empty for star (immediate) triggers, the just-typed
@@ -598,7 +599,8 @@ _OnPrefixChar(IH, Char) {
         if (StrLen(_PrefixBuffer) > _MAX_BUFFER_LEN) {
             _PrefixBuffer := SubStr(_PrefixBuffer, -_MAX_BUFFER_LEN)
         }
-        LoggerDebug("PrefixWatcher", "DBG about to _LookupAndRender: buf='{1}' indexSize={2}.", _PrefixBuffer, _PrefixIndex.Count)
+        if LoggerIsDebugEnabled()
+            LoggerDebug("PrefixWatcher", "DBG about to _LookupAndRender: buf='{1}' indexSize={2}.", _PrefixBuffer, _PrefixIndex.Count)
         _LookupAndRender()
     } catch as Err {
         LoggerError("PrefixWatcher", "OnChar error for char '{1}': {2}.", Char, Err.Message)
@@ -845,7 +847,8 @@ _LookupAndRender() {
     global _PrefixBuffer, _PrefixIndex, _MIN_PREFIX_LEN, _PREFIX_WORD_BOUNDARIES, ScriptInformation
     Buffer := _PrefixBuffer
     Len := StrLen(Buffer)
-    LoggerDebug("PrefixWatcher", "DBG _LookupAndRender: buf='{1}' len={2} indexSize={3}.", Buffer, Len, _PrefixIndex.Count)
+    if LoggerIsDebugEnabled()
+        LoggerDebug("PrefixWatcher", "DBG _LookupAndRender: buf='{1}' len={2} indexSize={3}.", Buffer, Len, _PrefixIndex.Count)
     ; Short buffers are only skipped when they have no entry in the index.
     ; A 1-char buffer may validly match a magic-key trigger body (e.g. "c"
     ; is the body of "c★"), so we let the lookup below decide — the early
@@ -884,12 +887,14 @@ _LookupAndRender() {
     ; ``ct`` from ``CT`` — the index registers each case variant separately
     ; with its pre-cased output, exactly mirroring CreateCaseSensitiveHotstrings.
     if !_PrefixIndex.Has(SearchKey) {
-        LoggerDebug("PrefixWatcher", "DBG no prefix match for '{1}'.", SearchKey)
+        if LoggerIsDebugEnabled()
+            LoggerDebug("PrefixWatcher", "DBG no prefix match for '{1}'.", SearchKey)
         TooltipHide("LookupNoMatch")
         _NotifySuggestionDismissed()
         return
     }
-    LoggerDebug("PrefixWatcher", "DBG prefix MATCH for '{1}' ({2} candidates).", SearchKey, _PrefixIndex[SearchKey].Length)
+    if LoggerIsDebugEnabled()
+        LoggerDebug("PrefixWatcher", "DBG prefix MATCH for '{1}' ({2} candidates).", SearchKey, _PrefixIndex[SearchKey].Length)
     Buffer := SearchKey
 
     ; Collect candidates per group and lay them out as the user requested:
@@ -939,12 +944,14 @@ _LookupAndRender() {
         Items.Push(Item)
     }
     if (Items.Length == 0) {
-        LoggerDebug("PrefixWatcher", "DBG all candidates have ShowTooltip=false, hiding.")
+        if LoggerIsDebugEnabled()
+            LoggerDebug("PrefixWatcher", "DBG all candidates have ShowTooltip=false, hiding.")
         TooltipHide("LookupNoItems")
         _NotifySuggestionDismissed()
         return
     }
-    LoggerDebug("PrefixWatcher", "DBG calling TooltipShow: {1} item(s), first='{2}'.", Items.Length, Items[1].Text)
+    if LoggerIsDebugEnabled()
+        LoggerDebug("PrefixWatcher", "DBG calling TooltipShow: {1} item(s), first='{2}'.", Items.Length, Items[1].Text)
     TooltipShow(Items)
     ; Log the suggestion based on the first (top) item only.
     Primary := Items[1]
