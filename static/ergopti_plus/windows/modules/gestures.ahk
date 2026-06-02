@@ -1919,8 +1919,11 @@ if (RawAutoConfig == "1" or RawAutoConfig == "true") {
 }
 
 ; Arm the WinEvent hook that tracks manual window activations.
+; Skipped in the headless test runner (_AHK_DRY_RUN is defined by run_all.ahk)
+; because SetWinEventHook with OUTOFCONTEXT keeps a message-loop reference alive
+; and prevents ExitApp from returning promptly in a console-less CI process.
 _GestureWinOrder := []
-_GestureWinHook  := DllCall("SetWinEventHook",
+_GestureWinHook  := IsSet(_AHK_DRY_RUN) ? 0 : DllCall("SetWinEventHook",
     "UInt", 0x0003,           ; EVENT_SYSTEM_FOREGROUND
     "UInt", 0x0003,
     "Ptr",  0,
@@ -1928,6 +1931,7 @@ _GestureWinHook  := DllCall("SetWinEventHook",
     "UInt", 0,
     "UInt", 0,
     "UInt", 0x0000)           ; WINEVENT_OUTOFCONTEXT
-OnExit(_GestureUnhook)
+if !IsSet(_AHK_DRY_RUN)
+    OnExit(_GestureUnhook)
 
 LoggerSuccess("gestures", "Gestures module initialised — ready.")
