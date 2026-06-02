@@ -782,6 +782,16 @@ _HS_MagicKeyConfig(M, _Cat) {
 	RegisterMenuItem(M, t("menu.hotstrings.magic_key_prefix") . ScriptInformation["MagicKey"], MagicKeyEditor)
 }
 
+; Dynamic handler: repeat-key toggle (★ as repeat key).
+_HS_RepeatKey(M, _Cat) {
+	global HSE_RepeatEnabled
+	Label := t("menu.hotstrings.repeat_key_enabled")
+	RegisterMenuItem(M, Label, ToggleRepeatKeyEnabled)
+	if HSE_RepeatEnabled {
+		M.Check(Label)
+	}
+}
+
 ; Dynamic handler: standard hotstring categories.
 _HS_CategoriesStandard(M, _Cat) {
 	global HotstringCategoriesStd, SubMenus, Features
@@ -1946,6 +1956,7 @@ initMenu() {
 		"hotstring_personal",            (M, C) => _HS_Personal(M, C),
 		"hotstring_extensions",          (M, C) => _HS_Extensions(M, C),
 		"magic_key_config",              (M, C) => _HS_MagicKeyConfig(M, C),
+		"repeat_key",                    (M, C) => _HS_RepeatKey(M, C),
 	)
 
 	_HotGroupBuilders := Map(

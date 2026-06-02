@@ -153,9 +153,6 @@
 			"path": "shortcuts.wrap_text_if_selected"
 		},
 		{
-			"type": "---"
-		},
-		{
 			"type": "group",
 			"id": "modifier_combos",
 			"i18n": "menu.shortcuts.group_modifiers",
@@ -460,8 +457,8 @@
 			"id": "magic_key_config"
 		},
 		{
-			"type": "feature",
-			"path": "hotstrings.repeat_key_enabled",
+			"type": "dynamic",
+			"id": "repeat_key",
 			"platforms": ["ahk"]
 		}
 	],
