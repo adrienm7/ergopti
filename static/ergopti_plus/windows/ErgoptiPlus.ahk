@@ -1618,9 +1618,28 @@ _CollectFeatureUpdates(Updates, SectionPath, Node) {
 }
 
 ReloadWithDefaultConfig(*) {
-    ; Delete the config so the next startup uses all default values, then reload
-    if FileExist(ConfigurationFile) {
-        FileDelete(ConfigurationFile)
+    global _ConfigDir, _AhkSubDir
+    ; « Valeurs par défaut » must restore the FULL factory state, not only the
+    ; feature toggles. Three separate per-user files hold configurable state, all
+    ; under _ConfigDir\autohotkey\:
+    ;   - config.toml      → features, layout, shortcuts, gestures, LLM scalars,
+    ;                        metrics (regenerated from the shipped template).
+    ;   - tap_hold.toml    → tap/hold key assignments (regenerated from defaults).
+    ;   - api_entries.json → LLM remote endpoints + DPAPI-encrypted tokens
+    ;                        (absent file reads back as an empty list).
+    ; Deleting only config.toml left tap-holds and API entries on disk, so they
+    ; survived the reset — which is exactly the « ça réinitialise que les toggles »
+    ; complaint. Remove all three together, then reload.
+    AhkDir := _ConfigDir . _AhkSubDir
+    for FileName in ["config.toml", "tap_hold.toml", "api_entries.json"] {
+        Path := AhkDir . FileName
+        try {
+            if FileExist(Path) {
+                FileDelete(Path)
+            }
+        } catch as Err {
+            try LoggerError("GlobalReset", "Could not delete {1}: {2}.", FileName, Err.Message)
+        }
     }
     Reload
 }
