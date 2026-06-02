@@ -9,12 +9,12 @@
 ; runs depending on the current Shift state.
 ;
 ; FEATURES & RATIONALE:
-; 1. Lookup is O(1) Map vs. AHK's individual hotkey-variant matching, and the
+; 1. Lookup is O(1) Map vs. AHK’s individual hotkey-variant matching, and the
 ;    repeated 5-line ``if Shift then X else Y`` block from the original
 ;    layout.ahk is collapsed into a single dispatcher function.
 ; 2. The three logical sub-layers are kept as separate tables so the original
 ;    registration order is preserved bit-for-bit (rolls → ErgoptiPlus
-;    overrides → ErgoptiAltGr Number row → ErgoptiAltGr base rows). AHK's
+;    overrides → ErgoptiAltGr Number row → ErgoptiAltGr base rows). AHK’s
 ;    most-recently-registered-variant-wins rule depends on this ordering,
 ;    so flattening the tables would silently change which binding fires when
 ;    multiple Layout sub-features are simultaneously enabled.
@@ -162,7 +162,7 @@ _BuildAltGrTables() {
                    Shifted: DeadKey.Bind(DeadkeyMappingDiaresis) },
         "SC027", { Plain: WrapTextIfSelected.Bind("]", "[", "]"),
                    Shifted: DeadKey.Bind(DeadkeyMappingR) },
-        "SC028", { Plain: SendNewResult.Bind("'"),
+        "SC028", { Plain: SendNewResult.Bind("’"),
                    Shifted: DeadKey.Bind(DeadkeyMappingCurrency) },
         "SC02B", { Plain: WrapTextIfSelected.Bind("!", "!", "!"),
                    Shifted: SendNewResult.Bind("¡") },
@@ -217,7 +217,7 @@ _BuildAltGrTables() {
 ;
 ; The discriminator is _ALTGR_KANA_FIXUP, auto-detected at boot via a reverse
 ; VK_RMENU→SC probe in lib/hotstring_engine.ahk (re-evaluated on layout switch
-; through the watcher's Reload). Manual TOML override available via
+; through the watcher’s Reload). Manual TOML override available via
 ; ScriptInformation["AltGrIsKanaRemap"] in case the probe ever misfires.
 IsRealAltGrPress() {
     global _ALTGR_KANA_FIXUP, _OB_ALTGR_PASSTHROUGH
@@ -225,7 +225,7 @@ IsRealAltGrPress() {
     ; any Ergopti feature, so every SC138-prefixed hotkey in the driver must
     ; defer to the host Windows layout. Returning false here neutralises every
     ; #HotIf that gates on IsRealAltGrPress(), which is the gate used by every
-    ; static SC138 combo in the codebase. AHK's "all variants false → prefix
+    ; static SC138 combo in the codebase. AHK’s "all variants false → prefix
     ; reverts to native function" rule then restores native AltGr behaviour
     ; for the duration of the wizard. The flag flips back automatically when
     ; the wizard committed (Reload) or when the user closed it (ExitApp).
@@ -256,7 +256,7 @@ AltGrShiftDispatch(SC, Table, *) {
     ; This dispatcher only runs on a real AltGr/Kana press — the HotIf in
     ; RegisterAltGrLayer guards every SC138 hotkey on IsRealAltGrPress().
     ; Ghost SC138 prefixes (injected by an OS driver for AltGr-mapped keys
-    ; like Bépo's `'`) therefore fall through to the regular *SC<key>/SC<key>
+    ; like Bépo’s `'`) therefore fall through to the regular *SC<key>/SC<key>
     ; remap hotkeys and produce the correct base-layer character.
     Entry := Table[SC]
     Cb := GetKeyState("Shift", "P") ? Entry.Shifted : Entry.Plain
@@ -268,7 +268,7 @@ CtrlAltDispatch(Combo, *) {
 }
 
 ; Register every AltGr-layer hotkey from the three tables, preserving the
-; exact same order as the original ``SC138 & SCxxx::`` blocks so AHK's
+; exact same order as the original ``SC138 & SCxxx::`` blocks so AHK’s
 ; "most-recently-registered variant wins" rule produces identical
 ; behaviour when several Layout sub-features are simultaneously enabled.
 RegisterAltGrLayer() {
@@ -278,7 +278,7 @@ RegisterAltGrLayer() {
     ; AltGr hotkeys must only fire on a real AltGr/Kana press. The
     ; IsRealAltGrPress() helper accepts physical RAlt (Bépo OS) or any SC138
     ; press without LCtrl held (Kana / custom layouts), and rejects the OS
-    ; driver's ghost SC138 prefix which arrives with LCtrl still held.
+    ; driver’s ghost SC138 prefix which arrives with LCtrl still held.
 
     ; --- ErgoptiPlus overrides (registered first, lowest precedence) ---
     HotIf((*) => Features["layout"]["ergopti_plus"] and IsRealAltGrPress())
