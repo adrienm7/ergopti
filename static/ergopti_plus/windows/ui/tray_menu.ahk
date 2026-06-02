@@ -1482,10 +1482,6 @@ initMenu() {
 		MenuAddLetterPicker(AccentsMenuLayout, "Shortcuts", V1LetterId)
 	}
 	LayoutMenu.Add(t("menu.shortcuts.group_accented"), AccentsMenuLayout)
-	WrapEntryLayout := ManifestFindEntryByPath("shortcuts.wrap_text_if_selected")
-	if (WrapEntryLayout != false) {
-		MenuAddItemFromManifest(LayoutMenu, WrapEntryLayout, "Shortcuts")
-	}
 	LayoutMenuTitle := t("menu.layout.title")
 	A_TrayMenu.Add(LayoutMenuTitle, LayoutMenu)
 	if LayoutGated {
