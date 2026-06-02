@@ -1607,7 +1607,12 @@ _BuildShortcutsSubmenu() {
 }
 
 ; Dynamic handler: personal shortcuts submenu (if any registered).
+; Returns false when nothing was added so the renderer suppresses the adjacent separator.
 _SC_Personal(SubMenu, _Cat) {
+	global _PersonalShortcutsRegistry
+	if !_PersonalShortcutsRegistry.Has("__Order") or _PersonalShortcutsRegistry["__Order"].Length == 0 {
+		return false
+	}
 	_AppendPersonalShortcutsSubmenuIfAny(SubMenu)
 }
 
@@ -1631,7 +1636,7 @@ _SC_Extensions(SubMenu, _Cat) {
 		}
 	}
 	if !HasExtShortcuts {
-		return
+		return false
 	}
 	ExtShortcutsHeader := MenuSectionTitle(t("menu.extensions.header"))
 	SubMenu.Add(ExtShortcutsHeader, (*) => NoAction())
@@ -1945,7 +1950,10 @@ initMenu() {
 		"magic_key_config",              (M, C) => _HS_MagicKeyConfig(M, C),
 	)
 
-	HotstringsMenu := MenuRenderer_Build("hotstrings_menu", "Hotstrings", _HotDynHandlers)
+	_HotGroupBuilders := Map(
+		"hotstrings_params", (*) => MenuRenderer_Build("hotstrings_params_group", "Hotstrings", _HotDynHandlers),
+	)
+	HotstringsMenu := MenuRenderer_Build("hotstrings_menu", "Hotstrings", _HotDynHandlers, _HotGroupBuilders)
 
 	HotstringsMenuTitle := t("menu.hotstrings.title") . " (" . FmtCount(_HS_ComputeGrandTotal()) . ")"
 	A_TrayMenu.Add(HotstringsMenuTitle, HotstringsMenu)
