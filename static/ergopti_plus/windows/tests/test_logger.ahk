@@ -14,7 +14,10 @@
 ; ==============================================================================
 
 ; ── Setup: redirect logger output to a tests-only path ──
-LOGGER_LOG_PATH := A_ScriptDir . "\test_run.log"
+; Use A_Temp so the CI antivirus (Windows Defender real-time scan) does not
+; hold a file lock on a path inside the repo checkout and block FileOpen calls
+; from LoggerWarn/LoggerError throughout the rest of the test suite.
+LOGGER_LOG_PATH := A_Temp . "\ergopti_test_run.log"
 LOGGER_RING_BUFFER := []
 LOGGER_RING_CURSOR := 0
 LOGGER_MIN_LEVEL := "DEBUG"
