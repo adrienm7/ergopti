@@ -178,11 +178,11 @@
 		},
 		{
 			"type": "dynamic",
-			"id": "personal_shortcuts"
+			"id": "script_control_shortcuts"
 		},
 		{
 			"type": "dynamic",
-			"id": "script_control_shortcuts"
+			"id": "personal_shortcuts"
 		},
 		{
 			"type": "action",
