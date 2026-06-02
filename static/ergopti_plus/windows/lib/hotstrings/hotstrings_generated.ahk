@@ -4,8 +4,8 @@
 ; MODULE: Generated Hotstrings Registrar — Entry Point
 ; DESCRIPTION:
 ; AUTO-GENERATED FILE — DO NOT EDIT BY HAND.
-; Regenerate with ``node scripts/build-hotstrings.cjs`` from the repo root
-; whenever the bundled TOML files under ``static/ergopti_plus/shared/hotstrings/`` change.
+; Regenerate with ``python tools/compile_hotstrings.py`` from the repo root
+; whenever the bundled TOML files under ``static/ergopti_plus/_shared/hotstrings/`` change.
 ;
 ; This file is a thin entry-point that ``#Include``s one generated file per
 ; category. Consumers that already ``#Include`` this file require no change.

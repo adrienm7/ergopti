@@ -4,8 +4,8 @@
 ; MODULE: Generated Hotstrings — sfbsreduction
 ; DESCRIPTION:
 ; AUTO-GENERATED FILE — DO NOT EDIT BY HAND.
-; Regenerate with ``node scripts/build-hotstrings.cjs`` from the repo root
-; whenever the bundled TOML files under ``static/ergopti_plus/shared/hotstrings/`` change.
+; Regenerate with ``python tools/compile_hotstrings.py`` from the repo root
+; whenever the bundled TOML files under ``static/ergopti_plus/_shared/hotstrings/`` change.
 ;
 ; Contains the ``_GenLoad_*`` loader functions and the partial
 ; ``_GENERATED_HOTSTRINGS`` map entries for the ``sfbsreduction`` category.
@@ -26,9 +26,9 @@
 global _GENERATED_HOTSTRINGS_SFBSREDUCTION := Map(
 	"sfbsreduction.bu", _GenLoad_sfbsreduction_bu,
 	"sfbsreduction.comma", _GenLoad_sfbsreduction_comma,
-	"sfbsreduction.ecirc", _GenLoad_sfbsreduction_ecirc,
-	"sfbsreduction.egrave", _GenLoad_sfbsreduction_egrave,
-	"sfbsreduction.ie", _GenLoad_sfbsreduction_ie,
+	"sfbsreduction.e_circ", _GenLoad_sfbsreduction_e_circ,
+	"sfbsreduction.e_grave", _GenLoad_sfbsreduction_e_grave,
+	"sfbsreduction.i_e_acute", _GenLoad_sfbsreduction_i_e_acute,
 )
 
 
@@ -178,63 +178,63 @@ _GenLoad_sfbsreduction_comma(FeatureConfig, ExtraOptions := unset) {
 	CreateCaseSensitiveHotstrings("*?", ",z", "bj", _GenOpts)
 }
 
-_GenLoad_sfbsreduction_ecirc(FeatureConfig, ExtraOptions := unset) {
+_GenLoad_sfbsreduction_e_circ(FeatureConfig, ExtraOptions := unset) {
 	global ScriptInformation
 	_GenTimeAct := FeatureConfig.HasOwnProp("TimeActivationSeconds") ? FeatureConfig.TimeActivationSeconds : 0
 	_GenMK := ScriptInformation["MagicKey"]
-	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "sfbsreduction", "Section", "ecirc")
+	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "sfbsreduction", "Section", "e_circ")
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
 	CreateCaseSensitiveHotstrings("*?", "ê,", "u,", _GenOpts)
-	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "sfbsreduction", "Section", "ecirc")
+	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "sfbsreduction", "Section", "e_circ")
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
 	CreateCaseSensitiveHotstrings("*?", "ê.", "u.", _GenOpts)
-	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "sfbsreduction", "Section", "ecirc")
+	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "sfbsreduction", "Section", "e_circ")
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
 	CreateCaseSensitiveHotstrings("*?", "éê", "eo", _GenOpts)
-	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "sfbsreduction", "Section", "ecirc")
+	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "sfbsreduction", "Section", "e_circ")
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
 	CreateCaseSensitiveHotstrings("*?", "êé", "oe", _GenOpts)
 }
 
-_GenLoad_sfbsreduction_egrave(FeatureConfig, ExtraOptions := unset) {
+_GenLoad_sfbsreduction_e_grave(FeatureConfig, ExtraOptions := unset) {
 	global ScriptInformation
 	_GenTimeAct := FeatureConfig.HasOwnProp("TimeActivationSeconds") ? FeatureConfig.TimeActivationSeconds : 0
 	_GenMK := ScriptInformation["MagicKey"]
-	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "sfbsreduction", "Section", "egrave")
+	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "sfbsreduction", "Section", "e_grave")
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
 	CreateCaseSensitiveHotstrings("*?", "èy", "aî", _GenOpts)
-	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "sfbsreduction", "Section", "egrave")
+	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "sfbsreduction", "Section", "e_grave")
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
 	CreateCaseSensitiveHotstrings("*?", "yè", "â", _GenOpts)
 }
 
-_GenLoad_sfbsreduction_ie(FeatureConfig, ExtraOptions := unset) {
+_GenLoad_sfbsreduction_i_e_acute(FeatureConfig, ExtraOptions := unset) {
 	global ScriptInformation
 	_GenTimeAct := FeatureConfig.HasOwnProp("TimeActivationSeconds") ? FeatureConfig.TimeActivationSeconds : 0
 	_GenMK := ScriptInformation["MagicKey"]
-	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "sfbsreduction", "Section", "ie")
+	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "sfbsreduction", "Section", "i_e_acute")
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
 	CreateCaseSensitiveHotstrings("*?", "àé", "éi", _GenOpts)
-	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "sfbsreduction", "Section", "ie")
+	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "sfbsreduction", "Section", "i_e_acute")
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
 	CreateCaseSensitiveHotstrings("*?", "éà", "ié", _GenOpts)
-	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "sfbsreduction", "Section", "ie")
+	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "sfbsreduction", "Section", "i_e_acute")
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
 	}

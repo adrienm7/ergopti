@@ -4,8 +4,8 @@
 ; MODULE: Generated Hotstrings — autocorrection
 ; DESCRIPTION:
 ; AUTO-GENERATED FILE — DO NOT EDIT BY HAND.
-; Regenerate with ``node scripts/build-hotstrings.cjs`` from the repo root
-; whenever the bundled TOML files under ``static/ergopti_plus/shared/hotstrings/`` change.
+; Regenerate with ``python tools/compile_hotstrings.py`` from the repo root
+; whenever the bundled TOML files under ``static/ergopti_plus/_shared/hotstrings/`` change.
 ;
 ; Contains the ``_GenLoad_*`` loader functions and the partial
 ; ``_GENERATED_HOTSTRINGS`` map entries for the ``autocorrection`` category.
@@ -28,12 +28,12 @@ global _GENERATED_HOTSTRINGS_AUTOCORRECTION := Map(
 	"autocorrection.caps", _GenLoad_autocorrection_caps,
 	"autocorrection.errors", _GenLoad_autocorrection_errors,
 	"autocorrection.minus", _GenLoad_autocorrection_minus,
-	"autocorrection.minusapostrophe", _GenLoad_autocorrection_minusapostrophe,
-	"autocorrection.multiplepunctuationmarks", _GenLoad_autocorrection_multiplepunctuationmarks,
+	"autocorrection.minus_apostrophe", _GenLoad_autocorrection_minus_apostrophe,
+	"autocorrection.multiple_punctuation_marks", _GenLoad_autocorrection_multiple_punctuation_marks,
 	"autocorrection.names", _GenLoad_autocorrection_names,
 	"autocorrection.ou", _GenLoad_autocorrection_ou,
-	"autocorrection.suffixesachaining", _GenLoad_autocorrection_suffixesachaining,
-	"autocorrection.typographicapostrophe", _GenLoad_autocorrection_typographicapostrophe,
+	"autocorrection.suffixes_a_chaining", _GenLoad_autocorrection_suffixes_a_chaining,
+	"autocorrection.typographic_apostrophe", _GenLoad_autocorrection_typographic_apostrophe,
 )
 
 
@@ -3010,142 +3010,142 @@ _GenLoad_autocorrection_minus(FeatureConfig, ExtraOptions := unset) {
 	CreateCaseSensitiveHotstrings("", "yatil", "y a-t-il", _GenOpts)
 }
 
-_GenLoad_autocorrection_minusapostrophe(FeatureConfig, ExtraOptions := unset) {
+_GenLoad_autocorrection_minus_apostrophe(FeatureConfig, ExtraOptions := unset) {
 	global ScriptInformation
 	_GenTimeAct := FeatureConfig.HasOwnProp("TimeActivationSeconds") ? FeatureConfig.TimeActivationSeconds : 0
 	_GenMK := ScriptInformation["MagicKey"]
-	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "minusapostrophe")
+	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "minus_apostrophe")
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
 	CreateCaseSensitiveHotstrings("*?", "a't", "a-t", _GenOpts)
-	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "minusapostrophe")
+	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "minus_apostrophe")
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
 	CreateCaseSensitiveHotstrings("*?", "a't'e", "a-t-e", _GenOpts)
-	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "minusapostrophe")
+	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "minus_apostrophe")
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
 	CreateCaseSensitiveHotstrings("*?", "a't'i", "a-t-i", _GenOpts)
-	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "minusapostrophe")
+	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "minus_apostrophe")
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
 	CreateCaseSensitiveHotstrings("*?", "a't'o", "a-t-o", _GenOpts)
-	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "minusapostrophe")
+	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "minus_apostrophe")
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
 	CreateCaseSensitiveHotstrings("*?", "ai',", "ai-j", _GenOpts)
-	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "minusapostrophe")
+	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "minus_apostrophe")
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
 	CreateCaseSensitiveHotstrings("*?", "ai'j", "ai-j", _GenOpts)
-	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "minusapostrophe")
+	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "minus_apostrophe")
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
 	CreateCaseSensitiveHotstrings("*?", "as't", "as-t", _GenOpts)
-	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "minusapostrophe")
+	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "minus_apostrophe")
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
 	CreateCaseSensitiveHotstrings("*?", "s',", "s-j", _GenOpts)
-	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "minusapostrophe")
+	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "minus_apostrophe")
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
 	CreateCaseSensitiveHotstrings("*?", "s'j", "s-j", _GenOpts)
-	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "minusapostrophe")
+	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "minus_apostrophe")
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
 	CreateCaseSensitiveHotstrings("*?", "s'm", "s-m", _GenOpts)
-	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "minusapostrophe")
+	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "minus_apostrophe")
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
 	CreateCaseSensitiveHotstrings("*?", "s'n", "s-n", _GenOpts)
-	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "minusapostrophe")
+	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "minus_apostrophe")
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
 	CreateCaseSensitiveHotstrings("*?", "s't", "s-t", _GenOpts)
-	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "minusapostrophe")
+	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "minus_apostrophe")
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
 	CreateCaseSensitiveHotstrings("*?", "t'e", "t-e", _GenOpts)
-	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "minusapostrophe")
+	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "minus_apostrophe")
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
 	CreateCaseSensitiveHotstrings("*?", "t'i", "t-i", _GenOpts)
-	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "minusapostrophe")
+	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "minus_apostrophe")
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
 	CreateCaseSensitiveHotstrings("*?", "t'o", "t-o", _GenOpts)
-	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "minusapostrophe")
+	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "minus_apostrophe")
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
 	CreateCaseSensitiveHotstrings("*?", "x't", "x-t", _GenOpts)
-	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "minusapostrophe")
+	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "minus_apostrophe")
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
 	CreateCaseSensitiveHotstrings("", "ya", "y'a", _GenOpts)
-	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "minusapostrophe")
+	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "minus_apostrophe")
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
 	CreateCaseSensitiveHotstrings("*?", "z'v", "z-v", _GenOpts)
 }
 
-_GenLoad_autocorrection_multiplepunctuationmarks(FeatureConfig, ExtraOptions := unset) {
+_GenLoad_autocorrection_multiple_punctuation_marks(FeatureConfig, ExtraOptions := unset) {
 	global ScriptInformation
 	_GenTimeAct := FeatureConfig.HasOwnProp("TimeActivationSeconds") ? FeatureConfig.TimeActivationSeconds : 0
 	_GenMK := ScriptInformation["MagicKey"]
-	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "multiplepunctuationmarks")
+	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "multiple_punctuation_marks")
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
 	CreateHotstring("*?", "! !", "!!", _GenOpts)
-	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "multiplepunctuationmarks")
+	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "multiple_punctuation_marks")
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
 	CreateHotstring("*?", "! ?", "!?", _GenOpts)
-	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "multiplepunctuationmarks")
+	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "multiple_punctuation_marks")
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
 	CreateHotstring("*?", "? !", "?!", _GenOpts)
-	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "multiplepunctuationmarks")
+	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "multiple_punctuation_marks")
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
 	CreateHotstring("*?", "? ?", "??", _GenOpts)
-	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "multiplepunctuationmarks")
+	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "multiple_punctuation_marks")
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
 	CreateHotstring("*?", " ! !", " !!", _GenOpts)
-	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "multiplepunctuationmarks")
+	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "multiple_punctuation_marks")
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
 	CreateHotstring("*?", " ! ?", " !?", _GenOpts)
-	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "multiplepunctuationmarks")
+	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "multiple_punctuation_marks")
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
 	CreateHotstring("*?", " ? !", " ?!", _GenOpts)
-	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "multiplepunctuationmarks")
+	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "multiple_punctuation_marks")
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
@@ -3374,127 +3374,127 @@ _GenLoad_autocorrection_ou(FeatureConfig, ExtraOptions := unset) {
 	CreateCaseSensitiveHotstrings("*", "où .", "où.", _GenOpts)
 }
 
-_GenLoad_autocorrection_suffixesachaining(FeatureConfig, ExtraOptions := unset) {
+_GenLoad_autocorrection_suffixes_a_chaining(FeatureConfig, ExtraOptions := unset) {
 	global ScriptInformation
 	_GenTimeAct := FeatureConfig.HasOwnProp("TimeActivationSeconds") ? FeatureConfig.TimeActivationSeconds : 0
 	_GenMK := ScriptInformation["MagicKey"]
-	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "suffixesachaining")
+	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "suffixes_a_chaining")
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
 	CreateCaseSensitiveHotstrings("*?", "eàa", "aire", _GenOpts)
-	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "suffixesachaining")
+	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "suffixes_a_chaining")
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
 	CreateCaseSensitiveHotstrings("*?", "eàf", "iste", _GenOpts)
-	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "suffixesachaining")
+	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "suffixes_a_chaining")
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
 	CreateCaseSensitiveHotstrings("*?", "eàl", "elle", _GenOpts)
-	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "suffixesachaining")
+	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "suffixes_a_chaining")
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
 	CreateCaseSensitiveHotstrings("*?", "eàm", "isme", _GenOpts)
-	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "suffixesachaining")
+	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "suffixes_a_chaining")
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
 	CreateCaseSensitiveHotstrings("*?", "eàn", "ation", _GenOpts)
-	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "suffixesachaining")
+	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "suffixes_a_chaining")
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
 	CreateCaseSensitiveHotstrings("*?", "eàp", "ence", _GenOpts)
-	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "suffixesachaining")
+	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "suffixes_a_chaining")
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
 	CreateCaseSensitiveHotstrings("*?", "eàq", "ique", _GenOpts)
-	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "suffixesachaining")
+	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "suffixes_a_chaining")
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
 	CreateCaseSensitiveHotstrings("*?", "eàr", "erre", _GenOpts)
-	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "suffixesachaining")
+	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "suffixes_a_chaining")
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
 	CreateCaseSensitiveHotstrings("*?", "eàs", "ement", _GenOpts)
-	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "suffixesachaining")
+	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "suffixes_a_chaining")
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
 	CreateCaseSensitiveHotstrings("*?", "eàt", "ettre", _GenOpts)
-	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "suffixesachaining")
+	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "suffixes_a_chaining")
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
 	CreateCaseSensitiveHotstrings("*?", "eàz", "ez-vous", _GenOpts)
-	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "suffixesachaining")
+	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "suffixes_a_chaining")
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
 	CreateCaseSensitiveHotstrings("*?", "ieàq", "ique", _GenOpts)
 }
 
-_GenLoad_autocorrection_typographicapostrophe(FeatureConfig, ExtraOptions := unset) {
+_GenLoad_autocorrection_typographic_apostrophe(FeatureConfig, ExtraOptions := unset) {
 	global ScriptInformation
 	_GenTimeAct := FeatureConfig.HasOwnProp("TimeActivationSeconds") ? FeatureConfig.TimeActivationSeconds : 0
 	_GenMK := ScriptInformation["MagicKey"]
-	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "typographicapostrophe")
+	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "typographic_apostrophe")
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
 	CreateCaseSensitiveHotstrings("*", "c'", "c’", _GenOpts)
-	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "typographicapostrophe")
+	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "typographic_apostrophe")
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
 	CreateCaseSensitiveHotstrings("*", "ch'ti", "ch’ti", _GenOpts)
-	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "typographicapostrophe")
+	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "typographic_apostrophe")
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
 	CreateCaseSensitiveHotstrings("*", "d'", "d’", _GenOpts)
-	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "typographicapostrophe")
+	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "typographic_apostrophe")
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
 	CreateCaseSensitiveHotstrings("*", "ju'", "jusqu’", _GenOpts)
-	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "typographicapostrophe")
+	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "typographic_apostrophe")
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
 	CreateCaseSensitiveHotstrings("*", "j'", "j’", _GenOpts)
-	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "typographicapostrophe")
+	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "typographic_apostrophe")
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
 	CreateCaseSensitiveHotstrings("*", "l'", "l’", _GenOpts)
-	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "typographicapostrophe")
+	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "typographic_apostrophe")
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
 	CreateCaseSensitiveHotstrings("*", "m'", "m’", _GenOpts)
-	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "typographicapostrophe")
+	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "typographic_apostrophe")
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
 	CreateCaseSensitiveHotstrings("*", "n'", "n’", _GenOpts)
-	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "typographicapostrophe")
+	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "typographic_apostrophe")
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
 	CreateCaseSensitiveHotstrings("*?", "n't", "n’t", _GenOpts)
-	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "typographicapostrophe")
+	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "typographic_apostrophe")
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
 	CreateCaseSensitiveHotstrings("*", "s'", "s’", _GenOpts)
-	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "typographicapostrophe")
+	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "typographic_apostrophe")
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
