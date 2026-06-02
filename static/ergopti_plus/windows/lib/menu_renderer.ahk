@@ -165,8 +165,8 @@ MenuRenderer_Build(ManifestKey, CategoryName, DynamicHandlers, GroupBuilders := 
 		PendingSep := false
 
 		if ItemType == "toggle" {
-			; Category toggles are always managed by the caller (AddCategoryToggleItem).
-			; Skip here to avoid a duplicate toggle when caller also adds it manually.
+			_MR_RenderToggle(Result, Item, CategoryName)
+			ItemCount++
 
 		} else if ItemType == "feature" {
 			_MR_RenderFeature(Result, Item, CategoryName)
