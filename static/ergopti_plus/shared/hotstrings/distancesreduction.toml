@@ -119,7 +119,6 @@ suffixesa = { fr = "À + lettre donne un suffixe : às = ement, àn = ation, àh
 "êi" = { output = "î", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = false }
 "êJ" = { output = "J", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "êj" = { output = "j", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
-"ê★" = { output = "j", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "êK" = { output = "☻", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "êk" = { output = "☺", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "êL" = { output = "‡", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
