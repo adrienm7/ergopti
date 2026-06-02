@@ -347,18 +347,21 @@ _ApplyMenuLabelDynamicSubstitutions(Label, V1Path) {
 				Label := StrReplace(Label, "{date}", FormatTime(, "yyyy_MM_dd"))
 		}
 	}
-	; Append hotstring entry counts for the TOML-backed categories and the
-	; DynamicHotstrings entries (PhonePrefixes, SsnPrefixes, …). The v1
-	; PascalCase category is the CategoryName argument CountTomlSection
-	; expects; section name is the FoldAsciiLower of the v1 feature id
-	; (``Errors`` -> ``errors``, ``IÉ`` -> ``ie``).
+	; Append hotstring entry counts for the TOML-backed categories.
+	; CountTomlSection expects the TOML section name, which is now the
+	; v2 snake_case id — resolve it from the manifest path.
 	Parts := StrSplit(V1Path, ".")
 	if (Parts.Length == 2) {
 		switch Parts[1] {
 			case "Autocorrection", "DistancesReduction", "MagicKey", "Rolls", "SFBsReduction":
-				N := CountTomlSection(Parts[1], FoldAsciiLower(Parts[2]))
-				if (N > 0) {
-					Label := Label . " (" . N . ")"
+				V2FullPath := LegacyPathToManifestPath(V1Path)
+				if (V2FullPath != "") {
+					V2Parts := StrSplit(V2FullPath, ".")
+					V2SecId := V2Parts[V2Parts.Length]
+					N := CountTomlSection(Parts[1], V2SecId)
+					if (N > 0) {
+						Label := Label . " (" . N . ")"
+					}
 				}
 			case "DynamicHotstrings":
 				N := CountDynamicSection(Parts[2])
@@ -1522,13 +1525,10 @@ _CountEnabledForCategory(V1Cat) {
 	if !Features["hotstrings"].Has(V2Cat) {
 		return 0
 	}
-	InvMap := _V1CatToInverseKeyMap.Has(V1Cat) ? _V1CatToInverseKeyMap[V1Cat] : false
 	Total := 0
 	for V2SecId, FNode in Features["hotstrings"][V2Cat] {
 		if (IsObject(FNode) and FNode.Has("enabled") and FNode["enabled"]) {
-			; v2 snake_case -> v1 PascalCase -> lowercase = TOML section name
-			V1Key := (InvMap and InvMap.Has(V2SecId)) ? InvMap[V2SecId] : V2SecId
-			Total += CountTomlSection(V1Cat, FoldAsciiLower(V1Key))
+			Total += CountTomlSection(V1Cat, V2SecId)
 		}
 	}
 	return Total
@@ -1539,7 +1539,7 @@ _CountEnabledForCategory(V1Cat) {
 ; zeroes Features in memory so _CountEnabledForCategory would return 0, but the menu
 ; should still display the persisted counts so the user knows what will reactivate.
 _CountAllForCategory(V1Cat) {
-	global Features, _V1CatToV2CatMap, _V1CatToInverseKeyMap
+	global Features, _V1CatToV2CatMap
 	if !_V1CatToV2CatMap.Has(V1Cat) {
 		return 0
 	}
@@ -1547,12 +1547,10 @@ _CountAllForCategory(V1Cat) {
 	if !Features["hotstrings"].Has(V2Cat) {
 		return 0
 	}
-	InvMap := _V1CatToInverseKeyMap.Has(V1Cat) ? _V1CatToInverseKeyMap[V1Cat] : false
 	Total := 0
 	for V2SecId, FNode in Features["hotstrings"][V2Cat] {
 		if IsObject(FNode) {
-			V1Key := (InvMap and InvMap.Has(V2SecId)) ? InvMap[V2SecId] : V2SecId
-			Total += CountTomlSection(V1Cat, FoldAsciiLower(V1Key))
+			Total += CountTomlSection(V1Cat, V2SecId)
 		}
 	}
 	return Total

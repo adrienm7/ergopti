@@ -8,7 +8,7 @@
 delay = 0.5
 show_tooltip = false
 description = { fr = "Roulements", en = "Rolls", de = "Läufe", es = "Rodamientos", zh = "连击", ar = "تداول", cs = "Rolování", da = "Rolls", he = "גלגולים", hi = "रोल्स", it = "Rollate", ja = "ロール", ko = "롤", nl = "Rolls", no = "Rolls", pl = "Rolady", pt = "Rolagens", ru = "Перекаты", sv = "Rolls", tr = "Yuvarlamalar", uk = "Перекати" }
-sections_order = ["hc", "sx", "cx", "englishnegation", "ez", "ct", "-", "closechevrontag", "chevronless", "chevrongreater", "commentopen", "commentclose", "-", "assign", "notequal", "-", "parenquote", "bracketquote", "hashtagparenthesis", "hashtagopenbracket", "hashtagclosebracket", "equalstring", "-", "leftarrow", "assignarrowequalright", "assignarrowequalleft", "assignarrowminusright", "assignarrowminusleft"]
+sections_order = ["hc", "sx", "cx", "english_negation", "ez", "ct", "-", "close_chevron_tag", "chevron_less", "chevron_greater", "comment_open", "comment_close", "-", "assign", "not_equal", "-", "paren_quote", "bracket_quote", "hashtag_parenthesis", "hashtag_open_bracket", "hashtag_close_bracket", "equal_string", "-", "left_arrow", "assign_arrow_equal_right", "assign_arrow_equal_left", "assign_arrow_minus_right", "assign_arrow_minus_left"]
 
 
 
@@ -18,28 +18,28 @@ sections_order = ["hc", "sx", "cx", "englishnegation", "ez", "ct", "-", "closech
 
 [_meta.sections]
 assign = "#! ➜ :="
-assignarrowequalleft = "=$ ➜ <="
-assignarrowequalright = "$= ➜ =>"
-assignarrowminusleft = "?+ ➜ <-"
-assignarrowminusright = "+? ➜ ->"
-bracketquote = "[# ➜ [\""
-chevrongreater = ">% ➜ >="
-chevronless = "<% ➜ <="
-closechevrontag = "<@ ➜ </"
-commentclose = "\"\\ ➜ */"
-commentopen = "\\\" ➜ /*"
+assign_arrow_equal_left = "=$ ➜ <="
+assign_arrow_equal_right = "$= ➜ =>"
+assign_arrow_minus_left = "?+ ➜ <-"
+assign_arrow_minus_right = "+? ➜ ->"
+bracket_quote = "[# ➜ [\""
+chevron_greater = ">% ➜ >="
+chevron_less = "<% ➜ <="
+close_chevron_tag = "<@ ➜ </"
+comment_close = "\"\\ ➜ */"
+comment_open = "\\\" ➜ /*"
 ct = "P’ ➜ CT"
 cx = "CX ➜ CK"
-englishnegation = "NT’ ➜ N’T"
-equalstring = "[) ➜ = \"\""
+english_negation = "NT’ ➜ N’T"
+equal_string = "[) ➜ = \"\""
 ez = "EÉ ➜ EZ"
-hashtagclosebracket = "#] ➜ \"]"
-hashtagopenbracket = "#[ ➜ \"]"
-hashtagparenthesis = "#( ➜ \")"
-parenquote = "(# ➜ (\""
+hashtag_close_bracket = "#] ➜ \"]"
+hashtag_open_bracket = "#[ ➜ \"]"
+hashtag_parenthesis = "#( ➜ \")"
+paren_quote = "(# ➜ (\""
 hc = "HC ➜ WH"
-leftarrow = "=+ = ➜"
-notequal = "!# ➜ !="
+left_arrow = "=+ = ➜"
+not_equal = "!# ➜ !="
 sx = "SX ➜ SK"
 
 
@@ -68,7 +68,7 @@ sx = "SX ➜ SK"
 # ====================================
 # ====================================
 
-[[assignarrowequalleft]]
+[[assign_arrow_equal_left]]
 " = $" = { output = " <= ", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
 
 
@@ -81,7 +81,7 @@ sx = "SX ➜ SK"
 # =====================================
 # =====================================
 
-[[assignarrowequalright]]
+[[assign_arrow_equal_right]]
 " $ = " = { output = " => ", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
 "$ = " = { output = " => ", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
 
@@ -95,7 +95,7 @@ sx = "SX ➜ SK"
 # ====================================
 # ====================================
 
-[[assignarrowminusleft]]
+[[assign_arrow_minus_left]]
 " ?+" = { output = " <- ", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
 "?+" = { output = " <- ", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
 
@@ -109,7 +109,7 @@ sx = "SX ➜ SK"
 # =====================================
 # =====================================
 
-[[assignarrowminusright]]
+[[assign_arrow_minus_right]]
 " +?" = { output = " -> ", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
 "+?" = { output = " -> ", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
 
@@ -123,7 +123,7 @@ sx = "SX ➜ SK"
 # ============================
 # ============================
 
-[[bracketquote]]
+[[bracket_quote]]
 "[#" = { output = "[\"", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
 
 
@@ -136,7 +136,7 @@ sx = "SX ➜ SK"
 # ==============================
 # ==============================
 
-[[chevrongreater]]
+[[chevron_greater]]
 ">%" = { output = ">=", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
 
 
@@ -149,7 +149,7 @@ sx = "SX ➜ SK"
 # ===========================
 # ===========================
 
-[[chevronless]]
+[[chevron_less]]
 "<%" = { output = "<=", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
 
 
@@ -162,7 +162,7 @@ sx = "SX ➜ SK"
 # ===============================
 # ===============================
 
-[[closechevrontag]]
+[[close_chevron_tag]]
 "<@" = { output = "</", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
 
 
@@ -175,7 +175,7 @@ sx = "SX ➜ SK"
 # ============================
 # ============================
 
-[[commentclose]]
+[[comment_close]]
 "\"\\" = { output = "*/", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
 
 
@@ -188,7 +188,7 @@ sx = "SX ➜ SK"
 # ===========================
 # ===========================
 
-[[commentopen]]
+[[comment_open]]
 "\\\"" = { output = "/*", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
 
 
@@ -228,7 +228,7 @@ sx = "SX ➜ SK"
 # ===============================
 # ===============================
 
-[[englishnegation]]
+[[english_negation]]
 "nt'" = { output = "n’t", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = false }
 
 
@@ -241,7 +241,7 @@ sx = "SX ➜ SK"
 # ===========================
 # ===========================
 
-[[equalstring]]
+[[equal_string]]
 " [)" = { output = " = \"\"", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
 "[)" = { output = " = \"\"", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
 
@@ -268,7 +268,7 @@ sx = "SX ➜ SK"
 # ===================================
 # ===================================
 
-[[hashtagclosebracket]]
+[[hashtag_close_bracket]]
 "#]" = { output = "\"]", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
 
 
@@ -281,7 +281,7 @@ sx = "SX ➜ SK"
 # ==================================
 # ==================================
 
-[[hashtagopenbracket]]
+[[hashtag_open_bracket]]
 "#[" = { output = "\"]", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
 
 
@@ -294,7 +294,7 @@ sx = "SX ➜ SK"
 # ==================================
 # ==================================
 
-[[hashtagparenthesis]]
+[[hashtag_parenthesis]]
 "#(" = { output = "\")", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
 
 
@@ -320,7 +320,7 @@ sx = "SX ➜ SK"
 # =========================
 # =========================
 
-[[leftarrow]]
+[[left_arrow]]
 " = +" = { output = " ➜ ", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = false }
 
 
@@ -333,7 +333,7 @@ sx = "SX ➜ SK"
 # ========================
 # ========================
 
-[[notequal]]
+[[not_equal]]
 " !#" = { output = " != ", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
 " ç#" = { output = " != ", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
 "!#" = { output = " != ", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
@@ -349,7 +349,7 @@ sx = "SX ➜ SK"
 # ==========================
 # ==========================
 
-[[parenquote]]
+[[paren_quote]]
 "(#" = { output = "(\"", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
 
 
