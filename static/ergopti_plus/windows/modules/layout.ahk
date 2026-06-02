@@ -418,13 +418,16 @@ WrapTextIfSelected(Symbol, LeftSymbol, RightSymbol) {
 	) {
 		try {
 			el := UIA.GetFocusedElement()
-			; Check both TextPattern and SelectionPattern availability before querying selection;
-			; SelectionPattern2 (used internally by UIA) is absent on many controls and causes
-			; a ptr-not-found crash in the pattern wrapper's destructor, which escapes try/catch
-			if (el.IsTextPatternAvailable and el.IsSelectionPatternAvailable) {
-				selections := el.GetSelection()
-				if (selections.Length > 0) {
-					Selection := selections[1].GetText()
+			; TextPattern.GetSelection() returns IUIAutomationTextRange objects whose
+			; .GetText(-1) yields the selected string. el.GetSelection() (MSAA path) returns
+			; child elements, not text — wrong API for text selection detection.
+			; IsSelectionPatternAvailable guards the old MSAA path and is unrelated here;
+			; IsTextPatternAvailable is the correct gate for the TextPattern path.
+			if el.IsTextPatternAvailable {
+				tp := el.GetPattern("Text")
+				ranges := tp.GetSelection()
+				if (ranges.Length > 0) {
+					Selection := ranges[1].GetText(-1)
 				}
 			}
 		}
