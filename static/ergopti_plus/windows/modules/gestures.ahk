@@ -1626,6 +1626,11 @@ GestureReleaseRightClick(*) {
 GestureDispatch(slot) {
     global GestureAssignments, GESTURE_ACTIONS, Features
 
+    ; Guard against being called before auto-execute completes (e.g. hotkey fires
+    ; during a Reload triggered by enabling metrics)
+    if !IsSet(GestureAssignments) or !IsSet(GESTURE_ACTIONS) or !IsSet(Features)
+        return
+
     if !Features["gestures"]["enabled"] {
         return
     }
