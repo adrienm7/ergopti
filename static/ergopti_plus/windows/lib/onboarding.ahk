@@ -81,6 +81,15 @@ global _ob_register_pending  := false
 ; Reference to the currently active wizard Gui object
 global _ob_gui          := unset
 
+; Debounce state for the step-1 language preview. ItemSelect fires on every
+; arrow key / mouse movement, including deselect+select pairs for a single
+; navigation step. We arm a one-shot timer and re-read the focused row at
+; fire time so only the final resting position triggers a FileRead+JsonParse.
+global _ob_s1_lv        := unset   ; ListView ref kept for the timer closure
+global _ob_s1_lv_hwnd   := 0       ; Hwnd of that ListView, used to filter WM_KEYDOWN
+global _ob_s1_refs      := unset   ; Map of {headingText, btn, SortedLocales}
+global _ob_s1_debounce_ms := 120   ; delay after last ItemSelect before re-render
+
 ; AltGr passthrough switch — read by ``IsRealAltGrPress`` in lib/layout/layout_altgr.ahk
 ; AND by ``IsOnboardingActive`` below. AHK promotes a key to a "prefix key" the
 ; moment any ``SC138 & X::`` combo is parsed, which costs SC138 (= AltGr) its
@@ -163,17 +172,18 @@ Onboarding_ShowFromMenu(*) {
 ; @param Key  string Translation key to look up.
 ; @returns string The translated value in Code, or the key itself on failure.
 _Onboarding_Translate(Code, Key) {
-	global _I18nLocale, _I18nCache, _I18nCacheLoaded
-	PrevLocale := _I18nLocale
-	PrevCache  := _I18nCache
-	PrevLoaded := _I18nCacheLoaded
-	_I18nLocale      := Code
-	_I18nCacheLoaded := false
-	Value := t(Key)
-	_I18nLocale      := PrevLocale
-	_I18nCache       := PrevCache
-	_I18nCacheLoaded := PrevLoaded
-	return Value
+	; Load the target locale into a throwaway local cache so we never touch the
+	; shared globals (_I18nLocale / _I18nCache / _I18nCacheLoaded). Swapping
+	; globals was the root cause of the rapid-switch stale-language bug: rapid
+	; ItemSelect events queued multiple swap/restore cycles, each one capturing
+	; the globals mid-flight from the previous swap, leaving the cache pointing
+	; at an arbitrary intermediate locale after the dust settled.
+	local LocalCache := Map(), Loaded := false
+	_I18nLoadInto(Code, &LocalCache, &Loaded)
+	if Loaded and LocalCache.Has(Key)
+		return LocalCache[Key]
+	; Fall back to the key name so the UI is never silently blank
+	return Key
 }
 
 
@@ -304,24 +314,86 @@ _Onboarding_Step1() {
 	btnNext.OnEvent("Click", _Step1_Next.Bind(g, lv, SortedLocales, DefaultIndex))
 
 	; Re-render the title, heading and button label in the previewed locale
-	; whenever the selection changes
-	lv.OnEvent("ItemSelect", _Step1_UpdateUi.Bind(g, headingText, btnNext, SortedLocales))
+	; whenever the selection changes. ItemSelect fires on every arrow key and
+	; mouse movement (including deselect+select pairs per step), so we debounce:
+	; the handler just arms a one-shot timer; the timer re-reads the focused row
+	; at fire time, guaranteeing we always render the final resting position.
+	global _ob_s1_lv, _ob_s1_refs
+	_ob_s1_lv   := lv
+	_ob_s1_refs := Map("headingText", headingText, "btn", btnNext, "SortedLocales", SortedLocales)
+	lv.OnEvent("ItemSelect", _Step1_OnItemSelect)
+
+	; Remap Left→Up and Right→Down inside the ListView so horizontal arrow
+	; keys navigate the list the same way vertical ones do.
+	; WM_KEYDOWN = 0x0100, VK_LEFT = 0x25, VK_RIGHT = 0x27,
+	; VK_UP = 0x26, VK_DOWN = 0x28.
+	global _ob_s1_lv_hwnd := lv.Hwnd
+	OnMessage(0x0100, _Step1_LvKeyDown)
 
 	; Immediately render in the pre-selected locale — Modify(Select) does not
 	; fire ItemSelect, so we invoke the handler manually with the default row.
-	_Step1_UpdateUi(g, headingText, btnNext, SortedLocales, lv, DefaultIndex, true)
+	_Step1_RenderLocale(DefaultIndex)
 
 	_Onboarding_Show(g)
 	global _ob_gui := g
 }
 
-_Step1_UpdateUi(g, headingText, btn, SortedLocales, lv, row, selected, *) {
-	if !selected or row <= 0
+; ItemSelect fires on every arrow key / mouse move (including deselect events).
+; We only arm the debounce timer here — never render directly — so rapid
+; navigation through the list doesn't trigger a FileRead+JsonParse per step.
+_Step1_OnItemSelect(*) {
+	global _ob_s1_debounce_ms
+	; Negative period = one-shot after the delay; re-arming cancels any pending call.
+	SetTimer(_Step1_DebounceRender, -_ob_s1_debounce_ms)
+}
+
+; Fired by the debounce timer. Re-reads the focused row from the ListView at
+; this moment so we always render whatever row the user actually landed on,
+; regardless of how many ItemSelect events were queued before us.
+_Step1_DebounceRender(*) {
+	global _ob_s1_lv, _ob_s1_refs
+	if !IsSet(_ob_s1_lv) or !IsSet(_ob_s1_refs)
+		return
+	row := _ob_s1_lv.GetNext(0, "Focused")
+	if row > 0
+		_Step1_RenderLocale(row)
+}
+
+; Does the actual translate + assign. Separated so the initial manual call
+; (before ItemSelect is wired) and the debounce path share one implementation.
+_Step1_RenderLocale(row) {
+	global _ob_s1_refs
+	if !IsSet(_ob_s1_refs)
+		return
+	SortedLocales := _ob_s1_refs["SortedLocales"]
+	headingText   := _ob_s1_refs["headingText"]
+	btn           := _ob_s1_refs["btn"]
+	if row <= 0 or row > SortedLocales.Length
 		return
 	Code := SortedLocales[row].Code
-	try g.Title       := _Onboarding_Translate(Code, "onboarding.welcome.title")
-	try headingText.Text := _Onboarding_Translate(Code, "onboarding.welcome.heading")
-	try btn.Text      := _Onboarding_Translate(Code, "onboarding.next")
+	try _ob_s1_refs["headingText"].Text := _Onboarding_Translate(Code, "onboarding.welcome.heading")
+	try _ob_s1_refs["btn"].Text         := _Onboarding_Translate(Code, "onboarding.next")
+	; Window title needs the Gui ref — fetch it from the global
+	global _ob_gui
+	if IsSet(_ob_gui)
+		try _ob_gui.Title := _Onboarding_Translate(Code, "onboarding.welcome.title")
+}
+
+; WM_KEYDOWN handler — translates Left→Up and Right→Down inside the step-1
+; ListView so horizontal arrow keys navigate the language list identically to
+; the vertical ones. Registered only while step 1 is active; unregistered by
+; _Onboarding_DestroyActive before the Gui is torn down.
+_Step1_LvKeyDown(wParam, lParam, msg, hwnd) {
+	global _ob_s1_lv_hwnd
+	; Only act when the message targets our ListView
+	if (hwnd != _ob_s1_lv_hwnd)
+		return
+	; VK_LEFT (0x25) → synthesise VK_UP (0x26); VK_RIGHT (0x27) → VK_DOWN (0x28)
+	if (wParam = 0x25 or wParam = 0x27) {
+		replacement := (wParam = 0x25) ? 0x26 : 0x28
+		PostMessage(0x0100, replacement, lParam, , "ahk_id " _ob_s1_lv_hwnd)
+		return 0   ; Suppress the original Left/Right key
+	}
 }
 
 _Step1_Next(g, lv, SortedLocales, DefaultIndex, *) {
@@ -1305,7 +1377,14 @@ _Onboarding_OnGuiClose(g, *) {
 
 ; Destroy the current wizard Gui if one is open — keeps at most one page alive.
 _Onboarding_DestroyActive() {
-	global _ob_gui
+	global _ob_gui, _ob_s1_lv_hwnd
+	; Unregister the WM_KEYDOWN hook installed by step 1 before destroying the
+	; Gui — leaving it registered would let the handler fire on stale hwnd checks
+	; in subsequent wizard steps or other windows.
+	if (_ob_s1_lv_hwnd != 0) {
+		OnMessage(0x0100, _Step1_LvKeyDown, 0)
+		_ob_s1_lv_hwnd := 0
+	}
 	try {
 		if IsSet(_ob_gui) {
 			_ob_gui.Destroy()
