@@ -1476,7 +1476,6 @@ initMenu() {
 		MenuAddItemFromManifest(LayoutMenu, ReplaceEntry, "MagicKey")
 	}
 	; Accented letters stay in Disposition clavier (keyboard emulation feature)
-	LayoutMenu.Add() ; Separator before accented letters
 	AccentsMenuLayout := Menu()
 	for V1LetterId in ["EGrave", "ECirc", "EAcute", "AGrave"] {
 		MenuAddLetterPicker(AccentsMenuLayout, "Shortcuts", V1LetterId)
