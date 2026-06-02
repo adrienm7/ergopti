@@ -1607,12 +1607,8 @@ _BuildShortcutsSubmenu() {
 }
 
 ; Dynamic handler: personal shortcuts submenu (if any registered).
-; Returns false when nothing was added so the renderer suppresses the adjacent separator.
+; Emits its own leading separator when items are present, matching pre-refactor behaviour.
 _SC_Personal(SubMenu, _Cat) {
-	global _PersonalShortcutsRegistry
-	if !_PersonalShortcutsRegistry.Has("__Order") or _PersonalShortcutsRegistry["__Order"].Length == 0 {
-		return false
-	}
 	_AppendPersonalShortcutsSubmenuIfAny(SubMenu)
 }
 
@@ -1638,6 +1634,7 @@ _SC_Extensions(SubMenu, _Cat) {
 	if !HasExtShortcuts {
 		return false
 	}
+	SubMenu.Add()
 	ExtShortcutsHeader := MenuSectionTitle(t("menu.extensions.header"))
 	SubMenu.Add(ExtShortcutsHeader, (*) => NoAction())
 	SubMenu.Disable(ExtShortcutsHeader)
@@ -1900,6 +1897,7 @@ _AppendPersonalShortcutsSubmenuIfAny(ShortcutsMenu) {
 	for Name in Names {
 		MenuAddItem(PersonalMenu, "Shortcuts.Personal", Name)
 	}
+	ShortcutsMenu.Add()
 	ShortcutsMenu.Add(t("menu.shortcuts.personal"), PersonalMenu)
 }
 

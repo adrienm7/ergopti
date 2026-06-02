@@ -184,14 +184,8 @@
 			"id": "personal_shortcuts"
 		},
 		{
-			"type": "---"
-		},
-		{
 			"type": "dynamic",
 			"id": "script_control_shortcuts"
-		},
-		{
-			"type": "---"
 		},
 		{
 			"type": "dynamic",
@@ -470,8 +464,8 @@
 		},
 		{
 			"type": "feature",
-			"id": "repeat_key",
-			"i18n": "menu.hotstrings.repeat_key"
+			"path": "hotstrings.repeat_key_enabled",
+			"platforms": ["ahk"]
 		}
 	],
 	"dynamic_hotstrings_order": [

@@ -173,16 +173,10 @@ MenuRenderer_Build(ManifestKey, CategoryName, DynamicHandlers, GroupBuilders := 
 			ItemCount++
 
 		} else if ItemType == "action" {
-			; Actions rendered via dynamic handler keyed by action id.
-			; Handler returning false signals it added nothing — suppress separator.
 			Id := _MR_Get(Item, "id")
 			if (Id != "" and DynamicHandlers is Map and DynamicHandlers.Has(Id)) {
-				Ret := (DynamicHandlers[Id])(Result, CategoryName)
-				if (Ret != false) {
-					ItemCount++
-				} else {
-					PendingSep := false
-				}
+				(DynamicHandlers[Id])(Result, CategoryName)
+				ItemCount++
 			}
 
 		} else if ItemType == "section_header" {
@@ -198,15 +192,10 @@ MenuRenderer_Build(ManifestKey, CategoryName, DynamicHandlers, GroupBuilders := 
 			ItemCount++
 
 		} else if ItemType == "dynamic" {
-			; Handler returning false signals it added nothing — suppress separator.
 			Id := _MR_Get(Item, "id")
 			if (Id != "" and DynamicHandlers is Map and DynamicHandlers.Has(Id)) {
-				Ret := (DynamicHandlers[Id])(Result, CategoryName)
-				if (Ret != false) {
-					ItemCount++
-				} else {
-					PendingSep := false
-				}
+				(DynamicHandlers[Id])(Result, CategoryName)
+				ItemCount++
 			}
 
 		} else {
