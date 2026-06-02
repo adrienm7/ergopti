@@ -79,7 +79,7 @@ global _ob_config_dir        := IsSet(_ConfigDir) ? _ConfigDir : ""
 global _ob_register_pending  := false
 
 ; Reference to the currently active wizard Gui object
-global _ob_gui          := unset
+global _ob_gui          := 0
 
 ; Debounce state for the step-1 language preview. ItemSelect fires on every
 ; arrow key / mouse movement, including deselect+select pairs for a single
@@ -137,7 +137,7 @@ Onboarding_Run() {
 	; Loop tick chosen large enough to leave the message pump idle most of
 	; the time, small enough to dismiss the script quickly when the user
 	; closes the wizard.
-	while IsSet(_ob_gui) {
+	while (_ob_gui != 0) {
 		Sleep(100)
 	}
 	; Reaching here means the wizard window was closed without committing —
@@ -377,7 +377,7 @@ _Step1_RenderLocale(row) {
 	try _ob_s1_refs["btn"].Text         := _Onboarding_Translate(Code, "onboarding.next")
 	; Window title needs the Gui ref — fetch it from the global
 	global _ob_gui
-	if IsSet(_ob_gui)
+	if (_ob_gui != 0)
 		try _ob_gui.Title := _Onboarding_Translate(Code, "onboarding.welcome.title")
 }
 
@@ -1392,9 +1392,9 @@ _Onboarding_DestroyActive() {
 		_ob_s1_lv_hwnd := 0
 	}
 	try {
-		if IsSet(_ob_gui) {
+		if (_ob_gui != 0) {
 			_ob_gui.Destroy()
 		}
 	}
-	_ob_gui := unset
+	_ob_gui := 0
 }
