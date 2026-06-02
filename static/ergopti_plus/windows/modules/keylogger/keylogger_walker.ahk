@@ -995,24 +995,24 @@ KLW_BuildBatchSql() {
     d := Keylogger._device_id_lit
     out := ""
 
-    ; agg_app_day.
+    ; agg_app_day — walker-owned columns ONLY. `time_ms` stays here because
+    ; the walker's capped inter-key accounting is more accurate than a naive
+    ; json_each delta sum, and llm_* have no SQL-rebuild source yet (the
+    ; events_llm table is currently unused). Every other column — chars,
+    ; pauses, think_time_ms, hs_chars, hs_triggers, hs_input_chars and
+    ; app_time_ms — is owned by KLR_RebuildAggregates, which computes it once
+    ; all-time from events_*; writing it here too would double-count it.
     for key, row in KLW.batch["app_day"] {
         out .= Format(
-            "INSERT INTO agg_app_day (device_id, date, app, chars, pauses, time_ms, think_time_ms, hs_chars, llm_chars, hs_triggers, llm_triggers, hs_input_chars, llm_input_chars) VALUES ({1},{2},{3},{4},{5},{6},{7},{8},{9},{10},{11},{12},{13}) ON CONFLICT(device_id, date, app) DO UPDATE SET chars=chars+excluded.chars,pauses=pauses+excluded.pauses,time_ms=time_ms+excluded.time_ms,think_time_ms=think_time_ms+excluded.think_time_ms,hs_chars=hs_chars+excluded.hs_chars,llm_chars=llm_chars+excluded.llm_chars,hs_triggers=hs_triggers+excluded.hs_triggers,llm_triggers=llm_triggers+excluded.llm_triggers,hs_input_chars=hs_input_chars+excluded.hs_input_chars,llm_input_chars=llm_input_chars+excluded.llm_input_chars;`n",
+            "INSERT INTO agg_app_day (device_id, date, app, time_ms, llm_chars, llm_triggers, llm_input_chars) VALUES ({1},{2},{3},{4},{5},{6},{7}) ON CONFLICT(device_id, date, app) DO UPDATE SET time_ms=time_ms+excluded.time_ms,llm_chars=llm_chars+excluded.llm_chars,llm_triggers=llm_triggers+excluded.llm_triggers,llm_input_chars=llm_input_chars+excluded.llm_input_chars;`n",
             d, KLW_SqlEscape(row["date"]), KLW_SqlEscape(row["app"]),
-            KLW_GetMap(row, "chars", 0), KLW_GetMap(row, "pauses", 0),
-            KLW_GetMap(row, "time_ms", 0), KLW_GetMap(row, "think_time_ms", 0),
-            KLW_GetMap(row, "hs_chars", 0), KLW_GetMap(row, "llm_chars", 0),
-            KLW_GetMap(row, "hs_triggers", 0), KLW_GetMap(row, "llm_triggers", 0),
-            KLW_GetMap(row, "hs_input_chars", 0), KLW_GetMap(row, "llm_input_chars", 0))
+            KLW_GetMap(row, "time_ms", 0), KLW_GetMap(row, "llm_chars", 0),
+            KLW_GetMap(row, "llm_triggers", 0), KLW_GetMap(row, "llm_input_chars", 0))
     }
 
-    ; agg_app_day app_time.
-    for key, row in KLW.batch["app_time"] {
-        out .= Format(
-            "INSERT INTO agg_app_day (device_id, date, app, app_time_ms) VALUES ({1},{2},{3},{4}) ON CONFLICT(device_id, date, app) DO UPDATE SET app_time_ms=app_time_ms+excluded.app_time_ms;`n",
-            d, KLW_SqlEscape(row["date"]), KLW_SqlEscape(row["app"]), row["ms"])
-    }
+    ; agg_app_day_ms (app_time_ms) is intentionally NOT written by the walker
+    ; — KLR_RebuildAggregates owns it from events_app_switch.duration_ms so
+    ; the foreground-time figure is single-sourced and all-time.
 
     ; agg_app_day_buckets.
     for key, row in KLW.batch["app_buckets"] {
@@ -1071,29 +1071,34 @@ KLW_BuildBatchSql() {
             row["max_ms"], row["tap_count"], row["hold_count"])
     }
 
-    ; agg_app_day_titles.
+    ; agg_app_day_titles — walker owns `ms` (focus time per title); the
+    ; occurrence count `c` is owned by KLR_RebuildAggregates (from
+    ; events_window_switch), so it is not written here.
     for key, row in KLW.batch["titles"] {
         out .= Format(
-            "INSERT INTO agg_app_day_titles (device_id, date, app, title, c, ms) VALUES ({1},{2},{3},{4},{5},{6}) ON CONFLICT(device_id, date, app, title) DO UPDATE SET c=c+excluded.c,ms=ms+excluded.ms;`n",
+            "INSERT INTO agg_app_day_titles (device_id, date, app, title, ms) VALUES ({1},{2},{3},{4},{5}) ON CONFLICT(device_id, date, app, title) DO UPDATE SET ms=ms+excluded.ms;`n",
             d, KLW_SqlEscape(row["date"]), KLW_SqlEscape(row["app"]),
-            KLW_SqlEscape(row["title"]), row["c"], row["ms"])
+            KLW_SqlEscape(row["title"]), row["ms"])
     }
 
-    ; agg_app_day_hourly.
+    ; agg_app_day_hourly — walker owns the per-hour error columns
+    ; (e/em/es/e_buckets_json); the keystroke count `c` is owned by
+    ; KLR_RebuildAggregates so it is not written here (avoids double-count).
     for key, row in KLW.batch["hourly"] {
         out .= Format(
-            "INSERT INTO agg_app_day_hourly (device_id, date, app, hour, c, e, em, es, e_buckets_json) VALUES ({1},{2},{3},{4},{5},{6},{7},{8},{9}) ON CONFLICT(device_id, date, app, hour) DO UPDATE SET c=c+excluded.c,e=e+excluded.e,em=em+excluded.em,es=es+excluded.es,e_buckets_json=excluded.e_buckets_json;`n",
+            "INSERT INTO agg_app_day_hourly (device_id, date, app, hour, e, em, es, e_buckets_json) VALUES ({1},{2},{3},{4},{5},{6},{7},{8}) ON CONFLICT(device_id, date, app, hour) DO UPDATE SET e=e+excluded.e,em=em+excluded.em,es=es+excluded.es,e_buckets_json=excluded.e_buckets_json;`n",
             d, KLW_SqlEscape(row["date"]), KLW_SqlEscape(row["app"]),
-            KLW_SqlEscape(row["hour"]), row["c"], row["e"], row["em"], row["es"],
+            KLW_SqlEscape(row["hour"]), row["e"], row["em"], row["es"],
             KLW_JsonEscape(row["e_buckets"]))
     }
 
-    ; agg_app_day_hourly_min5.
+    ; agg_app_day_hourly_min5 — walker owns e/es/e_buckets_json; the keystroke
+    ; count `c` is owned by KLR_RebuildAggregates so it is not written here.
     for key, row in KLW.batch["hourly_min5"] {
         out .= Format(
-            "INSERT INTO agg_app_day_hourly_min5 (device_id, date, app, slot, c, e, es, e_buckets_json) VALUES ({1},{2},{3},{4},{5},{6},{7},{8}) ON CONFLICT(device_id, date, app, slot) DO UPDATE SET c=c+excluded.c,e=e+excluded.e,es=es+excluded.es,e_buckets_json=excluded.e_buckets_json;`n",
+            "INSERT INTO agg_app_day_hourly_min5 (device_id, date, app, slot, e, es, e_buckets_json) VALUES ({1},{2},{3},{4},{5},{6},{7}) ON CONFLICT(device_id, date, app, slot) DO UPDATE SET e=e+excluded.e,es=es+excluded.es,e_buckets_json=excluded.e_buckets_json;`n",
             d, KLW_SqlEscape(row["date"]), KLW_SqlEscape(row["app"]),
-            KLW_SqlEscape(row["slot"]), row["c"], row["e"], row["es"],
+            KLW_SqlEscape(row["slot"]), row["e"], row["es"],
             KLW_JsonEscape(row["e_buckets"]))
     }
 
@@ -1154,21 +1159,20 @@ KLW_BuildBatchSql() {
             KLW_JsonEscape(row["durations"]))
     }
 
-    ; agg_app_day_switches_to.
-    for key, row in KLW.batch["switches_to"] {
-        out .= Format(
-            "INSERT INTO agg_app_day_switches_to (device_id, date, app_from, app_to, count) VALUES ({1},{2},{3},{4},{5}) ON CONFLICT(device_id, date, app_from, app_to) DO UPDATE SET count=count+excluded.count;`n",
-            d, KLW_SqlEscape(row["date"]), KLW_SqlEscape(row["app_from"]),
-            KLW_SqlEscape(row["app_to"]), row["count"])
-    }
+    ; agg_app_day_switches_to is intentionally NOT written by the walker —
+    ; KLR_RebuildAggregates now owns it (all-time, from events_app_switch).
+    ; The walker batch still accumulates KLW.batch["switches_to"] harmlessly;
+    ; it simply is not flushed here, so the table is single-sourced.
 
-    ; agg_system_day.
+    ; agg_system_day — walker owns the columns KLR_RebuildAggregates does not
+    ; compute (space_switches, audio_muted_ms, passive_count, night_wake_count).
+    ; wifi_changes / locked_ms / sleep_ms / awake_ms are owned by the SQL
+    ; rebuild from events_system, so they are not written here.
     for key, row in KLW.batch["system_day"] {
         out .= Format(
-            "INSERT INTO agg_system_day (device_id, date, wifi_changes, space_switches, audio_muted_ms, locked_ms, sleep_ms, awake_ms, passive_count, night_wake_count) VALUES ({1},{2},{3},{4},{5},{6},{7},{8},{9},{10}) ON CONFLICT(device_id, date) DO UPDATE SET wifi_changes=wifi_changes+excluded.wifi_changes,space_switches=space_switches+excluded.space_switches,audio_muted_ms=audio_muted_ms+excluded.audio_muted_ms,locked_ms=locked_ms+excluded.locked_ms,sleep_ms=sleep_ms+excluded.sleep_ms,awake_ms=awake_ms+excluded.awake_ms,passive_count=passive_count+excluded.passive_count,night_wake_count=night_wake_count+excluded.night_wake_count;`n",
+            "INSERT INTO agg_system_day (device_id, date, space_switches, audio_muted_ms, passive_count, night_wake_count) VALUES ({1},{2},{3},{4},{5},{6}) ON CONFLICT(device_id, date) DO UPDATE SET space_switches=space_switches+excluded.space_switches,audio_muted_ms=audio_muted_ms+excluded.audio_muted_ms,passive_count=passive_count+excluded.passive_count,night_wake_count=night_wake_count+excluded.night_wake_count;`n",
             d, KLW_SqlEscape(row["date"]),
-            row["wifi_changes"], row["space_switches"], row["audio_muted_ms"],
-            row["locked_ms"], row["sleep_ms"], row["awake_ms"],
+            row["space_switches"], row["audio_muted_ms"],
             row["passive_count"], row["night_wake_count"])
     }
 

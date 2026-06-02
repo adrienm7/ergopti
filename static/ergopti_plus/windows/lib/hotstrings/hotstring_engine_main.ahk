@@ -942,6 +942,11 @@ HSE_DispatchMatch(Spec, EndChar) {
     if IsSet(PrefixWatcherSuppress) {
         try PrefixWatcherSuppress(true)
     }
+    ; Tag the backspace+replacement burst as synthetic so the keylogger keeps
+    ; it out of the manual `chars` count and attributes the resulting n-grams
+    ; to the hotstring source (esrc). Released on the same deferred timer as
+    ; the suppression below so it covers the OS message-loop flush window.
+    try KL_MarkSynthetic("hotstring")
     try {
         if _ALTGR_KANA_FIXUP {
             SendEvent("{SC138 Up}")
@@ -1007,6 +1012,9 @@ HSE_DispatchMatch(Spec, EndChar) {
         if IsSet(PrefixWatcherSuppress) {
             SetTimer((*) => PrefixWatcherSuppress(false), -HSE_SUPPRESS_RELEASE_DELAY_MS)
         }
+        ; Release the synthetic flag on the same flush window as the suppression
+        ; — clearing inline would let trailing replacement keystrokes look manual.
+        SetTimer((*) => KL_ClearSynthetic(), -HSE_SUPPRESS_RELEASE_DELAY_MS)
     }
 }
 

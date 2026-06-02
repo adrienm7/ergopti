@@ -389,6 +389,12 @@ _HotstringDispatch(Replacement, EndChar, BackSpaceSeq, PrevCharKey, OnlyText, Fi
         try PrefixWatcherSuppress(true)
     }
 
+    ; Tag the backspace+replacement burst as synthetic so the keylogger keeps
+    ; it out of the manual `chars` count and attributes the resulting n-grams
+    ; to the hotstring source (esrc). Released on the same deferred timer as
+    ; the prefix-watcher suppression so it covers the OS message-loop flush.
+    try KL_MarkSynthetic("hotstring")
+
     try {
         if GetActiveApp().IsNotepad {
             ; Windows 11 Notepad mis-handles hotstrings (Windows bug, not AHK),
@@ -413,6 +419,9 @@ _HotstringDispatch(Replacement, EndChar, BackSpaceSeq, PrevCharKey, OnlyText, Fi
         if IsSet(PrefixWatcherSuppress) {
             SetTimer((*) => PrefixWatcherSuppress(false), -60)
         }
+        ; Release the synthetic flag on the same flush window — clearing it
+        ; inline would let trailing replacement keystrokes look manual.
+        SetTimer((*) => KL_ClearSynthetic(), -60)
     }
     ; Notify the WPM widget for end-char fires only — star (immediate) fires
     ; are already logged by the prefix watcher via HSE_DispatchMatch.
