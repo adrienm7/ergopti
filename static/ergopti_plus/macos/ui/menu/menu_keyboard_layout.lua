@@ -1229,40 +1229,9 @@ function M.build(ctx)
 		end
 	end
 
-	-- Keyboard emulation features: accented letters + symbol-on-selection
-	-- moved here from Raccourcis (they are keyboard emulation, not shortcuts)
-	local hs_paused = ctx and ctx.paused
-	local shortcuts = ctx and ctx.shortcuts
-	if shortcuts and type(shortcuts.list_shortcuts) == "function" then
-		local ok_list, sh_list = pcall(shortcuts.list_shortcuts)
-		if ok_list and type(sh_list) == "table" then
-			local wrap_entry = nil
-			for _, s in ipairs(sh_list) do
-				if type(s) == "table" and s.id == "wrap_text_if_selected" then
-					wrap_entry = s
-					break
-				end
-			end
-			if wrap_entry then
-				submenu[#submenu + 1] = { title = "-" }
-				local wrap_enabled = wrap_entry.enabled
-				submenu[#submenu + 1] = {
-					title    = i18n.get("menu.shortcuts.altgr_s_title"),
-					checked  = wrap_enabled,
-					disabled = hs_paused or nil,
-					fn       = not hs_paused and function()
-						if type(shortcuts.toggle) == "function" then
-							pcall(shortcuts.toggle, "wrap_text_if_selected")
-						end
-						ctx.do_reload("menu")
-					end or nil,
-				}
-			end
-		end
-	end
-
 	-- J→★ remapping lives here because it configures the physical key, not hotstring behaviour.
 	-- repeat_key_toggle remains in Hotstrings > Paramètres as it governs hotstring timing.
+	local hs_paused = ctx and ctx.paused
 	local replace_enabled = ctx and ctx.keymap
 		and type(ctx.keymap.is_section_enabled) == "function"
 		and ctx.keymap.is_section_enabled("magic_key", "replace")
