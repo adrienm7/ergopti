@@ -270,34 +270,36 @@ _Onboarding_Step1() {
 		iIcon := FlagIndexMap.Has(loc.Code) ? FlagIndexMap[loc.Code] : 0
 		lv.Add("Icon" iIcon, loc.Name)
 	}
-	; Subtract scrollbar width (~17px) so the column never triggers horizontal overflow
+	; Subtract scrollbar width (~17 px) so the column never triggers horizontal overflow
 	lv.ModifyCol(1, ContentW - 20)
-	; Resize the ListView to the exact size Windows itself uses for N items.
-	; LVM_APPROXIMATEVIEWRECT (0x1041) returns the precise outer dimensions
-	; (border included) needed to show ``visRows`` items without a partial
-	; row at the bottom — historically the source of the "white stripe when
-	; scrolled" complaint. We fall back to the manual ``visRows × rowH``
-	; calc when the message returns an unusable height (rare; covers OS
-	; theme tweaks that intercept the message).
-	;
-	; wParam = item count, lParam = (cy << 16) | cx with -1 meaning "use
-	; the default". The result is (cyOut << 16) | cxOut — we only want the
-	; height, masked to 16 bits.
-	; Measure the LV's natural row height via LVM_GETITEMRECT and shrink the
-	; control to ``visRows × rowH + 2 × SM_CYEDGE`` so it shows exactly N items
-	; with no white stripe at the bottom of the scroll. CRITICAL: we ALSO have
-	; to relocate the Next button by hand below because AHK's "next control"
-	; position tracker is set when the LV is *added* (with the initial h240)
-	; and is NOT updated by ``Move()`` — so a relative ``y+16`` on the button
-	; would land it on top of the (now-shorter) LV instead of below it.
-	RECT := Buffer(16, 0)
-	SendMessage(0x100E, 0, RECT.Ptr, lv)  ; LVM_GETITEMRECT, item 0, LVIR_BOUNDS
-	rowH := NumGet(RECT, 12, "Int") - NumGet(RECT, 4, "Int")  ; bottom - top
-	if (rowH > 0) {
-		maxRows := 8
-		visRows := Min(SortedLocales.Length, maxRows)
-		borderPx := 2 * DllCall("GetSystemMetrics", "Int", 13, "Int")
-		lv.Move(,, , visRows * rowH + borderPx)
+	; Resize the ListView so it shows exactly min(N, 8) rows with no partial
+	; row and no white stripe at the bottom when scrolled to the end.
+	; LVM_APPROXIMATEVIEWRECT (0x1041) asks Windows for the precise outer
+	; dimensions (borders included) needed to display exactly wParam items.
+	; wParam = desired item count, lParam = MAKELPARAM(-1, -1) ("use default
+	; column width / height"). Return value = MAKELPARAM(cxOut, cyOut) — we
+	; extract cyOut from the high word. CRITICAL: we ALSO have to relocate
+	; the Next button by hand below because AHK's "next control" position
+	; tracker is set when the LV is *added* (with the initial h240) and is
+	; NOT updated by ``Move()`` — so a relative ``y+16`` on the button would
+	; land it on top of the (now-shorter) LV instead of below it.
+	maxRows := 8
+	visRows := Min(SortedLocales.Length, maxRows)
+	; MAKELPARAM(-1, -1) = 0xFFFFFFFF — "use the control's current width and
+	; default row height" — so we only constrain the row count via wParam.
+	approxResult := SendMessage(0x1041, visRows, 0xFFFFFFFF, lv)
+	approxH := (approxResult >> 16) & 0xFFFF
+	if (approxH > 0) {
+		lv.Move(,, , approxH)
+	} else {
+		; Fallback: measure row height manually via LVM_GETITEMRECT
+		RECT := Buffer(16, 0)
+		SendMessage(0x100E, 0, RECT.Ptr, lv)  ; LVM_GETITEMRECT, item 0
+		rowH := NumGet(RECT, 12, "Int") - NumGet(RECT, 4, "Int")
+		if (rowH > 0) {
+			borderPx := 2 * DllCall("GetSystemMetrics", "Int", 13, "Int")
+			lv.Move(,, , visRows * rowH + borderPx)
+		}
 	}
 	; Pre-select the default locale row
 	lv.Modify(DefaultIndex, "Select Focus Vis")
@@ -432,7 +434,7 @@ _Step1_Next(g, lv, SortedLocales, DefaultIndex, *) {
 ; so every module picks up the new location.
 _Onboarding_StepConfigDir() {
 	global _ob_config_dir, _ConfigDir
-	g := Gui("+AlwaysOnTop", t("dialog.config_folder.title"))
+	g := Gui("+AlwaysOnTop", t("onboarding.welcome.title"))
 	g.SetFont("s10", "Segoe UI")
 	g.MarginX := 20
 	g.MarginY := 16
@@ -625,7 +627,7 @@ _Onboarding_PreloadFromExistingConfig(ChosenDir) {
 
 _Onboarding_Step2() {
 	global _StaticDir
-	g := Gui("+AlwaysOnTop", t("onboarding.layout.title"))
+	g := Gui("+AlwaysOnTop", t("onboarding.welcome.title"))
 	g.SetFont("s10", "Segoe UI")
 	g.MarginX := 20
 	g.MarginY := 16
@@ -724,7 +726,7 @@ _Onboarding_PickDefaultMagicKey() {
 }
 
 _Onboarding_Step3() {
-	g := Gui("+AlwaysOnTop", t("onboarding.magic_key.title"))
+	g := Gui("+AlwaysOnTop", t("onboarding.welcome.title"))
 	g.SetFont("s10", "Segoe UI")
 	g.MarginX := 20
 	g.MarginY := 16
@@ -855,7 +857,7 @@ _Step3_Next(g, rBlackStar, rUGrave, rSemi, rCustom, edKey, *) {
 
 _Onboarding_Step4() {
 	global _ConfigDir
-	g := Gui("+AlwaysOnTop", t("onboarding.metrics.title"))
+	g := Gui("+AlwaysOnTop", t("onboarding.welcome.title"))
 	g.SetFont("s10", "Segoe UI")
 	g.MarginX := 20
 	g.MarginY := 16
@@ -917,7 +919,7 @@ _Step4_Next(g, rYes, *) {
 ; ===========================================
 
 _Onboarding_Step5() {
-	g := Gui("+AlwaysOnTop", t("onboarding.gestures.title"))
+	g := Gui("+AlwaysOnTop", t("onboarding.welcome.title"))
 	g.SetFont("s10", "Segoe UI")
 	g.MarginX := 20
 	g.MarginY := 16
