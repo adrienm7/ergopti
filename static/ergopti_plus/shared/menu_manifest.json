@@ -267,19 +267,16 @@
 			"i18n": "menu.metrics.privacy_header"
 		},
 		{
-			"type": "feature",
-			"id": "filter_private",
-			"i18n": "menu.metrics.filter_private"
+			"type": "dynamic",
+			"id": "filter_private"
 		},
 		{
-			"type": "feature",
-			"id": "filter_secure",
-			"i18n": "menu.metrics.filter_secure"
+			"type": "dynamic",
+			"id": "filter_secure"
 		},
 		{
-			"type": "feature",
-			"id": "filter_sysauth",
-			"i18n": "menu.metrics.filter_sysauth"
+			"type": "dynamic",
+			"id": "filter_sysauth"
 		},
 		{
 			"type": "dynamic",
@@ -306,27 +303,20 @@
 			"depends_on": "wpm_menubar"
 		},
 		{
-			"type": "feature",
-			"id": "wpm_widget",
-			"i18n": "menu.metrics.show_wpm_widget"
+			"type": "dynamic",
+			"id": "wpm_widget"
 		},
 		{
-			"type": "feature",
-			"id": "widget_colors",
-			"i18n": "menu.metrics.colors_by_source",
-			"depends_on": "wpm_widget"
+			"type": "dynamic",
+			"id": "widget_colors"
 		},
 		{
-			"type": "feature",
-			"id": "include_realtime",
-			"i18n": "menu.metrics.include_realtime",
-			"depends_on": "wpm_widget"
+			"type": "dynamic",
+			"id": "include_realtime"
 		},
 		{
-			"type": "action",
-			"id": "reset_wpm_position",
-			"i18n": "menu.metrics.reset_wpm_position",
-			"depends_on": "wpm_widget"
+			"type": "dynamic",
+			"id": "reset_wpm_position"
 		},
 		{
 			"type": "---"
