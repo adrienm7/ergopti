@@ -345,6 +345,23 @@ KLWV_OnWebMessage(which, sender, args) {
         case "request_refresh":
             try KLPF_BuildAndWrite(which, KLWV.metrics_dir)
             KLWV_PushPrefetch(which)
+        case "clear_cache":
+            ; Purge every layer of cache so the next rebuild is a full cold read:
+            ; - KLPF_MANIFEST_CACHE: manifest projection (historical days)
+            ; - KLPF_LAST_JSON:      in-memory JSON blob for the push path
+            ; - KLRCache:            in-memory SQLite DB (force reload from data.sql)
+            ; The on-disk prefetch is also deleted so a stale file isn't served
+            ; if the page reloads before the new push arrives.
+            global KLPF_MANIFEST_CACHE, KLPF_LAST_JSON
+            KLPF_MANIFEST_CACHE := unset
+            KLR_ResetCache()
+            if IsSet(KLPF_LAST_JSON) && KLPF_LAST_JSON.Has(which)
+                KLPF_LAST_JSON.Delete(which)
+            try FileDelete(KLPF_PrefetchPath(which))
+            try FileAppend("[" . A_Now . "] clear_cache(" . which . "): caches purged`r`n", log, "UTF-8")
+            ; Rebuild immediately so the dashboard gets fresh (possibly empty) data
+            try KLPF_BuildAndWrite(which, KLWV.metrics_dir)
+            KLWV_PushPrefetch(which)
     }
 }
 
