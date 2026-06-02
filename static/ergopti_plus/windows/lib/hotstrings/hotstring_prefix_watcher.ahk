@@ -86,6 +86,21 @@ global _PREFIX_WATCHER_CATEGORIES := [
     "autocorrection", "magickey", "personal"
 ]
 
+; Asymmetric wrapping pairs for the UIA selection-wrap feature.
+; When the typed symbol is a closing delimiter, the pair opens with the
+; corresponding opener so the selection ends up properly bracketed.
+; Symmetric symbols (not listed here) wrap with themselves on both sides.
+global _UIA_WRAP_PAIRS := Map(
+    "(", Map("left", "(", "right", ")"),
+    ")", Map("left", "(", "right", ")"),
+    "[", Map("left", "[", "right", "]"),
+    "]", Map("left", "[", "right", "]"),
+    "{", Map("left", "{", "right", "}"),
+    "}", Map("left", "{", "right", "}"),
+    "<", Map("left", "<", "right", ">"),
+    ">", Map("left", "<", "right", ">")
+)
+
 
 
 
@@ -476,6 +491,40 @@ _OnPrefixChar(IH, Char) {
         return
     if !IsCategoryGated("Hotstrings")
         return
+    ; UIA selection-wrap: when the user types a symbol (non-alphanumeric) while
+    ; text is selected, wrap the selection instead of inserting the bare symbol.
+    ; This works independently of keyboard emulation — the InputHook is in V
+    ; (pass-through) mode so the character already reached the app; we undo it
+    ; with a single BackSpace before sending the wrapped replacement.
+    if (IsSet(Features) and Features.Has("shortcuts")
+        and Features["shortcuts"].Has("wrap_text_if_selected")
+        and Features["shortcuts"]["wrap_text_if_selected"]
+        and !RegExMatch(Char, "[[:alnum:]]")
+    ) {
+        try {
+            UIASel := GetUIASelection()
+            if (UIASel != "") {
+                global _UIA_WRAP_PAIRS
+                if _UIA_WRAP_PAIRS.Has(Char) {
+                    Left  := _UIA_WRAP_PAIRS[Char]["left"]
+                    Right := _UIA_WRAP_PAIRS[Char]["right"]
+                } else {
+                    Left  := Char
+                    Right := Char
+                }
+                ; Erase the character already delivered by the pass-through hook,
+                ; then send the wrapped replacement without re-triggering hotstrings.
+                PrefixWatcherSuppress(true)
+                SendEvent("{BackSpace}")
+                SendInstant(Left . UIASel . Right)
+                PrefixWatcherSuppress(false)
+                _ResetPrefixBuffer()
+                return
+            }
+        } catch as _UIAErr {
+            LoggerError("PrefixWatcher", "UIA wrap error for char '{1}': {2}.", Char, _UIAErr.Message)
+        }
+    }
     ; Honour BOTH suppression flags. _PrefixWatcherSuppressed is set by
     ; PrefixWatcherSuppress (manual / tray toggles); HSE_Suppressed is
     ; set by HSE_DispatchMatch while it is replaying its SendEvent burst.

@@ -410,38 +410,47 @@ RemapKey(ScanCode, Character, AlternativeCharacter := "") {
 	}
 }
 
-WrapTextIfSelected(Symbol, LeftSymbol, RightSymbol) {
-	Selection := ""
-	if (
-		isSet(UIA) and Features["shortcuts"]["wrap_text_if_selected"]
-		and not WinActive("Code") ; Electron Apps like VSCode don't fully work with UIA
-	) {
-		try {
-			el := UIA.GetFocusedElement()
-			; TextPattern.GetSelection() returns IUIAutomationTextRange objects whose
-			; .GetText(-1) yields the selected string. el.GetSelection() (MSAA path) returns
-			; child elements, not text — wrong API for text selection detection.
-			; IsSelectionPatternAvailable guards the old MSAA path and is unrelated here;
-			; IsTextPatternAvailable is the correct gate for the TextPattern path.
-			if el.IsTextPatternAvailable {
-				tp := el.GetPattern("Text")
-				ranges := tp.GetSelection()
-				if (ranges.Length > 0) {
-					Selection := ranges[1].GetText(-1)
+; Returns the currently selected text via UIA TextPattern, or "" when:
+; - UIA is unavailable
+; - the focused element does not support TextPattern
+; - nothing is selected (degenerate/empty range)
+; - the selection is all blank lines (caller usually wants to skip wrapping)
+; - we are in an Electron app (VSCode etc.) where UIA TextPattern is unreliable
+GetUIASelection() {
+	if (!isSet(UIA) or WinActive("Code")) {
+		return ""
+	}
+	try {
+		el := UIA.GetFocusedElement()
+		; TextPattern.GetSelection() returns IUIAutomationTextRange objects whose
+		; .GetText(-1) yields the selected string. el.GetSelection() (MSAA path) returns
+		; child elements, not text — wrong API for text selection detection.
+		if el.IsTextPatternAvailable {
+			tp := el.GetPattern("Text")
+			ranges := tp.GetSelection()
+			if (ranges.Length > 0) {
+				Text := ranges[1].GetText(-1)
+				; Blank-only selections (newlines) are not meaningful to wrap
+				if (Text != "" and !RegExMatch(Text, "^(\r\n|\r|\n)+$")) {
+					return Text
 				}
 			}
 		}
 	}
+	return ""
+}
 
-	; This regex is to not trigger the wrapping if there are only blank lines
-	RegEx := "^(\r\n|\r|\n)+$"
-
-	if Selection != "" and RegExMatch(Selection, RegEx) = 0 {
-		; Send all the text instantly and without triggering hotstrings while typing it
-		SendInstant(LeftSymbol Selection RightSymbol)
-	} else {
-		SendNewResult(Symbol) ; SendEvent({Text}) doesn't work everywhere, for example in Google Sheets
+WrapTextIfSelected(Symbol, LeftSymbol, RightSymbol) {
+	if Features["shortcuts"]["wrap_text_if_selected"] {
+		Selection := GetUIASelection()
+		if (Selection != "") {
+			; Send all the text instantly and without triggering hotstrings while typing it
+			SendInstant(LeftSymbol Selection RightSymbol)
+			UpdateLastSentCharacter(Symbol)
+			return
+		}
 	}
+	SendNewResult(Symbol) ; SendEvent({Text}) doesn't work everywhere, for example in Google Sheets
 	UpdateLastSentCharacter(Symbol)
 }
 
