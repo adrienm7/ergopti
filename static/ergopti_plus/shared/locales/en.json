@@ -619,7 +619,7 @@
 	"menu.gestures.title": "🖐️ Gestures",
 	"menu.global.config_folder": "📂 Configuration folder…",
 	"menu.global.disable_all": "☐ Disable all features",
-	"menu.global.edit_shortcuts": "✎ Edit personal shortcuts",
+	"menu.global.edit_shortcuts": "↳ Edit personal shortcuts",
 	"menu.global.enable_all": "☑ Enable all features",
 	"menu.global.language": "🌐 Language",
 	"menu.global.quit": "⏹ Quit",

@@ -619,7 +619,7 @@
 	"menu.gestures.title": "🖐️ इशारे",
 	"menu.global.config_folder": "📂 कॉन्फ़िगरेशन फोल्डर…",
 	"menu.global.disable_all": "☐ सभी विशेषताओं को अक्षम करें",
-	"menu.global.edit_shortcuts": "✎ व्यक्तिगत शॉर्टकट संपादित करें",
+	"menu.global.edit_shortcuts": "↳ व्यक्तिगत शॉर्टकट संपादित करें",
 	"menu.global.enable_all": "☑ सभी विशेषताओं को सक्षम करें",
 	"menu.global.language": "🌐 भाषा",
 	"menu.global.quit": "⏹ बंद करें",

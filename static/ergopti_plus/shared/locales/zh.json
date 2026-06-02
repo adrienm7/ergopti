@@ -619,7 +619,7 @@
 	"menu.gestures.title": "🖐️ 手势",
 	"menu.global.config_folder": "📂 配置文件夹…",
 	"menu.global.disable_all": "☐ 禁用所有功能",
-	"menu.global.edit_shortcuts": "✎ 编辑个人快捷键",
+	"menu.global.edit_shortcuts": "↳ 编辑个人快捷键",
 	"menu.global.enable_all": "☑ 启用所有功能",
 	"menu.global.language": "🌐 语言",
 	"menu.global.quit": "⏹ 退出",

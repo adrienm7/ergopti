@@ -619,7 +619,7 @@
 	"menu.gestures.title": "🖐️ Hareketler",
 	"menu.global.config_folder": "📂 Yapılandırma klasörü…",
 	"menu.global.disable_all": "☐ Tüm özellikleri devre dışı bırak",
-	"menu.global.edit_shortcuts": "✎ Kişisel kısayolları düzenle",
+	"menu.global.edit_shortcuts": "↳ Kişisel kısayolları düzenle",
 	"menu.global.enable_all": "☑ Tüm özellikleri etkinleştir",
 	"menu.global.language": "🌐 Dil",
 	"menu.global.quit": "⏹ Çıkış",

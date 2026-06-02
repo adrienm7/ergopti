@@ -619,7 +619,7 @@
 	"menu.gestures.title": "🖐️ Gester",
 	"menu.global.config_folder": "📂 Konfigurasjonsmappe…",
 	"menu.global.disable_all": "☐ Deaktiver alle funksjoner",
-	"menu.global.edit_shortcuts": "✎ Rediger personlige snarveier",
+	"menu.global.edit_shortcuts": "↳ Rediger personlige snarveier",
 	"menu.global.enable_all": "☑ Aktiver alle funksjoner",
 	"menu.global.language": "🌐 Språk",
 	"menu.global.quit": "⏹ Avslutt",

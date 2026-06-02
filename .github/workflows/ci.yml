@@ -328,7 +328,7 @@ jobs:
                   if (-not (Test-Path $runner)) {
                       Write-Error "Test runner not found at $runner"; exit 2
                   }
-                  $resultsFile = "${{ github.workspace }}\static\ergopti_plus\windows\tests\test_results.txt"
+                  $resultsFile = "$env:TEMP\ergopti_test_results.txt"
                   Remove-Item $resultsFile -Force -ErrorAction SilentlyContinue
                   Write-Host "AHK runtime : $ahk"
                   Write-Host "Test runner : $runner"

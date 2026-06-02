@@ -619,7 +619,7 @@
 	"menu.gestures.title": "🖐️ Gestus",
 	"menu.global.config_folder": "📂 Konfigurationsmappe…",
 	"menu.global.disable_all": "☐ Deaktivér alle funktioner",
-	"menu.global.edit_shortcuts": "✎ Rediger personlige genveje",
+	"menu.global.edit_shortcuts": "↳ Rediger personlige genveje",
 	"menu.global.enable_all": "☑ Aktivér alle funktioner",
 	"menu.global.language": "🌐 Sprog",
 	"menu.global.quit": "⏹ Afslut",

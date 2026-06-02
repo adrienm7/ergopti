@@ -624,7 +624,7 @@
 	"menu.gestures.title": "🖐️ Gestes",
 	"menu.global.config_folder": "📂 Dossier de configuration…",
 	"menu.global.disable_all": "☐ Désactiver toutes les fonctionnalités",
-	"menu.global.edit_shortcuts": "✎ Éditer les raccourcis personnels",
+	"menu.global.edit_shortcuts": "↳ Éditer les raccourcis personnels",
 	"menu.global.enable_all": "☑ Activer toutes les fonctionnalités",
 	"menu.global.language": "🌐 Langue",
 	"menu.global.quit": "⏹ Quitter",

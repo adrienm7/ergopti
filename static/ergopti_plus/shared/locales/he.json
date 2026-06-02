@@ -619,7 +619,7 @@
 	"menu.gestures.title": "🖐️ מחוות",
 	"menu.global.config_folder": "📂 תיקיית הגדרות…",
 	"menu.global.disable_all": "☐ השבת את כל התכונות",
-	"menu.global.edit_shortcuts": "✎ ערוך קיצורים אישיים",
+	"menu.global.edit_shortcuts": "↳ ערוך קיצורים אישיים",
 	"menu.global.enable_all": "☑ הפעל את כל התכונות",
 	"menu.global.language": "🌐 שפה",
 	"menu.global.quit": "⏹ צא",
