@@ -175,7 +175,14 @@ KLR_BuildDatabase(metrics_dir) {
     ; make this idempotent across overlapping device files.
     by_root := md . "by_device\"
     if !DirExist(by_root) {
-        return db   ; empty but valid handle.
+        ; No device folder yet (first run / metrics reset) — still need to
+        ; rebuild aggregates and inject the walker batch so today's live
+        ; typing shows up immediately without requiring a data.sql.
+        KLRCache.db := db
+        KLR_ClearAggregates(db)
+        KLR_RebuildAggregates(db)
+        KLR_InjectKlwBatch(db)
+        return db
     }
     loop files, by_root . "*", "D" {
         sql_path := A_LoopFileFullPath . "\data.sql"

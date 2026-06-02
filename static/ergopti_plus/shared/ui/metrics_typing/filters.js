@@ -207,8 +207,13 @@ function apply_date_app_filters() {
  * threshold, quick range) to their defaults WITHOUT changing the active tab.
  */
 function reset_filters() {
-	// Ask Lua to delete the on-disk snapshot so the next open forces a fresh decrypt.
-	window._lua_request = JSON.stringify({ action: "clear_cache" });
+	// Ask the backend to purge its in-memory and on-disk prefetch caches so
+	// the next push carries a clean rebuild. On Windows this goes via the
+	// WebView2 postMessage channel; on macOS it goes via the _lua_request poll.
+	const clear_msg = JSON.stringify({ action: "clear_cache" });
+	if (typeof window.chrome !== "undefined" && window.chrome.webview)
+		window.chrome.webview.postMessage(clear_msg);
+	window._lua_request = clear_msg;
 
 	apply_default_date_range();
 
