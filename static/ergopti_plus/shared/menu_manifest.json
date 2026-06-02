@@ -95,7 +95,7 @@
 		{ "type": "action",         "id": "reset_wpm_position","i18n": "menu.metrics.reset_wpm_position","depends_on": "wpm_widget" },
 		{ "type": "---" },
 		{ "type": "---" },
-		{ "type": "dynamic",        "id": "encryption" }
+		{ "type": "dynamic",        "id": "encryption",  "platforms": ["hs"] }
 	],
 
 

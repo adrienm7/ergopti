@@ -615,7 +615,6 @@ BuildMetricsMenu() {
 		"widget_colors",      (M, C) => _MET_WpmWidgetColors(M, C),
 		"include_realtime",   (M, C) => _MET_WpmWidgetGraph(M, C),
 		"reset_wpm_position", (M, C) => _MET_WpmWidgetReset(M, C),
-		"encryption",         (M, C) => _MET_Encryption(M, C),
 	)
 
 	MetricsMenu := MenuRenderer_Build("metrics_menu", "Metrics", DynHandlers)
@@ -741,97 +740,6 @@ _MET_WpmWidgetReset(M, _Cat) {
 	if !WPMWidget.visible or !MetricsShortcuts.enabled
 		M.Disable(Label)
 }
-
-; Dynamic handler: encryption toggle + open encryptor app.
-; Ported from macOS (previously absent on Windows).
-_MET_Encryption(M, _Cat) {
-	EncLabel     := t("menu.metrics.encrypt_toggle")
-	EncOpenLabel := t("menu.metrics.open_encryptor")
-
-	; Encryption toggle
-	RegisterMenuItem(M, EncLabel, (*) => _MET_DoEncryptionToggle())
-	if MetricsEncryption.enabled
-		M.Check(EncLabel)
-	if !MetricsShortcuts.enabled
-		M.Disable(EncLabel)
-
-	; Open Encryptor application
-	RegisterMenuItem(M, EncOpenLabel, (*) => _MET_OpenEncryptorApp())
-	if !MetricsShortcuts.enabled
-		M.Disable(EncOpenLabel)
-}
-
-; Toggle encryption state — prompts for confirmation and password, then
-; batch-processes existing log files. Mirrors the macOS implementation.
-_MET_DoEncryptionToggle() {
-	global MetricsEncryption, _LogDir
-
-	if !MetricsEncryption.enabled {
-		; Confirm intent before encrypting
-		Res := MetricsEncryptionConfirmDialog("encrypt")
-		if (Res != "encrypt")
-			return
-
-		Pwd := MetricsEncryptionPromptPassword("encrypt")
-		if (Pwd == "")
-			return
-
-		MetricsEncryption.enabled := true
-		WriteFeatureUpdate("Metrics.Encrypt", true)
-
-		Files := _MET_CollectLogFiles("\.log\.gz$", "\.enc$")
-		if (Files.Length > 0) {
-			MetricsEncryptFiles(Files, Pwd)
-		}
-	} else {
-		; Confirm intent before decrypting
-		Res := MetricsEncryptionConfirmDialog("decrypt")
-		if (Res != "decrypt")
-			return
-
-		Pwd := MetricsEncryptionPromptPassword("decrypt")
-		if (Pwd == "")
-			return
-
-		MetricsEncryption.enabled := false
-		WriteFeatureUpdate("Metrics.Encrypt", false)
-
-		Files := _MET_CollectLogFiles("\.enc$", "")
-		if (Files.Length > 0) {
-			MetricsEncryptFiles(Files, Pwd, false)
-		}
-	}
-	Reload
-}
-
-; Collect files in the log directory matching Pattern and not matching Exclude.
-; Returns an Array of full file paths.
-_MET_CollectLogFiles(Pattern, Exclude) {
-	global _LogDir
-	Files := []
-	if !DirExist(_LogDir)
-		return Files
-	Loop Files _LogDir . "\*", "F" {
-		if !RegExMatch(A_LoopFileName, Pattern)
-			continue
-		if (Exclude != "" and RegExMatch(A_LoopFileName, Exclude))
-			continue
-		Files.Push(A_LoopFileFullPath)
-	}
-	return Files
-}
-
-; Open the standalone Encryptor application if it exists.
-_MET_OpenEncryptorApp() {
-	global _StaticDir
-	AppPath := _StaticDir . "\utils\encryptor\Encryptor.exe"
-	if FileExist(AppPath) {
-		try Run(AppPath)
-	} else {
-		MsgBox(t("dialog.metrics.encryptor_error_body"), t("dialog.metrics.encryptor_error_title"), "OK Icon!")
-	}
-}
-
 
 ; ── Layout dynamic handlers ────────────────────────────────────────────────────
 
