@@ -160,13 +160,13 @@
 		{ "type": "---" },
 		{ "type": "feature",  "id": "circular_spaces",   "i18n": "menu.gestures.circular_spaces",  "platforms": ["hs"] },
 		{ "type": "---" },
-		{ "type": "dynamic",  "id": "gesture_slots_2" },
+		{ "type": "dynamic",  "id": "gesture_slots_2",  "platforms": ["hs"] },
 		{ "type": "---" },
-		{ "type": "dynamic",  "id": "gesture_slots_3" },
+		{ "type": "dynamic",  "id": "gesture_slots_3",  "platforms": ["hs"] },
 		{ "type": "---" },
-		{ "type": "dynamic",  "id": "gesture_slots_4" },
+		{ "type": "dynamic",  "id": "gesture_slots_4",  "platforms": ["hs"] },
 		{ "type": "---" },
-		{ "type": "dynamic",  "id": "gesture_slots_5" }
+		{ "type": "dynamic",  "id": "gesture_slots_5",  "platforms": ["hs"] }
 	],
 
 	"gesture_slots": {
