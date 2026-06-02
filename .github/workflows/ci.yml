@@ -317,6 +317,17 @@ jobs:
                   }
                   Write-Host "Encoding OK — $($ahkFiles.Count) file(s) verified."
 
+            - name: Exclude test workspace from Windows Defender real-time scan
+              shell: pwsh
+              run: |
+                  # Windows Defender real-time scanning locks .toml/.ini files written
+                  # by the AHK test suite for several seconds, causing FileAppend /
+                  # FileDelete to block and the watchdog to fire at 240 s. Excluding
+                  # the test directory removes that lock contention without disabling AV
+                  # protection for the rest of the runner.
+                  Add-MpPreference -ExclusionPath "${{ github.workspace }}\static\ergopti_plus\windows\tests"
+                  Add-MpPreference -ExclusionPath "$env:TEMP"
+
             - name: Run AHK test suite
               shell: pwsh
               timeout-minutes: 5
