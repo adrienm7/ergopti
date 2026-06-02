@@ -317,6 +317,15 @@ jobs:
                   }
                   Write-Host "Encoding OK — $($ahkFiles.Count) file(s) verified."
 
+            - name: Disable Windows Defender real-time scanning for AHK tests
+              shell: pwsh
+              run: |
+                  # Defender holds intermittent exclusive scan locks on any file written
+                  # inside the runner (checkout or A_Temp), causing FileAppend calls in
+                  # the AHK test suite to block for the full 240 s watchdog window.
+                  # Disable real-time monitoring for the duration of the test run.
+                  Set-MpPreference -DisableRealtimeMonitoring $true
+
             - name: Run AHK test suite
               shell: pwsh
               timeout-minutes: 5
