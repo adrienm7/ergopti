@@ -31,12 +31,25 @@ local i18n       = require("lib.i18n")
 
 local LOG = "metrics_typing"
 
+-- Lazy-loaded to avoid circular require; populated on first open().
+local _log_manager = nil
+local function _get_log_manager()
+	if not _log_manager then
+		_log_manager = require("modules.keylogger.log_manager")
+	end
+	return _log_manager
+end
+
 local UI_CACHE_DIR  = (os.getenv("TMPDIR") or "/tmp/"):gsub("/?$", "/")
 local UI_CACHE_FILE = UI_CACHE_DIR .. "ergopti_metrics_typing_cache.json"
 
 M._wv             = nil
 M._timer          = nil
 M._app_icon_cache = {}
+--- True once we have registered our on_ingest_done listener.
+--- The listener is registered once for the module lifetime; subsequent
+--- opens reuse it (the dashboard state is on M which is always live).
+M._ingest_listener_registered = false
 
 
 
@@ -72,6 +85,13 @@ M._manifest_cache    = nil
 M._manifest_rev      = -1
 M._range_cache       = {}    -- cache_key → { historical, today }
 M._range_cache_rev   = -1
+
+--- Set by push_live_update when a fresh ingest cycle completes.
+--- The JS-side poller picks it up on its next tick (≤ 300 ms) and
+--- re-fetches with the current query parameters.
+M._pending_ingest_notify = false
+--- Last query parameters seen by the poller — replayed on notify.
+M._last_query = nil
 
 
 
@@ -387,6 +407,17 @@ function M.show()
 		end,
 	})
 
+	-- Register the ingest listener once for the module lifetime so the
+	-- dashboard refreshes within ≤ 300 ms of every ingest cycle completing,
+	-- regardless of whether the user has interacted with a filter recently.
+	if not M._ingest_listener_registered then
+		_get_log_manager().on_ingest_done(function()
+			M.push_live_update()
+		end)
+		M._ingest_listener_registered = true
+		Logger.debug(LOG, "Post-ingest live-update listener registered.")
+	end
+
 	raise_now(M._wv)
 	poll_and_set_behavior(M._wv, 20)
 
@@ -403,6 +434,22 @@ function M.show()
 			M._timer:stop(); M._timer = nil
 			return
 		end
+		-- When a fresh ingest just completed, invalidate the range cache
+		-- and replay the last known query so the dashboard updates within
+		-- one poll tick (≤ 300 ms) after the ingest — not waiting for the
+		-- JS to set a new _lua_request on the next user interaction.
+		if M._pending_ingest_notify and M._last_query then
+			M._pending_ingest_notify = false
+			M._range_cache     = {}
+			M._range_cache_rev = -1
+			local q = M._last_query
+			pcall(function()
+				local raw_data = fetch_range_cached(q.start_date, q.end_date, q.apps)
+				local js_cmd   = string.format("window.receive_range_data(%s)", json.encode(raw_data))
+				M._wv:evaluateJavaScript(js_cmd)
+			end)
+			return
+		end
 		pcall(function()
 			M._wv:evaluateJavaScript("window._lua_request", function(req)
 				if req and type(req) == "string" and req ~= "" and req ~= "null" then
@@ -415,6 +462,7 @@ function M.show()
 							M._manifest_cache = nil
 							Logger.info(LOG, "Caches cleared by user reset.")
 						else
+							M._last_query = query
 							local raw_data = fetch_range_cached(query.start_date, query.end_date, query.apps)
 							local js_cmd   = string.format("window.receive_range_data(%s)", json.encode(raw_data))
 							pcall(function() M._wv:evaluateJavaScript(js_cmd) end)
@@ -429,11 +477,15 @@ function M.show()
 	Logger.success(LOG, "Typing metrics dashboard window opened.")
 end
 
---- Live-update hook kept for API compatibility; the rev-keyed cache picks
---- up new data on the next read.
+--- Signals that a fresh ingest cycle just completed. The JS-side poller
+--- will pick up the flag on its next tick (≤ 300 ms), invalidate the
+--- range cache, and replay the last known query so the dashboard updates
+--- in near-real time without waiting for the user to change a filter.
 function M.push_live_update(_unused)
-	-- No-op: the SQLite cache is the source of truth and the range cache
-	-- invalidates itself when meta.rev advances on the next ingest tick.
+	if M._wv and M._last_query then
+		M._pending_ingest_notify = true
+		Logger.debug(LOG, "push_live_update: pending notify set.")
+	end
 end
 
 return M

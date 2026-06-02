@@ -70,6 +70,12 @@ class KLHookConst {
     ; double Win32 calls (WinGetTitle + WinGetProcessName) at high typing
     ; speed while still detecting app switches within 1 s.
     static CONTEXT_TTL_MS := 1000
+
+    ; Debounce window for the live dashboard push after a flush. Coalesces
+    ; rapid typing bursts into a single KLWV_NotifyIngest call so the
+    ; prefetch rebuild (150-300 ms) is not re-triggered on every keystroke
+    ; while keeping the dashboard latency under ~2 s during normal use.
+    static LIVE_PUSH_DEBOUNCE_MS := 1500
 }
 
 ; Special-key VK → bracket marker. Mirrors the macOS hs.eventtap codepath
@@ -102,9 +108,10 @@ global KLHOOK_SPECIAL := Map(
 ; ===================================
 
 class KLHook {
-    static ih := unset   ; the live InputHook object
-    static flush_timer := unset   ; bound function reference for SetTimer
-    static last_tick := 0       ; A_TickCount of the last captured event
+    static ih := unset           ; the live InputHook object
+    static flush_timer := unset  ; bound function reference for SetTimer
+    static live_push_timer := unset  ; one-shot debounce for KLWV_NotifyIngest
+    static last_tick := 0        ; A_TickCount of the last captured event
 
     ; Last (vk, sc) seen by OnKeyDown — paired with OnChar so each
     ; printable char carries both the virtual keycode AND the hardware
@@ -347,6 +354,21 @@ KL_Hook_Tick() {
         && Keylogger.session_scrolls = 0)
         return
     try KL_FlushBuffer()
+    ; Re-arm the debounce timer so the dashboard sees the flush within
+    ; LIVE_PUSH_DEBOUNCE_MS after the last keystroke in the burst.
+    ; Using a negative period turns SetTimer into a one-shot; re-calling
+    ; it before it fires resets the countdown, coalescing burst activity.
+    if !IsSet(KLHook.live_push_timer) || !IsObject(KLHook.live_push_timer)
+        KLHook.live_push_timer := KL_Hook_LivePush.Bind()
+    SetTimer(KLHook.live_push_timer, -KLHookConst.LIVE_PUSH_DEBOUNCE_MS)
+}
+
+KL_Hook_LivePush() {
+    ; Manifest-only rebuild — fast (~20 ms with the manifest cache warm)
+    ; and enough for the KPI bar and WPM widget to update in near-real time.
+    ; The full "live" rebuild (heatmaps + top-500 n-grams, ~150-300 ms) is
+    ; left to the 5 s ingest cycle so it never runs on the flush thread.
+    try KLWV_NotifyIngest("manifest")
 }
 
 
@@ -387,6 +409,9 @@ KL_Hook_Start() {
 KL_Hook_Stop() {
     if KLHook.HasOwnProp("flush_timer") {
         try SetTimer(KLHook.flush_timer, 0)
+    }
+    if KLHook.HasOwnProp("live_push_timer") && IsObject(KLHook.live_push_timer) {
+        try SetTimer(KLHook.live_push_timer, 0)
     }
     if KLHook.HasOwnProp("ih") && IsObject(KLHook.ih) {
         try KLHook.ih.Stop()

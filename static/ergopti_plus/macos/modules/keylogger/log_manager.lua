@@ -87,6 +87,11 @@ local _paths = {}
 --- Background ingest timer.
 local _ingest_timer = nil
 
+--- Registered post-ingest listeners — called after every successful ingest cycle.
+--- Each entry is a function(); errors are swallowed so one broken listener cannot
+--- prevent the others from firing. Register via M.on_ingest_done().
+local _ingest_listeners = {}
+
 --- Whether `_uuid_v4` has seeded math.randomseed.
 local _uuid_seeded = false
 
@@ -439,6 +444,14 @@ function M.get_db_rev()
 	return Export.get_db_rev()
 end
 
+--- Register a callback to be called after every successful ingest cycle.
+--- The callback receives no arguments; use M.get_db_rev() to read the new rev.
+--- Errors inside the callback are swallowed.
+---@param fn function The listener to register.
+function M.on_ingest_done(fn)
+	table.insert(_ingest_listeners, fn)
+end
+
 
 
 
@@ -534,6 +547,12 @@ function M.ingest_once()
 
 	Rotation.set_offset(new_offset, Rotation.get_date())
 	Logger.debug(LOG, "Ingest cycle: %d entry(ies), offset now %d.", #entries, new_offset)
+
+	-- Notify live-update listeners — dashboard UIs use this to invalidate
+	-- their caches immediately rather than waiting for the next JS poll.
+	for _, fn in ipairs(_ingest_listeners) do
+		pcall(fn)
+	end
 end
 
 --- Day rollover handler. Drains remaining today.log then delegates to
