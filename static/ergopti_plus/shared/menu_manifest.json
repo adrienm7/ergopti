@@ -188,16 +188,13 @@
 			"id": "script_control_shortcuts"
 		},
 		{
-			"type": "dynamic",
-			"id": "extensions_shortcuts"
-		},
-		{
-			"type": "---"
-		},
-		{
 			"type": "action",
 			"id": "edit_shortcuts",
 			"i18n": "menu.global.edit_shortcuts"
+		},
+		{
+			"type": "dynamic",
+			"id": "extensions_shortcuts"
 		}
 	],
 	"modifier_combos_group": [
