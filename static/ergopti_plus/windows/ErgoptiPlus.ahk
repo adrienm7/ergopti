@@ -434,14 +434,12 @@ global KEYBOARD_SHORTCUT_DEFAULTS := Map(
     "win_u", "uppercase_selection",
     "win_w", "titlecase_selection",
     "win_x", "pick_color",
-    "win_sc029", "screen_capture_instant",
     "ctrl_b", "microsoft_bold",
     "ctrl_shift_v", "paste_plain",
 )
 ; AHK send-key codes for each slot — must match GESTURE_ACTIONS Fn lambdas.
 ; Slots not listed here are generated dynamically from their suffix.
 global KEYBOARD_SHORTCUT_SEND_CODES := Map(
-    "win_sc029", "#SC029",
     "ctrl_shift_v", "^+v",
 )
 global KeyboardShortcutAssignments := Map()
@@ -1879,6 +1877,19 @@ InsertKeyboardShortcutGroups(TargetMenu, InsertBefore) {
         ; Only show slots that have a non-none assignment
         for Slot, Action in KeyboardShortcutAssignments {
             if (SubStr(Slot, 1, StrLen(Prefix)) != Prefix)
+                continue
+            ; Ensure exact prefix match — e.g. "ctrl_shift_v" must not appear under "ctrl_"
+            ; because "ctrl_shift_" is a longer prefix that matches first.
+            IsExactPrefix := true
+            for OtherGroup in _Groups {
+                OtherPrefix := OtherGroup["prefix"]
+                if (OtherPrefix != Prefix and StrLen(OtherPrefix) > StrLen(Prefix)
+                    and SubStr(Slot, 1, StrLen(OtherPrefix)) == OtherPrefix) {
+                    IsExactPrefix := false
+                    break
+                }
+            }
+            if !IsExactPrefix
                 continue
             if (Action == "none")
                 continue

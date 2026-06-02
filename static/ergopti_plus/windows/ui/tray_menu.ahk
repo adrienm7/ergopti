@@ -1122,6 +1122,13 @@ _BuildShortcutsSubmenu() {
 	global _SHORTCUTS_SUBMAP_V1V2
 	SubMenu := Menu()
 
+	; ── Instant screenshot toggle (bare ² key = SC029) ──────
+	; Controlled by the screen_instant feature flag, not a modifier-combo slot.
+	ScreenInstantEntry := ManifestFindEntryByPath("ahk.shortcuts.screen_instant")
+	if (ScreenInstantEntry != false) {
+		MenuAddItemFromManifest(SubMenu, ScreenInstantEntry, "Shortcuts")
+	}
+
 	; ── UIA symbol-wrap toggle ────────────────────────────────
 	; Independent of keyboard emulation — works via the InputHook pass-through.
 	WrapEntry := ManifestFindEntryByPath("shortcuts.wrap_text_if_selected")
