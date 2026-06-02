@@ -670,7 +670,7 @@
 	"menu.hotstrings.params": "⚙️ הגדרות Hotstring",
 	"menu.hotstrings.personal_header": "hotstrings אישיים",
 	"menu.hotstrings.preview_bubbles": "תצוגה מקדימה של בועות",
-	"menu.hotstrings.repeat_key_toggle": "   ↳ חזרה על תו עם מקש ★",
+	"menu.hotstrings.repeat_key_toggle": "מקש ★ חוזר על הקשה האחרונה",
 	"menu.hotstrings.reset_magic_key": "   ↳ אפס (ברירת מחדל: ★)",
 	"menu.hotstrings.rolls.assign": "#! ➜ :=",
 	"menu.hotstrings.rolls.assign_arrow_equal_left": "=$ ➜ <=",

@@ -670,7 +670,7 @@
 	"menu.hotstrings.params": "⚙️ Kısaltma ayarları",
 	"menu.hotstrings.personal_header": "Kişisel kısaltmalar",
 	"menu.hotstrings.preview_bubbles": "Önizleme baloncukları",
-	"menu.hotstrings.repeat_key_toggle": "   ↳ ★ tuşuyla karakter tekrarla",
+	"menu.hotstrings.repeat_key_toggle": "★ tuşu son tuş vuruşunu tekrarlar",
 	"menu.hotstrings.reset_magic_key": "   ↳ Sıfırla (varsayılan: ★)",
 	"menu.hotstrings.rolls.assign": "#! ➜ :=",
 	"menu.hotstrings.rolls.assign_arrow_equal_left": "=$ ➜ <=",

@@ -670,7 +670,7 @@
 	"menu.hotstrings.params": "⚙️ Hotstring-inställningar",
 	"menu.hotstrings.personal_header": "Personliga hotstrings",
 	"menu.hotstrings.preview_bubbles": "Förhandsgranska bubblor",
-	"menu.hotstrings.repeat_key_toggle": "   ↳ Upprepa tecken med ★-tangenten",
+	"menu.hotstrings.repeat_key_toggle": "★-tangenten upprepar senaste tangenttryckning",
 	"menu.hotstrings.reset_magic_key": "   ↳ Återställ (standard: ★)",
 	"menu.hotstrings.rolls.assign": "#! ➜ :=",
 	"menu.hotstrings.rolls.assign_arrow_equal_left": "=$ ➜ <=",

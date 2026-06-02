@@ -670,7 +670,7 @@
 	"menu.hotstrings.params": "⚙️ إعدادات السلاسل النصية",
 	"menu.hotstrings.personal_header": "hotstrings الشخصية",
 	"menu.hotstrings.preview_bubbles": "فقاعات المعاينة",
-	"menu.hotstrings.repeat_key_toggle": "   ↳ توليد الكتابة المتكررة بالضغط على ★",
+	"menu.hotstrings.repeat_key_toggle": "مفتاح ★ يكرر آخر ضغطة",
 	"menu.hotstrings.reset_magic_key": "   ↳ إعادة تعيين (افتراضي: ★)",
 	"menu.hotstrings.rolls.assign": "#! ➜ :=",
 	"menu.hotstrings.rolls.assign_arrow_equal_left": "=$ ➜ <=",

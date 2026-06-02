@@ -670,7 +670,7 @@
 	"menu.hotstrings.params": "⚙️ Hotstring-Einstellungen",
 	"menu.hotstrings.personal_header": "Persönliche Hotstrings",
 	"menu.hotstrings.preview_bubbles": "Vorschau-Blasen",
-	"menu.hotstrings.repeat_key_toggle": "   ↳ Zeichen mit ★ wiederholen",
+	"menu.hotstrings.repeat_key_toggle": "★-Taste wiederholt letzten Tastendruck",
 	"menu.hotstrings.reset_magic_key": "   ↳ Zurücksetzen (Standard: ★)",
 	"menu.hotstrings.rolls.assign": "#! ➜ :=",
 	"menu.hotstrings.rolls.assign_arrow_equal_left": "=$ ➜ <=",

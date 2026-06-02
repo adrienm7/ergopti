@@ -670,7 +670,7 @@
 	"menu.hotstrings.params": "⚙️ ホットストリング設定",
 	"menu.hotstrings.personal_header": "個人のホットストリング",
 	"menu.hotstrings.preview_bubbles": "プレビューバブル",
-	"menu.hotstrings.repeat_key_toggle": "   ↳ ★キーで文字を繰り返す",
+	"menu.hotstrings.repeat_key_toggle": "★キーで直前のキー入力を繰り返す",
 	"menu.hotstrings.reset_magic_key": "   ↳ リセット（デフォルト: ★）",
 	"menu.hotstrings.rolls.assign": "#! ➜ :=",
 	"menu.hotstrings.rolls.assign_arrow_equal_left": "=$ ➜ <=",

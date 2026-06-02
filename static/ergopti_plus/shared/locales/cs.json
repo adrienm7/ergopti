@@ -670,7 +670,7 @@
 	"menu.hotstrings.params": "⚙️ Nastavení hotstring",
 	"menu.hotstrings.personal_header": "Osobní hotstringy",
 	"menu.hotstrings.preview_bubbles": "Náhledové bubliny",
-	"menu.hotstrings.repeat_key_toggle": "   ↳ Opakování znaku klávesou ★",
+	"menu.hotstrings.repeat_key_toggle": "Klávesa ★ opakuje poslední stisk",
 	"menu.hotstrings.reset_magic_key": "   ↳ Obnovit (výchozí: ★)",
 	"menu.hotstrings.rolls.assign": "#! ➜ :=",
 	"menu.hotstrings.rolls.assign_arrow_equal_left": "=$ ➜ <=",
