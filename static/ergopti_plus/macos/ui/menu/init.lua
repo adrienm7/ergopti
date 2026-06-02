@@ -375,8 +375,13 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	end
 
 	local function reset_all_defaults()
-		-- Delete config.json so that the next startup uses the default module settings
+		-- Restore the full factory state, not only the config.toml-backed toggles.
+		-- The tap/hold key assignments live in a SEPARATE Karabiner config file, so
+		-- deleting only config.toml left them in place — the same « ça réinitialise
+		-- que les toggles » gap fixed on the AHK side (tap_hold.toml). Remove both
+		-- so the next startup regenerates them from defaults.
 		pcall(os.remove, MenuPaths.get("ConfigTomlPath"))
+		pcall(os.remove, MenuPaths.get("KarabinerConfigPath"))
 		pcall(notifications.notify, i18n.get("notify.defaults_reset"), nil, "info")
 		hs.timer.doAfter(0.25, function() pcall(hs.reload) end)
 	end
