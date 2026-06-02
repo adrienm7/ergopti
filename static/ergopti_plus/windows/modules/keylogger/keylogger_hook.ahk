@@ -358,7 +358,7 @@ KL_Hook_Tick() {
     ; LIVE_PUSH_DEBOUNCE_MS after the last keystroke in the burst.
     ; Using a negative period turns SetTimer into a one-shot; re-calling
     ; it before it fires resets the countdown, coalescing burst activity.
-    if !IsSet(KLHook.live_push_timer) || !IsObject(KLHook.live_push_timer)
+    if !KLHook.HasOwnProp("live_push_timer") || !IsObject(KLHook.live_push_timer)
         KLHook.live_push_timer := KL_Hook_LivePush.Bind()
     SetTimer(KLHook.live_push_timer, -KLHookConst.LIVE_PUSH_DEBOUNCE_MS)
 }
