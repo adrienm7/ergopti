@@ -3463,17 +3463,17 @@ _GenLoad_autocorrection_typographicapostrophe(FeatureConfig, ExtraOptions := uns
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", "ju’", "jusqu’", _GenOpts)
+	CreateCaseSensitiveHotstrings("*", "ju'", "jusqu’", _GenOpts)
 	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "typographicapostrophe")
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", "j’", "j’", _GenOpts)
+	CreateCaseSensitiveHotstrings("*", "j'", "j’", _GenOpts)
 	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "typographicapostrophe")
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", "l’", "l’", _GenOpts)
+	CreateCaseSensitiveHotstrings("*", "l'", "l’", _GenOpts)
 	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "typographicapostrophe")
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
