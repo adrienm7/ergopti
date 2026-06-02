@@ -66,8 +66,10 @@ class KLHookConst {
     static FLUSH_PERIOD_MS := 200
 
     ; Window context (active app + title) is cheap to refresh but the
-    ; per-keystroke cost adds up — cache for this many ms.
-    static CONTEXT_TTL_MS := 500
+    ; per-keystroke cost adds up — cache for this many ms. 1000 ms avoids
+    ; double Win32 calls (WinGetTitle + WinGetProcessName) at high typing
+    ; speed while still detecting app switches within 1 s.
+    static CONTEXT_TTL_MS := 1000
 }
 
 ; Special-key VK → bracket marker. Mirrors the macOS hs.eventtap codepath
@@ -335,17 +337,16 @@ KL_Hook_OnKeyDown(ih, vk, sc) {
 ; =====================================
 
 KL_Hook_Tick() {
-    ; Fire only when the buffer has something to commit. We then flush
-    ; AND chain straight into KL_IngestOnce so the dashboard’s live
-    ; channel sees the new keystrokes within ~500 ms instead of waiting
-    ; for the slower 5 s ingest cadence. The cached SQLite DB makes
-    ; this near-free (only the new INSERTs are exec'd).
+    ; Fire only when the buffer has something to commit. KL_IngestOnce is
+    ; NOT called here — it carries a FileAppend to data.sql that runs on
+    ; the same AHK thread and would block incoming keystroke callbacks,
+    ; causing perceptible input lag at high typing speed. The 5 s ingest
+    ; timer in keylogger.ahk handles persistence asynchronously.
     if (Keylogger.buffer_events.Length = 0
         && Keylogger.session_clicks = 0
         && Keylogger.session_scrolls = 0)
         return
     try KL_FlushBuffer()
-    try KL_IngestOnce()
 }
 
 
