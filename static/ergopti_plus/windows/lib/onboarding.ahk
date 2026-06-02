@@ -1379,7 +1379,7 @@ _Onboarding_OnGuiClose(g, *) {
 
 ; Destroy the current wizard Gui if one is open — keeps at most one page alive.
 _Onboarding_DestroyActive() {
-	global _ob_gui, _ob_s1_lv_hwnd, _ob_s1_lv, _ob_s1_refs
+	global _ob_gui, _ob_s1_lv_hwnd
 	; Cancel the debounce timer before destroying the Gui — if the timer fires
 	; after Destroy(), _Step1_DebounceRender would call GetNext() on a dead ListView
 	; reference, causing an AHK exception that terminates the script.
@@ -1391,8 +1391,6 @@ _Onboarding_DestroyActive() {
 		OnMessage(0x0100, _Step1_LvKeyDown, 0)
 		_ob_s1_lv_hwnd := 0
 	}
-	_ob_s1_lv   := unset
-	_ob_s1_refs := unset
 	try {
 		if IsSet(_ob_gui) {
 			_ob_gui.Destroy()
