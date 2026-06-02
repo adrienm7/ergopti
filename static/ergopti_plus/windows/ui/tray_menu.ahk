@@ -1011,6 +1011,30 @@ _CountEnabledForCategory(V1Cat) {
 	return Total
 }
 
+; Sum ALL hotstring entries for a flat category regardless of the per-section
+; enabled flag. Used when the Hotstrings master gate is off: ApplyMasterGatesToFeatures
+; zeroes Features in memory so _CountEnabledForCategory would return 0, but the menu
+; should still display the persisted counts so the user knows what will reactivate.
+_CountAllForCategory(V1Cat) {
+	global Features, _V1CatToV2CatMap, _V1CatToInverseKeyMap
+	if !_V1CatToV2CatMap.Has(V1Cat) {
+		return 0
+	}
+	V2Cat := _V1CatToV2CatMap[V1Cat]
+	if !Features["hotstrings"].Has(V2Cat) {
+		return 0
+	}
+	InvMap := _V1CatToInverseKeyMap.Has(V1Cat) ? _V1CatToInverseKeyMap[V1Cat] : false
+	Total := 0
+	for V2SecId, FNode in Features["hotstrings"][V2Cat] {
+		if IsObject(FNode) {
+			V1Key := (InvMap and InvMap.Has(V2SecId)) ? InvMap[V2SecId] : V2SecId
+			Total += CountTomlSection(V1Cat, FoldAsciiLower(V1Key))
+		}
+	}
+	return Total
+}
+
 
 ; Collect every v1 feature path that belongs to the Hotstrings category:
 ; flat TOML categories (Autocorrection, DistancesReduction, …), dynamic
@@ -1468,15 +1492,27 @@ initMenu() {
 	HotstringsMenu.Add() ; Separator after paramètres block
 
 	; 2a. Standard hotstring groups + dynamic — "Hotstrings communs" header
+	; When the master gate is off, ApplyMasterGatesToFeatures zeroes Features in
+	; memory so _CountEnabledForCategory returns 0. Use _CountAllForCategory instead
+	; so the menu still shows the persisted counts the user set before disabling.
+	_CountFn := HotstringsAllEnabled ? _CountEnabledForCategory : _CountAllForCategory
 	StdTotal := 0
 	for _CCat in HotstringCategoriesStd {
-		StdTotal += _CountEnabledForCategory(_CCat)
+		StdTotal += _CountFn(_CCat)
 	}
 	DynTotalStd := 0
 	if Features.Has("hotstrings") and Features["hotstrings"].Has("dynamic") {
 		for _DKey, _DCfg in Features["hotstrings"]["dynamic"] {
-			if (IsObject(_DCfg) and _DCfg.Has("enabled") and _DCfg["enabled"]) {
-				DynTotalStd += CountDynamicSection(_DKey)
+			; When gate is off every _DCfg["enabled"] is false in memory — count
+			; all dynamic sections unconditionally so the header total stays correct.
+			if HotstringsAllEnabled {
+				if (IsObject(_DCfg) and _DCfg.Has("enabled") and _DCfg["enabled"]) {
+					DynTotalStd += CountDynamicSection(_DKey)
+				}
+			} else {
+				if IsObject(_DCfg) {
+					DynTotalStd += CountDynamicSection(_DKey)
+				}
 			}
 		}
 	}
@@ -1486,7 +1522,7 @@ initMenu() {
 	HotstringsMenu.Disable(StdHeader)
 	for Category in HotstringCategoriesStd {
 		if SubMenus.Has(Category) {
-			Total := _CountEnabledForCategory(Category)
+			Total := _CountFn(Category)
 			Title := GetCategoryTitle(Category) . " (" . FmtCount(Total) . ")"
 			HotstringsMenu.Add(Title, SubMenus[Category])
 			if HotstringsAllEnabled and _IsCategoryFullyEnabled(Category) {
@@ -1499,8 +1535,14 @@ initMenu() {
 		DynMenu := SubMenus["DynamicHotstrings"]
 		DynTotal := 0
 		for _DKey, _DCfg in Features["hotstrings"]["dynamic"] {
-			if (IsObject(_DCfg) and _DCfg.Has("enabled") and _DCfg["enabled"]) {
-				DynTotal += CountDynamicSection(_DKey)
+			if HotstringsAllEnabled {
+				if (IsObject(_DCfg) and _DCfg.Has("enabled") and _DCfg["enabled"]) {
+					DynTotal += CountDynamicSection(_DKey)
+				}
+			} else {
+				if IsObject(_DCfg) {
+					DynTotal += CountDynamicSection(_DKey)
+				}
 			}
 		}
 		DynTitle := GetCategoryTitle("DynamicHotstrings") . " (" . FmtCount(DynTotal) . ")"
@@ -1521,14 +1563,14 @@ initMenu() {
 	HotstringsMenu.Add() ; Separator between communs and Ergopti blocks
 	ErgoptiTotal := 0
 	for _ECat in HotstringCategoriesErgopti {
-		ErgoptiTotal += _CountEnabledForCategory(_ECat)
+		ErgoptiTotal += _CountFn(_ECat)
 	}
 	ErgoptiHeader := MenuSectionTitle(t("menu.hotstrings.ergopti_header") . " (" . FmtCount(ErgoptiTotal) . ")")
 	HotstringsMenu.Add(ErgoptiHeader, (*) => NoAction())
 	HotstringsMenu.Disable(ErgoptiHeader)
 	for Category in HotstringCategoriesErgopti {
 		if SubMenus.Has(Category) {
-			Total := _CountEnabledForCategory(Category)
+			Total := _CountFn(Category)
 			Title := GetCategoryTitle(Category) . " (" . FmtCount(Total) . ")"
 			HotstringsMenu.Add(Title, SubMenus[Category])
 			if HotstringsAllEnabled and _IsCategoryFullyEnabled(Category) {
