@@ -785,7 +785,7 @@ _HS_MagicKeyConfig(M, _Cat) {
 ; Dynamic handler: repeat-key toggle (★ as repeat key).
 _HS_RepeatKey(M, _Cat) {
 	global HSE_RepeatEnabled
-	Label := t("menu.hotstrings.repeat_key_enabled")
+	Label := t("menu.hotstrings.repeat_key_toggle")
 	RegisterMenuItem(M, Label, ToggleRepeatKeyEnabled)
 	if HSE_RepeatEnabled {
 		M.Check(Label)
