@@ -981,13 +981,26 @@ function M.build_custom(ctx)
 		table.sort(keys)
 		return keys
 	end
+	-- Sum all hotstring counts inside a node and its sub-nodes recursively.
+	local function node_total(node)
+		local total = 0
+		for _, file in ipairs(node.files) do
+			-- file.title is already "stem (N)" — extract the count from the raw groups
+			if type(file.count) == "number" then total = total + file.count end
+		end
+		for _, sub in pairs(node.folders) do total = total + node_total(sub) end
+		return total
+	end
+
 	local function render_ext_tree(node, target, separate_files)
 		if separate_files == nil then separate_files = true end
 		local folder_names = sorted_keys(node.folders)
 		for _, folder_name in ipairs(folder_names) do
 			local folder_menu = {}
 			render_ext_tree(node.folders[folder_name], folder_menu, true)
-			target[#target + 1] = { title = folder_name, menu = folder_menu }
+			local folder_total = node_total(node.folders[folder_name])
+			local folder_label = folder_name .. (folder_total > 0 and (" (" .. fmt_count(folder_total) .. ")") or "")
+			target[#target + 1] = { title = folder_label, menu = folder_menu }
 		end
 		if separate_files and #folder_names > 0 and #node.files > 0 then
 			target[#target + 1] = { title = "-" }
@@ -1019,8 +1032,21 @@ function M.build_custom(ctx)
 						node.folders[folder] = node.folders[folder] or { folders = {}, files = {} }
 						node = node.folders[folder]
 					end
+					local g_count = 0
+					local g_secs_for_count = all_personal_secs_by_group[gname]
+					if type(g_secs_for_count) == "table" then
+						for _, sec in ipairs(g_secs_for_count) do
+							if type(sec) == "table" and sec.name ~= "-" and not sec.is_module_placeholder
+								and sec.count ~= nil then
+								local active = not is_sec_enabled_fn or is_sec_enabled_fn(gname, sec.name)
+								if active then g_count = g_count + tonumber(sec.count) end
+							end
+						end
+					end
+					local file_label = parts[#parts] .. (g_count > 0 and (" (" .. fmt_count(g_count) .. ")") or "")
 					node.files[#node.files + 1] = {
-						title = parts[#parts],
+						title = file_label,
+						count = g_count,
 						menu  = file_rows_for_group(gname, g_rows),
 					}
 				end
