@@ -459,6 +459,9 @@ GetCategoryTitle(Category) {
 ; ===================================
 
 BuildGesturesMenu() {
+	global Features
+	GestEnabled := Features.Has("gestures") and Features["gestures"].Has("enabled")
+		and Features["gestures"]["enabled"] = true
 	DynHandlers := Map(
 		"auto_configure",     (M, C) => _GES_AutoConfigure(M, C),
 		"manual_tutorial",    (M, C) => _GES_ManualTutorial(M, C),
@@ -468,7 +471,13 @@ BuildGesturesMenu() {
 		"gesture_slots_4",    (M, C) => _GES_Slots4(M, C),
 		"gesture_slots_5",    (M, C) => _GES_Slots5(M, C),
 	)
-	return MenuRenderer_Build("gestures_menu", "Gestures", DynHandlers)
+	GMenu := MenuRenderer_Build("gestures_menu", "Gestures", DynHandlers)
+	; Gestures toggle uses a dedicated fn (writes Features.Enabled + Reload)
+	; rather than the generic ToggleCategoryAllFeatures used by other menus.
+	AddCategoryToggleItem(GMenu,
+		t("menu.gestures.on"), t("menu.gestures.off"),
+		GestEnabled, (*) => ToggleGesturesEnabled())
+	return GMenu
 }
 
 ; Dynamic handler: auto-configure button.
@@ -607,14 +616,7 @@ BuildMetricsMenu() {
 	)
 
 	MetricsMenu := MenuRenderer_Build("metrics_menu", "Metrics", DynHandlers)
-
 	A_TrayMenu.Add(t("menu.metrics.title"), MetricsMenu)
-	; Category toggle appended last so it lands at position 1 via Insert.
-	AddCategoryToggleItem(MetricsMenu,
-		t("menu.metrics.on"),
-		t("menu.metrics.off"),
-		MetricsShortcuts.enabled,
-		(*) => ToggleMetricsEnabled())
 }
 
 ; Dynamic handler: Show Typing button.
@@ -1998,12 +2000,6 @@ initMenu() {
 		}
 	}
 	if SubMenus.Has("TapHolds") {
-		TapHoldsAllEnabled := IsCategoryGated("TapHolds")
-		AddCategoryToggleItem(SubMenus["TapHolds"],
-			t("menu.tapholds.on"),
-			t("menu.tapholds.off"),
-			TapHoldsAllEnabled,
-			(*) => ToggleCategoryAllFeatures("TapHolds", !TapHoldsAllEnabled))
 		A_TrayMenu.Add(GetCategoryTitle("TapHolds"), SubMenus["TapHolds"])
 		if TapHoldsAllEnabled {
 			A_TrayMenu.Check(GetCategoryTitle("TapHolds"))

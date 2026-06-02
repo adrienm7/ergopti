@@ -414,14 +414,14 @@
 		{
 			"type": "group",
 			"id": "hotstrings_params",
-			"i18n": "menu.hotstrings.parameters"
+			"i18n": "menu.hotstrings.params"
 		},
 		{
 			"type": "---"
 		},
 		{
 			"type": "section_header",
-			"i18n": "menu.hotstrings.group_standard"
+			"i18n": "menu.hotstrings.header_common"
 		},
 		{
 			"type": "dynamic",
@@ -436,7 +436,7 @@
 		},
 		{
 			"type": "section_header",
-			"i18n": "menu.hotstrings.group_ergopti"
+			"i18n": "menu.hotstrings.header_ergopti"
 		},
 		{
 			"type": "dynamic",
@@ -447,7 +447,7 @@
 		},
 		{
 			"type": "section_header",
-			"i18n": "menu.hotstrings.group_personal"
+			"i18n": "menu.hotstrings.header_personal"
 		},
 		{
 			"type": "dynamic",
@@ -499,7 +499,10 @@
 			"type": "toggle",
 			"i18n_on": "menu.gestures.on",
 			"i18n_off": "menu.gestures.off",
-			"category": "Gestures"
+			"category": "Gestures",
+			"platforms": [
+				"hs"
+			]
 		},
 		{
 			"type": "action",
