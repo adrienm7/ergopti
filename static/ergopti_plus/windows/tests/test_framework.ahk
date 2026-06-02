@@ -143,17 +143,50 @@ Test(Name, Callback) {
 	TEST_REGISTRY.Push({ name: Name, callback: Callback })
 }
 
-; Path of the TAP results file. A_Temp is used so Windows Defender real-time
-; scanning on CI runners cannot hold a write lock on a file inside the repo
-; checkout and cause FileAppend to block indefinitely between test lines.
+; Path of the TAP results file. A_Temp avoids repo-checkout paths that
+; Windows Defender may scan and momentarily lock between writes.
 global TEST_RESULTS_FILE := A_Temp . "\ergopti_test_results.txt"
 
-; Append a TAP line to TEST_RESULTS_FILE. Writing to "*" (stdout) blocks when
-; AHK is launched via cmd redirection without an inherited console handle, so
-; the file is the single output channel. CI reads this file via tail-read while
-; the process runs.
+; Persistent file handle kept open for the entire RunTests() run so that
+; Defender cannot acquire an exclusive scan lock between individual writes.
+; Opened lazily on first call to _TestPrint.
+global _TEST_FILE_HANDLE := 0
+
+; Append a TAP line using a single long-lived file handle opened with
+; FILE_FLAG_WRITE_THROUGH so every write goes directly to disk with no OS
+; buffering — the CI tail-reader sees each line the instant it is written.
+; Keeping one handle open for the whole suite prevents Defender from
+; acquiring an exclusive scan lock between individual FileAppend calls,
+; which was the root cause of non-deterministic 240 s hangs on CI.
 _TestPrint(Line) {
-	try FileAppend(Line . "`r`n", TEST_RESULTS_FILE)
+	global _TEST_FILE_HANDLE, TEST_RESULTS_FILE
+	if !_TEST_FILE_HANDLE {
+		; 0x40000000 = GENERIC_WRITE, 0x3 = FILE_SHARE_READ|WRITE,
+		; 0x2 = CREATE_ALWAYS, 0x80000000 = FILE_FLAG_WRITE_THROUGH (no buffer)
+		hFile := DllCall("CreateFileW",
+			"Str",  TEST_RESULTS_FILE,
+			"UInt", 0x40000000,
+			"UInt", 0x3,
+			"Ptr",  0,
+			"UInt", 0x2,
+			"UInt", 0x80000000,
+			"Ptr",  0, "Ptr")
+		if hFile != -1 {
+			_TEST_FILE_HANDLE := hFile
+		}
+	}
+	if _TEST_FILE_HANDLE {
+		Bytes := Line . "`r`n"
+		ByteLen := StrPut(Bytes, "UTF-8") - 1  ; -1 excludes null terminator
+		Buf := Buffer(ByteLen)
+		StrPut(Bytes, Buf, "UTF-8")
+		DllCall("WriteFile",
+			"Ptr",  _TEST_FILE_HANDLE,
+			"Ptr",  Buf.Ptr,
+			"UInt", ByteLen,
+			"Ptr",  0,
+			"Ptr",  0)
+	}
 }
 
 ; Execute every registered test, print TAP-style results and exit with
@@ -162,10 +195,13 @@ _TestPrint(Line) {
 ; When --dry-run is passed on the command line, exits immediately after
 ; printing the plan line so the CI warning-check step stays fast.
 RunTests() {
-	global TEST_REGISTRY, TEST_PASS_COUNT, TEST_FAIL_COUNT, _AHK_DRY_RUN
+	global TEST_REGISTRY, TEST_PASS_COUNT, TEST_FAIL_COUNT, _AHK_DRY_RUN, _TEST_FILE_HANDLE
 	_TestPrint("1.." . TEST_REGISTRY.Length)
 	if _AHK_DRY_RUN {
 		_TestPrint("# dry-run — skipping execution.")
+		if _TEST_FILE_HANDLE {
+			DllCall("CloseHandle", "Ptr", _TEST_FILE_HANDLE)
+		}
 		ExitApp(0)
 	}
 	Index := 0
@@ -187,5 +223,9 @@ RunTests() {
 		_TestPrint(Status . " " . Index . " - " . TestEntry.name . Detail)
 	}
 	_TestPrint("# " . TEST_PASS_COUNT . " passed, " . TEST_FAIL_COUNT . " failed.")
+	if _TEST_FILE_HANDLE {
+		DllCall("CloseHandle", "Ptr", _TEST_FILE_HANDLE)
+		_TEST_FILE_HANDLE := 0
+	}
 	ExitApp(TEST_FAIL_COUNT > 0 ? 1 : 0)
 }
