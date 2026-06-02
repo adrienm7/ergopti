@@ -2001,7 +2001,7 @@ initMenu() {
 	}
 	if SubMenus.Has("TapHolds") {
 		A_TrayMenu.Add(GetCategoryTitle("TapHolds"), SubMenus["TapHolds"])
-		if TapHoldsAllEnabled {
+		if IsCategoryGated("TapHolds") {
 			A_TrayMenu.Check(GetCategoryTitle("TapHolds"))
 		}
 	}
