@@ -310,6 +310,12 @@ end
 --- @param pos table Current centroid position.
 --- @param now number Current timestamp.
 local function triggerLiveAxisIfNeeded(slot, pos, now, axis)
+	-- Do not fire live actions while gestures are disabled/paused. The commit
+	-- path already gates on _state.enabled; the low-latency live-fire path must
+	-- match it, otherwise a swipe performed while the script is paused still
+	-- executes real system actions (word_next, tab_next, …). Mirrors AHK, where
+	-- the gesture dispatch hotkeys are disarmed by native Suspend.
+	if not _state.enabled then return end
 	if not slot or not _state.ga[slot] or _state.ga[slot] == "none" then return end
 	local action = _state.ga[slot]
 

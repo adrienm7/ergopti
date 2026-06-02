@@ -81,12 +81,19 @@ _TooltipTimerFn() {
 ; from the main script body at startup and always runs in the main thread.
 _TooltipDequeuePollFn() {
     global _TooltipDequeueItems, _TooltipGeneration, _TooltipTimerGeneration
+    global _TooltipDequeueActive
     static _PollCount := 0
     _PollCount += 1
     if (_TooltipDequeueItems == 0 or !IsObject(_TooltipDequeueItems))
         return
-    if (_TooltipTimerGeneration != _TooltipGeneration)
+    if (_TooltipTimerGeneration != _TooltipGeneration) {
+        ; Generation mismatch while dequeue is still flagged active — a new
+        ; TooltipShow superseded this cycle.  Clear the active flag so
+        ; subsequent TooltipHide calls are no longer gated.
+        if _TooltipDequeueActive
+            _TooltipDequeueActive := false
         return
+    }
     Now := A_TickCount
     ; Check if the earliest deadline has passed.
     NeedDequeue := false
@@ -244,6 +251,15 @@ global _TOOLTIP_SAFETY_SEC := 3.0
 ; The shortest DurationSec across all items drives the auto-hide timer
 ; (0 / omitted means "stay until TooltipHide()").
 TooltipShow(Items, DurationSec := 0) {
+
+    ; While the script is suspended nothing may paint — « pause = AHK éteint ».
+    ; The per-callback input guards normally prevent reaching here, but the
+    ; dequeue poll timer and async LLM callers can still land mid-pause, so tear
+    ; down anything still up and refuse the show.
+    if A_IsSuspended {
+        TooltipHide("Suspend", true)
+        return
+    }
 
     ; Normalise to an Array of { Text, ColorHex } objects.
     if !IsObject(Items) {
@@ -1128,6 +1144,11 @@ global _LLM_Tooltip_Visible  := false
 ; Inactive slots: full Text in gray.
 LLM_TooltipShow(payload, active := 1, is_final := false) {
 	global _LLM_Tooltip_Slots, _LLM_Tooltip_ActiveIdx, _LLM_Tooltip_Visible
+
+	; No prediction tooltip while paused — Ergopti_OnSuspendEnter already hid any
+	; visible one, this refuses late async renders.
+	if A_IsSuspended
+		return
 
 	slots := []
 	if (Type(payload) == "Array") {

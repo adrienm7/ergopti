@@ -881,8 +881,9 @@ InitSubMenus() {
 	global SubMenus, _FLAT_HOTSTRING_V1_CATS, _LegacyTopCategoryMap, _SharedDir
 	SubMenus := Map()
 
-	; Flat hotstring categories — order = manifest declaration order
-	; (preserved by the codegen emitter).
+	; Flat hotstring categories — order = sections_order from the TOML (which
+	; includes "-" separators); falls back to manifest declaration order when
+	; the TOML has no sections_order.
 	for V1Cat in _FLAT_HOTSTRING_V1_CATS {
 		SubMenu := Menu()
 		TomlPath := _SharedDir . "\hotstrings\" . StrLower(V1Cat) . ".toml"
@@ -892,8 +893,33 @@ InitSubMenus() {
 		}
 		V2Section := _LegacyTopCategoryMap.Has(V1Cat) ? _LegacyTopCategoryMap[V1Cat] : ""
 		if (V2Section != "") {
-			for Entry in ManifestFeaturesForSection(V2Section) {
-				MenuAddItemFromManifest(SubMenu, Entry, V1Cat)
+			Entries := ManifestFeaturesForSection(V2Section)
+			; Build a map from the section-name part of the v2 path to its entry
+			; so we can look up entries by TOML section name while iterating
+			; sections_order (which preserves visual separators).
+			EntryBySectionId := Map()
+			for Entry in Entries {
+				; path looks like "hotstrings.rolls.hc" — last segment is the id
+				Parts := StrSplit(Entry["path"], ".")
+				EntryBySectionId[Parts[Parts.Length]] := Entry
+			}
+			SectionsOrder := ReadTomlSectionsOrder(V1Cat, TomlPath)
+			if (SectionsOrder.Length > 0) {
+				; Render following TOML sections_order, honouring "-" separators
+				for _, SecId in SectionsOrder {
+					if (SecId == "-") {
+						SubMenu.Add()
+						continue
+					}
+					if EntryBySectionId.Has(SecId) {
+						MenuAddItemFromManifest(SubMenu, EntryBySectionId[SecId], V1Cat)
+					}
+				}
+			} else {
+				; No sections_order in TOML — fall back to manifest order
+				for Entry in Entries {
+					MenuAddItemFromManifest(SubMenu, Entry, V1Cat)
+				}
 			}
 		}
 		SubMenus[V1Cat] := SubMenu
@@ -1058,21 +1084,9 @@ _BuildShortcutsSubmenu() {
 	global _SHORTCUTS_SUBMAP_V1V2
 	SubMenu := Menu()
 
-	; ── Accents virtual group ────────────────────────────────
-	AccentsMenu := Menu()
-	for V1LetterId in ["EGrave", "ECirc", "EAcute", "AGrave"] {
-		MenuAddLetterPicker(AccentsMenu, "Shortcuts", V1LetterId)
-	}
-	SubMenu.Add(t("menu.shortcuts.group_accented"), AccentsMenu)
-
-	; ── WrapTextIfSelected (plain bool) ──────────────────────
-	WrapEntry := ManifestFindEntryByPath("shortcuts.wrap_text_if_selected")
-	if (WrapEntry != false) {
-		MenuAddItemFromManifest(SubMenu, WrapEntry, "Shortcuts")
-	} else {
-		try LoggerWarn("Menu",
-			"Shortcuts: no manifest entry for 'wrap_text_if_selected' — skipped.")
-	}
+	; Note: Accents (Lettres accentuées) and WrapTextIfSelected (taper un symbole
+	; lors d'une sélection) have been moved to Disposition clavier because they
+	; are keyboard emulation features, not shortcuts.
 
 	; ── Modifier combos virtual group ────────────────────────
 	ModifiersMenu := Menu()
@@ -1402,7 +1416,7 @@ initMenu() {
 		}
 	}
 
-	; ── 🌐 Disposition clavier — mirrors the HS layout submenu naming ──
+	; ── 🌐 Disposition clavier — keyboard emulation features ──
 	LayoutMenu := Menu()
 	LayoutGated := IsCategoryGated("Layout")
 	AddCategoryToggleItem(LayoutMenu,
@@ -1413,12 +1427,17 @@ initMenu() {
 	for LayoutEntry in ManifestFeaturesForSection("ahk.layout") {
 		MenuAddItemFromManifest(LayoutMenu, LayoutEntry, "Layout")
 	}
-	LayoutMenu.Add() ; Separator before magic key config
-	RegisterMenuItem(LayoutMenu, t("menu.hotstrings.magic_key_prefix") . ScriptInformation["MagicKey"], MagicKeyEditor)
-	LayoutRepeatToggleLabel := t("menu.hotstrings.repeat_key_toggle")
-	RegisterMenuItem(LayoutMenu, LayoutRepeatToggleLabel, ToggleRepeatKeyEnabled)
-	if HSE_RepeatEnabled {
-		LayoutMenu.Check(LayoutRepeatToggleLabel)
+	; Keyboard emulation: accented letters + symbol-on-selection
+	; moved here from Raccourcis (they are keyboard emulation, not shortcuts)
+	LayoutMenu.Add() ; Separator before keyboard emulation extras
+	AccentsMenuLayout := Menu()
+	for V1LetterId in ["EGrave", "ECirc", "EAcute", "AGrave"] {
+		MenuAddLetterPicker(AccentsMenuLayout, "Shortcuts", V1LetterId)
+	}
+	LayoutMenu.Add(t("menu.shortcuts.group_accented"), AccentsMenuLayout)
+	WrapEntryLayout := ManifestFindEntryByPath("shortcuts.wrap_text_if_selected")
+	if (WrapEntryLayout != false) {
+		MenuAddItemFromManifest(LayoutMenu, WrapEntryLayout, "Shortcuts")
 	}
 	LayoutMenuTitle := t("menu.layout.title")
 	A_TrayMenu.Add(LayoutMenuTitle, LayoutMenu)
@@ -1438,6 +1457,13 @@ initMenu() {
 	ParamsMenu := Menu()
 	RegisterMenuItem(ParamsMenu, t("menu.hotstrings.delays_colors"),
 		(*) => OpenHotstringsConfigWindow())
+	ParamsMenu.Add() ; Separator before magic key / repeat settings
+	RegisterMenuItem(ParamsMenu, t("menu.hotstrings.magic_key_prefix") . ScriptInformation["MagicKey"], MagicKeyEditor)
+	LayoutRepeatToggleLabel := t("menu.hotstrings.repeat_key_toggle")
+	RegisterMenuItem(ParamsMenu, LayoutRepeatToggleLabel, ToggleRepeatKeyEnabled)
+	if HSE_RepeatEnabled {
+		ParamsMenu.Check(LayoutRepeatToggleLabel)
+	}
 	HotstringsMenu.Add(t("menu.hotstrings.params"), ParamsMenu)
 	HotstringsMenu.Add() ; Separator after paramètres block
 

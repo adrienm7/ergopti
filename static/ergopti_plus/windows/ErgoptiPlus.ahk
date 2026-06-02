@@ -325,6 +325,13 @@ global ConfigurationFile := _ConfigDir . _AhkSubDir . "config.toml"
 HotstringsConfigInit(_ConfigDir . "hotstrings_config.toml")
 TooltipDequeueInit()
 
+; Arm the suspend watchdog so the pause reactor (Ergopti_OnSuspendEnter/Resume)
+; fires even when suspend is toggled outside ToggleSuspend. 500 ms is well under
+; human perception for the tear-down yet costs nothing while idle.
+SUSPEND_WATCHDOG_MS := 500
+global _LastSuspendState := A_IsSuspended
+SetTimer(_SuspendStateWatchdog, SUSPEND_WATCHDOG_MS)
+
 ; _LogoDir: fully-normalized absolute path avoids any '..' traversal that
 ; TraySetIcon may refuse to resolve on some Windows configurations.
 global _LogoDir := _StaticDir . "\img\logo"
@@ -1611,9 +1618,28 @@ _CollectFeatureUpdates(Updates, SectionPath, Node) {
 }
 
 ReloadWithDefaultConfig(*) {
-    ; Delete the config so the next startup uses all default values, then reload
-    if FileExist(ConfigurationFile) {
-        FileDelete(ConfigurationFile)
+    global _ConfigDir, _AhkSubDir
+    ; « Valeurs par défaut » must restore the FULL factory state, not only the
+    ; feature toggles. Three separate per-user files hold configurable state, all
+    ; under _ConfigDir\autohotkey\:
+    ;   - config.toml      → features, layout, shortcuts, gestures, LLM scalars,
+    ;                        metrics (regenerated from the shipped template).
+    ;   - tap_hold.toml    → tap/hold key assignments (regenerated from defaults).
+    ;   - api_entries.json → LLM remote endpoints + DPAPI-encrypted tokens
+    ;                        (absent file reads back as an empty list).
+    ; Deleting only config.toml left tap-holds and API entries on disk, so they
+    ; survived the reset — which is exactly the « ça réinitialise que les toggles »
+    ; complaint. Remove all three together, then reload.
+    AhkDir := _ConfigDir . _AhkSubDir
+    for FileName in ["config.toml", "tap_hold.toml", "api_entries.json"] {
+        Path := AhkDir . FileName
+        try {
+            if FileExist(Path) {
+                FileDelete(Path)
+            }
+        } catch as Err {
+            try LoggerError("GlobalReset", "Could not delete {1}: {2}.", FileName, Err.Message)
+        }
     }
     Reload
 }
@@ -1629,6 +1655,38 @@ ReadScriptShortcutsConfig() {
         if (Value != "_" and (Value == "none" or GESTURE_ACTIONS.Has(Value))) {
             ScriptShortcutAssignments[Slot] := Value
         }
+    }
+}
+
+; Clean up after a script-management combo (AltGr+Enter/BackSpace/Delete/Escape)
+; has fired its action. Two problems are solved here, and ONLY together — fixing
+; one without the other reintroduces the other:
+;
+;   1. Stuck prefix: on an AltGr-as-Kana driver remap (_ALTGR_KANA_FIXUP) SC138
+;      IS the Kana virtual key, kept by AHK as the held prefix for the
+;      "S"-suspend-exempt script combos. After the un-suspend action the
+;      layout's SC138 hotkeys come back on with that prefix still latched, so
+;      every following keystroke lands on the AltGr/Kana layer (« AltGr bloqué »).
+;      We clear it by injecting an SC138 up.
+;   2. Leaked suffix: the custom combo already suppresses the suffix key-down,
+;      but injecting the SC138 up WHILE the suffix is still physically held makes
+;      AHK replay that suppressed key into the app — the « ça envoie enter puis
+;      sort de la pause » bug. So we first wait (bounded) for the suffix to
+;      physically lift, and only inject the prefix release once it is confirmed
+;      up. If the wait times out with the key still down we skip the inject — a
+;      possibly-latched prefix (one AltGr tap to clear) is far less bad than a
+;      stray Enter/BackSpace landing in the document.
+;
+; On non-Kana layouts the prefix is physical RAlt; nothing is injected and
+; natural key release already does the right thing, so this is a no-op.
+ResetScriptComboKeys(SuffixSC) {
+    global _ALTGR_KANA_FIXUP
+    if !(IsSet(_ALTGR_KANA_FIXUP) and _ALTGR_KANA_FIXUP) {
+        return
+    }
+    KeyWait(SuffixSC, "T2")
+    if !GetKeyState(SuffixSC, "P") {
+        SendEvent("{SC138 Up}")
     }
 }
 
@@ -1673,7 +1731,11 @@ BuildScriptShortcutsMenu() {
         Current      := ScriptShortcutAssignments.Has(Slot) ? ScriptShortcutAssignments[Slot] : "none"
         CurrentLabel := GESTURE_ACTIONS.Has(Current) ? _GestureActionLabel(Current) : t("dialog.action_picker.disabled")
         SlotLabel    := SCRIPT_SHORTCUT_LABELS[Slot]
-        SMenu.Add(SlotLabel . " : " . CurrentLabel,
+        ; RegisterMenuItem (not raw SMenu.Add) routes the click through the
+        ; WM_COMMAND retry dispatcher. Raw SMenu.Add inherits AHK 2.0's flaky
+        ; native menu dispatch, which silently drops the click so the action
+        ; picker never opens — exactly the gesture-slot pattern at GMenu.
+        RegisterMenuItem(SMenu, SlotLabel . " : " . CurrentLabel,
             ((_s, _l) => (*) => ShowActionPicker(_l, ScriptShortcutAssignments.Has(_s) ? ScriptShortcutAssignments[_s] : "none", (Id) => SetScriptShortcutAction(_s, Id)))(Slot, SlotLabel))
     }
     return SMenu
@@ -2123,13 +2185,63 @@ ActivateEdit(*) {
 }
 
 ToggleSuspend(*) {
+    global _LastSuspendState
     if A_IsSuspended {
         Suspend(0)
     } else {
         Suspend(1)
     }
     UpdateTrayIcon()
+    ; Drive the pause reactor from the authoritative toggle. _LastSuspendState is
+    ; updated here too so the watchdog (which catches transitions that bypass
+    ; this function) sees the new state and does not double-fire the handlers.
+    _LastSuspendState := A_IsSuspended
+    if A_IsSuspended {
+        Ergopti_OnSuspendEnter()
+    } else {
+        Ergopti_OnSuspendResume()
+    }
     LoggerInfo("ErgoptiPlus", "Suspend toggled: {1}.", A_IsSuspended ? "ON" : "OFF")
+}
+
+; Pause reactor — entered when the script becomes suspended. Native Suspend only
+; disarms hotkeys/hotstrings; every InputHook, timer and OnMessage keeps running,
+; so the user still sees tooltips, LLM predictions, the WPM widget, etc. The
+; per-callback ``if A_IsSuspended`` guards stop NEW activity; this handler tears
+; down whatever was already live so the paused state is truly « AHK éteint ».
+Ergopti_OnSuspendEnter() {
+    try TooltipHide("Suspend", true)
+    try LLM_Tooltip_Hide(true)
+    try LLM_Engine_CancelTimer()
+}
+
+; Pause reactor — entered when the script resumes. The guards simply stop
+; early-returning once A_IsSuspended is false and the WPM tick repaints itself,
+; so the only cleanup needed is to drop any stale prefix-watcher context so
+; typing restarts at a clean word boundary instead of matching pre-pause input.
+Ergopti_OnSuspendResume() {
+    if IsSet(_ResetPrefixBuffer) {
+        try _ResetPrefixBuffer()
+    }
+}
+
+; Catches suspend transitions that bypass ToggleSuspend (a native Pause/Suspend
+; command, an external trigger, the AltGr+Enter pause-bug edge) and runs the same
+; reactor so « pause = tout éteint » holds no matter how suspend was toggled.
+; Timer callbacks are never affected by Suspend, so this keeps polling while
+; suspended — exactly what is needed to detect the resume edge.
+_SuspendStateWatchdog() {
+    global _LastSuspendState
+    if (A_IsSuspended == _LastSuspendState) {
+        return
+    }
+    _LastSuspendState := A_IsSuspended
+    UpdateTrayIcon()
+    if A_IsSuspended {
+        Ergopti_OnSuspendEnter()
+    } else {
+        Ergopti_OnSuspendResume()
+    }
 }
 
 UpdateTrayIcon() {
@@ -2216,9 +2328,15 @@ ShowHealthCheck(*) {
 ; reference them. Each handler double-checks the modifier state via
 ; GetKeyState — same defensive guard as the original blocks — so a stale
 ; AltGr+key ghost cannot replay the action on the next isolated keystroke.
+; After RunScriptShortcutAction returns (for actions that do — e.g. the pause
+; toggle), ResetScriptComboKeys waits for the suffix to lift then clears the
+; SC138/Kana prefix, so the combo neither leaks its key into the app nor leaves
+; AltGr stuck. Reload/ExitApp actions never return, so the reset is skipped —
+; a fresh process (or a closed one) has no latched prefix to clear anyway.
 _ScriptAltGrEnterHandler(*) {
     if (GetKeyState("SC138", "P") and GetKeyState("SC01C", "P")) {
         RunScriptShortcutAction("script_altgr_enter")
+        ResetScriptComboKeys("SC01C")
     } else {
         SendInput("{Enter}")
     }
@@ -2227,6 +2345,7 @@ _ScriptAltGrEnterHandler(*) {
 _ScriptAltGrBackSpaceHandler(*) {
     if (GetKeyState("SC138", "P") and GetKeyState("SC00E", "P")) {
         RunScriptShortcutAction("script_altgr_backspace")
+        ResetScriptComboKeys("SC00E")
     } else {
         SendInput("{BackSpace}")
     }
@@ -2235,6 +2354,7 @@ _ScriptAltGrBackSpaceHandler(*) {
 _ScriptAltGrDeleteHandler(*) {
     if (GetKeyState("SC138", "P") and GetKeyState("SC153", "P")) {
         RunScriptShortcutAction("script_altgr_delete")
+        ResetScriptComboKeys("SC153")
     } else {
         SendInput("{Delete}")
     }
@@ -2243,6 +2363,7 @@ _ScriptAltGrDeleteHandler(*) {
 _ScriptAltGrEscapeHandler(*) {
     if (GetKeyState("SC138", "P") and GetKeyState("SC001", "P")) {
         RunScriptShortcutAction("script_altgr_escape")
+        ResetScriptComboKeys("SC001")
     } else {
         SendInput("{Escape}")
     }

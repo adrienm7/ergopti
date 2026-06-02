@@ -1229,50 +1229,40 @@ function M.build(ctx)
 		end
 	end
 
-	-- Magic key config items — specific to the Ergopti layout (★ is a dedicated Ergopti key)
-	local hs_state  = ctx and ctx.state
+	-- Keyboard emulation features: accented letters + symbol-on-selection
+	-- moved here from Raccourcis (they are keyboard emulation, not shortcuts)
 	local hs_paused = ctx and ctx.paused
-	submenu[#submenu + 1] = { title = "-" }
-	submenu[#submenu + 1] = {
-		title    = i18n.get("menu.hotstrings.magic_key_item_prefix") .. (hs_state and hs_state.trigger_char or "★"),
-		disabled = hs_paused or nil,
-		fn       = not hs_paused and function()
-			if not hs_state then return end
-			local ok_p, btn, raw = pcall(dialog.text_prompt,
-				i18n.get("menu.hotstrings.magic_key_title"),
-				i18n.get("menu.hotstrings.magic_key_prompt"),
-				hs_state.trigger_char, "OK", i18n.get("common.cancel")
-			)
-			if ok_p and btn == "OK" and type(raw) == "string" and raw ~= "" then
-				local new_char = raw:match("^([%z\1-\127\194-\244][\128-\191]*)") or raw:sub(1,1)
-				if new_char and new_char ~= hs_state.trigger_char then
-					hs_state.trigger_char = new_char
-					if ctx.keymap and type(ctx.keymap.set_trigger_char) == "function" then
-						pcall(ctx.keymap.set_trigger_char, new_char)
-					end
-					if ctx.hotstring_editor and type(ctx.hotstring_editor.set_trigger_char) == "function" then
-						pcall(ctx.hotstring_editor.set_trigger_char, new_char)
-					end
-					ctx.save_prefs()
-					ctx.do_reload("menu")
+	local shortcuts = ctx and ctx.shortcuts
+	if shortcuts and type(shortcuts.list_shortcuts) == "function" then
+		local ok_list, sh_list = pcall(shortcuts.list_shortcuts)
+		if ok_list and type(sh_list) == "table" then
+			local wrap_entry = nil
+			for _, s in ipairs(sh_list) do
+				if type(s) == "table" and s.id == "wrap_text_if_selected" then
+					wrap_entry = s
+					break
 				end
 			end
-		end or nil,
-	}
-	local repeat_enabled = ctx and ctx.keymap
-		and type(ctx.keymap.is_repeat_feature_enabled) == "function"
-		and ctx.keymap.is_repeat_feature_enabled()
-	submenu[#submenu + 1] = {
-		title    = i18n.get("menu.hotstrings.repeat_key_toggle"),
-		checked  = repeat_enabled,
-		disabled = hs_paused or nil,
-		fn       = not hs_paused and function()
-			if ctx and ctx.keymap and type(ctx.keymap.set_repeat_feature_enabled) == "function" then
-				pcall(ctx.keymap.set_repeat_feature_enabled, not repeat_enabled)
+			if wrap_entry then
+				submenu[#submenu + 1] = { title = "-" }
+				local wrap_enabled = wrap_entry.enabled
+				submenu[#submenu + 1] = {
+					title    = i18n.get("menu.shortcuts.altgr_s_title"),
+					checked  = wrap_enabled,
+					disabled = hs_paused or nil,
+					fn       = not hs_paused and function()
+						if type(shortcuts.toggle) == "function" then
+							pcall(shortcuts.toggle, "wrap_text_if_selected")
+						end
+						ctx.do_reload("menu")
+					end or nil,
+				}
 			end
-			ctx.do_reload("menu")
-		end or nil,
-	}
+		end
+	end
+
+	-- Note: magic_key and repeat_key_toggle moved to Hotstrings > Paramètres
+	-- since they govern hotstring behaviour, not the physical key layout.
 
 	return {
 		title = i18n.get("menu.layout.title"),

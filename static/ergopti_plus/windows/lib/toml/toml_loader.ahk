@@ -564,6 +564,55 @@ CountTomlHotstrings(CategoryName, FilePath := "") {
 
 
 
+; Read the sections_order array from the [_meta] block of a shared hotstrings
+; TOML file (e.g. rolls.toml).  Returns an Array whose elements are either a
+; section-name string or the sentinel string "-" (visual separator).
+; Returns an empty Array when the file does not exist or has no sections_order.
+; Uses the ReadTomlFile cache to avoid double I/O.
+ReadTomlSectionsOrder(CategoryName, FilePath := "") {
+    global _SharedDir
+    if (FilePath == "") {
+        FilePath := _SharedDir . "\hotstrings\" . StrLower(CategoryName) . ".toml"
+    }
+    if !FileExist(FilePath) {
+        return []
+    }
+    InMeta := false
+    loop parse, ReadTomlFile(FilePath), "`n", "`r" {
+        Line := Trim(A_LoopField, " `t")
+        if (Line == "" or SubStr(Line, 1, 1) == "#") {
+            continue
+        }
+        ; Enter / leave the [_meta] block
+        if (Line == "[_meta]") {
+            InMeta := true
+            continue
+        }
+        if (InMeta and SubStr(Line, 1, 1) == "[") {
+            break  ; Left _meta block — sections_order not found
+        }
+        if !InMeta {
+            continue
+        }
+        ; Match: sections_order = ["a", "b", "-", "c"]
+        if !RegExMatch(Line, "^sections_order\s*=\s*\[(.+)\]", &M) {
+            continue
+        }
+        Out := []
+        loop parse, M[1], "," {
+            Token := Trim(A_LoopField, " `t" Chr(34))
+            if (Token != "") {
+                Out.Push(Token)
+            }
+        }
+        return Out
+    }
+    return []
+}
+
+
+
+
 ; ==========================================
 ; ==========================================
 ; ======= User config.toml overrides =======
