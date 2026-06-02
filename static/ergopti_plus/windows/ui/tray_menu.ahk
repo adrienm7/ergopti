@@ -465,12 +465,12 @@ BuildGesturesMenu() {
 		and Features["gestures"]["enabled"] = true
 
 	DynHandlers := Map(
-		"auto_configure",    _GES_AutoConfigure,
-		"manual_tutorial",   _GES_ManualTutorial,
-		"gesture_slots_2",   _GES_Slots2,
-		"gesture_slots_3",   _GES_Slots3,
-		"gesture_slots_4",   _GES_Slots4,
-		"gesture_slots_5",   _GES_Slots5,
+		"auto_configure",    Func("_GES_AutoConfigure"),
+		"manual_tutorial",   Func("_GES_ManualTutorial"),
+		"gesture_slots_2",   Func("_GES_Slots2"),
+		"gesture_slots_3",   Func("_GES_Slots3"),
+		"gesture_slots_4",   Func("_GES_Slots4"),
+		"gesture_slots_5",   Func("_GES_Slots5"),
 	)
 
 	return MenuRenderer_Build("gestures_menu", "Gestures", DynHandlers)
@@ -603,19 +603,19 @@ BuildMetricsMenu() {
 	; at build time, matching the previous per-item Disable() calls.
 
 	DynHandlers := Map(
-		"show_typing", _MET_ShowTyping,
-		"shortcut_typing", _MET_ShortcutTyping,
-		"show_apps", _MET_ShowApps,
-		"shortcut_apps", _MET_ShortcutApps,
-		"filter_private", _MET_FilterPrivate,
-		"filter_secure", _MET_FilterSecure,
-		"filter_sysauth", _MET_FilterSysauth,
-		"exclude_apps", _MET_ExcludeApps,
-		"wpm_widget", _MET_WpmWidget,
-		"widget_colors", _MET_WpmWidgetColors,
-		"include_realtime", _MET_WpmWidgetGraph,
-		"reset_wpm_position", _MET_WpmWidgetReset,
-		"encryption", _MET_Encryption,
+		"show_typing",       Func("_MET_ShowTyping"),
+		"shortcut_typing",   Func("_MET_ShortcutTyping"),
+		"show_apps",         Func("_MET_ShowApps"),
+		"shortcut_apps",     Func("_MET_ShortcutApps"),
+		"filter_private",    Func("_MET_FilterPrivate"),
+		"filter_secure",     Func("_MET_FilterSecure"),
+		"filter_sysauth",    Func("_MET_FilterSysauth"),
+		"exclude_apps",      Func("_MET_ExcludeApps"),
+		"wpm_widget",        Func("_MET_WpmWidget"),
+		"widget_colors",     Func("_MET_WpmWidgetColors"),
+		"include_realtime",  Func("_MET_WpmWidgetGraph"),
+		"reset_wpm_position", Func("_MET_WpmWidgetReset"),
+		"encryption",        Func("_MET_Encryption"),
 	)
 
 	MetricsMenu := MenuRenderer_Build("metrics_menu", "Metrics", DynHandlers)
@@ -1697,13 +1697,11 @@ global _SHORTCUTS_SUBMAP_V1V2 := Map(
 ; Dynamic handlers supply the platform-specific blocks (personal shortcuts,
 ; script control, extensions, edit action) that cannot be described in JSON.
 _BuildShortcutsSubmenu() {
-	global _StaticDir
-
 	DynHandlers := Map(
-		"personal_shortcuts",         _SC_Personal,
-		"script_control_shortcuts",   _SC_ScriptControl,
-		"extensions_shortcuts",       _SC_Extensions,
-		"edit_shortcuts",             _SC_EditAction,
+		"personal_shortcuts",         Func("_SC_Personal"),
+		"script_control_shortcuts",   Func("_SC_ScriptControl"),
+		"extensions_shortcuts",       Func("_SC_Extensions"),
+		"edit_shortcuts",             Func("_SC_EditAction"),
 	)
 
 	return MenuRenderer_Build("shortcuts_menu", "Shortcuts", DynHandlers)
@@ -1802,9 +1800,9 @@ _SC_EditAction(SubMenu, _Cat) {
 ; reload the script to refresh the menu.
 _BuildTapHoldsSubmenu() {
 	DynHandlers := Map(
-		"reset_defaults", _TH_DynResetDefaults,
-		"disable_all",    _TH_DynDisableAll,
-		"tap_hold_keys",  _TH_DynKeys,
+		"reset_defaults", Func("_TH_DynResetDefaults"),
+		"disable_all",    Func("_TH_DynDisableAll"),
+		"tap_hold_keys",  Func("_TH_DynKeys"),
 	)
 	return MenuRenderer_Build("tap_holds_menu", "TapHolds", DynHandlers)
 }
@@ -2024,7 +2022,7 @@ initMenu() {
 	; Dynamic handler ``layout_features`` iterates ``ahk.layout`` entries;
 	; ``active_layouts`` is macOS-only and skipped by the AHK platform filter.
 	LayoutDynHandlers := Map(
-		"layout_features", _LAY_LayoutFeatures,
+		"layout_features", Func("_LAY_LayoutFeatures"),
 	)
 	LayoutMenu  := MenuRenderer_Build("layout_menu", "Layout", LayoutDynHandlers)
 	LayoutGated := IsCategoryGated("Layout")
@@ -2042,12 +2040,12 @@ initMenu() {
 	_CountFn := HotstringsAllEnabled ? _CountEnabledForCategory : _CountAllForCategory
 
 	_HotDynHandlers := Map(
-		"hotstring_categories_standard", _HS_CategoriesStandard,
-		"hotstring_categories_dynamic",  _HS_CategoriesDynamic,
-		"hotstring_categories_ergopti",  _HS_CategoriesErgopti,
-		"hotstring_personal",            _HS_Personal,
-		"hotstring_extensions",          _HS_Extensions,
-		"magic_key_config",              _HS_MagicKeyConfig,
+		"hotstring_categories_standard", Func("_HS_CategoriesStandard"),
+		"hotstring_categories_dynamic",  Func("_HS_CategoriesDynamic"),
+		"hotstring_categories_ergopti",  Func("_HS_CategoriesErgopti"),
+		"hotstring_personal",            Func("_HS_Personal"),
+		"hotstring_extensions",          Func("_HS_Extensions"),
+		"magic_key_config",              Func("_HS_MagicKeyConfig"),
 	)
 
 	HotstringsMenu := MenuRenderer_Build("hotstrings_menu", "Hotstrings", _HotDynHandlers)
