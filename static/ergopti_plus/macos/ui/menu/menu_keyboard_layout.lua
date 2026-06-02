@@ -1261,8 +1261,56 @@ function M.build(ctx)
 		end
 	end
 
-	-- Note: magic_key and repeat_key_toggle moved to Hotstrings > Paramètres
-	-- since they govern hotstring behaviour, not the physical key layout.
+	-- J→★ remapping lives here because it configures the physical key, not hotstring behaviour.
+	-- repeat_key_toggle remains in Hotstrings > Paramètres as it governs hotstring timing.
+	local replace_enabled = ctx and ctx.keymap
+		and type(ctx.keymap.is_section_enabled) == "function"
+		and ctx.keymap.is_section_enabled("magic_key", "replace")
+	local replace_group_on = ctx and ctx.keymap
+		and type(ctx.keymap.is_group_enabled) == "function"
+		and ctx.keymap.is_group_enabled("magic_key")
+	-- Resolve the section label from the TOML _meta.sections description (locale-aware)
+	local replace_label = nil
+	if ctx and ctx.keymap and type(ctx.keymap.get_sections) == "function" then
+		local mk_secs = ctx.keymap.get_sections("magic_key")
+		if type(mk_secs) == "table" then
+			for _, sec in ipairs(mk_secs) do
+				if type(sec) == "table" and sec.name == "replace" and sec.description then
+					local desc = sec.description
+					if type(desc) == "table" then
+						local code = i18n.get_locale and i18n.get_locale() or "fr"
+						replace_label = desc[code] or desc["fr"]
+					elseif type(desc) == "string" then
+						replace_label = desc
+					end
+					break
+				end
+			end
+		end
+	end
+	if replace_label then
+		submenu[#submenu + 1] = { title = "-" }
+		submenu[#submenu + 1] = {
+			title    = replace_label,
+			checked  = (replace_enabled and not hs_paused) or nil,
+			disabled = not replace_group_on or hs_paused or nil,
+			fn       = (replace_group_on and not hs_paused) and function()
+				if ctx and ctx.keymap then
+					if replace_enabled then
+						if type(ctx.keymap.disable_section) == "function" then
+							pcall(ctx.keymap.disable_section, "magic_key", "replace")
+						end
+					else
+						if type(ctx.keymap.enable_section) == "function" then
+							pcall(ctx.keymap.enable_section, "magic_key", "replace")
+						end
+						if type(ctx.keymap.start) == "function" then pcall(ctx.keymap.start) end
+					end
+				end
+				ctx.do_reload("menu")
+			end or nil,
+		}
+	end
 
 	return {
 		title = i18n.get("menu.layout.title"),

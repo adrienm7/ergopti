@@ -9,7 +9,7 @@ color = "#e53935"
 delay = 2.0
 show_tooltip = true
 description = { fr = "Touche ★ et expansion de texte", en = "★ key and text expansion", de = "★-Taste und Texterweiterung", es = "Tecla ★ y expansión de texto", zh = "★ 键与文本扩展", ar = "مفتاح ★ وتوسيع النص", cs = "Klávesa ★ a rozšíření textu", da = "★-tast og tekstudvidelse", he = "מקש ★ והרחבת טקסט", hi = "★ कुंजी और टेक्स्ट विस्तार", it = "Tasto ★ e espansione testo", ja = "★キーとテキスト展開", ko = "★ 키와 텍스트 확장", nl = "★-toets en tekstuitbreiding", no = "★-tast og tekstutvidelse", pl = "Klawisz ★ i rozszerzenie tekstu", pt = "Tecla ★ e expansão de texto", ru = "Клавиша ★ и расширение текста", sv = "★-tangent och textutvidgning", tr = "★ tuşu ve metin genişletme", uk = "Клавіша ★ та розширення тексту" }
-sections_order = ["replace", "repeatcorrections", "-", "textexpansion", "textexpansionemojis", "textexpansionsymbols", "textexpansionsymbolstypst"]
+sections_order = ["replace", "repeat_corrections", "-", "text_expansion", "text_expansion_emojis", "text_expansion_symbols", "text_expansion_symbols_typst"]
 
 
 

@@ -905,19 +905,33 @@ InitSubMenus() {
 			}
 			SectionsOrder := ReadTomlSectionsOrder(V1Cat, TomlPath)
 			if (SectionsOrder.Length > 0) {
-				; Render following TOML sections_order, honouring "-" separators
+				; Render following TOML sections_order, honouring "-" separators.
+				; "replace" (J→★ key remapping) is shown in Disposition Ergopti instead.
+				_PrevWasSep := true ; Treat start as a virtual separator to suppress a leading "--"
 				for _, SecId in SectionsOrder {
 					if (SecId == "-") {
-						SubMenu.Add()
+						if !_PrevWasSep {
+							SubMenu.Add()
+							_PrevWasSep := true
+						}
+						continue
+					}
+					if (V1Cat == "MagicKey" and SecId == "replace") {
 						continue
 					}
 					if EntryBySectionId.Has(SecId) {
 						MenuAddItemFromManifest(SubMenu, EntryBySectionId[SecId], V1Cat)
+						_PrevWasSep := false
 					}
 				}
 			} else {
-				; No sections_order in TOML — fall back to manifest order
+				; No sections_order in TOML — fall back to manifest order.
+				; Still skip "replace" for MagicKey (shown in Disposition Ergopti).
 				for Entry in Entries {
+					Parts := StrSplit(Entry["path"], ".")
+					if (V1Cat == "MagicKey" and Parts[Parts.Length] == "replace") {
+						continue
+					}
 					MenuAddItemFromManifest(SubMenu, Entry, V1Cat)
 				}
 			}
@@ -1108,9 +1122,13 @@ _BuildShortcutsSubmenu() {
 	global _SHORTCUTS_SUBMAP_V1V2
 	SubMenu := Menu()
 
-	; Note: Accents (Lettres accentuées) and WrapTextIfSelected (taper un symbole
-	; lors d'une sélection) have been moved to Disposition clavier because they
-	; are keyboard emulation features, not shortcuts.
+	; ── UIA symbol-wrap toggle ────────────────────────────────
+	; Independent of keyboard emulation — works via the InputHook pass-through.
+	WrapEntry := ManifestFindEntryByPath("shortcuts.wrap_text_if_selected")
+	if (WrapEntry != false) {
+		MenuAddItemFromManifest(SubMenu, WrapEntry, "Shortcuts")
+		SubMenu.Add() ; Separator after the UIA toggle
+	}
 
 	; ── Modifier combos virtual group ────────────────────────
 	ModifiersMenu := Menu()
@@ -1451,9 +1469,14 @@ initMenu() {
 	for LayoutEntry in ManifestFeaturesForSection("ahk.layout") {
 		MenuAddItemFromManifest(LayoutMenu, LayoutEntry, "Layout")
 	}
-	; Keyboard emulation: accented letters + symbol-on-selection
-	; moved here from Raccourcis (they are keyboard emulation, not shortcuts)
-	LayoutMenu.Add() ; Separator before keyboard emulation extras
+	; J→★ remapping lives here because it configures the physical key, not hotstring behaviour
+	ReplaceEntry := ManifestFindEntryByPath("hotstrings.magic_key.replace")
+	if (ReplaceEntry != false) {
+		LayoutMenu.Add() ; Separator before J→★ remapping
+		MenuAddItemFromManifest(LayoutMenu, ReplaceEntry, "MagicKey")
+	}
+	; Accented letters stay in Disposition clavier (keyboard emulation feature)
+	LayoutMenu.Add() ; Separator before accented letters
 	AccentsMenuLayout := Menu()
 	for V1LetterId in ["EGrave", "ECirc", "EAcute", "AGrave"] {
 		MenuAddLetterPicker(AccentsMenuLayout, "Shortcuts", V1LetterId)
