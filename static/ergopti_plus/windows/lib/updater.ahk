@@ -95,10 +95,14 @@ Updater_LoadChannel() {
 	global BUNDLE_CHANNEL
 
 	; Step 2: seed from the build-stamped channel first (overridden below if
-	; the user has an explicit config-file override).
+	; the user has an explicit config-file override). When running from the
+	; source tree BUNDLE_CHANNEL is not set, so default to "dev" — all releases
+	; are pre-releases in that context and "main" would show an empty list.
 	if IsSet(BUNDLE_CHANNEL)
 		and (BUNDLE_CHANNEL == "main" or BUNDLE_CHANNEL == "dev") {
 		UPDATER_CHANNEL := BUNDLE_CHANNEL
+	} else {
+		UPDATER_CHANNEL := "dev"
 	}
 
 	; Step 1: explicit user override always wins.
