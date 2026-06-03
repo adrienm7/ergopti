@@ -624,11 +624,9 @@ Updater_OneClickUpdate(*) {
 ; Available in all run modes — local-source users see published releases too.
 Updater_ShowChangelog(*) {
 	global UPDATER_CHANNEL
-
-	; In local-source mode we still fetch published releases so the user can
-	; browse the changelog. Channel selection is read from the global state;
-	; for local-source builds the switch button does not persist the change.
-	_Updater_OpenChangelogWindow(UPDATER_CHANNEL)
+	; Delegate to the shared-UI webview changelog (same HTML/CSS/JS as macOS).
+	; Falls back to the old AHK-native window when WebView2 is unavailable.
+	Changelog_Open(UPDATER_CHANNEL)
 }
 
 ; Updates the "Install this version" button label and enabled state to reflect
