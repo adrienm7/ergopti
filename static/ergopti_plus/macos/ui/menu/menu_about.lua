@@ -24,6 +24,7 @@ local M = {}
 local hs     = hs
 local Logger = require("lib.logger")
 local i18n   = require("lib.i18n")
+local dialog = require("lib.dialog_util")
 local LOG    = "menu_about"
 
 M.DEFAULT_STATE = {
@@ -203,7 +204,7 @@ local function replace_and_reload(zip_path, update_menu_fn)
 	local target = app_bundle_path()
 	if not target then
 		Logger.error(LOG, "Cannot determine .app bundle path — aborting install.")
-		hs.dialog.alert(i18n.get("menu.about.update.install_error"), "OK", "Warning")
+		dialog.alert(i18n.get("common.error"), i18n.get("menu.about.update.install_error"), i18n.get("button.ok"))
 		_update_state = "idle"
 		update_menu_fn()
 		return
@@ -220,7 +221,7 @@ local function replace_and_reload(zip_path, update_menu_fn)
 	local task = hs.task.new("/usr/bin/unzip", function(exit_code, _, stderr)
 		if exit_code ~= 0 then
 			Logger.error(LOG, "unzip failed (exit %d): %s.", exit_code, stderr or "")
-			hs.dialog.alert(i18n.get("menu.about.update.install_error"), "OK", "Warning")
+			dialog.alert(i18n.get("common.error"), i18n.get("menu.about.update.install_error"), i18n.get("button.ok"))
 			_update_state = "idle"
 			update_menu_fn()
 			return
@@ -230,7 +231,7 @@ local function replace_and_reload(zip_path, update_menu_fn)
 		local ok_attr = hs.fs.attributes(new_app)
 		if not ok_attr then
 			Logger.error(LOG, "Unzipped archive does not contain ErgoptiPlus.app at %s.", new_app)
-			hs.dialog.alert(i18n.get("menu.about.update.install_error"), "OK", "Warning")
+			dialog.alert(i18n.get("common.error"), i18n.get("menu.about.update.install_error"), i18n.get("button.ok"))
 			_update_state = "idle"
 			update_menu_fn()
 			return
@@ -241,7 +242,7 @@ local function replace_and_reload(zip_path, update_menu_fn)
 		local ok_bak = os.rename(target, backup_app)
 		if not ok_bak then
 			Logger.error(LOG, "Could not move current .app to backup at %s.", backup_app)
-			hs.dialog.alert(i18n.get("menu.about.update.install_error"), "OK", "Warning")
+			dialog.alert(i18n.get("common.error"), i18n.get("menu.about.update.install_error"), i18n.get("button.ok"))
 			_update_state = "idle"
 			update_menu_fn()
 			return
@@ -251,7 +252,7 @@ local function replace_and_reload(zip_path, update_menu_fn)
 			-- Attempt to restore from backup before bailing.
 			os.rename(backup_app, target)
 			Logger.error(LOG, "Could not move new .app to %s — restored backup.", target)
-			hs.dialog.alert(i18n.get("menu.about.update.install_error"), "OK", "Warning")
+			dialog.alert(i18n.get("common.error"), i18n.get("menu.about.update.install_error"), i18n.get("button.ok"))
 			_update_state = "idle"
 			update_menu_fn()
 			return
@@ -289,7 +290,7 @@ local function one_click_update(channel, update_menu_fn)
 		local zip_path = os.tmpname() .. "_ErgoptiPlus.app.zip"
 		download_to_file(_cached_release.zip_url, zip_path, function(ok, err)
 			if not ok then
-				hs.dialog.alert(err, "OK", "Warning")
+				dialog.alert(i18n.get("common.error"), err, i18n.get("button.ok"))
 				_update_state = "available"
 				update_menu_fn()
 				return
@@ -310,7 +311,7 @@ local function one_click_update(channel, update_menu_fn)
 			Logger.warn(LOG, "One-click check: network unreachable (HTTP %d).", status)
 			_update_state = "idle"
 			update_menu_fn()
-			hs.dialog.alert(i18n.get("menu.about.update.network_error"), "OK", "Warning")
+			dialog.alert(i18n.get("common.warning"), i18n.get("menu.about.update.network_error"), i18n.get("button.ok"))
 			return
 		end
 		local latest = parse_tag(body)
@@ -318,7 +319,7 @@ local function one_click_update(channel, update_menu_fn)
 			Logger.warn(LOG, "One-click check: tag parse failed.")
 			_update_state = "idle"
 			update_menu_fn()
-			hs.dialog.alert(i18n.get("menu.about.update.parse_error"), "OK", "Warning")
+			dialog.alert(i18n.get("common.warning"), i18n.get("menu.about.update.parse_error"), i18n.get("button.ok"))
 			return
 		end
 		if latest == current then
@@ -326,7 +327,7 @@ local function one_click_update(channel, update_menu_fn)
 			_update_state = "idle"
 			update_menu_fn()
 			local msg = i18n.get("menu.about.update.up_to_date"):gsub("{version}", current)
-			hs.dialog.alert(msg, "OK", "Informational")
+			dialog.alert(i18n.get("menu.about.changelog"), msg, i18n.get("button.ok"))
 			return
 		end
 
@@ -335,7 +336,7 @@ local function one_click_update(channel, update_menu_fn)
 			Logger.error(LOG, "One-click check: asset '%s' not found in release %s.", ASSET_NAME, latest)
 			_update_state = "idle"
 			update_menu_fn()
-			hs.dialog.alert(i18n.get("menu.about.update.no_asset"), "OK", "Warning")
+			dialog.alert(i18n.get("common.warning"), i18n.get("menu.about.update.no_asset"), i18n.get("button.ok"))
 			return
 		end
 
@@ -347,7 +348,7 @@ local function one_click_update(channel, update_menu_fn)
 		local zip_path = os.tmpname() .. "_ErgoptiPlus.app.zip"
 		download_to_file(zip_url, zip_path, function(ok, err)
 			if not ok then
-				hs.dialog.alert(err, "OK", "Warning")
+				dialog.alert(i18n.get("common.error"), err, i18n.get("button.ok"))
 				_update_state = "available"
 				update_menu_fn()
 				return
@@ -363,13 +364,13 @@ local function show_changelog(channel)
 	local url = api_url(channel)
 	hs.http.asyncGet(url, { ["User-Agent"] = "ErgoptiPlus-Updater/1.0" }, function(status, body, _)
 		if status ~= 200 or not body then
-			hs.dialog.alert(i18n.get("menu.about.update.network_error"), "OK", "Warning")
+			dialog.alert(i18n.get("common.warning"), i18n.get("menu.about.update.network_error"), i18n.get("button.ok"))
 			return
 		end
 		local tag   = parse_tag(body)
 		local notes = parse_notes(body)
 		if tag == "" then
-			hs.dialog.alert(i18n.get("menu.about.update.changelog_error"), "OK", "Warning")
+			dialog.alert(i18n.get("common.warning"), i18n.get("menu.about.update.changelog_error"), i18n.get("button.ok"))
 			return
 		end
 		if notes == "" then notes = "(No release notes available for this version.)" end
@@ -377,8 +378,9 @@ local function show_changelog(channel)
 		local msg = i18n.get("menu.about.update.changelog_header")
 			:gsub("{tag}",   tag)
 			:gsub("{notes}", notes)
-		local open_label = i18n.get("menu.about.open_releases_page")
-		local btn = hs.dialog.alert(msg, open_label, "Dismiss", "Informational")
+		local open_label  = i18n.get("menu.about.open_releases_page")
+		local close_label = i18n.get("button.close")
+		local btn = dialog.alert(i18n.get("menu.about.changelog"), msg, open_label, close_label)
 		if btn == open_label then
 			hs.urlevent.openURL(releases_page_url())
 		end
