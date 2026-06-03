@@ -1,4 +1,4 @@
-{
+﻿{
 	"_meta.flag": "🇮🇳",
 	"_meta.locale": "hi",
 	"_meta.name": "हिन्दी",
@@ -170,6 +170,10 @@
 	"dialog.hotstrings.invalid_title": "अमान्य इनपुट",
 	"dialog.hotstrings.new_prompt": "ट्रिगर वर्ण दर्ज करें (बिल्कुल एक वर्ण):",
 	"dialog.hotstrings.new_title": "नया शब्द एक्सपेंडर",
+	"dialog.hotstrings.delete_delimiter_body": "Are you sure you want to delete this custom delimiter?",
+	"dialog.hotstrings.delete_delimiter_title": "Delete delimiter",
+	"dialog.hotstrings.new_delimiter_prompt": "Enter the delimiter character (one only):",
+	"dialog.hotstrings.new_delimiter_title": "New word delimiter",
 	"dialog.keyboard_shortcut.prompt": "कुंजी संयोजन चुनें:",
 	"dialog.keyboard_shortcut.title_prefix": "कुंजी चुनें — ",
 	"dialog.llm.delete_profile_prefix": "\"",
@@ -717,6 +721,10 @@
 	"menu.hotstrings.tooltip_default": "डिफ़ॉल्ट विलंब (सभी समूह)",
 	"menu.hotstrings.tooltip_magic": "★ पूर्वावलोकन",
 	"menu.hotstrings.word_delimiters": "Word delimiters",
+	"menu.hotstrings.delete_delimiter": "Delete this delimiter…",
+	"menu.hotstrings.add_delimiter": "+ Add custom delimiter…",
+	"menu.hotstrings.uncheck_all": "Uncheck all",
+	"menu.hotstrings.check_all": "Check all",
 	"menu.hotstrings.word_expanders": "⌨ विस्तारक",
 	"menu.hs.gestures.modes": "मोड",
 	"menu.hs.gestures.modes.swipe_2_down": "मोड — 2-फिंगर स्वाइप ↓",

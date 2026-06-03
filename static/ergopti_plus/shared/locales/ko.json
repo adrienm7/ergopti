@@ -1,4 +1,4 @@
-{
+﻿{
 	"_meta.flag": "🇰🇷",
 	"_meta.locale": "ko",
 	"_meta.name": "한국어",
@@ -170,6 +170,10 @@
 	"dialog.hotstrings.invalid_title": "잘못된 입력",
 	"dialog.hotstrings.new_prompt": "트리거 문자를 입력하세요 (정확히 한 문자):",
 	"dialog.hotstrings.new_title": "새 단어 확장기",
+	"dialog.hotstrings.delete_delimiter_body": "Are you sure you want to delete this custom delimiter?",
+	"dialog.hotstrings.delete_delimiter_title": "Delete delimiter",
+	"dialog.hotstrings.new_delimiter_prompt": "Enter the delimiter character (one only):",
+	"dialog.hotstrings.new_delimiter_title": "New word delimiter",
 	"dialog.keyboard_shortcut.prompt": "키 조합을 선택하세요:",
 	"dialog.keyboard_shortcut.title_prefix": "키 선택 — ",
 	"dialog.llm.delete_profile_prefix": "삭제 \"",
@@ -717,6 +721,10 @@
 	"menu.hotstrings.tooltip_default": "기본 지연 (모든 그룹)",
 	"menu.hotstrings.tooltip_magic": "★ 미리보기",
 	"menu.hotstrings.word_delimiters": "단어 구분자",
+	"menu.hotstrings.delete_delimiter": "Delete this delimiter…",
+	"menu.hotstrings.add_delimiter": "+ Add custom delimiter…",
+	"menu.hotstrings.uncheck_all": "Uncheck all",
+	"menu.hotstrings.check_all": "Check all",
 	"menu.hotstrings.word_expanders": "⌨ 확장기",
 	"menu.hs.gestures.modes": "모드",
 	"menu.hs.gestures.modes.swipe_2_down": "모드 — 2손가락 스와이프 ↓",

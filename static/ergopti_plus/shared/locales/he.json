@@ -1,4 +1,4 @@
-{
+﻿{
 	"_meta.flag": "🇮🇱",
 	"_meta.locale": "he",
 	"_meta.name": "עברית",
@@ -170,6 +170,10 @@
 	"dialog.hotstrings.invalid_title": "קלט לא חוקי",
 	"dialog.hotstrings.new_prompt": "הזן את תו ההפעלה (תו אחד בדיוק):",
 	"dialog.hotstrings.new_title": "מרחיב מילים חדש",
+	"dialog.hotstrings.delete_delimiter_body": "Are you sure you want to delete this custom delimiter?",
+	"dialog.hotstrings.delete_delimiter_title": "Delete delimiter",
+	"dialog.hotstrings.new_delimiter_prompt": "Enter the delimiter character (one only):",
+	"dialog.hotstrings.new_delimiter_title": "New word delimiter",
 	"dialog.keyboard_shortcut.prompt": "בחר את צירוף המקשים:",
 	"dialog.keyboard_shortcut.title_prefix": "בחר מקש — ",
 	"dialog.llm.delete_profile_prefix": "מחק \"",
@@ -717,6 +721,10 @@
 	"menu.hotstrings.tooltip_default": "השהיית ברירת מחדל (כל הקבוצות)",
 	"menu.hotstrings.tooltip_magic": "תצוגה מקדימה של ★",
 	"menu.hotstrings.word_delimiters": "Word delimiters",
+	"menu.hotstrings.delete_delimiter": "Delete this delimiter…",
+	"menu.hotstrings.add_delimiter": "+ Add custom delimiter…",
+	"menu.hotstrings.uncheck_all": "Uncheck all",
+	"menu.hotstrings.check_all": "Check all",
 	"menu.hotstrings.word_expanders": "⌨ מרחיבים",
 	"menu.hs.gestures.modes": "מצב",
 	"menu.hs.gestures.modes.swipe_2_down": "מצב — החלקה ב-2 אצבעות ↓",

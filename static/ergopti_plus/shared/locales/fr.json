@@ -1,4 +1,4 @@
-{
+﻿{
 	"_meta.flag": "🇫🇷",
 	"_meta.locale": "fr",
 	"_meta.name": "Français",
@@ -170,6 +170,10 @@
 	"dialog.hotstrings.invalid_title": "Saisie invalide",
 	"dialog.hotstrings.new_prompt": "Saisissez le caractère déclencheur (un seul caractère) :",
 	"dialog.hotstrings.new_title": "Nouvel expanseur de mots",
+	"dialog.hotstrings.delete_delimiter_body": "Êtes-vous sûr de vouloir supprimer ce délimiteur personnalisé ?",
+	"dialog.hotstrings.delete_delimiter_title": "Supprimer le délimiteur",
+	"dialog.hotstrings.new_delimiter_prompt": "Saisissez le caractère délimiteur (un seul) :",
+	"dialog.hotstrings.new_delimiter_title": "Nouveau délimiteur de mots",
 	"dialog.keyboard_shortcut.prompt": "Sélectionner la combinaison de touches :",
 	"dialog.keyboard_shortcut.title_prefix": "Choisir une touche — ",
 	"dialog.llm.delete_profile_prefix": "Supprimer « ",
@@ -722,6 +726,10 @@
 	"menu.hotstrings.tooltip_default": "Délai par défaut (tous groupes)",
 	"menu.hotstrings.tooltip_magic": "Aperçu ★",
 	"menu.hotstrings.word_delimiters": "Délimiteurs de mots",
+	"menu.hotstrings.delete_delimiter": "Supprimer ce délimiteur…",
+	"menu.hotstrings.add_delimiter": "+ Ajouter un délimiteur personnalisé…",
+	"menu.hotstrings.uncheck_all": "Tout décocher",
+	"menu.hotstrings.check_all": "Tout cocher",
 	"menu.hotstrings.word_expanders": "⌨ Expanseurs",
 	"menu.hs.gestures.modes": "Mode ",
 	"menu.hs.gestures.modes.swipe_2_down": "Mode  — Swipe 2 doigts ↓",

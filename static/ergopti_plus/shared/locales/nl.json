@@ -1,4 +1,4 @@
-{
+﻿{
 	"_meta.flag": "🇳🇱",
 	"_meta.locale": "nl",
 	"_meta.name": "Nederlands",
@@ -170,6 +170,10 @@
 	"dialog.hotstrings.invalid_title": "Ongeldige invoer",
 	"dialog.hotstrings.new_prompt": "Voer het activeringsteken in (precies één teken):",
 	"dialog.hotstrings.new_title": "Nieuwe woorduitbreider",
+	"dialog.hotstrings.delete_delimiter_body": "Are you sure you want to delete this custom delimiter?",
+	"dialog.hotstrings.delete_delimiter_title": "Delete delimiter",
+	"dialog.hotstrings.new_delimiter_prompt": "Enter the delimiter character (one only):",
+	"dialog.hotstrings.new_delimiter_title": "New word delimiter",
 	"dialog.keyboard_shortcut.prompt": "Selecteer de toetscombinatie:",
 	"dialog.keyboard_shortcut.title_prefix": "Kies een toets — ",
 	"dialog.llm.delete_profile_prefix": "Verwijder \"",
@@ -717,6 +721,10 @@
 	"menu.hotstrings.tooltip_default": "Standaardvertraging (alle groepen)",
 	"menu.hotstrings.tooltip_magic": "★ Voorbeeld",
 	"menu.hotstrings.word_delimiters": "Woordscheidingstekens",
+	"menu.hotstrings.delete_delimiter": "Delete this delimiter…",
+	"menu.hotstrings.add_delimiter": "+ Add custom delimiter…",
+	"menu.hotstrings.uncheck_all": "Uncheck all",
+	"menu.hotstrings.check_all": "Check all",
 	"menu.hotstrings.word_expanders": "⌨ Uitbreiders",
 	"menu.hs.gestures.modes": "Modus",
 	"menu.hs.gestures.modes.swipe_2_down": "Modus — Veeg 2 vingers ↓",

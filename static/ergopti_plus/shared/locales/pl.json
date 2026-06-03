@@ -1,4 +1,4 @@
-{
+﻿{
 	"_meta.flag": "🇵🇱",
 	"_meta.locale": "pl",
 	"_meta.name": "Polski",
@@ -170,6 +170,10 @@
 	"dialog.hotstrings.invalid_title": "Nieprawidłowe dane wejściowe",
 	"dialog.hotstrings.new_prompt": "Wprowadź znak wyzwalający (dokładnie jeden znak):",
 	"dialog.hotstrings.new_title": "Nowy rozszerzacz słów",
+	"dialog.hotstrings.delete_delimiter_body": "Are you sure you want to delete this custom delimiter?",
+	"dialog.hotstrings.delete_delimiter_title": "Delete delimiter",
+	"dialog.hotstrings.new_delimiter_prompt": "Enter the delimiter character (one only):",
+	"dialog.hotstrings.new_delimiter_title": "New word delimiter",
 	"dialog.keyboard_shortcut.prompt": "Wybierz kombinację klawiszy:",
 	"dialog.keyboard_shortcut.title_prefix": "Wybierz klawisz — ",
 	"dialog.llm.delete_profile_prefix": "Usuń \"",
@@ -717,6 +721,10 @@
 	"menu.hotstrings.tooltip_default": "Domyślne opóźnienie (wszystkie grupy)",
 	"menu.hotstrings.tooltip_magic": "★ Podgląd",
 	"menu.hotstrings.word_delimiters": "Separatory wyrazów",
+	"menu.hotstrings.delete_delimiter": "Delete this delimiter…",
+	"menu.hotstrings.add_delimiter": "+ Add custom delimiter…",
+	"menu.hotstrings.uncheck_all": "Uncheck all",
+	"menu.hotstrings.check_all": "Check all",
 	"menu.hotstrings.word_expanders": "⌨ Rozszerzacze",
 	"menu.hs.gestures.modes": "Tryb",
 	"menu.hs.gestures.modes.swipe_2_down": "Tryb — Przesunięcie 2 palcami ↓",

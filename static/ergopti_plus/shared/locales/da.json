@@ -1,4 +1,4 @@
-{
+﻿{
 	"_meta.flag": "🇩🇰",
 	"_meta.locale": "da",
 	"_meta.name": "Dansk",
@@ -170,6 +170,10 @@
 	"dialog.hotstrings.invalid_title": "Ugyldigt input",
 	"dialog.hotstrings.new_prompt": "Indtast triggertegnet (præcis ét tegn):",
 	"dialog.hotstrings.new_title": "Ny ordudvidelse",
+	"dialog.hotstrings.delete_delimiter_body": "Are you sure you want to delete this custom delimiter?",
+	"dialog.hotstrings.delete_delimiter_title": "Delete delimiter",
+	"dialog.hotstrings.new_delimiter_prompt": "Enter the delimiter character (one only):",
+	"dialog.hotstrings.new_delimiter_title": "New word delimiter",
 	"dialog.keyboard_shortcut.prompt": "Vælg tastaturkombinationen:",
 	"dialog.keyboard_shortcut.title_prefix": "Vælg en tast — ",
 	"dialog.llm.delete_profile_prefix": "Slet \"",
@@ -717,6 +721,10 @@
 	"menu.hotstrings.tooltip_default": "Standardforsinkelse (alle grupper)",
 	"menu.hotstrings.tooltip_magic": "★ Forhåndsvisning",
 	"menu.hotstrings.word_delimiters": "Ordafgrænsere",
+	"menu.hotstrings.delete_delimiter": "Delete this delimiter…",
+	"menu.hotstrings.add_delimiter": "+ Add custom delimiter…",
+	"menu.hotstrings.uncheck_all": "Uncheck all",
+	"menu.hotstrings.check_all": "Check all",
 	"menu.hotstrings.word_expanders": "⌨ Expandere",
 	"menu.hs.gestures.modes": "Tilstand",
 	"menu.hs.gestures.modes.swipe_2_down": "Tilstand — 2-finger-stryg ↓",
