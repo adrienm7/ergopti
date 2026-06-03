@@ -28,8 +28,18 @@ local dialog    = require("lib.dialog_util")
 local changelog = require("ui.changelog")
 local LOG       = "menu_about"
 
+-- Detect source vs bundled at module load time so DEFAULT_STATE carries the
+-- right channel seed before preferences.lua hydrates the shared state table.
+local _BUNDLED_ID = "com.ergopti.app"
+local _is_local   = (function()
+	local info = hs and hs.processInfo
+	if not info then return true end
+	return (info.bundleID or "") ~= _BUNDLED_ID
+end)()
+
 M.DEFAULT_STATE = {
-	update_channel = "main",
+	-- "dev" from source (all releases are pre-releases), "main" from bundled app.
+	update_channel = _is_local and "dev" or "main",
 }
 
 
@@ -386,11 +396,8 @@ end
 --- @return table Menu item table for insertion into the parent menu.
 function M.build(ctx)
 	local state   = ctx and ctx.state or {}
-	-- Use the saved preference; fall back to "dev" when running from source
-	-- (no stable releases exist yet) and "main" for a bundled app.
-	local saved   = (type(state.update_channel) == "string" and state.update_channel ~= "")
-	local channel = saved and state.update_channel
-		or (is_local_source() and "dev" or M.DEFAULT_STATE.update_channel)
+	local channel = (type(state.update_channel) == "string" and state.update_channel ~= "")
+		and state.update_channel or M.DEFAULT_STATE.update_channel
 	local ver     = current_version()
 	local ver_label = i18n.get("menu.about.title")
 
