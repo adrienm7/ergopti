@@ -822,7 +822,7 @@ _HS_BuildDelimiterSubMenu() {
 	; ── Bulk actions ─────────────────────────────────────────────────────────
 	RegisterMenuItem(Sub, t("menu.hotstrings.check_all"),      (*) => _HS_DelimSetAll(true))
 	RegisterMenuItem(Sub, t("menu.hotstrings.uncheck_all"),    (*) => _HS_DelimSetAll(false))
-	RegisterMenuItem(Sub, t("hs_config.delimiters_reset"),     (*) => _HS_DelimReset())
+	RegisterMenuItem(Sub, t("menu.global.reset_defaults"),     (*) => _HS_DelimReset())
 	Sub.Add()
 
 	; ── Built-in delimiters ───────────────────────────────────────────────────

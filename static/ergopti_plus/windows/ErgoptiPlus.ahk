@@ -1146,12 +1146,22 @@ _ParseExtTomlSections(FilePath) {
 }
 
 MagicKeyEditor(*) {
-    GuiToShow := Gui(, t("dialog.magic_key.title"))
-    GuiToShow.Add("Text", , t("dialog.magic_key.prompt"))
-    NewValue := GuiToShow.Add("Edit", "w50 x+10", ScriptInformation["MagicKey"])
-
-    GuiToShow.Add("Button", "w100 x+10", t("button.ok")).OnEvent("Click", (*) => ModifyMagicKey(GuiToShow, NewValue.Text))
+    ; A plain Edit control routes every keystroke through the hotstring engine
+    ; (~6000 mappings), causing severe lag on each character. Capture the new
+    ; magic key via a one-shot InputHook instead: the GUI is purely informative,
+    ; the first non-modifier key pressed becomes the new value.
+    GuiToShow := Gui("+AlwaysOnTop", t("dialog.magic_key.title"))
+    GuiToShow.Add("Text", "w300", t("dialog.magic_key.prompt"))
+    GuiToShow.Add("Text", "w300", t("button.cancel") . " → Echap")
     GuiToShow.Show("Center")
+
+    IH := InputHook("L1 I", "{Escape}")
+    IH.Start()
+    IH.Wait()
+    GuiToShow.Destroy()
+
+    if (IH.EndReason = "Stopped" && IH.Input != "")
+        ModifyMagicKey(0, IH.Input)
 }
 ModifyMagicKey(gui, NewValue) {
     global ScriptInformation, Features, ConfigurationFile
@@ -1161,7 +1171,8 @@ ModifyMagicKey(gui, NewValue) {
     }
     TOML_Write(NewValue, ConfigurationFile, "hotstrings", "trigger_char")
 
-    gui.Destroy()
+    if (gui != 0)
+        gui.Destroy()
     Reload
 }
 
