@@ -445,13 +445,13 @@
 	],
 	"hotstrings_params_group": [
 		{
+			"type": "dynamic",
+			"id": "word_expanders"
+		},
+		{
 			"type": "action",
 			"id": "delays_colors",
 			"i18n": "menu.hotstrings.delays_colors"
-		},
-		{
-			"type": "dynamic",
-			"id": "word_delimiters"
 		},
 		{
 			"type": "---"

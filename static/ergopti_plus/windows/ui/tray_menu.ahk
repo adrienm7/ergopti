@@ -800,12 +800,12 @@ _HS_DelaysColors(M, _Cat) {
 	RegisterMenuItem(M, t("menu.hotstrings.delays_colors"), (*) => OpenHotstringsConfigWindow())
 }
 
-; Dynamic handler: word-delimiter sub-menu, mirroring the terminators sub-menu.
+; Dynamic handler: word-expanders sub-menu, mirroring the terminators sub-menu.
 ; Built-ins are declared inline (manifest access is not available from tray context);
 ; custom ones are any chars in the effective string that are not in the built-in list.
-_HS_WordDelimiters(M, _Cat) {
+_HS_WordExpanders(M, _Cat) {
 	Sub := _HS_BuildDelimiterSubMenu()
-	M.Add(t("menu.hotstrings.word_delimiters"), Sub)
+	M.Add(t("menu.hotstrings.word_expanders"), Sub)
 }
 
 ; Build the delimiter sub-menu fresh each time so checkbox states are always current.
@@ -2173,7 +2173,7 @@ initMenu() {
 		"magic_key_config",              (M, C) => _HS_MagicKeyConfig(M, C),
 		"repeat_key",                    (M, C) => _HS_RepeatKey(M, C),
 		"delays_colors",                 (M, C) => _HS_DelaysColors(M, C),
-		"word_delimiters",               (M, C) => _HS_WordDelimiters(M, C),
+		"word_expanders",                (M, C) => _HS_WordExpanders(M, C),
 	)
 
 	_HotGroupBuilders := Map(
