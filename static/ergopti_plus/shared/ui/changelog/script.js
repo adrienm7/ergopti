@@ -19,12 +19,14 @@
  * ==============================================================================
  */
 
-var _currentChannel    = "main";
+// Read native config immediately at module level — before any function runs —
+// so _currentChannel is correct even if init() runs before DOMContentLoaded.
+var _currentChannel    = (window.__changelog_channel === "dev") ? "dev" : "main";
 var _releases          = [];
 var _selectedIndex     = -1;
 var _currentReleaseUrl = null;
-var _ghOwner           = "adrienm7";
-var _ghRepo            = "ergopti";
+var _ghOwner           = window.__changelog_gh_owner || "adrienm7";
+var _ghRepo            = window.__changelog_gh_repo  || "ergopti";
 // Set to true once the native backend has responded for the current channel;
 // prevents the client-side fallback from overwriting native data.
 var _nativeResponded   = false;
@@ -401,12 +403,7 @@ function showError(message) {
 // ======================================
 
 (function init() {
-	// Read native config FIRST so channel buttons reflect the injected value.
-	if (window.__changelog_gh_owner) _ghOwner = window.__changelog_gh_owner;
-	if (window.__changelog_gh_repo)  _ghRepo  = window.__changelog_gh_repo;
-	if (window.__changelog_channel)  _currentChannel = window.__changelog_channel;
-
-	// Apply initial channel button state.
+	// Apply initial channel button state — _currentChannel already set at module level.
 	var btnStable = document.getElementById("btn-stable");
 	var btnDev    = document.getElementById("btn-dev");
 	if (btnStable) btnStable.classList.toggle("active", _currentChannel === "main");
