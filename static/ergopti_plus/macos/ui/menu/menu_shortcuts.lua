@@ -186,22 +186,16 @@ function M.build(ctx)
 
 	-- Each handler appends its items into the ``items`` list it receives.
 
-	local function dyn_ctrl_shortcuts(items, _ctx)
-		if #ctrl_items == 0 then return end
-		table.insert(items, {
-			title    = i18n.get("menu.shortcuts.submenu_ctrl"),
-			disabled = not state.shortcuts or paused or nil,
-			menu     = ctrl_items,
-		})
+	-- group_builders return { menu = items } (or nil to skip) — the manifest
+	-- renderer wraps them with the i18n label from the manifest entry.
+	local function build_ctrl_shortcuts(_ctx)
+		if #ctrl_items == 0 then return nil end
+		return { disabled = not state.shortcuts or paused or nil, menu = ctrl_items }
 	end
 
-	local function dyn_cmd_shortcuts(items, _ctx)
-		if #cmd_items == 0 then return end
-		table.insert(items, {
-			title    = i18n.get("menu.shortcuts.submenu_cmd"),
-			disabled = not state.shortcuts or paused or nil,
-			menu     = cmd_items,
-		})
+	local function build_cmd_shortcuts(_ctx)
+		if #cmd_items == 0 then return nil end
+		return { disabled = not state.shortcuts or paused or nil, menu = cmd_items }
 	end
 
 	local function dyn_script_control(items, _ctx)
@@ -374,14 +368,17 @@ function M.build(ctx)
 	-- =============================================
 
 	local dyn_handlers = {
-		ctrl_shortcuts          = dyn_ctrl_shortcuts,
-		cmd_shortcuts           = dyn_cmd_shortcuts,
 		script_control_shortcuts = dyn_script_control,
 		extensions_shortcuts    = dyn_extensions_shortcuts,
 		edit_shortcuts          = dyn_edit_shortcuts,
 	}
 
-	local s_menu = ManifestMenu.build("shortcuts_menu", "Shortcuts", dyn_handlers, nil, ctx)
+	local group_builders = {
+		ctrl_shortcuts = build_ctrl_shortcuts,
+		cmd_shortcuts  = build_cmd_shortcuts,
+	}
+
+	local s_menu = ManifestMenu.build("shortcuts_menu", "Shortcuts", dyn_handlers, group_builders, ctx)
 
 	-- Prepend the top-level feature items before the manifest section
 	for i, it in ipairs(top_items) do
