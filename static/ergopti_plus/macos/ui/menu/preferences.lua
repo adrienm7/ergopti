@@ -140,6 +140,7 @@ local NESTED_KEY_MAP = {
 	sections_order_overrides = { sec = "hotstrings", key = "order_overrides"            },
 	custom_editor_shortcut   = { sec = "hotstrings", key = "editor.shortcut"            },
 	custom_terminators       = { sec = "hotstrings", key = "terminators"                },
+	custom_delimiters        = { sec = "hotstrings", key = "delimiters"                 },
 	-- Metrics nested tables
 	keylogger_disabled_apps  = { sec = "metrics",    key = "disabled_apps"              },
 	-- LLM nested tables

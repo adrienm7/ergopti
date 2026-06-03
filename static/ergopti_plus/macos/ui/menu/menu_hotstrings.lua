@@ -59,6 +59,7 @@ M.DEFAULT_STATE = {
 	sections_order_overrides      = {},
 	terminator_states             = {},
 	custom_terminators            = {},
+	custom_delimiters             = {},
 	hotstrings                    = {},
 	delays                        = {},
 	-- Dynamic hotstrings defaults — read from their canonical module.
@@ -691,7 +692,7 @@ function M.build_management(ctx)
 				end or nil,
 			})
 			table.insert(sub, {
-				title    = i18n.get("hs_config.delimiters_reset"),
+				title    = i18n.get("menu.global.reset_defaults"),
 				disabled = paused or nil,
 				fn = not paused and function()
 					pcall(hs_cfg.set_word_delimiters, nil)
@@ -728,11 +729,23 @@ function M.build_management(ctx)
 			table.insert(sub, { title = "-" })
 
 			-- Custom delimiters (chars present in the string but not in the built-in list)
+			-- Custom chars are stored as plain char (non-consumed) or as char+"\0" sentinel
+			-- (consumed). We use the state.custom_delimiters list for consume metadata.
+			local custom_delims = type(state.custom_delimiters) == "table" and state.custom_delimiters or {}
+			local custom_by_char = {}
+			for _, cd in ipairs(custom_delims) do
+				if type(cd) == "table" and type(cd.char) == "string" then
+					custom_by_char[cd.char] = cd
+				end
+			end
 			for i = 1, #current do
 				local ch = current:sub(i, i)
 				if ch ~= "\r" and ch ~= "\n" and not builtin_chars:find(ch, 1, true) then
-					local lbl   = ch .. " : " .. i18n.get("menu.hotstrings.custom_label")
-					local ct_sub = {
+					local cd      = custom_by_char[ch]
+					local consume = cd and cd.consume or false
+					local sfx     = consume and (" " .. i18n.get("menu.hotstrings.consumed_suffix")) or ""
+					local lbl     = ch .. " : " .. i18n.get("menu.hotstrings.custom_label") .. sfx
+					local ct_sub  = {
 						{
 							title    = i18n.get("menu.hotstrings.delete_delimiter"),
 							disabled = paused or nil,
@@ -747,20 +760,30 @@ function M.build_management(ctx)
 									local cur = hs_cfg.get_word_delimiters()
 									pcall(hs_cfg.set_word_delimiters,
 										cur:gsub(c:gsub("[%(%)%.%%%+%-%*%?%[%^%$]", "%%%1"), ""))
+									-- Remove from custom_delimiters state
+									if type(state.custom_delimiters) == "table" then
+										for idx, entry in ipairs(state.custom_delimiters) do
+											if type(entry) == "table" and entry.char == c then
+												table.remove(state.custom_delimiters, idx); break
+											end
+										end
+									end
+									ctx.save_prefs()
 									pcall(ctx.updateMenu)
 								end
 							end)(ch) or nil,
-						}
+						},
 					}
 					table.insert(sub, { title = lbl, checked = true, menu = ct_sub, disabled = paused or nil })
 				end
 			end
 
-			-- Add custom delimiter button
+			-- Add custom delimiter button — asks for char then consume behaviour
 			table.insert(sub, {
 				title    = i18n.get("menu.hotstrings.add_delimiter"),
 				disabled = paused or nil,
 				fn = not paused and function()
+					-- 1. Ask for the character
 					local char
 					while true do
 						local ok_p, btn, char_raw = pcall(dialog.text_prompt,
@@ -769,7 +792,6 @@ function M.build_management(ctx)
 							"", i18n.get("button.ok"), i18n.get("button.cancel")
 						)
 						if not ok_p or btn ~= "OK" or type(char_raw) ~= "string" then return end
-						-- Accept exactly one Unicode code point (handles multi-byte UTF-8)
 						local first = char_raw:match("^([%z\1-\127\194-\244][\128-\191]*)")
 						if first and first ~= "" and first == char_raw then
 							char = first; break
@@ -777,10 +799,33 @@ function M.build_management(ctx)
 						dialog.block_alert(i18n.get("dialog.hotstrings.invalid_title"),
 							i18n.get("dialog.hotstrings.invalid_body"), i18n.get("button.retry"))
 					end
+					-- 2. Ask consume behaviour (mirrors terminators dialog)
+					local consume_res = dialog.block_alert(
+						i18n.get("dialog.hotstrings.consume_title"),
+						i18n.get("dialog.hotstrings.consume_body"),
+						i18n.get("dialog.hotstrings.consume_no"),
+						i18n.get("dialog.hotstrings.consume_yes"),
+						i18n.get("button.cancel")
+					)
+					if consume_res == i18n.get("button.cancel") then return end
+					local consume = (consume_res == i18n.get("dialog.hotstrings.consume_yes"))
+					-- 3. Add to effective string and persist metadata
 					local cur = hs_cfg.get_word_delimiters()
 					if not cur:find(char, 1, true) then
 						pcall(hs_cfg.set_word_delimiters, cur .. char)
 					end
+					if type(state.custom_delimiters) ~= "table" then state.custom_delimiters = {} end
+					-- Overwrite if already present
+					local found = false
+					for _, entry in ipairs(state.custom_delimiters) do
+						if type(entry) == "table" and entry.char == char then
+							entry.consume = consume; found = true; break
+						end
+					end
+					if not found then
+						table.insert(state.custom_delimiters, { char = char, consume = consume })
+					end
+					ctx.save_prefs()
 					pcall(ctx.updateMenu)
 				end or nil,
 			})
