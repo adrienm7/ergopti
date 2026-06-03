@@ -716,6 +716,7 @@
 	"menu.hotstrings.tooltip_colored": "Vistas previas con color",
 	"menu.hotstrings.tooltip_default": "Retardo predeterminado (todos los grupos)",
 	"menu.hotstrings.tooltip_magic": "Vista previa ★",
+	"menu.hotstrings.word_delimiters": "Delimitadores de palabras",
 	"menu.hotstrings.word_expanders": "⌨ Expansores",
 	"menu.hs.gestures.modes": "Modo",
 	"menu.hs.gestures.modes.swipe_2_down": "Modo — Deslizar 2 dedos ↓",

@@ -716,6 +716,7 @@
 	"menu.hotstrings.tooltip_colored": "Кольоровий попередній перегляд",
 	"menu.hotstrings.tooltip_default": "Затримка за замовчуванням (усі групи)",
 	"menu.hotstrings.tooltip_magic": "★ Попередній перегляд",
+	"menu.hotstrings.word_delimiters": "Роздільники слів",
 	"menu.hotstrings.word_expanders": "⌨ Розширювачі",
 	"menu.hs.gestures.modes": "Режим",
 	"menu.hs.gestures.modes.swipe_2_down": "Режим — Свайп 2 пальцями ↓",

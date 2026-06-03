@@ -716,6 +716,7 @@
 	"menu.hotstrings.tooltip_colored": "Renkli önizlemeler",
 	"menu.hotstrings.tooltip_default": "Varsayılan gecikme (tüm gruplar)",
 	"menu.hotstrings.tooltip_magic": "★ Önizleme",
+	"menu.hotstrings.word_delimiters": "Sözcük sınırlayıcıları",
 	"menu.hotstrings.word_expanders": "⌨ Genişleticiler",
 	"menu.hs.gestures.modes": "Mod",
 	"menu.hs.gestures.modes.swipe_2_down": "Mod — 2 parmak kaydırma ↓",

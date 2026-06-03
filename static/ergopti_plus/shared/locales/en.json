@@ -716,6 +716,7 @@
 	"menu.hotstrings.tooltip_colored": "Coloured previews",
 	"menu.hotstrings.tooltip_default": "Default delay (all groups)",
 	"menu.hotstrings.tooltip_magic": "★ Preview",
+	"menu.hotstrings.word_delimiters": "Word delimiters",
 	"menu.hotstrings.word_expanders": "⌨ Expanders",
 	"menu.hs.gestures.modes": "Mode",
 	"menu.hs.gestures.modes.swipe_2_down": "Mode — 2-finger swipe ↓",

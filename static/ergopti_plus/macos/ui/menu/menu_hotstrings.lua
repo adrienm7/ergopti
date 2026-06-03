@@ -26,10 +26,12 @@ local function resolve_desc(desc)
 	return type(desc) == "string" and desc or ""
 end
 
-local dh_mod = require("modules.dynamic_hotstrings")
+local dh_mod       = require("modules.dynamic_hotstrings")
 -- Keymap is already loaded by init.lua before this module is required;
 -- require() returns the cached module with no side-effects.
-local keymap  = require("modules.keymap")
+local keymap       = require("modules.keymap")
+local hs_cfg_ok, hs_cfg = pcall(require, "modules.hotstrings_config")
+if not hs_cfg_ok then hs_cfg = nil end
 
 
 
@@ -626,7 +628,78 @@ function M.build_management(ctx)
 
 	delays_item = { title = i18n.get("menu.hotstrings.delays_colors"), disabled = paused or nil, menu = delay_menu }
 
+	-- Word-delimiter sub-menu: one checkable item per configurable character.
+	local delim_item = nil
+	if hs_cfg and type(hs_cfg.get_word_delimiters) == "function" then
+		local DELIM_DEFS = {
+			{ char = " ",        label_key = "hs_config.delim_space" },
+			{ char = "\t",       label_key = "hs_config.delim_tab"   },
+			{ char = ".",        label = "."   },
+			{ char = ",",        label = ","   },
+			{ char = ";",        label = ";"   },
+			{ char = ":",        label = ":"   },
+			{ char = "?",        label = "?"   },
+			{ char = "!",        label = "!"   },
+			{ char = "'",        label = "' (ASCII)"                  },
+			{ char = "\xe2\x80\x99", label = "\xe2\x80\x99 (typogr.)" }, -- U+2019
+			{ char = "-",        label = "-"   },
+			{ char = "=",        label = "="   },
+			{ char = "(",        label = "("   },
+			{ char = ")",        label = ")"   },
+			{ char = "[",        label = "["   },
+			{ char = "]",        label = "]"   },
+			{ char = "/",        label = "/"   },
+			{ char = "\\",       label = "\\"  },
+			{ char = "+",        label = "+"   },
+			{ char = "*",        label = "*"   },
+		}
+		local function build_delim_sub()
+			local current = hs_cfg.get_word_delimiters()
+			local sub = {}
+			for _, def in ipairs(DELIM_DEFS) do
+				local lbl = def.label_key and i18n.get(def.label_key) or def.label
+				local ch  = def.char
+				local checked = current:find(ch, 1, true) ~= nil
+				table.insert(sub, {
+					title   = lbl,
+					checked = checked or nil,
+					disabled = paused or nil,
+					fn = not paused and (function(c, l)
+						return function()
+							local cur = hs_cfg.get_word_delimiters()
+							local new
+							if cur:find(c, 1, true) then
+								-- Remove the character but always keep \r and \n
+								new = cur:gsub(c:gsub("[%(%)%.%%%+%-%*%?%[%^%$]", "%%%1"), "")
+							else
+								new = cur .. c
+							end
+							pcall(hs_cfg.set_word_delimiters, new)
+							pcall(ctx.updateMenu)
+						end
+					end)(ch, lbl) or nil,
+				})
+			end
+			table.insert(sub, { title = "-" })
+			table.insert(sub, {
+				title    = i18n.get("hs_config.delimiters_reset"),
+				disabled = paused or nil,
+				fn = not paused and function()
+					pcall(hs_cfg.set_word_delimiters, nil)
+					pcall(ctx.updateMenu)
+				end or nil,
+			})
+			return sub
+		end
+		delim_item = {
+			title    = i18n.get("menu.hotstrings.word_delimiters"),
+			disabled = paused or nil,
+			menu     = build_delim_sub(),
+		}
+	end
+
 	if exp_item then table.insert(menu, exp_item) end
+	if delim_item then table.insert(menu, delim_item) end
 	if delays_item then table.insert(menu, delays_item) end
 	table.insert(menu, { title = "-" })
 	if bubble_item then table.insert(menu, bubble_item) end

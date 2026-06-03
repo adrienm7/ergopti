@@ -716,6 +716,7 @@
 	"menu.hotstrings.tooltip_colored": "カラープレビュー",
 	"menu.hotstrings.tooltip_default": "デフォルト遅延（全グループ）",
 	"menu.hotstrings.tooltip_magic": "★ プレビュー",
+	"menu.hotstrings.word_delimiters": "単語区切り文字",
 	"menu.hotstrings.word_expanders": "⌨ エクスパンダー",
 	"menu.hs.gestures.modes": "モード",
 	"menu.hs.gestures.modes.swipe_2_down": "モード — 2本指スワイプ ↓",

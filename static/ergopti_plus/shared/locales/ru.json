@@ -716,6 +716,7 @@
 	"menu.hotstrings.tooltip_colored": "Цветные предпросмотры",
 	"menu.hotstrings.tooltip_default": "Задержка по умолчанию (все группы)",
 	"menu.hotstrings.tooltip_magic": "★ Предпросмотр",
+	"menu.hotstrings.word_delimiters": "Разделители слов",
 	"menu.hotstrings.word_expanders": "⌨ Расширители",
 	"menu.hs.gestures.modes": "Режим",
 	"menu.hs.gestures.modes.swipe_2_down": "Режим — Свайп 2 пальцами ↓",

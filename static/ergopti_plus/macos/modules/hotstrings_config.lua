@@ -59,6 +59,10 @@ local CATEGORY_DEFAULT_COLORS = {
 -- =================================
 -- =================================
 
+-- Built-in word-delimiter set — mirrors HOTSTRINGS_DEFAULT_WORD_DELIMITERS in AHK.
+-- CR and LF are always included; the rest are user-configurable.
+local DEFAULT_WORD_DELIMITERS = " \t\r\n.,;:?!'’-=()[]/\\+*"
+
 local _state = nil
 
 local function require_state(func_name)
@@ -79,23 +83,49 @@ end
 --- ====================================
 -- ===================================
 
---- Parses the user override TOML file into a nested structure:
----   { [category] = { delay = n, color = s, sections = { [name] = { delay, color } } } }
+--- Parses the user override TOML file into two structures:
+--- - overrides: { [category] = { delay = n, color = s, sections = { [name] = { delay, color } } } }
+--- - global_word_delimiters: string|nil (from [__global__] word_delimiters key)
 --- Unknown keys and malformed lines are silently ignored — the file is
 --- user-edited (and machine-written) so robustness matters more than strictness.
 --- @param path string Absolute path to the override file.
---- @return table The parsed overrides (empty table when file is missing).
+--- @return table, string|nil The parsed overrides and optional word-delimiter override.
 local function parse_overrides(path)
 	local result = {}
+	local word_delimiters = nil
 	local f = io.open(path, "r")
-	if not f then return result end
+	if not f then return result, nil end
 
 	local current_cat = nil
 	local current_sec = nil
+	local in_global   = false
 
 	for raw in f:lines() do
 		local line = raw:match("^%s*(.-)%s*$")
 		if not line or line == "" or line:sub(1, 1) == "#" then goto continue end
+
+		-- [__global__] — script-wide settings (word_delimiters, etc.)
+		if line == "[__global__]" then
+			in_global = true
+			current_cat, current_sec = nil, nil
+			goto continue
+		end
+
+		-- Any other section header resets the __global__ context
+		if line:sub(1, 1) == "[" then
+			in_global = false
+		end
+
+		-- word_delimiters in [__global__]
+		if in_global then
+			local wd = line:match("^word_delimiters%s*=%s*\"(.-)\"%s*$")
+			if wd then
+				-- Basic TOML string unescaping: \n → newline, \t → tab, \\ → backslash
+				wd = wd:gsub("\\n", "\n"):gsub("\\t", "\t"):gsub("\\\\", "\\")
+				word_delimiters = wd
+			end
+			goto continue
+		end
 
 		-- [ext.name.section] — extension section override (3 dotted segments)
 		local ext_name, ext_sec = line:match("^%[ext%.([%w_%-]+)%.([%w_%-]+)%]$")
@@ -165,7 +195,7 @@ local function parse_overrides(path)
 	end
 
 	pcall(function() f:close() end)
-	return result
+	return result, word_delimiters
 end
 
 --- Serializes the in-memory override table back to TOML.
@@ -306,11 +336,13 @@ function M.init(opts)
 		return
 	end
 
+	local overrides, word_delimiters = parse_overrides(opts.override_path)
 	_state = {
-		path          = opts.override_path,
-		toml_resolver = opts.toml_resolver,
-		overrides     = parse_overrides(opts.override_path),
-		toml_cache    = {},
+		path            = opts.override_path,
+		toml_resolver   = opts.toml_resolver,
+		overrides       = overrides,
+		word_delimiters = word_delimiters,
+		toml_cache      = {},
 	}
 	Logger.success(LOG, "Initialized (override file: '%s').", opts.override_path)
 end
@@ -509,7 +541,9 @@ end
 --- @return boolean
 function M.reload()
 	if not require_state("reload") then return false end
-	_state.overrides = parse_overrides(_state.path)
+	local overrides, word_delimiters = parse_overrides(_state.path)
+	_state.overrides       = overrides
+	_state.word_delimiters = word_delimiters
 	Logger.debug(LOG, "Overrides reloaded from disk.")
 	return true
 end
@@ -575,6 +609,141 @@ function M.get_user_override(category, section)
 	if not target then return nil end
 	if target.delay == nil and target.color == nil and target.show_tooltip == nil then return nil end
 	return { delay = target.delay, color = target.color, show_tooltip = target.show_tooltip }
+end
+
+-- =================================================
+-- =================================================
+-- ======= 7/ Word-delimiter API ===================
+-- =================================================
+-- =================================================
+
+--- Returns the effective word-delimiter string: user override when stored,
+--- otherwise the built-in DEFAULT_WORD_DELIMITERS constant (mirrors AHK default).
+--- @return string
+function M.get_word_delimiters()
+	if not require_state("get_word_delimiters") then return DEFAULT_WORD_DELIMITERS end
+	return _state.word_delimiters or DEFAULT_WORD_DELIMITERS
+end
+
+--- Returns the built-in default word-delimiter string.
+--- @return string
+function M.get_default_word_delimiters()
+	return DEFAULT_WORD_DELIMITERS
+end
+
+--- Persists a new word-delimiter string to the [__global__] section of the
+--- override file and updates the in-memory value.
+--- Pass nil or the default string to clear the override (removes the key).
+--- @param delimiters string|nil The new delimiter string, or nil to reset.
+--- @return boolean True on success.
+function M.set_word_delimiters(delimiters)
+	if not require_state("set_word_delimiters") then return false end
+
+	-- Normalize: nil or exact default → remove stored override
+	if delimiters == nil or delimiters == DEFAULT_WORD_DELIMITERS then
+		_state.word_delimiters = nil
+	else
+		_state.word_delimiters = delimiters
+	end
+
+	-- Patch the [__global__] section in the override file in-place.
+	local path = _state.path
+	local existing = ""
+	local f_in = io.open(path, "r")
+	if f_in then
+		existing = f_in:read("*a")
+		pcall(function() f_in:close() end)
+	end
+
+	-- Build the updated file content.
+	local lines = {}
+	for line in (existing .. "\n"):gmatch("([^\n]*)\n") do
+		table.insert(lines, line)
+	end
+	-- Strip trailing empty line that the gmatch above may produce
+	while #lines > 0 and lines[#lines] == "" do table.remove(lines) end
+
+	local in_global = false
+	local global_start = nil
+	local global_end   = nil
+	local key_line     = nil  -- index of existing word_delimiters line inside [__global__]
+
+	for i, line in ipairs(lines) do
+		local trimmed = line:match("^%s*(.-)%s*$") or ""
+		if trimmed == "[__global__]" then
+			in_global = true
+			global_start = i
+		elseif in_global and trimmed:sub(1, 1) == "[" then
+			in_global = false
+			global_end = i - 1
+		elseif in_global and trimmed:match("^word_delimiters%s*=") then
+			key_line = i
+		end
+	end
+	if in_global and not global_end then global_end = #lines end
+
+	-- Helper: escape a Lua string for TOML double-quoted value.
+	local function toml_escape(s)
+		return s:gsub("\\", "\\\\"):gsub('"', '\\"'):gsub("\t", "\\t"):gsub("\n", "\\n"):gsub("\r", "\\r")
+	end
+
+	local new_value_line = _state.word_delimiters and
+		('word_delimiters = "' .. toml_escape(_state.word_delimiters) .. '"') or nil
+
+	if key_line then
+		-- Replace or delete the existing key line
+		if new_value_line then
+			lines[key_line] = new_value_line
+		else
+			table.remove(lines, key_line)
+			-- Clean up a now-empty [__global__] section
+			if global_start and lines[global_start] and (lines[global_start]:match("^%[__global__%]")) then
+				-- Remove the section header too if nothing follows in the section
+				local next_real = nil
+				for i = global_start + 1, #lines do
+					local t = lines[i]:match("^%s*(.-)%s*$") or ""
+					if t ~= "" and t:sub(1, 1) ~= "#" then
+						next_real = t
+						break
+					end
+				end
+				if not next_real or next_real:sub(1, 1) == "[" then
+					-- Remove empty section header and any blank lines after it
+					while global_start <= #lines do
+						local t = lines[global_start]:match("^%s*(.-)%s*$") or ""
+						if t == "" or t == "[__global__]" then
+							table.remove(lines, global_start)
+						else
+							break
+						end
+					end
+				end
+			end
+		end
+	elseif new_value_line then
+		-- No existing [__global__] section — append it
+		if global_start then
+			-- Section exists but key was not present; insert after section header
+			table.insert(lines, global_start + 1, new_value_line)
+		else
+			-- Append new section at the end
+			table.insert(lines, "")
+			table.insert(lines, "[__global__]")
+			table.insert(lines, new_value_line)
+		end
+	end
+
+	local content = table.concat(lines, "\n") .. "\n"
+	local f_out, err = io.open(path, "w")
+	if not f_out then
+		Logger.error(LOG, "set_word_delimiters(): cannot write override file: %s.", tostring(err))
+		return false
+	end
+	pcall(function() f_out:write(content) end)
+	pcall(function() f_out:close() end)
+	Logger.debug(LOG, "word_delimiters persisted: %s.", _state.word_delimiters and
+		('"' .. tostring(_state.word_delimiters) .. '"') or "(default — key removed)")
+	return true
 end
 
 return M

@@ -716,6 +716,7 @@
 	"menu.hotstrings.tooltip_colored": "색상 미리보기",
 	"menu.hotstrings.tooltip_default": "기본 지연 (모든 그룹)",
 	"menu.hotstrings.tooltip_magic": "★ 미리보기",
+	"menu.hotstrings.word_delimiters": "단어 구분자",
 	"menu.hotstrings.word_expanders": "⌨ 확장기",
 	"menu.hs.gestures.modes": "모드",
 	"menu.hs.gestures.modes.swipe_2_down": "모드 — 2손가락 스와이프 ↓",

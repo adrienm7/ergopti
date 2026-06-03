@@ -716,6 +716,7 @@
 	"menu.hotstrings.tooltip_colored": "彩色预览",
 	"menu.hotstrings.tooltip_default": "默认延迟（所有组）",
 	"menu.hotstrings.tooltip_magic": "★ 预览",
+	"menu.hotstrings.word_delimiters": "单词分隔符",
 	"menu.hotstrings.word_expanders": "⌨ 扩展器",
 	"menu.hs.gestures.modes": "模式",
 	"menu.hs.gestures.modes.swipe_2_down": "模式 — 双指下滑 ↓",

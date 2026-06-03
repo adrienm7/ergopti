@@ -450,6 +450,10 @@
 			"i18n": "menu.hotstrings.delays_colors"
 		},
 		{
+			"type": "dynamic",
+			"id": "word_delimiters"
+		},
+		{
 			"type": "---"
 		},
 		{
@@ -459,7 +463,9 @@
 		{
 			"type": "dynamic",
 			"id": "repeat_key",
-			"platforms": ["ahk"]
+			"platforms": [
+				"ahk"
+			]
 		}
 	],
 	"dynamic_hotstrings_order": [

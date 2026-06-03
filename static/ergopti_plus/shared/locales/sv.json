@@ -716,6 +716,7 @@
 	"menu.hotstrings.tooltip_colored": "Färgade förhandsvisningar",
 	"menu.hotstrings.tooltip_default": "Standardfördröjning (alla grupper)",
 	"menu.hotstrings.tooltip_magic": "★ Förhandsvisning",
+	"menu.hotstrings.word_delimiters": "Ordavgränsare",
 	"menu.hotstrings.word_expanders": "⌨ Expandrar",
 	"menu.hs.gestures.modes": "Läge",
 	"menu.hs.gestures.modes.swipe_2_down": "Läge — 2-fingersväng ↓",
