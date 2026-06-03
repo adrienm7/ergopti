@@ -396,8 +396,11 @@ end
 --- @return table Menu item table for insertion into the parent menu.
 function M.build(ctx)
 	local state   = ctx and ctx.state or {}
-	local channel = (type(state.update_channel) == "string" and state.update_channel ~= "")
-		and state.update_channel or M.DEFAULT_STATE.update_channel
+	-- When running from source, always use "dev" regardless of any stale TOML
+	-- value — stable releases do not exist yet so "main" yields an empty list.
+	local channel = _is_local and "dev"
+		or ((type(state.update_channel) == "string" and state.update_channel ~= "")
+			and state.update_channel or M.DEFAULT_STATE.update_channel)
 	local ver     = current_version()
 	local ver_label = i18n.get("menu.about.title")
 
