@@ -148,7 +148,7 @@
 	"dialog.app_picker.running_count": "{n} spuštěná/spuštěných aplikace/í.",
 	"dialog.app_picker.stopped_suffix": " (zastaveno)",
 	"dialog.app_picker.title": "Výběr aplikace",
-	"dialog.config_folder.hint": "Všechny osobní soubory (personal_shortcuts.ahk, personal_hotstrings.toml…)\nbudou hledány v této složce. Ponechte prázdné pro použití výchozí složky.",
+	"dialog.config_folder.hint": "Všechny osobní soubory (personal_shortcuts.ahk, personal_hotstrings.toml…) budou hledány v této složce. Ponechte prázdné pro použití výchozí složky.",
 	"dialog.config_folder.label": "Cesta:",
 	"dialog.config_folder.select_title": "Vybrat konfigurační složku",
 	"dialog.config_folder.title": "ErgoptiPlus — Konfigurační složka",

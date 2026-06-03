@@ -148,7 +148,7 @@
 	"dialog.app_picker.running_count": "{n} laufende Anwendung(en).",
 	"dialog.app_picker.stopped_suffix": " (gestoppt)",
 	"dialog.app_picker.title": "Anwendungsauswahl",
-	"dialog.config_folder.hint": "Alle persönlichen Dateien (personal_shortcuts.ahk, personal_hotstrings.toml…)\nwerden in diesem Ordner gesucht. Leer lassen für den Standardordner.",
+	"dialog.config_folder.hint": "Alle persönlichen Dateien (personal_shortcuts.ahk, personal_hotstrings.toml…) werden in diesem Ordner gesucht. Leer lassen für den Standardordner.",
 	"dialog.config_folder.label": "Pfad:",
 	"dialog.config_folder.select_title": "Konfigurationsordner auswählen",
 	"dialog.config_folder.title": "ErgoptiPlus — Konfigurationsordner",

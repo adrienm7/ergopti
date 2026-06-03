@@ -148,7 +148,7 @@
 	"dialog.app_picker.running_count": "{n} запущенных приложений.",
 	"dialog.app_picker.stopped_suffix": " (остановлено)",
 	"dialog.app_picker.title": "Выбор приложений",
-	"dialog.config_folder.hint": "Все личные файлы (personal_shortcuts.ahk, personal_hotstrings.toml…)\nбудут искаться в этой папке. Оставьте пустым для использования папки по умолчанию.",
+	"dialog.config_folder.hint": "Все личные файлы (personal_shortcuts.ahk, personal_hotstrings.toml…) будут искаться в этой папке. Оставьте пустым для использования папки по умолчанию.",
 	"dialog.config_folder.label": "Путь:",
 	"dialog.config_folder.select_title": "Выберите папку конфигурации",
 	"dialog.config_folder.title": "ErgoptiPlus — Папка конфигурации",
