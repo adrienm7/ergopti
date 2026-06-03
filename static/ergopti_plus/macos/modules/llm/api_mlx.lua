@@ -421,7 +421,7 @@ local function discover_endpoints(on_done)
 			finish_discovery(false)
 			return
 		end
-		Logger.warn(LOG, "Endpoint discovery: polling /v1/models (elapsed=%.1fs)…", elapsed)
+		Logger.debug(LOG, "Endpoint discovery: polling /v1/models (elapsed=%.1fs)…", elapsed)
 		-- Use curl instead of hs.http.asyncGet so we can pass --no-keepalive.
 		-- Hammerspoon's HTTP client pools TCP connections and will reuse a keep-alive
 		-- socket to a zombie server (whose process was kill -9'd but whose socket
@@ -437,7 +437,7 @@ local function discover_endpoints(on_done)
 			poll_timer = nil
 			local status = (exit_code == 0) and 200 or -1
 			local body   = stdout or ""
-			Logger.warn(LOG, "Endpoint discovery: /v1/models -> HTTP %s.", tostring(status))
+			Logger.debug(LOG, "Endpoint discovery: /v1/models -> HTTP %s.", tostring(status))
 			if not _endpoint_probe_in_flight then return end  -- reset externally
 			if status == 200 then
 				-- mlx_lm.server's /v1/models endpoint returns the LIST of models
@@ -465,7 +465,7 @@ local function discover_endpoints(on_done)
 					end
 				end
 				if not _endpoint_probe_in_flight then return end
-				Logger.warn(LOG, "Endpoint discovery: server reachable on /v1/models — starting POST probes.")
+				Logger.info(LOG, "Endpoint discovery: server reachable on /v1/models — starting POST probes.")
 				run_post_probes()
 			else
 				-- Server not ready yet — apply exponential backoff before the next tick
@@ -553,19 +553,18 @@ end
 --- @param model_name string The MLX model identifier (logged only).
 --- @param profile table|nil The active profile object; falls back to a minimal ping.
 function M.warmup(model_name, profile)
-	-- Log at warn so the line appears in logs regardless of configured log level
-	Logger.warn(LOG, "warmup() called — model='%s' _is_ready=%s _warmup_in_flight=%s _endpoints_discovered=%s.",
+	Logger.debug(LOG, "warmup() called — model='%s' _is_ready=%s _warmup_in_flight=%s _endpoints_discovered=%s.",
 		tostring(model_name), tostring(_is_ready), tostring(_warmup_in_flight), tostring(_endpoints_discovered))
 	-- Skip if the backend already answered a previous warmup successfully — the
 	-- model is loaded, no need to re-prime
 	if _is_ready then
-		Logger.warn(LOG, "MLX warmup skipped — backend already ready.")
+		Logger.debug(LOG, "MLX warmup skipped — backend already ready.")
 		return
 	end
 	-- Skip if a warmup is already in flight; otherwise the user's log shows 4
 	-- simultaneous POST requests piling up against the single-threaded server
 	if _warmup_in_flight then
-		Logger.warn(LOG, "MLX warmup skipped — request already in flight.")
+		Logger.debug(LOG, "MLX warmup skipped — request already in flight.")
 		return
 	end
 
@@ -573,7 +572,7 @@ function M.warmup(model_name, profile)
 	-- send the warmup itself. Without this, a route rename in a freshly
 	-- installed mlx-lm wheel turns every warmup into a 404 with no recovery.
 	if not _endpoints_discovered then
-		Logger.warn(LOG, "warmup() — endpoints not yet discovered, triggering discovery…")
+		Logger.debug(LOG, "warmup() — endpoints not yet discovered, triggering discovery…")
 		-- Record the model we are waiting for so the discovery poll can reject a
 		-- /v1/models 200 from the old server (still alive for ~2 s during model switch).
 		_expected_model_id = model_name
@@ -581,7 +580,7 @@ function M.warmup(model_name, profile)
 		return
 	end
 
-	Logger.warn(LOG, "warmup() — sending warmup POST to '%s' for model '%s'…",
+	Logger.info(LOG, "warmup() — sending warmup POST to '%s' for model '%s'…",
 		_completions_endpoint, tostring(model_name))
 
 	local Profiles  = require("modules.llm.profiles")
