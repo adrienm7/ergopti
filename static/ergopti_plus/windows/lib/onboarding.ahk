@@ -47,6 +47,24 @@ global ONBOARDING_STEP2_W := 820
 ; Height of the language ListView — fits ~8 rows, scrollable beyond that
 global ONBOARDING_LV_H := 240
 
+; Vertical margin applied to every wizard page. Bumped from the historical 16
+; to give the redesigned pages (progress dots + larger bold titles) more air.
+global ONBOARDING_MARGIN_Y := 20
+
+; Wizard progress indicator — top-of-page step dots.
+; The wizard draws one dot per step so the user always knows where they are.
+; Six steps in order: language, config folder, layout, magic key, metrics,
+; gestures. Keep in sync with the stepIndex passed by each _Onboarding_StepN.
+global ONBOARDING_TOTAL_STEPS := 6
+; Horizontal pitch (px) between adjacent step-glyph centres in the progress row.
+global ONBOARDING_DOT_PITCH := 28
+; Glyph colours (6-hex RGB, no 0x — matches AHK's ``c`` option format). Completed
+; and current steps use the strong accent blue; upcoming steps are gray. The last
+; step overrides the active colour to green (see _Onboarding_AddProgressDots).
+global ONBOARDING_DOT_ACTIVE := "1E6FD9"
+global ONBOARDING_DOT_IDLE   := "C8C8C8"
+global ONBOARDING_DOT_LAST   := "1A8C3A"  ; green — shown on the final step
+
 ; Default magic key inserted into the Step 3 input.
 ; ★ (U+2605 BLACK STAR) is the canonical Ergopti default — it sits on a
 ; dedicated key in the Ergopti+ layout and the rest of the codebase
@@ -150,7 +168,7 @@ Onboarding_Run() {
 ; config already exists — useful after a reset or for re-configuration.
 Onboarding_ShowFromMenu(*) {
 	global _OB_ALTGR_PASSTHROUGH := true
-	_Onboarding_Step1()
+	_Onboarding_Navigate(_Onboarding_Step1)
 }
 
 
@@ -187,6 +205,21 @@ _Onboarding_Translate(Code, Key) {
 }
 
 
+; Strips the leading "ErgoptiPlus" brand + separator from a step title so it can
+; be shown as an in-content heading without repeating the brand — the window
+; title already reads "ErgoptiPlus — Configuration" on every page. The step-title
+; keys historically doubled as window titles, so we strip at the point of use
+; rather than editing the shared locale strings (all 21 locales use the exact
+; "ErgoptiPlus — X" form). Locale-agnostic: a title with no brand prefix is
+; returned unchanged.
+; @param title string Localised step title (e.g. "ErgoptiPlus — Keyboard layout").
+; @returns string The heading without the brand prefix (e.g. "Keyboard layout").
+_Onboarding_StripBrand(title) {
+	; Separators seen across locales: em dash (U+2014), en dash (U+2013), hyphen.
+	return RegExReplace(title, "^\s*ErgoptiPlus\s*[\x{2014}\x{2013}\-]\s*", "")
+}
+
+
 
 
 
@@ -203,7 +236,6 @@ _Onboarding_Translate(Code, Key) {
 ; ============================================
 
 _Onboarding_Step1() {
-	_Onboarding_DestroyActive()
 	global _StaticDir, _ob_layout, _ob_magic_key, _ob_metrics, _ob_gestures, _ob_register_pending
 	_ob_layout            := false
 	_ob_magic_key         := ONBOARDING_DEFAULT_MAGIC_KEY
@@ -241,14 +273,24 @@ _Onboarding_Step1() {
 	g := Gui("+AlwaysOnTop", _Onboarding_Translate(DefaultCode, "onboarding.welcome.title"))
 	g.SetFont("s10", "Segoe UI")
 	g.MarginX := 20
-	g.MarginY := 16
+	g.MarginY := ONBOARDING_MARGIN_Y
+
+	; Progress dots — step 1 of 6.
+	_Onboarding_AddProgressDots(g, 1)
 
 	; The main heading is the only piece of static text in the welcome screen.
 	; We deliberately ship a single language at a time (re-rendered live on
 	; selection) rather than the old "Welcome / Bienvenue / Willkommen" salad,
 	; because mixing five locales hurt readability and made every line cramped.
-	headingText := g.AddText("w" ONBOARDING_WIN_W - 40 " Section",
+	; Rendered as the page's large bold section title (s12 Bold), centred.
+	; ``xm`` is REQUIRED: the progress glyphs above are positioned with absolute
+	; X, and a control with no explicit X inherits the previous control's X — so
+	; without ``xm`` the title would inherit the last glyph's X and float to the
+	; right of the page instead of spanning it.
+	g.SetFont("s12 Bold")
+	headingText := g.AddText("xm w" ONBOARDING_WIN_W - 40 " y+12 Center Section",
 		_Onboarding_Translate(DefaultCode, "onboarding.welcome.heading"))
+	g.SetFont("s10 norm")
 
 	; Build a 32×24 image list from flag PNGs in static/img/flags/
 	FlagsDir := _StaticDir . "\img\flags\"
@@ -261,9 +303,13 @@ _Onboarding_Step1() {
 		FlagIndexMap[loc.Code] := (idx > 0) ? idx : 0
 	}
 
-	; Single-select ListView — one row per locale, flag icon + name
-	ContentW := ONBOARDING_WIN_W - 40
-	lv := g.AddListView("w" ContentW " h" ONBOARDING_LV_H " -Hdr -Multi -HScroll LV0x10 NoSortHdr y+10", ["Language"])
+	; Single-select ListView — one row per locale, flag icon + name. Width is
+	; ~half the page (language names are short) and the control is centred
+	; horizontally so the list sits in the middle of the page rather than
+	; flush-left with a large empty band beside it.
+	ContentW := (ONBOARDING_WIN_W - 40) // 2 + 20   ; ~half page + room for flag and scrollbar
+	lvX      := (ONBOARDING_WIN_W - ContentW) // 2  ; centre the control on the page
+	lv := g.AddListView("x" lvX " y+10 w" ContentW " h" ONBOARDING_LV_H " -Hdr -Multi -HScroll LV0x10 NoSortHdr", ["Language"])
 	lv.SetImageList(IL)
 	loop SortedLocales.Length {
 		loc   := SortedLocales[A_Index]
@@ -309,7 +355,10 @@ _Onboarding_Step1() {
 	lv.GetPos(, &_lvY, , &_lvH)
 	btns := _Onboarding_AddNavButtons(g, "", t("onboarding.next"))
 	btnNext := btns[2]
-	btnNext.Move(, _lvY + _lvH + 16)
+	; Centre the lone Next button under the list (the nav helper right-pins it
+	; by default, which looks unbalanced on this single-button page).
+	btnNext.GetPos(, , &_nextW, )
+	btnNext.Move((ONBOARDING_WIN_W - _nextW) // 2, _lvY + _lvH + 16)
 	btnNext.OnEvent("Click", _Step1_Next.Bind(g, lv, SortedLocales, DefaultIndex))
 
 	; Re-render the title, heading and button label in the previewed locale
@@ -410,8 +459,7 @@ _Step1_Next(g, lv, SortedLocales, DefaultIndex, *) {
 	_I18nLocale := locale.Code
 	_I18nCacheLoaded := false
 
-	_Onboarding_DestroyActive()
-	_Onboarding_StepConfigDir()
+	_Onboarding_Navigate(_Onboarding_StepConfigDir)
 }
 
 
@@ -434,9 +482,15 @@ _Onboarding_StepConfigDir() {
 	g := Gui("+AlwaysOnTop", t("onboarding.welcome.title"))
 	g.SetFont("s10", "Segoe UI")
 	g.MarginX := 20
-	g.MarginY := 16
+	g.MarginY := ONBOARDING_MARGIN_Y
 
-	g.AddText("w" ONBOARDING_WIN_W - 40, t("dialog.config_folder.title"))
+	; Progress dots — step 2 of 6.
+	_Onboarding_AddProgressDots(g, 2)
+
+	g.SetFont("s12 Bold")
+	g.AddText("xm w" ONBOARDING_WIN_W - 40 " y+12 Center", _Onboarding_StripBrand(t("dialog.config_folder.title")))
+	g.SetFont("s10 norm")
+	g.AddText("xm w" ONBOARDING_WIN_W - 40 " y+4", t("dialog.config_folder.hint"))
 
 	; Row 1: short label + Browse on the same line. The previous "Personal
 	; configuration folder:" label was a near-duplicate of the title above, so
@@ -463,9 +517,6 @@ _Onboarding_StepConfigDir() {
 	current := _ob_config_dir != "" ? _ob_config_dir : (IsSet(_ConfigDir) ? _ConfigDir : "")
 	dirEdit := g.AddEdit("xm y+6 w" ONBOARDING_WIN_W - 40, StrReplace(current, "\", "/"))
 
-	; Row 3: hint below the input. ``y+10`` measured from the edit's bottom.
-	g.SetFont("s9 cGray")
-	g.AddText("xm y+10 w" ONBOARDING_WIN_W - 40, t("dialog.config_folder.hint"))
 	g.SetFont("s10")
 
 	btns := _Onboarding_AddNavButtons(g, t("onboarding.back"), t("onboarding.next"))
@@ -510,8 +561,7 @@ _StepConfigDir_Browse(g, dirEdit, *) {
 }
 
 _StepConfigDir_Back(g, *) {
-	_Onboarding_DestroyActive()
-	_Onboarding_Step1()
+	_Onboarding_Navigate(_Onboarding_Step1)
 }
 
 _StepConfigDir_Next(g, dirEdit, *) {
@@ -535,8 +585,7 @@ _StepConfigDir_Next(g, dirEdit, *) {
 	; re-pick the same options manually. Empty path → keep wizard defaults.
 	_Onboarding_PreloadFromExistingConfig(val)
 
-	_Onboarding_DestroyActive()
-	_Onboarding_Step2()
+	_Onboarding_Navigate(_Onboarding_Step2)
 }
 
 
@@ -627,15 +676,18 @@ _Onboarding_Step2() {
 	g := Gui("+AlwaysOnTop", t("onboarding.welcome.title"))
 	g.SetFont("s10", "Segoe UI")
 	g.MarginX := 20
-	g.MarginY := 16
+	g.MarginY := ONBOARDING_MARGIN_Y
 
 	; Step 2 uses the WIDER ``ONBOARDING_STEP2_W`` so the layout preview JPG
 	; renders larger — at the default 460 px wizard width, the keys were
 	; barely readable.
 	contentW := ONBOARDING_STEP2_W - 40
-	g.AddText("w" contentW, t("onboarding.layout.title"))
-	g.SetFont("s9")
-	g.AddText("w" contentW " y+8", t("onboarding.layout.desc"))
+	; Progress dots — step 3 of 6 (centred on the wider canvas).
+	_Onboarding_AddProgressDots(g, 3, ONBOARDING_STEP2_W)
+	g.SetFont("s12 Bold")
+	g.AddText("xm w" contentW " y+12 Center", _Onboarding_StripBrand(t("onboarding.layout.title")))
+	g.SetFont("s9 norm")
+	g.AddText("xm w" contentW " y+8", t("onboarding.layout.desc"))
 	g.SetFont("s10")
 
 	; Visual preview of the Ergopti layout — picking it blind from a one-line
@@ -648,7 +700,7 @@ _Onboarding_Step2() {
 	imgPath := _StaticDir . "\img\ergopti.jpg"
 	if FileExist(imgPath) {
 		try {
-			g.AddPicture("w" contentW " h-1 y+10", imgPath)
+			g.AddPicture("xm w" contentW " h-1 y+10", imgPath)
 		} catch as e {
 			try LoggerWarn("onboarding", "Step 2: AddPicture failed for '{1}': {2}.", imgPath, e.Message)
 		}
@@ -663,7 +715,7 @@ _Onboarding_Step2() {
 	; a compact action area.
 	global _ob_layout
 	rYes := g.AddRadio("vLayoutChoice xm y+8" . (_ob_layout ? " Checked" : ""), t("onboarding.layout.yes"))
-	rNo  := g.AddRadio((_ob_layout ? "" : "Checked"), t("onboarding.layout.no"))
+	rNo  := g.AddRadio("y+2", t("onboarding.layout.no"))
 
 	btns := _Onboarding_AddNavButtons(g, t("onboarding.back"), t("onboarding.next"))
 	btnBack := btns[1]
@@ -682,16 +734,14 @@ _Onboarding_Step2() {
 }
 
 _Step2_Back(g, *) {
-	_Onboarding_DestroyActive()
 	; Back returns to the inserted config-folder step (was Step1 before
 	; the picker was added between Step1 and Step2).
-	_Onboarding_StepConfigDir()
+	_Onboarding_Navigate(_Onboarding_StepConfigDir)
 }
 
 _Step2_Next(g, rYes, *) {
 	global _ob_layout := (rYes.Value = 1)
-	_Onboarding_DestroyActive()
-	_Onboarding_Step3()
+	_Onboarding_Navigate(_Onboarding_Step3)
 }
 
 
@@ -726,13 +776,17 @@ _Onboarding_Step3() {
 	g := Gui("+AlwaysOnTop", t("onboarding.welcome.title"))
 	g.SetFont("s10", "Segoe UI")
 	g.MarginX := 20
-	g.MarginY := 16
+	g.MarginY := ONBOARDING_MARGIN_Y
+
+	; Progress dots — step 4 of 6.
+	_Onboarding_AddProgressDots(g, 4)
 
 	; Heading and short description — kept upright (no italic) so the page
 	; reads as a regular form rather than a long block of quoted text.
-	g.AddText("w" ONBOARDING_WIN_W - 40, t("onboarding.magic_key.title"))
-	g.SetFont("s9")
-	g.AddText("w" ONBOARDING_WIN_W - 40 " y+8", t("onboarding.magic_key.desc"))
+	g.SetFont("s12 Bold")
+	g.AddText("xm w" ONBOARDING_WIN_W - 40 " y+12 Center", _Onboarding_StripBrand(t("onboarding.magic_key.title")))
+	g.SetFont("s9 norm")
+	g.AddText("xm w" ONBOARDING_WIN_W - 40 " y+8", t("onboarding.magic_key.desc"))
 	g.SetFont("s10")
 
 	; Three pre-baked picks (Ergopti+ / AZERTY / QWERTY) plus a free-form
@@ -794,7 +848,7 @@ _Onboarding_Step3() {
 	; Closing reminder — the ONLY italic line on this page, deliberately so it
 	; reads as a softer side-note rather than another header.
 	g.SetFont("s9 italic")
-	g.AddText("w" ONBOARDING_WIN_W - 40 " x20 y+14", t("onboarding.magic_key.choose_freely"))
+	g.AddText("xm w" ONBOARDING_WIN_W - 40 " y+14", t("onboarding.magic_key.choose_freely"))
 	g.SetFont("s10 norm")
 
 	btns := _Onboarding_AddNavButtons(g, t("onboarding.back"), t("onboarding.next"))
@@ -818,8 +872,7 @@ _Step3_OnRadioClick(rCustom, edKey, *) {
 }
 
 _Step3_Back(g, *) {
-	_Onboarding_DestroyActive()
-	_Onboarding_Step2()
+	_Onboarding_Navigate(_Onboarding_Step2)
 }
 
 _Step3_Next(g, rBlackStar, rUGrave, rSemi, rCustom, edKey, *) {
@@ -842,8 +895,7 @@ _Step3_Next(g, rBlackStar, rUGrave, rSemi, rCustom, edKey, *) {
 	if (val == "")
 		val := ONBOARDING_DEFAULT_MAGIC_KEY
 	global _ob_magic_key := val
-	_Onboarding_DestroyActive()
-	_Onboarding_Step4()
+	_Onboarding_Navigate(_Onboarding_Step4)
 }
 
 
@@ -857,11 +909,15 @@ _Onboarding_Step4() {
 	g := Gui("+AlwaysOnTop", t("onboarding.welcome.title"))
 	g.SetFont("s10", "Segoe UI")
 	g.MarginX := 20
-	g.MarginY := 16
+	g.MarginY := ONBOARDING_MARGIN_Y
 
-	g.AddText("w" ONBOARDING_WIN_W - 40, t("onboarding.metrics.title"))
-	g.SetFont("s9")
-	g.AddText("w" ONBOARDING_WIN_W - 40 " y+8", t("onboarding.metrics.desc"))
+	; Progress dots — step 5 of 6.
+	_Onboarding_AddProgressDots(g, 5)
+
+	g.SetFont("s12 Bold")
+	g.AddText("xm w" ONBOARDING_WIN_W - 40 " y+12 Center", _Onboarding_StripBrand(t("onboarding.metrics.title")))
+	g.SetFont("s9 norm")
+	g.AddText("xm w" ONBOARDING_WIN_W - 40 " y+8", t("onboarding.metrics.desc"))
 
 	; The shared keylogger warning string uses ``%s`` (printf-style) so the same
 	; text works on Hammerspoon (Lua's string.format) and AHK. AHK v2's
@@ -874,18 +930,20 @@ _Onboarding_Step4() {
 	; the red warning block.
 	metrics_path := StrReplace(_ConfigDir . "metrics", "\", "/")
 	warning := Format(t("dialog.metrics.enable_warning"), metrics_path)
+	; Warning block: outlined box (GroupBox) so it reads as a distinct "attention"
+	; area — the same visual treatment used in the Hammerspoon onboarding.
+	warnW := ONBOARDING_WIN_W - 40
+	warnBox := g.AddGroupBox("xm y+10 w" warnW, Chr(0x26A0) " " t("onboarding.warning_label"))
 	g.SetFont("s8 italic")
-	g.AddText("w" ONBOARDING_WIN_W - 40 " y+10 cRed", warning)
+	g.AddText("xm+" "10 y+6 w" warnW - 20 " cRed", warning)
 	g.SetFont("s10 norm")
+	; Bottom padding inside the box — an empty control at the box's inner bottom
+	; edge so the GroupBox auto-sizes tall enough to contain the text.
+	g.AddText("xm+" "10 y+6 w1 h1", "")
 
-	; Restore the previously-saved Yes/No when the wizard was re-opened over
-	; an existing config (pre-load step in _StepConfigDir_Next).  Radios sit
-	; right under the red warning with the radio control's natural padding —
-	; the empty spacer text used to add a ~12 px gap that pushed the action
-	; row off the screen on smaller displays.
 	global _ob_metrics
-	rYes := g.AddRadio("vMetricsChoice xm y+6" . (_ob_metrics ? " Checked" : ""), t("onboarding.yes"))
-	rNo  := g.AddRadio((_ob_metrics ? "" : "Checked"), t("onboarding.no"))
+	rYes := g.AddRadio("vMetricsChoice xm y+12" . (_ob_metrics ? " Checked" : ""), t("onboarding.yes"))
+	rNo  := g.AddRadio("y+2", t("onboarding.no"))
 
 	btns := _Onboarding_AddNavButtons(g, t("onboarding.back"), t("onboarding.next"))
 	btnBack := btns[1]
@@ -899,14 +957,12 @@ _Onboarding_Step4() {
 }
 
 _Step4_Back(g, *) {
-	_Onboarding_DestroyActive()
-	_Onboarding_Step3()
+	_Onboarding_Navigate(_Onboarding_Step3)
 }
 
 _Step4_Next(g, rYes, *) {
 	global _ob_metrics := (rYes.Value = 1)
-	_Onboarding_DestroyActive()
-	_Onboarding_Step5()
+	_Onboarding_Navigate(_Onboarding_Step5)
 }
 
 
@@ -919,38 +975,44 @@ _Onboarding_Step5() {
 	g := Gui("+AlwaysOnTop", t("onboarding.welcome.title"))
 	g.SetFont("s10", "Segoe UI")
 	g.MarginX := 20
-	g.MarginY := 16
+	g.MarginY := ONBOARDING_MARGIN_Y
 
-	g.AddText("w" ONBOARDING_WIN_W - 40, t("onboarding.gestures.title"))
-	g.SetFont("s9")
-	g.AddText("w" ONBOARDING_WIN_W - 40 " y+8", t("onboarding.gestures.desc"))
+	; Progress dots — step 6 of 6.
+	_Onboarding_AddProgressDots(g, 6)
+
+	g.SetFont("s12 Bold")
+	g.AddText("xm w" ONBOARDING_WIN_W - 40 " y+12 Center", _Onboarding_StripBrand(t("onboarding.gestures.title")))
+	g.SetFont("s9 norm")
+	g.AddText("xm w" ONBOARDING_WIN_W - 40 " y+8", t("onboarding.gestures.desc"))
 	g.SetFont("s10")
 
 	; Restore the previously-saved Yes/No when the wizard was re-opened over
 	; an existing config (pre-load step in _StepConfigDir_Next).
 	global _ob_gestures
 	g.AddText("w" ONBOARDING_WIN_W - 40 " y+12", "")
-	rYes := g.AddRadio("vGesturesChoice" . (_ob_gestures ? " Checked" : ""), t("onboarding.yes"))
-	rNo  := g.AddRadio((_ob_gestures ? "" : "Checked"), t("onboarding.no"))
+	rYes := g.AddRadio("vGesturesChoice xm" . (_ob_gestures ? " Checked" : ""), t("onboarding.yes"))
+	rNo  := g.AddRadio("y+2", t("onboarding.no"))
 
 	; Registration panel — only visible when "Yes" is selected. We pre-build
 	; every control as hidden so the layout does not jump when the user clicks
 	; the radio buttons; visibility is toggled by _Step5_OnRadioChange.
-	g.AddText("w" ONBOARDING_WIN_W - 40 " y+14", "")
-	regSectionLbl := g.AddText("w" ONBOARDING_WIN_W - 40 " Hidden",
+	; All controls anchored xm so they align flush with the left margin.
+	panelW := ONBOARDING_WIN_W - 40
+	g.AddText("xm w" panelW " y+10 Hidden", "")
+	regSectionLbl := g.AddText("xm w" panelW " Hidden",
 		t("onboarding.gestures.register_section"))
 
-	btnRegAuto := g.AddButton("w" ONBOARDING_WIN_W - 40 " xs y+6 Hidden",
+	btnRegAuto := g.AddButton("xm w" panelW " y+6 Hidden",
 		t("onboarding.gestures.register_auto"))
 	g.SetFont("s8 italic")
-	autoHint := g.AddText("w" ONBOARDING_WIN_W - 40 " y+4 Hidden",
+	autoHint := g.AddText("xm w" panelW " y+4 Hidden",
 		t("onboarding.gestures.register_auto_hint"))
 	g.SetFont("s10 norm")
 
-	btnRegManual := g.AddButton("w" ONBOARDING_WIN_W - 40 " y+10 Hidden",
+	btnRegManual := g.AddButton("xm w" panelW " y+6 Hidden",
 		t("onboarding.gestures.register_manual"))
 	g.SetFont("s8 italic")
-	manualHint := g.AddText("w" ONBOARDING_WIN_W - 40 " y+4 Hidden",
+	manualHint := g.AddText("xm w" panelW " y+4 Hidden",
 		t("onboarding.gestures.register_manual_hint"))
 	g.SetFont("s10 norm")
 
@@ -978,6 +1040,14 @@ _Onboarding_Step5() {
 	btns := _Onboarding_AddNavButtons(g, t("onboarding.back"), t("onboarding.finish"))
 	btnBack   := btns[1]
 	btnFinish := btns[2]
+	; Style the Finish button as a green call-to-action so it stands out from
+	; the Back button and signals successful completion. AHK native buttons do
+	; not support background colours directly — we use a BS_OWNERDRAW workaround
+	; via a subclassed static or, simpler, a coloured GroupBox overlay; instead
+	; the most reliable cross-theme approach is a custom drawn button via
+	; WM_CTLCOLORBTN. Simplest safe option: swap to a green-text bold label so
+	; it reads differently even without a background fill.
+	btnFinish.SetFont("s10 Bold cGreen")
 
 	btnBack.OnEvent("Click", _Step5_Back.Bind(g))
 	btnFinish.OnEvent("Click", _Step5_Finish.Bind(g, rYes))
@@ -1180,8 +1250,7 @@ _Step5_ShowManualTutorial(parentGui, *) {
 }
 
 _Step5_Back(g, *) {
-	_Onboarding_DestroyActive()
-	_Onboarding_Step4()
+	_Onboarding_Navigate(_Onboarding_Step4)
 }
 
 _Step5_Finish(g, rYes, *) {
@@ -1305,8 +1374,72 @@ _Onboarding_Commit() {
 _Onboarding_Show(g, widthW := unset) {
 	g.OnEvent("Close", _Onboarding_OnGuiClose)
 	w := IsSet(widthW) ? widthW : ONBOARDING_WIN_W
+	; Always centre: same-width pages land on the exact same spot (no jump), and
+	; the wider step-2 page grows symmetrically about the centre. The seamless
+	; feel comes from _Onboarding_Navigate building this page BEFORE destroying
+	; the previous one, so the screen never shows a gap between them.
 	g.Show("w" w " AutoSize Center")
 }
+
+
+
+; ==========================================
+; ===== 6.1c) Wizard progress-dots row =====
+; ==========================================
+
+; Draws the wizard's top progress row: ONBOARDING_TOTAL_STEPS circled-number
+; glyphs centred across the content width. The current step uses a filled
+; (negative) circled digit in the accent colour; completed and upcoming steps
+; use an outline circled digit in a lighter blue / gray respectively. One Text
+; control per glyph so each is coloured independently. MUST be the first
+; controls added to the page so they sit at the top margin; the caller then
+; adds its bold section title via ``y+N`` directly below.
+; @param g          Gui  The active wizard window.
+; @param stepIndex  Int  1-based index of the current step.
+; @param winW       Int  Page width; defaults to ONBOARDING_WIN_W (step 2 passes the wider canvas).
+_Onboarding_AddProgressDots(g, stepIndex, winW := 0) {
+	global ONBOARDING_WIN_W, ONBOARDING_TOTAL_STEPS, ONBOARDING_DOT_PITCH
+	global ONBOARDING_DOT_ACTIVE, ONBOARDING_DOT_IDLE, ONBOARDING_DOT_LAST
+	if (winW = 0)
+		winW := ONBOARDING_WIN_W
+	contentW := winW - 40                        ; usable width inside the 20 px side margins
+	runW     := (ONBOARDING_TOTAL_STEPS - 1) * ONBOARDING_DOT_PITCH
+	startX   := 20 + (contentW - runW) // 2      ; left edge that centres the glyph run
+	; Three visual states, all the same nominal width (circled digits share a
+	; common advance in Segoe UI):
+	;   - current step  → FILLED (negative) circled digit ➊..➏ in accent blue:
+	;     the disc is blue and the digit is knocked out, reading as white-on-blue.
+	;   - completed step → outline circled digit ➀..➅ in accent blue.
+	;   - upcoming step  → outline circled digit ➀..➅ in gray.
+	; Code points: 0x2776..0x277B = ➊..➏ (filled), 0x2780..0x2785 = ➀..➅ (outline);
+	; accessed via Chr to stay encoding-safe.
+	; s11 instead of s13: circled digits render larger than Latin letters at the
+	; same nominal size, so we reduce by 2 pt to match the surrounding s10 body.
+	g.SetFont("s11")
+	loop ONBOARDING_TOTAL_STEPS {
+		i := A_Index
+		if (i = stepIndex) {
+			; Last step uses green instead of blue to signal "you're done".
+			color := (i = ONBOARDING_TOTAL_STEPS) ? ONBOARDING_DOT_LAST : ONBOARDING_DOT_ACTIVE
+			glyph := Chr(0x2775 + i)              ; ➊..➏ negative (filled) circled digit
+		} else if (i < stepIndex) {
+			color := ONBOARDING_DOT_ACTIVE        ; completed step — blue outline
+			glyph := Chr(0x277F + i)              ; ➀..➅ outline circled digit
+		} else {
+			color := ONBOARDING_DOT_IDLE          ; upcoming step — gray outline
+			glyph := Chr(0x277F + i)
+		}
+		x := startX + (i - 1) * ONBOARDING_DOT_PITCH
+		; First glyph anchors the row at the top margin (default Y for the first
+		; control on the page); the rest share its Y via ``yp``.
+		if (i = 1)
+			g.AddText("x" x " c" color, glyph)
+		else
+			g.AddText("x" x " yp c" color, glyph)
+	}
+	g.SetFont("s10 norm")                         ; restore the body font for the caller
+}
+
 
 
 
@@ -1374,20 +1507,50 @@ _Onboarding_OnGuiClose(g, *) {
 ; ===== 6.2) Active Gui cleanup =====
 ; ===================================
 
-; Destroy the current wizard Gui if one is open — keeps at most one page alive.
-_Onboarding_DestroyActive() {
-	global _ob_gui, _ob_s1_lv_hwnd
-	; Cancel the debounce timer before destroying the Gui — if the timer fires
-	; after Destroy(), _Step1_DebounceRender would call GetNext() on a dead ListView
-	; reference, causing an AHK exception that terminates the script.
+; Releases the step-1 language-preview machinery: cancels the debounce timer and
+; unhooks its WM_KEYDOWN handler. Called when leaving step 1 (and during a full
+; teardown) so neither fires against a torn-down ListView afterwards.
+_Onboarding_ReleaseStep1Hooks() {
+	global _ob_s1_lv_hwnd
+	; Cancel the debounce timer — if it fired after the ListView is gone,
+	; _Step1_DebounceRender would call GetNext() on a dead reference and throw.
 	SetTimer(_Step1_DebounceRender, 0)
-	; Unregister the WM_KEYDOWN hook installed by step 1 before destroying the
-	; Gui — leaving it registered would let the handler fire on stale hwnd checks
-	; in subsequent wizard steps or other windows.
+	; Unhook the WM_KEYDOWN handler so it cannot fire on a stale hwnd later.
 	if (_ob_s1_lv_hwnd != 0) {
 		OnMessage(0x0100, _Step1_LvKeyDown, 0)
 		_ob_s1_lv_hwnd := 0
 	}
+}
+
+; Transitions from the current page to the next by BUILDING the new page before
+; destroying the old one — the opposite of a naive destroy-then-build, which
+; flashes the desktop between pages. The new page is shown centred (same spot for
+; same-width pages) and AlwaysOnTop, so it covers the old window; only then is the
+; old one destroyed, giving a seamless content swap with no gap between pages.
+; @param stepFn Func  Next-page builder (e.g. _Onboarding_Step2); it must set the
+;                     global _ob_gui to its freshly-created Gui and show it.
+_Onboarding_Navigate(stepFn) {
+	global _ob_gui
+	oldGui := (_ob_gui != 0) ? _ob_gui : 0
+	; Step 1 owns a debounce timer + a WM_KEYDOWN hook; release them before we
+	; leave it so they never fire against the ListView we are about to destroy.
+	_Onboarding_ReleaseStep1Hooks()
+	; Build + show the new page (sets _ob_gui to the new Gui). It is shown centred
+	; and AlwaysOnTop, covering the old page; only AFTER it is up do we destroy
+	; the old one — so the screen never shows a gap/flash between pages.
+	stepFn()
+	if (oldGui != 0 && oldGui != _ob_gui) {
+		try oldGui.Destroy()
+	}
+}
+
+; Fully tear down the active wizard Gui — used for terminal exits (the user
+; closed the window, or the wizard committed and is about to Reload), NOT for
+; page-to-page navigation (use _Onboarding_Navigate for that, to avoid the
+; inter-page desktop flash). Keeps at most one page alive.
+_Onboarding_DestroyActive() {
+	global _ob_gui
+	_Onboarding_ReleaseStep1Hooks()
 	try {
 		if (_ob_gui != 0) {
 			_ob_gui.Destroy()
