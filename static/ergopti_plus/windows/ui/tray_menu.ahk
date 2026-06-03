@@ -2265,14 +2265,14 @@ initMenu() {
 	}
 	global UPDATER_CHANNEL, UPDATER_CHECK_INTERVAL, UPDATER_INTERVAL_PRESETS
 	global UPDATER_LATEST_RELEASE
+	AboutMenu.Add()
+	ChannelMenu := Menu()
+	RegisterMenuItem(ChannelMenu, t("menu.about.channel_main"), (*) => Updater_SetChannel("main"))
+	RegisterMenuItem(ChannelMenu, t("menu.about.channel_dev"),  (*) => Updater_SetChannel("dev"))
+	ChannelMenu.Check((UPDATER_CHANNEL == "dev") ? t("menu.about.channel_dev") : t("menu.about.channel_main"))
+	ChannelDisplay := (UPDATER_CHANNEL == "dev") ? t("menu.about.channel_dev") : t("menu.about.channel_main")
+	AboutMenu.Add(t("menu.about.channel_menu") . ": " . ChannelDisplay, ChannelMenu)
 	if not Updater_IsLocalSource() {
-		AboutMenu.Add()
-		ChannelMenu := Menu()
-		RegisterMenuItem(ChannelMenu, t("menu.about.channel_main"), (*) => Updater_SetChannel("main"))
-		RegisterMenuItem(ChannelMenu, t("menu.about.channel_dev"),  (*) => Updater_SetChannel("dev"))
-		ChannelMenu.Check((UPDATER_CHANNEL == "dev") ? t("menu.about.channel_dev") : t("menu.about.channel_main"))
-		ChannelDisplay := (UPDATER_CHANNEL == "dev") ? t("menu.about.channel_dev") : t("menu.about.channel_main")
-		AboutMenu.Add(t("menu.about.channel_menu") . ": " . ChannelDisplay, ChannelMenu)
 
 		FreqMenu := Menu()
 		CurrentLabel := ""
