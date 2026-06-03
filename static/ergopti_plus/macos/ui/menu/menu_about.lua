@@ -29,7 +29,9 @@ local changelog = require("ui.changelog")
 local LOG       = "menu_about"
 
 M.DEFAULT_STATE = {
-	update_channel = "main",
+	-- Default to "dev" — running from source means all releases are pre-releases,
+	-- so "main" would show an empty stable list until the user switches manually.
+	update_channel = "dev",
 }
 
 
@@ -387,7 +389,7 @@ end
 function M.build(ctx)
 	local state   = ctx and ctx.state or {}
 	local channel = (type(state.update_channel) == "string" and state.update_channel ~= "")
-		and state.update_channel or "main"
+		and state.update_channel or M.DEFAULT_STATE.update_channel
 	local ver     = current_version()
 	local ver_label = i18n.get("menu.about.title")
 
