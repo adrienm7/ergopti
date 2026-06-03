@@ -29,9 +29,7 @@ local changelog = require("ui.changelog")
 local LOG       = "menu_about"
 
 M.DEFAULT_STATE = {
-	-- Default to "dev" — running from source means all releases are pre-releases,
-	-- so "main" would show an empty stable list until the user switches manually.
-	update_channel = "dev",
+	update_channel = "main",
 }
 
 
@@ -388,8 +386,11 @@ end
 --- @return table Menu item table for insertion into the parent menu.
 function M.build(ctx)
 	local state   = ctx and ctx.state or {}
-	local channel = (type(state.update_channel) == "string" and state.update_channel ~= "")
-		and state.update_channel or M.DEFAULT_STATE.update_channel
+	-- Use the saved preference; fall back to "dev" when running from source
+	-- (no stable releases exist yet) and "main" for a bundled app.
+	local saved   = (type(state.update_channel) == "string" and state.update_channel ~= "")
+	local channel = saved and state.update_channel
+		or (is_local_source() and "dev" or M.DEFAULT_STATE.update_channel)
 	local ver     = current_version()
 	local ver_label = i18n.get("menu.about.title")
 
