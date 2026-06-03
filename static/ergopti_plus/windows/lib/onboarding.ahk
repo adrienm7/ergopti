@@ -167,8 +167,12 @@ Onboarding_Run() {
 
 ; Allow the user to re-run the wizard from the tray menu even when a
 ; config already exists — useful after a reset or for re-configuration.
+; AltGr passthrough is NOT activated here: the user already has a working
+; config and needs their AltGr layer (e.g. magic key) to remain functional
+; while navigating the wizard. Passthrough is only needed during first-run
+; (Onboarding_Run) where no config exists yet and native AltGr typing in
+; text fields must be preserved.
 Onboarding_ShowFromMenu(*) {
-	global _OB_ALTGR_PASSTHROUGH := true
 	_Onboarding_Navigate(_Onboarding_Step1)
 }
 
