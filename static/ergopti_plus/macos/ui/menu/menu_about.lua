@@ -85,6 +85,10 @@ local function app_bundle_path()
 end
 
 --- Builds the GitHub Releases API URL for the active channel.
+--- "main" uses /latest which only returns stable releases (non-prerelease).
+--- "dev" fetches the most recent release of any kind (including pre-releases).
+--- Note: if the repo has no stable release yet, /latest returns 404 — the
+--- caller falls back to the dev endpoint automatically in that case.
 --- @param channel string "main" or "dev"
 --- @return string
 local function api_url(channel)
@@ -93,6 +97,12 @@ local function api_url(channel)
 		return base .. "?per_page=1"
 	end
 	return base .. "/latest"
+end
+
+--- Fallback URL used when the stable channel returns 404 (no stable release yet).
+--- @return string
+local function api_url_fallback()
+	return string.format("https://api.github.com/repos/%s/%s/releases?per_page=1", GH_OWNER, GH_REPO)
 end
 
 local function releases_page_url()
@@ -204,7 +214,7 @@ local function replace_and_reload(zip_path, update_menu_fn)
 	local target = app_bundle_path()
 	if not target then
 		Logger.error(LOG, "Cannot determine .app bundle path — aborting install.")
-		dialog.alert(i18n.get("common.error_title"), i18n.get("menu.about.update.install_error"), i18n.get("button.ok"))
+		dialog.block_alert(i18n.get("common.error_title"), i18n.get("menu.about.update.install_error"), i18n.get("button.ok"))
 		_update_state = "idle"
 		update_menu_fn()
 		return
@@ -221,7 +231,7 @@ local function replace_and_reload(zip_path, update_menu_fn)
 	local task = hs.task.new("/usr/bin/unzip", function(exit_code, _, stderr)
 		if exit_code ~= 0 then
 			Logger.error(LOG, "unzip failed (exit %d): %s.", exit_code, stderr or "")
-			dialog.alert(i18n.get("common.error_title"), i18n.get("menu.about.update.install_error"), i18n.get("button.ok"))
+			dialog.block_alert(i18n.get("common.error_title"), i18n.get("menu.about.update.install_error"), i18n.get("button.ok"))
 			_update_state = "idle"
 			update_menu_fn()
 			return
@@ -231,7 +241,7 @@ local function replace_and_reload(zip_path, update_menu_fn)
 		local ok_attr = hs.fs.attributes(new_app)
 		if not ok_attr then
 			Logger.error(LOG, "Unzipped archive does not contain ErgoptiPlus.app at %s.", new_app)
-			dialog.alert(i18n.get("common.error_title"), i18n.get("menu.about.update.install_error"), i18n.get("button.ok"))
+			dialog.block_alert(i18n.get("common.error_title"), i18n.get("menu.about.update.install_error"), i18n.get("button.ok"))
 			_update_state = "idle"
 			update_menu_fn()
 			return
@@ -242,7 +252,7 @@ local function replace_and_reload(zip_path, update_menu_fn)
 		local ok_bak = os.rename(target, backup_app)
 		if not ok_bak then
 			Logger.error(LOG, "Could not move current .app to backup at %s.", backup_app)
-			dialog.alert(i18n.get("common.error_title"), i18n.get("menu.about.update.install_error"), i18n.get("button.ok"))
+			dialog.block_alert(i18n.get("common.error_title"), i18n.get("menu.about.update.install_error"), i18n.get("button.ok"))
 			_update_state = "idle"
 			update_menu_fn()
 			return
@@ -252,7 +262,7 @@ local function replace_and_reload(zip_path, update_menu_fn)
 			-- Attempt to restore from backup before bailing.
 			os.rename(backup_app, target)
 			Logger.error(LOG, "Could not move new .app to %s — restored backup.", target)
-			dialog.alert(i18n.get("common.error_title"), i18n.get("menu.about.update.install_error"), i18n.get("button.ok"))
+			dialog.block_alert(i18n.get("common.error_title"), i18n.get("menu.about.update.install_error"), i18n.get("button.ok"))
 			_update_state = "idle"
 			update_menu_fn()
 			return
@@ -290,7 +300,7 @@ local function one_click_update(channel, update_menu_fn)
 		local zip_path = os.tmpname() .. "_ErgoptiPlus.app.zip"
 		download_to_file(_cached_release.zip_url, zip_path, function(ok, err)
 			if not ok then
-				dialog.alert(i18n.get("common.error_title"), err, i18n.get("button.ok"))
+				dialog.block_alert(i18n.get("common.error_title"), err, i18n.get("button.ok"))
 				_update_state = "available"
 				update_menu_fn()
 				return
@@ -311,7 +321,7 @@ local function one_click_update(channel, update_menu_fn)
 			Logger.warn(LOG, "One-click check: network unreachable (HTTP %d).", status)
 			_update_state = "idle"
 			update_menu_fn()
-			dialog.alert(i18n.get("common.warning"), i18n.get("menu.about.update.network_error"), i18n.get("button.ok"))
+			dialog.block_alert(i18n.get("common.warning"), i18n.get("menu.about.update.network_error"), i18n.get("button.ok"))
 			return
 		end
 		local latest = parse_tag(body)
@@ -319,7 +329,7 @@ local function one_click_update(channel, update_menu_fn)
 			Logger.warn(LOG, "One-click check: tag parse failed.")
 			_update_state = "idle"
 			update_menu_fn()
-			dialog.alert(i18n.get("common.warning"), i18n.get("menu.about.update.parse_error"), i18n.get("button.ok"))
+			dialog.block_alert(i18n.get("common.warning"), i18n.get("menu.about.update.parse_error"), i18n.get("button.ok"))
 			return
 		end
 		if latest == current then
@@ -327,7 +337,7 @@ local function one_click_update(channel, update_menu_fn)
 			_update_state = "idle"
 			update_menu_fn()
 			local msg = i18n.get("menu.about.update.up_to_date"):gsub("{version}", current)
-			dialog.alert(i18n.get("menu.about.changelog"), msg, i18n.get("button.ok"))
+			dialog.block_alert(i18n.get("menu.about.changelog"), msg, i18n.get("button.ok"))
 			return
 		end
 
@@ -336,7 +346,7 @@ local function one_click_update(channel, update_menu_fn)
 			Logger.error(LOG, "One-click check: asset '%s' not found in release %s.", ASSET_NAME, latest)
 			_update_state = "idle"
 			update_menu_fn()
-			dialog.alert(i18n.get("common.warning"), i18n.get("menu.about.update.no_asset"), i18n.get("button.ok"))
+			dialog.block_alert(i18n.get("common.warning"), i18n.get("menu.about.update.no_asset"), i18n.get("button.ok"))
 			return
 		end
 
@@ -348,7 +358,7 @@ local function one_click_update(channel, update_menu_fn)
 		local zip_path = os.tmpname() .. "_ErgoptiPlus.app.zip"
 		download_to_file(zip_url, zip_path, function(ok, err)
 			if not ok then
-				dialog.alert(i18n.get("common.error_title"), err, i18n.get("button.ok"))
+				dialog.block_alert(i18n.get("common.error_title"), err, i18n.get("button.ok"))
 				_update_state = "available"
 				update_menu_fn()
 				return
@@ -358,45 +368,70 @@ local function one_click_update(channel, update_menu_fn)
 	end)
 end
 
+--- Shows the parsed release notes dialog once the JSON body is available.
+--- Uses block_alert so the dialog is modal and receives keyboard focus.
+--- @param body string Raw GitHub API JSON
+local function show_changelog_dialog(body)
+	local tag   = parse_tag(body)
+	local notes = parse_notes(body)
+	Logger.info(LOG, "show_changelog: tag='%s', notes_len=%d.", tostring(tag), #notes)
+	if tag == "" then
+		Logger.warn(LOG, "show_changelog: could not parse tag from response.")
+		local ok, err = pcall(dialog.block_alert, i18n.get("common.warning"), i18n.get("menu.about.update.changelog_error"), i18n.get("button.ok"))
+		if not ok then Logger.error(LOG, "show_changelog: block_alert raised — %s.", tostring(err)) end
+		return
+	end
+	if notes == "" then notes = "(No release notes available for this version.)" end
+	if #notes > 2000 then notes = notes:sub(1, 2000) .. "\n…(truncated)" end
+	local msg = i18n.get("menu.about.update.changelog_header")
+		:gsub("{tag}",   tag)
+		:gsub("{notes}", notes)
+	local open_label  = i18n.get("menu.about.open_releases_page")
+	local close_label = i18n.get("button.close")
+	Logger.info(LOG, "show_changelog: opening block_alert dialog.")
+	local ok, btn = pcall(dialog.block_alert, i18n.get("menu.about.changelog"), msg, open_label, close_label)
+	if not ok then
+		Logger.error(LOG, "show_changelog: block_alert raised — %s.", tostring(btn))
+		return
+	end
+	Logger.success(LOG, "show_changelog: dialog closed, btn='%s'.", tostring(btn))
+	if btn == open_label then
+		hs.urlevent.openURL(releases_page_url())
+	end
+end
+
 --- Fetches and shows the release notes for the latest release on the active channel.
+--- When the stable channel returns 404 (no stable release yet), automatically
+--- retries with the dev endpoint so pre-release notes are still visible.
 --- @param channel string "main" or "dev"
 local function show_changelog(channel)
 	local url = api_url(channel)
 	Logger.start(LOG, "show_changelog: fetching '%s'…", url)
-	hs.http.asyncGet(url, { ["User-Agent"] = "ErgoptiPlus-Updater/1.0" }, function(status, body, headers)
+	hs.http.asyncGet(url, { ["User-Agent"] = "ErgoptiPlus-Updater/1.0" }, function(status, body, _)
 		Logger.info(LOG, "show_changelog: HTTP %s, body_len=%s.", tostring(status), tostring(body and #body or "nil"))
+		-- 404 on the stable endpoint means no stable release exists yet — fall back to dev.
+		if status == 404 and channel == "main" then
+			Logger.info(LOG, "show_changelog: no stable release found (404) — retrying with dev endpoint.")
+			local fb_url = api_url_fallback()
+			hs.http.asyncGet(fb_url, { ["User-Agent"] = "ErgoptiPlus-Updater/1.0" }, function(s2, b2, _)
+				Logger.info(LOG, "show_changelog: fallback HTTP %s, body_len=%s.", tostring(s2), tostring(b2 and #b2 or "nil"))
+				if s2 ~= 200 or not b2 then
+					Logger.warn(LOG, "show_changelog: fallback also failed (status=%s).", tostring(s2))
+					local ok, err = pcall(dialog.block_alert, i18n.get("common.warning"), i18n.get("menu.about.update.network_error"), i18n.get("button.ok"))
+					if not ok then Logger.error(LOG, "show_changelog: block_alert raised — %s.", tostring(err)) end
+					return
+				end
+				show_changelog_dialog(b2)
+			end)
+			return
+		end
 		if status ~= 200 or not body then
 			Logger.warn(LOG, "show_changelog: network error (status=%s) — showing dialog.", tostring(status))
-			local ok, err = pcall(dialog.alert, i18n.get("common.warning"), i18n.get("menu.about.update.network_error"), i18n.get("button.ok"))
-			if not ok then Logger.error(LOG, "show_changelog: dialog.alert raised — %s.", tostring(err)) end
+			local ok, err = pcall(dialog.block_alert, i18n.get("common.warning"), i18n.get("menu.about.update.network_error"), i18n.get("button.ok"))
+			if not ok then Logger.error(LOG, "show_changelog: block_alert raised — %s.", tostring(err)) end
 			return
 		end
-		local tag   = parse_tag(body)
-		local notes = parse_notes(body)
-		Logger.info(LOG, "show_changelog: tag='%s', notes_len=%s.", tostring(tag), tostring(#notes))
-		if tag == "" then
-			Logger.warn(LOG, "show_changelog: could not parse tag from response.")
-			local ok, err = pcall(dialog.alert, i18n.get("common.warning"), i18n.get("menu.about.update.changelog_error"), i18n.get("button.ok"))
-			if not ok then Logger.error(LOG, "show_changelog: dialog.alert raised — %s.", tostring(err)) end
-			return
-		end
-		if notes == "" then notes = "(No release notes available for this version.)" end
-		if #notes > 2000 then notes = notes:sub(1, 2000) .. "\n…(truncated)" end
-		local msg = i18n.get("menu.about.update.changelog_header")
-			:gsub("{tag}",   tag)
-			:gsub("{notes}", notes)
-		local open_label  = i18n.get("menu.about.open_releases_page")
-		local close_label = i18n.get("button.close")
-		Logger.info(LOG, "show_changelog: opening dialog.")
-		local ok, btn = pcall(dialog.alert, i18n.get("menu.about.changelog"), msg, open_label, close_label)
-		if not ok then
-			Logger.error(LOG, "show_changelog: dialog.alert raised — %s.", tostring(btn))
-			return
-		end
-		Logger.success(LOG, "show_changelog: dialog closed, btn='%s'.", tostring(btn))
-		if btn == open_label then
-			hs.urlevent.openURL(releases_page_url())
-		end
+		show_changelog_dialog(body)
 	end)
 end
 
