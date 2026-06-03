@@ -315,8 +315,12 @@ function M.show_webview(opts)
 		end)
 	end)
 
-	-- Inject HTML assets
-	if type(opts.assets_dir) == "string" then
+	-- Inject HTML assets — prefer a pre-built html_string when provided so
+	-- callers that need to patch the HTML before loading (e.g. injecting a
+	-- config <script> block) can do so without duplicating the inlining logic.
+	if type(opts.html_string) == "string" and opts.html_string ~= "" then
+		pcall(function() wv:html(opts.html_string) end)
+	elseif type(opts.assets_dir) == "string" then
 		local final_html = M.build_injected_html(opts.assets_dir)
 		pcall(function() wv:html(final_html) end)
 	end
