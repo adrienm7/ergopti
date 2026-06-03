@@ -362,15 +362,22 @@ end
 --- @param channel string "main" or "dev"
 local function show_changelog(channel)
 	local url = api_url(channel)
-	hs.http.asyncGet(url, { ["User-Agent"] = "ErgoptiPlus-Updater/1.0" }, function(status, body, _)
+	Logger.start(LOG, "show_changelog: fetching '%s'…", url)
+	hs.http.asyncGet(url, { ["User-Agent"] = "ErgoptiPlus-Updater/1.0" }, function(status, body, headers)
+		Logger.info(LOG, "show_changelog: HTTP %s, body_len=%s.", tostring(status), tostring(body and #body or "nil"))
 		if status ~= 200 or not body then
-			dialog.alert(i18n.get("common.warning"), i18n.get("menu.about.update.network_error"), i18n.get("button.ok"))
+			Logger.warn(LOG, "show_changelog: network error (status=%s) — showing dialog.", tostring(status))
+			local ok, err = pcall(dialog.alert, i18n.get("common.warning"), i18n.get("menu.about.update.network_error"), i18n.get("button.ok"))
+			if not ok then Logger.error(LOG, "show_changelog: dialog.alert raised — %s.", tostring(err)) end
 			return
 		end
 		local tag   = parse_tag(body)
 		local notes = parse_notes(body)
+		Logger.info(LOG, "show_changelog: tag='%s', notes_len=%s.", tostring(tag), tostring(#notes))
 		if tag == "" then
-			dialog.alert(i18n.get("common.warning"), i18n.get("menu.about.update.changelog_error"), i18n.get("button.ok"))
+			Logger.warn(LOG, "show_changelog: could not parse tag from response.")
+			local ok, err = pcall(dialog.alert, i18n.get("common.warning"), i18n.get("menu.about.update.changelog_error"), i18n.get("button.ok"))
+			if not ok then Logger.error(LOG, "show_changelog: dialog.alert raised — %s.", tostring(err)) end
 			return
 		end
 		if notes == "" then notes = "(No release notes available for this version.)" end
@@ -380,7 +387,13 @@ local function show_changelog(channel)
 			:gsub("{notes}", notes)
 		local open_label  = i18n.get("menu.about.open_releases_page")
 		local close_label = i18n.get("button.close")
-		local btn = dialog.alert(i18n.get("menu.about.changelog"), msg, open_label, close_label)
+		Logger.info(LOG, "show_changelog: opening dialog.")
+		local ok, btn = pcall(dialog.alert, i18n.get("menu.about.changelog"), msg, open_label, close_label)
+		if not ok then
+			Logger.error(LOG, "show_changelog: dialog.alert raised — %s.", tostring(btn))
+			return
+		end
+		Logger.success(LOG, "show_changelog: dialog closed, btn='%s'.", tostring(btn))
 		if btn == open_label then
 			hs.urlevent.openURL(releases_page_url())
 		end
