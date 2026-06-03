@@ -404,14 +404,24 @@ function M.build(ctx)
 	end
 
 	local local_src = is_local_source()
-	-- Channel items: shown and selectable only for release builds.
-	-- In local-source mode the version label already signals "local", so no extra channel item is needed.
-	local channel_items
-	local channel_display
-	if local_src then
-		channel_items   = {}
-		channel_display = nil
+
+	-- First disabled item mirrors AHK: "ErgoptiPlus <version>" with channel tag.
+	-- e.g. "ErgoptiPlus v0.2.1-dev" or "ErgoptiPlus local"
+	local ver_display
+	if ver == "local" then
+		ver_display = "ErgoptiPlus local"
 	else
+		local channel_tag = (channel == "dev") and "-dev" or ""
+		ver_display = "ErgoptiPlus " .. ver .. channel_tag
+	end
+
+	-- Changelog uses "dev" when running from source (all releases are pre-releases).
+	local effective_channel = local_src and "dev" or channel
+
+	-- Channel submenu: only for release builds.
+	local channel_items = {}
+	local channel_display
+	if not local_src then
 		channel_display = (channel == "dev")
 			and i18n.get("menu.about.channel_dev")
 			or  i18n.get("menu.about.channel_main")
@@ -429,23 +439,18 @@ function M.build(ctx)
 		}
 	end
 
-	-- Changelog uses "main" when running from source (no installed version).
-	local effective_channel = local_src and "main" or channel
-
 	local menu_items = {}
-	table.insert(menu_items, { title = ver_label, disabled = true })
-	if #channel_items > 0 then
-		table.insert(menu_items, { title = "-" })
-		-- Show the active channel value in the submenu title so the user can see
-		-- the current setting without having to open it — mirrors AHK behaviour.
-		local channel_title = i18n.get("menu.about.channel_menu") .. ": " .. (channel_display or "")
-		table.insert(menu_items, { title = channel_title, menu = channel_items })
-	end
+
+	-- Version header — always the first item, always disabled.
+	table.insert(menu_items, { title = ver_display, disabled = true })
 
 	if not local_src then
-		-- Dynamic one-click update item: label and enabled state reflect _update_state.
-		-- Kept in the same group as the channel selector (no separator between them)
-		-- so all update-related controls are visually grouped.
+		table.insert(menu_items, { title = "-" })
+		-- Channel selector submenu with current value in the title, mirroring AHK.
+		local channel_title = i18n.get("menu.about.channel_menu") .. ": " .. (channel_display or "")
+		table.insert(menu_items, { title = channel_title, menu = channel_items })
+
+		-- Dynamic one-click update item.
 		local is_busy = (_update_state == "checking" or _update_state == "installing")
 		table.insert(menu_items, {
 			title    = get_update_menu_label(),
@@ -456,8 +461,8 @@ function M.build(ctx)
 			end or nil,
 		})
 	end
-	table.insert(menu_items, { title = "-" })
 
+	table.insert(menu_items, { title = "-" })
 	table.insert(menu_items, {
 		title = i18n.get("menu.about.changelog"),
 		fn    = function()
@@ -470,6 +475,8 @@ function M.build(ctx)
 		fn    = function() hs.urlevent.openURL(releases_page_url()) end,
 	})
 
+	-- The submenu title uses the generic i18n label (e.g. "Version / Mise à jour")
+	-- so the menubar entry stays compact; the version detail is inside the submenu.
 	return { title = ver_label, menu = menu_items }
 end
 
