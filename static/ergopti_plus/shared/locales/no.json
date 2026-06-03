@@ -1,4 +1,4 @@
-{
+﻿{
 	"_meta.flag": "🇳🇴",
 	"_meta.locale": "no",
 	"_meta.name": "Norsk",
@@ -171,7 +171,7 @@
 	"dialog.hotstrings.delete_title": "Slett ekspander",
 	"dialog.hotstrings.invalid_body": "Vennligst skriv inn nøyaktig ett tegn.",
 	"dialog.hotstrings.invalid_title": "Ugyldig input",
-	"dialog.hotstrings.new_delimiter_prompt": "Enter the delimiter character (one only):",
+	"dialog.hotstrings.new_delimiter_prompt": "Skilletegn",
 	"dialog.hotstrings.new_delimiter_title": "New word delimiter",
 	"dialog.hotstrings.new_prompt": "Skriv inn utløsertegnet (nøyaktig ett tegn):",
 	"dialog.hotstrings.new_title": "Ny ordekspander",

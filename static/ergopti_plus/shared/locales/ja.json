@@ -1,4 +1,4 @@
-{
+﻿{
 	"_meta.flag": "🇯🇵",
 	"_meta.locale": "ja",
 	"_meta.name": "日本語",
@@ -171,7 +171,7 @@
 	"dialog.hotstrings.delete_title": "エクスパンダーを削除",
 	"dialog.hotstrings.invalid_body": "正確に1文字を入力してください。",
 	"dialog.hotstrings.invalid_title": "無効な入力",
-	"dialog.hotstrings.new_delimiter_prompt": "Enter the delimiter character (one only):",
+	"dialog.hotstrings.new_delimiter_prompt": "区切り文字",
 	"dialog.hotstrings.new_delimiter_title": "New word delimiter",
 	"dialog.hotstrings.new_prompt": "トリガー文字を入力してください（正確に1文字）:",
 	"dialog.hotstrings.new_title": "新しい単語エクスパンダー",

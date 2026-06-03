@@ -1,4 +1,4 @@
-{
+﻿{
 	"_meta.flag": "🇵🇱",
 	"_meta.locale": "pl",
 	"_meta.name": "Polski",
@@ -171,7 +171,7 @@
 	"dialog.hotstrings.delete_title": "Usuń rozszerzacz",
 	"dialog.hotstrings.invalid_body": "Wprowadź dokładnie jeden znak.",
 	"dialog.hotstrings.invalid_title": "Nieprawidłowe dane wejściowe",
-	"dialog.hotstrings.new_delimiter_prompt": "Enter the delimiter character (one only):",
+	"dialog.hotstrings.new_delimiter_prompt": "Znak separatora",
 	"dialog.hotstrings.new_delimiter_title": "New word delimiter",
 	"dialog.hotstrings.new_prompt": "Wprowadź znak wyzwalający (dokładnie jeden znak):",
 	"dialog.hotstrings.new_title": "Nowy rozszerzacz słów",

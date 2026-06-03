@@ -1,4 +1,4 @@
-{
+﻿{
 	"_meta.flag": "🇸🇦",
 	"_meta.locale": "ar",
 	"_meta.name": "العربية",
@@ -171,7 +171,7 @@
 	"dialog.hotstrings.delete_title": "حذف موسّع",
 	"dialog.hotstrings.invalid_body": "الرجاء إدخال حرف واحد بالضبط.",
 	"dialog.hotstrings.invalid_title": "إدخال غير صالح",
-	"dialog.hotstrings.new_delimiter_prompt": "Enter the delimiter character (one only):",
+	"dialog.hotstrings.new_delimiter_prompt": "حرف الفاصل",
 	"dialog.hotstrings.new_delimiter_title": "New word delimiter",
 	"dialog.hotstrings.new_prompt": "أدخل حرف التشغيل (حرف واحد بالضبط):",
 	"dialog.hotstrings.new_title": "موسّع كلمات جديد",

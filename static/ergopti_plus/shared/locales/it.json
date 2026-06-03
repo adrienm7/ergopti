@@ -1,4 +1,4 @@
-{
+﻿{
 	"_meta.flag": "🇮🇹",
 	"_meta.locale": "it",
 	"_meta.name": "Italiano",
@@ -171,7 +171,7 @@
 	"dialog.hotstrings.delete_title": "Elimina espansore",
 	"dialog.hotstrings.invalid_body": "Inserisci esattamente un carattere.",
 	"dialog.hotstrings.invalid_title": "Input non valido",
-	"dialog.hotstrings.new_delimiter_prompt": "Enter the delimiter character (one only):",
+	"dialog.hotstrings.new_delimiter_prompt": "Carattere delimitatore",
 	"dialog.hotstrings.new_delimiter_title": "New word delimiter",
 	"dialog.hotstrings.new_prompt": "Inserisci il carattere trigger (esattamente un carattere):",
 	"dialog.hotstrings.new_title": "Nuovo espansore parola",
