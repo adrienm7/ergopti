@@ -148,7 +148,7 @@
 	"dialog.app_picker.running_count": "{n} program som körs.",
 	"dialog.app_picker.stopped_suffix": " (stoppad)",
 	"dialog.app_picker.title": "Programurval",
-	"dialog.config_folder.hint": "Alla personliga filer (personal_shortcuts.ahk, personal_hotstrings.toml…)\nsöks i denna mapp. Lämna tom för att använda standardmappen.",
+	"dialog.config_folder.hint": "Alla personliga filer (personal_shortcuts.ahk, personal_hotstrings.toml…) söks i denna mapp. Lämna tom för att använda standardmappen.",
 	"dialog.config_folder.label": "Sökväg:",
 	"dialog.config_folder.select_title": "Välj konfigurationsmapp",
 	"dialog.config_folder.title": "ErgoptiPlus — Konfigurationsmapp",

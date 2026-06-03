@@ -148,7 +148,7 @@
 	"dialog.app_picker.running_count": "{n} kørende program(mer).",
 	"dialog.app_picker.stopped_suffix": " (stoppet)",
 	"dialog.app_picker.title": "Programvalg",
-	"dialog.config_folder.hint": "Alle personlige filer (personal_shortcuts.ahk, personal_hotstrings.toml…)\nvil blive søgt i denne mappe. Lad være tom for at bruge standardmappen.",
+	"dialog.config_folder.hint": "Alle personlige filer (personal_shortcuts.ahk, personal_hotstrings.toml…) vil blive søgt i denne mappe. Lad være tom for at bruge standardmappen.",
 	"dialog.config_folder.label": "Sti:",
 	"dialog.config_folder.select_title": "Vælg konfigurationsmappe",
 	"dialog.config_folder.title": "ErgoptiPlus — Konfigurationsmappe",

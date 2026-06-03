@@ -148,7 +148,7 @@
 	"dialog.app_picker.running_count": "{n} 个运行中的应用。",
 	"dialog.app_picker.stopped_suffix": " (已停止)",
 	"dialog.app_picker.title": "应用选择",
-	"dialog.config_folder.hint": "所有个人文件（personal_shortcuts.ahk, personal_hotstrings.toml…）\n将在此文件夹中搜索。留空则使用默认文件夹。",
+	"dialog.config_folder.hint": "所有个人文件（personal_shortcuts.ahk, personal_hotstrings.toml…） 将在此文件夹中搜索。留空则使用默认文件夹。",
 	"dialog.config_folder.label": "路径：",
 	"dialog.config_folder.select_title": "选择配置文件夹",
 	"dialog.config_folder.title": "ErgoptiPlus — 配置文件夹",

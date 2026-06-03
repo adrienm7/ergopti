@@ -148,7 +148,7 @@
 	"dialog.app_picker.running_count": "{n} çalışan uygulama.",
 	"dialog.app_picker.stopped_suffix": " (durduruldu)",
 	"dialog.app_picker.title": "Uygulama seçimi",
-	"dialog.config_folder.hint": "Tüm kişisel dosyalar (personal_shortcuts.ahk, personal_hotstrings.toml…)\nbu klasörde aranacak. Varsayılan klasörü kullanmak için boş bırakın.",
+	"dialog.config_folder.hint": "Tüm kişisel dosyalar (personal_shortcuts.ahk, personal_hotstrings.toml…) bu klasörde aranacak. Varsayılan klasörü kullanmak için boş bırakın.",
 	"dialog.config_folder.label": "Yol:",
 	"dialog.config_folder.select_title": "Yapılandırma klasörünü seçin",
 	"dialog.config_folder.title": "ErgoptiPlus — Yapılandırma klasörü",
