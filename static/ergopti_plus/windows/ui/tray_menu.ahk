@@ -797,7 +797,7 @@ _HS_RepeatKey(M, _Cat) {
 
 ; Dynamic handler: open the delays-and-colors config window.
 _HS_DelaysColors(M, _Cat) {
-	RegisterMenuItem(M, t("menu.hotstrings.delays_colors"), OpenHotstringsConfigWindow)
+	RegisterMenuItem(M, t("menu.hotstrings.delays_colors"), (*) => OpenHotstringsConfigWindow())
 }
 
 ; Dynamic handler: standard hotstring categories.

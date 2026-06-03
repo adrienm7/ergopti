@@ -44,8 +44,18 @@ global HOTSTRINGS_CATEGORY_DEFAULT_COLORS := Map(
     "personal", "#6e6e73",  ; Gray — neutral baseline so user-added entries stand out only when the user picks a colour themselves
 )
 
+; Default word-terminator string — characters whose typing ends the current
+; word and fires the hotstring engine. The user can add or remove chars via
+; the config window; this constant is the canonical fallback applied when no
+; override is stored in hotstrings_config.toml.
+global HOTSTRINGS_DEFAULT_WORD_DELIMITERS := " `t`r`n.,;:?!''"
+
 ; Absolute path of the user override file (set by HotstringsConfigInit).
 global _HotstringsOverridesPath := ""
+
+; User-overridden word-delimiter string read from [__global__] in the override
+; file. Empty string means "use the engine default".
+global _HotstringsWordDelimiters := ""
 
 ; In-memory cache of the override file content. Shape mirrors the HS module:
 ;   Map(category -> { Delay: Number|"", Color: String|"", ShowTooltip: true|"", Sections: Map(name -> { Delay, Color, ShowTooltip }) })
@@ -65,10 +75,136 @@ global _HotstringsOverrides := Map()
 ; The path is shared with Hammerspoon so both drivers can read each other's
 ; edits after a reload.
 HotstringsConfigInit(OverridePath) {
-    global _HotstringsOverridesPath, _HotstringsOverrides
+    global _HotstringsOverridesPath, _HotstringsOverrides, _HotstringsWordDelimiters
     _HotstringsOverridesPath := OverridePath
     _HotstringsOverrides := _ParseOverrides(OverridePath)
+    _HotstringsWordDelimiters := _ParseGlobalWordDelimiters(OverridePath)
     try LoggerInfo("HotstringsConfig", "Initialized (override file: '{1}').", OverridePath)
+}
+
+; Read the ``word_delimiters`` key from the ``[__global__]`` section of the
+; override file. Returns "" when the file is missing or the key is absent —
+; the caller should fall back to the engine default in that case.
+_ParseGlobalWordDelimiters(Path) {
+    if (Path == "" or !FileExist(Path)) {
+        return ""
+    }
+    InGlobal := false
+    loop read, Path {
+        Line := Trim(A_LoopReadLine, " `t")
+        if (Line == "[__global__]") {
+            InGlobal := true
+            continue
+        }
+        if (InGlobal and SubStr(Line, 1, 1) == "[") {
+            break
+        }
+        if InGlobal and RegExMatch(Line, "^word_delimiters\s*=\s*`"((?:[^`"\\]|\\.)*)`"\s*$", &M) {
+            return UnescapeTomlString(M[1])
+        }
+    }
+    return ""
+}
+
+; Return the effective word-delimiter string: user override when present,
+; otherwise the engine default ``HOTSTRINGS_DEFAULT_WORD_DELIMITERS``.
+HotstringsGetWordDelimiters() {
+    global _HotstringsWordDelimiters, HOTSTRINGS_DEFAULT_WORD_DELIMITERS
+    return (_HotstringsWordDelimiters != "") ? _HotstringsWordDelimiters : HOTSTRINGS_DEFAULT_WORD_DELIMITERS
+}
+
+; Persist a new word-delimiter string to the [__global__] section of the
+; override file, then trigger a Reload so the engine picks up the change.
+HotstringsSetWordDelimiters(Delimiters) {
+    global _HotstringsOverridesPath, _HotstringsWordDelimiters, HOTSTRINGS_DEFAULT_WORD_DELIMITERS
+    _HotstringsWordDelimiters := Delimiters
+    _SaveGlobalWordDelimiters(Delimiters)
+}
+
+; Write (or clear) the ``word_delimiters`` key in ``[__global__]``.
+_SaveGlobalWordDelimiters(Delimiters) {
+    global _HotstringsOverridesPath, HOTSTRINGS_DEFAULT_WORD_DELIMITERS
+    Path := _HotstringsOverridesPath
+    if (Path == "") {
+        return
+    }
+
+    ; Read existing file content; create an empty baseline when absent.
+    if FileExist(Path) {
+        Content := FileRead(Path, "UTF-8")
+    } else {
+        Content := "# Hotstrings — overrides utilisateur`n`n"
+    }
+
+    Lines     := StrSplit(Content, "`n", "`r")
+    InGlobal  := false
+    Found     := false
+    FieldDone := false
+    Out       := []
+    IsDefault := (Delimiters == HOTSTRINGS_DEFAULT_WORD_DELIMITERS or Delimiters == "")
+
+    for _, RawLine in Lines {
+        Line := Trim(RawLine, " `t`r")
+        if (Line == "[__global__]") {
+            InGlobal := true
+            Found    := true
+            Out.Push(RawLine)
+            continue
+        }
+        if InGlobal and SubStr(Line, 1, 1) == "[" {
+            ; Flush any pending write before leaving the section
+            if !FieldDone and !IsDefault {
+                Out.Push("word_delimiters = `"" . _EscapeTomlString(Delimiters) . "`"")
+                FieldDone := true
+            }
+            InGlobal := false
+        }
+        if InGlobal and RegExMatch(Line, "^word_delimiters\s*=") {
+            if !IsDefault and !FieldDone {
+                Out.Push("word_delimiters = `"" . _EscapeTomlString(Delimiters) . "`"")
+                FieldDone := true
+            }
+            ; Skip the old line (cleared when IsDefault)
+            continue
+        }
+        Out.Push(RawLine)
+    }
+
+    if InGlobal and !FieldDone and !IsDefault {
+        Out.Push("word_delimiters = `"" . _EscapeTomlString(Delimiters) . "`"")
+    }
+
+    if !Found and !IsDefault {
+        ; Append a new [__global__] section at the end
+        if (Out.Length > 0 and Out[Out.Length] != "") {
+            Out.Push("")
+        }
+        Out.Push("[__global__]")
+        Out.Push("word_delimiters = `"" . _EscapeTomlString(Delimiters) . "`"")
+    }
+
+    ; Trim trailing blank lines to one
+    while Out.Length > 1 and Out[Out.Length] == "" and Out[Out.Length - 1] == "" {
+        Out.Pop()
+    }
+
+    NewContent := ""
+    for I, L in Out {
+        NewContent .= L
+        if (I < Out.Length) {
+            NewContent .= "`n"
+        }
+    }
+    try FileOpen(Path, "w", "UTF-8").Write(NewContent)
+}
+
+_EscapeTomlString(S) {
+    S := StrReplace(S, "\", "\\")
+    S := StrReplace(S, '"', '`"')
+    S := StrReplace(S, "`t", "\t")
+    S := StrReplace(S, "`r", "\r")
+    S := StrReplace(S, "`n", "\n")
+    return S
 }
 
 ; Parse the override TOML file. Returns an empty Map when the file is missing.

@@ -331,6 +331,19 @@ OpenHotstringsConfigWindow() {
 	TooltipChk := G.Add("Checkbox", "xm y+10", t("hs_config.label_tooltip"))
 	TooltipReset := G.Add("Button", "x512 yp-2 w28 h24", "↺")
 
+	G.Add("Text", "xm y+14 w526 h1 0x10")   ; section separator
+
+	; ----- Word delimiters section -----------------------------------------
+	G.Add("Text", "xm y+12 w526 h18", t("hs_config.label_delimiters"))
+	G.Add("Text", "xm y+4 w526 h16 cGray", t("hs_config.delimiters_hint"))
+
+	; Two rows of checkboxes, 8 per row, evenly spaced across the 526 px column.
+	; Each checkbox captures its char via a closure over (Char).
+	DelimChks := _HCW_BuildDelimiterCheckboxes(G)
+	BtnDelimReset := G.Add("Button", "xm y+10 h24", t("hs_config.delimiters_reset"))
+	Gui_HarmoniseButtonWidths([BtnDelimReset])
+	BtnDelimReset.OnEvent("Click", (*) => _HCW_ResetDelimiters(DelimChks))
+
 	G.Add("Text", "xm y+14 w526 h1 0x10")   ; horizontal rule aligned to x=540
 
 	; ----- Close button (bottom, after HR) --------------------------------
@@ -358,6 +371,7 @@ OpenHotstringsConfigWindow() {
 		TooltipChk:   TooltipChk,
 		TooltipReset: TooltipReset,
 		Status:       Status,
+		DelimChks:    DelimChks,
 	}
 
 	GroupDD.Choose(1)
@@ -374,6 +388,7 @@ OpenHotstringsConfigWindow() {
 	G.OnEvent("Close",             (*) => _HCW_OnClose())
 
 	_HCW_OnGroupChanged()    ; populate file + section dropdowns and first load
+	_HCW_LoadDelimiterCheckboxes(DelimChks)   ; tick boxes for current delimiters
 
 	G.Show()
 	_HCWGui := G
@@ -601,6 +616,100 @@ _HCW_OnClose() {
 	global _HCWGui, _HCWWidgets
 	_HCWGui := 0
 	_HCWWidgets := 0
+}
+
+
+; Ordered list of configurable delimiter characters.
+; Each entry: { Char, Label } — Label is the text shown next to the checkbox.
+; Structural chars (\r \n) are always active and not exposed to the user.
+_HCW_DELIMITER_DEFS() {
+	return [
+		{ Char: " ",  Label: t("hs_config.delim_space")   },
+		{ Char: "`t", Label: t("hs_config.delim_tab")     },
+		{ Char: ".",  Label: "."  },
+		{ Char: ",",  Label: ","  },
+		{ Char: ";",  Label: ";"  },
+		{ Char: ":",  Label: ":"  },
+		{ Char: "?",  Label: "?"  },
+		{ Char: "!",  Label: "!"  },
+		{ Char: "'",  Label: Chr(0x27) . " '"  },
+		{ Char: Chr(0x2019), Label: Chr(0x2019) . " '"  },
+		{ Char: "-",  Label: "-"  },
+		{ Char: "=",  Label: "="  },
+		{ Char: "(",  Label: "("  },
+		{ Char: ")",  Label: ")"  },
+		{ Char: "[",  Label: "["  },
+		{ Char: "]",  Label: "]"  },
+		{ Char: "/",  Label: "/"  },
+		{ Char: "\",  Label: "\"  },
+		{ Char: "+",  Label: "+"  },
+		{ Char: "*",  Label: "*"  },
+	]
+}
+
+; Build a grid of checkboxes (4 per row) for each configurable delimiter.
+; Returns an Array of { Char, Chk } so callers can read/set .Value.
+_HCW_BuildDelimiterCheckboxes(G) {
+	Defs := _HCW_DELIMITER_DEFS()
+	Chks := []
+	ColW := 120    ; px per column (526 / 4 ≈ 131, leaving a small margin)
+	Cols := 4
+	FirstInRow := true
+	for Idx, D in Defs {
+		Col := Mod(Idx - 1, Cols)
+		if (Col == 0) {
+			; Start a new row
+			if (Idx == 1) {
+				Opt := "xm y+8 w" . ColW
+			} else {
+				Opt := "xm y+6 w" . ColW
+			}
+			FirstInRow := true
+		} else {
+			Opt := "x+4 yp w" . ColW
+			FirstInRow := false
+		}
+		Chk := G.Add("Checkbox", Opt, D.Label)
+		; Capture D.Char via closure — lambda arg is the unused event args
+		Chk.OnEvent("Click", ((Ch) => (*) => _HCW_OnDelimiterChanged())(D.Char))
+		Chks.Push({ Char: D.Char, Chk: Chk })
+	}
+	return Chks
+}
+
+; Tick/untick the delimiter checkboxes to match the current effective string.
+_HCW_LoadDelimiterCheckboxes(DelimChks) {
+	Current := HotstringsGetWordDelimiters()
+	for _, Entry in DelimChks {
+		Entry.Chk.Value := (InStr(Current, Entry.Char) > 0) ? 1 : 0
+	}
+}
+
+; Called when any delimiter checkbox is clicked — rebuild the string from all
+; checkbox states and persist it.
+_HCW_OnDelimiterChanged() {
+	global _HCWWidgets, HOTSTRINGS_DEFAULT_WORD_DELIMITERS
+	if !IsObject(_HCWWidgets) or !_HCWWidgets.HasOwnProp("DelimChks") {
+		return
+	}
+	; Always preserve structural chars that are never exposed as checkboxes
+	Fixed := "`r`n"
+	New   := Fixed
+	for _, Entry in _HCWWidgets.DelimChks {
+		if (Entry.Chk.Value == 1) {
+			New .= Entry.Char
+		}
+	}
+	HotstringsSetWordDelimiters(New)
+	TrayTip(t("hs_config.notify_delimiters_saved"), "", "Iconi Mute")
+}
+
+; Reset all delimiter checkboxes to the built-in defaults.
+_HCW_ResetDelimiters(DelimChks) {
+	global HOTSTRINGS_DEFAULT_WORD_DELIMITERS
+	HotstringsSetWordDelimiters(HOTSTRINGS_DEFAULT_WORD_DELIMITERS)
+	_HCW_LoadDelimiterCheckboxes(DelimChks)
+	TrayTip(t("hs_config.notify_delimiters_saved"), "", "Iconi Mute")
 }
 
 
