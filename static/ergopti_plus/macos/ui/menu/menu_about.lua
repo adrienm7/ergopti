@@ -204,7 +204,7 @@ local function replace_and_reload(zip_path, update_menu_fn)
 	local target = app_bundle_path()
 	if not target then
 		Logger.error(LOG, "Cannot determine .app bundle path — aborting install.")
-		dialog.alert(i18n.get("common.error"), i18n.get("menu.about.update.install_error"), i18n.get("button.ok"))
+		dialog.alert(i18n.get("common.error_title"), i18n.get("menu.about.update.install_error"), i18n.get("button.ok"))
 		_update_state = "idle"
 		update_menu_fn()
 		return
@@ -221,7 +221,7 @@ local function replace_and_reload(zip_path, update_menu_fn)
 	local task = hs.task.new("/usr/bin/unzip", function(exit_code, _, stderr)
 		if exit_code ~= 0 then
 			Logger.error(LOG, "unzip failed (exit %d): %s.", exit_code, stderr or "")
-			dialog.alert(i18n.get("common.error"), i18n.get("menu.about.update.install_error"), i18n.get("button.ok"))
+			dialog.alert(i18n.get("common.error_title"), i18n.get("menu.about.update.install_error"), i18n.get("button.ok"))
 			_update_state = "idle"
 			update_menu_fn()
 			return
@@ -231,7 +231,7 @@ local function replace_and_reload(zip_path, update_menu_fn)
 		local ok_attr = hs.fs.attributes(new_app)
 		if not ok_attr then
 			Logger.error(LOG, "Unzipped archive does not contain ErgoptiPlus.app at %s.", new_app)
-			dialog.alert(i18n.get("common.error"), i18n.get("menu.about.update.install_error"), i18n.get("button.ok"))
+			dialog.alert(i18n.get("common.error_title"), i18n.get("menu.about.update.install_error"), i18n.get("button.ok"))
 			_update_state = "idle"
 			update_menu_fn()
 			return
@@ -242,7 +242,7 @@ local function replace_and_reload(zip_path, update_menu_fn)
 		local ok_bak = os.rename(target, backup_app)
 		if not ok_bak then
 			Logger.error(LOG, "Could not move current .app to backup at %s.", backup_app)
-			dialog.alert(i18n.get("common.error"), i18n.get("menu.about.update.install_error"), i18n.get("button.ok"))
+			dialog.alert(i18n.get("common.error_title"), i18n.get("menu.about.update.install_error"), i18n.get("button.ok"))
 			_update_state = "idle"
 			update_menu_fn()
 			return
@@ -252,7 +252,7 @@ local function replace_and_reload(zip_path, update_menu_fn)
 			-- Attempt to restore from backup before bailing.
 			os.rename(backup_app, target)
 			Logger.error(LOG, "Could not move new .app to %s — restored backup.", target)
-			dialog.alert(i18n.get("common.error"), i18n.get("menu.about.update.install_error"), i18n.get("button.ok"))
+			dialog.alert(i18n.get("common.error_title"), i18n.get("menu.about.update.install_error"), i18n.get("button.ok"))
 			_update_state = "idle"
 			update_menu_fn()
 			return
@@ -290,7 +290,7 @@ local function one_click_update(channel, update_menu_fn)
 		local zip_path = os.tmpname() .. "_ErgoptiPlus.app.zip"
 		download_to_file(_cached_release.zip_url, zip_path, function(ok, err)
 			if not ok then
-				dialog.alert(i18n.get("common.error"), err, i18n.get("button.ok"))
+				dialog.alert(i18n.get("common.error_title"), err, i18n.get("button.ok"))
 				_update_state = "available"
 				update_menu_fn()
 				return
@@ -348,7 +348,7 @@ local function one_click_update(channel, update_menu_fn)
 		local zip_path = os.tmpname() .. "_ErgoptiPlus.app.zip"
 		download_to_file(zip_url, zip_path, function(ok, err)
 			if not ok then
-				dialog.alert(i18n.get("common.error"), err, i18n.get("button.ok"))
+				dialog.alert(i18n.get("common.error_title"), err, i18n.get("button.ok"))
 				_update_state = "available"
 				update_menu_fn()
 				return
