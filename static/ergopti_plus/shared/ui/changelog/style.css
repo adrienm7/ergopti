@@ -144,9 +144,9 @@ body {
 }
 
 .badge-prerelease {
-	background: rgba(191, 122, 240, 0.18);
-	color: #bf7af0;
-	border: 1px solid rgba(191, 122, 240, 0.35);
+	background: rgba(10, 132, 255, 0.18);
+	color: #4da6ff;
+	border: 1px solid rgba(10, 132, 255, 0.35);
 }
 
 .badge-latest {
