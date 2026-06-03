@@ -1,4 +1,4 @@
-{
+﻿{
 	"_meta.flag": "🇨🇳",
 	"_meta.locale": "zh",
 	"_meta.name": "中文",
@@ -171,7 +171,7 @@
 	"dialog.hotstrings.delete_title": "删除扩展",
 	"dialog.hotstrings.invalid_body": "请输入恰好一个字符。",
 	"dialog.hotstrings.invalid_title": "输入无效",
-	"dialog.hotstrings.new_delimiter_prompt": "Enter the delimiter character (one only):",
+	"dialog.hotstrings.new_delimiter_prompt": "分隔符",
 	"dialog.hotstrings.new_delimiter_title": "New word delimiter",
 	"dialog.hotstrings.new_prompt": "输入触发字符（仅一个字符）：",
 	"dialog.hotstrings.new_title": "新建词语扩展器",

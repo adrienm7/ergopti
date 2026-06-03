@@ -1,4 +1,4 @@
-{
+﻿{
 	"_meta.flag": "🇳🇱",
 	"_meta.locale": "nl",
 	"_meta.name": "Nederlands",
@@ -171,7 +171,7 @@
 	"dialog.hotstrings.delete_title": "Uitbreider verwijderen",
 	"dialog.hotstrings.invalid_body": "Voer precies één teken in.",
 	"dialog.hotstrings.invalid_title": "Ongeldige invoer",
-	"dialog.hotstrings.new_delimiter_prompt": "Enter the delimiter character (one only):",
+	"dialog.hotstrings.new_delimiter_prompt": "Scheidingsteken",
 	"dialog.hotstrings.new_delimiter_title": "New word delimiter",
 	"dialog.hotstrings.new_prompt": "Voer het activeringsteken in (precies één teken):",
 	"dialog.hotstrings.new_title": "Nieuwe woorduitbreider",

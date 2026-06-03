@@ -1,4 +1,4 @@
-{
+﻿{
 	"_meta.flag": "🇷🇺",
 	"_meta.locale": "ru",
 	"_meta.name": "Русский",
@@ -171,7 +171,7 @@
 	"dialog.hotstrings.delete_title": "Удалить расширитель",
 	"dialog.hotstrings.invalid_body": "Введите ровно один символ.",
 	"dialog.hotstrings.invalid_title": "Недопустимый ввод",
-	"dialog.hotstrings.new_delimiter_prompt": "Enter the delimiter character (one only):",
+	"dialog.hotstrings.new_delimiter_prompt": "Символ разделителя",
 	"dialog.hotstrings.new_delimiter_title": "New word delimiter",
 	"dialog.hotstrings.new_prompt": "Введите символ-триггер (ровно один символ):",
 	"dialog.hotstrings.new_title": "Новый расширитель слов",

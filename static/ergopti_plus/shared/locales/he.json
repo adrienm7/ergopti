@@ -1,4 +1,4 @@
-{
+﻿{
 	"_meta.flag": "🇮🇱",
 	"_meta.locale": "he",
 	"_meta.name": "עברית",
@@ -171,7 +171,7 @@
 	"dialog.hotstrings.delete_title": "מחק מרחיב",
 	"dialog.hotstrings.invalid_body": "אנא הזן תו אחד בדיוק.",
 	"dialog.hotstrings.invalid_title": "קלט לא חוקי",
-	"dialog.hotstrings.new_delimiter_prompt": "Enter the delimiter character (one only):",
+	"dialog.hotstrings.new_delimiter_prompt": "תו מפריד",
 	"dialog.hotstrings.new_delimiter_title": "New word delimiter",
 	"dialog.hotstrings.new_prompt": "הזן את תו ההפעלה (תו אחד בדיוק):",
 	"dialog.hotstrings.new_title": "מרחיב מילים חדש",

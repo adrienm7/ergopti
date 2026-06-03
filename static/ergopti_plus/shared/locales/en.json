@@ -1,4 +1,4 @@
-{
+﻿{
 	"_meta.flag": "🇬🇧",
 	"_meta.locale": "en",
 	"_meta.name": "English",
@@ -171,7 +171,7 @@
 	"dialog.hotstrings.delete_title": "Delete expander",
 	"dialog.hotstrings.invalid_body": "Please enter exactly one character.",
 	"dialog.hotstrings.invalid_title": "Invalid input",
-	"dialog.hotstrings.new_delimiter_prompt": "Enter the delimiter character (one only):",
+	"dialog.hotstrings.new_delimiter_prompt": "Delimiter character",
 	"dialog.hotstrings.new_delimiter_title": "New word delimiter",
 	"dialog.hotstrings.new_prompt": "Enter the trigger character (exactly one character):",
 	"dialog.hotstrings.new_title": "New word expander",

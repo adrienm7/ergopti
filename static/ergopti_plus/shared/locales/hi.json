@@ -1,4 +1,4 @@
-{
+﻿{
 	"_meta.flag": "🇮🇳",
 	"_meta.locale": "hi",
 	"_meta.name": "हिन्दी",
@@ -171,7 +171,7 @@
 	"dialog.hotstrings.delete_title": "एक्सपेंडर हटाएँ",
 	"dialog.hotstrings.invalid_body": "कृपया बिल्कुल एक वर्ण दर्ज करें।",
 	"dialog.hotstrings.invalid_title": "अमान्य इनपुट",
-	"dialog.hotstrings.new_delimiter_prompt": "Enter the delimiter character (one only):",
+	"dialog.hotstrings.new_delimiter_prompt": "सीमांकक वर्ण",
 	"dialog.hotstrings.new_delimiter_title": "New word delimiter",
 	"dialog.hotstrings.new_prompt": "ट्रिगर वर्ण दर्ज करें (बिल्कुल एक वर्ण):",
 	"dialog.hotstrings.new_title": "नया शब्द एक्सपेंडर",

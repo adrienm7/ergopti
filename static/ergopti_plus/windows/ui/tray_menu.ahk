@@ -942,15 +942,12 @@ _HS_DelimAddCustom() {
 	EditCtrl := G.Add("Edit", "xm y+6 w60 Limit1")
 	ChkCtrl  := G.Add("Checkbox", "xm y+10 w300", t("dialog.hotstrings.consume_checkbox"))
 	G.Add("Text", "xm y+14 w300 h1 0x10")  ; horizontal rule
-	BtnOK     := G.Add("Button", "xm y+10 w80 Default", t("button.ok"))
-	BtnCancel := G.Add("Button", "x+8 yp w80", t("button.cancel"))
-	Gui_HarmoniseButtonWidths([BtnOK, BtnCancel])
+	BtnOK := G.Add("Button", "xm y+10 w80 Default", t("button.ok"))
 
 	; Result holder — set by OK handler, read after WaitClose
 	Result := { Char: "", Consume: false, OK: false }
 
 	BtnOK.OnEvent("Click", (*) => _HS_DelimGuiSubmit(G, EditCtrl, ChkCtrl, Result))
-	BtnCancel.OnEvent("Click", (*) => G.Destroy())
 	G.OnEvent("Close", (*) => G.Destroy())
 	G.OnEvent("Escape", (*) => G.Destroy())
 

@@ -1,4 +1,4 @@
-{
+﻿{
 	"_meta.flag": "🇰🇷",
 	"_meta.locale": "ko",
 	"_meta.name": "한국어",
@@ -171,7 +171,7 @@
 	"dialog.hotstrings.delete_title": "확장기 삭제",
 	"dialog.hotstrings.invalid_body": "정확히 한 문자를 입력하세요.",
 	"dialog.hotstrings.invalid_title": "잘못된 입력",
-	"dialog.hotstrings.new_delimiter_prompt": "Enter the delimiter character (one only):",
+	"dialog.hotstrings.new_delimiter_prompt": "구분 문자",
 	"dialog.hotstrings.new_delimiter_title": "New word delimiter",
 	"dialog.hotstrings.new_prompt": "트리거 문자를 입력하세요 (정확히 한 문자):",
 	"dialog.hotstrings.new_title": "새 단어 확장기",

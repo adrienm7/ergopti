@@ -1,4 +1,4 @@
-{
+﻿{
 	"_meta.flag": "🇹🇷",
 	"_meta.locale": "tr",
 	"_meta.name": "Türkçe",
@@ -171,7 +171,7 @@
 	"dialog.hotstrings.delete_title": "Genişleticiyi sil",
 	"dialog.hotstrings.invalid_body": "Tam olarak bir karakter girin.",
 	"dialog.hotstrings.invalid_title": "Geçersiz giriş",
-	"dialog.hotstrings.new_delimiter_prompt": "Enter the delimiter character (one only):",
+	"dialog.hotstrings.new_delimiter_prompt": "Ayırıcı karakter",
 	"dialog.hotstrings.new_delimiter_title": "New word delimiter",
 	"dialog.hotstrings.new_prompt": "Tetikleyici karakteri girin (tam olarak bir karakter):",
 	"dialog.hotstrings.new_title": "Yeni kelime genişletici",

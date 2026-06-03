@@ -1,4 +1,4 @@
-{
+﻿{
 	"_meta.flag": "🇪🇸",
 	"_meta.locale": "es",
 	"_meta.name": "Español",
@@ -171,7 +171,7 @@
 	"dialog.hotstrings.delete_title": "Eliminar expansor",
 	"dialog.hotstrings.invalid_body": "Por favor, introduzca exactamente un carácter.",
 	"dialog.hotstrings.invalid_title": "Entrada no válida",
-	"dialog.hotstrings.new_delimiter_prompt": "Enter the delimiter character (one only):",
+	"dialog.hotstrings.new_delimiter_prompt": "Carácter delimitador",
 	"dialog.hotstrings.new_delimiter_title": "New word delimiter",
 	"dialog.hotstrings.new_prompt": "Introduzca el carácter desencadenador (exactamente un carácter):",
 	"dialog.hotstrings.new_title": "Nuevo expansor de palabras",

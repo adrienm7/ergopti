@@ -1,4 +1,4 @@
-{
+﻿{
 	"_meta.flag": "🇫🇷",
 	"_meta.locale": "fr",
 	"_meta.name": "Français",
@@ -171,7 +171,7 @@
 	"dialog.hotstrings.delete_title": "Supprimer l'expanseur",
 	"dialog.hotstrings.invalid_body": "Veuillez saisir exactement un seul caractère.",
 	"dialog.hotstrings.invalid_title": "Saisie invalide",
-	"dialog.hotstrings.new_delimiter_prompt": "Saisissez le caractère délimiteur (un seul) :",
+	"dialog.hotstrings.new_delimiter_prompt": "Caractère délimiteur",
 	"dialog.hotstrings.new_delimiter_title": "Nouveau délimiteur de mots",
 	"dialog.hotstrings.new_prompt": "Saisissez le caractère déclencheur (un seul caractère) :",
 	"dialog.hotstrings.new_title": "Nouvel expanseur de mots",
