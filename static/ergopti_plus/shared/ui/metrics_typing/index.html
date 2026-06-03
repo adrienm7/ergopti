@@ -934,6 +934,15 @@
 						} catch (e) {
 							console.error("receive_range_data failed:", e);
 						}
+					} else if (!has_prefetch && manifest_seeded && typeof window.apply_local_filters === "function") {
+						// Manifest-only push (no _prefetch_data): the n-gram tables stay
+						// unchanged but KPI cards (MPM/CPM, chars) must re-render against
+						// the freshly updated window.metrics_manifest.
+						try {
+							window.apply_local_filters();
+						} catch (e) {
+							console.error("apply_local_filters (manifest push) failed:", e);
+						}
 					}
 				}
 

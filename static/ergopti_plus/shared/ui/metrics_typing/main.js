@@ -32,6 +32,7 @@
 // Data pipeline
 window.process_manifest    = process_manifest;
 window.receive_range_data  = receive_range_data;
+window.apply_local_filters = apply_local_filters;
 // receive_live_update is already assigned in data.js via window.receive_live_update = ...
 
 // Filter management
