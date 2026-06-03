@@ -161,6 +161,7 @@
 	"dialog.gestures.warning_title": "Gesture warning",
 	"dialog.gpt_link.title": "Edit link opened by Win + G",
 	"dialog.hotstrings.consume_body": "Should the trigger character be consumed (not typed) during expansion?",
+	"dialog.hotstrings.consume_checkbox": "Consume (do not retype the character)",
 	"dialog.hotstrings.consume_no": "No — type the character",
 	"dialog.hotstrings.consume_title": "Trigger behaviour",
 	"dialog.hotstrings.consume_yes": "Yes — consume it",

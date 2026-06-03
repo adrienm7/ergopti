@@ -161,6 +161,7 @@
 	"dialog.gestures.warning_title": "Ostrzeżenie o gestach",
 	"dialog.gpt_link.title": "Edytuj link otwierany przez Win + G",
 	"dialog.hotstrings.consume_body": "Czy znak wyzwalający powinien być pochłonięty (nie wpisywany) podczas rozszerzania?",
+	"dialog.hotstrings.consume_checkbox": "Pochłoń (nie wpisuj znaku ponownie)",
 	"dialog.hotstrings.consume_no": "Nie — wpisz znak",
 	"dialog.hotstrings.consume_title": "Zachowanie wyzwalacza",
 	"dialog.hotstrings.consume_yes": "Tak — pochłoń go",

@@ -161,6 +161,7 @@
 	"dialog.gestures.warning_title": "אזהרת מחוות",
 	"dialog.gpt_link.title": "ערוך קישור הנפתח על ידי Win + G",
 	"dialog.hotstrings.consume_body": "האם יש לצרוך את תו ההפעלה (לא להקליד) במהלך ההרחבה?",
+	"dialog.hotstrings.consume_checkbox": "Consume (do not retype the character)",
 	"dialog.hotstrings.consume_no": "לא — הקלד את התו",
 	"dialog.hotstrings.consume_title": "התנהגות הפעלה",
 	"dialog.hotstrings.consume_yes": "כן — צרוך אותו",

@@ -161,6 +161,7 @@
 	"dialog.gestures.warning_title": "Gesten-Warnung",
 	"dialog.gpt_link.title": "Von Win + G geöffneten Link bearbeiten",
 	"dialog.hotstrings.consume_body": "Soll das Auslösezeichen bei der Expansion verbraucht (nicht getippt) werden?",
+	"dialog.hotstrings.consume_checkbox": "Verbrauchen (Zeichen nicht erneut tippen)",
 	"dialog.hotstrings.consume_no": "Nein — Zeichen tippen",
 	"dialog.hotstrings.consume_title": "Auslöseverhalten",
 	"dialog.hotstrings.consume_yes": "Ja — verbrauchen",

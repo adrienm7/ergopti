@@ -161,6 +161,7 @@
 	"dialog.gestures.warning_title": "تحذير الإيماءات",
 	"dialog.gpt_link.title": "تعديل الرابط الذي يفتحه Win + G",
 	"dialog.hotstrings.consume_body": "هل يجب استهلاك حرف التشغيل (عدم كتابته) أثناء التوسيع؟",
+	"dialog.hotstrings.consume_checkbox": "استهلاك (عدم إعادة كتابة الحرف)",
 	"dialog.hotstrings.consume_no": "لا — اكتب الحرف",
 	"dialog.hotstrings.consume_title": "سلوك التشغيل",
 	"dialog.hotstrings.consume_yes": "نعم — استهلكه",

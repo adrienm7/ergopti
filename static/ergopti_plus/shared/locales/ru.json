@@ -161,6 +161,7 @@
 	"dialog.gestures.warning_title": "Предупреждение о жестах",
 	"dialog.gpt_link.title": "Изменить ссылку, открываемую Win + G",
 	"dialog.hotstrings.consume_body": "Должен ли символ-триггер поглощаться (не вводиться) при раскрытии?",
+	"dialog.hotstrings.consume_checkbox": "Поглотить (не повторять символ)",
 	"dialog.hotstrings.consume_no": "Нет — ввести символ",
 	"dialog.hotstrings.consume_title": "Поведение триггера",
 	"dialog.hotstrings.consume_yes": "Да — поглотить",

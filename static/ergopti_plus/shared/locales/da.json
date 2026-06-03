@@ -161,6 +161,7 @@
 	"dialog.gestures.warning_title": "Gestusadvarsel",
 	"dialog.gpt_link.title": "Rediger link åbnet af Win + G",
 	"dialog.hotstrings.consume_body": "Skal triggertegnet være konsumeret (ikke tastet) under udvidelse?",
+	"dialog.hotstrings.consume_checkbox": "Forbruge (skriv ikke tegnet igen)",
 	"dialog.hotstrings.consume_no": "Nej — tast tegnet",
 	"dialog.hotstrings.consume_title": "Triggeradfærd",
 	"dialog.hotstrings.consume_yes": "Ja — konsumer det",

@@ -327,7 +327,8 @@ HotstringsConfigInit(_ConfigDir . "hotstrings_config.toml")
 ; Apply the user's word-delimiter preference so HSE fires on the right chars.
 ; HotstringsGetWordDelimiters() returns the stored override or the canonical
 ; default — assigning it here replaces the compile-time constant in the engine.
-HSE_WORD_TERMINATORS := HotstringsGetWordDelimiters()
+HSE_WORD_TERMINATORS    := HotstringsGetWordDelimiters()
+HSE_CONSUMED_DELIMITERS := HotstringsGetConsumedDelimiters()
 TooltipDequeueInit()
 
 ; Arm the suspend watchdog so the pause reactor (Ergopti_OnSuspendEnter/Resume)

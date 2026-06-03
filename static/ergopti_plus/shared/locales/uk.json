@@ -161,6 +161,7 @@
 	"dialog.gestures.warning_title": "Попередження про жести",
 	"dialog.gpt_link.title": "Змінити посилання, що відкривається Win + G",
 	"dialog.hotstrings.consume_body": "Чи повинен символ-тригер поглинатися (не вводитися) під час розширення?",
+	"dialog.hotstrings.consume_checkbox": "Поглинути (не вводити символ знову)",
 	"dialog.hotstrings.consume_no": "Ні — ввести символ",
 	"dialog.hotstrings.consume_title": "Поведінка тригера",
 	"dialog.hotstrings.consume_yes": "Так — поглинути",

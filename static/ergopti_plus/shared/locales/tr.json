@@ -161,6 +161,7 @@
 	"dialog.gestures.warning_title": "Hareket uyarısı",
 	"dialog.gpt_link.title": "Win + G tarafından açılan bağlantıyı düzenle",
 	"dialog.hotstrings.consume_body": "Genişletme sırasında tetikleyici karakter tüketilmeli mi (yazılmamalı mı)?",
+	"dialog.hotstrings.consume_checkbox": "Tüket (karakteri yeniden yazmayın)",
 	"dialog.hotstrings.consume_no": "Hayır — karakteri yaz",
 	"dialog.hotstrings.consume_title": "Tetikleyici davranışı",
 	"dialog.hotstrings.consume_yes": "Evet — tüket",
