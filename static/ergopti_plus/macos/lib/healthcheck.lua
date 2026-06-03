@@ -72,15 +72,15 @@ local ADAPTER_SPECS = {
 	},
 	{
 		id       = "adapters.notifier",
-		contract = { "notify" },
+		contract = { "send" },
 	},
 	{
 		id       = "adapters.process_lifecycle",
-		contract = { "launch", "kill" },
+		contract = { "start", "stop" },
 	},
 	{
 		id       = "adapters.secure_field_detector",
-		contract = { "is_secure" },
+		contract = { "isSecureField", "isSecureApp", "refresh" },
 	},
 	{
 		id       = "adapters.storage",
@@ -104,7 +104,7 @@ local ADAPTER_SPECS = {
 	},
 	{
 		id       = "adapters.window_info",
-		contract = { "focused_app", "focused_title" },
+		contract = { "getFocused", "getAll" },
 	},
 }
 
