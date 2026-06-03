@@ -936,7 +936,7 @@ _Onboarding_Step4() {
 	; Warning: plain orange text between two horizontal rules — simpler and reliable.
 	g.AddText("xm y+10 w" ONBOARDING_WIN_W - 40 " 0x10")  ; SS_ETCHEDHORZ — top separator
 	g.SetFont("s9 norm", "Segoe UI")
-	g.AddText("xm y+6 w" ONBOARDING_WIN_W - 40 " cFF8C00", Chr(0x26A0) " " t("onboarding.warning_label") " — " warning)
+	g.AddText("xm y+6 w" ONBOARDING_WIN_W - 40 " cFF8C00", Chr(0x26A0) " " warning)
 	g.SetFont("s10 norm", "Segoe UI")
 	g.AddText("xm y+6 w" ONBOARDING_WIN_W - 40 " 0x10")  ; SS_ETCHEDHORZ — bottom separator
 
