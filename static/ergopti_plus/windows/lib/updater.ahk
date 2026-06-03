@@ -344,9 +344,15 @@ Updater_FetchReleasesListJson(Channel := "") {
 		Req.Open("GET", Url, false)
 		Req.SetRequestHeader("Accept", "application/vnd.github+json")
 		Req.SetRequestHeader("User-Agent", "ErgoptiPlus-Updater/1.0")
+		; 15 s connect + 30 s receive — avoids blocking the UI indefinitely
+		; on a slow connection while still giving GitHub enough headroom.
+		Req.SetTimeouts(0, 15000, 30000, 30000)
 		Req.Send()
-		if (Req.Status == 200)
+		if (Req.Status == 200) {
 			Json := Req.ResponseText
+		} else {
+			LoggerWarn("Updater", "Releases list HTTP {1} for '{2}'.", Req.Status, Url)
+		}
 	} catch as Err {
 		LoggerWarn("Updater", "Releases list HTTP request failed: {1}.", Err.Message)
 	}

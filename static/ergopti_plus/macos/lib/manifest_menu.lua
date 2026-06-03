@@ -197,7 +197,10 @@ function M.build(manifest_key, category, dynamic_handlers, group_builders, ctx)
 			end
 			if type(built) == "table" then
 				flush_sep()
-				table.insert(result, { title = label, menu = built })
+				-- built may be a raw items list or a table with {menu=…, disabled=…}
+				local sub_menu    = type(built.menu) == "table" and built.menu or built
+				local sub_disabled = built.disabled or nil
+				table.insert(result, { title = label, menu = sub_menu, disabled = sub_disabled })
 				item_count = item_count + 1
 			end
 
