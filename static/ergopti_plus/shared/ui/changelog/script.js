@@ -312,9 +312,7 @@ function selectRelease(idx) {
 	if (tagEl)  tagEl.textContent  = release.tag_name || "";
 	if (metaEl) {
 		var parts = [];
-		if (release.name && release.name !== release.tag_name) parts.push(release.name);
 		if (release.published_at) parts.push(_formatDate(release.published_at));
-		if (release.prerelease) parts.push(_t("changelog_window.badge_prerelease") || "pre-release");
 		metaEl.textContent = parts.join("  ·  ");
 	}
 
@@ -403,16 +401,16 @@ function showError(message) {
 // ======================================
 
 (function init() {
+	// Read native config FIRST so channel buttons reflect the injected value.
+	if (window.__changelog_gh_owner) _ghOwner = window.__changelog_gh_owner;
+	if (window.__changelog_gh_repo)  _ghRepo  = window.__changelog_gh_repo;
+	if (window.__changelog_channel)  _currentChannel = window.__changelog_channel;
+
 	// Apply initial channel button state.
 	var btnStable = document.getElementById("btn-stable");
 	var btnDev    = document.getElementById("btn-dev");
 	if (btnStable) btnStable.classList.toggle("active", _currentChannel === "main");
 	if (btnDev)    btnDev.classList.toggle("active",    _currentChannel === "dev");
-
-	// Allow the native backend to configure the owner/repo before init runs.
-	if (window.__changelog_gh_owner) _ghOwner = window.__changelog_gh_owner;
-	if (window.__changelog_gh_repo)  _ghRepo  = window.__changelog_gh_repo;
-	if (window.__changelog_channel)  _currentChannel = window.__changelog_channel;
 
 	applyLabels();
 	showLoading();
