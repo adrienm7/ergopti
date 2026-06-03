@@ -98,6 +98,7 @@ global _ob_register_pending  := false
 
 ; Reference to the currently active wizard Gui object
 global _ob_gui          := 0
+global _ob_finish_hwnd  := 0   ; hwnd of the owner-drawn Finish button on step 6
 
 ; Debounce state for the step-1 language preview. ItemSelect fires on every
 ; arrow key / mouse movement, including deselect+select pairs for a single
@@ -490,7 +491,9 @@ _Onboarding_StepConfigDir() {
 	g.SetFont("s12 Bold")
 	g.AddText("xm w" ONBOARDING_WIN_W - 40 " y+12 Center", _Onboarding_StripBrand(t("dialog.config_folder.title")))
 	g.SetFont("s10 norm")
+	g.SetFont("s8")
 	g.AddText("xm w" ONBOARDING_WIN_W - 40 " y+4", t("dialog.config_folder.hint"))
+	g.SetFont("s10 norm")
 
 	; Row 1: short label + Browse on the same line. The previous "Personal
 	; configuration folder:" label was a near-duplicate of the title above, so
@@ -715,7 +718,7 @@ _Onboarding_Step2() {
 	; a compact action area.
 	global _ob_layout
 	rYes := g.AddRadio("vLayoutChoice xm y+8" . (_ob_layout ? " Checked" : ""), t("onboarding.layout.yes"))
-	rNo  := g.AddRadio("y+2", t("onboarding.layout.no"))
+	rNo  := g.AddRadio((!_ob_layout ? "Checked " : "") . "y+2", t("onboarding.layout.no"))
 
 	btns := _Onboarding_AddNavButtons(g, t("onboarding.back"), t("onboarding.next"))
 	btnBack := btns[1]
@@ -930,20 +933,16 @@ _Onboarding_Step4() {
 	; the red warning block.
 	metrics_path := StrReplace(_ConfigDir . "metrics", "\", "/")
 	warning := Format(t("dialog.metrics.enable_warning"), metrics_path)
-	; Warning block: outlined box (GroupBox) so it reads as a distinct "attention"
-	; area — the same visual treatment used in the Hammerspoon onboarding.
-	warnW := ONBOARDING_WIN_W - 40
-	warnBox := g.AddGroupBox("xm y+10 w" warnW, Chr(0x26A0) " " t("onboarding.warning_label"))
-	g.SetFont("s8 italic")
-	g.AddText("xm+" "10 y+6 w" warnW - 20 " cRed", warning)
-	g.SetFont("s10 norm")
-	; Bottom padding inside the box — an empty control at the box's inner bottom
-	; edge so the GroupBox auto-sizes tall enough to contain the text.
-	g.AddText("xm+" "10 y+6 w1 h1", "")
+	; Warning: plain orange text between two horizontal rules — simpler and reliable.
+	g.AddText("xm y+10 w" ONBOARDING_WIN_W - 40 " 0x10")  ; SS_ETCHEDHORZ — top separator
+	g.SetFont("s9 norm", "Segoe UI")
+	g.AddText("xm y+6 w" ONBOARDING_WIN_W - 40 " cFF8C00", Chr(0x26A0) " " t("onboarding.warning_label") " — " warning)
+	g.SetFont("s10 norm", "Segoe UI")
+	g.AddText("xm y+6 w" ONBOARDING_WIN_W - 40 " 0x10")  ; SS_ETCHEDHORZ — bottom separator
 
 	global _ob_metrics
-	rYes := g.AddRadio("vMetricsChoice xm y+12" . (_ob_metrics ? " Checked" : ""), t("onboarding.yes"))
-	rNo  := g.AddRadio("y+2", t("onboarding.no"))
+	rYes := g.AddRadio("vMetricsChoice xm y+10" . (_ob_metrics ? " Checked" : ""), t("onboarding.yes"))
+	rNo  := g.AddRadio((!_ob_metrics ? "Checked " : "") . "y+2", t("onboarding.no"))
 
 	btns := _Onboarding_AddNavButtons(g, t("onboarding.back"), t("onboarding.next"))
 	btnBack := btns[1]
@@ -991,7 +990,7 @@ _Onboarding_Step5() {
 	global _ob_gestures
 	g.AddText("w" ONBOARDING_WIN_W - 40 " y+12", "")
 	rYes := g.AddRadio("vGesturesChoice xm" . (_ob_gestures ? " Checked" : ""), t("onboarding.yes"))
-	rNo  := g.AddRadio("y+2", t("onboarding.no"))
+	rNo  := g.AddRadio((!_ob_gestures ? "Checked " : "") . "y+2", t("onboarding.no"))
 
 	; Registration panel — only visible when "Yes" is selected. We pre-build
 	; every control as hidden so the layout does not jump when the user clicks
@@ -1040,20 +1039,95 @@ _Onboarding_Step5() {
 	btns := _Onboarding_AddNavButtons(g, t("onboarding.back"), t("onboarding.finish"))
 	btnBack   := btns[1]
 	btnFinish := btns[2]
-	; Style the Finish button as a green call-to-action so it stands out from
-	; the Back button and signals successful completion. AHK native buttons do
-	; not support background colours directly — we use a BS_OWNERDRAW workaround
-	; via a subclassed static or, simpler, a coloured GroupBox overlay; instead
-	; the most reliable cross-theme approach is a custom drawn button via
-	; WM_CTLCOLORBTN. Simplest safe option: swap to a green-text bold label so
-	; it reads differently even without a background fill.
-	btnFinish.SetFont("s10 Bold cGreen")
+	; Style the Finish button as a green call-to-action. Win32 push-buttons with
+	; visual styles (UxTheme) ignore WM_CTLCOLORBTN. The reliable portable trick
+	; is to add BS_OWNERDRAW (0x0B) so Windows asks us to paint it, then respond
+	; to WM_DRAWITEM. We keep it simple: we send BM_SETTEXT is not enough, so
+	; instead we use SetWindowLong to change to BS_FLAT+owner-draw style, then
+	; hook WM_DRAWITEM on the Gui to do a filled green rect + white centred text.
+	; Simpler alternative that actually works across themes: use a Text control
+	; styled as a clickable label (SS_CENTER | SS_NOTIFY) with BackColor + cWhite.
+	; We go with that approach — create a green static-button lookalike.
+	finishHwnd := btnFinish.Hwnd
+	; Apply BS_OWNERDRAW style to the button so UxTheme does not override colours.
+	BS_OWNERDRAW := 0xB
+	curStyle := DllCall("GetWindowLong", "Ptr", finishHwnd, "Int", -16, "UInt")
+	DllCall("SetWindowLong", "Ptr", finishHwnd, "Int", -16, "UInt", (curStyle & ~0xF) | BS_OWNERDRAW)
+	; Register WM_DRAWITEM globally to paint the button green with white text.
+	; OnMessage() must be called at global scope — Gui objects have no OnMessage method.
+	_ob_finish_hwnd := finishHwnd
+	OnMessage(0x002B, _Onboarding_DrawFinishBtn)
 
 	btnBack.OnEvent("Click", _Step5_Back.Bind(g))
 	btnFinish.OnEvent("Click", _Step5_Finish.Bind(g, rYes))
 
 	_Onboarding_Show(g)
 	global _ob_gui := g
+}
+
+; WM_DRAWITEM handler for the owner-drawn Finish button — paints a green filled
+; rectangle with centred white text. Only acts on the Finish button hwnd.
+_Onboarding_DrawFinishBtn(wParam, lParam, msg, hwnd) {
+	global _ob_finish_hwnd
+	; DRAWITEMSTRUCT layout on 64-bit Windows (sizes and offsets):
+	;   CtlType   UINT  +0   (4)
+	;   CtlID     UINT  +4   (4)
+	;   itemID    UINT  +8   (4)
+	;   itemAction UINT +12  (4)
+	;   itemState UINT  +16  (4)
+	;   <4-byte pad to align Ptr>
+	;   hwndItem  Ptr   +24  (8)
+	;   hDC       Ptr   +32  (8)
+	;   rcItem    RECT  +40  (16: left+4 top+4 right+4 bottom+4)
+	;   itemData  UPtr  +56  (8)
+	ctlType := NumGet(lParam + 0,  "UInt")
+	if (ctlType != 4)   ; ODT_BUTTON = 4
+		return
+	btnHwnd := NumGet(lParam + 24, "Ptr")
+	if (_ob_finish_hwnd != 0 && btnHwnd != _ob_finish_hwnd)
+		return
+	itemState := NumGet(lParam + 16, "UInt")
+	hDC    := NumGet(lParam + 32, "Ptr")
+	rcL    := NumGet(lParam + 40, "Int")
+	rcT    := NumGet(lParam + 44, "Int")
+	rcR    := NumGet(lParam + 48, "Int")
+	rcB    := NumGet(lParam + 52, "Int")
+	; ODS_HOTLIGHT(0x40) = mouse hover, ODS_SELECTED(0x01) = pressed
+	; Lighten fill for hover, darken for press — same pattern as Windows native buttons
+	ODS_SELECTED := 0x01, ODS_HOTLIGHT := 0x40
+	if (itemState & ODS_SELECTED)
+		GREEN := 0x157030   ; pressed — darker green  (RGB #307015)
+	else if (itemState & ODS_HOTLIGHT)
+		GREEN := 0x22A848   ; hover  — lighter green  (RGB #48A822)
+	else
+		GREEN := 0x1A8C3A   ; normal — base green     (RGB #3A8C1A)
+	GreenBGR := ((GREEN & 0xFF) << 16) | (GREEN & 0xFF00) | ((GREEN >> 16) & 0xFF)
+	hBrush := DllCall("CreateSolidBrush", "UInt", GreenBGR, "Ptr")
+	RECT   := Buffer(16, 0)
+	NumPut("Int", rcL, RECT,  0)
+	NumPut("Int", rcT, RECT,  4)
+	NumPut("Int", rcR, RECT,  8)
+	NumPut("Int", rcB, RECT, 12)
+	; Fill green rounded rect then draw a 1-px darker-green border (radius 4 px)
+	RADIUS   := 8    ; RoundRect ellipse diameter = 2 × corner radius
+	; Darker border: #157030 BGR
+	BorderBGR := ((0x30 << 16) | (0x70 << 8) | 0x15)
+	hPen     := DllCall("CreatePen", "Int", 0, "Int", 1, "UInt", BorderBGR, "Ptr")
+	hOldBrush := DllCall("SelectObject", "Ptr", hDC, "Ptr", hBrush, "Ptr")
+	hOldPen   := DllCall("SelectObject", "Ptr", hDC, "Ptr", hPen,   "Ptr")
+	DllCall("RoundRect", "Ptr", hDC, "Int", rcL, "Int", rcT, "Int", rcR, "Int", rcB, "Int", RADIUS, "Int", RADIUS)
+	DllCall("SelectObject", "Ptr", hDC, "Ptr", hOldBrush)
+	DllCall("SelectObject", "Ptr", hDC, "Ptr", hOldPen)
+	DllCall("DeleteObject", "Ptr", hBrush)
+	DllCall("DeleteObject", "Ptr", hPen)
+	; Draw white centred text
+	DllCall("SetTextColor", "Ptr", hDC, "UInt", 0xFFFFFF)
+	DllCall("SetBkMode",    "Ptr", hDC, "Int", 1)   ; TRANSPARENT
+	btnText := ControlGetText(btnHwnd)
+	DT_CENTER := 0x01, DT_VCENTER := 0x04, DT_SINGLELINE := 0x20
+	DllCall("DrawText", "Ptr", hDC, "Str", btnText, "Int", -1,
+		"Ptr", RECT, "UInt", DT_CENTER | DT_VCENTER | DT_SINGLELINE)
+	return true
 }
 
 _Step5_OnRadioChange(regControls, statusLbl, isYes, *) {
@@ -1362,6 +1436,7 @@ _Onboarding_Commit() {
 ; ===== 6.1) Centering and display =====
 ; ======================================
 
+
 ; Center the wizard window on the primary monitor and show it. Also wire a
 ; Close handler so the X button does not leave Onboarding_Run() looping on a
 ; window that is no longer visible — instead it cleanly clears ``_ob_gui``
@@ -1412,26 +1487,25 @@ _Onboarding_AddProgressDots(g, stepIndex, winW := 0) {
 	;   - completed step → outline circled digit ➀..➅ in accent blue.
 	;   - upcoming step  → outline circled digit ➀..➅ in gray.
 	; Code points: 0x2776..0x277B = ➊..➏ (filled), 0x2780..0x2785 = ➀..➅ (outline);
-	; accessed via Chr to stay encoding-safe.
-	; s11 instead of s13: circled digits render larger than Latin letters at the
-	; same nominal size, so we reduce by 2 pt to match the surrounding s10 body.
-	g.SetFont("s11")
+	; Three glyph series, all from the same Segoe UI font block so metrics match:
+	;   Active  → U+2776+i  (➊➋➌➍➎➏) filled disc, digit knocked out — blue/green
+	;   Done    → U+2460+i-1 (①②③④⑤⑥) thin circle outline — blue
+	;   Upcoming→ same outline series — gray
+	; All rendered at s13 Bold so the advance widths are identical across states.
+	g.SetFont("s13 Bold")
 	loop ONBOARDING_TOTAL_STEPS {
 		i := A_Index
-		if (i = stepIndex) {
-			; Last step uses green instead of blue to signal "you're done".
-			color := (i = ONBOARDING_TOTAL_STEPS) ? ONBOARDING_DOT_LAST : ONBOARDING_DOT_ACTIVE
-			glyph := Chr(0x2775 + i)              ; ➊..➏ negative (filled) circled digit
-		} else if (i < stepIndex) {
-			color := ONBOARDING_DOT_ACTIVE        ; completed step — blue outline
-			glyph := Chr(0x277F + i)              ; ➀..➅ outline circled digit
-		} else {
-			color := ONBOARDING_DOT_IDLE          ; upcoming step — gray outline
-			glyph := Chr(0x277F + i)
-		}
 		x := startX + (i - 1) * ONBOARDING_DOT_PITCH
-		; First glyph anchors the row at the top margin (default Y for the first
-		; control on the page); the rest share its Y via ``yp``.
+		if (i = stepIndex) {
+			color := (i = ONBOARDING_TOTAL_STEPS) ? ONBOARDING_DOT_LAST : ONBOARDING_DOT_ACTIVE
+			glyph := Chr(0x2775 + i)   ; ➊=U+2776 … ➏=U+277B  filled disc
+		} else if (i < stepIndex) {
+			color := ONBOARDING_DOT_ACTIVE
+			glyph := Chr(0x245F + i)   ; ①=U+2460 … ⑥=U+2465  outline
+		} else {
+			color := ONBOARDING_DOT_IDLE
+			glyph := Chr(0x245F + i)
+		}
 		if (i = 1)
 			g.AddText("x" x " c" color, glyph)
 		else
