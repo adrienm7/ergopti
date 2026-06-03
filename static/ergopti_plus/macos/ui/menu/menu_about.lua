@@ -396,11 +396,8 @@ end
 --- @return table Menu item table for insertion into the parent menu.
 function M.build(ctx)
 	local state   = ctx and ctx.state or {}
-	-- When running from source, always use "dev" regardless of any stale TOML
-	-- value — stable releases do not exist yet so "main" yields an empty list.
-	local channel = _is_local and "dev"
-		or ((type(state.update_channel) == "string" and state.update_channel ~= "")
-			and state.update_channel or M.DEFAULT_STATE.update_channel)
+	local channel = (type(state.update_channel) == "string" and state.update_channel ~= "")
+		and state.update_channel or M.DEFAULT_STATE.update_channel
 	local ver     = current_version()
 	local ver_label = i18n.get("menu.about.title")
 
@@ -428,49 +425,43 @@ function M.build(ctx)
 		ver_display = "ErgoptiPlus " .. ver .. channel_tag
 	end
 
-	-- Changelog uses "dev" when running from source (all releases are pre-releases).
-	local effective_channel = local_src and "dev" or channel
-
-	-- Channel submenu: only for release builds.
-	local channel_items = {}
-	local channel_display
-	if not local_src then
-		channel_display = (channel == "dev")
-			and i18n.get("menu.about.channel_dev")
-			or  i18n.get("menu.about.channel_main")
-		channel_items = {
-			{
-				title   = i18n.get("menu.about.channel_main"),
-				checked = (channel == "main") or nil,
-				fn      = function() set_channel("main") end,
-			},
-			{
-				title   = i18n.get("menu.about.channel_dev"),
-				checked = (channel == "dev") or nil,
-				fn      = function() set_channel("dev") end,
-			},
-		}
-	end
+	-- Channel submenu — shown in both local and bundled modes.
+	local channel_display = (channel == "dev")
+		and i18n.get("menu.about.channel_dev")
+		or  i18n.get("menu.about.channel_main")
+	local channel_items = {
+		{
+			title   = i18n.get("menu.about.channel_main"),
+			checked = (channel == "main") or nil,
+			fn      = function() set_channel("main") end,
+		},
+		{
+			title   = i18n.get("menu.about.channel_dev"),
+			checked = (channel == "dev") or nil,
+			fn      = function() set_channel("dev") end,
+		},
+	}
 
 	local menu_items = {}
 
 	-- Version header — always the first item, always disabled.
 	table.insert(menu_items, { title = ver_display, disabled = true })
 
-	if not local_src then
-		table.insert(menu_items, { title = "-" })
-		-- Channel selector submenu with current value in the title, mirroring AHK.
-		local channel_title = i18n.get("menu.about.channel_menu") .. ": " .. (channel_display or "")
-		table.insert(menu_items, { title = channel_title, menu = channel_items })
+	table.insert(menu_items, { title = "-" })
 
-		-- Dynamic one-click update item.
+	-- Channel selector submenu — always shown so the user can switch.
+	local channel_title = i18n.get("menu.about.channel_menu") .. ": " .. channel_display
+	table.insert(menu_items, { title = channel_title, menu = channel_items })
+
+	if not local_src then
+		-- Dynamic one-click update item — only meaningful for bundled builds.
 		local is_busy = (_update_state == "checking" or _update_state == "installing")
 		table.insert(menu_items, {
 			title    = get_update_menu_label(),
 			disabled = is_busy or nil,
 			fn       = not is_busy and function()
-				Logger.info(LOG, "User triggered one-click update (channel: %s).", effective_channel)
-				one_click_update(effective_channel, update_menu_fn)
+				Logger.info(LOG, "User triggered one-click update (channel: %s).", channel)
+				one_click_update(channel, update_menu_fn)
 			end or nil,
 		})
 	end
@@ -479,8 +470,8 @@ function M.build(ctx)
 	table.insert(menu_items, {
 		title = i18n.get("menu.about.changelog"),
 		fn    = function()
-			Logger.info(LOG, "User opened changelog (channel: %s).", effective_channel)
-			show_changelog(effective_channel)
+			Logger.info(LOG, "User opened changelog (channel: %s).", channel)
+			show_changelog(channel)
 		end,
 	})
 	table.insert(menu_items, {
