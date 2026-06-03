@@ -65,7 +65,14 @@ function injectReleases(releases, channel) {
 	// Cancel the client-side fallback — native backend responded first.
 	_nativeResponded = true;
 	if (_fallbackTimer) { clearTimeout(_fallbackTimer); _fallbackTimer = null; }
-	_currentChannel = channel || _currentChannel;
+	if (channel) {
+		_currentChannel = channel;
+		// Sync channel buttons to match what the native backend actually served.
+		var btnStable = document.getElementById("btn-stable");
+		var btnDev    = document.getElementById("btn-dev");
+		if (btnStable) btnStable.classList.toggle("active", channel === "main");
+		if (btnDev)    btnDev.classList.toggle("active",    channel === "dev");
+	}
 	_releases = releases;
 	_selectedIndex = -1;
 	renderReleaseList();
