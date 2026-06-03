@@ -2213,10 +2213,22 @@ ActivateEdit(*) {
 }
 
 ToggleSuspend(*) {
-    global _LastSuspendState
+    global _LastSuspendState, _ALTGR_KANA_FIXUP
     if A_IsSuspended {
         Suspend(0)
     } else {
+        ; Keyboard-combo pause: SC138 (the Kana AltGr prefix) is physically held.
+        ; Wait for it to lift BEFORE suspending so the still-live AltGr layer sees
+        ; the release and clears its custom-combination prefix flag. Suspending
+        ; while SC138 is down strands that flag set — its release then lands while
+        ; the layer is disarmed — surfacing as « AltGr bloqué » after a menu/gesture
+        ; resume. A synthetic tap cannot clear it (only a real release does), so we
+        ; prevent the latch here instead. The guard makes a menu/gesture pause
+        ; (SC138 already up) suspend with no delay; T1 bounds the wait so a stuck
+        ; key can never hang the toggle.
+        if (IsSet(_ALTGR_KANA_FIXUP) and _ALTGR_KANA_FIXUP and GetKeyState("SC138", "P")) {
+            KeyWait("SC138", "T1")
+        }
         Suspend(1)
     }
     UpdateTrayIcon()
@@ -2418,6 +2430,25 @@ _RegisterScriptAltGrHotkeys() {
     Hotkey("SC138 & SC153",    _ScriptAltGrDeleteHandler,    "I2 S")
     Hotkey("RAlt & Escape",    _ScriptAltGrEscapeHandler,    "I2 S")
     Hotkey("SC138 & SC001",    _ScriptAltGrEscapeHandler,    "I2 S")
+    HotIf()
+
+    ; Suspend fallback. A pause toggled from anywhere other than the combo's own
+    ; hook thread (tray-menu « Suspendre », a gesture) rebuilds the keyboard hook
+    ; with the SC138/RAlt custom-combination prefix left un-armed, so the
+    ; ``SC138 & X`` combos above silently stop firing and the script can no longer
+    ; be un-paused from the keyboard. Re-detect the same chords as PLAIN SUFFIX
+    ; hotkeys gated on « suspended AND SC138 physically held »: a suffix hotkey
+    ; needs no prefix arming, so the menu-thread rebuild cannot break it, and it
+    ; never re-registers an SC138 prefix so it cannot latch the Kana key. They
+    ; reuse the existing handlers; the GetKeyState in the HotIf guarantees SC138
+    ; is down, so a lone Enter/BackSpace/Delete/Escape while paused is untouched
+    ; (HotIf false → native key). When the prefix IS armed (a keyboard pause) the
+    ; ``SC138 & X`` combo takes precedence, so these never double-fire.
+    HotIf((*) => A_IsSuspended and GetKeyState("SC138", "P"))
+    Hotkey("SC01C", _ScriptAltGrEnterHandler,     "I2 S")
+    Hotkey("SC00E", _ScriptAltGrBackSpaceHandler, "I2 S")
+    Hotkey("SC153", _ScriptAltGrDeleteHandler,    "I2 S")
+    Hotkey("SC001", _ScriptAltGrEscapeHandler,    "I2 S")
     HotIf()
 }
 
