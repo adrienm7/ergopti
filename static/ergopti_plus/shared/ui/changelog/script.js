@@ -62,6 +62,11 @@ function postBridgeMessage(msg) {
  */
 function injectReleases(releases, channel) {
 	if (!Array.isArray(releases)) return;
+	// Filter pre-releases on the JS side for the stable channel — avoids
+	// fragile server-side JSON parsing (AHK brace-depth tracker was unreliable).
+	if (channel === "main") {
+		releases = releases.filter(function (r) { return !r.prerelease; });
+	}
 	// Cancel the client-side fallback — native backend responded first.
 	_nativeResponded = true;
 	if (_fallbackTimer) { clearTimeout(_fallbackTimer); _fallbackTimer = null; }

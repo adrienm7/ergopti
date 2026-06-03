@@ -311,45 +311,8 @@ _CLW_DoFetch(Channel) {
 		return
 	}
 
-	; For the stable channel, filter out pre-releases.
-	; Parse the JSON array, strip pre-releases for "main", re-encode.
-	; We use a lightweight regex approach rather than a full JSON parser
-	; because AHK's JSON.parse may not be available in all builds.
-	if (Channel == "main") {
-		; Extract each release object and test its "prerelease" field.
-		FilteredParts := []
-		StartPos := 1
-		While (ObjStart := InStr(Json, "{", , StartPos)) {
-			; Find the matching closing brace using brace depth tracking.
-			Depth := 0
-			ObjEnd := ObjStart
-			Loop {
-				Ch := SubStr(Json, ObjEnd, 1)
-				if (Ch == "")
-					break
-				if (Ch == "{")
-					Depth++
-				else if (Ch == "}")
-					Depth--
-				if (Depth == 0)
-					break
-				ObjEnd++
-			}
-			ObjStr := SubStr(Json, ObjStart, ObjEnd - ObjStart + 1)
-			; Skip if "prerelease":true
-			if !RegExMatch(ObjStr, '"prerelease"\s*:\s*true')
-				FilteredParts.Push(ObjStr)
-			StartPos := ObjEnd + 1
-		}
-		; Re-assemble as JSON array.
-		FilteredJson := "["
-		for i, Part in FilteredParts {
-			FilteredJson .= (i > 1 ? "," : "") . Part
-		}
-		FilteredJson .= "]"
-		Json := FilteredJson
-	}
-
+	; Pass the raw JSON array to the JS side; injectReleases filters pre-releases
+	; for the "main" channel. Doing it in JS avoids a fragile AHK JSON parser.
 	try LoggerDone("Changelog", "Injecting releases (channel={1})…", Channel)
 	_CLW_Eval("injectReleases(" . Json . "," . _CLW_JsStr(Channel) . ")")
 }
