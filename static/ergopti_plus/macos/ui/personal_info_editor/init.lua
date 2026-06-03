@@ -35,21 +35,21 @@ local _srv        = nil
 
 -- Field definitions for the form. Keys match the preferences table.
 local FIELDS = {
-	{ key = "FirstName",            label = i18n.get("personal_info.field_firstname") },
-	{ key = "LastName",             label = "Nom" },
-	{ key = "DateOfBirth",          label = "Date de naissance" },
-	{ key = "EmailAddress",         label = "E-mail" },
-	{ key = "WorkEmailAddress",     label = "E-mail professionnel" },
-	{ key = "PhoneNumber",          label = i18n.get("personal_info.field_phone_digits") },
-	{ key = "PhoneNumberFormatted", label = i18n.get("personal_info.field_phone_formatted") },
-	{ key = "StreetAddress",        label = "Adresse" },
-	{ key = "PostalCode",           label = "Code postal" },
-	{ key = "City",                 label = "Ville" },
-	{ key = "Country",              label = "Pays" },
-	{ key = "IBAN",                 label = "IBAN" },
-	{ key = "BIC",                  label = "BIC" },
-	{ key = "CreditCard",           label = i18n.get("personal_info.field_credit_card") },
-	{ key = "SocialSecurityNumber", label = i18n.get("personal_info.field_ssn") },
+	{ key = "first_name",            label = i18n.get("personal_info.field_firstname") },
+	{ key = "last_name",             label = "Nom" },
+	{ key = "date_of_birth",         label = "Date de naissance" },
+	{ key = "email_address",         label = "E-mail" },
+	{ key = "work_email_address",    label = "E-mail professionnel" },
+	{ key = "phone_number",          label = i18n.get("personal_info.field_phone_digits") },
+	{ key = "phone_number_clean",    label = i18n.get("personal_info.field_phone_formatted") },
+	{ key = "street_address",        label = "Adresse" },
+	{ key = "postal_code",           label = "Code postal" },
+	{ key = "city",                  label = "Ville" },
+	{ key = "country",               label = "Pays" },
+	{ key = "iban",                  label = "IBAN" },
+	{ key = "bic",                   label = "BIC" },
+	{ key = "credit_card",           label = i18n.get("personal_info.field_credit_card") },
+	{ key = "social_security_number", label = i18n.get("personal_info.field_ssn") },
 }
 
 -- Response HTML displayed after a successful save (built at require-time so

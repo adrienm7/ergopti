@@ -58,12 +58,11 @@ global ONBOARDING_MARGIN_Y := 20
 global ONBOARDING_TOTAL_STEPS := 6
 ; Horizontal pitch (px) between adjacent step-glyph centres in the progress row.
 global ONBOARDING_DOT_PITCH := 28
-; Glyph colours (6-hex RGB, no 0x — matches AHK's ``c`` option format). Completed
-; and current steps use the strong accent blue; upcoming steps are gray. The last
-; step overrides the active colour to green (see _Onboarding_AddProgressDots).
+; Glyph colours (6-hex RGB, no 0x — matches AHK's ``c`` option format).
+; Completed steps use green; the current step uses accent blue; upcoming steps are gray.
 global ONBOARDING_DOT_ACTIVE := "1E6FD9"
 global ONBOARDING_DOT_IDLE   := "C8C8C8"
-global ONBOARDING_DOT_LAST   := "1A8C3A"  ; green — shown on the final step
+global ONBOARDING_DOT_DONE   := "1A8C3A"  ; green — shown on completed steps
 
 ; Default magic key inserted into the Step 3 input.
 ; ★ (U+2605 BLACK STAR) is the canonical Ergopti default — it sits on a
@@ -97,8 +96,7 @@ global _ob_config_dir        := IsSet(_ConfigDir) ? _ConfigDir : ""
 global _ob_register_pending  := false
 
 ; Reference to the currently active wizard Gui object
-global _ob_gui          := 0
-global _ob_finish_hwnd  := 0   ; hwnd of the owner-drawn Finish button on step 6
+global _ob_gui := 0
 
 ; Debounce state for the step-1 language preview. ItemSelect fires on every
 ; arrow key / mouse movement, including deselect+select pairs for a single
@@ -1043,95 +1041,12 @@ _Onboarding_Step5() {
 	btns := _Onboarding_AddNavButtons(g, t("onboarding.back"), t("onboarding.finish"))
 	btnBack   := btns[1]
 	btnFinish := btns[2]
-	; Style the Finish button as a green call-to-action. Win32 push-buttons with
-	; visual styles (UxTheme) ignore WM_CTLCOLORBTN. The reliable portable trick
-	; is to add BS_OWNERDRAW (0x0B) so Windows asks us to paint it, then respond
-	; to WM_DRAWITEM. We keep it simple: we send BM_SETTEXT is not enough, so
-	; instead we use SetWindowLong to change to BS_FLAT+owner-draw style, then
-	; hook WM_DRAWITEM on the Gui to do a filled green rect + white centred text.
-	; Simpler alternative that actually works across themes: use a Text control
-	; styled as a clickable label (SS_CENTER | SS_NOTIFY) with BackColor + cWhite.
-	; We go with that approach — create a green static-button lookalike.
-	finishHwnd := btnFinish.Hwnd
-	; Apply BS_OWNERDRAW style to the button so UxTheme does not override colours.
-	BS_OWNERDRAW := 0xB
-	curStyle := DllCall("GetWindowLong", "Ptr", finishHwnd, "Int", -16, "UInt")
-	DllCall("SetWindowLong", "Ptr", finishHwnd, "Int", -16, "UInt", (curStyle & ~0xF) | BS_OWNERDRAW)
-	; Register WM_DRAWITEM globally to paint the button green with white text.
-	; OnMessage() must be called at global scope — Gui objects have no OnMessage method.
-	_ob_finish_hwnd := finishHwnd
-	OnMessage(0x002B, _Onboarding_DrawFinishBtn)
 
 	btnBack.OnEvent("Click", _Step5_Back.Bind(g))
 	btnFinish.OnEvent("Click", _Step5_Finish.Bind(g, rYes))
 
 	_Onboarding_Show(g)
 	global _ob_gui := g
-}
-
-; WM_DRAWITEM handler for the owner-drawn Finish button — paints a green filled
-; rectangle with centred white text. Only acts on the Finish button hwnd.
-_Onboarding_DrawFinishBtn(wParam, lParam, msg, hwnd) {
-	global _ob_finish_hwnd
-	; DRAWITEMSTRUCT layout on 64-bit Windows (sizes and offsets):
-	;   CtlType   UINT  +0   (4)
-	;   CtlID     UINT  +4   (4)
-	;   itemID    UINT  +8   (4)
-	;   itemAction UINT +12  (4)
-	;   itemState UINT  +16  (4)
-	;   <4-byte pad to align Ptr>
-	;   hwndItem  Ptr   +24  (8)
-	;   hDC       Ptr   +32  (8)
-	;   rcItem    RECT  +40  (16: left+4 top+4 right+4 bottom+4)
-	;   itemData  UPtr  +56  (8)
-	ctlType := NumGet(lParam + 0,  "UInt")
-	if (ctlType != 4)   ; ODT_BUTTON = 4
-		return
-	btnHwnd := NumGet(lParam + 24, "Ptr")
-	if (_ob_finish_hwnd != 0 && btnHwnd != _ob_finish_hwnd)
-		return
-	itemState := NumGet(lParam + 16, "UInt")
-	hDC    := NumGet(lParam + 32, "Ptr")
-	rcL    := NumGet(lParam + 40, "Int")
-	rcT    := NumGet(lParam + 44, "Int")
-	rcR    := NumGet(lParam + 48, "Int")
-	rcB    := NumGet(lParam + 52, "Int")
-	; ODS_HOTLIGHT(0x40) = mouse hover, ODS_SELECTED(0x01) = pressed
-	; Lighten fill for hover, darken for press — same pattern as Windows native buttons
-	ODS_SELECTED := 0x01, ODS_HOTLIGHT := 0x40
-	if (itemState & ODS_SELECTED)
-		GREEN := 0x157030   ; pressed — darker green  (RGB #307015)
-	else if (itemState & ODS_HOTLIGHT)
-		GREEN := 0x22A848   ; hover  — lighter green  (RGB #48A822)
-	else
-		GREEN := 0x1A8C3A   ; normal — base green     (RGB #3A8C1A)
-	GreenBGR := ((GREEN & 0xFF) << 16) | (GREEN & 0xFF00) | ((GREEN >> 16) & 0xFF)
-	hBrush := DllCall("CreateSolidBrush", "UInt", GreenBGR, "Ptr")
-	RECT   := Buffer(16, 0)
-	NumPut("Int", rcL, RECT,  0)
-	NumPut("Int", rcT, RECT,  4)
-	NumPut("Int", rcR, RECT,  8)
-	NumPut("Int", rcB, RECT, 12)
-	; Fill green rounded rect then draw a 1-px darker-green border (radius 4 px)
-	RADIUS   := 8    ; RoundRect ellipse diameter = 2 × corner radius
-	; Darker border: #157030 BGR
-	BorderBGR := ((0x30 << 16) | (0x70 << 8) | 0x15)
-	hPen     := DllCall("CreatePen", "Int", 0, "Int", 1, "UInt", BorderBGR, "Ptr")
-	hOldBrush := DllCall("SelectObject", "Ptr", hDC, "Ptr", hBrush, "Ptr")
-	hOldPen   := DllCall("SelectObject", "Ptr", hDC, "Ptr", hPen,   "Ptr")
-	DllCall("RoundRect", "Ptr", hDC, "Int", rcL, "Int", rcT, "Int", rcR, "Int", rcB, "Int", RADIUS, "Int", RADIUS)
-	DllCall("SelectObject", "Ptr", hDC, "Ptr", hOldBrush)
-	DllCall("SelectObject", "Ptr", hDC, "Ptr", hOldPen)
-	DllCall("DeleteObject", "Ptr", hBrush)
-	DllCall("DeleteObject", "Ptr", hPen)
-	; Draw white centred text
-	DllCall("SetTextColor", "Ptr", hDC, "UInt", 0xFFFFFF)
-	DllCall("SetBkMode",    "Ptr", hDC, "Int", 1)   ; TRANSPARENT
-	btnText := ControlGetText(btnHwnd)
-	DT_CENTER := 0x01, DT_VCENTER := 0x04, DT_SINGLELINE := 0x20
-	DllCall("DrawText", "Ptr", hDC, "Str", btnText, "Int", -1,
-		"Ptr", RECT, "UInt", DT_CENTER | DT_VCENTER | DT_SINGLELINE)
-	return true
 }
 
 _Step5_OnRadioChange(regControls, statusLbl, isYes, *) {
@@ -1478,7 +1393,7 @@ _Onboarding_Show(g, widthW := unset) {
 ; @param winW       Int  Page width; defaults to ONBOARDING_WIN_W (step 2 passes the wider canvas).
 _Onboarding_AddProgressDots(g, stepIndex, winW := 0) {
 	global ONBOARDING_WIN_W, ONBOARDING_TOTAL_STEPS, ONBOARDING_DOT_PITCH
-	global ONBOARDING_DOT_ACTIVE, ONBOARDING_DOT_IDLE, ONBOARDING_DOT_LAST
+	global ONBOARDING_DOT_ACTIVE, ONBOARDING_DOT_IDLE, ONBOARDING_DOT_DONE
 	if (winW = 0)
 		winW := ONBOARDING_WIN_W
 	contentW := winW - 40                        ; usable width inside the 20 px side margins
@@ -1501,13 +1416,13 @@ _Onboarding_AddProgressDots(g, stepIndex, winW := 0) {
 		i := A_Index
 		x := startX + (i - 1) * ONBOARDING_DOT_PITCH
 		if (i = stepIndex) {
-			color := (i = ONBOARDING_TOTAL_STEPS) ? ONBOARDING_DOT_LAST : ONBOARDING_DOT_ACTIVE
+			color := ONBOARDING_DOT_ACTIVE            ; current step — always blue
 			glyph := Chr(0x2775 + i)   ; ➊=U+2776 … ➏=U+277B  filled disc
 		} else if (i < stepIndex) {
-			color := ONBOARDING_DOT_ACTIVE
+			color := ONBOARDING_DOT_DONE              ; completed steps — green
 			glyph := Chr(0x245F + i)   ; ①=U+2460 … ⑥=U+2465  outline
 		} else {
-			color := ONBOARDING_DOT_IDLE
+			color := ONBOARDING_DOT_IDLE              ; upcoming steps — gray
 			glyph := Chr(0x245F + i)
 		}
 		if (i = 1)

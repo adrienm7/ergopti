@@ -795,6 +795,11 @@ _HS_RepeatKey(M, _Cat) {
 	}
 }
 
+; Dynamic handler: open the delays-and-colors config window.
+_HS_DelaysColors(M, _Cat) {
+	RegisterMenuItem(M, t("menu.hotstrings.delays_colors"), OpenHotstringsConfigWindow)
+}
+
 ; Dynamic handler: standard hotstring categories.
 _HS_CategoriesStandard(M, _Cat) {
 	global HotstringCategoriesStd, SubMenus, Features
@@ -1967,6 +1972,7 @@ initMenu() {
 		"hotstring_extensions",          (M, C) => _HS_Extensions(M, C),
 		"magic_key_config",              (M, C) => _HS_MagicKeyConfig(M, C),
 		"repeat_key",                    (M, C) => _HS_RepeatKey(M, C),
+		"delays_colors",                 (M, C) => _HS_DelaysColors(M, C),
 	)
 
 	_HotGroupBuilders := Map(
