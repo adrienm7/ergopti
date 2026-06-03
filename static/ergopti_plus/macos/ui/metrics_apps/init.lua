@@ -51,7 +51,7 @@ local function resolve_ui_assets_dir(subdir)
 	source = source:sub(1, 1) == "@" and source:sub(2) or source
 	local this_dir = source:match("^(.*)/[^/]+$") or ""
 	if this_dir ~= "" then
-		local by_module = this_dir .. "/../../shared/ui/" .. subdir
+		local by_module = this_dir .. "/../../../shared/ui/" .. subdir
 		if fs.dir(by_module) then
 			Logger.debug(LOG, "resolve_ui_assets_dir('%s'): module path OK.", subdir)
 			return by_module .. "/"

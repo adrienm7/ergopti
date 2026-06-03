@@ -139,10 +139,10 @@ local function register_prefix_entries()
 
 	local opts = { is_word = false, auto_expand = true, is_case_sensitive = true }
 
-	local phone  = type(_personal_data.PhoneNumber) == "string" and _personal_data.PhoneNumber or tostring(_personal_data.PhoneNumber or "")
-	local fphone = type(_personal_data.PhoneNumberFormatted) == "string" and _personal_data.PhoneNumberFormatted or tostring(_personal_data.PhoneNumberFormatted or "")
-	local ssn    = type(_personal_data.SocialSecurityNumber) == "string" and _personal_data.SocialSecurityNumber or tostring(_personal_data.SocialSecurityNumber or "")
-	local iban   = type(_personal_data.IBAN) == "string" and _personal_data.IBAN or tostring(_personal_data.IBAN or "")
+	local phone  = type(_personal_data.phone_number) == "string" and _personal_data.phone_number or tostring(_personal_data.phone_number or "")
+	local fphone = type(_personal_data.phone_number_clean) == "string" and _personal_data.phone_number_clean or tostring(_personal_data.phone_number_clean or "")
+	local ssn    = type(_personal_data.social_security_number) == "string" and _personal_data.social_security_number or tostring(_personal_data.social_security_number or "")
+	local iban   = type(_personal_data.iban) == "string" and _personal_data.iban or tostring(_personal_data.iban or "")
 
 	-- Strip decorative spaces for prefix matching (SSN and IBAN contain spaces)
 	local ssn_raw  = ssn:gsub("%s+", "")

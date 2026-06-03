@@ -519,6 +519,17 @@ local function onKeyDownRaw(e)
 	-- 9-branch `or` chain further down, saving ~10 comparisons per keystroke.
 	if FAST_EXIT_KEYCODES[keyCode] then return false end
 
+	-- Fast-exit when a Hammerspoon webview has focus. The is_ignored_window cache
+	-- makes this nearly free on repeated keystrokes; it already treats the HS app
+	-- as always-ignored, so we move the check before the expensive LLM/interceptor
+	-- path so typing in any HS dialog or webview incurs no processing overhead.
+	do
+		local now_pre = hs.timer.secondsSinceEpoch()
+		if km_utils.is_ignored_window(CoreState.ignored_window_titles, CoreState.ignored_window_patterns, now_pre) then
+			return false
+		end
+	end
+
 	local now = hs.timer.secondsSinceEpoch()
 	local dt  = now - CoreState.last_key_time
 	CoreState.last_key_time = now
@@ -548,9 +559,9 @@ local function onKeyDownRaw(e)
 		return false
 	end
 
-	-- Defer is_ignored_window until after all cheap early-exits above have had
-	-- their chance. The AX call inside is_ignored_window is the single most
-	-- expensive per-keystroke operation when the cache has expired.
+	-- Cache hit guaranteed: is_ignored_window was already called above and returned
+	-- false (otherwise we would have early-exited). Re-call returns the same cached
+	-- value — needed here as `is_ignored` is passed on to LLM and later callers.
 	local is_ignored = km_utils.is_ignored_window(CoreState.ignored_window_titles, CoreState.ignored_window_patterns, now)
 
 	-- 2. Route LLM prediction keys (Enter / digits / arrows) before buffer logic.

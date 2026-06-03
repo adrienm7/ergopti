@@ -263,34 +263,48 @@ function M.show_window()
 	pcall(function() wv:allowGestures(false) end)
 	pcall(function() wv:level(hs.drawing.windowLevels.normal) end)
 
+	-- Wire up the copy-and-close button using a flag polled from Lua.
+	-- WKWebView rejects custom URL schemes (ergopti://) with NSURLErrorDomain -1002
+	-- before willNavigate fires, so we set a JS global instead and poll it.
+	local _poll_timer = nil
+	local function stop_poll()
+		if _poll_timer then _poll_timer:stop(); _poll_timer = nil end
+	end
+
 	pcall(function()
 		wv:windowCallback(function(action)
-			if action == "closing" or action == "closed" then _window = nil end
+			if action == "closing" or action == "closed" then
+				stop_poll()
+				_window = nil
+			end
 		end)
 	end)
 
-	-- Wire up the copy-and-close button once the page is fully loaded.
-	-- The button navigates to ergopti://copy_and_close; the navigationCallback
-	-- intercepts that URL, copies the plain-text to the clipboard, and closes
-	-- the window — returning false cancels the navigation so no error page loads.
 	pcall(function()
-		wv:navigationCallback(function(action, _, nav)
+		wv:navigationCallback(function(action, _)
 			if action == "didFinishNavigation" then
+				-- Inject a flag variable and a click handler that sets it
 				wv:evaluateJavaScript(
-					"document.getElementById('btnCopy').onclick=function(){"
-					.. "window.location='ergopti://copy_and_close';"
+					"window.__hs_copy_requested = false;"
+					.. "document.getElementById('btnCopy').onclick=function(){"
+					.. "window.__hs_copy_requested=true;"
 					.. "};"
 				)
-			elseif action == "willNavigate" then
-				local url = (type(nav) == "string") and nav or ""
-				if url:find("ergopti://copy_and_close") then
-					hs.pasteboard.setContents(plain)
-					if _window then
-						pcall(function() _window:delete() end)
-						_window = nil
-					end
-					return false  -- cancel navigation — no error page
-				end
+				-- Poll every 200 ms for the flag; stop and clean up when triggered
+				_poll_timer = hs.timer.new(0.2, function()
+					if not wv then stop_poll(); return end
+					wv:evaluateJavaScript("window.__hs_copy_requested", function(result)
+						if result == true then
+							hs.pasteboard.setContents(plain)
+							stop_poll()
+							if _window then
+								pcall(function() _window:delete() end)
+								_window = nil
+							end
+						end
+					end)
+				end)
+				_poll_timer:start()
 			end
 		end)
 	end)
