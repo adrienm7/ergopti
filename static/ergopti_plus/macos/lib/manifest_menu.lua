@@ -177,7 +177,7 @@ function M.build(manifest_key, category, dynamic_handlers, group_builders, ctx)
 			local i18n_key = type(item.i18n) == "string" and item.i18n or ""
 			if i18n_key ~= "" then
 				flush_sep()
-				table.insert(result, { title = "— " .. i18n.section(i18n_key) .. " —", disabled = true })
+				table.insert(result, { title = i18n.section(i18n_key), disabled = true })
 				item_count = item_count + 1
 			end
 
