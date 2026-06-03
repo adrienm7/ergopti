@@ -1,4 +1,4 @@
-{
+﻿{
 	"_meta.flag": "🇸🇪",
 	"_meta.locale": "sv",
 	"_meta.name": "Svenska",
@@ -170,6 +170,10 @@
 	"dialog.hotstrings.invalid_title": "Ogiltiga inmatningar",
 	"dialog.hotstrings.new_prompt": "Ange utlösartecknet (exakt ett tecken):",
 	"dialog.hotstrings.new_title": "Ny ordexpandare",
+	"dialog.hotstrings.delete_delimiter_body": "Are you sure you want to delete this custom delimiter?",
+	"dialog.hotstrings.delete_delimiter_title": "Delete delimiter",
+	"dialog.hotstrings.new_delimiter_prompt": "Enter the delimiter character (one only):",
+	"dialog.hotstrings.new_delimiter_title": "New word delimiter",
 	"dialog.keyboard_shortcut.prompt": "Välj tangentkombination:",
 	"dialog.keyboard_shortcut.title_prefix": "Välj en tangent — ",
 	"dialog.llm.delete_profile_prefix": "Ta bort \"",
@@ -717,6 +721,10 @@
 	"menu.hotstrings.tooltip_default": "Standardfördröjning (alla grupper)",
 	"menu.hotstrings.tooltip_magic": "★ Förhandsvisning",
 	"menu.hotstrings.word_delimiters": "Ordavgränsare",
+	"menu.hotstrings.delete_delimiter": "Delete this delimiter…",
+	"menu.hotstrings.add_delimiter": "+ Add custom delimiter…",
+	"menu.hotstrings.uncheck_all": "Uncheck all",
+	"menu.hotstrings.check_all": "Check all",
 	"menu.hotstrings.word_expanders": "⌨ Expandrar",
 	"menu.hs.gestures.modes": "Läge",
 	"menu.hs.gestures.modes.swipe_2_down": "Läge — 2-fingersväng ↓",

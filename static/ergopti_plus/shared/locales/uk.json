@@ -1,4 +1,4 @@
-{
+﻿{
 	"_meta.flag": "🇺🇦",
 	"_meta.locale": "uk",
 	"_meta.name": "Українська",
@@ -170,6 +170,10 @@
 	"dialog.hotstrings.invalid_title": "Недопустиме введення",
 	"dialog.hotstrings.new_prompt": "Введіть символ-тригер (рівно один символ):",
 	"dialog.hotstrings.new_title": "Новий розширювач слів",
+	"dialog.hotstrings.delete_delimiter_body": "Are you sure you want to delete this custom delimiter?",
+	"dialog.hotstrings.delete_delimiter_title": "Delete delimiter",
+	"dialog.hotstrings.new_delimiter_prompt": "Enter the delimiter character (one only):",
+	"dialog.hotstrings.new_delimiter_title": "New word delimiter",
 	"dialog.keyboard_shortcut.prompt": "Оберіть комбінацію клавіш:",
 	"dialog.keyboard_shortcut.title_prefix": "Оберіть клавішу — ",
 	"dialog.llm.delete_profile_prefix": "Видалити \"",
@@ -717,6 +721,10 @@
 	"menu.hotstrings.tooltip_default": "Затримка за замовчуванням (усі групи)",
 	"menu.hotstrings.tooltip_magic": "★ Попередній перегляд",
 	"menu.hotstrings.word_delimiters": "Роздільники слів",
+	"menu.hotstrings.delete_delimiter": "Delete this delimiter…",
+	"menu.hotstrings.add_delimiter": "+ Add custom delimiter…",
+	"menu.hotstrings.uncheck_all": "Uncheck all",
+	"menu.hotstrings.check_all": "Check all",
 	"menu.hotstrings.word_expanders": "⌨ Розширювачі",
 	"menu.hs.gestures.modes": "Режим",
 	"menu.hs.gestures.modes.swipe_2_down": "Режим — Свайп 2 пальцями ↓",

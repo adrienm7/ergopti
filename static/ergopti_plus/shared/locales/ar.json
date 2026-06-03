@@ -1,4 +1,4 @@
-{
+﻿{
 	"_meta.flag": "🇸🇦",
 	"_meta.locale": "ar",
 	"_meta.name": "العربية",
@@ -170,6 +170,10 @@
 	"dialog.hotstrings.invalid_title": "إدخال غير صالح",
 	"dialog.hotstrings.new_prompt": "أدخل حرف التشغيل (حرف واحد بالضبط):",
 	"dialog.hotstrings.new_title": "موسّع كلمات جديد",
+	"dialog.hotstrings.delete_delimiter_body": "Are you sure you want to delete this custom delimiter?",
+	"dialog.hotstrings.delete_delimiter_title": "Delete delimiter",
+	"dialog.hotstrings.new_delimiter_prompt": "Enter the delimiter character (one only):",
+	"dialog.hotstrings.new_delimiter_title": "New word delimiter",
 	"dialog.keyboard_shortcut.prompt": "حدد تركيبة المفاتيح:",
 	"dialog.keyboard_shortcut.title_prefix": "اختر مفتاحًا — ",
 	"dialog.llm.delete_profile_prefix": "حذف \"",
@@ -717,6 +721,10 @@
 	"menu.hotstrings.tooltip_default": "التأخير الافتراضي (جميع المجموعات)",
 	"menu.hotstrings.tooltip_magic": "★ معاينة",
 	"menu.hotstrings.word_delimiters": "محددات الكلمات",
+	"menu.hotstrings.delete_delimiter": "Delete this delimiter…",
+	"menu.hotstrings.add_delimiter": "+ Add custom delimiter…",
+	"menu.hotstrings.uncheck_all": "Uncheck all",
+	"menu.hotstrings.check_all": "Check all",
 	"menu.hotstrings.word_expanders": "⌨ موسّعات",
 	"menu.hs.gestures.modes": "الوضع",
 	"menu.hs.gestures.modes.swipe_2_down": "الوضع — تمرير بإصبعين ↓",

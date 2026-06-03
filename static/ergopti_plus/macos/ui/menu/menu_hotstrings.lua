@@ -628,59 +628,68 @@ function M.build_management(ctx)
 
 	delays_item = { title = i18n.get("menu.hotstrings.delays_colors"), disabled = paused or nil, menu = delay_menu }
 
-	-- Word-delimiter sub-menu: one checkable item per configurable character.
+	-- Word-delimiter sub-menu: mirrors the terminators sub-menu structure.
 	local delim_item = nil
 	if hs_cfg and type(hs_cfg.get_word_delimiters) == "function" then
-		local DELIM_DEFS = {
-			{ char = " ",        label_key = "hs_config.delim_space" },
-			{ char = "\t",       label_key = "hs_config.delim_tab"   },
-			{ char = ".",        label = "."   },
-			{ char = ",",        label = ","   },
-			{ char = ";",        label = ";"   },
-			{ char = ":",        label = ":"   },
-			{ char = "?",        label = "?"   },
-			{ char = "!",        label = "!"   },
-			{ char = "'",        label = "' (ASCII)"                  },
+		-- Fallback hardcoded list (manifest access is not guaranteed at menu-build time)
+		local builtin_defs = {
+			{ char = " ",                label = i18n.get("hs_config.delim_space") },
+			{ char = "\t",               label = i18n.get("hs_config.delim_tab")   },
+			{ char = ".",  label = "." }, { char = ",",  label = "," },
+			{ char = ";",  label = ";" }, { char = ":",  label = ":" },
+			{ char = "?",  label = "?" }, { char = "!",  label = "!" },
+			{ char = "'",  label = "' (ASCII)" },
 			{ char = "\xe2\x80\x99", label = "\xe2\x80\x99 (typogr.)" }, -- U+2019
-			{ char = "-",        label = "-"   },
-			{ char = "=",        label = "="   },
-			{ char = "(",        label = "("   },
-			{ char = ")",        label = ")"   },
-			{ char = "[",        label = "["   },
-			{ char = "]",        label = "]"   },
-			{ char = "/",        label = "/"   },
-			{ char = "\\",       label = "\\"  },
-			{ char = "+",        label = "+"   },
-			{ char = "*",        label = "*"   },
+			{ char = "-",  label = "-" }, { char = "=",  label = "=" },
+			{ char = "(",  label = "(" }, { char = ")",  label = ")" },
+			{ char = "[",  label = "[" }, { char = "]",  label = "]" },
+			{ char = "/",  label = "/" }, { char = "\\", label = "\\" },
+			{ char = "+",  label = "+" }, { char = "*",  label = "*" },
 		}
+
+		local builtin_chars = ""
+		for _, def in ipairs(builtin_defs) do builtin_chars = builtin_chars .. def.char end
+
 		local function build_delim_sub()
 			local current = hs_cfg.get_word_delimiters()
 			local sub = {}
-			for _, def in ipairs(DELIM_DEFS) do
-				local lbl = def.label_key and i18n.get(def.label_key) or def.label
-				local ch  = def.char
-				local checked = current:find(ch, 1, true) ~= nil
-				table.insert(sub, {
-					title   = lbl,
-					checked = checked or nil,
-					disabled = paused or nil,
-					fn = not paused and (function(c, l)
-						return function()
-							local cur = hs_cfg.get_word_delimiters()
-							local new
-							if cur:find(c, 1, true) then
-								-- Remove the character but always keep \r and \n
-								new = cur:gsub(c:gsub("[%(%)%.%%%+%-%*%?%[%^%$]", "%%%1"), "")
-							else
-								new = cur .. c
-							end
-							pcall(hs_cfg.set_word_delimiters, new)
-							pcall(ctx.updateMenu)
+
+			-- Bulk actions
+			table.insert(sub, {
+				title    = i18n.get("menu.hotstrings.check_all"),
+				disabled = paused or nil,
+				fn = not paused and function()
+					-- Enable all built-ins while preserving custom chars
+					local cur = hs_cfg.get_word_delimiters()
+					local new = "\r\n"
+					for _, def in ipairs(builtin_defs) do new = new .. def.char end
+					for i = 1, #cur do
+						local ch = cur:sub(i, i)
+						if ch ~= "\r" and ch ~= "\n" and not builtin_chars:find(ch, 1, true) then
+							new = new .. ch
 						end
-					end)(ch, lbl) or nil,
-				})
-			end
-			table.insert(sub, { title = "-" })
+					end
+					pcall(hs_cfg.set_word_delimiters, new)
+					pcall(ctx.updateMenu)
+				end or nil,
+			})
+			table.insert(sub, {
+				title    = i18n.get("menu.hotstrings.uncheck_all"),
+				disabled = paused or nil,
+				fn = not paused and function()
+					-- Keep only structural chars and custom chars
+					local cur = hs_cfg.get_word_delimiters()
+					local new = "\r\n"
+					for i = 1, #cur do
+						local ch = cur:sub(i, i)
+						if ch ~= "\r" and ch ~= "\n" and not builtin_chars:find(ch, 1, true) then
+							new = new .. ch
+						end
+					end
+					pcall(hs_cfg.set_word_delimiters, new)
+					pcall(ctx.updateMenu)
+				end or nil,
+			})
 			table.insert(sub, {
 				title    = i18n.get("hs_config.delimiters_reset"),
 				disabled = paused or nil,
@@ -689,8 +698,96 @@ function M.build_management(ctx)
 					pcall(ctx.updateMenu)
 				end or nil,
 			})
+			table.insert(sub, { title = "-" })
+
+			-- Built-in delimiters (checkable)
+			for _, def in ipairs(builtin_defs) do
+				local ch      = def.char
+				local lbl     = def.label
+				local checked = current:find(ch, 1, true) ~= nil
+				table.insert(sub, {
+					title    = lbl,
+					checked  = checked or nil,
+					disabled = paused or nil,
+					fn = not paused and (function(c)
+						return function()
+							local cur = hs_cfg.get_word_delimiters()
+							local new
+							if cur:find(c, 1, true) then
+								-- Escape pattern-special chars before gsub
+								new = cur:gsub(c:gsub("[%(%)%.%%%+%-%*%?%[%^%$]", "%%%1"), "")
+							else
+								new = cur .. c
+							end
+							pcall(hs_cfg.set_word_delimiters, new)
+							pcall(ctx.updateMenu)
+						end
+					end)(ch) or nil,
+				})
+			end
+			table.insert(sub, { title = "-" })
+
+			-- Custom delimiters (chars present in the string but not in the built-in list)
+			for i = 1, #current do
+				local ch = current:sub(i, i)
+				if ch ~= "\r" and ch ~= "\n" and not builtin_chars:find(ch, 1, true) then
+					local lbl   = ch .. " : " .. i18n.get("menu.hotstrings.custom_label")
+					local ct_sub = {
+						{
+							title    = i18n.get("menu.hotstrings.delete_delimiter"),
+							disabled = paused or nil,
+							fn = not paused and (function(c)
+								return function()
+									local res = dialog.block_alert(
+										i18n.get("dialog.hotstrings.delete_delimiter_title"),
+										i18n.get("dialog.hotstrings.delete_delimiter_body"),
+										i18n.get("button.delete"), i18n.get("button.cancel")
+									)
+									if res ~= i18n.get("button.delete") then return end
+									local cur = hs_cfg.get_word_delimiters()
+									pcall(hs_cfg.set_word_delimiters,
+										cur:gsub(c:gsub("[%(%)%.%%%+%-%*%?%[%^%$]", "%%%1"), ""))
+									pcall(ctx.updateMenu)
+								end
+							end)(ch) or nil,
+						}
+					}
+					table.insert(sub, { title = lbl, checked = true, menu = ct_sub, disabled = paused or nil })
+				end
+			end
+
+			-- Add custom delimiter button
+			table.insert(sub, {
+				title    = i18n.get("menu.hotstrings.add_delimiter"),
+				disabled = paused or nil,
+				fn = not paused and function()
+					local char
+					while true do
+						local ok_p, btn, char_raw = pcall(dialog.text_prompt,
+							i18n.get("dialog.hotstrings.new_delimiter_title"),
+							i18n.get("dialog.hotstrings.new_delimiter_prompt"),
+							"", i18n.get("button.ok"), i18n.get("button.cancel")
+						)
+						if not ok_p or btn ~= "OK" or type(char_raw) ~= "string" then return end
+						-- Accept exactly one Unicode code point (handles multi-byte UTF-8)
+						local first = char_raw:match("^([%z\1-\127\194-\244][\128-\191]*)")
+						if first and first ~= "" and first == char_raw then
+							char = first; break
+						end
+						dialog.block_alert(i18n.get("dialog.hotstrings.invalid_title"),
+							i18n.get("dialog.hotstrings.invalid_body"), i18n.get("button.retry"))
+					end
+					local cur = hs_cfg.get_word_delimiters()
+					if not cur:find(char, 1, true) then
+						pcall(hs_cfg.set_word_delimiters, cur .. char)
+					end
+					pcall(ctx.updateMenu)
+				end or nil,
+			})
+
 			return sub
 		end
+
 		delim_item = {
 			title    = i18n.get("menu.hotstrings.word_delimiters"),
 			disabled = paused or nil,

@@ -800,56 +800,95 @@ _HS_DelaysColors(M, _Cat) {
 	RegisterMenuItem(M, t("menu.hotstrings.delays_colors"), (*) => OpenHotstringsConfigWindow())
 }
 
-; Dynamic handler: word-delimiter sub-menu (checkboxes for each configurable character).
-; The sub-menu is rebuilt every time the tray opens so checkbox states are always fresh.
+; Dynamic handler: word-delimiter sub-menu, mirroring the terminators sub-menu.
+; Built-ins are declared inline (manifest access is not available from tray context);
+; custom ones are any chars in the effective string that are not in the built-in list.
 _HS_WordDelimiters(M, _Cat) {
-	global HOTSTRINGS_DEFAULT_WORD_DELIMITERS
-	Current := HotstringsGetWordDelimiters()
-	Defs := [
-		{ Char: " ",           Label: t("hs_config.delim_space") },
-		{ Char: "`t",          Label: t("hs_config.delim_tab")   },
-		{ Char: ".",           Label: "."   },
-		{ Char: ",",           Label: ","   },
-		{ Char: ";",           Label: ";"   },
-		{ Char: ":",           Label: ":"   },
-		{ Char: "?",           Label: "?"   },
-		{ Char: "!",           Label: "!"   },
-		{ Char: "'",           Label: "' (ASCII)"                },
-		{ Char: Chr(0x2019),   Label: Chr(0x2019) . " (typogr.)" },
-		{ Char: "-",           Label: "-"   },
-		{ Char: "=",           Label: "="   },
-		{ Char: "(",           Label: "("   },
-		{ Char: ")",           Label: ")"   },
-		{ Char: "[",           Label: "["   },
-		{ Char: "]",           Label: "]"   },
-		{ Char: "/",           Label: "/"   },
-		{ Char: "\",           Label: "\"   },
-		{ Char: "+",           Label: "+"   },
-		{ Char: "*",           Label: "*"   },
-	]
+	Sub := _HS_BuildDelimiterSubMenu()
+	M.Add(t("menu.hotstrings.word_delimiters"), Sub)
+}
+
+; Build the delimiter sub-menu fresh each time so checkbox states are always current.
+_HS_BuildDelimiterSubMenu() {
+	Current      := HotstringsGetWordDelimiters()
+	BuiltinDefs  := _HS_GetBuiltinDelimiterDefs()
+	BuiltinChars := ""
+	for D in BuiltinDefs {
+		BuiltinChars .= D.Char
+	}
 
 	Sub := Menu()
-	for D in Defs {
-		; Capture loop variable D by value — closure over Ch/Lbl avoids AHK late-binding issue
-		Ch := D.Char
+
+	; ── Bulk actions ─────────────────────────────────────────────────────────
+	RegisterMenuItem(Sub, t("menu.hotstrings.check_all"),      (*) => _HS_DelimSetAll(true))
+	RegisterMenuItem(Sub, t("menu.hotstrings.uncheck_all"),    (*) => _HS_DelimSetAll(false))
+	RegisterMenuItem(Sub, t("hs_config.delimiters_reset"),     (*) => _HS_DelimReset())
+	Sub.Add()
+
+	; ── Built-in delimiters ───────────────────────────────────────────────────
+	for D in BuiltinDefs {
+		Ch  := D.Char
 		Lbl := D.Label
-		Sub.Add(Lbl, ((C) => (*) => _HS_ToggleDelimiter(C))(Ch))
+		Sub.Add(Lbl, ((C) => (*) => _HS_DelimToggle(C))(Ch))
 		if (InStr(Current, Ch) > 0) {
 			Sub.Check(Lbl)
 		}
 	}
 	Sub.Add()
-	RegisterMenuItem(Sub, t("hs_config.delimiters_reset"), (*) => _HS_ResetDelimiters())
 
-	M.Add(t("menu.hotstrings.word_delimiters"), Sub)
+	; ── Custom delimiters (chars in effective string not in the built-in list) ──
+	; Structural chars (CR/LF) are always kept silently — never shown as toggleable
+	Fixed := "`r`n"
+	Loop StrLen(Current) {
+		Ch := SubStr(Current, A_Index, 1)
+		if (!InStr(Fixed, Ch) and !InStr(BuiltinChars, Ch)) {
+			Lbl   := Ch . " : " . t("menu.hotstrings.custom_label")
+			CtSub := Menu()
+			RegisterMenuItem(CtSub, t("menu.hotstrings.delete_delimiter"), ((C) => (*) => _HS_DelimRemoveCustom(C))(Ch))
+			Sub.Add(Lbl, CtSub)
+			; Custom delimiters are always active — they are present in the string
+			Sub.Check(Lbl)
+		}
+	}
+
+	; ── Add custom delimiter button ───────────────────────────────────────────
+	RegisterMenuItem(Sub, t("menu.hotstrings.add_delimiter"), (*) => _HS_DelimAddCustom())
+
+	return Sub
 }
 
-; Toggle a single delimiter character on/off and persist the result.
-_HS_ToggleDelimiter(Char) {
-	global HOTSTRINGS_DEFAULT_WORD_DELIMITERS
+; Return the hardcoded list of built-in delimiter definitions.
+; The manifest is not reliably accessible from tray context, so the list is inlined.
+_HS_GetBuiltinDelimiterDefs() {
+	Raw := [
+		{ Char: " ",           Label: t("hs_config.delim_space")           },
+		{ Char: "`t",          Label: t("hs_config.delim_tab")             },
+		{ Char: ".",           Label: "."                                   },
+		{ Char: ",",           Label: ","                                   },
+		{ Char: ";",           Label: ";"                                   },
+		{ Char: ":",           Label: ":"                                   },
+		{ Char: "?",           Label: "?"                                   },
+		{ Char: "!",           Label: "!"                                   },
+		{ Char: "'",           Label: "' (ASCII)"                           },
+		{ Char: Chr(0x2019),   Label: Chr(0x2019) . " (typogr.)"           },
+		{ Char: "-",           Label: "-"                                   },
+		{ Char: "=",           Label: "="                                   },
+		{ Char: "(",           Label: "("                                   },
+		{ Char: ")",           Label: ")"                                   },
+		{ Char: "[",           Label: "["                                   },
+		{ Char: "]",           Label: "]"                                   },
+		{ Char: "/",           Label: "/"                                   },
+		{ Char: "\",           Label: "\"                                   },
+		{ Char: "+",           Label: "+"                                   },
+		{ Char: "*",           Label: "*"                                   },
+	]
+	return Raw
+}
+
+; Toggle a single built-in delimiter on/off and persist.
+_HS_DelimToggle(Char) {
 	Current := HotstringsGetWordDelimiters()
 	if (InStr(Current, Char) > 0) {
-		; Remove the character (but never strip structural CR/LF)
 		New := StrReplace(Current, Char, "")
 	} else {
 		New := Current . Char
@@ -858,10 +897,69 @@ _HS_ToggleDelimiter(Char) {
 	TrayTip(t("hs_config.notify_delimiters_saved"), "", "Iconi Mute")
 }
 
-; Reset all delimiters to the built-in defaults and persist.
-_HS_ResetDelimiters() {
+; Set all built-in delimiters on (true) or off (false), preserving custom chars.
+_HS_DelimSetAll(Enable) {
+	Current      := HotstringsGetWordDelimiters()
+	BuiltinDefs  := _HS_GetBuiltinDelimiterDefs()
+	BuiltinChars := ""
+	for D in BuiltinDefs {
+		BuiltinChars .= D.Char
+	}
+	; Always preserve structural chars and any user-defined custom chars
+	Fixed := "`r`n"
+	Kept  := Fixed
+	Loop StrLen(Current) {
+		Ch := SubStr(Current, A_Index, 1)
+		if (!InStr(Fixed, Ch) and !InStr(BuiltinChars, Ch)) {
+			Kept .= Ch
+		}
+	}
+	if (Enable) {
+		for D in BuiltinDefs {
+			Kept .= D.Char
+		}
+	}
+	HotstringsSetWordDelimiters(Kept)
+	TrayTip(t("hs_config.notify_delimiters_saved"), "", "Iconi Mute")
+}
+
+; Reset all delimiters to the built-in defaults.
+_HS_DelimReset() {
 	global HOTSTRINGS_DEFAULT_WORD_DELIMITERS
 	HotstringsSetWordDelimiters(HOTSTRINGS_DEFAULT_WORD_DELIMITERS)
+	TrayTip(t("hs_config.notify_delimiters_saved"), "", "Iconi Mute")
+}
+
+; Prompt the user for a new custom delimiter character and persist it.
+_HS_DelimAddCustom() {
+	loop {
+		IB := InputBox(t("dialog.hotstrings.new_delimiter_prompt"), t("dialog.hotstrings.new_delimiter_title"))
+		if (IB.Result != "OK") {
+			return
+		}
+		Raw := IB.Value
+		if (StrLen(Raw) == 1) {
+			break
+		}
+		MsgBox(t("dialog.hotstrings.invalid_body"), t("dialog.hotstrings.invalid_title"))
+	}
+	Ch      := Raw
+	Current := HotstringsGetWordDelimiters()
+	if (InStr(Current, Ch) > 0) {
+		return
+	}
+	HotstringsSetWordDelimiters(Current . Ch)
+	TrayTip(t("hs_config.notify_delimiters_saved"), "", "Iconi Mute")
+}
+
+; Ask for confirmation then remove a custom delimiter character.
+_HS_DelimRemoveCustom(Char) {
+	Res := MsgBox(t("dialog.hotstrings.delete_delimiter_body"), t("dialog.hotstrings.delete_delimiter_title"), "YesNo")
+	if (Res != "Yes") {
+		return
+	}
+	Current := HotstringsGetWordDelimiters()
+	HotstringsSetWordDelimiters(StrReplace(Current, Char, ""))
 	TrayTip(t("hs_config.notify_delimiters_saved"), "", "Iconi Mute")
 }
 

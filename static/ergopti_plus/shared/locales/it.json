@@ -1,4 +1,4 @@
-{
+﻿{
 	"_meta.flag": "🇮🇹",
 	"_meta.locale": "it",
 	"_meta.name": "Italiano",
@@ -170,6 +170,10 @@
 	"dialog.hotstrings.invalid_title": "Input non valido",
 	"dialog.hotstrings.new_prompt": "Inserisci il carattere trigger (esattamente un carattere):",
 	"dialog.hotstrings.new_title": "Nuovo espansore parola",
+	"dialog.hotstrings.delete_delimiter_body": "Are you sure you want to delete this custom delimiter?",
+	"dialog.hotstrings.delete_delimiter_title": "Delete delimiter",
+	"dialog.hotstrings.new_delimiter_prompt": "Enter the delimiter character (one only):",
+	"dialog.hotstrings.new_delimiter_title": "New word delimiter",
 	"dialog.keyboard_shortcut.prompt": "Seleziona la combinazione di tasti:",
 	"dialog.keyboard_shortcut.title_prefix": "Scegli un tasto — ",
 	"dialog.llm.delete_profile_prefix": "Elimina \"",
@@ -717,6 +721,10 @@
 	"menu.hotstrings.tooltip_default": "Ritardo predefinito (tutti i gruppi)",
 	"menu.hotstrings.tooltip_magic": "★ Anteprima",
 	"menu.hotstrings.word_delimiters": "Delimitatori di parole",
+	"menu.hotstrings.delete_delimiter": "Delete this delimiter…",
+	"menu.hotstrings.add_delimiter": "+ Add custom delimiter…",
+	"menu.hotstrings.uncheck_all": "Uncheck all",
+	"menu.hotstrings.check_all": "Check all",
 	"menu.hotstrings.word_expanders": "⌨ Espansori",
 	"menu.hs.gestures.modes": "Modalità",
 	"menu.hs.gestures.modes.swipe_2_down": "Modalità — Swipe 2 dita ↓",
