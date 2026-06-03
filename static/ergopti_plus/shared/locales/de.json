@@ -716,6 +716,7 @@
 	"menu.hotstrings.tooltip_colored": "Farbige Vorschauen",
 	"menu.hotstrings.tooltip_default": "Standardverzögerung (alle Gruppen)",
 	"menu.hotstrings.tooltip_magic": "★ Vorschau",
+	"menu.hotstrings.word_delimiters": "Worttrennzeichen",
 	"menu.hotstrings.word_expanders": "⌨ Expander",
 	"menu.hs.gestures.modes": "Modus",
 	"menu.hs.gestures.modes.swipe_2_down": "Modus — 2-Finger-Wischen ↓",

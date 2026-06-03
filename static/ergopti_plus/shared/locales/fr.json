@@ -721,6 +721,7 @@
 	"menu.hotstrings.tooltip_colored": "Aperçus colorés",
 	"menu.hotstrings.tooltip_default": "Délai par défaut (tous groupes)",
 	"menu.hotstrings.tooltip_magic": "Aperçu ★",
+	"menu.hotstrings.word_delimiters": "Délimiteurs de mots",
 	"menu.hotstrings.word_expanders": "⌨ Expanseurs",
 	"menu.hs.gestures.modes": "Mode ",
 	"menu.hs.gestures.modes.swipe_2_down": "Mode  — Swipe 2 doigts ↓",

@@ -800,6 +800,71 @@ _HS_DelaysColors(M, _Cat) {
 	RegisterMenuItem(M, t("menu.hotstrings.delays_colors"), (*) => OpenHotstringsConfigWindow())
 }
 
+; Dynamic handler: word-delimiter sub-menu (checkboxes for each configurable character).
+; The sub-menu is rebuilt every time the tray opens so checkbox states are always fresh.
+_HS_WordDelimiters(M, _Cat) {
+	global HOTSTRINGS_DEFAULT_WORD_DELIMITERS
+	Current := HotstringsGetWordDelimiters()
+	Defs := [
+		{ Char: " ",           Label: t("hs_config.delim_space") },
+		{ Char: "`t",          Label: t("hs_config.delim_tab")   },
+		{ Char: ".",           Label: "."   },
+		{ Char: ",",           Label: ","   },
+		{ Char: ";",           Label: ";"   },
+		{ Char: ":",           Label: ":"   },
+		{ Char: "?",           Label: "?"   },
+		{ Char: "!",           Label: "!"   },
+		{ Char: "'",           Label: "' (ASCII)"                },
+		{ Char: Chr(0x2019),   Label: Chr(0x2019) . " (typogr.)" },
+		{ Char: "-",           Label: "-"   },
+		{ Char: "=",           Label: "="   },
+		{ Char: "(",           Label: "("   },
+		{ Char: ")",           Label: ")"   },
+		{ Char: "[",           Label: "["   },
+		{ Char: "]",           Label: "]"   },
+		{ Char: "/",           Label: "/"   },
+		{ Char: "\",           Label: "\"   },
+		{ Char: "+",           Label: "+"   },
+		{ Char: "*",           Label: "*"   },
+	]
+
+	Sub := Menu()
+	for D in Defs {
+		; Capture loop variable D by value — closure over Ch/Lbl avoids AHK late-binding issue
+		Ch := D.Char
+		Lbl := D.Label
+		Sub.Add(Lbl, ((C) => (*) => _HS_ToggleDelimiter(C))(Ch))
+		if (InStr(Current, Ch) > 0) {
+			Sub.Check(Lbl)
+		}
+	}
+	Sub.Add()
+	RegisterMenuItem(Sub, t("hs_config.delimiters_reset"), (*) => _HS_ResetDelimiters())
+
+	M.Add(t("menu.hotstrings.word_delimiters"), Sub)
+}
+
+; Toggle a single delimiter character on/off and persist the result.
+_HS_ToggleDelimiter(Char) {
+	global HOTSTRINGS_DEFAULT_WORD_DELIMITERS
+	Current := HotstringsGetWordDelimiters()
+	if (InStr(Current, Char) > 0) {
+		; Remove the character (but never strip structural CR/LF)
+		New := StrReplace(Current, Char, "")
+	} else {
+		New := Current . Char
+	}
+	HotstringsSetWordDelimiters(New)
+	TrayTip(t("hs_config.notify_delimiters_saved"), "", "Iconi Mute")
+}
+
+; Reset all delimiters to the built-in defaults and persist.
+_HS_ResetDelimiters() {
+	global HOTSTRINGS_DEFAULT_WORD_DELIMITERS
+	HotstringsSetWordDelimiters(HOTSTRINGS_DEFAULT_WORD_DELIMITERS)
+	TrayTip(t("hs_config.notify_delimiters_saved"), "", "Iconi Mute")
+}
+
 ; Dynamic handler: standard hotstring categories.
 _HS_CategoriesStandard(M, _Cat) {
 	global HotstringCategoriesStd, SubMenus, Features
@@ -1973,6 +2038,7 @@ initMenu() {
 		"magic_key_config",              (M, C) => _HS_MagicKeyConfig(M, C),
 		"repeat_key",                    (M, C) => _HS_RepeatKey(M, C),
 		"delays_colors",                 (M, C) => _HS_DelaysColors(M, C),
+		"word_delimiters",               (M, C) => _HS_WordDelimiters(M, C),
 	)
 
 	_HotGroupBuilders := Map(

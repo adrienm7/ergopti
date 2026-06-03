@@ -716,6 +716,7 @@
 	"menu.hotstrings.tooltip_colored": "Barevné náhledy",
 	"menu.hotstrings.tooltip_default": "Výchozí zpoždění (všechny skupiny)",
 	"menu.hotstrings.tooltip_magic": "★ Náhled",
+	"menu.hotstrings.word_delimiters": "Oddělovače slov",
 	"menu.hotstrings.word_expanders": "⌨ Expandéry",
 	"menu.hs.gestures.modes": "Režim",
 	"menu.hs.gestures.modes.swipe_2_down": "Režim — Přejetí 2 prsty ↓",
