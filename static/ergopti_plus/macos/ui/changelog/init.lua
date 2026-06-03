@@ -142,14 +142,15 @@ local function fetch_and_inject(channel)
 		end
 
 		-- For the stable channel, filter out pre-releases.
-		-- If filtering yields nothing (no stable releases yet), use all releases.
+		-- If none exist yet, inject an empty list so the JS shows the empty state
+		-- rather than silently falling back to showing all pre-releases as "stable".
 		local releases = data
 		if channel == "main" then
 			local stable = {}
 			for _, r in ipairs(data) do
 				if not r.prerelease then table.insert(stable, r) end
 			end
-			if #stable > 0 then releases = stable end
+			releases = stable
 		end
 
 		local ok_enc, json = pcall(hs.json.encode, releases)

@@ -19,12 +19,16 @@
  * ==============================================================================
  */
 
-var _currentChannel  = "main";
-var _releases        = [];
-var _selectedIndex   = -1;
+var _currentChannel    = "main";
+var _releases          = [];
+var _selectedIndex     = -1;
 var _currentReleaseUrl = null;
-var _ghOwner         = "adrienm7";
-var _ghRepo          = "ergopti";
+var _ghOwner           = "adrienm7";
+var _ghRepo            = "ergopti";
+// Set to true once the native backend has responded for the current channel;
+// prevents the client-side fallback from overwriting native data.
+var _nativeResponded   = false;
+var _fallbackTimer     = null;
 
 
 
@@ -56,6 +60,9 @@ function postBridgeMessage(msg) {
  */
 function injectReleases(releases, channel) {
 	if (!Array.isArray(releases)) return;
+	// Cancel the client-side fallback — native backend responded first.
+	_nativeResponded = true;
+	if (_fallbackTimer) { clearTimeout(_fallbackTimer); _fallbackTimer = null; }
 	_currentChannel = channel || _currentChannel;
 	_releases = releases;
 	_selectedIndex = -1;
@@ -143,18 +150,21 @@ function setChannel(channel) {
 	if (btnStable) btnStable.classList.toggle("active", channel === "main");
 	if (btnDev)    btnDev.classList.toggle("active",    channel === "dev");
 
-	// Ask the native backend to re-fetch; fall back to direct API call.
+	// Ask the native backend to re-fetch; fall back to direct API call after 800 ms
+	// only if the native backend has not responded (browser preview or no bridge).
 	postBridgeMessage(JSON.stringify({ action: "fetch", channel: channel }));
 	showLoading();
+	_nativeResponded = false;
 	_releases = [];
 	_selectedIndex = -1;
 	document.getElementById("release-list").innerHTML = "";
 	clearContent();
 
-	// Client-side fallback: fetch directly from the GitHub API.
-	// This only runs when the native backend does not handle the message
-	// (browser preview, or backend does not suppress the call).
-	_clientFetch(channel);
+	// Cancel any existing fallback timer before arming a new one.
+	if (_fallbackTimer) { clearTimeout(_fallbackTimer); _fallbackTimer = null; }
+	_fallbackTimer = setTimeout(function () {
+		if (!_nativeResponded) _clientFetch(channel);
+	}, 800);
 }
 
 /**
@@ -409,9 +419,9 @@ function showError(message) {
 
 	// Give the native backend 800 ms to inject data; if it does not respond,
 	// fall back to a direct API fetch so the UI is never stuck on a spinner.
-	setTimeout(function () {
-		if (_releases.length === 0) {
-			_clientFetch(_currentChannel);
-		}
+	_nativeResponded = false;
+	_fallbackTimer = setTimeout(function () {
+		_fallbackTimer = null;
+		if (!_nativeResponded) _clientFetch(_currentChannel);
 	}, 800);
 })();
