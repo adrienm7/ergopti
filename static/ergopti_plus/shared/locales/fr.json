@@ -161,6 +161,7 @@
 	"dialog.gestures.warning_title": "Avertissement Gestes",
 	"dialog.gpt_link.title": "Modifier le lien ouvert par Win + G",
 	"dialog.hotstrings.consume_body": "Voulez-vous que le caractère soit consommé (non tapé) lors de l'expansion ?",
+	"dialog.hotstrings.consume_checkbox": "Consommer (ne pas retaper le caractère)",
 	"dialog.hotstrings.consume_no": "Non — taper le caractère",
 	"dialog.hotstrings.consume_title": "Comportement du déclencheur",
 	"dialog.hotstrings.consume_yes": "Oui — consommer",

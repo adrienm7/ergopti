@@ -161,6 +161,7 @@
 	"dialog.gestures.warning_title": "제스처 경고",
 	"dialog.gpt_link.title": "Win + G로 열리는 링크 편집",
 	"dialog.hotstrings.consume_body": "확장 중에 트리거 문자를 소비해야 합니까 (입력되지 않음)?",
+	"dialog.hotstrings.consume_checkbox": "소비 (문자를 다시 입력하지 않음)",
 	"dialog.hotstrings.consume_no": "아니요 — 문자를 입력합니다",
 	"dialog.hotstrings.consume_title": "트리거 동작",
 	"dialog.hotstrings.consume_yes": "예 — 소비합니다",

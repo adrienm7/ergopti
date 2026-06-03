@@ -161,6 +161,7 @@
 	"dialog.gestures.warning_title": "Aviso de gesto",
 	"dialog.gpt_link.title": "Editar link aberto por Win + G",
 	"dialog.hotstrings.consume_body": "O caractere de acionamento deve ser consumido (não digitado) durante a expansão?",
+	"dialog.hotstrings.consume_checkbox": "Consumir (não redigitar o caractere)",
 	"dialog.hotstrings.consume_no": "Não — digitar o caractere",
 	"dialog.hotstrings.consume_title": "Comportamento do acionamento",
 	"dialog.hotstrings.consume_yes": "Sim — consumi-lo",

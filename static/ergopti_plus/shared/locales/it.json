@@ -161,6 +161,7 @@
 	"dialog.gestures.warning_title": "Avviso gesto",
 	"dialog.gpt_link.title": "Modifica link aperto da Win + G",
 	"dialog.hotstrings.consume_body": "Il carattere trigger deve essere consumato (non digitato) durante l'espansione?",
+	"dialog.hotstrings.consume_checkbox": "Consumare (non riscrivere il carattere)",
 	"dialog.hotstrings.consume_no": "No — digita il carattere",
 	"dialog.hotstrings.consume_title": "Comportamento trigger",
 	"dialog.hotstrings.consume_yes": "Sì — consumalo",

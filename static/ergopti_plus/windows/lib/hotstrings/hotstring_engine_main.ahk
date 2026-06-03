@@ -68,7 +68,13 @@ global HSE_MAX_BUFFER_LEN := 64
 ; that French contractions like "l'ia" let the "ia" trigger fire on the
 ; next terminator — the engine must treat the char after an apostrophe
 ; as the start of a new word, exactly like after a space.
-global HSE_WORD_TERMINATORS := " `t`r`n.,;:?!'’"
+global HSE_WORD_TERMINATORS := " `t`r`n.,;:?!’’"
+
+; Subset of HSE_WORD_TERMINATORS whose chars are consumed (not re-injected) after
+; an expansion fires. Empty by default — the user opts specific custom delimiters
+; into consume mode via the word-delimiter menu. Only characters also present in
+; HSE_WORD_TERMINATORS have any effect here.
+global HSE_CONSUMED_DELIMITERS := ""
 
 
 
@@ -980,7 +986,9 @@ HSE_DispatchMatch(Spec, EndChar) {
             ; SendEvent was only needed for AHK-native-engine cascade triggering,
             ; which HSE handles itself via its own buffer — no cascade benefit here.
             ReplacementPart := OnlyText ? ("{Text}" . Replacement) : Replacement
-            EndCharPart := (EndChar != "") ? EndChar : ""
+            ; Consume the end-char when it is explicitly listed as consumed —
+            ; otherwise always re-inject it so the user sees what they typed.
+            EndCharPart := (EndChar != "" and !InStr(HSE_CONSUMED_DELIMITERS, EndChar)) ? EndChar : ""
             Burst := BackSpaceSeq . ReplacementPart . EndCharPart
             ; Route through _SendHook when present (test harness) so the
             ; entire atomic burst is recorded and assertions can inspect it.

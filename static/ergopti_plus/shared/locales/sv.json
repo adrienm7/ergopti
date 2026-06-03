@@ -161,6 +161,7 @@
 	"dialog.gestures.warning_title": "Varningstecken för gester",
 	"dialog.gpt_link.title": "Redigera länk öppnad av Win + G",
 	"dialog.hotstrings.consume_body": "Ska utlösartecknet förbrukas (inte skrivas) under expansion?",
+	"dialog.hotstrings.consume_checkbox": "Förbruka (skriv inte om tecknet)",
 	"dialog.hotstrings.consume_no": "Nej — skriv tecknet",
 	"dialog.hotstrings.consume_title": "Utlösarbeteende",
 	"dialog.hotstrings.consume_yes": "Ja — förbruka det",

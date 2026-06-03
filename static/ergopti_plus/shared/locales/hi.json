@@ -161,6 +161,7 @@
 	"dialog.gestures.warning_title": "इशारा चेतावनी",
 	"dialog.gpt_link.title": "Win + G द्वारा खोली गई लिंक संपादित करें",
 	"dialog.hotstrings.consume_body": "क्या विस्तार के दौरान ट्रिगर वर्ण का उपभोग किया जाना चाहिए (टाइप न किया जाए)?",
+	"dialog.hotstrings.consume_checkbox": "Consume (do not retype the character)",
 	"dialog.hotstrings.consume_no": "नहीं — वर्ण टाइप करें",
 	"dialog.hotstrings.consume_title": "ट्रिगर व्यवहार",
 	"dialog.hotstrings.consume_yes": "हाँ — इसका उपभोग करें",

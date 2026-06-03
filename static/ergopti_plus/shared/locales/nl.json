@@ -161,6 +161,7 @@
 	"dialog.gestures.warning_title": "Gebaarwaarschuwing",
 	"dialog.gpt_link.title": "Link bewerken geopend door Win + G",
 	"dialog.hotstrings.consume_body": "Moet het activeringsteken worden verbruikt (niet getypt) tijdens uitbreiding?",
+	"dialog.hotstrings.consume_checkbox": "Verbruiken (teken niet opnieuw typen)",
 	"dialog.hotstrings.consume_no": "Nee — tik het teken",
 	"dialog.hotstrings.consume_title": "Activeringsgedrag",
 	"dialog.hotstrings.consume_yes": "Ja — verbruik het",

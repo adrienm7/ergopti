@@ -161,6 +161,7 @@
 	"dialog.gestures.warning_title": "Gesteradvarsel",
 	"dialog.gpt_link.title": "Rediger lenke åpnet av Win + G",
 	"dialog.hotstrings.consume_body": "Skal utløsertegnet forbrukes (ikke skrives) under utvidelse?",
+	"dialog.hotstrings.consume_checkbox": "Consume (do not retype the character)",
 	"dialog.hotstrings.consume_no": "Nei — skriv tegnet",
 	"dialog.hotstrings.consume_title": "Utløseratferd",
 	"dialog.hotstrings.consume_yes": "Ja — forbruk det",

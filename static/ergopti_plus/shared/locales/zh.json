@@ -161,6 +161,7 @@
 	"dialog.gestures.warning_title": "手势警告",
 	"dialog.gpt_link.title": "编辑 Win + G 打开的链接",
 	"dialog.hotstrings.consume_body": "扩展时是否消耗触发字符（不输出）？",
+	"dialog.hotstrings.consume_checkbox": "消耗（不重新输入字符）",
 	"dialog.hotstrings.consume_no": "否 — 输出字符",
 	"dialog.hotstrings.consume_title": "触发器行为",
 	"dialog.hotstrings.consume_yes": "是 — 消耗字符",

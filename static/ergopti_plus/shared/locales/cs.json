@@ -161,6 +161,7 @@
 	"dialog.gestures.warning_title": "Upozornění gesta",
 	"dialog.gpt_link.title": "Upravit odkaz otevřený pomocí Win + G",
 	"dialog.hotstrings.consume_body": "Má být spouštěcí znak spotřebován (nezapsán) při expanzi?",
+	"dialog.hotstrings.consume_checkbox": "Spotřebovat (nezadávat znak znovu)",
 	"dialog.hotstrings.consume_no": "Ne — zapsat znak",
 	"dialog.hotstrings.consume_title": "Chování spouštěče",
 	"dialog.hotstrings.consume_yes": "Ano — spotřebovat ho",

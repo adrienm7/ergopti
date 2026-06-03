@@ -161,6 +161,7 @@
 	"dialog.gestures.warning_title": "Advertencia de gestos",
 	"dialog.gpt_link.title": "Editar enlace abierto por Win + G",
 	"dialog.hotstrings.consume_body": "¿Debe consumirse el carácter desencadenador (no escribirse) durante la expansión?",
+	"dialog.hotstrings.consume_checkbox": "Consumir (no volver a escribir el carácter)",
 	"dialog.hotstrings.consume_no": "No — escribir el carácter",
 	"dialog.hotstrings.consume_title": "Comportamiento del desencadenador",
 	"dialog.hotstrings.consume_yes": "Sí — consumirlo",

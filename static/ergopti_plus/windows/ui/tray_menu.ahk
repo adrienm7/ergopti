@@ -838,11 +838,14 @@ _HS_BuildDelimiterSubMenu() {
 
 	; ── Custom delimiters (chars in effective string not in the built-in list) ──
 	; Structural chars (CR/LF) are always kept silently — never shown as toggleable
-	Fixed := "`r`n"
+	Fixed    := "`r`n"
+	Consumed := HotstringsGetConsumedDelimiters()
 	Loop StrLen(Current) {
 		Ch := SubStr(Current, A_Index, 1)
 		if (!InStr(Fixed, Ch) and !InStr(BuiltinChars, Ch)) {
-			Lbl   := Ch . " : " . t("menu.hotstrings.custom_label")
+			IsConsumed := InStr(Consumed, Ch) > 0
+			ConsumedSfx := IsConsumed ? (" " . t("menu.hotstrings.consumed_suffix")) : ""
+			Lbl   := Ch . " : " . t("menu.hotstrings.custom_label") . ConsumedSfx
 			CtSub := Menu()
 			RegisterMenuItem(CtSub, t("menu.hotstrings.delete_delimiter"), ((C) => (*) => _HS_DelimRemoveCustom(C))(Ch))
 			Sub.Add(Lbl, CtSub)
@@ -930,36 +933,73 @@ _HS_DelimReset() {
 	TrayTip(t("hs_config.notify_delimiters_saved"), "", "Iconi Mute")
 }
 
-; Prompt the user for a new custom delimiter character and persist it.
+; Mini GUI: one-shot dialog to pick a delimiter character and its consume mode.
+; Returns "" on cancel, or triggers the add immediately.
 _HS_DelimAddCustom() {
-	loop {
-		IB := InputBox(t("dialog.hotstrings.new_delimiter_prompt"), t("dialog.hotstrings.new_delimiter_title"))
-		if (IB.Result != "OK") {
-			return
-		}
-		Raw := IB.Value
-		if (StrLen(Raw) == 1) {
-			break
-		}
-		MsgBox(t("dialog.hotstrings.invalid_body"), t("dialog.hotstrings.invalid_title"))
-	}
-	Ch      := Raw
-	Current := HotstringsGetWordDelimiters()
-	if (InStr(Current, Ch) > 0) {
+	G := Gui("+AlwaysOnTop +Owner", t("dialog.hotstrings.new_delimiter_title"))
+	G.SetFont("s10", "Segoe UI")
+	G.Add("Text", "xm y10 w300", t("dialog.hotstrings.new_delimiter_prompt"))
+	EditCtrl := G.Add("Edit", "xm y+6 w60 Limit1")
+	ChkCtrl  := G.Add("Checkbox", "xm y+10 w300", t("dialog.hotstrings.consume_checkbox"))
+	G.Add("Text", "xm y+14 w300 h1 0x10")  ; horizontal rule
+	BtnOK     := G.Add("Button", "xm y+10 w80 Default", t("button.ok"))
+	BtnCancel := G.Add("Button", "x+8 yp w80", t("button.cancel"))
+	Gui_HarmoniseButtonWidths([BtnOK, BtnCancel])
+
+	; Result holder — set by OK handler, read after WaitClose
+	Result := { Char: "", Consume: false, OK: false }
+
+	BtnOK.OnEvent("Click", (*) => _HS_DelimGuiSubmit(G, EditCtrl, ChkCtrl, Result))
+	BtnCancel.OnEvent("Click", (*) => G.Destroy())
+	G.OnEvent("Close", (*) => G.Destroy())
+	G.OnEvent("Escape", (*) => G.Destroy())
+
+	G.Show("Center AutoSize")
+	; Block until the GUI is closed (OK or Cancel)
+	WinWaitClose("ahk_id " . G.Hwnd)
+
+	if (!Result.OK or Result.Char == "") {
 		return
 	}
+	Ch      := Result.Char
+	Current := HotstringsGetWordDelimiters()
+	if (InStr(Current, Ch) > 0) {
+		return  ; Already present — silently ignore
+	}
 	HotstringsSetWordDelimiters(Current . Ch)
+	if (Result.Consume) {
+		Consumed := HotstringsGetConsumedDelimiters()
+		if (!InStr(Consumed, Ch)) {
+			HotstringsSetConsumedDelimiters(Consumed . Ch)
+		}
+	}
 	TrayTip(t("hs_config.notify_delimiters_saved"), "", "Iconi Mute")
 }
 
-; Ask for confirmation then remove a custom delimiter character.
+; Called by the OK button of the add-delimiter GUI.
+_HS_DelimGuiSubmit(G, EditCtrl, ChkCtrl, Result) {
+	Ch := EditCtrl.Value
+	if (StrLen(Ch) != 1) {
+		MsgBox(t("dialog.hotstrings.invalid_body"), t("dialog.hotstrings.invalid_title"), "Icon!")
+		return
+	}
+	Result.Char    := Ch
+	Result.Consume := (ChkCtrl.Value == 1)
+	Result.OK      := true
+	G.Destroy()
+}
+
+; Confirm then remove a custom delimiter character (and its consume flag if set).
 _HS_DelimRemoveCustom(Char) {
 	Res := MsgBox(t("dialog.hotstrings.delete_delimiter_body"), t("dialog.hotstrings.delete_delimiter_title"), "YesNo")
 	if (Res != "Yes") {
 		return
 	}
-	Current := HotstringsGetWordDelimiters()
-	HotstringsSetWordDelimiters(StrReplace(Current, Char, ""))
+	HotstringsSetWordDelimiters(StrReplace(HotstringsGetWordDelimiters(), Char, ""))
+	Consumed := HotstringsGetConsumedDelimiters()
+	if (InStr(Consumed, Char)) {
+		HotstringsSetConsumedDelimiters(StrReplace(Consumed, Char, ""))
+	}
 	TrayTip(t("hs_config.notify_delimiters_saved"), "", "Iconi Mute")
 }
 

@@ -161,6 +161,7 @@
 	"dialog.gestures.warning_title": "ジェスチャーの警告",
 	"dialog.gpt_link.title": "Win + Gで開くリンクを編集",
 	"dialog.hotstrings.consume_body": "展開中にトリガー文字を消費（入力しない）しますか？",
+	"dialog.hotstrings.consume_checkbox": "消費する（文字を再入力しない）",
 	"dialog.hotstrings.consume_no": "いいえ — 文字を入力する",
 	"dialog.hotstrings.consume_title": "トリガーの動作",
 	"dialog.hotstrings.consume_yes": "はい — 消費する",

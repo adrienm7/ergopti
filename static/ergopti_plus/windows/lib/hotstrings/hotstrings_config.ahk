@@ -57,6 +57,11 @@ global _HotstringsOverridesPath := ""
 ; file. Empty string means "use the engine default".
 global _HotstringsWordDelimiters := ""
 
+; Chars within the active word-delimiter set that are consumed (not re-injected)
+; after an expansion fires. Stored in [__global__] consumed_delimiters in the
+; override file. Empty string means "consume nothing" (default behaviour).
+global _HotstringsConsumedDelimiters := ""
+
 ; In-memory cache of the override file content. Shape mirrors the HS module:
 ;   Map(category -> { Delay: Number|"", Color: String|"", ShowTooltip: true|"", Sections: Map(name -> { Delay, Color, ShowTooltip }) })
 global _HotstringsOverrides := Map()
@@ -75,21 +80,23 @@ global _HotstringsOverrides := Map()
 ; The path is shared with Hammerspoon so both drivers can read each other's
 ; edits after a reload.
 HotstringsConfigInit(OverridePath) {
-    global _HotstringsOverridesPath, _HotstringsOverrides, _HotstringsWordDelimiters
-    _HotstringsOverridesPath := OverridePath
-    _HotstringsOverrides := _ParseOverrides(OverridePath)
-    _HotstringsWordDelimiters := _ParseGlobalWordDelimiters(OverridePath)
+    global _HotstringsOverridesPath, _HotstringsOverrides
+    global _HotstringsWordDelimiters, _HotstringsConsumedDelimiters
+    _HotstringsOverridesPath    := OverridePath
+    _HotstringsOverrides        := _ParseOverrides(OverridePath)
+    _HotstringsWordDelimiters   := _ParseGlobalKey(OverridePath, "word_delimiters")
+    _HotstringsConsumedDelimiters := _ParseGlobalKey(OverridePath, "consumed_delimiters")
     try LoggerInfo("HotstringsConfig", "Initialized (override file: '{1}').", OverridePath)
 }
 
-; Read the ``word_delimiters`` key from the ``[__global__]`` section of the
-; override file. Returns "" when the file is missing or the key is absent —
-; the caller should fall back to the engine default in that case.
-_ParseGlobalWordDelimiters(Path) {
+; Read a quoted-string key from the ``[__global__]`` section of the override file.
+; Returns "" when the file is missing or the key is absent.
+_ParseGlobalKey(Path, KeyName) {
     if (Path == "" or !FileExist(Path)) {
         return ""
     }
     InGlobal := false
+    Pattern  := "^" . KeyName . "\s*=\s*`"((?:[^`"\\]|\\.)*)`"\s*$"
     loop read, Path {
         Line := Trim(A_LoopReadLine, " `t")
         if (Line == "[__global__]") {
@@ -99,7 +106,7 @@ _ParseGlobalWordDelimiters(Path) {
         if (InGlobal and SubStr(Line, 1, 1) == "[") {
             break
         }
-        if InGlobal and RegExMatch(Line, "^word_delimiters\s*=\s*`"((?:[^`"\\]|\\.)*)`"\s*$", &M) {
+        if InGlobal and RegExMatch(Line, Pattern, &M) {
             return UnescapeTomlString(M[1])
         }
     }
@@ -121,15 +128,38 @@ HotstringsSetWordDelimiters(Delimiters) {
     _SaveGlobalWordDelimiters(Delimiters)
 }
 
+; Return the effective consumed-delimiter string (empty = consume nothing).
+HotstringsGetConsumedDelimiters() {
+    global _HotstringsConsumedDelimiters
+    return _HotstringsConsumedDelimiters
+}
+
+; Persist a new consumed-delimiter string to [__global__] and update in memory.
+; Pass "" to clear (no chars consumed — default behaviour).
+HotstringsSetConsumedDelimiters(Consumed) {
+    global _HotstringsConsumedDelimiters, HSE_CONSUMED_DELIMITERS
+    _HotstringsConsumedDelimiters := Consumed
+    HSE_CONSUMED_DELIMITERS       := Consumed
+    _SaveGlobalKey("consumed_delimiters", Consumed, "")
+}
+
 ; Write (or clear) the ``word_delimiters`` key in ``[__global__]``.
 _SaveGlobalWordDelimiters(Delimiters) {
     global _HotstringsOverridesPath, HOTSTRINGS_DEFAULT_WORD_DELIMITERS
+    IsDefault := (Delimiters == HOTSTRINGS_DEFAULT_WORD_DELIMITERS or Delimiters == "")
+    _SaveGlobalKey("word_delimiters", IsDefault ? "" : Delimiters, "")
+}
+
+; Generic writer for a quoted-string key inside [__global__].
+; Writes KeyName = "Value" when Value is non-empty, removes the line otherwise.
+; Creates the [__global__] section when it doesn't exist yet.
+_SaveGlobalKey(KeyName, Value, _Unused := "") {
+    global _HotstringsOverridesPath
     Path := _HotstringsOverridesPath
     if (Path == "") {
         return
     }
 
-    ; Read existing file content; create an empty baseline when absent.
     if FileExist(Path) {
         Content := FileRead(Path, "UTF-8")
     } else {
@@ -141,7 +171,8 @@ _SaveGlobalWordDelimiters(Delimiters) {
     Found     := false
     FieldDone := false
     Out       := []
-    IsDefault := (Delimiters == HOTSTRINGS_DEFAULT_WORD_DELIMITERS or Delimiters == "")
+    IsEmpty   := (Value == "")
+    Pattern   := "^" . KeyName . "\s*="
 
     for _, RawLine in Lines {
         Line := Trim(RawLine, " `t`r")
@@ -152,38 +183,34 @@ _SaveGlobalWordDelimiters(Delimiters) {
             continue
         }
         if InGlobal and SubStr(Line, 1, 1) == "[" {
-            ; Flush any pending write before leaving the section
-            if !FieldDone and !IsDefault {
-                Out.Push("word_delimiters = `"" . _EscapeTomlString(Delimiters) . "`"")
+            if !FieldDone and !IsEmpty {
+                Out.Push(KeyName . " = `"" . _EscapeTomlString(Value) . "`"")
                 FieldDone := true
             }
             InGlobal := false
         }
-        if InGlobal and RegExMatch(Line, "^word_delimiters\s*=") {
-            if !IsDefault and !FieldDone {
-                Out.Push("word_delimiters = `"" . _EscapeTomlString(Delimiters) . "`"")
+        if InGlobal and RegExMatch(Line, Pattern) {
+            if !IsEmpty and !FieldDone {
+                Out.Push(KeyName . " = `"" . _EscapeTomlString(Value) . "`"")
                 FieldDone := true
             }
-            ; Skip the old line (cleared when IsDefault)
-            continue
+            continue  ; Skip old line (drop it when IsEmpty)
         }
         Out.Push(RawLine)
     }
 
-    if InGlobal and !FieldDone and !IsDefault {
-        Out.Push("word_delimiters = `"" . _EscapeTomlString(Delimiters) . "`"")
+    if InGlobal and !FieldDone and !IsEmpty {
+        Out.Push(KeyName . " = `"" . _EscapeTomlString(Value) . "`"")
     }
 
-    if !Found and !IsDefault {
-        ; Append a new [__global__] section at the end
+    if !Found and !IsEmpty {
         if (Out.Length > 0 and Out[Out.Length] != "") {
             Out.Push("")
         }
         Out.Push("[__global__]")
-        Out.Push("word_delimiters = `"" . _EscapeTomlString(Delimiters) . "`"")
+        Out.Push(KeyName . " = `"" . _EscapeTomlString(Value) . "`"")
     }
 
-    ; Trim trailing blank lines to one
     while Out.Length > 1 and Out[Out.Length] == "" and Out[Out.Length - 1] == "" {
         Out.Pop()
     }
