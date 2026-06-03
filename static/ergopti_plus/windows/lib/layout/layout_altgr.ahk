@@ -253,6 +253,18 @@ AltGrShiftDispatch(SC, Table, *) {
     if !Table.Has(SC) {
         return
     }
+    ; Regression guard-rail (kept on purpose for future debugging): the AltGr
+    ; layer must only ever dispatch while SC138 is PHYSICALLY held. A dispatch
+    ; with SC138 up means AHK's custom-combination prefix flag has latched on —
+    ; the « AltGr bloqué » bug that a non-keyboard resume used to trigger. It is
+    ; prevented at the source now (ToggleSuspend waits for SC138 to lift before
+    ; suspending), so this should never fire; logging it loudly as a WARNING means
+    ; any future recurrence is caught immediately in ErgoptiPlus_layout.log.
+    if !GetKeyState("SC138", "P") {
+        try LoggerWarn("LayoutAltGr",
+            "Spurious AltGr dispatch (SC138 not physically held — prefix flag latched?): SC={1}, SC138 logical={2}, suspended={3}.",
+            SC, GetKeyState("SC138"), A_IsSuspended)
+    }
     ; This dispatcher only runs on a real AltGr/Kana press — the HotIf in
     ; RegisterAltGrLayer guards every SC138 hotkey on IsRealAltGrPress().
     ; Ghost SC138 prefixes (injected by an OS driver for AltGr-mapped keys
