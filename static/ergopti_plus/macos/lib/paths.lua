@@ -69,7 +69,7 @@ function M.find_upward(base_dir, relative_target, max_steps)
 		if not parent or parent == current then break end
 		current = parent
 	end
-	Logger.warn(LOG, "find_upward('%s'): not found within %d levels of '%s'.", relative_target, max_steps, base_dir)
+	Logger.debug(LOG, "find_upward('%s'): not found within %d levels of '%s'.", relative_target, max_steps, base_dir)
 	return nil
 end
 
@@ -92,8 +92,11 @@ function M.find_from_configdir(relative_target, max_steps)
 	-- holds ergopti_plus/shared/.
 	if _script_dir ~= "" then
 		Logger.debug(LOG, "find_from_configdir('%s'): retrying from script dir '%s'.", relative_target, _script_dir)
-		return M.find_upward(_script_dir, relative_target, max_steps)
+		result = M.find_upward(_script_dir, relative_target, max_steps)
+		if result then return result end
 	end
+	-- Both attempts failed — this is a genuine misconfiguration worth surfacing.
+	Logger.warn(LOG, "find_from_configdir('%s'): not found from configdir or script dir.", relative_target)
 	return nil
 end
 

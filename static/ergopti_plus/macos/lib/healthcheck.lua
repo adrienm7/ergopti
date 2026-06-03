@@ -428,11 +428,12 @@ function _sys_info()
 	end
 	info.screen_res = res
 
-	-- System locale
+	-- System locale — hs.host.locale is a table; current() is the function
 	local locale = "?"
-	if ok_host and hs_host and type(hs_host.locale) == "function" then
-		local ok_l, l = pcall(hs_host.locale)
-		if ok_l and type(l) == "string" then locale = l end
+	if ok_host and hs_host and type(hs_host.locale) == "table"
+			and type(hs_host.locale.current) == "function" then
+		local ok_l, l = pcall(hs_host.locale.current)
+		if ok_l and type(l) == "string" and l ~= "" then locale = l end
 	end
 	info.locale = locale
 
@@ -443,11 +444,17 @@ function _sys_info()
 	end
 	info.config_dir = config_dir
 
-	-- Short git commit hash of the running source tree
+	-- Short git commit hash — run git from this file's directory so it reaches
+	-- the actual repo root even when hs.configdir is ~/.hammerspoon (not a repo).
+	local _this_dir = (function()
+		local src = (debug.getinfo(1, "S") or {}).source or ""
+		src = src:gsub("^@", "")
+		return src:match("^(.*)[/\\][^/\\]+$") or hs.configdir
+	end)()
 	local git_hash = "unknown"
-	local ok_git, out = pcall(hs.execute, "git -C " .. hs.configdir .. " rev-parse --short HEAD 2>/dev/null")
+	local ok_git, out = pcall(hs.execute, "git -C " .. _this_dir .. " rev-parse --short HEAD 2>/dev/null")
 	if ok_git and type(out) == "string" and out ~= "" then
-		git_hash = out:match("^%s*(.-)%s*$")  -- trim whitespace
+		git_hash = out:match("^%s*(.-)%s*$")
 	end
 	info.git_hash = git_hash
 
@@ -562,8 +569,8 @@ function _snapshot_to_html(snapshot, btn_label)
 		.. table.concat(sys_rows) .. "</table>"
 
 	-- Session counters table
-	local w_icon = warn_count == 0 and "<span class=ok>✓</span>" or "<span class=fail>✗</span>"
-	local e_icon = err_count  == 0 and "<span class=ok>✓</span>" or "<span class=fail>✗</span>"
+	local w_icon = warn_count == 0 and "<span class=ok>✓</span>" or "<span style='color:#b45309'>⚠️</span>"
+	local e_icon = err_count  == 0 and "<span class=ok>✓</span>" or "<span class=fail>❌</span>"
 	local ctr_tbl = "<table><tr><th>Type</th><th>Count</th></tr>"
 		.. "<tr><td>" .. w_icon .. " Warnings</td><td>" .. warn_count .. "</td></tr>"
 		.. "<tr><td>" .. e_icon .. " Errors</td><td>"   .. err_count  .. "</td></tr>"
