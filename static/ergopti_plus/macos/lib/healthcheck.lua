@@ -569,11 +569,11 @@ function _snapshot_to_html(snapshot, btn_label)
 		.. table.concat(sys_rows) .. "</table>"
 
 	-- Session counters table
-	local w_icon = warn_count == 0 and "<span class=ok>✓</span>" or "<span style='color:#b45309'>⚠️</span>"
-	local e_icon = err_count  == 0 and "<span class=ok>✓</span>" or "<span class=fail>❌</span>"
+	local w_count = (warn_count == 0 and "<span class=ok>✅ " or "<span class=fail>❌ ") .. warn_count .. "</span>"
+	local e_count = (err_count  == 0 and "<span class=ok>✅ " or "<span class=fail>❌ ") .. err_count  .. "</span>"
 	local ctr_tbl = "<table><tr><th>Type</th><th>Count</th></tr>"
-		.. "<tr><td>" .. w_icon .. " Warnings</td><td>" .. warn_count .. "</td></tr>"
-		.. "<tr><td>" .. e_icon .. " Errors</td><td>"   .. err_count  .. "</td></tr>"
+		.. "<tr><td>⚠️ Warnings</td><td>" .. w_count .. "</td></tr>"
+		.. "<tr><td>🔴 Errors</td><td>"   .. e_count .. "</td></tr>"
 		.. "</table>"
 
 	-- Adapters list
