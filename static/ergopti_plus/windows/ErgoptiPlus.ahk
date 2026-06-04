@@ -1604,14 +1604,12 @@ SaveFullConfig() {
 
     ; [hotstrings] root — MagicKey lives at hotstrings.trigger_char.
     Updates.Push({ Section: "hotstrings", Key: "trigger_char", Value: ScriptInformation["MagicKey"] })
-    ; magic_key_source_scan is only persisted when the user explicitly set a
-    ; custom scan AND ergopti_base is on — when emulation is off the scan is
-    ; resolved dynamically at startup from the active OS layout and must NOT
-    ; be frozen in the TOML (doing so would break the next reload on a
-    ; different layout). magic_key_source_char is always derived, never saved.
-    if (IsSet(Features) and Features["layout"]["ergopti_base"]
-        and ScriptInformation["MagicKeySourceScan"] != "SC02E")
-        Updates.Push({ Section: "hotstrings", Key: "magic_key_source_scan", Value: ScriptInformation["MagicKeySourceScan"] })
+    ; magic_key_source_scan and magic_key_source_char are intentionally NOT
+    ; persisted here. The scan is either SC02E (Ergopti default, needs no
+    ; entry) or resolved dynamically at startup from the active OS layout
+    ; (must not be frozen or it breaks reload on layout switch). Manual
+    ; overrides can be added directly to config.toml by the user and are
+    ; respected by ReadScriptConfig without ever being rewritten here.
 
     ; [ahk.shortcuts.script_control] — script management hotkey slots.
     if IsSet(ScriptShortcutAssignments) {
