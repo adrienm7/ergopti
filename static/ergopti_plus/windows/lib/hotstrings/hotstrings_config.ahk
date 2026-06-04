@@ -59,6 +59,17 @@ global HOTSTRINGS_CATEGORY_DEFAULT_COLORS := Map(
 ; override is stored in hotstrings_config.toml.
 global HOTSTRINGS_DEFAULT_WORD_DELIMITERS := " `t`r`n.,;:?!''"
 
+; Shared terminator catalogue instance — the single source of truth for the
+; word-expander LIST (labels, order, separators), generated from
+; shared/domain/Terminators.spec.js and shared verbatim with macOS. Both the
+; tray submenu and the config-window checkboxes render HSE_Terminators.all() so
+; the catalogue can never drift between the two UIs or between drivers. The
+; instance is created once at load — before initMenu reads it — so the menu
+; build never hits an unassigned global. Per-entry enabled state is still
+; persisted as the word-delimiter string (see HotstringsGetWordDelimiters); the
+; catalogue supplies the items, the string supplies which are active.
+global HSE_Terminators := Terminators()
+
 ; Absolute path of the user override file (set by HotstringsConfigInit).
 global _HotstringsOverridesPath := ""
 
@@ -690,4 +701,96 @@ HotstringsConfigReload() {
 HotstringsConfigPath() {
     global _HotstringsOverridesPath
     return _HotstringsOverridesPath
+}
+
+
+
+
+; ============================================================
+; ============================================================
+; ======= 3/ Terminator catalogue helpers ===================
+; ============================================================
+; ============================================================
+
+; Pure helpers shared by the tray word-expander submenu and the config-window
+; checkbox grid so the per-entry enable/toggle logic lives in exactly one place
+; (and is unit-tested via test_terminators.ahk). They operate on the active
+; word-delimiter STRING — the persisted serialization of the catalogue's
+; enabled state — and the generated HSE_Terminators catalogue. No I/O here;
+; callers persist the returned string via HotstringsSetWordDelimiters.
+
+; Concatenated chars of every built-in (non-separator) catalogue entry. Used to
+; tell user-defined custom delimiters apart from catalogue ones.
+HSE_TerminatorBuiltinChars() {
+    global HSE_Terminators
+    Out := ""
+    for D in HSE_Terminators.all() {
+        if (D.Has("type") and D["type"] == "separator")
+            continue
+        for Ch in D["chars"]
+            Out .= Ch
+    }
+    return Out
+}
+
+; True when EVERY char of a catalogue entry is present in the delimiter string
+; (an entry such as "enter" owns both CR and LF and toggles as one unit).
+HSE_TerminatorEntryEnabled(CharsArr, WordStr) {
+    if (CharsArr.Length == 0)
+        return false
+    for Ch in CharsArr {
+        if !InStr(WordStr, Ch)
+            return false
+    }
+    return true
+}
+
+; True when any of the entry's chars appears in the given string (used to render
+; the "(consumed)" suffix from the actual consumed-delimiter set).
+HSE_TerminatorAnyCharIn(CharsArr, Hay) {
+    for Ch in CharsArr {
+        if InStr(Hay, Ch)
+            return true
+    }
+    return false
+}
+
+; Pure: return WordStr with the entry's chars toggled — all removed when the
+; entry is currently enabled, all added otherwise.
+HSE_TerminatorToggleString(WordStr, CharsArr) {
+    if HSE_TerminatorEntryEnabled(CharsArr, WordStr) {
+        for Ch in CharsArr
+            WordStr := StrReplace(WordStr, Ch, "")
+    } else {
+        for Ch in CharsArr {
+            if !InStr(WordStr, Ch)
+                WordStr .= Ch
+        }
+    }
+    return WordStr
+}
+
+; Pure: return WordStr with every built-in catalogue char enabled (Enable=true)
+; or removed (Enable=false), always preserving user-defined custom chars (those
+; owned by no catalogue entry). CR/LF belong to the "enter" entry and follow it.
+HSE_TerminatorSetAllString(WordStr, Enable) {
+    global HSE_Terminators
+    BuiltinChars := HSE_TerminatorBuiltinChars()
+    Kept := ""
+    Loop Parse, WordStr {
+        Ch := A_LoopField
+        if (Ch != "`r" and Ch != "`n" and !InStr(BuiltinChars, Ch))
+            Kept .= Ch
+    }
+    if Enable {
+        for D in HSE_Terminators.all() {
+            if (D.Has("type") and D["type"] == "separator")
+                continue
+            for Ch in D["chars"] {
+                if !InStr(Kept, Ch)
+                    Kept .= Ch
+            }
+        }
+    }
+    return Kept
 }

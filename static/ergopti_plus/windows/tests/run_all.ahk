@@ -48,6 +48,9 @@ global _AHK_DRY_RUN := (A_Args.Length > 0 && A_Args[1] == "--dry-run")
 #Include ../lib/nav_layer_helpers.ahk
 #Include ../lib/hotstrings/hotstring_engine.ahk
 #Include ../lib/hotstrings/hotstring_engine_main.ahk
+; Generated terminator catalogue (shared single source) — exercised by
+; test_terminators.ahk and consumed by the tray / config-window delimiter menus.
+#Include ../_generated/terminators.ahk
 #Include ../lib/toml/toml_loader.ahk
 #Include ../lib/toml/toml_config_loader.ahk
 #Include ../lib/tap_hold/tap_hold_loader.ahk
@@ -105,6 +108,7 @@ InstallSendNoOps()
 #Include test_domain_expander.ahk
 #Include test_toml_loader.ahk
 #Include test_hotstrings_config.ahk
+#Include test_terminators.ahk
 #Include test_personal_toml_editor.ahk
 #Include test_layout_tables.ahk
 #Include test_active_app_cache.ahk

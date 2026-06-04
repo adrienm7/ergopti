@@ -1871,7 +1871,12 @@ description_key = "menu.gestures.enabled"
 id = "space_wrap"
 default = true
 type = "boolean"
-description_key = "menu.gestures.space_wrap"
+# The config id stays "space_wrap" (persisted setting + get/set_space_wrap), but
+# the menu label is the canonical "circular_spaces" i18n key — the menu manifest,
+# the locales and menu_gestures.lua all use it. The duplicate "space_wrap" locale
+# entry was dropped by the i18n canonicalization, so this description_key must
+# point at the surviving key or it resolves to nothing.
+description_key = "menu.gestures.circular_spaces"
 
 [[features.hs.gestures]]
 id = "swipe_2_left"
