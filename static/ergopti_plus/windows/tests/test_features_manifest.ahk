@@ -552,3 +552,58 @@ TestFMv2_AllFeaturesKeysSnakeCase() {
 Test("ManifestBuildFeaturesMap: all keys are snake_case (no v1 PascalCase residue)",
 	TestFMv2_AllFeaturesKeysSnakeCase)
 
+
+
+
+
+; ====================================================================
+; ===============================================================
+; ======= 7/ #HotIf Features[] safety guard (source-scan) =======
+; ===============================================================
+; ====================================================================
+
+; Every #HotIf that dereferences Features[] must include IsSet(Features) to
+; prevent an "uninitialized global" crash when an error fires before boot
+; completes (regression: layout.ahk:485 crash during early error handling).
+; This test reads the source files directly so the guard can never silently
+; revert without the test catching it.
+
+_FMv2_SourceFiles() {
+	Base := A_ScriptDir . "\.."
+	return [
+		Base . "\modules\layout.ahk",
+		Base . "\modules\shortcuts\win.ahk",
+	]
+}
+
+_FMv2_HotIfFeaturesLines(FilePath) {
+	Result := []
+	if !FileExist(FilePath) {
+		return Result
+	}
+	Content := FileRead(FilePath)
+	Lines := StrSplit(Content, "`n")
+	for LineNum, Line in Lines {
+		TrimmedLine := Trim(Line, " `t`r")
+		if (SubStr(TrimmedLine, 1, 7) = "#HotIf " and InStr(TrimmedLine, "Features[")) {
+			Result.Push({ Line: LineNum, Text: TrimmedLine })
+		}
+	}
+	return Result
+}
+
+TestFMv2_HotIfFeaturesHasIsSetGuard() {
+	Violations := []
+	for FilePath in _FMv2_SourceFiles() {
+		for Entry in _FMv2_HotIfFeaturesLines(FilePath) {
+			if !InStr(Entry.Text, "IsSet(Features)") {
+				Violations.Push(FilePath . ":" . Entry.Line . " -> " . Entry.Text)
+			}
+		}
+	}
+	AssertEqual(0, Violations.Length,
+		"#HotIf Features[] without IsSet guard: " . (Violations.Length > 0 ? Violations[1] : ""))
+}
+Test("#HotIf Features[]: all occurrences have IsSet(Features) guard",
+	TestFMv2_HotIfFeaturesHasIsSetGuard)
+

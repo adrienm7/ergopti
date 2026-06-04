@@ -151,8 +151,10 @@ RegisterCapsLockLayer() {
 	try LoggerStart("LayoutCaps", "Registering CapsLock layer hotkeys…")
 
 	; --- Magic key overlay (registered first, lowest precedence) ---
+	; Use the configurable source scancode, not the hardcoded Ergopti-layout default,
+	; so users on bépo or other layouts bind the correct physical key.
 	HotIf((*) => GetCapsLockCondition() and Features["hotstrings"]["magic_key"]["replace"]["enabled"])
-	Hotkey("SC02E", ((*) => SendNewResult(ScriptInformation["MagicKey"])), "I2")
+	Hotkey(ScriptInformation["MagicKeySourceScan"], ((*) => SendNewResult(ScriptInformation["MagicKey"])), "I2")
 
 	; --- Letters and symbols (registered last, highest precedence) ---
 	HotIf((*) => GetCapsLockCondition() and Features["layout"]["ergopti_base"])
