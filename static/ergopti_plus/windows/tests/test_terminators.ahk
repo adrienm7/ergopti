@@ -10,8 +10,9 @@
 ; submenu and the config window both build on.
 ;
 ; FEATURES & RATIONALE:
-; 1. Default state: guards the catalogue defaults that both drivers share
-;    (space / non-breaking spaces / comma / magic key on; punctuation off).
+; 1. Default state: guards the catalogue defaults that both drivers share —
+;    the basic terminators on (whitespace + sentence punctuation + magic key),
+;    every other option off.
 ; 2. Superset content: asserts the entries added when the two prior lists were
 ;    merged (ellipsis, semicolon) exist, and that ONLY closing delimiters made
 ;    the cut - a regression here would resurface the old duplicated lists.
@@ -66,13 +67,20 @@ _TermCatalogueHasChar(T, Ch) {
 
 TestTerminators_Defaults() {
     T := Terminators()
-    AssertTrue(T.isTerminator(" "), "space is a terminator by default")
-    AssertFalse(T.isConsumed(" "), "space is not consumed")
-    AssertTrue(T.isTerminator(","), "comma is a terminator by default")
-    AssertFalse(T.isTerminator("."), "period is disabled by default (mirrors macOS)")
+    ; Basic terminators ship ON: whitespace + sentence punctuation.
+    AssertTrue(T.isTerminator(" "),  "space is a terminator by default")
+    AssertFalse(T.isConsumed(" "),   "space is not consumed")
+    AssertTrue(T.isTerminator("`t"), "tab is a terminator by default")
+    AssertTrue(T.isTerminator("`r"), "enter (CR) is a terminator by default")
+    AssertTrue(T.isTerminator("."),  "period is a terminator by default (basic)")
+    AssertTrue(T.isTerminator(","),  "comma is a terminator by default (basic)")
+    AssertTrue(T.isTerminator(";"),  "semicolon is a terminator by default (basic)")
+    AssertTrue(T.isTerminator(":"),  "colon is a terminator by default (basic)")
+    AssertTrue(T.isTerminator("!"),  "exclamation is a terminator by default (basic)")
+    AssertTrue(T.isTerminator("?"),  "question is a terminator by default (basic)")
     AssertFalse(T.isTerminator("x"), "an ordinary letter is never a terminator")
 }
-Test("Terminators: default enabled/consumed state", TestTerminators_Defaults)
+Test("Terminators: basic punctuation enabled by default", TestTerminators_Defaults)
 
 TestTerminators_MagicKeyConsumed() {
     T := Terminators()
@@ -82,12 +90,21 @@ TestTerminators_MagicKeyConsumed() {
 }
 Test("Terminators: magic key enabled and consumed", TestTerminators_MagicKeyConsumed)
 
-TestTerminators_NonBreakingSpacesDefaultOn() {
+TestTerminators_OptionsOffByDefault() {
     T := Terminators()
-    AssertTrue(T.isTerminator(Chr(0x00A0)), "nbsp is a terminator by default")
-    AssertTrue(T.isTerminator(Chr(0x202F)), "narrow nbsp is a terminator by default")
+    ; The catalogue offers many options, but only the basics ship on. These are
+    ; available-but-off until the user toggles them in the menu.
+    AssertFalse(T.isTerminator(Chr(0x00A0)), "nbsp is off by default (an option)")
+    AssertFalse(T.isTerminator(Chr(0x202F)), "narrow nbsp is off by default (an option)")
+    AssertFalse(T.isTerminator(")"),         "closing paren is off by default (an option)")
+    AssertFalse(T.isTerminator("/"),         "slash is off by default (an option)")
+    AssertFalse(T.isTerminator("-"),         "dash is off by default (an option)")
+    AssertFalse(T.isEnabled("apostrophe_straight"), "straight apostrophe is off by default")
+    ; ...but they exist in the catalogue and resolve once enabled.
+    T.setEnabled("parenright", true)
+    AssertTrue(T.isTerminator(")"), "closing paren resolves once enabled")
 }
-Test("Terminators: non-breaking spaces enabled by default", TestTerminators_NonBreakingSpacesDefaultOn)
+Test("Terminators: non-basic options are off by default", TestTerminators_OptionsOffByDefault)
 
 
 
@@ -98,20 +115,20 @@ Test("Terminators: non-breaking spaces enabled by default", TestTerminators_NonB
 ; ============================================================
 ; ============================================================
 
-TestTerminators_SupersetAdditionsPresentButOff() {
+TestTerminators_SupersetAdditionsPresent() {
     T := Terminators()
     ; The ellipsis and semicolon slots were added when the two prior driver
-    ; lists were merged into one catalogue - they MUST exist...
+    ; lists were merged into one catalogue - they MUST exist.
     AssertTrue(_TermHasKey(T, "ellipsis"),  "ellipsis slot present in the catalogue")
     AssertTrue(_TermHasKey(T, "semicolon"), "semicolon slot present in the catalogue")
-    ; ...but ship disabled, like their punctuation siblings.
-    AssertFalse(T.isEnabled("ellipsis"),  "ellipsis disabled by default")
-    AssertFalse(T.isEnabled("semicolon"), "semicolon disabled by default")
+    ; Semicolon is basic punctuation -> on; ellipsis is a fancier option -> off.
+    AssertTrue(T.isEnabled("semicolon"), "semicolon enabled by default (basic punctuation)")
+    AssertFalse(T.isEnabled("ellipsis"), "ellipsis off by default (an option)")
     ; The ellipsis char resolves once the slot is enabled.
     T.setEnabled("ellipsis", true)
     AssertTrue(T.isTerminator(Chr(0x2026)), "ellipsis becomes a terminator once enabled")
 }
-Test("Terminators: superset additions (ellipsis, semicolon) present but off", TestTerminators_SupersetAdditionsPresentButOff)
+Test("Terminators: superset additions (ellipsis, semicolon) present", TestTerminators_SupersetAdditionsPresent)
 
 TestTerminators_ClosingDelimitersOnly() {
     T := Terminators()
@@ -247,3 +264,126 @@ TestTerminators_GlobalInstance() {
     AssertTrue(HSE_Terminators.all().Length > 5, "HSE_Terminators exposes the catalogue")
 }
 Test("Terminators: HSE_Terminators global instance is ready", TestTerminators_GlobalInstance)
+
+
+
+
+; ============================================================
+; ============================================================
+; ======= 6/ Catalogue-derived defaults (basic set) =========
+; ============================================================
+; ============================================================
+
+TestTerminators_DefaultWordDelimitersAreBasic() {
+    ; The default word-terminator set is derived from the catalogue and must be
+    ; the BASIC set: whitespace + sentence punctuation + the magic key — nothing
+    ; fancier. This is the single source the AHK boot wiring reads, kept in
+    ; lock-step with macOS.
+    D := HSE_TerminatorDefaultWordDelimiters()
+    for Ch in [" ", "`t", "`r", "`n", ".", ",", ";", ":", "!", "?", Chr(0x2605)] {
+        AssertTrue(InStr(D, Ch) > 0, "default set includes a basic terminator")
+    }
+    ; Non-basic options must be OFF in the default set.
+    for Ch in [Chr(0x00A0), Chr(0x202F), "-", "_", "=", ")", "]", "}", ">", "/", "\", Chr(0x2026), "'", "`""] {
+        AssertFalse(InStr(D, Ch) > 0, "default set excludes a non-basic option")
+    }
+}
+Test("Terminators: default word-delimiters are the basic set", TestTerminators_DefaultWordDelimitersAreBasic)
+
+TestTerminators_DefaultConsumedIsMagicKeyOnly() {
+    ; Only the magic key is consumed out of the box (matches macOS).
+    C := HSE_TerminatorDefaultConsumedDelimiters()
+    AssertTrue(InStr(C, Chr(0x2605)) > 0, "magic key is consumed by default")
+    AssertFalse(InStr(C, " ") > 0, "space is not consumed by default")
+    AssertFalse(InStr(C, ".") > 0, "period is not consumed by default")
+}
+Test("Terminators: default consumed set is the magic key only", TestTerminators_DefaultConsumedIsMagicKeyOnly)
+
+TestTerminators_GlobalDefaultsMatchCatalogue() {
+    ; The boot-time globals must equal the catalogue-derived defaults so AHK and
+    ; macOS start from the same set (no hardcoded drift).
+    AssertEqual(HSE_TerminatorDefaultWordDelimiters(), HOTSTRINGS_DEFAULT_WORD_DELIMITERS,
+        "HOTSTRINGS_DEFAULT_WORD_DELIMITERS is catalogue-derived")
+    AssertEqual(HSE_TerminatorDefaultConsumedDelimiters(), HOTSTRINGS_DEFAULT_CONSUMED_DELIMITERS,
+        "HOTSTRINGS_DEFAULT_CONSUMED_DELIMITERS is catalogue-derived")
+}
+Test("Terminators: boot-time default globals are catalogue-derived", TestTerminators_GlobalDefaultsMatchCatalogue)
+
+
+
+
+
+; ============================================================
+; ============================================================
+; ======= 7/ Magic key as a terminator (engine parity) =======
+; ============================================================
+; ============================================================
+
+; Aligning AHK with macOS makes the magic key a consumed word terminator in
+; ADDITION to its dedicated star-trigger role on Windows. These tests prove the
+; two mechanisms coexist in the engine: a non-star trigger fires when the magic
+; key terminates it, a star trigger still fires on the magic key, and when both
+; could match the longer star trigger wins (no double fire — the engine's
+; _HSE_StarTriggerCoversBody guard). Regression guard for the alignment change.
+
+TestTerminators_MagicKeyTerminatesNonStarTrigger() {
+    global HSE_WORD_TERMINATORS, HSE_CONSUMED_DELIMITERS
+    SavedWT := HSE_WORD_TERMINATORS
+    SavedCD := HSE_CONSUMED_DELIMITERS
+    Star := Chr(0x2605)
+    HSE_TestReset()
+    HSE_WORD_TERMINATORS    := " " . Star
+    HSE_CONSUMED_DELIMITERS := Star
+    HSE_Register("", "btw", () => 0)          ; regular (non-star) trigger
+    HSE_FeedChar("b")
+    HSE_FeedChar("t")
+    AssertEqual("", HSE_FeedChar("w"), "non-star trigger does not fire on its body alone")
+    Match := HSE_FeedChar(Star)
+    AssertTrue(Match != "", "non-star trigger fires when the magic key terminates it")
+    AssertEqual("btw", Match.Trigger)
+    HSE_WORD_TERMINATORS    := SavedWT
+    HSE_CONSUMED_DELIMITERS := SavedCD
+}
+Test("Terminators: magic key terminates a non-star trigger (macOS parity)", TestTerminators_MagicKeyTerminatesNonStarTrigger)
+
+TestTerminators_StarTriggerStillFiresWithMagicKeyTerminator() {
+    global HSE_WORD_TERMINATORS, HSE_CONSUMED_DELIMITERS
+    SavedWT := HSE_WORD_TERMINATORS
+    SavedCD := HSE_CONSUMED_DELIMITERS
+    Star := Chr(0x2605)
+    HSE_TestReset()
+    HSE_WORD_TERMINATORS    := " " . Star
+    HSE_CONSUMED_DELIMITERS := Star
+    HSE_Register("*", "gg" . Star, () => 0)   ; star trigger (magic-key mechanism)
+    HSE_FeedChar("g")
+    HSE_FeedChar("g")
+    Match := HSE_FeedChar(Star)
+    AssertTrue(Match != "", "star trigger still fires on the magic key")
+    AssertEqual("gg" . Star, Match.Trigger)
+    HSE_WORD_TERMINATORS    := SavedWT
+    HSE_CONSUMED_DELIMITERS := SavedCD
+}
+Test("Terminators: star trigger still fires when the magic key is also a terminator", TestTerminators_StarTriggerStillFiresWithMagicKeyTerminator)
+
+TestTerminators_StarTriggerWinsOverEndCharOnMagicKey() {
+    global HSE_WORD_TERMINATORS, HSE_CONSUMED_DELIMITERS
+    SavedWT := HSE_WORD_TERMINATORS
+    SavedCD := HSE_CONSUMED_DELIMITERS
+    Star := Chr(0x2605)
+    HSE_TestReset()
+    HSE_WORD_TERMINATORS    := " " . Star
+    HSE_CONSUMED_DELIMITERS := Star
+    ; Both could match on "ab" + magic key: the star trigger "ab*" and the
+    ; non-star "ab" with the magic key as its end char. The longer star trigger
+    ; must win — no double expansion.
+    HSE_Register("*", "ab" . Star, () => 0)
+    HSE_Register("", "ab", () => 0)
+    HSE_FeedChar("a")
+    HSE_FeedChar("b")
+    Match := HSE_FeedChar(Star)
+    AssertTrue(Match != "", "a match fires on the magic key")
+    AssertEqual("ab" . Star, Match.Trigger, "the star trigger wins over the end-char match")
+    HSE_WORD_TERMINATORS    := SavedWT
+    HSE_CONSUMED_DELIMITERS := SavedCD
+}
+Test("Terminators: star trigger wins over the end-char match on the magic key", TestTerminators_StarTriggerWinsOverEndCharOnMagicKey)

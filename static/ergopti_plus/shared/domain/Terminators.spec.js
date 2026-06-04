@@ -63,31 +63,35 @@
  * - Labels are static French strings. The macOS shim re-resolves a handful of
  *   keys (nbsp, nnbsp, enter, parenright, equal) through i18n at load time;
  *   every other label is shown verbatim on both drivers.
- * - Defaults mirror the macOS reference: only space, the two non-breaking
- *   spaces, the comma and the magic key fire out of the box. Everything else
- *   ships disabled-but-toggleable so the two drivers behave identically.
+ * - Defaults are deliberately conservative: only the BASIC word-terminators
+ *   fire out of the box — whitespace (space, tab, enter), the sentence
+ *   punctuation (. , ; : ! ?) and the magic key. Everything else (the
+ *   non-breaking spaces, dashes, ellipsis, apostrophes, double quote, closing
+ *   delimiters, slashes, equals) ships disabled-but-toggleable: the catalogue
+ *   offers plenty of options, but only the obvious ones are on. Both drivers
+ *   derive their defaults from this single list, so they behave identically.
  */
 const TERMINATOR_DEFS = [
 	// Whitespace & dashes
 	{ key: "space",      chars: [" "],        label: "␣ : Espace",                 default_enabled: true,  consume: false },
-	{ key: "nbsp",       chars: [" "],   label: "⍽ : Espace insécable",       default_enabled: true,  consume: false },
-	{ key: "nnbsp",      chars: [" "],   label: "⍽ : Espace fine insécable",  default_enabled: true,  consume: false },
+	{ key: "nbsp",       chars: [" "],   label: "⍽ : Espace insécable",       default_enabled: false,  consume: false },
+	{ key: "nnbsp",      chars: [" "],   label: "⍽ : Espace fine insécable",  default_enabled: false,  consume: false },
 	{ key: "minus",      chars: ["-"],        label: "- : Tiret",                  default_enabled: false, consume: false },
 	{ key: "underscore", chars: ["_"],        label: "_ : Tiret bas",              default_enabled: false, consume: false },
 	{ type: "separator" },
 	// Tab / Entrée / magic key
-	{ key: "tab",   chars: ["\t"],            label: "⇥ : Tabulation",             default_enabled: false, consume: false },
-	{ key: "enter", chars: ["\r", "\n"],      label: "⏎ : Entrée",                 default_enabled: false, consume: false },
+	{ key: "tab",   chars: ["\t"],            label: "⇥ : Tabulation",             default_enabled: true, consume: false },
+	{ key: "enter", chars: ["\r", "\n"],      label: "⏎ : Entrée",                 default_enabled: true, consume: false },
 	{ key: "star",  chars: ["★"],             label: "★ : Touche magique",         default_enabled: true,  consume: true  },
 	{ type: "separator" },
 	// Sentence punctuation
 	{ key: "comma",     chars: [","],         label: ", : Virgule",                default_enabled: true,  consume: false },
-	{ key: "semicolon", chars: [";"],         label: "; : Point-virgule",          default_enabled: false, consume: false },
-	{ key: "period",    chars: ["."],         label: ". : Point",                  default_enabled: false, consume: false },
+	{ key: "semicolon", chars: [";"],         label: "; : Point-virgule",          default_enabled: true, consume: false },
+	{ key: "period",    chars: ["."],         label: ". : Point",                  default_enabled: true, consume: false },
 	{ key: "ellipsis",  chars: ["…"],         label: "… : Points de suspension",   default_enabled: false, consume: false },
-	{ key: "exclam",    chars: ["!"],         label: "! : Point d'exclamation",    default_enabled: false, consume: false },
-	{ key: "question",  chars: ["?"],         label: "? : Point d'interrogation",  default_enabled: false, consume: false },
-	{ key: "colon",     chars: [":"],         label: ": : Deux-points",            default_enabled: false, consume: false },
+	{ key: "exclam",    chars: ["!"],         label: "! : Point d'exclamation",    default_enabled: true, consume: false },
+	{ key: "question",  chars: ["?"],         label: "? : Point d'interrogation",  default_enabled: true, consume: false },
+	{ key: "colon",     chars: [":"],         label: ": : Deux-points",            default_enabled: true, consume: false },
 	{ type: "separator" },
 	// Closing delimiters only (the opening ( [ { < never end a word)
 	{ key: "parenright",        chars: [")"], label: ") : Parenthèse fermante",    default_enabled: false, consume: false },

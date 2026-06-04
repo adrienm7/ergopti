@@ -15,8 +15,15 @@ helpers.describe("keymap.terminators: defaults", function()
 		helpers.assert_true(term.is_terminator(" "))
 	end)
 
-	helpers.it("period is disabled by default", function()
-		helpers.assert_true(not term.is_terminator("."))
+	helpers.it("period is enabled by default (basic punctuation)", function()
+		helpers.assert_true(term.is_terminator("."))
+	end)
+
+	helpers.it("non-basic options are off by default", function()
+		-- The catalogue offers many options but only the basics ship on.
+		helpers.assert_true(not term.is_terminator("\u{00A0}"))   -- nbsp
+		helpers.assert_true(not term.is_terminator(")"))           -- closing paren
+		helpers.assert_true(not term.is_terminator("/"))           -- slash
 	end)
 
 	helpers.it("magic key (star) is enabled by default and consumed", function()
