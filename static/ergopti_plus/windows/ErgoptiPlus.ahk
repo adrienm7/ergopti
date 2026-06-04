@@ -369,6 +369,12 @@ if !FileExist(_PersonalTomlBootstrap)
 
 global ScriptInformation := Map(
     "MagicKey", "★",
+    ; Scancode and QWERTY character of the physical key remapped to ★.
+    ; Defaults to SC02E / "j" (the J position on the Ergopti layout).
+    ; QWERTY users or other layouts can override via [hotstrings] magic_key_source_scan
+    ; and magic_key_source_char in config.toml.
+    "MagicKeySourceScan", "SC02E",
+    "MagicKeySourceChar", "j",
     ; Manual override for the AltGr-as-Kana / custom-remap detection. Default
     ; false here is overwritten by HotstringEngineInit() which auto-detects via
     ; a reverse VK_RMENU→SC probe. The TOML value (under [Script]) wins when
@@ -502,6 +508,14 @@ ReadScriptConfig(Cache) {
     Raw := IniCacheGet(Cache, "hotstrings", "trigger_char")
     if Raw != "_"
         ScriptInformation["MagicKey"] := Raw
+    ; Source key for the J→★ remap — scancode and QWERTY character are stored
+    ; separately so the remapping works regardless of the active OS layout.
+    RawScan := IniCacheGet(Cache, "hotstrings", "magic_key_source_scan")
+    if RawScan != "_"
+        ScriptInformation["MagicKeySourceScan"] := RawScan
+    RawChar := IniCacheGet(Cache, "hotstrings", "magic_key_source_char")
+    if RawChar != "_"
+        ScriptInformation["MagicKeySourceChar"] := RawChar
     ; AltGr-as-Kana manual override. Default "auto" defers to the reverse
     ; VK_RMENU→SC probe in HotstringEngineInit(); "true" / "false" force the
     ; respective mode. Lives in [script] so the user can lock it once per
@@ -1511,6 +1525,12 @@ SaveFullConfig() {
 
     ; [hotstrings] root — MagicKey lives at hotstrings.trigger_char.
     Updates.Push({ Section: "hotstrings", Key: "trigger_char", Value: ScriptInformation["MagicKey"] })
+    ; Source key for the J→★ remap — only persisted when non-default so that
+    ; config.toml stays clean for Ergopti users who never change this.
+    if ScriptInformation["MagicKeySourceScan"] != "SC02E"
+        Updates.Push({ Section: "hotstrings", Key: "magic_key_source_scan", Value: ScriptInformation["MagicKeySourceScan"] })
+    if ScriptInformation["MagicKeySourceChar"] != "j"
+        Updates.Push({ Section: "hotstrings", Key: "magic_key_source_char", Value: ScriptInformation["MagicKeySourceChar"] })
 
     ; [ahk.shortcuts.script_control] — script management hotkey slots.
     if IsSet(ScriptShortcutAssignments) {

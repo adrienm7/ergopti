@@ -329,14 +329,6 @@
 			"id": "layout_features"
 		},
 		{
-			"type": "---"
-		},
-		{
-			"type": "feature",
-			"path": "hotstrings.magic_key.replace",
-			"i18n": "menu.layout.replace"
-		},
-		{
 			"type": "group",
 			"id": "accented_letters",
 			"i18n": "menu.shortcuts.group_accented",
@@ -345,11 +337,22 @@
 			]
 		},
 		{
+			"type": "---"
+		},
+		{
 			"type": "dynamic",
 			"id": "active_layouts",
 			"platforms": [
 				"hs"
 			]
+		},
+		{
+			"type": "---"
+		},
+		{
+			"type": "feature",
+			"path": "hotstrings.magic_key.replace",
+			"i18n": "menu.layout.replace"
 		}
 	],
 	"accented_letters_group": [
