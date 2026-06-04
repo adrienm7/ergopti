@@ -44,30 +44,35 @@ class Terminators {
     ; -----------------------------------------------------------------------
     __New() {
         this._catalogue := [
-        Map("key", "space", "chars", [" "], "label", "Espace", "default_enabled", true, "consume", false),
-        Map("key", "tab", "chars", ["`t"], "label", "Tab", "default_enabled", true, "consume", false),
-        Map("key", "enter", "chars", ["`r", "`n"], "label", "Entrée", "default_enabled", true, "consume", false),
-        Map("key", "separator_3", "chars", [], "label", "-", "default_enabled", false, "consume", false, "type", "separator"),
-        Map("key", "period", "chars", ["."], "label", "Point", "default_enabled", true, "consume", false),
-        Map("key", "ellipsis", "chars", ["…"], "label", "…", "default_enabled", true, "consume", false),
-        Map("key", "comma", "chars", [","], "label", "Virgule", "default_enabled", true, "consume", false),
-        Map("key", "semicolon", "chars", [";"], "label", "Point-virgule", "default_enabled", true, "consume", false),
-        Map("key", "colon", "chars", [":"], "label", "Deux-points", "default_enabled", true, "consume", false),
-        Map("key", "exclamation", "chars", ["!"], "label", "Point d'excl.", "default_enabled", true, "consume", false),
-        Map("key", "question", "chars", ["?"], "label", "Point d'interr.", "default_enabled", true, "consume", false),
-        Map("key", "separator_11", "chars", [], "label", "-", "default_enabled", false, "consume", false, "type", "separator"),
-        Map("key", "apostrophe", "chars", ["'"], "label", "'", "default_enabled", true, "consume", false),
-        Map("key", "apostrophe_typographic", "chars", ["’"], "label", "’", "default_enabled", true, "consume", false),
-        Map("key", "separator_14", "chars", [], "label", "-", "default_enabled", false, "consume", false, "type", "separator"),
-        Map("key", "paren_close", "chars", [")"], "label", ")", "default_enabled", true, "consume", false),
-        Map("key", "bracket_close", "chars", ["]"], "label", "]", "default_enabled", true, "consume", false),
-        Map("key", "brace_close", "chars", ["}"], "label", "}", "default_enabled", true, "consume", false),
-        Map("key", "angle_close", "chars", [">"], "label", ">", "default_enabled", true, "consume", false),
-        Map("key", "separator_19", "chars", [], "label", "-", "default_enabled", false, "consume", false, "type", "separator"),
-        Map("key", "slash", "chars", ["/"], "label", "Slash", "default_enabled", false, "consume", false),
-        Map("key", "backslash", "chars", ["\"], "label", "Antislash", "default_enabled", false, "consume", false),
+        Map("key", "space", "chars", [" "], "label", "␣ : Espace", "default_enabled", true, "consume", false),
+        Map("key", "nbsp", "chars", [" "], "label", "⍽ : Espace insécable", "default_enabled", true, "consume", false),
+        Map("key", "nnbsp", "chars", [" "], "label", "⍽ : Espace fine insécable", "default_enabled", true, "consume", false),
+        Map("key", "minus", "chars", ["-"], "label", "- : Tiret", "default_enabled", false, "consume", false),
+        Map("key", "underscore", "chars", ["_"], "label", "_ : Tiret bas", "default_enabled", false, "consume", false),
+        Map("key", "separator_5", "chars", [], "label", "-", "default_enabled", false, "consume", false, "type", "separator"),
+        Map("key", "tab", "chars", ["`t"], "label", "⇥ : Tabulation", "default_enabled", false, "consume", false),
+        Map("key", "enter", "chars", ["`r", "`n"], "label", "⏎ : Entrée", "default_enabled", false, "consume", false),
+        Map("key", "star", "chars", ["★"], "label", "★ : Touche magique", "default_enabled", true, "consume", true),
+        Map("key", "separator_9", "chars", [], "label", "-", "default_enabled", false, "consume", false, "type", "separator"),
+        Map("key", "comma", "chars", [","], "label", ", : Virgule", "default_enabled", true, "consume", false),
+        Map("key", "semicolon", "chars", [";"], "label", "; : Point-virgule", "default_enabled", false, "consume", false),
+        Map("key", "period", "chars", ["."], "label", ". : Point", "default_enabled", false, "consume", false),
+        Map("key", "ellipsis", "chars", ["…"], "label", "… : Points de suspension", "default_enabled", false, "consume", false),
+        Map("key", "exclam", "chars", ["!"], "label", "! : Point d'exclamation", "default_enabled", false, "consume", false),
+        Map("key", "question", "chars", ["?"], "label", "? : Point d'interrogation", "default_enabled", false, "consume", false),
+        Map("key", "colon", "chars", [":"], "label", ": : Deux-points", "default_enabled", false, "consume", false),
+        Map("key", "separator_17", "chars", [], "label", "-", "default_enabled", false, "consume", false, "type", "separator"),
+        Map("key", "parenright", "chars", [")"], "label", ") : Parenthèse fermante", "default_enabled", false, "consume", false),
+        Map("key", "braceright", "chars", ["}"], "label", "} : Accolade fermante", "default_enabled", false, "consume", false),
+        Map("key", "bracketright", "chars", ["]"], "label", "] : Crochet fermant", "default_enabled", false, "consume", false),
+        Map("key", "anglebracketright", "chars", [">"], "label", "> : Guillemet fermant", "default_enabled", false, "consume", false),
         Map("key", "separator_22", "chars", [], "label", "-", "default_enabled", false, "consume", false, "type", "separator"),
-        Map("key", "magic_key", "chars", ["★"], "label", "Touche magique", "default_enabled", true, "consume", true)
+        Map("key", "apostrophe_typo", "chars", ["’"], "label", "’ : Apostrophe typographique", "default_enabled", false, "consume", false),
+        Map("key", "apostrophe_straight", "chars", ["'"], "label", "' : Apostrophe droite", "default_enabled", false, "consume", false),
+        Map("key", "quote", "chars", ["`""], "label", "`" : Guillemet double", "default_enabled", false, "consume", false),
+        Map("key", "equal", "chars", ["="], "label", "= : Égal", "default_enabled", false, "consume", false),
+        Map("key", "slash", "chars", ["/"], "label", "/ : Slash", "default_enabled", false, "consume", false),
+        Map("key", "backslash", "chars", ["\"], "label", "\ : Backslash", "default_enabled", false, "consume", false)
         ]
         for entry in this._catalogue {
             this._enabled[entry["key"]] := entry["default_enabled"]
@@ -141,7 +146,7 @@ class Terminators {
     ; -----------------------------------------------------------------------
     updateMagicKey(char) {
         for entry in this._catalogue {
-            if entry["key"] = "magic_key" {
+            if entry["key"] = "star" {
                 entry["chars"] := [char]
                 break
             }

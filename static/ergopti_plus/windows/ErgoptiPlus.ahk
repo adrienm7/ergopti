@@ -164,6 +164,11 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 ; stays focused on ErgoptiPlus-specific logic.
 #Include lib/hotstrings/hotstring_engine.ahk
 #Include lib/hotstrings/hotstring_engine_main.ahk
+; Generated terminator catalogue (single source of truth — shared with macOS via
+; shared/domain/Terminators.spec.js). Both the tray and config-window delimiter
+; menus render this catalogue so the word-terminator list never drifts between
+; drivers. Included before the menus and before HSE_Terminators is instantiated.
+#Include _generated/terminators.ahk
 #Include lib/toml/toml_loader.ahk
 #Include lib/toml/toml_config_loader.ahk
 ; manifest_reader.ahk + path_translator.ahk are loaded at the top of

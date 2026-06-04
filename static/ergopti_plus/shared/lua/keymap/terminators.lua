@@ -42,35 +42,13 @@ local Logger = require("logger.shim")
 --- Built-in terminator definitions. Each entry with a key produces one entry
 --- in the enable/disable table. Separators (type = "separator") are UI-only.
 --- Labels are static French strings; host drivers may resolve them further via i18n.
-M.TERMINATOR_DEFS = {
-	{ key = "space",                chars = { " " },          label = "␣ : Espace",                        default_enabled = true },
-	{ key = "nbsp",                 chars = { "\u{00A0}" },   label = "⍽ : Espace insécable",              default_enabled = true },
-	{ key = "nnbsp",                chars = { "\u{202F}" },   label = "⍽ : Espace fine insécable",         default_enabled = true },
-	{ key = "minus",                chars = { "-" },          label = "- : Tiret",                         default_enabled = false },
-	{ key = "underscore",           chars = { "_" },          label = "_ : Tiret bas",                     default_enabled = false },
-	{ type = "separator" },
-	{ key = "tab",                  chars = { "\t" },         label = "⇥ : Tabulation",                    default_enabled = false },
-	{ key = "enter",                chars = { "\r", "\n" },   label = "⏎ : Entrée",                        default_enabled = false },
-	{ key = "star",                 chars = { "★" },          label = "★ : Touche magique",                default_enabled = true, consume = true },
-	{ type = "separator" },
-	{ key = "comma",                chars = { "," },          label = ", : Virgule",                       default_enabled = true },
-	{ key = "period",               chars = { "." },          label = ". : Point",                         default_enabled = false },
-	{ key = "exclam",               chars = { "!" },          label = "! : Point d'exclamation",           default_enabled = false },
-	{ key = "question",             chars = { "?" },          label = "? : Point d'interrogation",         default_enabled = false },
-	{ key = "colon",                chars = { ":" },          label = ": : Deux-points",                   default_enabled = false },
-	{ type = "separator" },
-	{ key = "parenright",           chars = { ")" },          label = ") : Parenthèse fermante",           default_enabled = false },
-	{ key = "braceright",           chars = { "}" },          label = "} : Accolade fermante",             default_enabled = false },
-	{ key = "bracketright",         chars = { "]" },          label = "] : Crochet fermant",               default_enabled = false },
-	{ key = "anglebracketright",    chars = { ">" },          label = "> : Guillemet fermant",             default_enabled = false },
-	{ type = "separator" },
-	{ key = "apostrophe_typo",      chars = { "\u{2019}" },   label = "\u{2019} : Apostrophe typographique", default_enabled = false },
-	{ key = "apostrophe_straight",  chars = { "'" },          label = "' : Apostrophe droite",             default_enabled = false },
-	{ key = "quote",                chars = { '"' },          label = '" : Guillemet double',              default_enabled = false },
-	{ key = "equal",                chars = { "=" },          label = "= : Égal",                          default_enabled = false },
-	{ key = "slash",                chars = { "/" },          label = "/ : Slash",                         default_enabled = false },
-	{ key = "backslash",            chars = { "\\" },         label = "\\ : Backslash",                    default_enabled = false },
-}
+---
+--- The catalogue DATA is generated from the single source of truth
+--- (shared/domain/Terminators.spec.js → `npm run codegen:terminators`) so this
+--- module and the AHK driver can never drift. Only the data lives in the
+--- generated file; all logic below (O(1) caches, multi-codepoint safety, custom
+--- and magic-key lifecycle) stays hand-written here.
+M.TERMINATOR_DEFS = require("keymap.terminators_catalogue")
 
 
 -- Flat enable/disable table keyed by terminator key, seeded from default_enabled.
