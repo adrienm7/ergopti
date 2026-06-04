@@ -251,29 +251,6 @@
 			"type": "---"
 		},
 		{
-			"type": "section_header",
-			"i18n": "menu.metrics.privacy_header"
-		},
-		{
-			"type": "dynamic",
-			"id": "filter_private"
-		},
-		{
-			"type": "dynamic",
-			"id": "filter_secure"
-		},
-		{
-			"type": "dynamic",
-			"id": "filter_sysauth"
-		},
-		{
-			"type": "dynamic",
-			"id": "exclude_apps"
-		},
-		{
-			"type": "---"
-		},
-		{
 			"type": "feature",
 			"id": "wpm_menubar",
 			"i18n": "menu.metrics.show_wpm_menubar",
@@ -305,6 +282,29 @@
 		{
 			"type": "dynamic",
 			"id": "reset_wpm_position"
+		},
+		{
+			"type": "---"
+		},
+		{
+			"type": "section_header",
+			"i18n": "menu.metrics.privacy_header"
+		},
+		{
+			"type": "dynamic",
+			"id": "filter_private"
+		},
+		{
+			"type": "dynamic",
+			"id": "filter_secure"
+		},
+		{
+			"type": "dynamic",
+			"id": "filter_sysauth"
+		},
+		{
+			"type": "dynamic",
+			"id": "exclude_apps"
 		},
 		{
 			"type": "---"
