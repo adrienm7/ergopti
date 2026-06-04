@@ -299,9 +299,10 @@ RegisterAltGrLayer() {
     }
 
     ; --- ErgoptiAltGr Number row + Ctrl+Alt Numpad mappings ---
-    HotIf((*) => Features["layout"]["ergopti_alt_gr"]
-        and Features["layout"]["ergopti_base"]
-        and IsRealAltGrPress())
+    ; Note: ergopti_base is intentionally NOT required here — superscripts,
+    ; subscripts and the € sign are layout-independent and must work even when
+    ; the Ergopti keyboard emulation is off.
+    HotIf((*) => Features["layout"]["ergopti_alt_gr"] and IsRealAltGrPress())
     for SC in ALTGR_NUMBER_ROW {
         Hotkey("SC138 & " . SC, AltGrShiftDispatch.Bind(SC, ALTGR_NUMBER_ROW), "I2")
     }

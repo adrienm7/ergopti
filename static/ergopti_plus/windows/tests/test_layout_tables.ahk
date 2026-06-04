@@ -425,3 +425,39 @@ TestLT_CapsLockSymbolsAllRun() {
 	}
 }
 Test("CAPSLOCK_SYMBOLS: every entry runs without crashing", TestLT_CapsLockSymbolsAllRun)
+
+
+
+
+
+; ========================================================================
+; ==========================================================================
+; ======= Regression: AltGr number-row must not require ergopti_base =======
+; ==========================================================================
+; ========================================================================
+
+; Source-scan the registration block in layout_altgr.ahk to ensure the HotIf
+; condition for ALTGR_NUMBER_ROW does not require ergopti_base. When that
+; requirement existed, AltGr+digit (superscripts, subscripts, euro) were silently
+; disabled for users who had Ergopti AltGr on but Ergopti base emulation off.
+TestLT_AltGrNumberRowRegistrationNoErgoptiBase() {
+	FilePath := A_ScriptDir . "\..\lib\layout\layout_altgr.ahk"
+	Content := FileRead(FilePath, "UTF-8-RAW")
+	; Locate the HotIf line that gates ALTGR_NUMBER_ROW registration.
+	; That line should contain "ergopti_alt_gr" but must NOT contain "ergopti_base".
+	Pattern := "HotIf\([^)]*ergopti_alt_gr[^)]*\)"
+	Pos := 1
+	while (Pos := RegExMatch(Content, Pattern, &M, Pos)) {
+		if InStr(M[], "ergopti_base") {
+			AssertFalse(true,
+				"ALTGR_NUMBER_ROW HotIf condition must not require ergopti_base"
+				. " (superscripts/subscripts are layout-independent). Found: " . M[])
+			return
+		}
+		Pos += StrLen(M[])
+	}
+	; No forbidden condition found.
+	AssertTrue(true)
+}
+Test("ALTGR_NUMBER_ROW registration: HotIf does not require ergopti_base",
+	TestLT_AltGrNumberRowRegistrationNoErgoptiBase)

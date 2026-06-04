@@ -651,6 +651,64 @@ ApplyConfigToml(Features, _ConfigDir . _AhkSubDir . "config.toml")
 global TapHold := LoadTapHoldToml(_ConfigDir . _AhkSubDir . "tap_hold.toml",
 	_DriverDir . "\data\tap_hold\defaults.toml")
 
+; When Ergopti keyboard emulation is off, the magic-key source scancode must
+; track whatever physical key produces MagicKeySourceChar on the user's active
+; OS layout (e.g. on bépo, "j" lives on a different scancode than Ergopti's
+; SC02E). We auto-detect here, after ApplyConfigToml has already applied any
+; explicit user override from config.toml — so a manual magic_key_source_scan
+; entry in TOML takes precedence and this block is a no-op when it kicks in.
+;
+; HKL resolution cascade: at script startup there may be no foreground window
+; (AHK launches tray-only), so GetForegroundKeyboardLayout() returns 0.
+; Fallback 1: GetKeyboardLayout(A_ThreadID) — the layout of the AHK thread
+; itself, which Windows inherits from the shell process and therefore usually
+; matches the user's default input language.
+; Fallback 2: SystemParametersInfo(SPI_GETDEFAULTINPUTLANG) — the system's
+; registered default input language, stored in the registry. Most reliable
+; but requires an extra SPI call.
+if !Features["layout"]["ergopti_base"] {
+	_HKL := GetForegroundKeyboardLayout()
+	if _HKL = 0 {
+		_HKL := DllCall("GetKeyboardLayout", "UInt", A_ThreadID, "Ptr")
+	}
+	if _HKL = 0 {
+		; SPI_GETDEFAULTINPUTLANG = 0x0059; pvParam receives an HKL.
+		_HklBuf := Buffer(A_PtrSize, 0)
+		DllCall("SystemParametersInfo", "UInt", 0x0059, "UInt", 0, "Ptr", _HklBuf, "UInt", 0)
+		_HKL := NumGet(_HklBuf, 0, "Ptr")
+	}
+	if _HKL != 0 {
+		_SrcChar := ScriptInformation["MagicKeySourceChar"]
+		; VkKeyScanExW: low byte = VK, high byte = required modifiers.
+		; 0xFF in the low byte signals "character not on this layout".
+		_VK := DllCall("VkKeyScanExW", "WStr", _SrcChar, "Ptr", _HKL, "Short") & 0xFF
+		if (_VK != 0xFF and _VK != 0) {
+			; MAPVK_VK_TO_VSC = 0: translate VK to base (non-extended) scancode.
+			_SC := DllCall("MapVirtualKeyExW", "UInt", _VK, "UInt", 0, "Ptr", _HKL, "UInt")
+			if _SC != 0 {
+				ScriptInformation["MagicKeySourceScan"] := Format("SC{:03X}", _SC)
+				LoggerInfo("ErgoptiPlus",
+					"Magic-key source resolved from layout: char={1}, VK=0x{2:X}, scan={3}.",
+					_SrcChar, _VK, ScriptInformation["MagicKeySourceScan"])
+			} else {
+				LoggerWarn("ErgoptiPlus",
+					"Magic-key scan resolution failed: MapVirtualKeyExW returned 0"
+					. " (char={1}, VK=0x{2:X}, HKL=0x{3:X}) — using default SC02E.",
+					_SrcChar, _VK, _HKL)
+			}
+		} else {
+			LoggerWarn("ErgoptiPlus",
+				"Magic-key scan resolution failed: '{1}' not found on active layout"
+				. " (HKL=0x{2:X}, VK=0x{3:X}) — using default SC02E.",
+				_SrcChar, _HKL, _VK)
+		}
+	} else {
+		LoggerWarn("ErgoptiPlus",
+			"Magic-key scan resolution skipped: could not obtain a valid HKL"
+			. " at startup — using default SC02E.")
+	}
+}
+
 ; Count the exact number of hotstrings that will be generated for a DynamicHotstrings
 ; section — mirrors the same threshold logic used in hotstrings.ahk section 5.
 ; This must stay in sync with the registration code whenever prefix rules change.
