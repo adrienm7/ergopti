@@ -482,7 +482,7 @@ _OsLayoutDigitsAreShifted() {
 	return (HighByte & 0x01) != 0
 }
 
-#HotIf Features["layout"]["direct_access_digits"]
+#HotIf IsSet(Features) and Features["layout"]["direct_access_digits"]
 ; We need to use SendEvent for symbols, otherwise it may trigger and lock AltGr. This issue happens on AZERTY at least.
 ; For digits, it is better to remap with sending the down event instead of using the RemapKey function.
 ; Otherwise, there is a problem of digit password boxes that skips to the n+2 box instead of n+2 because two down key events are sent by key
@@ -715,14 +715,14 @@ RegisterAltGrLayer()
 ; ================================
 ; ================================
 
-#HotIf Features["layout"]["ergopti_base"]
+#HotIf IsSet(Features) and Features["layout"]["ergopti_base"]
 ^SC02F:: SendFinalResult("^v") ; Correct issue where Win + V paste doesn't work
 *^SC00C:: SendFinalResult("^{NumpadSub}") ; Zoom out with Ctrl + %
 *^SC00D:: SendFinalResult("^{NumpadAdd}") ; Zoom in with Ctrl + $
 #HotIf
 
 ; In Microsoft apps like Word or Excel, we can't use Numpad + to zoom
-#HotIf Features["layout"]["ergopti_base"] and MicrosoftApps()
+#HotIf IsSet(Features) and Features["layout"]["ergopti_base"] and MicrosoftApps()
 *^SC00C:: SendFinalResult("^{WheelDown}") ; Zoom out with (Shift +) Ctrl + %
 *^SC00D:: SendFinalResult("^{WheelUp}") ; Zoom in with (Shift +) Ctrl + $
 #HotIf

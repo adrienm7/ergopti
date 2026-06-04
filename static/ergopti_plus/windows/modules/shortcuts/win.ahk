@@ -21,7 +21,7 @@
 ; ================================
 ; ================================
 
-#HotIf Features["shortcuts"]["win_caps_lock"]
+#HotIf IsSet(Features) and Features["shortcuts"]["win_caps_lock"]
 ; Win + "CapsLock" to toggle CapsLock
 #SC03A:: ToggleCapsLock()
 #HotIf
@@ -465,7 +465,7 @@ if Features["shortcuts"]["spotlight_mouse"] {
     AddShortcut("#", "'", (*) => (MouseGetPos(&Mx, &My), SpotlightMouseAt(Mx, My, 5000)))
 }
 
-#HotIf Features["shortcuts"]["screen_instant"]
+#HotIf IsSet(Features) and Features["shortcuts"]["screen_instant"]
 ; SC029 (²/$ -- key left of 1) -- instant screenshot of the active window, saved to Pictures
 SC029:: {
     WinGetPos(&WX, &WY, &WW, &WH, "A")
