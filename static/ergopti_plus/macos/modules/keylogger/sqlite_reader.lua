@@ -64,7 +64,7 @@ local function _new_app_entry()
 		hs_chars = 0, llm_chars = 0,
 		hs_triggers = 0, llm_triggers = 0,
 		hs_input_chars = 0, llm_input_chars = 0,
-		app_time = 0,
+		app_time_ms = 0,
 		category = nil,
 		-- Sub-aggregates populated lazily by the projection passes.
 		burst_count_total           = 0,
@@ -154,7 +154,7 @@ function M.read_manifest(sqlite_path, start_date, end_date)
 		       SUM(llm_triggers)     AS llm_triggers,
 		       SUM(hs_input_chars)   AS hs_input_chars,
 		       SUM(llm_input_chars)  AS llm_input_chars,
-		       SUM(app_time_ms)      AS app_time,
+		       SUM(app_time_ms)      AS app_time_ms,
 		       MAX(category)         AS category
 		FROM agg_app_day %s
 		GROUP BY date, app
@@ -170,7 +170,7 @@ function M.read_manifest(sqlite_path, start_date, end_date)
 		a.llm_triggers     = r.llm_triggers or 0
 		a.hs_input_chars   = r.hs_input_chars or 0
 		a.llm_input_chars  = r.llm_input_chars or 0
-		a.app_time         = r.app_time or 0
+		a.app_time_ms      = r.app_time_ms or 0
 		a.category         = r.category
 	end
 

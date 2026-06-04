@@ -485,7 +485,7 @@ KLR_NewAppEntry() {
         "hs_triggers", 0, "llm_triggers", 0,
         "hs_suggested", 0, "llm_suggested", 0,
         "hs_input_chars", 0, "llm_input_chars", 0,
-        "app_time", 0, "category", "",
+        "app_time_ms", 0, "category", "",
         "burst_count_total", 0, "burst_max_cpm", 0, "burst_max_chars", 0,
         "burst_length_buckets", Map(),
         "burst_inter_delay_count", 0, "burst_inter_delay_sum", 0, "burst_inter_delay_sumsq", 0,
@@ -522,7 +522,7 @@ KLR__SumAppDay(db, manifest, where) {
         . " SUM(hs_triggers) AS hs_triggers, SUM(llm_triggers) AS llm_triggers,"
         . " SUM(hs_suggested) AS hs_suggested, SUM(llm_suggested) AS llm_suggested,"
         . " SUM(hs_input_chars) AS hs_input_chars, SUM(llm_input_chars) AS llm_input_chars,"
-        . " SUM(app_time_ms) AS app_time, MAX(category) AS category"
+        . " SUM(app_time_ms) AS app_time_ms, MAX(category) AS category"
         . " FROM agg_app_day" . where . " GROUP BY date, app"
     for r in SQLite_Query(db, sql) {
         a := KLR_GetCell(manifest, r["date"], r["app"])
@@ -538,7 +538,7 @@ KLR__SumAppDay(db, manifest, where) {
         a["llm_suggested"] := r["llm_suggested"]
         a["hs_input_chars"] := r["hs_input_chars"]
         a["llm_input_chars"] := r["llm_input_chars"]
-        a["app_time"] := r["app_time"]
+        a["app_time_ms"] := r["app_time_ms"]
         a["category"] := r["category"]
     }
 }
