@@ -2208,6 +2208,11 @@ initMenu() {
 		"layout_features_altgr",  (M, C) => _LAY_LayoutFeaturesAltGr(M, C),
 	)
 	LayoutMenu  := MenuRenderer_Build("layout_menu", "Layout", LayoutDynHandlers)
+	; Grey out accented-letter shortcuts when Ergopti keyboard emulation is off —
+	; the shortcuts depend on Ergopti key positions and are unusable without it.
+	if !Features["layout"]["ergopti_base"] {
+		LayoutMenu.Disable(t("menu.shortcuts.group_accented"))
+	}
 	LayoutGated := IsCategoryGated("Layout")
 	LayoutMenuTitle := t("menu.layout.title")
 	A_TrayMenu.Add(LayoutMenuTitle, LayoutMenu)
