@@ -737,10 +737,22 @@ _MET_WpmWidgetReset(M, _Cat) {
 
 ; ── Layout dynamic handlers ────────────────────────────────────────────────────
 
-; Dynamic handler: iterate ``ahk.layout`` manifest section and add each entry.
-_LAY_LayoutFeatures(M, _Cat) {
+; Dynamic handler: Ergopti base-layer feature only (ergopti_base).
+_LAY_LayoutFeaturesBase(M, _Cat) {
 	for LayoutEntry in ManifestFeaturesForSection("ahk.layout") {
-		MenuAddItemFromManifest(M, LayoutEntry, "Layout")
+		if (LayoutEntry["id"] == "ergopti_base") {
+			MenuAddItemFromManifest(M, LayoutEntry, "Layout")
+		}
+	}
+}
+
+; Dynamic handler: AltGr / digit-shift features (direct_access_digits,
+; ergopti_alt_gr, ergopti_plus) — usable without the Ergopti base layer.
+_LAY_LayoutFeaturesAltGr(M, _Cat) {
+	for LayoutEntry in ManifestFeaturesForSection("ahk.layout") {
+		if (LayoutEntry["id"] != "ergopti_base") {
+			MenuAddItemFromManifest(M, LayoutEntry, "Layout")
+		}
 	}
 }
 
@@ -2147,7 +2159,8 @@ initMenu() {
 	; Dynamic handler ``layout_features`` iterates ``ahk.layout`` entries;
 	; ``active_layouts`` is macOS-only and skipped by the AHK platform filter.
 	LayoutDynHandlers := Map(
-		"layout_features", (M, C) => _LAY_LayoutFeatures(M, C),
+		"layout_features_base",   (M, C) => _LAY_LayoutFeaturesBase(M, C),
+		"layout_features_altgr",  (M, C) => _LAY_LayoutFeaturesAltGr(M, C),
 	)
 	LayoutMenu  := MenuRenderer_Build("layout_menu", "Layout", LayoutDynHandlers)
 	LayoutGated := IsCategoryGated("Layout")

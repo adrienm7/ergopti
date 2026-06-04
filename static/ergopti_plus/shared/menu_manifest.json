@@ -326,7 +326,14 @@
 		},
 		{
 			"type": "dynamic",
-			"id": "layout_features"
+			"id": "layout_features_base"
+		},
+		{
+			"type": "---"
+		},
+		{
+			"type": "dynamic",
+			"id": "layout_features_altgr"
 		},
 		{
 			"type": "group",
@@ -335,9 +342,6 @@
 			"platforms": [
 				"ahk"
 			]
-		},
-		{
-			"type": "---"
 		},
 		{
 			"type": "dynamic",
