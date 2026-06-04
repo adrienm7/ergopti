@@ -53,22 +53,26 @@ global HOTSTRINGS_CATEGORY_DEFAULT_COLORS := Map(
     "personal", "#6e6e73",  ; Gray — neutral baseline so user-added entries stand out only when the user picks a colour themselves
 )
 
-; Default word-terminator string — characters whose typing ends the current
-; word and fires the hotstring engine. The user can add or remove chars via
-; the config window; this constant is the canonical fallback applied when no
-; override is stored in hotstrings_config.toml.
-global HOTSTRINGS_DEFAULT_WORD_DELIMITERS := " `t`r`n.,;:?!''"
-
 ; Shared terminator catalogue instance — the single source of truth for the
-; word-expander LIST (labels, order, separators), generated from
-; shared/domain/Terminators.spec.js and shared verbatim with macOS. Both the
-; tray submenu and the config-window checkboxes render HSE_Terminators.all() so
-; the catalogue can never drift between the two UIs or between drivers. The
-; instance is created once at load — before initMenu reads it — so the menu
-; build never hits an unassigned global. Per-entry enabled state is still
-; persisted as the word-delimiter string (see HotstringsGetWordDelimiters); the
-; catalogue supplies the items, the string supplies which are active.
+; word-expander LIST (labels, order, separators) AND the default-enabled set,
+; generated from shared/domain/Terminators.spec.js and shared verbatim with
+; macOS. Both the tray submenu and the config-window checkboxes render
+; HSE_Terminators.all() so the catalogue can never drift between the two UIs or
+; between drivers. Created once at load — before initMenu and before the default
+; strings below read it — so nothing hits an unassigned global. Per-entry
+; enabled state is persisted as the word-delimiter string (see
+; HotstringsGetWordDelimiters); the catalogue supplies the items, the string
+; supplies which are active.
 global HSE_Terminators := Terminators()
+
+; Default word-terminator and consumed-delimiter strings — the canonical
+; fallbacks applied when no override is stored in hotstrings_config.toml. Both
+; are DERIVED from the catalogue's default_enabled / consume flags so the AHK
+; defaults are byte-identical to the macOS defaults (one source). Only the basic
+; terminators ship on (whitespace + sentence punctuation + the magic key); every
+; other slot is available but off by default. See Terminators.spec.js.
+global HOTSTRINGS_DEFAULT_WORD_DELIMITERS     := HSE_TerminatorDefaultWordDelimiters()
+global HOTSTRINGS_DEFAULT_CONSUMED_DELIMITERS := HSE_TerminatorDefaultConsumedDelimiters()
 
 ; Absolute path of the user override file (set by HotstringsConfigInit).
 global _HotstringsOverridesPath := ""
@@ -148,14 +152,16 @@ HotstringsSetWordDelimiters(Delimiters) {
     _SaveGlobalWordDelimiters(Delimiters)
 }
 
-; Return the effective consumed-delimiter string (empty = consume nothing).
+; Return the effective consumed-delimiter string: user override when present,
+; otherwise the catalogue-derived default (the magic key is consumed out of the
+; box, matching macOS).
 HotstringsGetConsumedDelimiters() {
-    global _HotstringsConsumedDelimiters
-    return _HotstringsConsumedDelimiters
+    global _HotstringsConsumedDelimiters, HOTSTRINGS_DEFAULT_CONSUMED_DELIMITERS
+    return (_HotstringsConsumedDelimiters != "") ? _HotstringsConsumedDelimiters : HOTSTRINGS_DEFAULT_CONSUMED_DELIMITERS
 }
 
 ; Persist a new consumed-delimiter string to [__global__] and update in memory.
-; Pass "" to clear (no chars consumed — default behaviour).
+; Pass "" to fall back to the catalogue default (the magic key stays consumed).
 HotstringsSetConsumedDelimiters(Consumed) {
     global _HotstringsConsumedDelimiters, HSE_CONSUMED_DELIMITERS
     _HotstringsConsumedDelimiters := Consumed
@@ -718,6 +724,40 @@ HotstringsConfigPath() {
 ; word-delimiter STRING — the persisted serialization of the catalogue's
 ; enabled state — and the generated HSE_Terminators catalogue. No I/O here;
 ; callers persist the returned string via HotstringsSetWordDelimiters.
+
+; Default word-terminator string — the chars of every catalogue entry that is
+; enabled by default. This is the single source for the AHK default set, kept in
+; lock-step with macOS (both read the same catalogue). Separators are skipped.
+HSE_TerminatorDefaultWordDelimiters() {
+    global HSE_Terminators
+    Out := ""
+    for D in HSE_Terminators.all() {
+        if (D.Has("type") and D["type"] == "separator")
+            continue
+        if !D["default_enabled"]
+            continue
+        for Ch in D["chars"]
+            Out .= Ch
+    }
+    return Out
+}
+
+; Default consumed-delimiter string — the chars of every catalogue entry that is
+; both enabled by default AND marked consume (i.e. the magic key). Swallowed
+; rather than re-injected after an expansion, matching macOS.
+HSE_TerminatorDefaultConsumedDelimiters() {
+    global HSE_Terminators
+    Out := ""
+    for D in HSE_Terminators.all() {
+        if (D.Has("type") and D["type"] == "separator")
+            continue
+        if !(D["default_enabled"] and D["consume"])
+            continue
+        for Ch in D["chars"]
+            Out .= Ch
+    }
+    return Out
+}
 
 ; Concatenated chars of every built-in (non-separator) catalogue entry. Used to
 ; tell user-defined custom delimiters apart from catalogue ones.
