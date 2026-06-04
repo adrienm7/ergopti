@@ -329,19 +329,19 @@
 			"id": "layout_features_base"
 		},
 		{
-			"type": "---"
-		},
-		{
-			"type": "dynamic",
-			"id": "layout_features_altgr"
-		},
-		{
 			"type": "group",
 			"id": "accented_letters",
 			"i18n": "menu.shortcuts.group_accented",
 			"platforms": [
 				"ahk"
 			]
+		},
+		{
+			"type": "---"
+		},
+		{
+			"type": "dynamic",
+			"id": "layout_features_altgr"
 		},
 		{
 			"type": "dynamic",
