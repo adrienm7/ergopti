@@ -117,6 +117,10 @@ function M.new(defaults, delays_default)
 		WORD_TIMEOUT_SEC           = 5.0,
 		BASE_DELAY_SEC             = defaults.expansion_delay,
 		DELAYS                     = {},
+		-- Per-section delay overrides (seconds), keyed by section name. Loaded
+		-- from a category TOML's [_meta.section_delays] block. Higher priority
+		-- than the group delay; see mapping_fires for the full precedence.
+		SECTION_DELAYS             = {},
 		DELAYS_DEFAULT             = delays_default,
 		current_group              = nil,
 		group_post_load_hooks      = {},
@@ -144,18 +148,32 @@ function M.new(defaults, delays_default)
 		s.no_rescan_until = epoch_fn() + (tonumber(duration) or DEFAULT_SUPPRESS_KEEP_SEC)
 	end
 
-	-- Seed the initial per-group delays from defaults and compute the
-	-- word-timeout. A delay of 0 for any group means "always-active
-	-- trigger" — in that case the word-timeout must be infinite so the
-	-- buffer is never auto-wiped behind the user's back.
-	local has_infinite = false
-	local max_delay    = 0
+	-- Seed the initial per-group delays from defaults.
 	for k, v in pairs(delays_default) do
 		s.DELAYS[k] = v
-		if v == 0 then has_infinite = true end
-		if v > max_delay then max_delay = v end
 	end
-	s.WORD_TIMEOUT_SEC = has_infinite and 0 or (max_delay + 0.5)
+
+	-- Recompute the word-inactivity timeout from the LARGEST active delay,
+	-- considering BOTH group delays and per-section overrides. A delay of 0
+	-- means "always-active" → the timeout must be infinite (0) so the buffer is
+	-- never auto-wiped before such a trigger can fire. Section delays MUST be
+	-- included: a long per-section window (e.g. comma_j = 5 s) would otherwise
+	-- be cut short by a timeout sized only to the group delays. Call again
+	-- whenever DELAYS or SECTION_DELAYS change (set_delay, load_toml).
+	s.recompute_word_timeout = function()
+		local has_infinite = false
+		local max_delay    = 0
+		for _, tbl in ipairs({ s.DELAYS, s.SECTION_DELAYS }) do
+			for _, v in pairs(tbl) do
+				if type(v) == "number" then
+					if v == 0        then has_infinite = true end
+					if v > max_delay then max_delay = v       end
+				end
+			end
+		end
+		s.WORD_TIMEOUT_SEC = has_infinite and 0 or (max_delay + 0.5)
+	end
+	s.recompute_word_timeout()
 
 	return s
 end

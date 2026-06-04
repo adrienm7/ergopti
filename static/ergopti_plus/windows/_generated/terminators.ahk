@@ -1,5 +1,5 @@
 ﻿; static/ergopti_plus/windows/_generated/terminators.ahk
-; AUTO-GENERATED from _shared/domain/terminators.spec.js.
+; AUTO-GENERATED from shared/domain/Terminators.spec.js.
 ; DO NOT EDIT BY HAND — run `npm run codegen:terminators` to refresh.
 
 ; ==============================================================================
@@ -47,14 +47,26 @@ class Terminators {
         Map("key", "space", "chars", [" "], "label", "Espace", "default_enabled", true, "consume", false),
         Map("key", "tab", "chars", ["`t"], "label", "Tab", "default_enabled", true, "consume", false),
         Map("key", "enter", "chars", ["`r", "`n"], "label", "Entrée", "default_enabled", true, "consume", false),
+        Map("key", "separator_3", "chars", [], "label", "-", "default_enabled", false, "consume", false, "type", "separator"),
         Map("key", "period", "chars", ["."], "label", "Point", "default_enabled", true, "consume", false),
+        Map("key", "ellipsis", "chars", ["…"], "label", "…", "default_enabled", true, "consume", false),
         Map("key", "comma", "chars", [","], "label", "Virgule", "default_enabled", true, "consume", false),
         Map("key", "semicolon", "chars", [";"], "label", "Point-virgule", "default_enabled", true, "consume", false),
         Map("key", "colon", "chars", [":"], "label", "Deux-points", "default_enabled", true, "consume", false),
         Map("key", "exclamation", "chars", ["!"], "label", "Point d'excl.", "default_enabled", true, "consume", false),
         Map("key", "question", "chars", ["?"], "label", "Point d'interr.", "default_enabled", true, "consume", false),
+        Map("key", "separator_11", "chars", [], "label", "-", "default_enabled", false, "consume", false, "type", "separator"),
+        Map("key", "apostrophe", "chars", ["'"], "label", "'", "default_enabled", true, "consume", false),
+        Map("key", "apostrophe_typographic", "chars", ["’"], "label", "’", "default_enabled", true, "consume", false),
+        Map("key", "separator_14", "chars", [], "label", "-", "default_enabled", false, "consume", false, "type", "separator"),
+        Map("key", "paren_close", "chars", [")"], "label", ")", "default_enabled", true, "consume", false),
+        Map("key", "bracket_close", "chars", ["]"], "label", "]", "default_enabled", true, "consume", false),
+        Map("key", "brace_close", "chars", ["}"], "label", "}", "default_enabled", true, "consume", false),
+        Map("key", "angle_close", "chars", [">"], "label", ">", "default_enabled", true, "consume", false),
+        Map("key", "separator_19", "chars", [], "label", "-", "default_enabled", false, "consume", false, "type", "separator"),
         Map("key", "slash", "chars", ["/"], "label", "Slash", "default_enabled", false, "consume", false),
         Map("key", "backslash", "chars", ["\"], "label", "Antislash", "default_enabled", false, "consume", false),
+        Map("key", "separator_22", "chars", [], "label", "-", "default_enabled", false, "consume", false, "type", "separator"),
         Map("key", "magic_key", "chars", ["★"], "label", "Touche magique", "default_enabled", true, "consume", true)
         ]
         for entry in this._catalogue {

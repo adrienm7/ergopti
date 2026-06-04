@@ -10,6 +10,14 @@ show_tooltip = false
 description = { fr = "Réduction des distances", en = "Distance reduction", de = "Distanzreduktion", es = "Reducción de distancias", zh = "距离减少", ar = "تقليل المسافات", cs = "Snížení vzdáleností", da = "Afstandsreduktion", he = "הפחתת מרחקים", hi = "दूरी में कमी", it = "Riduzione delle distanze", ja = "距離削減", ko = "거리 감소", nl = "Afstandsreductie", no = "Avstandsreduksjon", pl = "Redukcja odległości", pt = "Redução de distâncias", ru = "Уменьшение расстояний", sv = "Avståndsminskning", tr = "Mesafe azaltma", uk = "Зменшення відстаней" }
 sections_order = ["qu", "suffixes_a", "-", "comma_j", "comma_far_letters", "-", "dead_key_e_circumflex", "e_circumflex_e", "-", "space_around_symbols"]
 
+[_meta.section_delays]
+# Per-section expansion-delay overrides (seconds). A value here overrides the
+# group `delay` above for that section; a user custom delay still wins over it.
+# comma → J expansions are deliberate layer/dead-key sequences (shifted nnbsp +
+# punctuation, ¨+s nbsp, Shift for the uppercase vowel), so they need a generous
+# activation window or the typing-speed gate drops them — 5 s vs the 0.5 s group.
+comma_j = 5
+
 
 
 # =========================

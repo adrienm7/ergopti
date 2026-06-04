@@ -1205,10 +1205,20 @@ LLM_TooltipShow(payload, active := 1, is_final := false) {
 		TooltipShow(Items, 0)
 	}
 
-	; Arm the LLM-specific auto-hide timer.
+	; Arm the LLM-specific auto-hide timer. The duration mirrors the macOS
+	; llm_prediction delay: it defaults to UI_LLM_TIMEOUT_SEC (20 s) but is
+	; user-overridable from the hotstrings "Delays" submenu, stored as the
+	; "llm_prediction" delay override. Resolve it live so a change applies
+	; without a restart; fall back to the UI constant if the resolver is absent.
 	global _TooltipTimerGeneration, _TooltipGeneration, UI_LLM_TIMEOUT_SEC
 	_TooltipTimerGeneration := _TooltipGeneration
-	timeout_ms := Round(Max(0.05, UI_LLM_TIMEOUT_SEC - 0.2) * 1000)
+	llm_timeout_sec := UI_LLM_TIMEOUT_SEC
+	try {
+		_llm_ov := HotstringsResolve("llm_prediction", "")
+		if _llm_ov.HasOverride
+			llm_timeout_sec := _llm_ov.Delay
+	}
+	timeout_ms := Round(Max(0.05, llm_timeout_sec - 0.2) * 1000)
 	SetTimer(_TooltipTimerFn, -timeout_ms)
 }
 

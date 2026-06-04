@@ -1303,7 +1303,7 @@ M.features = {
 		section = "hs.gestures",
 		default = true,
 		type = "boolean",
-		description_key = "menu.gestures.space_wrap",
+		description_key = "menu.gestures.circular_spaces",
 		platforms = { "hs" }
 	},
 	{

@@ -30,6 +30,10 @@ local dh_mod       = require("modules.dynamic_hotstrings")
 -- Keymap is already loaded by init.lua before this module is required;
 -- require() returns the cached module with no side-effects.
 local keymap       = require("modules.keymap")
+-- Per-category delays (magic key, autocorrection) are owned by hotstrings_config
+-- (persisted to hotstrings_config.toml, shared with the config window). The quick
+-- menu items below read/write through it so the two UIs never desync.
+local hotstrings_config = require("modules.hotstrings_config")
 
 
 
@@ -200,7 +204,7 @@ local function buildPersonalInfoItems(ctx, description)
 			end,
 		},
 		{
-			title = i18n.get("menu.hotstrings.edit_personal_info"),
+			title = i18n.get("menu.shortcuts.edit_personal_info"),
 			fn    = function() hs.timer.doAfter(0.1, function() pcall(ctx.personal_info.open_editor) end) end,
 		},
 	}
@@ -405,7 +409,45 @@ function M.build_management(ctx)
 	local defs    = ctx.keymap and type(ctx.keymap.get_terminator_defs) == "function" and ctx.keymap.get_terminator_defs() or {}
 	local exp_sub = {}
 
-	-- Built-in terminators (non-custom), with consume indicator
+	-- Bulk actions — mirror the Windows word-expanders submenu so both drivers
+	-- expose the same set: enable all / disable all / reset the built-in
+	-- terminators to their catalogue defaults. Custom terminators are managed
+	-- individually below and are left untouched here.
+	local function bulk_set_terminators(enabled)
+		for _, d in ipairs(defs) do
+			if type(d) == "table" and not d.custom and d.key then
+				if ctx.keymap and type(ctx.keymap.set_terminator_enabled) == "function" then
+					pcall(ctx.keymap.set_terminator_enabled, d.key, enabled)
+				end
+				state.terminator_states[d.key] = enabled
+			end
+		end
+		ctx.save_prefs()
+		ctx.updateMenu()
+	end
+	local function reset_terminators()
+		for _, d in ipairs(defs) do
+			if type(d) == "table" and not d.custom and d.key then
+				-- default_enabled is true unless the catalogue marks it false (slash/backslash)
+				local def_on = (d.default_enabled ~= false)
+				if ctx.keymap and type(ctx.keymap.set_terminator_enabled) == "function" then
+					pcall(ctx.keymap.set_terminator_enabled, d.key, def_on)
+				end
+				state.terminator_states[d.key] = def_on
+			end
+		end
+		ctx.save_prefs()
+		ctx.updateMenu()
+	end
+	exp_sub[#exp_sub + 1] = { title = i18n.get("menu.hotstrings.check_all"),   disabled = paused or nil, fn = not paused and function() bulk_set_terminators(true)  end or nil }
+	exp_sub[#exp_sub + 1] = { title = i18n.get("menu.hotstrings.uncheck_all"), disabled = paused or nil, fn = not paused and function() bulk_set_terminators(false) end or nil }
+	exp_sub[#exp_sub + 1] = { title = i18n.get("menu.global.reset_defaults"),  disabled = paused or nil, fn = not paused and reset_terminators or nil }
+	exp_sub[#exp_sub + 1] = { title = "-" }
+
+	-- Built-in terminators (non-custom), with consume indicator. The shared
+	-- catalogue order IS the menu order; { type = "separator" } entries become
+	-- "-" dividers so the groups (whitespace, punctuation, apostrophes, closing
+	-- delimiters, slashes, magic key) are separated — single source = the spec.
 	for _, def in ipairs(defs) do
 		if type(def) == "table" and not def.custom then
 			if def.type == "separator" then
@@ -560,7 +602,9 @@ function M.build_management(ctx)
 		local display_ms = (cur_ms == 0) and i18n.get("menu.hotstrings.infinite") or (cur_ms .. " ms")
 		
 		return {
-			title    = title .. " : " .. display_ms .. (cur_ms == def_ms and (" " .. i18n.get("menu.hotstrings.default_indicator")) or ""),
+			-- menu.settings.default_indicator (" (default)") is the surviving shared
+			-- key — its value already carries the leading space, so we don't add one.
+			title    = title .. " : " .. display_ms .. (cur_ms == def_ms and i18n.get("menu.settings.default_indicator") or ""),
 			disabled = paused or nil,
 			fn       = not paused and function()
 				local ok_p, btn, raw = pcall(dialog.text_prompt,
@@ -584,6 +628,54 @@ function M.build_management(ctx)
 					state.delays[key] = new_sec
 					if ctx.keymap and type(ctx.keymap.set_delay) == "function" then pcall(ctx.keymap.set_delay, key, new_sec) end
 				end
+				ctx.save_prefs()
+				ctx.updateMenu()
+			end or nil,
+		}
+	end
+
+	-- Builds a quick-access delay item for a TOML-backed category (magic key,
+	-- autocorrection). Unlike make_delay_item — which owns its value in
+	-- state.delays — this reads the EFFECTIVE delay via hotstrings_config.resolve
+	-- (so the row shows the same number as the config window) and writes through
+	-- set_override (the one persistent source both UIs share), then pushes the new
+	-- value into the live CoreState.DELAYS via set_delay so it applies at once.
+	local function make_category_delay_item(title, key, category)
+		local resolved = hotstrings_config.resolve(category, nil)
+		local cur_val  = (type(resolved) == "table" and type(resolved.delay) == "number") and resolved.delay or nil
+		if type(cur_val) ~= "number" then
+			Logger.error(LOG, "make_category_delay_item(): no resolvable delay for category '%s'.", category)
+			return { title = title .. " : " .. i18n.get("menu.hotstrings.missing_value"), disabled = true }
+		end
+		local cur_ms     = math.floor(cur_val * 1000 + 0.5)
+		local has_over   = (type(resolved) == "table" and resolved.has_override) or false
+		local display_ms = (cur_ms == 0) and i18n.get("menu.hotstrings.infinite") or (cur_ms .. " ms")
+
+		return {
+			-- menu.settings.default_indicator (" (default)") carries its own leading
+			-- space; show it while the user has set no override for this category.
+			title    = title .. " : " .. display_ms .. ((not has_over) and i18n.get("menu.settings.default_indicator") or ""),
+			disabled = paused or nil,
+			fn       = not paused and function()
+				local ok_p, btn, raw = pcall(dialog.text_prompt,
+					title,
+					i18n.get("menu.hotstrings.delay_prompt"),
+					tostring(cur_ms), "OK", i18n.get("common.cancel")
+				)
+				if not ok_p or btn ~= "OK" then return end
+
+				local val = tonumber(raw)
+				if not val or val < 0 or val ~= math.floor(val) then
+					pcall(notifications.notify, i18n.get("menu.hotstrings.delay_invalid_title"), i18n.get("menu.hotstrings.delay_invalid_body"), "error")
+					return
+				end
+
+				-- Persist through hotstrings_config (same store + file the config
+				-- window writes to, so the two UIs never desync) then apply to the
+				-- running engine so the new delay takes effect without a restart.
+				local new_sec = val / 1000
+				pcall(hotstrings_config.set_override, category, nil, "delay", new_sec)
+				if ctx.keymap and type(ctx.keymap.set_delay) == "function" then pcall(ctx.keymap.set_delay, key, new_sec) end
 				ctx.save_prefs()
 				ctx.updateMenu()
 			end or nil,
@@ -625,6 +717,15 @@ function M.build_management(ctx)
 		table.insert(delay_menu, make_delay_item(i18n.get("menu.hotstrings.tooltip_default"), nil, def_base, true))
 	end
 
+	-- The ★ magic-key and autocorrection delays are TOML-backed categories
+	-- (also tunable in the config window). Surface them here too, mirroring the
+	-- AHK tray, so the most-used per-category delays are one click away.
+	if def_delays then
+		table.insert(delay_menu, { title = "-" })
+		table.insert(delay_menu, make_category_delay_item(i18n.get("menu.hotstrings.delay_magic_key"), "STAR_TRIGGER", "magickey"))
+		table.insert(delay_menu, make_category_delay_item(i18n.get("menu.hotstrings.delay_autocorrection"), "autocorrection", "autocorrection"))
+	end
+
 	delays_item = { title = i18n.get("menu.hotstrings.delays_colors"), disabled = paused or nil, menu = delay_menu }
 
 	if exp_item then table.insert(menu, exp_item) end
@@ -635,7 +736,7 @@ function M.build_management(ctx)
 	local hs_state  = ctx and ctx.state
 	local hs_paused = ctx and ctx.paused
 	table.insert(menu, {
-		title    = i18n.get("menu.hotstrings.magic_key_item_prefix") .. (hs_state and hs_state.trigger_char or "★"),
+		title    = i18n.get("menu.hotstrings.magic_key_prefix") .. (hs_state and hs_state.trigger_char or "★"),
 		disabled = hs_paused or nil,
 		fn       = not hs_paused and function()
 			if not hs_state then return end
@@ -824,7 +925,7 @@ function M.build_custom(ctx)
 
 	-- Build the default-section sub-menu: "Aucune" first, then one item per personal section
 	local function default_section_label()
-		if not state.custom_default_section then return i18n.get("menu.hotstrings.no_default_section") end
+		if not state.custom_default_section then return i18n.get("menu.hotstrings.default_none") end
 		if type(personal_secs) == "table" then
 			for _, sec in ipairs(personal_secs) do
 				if type(sec) == "table" and sec.name == state.custom_default_section then
@@ -838,7 +939,7 @@ function M.build_custom(ctx)
 	end
 
 	local cat_menu = { {
-		title   = i18n.get("menu.hotstrings.no_default_section"),
+		title   = i18n.get("menu.hotstrings.default_none"),
 		checked = (not state.custom_default_section) or nil,
 		fn      = function()
 			state.custom_default_section = nil

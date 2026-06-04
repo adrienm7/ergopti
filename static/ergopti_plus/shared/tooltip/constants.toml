@@ -282,9 +282,12 @@ loading_hex = "#F0C747"
 # 0 means "stay until explicitly hidden".
 hotstring_timeout_sec = 2.5
 
-# Default auto-hide duration for LLM prediction tooltips (seconds).
+# Default auto-hide duration for LLM prediction tooltips (seconds). Aligned with
+# the macOS llm_prediction delay default (20 s). User-overridable at runtime from
+# the hotstrings "Delays" submenu — stored as the "llm_prediction" delay override
+# and resolved live when the tooltip timer is armed.
 # 0 means "stay until explicitly hidden".
-llm_timeout_sec = 12.0
+llm_timeout_sec = 20.0
 
 # Safety cap applied when the caller requests duration = 0 (infinite).
 # Prevents ghost tooltips if the normal hide path is skipped due to an error.

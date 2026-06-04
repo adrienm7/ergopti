@@ -196,8 +196,13 @@ end
 --- @param tail_char string Single-codepoint UTF-8 string.
 --- @return table|nil Array of mapping entries, or nil.
 function M.mappings_for_tail(tail_char)
-	if not _state then return nil end
-	return _state.mappings_by_tail_char[tail_char]
+	if not _state or type(tail_char) ~= "string" then return nil end
+	-- Buckets are keyed by the trigger's last codepoint LOWERCASED (see add_raw's
+	-- tail_char). The lookup MUST lowercase too, otherwise an uppercase last char
+	-- (e.g. the "E" of the ";E" → "JE" J trigger) probes an empty bucket and the
+	-- auto-expansion never fires. ASCII-only :lower() mirrors the registration
+	-- (accented codepoints are unchanged on both sides, so they still match).
+	return _state.mappings_by_tail_char[tail_char:lower()]
 end
 
 --- Returns the bucket of has_magic mappings whose star_base ends with
@@ -354,6 +359,9 @@ function M.add(trigger, replacement, opts)
 	local is_auto           = opts.auto_expand        == true
 	local is_case_sensitive = opts.is_case_sensitive  == true
 	local is_final          = opts.final_result       == true
+	-- Owning section name (e.g. "comma_j"), threaded through so mapping_fires can
+	-- look up a per-section delay override. Generated aliases inherit it.
+	local section           = type(opts.section) == "string" and opts.section or nil
 
 	-- Replacements containing newlines or key directives are always "final" so
 	-- the engine does not attempt to chain another expansion on top of them.
@@ -393,6 +401,7 @@ function M.add(trigger, replacement, opts)
 			-- being called on every keystroke in update_preview() and the expander
 			plain_repl   = plain_r,
 			is_word      = is_word,
+			section      = section,
 			auto         = a,
 			seq          = _state.seq_counter,
 			tlen         = text_utils.utf8_len(t),
@@ -482,18 +491,39 @@ function M.add(trigger, replacement, opts)
 		end
 	end
 
-	-- Generate a ";" alias for triggers that start with ",".
+	-- Generate ";" and nbsp-prefixed aliases for triggers that start with ",".
 	-- On the Ergopti layout ";" is in the comma layer, so both keys should fire.
+	-- nbsp (U+00A0) + ";" or ":" and nnbsp (U+202F) + ";" or ":" are the shifted
+	-- forms of "," on the layout — they must trigger J+vowel independently of
+	-- whether nbsp/nnbsp are configured as word terminators.
+	local NBSP  = "\194\160"     -- U+00A0
+	local NNBSP = "\226\128\175" -- U+202F
 	local first_char_src = is_case_sensitive and trigger or lower_trig
 	local first_char     = first_char_src:match("^[%z\1-\127\194-\244][\128-\191]*")
 	if first_char == "," then
 		local rest = lower_trig:sub(#first_char + 1)
 		if rest ~= "" then
-			add_with_space_variants(";" .. text_utils.trig_lower(rest), title_repl, plain_repl_title)
-			for _, ru in ipairs(text_utils.trig_upper(rest)) do
+			local lower_rest = text_utils.trig_lower(rest)
+			local upper_rests = text_utils.trig_upper(rest)
+			-- Plain ";" alias (original behaviour)
+			add_with_space_variants(";" .. lower_rest, title_repl, plain_repl_title)
+			for _, ru in ipairs(upper_rests) do
 				local alias = ";" .. ru
-				if alias ~= ";" .. text_utils.trig_lower(rest) then
+				if alias ~= ";" .. lower_rest then
 					add_with_space_variants(alias, upper_repl, plain_repl_upper)
+				end
+			end
+			-- nbsp/nnbsp + ";" and ":" aliases — independent of terminator config
+			for _, sp in ipairs({ NBSP, NNBSP }) do
+				for _, punct in ipairs({ ";", ":" }) do
+					local pfx = sp .. punct
+					add_raw(pfx .. lower_rest, title_repl, is_auto, plain_repl_title)
+					for _, ru in ipairs(upper_rests) do
+						local alias = pfx .. ru
+						if alias ~= pfx .. lower_rest then
+							add_raw(alias, upper_repl, is_auto, plain_repl_upper)
+						end
+					end
 				end
 			end
 		end
@@ -599,6 +629,7 @@ function M.load_toml(name, path)
 					auto_expand       = entry.auto_expand,
 					is_case_sensitive = entry.is_case_sensitive,
 					final_result      = entry.final_result,
+					section           = sec_name,
 				})
 			end
 		else
@@ -616,6 +647,21 @@ function M.load_toml(name, path)
 
 	_state.current_group = nil
 	M.sort_mappings()
+
+	-- Per-section delay overrides from [_meta.section_delays] (seconds). Merge
+	-- into the shared map so mapping_fires can apply them (precedence: user >
+	-- section > group > base), then resize the word-inactivity timeout so a long
+	-- per-section window (e.g. comma_j = 5 s) is not cut short by the timeout.
+	if type(data.meta) == "table" and type(data.meta.section_delays) == "table" then
+		for sec_name, secs in pairs(data.meta.section_delays) do
+			if type(secs) == "number" then
+				_state.SECTION_DELAYS[sec_name] = secs
+			end
+		end
+		if type(_state.recompute_word_timeout) == "function" then
+			_state.recompute_word_timeout()
+		end
+	end
 
 	local seqs = {}
 	for _, m in ipairs(_state.mappings) do

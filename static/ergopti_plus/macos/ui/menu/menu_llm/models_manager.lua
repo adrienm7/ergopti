@@ -326,7 +326,7 @@ function M.new(deps)
 			body = body .. "\n\n" .. i18n.get("menu.llm.launch_download_prompt")
 
 			local ok_c, choice = pcall(dialog.block_alert,
-				string.format(i18n.get("menu.llm.install_required_title"), engine_name),
+				string.format(i18n.get("menu.llm.hw_header"), engine_name),
 				body, i18n.get("menu.llm.btn_download"), i18n.get("common.cancel"), msg:find("⚠️") and "warning" or "informational")
 				
 			if ok_c and choice == i18n.get("menu.llm.btn_download") then

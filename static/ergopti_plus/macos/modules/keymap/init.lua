@@ -191,16 +191,9 @@ function M.set_delay(key, val)
 	CoreState.DELAYS[key] = tonumber(val) or M.DELAYS_DEFAULT[key]
 	Logger.debug(LOG, "Delay '%s': %.3fs.", key, CoreState.DELAYS[key])
 
-	-- Recompute WORD_TIMEOUT_SEC whenever any delay changes.
-	local has_inf = false
-	local max_d   = 0
-	for _, v in pairs(CoreState.DELAYS) do
-		if type(v) == "number" then
-			if v == 0     then has_inf = true end
-			if v > max_d  then max_d = v      end
-		end
-	end
-	CoreState.WORD_TIMEOUT_SEC = has_inf and 0 or (max_d + 0.5)
+	-- Recompute WORD_TIMEOUT_SEC whenever any delay changes — factors in the
+	-- per-section overrides too (see CoreState.recompute_word_timeout).
+	CoreState.recompute_word_timeout()
 end
 
 --- Globally reassigns the magic expansion key (the "★" character by default).
@@ -390,9 +383,19 @@ local function mapping_fires(m)
 	if m.group and CoreState.groups[m.group] and not CoreState.groups[m.group].enabled then
 		return false
 	end
+	-- Delay precedence (highest first), mirroring the AHK HotstringsResolve chain:
+	--   user-overridden group delay > TOML per-section delay > group delay > base.
+	-- A group delay that differs from its hardcoded default is treated as a user
+	-- override (priority 0) and wins over a per-section TOML value.
 	local specific_delay
 	if m.has_magic then
 		specific_delay = CoreState.DELAYS.STAR_TRIGGER
+	elseif m.group and CoreState.DELAYS[m.group] ~= nil
+		and CoreState.DELAYS_DEFAULT[m.group] ~= nil
+		and CoreState.DELAYS[m.group] ~= CoreState.DELAYS_DEFAULT[m.group] then
+		specific_delay = CoreState.DELAYS[m.group]
+	elseif m.section and CoreState.SECTION_DELAYS[m.section] then
+		specific_delay = CoreState.SECTION_DELAYS[m.section]
 	elseif m.group and CoreState.DELAYS[m.group] then
 		specific_delay = CoreState.DELAYS[m.group]
 	else

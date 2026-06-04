@@ -107,6 +107,34 @@ if Features["hotstrings"]["distances_reduction"]["comma_j"]["enabled"] {
 	CreateCaseSensitiveHotstrings("*?", ",'", "j'", CommaJOptions)
 	; To fix a problem of "J'" for ,'
 	CreateHotstring("*?C", ",'", "j'", CommaJOptions)
+
+	; Uppercase-J variants: Shift+SC02F sends nnbsp (U+202F)+; and Shift+SC022
+	; sends nnbsp+: on the Ergopti layout; ¨+s produces nbsp (U+00A0). Both act
+	; as the "shifted comma" — the Shift capitalises the J, so the lowercase
+	; comma "je" becomes "Je". The vowel's own case carries through: a lowercase
+	; vowel yields titlecase ("Je"), a Shift-held uppercase vowel yields all-caps
+	; ("JE") — case-sensitive triggers are registered for each variant.
+	; Registered explicitly here because CreateCaseSensitiveHotstrings cannot
+	; handle triggers that contain a terminator character (like : or ;) as an
+	; internal part of the trigger — the HSE end-char path would intercept it.
+	; These triggers are independent of the nbsp/nnbsp terminator settings.
+	_CommaJVowels := Map(
+		"à", "J",  "a", "Ja", "e", "Je", "é", "Jé",
+		"i", "Ji", "o", "Jo", "u", "Ju", "ê", "Ju",
+		"A", "JA", "E", "JE", "É", "JÉ",
+		"I", "JI", "O", "JO", "U", "JU", "Ê", "JU", "À", "J",
+		Chr(0x27), "J'", Chr(0x2019), "J'"
+	)
+	; The bare ";" (comma-layer key, un-shifted) is included alongside the
+	; nnbsp/nbsp-prefixed forms so the J expansion fires from it too. Like the
+	; prefixed forms it uses "*?C" (in-word) — the J is guaranteed regardless of
+	; surrounding context (e.g. "test;e" → "testJe"), by deliberate design. The
+	; bare ":" is intentionally absent: only ";" doubles as the comma-layer J key.
+	for _Vowel, _Output in _CommaJVowels {
+		for _Prefix in [Chr(0x202F) Chr(0x3B), Chr(0x202F) ":", Chr(0x00A0) Chr(0x3B), Chr(0x00A0) ":", Chr(0x3B)] {
+			CreateHotstring("*?C", _Prefix . _Vowel, _Output, CommaJOptions)
+		}
+	}
 }
 
 
@@ -657,6 +685,18 @@ if Features["hotstrings"]["magic_key"]["text_expansion_symbols_typst"]["enabled"
 ; =====================================
 ; =====================================
 
+; Effective activation delay for the dynamic hotstrings: the user's
+; "dynamichotstrings" delay override when set, otherwise the shared default
+; DYN_HOTSTRINGS_DEFAULT_DELAY (defined in lib/hotstrings/hotstrings_config.ahk,
+; the early-loaded layer the tray menu also reads). No category TOML backs this
+; key, so HotstringsResolve reports HasOverride=false until the user sets one
+; from the tray "Delays" submenu (mirrors the macOS dynamichotstrings delay item).
+_DynamicHotstringDelay() {
+	global DYN_HOTSTRINGS_DEFAULT_DELAY
+	R := HotstringsResolve("dynamichotstrings", "")
+	return R.HasOverride ? R.Delay : DYN_HOTSTRINGS_DEFAULT_DELAY
+}
+
 ; Returns the shortest prefix of a spaced string that contains exactly RawCount
 ; non-space characters. Used to build the "spaced" trigger for SSN and IBAN.
 SpacedPrefix(SpacedStr, RawCount) {
@@ -695,14 +735,18 @@ _DateIso(*) {
 	return FormatTime(, "yyyy_MM_dd")
 }
 MK := ScriptInformation["MagicKey"]
+; The dynamic hotstrings (dates + phone/SSN/IBAN prefixes) share one activation
+; delay gate so they fire only when the trigger was typed within the configured
+; window. Resolve it once and reuse the options Map for every registration below.
+_DynOpts := Map("FinalResult", True, "TimeActivationSeconds", _DynamicHotstringDelay())
 if Features["hotstrings"]["dynamic"]["date_fr"]["enabled"] {
-	CreateHotstring("*?", "@dt" . MK, _DateShortFr, Map("FinalResult", True))
+	CreateHotstring("*?", "@dt" . MK, _DateShortFr, _DynOpts)
 }
 if Features["hotstrings"]["dynamic"]["date_long_fr"]["enabled"] {
-	CreateHotstring("*?", "@date" . MK, _DateLongFr, Map("FinalResult", True))
+	CreateHotstring("*?", "@date" . MK, _DateLongFr, _DynOpts)
 }
 if Features["hotstrings"]["dynamic"]["date"]["enabled"] {
-	CreateHotstring("*?", "@td" . MK, _DateIso, Map("FinalResult", True))
+	CreateHotstring("*?", "@td" . MK, _DateIso, _DynOpts)
 }
 
 
@@ -714,7 +758,6 @@ if Features["hotstrings"]["dynamic"]["date"]["enabled"] {
 ; Prefix-based hotstrings derived from the user's personal data.
 ; Registered once at startup from PersonalInformation — same logic as HS rules_engine.
 ; Each trigger auto-expands without end-char (*) and is case-sensitive (C).
-_DynFlags := ":*C:"
 Phone  := PersonalInformation["phone_number"]        ; e.g. "0606060606"
 FPhone := PersonalInformation["phone_number_clean"]   ; e.g. "06 06 06 06 06"
 Ssn    := PersonalInformation["social_security_number"] ; e.g. "1 99 99 99 999 999 99"
@@ -728,18 +771,18 @@ if Features["hotstrings"]["dynamic"]["phone_prefixes"]["enabled"] {
 	; Mirrors HS: phone[1:2]+★, +33+phone[1:2], phone[1:4], +33+phone[2:4], phone[2:5], fphone[1:5]
 	MK := ScriptInformation["MagicKey"]
 	if StrLen(Phone) >= 2 {
-		Hotstring(_DynFlags . SubStr(Phone, 1, 2) . MK, (*) => SendFinalResult(Phone))
-		Hotstring(_DynFlags . "+33" . SubStr(Phone, 1, 2), (*) => SendFinalResult("+33" . SubStr(Phone, 2)))
+		CreateHotstring("*C", SubStr(Phone, 1, 2) . MK, (*) => Phone, _DynOpts)
+		CreateHotstring("*C", "+33" . SubStr(Phone, 1, 2), (*) => "+33" . SubStr(Phone, 2), _DynOpts)
 	}
 	if StrLen(Phone) >= 4 {
-		Hotstring(_DynFlags . SubStr(Phone, 1, 4), (*) => SendFinalResult(Phone))
-		Hotstring(_DynFlags . "+33" . SubStr(Phone, 2, 3), (*) => SendFinalResult("+33" . SubStr(Phone, 2)))
+		CreateHotstring("*C", SubStr(Phone, 1, 4), (*) => Phone, _DynOpts)
+		CreateHotstring("*C", "+33" . SubStr(Phone, 2, 3), (*) => "+33" . SubStr(Phone, 2), _DynOpts)
 	}
 	if StrLen(Phone) >= 6 {
-		Hotstring(_DynFlags . SubStr(Phone, 2, 4), (*) => SendFinalResult(Phone))
+		CreateHotstring("*C", SubStr(Phone, 2, 4), (*) => Phone, _DynOpts)
 	}
 	if StrLen(FPhone) >= 5 {
-		Hotstring(_DynFlags . SubStr(FPhone, 1, 5), (*) => SendFinalResult(FPhone))
+		CreateHotstring("*C", SubStr(FPhone, 1, 5), (*) => FPhone, _DynOpts)
 	}
 }
 
@@ -749,9 +792,9 @@ if Features["hotstrings"]["dynamic"]["ssn_prefixes"]["enabled"] {
 	if StrLen(SsnRaw) >= 5 {
 		SsnRawPrefix  := SubStr(SsnRaw, 1, 5)
 		SsnSpacedPfx  := SpacedPrefix(Ssn, 5)
-		Hotstring(_DynFlags . SsnRawPrefix,  (*) => SendFinalResult(SsnRaw))
+		CreateHotstring("*C", SsnRawPrefix,  (*) => SsnRaw, _DynOpts)
 		if SsnSpacedPfx != SsnRawPrefix {
-			Hotstring(_DynFlags . SsnSpacedPfx, (*) => SendFinalResult(Ssn))
+			CreateHotstring("*C", SsnSpacedPfx, (*) => Ssn, _DynOpts)
 		}
 	}
 }
@@ -760,13 +803,13 @@ if Features["hotstrings"]["dynamic"]["iban_prefixes"]["enabled"] {
 	; 6 raw chars (case-insensitive) → IBAN without spaces.
 	; 7 spaced chars (e.g. "FR76 XX") → IBAN with spaces.
 	; Both triggers fire at the 6th raw character typed.
-	_DynFlagsCI := ":*:"  ; No C flag = case-insensitive for letter prefix
 	if StrLen(IbanRaw) >= 6 {
 		IbanRawPrefix    := SubStr(IbanRaw, 1, 6)
 		IbanSpacedPfx    := SpacedPrefix(Iban, 6)
-		Hotstring(_DynFlagsCI . IbanRawPrefix,  (*) => SendFinalResult(StrReplace(Iban, " ", "")))
+		; No C flag = case-insensitive matching for the letter prefix (e.g. "fr76")
+		CreateHotstring("*", IbanRawPrefix,  (*) => StrReplace(Iban, " ", ""), _DynOpts)
 		if IbanSpacedPfx != IbanRawPrefix {
-			Hotstring(_DynFlagsCI . IbanSpacedPfx, (*) => SendFinalResult(Iban))
+			CreateHotstring("*", IbanSpacedPfx, (*) => Iban, _DynOpts)
 		}
 	}
 }

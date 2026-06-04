@@ -688,7 +688,7 @@ _MET_FilterSysauth(M, _Cat) {
 _MET_ExcludeApps(M, _Cat) {
 	n := MF_DisabledCount()
 	Label := (n > 0)
-		? t("menu.metrics.disabled_in_prefix") . n . (n > 1 ? t("menu.metrics.disabled_in_suffix_p") : t("menu.metrics.disabled_in_suffix_s"))
+		? StrReplace(StrReplace(t("menu.metrics.disabled_in_label"), "%d", n), "%s", (n > 1 ? "s" : ""))
 		: t("menu.metrics.exclude_apps")
 	RegisterMenuItem(M, Label, OpenMetricsAppPicker)
 	if !MetricsShortcuts.enabled
@@ -807,9 +807,98 @@ _HS_RepeatKey(M, _Cat) {
 	}
 }
 
-; Dynamic handler: open the delays-and-colors config window.
+; Dynamic handler: delays & colours sub-menu. Mirrors the Hammerspoon "delays"
+; submenu — the per-category config window, then quick-access per-delay items
+; grouped by a separator, exactly like the HS make_delay_item rows: the base
+; default expansion delay, then the ★ magic-key and autocorrection per-category
+; delays (settable straight from the menu, not only buried in the config window).
 _HS_DelaysColors(M, _Cat) {
-	RegisterMenuItem(M, t("menu.hotstrings.delays_colors"), (*) => OpenHotstringsConfigWindow())
+	global UI_LLM_TIMEOUT_SEC, DYN_HOTSTRINGS_DEFAULT_DELAY
+	Sub := Menu()
+	RegisterMenuItem(Sub, t("menu.hotstrings.config_item"), (*) => OpenHotstringsConfigWindow())
+	Sub.Add()
+	RegisterMenuItem(Sub, _HS_DefaultDelayLabel(), (*) => _HS_PromptDefaultDelay())
+	RegisterMenuItem(Sub, _HS_CategoryDelayLabel("magickey", "menu.hotstrings.delay_magic_key"), (*) => _HS_PromptCategoryDelay("magickey", "menu.hotstrings.delay_magic_key"))
+	RegisterMenuItem(Sub, _HS_CategoryDelayLabel("autocorrection", "menu.hotstrings.delay_autocorrection"), (*) => _HS_PromptCategoryDelay("autocorrection", "menu.hotstrings.delay_autocorrection"))
+	; AI prediction tooltip auto-dismiss timeout — mirrors the HS "Délai
+	; d'acceptation IA" item. No TOML [_meta] delay backs the "llm_prediction"
+	; key, so its no-override default is the UI constant (20 s); the live tooltip
+	; timer reads the same override (lib/tooltip.ahk).
+	Sub.Add()
+	RegisterMenuItem(Sub, _HS_CategoryDelayLabel("llm_prediction", "menu.hotstrings.tooltip_ai_acceptance", UI_LLM_TIMEOUT_SEC), (*) => _HS_PromptCategoryDelay("llm_prediction", "menu.hotstrings.tooltip_ai_acceptance", UI_LLM_TIMEOUT_SEC))
+	; Dynamic hotstrings (dates, phone/SSN/IBAN prefixes) activation delay —
+	; mirrors the HS "Délai autocomplétion" item. Backed by the "dynamichotstrings"
+	; override; the no-override default is DYN_HOTSTRINGS_DEFAULT_DELAY (2 s).
+	RegisterMenuItem(Sub, _HS_CategoryDelayLabel("dynamichotstrings", "menu.hotstrings.tooltip_autocompletion", DYN_HOTSTRINGS_DEFAULT_DELAY), (*) => _HS_PromptCategoryDelay("dynamichotstrings", "menu.hotstrings.tooltip_autocompletion", DYN_HOTSTRINGS_DEFAULT_DELAY))
+	M.Add(t("menu.hotstrings.delays_colors"), Sub)
+}
+
+; Label for the "default expansion delay" item: "Default : <ms>[ (default)]". The
+; "(default)" marker shows when no global override is set — the effective value
+; is then the built-in GLOBAL_DEFAULT_DELAY fallback.
+_HS_DefaultDelayLabel() {
+	global _HotstringsOverrides, GLOBAL_DEFAULT_DELAY
+	HasGlobal := _HotstringsOverrides.Has("_global") and _HotstringsOverrides["_global"].Delay != ""
+	Seconds   := HasGlobal ? _HotstringsOverrides["_global"].Delay : GLOBAL_DEFAULT_DELAY
+	Ms        := Round(Seconds * 1000)
+	Display   := (Ms == 0) ? t("menu.hotstrings.infinite") : (Ms . " ms")
+	; menu.settings.default_indicator already carries a leading space.
+	return t("menu.hotstrings.tooltip_default") . " : " . Display . (HasGlobal ? "" : t("menu.settings.default_indicator"))
+}
+
+; Prompt for and persist the global default expansion delay (entered in ms),
+; mirroring the Hammerspoon make_delay_item prompt. Reuses HotstringsSetOverride
+; with the reserved "_global" key, which HotstringsResolve consults as the
+; lowest-priority user value, just above the hardcoded GLOBAL_DEFAULT_DELAY.
+_HS_PromptDefaultDelay() {
+	global _HotstringsOverrides, GLOBAL_DEFAULT_DELAY
+	HasGlobal := _HotstringsOverrides.Has("_global") and _HotstringsOverrides["_global"].Delay != ""
+	CurMs     := Round((HasGlobal ? _HotstringsOverrides["_global"].Delay : GLOBAL_DEFAULT_DELAY) * 1000)
+	IB := InputBox(t("menu.hotstrings.delay_prompt"), t("menu.hotstrings.tooltip_default"), "w340 h140", CurMs)
+	if (IB.Result != "OK") {
+		return
+	}
+	Val := Trim(IB.Value, " `t")
+	if !RegExMatch(Val, "^\d+$") {
+		MsgBox(t("menu.hotstrings.delay_invalid_body"), t("menu.hotstrings.delay_invalid_title"))
+		return
+	}
+	HotstringsSetOverride("_global", "", "delay", (Val + 0) / 1000)
+}
+
+; Label for a per-category default-delay item ("<name> : <ms>[ (default)]").
+; Reads the EFFECTIVE delay via HotstringsResolve so it reflects the category's
+; TOML [_meta] delay and any user override — the same value the config window
+; shows — and marks "(default)" when the user has set no override of their own.
+_HS_CategoryDelayLabel(Cat, I18nKey, DefaultSec := "") {
+	R       := HotstringsResolve(Cat, "")
+	; Categories with no TOML [_meta] delay (llm_prediction, dynamichotstrings)
+	; pass an explicit DefaultSec; the TOML-backed ones (magickey, autocorrection)
+	; leave it blank and use the resolved category default directly.
+	Sec     := R.HasOverride ? R.Delay : ((DefaultSec != "") ? DefaultSec : R.Delay)
+	Ms      := Round(Sec * 1000)
+	Display := (Ms == 0) ? t("menu.hotstrings.infinite") : (Ms . " ms")
+	; menu.settings.default_indicator already carries a leading space.
+	return t(I18nKey) . " : " . Display . (R.HasOverride ? "" : t("menu.settings.default_indicator"))
+}
+
+; Prompt for and persist a per-category default expansion delay (entered in ms),
+; reusing HotstringsSetOverride so the value lands in the same user-override store
+; the config window writes to — both UIs therefore stay in sync.
+_HS_PromptCategoryDelay(Cat, I18nKey, DefaultSec := "") {
+	R     := HotstringsResolve(Cat, "")
+	Sec   := R.HasOverride ? R.Delay : ((DefaultSec != "") ? DefaultSec : R.Delay)
+	CurMs := Round(Sec * 1000)
+	IB := InputBox(t("menu.hotstrings.delay_prompt"), t(I18nKey), "w340 h140", CurMs)
+	if (IB.Result != "OK") {
+		return
+	}
+	Val := Trim(IB.Value, " `t")
+	if !RegExMatch(Val, "^\d+$") {
+		MsgBox(t("menu.hotstrings.delay_invalid_body"), t("menu.hotstrings.delay_invalid_title"))
+		return
+	}
+	HotstringsSetOverride(Cat, "", "delay", (Val + 0) / 1000)
 }
 
 ; Dynamic handler: word-expanders sub-menu, mirroring the terminators sub-menu.

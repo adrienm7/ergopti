@@ -201,6 +201,6 @@ MS_PromptShortcut(which, ToggleFn) {
 MS_GetDisplayLabel(which) {
     s := (which = "typing") ? MetricsShortcuts.typing_str : MetricsShortcuts.apps_str
     if (s = "")
-        return "Aucun"
+        return t("menu.metrics.shortcut_none")
     return s
 }

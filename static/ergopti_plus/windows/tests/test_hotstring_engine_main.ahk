@@ -395,6 +395,121 @@ Test("HSE longest match wins when multiple triggers share a suffix",
     TestHSE_LongestMatchWins)
 
 
+; ── nnbsp/nbsp + punctuation + vowel → J triggers ──
+; The Ergopti shift layer sends Chr(0x202F) (nnbsp) + ';' or ':' and the ¨+s
+; deadkey sends Chr(0x00A0) (nbsp). These prefixes act as a "shifted comma"
+; that must expand the following vowel to a capital J form (e.g. nnbsp+;+e →
+; "Je"). The triggers are star (*) + in-word (?) + case-sensitive (C). These
+; tests prove the engine matches the multi-char prefix as a suffix even though
+; ';' and ':' are themselves word terminators — the regression that made the
+; feature silently fail on Windows.
+TestHSE_NnbspSemicolonVowelFires() {
+    HSE_TestReset()
+    Trigger := Chr(0x202F) Chr(0x3B) "e"   ; nnbsp + ';' + 'e'
+    HSE_Register("*?C", Trigger, () => 0)
+    HSE_FeedChar(Chr(0x202F))
+    HSE_FeedChar(Chr(0x3B))
+    Match := HSE_FeedChar("e")
+    AssertTrue(Match != "",
+        "nnbsp+';'+'e' fires the star trigger despite ';' being a terminator")
+    AssertEqual(Trigger, Match.Trigger)
+}
+Test("HSE nnbsp + semicolon + vowel fires the J trigger",
+    TestHSE_NnbspSemicolonVowelFires)
+
+TestHSE_NnbspColonVowelFires() {
+    HSE_TestReset()
+    Trigger := Chr(0x202F) ":" "e"         ; nnbsp + ':' + 'e'
+    HSE_Register("*?C", Trigger, () => 0)
+    HSE_FeedChar(Chr(0x202F))
+    HSE_FeedChar(":")
+    Match := HSE_FeedChar("e")
+    AssertTrue(Match != "",
+        "nnbsp+':'+'e' fires the star trigger despite ':' being a terminator")
+    AssertEqual(Trigger, Match.Trigger)
+}
+Test("HSE nnbsp + colon + vowel fires the J trigger",
+    TestHSE_NnbspColonVowelFires)
+
+TestHSE_NbspSemicolonVowelFires() {
+    HSE_TestReset()
+    Trigger := Chr(0x00A0) Chr(0x3B) "e"   ; nbsp + ';' + 'e'
+    HSE_Register("*?C", Trigger, () => 0)
+    HSE_FeedChar(Chr(0x00A0))
+    HSE_FeedChar(Chr(0x3B))
+    Match := HSE_FeedChar("e")
+    AssertTrue(Match != "",
+        "nbsp (U+00A0) variant fires too — the deadkey ¨+s path")
+    AssertEqual(Trigger, Match.Trigger)
+}
+Test("HSE nbsp + semicolon + vowel fires the J trigger",
+    TestHSE_NbspSemicolonVowelFires)
+
+TestHSE_NnbspPrefixFiresAfterLeadingWord() {
+    HSE_TestReset()
+    Trigger := Chr(0x202F) Chr(0x3B) "e"
+    HSE_Register("*?C", Trigger, () => 0)
+    ; Mimic the real buffer: a finished word, a space, then the prefix+vowel.
+    ; InWord (?) makes the match robust to anything left of the prefix.
+    for Char in StrSplit("Bonjour ") {
+        HSE_FeedChar(Char)
+    }
+    HSE_FeedChar(Chr(0x202F))
+    HSE_FeedChar(Chr(0x3B))
+    Match := HSE_FeedChar("e")
+    AssertTrue(Match != "",
+        "suffix match fires regardless of preceding word context (InWord trigger)")
+    AssertEqual(Trigger, Match.Trigger)
+}
+Test("HSE nnbsp J trigger fires as a suffix after a leading word",
+    TestHSE_NnbspPrefixFiresAfterLeadingWord)
+
+TestHSE_NnbspUppercaseVowelNeedsOwnTrigger() {
+    HSE_TestReset()
+    ; The lowercase trigger is case-sensitive (C) and must NOT match an
+    ; uppercase vowel — proving the explicit uppercase registrations are
+    ; required (the bug where ':E' produced nothing).
+    LowerTrigger := Chr(0x202F) Chr(0x3B) "e"
+    HSE_Register("*?C", LowerTrigger, () => 0)
+    HSE_FeedChar(Chr(0x202F))
+    HSE_FeedChar(Chr(0x3B))
+    Match := HSE_FeedChar("E")
+    AssertEqual("", Match,
+        "case-sensitive lowercase trigger does NOT fire on an uppercase vowel")
+    ; Now register the uppercase variant and confirm it fires.
+    UpperTrigger := Chr(0x202F) Chr(0x3B) "E"
+    HSE_Register("*?C", UpperTrigger, () => 0)
+    HSE_FeedReset(true)
+    HSE_FeedChar(Chr(0x202F))
+    HSE_FeedChar(Chr(0x3B))
+    Match := HSE_FeedChar("E")
+    AssertTrue(Match != "",
+        "explicit uppercase trigger fires on the uppercase vowel")
+    AssertEqual(UpperTrigger, Match.Trigger)
+}
+Test("HSE uppercase vowel requires its own case-sensitive J trigger",
+    TestHSE_NnbspUppercaseVowelNeedsOwnTrigger)
+
+TestHSE_BareSemicolonVowelFiresInWord() {
+    HSE_TestReset()
+    ; The bare ";" (comma-layer key) J trigger is registered "*?C" — in-word —
+    ; so the capital J is guaranteed in EVERY context, never word-boundary-gated.
+    ; This locks in the deliberate design: "test;e" must still expand to "testJe".
+    Trigger := Chr(0x3B) "e"   ; ";" + "e"
+    HSE_Register("*?C", Trigger, () => 0)
+    for Char in StrSplit("test") {
+        HSE_FeedChar(Char)
+    }
+    HSE_FeedChar(Chr(0x3B))
+    Match := HSE_FeedChar("e")
+    AssertTrue(Match != "",
+        "bare ';'+vowel fires unconditionally (in-word), even straight after a letter")
+    AssertEqual(Trigger, Match.Trigger)
+}
+Test("HSE bare semicolon + vowel fires unconditionally (in-word, not gated)",
+    TestHSE_BareSemicolonVowelFiresInWord)
+
+
 
 
 
