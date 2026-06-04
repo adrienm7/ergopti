@@ -583,13 +583,15 @@ if Features["layout"]["ergopti_base"] {
 }
 
 if Features["hotstrings"]["magic_key"]["replace"]["enabled"] {
-	RemapKey("SC02E", "j", ScriptInformation["MagicKey"])
+	MagicSrcScan := ScriptInformation["MagicKeySourceScan"]
+	MagicSrcChar := ScriptInformation["MagicKeySourceChar"]
+	RemapKey(MagicSrcScan, MagicSrcChar, ScriptInformation["MagicKey"])
 }
 
-; Win + ★ (SC02E) opens the personal TOML hotstring editor.
-; Registered at InputLevel 3 so it overrides the #SC02E → "#j" binding that
-; RemapKey installs at InputLevel 2 for the layout remapping.
-Hotkey("#SC02E", (*) => OpenPersonalEditor(), "I3")
+; Win + ★ opens the personal TOML hotstring editor.
+; Registered at InputLevel 3 so it overrides the # + source-scan → "#<char>" binding
+; that RemapKey installs at InputLevel 2 for the layout remapping.
+Hotkey("#" . ScriptInformation["MagicKeySourceScan"], (*) => OpenPersonalEditor(), "I3")
 
 
 
