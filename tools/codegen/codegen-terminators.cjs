@@ -119,7 +119,12 @@ function writeFile(filePath, content) {
  */
 function generateAhk() {
 	// Build the catalogue entries as AHK Map literals.
-	const defsLines = TERMINATOR_DEFS.map((def) => {
+	const defsLines = TERMINATOR_DEFS.map((def, i) => {
+		// Separator: a fully-formed but disabled, char-less slot so the engine
+		// loops skip it naturally (no guard needed); the menus render it as "-".
+		if (def.type === "separator") {
+			return `        Map("key", "separator_${i}", "chars", [], "label", "-", "default_enabled", false, "consume", false, "type", "separator")`;
+		}
 		const charsArr = def.chars
 			.map((c) => `"${ahkEscape(c)}"`)
 			.join(", ");
@@ -317,7 +322,12 @@ function generateAhk() {
  */
 function generateLua() {
 	// Build TERMINATOR_DEFS as a Lua table literal.
-	const defsLines = TERMINATOR_DEFS.map((def) => {
+	const defsLines = TERMINATOR_DEFS.map((def, i) => {
+		// Separator: a fully-formed but disabled, char-less slot so the engine
+		// loops skip it naturally (no guard needed); the menus render it as "-".
+		if (def.type === "separator") {
+			return `\t{ key = "separator_${i}", chars = {}, label = "-", default_enabled = false, consume = false, type = "separator" }`;
+		}
 		const charsArr = def.chars
 			.map((c) => `"${luaEscape(c)}"`)
 			.join(", ");

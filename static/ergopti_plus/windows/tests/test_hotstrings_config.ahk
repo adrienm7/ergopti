@@ -122,6 +122,28 @@ TestHotstringsConfig_ResolveFallsBackToGlobal() {
 Test("HotstringsConfig: resolve falls back to GLOBAL_DEFAULT_DELAY",
     TestHotstringsConfig_ResolveFallsBackToGlobal)
 
+TestHotstringsConfig_GlobalDefaultDelayTier() {
+    _HCfgTestReset()
+    ; Nothing set anywhere → hardcoded fallback.
+    R := HotstringsResolve("rolls", "")
+    AssertEqual(GLOBAL_DEFAULT_DELAY, R.Delay,
+        "no toml + no override + no global → hardcoded GLOBAL_DEFAULT_DELAY")
+    ; The menu-set global default (key "_global") applies for any category that
+    ; has no delay of its own — below a per-category value, above the fallback.
+    HotstringsSetOverride("_global", "", "delay", 2.5)
+    R := HotstringsResolve("rolls", "")
+    AssertEqual(2.5, R.Delay,
+        "global default delay applies when the category has no delay")
+    AssertFalse(R.HasOverride,
+        "the global default is not a per-category override — HasOverride stays false")
+    ; A per-category user override still wins over the global default.
+    HotstringsSetOverride("rolls", "", "delay", 1.2)
+    R := HotstringsResolve("rolls", "")
+    AssertEqual(1.2, R.Delay, "per-category override wins over the global default")
+}
+Test("HotstringsConfig: menu-set global default delay tier (below category, above fallback)",
+    TestHotstringsConfig_GlobalDefaultDelayTier)
+
 TestHotstringsConfig_PersonalCategoryFallsBackToBaseline() {
     _HCfgTestReset()
     R := HotstringsResolve("personal", "")
@@ -225,3 +247,23 @@ TestHotstringsConfig_SetOverrideRejectsUnknownField() {
 }
 Test("HotstringsConfig: setOverride rejects fields other than delay/color",
     TestHotstringsConfig_SetOverrideRejectsUnknownField)
+
+; Regression (fixed 2026-06-04): the dynamic-hotstrings default activation delay
+; must be defined in this EARLY-loaded config layer, not in modules/hotstrings.ahk.
+; The tray "Delays" submenu reads DYN_HOTSTRINGS_DEFAULT_DELAY while building the
+; menu at startup (initMenu) — before the feature module's top-level code runs —
+; so a definition in the late module left it unassigned and crashed menu
+; construction ("This global variable has not been assigned a value").
+; This suite loads hotstrings_config.ahk but NOT modules/hotstrings.ahk, so if the
+; constant ever drifts back into the module it is undefined here and this fails.
+TestHotstringsConfig_DynDefaultDelayDefinedEarly() {
+    global DYN_HOTSTRINGS_DEFAULT_DELAY
+    AssertTrue(IsSet(DYN_HOTSTRINGS_DEFAULT_DELAY),
+        "DYN_HOTSTRINGS_DEFAULT_DELAY must be defined in the early-loaded config layer (the tray menu reads it at initMenu, before modules/hotstrings.ahk runs)")
+    if IsSet(DYN_HOTSTRINGS_DEFAULT_DELAY) {
+        AssertEqual(2.0, DYN_HOTSTRINGS_DEFAULT_DELAY,
+            "dynamic hotstrings default activation delay is 2.0s (mirrors macOS DELAYS_DEFAULT.dynamichotstrings)")
+    }
+}
+Test("HotstringsConfig: DYN_HOTSTRINGS_DEFAULT_DELAY is defined in the early config layer (initMenu-safe)",
+    TestHotstringsConfig_DynDefaultDelayDefinedEarly)

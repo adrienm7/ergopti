@@ -154,8 +154,11 @@ end
 ---   abuts a known word terminator.
 --- @return boolean True when the word boundary blocks the match.
 local function word_boundary_blocks(buffer, trigger, trigger_start_byte, start_is_word_boundary)
-	-- Triggers that start with whitespace carry their own boundary and skip this check.
-	if trigger:match("^[ \194\160\226\128\175]") then return false end
+	-- Triggers that start with a separator carry their own boundary and skip this
+	-- check: whitespace, nbsp (U+00A0), nnbsp (U+202F), and the comma-layer ";".
+	-- Including ";" guarantees the comma→J expansion (";e" → "Je") fires in every
+	-- context, never word-boundary-gated — the mirror of the AHK "*?C" in-word flag.
+	if trigger:match("^[ \194\160\226\128\175;]") then return false end
 	if trigger_start_byte <= 1 then
 		return not start_is_word_boundary
 	end

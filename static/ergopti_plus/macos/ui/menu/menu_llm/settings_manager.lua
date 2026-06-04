@@ -199,7 +199,7 @@ function M.new(deps)
 		local current_val = tonumber(state.llm_min_words)
 		local display_val = (current_val and current_val > 0) and tostring(current_val) or "1"
 
-		local full_msg = i18n.get("menu.settings.min_words_prompt")
+		local full_msg = i18n.get("menu.llm.min_words_prompt")
 
 		local ok_p, btn, raw = pcall(dialog.text_prompt, i18n.get("menu.settings.min_words_title"), full_msg, display_val, i18n.get("button.ok"), i18n.get("common.cancel"))
 
@@ -240,7 +240,7 @@ function M.new(deps)
 	function obj.set_context_length()
 		generic_numeric_prompt(deps, 
 			i18n.get("menu.settings.context_length_title"), 
-			i18n.get("menu.settings.context_length_prompt"), 
+			i18n.get("menu.llm.context_length_prompt"), 
 			"llm_context_length", nil, "set_llm_context_length", llm_mod.DEFAULT_STATE.llm_context_length
 		)
 	end

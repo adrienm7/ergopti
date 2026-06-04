@@ -59,6 +59,11 @@ local function locale_path(code)
 	-- Module-local resolution is stable in both dev and packaged app runtimes.
 	local source = debug.getinfo(1, "S").source or ""
 	source = source:sub(1, 1) == "@" and source:sub(2) or source
+	-- Normalize Windows separators: package.searchpath substitutes the OS
+	-- directory separator ("\") for the final "?" segment, yielding a mixed
+	-- path like ".../macos/lib\locale.lua". A forward-slash-only match would
+	-- then drop the "lib" segment and resolve the wrong locale directory.
+	source = source:gsub("\\", "/")
 	local this_dir = source:match("^(.*)/[^/]+$") or ""
 	if this_dir ~= "" then
 		local by_module = this_dir .. "/../../shared/locales/" .. code .. ".json"

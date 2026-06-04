@@ -438,6 +438,11 @@ ParseTomlGroupConfig(CategoryName, FilePath := "") {
             }
             continue
         }
+        if RegExMatch(Line, "^\[_meta\.section_delays\]$") {
+            Mode := "meta_section_delays"
+            CurrentSec := ""
+            continue
+        }
         if (Line == "[_meta]") {
             Mode := "meta"
             continue
@@ -467,6 +472,18 @@ ParseTomlGroupConfig(CategoryName, FilePath := "") {
                 Sec.ShowTooltip := (BoolMatch[1] == "true")
             } else if RegExMatch(Line, "^description\s*=\s*`"((?:[^`"\\]|\\.)*)`"\s*$", &DescMatch) {
                 Sec.Description := UnescapeTomlString(DescMatch[1])
+            }
+        } else if (Mode == "meta_section_delays") {
+            ; [_meta.section_delays] — each ``section = <seconds>`` line sets that
+            ; section's delay override, read into the same Sections map that
+            ; HotstringsResolve consults via TomlSec.Delay (precedence: user >
+            ; section > group > global default).
+            if RegExMatch(Line, "^([A-Za-z0-9_\-]+)\s*=\s*([0-9]+(?:\.[0-9]+)?)\s*$", &SDMatch) {
+                SDKey := StrLower(SDMatch[1])
+                if !Config.Sections.Has(SDKey) {
+                    Config.Sections[SDKey] := { Delay: "", Color: "", ShowTooltip: "", Description: "" }
+                }
+                Config.Sections[SDKey].Delay := SDMatch[2] + 0
             }
         }
     }

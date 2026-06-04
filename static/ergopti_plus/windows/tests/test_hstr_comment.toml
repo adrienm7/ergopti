@@ -1,3 +1,0 @@
-﻿[[sect]]
-# this line is a comment and should be skipped
-"real" = { output = "kept", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }

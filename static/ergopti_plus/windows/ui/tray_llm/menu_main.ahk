@@ -77,7 +77,7 @@ LLM_Tray_Build() {
 
 	; Backend submenu
 	backend_menu := LLM_Tray_BuildBackendMenu()
-	backend_label := t("menu.llm.backend_label")
+	backend_label := t("menu.llm.model_backend")
 	_LLM_Tray_Menu.Add(StrReplace(backend_label, "%s", _LLM_Tray["backend"]), backend_menu)
 
 	; Model submenu — prefix the label with a backend-health dot so the user

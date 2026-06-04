@@ -48,19 +48,47 @@
  * @property {string}   label           Human-readable UI label.
  * @property {boolean}  default_enabled True = active out of the box.
  * @property {boolean}  consume         True = the char is swallowed, not echoed.
+ *
+ * Conventions:
+ * - The list ORDER is the menu order; both drivers render the catalogue in this
+ *   exact sequence.
+ * - One character per slot (do not bundle several toggleable chars into one
+ *   entry); the lone exception is "enter" (CR+LF are one logical key).
+ * - Only CLOSING delimiters terminate a word — the opening "(", "[", "{", "<"
+ *   never end a word, so only ")", "]", "}", ">" are listed.
+ * - Insert a bare { type: "separator" } entry to render a "-" divider between
+ *   groups in the menus (it carries no characters and is never enabled).
  */
 const TERMINATOR_DEFS = [
-	{ key: "space",        chars: [" "],        label: "Espace",          default_enabled: true,  consume: false },
-	{ key: "tab",          chars: ["\t"],        label: "Tab",             default_enabled: true,  consume: false },
-	{ key: "enter",        chars: ["\r", "\n"],  label: "Entrée",          default_enabled: true,  consume: false },
-	{ key: "period",       chars: ["."],         label: "Point",           default_enabled: true,  consume: false },
-	{ key: "comma",        chars: [","],         label: "Virgule",         default_enabled: true,  consume: false },
-	{ key: "semicolon",    chars: [";"],         label: "Point-virgule",   default_enabled: true,  consume: false },
-	{ key: "colon",        chars: [":"],         label: "Deux-points",     default_enabled: true,  consume: false },
-	{ key: "exclamation",  chars: ["!"],         label: "Point d'excl.",   default_enabled: true,  consume: false },
-	{ key: "question",     chars: ["?"],         label: "Point d'interr.", default_enabled: true,  consume: false },
-	{ key: "slash",        chars: ["/"],         label: "Slash",           default_enabled: false, consume: false },
-	{ key: "backslash",    chars: ["\\"],        label: "Antislash",       default_enabled: false, consume: false },
+	// Whitespace
+	{ key: "space",       chars: [" "],         label: "Espace",          default_enabled: true,  consume: false },
+	{ key: "tab",         chars: ["\t"],        label: "Tab",             default_enabled: true,  consume: false },
+	{ key: "enter",       chars: ["\r", "\n"],  label: "Entrée",          default_enabled: true,  consume: false },
+	{ type: "separator" },
+	// Sentence punctuation
+	{ key: "period",      chars: ["."],         label: "Point",           default_enabled: true,  consume: false },
+	{ key: "ellipsis",    chars: ["…"],         label: "…",               default_enabled: true,  consume: false },
+	{ key: "comma",       chars: [","],         label: "Virgule",         default_enabled: true,  consume: false },
+	{ key: "semicolon",   chars: [";"],         label: "Point-virgule",   default_enabled: true,  consume: false },
+	{ key: "colon",       chars: [":"],         label: "Deux-points",     default_enabled: true,  consume: false },
+	{ key: "exclamation", chars: ["!"],         label: "Point d'excl.",   default_enabled: true,  consume: false },
+	{ key: "question",    chars: ["?"],         label: "Point d'interr.", default_enabled: true,  consume: false },
+	{ type: "separator" },
+	// Apostrophes (one char per slot)
+	{ key: "apostrophe",             chars: ["'"], label: "'", default_enabled: true, consume: false },
+	{ key: "apostrophe_typographic", chars: ["’"], label: "’", default_enabled: true, consume: false },
+	{ type: "separator" },
+	// Closing delimiters only (the opening ( [ { < never end a word)
+	{ key: "paren_close",   chars: [")"],       label: ")",               default_enabled: true,  consume: false },
+	{ key: "bracket_close", chars: ["]"],       label: "]",               default_enabled: true,  consume: false },
+	{ key: "brace_close",   chars: ["}"],       label: "}",               default_enabled: true,  consume: false },
+	{ key: "angle_close",   chars: [">"],       label: ">",               default_enabled: true,  consume: false },
+	{ type: "separator" },
+	// Slashes (off by default)
+	{ key: "slash",       chars: ["/"],         label: "Slash",           default_enabled: false, consume: false },
+	{ key: "backslash",   chars: ["\\"],        label: "Antislash",       default_enabled: false, consume: false },
+	{ type: "separator" },
+	// Magic key
 	{ key: "magic_key",   chars: ["★"],         label: "Touche magique",  default_enabled: true,  consume: true  },
 ];
 

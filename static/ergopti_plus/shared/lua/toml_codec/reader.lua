@@ -345,7 +345,7 @@ end
 --- @return table The structured metadata and sections.
 function M.parse(path)
 	local empty_result = {
-		meta = { description = "", sections = {}, sections_order = {} },
+		meta = { description = "", sections = {}, sections_order = {}, section_delays = {} },
 		sections_order = {},
 		sections = {}
 	}
@@ -360,7 +360,7 @@ function M.parse(path)
 	end
 
 	local result = {
-		meta           = { description = "", sections = {}, sections_order = {} },
+		meta           = { description = "", sections = {}, sections_order = {}, section_delays = {} },
 		sections_order = {},
 		sections       = {},
 	}
@@ -404,6 +404,14 @@ function M.parse(path)
 				mode             = "meta_section"
 				current_meta_sec = meta_sec_name
 				ensure_meta_section(current_meta_sec)
+				goto continue
+			end
+
+			-- Per-section delay overrides: [_meta.section_delays] with
+			-- `<section> = <seconds>` lines. Kept separate from [_meta.sections]
+			-- (which holds inline lang-map descriptions) to avoid a TOML key clash.
+			if line == "[_meta.section_delays]" then
+				mode = "meta_section_delays"
 				goto continue
 			end
 
@@ -495,6 +503,12 @@ function M.parse(path)
 					elseif key == "show_tooltip" and type(val) == "boolean" then
 						entry.show_tooltip = val
 					end
+				end
+
+			elseif mode == "meta_section_delays" then
+				local key, val = parse_kv_value(line)
+				if key and type(val) == "number" then
+					result.meta.section_delays[key] = val
 				end
 
 			elseif mode == "section" and current_sec then

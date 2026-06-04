@@ -68,7 +68,10 @@ global HSE_MAX_BUFFER_LEN := 64
 ; that French contractions like "l'ia" let the "ia" trigger fire on the
 ; next terminator — the engine must treat the char after an apostrophe
 ; as the start of a new word, exactly like after a space.
-global HSE_WORD_TERMINATORS := " `t`r`n.,;:?!’’"
+; Both apostrophes are spelled with Chr() rather than literals: a typography
+; pass once silently rewrote the ASCII apostrophe to a second U+2019, dropping
+; U+0027 from the set — Chr() makes the codepoints explicit and tamper-proof.
+global HSE_WORD_TERMINATORS := " `t`r`n.,;:?!" . Chr(0x27) . Chr(0x2019)
 
 ; Subset of HSE_WORD_TERMINATORS whose chars are consumed (not re-injected) after
 ; an expansion fires. Empty by default — the user opts specific custom delimiters

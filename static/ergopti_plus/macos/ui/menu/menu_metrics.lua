@@ -336,10 +336,9 @@ function M.build(ctx)
 
 	local function dyn_exclude_apps(items, _ctx)
 		local disabled_count = #(type(state.keylogger_disabled_apps) == "table" and state.keylogger_disabled_apps or {})
-		local label = i18n.get("menu.metrics.disabled_in_prefix")
-			.. (disabled_count > 0
-				and (disabled_count .. i18n.get("menu.metrics.disabled_in_suffix_s") .. (disabled_count > 1 and "s" or ""))
-				or i18n.get("menu.metrics.disabled_in_suffix_p"))
+		local label = disabled_count > 0
+			and string.format(i18n.get("menu.metrics.disabled_in_label"), disabled_count, disabled_count > 1 and "s" or "")
+			or i18n.get("menu.metrics.exclude_apps")
 		local exclusion_menu = AppPickerLib.build_menu(
 			state.keylogger_disabled_apps,
 			function(new_list)

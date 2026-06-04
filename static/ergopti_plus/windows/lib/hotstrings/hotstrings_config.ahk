@@ -37,6 +37,15 @@
 global GLOBAL_DEFAULT_DELAY := 0.75
 global GLOBAL_DEFAULT_COLOR := "#1e88e5"  ; Blue — global tooltip tint when nothing else is configured
 
+; Default activation delay (seconds) for the dynamic hotstrings (dates, phone /
+; SSN / IBAN prefixes). Mirrors the macOS DELAYS_DEFAULT.dynamichotstrings value.
+; Defined HERE — in the early-loaded config layer — rather than in
+; modules/hotstrings.ahk, because the tray "Delays" submenu reads it while
+; building the menu at startup (initMenu), before the feature module's top-level
+; code has run; a definition in the late module leaves it unassigned and crashes
+; menu construction. The user's "dynamichotstrings" delay override takes priority.
+global DYN_HOTSTRINGS_DEFAULT_DELAY := 2.0
+
 ; Per-category baseline that overrides ``GLOBAL_DEFAULT_COLOR`` only when no
 ; TOML _meta or user override sets a color. Lives next to the global default
 ; so all defaults are visible in one place.
@@ -459,6 +468,12 @@ HotstringsResolve(CategoryName, SectionName := "") {
         Delay := TomlSec.Delay
     } else if (TomlCfg.Delay != "") {
         Delay := TomlCfg.Delay
+    } else if (_HotstringsOverrides.Has("_global") and _HotstringsOverrides["_global"].Delay != "") {
+        ; Menu-set global default expansion delay — applied only when no user or
+        ; TOML delay is defined for this category/section. It is the "default
+        ; expansion delay" the user edits from the tray menu; the hardcoded
+        ; GLOBAL_DEFAULT_DELAY below is the final fallback when even that is unset.
+        Delay := _HotstringsOverrides["_global"].Delay
     } else {
         Delay := GLOBAL_DEFAULT_DELAY
     }
@@ -542,6 +557,12 @@ HotstringsResolveExt(ExtId, TomlPath, SectionName := "") {
         Delay := TomlSec.Delay
     } else if (TomlCfg.Delay != "") {
         Delay := TomlCfg.Delay
+    } else if (_HotstringsOverrides.Has("_global") and _HotstringsOverrides["_global"].Delay != "") {
+        ; Menu-set global default expansion delay — applied only when no user or
+        ; TOML delay is defined for this category/section. It is the "default
+        ; expansion delay" the user edits from the tray menu; the hardcoded
+        ; GLOBAL_DEFAULT_DELAY below is the final fallback when even that is unset.
+        Delay := _HotstringsOverrides["_global"].Delay
     } else {
         Delay := GLOBAL_DEFAULT_DELAY
     }

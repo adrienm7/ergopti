@@ -483,7 +483,7 @@ _StartInputHook() {
 ; does not silently kill the InputHook callback chain — AHK v2 stops invoking
 ; the OnChar callback permanently if an unhandled error propagates out of it.
 _OnPrefixChar(IH, Char) {
-    global _PrefixBuffer, _MAX_BUFFER_LEN, _PrefixWatcherSuppressed, HSE_Suppressed, _PrefixIndex
+    global _PrefixBuffer, _MAX_BUFFER_LEN, _PrefixWatcherSuppressed, HSE_Suppressed, _PrefixIndex, HSE_Buffer
     ; No hotstring preview tooltip and no expansion dispatch while the script is
     ; paused or the Hotstrings master gate is off — this watcher uses its OWN
     ; InputHook, so the HookDispatcher guard does not cover it.
@@ -536,7 +536,7 @@ _OnPrefixChar(IH, Char) {
     }
     try {
         if LoggerIsDebugEnabled()
-            LoggerDebug("PrefixWatcher", "DBG OnChar: char='{1}' buf='{2}' suppressed={3}/{4}.", Char, _PrefixBuffer, _PrefixWatcherSuppressed, HSE_Suppressed)
+            LoggerDebug("PrefixWatcher", "DBG OnChar: char='{1}' prefixBuf='{2}' hseBuf='{3}' suppressed={4}/{5}.", Char, _PrefixBuffer, HSE_Buffer, _PrefixWatcherSuppressed, HSE_Suppressed)
         ; Feed HSE — when HSE_FeedChar reports a match, fire the
         ; expansion right here. HSE_LastEndChar is the authoritative end
         ; character: empty for star (immediate) triggers, the just-typed
@@ -620,30 +620,24 @@ _OnPrefixChar(IH, Char) {
             return
         }
 
-        ; Word-terminator characters reset the buffer — the trigger index only
-        ; contains word-internal sequences, and a leading terminator would
-        ; prevent any match. OnKeyDown handles VK-only keys (arrows, Escape…);
-        ; this guard covers printable terminators (space, punctuation, …) that
-        ; produce a char event — including those arriving via tap-hold or AltGr
-        ; layers whose VK event may be swallowed before reaching the InputHook.
-        ; Feed the terminator to HSE first so end-char hotstrings can match
-        ; (e.g. "ia"+space → "IA"). Only reset if no match fired; if a match
-        ; fired, HSE_DispatchMatch already called HSE_FeedReset via its finally.
+        ; Word-terminator characters: the trigger index only contains
+        ; word-internal sequences, and a leading terminator would prevent any
+        ; match. OnKeyDown handles VK-only keys (arrows, Escape…); this guard
+        ; covers printable terminators (space, punctuation, …) that produce a
+        ; char event — including those arriving via tap-hold or AltGr layers
+        ; whose VK event may be swallowed before reaching the InputHook.
+        ;
+        ; The terminator was ALREADY fed to HSE by the single HSE_FeedChar at
+        ; the top of this function — that is where end-char hotstrings fire
+        ; (e.g. "ia"+space → "IA", handled above when HSEMatch != ""). Reaching
+        ; here means nothing matched, so we must NOT feed the terminator a
+        ; second time: re-feeding doubled it in HSE_Buffer (e.g. "nnbsp::e"),
+        ; which silently broke every trigger that CONTAINS a terminator as a
+        ; non-final char — the nnbsp/nbsp + ';'/':' + vowel "J" triggers. We
+        ; only reset the UI prefix buffer here; HSE_Buffer keeps the single
+        ; terminator so such triggers still match on the next keystroke.
         if InStr(_PREFIX_WORD_BOUNDARIES, Char) {
-            HSEMatch := HSE_FeedChar(Char)
-            if (HSEMatch != "") {
-                HSE_DispatchMatch(HSEMatch, HSE_LastEndChar)
-                HotstringHType := _ResolveFireHType(HSEMatch)
-                HotstringRepl := HSEMatch.HasOwnProp("Replacement") ? HSEMatch.Replacement : HSEMatch.Trigger
-                HotstringCategory := HSEMatch.HasOwnProp("IsRepeat") && HSEMatch.IsRepeat
-                    ? "repeat_key"
-                    : (HSEMatch.HasOwnProp("Category") ? HSEMatch.Category : "")
-                HotstringSection := HSEMatch.HasOwnProp("Section") ? HSEMatch.Section : ""
-                try KL_LogHotstring(HSEMatch.Trigger, HotstringRepl, HotstringHType, "", HotstringCategory, HotstringSection)
-            }
-            ; Pass ConsumedByFire=true when a match fired so TooltipHide skips
-            ; killing an active dequeue cycle — the dequeue manages its own end.
-            _ResetPrefixBuffer(HSEMatch != "")
+            _ResetPrefixBuffer(false)
             return
         }
         _PrefixBuffer .= Char

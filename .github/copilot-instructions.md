@@ -266,6 +266,14 @@ function M.start()
 end
 ```
 
+### 5.9 Regression Tests for Every Bug Fix
+
+**Every bug fixed at the user's request MUST ship with a regression test** that fails before the fix and passes after it. The test encodes the specific failure mode so the bug can never silently return. No bug fix is complete until its test is written, runs, and is green.
+
+- Put the test in the suite that covers the affected layer: AHK `static/ergopti_plus/windows/tests/`, macOS `static/ergopti_plus/macos/tests/`, or the cross-platform `tools/test/`.
+- Encode the **root cause**, not just the symptom. Example: the `DYN_HOTSTRINGS_DEFAULT_DELAY` startup crash (a menu-build global defined in a late-loaded module) is guarded by a test asserting the constant lives in the early-loaded config layer — the AHK suite loads `hotstrings_config.ahk` but not `modules/hotstrings.ahk`, so a regression to the late module makes the constant undefined and fails the test.
+- The goal is a suite that becomes **strictly more robust over time**: every bug we hit once is a bug the suite catches forever. Time should make the tests stronger, never weaker — never delete or weaken a regression test to make a change pass; fix the change.
+
 ## 6. Git & Commit Conventions
 
 - **Format:** All commits MUST follow the [Conventional Commits](https://www.conventionalcommits.org/) specification.
