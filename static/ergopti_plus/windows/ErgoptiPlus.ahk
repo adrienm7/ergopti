@@ -651,21 +651,20 @@ ApplyConfigToml(Features, _ConfigDir . _AhkSubDir . "config.toml")
 global TapHold := LoadTapHoldToml(_ConfigDir . _AhkSubDir . "tap_hold.toml",
 	_DriverDir . "\data\tap_hold\defaults.toml")
 
-; When Ergopti keyboard emulation is off, the magic-key source scancode must
-; track whatever physical key produces MagicKeySourceChar on the user's active
-; OS layout (e.g. on bépo, "j" lives on a different scancode than Ergopti's
-; SC02E). We auto-detect here, after ApplyConfigToml has already applied any
-; explicit user override from config.toml — so a manual magic_key_source_scan
-; entry in TOML takes precedence and this block is a no-op when it kicks in.
+; When Ergopti keyboard emulation is off, MagicKeySourceChar must reflect
+; whatever character the source scancode (default SC02E) produces on the
+; user's active OS layout, so that RemapKey registers the correct {Blind}
+; passthrough binding (e.g. on bépo SC02E → "h", not "j").
+;
+; Strategy: resolve SC → VK → char on the active HKL. We go scancode→VK
+; (not char→VK) because on layouts like bépo the source character ("j") is
+; only reachable via AltGr and VkKeyScanExW cannot find it — the scancode
+; position is the stable anchor, not the character label.
 ;
 ; HKL resolution cascade: at script startup there may be no foreground window
 ; (AHK launches tray-only), so GetForegroundKeyboardLayout() returns 0.
-; Fallback 1: GetKeyboardLayout(A_ThreadID) — the layout of the AHK thread
-; itself, which Windows inherits from the shell process and therefore usually
-; matches the user's default input language.
-; Fallback 2: SystemParametersInfo(SPI_GETDEFAULTINPUTLANG) — the system's
-; registered default input language, stored in the registry. Most reliable
-; but requires an extra SPI call.
+; Fallback 1: GetKeyboardLayout(A_ThreadID) — layout of the AHK thread itself.
+; Fallback 2: SystemParametersInfo(SPI_GETDEFAULTINPUTLANG) — system default.
 if !Features["layout"]["ergopti_base"] {
 	_HKL := GetForegroundKeyboardLayout()
 	if _HKL = 0 {
@@ -678,34 +677,43 @@ if !Features["layout"]["ergopti_base"] {
 		_HKL := NumGet(_HklBuf, 0, "Ptr")
 	}
 	if _HKL != 0 {
-		_SrcChar := ScriptInformation["MagicKeySourceChar"]
-		; VkKeyScanExW: low byte = VK, high byte = required modifiers.
-		; 0xFF in the low byte signals "character not on this layout".
-		_VK := DllCall("VkKeyScanExW", "WStr", _SrcChar, "Ptr", _HKL, "Short") & 0xFF
-		if (_VK != 0xFF and _VK != 0) {
-			; MAPVK_VK_TO_VSC = 0: translate VK to base (non-extended) scancode.
-			_SC := DllCall("MapVirtualKeyExW", "UInt", _VK, "UInt", 0, "Ptr", _HKL, "UInt")
-			if _SC != 0 {
-				ScriptInformation["MagicKeySourceScan"] := Format("SC{:03X}", _SC)
+		; Parse the decimal value of the source scancode (e.g. "SC02E" → 0x02E = 46).
+		_SrcScan := ScriptInformation["MagicKeySourceScan"]
+		_ScanHex := SubStr(_SrcScan, 3)  ; strip the "SC" prefix
+		_ScanDec := Integer("0x" . _ScanHex)
+		; MAPVK_VSC_TO_VK_EX = 3: scancode → VK, extended-key-aware.
+		_VK := DllCall("MapVirtualKeyExW", "UInt", _ScanDec, "UInt", 3, "Ptr", _HKL, "UInt")
+		if _VK != 0 {
+			; ToUnicodeEx: convert VK + scancode → Unicode character on the given layout.
+			; Buffer for up to 4 UTF-16 code units + null terminator.
+			_CharBuf := Buffer(10, 0)
+			_KeyState := Buffer(256, 0)  ; all modifier keys unpressed
+			_Len := DllCall("ToUnicodeEx",
+				"UInt", _VK, "UInt", _ScanDec, "Ptr", _KeyState,
+				"Ptr", _CharBuf, "Int", 4, "UInt", 0, "Ptr", _HKL, "Int")
+			if _Len > 0 {
+				_ResolvedChar := StrGet(_CharBuf, _Len, "UTF-16")
+				ScriptInformation["MagicKeySourceChar"] := _ResolvedChar
 				LoggerInfo("ErgoptiPlus",
-					"Magic-key source resolved from layout: char={1}, VK=0x{2:X}, scan={3}.",
-					_SrcChar, _VK, ScriptInformation["MagicKeySourceScan"])
+					"Magic-key source char resolved from layout: scan={1}, VK=0x{2:X}, char='{3}' (HKL=0x{4:X}).",
+					_SrcScan, _VK, _ResolvedChar, _HKL)
 			} else {
 				LoggerWarn("ErgoptiPlus",
-					"Magic-key scan resolution failed: MapVirtualKeyExW returned 0"
-					. " (char={1}, VK=0x{2:X}, HKL=0x{3:X}) — using default SC02E.",
-					_SrcChar, _VK, _HKL)
+					"Magic-key char resolution: ToUnicodeEx returned {1} for scan={2}, VK=0x{3:X}"
+					. " — keeping default char '{4}'.",
+					_Len, _SrcScan, _VK, ScriptInformation["MagicKeySourceChar"])
 			}
 		} else {
 			LoggerWarn("ErgoptiPlus",
-				"Magic-key scan resolution failed: '{1}' not found on active layout"
-				. " (HKL=0x{2:X}, VK=0x{3:X}) — using default SC02E.",
-				_SrcChar, _HKL, _VK)
+				"Magic-key char resolution: MapVirtualKeyExW returned VK=0 for scan={1}"
+				. " (HKL=0x{2:X}) — keeping default char '{3}'.",
+				_SrcScan, _HKL, ScriptInformation["MagicKeySourceChar"])
 		}
 	} else {
 		LoggerWarn("ErgoptiPlus",
-			"Magic-key scan resolution skipped: could not obtain a valid HKL"
-			. " at startup — using default SC02E.")
+			"Magic-key char resolution skipped: could not obtain a valid HKL at startup"
+			. " — keeping default char '{1}'.",
+			ScriptInformation["MagicKeySourceChar"])
 	}
 }
 
