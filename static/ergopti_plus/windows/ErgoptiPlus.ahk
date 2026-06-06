@@ -1394,6 +1394,47 @@ ToggleAllFeaturesOn(*) {
 ToggleAllFeaturesOff(*) {
     ToggleAllFeatures(0)
 }
+
+; Clears every user binding (gestures, keyboard/script shortcuts, tap-holds)
+; to ``none`` / empty. Called by « Tout désactiver » so features AND assignments
+; are wiped — not only the feature toggles in the menu.
+_GlobalClearAllBindings(&Updates) {
+    global GestureAssignments, GESTURE_SLOTS
+    global KeyboardShortcutAssignments, KEYBOARD_SHORTCUT_DEFAULTS
+    global ScriptShortcutAssignments, SCRIPT_SHORTCUT_SLOTS
+    global TapHold, _IniCache
+
+    for Slot in GESTURE_SLOTS {
+        GestureAssignments[Slot] := "none"
+        Updates.Push({ Section: "ahk.gestures", Key: Slot, Value: "none" })
+    }
+
+    KbWritten := Map()
+    for Slot, _ in KEYBOARD_SHORTCUT_DEFAULTS {
+        KeyboardShortcutAssignments[Slot] := "none"
+        Updates.Push({ Section: "ahk.shortcuts.keyboard", Key: Slot, Value: "none" })
+        KbWritten[Slot] := true
+    }
+    if IsSet(_IniCache) and _IniCache.Has("ahk.shortcuts.keyboard") {
+        for Slot, _ in _IniCache["ahk.shortcuts.keyboard"] {
+            if !KbWritten.Has(Slot) {
+                KeyboardShortcutAssignments[Slot] := "none"
+                Updates.Push({ Section: "ahk.shortcuts.keyboard", Key: Slot, Value: "none" })
+            }
+        }
+    }
+
+    for Slot in SCRIPT_SHORTCUT_SLOTS {
+        ScriptShortcutAssignments[Slot] := "none"
+        Updates.Push({ Section: "ahk.shortcuts.script_control", Key: Slot, Value: "none" })
+    }
+
+    if IsSet(TapHold) and TapHold.Has("keys")
+        TapHold["keys"] := Map()
+    if IsSet(_TH_WriteTapHoldToml)
+        try _TH_WriteTapHoldToml()
+}
+
 ; Walk every feature in ``Features`` and force its ``enabled`` flag to
 ; ``Value``. Collects all mutations into a single batch — writing them one
 ; by one through TOML_Write does 50+ FileOpen/Write/Close round-trips and
@@ -1487,6 +1528,9 @@ ToggleAllFeatures(Value) {
     Updates.Push({ Section: "ahk.metrics", Key: WPMWidgetConst.CFG_VISIBLE, Value: Bool ? "1" : "0" })
     Updates.Push({ Section: "ahk.metrics", Key: WPMWidgetConst.CFG_COLORS,  Value: Bool ? "1" : "0" })
     Updates.Push({ Section: "ahk.metrics", Key: WPMWidgetConst.CFG_GRAPH,   Value: Bool ? "1" : "0" })
+
+    if !Bool
+        _GlobalClearAllBindings(Updates)
 
     TOML_BatchWrite(ConfigurationFile, Updates)
     ; Hotstrings features are nested 3 levels deep (hotstrings.cat.id.enabled)

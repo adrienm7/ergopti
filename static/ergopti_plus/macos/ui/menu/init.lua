@@ -300,6 +300,82 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		})
 	end
 
+	local gestures_core_mod = safe_require("modules.gestures", "gestures core")
+
+	local function clear_keyboard_shortcut_settings()
+		local prefix = "keyboard_shortcut_"
+		local prefix_len = #prefix
+		local keys = hs.settings.getKeys() or {}
+		for _, k in ipairs(keys) do
+			if k:sub(1, prefix_len) == prefix then
+				local slot = k:sub(prefix_len + 1)
+				if core_mods.shortcuts_mod and type(core_mods.shortcuts_mod.set_keyboard_action) == "function" then
+					pcall(core_mods.shortcuts_mod.set_keyboard_action, slot, "none")
+				else
+					pcall(function() hs.settings.set(k, "none") end)
+				end
+			end
+		end
+	end
+
+	local function clear_all_bindings()
+		local disabled_action = "none"
+		if gestures and gestures_core_mod and type(gestures_core_mod.SINGLE_SLOTS) == "table" then
+			for _, slot in ipairs(gestures_core_mod.SINGLE_SLOTS) do
+				if type(gestures.set_action) == "function" then pcall(gestures.set_action, slot, disabled_action) end
+			end
+		end
+		if karabiner then
+			for _, key_def in ipairs(karabiner.TAP_HOLD_KEYS or {}) do
+				pcall(karabiner.set_tap_action,  key_def.id, disabled_action)
+				pcall(karabiner.set_hold_action, key_def.id, disabled_action)
+			end
+			for _, combo_def in ipairs(karabiner.MOD_COMBOS or {}) do
+				pcall(karabiner.set_combo_combo_action, combo_def.id, disabled_action)
+				pcall(karabiner.set_combo_tap_action,   combo_def.id, disabled_action)
+				pcall(karabiner.set_combo_hold_action,  combo_def.id, disabled_action)
+			end
+			if type(karabiner.regenerate) == "function" then pcall(karabiner.regenerate) end
+		end
+		clear_keyboard_shortcut_settings()
+		if core_mods.shortcuts_mod and type(core_mods.shortcuts_mod.set_shortcut_action) == "function" then
+			if type(state.script_control_shortcuts) ~= "table" then state.script_control_shortcuts = {} end
+			for _, keyname in ipairs({ "return_key", "backspace", "escape" }) do
+				state.script_control_shortcuts[keyname] = disabled_action
+				pcall(core_mods.shortcuts_mod.set_shortcut_action, keyname, disabled_action)
+			end
+		end
+	end
+
+	local function restore_factory_bindings()
+		if gestures and gestures_core_mod and type(gestures_core_mod.DEFAULT_GESTURES) == "table" then
+			for slot, action in pairs(gestures_core_mod.DEFAULT_GESTURES) do
+				if type(gestures.set_action) == "function" then pcall(gestures.set_action, slot, action) end
+			end
+		end
+		if karabiner and type(karabiner.reset_to_defaults) == "function" then
+			pcall(karabiner.reset_to_defaults)
+			if type(karabiner.regenerate) == "function" then pcall(karabiner.regenerate) end
+		end
+		clear_keyboard_shortcut_settings()
+		local sc_defaults = core_mods.shortcuts_mod
+			and core_mods.shortcuts_mod.DEFAULT_STATE
+			and core_mods.shortcuts_mod.DEFAULT_STATE.script_control_shortcuts
+		if sc_defaults and core_mods.shortcuts_mod and type(core_mods.shortcuts_mod.set_shortcut_action) == "function" then
+			if type(state.script_control_shortcuts) ~= "table" then state.script_control_shortcuts = {} end
+			for keyname, action in pairs(sc_defaults) do
+				state.script_control_shortcuts[keyname] = action
+				pcall(core_mods.shortcuts_mod.set_shortcut_action, keyname, action)
+			end
+		end
+	end
+
+	local function clear_persisted_binding_overrides()
+		clear_keyboard_shortcut_settings()
+		pcall(function() hs.settings.set("llm_api_entries", {}) end)
+		pcall(function() hs.settings.set("llm_api_entry_id", "") end)
+	end
+
 	local function set_all_enabled(enabled)
 		-- 1. Set global states
 		state.keymap                 = enabled
@@ -367,7 +443,12 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			end
 		end
 		
-		-- 5. Sync engines and Save
+		-- 5. « Tout désactiver » also empties gesture / shortcut / tap-hold slots.
+		if not enabled then
+			clear_all_bindings()
+		end
+
+		-- 6. Sync engines and Save
 		sync_state_to_modules(state, false)
 		save_prefs()
 		
@@ -377,12 +458,14 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 
 	local function reset_all_defaults()
 		-- Restore the full factory state, not only the config.toml-backed toggles.
-		-- The tap/hold key assignments live in a SEPARATE Karabiner config file, so
-		-- deleting only config.toml left them in place — the same « ça réinitialise
-		-- que les toggles » gap fixed on the AHK side (tap_hold.toml). Remove both
-		-- so the next startup regenerates them from defaults.
+		-- Bindings live in several stores: config.toml (gestures, script shortcuts),
+		-- config_karabiner.toml (tap/hold), and hs.settings (keyboard shortcuts,
+		-- LLM API entries). Wipe every store so the reload seeds factory defaults.
+		restore_factory_bindings()
+		clear_persisted_binding_overrides()
 		pcall(os.remove, MenuPaths.get("ConfigTomlPath"))
 		pcall(os.remove, MenuPaths.get("KarabinerConfigPath"))
+		save_prefs()
 		pcall(notifications.notify, i18n.get("notify.defaults_reset"), nil, "info")
 		hs.timer.doAfter(0.25, function() pcall(hs.reload) end)
 	end
