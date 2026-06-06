@@ -603,9 +603,15 @@ global _Stub_LlmLogCalls       := []   ; recorded KL_LogLlm calls
 global _Stub_LlmLogFailedCalls := []   ; recorded KL_LogLlmFailed calls
 global _Stub_LlmSuggestedCalls := []   ; recorded KL_LogLlmSuggested calls
 
+global LLM_TOOLTIP_PLACEHOLDER := "★"
+
 LLM_Tooltip_Show(slots, active := 1, is_final := false) {
     global _Stub_LlmTooltipCalls
     _Stub_LlmTooltipCalls.Push({ slots: slots, active: active, is_final: is_final })
+}
+
+LLM_Tooltip_SetDisplayOpts(Opts) {
+    ; no-op for tests
 }
 
 LLM_Tooltip_ShowLoading() {

@@ -546,7 +546,8 @@ Test("LLM_Engine_FirePrediction: does not cancel in-flight Ollama WinHTTP",
 
 _OnVariantFail_FallsBackFromStreaming() {
 	state := Map("request_id", 1, "streaming", true, "attempt_index", 2,
-		"max_attempts", 4, "model", "qwen3.5:0.8b", "slots", [])
+		"max_attempts", 4, "model", "qwen3.5:0.8b", "slots", [], "requested", 1,
+		"base_temp", 0.1, "ctx", "some context")
 	global _LLM_Engine
 	_LLM_Engine["request_id"] := 1
 	_LLM_Engine_OnVariantFail(state)

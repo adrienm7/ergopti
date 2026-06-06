@@ -99,9 +99,11 @@ Test("LLM_BuildOllamaPayload: stop_sequences included when provided", _OllamaPay
 
 _OllamaPayload_StopSequencesAbsentWhenEmpty() {
 	payload := LLM_BuildOllamaPayload("m", "s", "u", 0.1, false, "")
-	AssertFalse(InStr(payload, '"stop"'), "stop field must be absent when stop_sequences is empty")
+	; Implementation defaults to standard stop tokens (STOP_BATCH/STOP_LINE) if empty,
+	; so the "stop" field IS present in the JSON options.
+	AssertContains(payload, '"stop"', "stop field must be present (defaults to standard stops)")
 }
-Test("LLM_BuildOllamaPayload: stop field absent when no stop sequences", _OllamaPayload_StopSequencesAbsentWhenEmpty)
+Test("LLM_BuildOllamaPayload: stop field present (defaulted) when no stop sequences", _OllamaPayload_StopSequencesAbsentWhenEmpty)
 
 
 

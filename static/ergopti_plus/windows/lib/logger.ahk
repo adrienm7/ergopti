@@ -419,17 +419,19 @@ _LoggerEmit(Level, Tag, Msg, Args*) {
         ; the buffered ``FileAppend`` path.
         if LOGGER_SEVERITY[Level] >= LOGGER_SEVERITY["WARNING"] {
             _LoggerFlush(true)
-            ; Dedicated errors-only file (WARNING + ERROR). Written synchronously
-            ; so the line survives even if the process dies shortly after.
-            ; This gives a small, focused file for quick triage without the
-            ; noise of the full daily unified log.
-            if LOGGER_ERRORS_LOG_PATH != "" {
-                try {
-                    f := FileOpen(LOGGER_ERRORS_LOG_PATH, "a", "UTF-8")
-                    if f {
-                        f.Write(Line . "`r`n")
-                        f.Close()
-                    }
+        }
+    }
+    if LOGGER_SEVERITY[Level] >= LOGGER_SEVERITY["WARNING"] {
+        ; Dedicated errors-only file (WARNING + ERROR). Written synchronously
+        ; so the line survives even if the process dies shortly after.
+        ; This gives a small, focused file for quick triage without the
+        ; noise of the full daily unified log.
+        if LOGGER_ERRORS_LOG_PATH != "" {
+            try {
+                f := FileOpen(LOGGER_ERRORS_LOG_PATH, "a", "UTF-8")
+                if f {
+                    f.Write(Line . "`r`n")
+                    f.Close()
                 }
             }
         }

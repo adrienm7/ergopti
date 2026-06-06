@@ -594,6 +594,9 @@ StrTitle(Text) {
 
 GenerateUppercaseVariants(AbbreviationUpperCase, UppercasedSymbols) {
     Variants := [AbbreviationUpperCase]
+    if !(UppercasedSymbols is Map) {
+        return Variants
+    }
     for i, Char in StrSplit(AbbreviationUpperCase) {
         if UppercasedSymbols.Has(Char) {
             for UpperSymbol in UppercasedSymbols[Char] {

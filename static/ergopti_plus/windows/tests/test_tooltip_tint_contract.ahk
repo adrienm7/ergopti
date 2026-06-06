@@ -84,6 +84,18 @@ _TintHexWithinTolerance(Actual, Expected) {
 ; ======================================
 
 _RunTooltipTintContractTests() {
+	global UI_TINT_LIGHTNESS, UI_TINT_SATURATION, UI_BG_HEX
+	global _TOOLTIP_LIGHTNESS, _TOOLTIP_SATURATION, _TOOLTIP_DEFAULT_BG_HEX
+	; Seed globals to match the JS reference defaults used to compute the vectors
+	UI_TINT_LIGHTNESS := 0.10
+	UI_TINT_SATURATION := 0.40
+	UI_BG_HEX := "242424"
+	
+	; Sync internal tooltip globals directly for the test
+	_TOOLTIP_LIGHTNESS := UI_TINT_LIGHTNESS
+	_TOOLTIP_SATURATION := UI_TINT_SATURATION
+	_TOOLTIP_DEFAULT_BG_HEX := UI_BG_HEX
+
 	Vectors := _GetTintVectors()
 
 	for Vec in Vectors {
