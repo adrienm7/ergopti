@@ -27,7 +27,10 @@ package.loaded["lib.keycodes"] = {
 }
 package.loaded["lib.i18n"] = { get = function(k) return k end, get_locale = function() return "fr" end }
 package.loaded["modules.gestures.engine"] = {}
-package.loaded["modules.gestures.actions"] = { get_label = function(n) return n end }
+package.loaded["modules.gestures.actions"] = {
+	get_label = function(n) return n end,
+	SG_NAMES = { "none", "script_pause_toggle", "script_reload", "script_quit", "other_action" }
+}
 
 local SC = helpers.load_with_stubs("modules.shortcuts.script_control")
 

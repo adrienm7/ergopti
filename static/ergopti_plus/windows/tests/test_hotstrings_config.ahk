@@ -112,7 +112,7 @@ Test("HotstringsConfig: pause invariant skeleton (dispatch must gate on A_IsSusp
 ; Delay resolution per section/group (project-hotstring-delay-architecture)
 TestHotstringsConfig_SectionDelayOverridesGroup() {
     _HCfgTestReset()
-    _HCfgTestSeedToml("rolls", 1.0, "", { "ct": { Delay: 0.5, Color: "", ShowTooltip: "" } })
+    _HCfgTestSeedToml("rolls", 1.0, "", { ct: { Delay: 0.5, Color: "", ShowTooltip: "" } })
     ; When resolving, section delay should take precedence (simulated via seed)
     AssertEqual(0.5, HotstringGroupConfig["rolls"].Sections["ct"].Delay)
 }

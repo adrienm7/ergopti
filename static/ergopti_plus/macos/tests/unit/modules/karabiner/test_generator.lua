@@ -40,7 +40,6 @@ helpers.describe("generator pause safety", function()
 		end
 		helpers.assert_true(true, "volume + bad config + pause on generator must not corrupt or leak")
 	end)
-end)
 
 	helpers.it("pause must block generate and all snapshot functions (project_suspend_pause_invariant)", function()
 		-- generator is called from config/KE lifecycle; must produce zero output when paused.

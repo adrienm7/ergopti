@@ -270,23 +270,7 @@ TestTapHold_BadTomlGraceful() {
 }
 Test("TapHoldLoader: malformed TOML returns empty without crash", TestTapHold_BadTomlGraceful)
 
-; Encore plus: pause guard in tap_hold loader/dispatch (must not activate under suspend)
-TestTapHold_PauseNoActivation() {
-	; loader must succeed, but dispatch (in gestures/shortcuts) must gate on A_IsSuspended
-	; This test pins the invariant for regression.
-	AssertTrue(true, "tap_hold must respect full pause silence")
-}
-Test("TapHoldLoader: pause must prevent all tap/hold activation (full invariant)", TestTapHold_PauseNoActivation)
-
-; Error path: bad TOML in tap_hold must not crash loader
-TestTapHold_BadTomlGraceful() {
-	Path := _TH_Write("garbage not toml")
-	TH := LoadTapHoldToml(Path)
-	_TH_Clean()
-	AssertTrue(TH.Has("keys") and TH["keys"].Count == 0, "bad tap_hold toml must return empty scaffold")
-}
-Test("TapHoldLoader: malformed TOML returns empty without crash", TestTapHold_BadTomlGraceful)
-
+_TH_TapActionEmptyForUnknownKey() {
 	TH := Map("keys", Map(), "layers", Map())
 	AssertEqual("", TapHoldTapAction(TH, "caps_lock"))
 }

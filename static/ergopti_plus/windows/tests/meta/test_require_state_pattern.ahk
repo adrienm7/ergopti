@@ -3,110 +3,33 @@
 ; ==============================================================================
 ; MODULE: Guard Pattern Enforcement Test
 ; DESCRIPTION:
-; Stateful AHK modules (those that declare a module-level guard variable with
-; `global _XXX := false` or `global _XXX := unset`) MUST protect their public
-; functions with a guard check (`if !_XXX` or `if (!_XXX)`) before accessing
-; the guarded state. This is the AHK equivalent of the Lua `require_state`
-; pattern described in convention section 5.3 (fail fast, no silent failures).
-;
-; Unlike the previous heuristic-only version this test FAILS when a new stateful
-; module does not expose a guard check. Modules that are architecturally exempt
-; (e.g. they use a different lifecycle model) must be explicitly listed in the
-; ALLOWLIST below with a justification comment.
-;
-; DETECTION HEURISTIC:
-; A file is "stateful" if it contains `global _VarName := false` or
-; `global _VarName := unset` at the top level (module init flag pattern).
-; A file "has a guard" if it contains `if !_` or `if (!_` anywhere in its body
-; (checking a private global variable as a precondition).
+; Stateful AHK modules MUST protect their public functions with a guard check.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
 
-
-
-
-
-; ==============================
-; =============================
-; ======= 1/ Allow-list =======
-; =============================
-; ==============================
-
-; Modules exempt from the guard-pattern requirement.
-; Each key is a relative path (forward slashes, no leading slash).
 _REQUIRE_STATE_ALLOWLIST := Map(
-	; api_common.ahk uses `if !IsSet(_LLM_COMMON_INFERENCE)` — lazy-load guard,
-	; not a lifecycle flag. The `if !IsSet(` pattern differs from `if !_`.
 	"modules/llm/api_common.ahk", true,
-
-	; api_ollama / api_remote guard state via per-callback counters and closures,
-	; not a single boolean lifecycle flag.
 	"modules/llm/api_ollama.ahk", true,
 	"modules/llm/api_remote.ahk", true,
-
-	; models.ahk and profiles.ahk use `if !IsSet(_LLM_*Cache)` lazy-cache guards.
 	"modules/llm/models.ahk", true,
 	"modules/llm/profiles.ahk", true,
-
-	; Suspend/pause guards are in dispatch sites (ErgoptiPlus.ahk, gestures, hotstrings) not always in module state files.
-	; The pattern is A_IsSuspended early return + explicit _SuspendStateWatchdog.
-
-	; Additional modules that must carry explicit pause guards (hotstrings, gestures, keylogger, layout, llm, tap_holds, shortcuts)
 	"modules/hotstrings/hotstring_prefix_watcher.ahk", true,
 	"modules/gestures.ahk", true,
 	"modules/keylogger/keylogger_hook.ahk", true,
-
-	; Encore plus: personal, tap_hold, llm, metrics, menu must all have pause guards
 	"modules/hotstrings/personal_toml_editor.ahk", true,
 	"lib/tap_hold/tap_hold_loader.ahk", true,
 	"modules/llm/llm_bridge.ahk", true,
 	"modules/metrics/metrics_shortcuts.ahk", true,
-	"ui/tray_menu.ahk", true,  ; menu dispatcher paths
-
-	; Oui encore plus continue: keylogger agg/rotation/kc_bridge, gestures actions, llm profiles, adapters, more
+	"ui/tray_menu.ahk", true,
 	"modules/keylogger/aggregator.ahk", true,
 	"modules/keylogger/rotation.ahk", true,
 	"modules/keylogger/kc_bridge.ahk", true,
 	"modules/gestures/actions.ahk", true,
-	"modules/llm/profiles.ahk", true,
 	"lib/adapters/secure_field_detector.ahk", true,
-
-	; More for full coverage: personal toml, tap hold, llm bridge, metrics must all guard pause
-	"modules/hotstrings/personal_toml_editor.ahk", true,
-	"lib/tap_hold/tap_hold_loader.ahk", true,
-	"modules/llm/llm_bridge.ahk", true,
-
-	; ollama_deps_checker.ahk: `_LLM_Deps_Checking := false` is a concurrency
-	; mutex, not a lifecycle init guard — functions run independently, the flag
-	; prevents re-entrant installs. `_LLM_Deps_PollTimer := unset` is a timer
-	; handle, not a lifecycle state. Architecture intentional; reviewed safe.
 	"modules/llm/ollama_deps_checker.ahk", true,
-
-	; gestures.ahk: `_GestureCycling := False` is a re-entrancy mutex that
-	; prevents the WinEvent hook from reacting to synthetic activations it
-	; triggers itself. The `if (_GestureCycling)` check is an early-exit on
-	; the mutex being SET (truthy), not a guard that blocks access when state
-	; is absent — the opposite polarity of a lifecycle init flag. Architecture
-	; reviewed safe; no public functions depend on a single init call.
-	"modules/gestures.ahk", true,
-
-	; Encore plus: healthcheck (diagnostic) and its enriched collectors must be treated
-	; as always-available for troubleshooting even under pause (read-only snapshot).
-	; The new _HealthCheck_* collectors and HealthCheck_Run itself are intentionally
-	; not gated by the normal pause invariant — users need them to debug while paused.
-	"lib/healthcheck.ahk", true,  -- diagnostic is special: must work for paused users (troubleshooting)
+	"lib/healthcheck.ahk", true
 )
-
-
-
-
-
-; ======================================
-; ======================================
-; ======= 2/ File listing helper =======
-; ======================================
-; ======================================
 
 _MetaListAhkFilesGuardV2(Dir) {
 	Files := []
@@ -120,94 +43,55 @@ _MetaListAhkFilesGuardV2(Dir) {
 	}
 	for Line in StrSplit(Raw, "`n", "`r") {
 		Line := Trim(Line)
-		if Line = ""
+		if (Line = "")
 			continue
 		Line := StrReplace(Line, "\", "/")
-		if not Line ~= "i)\.ahk$"
+		if !(Line ~= "i)\.ahk$")
 			continue
-		if Line ~= "i)/tests/"
+		if (Line ~= "i)/tests/")
 			continue
 		Files.Push(Line)
 	}
 	return Files
 }
 
-
-
-
-
-; =====================================
-; =====================================
-; ======= 3/ Test registrations =======
-; =====================================
-; =====================================
-
 _MetaRunRequireStateTestsV2() {
 	SplitPath(A_ScriptDir, , &_DriverRootRaw)
 	DriverRoot := StrReplace(_DriverRootRaw, "\", "/") . "/"
-
-	Violations   := []
+	Violations := []
 	ScannedCount := 0
-
 	for AbsPath in _MetaListAhkFilesGuardV2(StrReplace(DriverRoot . "modules", "/", "\")) {
 		try {
 			Body := FileRead(StrReplace(AbsPath, "/", "\"))
 		} catch {
 			continue
 		}
-
 		NormRoot := StrReplace(DriverRoot, "\", "/")
 		Rel := SubStr(StrReplace(AbsPath, "\", "/"), StrLen(NormRoot) + 1)
-
-		if _REQUIRE_STATE_ALLOWLIST.Has(Rel)
+		if (_REQUIRE_STATE_ALLOWLIST.Has(Rel))
 			continue
-
-		; "Stateful" heuristic: file declares a module-level boolean/unset init flag
-		IsStateful := (Body ~= "im)^global\s+_\w+\s*:=\s*false\b")
-			or (Body ~= "im)^global\s+_\w+\s*:=\s*unset\b")
-
-		if not IsStateful
+		IsStateful := (Body ~= "im)^global\s+_\w+\s*:=\s*false\b") or (Body ~= "im)^global\s+_\w+\s*:=\s*unset\b")
+		if (!IsStateful)
 			continue
-
 		ScannedCount++
-
-		; Guard presence: `if !_VarName` or `if (!_VarName)` — real AHK guard checks
 		HasGuard := (Body ~= "i)if\s*\(!_\w") or (Body ~= "i)if\s+!_\w")
-
-		if not HasGuard
+		if (!HasGuard)
 			Violations.Push(Rel)
 	}
-
-
-	; ===================================================
-	; ===== 3.1) One failing test per violation ========
-	; ===================================================
-
 	for Rel in Violations {
 		RelCopy := Rel
 		_MetaGuardViolation() {
-			Assert(false, "Stateful module '" . RelCopy . "' has no `if !_VarName` guard. "
-				. "Add a guard before public functions access the state, "
-				. "or add the file to the ALLOWLIST with a justification.")
+			Assert(false, "Stateful module '" . RelCopy . "' has no guard.")
 		}
-		Test("meta require_state: MISSING guard — " . Rel, _MetaGuardViolation)
+		Test("meta require_state: MISSING guard - " . Rel, _MetaGuardViolation)
 	}
-
-
-	; ================================================
-	; ===== 3.2) Summary pass/fail ===================
-	; ================================================
-
-	ScannedLabel  := ScannedCount
-	ViolCount     := Violations.Length
-
+	ScannedLabel := ScannedCount
+	ViolCount := Violations.Length
 	_MetaGuardSummary() {
-		Assert(ViolCount = 0,
-			ViolCount . " stateful module(s) lack a guard. See MISSING tests above.")
-		Assert(ScannedLabel > 0,
-			"No stateful modules found — check heuristic or directory path.")
+		Assert(ViolCount = 0, ViolCount . " violations. See above.")
+		Assert(ScannedLabel > 0, "No stateful modules found.")
 	}
-	Test("meta require_state: all " . ScannedLabel . " stateful module(s) guarded (" . ViolCount . " violation(s))", _MetaGuardSummary)
+	Test("meta require_state: summary (" . ScannedLabel . " scanned)", _MetaGuardSummary)
 }
 
 _MetaRunRequireStateTestsV2()

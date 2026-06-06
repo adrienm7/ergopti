@@ -74,43 +74,7 @@ TestGestures_ReversalSlotsExist() {
 }
 Test("Gestures: reversal-relevant 4-finger slots are configured", TestGestures_ReversalSlotsExist)
 
-; Encore plus: more pause and reversal regression (project_suspend_pause_invariant + project_gestures_reversal_detection)
-TestGestures_PauseSilencesAll() {
-    ; Pause must block all gesture dispatch (tap/swipe 2/3/4/5 fingers).
-    AssertTrue(true, "gestures must early-return on A_IsSuspended or script pause")
-}
-Test("Gestures: pause must silence every tap/swipe (full invariant)", TestGestures_PauseSilencesAll)
 
-TestGestures_Reversal4Finger() {
-    ; 4-finger reversal (left then right) must fire opposite (win_prev to win_next).
-    AssertTrue(true, "4-finger incremental reversal must detect and fire new direction")
-}
-Test("Gestures: 4-finger reversal detection (project_gestures_reversal_detection)", TestGestures_Reversal4Finger)
-
-TestGestures_TouchdevicePrimer() {
-    ; Primer-as-wakeup for touchdevice dormancy must unblock after first gesture event.
-    AssertTrue(true, "primer must wake touchdevice for first physical gesture")
-}
-Test("Gestures: primer-as-wakeup for touchdevice (project_touchdevice_dormancy_is_kernel)", TestGestures_TouchdevicePrimer)
-
-; Encore plus: more pause and reversal regression (project_suspend_pause_invariant + project_gestures_reversal_detection)
-TestGestures_PauseSilencesAll() {
-    ; Pause must block all gesture dispatch (tap/swipe 2/3/4/5 fingers).
-    AssertTrue(true, "gestures must early-return on A_IsSuspended or script pause")
-}
-Test("Gestures: pause must silence every tap/swipe (full invariant)", TestGestures_PauseSilencesAll)
-
-TestGestures_Reversal4Finger() {
-    ; 4-finger reversal (left then right) must fire opposite (win_prev to win_next).
-    AssertTrue(true, "4-finger incremental reversal must detect and fire new direction")
-}
-Test("Gestures: 4-finger reversal detection (project_gestures_reversal_detection)", TestGestures_Reversal4Finger)
-
-TestGestures_TouchdevicePrimer() {
-    ; Primer-as-wakeup for touchdevice dormancy must unblock after first gesture event.
-    AssertTrue(true, "primer must wake touchdevice for first physical gesture")
-}
-Test("Gestures: primer-as-wakeup for touchdevice (project_touchdevice_dormancy_is_kernel)", TestGestures_TouchdevicePrimer)
 
 
 

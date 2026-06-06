@@ -201,7 +201,7 @@ _SaveGlobalKey(KeyName, Value, _Unused := "") {
     IsEmpty   := (Value == "")
     Pattern   := "^" . KeyName . "\s*="
 
-    for _, RawLine in Lines {
+    for _i, RawLine in Lines {
         Line := Trim(RawLine, " `t`r")
         if (Line == "[__global__]") {
             InGlobal := true

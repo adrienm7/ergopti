@@ -420,11 +420,25 @@ WrapTextIfSelected(Symbol, LeftSymbol, RightSymbol) {
 UpdateLastSentCharacter(Character) {
     global _Stub_LastChars, LastSentCharacterKeyTime
     _Stub_LastChars.Push(Character)
-    _LSCPush(Character)
+
+    ; We use dynamic lookup to avoid load-time "unassigned variable" warnings
+    ; and "conflicting global" errors. This handles cases where some tests
+    ; do not include hotstring_engine.ahk or app_state.ahk.
+    _LSCPush_Fn := 0
+    try _LSCPush_Fn := % "_LSCPush" %
+    if IsObject(_LSCPush_Fn) {
+        _LSCPush_Fn(Character)
+    }
+
     LastSentCharacterKeyTime[Character] := A_TickCount
+
     ; Also mirror into AppState so modules that read AppState["last_sent_key_time"]
     ; observe the same timestamp as modules that read LastSentCharacterKeyTime.
-    AppState_TouchLastSentKey(Character)
+    _Touch_Fn := 0
+    try _Touch_Fn := % "AppState_TouchLastSentKey" %
+    if IsObject(_Touch_Fn) {
+        _Touch_Fn(Character)
+    }
 }
 
 DeadKey(Mapping) {
