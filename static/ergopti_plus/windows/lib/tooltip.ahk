@@ -36,12 +36,13 @@ global _TooltipRowGuis := []
 global _TooltipGeneration := 0
 global _TooltipTimerGeneration := 0
 
-; Dequeue state — items that have per-row expiry deadlines. When any item
-; has a non-zero DurationSec, TooltipShow stores the full item list here
-; with absolute expiry timestamps (A_TickCount + duration_ms). The dequeue
-; timer fires at the next expiry, removes items whose deadline has passed,
-; and re-renders the remaining stack. This gives each row its own lifetime
-; so a short row disappears first and longer rows stay visible.
+; Dequeue state — items that have per-row expiry deadlines. Canonical algorithm:
+; shared/tooltip/dequeue.js (SPEC.md § 7.1). When rows carry distinct non-zero
+; DurationSec values, TooltipShow stores the full item list here with absolute
+; expiry timestamps (A_TickCount + duration_ms). The dequeue poll timer removes
+; expired rows and re-renders the surviving stack so a short row disappears first
+; and longer rows stay visible (e.g. output1@1s + output2@2s → both 0.8s, then
+; output2 alone for another 1.0s after the 0.2s decrement).
 ; Shape: Array of { ..item fields.., ExpireMs: integer }
 ; 0 when no dequeue cycle is active (all items have DurationSec = 0).
 global _TooltipDequeueItems := 0
