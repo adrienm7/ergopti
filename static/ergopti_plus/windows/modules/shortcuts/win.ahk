@@ -145,7 +145,7 @@ if Features["shortcuts"]["move"] {
         AwakeInputHook.OnChar := AwakeCancelOnKeypress
         AwakeInputHook.OnKeyDown := AwakeCancelOnKeypress
         AwakeInputHook.Start()
-        TrayTip(t("keepawake.started"), t("keepawake.title"), "Iconi Mute")
+        try TrayTip(t("keepawake.started"), t("keepawake.title"), "Iconi Mute")
     }
 
     ToggleActivitySimulation(*) {
@@ -172,7 +172,7 @@ if Features["shortcuts"]["move"] {
             try AwakeInputHook.Stop()
             AwakeInputHook := ""
         }
-        TrayTip(t("keepawake.stopped"), t("keepawake.title"), "Iconi Mute")
+        try TrayTip(t("keepawake.stopped"), t("keepawake.title"), "Iconi Mute")
     }
 
     AwakeReturnToOrigin() {
@@ -508,7 +508,7 @@ SC029:: {
     FileDelete(TmpScript)
     FileAppend(ScriptContent, TmpScript, "UTF-8")
     RunWait('powershell -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "' . TmpScript . '"',, "Hide")
-    TrayTip(StrReplace(t("notify.screenshot_saved_path"), "%s", FilePath), t("notify.screenshot_title"), "Iconi Mute")
+    try TrayTip(StrReplace(t("notify.screenshot_saved_path"), "%s", FilePath), t("notify.screenshot_title"), "Iconi Mute")
 }
 #HotIf
 

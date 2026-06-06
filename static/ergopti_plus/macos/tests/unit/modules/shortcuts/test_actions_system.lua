@@ -7,6 +7,7 @@ local hs_stub = helpers.load_with_stubs("tests.stubs.hs")
 
 helpers.describe("shortcuts.actions.system", function()
 	helpers.it("toggle_awake creates an event watcher with the correct events", function()
+		package.loaded["lib.keycodes"] = nil
 		package.loaded["modules.shortcuts.actions.system"] = nil
 		local sys = helpers.load_with_stubs("modules.shortcuts.actions.system")
 
