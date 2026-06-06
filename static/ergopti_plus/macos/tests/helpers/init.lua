@@ -98,6 +98,27 @@ function M.load_with_stubs(module_name, hs_overrides)
 		set_locale = function() end,
 	}
 
+	-- Stub lib.paths so that any module (e.g. llm/api_remote, profiles resolution)
+	-- can find shared/llm/api_providers.json and profiles.json during headless
+	-- tests. Without this, io.open fails or returns nil path, causing "not found"
+	-- errors in tests that load api_remote or exercise catalogue-dependent code.
+	package.loaded["lib.paths"] = {
+		shared_llm_path = function(name)
+			return M.driver_root() .. "../shared/llm/" .. name
+		end,
+	}
+
+	-- Minimal DEFAULT_STATE for modules.llm.init (lazy-required by
+	-- profiles.resolve_system_prompt for {min_words}/{max_words} injection).
+	-- Prevents "attempt to index a nil value" when Core.DEFAULT_STATE is accessed
+	-- in test/CI envs.
+	package.loaded["modules.llm.init"] = {
+		DEFAULT_STATE = {
+			llm_min_words = 4,
+			llm_max_words = 20,
+		},
+	}
+
 	-- Register sub-module aliases so that `require("hs.json")` etc. resolve to
 	-- the same tables as `hs.json`. Some production modules call require("hs.*")
 	-- directly rather than accessing the global `hs` table.

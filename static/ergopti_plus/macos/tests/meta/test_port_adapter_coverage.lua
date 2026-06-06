@@ -252,14 +252,31 @@ helpers.describe("meta: shared/ code purity", function()
 
 		local rel = file_path:sub(#shared_dir + 1)
 		local line_num = 0
+		local in_multiline_comment = false
+
 		for line in (body .. "\n"):gmatch("([^\n]*)\n") do
 			line_num = line_num + 1
-			for _, entry in ipairs(forbidden_js_patterns) do
-				if line:find(entry.pat) then
-					js_violations = js_violations + 1
-					print(string.format("  WARN: %s in shared/ file: %s:%d",
-						entry.desc, rel, line_num))
+
+			-- Handle multiline comments /* ... */
+			if not in_multiline_comment and line:find("/%*") then
+				in_multiline_comment = true
+			end
+
+			-- Skip comments: single-line // or active multiline block
+			local is_comment = in_multiline_comment or line:match("^%s*//") or line:match("^%s*%*")
+			
+			if not is_comment then
+				for _, entry in ipairs(forbidden_js_patterns) do
+					if line:find(entry.pat) then
+						js_violations = js_violations + 1
+						print(string.format("  WARN: %s in shared/ file: %s:%d",
+							entry.desc, rel, line_num))
+					end
 				end
+			end
+
+			if in_multiline_comment and line:find("%*/") then
+				in_multiline_comment = false
 			end
 		end
 

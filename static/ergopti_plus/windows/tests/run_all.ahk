@@ -37,6 +37,26 @@ global _AHK_DRY_RUN := (A_Args.Length > 0 && A_Args[1] == "--dry-run")
 ; reference at definition (Bind) time or at call time during tests.
 #Include test_stubs.ahk
 
+; Install a very early error handler for top-level / #Include phase errors.
+; When a newly added production module (LLM, gestures, keylogger, prompt builder,
+; tray_llm persist, etc.) or test_*.ahk has a top-level statement that throws
+; (unset global, t() before i18n is ready, missing stub for a static initializer,
+; bad include order, etc.) the default AHK behaviour is to show a modal error
+; MsgBox. In the headless CI runner that dialog is never dismissed → the exe
+; never exits → the step times out even if the previous green run was ~10 s.
+; This handler writes a clear "not ok 0" line to the exact file the CI tailer
+; watches and forces a clean ExitApp so the failure is visible and fast.
+_FatalErrorHandler(e, mode) {
+    msg := "not ok 0 - FATAL STARTUP ERROR: " . e.Message
+    try msg .= A_NewLine . "STACK TRACE:" . A_NewLine . e.Stack
+    msg .= A_NewLine . "Likely cause: top-level code or missing stub in a newly added module."
+    try FileAppend(msg . A_NewLine, A_Temp . "\ergopti_test_results.txt", "UTF-8")
+    try FileAppend(msg . A_NewLine, "*")
+    ExitApp(1)
+    return 1
+}
+OnError(_FatalErrorHandler)
+
 ; ── Production lib files in dependency order ──
 #Include ../lib/app_state.ahk
 #Include ../lib/ui_style.ahk
@@ -68,6 +88,8 @@ global _AHK_DRY_RUN := (A_Args.Length > 0 && A_Args[1] == "--dry-run")
 ; when building GESTURE_SLOT_LABELS; without this the process blocks on
 ; an AHK runtime-error MsgBox and the CI job times out.
 #Include ../lib/i18n.ahk
+try FileAppend("# [marker] i18n included (t() should now be available)`r`n", A_Temp . "\ergopti_test_results.txt", "UTF-8")
+try FileAppend("# [marker] i18n included (t() should now be available)`r`n", "*")
 
 ; Install the hotstring hooks for the entire test process so neither real
 ; ``Hotstring()`` registrations nor real ``SendEvent`` keystrokes ever escape
@@ -132,6 +154,8 @@ InstallSendNoOps()
 ; lookup, payload building, response parsing, cancel helpers, and engine
 ; debounce / cache logic without any real network calls.
 ; models.ahk defines LLM_GetSharedPath which profiles.ahk depends on.
+try FileAppend("# [marker] starting direct include of LLM production modules`r`n", A_Temp . "\ergopti_test_results.txt", "UTF-8")
+try FileAppend("# [marker] starting direct include of LLM production modules`r`n", "*")
 #Include ../modules/llm/models.ahk
 #Include ../modules/llm/profiles.ahk
 #Include test_llm_profiles.ahk
@@ -142,6 +166,8 @@ InstallSendNoOps()
 #Include test_llm_api_remote.ahk
 #Include ../modules/llm/prediction_engine.ahk
 #Include test_llm_prediction_engine.ahk
+try FileAppend("# [marker] LLM production modules + tests included`r`n", A_Temp . "\ergopti_test_results.txt", "UTF-8")
+try FileAppend("# [marker] LLM production modules + tests included`r`n", "*")
 
 ; LLM tray menu -> config.toml persistence (contract-driven round-trips).
 global _LLM_Tray := Map(
@@ -155,20 +181,30 @@ global _LLM_Tray := Map(
 	"auto_raise_temp", true, "nav_modifiers", "", "val_modifiers", "alt",
 	"trigger_shortcut", "Ctrl+Space", "inline_autotype", false
 )
+try FileAppend("# [marker] about to include tray_llm/persist.ahk (with _LLM_Tray hack)`r`n", A_Temp . "\ergopti_test_results.txt", "UTF-8")
+try FileAppend("# [marker] about to include tray_llm/persist.ahk (with _LLM_Tray hack)`r`n", "*")
 #Include ../ui/tray_llm/persist.ahk
 #Include test_llm_menu_persistence.ahk
 #Include test_llm_menu_regressions.ahk
+try FileAppend("# [marker] tray_llm persist + tests included`r`n", A_Temp . "\ergopti_test_results.txt", "UTF-8")
+try FileAppend("# [marker] tray_llm persist + tests included`r`n", "*")
 
 ; Gestures module — included here because its pure logic (assignments, action
 ; registry, dispatch) is testable. The hotkeys it registers are harmless since
 ; RunTests() calls ExitApp immediately after completion.
+try FileAppend("# [marker] about to include gestures.ahk (top-level t() for SLOT_LABELS)`r`n", A_Temp . "\ergopti_test_results.txt", "UTF-8")
+try FileAppend("# [marker] about to include gestures.ahk (top-level t() for SLOT_LABELS)`r`n", "*")
 #Include ../modules/gestures.ahk
 #Include test_gestures.ahk
+try FileAppend("# [marker] gestures + test included`r`n", A_Temp . "\ergopti_test_results.txt", "UTF-8")
+try FileAppend("# [marker] gestures + test included`r`n", "*")
 
 ; Keylogger sub-modules — pure-logic subsets included here to test category
 ; lookup, character classification, and burst helpers without OS hooks or I/O.
 ; sqlite3.ahk needs _VendorDir (set by ErgoptiPlus.ahk at runtime); stub it
 ; here so the class static initialiser does not crash the test runner.
+try FileAppend("# [marker] about to include keylogger modules + sqlite3 (with _VendorDir stub)`r`n", A_Temp . "\ergopti_test_results.txt", "UTF-8")
+try FileAppend("# [marker] about to include keylogger modules + sqlite3 (with _VendorDir stub)`r`n", "*")
 global _VendorDir := A_ScriptDir . "\..\vendor"
 #Include ../lib/sqlite3.ahk
 #Include ../modules/keylogger/keylogger_walker.ahk
@@ -177,6 +213,8 @@ global _VendorDir := A_ScriptDir . "\..\vendor"
 #Include test_keylogger_walker.ahk
 #Include test_keylogger_app_categories.ahk
 #Include test_keylogger_reader.ahk
+try FileAppend("# [marker] keylogger modules + tests included`r`n", A_Temp . "\ergopti_test_results.txt", "UTF-8")
+try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 
 ; ── Meta tests (codebase hygiene, no production includes needed) ──
 #Include meta/test_file_headers.ahk

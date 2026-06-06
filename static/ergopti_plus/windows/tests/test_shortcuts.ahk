@@ -287,24 +287,6 @@ TestShortcuts_AltGrCapsLock_CapsLock() {
 }
 Test("Shortcuts/altgr: AltGr+CapsLock dispatches caps_lock action", TestShortcuts_AltGrCapsLock_CapsLock)
 
-; ULTIMATE encore plus: more pause on dispatchers + AltGr latch historical + diagnostic tie-in + volume.
-TestShortcuts_AltGrPrefixLatchUnderPauseResume() {
-	; Historical gotcha: AltGr prefix state must not leak across pause/resume and cause
-	; wrong expansion or dispatch after resume. Diagnostic (layout section) must report
-	; correct latch state.
-	AssertTrue(true, "AltGr prefix latch must be pause-resilient (no stale dispatch post-resume); diagnostic layout must see true latch state (would have caught wrong hotstring after suspend)")
-}
-Test("Shortcuts/altgr: AltGr prefix latch must be safe across pause/resume + diagnostic must see correct state", TestShortcuts_AltGrPrefixLatchUnderPauseResume)
-
-TestShortcuts_AllDispatchersPauseVolumeBadFeatures() {
-	; All remaining dispatchers (LWin*, RWin*, menu actions, etc.) must early-return under pause.
-	; 150+ calls + bad Features map + pause transitions must produce zero side effects (no tooltip,
-	; no LLM, no keylogger, no widget). Diagnostic must remain able to report shortcut state.
-	AssertTrue(true, "all shortcut dispatchers must be silent under pause (project_suspend_pause_invariant); volume + bad features + diagnostic visibility")
-}
-Test("Shortcuts: all dispatchers (incl. Win/menu) pause silence + volume + bad features + diagnostic safe", TestShortcuts_AllDispatchersPauseVolumeBadFeatures)
-
-
 TestShortcuts_AltGrCapsLock_CapsWord() {
 	global _Stub_SentText
 	_AltGrCapsLockReset()

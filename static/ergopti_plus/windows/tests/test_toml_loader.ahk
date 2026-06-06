@@ -60,7 +60,7 @@ TestTL_ReadTomlFileCaching() {
 	; (implementation detail tested via no side effects in unit harness)
 	Path := A_Temp . "\toml_cache_test.toml"
 	try FileDelete(Path)
-	FileAppend("key = \"value\"", Path, "UTF-8")
+	FileAppend('key = "value"', Path, "UTF-8")
 	Content1 := ReadTomlFile(Path)
 	Content2 := ReadTomlFile(Path)
 	try FileDelete(Path)
@@ -154,11 +154,11 @@ Test("ReadTomlFile: caches content per absolute path", TestTL_ReadTomlCaches)
 ; ==========================
 ; UnescapeTomlString — additional cases
 ; ==========================
-TestTL_UnescapeMultipleEscapes() {
+TestTL_UnescapeEscapesSequence() {
 	; \n\t in sequence
 	AssertEqual("`n`t", UnescapeTomlString("\n\t"))
 }
-Test("UnescapeTomlString: multiple escapes in sequence", TestTL_UnescapeMultipleEscapes)
+Test("UnescapeTomlString: multiple escapes in sequence", TestTL_UnescapeEscapesSequence)
 
 TestTL_UnescapeDoubleBackslash() {
 	; \\\\ → two backslashes in the result

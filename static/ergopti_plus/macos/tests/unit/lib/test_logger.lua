@@ -542,6 +542,12 @@ helpers.describe("Logger: errors-only sink (ERRORS_LOG_FILE)", function()
 		helpers.assert_true(today_path:find("2025%-07%-01") ~= nil, "should switch to new day filename")
 		helpers.assert_true(today_path ~= yesterday_path, "paths must differ after rollover")
 
+		-- Ensure directory exists for today's path too
+		do
+			local log_dir = today_path:match("^(.*[/\\])") or "/tmp/"
+			pcall(function() os.execute('mkdir -p "' .. log_dir .. '"') end)
+		end
+
 		L.error("roll", "error on fake today")
 		local fh2 = io.open(today_path, "r")
 		local c2 = fh2 and (fh2:read("*a") or "") or ""
