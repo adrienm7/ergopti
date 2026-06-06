@@ -1395,6 +1395,39 @@ ToggleAllFeaturesOff(*) {
     ToggleAllFeatures(0)
 }
 
+; Restore factory gesture / shortcut / tap-hold assignments. Used by
+; « Valeurs par défaut » before wiping per-user config files.
+_GlobalRestoreFactoryBindings() {
+    global GestureAssignments, GESTURE_SLOTS, GESTURE_FACTORY_DEFAULTS
+    global KeyboardShortcutAssignments, KEYBOARD_SHORTCUT_DEFAULTS
+    global ScriptShortcutAssignments, SCRIPT_SHORTCUT_SLOTS, SCRIPT_SHORTCUT_DEFAULTS
+    global CategoryEnabled, _ConfigDir, _AhkSubDir
+
+    if IsSet(GESTURE_FACTORY_DEFAULTS) {
+        for Slot in GESTURE_SLOTS
+            GestureAssignments[Slot] := GESTURE_FACTORY_DEFAULTS.Has(Slot)
+                ? GESTURE_FACTORY_DEFAULTS[Slot] : "none"
+    }
+
+    for Slot, Action in KEYBOARD_SHORTCUT_DEFAULTS
+        KeyboardShortcutAssignments[Slot] := Action
+
+    for Slot in SCRIPT_SHORTCUT_SLOTS
+        ScriptShortcutAssignments[Slot] := SCRIPT_SHORTCUT_DEFAULTS[Slot]
+
+    for Category, _ in CategoryEnabled
+        CategoryEnabled[Category] := true
+
+    ; Deleting the user file lets LoadTapHoldToml merge shipped defaults on boot.
+    Path := _ConfigDir . _AhkSubDir . "tap_hold.toml"
+    try {
+        if FileExist(Path)
+            FileDelete(Path)
+    } catch as Err {
+        try LoggerError("GlobalReset", "Could not delete tap_hold.toml: {1}.", Err.Message)
+    }
+}
+
 ; Clears every user binding (gestures, keyboard/script shortcuts, tap-holds)
 ; to ``none`` / empty. Called by « Tout désactiver » so features AND assignments
 ; are wiped — not only the feature toggles in the menu.
@@ -1429,10 +1462,8 @@ _GlobalClearAllBindings(&Updates) {
         Updates.Push({ Section: "ahk.shortcuts.script_control", Key: Slot, Value: "none" })
     }
 
-    if IsSet(TapHold) and TapHold.Has("keys")
-        TapHold["keys"] := Map()
-    if IsSet(_TH_WriteTapHoldToml)
-        try _TH_WriteTapHoldToml()
+    if IsSet(_TH_WriteTapHoldDisabled)
+        try _TH_WriteTapHoldDisabled()
 }
 
 ; Walk every feature in ``Features`` and force its ``enabled`` flag to
@@ -1799,6 +1830,7 @@ ReloadWithDefaultConfig(*) {
     ; Deleting only config.toml left tap-holds and API entries on disk, so they
     ; survived the reset — which is exactly the « ça réinitialise que les toggles »
     ; complaint. Remove all three together, then reload.
+    _GlobalRestoreFactoryBindings()
     AhkDir := _ConfigDir . _AhkSubDir
     for FileName in ["config.toml", "tap_hold.toml", "api_entries.json"] {
         Path := AhkDir . FileName

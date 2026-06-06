@@ -2065,15 +2065,10 @@ _TH_ResetAllToDefaults(*) {
 ; Clear every configured key so all physical keys revert to their native OS
 ; behaviour (no tap remapping, no hold remapping).
 _TH_DisableAll(*) {
-	global TapHold
-	if !IsSet(TapHold) {
-		return
+	if IsSet(_TH_WriteTapHoldDisabled) {
+		try _TH_WriteTapHoldDisabled()
 	}
-	if TapHold.Has("keys") {
-		TapHold["keys"] := Map()
-	}
-	_TH_WriteTapHoldToml()
-	Reload
+	Reload()
 }
 
 ; ---- Callback classes ---------------------------------------------------------

@@ -998,8 +998,8 @@ if _GestureTomlData.Has("ax_order") && _GestureTomlData["ax_order"].Has("items")
     }
 }
 
-; Current action assignments — read from INI or defaults
-global GestureAssignments := Map(
+; Factory gesture slot actions — mirrors features_manifest.ahk defaults.
+global GESTURE_FACTORY_DEFAULTS := Map(
     "tap_3", "left_click_toggle",
     "swipe_3_up", "tab_new",
     "swipe_3_down", "tab_close",
@@ -1011,6 +1011,11 @@ global GestureAssignments := Map(
     "swipe_4_left", "desktop_prev",
     "swipe_4_right", "desktop_next",
 )
+
+; Current action assignments — read from config.toml or factory defaults.
+global GestureAssignments := Map()
+for _Slot, _Action in GESTURE_FACTORY_DEFAULTS
+    GestureAssignments[_Slot] := _Action
 
 ; Click hold mode state
 global GestureLeftClickHeld  := False

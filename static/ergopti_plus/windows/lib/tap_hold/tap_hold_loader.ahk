@@ -46,10 +46,21 @@
 ; as-is so a fresh install still gets working defaults after first boot.
 LoadTapHoldToml(FilePath, DefaultsFilePath := "") {
 	Result := Map("keys", Map(), "layers", Map())
+	InheritDefaults := true
+
+	; When the user file opts out via [tap_hold] inherit_defaults = false
+	; (written by « Tout désactiver »), skip the shipped defaults overlay so
+	; every tap/hold slot stays empty after reload.
+	if FileExist(FilePath) {
+		Meta := Map("keys", Map(), "layers", Map())
+		_TapHold_ParseFileInto(FilePath, Meta)
+		if Meta.Has("inherit_defaults")
+			InheritDefaults := !!Meta["inherit_defaults"]
+	}
 
 	; Load shared defaults first when the caller supplies the path. Missing
 	; defaults file is non-fatal (logs a debug notice and continues).
-	if (DefaultsFilePath != "") {
+	if (DefaultsFilePath != "" and InheritDefaults) {
 		if FileExist(DefaultsFilePath) {
 			try LoggerDebug("TapHoldLoader", "Loading tap-hold defaults from '{1}'…", DefaultsFilePath)
 			_TapHold_ParseFileInto(DefaultsFilePath, Result)
@@ -115,6 +126,14 @@ _TapHold_ParseFileInto(FilePath, Result) {
 		}
 		Key := KvMatch[1]
 		Value := TomlCoerceValue(KvMatch[2])
+
+		; [tap_hold] root metadata (e.g. inherit_defaults = false).
+		if (CurrentPath == "tap_hold") {
+			if (Key == "inherit_defaults")
+				Result["inherit_defaults"] := (Value == true or Value == 1
+					or Value == "true" or Value == "1")
+			continue
+		}
 
 		; tap_hold.keys.<id>
 		if RegExMatch(CurrentPath, "^tap_hold\.keys\.([A-Za-z0-9_]+)$", &KeyMatch) {
