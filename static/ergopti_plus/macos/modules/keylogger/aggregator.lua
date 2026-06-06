@@ -512,7 +512,7 @@ function M.walk_typing(entry)
 					if synth_type == "hotstring" then
 						_bump_app_day(date_str, app, "hs_chars", -1)
 						_bump_app_day(date_str, app, "hs_input_chars", 1)
-						if trigger_evt then
+						if trigger_evt and type(trigger_evt.delay) == "number" then
 							for _, t in ipairs(UI_PAUSE_BUCKETS_MS) do
 								if trigger_evt.delay <= t then
 									local bkey = app_day_key .. "\1" .. tostring(t)
@@ -528,7 +528,7 @@ function M.walk_typing(entry)
 					elseif synth_type == "llm" then
 						_bump_app_day(date_str, app, "llm_chars", -1)
 						_bump_app_day(date_str, app, "llm_input_chars", 1)
-						if trigger_evt then
+						if trigger_evt and type(trigger_evt.delay) == "number" then
 							for _, t in ipairs(UI_PAUSE_BUCKETS_MS) do
 								if trigger_evt.delay <= t then
 									local bkey = app_day_key .. "\1" .. tostring(t)

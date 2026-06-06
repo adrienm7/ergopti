@@ -309,6 +309,19 @@ helpers.describe("aggregator — walk_typing char counts", function()
 		helpers.assert_eq(ctx["SuiteApp"].p1, "c")
 	end)
 
+	helpers.it("synthetic event with missing delay does not crash (regression)", function()
+		-- This simulates a corrupt or malformed hotstring entry in today.log
+		local ok = pcall(function()
+			a.walk_typing({
+				app = "TestApp", timestamp = "2024-06-01 10:05:00.000",
+				events = {
+					{ "synth", nil, { s = true, t = "hotstring" } },
+				},
+			})
+		end)
+		helpers.assert_true(ok)
+	end)
+
 	helpers.it("backspace shrinks cur_word", function()
 		local a2 = helpers.load_with_stubs("modules.keylogger.aggregator")
 		package.loaded["modules.keylogger.sqlite_writer"] = { get_db = function() return nil end }
