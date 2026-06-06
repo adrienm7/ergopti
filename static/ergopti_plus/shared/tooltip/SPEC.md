@@ -14,6 +14,7 @@ static/ergopti_plus/shared/tooltip/
 ├── constants.toml   ← All numeric and color constants (canonical source)
 ├── tint.js          ← Pure HSL tint-mixing algorithm + test vectors
 ├── layout.js        ← Pure position resolution + canvas geometry + test vectors
+├── dequeue.js       ← Stacked row expiry / destacking logic + test vectors
 └── draw_calls.js    ← draw_calls[] IR type definitions and composer functions
 ```
 
@@ -267,6 +268,44 @@ by `combined_h`.
 
 ## 7. Timing and Auto-Dismiss
 
+### 7.1 Stacked hotstring destacking (per-row expiry)
+
+When a trigger produces multiple outputs with **distinct** display durations,
+the tooltip enters the **dequeue path** (canonical algorithm in `dequeue.js`):
+
+1. On first show, stamp each row with an absolute expiry using the effective
+   duration formula (§ 7.2).
+2. Render the full stack.
+3. When the earliest row expires, remove it and re-render the surviving rows.
+4. Repeat until no rows remain, then hide.
+
+**Example:** output1 delay 1 s, output2 delay 2 s (decrement 0.2 s):
+
+| Elapsed | Visible rows |
+|---|---|
+| 0 – 0.8 s | output1 + output2 (stacked) |
+| 0.8 – 1.8 s | output2 only |
+| ≥ 1.8 s | hidden |
+
+Rows with duration `0` never expire during a dequeue cycle (they stay until
+all finite rows have been pruned, or until an authoritative hide).
+
+When all rows share the same non-zero duration, the **simple path** applies:
+one global auto-hide timer (shortest duration wins) — used by the LLM tooltip
+and by hotstring previews where every category shares one delay.
+
+External hide requests (mouse move, lookup miss) are **suppressed** during an
+active dequeue cycle so longer rows are not killed when a shorter row expires.
+Authoritative hides (real keystroke, forced hide, new show) bypass the guard.
+
+| Driver | Implementation |
+|---|---|
+| AHK | `lib/tooltip.ahk` — `_TooltipDequeuePollFn`, `_TooltipDequeueActive` |
+| Hammerspoon | `ui/tooltip/dequeue.lua` + `ui/tooltip/tooltip_hotstring.lua` |
+| Reference | `dequeue.js:dequeueTestVectors()` |
+
+### 7.2 Effective duration
+
 From `constants.toml [timing]`:
 
 | Parameter | Value |
@@ -307,7 +346,8 @@ A driver is considered compliant with this spec when:
 - [ ] Position output matches `layout.js:layoutTestVectors()` exactly.
 - [ ] draw_calls[] IDs match the ordering in § 5.2.
 - [ ] Partial update path uses stable IDs (`"preds"`, `"info"`, `"model_info"`).
-- [ ] Auto-dismiss follows the timing formula in § 7.
+- [ ] Auto-dismiss follows the timing formula in § 7.2.
+- [ ] Stacked destacking matches `dequeue.js:dequeueTestVectors()`.
 - [ ] Any rendering exception falls back to hide (no ghost tooltips).
 
 ---
@@ -317,6 +357,7 @@ A driver is considered compliant with this spec when:
 - Constants: [`constants.toml`](./constants.toml)
 - Tint algorithm: [`tint.js`](./tint.js)
 - Layout engine: [`layout.js`](./layout.js)
+- Dequeue / destacking: [`dequeue.js`](./dequeue.js)
 - Draw-call IR: [`draw_calls.js`](./draw_calls.js)
 - AHK implementation: [`lib/tooltip.ahk`](../../windows/lib/tooltip.ahk),
   [`ui/tooltip_llm.ahk`](../../windows/ui/tooltip_llm.ahk),
