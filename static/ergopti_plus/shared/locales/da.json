@@ -2139,5 +2139,7 @@
 	"updater.update_dialog_open": "Åbn på GitHub",
 	"updater.update_dialog_title": "ErgoptiPlus — Installér opdatering",
 	"updater.version_message": "ErgoptiPlus {1}{2}\n\nÅbn udgivelsessiden på GitHub?",
-	"vscode.reload_required": "Genindlæs VSCode (Cmd+Shift+P > Reload Window) for at aktivere skriveudvidelsen"
+	"vscode.reload_required": "Genindlæs VSCode (Cmd+Shift+P > Reload Window) for at aktivere skriveudvidelsen",
+	"menu.debug.open_error_log": "Open error log",
+	"sg_actions.open_error_log": "📄 Error log"
 }

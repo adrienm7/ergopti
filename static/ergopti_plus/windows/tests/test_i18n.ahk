@@ -33,6 +33,17 @@ _I18nTestReset() {
 	_I18nCacheFrLoaded := false
 }
 
+; Pause/suspend regression for i18n (locales must load even if script paused; t() fallback must work)
+TestI18n_PauseSafe() {
+	_I18nTestReset()
+	; i18n init and t() must not depend on active keyboard state
+	Path := _I18nTmpJson("{""test.key"": ""valeur""}")
+	_I18nLoadFile("fr", Path)
+	AssertEqual("valeur", t("test.key"))
+	_I18nTestReset()
+}
+Test("i18n: pause/suspend must not break locale loading or t() fallback", TestI18n_PauseSafe)
+
 _I18nTmpJson(Content) {
 	Path := A_Temp . "\i18n_test_locale.json"
 	if FileExist(Path) {

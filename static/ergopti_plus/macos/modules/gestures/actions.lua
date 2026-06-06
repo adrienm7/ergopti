@@ -466,6 +466,20 @@ sg("open_today_log",                   function()
 	end)
 	pcall(hs.execute, string.format("open %q", path))
 end)
+sg("open_error_log",                   function()
+	local ok_p, path = pcall(function()
+		local ok_l, Logger = pcall(require, "lib.logger")
+		if ok_l and type(Logger) == "table" and type(Logger.ERRORS_LOG_FILE) == "string" and Logger.ERRORS_LOG_FILE ~= "" then
+			return Logger.ERRORS_LOG_FILE
+		end
+		local ok_u, utils = pcall(require, "lib.utils")
+		if ok_u and type(utils.get_logs_dir) == "function" then
+			return utils.get_logs_dir() .. "ErgoptiPlus_errors_" .. os.date("%Y-%m-%d") .. ".log"
+		end
+		return hs.configdir .. "/logs/ErgoptiPlus_errors_" .. os.date("%Y-%m-%d") .. ".log"
+	end)
+	pcall(hs.execute, string.format("open %q", path))
+end)
 
 -- Script management
 sg("script_pause_toggle",     function()
@@ -649,6 +663,7 @@ local LABELS = {
 	open_config                      = "⚙ Configuration",
 	open_logs_folder                 = "📁 Logs folder",
 	open_today_log                   = "📄 Today's log",
+	open_error_log                   = "📄 Error log",
 	script_pause_toggle              = "⏸/▶ Suspend / Resume",
 	script_reload                    = "↻ Reload",
 	script_save_reload               = "↻ Save and reload",
@@ -907,7 +922,7 @@ function M.get_sg_names()
 		"-", h("sg_actions.sg_order.header.files"),
 		"open_script_source", "open_personal_shortcuts",
 		"open_personal_hotstrings", "open_personal_info",
-		"open_config", "open_logs_folder", "open_today_log",
+		"open_config", "open_logs_folder", "open_today_log", "open_error_log",
 		"-", h("sg_actions.sg_order.header.script"),
 		"script_pause_toggle", "script_reload", "script_save_reload", "script_quit",
 		"-", h("sg_actions.sg_order.header.debug"),

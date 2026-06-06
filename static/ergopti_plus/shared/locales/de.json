@@ -2139,5 +2139,7 @@
 	"updater.update_dialog_open": "Auf GitHub öffnen",
 	"updater.update_dialog_title": "ErgoptiPlus — Update installieren",
 	"updater.version_message": "ErgoptiPlus {1}{2}\n\nReleases-Seite auf GitHub öffnen?",
-	"vscode.reload_required": "Bitte VSCode neu laden (Cmd+Shift+P > Reload Window), um die Tipp-Erweiterung zu aktivieren"
+	"vscode.reload_required": "Bitte VSCode neu laden (Cmd+Shift+P > Reload Window), um die Tipp-Erweiterung zu aktivieren",
+	"menu.debug.open_error_log": "Open error log",
+	"sg_actions.open_error_log": "📄 Error log"
 }

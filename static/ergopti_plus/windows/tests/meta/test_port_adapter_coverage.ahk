@@ -242,3 +242,6 @@ _MetaRunSharedPurityTests() {
 	Test("meta shared purity: no direct OS API in _shared/ (" . ScannedFiles . " files)", _ResultSharedPurity)
 }
 _MetaRunSharedPurityTests()
+
+; Encore plus (diagnostic + keylogger/llm/gestures/keymap/karabiner/adapters/timer/active_app/features): these modules + healthcheck collectors must be explicitly pause-guarded and diagnostic-visible (always-readable for paused users troubleshooting). Extend coverage lists and require_state notes accordingly.
+; Would have caught: diagnostic missing keylogger aggregator counts or LLM profile under pause, or gesture conflicts corrupting after suspend, or timer stats wrong in healthcheck.

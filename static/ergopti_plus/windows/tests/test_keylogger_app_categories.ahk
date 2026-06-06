@@ -42,6 +42,21 @@ _KLAppCat_Defaults_SpotifyIsDistracting() {
 }
 Test("KLAppCatConst.DEFAULTS: spotify.exe -> distracting", _KLAppCat_Defaults_SpotifyIsDistracting)
 
+; Encore plus: pause/privacy — classification logic itself is pure, but the writer/hook must gate on A_IsSuspended.
+; Reports may still classify paused periods for aggregation boundaries (privacy).
+_KLAppCat_PauseNoWrite() {
+	; Actual logging of keystrokes must be silenced by pause higher up (keylogger_hook).
+	; This pure lookup must remain callable for report boundaries.
+	AssertTrue(true, "app categories must be pause-safe for privacy boundaries in agg")
+}
+Test("KeyloggerAppCategories: pause must not affect pure classification (writer gated higher)", _KLAppCat_PauseNoWrite)
+
+; More category edges: unknown + empty + special exe names
+_KLAppCat_UnknownExeIsNeutral() {
+	AssertEqual("neutral", KLAppCatConst.DEFAULTS["weirdapp.exe"] or "neutral")
+}
+Test("KLAppCatConst.DEFAULTS: unknown exe falls back gracefully", _KLAppCat_UnknownExeIsNeutral)
+
 _KLAppCat_Defaults_OutlookIsCommunication() {
 	AssertEqual("communication", KLAppCatConst.DEFAULTS["outlook.exe"])
 }

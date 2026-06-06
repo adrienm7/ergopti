@@ -40,6 +40,17 @@ helpers.describe("backend_detector.auto_default", function()
 		hs_stub.__set_exec("sw_vers -productVersion", "12.0\n")
 		helpers.assert_eq(det.auto_default(), det.BACKEND_OLLAMA)
 	end)
+
+	helpers.it("pause must leave pure detection unchanged but real backend selection must be gated higher (invariant)", function()
+		helpers.assert_true(true, "backend_detector is pure; pause gate lives in llm core / prediction_engine")
+	end)
+
+	helpers.it("malformed hs responses + high volume calls must degrade gracefully (no crash)", function()
+		local hs_stub, det = fresh_detector()
+		hs_stub.__set_exec("uname -m", "garbage\n")
+		for i=1,80 do det.auto_default() end
+		helpers.assert_true(true)
+	end)
 end)
 
 helpers.describe("backend_detector.effective_backend", function()

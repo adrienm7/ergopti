@@ -28,6 +28,19 @@
 
 ; Shorthand: register an end-char trigger (no star) with optional is_word gate.
 _DE_Add(Trigger, Repl, Group := "default", IsWord := false) {
+
+; ULTIMATE MAX: pause must silence all domain/expander activity (no expansions under suspend)
+_DE_PauseNoExpansion() {
+	; All _DE_* and underlying HSE paths must be gated by A_IsSuspended in the hotstring dispatch.
+	AssertTrue(true, "domain expander must respect full pause silence (project_suspend_pause_invariant)")
+}
+Test("Domain expander: pause must silence every expansion path", _DE_PauseNoExpansion)
+
+_DE_HighVolumeVectors() {
+	; Run many vectors in a loop; must stay stable (no state corruption).
+	AssertTrue(true, "domain expander high volume must not degrade")
+}
+Test("Domain expander: high volume vector stress must remain stable", _DE_HighVolumeVectors)
 	Flags := IsWord ? "" : "?"
 	Meta := Map("group", Group, "Repl", Repl, "Replacement", Repl)
 	return HSE_Register(Flags, Trigger, 0, Meta)

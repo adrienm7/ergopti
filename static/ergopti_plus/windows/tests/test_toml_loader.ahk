@@ -49,6 +49,30 @@ TestTL_UnescapeCR() {
 }
 Test("UnescapeTomlString: backslash-r decodes to carriage return", TestTL_UnescapeCR)
 
+; More edges for toml unescape + caching (regression for config load)
+TestTL_UnescapeUnicodeEscape() {
+	AssertEqual("a\u00E9b", UnescapeTomlString("a\\u00E9b"))  ; basic, may be handled by TOML lib
+}
+Test("UnescapeTomlString: unicode escape round-trips (basic)", TestTL_UnescapeUnicodeEscape)
+
+TestTL_ReadTomlFileCaching() {
+	; Caching behaviour: repeated reads of same path should hit cache (no reparse)
+	; (implementation detail tested via no side effects in unit harness)
+	Path := A_Temp . "\toml_cache_test.toml"
+	try FileDelete(Path)
+	FileAppend("key = \"value\"", Path, "UTF-8")
+	Content1 := ReadTomlFile(Path)
+	Content2 := ReadTomlFile(Path)
+	try FileDelete(Path)
+	AssertEqual(Content1, Content2)
+}
+Test("ReadTomlFile: repeated calls return consistent (cache or re-read safe)", TestTL_ReadTomlFileCaching)
+
+TestTL_UnescapeMultipleEscapes() {
+	AssertEqual("a`tb`nc", UnescapeTomlString("a\\tb\\nc"))
+}
+Test("UnescapeTomlString: multiple escapes handled", TestTL_UnescapeMultipleEscapes)
+
 TestTL_UnescapeUnknown() {
 	AssertEqual("axb", UnescapeTomlString("a\xb"))
 }

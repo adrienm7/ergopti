@@ -2139,5 +2139,7 @@
 	"updater.update_dialog_open": "فتح على GitHub",
 	"updater.update_dialog_title": "ErgoptiPlus — تثبيت التحديث",
 	"updater.version_message": "ErgoptiPlus {1}{2}\n\nهل تريد فتح صفحة الإصدارات في GitHub؟",
-	"vscode.reload_required": "يرجى إعادة تحميل VSCode (Cmd+Shift+P > Reload Window) لتفعيل امتداد الكتابة"
+	"vscode.reload_required": "يرجى إعادة تحميل VSCode (Cmd+Shift+P > Reload Window) لتفعيل امتداد الكتابة",
+	"menu.debug.open_error_log": "Open error log",
+	"sg_actions.open_error_log": "📄 Error log"
 }

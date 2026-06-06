@@ -27,6 +27,9 @@
 ---    based on module tag matching, giving focused tail targets per feature area.
 --- 8. Timestamp format: HHhMMminSSsNNNms — matches the AHK driver exactly so both
 ---    log files look identical when tailed side by side.
+--- 9. Errors-only sink: WARNING and ERROR lines are also written to
+---    ErgoptiPlus_errors_YYYY-MM-DD.log (daily rotation + purge). Provides a
+---    small dedicated file for quick triage of failures.
 --- ==============================================================================
 
 local M = {}
@@ -39,6 +42,11 @@ local _gettime = (_ok_socket and _socket and _socket.gettime) or os.time
 -- Main unified log file. Set to a safe early-boot fallback; overridden by
 -- M.init_log_path() once the user config directory is known.
 M.UNIFIED_LOG_FILE = "/tmp/ErgoptiPlus_boot.log"
+
+-- Dedicated errors-only log (WARNING + ERROR levels). Daily file under the
+-- driver logs directory. Purpose: quick triage of problems without the volume
+-- of the full unified daily log.
+M.ERRORS_LOG_FILE = "/tmp/ErgoptiPlus_errors_boot.log"
 
 -- Log directory resolved after M.init_log_path(); used by sub-file fan-out.
 local _log_dir = "/tmp/"
@@ -278,6 +286,7 @@ function M.init_log_path(config_dir, max_age_days)
 	end
 
 	M.UNIFIED_LOG_FILE = log_dir .. "ErgoptiPlus_" .. os.date("%Y-%m-%d") .. ".log"
+	M.ERRORS_LOG_FILE = log_dir .. "ErgoptiPlus_errors_" .. os.date("%Y-%m-%d") .. ".log"
 
 	-- Load sub-file routing rules from shared/logger/sub_files.toml so adding a
 	-- new topical log requires only a TOML edit, not a code change in both drivers.
@@ -516,6 +525,21 @@ local function _log(variant_key, module_name, msg, ...)
 	if _test_sink then pcall(_test_sink, console_line) end
 
 	_write_to_file(stamp, line)
+
+	-- Dedicated errors-only log (WARNING + ERROR). Separate open/close per
+	-- write (like sub-files) so a crash never leaks a handle. This file stays
+	-- small and is the recommended first place to look when something goes
+	-- wrong without drowning in the full daily unified log.
+	if variant.level >= M.LEVELS.WARNING then
+		local err_full = stamp .. " " .. line .. "\n"
+		pcall(function()
+			local f = io.open(M.ERRORS_LOG_FILE, "a")
+			if f then
+				f:write(err_full)
+				f:close()
+			end
+		end)
+	end
 end
 
 

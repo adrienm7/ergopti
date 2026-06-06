@@ -526,6 +526,8 @@ function M.generate(ctx, menu_mods, actions)
 			table.insert(debug_items, { title = i18n.get("menu.debug.open_logs"), fn = actions.open_logs })
 		elseif id == "open_today_log" then
 			table.insert(debug_items, { title = i18n.get("menu.debug.open_today_log"), fn = actions.open_today_log })
+		elseif id == "open_error_log" then
+			table.insert(debug_items, { title = i18n.get("menu.debug.open_error_log"), fn = actions.open_error_log })
 		elseif id == "healthcheck" then
 			table.insert(debug_items, { title = i18n.get("menu.debug.healthcheck"), fn = function() healthcheck.show_window() end })
 		end

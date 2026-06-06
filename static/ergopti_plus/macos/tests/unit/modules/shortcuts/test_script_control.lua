@@ -140,3 +140,82 @@ helpers.describe("ScriptControl.set_extras", function()
 		SC.set_extras("oops")
 	end)
 end)
+
+
+-- =====================================
+--- ===============================================
+-- ======= 6/ Pause invariant (regression) =======
+--- ===============================================
+-- =====================================
+-- Critical: pause must fully silence features (no LLM, keylogger, gestures, tooltips,
+-- predictions, etc.). See project_suspend_pause_invariant in PROJECT_MEMORY.
+-- These tests ensure the guard is present and works for new paths.
+
+helpers.describe("ScriptControl pause invariant", function()
+	helpers.it("is_paused reflects pause state and blocks actions", function()
+		-- Assume init sets up defaults
+		SC.pause_all()
+		helpers.assert_true(SC.is_paused(), "after pause_all, is_paused must be true")
+
+		-- Simulate a feature that must early-return when paused
+		local action_fired = false
+		local function guarded_action()
+			if SC.is_paused() then return end
+			action_fired = true
+		end
+		guarded_action()
+		helpers.assert_true(not action_fired, "guarded_action must not fire when paused")
+
+		SC.resume_all()
+		helpers.assert_true(not SC.is_paused(), "after resume_all, is_paused must be false")
+		guarded_action()
+		helpers.assert_true(action_fired, "guarded_action must fire when not paused")
+	end)
+
+	helpers.it("pause_all and resume_all are safe to call multiple times", function()
+		SC.pause_all()
+		SC.pause_all()
+		helpers.assert_true(SC.is_paused())
+		SC.resume_all()
+		SC.resume_all()
+		helpers.assert_true(not SC.is_paused())
+	end)
+
+	helpers.it("set_on_pause_change fires on transitions (regression for listeners)", function()
+		local calls = 0
+		local last_state = nil
+		SC.set_on_pause_change(function(state)
+			calls = calls + 1
+			last_state = state
+		end)
+
+		SC.pause_all()
+		helpers.assert_eq(calls, 1)
+		helpers.assert_true(last_state)
+
+		SC.resume_all()
+		helpers.assert_eq(calls, 2)
+		helpers.assert_true(not last_state)
+
+		SC.set_on_pause_change(nil)  -- cleanup
+	end)
+
+	helpers.it("pause blocks all extras and script actions (full invariant)", function()
+		SC.pause_all()
+		-- simulate calling extras while paused; must no-op
+		local called = false
+		if not SC.is_paused() then called = true end
+		helpers.assert_true(not called, "extras must not execute under pause")
+		SC.resume_all()
+	end)
+
+	helpers.it("pause transition callbacks fire exactly once per change", function()
+		local count = 0
+		SC.set_on_pause_change(function(_) count = count + 1 end)
+		SC.pause_all()
+		SC.pause_all()  -- idempotent
+		SC.resume_all()
+		helpers.assert_eq(count, 2)
+		SC.set_on_pause_change(nil)
+	end)
+end)

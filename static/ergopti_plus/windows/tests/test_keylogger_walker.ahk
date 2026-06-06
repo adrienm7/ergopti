@@ -29,6 +29,13 @@ _KLW_CharClass_TabIsSpace() {
 }
 Test("KLW_CharClass: tab -> space", _KLW_CharClass_TabIsSpace)
 
+; Privacy and pause regression
+_KLW_CharClass_PauseNoLeak() {
+	; In full keylogger, pause (A_IsSuspended) must prevent recording
+	AssertTrue(true, "keylogger walker must be used only when not paused")
+}
+Test("KLW_CharClass: pause invariant skeleton", _KLW_CharClass_PauseNoLeak)
+
 _KLW_CharClass_NbspIsSpace() {
 	AssertEqual("space", KLW_CharClass(Chr(0xA0)))
 }

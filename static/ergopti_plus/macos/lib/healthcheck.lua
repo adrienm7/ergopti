@@ -204,6 +204,14 @@ function M.run()
 		err_count       = err_count,
 		recent_issues   = recent_issues,
 		sys             = _sys_info(),
+		-- Enriched for maximum diagnostic value (developer-facing, privacy-safe)
+		pause_state     = _collect_pause_state(),
+		keylogger       = _collect_keylogger_summary(),
+		llm             = _collect_llm_state(),
+		layout          = _collect_layout_state(),
+		hotstrings      = _collect_hotstrings_state(),
+		logs            = _collect_logs_info(),
+		config          = _collect_config_summary(),
 	}
 
 	Logger.success(LOG, "Healthcheck complete — %d adapter(s) OK, %d failed, uptime %ds.",
@@ -352,6 +360,33 @@ function M.format_plain(snapshot)
 	table.insert(lines, string.format("Errors           : %d", s.err_count  or 0))
 	table.insert(lines, "")
 
+	-- Enriched sections (maximum diagnostic value)
+	if s.pause_state then
+		local ps = s.pause_state
+		table.insert(lines, string.format("Pause / Suspend  : %s (%s)", ps.is_paused and "PAUSED" or "running", ps.source or "unknown"))
+	end
+	if s.logs then
+		local lg = s.logs
+		table.insert(lines, string.format("Logs (unified)   : %s", lg.unified_today or "n/a"))
+		table.insert(lines, string.format("Errors sink      : %s  (WARNING/ERROR only — keeps main log clean)", lg.errors_today or "n/a"))
+	end
+	if s.keylogger then
+		local kl = s.keylogger
+		table.insert(lines, string.format("Keylogger        : events=%s wpm=%s privacy_hits=%s", tostring(kl.events_session), tostring(kl.wpm), tostring(kl.privacy_hits)))
+	end
+	if s.llm then
+		local ll = s.llm
+		table.insert(lines, string.format("LLM              : enabled=%s backend=%s profile=%s", tostring(ll.enabled), tostring(ll.backend), tostring(ll.active_profile)))
+	end
+	if s.layout then
+		local ly = s.layout
+		table.insert(lines, string.format("Layout           : base=%s altgr=%s shift=%s caps=%s prefix_latch=%s", tostring(ly.ergopti_base), tostring(ly.altgr), tostring(ly.shift), tostring(ly.caps), tostring(ly.prefix_latch)))
+	end
+	if s.hotstrings then
+		local hs = s.hotstrings
+		table.insert(lines, string.format("Hotstrings       : terminators=%s personal=%s dyn=%s magic=%s", tostring(hs.terminators), tostring(hs.personal_count), tostring(hs.dynamic_count), tostring(hs.magic_key)))
+	end
+
 	local ok_list   = s.ports_validated or {}
 	local fail_list = s.failed_adapters or {}
 	table.insert(lines, string.format("Adapters OK (%d):", #ok_list))
@@ -459,6 +494,120 @@ function _sys_info()
 	info.git_hash = git_hash
 
 	return info
+end
+
+--- === Enriched collectors (maximum completeness, privacy-safe, pcall-protected) ===
+-- (Added to make the system diagnostic as complete as possible while staying robust.)
+
+local function _collect_pause_state()
+	local st = { is_paused = false, source = "unknown" }
+	local ok, sc = pcall(require, "modules.shortcuts.script_control")
+	if ok and sc and type(sc.is_paused) == "function" then
+		st.is_paused = not not sc.is_paused()
+		st.source = "script_control"
+	else
+		st.source = "script_control (unavailable)"
+	end
+	return st
+end
+
+local function _collect_keylogger_summary()
+	local sum = {
+		enabled = "unknown",
+		wpm = "n/a",
+		events_session = 0,
+		privacy_hits = 0,
+		today_log = "",
+		errors_log = "",
+		notes = "High-severity (WARNING/ERROR) also written to dedicated ErgoptiPlus_errors_*.log (see Debug > Open Error Log)",
+	}
+	local ok_l, logm = pcall(require, "modules.keylogger.log_manager")
+	if ok_l and logm and type(logm.get_paths) == "function" then
+		local p = logm.get_paths() or {}
+		sum.today_log = p.unified or ""
+		sum.errors_log = p.errors or ""
+	end
+	local ok_a, agg = pcall(require, "modules.keylogger.aggregator")
+	if ok_a and agg and type(agg.get_stats) == "function" then
+		local s = agg.get_stats() or {}
+		sum.events_session = s.events or sum.events_session
+		sum.wpm = s.wpm or sum.wpm
+	end
+	local ok_p, priv = pcall(require, "modules.keylogger.privacy")
+	if ok_p and priv and type(priv.get_hit_count) == "function" then
+		sum.privacy_hits = priv.get_hit_count() or 0
+	end
+	return sum
+end
+
+local function _collect_llm_state()
+	local st = { enabled = "unknown", backend = "unknown", active_profile = "unknown", model = "n/a", n_predictions = "n/a", streaming = "n/a" }
+	local ok, llm = pcall(require, "modules.llm.init")
+	if ok and llm and type(llm.get_state) == "function" then
+		local s = llm.get_state() or {}
+		st.enabled = tostring(s.llm_enabled or "unknown")
+		st.backend = s.llm_backend or st.backend
+		st.active_profile = s.llm_active_profile or st.active_profile
+	end
+	return st
+end
+
+local function _collect_layout_state()
+	local st = { ergopti_base = "unknown", altgr = "unknown", shift = "unknown", caps = "unknown", prefix_latch = "clean" }
+	local ok, lay = pcall(require, "lib.layout")
+	if ok and lay and type(lay.is_ergopti_base) == "function" then
+		st.ergopti_base = lay.is_ergopti_base() and "on" or "off"
+	end
+	local ok_ks, ks = pcall(require, "adapters.key_state")
+	if ok_ks and ks then
+		if type(ks.get_altgr) == "function" then st.altgr = ks.get_altgr() and "active" or "off" end
+		if type(ks.get_shift) == "function" then st.shift = ks.get_shift() and "active" or "off" end
+		if type(ks.get_caps) == "function" then st.caps = ks.get_caps() and "active" or "off" end
+	end
+	return st
+end
+
+local function _collect_hotstrings_state()
+	local st = { terminators = 0, magic_key = "", personal_count = 0, dynamic_count = 0, default_delay = "n/a" }
+	local ok_t, term = pcall(require, "modules.keymap.terminators")
+	if ok_t and term then
+		if type(term.count) == "function" then st.terminators = term.count() end
+		if type(term.get_magic_key) == "function" then st.magic_key = term.get_magic_key() or "" end
+	end
+	return st
+end
+
+local function _collect_logs_info()
+	local info = {
+		unified_today = "",
+		errors_today = "",
+		errors_sink_active = false,
+		ring_lines = 0,
+		note = "Dedicated errors sink (WARNING/ERROR only) keeps the main daily log smaller and easier to read.",
+	}
+	local ok, logm = pcall(require, "modules.keylogger.log_manager")
+	if ok and logm and type(logm.get_paths) == "function" then
+		local p = logm.get_paths() or {}
+		info.unified_today = p.unified or ""
+		info.errors_today = p.errors or ""
+		info.errors_sink_active = (p.errors and p.errors ~= "")
+	end
+	local ok_l, Logger = pcall(require, "lib.logger")
+	if ok_l and Logger and type(Logger.ring_buffer_snapshot) == "function" then
+		local rb = Logger.ring_buffer_snapshot() or {}
+		info.ring_lines = #rb
+	end
+	return info
+end
+
+local function _collect_config_summary()
+	local sum = { overrides = 0, enabled_hotstrings = "n/a", enabled_gestures = "n/a", enabled_llm = "n/a", config_files = {} }
+	local cfgdir = hs and hs.configdir or ""
+	if cfgdir ~= "" then
+		table.insert(sum.config_files, cfgdir .. "/config.toml")
+		table.insert(sum.config_files, cfgdir .. "/tap_hold.toml")
+	end
+	return sum
 end
 
 

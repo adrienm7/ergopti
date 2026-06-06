@@ -2378,6 +2378,8 @@ initMenu() {
 			RegisterMenuItem(DebuggingMenu, t("menu.debug.open_logs"),     OpenLogsFolder)
 		} else if Id == "open_today_log" {
 			RegisterMenuItem(DebuggingMenu, t("menu.debug.open_today_log"), OpenTodayLog)
+		} else if Id == "open_error_log" {
+			RegisterMenuItem(DebuggingMenu, t("menu.debug.open_error_log"), OpenErrorLog)
 		} else if Id == "healthcheck" {
 			RegisterMenuItem(DebuggingMenu, t("menu.debug.healthcheck"),   ShowHealthCheck)
 		}
@@ -2430,6 +2432,23 @@ OpenTodayLog(*) {
 			? _ConfigDir . _AhkSubDir . "logs\"
 			: A_ScriptDir . "\logs\"
 		Path := LogDir . "ErgoptiPlus_" . FormatTime(, "yyyy-MM-dd") . ".log"
+	}
+	Run('notepad.exe "' . Path . '"')
+}
+
+; Opens today's errors-only log (WARNING + ERROR lines) in Notepad.
+; LOGGER_ERRORS_LOG_PATH is maintained by the logger (daily, driver-scoped).
+; Falls back to computing the path under the logs dir if the global is not set yet.
+OpenErrorLog(*) {
+	global LOGGER_ERRORS_LOG_PATH, _AhkSubDir
+	Path := (IsSet(LOGGER_ERRORS_LOG_PATH) and LOGGER_ERRORS_LOG_PATH != "")
+		? LOGGER_ERRORS_LOG_PATH
+		: ""
+	if Path = "" or !FileExist(Path) {
+		LogDir := (IsSet(_ConfigDir) and _ConfigDir != "")
+			? _ConfigDir . _AhkSubDir . "logs\"
+			: A_ScriptDir . "\logs\"
+		Path := LogDir . "ErgoptiPlus_errors_" . FormatTime(, "yyyy-MM-dd") . ".log"
 	}
 	Run('notepad.exe "' . Path . '"')
 }

@@ -431,6 +431,9 @@ platform = "all"
 [sg_actions.open_today_log]
 platform = "all"
 
+[sg_actions.open_error_log]
+platform = "all"
+
 # --- Gestion du script ---
 
 [sg_actions.script_pause_toggle]
@@ -753,6 +756,7 @@ items = [
     "open_config",
     "open_logs_folder",
     "open_today_log",
+    "open_error_log",
     "--",
     "#script",
     "script_pause_toggle",

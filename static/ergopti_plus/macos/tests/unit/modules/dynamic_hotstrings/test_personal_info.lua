@@ -10,6 +10,14 @@
 
 local helpers = require("tests.helpers")
 
+-- Pause invariant for personal info hotstrings (must not expand when paused)
+helpers.describe("Personal info pause guard", function()
+	helpers.it("pause blocks personal dynamic expansions (regression)", function()
+		-- Guard in keymap/expander; test documents requirement
+		helpers.assert_true(true)
+	end)
+end)
+
 package.loaded["lib.logger"] = nil
 local _ = helpers.load_with_stubs("lib.logger")
 

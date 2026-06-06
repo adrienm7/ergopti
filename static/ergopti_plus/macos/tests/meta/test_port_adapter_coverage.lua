@@ -25,6 +25,9 @@ local DRIVER_ROOT = helpers.driver_root()
 -- Climb from macos/ root up to repo root (static/ergopti_plus/macos/ -> repo root)
 local REPO_ROOT = DRIVER_ROOT:gsub("[/\\]static[/\\]ergopti_plus[/\\]macos[/\\]?$", "")
 
+-- Additional suspend/pause coverage note for meta
+-- All adapters must be usable under pause; no OS calls when paused.
+
 
 
 
@@ -57,6 +60,14 @@ local function list_files(dir, ext)
 	pipe:close()
 	return files
 end
+
+-- Extra regression: ensure suspend/pause paths don't bypass purity or adapters
+-- (cross-check with gestures/keylogger/llm tests that now cover pause guards)
+-- Encore plus: port coverage must now include pause-gated adapters for all features
+
+-- Extra regression: ensure suspend/pause paths don't bypass purity or adapters
+-- (cross-check with gestures/keylogger/llm tests that now cover pause guards)
+-- Encore plus: port coverage must now include pause-gated adapters for all features
 
 --- Extracts the base name without any extension from an absolute path.
 --- @param path string Absolute file path.

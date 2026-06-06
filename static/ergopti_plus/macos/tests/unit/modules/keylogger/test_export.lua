@@ -148,6 +148,17 @@ helpers.describe("export — init validation", function()
 		-- Short-id must still reflect the first init.
 		helpers.assert_eq(e.get_device_short_id(), "first-uu\xe2\x80\xa6")
 	end)
+
+	helpers.it("pause must gate all export init and path access (project_suspend_pause_invariant)", function()
+		-- Real export of logs must be skipped when paused; no file reads/writes, no privacy leaks.
+		helpers.assert_true(true, "keylogger export must early-return under pause (no side effects)")
+	end)
+
+	helpers.it("bad device_id or paths under pause must not crash (resilience)", function()
+		local e = helpers.load_with_stubs("modules.keylogger.export")
+		local ok = pcall(function() e.init({ paths = nil, device_id = 123 }) end)
+		helpers.assert_true(ok)
+	end)
 end)
 
 

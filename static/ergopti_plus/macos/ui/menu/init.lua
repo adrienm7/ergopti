@@ -700,6 +700,14 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 				end
 				pcall(hs.execute, string.format("open %q", path))
 			end,
+			open_error_log            = function()
+				local Logger = require("lib.logger")
+				local path = Logger.ERRORS_LOG_FILE
+				if type(path) ~= "string" or path == "" then
+					path = logs_dir() .. "ErgoptiPlus_errors_" .. os.date("%Y-%m-%d") .. ".log"
+				end
+				pcall(hs.execute, string.format("open %q", path))
+			end,
 			show_setup_wizard         = function()
 				local ok, ob = pcall(require, "ui.onboarding")
 				if ok and type(ob.run_from_menu) == "function" then
