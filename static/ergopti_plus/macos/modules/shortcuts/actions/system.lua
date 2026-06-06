@@ -92,7 +92,6 @@ local SPOTLIGHT_TAP_DELAY_SEC       = 0.05 -- Delay before arming the mouseMoved
 local SPOTLIGHT_TELEPORT_DURATION_S = 3    -- Shorter duration when triggered by teleport
 
 local awake_timer      = nil
-local awake_alert_id   = nil
 local awake_active     = false
 local awake_origin_pos = nil
 -- Timestamp (seconds since epoch) when keep-awake was last toggled ON; used
@@ -191,11 +190,6 @@ function M.toggle_awake()
 			awake_timer = nil
 		end
 
-		if awake_alert_id then
-			pcall(hs.alert.closeSpecific, awake_alert_id)
-			awake_alert_id = nil
-		end
-
 		-- Log the keep-awake duration as a special passive period AND tag the
 		-- focused app so the dashboard can subtract it from per-app stats
 		-- when the user opted out of counting keep-awake time.
@@ -217,7 +211,8 @@ function M.toggle_awake()
 		end
 
 		Logger.info(LOG, "Keep-awake disabled.")
-		pcall(hs.alert.show, i18n.get("shortcuts.keep_awake_off"), 2)
+		pcall(hs.alert.closeAll, 0.0)
+		pcall(hs.alert.show, i18n.get("shortcuts.keep_awake_off"), 2.0)
 	else
 		awake_active = true
 		awake_started_at = hs.timer.secondsSinceEpoch()
@@ -229,8 +224,8 @@ function M.toggle_awake()
 		end
 		math.randomseed(os.time())
 
-		local ok, aid = pcall(hs.alert.show, i18n.get("shortcuts.keep_awake_on"), math.huge)
-		if ok then awake_alert_id = aid end
+		pcall(hs.alert.closeAll, 0.0)
+		pcall(hs.alert.show, i18n.get("shortcuts.keep_awake_on"), 2.0)
 
 		-- Record the current mouse position as the jitter origin
 		local ok_pos, pos = pcall(hs.mouse.absolutePosition)
@@ -267,6 +262,14 @@ function M.toggle_awake()
 			end
 
 			local type = _ev:getType()
+			-- Ignore key presses with modifiers to prevent the trigger shortcut
+			-- from instantly deactivating the keep-awake mode.
+			if type == ev.keyDown then
+				local flags = _ev:getFlags()
+				if flags.cmd or flags.alt or flags.ctrl then
+					return false
+				end
+			end
 			-- If it's a mouse movement, only deactivate if it moved beyond the jitter area
 			if type == ev.mouseMoved and awake_origin_pos then
 				local pos = _ev:location()
@@ -283,10 +286,8 @@ function M.toggle_awake()
 				pcall(function() awake_timer:stop() end)
 				awake_timer = nil
 			end
-			if awake_alert_id then
-				pcall(hs.alert.closeSpecific, awake_alert_id)
-				awake_alert_id = nil
-			end
+
+			pcall(hs.alert.closeAll, 0.0)
 
 			-- Log duration so the dashboard accounts for the keep-awake period
 			if awake_started_at then
@@ -331,10 +332,7 @@ function M.stop_awake()
 		awake_timer = nil
 	end
 
-	if awake_alert_id then
-		pcall(hs.alert.closeSpecific, awake_alert_id)
-		awake_alert_id = nil
-	end
+	pcall(hs.alert.closeAll, 0.0)
 end
 
 --- Toggles the hardware CapsLock state by synthesising a raw CapsLock keystroke.
