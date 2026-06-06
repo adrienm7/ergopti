@@ -50,7 +50,8 @@ global DYN_HOTSTRINGS_DEFAULT_DELAY := 2.0
 ; TOML _meta or user override sets a color. Lives next to the global default
 ; so all defaults are visible in one place.
 global HOTSTRINGS_CATEGORY_DEFAULT_COLORS := Map(
-    "personal", "#6e6e73",  ; Gray — neutral baseline so user-added entries stand out only when the user picks a colour themselves
+    "personal",       "#6e6e73",  ; Gray — neutral baseline so user-added entries stand out only when the user picks a colour themselves
+    "llm_prediction", "#AD61FF",  ; Violet — AI loading / in-flight tooltip (macOS ai_loading; overridable in hotstring settings)
 )
 
 ; Shared terminator catalogue instance — the single source of truth for the

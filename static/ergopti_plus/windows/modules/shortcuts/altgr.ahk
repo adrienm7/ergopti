@@ -150,10 +150,13 @@ AltGrCapsLockShortcut() {
 ; the combo unless the feature is enabled AND the press came through a real
 ; AltGr / Kana modifier.
 _RegisterAltGrShortcutsHotkeys() {
+    ; I3 — same priority as script-management AltGr combos. Custom prefix combos
+    ; (SC138 & suffix) already use the keyboard hook; a leading ``$`` is invalid.
+    opts := "I3"
     HotIf((*) => IsAltGrLAltEnabled() and IsRealAltGrPress())
-    Hotkey("SC138 & SC038", (*) => AltGrLAltShortcut(), "I2")
+    Hotkey("SC138 & SC038", (*) => AltGrLAltShortcut(), opts)
     HotIf((*) => IsAltGrCapsLockEnabled() and IsRealAltGrPress())
-    Hotkey("SC138 & SC03A", (*) => AltGrCapsLockShortcut(), "I2")
+    Hotkey("SC138 & SC03A", (*) => AltGrCapsLockShortcut(), opts)
     HotIf()
 }
 

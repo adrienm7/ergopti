@@ -2,6 +2,8 @@
 
 ; ==============================================================================
 ; MODULE: Hotstrings Config Tests
+; RUN:    AutoHotkey64.exe run_hotstrings_config.ahk  (not this file directly —
+;         it has no test framework; run_all.ahk also includes this suite).
 ; DESCRIPTION:
 ; Covers the override-file parser, the resolution cascade
 ; (user.section → user.file → toml.section → toml.file → GLOBAL_DEFAULT_DELAY)
@@ -152,6 +154,15 @@ TestHotstringsConfig_PersonalCategoryFallsBackToBaseline() {
 }
 Test("HotstringsConfig: personal category falls back to its per-category baseline",
     TestHotstringsConfig_PersonalCategoryFallsBackToBaseline)
+
+TestHotstringsConfig_LlmPredictionVioletDefault() {
+    _HCfgTestReset()
+    R := HotstringsResolve("llm_prediction", "")
+    AssertEqual(HOTSTRINGS_CATEGORY_DEFAULT_COLORS["llm_prediction"], R.Color,
+        "llm_prediction category defaults to violet AI loading tint")
+}
+Test("HotstringsConfig: llm_prediction category defaults to violet AI tint",
+    TestHotstringsConfig_LlmPredictionVioletDefault)
 
 TestHotstringsConfig_ResolveTomlFile() {
     _HCfgTestReset()

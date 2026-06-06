@@ -395,10 +395,8 @@ TOML_RenderKey(k) {
 }
 
 TOML_RenderValue(v) {
-    if (v = true)
-        return "true"
-    if (v = false)
-        return "false"
+    ; Numbers before booleans: in AHK, ``false`` is integer 0, so ``0 = false``
+    ; is true and would serialize pred_indent=0 as ``false``.
     if (v is Array) {
         parts := []
         for s in v
@@ -415,8 +413,10 @@ TOML_RenderValue(v) {
             return Format("{:.10g}", v)
         return String(v)
     }
-    ; AHK boolean stored as 0/1 reaches us as a number above; everything
-    ; else is a string.
+    if (v = true)
+        return "true"
+    if (v = false)
+        return "false"
     return TOML_RenderString(String(v))
 }
 

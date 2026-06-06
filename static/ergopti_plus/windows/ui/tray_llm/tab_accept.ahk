@@ -39,9 +39,7 @@
 ; The hotkey is context-sensitive: active only when the tooltip is shown.
 #HotIf LLM_Tooltip_GetText() != ""
 Tab:: {
-	text := LLM_Tooltip_GetText()
-	if (text != "")
-		LLM_Bridge_OnAccept(text)
+	LLM_Tooltip_TryAcceptTab()
 }
 
 ; ── Slot navigation ──
