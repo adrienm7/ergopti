@@ -55,8 +55,9 @@ font_size_main_hs  = 14
 font_size_hint_ahk = 11
 font_size_hint_hs  = 11
 
-# Info-bar font size (model name, TTFT/TTLT timing line) — HS only.
-font_size_info_hs = 10
+# Info-bar font size (model name, TTFT/TTLT timing line).
+font_size_info_ahk = 10
+font_size_info_hs  = 10
 
 
 # ==================================================
@@ -180,10 +181,12 @@ dim_hex = "#8C8C8C"
 # Hint line color (navigation instructions below the predictions).
 hint_white = 0.40
 hint_alpha = 1.0
+hint_hex = "#666666"
 
-# Info bar (model + TTFT/TTLT timing) — HS only.
+# Info bar (model + TTFT/TTLT timing).
 info_white = 0.30
 info_alpha = 1.0
+info_hex = "#4D4D4D"
 
 # Invisible / fully transparent (used to hide canvas elements without removal).
 invis_white = 0.0
@@ -234,6 +237,7 @@ hotstring_personal = { red = 0.20, green = 0.55, blue = 1.00, alpha = 1.0 }
 
 # LLM loading / in-flight indicator.
 ai_loading = { red = 0.68, green = 0.38, blue = 1.00, alpha = 1.0 }
+ai_loading_hex = "#AD61FF"
 
 # LLM prediction results — no tint by default (plain dark background).
 # ai_prediction = null
@@ -269,10 +273,62 @@ unsel_gray_hex = "#808080"
 loading = { red = 0.94, green = 0.78, blue = 0.28, alpha = 1.0 }
 loading_hex = "#F0C747"
 
+# Active-slot sparkle prefix (✨) — yellow cursor marker.
+cursor = { red = 0.98, green = 0.88, blue = 0.22, alpha = 1.0 }
+cursor_hex = "#FAE038"
+
+# Multi-slot shortcut labels on the right (modifier + digit).
+cmd_sel = { red = 0.95, green = 0.58, blue = 0.08, alpha = 0.75 }
+cmd_sel_hex = "#F29414"
+cmd_dim = { white = 0.45, alpha = 1.0 }
+cmd_dim_hex = "#737373"
+
 
 # ==================================================
 # ==================================================
-# ======= 8/ Timing =======
+# ======= 8/ LLM tooltip UI chrome =======
+# ==================================================
+# ==================================================
+
+[llm_ui]
+# Structural LLM-tooltip constants shared by every driver.
+# User-facing hint strings live here as canonical defaults; drivers may
+# override via i18n (AHK: t(), HS: i18n.get()) when locale keys exist.
+
+# Active prediction row prefix (sparkle cursor marker).
+active_prefix = "✨ "
+
+# Placeholder text while a slot is still generating.
+slot_placeholder = "..."
+
+# Thin-space (U+2009) alignment compensation for inactive rows.
+inactive_align_char = " "
+
+# Footer layout: 6-space divider between hint segments / combined-line parts.
+footer_space_divider = "      "
+footer_combined_separator = "|"
+
+# Gap before modifier+digit shortcut labels (e.g. "   ⌥1").
+shortcut_label_gap = "   "
+
+# Vertical gap between stacked prediction lines (HS canvas gap font size).
+prediction_line_gap_hs = 3
+
+# Navigation hint strings (French canonical — mirror tooltip_llm.lua).
+hint_accept_single = "Tab pour accepter"
+hint_nav_left = "⇧G + Tab"
+hint_nav_right = "⇧D + Tab"
+hint_accept_center = "Tab = accepter"
+hint_arrow_left = "↑/←"
+hint_arrow_right = "↓/→"
+hint_or = " ou "
+hint_arrow_sep_left = " ◀"
+hint_arrow_sep_right = "▶ "
+
+
+# ==================================================
+# ==================================================
+# ======= 9/ Timing =======
 # ==================================================
 # ==================================================
 
