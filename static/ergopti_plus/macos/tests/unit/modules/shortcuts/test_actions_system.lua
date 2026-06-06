@@ -6,14 +6,10 @@ local helpers = require("tests.helpers")
 local hs_stub = helpers.load_with_stubs("tests.stubs.hs")
 
 helpers.describe("shortcuts.actions.system", function()
-	local sys
-	
-	helpers.before_each(function()
-		package.loaded["modules.shortcuts.actions.system"] = nil
-		sys = helpers.load_with_stubs("modules.shortcuts.actions.system")
-	end)
-
 	helpers.it("toggle_awake creates an event watcher with the correct events", function()
+		package.loaded["modules.shortcuts.actions.system"] = nil
+		local sys = helpers.load_with_stubs("modules.shortcuts.actions.system")
+
 		-- We just ensure that toggle_awake doesn't crash and starts successfully
 		sys.toggle_awake()
 		-- We cannot easily assert the exact watch_types here without deep introspection of the eventtap stub,
