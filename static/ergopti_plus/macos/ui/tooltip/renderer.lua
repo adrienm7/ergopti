@@ -222,7 +222,8 @@ function M.render(blocks, state, start_watchers_callback)
 
 		local hint_styled = blocks.hint_st
 		local info_styled = blocks.info_st
-		local space_divider = blocks.SP or "      "
+		local space_divider = blocks.SP or Config.llm_ui.footer_space_divider
+		local combined_sep  = Config.llm_ui.footer_combined_sep
 
 		local size_hint = hint_styled and M.canvas:minimumTextSize(3, hint_styled) or { w = 0, h = 0 }
 		local size_info = info_styled and M.canvas:minimumTextSize(3, info_styled) or { w = 0, h = 0 }
@@ -232,7 +233,7 @@ function M.render(blocks, state, start_watchers_callback)
 		local combined_styled = nil
 
 		if info_styled and hint_styled then
-			local separator_styled = hs.styledtext.new(space_divider .. "|" .. space_divider, { font = { name = Config.fonts.main, size = Config.sizes.hint }, color = Config.colors.sep })
+			local separator_styled = hs.styledtext.new(space_divider .. combined_sep .. space_divider, { font = { name = Config.fonts.main, size = Config.sizes.hint }, color = Config.colors.sep })
 			combined_styled = hs.styledtext.new("") .. hint_styled .. separator_styled .. info_styled
 			combined_styled = combined_styled:setStyle({ paragraphStyle = { alignment = "center" } }, 1, #combined_styled)
 

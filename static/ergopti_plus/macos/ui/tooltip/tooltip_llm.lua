@@ -483,13 +483,15 @@ local function assemble_blocks(state, reserved_count)
 		return { preds = hs.styledtext.new("") } 
 	end
 
+	local ui = Config.llm_ui
+	local active_mark = ui.active_prefix
 	local prefix_selected = ""
 	local prefix_unselected = ""
-	local visual_compensation_space = " "
+	local visual_compensation_space = ui.inactive_align_char
 
-	if display_count == 1 then prefix_selected = "✨ "
-	elseif display_count >= 2 and state.indent > 0 then prefix_selected = string.rep(" ", state.indent) .. "✨ "
-	else prefix_selected = "✨ "
+	if display_count == 1 then prefix_selected = active_mark
+	elseif display_count >= 2 and state.indent > 0 then prefix_selected = string.rep(" ", state.indent) .. active_mark
+	else prefix_selected = active_mark
 	end
 
 	local indent_numeric = math.floor(tonumber(state.indent) or 0)
@@ -523,7 +525,7 @@ local function assemble_blocks(state, reserved_count)
 			end
 		else
 			local placeholder_prefix = prefix_unselected ~= "" and styled_prefix_unselected or styled_prefix_empty
-			body_block = hs.styledtext.new("...", { font = { name = Config.fonts.main, size = Config.sizes.main, traits = { italic = true } }, color = Config.colors.loading })
+			body_block = hs.styledtext.new(ui.slot_placeholder, { font = { name = Config.fonts.main, size = Config.sizes.main, traits = { italic = true } }, color = Config.colors.loading })
 			assembled_result = assembled_result and (assembled_result .. styled_gap .. (placeholder_prefix .. body_block)) or (placeholder_prefix .. body_block)
 			goto continue
 		end
@@ -533,8 +535,9 @@ local function assemble_blocks(state, reserved_count)
 			local modifier_symbol = tostring(state.shortcut_mod):gsub("cmd", "⌘"):gsub("ctrl", "⌃"):gsub("alt", "⌥"):gsub("shift", "⇧"):gsub("%+", "")
 			if modifier_symbol == "" or modifier_symbol == "nil" then modifier_symbol = "⌥" end
 			
-			if i <= 9 then shortcut_string = "   " .. modifier_symbol .. i 
-			elseif i == 10 then shortcut_string = "   " .. modifier_symbol .. "0" 
+			local sc_gap = ui.shortcut_label_gap
+			if i <= 9 then shortcut_string = sc_gap .. modifier_symbol .. i
+			elseif i == 10 then shortcut_string = sc_gap .. modifier_symbol .. "0"
 			end
 		end
 
@@ -550,24 +553,28 @@ local function assemble_blocks(state, reserved_count)
 		::continue::
 	end
 
-	local space_divider = string.rep(" ", 6)
+	local space_divider = ui.footer_space_divider
 	local styled_hint
 
 	if display_count > 1 then
-		local hint_left  = "⇧G + Tab"
-		local hint_right = "⇧D + Tab"
+		local hint_left  = ui.hint_nav_left
+		local hint_right = ui.hint_nav_right
 		if state.nav_mod_str ~= "none" then
-			local optional_nav_mod = (state.nav_mod_str ~= "" and state.nav_mod_str ~= "none") and (state.nav_mod_str .. " + ") or ""
-			hint_left  = hint_left  .. " ou " .. optional_nav_mod .. "↑/←"
-			hint_right = hint_right .. " ou " .. optional_nav_mod .. "↓/→"
+			local optional_nav_mod = (state.nav_mod_str ~= "" and state.nav_mod_str ~= "none") and (state.nav_mod_str .. " + ") or ""
+			local hint_or = ui.hint_or
+			hint_left  = hint_left  .. hint_or .. optional_nav_mod .. ui.hint_arrow_left
+			hint_right = hint_right .. hint_or .. optional_nav_mod .. ui.hint_arrow_right
 		end
-		
+
 		styled_hint = hs.styledtext.new(
-			hint_left .. space_divider .. " ◀" .. space_divider .. "Tab = accepter" .. space_divider .. "▶ " .. space_divider .. hint_right,
+			hint_left .. space_divider .. ui.hint_arrow_sep_left .. space_divider
+				.. ui.hint_accept_center .. space_divider
+				.. ui.hint_arrow_sep_right .. space_divider .. hint_right,
 			{ font = { name = Config.fonts.main, size = Config.sizes.hint }, color = Config.colors.hint, paragraphStyle = { alignment = "center" } }
 		)
 	else
-		styled_hint = hs.styledtext.new("Tab pour accepter", { font = { name = Config.fonts.main, size = Config.sizes.hint }, color = Config.colors.hint, paragraphStyle = { alignment = "center" } })
+		styled_hint = hs.styledtext.new(ui.hint_accept_single,
+			{ font = { name = Config.fonts.main, size = Config.sizes.hint }, color = Config.colors.hint, paragraphStyle = { alignment = "center" } })
 	end
 
 	-- Info row composes the static model/profile header (state.info_bar) with
@@ -840,8 +847,10 @@ function M.show_predictions(predictions, current_index, is_enabled, info_bar, sh
 			
 			local final_width = width_predictions
 			if blocks.info_st and blocks.hint_st then
-				local space_divider = blocks.SP or "      "
-				local separator_styled = hs.styledtext.new(space_divider .. "|" .. space_divider, { font = { name = Config.fonts.main, size = Config.sizes.hint } })
+				local ui = Config.llm_ui
+				local space_divider = blocks.SP or ui.footer_space_divider
+				local combined_sep  = ui.footer_combined_sep
+				local separator_styled = hs.styledtext.new(space_divider .. combined_sep .. space_divider, { font = { name = Config.fonts.main, size = Config.sizes.hint } })
 				local combined_styled = hs.styledtext.new("") .. blocks.hint_st .. separator_styled .. blocks.info_st
 				local width_combined = Renderer.canvas:minimumTextSize(3, combined_styled).w
 				

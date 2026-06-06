@@ -3,11 +3,10 @@
 --- ==============================================================================
 --- MODULE: Tooltip Configuration
 --- DESCRIPTION:
---- Hammerspoon-side mirror of the cross-driver tooltip visual constants.
---- The canonical source of truth is
---- static/ergopti_plus/shared/tooltip/constants.toml — every value declared here
---- MUST match the corresponding entry in that file. When constants.toml is
---- updated, this file must be updated to match.
+--- Hammerspoon-side loader for the cross-driver tooltip visual constants.
+--- The canonical source of truth is shared/tooltip/constants.toml — every
+--- value exposed on M.* is read from that file at require-time. Missing file
+--- or key → error (fail fast). No driver-side fallback values.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Cross-driver parity: every constant here has a named equivalent in
@@ -48,74 +47,28 @@ local M = {}
 local Logger = require("lib.logger")
 local LOG = "tooltip_config"
 
-M.fonts = { main = ".AppleSystemUIFont", bold = ".AppleSystemUIFontBold" }
-M.sizes = { main = 14, hint = 11, info = 10, gap = 3 }
+-- Populated strictly from shared/tooltip/constants.toml at require-time (fail fast).
+M.fonts = {}
+M.sizes = {}
+M.layout = {}
+M.colors = {}
+M.tint_config = {}
+M.llm_ui = {}
 
-M.layout = {
-	pad_x               = 14,
-	pad_y               = 7,
-	line_spacing        = 8,
-	hint_spacing        = 4,
-	caret_offset_x      = 15,
-	caret_offset_y      = 18,
-	window_offset_y     = 5,
-	window_bottom_inset = 40,
-	screen_margin       = 5,
-	max_caret_height    = 80
-}
-
-M.colors = {
-	bg         = { white = 0, alpha = 1.0 },
-	bg_alpha   = 0.97,
-	corr_sel   = { red = 0.25, green = 0.90, blue = 0.40, alpha = 1.0 },
-	nw_sel     = { red = 1.00, green = 0.62, blue = 0.10, alpha = 1.0 },
-	unsel_gray = { white = 0.50, alpha = 1.0 },
-	cursor     = { red = 0.98, green = 0.88, blue = 0.22, alpha = 1.0 },
-	cmd_sel    = { red = 0.95, green = 0.58, blue = 0.08, alpha = 0.75 },
-	cmd_dim    = { white = 0.45, alpha = 1.0 },
-	hint       = { white = 0.40, alpha = 1.0 },
-	info_bar   = { white = 0.30, alpha = 1.0 },
-	sep        = { white = 1.00, alpha = 0.09 },
-	invis      = { white = 0.00, alpha = 0.00 },
-	loading    = { red = 0.94, green = 0.78, blue = 0.28, alpha = 1.0 }
-}
-
-M.tint_config = {
-	lightness  = 0.13,
-	saturation = 0.85,
-}
-
--- Default tooltip durations (seconds). 0 means "infinite display".
-local DEFAULT_TIMEOUT_SEC     = 2.5
-local DEFAULT_LLM_TIMEOUT_SEC = 12.0
-
--- Internal floor preserved when a positive timeout is requested. Any positive
--- caller-provided value is reduced by TIMEOUT_DECREMENT_SEC so back-to-back
--- tooltips do not visually overlap, but never below TIMEOUT_FLOOR_SEC.
-local TIMEOUT_FLOOR_SEC     = 0.05
-local TIMEOUT_DECREMENT_SEC = 0.2
+-- Tooltip durations (seconds). 0 means "infinite display". Set from TOML [timing].
+local DEFAULT_TIMEOUT_SEC     = nil
+local DEFAULT_LLM_TIMEOUT_SEC = nil
+local TIMEOUT_FLOOR_SEC       = nil
+local TIMEOUT_DECREMENT_SEC   = nil
 
 M.settings = {
-	timeout_sec          = DEFAULT_TIMEOUT_SEC,
-	llm_timeout_sec      = DEFAULT_LLM_TIMEOUT_SEC,
+	timeout_sec          = 0,
+	llm_timeout_sec      = 0,
 	colorization_enabled = true
 }
 
--- Default background tint for each tooltip display context.
--- A nil value means no tint (the tooltip uses the standard dark background).
-local DEFAULT_ACCENT_COLORS = {
-	hotstring_star        = { red = 1.00, green = 0.00, blue = 0.00, alpha = 1.0 },
-	hotstring_autocorrect = { red = 0.00, green = 0.80, blue = 0.00, alpha = 1.0 },
-	hotstring_personal    = { red = 0.20, green = 0.55, blue = 1.00, alpha = 1.0 },
-	ai_loading            = { red = 0.68, green = 0.38, blue = 1.00, alpha = 1.0 },
-	ai_prediction         = nil,
-}
-
--- Active accent colors — initialized from defaults, overridable at runtime via set_accent_color()
+-- Accent colors per display context — loaded from TOML [accent_colors].
 M.accent_colors = {}
-for key, color in pairs(DEFAULT_ACCENT_COLORS) do
-	M.accent_colors[key] = color
-end
 
 
 
@@ -247,93 +200,144 @@ end
 --- =====================================================================
 -- =====================================================================
 
---- Reads shared/tooltip/constants.toml at require-time and overwrites the
---- hardcoded defaults declared above so the Lua driver stays in sync with the
---- TOML single source of truth. Any read failure is logged at WARN and the
---- hardcoded defaults remain active — the tooltip is always functional.
+--- Reads shared/tooltip/constants.toml at require-time. Missing file, section,
+--- or key → error (fail fast — no driver-side fallback values).
 local function load_from_shared()
-	local ok_reader, toml_reader = pcall(require, "lib.toml_reader")
-	if not ok_reader or not toml_reader then
-		Logger.warn(LOG, "lib.toml_reader not available — tooltip constants using compile-time defaults.")
-		return
-	end
+	local toml_reader = require("lib.toml_reader")
 
 	-- Locate shared dir by walking up from this file:
 	-- macos/ui/tooltip/config.lua → macos/ui/tooltip → macos/ui → macos → ergopti_plus → shared
-	local ok_path, shared_path = pcall(function()
+	local shared_path = (function()
 		local src = debug.getinfo(1, "S").source:gsub("^@", "")
-		-- Strip 3 path components (config.lua, tooltip/, ui/) to reach macos/
-		local dir = src:match("^(.*)[/\\][^/\\]+$") or src      -- tooltip/
-		dir = dir:match("^(.*)[/\\][^/\\]+$") or dir            -- ui/
-		dir = dir:match("^(.*)[/\\][^/\\]+$") or dir            -- macos/
-		local ergopti_plus = dir:match("^(.*)[/\\][^/\\]+$") or dir -- ergopti_plus/
+		local dir = src:match("^(.*)[/\\][^/\\]+$") or src
+		dir = dir:match("^(.*)[/\\][^/\\]+$") or dir
+		dir = dir:match("^(.*)[/\\][^/\\]+$") or dir
+		local ergopti_plus = dir:match("^(.*)[/\\][^/\\]+$") or dir
 		return ergopti_plus .. "/shared"
-	end)
-	if not ok_path or not shared_path then
-		error("[tooltip/config] Cannot resolve shared dir — tooltip constants not loaded.")
-	end
+	end)()
 
 	local toml_path = shared_path .. "/tooltip/constants.toml"
-	local ok_c, c = pcall(toml_reader.parse, toml_path)
-	if not ok_c or type(c) ~= "table" then
-		error("[tooltip/config] shared/tooltip/constants.toml not readable: " .. tostring(c))
+	local c = toml_reader.parse(toml_path)
+	if type(c) ~= "table" or type(c.sections) ~= "table" then
+		error("[tooltip/config] shared/tooltip/constants.toml not readable")
 	end
 
-	local function get(section, key, default)
+	local function require_key(section, key)
 		local s = c.sections[section]
-		if type(s) ~= "table" then return default end
+		if type(s) ~= "table" then
+			error(string.format("[tooltip/config] missing section [%s] in constants.toml", section))
+		end
 		local v = s[key]
-		return (v ~= nil) and v or default
+		if v == nil then
+			error(string.format("[tooltip/config] missing key [%s].%s in constants.toml", section, key))
+		end
+		return v
+	end
+
+	local function optional_key(section, key)
+		local s = c.sections[section]
+		if type(s) ~= "table" then return nil end
+		return s[key]
+	end
+
+	local function rgba_from_table(t, section, key)
+		if type(t) ~= "table" then
+			error(string.format("[tooltip/config] [%s].%s must be an RGBA table", section, key))
+		end
+		if t.red ~= nil or t.green ~= nil or t.blue ~= nil then
+			return {
+				red   = tonumber(t.red) or 0,
+				green = tonumber(t.green) or 0,
+				blue  = tonumber(t.blue) or 0,
+				alpha = tonumber(t.alpha) or 1.0,
+			}
+		end
+		if t.white ~= nil then
+			return { white = tonumber(t.white) or 0, alpha = tonumber(t.alpha) or 1.0 }
+		end
+		error(string.format("[tooltip/config] [%s].%s must contain red/green/blue or white", section, key))
 	end
 
 	-- [typography]
-	M.sizes.main = get("typography", "font_size_main_hs",  M.sizes.main)
-	M.sizes.hint = get("typography", "font_size_hint_hs",  M.sizes.hint)
-	M.sizes.info = get("typography", "font_size_info_hs",  M.sizes.info)
+	M.fonts.main = require_key("typography", "font_main_hs")
+	M.fonts.bold = require_key("typography", "font_bold_hs")
+	M.sizes.main = require_key("typography", "font_size_main_hs")
+	M.sizes.hint = require_key("typography", "font_size_hint_hs")
+	M.sizes.info = require_key("typography", "font_size_info_hs")
+	M.sizes.gap  = require_key("llm_ui", "prediction_line_gap_hs")
 
 	-- [layout]
-	M.layout.pad_x               = get("layout", "pad_x",             M.layout.pad_x)
-	M.layout.pad_y               = get("layout", "pad_y",             M.layout.pad_y)
-	M.layout.line_spacing        = get("layout", "line_spacing",       M.layout.line_spacing)
-	M.layout.hint_spacing        = get("layout", "hint_spacing",       M.layout.hint_spacing)
-	M.layout.screen_margin       = get("layout", "screen_margin",      M.layout.screen_margin)
-	-- corner_radius passed directly as xRadius/yRadius on canvas element (no ×2)
-	M.layout.corner_radius       = get("layout", "corner_radius",      M.layout.corner_radius)
+	M.layout.pad_x         = require_key("layout", "pad_x")
+	M.layout.pad_y         = require_key("layout", "pad_y")
+	M.layout.line_spacing  = require_key("layout", "line_spacing")
+	M.layout.hint_spacing  = require_key("layout", "hint_spacing")
+	M.layout.screen_margin = require_key("layout", "screen_margin")
+	M.layout.corner_radius = require_key("layout", "corner_radius")
 
 	-- [positioning]
-	M.layout.caret_offset_x      = get("positioning", "caret_offset_x",         M.layout.caret_offset_x)
-	M.layout.caret_offset_y      = get("positioning", "caret_offset_y",         M.layout.caret_offset_y)
-	M.layout.window_offset_y     = get("positioning", "window_offset_y",        M.layout.window_offset_y)
-	M.layout.window_bottom_inset = get("positioning", "window_bottom_inset_hs", M.layout.window_bottom_inset)
-	M.layout.max_caret_height    = get("positioning", "max_caret_height",       M.layout.max_caret_height)
+	M.layout.caret_offset_x      = require_key("positioning", "caret_offset_x")
+	M.layout.caret_offset_y      = require_key("positioning", "caret_offset_y")
+	M.layout.window_offset_y     = require_key("positioning", "window_offset_y")
+	M.layout.window_bottom_inset = require_key("positioning", "window_bottom_inset_hs")
+	M.layout.max_caret_height    = require_key("positioning", "max_caret_height")
 
 	-- [colors]
-	local bg_w = get("colors", "bg_white",    M.colors.bg.white)
-	local bg_a = get("colors", "bg_alpha",    M.colors.bg.alpha)
-	M.colors.bg       = { white = bg_w, alpha = bg_a }
-	M.colors.bg_alpha = get("colors", "canvas_alpha_hs", M.colors.bg_alpha)
+	M.colors.bg       = { white = require_key("colors", "bg_white"), alpha = require_key("colors", "bg_alpha") }
+	M.colors.bg_alpha = require_key("colors", "canvas_alpha_hs")
+	M.colors.sep      = { white = require_key("colors", "sep_white"), alpha = require_key("colors", "sep_alpha_hs") }
+	M.colors.hint     = { white = require_key("colors", "hint_white"), alpha = require_key("colors", "hint_alpha") }
+	M.colors.info_bar = { white = require_key("colors", "info_white"), alpha = require_key("colors", "info_alpha") }
+	M.colors.invis    = { white = require_key("colors", "invis_white"), alpha = require_key("colors", "invis_alpha") }
 
-	-- [sep]
-	local sep_w = get("colors", "sep_white",    M.colors.sep.white)
-	local sep_a = get("colors", "sep_alpha_hs", M.colors.sep.alpha)
-	M.colors.sep      = { white = sep_w, alpha = sep_a }
+	-- [llm_colors]
+	M.colors.corr_sel   = rgba_from_table(require_key("llm_colors", "corr_sel"),   "llm_colors", "corr_sel")
+	M.colors.nw_sel     = rgba_from_table(require_key("llm_colors", "nw_sel"),     "llm_colors", "nw_sel")
+	M.colors.unsel_gray = rgba_from_table(require_key("llm_colors", "unsel_gray"), "llm_colors", "unsel_gray")
+	M.colors.cursor     = rgba_from_table(require_key("llm_colors", "cursor"),     "llm_colors", "cursor")
+	M.colors.cmd_sel    = rgba_from_table(require_key("llm_colors", "cmd_sel"),    "llm_colors", "cmd_sel")
+	M.colors.cmd_dim    = rgba_from_table(require_key("llm_colors", "cmd_dim"),    "llm_colors", "cmd_dim")
+	M.colors.loading    = rgba_from_table(require_key("llm_colors", "loading"),    "llm_colors", "loading")
+
+	-- [accent_colors] — ai_prediction may be absent (no tint)
+	M.accent_colors.hotstring_star        = rgba_from_table(require_key("accent_colors", "hotstring_star"),        "accent_colors", "hotstring_star")
+	M.accent_colors.hotstring_autocorrect = rgba_from_table(require_key("accent_colors", "hotstring_autocorrect"), "accent_colors", "hotstring_autocorrect")
+	M.accent_colors.hotstring_personal    = rgba_from_table(require_key("accent_colors", "hotstring_personal"),    "accent_colors", "hotstring_personal")
+	M.accent_colors.ai_loading            = rgba_from_table(require_key("accent_colors", "ai_loading"),            "accent_colors", "ai_loading")
+	M.accent_colors.ai_prediction         = optional_key("accent_colors", "ai_prediction")
+
+	-- [llm_ui] — structural LLM tooltip chrome
+	M.llm_ui = {
+		active_prefix        = require_key("llm_ui", "active_prefix"),
+		slot_placeholder     = require_key("llm_ui", "slot_placeholder"),
+		inactive_align_char  = require_key("llm_ui", "inactive_align_char"),
+		footer_space_divider = require_key("llm_ui", "footer_space_divider"),
+		footer_combined_sep  = require_key("llm_ui", "footer_combined_separator"),
+		shortcut_label_gap   = require_key("llm_ui", "shortcut_label_gap"),
+		hint_accept_single   = require_key("llm_ui", "hint_accept_single"),
+		hint_nav_left        = require_key("llm_ui", "hint_nav_left"),
+		hint_nav_right       = require_key("llm_ui", "hint_nav_right"),
+		hint_accept_center   = require_key("llm_ui", "hint_accept_center"),
+		hint_arrow_left      = require_key("llm_ui", "hint_arrow_left"),
+		hint_arrow_right     = require_key("llm_ui", "hint_arrow_right"),
+		hint_or              = require_key("llm_ui", "hint_or"),
+		hint_arrow_sep_left  = require_key("llm_ui", "hint_arrow_sep_left"),
+		hint_arrow_sep_right = require_key("llm_ui", "hint_arrow_sep_right"),
+	}
 
 	-- [tint]
-	M.tint_config = M.tint_config or {}
-	M.tint_config.lightness  = get("tint", "lightness",  0)
-	M.tint_config.saturation = get("tint", "saturation", 0)
+	M.tint_config.lightness  = require_key("tint", "lightness")
+	M.tint_config.saturation = require_key("tint", "saturation")
 
 	-- [timing]
-	DEFAULT_TIMEOUT_SEC     = get("timing", "hotstring_timeout_sec", DEFAULT_TIMEOUT_SEC)
-	DEFAULT_LLM_TIMEOUT_SEC = get("timing", "llm_timeout_sec",       DEFAULT_LLM_TIMEOUT_SEC)
-	TIMEOUT_DECREMENT_SEC   = get("timing", "timeout_decrement_sec", TIMEOUT_DECREMENT_SEC)
-	TIMEOUT_FLOOR_SEC       = get("timing", "timeout_floor_sec",     TIMEOUT_FLOOR_SEC)
-	-- Re-apply to settings table so the live values reflect the TOML.
+	DEFAULT_TIMEOUT_SEC     = require_key("timing", "hotstring_timeout_sec")
+	DEFAULT_LLM_TIMEOUT_SEC = require_key("timing", "llm_timeout_sec")
+	TIMEOUT_DECREMENT_SEC   = require_key("timing", "timeout_decrement_sec")
+	TIMEOUT_FLOOR_SEC       = require_key("timing", "timeout_floor_sec")
 	M.settings.timeout_sec     = DEFAULT_TIMEOUT_SEC
 	M.settings.llm_timeout_sec = DEFAULT_LLM_TIMEOUT_SEC
 
 	Logger.done(LOG, "Shared tooltip constants loaded (pad_x=%d corner=%d tmo=%.1fs llm=%.1fs).",
-		M.layout.pad_x, M.layout.corner_radius or 7,
+		M.layout.pad_x, M.layout.corner_radius,
 		M.settings.timeout_sec, M.settings.llm_timeout_sec)
 end
 
