@@ -272,9 +272,24 @@ local function flatten_from_disk(grouped)
 						-- walk each inner key through the reverse scalar and nested maps.
 						for inner_key, inner_val in pairs(disk_val) do
 							if type(inner_val) == "table" then
-								-- Depth-3 nested table (e.g. hotstrings.editor.shortcut)
-								local nfk = _reverse_nested[sec_name .. ":" .. disk_key .. "." .. inner_key]
-								if nfk then flat[nfk] = inner_val end
+								-- TOML arrays decode as Lua sequences (#t > 0). Treat them
+								-- as scalars (llm_val_modifiers, …), not depth-3 maps.
+								if #inner_val > 0 then
+									local lookup = sec_name .. ":" .. disk_key .. "." .. inner_key
+									local fk     = _reverse_scalar[lookup]
+									if fk then flat[fk] = inner_val end
+								else
+									-- Structured scalar (e.g. llm.trigger.shortcut = {mods,key})
+									-- or depth-3 nested maps (hotstrings.editor.*).
+									local lookup = sec_name .. ":" .. disk_key .. "." .. inner_key
+									local fk     = _reverse_scalar[lookup]
+									if fk then
+										flat[fk] = inner_val
+									else
+										local nfk = _reverse_nested[lookup]
+										if nfk then flat[nfk] = inner_val end
+									end
+								end
 							else
 								local lookup = sec_name .. ":" .. disk_key .. "." .. inner_key
 								local fk     = _reverse_scalar[lookup]

@@ -43,9 +43,8 @@ LLM_Tray_BuildNMenu() {
 	global _LLM_Tray
 	m := Menu()
 	for n in LLM_TRAY_N_OPTIONS {
-		captured_n := n
 		label := StrReplace(StrReplace(t("menu.llm.prediction_count_label"), "%d", n), "%s", (n > 1 ? "s" : ""))
-		RegisterMenuItem(m, label, (name, pos, menu) => LLM_Tray_SetN(captured_n))
+		RegisterMenuItem(m, label, _LLM_Tray_MakeSetNHandler(n))
 		if (n == _LLM_Tray["n_predictions"])
 			m.Check(label)
 	}
@@ -273,7 +272,6 @@ LLM_Tray_BuildDisplayMenu() {
 	; continuation lines up at column-N relative to the original cursor.
 	indent_menu := Menu()
 	for lvl in LLM_TRAY_INDENT_OPTIONS {
-		captured_lvl := lvl
 		if (lvl == 0) {
 			indent_label := t("menu.llm.indent_none")
 		} else if (lvl == 1 or lvl == -1) {
@@ -281,7 +279,7 @@ LLM_Tray_BuildDisplayMenu() {
 		} else {
 			indent_label := lvl . " " . t("menu.llm.indent_spaces")
 		}
-		RegisterMenuItem(indent_menu, indent_label, (name, pos, menu) => LLM_Tray_SetIndent(captured_lvl))
+		RegisterMenuItem(indent_menu, indent_label, _LLM_Tray_MakeSetIndentHandler(lvl))
 		if (lvl == _LLM_Tray["pred_indent"])
 			indent_menu.Check(indent_label)
 	}

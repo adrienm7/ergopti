@@ -51,7 +51,6 @@ _LLM_Tray_BuildApiEntriesMenu() {
 	} else {
 		active_id := _LLM_Tray.Has("api_entry_id") ? _LLM_Tray["api_entry_id"] : ""
 		for entry in entries {
-			captured := entry
 			id    := _LLM_TrayApiEntryGet(entry, "Id",       "")
 			name  := _LLM_TrayApiEntryGet(entry, "Name",     "(unnamed)")
 			prov  := _LLM_TrayApiEntryGet(entry, "Provider", "")
@@ -61,7 +60,7 @@ _LLM_Tray_BuildApiEntriesMenu() {
 				: (prov  != "") ? "  —  " . prov
 				: ""
 			label := name . suffix
-			RegisterMenuItem(m, label, (name, pos, menu) => _LLM_Tray_SelectApiEntry(captured))
+			RegisterMenuItem(m, label, _LLM_Tray_MakeSelectApiEntryHandler(entry))
 			if (id == active_id)
 				m.Check(label)
 		}

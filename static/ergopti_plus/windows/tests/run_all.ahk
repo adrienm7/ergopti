@@ -143,6 +143,22 @@ InstallSendNoOps()
 #Include ../modules/llm/prediction_engine.ahk
 #Include test_llm_prediction_engine.ahk
 
+; LLM tray menu -> config.toml persistence (contract-driven round-trips).
+global _LLM_Tray := Map(
+	"enabled", true, "backend", "ollama", "model", "Qwen3.5-0.8B",
+	"profile_id", "basic", "n_predictions", 3, "auto_profile_for_model", true,
+	"min_words", 3, "max_words", 15, "language", "fr", "debounce_ms", 500,
+	"ctx_chars", 500, "temperature", "0.10", "instant_on_word_end", true,
+	"after_hotstring", true, "reset_on_nav", true, "disable_url_bars", true,
+	"disable_password_fields", true, "disabled_apps", [], "show_info_bar", true,
+	"streaming", true, "show_all_at_once", true, "pred_indent", 0,
+	"auto_raise_temp", true, "nav_modifiers", "", "val_modifiers", "alt",
+	"trigger_shortcut", "Ctrl+Space", "inline_autotype", false
+)
+#Include ../ui/tray_llm/persist.ahk
+#Include test_llm_menu_persistence.ahk
+#Include test_llm_menu_regressions.ahk
+
 ; Gestures module — included here because its pure logic (assignments, action
 ; registry, dispatch) is testable. The hotkeys it registers are harmless since
 ; RunTests() calls ExitApp immediately after completion.
@@ -172,6 +188,7 @@ global _VendorDir := A_ScriptDir . "\..\vendor"
 #Include meta/test_no_pascal_case_in_toml.ahk
 #Include meta/test_bundle_exclusions.ahk
 #Include meta/test_llm_tray_init_order.ahk
+#Include meta/test_tray_llm_actions_include.ahk
 #Include meta/test_port_adapter_coverage.ahk
 #Include meta/test_no_class_global_conflict.ahk
 #Include meta/test_locale_json_valid.ahk

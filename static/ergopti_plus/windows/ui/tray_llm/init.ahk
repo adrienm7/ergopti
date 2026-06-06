@@ -67,6 +67,17 @@ LLM_Tray_Init(saved_opts := Map()) {
 		if saved_opts.Has(key) && (saved_opts[key] is Array)
 			_LLM_Tray[key] := saved_opts[key]
 
+	; Keep Features["llm"] aligned with tray state so the deferred startup
+	; SaveFullConfig() (~500 ms) does not rewrite num_predictions (etc.) back
+	; to manifest defaults and clobber a change the user just saved.
+	if IsSet(_LLM_Tray_SyncToFeatures)
+		_LLM_Tray_SyncToFeatures()
+
+	; Auto-correct legacy raw-tag configs (e.g. qwen2.5:3b) before the first
+	; bootstrap / bridge start so predictions do not silently fail.
+	if (_LLM_Tray["backend"] == "ollama")
+		LLM_Tray_EnsureModelReady()
+
 	; Restore trigger shortcut hotkey
 	if (_LLM_Tray["trigger_shortcut"] != "")
 		LLM_Tray_ApplyTriggerShortcut(_LLM_Tray["trigger_shortcut"])
