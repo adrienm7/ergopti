@@ -214,6 +214,37 @@ LLM_Engine_OnKeystroke(buffer) {
 }
 
 /**
+ * Arms the debounce timer with an optional delay override in seconds.
+ * Mirrors HS prediction_engine.start_timer(delay_override). When omitted,
+ * uses the configured debounce_ms. The buffer defaults to last_buffer,
+ * then falls back to the LLM bridge rolling context.
+ * @param {number} delaySec - Optional timer delay in seconds (0 = immediate).
+ * @param {string} buffer - Optional context override captured at schedule time.
+ */
+LLM_Engine_StartTimer(delaySec := "", buffer := "") {
+	global _LLM_Engine
+	if !_LLM_Engine["enabled"]
+		return
+
+	if (buffer == "") {
+		buffer := _LLM_Engine.Has("last_buffer") ? _LLM_Engine["last_buffer"] : ""
+		if (buffer == "" and IsSet(_LLM_Bridge_Buffer))
+			buffer := _LLM_Bridge_Buffer
+	}
+	if (buffer == "")
+		return
+
+	LLM_Engine_CancelTimer()
+	_LLM_Engine["last_buffer"] := buffer
+	delay_ms := (delaySec != "" and IsNumber(delaySec))
+		? Max(1, Round(delaySec * 1000))
+		: _LLM_Engine["debounce_ms"]
+	_LLM_Engine["pending_timer"] := LLM_Engine_FirePrediction.Bind(buffer)
+	SetTimer(_LLM_Engine["pending_timer"], -delay_ms)
+	_LLM_Engine["timer_active"] := true
+}
+
+/**
  * Cancels any pending debounce timer.
  */
 LLM_Engine_CancelTimer() {

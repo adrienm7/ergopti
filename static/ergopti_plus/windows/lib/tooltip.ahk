@@ -549,6 +549,8 @@ TooltipRearmTimer() {
     SetTimer(_TooltipTimerFn, 0)
     _TooltipTimerGeneration := _TooltipGeneration
     SetTimer(_TooltipTimerFn, -Round(Effective * 1000))
+    if IsSet(LLM_Bridge_ScheduleAfterHotstring)
+        try LLM_Bridge_ScheduleAfterHotstring(_TooltipLastItems)
 }
 
 
@@ -692,30 +694,17 @@ _TooltipBuildGui(Items) {
     DpiScale := A_ScreenDPI / 96
 
     ; ── Measure all text items ──────────────────────────────────────────────
-    ; Probe Guis are positioned far off-screen (-32000, -32000) so they
-    ; can never flash on the user's monitor during the show-then-destroy
-    ; measurement cycle. WS_EX_TOOLWINDOW (+E0x80) additionally keeps
-    ; them out of the taskbar and Alt-Tab switcher even in the unlikely
-    ; case they remain visible long enough for either to notice.
+    ; GDI GetTextExtentPoint32W — same path as the LLM renderer. Transient
+    ; Probe Guis inherit the OS default minimum client width (~640 logical px
+    ; on Windows 11), which made compact rows (e.g. the violet « Génération en
+    ; cours… » spinner) stretch far beyond their text.
     Sizes := []
     MaxW := 0
     for , Item in Items {
-        ProbeGui := Gui("-Caption +E0x80 +LastFound")
-        try {
-            ProbeGui.MarginX := 0
-            ProbeGui.MarginY := 0
-            ProbeGui.SetFont("s" . _TOOLTIP_FONT_SIZE, _TOOLTIP_FONT_NAME)
-            ProbeGui.Add("Text", "x0 y0", Item.Text)
-            ProbeGui.Show("NoActivate x-32000 y-32000")
-            WinGetClientPos(, , &CW, &CH, ProbeGui.Hwnd)
-            CW := Round(CW / DpiScale)
-            CH := Round(CH / DpiScale)
-            Sizes.Push({ W: CW, H: CH })
-            if (CW > MaxW)
-                MaxW := CW
-        } finally {
-            ProbeGui.Destroy()
-        }
+        S := _TooltipMeasureTextSize(Item.Text, _TOOLTIP_FONT_SIZE)
+        Sizes.Push(S)
+        if (S.W > MaxW)
+            MaxW := S.W
     }
 
     MaxLabelW := 0
@@ -723,22 +712,10 @@ _TooltipBuildGui(Items) {
     for , Item in Items {
         Label := Item.HasOwnProp("TriggerLabel") ? Item.TriggerLabel : ""
         if (Label != "") {
-            ProbeL := Gui("-Caption +E0x80 +LastFound")
-            try {
-                ProbeL.MarginX := 0
-                ProbeL.MarginY := 0
-                ProbeL.SetFont("s" . _TOOLTIP_LABEL_FONT_SIZE, _TOOLTIP_FONT_NAME)
-                ProbeL.Add("Text", "x0 y0", Label)
-                ProbeL.Show("NoActivate x-32000 y-32000")
-                WinGetClientPos(, , &LW, &LH, ProbeL.Hwnd)
-                LW := Round(LW / DpiScale)
-                LH := Round(LH / DpiScale)
-                LabelSizes.Push({ W: LW, H: LH })
-                if (LW > MaxLabelW)
-                    MaxLabelW := LW
-            } finally {
-                ProbeL.Destroy()
-            }
+            LS := _TooltipMeasureTextSize(Label, _TOOLTIP_LABEL_FONT_SIZE)
+            LabelSizes.Push(LS)
+            if (LS.W > MaxLabelW)
+                MaxLabelW := LS.W
         } else {
             LabelSizes.Push({ W: 0, H: 0 })
         }

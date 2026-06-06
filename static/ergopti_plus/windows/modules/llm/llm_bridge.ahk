@@ -48,6 +48,11 @@ global _LLM_PointerWatch_LastY     := unset
 global _LLM_PointerWatch_MoveFn    := unset
 global _LLM_PointerWatch_ActivityFn := unset
 global _LLM_POINTER_POLL_MS        := 50
+; Mirrors macOS llm_bridge.lua HOTSTRING_CHAIN_OFFSET_SEC — prediction fires
+; just after the hotstring tooltip would normally close.
+global _LLM_HOTSTRING_CHAIN_OFFSET_SEC := 0.05
+global _LLM_INFINITE_TOOLTIP_SEC       := 86400
+global _LLM_MIN_TOOLTIP_DURATION_SEC   := 0.05
 
 
 
@@ -191,6 +196,45 @@ LLM_Bridge_FeedKeyDownIfActive(vk) {
 ; =========================================
 
 /**
+ * Schedules an LLM prediction to fire when the hotstring tooltip closes.
+ * Called from the prefix watcher after TooltipShow / TooltipRearmTimer.
+ * Parity with macOS llm_bridge.update_preview() chain branch.
+ * @param {Array} items - Tooltip rows shown by TooltipShow (DurationSec per row).
+ */
+LLM_Bridge_ScheduleAfterHotstring(items) {
+	global _LLM_Bridge_Active, _LLM_Bridge_Buffer, _LLM_Engine
+	global _LLM_HOTSTRING_CHAIN_OFFSET_SEC, _LLM_INFINITE_TOOLTIP_SEC
+	global _LLM_MIN_TOOLTIP_DURATION_SEC
+
+	if !(IsSet(_LLM_Bridge_Active) && _LLM_Bridge_Active)
+		return
+	if !(IsSet(_LLM_Engine) && _LLM_Engine["enabled"] && _LLM_Engine["after_hotstring"])
+		return
+	if !(IsObject(items) && items.Length > 0)
+		return
+
+	LLM_Engine_CancelTimer()
+
+	minDur := 0
+	hasDur := false
+	for , Item in items {
+		D := Item.HasOwnProp("DurationSec") ? Item.DurationSec : 0
+		if (D > 0) {
+			hasDur := true
+			if (minDur == 0 or D < minDur)
+				minDur := D
+		}
+	}
+	tooltipTimeout := hasDur
+		? Max(_LLM_MIN_TOOLTIP_DURATION_SEC, minDur)
+		: _LLM_INFINITE_TOOLTIP_SEC
+	delaySec := tooltipTimeout + _LLM_HOTSTRING_CHAIN_OFFSET_SEC
+	buffer := _LLM_Bridge_Buffer
+	try LoggerDebug("LLM", "Hotstring chain scheduled in {1:.3f}s.", delaySec)
+	LLM_Engine_StartTimer(delaySec, buffer)
+}
+
+/**
  * Must be called from a hotkey or keyboard hook on every typed character.
  * Maintains the rolling context buffer and feeds it to the prediction engine.
  * @param {string} ch - The character that was just typed.
@@ -202,11 +246,9 @@ LLM_Bridge_OnChar(ch) {
 
 	_LLM_Bridge_Buffer .= ch
 	; Hotstring tooltip priority: if the PrefixWatcher's tooltip is visible,
-	; update the buffer but do NOT arm the LLM timer — the prediction must
-	; wait until the overlay is gone, exactly like the HS chain-delay logic
-	; (modules/keymap/llm_bridge.lua: engine.start_timer(tooltip_timeout +
-	; HOTSTRING_CHAIN_OFFSET_SEC)). The next keystroke after the tooltip
-	; closes will re-arm the debounce timer and fire the prediction normally.
+	; update the buffer but do NOT arm the LLM timer — LLM_Bridge_ScheduleAfterHotstring
+	; (fired from _LookupAndRender / TooltipRearmTimer) owns the chain delay until
+	; the overlay closes, mirroring HS update_preview().
 	if TooltipIsVisible()
 		return
 	; Only hide OUR tooltip — never dismiss a hotstring overlay.
