@@ -21,8 +21,31 @@ local Logger    = require("lib.logger")
 local dialog    = require("lib.dialog_util")
 local llm_mod   = require("modules.llm")
 local i18n      = require("lib.i18n")
+local Paths     = require("lib.paths")
 
 local LOG = "menu_llm.models"
+
+--- Loads shared/llm/models.json via lib.paths (configdir + script-relative walk).
+--- Missing or invalid file → error (fail fast).
+--- @return table Provider list parsed from models.json.
+local function load_models_presets()
+	local path = Paths.shared_llm_path("models.json")
+	if not path then
+		error("[menu_llm.models] static/ergopti_plus/shared/llm/models.json not found")
+	end
+	local fh = io.open(path, "r")
+	if not fh then
+		error("[menu_llm.models] cannot open models.json: " .. path)
+	end
+	local raw = fh:read("*a")
+	fh:close()
+	local ok, data = pcall(hs.json.decode, raw)
+	if not ok or type(data) ~= "table" or #data == 0 then
+		error("[menu_llm.models] models.json invalid or empty: " .. path)
+	end
+	Logger.done(LOG, "Loaded models catalogue (%d providers) from %s.", #data, path)
+	return data
+end
 
 local _model_ram_cache = nil
 
@@ -248,24 +271,7 @@ end
 function M.new(deps)
 	local obj = {}
 
-	local candidates = {
-		hs.configdir .. "/../shared/llm/models.json",
-		hs.configdir .. "/../../shared/llm/models.json",
-		hs.configdir .. "/data/llm_models.json",
-		hs.configdir .. "/../hammerspoon/data/llm_models.json",
-	}
-	local presets = {}
-	for _, path in ipairs(candidates) do
-		local ok, fh = pcall(io.open, path, "r")
-		if ok and fh then
-			local raw = fh:read("*a")
-			pcall(function() fh:close() end)
-			local dec_ok, data = pcall(hs.json.decode, raw)
-			if dec_ok and type(data) == "table" then 
-				presets = data; break 
-			end
-		end
-	end
+	local presets = load_models_presets()
 
 	-- Injecting a cross-engine hardware check for dynamic scaling.
 	deps.shared_system_check = function(target_model, engine_name, repo_info, do_download, on_cancel)

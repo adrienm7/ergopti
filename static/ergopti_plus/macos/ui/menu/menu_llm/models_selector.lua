@@ -435,12 +435,64 @@ function M.build(ctx)
 
 
 	-- =====================================================
-	-- ===== 1.6) Add custom model =====
+	-- ===== 1.6) Browse + add custom model =====
 	-- =====================================================
 
-	-- Power-user entry at the bottom — sits below the curated list so the
-	-- standard presets remain the first-seen, discoverable choice.
+	local function open_model_browser()
+		local choices = {}
+		for _, provider in ipairs(presets) do
+			for _, family in ipairs(provider.families or {}) do
+				for _, m in ipairs(family.models or {}) do
+					local m_name = m.name or m.repo
+					local active_source = m.urls and m.urls[active_backend]
+					if m_name and type(active_source) == "string" and active_source ~= "" then
+						local ram = models_mgr.get_model_ram(m_name) or 0
+						table.insert(choices, {
+							text    = m_name,
+							subText = string.format("%s · %s · ~%d Go",
+								provider.label or "", family.label or "", math.ceil(ram)),
+							m_name  = m_name,
+						})
+					end
+				end
+			end
+		end
+		if #choices == 0 then
+			Logger.warn(LOG, "Model browser: catalogue empty for backend '%s'.", tostring(active_backend))
+			return
+		end
+		table.sort(choices, function(a, b) return a.text < b.text end)
+		local chooser = hs.chooser.new(function(choice)
+			if choice and choice.m_name then
+				switch_model(choice.m_name)
+			end
+		end)
+		chooser:width(72)
+		chooser:placeholderText(i18n.get("menu.llm.browse_models_filter"))
+		chooser:queryChangedFn(function(query)
+			local q = (query or ""):lower()
+			if q == "" then
+				chooser:choices(choices)
+				return
+			end
+			local filtered = {}
+			for _, c in ipairs(choices) do
+				if c.text:lower():find(q, 1, true)
+					or (c.subText and c.subText:lower():find(q, 1, true)) then
+					table.insert(filtered, c)
+				end
+			end
+			chooser:choices(filtered)
+		end)
+		chooser:choices(choices)
+		chooser:show()
+	end
+
 	table.insert(menu, { title = "-" })
+	table.insert(menu, {
+		title = i18n.get("menu.llm.browse_models_entry"),
+		fn    = function() open_model_browser() end,
+	})
 	table.insert(menu, {
 		title = i18n.get("menu.llm.add_model_entry"),
 		fn    = function() prompt_add_user_model() end,

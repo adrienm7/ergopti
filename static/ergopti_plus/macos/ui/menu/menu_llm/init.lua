@@ -454,10 +454,16 @@ function M.create(deps)
             rich_model_title = rich_model_title .. string.format("%s%s%s", active_display_model, type_str, params_ram_str)
         end
 
-        table.insert(main_menu, {
-            title    = rich_model_title,
-            disabled = paused or nil,
-            menu     = ModelsSelector.build({
+        local model_submenu
+        if state.llm_backend == "api" then
+            model_submenu = ApiPanel.build_model_picker({
+                state       = state,
+                paused      = paused,
+                update_menu = update_menu,
+                WarmupCtrl  = WarmupCtrl,
+            })
+        else
+            model_submenu = ModelsSelector.build({
                 state         = state,
                 models_mgr    = models_mgr,
                 switch_model  = switch_model,
@@ -465,6 +471,12 @@ function M.create(deps)
                 update_menu   = update_menu,
                 DEFAULT_STATE = M.DEFAULT_STATE,
             })
+        end
+
+        table.insert(main_menu, {
+            title    = rich_model_title,
+            disabled = paused or nil,
+            menu     = model_submenu,
         })
 
         if info and info.emojis and info.emojis:find("🧠💭") then
