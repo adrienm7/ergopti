@@ -13,6 +13,11 @@ local helpers = require("tests.helpers")
 package.loaded["lib.logger"] = nil
 local _ = helpers.load_with_stubs("lib.logger")
 
+-- Clear sub-modules so they are re-required fresh (avoids contamination from stubs in other tests)
+package.loaded["modules.gestures.engine"] = nil
+package.loaded["modules.gestures.actions"] = nil
+package.loaded["modules.gestures.conflicts"] = nil
+
 local Gestures = helpers.load_with_stubs("modules.gestures")
 
 

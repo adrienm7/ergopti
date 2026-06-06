@@ -29,11 +29,14 @@ package.loaded["lib.i18n"] = { get = function(k) return k end, get_locale = func
 package.loaded["modules.gestures.engine"] = {
   init = function() end
 }
-package.loaded["modules.gestures.conflicts"] = {}
+package.loaded["modules.gestures.conflicts"] = {
+  on_action_changed = function() end
+}
 package.loaded["modules.gestures.actions"] = {
   init = function() end,
   get_label = function(n) return n end,
-  SG_NAMES = { "none", "script_pause_toggle", "script_reload", "script_quit", "other_action" }
+  SG_NAMES = { "none", "script_pause_toggle", "script_reload", "script_quit", "other_action" },
+  AX_NAMES = {}
 }
 
 local SC = helpers.load_with_stubs("modules.shortcuts.script_control")
