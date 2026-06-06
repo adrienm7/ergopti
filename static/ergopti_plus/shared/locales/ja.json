@@ -2139,5 +2139,7 @@
 	"updater.update_dialog_open": "GitHub で開く",
 	"updater.update_dialog_title": "ErgoptiPlus — アップデートのインストール",
 	"updater.version_message": "ErgoptiPlus {1}{2}\n\nGitHub のリリースページを開きますか?",
-	"vscode.reload_required": "タイピング拡張機能を有効にするには VSCode を再読込してください (Cmd+Shift+P > Reload Window)"
+	"vscode.reload_required": "タイピング拡張機能を有効にするには VSCode を再読込してください (Cmd+Shift+P > Reload Window)",
+	"menu.debug.open_error_log": "Open error log",
+	"sg_actions.open_error_log": "📄 Error log"
 }

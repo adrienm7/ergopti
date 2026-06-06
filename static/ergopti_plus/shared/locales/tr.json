@@ -2139,5 +2139,7 @@
 	"updater.update_dialog_open": "GitHub'da aç",
 	"updater.update_dialog_title": "ErgoptiPlus — Güncellemeyi yükle",
 	"updater.version_message": "ErgoptiPlus {1}{2}\n\nGitHub’da sürümler sayfasını açayım mı?",
-	"vscode.reload_required": "Yazım uzantısını etkinleştirmek için VSCode’u yeniden yükleyin (Cmd+Shift+P > Reload Window)"
+	"vscode.reload_required": "Yazım uzantısını etkinleştirmek için VSCode’u yeniden yükleyin (Cmd+Shift+P > Reload Window)",
+	"menu.debug.open_error_log": "Open error log",
+	"sg_actions.open_error_log": "📄 Error log"
 }

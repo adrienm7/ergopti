@@ -2139,5 +2139,7 @@
 	"updater.update_dialog_open": "פתח ב-GitHub",
 	"updater.update_dialog_title": "ErgoptiPlus — התקנת עדכון",
 	"updater.version_message": "ErgoptiPlus {1}{2}\n\nלפתוח את עמוד ההפצות ב-GitHub?",
-	"vscode.reload_required": "טען מחדש את VSCode (Cmd+Shift+P > Reload Window) להפעלת תוסף הכתיבה"
+	"vscode.reload_required": "טען מחדש את VSCode (Cmd+Shift+P > Reload Window) להפעלת תוסף הכתיבה",
+	"menu.debug.open_error_log": "Open error log",
+	"sg_actions.open_error_log": "📄 Error log"
 }

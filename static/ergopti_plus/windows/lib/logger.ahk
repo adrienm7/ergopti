@@ -22,6 +22,9 @@
 ;    can crank it to DEBUG when troubleshooting and back to INFO afterwards.
 ; 5. The optional in-memory ring buffer (200 last lines) supports a future
 ;    "Dump recent logs" menu entry without needing a file read.
+; 6. Dedicated errors-only sink: every WARNING/ERROR line is also appended to
+;    ErgoptiPlus_errors_YYYY-MM-DD.log (same daily rotation/purge policy). This
+;    gives a small, focused file for quick triage of problems.
 ; ==============================================================================
 
 
@@ -73,6 +76,11 @@ global _LOGGER_ERROR_ENABLED := True    ; ERROR
 ; Absolute path to the log file. Resolved lazily so the script directory is
 ; always correct even when running from a temporary copy.
 global LOGGER_LOG_PATH := ""
+
+; Absolute path to the errors-only log (WARNING + ERROR levels only).
+; Separate daily file so the user can quickly triage issues without wading
+; through thousands of normal lines in the unified log.
+global LOGGER_ERRORS_LOG_PATH := ""
 
 ; In-memory ring buffer (Array) and write cursor (1-based index). RemoveAt is
 ; avoided to keep the hot path O(1) — we overwrite the oldest slot directly.
@@ -131,7 +139,7 @@ global _LOGGER_TEST_SINK := 0
 ; log file path. Safe to call multiple times — later calls just refresh the
 ; minimum level (e.g. after the user changes it via the menu).
 LoggerInit() {
-    global LOGGER_LOG_PATH, LOGGER_MIN_LEVEL, LOGGER_DEFAULT_LEVEL, ConfigurationFile
+    global LOGGER_LOG_PATH, LOGGER_ERRORS_LOG_PATH, LOGGER_MIN_LEVEL, LOGGER_DEFAULT_LEVEL, ConfigurationFile
     global _LOGGER_FLUSH_TIMER_STARTED, LOGGER_FLUSH_INTERVAL_MS, _ConfigDir, _AhkSubDir
 
     ; Daily-rotating log file under <ConfigDir>/autohotkey/logs/. Resolves
@@ -143,6 +151,7 @@ LoggerInit() {
         try DirCreate(LogDir)
     }
     LOGGER_LOG_PATH := LogDir . "ErgoptiPlus_" . FormatTime(, "yyyy-MM-dd") . ".log"
+    LOGGER_ERRORS_LOG_PATH := LogDir . "ErgoptiPlus_errors_" . FormatTime(, "yyyy-MM-dd") . ".log"
     _LoggerPurgeOldLogs(LogDir, 14)
     ; Load sub-file routing rules from _shared/logger/sub_files.toml so adding a
     ; new topical log requires only a TOML edit, not a code change in both drivers.
@@ -410,6 +419,19 @@ _LoggerEmit(Level, Tag, Msg, Args*) {
         ; the buffered ``FileAppend`` path.
         if LOGGER_SEVERITY[Level] >= LOGGER_SEVERITY["WARNING"] {
             _LoggerFlush(true)
+            ; Dedicated errors-only file (WARNING + ERROR). Written synchronously
+            ; so the line survives even if the process dies shortly after.
+            ; This gives a small, focused file for quick triage without the
+            ; noise of the full daily unified log.
+            if LOGGER_ERRORS_LOG_PATH != "" {
+                try {
+                    f := FileOpen(LOGGER_ERRORS_LOG_PATH, "a", "UTF-8")
+                    if f {
+                        f.Write(Line . "`r`n")
+                        f.Close()
+                    }
+                }
+            }
         }
     }
     _LoggerFanOut(Tag, Line)
@@ -604,9 +626,9 @@ _LoggerLoadSubFilesToml(ScriptDir) {
     }
 }
 
-; Removes ErgoptiPlus_*.log files in LogDir whose date prefix is older than
-; MaxAgeDays. Filename format: ErgoptiPlus_YYYY-MM-DD.log. Best-effort: errors
-; are swallowed so a permission issue cannot break logger init.
+; Removes ErgoptiPlus_*.log (and ErgoptiPlus_errors_*.log) files in LogDir whose
+; date prefix is older than MaxAgeDays. Best-effort: errors are swallowed so a
+; permission issue cannot break logger init.
 _LoggerPurgeOldLogs(LogDir, MaxAgeDays) {
     if !DirExist(LogDir) {
         return
@@ -615,8 +637,9 @@ _LoggerPurgeOldLogs(LogDir, MaxAgeDays) {
     CutoffDate := SubStr(CutoffStamp, 1, 8)  ; YYYYMMDD
     try {
         loop files, LogDir . "ErgoptiPlus_*.log" {
-            ; Extract the date from the filename: ErgoptiPlus_YYYY-MM-DD.log
-            if RegExMatch(A_LoopFileName, "^ErgoptiPlus_(\d{4})-(\d{2})-(\d{2})\.log$",
+            ; Supports both unified (ErgoptiPlus_YYYY-MM-DD.log) and the dedicated
+            ; errors file (ErgoptiPlus_errors_YYYY-MM-DD.log).
+            if RegExMatch(A_LoopFileName, "^ErgoptiPlus(?:_errors)?_(\d{4})-(\d{2})-(\d{2})\.log$",
                 &Match) {
                 FileDate := Match[1] . Match[2] . Match[3]
                 if (FileDate < CutoffDate) {

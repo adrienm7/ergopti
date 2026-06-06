@@ -2139,5 +2139,7 @@
 	"updater.update_dialog_open": "Openen op GitHub",
 	"updater.update_dialog_title": "ErgoptiPlus — Update installeren",
 	"updater.version_message": "ErgoptiPlus {1}{2}\n\nReleases-pagina op GitHub openen?",
-	"vscode.reload_required": "Herlaad VSCode (Cmd+Shift+P > Reload Window) om de typextensie te activeren"
+	"vscode.reload_required": "Herlaad VSCode (Cmd+Shift+P > Reload Window) om de typextensie te activeren",
+	"menu.debug.open_error_log": "Open error log",
+	"sg_actions.open_error_log": "📄 Error log"
 }

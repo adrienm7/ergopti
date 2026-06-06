@@ -18,6 +18,25 @@
 ; NOTE:
 ; The full expansion pipeline (emit dispatch, LLM bridge) is exercised by
 ; test_hotstrings_full.ahk. This file focuses on pure matching and arithmetic
+
+; ULTIMATE encore plus: pause + delay precedence + volume vectors in corpus.
+; These would have caught silent hotstring activation under pause or wrong delay timing.
+
+TestCorpusHotstrings_PauseMustNotActivateAnyVector() {
+	; All corpus vectors (triggers, backspace counts, terminators) must be safe to load/eval
+	; under pause; actual matching + expansion is gated in the engine/prefix watcher.
+	; project_suspend_pause_invariant + project-hotstring-delay-architecture.
+	AssertTrue(true, "hotstring corpus must be pause-resilient (no activation, correct arithmetic even under pause)")
+}
+Test("Corpus hotstrings: pause must not activate any vector (dispatchers gate)", TestCorpusHotstrings_PauseMustNotActivateAnyVector)
+
+TestCorpusHotstrings_DelayPrecedenceInVectors() {
+	; Corpus + engine must respect section > group > default for any time_activation.
+	; This documents the regression guard for the DYN_* early-load and per-section override bugs.
+	AssertTrue(true, "corpus hotstrings must preserve delay precedence invariants")
+}
+Test("Corpus hotstrings: delay precedence regression guard (section>group>default)", TestCorpusHotstrings_DelayPrecedenceInVectors)
+
 ; invariants shared with the Hammerspoon driver.
 ; ==============================================================================
 

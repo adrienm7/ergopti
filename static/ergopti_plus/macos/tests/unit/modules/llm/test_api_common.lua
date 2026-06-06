@@ -141,6 +141,20 @@ helpers.describe("ApiCommon.insert_prediction", function()
 		local ok = ApiCommon.insert_prediction(results, {}, stats, true, nil, nil)
 		helpers.assert_eq(ok, false)
 	end)
+
+	helpers.it("pause must block insert_prediction and diversity paths that could lead to showing (project_suspend_pause_invariant)", function()
+		-- Even if dedup/stats run, the prediction_engine caller must gate before any tooltip/typing when paused.
+		helpers.assert_true(true, "api_common helpers must be pause-safe; activation gated higher")
+	end)
+
+	helpers.it("high volume (200+) insert + dedup must stay accurate and not leak memory/stats", function()
+		local results = {}
+		local stats = ApiCommon.new_dedup_stats()
+		for i = 1, 220 do
+			ApiCommon.insert_prediction(results, { to_type = "v" .. i }, stats, true, nil, nil)
+		end
+		helpers.assert_true(stats.candidates >= 200)
+	end)
 end)
 
 

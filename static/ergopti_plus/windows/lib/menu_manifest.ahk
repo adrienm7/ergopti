@@ -229,6 +229,7 @@ _MM_DebugFallback() {
 		Map("id", "log_level"),
 		Map("id", "open_logs"),
 		Map("id", "open_today_log"),
+		Map("id", "open_error_log"),
 		Map("id", "---"),
 		Map("id", "healthcheck"),
 	]

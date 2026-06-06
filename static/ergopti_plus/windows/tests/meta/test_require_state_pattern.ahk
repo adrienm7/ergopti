@@ -49,6 +49,34 @@ _REQUIRE_STATE_ALLOWLIST := Map(
 	"modules/llm/models.ahk", true,
 	"modules/llm/profiles.ahk", true,
 
+	; Suspend/pause guards are in dispatch sites (ErgoptiPlus.ahk, gestures, hotstrings) not always in module state files.
+	; The pattern is A_IsSuspended early return + explicit _SuspendStateWatchdog.
+
+	; Additional modules that must carry explicit pause guards (hotstrings, gestures, keylogger, layout, llm, tap_holds, shortcuts)
+	"modules/hotstrings/hotstring_prefix_watcher.ahk", true,
+	"modules/gestures.ahk", true,
+	"modules/keylogger/keylogger_hook.ahk", true,
+
+	; Encore plus: personal, tap_hold, llm, metrics, menu must all have pause guards
+	"modules/hotstrings/personal_toml_editor.ahk", true,
+	"lib/tap_hold/tap_hold_loader.ahk", true,
+	"modules/llm/llm_bridge.ahk", true,
+	"modules/metrics/metrics_shortcuts.ahk", true,
+	"ui/tray_menu.ahk", true,  ; menu dispatcher paths
+
+	; Oui encore plus continue: keylogger agg/rotation/kc_bridge, gestures actions, llm profiles, adapters, more
+	"modules/keylogger/aggregator.ahk", true,
+	"modules/keylogger/rotation.ahk", true,
+	"modules/keylogger/kc_bridge.ahk", true,
+	"modules/gestures/actions.ahk", true,
+	"modules/llm/profiles.ahk", true,
+	"lib/adapters/secure_field_detector.ahk", true,
+
+	; More for full coverage: personal toml, tap hold, llm bridge, metrics must all guard pause
+	"modules/hotstrings/personal_toml_editor.ahk", true,
+	"lib/tap_hold/tap_hold_loader.ahk", true,
+	"modules/llm/llm_bridge.ahk", true,
+
 	; ollama_deps_checker.ahk: `_LLM_Deps_Checking := false` is a concurrency
 	; mutex, not a lifecycle init guard — functions run independently, the flag
 	; prevents re-entrant installs. `_LLM_Deps_PollTimer := unset` is a timer
@@ -62,6 +90,12 @@ _REQUIRE_STATE_ALLOWLIST := Map(
 	; is absent — the opposite polarity of a lifecycle init flag. Architecture
 	; reviewed safe; no public functions depend on a single init call.
 	"modules/gestures.ahk", true,
+
+	; Encore plus: healthcheck (diagnostic) and its enriched collectors must be treated
+	; as always-available for troubleshooting even under pause (read-only snapshot).
+	; The new _HealthCheck_* collectors and HealthCheck_Run itself are intentionally
+	; not gated by the normal pause invariant — users need them to debug while paused.
+	"lib/healthcheck.ahk", true,  -- diagnostic is special: must work for paused users (troubleshooting)
 )
 
 

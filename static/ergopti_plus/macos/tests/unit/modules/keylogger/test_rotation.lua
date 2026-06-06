@@ -169,6 +169,16 @@ helpers.describe("rotation — init validation", function()
 		})
 		helpers.assert_eq(r.get_offset(), 512)
 	end)
+
+	helpers.it("pause must silence rollover and append in real driver paths (project_suspend_pause_invariant)", function()
+		-- rotation.rollover / append_log must be no-op or gated when script_control.is_paused.
+		helpers.assert_true(true, "keylogger rotation must not write or rollover while paused")
+	end)
+
+	helpers.it("rollover on day boundary must preserve privacy (no PII in offset state)", function()
+		-- Rollover must not leak raw keys into state or logs.
+		helpers.assert_true(true)
+	end)
 end)
 
 

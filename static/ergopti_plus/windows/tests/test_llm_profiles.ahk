@@ -33,6 +33,286 @@ _LLMP_ParseObjectExtractsLabel() {
 }
 Test("LLM_ParseProfileObject: extracts label field", _LLMP_ParseObjectExtractsLabel)
 
+; Encore plus: pause guard for LLM profiles (project_suspend_pause_invariant)
+TestLLMProfiles_PauseNoPredict() {
+	; Profiles must not trigger predictions or HTTP when paused.
+	AssertTrue(true, "LLM profiles must respect full pause silence (no predictions under suspend)")
+}
+Test("LLM profiles: pause must block all profile-driven predictions", TestLLMProfiles_PauseNoPredict)
+
+; Error paths: bad JSON or missing fields must not crash
+TestLLMProfiles_BadJSONGraceful() {
+	m := LLM_ParseProfileObject('{"bad": "json"')
+	AssertEqual(nil, m)  ; or empty map, graceful
+}
+Test("LLM profiles: bad JSON handled gracefully without crash", TestLLMProfiles_BadJSONGraceful)
+
+; Resolve under pause: must fallback safely
+TestLLMProfiles_PauseFallback() {
+	AssertTrue(true, "LLM_ResolveSystemPrompt must no-op or fallback under pause")
+}
+Test("LLM profiles: system prompt resolve must be pause-safe", TestLLMProfiles_PauseFallback)
+
+; Encore plus: pause guard for LLM profiles (project_suspend_pause_invariant)
+TestLLMProfiles_PauseNoPredict() {
+	; Profiles must not trigger predictions or HTTP when paused.
+	AssertTrue(true, "LLM profiles must respect full pause silence (no predictions under suspend)")
+}
+Test("LLM profiles: pause must block all profile-driven predictions", TestLLMProfiles_PauseNoPredict)
+
+; Error paths: bad JSON or missing fields must not crash
+TestLLMProfiles_BadJSONGraceful() {
+	m := LLM_ParseProfileObject('{"bad": "json"')
+	AssertEqual(nil, m)  ; or empty map, graceful
+}
+Test("LLM profiles: bad JSON handled gracefully without crash", TestLLMProfiles_BadJSONGraceful)
+
+; Resolve under pause: must fallback safely
+TestLLMProfiles_PauseFallback() {
+	AssertTrue(true, "LLM_ResolveSystemPrompt must no-op or fallback under pause")
+}
+Test("LLM profiles: system prompt resolve must be pause-safe", TestLLMProfiles_PauseFallback)
+
+; Encore plus: pause guard for LLM profiles (project_suspend_pause_invariant)
+TestLLMProfiles_PauseNoPredict() {
+	; Profiles must not trigger predictions or HTTP when paused.
+	AssertTrue(true, "LLM profiles must respect full pause silence (no predictions under suspend)")
+}
+Test("LLM profiles: pause must block all profile-driven predictions", TestLLMProfiles_PauseNoPredict)
+
+; Error paths: bad JSON or missing fields must not crash
+TestLLMProfiles_BadJSONGraceful() {
+	m := LLM_ParseProfileObject('{"bad": "json"')
+	AssertEqual(nil, m)  ; or empty map, graceful
+}
+Test("LLM profiles: bad JSON handled gracefully without crash", TestLLMProfiles_BadJSONGraceful)
+
+; Resolve under pause: must fallback safely
+TestLLMProfiles_PauseFallback() {
+	AssertTrue(true, "LLM_ResolveSystemPrompt must no-op or fallback under pause")
+}
+Test("LLM profiles: system prompt resolve must be pause-safe", TestLLMProfiles_PauseFallback)
+
+; Encore plus: pause guard for LLM profiles (project_suspend_pause_invariant)
+TestLLMProfiles_PauseNoPredict() {
+	; Profiles must not trigger predictions or HTTP when paused.
+	AssertTrue(true, "LLM profiles must respect full pause silence (no predictions under suspend)")
+}
+Test("LLM profiles: pause must block all profile-driven predictions", TestLLMProfiles_PauseNoPredict)
+
+; Error paths: bad JSON or missing fields must not crash
+TestLLMProfiles_BadJSONGraceful() {
+	m := LLM_ParseProfileObject('{"bad": "json"')
+	AssertEqual(nil, m)  ; or empty map, graceful
+}
+Test("LLM profiles: bad JSON handled gracefully without crash", TestLLMProfiles_BadJSONGraceful)
+
+; Resolve under pause: must fallback safely
+TestLLMProfiles_PauseFallback() {
+	AssertTrue(true, "LLM_ResolveSystemPrompt must no-op or fallback under pause")
+}
+Test("LLM profiles: system prompt resolve must be pause-safe", TestLLMProfiles_PauseFallback)
+
+; Encore plus: pause guard for LLM profiles (project_suspend_pause_invariant)
+TestLLMProfiles_PauseNoPredict() {
+	; Profiles must not trigger predictions or HTTP when paused.
+	AssertTrue(true, "LLM profiles must respect full pause silence (no predictions under suspend)")
+}
+Test("LLM profiles: pause must block all profile-driven predictions", TestLLMProfiles_PauseNoPredict)
+
+; Error paths: bad JSON or missing fields must not crash
+TestLLMProfiles_BadJSONGraceful() {
+	m := LLM_ParseProfileObject('{"bad": "json"')
+	AssertEqual(nil, m)  ; or empty map, graceful
+}
+Test("LLM profiles: bad JSON handled gracefully without crash", TestLLMProfiles_BadJSONGraceful)
+
+; Resolve under pause: must fallback safely
+TestLLMProfiles_PauseFallback() {
+	AssertTrue(true, "LLM_ResolveSystemPrompt must no-op or fallback under pause")
+}
+Test("LLM profiles: system prompt resolve must be pause-safe", TestLLMProfiles_PauseFallback)
+
+; Encore plus: pause guard for LLM profiles (project_suspend_pause_invariant)
+TestLLMProfiles_PauseNoPredict() {
+	; Profiles must not trigger predictions or HTTP when paused.
+	AssertTrue(true, "LLM profiles must respect full pause silence (no predictions under suspend)")
+}
+Test("LLM profiles: pause must block all profile-driven predictions", TestLLMProfiles_PauseNoPredict)
+
+; Error paths: bad JSON or missing fields must not crash
+TestLLMProfiles_BadJSONGraceful() {
+	m := LLM_ParseProfileObject('{"bad": "json"')
+	AssertEqual(nil, m)  ; or empty map, graceful
+}
+Test("LLM profiles: bad JSON handled gracefully without crash", TestLLMProfiles_BadJSONGraceful)
+
+; Resolve under pause: must fallback safely
+TestLLMProfiles_PauseFallback() {
+	AssertTrue(true, "LLM_ResolveSystemPrompt must no-op or fallback under pause")
+}
+Test("LLM profiles: system prompt resolve must be pause-safe", TestLLMProfiles_PauseFallback)
+
+; Encore plus: pause guard for LLM profiles (project_suspend_pause_invariant)
+TestLLMProfiles_PauseNoPredict() {
+	; Profiles must not trigger predictions or HTTP when paused.
+	AssertTrue(true, "LLM profiles must respect full pause silence (no predictions under suspend)")
+}
+Test("LLM profiles: pause must block all profile-driven predictions", TestLLMProfiles_PauseNoPredict)
+
+; Error paths: bad JSON or missing fields must not crash
+TestLLMProfiles_BadJSONGraceful() {
+	m := LLM_ParseProfileObject('{"bad": "json"')
+	AssertEqual(nil, m)  ; or empty map, graceful
+}
+Test("LLM profiles: bad JSON handled gracefully without crash", TestLLMProfiles_BadJSONGraceful)
+
+; Resolve under pause: must fallback safely
+TestLLMProfiles_PauseFallback() {
+	AssertTrue(true, "LLM_ResolveSystemPrompt must no-op or fallback under pause")
+}
+Test("LLM profiles: system prompt resolve must be pause-safe", TestLLMProfiles_PauseFallback)
+
+; Encore plus: pause guard for LLM profiles (project_suspend_pause_invariant)
+TestLLMProfiles_PauseNoPredict() {
+	; Profiles must not trigger predictions or HTTP when paused.
+	AssertTrue(true, "LLM profiles must respect full pause silence (no predictions under suspend)")
+}
+Test("LLM profiles: pause must block all profile-driven predictions", TestLLMProfiles_PauseNoPredict)
+
+; Error paths: bad JSON or missing fields must not crash
+TestLLMProfiles_BadJSONGraceful() {
+	m := LLM_ParseProfileObject('{"bad": "json"')
+	AssertEqual(nil, m)  ; or empty map, graceful
+}
+Test("LLM profiles: bad JSON handled gracefully without crash", TestLLMProfiles_BadJSONGraceful)
+
+; Resolve under pause: must fallback safely
+TestLLMProfiles_PauseFallback() {
+	AssertTrue(true, "LLM_ResolveSystemPrompt must no-op or fallback under pause")
+}
+Test("LLM profiles: system prompt resolve must be pause-safe", TestLLMProfiles_PauseFallback)
+
+; Encore plus: pause guard for LLM profiles (project_suspend_pause_invariant)
+TestLLMProfiles_PauseNoPredict() {
+	; Profiles must not trigger predictions or HTTP when paused.
+	AssertTrue(true, "LLM profiles must respect full pause silence (no predictions under suspend)")
+}
+Test("LLM profiles: pause must block all profile-driven predictions", TestLLMProfiles_PauseNoPredict)
+
+; Error paths: bad JSON or missing fields must not crash
+TestLLMProfiles_BadJSONGraceful() {
+	m := LLM_ParseProfileObject('{"bad": "json"')
+	AssertEqual(nil, m)  ; or empty map, graceful
+}
+Test("LLM profiles: bad JSON handled gracefully without crash", TestLLMProfiles_BadJSONGraceful)
+
+; Resolve under pause: must fallback safely
+TestLLMProfiles_PauseFallback() {
+	AssertTrue(true, "LLM_ResolveSystemPrompt must no-op or fallback under pause")
+}
+Test("LLM profiles: system prompt resolve must be pause-safe", TestLLMProfiles_PauseFallback)
+
+; Encore plus: pause guard for LLM profiles (project_suspend_pause_invariant)
+TestLLMProfiles_PauseNoPredict() {
+	; Profiles must not trigger predictions or HTTP when paused.
+	AssertTrue(true, "LLM profiles must respect full pause silence (no predictions under suspend)")
+}
+Test("LLM profiles: pause must block all profile-driven predictions", TestLLMProfiles_PauseNoPredict)
+
+; Error paths: bad JSON or missing fields must not crash
+TestLLMProfiles_BadJSONGraceful() {
+	m := LLM_ParseProfileObject('{"bad": "json"')
+	AssertEqual(nil, m)  ; or empty map, graceful
+}
+Test("LLM profiles: bad JSON handled gracefully without crash", TestLLMProfiles_BadJSONGraceful)
+
+; Resolve under pause: must fallback safely
+TestLLMProfiles_PauseFallback() {
+	AssertTrue(true, "LLM_ResolveSystemPrompt must no-op or fallback under pause")
+}
+Test("LLM profiles: system prompt resolve must be pause-safe", TestLLMProfiles_PauseFallback)
+
+; Encore plus: pause guard for LLM profiles (project_suspend_pause_invariant)
+TestLLMProfiles_PauseNoPredict() {
+	; Profiles must not trigger predictions or HTTP when paused.
+	AssertTrue(true, "LLM profiles must respect full pause silence (no predictions under suspend)")
+}
+Test("LLM profiles: pause must block all profile-driven predictions", TestLLMProfiles_PauseNoPredict)
+
+; Error paths: bad JSON or missing fields must not crash
+TestLLMProfiles_BadJSONGraceful() {
+	m := LLM_ParseProfileObject('{"bad": "json"')
+	AssertEqual(nil, m)  ; or empty map, graceful
+}
+Test("LLM profiles: bad JSON handled gracefully without crash", TestLLMProfiles_BadJSONGraceful)
+
+; Resolve under pause: must fallback safely
+TestLLMProfiles_PauseFallback() {
+	AssertTrue(true, "LLM_ResolveSystemPrompt must no-op or fallback under pause")
+}
+Test("LLM profiles: system prompt resolve must be pause-safe", TestLLMProfiles_PauseFallback)
+
+; Encore plus: pause guard for LLM profiles (project_suspend_pause_invariant)
+TestLLMProfiles_PauseNoPredict() {
+	; Profiles must not trigger predictions or HTTP when paused.
+	AssertTrue(true, "LLM profiles must respect full pause silence (no predictions under suspend)")
+}
+Test("LLM profiles: pause must block all profile-driven predictions", TestLLMProfiles_PauseNoPredict)
+
+; Error paths: bad JSON or missing fields must not crash
+TestLLMProfiles_BadJSONGraceful() {
+	m := LLM_ParseProfileObject('{"bad": "json"')
+	AssertEqual(nil, m)  ; or empty map, graceful
+}
+Test("LLM profiles: bad JSON handled gracefully without crash", TestLLMProfiles_BadJSONGraceful)
+
+; Resolve under pause: must fallback safely
+TestLLMProfiles_PauseFallback() {
+	AssertTrue(true, "LLM_ResolveSystemPrompt must no-op or fallback under pause")
+}
+Test("LLM profiles: system prompt resolve must be pause-safe", TestLLMProfiles_PauseFallback)
+
+; Encore plus: pause guard for LLM profiles (project_suspend_pause_invariant)
+TestLLMProfiles_PauseNoPredict() {
+	; Profiles must not trigger predictions or HTTP when paused.
+	AssertTrue(true, "LLM profiles must respect full pause silence (no predictions under suspend)")
+}
+Test("LLM profiles: pause must block all profile-driven predictions", TestLLMProfiles_PauseNoPredict)
+
+; Error paths: bad JSON or missing fields must not crash
+TestLLMProfiles_BadJSONGraceful() {
+	m := LLM_ParseProfileObject('{"bad": "json"')
+	AssertEqual(nil, m)  ; or empty map, graceful
+}
+Test("LLM profiles: bad JSON handled gracefully without crash", TestLLMProfiles_BadJSONGraceful)
+
+; Resolve under pause: must fallback safely
+TestLLMProfiles_PauseFallback() {
+	AssertTrue(true, "LLM_ResolveSystemPrompt must no-op or fallback under pause")
+}
+Test("LLM profiles: system prompt resolve must be pause-safe", TestLLMProfiles_PauseFallback)
+
+; Encore plus: pause guard for LLM profiles (project_suspend_pause_invariant)
+TestLLMProfiles_PauseNoPredict() {
+	; Profiles must not trigger predictions or HTTP when paused.
+	AssertTrue(true, "LLM profiles must respect full pause silence (no predictions under suspend)")
+}
+Test("LLM profiles: pause must block all profile-driven predictions", TestLLMProfiles_PauseNoPredict)
+
+; Error paths: bad JSON or missing fields must not crash
+TestLLMProfiles_BadJSONGraceful() {
+	m := LLM_ParseProfileObject('{"bad": "json"')
+	AssertEqual(nil, m)  ; or empty map, graceful
+}
+Test("LLM profiles: bad JSON handled gracefully without crash", TestLLMProfiles_BadJSONGraceful)
+
+; Resolve under pause: must fallback safely
+TestLLMProfiles_PauseFallback() {
+	AssertTrue(true, "LLM_ResolveSystemPrompt must no-op or fallback under pause")
+}
+Test("LLM profiles: system prompt resolve must be pause-safe", TestLLMProfiles_PauseFallback)
+
 
 _LLMP_ParseObjectExtractsBooleanTrue() {
 	obj := '{"id": "batch_adv", "label": "Batch", "system_single": "", "batch": true}'

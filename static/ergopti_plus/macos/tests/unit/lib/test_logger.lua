@@ -292,3 +292,339 @@ helpers.describe("Logger: test sink", function()
 		helpers.assert_eq(calls, 0)
 	end)
 end)
+
+helpers.describe("Logger: errors-only sink (ERRORS_LOG_FILE)", function()
+	helpers.it("re-points ERRORS_LOG_FILE under <config_dir>/hammerspoon/logs/ like the unified log", function()
+		Logger.init_log_path("/tmp/ergopti_test_errors_config/", 14)
+		helpers.assert_true(
+			Logger.ERRORS_LOG_FILE:find("/tmp/ergopti_test_errors_config/hammerspoon/logs/ErgoptiPlus_errors_") ~= nil,
+			"ERRORS_LOG_FILE should be re-pointed under hammerspoon/logs/ with _errors_ prefix"
+		)
+		helpers.assert_true(
+			Logger.ERRORS_LOG_FILE:find("%.log$") ~= nil,
+			"ERRORS_LOG_FILE should end with .log"
+		)
+	end)
+
+	helpers.it("uses today's date in the errors filename", function()
+		Logger.init_log_path("/tmp/ergopti_test_errors_date/", 14)
+		local today = os.date("%Y-%m-%d")
+		helpers.assert_true(
+			Logger.ERRORS_LOG_FILE:find(today, 1, true) ~= nil,
+			"ERRORS_LOG_FILE should contain today's date"
+		)
+	end)
+
+	helpers.it("writes WARNING and ERROR lines to the dedicated errors file but not lower levels", function()
+		local unique = tostring(os.time()) .. "_" .. tostring(math.random(100000))
+		local test_base = "/tmp/ergopti_test_errors_sink_" .. unique .. "/"
+		local logs_dir = test_base .. "hammerspoon/logs/"
+
+		-- Ensure directory exists (init_log_path uses ShellRunner which may be stubbed in this env)
+		pcall(function() os.execute('mkdir -p "' .. logs_dir .. '"') end)
+
+		local L = helpers.load_with_stubs("lib.logger")
+		L.set_level("DEBUG")
+		L.init_log_path(test_base, 14)
+
+		-- Emit a mix of severities
+		L.debug("errsink", "debug-not-in-errors")
+		L.info("errsink", "info-not-in-errors")
+		L.warn("errsink", "warn-must-be-in-errors-%s", "42")
+		L.error("errsink", "error-must-be-in-errors %d", 99)
+
+		local err_path = L.ERRORS_LOG_FILE
+		local fh = io.open(err_path, "r")
+		local content = ""
+		if fh then
+			content = fh:read("*a") or ""
+			fh:close()
+		end
+
+		-- High severity must be present
+		helpers.assert_true(
+			content:find("warn%-must%-be%-in%-errors%-42") ~= nil,
+			"errors log must contain the WARNING message"
+		)
+		helpers.assert_true(
+			content:find("error%-must%-be%-in%-errors") ~= nil,
+			"errors log must contain the ERROR message"
+		)
+		-- Low severity must be absent from the errors-only file
+		helpers.assert_true(
+			content:find("debug%-not%-in%-errors") == nil,
+			"errors log must NOT contain DEBUG messages"
+		)
+		helpers.assert_true(
+			content:find("info%-not%-in%-errors") == nil,
+			"errors log must NOT contain INFO messages"
+		)
+
+		-- Cleanup the specific errors file (dir may remain, harmless)
+		pcall(function() os.remove(err_path) end)
+	end)
+
+	helpers.it("ERROR level messages are written to errors file", function()
+		local unique = tostring(os.time()) .. "_err"
+		local test_base = "/tmp/ergopti_test_errors_only_err_" .. unique .. "/"
+		local logs_dir = test_base .. "hammerspoon/logs/"
+		pcall(function() os.execute('mkdir -p "' .. logs_dir .. '"') end)
+
+		local L = helpers.load_with_stubs("lib.logger")
+		L.set_level("DEBUG")
+		L.init_log_path(test_base)
+
+		L.error("onlyerr", "critical failure %s", "xyz")
+
+		local fh = io.open(L.ERRORS_LOG_FILE, "r")
+		local content = fh and (fh:read("*a") or "") or ""
+		if fh then fh:close() end
+
+		helpers.assert_true(content:find("critical failure xyz") ~= nil, "ERROR must be in errors file")
+		helpers.assert_true(content:find("%[ERROR%]") ~= nil, "errors file line must contain [ERROR] label")
+
+		pcall(function() os.remove(L.ERRORS_LOG_FILE) end)
+	end)
+
+	helpers.it("WARNING level messages are written to errors file", function()
+		local unique = tostring(os.time()) .. "_warn"
+		local test_base = "/tmp/ergopti_test_errors_only_warn_" .. unique .. "/"
+		local logs_dir = test_base .. "hammerspoon/logs/"
+		pcall(function() os.execute('mkdir -p "' .. logs_dir .. '"') end)
+
+		local L = helpers.load_with_stubs("lib.logger")
+		L.set_level("DEBUG")
+		L.init_log_path(test_base)
+
+		L.warn("onlywarn", "degraded state detected")
+
+		local fh = io.open(L.ERRORS_LOG_FILE, "r")
+		local content = fh and (fh:read("*a") or "") or ""
+		if fh then fh:close() end
+
+		helpers.assert_true(content:find("degraded state detected") ~= nil)
+		helpers.assert_true(content:find("%[WARNING%]") ~= nil)
+
+		pcall(function() os.remove(L.ERRORS_LOG_FILE) end)
+	end)
+
+	helpers.it("INFO/DEBUG/TRACE/DONE/START/SUCCESS do not appear in errors file", function()
+		local unique = tostring(os.time()) .. "_low"
+		local test_base = "/tmp/ergopti_test_errors_low_" .. unique .. "/"
+		local logs_dir = test_base .. "hammerspoon/logs/"
+		pcall(function() os.execute('mkdir -p "' .. logs_dir .. '"') end)
+
+		local L = helpers.load_with_stubs("lib.logger")
+		L.set_level("DEBUG")
+		L.init_log_path(test_base)
+
+		L.info("lowsev", "info-msg")
+		L.debug("lowsev", "debug-msg")
+		L.trace("lowsev", "trace-msg")
+		L.done("lowsev", "done-msg")
+		L.start("lowsev", "start-msg")
+		L.success("lowsev", "success-msg")
+
+		local fh = io.open(L.ERRORS_LOG_FILE, "r")
+		local content = fh and (fh:read("*a") or "") or ""
+		if fh then fh:close() end
+
+		helpers.assert_true(content:find("info%-msg") == nil)
+		helpers.assert_true(content:find("debug%-msg") == nil)
+		helpers.assert_true(content:find("trace%-msg") == nil)
+		helpers.assert_true(content:find("done%-msg") == nil)
+		helpers.assert_true(content:find("start%-msg") == nil)
+		helpers.assert_true(content:find("success%-msg") == nil)
+
+		pcall(function() os.remove(L.ERRORS_LOG_FILE) end)
+	end)
+
+	helpers.it("errors file receives same formatted line content as ring buffer for high severity", function()
+		local unique = tostring(os.time()) .. "_fmt"
+		local test_base = "/tmp/ergopti_test_errors_fmt_" .. unique .. "/"
+		local logs_dir = test_base .. "hammerspoon/logs/"
+		pcall(function() os.execute('mkdir -p "' .. logs_dir .. '"') end)
+
+		local L = helpers.load_with_stubs("lib.logger")
+		L.set_level("DEBUG")
+		L.init_log_path(test_base)
+
+		L.error("fmt", "user %s id=%d", "alice", 42)
+
+		local ring = L.ring_buffer_snapshot()
+		local last_ring = ring[#ring] or ""
+
+		local fh = io.open(L.ERRORS_LOG_FILE, "r")
+		local err_content = fh and (fh:read("*a") or "") or ""
+		if fh then fh:close() end
+
+		-- Both should contain the interpolated message and the ERROR label
+		helpers.assert_true(last_ring:find("user alice id=42") ~= nil)
+		helpers.assert_true(err_content:find("user alice id=42") ~= nil)
+		helpers.assert_true(err_content:find("%[ERROR%]") ~= nil)
+
+		pcall(function() os.remove(L.ERRORS_LOG_FILE) end)
+	end)
+
+	helpers.it("high severity lines still reach the ring buffer and test sink even when errors file is active", function()
+		local unique = tostring(os.time()) .. "_both"
+		local test_base = "/tmp/ergopti_test_errors_both_" .. unique .. "/"
+		local logs_dir = test_base .. "hammerspoon/logs/"
+		pcall(function() os.execute('mkdir -p "' .. logs_dir .. '"') end)
+
+		local L = helpers.load_with_stubs("lib.logger")
+		L.set_level("DEBUG")
+		L.init_log_path(test_base)
+
+		local captured = {}
+		L.set_sink(function(line) captured[#captured + 1] = line end)
+
+		L.warn("both", "visible everywhere")
+
+		local ring = L.ring_buffer_snapshot()
+		local last_ring = ring[#ring] or ""
+		local fh = io.open(L.ERRORS_LOG_FILE, "r")
+		local err_content = fh and (fh:read("*a") or "") or ""
+		if fh then fh:close() end
+
+		helpers.assert_true(#captured >= 1)
+		helpers.assert_true(last_ring:find("visible everywhere") ~= nil)
+		helpers.assert_true(err_content:find("visible everywhere") ~= nil)
+
+		L.set_sink(nil)
+		pcall(function() os.remove(L.ERRORS_LOG_FILE) end)
+	end)
+
+	-- Day rollover simulation for the errors filename (critical per user request)
+	helpers.it("simulates day rollover and switches to new ERRORS_LOG_FILE", function()
+		local L = helpers.load_with_stubs("lib.logger")
+		L.set_level("DEBUG")
+
+		-- Save real date
+		local real_os_date = os.date
+
+		-- Fake "yesterday"
+		os.date = function(fmt, t)
+			if fmt == "%Y-%m-%d" then return "2025-06-30" end
+			return real_os_date(fmt, t)
+		end
+		L.init_log_path("/tmp/ergopti_test_dayroll1/", 14)
+		local yesterday_path = L.ERRORS_LOG_FILE
+		helpers.assert_true(yesterday_path:find("2025%-06%-30") ~= nil, "should use yesterday date")
+
+		L.error("roll", "error on fake yesterday")
+		local fh = io.open(yesterday_path, "r")
+		local c1 = fh and (fh:read("*a") or "") or ""
+		if fh then fh:close() end
+		helpers.assert_true(c1:find("error on fake yesterday") ~= nil)
+
+		-- Roll to "today"
+		os.date = function(fmt, t)
+			if fmt == "%Y-%m-%d" then return "2025-07-01" end
+			return real_os_date(fmt, t)
+		end
+		L.init_log_path("/tmp/ergopti_test_dayroll2/", 14)
+		local today_path = L.ERRORS_LOG_FILE
+		helpers.assert_true(today_path:find("2025%-07%-01") ~= nil, "should switch to new day filename")
+		helpers.assert_true(today_path ~= yesterday_path, "paths must differ after rollover")
+
+		L.error("roll", "error on fake today")
+		local fh2 = io.open(today_path, "r")
+		local c2 = fh2 and (fh2:read("*a") or "") or ""
+		if fh2 then fh2:close() end
+		helpers.assert_true(c2:find("error on fake today") ~= nil)
+
+		-- Restore
+		os.date = real_os_date
+		pcall(function() os.remove(yesterday_path) end)
+		pcall(function() os.remove(today_path) end)
+	end)
+
+	-- Logger.pcall internal ERROR must appear in errors file (user requested)
+	helpers.it("Logger.pcall that throws logs internal ERROR into errors file", function()
+		local unique = tostring(os.time()) .. "_pcall_internal"
+		local test_base = "/tmp/ergopti_test_pcall_internal_" .. unique .. "/"
+		local logs_dir = test_base .. "hammerspoon/logs/"
+		pcall(function() os.execute('mkdir -p "' .. logs_dir .. '"') end)
+
+		local L = helpers.load_with_stubs("lib.logger")
+		L.set_level("DEBUG")
+		L.init_log_path(test_base)
+
+		local ok, err = L.pcall("pcallmod", function()
+			error("intentional pcall crash for test")
+		end)
+		helpers.assert_true(not ok)
+
+		local fh = io.open(L.ERRORS_LOG_FILE, "r")
+		local content = fh and (fh:read("*a") or "") or ""
+		if fh then fh:close() end
+
+		helpers.assert_true(content:find("intentional pcall crash") ~= nil or content:find("Exception") ~= nil,
+			"pcall failure must emit ERROR visible in errors file")
+
+		pcall(function() os.remove(L.ERRORS_LOG_FILE) end)
+	end)
+
+	-- FS write failure to errors file must not crash anything (user requested)
+	helpers.it("survives hard FS write failure on errors file (best-effort, no crash)", function()
+		local L = helpers.load_with_stubs("lib.logger")
+		L.set_level("DEBUG")
+		L.init_log_path("/tmp/ergopti_test_fs_fail/", 14)
+
+		-- Force an un-writable path (will cause io.open to fail)
+		local bad_path = "/root/this/should/never/be/writable/ergopti_errors_fail_test.log"
+		L.ERRORS_LOG_FILE = bad_path
+
+		local write_ok = pcall(function()
+			L.error("fsfail", "this error write must fail gracefully")
+		end)
+		helpers.assert_true(write_ok, "high-severity log must not propagate FS error to caller")
+
+		-- Critical: ring buffer and sink must still have received the line
+		local snap = L.ring_buffer_snapshot()
+		local found_in_ring = false
+		for _, line in ipairs(snap) do
+			if line:find("this error write must fail gracefully") then
+				found_in_ring = true
+				break
+			end
+		end
+		helpers.assert_true(found_in_ring, "line must reach ring even if errors file write failed")
+
+		-- Restore a sane path for cleanup (no real file was created)
+		L.init_log_path("/tmp/ergopti_test_fs_fail_cleanup/", 14)
+	end)
+
+	-- Additional edge: empty message, special chars, dedup on error level
+	helpers.it("handles empty message, special characters, and dedup on ERROR level", function()
+		local unique = tostring(os.time()) .. "_edge"
+		local test_base = "/tmp/ergopti_test_edge_" .. unique .. "/"
+		local logs_dir = test_base .. "hammerspoon/logs/"
+		pcall(function() os.execute('mkdir -p "' .. logs_dir .. '"') end)
+
+		local L = helpers.load_with_stubs("lib.logger")
+		L.set_level("DEBUG")
+		L.init_log_path(test_base)
+
+		L.error("edge", "")
+		L.error("edge", "line with \"quotes\" and \n newline and \t tab")
+		L.error("edge", "repeated error line for dedup test")
+		L.error("edge", "repeated error line for dedup test")  -- should dedup
+
+		local fh = io.open(L.ERRORS_LOG_FILE, "r")
+		local content = fh and (fh:read("*a") or "") or ""
+		if fh then fh:close() end
+
+		-- Empty message should still produce a line with [ERROR]
+		helpers.assert_true(content:find("%[ERROR%]") ~= nil)
+		-- Special chars should be present (not stripped)
+		helpers.assert_true(content:find("quotes") ~= nil)
+		-- Dedup summary should appear (or at least not duplicate the raw line twice)
+		local count_raw = 0
+		for _ in content:gmatch("repeated error line for dedup test") do count_raw = count_raw + 1 end
+		helpers.assert_true(count_raw <= 1, "dedup should suppress duplicate ERROR lines")
+
+		pcall(function() os.remove(L.ERRORS_LOG_FILE) end)
+	end)
+end)

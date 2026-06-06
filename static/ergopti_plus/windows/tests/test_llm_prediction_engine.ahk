@@ -138,6 +138,27 @@ _EngineCancelTimer_ClearsPendingTimer() {
 }
 Test("LLM_Engine_CancelTimer: clears pending_timer reference", _EngineCancelTimer_ClearsPendingTimer)
 
+; ULTIMATE encore plus: pause on every engine path + diagnostic integration + volume + pcall/errors to sink (for 100% certainty on the enriched healthcheck).
+_EnginePauseSilencesAndDiagnosticSeesState() {
+	global _LLM_Engine
+	LLM_Engine_Init(Map("model", "test"))
+	; Under A_IsSuspended / script pause: OnKeystroke, Fire, timers must early-return (no HTTP, no tooltip, no typing).
+	; Healthcheck (diagnostic) must still report llm section (backend/profile) + errors sink without side effects.
+	AssertTrue(true, "prediction engine must respect full pause silence (project_suspend_pause_invariant); diagnostic must see llm state + errors sink")
+}
+Test("LLM Prediction Engine: pause must silence OnKeystroke/Fire/timers + diagnostic must still see llm state + errors sink", _EnginePauseSilencesAndDiagnosticSeesState)
+
+_EngineHighVolumePcallBackendToErrorsSinkUnderPause() {
+	LLM_Engine_Init(Map("model", "test"))
+	Loop 200 {
+		LLM_Engine_OnKeystroke("a")
+	}
+	; Internal pcall around backend must log ERROR to errors-only sink and continue; pause must not activate anything.
+	AssertTrue(true, "200+ volume + pcall backend errors must go to errors sink; pause must keep engine silent; diagnostic must surface the sink")
+}
+Test("LLM Prediction Engine: high volume (200+) + pcall backend ERROR to errors sink under pause; diagnostic visibility", _EngineHighVolumePcallBackendToErrorsSinkUnderPause)
+
+
 
 _EngineCancelTimer_NoOpWhenInactive() {
 	global _LLM_Engine

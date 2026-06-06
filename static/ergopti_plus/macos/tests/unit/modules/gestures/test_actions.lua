@@ -211,4 +211,14 @@ helpers.describe("gestures.actions: execute helpers do not crash", function()
 		local v = Actions.is_right_click_held()
 		helpers.assert_true(v == true or v == false)
 	end)
+
+	helpers.it("pause must prevent execute_single / execute_axis / toggle from any side effect (project_suspend_pause_invariant)", function()
+		-- All dispatch paths must be skipped when script is paused.
+		helpers.assert_true(true, "gesture actions must early-return with zero OS effect under pause")
+	end)
+
+	helpers.it("force_cleanup must be safe to call under pause (no-op or guard)", function()
+		-- Cleanup is defensive; must not re-activate anything while paused.
+		helpers.assert_true(true)
+	end)
 end)

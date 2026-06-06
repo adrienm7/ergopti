@@ -93,8 +93,19 @@ CrashReport_Build(ErrorObj) {
 	; ── Timestamp ────────────────────────────────────────────────────────────
 	Ts := _CrashReport_IsoTimestamp()
 
-	; ── Full system info (mirrors healthcheck _HealthCheck_SysInfo) ──────────
+	; ── Full system info (mirrors healthcheck _HealthCheck_SysInfo + enriched fields) ──────────
 	Sys := _CrashReport_SysInfo()
+	; Pull a few safe enriched fields from the live healthcheck for even richer crash reports (pause state, key logs paths, etc.)
+	try {
+		HC := HealthCheck_Run()
+		if HC.Has("pause_state")
+			Sys["pause_at_crash"] := HC["pause_state"]["is_paused"] ? "paused" : "running"
+		if HC.Has("logs") {
+			Sys["errors_log_path"] := HC["logs"]["errors_today"]
+		}
+	} catch {
+		; never let diagnostic enrichment break a crash report
+	}
 
 	; ── Uptime ────────────────────────────────────────────────────────────────
 	UptimeSec := 0

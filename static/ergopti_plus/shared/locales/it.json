@@ -2139,5 +2139,7 @@
 	"updater.update_dialog_open": "Apri su GitHub",
 	"updater.update_dialog_title": "ErgoptiPlus — Installa aggiornamento",
 	"updater.version_message": "ErgoptiPlus {1}{2}\n\nAprire la pagina delle release su GitHub?",
-	"vscode.reload_required": "Ricaricare VSCode (Cmd+Shift+P > Reload Window) per attivare l’estensione di digitazione"
+	"vscode.reload_required": "Ricaricare VSCode (Cmd+Shift+P > Reload Window) per attivare l’estensione di digitazione",
+	"menu.debug.open_error_log": "Open error log",
+	"sg_actions.open_error_log": "📄 Error log"
 }

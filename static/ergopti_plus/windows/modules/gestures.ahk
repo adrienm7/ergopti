@@ -444,6 +444,9 @@ global GESTURE_ACTIONS := Map(
     "open_today_log", {
         Fn: (*) => OpenTodayLog(),
     },
+    "open_error_log", {
+        Fn: (*) => OpenErrorLog(),
+    },
     ; --- Script management ---
     "script_pause_toggle", {
         Fn: (*) => ToggleSuspend(),
