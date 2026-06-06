@@ -37,7 +37,10 @@
 
 ; Default Ollama endpoint
 global LLM_OLLAMA_BASE_URL := "http://localhost:11434"
-global LLM_OLLAMA_TIMEOUT  := 30000   ; ms — generous to accommodate cold-start inference
+; Weak laptops running qwen3.5:0.8b on CPU can exceed 30 s per token batch.
+; WinHTTP aborts the whole request when this fires — too low and the tooltip
+; never appears despite Ollama still computing in the background.
+global LLM_OLLAMA_TIMEOUT  := 180000  ; ms (3 min) — cold CPU inference headroom
 
 ; Polling interval for the async path. 50 ms is the same cadence the HS side
 ; effectively gets from hs.http.asyncPost's underlying CFRunLoop tick — fine
@@ -56,6 +59,33 @@ global LLM_OLLAMA_MAX_INFLIGHT := 16
 ; it and bails before invoking the user's callback.
 global _LLM_Ollama_Async := Map()
 global _LLM_Ollama_AsyncCounter := 0
+; Latest-only queue when Ollama is busy — coalesces rapid re-fires instead of
+; aborting in-flight WinHTTP (Abort made Ollama return ``content: ""``).
+global _LLM_Ollama_Pending := ""
+; In-flight curl streaming handles — cancelled by LLM_OllamaCancelAllAsync.
+global _LLM_Ollama_ActiveStreams := []
+
+; Stop tokens — same lists as macOS api_ollama.lua (STOP_BATCH / STOP_LINE).
+global _LLM_OLLAMA_STOP_BATCH := ["<|eot_id|>", "<|im_end|>", "[/INST]", "PREFIX:", "TAIL:"]
+global _LLM_OLLAMA_STOP_LINE := ["<|eot_id|>", "<|im_end|>", "[/INST]", "PREFIX:", "TAIL:", "`n`n", "===", "`n", "`r", "</", "Suite finale", "SUITE", "NEXT_WORDS:"]
+
+; True after warmup succeeds — mirrors macOS api_ollama ``_is_ready``.
+global _LLM_Ollama_IsReady := false
+; Warmup retry loop (macOS warmup_controller parity). Without this, a single
+; failed or slow warmup left _LLM_Ollama_IsReady false forever and the engine
+; dropped every prediction at FirePrediction.
+global _LLM_Ollama_WarmupRetryFn := unset
+global _LLM_Ollama_WarmupRetryModel := ""
+global _LLM_Ollama_WarmupRetryIntervalMs := 5000
+global _LLM_Ollama_WarmupStartedTick := 0
+; Monotonic id so stale warmup poll chains bail after a newer warmup starts.
+global _LLM_Ollama_WarmupGeneration := 0
+; Warmup uses a shorter ceiling than real predictions — a hung warmup must not
+; block the server for 3 min while the user is typing real requests.
+global LLM_OLLAMA_WARMUP_TIMEOUT := 90000
+; Warmup poll must outlive cold CPU model loads (3 s was far too short — logs
+; showed endless "prediction deferred" with no "Model warmed up" line).
+global _LLM_OLLAMA_WARMUP_POLL_MS := 250
 
 
 
@@ -67,6 +97,17 @@ global _LLM_Ollama_AsyncCounter := 0
 ; =====================================
 
 /**
+ * Sends a JSON body via WinHTTP. Async ``Open(..., true)`` rejects ADODB binary
+ * SafeArrays (hard failure / E_NOINTERFACE); sync mode tolerated them but the
+ * prediction engine is async-only. ``_LLM_Ollama_EscapeJSON`` keeps the wire
+ * form ASCII via ``\uXXXX`` so ``Send(string)`` is safe for accented context.
+ */
+_LLM_Ollama_SendUtf8(http, payload) {
+	http.SetRequestHeader("Content-Type", "application/json; charset=utf-8")
+	http.Send(payload)
+}
+
+/**
  * Sends a prompt to Ollama and returns the generated text (blocking).
  * Kept for legacy call sites (test harnesses, manual probes). The prediction
  * engine uses the async surface below.
@@ -76,23 +117,42 @@ global _LLM_Ollama_AsyncCounter := 0
  * @param {number} temperature - Sampling temperature (0.0–2.0).
  * @returns {string} The generated text, or "" on error.
  */
-LLM_OllamaGenerate(model, system_prompt, user_text, temperature := 0.1) {
-	payload := LLM_BuildOllamaPayload(model, system_prompt, user_text, temperature)
+LLM_OllamaIsReady() {
+	global _LLM_Ollama_IsReady
+	return _LLM_Ollama_IsReady
+}
+
+/**
+ * True when predictions may hit Ollama: warmup succeeded, or the server was
+ * reachable long enough that blocking forever is worse than a slow first token.
+ */
+LLM_OllamaAllowInference() {
+	global _LLM_Ollama_IsReady, _LLM_Ollama_WarmupStartedTick
+	if _LLM_Ollama_IsReady
+		return true
+	if !(IsSet(LLM_Deps_IsReady) and LLM_Deps_IsReady())
+		return false
+	if (_LLM_Ollama_WarmupStartedTick > 0
+			and (A_TickCount - _LLM_Ollama_WarmupStartedTick) >= 8000)
+		return true
+	return false
+}
+
+LLM_OllamaGenerate(model, system_prompt, full_text, temperature := 0.1, tail_text := "") {
+	payload := LLM_BuildOllamaPayload(model, system_prompt, full_text, temperature, false, "", 15, false, tail_text)
 
 	try {
 		http := ComObject("WinHttp.WinHttpRequest.5.1")
-		http.Open("POST", LLM_OLLAMA_BASE_URL "/api/generate", false)
+		http.Open("POST", LLM_OLLAMA_BASE_URL "/api/chat", false)
 		http.SetTimeouts(LLM_OLLAMA_TIMEOUT, LLM_OLLAMA_TIMEOUT, LLM_OLLAMA_TIMEOUT, LLM_OLLAMA_TIMEOUT)
-		http.SetRequestHeader("Content-Type", "application/json")
-		http.Send(payload)
+		_LLM_Ollama_SendUtf8(http, payload)
 
 		if (http.Status != 200) {
 			return ""
 		}
 
 		raw := http.ResponseText
-		parsed := LLM_ParseOllamaResponse(raw)
-		return parsed
+		return LLM_ParseOllamaChatResponse(raw)
 	} catch as err {
 		return ""
 	}
@@ -229,28 +289,87 @@ LLM_OllamaDeleteModel(tag) {
  * @param {function} on_fail       - Callback fired on any failure.
  * @returns {Integer} The request id (use with LLM_OllamaCancelAsync to abort).
  */
-LLM_OllamaGenerate_Async(model, system_prompt, user_text, temperature, on_success, on_fail, stop_sequences := "") {
-	global _LLM_Ollama_Async, _LLM_Ollama_AsyncCounter, LLM_OLLAMA_BASE_URL, LLM_OLLAMA_TIMEOUT
-
+LLM_OllamaGenerate_Async(model, system_prompt, full_text, temperature, on_success, on_fail, stop_sequences := "", max_words := 15, is_batch := false, tail_text := "") {
+	global _LLM_Ollama_AsyncCounter, _LLM_Ollama_Pending
 	_LLM_Ollama_AsyncCounter += 1
 	req_id := _LLM_Ollama_AsyncCounter
-
-	payload := LLM_BuildOllamaPayload(model, system_prompt, user_text, temperature, false, stop_sequences)
-	try {
-		http := ComObject("WinHttp.WinHttpRequest.5.1")
-		http.Open("POST", LLM_OLLAMA_BASE_URL "/api/generate", true)
-		http.SetTimeouts(LLM_OLLAMA_TIMEOUT, LLM_OLLAMA_TIMEOUT, LLM_OLLAMA_TIMEOUT, LLM_OLLAMA_TIMEOUT)
-		http.SetRequestHeader("Content-Type", "application/json")
-		http.Send(payload)
-	} catch as err {
-		try on_fail()
+	job := Map(
+		"req_id", req_id,
+		"model", model,
+		"system_prompt", system_prompt,
+		"full_text", full_text,
+		"temperature", temperature,
+		"on_success", on_success,
+		"on_fail", on_fail,
+		"stop_sequences", stop_sequences,
+		"max_words", max_words,
+		"is_batch", is_batch,
+		"tail_text", tail_text
+	)
+	global _LLM_Ollama_Async
+	if (_LLM_Ollama_Async.Count > 0) {
+		_LLM_Ollama_Pending := job
+		try LoggerInfo("LLM.ollama", "Ollama busy — coalescing request #{1} until slot free.", req_id)
 		return req_id
 	}
-
-	_LLM_Ollama_TrimAsyncRegistry()
-	_LLM_Ollama_Async[req_id] := Map("http", http, "on_success", on_success, "on_fail", on_fail, "cancelled", false)
-	_LLM_Ollama_PollRequest(req_id, _LLM_OllamaParseAsyncBody)
+	_LLM_Ollama_DispatchAsync(job)
 	return req_id
+}
+
+; Starts one /api/chat request via curl (UTF-8 file body). WinHTTP async ``Send()``
+; returned HTTP 200 with ``content: ""`` on this driver despite valid JSON payloads.
+_LLM_Ollama_DispatchAsync(job) {
+	global _LLM_Ollama_Async, LLM_OLLAMA_BASE_URL, LLM_OLLAMA_TIMEOUT
+	req_id := job["req_id"]
+	payload := LLM_BuildOllamaPayload(
+		job["model"], job["system_prompt"], job["full_text"], job["temperature"],
+		false, job["stop_sequences"], job["max_words"], job["is_batch"], job["tail_text"])
+	uid := _LLM_Ollama_NextStreamUid()
+	tmp_payload := A_Temp . "\ergopti_ollama_" . uid . ".json"
+	tmp_stdout := A_Temp . "\ergopti_ollama_" . uid . ".out"
+	if !FSWrite(tmp_payload, payload) {
+		try LoggerWarn("LLM.ollama", "Failed to write curl payload file.")
+		try job["on_fail"]()
+		_LLM_Ollama_DrainPending()
+		return
+	}
+	curl_exe := A_WinDir . "\System32\curl.exe"
+	cmdLine := '"' . curl_exe . '" -s -S -X POST '
+		. '-H "Content-Type: application/json" '
+		. '--data-binary @' . _Q(tmp_payload) . ' '
+		. _Q(LLM_OLLAMA_BASE_URL . "/api/chat") . ' '
+		. '-o ' . _Q(tmp_stdout)
+	pid := 0
+	try {
+		Run(cmdLine, , "Hide", &pid)
+	} catch as err {
+		try FSDelete(tmp_payload)
+		try LoggerWarn("LLM.ollama", "curl launch failed: {1}.", err.Message)
+		try job["on_fail"]()
+		_LLM_Ollama_DrainPending()
+		return
+	}
+	_LLM_Ollama_TrimAsyncRegistry()
+	deadline := A_TickCount + LLM_OLLAMA_TIMEOUT + 5000
+	payload_snip := StrLen(payload) > 160 ? SubStr(payload, 1, 160) . "…" : payload
+	_LLM_Ollama_Async[req_id] := Map(
+		"pid", pid, "tmp_payload", tmp_payload, "tmp_stdout", tmp_stdout,
+		"on_success", job["on_success"], "on_fail", job["on_fail"],
+		"cancelled", false, "deadline", deadline, "start_tick", A_TickCount,
+		"payload_snip", payload_snip)
+	_LLM_Ollama_PollCurl(req_id)
+}
+
+; Sends the latest coalesced job once the in-flight slot is free.
+_LLM_Ollama_DrainPending() {
+	global _LLM_Ollama_Async, _LLM_Ollama_Pending
+	if (_LLM_Ollama_Async.Count > 0)
+		return
+	if !(_LLM_Ollama_Pending is Map)
+		return
+	job := _LLM_Ollama_Pending
+	_LLM_Ollama_Pending := ""
+	_LLM_Ollama_DispatchAsync(job)
 }
 
 /**
@@ -264,7 +383,13 @@ LLM_OllamaCancelAsync(req_id) {
 	global _LLM_Ollama_Async
 	if !_LLM_Ollama_Async.Has(req_id)
 		return
-	_LLM_Ollama_Async[req_id]["cancelled"] := true
+	entry := _LLM_Ollama_Async[req_id]
+	entry["cancelled"] := true
+	if entry.Has("http") {
+		try entry["http"].Abort()
+	} else if entry.Has("pid") and entry["pid"] > 0 {
+		try ProcessClose(entry["pid"])
+	}
 }
 
 /**
@@ -272,10 +397,41 @@ LLM_OllamaCancelAsync(req_id) {
  * prediction fire so previous variants don't keep landing into the tooltip
  * after the user has typed more characters.
  */
+/**
+ * Cancels in-flight curl streams only. WinHTTP async requests are left running;
+ * stale responses are ignored via the engine's request_id (macOS parity).
+ */
+LLM_OllamaCancelStreams() {
+	global _LLM_Ollama_ActiveStreams
+	for h in _LLM_Ollama_ActiveStreams
+		try LLM_OllamaCancelStream(h)
+	_LLM_Ollama_ActiveStreams := []
+}
+
 LLM_OllamaCancelAllAsync() {
 	global _LLM_Ollama_Async
-	for _id, entry in _LLM_Ollama_Async
+	for _id, entry in _LLM_Ollama_Async {
 		entry["cancelled"] := true
+		if entry.Has("http") {
+			try entry["http"].Abort()
+		} else if entry.Has("pid") and entry["pid"] > 0 {
+			try ProcessClose(entry["pid"])
+		}
+	}
+	LLM_OllamaCancelStreams()
+}
+
+/**
+ * Marks the model ready after a successful inference (warmup may have timed out
+ * on slow CPU loads while real predictions still work).
+ */
+LLM_OllamaNoteInferenceSuccess() {
+	global _LLM_Ollama_IsReady
+	if _LLM_Ollama_IsReady
+		return
+	_LLM_Ollama_IsReady := true
+	try LoggerInfo("LLM.ollama", "Model ready — first successful prediction.")
+	LLM_OllamaCancelWarmupRetry()
 }
 
 /**
@@ -293,17 +449,33 @@ _LLM_Ollama_PollRequest(req_id, parser) {
 	entry := _LLM_Ollama_Async[req_id]
 	if entry["cancelled"] {
 		_LLM_Ollama_Async.Delete(req_id)
+		_LLM_Ollama_DrainPending()
 		return
 	}
 	http := entry["http"]
 	ready := false
 	try ready := http.WaitForResponse(0)
 	if !ready {
+		if (entry.Has("deadline") and A_TickCount >= entry["deadline"]) {
+			elapsed := entry.Has("start_tick") ? (A_TickCount - entry["start_tick"]) : 0
+			try LoggerWarn("LLM.ollama", "Ollama request timed out after {1} ms.", elapsed)
+			on_fail := entry["on_fail"]
+			_LLM_Ollama_Async.Delete(req_id)
+			try on_fail()
+			_LLM_Ollama_DrainPending()
+			return
+		}
 		SetTimer(() => _LLM_Ollama_PollRequest(req_id, parser), -LLM_OLLAMA_POLL_MS)
 		return
 	}
-	; Response received — pull status / body inside a try so a misbehaving
-	; ResponseText property never leaves the registry entry alive.
+	; Response received — honour cancellation before invoking callbacks. Without
+	; this check, ``Abort()`` races could still deliver empty ``content`` bodies
+	; from superseded requests into the active variant loop.
+	if entry["cancelled"] {
+		_LLM_Ollama_Async.Delete(req_id)
+		_LLM_Ollama_DrainPending()
+		return
+	}
 	on_success := entry["on_success"]
 	on_fail    := entry["on_fail"]
 	_LLM_Ollama_Async.Delete(req_id)
@@ -312,25 +484,97 @@ _LLM_Ollama_PollRequest(req_id, parser) {
 		body   := http.ResponseText
 	} catch {
 		try on_fail()
+		_LLM_Ollama_DrainPending()
 		return
 	}
 	if (status != 200) {
+		try LoggerWarn("LLM.ollama", "Ollama request failed — HTTP {1}.", status)
 		try on_fail()
+		_LLM_Ollama_DrainPending()
 		return
 	}
-	try parser(body, on_success, on_fail)
+	try parser(body, on_success, on_fail, entry)
+	_LLM_Ollama_DrainPending()
+}
+
+; Polls a non-streaming curl child until stdout is ready or the slot times out.
+_LLM_Ollama_PollCurl(req_id) {
+	global _LLM_Ollama_Async, LLM_OLLAMA_POLL_MS
+	if !_LLM_Ollama_Async.Has(req_id)
+		return
+	entry := _LLM_Ollama_Async[req_id]
+	if entry["cancelled"] {
+		if entry.Has("pid") and entry["pid"] > 0
+			try ProcessClose(entry["pid"])
+		_LLM_Ollama_CleanupCurlFiles(entry)
+		_LLM_Ollama_Async.Delete(req_id)
+		_LLM_Ollama_DrainPending()
+		return
+	}
+	if (entry.Has("deadline") and A_TickCount >= entry["deadline"]) {
+		if entry.Has("pid") and entry["pid"] > 0
+			try ProcessClose(entry["pid"])
+		elapsed := entry.Has("start_tick") ? (A_TickCount - entry["start_tick"]) : 0
+		try LoggerWarn("LLM.ollama", "curl request timed out after {1} ms.", elapsed)
+		on_fail := entry["on_fail"]
+		_LLM_Ollama_CleanupCurlFiles(entry)
+		_LLM_Ollama_Async.Delete(req_id)
+		try on_fail()
+		_LLM_Ollama_DrainPending()
+		return
+	}
+	if entry.Has("pid") and entry["pid"] > 0 and ProcessExist(entry["pid"]) {
+		SetTimer(() => _LLM_Ollama_PollCurl(req_id), -LLM_OLLAMA_POLL_MS)
+		return
+	}
+	on_success := entry["on_success"]
+	on_fail    := entry["on_fail"]
+	body := ""
+	try {
+		if entry.Has("tmp_stdout") and FileExist(entry["tmp_stdout"])
+			body := FileRead(entry["tmp_stdout"], "UTF-8-RAW")
+	} catch {
+		body := ""
+	}
+	_LLM_Ollama_CleanupCurlFiles(entry)
+	_LLM_Ollama_Async.Delete(req_id)
+	if (body == "") {
+		try LoggerWarn("LLM.ollama", "curl finished with empty stdout.")
+		try on_fail()
+		_LLM_Ollama_DrainPending()
+		return
+	}
+	try _LLM_OllamaParseAsyncBody(body, on_success, on_fail, entry)
+	_LLM_Ollama_DrainPending()
+}
+
+_LLM_Ollama_CleanupCurlFiles(entry) {
+	if !(entry is Map)
+		return
+	if entry.Has("tmp_payload") and entry["tmp_payload"] != ""
+		try FSDelete(entry["tmp_payload"])
+	if entry.Has("tmp_stdout") and entry["tmp_stdout"] != ""
+		try FSDelete(entry["tmp_stdout"])
 }
 
 /**
  * Default async-response parser — extracts the ``response`` field from
  * Ollama's /api/generate reply and hands the unescaped text to on_success.
  */
-_LLM_OllamaParseAsyncBody(body, on_success, on_fail) {
-	text := LLM_ParseOllamaResponse(body)
+_LLM_OllamaParseAsyncBody(body, on_success, on_fail, entry := "") {
+	text := LLM_ParseOllamaChatResponse(body)
 	if (text == "") {
+		snip := StrLen(body) > 120 ? SubStr(body, 1, 120) . "…" : body
+		payload_hint := ""
+		if (entry is Map) and entry.Has("payload_snip")
+			payload_hint := " Payload: «" . entry["payload_snip"] . "»."
+		try LoggerWarn("LLM.ollama", "Ollama returned an empty prediction (parse miss). Body: «{1}».{2}", snip, payload_hint)
 		try on_fail()
 		return
 	}
+	snip := StrLen(text) > 60 ? SubStr(text, 1, 60) . "…" : text
+	try LoggerInfo("LLM.ollama", "Prediction received ({1} chars): «{2}».", StrLen(text), snip)
+	try LLM_OllamaNoteInferenceSuccess()
 	try on_success(text)
 }
 
@@ -417,24 +661,104 @@ _LLM_Ollama_TrimAsyncRegistry() {
  * @param {string} model - Ollama model tag.
  */
 LLM_OllamaWarmup(model) {
+	global _LLM_Ollama_IsReady, _LLM_Ollama_WarmupGeneration, LLM_OLLAMA_WARMUP_TIMEOUT
 	if (model == "")
 		return
-	payload := LLM_BuildOllamaPayload(model, "", " ", 0)
-	; Override num_predict to 1 — fastest possible round-trip that still
-	; forces weight load.
-	payload := RegExReplace(payload, '"options"\s*:\s*\{', '"options":{"num_predict":1,')
+	if _LLM_Ollama_IsReady
+		return
+	_LLM_Ollama_WarmupGeneration += 1
+	gen := _LLM_Ollama_WarmupGeneration
+	payload := LLM_BuildOllamaPayload(model, "", " ", 0, false, "", 1, false)
+	payload := RegExReplace(payload, '"num_predict":\d+', '"num_predict":1', , 1)
 	try {
 		http := ComObject("WinHttp.WinHttpRequest.5.1")
-		http.Open("POST", LLM_OLLAMA_BASE_URL "/api/generate", true)
-		http.SetTimeouts(LLM_OLLAMA_TIMEOUT, LLM_OLLAMA_TIMEOUT, LLM_OLLAMA_TIMEOUT, LLM_OLLAMA_TIMEOUT)
-		http.SetRequestHeader("Content-Type", "application/json")
-		http.Send(payload)
-		; No callback — we just need the server to start loading. The
-		; polling tick is still wired so the COM object eventually gets
-		; reaped instead of hanging around forever.
-		_LLM_Ollama_PollGeneric(http, (*) => 0, (*) => 0)
-	} catch {
+		http.Open("POST", LLM_OLLAMA_BASE_URL "/api/chat", true)
+		http.SetTimeouts(LLM_OLLAMA_WARMUP_TIMEOUT, LLM_OLLAMA_WARMUP_TIMEOUT,
+			LLM_OLLAMA_WARMUP_TIMEOUT, LLM_OLLAMA_WARMUP_TIMEOUT)
+		_LLM_Ollama_SendUtf8(http, payload)
+		warmup_deadline := A_TickCount + LLM_OLLAMA_WARMUP_TIMEOUT
+		_LLM_Ollama_PollGeneric(http,
+			(status, _body) => _LLM_Ollama_OnWarmupDone(status, gen),
+			() => _LLM_Ollama_OnWarmupPollFailed("timeout", gen),
+			warmup_deadline,
+			_LLM_OLLAMA_WARMUP_POLL_MS)
+	} catch as e {
+		try LoggerWarn("LLM.ollama", "Warmup POST failed: {1}.", e.Message)
+		_LLM_Ollama_OnWarmupPollFailed("send", gen)
 	}
+}
+
+_LLM_Ollama_OnWarmupPollFailed(reason, gen := 0) {
+	global _LLM_Ollama_WarmupGeneration
+	if (gen != 0 and gen != _LLM_Ollama_WarmupGeneration)
+		return
+	try LoggerInfo("LLM.ollama", "Warmup poll ended ({1}) — grace inference may proceed.", reason)
+}
+
+_LLM_Ollama_OnWarmupDone(status, gen := 0) {
+	global _LLM_Ollama_IsReady, _LLM_Ollama_WarmupGeneration
+	if (gen != 0 and gen != _LLM_Ollama_WarmupGeneration)
+		return
+	if (status = 200) {
+		_LLM_Ollama_IsReady := true
+		try LoggerInfo("LLM.ollama", "Model warmed up — ready for predictions.")
+		LLM_OllamaCancelWarmupRetry()
+	} else {
+		try LoggerInfo("LLM.ollama", "Warmup finished with HTTP {1} — will retry.", status)
+	}
+}
+
+/**
+ * Keeps firing warmup POSTs with exponential backoff until ``_LLM_Ollama_IsReady``
+ * flips true or LLM is disabled. Mirrors macOS ``warmup_controller.lua``.
+ * @param {string} model - Display name or Ollama tag.
+ */
+LLM_OllamaScheduleWarmupRetry(model := "") {
+	global _LLM_Ollama_WarmupRetryModel, _LLM_Ollama_WarmupRetryIntervalMs, _LLM_Ollama_WarmupRetryFn
+		, _LLM_Ollama_WarmupStartedTick
+	if (_LLM_Ollama_WarmupStartedTick = 0)
+		_LLM_Ollama_WarmupStartedTick := A_TickCount
+	if (model != "")
+		_LLM_Ollama_WarmupRetryModel := (IsSet(LLM_ResolveOllamaTag))
+			? LLM_ResolveOllamaTag(model) : model
+	if (_LLM_Ollama_WarmupRetryModel == "")
+		return
+	if LLM_OllamaIsReady()
+		return
+	if (IsSet(_LLM_Tray) && _LLM_Tray.Has("enabled") && !_LLM_Tray["enabled"])
+		return
+	LLM_OllamaWarmup(_LLM_Ollama_WarmupRetryModel)
+	if (IsSet(_LLM_Ollama_WarmupRetryFn) && _LLM_Ollama_WarmupRetryFn)
+		SetTimer(_LLM_Ollama_WarmupRetryFn, 0)
+	_LLM_Ollama_WarmupRetryFn := LLM_Ollama_WarmupRetryTick.Bind()
+	SetTimer(_LLM_Ollama_WarmupRetryFn, -_LLM_Ollama_WarmupRetryIntervalMs)
+}
+
+LLM_Ollama_WarmupRetryTick() {
+	global _LLM_Ollama_WarmupRetryIntervalMs, _LLM_Ollama_WarmupRetryModel, _LLM_Ollama_Async
+	if LLM_OllamaIsReady()
+		return
+	; Do not stack warmups behind an in-flight prediction — Ollama is single-queue.
+	if (IsSet(_LLM_Ollama_Async) and _LLM_Ollama_Async.Count > 0)
+		return
+	if (IsSet(_LLM_Tray) && _LLM_Tray.Has("enabled") && !_LLM_Tray["enabled"]) {
+		LLM_OllamaCancelWarmupRetry()
+		return
+	}
+	_LLM_Ollama_WarmupRetryIntervalMs := Min(_LLM_Ollama_WarmupRetryIntervalMs * 2, 60000)
+	try LoggerInfo("LLM.ollama", "Warmup retry in {1} ms for '{2}'.",
+		_LLM_Ollama_WarmupRetryIntervalMs, _LLM_Ollama_WarmupRetryModel)
+	LLM_OllamaScheduleWarmupRetry(_LLM_Ollama_WarmupRetryModel)
+}
+
+LLM_OllamaCancelWarmupRetry() {
+	global _LLM_Ollama_WarmupRetryFn, _LLM_Ollama_WarmupRetryIntervalMs, _LLM_Ollama_WarmupStartedTick
+	if (IsSet(_LLM_Ollama_WarmupRetryFn) && _LLM_Ollama_WarmupRetryFn) {
+		SetTimer(_LLM_Ollama_WarmupRetryFn, 0)
+		_LLM_Ollama_WarmupRetryFn := unset
+	}
+	_LLM_Ollama_WarmupRetryIntervalMs := 5000
+	_LLM_Ollama_WarmupStartedTick := 0
 }
 
 
@@ -470,9 +794,9 @@ LLM_OllamaWarmup(model) {
  * @returns {Object} A handle ``{ Pid, Cancelled }`` callers can pass to
  *                   LLM_OllamaCancelStream to terminate the curl process.
  */
-LLM_OllamaGenerate_Streaming(model, system_prompt, user_text, temperature, on_partial, on_success, on_fail, stop_sequences := "") {
-	; Build the streaming payload — ``stream:true`` flips Ollama to JSONL.
-	payload := LLM_BuildOllamaPayload(model, system_prompt, user_text, temperature, true, stop_sequences)
+LLM_OllamaGenerate_Streaming(model, system_prompt, full_text, temperature, on_partial, on_success, on_fail, stop_sequences := "", max_words := 15, is_batch := false, tail_text := "") {
+	; Build the streaming payload — ``stream:true`` flips Ollama to JSONL (/api/chat).
+	payload := LLM_BuildOllamaPayload(model, system_prompt, full_text, temperature, true, stop_sequences, max_words, is_batch, tail_text)
 
 	; Write the payload to a temp file (curl --data-binary @file). Avoids
 	; command-line length limits and shell escaping headaches with the JSON
@@ -487,15 +811,19 @@ LLM_OllamaGenerate_Streaming(model, system_prompt, user_text, temperature, on_pa
 	}
 
 	tmp_stdout := A_Temp . "\ergopti_ollama_" . uid . ".out"
-	; -N = no-buffer, -s = silent, -X POST + URL, -H Content-Type
-	cmd := A_ComSpec . ' /c curl.exe -N -s -X POST '
+	; Launch curl.exe directly (not cmd /c): hidden cmd often lacks curl on PATH and
+	; shell redirects (> file) silently produce empty/missing stdout — logs showed
+	; "Streaming finished with empty response. No stdout file."
+	curl_exe := A_WinDir . "\System32\curl.exe"
+	cmdLine := '"' . curl_exe . '" -N -s -S -X POST '
 		. '-H "Content-Type: application/json" '
 		. '--data-binary @' . _Q(tmp_payload) . ' '
-		. _Q(LLM_OLLAMA_BASE_URL . "/api/generate") . ' > ' . _Q(tmp_stdout)
+		. _Q(LLM_OLLAMA_BASE_URL . "/api/chat") . ' '
+		. '-o ' . _Q(tmp_stdout)
 
 	handle := { Pid: 0, Cancelled: false, TmpPayload: tmp_payload, TmpStdout: tmp_stdout }
 	try {
-		Run(cmd, , "Hide", &pid)
+		Run(cmdLine, , "Hide", &pid)
 		handle.Pid := pid
 	} catch {
 		try on_fail()
@@ -506,7 +834,10 @@ LLM_OllamaGenerate_Streaming(model, system_prompt, user_text, temperature, on_pa
 	; Polling loop: read what's appeared in tmp_stdout so far, parse new
 	; JSONL lines, fire on_partial for each. When the process exits, fire
 	; on_success with the accumulated text.
-	state := Map("acc", "", "last_pos", 0)
+	state := Map("acc", "", "last_pos", 0, "start_tick", A_TickCount,
+		"deadline", A_TickCount + LLM_OLLAMA_TIMEOUT + 5000)
+	global _LLM_Ollama_ActiveStreams
+	_LLM_Ollama_ActiveStreams.Push(handle)
 	_LLM_Ollama_StreamPoll(handle, state, on_partial, on_success, on_fail)
 	return handle
 }
@@ -521,6 +852,18 @@ _LLM_Ollama_StreamPoll(handle, state, on_partial, on_success, on_fail) {
 	global LLM_OLLAMA_POLL_MS
 	if handle.Cancelled {
 		_LLM_Ollama_CleanupStreamFiles(handle)
+		_LLM_Ollama_RemoveStreamHandle(handle)
+		try LoggerInfo("LLM.ollama", "Streaming cancelled (newer prediction).")
+		try on_fail()
+		return
+	}
+	if (state.Has("deadline") and A_TickCount >= state["deadline"]) {
+		if (handle.Pid > 0)
+			try ProcessClose(handle.Pid)
+		_LLM_Ollama_CleanupStreamFiles(handle)
+		_LLM_Ollama_RemoveStreamHandle(handle)
+		elapsed := state.Has("start_tick") ? (A_TickCount - state["start_tick"]) : 0
+		try LoggerWarn("LLM.ollama", "Streaming timed out after {1} ms.", elapsed)
 		try on_fail()
 		return
 	}
@@ -544,26 +887,65 @@ _LLM_Ollama_StreamPoll(handle, state, on_partial, on_success, on_fail) {
 		return
 	}
 	; Process exited: flush whatever is left on disk one last time before
-	; declaring success.
-	try {
-		fh := FileOpen(handle.TmpStdout, "r", "UTF-8")
-		if IsObject(fh) {
-			fh.Pos := state["last_pos"]
-			chunk := fh.Read()
-			fh.Close()
-			if (chunk != "") {
-				_LLM_Ollama_ConsumeStreamChunk(chunk, state, on_partial)
+	; declaring success. The cmd redirect can lag the child exit by a few ms.
+	loop 5 {
+		try {
+			fh := FileOpen(handle.TmpStdout, "r", "UTF-8")
+			if IsObject(fh) {
+				fh.Pos := state["last_pos"]
+				chunk := fh.Read()
+				state["last_pos"] := fh.Pos
+				fh.Close()
+				if (chunk != "") {
+					_LLM_Ollama_ConsumeStreamChunk(chunk, state, on_partial)
+				}
 			}
+		} catch {
 		}
-	} catch {
+		if (state["acc"] != "" or !FileExist(handle.TmpStdout) or FileGetSize(handle.TmpStdout) = 0)
+			break
+		Sleep(40)
 	}
 	final := state["acc"]
 	_LLM_Ollama_CleanupStreamFiles(handle)
+	_LLM_Ollama_RemoveStreamHandle(handle)
 	if (final == "") {
+		hint := _LLM_Ollama_StreamFailHint(handle.TmpStdout)
+		try LoggerWarn("LLM.ollama", "Streaming finished with empty response.{1}", hint != "" ? " " hint : "")
 		try on_fail()
 		return
 	}
+	try LLM_OllamaNoteInferenceSuccess()
 	try on_success(final)
+}
+
+_LLM_Ollama_RemoveStreamHandle(handle) {
+	global _LLM_Ollama_ActiveStreams
+	if !(handle is Map) or !handle.Has("Pid")
+		return
+	next := []
+	for h in _LLM_Ollama_ActiveStreams {
+		if !(h is Map) or h["Pid"] != handle["Pid"]
+			next.Push(h)
+	}
+	_LLM_Ollama_ActiveStreams := next
+}
+
+_LLM_Ollama_StreamFailHint(stdout_path) {
+	if (stdout_path == "" or !FileExist(stdout_path))
+		return "No stdout file."
+	try {
+		raw := FileRead(stdout_path, "UTF-8-RAW")
+		if (raw == "")
+			return "Stdout empty."
+		if InStr(raw, '"error"')
+			return "Ollama error: " . SubStr(raw, 1, 200)
+		if InStr(raw, '"thinking"') and !InStr(raw, '"response":"') 
+			return "Model returned thinking-only tokens (enable think:false)."
+		return "Stdout snippet: " . SubStr(raw, 1, 120)
+	} catch {
+		return ""
+	}
 }
 
 /**
@@ -594,8 +976,9 @@ _LLM_Ollama_ConsumeStreamChunk(chunk, state, on_partial) {
 	for line in lines {
 		if (line == "")
 			continue
-		if RegExMatch(line, '"response"\s*:\s*"((?:[^"\\]|\\.)*)"', &m)
-			new_acc .= LLM_UnescapeJSON(m[1])
+		token := _LLM_Ollama_ParseStreamLine(line)
+		if (token != "")
+			new_acc .= token
 	}
 	if (new_acc != state["acc"]) {
 		state["acc"] := new_acc
@@ -673,53 +1056,165 @@ _Q(s) {
 ; =====================================
 
 /**
- * Serialises request parameters into an Ollama /api/generate JSON payload.
- * @param {string}  model         - Model tag.
- * @param {string}  system_prompt - System instruction.
- * @param {string}  user_text     - User context.
- * @param {number}  temperature   - Sampling temperature.
- * @param {boolean} streaming     - When true, emits ``stream:true`` for the
- *                                  curl-based streaming path; default false
- *                                  matches the existing sync caller behaviour.
- * @param {Array}   stop_sequences - Optional array of strings the model
- *                                   must stop generating at. When empty
- *                                   (the default), Ollama uses its own
- *                                   built-in stops. Power-user profiles
- *                                   can override via the ``stop_sequences``
- *                                   field on the profile JSON record.
- * @returns {string} JSON string ready to send.
+ * Escapes a string for embedding in a JSON value. Written via ``FSWrite``
+ * (UTF-8-RAW) into the curl payload file — accents pass through as UTF-8.
  */
-LLM_BuildOllamaPayload(model, system_prompt, user_text, temperature, streaming := false, stop_sequences := "") {
-	EscapeJSON(s) {
-		s := StrReplace(s, "\", "\\")
-		s := StrReplace(s, '"', '\"')
-		s := StrReplace(s, "`n", "\n")
-		s := StrReplace(s, "`r", "")
-		return s
-	}
-
-	stream_field := streaming ? "true" : "false"
-	options := '"temperature":' . Format("{:g}", temperature)
-	if (stop_sequences != "" and Type(stop_sequences) == "Array" and stop_sequences.Length > 0) {
-		stops_json := ""
-		for s in stop_sequences {
-			if (stops_json != "")
-				stops_json .= ","
-			stops_json .= '"' . EscapeJSON(s) . '"'
+_LLM_Ollama_EscapeJSON(s) {
+	out := ""
+	loop parse s {
+		ch := A_LoopField
+		code := Ord(ch)
+		if (ch = "\") {
+			out .= "\\"
+		} else if (ch = '"') {
+			out .= '\"'
+		} else if (ch = "`n") {
+			out .= "\n"
+		} else if (ch = "`r") {
+			out .= "\r"
+		} else if (ch = "`t") {
+			out .= "\t"
+		} else if (code < 0x20) {
+			out .= Format("\u{:04X}", code)
+		} else {
+			out .= ch
 		}
-		options .= ',"stop":[' . stops_json . ']'
 	}
-	return '{"model":"' EscapeJSON(model) '",'
-		. '"system":"' EscapeJSON(system_prompt) '",'
-		. '"prompt":"' EscapeJSON(user_text) '",'
-		. '"stream":' stream_field ','
-		. '"options":{' options '}}'
+	return out
+}
+
+_LLM_Ollama_IsLineMode(system_prompt, is_batch) {
+	if is_batch
+		return false
+	if (InStr(system_prompt, "TAIL_CORRECTED") or InStr(system_prompt, "NEXT_WORDS"))
+		return false
+	return true
+}
+
+_LLM_Ollama_StopsArray(stop_sequences, line_mode, is_batch) {
+	if (stop_sequences != "" and Type(stop_sequences) == "Array" and stop_sequences.Length > 0)
+		return stop_sequences
+	global _LLM_OLLAMA_STOP_BATCH, _LLM_OLLAMA_STOP_LINE
+	return (line_mode && !is_batch) ? _LLM_OLLAMA_STOP_LINE : _LLM_OLLAMA_STOP_BATCH
+}
+
+_LLM_Ollama_StopsJson(stop_sequences, line_mode, is_batch) {
+	stops := _LLM_Ollama_StopsArray(stop_sequences, line_mode, is_batch)
+	out := ""
+	for s in stops {
+		escaped := _LLM_Ollama_EscapeJSON(s)
+		if (escaped = "")
+			continue
+		if (out != "")
+			out .= ","
+		out .= '"' escaped '"'
+	}
+	return out
 }
 
 /**
- * Extracts the "response" field from an Ollama /api/generate JSON reply.
- * @param {string} raw - Raw JSON response body.
- * @returns {string} The extracted response text, trimmed.
+ * Builds the ``messages`` array for /api/chat — mirrors macOS ``build_request_context``.
+ */
+_LLM_Ollama_BuildMessages(system_prompt, full_text, tail_text, model) {
+	messages := []
+	sys := system_prompt
+	user := full_text
+	tail := (tail_text != "") ? tail_text : full_text
+	if (InStr(sys, "PREFIX") and InStr(sys, "TAIL")) {
+		user := Format('PREFIX: "{1}"`nTAIL: "{2}"', full_text, tail)
+	} else if (sys != "" and InStr(sys, "{context}")) {
+		sys := StrReplace(sys, "{context}", full_text)
+		user := sys
+		sys := ""
+	}
+	if RegExMatch(model, "i)qwen3|deepseek|(?:^|:)r1|think|reasoning") {
+		if !InStr(user, "/no_think")
+			user .= "`n`n/no_think"
+	}
+	if (sys != "")
+		messages.Push(Map("role", "system", "content", sys))
+	messages.Push(Map("role", "user", "content", user))
+	return messages
+}
+
+/**
+ * Serialises parameters into an Ollama /api/chat JSON payload (macOS parity).
+ */
+LLM_BuildOllamaPayload(model, system_prompt, full_text, temperature, streaming := false, stop_sequences := "", max_words := 15, is_batch := false, tail_text := "") {
+	line_mode := _LLM_Ollama_IsLineMode(system_prompt, is_batch)
+	mw := (max_words is Number and max_words > 0) ? Integer(max_words) : 15
+	num_predict := Max(24, Min(96, mw * 4))
+	msgs := _LLM_Ollama_BuildMessages(system_prompt, full_text, tail_text, model)
+	msgs_json := ""
+	for m in msgs {
+		if (msgs_json != "")
+			msgs_json .= ","
+		msgs_json .= '{"role":"' m["role"] '","content":"' _LLM_Ollama_EscapeJSON(m["content"]) '"}'
+	}
+	stream_field := streaming ? "true" : "false"
+	return '{"model":"' _LLM_Ollama_EscapeJSON(model) '",'
+		. '"messages":[' msgs_json '],'
+		. '"stream":' stream_field ','
+		. '"think":false,'
+		. '"keep_alive":"30m",'
+		. '"options":{"temperature":' Format("{:g}", temperature)
+		. ',"num_predict":' num_predict
+		. ',"thinking_budget":0'
+		. ',"stop":[' _LLM_Ollama_StopsJson(stop_sequences, line_mode, is_batch) . ']}}'
+}
+
+/**
+ * Parses one NDJSON line from a /api/chat stream (``message.content`` tokens).
+ */
+_LLM_Ollama_ParseStreamLine(line) {
+	if (line == "")
+		return ""
+	try {
+		obj := JsonParse(line)
+		if !(obj is Map) or !obj.Has("message")
+			return ""
+		msg := obj["message"]
+		if !(msg is Map) or !msg.Has("content")
+			return ""
+		content := msg["content"]
+		return (Type(content) = "String") ? content : ""
+	} catch {
+		return ""
+	}
+}
+
+/**
+ * Extracts assistant text from a /api/chat JSON reply (non-streaming).
+ */
+LLM_ParseOllamaChatResponse(raw) {
+	if (raw == "")
+		return ""
+	try {
+		obj := JsonParse(raw)
+		if (obj is Map) and obj.Has("message") {
+			msg := obj["message"]
+			if (msg is Map) and msg.Has("content") and Type(msg["content"]) = "String" {
+				text := Trim(msg["content"])
+				if (text != "")
+					return text
+				if msg.Has("thinking") and Type(msg["thinking"]) = "String" {
+					thinking := Trim(msg["thinking"])
+					if (thinking != "") {
+						try LoggerInfo("LLM.ollama", "Using thinking field as fallback ({1} chars).", StrLen(thinking))
+						return (IsSet(LLM_Parser_StripThinking))
+							? LLM_Parser_StripThinking(thinking) : thinking
+					}
+				}
+			}
+		}
+	} catch {
+	}
+	; Legacy /api/generate bodies (tests + old logs).
+	return LLM_ParseOllamaResponse(raw)
+}
+
+/**
+ * Extracts the "response" field from a legacy Ollama /api/generate JSON reply.
  */
 LLM_ParseOllamaResponse(raw) {
 	if RegExMatch(raw, '"response"\s*:\s*"((?:[^"\\]|\\.)*)"', &m)
