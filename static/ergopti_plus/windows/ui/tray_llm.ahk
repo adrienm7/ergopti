@@ -147,6 +147,9 @@ global _LLM_Tray := Map(
 	; logic has had a chance to run. Without this default a fresh install
 	; would crash with ``Item has no value`` on the first config write.
 	"onboarding_seen",            false,
+	; Set when Ollama is ready but PrefixWatcher is not up yet; cleared when
+	; HotstringPrefixWatcherInit starts the bridge.
+	"bridge_pending",             false,
 	; ── Remote API backend ──
 	; Persisted across reloads via SaveFullConfig (config.toml [LLM]
 	; subsection). The user adds an entry via "+ Add an API…" in the model
@@ -237,6 +240,7 @@ global _LLM_Tray_TriggerHk := unset
 ; can reference any other. The grouping below mirrors the call graph
 ; (init → build → action handlers) purely for human readability.
 
+#Include tray_llm/persist.ahk
 #Include tray_llm/init.ahk
 #Include tray_llm/menu_main.ahk
 #Include tray_llm/menu_models.ahk

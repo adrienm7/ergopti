@@ -85,6 +85,7 @@ LLM_Tray_OnToggle(*) {
 	LLM_Tray_SaveConfig()
 	LLM_Tray_Build()
 	if _LLM_Tray["enabled"] {
+		LLM_Tray_EnsureModelReady()
 		SetTimer(() => LLM_Tray_BootstrapOllama(true), -1)
 	} else {
 		; OFF flow — kill any in-flight Ollama install AND close the
@@ -93,52 +94,14 @@ LLM_Tray_OnToggle(*) {
 		; hidden powershell.exe running and the install window open.
 		try LLM_Deps_Cancel()
 		try OllamaWV_Close()
+		try LLM_OllamaCancelWarmupRetry()
 		LLM_Bridge_Stop()
 	}
 }
 
 /**
- * Mirrors _LLM_Tray runtime state back into Features["llm"] so that
- * _CollectFeatureUpdates() (called by SaveFullConfig) picks up the current
- * user choices. Without this sync every save would re-emit the boot-time
- * snapshot and silently roll back all in-session changes on the next reload.
- */
-_LLM_Tray_SyncToFeatures() {
-	global _LLM_Tray, Features
-	if !IsSet(Features) or !IsSet(_LLM_Tray)
-		return
-	if !Features.Has("llm")
-		return
-	llm := Features["llm"]
-	; llm root
-	llm["enabled"]                                  := _LLM_Tray["enabled"]
-	; llm.models
-	llm["models"]["ollama"]                         := _LLM_Tray["model"]
-	; llm.profiles
-	llm["profiles"]["active"]                       := _LLM_Tray["profile_id"]
-	llm["profiles"]["num_predictions"]              := _LLM_Tray["n_predictions"]
-	llm["profiles"]["auto_profile_for_model"]       := _LLM_Tray["auto_profile_for_model"]
-	; llm.generation
-	llm["generation"]["temperature"]                := _LLM_Tray["temperature"]
-	llm["generation"]["min_words"]                  := _LLM_Tray["min_words"]
-	llm["generation"]["max_words"]                  := _LLM_Tray["max_words"]
-	llm["generation"]["context_length"]             := _LLM_Tray["ctx_chars"]
-	llm["generation"]["auto_raise_temp"]            := _LLM_Tray["auto_raise_temp"]
-	llm["generation"]["reset_on_nav"]               := _LLM_Tray["reset_on_nav"]
-	; llm.display
-	llm["display"]["show_info_bar"]                 := _LLM_Tray["show_info_bar"]
-	llm["display"]["streaming"]                     := _LLM_Tray["streaming"]
-	llm["display"]["streaming_multi"]               := _LLM_Tray["show_all_at_once"]
-	llm["display"]["pred_indent"]                   := _LLM_Tray["pred_indent"]
-	; llm.trigger
-	llm["trigger"]["debounce_ms"]                   := _LLM_Tray["debounce_ms"]
-	llm["trigger"]["instant_on_word_end"]           := _LLM_Tray["instant_on_word_end"]
-	llm["trigger"]["after_hotstring"]               := _LLM_Tray["after_hotstring"]
-	llm["trigger"]["inline_autotype"]               := _LLM_Tray["inline_autotype"]
-}
-
-/**
  * Persists the current LLM tray state to the shared config TOML.
+ * (_LLM_Tray_SyncToFeatures lives in persist.ahk, included by ui/tray_llm.ahk before this file.)
  */
 LLM_Tray_SaveConfig() {
 	global _SaveFullConfigReady
@@ -218,7 +181,9 @@ LLM_Tray_SetModel(tag) {
 	; first real prediction skips the cold-start penalty. No-op for the
 	; remote API backend — there's no local server to warm.
 	if (_LLM_Tray["backend"] == "ollama") {
-		try LLM_OllamaWarmup(LLM_ResolveOllamaTag(tag))
+		global _LLM_Ollama_IsReady
+		_LLM_Ollama_IsReady := false
+		try LLM_OllamaScheduleWarmupRetry(tag)
 	}
 	LLM_Tray_Build()
 }
@@ -353,8 +318,59 @@ LLM_Tray_OnAbout(*) {
 /**
  * Starts the LLM bridge with the current tray settings.
  */
+/**
+ * Starts the bridge once PrefixWatcher's InputHook is alive. Ollama bootstrap
+ * can finish before HotstringPrefixWatcherInit — starting early left the bridge
+ * subscribed to HookDispatcher while keystrokes only reached PrefixWatcher.
+ */
+LLM_Tray_TryStartBridge() {
+	global _LLM_Tray
+	if !_LLM_Tray["enabled"] or !LLM_Deps_IsReady()
+		return
+	_LLM_Tray["bridge_pending"] := false
+	LLM_Tray_StartBridge()
+	if (IsSet(_PrefixInputHook) && _PrefixInputHook && IsSet(LLM_Bridge_OnPrefixWatcherReady))
+		LLM_Bridge_OnPrefixWatcherReady()
+}
+
 LLM_Tray_StartBridge() {
+	global _LLM_Tray
+	LLM_Tray_EnsureModelReady()
 	LLM_Bridge_Start(LLM_Tray_BuildOpts())
+	tag := LLM_ResolveOllamaTag(_LLM_Tray["model"])
+	if (IsSet(_PrefixInputHook) && _PrefixInputHook)
+		LoggerInfo("LLM", "Bridge started — model: {1}, tag: {2} (PrefixWatcher hook).", _LLM_Tray["model"], tag)
+	else
+		LoggerInfo("LLM", "Bridge started — model: {1}, tag: {2} (HookDispatcher until PrefixWatcher).", _LLM_Tray["model"], tag)
+}
+
+/**
+ * Ensures _LLM_Tray["model"] points at a locally installed model before the
+ * engine fires requests. Legacy configs stored raw Ollama tags (e.g.
+ * ``qwen2.5:3b``) that are not installed — auto-switch to the best match.
+ */
+LLM_Tray_EnsureModelReady() {
+	global _LLM_Tray
+	if (_LLM_Tray["backend"] != "ollama")
+		return
+	model := _LLM_Tray["model"]
+	if (model == "")
+		model := _LLM_DefaultFor("llm_model", "Qwen3.5-0.8B")
+	if LLM_IsModelInstalled(model) {
+		if (_LLM_Tray["model"] == "")
+			_LLM_Tray["model"] := model
+		return
+	}
+	replacement := LLM_PickBestInstalledDisplayName()
+	if (replacement == "")
+		return
+	old_tag := _LLM_ResolveOllamaTagCore(model, false)
+	new_tag := _LLM_ResolveOllamaTagCore(replacement, false)
+	try LoggerWarn("LLM",
+		"Model '{1}' (tag '{2}') is not installed — switching to '{3}' (tag '{4}').",
+		model, old_tag, replacement, new_tag)
+	_LLM_Tray["model"] := replacement
+	LLM_Tray_SaveConfig()
 }
 
 /**
@@ -410,13 +426,20 @@ LLM_Tray_BuildOpts() {
  */
 LLM_Tray_OnDepsReady() {
 	global _LLM_Tray
+	LoggerInfo("LLM", "Ollama ready — LLM enabled: {1}.",
+		_LLM_Tray["enabled"] ? "true" : "false")
 	LLM_Tray_Build()
 	if _LLM_Tray["enabled"] {
-		LLM_Tray_StartBridge()
+		LLM_Tray_TryStartBridge()
 		; Prime the current model so the first user keystroke does not
 		; pay the cold-start penalty. Async — no blocking on Build.
 		if (_LLM_Tray["backend"] == "ollama" and _LLM_Tray["model"] != "") {
-			try LLM_OllamaWarmup(LLM_ResolveOllamaTag(_LLM_Tray["model"]))
+			global _LLM_Ollama_IsReady
+			_LLM_Ollama_IsReady := false
+			try LLM_OllamaScheduleWarmupRetry(_LLM_Tray["model"])
+		} else {
+			global _LLM_Ollama_IsReady
+			_LLM_Ollama_IsReady := true
 		}
 	}
 }

@@ -49,10 +49,9 @@ LLM_Tray_BuildBackendMenu() {
 		"api",    "API 🌐 — "
 	)
 	for backend_id in LLM_TRAY_BACKEND_OPTIONS {
-		captured_id := backend_id
 		prefix := _backend_prefix.Has(backend_id) ? _backend_prefix[backend_id] : ""
 		label := prefix . t("menu.llm.backend_" backend_id "_suffix")
-		RegisterMenuItem(m, label, (name, pos, menu) => LLM_Tray_SetBackend(captured_id))
+		RegisterMenuItem(m, label, _LLM_Tray_MakeSetBackendHandler(backend_id))
 		if (backend_id == _LLM_Tray["backend"])
 			m.Check(label)
 	}
@@ -118,11 +117,11 @@ LLM_Tray_BuildModelMenu() {
 	; Backend default — shortcut that restores the canonical Ollama tag
 	; without scrolling the catalogue. Reads from the shared defaults.json
 	; so any change to the canonical default propagates here automatically.
-	default_tag := _LLM_DefaultFor("llm_model_ollama", "")
-	if (default_tag != "") {
-		def_label := StrReplace(t("menu.llm.backend_default_model"), "%s", default_tag)
-		RegisterMenuItem(m, def_label, _LLM_Tray_MakeSetModelHandler(default_tag))
-		if (active == default_tag)
+	default_name := _LLM_DefaultFor("llm_model", "")
+	if (default_name != "") {
+		def_label := StrReplace(t("menu.llm.backend_default_model"), "%s", default_name)
+		RegisterMenuItem(m, def_label, _LLM_Tray_MakeSetModelHandler(default_name))
+		if (active == default_name)
 			m.Check(def_label)
 	}
 
@@ -419,6 +418,34 @@ _LLM_Tray_BuildPerModelSubmenu(name, model, ollama_url, active) {
 _LLM_Tray_MakeSetModelHandler(name) {
 	captured := name
 	return (*) => LLM_Tray_SetModel(captured)
+}
+
+_LLM_Tray_MakeSetNHandler(n) {
+	return (name, pos, menu) => LLM_Tray_SetN(n)
+}
+
+_LLM_Tray_MakeSetIndentHandler(lvl) {
+	return (name, pos, menu) => LLM_Tray_SetIndent(lvl)
+}
+
+_LLM_Tray_MakeSetBackendHandler(backend_id) {
+	return (name, pos, menu) => LLM_Tray_SetBackend(backend_id)
+}
+
+_LLM_Tray_MakeSetProfileHandler(id) {
+	return (name, pos, menu) => LLM_Tray_SetProfile(id)
+}
+
+_LLM_Tray_MakeUserProfileClickHandler(p) {
+	return (name, pos, menu) => LLM_Tray_OnUserProfileClick(p)
+}
+
+_LLM_Tray_MakeSelectApiEntryHandler(entry) {
+	return (name, pos, menu) => _LLM_Tray_SelectApiEntry(entry)
+}
+
+_LLM_Tray_MakeClearOverrideHandler(app_name) {
+	return (*) => _LLM_Tray_ClearOverrideFor(app_name)
 }
 
 _LLM_Tray_MakeDeleteCacheHandler(name) {

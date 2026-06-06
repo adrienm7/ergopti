@@ -79,11 +79,10 @@ LLM_Tray_BuildProfileMenu() {
 	m.Disable(header_builtin)
 
 	for id in ["raw", "basic", "advanced", "batch_advanced"] {
-		captured_id := id
 		base_label := LLM_Tray_GetProfileLabel(id)
 		hint := LLM_Tray_GetProfileHotkeyHint(id)
 		label := (hint != "") ? base_label . "  (" . hint . ")" : base_label
-		RegisterMenuItem(m, label, (name, pos, menu) => LLM_Tray_SetProfile(captured_id))
+		RegisterMenuItem(m, label, _LLM_Tray_MakeSetProfileHandler(id))
 		if (id == _LLM_Tray["profile_id"])
 			m.Check(label)
 	}
@@ -97,12 +96,11 @@ LLM_Tray_BuildProfileMenu() {
 		m.Disable(header_custom)
 
 		for p in user_profiles {
-			captured_p := p
 			pid        := p.Has("id") ? p["id"] : ""
 			base_plabel := p.Has("label") ? p["label"] : pid
 			hint := LLM_Tray_GetProfileHotkeyHint(pid)
 			plabel := (hint != "") ? base_plabel . "  (" . hint . ")" : base_plabel
-			RegisterMenuItem(m, plabel, (name, pos, menu) => LLM_Tray_OnUserProfileClick(captured_p))
+			RegisterMenuItem(m, plabel, _LLM_Tray_MakeUserProfileClickHandler(p))
 			if (pid == _LLM_Tray["profile_id"])
 				m.Check(plabel)
 		}
@@ -166,9 +164,8 @@ _LLM_Tray_BuildPerAppProfileMenu() {
 		sm.Add()
 		; List each override: "slack → informel"  + click clears it.
 		for app_name, profile_id in overrides {
-			captured_app := app_name
 			label := app_name . "  →  " . LLM_Tray_GetProfileLabel(profile_id)
-			RegisterMenuItem(sm, label, (*) => _LLM_Tray_ClearOverrideFor(captured_app))
+			RegisterMenuItem(sm, label, _LLM_Tray_MakeClearOverrideHandler(app_name))
 		}
 	}
 	return sm
