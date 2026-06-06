@@ -246,11 +246,11 @@ function M.toggle_awake()
 		-- swipe, tap, pinch, rotate…). We cut silently (no alert) since the user
 		-- is clearly back — the visual noise would be worse than the keep-awake itself.
 		local ev = eventtap.event.types
-		-- keyDown is intentionally excluded: it is the event type that triggered
-		-- toggle_awake() itself, and even a deferred watcher start risks catching
-		-- it or its keyUp twin. Scroll and gesture events are sufficient to detect
-		-- real user activity on the trackpad; mouse buttons cover click activity.
-		local watch_types = { ev.scrollWheel, ev.leftMouseDown, ev.rightMouseDown, ev.otherMouseDown }
+		local watch_types = {
+			ev.scrollWheel, ev.leftMouseDown, ev.rightMouseDown, ev.otherMouseDown,
+			ev.leftMouseUp, ev.rightMouseUp, ev.otherMouseUp,
+			ev.mouseMoved, ev.keyDown
+		}
 		-- Touchpad gesture event types — some may be absent on older macOS builds
 		for _, name in ipairs({ "gesture", "beginGesture", "endGesture", "swipe", "magnify", "rotate", "directTouch", "smartMagnify" }) do
 			if ev[name] then
@@ -259,6 +259,22 @@ function M.toggle_awake()
 		end
 		awake_input_watcher = eventtap.new(watch_types, function(_ev)
 			if not awake_active then return false end
+
+			-- Ignore events within 500ms of activation to prevent the trigger
+			-- hotkey (e.g. Ctrl+M) keyUp/keyDown from instantly deactivating it.
+			if awake_started_at and hs.timer.secondsSinceEpoch() - awake_started_at < 0.5 then
+				return false
+			end
+
+			local type = _ev:getType()
+			-- If it's a mouse movement, only deactivate if it moved beyond the jitter area
+			if type == ev.mouseMoved and awake_origin_pos then
+				local pos = _ev:location()
+				if math.abs(pos.x - awake_origin_pos.x) <= AWAKE_JITTER_X and
+				   math.abs(pos.y - awake_origin_pos.y) <= AWAKE_JITTER_Y then
+					return false
+				end
+			end
 
 			awake_active = false
 			stop_awake_input_watcher()
