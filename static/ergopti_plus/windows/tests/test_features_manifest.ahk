@@ -236,7 +236,7 @@ TestFMv2_LlmStructureSplit() {
 	AssertEqual(3, Built["llm"]["profiles"]["num_predictions"])
 	AssertEqual("basic", Built["llm"]["profiles"]["active"])
 	AssertEqual("ollama", Built["llm"]["models"]["selected"])
-	AssertEqual("qwen2.5:3b", Built["llm"]["models"]["ollama"])
+	AssertEqual("Qwen3.5-0.8B", Built["llm"]["models"]["ollama"])
 }
 Test("ManifestBuildFeaturesMap: llm is split into 6 sub-sections with the expected keys",
 	TestFMv2_LlmStructureSplit)

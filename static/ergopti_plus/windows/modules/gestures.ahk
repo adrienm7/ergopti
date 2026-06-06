@@ -206,7 +206,7 @@ global GESTURE_ACTIONS := Map(
         Fn: (*) => TextPressKey("Enter", []),
     },
     "tab", {
-        Fn: (*) => TextPressKey("Tab", []),
+        Fn: (*) => LLM_Tooltip_FireTabOrAccept([]),
     },
     "escape", {
         Fn: (*) => TextPressKey("Escape", []),
@@ -872,11 +872,33 @@ GestureGenericToggleUI(get_hwnd_fn, open_fn, close_fn) {
     try open_fn.Call()
 }
 
+; True when the foreground window is a shell / terminal. Ctrl+S there is not a
+; document save (consoles use XOFF pause or other bindings) — skip it so
+; Kana+Backspace reload does not disturb PowerShell when AHK is active.
+_GestureIsTerminalForeground() {
+    try {
+        cls := WinGetClass("A")
+        exe := WinGetProcessName("A")
+    } catch {
+        return false
+    }
+    if (cls = "ConsoleWindowClass" || cls = "CASCADIA_HOSTING_WINDOW_CLASS"
+        || cls = "PseudoConsoleWindow") {
+        return true
+    }
+    static TerminalExes := Map(
+        "WindowsTerminal.exe", true, "wt.exe", true,
+        "pwsh.exe", true, "powershell.exe", true, "cmd.exe", true)
+    return TerminalExes.Has(exe)
+}
+
 ; Save the active document with Ctrl+S then reload — mirrors the legacy
 ; AltGr+BackSpace shortcut that pre-dated the action registry.
 GestureSaveAndReload() {
-    TextPressKey("s", ["Ctrl"])
-    Sleep(300)
+    if !_GestureIsTerminalForeground() {
+        TextPressKey("s", ["Ctrl"])
+        Sleep(300)
+    }
     Reload()
 }
 

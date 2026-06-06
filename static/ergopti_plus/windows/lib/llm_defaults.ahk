@@ -51,7 +51,7 @@ global _LLM_DEFAULTS_FALLBACK := Map(
 	"llm_disable_password_fields", false,
 	"llm_nav_modifiers",         "",
 	"llm_val_modifiers",         "alt",
-	"llm_model",                 "qwen2.5:3b",
+	"llm_model",                 "Qwen3.5-0.8B",
 	"llm_backend",               "ollama"
 )
 

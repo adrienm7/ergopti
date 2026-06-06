@@ -594,6 +594,20 @@ LLM_Tooltip_Show(slots, active := 1, is_final := false) {
     _Stub_LlmTooltipCalls.Push({ slots: slots, active: active, is_final: is_final })
 }
 
+LLM_Tooltip_ShowLoading() {
+    global _Stub_LlmTooltipCalls
+    _Stub_LlmTooltipCalls.Push({ loading: true })
+}
+
+LLM_Tooltip_Hide(accepted := false) {
+    global _Stub_LlmTooltipCalls
+    _Stub_LlmTooltipCalls.Push({ hide: true, accepted: accepted })
+}
+
+LLM_Deps_IsReady() {
+    return true
+}
+
 KL_LogLlm(event_type, evt) {
     global _Stub_LlmLogCalls
     _Stub_LlmLogCalls.Push({ event_type: event_type, evt: evt })

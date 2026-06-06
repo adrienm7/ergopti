@@ -889,7 +889,7 @@ description_key = "menu.llm.models.selected"
 
 [[features.llm.models]]
 id = "ollama"
-default_per_platform = { ahk = "qwen2.5:3b", hs = "gemma-4-E2B-it" }
+default_per_platform = { ahk = "Qwen3.5-0.8B", hs = "gemma-4-E2B-it" }
 type = "string"
 description_key = "menu.llm.models.ollama"
 
@@ -1607,7 +1607,7 @@ description_key = "menu.ahk.shortcuts.personal.programmable_keyboard"
 
 [[features.ahk.shortcuts.script_control]]
 id = "script_altgr_backspace"
-default = "script_save_reload"
+default = "script_reload"
 type = "action"
 description_key = "menu.ahk.shortcuts.script_control.script_altgr_backspace"
 
