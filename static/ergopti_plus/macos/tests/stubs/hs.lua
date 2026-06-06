@@ -443,11 +443,14 @@ M.canvas = {
 M.styledtext = { new = function(s, _) return s end }
 M.console = { printStyledtext = function(_) end }
 M.notify = {
-	new = function(opts) return {
-		send = function() end,
-		release = function() end,
-		opts = opts,
-	} end,
+	new = function(arg1, arg2)
+		local opts = type(arg1) == "function" and arg2 or arg1
+		return {
+			send = function() end,
+			release = function() end,
+			opts = opts,
+		}
+	end,
 	show = function(_) end,
 }
 M.dialog = {
