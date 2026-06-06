@@ -333,6 +333,10 @@ local function load_from_shared()
 	DEFAULT_LLM_TIMEOUT_SEC = require_key("timing", "llm_timeout_sec")
 	TIMEOUT_DECREMENT_SEC   = require_key("timing", "timeout_decrement_sec")
 	TIMEOUT_FLOOR_SEC       = require_key("timing", "timeout_floor_sec")
+	M.timing = {
+		timeout_decrement_sec = TIMEOUT_DECREMENT_SEC,
+		timeout_floor_sec     = TIMEOUT_FLOOR_SEC,
+	}
 	M.settings.timeout_sec     = DEFAULT_TIMEOUT_SEC
 	M.settings.llm_timeout_sec = DEFAULT_LLM_TIMEOUT_SEC
 
