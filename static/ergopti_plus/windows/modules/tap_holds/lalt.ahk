@@ -124,7 +124,7 @@ SC038::
 	CharacterSentTime := LastSentCharacterKeyTime.Has("LAlt") ? LastSentCharacterKeyTime["LAlt"] : Now
 	tap := (Now - CharacterSentTime <= TapHoldDuration(TapHold, "left_alt") * 1000)
 	if tap {
-		TextPressKey("Tab", "")
+		LLM_Tooltip_FireTabOrAccept("")
 	}
 }
 

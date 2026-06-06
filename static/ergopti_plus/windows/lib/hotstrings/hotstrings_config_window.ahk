@@ -44,6 +44,10 @@ global _HCW_COMMON_CATS := [
 	"sfbsreduction", "distancesreduction"
 ]
 
+; Override-only categories (no TOML file) — colour / delay live in
+; hotstrings_config.toml under the category key (e.g. llm_prediction).
+global _HCW_VIRTUAL_CATS := ["llm_prediction"]
+
 ; Locale-dependent labels — populated lazily at window-open time.
 global _HCW_CATEGORY_LABELS := Map()
 global _HCW_COLOR_PRESETS   := []
@@ -59,6 +63,7 @@ _HCW_InitLocaleStrings() {
 		"rolls",              t("hs_config.cat_rolls"),
 		"sfbsreduction",      t("hs_config.cat_sfbs"),
 		"distancesreduction", t("hs_config.cat_distances"),
+		"llm_prediction",     t("menu.hotstrings.tooltip_ai"),
 	)
 	; Color palette — labels intentionally carry NO category hint in parentheses;
 	; mapping a colour to a meaning (e.g. "orange = rolls") is the user's job,
@@ -71,6 +76,7 @@ _HCW_InitLocaleStrings() {
 		Map("Label", t("hs_config.color_red"),       "Hex", "#e53935"),
 		Map("Label", t("hs_config.color_pink"),      "Hex", "#e91e63"),
 		Map("Label", t("hs_config.color_purple"),    "Hex", "#8e44ad"),
+		Map("Label", t("menu.hotstrings.tooltip_ai"), "Hex", "#AD61FF"),
 		Map("Label", t("hs_config.color_indigo"),    "Hex", "#3f51b5"),
 		Map("Label", t("hs_config.color_blue"),      "Hex", "#1e88e5"),
 		Map("Label", t("hs_config.color_cyan"),      "Hex", "#00838f"),
@@ -102,6 +108,21 @@ _HCW_BuildCategoryList() {
 			Path:        "",
 			IsPersonal:  false,
 			IsExtension: false,
+			IsVirtual:   false,
+			ExtId:       "",
+			ExtName:     "",
+			Group:       "common",
+		})
+	}
+	for _, Cat in _HCW_VIRTUAL_CATS {
+		Label := _HCW_CATEGORY_LABELS.Has(Cat) ? _HCW_CATEGORY_LABELS[Cat] : Cat
+		List.Push({
+			Key:         Cat,
+			Label:       Label,
+			Path:        "",
+			IsPersonal:  false,
+			IsExtension: false,
+			IsVirtual:   true,
 			ExtId:       "",
 			ExtName:     "",
 			Group:       "common",
@@ -445,11 +466,12 @@ _HCW_LoadCurrent() {
 	Defaults := _HCW_TomlDefaults(Entry, Sec)
 	Override := _HCW_UserOverride(Entry, Sec)
 
-	DelayMs := (Resolved.Delay != "") ? Round(Resolved.Delay * 1000) : Round(GLOBAL_DEFAULT_DELAY * 1000)
+	FallbackDelayMs := _HCW_FallbackDelayMs(Entry)
+	DelayMs := (Resolved.Delay != "") ? Round(Resolved.Delay * 1000) : FallbackDelayMs
 
-	; Fall back to the global default when the TOML has no [_meta] delay,
+	; Fall back to the category baseline when the TOML has no [_meta] delay,
 	; so the hint never shows "0 ms".
-	DelayDefMs := (Defaults.Delay != "") ? Round(Defaults.Delay * 1000) : Round(GLOBAL_DEFAULT_DELAY * 1000)
+	DelayDefMs := (Defaults.Delay != "") ? Round(Defaults.Delay * 1000) : FallbackDelayMs
 	DelayOverridden := (Override.HasOwnProp("Delay") and Override.Delay != "")
 
 	_HCWWidgets.DelayEdit.Value := DelayMs
@@ -988,7 +1010,25 @@ _HCW_StatusPath(Entry, Sec) {
 }
 
 
+_HCW_FallbackDelayMs(Entry) {
+	global GLOBAL_DEFAULT_DELAY, UI_LLM_TIMEOUT_SEC
+	if (Entry.Key = "llm_prediction")
+		return Round(UI_LLM_TIMEOUT_SEC * 1000)
+	return Round(GLOBAL_DEFAULT_DELAY * 1000)
+}
+
 _HCW_TomlDefaults(Entry, Section) {
+	if (Entry.HasOwnProp("IsVirtual") and Entry.IsVirtual) {
+		if (Entry.Key = "llm_prediction") {
+			global HOTSTRINGS_CATEGORY_DEFAULT_COLORS, UI_LLM_TIMEOUT_SEC
+			return {
+				Delay: UI_LLM_TIMEOUT_SEC,
+				Color: HOTSTRINGS_CATEGORY_DEFAULT_COLORS.Has("llm_prediction")
+					? HOTSTRINGS_CATEGORY_DEFAULT_COLORS["llm_prediction"] : ""
+			}
+		}
+		return { Delay: "", Color: "" }
+	}
 	if Entry.IsPersonal {
 		Cfg := ParseTomlGroupConfig("__personal__", Entry.Path)
 	} else if Entry.IsExtension {

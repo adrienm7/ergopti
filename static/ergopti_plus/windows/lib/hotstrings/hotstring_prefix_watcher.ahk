@@ -133,6 +133,12 @@ HotstringPrefixWatcherInit() {
     _StartInputHook()
     _InstallMouseClickResetHooks()
     LoggerSuccess("PrefixWatcher", "Watcher started ({1} trigger(s) indexed).", EntryCount)
+    ; LLM bridge must attach to this InputHook — Ollama bootstrap often
+    ; completes before we exist; honour a deferred start request here.
+    if (IsSet(LLM_Tray_TryStartBridge))
+        LLM_Tray_TryStartBridge()
+    else if (IsSet(LLM_Bridge_OnPrefixWatcherReady))
+        LLM_Bridge_OnPrefixWatcherReady()
 }
 
 ; Mouse clicks move the cursor to a position we cannot observe — the
@@ -440,7 +446,7 @@ _AddTriggerToIndex(Trigger, Output, Category, Section) {
         return
     }
     Prefix := SubStr(Trigger, 1, KeyLen)
-    if !_PrefixIndex.Has(Prefix) {
+    if (!_PrefixIndex.Has(Prefix) or Type(_PrefixIndex[Prefix]) != "Array") {
         _PrefixIndex[Prefix] := []
     }
     _PrefixIndex[Prefix].Push(Entry)
@@ -489,6 +495,11 @@ _OnPrefixChar(IH, Char) {
     ; InputHook, so the HookDispatcher guard does not cover it.
     if A_IsSuspended
         return
+    if (_PrefixWatcherSuppressed or HSE_Suppressed)
+        return
+    ; LLM predictions stay on even when the Hotstrings master gate is off.
+    if (IsSet(LLM_Bridge_FeedCharIfActive))
+        LLM_Bridge_FeedCharIfActive(Char)
     if !IsCategoryGated("Hotstrings")
         return
     ; UIA selection-wrap: when the user types a symbol (non-alphanumeric) while
@@ -524,15 +535,6 @@ _OnPrefixChar(IH, Char) {
         } catch as _UIAErr {
             LoggerError("PrefixWatcher", "UIA wrap error for char '{1}': {2}.", Char, _UIAErr.Message)
         }
-    }
-    ; Honour BOTH suppression flags. _PrefixWatcherSuppressed is set by
-    ; PrefixWatcherSuppress (manual / tray toggles); HSE_Suppressed is
-    ; set by HSE_DispatchMatch while it is replaying its SendEvent burst.
-    ; Missing the HSE flag here lets AHK's own output refill _PrefixBuffer
-    ; and resurface a ghost tooltip on a prefix match against the
-    ; expansion we just emitted.
-    if (_PrefixWatcherSuppressed or HSE_Suppressed) {
-        return
     }
     try {
         if LoggerIsDebugEnabled()
@@ -722,7 +724,11 @@ _OnPrefixKeyDown(IH, VK, SC) {
         ; tap-hold) still flips the boundary flag.
         if (VK == 0x08) {
             HSE_FeedBackspace()
+            if (IsSet(LLM_Bridge_FeedKeyDownIfActive))
+                LLM_Bridge_FeedKeyDownIfActive(VK)
         } else if (VK == 0x09 or VK == 0x0D) {
+            if (VK == 0x09 and IsSet(LLM_Tooltip_TryAcceptTab) and LLM_Tooltip_TryAcceptTab())
+                return
             HSE_FeedReset(true)
         } else if (VK == 0x1B
                 or VK == 0x25 or VK == 0x26
@@ -730,6 +736,11 @@ _OnPrefixKeyDown(IH, VK, SC) {
             ; Arrow keys and Escape move the cursor to an unknown position,
             ; but the next typed run starts fresh — treat as word boundary.
             HSE_FeedReset(true)
+            if (IsSet(LLM_Bridge_FeedKeyDownIfActive))
+                LLM_Bridge_FeedKeyDownIfActive(VK)
+        } else if (VK == 0x09 or VK == 0x0D or VK == 0x1B) {
+            if (IsSet(LLM_Bridge_FeedKeyDownIfActive))
+                LLM_Bridge_FeedKeyDownIfActive(VK)
         }
         if ResetVKs.Has(VK) {
             _ResetPrefixBuffer()

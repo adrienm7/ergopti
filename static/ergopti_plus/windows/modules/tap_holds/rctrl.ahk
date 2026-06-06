@@ -97,7 +97,7 @@ SC11D::
 	tap := KeyWait("RControl", "T" . TapHoldDuration(TapHold, "right_ctrl"))
 	if (tap and A_PriorKey == "RControl") {
 		TextPressKey("RCtrl", "Up")
-		TextPressKey("Tab", "")
+		LLM_Tooltip_FireTabOrAccept("")
 	}
 }
 
