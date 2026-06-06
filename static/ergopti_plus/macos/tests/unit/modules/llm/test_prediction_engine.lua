@@ -328,6 +328,11 @@ helpers.describe("prediction_engine — timer safety", function()
 		PE.start_timer()
 	end)
 
+	helpers.it("start_timer with override does not throw (regression for timer replacement)", function()
+		local ok = pcall(function() PE.start_timer(10.0) end)
+		helpers.assert_true(ok)
+	end)
+
 	helpers.it("start_timer_word_end does not throw", function()
 		PE.start_timer_word_end()
 	end)

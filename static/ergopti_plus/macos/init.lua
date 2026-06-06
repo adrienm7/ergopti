@@ -26,6 +26,31 @@ do
 	if not package.path:find(_shared, 1, true) then
 		package.path = _shared .. "/?.lua;" .. _shared .. "/?/init.lua;" .. package.path
 	end
+
+	-- Inject a custom searcher for the bundled touchdevice API so it can be loaded
+	-- as its original module name ("hs._asm.undocumented.touchdevice") without
+	-- needing to map exact folder structures into package.path / package.cpath.
+	local searchers = package.searchers or package.loaders
+	if searchers then
+		table.insert(searchers, 2, function(modname)
+			if type(modname) == "string" and modname:match("^hs%._asm%.undocumented%.touchdevice") then
+				local sub = modname:match("^hs%._asm%.undocumented%.touchdevice%.(.+)$")
+				local base = _hs_root .. "/vendor/hs_asm/undocumented/touchdevice/"
+				if not sub then
+					return loadfile(base .. "init.lua")
+				else
+					local so_path = base .. sub .. ".so"
+					local func_name = "luaopen_" .. modname:gsub("%.", "_")
+					local f = package.loadlib(so_path, func_name)
+					if f then return f end
+					-- Fallback symbol name if compiled differently
+					local f2 = package.loadlib(so_path, "luaopen_hs__asm_undocumented_touchdevice_" .. sub)
+					if f2 then return f2 end
+					return "\n\tno file '" .. so_path .. "' (custom searcher)"
+				end
+			end
+		end)
+	end
 end
 
 

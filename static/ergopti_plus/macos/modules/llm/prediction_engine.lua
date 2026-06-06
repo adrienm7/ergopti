@@ -559,7 +559,8 @@ function M.perform_check(force_trigger, profile_name)
 			Logger.debug(LOG, "Backend '%s' floor (%dms) — deferring %dms.",
 				backend_id, math.floor(min_interval * 1000), math.floor(remaining * 1000))
 			if _inactivity_timer then _inactivity_timer:stop() end
-			_inactivity_timer = hs.timer.doAfter(remaining, function() M.perform_check(force_trigger, profile_name) end)
+			_inactivity_timer = hs.timer.delayed.new(remaining, function() M.perform_check(force_trigger, profile_name) end)
+			_inactivity_timer:start()
 			return
 		end
 	end

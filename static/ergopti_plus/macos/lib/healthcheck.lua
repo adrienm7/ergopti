@@ -41,6 +41,13 @@ local _last_error = nil
 -- Reference to the currently open webview window (singleton — one at a time).
 local _window = nil
 
+local _sys_info
+local _format_uptime
+local _js_str
+local _he
+local _hcode
+local _snapshot_to_html
+
 
 
 
@@ -432,7 +439,7 @@ end
 
 --- Collects OS/runtime/screen fields into a flat table.
 --- @return table
-function _sys_info()
+local function _sys_info()
 	local info = {}
 
 	-- Hammerspoon version
@@ -672,7 +679,7 @@ end
 --- @param snapshot table Result from M.run().
 --- @param btn_label string Translated label for the copy-and-close button.
 --- @return string Complete HTML document.
-function _snapshot_to_html(snapshot, btn_label)
+local function _snapshot_to_html(snapshot, btn_label)
 	local s         = snapshot
 	local sys       = s.sys or {}
 	local ok_list   = s.ports_validated or {}
