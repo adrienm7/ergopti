@@ -72,6 +72,11 @@ global UPDATER_LATEST_RELEASE      := unset
 ; timer before scheduling a new one with the freshly chosen cadence.
 global _UpdaterBackgroundFn        := unset
 
+; Per-channel GitHub API cache for conditional GET (If-None-Match). A 304
+; response does not count against the anonymous 60 req/h rate limit, which
+; makes short intervals like 1m viable for background polling.
+global _UpdaterFetchCache          := Map()
+
 
 
 ; ====================================
@@ -207,31 +212,86 @@ _Updater_NormalizeTag(Tag) {
 	return (SubStr(Tag, 1, 1) == "v") ? SubStr(Tag, 2) : Tag
 }
 
-; Returns true when Latest is strictly newer than Current (semver comparison).
-; Both inputs are normalised before comparison so mixed "v"-prefixed and
-; unprefixed strings work correctly. Returns false when equal or when Current
-; is newer (downgrade guard prevents the background poller from offering a
-; "rollback" as an update).
-_Updater_IsNewerVersion(Latest, Current) {
-	L := _Updater_NormalizeTag(Latest)
-	C := _Updater_NormalizeTag(Current)
-	if (L == C)
-		return false
-	; Parse each dot-separated segment as an integer for correct numeric ordering.
-	; Non-numeric suffixes (e.g. "-dev.3") are stripped — semver pre-release
-	; ordering is not needed here; any tagged release is treated as a release.
-	LParts := StrSplit(RegExReplace(L, "-.*$", ""), ".")
-	CParts := StrSplit(RegExReplace(C, "-.*$", ""), ".")
-	MaxLen := Max(LParts.Length, CParts.Length)
-	loop MaxLen {
-		lv := (A_Index <= LParts.Length) ? Integer(LParts[A_Index]) : 0
-		cv := (A_Index <= CParts.Length) ? Integer(CParts[A_Index]) : 0
-		if (lv > cv)
-			return true
-		if (lv < cv)
-			return false
+; Semver helpers — canonical algorithm in shared/updater/version.js.
+; Parses "2.5.0-dev.3" into { Maj, Min, Pat, PreParts } or 0 on failure.
+_Updater_ParseVersion(Tag) {
+	Norm := _Updater_NormalizeTag(Tag)
+	if !RegExMatch(Norm, "^(?P<maj>\d+)\.(?P<min>\d+)\.(?P<pat>\d+)(?:-(?P<pre>.+))?$", &M)
+		return 0
+	PreParts := 0
+	if M.HasProp("pre") and M.pre != "" {
+		PreParts := []
+		for , Part in StrSplit(M.pre, ".")
+			PreParts.Push(Part)
 	}
-	return false
+	return { Maj: Integer(M.maj), Min: Integer(M.min), Pat: Integer(M.pat), PreParts: PreParts }
+}
+
+; Compares two prerelease identifier segments (numeric when all digits).
+_Updater_ComparePreId(A, B) {
+	if RegExMatch(A, "^\d+$") and RegExMatch(B, "^\d+$") {
+		ai := Integer(A), bi := Integer(B)
+		if (ai > bi)
+			return 1
+		if (ai < bi)
+			return -1
+		return 0
+	}
+	if (A > B)
+		return 1
+	if (A < B)
+		return -1
+	return 0
+}
+
+; Returns 1 if A > B, -1 if A < B, 0 if equal (semver prerelease rules).
+_Updater_ComparePre(A, B) {
+	if (A == 0 and B == 0)
+		return 0
+	if (A == 0 and B != 0)
+		return 1
+	if (A != 0 and B == 0)
+		return -1
+	MaxLen := Max(A.Length, B.Length)
+	loop MaxLen {
+		ai := (A_Index <= A.Length) ? A[A_Index] : ""
+		bi := (A_Index <= B.Length) ? B[A_Index] : ""
+		if (ai == "")
+			return -1
+		if (bi == "")
+			return 1
+		Cmp := _Updater_ComparePreId(ai, bi)
+		if (Cmp != 0)
+			return Cmp
+	}
+	return 0
+}
+
+; Returns 1 if A > B, -1 if A < B, 0 if equal.
+_Updater_CompareVersions(A, B) {
+	Pa := _Updater_ParseVersion(A)
+	Pb := _Updater_ParseVersion(B)
+	if (Pa == 0 or Pb == 0) {
+		Na := _Updater_NormalizeTag(A)
+		Nb := _Updater_NormalizeTag(B)
+		if (Na == Nb)
+			return 0
+		return (Na > Nb) ? 1 : -1
+	}
+	if (Pa.Maj != Pb.Maj)
+		return (Pa.Maj > Pb.Maj) ? 1 : -1
+	if (Pa.Min != Pb.Min)
+		return (Pa.Min > Pb.Min) ? 1 : -1
+	if (Pa.Pat != Pb.Pat)
+		return (Pa.Pat > Pb.Pat) ? 1 : -1
+	return _Updater_ComparePre(Pa.PreParts, Pb.PreParts)
+}
+
+; Returns true when Latest is strictly newer than Current (semver comparison).
+; Handles pre-release tags (e.g. 2.5.0-dev.3 → 2.5.0-dev.4). Canonical
+; vectors live in shared/updater/version.js:versionTestVectors().
+_Updater_IsNewerVersion(Latest, Current) {
+	return _Updater_CompareVersions(Latest, Current) > 0
 }
 
 ; Returns the GitHub Releases API URL for the chosen channel.
@@ -289,7 +349,10 @@ Updater_OpenCurrentRelease(*) {
 
 ; Makes a synchronous GET to the GitHub Releases API and returns the raw JSON
 ; string. Returns "" on any error (network, HTTP non-200, COM failure).
+; Uses If-None-Match when a prior ETag is cached so unchanged feeds return 304
+; without consuming the GitHub anonymous rate-limit budget.
 Updater_FetchLatestJson(Channel) {
+	global _UpdaterFetchCache
 	Url := Updater_ReleaseApiUrl(Channel)
 	Json := ""
 	try {
@@ -297,34 +360,64 @@ Updater_FetchLatestJson(Channel) {
 		Req.Open("GET", Url, false)
 		Req.SetRequestHeader("Accept", "application/vnd.github+json")
 		Req.SetRequestHeader("User-Agent", "ErgoptiPlus-Updater/1.0")
+		if _UpdaterFetchCache.Has(Channel) {
+			Etag := _UpdaterFetchCache[Channel].Etag
+			if (Etag != "")
+				Req.SetRequestHeader("If-None-Match", Etag)
+		}
 		Req.Send()
-		if (Req.Status == 200)
+		Status := Req.Status
+		if (Status == 304) {
+			if _UpdaterFetchCache.Has(Channel)
+				Json := _UpdaterFetchCache[Channel].Json
+			try LoggerDebug("Updater", "GitHub releases unchanged (304) for channel {1}.", Channel)
+		} else if (Status == 200) {
 			Json := Req.ResponseText
+			Etag := ""
+			try Etag := Req.GetResponseHeader("ETag")
+			if (Etag != "" and Json != "") {
+				_UpdaterFetchCache[Channel] := { Etag: Etag, Json: Json }
+			}
+		} else if (Status == 403) {
+			try LoggerWarn("Updater", "GitHub API rate limit (HTTP 403) for '{1}'.", Url)
+		} else {
+			try LoggerWarn("Updater", "GitHub API HTTP {1} for '{2}'.", Status, Url)
+		}
 	} catch as Err {
 		LoggerWarn("Updater", "HTTP request failed: {1}.", Err.Message)
 	}
-	; Array response (dev channel) — unwrap to the first prerelease object so
+	; Array response (dev channel) — unwrap to the highest-semver prerelease so
 	; every downstream parser receives a single-object JSON string.
 	if (Json != "" and SubStr(LTrim(Json), 1, 1) == "[") {
-		Json := _Updater_UnwrapFirstPrerelease(Json)
+		Json := _Updater_UnwrapLatestPrerelease(Json)
 	}
 	return Json
 }
 
 ; Given a GitHub releases array JSON string, return the JSON object of the
-; first entry whose "prerelease" flag is true.  Falls back to the first entry
-; when no prerelease is found (matches the previous per_page=1 behaviour).
-_Updater_UnwrapFirstPrerelease(Json) {
+; highest-semver prerelease entry. GitHub orders by publish date, not semver;
+; a stable release at the top must not cause us to miss a newer prerelease
+; further down the page. Falls back to the first entry when no prerelease
+; is found.
+_Updater_UnwrapLatestPrerelease(Json) {
 	Chunks := _Updater_SplitReleasesArray(Json)
+	BestTag := ""
+	BestChunk := ""
 	for _, Chunk in Chunks {
-		if _Updater_ParsePrerelease(Chunk) {
-			return Chunk
+		if !_Updater_ParsePrerelease(Chunk)
+			continue
+		Tag := Updater_ParseTagName(Chunk)
+		if (Tag == "")
+			continue
+		if (BestTag == "" or _Updater_CompareVersions(Tag, BestTag) > 0) {
+			BestTag := Tag
+			BestChunk := Chunk
 		}
 	}
-	; No prerelease found — return the first element as fallback
-	if (Chunks.Length > 0) {
+	if (BestChunk != "")
+		return BestChunk
+	if (Chunks.Length > 0)
 		return Chunks[1]
-	}
 	return Json
 }
 
@@ -1003,10 +1096,10 @@ Updater_StartBackgroundChecks() {
 	}
 	_UpdaterBackgroundFn := Updater_BackgroundTick
 	try LoggerStart("Updater", "Starting background update checks (every {1}s)…", UPDATER_CHECK_INTERVAL)
-	; Fire once shortly after boot so users with a "1m" preset don't have to
-	; wait 24h on first install for the welcome ping. Then settle into the
-	; configured cadence.
-	SetTimer(_UpdaterBackgroundFn, -30000)
+	; Fire once shortly after boot (capped by the configured interval) so short
+	; presets like "1m" are honoured without an extra-long initial wait.
+	FirstMs := Min(30000, Max(1000, UPDATER_CHECK_INTERVAL * 1000))
+	SetTimer(_UpdaterBackgroundFn, -FirstMs)
 	try LoggerSuccess("Updater", "Background update checks armed.")
 }
 

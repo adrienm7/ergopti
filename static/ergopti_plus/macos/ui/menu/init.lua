@@ -25,6 +25,7 @@ local Builder       = require("ui.menu.builder")
 local MenuPaths     = require("ui.menu.menu_paths")
 local MenuState     = require("ui.menu.menu_state")
 local MenuWatchers  = require("ui.menu.menu_watchers")
+local Updater       = require("lib.updater")
 
 local LOG = "menu"
 local load_errors = {}
@@ -648,6 +649,12 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	end
 
 	updateMenu()
+
+	-- Background update poller — parity with AHK ErgoptiPlus.ahk boot path.
+	local update_channel = (type(state.update_channel) == "string" and state.update_channel ~= "")
+		and state.update_channel or "dev"
+	local update_interval = tonumber(state.update_check_interval_seconds) or Updater.get_check_interval()
+	Updater.start_background_checks(update_channel, update_interval, updateMenu)
 
 	-- Load the user's personal_shortcuts.lua. Done after the menu is built
 	-- so any hs.hotkey.bind defined in the user file finds the rest of the

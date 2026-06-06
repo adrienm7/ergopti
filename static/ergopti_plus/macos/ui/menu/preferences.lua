@@ -119,6 +119,7 @@ local KEY_MAP = {
 
 	-- ── Updater ────────────────────────────────────────────────────────────
 	update_channel                       = { sec = "updater",  key = "channel"               },
+	update_check_interval_seconds        = { sec = "updater",  key = "check_interval_seconds" },
 }
 
 --- Maps nested-table flat state keys to their on-disk location.
