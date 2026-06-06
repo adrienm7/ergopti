@@ -147,6 +147,10 @@ LLM_Tooltip_IsVisible() {
 	return LLM_TooltipIsVisible()
 }
 
+LLM_Tooltip_IsLoading() {
+	return LLM_TooltipIsLoading()
+}
+
 /**
  * Accepts the active prediction when the tooltip is showing. Used by the
  * physical Tab hotkey, tap-hold keys remapped to Tab (e.g. AltGr tap), and

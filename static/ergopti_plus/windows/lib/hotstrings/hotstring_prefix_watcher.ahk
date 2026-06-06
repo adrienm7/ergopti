@@ -159,6 +159,8 @@ _OnMouseClickReset(*) {
         ; is_word triggers (e.g. "c★ → c'est") fire immediately.
         HSE_FeedReset(true)
         _ResetPrefixBuffer()
+        if IsSet(LLM_Bridge_ResetPredictions)
+            LLM_Bridge_ResetPredictions()
     } catch as Err {
         LoggerError("PrefixWatcher", "Mouse-click reset failed: {1}.", Err.Message)
     }

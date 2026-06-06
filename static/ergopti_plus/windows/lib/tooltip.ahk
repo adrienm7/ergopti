@@ -1405,6 +1405,11 @@ LLM_TooltipIsVisible() {
 	return IsSet(_LLM_Tooltip_Visible) and _LLM_Tooltip_Visible
 }
 
+LLM_TooltipIsLoading() {
+	global _LLM_Tooltip_Loading
+	return IsSet(_LLM_Tooltip_Loading) and _LLM_Tooltip_Loading
+}
+
 LLM_TooltipSetActiveIdx(idx) {
 	global _LLM_Tooltip_Visible, _LLM_Tooltip_Slots, _LLM_Tooltip_ActiveIdx
 	if !_LLM_Tooltip_Visible or _LLM_Tooltip_Slots.Length == 0
