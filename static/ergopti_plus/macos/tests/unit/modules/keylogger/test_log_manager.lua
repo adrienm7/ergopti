@@ -137,13 +137,23 @@ helpers.describe("log_manager — pre-init guards", function()
 	-- Fresh module so _state is nil.
 	local fresh = helpers.load_with_stubs("modules.keylogger.log_manager", hs_overrides)
 
-	helpers.it("flush_buffer is a safe no-op before init", function()
+	helpers.it("flush_buffer is a safe no-op before init (logs DEBUG)", function()
 		local ok = pcall(function() fresh.flush_buffer() end)
 		helpers.assert_true(ok)
 	end)
 
-	helpers.it("log_app_switch is a safe no-op before init", function()
+	helpers.it("log_app_switch is a safe no-op before init (logs DEBUG)", function()
 		local ok = pcall(function() fresh.log_app_switch("A", "B", 1000) end)
+		helpers.assert_true(ok)
+	end)
+
+	helpers.it("tag_awake_focus is a safe no-op before init (regression test)", function()
+		local ok = pcall(function() fresh.tag_awake_focus("Test", 500) end)
+		helpers.assert_true(ok)
+	end)
+
+	helpers.it("log_passive_period is a safe no-op before init (regression test)", function()
+		local ok = pcall(function() fresh.log_passive_period("awake", 200) end)
 		helpers.assert_true(ok)
 	end)
 

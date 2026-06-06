@@ -107,7 +107,10 @@ local _uuid_seeded = false
 --- Guards every public function against being called before M.init().
 local function _require_state(func_name)
 	if not _state then
-		Logger.error(LOG, "'%s' called before M.init() — module non-functional.", func_name)
+		-- Early boot events (wake, lock, etc.) can trigger calls before the
+		-- engine has finished its M.init() handshake. We ignore them quietly
+		-- at DEBUG level rather than emitting a scary ERROR.
+		Logger.debug(LOG, "'%s' called before M.init() — ignoring early boot event.", func_name)
 		return false
 	end
 	return true
