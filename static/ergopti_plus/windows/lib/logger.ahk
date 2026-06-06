@@ -407,6 +407,19 @@ _LoggerEmit(Level, Tag, Msg, Args*) {
     }
     Stamp := _StampSecStr . ":" . Format("{:03}", A_MSec)
     Line := Format("{1} [{2}] [{3}] {4}", Stamp, Level, Tag, Body)
+
+    ; ── ERROR deduplication ──
+    ; Suppress identical consecutive ERROR messages (same tag and body) to
+    ; prevent log flooding during tight loops or repeat failures.
+    static _LastErrTag := "", _LastErrBody := ""
+    if (Level == "ERROR") {
+        if (Tag == _LastErrTag and Body == _LastErrBody) {
+            return
+        }
+        _LastErrTag := Tag
+        _LastErrBody := Body
+    }
+
     _LoggerPushRing(Line)
     if _LOGGER_TEST_SINK != 0 {
         try _LOGGER_TEST_SINK(Line)

@@ -543,15 +543,15 @@ _FirePrediction_DoesNotCancelOllamaAsync() {
 }
 Test("LLM_Engine_FirePrediction: does not cancel in-flight Ollama WinHTTP",
 	_FirePrediction_DoesNotCancelOllamaAsync)
-
 _OnVariantFail_FallsBackFromStreaming() {
 	state := Map("request_id", 1, "streaming", true, "attempt_index", 2,
 		"max_attempts", 4, "model", "qwen3.5:0.8b", "slots", [], "requested", 1,
-		"base_temp", 0.1, "ctx", "some context")
+		"dispatch_fn", (*) => "", "base_temp", 0.1, "ctx", "some context")
 	global _LLM_Engine
 	_LLM_Engine["request_id"] := 1
 	_LLM_Engine_OnVariantFail(state)
 	AssertFalse(state["streaming"], "streaming must be disabled after stream failure")
 }
+
 Test("LLM_Engine_OnVariantFail: disables streaming for WinHTTP retry",
 	_OnVariantFail_FallsBackFromStreaming)
