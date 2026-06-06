@@ -14,8 +14,8 @@
 --- 2. State machine: the item label reflects the current state (idle /
 ---    checking / update available / installing) so the user always knows
 ---    what is happening.
---- 3. No background polling: all network requests are user-initiated so the
----    driver never makes unexpected outbound calls.
+--- 3. Background polling: optional periodic silent check (shared/updater/
+---    constants.toml interval presets), surfaces a notification on new releases.
 --- 4. Channel-aware: the user can switch between "main" (stable releases) and
 ---    "dev" (pre-releases) and the choice is persisted in config.toml.
 --- ==============================================================================
@@ -26,6 +26,7 @@ local Logger    = require("lib.logger")
 local i18n      = require("lib.i18n")
 local dialog    = require("lib.dialog_util")
 local changelog = require("ui.changelog")
+local Updater   = require("lib.updater")
 local LOG       = "menu_about"
 
 -- Detect source vs bundled at module load time so DEFAULT_STATE carries the
@@ -40,6 +41,7 @@ end)()
 M.DEFAULT_STATE = {
 	-- "dev" from source (all releases are pre-releases), "main" from bundled app.
 	update_channel = _is_local and "dev" or "main",
+	update_check_interval_seconds = Updater.get_check_interval(),
 }
 
 
@@ -56,31 +58,12 @@ local GH_REPO       = "ergopti"
 local ASSET_NAME    = "ErgoptiPlus.app.zip"
 local BUNDLED_ID    = "com.ergopti.app"
 
--- Module-level state for the update flow.
--- Shared across build() calls so the label stays consistent across menu rebuilds.
-local _update_state   = "idle"   -- "idle" | "checking" | "available" | "installing"
-local _cached_release = nil      -- { tag, notes, zip_url } or nil
-
-
---- Returns true when running from a local Hammerspoon config directory
---- (not from inside a bundled Ergopti.app).
---- @return boolean
 local function is_local_source()
-	local info = hs.processInfo
-	if not info then return true end
-	local bid = info.bundleID or ""
-	return bid ~= BUNDLED_ID
+	return Updater.is_local_source()
 end
 
---- Returns the current app version string.
---- @return string
 local function current_version()
-	if is_local_source() then return "local" end
-	local info = hs.processInfo
-	if info and info.version and info.version ~= "" then
-		return info.version
-	end
-	return "local"
+	return Updater.current_version()
 end
 
 --- Returns the absolute path to the running .app bundle, or nil.
@@ -95,23 +78,12 @@ local function app_bundle_path()
 	return nil
 end
 
---- Builds the GitHub Releases API URL for the active channel.
---- "main" uses /latest which only returns stable releases (non-prerelease).
---- "dev" fetches the most recent release of any kind (including pre-releases).
---- Note: if the repo has no stable release yet, /latest returns 404 — the
---- caller falls back to the dev endpoint automatically in that case.
---- @param channel string "main" or "dev"
---- @return string
 local function api_url(channel)
-	local base = string.format("https://api.github.com/repos/%s/%s/releases", GH_OWNER, GH_REPO)
-	if channel == "dev" then
-		return base .. "?per_page=1"
-	end
-	return base .. "/latest"
+	return Updater.release_api_url(channel)
 end
 
 local function releases_page_url()
-	return string.format("https://github.com/%s/%s/releases", GH_OWNER, GH_REPO)
+	return Updater.releases_page_url()
 end
 
 --- Parses the tag_name from a GitHub release JSON string.
@@ -165,16 +137,7 @@ end
 --- @param update_menu_fn function Callback to rebuild the menubar item after state change.
 --- @return string
 local function get_update_menu_label()
-	if _update_state == "checking" then
-		return i18n.get("menu.about.update_checking")
-	end
-	if _update_state == "installing" then
-		return i18n.get("menu.about.update_installing")
-	end
-	if _update_state == "available" and _cached_release then
-		return i18n.get("menu.about.update_now"):gsub("{tag}", _cached_release.tag)
-	end
-	return i18n.get("menu.about.check_for_updates")
+	return Updater.get_update_menu_label()
 end
 
 --- Downloads a URL to a local file path using hs.http.asyncGet.
@@ -220,7 +183,7 @@ local function replace_and_reload(zip_path, update_menu_fn)
 	if not target then
 		Logger.error(LOG, "Cannot determine .app bundle path — aborting install.")
 		dialog.block_alert(i18n.get("common.error_title"), i18n.get("menu.about.update.install_error"), i18n.get("button.ok"))
-		_update_state = "idle"
+		Updater.set_update_state("idle")
 		update_menu_fn()
 		return
 	end
@@ -237,7 +200,7 @@ local function replace_and_reload(zip_path, update_menu_fn)
 		if exit_code ~= 0 then
 			Logger.error(LOG, "unzip failed (exit %d): %s.", exit_code, stderr or "")
 			dialog.block_alert(i18n.get("common.error_title"), i18n.get("menu.about.update.install_error"), i18n.get("button.ok"))
-			_update_state = "idle"
+			Updater.set_update_state("idle")
 			update_menu_fn()
 			return
 		end
@@ -247,7 +210,7 @@ local function replace_and_reload(zip_path, update_menu_fn)
 		if not ok_attr then
 			Logger.error(LOG, "Unzipped archive does not contain ErgoptiPlus.app at %s.", new_app)
 			dialog.block_alert(i18n.get("common.error_title"), i18n.get("menu.about.update.install_error"), i18n.get("button.ok"))
-			_update_state = "idle"
+			Updater.set_update_state("idle")
 			update_menu_fn()
 			return
 		end
@@ -258,7 +221,7 @@ local function replace_and_reload(zip_path, update_menu_fn)
 		if not ok_bak then
 			Logger.error(LOG, "Could not move current .app to backup at %s.", backup_app)
 			dialog.block_alert(i18n.get("common.error_title"), i18n.get("menu.about.update.install_error"), i18n.get("button.ok"))
-			_update_state = "idle"
+			Updater.set_update_state("idle")
 			update_menu_fn()
 			return
 		end
@@ -268,7 +231,7 @@ local function replace_and_reload(zip_path, update_menu_fn)
 			os.rename(backup_app, target)
 			Logger.error(LOG, "Could not move new .app to %s — restored backup.", target)
 			dialog.block_alert(i18n.get("common.error_title"), i18n.get("menu.about.update.install_error"), i18n.get("button.ok"))
-			_update_state = "idle"
+			Updater.set_update_state("idle")
 			update_menu_fn()
 			return
 		end
@@ -278,8 +241,7 @@ local function replace_and_reload(zip_path, update_menu_fn)
 		hs.task.new("/bin/rm", nil, { "-rf", backup_app, tmp_dir }):start()
 
 		Logger.success(LOG, "Update installed at %s — reloading.", target)
-		_update_state = "idle"
-		_cached_release = nil
+		Updater.clear_cached_release()
 		-- Short delay lets the log flush before hs.reload tears everything down.
 		hs.timer.doAfter(0.3, function() hs.reload() end)
 	end, { "-o", zip_path, "-d", tmp_dir })
@@ -295,18 +257,19 @@ end
 --- @param update_menu_fn function Rebuild callback to refresh the label
 local function one_click_update(channel, update_menu_fn)
 	if is_local_source() then return end
-	if _update_state == "checking" or _update_state == "installing" then return end
+	local state = Updater.get_update_state()
+	if state == "checking" or state == "installing" then return end
 
-	-- Fast path: update already cached.
-	if _update_state == "available" and _cached_release then
-		_update_state = "installing"
+	local cached = Updater.get_cached_release()
+	if state == "available" and cached then
+		Updater.set_update_state("installing")
 		update_menu_fn()
-		Logger.start(LOG, "Installing cached update %s…", _cached_release.tag)
+		Logger.start(LOG, "Installing cached update %s…", cached.tag)
 		local zip_path = os.tmpname() .. "_ErgoptiPlus.app.zip"
-		download_to_file(_cached_release.zip_url, zip_path, function(ok, err)
+		download_to_file(cached.zip_url, zip_path, function(ok, err)
 			if not ok then
 				dialog.block_alert(i18n.get("common.error_title"), err, i18n.get("button.ok"))
-				_update_state = "available"
+				Updater.set_update_state("available")
 				update_menu_fn()
 				return
 			end
@@ -315,8 +278,7 @@ local function one_click_update(channel, update_menu_fn)
 		return
 	end
 
-	-- Slow path: check first.
-	_update_state = "checking"
+	Updater.set_update_state("checking")
 	update_menu_fn()
 	local current = current_version()
 	Logger.start(LOG, "One-click update check (channel: %s, current: %s)…", channel, current)
@@ -324,47 +286,50 @@ local function one_click_update(channel, update_menu_fn)
 	hs.http.asyncGet(api_url(channel), { ["User-Agent"] = "ErgoptiPlus-Updater/1.0" }, function(status, body, _)
 		if status ~= 200 or not body then
 			Logger.warn(LOG, "One-click check: network unreachable (HTTP %d).", status)
-			_update_state = "idle"
+			Updater.set_update_state("idle")
 			update_menu_fn()
 			dialog.block_alert(i18n.get("common.warning"), i18n.get("menu.about.update.network_error"), i18n.get("button.ok"))
 			return
 		end
-		local latest = parse_tag(body)
+		if channel == "dev" and body:match("^%s*%[") then
+			body = Updater.pick_latest_prerelease_json(body)
+		end
+		local latest = Updater.parse_tag(body)
 		if latest == "" then
 			Logger.warn(LOG, "One-click check: tag parse failed.")
-			_update_state = "idle"
+			Updater.set_update_state("idle")
 			update_menu_fn()
 			dialog.block_alert(i18n.get("common.warning"), i18n.get("menu.about.update.parse_error"), i18n.get("button.ok"))
 			return
 		end
-		if latest == current then
+		if not Updater.is_newer_version(latest, current) then
 			Logger.info(LOG, "One-click check: already up to date (%s).", current)
-			_update_state = "idle"
+			Updater.set_update_state("idle")
 			update_menu_fn()
 			local msg = i18n.get("menu.about.update.up_to_date"):gsub("{version}", current)
 			dialog.block_alert(i18n.get("menu.about.changelog"), msg, i18n.get("button.ok"))
 			return
 		end
 
-		local zip_url = parse_asset_url(body)
+		local zip_url = Updater.parse_asset_url(body)
 		if zip_url == "" then
 			Logger.error(LOG, "One-click check: asset '%s' not found in release %s.", ASSET_NAME, latest)
-			_update_state = "idle"
+			Updater.set_update_state("idle")
 			update_menu_fn()
 			dialog.block_alert(i18n.get("common.warning"), i18n.get("menu.about.update.no_asset"), i18n.get("button.ok"))
 			return
 		end
 
 		Logger.success(LOG, "New version %s found, starting install…", latest)
-		_cached_release = { tag = latest, notes = parse_notes(body), zip_url = zip_url }
-		_update_state = "installing"
+		Updater.set_cached_release({ tag = latest, notes = Updater.parse_notes(body), zip_url = zip_url })
+		Updater.set_update_state("installing")
 		update_menu_fn()
 
 		local zip_path = os.tmpname() .. "_ErgoptiPlus.app.zip"
 		download_to_file(zip_url, zip_path, function(ok, err)
 			if not ok then
 				dialog.block_alert(i18n.get("common.error_title"), err, i18n.get("button.ok"))
-				_update_state = "available"
+				Updater.set_update_state("available")
 				update_menu_fn()
 				return
 			end
@@ -401,9 +366,28 @@ function M.build(ctx)
 	local ver     = current_version()
 	local ver_label = i18n.get("menu.about.title")
 
+	local interval_sec = tonumber(state.update_check_interval_seconds) or Updater.get_check_interval()
+
 	local function set_channel(c)
 		state.update_channel = c
 		if type(ctx.save_prefs) == "function" then ctx.save_prefs() end
+		Updater.restart_background_checks(
+			c,
+			tonumber(state.update_check_interval_seconds) or Updater.get_check_interval(),
+			update_menu_fn
+		)
+		if type(ctx.updateMenu) == "function" then ctx.updateMenu() end
+	end
+
+	local function set_check_interval(seconds)
+		interval_sec = tonumber(seconds) or 0
+		state.update_check_interval_seconds = interval_sec
+		if type(ctx.save_prefs) == "function" then ctx.save_prefs() end
+		Updater.restart_background_checks(
+			state.update_channel or channel,
+			interval_sec,
+			update_menu_fn
+		)
 		if type(ctx.updateMenu) == "function" then ctx.updateMenu() end
 	end
 
@@ -454,8 +438,28 @@ function M.build(ctx)
 	table.insert(menu_items, { title = channel_title, menu = channel_items })
 
 	if not local_src then
+		local freq_items = {}
+		local current_freq_code = ""
+		for _, preset in ipairs(Updater.INTERVAL_PRESETS) do
+			local label = i18n.get("menu.about.frequency." .. preset.code)
+			if preset.seconds == interval_sec then
+				current_freq_code = preset.code
+			end
+			table.insert(freq_items, {
+				title   = label,
+				checked = (preset.seconds == interval_sec) or nil,
+				fn      = function() set_check_interval(preset.seconds) end,
+			})
+		end
+		local freq_display = (current_freq_code ~= "") and current_freq_code or "?"
+		table.insert(menu_items, {
+			title = i18n.get("menu.about.frequency_menu") .. ": " .. freq_display,
+			menu  = freq_items,
+		})
+
 		-- Dynamic one-click update item — only meaningful for bundled builds.
-		local is_busy = (_update_state == "checking" or _update_state == "installing")
+		local upd_state = Updater.get_update_state()
+		local is_busy = (upd_state == "checking" or upd_state == "installing")
 		table.insert(menu_items, {
 			title    = get_update_menu_label(),
 			disabled = is_busy or nil,
