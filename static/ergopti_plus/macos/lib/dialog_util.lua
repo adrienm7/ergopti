@@ -40,10 +40,23 @@ local M = {}
 --- transitions and we never want that to stop the caller from opening its
 --- dialog.
 local function focus_hammerspoon()
-	local ok, err = pcall(hs.focus)
-	if not ok then
-		Logger.debug(LOG, "hs.focus raised before dialog: %s.", tostring(err))
+	local function do_focus()
+		local ok, err = pcall(hs.focus)
+		if not ok then
+			Logger.debug(LOG, "hs.focus raised before dialog: %s.", tostring(err))
+		end
+		pcall(function()
+			local app = hs.application.get("Hammerspoon")
+			if app then app:activate(true) end
+		end)
 	end
+
+	do_focus()
+	-- Modal dialogs (hs.dialog.*) block the main thread but run a nested runloop.
+	-- Firing timers ensures that once the window is actually composited and on-screen,
+	-- we steal the focus again. Fixes focus issues when called from the menubar.
+	hs.timer.doAfter(0.05, do_focus)
+	hs.timer.doAfter(0.20, do_focus)
 end
 
 --- Focus-aware wrapper around hs.dialog.blockAlert.

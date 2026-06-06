@@ -99,7 +99,13 @@ function M.notify(title_or_msg, body, kind)
 
     -- Ensure the notification process never crashes the script
     pcall(function()
-        local n = hs.notify.new({
+        local n = hs.notify.new(function()
+            pcall(hs.focus)
+            pcall(function()
+                local app = hs.application.get("Hammerspoon")
+                if app then app:activate(true) end
+            end)
+        end, {
             title           = title_text,
             informativeText = info_text,
             contentImage    = _get_logo(),
