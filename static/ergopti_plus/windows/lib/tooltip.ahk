@@ -590,6 +590,22 @@ _TooltipRevealSurfaces() {
     }
 }
 
+; Win11 inflates borderless Gui client areas to ~640 logical px when the
+; requested width is smaller. Re-apply the measured client size after Show
+; so the HWND, region clip, and border overlay all agree on content width.
+_TooltipClampClientSize(Hwnd, ClientW, ClientH) {
+    if !Hwnd or ClientW <= 0 or ClientH <= 0
+        return
+    DpiScale := A_ScreenDPI / 96
+    PW := Round(ClientW * DpiScale)
+    PH := Round(ClientH * DpiScale)
+    if (PW <= 0 or PH <= 0)
+        return
+    ; NOMOVE | NOZORDER | NOACTIVATE
+    DllCall("User32\SetWindowPos", "Ptr", Hwnd, "Ptr", 0,
+        "Int", 0, "Int", 0, "Int", PW, "Int", PH, "UInt", 0x0014)
+}
+
 ; PREPARE + REVEAL for a built stack. Pos = { X, Y }, Row = { Gui, W, H }.
 _TooltipPresentStack(Pos, Row, ArmSafety := true) {
     global _TooltipShownHwnds, _TOOLTIP_HWND_TRACK_CAP, _TOOLTIP_SAFETY_SEC
@@ -598,6 +614,7 @@ _TooltipPresentStack(Pos, Row, ArmSafety := true) {
 
     ; PREPARE — hidden at final coordinates (Hwnd valid, nothing painted yet).
     Row.Gui.Show(Format("Hide NoActivate w{1} h{2} x{3} y{4}", Row.W, Row.H, Pos.X, Pos.Y))
+    _TooltipClampClientSize(Row.Gui.Hwnd, Row.W, Row.H)
     _TooltipDisableDwmRounding(Row.Gui.Hwnd)
     if (_TooltipShownHwnds.Length >= _TOOLTIP_HWND_TRACK_CAP) {
         DroppedHwnd := _TooltipShownHwnds.RemoveAt(1)
@@ -1286,6 +1303,25 @@ LLM_TooltipShow(payload, active := 1, is_final := false) {
 	if (slots.Length == 0) {
 		LLM_TooltipHide()
 		return
+	}
+
+	; macOS parity: keep the compact violet « Génération en cours… » indicator
+	; until at least one slot carries real text. Intermediate placeholder paints
+	; (DispatchBatch / variant reveal) used to swap in the full LLM chrome with
+	; footer + info-bar width reservation, which stretched a short label across
+	; the whole tooltip frame on Windows 11.
+	if (!is_final) {
+		all_placeholder := true
+		for s in slots {
+			if !_LLM_SlotIsPlaceholder(s) {
+				all_placeholder := false
+				break
+			}
+		}
+		if all_placeholder {
+			LLM_TooltipShowLoading()
+			return
+		}
 	}
 
 	global _LLM_Tooltip_Loading
