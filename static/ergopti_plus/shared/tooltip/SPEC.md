@@ -15,6 +15,7 @@ static/ergopti_plus/shared/tooltip/
 ├── tint.js          ← Pure HSL tint-mixing algorithm + test vectors
 ├── layout.js        ← Pure position resolution + canvas geometry + test vectors
 ├── dequeue.js       ← Stacked row expiry / destacking logic + test vectors
+├── lifecycle.js     ← Surface show/hide/rebuild phase contract (ghost prevention)
 └── draw_calls.js    ← draw_calls[] IR type definitions and composer functions
 ```
 
@@ -335,6 +336,27 @@ WARNING and ERROR log lines from the logger trigger an immediate forced flush
 rendering path MUST call `TooltipHide()` / `M.hide()` immediately so no ghost
 tooltip lingers on screen.
 
+### 7.3 Surface lifecycle (ghost prevention)
+
+Canonical phases are defined in `lifecycle.js`. They prevent transient defects
+on Windows where the tooltip uses **two HWNDs** (content Gui + layered border):
+
+| Defect | Cause | Fix |
+|---|---|---|
+| Border ring alone | Content destroyed/hidden while border HWND stays visible | `SUSPEND` hides border before content; `TEARDOWN` destroys border first |
+| Empty tinted rectangle | Content `Show()` before controls/regions are ready | `PREPARE` uses `Show("Hide")`, apply region + border DIB, then `REVEAL` |
+| Ghost for ~3 s | Partial show path armed safety timer on a broken surface | `PREPARE` failure → immediate `TEARDOWN`; atomic `REVEAL` |
+
+| Phase | AHK | Hammerspoon |
+|---|---|---|
+| `TEARDOWN` | `TooltipHide()` | `M.hide()` / `hide_stacked()` / `hide_forced()` |
+| `SUSPEND` | `_TooltipSuspendSurfaces()` | N/A (single canvas — update elements while hidden) |
+| `PREPARE` | `_TooltipPresentStack` hidden half | `render()` sets all elements, then `canvas:show()` once |
+| `REVEAL` | `_TooltipRevealSurfaces()` | `canvas:show()` at end of `render()` |
+
+Dequeue destack rebuilds on AHK use `SUSPEND → build → REVEAL` via
+`_TooltipDequeueRebuild()` instead of full `TEARDOWN` between row expiries.
+
 ---
 
 ## 8. Driver Compliance Checklist
@@ -348,6 +370,7 @@ A driver is considered compliant with this spec when:
 - [ ] Partial update path uses stable IDs (`"preds"`, `"info"`, `"model_info"`).
 - [ ] Auto-dismiss follows the timing formula in § 7.2.
 - [ ] Stacked destacking matches `dequeue.js:dequeueTestVectors()`.
+- [ ] Surface lifecycle follows `lifecycle.js` phases (§ 7.3).
 - [ ] Any rendering exception falls back to hide (no ghost tooltips).
 
 ---
@@ -358,6 +381,7 @@ A driver is considered compliant with this spec when:
 - Tint algorithm: [`tint.js`](./tint.js)
 - Layout engine: [`layout.js`](./layout.js)
 - Dequeue / destacking: [`dequeue.js`](./dequeue.js)
+- Surface lifecycle: [`lifecycle.js`](./lifecycle.js)
 - Draw-call IR: [`draw_calls.js`](./draw_calls.js)
 - AHK implementation: [`lib/tooltip.ahk`](../../windows/lib/tooltip.ahk),
   [`ui/tooltip_llm.ahk`](../../windows/ui/tooltip_llm.ahk),

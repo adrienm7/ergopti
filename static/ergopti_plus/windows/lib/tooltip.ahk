@@ -128,7 +128,7 @@ _TooltipDequeuePollFn() {
         RebuildItems.Push(Copy)
     }
     _TooltipDequeueItems := Remaining
-    TooltipShow(RebuildItems, 0)
+    _TooltipDequeueRebuild(RebuildItems)
 }
 
 ; TooltipDequeueInit() must be called once at script startup (from ErgoptiPlus.ahk)
@@ -220,6 +220,9 @@ global _TooltipBorderGui := 0
 ; (returns FALSE, no exception) so the sweep is safe to run unconditionally.
 global _TooltipShownHwnds := []
 global _TooltipShownBorderHwnds := []
+; Last resolved screen position — reused by dequeue destack rebuilds so the
+; surviving rows do not jump while rows above them expire.
+global _TooltipLastPos := 0
 
 ; Cap on the tracking arrays so a long typing session cannot grow them
 ; unbounded. Each entry is a single Ptr (8 B) so the cap is generous;
@@ -317,32 +320,11 @@ TooltipShow(Items, DurationSec := 0) {
 
     Pos := _TooltipResolvePosition()
     Row := Rows[1]
-    ; Snapshot generation before Show so any exception after Show still arms
-    ; the timer correctly and the ghost cannot outlive the safety deadline.
+    ; Snapshot generation before present so any exception still arms the timer
+    ; correctly and the ghost cannot outlive the safety deadline.
     _TooltipTimerGeneration := _TooltipGeneration
     try {
-        Row.Gui.Show(Format("w{1} h{2} x{3} y{4} NoActivate", Row.W, Row.H, Pos.X, Pos.Y))
-        ; Disable DWM rounded corners AFTER Show — .Hwnd is only valid once the
-        ; window has been shown for the first time; calling it before raises
-        ; "Gui has no window" and crashes the entire show path.
-        _TooltipDisableDwmRounding(Row.Gui.Hwnd)
-        ; Track the Hwnd RIGHT AFTER Show — from this point on, the window
-        ; exists on screen and must be tracked so TooltipHide's defensive
-        ; sweep can clean it up even if subsequent code fails.
-        if (_TooltipShownHwnds.Length >= _TOOLTIP_HWND_TRACK_CAP) {
-            DroppedHwnd := _TooltipShownHwnds.RemoveAt(1)
-            GR_DestroyWindow(DroppedHwnd)
-        }
-        _TooltipShownHwnds.Push(Row.Gui.Hwnd)
-        ; Arm the safety timer IMMEDIATELY so any subsequent failure (corner
-        ; region, border construction, duration math) still has an auto-hide
-        ; path — the tooltip cannot outlive the safety deadline.
-        SetTimer(_TooltipTimerFn, -Round(_TOOLTIP_SAFETY_SEC * 1000))
-        _TooltipApplyStackedCorners()
-        ; Build border DIB, upload via UpdateLayeredWindow, and show border.
-        ; _TooltipShowBorder now calls GR_Show itself — the DWM pixel-loop
-        ; is pre-computed before GR_Show so both windows appear near-simultaneously.
-        _TooltipShowBorder(Pos.X, Pos.Y, Row.W, Row.H)
+        _TooltipPresentStack(Pos, Row, true)
     } catch {
         TooltipHide("ShowFail", true)
         return
@@ -578,6 +560,116 @@ TooltipRearmTimer() {
 ; ======= 2/ Internal helpers ===============================
 ; ============================================================
 ; ============================================================
+
+; Surface lifecycle — canonical phases in shared/tooltip/lifecycle.js.
+; AHK uses two HWNDs (content + border); PREPARE keeps both hidden until the
+; border DIB and content controls are ready, then REVEAL shows them together.
+
+; Hide content + border without destroying HWNDs. Used before in-place rebuilds
+; (LLM streaming refresh, dequeue destack) so a lone border ring never lingers.
+_TooltipSuspendSurfaces() {
+    global _TooltipBorderGui, _TooltipRowGuis
+    if _TooltipBorderGui {
+        try GR_Hide(_TooltipBorderGui.Hwnd)
+    }
+    for , Row in _TooltipRowGuis {
+        try DllCall("User32\ShowWindow", "Ptr", Row.Gui.Hwnd, "Int", 0)
+    }
+}
+
+; Show content + border together after PREPARE completed while hidden.
+_TooltipRevealSurfaces() {
+    global _TooltipBorderGui, _TooltipRowGuis
+    if (_TooltipRowGuis.Length > 0) {
+        try DllCall("User32\ShowWindow", "Ptr", _TooltipRowGuis[1].Gui.Hwnd, "Int", 4)
+    }
+    if _TooltipBorderGui {
+        GR_Show(_TooltipBorderGui.Hwnd)
+    }
+}
+
+; PREPARE + REVEAL for a built stack. Pos = { X, Y }, Row = { Gui, W, H }.
+_TooltipPresentStack(Pos, Row, ArmSafety := true) {
+    global _TooltipShownHwnds, _TOOLTIP_HWND_TRACK_CAP, _TOOLTIP_SAFETY_SEC
+    global _TooltipLastPos
+    _TooltipLastPos := Pos
+
+    ; PREPARE — hidden at final coordinates (Hwnd valid, nothing painted yet).
+    Row.Gui.Show(Format("Hide NoActivate w{1} h{2} x{3} y{4}", Row.W, Row.H, Pos.X, Pos.Y))
+    _TooltipDisableDwmRounding(Row.Gui.Hwnd)
+    if (_TooltipShownHwnds.Length >= _TOOLTIP_HWND_TRACK_CAP) {
+        DroppedHwnd := _TooltipShownHwnds.RemoveAt(1)
+        GR_DestroyWindow(DroppedHwnd)
+    }
+    _TooltipShownHwnds.Push(Row.Gui.Hwnd)
+    if ArmSafety
+        SetTimer(_TooltipTimerFn, -Round(_TOOLTIP_SAFETY_SEC * 1000))
+    _TooltipApplyStackedCorners()
+    _TooltipShowBorder(Pos.X, Pos.Y, Row.W, Row.H, false)
+    _TooltipRevealSurfaces()
+}
+
+; In-place destack rebuild — SUSPEND → build → PREPARE → REVEAL without TEARDOWN.
+; Preserves dequeue state and avoids border-only flashes during row expiry.
+_TooltipDequeueRebuild(Items) {
+    global _TooltipGeneration, _TooltipTimerGeneration, _TooltipDequeueActive
+    global _TooltipDequeueItems, _TooltipLastPos
+    global _TOOLTIP_TIMEOUT_DECREMENT_SEC, _TOOLTIP_TIMEOUT_FLOOR_SEC
+
+    _TooltipGeneration += 1
+    _TooltipTimerGeneration := _TooltipGeneration
+    SetTimer(_TooltipTimerFn, 0)
+    _TooltipSuspendSurfaces()
+
+    try {
+        _TooltipBuildGui(Items)
+    } catch {
+        TooltipHide("DequeueBuildFail", true)
+        return
+    }
+
+    Rows := _TooltipRowGuis
+    if (Rows.Length == 0) {
+        TooltipHide("DequeueNoRows", true)
+        return
+    }
+
+    Pos := IsObject(_TooltipLastPos) ? _TooltipLastPos : _TooltipResolvePosition()
+    Row := Rows[1]
+    try {
+        _TooltipPresentStack(Pos, Row, false)
+    } catch {
+        TooltipHide("DequeuePresentFail", true)
+        return
+    }
+
+    MaxMs := 0
+    Now := A_TickCount
+    for , Item in _TooltipDequeueItems {
+        if (Item.ExpireMs > 0) {
+            Remaining := Max(50, Item.ExpireMs - Now)
+            if (Remaining > MaxMs)
+                MaxMs := Remaining
+        }
+    }
+    if (MaxMs > 0)
+        SetTimer(_TooltipTimerFn, -MaxMs)
+    _TooltipDequeueActive := true
+}
+
+; Tear down only the border overlay (used before LLM content rebuild).
+_TooltipTeardownBorder() {
+    global _TooltipBorderGui, _TooltipShownBorderHwnds
+    if _TooltipBorderGui {
+        try GR_Hide(_TooltipBorderGui.Hwnd)
+        try _TooltipBorderGui.Destroy()
+        _TooltipBorderGui := 0
+    }
+    for , Hwnd in _TooltipShownBorderHwnds {
+        GR_DestroyWindow(Hwnd)
+    }
+    _TooltipShownBorderHwnds := []
+}
 
 ; Build a single Gui that holds the entire tooltip stack.
 ; Each row is rendered as a full-width background Text control (tinted per group)
@@ -837,10 +929,11 @@ _TooltipApplyStackedCorners() {
 ; writes opaque pixels), then every non-zero pixel's alpha channel is set to the
 ; desired opacity (0x40 = 25 %).  No DWM rounding can affect the result because
 ; the window has zero client area — it is just a bitmap handed to the compositor.
-_TooltipShowBorder(X, Y, W, H) {
+_TooltipShowBorder(X, Y, W, H, Reveal := true) {
     global _TooltipBorderGui, _TOOLTIP_CORNER_RADIUS
 
     if _TooltipBorderGui {
+        try GR_Hide(_TooltipBorderGui.Hwnd)
         try _TooltipBorderGui.Destroy()
         _TooltipBorderGui := 0
     }
@@ -953,10 +1046,10 @@ _TooltipShowBorder(X, Y, W, H) {
     DllCall("Gdi32\DeleteDC", "Ptr", MemDC)
     DllCall("Gdi32\DeleteObject", "Ptr", HBmp)
 
-    ; Show the border window. The pixel loop above is fast (RtlFillMemory-style
-    ; write) so the border appears within the same DWM composition cycle as the
-    ; content window — no perceptible gap on the way in.
-    GR_Show(Hwnd)
+    ; REVEAL is deferred to _TooltipRevealSurfaces() when Reveal=false so
+    ; content and border become visible in the same composition pass.
+    if Reveal
+        GR_Show(Hwnd)
 
     global _TooltipShownBorderHwnds, _TOOLTIP_HWND_TRACK_CAP
     if (_TooltipShownBorderHwnds.Length >= _TOOLTIP_HWND_TRACK_CAP) {
@@ -1636,6 +1729,8 @@ _TooltipBuildGuiLlm(slots, active_idx) {
 	global UI_LLM_CURSOR_HEX, UI_LLM_CMD_SEL_HEX, UI_LLM_CMD_DIM_HEX
 	global UI_LLM_FOOTER_SPACE_DIV, UI_LLM_FOOTER_COMBINED_SEP
 
+	_TooltipSuspendSurfaces()
+	_TooltipTeardownBorder()
 	if _TooltipGui
 		try _TooltipGui.Destroy()
 	_TooltipGui    := 0
@@ -1840,17 +1935,8 @@ _TooltipBuildGuiLlm(slots, active_idx) {
 	Row := Rows[1]
 	_TooltipTimerGeneration := _TooltipGeneration
 	try {
-		Row.Gui.Show(Format("w{1} h{2} x{3} y{4} NoActivate", Row.W, Row.H, Pos.X, Pos.Y))
-		_TooltipDisableDwmRounding(Row.Gui.Hwnd)
-		if (_TooltipShownHwnds.Length >= _TOOLTIP_HWND_TRACK_CAP) {
-			DroppedHwnd := _TooltipShownHwnds.RemoveAt(1)
-			GR_DestroyWindow(DroppedHwnd)
-		}
-		_TooltipShownHwnds.Push(Row.Gui.Hwnd)
-		SetTimer(_TooltipTimerFn, -Round(_TOOLTIP_SAFETY_SEC * 1000))
-		_TooltipApplyStackedCorners()
-		_TooltipShowBorder(Pos.X, Pos.Y, Row.W, Row.H)
+		_TooltipPresentStack(Pos, Row, true)
 	} catch {
-		TooltipHide()
+		TooltipHide("LlmPresentFail", true)
 	}
 }

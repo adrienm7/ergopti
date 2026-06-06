@@ -325,7 +325,10 @@ function M.render(blocks, state, start_watchers_callback)
 		if type(start_watchers_callback) == "function" then start_watchers_callback() end
 	end)
 
-	if not ok then Logger.error(LOG, "Crash during UI rendering: " .. tostring(err) .. ".") end
+	if not ok then
+		Logger.error(LOG, "Crash during UI rendering: " .. tostring(err) .. ".")
+		M.hide()
+	end
 end
 
 --- Safely hides the canvas. Also clears the stable model-info zone so the
@@ -553,7 +556,10 @@ function M.render_stacked(rows, state, start_watchers_callback)
 		M.stacked_canvas:show()
 		if type(start_watchers_callback) == "function" then start_watchers_callback() end
 	end)
-	if not ok then Logger.error(LOG, "Crash during stacked tooltip rendering: " .. tostring(err) .. ".") end
+	if not ok then
+		Logger.error(LOG, "Crash during stacked tooltip rendering: " .. tostring(err) .. ".")
+		M.hide_stacked()
+	end
 end
 
 --- Hides the stacked canvas.
