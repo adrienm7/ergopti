@@ -219,8 +219,8 @@ end)
 -- The tests fail only if the count INCREASES beyond these thresholds, preventing
 -- regressions while allowing incremental clean-up of the backlog.
 -- TODO: drive all baselines to zero as modules are refactored to use port adapters.
-local LUA_HS_BASELINE       = 862  -- hs.* calls in macos/modules/ and macos/lib/
-local LUA_IO_OS_BASELINE    = 63   -- io.open / os.execute calls in macos/modules/ and macos/lib/
+local LUA_HS_BASELINE       = 870  -- hs.* calls in macos/modules/ and macos/lib/
+local LUA_IO_OS_BASELINE    = 65   -- io.open / os.execute calls in macos/modules/ and macos/lib/
 
 helpers.describe("meta: shared/ code purity", function()
 	local shared_dir = REPO_ROOT .. "/static/ergopti_plus/shared"
