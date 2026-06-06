@@ -396,3 +396,20 @@ _TH_OverlayBackwardCompatNoDefaults() {
 	AssertEqual("tab", TH["keys"]["tab"]["tap_action"])
 }
 Test("LoadTapHoldToml overlay: backward-compatible when DefaultsFilePath omitted", _TH_OverlayBackwardCompatNoDefaults)
+
+; inherit_defaults = false opts out of the shipped defaults overlay
+_TH_InheritDefaultsFalseSkipsShippedDefaults() {
+	DefPath := _TH_WriteDefaults(
+		"[tap_hold.keys.caps_lock]`r`n"
+		. "tap_action = `"escape`"`r`n"
+	)
+	UserPath := _TH_Write(
+		"[tap_hold]`r`n"
+		. "inherit_defaults = false`r`n"
+	)
+	TH := LoadTapHoldToml(UserPath, DefPath)
+	_TH_Clean()
+	_TH_CleanDefaults()
+	AssertEqual(0, TH["keys"].Count)
+}
+Test("LoadTapHoldToml: inherit_defaults=false skips shipped defaults", _TH_InheritDefaultsFalseSkipsShippedDefaults)

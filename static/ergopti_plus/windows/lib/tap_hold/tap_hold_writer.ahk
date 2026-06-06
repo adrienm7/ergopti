@@ -260,6 +260,33 @@ WriteTapHoldHold(KeyId, HoldOpt) {
 ; =======================================
 ; =======================================
 
+; Persist an explicit « all tap-holds disabled » state. Without
+; ``inherit_defaults = false`` the loader would re-merge shipped defaults on
+; the next reload, undoing « Tout désactiver ».
+_TH_WriteTapHoldDisabled() {
+	global TapHold, _ConfigDir, _AhkSubDir
+	if IsSet(TapHold) {
+		TapHold["keys"] := Map()
+		TapHold["layers"] := Map()
+		TapHold["inherit_defaults"] := false
+	}
+	if !IsSet(_ConfigDir) {
+		try LoggerWarn("TapHoldWriter", "_ConfigDir unset — cannot persist disabled tap_hold.toml.")
+		return
+	}
+	Path := _ConfigDir . _AhkSubDir . "tap_hold.toml"
+	Content := "# Cleared by Ergopti+ global disable — shipped defaults are not inherited.`r`n"
+		. "[tap_hold]`r`n"
+		. "inherit_defaults = false`r`n"
+	try {
+		if FileExist(Path)
+			FileDelete(Path)
+		FileAppend(Content, Path, "UTF-8-RAW")
+	} catch as Err {
+		try LoggerError("TapHoldWriter", "Could not write disabled tap_hold.toml: {1}.", Err.Message)
+	}
+}
+
 ; Rewrite ``<config>/autohotkey/tap_hold.toml`` from scratch from the current
 ; in-memory ``TapHold`` global. Preserves the ``layers`` block verbatim
 ; so any user-customised layer mappings survive a key-section write.
