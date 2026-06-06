@@ -31,7 +31,10 @@ helpers.describe("notifications.notify", function()
 
 	helpers.it("invokes hs.notify.new with a single message", function()
 		local captured = nil
-		_G.hs.notify.new = function(opts) captured = opts ; return { send = function() end } end
+		_G.hs.notify.new = function(arg1, arg2)
+			captured = type(arg1) == "function" and arg2 or arg1
+			return { send = function() end }
+		end
 		notifications.notify("hello")
 		helpers.assert_eq(captured.title, "Ergopti+")
 		helpers.assert_eq(captured.informativeText, "hello")
@@ -39,7 +42,10 @@ helpers.describe("notifications.notify", function()
 
 	helpers.it("uses two-arg call as title + body", function()
 		local captured = nil
-		_G.hs.notify.new = function(opts) captured = opts ; return { send = function() end } end
+		_G.hs.notify.new = function(arg1, arg2)
+			captured = type(arg1) == "function" and arg2 or arg1
+			return { send = function() end }
+		end
 		notifications.notify("My title", "My body")
 		helpers.assert_eq(captured.title, "My title")
 		helpers.assert_eq(captured.informativeText, "My body")

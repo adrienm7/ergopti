@@ -504,7 +504,11 @@ M.image = { imageFromPath = function(_) return nil end, imageFromName = function
 M.task = { new = function(_, _) return { start = function() end, terminate = function() end } end }
 M.webview = { new = function() return {} end }
 M.distributednotifications = { new = function() return { start = function() end, stop = function() end } end }
-M.alert = function(_) end
+M.alert = setmetatable({
+	show = function() return "uuid" end,
+	closeAll = function() end,
+	closeSpecific = function() end,
+}, { __call = function(_, _) end })
 M.reload = function() end
 M.configdir = "/tmp/test_hammerspoon"
 M.shutdownCallback = nil
