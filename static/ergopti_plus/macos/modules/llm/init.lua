@@ -387,20 +387,16 @@ local _model_index = nil
 --- @return table The index keyed by model label.
 local function get_model_index()
 	if _model_index then return _model_index end
-	local candidates = {
-		hs.configdir .. "/../shared/llm/models.json",
-		hs.configdir .. "/../../shared/llm/models.json",
-		hs.configdir .. "/data/llm_models.json",
-		hs.configdir .. "/../hammerspoon/data/llm_models.json",
-	}
+	local Paths = require("lib.paths")
+	local path = Paths.shared_llm_path("models.json")
 	local presets = {}
-	for _, path in ipairs(candidates) do
+	if path then
 		local ok, fh = pcall(io.open, path, "r")
 		if ok and fh then
 			local raw = fh:read("*a")
 			pcall(function() fh:close() end)
 			local dec_ok, data = pcall(hs.json.decode, raw)
-			if dec_ok and type(data) == "table" then presets = data; break end
+			if dec_ok and type(data) == "table" then presets = data end
 		end
 	end
 	-- Flatten all models into a single index keyed by label

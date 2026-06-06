@@ -261,4 +261,62 @@ function M.build(ctx)
 	return api_title, api_menu
 end
 
+--- Builds the "active model" submenu when the remote API backend is selected.
+--- Mirrors Windows ``_LLM_Tray_BuildApiEntriesMenu()`` — local catalogue rows
+--- are hidden because they have no ``urls.api`` entry in models.json.
+--- @param ctx table Context with fields: state, paused, update_menu, WarmupCtrl.
+--- @return table menu Populated API entry picker.
+function M.build_model_picker(ctx)
+	local state       = ctx.state
+	local paused      = ctx.paused
+	local update_menu = ctx.update_menu
+	local WarmupCtrl  = ctx.WarmupCtrl
+
+	local api_remote = llm_mod.api_remote
+	local entries    = (api_remote and api_remote.get_entries()) or {}
+	local active_id  = (api_remote and api_remote.get_active_entry_id()) or ""
+	local menu       = {}
+
+	table.insert(menu, {
+		title   = i18n.get("menu.llm.no_model"),
+		checked = (active_id == "" or active_id == nil),
+		disabled = paused or nil,
+		fn      = not paused and function()
+			if api_remote and api_remote.set_active_entry_id then
+				api_remote.set_active_entry_id("")
+				state.llm_model = ""
+				pcall_log("persist_api_entries(clear_active)", llm_mod.persist_api_entries)
+				WarmupCtrl.warmup("api_clear_active")
+				update_menu()
+			end
+		end or nil,
+	})
+
+	if #entries > 0 then
+		table.insert(menu, { title = "-" })
+	end
+
+	for _, e in ipairs(entries) do
+		local provider_label = (api_remote.PROVIDERS[e.provider] and api_remote.PROVIDERS[e.provider].label) or e.provider
+		local entry_title = string.format("%s — %s (%s)",
+			tostring(e.label or e.id or "?"),
+			tostring(e.model or "?"),
+			provider_label)
+		table.insert(menu, {
+			title    = entry_title,
+			checked  = (e.id == active_id),
+			disabled = paused or nil,
+			fn       = not paused and function()
+				api_remote.set_active_entry_id(e.id)
+				state.llm_model = tostring(e.model or "")
+				pcall_log("persist_api_entries(set_active)", llm_mod.persist_api_entries)
+				WarmupCtrl.warmup("api_set_active")
+				update_menu()
+			end or nil,
+		})
+	end
+
+	return menu
+end
+
 return M

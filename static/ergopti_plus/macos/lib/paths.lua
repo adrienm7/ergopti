@@ -100,4 +100,16 @@ function M.find_from_configdir(relative_target, max_steps)
 	return nil
 end
 
+--- Resolves a file inside ``static/ergopti_plus/shared/llm/``.
+--- @param filename string|nil File name (e.g. ``"models.json"``). Nil → directory path.
+--- @return string|nil Absolute path, or nil when the shared tree is unreachable.
+function M.shared_llm_path(filename)
+	local dir = M.find_from_configdir("static/ergopti_plus/shared/llm")
+	if not dir then return nil end
+	if filename and filename ~= "" then
+		return dir .. "/" .. filename
+	end
+	return dir
+end
+
 return M

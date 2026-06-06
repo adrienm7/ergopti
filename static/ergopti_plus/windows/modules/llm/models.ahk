@@ -161,23 +161,72 @@ LLM_GetModelInfo(display_name) {
 }
 
 /**
- * Resolves the Ollama tag for a model display name.
- * @param {string} display_name - The "name" field from models.json.
- * @returns {string} Ollama model tag, or the display_name itself as fallback.
+ * Core resolver — optionally logs when the name cannot be mapped to a known
+ * catalogue entry or an installed Ollama tag. ``LLM_IsModelInstalled`` calls
+ * this with logging disabled so the tray menu does not spam warnings.
+ *
+ * @param {string}  display_name - Catalogue display name or raw Ollama tag.
+ * @param {boolean} log_unknown  - When true, emit a WARN for unknown names.
+ * @returns {string} Ollama tag, or the input unchanged as last resort.
  */
-LLM_ResolveOllamaTag(display_name) {
+_LLM_ResolveOllamaTagCore(display_name, log_unknown := false) {
+	if (display_name == "")
+		return ""
 	index := LLM_GetModelIndex()
 	if index.Has(display_name) {
 		entry := index[display_name]
 		if entry.Has("ollama") && entry["ollama"] != ""
 			return entry["ollama"]
 	}
-	; Unknown model: pass the name as-is (may work if already a valid tag).
-	; Log a warn so a "predictions silently stopped working after I typed a
-	; custom model name" diagnostic actually shows up in the unified log —
-	; the previous silent fallback hid the symptom.
-	try LoggerWarn("LLM.models", "Unknown model '{1}' — passing through as Ollama tag; predictions may fail.", display_name)
+	; Legacy configs and the installed-tag fallback menu store the raw tag.
+	tags := _LLM_GetInstalledTagsCached()
+	name_lc := StrLower(display_name)
+	for installed in tags {
+		if (StrLower(installed) == name_lc)
+			return installed
+	}
+	; Case-insensitive catalogue display-name match (config.toml drift).
+	for cat_name, entry in index {
+		if (StrLower(cat_name) == name_lc) {
+			if entry.Has("ollama") && entry["ollama"] != ""
+				return entry["ollama"]
+		}
+	}
+	if log_unknown {
+		try LoggerWarn("LLM.models",
+			"Unknown model '{1}' — not in catalogue and not installed locally; predictions may fail.",
+			display_name)
+	}
 	return display_name
+}
+
+/**
+ * Resolves the Ollama tag for a model display name.
+ * @param {string} display_name - The "name" field from models.json.
+ * @returns {string} Ollama model tag, or the display_name itself as fallback.
+ */
+LLM_ResolveOllamaTag(display_name) {
+	return _LLM_ResolveOllamaTagCore(display_name, true)
+}
+
+/**
+ * Picks the best catalogue display name that is installed locally.
+ * Prefers the shared AHK default, then any catalogue entry, then the first
+ * raw tag from ``ollama list``.
+ *
+ * @returns {string} Display name or raw tag, or "" when Ollama has no models.
+ */
+LLM_PickBestInstalledDisplayName() {
+	preferred := IsSet(LLM_Defaults) && LLM_Defaults.Has("llm_model")
+		? LLM_Defaults["llm_model"] : "Qwen3.5-0.8B"
+	if (preferred != "" && LLM_IsModelInstalled(preferred))
+		return preferred
+	for name in LLM_GetAllModelNames() {
+		if LLM_IsModelInstalled(name)
+			return name
+	}
+	installed := LLM_OllamaListModels()
+	return (installed.Length > 0) ? installed[1] : ""
 }
 
 /**
@@ -189,7 +238,7 @@ LLM_ResolveOllamaTag(display_name) {
  * @returns {Boolean} True when ``ollama list`` includes the resolved tag.
  */
 LLM_IsModelInstalled(display_name) {
-	tag := LLM_ResolveOllamaTag(display_name)
+	tag := _LLM_ResolveOllamaTagCore(display_name, false)
 	if (tag == "")
 		return false
 	tags := _LLM_GetInstalledTagsCached()
