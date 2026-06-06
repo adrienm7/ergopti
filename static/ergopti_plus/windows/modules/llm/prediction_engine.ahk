@@ -325,6 +325,17 @@ LLM_Engine_FirePrediction(buffer) {
 	if !_LLM_Engine["enabled"] || buffer == ""
 		return
 
+	; ── Bump the request id ──
+	; Every async callback closes over the id it saw at dispatch time. If
+	; the engine's current id has moved on, the callback bails — mirrors
+	; the HS llm_request_counter pattern in modules/llm/prediction_engine.lua.
+	;
+	; Moved to the top so even deferred attempts (warmup, rate limit) or
+	; short-context skips bump the id and invalidate stale in-flight results
+	; from previous contexts.
+	_LLM_Engine["request_id"] := (_LLM_Engine.Has("request_id") ? _LLM_Engine["request_id"] : 0) + 1
+	this_request_id := _LLM_Engine["request_id"]
+
 	backend_now := _LLM_Engine.Has("backend") ? _LLM_Engine["backend"] : "ollama"
 	if (backend_now = "ollama" and IsSet(LLM_OllamaAllowInference) and !LLM_OllamaAllowInference()) {
 		static _LLM_LastDeferLogTick := 0
@@ -386,7 +397,6 @@ LLM_Engine_FirePrediction(buffer) {
 			and Type(_LLM_Engine["last_results"]) == "Array"
 			and _LLM_Engine["last_results"].Length > 0) {
 		try LLM_OllamaCancelStreams()
-		_LLM_Engine["request_id"] := (_LLM_Engine.Has("request_id") ? _LLM_Engine["request_id"] : 0) + 1
 		LLM_Engine_OnResults(_LLM_Engine["last_results"], ctx, 1, true)
 		return
 	}
@@ -421,7 +431,6 @@ LLM_Engine_FirePrediction(buffer) {
 			; Same race fix as the exact-match cache branch above: bump
 			; request_id so late callbacks bail; WinHTTP stays in flight.
 			try LLM_OllamaCancelStreams()
-			_LLM_Engine["request_id"] := (_LLM_Engine.Has("request_id") ? _LLM_Engine["request_id"] : 0) + 1
 			LLM_Engine_OnResults(sliced, ctx, 1, true)
 			return
 		}
@@ -456,12 +465,6 @@ LLM_Engine_FirePrediction(buffer) {
 	}
 	try LLM_OllamaCancelStreams()
 
-	; ── Bump the request id ──
-	; Every async callback closes over the id it saw at dispatch time. If
-	; the engine's current id has moved on, the callback bails — mirrors
-	; the HS llm_request_counter pattern in modules/llm/prediction_engine.lua.
-	_LLM_Engine["request_id"] := (_LLM_Engine.Has("request_id") ? _LLM_Engine["request_id"] : 0) + 1
-	this_request_id := _LLM_Engine["request_id"]
 	try LLM_Tooltip_SetChainStart()
 
 	; Resolve profile and build the system prompt. If the user has

@@ -106,6 +106,12 @@ function M.load_with_stubs(module_name, hs_overrides)
 		shared_llm_path = function(name)
 			return M.driver_root() .. "../shared/llm/" .. name
 		end,
+		find_from_configdir = function(relative_target)
+			-- relative_target is usually "static/ergopti_plus/shared/locales"
+			-- M.driver_root() is .../static/ergopti_plus/macos/
+			-- We want to return .../relative_target
+			return M.driver_root() .. "../../" .. relative_target
+		end,
 	}
 
 	-- Minimal DEFAULT_STATE for modules.llm.init (lazy-required by
