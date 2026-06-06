@@ -184,7 +184,7 @@ end
 --- @return table Full default state: {enabled, tap_hold_config, mod_combos_config, timeouts…}
 function M.build_default_state(tap_hold_keys, mod_combos)
 	local tap_hold_config = {}
-	for _, key_def in ipairs(tap_hold_keys) do
+	for _, key_def in ipairs(tap_hold_keys or {}) do
 		local d = Defaults.tap_hold[key_def.id]
 		if not d then
 			Logger.warn(LOG, "No default entry for key '%s' in defaults.lua — using none/none.", key_def.id)
@@ -196,7 +196,7 @@ function M.build_default_state(tap_hold_keys, mod_combos)
 	end
 
 	local mod_combos_config = {}
-	for _, combo_def in ipairs(mod_combos) do
+	for _, combo_def in ipairs(mod_combos or {}) do
 		local d = Defaults.combos[combo_def.id]
 		if not d then
 			Logger.warn(LOG, "No default entry for combo '%s' in defaults.lua — using none/none/none.", combo_def.id)

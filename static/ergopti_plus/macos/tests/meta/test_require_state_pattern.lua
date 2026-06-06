@@ -38,7 +38,7 @@ local KNOWN_VIOLATIONS = {
 	["modules/llm/api_common.lua"] = true,
 	["modules/gestures/actions.lua"] = true,
 
-	; Encore plus: more modules for full pause coverage
+	-- Encore plus: more modules for full pause coverage
 	["modules/keymap/expander.lua"] = true,
 	["modules/llm/prediction_engine.lua"] = true,
 	["modules/metrics/aggregator.lua"] = true,

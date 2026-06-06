@@ -415,7 +415,9 @@ Test("_LLM_Engine_GetActiveApiEntry: falls back to first entry when active id no
 ; ===========================================================================
 
 _RequestId_BumpsOnFirePrediction() {
-	global _LLM_Engine
+	global _LLM_Engine, _LLM_Ollama_IsReady
+	; Enable inference so FirePrediction gets past the warmup guard
+	_LLM_Ollama_IsReady := true
 	; Disable so FirePrediction returns early without touching HTTP
 	LLM_Engine_Init(Map("debounce_ms", 9999))
 	LLM_Engine_SetEnabled(false)
@@ -451,7 +453,8 @@ Test("_LLM_Engine: request_id is initialised at 0", _RequestId_InitialisesAtZero
 ; ===================================================
 
 _CacheHit_ExactMatchReturnsCachedResults() {
-	global _LLM_Engine
+	global _LLM_Engine, _LLM_Ollama_IsReady
+	_LLM_Ollama_IsReady := true
 	; Seed the cache with a known context and results
 	LLM_Engine_Init(Map())
 	_LLM_Engine["last_ctx"]     := "intelligen"
@@ -466,7 +469,8 @@ Test("LLM_Engine_FirePrediction: exact cache hit bumps request_id", _CacheHit_Ex
 
 
 _CacheHit_PrefixMatchSlicesResults() {
-	global _LLM_Engine
+	global _LLM_Engine, _LLM_Ollama_IsReady
+	_LLM_Ollama_IsReady := true
 	; Cache: context "intelligen", predicted suffix "ce alone" (starts with "ce ").
 	; Firing with ctx="intelligence " gives typed_delta="ce " which matches the
 	; start of the cached slot — prefix-cache hits and slices to "alone".
@@ -484,7 +488,8 @@ Test("LLM_Engine_FirePrediction: prefix cache hit bumps request_id", _CacheHit_P
 
 
 _CacheHit_EmptyContextSkipsRequest() {
-	global _LLM_Engine
+	global _LLM_Engine, _LLM_Ollama_IsReady
+	_LLM_Ollama_IsReady := true
 	LLM_Engine_Init(Map())
 	id_before := _LLM_Engine["request_id"]
 	; Empty context must return early without bumping request_id
