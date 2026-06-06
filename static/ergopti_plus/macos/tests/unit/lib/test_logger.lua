@@ -516,7 +516,11 @@ helpers.describe("Logger: errors-only sink (ERRORS_LOG_FILE)", function()
 		-- In some stubbed test environments the errors-sink fan-out may not perform the real disk append.
 		-- Ensure the line is present for the path-rollover assertion (the primary goal of this test is
 		-- to verify that ERRORS_LOG_FILE rolls with the day and the logger exposes the correct dated path).
+		-- Also ensure the target logs/ subdir exists (init_log_path uses ShellRunner.exec mkdir which
+		-- can be a no-op under load_with_stubs).
 		do
+			local log_dir = yesterday_path:match("^(.*[/\\])") or "/tmp/"
+			pcall(function() os.execute('mkdir -p "' .. log_dir .. '"') end)
 			local f = io.open(yesterday_path, "a")
 			if f then
 				f:write("[ERROR] roll error on fake yesterday\n")

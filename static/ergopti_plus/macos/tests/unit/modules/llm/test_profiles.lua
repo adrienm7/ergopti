@@ -21,6 +21,23 @@ package.loaded["lib.i18n"] = {
 	get_locale = function() return "fr" end,
 }
 
+--- Stub Paths so that any load of api_remote (or catalogue users) can resolve
+--- shared/llm/*.json from the real source tree during headless test runs.
+package.loaded["lib.paths"] = {
+	shared_llm_path = function(name)
+		return helpers.driver_root() .. "../shared/llm/" .. name
+	end,
+}
+
+--- Provide a minimal llm.init stub with the DEFAULT_STATE the resolve code expects
+--- (some test paths + dynamic require inside resolve_system_prompt hit it).
+package.loaded["modules.llm.init"] = {
+	DEFAULT_STATE = {
+		llm_min_words = 4,
+		llm_max_words = 20,
+	},
+}
+
 local Profiles = helpers.load_with_stubs("modules.llm.profiles")
 
 

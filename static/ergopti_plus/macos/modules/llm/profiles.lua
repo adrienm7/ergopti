@@ -159,20 +159,24 @@ function M.resolve_system_prompt(profile, n)
 	end
 
 	-- Lazy load Core to avoid circular dependency (init.lua requires profiles.lua).
-	local Core    = require("modules.llm.init")
-	local def_min = Core.DEFAULT_STATE.llm_min_words
-	local def_max = Core.DEFAULT_STATE.llm_max_words
+	local Core    = require("modules.llm.init") or {}
+	local ds      = (Core and Core.DEFAULT_STATE) or {}
+	local def_min = ds.llm_min_words or 4
+	local def_max = ds.llm_max_words or 20
 
-	-- Read live user settings; fall back to Core defaults when absent.
-	local min_w = tonumber(hs.settings.get("llm_min_words")) or def_min
-	local max_w = tonumber(hs.settings.get("llm_max_words")) or def_max
+	-- Read live user settings; fall back to Core defaults when absent. Guard hs/i18n for stubbed test/CI envs.
+	local settings = (hs and hs.settings) or {}
+	local get_setting = (settings and settings.get) or function() return nil end
+	local min_w = tonumber(get_setting("llm_min_words")) or def_min
+	local max_w = tonumber(get_setting("llm_max_words")) or def_max
 	if max_w > 0 and max_w < min_w then max_w = min_w end
 
 	prompt = prompt:gsub("{max_words}", (max_w > 0) and tostring(max_w) or "illimité")
 	prompt = prompt:gsub("{min_words}", tostring(min_w))
 
 	-- Inject the active UI locale so the model replies in the user's language.
-	local locale = i18n.get_locale() or "fr"
+	local get_locale = (i18n and i18n.get_locale) or function() return "fr" end
+	local locale = get_locale() or "fr"
 	prompt = prompt:gsub("{language}", locale)
 
 	return prompt

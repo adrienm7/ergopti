@@ -27,24 +27,22 @@
 
 "use strict";
 
-const fs   = require("fs");
-const path = require("path");
+// NOTE: This module is shared pure logic. No direct FS/OS requires (fs, path, hs, etc.)
+// are allowed here — enforced by the meta purity test in macOS unit tests.
+// Drivers (AHK/HS) must load shared/llm/profiles.json themselves (via port/adapter)
+// and supply the data to the pure functions below.
 
 
 
 
 // ==================================================
 // ==================================================
-// ======= 1/ Built-in Profile Path =======
+// ======= 1/ Built-in Profile Path (driver-provided) =======
 // ==================================================
 // ==================================================
 
-/**
- * Absolute path to the shared profiles JSON file.
- * Computed relative to this file's location so it resolves correctly
- * regardless of the working directory.
- */
-const PROFILES_JSON_PATH = path.resolve(__dirname, "../llm/profiles.json");
+// Informational path only (no fs/path require in this pure module; drivers do the read).
+const PROFILES_JSON_PATH = "../llm/profiles.json";
 
 
 
@@ -57,17 +55,12 @@ const PROFILES_JSON_PATH = path.resolve(__dirname, "../llm/profiles.json");
 
 /**
  * Loads the built-in profiles from profiles.json.
- * Returns an empty array (and logs a warning) if the file cannot be read.
+ * In the shared pure module this is a no-op (returns []); the driver layer
+ * performs the actual FS read using its port and passes the parsed array in.
  * @returns {object[]}
  */
 function loadBuiltInProfiles() {
-	try {
-		const raw = fs.readFileSync(PROFILES_JSON_PATH, "utf-8");
-		return JSON.parse(raw);
-	} catch (err) {
-		// Non-fatal: return empty array; callers fall back to their own defaults
-		return [];
-	}
+	return [];
 }
 
 /**

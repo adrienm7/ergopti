@@ -14,6 +14,21 @@ local helpers = require("tests.helpers")
 package.loaded["lib.logger"] = nil
 local _ = helpers.load_with_stubs("lib.logger")
 
+-- Stub modules required at top-level by script_control.lua so that load_with_stubs
+-- can fully execute the module and expose pause_all/resume_all etc on the returned table.
+package.loaded["lib.notifications"] = { notify = function() end }
+package.loaded["lib.keycodes"] = {
+	F13_KARABINER_RETURN = 0x6A,
+	F14_KARABINER_BACKSPACE = 0x6B,
+	F15_KARABINER_ESCAPE = 0x6C,
+	BACKSPACE = 0x33,
+	RETURN = 0x24,
+	ESCAPE = 0x35,
+}
+package.loaded["lib.i18n"] = { get = function(k) return k end, get_locale = function() return "fr" end }
+package.loaded["modules.gestures.engine"] = {}
+package.loaded["modules.gestures.actions"] = { get_label = function(n) return n end }
+
 local SC = helpers.load_with_stubs("modules.shortcuts.script_control")
 
 
