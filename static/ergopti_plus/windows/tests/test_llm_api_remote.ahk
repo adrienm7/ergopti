@@ -251,6 +251,14 @@ _RemoteResolve_ValidOpenAIEntry() {
 Test("_LLMRemoteResolveEntry: valid openai entry resolves correctly", _RemoteResolve_ValidOpenAIEntry)
 
 
+_RemoteResolve_MissingTokenReturnsEmpty() {
+	entry := Map("Provider", "openai", "Token", "", "Model", "gpt-4o-mini", "BaseUrl", "")
+	resolved := _LLMRemoteResolveEntry(entry)
+	AssertEqual("", resolved)
+}
+Test("_LLMRemoteResolveEntry: missing token returns empty string", _RemoteResolve_MissingTokenReturnsEmpty)
+
+
 _RemoteResolve_UnknownProviderReturnsEmpty() {
 	entry := Map("Provider", "unknown_xyz", "Token", "t", "Model", "m", "BaseUrl", "http://x")
 	resolved := _LLMRemoteResolveEntry(entry)
@@ -447,3 +455,48 @@ _RemoteTrimRegistry_DropsOldestWhenAtCap() {
 	_LLM_Remote_Async := Map()
 }
 Test("_LLMRemote_TrimAsyncRegistry: removes oldest entry when at cap", _RemoteTrimRegistry_DropsOldestWhenAtCap)
+
+
+
+
+
+; ================================================
+; ================================================
+; ======= 9/ Catalogue + request context ==========
+; ================================================
+; ================================================
+
+_RemoteCatalog_LoadedFromShared() {
+	AssertTrue(LLM_API_PROVIDERS.Has("openai"))
+	AssertTrue(LLM_API_PROVIDERS.Has("openai_compat"))
+	AssertEqual(9, LLM_API_PROVIDER_ORDER.Length)
+	AssertTrue(LLM_REMOTE_MODEL_PRICES.Has("gpt-4o-mini"))
+}
+Test("api_providers.json: catalogue loaded at module init", _RemoteCatalog_LoadedFromShared)
+
+
+_RemoteBuildContext_PrefixTail() {
+	req := _LLMRemote_BuildRequestContext("PREFIX and TAIL markers", "full ctx", "tail bit")
+	AssertContains(req["user"], 'PREFIX: "full ctx"')
+	AssertContains(req["user"], 'TAIL: "tail bit"')
+}
+Test("_LLMRemote_BuildRequestContext: PREFIX/TAIL profiles format user turn", _RemoteBuildContext_PrefixTail)
+
+
+_RemoteBuildContext_ContextSubstitution() {
+	req := _LLMRemote_BuildRequestContext("Complete: {context}", "hello world", "world")
+	AssertContains(req["system"], "hello world")
+	AssertEqual("", req["user"])
+}
+Test("_LLMRemote_BuildRequestContext: {context} substitution moves text into system", _RemoteBuildContext_ContextSubstitution)
+
+
+_RemoteIsReady_AnthropicAuthHeader() {
+	entry := Map("Provider", "anthropic", "Token", "sk-ant", "Model", "claude-haiku-4-5", "BaseUrl", "")
+	; Offline: we only verify resolve + URL shape — no HTTP.
+	resolved := _LLMRemoteResolveEntry(entry)
+	AssertEqual("anthropic", resolved["Format"])
+	url := _LLMRemoteBuildUrl(resolved["BaseUrl"], resolved["Format"], resolved["Token"], resolved["Model"])
+	AssertEqual("https://api.anthropic.com/v1/messages", url)
+}
+Test("LLM_RemoteIsReady path: anthropic resolves to /messages endpoint", _RemoteIsReady_AnthropicAuthHeader)
