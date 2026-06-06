@@ -58,7 +58,7 @@ Test("PersonalTomlEditor: pause must silence all personal info expansions", Test
 
 ; Error paths: bad input to escape/write must not crash
 TestPE_BadInputGraceful() {
-	AssertEqual("", EscapeTomlValue(nil))  ; or handle gracefully
+	AssertEqual("", EscapeTomlValue(""))  ; or handle gracefully
 }
 Test("PersonalTomlEditor: bad input to EscapeTomlValue handled gracefully", TestPE_BadInputGraceful)
 

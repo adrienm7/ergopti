@@ -649,7 +649,8 @@ TestLogger_ErrorsPathIsSeparate() {
 	AssertTrue(!InStr(Content, "this-debug-must-NOT-go-to-errors"))
 
 	; Ring buffer (main path) must still have received the info line (regression guard)
-	AssertContains(LOGGER_RING_BUFFER[LOGGER_RING_BUFFER.Length], "this-info-must-NOT-go-to-errors")
+	; It's at index Length-1 because of the subsequent Debug call.
+	AssertContains(LOGGER_RING_BUFFER[LOGGER_RING_BUFFER.Length - 1], "this-info-must-NOT-go-to-errors")
 
 	; Cleanup
 	try FileDelete(ErrorsTmp)

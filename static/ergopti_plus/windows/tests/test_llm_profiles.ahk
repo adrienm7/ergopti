@@ -44,7 +44,9 @@ Test("LLM profiles: pause must block all profile-driven predictions", TestLLMPro
 ; Error paths: bad JSON or missing fields must not crash
 TestLLMProfiles_BadJSONGraceful() {
 	m := LLM_ParseProfileObject('{"bad": "json"')
-	AssertEqual(nil, m)  ; or empty map, graceful
+	AssertTrue(m is Map, "bad JSON must still return a Map (resilient defaults)")
+	AssertEqual("", m["id"])
+	AssertFalse(m["batch"])
 }
 Test("LLM profiles: bad JSON handled gracefully without crash", TestLLMProfiles_BadJSONGraceful)
 

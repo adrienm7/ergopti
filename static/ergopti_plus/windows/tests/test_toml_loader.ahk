@@ -69,7 +69,7 @@ TestTL_ReadTomlFileCaching() {
 Test("ReadTomlFile: repeated calls return consistent (cache or re-read safe)", TestTL_ReadTomlFileCaching)
 
 TestTL_UnescapeMultipleEscapes() {
-	AssertEqual("a`tb`nc", UnescapeTomlString("a\\tb\\nc"))
+	AssertEqual("a`tb`nc", UnescapeTomlString("a\tb\nc"))
 }
 Test("UnescapeTomlString: multiple escapes handled", TestTL_UnescapeMultipleEscapes)
 

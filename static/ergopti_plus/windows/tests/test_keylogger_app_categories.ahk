@@ -53,8 +53,11 @@ Test("KeyloggerAppCategories: pause must not affect pure classification (writer 
 
 ; More category edges: unknown + empty + special exe names
 _KLAppCat_UnknownExeIsNeutral() {
-	AssertEqual("neutral", KLAppCatConst.DEFAULTS["weirdapp.exe"] or "neutral")
+	global KLAppCatConst
+	; Ensure we're checking the static DEFAULTS Map
+	AssertEqual("neutral", KLAppCatConst.DEFAULTS.Has("weirdapp.exe") ? KLAppCatConst.DEFAULTS["weirdapp.exe"] : "neutral")
 }
+
 Test("KLAppCatConst.DEFAULTS: unknown exe falls back gracefully", _KLAppCat_UnknownExeIsNeutral)
 
 _KLAppCat_Defaults_OutlookIsCommunication() {
