@@ -33,89 +33,13 @@
 ; =======================================
 ; =======================================
 
-; Each provider ID maps to a descriptor consumed by LLM_RemoteGenerate. Fields:
-;   - Label         — human-readable name shown in the picker dialog.
-;   - BaseUrl       — default endpoint. The user can override per API entry.
-;   - DefaultModel  — pre-filled when adding a new API entry; the user can
-;                     replace it with any model the provider exposes.
-;   - Format        — "openai" | "anthropic" | "gemini". Selects the request
-;                     formatter and response parser at call time.
-;
-; Adding a new provider = one entry here + (optionally) a new Format branch in
-; _LLMRemoteBuildPayload / _LLMRemoteParseResponse.
-global LLM_API_PROVIDERS := Map(
-    "openai", Map(
-        "Label",        "OpenAI",
-        "BaseUrl",      "https://api.openai.com/v1",
-        "DefaultModel", "gpt-4o-mini",
-        "Format",       "openai"
-    ),
-    "anthropic", Map(
-        "Label",        "Anthropic",
-        "BaseUrl",      "https://api.anthropic.com/v1",
-        "DefaultModel", "claude-haiku-4-5",
-        "Format",       "anthropic"
-    ),
-    "gemini", Map(
-        "Label",        "Google Gemini",
-        "BaseUrl",      "https://generativelanguage.googleapis.com/v1beta",
-        "DefaultModel", "gemini-2.0-flash",
-        "Format",       "gemini"
-    ),
-    ; xAI ships an OpenAI-compatible Chat Completions endpoint; the only
-    ; difference is the URL. Bearer auth.
-    "xai", Map(
-        "Label",        "xAI (Grok)",
-        "BaseUrl",      "https://api.x.ai/v1",
-        "DefaultModel", "grok-2-mini",
-        "Format",       "openai"
-    ),
-    ; Mistral: OpenAI-compatible at the URL below. ``mistral-small-latest``
-    ; is the cheap-and-fast default; codestral / large stay accessible
-    ; via the model field.
-    "mistral", Map(
-        "Label",        "Mistral",
-        "BaseUrl",      "https://api.mistral.ai/v1",
-        "DefaultModel", "mistral-small-latest",
-        "Format",       "openai"
-    ),
-    ; DeepSeek: same shape as OpenAI. The ``deepseek-chat`` model is
-    ; sized like gpt-4o-mini and competitively priced.
-    "deepseek", Map(
-        "Label",        "DeepSeek",
-        "BaseUrl",      "https://api.deepseek.com",
-        "DefaultModel", "deepseek-chat",
-        "Format",       "openai"
-    ),
-    ; Cohere: exposes an OpenAI-compatible Chat Completions route at
-    ; ``/compatibility/v1`` (NOT the native ``/v2/chat`` route, which has a
-    ; different schema). ``command-r7b-12-2024`` is the small / fast tier.
-    "cohere", Map(
-        "Label",        "Cohere",
-        "BaseUrl",      "https://api.cohere.ai/compatibility/v1",
-        "DefaultModel", "command-r7b-12-2024",
-        "Format",       "openai"
-    ),
-    ; Cerebras: hardware-accelerated Llama / Qwen inference. Pure
-    ; OpenAI-compatible at /v1/chat/completions; the value-add is raw
-    ; tokens-per-second (~1700 tok/s on Llama 3.1 70B), not the schema.
-    "cerebras", Map(
-        "Label",        "Cerebras",
-        "BaseUrl",      "https://api.cerebras.ai/v1",
-        "DefaultModel", "llama-3.1-8b",
-        "Format",       "openai"
-    ),
-    ; Generic OpenAI-compatible covers Groq, OpenRouter, LM Studio, vLLM,
-    ; llama.cpp HTTP server, Together.ai, Fireworks, DeepInfra, … — anything
-    ; that speaks the Chat Completions schema. BaseUrl is empty so the user
-    ; HAS to fill it in (no sensible default for a generic endpoint).
-    "openai_compat", Map(
-        "Label",        "OpenAI-compatible",
-        "BaseUrl",      "",
-        "DefaultModel", "",
-        "Format",       "openai"
-    )
-)
+; Loaded from shared/llm/api_providers.json at boot (see _LLMRemote_LoadCatalog).
+; Each provider ID maps to Label / BaseUrl / DefaultModel / Format — same
+; schema as the HS twin. Adding a provider = one entry in api_providers.json
+; plus (optionally) a new Format branch in _LLMRemoteBuildPayload /
+; _LLMRemoteParseResponse.
+global LLM_API_PROVIDERS := Map()
+global LLM_API_PROVIDER_ORDER := []
 
 global LLM_REMOTE_TIMEOUT_MS := 30000   ; same generous ceiling as Ollama
 
@@ -138,15 +62,16 @@ global LLM_REMOTE_TIMEOUT_MS := 30000   ; same generous ceiling as Ollama
 ; Returns the generated text, or "" on any error (network, HTTP non-2xx, parse
 ; failure). Failure is silent by design so the prediction loop never crashes —
 ; the user gets no tooltip instead of an error dialog mid-typing.
-LLM_RemoteGenerate(Entry, SystemPrompt, UserText, Temperature := 0.1) {
+LLM_RemoteGenerate(Entry, SystemPrompt, FullText, Temperature := 0.1, TailText := "") {
     global LLM_API_PROVIDERS, LLM_REMOTE_TIMEOUT_MS
 
     resolved := _LLMRemoteResolveEntry(Entry)
     if (resolved == "")
         return ""
 
+    req := _LLMRemote_BuildRequestContext(SystemPrompt, FullText, TailText)
     Url     := _LLMRemoteBuildUrl(resolved["BaseUrl"], resolved["Format"], resolved["Token"], resolved["Model"])
-    Payload := _LLMRemoteBuildPayload(resolved["Format"], resolved["Model"], SystemPrompt, UserText, Temperature)
+    Payload := _LLMRemoteBuildPayload(resolved["Format"], resolved["Model"], req["system"], req["user"], Temperature)
 
     try {
         Http := ComObject("WinHttp.WinHttpRequest.5.1")
@@ -191,7 +116,7 @@ global LLM_REMOTE_MAX_INFLIGHT := 16
  * @param {function}   on_fail      - Called on HTTP / parse failure.
  * @returns {Integer}  Request id, usable with LLM_RemoteCancelAsync.
  */
-LLM_RemoteGenerate_Async(Entry, SystemPrompt, UserText, Temperature, on_success, on_fail) {
+LLM_RemoteGenerate_Async(Entry, SystemPrompt, FullText, Temperature, on_success, on_fail, TailText := "") {
     global _LLM_Remote_Async, _LLM_Remote_AsyncCounter, LLM_REMOTE_TIMEOUT_MS
 
     _LLM_Remote_AsyncCounter += 1
@@ -203,8 +128,9 @@ LLM_RemoteGenerate_Async(Entry, SystemPrompt, UserText, Temperature, on_success,
         return req_id
     }
 
+    req := _LLMRemote_BuildRequestContext(SystemPrompt, FullText, TailText)
     Url     := _LLMRemoteBuildUrl(resolved["BaseUrl"], resolved["Format"], resolved["Token"], resolved["Model"])
-    Payload := _LLMRemoteBuildPayload(resolved["Format"], resolved["Model"], SystemPrompt, UserText, Temperature)
+    Payload := _LLMRemoteBuildPayload(resolved["Format"], resolved["Model"], req["system"], req["user"], Temperature)
 
     try {
         http := ComObject("WinHttp.WinHttpRequest.5.1")
@@ -282,7 +208,7 @@ _LLMRemote_PollRequest(req_id) {
     ; doesn't (its non-streaming response has ``eval_count`` /
     ; ``prompt_eval_count`` instead, which we don't parse for the remote
     ; path because the engine only treats local backends as "free").
-    meta := _LLMRemoteExtractUsage(format, body, entry.Has("model_id_at_dispatch") ? entry["model_id_at_dispatch"] : "")
+    meta := _LLMRemoteExtractUsage(entryFormat, body, entry.Has("model_id_at_dispatch") ? entry["model_id_at_dispatch"] : "")
     try on_success(text, meta)
 }
 
@@ -328,47 +254,8 @@ _LLMRemoteExtractUsage(format, body, model) {
     return out
 }
 
-; Per-model USD price table (per 1M tokens). Hardcoded — kept in lockstep
-; with the published pricing pages as of the file's last edit. The user
-; can override pricing per entry via a ``price_in_per_m`` / ``price_out_per_m``
-; field on the entry record (see _LLMRemoteEntryGet at the bottom of this
-; file). Models not in the table fall back to 0 — cost is reported as 0
-; rather than a wrong number, and the user knows to add the pricing if
-; they care about the metric.
-global LLM_REMOTE_MODEL_PRICES := Map(
-    ; OpenAI
-    "gpt-4o-mini",          Map("in", 0.15,  "out", 0.60),
-    "gpt-4o",               Map("in", 2.50,  "out", 10.00),
-    "gpt-4.1-mini",         Map("in", 0.40,  "out", 1.60),
-    "gpt-4.1",              Map("in", 2.00,  "out", 8.00),
-    ; Anthropic
-    "claude-haiku-4-5",     Map("in", 0.25,  "out", 1.25),
-    "claude-sonnet-4-6",    Map("in", 3.00,  "out", 15.00),
-    "claude-opus-4-7",      Map("in", 15.00, "out", 75.00),
-    ; Google Gemini — ``gemini-2.0-pro`` never shipped under that exact
-    ; SKU; the actual large-tier is ``gemini-1.5-pro``. Both kept so an
-    ; older config doesn't regress to zero cost while the user retunes.
-    "gemini-2.0-flash",     Map("in", 0.10,  "out", 0.40),
-    "gemini-1.5-pro",       Map("in", 1.25,  "out", 5.00),
-    "gemini-2.0-pro",       Map("in", 1.25,  "out", 5.00),
-    ; xAI — ``grok-2-mini`` was the early mini-tier slug; the current
-    ; public API uses ``grok-2-1212`` (with ``grok-2`` as alias). Verify
-    ; against https://docs.x.ai/docs before billing on these.
-    "grok-2-mini",          Map("in", 0.30,  "out", 0.50),
-    "grok-2-1212",          Map("in", 2.00,  "out", 10.00),
-    "grok-2",               Map("in", 2.00,  "out", 10.00),
-    ; Mistral
-    "mistral-small-latest", Map("in", 0.20,  "out", 0.60),
-    "mistral-large-latest", Map("in", 2.00,  "out", 6.00),
-    ; DeepSeek
-    "deepseek-chat",        Map("in", 0.14,  "out", 0.28),
-    ; Cohere
-    "command-r7b-12-2024",  Map("in", 0.0375,"out", 0.15),
-    "command-r-plus",       Map("in", 2.50,  "out", 10.00),
-    ; Cerebras
-    "llama-3.1-8b",         Map("in", 0.10,  "out", 0.10),
-    "llama-3.1-70b",        Map("in", 0.60,  "out", 0.60)
-)
+; Per-model USD price table (per 1M tokens) — loaded from api_providers.json.
+global LLM_REMOTE_MODEL_PRICES := Map()
 
 _LLMRemoteEstimateCost(model, in_tokens, out_tokens) {
     global LLM_REMOTE_MODEL_PRICES
@@ -405,6 +292,8 @@ _LLMRemoteResolveEntry(Entry) {
     if (BaseUrl == "")
         return ""
     Token := _LLMRemoteEntryGet(Entry, "Token", "")
+    if (Token == "")
+        return ""
     Model := _LLMRemoteEntryGet(Entry, "Model", Provider["DefaultModel"])
     if (Model == "")
         return ""
@@ -446,7 +335,7 @@ LLM_RemoteIsReady(Entry) {
         Http := ComObject("WinHttp.WinHttpRequest.5.1")
         Http.Open("GET", PingUrl, false)
         Http.SetTimeouts(2000, 2000, 2000, 2000)
-        _LLMRemoteSetAuthHeaders(Http, Format, Token)
+        _LLMRemoteSetAuthHeaders(Http, ProvFmt, Token)
         Http.Send()
         return (Http.Status >= 200 and Http.Status < 300)
     } catch {
@@ -462,6 +351,22 @@ LLM_RemoteIsReady(Entry) {
 ; ======= 3/ Internal helpers ===============
 ; ============================================
 ; ============================================
+
+; Mirrors macOS api_remote.lua post_and_parse and api_ollama build_request_context.
+_LLMRemote_BuildRequestContext(system_prompt, full_text, tail_text) {
+    sys := system_prompt
+    user := full_text
+    tail := (tail_text != "") ? tail_text : full_text
+    if (InStr(sys, "PREFIX") and InStr(sys, "TAIL")) {
+        user := Format('PREFIX: "{1}"`nTAIL: "{2}"', full_text, tail)
+    } else if (sys != "" and InStr(sys, "{context}")) {
+        sys := StrReplace(sys, "{context}", full_text)
+        user := ""
+    } else {
+        user := full_text
+    }
+    return Map("system", sys, "user", user)
+}
 
 _LLMRemoteEntryGet(Entry, Key, Default := "") {
     if (Entry is Map) {
@@ -599,3 +504,68 @@ _LLMRemoteJsonUnescape(s) {
     s := StrReplace(s, "\\",  "\")
     return s
 }
+
+; ============================================
+; ======= 4/ Shared catalogue loader =========
+; ============================================
+
+/**
+ * Loads provider descriptors + model prices from shared/llm/api_providers.json.
+ * Fail-fast when the file is missing or malformed — same contract as the HS twin.
+ */
+_LLMRemote_LoadCatalog() {
+    global LLM_API_PROVIDERS, LLM_API_PROVIDER_ORDER, LLM_REMOTE_MODEL_PRICES, _SharedDir
+    path := _SharedDir . "\llm\api_providers.json"
+    if !FileExist(path)
+        throw Error("api_providers.json not found at " . path)
+    try {
+        root := JsonParse(FileRead(path, "UTF-8"))
+    } catch as err {
+        throw Error("api_providers.json parse failed: " . err.Message)
+    }
+    if !(root is Map)
+        throw Error("api_providers.json root must be an object")
+    order := root.Has("provider_order") ? root["provider_order"] : ""
+    providers := root.Has("providers") ? root["providers"] : ""
+    prices := root.Has("model_prices") ? root["model_prices"] : ""
+    if !(order is Array) or order.Length = 0
+        throw Error("api_providers.json: provider_order must be a non-empty array")
+    if !(providers is Map) or providers.Count = 0
+        throw Error("api_providers.json: providers must be a non-empty object")
+    if !(prices is Map)
+        throw Error("api_providers.json: model_prices must be an object")
+
+    LLM_API_PROVIDERS := Map()
+    LLM_API_PROVIDER_ORDER := []
+    for pid in order {
+        if (Type(pid) != "String" or pid = "")
+            throw Error("api_providers.json: invalid provider_order entry")
+        if !providers.Has(pid)
+            throw Error("api_providers.json: provider_order references unknown '" . pid . "'")
+        desc := providers[pid]
+        if !(desc is Map)
+            throw Error("api_providers.json: providers." . pid . " must be an object")
+        for req in ["label", "base_url", "default_model", "format"] {
+            if !desc.Has(req)
+                throw Error("api_providers.json: providers." . pid . " missing '" . req . "'")
+        }
+        fmt := desc["format"]
+        if (fmt != "openai" and fmt != "anthropic" and fmt != "gemini")
+            throw Error("api_providers.json: providers." . pid . " has invalid format '" . fmt . "'")
+        LLM_API_PROVIDERS[pid] := Map(
+            "Label", desc["label"],
+            "BaseUrl", desc["base_url"],
+            "DefaultModel", desc["default_model"],
+            "Format", fmt)
+        LLM_API_PROVIDER_ORDER.Push(pid)
+    }
+
+    LLM_REMOTE_MODEL_PRICES := Map()
+    for model, row in prices {
+        if !(row is Map) or !row.Has("in") or !row.Has("out")
+            throw Error("api_providers.json: model_prices." . model . " must have in/out")
+        LLM_REMOTE_MODEL_PRICES[model] := Map("in", row["in"], "out", row["out"])
+    }
+}
+
+_LLMRemote_LoadCatalog()

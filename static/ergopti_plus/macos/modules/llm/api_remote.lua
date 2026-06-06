@@ -33,6 +33,7 @@
 local M = {}
 
 local Logger         = require("lib.logger")
+local Paths          = require("lib.paths")
 local Profiles       = require("modules.llm.profiles")
 local Parser         = require("modules.llm.parser")
 local ApiCommon      = require("modules.llm.api_common")
@@ -53,87 +54,74 @@ if not ok_kl then keylogger = nil end
 -- =======================================
 -- =======================================
 
---- Map of provider id → descriptor. Each descriptor MUST match the schema:
----   { label = string, base_url = string, default_model = string, format = string }
---- where ``format`` is one of "openai" | "anthropic" | "gemini" and selects the
---- request/response codec at call time.
-M.PROVIDERS = {
-	openai = {
-		label         = "OpenAI",
-		base_url      = "https://api.openai.com/v1",
-		default_model = "gpt-4o-mini",
-		format        = "openai",
-	},
-	anthropic = {
-		label         = "Anthropic",
-		base_url      = "https://api.anthropic.com/v1",
-		default_model = "claude-haiku-4-5",
-		format        = "anthropic",
-	},
-	gemini = {
-		label         = "Google Gemini",
-		base_url      = "https://generativelanguage.googleapis.com/v1beta",
-		default_model = "gemini-2.0-flash",
-		format        = "gemini",
-	},
-	-- xAI ships an OpenAI-compatible Chat Completions endpoint. Bearer auth.
-	xai = {
-		label         = "xAI (Grok)",
-		base_url      = "https://api.x.ai/v1",
-		default_model = "grok-2-mini",
-		format        = "openai",
-	},
-	-- Mistral: OpenAI-compatible Chat Completions. mistral-small-latest is
-	-- the cheap-and-fast default; codestral / large stay accessible via the
-	-- model field on the entry.
-	mistral = {
-		label         = "Mistral",
-		base_url      = "https://api.mistral.ai/v1",
-		default_model = "mistral-small-latest",
-		format        = "openai",
-	},
-	-- DeepSeek: same shape as OpenAI. deepseek-chat is sized like
-	-- gpt-4o-mini and competitively priced.
-	deepseek = {
-		label         = "DeepSeek",
-		base_url      = "https://api.deepseek.com",
-		default_model = "deepseek-chat",
-		format        = "openai",
-	},
-	-- Cohere: exposes an OpenAI-compatible Chat Completions route at
-	-- ``/compatibility/v1`` (NOT the native ``/v2/chat`` route, which has a
-	-- different schema). Pointing at /v2 returned 404 on every request.
-	cohere = {
-		label         = "Cohere",
-		base_url      = "https://api.cohere.ai/compatibility/v1",
-		default_model = "command-r7b-12-2024",
-		format        = "openai",
-	},
-	-- Cerebras: hardware-accelerated Llama / Qwen inference. Pure
-	-- OpenAI-compatible at /v1/chat/completions; the value-add is raw
-	-- tokens-per-second (~1700 tok/s on Llama 3.1 70B), not the schema.
-	cerebras = {
-		label         = "Cerebras",
-		base_url      = "https://api.cerebras.ai/v1",
-		default_model = "llama-3.1-8b",
-		format        = "openai",
-	},
-	-- Generic OpenAI-compatible covers Groq, OpenRouter, LM Studio, vLLM,
-	-- llama.cpp HTTP server, Together.ai, Fireworks, DeepInfra, … —
-	-- anything that speaks the Chat Completions schema. ``base_url`` is
-	-- empty so the user has to fill it in (no sensible default for a
-	-- generic endpoint).
-	openai_compat = {
-		label         = "OpenAI-compatible",
-		base_url      = "",
-		default_model = "",
-		format        = "openai",
-	},
-}
+--- Loaded from shared/llm/api_providers.json at require time (AHK twin loads the
+--- same file). Adding a provider = one entry in the JSON plus (optionally) a
+--- new format branch in build_payload / parse_response below.
+local function load_api_providers()
+	local path = Paths.shared_llm_path("api_providers.json")
+	if not path then
+		error("api_providers.json not found — check static/ergopti_plus/shared/llm path resolution")
+	end
+	local fh = io.open(path, "r")
+	if not fh then
+		error("api_providers.json unreadable at " .. tostring(path))
+	end
+	local raw = fh:read("*a")
+	fh:close()
+	local ok, root = pcall(JsonCodec.decode, raw)
+	if not ok or type(root) ~= "table" then
+		error("api_providers.json parse failed at " .. tostring(path))
+	end
+	local order = root.provider_order
+	local providers = root.providers
+	local prices = root.model_prices
+	if type(order) ~= "table" or #order == 0 then
+		error("api_providers.json: provider_order must be a non-empty array")
+	end
+	if type(providers) ~= "table" then
+		error("api_providers.json: providers must be an object")
+	end
+	if type(prices) ~= "table" then
+		error("api_providers.json: model_prices must be an object")
+	end
+	local out_providers = {}
+	for _, pid in ipairs(order) do
+		if type(pid) ~= "string" or pid == "" then
+			error("api_providers.json: invalid provider_order entry")
+		end
+		local desc = providers[pid]
+		if type(desc) ~= "table" then
+			error("api_providers.json: missing providers." .. pid)
+		end
+		for _, key in ipairs({ "label", "base_url", "default_model", "format" }) do
+			if desc[key] == nil then
+				error("api_providers.json: providers." .. pid .. " missing " .. key)
+			end
+		end
+		local fmt = desc.format
+		if fmt ~= "openai" and fmt ~= "anthropic" and fmt ~= "gemini" then
+			error("api_providers.json: providers." .. pid .. " has invalid format")
+		end
+		out_providers[pid] = {
+			label         = tostring(desc.label),
+			base_url      = tostring(desc.base_url),
+			default_model = tostring(desc.default_model),
+			format        = fmt,
+		}
+	end
+	local out_prices = {}
+	for model, row in pairs(prices) do
+		if type(row) ~= "table" or row["in"] == nil or row["out"] == nil then
+			error("api_providers.json: model_prices." .. tostring(model) .. " must have in/out")
+		end
+		out_prices[model] = { ["in"] = row["in"], ["out"] = row["out"] }
+	end
+	Logger.info(LOG, "Loaded API provider catalogue (%d providers) from %s", #order, path)
+	return out_providers, order, out_prices
+end
 
--- Per-provider ordered listing for the picker UI (Lua tables don't preserve
--- order; this array is the user-facing display order).
-M.PROVIDER_ORDER = { "openai", "anthropic", "gemini", "xai", "mistral", "deepseek", "cohere", "cerebras", "openai_compat" }
+local MODEL_PRICES
+M.PROVIDERS, M.PROVIDER_ORDER, MODEL_PRICES = load_api_providers()
 
 local REQUEST_TIMEOUT_S = 30
 
@@ -293,47 +281,6 @@ local function build_payload(format, model, system_prompt, user_prompt, temperat
 		stream      = false,
 	}
 end
-
---- Per-model USD price table (per 1M tokens). Mirror of the AHK
---- LLM_REMOTE_MODEL_PRICES map in api_remote.ahk — keep in lockstep when
---- providers re-tariff. Models not in the table fall back to 0 — cost is
---- reported as 0 rather than a wrong number, and the user knows to add
---- the pricing if they care about the metric.
-local MODEL_PRICES = {
-	-- OpenAI
-	["gpt-4o-mini"]          = { ["in"] = 0.15,  ["out"] = 0.60 },
-	["gpt-4o"]               = { ["in"] = 2.50,  ["out"] = 10.00 },
-	["gpt-4.1-mini"]         = { ["in"] = 0.40,  ["out"] = 1.60 },
-	["gpt-4.1"]              = { ["in"] = 2.00,  ["out"] = 8.00 },
-	-- Anthropic
-	["claude-haiku-4-5"]     = { ["in"] = 0.25,  ["out"] = 1.25 },
-	["claude-sonnet-4-6"]    = { ["in"] = 3.00,  ["out"] = 15.00 },
-	["claude-opus-4-7"]      = { ["in"] = 15.00, ["out"] = 75.00 },
-	-- Gemini — ``gemini-2.0-pro`` was a tentative SKU that never shipped
-	-- under that exact name; the actual large-tier Gemini at the time of
-	-- writing is ``gemini-1.5-pro``. Both kept so an older config doesn't
-	-- regress to zero cost while the user retunes.
-	["gemini-2.0-flash"]     = { ["in"] = 0.10,  ["out"] = 0.40 },
-	["gemini-1.5-pro"]       = { ["in"] = 1.25,  ["out"] = 5.00 },
-	["gemini-2.0-pro"]       = { ["in"] = 1.25,  ["out"] = 5.00 },
-	-- xAI — ``grok-2-mini`` was the original public mini-tier slug; xAI's
-	-- current public API uses ``grok-2-1212`` (and ``grok-2`` as alias).
-	-- Verify against https://docs.x.ai/docs before billing on these.
-	["grok-2-mini"]          = { ["in"] = 0.30,  ["out"] = 0.50 },
-	["grok-2-1212"]          = { ["in"] = 2.00,  ["out"] = 10.00 },
-	["grok-2"]               = { ["in"] = 2.00,  ["out"] = 10.00 },
-	-- Mistral
-	["mistral-small-latest"] = { ["in"] = 0.20,  ["out"] = 0.60 },
-	["mistral-large-latest"] = { ["in"] = 2.00,  ["out"] = 6.00 },
-	-- DeepSeek
-	["deepseek-chat"]        = { ["in"] = 0.14,  ["out"] = 0.28 },
-	-- Cohere
-	["command-r7b-12-2024"]  = { ["in"] = 0.0375,["out"] = 0.15 },
-	["command-r-plus"]       = { ["in"] = 2.50,  ["out"] = 10.00 },
-	-- Cerebras
-	["llama-3.1-8b"]         = { ["in"] = 0.10,  ["out"] = 0.10 },
-	["llama-3.1-70b"]        = { ["in"] = 0.60,  ["out"] = 0.60 },
-}
 
 local function estimate_cost(model, in_tokens, out_tokens)
 	if not model or model == "" or not MODEL_PRICES[model] then return 0.0 end

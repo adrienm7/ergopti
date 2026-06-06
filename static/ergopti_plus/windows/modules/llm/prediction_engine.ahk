@@ -146,13 +146,13 @@ LLM_Engine_Init(opts) {
 	global _LLM_Engine
 	_LLM_Engine["enabled"] := true
 
-	static _keys := ["model", "profile_id", "n_predictions", "min_words", "max_words",
+	static _keys := ["model", "profile_id", "backend", "n_predictions", "min_words", "max_words",
 		"debounce_ms", "ctx_chars", "language", "temperature",
 		"instant_on_word_end", "after_hotstring", "reset_on_nav",
 		"disable_url_bars", "disable_password_fields",
 		"show_info_bar", "streaming", "show_all_at_once",
 		"pred_indent", "auto_raise_temp", "nav_modifiers", "val_modifiers",
-		"inline_autotype"]
+		"inline_autotype", "api_entry_id"]
 
 	for k in _keys
 		if opts.Has(k)
@@ -163,6 +163,8 @@ LLM_Engine_Init(opts) {
 		_LLM_Engine["user_profiles"] := opts["user_profiles"]
 	if opts.Has("disabled_apps") && (opts["disabled_apps"] is Array)
 		_LLM_Engine["disabled_apps"] := opts["disabled_apps"]
+	if opts.Has("api_entries") && (opts["api_entries"] is Array)
+		_LLM_Engine["api_entries"] := opts["api_entries"]
 	; Per-app profile overrides Map(app_name -> profile_id). Copy by
 	; reference is fine — the tray owns the canonical Map and the engine
 	; only reads from it.
@@ -203,16 +205,10 @@ LLM_Engine_OnKeystroke(buffer) {
 
 	LLM_Engine_CancelTimer()
 
-	; Trim context to the last ctx_chars characters
-	ctx := SubStr(buffer, -_LLM_Engine["ctx_chars"])
-
-	; Arm debounce timer — closure captures current ctx value. We MUST keep a
-	; reference to the closure: SetTimer cancels by function identity, and a
-	; bare ``() => …`` lambda is a fresh object every keystroke. Without
-	; storing the reference, ``SetTimer(, 0)`` would not find a target to
-	; cancel and predictions would accumulate on fast typing.
-	_LLM_Engine["last_ctx"] := ctx
-	_LLM_Engine["pending_timer"] := LLM_Engine_FirePrediction.Bind(ctx)
+	; Arm debounce timer — closure captures the full buffer. PromptBuilder
+	; (macOS parity) derives capped context + tail inside FirePrediction.
+	_LLM_Engine["last_buffer"] := buffer
+	_LLM_Engine["pending_timer"] := LLM_Engine_FirePrediction.Bind(buffer)
 	SetTimer(_LLM_Engine["pending_timer"], -_LLM_Engine["debounce_ms"])
 	_LLM_Engine["timer_active"] := true
 }
@@ -245,9 +241,9 @@ LLM_Engine_CancelTimer() {
 /**
  * Fires the actual LLM call after the debounce period expires.
  * Skips the call if context is identical to the last result's context.
- * @param {string} ctx - The context string captured at debounce arm time.
+ * @param {string} buffer - Full typed buffer captured at debounce arm time.
  */
-LLM_Engine_FirePrediction(ctx) {
+LLM_Engine_FirePrediction(buffer) {
 	global _LLM_Engine
 	_LLM_Engine["timer_active"] := false
 
@@ -256,8 +252,57 @@ LLM_Engine_FirePrediction(ctx) {
 	if A_IsSuspended
 		return
 
-	if !_LLM_Engine["enabled"] || ctx == ""
+	if !_LLM_Engine["enabled"] || buffer == ""
 		return
+
+	backend_now := _LLM_Engine.Has("backend") ? _LLM_Engine["backend"] : "ollama"
+	if (backend_now = "ollama" and IsSet(LLM_OllamaAllowInference) and !LLM_OllamaAllowInference()) {
+		static _LLM_LastDeferLogTick := 0
+		if (A_TickCount - _LLM_LastDeferLogTick > 5000) {
+			_LLM_LastDeferLogTick := A_TickCount
+			try LoggerInfo("LLM", "Ollama warmup in progress — prediction deferred (retry shortly).")
+		}
+		if IsSet(LLM_OllamaScheduleWarmupRetry)
+			LLM_OllamaScheduleWarmupRetry(_LLM_Engine["model"])
+		retry_ms := Max(500, Min(_LLM_Engine["debounce_ms"], 2000))
+		_LLM_Engine["pending_timer"] := LLM_Engine_FirePrediction.Bind(buffer)
+		SetTimer(_LLM_Engine["pending_timer"], -retry_ms)
+		_LLM_Engine["timer_active"] := true
+		return
+	}
+	if (backend_now = "ollama" and IsSet(LLM_OllamaIsReady) and !LLM_OllamaIsReady()
+			and IsSet(LLM_OllamaAllowInference) and LLM_OllamaAllowInference()) {
+		static _LLM_GraceLogged := false
+		if !_LLM_GraceLogged {
+			_LLM_GraceLogged := true
+			try LoggerInfo("LLM", "Allowing prediction while model finishes loading (warmup grace).")
+		}
+	}
+
+	pb := PromptBuilder()
+	pb_cfg := Map(
+		"max_words",       _LLM_Engine["max_words"],
+		"min_words",       _LLM_Engine["min_words"],
+		"num_predictions", _LLM_Engine["n_predictions"],
+		"temperature",     _LLM_Engine["temperature"] + 0.0,
+		"auto_raise_temp", _LLM_Engine["auto_raise_temp"],
+		"language",        _LLM_Engine["language"]
+	)
+	params := pb.Build(buffer, pb_cfg)
+	ctx := params["context"]
+	tail := params["context_tail"]
+	req_temp := params["temperature"]
+
+	if (tail == "" or StrLen(tail) < 2) {
+		try LoggerInfo("LLM", "Context too short — prediction skipped.")
+		return
+	}
+
+	try {
+		preview := SubStr(tail, -40)
+		LoggerInfo("LLM", "Prediction request queued — tail: «{1}».", preview)
+	} catch {
+	}
 
 	; Cache hit (exact match): re-display last result without an API call.
 	; The cache is an array of slot strings so the multi-prediction reveal
@@ -270,8 +315,7 @@ LLM_Engine_FirePrediction(ctx) {
 	if (ctx == _LLM_Engine["last_ctx"] && _LLM_Engine.Has("last_results")
 			and Type(_LLM_Engine["last_results"]) == "Array"
 			and _LLM_Engine["last_results"].Length > 0) {
-		try LLM_OllamaCancelAllAsync()
-		try LLM_RemoteCancelAllAsync()
+		try LLM_OllamaCancelStreams()
 		_LLM_Engine["request_id"] := (_LLM_Engine.Has("request_id") ? _LLM_Engine["request_id"] : 0) + 1
 		LLM_Engine_OnResults(_LLM_Engine["last_results"], ctx, 1, true)
 		return
@@ -304,10 +348,9 @@ LLM_Engine_FirePrediction(ctx) {
 			}
 		}
 		if (sliced.Length > 0) {
-			; Same race fix as the exact-match cache branch above: cancel
-			; in-flight requests and bump request_id so late callbacks bail.
-			try LLM_OllamaCancelAllAsync()
-			try LLM_RemoteCancelAllAsync()
+			; Same race fix as the exact-match cache branch above: bump
+			; request_id so late callbacks bail; WinHTTP stays in flight.
+			try LLM_OllamaCancelStreams()
 			_LLM_Engine["request_id"] := (_LLM_Engine.Has("request_id") ? _LLM_Engine["request_id"] : 0) + 1
 			LLM_Engine_OnResults(sliced, ctx, 1, true)
 			return
@@ -328,17 +371,20 @@ LLM_Engine_FirePrediction(ctx) {
 		remaining := min_interval - (now - last)
 		; Same reasoning as LLM_Engine_OnKeystroke: keep a reference to the
 		; closure so the next CancelTimer call can actually cancel it.
-		_LLM_Engine["pending_timer"] := LLM_Engine_FirePrediction.Bind(ctx)
+		_LLM_Engine["pending_timer"] := LLM_Engine_FirePrediction.Bind(buffer)
 		SetTimer(_LLM_Engine["pending_timer"], -remaining)
 		_LLM_Engine["timer_active"] := true
 		return
 	}
 
-	; ── Cancel any in-flight async variants from a previous fire ──
-	; Without this, late callbacks land on a stale context and paint the
-	; tooltip with predictions for text the user has since moved past.
-	try LLM_OllamaCancelAllAsync()
-	try LLM_RemoteCancelAllAsync()
+	; ── Cancel stale curl streams only (macOS parity) ──
+	; WinHTTP is single-flight via ``_LLM_Ollama_Pending`` in api_ollama.ahk.
+	; ``Abort()`` on stacked /api/chat calls made Ollama return ``content: ""``.
+	global _LLM_Ollama_ActiveStreams
+	if (IsSet(_LLM_Ollama_ActiveStreams) and _LLM_Ollama_ActiveStreams.Length > 0) {
+		try LoggerInfo("LLM", "Cancelling {1} prior Ollama stream(s) — context changed.", _LLM_Ollama_ActiveStreams.Length)
+	}
+	try LLM_OllamaCancelStreams()
 
 	; ── Bump the request id ──
 	; Every async callback closes over the id it saw at dispatch time. If
@@ -346,6 +392,7 @@ LLM_Engine_FirePrediction(ctx) {
 	; the HS llm_request_counter pattern in modules/llm/prediction_engine.lua.
 	_LLM_Engine["request_id"] := (_LLM_Engine.Has("request_id") ? _LLM_Engine["request_id"] : 0) + 1
 	this_request_id := _LLM_Engine["request_id"]
+	try LLM_Tooltip_SetChainStart()
 
 	; Resolve profile and build the system prompt. If the user has
 	; configured a per-app override for the focused window, that wins
@@ -368,7 +415,7 @@ LLM_Engine_FirePrediction(ctx) {
 		_LLM_Engine["max_words"],
 		_LLM_Engine["language"]
 	)
-	system_prompt := StrReplace(system_prompt, "{context}", ctx)
+	is_batch_profile := (profile is Map and profile.Has("batch") and profile["batch"] == true)
 
 	_LLM_Engine["last_request_tick"] := A_TickCount
 
@@ -383,6 +430,10 @@ LLM_Engine_FirePrediction(ctx) {
 	dispatch_fn := ""
 	dispatch_stream_fn := ""
 	streaming_enabled := _LLM_Engine.Has("streaming") and _LLM_Engine["streaming"]
+	; Windows curl streaming is not reliable yet (logs: empty stdout / No stdout
+	; file). WinHTTP async matches macOS behaviour and completes on this driver.
+	if (backend == "ollama")
+		streaming_enabled := false
 	if (backend == "api") {
 		entry := _LLM_Engine_GetActiveApiEntry()
 		if (entry == "")
@@ -390,7 +441,7 @@ LLM_Engine_FirePrediction(ctx) {
 		model_tag := (entry is Map and entry.Has("Model")) ? entry["Model"] : (entry.HasOwnProp("Model") ? entry.Model : "")
 		log_model := model_tag
 		dispatch_fn := (temp, on_succ, on_fail) =>
-			LLM_RemoteGenerate_Async(entry, system_prompt, ctx, temp, on_succ, on_fail)
+			LLM_RemoteGenerate_Async(entry, system_prompt, ctx, temp, on_succ, on_fail, tail)
 		; No remote-streaming dispatcher — disable streaming for the API
 		; backend so the engine falls back to the async non-streaming path.
 		streaming_enabled := false
@@ -404,28 +455,35 @@ LLM_Engine_FirePrediction(ctx) {
 		; to its built-in stops.
 		stop_seqs := (profile is Map and profile.Has("stop_sequences") and profile["stop_sequences"] is Array)
 			? profile["stop_sequences"] : ""
+		mw := Integer(_LLM_Engine["max_words"])
+		is_batch := (profile is Map and profile.Has("batch") and profile["batch"] == true)
 		dispatch_fn := (temp, on_succ, on_fail) =>
-			LLM_OllamaGenerate_Async(model_tag, system_prompt, ctx, temp, on_succ, on_fail, stop_seqs)
+			LLM_OllamaGenerate_Async(model_tag, system_prompt, ctx, temp, on_succ, on_fail, stop_seqs, mw, is_batch, tail)
 		dispatch_stream_fn := (temp, on_partial, on_succ, on_fail) =>
-			LLM_OllamaGenerate_Streaming(model_tag, system_prompt, ctx, temp, on_partial, on_succ, on_fail, stop_seqs)
+			LLM_OllamaGenerate_Streaming(model_tag, system_prompt, ctx, temp, on_partial, on_succ, on_fail, stop_seqs, mw, is_batch, tail)
 	}
 
 	; ── Batch vs sequential dispatch ──
 	; A profile with batch=true asks the model to return all N predictions
 	; in a single response, separated by ===. Mirrors the HS fetch_batch
 	; path. Falls back to sequential when batch is off or n=1.
-	if (n_predictions > 1 and profile.Has("batch") and profile["batch"] == true) {
+	if (n_predictions > 1 and is_batch_profile) {
 		state := Map(
 			"ctx",           ctx,
+			"ctx_tail",      tail,
+			"min_words",     _LLM_Engine["min_words"],
+			"max_words",     _LLM_Engine["max_words"],
+			"is_batch",      true,
 			"request_id",    this_request_id,
 			"backend",       backend,
 			"model",         log_model,
 			"system_prompt", system_prompt,
 			"requested",     n_predictions,
-			"base_temp",     _LLM_Engine["temperature"] + 0.0,
+			"base_temp",     req_temp,
 			"dispatch_fn",   dispatch_fn,
 			"request_start", A_TickCount
 		)
+		_LLM_Engine_ShowLoadingTooltip()
 		_LLM_Engine_DispatchBatch(state)
 		return
 	}
@@ -440,6 +498,10 @@ LLM_Engine_FirePrediction(ctx) {
 	; completions don't fill multiple slots.
 	state := Map(
 		"ctx",               ctx,
+		"ctx_tail",          tail,
+		"min_words",         _LLM_Engine["min_words"],
+		"max_words",         _LLM_Engine["max_words"],
+		"is_batch",          is_batch_profile,
 		"request_id",        this_request_id,
 		"backend",           backend,
 		"model",             log_model,
@@ -448,7 +510,7 @@ LLM_Engine_FirePrediction(ctx) {
 		"requested",         n_predictions,
 		"attempt_index",     1,
 		"max_attempts",      _LLM_Engine_MaxAttempts(n_predictions),
-		"base_temp",         _LLM_Engine["temperature"] + 0.0,
+		"base_temp",         req_temp,
 		"dedup_stats",       LLM_ApiCommon_NewDedupStats(),
 		"dispatch_fn",       dispatch_fn,
 		"dispatch_stream_fn",dispatch_stream_fn,
@@ -458,7 +520,45 @@ LLM_Engine_FirePrediction(ctx) {
 		; field). Read at finalize time as ``A_TickCount - request_start``.
 		"request_start",     A_TickCount
 	)
+	_LLM_Engine_ShowLoadingTooltip()
 	_LLM_Engine_DispatchVariant(state)
+}
+
+; Push footer/display state into the tooltip module before every paint.
+_LLM_Engine_ApplyTooltipDisplayOpts(slotCount := 1) {
+	global _LLM_Engine
+	profile_label := ""
+	try {
+		prof := LLM_GetActiveProfile(
+			_LLM_Engine_ResolveProfileIdForApp(_LLM_Engine["profile_id"]),
+			_LLM_Engine.Has("user_profiles") ? _LLM_Engine["user_profiles"] : [])
+		if (prof is Map and prof.Has("label"))
+			profile_label := prof["label"]
+	}
+	info_model := ""
+	if (_LLM_Engine.Has("show_info_bar") and _LLM_Engine["show_info_bar"])
+		info_model := _LLM_Engine_BuildInfoBarText(
+			_LLM_Engine.Has("model") ? _LLM_Engine["model"] : "",
+			_LLM_Engine_ResolveBackendLabel(),
+			profile_label)
+	LLM_Tooltip_SetDisplayOpts(Map(
+		"show_info_bar", !!(_LLM_Engine.Has("show_info_bar") and _LLM_Engine["show_info_bar"]),
+		"info_model", info_model,
+		"slot_count", Max(1, Integer(slotCount)),
+		"nav_modifiers", _LLM_Engine.Has("nav_modifiers") ? _LLM_Engine["nav_modifiers"] : "",
+		"pred_indent", _LLM_Engine.Has("pred_indent") ? Integer(_LLM_Engine["pred_indent"]) : 0,
+		"val_modifiers", _LLM_Engine.Has("val_modifiers") ? _LLM_Engine["val_modifiers"] : "",
+	))
+}
+
+; Purple loading tooltip — macOS ``tooltip.show_loading`` parity. Fires once per
+; debounced request after the inactivity delay, before HTTP dispatch.
+_LLM_Engine_ShowLoadingTooltip() {
+	global _LLM_Engine
+	if (_LLM_Engine.Has("inline_autotype") and _LLM_Engine["inline_autotype"])
+		return
+	_LLM_Engine_ApplyTooltipDisplayOpts(1)
+	try LLM_Tooltip_ShowLoading()
 }
 
 ; Single-shot batch dispatch: one async request, the model returns N
@@ -468,8 +568,9 @@ _LLM_Engine_DispatchBatch(state) {
 	; Paint an empty placeholder row immediately so the user sees the
 	; reveal animation even though only one HTTP request is in flight.
 	preview_slots := []
+	ph := LLM_TOOLTIP_PLACEHOLDER
 	loop state["requested"]
-		preview_slots.Push("")
+		preview_slots.Push(ph)
 	LLM_Engine_OnResults(preview_slots, state["ctx"], 1, false)
 
 	state_ref := state
@@ -497,16 +598,9 @@ _LLM_Engine_OnBatchSuccess(state, text, meta := "") {
 		state["total_tokens"]      := (state.Has("total_tokens")      ? state["total_tokens"]      : 0) + (meta.Has("total_tokens")      ? meta["total_tokens"]      : 0)
 		state["est_cost_usd"]      := (state.Has("est_cost_usd")      ? state["est_cost_usd"]      : 0.0) + (meta.Has("est_cost_usd")    ? meta["est_cost_usd"]      : 0.0)
 	}
-	blocks := _LLM_Engine_SplitBatchBlocks(text)
-	stats  := LLM_ApiCommon_NewDedupStats()
-	slots  := []
-	for b in blocks {
-		if (slots.Length >= state["requested"])
-			break
-		LLM_ApiCommon_InsertPrediction(slots, b, stats, true)
-	}
+	slots := _LLM_Engine_ParseSlots(text, state)
 	state["slots"]       := slots
-	state["dedup_stats"] := stats
+	state["dedup_stats"] := LLM_ApiCommon_NewDedupStats()
 	_LLM_Engine_FinalizeRequest(state)
 }
 
@@ -585,7 +679,7 @@ _LLM_Engine_DispatchVariant(state) {
 	for s in state["slots"]
 		preview_slots.Push(s)
 	while (preview_slots.Length < variant_idx)
-		preview_slots.Push("")
+		preview_slots.Push(LLM_TOOLTIP_PLACEHOLDER)
 	active_idx := 1
 	for i, s in preview_slots {
 		if (s != "") {
@@ -637,7 +731,9 @@ _LLM_Engine_OnStreamPartial(state, slot_idx, partial) {
 		preview.Push(s)
 	while (preview.Length < slot_idx - 1)
 		preview.Push("")
-	preview.Push(partial)
+	; Strip thinking tags during streaming; full parser runs on on_success.
+	display := LLM_Parser_StripThinking(partial)
+	preview.Push(display)
 	; Active = the slot currently streaming, so Tab during streaming still
 	; produces something sensible.
 	LLM_Engine_OnResults(preview, state["ctx"], slot_idx, false)
@@ -646,8 +742,10 @@ _LLM_Engine_OnStreamPartial(state, slot_idx, partial) {
 _LLM_Engine_OnVariantSuccess(state, text, meta := "") {
 	global _LLM_Engine
 	current_id := _LLM_Engine.Has("request_id") ? _LLM_Engine["request_id"] : 0
-	if (state["request_id"] != current_id)
+	if (state["request_id"] != current_id) {
+		try LoggerInfo("LLM", "Variant success ignored — superseded by newer typing.")
 		return
+	}
 	; Accumulate token usage / cost across variants. The Ollama path does
 	; not pass meta (its sync /api/generate response carries different
 	; fields we don't bill on); the API path does. Missing values stay 0.
@@ -662,7 +760,9 @@ _LLM_Engine_OnVariantSuccess(state, text, meta := "") {
 	; for strings, so without StrCompare two predictions that differ only by
 	; case ("Paris" vs "paris") would collapse into one slot.
 	inserted := false
-	if (text != "") {
+	parsed := _LLM_Engine_ParseSlots(text, state)
+	if (parsed.Length > 0) {
+		text := parsed[1]
 		dup := false
 		for s in state["slots"] {
 			if (StrCompare(s, text, true) == 0) {
@@ -695,8 +795,18 @@ _LLM_Engine_OnVariantSuccess(state, text, meta := "") {
 _LLM_Engine_OnVariantFail(state) {
 	global _LLM_Engine
 	current_id := _LLM_Engine.Has("request_id") ? _LLM_Engine["request_id"] : 0
-	if (state["request_id"] != current_id)
+	if (state["request_id"] != current_id) {
+		try LoggerInfo("LLM", "Variant failure ignored — superseded by newer typing.")
 		return
+	}
+	; Curl streaming is best-effort on Windows — fall back to WinHTTP async for
+	; the remaining attempts in this request when a stream dies empty.
+	if (state.Has("streaming") and state["streaming"]) {
+		state["streaming"] := false
+		try LoggerInfo("LLM", "Streaming failed — retrying via WinHTTP async.")
+	}
+	try LoggerWarn("LLM", "Variant {1}/{2} failed (model {3}).",
+		state["attempt_index"] - 1, state["max_attempts"], state["model"])
 	; The variant didn't yield a usable result. ``attempt_index`` already
 	; advanced for the next attempt; the retry budget (max_attempts) caps
 	; how often we keep trying. No special retry-temperature step here —
@@ -714,6 +824,8 @@ _LLM_Engine_FinalizeRequest(state) {
 		; Every variant failed — log a single ``llm_generation_failed`` so
 		; the audit trail captures the failure instead of silently
 		; dropping. The tooltip auto-dismisses via its own timer.
+		try LoggerWarn("LLM", "All variants failed for model {1} — no tooltip rendered.", state["model"])
+		try LLM_Tooltip_Hide()
 		try {
 			app_name := ""
 			try app_name := WIGetFocused()["appId"]
@@ -739,6 +851,9 @@ _LLM_Engine_FinalizeRequest(state) {
 	_LLM_Engine["last_result"]  := state["slots"][1]
 
 	try LLM_ApiCommon_LogSummary("sequential", state["requested"], state["dedup_stats"], state["slots"].Length)
+	try LoggerInfo("LLM", "Prediction received — {1} suggestion(s).", state["slots"].Length)
+	global _LLM_Ollama_IsReady
+	_LLM_Ollama_IsReady := true
 
 	; Keylogger event — same shape as HS (modules/keylogger/init.lua /
 	; M.log_llm) so a tail of the unified log reads identically across
@@ -832,6 +947,20 @@ _LLM_Engine_ResolveProfileIdForApp(default_id) {
 ; no entries are configured / no active id is set. Keeps the lookup logic out
 ; of the hot path so future changes (e.g. resolving by name, fallback chain)
 ; only touch one place.
+; Parse raw model output into tooltip slot strings (macOS Parser + insert_prediction).
+_LLM_Engine_ParseSlots(raw, state) {
+	is_batch := state.Has("is_batch") and state["is_batch"]
+	return LLM_Parser_ParseResponse(
+		raw,
+		state["ctx"],
+		state.Has("ctx_tail") ? state["ctx_tail"] : state["ctx"],
+		state.Has("min_words") ? state["min_words"] : 1,
+		state.Has("max_words") ? state["max_words"] : 15,
+		is_batch,
+		state["requested"]
+	)
+}
+
 _LLM_Engine_GetActiveApiEntry() {
 	global _LLM_Engine
 	entries := _LLM_Engine.Has("api_entries") ? _LLM_Engine["api_entries"] : []
@@ -903,6 +1032,48 @@ LLM_Engine_OnResults(slots, ctx, active := 1, is_final := false) {
 		}
 	}
 
+	_LLM_Engine_ApplyTooltipDisplayOpts(slots.Length)
 	LLM_Tooltip_Show(display_slots, active, is_final)
+	if is_final
+		try LLM_Tooltip_MarkChainComplete()
+}
+
+_LLM_Engine_ResolveBackendLabel() {
+	global _LLM_Engine
+	backend := _LLM_Engine.Has("backend") ? _LLM_Engine["backend"] : "ollama"
+	if (backend = "mlx")
+		return "MLX 🚀"
+	if (backend = "ollama")
+		return "Ollama 🦙"
+	return ""
+}
+
+_LLM_Engine_TrimProfileLabel(label) {
+	if (Type(label) != "String" or label = "")
+		return ""
+	clean := Trim(label)
+	if (clean = "")
+		return ""
+	if RegExMatch(clean, "^(.*?)\s*—", &m) {
+		head := Trim(m[1])
+		if (head != "")
+			return head
+	}
+	return RegExReplace(clean, "\s*—\s*$", "")
+}
+
+_LLM_Engine_BuildInfoBarText(modelName, backend := "", profileName := "") {
+	if (modelName = "")
+		return ""
+	pieces := [modelName]
+	if (backend != "")
+		pieces.Push(backend)
+	shortProfile := _LLM_Engine_TrimProfileLabel(profileName)
+	if (shortProfile != "")
+		pieces.Push(shortProfile)
+	out := ""
+	for i, p in pieces
+		out .= (i = 1) ? p : " — " . p
+	return out
 }
 
