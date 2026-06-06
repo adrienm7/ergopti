@@ -228,6 +228,45 @@ LLM_Engine_CancelTimer() {
 	_LLM_Engine["timer_active"]  := false
 }
 
+/**
+ * Returns true while a debounce timer, HTTP request, or curl stream is active.
+ * Used by the pointer-dismiss watcher to avoid polling work when idle.
+ */
+LLM_Engine_IsBusy() {
+	global _LLM_Engine, _LLM_Ollama_ActiveStreams, _LLM_Ollama_Async, _LLM_Remote_Async
+	if (IsSet(_LLM_Engine) and _LLM_Engine.Has("timer_active") and _LLM_Engine["timer_active"])
+		return true
+	if (IsSet(_LLM_Ollama_ActiveStreams) and _LLM_Ollama_ActiveStreams.Length > 0)
+		return true
+	if (IsSet(_LLM_Ollama_Async)) {
+		for , entry in _LLM_Ollama_Async {
+			if (IsObject(entry) and (!entry.Has("cancelled") or !entry["cancelled"]))
+				return true
+		}
+	}
+	if (IsSet(_LLM_Remote_Async)) {
+		for , entry in _LLM_Remote_Async {
+			if (IsObject(entry) and (!entry.Has("cancelled") or !entry["cancelled"]))
+				return true
+		}
+	}
+	return false
+}
+
+/**
+ * Stops debounced and in-flight generation without hiding the tooltip.
+ * Mirrors HS prediction_engine.stop_timer() + cancel_streaming().
+ */
+LLM_Engine_StopGeneration() {
+	global _LLM_Engine
+	LLM_Engine_CancelTimer()
+	if IsSet(_LLM_Engine)
+		_LLM_Engine["request_id"] := (_LLM_Engine.Has("request_id") ? _LLM_Engine["request_id"] : 0) + 1
+	try LLM_OllamaCancelStreams()
+	try LLM_OllamaCancelAllAsync()
+	try LLM_RemoteCancelAllAsync()
+}
+
 
 
 

@@ -41,6 +41,13 @@ global _LLM_Bridge_DispatcherKeyFn := 0
 ; Throttle keystroke logs — one INFO line per ~2 s of typing is enough to
 ; confirm the pipeline is alive without flooding ErgoptiPlus_*.log.
 global _LLM_Bridge_LastLogTick := 0
+; Pointer-dismiss watcher — mirrors macOS tooltip_llm.lua mouseMoved/click/scroll.
+global _LLM_PointerWatch_Armed     := false
+global _LLM_PointerWatch_LastX     := unset
+global _LLM_PointerWatch_LastY     := unset
+global _LLM_PointerWatch_MoveFn    := unset
+global _LLM_PointerWatch_ActivityFn := unset
+global _LLM_POINTER_POLL_MS        := 50
 
 
 
@@ -64,10 +71,12 @@ LLM_Bridge_Start(opts) {
 		return
 	if (IsSet(_PrefixInputHook) && _PrefixInputHook) {
 		_LLM_Bridge_Activate("PrefixWatcher")
+		_LLM_PointerWatch_Start()
 		return
 	}
 	_LLM_Bridge_RegisterDispatcherFallback()
 	_LLM_Bridge_Active := true
+	_LLM_PointerWatch_Start()
 	try LoggerInfo("LLM", "Bridge engine ready — keystrokes via HookDispatcher until PrefixWatcher starts.")
 }
 
@@ -81,6 +90,7 @@ _LLM_Bridge_Activate(source) {
 	if _LLM_Bridge_Active
 		return
 	_LLM_Bridge_Active := true
+	_LLM_PointerWatch_Start()
 	try LoggerInfo("LLM", "Bridge active — keystrokes via {1}.", source)
 }
 
@@ -122,6 +132,7 @@ _LLM_Bridge_OnDispatcherKey(ih, vk, sc) {
 LLM_Bridge_Stop() {
 	global _LLM_Bridge_Active, _LLM_Bridge_Buffer
 	_LLM_Bridge_UnregisterDispatcherFallback()
+	_LLM_PointerWatch_Stop()
 	if !_LLM_Bridge_Active
 		return
 	_LLM_Bridge_Active := false
@@ -240,11 +251,97 @@ LLM_Bridge_OnFlush() {
 	if !_LLM_Bridge_Active
 		return
 	_LLM_Bridge_Buffer := ""
-	; A flush IS a deliberate user action (Esc / Enter / Tab) — keep the
-	; default behaviour where Hide emits llm_dismissed so the acceptance
-	; metric counts these as "user moved on without taking the suggestion".
-	LLM_Tooltip_Hide()
-	LLM_Engine_CancelTimer()
+	LLM_Bridge_ResetPredictions()
+}
+
+/**
+ * Returns true when pointer activity should cancel LLM work (tooltip, loading,
+ * debounce timer, or in-flight HTTP/stream).
+ */
+LLM_Bridge_HasActivePredictionWork() {
+	if !(IsSet(_LLM_Bridge_Active) && _LLM_Bridge_Active)
+		return false
+	if (IsSet(LLM_Tooltip_IsVisible) && LLM_Tooltip_IsVisible())
+		return true
+	if (IsSet(LLM_Tooltip_IsLoading) && LLM_Tooltip_IsLoading())
+		return true
+	return LLM_Engine_IsBusy()
+}
+
+/**
+ * Clears predictions, cancels generation, and hides the tooltip.
+ * Parity with macOS LLMBridge.reset_predictions() + engine.reset().
+ */
+LLM_Bridge_ResetPredictions() {
+	global _LLM_Bridge_Buffer, _LLM_Engine, _LLM_Bridge_Active
+	if !(IsSet(_LLM_Bridge_Active) && _LLM_Bridge_Active)
+		return
+	if !LLM_Bridge_HasActivePredictionWork()
+		return
+	if (IsSet(_LLM_Engine) and _LLM_Engine.Has("reset_on_nav") and _LLM_Engine["reset_on_nav"])
+		_LLM_Bridge_Buffer := ""
+	try LLM_Tooltip_MarkChainComplete()
+	LLM_Engine_StopGeneration()
+	if ((IsSet(LLM_Tooltip_IsVisible) && LLM_Tooltip_IsVisible())
+			or (IsSet(LLM_Tooltip_IsLoading) && LLM_Tooltip_IsLoading()))
+		LLM_Tooltip_Hide()
+}
+
+/**
+ * Entry point for mouse / touchpad / wheel activity while LLM work is active.
+ */
+LLM_Bridge_OnPointerActivity(*) {
+	LLM_Bridge_ResetPredictions()
+}
+
+_LLM_PointerWatch_Start() {
+	global _LLM_PointerWatch_Armed, _LLM_PointerWatch_MoveFn, _LLM_PointerWatch_ActivityFn
+	if _LLM_PointerWatch_Armed
+		return
+	_LLM_PointerWatch_Armed := true
+	_LLM_PointerWatch_LastX := unset
+	_LLM_PointerWatch_LastY := unset
+	if !IsSet(_LLM_PointerWatch_ActivityFn) or !(_LLM_PointerWatch_ActivityFn is Func)
+		_LLM_PointerWatch_ActivityFn := LLM_Bridge_OnPointerActivity.Bind()
+	; Pass-through hotkeys — same pattern as hotstring_prefix_watcher.ahk.
+	for key in ["~LButton", "~RButton", "~MButton", "~XButton1", "~XButton2",
+			"~WheelUp", "~WheelDown", "~WheelLeft", "~WheelRight"] {
+		try Hotkey(key, _LLM_PointerWatch_ActivityFn, "On")
+	}
+	if !IsSet(_LLM_PointerWatch_MoveFn) or !(_LLM_PointerWatch_MoveFn is Func)
+		_LLM_PointerWatch_MoveFn := _LLM_PointerWatch_OnMoveTick.Bind()
+	global _LLM_POINTER_POLL_MS
+	SetTimer(_LLM_PointerWatch_MoveFn, _LLM_POINTER_POLL_MS)
+	try LoggerDebug("LLM", "Pointer-dismiss watcher armed.")
+}
+
+_LLM_PointerWatch_Stop() {
+	global _LLM_PointerWatch_Armed, _LLM_PointerWatch_MoveFn, _LLM_PointerWatch_ActivityFn
+	if !_LLM_PointerWatch_Armed
+		return
+	_LLM_PointerWatch_Armed := false
+	if IsSet(_LLM_PointerWatch_MoveFn) and (_LLM_PointerWatch_MoveFn is Func)
+		try SetTimer(_LLM_PointerWatch_MoveFn, 0)
+	if IsSet(_LLM_PointerWatch_ActivityFn) and (_LLM_PointerWatch_ActivityFn is Func) {
+		for key in ["~LButton", "~RButton", "~MButton", "~XButton1", "~XButton2",
+				"~WheelUp", "~WheelDown", "~WheelLeft", "~WheelRight"] {
+			try Hotkey(key, _LLM_PointerWatch_ActivityFn, "Off")
+		}
+	}
+	try LoggerDebug("LLM", "Pointer-dismiss watcher stopped.")
+}
+
+_LLM_PointerWatch_OnMoveTick(*) {
+	global _LLM_PointerWatch_LastX, _LLM_PointerWatch_LastY
+	if !LLM_Bridge_HasActivePredictionWork()
+		return
+	MouseGetPos(&x, &y)
+	if IsSet(_LLM_PointerWatch_LastX) {
+		if (x != _LLM_PointerWatch_LastX or y != _LLM_PointerWatch_LastY)
+			LLM_Bridge_OnPointerActivity()
+	}
+	_LLM_PointerWatch_LastX := x
+	_LLM_PointerWatch_LastY := y
 }
 
 /**
