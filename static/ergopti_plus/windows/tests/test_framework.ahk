@@ -51,6 +51,10 @@ global TEST_REGISTRY := []
 global TEST_PASS_COUNT := 0
 global TEST_FAIL_COUNT := 0
 
+; Default false when no runner pre-declares it (run_all sets true for --dry-run).
+if !IsSet(_AHK_DRY_RUN)
+	global _AHK_DRY_RUN := false
+
 
 
 
@@ -71,18 +75,18 @@ Assert(Condition, Message := "assertion failed") {
 
 AssertEqual(Expected, Actual, Message := "values differ") {
 	if (Expected != Actual) {
-		throw Error(Message . " — expected: <" . _DescribeValue(Expected)
+		throw Error(Message . " - expected: <" . _DescribeValue(Expected)
 			. ">, actual: <" . _DescribeValue(Actual) . ">")
 	}
 }
 
 AssertTrue(Value, Message := "expected true") {
-	Assert(Value, Message . " — actual: <" . _DescribeValue(Value) . ">")
+	Assert(Value, Message . " - actual: <" . _DescribeValue(Value) . ">")
 }
 
 AssertFalse(Value, Message := "expected false") {
 	if Value {
-		throw Error(Message . " — actual: <" . _DescribeValue(Value) . ">")
+		throw Error(Message . " - actual: <" . _DescribeValue(Value) . ">")
 	}
 }
 
@@ -143,50 +147,19 @@ Test(Name, Callback) {
 	TEST_REGISTRY.Push({ name: Name, callback: Callback })
 }
 
-; Path of the TAP results file. A_Temp avoids repo-checkout paths that
-; Windows Defender may scan and momentarily lock between writes.
+; Path of the TAP results file. Overridden by e2e; otherwise set per-run in
+; RunTests() (PID suffix) so parallel AHK runners do not deadlock on one handle.
 global TEST_RESULTS_FILE := A_Temp . "\ergopti_test_results.txt"
+global TEST_RESULTS_CANONICAL := A_Temp . "\ergopti_test_results.txt"
 
-; Persistent file handle kept open for the entire RunTests() run so that
-; Defender cannot acquire an exclusive scan lock between individual writes.
-; Opened lazily on first call to _TestPrint.
-global _TEST_FILE_HANDLE := 0
-
-; Append a TAP line using a single long-lived file handle opened with
-; FILE_FLAG_WRITE_THROUGH so every write goes directly to disk with no OS
-; buffering — the CI tail-reader sees each line the instant it is written.
-; Keeping one handle open for the whole suite prevents Defender from
-; acquiring an exclusive scan lock between individual FileAppend calls,
-; which was the root cause of non-deterministic 240 s hangs on CI.
+; Append one TAP line. FileAppend per line avoids a suite-wide exclusive handle
+; that blocked when two AutoHotkey.exe instances targeted the same path.
 _TestPrint(Line) {
-	global _TEST_FILE_HANDLE, TEST_RESULTS_FILE
-	if !_TEST_FILE_HANDLE {
-		; 0x40000000 = GENERIC_WRITE, 0x3 = FILE_SHARE_READ|WRITE,
-		; 0x2 = CREATE_ALWAYS, 0x80000000 = FILE_FLAG_WRITE_THROUGH (no buffer)
-		hFile := DllCall("CreateFileW",
-			"Str",  TEST_RESULTS_FILE,
-			"UInt", 0x40000000,
-			"UInt", 0x3,
-			"Ptr",  0,
-			"UInt", 0x2,
-			"UInt", 0x80000000,
-			"Ptr",  0, "Ptr")
-		if hFile != -1 {
-			_TEST_FILE_HANDLE := hFile
-		}
-	}
-	if _TEST_FILE_HANDLE {
-		Bytes := Line . "`r`n"
-		ByteLen := StrPut(Bytes, "UTF-8") - 1  ; -1 excludes null terminator
-		Buf := Buffer(ByteLen)
-		StrPut(Bytes, Buf, "UTF-8")
-		DllCall("WriteFile",
-			"Ptr",  _TEST_FILE_HANDLE,
-			"Ptr",  Buf.Ptr,
-			"UInt", ByteLen,
-			"Ptr",  0,
-			"Ptr",  0)
-	}
+	global TEST_RESULTS_FILE
+	; Stdout first so headless runners show progress even if the temp-file
+	; append is delayed by AV scanning.
+	try FileAppend(Line . "`r`n", "*")
+	try FileAppend(Line . "`r`n", TEST_RESULTS_FILE, "UTF-8")
 }
 
 ; Execute every registered test, print TAP-style results and exit with
@@ -195,13 +168,20 @@ _TestPrint(Line) {
 ; When --dry-run is passed on the command line, exits immediately after
 ; printing the plan line so the CI warning-check step stays fast.
 RunTests() {
-	global TEST_REGISTRY, TEST_PASS_COUNT, TEST_FAIL_COUNT, _AHK_DRY_RUN, _TEST_FILE_HANDLE
+	global TEST_REGISTRY, TEST_PASS_COUNT, TEST_FAIL_COUNT, _AHK_DRY_RUN
+	global TEST_RESULTS_FILE, TEST_RESULTS_CANONICAL
+	if !IsSet(_AHK_DRY_RUN)
+		_AHK_DRY_RUN := false
+	; Per-process results path unless a runner already chose a custom file (e2e).
+	if (TEST_RESULTS_FILE = TEST_RESULTS_CANONICAL) {
+		TEST_RESULTS_FILE := A_Temp . "\ergopti_test_results_"
+			. DllCall("GetCurrentProcessId") . ".txt"
+	}
+	try FileDelete(TEST_RESULTS_FILE)
 	_TestPrint("1.." . TEST_REGISTRY.Length)
-	if _AHK_DRY_RUN {
-		_TestPrint("# dry-run — skipping execution.")
-		if _TEST_FILE_HANDLE {
-			DllCall("CloseHandle", "Ptr", _TEST_FILE_HANDLE)
-		}
+	if (_AHK_DRY_RUN) {
+		_TestPrint("# dry-run - skipping execution.")
+		_CopyTestResultsForCi()
 		ExitApp(0)
 	}
 	Index := 0
@@ -223,9 +203,17 @@ RunTests() {
 		_TestPrint(Status . " " . Index . " - " . TestEntry.name . Detail)
 	}
 	_TestPrint("# " . TEST_PASS_COUNT . " passed, " . TEST_FAIL_COUNT . " failed.")
-	if _TEST_FILE_HANDLE {
-		DllCall("CloseHandle", "Ptr", _TEST_FILE_HANDLE)
-		_TEST_FILE_HANDLE := 0
-	}
+	_CopyTestResultsForCi()
 	ExitApp(TEST_FAIL_COUNT > 0 ? 1 : 0)
+}
+
+; CI and local tooling read %TEMP%\ergopti_test_results.txt (fixed name).
+_CopyTestResultsForCi() {
+	global TEST_RESULTS_FILE, TEST_RESULTS_CANONICAL
+	if (TEST_RESULTS_FILE = TEST_RESULTS_CANONICAL)
+		return
+	try {
+		if FileExist(TEST_RESULTS_FILE)
+			FileCopy(TEST_RESULTS_FILE, TEST_RESULTS_CANONICAL, true)
+	}
 }
