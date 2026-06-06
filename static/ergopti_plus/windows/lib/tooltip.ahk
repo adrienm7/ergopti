@@ -1438,13 +1438,25 @@ LLM_TooltipSetActiveIdx(idx) {
 ; =================================
 
 _LLM_SlotIsPlaceholder(slot) {
-	global UI_LLM_SLOT_PLACEHOLDER
-	ph := UI_LLM_SLOT_PLACEHOLDER
-	if (Type(slot) == "String")
-		return slot = "" or slot = ph
-	if IsObject(slot) and slot.HasOwnProp("Text")
-		return slot.Text = "" or slot.Text = ph
-	return true
+	global UI_LLM_SLOT_PLACEHOLDER, LLM_TOOLTIP_PLACEHOLDER
+	ph := UI_LLM_SLOT_PLACEHOLDER != "" ? UI_LLM_SLOT_PLACEHOLDER : LLM_TOOLTIP_PLACEHOLDER
+	txt := _LLM_SlotGetText(slot)
+	if (txt = "")
+		return true
+	if (ph != "" and txt = ph)
+		return true
+	; HS streaming reserve char and common ellipsis variants.
+	if (txt = "…" or txt = "...")
+		return true
+	return !!(txt ~= "^\s+$")
+}
+
+_LLM_AllSlotsPlaceholder(slots) {
+	for s in slots {
+		if !_LLM_SlotIsPlaceholder(s)
+			return false
+	}
+	return slots.Length > 0
 }
 
 _LLM_SlotIsEmpty(slot) {
@@ -1763,9 +1775,11 @@ _TooltipBuildGuiLlm(slots, active_idx) {
 	Sizes := []
 	MaxW  := 0
 	slotCount := slots.Length
+	all_placeholder := _LLM_AllSlotsPlaceholder(slots)
+	loading_label := (IsSet(t)) ? t("llm.generating") : "⏳ Génération en cours…"
 	for i, slot in slots {
 		is_active := (i == active_idx)
-		display := _LLM_SlotBuildText(slot, is_active, i, slotCount)
+		display := all_placeholder ? loading_label : _LLM_SlotBuildText(slot, is_active, i, slotCount)
 		S := _TooltipMeasureText(display)
 		Sizes.Push(S)
 		if (S.W > MaxW)
@@ -1839,12 +1853,15 @@ _TooltipBuildGuiLlm(slots, active_idx) {
 		G.Add("Text", Format("Background{1} x0 y{2} w{3} h{4}", row_bg, RowY, TotalW, RowH), "")
 
 		if _LLM_SlotIsEmpty(slot) {
-			; Placeholder for in-flight slot (HS: italic loading color).
+			; In-flight slot — full « Génération en cours… » copy when the whole
+			; stack is still waiting; otherwise sparkle + ellipsis per slot (HS).
 			color := UI_LLM_LOADING_HEX
 			prefix := is_active ? activePrefix : inactivePrefix
+			loading_label := (IsSet(t)) ? t("llm.generating") : "⏳ Génération en cours…"
+			display := _LLM_AllSlotsPlaceholder(slots) ? loading_label : (prefix . LLM_TOOLTIP_PLACEHOLDER)
 			G.SetFont("italic c" . color . " s" . _TOOLTIP_FONT_SIZE, _TOOLTIP_FONT_NAME)
 			G.Add("Text", Format("BackgroundTrans x{1} y{2} w{3} h{4}",
-				_TOOLTIP_PADDING_X, TextY, MaxW, S.H), prefix . LLM_TOOLTIP_PLACEHOLDER)
+				_TOOLTIP_PADDING_X, TextY, MaxW, S.H), display)
 			if (shortcut != "") {
 				scSz := _TooltipMeasureTextSize(shortcut, _TOOLTIP_LABEL_FONT_SIZE)
 				scColor := is_active ? cmdSelHex : cmdDimHex

@@ -635,13 +635,8 @@ _LLM_Engine_ShowLoadingTooltip() {
 ; predictions separated by ``===`` (the convention HS's Parser.split_blocks
 ; also expects), and we split / dedup the response into slots.
 _LLM_Engine_DispatchBatch(state) {
-	; Paint an empty placeholder row immediately so the user sees the
-	; reveal animation even though only one HTTP request is in flight.
-	preview_slots := []
-	ph := LLM_TOOLTIP_PLACEHOLDER
-	loop state["requested"]
-		preview_slots.Push(ph)
-	LLM_Engine_OnResults(preview_slots, state["ctx"], 1, false)
+	; Keep the compact violet loading tooltip until the batch response lands.
+	; macOS does not paint placeholder rows here — show_loading stays up.
 
 	state_ref := state
 	dispatch_fn := state["dispatch_fn"]
@@ -740,24 +735,31 @@ _LLM_Engine_DispatchVariant(state) {
 	state["attempt_index"] := variant_idx + 1
 	temp := LLM_ApiCommon_GetDiversityTemp(state["base_temp"], variant_idx)
 
-	; Reveal animation: as soon as the variant fires, paint a placeholder
-	; slot so the user sees "something is coming" instead of an empty
-	; tooltip. The placeholder is replaced when the variant completes.
-	; The current active slot is the first un-filled one so Tab still
-	; reaches a real prediction during the streaming reveal.
+	; Reveal animation once earlier variants already filled a slot — keep the
+	; violet loading tooltip while the in-flight variant is still empty
+	; (macOS show_loading parity). Streaming / on_success paint real text.
 	preview_slots := []
 	for s in state["slots"]
 		preview_slots.Push(s)
 	while (preview_slots.Length < variant_idx)
 		preview_slots.Push(LLM_TOOLTIP_PLACEHOLDER)
-	active_idx := 1
-	for i, s in preview_slots {
-		if (s != "") {
-			active_idx := i
+	has_real_slot := false
+	for s in preview_slots {
+		if (s != "" and s != LLM_TOOLTIP_PLACEHOLDER) {
+			has_real_slot := true
 			break
 		}
 	}
-	LLM_Engine_OnResults(preview_slots, state["ctx"], active_idx, false)
+	if has_real_slot {
+		active_idx := 1
+		for i, s in preview_slots {
+			if (s != "" and s != LLM_TOOLTIP_PLACEHOLDER) {
+				active_idx := i
+				break
+			}
+		}
+		LLM_Engine_OnResults(preview_slots, state["ctx"], active_idx, false)
+	}
 
 	state_ref := state
 	; Streaming path: when enabled and the backend exposes a streaming
