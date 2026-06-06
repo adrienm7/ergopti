@@ -163,10 +163,15 @@ helpers.describe("LLM menu persistence — disk round-trip", function()
 			prefs.save(tmp, state, {}, {})
 			local flat = prefs.load(tmp)
 
+			local got = flat[hs.flat_key]
+			local flat_ok = values_equal(hs.sample, got, hs)
+			if not flat_ok and got == nil and hs and hs.persist == "nested" then
+				flat_ok = true
+			end
 			helpers.assert_true(
-				values_equal(hs.sample, flat[hs.flat_key], hs) or (flat[hs.flat_key] == nil and (label == "nav_modifiers" or label == "disabled_apps")),
+				flat_ok,
 				label .. " flat load mismatch (got "
-					.. tostring(flat[hs.flat_key]) .. ")"
+					.. tostring(got) .. ")"
 			)
 
 			local fh = io.open(tmp, "r")
