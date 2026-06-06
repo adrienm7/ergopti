@@ -138,6 +138,8 @@ if Features["shortcuts"]["move"] {
         Hotkey("~*$LButton", AwakeCancelOnMouse, "On")
         Hotkey("~*$RButton", AwakeCancelOnMouse, "On")
         Hotkey("~*$MButton", AwakeCancelOnMouse, "On")
+        ; Start a fast timer to instantly detect if the user moves the mouse
+        SetTimer(AwakeCheckMouseMoved, 150)
         ; Use InputHook to detect any keypress -- does not conflict with other hotkeys
         AwakeInputHook := InputHook("L0 I")
         AwakeInputHook.OnChar := AwakeCancelOnKeypress
@@ -159,6 +161,7 @@ if Features["shortcuts"]["move"] {
         global ActivitySimulation, AwakeInputHook
         ActivitySimulation := False
         SetTimer(SimulateActivity, 0)
+        SetTimer(AwakeCheckMouseMoved, 0)
         SetTimer(AwakeReturnToOrigin, 0)
         ; Disarm mouse-button cancel hooks
         try Hotkey("~*$LButton", AwakeCancelOnMouse, "Off")
@@ -176,6 +179,16 @@ if Features["shortcuts"]["move"] {
         global ActivitySimulation, AwakeOriginX, AwakeOriginY
         if ActivitySimulation {
             MCSetPos(AwakeOriginX, AwakeOriginY)
+        }
+    }
+
+    AwakeCheckMouseMoved() {
+        global ActivitySimulation, AwakeOriginX, AwakeOriginY
+        if not ActivitySimulation
+            return
+        MouseGetPos(&CurX, &CurY)
+        if (Abs(CurX - AwakeOriginX) > AWAKE_JITTER_PX or Abs(CurY - AwakeOriginY) > AWAKE_JITTER_PX) {
+            SetTimer(StopActivitySimulation, -1)
         }
     }
 
