@@ -168,25 +168,25 @@ _EngineOnKeystroke_ArmsTimer() {
 Test("LLM_Engine_OnKeystroke: arms debounce timer", _EngineOnKeystroke_ArmsTimer)
 
 
-_EngineOnKeystroke_StoresContext() {
+_EngineOnKeystroke_StoresBuffer() {
 	global _LLM_Engine
 	LLM_Engine_Init(Map("ctx_chars", 500, "debounce_ms", 9999))
 	LLM_Engine_OnKeystroke("test context")
-	AssertEqual("test context", _LLM_Engine["last_ctx"])
+	AssertEqual("test context", _LLM_Engine["last_buffer"])
 	LLM_Engine_CancelTimer()
 }
-Test("LLM_Engine_OnKeystroke: stores context in last_ctx", _EngineOnKeystroke_StoresContext)
+Test("LLM_Engine_OnKeystroke: stores full buffer in last_buffer", _EngineOnKeystroke_StoresBuffer)
 
 
-_EngineOnKeystroke_TruncatesToCtxChars() {
+_EngineOnKeystroke_KeepsFullBuffer() {
 	global _LLM_Engine
 	LLM_Engine_Init(Map("ctx_chars", 5, "debounce_ms", 9999))
 	LLM_Engine_OnKeystroke("ABCDEFGHIJ")
-	; last_ctx must be the LAST 5 chars
-	AssertEqual("FGHIJ", _LLM_Engine["last_ctx"])
+	; Truncation happens in PromptBuilder at fire time, not on each keystroke.
+	AssertEqual("ABCDEFGHIJ", _LLM_Engine["last_buffer"])
 	LLM_Engine_CancelTimer()
 }
-Test("LLM_Engine_OnKeystroke: truncates context to ctx_chars", _EngineOnKeystroke_TruncatesToCtxChars)
+Test("LLM_Engine_OnKeystroke: keeps full buffer (ctx cap applied at fire)", _EngineOnKeystroke_KeepsFullBuffer)
 
 
 _EngineOnKeystroke_NoOpWhenDisabled() {
@@ -471,3 +471,60 @@ _CacheHit_EmptyContextSkipsRequest() {
 	AssertEqual(id_before, _LLM_Engine["request_id"])
 }
 Test("LLM_Engine_FirePrediction: empty context returns early without bumping request_id", _CacheHit_EmptyContextSkipsRequest)
+
+_FirePrediction_RearmsWhenOllamaNotReady() {
+	global _LLM_Engine, _LLM_Ollama_IsReady, _LLM_Ollama_WarmupStartedTick
+	_LLM_Ollama_IsReady := false
+	_LLM_Ollama_WarmupStartedTick := A_TickCount
+	LLM_Engine_Init(Map("model", "Qwen3.5-0.8B", "debounce_ms", 500))
+	LLM_Engine_CancelTimer()
+	LLM_Engine_FirePrediction("hello world context here")
+	Assert(_LLM_Engine["timer_active"],
+		"FirePrediction must re-arm debounce while Ollama warmup is pending")
+	Assert(_LLM_Engine.Has("pending_timer") && IsObject(_LLM_Engine["pending_timer"]),
+		"pending_timer must be set for deferred retry")
+	LLM_Engine_CancelTimer()
+	_LLM_Ollama_IsReady := true
+	_LLM_Ollama_WarmupStartedTick := 0
+}
+Test("LLM_Engine_FirePrediction: re-arms timer when Ollama not ready",
+	_FirePrediction_RearmsWhenOllamaNotReady)
+
+_OllamaAllowInference_GraceAfterWarmupStart() {
+	global _LLM_Ollama_IsReady, _LLM_Ollama_WarmupStartedTick
+	_LLM_Ollama_IsReady := false
+	_LLM_Ollama_WarmupStartedTick := A_TickCount - 10000
+	AssertTrue(LLM_OllamaAllowInference(), "grace must allow inference 8s after warmup start")
+	_LLM_Ollama_WarmupStartedTick := 0
+}
+Test("LLM_OllamaAllowInference: grace period after warmup start",
+	_OllamaAllowInference_GraceAfterWarmupStart)
+
+_FirePrediction_DoesNotCancelOllamaAsync() {
+	global _LLM_Engine, _LLM_Ollama_Async, _LLM_Ollama_IsReady
+	_LLM_Ollama_IsReady := true
+	_LLM_Ollama_Async := Map()
+	fake_http := Map()
+	_LLM_Ollama_Async[99] := Map("http", fake_http, "on_success", (*) => "", "on_fail", (*) => "",
+		"cancelled", false)
+	LLM_Engine_Init(Map("backend", "api", "api_entries", [], "debounce_ms", 500))
+	_LLM_Engine["last_ctx"] := ""
+	_LLM_Engine["last_results"] := []
+	LLM_Engine_FirePrediction("enough context here for a real tail segment")
+	AssertFalse(_LLM_Ollama_Async[99]["cancelled"],
+		"FirePrediction must not cancel in-flight WinHTTP — request_id handles staleness")
+	_LLM_Ollama_Async := Map()
+}
+Test("LLM_Engine_FirePrediction: does not cancel in-flight Ollama WinHTTP",
+	_FirePrediction_DoesNotCancelOllamaAsync)
+
+_OnVariantFail_FallsBackFromStreaming() {
+	state := Map("request_id", 1, "streaming", true, "attempt_index", 2,
+		"max_attempts", 4, "model", "qwen3.5:0.8b", "slots", [])
+	global _LLM_Engine
+	_LLM_Engine["request_id"] := 1
+	_LLM_Engine_OnVariantFail(state)
+	AssertFalse(state["streaming"], "streaming must be disabled after stream failure")
+}
+Test("LLM_Engine_OnVariantFail: disables streaming for WinHTTP retry",
+	_OnVariantFail_FallsBackFromStreaming)
