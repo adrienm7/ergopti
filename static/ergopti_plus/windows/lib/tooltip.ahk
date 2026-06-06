@@ -159,6 +159,11 @@ global _TOOLTIP_CORNER_RADIUS := UI_CORNER_RADIUS
 global _TOOLTIP_LABEL_FONT_SIZE := UI_FONT_SIZE_HINT
 global _TOOLTIP_LABEL_GAP := UI_LABEL_GAP
 global _TOOLTIP_LABEL_COLOR_HEX := UI_LABEL_COLOR_HEX
+global _TOOLTIP_HINT_COLOR_HEX := UI_HINT_COLOR_HEX
+global _TOOLTIP_INFO_COLOR_HEX := UI_INFO_COLOR_HEX
+global _TOOLTIP_INFO_FONT_SIZE := UI_FONT_SIZE_INFO
+global _TOOLTIP_LINE_SPACING := UI_LINE_SPACING
+global _TOOLTIP_HINT_SPACING := UI_HINT_SPACING
 global _TOOLTIP_LIGHTNESS := UI_TINT_LIGHTNESS
 global _TOOLTIP_SATURATION := UI_TINT_SATURATION
 global _TOOLTIP_MAX_CARET_HEIGHT_PX := UI_MAX_CARET_HEIGHT_PX
@@ -187,6 +192,11 @@ Tooltip_UpdateStyles() {
     _TOOLTIP_LABEL_FONT_SIZE := UI_FONT_SIZE_HINT
     _TOOLTIP_LABEL_GAP := UI_LABEL_GAP
     _TOOLTIP_LABEL_COLOR_HEX := UI_LABEL_COLOR_HEX
+    _TOOLTIP_HINT_COLOR_HEX := UI_HINT_COLOR_HEX
+    _TOOLTIP_INFO_COLOR_HEX := UI_INFO_COLOR_HEX
+    _TOOLTIP_INFO_FONT_SIZE := UI_FONT_SIZE_INFO
+    _TOOLTIP_LINE_SPACING := UI_LINE_SPACING
+    _TOOLTIP_HINT_SPACING := UI_HINT_SPACING
     _TOOLTIP_LIGHTNESS := UI_TINT_LIGHTNESS
     _TOOLTIP_SATURATION := UI_TINT_SATURATION
     _TOOLTIP_MAX_CARET_HEIGHT_PX := UI_MAX_CARET_HEIGHT_PX
@@ -965,6 +975,24 @@ _TooltipDisableDwmRounding(Hwnd) {
     DllCall("Dwmapi\DwmSetWindowAttribute", "Ptr", Hwnd, "UInt", 33, "Ptr", Pref, "UInt", 4)
 }
 
+; Resolve the accent hex for an LLM / hotstring tooltip context.
+; ``ai_loading`` — violet in-flight tint; user-overridable via the
+; ``llm_prediction`` hotstring colour (Delays / settings submenu on Windows).
+; Returns "" when no tint should be applied (final predictions by default).
+_TooltipResolveAccent(contextKey) {
+	global UI_AI_LOADING_HEX
+	if (contextKey = "ai_loading") {
+		try {
+			resolved := HotstringsResolve("llm_prediction", "")
+			if (resolved.Color != "")
+				return resolved.Color
+		}
+		if (IsSet(UI_AI_LOADING_HEX) and UI_AI_LOADING_HEX != "")
+			return "#" . UI_AI_LOADING_HEX
+	}
+	return ""
+}
+
 ; Mix an accent colour with a near-black background, mirroring Hammerspoon's
 ; renderer.lua: only the hue of the accent contributes — lightness is fixed
 ; at _TOOLTIP_LIGHTNESS and saturation at _TOOLTIP_SATURATION, producing the
@@ -1137,6 +1165,17 @@ _TooltipResolvePosition() {
 global _LLM_Tooltip_Slots    := []
 global _LLM_Tooltip_ActiveIdx := 1
 global _LLM_Tooltip_Visible  := false
+global _LLM_Tooltip_Loading  := false
+; Footer state — mirrors tooltip_llm.lua info/hint rows.
+global _LLM_Tooltip_ShowInfoBar := false
+global _LLM_Tooltip_InfoModel   := ""
+global _LLM_Tooltip_FooterSlots := 1
+global _LLM_Tooltip_NavMods     := ""
+global _LLM_Tooltip_PredIndent  := 0
+global _LLM_Tooltip_ValMods     := "alt"
+global _LLM_Tooltip_Chain := {
+	StartTick: 0, FirstShowTick: 0, LastUpdateTick: 0, TtftMs: 0, TtltMs: 0,
+}
 
 ; Show the LLM multi-slot tooltip using the shared Gui engine.
 ; Each slot may be a plain string (streaming) or a diff object:
@@ -1163,9 +1202,9 @@ LLM_TooltipShow(payload, active := 1, is_final := false) {
 		return
 	}
 
-	while (slots.Length > 0 and _LLM_SlotIsEmpty(slots[slots.Length]))
-		slots.Pop()
 	if is_final {
+		while (slots.Length > 0 and _LLM_SlotIsEmpty(slots[slots.Length]))
+			slots.Pop()
 		filtered := []
 		for s in slots {
 			if !_LLM_SlotIsEmpty(s)
@@ -1178,6 +1217,8 @@ LLM_TooltipShow(payload, active := 1, is_final := false) {
 		return
 	}
 
+	global _LLM_Tooltip_Loading
+	_LLM_Tooltip_Loading := false
 	_LLM_Tooltip_Slots    := slots
 	_LLM_Tooltip_ActiveIdx := Max(1, Min(Integer(active), slots.Length))
 	_LLM_Tooltip_Visible  := true
@@ -1191,19 +1232,8 @@ LLM_TooltipShow(payload, active := 1, is_final := false) {
 		}
 	}
 
-	if has_chunks {
-		_TooltipBuildGuiLlm(slots, _LLM_Tooltip_ActiveIdx)
-	} else {
-		; Streaming / plain-string path: fall back to the shared TooltipShow
-		; with text-only items (no per-chunk coloring).
-		Items := []
-		for i, slot in slots {
-			is_active := (i == _LLM_Tooltip_ActiveIdx)
-			Item := { Text: _LLM_SlotBuildText(slot, is_active), ColorHex: "", IsDimmed: !is_active, DurationSec: 0 }
-			Items.Push(Item)
-		}
-		TooltipShow(Items, 0)
-	}
+	LLM_TooltipRefreshChainTiming()
+	_TooltipBuildGuiLlm(slots, _LLM_Tooltip_ActiveIdx)
 
 	; Arm the LLM-specific auto-hide timer. The duration mirrors the macOS
 	; llm_prediction delay: it defaults to UI_LLM_TIMEOUT_SEC (20 s) but is
@@ -1222,10 +1252,29 @@ LLM_TooltipShow(payload, active := 1, is_final := false) {
 	SetTimer(_TooltipTimerFn, -timeout_ms)
 }
 
+; Purple in-flight indicator — macOS ``show_loading`` parity (ai_loading tint).
+; Stays visible until replaced by ``LLM_TooltipShow`` or ``LLM_TooltipHide``.
+LLM_TooltipShowLoading() {
+	global _LLM_Tooltip_Visible, _LLM_Tooltip_Loading
+	if A_IsSuspended
+		return
+	_LLM_Tooltip_Loading := true
+	_LLM_Tooltip_Visible  := true
+	label := (IsSet(t)) ? t("llm.generating") : "⏳ Génération en cours…"
+	accent := _TooltipResolveAccent("ai_loading")
+	TooltipShow([{ Text: label, ColorHex: accent, IsDimmed: false, DurationSec: 0 }], 0)
+	; TooltipShow arms a 3 s safety timer — cancel it so loading survives slow inference.
+	SetTimer(_TooltipTimerFn, 0)
+	global _TooltipDequeueActive
+	_TooltipDequeueActive := false
+}
+
 LLM_TooltipHide(accepted := false) {
-	global _LLM_Tooltip_Visible, _LLM_Tooltip_Slots
+	global _LLM_Tooltip_Visible, _LLM_Tooltip_Slots, _LLM_Tooltip_Loading
 	_LLM_Tooltip_Visible := false
+	_LLM_Tooltip_Loading := false
 	_LLM_Tooltip_Slots   := []
+	_LLM_TooltipResetChain()
 	TooltipHide()
 }
 
@@ -1276,12 +1325,18 @@ LLM_TooltipSetActiveIdx(idx) {
 ; ===== 3.1) LLM slot helpers =====
 ; =================================
 
-_LLM_SlotIsEmpty(slot) {
+_LLM_SlotIsPlaceholder(slot) {
+	global UI_LLM_SLOT_PLACEHOLDER
+	ph := UI_LLM_SLOT_PLACEHOLDER
 	if (Type(slot) == "String")
-		return slot == ""
+		return slot = "" or slot = ph
 	if IsObject(slot) and slot.HasOwnProp("Text")
-		return slot.Text == ""
+		return slot.Text = "" or slot.Text = ph
 	return true
+}
+
+_LLM_SlotIsEmpty(slot) {
+	return _LLM_SlotIsPlaceholder(slot)
 }
 
 _LLM_SlotGetText(slot) {
@@ -1292,16 +1347,270 @@ _LLM_SlotGetText(slot) {
 	return ""
 }
 
+_LLM_RepeatChar(ch, count) {
+	if (count <= 0)
+		return ""
+	out := ""
+	loop count
+		out .= ch
+	return out
+}
+
+; Prefixes for active/inactive rows — mirrors tooltip_llm.lua assemble_blocks.
+_LLM_GetActivePrefix(slotCount) {
+	global _LLM_Tooltip_PredIndent, UI_LLM_ACTIVE_PREFIX
+	sparkle := UI_LLM_ACTIVE_PREFIX
+	indent := Integer(_LLM_Tooltip_PredIndent)
+	if (slotCount >= 2 and indent > 0)
+		return _LLM_RepeatChar(" ", indent) . sparkle
+	return sparkle
+}
+
+_LLM_GetInactivePrefix(slotCount) {
+	global _LLM_Tooltip_PredIndent, UI_LLM_INACTIVE_ALIGN_CHAR
+	indent := Integer(_LLM_Tooltip_PredIndent)
+	if (indent < 0 and indent > -3)
+		return _LLM_RepeatChar(" ", -indent)
+	if (indent <= -3)
+		return _LLM_GetActivePrefix(slotCount) . _LLM_RepeatChar(" ", Max(0, -indent - 3))
+	align := UI_LLM_INACTIVE_ALIGN_CHAR
+	return (indent > -3) ? align : ""
+}
+
+_LLM_FormatValModifiers(valMods) {
+	if (valMods = "" or valMods = "none")
+		return ""
+	sym := valMods
+	sym := StrReplace(sym, "cmd", "⌘", , true)
+	sym := StrReplace(sym, "ctrl", "⌃", , true)
+	sym := StrReplace(sym, "alt", "⌥", , true)
+	sym := StrReplace(sym, "shift", "⇧", , true)
+	return StrReplace(sym, "+", "")
+}
+
+_LLM_BuildShortcutSuffix(idx, slotCount, valMods := "") {
+	global UI_LLM_SHORTCUT_LABEL_GAP
+	if (slotCount <= 1)
+		return ""
+	sym := _LLM_FormatValModifiers(valMods)
+	if (sym = "")
+		return ""
+	gap := UI_LLM_SHORTCUT_LABEL_GAP
+	if (idx <= 9)
+		return gap . sym . idx
+	if (idx = 10)
+		return gap . sym . "0"
+	return ""
+}
+
 ; Build the display string for a slot row (used by the plain-string path).
-_LLM_SlotBuildText(slot, is_active) {
-	global LLM_TOOLTIP_ACTIVE_PREFIX, LLM_TOOLTIP_INACTIVE_PREFIX
-	global LLM_TOOLTIP_PLACEHOLDER, LLM_TOOLTIP_TAB_SUFFIX
+_LLM_SlotBuildText(slot, is_active, slotIdx := 1, slotCount := 1) {
+	global LLM_TOOLTIP_PLACEHOLDER, LLM_TOOLTIP_TAB_SUFFIX, _LLM_Tooltip_ValMods
+	prefix := is_active ? _LLM_GetActivePrefix(slotCount) : _LLM_GetInactivePrefix(slotCount)
+	shortcut := _LLM_BuildShortcutSuffix(slotIdx, slotCount, _LLM_Tooltip_ValMods)
 	if _LLM_SlotIsEmpty(slot)
-		return (is_active ? LLM_TOOLTIP_ACTIVE_PREFIX : LLM_TOOLTIP_INACTIVE_PREFIX) . LLM_TOOLTIP_PLACEHOLDER
+		return prefix . LLM_TOOLTIP_PLACEHOLDER . shortcut
 	txt    := _LLM_SlotGetText(slot)
-	prefix := is_active ? LLM_TOOLTIP_ACTIVE_PREFIX : LLM_TOOLTIP_INACTIVE_PREFIX
 	suffix := is_active ? LLM_TOOLTIP_TAB_SUFFIX : ""
-	return prefix . txt . suffix
+	return prefix . txt . suffix . shortcut
+}
+
+LLM_TooltipSetDisplayOpts(opts) {
+	global _LLM_Tooltip_ShowInfoBar, _LLM_Tooltip_InfoModel
+	global _LLM_Tooltip_FooterSlots, _LLM_Tooltip_NavMods
+	global _LLM_Tooltip_PredIndent, _LLM_Tooltip_ValMods
+	if !(opts is Map)
+		return
+	_LLM_Tooltip_ShowInfoBar := !!(opts.Has("show_info_bar") and opts["show_info_bar"])
+	_LLM_Tooltip_InfoModel := (opts.Has("info_model") and opts["info_model"] != "")
+		? opts["info_model"] : ""
+	_LLM_Tooltip_FooterSlots := (opts.Has("slot_count") and opts["slot_count"] > 0)
+		? Integer(opts["slot_count"]) : 1
+	_LLM_Tooltip_NavMods := (opts.Has("nav_modifiers") and opts["nav_modifiers"] != "")
+		? opts["nav_modifiers"] : ""
+	if opts.Has("pred_indent")
+		_LLM_Tooltip_PredIndent := Integer(opts["pred_indent"])
+	if opts.Has("val_modifiers")
+		_LLM_Tooltip_ValMods := opts["val_modifiers"]
+}
+
+LLM_TooltipSetChainStart() {
+	global _LLM_Tooltip_Chain
+	_LLM_Tooltip_Chain.StartTick := A_TickCount
+	_LLM_Tooltip_Chain.FirstShowTick := 0
+	_LLM_Tooltip_Chain.LastUpdateTick := 0
+	_LLM_Tooltip_Chain.TtftMs := 0
+	_LLM_Tooltip_Chain.TtltMs := 0
+}
+
+LLM_TooltipRefreshChainTiming() {
+	global _LLM_Tooltip_Chain
+	if !_LLM_Tooltip_Chain.StartTick
+		return
+	now := A_TickCount
+	_LLM_Tooltip_Chain.LastUpdateTick := now
+	if !_LLM_Tooltip_Chain.FirstShowTick {
+		_LLM_Tooltip_Chain.FirstShowTick := now
+		_LLM_Tooltip_Chain.TtftMs := now - _LLM_Tooltip_Chain.StartTick
+	}
+}
+
+LLM_TooltipMarkChainComplete() {
+	global _LLM_Tooltip_Chain, _LLM_Tooltip_Visible, _LLM_Tooltip_Slots, _LLM_Tooltip_ActiveIdx
+	if !_LLM_Tooltip_Chain.StartTick
+		return
+	final := _LLM_Tooltip_Chain.LastUpdateTick ? _LLM_Tooltip_Chain.LastUpdateTick : A_TickCount
+	_LLM_Tooltip_Chain.TtltMs := final - _LLM_Tooltip_Chain.StartTick
+	if !_LLM_Tooltip_Chain.TtftMs
+		_LLM_Tooltip_Chain.TtftMs := _LLM_Tooltip_Chain.TtltMs
+	; Re-render so the info bar picks up TTLT — mirrors HS set_timing().
+	if (_LLM_Tooltip_Visible and _LLM_Tooltip_Slots.Length > 0)
+		LLM_TooltipShow(_LLM_Tooltip_Slots, _LLM_Tooltip_ActiveIdx, false)
+}
+
+_LLM_TooltipResetChain() {
+	global _LLM_Tooltip_Chain
+	_LLM_Tooltip_Chain.StartTick := 0
+	_LLM_Tooltip_Chain.FirstShowTick := 0
+	_LLM_Tooltip_Chain.LastUpdateTick := 0
+	_LLM_Tooltip_Chain.TtftMs := 0
+	_LLM_Tooltip_Chain.TtltMs := 0
+}
+
+_LLM_FormatInfoLine(modelInfo, ttftMs := "", ttltMs := "", forSizing := false) {
+	hasModel := (modelInfo != "")
+	hasTtft := (IsNumber(ttftMs) and ttftMs > 0)
+	hasTtlt := (IsNumber(ttltMs) and ttltMs > 0)
+	if forSizing {
+		if !hasTtft
+			ttftMs := 9999, hasTtft := true
+		if !hasTtlt
+			ttltMs := 9999, hasTtlt := true
+	}
+	if (!hasModel and !hasTtft and !hasTtlt)
+		return ""
+	pieces := []
+	if hasModel
+		pieces.Push(modelInfo)
+	if hasTtft {
+		timing := Format("⏱ {:.2f} s", ttftMs / 1000)
+		if hasTtlt
+			timing .= Format(" — {:.2f} s", ttltMs / 1000)
+		pieces.Push(timing)
+	} else if hasTtlt
+		pieces.Push(Format("⏱ {:.2f} s", ttltMs / 1000))
+	out := ""
+	for i, p in pieces
+		out .= (i = 1) ? p : " — " . p
+	return out
+}
+
+_LLM_BuildNavHint(slotCount, navMods := "") {
+	global UI_LLM_FOOTER_SPACE_DIV, UI_LLM_HINT_ACCEPT_SINGLE, UI_LLM_HINT_NAV_LEFT
+	global UI_LLM_HINT_NAV_RIGHT, UI_LLM_HINT_ACCEPT_CENTER, UI_LLM_HINT_ARROW_LEFT
+	global UI_LLM_HINT_ARROW_RIGHT, UI_LLM_HINT_OR, UI_LLM_HINT_ARROW_SEP_LEFT
+	global UI_LLM_HINT_ARROW_SEP_RIGHT
+	spaceDiv := UI_LLM_FOOTER_SPACE_DIV
+	acceptSingle := UI_LLM_HINT_ACCEPT_SINGLE
+	if (slotCount <= 1)
+		return acceptSingle
+	navStr := navMods
+	if (navStr = "" or navStr = "none")
+		navStr := ""
+	else
+		navStr := _LLM_FormatValModifiers(navStr)
+	hintLeft := UI_LLM_HINT_NAV_LEFT
+	hintRight := UI_LLM_HINT_NAV_RIGHT
+	hintOr := UI_LLM_HINT_OR
+	arrL := UI_LLM_HINT_ARROW_LEFT
+	arrR := UI_LLM_HINT_ARROW_RIGHT
+	if (navStr != "") {
+		hintLeft .= hintOr . navStr . " + " . arrL
+		hintRight .= hintOr . navStr . " + " . arrR
+	}
+	sepL := UI_LLM_HINT_ARROW_SEP_LEFT
+	sepR := UI_LLM_HINT_ARROW_SEP_RIGHT
+	acceptCenter := UI_LLM_HINT_ACCEPT_CENTER
+	return hintLeft . spaceDiv . sepL . spaceDiv . acceptCenter . spaceDiv . sepR . spaceDiv . hintRight
+}
+
+_LLM_TooltipAppendFooter(G, &TotalH, TotalW, bgHex) {
+	global _LLM_Tooltip_ShowInfoBar, _LLM_Tooltip_InfoModel, _LLM_Tooltip_FooterSlots
+	global _LLM_Tooltip_NavMods, _LLM_Tooltip_Chain
+	global _TOOLTIP_FONT_NAME, _TOOLTIP_HINT_COLOR_HEX, _TOOLTIP_INFO_COLOR_HEX
+	global _TOOLTIP_LABEL_FONT_SIZE, _TOOLTIP_INFO_FONT_SIZE, _TOOLTIP_PADDING_Y
+	global _TOOLTIP_PADDING_X, _TOOLTIP_LINE_SPACING, _TOOLTIP_HINT_SPACING, _TOOLTIP_SEP_COLOR_HEX
+
+	hintText := _LLM_BuildNavHint(_LLM_Tooltip_FooterSlots, _LLM_Tooltip_NavMods)
+	infoText := ""
+	if _LLM_Tooltip_ShowInfoBar {
+		ttft := _LLM_Tooltip_Chain.TtftMs
+		ttlt := _LLM_Tooltip_Chain.TtltMs
+		infoText := _LLM_FormatInfoLine(_LLM_Tooltip_InfoModel, ttft, ttlt, false)
+	}
+	if (hintText == "" and infoText == "")
+		return
+
+	global UI_LLM_FOOTER_SPACE_DIV, UI_LLM_FOOTER_COMBINED_SEP
+	spaceDiv := UI_LLM_FOOTER_SPACE_DIV
+	combinedSep := UI_LLM_FOOTER_COMBINED_SEP
+	isCombined := false
+	combinedText := ""
+	combinedSz := { W: 0, H: 0 }
+	if (hintText != "" and infoText != "") {
+		combinedText := hintText . spaceDiv . combinedSep . spaceDiv . infoText
+		combinedSz := _TooltipMeasureTextSize(combinedText, _TOOLTIP_LABEL_FONT_SIZE)
+		if (combinedSz.W <= TotalW - 2 * _TOOLTIP_PADDING_X)
+			isCombined := true
+	}
+
+	; HS layout: preds → line_spacing → sep → line_spacing → hint/info.
+	if _TOOLTIP_LINE_SPACING > 0
+		TotalH += _TOOLTIP_LINE_SPACING
+	sepY := TotalH
+	G.SetFont("s1", _TOOLTIP_FONT_NAME)
+	G.Add("Text", Format("Background{1} x0 y{2} w{3} h1", _TOOLTIP_SEP_COLOR_HEX, sepY, TotalW), "")
+	TotalH += 1
+	if _TOOLTIP_LINE_SPACING > 0
+		TotalH += _TOOLTIP_LINE_SPACING
+
+	if isCombined {
+		rowH := _TOOLTIP_PADDING_Y + combinedSz.H + _TOOLTIP_PADDING_Y
+		textY := TotalH + _TOOLTIP_PADDING_Y
+		G.Add("Text", Format("Background{1} x0 y{2} w{3} h{4}", bgHex, TotalH, TotalW, rowH), "")
+		G.SetFont("norm c" . _TOOLTIP_HINT_COLOR_HEX . " s" . _TOOLTIP_LABEL_FONT_SIZE, _TOOLTIP_FONT_NAME)
+		textX := Max(_TOOLTIP_PADDING_X, (TotalW - combinedSz.W) // 2)
+		G.Add("Text", Format("BackgroundTrans x{1} y{2} w{3} h{4}",
+			textX, textY, combinedSz.W + 4, combinedSz.H), combinedText)
+		TotalH += rowH
+		return
+	}
+
+	if (hintText != "") {
+		hintSz := _TooltipMeasureTextSize(hintText, _TOOLTIP_LABEL_FONT_SIZE)
+		hintY := TotalH + _TOOLTIP_PADDING_Y
+		hintRowH := _TOOLTIP_PADDING_Y + hintSz.H + _TOOLTIP_PADDING_Y
+		G.Add("Text", Format("Background{1} x0 y{2} w{3} h{4}", bgHex, TotalH, TotalW, hintRowH), "")
+		G.SetFont("norm c" . _TOOLTIP_HINT_COLOR_HEX . " s" . _TOOLTIP_LABEL_FONT_SIZE, _TOOLTIP_FONT_NAME)
+		hintX := Max(_TOOLTIP_PADDING_X, (TotalW - hintSz.W) // 2)
+		G.Add("Text", Format("BackgroundTrans x{1} y{2} w{3} h{4}",
+			hintX, hintY, hintSz.W + 4, hintSz.H), hintText)
+		TotalH += hintRowH
+	}
+
+	if (infoText != "") {
+		if (hintText != "")
+			TotalH += _TOOLTIP_HINT_SPACING
+		infoSz := _TooltipMeasureTextSize(infoText, _TOOLTIP_INFO_FONT_SIZE)
+		infoY := TotalH + _TOOLTIP_PADDING_Y
+		infoRowH := _TOOLTIP_PADDING_Y + infoSz.H + _TOOLTIP_PADDING_Y
+		G.Add("Text", Format("Background{1} x0 y{2} w{3} h{4}", bgHex, TotalH, TotalW, infoRowH), "")
+		G.SetFont("norm c" . _TOOLTIP_INFO_COLOR_HEX . " s" . _TOOLTIP_INFO_FONT_SIZE, _TOOLTIP_FONT_NAME)
+		infoX := Max(_TOOLTIP_PADDING_X, (TotalW - infoSz.W) // 2)
+		G.Add("Text", Format("BackgroundTrans x{1} y{2} w{3} h{4}",
+			infoX, infoY, infoSz.W + 4, infoSz.H), infoText)
+		TotalH += infoRowH
+	}
 }
 
 
@@ -1318,9 +1627,13 @@ _LLM_SlotBuildText(slot, is_active) {
 _TooltipBuildGuiLlm(slots, active_idx) {
 	global _TooltipGui, _TooltipRowGuis
 	global _TOOLTIP_FONT_NAME, _TOOLTIP_FONT_SIZE, _TOOLTIP_PADDING_X, _TOOLTIP_PADDING_Y
-	global LLM_TOOLTIP_ACTIVE_PREFIX, LLM_TOOLTIP_INACTIVE_PREFIX
+	global _TOOLTIP_DEFAULT_BG_HEX, _TOOLTIP_SEP_COLOR_HEX, _TOOLTIP_LABEL_FONT_SIZE
+	global _TOOLTIP_INFO_FONT_SIZE, _LLM_Tooltip_FooterSlots, _LLM_Tooltip_NavMods
+	global _LLM_Tooltip_ShowInfoBar, _LLM_Tooltip_InfoModel, _LLM_Tooltip_ValMods
 	global LLM_TOOLTIP_PLACEHOLDER, LLM_TOOLTIP_TAB_SUFFIX
 	global UI_LLM_CORR_SEL_HEX, UI_LLM_NW_SEL_HEX, UI_LLM_UNSEL_GRAY_HEX, UI_LLM_LOADING_HEX
+	global UI_LLM_CURSOR_HEX, UI_LLM_CMD_SEL_HEX, UI_LLM_CMD_DIM_HEX
+	global UI_LLM_FOOTER_SPACE_DIV, UI_LLM_FOOTER_COMBINED_SEP
 
 	if _TooltipGui
 		try _TooltipGui.Destroy()
@@ -1335,13 +1648,37 @@ _TooltipBuildGuiLlm(slots, active_idx) {
 	; Each row's text = prefix + full slot text + suffix (for width budget).
 	Sizes := []
 	MaxW  := 0
+	slotCount := slots.Length
 	for i, slot in slots {
 		is_active := (i == active_idx)
-		display := _LLM_SlotBuildText(slot, is_active)
+		display := _LLM_SlotBuildText(slot, is_active, i, slotCount)
 		S := _TooltipMeasureText(display)
 		Sizes.Push(S)
 		if (S.W > MaxW)
 			MaxW := S.W
+	}
+	hintText := _LLM_BuildNavHint(_LLM_Tooltip_FooterSlots, _LLM_Tooltip_NavMods)
+	infoSizing := ""
+	if _LLM_Tooltip_ShowInfoBar
+		infoSizing := _LLM_FormatInfoLine(_LLM_Tooltip_InfoModel, 9999, 9999, true)
+	spaceDiv := UI_LLM_FOOTER_SPACE_DIV
+	combinedSep := UI_LLM_FOOTER_COMBINED_SEP
+	if (hintText != "" and infoSizing != "") {
+		combinedW := _TooltipMeasureTextSize(
+			hintText . spaceDiv . combinedSep . spaceDiv . infoSizing, _TOOLTIP_LABEL_FONT_SIZE).W
+		if (combinedW > MaxW)
+			MaxW := combinedW
+	} else {
+		if (hintText != "") {
+			hintW := _TooltipMeasureTextSize(hintText, _TOOLTIP_LABEL_FONT_SIZE).W
+			if (hintW > MaxW)
+				MaxW := hintW
+		}
+		if (infoSizing != "") {
+			infoW := _TooltipMeasureTextSize(infoSizing, _TOOLTIP_INFO_FONT_SIZE).W
+			if (infoW > MaxW)
+				MaxW := infoW
+		}
 	}
 
 	TotalW := _TOOLTIP_PADDING_X + MaxW + _TOOLTIP_PADDING_X
@@ -1355,8 +1692,19 @@ _TooltipBuildGuiLlm(slots, active_idx) {
 			TotalH += SEP_H
 	}
 
+	inflight_bg := _TooltipMixTintHex(_TooltipResolveAccent("ai_loading"))
+	has_loading := false
+	for , slot in slots {
+		if _LLM_SlotIsPlaceholder(slot) {
+			has_loading := true
+			break
+		}
+	}
+	cursorHex := UI_LLM_CURSOR_HEX
+	cmdSelHex := UI_LLM_CMD_SEL_HEX
+	cmdDimHex := UI_LLM_CMD_DIM_HEX
 	G := Gui("+AlwaysOnTop -Caption +E0x20 +E0x80 +LastFound")
-	G.BackColor := _TOOLTIP_DEFAULT_BG_HEX
+	G.BackColor := has_loading ? inflight_bg : _TOOLTIP_DEFAULT_BG_HEX
 	G.MarginX := 0
 	G.MarginY := 0
 
@@ -1367,32 +1715,48 @@ _TooltipBuildGuiLlm(slots, active_idx) {
 		RowH := Meta.H
 		S    := Sizes[Idx]
 		TextY := RowY + _TOOLTIP_PADDING_Y
+		row_bg := _LLM_SlotIsPlaceholder(slot) ? inflight_bg : _TOOLTIP_DEFAULT_BG_HEX
+		activePrefix := _LLM_GetActivePrefix(slotCount)
+		inactivePrefix := _LLM_GetInactivePrefix(slotCount)
+		shortcut := _LLM_BuildShortcutSuffix(Idx, slotCount, _LLM_Tooltip_ValMods)
 
 		; Full-width background band.
 		G.SetFont("norm s1", _TOOLTIP_FONT_NAME)
-		G.Add("Text", Format("Background{1} x0 y{2} w{3} h{4}", _TOOLTIP_DEFAULT_BG_HEX, RowY, TotalW, RowH), "")
+		G.Add("Text", Format("Background{1} x0 y{2} w{3} h{4}", row_bg, RowY, TotalW, RowH), "")
 
 		if _LLM_SlotIsEmpty(slot) {
-			; Placeholder for in-flight slot.
+			; Placeholder for in-flight slot (HS: italic loading color).
 			color := UI_LLM_LOADING_HEX
-			G.SetFont("norm c" . color . " s" . _TOOLTIP_FONT_SIZE, _TOOLTIP_FONT_NAME)
-			prefix := is_active ? LLM_TOOLTIP_ACTIVE_PREFIX : LLM_TOOLTIP_INACTIVE_PREFIX
+			prefix := is_active ? activePrefix : inactivePrefix
+			G.SetFont("italic c" . color . " s" . _TOOLTIP_FONT_SIZE, _TOOLTIP_FONT_NAME)
 			G.Add("Text", Format("BackgroundTrans x{1} y{2} w{3} h{4}",
 				_TOOLTIP_PADDING_X, TextY, MaxW, S.H), prefix . LLM_TOOLTIP_PLACEHOLDER)
+			if (shortcut != "") {
+				scSz := _TooltipMeasureTextSize(shortcut, _TOOLTIP_LABEL_FONT_SIZE)
+				scColor := is_active ? cmdSelHex : cmdDimHex
+				G.SetFont("norm c" . scColor . " s" . _TOOLTIP_LABEL_FONT_SIZE, _TOOLTIP_FONT_NAME)
+				G.Add("Text", Format("BackgroundTrans x{1} y{2} w{3} h{4}",
+					TotalW - _TOOLTIP_PADDING_X - scSz.W, TextY, scSz.W + 2, S.H), shortcut)
+			}
 		} else if !is_active {
 			; Inactive slot: plain gray.
 			G.SetFont("norm c" . UI_LLM_UNSEL_GRAY_HEX . " s" . _TOOLTIP_FONT_SIZE, _TOOLTIP_FONT_NAME)
-			display := LLM_TOOLTIP_INACTIVE_PREFIX . _LLM_SlotGetText(slot)
+			display := inactivePrefix . _LLM_SlotGetText(slot)
 			G.Add("Text", Format("BackgroundTrans x{1} y{2} w{3} h{4}",
 				_TOOLTIP_PADDING_X, TextY, MaxW, S.H), display)
+			if (shortcut != "") {
+				scSz := _TooltipMeasureTextSize(shortcut, _TOOLTIP_LABEL_FONT_SIZE)
+				G.SetFont("norm c" . cmdDimHex . " s" . _TOOLTIP_LABEL_FONT_SIZE, _TOOLTIP_FONT_NAME)
+				G.Add("Text", Format("BackgroundTrans x{1} y{2} w{3} h{4}",
+					TotalW - _TOOLTIP_PADDING_X - scSz.W, TextY, scSz.W + 2, S.H), shortcut)
+			}
 		} else {
 			; Active slot with per-chunk coloring.
-			; Prefix "▶ " in white.
 			CurX := _TOOLTIP_PADDING_X
-			PrefixSz := _TooltipMeasureText(LLM_TOOLTIP_ACTIVE_PREFIX)
-			G.SetFont("norm cFFFFFF s" . _TOOLTIP_FONT_SIZE, _TOOLTIP_FONT_NAME)
+			PrefixSz := _TooltipMeasureText(activePrefix)
+			G.SetFont("norm c" . cursorHex . " s" . _TOOLTIP_FONT_SIZE, _TOOLTIP_FONT_NAME)
 			G.Add("Text", Format("BackgroundTrans x{1} y{2} w{3} h{4}",
-				CurX, TextY, PrefixSz.W + 2, S.H), LLM_TOOLTIP_ACTIVE_PREFIX)
+				CurX, TextY, PrefixSz.W + 2, S.H), activePrefix)
 			CurX += PrefixSz.W
 
 			has_chunks := IsObject(slot) and slot.HasOwnProp("Chunks") and slot.Chunks.Length > 0
@@ -1401,11 +1765,24 @@ _TooltipBuildGuiLlm(slots, active_idx) {
 					chunk_txt := chunk.HasOwnProp("text") ? chunk.text : ""
 					if (chunk_txt == "")
 						continue
-					chunk_color := (chunk.type == "equal") ? UI_LLM_CORR_SEL_HEX : UI_LLM_NW_SEL_HEX
+					chunk_color := (chunk.type == "insert") ? UI_LLM_CORR_SEL_HEX : UI_LLM_UNSEL_GRAY_HEX
 					CSz := _TooltipMeasureText(chunk_txt)
 					G.SetFont("norm c" . chunk_color . " s" . _TOOLTIP_FONT_SIZE, _TOOLTIP_FONT_NAME)
 					G.Add("Text", Format("BackgroundTrans x{1} y{2} w{3} h{4}",
 						CurX, TextY, CSz.W + 4, S.H), chunk_txt)
+					CurX += CSz.W
+				}
+				nw := slot.HasOwnProp("NextWords") ? slot.NextWords : ""
+				has_insert := false
+				for , chunk in slot.Chunks {
+					if (chunk.HasOwnProp("type") and chunk.type == "insert")
+						has_insert := true
+				}
+				if (nw != "" and !has_insert) {
+					CSz := _TooltipMeasureText(nw)
+					G.SetFont("norm c" . UI_LLM_NW_SEL_HEX . " s" . _TOOLTIP_FONT_SIZE, _TOOLTIP_FONT_NAME)
+					G.Add("Text", Format("BackgroundTrans x{1} y{2} w{3} h{4}",
+						CurX, TextY, CSz.W + 4, S.H), nw)
 					CurX += CSz.W
 				}
 			} else {
@@ -1417,10 +1794,17 @@ _TooltipBuildGuiLlm(slots, active_idx) {
 				CurX += _TooltipMeasureText(plain).W
 			}
 
-			; Tab suffix in label color.
-			G.SetFont("norm c" . _TOOLTIP_LABEL_COLOR_HEX . " s" . _TOOLTIP_FONT_SIZE, _TOOLTIP_FONT_NAME)
-			G.Add("Text", Format("BackgroundTrans x{1} y{2} w{3} h{4}",
-				CurX, TextY, _TooltipMeasureText(LLM_TOOLTIP_TAB_SUFFIX).W + 4, S.H), LLM_TOOLTIP_TAB_SUFFIX)
+			if (LLM_TOOLTIP_TAB_SUFFIX != "") {
+				G.SetFont("norm c" . _TOOLTIP_LABEL_COLOR_HEX . " s" . _TOOLTIP_FONT_SIZE, _TOOLTIP_FONT_NAME)
+				G.Add("Text", Format("BackgroundTrans x{1} y{2} w{3} h{4}",
+					CurX, TextY, _TooltipMeasureText(LLM_TOOLTIP_TAB_SUFFIX).W + 4, S.H), LLM_TOOLTIP_TAB_SUFFIX)
+			}
+			if (shortcut != "") {
+				scSz := _TooltipMeasureTextSize(shortcut, _TOOLTIP_LABEL_FONT_SIZE)
+				G.SetFont("norm c" . cmdSelHex . " s" . _TOOLTIP_LABEL_FONT_SIZE, _TOOLTIP_FONT_NAME)
+				G.Add("Text", Format("BackgroundTrans x{1} y{2} w{3} h{4}",
+					TotalW - _TOOLTIP_PADDING_X - scSz.W, TextY, scSz.W + 2, S.H), shortcut)
+			}
 		}
 
 		; Separator.
@@ -1430,6 +1814,9 @@ _TooltipBuildGuiLlm(slots, active_idx) {
 			G.Add("Text", Format("Background{1} x0 y{2} w{3} h{4}", _TOOLTIP_SEP_COLOR_HEX, SepY, TotalW, SEP_H), "")
 		}
 	}
+
+	row_bg_final := _TOOLTIP_DEFAULT_BG_HEX
+	_LLM_TooltipAppendFooter(G, &TotalH, TotalW, row_bg_final)
 
 	_TooltipGui := G
 	_TooltipRowGuis := [{ Gui: G, H: TotalH, W: TotalW, IsSep: false }]

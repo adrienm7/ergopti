@@ -33,13 +33,21 @@
 ; ====================================
 ; ===================================
 
-; Visual prefixes for the active / inactive slot rows.
-LLM_TOOLTIP_ACTIVE_PREFIX   := "▶ "
-LLM_TOOLTIP_INACTIVE_PREFIX := "·  "
-; Suffix appended to the active row to hint that Tab accepts it.
-LLM_TOOLTIP_TAB_SUFFIX      := "   [Tab]"
-; Placeholder shown while a slot is still being generated.
-LLM_TOOLTIP_PLACEHOLDER     := "⏳ …"
+; LLM tooltip chrome — loaded from shared/tooltip/constants.toml via ui_style.ahk.
+; Compile-time sentinels overwritten by Tooltip_LlmUiSyncFromShared() at boot.
+LLM_TOOLTIP_ACTIVE_PREFIX   := ""
+LLM_TOOLTIP_INACTIVE_PREFIX := ""   ; built dynamically from pred_indent
+LLM_TOOLTIP_TAB_SUFFIX      := ""
+LLM_TOOLTIP_PLACEHOLDER     := ""
+
+; Mirrors shared [llm_ui] into the legacy LLM_TOOLTIP_* aliases after TOML load.
+; UiStyle_LoadSharedConst() already fail-fast-validated every key.
+Tooltip_LlmUiSyncFromShared() {
+	global LLM_TOOLTIP_ACTIVE_PREFIX, LLM_TOOLTIP_PLACEHOLDER
+	global UI_LLM_ACTIVE_PREFIX, UI_LLM_SLOT_PLACEHOLDER
+	LLM_TOOLTIP_ACTIVE_PREFIX := UI_LLM_ACTIVE_PREFIX
+	LLM_TOOLTIP_PLACEHOLDER := UI_LLM_SLOT_PLACEHOLDER
+}
 
 
 
@@ -61,8 +69,28 @@ LLM_TOOLTIP_PLACEHOLDER     := "⏳ …"
  * @param {Integer}      active    1-based active slot index (default 1).
  * @param {boolean}      is_final  True on the final render of a request.
  */
+LLM_Tooltip_SetDisplayOpts(opts) {
+	LLM_TooltipSetDisplayOpts(opts)
+}
+
+LLM_Tooltip_SetChainStart() {
+	LLM_TooltipSetChainStart()
+}
+
+LLM_Tooltip_MarkChainComplete() {
+	LLM_TooltipMarkChainComplete()
+}
+
 LLM_Tooltip_Show(payload, active := 1, is_final := false) {
 	LLM_TooltipShow(payload, active, is_final)
+}
+
+/**
+ * Shows the purple "generation in progress" tooltip (macOS show_loading parity).
+ * Replaced automatically when ``LLM_Tooltip_Show`` paints the first prediction.
+ */
+LLM_Tooltip_ShowLoading() {
+	LLM_TooltipShowLoading()
 }
 
 /**
@@ -117,4 +145,40 @@ LLM_Tooltip_GetActiveIdx() {
 
 LLM_Tooltip_IsVisible() {
 	return LLM_TooltipIsVisible()
+}
+
+/**
+ * Accepts the active prediction when the tooltip is showing. Used by the
+ * physical Tab hotkey, tap-hold keys remapped to Tab (e.g. AltGr tap), and
+ * synthetic Tab events from the prefix watcher.
+ * @returns {boolean} True when a prediction was accepted.
+ */
+LLM_Tooltip_TryAcceptTab() {
+	if !LLM_Tooltip_IsVisible()
+		return false
+	text := LLM_Tooltip_GetText()
+	if (text == "")
+		return false
+	LLM_Bridge_OnAccept(text)
+	return true
+}
+
+/**
+ * Fires an unmodified Tab keystroke unless an LLM prediction is visible —
+ * then accepts it instead of sending Tab to the active app.
+ * @param {Array|String} Modifiers - TextPressKey modifier argument (Down/Up unchanged).
+ */
+LLM_Tooltip_FireTabOrAccept(Modifiers := []) {
+	if (Modifiers == "Down" or Modifiers == "Up") {
+		TextPressKey("Tab", Modifiers)
+		return
+	}
+	has_mods := false
+	if (Modifiers is Array)
+		has_mods := (Modifiers.Length > 0)
+	else if (Modifiers != "")
+		has_mods := true
+	if !has_mods and LLM_Tooltip_TryAcceptTab()
+		return
+	TextPressKey("Tab", Modifiers)
 }
