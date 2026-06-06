@@ -27,16 +27,18 @@ Test("LLM_BuildOllamaPayload: contains model field", _OllamaPayload_ContainsMode
 
 _OllamaPayload_ContainsSystem() {
 	payload := LLM_BuildOllamaPayload("m", "My system prompt", "user text", 0.1)
-	AssertContains(payload, '"system":"My system prompt"')
+	AssertContains(payload, '"role":"system"')
+	AssertContains(payload, "My system prompt")
 }
 Test("LLM_BuildOllamaPayload: contains system field", _OllamaPayload_ContainsSystem)
 
 
 _OllamaPayload_ContainsPrompt() {
 	payload := LLM_BuildOllamaPayload("m", "sys", "user context here", 0.5)
-	AssertContains(payload, '"prompt":"user context here"')
+	AssertContains(payload, '"role":"user"')
+	AssertContains(payload, "user context here")
 }
-Test("LLM_BuildOllamaPayload: contains prompt field", _OllamaPayload_ContainsPrompt)
+Test("LLM_BuildOllamaPayload: contains user message", _OllamaPayload_ContainsPrompt)
 
 
 _OllamaPayload_StreamFalseByDefault() {
@@ -73,6 +75,14 @@ _OllamaPayload_EscapesNewlineInSystem() {
 	AssertContains(payload, "\n")
 }
 Test("LLM_BuildOllamaPayload: escapes newlines in system prompt", _OllamaPayload_EscapesNewlineInSystem)
+
+
+_OllamaPayload_PreservesUnicodeInJson() {
+	payload := LLM_BuildOllamaPayload("m", "sys", "éà résumé ★", 0.1)
+	AssertContains(payload, "é")
+	AssertContains(payload, "★")
+}
+Test("LLM_BuildOllamaPayload: preserves UTF-8 context in JSON (curl payload file)", _OllamaPayload_PreservesUnicodeInJson)
 
 
 _OllamaPayload_StopSequencesIncluded() {
@@ -147,6 +157,44 @@ _OllamaParseResponse_EmptyResponseFieldReturnsEmpty() {
 	AssertEqual("", result)
 }
 Test("LLM_ParseOllamaResponse: empty response field returns empty string", _OllamaParseResponse_EmptyResponseFieldReturnsEmpty)
+
+
+_OllamaParseChatResponse_ExtractsMessageContent() {
+	raw := '{"model":"qwen3.5:0.8b","message":{"role":"assistant","content":"bonjour le monde"},"done":true}'
+	result := LLM_ParseOllamaChatResponse(raw)
+	AssertEqual("bonjour le monde", result)
+}
+Test("LLM_ParseOllamaChatResponse: extracts message.content from /api/chat", _OllamaParseChatResponse_ExtractsMessageContent)
+
+
+_OllamaParseChatResponse_FallsBackToLegacyGenerate() {
+	raw := '{"model":"qwen2.5:3b","response":"legacy path","done":true}'
+	result := LLM_ParseOllamaChatResponse(raw)
+	AssertEqual("legacy path", result)
+}
+Test("LLM_ParseOllamaChatResponse: falls back to legacy response field", _OllamaParseChatResponse_FallsBackToLegacyGenerate)
+
+
+_OllamaPayload_ThinkDisabled() {
+	payload := LLM_BuildOllamaPayload("qwen3.5:0.8b", "sys", "ctx", 0.1)
+	AssertContains(payload, '"think":false')
+}
+Test("LLM_BuildOllamaPayload: think is false for qwen3 models", _OllamaPayload_ThinkDisabled)
+
+
+_OllamaPayload_StopCrNotEmpty() {
+	payload := LLM_BuildOllamaPayload("m", "s", "u", 0.1)
+	AssertFalse(RegExMatch(payload, ',""\]'), "stop array must not contain an empty token (\\r was dropped)")
+	AssertContains(payload, '\r')
+}
+Test("LLM_BuildOllamaPayload: carriage-return stop serialises as \\r not empty string", _OllamaPayload_StopCrNotEmpty)
+
+
+_OllamaPayload_AppendsNoThinkForQwen3() {
+	payload := LLM_BuildOllamaPayload("qwen3.5:0.8b", "PREFIX and TAIL", "full", 0.1, false, "", 15, false, "tail")
+	AssertContains(payload, "/no_think")
+}
+Test("LLM_BuildOllamaPayload: appends /no_think for reasoning models", _OllamaPayload_AppendsNoThinkForQwen3)
 
 
 
