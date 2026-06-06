@@ -1011,6 +1011,8 @@ _LookupAndRender() {
     if LoggerIsDebugEnabled()
         LoggerDebug("PrefixWatcher", "DBG calling TooltipShow: {1} item(s), first='{2}'.", Items.Length, Items[1].Text)
     TooltipShow(Items)
+    if IsSet(LLM_Bridge_ScheduleAfterHotstring)
+        try LLM_Bridge_ScheduleAfterHotstring(Items)
     ; Log the suggestion based on the first (top) item only.
     Primary := Items[1]
     _NotifySuggestionShown(Primary.Trigger, Primary.Text, Primary.Category)
