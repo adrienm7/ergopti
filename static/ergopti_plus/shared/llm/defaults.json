@@ -26,7 +26,7 @@
 	"_comment_platform": "These values differ per platform and are NOT overridden by this file.",
 	"_platform_defaults": {
 		"ahk": {
-			"llm_model":   "qwen2.5:3b",
+			"llm_model":   "Qwen3.5-0.8B",
 			"llm_backend": "ollama"
 		},
 		"hs": {

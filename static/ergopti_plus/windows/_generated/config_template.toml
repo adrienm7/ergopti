@@ -275,7 +275,7 @@ sequential_mode = false
 
 [llm.models]
 selected = "ollama"
-ollama = "qwen2.5:3b"
+ollama = "Qwen3.5-0.8B"
 
 [llm.profiles]
 active = "basic"
@@ -414,7 +414,7 @@ professional_environment = false
 programmable_keyboard = true
 
 [ahk.shortcuts.script_control]
-script_altgr_backspace = "script_save_reload"
+script_altgr_backspace = "script_reload"
 script_altgr_delete = "open_personal_shortcuts"
 script_altgr_enter = "script_pause_toggle"
 script_altgr_escape = "script_quit"

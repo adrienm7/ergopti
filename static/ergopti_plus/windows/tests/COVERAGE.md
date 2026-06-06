@@ -40,8 +40,25 @@ it intentionally skips, and the rationale for each deferral.
 | Adapter contract vectors (corpus)          | `test_adapter_contract_vectors.ahk`            | —          |
 | Registry (AHK-specific)                    | `test_registry.ahk`                            | 8          |
 | Features manifest parity                   | `test_features_manifest.ahk`                   | 108        |
+| LLM tray menu → `config.toml` persistence  | `test_llm_menu_persistence.ahk`                | 4 (+ 26 contract round-trips) |
+| LLM tray menu — fixed-bug regressions      | `test_llm_menu_regressions.ahk`                | 9 |
 
-**Total: ~1 230+ assertions** across ~33 unit-test files.
+**Total: ~1 230+ assertions** across ~34 unit-test files.
+
+### LLM menu persistence (regression guard)
+
+Contract: `shared/llm/menu_persistence_contract.json` — one row per tray/menu knob that must round-trip to disk.
+
+| Runner | Command |
+|--------|---------|
+| AHK (focused) | `AutoHotkey64.exe /ErrorStdOut windows/tests/run_llm_menu_persistence.ahk` |
+| AHK (full suite) | `AutoHotkey64.exe /ErrorStdOut windows/tests/run_all.ahk` |
+| Hammerspoon | `lua macos/tests/run.lua` (includes `test_llm_menu_persistence.lua`, `test_llm_menu_regressions.lua`) |
+| Contract schema (CI) | `python shared/llm/validate_menu_persistence_contract.py` |
+
+When adding a new IA menu option: extend the JSON contract, wire `ui/tray_llm/persist.ahk` (sync + append + `BuildSavedOpts`), map `preferences.lua` on macOS, then run the three runners above.
+
+**Regression suite** (`test_llm_menu_regressions.*`): one test per fixed incident — `_AHK_DRY_RUN` / `.Call()`, `val_modifiers` comma split, no `actions.ahk` `#Include persist`, AHK v2 menu closure (`MakeSetNHandler`), macOS `build_num_pred_menu` index capture. Add a matching AHK + HS test when fixing the next menu bug.
 
 ## Architectural meta-tests
 

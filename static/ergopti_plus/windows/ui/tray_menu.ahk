@@ -2252,19 +2252,7 @@ initMenu() {
 
 	global _LLM_Tray_InTray
 	_LLM_Tray_InTray := false
-	_LlmSavedOpts := Map()
-	_LlmSavedOpts["enabled"]                := Features["llm"]["enabled"]
-	_LlmSavedOpts["model"]                  := Features["llm"]["models"]["ollama"]
-	_LlmSavedOpts["profile_id"]             := Features["llm"]["profiles"]["active"]
-	_LlmSavedOpts["temperature"]            := Features["llm"]["generation"]["temperature"]
-	_LlmSavedOpts["n_predictions"]          := Features["llm"]["profiles"]["num_predictions"]
-	_LlmSavedOpts["min_words"]              := Features["llm"]["generation"]["min_words"]
-	_LlmSavedOpts["max_words"]              := Features["llm"]["generation"]["max_words"]
-	_LlmSavedOpts["debounce_ms"]            := Features["llm"]["trigger"]["debounce_ms"]
-	_LlmSavedOpts["ctx_chars"]              := Features["llm"]["generation"]["context_length"]
-	_LlmSavedOpts["instant_on_word_end"]    := Features["llm"]["trigger"]["instant_on_word_end"]
-	_LlmSavedOpts["auto_profile_for_model"] := Features["llm"]["profiles"]["auto_profile_for_model"]
-	_LlmSavedOpts["inline_autotype"]        := Features["llm"]["trigger"]["inline_autotype"]
+	_LlmSavedOpts := LLM_Tray_BuildSavedOpts(_IniCache)
 
 	_LlmRawOnboarded := IniCacheGet(_IniCache, "llm", "onboarding_seen")
 	if (_LlmRawOnboarded != "_")

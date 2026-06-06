@@ -238,9 +238,11 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 #Include modules/keylogger/keylogger_prefetch.ahk
 #Include modules/keylogger/keylogger_webview.ahk
 #Include modules/keylogger/keylogger_ui.ahk
+#Include _generated/prompt_builder.ahk
 #Include modules/llm/api_common.ahk
 #Include modules/llm/api_token_crypto.ahk
 #Include modules/llm/api_ollama.ahk
+#Include modules/llm/parser.ahk
 #Include modules/llm/api_remote.ahk
 #Include modules/llm/models.ahk
 ; LLM_GetSharedPath is now available — load the cross-platform defaults before
@@ -419,7 +421,7 @@ global SCRIPT_SHORTCUT_LABELS := Map(
 )
 global SCRIPT_SHORTCUT_DEFAULTS := Map(
     "script_altgr_enter", "script_pause_toggle",
-    "script_altgr_backspace", "script_save_reload",
+    "script_altgr_backspace", "script_reload",
     "script_altgr_delete", "open_personal_shortcuts",
     "script_altgr_escape", "script_quit",
 )
@@ -1584,6 +1586,12 @@ SaveFullConfig() {
     global PrevCanonState
     Updates := []
 
+    ; Tray LLM settings (n_predictions, debounce, …) live in _LLM_Tray at
+    ; runtime. Sync before walking Features so every full save — including
+    ; the deferred boot timer — persists the menu state, not a stale snapshot.
+    if IsSet(_LLM_Tray_SyncToFeatures)
+        _LLM_Tray_SyncToFeatures()
+
     ; Emit every feature flag from the v2 Map. ``_CollectFeatureUpdates``
     ; walks the hierarchical Features (Map of Map of …) and produces one
     ; v2 TOML section per nested key path.
@@ -1656,7 +1664,7 @@ SaveFullConfig() {
     ; [llm] section — runtime state (onboarding flag + per-app overrides).
     ; The feature-shaped LLM settings (model / profile / generation / trigger /
     ; navigation) are already emitted by the v2 walker above; we only add
-    ; the two runtime-only keys here.
+    ; the runtime-only keys here.
     Updates.Push({ Section: "llm", Key: "onboarding_seen", Value: _LLM_Tray["onboarding_seen"] ? "1" : "0" })
     _AppOverridesStr := ""
     for _AppName, _AppProfileId in _LLM_Tray["app_profile_overrides"] {
@@ -1665,6 +1673,8 @@ SaveFullConfig() {
         _AppOverridesStr .= _AppName . "=" . _AppProfileId
     }
     Updates.Push({ Section: "llm", Key: "app_profile_overrides", Value: _AppOverridesStr })
+    if IsSet(_LLM_Tray_AppendPersistedUpdates)
+        _LLM_Tray_AppendPersistedUpdates(Updates)
 
     ; [ahk.category_enabled] — master category gating state.
     global CategoryEnabled
@@ -2473,40 +2483,88 @@ ShowHealthCheck(*) {
 ; SC138/Kana prefix, so the combo neither leaks its key into the app nor leaves
 ; AltGr stuck. Reload/ExitApp actions never return, so the reset is skipped —
 ; a fresh process (or a closed one) has no latched prefix to clear anyway.
-_ScriptAltGrEnterHandler(*) {
-    if (GetKeyState("SC138", "P") and GetKeyState("SC01C", "P")) {
-        RunScriptShortcutAction("script_altgr_enter")
-        ResetScriptComboKeys("SC01C")
-    } else {
-        SendInput("{Enter}")
+_ScriptAltGrChordDebounce() {
+    static last_tick := 0
+    if (A_TickCount - last_tick < 80)
+        return true
+    last_tick := A_TickCount
+    return false
+}
+
+; True when the suffix key is still down and the press came from a physical
+; AltGr/Kana modifier — not a deliberate LCtrl+LAlt chord in a terminal.
+_ScriptAltGrIsPhysical(SuffixSC) {
+    global _ALTGR_KANA_FIXUP
+    if !GetKeyState(SuffixSC, "P")
+        return false
+    ; Kana layouts: the layer key is SC138 (VK_KANA), not RAlt — never accept
+    ; the ^! Ctrl+Alt fallback below, which would mis-fire in terminals.
+    if (IsSet(_ALTGR_KANA_FIXUP) and _ALTGR_KANA_FIXUP)
+        return GetKeyState("SC138", "P")
+    if GetKeyState("SC138", "P") or GetKeyState("RAlt", "P")
+        return true
+    ; Vanilla AltGr: terminals surface ^!Backspace; RAlt/SC138 can lag the
+    ; suffix key in the hook. Accept Ctrl+Alt unless it is LCtrl+LAlt only.
+    if InStr(A_ThisHotkey, "^!")
+        and GetKeyState("Ctrl", "P") and GetKeyState("Alt", "P")
+        and !(GetKeyState("LAlt", "P") and !GetKeyState("RAlt", "P")) {
+        return true
     }
+    return false
+}
+
+; Replay a swallowed ^! chord when the handler decides it was not AltGr.
+_ScriptAltGrReplayCtrlAlt(SuffixKey) {
+    SendInput("^!{" . SuffixKey . "}")
+}
+
+_ScriptAltGrDispatch(SuffixSC, Slot, NativeSend, CtrlAltSuffixKey) {
+    if _ScriptAltGrChordDebounce()
+        return
+    if !_ScriptAltGrIsPhysical(SuffixSC) {
+        if InStr(A_ThisHotkey, "^!")
+            _ScriptAltGrReplayCtrlAlt(CtrlAltSuffixKey)
+        else
+            SendInput(NativeSend)
+        return
+    }
+    RunScriptShortcutAction(Slot)
+    ResetScriptComboKeys(SuffixSC)
+}
+
+_ScriptAltGrEnterHandler(*) {
+    _ScriptAltGrDispatch("SC01C", "script_altgr_enter", "{Enter}", "Enter")
 }
 
 _ScriptAltGrBackSpaceHandler(*) {
-    if (GetKeyState("SC138", "P") and GetKeyState("SC00E", "P")) {
-        RunScriptShortcutAction("script_altgr_backspace")
-        ResetScriptComboKeys("SC00E")
-    } else {
-        SendInput("{BackSpace}")
-    }
+    _ScriptAltGrDispatch("SC00E", "script_altgr_backspace", "{BackSpace}", "Backspace")
 }
 
 _ScriptAltGrDeleteHandler(*) {
-    if (GetKeyState("SC138", "P") and GetKeyState("SC153", "P")) {
-        RunScriptShortcutAction("script_altgr_delete")
-        ResetScriptComboKeys("SC153")
-    } else {
-        SendInput("{Delete}")
-    }
+    _ScriptAltGrDispatch("SC153", "script_altgr_delete", "{Delete}", "Delete")
 }
 
 _ScriptAltGrEscapeHandler(*) {
-    if (GetKeyState("SC138", "P") and GetKeyState("SC001", "P")) {
-        RunScriptShortcutAction("script_altgr_escape")
-        ResetScriptComboKeys("SC001")
-    } else {
-        SendInput("{Escape}")
-    }
+    _ScriptAltGrDispatch("SC001", "script_altgr_escape", "{Escape}", "Escape")
+}
+
+; Options for script-management AltGr combos. I3 beats layout remaps (I2);
+; the ``$`` key prefix (see _ScriptAltGrHookKey) forces the keyboard hook on
+; plain modifier chords (^!X, SC00E, …) so terminals (PowerShell PSReadLine,
+; etc.) cannot win the Ctrl+Alt+<key> chord that AltGr physically emits; custom
+; prefix combos (RAlt & X, SC138 & X) already require the hook and reject ``$``;
+; S keeps AltGr+Enter usable to unsuspend after a keyboard pause.
+global _SCRIPT_ALTGR_HOTKEY_OPTS := "I3 S"
+
+; AHK v2: hook hotkeys use a ``$`` prefix on KeyName — not a Hotkey() option.
+; Custom-combination names (key1 & key2) cannot take ``$`` — AHK reports
+; "Invalid hotkey" for strings like ``$RAlt & Enter``.
+_ScriptAltGrHookKey(KeyName) {
+    if (SubStr(KeyName, 1, 1) = "$")
+        return KeyName
+    if InStr(KeyName, " & ")
+        return KeyName
+    return "$" . KeyName
 }
 
 ; Registration entry point. Called once Onboarding_Run() has returned so the
@@ -2514,23 +2572,46 @@ _ScriptAltGrEscapeHandler(*) {
 ; criterion set immediately before, which mirrors what the previous static
 ; ``#HotIf IsRealAltGrPress()`` block established.
 _RegisterScriptAltGrHotkeys() {
+    global _SCRIPT_ALTGR_HOTKEY_OPTS
+    opts := _SCRIPT_ALTGR_HOTKEY_OPTS
     ; HotIf() expects a callable of the form Callback(HotkeyName), so passing
     ; the bare ``IsRealAltGrPress`` reference fails with "Invalid callback
     ; function" — that helper takes no parameters. Wrap it in a varargs lambda
     ; so AHK can hand it the hotkey name without tripping the signature check.
-    ; "S" option = suspend-exempt: the script-management combos must keep
-    ; firing while AHK is suspended, otherwise the user cannot unsuspend the
-    ; script after pressing AltGr+Enter once (the pause toggle disables itself).
     HotIf((*) => IsRealAltGrPress())
-    Hotkey("RAlt & Enter",     _ScriptAltGrEnterHandler,     "I2 S")
-    Hotkey("SC138 & SC01C",    _ScriptAltGrEnterHandler,     "I2 S")
-    Hotkey("RAlt & BackSpace", _ScriptAltGrBackSpaceHandler, "I2 S")
-    Hotkey("SC138 & SC00E",    _ScriptAltGrBackSpaceHandler, "I2 S")
-    Hotkey("RAlt & Delete",    _ScriptAltGrDeleteHandler,    "I2 S")
-    Hotkey("SC138 & SC153",    _ScriptAltGrDeleteHandler,    "I2 S")
-    Hotkey("RAlt & Escape",    _ScriptAltGrEscapeHandler,    "I2 S")
-    Hotkey("SC138 & SC001",    _ScriptAltGrEscapeHandler,    "I2 S")
+    ; SC138 / RAlt custom combos (canonical on Kana-remap and vanilla layouts).
+    Hotkey(_ScriptAltGrHookKey("RAlt & Enter"),     _ScriptAltGrEnterHandler,     opts)
+    Hotkey(_ScriptAltGrHookKey("SC138 & SC01C"),    _ScriptAltGrEnterHandler,     opts)
+    Hotkey(_ScriptAltGrHookKey("RAlt & BackSpace"), _ScriptAltGrBackSpaceHandler, opts)
+    Hotkey(_ScriptAltGrHookKey("SC138 & SC00E"),    _ScriptAltGrBackSpaceHandler, opts)
+    Hotkey(_ScriptAltGrHookKey("RAlt & Delete"),    _ScriptAltGrDeleteHandler,    opts)
+    Hotkey(_ScriptAltGrHookKey("SC138 & SC153"),    _ScriptAltGrDeleteHandler,    opts)
+    Hotkey(_ScriptAltGrHookKey("RAlt & Escape"),    _ScriptAltGrEscapeHandler,    opts)
+    Hotkey(_ScriptAltGrHookKey("SC138 & SC001"),    _ScriptAltGrEscapeHandler,    opts)
     HotIf()
+
+    ; Vanilla AltGr only: Windows emits ^! at the OS level. Kana layouts (SC138)
+    ; do not — registering ^! mirrors there would only fire from AHK-internal
+    ; modifier state and mis-trigger actions PowerShell never sees natively.
+    if !(IsSet(_ALTGR_KANA_FIXUP) and _ALTGR_KANA_FIXUP) {
+        Hotkey(_ScriptAltGrHookKey("^!Enter"),     _ScriptAltGrEnterHandler,     opts)
+        Hotkey(_ScriptAltGrHookKey("^!Backspace"), _ScriptAltGrBackSpaceHandler, opts)
+        Hotkey(_ScriptAltGrHookKey("^!Delete"),    _ScriptAltGrDeleteHandler,    opts)
+        Hotkey(_ScriptAltGrHookKey("^!Escape"),    _ScriptAltGrEscapeHandler,    opts)
+    }
+
+    ; Kana remap (SC138, not RAlt): terminals never see SC138 & suffix — only
+    ; the bare suffix key while Kana is held. Plain $SC00E-style hooks gated on
+    ; GetKeyState("SC138") do not need prefix arming, so they still fire in
+    ; PowerShell where custom combos can silently fail.
+    if (IsSet(_ALTGR_KANA_FIXUP) and _ALTGR_KANA_FIXUP) {
+        HotIf((*) => GetKeyState("SC138", "P"))
+        Hotkey(_ScriptAltGrHookKey("SC01C"), _ScriptAltGrEnterHandler,     opts)
+        Hotkey(_ScriptAltGrHookKey("SC00E"), _ScriptAltGrBackSpaceHandler, opts)
+        Hotkey(_ScriptAltGrHookKey("SC153"), _ScriptAltGrDeleteHandler,    opts)
+        Hotkey(_ScriptAltGrHookKey("SC001"), _ScriptAltGrEscapeHandler,    opts)
+        HotIf()
+    }
 
     ; Suspend fallback. A pause toggled from anywhere other than the combo's own
     ; hook thread (tray-menu « Suspendre », a gesture) rebuilds the keyboard hook
@@ -2545,10 +2626,10 @@ _RegisterScriptAltGrHotkeys() {
     ; (HotIf false → native key). When the prefix IS armed (a keyboard pause) the
     ; ``SC138 & X`` combo takes precedence, so these never double-fire.
     HotIf((*) => A_IsSuspended and GetKeyState("SC138", "P"))
-    Hotkey("SC01C", _ScriptAltGrEnterHandler,     "I2 S")
-    Hotkey("SC00E", _ScriptAltGrBackSpaceHandler, "I2 S")
-    Hotkey("SC153", _ScriptAltGrDeleteHandler,    "I2 S")
-    Hotkey("SC001", _ScriptAltGrEscapeHandler,    "I2 S")
+    Hotkey(_ScriptAltGrHookKey("SC01C"), _ScriptAltGrEnterHandler,     opts)
+    Hotkey(_ScriptAltGrHookKey("SC00E"), _ScriptAltGrBackSpaceHandler, opts)
+    Hotkey(_ScriptAltGrHookKey("SC153"), _ScriptAltGrDeleteHandler,    opts)
+    Hotkey(_ScriptAltGrHookKey("SC001"), _ScriptAltGrEscapeHandler,    opts)
     HotIf()
 }
 
