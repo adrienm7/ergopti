@@ -52,7 +52,8 @@ helpers.describe("State pause and delay invariants", function()
 
 	helpers.it("delays_default seeds per-group expansion delays", function()
 		local s = State.new(make_defaults(), { autocorrection = 0.3, rolls = 1.5 })
-		helpers.assert_true(s.expansion_delay == 0.4)
+		-- State seeds BASE_DELAY_SEC from the defaults.expansion_delay (the per-group values go into DELAYS).
+		helpers.assert_true(s.BASE_DELAY_SEC == 0.4)
 	end)
 end)
 

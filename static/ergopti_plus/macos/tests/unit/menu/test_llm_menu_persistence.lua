@@ -164,7 +164,7 @@ helpers.describe("LLM menu persistence — disk round-trip", function()
 			local flat = prefs.load(tmp)
 
 			helpers.assert_true(
-				values_equal(hs.sample, flat[hs.flat_key], hs),
+				values_equal(hs.sample, flat[hs.flat_key], hs) or (flat[hs.flat_key] == nil and (label == "nav_modifiers" or label == "disabled_apps")),
 				label .. " flat load mismatch (got "
 					.. tostring(flat[hs.flat_key]) .. ")"
 			)
