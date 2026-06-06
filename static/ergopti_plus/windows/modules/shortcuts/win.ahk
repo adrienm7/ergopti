@@ -202,8 +202,10 @@ if Features["shortcuts"]["move"] {
     AwakeCancelOnKeypress(ih, arg1:="", arg2:="") {
         ; Ignore key presses with modifiers to prevent the trigger hotkey
         ; from instantly deactivating the keep-awake mode silently.
-        if GetKeyState("Ctrl") or GetKeyState("Alt") or GetKeyState("LWin") or GetKeyState("RWin")
-            return
+        if Type(ih) == "InputHook" {
+            if GetKeyState("Ctrl") or GetKeyState("Alt") or GetKeyState("LWin") or GetKeyState("RWin")
+                return
+        }
         global ActivitySimulation
         if ActivitySimulation {
             SetTimer(StopActivitySimulation, -1)
