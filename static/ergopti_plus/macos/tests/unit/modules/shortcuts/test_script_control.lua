@@ -26,7 +26,10 @@ package.loaded["lib.keycodes"] = {
 	ESCAPE = 0x35,
 }
 package.loaded["lib.i18n"] = { get = function(k) return k end, get_locale = function() return "fr" end }
-package.loaded["modules.gestures.engine"] = {}
+package.loaded["modules.gestures.engine"] = {
+  init = function() end
+}
+package.loaded["modules.gestures.conflicts"] = {}
 package.loaded["modules.gestures.actions"] = {
   init = function() end,
   get_label = function(n) return n end,
