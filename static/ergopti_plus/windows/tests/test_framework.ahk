@@ -51,6 +51,12 @@ global TEST_REGISTRY := []
 global TEST_PASS_COUNT := 0
 global TEST_FAIL_COUNT := 0
 
+; Results file for CI live tailing (same pattern as E2E to guarantee progress logs even
+; when stdout is buffered or the process has no console handle).
+global _TEST_RESULTS_FILE := A_ScriptDir . "\test_results.txt"
+; Ensure a fresh file at the very start of the run (before any Test() registrations).
+try FileDelete(_TEST_RESULTS_FILE)
+
 ; Default false when no runner pre-declares it (run_all sets true for --dry-run).
 if !IsSet(_AHK_DRY_RUN)
 	global _AHK_DRY_RUN := false
@@ -71,6 +77,12 @@ Assert(Condition, Message := "assertion failed") {
 	if !Condition {
 		throw Error(Message)
 	}
+}
+
+; Append a line to the results file (for CI tailing) and also to stdout when possible.
+_TestAppendProgress(line) {
+	try FileAppend(line . "`r`n", _TEST_RESULTS_FILE)
+	try FileAppend(line . "`r`n", "*")
 }
 
 AssertEqual(Expected, Actual, Message := "values differ") {
@@ -187,6 +199,7 @@ RunTests() {
 	Index := 0
 	for TestEntry in TEST_REGISTRY {
 		Index += 1
+		_TestPrint("RUNNING " . Index . "/" . TEST_REGISTRY.Length . " - " . TestEntry.name)
 		Status := "ok"
 		Detail := ""
 		try {
