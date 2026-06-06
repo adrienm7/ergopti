@@ -168,12 +168,7 @@ global TEST_RESULTS_CANONICAL := A_Temp . "\ergopti_test_results.txt"
 ; that blocked when two AutoHotkey.exe instances targeted the same path.
 _TestPrint(Line) {
 	global TEST_RESULTS_FILE
-	; In GitHub Actions CI, the stdout pipe is not actively drained by the
-	; runner, causing FileAppend to "*" to block forever once the ~64KB
-	; pipe buffer fills up (which happens around test 700).
-	if EnvGet("GITHUB_ACTIONS") != "true" {
-		try FileAppend(Line . "`r`n", "*")
-	}
+	try FileAppend(Line . "`r`n", "*")
 	try FileAppend(Line . "`r`n", TEST_RESULTS_FILE, "UTF-8")
 }
 
