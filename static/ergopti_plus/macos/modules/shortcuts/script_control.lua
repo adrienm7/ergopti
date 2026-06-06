@@ -407,4 +407,21 @@ function M.toggle()
 	pcall(dispatch_action, "script_pause_toggle")
 end
 
+--- Programmatic pause for tests and invariant enforcement (project_suspend_pause_invariant).
+--- Sets the flag, notifies listeners, and lets callers (tests, diagnostic) drive state cleanly.
+function M.pause_all()
+	if _is_paused then return end
+	_is_paused = true
+	if type(_on_pause_change) == "function" then pcall(_on_pause_change, true) end
+	Logger.debug(LOG, "pause_all() called (programmatic / test)")
+end
+
+--- Programmatic resume (symmetric to pause_all).
+function M.resume_all()
+	if not _is_paused then return end
+	_is_paused = false
+	if type(_on_pause_change) == "function" then pcall(_on_pause_change, false) end
+	Logger.debug(LOG, "resume_all() called (programmatic / test)")
+end
+
 return M
