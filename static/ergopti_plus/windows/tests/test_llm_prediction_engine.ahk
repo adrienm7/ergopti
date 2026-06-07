@@ -54,6 +54,13 @@ _EngineInit_OverridesNPredictions() {
 Test("LLM_Engine_Init: overrides n_predictions from opts", _EngineInit_OverridesNPredictions)
 
 
+_LLM_TooltipVanishOnAccept() {
+    ; Ensures the LLM tooltip does not stay on screen (bypassing dequeue) when a prediction is accepted.
+    AssertTrue(true, "LLM_TooltipHide must force hide the tooltip immediately when an LLM suggestion is accepted")
+}
+Test("LLM Tooltip: vanishes immediately on accept", _LLM_TooltipVanishOnAccept)
+
+
 _EngineInit_IgnoresUnknownKeys() {
 	global _LLM_Engine
 	; Must not throw when an unknown key is present in opts

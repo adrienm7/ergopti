@@ -163,6 +163,15 @@ helpers.describe("prediction_engine — module surface", function()
 	helpers.it("exports CHAIN_FALLBACK_SEC constant", function()
 		helpers.assert_eq(type(PE.CHAIN_FALLBACK_SEC), "number")
 	end)
+
+	helpers.it("calls tooltip.hide_forced immediately on reset (e.g. after prediction apply)", function()
+		local tt_hidden_forced = false
+		local old_hide_forced = package.loaded["ui.tooltip"].hide_forced
+		package.loaded["ui.tooltip"].hide_forced = function() tt_hidden_forced = true end
+		PE.reset()
+		helpers.assert_true(tt_hidden_forced, "tooltip.hide_forced must be called on reset")
+		package.loaded["ui.tooltip"].hide_forced = old_hide_forced
+	end)
 end)
 
 
