@@ -461,9 +461,9 @@ if Features["shortcuts"]["teleport_mouse"] {
 
         ; Find which monitor currently holds the cursor
         CurrentIndex := 1
-        for Mon in Monitors {
+        for _, Mon in Monitors {
             if (CurX >= Mon.Left and CurX < Mon.Right and CurY >= Mon.Top and CurY < Mon.Bottom) {
-                CurrentIndex := A_Index
+                CurrentIndex := _
                 break
             }
         }
@@ -583,7 +583,7 @@ if Features["shortcuts"]["open_downloads"] {
             Profile "\Transferências",
             Profile "\Загрузки",
         ]
-        for Path in Candidates {
+        for _, Path in Candidates {
             if DirExist(Path) {
                 return Path
             }

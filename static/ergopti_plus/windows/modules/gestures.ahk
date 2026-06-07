@@ -145,7 +145,7 @@ global GESTURE_SLOTS := [
 
 ; Human-readable labels for each slot
 global GESTURE_SLOT_LABELS := Map()
-for _Slot in ["tap_3", "swipe_3_up", "swipe_3_down", "swipe_3_left", "swipe_3_right",
+for _, _Slot in ["tap_3", "swipe_3_up", "swipe_3_down", "swipe_3_left", "swipe_3_right",
               "tap_4", "swipe_4_up", "swipe_4_down", "swipe_4_left", "swipe_4_right"] {
     GESTURE_SLOT_LABELS[_Slot] := t("gesture.slots." . _Slot)
 }
@@ -930,7 +930,7 @@ _GestureTomlData := ParseTomlFile(_GestureSharedToml)
 ; are either a sentinel ("--", "#…") or an action whose platform is "all" / "ahk".
 if _GestureTomlData.Has("sg_order") && _GestureTomlData["sg_order"].Has("items") {
     _SgItems := _GestureTomlData["sg_order"]["items"]
-    for _Item in _SgItems {
+    for _, _Item in _SgItems {
         ; Sentinels and headers pass through unconditionally
         if (_Item = "--" || SubStr(_Item, 1, 1) = "#") {
             GESTURE_ACTION_NAMES.Push(_Item)
@@ -991,7 +991,7 @@ if _GestureTomlData.Has("sg_order") && _GestureTomlData["sg_order"].Has("items")
 ; Build GESTURE_AX_NAMES from [ax_order].items, same filtering logic.
 if _GestureTomlData.Has("ax_order") && _GestureTomlData["ax_order"].Has("items") {
     _AxItems := _GestureTomlData["ax_order"]["items"]
-    for _Item in _AxItems {
+    for _, _Item in _AxItems {
         _SecKey := "ax_actions." . _Item
         if _GestureTomlData.Has(_SecKey) {
             _Plat := _GestureTomlData[_SecKey].Has("platform") ? _GestureTomlData[_SecKey]["platform"] : "all"
@@ -1095,7 +1095,7 @@ GestureSendShortcut(Keys) {
 GestureGetCyclableWindows(ProcessFilter := "") {
     Result := []
     Ids := WMGetList()
-    for HWnd in Ids {
+    for _, HWnd in Ids {
         try {
             Title := WinGetTitle("ahk_id " . HWnd)
             if (Title = "") {
@@ -1174,7 +1174,7 @@ _GestureOnForeground(hWinEventHook, Event, HWnd, IdObject, IdChild, Thread, Time
     }
     ; Remove existing entry for this HWND, then prepend it (most-recent first)
     NewOrder := [HWnd]
-    for H in _GestureWinOrder {
+    for _, H in _GestureWinOrder {
         if (H != HWnd) {
             NewOrder.Push(H)
         }
@@ -1201,12 +1201,12 @@ _GestureOrderedWindows(ProcessFilter := "") {
     Cyclable := GestureGetCyclableWindows(ProcessFilter)
     ; Build a Set for O(1) membership check
     CyclableSet := Map()
-    for H in Cyclable {
+    for _, H in Cyclable {
         CyclableSet[H] := True
     }
     ; Retain only HWNDs still alive and cyclable, in recency order
     Result := []
-    for H in _GestureWinOrder {
+    for _, H in _GestureWinOrder {
         if CyclableSet.Has(H) {
             Result.Push(H)
         }
@@ -1218,10 +1218,10 @@ _GestureOrderedWindows(ProcessFilter := "") {
     ; Append any cyclable windows not yet seen in the tracker
     ; (e.g. opened before ErgoptiPlus was running)
     TrackedSet := Map()
-    for H in Result {
+    for _, H in Result {
         TrackedSet[H] := True
     }
-    for H in Cyclable {
+    for _, H in Cyclable {
         if !TrackedSet.Has(H) {
             Result.Push(H)
         }
@@ -1617,7 +1617,7 @@ GestureToggleRightClick() {
     ; Install a keyboard hook that releases the button on any key press
     GestureStartKeyboardWatcher()
     ; Arm the LButton watcher dynamically — avoids installing the mouse hook
-    ; at load-time (which blocks on a headless CI runner with no hardware)
+    ; at load-time (which blocks on a hardware-less CI runner)
     Hotkey("~LButton", GestureReleaseRightClick, "On")
     LoggerInfo("gestures", "Right-click hold mode enabled.")
 }
@@ -1728,7 +1728,7 @@ GestureDispatch(slot) {
 GesturesReadConfig() {
     global GestureAssignments, _IniCache
 
-    for Slot in GESTURE_SLOTS {
+    for _, Slot in GESTURE_SLOTS {
         Value := IniCacheGet(_IniCache, "ahk.gestures", Slot)
         if (Value != "_") {
             GestureAssignments[Slot] := Value
@@ -1768,12 +1768,12 @@ GestureAutoConfigureRegistry() {
     Errors := 0
 
     ; Master enables — turn the gesture families on
-    for Name in GESTURE_REG_MASTER_ENABLES {
+    for _, Name in GESTURE_REG_MASTER_ENABLES {
         GestureRegWriteDword(Name, GESTURE_REG_CUSTOM_VALUE, &Errors)
     }
 
     ; Per-slot configuration
-    for Slot in GESTURE_SLOTS {
+    for _, Slot in GESTURE_SLOTS {
         ; Direction enables (swipes only)
         if GESTURE_REG_ENABLE_NAMES.Has(Slot) {
             GestureRegWriteDword(GESTURE_REG_ENABLE_NAMES[Slot],
@@ -1849,7 +1849,7 @@ GestureRestartTouchpadDevice() {
 GestureBuildSetupInstructions() {
     Body := t("gesture.setup.header") . t("gesture.setup.open_path") . t("gesture.setup.for_each")
     if IsSet(GESTURE_SLOTS) and IsSet(GESTURE_SHORTCUT_LABELS) {
-        for Slot in GESTURE_SLOTS {
+        for _, Slot in GESTURE_SLOTS {
             Body .= "  " . t("gesture.slots." . Slot) . " :  "
                 . GESTURE_SHORTCUT_LABELS[Slot] . "`n"
         }

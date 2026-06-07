@@ -403,7 +403,7 @@ LLM_OllamaCancelAsync(req_id) {
  */
 LLM_OllamaCancelStreams() {
 	global _LLM_Ollama_ActiveStreams
-	for h in _LLM_Ollama_ActiveStreams
+	for _, h in _LLM_Ollama_ActiveStreams
 		try LLM_OllamaCancelStream(h)
 	_LLM_Ollama_ActiveStreams := []
 }
@@ -924,7 +924,7 @@ _LLM_Ollama_RemoveStreamHandle(handle) {
 	if !(handle is Map) or !handle.Has("Pid")
 		return
 	next := []
-	for h in _LLM_Ollama_ActiveStreams {
+	for _, h in _LLM_Ollama_ActiveStreams {
 		if !(h is Map) or h["Pid"] != handle["Pid"]
 			next.Push(h)
 	}
@@ -973,7 +973,7 @@ _LLM_Ollama_ConsumeStreamChunk(chunk, state, on_partial) {
 	} else {
 		state["leftover"] := ""
 	}
-	for line in lines {
+	for _, line in lines {
 		if (line == "")
 			continue
 		token := _LLM_Ollama_ParseStreamLine(line)
@@ -1101,7 +1101,7 @@ _LLM_Ollama_StopsArray(stop_sequences, line_mode, is_batch) {
 _LLM_Ollama_StopsJson(stop_sequences, line_mode, is_batch) {
 	stops := _LLM_Ollama_StopsArray(stop_sequences, line_mode, is_batch)
 	out := ""
-	for s in stops {
+	for _, s in stops {
 		escaped := _LLM_Ollama_EscapeJSON(s)
 		if (escaped = "")
 			continue
@@ -1146,7 +1146,7 @@ LLM_BuildOllamaPayload(model, system_prompt, full_text, temperature, streaming :
 	num_predict := Max(24, Min(96, mw * 4))
 	msgs := _LLM_Ollama_BuildMessages(system_prompt, full_text, tail_text, model)
 	msgs_json := ""
-	for m in msgs {
+	for _, m in msgs {
 		if (msgs_json != "")
 			msgs_json .= ","
 		msgs_json .= '{"role":"' m["role"] '","content":"' _LLM_Ollama_EscapeJSON(m["content"]) '"}'

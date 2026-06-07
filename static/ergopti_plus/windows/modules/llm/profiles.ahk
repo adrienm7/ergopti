@@ -40,7 +40,7 @@ LLM_GetAllProfiles(user_profiles := []) {
 		_LLM_ProfilesCache := LLM_LoadProfilesJSON()
 
 	all := _LLM_ProfilesCache.Clone()
-	for p in user_profiles
+	for _, p in user_profiles
 		all.Push(p)
 	return all
 }
@@ -63,14 +63,14 @@ LLM_GetActiveProfile(active_id, user_profiles := []) {
 	if legacy.Has(id)
 		id := legacy[id]
 
-	for p in LLM_GetAllProfiles(user_profiles) {
+	for _, p in LLM_GetAllProfiles(user_profiles) {
 		if (p.Has("id") && p["id"] == id)
 			return p
 	}
 
 	; Fallback: search basic in both user-provided and built-in profiles so the
 	; fallback works even when the JSON file is absent (e.g. in tests).
-	for p in LLM_GetAllProfiles(user_profiles)
+	for _, p in LLM_GetAllProfiles(user_profiles)
 		if (p.Has("id") && p["id"] == "basic")
 			return p
 

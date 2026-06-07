@@ -181,7 +181,7 @@ _LLM_ResolveOllamaTagCore(display_name, log_unknown := false) {
 	; Legacy configs and the installed-tag fallback menu store the raw tag.
 	tags := _LLM_GetInstalledTagsCached()
 	name_lc := StrLower(display_name)
-	for installed in tags {
+	for _, installed in tags {
 		if (StrLower(installed) == name_lc)
 			return installed
 	}
@@ -221,7 +221,7 @@ LLM_PickBestInstalledDisplayName() {
 		? LLM_Defaults["llm_model"] : "Qwen3.5-0.8B"
 	if (preferred != "" && LLM_IsModelInstalled(preferred))
 		return preferred
-	for name in LLM_GetAllModelNames() {
+	for _, name in LLM_GetAllModelNames() {
 		if LLM_IsModelInstalled(name)
 			return name
 	}
@@ -243,7 +243,7 @@ LLM_IsModelInstalled(display_name) {
 		return false
 	tags := _LLM_GetInstalledTagsCached()
 	tag_lc := StrLower(tag)
-	for installed in tags {
+	for _, installed in tags {
 		if (StrLower(installed) == tag_lc)
 			return true
 	}
@@ -313,19 +313,19 @@ _LLM_BuildFlatIndex(presets) {
 	index := Map()
 	if (Type(presets) != "Array")
 		return index
-	for provider in presets {
+	for _, provider in presets {
 		if (Type(provider) != "Map")
 			continue
 		families := provider.Has("families") ? provider["families"] : []
 		if (Type(families) != "Array")
 			continue
-		for family in families {
+		for _, family in families {
 			if (Type(family) != "Map")
 				continue
 			models := family.Has("models") ? family["models"] : []
 			if (Type(models) != "Array")
 				continue
-			for model in models {
+			for _, model in models {
 				if (Type(model) != "Map")
 					continue
 				name := model.Has("name") ? model["name"] : ""

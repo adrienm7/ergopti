@@ -136,11 +136,22 @@ jobs:
               # mode to prevent convention drift from merging undetected.
               run: npm run lint:conventions:strict
 
-    # ==========================================
-    # ==========================================
-    # ======= 2/ macOS driver branch ===========
-    # ==========================================
-    # ==========================================
+    # ─────────────────────────────────────────────────
+    # 1.4) Translation consistency audit
+    # ─────────────────────────────────────────────────
+    validate-translations:
+        name: "Validate · translations audit"
+        runs-on: ubuntu-latest
+
+        steps:
+            - uses: actions/checkout@v4
+
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: "22"
+
+            - name: Run translation key consistency audit
+              run: node tools/lint/audit-translations.cjs
 
     # ─────────────────────────────────────────────────
     # 2.1) Hammerspoon unit tests

@@ -282,7 +282,7 @@ LLM_Parser_ProcessPrediction(full_text, tail_text, block, min_words := 1, max_wo
 				loop (nw_words.Length - buf_suffix_count)
 					remaining.Push(nw_words[buf_suffix_count + A_Index])
 				nw := ""
-				for w in remaining
+				for _, w in remaining
 					nw .= (nw = "" ? w : " " w)
 				break
 			}
@@ -341,7 +341,7 @@ LLM_Parser_ParseResponse(raw, full_text, tail_text, min_words, max_words, is_bat
 	stats := LLM_ApiCommon_NewDedupStats()
 	slots := []
 	if is_batch {
-		for block in LLM_Parser_SplitBlocks(raw) {
+		for _, block in LLM_Parser_SplitBlocks(raw) {
 			if (slots.Length >= n_predictions)
 				break
 			pred := LLM_Parser_ProcessPrediction(full_text, tail_text, block, min_words, max_words)
@@ -354,7 +354,7 @@ LLM_Parser_ParseResponse(raw, full_text, tail_text, min_words, max_words, is_bat
 			LLM_ApiCommon_InsertPrediction(slots, pred, stats, true)
 	}
 	out := []
-	for p in slots
+	for _, p in slots
 		out.Push(_LLM_ApiCommon_PredText(p))
 	return out
 }

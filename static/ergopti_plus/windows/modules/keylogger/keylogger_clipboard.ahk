@@ -150,7 +150,7 @@ KL_Clip_OnPaste() {
     ; Prune ticks outside the window
     cutoff := now - KLClipConst.PASTE_BURST_WINDOW_MS
     fresh := []
-    for t in KLClip.paste_ticks {
+    for _, t in KLClip.paste_ticks {
         if (t >= cutoff)
             fresh.Push(t)
     }

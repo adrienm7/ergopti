@@ -398,7 +398,7 @@ KL_ResolveDevice(metrics_dir) {
                                 "created_at",     "",
                                 "schema_version", KeylogConst.SCHEMA_VERSION
                             )
-                            for field in ["device_id", "name", "os", "os_version", "created_at"] {
+                            for _, field in ["device_id", "name", "os", "os_version", "created_at"] {
                                 if RegExMatch(raw, '"' . field . '"\s*:\s*"([^"]+)"', &mm)
                                     obj[field] := mm[1]
                             }
@@ -544,7 +544,7 @@ KL_JsonEncodeMap(m) {
 
 KL_JsonEncodeArray(a) {
     parts := []
-    for v in a
+    for _, v in a
         parts.Push(KL_JsonEncode(v))
     return "[" . KL_JoinArray(parts, ",") . "]"
 }
@@ -599,7 +599,7 @@ KL_ComToMap(v) {
     }
     out := Map()
     try {
-        for prop in v
+        for prop, _ in v
             out[prop] := KL_ComToMap(v[prop])
     }
     return out
@@ -673,7 +673,7 @@ KL_FlushBuffer() {
 
     total_time_ms := 0
     total_chars   := 0
-    for ev in Keylogger.buffer_events {
+    for _, ev in Keylogger.buffer_events {
         meta := ev[3]
         if !(meta is Map) || !meta.Has("s") || !meta["s"] {
             d := ev[2]
@@ -1215,7 +1215,7 @@ KL_IngestOnce() {
     new_offset := pair[1]
     entries    := pair[2]
     if (Keylogger._pending_entries.Length > 0) {
-        for e in Keylogger._pending_entries
+        for _, e in Keylogger._pending_entries
             entries.Push(e)
         Keylogger._pending_entries := []
     }
@@ -1230,8 +1230,8 @@ KL_IngestOnce() {
     }
 
     statements := []
-    for entry in entries {
-        for sql in KL_BuildInserts(entry)
+    for _, entry in entries {
+        for _, sql in KL_BuildInserts(entry)
             statements.Push(sql)
         ; Walk for aggregations (n-grams, bursts, sessions, …). The walker
         ; accumulates into KLW.batch; we flush below as a single SQL block
@@ -1263,7 +1263,7 @@ KL_IngestOnce() {
         .  " (offset " . Keylogger.today_log_offset
         .  " -> " . new_offset
         .  ", " . entries.Length . " entry(ies)) ===`nBEGIN TRANSACTION;`n"
-    for sql in statements
+    for _, sql in statements
         body .= sql . "`n"
     body .= "COMMIT;`n"
 

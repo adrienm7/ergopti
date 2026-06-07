@@ -386,7 +386,7 @@ OllamaWV_FlushQueue() {
 	; Inject the full locale strings now that the DOM exists
 	i18n_js := OllamaWV_I18nApplyScript(_I18nLocale)
 	try _OllamaWV_WebView.ExecuteScript(i18n_js)
-	for js in _OllamaWV_Queue
+	for _, js in _OllamaWV_Queue
 		try _OllamaWV_WebView.ExecuteScript(js)
 	_OllamaWV_Queue := []
 }

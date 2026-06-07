@@ -537,7 +537,7 @@ _LLMRemote_LoadCatalog() {
 
     LLM_API_PROVIDERS := Map()
     LLM_API_PROVIDER_ORDER := []
-    for pid in order {
+    for _, pid in order {
         if (Type(pid) != "String" or pid = "")
             throw Error("api_providers.json: invalid provider_order entry")
         if !providers.Has(pid)

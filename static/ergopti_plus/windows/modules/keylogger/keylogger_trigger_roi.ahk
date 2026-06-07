@@ -205,7 +205,7 @@ KL_Roi_ProcessWord(word) {
             if (v = 1)
                 prune.Push(k)
         }
-        for k in prune
+        for _, k in prune
             KLRoi.word_counts.Delete(k)
     }
 }

@@ -384,7 +384,7 @@ if Features["hotstrings"]["autocorrection"]["typographic_apostrophe"]["enabled"]
 
 	; Create all hotstrings y'a → y'a, y'b → y'b, etc.
 	; This prevents false positives like writing ['key'] ➜ ['key']
-	for Letter in StrSplit("abcdefghijklmnopqrstuvwxyz") {
+	for _, Letter in StrSplit("abcdefghijklmnopqrstuvwxyz") {
 		CreateCaseSensitiveHotstrings(
 			"*?", "y'" . Letter, "y'" . Letter,
 			Map("TimeActivationSeconds", HotstringsResolve("autocorrection", "typographic_apostrophe").Delay)
@@ -460,8 +460,8 @@ if Features["hotstrings"]["autocorrection"]["caps"]["enabled"] {
 		"son",
 		"ton",
 	]
-	for prefix in prefixes {
-		for app in apps {
+	for _, prefix in prefixes {
+		for _, app in apps {
 			from := prefix . " " . app
 			to := prefix . " " . Capitalize(app)
 			CreateHotstring("", from, to)
@@ -548,7 +548,7 @@ if Features["hotstrings"]["dynamic"]["text_expansion_personal_information"]["ena
 
 	GeneratePersonalInformationHotstrings(hotstrings, maxLen) {
 		keys := []
-		for k in hotstrings
+		for _, k in hotstrings
 			keys.Push(k)
 		loop maxLen
 			Generate(keys, hotstrings, "", A_Index)
@@ -583,7 +583,7 @@ if Features["hotstrings"]["dynamic"]["text_expansion_personal_information"]["ena
 			}
 			return
 		}
-		for key in keys {
+		for _, key in keys {
 			Generate(keys, hotstrings, combo . key, len - 1)
 		}
 	}
@@ -855,7 +855,7 @@ CreateHotstring("*", "clé" . ScriptInformation["MagicKey"], "🔑")
 if Features.Has("hotstrings") and Features["hotstrings"].Has("personal") {
     _PersonalGroup := Features["hotstrings"]["personal"]
     _PersonalKeys := []
-    for _Key in _PersonalGroup {
+    for _Key, _ in _PersonalGroup {
         _PersonalKeys.Push(_Key)
     }
     ; Reverse so the user's first-declared section (most prominent) loads

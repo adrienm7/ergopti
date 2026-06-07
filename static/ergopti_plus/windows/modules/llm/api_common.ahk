@@ -309,7 +309,7 @@ LLM_ApiCommon_InsertPrediction(results, pred, stats, dedup_enabled) {
 		return true
 	}
 
-	for existing in results {
+	for _, existing in results {
 		; Case-SENSITIVE comparison via StrCompare(.., true). AHK v2's ``==``
 		; on strings is case-INSENSITIVE, so without this two predictions that
 		; differ only by case would collapse into one slot. Matches the HS

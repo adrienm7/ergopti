@@ -527,7 +527,7 @@ if Features["layout"]["direct_access_digits"] and _OsLayoutDigitsAreShifted() {
 		[0x31, 0x02], [0x32, 0x03], [0x33, 0x04], [0x34, 0x05], [0x35, 0x06],
 		[0x36, 0x07], [0x37, 0x08], [0x38, 0x09], [0x39, 0x0A], [0x30, 0x0B]
 	]
-	for Pair in _DIGIT_VK_SC {
+	for _, Pair in _DIGIT_VK_SC {
 		VK := Pair[1]
 		SC := Pair[2]
 		; GetKeyName with the "vkXXscYYY" form queries whatever character the
