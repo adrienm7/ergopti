@@ -1199,7 +1199,7 @@ _ParseExtTomlSections(FilePath) {
         if !InMetaSections {
             continue
         }
-        if RegExMatch(Trimmed, "^([A-Za-z0-9_]+)\s*=\s*" . Q . "((?:[^" . Q . "\\]|\\.)*)" . Q, &KM) {
+        if RegExMatch(Trimmed, '^([A-Za-z0-9_]+)\s*=\s*"((?:[^"\\]|\\.)*)"', &KM) {
             SectionKey := StrLower(KM[1])
             SectionDescs[SectionKey] := KM[2]
             SectionOrder.Push(SectionKey)
@@ -1223,7 +1223,7 @@ _ParseExtTomlSections(FilePath) {
         if (CurSec != "" and Trimmed != "" and SubStr(Trimmed, 1, 1) != "#") {
             ; Match hotstring entry: key = value or key = { ... }
             ; Key can be "quoted" or bare words.
-            if RegExMatch(Trimmed, "^(?:`"[^`"]+`"|[A-Za-z0-9_.-]+)\s*=") {
+            if RegExMatch(Trimmed, '^(?:"[^"]+"|[A-Za-z0-9_.-]+)\s*=') {
                 SectionCounts[CurSec] := SectionCounts.Get(CurSec, 0) + 1
             }
         }
