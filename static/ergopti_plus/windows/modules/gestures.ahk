@@ -1854,7 +1854,6 @@ GestureBuildSetupInstructions() {
                 . GESTURE_SHORTCUT_LABELS[Slot] . "`n"
         }
     }
-    Body .= t("gesture.setup.auto_configure")
     return Body
 }
 
@@ -1867,26 +1866,31 @@ GestureShowManualTutorialDialog() {
     tg.SetFont("s9", "Segoe UI")
     tg.MarginX := 18
     tg.MarginY := 14
-    ; Edit height is sized to fit the full tutorial body without a vertical
-    ; scrollbar — the 10-slot list + section headers + auto-configure footer
-    ; comes out around 22 lines at the current font, so 340 px is the
-    ; comfortable minimum. -Wrap + HScroll keeps the shortcut column aligned.
-    tg.AddEdit("ReadOnly w480 h340 -Wrap +HScroll", GestureBuildSetupInstructions())
+    
+    ; Instructions in a read-only Edit (selectable text).
+    ; Sized to fit the 10 slots without a scrollbar (h380).
+    instructions := GestureBuildSetupInstructions()
+    hEdit := tg.AddEdit("ReadOnly w480 h380 -Wrap", instructions)
+    
+    ; Auto-configure hint placed OUTSIDE the selectable text area.
+    tg.AddText("w480 y+12", t("gesture.setup.auto_configure"))
+    
     tg.AddText("w480 y+10", t("onboarding.gestures.open_settings_hint"))
-    ; "Open settings" intentionally spans the full 480 px content width — the
-    ; localised label is the action's full sentence ("Open touchpad settings"),
-    ; not a control-bar verb, so a wide button reads as a call-to-action.
-    btnOpenSettings := tg.AddButton("w480 y+8", t("onboarding.gestures.open_settings"))
-    ; OK close: auto-sized with the 90 px floor so short labels keep their
-    ; historical heft and long localised "OK" variants (rare but possible) no
-    ; longer clip. Pinned to the right edge of the 480 px content column.
-    btnClose := tg.AddButton("Default x370 y+12", t("onboarding.btn.ok"))
-    Gui_HarmoniseButtonWidths([btnClose])
-    btnClose.GetPos(, , &_okW, )
-    btnClose.Move(498 - _okW)   ; 18 (margin) + 480 (content width) - btn width
+    
+    ; "Open settings" button gets the default focus.
+    btnOpenSettings := tg.AddButton("Default w480 y+8", t("onboarding.gestures.open_settings"))
     btnOpenSettings.OnEvent("Click", (*) => GestureOpenTouchpadSettings())
-    btnClose.OnEvent("Click", ((*) => tg.Destroy()))
+    
+    tg.OnEvent("Close", (*) => tg.Destroy())
+    tg.OnEvent("Escape", (*) => tg.Destroy())
+    
     tg.Show("AutoSize Center")
+    
+    ; Force focus to the button so the Edit text is not selected on start,
+    ; and an immediate 'Enter' key triggers the settings.
+    btnOpenSettings.Focus()
+    ; Clear any accidental selection in the edit control
+    SendMessage(0x00B1, -1, 0, , "ahk_id " . hEdit.Hwnd) ; EM_SETSEL
 }
 
 ; Opens Windows Settings to the touchpad page. Used both by the tutorial
