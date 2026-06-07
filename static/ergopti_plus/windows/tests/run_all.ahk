@@ -48,10 +48,10 @@ global _AHK_DRY_RUN := (A_Args.Length > 0 && A_Args[1] == "--dry-run")
 ; watches and forces a clean ExitApp so the failure is visible and fast.
 _FatalErrorHandler(e, mode) {
     msg := "not ok 0 - FATAL STARTUP ERROR: " . e.Message
-    try msg .= A_NewLine . "STACK TRACE:" . A_NewLine . e.Stack
-    msg .= A_NewLine . "Likely cause: top-level code or missing stub in a newly added module."
-    try FileAppend(msg . A_NewLine, A_Temp . "\ergopti_test_results.txt", "UTF-8")
-    try FileAppend(msg . A_NewLine, "*")
+    try 	msg .= "`r`nSTACK TRACE:`r`n" . e.Stack
+	msg .= "`r`nLikely cause: top-level code or missing stub in a newly added module."
+	try FileAppend(msg . "`r`n", A_Temp . "\ergopti_test_results.txt", "UTF-8")
+	try FileAppend(msg . "`r`n", "*")
     ExitApp(1)
     return 1
 }

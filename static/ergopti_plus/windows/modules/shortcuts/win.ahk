@@ -168,7 +168,7 @@ if Features["shortcuts"]["move"] {
         try Hotkey("~*$RButton", AwakeCancelOnMouse, "Off")
         try Hotkey("~*$MButton", AwakeCancelOnMouse, "Off")
         ; Stop the keypress detector
-        if IsObject(AwakeInputHook) {
+        if IsSet(AwakeInputHook) and IsObject(AwakeInputHook) {
             try AwakeInputHook.Stop()
             AwakeInputHook := ""
         }
