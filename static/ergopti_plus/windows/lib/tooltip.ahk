@@ -1365,7 +1365,7 @@ LLM_TooltipHide(accepted := false) {
 	_LLM_Tooltip_Loading := false
 	_LLM_Tooltip_Slots   := []
 	_LLM_TooltipResetChain()
-	TooltipHide()
+	TooltipHide("LLM", true)
 }
 
 LLM_TooltipGetText() {
