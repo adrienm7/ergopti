@@ -498,7 +498,7 @@ CreateCaseSensitiveHotstrings(Flags, Abbreviation, Replacement, options := unset
     }
 
     if (StrLen(Abbreviation) >= 2) {
-        for variant in GenerateUppercaseVariants(AbbreviationUpperCase, UppercasedSymbols) {
+        for _, variant in GenerateUppercaseVariants(AbbreviationUpperCase, UppercasedSymbols) {
             RegisterVariant(variant, ReplacementUpperCase)
         }
 
@@ -506,7 +506,7 @@ CreateCaseSensitiveHotstrings(Flags, Abbreviation, Replacement, options := unset
         if !(StrLower(FirstChar) == StrUpper(FirstChar)) {
             RegisterVariant(AbbreviationTitleCase, ReplacementTitleCase)
         } else if UppercasedSymbols.Has(FirstChar) {
-            for UppercasedSymbol in UppercasedSymbols[FirstChar] {
+            for _, UppercasedSymbol in UppercasedSymbols[FirstChar] {
                 RegisterVariant(UppercasedSymbol . SubStr(AbbreviationLowerCase, 2), ReplacementTitleCase)
             }
         }

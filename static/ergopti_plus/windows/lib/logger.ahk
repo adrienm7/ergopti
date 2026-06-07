@@ -201,7 +201,7 @@ _LoggerFlush(ForceFlush := false) {
     Pending := _LOGGER_PENDING
     _LOGGER_PENDING := []
     Blob := ""
-    for Line in Pending {
+    for _, Line in Pending {
         Blob .= Line . "`r`n"
     }
     if ForceFlush {
@@ -349,7 +349,7 @@ LoggerRingBufferSnapshot() {
     if LOGGER_RING_BUFFER.Length < LOGGER_RING_BUFFER_SIZE {
         ; Buffer not yet full — entries are already in order.
         Snapshot := []
-        for Line in LOGGER_RING_BUFFER {
+        for _, Line in LOGGER_RING_BUFFER {
             Snapshot.Push(Line)
         }
         return Snapshot
@@ -459,7 +459,7 @@ _LoggerInitSubFiles(LogDir) {
     global LOGGER_SUB_FILES, _LOGGER_SUB_PATHS
     Today := FormatTime(, "yyyy-MM-dd")
     _LOGGER_SUB_PATHS := Map()
-    for Entry in LOGGER_SUB_FILES {
+    for _, Entry in LOGGER_SUB_FILES {
         SubPath := LogDir . Entry["name"]
         _LOGGER_SUB_PATHS[Entry["name"]] := SubPath
         ; Delete if the file exists but belongs to a previous day
@@ -481,8 +481,8 @@ _LoggerFanOut(Tag, Line) {
     if !IsSet(_LOGGER_SUB_PATHS) or _LOGGER_SUB_PATHS.Count == 0 {
         return
     }
-    for Entry in LOGGER_SUB_FILES {
-        for TagPattern in Entry["tags"] {
+    for _, Entry in LOGGER_SUB_FILES {
+        for _, TagPattern in Entry["tags"] {
             if (Tag = TagPattern) {
                 SubPath := _LOGGER_SUB_PATHS[Entry["name"]]
                 try FileAppend(Line . "`r`n", SubPath, "UTF-8")
@@ -543,7 +543,7 @@ _LoggerLoadSubFilesToml(ScriptDir) {
         }
         ; Only include entries that list "autohotkey" in their platforms array
         IsAhk := false
-        for P in CurrentPlatforms {
+        for _, P in CurrentPlatforms {
             if (P = "autohotkey") {
                 IsAhk := true
                 break
@@ -577,7 +577,7 @@ _LoggerLoadSubFilesToml(ScriptDir) {
     }
 
     Lines := StrSplit(Raw, "`n")
-    for Line in Lines {
+    for _, Line in Lines {
         ; Strip inline comments and trim
         Line := Trim(RegExReplace(Line, "\s*#.*$", ""))
         if Line = "" {
@@ -590,7 +590,7 @@ _LoggerLoadSubFilesToml(ScriptDir) {
         ; Accumulate multi-line arrays
         if InPatternsArray {
             Extracted := _ExtractStrings(Line)
-            for S in Extracted {
+            for _, S in Extracted {
                 CurrentPatterns.Push(S)
             }
             if InStr(Line, "]") {
@@ -600,7 +600,7 @@ _LoggerLoadSubFilesToml(ScriptDir) {
         }
         if InPlatformsArray {
             Extracted := _ExtractStrings(Line)
-            for S in Extracted {
+            for _, S in Extracted {
                 CurrentPlatforms.Push(S)
             }
             if InStr(Line, "]") {
@@ -614,7 +614,7 @@ _LoggerLoadSubFilesToml(ScriptDir) {
         } else if RegExMatch(Line, '^platforms\s*=\s*\[(.*)$', &M) {
             Fragment := M[1]
             Extracted := _ExtractStrings(Fragment)
-            for S in Extracted {
+            for _, S in Extracted {
                 CurrentPlatforms.Push(S)
             }
             if !InStr(Fragment, "]") {
@@ -623,7 +623,7 @@ _LoggerLoadSubFilesToml(ScriptDir) {
         } else if RegExMatch(Line, '^patterns\s*=\s*\[(.*)$', &M) {
             Fragment := M[1]
             Extracted := _ExtractStrings(Fragment)
-            for S in Extracted {
+            for _, S in Extracted {
                 CurrentPatterns.Push(S)
             }
             if !InStr(Fragment, "]") {

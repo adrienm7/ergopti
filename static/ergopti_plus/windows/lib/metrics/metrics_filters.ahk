@@ -189,7 +189,7 @@ MF_ShouldFilter() {
 
     ; 4. Private browsing (title pattern match).
     if MetricsFilters.private_browsing && title != "" {
-        for pat in MF_PRIVATE_TITLE_PATTERNS {
+        for _, pat in MF_PRIVATE_TITLE_PATTERNS {
             if RegExMatch(title, pat)
                 return true
         }

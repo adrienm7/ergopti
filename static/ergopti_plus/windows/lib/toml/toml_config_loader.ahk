@@ -47,7 +47,7 @@ TomlCoerceValueExt(Raw) {
 		Inner := SubStr(Trimmed, 2, StrLen(Trimmed) - 2)
 		Result := []
 		if (Trim(Inner) != "") {
-			for Item in StrSplit(Inner, ",") {
+			for _, Item in StrSplit(Inner, ",") {
 				Result.Push(TomlCoerceValueExt(Trim(Item, " `t")))
 			}
 		}
@@ -158,7 +158,7 @@ ApplyConfigToml(Features, FilePath) {
 		Parts := StrSplit(CurrentSection, ".")
 		Node := Features
 		Failed := false
-		for Part in Parts {
+		for _, Part in Parts {
 			if (Part == "") {
 				continue
 			}

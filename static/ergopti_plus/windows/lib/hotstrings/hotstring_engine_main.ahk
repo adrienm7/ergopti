@@ -322,13 +322,13 @@ HSE_MappingsForTail(TailChar) {
     Out := []
     LowerKey := StrLower(TailChar)
     if HSE_RegistryByLastChar.Has(TailChar) {
-        for Spec in HSE_RegistryByLastChar[TailChar] {
+        for _, Spec in HSE_RegistryByLastChar[TailChar] {
             Out.Push(Spec)
         }
     }
     ; Avoid double-adding when TailChar is already lowercase.
     if (TailChar !== LowerKey) and HSE_RegistryByLastChar.Has(LowerKey) {
-        for Spec in HSE_RegistryByLastChar[LowerKey] {
+        for _, Spec in HSE_RegistryByLastChar[LowerKey] {
             Out.Push(Spec)
         }
     }
@@ -371,12 +371,12 @@ HSE_DisableGroup(Group) {
     }
     HSE_DisabledGroups[Group] := true
     ; Remove each spec from the live index.
-    for Spec in HSE_RegistryByGroup[Group] {
+    for _, Spec in HSE_RegistryByGroup[Group] {
         LookupKey := Spec.CaseSensitive ? Spec.TailChar : StrLower(Spec.TailChar)
         if HSE_RegistryByLastChar.Has(LookupKey) {
             Bucket := HSE_RegistryByLastChar[LookupKey]
             NewBucket := []
-            for S in Bucket {
+            for _, S in Bucket {
                 if (S.Seq !== Spec.Seq) {
                     NewBucket.Push(S)
                 }
@@ -386,7 +386,7 @@ HSE_DisableGroup(Group) {
         ; Remove from star index if applicable.
         if Spec.Star {
             NewStarSpecs := []
-            for S in HSE_StarSpecs {
+            for _, S in HSE_StarSpecs {
                 if (S.Seq !== Spec.Seq) {
                     NewStarSpecs.Push(S)
                 }
@@ -397,7 +397,7 @@ HSE_DisableGroup(Group) {
     ; Rebuild the prefix sets from the remaining star specs.
     HSE_StarPrefixSetCI := Map()
     HSE_StarPrefixSetCS := Map()
-    for S in HSE_StarSpecs {
+    for _, S in HSE_StarSpecs {
         _HSE_IndexStarPrefixes(S)
     }
 }

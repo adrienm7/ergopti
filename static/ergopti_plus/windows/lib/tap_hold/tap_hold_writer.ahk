@@ -90,7 +90,7 @@ TapHoldHoldOptions() {
 ; Return the i18n-resolved display label for a physical key group.
 TapHoldGroupLabel(KeyId) {
 	global _TH_KeyDefs
-	for Def in _TH_KeyDefs {
+	for _, Def in _TH_KeyDefs {
 		if (Def["id"] == KeyId) {
 			return t(Def["i18n"])
 		}
@@ -115,7 +115,7 @@ TapHoldCurrentHoldLabel(KeyId) {
 	global TapHold, _TH_HoldOptions
 	HoldMod   := TapHoldHoldModifier(TapHold, KeyId)
 	HoldLayer := TapHoldHoldLayer(TapHold, KeyId)
-	for Opt in _TH_HoldOptions {
+	for _, Opt in _TH_HoldOptions {
 		if (Opt["kind"] == "modifier" and Opt["id"] == HoldMod) {
 			return t(Opt["i18n"])
 		}

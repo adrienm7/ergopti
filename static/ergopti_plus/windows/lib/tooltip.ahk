@@ -1277,7 +1277,7 @@ LLM_TooltipShow(payload, active := 1, is_final := false) {
 		while (slots.Length > 0 and _LLM_SlotIsEmpty(slots[slots.Length]))
 			slots.Pop()
 		filtered := []
-		for s in slots {
+		for _, s in slots {
 			if !_LLM_SlotIsEmpty(s)
 				filtered.Push(s)
 		}
@@ -1295,7 +1295,7 @@ LLM_TooltipShow(payload, active := 1, is_final := false) {
 	; the whole tooltip frame on Windows 11.
 	if (!is_final) {
 		all_placeholder := true
-		for s in slots {
+		for _, s in slots {
 			if !_LLM_SlotIsPlaceholder(s) {
 				all_placeholder := false
 				break
@@ -1315,7 +1315,7 @@ LLM_TooltipShow(payload, active := 1, is_final := false) {
 
 	; Detect whether any slot carries diff chunks — if so use the rich Gui path.
 	has_chunks := false
-	for s in slots {
+	for _, s in slots {
 		if IsObject(s) and s.HasOwnProp("Chunks") and s.Chunks.Length > 0 {
 			has_chunks := true
 			break
