@@ -669,11 +669,11 @@ typographic_apostrophe ={ fr = "L’apostrophe devient typographique lors de l�
 
 
 
-# ===============================
-# ===============================
-# ======= Minusapostrophe =======
-# ===============================
-# ===============================
+# ================================
+# ================================
+# ======= Minus_apostrophe =======
+# ================================
+# ================================
 
 [[minus_apostrophe]]
 "a't" = { output = "a-t", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
@@ -699,11 +699,11 @@ typographic_apostrophe ={ fr = "L’apostrophe devient typographique lors de l�
 
 
 
-# ========================================
-# ========================================
-# ======= Multiplepunctuationmarks =======
-# ========================================
-# ========================================
+# ==========================================
+# ==========================================
+# ======= Multiple_punctuation_marks =======
+# ==========================================
+# ==========================================
 
 [[multiple_punctuation_marks]]
 "! !" = { output = "!!", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = false }
@@ -785,11 +785,11 @@ typographic_apostrophe ={ fr = "L’apostrophe devient typographique lors de l�
 
 
 
-# =================================
-# =================================
-# ======= Suffixesachaining =======
-# =================================
-# =================================
+# ===================================
+# ===================================
+# ======= Suffixes_a_chaining =======
+# ===================================
+# ===================================
 
 [[suffixes_a_chaining]]
 "eàa" = { output = "aire", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
@@ -809,18 +809,18 @@ typographic_apostrophe ={ fr = "L’apostrophe devient typographique lors de l�
 
 
 
-# =====================================
-# =====================================
-# ======= Typographicapostrophe =======
-# =====================================
-# =====================================
+# ======================================
+# ======================================
+# ======= Typographic_apostrophe =======
+# ======================================
+# ======================================
 
 [[typographic_apostrophe]]
 "c'" = { output = "c’", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "ch'ti" = { output = "ch’ti", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "d'" = { output = "d’", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
-"ju'" = { output = "jusqu’", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "j'" = { output = "j’", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"ju'" = { output = "jusqu’", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "l'" = { output = "l’", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "m'" = { output = "m’", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "n'" = { output = "n’", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }

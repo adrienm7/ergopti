@@ -4,7 +4,7 @@
 ; MODULE: Generated Hotstrings — autocorrection
 ; DESCRIPTION:
 ; AUTO-GENERATED FILE — DO NOT EDIT BY HAND.
-; Regenerate with ``python tools/compile_hotstrings.py`` from the repo root
+; Regenerate with ``node scripts/build-hotstrings.cjs`` from the repo root
 ; whenever the bundled TOML files under ``static/ergopti_plus/_shared/hotstrings/`` change.
 ;
 ; Contains the ``_GenLoad_*`` loader functions and the partial
@@ -3463,12 +3463,12 @@ _GenLoad_autocorrection_typographic_apostrophe(FeatureConfig, ExtraOptions := un
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", "ju'", "jusqu’", _GenOpts)
+	CreateCaseSensitiveHotstrings("*", "j'", "j’", _GenOpts)
 	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "typographic_apostrophe")
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", "j'", "j’", _GenOpts)
+	CreateCaseSensitiveHotstrings("*", "ju'", "jusqu’", _GenOpts)
 	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "typographic_apostrophe")
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]

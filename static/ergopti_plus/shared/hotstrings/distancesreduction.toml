@@ -37,11 +37,11 @@ suffixes_a ={ fr = "À + lettre donne un suffixe : às = ement, àn = ation, àh
 
 
 
-# ===============================
-# ===============================
-# ======= Commafarletters =======
-# ===============================
-# ===============================
+# =================================
+# =================================
+# ======= Comma_far_letters =======
+# =================================
+# =================================
 
 [[comma_far_letters]]
 ",c" = { output = "ç", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
@@ -54,11 +54,11 @@ suffixes_a ={ fr = "À + lettre donne un suffixe : às = ement, àn = ation, àh
 
 
 
-# ======================
-# ======================
-# ======= Commaj =======
-# ======================
-# ======================
+# =======================
+# =======================
+# ======= Comma_j =======
+# =======================
+# =======================
 
 [[comma_j]]
 ",'" = { output = "j’", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
@@ -75,11 +75,11 @@ suffixes_a ={ fr = "À + lettre donne un suffixe : às = ement, àn = ation, àh
 
 
 
-# ==================================
-# ==================================
-# ======= Deadkeyecircumflex =======
-# ==================================
-# ==================================
+# =====================================
+# =====================================
+# ======= Dead_key_e_circumflex =======
+# =====================================
+# =====================================
 
 [[dead_key_e_circumflex]]
 "ê " = { output = "^", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
@@ -163,11 +163,11 @@ suffixes_a ={ fr = "À + lettre donne un suffixe : às = ement, àn = ation, àh
 
 
 
-# ============================
-# ============================
-# ======= Ecircumflexe =======
-# ============================
-# ============================
+# ==============================
+# ==============================
+# ======= E_circumflex_e =======
+# ==============================
+# ==============================
 
 [[e_circumflex_e]]
 "êe" = { output = "œ", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
@@ -198,11 +198,11 @@ suffixes_a ={ fr = "À + lettre donne un suffixe : às = ement, àn = ation, àh
 
 
 
-# =========================
-# =========================
-# ======= Suffixesa =======
-# =========================
-# =========================
+# ==========================
+# ==========================
+# ======= Suffixes_a =======
+# ==========================
+# ==========================
 
 [[suffixes_a]]
 "à'" = { output = "ance", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }

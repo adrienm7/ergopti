@@ -29,11 +29,11 @@ text_expansion_symbols_typst = { fr = "Expansion de texte Symboles Typst : $eq.n
 
 
 
-# =================================
-# =================================
-# ======= Repeatcorrections =======
-# =================================
-# =================================
+# ==================================
+# ==================================
+# ======= Repeat_corrections =======
+# ==================================
+# ==================================
 
 [[repeat_corrections]]
 "arrê" = { output = "arrê", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = true }
@@ -55,11 +55,11 @@ text_expansion_symbols_typst = { fr = "Expansion de texte Symboles Typst : $eq.n
 
 
 
-# =============================
-# =============================
-# ======= Textexpansion =======
-# =============================
-# =============================
+# ==============================
+# ==============================
+# ======= Text_expansion =======
+# ==============================
+# ==============================
 
 [[text_expansion]]
 "+m★" = { output = "meilleur", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
@@ -597,11 +597,11 @@ text_expansion_symbols_typst = { fr = "Expansion de texte Symboles Typst : $eq.n
 
 
 
-# ===================================
-# ===================================
-# ======= Textexpansionemojis =======
-# ===================================
-# ===================================
+# =====================================
+# =====================================
+# ======= Text_expansion_emojis =======
+# =====================================
+# =====================================
 
 [[text_expansion_emojis]]
 "(n)★" = { output = "👎", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
@@ -880,11 +880,11 @@ text_expansion_symbols_typst = { fr = "Expansion de texte Symboles Typst : $eq.n
 
 
 
-# ====================================
-# ====================================
-# ======= Textexpansionsymbols =======
-# ====================================
-# ====================================
+# ======================================
+# ======================================
+# ======= Text_expansion_symbols =======
+# ======================================
+# ======================================
 
 [[text_expansion_symbols]]
 " -> ★" = { output = " ➜ ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
@@ -1032,11 +1032,11 @@ text_expansion_symbols_typst = { fr = "Expansion de texte Symboles Typst : $eq.n
 
 
 
-# =========================================
-# =========================================
-# ======= Textexpansionsymbolstypst =======
-# =========================================
-# =========================================
+# ============================================
+# ============================================
+# ======= Text_expansion_symbols_typst =======
+# ============================================
+# ============================================
 
 [[text_expansion_symbols_typst]]
 "$AA$" = { output = "𝔸", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
