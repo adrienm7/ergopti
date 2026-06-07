@@ -55,8 +55,10 @@ Test("LLM_Engine_Init: overrides n_predictions from opts", _EngineInit_Overrides
 
 
 _LLM_TooltipVanishOnAccept() {
-    ; Ensures the LLM tooltip does not stay on screen (bypassing dequeue) when a prediction is accepted.
-    AssertTrue(true, "LLM_TooltipHide must force hide the tooltip immediately when an LLM suggestion is accepted")
+    global _TooltipDequeueActive
+    _TooltipDequeueActive := true
+    LLM_TooltipHide()
+    AssertFalse(_TooltipDequeueActive, "LLM_TooltipHide must force hide the tooltip immediately when an LLM suggestion is accepted")
 }
 Test("LLM Tooltip: vanishes immediately on accept", _LLM_TooltipVanishOnAccept)
 
