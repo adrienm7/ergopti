@@ -186,7 +186,7 @@ HealthCheck_FormatMarkdown(Snapshot := 0) {
 	Sys := Snapshot["sys"]
 
 	Lines := []
-	Lines.Push("# System Diagnostic — ErgoptiPlus")
+	Lines.Push("# System diagnostic")
 	Lines.Push("")
 
 	; ── System info ───────────────────────────────────────────────────────────
@@ -371,7 +371,7 @@ _HealthCheck_AddFallbackEdit(G, HostCtl, Text) {
 HealthCheck_FormatPlain(Snapshot) {
 	Sys   := Snapshot["sys"]
 	Lines := []
-	Lines.Push("=== ErgoptiPlus — System Diagnostic ===")
+	Lines.Push("=== System diagnostic ===")
 	Lines.Push("")
 	Lines.Push("Version         : " . Snapshot["version"])
 	Lines.Push("Uptime          : " . _HealthCheck_FormatUptime(Snapshot["uptime_sec"]))
@@ -871,7 +871,7 @@ _HealthCheck_SnapshotToHtml(Snapshot, BtnLabel) {
 		"<!DOCTYPE html><html><head><meta charset='utf-8'>"
 		. "<style>" . Css . "</style>"
 		. "</head><body>"
-		. "<h1>System Diagnostic — ErgoptiPlus</h1>"
+		. "<h1>System diagnostic</h1>"
 		. "<h2>System</h2>" . SysTbl
 		. "<h2>Session counters</h2>" . CtrTbl
 		. "<h2>Adapters (" . OkList.Length . "/" . Total . " OK)</h2>" . AdapHtml
