@@ -45,16 +45,6 @@ Test("Logger: high volume (300+) ERROR must fill errors-only sink correctly", Te
 ; filter tests) can cause the full ErgoptiPlus driver to show tray balloons,
 ; MsgBox, or other visible AHK notifications. We override the common entry points
 ; so the entire test_logger.ahk run stays completely silent.
-Notify(Title, Text, Icon := "", Options := "") {
-    ; no-op during these tests
-}
-TrayTip(Text, Title := "", Options := 0) {
-    ; no-op
-}
-MsgBox(Text := "", Title := "", Options := "") {
-    ; Swallow — the test harness reports failures via Assert* + TAP results file.
-    return
-}
 
 _ResetLogger() {
 	global LOGGER_RING_BUFFER, LOGGER_RING_CURSOR, LOGGER_MIN_LEVEL, _LOGGER_PENDING

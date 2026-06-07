@@ -228,3 +228,16 @@ _CopyTestResultsForCi() {
 			FileCopy(TEST_RESULTS_FILE, TEST_RESULTS_CANONICAL, true)
 	}
 }
+
+
+; --- Global UI mocks ---
+; Prevent tests from deadlocking or halting the CI runner on headless Windows.
+Notify(Title, Text, Icon := "", Options := "") {
+    return
+}
+TrayTip(Text, Title := "", Options := 0) {
+    return
+}
+MsgBox(Text := "", Title := "", Options := "") {
+    return
+}
