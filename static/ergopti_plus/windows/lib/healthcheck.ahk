@@ -288,7 +288,7 @@ HealthCheck_ShowWindow() {
 	InnerW   := _HC_WIN_W - _HC_MARGIN * 2
 	ContentH := 560
 
-	G := Gui("+Resize +MinSize540x420", WinTitle)
+	G := Gui_Create("+Resize +MinSize540x420", WinTitle)
 	G.SetFont("s10", "Segoe UI")
 	G.MarginX := _HC_MARGIN
 	G.MarginY := _HC_MARGIN

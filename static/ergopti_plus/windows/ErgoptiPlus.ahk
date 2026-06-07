@@ -1250,7 +1250,7 @@ MagicKeyEditor(*) {
     ; (~6000 mappings), causing severe lag on each character. Capture the new
     ; magic key via a one-shot InputHook instead: the GUI is purely informative,
     ; the first non-modifier key pressed becomes the new value.
-    GuiToShow := Gui("+AlwaysOnTop", t("dialog.magic_key.title"))
+    GuiToShow := Gui_Create("+AlwaysOnTop", t("dialog.magic_key.title"))
     GuiToShow.Add("Text", "w300", t("dialog.magic_key.prompt"))
     GuiToShow.Add("Text", "w300", t("button.cancel") . " → Echap")
     GuiToShow.Show("Center")
@@ -2160,7 +2160,7 @@ ShowKeyboardSlotPicker(Prefix) {
     for SlotId in Slots
         SlotLabels.Push(_GestureActionLabel(SlotId))
 
-    W := Gui("+AlwaysOnTop", t("dialog.keyboard_shortcut.title_prefix") . Prefix)
+    W := Gui_Create("+AlwaysOnTop", t("dialog.keyboard_shortcut.title_prefix") . Prefix)
     W.SetFont("s10", "Segoe UI")
     W.MarginX := 12
     W.MarginY := 12
@@ -2254,7 +2254,7 @@ ShowActionPicker(Title, Current, OnConfirm, ShowNative := false) {
         }
     }
 
-    W := Gui("+AlwaysOnTop", Title)
+    W := Gui_Create("+AlwaysOnTop", Title)
     W.SetFont("s10", "Segoe UI")
     W.MarginX := 12
     W.MarginY := 12
@@ -2328,15 +2328,14 @@ FilePathsEditor(*) {
     W.MarginX := 12
     W.MarginY := 12
 
-    W.Add("Text", "xm", t("dialog.config_folder.label"))
+    W.Add("Text", "xm w400", t("dialog.config_folder.label"))
     ; Display path with forward slashes for readability
-    DirEdit := W.Add("Edit", "xm w480", StrReplace(_ConfigDir, "\", "/"))
-    W.Add("Button", "x+6 w80", t("common.browse")).OnEvent("Click", BrowseDir)
+    DirEdit := W.Add("Edit", "xm w400", StrReplace(_ConfigDir, "\", "/"))
+    W.Add("Button", "xm y+6 w80", t("common.browse")).OnEvent("Click", BrowseDir)
 
-    W.Add("Text", "xm y+14 cGray", t("dialog.config_folder.hint"))
+    W.Add("Text", "xm y+14 cGray w400", t("dialog.config_folder.hint"))
 
-    W.Add("Button", "xm y+10 w80", t("button.ok")).OnEvent("Click", SaveConfigDir)
-    W.Add("Button", "x+6 w80", t("common.cancel")).OnEvent("Click", (*) => W.Destroy())
+    W.Add("Button", "x162 y+10 w100 Default", t("button.ok")).OnEvent("Click", SaveConfigDir)
 
     BrowseDir(*) {
         ; Start from the current field value if it exists, otherwise fall back to

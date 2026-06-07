@@ -67,7 +67,7 @@ AppPicker_Show(opts) {
 
     rows := AppPicker_BuildRows(initial)
 
-    g := Gui("+Resize +MinSize400x500", title)
+    g := Gui_Create("+Resize +MinSize400x500", title)
     g.SetFont("s10")
     g.MarginX := 14
     g.MarginY := 14
