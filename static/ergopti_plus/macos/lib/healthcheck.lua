@@ -244,7 +244,7 @@ function M.show_window()
 		and function(k) return i18n.get(k) end
 		or  function(_) return nil end
 
-	local title     = "ErgoptiPlus — " .. (t("menu.debug.healthcheck") or "System Diagnostic")
+	local title     = "System diagnostic"
 	local btn_label = t("healthcheck.copy_and_close") or "Copy to clipboard and close"
 	local html      = _snapshot_to_html(snapshot, btn_label)
 
@@ -350,7 +350,7 @@ function M.format_plain(snapshot)
 	local sys    = s.sys or {}
 	local lines  = {}
 
-	table.insert(lines, "=== ErgoptiPlus — System Diagnostic ===")
+	table.insert(lines, "=== System diagnostic ===")
 	table.insert(lines, "")
 	table.insert(lines, string.format("Version          : %s", s.version))
 	table.insert(lines, string.format("Last git commit  : %s", tostring(sys.git_hash or "unknown")))
@@ -765,7 +765,7 @@ local function _snapshot_to_html(snapshot, btn_label)
 	return "<!DOCTYPE html><html><head><meta charset='utf-8'>"
 		.. "<style>" .. css .. "</style>"
 		.. "</head><body>"
-		.. "<h1>System Diagnostic — ErgoptiPlus</h1>"
+		.. "<h1>System diagnostic</h1>"
 		.. "<h2>System</h2>"         .. sys_tbl
 		.. "<h2>Session counters</h2>" .. ctr_tbl
 		.. "<h2>Adapters (" .. #ok_list .. "/" .. total .. " OK)</h2>" .. adap_html
