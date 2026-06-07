@@ -258,7 +258,9 @@ function M.show_webview(opts)
 		return nil 
 	end
 
-	pcall(function() wv:windowTitle(opts.title or "UI") end)
+	local prefix = "ErgoptiPlus"
+	local win_title = (opts.title and opts.title ~= "") and (prefix .. " — " .. opts.title) or prefix
+	pcall(function() wv:windowTitle(win_title) end)
 	
 	if opts.style_masks then 
 		pcall(function() wv:windowStyle(opts.style_masks) end) 

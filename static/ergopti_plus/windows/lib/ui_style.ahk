@@ -286,13 +286,26 @@ Gui_HarmoniseButtonWidths(buttons, minWidth := unset) {
 		return 0
 	floorW := IsSet(minWidth) ? minWidth : UI_BTN_MIN_W
 	sharedW := floorW
-	for btn in buttons {
+	for _, btn in buttons {
 		btn.GetPos(, , &w, )
 		if (w > sharedW)
 			sharedW := w
 	}
-	for btn in buttons {
+	for _, btn in buttons {
 		btn.Move(, , sharedW)
 	}
 	return sharedW
+}
+
+/**
+ * Centralized factory to create a Gui window with consistent title naming.
+ * Enforces the "ErgoptiPlus — <Name>" format mandated by repo conventions.
+ * @param {string} Options - Standard AHK Gui options.
+ * @param {string} Name - The suffix for the window title.
+ * @returns {Gui} The instantiated Gui object.
+ */
+Gui_Create(Options := "", Name := "") {
+    Prefix := "ErgoptiPlus"
+    Title := (Name == "") ? Prefix : Prefix . " — " . Name
+    return Gui(Options, Title)
 }

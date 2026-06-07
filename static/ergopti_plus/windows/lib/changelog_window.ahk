@@ -100,7 +100,7 @@ _CLW_BuildWindow(Channel) {
 	global _CLW_Gui, _CLW_Controller, _CLW_WebView, _VendorDir
 
 	WinTitle := t("changelog_window.window_title")
-	g := Gui("+Resize +MinSize860x540", WinTitle)
+	g := Gui_Create("+Resize +MinSize860x540", WinTitle)
 	g.BackColor := "0x1c1c1e"
 	g.MarginX   := 0
 	g.MarginY   := 0
