@@ -25,7 +25,7 @@ global _LLM_Tray := Map(
 
 ; Isolated suite should finish in seconds; exit if a stale lock/hang blocks RunTests.
 _LlmPersistWatchdog(*) {
-	FileAppend("`n[WATCHDOG] run_llm_menu_persistence timed out after 90s`n", "*")
+	try FileAppend("`n[WATCHDOG] run_llm_menu_persistence timed out after 90s`n", "*")
 	ExitApp(2)
 }
 SetTimer(_LlmPersistWatchdog, -90000)

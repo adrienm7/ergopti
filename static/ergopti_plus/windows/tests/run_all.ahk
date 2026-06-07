@@ -255,7 +255,7 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 ; runner is killed externally.
 global _SUITE_TIMEOUT_MS := 240000
 _WatchdogFire() {
-	FileAppend("`n[WATCHDOG] Test suite timed out after " . _SUITE_TIMEOUT_MS . " ms — force-exiting.`n", "*")
+	try FileAppend("`n[WATCHDOG] Test suite timed out after " . _SUITE_TIMEOUT_MS . " ms - force-exiting.`n", "*")
 	ExitApp(2)
 }
 SetTimer(_WatchdogFire, -_SUITE_TIMEOUT_MS)
