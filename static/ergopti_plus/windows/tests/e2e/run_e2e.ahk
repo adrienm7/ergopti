@@ -356,7 +356,7 @@ _E2E_RunGuiTest() {
 SetTimer(_E2E_Watchdog, -30000)
 
 _E2E_Watchdog() {
-    FileAppend("WATCHDOG: forced exit after 30 s`r`n", "*")
+    try FileAppend("WATCHDOG: forced exit after 30 s`r`n", "*")
     ExitApp(2)
 }
 
