@@ -532,7 +532,7 @@ function M.generate(ctx, menu_mods, actions)
 		elseif id == "console" then
 			table.insert(debug_items, { title = i18n.get("menu.debug.console"), fn = actions.open_console })
 		elseif id == "log_level" then
-			table.insert(debug_items, { title = i18n.get("menu.debug.log_level") .. " : " .. active_level_name, menu = log_level_items })
+			table.insert(debug_items, { title = i18n.get("menu.debug.log_level") .. " : " .. log_level_emoji(active_level_name) .. " " .. active_level_name, menu = log_level_items })
 		elseif id == "open_logs" then
 			table.insert(debug_items, { title = i18n.get("menu.debug.open_logs"), fn = actions.open_logs })
 		elseif id == "open_today_log" then
