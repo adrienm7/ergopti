@@ -76,7 +76,7 @@ function M.perform_text_replacement(deletes, emit_action, buffer_action, is_fina
 	Logger.trace(LOG, "Performing replacement (%d deletion(s))…", deletes)
 
 	_state.expected_synthetic_deletes = _state.expected_synthetic_deletes + deletes
-	if not is_ignored and tooltip.hide then tooltip.hide() end
+	if not is_ignored and tooltip.hide_forced then tooltip.hide_forced() elseif not is_ignored and tooltip.hide then tooltip.hide() end
 
 	for _ = 1, deletes do keyStroke({}, "delete", 0) end
 
@@ -224,7 +224,7 @@ function M.try_auto_expand(m, char_len, is_ignored)
 	-- No-op guard: skip when the plain-text expansion equals the trigger.
 	if repl_text == trigger then
 		if m.final_result then _state.suppress_rescan() end
-		if not is_ignored and tooltip.hide then tooltip.hide() end
+		if not is_ignored and tooltip.hide_forced then tooltip.hide_forced() elseif not is_ignored and tooltip.hide then tooltip.hide() end
 		return true
 	end
 
@@ -302,7 +302,7 @@ function M.try_terminator_expand(m, chars, char_len, is_ignored)
 	-- is correctly treated as a no-op — matches try_auto_expand's policy.
 	if m.plain_repl == trigger then
 		if m.final_result then _state.suppress_rescan() end
-		if not is_ignored and tooltip.hide then tooltip.hide() end
+		if not is_ignored and tooltip.hide_forced then tooltip.hide_forced() elseif not is_ignored and tooltip.hide then tooltip.hide() end
 		return true
 	end
 
@@ -418,7 +418,7 @@ function M.try_repeat_feature(chars, is_ignored)
 		return false
 	end
 
-	if not is_ignored and tooltip.hide then tooltip.hide() end
+	if not is_ignored and tooltip.hide_forced then tooltip.hide_forced() elseif not is_ignored and tooltip.hide then tooltip.hide() end
 
 	-- In ignored windows, the magic key is already on screen and must be deleted.
 	if is_ignored then

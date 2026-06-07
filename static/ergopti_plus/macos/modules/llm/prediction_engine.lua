@@ -726,7 +726,7 @@ function M.reset()
 	fetch_request_counter      = fetch_request_counter + 1
 
 	StreamingHandler.reset_failure_count()
-	tooltip.hide()
+	if tooltip.hide_forced then tooltip.hide_forced() else tooltip.hide() end
 	stop_inactivity_timer()
 	StreamingHandler.stop_watchdog()
 	-- Cancel any in-flight streaming curl task so it doesn't fire stale callbacks

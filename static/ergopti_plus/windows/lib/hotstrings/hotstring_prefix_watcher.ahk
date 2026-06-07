@@ -779,24 +779,8 @@ _ResetPrefixBuffer(ConsumedByFire := false) {
     global _PrefixBuffer, _TriggerSet, _TooltipDequeueActive
     Buf := _PrefixBuffer
     _PrefixBuffer := ""
-    ; When a hotstring just fired, the tooltip showing the expansion result is
-    ; managed independently (dequeue or simple timer) — never hide it here.
-    ; Only hide when the buffer is reset due to a navigation key, mouse click,
-    ; or other non-fire event, where the tooltip preview is no longer relevant.
-    if !ConsumedByFire {
-        TooltipHide("ResetBuf")
-    } else {
-        ; Pre-arm the dequeue guard so that any LookupNoMatch / ResetBuf calls
-        ; arriving before TooltipShow (which sets _TooltipDequeueActive itself)
-        ; are blocked. The guard is cleared by TooltipHide(Force=true) if the
-        ; tooltip turns out not to need a dequeue cycle.
-        _TooltipDequeueActive := true
-        ; Re-arm the timer from zero so the tooltip stays visible for its full
-        ; declared duration starting from the moment of fire, not from when the
-        ; preview was first shown (which may have been seconds earlier).
-        if IsSet(TooltipRearmTimer)
-            try TooltipRearmTimer()
-    }
+    ; Tooltips must disappear immediately upon hotstring firing.
+    TooltipHide("ResetBuf", true)
     if ConsumedByFire {
         _NotifySuggestionConsumed()
     } else {
@@ -912,7 +896,7 @@ _LookupAndRender() {
     ; is the body of "c★"), so we let the lookup below decide — the early
     ; exit here only avoids the Map lookup for guaranteed-empty cases.
     if (Len < 1) {
-        TooltipHide("LookupLen0")
+        TooltipHide("LookupLen0", true)
         _NotifySuggestionDismissed()
         return
     }
@@ -937,7 +921,7 @@ _LookupAndRender() {
     }
     SearchKey := (LastTermPos > 0) ? SubStr(Buffer, LastTermPos + 1) : Buffer
     if (SearchKey == "") {
-        TooltipHide("LookupKeyEmpty")
+        TooltipHide("LookupKeyEmpty", true)
         _NotifySuggestionDismissed()
         return
     }
@@ -947,7 +931,7 @@ _LookupAndRender() {
     if !_PrefixIndex.Has(SearchKey) {
         if LoggerIsDebugEnabled()
             LoggerDebug("PrefixWatcher", "DBG no prefix match for '{1}'.", SearchKey)
-        TooltipHide("LookupNoMatch")
+        TooltipHide("LookupNoMatch", true)
         _NotifySuggestionDismissed()
         return
     }
@@ -1004,7 +988,7 @@ _LookupAndRender() {
     if (Items.Length == 0) {
         if LoggerIsDebugEnabled()
             LoggerDebug("PrefixWatcher", "DBG all candidates have ShowTooltip=false, hiding.")
-        TooltipHide("LookupNoItems")
+        TooltipHide("LookupNoItems", true)
         _NotifySuggestionDismissed()
         return
     }
