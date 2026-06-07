@@ -622,8 +622,39 @@ function M.load_toml(name, path)
 			goto continue_sec
 		end
 
+		local entries = {}
+		local count = 0
+		if type(sec.entries) == "table" then
+			-- Legacy format: [[section]] entries = [...]
+			entries = sec.entries
+			count = #entries
+		else
+			-- Modern format: [[section]] followed by key = value pairs
+			-- or [section] table.
+			for k, v in pairs(sec) do
+				if type(k) == "string" and k ~= "description" and k ~= "is_placeholder" then
+					count = count + 1
+					if type(v) == "table" then
+						table.insert(entries, {
+							trigger           = k,
+							output            = v.output,
+							is_word           = v.is_word,
+							auto_expand       = v.auto_expand,
+							is_case_sensitive = v.is_case_sensitive,
+							final_result      = v.final_result,
+						})
+					else
+						table.insert(entries, {
+							trigger = k,
+							output  = tostring(v),
+						})
+					end
+				end
+			end
+		end
+
 		if M.is_section_enabled(name, sec_name) then
-			for _, entry in ipairs(sec.entries or {}) do
+			for _, entry in ipairs(entries) do
 				M.add(entry.trigger, entry.output, {
 					is_word           = entry.is_word,
 					auto_expand       = entry.auto_expand,
@@ -638,8 +669,8 @@ function M.load_toml(name, path)
 
 		table.insert(sections_info, {
 			name        = sec_name,
-			description = sec.description,
-			count       = #(sec.entries or {}),
+			description = sec.description or sec_name,
+			count       = count,
 		})
 
 		::continue_sec::

@@ -1205,24 +1205,27 @@ _ParseExtTomlSections(FilePath) {
             SectionOrder.Push(SectionKey)
         }
     }
-    ; Second pass: count entries per [[section]]
+    ; Second pass: count entries per section (supports [sec] and [[sec]])
     SectionCounts := Map()
     CurSec := ""
     for _, Line in StrSplit(Content, "`n", "`r") {
         Trimmed := Trim(Line, " `t")
-        if RegExMatch(Trimmed, "^\[\[([^\[\]]+)\]\]$", &SecM) {
+        ; Match [[section]] or [section]
+        if RegExMatch(Trimmed, "^\[+([^\[\]]+)\]+$", &SecM) {
             CurSec := StrLower(Trim(SecM[1]))
-            if !SectionCounts.Has(CurSec) {
+            if (CurSec == "_meta" or CurSec == "_meta.sections") {
+                CurSec := ""
+            } else if !SectionCounts.Has(CurSec) {
                 SectionCounts[CurSec] := 0
             }
             continue
         }
-        if (SubStr(Trimmed, 1, 1) == "[") {
-            CurSec := ""
-            continue
-        }
-        if (CurSec != "" and SubStr(Trimmed, 1, 1) == Q and InStr(Trimmed, "output")) {
-            SectionCounts[CurSec] := SectionCounts.Get(CurSec, 0) + 1
+        if (CurSec != "" and Trimmed != "" and SubStr(Trimmed, 1, 1) != "#") {
+            ; Match hotstring entry: key = value or key = { ... }
+            ; Key can be "quoted" or bare words.
+            if RegExMatch(Trimmed, "^(?:`"[^`"]+`"|[A-Za-z0-9_.-]+)\s*=") {
+                SectionCounts[CurSec] := SectionCounts.Get(CurSec, 0) + 1
+            }
         }
     }
     ; Build result in [_meta.sections] order (or any section not in meta, alphabetically)

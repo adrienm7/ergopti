@@ -201,14 +201,9 @@ LoadHotstringsSection(CategoryName, SectionName, FeatureConfig, ExtraOptions := 
             continue
         }
 
-        if RegExMatch(Line, "^\[\[(.+)\]\]$", &SectionMatch) {
-            CurrentSection := StrLower(SectionMatch[1])
-            continue
-        }
-
-        ; Any other [xxx] header terminates the current section context
-        if (SubStr(Line, 1, 1) == "[") {
-            CurrentSection := ""
+        ; Match [[section]] or [section]
+        if RegExMatch(Line, "^\[+([^\[\]]+)\]+$", &SectionMatch) {
+            CurrentSection := StrLower(Trim(SectionMatch[1]))
             continue
         }
 
@@ -297,18 +292,29 @@ LoadExtTomlFile(FilePath, CategoryLabel) {
         if (Line == "" or SubStr(Line, 1, 1) == "#") {
             continue
         }
-        if RegExMatch(Line, "^\[\[(.+)\]\]$", &SecM) {
-            CurrentSection := StrLower(SecM[1])
-            continue
-        }
-        if (SubStr(Line, 1, 1) == "[") {
-            CurrentSection := ""
+        ; Match [[section]] or [section]
+        if RegExMatch(Line, "^\[+([^\[\]]+)\]+$", &SecM) {
+            CurrentSection := StrLower(Trim(SecM[1]))
             continue
         }
         if (CurrentSection == "") {
             continue
         }
+        ; Match hotstring entry: key = value or key = { ... }
+        if !RegExMatch(Line, "^(?:`"[^`"]+`"|[A-Za-z0-9_.-]+)\s*=") {
+            continue
+        }
         if !RegExMatch(Line, _HOTSTRING_ENTRY_PATTERN, &Match) {
+            ; Simple format: "trigger" = "replacement" (not supported by full regex)
+            ; Try to extract just trigger and output for simple entries
+            if RegExMatch(Line, "i)^(?:`"([^`"]+)`"|([A-Za-z0-9_.-]+))\s*=\s*`"([^`"]+)`\"", &SimpleM) {
+                Trigger := (SimpleM[1] != "") ? SimpleM[1] : SimpleM[2]
+                Output  := SimpleM[3]
+                Trigger := StrReplace(Trigger, "★", ScriptInformation["MagicKey"])
+                Options := Map("TimeActivationSeconds", 0, "FinalResult", true)
+                CreateCaseSensitiveHotstrings("", Trigger, Output, Options)
+                TotalLoaded += 1
+            }
             continue
         }
         Trigger    := UnescapeTomlString(Match[1])
@@ -525,16 +531,20 @@ CountTomlSection(CategoryName, SectionName, FilePath := "") {
         if (Line == "" or SubStr(Line, 1, 1) == "#") {
             continue
         }
-        if RegExMatch(Line, "^\[\[(.+)\]\]$", &SectionMatch) {
-            CurrentSection := StrLower(SectionMatch[1])
+        ; Match [[section]] or [section]
+        if RegExMatch(Line, "^\[+([^\[\]]+)\]+$", &SectionMatch) {
+            CurrentSection := StrLower(Trim(SectionMatch[1]))
             continue
         }
         if (SubStr(Line, 1, 1) == "[") {
             CurrentSection := ""
             continue
         }
-        if (CurrentSection == TargetSection and SubStr(Line, 1, 1) == Q and InStr(Line, "output")) {
-            Count++
+        if (CurrentSection == TargetSection) {
+            ; Match hotstring entry: key = value or key = { ... }
+            if RegExMatch(Line, "^(?:`"[^`"]+`"|[A-Za-z0-9_.-]+)\s*=") {
+                Count++
+            }
         }
     }
     _TomlCountCache[CacheKey] := Count
@@ -567,10 +577,23 @@ CountTomlHotstrings(CategoryName, FilePath := "") {
     }
     Count := 0
     Q := Chr(34)
+    InSec := false
     loop parse, ReadTomlFile(FilePath), "`n", "`r" {
         Line := Trim(A_LoopField, " `t")
-        if (SubStr(Line, 1, 1) == Q and InStr(Line, "output")) {
-            Count++
+        if (Line == "" or SubStr(Line, 1, 1) == "#") {
+            continue
+        }
+        ; Match [[section]] or [section]
+        if RegExMatch(Line, "^\[+([^\[\]]+)\]+$", &SectionMatch) {
+            SecName := StrLower(Trim(SectionMatch[1]))
+            InSec := (SecName != "_meta" and SecName != "_meta.sections" and SecName != "_meta.section_delays")
+            continue
+        }
+        if (InSec) {
+            ; Match hotstring entry: key = value or key = { ... }
+            if RegExMatch(Line, "^(?:`"[^`"]+`"|[A-Za-z0-9_.-]+)\s*=") {
+                Count++
+            }
         }
     }
     _TomlCountCache[CacheKey] := Count
