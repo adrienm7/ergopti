@@ -762,29 +762,29 @@ _LAY_LayoutFeaturesAltGr(M, _Cat) {
 ; Compute the grand total count used in the tray menu title label.
 ; Sums enabled standard, ergopti, dynamic, personal and extension entries.
 _HS_ComputeGrandTotal() {
-	global Features, HotstringCategoriesStd, HotstringCategoriesErgopti
-	global ScriptInformation, _ExtTotalPersonalCounterGlobal
-	IsGated := IsCategoryGated("Hotstrings")
-	CountFn := IsGated ? _CountEnabledForCategory : _CountAllForCategory
-	Total := 0
-	for Cat in HotstringCategoriesStd
-		Total += CountFn(Cat)
-	for Cat in HotstringCategoriesErgopti
-		Total += CountFn(Cat)
-	if Features.Has("hotstrings") and Features["hotstrings"].Has("dynamic") {
-		for DKey, DCfg in Features["hotstrings"]["dynamic"] {
-			if IsGated {
-				if (IsObject(DCfg) and DCfg.Has("enabled") and DCfg["enabled"])
-					Total += CountDynamicSection(DKey)
-			} else {
-				if IsObject(DCfg)
-					Total += CountDynamicSection(DKey)
-			}
+global Features, HotstringCategoriesStd, HotstringCategoriesErgopti
+global ScriptInformation, _ExtTotalPersonalCounterGlobal
+IsGated := IsCategoryGated("Hotstrings")
+CountFn := IsGated ? _CountEnabledForCategory : _CountAllForCategory
+Total := 0
+for _, Cat in HotstringCategoriesStd
+	Total += CountFn(Cat)
+for _, Cat in HotstringCategoriesErgopti
+	Total += CountFn(Cat)
+if Features.Has("hotstrings") and Features["hotstrings"].Has("dynamic") {
+	for DKey, DCfg in Features["hotstrings"]["dynamic"] {
+		if IsGated {
+			if (IsObject(DCfg) and DCfg.Has("enabled") and DCfg["enabled"])
+				Total += CountDynamicSection(DKey)
+		} else {
+			if IsObject(DCfg)
+				Total += CountDynamicSection(DKey)
 		}
 	}
-	Total += IsObject(_ExtTotalPersonalCounterGlobal) ? _ExtTotalPersonalCounterGlobal.value : 0
-	return Total
-	}
+}
+Total += IsObject(_ExtTotalPersonalCounterGlobal) ? _ExtTotalPersonalCounterGlobal.value : 0
+return Total
+}
 
 ; Dynamic handler: magic key config entry (prefix + current char + editor).
 _HS_MagicKeyConfig(M, _Cat) {
