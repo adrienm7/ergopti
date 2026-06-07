@@ -73,7 +73,7 @@ global _DriverDir := _StaticDir . "\ergopti_plus\windows"
 ; "handled" (suppressing the default dialog).
 ErgoptiGlobalErrorHandler(Exc, Mode) {
     ; Release every modifier that could be stuck after the failed callback
-    for ModKey in ["LControl", "RControl", "LShift", "RShift", "LAlt", "RAlt", "LWin", "RWin"] {
+    for _, ModKey in ["LControl", "RControl", "LShift", "RShift", "LAlt", "RAlt", "LWin", "RWin"] {
         if GetKeyState(ModKey, "P") {
             SendEvent("{" ModKey " Up}")
         }
@@ -432,7 +432,7 @@ global SCRIPT_SHORTCUT_FALLBACKS := Map(
     "script_altgr_escape", "{Escape}",
 )
 global ScriptShortcutAssignments := Map()
-for _Slot in SCRIPT_SHORTCUT_SLOTS {
+for _, _Slot in SCRIPT_SHORTCUT_SLOTS {
     ScriptShortcutAssignments[_Slot] := SCRIPT_SHORTCUT_DEFAULTS[_Slot]
 }
 
@@ -818,7 +818,7 @@ RegisterPersonalFeature(Name, DefaultEnabled := false, Description := "") {
         ; Track insertion order so the submenu respects personal_shortcuts.ahk
         ; declaration order across reloads.
         Found := false
-        for Item in _PersonalShortcutsRegistry["__Order"] {
+        for _, Item in _PersonalShortcutsRegistry["__Order"] {
             if Item == Name {
                 Found := true
                 break

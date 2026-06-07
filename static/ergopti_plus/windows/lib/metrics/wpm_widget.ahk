@@ -233,7 +233,7 @@ WPMWidget_Calc() {
     has_ac := false
     earliest := now
     latest   := 0
-    for ev in WPMWidget._ring {
+    for _, ev in WPMWidget._ring {
         t := ev["t"]
         if (t < cutoff)
             continue
@@ -926,7 +926,7 @@ WPMWidget_PushGraphUpdate(wpm_str, txt_col, has_hs, has_ai, has_ac, is_idle) {
     accent := WPMWidget_ResolveGraphColor(has_hs, has_ai, has_ac, WPMWidget.use_colors)
     ; Build compact JSON array of history values.
     hist_parts := []
-    for v in WPMWidget._graph_hist
+    for _, v in WPMWidget._graph_hist
         hist_parts.Push(String(v))
     hist_json := "[" . StrJoin(hist_parts, ",") . "]"
 

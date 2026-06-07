@@ -268,7 +268,7 @@ TOML_BatchWrite(Path, Updates) {
     for sec in Sections
         order.Push(sec)
 
-    for U in Updates {
+    for _, U in Updates {
         Sec := U.Section
         K := U.Key
         V := U.Value
@@ -313,7 +313,7 @@ TOML_BatchWrite(Path, Updates) {
         SortedSections.Push(sec)
     SortedSections := SortArray(SortedSections)
     FirstSection := true
-    for sec in SortedSections {
+    for _, sec in SortedSections {
         if !FirstSection {
             EnsureTrailingBlankLines(5)
         }
@@ -324,7 +324,7 @@ TOML_BatchWrite(Path, Updates) {
         for k, v in Sections[sec]
             SortedKeys.Push(k)
         SortedKeys := SortArray(SortedKeys)
-        for k in SortedKeys
+        for _, k in SortedKeys
             body .= TOML_RenderKey(k) . " = " . TOML_RenderValue(Sections[sec][k]) . "`n"
     }
 

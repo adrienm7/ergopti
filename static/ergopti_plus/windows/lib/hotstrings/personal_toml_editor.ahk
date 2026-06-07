@@ -242,18 +242,18 @@ ReadPersonalToml() {
 
     ; ── Build final sections_order: meta order first, then unlisted sections ──
     Seen := Map()
-    for SecName in MetaOrder {
+    for _, SecName in MetaOrder {
         if Result["sections"].Has(SecName) {
             Result["sections_order"].Push(SecName)
             Seen[SecName] := true
         }
     }
-    for SecName in FileSectionOrder {
+    for _, SecName in FileSectionOrder {
         if !Seen.Has(SecName) {
             Result["sections_order"].Push(SecName)
+            Seen[SecName] := true
         }
     }
-
     return Result
 }
 
@@ -657,7 +657,7 @@ OpenPersonalEditor(DefaultSection := "") {
 ; DDL index always matches sections_order index 1:1.
 _BuildSectionList(Data) {
     List := []
-    for SecName in Data["sections_order"] {
+    for _, SecName in Data["sections_order"] {
         Desc := Data["sections"].Has(SecName) ? Data["sections"][SecName]["description"] : SecName
         List.Push(Desc)
     }
@@ -706,7 +706,7 @@ _PopulateList(LV, Data, SectionName) {
     if (SectionName == "" or !Data["sections"].Has(SectionName)) {
         return
     }
-    for E in Data["sections"][SectionName]["entries"] {
+    for _, E in Data["sections"][SectionName]["entries"] {
         LV.Add("",
             E["trigger"],
             StrReplace(E["output"], "`n", "↵"),

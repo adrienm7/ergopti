@@ -118,7 +118,7 @@ ManifestFeaturesForSection(SectionPath) {
 		return Out
 	}
 	global FEATURES_MANIFEST
-	for Entry in FEATURES_MANIFEST["features"] {
+	for _, Entry in FEATURES_MANIFEST["features"] {
 		if (Entry["section"] == SectionPath) {
 			Out.Push(Entry)
 		}
@@ -137,7 +137,7 @@ ManifestFindEntryByPath(V2Path) {
 	}
 	global FEATURES_MANIFEST
 	AhkVariant := "ahk." . V2Path
-	for Entry in FEATURES_MANIFEST["features"] {
+	for _, Entry in FEATURES_MANIFEST["features"] {
 		EntryPath := Entry["path"]
 		if (EntryPath == V2Path or EntryPath == AhkVariant) {
 			return Entry

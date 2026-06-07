@@ -99,7 +99,7 @@ _MR_IsForAhk(Entry) {
 	if !(Plats is Array) {
 		return true
 	}
-	for P in Plats {
+	for _, P in Plats {
 		if P == "ahk" {
 			return true
 		}

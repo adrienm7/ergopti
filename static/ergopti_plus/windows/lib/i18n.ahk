@@ -115,7 +115,7 @@ _I18nDetectSystemLocale() {
 	if Len > 1 {
 		Code := StrGet(Buf, "UTF-16")
 		Code := StrLower(SubStr(Code, 1, 2))
-		for _loc in I18N_LOCALES {
+		for _, _loc in I18N_LOCALES {
 			if _loc.Code = Code {
 				try LoggerDebug("i18n", "detect_system_locale: matched '{1}'.", Code)
 				return Code

@@ -364,7 +364,7 @@ _SaveOverrides() {
     }
     _SortStringsInPlace(Cats)
 
-    for Cat in Cats {
+    for _, Cat in Cats {
         Entry := _HotstringsOverrides[Cat]
         ; Extension keys are stored as "ext.name" — the header must be written
         ; as [ext.name] (2 segments), not [ext.name] which would be ambiguous
@@ -390,7 +390,7 @@ _SaveOverrides() {
             Secs.Push(Sec)
         }
         _SortStringsInPlace(Secs)
-        for Sec in Secs {
+        for _, Sec in Secs {
             S := Entry.Sections[Sec]
             if (S.Delay != "" or S.Color != "" or S.ShowTooltip != "") {
                 ; Extension: [ext.name.section] — Cat already contains the dot
@@ -732,12 +732,12 @@ HotstringsConfigPath() {
 HSE_TerminatorDefaultWordDelimiters() {
     global HSE_Terminators
     Out := ""
-    for D in HSE_Terminators.all() {
+    for _, D in HSE_Terminators.all() {
         if (D.Has("type") and D["type"] == "separator")
             continue
         if !D["default_enabled"]
             continue
-        for Ch in D["chars"]
+        for _, Ch in D["chars"]
             Out .= Ch
     }
     return Out
@@ -749,12 +749,12 @@ HSE_TerminatorDefaultWordDelimiters() {
 HSE_TerminatorDefaultConsumedDelimiters() {
     global HSE_Terminators
     Out := ""
-    for D in HSE_Terminators.all() {
+    for _, D in HSE_Terminators.all() {
         if (D.Has("type") and D["type"] == "separator")
             continue
         if !(D["default_enabled"] and D["consume"])
             continue
-        for Ch in D["chars"]
+        for _, Ch in D["chars"]
             Out .= Ch
     }
     return Out
@@ -765,10 +765,10 @@ HSE_TerminatorDefaultConsumedDelimiters() {
 HSE_TerminatorBuiltinChars() {
     global HSE_Terminators
     Out := ""
-    for D in HSE_Terminators.all() {
+    for _, D in HSE_Terminators.all() {
         if (D.Has("type") and D["type"] == "separator")
             continue
-        for Ch in D["chars"]
+        for _, Ch in D["chars"]
             Out .= Ch
     }
     return Out
@@ -779,7 +779,7 @@ HSE_TerminatorBuiltinChars() {
 HSE_TerminatorEntryEnabled(CharsArr, WordStr) {
     if (CharsArr.Length == 0)
         return false
-    for Ch in CharsArr {
+    for _, Ch in CharsArr {
         if !InStr(WordStr, Ch)
             return false
     }
@@ -789,7 +789,7 @@ HSE_TerminatorEntryEnabled(CharsArr, WordStr) {
 ; True when any of the entry's chars appears in the given string (used to render
 ; the "(consumed)" suffix from the actual consumed-delimiter set).
 HSE_TerminatorAnyCharIn(CharsArr, Hay) {
-    for Ch in CharsArr {
+    for _, Ch in CharsArr {
         if InStr(Hay, Ch)
             return true
     }
@@ -800,10 +800,10 @@ HSE_TerminatorAnyCharIn(CharsArr, Hay) {
 ; entry is currently enabled, all added otherwise.
 HSE_TerminatorToggleString(WordStr, CharsArr) {
     if HSE_TerminatorEntryEnabled(CharsArr, WordStr) {
-        for Ch in CharsArr
+        for _, Ch in CharsArr
             WordStr := StrReplace(WordStr, Ch, "")
     } else {
-        for Ch in CharsArr {
+        for _, Ch in CharsArr {
             if !InStr(WordStr, Ch)
                 WordStr .= Ch
         }
@@ -824,10 +824,10 @@ HSE_TerminatorSetAllString(WordStr, Enable) {
             Kept .= Ch
     }
     if Enable {
-        for D in HSE_Terminators.all() {
+        for _, D in HSE_Terminators.all() {
             if (D.Has("type") and D["type"] == "separator")
                 continue
-            for Ch in D["chars"] {
+            for _, Ch in D["chars"] {
                 if !InStr(Kept, Ch)
                     Kept .= Ch
             }
