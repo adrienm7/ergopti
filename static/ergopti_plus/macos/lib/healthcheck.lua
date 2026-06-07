@@ -242,9 +242,9 @@ function M.show_window()
 	local i18n_ok, i18n = pcall(require, "lib.i18n")
 	local t = (i18n_ok and type(i18n) == "table" and type(i18n.get) == "function")
 		and function(k) return i18n.get(k) end
-		or  function(_) return nil end
+		or  function(k) return k end
 
-	local title     = i18n_ok and i18n.get("menu.debug.healthcheck") or "System diagnostic"
+	local title = t("menu.debug.healthcheck") or "System diagnostic"
 	if not title:find("ErgoptiPlus") then
 		title = "ErgoptiPlus — " .. title
 	end
