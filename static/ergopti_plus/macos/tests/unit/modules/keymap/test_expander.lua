@@ -196,16 +196,18 @@ end)
 
 helpers.describe("keymap.expander: perform_text_replacement", function()
 	helpers.it("calls tooltip.hide_forced immediately on expansion", function()
-		local E = helpers.load_with_stubs("modules.keymap.expander")
-		local s = make_state("hello")
 		local tt_hidden_forced = false
+		local old_tooltip = package.loaded["ui.tooltip"]
 		package.loaded["ui.tooltip"] = {
 			hide = function() end,
 			hide_forced = function() tt_hidden_forced = true end
 		}
+		local E = helpers.load_with_stubs("modules.keymap.expander")
+		local s = make_state("hello")
 		E.init(s, make_registry({}, {}), make_llm())
 		E.perform_text_replacement(1, function() end, function() end, false, false, "star", nil)
 		helpers.assert_eq(tt_hidden_forced, true)
+		package.loaded["ui.tooltip"] = old_tooltip
 	end)
 
 	helpers.it("issues the requested deletes and runs the buffer_action", function()

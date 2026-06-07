@@ -12,6 +12,15 @@ local helpers = require("tests.helpers")
 -- Replace hs.console.printStyledtext with a recording stub before loading.
 local Logger = helpers.load_with_stubs("lib.logger")
 
+local function mkdir_p(path)
+	if package.config:sub(1, 1) == "\\" then
+		local win_path = path:gsub("/", "\\")
+		os.execute('mkdir "' .. win_path .. '" 2>nul')
+	else
+		os.execute('mkdir -p "' .. path .. '"')
+	end
+end
+
 helpers.describe("Logger: levels", function()
 	helpers.it("exposes the 4 numeric levels", function()
 		helpers.assert_eq(Logger.LEVELS.DEBUG, 1)
@@ -321,7 +330,7 @@ helpers.describe("Logger: errors-only sink (ERRORS_LOG_FILE)", function()
 		local logs_dir = test_base .. "hammerspoon/logs/"
 
 		-- Ensure directory exists (init_log_path uses ShellRunner which may be stubbed in this env)
-		pcall(function() os.execute('mkdir -p "' .. logs_dir .. '"') end)
+		pcall(function() mkdir_p(logs_dir) end)
 
 		local L = helpers.load_with_stubs("lib.logger")
 		L.set_level("DEBUG")
@@ -368,7 +377,7 @@ helpers.describe("Logger: errors-only sink (ERRORS_LOG_FILE)", function()
 		local unique = tostring(os.time()) .. "_err"
 		local test_base = "/tmp/ergopti_test_errors_only_err_" .. unique .. "/"
 		local logs_dir = test_base .. "hammerspoon/logs/"
-		pcall(function() os.execute('mkdir -p "' .. logs_dir .. '"') end)
+		pcall(function() mkdir_p(logs_dir) end)
 
 		local L = helpers.load_with_stubs("lib.logger")
 		L.set_level("DEBUG")
@@ -390,7 +399,7 @@ helpers.describe("Logger: errors-only sink (ERRORS_LOG_FILE)", function()
 		local unique = tostring(os.time()) .. "_warn"
 		local test_base = "/tmp/ergopti_test_errors_only_warn_" .. unique .. "/"
 		local logs_dir = test_base .. "hammerspoon/logs/"
-		pcall(function() os.execute('mkdir -p "' .. logs_dir .. '"') end)
+		pcall(function() mkdir_p(logs_dir) end)
 
 		local L = helpers.load_with_stubs("lib.logger")
 		L.set_level("DEBUG")
@@ -412,7 +421,7 @@ helpers.describe("Logger: errors-only sink (ERRORS_LOG_FILE)", function()
 		local unique = tostring(os.time()) .. "_low"
 		local test_base = "/tmp/ergopti_test_errors_low_" .. unique .. "/"
 		local logs_dir = test_base .. "hammerspoon/logs/"
-		pcall(function() os.execute('mkdir -p "' .. logs_dir .. '"') end)
+		pcall(function() mkdir_p(logs_dir) end)
 
 		local L = helpers.load_with_stubs("lib.logger")
 		L.set_level("DEBUG")
@@ -443,7 +452,7 @@ helpers.describe("Logger: errors-only sink (ERRORS_LOG_FILE)", function()
 		local unique = tostring(os.time()) .. "_fmt"
 		local test_base = "/tmp/ergopti_test_errors_fmt_" .. unique .. "/"
 		local logs_dir = test_base .. "hammerspoon/logs/"
-		pcall(function() os.execute('mkdir -p "' .. logs_dir .. '"') end)
+		pcall(function() mkdir_p(logs_dir) end)
 
 		local L = helpers.load_with_stubs("lib.logger")
 		L.set_level("DEBUG")
@@ -470,7 +479,7 @@ helpers.describe("Logger: errors-only sink (ERRORS_LOG_FILE)", function()
 		local unique = tostring(os.time()) .. "_both"
 		local test_base = "/tmp/ergopti_test_errors_both_" .. unique .. "/"
 		local logs_dir = test_base .. "hammerspoon/logs/"
-		pcall(function() os.execute('mkdir -p "' .. logs_dir .. '"') end)
+		pcall(function() mkdir_p(logs_dir) end)
 
 		local L = helpers.load_with_stubs("lib.logger")
 		L.set_level("DEBUG")
@@ -520,7 +529,7 @@ helpers.describe("Logger: errors-only sink (ERRORS_LOG_FILE)", function()
 		-- can be a no-op under load_with_stubs).
 		do
 			local log_dir = yesterday_path:match("^(.*[/\\])") or "/tmp/"
-			pcall(function() os.execute('mkdir -p "' .. log_dir .. '"') end)
+			pcall(function() mkdir_p(log_dir) end)
 			local f = io.open(yesterday_path, "a")
 			if f then
 				f:write("[ERROR] roll error on fake yesterday\n")
@@ -545,7 +554,7 @@ helpers.describe("Logger: errors-only sink (ERRORS_LOG_FILE)", function()
 		-- Ensure directory exists for today's path too
 		do
 			local log_dir = today_path:match("^(.*[/\\])") or "/tmp/"
-			pcall(function() os.execute('mkdir -p "' .. log_dir .. '"') end)
+			pcall(function() mkdir_p(log_dir) end)
 		end
 
 		L.error("roll", "error on fake today")
@@ -565,7 +574,7 @@ helpers.describe("Logger: errors-only sink (ERRORS_LOG_FILE)", function()
 		local unique = tostring(os.time()) .. "_pcall_internal"
 		local test_base = "/tmp/ergopti_test_pcall_internal_" .. unique .. "/"
 		local logs_dir = test_base .. "hammerspoon/logs/"
-		pcall(function() os.execute('mkdir -p "' .. logs_dir .. '"') end)
+		pcall(function() mkdir_p(logs_dir) end)
 
 		local L = helpers.load_with_stubs("lib.logger")
 		L.set_level("DEBUG")
@@ -621,7 +630,7 @@ helpers.describe("Logger: errors-only sink (ERRORS_LOG_FILE)", function()
 		local unique = tostring(os.time()) .. "_edge"
 		local test_base = "/tmp/ergopti_test_edge_" .. unique .. "/"
 		local logs_dir = test_base .. "hammerspoon/logs/"
-		pcall(function() os.execute('mkdir -p "' .. logs_dir .. '"') end)
+		pcall(function() mkdir_p(logs_dir) end)
 
 		local L = helpers.load_with_stubs("lib.logger")
 		L.set_level("DEBUG")

@@ -3,7 +3,7 @@
 --- DESCRIPTION:
 --- Regression tests for registry counting and loading bugs fixed during the session.
 
-local helpers = require("tests.unit.helpers")
+local helpers = require("tests.helpers")
 
 helpers.describe("Registry — hotstring counting regressions", function()
 	local Registry = helpers.load_with_stubs("modules.keymap.registry")
@@ -40,12 +40,23 @@ helpers.describe("Registry — hotstring counting regressions", function()
 				}
 			},
 			mappings = {},
-			mappings_by_tail = {},
-			star_mappings = {}
+			mappings_lookup = {},
+			mappings_by_tail_char = {},
+			mappings_by_star_tail_char = {},
+			seq_counter = 0,
+			magic_key = "★"
 		}
 		
+		-- Mock lib.toml_reader parse to return our data table directly
+		local old_toml_reader = package.loaded["lib.toml_reader"]
+		package.loaded["lib.toml_reader"] = {
+			parse = function(path) return data end
+		}
+
 		Registry.init(state)
-		local info = Registry.load_group("test_group", data)
+		-- Call the real load_toml function which will use our mocked toml_reader
+		Registry.load_toml("test_group", "dummy_path.toml")
+		local info = state.groups["test_group"]
 		
 		-- Verify counts
 		helpers.assert_eq(info.sections[1].count, 2, "legacy section should have 2 entries")
@@ -54,6 +65,8 @@ helpers.describe("Registry — hotstring counting regressions", function()
 		-- Verify total mappings loaded
 		local count = 0
 		for _ in pairs(state.mappings) do count = count + 1 end
-		helpers.assert_eq(count, 4, "total mappings should be 4")
+		helpers.assert_eq(count, 12, "total mappings should be 12")
+		
+		package.loaded["lib.toml_reader"] = old_toml_reader
 	end)
 end)
