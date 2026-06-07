@@ -82,7 +82,11 @@ function injectReleases(releases, channel) {
 	_selectedIndex = -1;
 	renderReleaseList();
 	hideLoading();
-	if (_releases.length > 0) selectRelease(0);
+	if (_releases.length > 0) {
+		selectRelease(0);
+	} else {
+		clearContent();
+	}
 }
 
 /**
@@ -298,9 +302,11 @@ function clearContent() {
 	var tagEl  = document.getElementById("release-tag");
 	var metaEl = document.getElementById("release-meta");
 	var bodyEl = document.getElementById("release-body");
+	var btnGh  = document.getElementById("btn-github");
 	if (tagEl)  tagEl.textContent  = "";
 	if (metaEl) metaEl.textContent = "";
 	if (bodyEl) bodyEl.innerHTML   = "";
+	if (btnGh)  btnGh.style.display = "none";
 	_currentReleaseUrl = null;
 }
 
@@ -323,11 +329,15 @@ function selectRelease(idx) {
 	// Populate header.
 	var tagEl  = document.getElementById("release-tag");
 	var metaEl = document.getElementById("release-meta");
+	var btnGh  = document.getElementById("btn-github");
 	if (tagEl)  tagEl.textContent  = release.tag_name || "";
 	if (metaEl) {
 		var parts = [];
 		if (release.published_at) parts.push(_formatDate(release.published_at));
 		metaEl.textContent = parts.join("  ·  ");
+	}
+	if (btnGh) {
+		btnGh.style.display = _currentReleaseUrl ? "block" : "none";
 	}
 
 	// Render markdown body.

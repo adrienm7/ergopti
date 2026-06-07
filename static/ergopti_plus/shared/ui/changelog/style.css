@@ -193,6 +193,7 @@ body {
 }
 
 #btn-github {
+	display: none;
 	background: rgba(48, 209, 88, 0.1);
 	border: 1px solid rgba(48, 209, 88, 0.4);
 	border-radius: 7px;
