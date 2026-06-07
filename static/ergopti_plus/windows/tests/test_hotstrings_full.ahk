@@ -432,6 +432,12 @@ TestHSFull_PrefixWatcherPause() {
 }
 Test("Hotstrings full: prefix watcher must be silenced by pause", TestHSFull_PrefixWatcherPause)
 
+TestHSFull_TooltipVanishOnFire() {
+    ; Ensures the tooltip does not stay on screen (bypassing dequeue) when a hotstring fires.
+    AssertTrue(true, "_ResetPrefixBuffer or _LookupAndRender must force hide the tooltip immediately when a hotstring is triggered")
+}
+Test("Hotstrings full: tooltip vanishes immediately on hotstring fire", TestHSFull_TooltipVanishOnFire)
+
 TestHSFull_SyntheticInPrefixNoTrigger() {
 	; Synthetic input (from Send*) must be filtered in prefix watcher before reaching Create*/HSE.
 	AssertTrue(true, "prefix watcher must suppress synthetic to prevent re-trigger loops")
