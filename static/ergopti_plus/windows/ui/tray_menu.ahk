@@ -1156,13 +1156,13 @@ _HS_Personal(M, _Cat) {
 			return Root[""]
 		}
 		Tree := Root
+		CurrentNode := Root.Has("") ? Root[""] : (Root[""] := Map("subfolders", Map(), "tomls", []))
 		for Part in PathParts {
-			if !Tree.Has(Part)
-				Tree[Part] := Map("subfolders", Map(), "tomls", [])
-			Node := Tree[Part]
-			Tree := Node["subfolders"]
+			if !CurrentNode["subfolders"].Has(Part)
+				CurrentNode["subfolders"][Part] := Map("subfolders", Map(), "tomls", [])
+			CurrentNode := CurrentNode["subfolders"][Part]
 		}
-		return Node
+		return CurrentNode
 	}
 
 	if IsSet(ScriptInformation) and ScriptInformation.Has("PersonalHotstringsDir") {
