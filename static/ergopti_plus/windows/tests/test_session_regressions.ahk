@@ -83,5 +83,19 @@ TestReg_RecursiveNodeTotal() {
 }
 Test("Regression: Recursive folder counting logic", TestReg_RecursiveNodeTotal)
 
+TestReg_ChangelogMessageParsing() {
+    MsgFetch := '{"action":"fetch","channel":"dev"}'
+    MsgOpenUrl := '{"action":"open_url","url":"https://github.com"}'
+    
+    PayloadFetch := JsonParse(MsgFetch)
+    AssertEqual("fetch", PayloadFetch["action"], "action should be fetch")
+    AssertEqual("dev", PayloadFetch["channel"], "channel should be dev")
+    
+    PayloadOpenUrl := JsonParse(MsgOpenUrl)
+    AssertEqual("open_url", PayloadOpenUrl["action"], "action should be open_url")
+    AssertEqual("https://github.com", PayloadOpenUrl["url"], "url should be github")
+}
+Test("Regression: Changelog WebView message parsing", TestReg_ChangelogMessageParsing)
+
 ; Hooks and global state for tooltip tests would require more setup, 
 ; but these core logic tests already prevent the most critical bugs we saw.
