@@ -435,7 +435,7 @@
 		},
 		{
 			"type": "section_header",
-			"i18n": "menu.hotstrings.header_personal"
+			"i18n": "menu.hotstrings.personal_header"
 		},
 		{
 			"type": "dynamic",
