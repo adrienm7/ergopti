@@ -65,10 +65,10 @@ concurrency:
 
 jobs:
     # ─────────────────────────────────────────────────
-    # 1.1) Hotstring TOML format
+    # 1.1) Unified validation gates
     # ─────────────────────────────────────────────────
-    validate-hotstrings:
-        name: "Validate · hotstrings TOML"
+    validate:
+        name: "Validate · gates (TOML, Domain, JS, I18n)"
         runs-on: ubuntu-latest
 
         steps:
@@ -81,16 +81,6 @@ jobs:
             - name: Check hotstring TOML files are sorted and formatted
               run: python tools/dev/format_toml.py --hotstrings --all --check
 
-    # ─────────────────────────────────────────────────
-    # 1.2) Domain build pipeline + drift detection
-    # ─────────────────────────────────────────────────
-    validate-domain:
-        name: "Validate · domain pipeline"
-        runs-on: ubuntu-latest
-
-        steps:
-            - uses: actions/checkout@v4
-
             - uses: actions/setup-node@v4
               with:
                   node-version: "22"
@@ -98,25 +88,8 @@ jobs:
 
             - run: npm ci
 
-            - name: Run domain build pipeline
+            - name: Run domain build pipeline (manifest, parity, compliance, drift)
               run: npm run build:domain
-
-    # ─────────────────────────────────────────────────
-    # 1.3) JS shared layer — port compliance + PBT
-    # ─────────────────────────────────────────────────
-    validate-js:
-        name: "Validate · JS ports + properties"
-        runs-on: ubuntu-latest
-
-        steps:
-            - uses: actions/checkout@v4
-
-            - uses: actions/setup-node@v4
-              with:
-                  node-version: "22"
-                  cache: "npm"
-
-            - run: npm ci
 
             - name: Port compliance (all 20 ports covered by adapters)
               run: npm run test:port-compliance
@@ -124,31 +97,12 @@ jobs:
             - name: Property-based tests (fast-check, 27 × 1000 runs)
               run: npm run test:properties
 
-            - name: Mutation tests — domain layer (Stryker, break=50)
-              # Guards the shared domain spec files (Registry, HotstringMatcher,
-              # Expander) by running the real spec exports through Stryker.
-              # A mutation score below 50% fails the build.
+            - name: Mutation tests — domain layer (Stryker, break=25)
+              # Guards the shared domain spec files (Registry, HotstringMatcher)
               run: npm run test:mutation
 
             - name: Convention lint (strict — banners, spacing, section headers)
-              # lint:conventions:strict fails on any violation. The --warn-only
-              # variant runs locally for developer convenience; CI uses strict
-              # mode to prevent convention drift from merging undetected.
               run: npm run lint:conventions:strict
-
-    # ─────────────────────────────────────────────────
-    # 1.4) Translation consistency audit
-    # ─────────────────────────────────────────────────
-    validate-translations:
-        name: "Validate · translations audit"
-        runs-on: ubuntu-latest
-
-        steps:
-            - uses: actions/checkout@v4
-
-            - uses: actions/setup-node@v4
-              with:
-                  node-version: "22"
 
             - name: Run translation key consistency audit
               run: node tools/lint/audit-translations.cjs
@@ -159,7 +113,7 @@ jobs:
     test-hs:
         name: "macOS · unit tests"
         runs-on: ubuntu-latest
-        needs: [validate-hotstrings, validate-domain, validate-js]
+        needs: [validate]
 
         steps:
             - uses: actions/checkout@v4
@@ -252,7 +206,7 @@ jobs:
     test-ahk:
         name: "Windows · unit tests"
         runs-on: windows-latest
-        needs: [validate-hotstrings, validate-domain, validate-js]
+        needs: [validate]
 
         steps:
             - uses: actions/checkout@v4
@@ -546,7 +500,7 @@ jobs:
     test-linux:
         name: "Linux · unit tests"
         runs-on: ubuntu-22.04
-        needs: [validate-hotstrings, validate-domain, validate-js]
+        needs: [validate]
 
         steps:
             - uses: actions/checkout@v4
