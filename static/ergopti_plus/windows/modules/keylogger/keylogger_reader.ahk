@@ -765,7 +765,7 @@ KLR_BuildNgramFilter(start_date, end_date, selected_apps) {
         clauses.Push("date <= " . SQLite_Q(end_date))
     if (selected_apps is Array && selected_apps.Length > 0) {
         quoted := []
-        for a in selected_apps
+        for _, a in selected_apps
             quoted.Push(SQLite_Q(a))
         clause := "app IN ("
         for i, q in quoted
@@ -875,7 +875,7 @@ KLR_BuildTodayIdxJson(db, selected_apps := unset) {
     app_clause := ""
     if (selected_apps is Array && selected_apps.Length > 0) {
         quoted := []
-        for a in selected_apps
+        for _, a in selected_apps
             quoted.Push(SQLite_Q(a))
         app_clause := " AND app IN ("
         for i, q in quoted
@@ -995,7 +995,7 @@ KLR_ReadRangeSplitTodayFast(db, selected_apps := unset) {
     app_clause := ""
     if (selected_apps is Array && selected_apps.Length > 0) {
         quoted := []
-        for a in selected_apps
+        for _, a in selected_apps
             quoted.Push(SQLite_Q(a))
         app_clause := " AND app IN ("
         for i, q in quoted
@@ -1086,7 +1086,7 @@ KLR_ReadRangeSplitToday(db, start_date := "", end_date := "", selected_apps := u
     app_clause := ""
     if (selected_apps is Array && selected_apps.Length > 0) {
         quoted := []
-        for a in selected_apps
+        for _, a in selected_apps
             quoted.Push(SQLite_Q(a))
         app_clause := " AND app IN ("
         for i, q in quoted

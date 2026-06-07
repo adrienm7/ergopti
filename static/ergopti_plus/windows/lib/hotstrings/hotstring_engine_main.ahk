@@ -413,14 +413,14 @@ HSE_EnableGroup(Group) {
         return
     }
     ; Re-insert each spec into the live index.
-    for Spec in HSE_RegistryByGroup[Group] {
+    for _, Spec in HSE_RegistryByGroup[Group] {
         LookupKey := Spec.CaseSensitive ? Spec.TailChar : StrLower(Spec.TailChar)
         if !HSE_RegistryByLastChar.Has(LookupKey) {
             HSE_RegistryByLastChar[LookupKey] := []
         }
         ; Avoid duplicates (idempotent enable).
         AlreadyIn := false
-        for S in HSE_RegistryByLastChar[LookupKey] {
+        for _, S in HSE_RegistryByLastChar[LookupKey] {
             if (S.Seq == Spec.Seq) {
                 AlreadyIn := true
                 break
@@ -431,7 +431,7 @@ HSE_EnableGroup(Group) {
         }
         if Spec.Star {
             AlreadyStar := false
-            for S in HSE_StarSpecs {
+            for _, S in HSE_StarSpecs {
                 if (S.Seq == Spec.Seq) {
                     AlreadyStar := true
                     break
@@ -738,8 +738,8 @@ HSE_FindMatchAtEnd(JustTypedChar) {
     ; ── END-CHAR path ──────────────────────────────────────────────
     if IsTerminator and (BodyLastChar != "") {
         Buckets2 := _HSE_BucketsFor(BodyLastChar)
-        for Bucket in Buckets2 {
-            for Spec in Bucket {
+        for _, Bucket in Buckets2 {
+            for _, Spec in Bucket {
                 if Spec.Star {
                     continue
                 }

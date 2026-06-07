@@ -154,7 +154,7 @@ LLM_Engine_Init(opts) {
 		"pred_indent", "auto_raise_temp", "nav_modifiers", "val_modifiers",
 		"inline_autotype", "api_entry_id"]
 
-	for k in _keys
+	for _, k in _keys
 		if opts.Has(k)
 			_LLM_Engine[k] := opts[k]
 
@@ -421,7 +421,7 @@ LLM_Engine_FirePrediction(buffer) {
 		; the user is now committed to typing). Case-SENSITIVE prefix
 		; comparison so "Paris" doesn't get mis-matched with "paris".
 		sliced := []
-		for s in _LLM_Engine["last_results"] {
+		for _, s in _LLM_Engine["last_results"] {
 			if (StrLen(s) > StrLen(typed_delta)
 					and StrCompare(SubStr(s, 1, StrLen(typed_delta)), typed_delta, true) == 0) {
 				sliced.Push(SubStr(s, StrLen(typed_delta) + 1))
@@ -742,12 +742,12 @@ _LLM_Engine_DispatchVariant(state) {
 	; violet loading tooltip while the in-flight variant is still empty
 	; (macOS show_loading parity). Streaming / on_success paint real text.
 	preview_slots := []
-	for s in state["slots"]
+	for _, s in state["slots"]
 		preview_slots.Push(s)
 	while (preview_slots.Length < variant_idx)
 		preview_slots.Push(LLM_TOOLTIP_PLACEHOLDER)
 	has_real_slot := false
-	for s in preview_slots {
+	for _, s in preview_slots {
 		if (s != "" and s != LLM_TOOLTIP_PLACEHOLDER) {
 			has_real_slot := true
 			break
@@ -802,7 +802,7 @@ _LLM_Engine_OnStreamPartial(state, slot_idx, partial) {
 	if (state["request_id"] != current_id)
 		return
 	preview := []
-	for s in state["slots"]
+	for _, s in state["slots"]
 		preview.Push(s)
 	while (preview.Length < slot_idx - 1)
 		preview.Push("")
@@ -837,14 +837,14 @@ _LLM_Engine_OnVariantSuccess(state, text, meta := "") {
 	inserted := false
 	parsed := _LLM_Engine_ParseSlots(text, state)
 	if (parsed.Length > 0) {
-		text := parsed[1]
-		dup := false
-		for s in state["slots"] {
-			if (StrCompare(s, text, true) == 0) {
-				dup := true
-				break
-			}
+	text := parsed[1]
+	dup := false
+	for _, s in state["slots"] {
+		if (StrCompare(s, text, true) == 0) {
+			dup := true
+			break
 		}
+	}
 		if !dup {
 			state["slots"].Push(text)
 			inserted := true
@@ -1099,7 +1099,7 @@ LLM_Engine_OnResults(slots, ctx, active := 1, is_final := false) {
 		if (StrLen(buf_tail) > 200)
 			buf_tail := SubStr(buf_tail, -199)
 		display_slots := []
-		for s in slots {
+		for _, s in slots {
 			if (s != "")
 				display_slots.Push(LLM_Diff_Compute(buf_tail, s))
 			else

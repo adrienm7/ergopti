@@ -101,7 +101,7 @@ KLUI_FindMsedge() {
         EnvGet("ProgramFiles(x86)") . "\Microsoft\Edge\Application\msedge.exe",
         EnvGet("LOCALAPPDATA") . "\Microsoft\Edge\Application\msedge.exe"
     ]
-    for path in candidates {
+    for _, path in candidates {
         if (path != "" && FileExist(path))
             return path
     }
