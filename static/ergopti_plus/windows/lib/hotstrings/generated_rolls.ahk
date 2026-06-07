@@ -4,7 +4,7 @@
 ; MODULE: Generated Hotstrings — rolls
 ; DESCRIPTION:
 ; AUTO-GENERATED FILE — DO NOT EDIT BY HAND.
-; Regenerate with ``python tools/compile_hotstrings.py`` from the repo root
+; Regenerate with ``node scripts/build-hotstrings.cjs`` from the repo root
 ; whenever the bundled TOML files under ``static/ergopti_plus/_shared/hotstrings/`` change.
 ;
 ; Contains the ``_GenLoad_*`` loader functions and the partial

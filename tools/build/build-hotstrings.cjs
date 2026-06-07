@@ -60,9 +60,9 @@ const BUNDLED_CATEGORIES = [
 // substitution is done with StrReplace(trigger, MAGIC_KEY_MARKER, MK).
 const MAGIC_KEY_MARKER = "★"; // ★
 
-const REPO_ROOT       = path.resolve(__dirname, "..");
-const TOML_SOURCE_DIR = path.join(REPO_ROOT, "static", "drivers", "_shared", "hotstrings");
-const OUTPUT_DIR      = path.join(REPO_ROOT, "static", "drivers", "autohotkey", "lib", "hotstrings");
+const REPO_ROOT       = path.resolve(__dirname, "..", "..");
+const TOML_SOURCE_DIR = path.join(REPO_ROOT, "static", "ergopti_plus", "shared", "hotstrings");
+const OUTPUT_DIR      = path.join(REPO_ROOT, "static", "ergopti_plus", "windows", "lib", "hotstrings");
 
 // UTF-8 BOM prefix — required for AHK v2 source files.
 const UTF8_BOM = "﻿";

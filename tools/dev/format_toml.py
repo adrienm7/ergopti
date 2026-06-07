@@ -31,14 +31,14 @@ from collections import OrderedDict
 from pathlib import Path
 
 HOTSTRING_FILES = [
-    "static/ergopti_plus/_shared/hotstrings/distancesreduction.toml",
-    "static/ergopti_plus/_shared/hotstrings/sfbsreduction.toml",
-    "static/ergopti_plus/_shared/hotstrings/rolls.toml",
-    "static/ergopti_plus/_shared/hotstrings/autocorrection.toml",
-    "static/ergopti_plus/_shared/hotstrings/magickey.toml",
+    "static/ergopti_plus/shared/hotstrings/distancesreduction.toml",
+    "static/ergopti_plus/shared/hotstrings/sfbsreduction.toml",
+    "static/ergopti_plus/shared/hotstrings/rolls.toml",
+    "static/ergopti_plus/shared/hotstrings/autocorrection.toml",
+    "static/ergopti_plus/shared/hotstrings/magickey.toml",
 ]
 
-_REPO_ROOT = Path(__file__).parent.parent
+_REPO_ROOT = Path(__file__).parent.parent.parent
 
 
 def section_display_name(section_key: str) -> str:

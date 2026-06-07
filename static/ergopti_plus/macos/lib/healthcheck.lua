@@ -244,7 +244,10 @@ function M.show_window()
 		and function(k) return i18n.get(k) end
 		or  function(_) return nil end
 
-	local title     = "System diagnostic"
+	local title     = i18n_ok and i18n.get("menu.debug.healthcheck") or "System diagnostic"
+	if not title:find("ErgoptiPlus") then
+		title = "ErgoptiPlus — " .. title
+	end
 	local btn_label = t("healthcheck.copy_and_close") or "Copy to clipboard and close"
 	local html      = _snapshot_to_html(snapshot, btn_label)
 
