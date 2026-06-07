@@ -301,13 +301,13 @@ LoadExtTomlFile(FilePath, CategoryLabel) {
             continue
         }
         ; Match hotstring entry: key = value or key = { ... }
-        if !RegExMatch(Line, "^(?:`"[^`"]+`"|[A-Za-z0-9_.-]+)\s*=") {
+        if !RegExMatch(Line, '^(?:"[^"]+"|[A-Za-z0-9_.-]+)\s*=') {
             continue
         }
         if !RegExMatch(Line, _HOTSTRING_ENTRY_PATTERN, &Match) {
             ; Simple format: "trigger" = "replacement" (not supported by full regex)
             ; Try to extract just trigger and output for simple entries
-            if RegExMatch(Line, "i)^(?:`"([^`"]+)`"|([A-Za-z0-9_.-]+))\s*=\s*`"([^`"]+)`\"", &SimpleM) {
+            if RegExMatch(Line, 'i)^(?:"([^"]+)"|([A-Za-z0-9_.-]+))\s*=\s*"([^"]+)"', &SimpleM) {
                 Trigger := (SimpleM[1] != "") ? SimpleM[1] : SimpleM[2]
                 Output  := SimpleM[3]
                 Trigger := StrReplace(Trigger, "★", ScriptInformation["MagicKey"])
