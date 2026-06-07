@@ -499,13 +499,24 @@ function M.generate(ctx, menu_mods, actions)
 	local log_level_items = {}
 	local Logger_mod = require("lib.logger")
 	local active_level_name = "INFO"
+
+	local function log_level_emoji(lvl)
+		local emojis = {
+			DEBUG   = "🐛",
+			INFO    = "ℹ️",
+			WARNING = "⚠️",
+			ERROR   = "❌",
+		}
+		return emojis[lvl] or "📝"
+	end
+
 	for _, lvl in ipairs({ "DEBUG", "INFO", "WARNING", "ERROR" }) do
 		local lvl_num = Logger_mod.LEVELS[lvl]
 		local is_active = (Logger_mod.current_level == lvl_num)
 		if is_active then active_level_name = lvl end
 		local lvl_capture = lvl
 		table.insert(log_level_items, {
-			title   = lvl,
+			title   = log_level_emoji(lvl) .. " " .. lvl,
 			checked = is_active,
 			fn      = function() actions.set_log_level(lvl_capture) end,
 		})
