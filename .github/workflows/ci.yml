@@ -4,10 +4,10 @@
 #
 # Architecture:
 #
-#   ┌─────────────────────────────────┐
-#   │  validate (fast gates, ubuntu)  │
-#   │  hotstrings · domain            │
-#   └──────────────┬──────────────────┘
+#   ┌──────────────────────────────────────────────────────────┐
+#   │ validate-hotstrings · validate-domain · validate-js      │
+#   │            (validate-translations)                       │
+#   └──────────────┬───────────────┬───────────────┬───────────┘
 #                  │ (always runs — no path filter)
 #        ┌─────────┼──────────┐
 #        ▼         ▼          ▼
@@ -65,10 +65,10 @@ concurrency:
 
 jobs:
     # ─────────────────────────────────────────────────
-    # 1.1) Unified validation gates
+    # 1.1) Hotstring TOML format
     # ─────────────────────────────────────────────────
-    validate:
-        name: "Validate · gates (TOML, Domain, JS, I18n)"
+    validate-hotstrings:
+        name: "Validate · hotstrings TOML"
         runs-on: ubuntu-latest
 
         steps:
@@ -81,6 +81,16 @@ jobs:
             - name: Check hotstring TOML files are sorted and formatted
               run: python tools/dev/format_toml.py --hotstrings --all --check
 
+    # ─────────────────────────────────────────────────
+    # 1.2) Domain build pipeline + drift detection
+    # ─────────────────────────────────────────────────
+    validate-domain:
+        name: "Validate · domain pipeline"
+        runs-on: ubuntu-latest
+
+        steps:
+            - uses: actions/checkout@v4
+
             - uses: actions/setup-node@v4
               with:
                   node-version: "22"
@@ -88,8 +98,25 @@ jobs:
 
             - run: npm ci
 
-            - name: Run domain build pipeline (manifest, parity, compliance, drift)
+            - name: Run domain build pipeline
               run: npm run build:domain
+
+    # ─────────────────────────────────────────────────
+    # 1.3) JS shared layer — port compliance + PBT
+    # ─────────────────────────────────────────────────
+    validate-js:
+        name: "Validate · JS ports + properties"
+        runs-on: ubuntu-latest
+
+        steps:
+            - uses: actions/checkout@v4
+
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: "22"
+                  cache: "npm"
+
+            - run: npm ci
 
             - name: Port compliance (all 20 ports covered by adapters)
               run: npm run test:port-compliance
@@ -104,6 +131,20 @@ jobs:
             - name: Convention lint (strict — banners, spacing, section headers)
               run: npm run lint:conventions:strict
 
+    # ─────────────────────────────────────────────────
+    # 1.4) Translation consistency audit
+    # ─────────────────────────────────────────────────
+    validate-translations:
+        name: "Validate · translations audit"
+        runs-on: ubuntu-latest
+
+        steps:
+            - uses: actions/checkout@v4
+
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: "22"
+
             - name: Run translation key consistency audit
               run: node tools/lint/audit-translations.cjs
 
@@ -113,7 +154,7 @@ jobs:
     test-hs:
         name: "macOS · unit tests"
         runs-on: ubuntu-latest
-        needs: [validate]
+        needs: [validate-hotstrings, validate-domain, validate-js, validate-translations]
 
         steps:
             - uses: actions/checkout@v4
@@ -206,7 +247,7 @@ jobs:
     test-ahk:
         name: "Windows · unit tests"
         runs-on: windows-latest
-        needs: [validate]
+        needs: [validate-hotstrings, validate-domain, validate-js, validate-translations]
 
         steps:
             - uses: actions/checkout@v4
@@ -500,7 +541,7 @@ jobs:
     test-linux:
         name: "Linux · unit tests"
         runs-on: ubuntu-22.04
-        needs: [validate]
+        needs: [validate-hotstrings, validate-domain, validate-js, validate-translations]
 
         steps:
             - uses: actions/checkout@v4
