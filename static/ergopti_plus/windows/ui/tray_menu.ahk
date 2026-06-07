@@ -1150,19 +1150,20 @@ _HS_Personal(M, _Cat) {
 	PersonalExtTree := Map()
 
 	_HS_GetOrCreateNode(Root, PathParts) {
-		if (PathParts.Length == 0) {
+		Tree := Root
+		Node := false
+		for Part in PathParts {
+			if !Tree.Has(Part)
+				Tree[Part] := Map("subfolders", Map(), "tomls", [])
+			Node := Tree[Part]
+			Tree := Node["subfolders"]
+		}
+		if (Node == false) {
 			if !Root.Has("")
 				Root[""] := Map("subfolders", Map(), "tomls", [])
 			return Root[""]
 		}
-		Tree := Root
-		CurrentNode := Root.Has("") ? Root[""] : (Root[""] := Map("subfolders", Map(), "tomls", []))
-		for Part in PathParts {
-			if !CurrentNode["subfolders"].Has(Part)
-				CurrentNode["subfolders"][Part] := Map("subfolders", Map(), "tomls", [])
-			CurrentNode := CurrentNode["subfolders"][Part]
-		}
-		return CurrentNode
+		return Node
 	}
 
 	if IsSet(ScriptInformation) and ScriptInformation.Has("PersonalHotstringsDir") {
