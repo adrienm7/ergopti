@@ -782,15 +782,9 @@ _HS_ComputeGrandTotal() {
 			}
 		}
 	}
-	PersonalTomlPath := IsSet(ScriptInformation) ? ScriptInformation.Get("PersonalTomlPath", "") : ""
-	if (PersonalTomlPath != "" and FileExist(PersonalTomlPath)) {
-		TomlData := ReadPersonalToml()
-		for _, SecData in TomlData["sections"]
-			Total += SecData["entries"].Length
-	}
 	Total += IsObject(_ExtTotalPersonalCounterGlobal) ? _ExtTotalPersonalCounterGlobal.value : 0
 	return Total
-}
+	}
 
 ; Dynamic handler: magic key config entry (prefix + current char + editor).
 _HS_MagicKeyConfig(M, _Cat) {
