@@ -2556,7 +2556,7 @@ LoggerSetLevel(Level) {
 ; active level so the user can see the current setting without opening the submenu.
 _LogLevelMenuLabel() {
 	global LOGGER_MIN_LEVEL
-	return t("menu.debug.log_level") . " : " . LOGGER_MIN_LEVEL
+	return t("menu.debug.log_level") . " : " . _LogLevelEmoji(LOGGER_MIN_LEVEL) . " " . LOGGER_MIN_LEVEL
 }
 
 ; Build the log level submenu for the Debug entry. Returns a Menu object
