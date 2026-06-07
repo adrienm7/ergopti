@@ -9,6 +9,7 @@
 
 #Include %A_LineFile%\..\test_framework.ahk
 #Include %A_LineFile%\..\..\lib\hotstrings\toml_loader.ahk
+#Include %A_LineFile%\..\..\lib\healthcheck.ahk
 
 TestReg_ArrayIteration() {
     Arr := ["Value1", "Value2", "Value3"]
@@ -96,6 +97,18 @@ TestReg_ChangelogMessageParsing() {
     AssertEqual("https://github.com", PayloadOpenUrl["url"], "url should be github")
 }
 Test("Regression: Changelog WebView message parsing", TestReg_ChangelogMessageParsing)
+
+TestReg_HealthcheckHelpers() {
+    AssertEqual("A&amp;B", _HealthCheck_HE("A&B"), "amp should be escaped")
+    AssertEqual("A&lt;B", _HealthCheck_HE("A<B"), "lt should be escaped")
+    AssertEqual("A&gt;B", _HealthCheck_HE("A>B"), "gt should be escaped")
+    AssertEqual("A&quot;B", _HealthCheck_HE('A"B'), "quot should be escaped")
+    
+    AssertEqual("45s", _HealthCheck_FormatUptime(45), "45s should format to 45s")
+    AssertEqual("2m 05s", _HealthCheck_FormatUptime(125), "125s should format to 2m 05s")
+    AssertEqual("1h 00m 05s", _HealthCheck_FormatUptime(3605), "3605s should format to 1h 00m 05s")
+}
+Test("Regression: Healthcheck formatting and escaping helpers", TestReg_HealthcheckHelpers)
 
 ; Hooks and global state for tooltip tests would require more setup, 
 ; but these core logic tests already prevent the most critical bugs we saw.
