@@ -52,11 +52,18 @@ local function focus_hammerspoon()
 	end
 
 	do_focus()
-	-- Modal dialogs (hs.dialog.*) block the main thread but run a nested runloop.
-	-- Firing timers ensures that once the window is actually composited and on-screen,
-	-- we steal the focus again. Fixes focus issues when called from the menubar.
-	hs.timer.doAfter(0.05, do_focus)
-	hs.timer.doAfter(0.20, do_focus)
+	do_focus()
+	-- Modal dialogs (hs.dialog.*) block the main thread and its default runloop,
+	-- meaning hs.timer.doAfter will NOT fire until AFTER the dialog is dismissed!
+	-- To guarantee the dialog receives keyboard focus (especially when opened
+	-- from a menubar click, which steals focus), we spawn a detached background
+	-- process that waits 100ms and asks macOS to aggressively activate Hammerspoon.
+	pcall(function()
+		local bundlePath = hs.processInfo.bundlePath
+		if bundlePath then
+			hs.task.new("/bin/sh", nil, {"-c", "sleep 0.1 && open '" .. bundlePath .. "'"}):start()
+		end
+	end)
 end
 
 --- Focus-aware wrapper around hs.dialog.blockAlert.
