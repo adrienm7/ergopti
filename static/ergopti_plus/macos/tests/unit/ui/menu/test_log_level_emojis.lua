@@ -3,7 +3,7 @@
 --- DESCRIPTION:
 --- Verifies that log level menu items include their respective emojis.
 
-local helpers = require("tests.unit.helpers")
+local helpers = require("tests.helpers")
 
 helpers.describe("Menu — log level emojis", function()
 	local builder = helpers.load_with_stubs("ui.menu.builder")
@@ -11,26 +11,54 @@ helpers.describe("Menu — log level emojis", function()
 	local Logger  = require("lib.logger")
 
 	helpers.it("includes correct emojis in log level selection labels", function()
+		local old_level = Logger.current_level
+		Logger.set_level("INFO")
+
 		-- We need to mock the environment for build_debug_menu
 		local actions = {
 			set_log_level = function() end,
 			open_logs = function() end,
 			open_today_log = function() end,
-			open_error_log = function() end
+			open_error_log = function() end,
+			open_console = function() end,
+			open_today_log = function() end,
+			open_error_log = function() end,
+			show_setup_wizard = function() end,
+			open_paths = function() end,
+			reload = function() end,
+			quit = function() end,
 		}
 		
 		-- Mock i18n.get to return keys for easier verification
+		local i18n = require("lib.i18n")
 		local old_get = i18n.get
 		i18n.get = function(k) return k end
+		-- Also need this for builder.lua line 488
+		i18n.build_language_menu_items = function() return {} end
 		
-		-- Trigger menu building (this typically builds the log_level_items table)
-		-- Since builder.lua defines log_level_emoji as a local inside a function,
-		-- we verify the output labels of build_debug_menu.
-		local menu = builder.build_debug_menu(actions)
+		-- Trigger menu building via M.generate
+		local ctx = {
+			config = { log_level = 2 }, -- INFO
+		}
+		local menu_mods = {}
+		local menu = builder.generate(ctx, menu_mods, actions)
 		
-		local log_level_item = nil
+		-- Find the Debug menu first
+		local debug_menu_item = nil
 		for _, item in ipairs(menu) do
-			if item.menu then -- The log level item has a sub-menu
+			if item.title == "menu.debug.title" then
+				debug_menu_item = item
+				break
+			end
+		end
+		helpers.assert_true(debug_menu_item ~= nil, "debug menu item should exist")
+
+		-- Find the Log level item within the Debug menu
+		local log_level_item = nil
+		-- In builder.lua, load_debug_menu falls back to DEBUG_MENU_FALLBACK
+		-- which has "log_level" at index 3 (after console and ---)
+		for _, item in ipairs(debug_menu_item.menu) do
+			if item.title:find("menu.debug.log_level") then
 				log_level_item = item
 				break
 			end
@@ -63,5 +91,6 @@ helpers.describe("Menu — log level emojis", function()
 		end
 		
 		i18n.get = old_get
+		Logger.current_level = old_level
 	end)
 end)

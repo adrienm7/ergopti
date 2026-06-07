@@ -350,7 +350,7 @@ function M.add(trigger, replacement, opts)
 	end
 
 	-- Substitute the canonical magic-key when a non-default trigger char is configured.
-	if _state.magic_key ~= "★" then
+	if _state.magic_key and _state.magic_key ~= "★" then
 		trigger = trigger:gsub("★", _state.magic_key)
 	end
 

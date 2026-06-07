@@ -429,6 +429,10 @@ end
 -- ============================
 -- ============================
 
+M.drawing = {
+	windowLevels = setmetatable({}, { __index = function() return 0 end }),
+}
+
 M.canvas = {
 	new = function(_) return setmetatable({}, {
 		__index = function() return function(self) return self end end,
@@ -532,6 +536,7 @@ M.inspect = function(v) return tostring(v) end
 M.host = {
 	operatingSystemVersion = function() return { major = 14, minor = 0, patch = 0 } end,
 	operatingSystemVersionString = function() return "macOS 14.0" end,
+	interfaceStyle = function() return "Dark" end,
 }
 
 

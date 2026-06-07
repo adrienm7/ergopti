@@ -170,7 +170,7 @@ for _, dir in ipairs(TEST_DIRS) do
 		print(string.format("\n>>> Loading %s", mod_name))
 		local ok, err = pcall(require, mod_name)
 		if not ok then
-			print(string.format("  ! load error: %s", tostring(err)))
+			print(string.format("  ! LOAD FAILURE in %s: %s", mod_name, tostring(err)))
 			helpers.get_results().failed = helpers.get_results().failed + 1
 		end
 	end
@@ -178,14 +178,16 @@ end
 
 local r = helpers.get_results()
 print(string.format(
-	"\n========================================\nTotal: %d module(s) loaded — %d passed, %d failed\n========================================",
+	"\n========================================\nOVERALL RESULTS:\nTotal modules: %d\nPassed tests:  %d\nFailed tests:  %d\n========================================",
 	total_modules, r.passed, r.failed
 ))
 
 if r.failed > 0 then
-	for _, f in ipairs(r.failures) do
-		print(string.format("  - %s : %s", f.name, f.err))
+	print("\n--- DETAILED FAILURES ---")
+	for i, f in ipairs(r.failures) do
+		print(string.format("[%d] %s\n    Error: %s\n", i, f.name, f.err))
 	end
 	os.exit(1)
 end
+print("\n[OK] All Lua unit tests passed.")
 os.exit(0)

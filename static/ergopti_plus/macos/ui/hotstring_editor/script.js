@@ -12,7 +12,9 @@
 // ====================================
 // ====================================
 
-function _t(key) { return (window._i18n_strings && window._i18n_strings[key]) || null; }
+function _t(key) {
+	return (window._i18n_strings && window._i18n_strings[key]) || null;
+}
 
 let D = null;
 let TRIGGER_CHAR = '★';
@@ -203,7 +205,9 @@ function showConfirm(msg, fn, opts = {}) {
 	let titleHtml = '';
 	if (opts.isWarning) {
 		titleHtml =
-			'<div style="display:flex;align-items:center;gap:8px;color:var(--warning);font-weight:600;font-size:15px;margin-bottom:10px;"><span style="font-size:20px;">⚠️</span> ' + (_t('common.warning') || 'Attention') + '</div>';
+			'<div style="display:flex;align-items:center;gap:8px;color:var(--warning);font-weight:600;font-size:15px;margin-bottom:10px;"><span style="font-size:20px;">⚠️</span> ' +
+			(_t('common.warning') || 'Attention') +
+			'</div>';
 	}
 	document.getElementById('confirm-text').innerHTML =
 		titleHtml +
@@ -996,7 +1000,9 @@ function saveSec() {
 function delSec(si) {
 	const s = D.sections[si];
 	showConfirm(
-		(_t('editor.hotstrings.confirm_del_section') || 'Delete « %s » and all its hotstrings?').replace('%s', s.description || s.name),
+		(
+			_t('editor.hotstrings.confirm_del_section') || 'Delete « %s » and all its hotstrings?'
+		).replace('%s', s.description || s.name),
 		function () {
 			D.sections.splice(si, 1);
 			persist();
@@ -1026,8 +1032,9 @@ function resetEntryForm() {
 function showAddEntry(si) {
 	edEntry = { si: si, ei: null };
 	const secName = D.sections[si].description || D.sections[si].name;
-	document.getElementById(‘entry-modal-title’).textContent =
-		(_t(‘editor.hotstrings.add_entry_title’) || ‘New hotstring — Section « %s »’).replace(‘%s’, secName);
+	document.getElementById('entry-modal-title').textContent = (
+		_t('editor.hotstrings.add_entry_title') || 'New hotstring — Section « %s »'
+	).replace('%s', secName);
 	resetEntryForm();
 	openModal('entry-modal');
 	setTimeout(() => document.getElementById('e-trig').focus(), 80);
@@ -1037,8 +1044,9 @@ function showEditEntry(si, ei, focusField) {
 	edEntry = { si: si, ei: ei };
 	const e = D.sections[si].entries[ei];
 	const secName = D.sections[si].description || D.sections[si].name;
-	document.getElementById(‘entry-modal-title’).textContent =
-		(_t(‘editor.hotstrings.edit_entry_title’) || ‘Edit hotstring — Section « %s »’).replace(‘%s’, secName);
+	document.getElementById('entry-modal-title').textContent = (
+		_t('editor.hotstrings.edit_entry_title') || 'Edit hotstring — Section « %s »'
+	).replace('%s', secName);
 
 	setTrigContent(document.getElementById('e-trig'), e.trigger || '');
 	setEditorContent(document.getElementById('e-out'), e.output || '');
@@ -1163,10 +1171,13 @@ function delEntryStop(e, si, ei) {
 
 function delEntry(si, ei) {
 	const trig = toDisplay(D.sections[si].entries[ei].trigger);
-	showConfirm((_t('editor.hotstrings.confirm_del_entry') || 'Delete « %s »?').replace('%s', esc(trig)), function () {
-		D.sections[si].entries.splice(ei, 1);
-		persist();
-	});
+	showConfirm(
+		(_t('editor.hotstrings.confirm_del_entry') || 'Delete « %s »?').replace('%s', esc(trig)),
+		function () {
+			D.sections[si].entries.splice(ei, 1);
+			persist();
+		}
+	);
 }
 
 // ====================================
