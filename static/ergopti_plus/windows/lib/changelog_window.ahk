@@ -244,7 +244,7 @@ _CLW_OnWebMessage(Handler, Args) {
 	}
 
 	; Try to parse as JSON action payload.
-	try Payload := JSON.parse(Msg)
+	try Payload := JsonParse(Msg)
 	if !IsSet(Payload)
 		return
 	if !IsObject(Payload)
