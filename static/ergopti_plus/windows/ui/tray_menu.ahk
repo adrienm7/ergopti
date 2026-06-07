@@ -2568,10 +2568,21 @@ _BuildLogLevelMenu() {
 	for _, Level in ["DEBUG", "INFO", "WARNING", "ERROR"] {
 		; Capture loop variable for the callback closure
 		_Lvl := Level
-		RegisterMenuItem(LevelMenu, Level, ((_l) => (*) => LoggerSetLevel(_l))(Level))
+		Label := _LogLevelEmoji(Level) . " " . Level
+		RegisterMenuItem(LevelMenu, Label, ((_l) => (*) => LoggerSetLevel(_l))(Level))
 		if (LOGGER_MIN_LEVEL == Level) {
-			LevelMenu.Check(Level)
+			LevelMenu.Check(Label)
 		}
 	}
 	return LevelMenu
+}
+
+_LogLevelEmoji(Level) {
+	switch Level {
+		case "DEBUG":   return "🐛"
+		case "INFO":    return "ℹ️"
+		case "WARNING": return "⚠️"
+		case "ERROR":   return "❌"
+		default:        return "📝"
+	}
 }
