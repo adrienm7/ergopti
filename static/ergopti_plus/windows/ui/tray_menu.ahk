@@ -133,7 +133,7 @@ _MasterCategoryFor(FeatureCategoryPath) {
 	; Hotstrings master gates all hotstring sub-trees regardless of their
 	; top-level Features key (which is the legacy v1 layout — v2 nests
 	; everything under [hotstrings.*]).
-	for HotsCat in ["Autocorrection", "DistancesReduction", "SFBsReduction",
+	for _, HotsCat in ["Autocorrection", "DistancesReduction", "SFBsReduction",
 		"Rolls", "MagicKey", "DynamicHotstrings"] {
 		if (HotsCat == First) {
 			return "Hotstrings"
@@ -390,7 +390,7 @@ ToggleMenuVariableByPath(FullPath) {
 	; doesn't need an enumeration here. Everything else returns an empty
 	; list — toggles are independent.
 	Batch := []
-	for SiblingPath in _MutexSiblingPathsFor(FullPath) {
+	for _, SiblingPath in _MutexSiblingPathsFor(FullPath) {
 		Batch.Push(Map("v1_path", SiblingPath . ".Enabled", "value", false))
 	}
 	Batch.Push(Map("v1_path", FullPath . ".Enabled", "value", NewValue))
@@ -499,7 +499,7 @@ _GES_SlotsAhk(M, _Cat) {
 	global GestureAssignments, GESTURE_ACTIONS, GESTURE_SLOTS, Features
 	GestEnabled := Features.Has("gestures") and Features["gestures"].Has("enabled")
 		and Features["gestures"]["enabled"] = true
-	for Slot in GESTURE_SLOTS {
+	for _, Slot in GESTURE_SLOTS {
 		if (Slot == "tap_4")
 			M.Add()
 		SlotLabel     := t("gesture.slots." . Slot)
@@ -739,7 +739,7 @@ _MET_WpmWidgetReset(M, _Cat) {
 
 ; Dynamic handler: Ergopti base-layer feature only (ergopti_base).
 _LAY_LayoutFeaturesBase(M, _Cat) {
-	for LayoutEntry in ManifestFeaturesForSection("ahk.layout") {
+	for _, LayoutEntry in ManifestFeaturesForSection("ahk.layout") {
 		if (LayoutEntry["id"] == "ergopti_base") {
 			MenuAddItemFromManifest(M, LayoutEntry, "Layout")
 		}
@@ -749,7 +749,7 @@ _LAY_LayoutFeaturesBase(M, _Cat) {
 ; Dynamic handler: AltGr / digit-shift features (direct_access_digits,
 ; ergopti_alt_gr, ergopti_plus) — usable without the Ergopti base layer.
 _LAY_LayoutFeaturesAltGr(M, _Cat) {
-	for LayoutEntry in ManifestFeaturesForSection("ahk.layout") {
+	for _, LayoutEntry in ManifestFeaturesForSection("ahk.layout") {
 		if (LayoutEntry["id"] != "ergopti_base") {
 			MenuAddItemFromManifest(M, LayoutEntry, "Layout")
 		}
@@ -921,7 +921,7 @@ _HS_BuildDelimiterSubMenu() {
 
 	; ── Built-in catalogue entries — rendered in catalogue order with the same
 	;    separators as the macOS word-expander menu (single shared source). ──
-	for D in Defs {
+	for _, D in Defs {
 		if (D.Has("type") and D["type"] == "separator") {
 			Sub.Add()  ; "-" divider
 			continue
@@ -1057,7 +1057,7 @@ _HS_CategoriesStandard(M, _Cat) {
 	IsGated := IsCategoryGated("Hotstrings")
 	CountFn := IsGated ? _CountEnabledForCategory : _CountAllForCategory
 	StdTotal := 0
-	for Cat in HotstringCategoriesStd
+	for _, Cat in HotstringCategoriesStd
 		StdTotal += CountFn(Cat)
 	DynTotal := 0
 	if Features.Has("hotstrings") and Features["hotstrings"].Has("dynamic") {
@@ -1074,7 +1074,7 @@ _HS_CategoriesStandard(M, _Cat) {
 	StdTotal += DynTotal
 	; Section header is rendered by the manifest (section_header type), so
 	; we only need to add the actual category submenus here.
-	for Category in HotstringCategoriesStd {
+	for _, Category in HotstringCategoriesStd {
 		if !SubMenus.Has(Category)
 			continue
 		Total := CountFn(Category)
@@ -1122,7 +1122,7 @@ _HS_CategoriesErgopti(M, _Cat) {
 	global HotstringCategoriesErgopti, SubMenus
 	IsGated := IsCategoryGated("Hotstrings")
 	CountFn := IsGated ? _CountEnabledForCategory : _CountAllForCategory
-	for Category in HotstringCategoriesErgopti {
+	for _, Category in HotstringCategoriesErgopti {
 		if !SubMenus.Has(Category)
 			continue
 		Total := CountFn(Category)
@@ -1134,66 +1134,72 @@ _HS_CategoriesErgopti(M, _Cat) {
 }
 
 ; Dynamic handler: personal hotstrings (personal_hotstrings.toml + ext tree).
+global _PersonalExtTree := Map()
+global _ExtTotalPersonalCounterGlobal := { value: 0 }
+
+; Pre-scans the personal hotstrings directory to build the tree and sum counts
+; so they are available for menu labels and the grand total at build time.
+_HS_PreScanPersonal() {
+	global ScriptInformation, _PersonalExtTree, _ExtTotalPersonalCounterGlobal
+	_PersonalExtTree := Map()
+	_ExtTotalPersonalCounterGlobal.value := 0
+
+	if !IsSet(ScriptInformation) or !ScriptInformation.Has("PersonalHotstringsDir")
+		return
+
+	HsDir := ScriptInformation["PersonalHotstringsDir"]
+	if !DirExist(HsDir)
+		return
+
+	_HS_ScanExt(CurrentDir, PathParts) {
+		Loop Files CurrentDir . "\*", "DF" {
+			if (A_LoopFileAttrib ~= "D") {
+				NewParts := PathParts.Clone()
+				NewParts.Push(A_LoopFileName)
+				_HS_ScanExt(A_LoopFileFullPath, NewParts)
+			} else if (A_LoopFileName ~= "i)\.toml$") {
+				if (PathParts.Length == 0 and A_LoopFileName == "personal_hotstrings.toml")
+					continue
+				SplitPath A_LoopFileFullPath, , , , &ExtStem
+				FileSections := _ParseExtTomlSections(A_LoopFileFullPath)
+				FileCount := 0
+				for _, FS in FileSections
+					FileCount += FS["count"]
+				Node := _HS_GetOrCreateNode(_PersonalExtTree, PathParts)
+				Node["tomls"].Push({ path: A_LoopFileFullPath, stem: ExtStem, sections: FileSections, count: FileCount })
+				_ExtTotalPersonalCounterGlobal.value += FileCount
+			}
+		}
+	}
+	_HS_ScanExt(RegExReplace(HsDir, "[/\\]+$"), [])
+}
+
+_HS_GetOrCreateNode(Root, PathParts) {
+	Tree := Root
+	Node := false
+	for _, Part in PathParts {
+		if !Tree.Has(Part)
+			Tree[Part] := Map("subfolders", Map(), "tomls", [])
+		Node := Tree[Part]
+		Tree := Node["subfolders"]
+	}
+	if (Node == false) {
+		if !Root.Has("")
+			Root[""] := Map("subfolders", Map(), "tomls", [])
+		return Root[""]
+	}
+	return Node
+}
+
+; Dynamic handler: personal hotstrings (personal_hotstrings.toml + pre-scanned ext tree).
 _HS_Personal(M, _Cat) {
-	global ScriptInformation, Features
+	global ScriptInformation, Features, _PersonalExtTree
 	IsGated := IsCategoryGated("Hotstrings")
-	TotalPersonal := 0
 	PersonalTomlData := false
 	PersonalTomlPath := IsSet(ScriptInformation) ? ScriptInformation.Get("PersonalTomlPath", "") : ""
 	if (PersonalTomlPath != "" and FileExist(PersonalTomlPath)) {
 		PersonalTomlData := ReadPersonalToml()
-		for _, SecData in PersonalTomlData["sections"]
-			TotalPersonal += SecData["entries"].Length
 	}
-
-	ExtTotalCounter := { value: 0 }
-	PersonalExtTree := Map()
-
-	_HS_GetOrCreateNode(Root, PathParts) {
-		Tree := Root
-		Node := false
-		for Part in PathParts {
-			if !Tree.Has(Part)
-				Tree[Part] := Map("subfolders", Map(), "tomls", [])
-			Node := Tree[Part]
-			Tree := Node["subfolders"]
-		}
-		if (Node == false) {
-			if !Root.Has("")
-				Root[""] := Map("subfolders", Map(), "tomls", [])
-			return Root[""]
-		}
-		return Node
-	}
-
-	if IsSet(ScriptInformation) and ScriptInformation.Has("PersonalHotstringsDir") {
-		HsDir := ScriptInformation["PersonalHotstringsDir"]
-		if DirExist(HsDir) {
-			_HS_ScanExt(CurrentDir, PathParts) {
-				Loop Files CurrentDir . "\*", "DF" {
-					if (A_LoopFileAttrib ~= "D") {
-						NewParts := PathParts.Clone()
-						NewParts.Push(A_LoopFileName)
-						_HS_ScanExt(A_LoopFileFullPath, NewParts)
-					} else if (A_LoopFileName ~= "i)\.toml$") {
-						if (PathParts.Length == 0 and A_LoopFileName == "personal_hotstrings.toml")
-							continue
-						SplitPath A_LoopFileFullPath, , , , &ExtStem
-						FileSections := _ParseExtTomlSections(A_LoopFileFullPath)
-						FileCount := 0
-						for _, FS in FileSections
-							FileCount += FS["count"]
-						Node := _HS_GetOrCreateNode(PersonalExtTree, PathParts)
-						Node["tomls"].Push({ path: A_LoopFileFullPath, stem: ExtStem, sections: FileSections, count: FileCount })
-						ExtTotalCounter.value += FileCount
-					}
-				}
-			}
-			_HS_ScanExt(RegExReplace(HsDir, "[/\\]+$"), [])
-		}
-	}
-
-	global _ExtTotalPersonalCounterGlobal := ExtTotalCounter
 
 	if (PersonalTomlData != false) {
 		TomlData := PersonalTomlData
@@ -1265,76 +1271,13 @@ _HS_Personal(M, _Cat) {
 			M.Check(PersonalTitle)
 	}
 
-	; Sum all hotstring counts inside a node and its sub-nodes recursively.
-	_HS_NodeTotal(Node) {
-		Total := 0
-		for TF in Node["tomls"]
-			Total += TF.count
-		for _, Sub in Node["subfolders"]
-			Total += _HS_NodeTotal(Sub)
-		return Total
-	}
-
-	; Render recursive ext tree (nested folder structure)
-	_HS_RenderTree(Tree, ParentMenu) {
-		FolderNames := []
-		for FolderName in Tree
-			FolderNames.Push(FolderName)
-		loop FolderNames.Length {
-			i := A_Index
-			loop FolderNames.Length - i {
-				j := A_Index
-				if (StrCompare(FolderNames[j], FolderNames[j+1]) > 0) {
-					tmp := FolderNames[j]
-					FolderNames[j] := FolderNames[j+1]
-					FolderNames[j+1] := tmp
-				}
-			}
-		}
-		for FolderName in FolderNames {
-			Node := Tree[FolderName]
-			FolderMenu := Menu()
-			FileNodeList := Node["tomls"]
-			loop FileNodeList.Length {
-				i := A_Index
-				loop FileNodeList.Length - i {
-					j := A_Index
-					if (StrCompare(FileNodeList[j].stem, FileNodeList[j+1].stem) > 0) {
-						tmp := FileNodeList[j]
-						FileNodeList[j] := FileNodeList[j+1]
-						FileNodeList[j+1] := tmp
-					}
-				}
-			}
-			if (Node["subfolders"].Count > 0)
-				_HS_RenderTree(Node["subfolders"], FolderMenu)
-			if (Node["subfolders"].Count > 0 and FileNodeList.Length > 0)
-				FolderMenu.Add()
-			for TF in FileNodeList {
-				TFMenu := Menu()
-				RegisterMenuItem(TFMenu, t("menu.hotstrings.open_file"), _MakeOpenFileFn(TF.path))
-				if (TF.sections.Length > 0) {
-					TFMenu.Add()
-					for _, ES in TF.sections {
-						SecLabel := ES["description"] . " (" . FmtCount(ES["count"]) . ")"
-						TFMenu.Add(SecLabel, (*) => NoAction())
-						TFMenu.Disable(SecLabel)
-					}
-				}
-				FolderMenu.Add(TF.stem . (TF.count > 0 ? " (" . FmtCount(TF.count) . ")" : ""), TFMenu)
-			}
-			FolderTotal := _HS_NodeTotal(Node)
-			FolderLabel := FolderName . (FolderTotal > 0 ? " (" . FmtCount(FolderTotal) . ")" : "")
-			ParentMenu.Add(FolderLabel, FolderMenu)
-		}
-	}
-
 	RootNode := false
-	if PersonalExtTree.Has("") {
-		RootNode := PersonalExtTree[""]
-		PersonalExtTree.Delete("")
+	TreeCopy := _PersonalExtTree.Clone()
+	if TreeCopy.Has("") {
+		RootNode := TreeCopy[""]
+		TreeCopy.Delete("")
 	}
-	_HS_RenderTree(PersonalExtTree, M)
+	_HS_RenderTree(TreeCopy, M)
 	if (RootNode != false) {
 		FileNodeList := RootNode["tomls"]
 		loop FileNodeList.Length {
@@ -1348,7 +1291,7 @@ _HS_Personal(M, _Cat) {
 				}
 			}
 		}
-		for TF in FileNodeList {
+		for _, TF in FileNodeList {
 			TFMenu := Menu()
 			RegisterMenuItem(TFMenu, t("menu.hotstrings.open_file"), _MakeOpenFileFn(TF.path))
 			if (TF.sections.Length > 0) {
@@ -1361,6 +1304,70 @@ _HS_Personal(M, _Cat) {
 			}
 			M.Add(TF.stem . (TF.count > 0 ? " (" . FmtCount(TF.count) . ")" : ""), TFMenu)
 		}
+	}
+}
+
+; Sum all hotstring counts inside a node and its sub-nodes recursively.
+_HS_NodeTotal(Node) {
+	Total := 0
+	for _, TF in Node["tomls"]
+		Total += TF.count
+	for _, Sub in Node["subfolders"]
+		Total += _HS_NodeTotal(Sub)
+	return Total
+}
+
+; Render recursive ext tree (nested folder structure)
+_HS_RenderTree(Tree, ParentMenu) {
+	FolderNames := []
+	for FolderName in Tree
+		FolderNames.Push(FolderName)
+	loop FolderNames.Length {
+		i := A_Index
+		loop FolderNames.Length - i {
+			j := A_Index
+			if (StrCompare(FolderNames[j], FolderNames[j+1]) > 0) {
+				tmp := FolderNames[j]
+				FolderNames[j] := FolderNames[j+1]
+				FolderNames[j+1] := tmp
+			}
+		}
+	}
+	for _, FolderName in FolderNames {
+		Node := Tree[FolderName]
+		FolderMenu := Menu()
+		FileNodeList := Node["tomls"]
+		loop FileNodeList.Length {
+			i := A_Index
+			loop FileNodeList.Length - i {
+				j := A_Index
+				if (StrCompare(FileNodeList[j].stem, FileNodeList[j+1].stem) > 0) {
+					tmp := FileNodeList[j]
+					FileNodeList[j] := FileNodeList[j+1]
+					FileNodeList[j+1] := tmp
+				}
+			}
+		}
+		if (Node["subfolders"].Count > 0)
+			_HS_RenderTree(Node["subfolders"], FolderMenu)
+		if (Node["subfolders"].Count > 0 and FileNodeList.Length > 0)
+			FolderMenu.Add()
+		for _, TF in FileNodeList {
+			TFMenu := Menu()
+			RegisterMenuItem(TFMenu, t("menu.hotstrings.open_file"), _MakeOpenFileFn(TF.path))
+			if (TF.sections.Length > 0) {
+				TFMenu.Add()
+				for _, ES in TF.sections {
+					SecLabel := ES["description"] . " (" . FmtCount(ES["count"]) . ")"
+					TFMenu.Add(SecLabel, (*) => NoAction())
+					TFMenu.Disable(SecLabel)
+				}
+			}
+			FolderMenu.Add(TF.stem . (TF.count > 0 ? " (" . FmtCount(TF.count) . ")" : ""), TFMenu)
+		}
+		FolderTotal := _HS_NodeTotal(Node)
+		FolderLabel := FolderName . (FolderTotal > 0 ? " (" . FmtCount(FolderTotal) . ")" : "")
+		ParentMenu.Add(FolderLabel, FolderMenu)
 	}
 }
 
@@ -1528,7 +1535,7 @@ OnMetricsAppPickerSave(selected) {
 	; the user expects "what's checked = what's filtered", not "diff
 	; against the previous state".
 	MetricsFilters.disabled_apps := Map()
-	for proc in selected
+	for _, proc in selected
 		MetricsFilters.disabled_apps[StrLower(proc)] := true
 	MF_SaveToIni()
 	Reload
@@ -1648,12 +1655,13 @@ global _DYNAMIC_HOTSTRINGS_ORDER := ["DateLongFr", "DateFr", "Date",
 ; initMenu's manifest iteration and also doesn't need a SubMenus slot.
 InitSubMenus() {
 	global SubMenus, _FLAT_HOTSTRING_V1_CATS, _LegacyTopCategoryMap, _SharedDir
+	_HS_PreScanPersonal()
 	SubMenus := Map()
 
 	; Flat hotstring categories — order = sections_order from the TOML (which
 	; includes "-" separators); falls back to manifest declaration order when
 	; the TOML has no sections_order.
-	for V1Cat in _FLAT_HOTSTRING_V1_CATS {
+	for _, V1Cat in _FLAT_HOTSTRING_V1_CATS {
 		SubMenu := Menu()
 		TomlPath := _SharedDir . "\hotstrings\" . StrLower(V1Cat) . ".toml"
 		if FileExist(TomlPath) {
@@ -1667,7 +1675,7 @@ InitSubMenus() {
 			; so we can look up entries by TOML section name while iterating
 			; sections_order (which preserves visual separators).
 			EntryBySectionId := Map()
-			for Entry in Entries {
+			for _, Entry in Entries {
 				; path looks like "hotstrings.rolls.hc" — last segment is the id
 				Parts := StrSplit(Entry["path"], ".")
 				EntryBySectionId[Parts[Parts.Length]] := Entry
@@ -1696,7 +1704,7 @@ InitSubMenus() {
 			} else {
 				; No sections_order in TOML — fall back to manifest order.
 				; Still skip "replace" for MagicKey (shown in Disposition Ergopti).
-				for Entry in Entries {
+				for _, Entry in Entries {
 					Parts := StrSplit(Entry["path"], ".")
 					if (V1Cat == "MagicKey" and Parts[Parts.Length] == "replace") {
 						continue
@@ -1724,7 +1732,7 @@ InitSubMenus() {
 _BuildDynamicHotstringsSubmenu() {
 	global _LegacyDynamicHotstringsKeyMap, _DYNAMIC_HOTSTRINGS_ORDER
 	SubMenu := Menu()
-	for V1Id in _DYNAMIC_HOTSTRINGS_ORDER {
+	for _, V1Id in _DYNAMIC_HOTSTRINGS_ORDER {
 		if (V1Id == "-") {
 			SubMenu.Add()
 			continue
@@ -1824,12 +1832,12 @@ _CollectAllHotstringsV1Paths() {
 	Paths := []
 
 	; Flat categories — read entries from the manifest
-	for V1Cat in _FLAT_HOTSTRING_V1_CATS {
+	for _, V1Cat in _FLAT_HOTSTRING_V1_CATS {
 		V2Section := _LegacyTopCategoryMap.Has(V1Cat) ? _LegacyTopCategoryMap[V1Cat] : ""
 		if (V2Section == "") {
 			continue
 		}
-		for Entry in ManifestFeaturesForSection(V2Section) {
+		for _, Entry in ManifestFeaturesForSection(V2Section) {
 			V1Path := ManifestPathToLegacyPath(Entry["path"])
 			if (V1Path != "") {
 				Paths.Push(V1Path)
@@ -1997,7 +2005,7 @@ _TH_DynDisableAll(M, _Cat) {
 ; Dynamic handler: per-key tap/hold entries.
 _TH_DynKeys(M, _Cat) {
 	global TapHold
-	for KeyDef in TapHoldKeyDefs() {
+	for _, KeyDef in TapHoldKeyDefs() {
 		KeyId    := KeyDef["id"]
 		KeyLabel := t(KeyDef["i18n"])
 		TapLbl   := TapHoldCurrentTapLabel(KeyId)
@@ -2131,7 +2139,7 @@ _TH_ApplyTap(KeyId, ActionId) {
 _BuildHoldPickerSubmenu(KeyId) {
 	global _TH_HoldOptions
 	PickerMenu := Menu()
-	for HoldOpt in _TH_HoldOptions {
+	for _, HoldOpt in _TH_HoldOptions {
 		Label    := t(HoldOpt["i18n"])
 		IsActive := IsTapHoldHoldActive(KeyId, HoldOpt)
 		PickerMenu.Add(Label, _TH_MakeHoldFn(KeyId, HoldOpt))
@@ -2166,12 +2174,13 @@ _AppendPersonalShortcutsSubmenuIfAny(ShortcutsMenu) {
 	}
 
 	PersonalMenu := Menu()
-	for Name in Names {
+	for _, Name in Names {
 		MenuAddItem(PersonalMenu, "Shortcuts.Personal", Name)
 	}
 	ShortcutsMenu.Add()
 	ShortcutsMenu.Add(t("menu.shortcuts.personal"), PersonalMenu)
 }
+
 
 initMenu() {
 	global SubMenus, A_TrayMenu, HotstringCategories
@@ -2318,7 +2327,7 @@ initMenu() {
 		FreqMenu := Menu()
 		CurrentLabel := ""
 		CurrentCode  := ""
-		for Preset in UPDATER_INTERVAL_PRESETS {
+		for _, Preset in UPDATER_INTERVAL_PRESETS {
 			Label := t("menu.about.frequency." . Preset.Code)
 			RegisterMenuItem(FreqMenu, Label, _MakeFreqSetter(Preset.Seconds))
 			if (Preset.Seconds == UPDATER_CHECK_INTERVAL) {
@@ -2357,7 +2366,7 @@ initMenu() {
 
 	DebuggingMenu := Menu()
 	DebugOrder    := MenuManifest_LoadDebugMenu()
-	for Entry in DebugOrder {
+	for _, Entry in DebugOrder {
 		Id := Entry["id"]
 		if Id == "---" {
 			DebuggingMenu.Add()
@@ -2556,7 +2565,7 @@ _LogLevelMenuLabel() {
 _BuildLogLevelMenu() {
 	global LOGGER_MIN_LEVEL
 	LevelMenu := Menu()
-	for Level in ["DEBUG", "INFO", "WARNING", "ERROR"] {
+	for _, Level in ["DEBUG", "INFO", "WARNING", "ERROR"] {
 		; Capture loop variable for the callback closure
 		_Lvl := Level
 		RegisterMenuItem(LevelMenu, Level, ((_l) => (*) => LoggerSetLevel(_l))(Level))
