@@ -110,5 +110,42 @@ TestReg_HealthcheckHelpers() {
 }
 Test("Regression: Healthcheck formatting and escaping helpers", TestReg_HealthcheckHelpers)
 
+TestReg_HS_GetOrCreateNode() {
+    GetOrCreateNode(Root, PathParts) {
+        Tree := Root
+        Node := false
+        for Part in PathParts {
+            if !Tree.Has(Part)
+                Tree[Part] := Map("subfolders", Map(), "tomls", [])
+            Node := Tree[Part]
+            Tree := Node["subfolders"]
+        }
+        if (Node == false) {
+            if !Root.Has("")
+                Root[""] := Map("subfolders", Map(), "tomls", [])
+            return Root[""]
+        }
+        return Node
+    }
+    
+    Root := Map()
+    
+    ; 1. Empty path parts (representing root folder)
+    RootNode := GetOrCreateNode(Root, [])
+    AssertTrue(Root.Has(""), "Root should have an empty string key for root files")
+    AssertEqual(Root[""], RootNode, "Returned root node should match Root['']")
+    
+    ; 2. Single folder path
+    FolderNode := GetOrCreateNode(Root, ["my_folder"])
+    AssertTrue(Root.Has("my_folder"), "Root should have 'my_folder' key")
+    AssertEqual(Root["my_folder"], FolderNode, "Returned node should match Root['my_folder']")
+    
+    ; 3. Nested folders path
+    NestedNode := GetOrCreateNode(Root, ["my_folder", "sub_folder"])
+    AssertTrue(FolderNode["subfolders"].Has("sub_folder"), "subfolders should have 'sub_folder' key")
+    AssertEqual(FolderNode["subfolders"]["sub_folder"], NestedNode, "Returned node should match the nested folder")
+}
+Test("Regression: HS GetOrCreateNode tree building logic", TestReg_HS_GetOrCreateNode)
+
 ; Hooks and global state for tooltip tests would require more setup, 
 ; but these core logic tests already prevent the most critical bugs we saw.
