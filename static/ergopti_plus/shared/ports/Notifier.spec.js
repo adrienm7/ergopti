@@ -22,10 +22,7 @@
  * ==============================================================================
  */
 
-"use strict";
-
-
-
+'use strict';
 
 // ==================================================
 // ==================================================
@@ -38,8 +35,8 @@
  * @type {object}
  */
 const portContract = {
-	name: "Notifier",
-	version: "1.0.0",
+	name: 'Notifier',
+	version: '1.0.0',
 
 	/**
 	 * send(message, opts) — Display a system notification.
@@ -54,18 +51,15 @@ const portContract = {
 	 *   @error_behavior "log_and_return" — notification failures are non-fatal.
 	 */
 	methods: {
-		send: { arity: 2, required: true },
+		send: { arity: 2, required: true }
 	},
 
 	/** Valid severity levels. Adapters MUST accept all four. */
-	LEVELS: ["info", "success", "warning", "error"],
+	LEVELS: ['info', 'success', 'warning', 'error'],
 
 	/** Default notification title used when opts.title is omitted. */
-	DEFAULT_TITLE: "Ergopti+",
+	DEFAULT_TITLE: 'Ergopti+'
 };
-
-
-
 
 // ==================================================
 // ==================================================
@@ -80,24 +74,19 @@ const portContract = {
  */
 function validateAdapter(adapter) {
 	const violations = [];
-	if (!adapter || typeof adapter !== "object") {
-		return ["adapter must be a non-null object"];
+	if (!adapter || typeof adapter !== 'object') {
+		return ['adapter must be a non-null object'];
 	}
 	for (const [name, spec] of Object.entries(portContract.methods)) {
 		if (!spec.required) continue;
-		if (typeof adapter[name] !== "function") {
+		if (typeof adapter[name] !== 'function') {
 			violations.push(`missing method: ${name}`);
 		} else if (adapter[name].length !== spec.arity) {
-			violations.push(
-				`method ${name}: expected arity ${spec.arity}, got ${adapter[name].length}`
-			);
+			violations.push(`method ${name}: expected arity ${spec.arity}, got ${adapter[name].length}`);
 		}
 	}
 	return violations;
 }
-
-
-
 
 // ==================================================
 // ==================================================
@@ -113,50 +102,49 @@ function validateAdapter(adapter) {
 function contractTestVectors() {
 	return [
 		{
-			id: "send_info",
+			id: 'send_info',
 			description: "send() with level='info' does not throw.",
-			input: { message: "Configuration loaded.", opts: { level: "info" } },
-			assert: { no_exception: true, notification_sent: true },
+			input: { message: 'Configuration loaded.', opts: { level: 'info' } },
+			assert: { no_exception: true, notification_sent: true }
 		},
 		{
-			id: "send_success",
+			id: 'send_success',
 			description: "send() with level='success' does not throw.",
-			input: { message: "LLM bridge initialized.", opts: { level: "success" } },
-			assert: { no_exception: true, notification_sent: true },
+			input: { message: 'LLM bridge initialized.', opts: { level: 'success' } },
+			assert: { no_exception: true, notification_sent: true }
 		},
 		{
-			id: "send_warning",
+			id: 'send_warning',
 			description: "send() with level='warning' does not throw.",
-			input: { message: "API key not set.", opts: { level: "warning" } },
-			assert: { no_exception: true, notification_sent: true },
+			input: { message: 'API key not set.', opts: { level: 'warning' } },
+			assert: { no_exception: true, notification_sent: true }
 		},
 		{
-			id: "send_error",
+			id: 'send_error',
 			description: "send() with level='error' does not throw.",
-			input: { message: "Configuration file missing.", opts: { level: "error" } },
-			assert: { no_exception: true, notification_sent: true },
+			input: { message: 'Configuration file missing.', opts: { level: 'error' } },
+			assert: { no_exception: true, notification_sent: true }
 		},
 		{
-			id: "default_title_applied",
-			description: "When opts.title is omitted, the adapter uses DEFAULT_TITLE.",
-			input: { message: "Hello.", opts: {} },
-			assert: { title_sent: "Ergopti+" },
+			id: 'default_title_applied',
+			description: 'When opts.title is omitted, the adapter uses DEFAULT_TITLE.',
+			input: { message: 'Hello.', opts: {} },
+			assert: { title_sent: 'Ergopti+' }
 		},
 		{
-			id: "custom_title_applied",
-			description: "opts.title overrides the default title.",
-			input: { message: "Ready.", opts: { title: "Mon Titre" } },
-			assert: { title_sent: "Mon Titre" },
+			id: 'custom_title_applied',
+			description: 'opts.title overrides the default title.',
+			input: { message: 'Ready.', opts: { title: 'Mon Titre' } },
+			assert: { title_sent: 'Mon Titre' }
 		},
 		{
-			id: "os_failure_does_not_propagate",
-			description: "If the OS API throws, send() catches it and returns normally.",
+			id: 'os_failure_does_not_propagate',
+			description: 'If the OS API throws, send() catches it and returns normally.',
 			stub: { os_throws: true },
-			input: { message: "Test.", opts: { level: "info" } },
-			assert: { no_exception: true },
-		},
+			input: { message: 'Test.', opts: { level: 'info' } },
+			assert: { no_exception: true }
+		}
 	];
 }
-
 
 module.exports = { portContract, validateAdapter, contractTestVectors };

@@ -27,7 +27,9 @@
 
 				<div id="stats">
 					<div id="stats-details" style="display: none"></div>
-					<div id="eta-container" style="display: none"><span data-i18n="download_window.eta_label"></span> <b id="eta"></b></div>
+					<div id="eta-container" style="display: none">
+						<span data-i18n="download_window.eta_label"></span> <b id="eta"></b>
+					</div>
 					<div id="stats-fallback" data-i18n="download_window.starting"></div>
 				</div>
 			</div>
@@ -41,9 +43,18 @@
 			</div>
 
 			<div class="btn-row">
-				<button id="btn-cancel" onclick="doCancel()" data-i18n="download_window.btn_cancel"></button>
+				<button
+					id="btn-cancel"
+					onclick="doCancel()"
+					data-i18n="download_window.btn_cancel"
+				></button>
 				<button id="btn-term" onclick="doTerm()" data-i18n="download_window.btn_terminal"></button>
-				<button id="btn-retry" onclick="doRetry()" style="display: none" data-i18n="download_window.btn_retry"></button>
+				<button
+					id="btn-retry"
+					onclick="doRetry()"
+					style="display: none"
+					data-i18n="download_window.btn_retry"
+				></button>
 			</div>
 		</div>
 

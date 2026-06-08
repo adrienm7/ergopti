@@ -6,13 +6,13 @@ Coordinates communication with local (Ollama, MLX) and remote LLM backends. Mana
 
 ## Ports used (`_shared/ports/`)
 
-| Port | Usage |
-|---|---|
-| `HttpClient` | REST calls to Ollama/MLX APIs and remote endpoints |
-| `FileSystem` | Reading `_shared/llm/defaults.json` and shell-script dependency installers |
-| `TimerScheduler` | Debounce timer between keystrokes and the actual LLM request |
-| `TooltipRenderer` | Streaming token display during prediction |
-| `ProcessLifecycle` | Launching and watching the Ollama/MLX background process |
+| Port               | Usage                                                                      |
+| ------------------ | -------------------------------------------------------------------------- |
+| `HttpClient`       | REST calls to Ollama/MLX APIs and remote endpoints                         |
+| `FileSystem`       | Reading `_shared/llm/defaults.json` and shell-script dependency installers |
+| `TimerScheduler`   | Debounce timer between keystrokes and the actual LLM request               |
+| `TooltipRenderer`  | Streaming token display during prediction                                  |
+| `ProcessLifecycle` | Launching and watching the Ollama/MLX background process                   |
 
 ## Domain module (`_shared/domain/`)
 
@@ -22,13 +22,13 @@ Coordinates communication with local (Ollama, MLX) and remote LLM backends. Mana
 
 ## Public API
 
-| Function | Description |
-|---|---|
-| `M.init(state)` | Initialize with the shared core state table |
+| Function                       | Description                                                 |
+| ------------------------------ | ----------------------------------------------------------- |
+| `M.init(state)`                | Initialize with the shared core state table                 |
 | `M.request(context, callback)` | Fire an async prediction request for the given text context |
-| `M.cancel()` | Cancel any in-flight prediction request |
-| `M.set_profile(name)` | Switch the active prompt profile at runtime |
-| `M.get_backend_status()` | Returns current backend name and availability flag |
+| `M.cancel()`                   | Cancel any in-flight prediction request                     |
+| `M.set_profile(name)`          | Switch the active prompt profile at runtime                 |
+| `M.get_backend_status()`       | Returns current backend name and availability flag          |
 
 ## Init pattern
 

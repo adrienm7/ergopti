@@ -17,17 +17,17 @@ eliminates that problem.
 
 Values are grouped into thematic sections:
 
-| Section        | Contents |
-|----------------|----------|
+| Section        | Contents                                                                                        |
+| -------------- | ----------------------------------------------------------------------------------------------- |
 | `[llm]`        | LLM prediction debounce, request timeouts, streaming watchdogs, warmup retries, model discovery |
-| `[tooltip]`    | Tooltip display TTLs, error dialogs, success banners |
-| `[debounce]`   | Keyboard/clipboard settle delays, Karabiner probing, hotstring expansion |
-| `[gestures]`   | Touchdevice probe loop, tap geometry, click cooldown |
-| `[keep_awake]` | Mouse-jitter activity simulation tick bounds |
-| `[keylogger]`  | Ingest tick, session gaps, WPM windows, network/sensor polls, hook flush |
-| `[tap_hold]`   | Tap-min, key-repeat initial delay and interval, one-shot shift |
-| `[ergonomics]` | Block-break, flow window, hesitation detection |
-| `[ui]`         | Menu refresh delays, Karabiner lifecycle, WPM widgets, HS reload debounce |
+| `[tooltip]`    | Tooltip display TTLs, error dialogs, success banners                                            |
+| `[debounce]`   | Keyboard/clipboard settle delays, Karabiner probing, hotstring expansion                        |
+| `[gestures]`   | Touchdevice probe loop, tap geometry, click cooldown                                            |
+| `[keep_awake]` | Mouse-jitter activity simulation tick bounds                                                    |
+| `[keylogger]`  | Ingest tick, session gaps, WPM windows, network/sensor polls, hook flush                        |
+| `[tap_hold]`   | Tap-min, key-repeat initial delay and interval, one-shot shift                                  |
+| `[ergonomics]` | Block-break, flow window, hesitation detection                                                  |
+| `[ui]`         | Menu refresh delays, Karabiner lifecycle, WPM widgets, HS reload debounce                       |
 
 All values are in **milliseconds** unless the key name explicitly says `_sec`.
 

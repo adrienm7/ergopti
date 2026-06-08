@@ -56,6 +56,7 @@ TrayMenu     ◀──────────  GestureRecognizer (spec)
 ```
 
 Domain modules:
+
 - **MUST NOT** import from `static/ergopti_plus/windows/` or `static/ergopti_plus/macos/`.
 - **MUST NOT** call any OS API directly.
 - **MAY** import from `static/ergopti_plus/shared/` (tooltip, ports, llm JSON files).
@@ -64,29 +65,29 @@ Domain modules:
 
 ## 4. Module Summary
 
-| Module | Type | What it owns |
-|---|---|---|
-| Registry | Spec | Hotstring data model, O(1) tail-char bucket lookup, group lifecycle |
-| Expander | Spec | Match decision pipeline, backspace count, replacement emit |
-| Terminators | Spec | Terminator catalogue, enabled state, O(1) char lookup |
-| TokenParser | Impl | Diff coloring: green = correction, orange = new words, gray = unchanged |
-| PromptBuilder | Impl | Context truncation, tail extraction, token budget, temperature formula |
-| ProfileSelector | Impl | Profile registry, active selection, template variable injection |
-| GestureRecognizer | Spec | Frame centroid, direction locking, threshold constants |
+| Module            | Type | What it owns                                                            |
+| ----------------- | ---- | ----------------------------------------------------------------------- |
+| Registry          | Spec | Hotstring data model, O(1) tail-char bucket lookup, group lifecycle     |
+| Expander          | Spec | Match decision pipeline, backspace count, replacement emit              |
+| Terminators       | Spec | Terminator catalogue, enabled state, O(1) char lookup                   |
+| TokenParser       | Impl | Diff coloring: green = correction, orange = new words, gray = unchanged |
+| PromptBuilder     | Impl | Context truncation, tail extraction, token budget, temperature formula  |
+| ProfileSelector   | Impl | Profile registry, active selection, template variable injection         |
+| GestureRecognizer | Spec | Frame centroid, direction locking, threshold constants                  |
 
 ---
 
 ## 5. Driver Compliance
 
-| Module | AHK adapter | HS adapter |
-|---|---|---|
-| Registry | `lib/hotstrings/hotstring_engine.ahk` | `modules/keymap/registry.lua` |
-| Expander | `modules/hotstrings.ahk` + `hotstring_engine.ahk` | `modules/keymap/expander.lua` |
-| Terminators | `lib/hotstrings/hotstring_prefix_watcher.ahk` | `modules/keymap/terminators.lua` |
-| TokenParser | `ui/tooltip_llm.ahk` (partial) | `modules/llm/parser.lua` |
-| PromptBuilder | `modules/llm/api_common.ahk` | `modules/llm/prompt_builder.lua` |
-| ProfileSelector | `modules/llm/profiles.ahk` | `modules/llm/profiles.lua` |
-| GestureRecognizer | `modules/gestures.ahk` (registry-only) | `modules/gestures/engine.lua` |
+| Module            | AHK adapter                                       | HS adapter                       |
+| ----------------- | ------------------------------------------------- | -------------------------------- |
+| Registry          | `lib/hotstrings/hotstring_engine.ahk`             | `modules/keymap/registry.lua`    |
+| Expander          | `modules/hotstrings.ahk` + `hotstring_engine.ahk` | `modules/keymap/expander.lua`    |
+| Terminators       | `lib/hotstrings/hotstring_prefix_watcher.ahk`     | `modules/keymap/terminators.lua` |
+| TokenParser       | `ui/tooltip_llm.ahk` (partial)                    | `modules/llm/parser.lua`         |
+| PromptBuilder     | `modules/llm/api_common.ahk`                      | `modules/llm/prompt_builder.lua` |
+| ProfileSelector   | `modules/llm/profiles.ahk`                        | `modules/llm/profiles.lua`       |
+| GestureRecognizer | `modules/gestures.ahk` (registry-only)            | `modules/gestures/engine.lua`    |
 
 ---
 

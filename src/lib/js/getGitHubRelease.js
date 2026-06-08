@@ -37,9 +37,8 @@ async function fetchRelease(channel) {
 		/** @type {Array<{tag_name: string, prerelease: boolean, assets: Array<{name: string, browser_download_url: string}>}>} */
 		const releases = await res.json();
 
-		const release = channel === 'dev'
-			? releases.find((r) => r.prerelease)
-			: releases.find((r) => !r.prerelease);
+		const release =
+			channel === 'dev' ? releases.find((r) => r.prerelease) : releases.find((r) => !r.prerelease);
 
 		if (!release) {
 			_cache[channel] = null;

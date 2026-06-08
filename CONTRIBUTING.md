@@ -168,7 +168,7 @@ Managed by [Husky](https://typicode.github.io/husky/). The hook runs in order:
 | 4    | `git add static/drivers/autohotkey/*.ahk`  | Stage the cleaned file                                |
 | 5    | Windows only: local Ahk2Exe compile        | If AHK is staged, compile and stage `ErgoptiPlus.exe` |
 | 6    | `uv run python … 0_generate_hotstrings.py` | Regenerate TOML hotstrings from the cleaned AHK       |
-| 7    | `git add static/hotstrings/*.toml` | Stage the regenerated TOML files                      |
+| 7    | `git add static/hotstrings/*.toml`         | Stage the regenerated TOML files                      |
 
 ```
 

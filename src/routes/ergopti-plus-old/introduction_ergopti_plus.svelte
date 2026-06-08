@@ -78,7 +78,8 @@
 					> ;
 				</li>
 				<li>
-					macOS : <a href="https://www.hammerspoon.org/" target="_blank" class="link">Hammerspoon</a> (tap-holds, autocorrection, snippets, raccourcis, gestes trackpad, etc.) ;
+					macOS : <a href="https://www.hammerspoon.org/" target="_blank" class="link">Hammerspoon</a
+					> (tap-holds, autocorrection, snippets, raccourcis, gestes trackpad, etc.) ;
 				</li>
 				<li>
 					Linux : les meilleurs outils sont actuellement <a

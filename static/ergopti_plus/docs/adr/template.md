@@ -1,10 +1,10 @@
 # NNN — Title
 
-| Field | Value |
-|---|---|
-| **Date** | YYYY-MM-DD |
-| **Status** | Proposed / Accepted / Deprecated / Superseded by [NNN](NNN-slug.md) |
-| **Deciders** | <!-- names or roles --> |
+| Field        | Value                                                               |
+| ------------ | ------------------------------------------------------------------- |
+| **Date**     | YYYY-MM-DD                                                          |
+| **Status**   | Proposed / Accepted / Deprecated / Superseded by [NNN](NNN-slug.md) |
+| **Deciders** | <!-- names or roles -->                                             |
 
 ---
 
@@ -35,8 +35,8 @@
 
 ## Alternatives considered
 
-| Alternative | Why rejected |
-|---|---|
+| Alternative     | Why rejected    |
+| --------------- | --------------- |
 | <!-- option --> | <!-- reason --> |
 
 ## Evidence in the codebase

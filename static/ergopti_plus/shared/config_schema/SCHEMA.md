@@ -81,15 +81,15 @@ All TOML keys are `snake_case`. That is the standard TOML convention.
 
 ### Universal vs. platform-specific sections
 
-| Section | Read by | Schema |
-|---|---|---|
-| `[script]` | AHK + HS | `$defs.script` |
-| `[hotstrings]` | AHK + HS | `$defs.hotstrings` |
-| `[llm]` | AHK + HS | `$defs.llm` |
-| `[metrics]` | AHK + HS | `$defs.metrics` |
-| `[shortcuts]` | AHK + HS | `$defs.shortcuts` |
-| `[ahk.*]` | AHK only | `$defs.ahk_specific` |
-| `[hs.*]` | HS only | `$defs.hs_specific` |
+| Section        | Read by                  | Schema                 |
+| -------------- | ------------------------ | ---------------------- |
+| `[script]`     | AHK + HS                 | `$defs.script`         |
+| `[hotstrings]` | AHK + HS                 | `$defs.hotstrings`     |
+| `[llm]`        | AHK + HS                 | `$defs.llm`            |
+| `[metrics]`    | AHK + HS                 | `$defs.metrics`        |
+| `[shortcuts]`  | AHK + HS                 | `$defs.shortcuts`      |
+| `[ahk.*]`      | AHK only                 | `$defs.ahk_specific`   |
+| `[hs.*]`       | HS only                  | `$defs.hs_specific`    |
 | `[tap_hold.*]` | AHK + HS (via Karabiner) | `tap_hold.schema.json` |
 
 If a `[hs.*]` section appears in the AHK config, the driver emits a **warn** at boot (or crashes in dev mode). Same for `[ahk.*]` on the HS side.
@@ -199,13 +199,13 @@ This means:
 
 Each `[tap_hold.keys.<name>]` entry may declare:
 
-| Field | Type | Required | Description |
-|---|---|---|---|
-| `time_activation_seconds` | number | yes | Tap vs hold threshold |
-| `tap_action` | string | no | Action emitted on short tap (ref `_shared/actions.toml`) |
-| `hold_layer` | string | no | Layer activated on hold (ref `tap_hold.layers.<name>`) |
-| `hold_modifier` | enum | no | Modifier emitted on hold (mutex with `hold_layer`) |
-| `enabled` | bool | no | Default `true`. Set `false` to disable this entry without deleting it |
+| Field                     | Type   | Required | Description                                                           |
+| ------------------------- | ------ | -------- | --------------------------------------------------------------------- |
+| `time_activation_seconds` | number | yes      | Tap vs hold threshold                                                 |
+| `tap_action`              | string | no       | Action emitted on short tap (ref `_shared/actions.toml`)              |
+| `hold_layer`              | string | no       | Layer activated on hold (ref `tap_hold.layers.<name>`)                |
+| `hold_modifier`           | enum   | no       | Modifier emitted on hold (mutex with `hold_layer`)                    |
+| `enabled`                 | bool   | no       | Default `true`. Set `false` to disable this entry without deleting it |
 
 `hold_layer` and `hold_modifier` are **mutually exclusive** (the schema enforces it).
 
@@ -213,22 +213,22 @@ Each `[tap_hold.keys.<name>]` entry may declare:
 
 Since we're going clean-state with no backward compatibility, this mapping is **informative only** — it documents what every v1 key becomes in v2, to make diffs easier to read in the AHK/HS code refactor.
 
-| v1 (PascalCase / mixed) | v2 (unified snake_case) | Notes |
-|---|---|---|
-| `[Hotstrings] MagicKey` | `[hotstrings] trigger_char` | Semantic rename |
-| `[Hotstrings.Autocorrection] Accents = true` + `Accents_TimeActivationSeconds = 0.5` | `[hotstrings.autocorrection.accents] enabled = true; time_activation_seconds = 0.5` | Modelling α |
-| `[LLM] ctx_chars` | `[llm.generation] context_length` | Adopts HS naming |
-| `[LLM] model` | `[llm.models] selected` + `[llm.models] ollama = "..."` | Explicit multi-backend |
-| `[Layout] ErgoptiBase` | `[ahk.layout] ergopti_base` | AHK-only, prefixed |
-| `[TapHolds.CapsLock]` (AHK) | `[tap_hold.keys.caps_lock]` (per-driver tap_hold.toml) | Dedicated file |
-| `[Shortcuts] AGrave = true` + `AGrave_Letter = "v"` | `[shortcuts.a_grave] enabled = true; letter = "v"` | Modelling α extended |
-| `[Shortcuts.AltGrCapsLock]` | `[ahk.shortcuts.alt_gr_caps_lock]` | AHK-only |
-| `[Gestures]` (AHK, limited vocab) | `[ahk.gestures]` | Prefixed (Win vocab) |
-| `[gestures]` (HS, rich vocab) | `[hs.gestures]` + `[hs.gestures.modes]` + `[hs.gestures.sensitivities]` | Prefixed (Mac vocab) |
-| `[Script] Locale` (PascalCase) | `[script] locale` | Casing |
-| `[Script] WpmWidget*` | moved under `[hs.metrics.float]` / dropped from AHK | Semantic re-centering |
-| `personal_info.toml` `[info] FirstName` | `[info] first_name` | Casing |
-| `personal_info.toml` `[letters] a = "StreetAddress"` | `[letters] a = "street_address"` | Casing also applied to values |
+| v1 (PascalCase / mixed)                                                              | v2 (unified snake_case)                                                             | Notes                         |
+| ------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------- | ----------------------------- |
+| `[Hotstrings] MagicKey`                                                              | `[hotstrings] trigger_char`                                                         | Semantic rename               |
+| `[Hotstrings.Autocorrection] Accents = true` + `Accents_TimeActivationSeconds = 0.5` | `[hotstrings.autocorrection.accents] enabled = true; time_activation_seconds = 0.5` | Modelling α                   |
+| `[LLM] ctx_chars`                                                                    | `[llm.generation] context_length`                                                   | Adopts HS naming              |
+| `[LLM] model`                                                                        | `[llm.models] selected` + `[llm.models] ollama = "..."`                             | Explicit multi-backend        |
+| `[Layout] ErgoptiBase`                                                               | `[ahk.layout] ergopti_base`                                                         | AHK-only, prefixed            |
+| `[TapHolds.CapsLock]` (AHK)                                                          | `[tap_hold.keys.caps_lock]` (per-driver tap_hold.toml)                              | Dedicated file                |
+| `[Shortcuts] AGrave = true` + `AGrave_Letter = "v"`                                  | `[shortcuts.a_grave] enabled = true; letter = "v"`                                  | Modelling α extended          |
+| `[Shortcuts.AltGrCapsLock]`                                                          | `[ahk.shortcuts.alt_gr_caps_lock]`                                                  | AHK-only                      |
+| `[Gestures]` (AHK, limited vocab)                                                    | `[ahk.gestures]`                                                                    | Prefixed (Win vocab)          |
+| `[gestures]` (HS, rich vocab)                                                        | `[hs.gestures]` + `[hs.gestures.modes]` + `[hs.gestures.sensitivities]`             | Prefixed (Mac vocab)          |
+| `[Script] Locale` (PascalCase)                                                       | `[script] locale`                                                                   | Casing                        |
+| `[Script] WpmWidget*`                                                                | moved under `[hs.metrics.float]` / dropped from AHK                                 | Semantic re-centering         |
+| `personal_info.toml` `[info] FirstName`                                              | `[info] first_name`                                                                 | Casing                        |
+| `personal_info.toml` `[letters] a = "StreetAddress"`                                 | `[letters] a = "street_address"`                                                    | Casing also applied to values |
 
 ## References
 

@@ -19,40 +19,39 @@
 name: Deploy site
 
 on:
-    push:
-        branches: [main, dev]
-        paths:
-            # Svelte app source
-            - "src/**"
-            # Site-only assets in static/ — driver folders are excluded:
-            #   static/ergopti_plus/  → macOS / Windows / Linux drivers
-            #   static/drivers/       → downloadable driver bundles
-            # Everything else in static/ is a site asset.
-            - "static/benchmarks/**"
-            - "static/corpus/**"
-            - "static/documents/**"
-            - "static/ergopti/**"
-            - "static/img/**"
-            - "static/layouts/**"
-            - "static/favicon.ico"
-            - "static/version.json"
-            # Build config
-            - "svelte.config.js"
-            - "vite.config.js"
-            - "package.json"
-            - "package-lock.json"
-            - ".github/workflows/deploy-site.yml"
-    workflow_dispatch:
+  push:
+    branches: [main, dev]
+    paths:
+      # Svelte app source
+      - 'src/**'
+      # Site-only assets in static/ — driver folders are excluded:
+      #   static/ergopti_plus/  → macOS / Windows / Linux drivers
+      #   static/drivers/       → downloadable driver bundles
+      # Everything else in static/ is a site asset.
+      - 'static/benchmarks/**'
+      - 'static/corpus/**'
+      - 'static/documents/**'
+      - 'static/ergopti/**'
+      - 'static/img/**'
+      - 'static/layouts/**'
+      - 'static/favicon.ico'
+      - 'static/version.json'
+      # Build config
+      - 'svelte.config.js'
+      - 'vite.config.js'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/deploy-site.yml'
+  workflow_dispatch:
 
 permissions:
-    contents: write
+  contents: write
 
 concurrency:
-    # Only one deploy per branch at a time — cancel any in-progress deploy
-    # for the same branch when a new push arrives.
-    group: deploy-site-${{ github.ref_name }}
-    cancel-in-progress: true
-
+  # Only one deploy per branch at a time — cancel any in-progress deploy
+  # for the same branch when a new push arrives.
+  group: deploy-site-${{ github.ref_name }}
+  cancel-in-progress: true
 
 # ===================================
 # ===================================
@@ -61,100 +60,99 @@ concurrency:
 # ===================================
 
 jobs:
+  deploy:
+    name: "Build + deploy → ${{ github.ref_name == 'main' && 'ergopti.fr/' || 'ergopti.fr/dev/' }}"
+    runs-on: ubuntu-latest
 
-    deploy:
-        name: "Build + deploy → ${{ github.ref_name == 'main' && 'ergopti.fr/' || 'ergopti.fr/dev/' }}"
-        runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          # Full history so git operations in later steps work correctly
+          fetch-depth: 0
 
-        steps:
-            - name: Checkout repository
-              uses: actions/checkout@v4
-              with:
-                  # Full history so git operations in later steps work correctly
-                  fetch-depth: 0
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
 
-            - name: Set up Node.js
-              uses: actions/setup-node@v4
-              with:
-                  node-version: "22"
-                  cache: "npm"
+      - name: Install dependencies
+        run: npm ci
 
-            - name: Install dependencies
-              run: npm ci
+      - name: Resolve deploy target
+        id: target
+        # main  → base path ""     → deploys to gh-pages root
+        # dev   → base path "/dev" → deploys to gh-pages /dev/ subdirectory
+        run: |
+          if [[ "${{ github.ref_name }}" == "main" ]]; then
+              echo "base_path="          >> "$GITHUB_OUTPUT"
+              echo "deploy_dir=."        >> "$GITHUB_OUTPUT"
+              echo "label=ergopti.fr/"   >> "$GITHUB_OUTPUT"
+          else
+              echo "base_path=/dev"        >> "$GITHUB_OUTPUT"
+              echo "deploy_dir=dev"         >> "$GITHUB_OUTPUT"
+              echo "label=ergopti.fr/dev/"  >> "$GITHUB_OUTPUT"
+          fi
 
-            - name: Resolve deploy target
-              id: target
-              # main  → base path ""     → deploys to gh-pages root
-              # dev   → base path "/dev" → deploys to gh-pages /dev/ subdirectory
-              run: |
-                  if [[ "${{ github.ref_name }}" == "main" ]]; then
-                      echo "base_path="          >> "$GITHUB_OUTPUT"
-                      echo "deploy_dir=."        >> "$GITHUB_OUTPUT"
-                      echo "label=ergopti.fr/"   >> "$GITHUB_OUTPUT"
-                  else
-                      echo "base_path=/dev"        >> "$GITHUB_OUTPUT"
-                      echo "deploy_dir=dev"         >> "$GITHUB_OUTPUT"
-                      echo "label=ergopti.fr/dev/"  >> "$GITHUB_OUTPUT"
-                  fi
+      - name: Build SvelteKit site
+        env:
+          BASE_PATH: ${{ steps.target.outputs.base_path }}
+        run: npm run build
 
-            - name: Build SvelteKit site
-              env:
-                  BASE_PATH: ${{ steps.target.outputs.base_path }}
-              run: npm run build
+      - name: Deploy to GitHub Pages
+        # Checks out the gh-pages branch, replaces only the target
+        # subdirectory (root for main, /dev/ for dev), then force-pushes.
+        # This avoids wiping the other branch's files.
+        run: |
+          set -euo pipefail
 
-            - name: Deploy to GitHub Pages
-              # Checks out the gh-pages branch, replaces only the target
-              # subdirectory (root for main, /dev/ for dev), then force-pushes.
-              # This avoids wiping the other branch's files.
-              run: |
-                  set -euo pipefail
+          DEPLOY_DIR="${{ steps.target.outputs.deploy_dir }}"
+          LABEL="${{ steps.target.outputs.label }}"
 
-                  DEPLOY_DIR="${{ steps.target.outputs.deploy_dir }}"
-                  LABEL="${{ steps.target.outputs.label }}"
+          # Stash the freshly built output before switching branches
+          cp -r build /tmp/site-build
 
-                  # Stash the freshly built output before switching branches
-                  cp -r build /tmp/site-build
+          # Configure git identity for the deploy commit
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
 
-                  # Configure git identity for the deploy commit
-                  git config user.name  "github-actions[bot]"
-                  git config user.email "github-actions[bot]@users.noreply.github.com"
+          # Switch to gh-pages, creating it if it does not exist yet
+          if git ls-remote --exit-code origin gh-pages > /dev/null 2>&1; then
+              git fetch origin gh-pages
+              git checkout gh-pages
+          else
+              git checkout --orphan gh-pages
+              git rm -rf . > /dev/null 2>&1 || true
+          fi
 
-                  # Switch to gh-pages, creating it if it does not exist yet
-                  if git ls-remote --exit-code origin gh-pages > /dev/null 2>&1; then
-                      git fetch origin gh-pages
-                      git checkout gh-pages
-                  else
-                      git checkout --orphan gh-pages
-                      git rm -rf . > /dev/null 2>&1 || true
-                  fi
+          # Replace only the target directory — the other branch is untouched
+          if [[ "$DEPLOY_DIR" == "." ]]; then
+              # Main deploy: replace root but preserve any subdirectories
+              # that belong to other branches (e.g. /dev/)
+              find . -maxdepth 1 ! -name '.' \
+                     ! -name '.git' \
+                     ! -name 'dev' \
+                     -exec rm -rf {} +
+              cp -r /tmp/site-build/. .
+          else
+              rm -rf "$DEPLOY_DIR"
+              mkdir -p "$DEPLOY_DIR"
+              cp -r /tmp/site-build/. "$DEPLOY_DIR/"
+          fi
 
-                  # Replace only the target directory — the other branch is untouched
-                  if [[ "$DEPLOY_DIR" == "." ]]; then
-                      # Main deploy: replace root but preserve any subdirectories
-                      # that belong to other branches (e.g. /dev/)
-                      find . -maxdepth 1 ! -name '.' \
-                             ! -name '.git' \
-                             ! -name 'dev' \
-                             -exec rm -rf {} +
-                      cp -r /tmp/site-build/. .
-                  else
-                      rm -rf "$DEPLOY_DIR"
-                      mkdir -p "$DEPLOY_DIR"
-                      cp -r /tmp/site-build/. "$DEPLOY_DIR/"
-                  fi
+          # GitHub Pages needs a .nojekyll file at the root to serve
+          # files whose names start with an underscore (SvelteKit chunks).
+          touch .nojekyll
 
-                  # GitHub Pages needs a .nojekyll file at the root to serve
-                  # files whose names start with an underscore (SvelteKit chunks).
-                  touch .nojekyll
+          git add -A
+          # Only commit if something actually changed
+          if git diff --cached --quiet; then
+              echo "No changes to deploy — gh-pages already up to date."
+              exit 0
+          fi
 
-                  git add -A
-                  # Only commit if something actually changed
-                  if git diff --cached --quiet; then
-                      echo "No changes to deploy — gh-pages already up to date."
-                      exit 0
-                  fi
-
-                  COMMIT_SHA="${{ github.sha }}"
-                  git commit -m "deploy: ${LABEL} ← ${COMMIT_SHA::8} (${GITHUB_REF_NAME})"
-                  git push origin gh-pages
-                  echo "Deployed to ${LABEL}"
+          COMMIT_SHA="${{ github.sha }}"
+          git commit -m "deploy: ${LABEL} ← ${COMMIT_SHA::8} (${GITHUB_REF_NAME})"
+          git push origin gh-pages
+          echo "Deployed to ${LABEL}"

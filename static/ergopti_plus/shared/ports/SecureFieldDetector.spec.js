@@ -28,10 +28,7 @@
  * ==============================================================================
  */
 
-"use strict";
-
-
-
+'use strict';
 
 // ===========================================
 // ===========================================
@@ -44,8 +41,8 @@
  * @type {object}
  */
 const portContract = {
-	name: "SecureFieldDetector",
-	version: "1.0.0",
+	name: 'SecureFieldDetector',
+	version: '1.0.0',
 
 	/**
 	 * isSecureField() — Return true if the active input field is a secure or
@@ -70,13 +67,10 @@ const portContract = {
 	 */
 	methods: {
 		isSecureField: { arity: 0, required: true },
-		isSecureApp:   { arity: 1, required: true },
-		refresh:       { arity: 0, required: true },
-	},
+		isSecureApp: { arity: 1, required: true },
+		refresh: { arity: 0, required: true }
+	}
 };
-
-
-
 
 // ===============================================
 // ===============================================
@@ -91,24 +85,19 @@ const portContract = {
  */
 function validateAdapter(adapter) {
 	const violations = [];
-	if (!adapter || typeof adapter !== "object") {
-		return ["adapter must be a non-null object"];
+	if (!adapter || typeof adapter !== 'object') {
+		return ['adapter must be a non-null object'];
 	}
 	for (const [name, spec] of Object.entries(portContract.methods)) {
 		if (!spec.required) continue;
-		if (typeof adapter[name] !== "function") {
+		if (typeof adapter[name] !== 'function') {
 			violations.push(`missing method: ${name}`);
 		} else if (adapter[name].length !== spec.arity) {
-			violations.push(
-				`method ${name}: expected arity ${spec.arity}, got ${adapter[name].length}`
-			);
+			violations.push(`method ${name}: expected arity ${spec.arity}, got ${adapter[name].length}`);
 		}
 	}
 	return violations;
 }
-
-
-
 
 // ==========================================
 // ==========================================
@@ -126,39 +115,29 @@ function validateAdapter(adapter) {
 function contractTestVectors() {
 	return [
 		{
-			id: "isSecureField_returns_boolean",
-			description: "isSecureField() returns a boolean (true or false), never throws.",
+			id: 'isSecureField_returns_boolean',
+			description: 'isSecureField() returns a boolean (true or false), never throws.',
 			steps: [
-				{ call: "isSecureField", args: [] },
-				{ assert: "return_type", expected: "boolean" },
-			],
+				{ call: 'isSecureField', args: [] },
+				{ assert: 'return_type', expected: 'boolean' }
+			]
 		},
 		{
-			id: "isSecureApp_unknown_returns_false",
-			description: "isSecureApp() returns false for an unrecognised process name.",
-			steps: [
-				{ call: "isSecureApp", args: ["notanapp.exe"] },
-				{ assert: "return_false" },
-			],
+			id: 'isSecureApp_unknown_returns_false',
+			description: 'isSecureApp() returns false for an unrecognised process name.',
+			steps: [{ call: 'isSecureApp', args: ['notanapp.exe'] }, { assert: 'return_false' }]
 		},
 		{
-			id: "isSecureApp_empty_returns_false",
-			description: "isSecureApp() returns false for an empty string, never throws.",
-			steps: [
-				{ call: "isSecureApp", args: [""] },
-				{ assert: "return_false" },
-			],
+			id: 'isSecureApp_empty_returns_false',
+			description: 'isSecureApp() returns false for an empty string, never throws.',
+			steps: [{ call: 'isSecureApp', args: [''] }, { assert: 'return_false' }]
 		},
 		{
-			id: "refresh_does_not_throw",
-			description: "refresh() completes without throwing regardless of window state.",
-			steps: [
-				{ call: "refresh", args: [] },
-				{ assert: "no_throw" },
-			],
-		},
+			id: 'refresh_does_not_throw',
+			description: 'refresh() completes without throwing regardless of window state.',
+			steps: [{ call: 'refresh', args: [] }, { assert: 'no_throw' }]
+		}
 	];
 }
-
 
 module.exports = { portContract, validateAdapter, contractTestVectors };

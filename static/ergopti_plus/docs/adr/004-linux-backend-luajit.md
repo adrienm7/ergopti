@@ -1,10 +1,10 @@
 # 004 — Linux driver uses LuaJIT + libinput + uinput
 
-| Field | Value |
-|---|---|
-| **Date** | 2025-10-01 |
-| **Status** | Proposed |
-| **Deciders** | Core team |
+| Field        | Value      |
+| ------------ | ---------- |
+| **Date**     | 2025-10-01 |
+| **Status**   | Proposed   |
+| **Deciders** | Core team  |
 
 ---
 
@@ -71,11 +71,11 @@ utilities) are the canonical implementations for the Linux driver — no rewrite
 
 ## Alternatives considered
 
-| Alternative | Why rejected |
-|---|---|
-| Python + evdev | Would require a second runtime; domain layer is Lua |
-| AHK under Wine | Unacceptable latency and portability issues |
-| C extension | Higher maintenance cost; LuaJIT FFI achieves the same result |
+| Alternative              | Why rejected                                                     |
+| ------------------------ | ---------------------------------------------------------------- |
+| Python + evdev           | Would require a second runtime; domain layer is Lua              |
+| AHK under Wine           | Unacceptable latency and portability issues                      |
+| C extension              | Higher maintenance cost; LuaJIT FFI achieves the same result     |
 | Wayland-native (wlroots) | Too early — most distributions still ship Xorg or mixed sessions |
 
 ## Evidence in the codebase

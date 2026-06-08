@@ -198,63 +198,81 @@ h1 {
 
 /* Second KPI row holds smaller, denser cards (6 across) for time / rhythm */
 .stats-grid-secondary {
-	grid-template-columns: repeat(6, 1fr);
 	gap: 12px;
+	grid-template-columns: repeat(6, 1fr);
 	margin-top: -8px; /* tighten gap with the primary KPI strip above */
 }
 .stats-grid-secondary .stat-card {
 	padding: 12px 14px;
 }
 .stats-grid-secondary .stat-card h2 {
-	font-size: 12px;
 	color: var(--text-muted);
+	font-size: 12px;
+	letter-spacing: 0.5px;
 	margin: 0 0 4px 0;
 	text-transform: uppercase;
-	letter-spacing: 0.5px;
 }
 .stats-grid-secondary .stat-value {
+	color: #fff;
 	font-size: 1.4em;
 	font-weight: 600;
-	color: #fff;
 }
 .stats-grid-secondary .stat-details {
-	font-size: 11px;
 	color: var(--text-muted);
+	font-size: 11px;
 	margin-top: 2px;
 }
 
 /* App drill-down modal */
 .app-modal {
-	position: fixed; inset: 0;
+	align-items: flex-start;
 	background: rgba(0, 0, 0, 0.7);
-	display: flex; align-items: flex-start; justify-content: center;
-	padding: 40px 20px;
-	z-index: 999;
+	display: flex;
+	inset: 0;
+	justify-content: center;
 	overflow-y: auto;
+	padding: 40px 20px;
+	position: fixed;
+	z-index: 999;
 }
 .app-modal-card {
 	background: #1a1a1a;
 	border: 1px solid rgba(255, 255, 255, 0.12);
 	border-radius: 12px;
-	width: 100%;
+	color: #ddd;
 	max-width: 920px;
 	padding: 20px 24px;
-	color: #ddd;
+	width: 100%;
 }
 .app-modal-header {
-	display: flex; align-items: center; justify-content: space-between;
-	margin-bottom: 16px;
+	align-items: center;
 	border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+	display: flex;
+	justify-content: space-between;
+	margin-bottom: 16px;
 	padding-bottom: 10px;
 }
-.app-modal-header h2 { margin: 0; font-size: 18px; color: #fff; }
-.app-modal-close {
-	background: transparent; color: #888; border: 0; font-size: 24px;
-	cursor: pointer; padding: 0 8px; line-height: 1;
+.app-modal-header h2 {
+	color: #fff;
+	font-size: 18px;
+	margin: 0;
 }
-.app-modal-close:hover { color: #fff; }
+.app-modal-close {
+	background: transparent;
+	border: 0;
+	color: #888;
+	cursor: pointer;
+	font-size: 24px;
+	line-height: 1;
+	padding: 0 8px;
+}
+.app-modal-close:hover {
+	color: #fff;
+}
 .app-modal-tiles {
-	display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px;
+	display: grid;
+	gap: 10px;
+	grid-template-columns: repeat(6, 1fr);
 	margin-bottom: 16px;
 }
 .app-modal-tile {
@@ -264,25 +282,44 @@ h1 {
 	padding: 10px 12px;
 }
 .app-modal-tile-label {
-	font-size: 10px; color: #888; text-transform: uppercase; letter-spacing: 0.5px;
+	color: #888;
+	font-size: 10px;
+	letter-spacing: 0.5px;
+	text-transform: uppercase;
 }
 .app-modal-tile-value {
-	font-size: 16px; font-weight: 600; color: #fff; margin-top: 2px;
+	color: #fff;
+	font-size: 16px;
+	font-weight: 600;
+	margin-top: 2px;
 }
 .app-modal-tile-detail {
-	font-size: 10px; color: #888; margin-top: 2px;
+	color: #888;
+	font-size: 10px;
+	margin-top: 2px;
 }
-.app-modal-section { margin-top: 14px; }
+.app-modal-section {
+	margin-top: 14px;
+}
 .app-modal-section h3 {
-	margin: 0 0 8px 0; font-size: 12px; color: #888;
-	text-transform: uppercase; letter-spacing: 0.5px;
+	color: #888;
+	font-size: 12px;
+	letter-spacing: 0.5px;
+	margin: 0 0 8px 0;
+	text-transform: uppercase;
 }
 .app-modal-grid-2 {
-	display: grid; grid-template-columns: 1fr 1fr; gap: 18px;
+	display: grid;
+	gap: 18px;
+	grid-template-columns: 1fr 1fr;
 }
 /* Hint that table rows are clickable */
-#apps-table tbody tr { cursor: pointer; }
-#apps-table tbody tr:hover { background: rgba(255, 255, 255, 0.04); }
+#apps-table tbody tr {
+	cursor: pointer;
+}
+#apps-table tbody tr:hover {
+	background: rgba(255, 255, 255, 0.04);
+}
 
 .stat-card {
 	background: var(--panel-bg);
@@ -403,6 +440,12 @@ tr:hover td {
 }
 
 /* Tabs (#57): hide non-active sections. */
-.main-content > [data-tab] { display: none; }
-.main-content > [data-tab].tab-active { display: block; }
-.main-content > .stats-grid[data-tab].tab-active { display: grid; }
+.main-content > [data-tab] {
+	display: none;
+}
+.main-content > [data-tab].tab-active {
+	display: block;
+}
+.main-content > .stats-grid[data-tab].tab-active {
+	display: grid;
+}

@@ -23,10 +23,7 @@
  * ==============================================================================
  */
 
-"use strict";
-
-
-
+'use strict';
 
 // ==================================================
 // ==================================================
@@ -39,8 +36,8 @@
  * @type {object}
  */
 const portContract = {
-	name: "GraphicsRenderer",
-	version: "1.0.0",
+	name: 'GraphicsRenderer',
+	version: '1.0.0',
 
 	/**
 	 * createWindow(opts) — Allocate a native layered window.
@@ -86,16 +83,13 @@ const portContract = {
 	 *   @error_behavior "ignore"
 	 */
 	methods: {
-		createWindow:  { arity: 1, required: true },
+		createWindow: { arity: 1, required: true },
 		destroyWindow: { arity: 1, required: true },
-		drawBitmap:    { arity: 2, required: true },
-		show:          { arity: 1, required: true },
-		hide:          { arity: 1, required: true },
-	},
+		drawBitmap: { arity: 2, required: true },
+		show: { arity: 1, required: true },
+		hide: { arity: 1, required: true }
+	}
 };
-
-
-
 
 // ==================================================
 // ==================================================
@@ -110,24 +104,19 @@ const portContract = {
  */
 function validateAdapter(adapter) {
 	const violations = [];
-	if (!adapter || typeof adapter !== "object") {
-		return ["adapter must be a non-null object"];
+	if (!adapter || typeof adapter !== 'object') {
+		return ['adapter must be a non-null object'];
 	}
 	for (const [name, spec] of Object.entries(portContract.methods)) {
 		if (!spec.required) continue;
-		if (typeof adapter[name] !== "function") {
+		if (typeof adapter[name] !== 'function') {
 			violations.push(`missing method: ${name}`);
 		} else if (adapter[name].length !== spec.arity) {
-			violations.push(
-				`method ${name}: expected arity ${spec.arity}, got ${adapter[name].length}`
-			);
+			violations.push(`method ${name}: expected arity ${spec.arity}, got ${adapter[name].length}`);
 		}
 	}
 	return violations;
 }
-
-
-
 
 // ==================================================
 // ==================================================
@@ -142,68 +131,67 @@ function validateAdapter(adapter) {
 function contractTestVectors() {
 	return [
 		{
-			id: "create_returns_nonzero_handle",
-			description: "createWindow() with valid opts returns a non-zero handle.",
+			id: 'create_returns_nonzero_handle',
+			description: 'createWindow() with valid opts returns a non-zero handle.',
 			input: { opts: { x: 100, y: 100, w: 200, h: 200 } },
-			assert: { handle_nonzero: true },
+			assert: { handle_nonzero: true }
 		},
 		{
-			id: "destroy_zero_is_noop",
-			description: "destroyWindow(0) is a safe no-op and does not throw.",
+			id: 'destroy_zero_is_noop',
+			description: 'destroyWindow(0) is a safe no-op and does not throw.',
 			input: { handle: 0 },
-			assert: { no_exception: true },
+			assert: { no_exception: true }
 		},
 		{
-			id: "show_zero_is_noop",
-			description: "show(0) is a safe no-op and does not throw.",
+			id: 'show_zero_is_noop',
+			description: 'show(0) is a safe no-op and does not throw.',
 			input: { handle: 0 },
-			assert: { no_exception: true },
+			assert: { no_exception: true }
 		},
 		{
-			id: "hide_zero_is_noop",
-			description: "hide(0) is a safe no-op and does not throw.",
+			id: 'hide_zero_is_noop',
+			description: 'hide(0) is a safe no-op and does not throw.',
 			input: { handle: 0 },
-			assert: { no_exception: true },
+			assert: { no_exception: true }
 		},
 		{
-			id: "draw_bitmap_zero_is_noop",
-			description: "drawBitmap(0, fn) is a safe no-op and does not throw.",
-			input: { handle: 0, drawFn: function(ctx) {} },
-			assert: { no_exception: true },
+			id: 'draw_bitmap_zero_is_noop',
+			description: 'drawBitmap(0, fn) is a safe no-op and does not throw.',
+			input: { handle: 0, drawFn: function (ctx) {} },
+			assert: { no_exception: true }
 		},
 		{
-			id: "draw_bitmap_calls_draw_fn",
-			description: "drawBitmap() calls drawFn with the platform context.",
+			id: 'draw_bitmap_calls_draw_fn',
+			description: 'drawBitmap() calls drawFn with the platform context.',
 			input: {
 				opts: { x: 0, y: 0, w: 64, h: 64 },
-				drawFn: "spy",
+				drawFn: 'spy'
 			},
-			assert: { draw_fn_called: true },
+			assert: { draw_fn_called: true }
 		},
 		{
-			id: "show_makes_window_visible",
-			description: "show() makes the window visible without stealing focus.",
+			id: 'show_makes_window_visible',
+			description: 'show() makes the window visible without stealing focus.',
 			input: { opts: { x: 0, y: 0, w: 64, h: 64 } },
-			assert: { visible_after_show: true },
+			assert: { visible_after_show: true }
 		},
 		{
-			id: "hide_makes_window_invisible",
-			description: "hide() after show() makes the window invisible.",
+			id: 'hide_makes_window_invisible',
+			description: 'hide() after show() makes the window invisible.',
 			steps: [
-				{ call: "createWindow", opts: { x: 0, y: 0, w: 64, h: 64 } },
-				{ call: "show" },
-				{ call: "hide" },
-				{ assert: "is_hidden" },
-			],
+				{ call: 'createWindow', opts: { x: 0, y: 0, w: 64, h: 64 } },
+				{ call: 'show' },
+				{ call: 'hide' },
+				{ assert: 'is_hidden' }
+			]
 		},
 		{
-			id: "destroy_releases_resources",
-			description: "destroyWindow() releases all GDI/CG resources without leaking.",
+			id: 'destroy_releases_resources',
+			description: 'destroyWindow() releases all GDI/CG resources without leaking.',
 			input: { opts: { x: 0, y: 0, w: 64, h: 64 } },
-			assert: { no_exception: true },
-		},
+			assert: { no_exception: true }
+		}
 	];
 }
-
 
 module.exports = { portContract, validateAdapter, contractTestVectors };

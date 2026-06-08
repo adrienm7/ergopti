@@ -19,12 +19,14 @@
  * ==============================================================================
  */
 
-"use strict";
+'use strict';
 
-const SHARED_SRC = "static/ergopti_plus/shared/lua/llm/prompt_builder.lua";
-const HS_CONSUMER = "static/ergopti_plus/macos/modules/llm/prompt_builder.lua";
+const SHARED_SRC = 'static/ergopti_plus/shared/lua/llm/prompt_builder.lua';
+const HS_CONSUMER = 'static/ergopti_plus/macos/modules/llm/prompt_builder.lua';
 
-console.log("codegen:prompt-builder:hs — no-op (HS uses shared Lua directly).");
+console.log('codegen:prompt-builder:hs — no-op (HS uses shared Lua directly).');
 console.log(`  Shared source : ${SHARED_SRC}`);
-console.log(`  HS consumer   : ${HS_CONSUMER}  (delegates to shared via require("llm.prompt_builder"))`);
-console.log("codegen:prompt-builder:hs — done.");
+console.log(
+	`  HS consumer   : ${HS_CONSUMER}  (delegates to shared via require("llm.prompt_builder"))`
+);
+console.log('codegen:prompt-builder:hs — done.');

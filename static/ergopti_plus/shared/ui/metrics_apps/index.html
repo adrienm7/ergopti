@@ -48,11 +48,17 @@
 				style="display: flex; gap: 18px; align-items: center; flex-wrap: wrap; margin-top: 8px"
 			>
 				<div style="display: flex; align-items: center; gap: 6px">
-					<span style="font-size: 12px; color: var(--text-muted)" data-i18n="ui_apps.label_categories"></span>
+					<span
+						style="font-size: 12px; color: var(--text-muted)"
+						data-i18n="ui_apps.label_categories"
+					></span>
 					<div id="category-filter-buttons" style="display: flex; gap: 4px; flex-wrap: wrap"></div>
 				</div>
 				<div style="display: flex; align-items: center; gap: 6px">
-					<span style="font-size: 12px; color: var(--text-muted)" data-i18n="ui_apps.label_days"></span>
+					<span
+						style="font-size: 12px; color: var(--text-muted)"
+						data-i18n="ui_apps.label_days"
+					></span>
 					<div id="weekday-filter-buttons" style="display: flex; gap: 4px"></div>
 				</div>
 			</div>
@@ -99,11 +105,31 @@
 				class="filters-bar"
 				style="display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap"
 			>
-				<button class="filter-btn tab-btn active" data-tab-target="overview" data-i18n="ui_apps.tab_overview"></button>
-				<button class="filter-btn tab-btn" data-tab-target="time" data-i18n="ui_apps.tab_time"></button>
-				<button class="filter-btn tab-btn" data-tab-target="apps" data-i18n="ui_apps.tab_apps"></button>
-				<button class="filter-btn tab-btn" data-tab-target="typing" data-i18n="ui_apps.tab_typing"></button>
-				<button class="filter-btn tab-btn" data-tab-target="system" data-i18n="ui_apps.tab_system"></button>
+				<button
+					class="filter-btn tab-btn active"
+					data-tab-target="overview"
+					data-i18n="ui_apps.tab_overview"
+				></button>
+				<button
+					class="filter-btn tab-btn"
+					data-tab-target="time"
+					data-i18n="ui_apps.tab_time"
+				></button>
+				<button
+					class="filter-btn tab-btn"
+					data-tab-target="apps"
+					data-i18n="ui_apps.tab_apps"
+				></button>
+				<button
+					class="filter-btn tab-btn"
+					data-tab-target="typing"
+					data-i18n="ui_apps.tab_typing"
+				></button>
+				<button
+					class="filter-btn tab-btn"
+					data-tab-target="system"
+					data-i18n="ui_apps.tab_system"
+				></button>
 			</div>
 
 			<!-- Primary KPI row: global time + productivity + context signals -->
@@ -125,15 +151,24 @@
 					style="display: flex; flex-direction: column; justify-content: center"
 				>
 					<div style="display: flex; justify-content: space-between; margin-bottom: 8px">
-						<span style="font-size: 0.85em; color: var(--text-muted)" data-i18n="ui_apps.lbl_switches"></span>
+						<span
+							style="font-size: 0.85em; color: var(--text-muted)"
+							data-i18n="ui_apps.lbl_switches"
+						></span>
 						<strong id="kpi-switches" style="color: #fff">--</strong>
 					</div>
 					<div style="display: flex; justify-content: space-between; margin-bottom: 8px">
-						<span style="font-size: 0.85em; color: var(--text-muted)" data-i18n="ui_apps.lbl_unlocks"></span>
+						<span
+							style="font-size: 0.85em; color: var(--text-muted)"
+							data-i18n="ui_apps.lbl_unlocks"
+						></span>
 						<strong id="kpi-unlocks" style="color: #fff">--</strong>
 					</div>
 					<div style="display: flex; justify-content: space-between">
-						<span style="font-size: 0.85em; color: var(--text-muted)" data-i18n="ui_apps.lbl_top_wifi"></span>
+						<span
+							style="font-size: 0.85em; color: var(--text-muted)"
+							data-i18n="ui_apps.lbl_top_wifi"
+						></span>
 						<strong id="kpi-wifi" style="color: #fff">--</strong>
 					</div>
 				</div>
@@ -252,7 +287,10 @@
 						padding: 15px;
 					"
 				>
-					<h3 style="margin: 0 0 10px 0; font-size: 14px; color: #fff" data-i18n="ui_apps.chart_top7"></h3>
+					<h3
+						style="margin: 0 0 10px 0; font-size: 14px; color: #fff"
+						data-i18n="ui_apps.chart_top7"
+					></h3>
 					<div style="position: relative; height: 210px">
 						<canvas id="apps_bar_chart"></canvas>
 					</div>
@@ -268,7 +306,10 @@
 						padding: 15px;
 					"
 				>
-					<h3 style="margin: 0 0 10px 0; font-size: 14px; color: #fff" data-i18n="ui_apps.chart_time_by_cat"></h3>
+					<h3
+						style="margin: 0 0 10px 0; font-size: 14px; color: #fff"
+						data-i18n="ui_apps.chart_time_by_cat"
+					></h3>
 					<div style="position: relative; height: 210px">
 						<canvas id="category_pie_chart"></canvas>
 					</div>
@@ -287,7 +328,11 @@
 					margin-bottom: 20px;
 				"
 			>
-				<h3 id="timeline_chart_title" style="margin: 0 0 10px 0; font-size: 14px; color: #fff" data-i18n="ui_apps.chart_timeline"></h3>
+				<h3
+					id="timeline_chart_title"
+					style="margin: 0 0 10px 0; font-size: 14px; color: #fff"
+					data-i18n="ui_apps.chart_timeline"
+				></h3>
 				<div style="position: relative; height: 210px">
 					<canvas id="timeline_stacked_chart"></canvas>
 				</div>
@@ -358,7 +403,11 @@
 					margin-bottom: 20px;
 				"
 			>
-				<h3 style="margin: 0 0 10px 0; font-size: 14px; color: #fff" data-i18n="ui_apps.chart_speed_by_cat"><span
+				<h3
+					style="margin: 0 0 10px 0; font-size: 14px; color: #fff"
+					data-i18n="ui_apps.chart_speed_by_cat"
+				>
+					<span
 						style="font-size: 11px; font-weight: 400; color: var(--text-muted); margin-left: 8px"
 						>caractères par minute focus, regroupés par catégorie d’app</span
 					>
@@ -584,10 +633,14 @@
 					margin-bottom: 20px;
 				"
 			>
-				<h3 style="margin: 0 0 10px 0; font-size: 14px; color: #fff" data-i18n="ui_apps.chart_speed_by_hour"><span
+				<h3
+					style="margin: 0 0 10px 0; font-size: 14px; color: #fff"
+					data-i18n="ui_apps.chart_speed_by_hour"
+				>
+					<span
 						style="font-size: 11px; font-weight: 400; color: var(--text-muted); margin-left: 8px"
-						data-i18n="ui_apps.sub_speed_by_hour"></span
-					>
+						data-i18n="ui_apps.sub_speed_by_hour"
+					></span>
 				</h3>
 				<div style="position: relative; height: 190px">
 					<canvas id="cpm_by_hour_chart"></canvas>
@@ -614,9 +667,17 @@
 						margin-bottom: 10px;
 					"
 				>
-					<h3 style="margin: 0; font-size: 14px; color: #fff" data-i18n="ui_apps.chart_activity_cal"></h3>
+					<h3
+						style="margin: 0; font-size: 14px; color: #fff"
+						data-i18n="ui_apps.chart_activity_cal"
+					></h3>
 					<div style="display: flex; gap: 6px">
-						<button class="filter-btn" id="cal-mode-time" onclick="setCalendarMode('time')" data-i18n="ui_apps.btn_mode_time"></button>
+						<button
+							class="filter-btn"
+							id="cal-mode-time"
+							onclick="setCalendarMode('time')"
+							data-i18n="ui_apps.btn_mode_time"
+						></button>
 						<button
 							class="filter-btn active"
 							id="cal-mode-chars"
@@ -648,9 +709,17 @@
 						margin-bottom: 10px;
 					"
 				>
-					<h3 style="margin: 0; font-size: 14px; color: #fff" data-i18n="ui_apps.chart_hour_weekday"></h3>
+					<h3
+						style="margin: 0; font-size: 14px; color: #fff"
+						data-i18n="ui_apps.chart_hour_weekday"
+					></h3>
 					<div style="display: flex; gap: 6px">
-						<button class="filter-btn" id="hwk-mode-time" onclick="setHourWeekdayMode('time')" data-i18n="ui_apps.btn_mode_time"></button>
+						<button
+							class="filter-btn"
+							id="hwk-mode-time"
+							onclick="setHourWeekdayMode('time')"
+							data-i18n="ui_apps.btn_mode_time"
+						></button>
 						<button
 							class="filter-btn active"
 							id="hwk-mode-chars"
@@ -674,7 +743,11 @@
 					margin-bottom: 20px;
 				"
 			>
-				<h3 style="margin: 0 0 12px 0; font-size: 14px; color: #fff" data-i18n="ui_apps.chart_annotated_strip"><span
+				<h3
+					style="margin: 0 0 12px 0; font-size: 14px; color: #fff"
+					data-i18n="ui_apps.chart_annotated_strip"
+				>
+					<span
 						style="font-size: 11px; font-weight: 400; color: var(--text-muted); margin-left: 8px"
 						>temps par app + marqueurs système (verrou, Wi-Fi, audio, Space)</span
 					>
@@ -694,7 +767,11 @@
 					margin-bottom: 20px;
 				"
 			>
-				<h3 style="margin: 0 0 12px 0; font-size: 14px; color: #fff" data-i18n="ui_apps.chart_session_durations"><span
+				<h3
+					style="margin: 0 0 12px 0; font-size: 14px; color: #fff"
+					data-i18n="ui_apps.chart_session_durations"
+				>
+					<span
 						style="font-size: 11px; font-weight: 400; color: var(--text-muted); margin-left: 8px"
 						>moustache : min / Q1 / médiane / Q3 / max</span
 					>
@@ -704,7 +781,11 @@
 
 			<!-- Top fenêtres (#39) — titres de fenêtre les plus tapés. -->
 			<div class="table-container" data-tab="system" style="margin-bottom: 20px">
-				<h3 style="margin: 0 0 12px 0; font-size: 14px; color: #fff; padding: 0 10px" data-i18n="ui_apps.chart_top_windows"><span
+				<h3
+					style="margin: 0 0 12px 0; font-size: 14px; color: #fff; padding: 0 10px"
+					data-i18n="ui_apps.chart_top_windows"
+				>
+					<span
 						style="font-size: 11px; font-weight: 400; color: var(--text-muted); margin-left: 8px"
 						>titres de fenêtre par caractères tapés</span
 					>
@@ -724,7 +805,11 @@
 
 			<!-- Top sessions (#37) — les plus longues sessions observées par app-jour. -->
 			<div class="table-container" data-tab="system" style="margin-bottom: 20px">
-				<h3 style="margin: 0 0 12px 0; font-size: 14px; color: #fff; padding: 0 10px" data-i18n="ui_apps.chart_top_sessions"><span
+				<h3
+					style="margin: 0 0 12px 0; font-size: 14px; color: #fff; padding: 0 10px"
+					data-i18n="ui_apps.chart_top_sessions"
+				>
+					<span
 						style="font-size: 11px; font-weight: 400; color: var(--text-muted); margin-left: 8px"
 						>les plus longues séances observées (par app-jour)</span
 					>
@@ -744,7 +829,11 @@
 
 			<!-- Top journées (#38) — meilleures journées par caractères, temps focus, bascules. -->
 			<div class="table-container" data-tab="system" style="margin-bottom: 20px">
-				<h3 style="margin: 0 0 12px 0; font-size: 14px; color: #fff; padding: 0 10px" data-i18n="ui_apps.chart_top_days"><span
+				<h3
+					style="margin: 0 0 12px 0; font-size: 14px; color: #fff; padding: 0 10px"
+					data-i18n="ui_apps.chart_top_days"
+				>
+					<span
 						style="font-size: 11px; font-weight: 400; color: var(--text-muted); margin-left: 8px"
 						>classement par caractères tapés, temps focus, et bascules</span
 					>
@@ -765,7 +854,11 @@
 
 			<!-- Table des paires d’app (#36) — bascules A→B les plus fréquentes. -->
 			<div class="table-container" data-tab="apps" style="margin-bottom: 20px">
-				<h3 style="margin: 0 0 12px 0; font-size: 14px; color: #fff; padding: 0 10px" data-i18n="ui_apps.chart_top_switch_pairs"><span
+				<h3
+					style="margin: 0 0 12px 0; font-size: 14px; color: #fff; padding: 0 10px"
+					data-i18n="ui_apps.chart_top_switch_pairs"
+				>
+					<span
 						style="font-size: 11px; font-weight: 400; color: var(--text-muted); margin-left: 8px"
 						>de quelle app vers quelle app et combien de fois</span
 					>
@@ -795,7 +888,11 @@
 					margin-bottom: 20px;
 				"
 			>
-				<h3 style="margin: 0 0 12px 0; font-size: 14px; color: #fff" data-i18n="ui_apps.chart_daily_evolution"><span
+				<h3
+					style="margin: 0 0 12px 0; font-size: 14px; color: #fff"
+					data-i18n="ui_apps.chart_daily_evolution"
+				>
+					<span
 						style="font-size: 11px; font-weight: 400; color: var(--text-muted); margin-left: 8px"
 						>temps focus, caractères, bascules par jour</span
 					>
@@ -814,7 +911,11 @@
 					margin-bottom: 20px;
 				"
 			>
-				<h3 style="margin: 0 0 12px 0; font-size: 14px; color: #fff" data-i18n="ui_apps.chart_active_ratio"><span
+				<h3
+					style="margin: 0 0 12px 0; font-size: 14px; color: #fff"
+					data-i18n="ui_apps.chart_active_ratio"
+				>
+					<span
 						style="font-size: 11px; font-weight: 400; color: var(--text-muted); margin-left: 8px"
 						>temps actif / focus net par jour</span
 					>
@@ -835,7 +936,11 @@
 					margin-bottom: 20px;
 				"
 			>
-				<h3 style="margin: 0 0 12px 0; font-size: 14px; color: #fff" data-i18n="ui_apps.chart_cat_evolution"><span
+				<h3
+					style="margin: 0 0 12px 0; font-size: 14px; color: #fff"
+					data-i18n="ui_apps.chart_cat_evolution"
+				>
+					<span
 						style="font-size: 11px; font-weight: 400; color: var(--text-muted); margin-left: 8px"
 						>aire empilée du temps focus par catégorie</span
 					>
@@ -856,7 +961,11 @@
 					margin-bottom: 20px;
 				"
 			>
-				<h3 style="margin: 0 0 12px 0; font-size: 14px; color: #fff" data-i18n="ui_apps.chart_wake_sleep"><span
+				<h3
+					style="margin: 0 0 12px 0; font-size: 14px; color: #fff"
+					data-i18n="ui_apps.chart_wake_sleep"
+				>
+					<span
 						style="font-size: 11px; font-weight: 400; color: var(--text-muted); margin-left: 8px"
 						>première et dernière frappe par jour</span
 					>
@@ -879,7 +988,8 @@
 					margin-bottom: 20px;
 				"
 			>
-				<h3 style="margin: 0 0 10px 0; font-size: 14px; color: #fff" data-i18n="ui_apps.chart_top8"><span
+				<h3 style="margin: 0 0 10px 0; font-size: 14px; color: #fff" data-i18n="ui_apps.chart_top8">
+					<span
 						style="font-size: 11px; font-weight: 400; color: var(--text-muted); margin-left: 8px"
 						>deux séries normalisées sur le top focus</span
 					>
@@ -901,7 +1011,11 @@
 					margin-bottom: 20px;
 				"
 			>
-				<h3 style="margin: 0 0 12px 0; font-size: 14px; color: #fff" data-i18n="ui_apps.chart_burst_hist"><span
+				<h3
+					style="margin: 0 0 12px 0; font-size: 14px; color: #fff"
+					data-i18n="ui_apps.chart_burst_hist"
+				>
+					<span
 						style="font-size: 11px; font-weight: 400; color: var(--text-muted); margin-left: 8px"
 						>combien de salves selon leur longueur en caractères</span
 					>
@@ -923,7 +1037,11 @@
 					margin-bottom: 20px;
 				"
 			>
-				<h3 style="margin: 0 0 12px 0; font-size: 14px; color: #fff" data-i18n="ui_apps.chart_app_switches"><span
+				<h3
+					style="margin: 0 0 12px 0; font-size: 14px; color: #fff"
+					data-i18n="ui_apps.chart_app_switches"
+				>
+					<span
 						style="font-size: 11px; font-weight: 400; color: var(--text-muted); margin-left: 8px"
 						>épaisseur du flux = nombre de bascules</span
 					>
@@ -943,7 +1061,11 @@
 					margin-bottom: 20px;
 				"
 			>
-				<h3 style="margin: 0 0 12px 0; font-size: 14px; color: #fff" data-i18n="ui_apps.chart_day_strip"><span
+				<h3
+					style="margin: 0 0 12px 0; font-size: 14px; color: #fff"
+					data-i18n="ui_apps.chart_day_strip"
+				>
+					<span
 						style="font-size: 11px; font-weight: 400; color: var(--text-muted); margin-left: 8px"
 						>une bande par jour, couleur = catégorie dominante à chaque heure</span
 					>
@@ -968,9 +1090,18 @@
 						<tr>
 							<th data-i18n="ui_apps.col_app_name"></th>
 							<th data-i18n="ui_apps.col_category"></th>
-							<th title="Temps avec l’app au foreground (somme des durées de focus)." data-i18n="ui_apps.col_focus"></th>
-							<th title="Part du temps focus passée à frapper activement (inter-touches sommés)." data-i18n="ui_apps.col_typing_pct"></th>
-							<th title="Caractères tapés ÷ minutes de focus. Densité de production texte par app." data-i18n="ui_apps.col_density"></th>
+							<th
+								title="Temps avec l’app au foreground (somme des durées de focus)."
+								data-i18n="ui_apps.col_focus"
+							></th>
+							<th
+								title="Part du temps focus passée à frapper activement (inter-touches sommés)."
+								data-i18n="ui_apps.col_typing_pct"
+							></th>
+							<th
+								title="Caractères tapés ÷ minutes de focus. Densité de production texte par app."
+								data-i18n="ui_apps.col_density"
+							></th>
 							<th
 								title="Nombre de séances détectées dans cette app sur la période (gap inactif &lt; 5 min)."
 								data-i18n="ui_apps.col_sessions"
@@ -997,7 +1128,12 @@
 					</thead>
 					<tbody id="apps-tbody">
 						<tr>
-							<td class="app-name-cell" colspan="9" style="text-align: center" data-i18n="ui_apps.loading_data"></td>
+							<td
+								class="app-name-cell"
+								colspan="9"
+								style="text-align: center"
+								data-i18n="ui_apps.loading_data"
+							></td>
 						</tr>
 					</tbody>
 				</table>
@@ -1014,7 +1150,12 @@
 			<div class="app-modal-card">
 				<div class="app-modal-header">
 					<h2 id="app_modal_title" data-i18n="ui_apps.modal_app_title"></h2>
-					<button class="app-modal-close" onclick="closeAppDrilldown()" title="Fermer" data-i18n="ui_apps.btn_close"></button>
+					<button
+						class="app-modal-close"
+						onclick="closeAppDrilldown()"
+						title="Fermer"
+						data-i18n="ui_apps.btn_close"
+					></button>
 				</div>
 				<div class="app-modal-tiles" id="app_modal_tiles"></div>
 				<div class="app-modal-section">
@@ -1092,7 +1233,7 @@
 				// polluting version control. The AHK launcher embeds its file://
 				// URL in the hash fragment as "#prefetch=file:///...".
 				const _hash_params = new URLSearchParams(location.hash.slice(1));
-				const _prefetch_url = _hash_params.get("prefetch") || "./prefetch.json";
+				const _prefetch_url = _hash_params.get('prefetch') || './prefetch.json';
 				fetch(_prefetch_url)
 					.then((r) => (r.ok ? r.json() : null))
 					.then((blob) => apply_prefetch(blob))

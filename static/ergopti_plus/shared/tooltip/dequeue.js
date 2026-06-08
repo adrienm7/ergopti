@@ -19,7 +19,7 @@
  * ==============================================================================
  */
 
-"use strict";
+'use strict';
 
 const DEFAULT_TIMEOUT_DECREMENT_SEC = 0.2;
 const DEFAULT_TIMEOUT_FLOOR_SEC = 0.05;
@@ -45,7 +45,7 @@ function effectiveDurationSec(callerDurationSec, opts = {}) {
  */
 function rowDurationSec(row, field) {
 	const d = row[field];
-	return (typeof d === "number" && d > 0) ? d : 0;
+	return typeof d === 'number' && d > 0 ? d : 0;
 }
 
 /**
@@ -67,8 +67,8 @@ function hasExpiryStamp(row, expireField) {
  * @returns {{ isRebuild: boolean, hasAnyDur: boolean, hasMixedDur: boolean }}
  */
 function analyzeDurations(rows, opts = {}) {
-	const durationField = opts.durationField ?? "durationSec";
-	const expireField = opts.expireField ?? "expireMs";
+	const durationField = opts.durationField ?? 'durationSec';
+	const expireField = opts.expireField ?? 'expireMs';
 
 	let isRebuild = false;
 	for (const row of rows) {
@@ -114,8 +114,8 @@ function shouldUseDequeuePath(rows, opts = {}) {
  * @returns {{ rows: object[], maxRemainingMs: number }}
  */
 function stampExpiryTimes(rows, nowMs, opts = {}) {
-	const durationField = opts.durationField ?? "durationSec";
-	const expireField = opts.expireField ?? "expireMs";
+	const durationField = opts.durationField ?? 'durationSec';
+	const expireField = opts.expireField ?? 'expireMs';
 	const { isRebuild } = analyzeDurations(rows, opts);
 
 	const stamped = [];
@@ -156,7 +156,7 @@ function stampExpiryTimes(rows, nowMs, opts = {}) {
  * @returns {object[]}
  */
 function pruneExpired(rows, nowMs, opts = {}) {
-	const expireField = opts.expireField ?? "expireMs";
+	const expireField = opts.expireField ?? 'expireMs';
 	const remaining = [];
 	for (const row of rows) {
 		const exp = row[expireField];
@@ -175,7 +175,7 @@ function pruneExpired(rows, nowMs, opts = {}) {
  * @returns {number}
  */
 function nextExpiryDelayMs(rows, nowMs, opts = {}) {
-	const expireField = opts.expireField ?? "expireMs";
+	const expireField = opts.expireField ?? 'expireMs';
 	let earliest = null;
 	for (const row of rows) {
 		const exp = row[expireField];
@@ -195,56 +195,56 @@ function nextExpiryDelayMs(rows, nowMs, opts = {}) {
 function dequeueTestVectors() {
 	return [
 		{
-			id: "mixed_1s_2s_stacked_destuck",
-			description: "output1 (1 s) + output2 (2 s): both visible 0.8 s, then output2 alone 1.0 s.",
+			id: 'mixed_1s_2s_stacked_destuck',
+			description: 'output1 (1 s) + output2 (2 s): both visible 0.8 s, then output2 alone 1.0 s.',
 			rows: [
-				{ id: "out1", durationSec: 1 },
-				{ id: "out2", durationSec: 2 },
+				{ id: 'out1', durationSec: 1 },
+				{ id: 'out2', durationSec: 2 }
 			],
 			expectDequeue: true,
 			steps: [
 				{
 					atMs: 0,
-					action: "stamp",
-					expectIds: ["out1", "out2"],
-					expectExpiries: { out1: 800, out2: 1800 },
+					action: 'stamp',
+					expectIds: ['out1', 'out2'],
+					expectExpiries: { out1: 800, out2: 1800 }
 				},
 				{
 					atMs: 500,
-					action: "prune",
-					expectIds: ["out1", "out2"],
+					action: 'prune',
+					expectIds: ['out1', 'out2']
 				},
 				{
 					atMs: 800,
-					action: "prune",
-					expectIds: ["out2"],
-					expectNextDelayMs: 1000,
+					action: 'prune',
+					expectIds: ['out2'],
+					expectNextDelayMs: 1000
 				},
 				{
 					atMs: 1800,
-					action: "prune",
-					expectIds: [],
-				},
-			],
+					action: 'prune',
+					expectIds: []
+				}
+			]
 		},
 		{
-			id: "identical_durations_simple_path",
-			description: "Equal durations → single global timer, no dequeue.",
+			id: 'identical_durations_simple_path',
+			description: 'Equal durations → single global timer, no dequeue.',
 			rows: [
-				{ id: "a", durationSec: 2 },
-				{ id: "b", durationSec: 2 },
+				{ id: 'a', durationSec: 2 },
+				{ id: 'b', durationSec: 2 }
 			],
-			expectDequeue: false,
+			expectDequeue: false
 		},
 		{
-			id: "single_positive_duration_simple_path",
-			description: "One finite + one zero-duration row → simple path (not mixed).",
+			id: 'single_positive_duration_simple_path',
+			description: 'One finite + one zero-duration row → simple path (not mixed).',
 			rows: [
-				{ id: "finite", durationSec: 1 },
-				{ id: "infinite", durationSec: 0 },
+				{ id: 'finite', durationSec: 1 },
+				{ id: 'infinite', durationSec: 0 }
 			],
-			expectDequeue: false,
-		},
+			expectDequeue: false
+		}
 	];
 }
 
@@ -258,5 +258,5 @@ module.exports = {
 	stampExpiryTimes,
 	pruneExpired,
 	nextExpiryDelayMs,
-	dequeueTestVectors,
+	dequeueTestVectors
 };

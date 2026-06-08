@@ -6,9 +6,9 @@ Implements tap-vs-hold disambiguation for keys that have dual roles: a short pre
 
 ## Ports used (`shared/ports/`)
 
-| Port | Usage |
-|---|---|
-| `KeyboardHook` | `#HotIf`-gated hotkeys for every tap/hold key |
+| Port             | Usage                                                                           |
+| ---------------- | ------------------------------------------------------------------------------- |
+| `KeyboardHook`   | `#HotIf`-gated hotkeys for every tap/hold key                                   |
 | `TimerScheduler` | Hold-threshold timers (`TAP_MIN_DURATION_MS`) used to distinguish tap from hold |
 
 ## Driver-local data (`windows/data/tap_hold/`)
@@ -17,13 +17,13 @@ Implements tap-vs-hold disambiguation for keys that have dual roles: a short pre
 
 ## Public API
 
-| File | Description |
-|---|---|
-| `constants.ahk` | `TAP_MIN_DURATION_MS` global and `TapMinDurationMs()` accessor |
-| `space.ahk` | Space tap-to-space / hold-to-modifier |
-| `tab.ahk` | Tab tap-to-tab / hold-to-layer |
-| `lalt.ahk` | LAlt tap-to-action / hold-to-nav-layer |
-| `rctrl.ahk` | RCtrl tap-to-action / hold-to-modifier |
+| File            | Description                                                            |
+| --------------- | ---------------------------------------------------------------------- |
+| `constants.ahk` | `TAP_MIN_DURATION_MS` global and `TapMinDurationMs()` accessor         |
+| `space.ahk`     | Space tap-to-space / hold-to-modifier                                  |
+| `tab.ahk`       | Tab tap-to-tab / hold-to-layer                                         |
+| `lalt.ahk`      | LAlt tap-to-action / hold-to-nav-layer                                 |
+| `rctrl.ahk`     | RCtrl tap-to-action / hold-to-modifier                                 |
 | `nav_layer.ahk` | Full navigation layer hotkeys, including a `1-0` repeat-multiplier row |
 
 ## Init pattern

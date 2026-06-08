@@ -14,10 +14,16 @@
 	const cmd = `branch="${branch}"; curl -fsSL "https://raw.githubusercontent.com/adrienm7/ergopti/$branch/static/ergopti/linux/xkb_installation/install.sh" | BRANCH="$branch" bash`;
 
 	// URLs des scripts d'installation (servis depuis le raw du dépôt au bon branch)
-	const urlInstallSh = getRawUrl("static/ergopti/linux/xkb_installation/install.sh");
-	const urlDetectSh = getRawUrl("static/ergopti/linux/xkb_installation/detect_installation_method.sh");
-	const urlInstallerClean = getRawUrl("static/ergopti/linux/xkb_installation/xkb_files_installer_clean.py");
-	const urlInstallerLegacy = getRawUrl("static/ergopti/linux/xkb_installation/xkb_files_installer_legacy.py");
+	const urlInstallSh = getRawUrl('static/ergopti/linux/xkb_installation/install.sh');
+	const urlDetectSh = getRawUrl(
+		'static/ergopti/linux/xkb_installation/detect_installation_method.sh'
+	);
+	const urlInstallerClean = getRawUrl(
+		'static/ergopti/linux/xkb_installation/xkb_files_installer_clean.py'
+	);
+	const urlInstallerLegacy = getRawUrl(
+		'static/ergopti/linux/xkb_installation/xkb_files_installer_legacy.py'
+	);
 
 	onMount(async () => {
 		release = await getRelease();
@@ -194,7 +200,8 @@
 
 <h3 id="linux-solutions">Résolution de problèmes connus</h3>
 <p>
-	Certains problèmes ont été rapportés avec le pilote XKB d'<Ergopti></Ergopti> dans quelques logiciels :
+	Certains problèmes ont été rapportés avec le pilote XKB d'<Ergopti></Ergopti> dans quelques logiciels
+	:
 </p>
 <ul>
 	<li>

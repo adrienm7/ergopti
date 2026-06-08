@@ -15,25 +15,25 @@ shape that the rest of the codebase never needs to inspect.
 
 ### 1.1 macOS driver (`api_token_crypto.lua`)
 
-| Property | Value |
-|---|---|
-| Mechanism | macOS Keychain via `/usr/bin/security` CLI |
-| Write path | `security add-generic-password -U -a <entry_id> -s org.ergopti.llm-api-token -w` (secret read from stdin, never from argv) |
-| Read path | `security find-generic-password -a <entry_id> -s … -w` (outputs password to stdout) |
-| Storage shape | `keychain:<entry_id>` (opaque reference, no secret material on disk) |
-| Legacy compat | Any value without the `keychain:` prefix is treated as cleartext and silently migrated on next save |
-| Error strategy | On any failure, falls back to plaintext — token is never lost |
+| Property       | Value                                                                                                                      |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| Mechanism      | macOS Keychain via `/usr/bin/security` CLI                                                                                 |
+| Write path     | `security add-generic-password -U -a <entry_id> -s org.ergopti.llm-api-token -w` (secret read from stdin, never from argv) |
+| Read path      | `security find-generic-password -a <entry_id> -s … -w` (outputs password to stdout)                                        |
+| Storage shape  | `keychain:<entry_id>` (opaque reference, no secret material on disk)                                                       |
+| Legacy compat  | Any value without the `keychain:` prefix is treated as cleartext and silently migrated on next save                        |
+| Error strategy | On any failure, falls back to plaintext — token is never lost                                                              |
 
 ### 1.2 Windows driver (`api_token_crypto.ahk`)
 
-| Property | Value |
-|---|---|
-| Mechanism | Windows DPAPI — `Crypt32\CryptProtectData` / `CryptUnprotectData` via DllCall |
-| Storage shape | `dpapi:<base64>` (DPAPI ciphertext encoded as a single-line base64 string) |
-| Secondary entropy | Static application string `"ergopti.llm.token"` mixed into every call |
-| Encoding | `CryptBinaryToStringW` / `CryptStringToBinaryW` (CRYPT_STRING_BASE64, no CRLF wrapping) |
-| Legacy compat | Same pattern: missing prefix → cleartext → re-encrypted on next save |
-| Error strategy | On any failure, returns cleartext — token is never lost |
+| Property          | Value                                                                                   |
+| ----------------- | --------------------------------------------------------------------------------------- |
+| Mechanism         | Windows DPAPI — `Crypt32\CryptProtectData` / `CryptUnprotectData` via DllCall           |
+| Storage shape     | `dpapi:<base64>` (DPAPI ciphertext encoded as a single-line base64 string)              |
+| Secondary entropy | Static application string `"ergopti.llm.token"` mixed into every call                   |
+| Encoding          | `CryptBinaryToStringW` / `CryptStringToBinaryW` (CRYPT_STRING_BASE64, no CRLF wrapping) |
+| Legacy compat     | Same pattern: missing prefix → cleartext → re-encrypted on next save                    |
+| Error strategy    | On any failure, returns cleartext — token is never lost                                 |
 
 ---
 
@@ -71,15 +71,15 @@ shape that the rest of the codebase never needs to inspect.
 
 ### 2.2 What the implementations do NOT protect against
 
-| Threat | macOS | Windows | Notes |
-|---|---|---|---|
-| Same-user malicious process | Not protected | Not protected | Any process running as the same user can call `security find-generic-password` or `CryptUnprotectData` — this is by design in both DPAPI and Keychain. |
-| Unlocked-screen attack | Not protected | Not protected | If the screen is unlocked, a logged-in attacker can trivially extract tokens. |
-| Memory scraping | Not protected | Not protected | Cleartext is held in Lua/AHK string variables during runtime; a process with ptrace/debugging rights can dump it. |
-| Backup leaks (macOS) | Partially protected | N/A | Time Machine backs up the Keychain file but encrypts it with the Keychain password. iCloud Keychain syncs are encrypted. Third-party backup tools that grab raw plist files see only the reference string. |
-| Cloud sync of config file | Protected | Protected | The secret material is never in the config file — only the opaque reference/ciphertext blob. |
-| Roaming profile / domain scenarios (Windows) | N/A | Partially protected | DPAPI behaves differently in domain environments with roaming profiles. If the domain controller is unreachable, the DPAPI master key may be inaccessible. |
-| Legacy cleartext configs | Cleartext until next save | Cleartext until next save | Both modules auto-migrate on next write, but if the user never opens the LLM panel again after upgrading, the old plaintext value persists. |
+| Threat                                       | macOS                     | Windows                   | Notes                                                                                                                                                                                                      |
+| -------------------------------------------- | ------------------------- | ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Same-user malicious process                  | Not protected             | Not protected             | Any process running as the same user can call `security find-generic-password` or `CryptUnprotectData` — this is by design in both DPAPI and Keychain.                                                     |
+| Unlocked-screen attack                       | Not protected             | Not protected             | If the screen is unlocked, a logged-in attacker can trivially extract tokens.                                                                                                                              |
+| Memory scraping                              | Not protected             | Not protected             | Cleartext is held in Lua/AHK string variables during runtime; a process with ptrace/debugging rights can dump it.                                                                                          |
+| Backup leaks (macOS)                         | Partially protected       | N/A                       | Time Machine backs up the Keychain file but encrypts it with the Keychain password. iCloud Keychain syncs are encrypted. Third-party backup tools that grab raw plist files see only the reference string. |
+| Cloud sync of config file                    | Protected                 | Protected                 | The secret material is never in the config file — only the opaque reference/ciphertext blob.                                                                                                               |
+| Roaming profile / domain scenarios (Windows) | N/A                       | Partially protected       | DPAPI behaves differently in domain environments with roaming profiles. If the domain controller is unreachable, the DPAPI master key may be inaccessible.                                                 |
+| Legacy cleartext configs                     | Cleartext until next save | Cleartext until next save | Both modules auto-migrate on next write, but if the user never opens the LLM panel again after upgrading, the old plaintext value persists.                                                                |
 
 ---
 
@@ -142,14 +142,14 @@ broker process with its own authentication, neither of which is in scope.
 
 ### 4.2 Risk summary by scenario
 
-| Scenario | Risk before | Risk after encryption landing |
-|---|---|---|
-| Laptop stolen with disk unencrypted | Critical — plaintext token in plist/TOML | Low — DPAPI/Keychain requires the user password |
-| Config file copied to untrusted system | Critical | Low |
-| Cloud backup / Dropbox sync of config | Critical | Low |
-| Malware on the same user account | Critical | Critical (unchanged) |
-| Screen-unlocked physical access | Critical | Critical (unchanged) |
-| Old cleartext entry never re-saved | Critical | Critical (unchanged — see §4.3) |
+| Scenario                               | Risk before                              | Risk after encryption landing                   |
+| -------------------------------------- | ---------------------------------------- | ----------------------------------------------- |
+| Laptop stolen with disk unencrypted    | Critical — plaintext token in plist/TOML | Low — DPAPI/Keychain requires the user password |
+| Config file copied to untrusted system | Critical                                 | Low                                             |
+| Cloud backup / Dropbox sync of config  | Critical                                 | Low                                             |
+| Malware on the same user account       | Critical                                 | Critical (unchanged)                            |
+| Screen-unlocked physical access        | Critical                                 | Critical (unchanged)                            |
+| Old cleartext entry never re-saved     | Critical                                 | Critical (unchanged — see §4.3)                 |
 
 ### 4.3 Residual risk: never-re-saved cleartext entries
 
@@ -279,12 +279,12 @@ Keychain/DPAPI write failure, which falls back to the existing cleartext value.
 
 ## 6. Migration Effort & Breaking Change Risk Summary
 
-| Item | Driver | Effort | Breaking change risk |
-|---|---|---|---|
-| 5.1 Replace `hs.execute` with `hs.task` in decrypt/delete | macOS | 30 min | None |
-| 5.2 Document + assert 64-bit assumption | Windows | 15 min | None |
-| 5.3 Implement Linux `api_token_crypto` module | Linux | 2–4 h | None (new module) |
-| 5.4 Startup migration for legacy cleartext entries | macOS + Windows | 2–4 h | Low |
+| Item                                                      | Driver          | Effort | Breaking change risk |
+| --------------------------------------------------------- | --------------- | ------ | -------------------- |
+| 5.1 Replace `hs.execute` with `hs.task` in decrypt/delete | macOS           | 30 min | None                 |
+| 5.2 Document + assert 64-bit assumption                   | Windows         | 15 min | None                 |
+| 5.3 Implement Linux `api_token_crypto` module             | Linux           | 2–4 h  | None (new module)    |
+| 5.4 Startup migration for legacy cleartext entries        | macOS + Windows | 2–4 h  | Low                  |
 
 No cryptographic primitive migration is required. Both drivers already use
 OS-grade secret stores. The main residual risk — legacy cleartext entries that

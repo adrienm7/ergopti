@@ -21,9 +21,9 @@
  * ==============================================================================
  */
 
-import fs from "fs";
-import path from "path";
-import { fileURLToPath } from "url";
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -33,26 +33,26 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 /** Root of the repository (one level above scripts/). */
-const REPO_ROOT = path.resolve(__dirname, "..");
+const REPO_ROOT = path.resolve(__dirname, '..');
 
 /** Where all drivers live. */
-const DRIVERS_DIR = path.join(REPO_ROOT, "static", "drivers");
+const DRIVERS_DIR = path.join(REPO_ROOT, 'static', 'drivers');
 
 /** Glob-equivalent source directories for specs. */
-const PORTS_DIR = path.join(DRIVERS_DIR, "_shared", "ports");
-const DOMAIN_DIR = path.join(DRIVERS_DIR, "_shared", "domain");
+const PORTS_DIR = path.join(DRIVERS_DIR, '_shared', 'ports');
+const DOMAIN_DIR = path.join(DRIVERS_DIR, '_shared', 'domain');
 
 /** Sub-directories every driver is expected to contain. */
-const DRIVER_SUBDIRS = ["adapters", "modules", "tests", "lib"];
+const DRIVER_SUBDIRS = ['adapters', 'modules', 'tests', 'lib'];
 
 /** Supported target languages. */
-const SUPPORTED_LANGS = ["lua", "ahk"];
+const SUPPORTED_LANGS = ['lua', 'ahk'];
 
 /** Comment prefix per language. */
-const COMMENT_PREFIX = { lua: "---", ahk: ";" };
+const COMMENT_PREFIX = { lua: '---', ahk: ';' };
 
 /** File extension per language. */
-const FILE_EXT = { lua: ".lua", ahk: ".ahk" };
+const FILE_EXT = { lua: '.lua', ahk: '.ahk' };
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -66,7 +66,7 @@ const FILE_EXT = { lua: ".lua", ahk: ".ahk" };
  * @returns {string} Snake-case equivalent.
  */
 function toSnakeCase(name) {
-	return name.replace(/([A-Z])/g, (m, c, i) => (i === 0 ? c.toLowerCase() : "_" + c.toLowerCase()));
+	return name.replace(/([A-Z])/g, (m, c, i) => (i === 0 ? c.toLowerCase() : '_' + c.toLowerCase()));
 }
 
 /**
@@ -80,8 +80,8 @@ function readSpecNames(dir) {
 	if (!fs.existsSync(dir)) return [];
 	return fs
 		.readdirSync(dir)
-		.filter((f) => f.endsWith(".spec.js"))
-		.map((f) => f.replace(".spec.js", ""))
+		.filter((f) => f.endsWith('.spec.js'))
+		.map((f) => f.replace('.spec.js', ''))
 		.sort();
 }
 
@@ -100,7 +100,7 @@ function buildAdapterStub(driverName, portName, lang) {
 	const filePath = `static/ergopti_plus/${driverName}/adapters/${snakeName}${ext}`;
 	const specRef = `static/ergopti_plus/_shared/ports/${portName}.spec.js`;
 
-	if (lang === "lua") {
+	if (lang === 'lua') {
 		return [
 			`--- ${filePath}`,
 			``,
@@ -133,8 +133,8 @@ function buildAdapterStub(driverName, portName, lang) {
 			``,
 			``,
 			`return M`,
-			``,
-		].join("\n");
+			``
+		].join('\n');
 	}
 
 	// AHK
@@ -163,8 +163,8 @@ function buildAdapterStub(driverName, portName, lang) {
 		``,
 		`; TODO: implement ${portName} contract`,
 		`; See: ${specRef}`,
-		``,
-	].join("\n");
+		``
+	].join('\n');
 }
 
 /**
@@ -177,8 +177,8 @@ function buildAdapterStub(driverName, portName, lang) {
  * @returns {string} Markdown content.
  */
 function buildDriverReadme(driverName, ports, domains, lang) {
-	const portList = ports.map((p) => `- \`${p}\``).join("\n");
-	const domainList = domains.map((d) => `- \`${d}\``).join("\n");
+	const portList = ports.map((p) => `- \`${p}\``).join('\n');
+	const domainList = domains.map((d) => `- \`${d}\``).join('\n');
 
 	return [
 		`# ${driverName} Driver`,
@@ -215,8 +215,8 @@ function buildDriverReadme(driverName, ports, domains, lang) {
 		`   \`npm run test:port-compliance\``,
 		`3. Add driver-specific tests under \`tests/\`.`,
 		`4. Update this README with runtime requirements and setup instructions.`,
-		``,
-	].join("\n");
+		``
+	].join('\n');
 }
 
 /**
@@ -234,7 +234,7 @@ function buildAdaptersReadme(driverName, ports, lang) {
 			const file = toSnakeCase(p) + ext;
 			return `| \`${file}\` | \`${p}\` | \`_shared/ports/${p}.spec.js\` | ❌ TODO |`;
 		})
-		.join("\n");
+		.join('\n');
 
 	return [
 		`# ${driverName} — Adapters`,
@@ -247,8 +247,8 @@ function buildAdaptersReadme(driverName, ports, lang) {
 		rows,
 		``,
 		`Replace the ❌ TODO status cells as you implement each adapter.`,
-		``,
-	].join("\n");
+		``
+	].join('\n');
 }
 
 // ---------------------------------------------------------------------------
@@ -262,8 +262,8 @@ function main() {
 	const args = process.argv.slice(2);
 
 	// Parse --lang flag
-	let lang = "lua";
-	const langIdx = args.indexOf("--lang");
+	let lang = 'lua';
+	const langIdx = args.indexOf('--lang');
 	if (langIdx !== -1) {
 		lang = args[langIdx + 1];
 		args.splice(langIdx, 2);
@@ -273,17 +273,21 @@ function main() {
 
 	// Validate arguments
 	if (!driverName) {
-		console.error("Usage: node scripts/new-driver.js <driver-name> [--lang lua|ahk]");
+		console.error('Usage: node scripts/new-driver.js <driver-name> [--lang lua|ahk]');
 		process.exit(1);
 	}
 
 	if (!/^[a-z][a-z0-9-]*$/.test(driverName)) {
-		console.error(`Error: driver name "${driverName}" must be lowercase letters, digits, and hyphens only.`);
+		console.error(
+			`Error: driver name "${driverName}" must be lowercase letters, digits, and hyphens only.`
+		);
 		process.exit(1);
 	}
 
 	if (!SUPPORTED_LANGS.includes(lang)) {
-		console.error(`Error: unsupported language "${lang}". Supported: ${SUPPORTED_LANGS.join(", ")}`);
+		console.error(
+			`Error: unsupported language "${lang}". Supported: ${SUPPORTED_LANGS.join(', ')}`
+		);
 		process.exit(1);
 	}
 
@@ -291,7 +295,7 @@ function main() {
 
 	if (fs.existsSync(targetDir)) {
 		console.error(`Error: directory already exists: ${targetDir}`);
-		console.error("Remove it first or choose a different driver name.");
+		console.error('Remove it first or choose a different driver name.');
 		process.exit(1);
 	}
 
@@ -313,19 +317,23 @@ function main() {
 	const ext = FILE_EXT[lang];
 	for (const port of ports) {
 		const snakeName = toSnakeCase(port);
-		const adapterPath = path.join(targetDir, "adapters", snakeName + ext);
-		fs.writeFileSync(adapterPath, buildAdapterStub(driverName, port, lang), "utf8");
+		const adapterPath = path.join(targetDir, 'adapters', snakeName + ext);
+		fs.writeFileSync(adapterPath, buildAdapterStub(driverName, port, lang), 'utf8');
 		console.log(`  Created  ${driverName}/adapters/${snakeName}${ext}  (${port})`);
 	}
 
 	// Generate READMEs
-	fs.writeFileSync(path.join(targetDir, "README.md"), buildDriverReadme(driverName, ports, domains, lang), "utf8");
+	fs.writeFileSync(
+		path.join(targetDir, 'README.md'),
+		buildDriverReadme(driverName, ports, domains, lang),
+		'utf8'
+	);
 	console.log(`  Created  ${driverName}/README.md`);
 
 	fs.writeFileSync(
-		path.join(targetDir, "adapters", "README.md"),
+		path.join(targetDir, 'adapters', 'README.md'),
 		buildAdaptersReadme(driverName, ports, lang),
-		"utf8",
+		'utf8'
 	);
 	console.log(`  Created  ${driverName}/adapters/README.md`);
 
@@ -337,10 +345,10 @@ Done. Next steps:
       (${ports.length} files — one per port contract in _shared/ports/)
 
   [ ] Satisfy the domain specs listed in static/ergopti_plus/_shared/domain/
-      (${domains.length} specs: ${domains.join(", ")})
+      (${domains.length} specs: ${domains.join(', ')})
 
   [ ] Add driver entry-point under static/ergopti_plus/${driverName}/
-      (e.g. a main .${lang === "lua" ? "lua" : "ahk"} file equivalent to linux/ergopti_hotstrings.lua)
+      (e.g. a main .${lang === 'lua' ? 'lua' : 'ahk'} file equivalent to linux/ergopti_hotstrings.lua)
 
   [ ] Add tests under static/ergopti_plus/${driverName}/tests/
 

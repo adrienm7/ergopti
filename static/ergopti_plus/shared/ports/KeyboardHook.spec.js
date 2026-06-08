@@ -24,10 +24,7 @@
  * ==============================================================================
  */
 
-"use strict";
-
-
-
+'use strict';
 
 // ==================================================
 // ==================================================
@@ -44,8 +41,8 @@
  * @type {object}
  */
 const portContract = {
-	name: "KeyboardHook",
-	version: "1.0.0",
+	name: 'KeyboardHook',
+	version: '1.0.0',
 
 	/**
 	 * Lifecycle methods.
@@ -78,11 +75,11 @@ const portContract = {
 	 *     windowTitle: window caption string
 	 */
 	methods: {
-		start:          { arity: 1, required: true },
-		stop:           { arity: 0, required: true },
-		isRunning:      { arity: 0, required: true },
+		start: { arity: 1, required: true },
+		stop: { arity: 0, required: true },
+		isRunning: { arity: 0, required: true },
 		refreshContext: { arity: 0, required: true },
-		getContext:     { arity: 0, required: true },
+		getContext: { arity: 0, required: true }
 	},
 
 	/**
@@ -102,8 +99,8 @@ const portContract = {
 	 *   @param {boolean} event.isDown    true = key pressed, false = released.
 	 */
 	events: {
-		onChar: { params: ["event"] },
-		onKey:  { params: ["event"] },
+		onChar: { params: ['event'] },
+		onKey: { params: ['event'] }
 	},
 
 	/**
@@ -111,16 +108,33 @@ const portContract = {
 	 * Adapters MUST map their platform-specific key codes to these names.
 	 */
 	KEY_NAMES: [
-		"Backspace", "Delete", "Enter", "Tab", "Escape",
-		"ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown",
-		"Home", "End", "PageUp", "PageDown",
-		"F1", "F2", "F3", "F4", "F5", "F6",
-		"F7", "F8", "F9", "F10", "F11", "F12",
-	],
+		'Backspace',
+		'Delete',
+		'Enter',
+		'Tab',
+		'Escape',
+		'ArrowLeft',
+		'ArrowRight',
+		'ArrowUp',
+		'ArrowDown',
+		'Home',
+		'End',
+		'PageUp',
+		'PageDown',
+		'F1',
+		'F2',
+		'F3',
+		'F4',
+		'F5',
+		'F6',
+		'F7',
+		'F8',
+		'F9',
+		'F10',
+		'F11',
+		'F12'
+	]
 };
-
-
-
 
 // ==================================================
 // ==================================================
@@ -136,24 +150,19 @@ const portContract = {
  */
 function validateAdapter(adapter) {
 	const violations = [];
-	if (!adapter || typeof adapter !== "object") {
-		return ["adapter must be a non-null object"];
+	if (!adapter || typeof adapter !== 'object') {
+		return ['adapter must be a non-null object'];
 	}
 	for (const [name, spec] of Object.entries(portContract.methods)) {
 		if (!spec.required) continue;
-		if (typeof adapter[name] !== "function") {
+		if (typeof adapter[name] !== 'function') {
 			violations.push(`missing method: ${name}`);
 		} else if (adapter[name].length !== spec.arity) {
-			violations.push(
-				`method ${name}: expected arity ${spec.arity}, got ${adapter[name].length}`
-			);
+			violations.push(`method ${name}: expected arity ${spec.arity}, got ${adapter[name].length}`);
 		}
 	}
 	return violations;
 }
-
-
-
 
 // ==================================================
 // ==================================================
@@ -174,66 +183,65 @@ function validateAdapter(adapter) {
 function contractTestVectors() {
 	return [
 		{
-			id: "lifecycle_start_stop",
-			description: "start() makes isRunning() true; stop() makes it false.",
+			id: 'lifecycle_start_stop',
+			description: 'start() makes isRunning() true; stop() makes it false.',
 			steps: [
-				{ call: "start", args: [{}] },
-				{ assert: "isRunning", expected: true },
-				{ call: "stop", args: [] },
-				{ assert: "isRunning", expected: false },
-			],
+				{ call: 'start', args: [{}] },
+				{ assert: 'isRunning', expected: true },
+				{ call: 'stop', args: [] },
+				{ assert: 'isRunning', expected: false }
+			]
 		},
 		{
-			id: "start_idempotent",
-			description: "Calling start() twice does not throw or duplicate callbacks.",
+			id: 'start_idempotent',
+			description: 'Calling start() twice does not throw or duplicate callbacks.',
 			steps: [
-				{ call: "start", args: [{}] },
-				{ call: "start", args: [{}] },   // second call must be no-op
-				{ assert: "isRunning", expected: true },
-				{ call: "stop", args: [] },
-			],
+				{ call: 'start', args: [{}] },
+				{ call: 'start', args: [{}] }, // second call must be no-op
+				{ assert: 'isRunning', expected: true },
+				{ call: 'stop', args: [] }
+			]
 		},
 		{
-			id: "stop_before_start",
-			description: "Calling stop() before start() is a safe no-op.",
+			id: 'stop_before_start',
+			description: 'Calling stop() before start() is a safe no-op.',
 			steps: [
-				{ call: "stop", args: [] },
-				{ assert: "isRunning", expected: false },
-			],
+				{ call: 'stop', args: [] },
+				{ assert: 'isRunning', expected: false }
+			]
 		},
 		{
-			id: "onChar_fires_for_printable",
-			description: "Injecting a printable key fires onChar with correct fields.",
-			setup: { inject: { type: "char", char: "a" } },
+			id: 'onChar_fires_for_printable',
+			description: 'Injecting a printable key fires onChar with correct fields.',
+			setup: { inject: { type: 'char', char: 'a' } },
 			assert_event: {
-				channel: "onChar",
-				fields: { char: "a" },
-				required_fields: ["char", "timestamp", "appId"],
-			},
+				channel: 'onChar',
+				fields: { char: 'a' },
+				required_fields: ['char', 'timestamp', 'appId']
+			}
 		},
 		{
-			id: "onKey_fires_for_backspace",
+			id: 'onKey_fires_for_backspace',
 			description: "Injecting Backspace fires onKey with key='Backspace'.",
-			setup: { inject: { type: "key", key: "Backspace" } },
+			setup: { inject: { type: 'key', key: 'Backspace' } },
 			assert_event: {
-				channel: "onKey",
-				fields: { key: "Backspace", isDown: true },
-				required_fields: ["key", "timestamp", "appId", "isDown"],
-			},
+				channel: 'onKey',
+				fields: { key: 'Backspace', isDown: true },
+				required_fields: ['key', 'timestamp', 'appId', 'isDown']
+			}
 		},
 		{
-			id: "getContext_returns_app_id",
-			description: "getContext() returns an object with appId and windowTitle strings.",
+			id: 'getContext_returns_app_id',
+			description: 'getContext() returns an object with appId and windowTitle strings.',
 			steps: [
-				{ call: "refreshContext", args: [] },
+				{ call: 'refreshContext', args: [] },
 				{
-					assert_shape: "getContext",
-					shape: { appId: "string", windowTitle: "string" },
-				},
-			],
-		},
+					assert_shape: 'getContext',
+					shape: { appId: 'string', windowTitle: 'string' }
+				}
+			]
+		}
 	];
 }
-
 
 module.exports = { portContract, validateAdapter, contractTestVectors };

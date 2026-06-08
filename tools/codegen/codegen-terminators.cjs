@@ -21,33 +21,30 @@
  * ==============================================================================
  */
 
-"use strict";
+'use strict';
 
-const fs   = require("fs");
-const path = require("path");
+const fs = require('fs');
+const path = require('path');
 
-const ROOT = path.resolve(__dirname, "../..");
+const ROOT = path.resolve(__dirname, '../..');
 
 // Load the spec by reading and eval-ing it as CommonJS, since the file uses
 // module.exports but the package is type:module (ESM). We inline the CJS
 // wrapper so require() works without needing a .cjs copy of the spec.
 const specSource = fs.readFileSync(
-	path.join(ROOT, "static/ergopti_plus/shared/domain/Terminators.spec.js"),
-	"utf8"
+	path.join(ROOT, 'static/ergopti_plus/shared/domain/Terminators.spec.js'),
+	'utf8'
 );
 const specModule = { exports: {} };
 // eslint-disable-next-line no-new-func
-new Function("require", "module", "exports", "__dirname", "__filename", specSource)(
+new Function('require', 'module', 'exports', '__dirname', '__filename', specSource)(
 	require,
 	specModule,
 	specModule.exports,
-	path.join(ROOT, "static/ergopti_plus/shared/domain"),
-	path.join(ROOT, "static/ergopti_plus/shared/domain/Terminators.spec.js")
+	path.join(ROOT, 'static/ergopti_plus/shared/domain'),
+	path.join(ROOT, 'static/ergopti_plus/shared/domain/Terminators.spec.js')
 );
 const { TERMINATOR_DEFS } = specModule.exports;
-
-
-
 
 // ==================================================
 // ==================================================
@@ -63,11 +60,11 @@ const { TERMINATOR_DEFS } = specModule.exports;
  */
 function ahkEscape(s) {
 	return s
-		.replace(/`/g, "``")
+		.replace(/`/g, '``')
 		.replace(/"/g, '`"')
-		.replace(/\r/g, "`r")
-		.replace(/\n/g, "`n")
-		.replace(/\t/g, "`t");
+		.replace(/\r/g, '`r')
+		.replace(/\n/g, '`n')
+		.replace(/\t/g, '`t');
 }
 
 /**
@@ -77,11 +74,11 @@ function ahkEscape(s) {
  */
 function luaEscape(s) {
 	return s
-		.replace(/\\/g, "\\\\")
+		.replace(/\\/g, '\\\\')
 		.replace(/"/g, '\\"')
-		.replace(/\r/g, "\\r")
-		.replace(/\n/g, "\\n")
-		.replace(/\t/g, "\\t");
+		.replace(/\r/g, '\\r')
+		.replace(/\n/g, '\\n')
+		.replace(/\t/g, '\\t');
 }
 
 /**
@@ -92,20 +89,17 @@ function luaEscape(s) {
  */
 function writeFile(filePath, content) {
 	fs.mkdirSync(path.dirname(filePath), { recursive: true });
-	if (filePath.endsWith(".ahk")) {
+	if (filePath.endsWith('.ahk')) {
 		// Enforce CRLF and prepend UTF-8 BOM (EF BB BF)
-		const crlf    = content.replace(/\r\n/g, "\n").replace(/\n/g, "\r\n");
-		const bom     = Buffer.from([0xef, 0xbb, 0xbf]);
-		const body    = Buffer.from(crlf, "utf8");
+		const crlf = content.replace(/\r\n/g, '\n').replace(/\n/g, '\r\n');
+		const bom = Buffer.from([0xef, 0xbb, 0xbf]);
+		const body = Buffer.from(crlf, 'utf8');
 		fs.writeFileSync(filePath, Buffer.concat([bom, body]));
 	} else {
-		fs.writeFileSync(filePath, content, "utf8");
+		fs.writeFileSync(filePath, content, 'utf8');
 	}
 	console.log(`  written: ${path.relative(ROOT, filePath)}`);
 }
-
-
-
 
 // ==================================================
 // ==================================================
@@ -122,15 +116,13 @@ function generateAhk() {
 	const defsLines = TERMINATOR_DEFS.map((def, i) => {
 		// Separator: a fully-formed but disabled, char-less slot so the engine
 		// loops skip it naturally (no guard needed); the menus render it as "-".
-		if (def.type === "separator") {
+		if (def.type === 'separator') {
 			return `        Map("key", "separator_${i}", "chars", [], "label", "-", "default_enabled", false, "consume", false, "type", "separator")`;
 		}
-		const charsArr = def.chars
-			.map((c) => `"${ahkEscape(c)}"`)
-			.join(", ");
-		const enabled  = def.default_enabled ? "true" : "false";
-		const consume  = def.consume         ? "true" : "false";
-		const label    = ahkEscape(def.label || def.key);
+		const charsArr = def.chars.map((c) => `"${ahkEscape(c)}"`).join(', ');
+		const enabled = def.default_enabled ? 'true' : 'false';
+		const consume = def.consume ? 'true' : 'false';
+		const label = ahkEscape(def.label || def.key);
 		return (
 			`        Map("key", "${def.key}", ` +
 			`"chars", [${charsArr}], ` +
@@ -138,7 +130,7 @@ function generateAhk() {
 			`"default_enabled", ${enabled}, ` +
 			`"consume", ${consume})`
 		);
-	}).join(",\n");
+	}).join(',\n');
 
 	return [
 		`; static/ergopti_plus/windows/_generated/terminators.ahk`,
@@ -303,12 +295,9 @@ function generateAhk() {
 		`    }`,
 		``,
 		`}`,
-		``,
-	].join("\n");
+		``
+	].join('\n');
 }
-
-
-
 
 // ==================================================
 // ==================================================
@@ -333,20 +322,18 @@ function generateLua() {
 	// its enable-seed and bulk loops gate on `def.key`, so a keyless separator is
 	// skipped naturally while the menus still render it as a "-" divider.
 	const defsLines = TERMINATOR_DEFS.map((def) => {
-		if (def.type === "separator") {
+		if (def.type === 'separator') {
 			return `\t{ label = "-", type = "separator" }`;
 		}
-		const charsArr = def.chars
-			.map((c) => `"${luaEscape(c)}"`)
-			.join(", ");
-		const enabled  = def.default_enabled ? "true" : "false";
-		const consume  = def.consume         ? "true" : "false";
-		const label    = luaEscape(def.label || def.key);
+		const charsArr = def.chars.map((c) => `"${luaEscape(c)}"`).join(', ');
+		const enabled = def.default_enabled ? 'true' : 'false';
+		const consume = def.consume ? 'true' : 'false';
+		const label = luaEscape(def.label || def.key);
 		return (
 			`\t{ key = "${def.key}", chars = { ${charsArr} }, ` +
 			`label = "${label}", default_enabled = ${enabled}, consume = ${consume} }`
 		);
-	}).join(",\n");
+	}).join(',\n');
 
 	return [
 		`--- static/ergopti_plus/shared/lua/keymap/terminators_catalogue.lua`,
@@ -365,12 +352,9 @@ function generateLua() {
 		`return {`,
 		defsLines,
 		`}`,
-		``,
-	].join("\n");
+		``
+	].join('\n');
 }
-
-
-
 
 // ==================================================
 // ==================================================
@@ -378,14 +362,10 @@ function generateLua() {
 // ==================================================
 // ==================================================
 
-const AHK_OUT = path.join(
-	ROOT, "static/ergopti_plus/windows/_generated/terminators.ahk"
-);
-const LUA_OUT = path.join(
-	ROOT, "static/ergopti_plus/shared/lua/keymap/terminators_catalogue.lua"
-);
+const AHK_OUT = path.join(ROOT, 'static/ergopti_plus/windows/_generated/terminators.ahk');
+const LUA_OUT = path.join(ROOT, 'static/ergopti_plus/shared/lua/keymap/terminators_catalogue.lua');
 
-console.log("codegen:terminators — generating from terminators.spec.js…");
+console.log('codegen:terminators — generating from terminators.spec.js…');
 writeFile(AHK_OUT, generateAhk());
 writeFile(LUA_OUT, generateLua());
-console.log("codegen:terminators — done.");
+console.log('codegen:terminators — done.');

@@ -46,9 +46,11 @@ Results are cached per-HWND with a 500 ms TTL to bound the UIA round-trip cost.
 ### 2.2 Private Browsing Filter (default: ON)
 
 **HS driver:**
+
 ```lua
 if CoreState.private_filter_enabled and CoreState.is_private_window then return end
 ```
+
 `is_private_window` is updated by a `hs.window.filter` subscriber watching browser focus and title changes.
 
 **AHK driver:** `MF_ShouldFilter()` runs regex patterns against window titles, matching localised private-mode strings for Chrome, Firefox, Edge, Safari, Brave, and Opera across EN/FR/DE.
@@ -56,10 +58,12 @@ if CoreState.private_filter_enabled and CoreState.is_private_window then return 
 ### 2.3 System Auth Dialog Filter (default: ON)
 
 **HS driver:**
+
 ```lua
 if CoreState.system_auth_filter_enabled and CoreState.active_app_bundle
 and SYSTEM_AUTH_BUNDLE_IDS[CoreState.active_app_bundle] then return end
 ```
+
 `SYSTEM_AUTH_BUNDLE_IDS` contains `com.apple.SecurityAgent` (admin/sudo) and `com.apple.CoreAuthUI` (Touch ID / biometric).
 
 **AHK driver:** `MF_ShouldFilter()` checks `MF_SYSTEM_AUTH_PROCESSES` (consent.exe, logonui.exe, credui.exe, winlogon.exe, credentialuibroker.exe) and `MF_SYSTEM_AUTH_CLASSES` (ConsentUI, LogonUI, Credential Dialog Xaml Host).
@@ -75,6 +79,7 @@ The user can exclude specific apps by bundle ID or process name. Checked first i
 The `typing` event written to `today.log` and `data.sql` contains a `text` column holding the concatenated plaintext of all characters typed in a burst (between two flush triggers such as a sentence-ending punctuation or idle timeout).
 
 **Example:**
+
 ```json
 {"type":"typing","text":"hello world","wpm":72.3,"events":[...]}
 ```
@@ -91,14 +96,14 @@ This is a **deliberate trade-off** made at the architecture level:
 
 ## 4. Verification — What Was Checked
 
-| Check | HS driver | AHK driver |
-|-------|-----------|------------|
-| Secure field flag checked before any `buffer_events.Push` | ✅ `init.lua:391` | ✅ `keylogger_hook.ahk:197,270` |
-| System-auth app blocked before any buffer mutation | ✅ `init.lua:394` | ✅ `metrics_filters.ahk:183` |
-| Private window blocked before any buffer mutation | ✅ `init.lua:391` | ✅ `metrics_filters.ahk:191` |
-| Password filter also checked in `KL_AppendLog` hot path | N/A (filter is in handle_key) | ✅ `keylogger.ahk:605` (redundant defence-in-depth) |
-| Secure field transitions flush normal buffer before blocking | ✅ `context_tracker.lua` | ✅ buffer reset on new `is_secure_field=true` context |
-| Filter toggle state exposed as user-configurable defaults | ✅ `DEFAULT_STATE` in `init.lua:132` | ✅ `MetricsFilters` class in `metrics_filters.ahk` |
+| Check                                                        | HS driver                            | AHK driver                                            |
+| ------------------------------------------------------------ | ------------------------------------ | ----------------------------------------------------- |
+| Secure field flag checked before any `buffer_events.Push`    | ✅ `init.lua:391`                    | ✅ `keylogger_hook.ahk:197,270`                       |
+| System-auth app blocked before any buffer mutation           | ✅ `init.lua:394`                    | ✅ `metrics_filters.ahk:183`                          |
+| Private window blocked before any buffer mutation            | ✅ `init.lua:391`                    | ✅ `metrics_filters.ahk:191`                          |
+| Password filter also checked in `KL_AppendLog` hot path      | N/A (filter is in handle_key)        | ✅ `keylogger.ahk:605` (redundant defence-in-depth)   |
+| Secure field transitions flush normal buffer before blocking | ✅ `context_tracker.lua`             | ✅ buffer reset on new `is_secure_field=true` context |
+| Filter toggle state exposed as user-configurable defaults    | ✅ `DEFAULT_STATE` in `init.lua:132` | ✅ `MetricsFilters` class in `metrics_filters.ahk`    |
 
 ---
 

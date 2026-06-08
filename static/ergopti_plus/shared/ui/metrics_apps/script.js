@@ -104,29 +104,29 @@ const CHART_PALETTE = [
 	'#30B0C7', // Cyan-Teal
 	'#FF453A', // Deep Red
 	'#34C759', // Leaf Green
-	'#5AC8FA', // Light Blue
+	'#5AC8FA' // Light Blue
 ];
 
 // Fixed aesthetic mappings for standard categories — each hue is deliberately distant
 const FIXED_CAT_COLORS = {
-	Productivité:       '#0A84FF',  // Blue
-	Développement:      '#5E5CE6',  // Indigo
-	'Réseaux sociaux':  '#FF375F',  // Pink-Red
-	Jeux:               '#FF453A',  // Deep Red
-	Divertissement:     '#BF5AF2',  // Purple
-	Utilitaires:        '#64D2FF',  // Sky Blue
-	Éducation:          '#FF9F0A',  // Orange
-	Business:           '#FFD60A',  // Yellow
-	Finance:            '#30B0C7',  // Teal
-	Design:             '#E588F8',  // Lavender
-	Photographie:       '#FF6B35',  // Burnt Orange
-	Vidéo:              '#FF375F',  // Coral
-	Musique:            '#32D74B',  // Green
-	'Santé & Forme':    '#34C759',  // Leaf Green
-	Actualités:         '#F4A460',  // Sandy
-	Météo:              '#5AC8FA',  // Light Blue
-	Voyage:             '#00C7BE',  // Cyan-Teal
-	Général:            '#8E8E93',  // Neutral Gray for uncategorized pieces
+	Productivité: '#0A84FF', // Blue
+	Développement: '#5E5CE6', // Indigo
+	'Réseaux sociaux': '#FF375F', // Pink-Red
+	Jeux: '#FF453A', // Deep Red
+	Divertissement: '#BF5AF2', // Purple
+	Utilitaires: '#64D2FF', // Sky Blue
+	Éducation: '#FF9F0A', // Orange
+	Business: '#FFD60A', // Yellow
+	Finance: '#30B0C7', // Teal
+	Design: '#E588F8', // Lavender
+	Photographie: '#FF6B35', // Burnt Orange
+	Vidéo: '#FF375F', // Coral
+	Musique: '#32D74B', // Green
+	'Santé & Forme': '#34C759', // Leaf Green
+	Actualités: '#F4A460', // Sandy
+	Météo: '#5AC8FA', // Light Blue
+	Voyage: '#00C7BE', // Cyan-Teal
+	Général: '#8E8E93' // Neutral Gray for uncategorized pieces
 };
 
 function translateCategory(catName) {
@@ -143,7 +143,7 @@ function paletteIndex(str) {
 	let h = 2166136261;
 	for (let i = 0; i < str.length; i++) {
 		h ^= str.charCodeAt(i);
-		h = (Math.imul(h, 16777619) >>> 0);
+		h = Math.imul(h, 16777619) >>> 0;
 	}
 	return h % CHART_PALETTE.length;
 }
@@ -161,7 +161,11 @@ function getCategoryColor(catName, score) {
  */
 function postBridge(payload) {
 	try {
-		if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.metrics_apps_bridge) {
+		if (
+			window.webkit &&
+			window.webkit.messageHandlers &&
+			window.webkit.messageHandlers.metrics_apps_bridge
+		) {
 			window.webkit.messageHandlers.metrics_apps_bridge.postMessage(payload);
 		} else {
 			console.error('metrics_apps_bridge unavailable');
@@ -196,11 +200,15 @@ function extractDominantColorFromImage(img) {
 		// Bucket pixels into 4-bit-per-channel bins, weighted by saturation; pick heaviest bin.
 		const buckets = {};
 		for (let i = 0; i < data.length; i += 4) {
-			const r = data[i], g = data[i + 1], b = data[i + 2], a = data[i + 3];
+			const r = data[i],
+				g = data[i + 1],
+				b = data[i + 2],
+				a = data[i + 3];
 			if (a < 100) continue;
 			const lum = (r + g + b) / 3;
 			if (lum > 235 || lum < 20) continue;
-			const max = Math.max(r, g, b), min = Math.min(r, g, b);
+			const max = Math.max(r, g, b),
+				min = Math.min(r, g, b);
 			const sat = max === 0 ? 0 : (max - min) / max;
 			if (sat < 0.18) continue;
 			const key = (r >> 4) * 256 + (g >> 4) * 16 + (b >> 4);
@@ -234,16 +242,19 @@ function precomputeIconColors() {
 	const entries = Object.entries(appIcons).filter(([n, u]) => u && !_dominantColorCache[n]);
 	if (entries.length === 0) return Promise.resolve();
 	return Promise.all(
-		entries.map(([appName, dataUrl]) => new Promise((resolve) => {
-			const img = new Image();
-			img.onload = () => {
-				const color = extractDominantColorFromImage(img);
-				if (color) _dominantColorCache[appName] = color;
-				resolve();
-			};
-			img.onerror = () => resolve();
-			img.src = dataUrl;
-		}))
+		entries.map(
+			([appName, dataUrl]) =>
+				new Promise((resolve) => {
+					const img = new Image();
+					img.onload = () => {
+						const color = extractDominantColorFromImage(img);
+						if (color) _dominantColorCache[appName] = color;
+						resolve();
+					};
+					img.onerror = () => resolve();
+					img.src = dataUrl;
+				})
+		)
 	).then(() => undefined);
 }
 
@@ -335,25 +346,25 @@ function getAggregatedData() {
 		rich: {
 			date_range: { start: null, end: null, days: 0 },
 			time: {
-				focus_ms: 0,        // Σ app_time_ms across non-system apps
-				active_ms: 0,       // Σ time (truly typing inter-key gaps)
-				think_ms: 0,        // Σ think_time
+				focus_ms: 0, // Σ app_time_ms across non-system apps
+				active_ms: 0, // Σ time (truly typing inter-key gaps)
+				think_ms: 0, // Σ think_time
 				passive_locked_ms: 0,
 				passive_sleep_ms: 0,
 				passive_count: 0,
 				// Keep-awake duration aggregated from _system.awake_ms across days.
 				// Subtracted from focus_ms when the "compter le keep-awake" toggle is OFF.
-				awake_ms: 0,
+				awake_ms: 0
 			},
 			system: {
-				wifi_changes:    0,
-				space_switches:  0,
-				battery_sum:     0,
-				battery_count:   0,
-				battery_min:     null,
-				battery_max:     null,
-				audio_muted_ms:  0,
-				night_wake_count:0,
+				wifi_changes: 0,
+				space_switches: 0,
+				battery_sum: 0,
+				battery_count: 0,
+				battery_min: null,
+				battery_max: null,
+				audio_muted_ms: 0,
+				night_wake_count: 0
 			},
 			typing: {
 				chars: 0,
@@ -367,32 +378,35 @@ function getAggregatedData() {
 				recovery_time_sum_ms: 0,
 				recovery_time_count: 0,
 				auto_repeat_count: 0,
-				char_letter: 0, char_digit: 0, char_punct: 0,
-				char_space: 0, char_other: 0,
+				char_letter: 0,
+				char_digit: 0,
+				char_punct: 0,
+				char_space: 0,
+				char_other: 0
 			},
 			sessions: {
 				count: 0,
 				total_active_ms: 0,
 				longest_ms: 0,
 				longest_chars: 0,
-				longest_app: null,
+				longest_app: null
 			},
 			bursts: {
 				count: 0,
 				max_cpm: 0,
 				max_chars: 0,
-				length_buckets: {},  // bucket_label → count, rolled up across apps
+				length_buckets: {} // bucket_label → count, rolled up across apps
 			},
 			ergonomics: {
 				same_finger_streak_max: 0,
-				same_hand_streak_max: 0,
+				same_hand_streak_max: 0
 			},
 			focus_latency: { sum_ms: 0, count: 0 },
 			// First / last typed minute observed across all apps in the range,
 			// stored as { date, hh, mm } so we can format both the time and
 			// the absolute moment for amplitude computation.
 			day_first: null,
-			day_last:  null,
+			day_last: null,
 			// kc_hold rolled up across all apps and days in the range
 			kc_hold: {},
 			// layouts_seen rolled up
@@ -418,7 +432,7 @@ function getAggregatedData() {
 			// Ribbon (#25): date_str → hour_str → cat → time_ms. Used to draw
 			// a Toggl-style horizontal bar per day, colored by dominant category
 			// at each hour.
-			ribbon: {},
+			ribbon: {}
 		},
 		timeline: {}
 	};
@@ -442,7 +456,7 @@ function getAggregatedData() {
 	const validDates = allDates.filter((d) => {
 		if (currentPeriod !== 'all' && (d.ts > anchorTs || d.ts < targetTsStart)) return false;
 		if (currentWeekdayFilter) {
-			const dow = ((new Date(d.ts).getDay() + 6) % 7);
+			const dow = (new Date(d.ts).getDay() + 6) % 7;
 			if (!currentWeekdayFilter.has(dow)) return false;
 		}
 		return true;
@@ -452,8 +466,8 @@ function getAggregatedData() {
 	if (validDates.length > 0) {
 		const sorted = [...validDates].sort((a, b) => a.ts - b.ts);
 		result.rich.date_range.start = sorted[0].key;
-		result.rich.date_range.end   = sorted[sorted.length - 1].key;
-		result.rich.date_range.days  = sorted.length;
+		result.rich.date_range.end = sorted[sorted.length - 1].key;
+		result.rich.date_range.days = sorted.length;
 	}
 
 	validDates.forEach((d) => {
@@ -476,39 +490,54 @@ function getAggregatedData() {
 		const sysEntry = dayData._system;
 		if (sysEntry) {
 			result.rich.time.passive_locked_ms += sysEntry.locked_ms || 0;
-			result.rich.time.passive_sleep_ms  += sysEntry.sleep_ms  || 0;
-			result.rich.time.passive_count     += sysEntry.passive_count || 0;
-			result.rich.time.awake_ms          += sysEntry.awake_ms  || 0;
+			result.rich.time.passive_sleep_ms += sysEntry.sleep_ms || 0;
+			result.rich.time.passive_count += sysEntry.passive_count || 0;
+			result.rich.time.awake_ms += sysEntry.awake_ms || 0;
 
 			// System counters (#13–19)
 			const rsys = result.rich.system;
-			rsys.wifi_changes     += sysEntry.wifi_changes     || 0;
-			rsys.space_switches   += sysEntry.space_switches   || 0;
-			rsys.audio_muted_ms   += sysEntry.audio_muted_ms   || 0;
+			rsys.wifi_changes += sysEntry.wifi_changes || 0;
+			rsys.space_switches += sysEntry.space_switches || 0;
+			rsys.audio_muted_ms += sysEntry.audio_muted_ms || 0;
 			rsys.night_wake_count += sysEntry.night_wake_count || 0;
 			if (sysEntry.battery_count) {
-				rsys.battery_sum   += sysEntry.battery_sum   || 0;
+				rsys.battery_sum += sysEntry.battery_sum || 0;
 				rsys.battery_count += sysEntry.battery_count || 0;
-				if (sysEntry.battery_min != null && (rsys.battery_min == null || sysEntry.battery_min < rsys.battery_min))
+				if (
+					sysEntry.battery_min != null &&
+					(rsys.battery_min == null || sysEntry.battery_min < rsys.battery_min)
+				)
 					rsys.battery_min = sysEntry.battery_min;
-				if (sysEntry.battery_max != null && (rsys.battery_max == null || sysEntry.battery_max > rsys.battery_max))
+				if (
+					sysEntry.battery_max != null &&
+					(rsys.battery_max == null || sysEntry.battery_max > rsys.battery_max)
+				)
 					rsys.battery_max = sysEntry.battery_max;
 			}
 		}
 
 		// Day-level rollup row
-		const byDate = result.rich.by_date[d.key] || (result.rich.by_date[d.key] = {
-			time_ms: 0, active_ms: 0, chars: 0, switches: 0, sessions: 0,
-			passive_ms: 0, by_category: {},
-			first_min: null, last_min: null,
-		});
+		const byDate =
+			result.rich.by_date[d.key] ||
+			(result.rich.by_date[d.key] = {
+				time_ms: 0,
+				active_ms: 0,
+				chars: 0,
+				switches: 0,
+				sessions: 0,
+				passive_ms: 0,
+				by_category: {},
+				first_min: null,
+				last_min: null
+			});
 		if (sysEntry) {
 			byDate.passive_ms += (sysEntry.locked_ms || 0) + (sysEntry.sleep_ms || 0);
 		}
 
 		// Weekday: parseDateKey returns a JS-compatible ts; convert to Mon=0..Sun=6
-		const dow = ((new Date(d.ts).getDay() + 6) % 7);
-		const byWk = result.rich.by_weekday[dow] || (result.rich.by_weekday[dow] = { time_ms: 0, chars: 0 });
+		const dow = (new Date(d.ts).getDay() + 6) % 7;
+		const byWk =
+			result.rich.by_weekday[dow] || (result.rich.by_weekday[dow] = { time_ms: 0, chars: 0 });
 
 		for (const [appName, appData] of Object.entries(dayData)) {
 			if (appName === '_sys' || appName === '_system') continue;
@@ -526,9 +555,9 @@ function getAggregatedData() {
 			// Per-app keep-awake correction: when the toggle is OFF (default),
 			// subtract awake_ms from app_time_ms so jiggler intervals don't
 			// inflate the focus aggregate. Toggle ON = count it normally.
-			const _appMsRaw  = Number(appData.app_time_ms) || 0;
-			const _appAwake  = Number(appData.awake_ms)    || 0;
-			const _appMsEff  = currentCountAwake ? _appMsRaw : Math.max(0, _appMsRaw - _appAwake);
+			const _appMsRaw = Number(appData.app_time_ms) || 0;
+			const _appAwake = Number(appData.awake_ms) || 0;
+			const _appMsEff = currentCountAwake ? _appMsRaw : Math.max(0, _appMsRaw - _appAwake);
 			result.apps[appName].time_ms += _appMsEff;
 			result.apps[appName].typing_time +=
 				(Number(appData.time) || 0) + (Number(appData.think_time) || 0);
@@ -545,26 +574,33 @@ function getAggregatedData() {
 			// Mirror common scalars onto the per-app entry so future drill-down
 			// modals / table columns can read them without re-walking manifest.
 			const appOut = result.apps[appName];
-			appOut.chars         = (appOut.chars         || 0) + (Number(appData.chars)         || 0);
-			appOut.hs_chars      = (appOut.hs_chars      || 0) + (Number(appData.hs_chars)      || 0);
-			appOut.llm_chars     = (appOut.llm_chars     || 0) + (Number(appData.llm_chars)     || 0);
-			appOut.bs_total      = (appOut.bs_total      || 0) + (Number(appData.bs_total)      || 0);
-			appOut.session_count = (appOut.session_count || 0) + (Number(appData.session_count_total) || 0);
+			appOut.chars = (appOut.chars || 0) + (Number(appData.chars) || 0);
+			appOut.hs_chars = (appOut.hs_chars || 0) + (Number(appData.hs_chars) || 0);
+			appOut.llm_chars = (appOut.llm_chars || 0) + (Number(appData.llm_chars) || 0);
+			appOut.bs_total = (appOut.bs_total || 0) + (Number(appData.bs_total) || 0);
+			appOut.session_count =
+				(appOut.session_count || 0) + (Number(appData.session_count_total) || 0);
 			appOut.session_total_active_ms =
 				(appOut.session_total_active_ms || 0) + (Number(appData.session_total_active_ms) || 0);
 			if ((Number(appData.session_longest_ms) || 0) > (appOut.session_longest_ms || 0)) {
-				appOut.session_longest_ms    = Number(appData.session_longest_ms) || 0;
+				appOut.session_longest_ms = Number(appData.session_longest_ms) || 0;
 				appOut.session_longest_chars = Number(appData.session_longest_chars) || 0;
 			}
 			if ((Number(appData.burst_max_cpm) || 0) > (appOut.burst_max_cpm || 0)) {
 				appOut.burst_max_cpm = Number(appData.burst_max_cpm) || 0;
 			}
-			appOut.focus_latency_sum_ms = (appOut.focus_latency_sum_ms || 0) + (Number(appData.focus_to_first_key_sum_ms) || 0);
-			appOut.focus_latency_count  = (appOut.focus_latency_count  || 0) + (Number(appData.focus_to_first_key_count)  || 0);
-			appOut.recovery_sum_ms      = (appOut.recovery_sum_ms      || 0) + (Number(appData.recovery_time_sum_ms)      || 0);
-			appOut.recovery_count       = (appOut.recovery_count       || 0) + (Number(appData.recovery_time_count)       || 0);
-			appOut.cascade_count        = (appOut.cascade_count        || 0) + (Number(appData.cascade_count_total)       || 0);
-			appOut.auto_repeat_count    = (appOut.auto_repeat_count    || 0) + (Number(appData.auto_repeat_count)         || 0);
+			appOut.focus_latency_sum_ms =
+				(appOut.focus_latency_sum_ms || 0) + (Number(appData.focus_to_first_key_sum_ms) || 0);
+			appOut.focus_latency_count =
+				(appOut.focus_latency_count || 0) + (Number(appData.focus_to_first_key_count) || 0);
+			appOut.recovery_sum_ms =
+				(appOut.recovery_sum_ms || 0) + (Number(appData.recovery_time_sum_ms) || 0);
+			appOut.recovery_count =
+				(appOut.recovery_count || 0) + (Number(appData.recovery_time_count) || 0);
+			appOut.cascade_count =
+				(appOut.cascade_count || 0) + (Number(appData.cascade_count_total) || 0);
+			appOut.auto_repeat_count =
+				(appOut.auto_repeat_count || 0) + (Number(appData.auto_repeat_count) || 0);
 			// #51 same-finger streak max per app
 			if ((Number(appData.same_finger_streak_max) || 0) > (appOut.same_finger_streak_max || 0)) {
 				appOut.same_finger_streak_max = Number(appData.same_finger_streak_max);
@@ -572,10 +608,10 @@ function getAggregatedData() {
 			// #52 modifier hold mean — sum across kc_hold for this app
 			if (appData.kc_hold) {
 				appOut.kc_hold_sum_ms = appOut.kc_hold_sum_ms || 0;
-				appOut.kc_hold_count  = appOut.kc_hold_count  || 0;
+				appOut.kc_hold_count = appOut.kc_hold_count || 0;
 				Object.values(appData.kc_hold).forEach((h) => {
 					appOut.kc_hold_sum_ms += h.s || 0;
-					appOut.kc_hold_count  += h.n || 0;
+					appOut.kc_hold_count += h.n || 0;
 				});
 			}
 			// #28 collect per-session durations
@@ -588,7 +624,7 @@ function getAggregatedData() {
 				appOut.win_titles = appOut.win_titles || {};
 				Object.entries(appData.win_titles).forEach(([t, w]) => {
 					const slot = appOut.win_titles[t] || (appOut.win_titles[t] = { c: 0, ms: 0 });
-					slot.c  += w.c  || 0;
+					slot.c += w.c || 0;
 					slot.ms += w.ms || 0;
 				});
 			}
@@ -596,38 +632,38 @@ function getAggregatedData() {
 			// Manifest-wide rollup — use the keep-awake-corrected app time so
 			// the headline focus_ms reflects the toggle.
 			const r = result.rich;
-			r.time.focus_ms  += _appMsEff;
-			r.time.active_ms += Number(appData.time)        || 0;
-			r.time.think_ms  += Number(appData.think_time)  || 0;
-			r.typing.chars         += Number(appData.chars)         || 0;
-			r.typing.hs_chars      += Number(appData.hs_chars)      || 0;
-			r.typing.llm_chars     += Number(appData.llm_chars)     || 0;
-			r.typing.hs_triggers   += Number(appData.hs_triggers)   || 0;
-			r.typing.llm_triggers  += Number(appData.llm_triggers)  || 0;
-			r.typing.bs_total      += Number(appData.bs_total)      || 0;
-			r.typing.cascade_count_total  += Number(appData.cascade_count_total)  || 0;
+			r.time.focus_ms += _appMsEff;
+			r.time.active_ms += Number(appData.time) || 0;
+			r.time.think_ms += Number(appData.think_time) || 0;
+			r.typing.chars += Number(appData.chars) || 0;
+			r.typing.hs_chars += Number(appData.hs_chars) || 0;
+			r.typing.llm_chars += Number(appData.llm_chars) || 0;
+			r.typing.hs_triggers += Number(appData.hs_triggers) || 0;
+			r.typing.llm_triggers += Number(appData.llm_triggers) || 0;
+			r.typing.bs_total += Number(appData.bs_total) || 0;
+			r.typing.cascade_count_total += Number(appData.cascade_count_total) || 0;
 			r.typing.recovery_time_sum_ms += Number(appData.recovery_time_sum_ms) || 0;
-			r.typing.recovery_time_count  += Number(appData.recovery_time_count)  || 0;
-			r.typing.auto_repeat_count    += Number(appData.auto_repeat_count)    || 0;
-			r.typing.char_letter  += Number(appData.char_letter)  || 0;
-			r.typing.char_digit   += Number(appData.char_digit)   || 0;
-			r.typing.char_punct   += Number(appData.char_punct)   || 0;
-			r.typing.char_space   += Number(appData.char_space)   || 0;
-			r.typing.char_other   += Number(appData.char_other)   || 0;
+			r.typing.recovery_time_count += Number(appData.recovery_time_count) || 0;
+			r.typing.auto_repeat_count += Number(appData.auto_repeat_count) || 0;
+			r.typing.char_letter += Number(appData.char_letter) || 0;
+			r.typing.char_digit += Number(appData.char_digit) || 0;
+			r.typing.char_punct += Number(appData.char_punct) || 0;
+			r.typing.char_space += Number(appData.char_space) || 0;
+			r.typing.char_other += Number(appData.char_other) || 0;
 			if ((Number(appData.cascade_max_len) || 0) > r.typing.cascade_max_len) {
 				r.typing.cascade_max_len = Number(appData.cascade_max_len);
 			}
-			r.sessions.count           += Number(appData.session_count_total)     || 0;
+			r.sessions.count += Number(appData.session_count_total) || 0;
 			r.sessions.total_active_ms += Number(appData.session_total_active_ms) || 0;
 			if ((Number(appData.session_longest_ms) || 0) > r.sessions.longest_ms) {
-				r.sessions.longest_ms    = Number(appData.session_longest_ms);
+				r.sessions.longest_ms = Number(appData.session_longest_ms);
 				r.sessions.longest_chars = Number(appData.session_longest_chars) || 0;
-				r.sessions.longest_app   = appName;
+				r.sessions.longest_app = appName;
 			}
 			if ((Number(appData.session_longest_ms) || 0) >= LONG_SESSION_THRESHOLD_MS) {
 				r.long_sessions += 1;
 			}
-			r.bursts.count   += Number(appData.burst_count_total) || 0;
+			r.bursts.count += Number(appData.burst_count_total) || 0;
 			if ((Number(appData.burst_max_cpm) || 0) > r.bursts.max_cpm) {
 				r.bursts.max_cpm = Number(appData.burst_max_cpm);
 			}
@@ -646,22 +682,30 @@ function getAggregatedData() {
 				r.ergonomics.same_hand_streak_max = Number(appData.same_hand_streak_max);
 			}
 			r.focus_latency.sum_ms += Number(appData.focus_to_first_key_sum_ms) || 0;
-			r.focus_latency.count  += Number(appData.focus_to_first_key_count)  || 0;
+			r.focus_latency.count += Number(appData.focus_to_first_key_count) || 0;
 
 			// Earliest / latest typed minute on the period
 			const ftm = appData.first_typed_min;
 			const ltm = appData.last_typed_min;
 			if (typeof ftm === 'string' && /^\d{2}:\d{2}$/.test(ftm)) {
-				const candidate = { date: d.key, hh: +ftm.slice(0,2), mm: +ftm.slice(3,5), str: ftm };
-				if (!r.day_first || d.key < r.day_first.date ||
-					(d.key === r.day_first.date && (candidate.hh*60+candidate.mm) < (r.day_first.hh*60+r.day_first.mm))) {
+				const candidate = { date: d.key, hh: +ftm.slice(0, 2), mm: +ftm.slice(3, 5), str: ftm };
+				if (
+					!r.day_first ||
+					d.key < r.day_first.date ||
+					(d.key === r.day_first.date &&
+						candidate.hh * 60 + candidate.mm < r.day_first.hh * 60 + r.day_first.mm)
+				) {
 					r.day_first = candidate;
 				}
 			}
 			if (typeof ltm === 'string' && /^\d{2}:\d{2}$/.test(ltm)) {
-				const candidate = { date: d.key, hh: +ltm.slice(0,2), mm: +ltm.slice(3,5), str: ltm };
-				if (!r.day_last || d.key > r.day_last.date ||
-					(d.key === r.day_last.date && (candidate.hh*60+candidate.mm) > (r.day_last.hh*60+r.day_last.mm))) {
+				const candidate = { date: d.key, hh: +ltm.slice(0, 2), mm: +ltm.slice(3, 5), str: ltm };
+				if (
+					!r.day_last ||
+					d.key > r.day_last.date ||
+					(d.key === r.day_last.date &&
+						candidate.hh * 60 + candidate.mm > r.day_last.hh * 60 + r.day_last.mm)
+				) {
 					r.day_last = candidate;
 				}
 			}
@@ -670,9 +714,9 @@ function getAggregatedData() {
 			if (appData.kc_hold) {
 				Object.entries(appData.kc_hold).forEach(([kc, h]) => {
 					const t = r.kc_hold[kc] || (r.kc_hold[kc] = { s: 0, n: 0, m: 0, tap: 0, hold: 0 });
-					t.s    += h.s    || 0;
-					t.n    += h.n    || 0;
-					t.tap  += h.tap  || 0;
+					t.s += h.s || 0;
+					t.n += h.n || 0;
+					t.tap += h.tap || 0;
 					t.hold += h.hold || 0;
 					if ((h.m || 0) > t.m) t.m = h.m;
 				});
@@ -696,61 +740,63 @@ function getAggregatedData() {
 					if (hMs === 0 && totalAppCharsForHourly > 0 && hData.c > 0) {
 						hMs = (hData.c / totalAppCharsForHourly) * (Number(appData.app_time_ms) || 0);
 					}
-					const slot = r.by_hour[hour] || (r.by_hour[hour] = { time_ms: 0, chars: 0, score_x_ms: 0 });
+					const slot =
+						r.by_hour[hour] || (r.by_hour[hour] = { time_ms: 0, chars: 0, score_x_ms: 0 });
 					slot.time_ms += hMs;
-					slot.chars   += hData.c || 0;
+					slot.chars += hData.c || 0;
 					slot.score_x_ms = (slot.score_x_ms || 0) + (_hourCat.score || 0) * hMs;
 					// Ribbon (#25) per-day per-hour per-category accumulation
-					const ribDay  = r.ribbon[d.key] || (r.ribbon[d.key] = {});
-					const ribHour = ribDay[hour]    || (ribDay[hour]    = {});
-					const ribCat  = _hourCat.type || 'Général';
+					const ribDay = r.ribbon[d.key] || (r.ribbon[d.key] = {});
+					const ribHour = ribDay[hour] || (ribDay[hour] = {});
+					const ribCat = _hourCat.type || 'Général';
 					ribHour[ribCat] = (ribHour[ribCat] || 0) + hMs;
 					// Hour × weekday cell — same dow as the day this app/day row
 					// belongs to. Drives the heatmap.
 					const cell_key = `${hour}|${dow}`;
-					const cell = r.hour_weekday[cell_key]
-						|| (r.hour_weekday[cell_key] = { time_ms: 0, chars: 0 });
+					const cell =
+						r.hour_weekday[cell_key] || (r.hour_weekday[cell_key] = { time_ms: 0, chars: 0 });
 					cell.time_ms += hMs;
-					cell.chars   += hData.c || 0;
+					cell.chars += hData.c || 0;
 				});
 			}
 
 			// Day rollup
-			byDate.time_ms   += Number(appData.app_time_ms) || 0;
-			byDate.active_ms += Number(appData.time)        || 0;
-			byDate.chars     += Number(appData.chars)       || 0;
-			byDate.sessions  += Number(appData.session_count_total) || 0;
+			byDate.time_ms += Number(appData.app_time_ms) || 0;
+			byDate.active_ms += Number(appData.time) || 0;
+			byDate.chars += Number(appData.chars) || 0;
+			byDate.sessions += Number(appData.session_count_total) || 0;
 			if (appData.switches_to) {
 				Object.values(appData.switches_to).forEach((n) => (byDate.switches += n || 0));
 			}
 			byWk.time_ms += Number(appData.app_time_ms) || 0;
-			byWk.chars   += Number(appData.chars)       || 0;
+			byWk.chars += Number(appData.chars) || 0;
 
 			// Category rollup uses the resolved category (user override aware)
 			const catData = getAppCategory(appName, appData.category);
 			const cat = catData.type || 'Général';
-			const catSlot = r.by_category[cat] || (r.by_category[cat] = { time_ms: 0, chars: 0, active_ms: 0 });
+			const catSlot =
+				r.by_category[cat] || (r.by_category[cat] = { time_ms: 0, chars: 0, active_ms: 0 });
 			const appMs = Number(appData.app_time_ms) || 0;
 			byDate.by_category[cat] = (byDate.by_category[cat] || 0) + appMs;
 			// First / last typed minute on this day across apps
 			const _ftmDay = appData.first_typed_min;
 			const _ltmDay = appData.last_typed_min;
 			if (typeof _ftmDay === 'string' && /^\d{2}:\d{2}$/.test(_ftmDay)) {
-				const _m = (+_ftmDay.slice(0,2)) * 60 + (+_ftmDay.slice(3,5));
+				const _m = +_ftmDay.slice(0, 2) * 60 + +_ftmDay.slice(3, 5);
 				if (byDate.first_min == null || _m < byDate.first_min) byDate.first_min = _m;
 			}
 			if (typeof _ltmDay === 'string' && /^\d{2}:\d{2}$/.test(_ltmDay)) {
-				const _m = (+_ltmDay.slice(0,2)) * 60 + (+_ltmDay.slice(3,5));
+				const _m = +_ltmDay.slice(0, 2) * 60 + +_ltmDay.slice(3, 5);
 				if (byDate.last_min == null || _m > byDate.last_min) byDate.last_min = _m;
 			}
-			catSlot.time_ms   += appMs;
-			catSlot.chars     += Number(appData.chars) || 0;
-			catSlot.active_ms += Number(appData.time)  || 0;
+			catSlot.time_ms += appMs;
+			catSlot.chars += Number(appData.chars) || 0;
+			catSlot.active_ms += Number(appData.time) || 0;
 
 			// #20 productivity split (sign of score)
-			if ((catData.score || 0) > 0)      r.prod_split.positive_ms += appMs;
+			if ((catData.score || 0) > 0) r.prod_split.positive_ms += appMs;
 			else if ((catData.score || 0) < 0) r.prod_split.negative_ms += appMs;
-			else                                r.prod_split.neutral_ms  += appMs;
+			else r.prod_split.neutral_ms += appMs;
 
 			// #22 per-weekday × category time
 			const wkSlot = r.weekday_category[dow] || (r.weekday_category[dow] = {});
@@ -808,12 +854,9 @@ function initDashboard() {
 			renderDashboard();
 		});
 		$id('btn-refresh').addEventListener('click', renderDashboard);
-		$id('btn-add-app').addEventListener(
-			'click',
-			() => {
-				postBridge({ action: 'pick' });
-			}
-		);
+		$id('btn-add-app').addEventListener('click', () => {
+			postBridge({ action: 'pick' });
+		});
 		const btnCmp = $id('btn-compare-prev');
 		if (btnCmp) {
 			btnCmp.addEventListener('click', () => {
@@ -876,7 +919,11 @@ function activateTab(name) {
 	});
 	// Re-render so newly-visible canvases get a non-zero size before Chart.js
 	// computes their dimensions. setTimeout(0) waits for the layout pass.
-	setTimeout(() => { try { renderDashboard(); } catch (_) {} }, 0);
+	setTimeout(() => {
+		try {
+			renderDashboard();
+		} catch (_) {}
+	}, 0);
 }
 
 /** Wires click handlers on the tab buttons (idempotent). */
@@ -898,7 +945,7 @@ function wireTabs() {
  */
 function rebuildFilterButtons() {
 	const catBox = document.getElementById('category-filter-buttons');
-	const wkBox  = document.getElementById('weekday-filter-buttons');
+	const wkBox = document.getElementById('weekday-filter-buttons');
 	if (!catBox || !wkBox) return;
 
 	// ── Categories ────────────────────────────────────────────────────
@@ -913,10 +960,12 @@ function rebuildFilterButtons() {
 	const catList = [...allCats].sort();
 
 	const renderCats = () => {
-		catBox.innerHTML = catList.map((c) => {
-			const active = !currentCategoryFilter || currentCategoryFilter.has(c);
-			return `<button class="filter-btn${active ? ' active' : ''}" data-cat="${escapeHtml(c)}" style="padding:3px 9px;font-size:11px;">${escapeHtml(c)}</button>`;
-		}).join('');
+		catBox.innerHTML = catList
+			.map((c) => {
+				const active = !currentCategoryFilter || currentCategoryFilter.has(c);
+				return `<button class="filter-btn${active ? ' active' : ''}" data-cat="${escapeHtml(c)}" style="padding:3px 9px;font-size:11px;">${escapeHtml(c)}</button>`;
+			})
+			.join('');
 		[...catBox.querySelectorAll('button[data-cat]')].forEach((btn) => {
 			btn.addEventListener('click', () => {
 				const cat = btn.getAttribute('data-cat');
@@ -937,14 +986,16 @@ function rebuildFilterButtons() {
 	// ── Weekdays ──────────────────────────────────────────────────────
 	const wkLabels = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
 	const renderWk = () => {
-		wkBox.innerHTML = wkLabels.map((label, idx) => {
-			const active = !currentWeekdayFilter || currentWeekdayFilter.has(idx);
-			return `<button class="filter-btn${active ? ' active' : ''}" data-dow="${idx}" style="padding:3px 9px;font-size:11px;">${label}</button>`;
-		}).join('');
+		wkBox.innerHTML = wkLabels
+			.map((label, idx) => {
+				const active = !currentWeekdayFilter || currentWeekdayFilter.has(idx);
+				return `<button class="filter-btn${active ? ' active' : ''}" data-dow="${idx}" style="padding:3px 9px;font-size:11px;">${label}</button>`;
+			})
+			.join('');
 		[...wkBox.querySelectorAll('button[data-dow]')].forEach((btn) => {
 			btn.addEventListener('click', () => {
 				const dow = +btn.getAttribute('data-dow');
-				if (!currentWeekdayFilter) currentWeekdayFilter = new Set([0,1,2,3,4,5,6]);
+				if (!currentWeekdayFilter) currentWeekdayFilter = new Set([0, 1, 2, 3, 4, 5, 6]);
 				if (currentWeekdayFilter.has(dow)) currentWeekdayFilter.delete(dow);
 				else currentWeekdayFilter.add(dow);
 				if (currentWeekdayFilter.size === 7) currentWeekdayFilter = null;
@@ -997,7 +1048,9 @@ function updateCharts(appsArray, aggregatedData) {
 		const iconImages = topApps.map((a) => {
 			if (!appIcons[a.name]) return null;
 			const img = new Image();
-			img.onload = () => { if (appsBarChart) appsBarChart.draw(); };
+			img.onload = () => {
+				if (appsBarChart) appsBarChart.draw();
+			};
 			img.src = appIcons[a.name];
 			return img;
 		});
@@ -1186,11 +1239,13 @@ function renderDashboard() {
 					.map((e) => `${escapeHtml(e[0])} (${e[1]})`);
 
 				const focus_min = appData.time_ms / 60000;
-				const density   = focus_min > 0 ? (appData.chars || 0) / focus_min : 0;
-				const focus_lat_mean = (appData.focus_latency_count || 0) > 0
-					? (appData.focus_latency_sum_ms / appData.focus_latency_count) : 0;
-				const hs_pct = (appData.chars || 0) > 0
-					? ((appData.hs_chars || 0) / appData.chars) * 100 : 0;
+				const density = focus_min > 0 ? (appData.chars || 0) / focus_min : 0;
+				const focus_lat_mean =
+					(appData.focus_latency_count || 0) > 0
+						? appData.focus_latency_sum_ms / appData.focus_latency_count
+						: 0;
+				const hs_pct =
+					(appData.chars || 0) > 0 ? ((appData.hs_chars || 0) / appData.chars) * 100 : 0;
 
 				appsArray.push({
 					name: appName,
@@ -1234,25 +1289,36 @@ function renderDashboard() {
 		const rs = r.sessions || {};
 		const passive_ms = (rt.passive_locked_ms || 0) + (rt.passive_sleep_ms || 0);
 		const focus_minus_passive = Math.max(0, (rt.focus_ms || 0) - passive_ms);
-		const active_ratio = focus_minus_passive > 0
-			? ((rt.active_ms || 0) / focus_minus_passive) * 100 : 0;
+		const active_ratio =
+			focus_minus_passive > 0 ? ((rt.active_ms || 0) / focus_minus_passive) * 100 : 0;
 
-		const setText = (id, txt) => { const el = $id(id); if (el) el.textContent = txt; };
-		const setHtml = (id, html) => { const el = $id(id); if (el) el.innerHTML = html; };
+		const setText = (id, txt) => {
+			const el = $id(id);
+			if (el) el.textContent = txt;
+		};
+		const setHtml = (id, html) => {
+			const el = $id(id);
+			if (el) el.innerHTML = html;
+		};
 
 		setText('kpi-active-time', formatDuration(rt.active_ms || 0));
-		setText('kpi-active-ratio',
-			focus_minus_passive > 0 ? `${active_ratio.toFixed(1)}% du focus net` : '—');
+		setText(
+			'kpi-active-ratio',
+			focus_minus_passive > 0 ? `${active_ratio.toFixed(1)}% du focus net` : '—'
+		);
 
 		setText('kpi-passive-time', passive_ms > 0 ? formatDuration(passive_ms) : '—');
-		setText('kpi-passive-detail',
+		setText(
+			'kpi-passive-detail',
 			passive_ms > 0
 				? `verrou ${formatDuration(rt.passive_locked_ms || 0)} · veille ${formatDuration(rt.passive_sleep_ms || 0)}`
-				: _t('ui_apps.kpi_no_lock'));
+				: _t('ui_apps.kpi_no_lock')
+		);
 
 		// First / last typed
-		const fmtMin = (m) => m && m.str ? m.str : '—';
-		const first = r.day_first, last = r.day_last;
+		const fmtMin = (m) => (m && m.str ? m.str : '—');
+		const first = r.day_first,
+			last = r.day_last;
 		if (first && last) {
 			setHtml('kpi-day-bounds', `${fmtMin(first)} → ${fmtMin(last)}`);
 			// Amplitude: minutes between first and last across multi-day spans is
@@ -1267,8 +1333,10 @@ function renderDashboard() {
 				amp_min = (last.hh - first.hh) * 60 + (last.mm - first.mm);
 			}
 			if (amp_min < 0) amp_min += 24 * 60;
-			setText('kpi-day-amplitude',
-				`amplitude ${Math.floor(amp_min / 60)}h${String(amp_min % 60).padStart(2, '0')}`);
+			setText(
+				'kpi-day-amplitude',
+				`amplitude ${Math.floor(amp_min / 60)}h${String(amp_min % 60).padStart(2, '0')}`
+			);
 		} else {
 			setText('kpi-day-bounds', '—');
 			setText('kpi-day-amplitude', _t('ui_apps.kpi_no_keystrokes'));
@@ -1277,8 +1345,10 @@ function renderDashboard() {
 		// Longest session
 		if ((rs.longest_ms || 0) > 0) {
 			setText('kpi-longest-session', formatDuration(rs.longest_ms));
-			setText('kpi-longest-session-app',
-				rs.longest_app ? _t('ui_apps.kpi_in_app').replace('{name}', rs.longest_app) : '');
+			setText(
+				'kpi-longest-session-app',
+				rs.longest_app ? _t('ui_apps.kpi_in_app').replace('{name}', rs.longest_app) : ''
+			);
 		} else {
 			setText('kpi-longest-session', '—');
 			setText('kpi-longest-session-app', _t('ui_apps.kpi_no_session'));
@@ -1287,15 +1357,21 @@ function renderDashboard() {
 		// Sessions count + mean
 		const session_mean_ms = (rs.count || 0) > 0 ? (rs.total_active_ms || 0) / rs.count : 0;
 		setText('kpi-sessions-count', String(rs.count || 0));
-		setText('kpi-sessions-mean',
-			session_mean_ms > 0 ? _t('ui_apps.kpi_session_mean').replace('{dur}', formatDuration(session_mean_ms)) : '—');
+		setText(
+			'kpi-sessions-mean',
+			session_mean_ms > 0
+				? _t('ui_apps.kpi_session_mean').replace('{dur}', formatDuration(session_mean_ms))
+				: '—'
+		);
 
 		// Density: chars / focus minute
-		const density_cpm = (rt.focus_ms || 0) > 0
-			? ((r.typing && r.typing.chars) || 0) / (rt.focus_ms / 60000) : 0;
+		const density_cpm =
+			(rt.focus_ms || 0) > 0 ? ((r.typing && r.typing.chars) || 0) / (rt.focus_ms / 60000) : 0;
 		setText('kpi-density', density_cpm > 0 ? `${density_cpm.toFixed(0)}` : '—');
-		setText('kpi-density-detail',
-			density_cpm > 0 ? _t('ui_apps.kpi_car_per_min') : _t('ui_apps.kpi_no_keystrokes'));
+		setText(
+			'kpi-density-detail',
+			density_cpm > 0 ? _t('ui_apps.kpi_car_per_min') : _t('ui_apps.kpi_no_keystrokes')
+		);
 
 		// ── Multitâche / context-switching KPIs ───────────────────────────
 		// Compute aggregates across the period from appsArray + aggData.
@@ -1306,33 +1382,35 @@ function renderDashboard() {
 		// "time you actually had an app at the foreground" minus passive.
 		const focus_min_eff = focus_minus_passive / 60000;
 		const hopping_rate = focus_min_eff > 0 ? totalSwitches / focus_min_eff : 0;
-		setText('kpi-hopping-rate',
-			focus_min_eff > 0 ? `${hopping_rate.toFixed(1)}` : '—');
-		setText('kpi-hopping-detail',
-			focus_min_eff > 0 ? _t('ui_apps.kpi_hopping_detail') : _t('ui_apps.kpi_no_focus'));
+		setText('kpi-hopping-rate', focus_min_eff > 0 ? `${hopping_rate.toFixed(1)}` : '—');
+		setText(
+			'kpi-hopping-detail',
+			focus_min_eff > 0 ? _t('ui_apps.kpi_hopping_detail') : _t('ui_apps.kpi_no_focus')
+		);
 
 		// Profondeur moyenne par app = Σ app_time / Σ switches
 		const depth_mean_ms = totalSwitches > 0 ? sum_focus_ms / totalSwitches : 0;
-		setText('kpi-depth-mean',
-			depth_mean_ms > 0 ? formatDuration(depth_mean_ms) : '—');
-		setText('kpi-depth-detail',
+		setText('kpi-depth-mean', depth_mean_ms > 0 ? formatDuration(depth_mean_ms) : '—');
+		setText(
+			'kpi-depth-detail',
 			depth_mean_ms > 0
 				? _t('ui_apps.kpi_switches_between').replace('{n}', totalSwitches)
-				: _t('ui_apps.kpi_no_switch'));
+				: _t('ui_apps.kpi_no_switch')
+		);
 
 		// Top trio
 		const top3 = apps_by_time.slice(0, 3);
-		const top3_share = sum_focus_ms > 0
-			? (top3.reduce((s, a) => s + a.timeMs, 0) / sum_focus_ms) * 100 : 0;
-		setText('kpi-top-trio-share',
-			top3.length > 0 ? `${top3_share.toFixed(0)}%` : '—');
-		setHtml('kpi-top-trio-list',
-			top3.length > 0
-				? top3.map(a => escapeHtml(a.name)).join(' · ')
-				: '—');
+		const top3_share =
+			sum_focus_ms > 0 ? (top3.reduce((s, a) => s + a.timeMs, 0) / sum_focus_ms) * 100 : 0;
+		setText('kpi-top-trio-share', top3.length > 0 ? `${top3_share.toFixed(0)}%` : '—');
+		setHtml(
+			'kpi-top-trio-list',
+			top3.length > 0 ? top3.map((a) => escapeHtml(a.name)).join(' · ') : '—'
+		);
 
 		// App pivot = app with the most distinct outgoing destinations
-		let pivot = null, pivot_dests = 0;
+		let pivot = null,
+			pivot_dests = 0;
 		for (const [appName, appData] of Object.entries(aggData.apps)) {
 			const distinct = appData.switches ? Object.keys(appData.switches).length : 0;
 			if (distinct > pivot_dests) {
@@ -1340,118 +1418,165 @@ function renderDashboard() {
 				pivot_dests = distinct;
 			}
 		}
-		setText('kpi-pivot-app',
-			pivot ? pivot : '—');
-		setText('kpi-pivot-detail',
-			pivot ? _t('ui_apps.kpi_towards_apps').replace('{n}', pivot_dests) : _t('ui_apps.kpi_no_switch'));
+		setText('kpi-pivot-app', pivot ? pivot : '—');
+		setText(
+			'kpi-pivot-detail',
+			pivot
+				? _t('ui_apps.kpi_towards_apps').replace('{n}', pivot_dests)
+				: _t('ui_apps.kpi_no_switch')
+		);
 
 		// Index focus = part du temps focus dans la top app
-		const focus_index = (sum_focus_ms > 0 && apps_by_time.length > 0)
-			? (apps_by_time[0].timeMs / sum_focus_ms) * 100 : 0;
-		setText('kpi-focus-index',
-			apps_by_time.length > 0 ? `${focus_index.toFixed(0)}%` : '—');
-		setText('kpi-focus-index-detail',
-			apps_by_time.length > 0 ? _t('ui_apps.kpi_in_app').replace('{name}', apps_by_time[0].name) : '');
+		const focus_index =
+			sum_focus_ms > 0 && apps_by_time.length > 0
+				? (apps_by_time[0].timeMs / sum_focus_ms) * 100
+				: 0;
+		setText('kpi-focus-index', apps_by_time.length > 0 ? `${focus_index.toFixed(0)}%` : '—');
+		setText(
+			'kpi-focus-index-detail',
+			apps_by_time.length > 0
+				? _t('ui_apps.kpi_in_app').replace('{name}', apps_by_time[0].name)
+				: ''
+		);
 
 		// Context volume = sum of switching events on the period
 		setText('kpi-context-volume', String(totalSwitches));
-		setText('kpi-context-detail',
-			(r.time && r.time.passive_count > 0)
+		setText(
+			'kpi-context-detail',
+			r.time && r.time.passive_count > 0
 				? `+ ${r.time.passive_count} verrou(s) / veille(s)`
-				: _t('ui_apps.kpi_app_switches'));
+				: _t('ui_apps.kpi_app_switches')
+		);
 
 		// ── Records personnels (period-best scores) ───────────────────────
-		const rb = r.bursts      || {};
-		const re = r.ergonomics  || {};
-		const rty = r.typing     || {};
-		setText('kpi-rec-burst',
-			(rb.max_cpm || 0) > 0 ? `${rb.max_cpm.toFixed(0)} CPM` : '—');
-		setText('kpi-rec-burst-detail',
-			(rb.count || 0) > 0 ? _t('ui_apps.kpi_bursts_count').replace('{n}', rb.count) : _t('ui_apps.kpi_no_burst'));
-		setText('kpi-rec-burst-chars',
-			(rb.max_chars || 0) > 0 ? format_int(rb.max_chars) : '—');
-		setText('kpi-rec-burst-chars-detail',
-			(rb.max_chars || 0) > 0 ? _t('ui_apps.kpi_chars_in_a_row') : '');
+		const rb = r.bursts || {};
+		const re = r.ergonomics || {};
+		const rty = r.typing || {};
+		setText('kpi-rec-burst', (rb.max_cpm || 0) > 0 ? `${rb.max_cpm.toFixed(0)} CPM` : '—');
+		setText(
+			'kpi-rec-burst-detail',
+			(rb.count || 0) > 0
+				? _t('ui_apps.kpi_bursts_count').replace('{n}', rb.count)
+				: _t('ui_apps.kpi_no_burst')
+		);
+		setText('kpi-rec-burst-chars', (rb.max_chars || 0) > 0 ? format_int(rb.max_chars) : '—');
+		setText(
+			'kpi-rec-burst-chars-detail',
+			(rb.max_chars || 0) > 0 ? _t('ui_apps.kpi_chars_in_a_row') : ''
+		);
 
-		setText('kpi-rec-session',
-			(rs.longest_ms || 0) > 0 ? formatDuration(rs.longest_ms) : '—');
-		setText('kpi-rec-session-detail',
-			rs.longest_app ? _t('ui_apps.kpi_in_app').replace('{name}', rs.longest_app) : '');
+		setText('kpi-rec-session', (rs.longest_ms || 0) > 0 ? formatDuration(rs.longest_ms) : '—');
+		setText(
+			'kpi-rec-session-detail',
+			rs.longest_app ? _t('ui_apps.kpi_in_app').replace('{name}', rs.longest_app) : ''
+		);
 
-		setText('kpi-rec-finger-streak',
-			(re.same_finger_streak_max || 0) > 0
-				? `${re.same_finger_streak_max} touches` : '—');
-		setText('kpi-rec-finger-streak-detail',
-			(re.same_hand_streak_max || 0) > 0
-				? `main : ${re.same_hand_streak_max} touches` : '');
+		setText(
+			'kpi-rec-finger-streak',
+			(re.same_finger_streak_max || 0) > 0 ? `${re.same_finger_streak_max} touches` : '—'
+		);
+		setText(
+			'kpi-rec-finger-streak-detail',
+			(re.same_hand_streak_max || 0) > 0 ? `main : ${re.same_hand_streak_max} touches` : ''
+		);
 
-		setText('kpi-rec-cascade',
-			(rty.cascade_max_len || 0) > 0
-				? `${rty.cascade_max_len} backspaces` : '—');  // "backspaces" is a technical term, kept as-is
-		setText('kpi-rec-cascade-detail',
+		setText(
+			'kpi-rec-cascade',
+			(rty.cascade_max_len || 0) > 0 ? `${rty.cascade_max_len} backspaces` : '—'
+		); // "backspaces" is a technical term, kept as-is
+		setText(
+			'kpi-rec-cascade-detail',
 			(rty.cascade_count_total || 0) > 0
-				? _t('ui_apps.kpi_cascades_period').replace('{n}', rty.cascade_count_total) : '');
+				? _t('ui_apps.kpi_cascades_period').replace('{n}', rty.cascade_count_total)
+				: ''
+		);
 
 		// Top day by chars
-		let best_day = null, best_day_chars = 0;
-		Object.entries((r.by_date || {})).forEach(([date_str, day]) => {
+		let best_day = null,
+			best_day_chars = 0;
+		Object.entries(r.by_date || {}).forEach(([date_str, day]) => {
 			if ((day.chars || 0) > best_day_chars) {
 				best_day_chars = day.chars;
 				best_day = date_str;
 			}
 		});
-		setText('kpi-rec-day-chars',
-			best_day_chars > 0 ? format_int(best_day_chars) : '—');
-		setText('kpi-rec-day-chars-detail',
-			best_day ? _t('ui_apps.kpi_day_best').replace('{date}', formatDisplayDate(best_day)) : '');
+		setText('kpi-rec-day-chars', best_day_chars > 0 ? format_int(best_day_chars) : '—');
+		setText(
+			'kpi-rec-day-chars-detail',
+			best_day ? _t('ui_apps.kpi_day_best').replace('{date}', formatDisplayDate(best_day)) : ''
+		);
 
 		// ── Typing × Temps (#40-43, 49) ───────────────────────────────────
-		const fl   = r.focus_latency || { sum_ms: 0, count: 0 };
+		const fl = r.focus_latency || { sum_ms: 0, count: 0 };
 		const flMs = (fl.count || 0) > 0 ? fl.sum_ms / fl.count : 0;
 		setText('kpi-tx-focus-lat', flMs > 0 ? `${flMs.toFixed(0)} ms` : '—');
-		setText('kpi-tx-focus-lat-detail',
-			(fl.count || 0) > 0 ? _t('ui_apps.kpi_focus_taken').replace('{n}', fl.count) : _t('ui_apps.kpi_not_measured'));
+		setText(
+			'kpi-tx-focus-lat-detail',
+			(fl.count || 0) > 0
+				? _t('ui_apps.kpi_focus_taken').replace('{n}', fl.count)
+				: _t('ui_apps.kpi_not_measured')
+		);
 
 		const layoutsCount = Object.keys(r.layouts || {}).length;
 		setText('kpi-tx-layouts', String(layoutsCount));
 		const topLayout = Object.entries(r.layouts || {}).sort((a, b) => b[1] - a[1])[0];
-		setText('kpi-tx-layouts-detail',
-			topLayout ? _t('ui_apps.kpi_top_layout').replace('{name}', topLayout[0]) : '—');
+		setText(
+			'kpi-tx-layouts-detail',
+			topLayout ? _t('ui_apps.kpi_top_layout').replace('{name}', topLayout[0]) : '—'
+		);
 
 		setText('kpi-tx-long-sessions', String(r.long_sessions || 0));
-		setText('kpi-tx-long-sessions-detail',
-			(r.long_sessions || 0) > 0 ? _t('ui_apps.kpi_app_days_90') : _t('ui_apps.kpi_no_long_session'));
+		setText(
+			'kpi-tx-long-sessions-detail',
+			(r.long_sessions || 0) > 0 ? _t('ui_apps.kpi_app_days_90') : _t('ui_apps.kpi_no_long_session')
+		);
 
-		const totalChars   = (r.typing && r.typing.chars) || 0;
+		const totalChars = (r.typing && r.typing.chars) || 0;
 		const autoRepCount = (r.typing && r.typing.auto_repeat_count) || 0;
 		const arPct = totalChars > 0 ? (autoRepCount / totalChars) * 100 : 0;
 		setText('kpi-tx-autorepeat', totalChars > 0 ? `${arPct.toFixed(1)} %` : '—');
-		setText('kpi-tx-autorepeat-detail',
-			autoRepCount > 0 ? `${format_int(autoRepCount)} touches répétées` : _t('ui_apps.kpi_no_repeat'));
+		setText(
+			'kpi-tx-autorepeat-detail',
+			autoRepCount > 0
+				? `${format_int(autoRepCount)} touches répétées`
+				: _t('ui_apps.kpi_no_repeat')
+		);
 
 		// Worst app for errors (#49): highest bs_total / chars (min 200 chars to avoid noise)
-		let wErrApp = null, wErrPct = 0;
+		let wErrApp = null,
+			wErrPct = 0;
 		Object.entries(aggData.apps || {}).forEach(([name, a]) => {
 			if ((a.chars || 0) >= 200) {
 				const p = ((a.bs_total || 0) / a.chars) * 100;
-				if (p > wErrPct) { wErrPct = p; wErrApp = name; }
+				if (p > wErrPct) {
+					wErrPct = p;
+					wErrApp = name;
+				}
 			}
 		});
 		setText('kpi-tx-error-app', wErrApp || '—');
-		setText('kpi-tx-error-app-detail',
-			wErrApp ? `${wErrPct.toFixed(1)} % de backspaces` : _t('ui_apps.kpi_no_enough_typing'));
+		setText(
+			'kpi-tx-error-app-detail',
+			wErrApp ? `${wErrPct.toFixed(1)} % de backspaces` : _t('ui_apps.kpi_no_enough_typing')
+		);
 
 		// Worst app for recovery (#50)
-		let wRecApp = null, wRecMs = 0;
+		let wRecApp = null,
+			wRecMs = 0;
 		Object.entries(aggData.apps || {}).forEach(([name, a]) => {
 			if ((a.recovery_count || 0) >= 5) {
 				const m = a.recovery_sum_ms / a.recovery_count;
-				if (m > wRecMs) { wRecMs = m; wRecApp = name; }
+				if (m > wRecMs) {
+					wRecMs = m;
+					wRecApp = name;
+				}
 			}
 		});
 		setText('kpi-tx-recovery-app', wRecApp || '—');
-		setText('kpi-tx-recovery-app-detail',
-			wRecApp ? `${wRecMs.toFixed(0)} ms en moyenne` : _t('ui_apps.kpi_no_enough_errors'));
+		setText(
+			'kpi-tx-recovery-app-detail',
+			wRecApp ? `${wRecMs.toFixed(0)} ms en moyenne` : _t('ui_apps.kpi_no_enough_errors')
+		);
 
 		// CPM par catégorie (#47)
 		(function renderCpmByCategory() {
@@ -1460,7 +1585,7 @@ function renderDashboard() {
 			const cats = Object.entries(r.by_category || {})
 				.map(([cat, c]) => ({
 					cat,
-					cpm: (c.time_ms || 0) > 0 ? (c.chars || 0) / (c.time_ms / 60000) : 0,
+					cpm: (c.time_ms || 0) > 0 ? (c.chars || 0) / (c.time_ms / 60000) : 0
 				}))
 				.filter((x) => x.cpm > 0)
 				.sort((a, b) => b.cpm - a.cpm);
@@ -1470,39 +1595,51 @@ function renderDashboard() {
 				type: 'bar',
 				data: {
 					labels: cats.map((c) => c.cat),
-					datasets: [{
-						label: 'CPM',
-						data: cats.map((c) => +c.cpm.toFixed(0)),
-						backgroundColor: cats.map((c) => getCategoryColor(c.cat, 0)),
-						borderRadius: 4,
-					}],
+					datasets: [
+						{
+							label: 'CPM',
+							data: cats.map((c) => +c.cpm.toFixed(0)),
+							backgroundColor: cats.map((c) => getCategoryColor(c.cat, 0)),
+							borderRadius: 4
+						}
+					]
 				},
 				options: {
-					responsive: true, maintainAspectRatio: false,
+					responsive: true,
+					maintainAspectRatio: false,
 					plugins: { legend: { display: false } },
 					scales: {
 						x: { grid: { display: false }, ticks: { color: '#ccc' } },
-						y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.08)' }, ticks: { color: '#ccc' } }
+						y: {
+							beginAtZero: true,
+							grid: { color: 'rgba(255,255,255,0.08)' },
+							ticks: { color: '#ccc' }
+						}
 					}
 				}
 			});
 		})();
 
 		// ── Productivité (#20–22) ─────────────────────────────────────────
-		const ps   = r.prod_split || { positive_ms: 0, neutral_ms: 0, negative_ms: 0 };
+		const ps = r.prod_split || { positive_ms: 0, neutral_ms: 0, negative_ms: 0 };
 		const psSum = (ps.positive_ms || 0) + (ps.neutral_ms || 0) + (ps.negative_ms || 0);
 		const elProdBar = $id('kpi-prod-bar');
 		if (elProdBar) {
 			if (psSum > 0) {
 				const pPos = (ps.positive_ms / psSum) * 100;
-				const pNeu = (ps.neutral_ms  / psSum) * 100;
+				const pNeu = (ps.neutral_ms / psSum) * 100;
 				const pNeg = (ps.negative_ms / psSum) * 100;
 				elProdBar.innerHTML =
 					`<div title="Productif" style="background:#30D158;width:${pPos}%"></div>` +
 					`<div title="Neutre"    style="background:#8e8e93;width:${pNeu}%"></div>` +
 					`<div title="Distraction" style="background:#FF453A;width:${pNeg}%"></div>`;
-				setText('kpi-prod-bar-detail',
-					_t('ui_apps.kpi_productive').replace('{p}', pPos.toFixed(0)).replace('{n}', pNeu.toFixed(0)).replace('{d}', pNeg.toFixed(0)));
+				setText(
+					'kpi-prod-bar-detail',
+					_t('ui_apps.kpi_productive')
+						.replace('{p}', pPos.toFixed(0))
+						.replace('{n}', pNeu.toFixed(0))
+						.replace('{d}', pNeg.toFixed(0))
+				);
 			} else {
 				elProdBar.innerHTML = '';
 				setText('kpi-prod-bar-detail', _t('ui_apps.kpi_no_data'));
@@ -1510,17 +1647,23 @@ function renderDashboard() {
 		}
 
 		// #21 Best hour by productivity (score-weighted)
-		let bestHour = null, bestHourScore = -Infinity;
+		let bestHour = null,
+			bestHourScore = -Infinity;
 		Object.entries(r.by_hour || {}).forEach(([hh, slot]) => {
 			if ((slot.time_ms || 0) > 0) {
 				const avg = (slot.score_x_ms || 0) / slot.time_ms;
-				if (avg > bestHourScore) { bestHourScore = avg; bestHour = hh; }
+				if (avg > bestHourScore) {
+					bestHourScore = avg;
+					bestHour = hh;
+				}
 			}
 		});
 		if (bestHour != null) {
 			setText('kpi-best-hour', `${bestHour}h`);
-			setText('kpi-best-hour-detail',
-				_t('ui_apps.kpi_best_hour_score').replace('{score}', bestHourScore.toFixed(2)));
+			setText(
+				'kpi-best-hour-detail',
+				_t('ui_apps.kpi_best_hour_score').replace('{score}', bestHourScore.toFixed(2))
+			);
 		} else {
 			setText('kpi-best-hour', '—');
 			setText('kpi-best-hour-detail', _t('ui_apps.kpi_no_focus_tracked'));
@@ -1530,11 +1673,15 @@ function renderDashboard() {
 		const DOW_LABELS = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
 		const wkLines = [];
 		let domToday = null;
-		const todayDow = ((new Date()).getDay() + 6) % 7;
+		const todayDow = (new Date().getDay() + 6) % 7;
 		Object.entries(r.weekday_category || {}).forEach(([dow, cats]) => {
-			let topCat = null, topMs = 0;
+			let topCat = null,
+				topMs = 0;
 			Object.entries(cats).forEach(([c, ms]) => {
-				if (ms > topMs) { topMs = ms; topCat = c; }
+				if (ms > topMs) {
+					topMs = ms;
+					topCat = c;
+				}
 			});
 			if (topCat) {
 				wkLines.push(`${DOW_LABELS[+dow]} : ${topCat}`);
@@ -1542,8 +1689,10 @@ function renderDashboard() {
 			}
 		});
 		setText('kpi-dom-cat', domToday || (wkLines.length > 0 ? wkLines[0].split(' : ')[1] : '—'));
-		setText('kpi-dom-cat-detail',
-			wkLines.length > 0 ? wkLines.join(' · ') : _t('ui_apps.kpi_no_day_data'));
+		setText(
+			'kpi-dom-cat-detail',
+			wkLines.length > 0 ? wkLines.join(' · ') : _t('ui_apps.kpi_no_day_data')
+		);
 
 		// ── Streaks (#58) ─────────────────────────────────────────────────
 		// Compute the longest run of consecutive calendar days where the
@@ -1554,20 +1703,23 @@ function renderDashboard() {
 				.map((k) => ({ key: k, ts: parseDateKey(k) }))
 				.filter((d) => !isNaN(d.ts))
 				.sort((a, b) => a.ts - b.ts);
-			const dayChars  = {};
+			const dayChars = {};
 			const dayActive = {};
 			allKeys.forEach((d) => {
-				let chars = 0, active = 0;
+				let chars = 0,
+					active = 0;
 				Object.entries(manifestData[d.key] || {}).forEach(([n, a]) => {
 					if (n === '_sys' || n === '_system') return;
-					chars  += a.chars || 0;
-					active += a.time  || 0;
+					chars += a.chars || 0;
+					active += a.time || 0;
 				});
-				dayChars[d.key]  = chars;
+				dayChars[d.key] = chars;
 				dayActive[d.key] = active;
 			});
 			const longestRun = (predicate) => {
-				let best = 0, cur = 0, prevTs = null;
+				let best = 0,
+					cur = 0,
+					prevTs = null;
 				allKeys.forEach((d) => {
 					const ok = predicate(d.key);
 					if (ok && (prevTs == null || d.ts - prevTs <= 86400000 + 60000)) cur += 1;
@@ -1580,9 +1732,15 @@ function renderDashboard() {
 			const streakChars = longestRun((k) => (dayChars[k] || 0) >= 1000);
 			const streakFocus = longestRun((k) => (dayActive[k] || 0) >= 30 * 60 * 1000);
 			setText('kpi-streak-chars', `${streakChars} j`);
-			setText('kpi-streak-chars-detail', streakChars > 0 ? _t('ui_apps.kpi_streak_chars') : _t('ui_apps.kpi_never_reached'));
+			setText(
+				'kpi-streak-chars-detail',
+				streakChars > 0 ? _t('ui_apps.kpi_streak_chars') : _t('ui_apps.kpi_never_reached')
+			);
 			setText('kpi-streak-focus', `${streakFocus} j`);
-			setText('kpi-streak-focus-detail', streakFocus > 0 ? _t('ui_apps.kpi_streak_focus') : _t('ui_apps.kpi_never_reached'));
+			setText(
+				'kpi-streak-focus-detail',
+				streakFocus > 0 ? _t('ui_apps.kpi_streak_focus') : _t('ui_apps.kpi_never_reached')
+			);
 		})();
 
 		// ── Objectif quotidien (#60) ──────────────────────────────────────
@@ -1595,7 +1753,7 @@ function renderDashboard() {
 			window._goalStore = window._goalStore || {};
 			let goalMin = window._goalStore.daily_min || 120;
 
-			const todayKey = currentSelectedDate || (Object.keys(manifestData).sort().slice(-1)[0]);
+			const todayKey = currentSelectedDate || Object.keys(manifestData).sort().slice(-1)[0];
 			let todayActiveMs = 0;
 			if (todayKey && manifestData[todayKey]) {
 				Object.entries(manifestData[todayKey]).forEach(([n, a]) => {
@@ -1610,8 +1768,12 @@ function renderDashboard() {
 			setText('kpi-goal-progress', `${todayMin.toFixed(0)} / ${goalMin} min`);
 			const bar = document.getElementById('kpi-goal-bar');
 			if (bar) bar.style.width = `${pct}%`;
-			setText('kpi-goal-detail',
-				pct >= 100 ? _t('ui_apps.goal_reached') : _t('ui_apps.goal_remaining').replace('{pct}', (100 - pct).toFixed(0)));
+			setText(
+				'kpi-goal-detail',
+				pct >= 100
+					? _t('ui_apps.goal_reached')
+					: _t('ui_apps.goal_remaining').replace('{pct}', (100 - pct).toFixed(0))
+			);
 
 			const valEl = document.getElementById('kpi-goal-value');
 			if (valEl && !valEl._bound) {
@@ -1629,58 +1791,77 @@ function renderDashboard() {
 
 		// ── Système & matériel (#13–19) ──────────────────────────────────
 		const sys = r.system || {};
-		const lock_ms  = rt.passive_locked_ms || 0;
-		const sleep_ms = rt.passive_sleep_ms  || 0;
+		const lock_ms = rt.passive_locked_ms || 0;
+		const sleep_ms = rt.passive_sleep_ms || 0;
 		setText('kpi-sys-passive', String(rt.passive_count || 0));
-		setText('kpi-sys-passive-detail',
+		setText(
+			'kpi-sys-passive-detail',
 			(rt.passive_count || 0) > 0
 				? _t('ui_apps.kpi_lock_sleep_cumul').replace('{dur}', formatDuration(lock_ms + sleep_ms))
-				: _t('ui_apps.kpi_no_lock'));
+				: _t('ui_apps.kpi_no_lock')
+		);
 
-		setText('kpi-sys-lock-vs-sleep',
-			(lock_ms + sleep_ms) > 0
-				? `${formatDuration(lock_ms)} / ${formatDuration(sleep_ms)}`
-				: '—');
-		setText('kpi-sys-lock-vs-sleep-detail',
-			(lock_ms + sleep_ms) > 0 ? _t('ui_apps.kpi_lock_vs_sleep') : '');
+		setText(
+			'kpi-sys-lock-vs-sleep',
+			lock_ms + sleep_ms > 0 ? `${formatDuration(lock_ms)} / ${formatDuration(sleep_ms)}` : '—'
+		);
+		setText(
+			'kpi-sys-lock-vs-sleep-detail',
+			lock_ms + sleep_ms > 0 ? _t('ui_apps.kpi_lock_vs_sleep') : ''
+		);
 
 		setText('kpi-sys-wifi', String(sys.wifi_changes || 0));
-		setText('kpi-sys-wifi-detail',
-			(sys.wifi_changes || 0) > 0 ? _t('ui_apps.kpi_wifi_switches') : _t('ui_apps.kpi_no_mobility'));
+		setText(
+			'kpi-sys-wifi-detail',
+			(sys.wifi_changes || 0) > 0 ? _t('ui_apps.kpi_wifi_switches') : _t('ui_apps.kpi_no_mobility')
+		);
 
-		const bat_avg = (sys.battery_count || 0) > 0
-			? Math.round(sys.battery_sum / sys.battery_count) : null;
-		setText('kpi-sys-battery',
-			bat_avg != null ? `${bat_avg}%` : '—');
-		setText('kpi-sys-battery-detail',
-			(sys.battery_min != null)
+		const bat_avg =
+			(sys.battery_count || 0) > 0 ? Math.round(sys.battery_sum / sys.battery_count) : null;
+		setText('kpi-sys-battery', bat_avg != null ? `${bat_avg}%` : '—');
+		setText(
+			'kpi-sys-battery-detail',
+			sys.battery_min != null
 				? `min ${Math.round(sys.battery_min)}% · max ${Math.round(sys.battery_max)}%`
-				: _t('ui_apps.kpi_no_data'));
+				: _t('ui_apps.kpi_no_data')
+		);
 
-		const muted_pct = (rt.focus_ms || 0) > 0
-			? ((sys.audio_muted_ms || 0) / rt.focus_ms) * 100 : 0;
-		setText('kpi-sys-mute',
-			(sys.audio_muted_ms || 0) > 0
-				? formatDuration(sys.audio_muted_ms) : '—');
-		setText('kpi-sys-mute-detail',
+		const muted_pct = (rt.focus_ms || 0) > 0 ? ((sys.audio_muted_ms || 0) / rt.focus_ms) * 100 : 0;
+		setText(
+			'kpi-sys-mute',
+			(sys.audio_muted_ms || 0) > 0 ? formatDuration(sys.audio_muted_ms) : '—'
+		);
+		setText(
+			'kpi-sys-mute-detail',
 			(sys.audio_muted_ms || 0) > 0
 				? _t('ui_apps.kpi_pct_focus_time').replace('{pct}', muted_pct.toFixed(0))
-				: _t('ui_apps.kpi_no_mute'));
+				: _t('ui_apps.kpi_no_mute')
+		);
 
 		setText('kpi-sys-spaces', String(sys.space_switches || 0));
-		setText('kpi-sys-spaces-detail',
-			(sys.space_switches || 0) > 0 ? _t('ui_apps.kpi_space_switches') : '—');
+		setText(
+			'kpi-sys-spaces-detail',
+			(sys.space_switches || 0) > 0 ? _t('ui_apps.kpi_space_switches') : '—'
+		);
 
 		setText('kpi-sys-night', String(sys.night_wake_count || 0));
-		setText('kpi-sys-night-detail',
-			(sys.night_wake_count || 0) > 0 ? _t('ui_apps.kpi_night_wakes') : _t('ui_apps.kpi_sleep_intact'));
+		setText(
+			'kpi-sys-night-detail',
+			(sys.night_wake_count || 0) > 0
+				? _t('ui_apps.kpi_night_wakes')
+				: _t('ui_apps.kpi_sleep_intact')
+		);
 
 		const awakeMs = rt.awake_ms || 0;
 		setText('kpi-sys-awake', awakeMs > 0 ? formatDuration(awakeMs) : '—');
-		setText('kpi-sys-awake-detail',
+		setText(
+			'kpi-sys-awake-detail',
 			awakeMs > 0
-				? (currentCountAwake ? _t('ui_apps.kpi_awake_included') : _t('ui_apps.kpi_awake_excluded'))
-				: _t('ui_apps.kpi_never_active'));
+				? currentCountAwake
+					? _t('ui_apps.kpi_awake_included')
+					: _t('ui_apps.kpi_awake_excluded')
+				: _t('ui_apps.kpi_never_active')
+		);
 
 		// Hour × weekday heatmap (decoupled from the existing day-only timeline)
 		renderHourWeekdayHeatmap(aggData);
@@ -1789,14 +1970,15 @@ function renderDashboard() {
 			const tdSfb = document.createElement('td');
 			tdSfb.style.textAlign = 'right';
 			const _sfbApp = aggData.apps[app.name] || {};
-			tdSfb.textContent = (_sfbApp.same_finger_streak_max || 0) > 0 ? String(_sfbApp.same_finger_streak_max) : '—';
+			tdSfb.textContent =
+				(_sfbApp.same_finger_streak_max || 0) > 0 ? String(_sfbApp.same_finger_streak_max) : '—';
 			tr.appendChild(tdSfb);
 
 			// #52 Modifier hold mean ms for this app
 			const tdHold = document.createElement('td');
 			tdHold.style.textAlign = 'right';
 			const _hSum = _sfbApp.kc_hold_sum_ms || 0;
-			const _hCnt = _sfbApp.kc_hold_count  || 0;
+			const _hCnt = _sfbApp.kc_hold_count || 0;
 			tdHold.textContent = _hCnt > 0 ? `${Math.round(_hSum / _hCnt)} ms` : '—';
 			tr.appendChild(tdHold);
 
@@ -1814,7 +1996,8 @@ function renderDashboard() {
 		if (!banner) {
 			banner = document.createElement('div');
 			banner.id = 'render-error-banner';
-			banner.style.cssText = 'position:fixed;bottom:8px;left:8px;right:8px;z-index:9999;background:rgba(255,69,58,0.95);color:#fff;font:12px/1.4 system-ui;padding:8px 12px;border-radius:6px;white-space:pre-wrap;max-height:160px;overflow:auto;';
+			banner.style.cssText =
+				'position:fixed;bottom:8px;left:8px;right:8px;z-index:9999;background:rgba(255,69,58,0.95);color:#fff;font:12px/1.4 system-ui;padding:8px 12px;border-radius:6px;white-space:pre-wrap;max-height:160px;overflow:auto;';
 			document.body.appendChild(banner);
 		}
 		banner.textContent = `[render error] ${err && err.stack ? err.stack : err}`;
@@ -1847,7 +2030,8 @@ function renderHourWeekdayHeatmap(aggData) {
 
 	// Determine grid bounds — 24 hours × 7 weekdays.
 	const HOURS = Array.from({ length: 24 }, (_, h) => String(h).padStart(2, '0'));
-	const W = 7, H = 24;
+	const W = 7,
+		H = 24;
 
 	// Find max for colour scaling
 	let max_v = 0;
@@ -1855,7 +2039,7 @@ function renderHourWeekdayHeatmap(aggData) {
 		for (let wd = 0; wd < W; wd++) {
 			const cell = grid[`${hh}|${wd}`];
 			if (!cell) continue;
-			const v = mode === 'time' ? (cell.time_ms || 0) : (cell.chars || 0);
+			const v = mode === 'time' ? cell.time_ms || 0 : cell.chars || 0;
 			if (v > max_v) max_v = v;
 		}
 	});
@@ -1865,12 +2049,12 @@ function renderHourWeekdayHeatmap(aggData) {
 		return;
 	}
 
-	const CELL = 24;     // px per cell
+	const CELL = 24; // px per cell
 	const GAP = 2;
 	const LABEL_LEFT = 38;
-	const LABEL_TOP  = 18;
+	const LABEL_TOP = 18;
 	const SVG_W = LABEL_LEFT + W * (CELL + GAP);
-	const SVG_H = LABEL_TOP  + H * (CELL + GAP);
+	const SVG_H = LABEL_TOP + H * (CELL + GAP);
 
 	// Heat: dark blue → orange → red, same palette as the keystroke heatmap.
 	const heat = (v) => {
@@ -1898,11 +2082,9 @@ function renderHourWeekdayHeatmap(aggData) {
 			const cx = LABEL_LEFT + wd * (CELL + GAP);
 			const cy2 = LABEL_TOP + h_idx * (CELL + GAP);
 			const cell = grid[`${hh}|${wd}`];
-			const v = !cell ? 0 : (mode === 'time' ? (cell.time_ms || 0) : (cell.chars || 0));
+			const v = !cell ? 0 : mode === 'time' ? cell.time_ms || 0 : cell.chars || 0;
 			const fill = heat(v);
-			const tip_v = mode === 'time'
-				? (v > 0 ? formatDuration(v) : '0')
-				: (v > 0 ? `${v} car.` : '0');
+			const tip_v = mode === 'time' ? (v > 0 ? formatDuration(v) : '0') : v > 0 ? `${v} car.` : '0';
 			const tip = `${WEEKDAY_LABELS_FR[wd]} ${hh}h — ${tip_v}`;
 			cells += `<rect x="${cx}" y="${cy2}" width="${CELL}" height="${CELL}" rx="3" fill="${fill}"><title>${tip}</title></rect>`;
 		}
@@ -1910,7 +2092,9 @@ function renderHourWeekdayHeatmap(aggData) {
 
 	container.innerHTML =
 		`<svg width="${SVG_W}" height="${SVG_H}" viewBox="0 0 ${SVG_W} ${SVG_H}" xmlns="http://www.w3.org/2000/svg">` +
-			labels_x + labels_y + cells +
+		labels_x +
+		labels_y +
+		cells +
 		`</svg>`;
 }
 
@@ -1921,7 +2105,7 @@ function renderHourWeekdayHeatmap(aggData) {
  */
 function renderRibbon(aggData) {
 	const container = document.getElementById('ribbon_container');
-	const legend    = document.getElementById('ribbon_legend');
+	const legend = document.getElementById('ribbon_legend');
 	if (!container) return;
 
 	const ribbon = (aggData && aggData.rich && aggData.rich.ribbon) || {};
@@ -1932,14 +2116,14 @@ function renderRibbon(aggData) {
 		return;
 	}
 
-	const HOURS      = Array.from({ length: 24 }, (_, h) => String(h).padStart(2, '0'));
-	const CELL_W     = 22;
-	const CELL_H     = 22;
-	const ROW_GAP    = 4;
+	const HOURS = Array.from({ length: 24 }, (_, h) => String(h).padStart(2, '0'));
+	const CELL_W = 22;
+	const CELL_H = 22;
+	const ROW_GAP = 4;
 	const LABEL_LEFT = 92;
-	const LABEL_TOP  = 16;
+	const LABEL_TOP = 16;
 	const SVG_W = LABEL_LEFT + 24 * CELL_W + 8;
-	const SVG_H = LABEL_TOP  + days.length * (CELL_H + ROW_GAP) + 4;
+	const SVG_H = LABEL_TOP + days.length * (CELL_H + ROW_GAP) + 4;
 
 	const cats_seen = new Set();
 
@@ -1957,7 +2141,7 @@ function renderRibbon(aggData) {
 		const y = LABEL_TOP + rowIdx * (CELL_H + ROW_GAP);
 		// Day label (e.g. "Lun 04/05")
 		const ts = parseDateKey(dateStr);
-		const dow = ((new Date(ts).getDay() + 6) % 7);
+		const dow = (new Date(ts).getDay() + 6) % 7;
 		const dd = String(new Date(ts).getDate()).padStart(2, '0');
 		const mm = String(new Date(ts).getMonth() + 1).padStart(2, '0');
 		const label = `${WEEKDAY_LABELS_FR[dow]} ${dd}/${mm}`;
@@ -1966,10 +2150,15 @@ function renderRibbon(aggData) {
 		HOURS.forEach((hh, hi) => {
 			const x = LABEL_LEFT + hi * CELL_W;
 			const cellCats = ribDay[hh] || {};
-			let topCat = null, topMs = 0, totalMs = 0;
+			let topCat = null,
+				topMs = 0,
+				totalMs = 0;
 			Object.entries(cellCats).forEach(([c, ms]) => {
 				totalMs += ms;
-				if (ms > topMs) { topMs = ms; topCat = c; }
+				if (ms > topMs) {
+					topMs = ms;
+					topCat = c;
+				}
 			});
 			const fill = topCat ? getCategoryColor(topCat, 0) : '#1e1e2e';
 			if (topCat) cats_seen.add(topCat);
@@ -1984,14 +2173,18 @@ function renderRibbon(aggData) {
 
 	container.innerHTML =
 		`<svg width="${SVG_W}" height="${SVG_H}" viewBox="0 0 ${SVG_W} ${SVG_H}" xmlns="http://www.w3.org/2000/svg">` +
-			header + rows +
+		header +
+		rows +
 		`</svg>`;
 
 	if (legend) {
-		legend.innerHTML = [...cats_seen].sort().map((c) => {
-			const col = getCategoryColor(c, 0);
-			return `<span style="display:inline-flex;align-items:center;gap:5px;"><span style="width:12px;height:12px;border-radius:3px;background:${col};"></span>${escapeHtml(c)}</span>`;
-		}).join('');
+		legend.innerHTML = [...cats_seen]
+			.sort()
+			.map((c) => {
+				const col = getCategoryColor(c, 0);
+				return `<span style="display:inline-flex;align-items:center;gap:5px;"><span style="width:12px;height:12px;border-radius:3px;background:${col};"></span>${escapeHtml(c)}</span>`;
+			})
+			.join('');
 	}
 }
 
@@ -2019,9 +2212,9 @@ function renderSankey(aggData) {
 	}
 
 	// Collect unique apps on left and right
-	const leftSet  = new Set(TOP_EDGES.map((e) => e.src));
+	const leftSet = new Set(TOP_EDGES.map((e) => e.src));
 	const rightSet = new Set(TOP_EDGES.map((e) => e.dst));
-	const leftApps  = [...leftSet].sort((a, b) => {
+	const leftApps = [...leftSet].sort((a, b) => {
 		const sa = TOP_EDGES.filter((e) => e.src === a).reduce((s, e) => s + e.count, 0);
 		const sb = TOP_EDGES.filter((e) => e.src === b).reduce((s, e) => s + e.count, 0);
 		return sb - sa;
@@ -2033,17 +2226,17 @@ function renderSankey(aggData) {
 	});
 
 	const NODE_W = 12;
-	const ROW_H  = 32;
+	const ROW_H = 32;
 	const PAD_TOP = 12;
 	const W = 720;
-	const LEFT_X  = 200;
+	const LEFT_X = 200;
 	const RIGHT_X = W - 200;
 	const H = PAD_TOP * 2 + Math.max(leftApps.length, rightApps.length) * ROW_H;
 
 	// Y for each app on each side
-	const leftY  = {};
+	const leftY = {};
 	const rightY = {};
-	leftApps.forEach((n, i)  => (leftY[n]  = PAD_TOP + i * ROW_H + ROW_H / 2));
+	leftApps.forEach((n, i) => (leftY[n] = PAD_TOP + i * ROW_H + ROW_H / 2));
 	rightApps.forEach((n, i) => (rightY[n] = PAD_TOP + i * ROW_H + ROW_H / 2));
 
 	const max_count = TOP_EDGES[0].count;
@@ -2130,18 +2323,21 @@ function renderDayTimeline() {
 		});
 	});
 
-	const ROW_H      = 18;
-	const GAP        = 3;
+	const ROW_H = 18;
+	const GAP = 3;
 	const LABEL_LEFT = 38;
-	const HOUR_W     = 720;
-	const SVG_W      = LABEL_LEFT + HOUR_W + 8;
-	const SVG_H      = 24 * (ROW_H + GAP) + 8;
+	const HOUR_W = 720;
+	const SVG_W = LABEL_LEFT + HOUR_W + 8;
+	const SVG_H = 24 * (ROW_H + GAP) + 8;
 
 	let svg = '';
 	for (let h = 0; h < 24; h++) {
-		const hh    = String(h).padStart(2, '0');
+		const hh = String(h).padStart(2, '0');
 		const slots = byHour[hh] || [];
-		const totalMs = Math.min(slots.reduce((s, x) => s + x.ms, 0), 60 * 60 * 1000);
+		const totalMs = Math.min(
+			slots.reduce((s, x) => s + x.ms, 0),
+			60 * 60 * 1000
+		);
 		const y = h * (ROW_H + GAP);
 		svg += `<text x="${LABEL_LEFT - 6}" y="${y + ROW_H / 2 + 4}" text-anchor="end" fill="#888" font-size="10" font-family="system-ui">${hh}h</text>`;
 		// Background
@@ -2168,24 +2364,28 @@ function renderDayTimeline() {
  * sessions, productivity_pct} for the given aggregateData payload.
  */
 function summarizeAggregate(agg) {
-	const r  = agg && agg.rich || {};
-	const t  = r.time   || {};
+	const r = (agg && agg.rich) || {};
+	const t = r.time || {};
 	const ty = r.typing || {};
-	const sw = Object.values(agg.apps || {}).reduce((s, a) => s + Object.values(a.switches || {}).reduce((s2, n) => s2 + n, 0), 0);
-	let prodSum = 0, prodWt = 0;
+	const sw = Object.values(agg.apps || {}).reduce(
+		(s, a) => s + Object.values(a.switches || {}).reduce((s2, n) => s2 + n, 0),
+		0
+	);
+	let prodSum = 0,
+		prodWt = 0;
 	Object.entries(agg.apps || {}).forEach(([n, a]) => {
 		const cat = getAppCategory(n, a.category);
 		prodSum += (cat.score || 0) * (a.time_ms || 0);
-		prodWt  += (a.time_ms || 0);
+		prodWt += a.time_ms || 0;
 	});
 	const prod = prodWt > 0 ? (prodSum / (prodWt * 2)) * 100 : 0;
 	return {
-		focus_ms:  t.focus_ms   || 0,
-		active_ms: t.active_ms  || 0,
-		chars:     ty.chars     || 0,
-		switches:  sw,
-		sessions:  (r.sessions && r.sessions.count) || 0,
-		productivity_pct: prod,
+		focus_ms: t.focus_ms || 0,
+		active_ms: t.active_ms || 0,
+		chars: ty.chars || 0,
+		switches: sw,
+		sessions: (r.sessions && r.sessions.count) || 0,
+		productivity_pct: prod
 	};
 }
 
@@ -2212,29 +2412,33 @@ function renderComparator(currentAgg) {
 		return;
 	}
 
-	const anchorTs   = parseDateKey(currentSelectedDate);
+	const anchorTs = parseDateKey(currentSelectedDate);
 	const prevAnchor = new Date(anchorTs - days * 86400000);
-	const yyyy       = prevAnchor.getFullYear();
-	const mm         = String(prevAnchor.getMonth() + 1).padStart(2, '0');
-	const dd         = String(prevAnchor.getDate()).padStart(2, '0');
-	const prevKey    = `${yyyy}-${mm}-${dd}`;
+	const yyyy = prevAnchor.getFullYear();
+	const mm = String(prevAnchor.getMonth() + 1).padStart(2, '0');
+	const dd = String(prevAnchor.getDate()).padStart(2, '0');
+	const prevKey = `${yyyy}-${mm}-${dd}`;
 
 	const savedDate = currentSelectedDate;
 	currentSelectedDate = prevKey;
 	const prevAgg = getAggregatedData();
 	currentSelectedDate = savedDate;
 
-	const cur  = summarizeAggregate(currentAgg);
+	const cur = summarizeAggregate(currentAgg);
 	const prev = summarizeAggregate(prevAgg);
 
 	const win = document.getElementById('compare-window');
-	if (win) win.textContent = _t('ui_apps.cmp_window').replace('{cur}', formatDisplayDate(currentSelectedDate)).replace('{period}', currentPeriod).replace('{prev}', formatDisplayDate(prevKey));
+	if (win)
+		win.textContent = _t('ui_apps.cmp_window')
+			.replace('{cur}', formatDisplayDate(currentSelectedDate))
+			.replace('{period}', currentPeriod)
+			.replace('{prev}', formatDisplayDate(prevKey));
 
 	const rows = document.getElementById('compare-rows');
 	if (!rows) return;
 	const fmtDelta = (curV, prevV, fmt) => {
 		const d = curV - prevV;
-		const pct = prevV > 0 ? (d / prevV) * 100 : (curV > 0 ? 100 : 0);
+		const pct = prevV > 0 ? (d / prevV) * 100 : curV > 0 ? 100 : 0;
 		const sign = d >= 0 ? '+' : '−';
 		const colour = d > 0 ? '#30D158' : d < 0 ? '#FF453A' : '#888';
 		return `<div style="font-size:18px;color:#fff;font-weight:600;">${fmt(curV)}</div>
@@ -2247,12 +2451,30 @@ function renderComparator(currentAgg) {
 		</div>`;
 
 	rows.innerHTML =
-		card(_t('ui_apps.cmp_focus_time'),    fmtDelta(cur.focus_ms,         prev.focus_ms,         (v) => formatDuration(v))) +
-		card(_t('ui_apps.cmp_active_time'),    fmtDelta(cur.active_ms,        prev.active_ms,        (v) => formatDuration(v))) +
-		card(_t('ui_apps.cmp_chars'),     fmtDelta(cur.chars,            prev.chars,            (v) => format_int(Math.round(v)))) +
-		card(_t('ui_apps.cmp_switches'),       fmtDelta(cur.switches,         prev.switches,         (v) => format_int(Math.round(v)))) +
-		card(_t('ui_apps.cmp_sessions'),        fmtDelta(cur.sessions,         prev.sessions,         (v) => format_int(Math.round(v)))) +
-		card(_t('ui_apps.cmp_productivity'),   fmtDelta(cur.productivity_pct, prev.productivity_pct, (v) => `${v.toFixed(0)}%`));
+		card(
+			_t('ui_apps.cmp_focus_time'),
+			fmtDelta(cur.focus_ms, prev.focus_ms, (v) => formatDuration(v))
+		) +
+		card(
+			_t('ui_apps.cmp_active_time'),
+			fmtDelta(cur.active_ms, prev.active_ms, (v) => formatDuration(v))
+		) +
+		card(
+			_t('ui_apps.cmp_chars'),
+			fmtDelta(cur.chars, prev.chars, (v) => format_int(Math.round(v)))
+		) +
+		card(
+			_t('ui_apps.cmp_switches'),
+			fmtDelta(cur.switches, prev.switches, (v) => format_int(Math.round(v)))
+		) +
+		card(
+			_t('ui_apps.cmp_sessions'),
+			fmtDelta(cur.sessions, prev.sessions, (v) => format_int(Math.round(v)))
+		) +
+		card(
+			_t('ui_apps.cmp_productivity'),
+			fmtDelta(cur.productivity_pct, prev.productivity_pct, (v) => `${v.toFixed(0)}%`)
+		);
 }
 
 /**
@@ -2272,17 +2494,20 @@ function renderSessionBoxplots(aggData) {
 	};
 	const rows = [];
 	Object.entries(aggData.apps || {}).forEach(([name, data]) => {
-		const arr = (data.session_durations || []).filter((d) => d > 0).slice().sort((a, b) => a - b);
+		const arr = (data.session_durations || [])
+			.filter((d) => d > 0)
+			.slice()
+			.sort((a, b) => a - b);
 		if (arr.length >= 4) {
 			rows.push({
 				name,
 				time_ms: data.time_ms || 0,
-				min:    arr[0],
-				q1:     quantile(arr, 0.25),
-				med:    quantile(arr, 0.5),
-				q3:     quantile(arr, 0.75),
-				max:    arr[arr.length - 1],
-				count:  arr.length,
+				min: arr[0],
+				q1: quantile(arr, 0.25),
+				med: quantile(arr, 0.5),
+				q3: quantile(arr, 0.75),
+				max: arr[arr.length - 1],
+				count: arr.length
 			});
 		}
 	});
@@ -2293,11 +2518,11 @@ function renderSessionBoxplots(aggData) {
 		return;
 	}
 	const max_ms = Math.max(...top.map((r) => r.max));
-	const ROW_H      = 36;
+	const ROW_H = 36;
 	const LABEL_LEFT = 160;
-	const W          = 760;
-	const TRACK_W    = W - LABEL_LEFT - 60;
-	const SVG_H      = top.length * ROW_H + 16;
+	const W = 760;
+	const TRACK_W = W - LABEL_LEFT - 60;
+	const SVG_H = top.length * ROW_H + 16;
 	const xFor = (ms) => LABEL_LEFT + (ms / max_ms) * TRACK_W;
 
 	let svg = '';
@@ -2312,7 +2537,8 @@ function renderSessionBoxplots(aggData) {
 		svg += `<line x1="${xFor(r.max)}" x2="${xFor(r.max)}" y1="${y - 6}" y2="${y + 6}" stroke="#aaa"/>`;
 		// IQR box
 		const col = getAppColor(r.name, 0);
-		const x1 = xFor(r.q1), x2 = xFor(r.q3);
+		const x1 = xFor(r.q1),
+			x2 = xFor(r.q3);
 		svg += `<rect x="${x1}" y="${y - 10}" width="${Math.max(2, x2 - x1)}" height="20" rx="3" fill="${col}" fill-opacity="0.6"/>`;
 		// Median tick
 		svg += `<line x1="${xFor(r.med)}" x2="${xFor(r.med)}" y1="${y - 12}" y2="${y + 12}" stroke="#fff" stroke-width="2"/>`;
@@ -2343,12 +2569,17 @@ function renderTopWindowsTable(aggData) {
 		tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--text-muted);">${_t('ui_apps.empty_windows')}</td></tr>`;
 		return;
 	}
-	tbody.innerHTML = rows.slice(0, 30).map((r) => `<tr>
+	tbody.innerHTML = rows
+		.slice(0, 30)
+		.map(
+			(r) => `<tr>
 		<td style="max-width:480px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHtml(r.title)}">${escapeHtml(r.title)}</td>
 		<td>${escapeHtml(r.app)}</td>
 		<td style="text-align:right;">${format_int(r.c)}</td>
 		<td style="text-align:right;">${formatDuration(r.ms)}</td>
-	</tr>`).join('');
+	</tr>`
+		)
+		.join('');
 }
 
 /**
@@ -2365,10 +2596,10 @@ function renderTopSessionsTable() {
 			const longest = Number(appData.session_longest_ms) || 0;
 			if (longest > 0) {
 				rows.push({
-					date:  dateStr,
-					app:   appName,
-					ms:    longest,
-					chars: Number(appData.session_longest_chars) || 0,
+					date: dateStr,
+					app: appName,
+					ms: longest,
+					chars: Number(appData.session_longest_chars) || 0
 				});
 			}
 		});
@@ -2379,12 +2610,16 @@ function renderTopSessionsTable() {
 		tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--text-muted);">${_t('ui_apps.empty_sessions')}</td></tr>`;
 		return;
 	}
-	tbody.innerHTML = top.map((r) => `<tr>
+	tbody.innerHTML = top
+		.map(
+			(r) => `<tr>
 		<td>${formatDisplayDate(r.date)}</td>
 		<td>${escapeHtml(r.app)}</td>
 		<td style="text-align:right;">${formatDuration(r.ms)}</td>
 		<td style="text-align:right;">${format_int(r.chars)}</td>
-	</tr>`).join('');
+	</tr>`
+		)
+		.join('');
 }
 
 /**
@@ -2402,13 +2637,17 @@ function renderTopDaysTable(aggData) {
 		tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--text-muted);">${_t('ui_apps.empty_days')}</td></tr>`;
 		return;
 	}
-	tbody.innerHTML = days.map((d) => `<tr>
+	tbody.innerHTML = days
+		.map(
+			(d) => `<tr>
 		<td>${formatDisplayDate(d.date)}</td>
 		<td style="text-align:right;">${format_int(d.chars || 0)}</td>
 		<td style="text-align:right;">${formatDuration(d.time_ms || 0)}</td>
 		<td style="text-align:right;">${d.switches || 0}</td>
 		<td style="text-align:right;">${d.sessions || 0}</td>
-	</tr>`).join('');
+	</tr>`
+		)
+		.join('');
 }
 
 /**
@@ -2430,15 +2669,17 @@ function renderAppPairsTable(aggData) {
 		return;
 	}
 	const top = edges.slice(0, 30);
-	tbody.innerHTML = top.map((e) => {
-		const pct = total > 0 ? (e.count / total) * 100 : 0;
-		return `<tr>
+	tbody.innerHTML = top
+		.map((e) => {
+			const pct = total > 0 ? (e.count / total) * 100 : 0;
+			return `<tr>
 			<td>${escapeHtml(e.src)}</td>
 			<td>${escapeHtml(e.dst)}</td>
 			<td style="text-align:right;">${e.count}</td>
 			<td style="text-align:right;color:var(--text-muted);">${pct.toFixed(1)} %</td>
 		</tr>`;
-	}).join('');
+		})
+		.join('');
 }
 
 /**
@@ -2451,7 +2692,7 @@ function renderAppPairsTable(aggData) {
 function renderDailyTrajectories(aggData) {
 	if (typeof Chart === 'undefined') return;
 	const byDate = (aggData.rich && aggData.rich.by_date) || {};
-	const dates  = Object.keys(byDate).sort();
+	const dates = Object.keys(byDate).sort();
 	const labels = dates.map(formatDisplayDate);
 
 	// #29 — focus_ms (h), chars, switches
@@ -2463,18 +2704,53 @@ function renderDailyTrajectories(aggData) {
 			data: {
 				labels,
 				datasets: [
-					{ label: _t('ui_apps.ds_focus_h'),    data: dates.map((d) => +(byDate[d].time_ms / 3600000).toFixed(2)),  borderColor: '#0A84FF', backgroundColor: 'rgba(10,132,255,0.15)', tension: 0.25, yAxisID: 'y1', borderWidth: 2 },
-					{ label: _t('ui_apps.ds_chars'),   data: dates.map((d) => byDate[d].chars || 0),                      borderColor: '#FF9F0A', backgroundColor: 'rgba(255,159,10,0.10)', tension: 0.25, yAxisID: 'y2', borderWidth: 2 },
-					{ label: _t('ui_apps.ds_switches'),     data: dates.map((d) => byDate[d].switches || 0),                   borderColor: '#BF5AF2', backgroundColor: 'rgba(191,90,242,0.10)', tension: 0.25, yAxisID: 'y2', borderWidth: 2 },
+					{
+						label: _t('ui_apps.ds_focus_h'),
+						data: dates.map((d) => +(byDate[d].time_ms / 3600000).toFixed(2)),
+						borderColor: '#0A84FF',
+						backgroundColor: 'rgba(10,132,255,0.15)',
+						tension: 0.25,
+						yAxisID: 'y1',
+						borderWidth: 2
+					},
+					{
+						label: _t('ui_apps.ds_chars'),
+						data: dates.map((d) => byDate[d].chars || 0),
+						borderColor: '#FF9F0A',
+						backgroundColor: 'rgba(255,159,10,0.10)',
+						tension: 0.25,
+						yAxisID: 'y2',
+						borderWidth: 2
+					},
+					{
+						label: _t('ui_apps.ds_switches'),
+						data: dates.map((d) => byDate[d].switches || 0),
+						borderColor: '#BF5AF2',
+						backgroundColor: 'rgba(191,90,242,0.10)',
+						tension: 0.25,
+						yAxisID: 'y2',
+						borderWidth: 2
+					}
 				]
 			},
 			options: {
-				responsive: true, maintainAspectRatio: false,
+				responsive: true,
+				maintainAspectRatio: false,
 				plugins: { legend: { labels: { color: '#ccc' } } },
 				scales: {
-					x:  { grid: { display: false }, ticks: { color: '#888' } },
-					y1: { position: 'left',  beginAtZero: true, grid: { color: 'rgba(255,255,255,0.08)' }, ticks: { color: '#0A84FF' } },
-					y2: { position: 'right', beginAtZero: true, grid: { drawOnChartArea: false }, ticks: { color: '#FF9F0A' } }
+					x: { grid: { display: false }, ticks: { color: '#888' } },
+					y1: {
+						position: 'left',
+						beginAtZero: true,
+						grid: { color: 'rgba(255,255,255,0.08)' },
+						ticks: { color: '#0A84FF' }
+					},
+					y2: {
+						position: 'right',
+						beginAtZero: true,
+						grid: { drawOnChartArea: false },
+						ticks: { color: '#FF9F0A' }
+					}
 				}
 			}
 		});
@@ -2487,17 +2763,33 @@ function renderDailyTrajectories(aggData) {
 			const eff = Math.max(0, (byDate[d].time_ms || 0) - (byDate[d].passive_ms || 0));
 			return eff > 0 ? +(((byDate[d].active_ms || 0) / eff) * 100).toFixed(1) : 0;
 		});
-		const colors = ratios.map((r) => r >= 60 ? '#30D158' : r >= 30 ? '#FFD60A' : '#FF453A');
+		const colors = ratios.map((r) => (r >= 60 ? '#30D158' : r >= 30 ? '#FFD60A' : '#FF453A'));
 		if (dailyActiveRatioChart) dailyActiveRatioChart.destroy();
 		dailyActiveRatioChart = new Chart(c30.getContext('2d'), {
 			type: 'bar',
-			data: { labels, datasets: [{ label: _t('ui_apps.ds_active_ratio'), data: ratios, backgroundColor: colors, borderRadius: 4 }] },
+			data: {
+				labels,
+				datasets: [
+					{
+						label: _t('ui_apps.ds_active_ratio'),
+						data: ratios,
+						backgroundColor: colors,
+						borderRadius: 4
+					}
+				]
+			},
 			options: {
-				responsive: true, maintainAspectRatio: false,
+				responsive: true,
+				maintainAspectRatio: false,
 				plugins: { legend: { display: false } },
 				scales: {
 					x: { grid: { display: false }, ticks: { color: '#888' } },
-					y: { beginAtZero: true, max: 100, grid: { color: 'rgba(255,255,255,0.08)' }, ticks: { color: '#ccc', callback: (v) => `${v}%` } }
+					y: {
+						beginAtZero: true,
+						max: 100,
+						grid: { color: 'rgba(255,255,255,0.08)' },
+						ticks: { color: '#ccc', callback: (v) => `${v}%` }
+					}
 				}
 			}
 		});
@@ -2513,21 +2805,27 @@ function renderDailyTrajectories(aggData) {
 			label: cat,
 			data: dates.map((d) => +(((byDate[d].by_category || {})[cat] || 0) / 3600000).toFixed(2)),
 			backgroundColor: getCategoryColor(cat, 0),
-			borderColor:     getCategoryColor(cat, 0),
+			borderColor: getCategoryColor(cat, 0),
 			fill: true,
 			tension: 0.25,
-			borderWidth: 1,
+			borderWidth: 1
 		}));
 		if (dailyCategoriesChart) dailyCategoriesChart.destroy();
 		dailyCategoriesChart = new Chart(c31.getContext('2d'), {
 			type: 'line',
 			data: { labels, datasets },
 			options: {
-				responsive: true, maintainAspectRatio: false,
+				responsive: true,
+				maintainAspectRatio: false,
 				plugins: { legend: { labels: { color: '#ccc' } } },
 				scales: {
 					x: { grid: { display: false }, ticks: { color: '#888' }, stacked: true },
-					y: { stacked: true, beginAtZero: true, grid: { color: 'rgba(255,255,255,0.08)' }, ticks: { color: '#ccc', callback: (v) => `${v}h` } }
+					y: {
+						stacked: true,
+						beginAtZero: true,
+						grid: { color: 'rgba(255,255,255,0.08)' },
+						ticks: { color: '#ccc', callback: (v) => `${v}h` }
+					}
 				}
 			}
 		});
@@ -2536,31 +2834,55 @@ function renderDailyTrajectories(aggData) {
 	// #32 — first / last typed minute per day, plotted as decimal hours
 	const c32 = document.getElementById('daily_bounds_chart');
 	if (c32) {
-		const firstHrs = dates.map((d) => byDate[d].first_min != null ? +(byDate[d].first_min / 60).toFixed(2) : null);
-		const lastHrs  = dates.map((d) => byDate[d].last_min  != null ? +(byDate[d].last_min  / 60).toFixed(2) : null);
+		const firstHrs = dates.map((d) =>
+			byDate[d].first_min != null ? +(byDate[d].first_min / 60).toFixed(2) : null
+		);
+		const lastHrs = dates.map((d) =>
+			byDate[d].last_min != null ? +(byDate[d].last_min / 60).toFixed(2) : null
+		);
 		if (dailyBoundsChart) dailyBoundsChart.destroy();
 		dailyBoundsChart = new Chart(c32.getContext('2d'), {
 			type: 'line',
 			data: {
 				labels,
 				datasets: [
-					{ label: _t('ui_apps.ds_first_key'), data: firstHrs, borderColor: '#0A84FF', backgroundColor: 'rgba(10,132,255,0.10)', tension: 0.25, borderWidth: 2, spanGaps: true },
-					{ label: _t('ui_apps.ds_last_key'), data: lastHrs,  borderColor: '#FF453A', backgroundColor: 'rgba(255,69,58,0.10)',  tension: 0.25, borderWidth: 2, spanGaps: true },
+					{
+						label: _t('ui_apps.ds_first_key'),
+						data: firstHrs,
+						borderColor: '#0A84FF',
+						backgroundColor: 'rgba(10,132,255,0.10)',
+						tension: 0.25,
+						borderWidth: 2,
+						spanGaps: true
+					},
+					{
+						label: _t('ui_apps.ds_last_key'),
+						data: lastHrs,
+						borderColor: '#FF453A',
+						backgroundColor: 'rgba(255,69,58,0.10)',
+						tension: 0.25,
+						borderWidth: 2,
+						spanGaps: true
+					}
 				]
 			},
 			options: {
-				responsive: true, maintainAspectRatio: false,
+				responsive: true,
+				maintainAspectRatio: false,
 				plugins: { legend: { labels: { color: '#ccc' } } },
 				scales: {
 					x: { grid: { display: false }, ticks: { color: '#888' } },
-					y: { min: 0, max: 24, grid: { color: 'rgba(255,255,255,0.08)' }, ticks: { color: '#ccc', stepSize: 4, callback: (v) => `${v}h` } }
+					y: {
+						min: 0,
+						max: 24,
+						grid: { color: 'rgba(255,255,255,0.08)' },
+						ticks: { color: '#ccc', stepSize: 4, callback: (v) => `${v}h` }
+					}
 				}
 			}
 		});
 	}
 }
-
-
 
 /**
  * Renders a radar chart of the top 8 apps with two normalized series:
@@ -2572,23 +2894,38 @@ function renderRadialTop8(appsArray) {
 	if (!canvas || typeof Chart === 'undefined') return;
 	const top = appsArray.slice(0, 8);
 	if (top.length === 0) {
-		if (radialTop8Chart) { radialTop8Chart.destroy(); radialTop8Chart = null; }
+		if (radialTop8Chart) {
+			radialTop8Chart.destroy();
+			radialTop8Chart = null;
+		}
 		return;
 	}
-	const max_time  = Math.max(...top.map((a) => a.timeMs || 0)) || 1;
-	const max_chars = Math.max(...top.map((a) => a.chars  || 0)) || 1;
+	const max_time = Math.max(...top.map((a) => a.timeMs || 0)) || 1;
+	const max_chars = Math.max(...top.map((a) => a.chars || 0)) || 1;
 	const labels = top.map((a) => a.name);
-	const time_norm  = top.map((a) => Math.round(((a.timeMs || 0) / max_time)  * 100));
-	const chars_norm = top.map((a) => Math.round(((a.chars  || 0) / max_chars) * 100));
+	const time_norm = top.map((a) => Math.round(((a.timeMs || 0) / max_time) * 100));
+	const chars_norm = top.map((a) => Math.round(((a.chars || 0) / max_chars) * 100));
 	if (radialTop8Chart) radialTop8Chart.destroy();
 	radialTop8Chart = new Chart(canvas.getContext('2d'), {
 		type: 'radar',
 		data: {
 			labels,
 			datasets: [
-				{ label: _t('ui_apps.ds_focus_time'), data: time_norm,  borderColor: '#0A84FF', backgroundColor: 'rgba(10,132,255,0.18)', borderWidth: 2 },
-				{ label: _t('ui_apps.ds_chars'),  data: chars_norm, borderColor: '#FF9F0A', backgroundColor: 'rgba(255,159,10,0.18)', borderWidth: 2 },
-			],
+				{
+					label: _t('ui_apps.ds_focus_time'),
+					data: time_norm,
+					borderColor: '#0A84FF',
+					backgroundColor: 'rgba(10,132,255,0.18)',
+					borderWidth: 2
+				},
+				{
+					label: _t('ui_apps.ds_chars'),
+					data: chars_norm,
+					borderColor: '#FF9F0A',
+					backgroundColor: 'rgba(255,159,10,0.18)',
+					borderWidth: 2
+				}
+			]
 		},
 		options: {
 			responsive: true,
@@ -2596,11 +2933,12 @@ function renderRadialTop8(appsArray) {
 			plugins: { legend: { labels: { color: '#ccc' } } },
 			scales: {
 				r: {
-					suggestedMin: 0, suggestedMax: 100,
-					grid:       { color: 'rgba(255,255,255,0.08)' },
+					suggestedMin: 0,
+					suggestedMax: 100,
+					grid: { color: 'rgba(255,255,255,0.08)' },
 					angleLines: { color: 'rgba(255,255,255,0.08)' },
-					pointLabels:{ color: '#ddd', font: { size: 11 } },
-					ticks:      { color: '#888', backdropColor: 'transparent', stepSize: 25 }
+					pointLabels: { color: '#ddd', font: { size: 11 } },
+					ticks: { color: '#888', backdropColor: 'transparent', stepSize: 25 }
 				}
 			}
 		}
@@ -2617,7 +2955,7 @@ function renderBurstHistogram(aggData) {
 	const buckets = (aggData.rich && aggData.rich.bursts && aggData.rich.bursts.length_buckets) || {};
 	const ORDER = ['1', '5', '10', '20', '50', '100', '200', '500', '500+'];
 	const labels = [];
-	const data   = [];
+	const data = [];
 	ORDER.forEach((k) => {
 		if (buckets[k] != null) {
 			labels.push(`≤ ${k}`);
@@ -2625,19 +2963,31 @@ function renderBurstHistogram(aggData) {
 		}
 	});
 	if (labels.length === 0) {
-		if (burstHistogramChart) { burstHistogramChart.destroy(); burstHistogramChart = null; }
+		if (burstHistogramChart) {
+			burstHistogramChart.destroy();
+			burstHistogramChart = null;
+		}
 		return;
 	}
 	if (burstHistogramChart) burstHistogramChart.destroy();
 	burstHistogramChart = new Chart(canvas.getContext('2d'), {
 		type: 'bar',
-		data: { labels, datasets: [{ label: _t('ui_apps.ds_bursts'), data, backgroundColor: '#30D158', borderRadius: 4 }] },
+		data: {
+			labels,
+			datasets: [
+				{ label: _t('ui_apps.ds_bursts'), data, backgroundColor: '#30D158', borderRadius: 4 }
+			]
+		},
 		options: {
 			responsive: true,
 			maintainAspectRatio: false,
 			plugins: { legend: { display: false } },
 			scales: {
-				y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.1)' }, ticks: { color: '#ccc' } },
+				y: {
+					beginAtZero: true,
+					grid: { color: 'rgba(255,255,255,0.1)' },
+					ticks: { color: '#ccc' }
+				},
 				x: { grid: { display: false }, ticks: { color: '#ccc' } }
 			}
 		}
@@ -2646,7 +2996,7 @@ function renderBurstHistogram(aggData) {
 
 /** Toggle button handler for the hour×weekday heatmap mode. */
 window.setHourWeekdayMode = function (mode) {
-	_hourWeekdayMode = (mode === 'time') ? 'time' : 'chars';
+	_hourWeekdayMode = mode === 'time' ? 'time' : 'chars';
 	const btn_t = document.getElementById('hwk-mode-time');
 	const btn_c = document.getElementById('hwk-mode-chars');
 	if (btn_t) btn_t.classList.toggle('active', _hourWeekdayMode === 'time');
@@ -2662,7 +3012,20 @@ window.setHourWeekdayMode = function (mode) {
 
 let _calendarMode = 'chars';
 
-const MONTHS_FR_SHORT = ['Jan','Fév','Mar','Avr','Mai','Juin','Juil','Août','Sep','Oct','Nov','Déc'];
+const MONTHS_FR_SHORT = [
+	'Jan',
+	'Fév',
+	'Mar',
+	'Avr',
+	'Mai',
+	'Juin',
+	'Juil',
+	'Août',
+	'Sep',
+	'Oct',
+	'Nov',
+	'Déc'
+];
 
 /**
  * Renders a GitHub-style 53-week × 7-day calendar covering the last 365
@@ -2688,7 +3051,7 @@ function renderActivityCalendar() {
 		Object.entries(day).forEach(([app_name, app_data]) => {
 			if (app_name === '_sys' || app_name === '_system') return;
 			slot.time_ms += Number(app_data.app_time_ms) || 0;
-			slot.chars   += Number(app_data.chars)       || 0;
+			slot.chars += Number(app_data.chars) || 0;
 		});
 	});
 
@@ -2704,24 +3067,24 @@ function renderActivityCalendar() {
 	let max_v = 0;
 	while (cursor < end) {
 		const yyyy = cursor.getFullYear();
-		const mm   = String(cursor.getMonth() + 1).padStart(2, '0');
-		const dd   = String(cursor.getDate()).padStart(2, '0');
-		const key  = `${yyyy}-${mm}-${dd}`;
-		const day  = per_day[key];
-		const v = !day ? 0
-			: (_calendarMode === 'time' ? (day.time_ms || 0) : (day.chars || 0));
+		const mm = String(cursor.getMonth() + 1).padStart(2, '0');
+		const dd = String(cursor.getDate()).padStart(2, '0');
+		const key = `${yyyy}-${mm}-${dd}`;
+		const day = per_day[key];
+		const v = !day ? 0 : _calendarMode === 'time' ? day.time_ms || 0 : day.chars || 0;
 		if (v > max_v) max_v = v;
 		cells.push({
 			key,
 			date: new Date(cursor),
-			weekday: (cursor.getDay() + 6) % 7,    // 0=Mon … 6=Sun
+			weekday: (cursor.getDay() + 6) % 7, // 0=Mon … 6=Sun
 			value: v,
-			in_window: cursor >= start && cursor <= today,
+			in_window: cursor >= start && cursor <= today
 		});
 		cursor.setDate(cursor.getDate() + 1);
 	}
 
-	const CELL = 11, GAP = 2;
+	const CELL = 11,
+		GAP = 2;
 	const HEAD_H = 16;
 	const LABEL_W = 22;
 	const cols = Math.ceil(cells.length / 7);
@@ -2731,7 +3094,8 @@ function renderActivityCalendar() {
 	const heat = (v) => {
 		if (v === 0) return '#1e1e2e';
 		const t = Math.pow(v / Math.max(1, max_v), 0.45);
-		if (t < 0.4) return `rgb(${Math.round(40 + t * 60)},${Math.round(70 + t * 110)},${Math.round(50 + t * 30)})`;
+		if (t < 0.4)
+			return `rgb(${Math.round(40 + t * 60)},${Math.round(70 + t * 110)},${Math.round(50 + t * 30)})`;
 		if (t < 0.7) {
 			const tt = (t - 0.4) / 0.3;
 			return `rgb(${Math.round(100 + tt * 100)},${Math.round(180 - tt * 50)},${Math.round(80 - tt * 60)})`;
@@ -2753,7 +3117,7 @@ function renderActivityCalendar() {
 		}
 	});
 
-	const wd_labels_short = ['L','M','M','J','V','S','D'];
+	const wd_labels_short = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
 	let wd_labels = '';
 	[1, 3, 5].forEach((wd_i) => {
 		const cy = HEAD_H + wd_i * (CELL + GAP) + 9;
@@ -2771,16 +3135,23 @@ function renderActivityCalendar() {
 			return;
 		}
 		const fill = heat(c.value);
-		const dt   = `${c.date.getDate()}/${c.date.getMonth() + 1}/${c.date.getFullYear()}`;
-		const v_txt = _calendarMode === 'time'
-			? (c.value > 0 ? formatDuration(c.value) : '0')
-			: (c.value > 0 ? `${c.value} car.` : '0');
+		const dt = `${c.date.getDate()}/${c.date.getMonth() + 1}/${c.date.getFullYear()}`;
+		const v_txt =
+			_calendarMode === 'time'
+				? c.value > 0
+					? formatDuration(c.value)
+					: '0'
+				: c.value > 0
+					? `${c.value} car.`
+					: '0';
 		rects += `<rect x="${x}" y="${y}" width="${CELL}" height="${CELL}" rx="2" fill="${fill}"><title>${dt} — ${v_txt}</title></rect>`;
 	});
 
 	container.innerHTML =
 		`<svg width="${SVG_W}" height="${SVG_H}" viewBox="0 0 ${SVG_W} ${SVG_H}" xmlns="http://www.w3.org/2000/svg">` +
-			month_labels + wd_labels + rects +
+		month_labels +
+		wd_labels +
+		rects +
 		`</svg>`;
 }
 
@@ -2803,8 +3174,8 @@ function renderCpmByHourChart(aggData) {
 	const by_hour = (aggData && aggData.rich && aggData.rich.by_hour) || {};
 
 	const labels = [];
-	const cpm    = [];
-	const chars  = [];
+	const cpm = [];
+	const chars = [];
 	for (let h = 0; h < 24; h++) {
 		const hh = String(h).padStart(2, '0');
 		labels.push(`${hh}h`);
@@ -2828,7 +3199,7 @@ function renderCpmByHourChart(aggData) {
 					backgroundColor: 'rgba(34, 211, 238, 0.35)',
 					borderColor: 'rgba(34, 211, 238, 0.8)',
 					borderWidth: 1,
-					yAxisID: 'y_chars',
+					yAxisID: 'y_chars'
 				},
 				{
 					type: 'line',
@@ -2838,9 +3209,9 @@ function renderCpmByHourChart(aggData) {
 					backgroundColor: 'rgba(245, 158, 11, 0.15)',
 					tension: 0.3,
 					yAxisID: 'y_cpm',
-					pointRadius: 3,
-				},
-			],
+					pointRadius: 3
+				}
+			]
 		},
 		options: {
 			responsive: true,
@@ -2850,31 +3221,46 @@ function renderCpmByHourChart(aggData) {
 				legend: { labels: { color: '#ddd', font: { size: 11 } } },
 				tooltip: {
 					callbacks: {
-						title: (items) => items[0] ? items[0].label : '',
-					},
-				},
+						title: (items) => (items[0] ? items[0].label : '')
+					}
+				}
 			},
 			scales: {
-				x: { ticks: { color: '#888', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.04)' } },
+				x: {
+					ticks: { color: '#888', font: { size: 10 } },
+					grid: { color: 'rgba(255,255,255,0.04)' }
+				},
 				y_chars: {
-					type: 'linear', position: 'left',
+					type: 'linear',
+					position: 'left',
 					ticks: { color: '#888', font: { size: 10 } },
 					grid: { color: 'rgba(255,255,255,0.04)' },
-					title: { display: true, text: _t('ui_apps.axis_chars'), color: '#888', font: { size: 10 } },
+					title: {
+						display: true,
+						text: _t('ui_apps.axis_chars'),
+						color: '#888',
+						font: { size: 10 }
+					}
 				},
 				y_cpm: {
-					type: 'linear', position: 'right',
+					type: 'linear',
+					position: 'right',
 					ticks: { color: '#f59e0b', font: { size: 10 } },
 					grid: { drawOnChartArea: false },
-					title: { display: true, text: _t('ui_apps.axis_speed'), color: '#f59e0b', font: { size: 10 } },
-				},
-			},
-		},
+					title: {
+						display: true,
+						text: _t('ui_apps.axis_speed'),
+						color: '#f59e0b',
+						font: { size: 10 }
+					}
+				}
+			}
+		}
 	});
 }
 
 window.setCalendarMode = function (mode) {
-	_calendarMode = (mode === 'time') ? 'time' : 'chars';
+	_calendarMode = mode === 'time' ? 'time' : 'chars';
 	const btn_t = document.getElementById('cal-mode-time');
 	const btn_c = document.getElementById('cal-mode-chars');
 	if (btn_t) btn_t.classList.toggle('active', _calendarMode === 'time');
@@ -2909,12 +3295,15 @@ function openAppDrilldown(appName) {
 		.map((k) => ({ key: k, ts: parseDateKey(k) }))
 		.filter((d) => !isNaN(d.ts));
 	let targetTsStart = 0;
-	const anchorTs = currentSelectedDate ? parseDateKey(currentSelectedDate)
-		: (allDates.length > 0 ? Math.max(...allDates.map(d => d.ts)) : 0);
-	if (currentPeriod === 'day')   targetTsStart = anchorTs;
-	if (currentPeriod === 'week')  targetTsStart = anchorTs - 7  * 86400000;
+	const anchorTs = currentSelectedDate
+		? parseDateKey(currentSelectedDate)
+		: allDates.length > 0
+			? Math.max(...allDates.map((d) => d.ts))
+			: 0;
+	if (currentPeriod === 'day') targetTsStart = anchorTs;
+	if (currentPeriod === 'week') targetTsStart = anchorTs - 7 * 86400000;
 	if (currentPeriod === 'month') targetTsStart = anchorTs - 30 * 86400000;
-	if (currentPeriod === 'year')  targetTsStart = anchorTs - 365 * 86400000;
+	if (currentPeriod === 'year') targetTsStart = anchorTs - 365 * 86400000;
 
 	const hourly = {};
 	for (let h = 0; h < 24; h++) hourly[String(h).padStart(2, '0')] = { time_ms: 0, chars: 0 };
@@ -2934,7 +3323,7 @@ function openAppDrilldown(appName) {
 				hMs = (hData.c / totalAppChars) * (Number(app_data.app_time_ms) || 0);
 			}
 			slot.time_ms += hMs;
-			slot.chars   += hData.c || 0;
+			slot.chars += hData.c || 0;
 		});
 	});
 
@@ -2944,31 +3333,68 @@ function openAppDrilldown(appName) {
 	// Stat tiles
 	const focus_min = (a.time_ms || 0) / 60000;
 	const density = focus_min > 0 ? (a.chars || 0) / focus_min : 0;
-	const focus_lat_mean = (a.focus_latency_count || 0) > 0
-		? a.focus_latency_sum_ms / a.focus_latency_count : 0;
+	const focus_lat_mean =
+		(a.focus_latency_count || 0) > 0 ? a.focus_latency_sum_ms / a.focus_latency_count : 0;
 	const tiles = [
-		{ label: _t('ui_apps.tile_focus'),          value: formatDuration(a.time_ms || 0), detail: '' },
-		{ label: _t('ui_apps.tile_typing'),  value: formatDuration(a.typing_time || 0),
-			detail: a.time_ms > 0 ? _t('ui_apps.modal_pct_focus').replace('{pct}', ((a.typing_time / a.time_ms) * 100).toFixed(1)) : '' },
-		{ label: _t('ui_apps.tile_chars'),     value: format_int(a.chars || 0),
-			detail: density > 0 ? _t('ui_apps.modal_density').replace('{n}', density.toFixed(0)) : '' },
-		{ label: _t('ui_apps.tile_sessions'),        value: String(a.session_count || 0),
-			detail: a.session_longest_ms > 0 ? _t('ui_apps.modal_longest_session').replace('{dur}', formatDuration(a.session_longest_ms)) : '' },
-		{ label: _t('ui_apps.tile_focus_lat'),  value: focus_lat_mean > 0 ? `${Math.round(focus_lat_mean)} ms` : '—',
-			detail: a.focus_latency_count > 0 ? `n=${a.focus_latency_count}` : '' },
-		{ label: _t('ui_apps.tile_backspaces'),     value: format_int(a.bs_total || 0),
-			detail: a.chars > 0 ? _t('ui_apps.modal_backspace_pct').replace('{pct}', ((a.bs_total / a.chars) * 100).toFixed(1)) : '' },
+		{ label: _t('ui_apps.tile_focus'), value: formatDuration(a.time_ms || 0), detail: '' },
+		{
+			label: _t('ui_apps.tile_typing'),
+			value: formatDuration(a.typing_time || 0),
+			detail:
+				a.time_ms > 0
+					? _t('ui_apps.modal_pct_focus').replace(
+							'{pct}',
+							((a.typing_time / a.time_ms) * 100).toFixed(1)
+						)
+					: ''
+		},
+		{
+			label: _t('ui_apps.tile_chars'),
+			value: format_int(a.chars || 0),
+			detail: density > 0 ? _t('ui_apps.modal_density').replace('{n}', density.toFixed(0)) : ''
+		},
+		{
+			label: _t('ui_apps.tile_sessions'),
+			value: String(a.session_count || 0),
+			detail:
+				a.session_longest_ms > 0
+					? _t('ui_apps.modal_longest_session').replace(
+							'{dur}',
+							formatDuration(a.session_longest_ms)
+						)
+					: ''
+		},
+		{
+			label: _t('ui_apps.tile_focus_lat'),
+			value: focus_lat_mean > 0 ? `${Math.round(focus_lat_mean)} ms` : '—',
+			detail: a.focus_latency_count > 0 ? `n=${a.focus_latency_count}` : ''
+		},
+		{
+			label: _t('ui_apps.tile_backspaces'),
+			value: format_int(a.bs_total || 0),
+			detail:
+				a.chars > 0
+					? _t('ui_apps.modal_backspace_pct').replace(
+							'{pct}',
+							((a.bs_total / a.chars) * 100).toFixed(1)
+						)
+					: ''
+		}
 	];
-	document.getElementById('app_modal_tiles').innerHTML = tiles.map(t =>
-		`<div class="app-modal-tile">
+	document.getElementById('app_modal_tiles').innerHTML = tiles
+		.map(
+			(t) =>
+				`<div class="app-modal-tile">
 			<div class="app-modal-tile-label">${escapeHtml(t.label)}</div>
 			<div class="app-modal-tile-value">${escapeHtml(t.value)}</div>
 			${t.detail ? `<div class="app-modal-tile-detail">${escapeHtml(t.detail)}</div>` : ''}
 		</div>`
-	).join('');
+		)
+		.join('');
 
 	// Hourly chart
-	const labels = [], chars_arr = [];
+	const labels = [],
+		chars_arr = [];
 	for (let h = 0; h < 24; h++) {
 		const hh = String(h).padStart(2, '0');
 		labels.push(`${hh}h`);
@@ -2978,69 +3404,109 @@ function openAppDrilldown(appName) {
 	if (_appModalChart) _appModalChart.destroy();
 	_appModalChart = new Chart(ctx, {
 		type: 'bar',
-		data: { labels, datasets: [{
-			label: _t('ui_apps.ds_chars'),
-			data: chars_arr,
-			backgroundColor: 'rgba(34, 211, 238, 0.55)',
-			borderRadius: 2,
-		}]},
+		data: {
+			labels,
+			datasets: [
+				{
+					label: _t('ui_apps.ds_chars'),
+					data: chars_arr,
+					backgroundColor: 'rgba(34, 211, 238, 0.55)',
+					borderRadius: 2
+				}
+			]
+		},
 		options: {
-			responsive: true, maintainAspectRatio: false,
+			responsive: true,
+			maintainAspectRatio: false,
 			plugins: { legend: { display: false } },
 			scales: {
-				x: { ticks: { color: '#888', font: { size: 9 } }, grid: { color: 'rgba(255,255,255,0.04)' } },
-				y: { ticks: { color: '#888', font: { size: 9 } }, grid: { color: 'rgba(255,255,255,0.04)' } },
-			},
-		},
+				x: {
+					ticks: { color: '#888', font: { size: 9 } },
+					grid: { color: 'rgba(255,255,255,0.04)' }
+				},
+				y: {
+					ticks: { color: '#888', font: { size: 9 } },
+					grid: { color: 'rgba(255,255,255,0.04)' }
+				}
+			}
+		}
 	});
 
 	// Destinations
-	const dest_html = a.switches && Object.keys(a.switches).length > 0
-		? Object.entries(a.switches).sort((x, y) => y[1] - x[1]).slice(0, 8)
-			.map(([dest, n]) => `<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:12px;"><span>${escapeHtml(dest)}</span><span style="color:#aaa;">${n}</span></div>`)
-			.join('')
-		: `<div style="color:#888;font-size:12px;">${_t('ui_apps.kpi_no_backslash_out')}</div>`;
+	const dest_html =
+		a.switches && Object.keys(a.switches).length > 0
+			? Object.entries(a.switches)
+					.sort((x, y) => y[1] - x[1])
+					.slice(0, 8)
+					.map(
+						([dest, n]) =>
+							`<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:12px;"><span>${escapeHtml(dest)}</span><span style="color:#aaa;">${n}</span></div>`
+					)
+					.join('')
+			: `<div style="color:#888;font-size:12px;">${_t('ui_apps.kpi_no_backslash_out')}</div>`;
 	document.getElementById('app_modal_dests').innerHTML = dest_html;
 
 	// Layouts seen — sum from manifest for this app within the period.
 	const layouts = {};
 	allDates.forEach((d) => {
 		if (currentPeriod !== 'all' && (d.ts > anchorTs || d.ts < targetTsStart)) return;
-		const ls = manifestData[d.key] && manifestData[d.key][appName] && manifestData[d.key][appName].layouts_seen;
+		const ls =
+			manifestData[d.key] &&
+			manifestData[d.key][appName] &&
+			manifestData[d.key][appName].layouts_seen;
 		if (!ls) return;
 		Object.entries(ls).forEach(([id, n]) => {
 			layouts[id] = (layouts[id] || 0) + (n || 0);
 		});
 	});
-	const layouts_html = Object.keys(layouts).length > 0
-		? Object.entries(layouts).sort((x, y) => y[1] - x[1])
-			.map(([id, n]) => `<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:12px;"><span>${escapeHtml(id)}</span><span style="color:#aaa;">${n}×</span></div>`)
-			.join('')
-		: `<div style="color:#888;font-size:12px;">${_t('ui_apps.kpi_no_layout')}</div>`;
+	const layouts_html =
+		Object.keys(layouts).length > 0
+			? Object.entries(layouts)
+					.sort((x, y) => y[1] - x[1])
+					.map(
+						([id, n]) =>
+							`<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:12px;"><span>${escapeHtml(id)}</span><span style="color:#aaa;">${n}×</span></div>`
+					)
+					.join('')
+			: `<div style="color:#888;font-size:12px;">${_t('ui_apps.kpi_no_layout')}</div>`;
 	document.getElementById('app_modal_layouts').innerHTML = layouts_html;
 
 	// Records
 	const recs = [];
 	if (a.session_longest_ms > 0) {
-		recs.push(`<div>${_t('ui_apps.modal_record_session').replace('{dur}', formatDuration(a.session_longest_ms)).replace('{chars}', a.session_longest_chars > 0 ? ` (${a.session_longest_chars} car.)` : '')}</div>`);
+		recs.push(
+			`<div>${_t('ui_apps.modal_record_session')
+				.replace('{dur}', formatDuration(a.session_longest_ms))
+				.replace(
+					'{chars}',
+					a.session_longest_chars > 0 ? ` (${a.session_longest_chars} car.)` : ''
+				)}</div>`
+		);
 	}
 	if ((a.burst_max_cpm || 0) > 0) {
-		recs.push(`<div>${_t('ui_apps.modal_record_burst').replace('{n}', a.burst_max_cpm.toFixed(0))}</div>`);
+		recs.push(
+			`<div>${_t('ui_apps.modal_record_burst').replace('{n}', a.burst_max_cpm.toFixed(0))}</div>`
+		);
 	}
 	if ((a.cascade_count || 0) > 0) {
 		recs.push(`<div>${_t('ui_apps.modal_record_cascade').replace('{n}', a.cascade_count)}</div>`);
 	}
-	const rec_html = recs.length > 0
-		? recs.map(r => `<div style="font-size:12px;padding:3px 0;">${r}</div>`).join('')
-		: `<div style="color:#888;font-size:12px;">${_t('ui_apps.kpi_no_record')}</div>`;
+	const rec_html =
+		recs.length > 0
+			? recs.map((r) => `<div style="font-size:12px;padding:3px 0;">${r}</div>`).join('')
+			: `<div style="color:#888;font-size:12px;">${_t('ui_apps.kpi_no_record')}</div>`;
 	document.getElementById('app_modal_records').innerHTML = rec_html;
 
 	// Hotstrings & IA
-	const hs_pct  = (a.chars || 0) > 0 ? (a.hs_chars  / a.chars) * 100 : 0;
+	const hs_pct = (a.chars || 0) > 0 ? (a.hs_chars / a.chars) * 100 : 0;
 	const llm_pct = (a.chars || 0) > 0 ? (a.llm_chars / a.chars) * 100 : 0;
 	document.getElementById('app_modal_assist').innerHTML =
-		`<div style="font-size:12px;padding:3px 0;">${_t('ui_apps.modal_hs_line').replace('{n}', format_int(a.hs_chars || 0)).replace('{pct}', hs_pct.toFixed(1))}</div>` +
-		`<div style="font-size:12px;padding:3px 0;">${_t('ui_apps.modal_llm_line').replace('{n}', format_int(a.llm_chars || 0)).replace('{pct}', llm_pct.toFixed(1))}</div>` +
+		`<div style="font-size:12px;padding:3px 0;">${_t('ui_apps.modal_hs_line')
+			.replace('{n}', format_int(a.hs_chars || 0))
+			.replace('{pct}', hs_pct.toFixed(1))}</div>` +
+		`<div style="font-size:12px;padding:3px 0;">${_t('ui_apps.modal_llm_line')
+			.replace('{n}', format_int(a.llm_chars || 0))
+			.replace('{pct}', llm_pct.toFixed(1))}</div>` +
 		`<div style="font-size:12px;padding:3px 0;color:#888;">${_t('ui_apps.modal_total_chars').replace('{n}', format_int(a.chars || 0))}</div>`;
 
 	modal.style.display = 'flex';

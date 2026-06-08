@@ -22,11 +22,7 @@
 //   node ./scripts/build-features-manifest.js
 
 import { parse as parseToml } from 'smol-toml';
-import {
-	mkdirSync,
-	readFileSync,
-	writeFileSync,
-} from 'fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
 
@@ -35,14 +31,10 @@ const REPO_ROOT = resolve(__dirname, '..', '..');
 
 const MANIFEST_PATH = resolve(REPO_ROOT, 'static/ergopti_plus/shared/features/manifest.toml');
 
-const OUT_AHK_DIR   = resolve(REPO_ROOT, 'static/ergopti_plus/windows/_generated');
-const OUT_HS_DIR    = resolve(REPO_ROOT, 'static/ergopti_plus/macos/_generated');
+const OUT_AHK_DIR = resolve(REPO_ROOT, 'static/ergopti_plus/windows/_generated');
+const OUT_HS_DIR = resolve(REPO_ROOT, 'static/ergopti_plus/macos/_generated');
 
 const PLATFORMS = ['ahk', 'hs'];
-
-
-
-
 
 // =================================================
 // =================================================
@@ -59,7 +51,7 @@ const PLATFORMS = ['ahk', 'hs'];
 function preprocessManifestSource(raw) {
 	return raw.replace(
 		/^\[\[features\.([^\]]+)\]\]\r?$/gm,
-		(_match, prefix) => `[[entries]]\npath_prefix = "${prefix}"`,
+		(_match, prefix) => `[[entries]]\npath_prefix = "${prefix}"`
 	);
 }
 
@@ -68,7 +60,9 @@ function loadManifest() {
 	const preprocessed = preprocessManifestSource(raw);
 	const parsed = parseToml(preprocessed);
 	if (!parsed.manifest || !parsed.sections || !parsed.entries) {
-		throw new Error('manifest.toml must contain [manifest], [sections], and at least one [[features.*]] block');
+		throw new Error(
+			'manifest.toml must contain [manifest], [sections], and at least one [[features.*]] block'
+		);
 	}
 	return parsed;
 }
@@ -90,7 +84,7 @@ function flattenFeatures(entries) {
 		result.push({
 			...rest,
 			section: path_prefix,
-			path:    `${path_prefix}.${entry.id}`,
+			path: `${path_prefix}.${entry.id}`
 		});
 	}
 	return result;
@@ -111,15 +105,20 @@ function flattenSections(node, pathParts = []) {
 
 	if (isMeta && pathParts.length > 0) {
 		result.push({
-			path:            pathParts.join('.'),
+			path: pathParts.join('.'),
 			description_key: node.description_key || '',
-			platforms:       node.platforms || PLATFORMS,
-			subsections:     node.subsections || [],
+			platforms: node.platforms || PLATFORMS,
+			subsections: node.subsections || []
 		});
 	}
 
 	for (const [key, val] of Object.entries(node)) {
-		if (key === 'order' || key === 'description_key' || key === 'platforms' || key === 'subsections') {
+		if (
+			key === 'order' ||
+			key === 'description_key' ||
+			key === 'platforms' ||
+			key === 'subsections'
+		) {
 			continue;
 		}
 		result.push(...flattenSections(val, [...pathParts, key]));
@@ -130,7 +129,7 @@ function flattenSections(node, pathParts = []) {
 // Resolve each feature's effective platforms list. If absent on the feature,
 // inherit from the nearest ancestor section that declares "platforms".
 function resolvePlatforms(features, sections) {
-	const sectionByPath = new Map(sections.map(s => [s.path, s]));
+	const sectionByPath = new Map(sections.map((s) => [s.path, s]));
 	for (const f of features) {
 		if (f.platforms && f.platforms.length > 0) continue;
 		// Walk up the section path looking for an explicit platforms list.
@@ -164,7 +163,7 @@ function resolveDefault(feature, platform) {
 
 function validate(features) {
 	for (const f of features) {
-		const hasDefault          = f.default !== undefined;
+		const hasDefault = f.default !== undefined;
 		const hasDefaultPerPlatform = f.default_per_platform !== undefined;
 		if (hasDefault === hasDefaultPerPlatform) {
 			throw new Error(
@@ -179,10 +178,6 @@ function validate(features) {
 		}
 	}
 }
-
-
-
-
 
 // ========================================
 // ========================================
@@ -202,9 +197,9 @@ function ahkEscapeString(s) {
 
 function ahkLiteral(value) {
 	if (value === null || value === undefined) return '""';
-	if (typeof value === 'boolean')           return value ? 'true' : 'false';
-	if (typeof value === 'number')            return String(value);
-	if (typeof value === 'string')            return `"${ahkEscapeString(value)}"`;
+	if (typeof value === 'boolean') return value ? 'true' : 'false';
+	if (typeof value === 'number') return String(value);
+	if (typeof value === 'string') return `"${ahkEscapeString(value)}"`;
 	if (Array.isArray(value)) {
 		return '[' + value.map(ahkLiteral).join(', ') + ']';
 	}
@@ -230,11 +225,11 @@ function renderAhkManifest(manifest, sections, features) {
 	lines.push(`    "section_order", ${ahkLiteral(topOrder)},`);
 
 	lines.push('    "sections", Map(');
-	const sectionLines = sections.map(s => {
+	const sectionLines = sections.map((s) => {
 		const meta = {
 			description_key: s.description_key,
-			platforms:       s.platforms,
-			subsections:     s.subsections,
+			platforms: s.platforms,
+			subsections: s.subsections
 		};
 		return `        ${ahkLiteral(s.path)}, ${ahkLiteral(meta)}`;
 	});
@@ -242,16 +237,16 @@ function renderAhkManifest(manifest, sections, features) {
 	lines.push('    ),');
 
 	lines.push('    "features", [');
-	const platformFeatures = features.filter(f => f.platforms.includes('ahk'));
-	const featLines = platformFeatures.map(f => {
+	const platformFeatures = features.filter((f) => f.platforms.includes('ahk'));
+	const featLines = platformFeatures.map((f) => {
 		const entry = {
-			path:            f.path,
-			id:              f.id,
-			section:         f.section,
-			default:         resolveDefault(f, 'ahk'),
-			type:            f.type || '',
+			path: f.path,
+			id: f.id,
+			section: f.section,
+			default: resolveDefault(f, 'ahk'),
+			type: f.type || '',
 			description_key: f.description_key || '',
-			platforms:       f.platforms,
+			platforms: f.platforms
 		};
 		if (f.enum_values) entry.enum_values = f.enum_values;
 		return `        ${ahkLiteral(entry)}`;
@@ -262,10 +257,6 @@ function renderAhkManifest(manifest, sections, features) {
 	lines.push('');
 	return lines.join('\n');
 }
-
-
-
-
 
 // ========================================
 // ========================================
@@ -284,18 +275,16 @@ function luaEscapeString(s) {
 
 function luaLiteral(value, indent = '') {
 	if (value === null || value === undefined) return 'nil';
-	if (typeof value === 'boolean')           return value ? 'true' : 'false';
-	if (typeof value === 'number')            return String(value);
-	if (typeof value === 'string')            return `"${luaEscapeString(value)}"`;
+	if (typeof value === 'boolean') return value ? 'true' : 'false';
+	if (typeof value === 'number') return String(value);
+	if (typeof value === 'string') return `"${luaEscapeString(value)}"`;
 	if (Array.isArray(value)) {
-		const inner = value.map(v => luaLiteral(v, indent + '\t')).join(', ');
+		const inner = value.map((v) => luaLiteral(v, indent + '\t')).join(', ');
 		return `{ ${inner} }`;
 	}
 	if (typeof value === 'object') {
 		const entries = Object.entries(value).map(([k, v]) => {
-			const keyLit = /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(k)
-				? k
-				: `["${luaEscapeString(k)}"]`;
+			const keyLit = /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(k) ? k : `["${luaEscapeString(k)}"]`;
 			return `${indent}\t${keyLit} = ${luaLiteral(v, indent + '\t')}`;
 		});
 		return `{\n${entries.join(',\n')}\n${indent}}`;
@@ -320,8 +309,8 @@ function renderLuaManifest(manifest, sections, features) {
 	for (const s of sections) {
 		const meta = {
 			description_key: s.description_key,
-			platforms:       s.platforms,
-			subsections:     s.subsections,
+			platforms: s.platforms,
+			subsections: s.subsections
 		};
 		const keyLit = `["${luaEscapeString(s.path)}"]`;
 		lines.push(`\t${keyLit} = ${luaLiteral(meta, '\t')},`);
@@ -329,16 +318,16 @@ function renderLuaManifest(manifest, sections, features) {
 	lines.push('}');
 	lines.push('');
 	lines.push('M.features = {');
-	const platformFeatures = features.filter(f => f.platforms.includes('hs'));
+	const platformFeatures = features.filter((f) => f.platforms.includes('hs'));
 	for (const f of platformFeatures) {
 		const entry = {
-			path:            f.path,
-			id:              f.id,
-			section:         f.section,
-			default:         resolveDefault(f, 'hs'),
-			type:            f.type || '',
+			path: f.path,
+			id: f.id,
+			section: f.section,
+			default: resolveDefault(f, 'hs'),
+			type: f.type || '',
 			description_key: f.description_key || '',
-			platforms:       f.platforms,
+			platforms: f.platforms
 		};
 		if (f.enum_values) entry.enum_values = f.enum_values;
 		lines.push(`\t${luaLiteral(entry, '\t')},`);
@@ -349,10 +338,6 @@ function renderLuaManifest(manifest, sections, features) {
 	lines.push('');
 	return lines.join('\n');
 }
-
-
-
-
 
 // ======================================================
 // ======================================================
@@ -398,7 +383,7 @@ function renderConfigTemplate(manifest, sections, features, platform) {
 # on first boot. After that, the user owns the copy.
 `;
 
-	const platformFeatures = features.filter(f => f.platforms.includes(platform));
+	const platformFeatures = features.filter((f) => f.platforms.includes(platform));
 
 	// Index features by section for stable emission order.
 	const bySection = new Map();
@@ -417,11 +402,11 @@ function renderConfigTemplate(manifest, sections, features, platform) {
 		const entries = bySection.get(sectionPath);
 
 		// First pass: primitive defaults → flat keys under [section].
-		const flatEntries = entries.filter(e => {
+		const flatEntries = entries.filter((e) => {
 			const def = resolveDefault(e, platform);
 			return typeof def !== 'object' || def === null || Array.isArray(def);
 		});
-		const tableEntries = entries.filter(e => {
+		const tableEntries = entries.filter((e) => {
 			const def = resolveDefault(e, platform);
 			return typeof def === 'object' && def !== null && !Array.isArray(def);
 		});
@@ -446,9 +431,6 @@ function renderConfigTemplate(manifest, sections, features, platform) {
 
 	return lines.join('\n');
 }
-
-
-
 
 // ========================================
 // ========================================
@@ -484,20 +466,20 @@ function main() {
 	// AHK outputs
 	writeOutput(
 		resolve(OUT_AHK_DIR, 'features_manifest.ahk'),
-		renderAhkManifest(manifest, sections, features),
+		renderAhkManifest(manifest, sections, features)
 	);
 	writeOutput(
 		resolve(OUT_AHK_DIR, 'config_template.toml'),
-		renderConfigTemplate(manifest, sections, features, 'ahk'),
+		renderConfigTemplate(manifest, sections, features, 'ahk')
 	);
 	// HS outputs
 	writeOutput(
 		resolve(OUT_HS_DIR, 'features_manifest.lua'),
-		renderLuaManifest(manifest, sections, features),
+		renderLuaManifest(manifest, sections, features)
 	);
 	writeOutput(
 		resolve(OUT_HS_DIR, 'config_template.toml'),
-		renderConfigTemplate(manifest, sections, features, 'hs'),
+		renderConfigTemplate(manifest, sections, features, 'hs')
 	);
 	console.log('Done.');
 }

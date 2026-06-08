@@ -26,10 +26,7 @@
  * ==============================================================================
  */
 
-"use strict";
-
-
-
+'use strict';
 
 // ==================================================
 // ==================================================
@@ -50,9 +47,6 @@
  * @property {string|null} color        Hex accent color for tooltip, or null.
  */
 
-
-
-
 // ==================================================
 // ==================================================
 // ======= 2/ Port Contract Definition =======
@@ -64,8 +58,8 @@
  * @type {object}
  */
 const portContract = {
-	name: "Expander",
-	version: "1.0.0",
+	name: 'Expander',
+	version: '1.0.0',
 
 	/**
 	 * decide(buffer, tailChar, opts) — Decide whether to expand.
@@ -90,14 +84,11 @@ const portContract = {
 	 *   @returns {void}
 	 */
 	methods: {
-		decide:    { arity: 3, required: true },
+		decide: { arity: 3, required: true },
 		cycleNext: { arity: 1, required: true },
-		reset:     { arity: 0, required: true },
-	},
+		reset: { arity: 0, required: true }
+	}
 };
-
-
-
 
 // ==================================================
 // ==================================================
@@ -112,12 +103,12 @@ const portContract = {
  */
 function validateAdapter(adapter) {
 	const violations = [];
-	if (!adapter || typeof adapter !== "object") {
-		return ["adapter must be a non-null object"];
+	if (!adapter || typeof adapter !== 'object') {
+		return ['adapter must be a non-null object'];
 	}
 	for (const [name, spec] of Object.entries(portContract.methods)) {
 		if (!spec.required) continue;
-		if (typeof adapter[name] !== "function") {
+		if (typeof adapter[name] !== 'function') {
 			violations.push(`missing method: ${name}`);
 		} else if (adapter[name].length !== spec.arity) {
 			violations.push(`method ${name}: expected arity ${spec.arity}, got ${adapter[name].length}`);
@@ -125,9 +116,6 @@ function validateAdapter(adapter) {
 	}
 	return violations;
 }
-
-
-
 
 // ==================================================
 // ==================================================
@@ -143,78 +131,77 @@ function validateAdapter(adapter) {
 function contractTestVectors() {
 	return [
 		{
-			id:       "simple_match",
-			description: "Buffer ending with trigger + terminator returns correct expansion.",
-			registry: [{ trigger: "btw", repl: "by the way", group: "g" }],
-			input:    { buffer: "btw", tailChar: " ", opts: {} },
-			assert:   {
-				not_null:         true,
-				replacement:      "by the way",
-				backspace_count:  3,   // trigger length = 3; terminator not part of trigger
-				consume_terminator: false,
-			},
-		},
-		{
-			id: "no_match_returns_null",
-			description: "Buffer that does not end with any trigger returns null.",
-			registry: [{ trigger: "btw", repl: "by the way", group: "g" }],
-			input: { buffer: "xyz", tailChar: " ", opts: {} },
-			assert: { is_null: true },
-		},
-		{
-			id: "word_boundary_respected",
-			description: "is_word=true trigger does not fire mid-word.",
-			registry: [{ trigger: "the", repl: "THE", group: "g", opts: { is_word: true } }],
-			// Buffer ends with "othe" — the trigger "the" is present but preceded by "o" (word char)
-			input: { buffer: "othe", tailChar: " ", opts: {} },
-			assert: { is_null: true },
-		},
-		{
-			id: "word_boundary_fires_after_space",
-			description: "is_word=true trigger fires when preceded by a space.",
-			registry: [{ trigger: "the", repl: "THE", group: "g", opts: { is_word: true } }],
-			input: { buffer: "hello the", tailChar: " ", opts: {} },
-			assert: { not_null: true, replacement: "THE" },
-		},
-		{
-			id: "longest_match_wins",
-			description: "When two triggers share a tail, the longer one wins.",
-			registry: [
-				{ trigger: "btw",  repl: "by the way",    group: "g" },
-				{ trigger: "btww", repl: "by the way wow", group: "g" },
-			],
-			input: { buffer: "btww", tailChar: " ", opts: {} },
-			assert: { not_null: true, trigger: "btww" },
-		},
-		{
-			id: "backspace_count_with_consumed_terminator",
-			description: "consume_terminator=true adds 1 to backspace_count.",
-			registry: [{ trigger: "btw", repl: "by the way", group: "g" }],
-			input: { buffer: "btw", tailChar: "★", opts: { terminator_consumed: true } },
+			id: 'simple_match',
+			description: 'Buffer ending with trigger + terminator returns correct expansion.',
+			registry: [{ trigger: 'btw', repl: 'by the way', group: 'g' }],
+			input: { buffer: 'btw', tailChar: ' ', opts: {} },
 			assert: {
-				not_null:        true,
-				backspace_count: 4,   // trigger(3) + terminator(1)
-				consume_terminator: true,
-			},
+				not_null: true,
+				replacement: 'by the way',
+				backspace_count: 3, // trigger length = 3; terminator not part of trigger
+				consume_terminator: false
+			}
 		},
 		{
-			id: "reset_clears_cycle_state",
-			description: "reset() after a cycleNext() means decide() starts fresh.",
+			id: 'no_match_returns_null',
+			description: 'Buffer that does not end with any trigger returns null.',
+			registry: [{ trigger: 'btw', repl: 'by the way', group: 'g' }],
+			input: { buffer: 'xyz', tailChar: ' ', opts: {} },
+			assert: { is_null: true }
+		},
+		{
+			id: 'word_boundary_respected',
+			description: 'is_word=true trigger does not fire mid-word.',
+			registry: [{ trigger: 'the', repl: 'THE', group: 'g', opts: { is_word: true } }],
+			// Buffer ends with "othe" — the trigger "the" is present but preceded by "o" (word char)
+			input: { buffer: 'othe', tailChar: ' ', opts: {} },
+			assert: { is_null: true }
+		},
+		{
+			id: 'word_boundary_fires_after_space',
+			description: 'is_word=true trigger fires when preceded by a space.',
+			registry: [{ trigger: 'the', repl: 'THE', group: 'g', opts: { is_word: true } }],
+			input: { buffer: 'hello the', tailChar: ' ', opts: {} },
+			assert: { not_null: true, replacement: 'THE' }
+		},
+		{
+			id: 'longest_match_wins',
+			description: 'When two triggers share a tail, the longer one wins.',
 			registry: [
-				{ trigger: "btw★", repl: "by the way",      group: "g", opts: { has_magic: true } },
-				{ trigger: "btw★", repl: "between",         group: "g", opts: { has_magic: true } },
+				{ trigger: 'btw', repl: 'by the way', group: 'g' },
+				{ trigger: 'btww', repl: 'by the way wow', group: 'g' }
+			],
+			input: { buffer: 'btww', tailChar: ' ', opts: {} },
+			assert: { not_null: true, trigger: 'btww' }
+		},
+		{
+			id: 'backspace_count_with_consumed_terminator',
+			description: 'consume_terminator=true adds 1 to backspace_count.',
+			registry: [{ trigger: 'btw', repl: 'by the way', group: 'g' }],
+			input: { buffer: 'btw', tailChar: '★', opts: { terminator_consumed: true } },
+			assert: {
+				not_null: true,
+				backspace_count: 4, // trigger(3) + terminator(1)
+				consume_terminator: true
+			}
+		},
+		{
+			id: 'reset_clears_cycle_state',
+			description: 'reset() after a cycleNext() means decide() starts fresh.',
+			registry: [
+				{ trigger: 'btw★', repl: 'by the way', group: 'g', opts: { has_magic: true } },
+				{ trigger: 'btw★', repl: 'between', group: 'g', opts: { has_magic: true } }
 			],
 			steps: [
-				{ call: "decide",    args: ["btw", "★", { terminator_consumed: true }] },
-				{ call: "cycleNext", args: ["btw"] },
-				{ call: "reset",     args: [] },
-				{ call: "decide",    args: ["btw", "★", { terminator_consumed: true }], capture: "r" },
+				{ call: 'decide', args: ['btw', '★', { terminator_consumed: true }] },
+				{ call: 'cycleNext', args: ['btw'] },
+				{ call: 'reset', args: [] },
+				{ call: 'decide', args: ['btw', '★', { terminator_consumed: true }], capture: 'r' },
 				// After reset, cycling restarts from the first candidate
-				{ assert_field: { variable: "r", field: "replacement", value: "by the way" } },
-			],
-		},
+				{ assert_field: { variable: 'r', field: 'replacement', value: 'by the way' } }
+			]
+		}
 	];
 }
-
 
 module.exports = { portContract, validateAdapter, contractTestVectors };

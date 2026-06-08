@@ -12,9 +12,9 @@
 
 	/** @type {Awaited<ReturnType<typeof getRelease>>} */
 	let release = $state(null);
-	let urlAhkExe = $derived(release?.url("ErgoptiPlus.exe") ?? "#");
-	let urlMacosApp = $derived(release?.url("ErgoptiPlus.app.zip") ?? "#");
-	let urlKanata = $derived(release?.url("kanata.kbd") ?? "#");
+	let urlAhkExe = $derived(release?.url('ErgoptiPlus.exe') ?? '#');
+	let urlMacosApp = $derived(release?.url('ErgoptiPlus.app.zip') ?? '#');
+	let urlKanata = $derived(release?.url('kanata.kbd') ?? '#');
 	const { aiProviders, aiTotalProviders, aiTotalModels, aiTotalFamilies } = data;
 
 	// Live typing demo — cycle through real expansions from the hotstring TOMLs.
@@ -775,20 +775,12 @@
 
 				<div class="hero-cta">
 					{#if osStyle === 'macos'}
-						<a
-							class="btn btn-primary"
-							href={urlMacosApp}
-							download={!!release}
-						>
+						<a class="btn btn-primary" href={urlMacosApp} download={!!release}>
 							<i class="icon-hammerspoon"></i>
 							<span>Télécharger pour macOS</span>
 						</a>
 					{:else}
-						<a
-							class="btn btn-primary"
-							href={urlAhkExe}
-							download={!!release}
-						>
+						<a class="btn btn-primary" href={urlAhkExe} download={!!release}>
 							<i class="icon-autohotkey"></i>
 							<span>Télécharger pour Windows</span>
 						</a>
@@ -2163,11 +2155,7 @@
 						>
 							<i class="icon-hammerspoon"></i><span>macOS (HS)</span>
 						</a>
-						<a
-							class="btn btn-secondary"
-							href={urlKanata}
-							download={!!release}
-						>
+						<a class="btn btn-secondary" href={urlKanata} download={!!release}>
 							<i class="icon-linux"></i><span>Linux (kanata.kbd)</span>
 						</a>
 					</div>

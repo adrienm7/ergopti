@@ -25,10 +25,7 @@
  * ==============================================================================
  */
 
-"use strict";
-
-
-
+'use strict';
 
 // ==================================================
 // ==================================================
@@ -41,8 +38,8 @@
  * @type {object}
  */
 const portContract = {
-	name: "HttpClient",
-	version: "1.0.0",
+	name: 'HttpClient',
+	version: '1.0.0',
 
 	/**
 	 * post(url, headers, body, callback) — Send an HTTP POST request.
@@ -66,17 +63,14 @@ const portContract = {
 	 *   @returns {boolean}
 	 */
 	methods: {
-		post:     { arity: 4, required: true },
-		cancel:   { arity: 0, required: true },
-		isActive: { arity: 0, required: true },
+		post: { arity: 4, required: true },
+		cancel: { arity: 0, required: true },
+		isActive: { arity: 0, required: true }
 	},
 
 	/** Default request timeout in milliseconds. Adapters MUST enforce this. */
-	DEFAULT_TIMEOUT_MS: 30_000,
+	DEFAULT_TIMEOUT_MS: 30_000
 };
-
-
-
 
 // ==================================================
 // ==================================================
@@ -91,24 +85,19 @@ const portContract = {
  */
 function validateAdapter(adapter) {
 	const violations = [];
-	if (!adapter || typeof adapter !== "object") {
-		return ["adapter must be a non-null object"];
+	if (!adapter || typeof adapter !== 'object') {
+		return ['adapter must be a non-null object'];
 	}
 	for (const [name, spec] of Object.entries(portContract.methods)) {
 		if (!spec.required) continue;
-		if (typeof adapter[name] !== "function") {
+		if (typeof adapter[name] !== 'function') {
 			violations.push(`missing method: ${name}`);
 		} else if (adapter[name].length !== spec.arity) {
-			violations.push(
-				`method ${name}: expected arity ${spec.arity}, got ${adapter[name].length}`
-			);
+			violations.push(`method ${name}: expected arity ${spec.arity}, got ${adapter[name].length}`);
 		}
 	}
 	return violations;
 }
-
-
-
 
 // ==================================================
 // ==================================================
@@ -124,71 +113,70 @@ function validateAdapter(adapter) {
 function contractTestVectors() {
 	return [
 		{
-			id: "post_success_200",
-			description: "Successful 200 response calls callback with ok=true.",
+			id: 'post_success_200',
+			description: 'Successful 200 response calls callback with ok=true.',
 			stub: { status: 200, body: '{"choices":[{"message":{"content":"hello"}}]}' },
 			input: {
-				url:     "https://api.example.com/v1/chat/completions",
-				headers: { "Content-Type": "application/json", "Authorization": "Bearer sk-test" },
-				body:    '{"model":"gpt-4o","messages":[]}',
+				url: 'https://api.example.com/v1/chat/completions',
+				headers: { 'Content-Type': 'application/json', Authorization: 'Bearer sk-test' },
+				body: '{"model":"gpt-4o","messages":[]}'
 			},
-			assert: { ok: true, status: 200, error: null },
+			assert: { ok: true, status: 200, error: null }
 		},
 		{
-			id: "post_auth_error_401",
-			description: "HTTP 401 calls callback with ok=false and status=401.",
+			id: 'post_auth_error_401',
+			description: 'HTTP 401 calls callback with ok=false and status=401.',
 			stub: { status: 401, body: '{"error":"invalid api key"}' },
 			input: {
-				url: "https://api.example.com/v1/chat/completions",
-				headers: { "Authorization": "Bearer bad-key" },
-				body: "{}",
+				url: 'https://api.example.com/v1/chat/completions',
+				headers: { Authorization: 'Bearer bad-key' },
+				body: '{}'
 			},
-			assert: { ok: false, status: 401 },
+			assert: { ok: false, status: 401 }
 		},
 		{
-			id: "post_network_error",
-			description: "Network failure calls callback with ok=false and status=0.",
+			id: 'post_network_error',
+			description: 'Network failure calls callback with ok=false and status=0.',
 			stub: { network_error: true },
 			input: {
-				url: "https://unreachable.invalid/v1/endpoint",
+				url: 'https://unreachable.invalid/v1/endpoint',
 				headers: {},
-				body: "{}",
+				body: '{}'
 			},
-			assert: { ok: false, status: 0, error_not_null: true },
+			assert: { ok: false, status: 0, error_not_null: true }
 		},
 		{
-			id: "post_timeout",
-			description: "Request exceeding DEFAULT_TIMEOUT_MS calls callback with ok=false.",
-			stub: { delay_ms: 31_000 },   // longer than the 30 s timeout
-			input: { url: "https://slow.example.com/api", headers: {}, body: "{}" },
-			assert: { ok: false, status: 0 },
+			id: 'post_timeout',
+			description: 'Request exceeding DEFAULT_TIMEOUT_MS calls callback with ok=false.',
+			stub: { delay_ms: 31_000 }, // longer than the 30 s timeout
+			input: { url: 'https://slow.example.com/api', headers: {}, body: '{}' },
+			assert: { ok: false, status: 0 }
 		},
 		{
-			id: "cancel_stops_callback",
-			description: "cancel() before response means callback is never called.",
+			id: 'cancel_stops_callback',
+			description: 'cancel() before response means callback is never called.',
 			stub: { delay_ms: 500 },
-			input: { url: "https://api.example.com/v1/chat", headers: {}, body: "{}" },
+			input: { url: 'https://api.example.com/v1/chat', headers: {}, body: '{}' },
 			steps: [
-				{ call: "post", async: true },
+				{ call: 'post', async: true },
 				{ advance_clock_ms: 100 },
-				{ call: "cancel" },
+				{ call: 'cancel' },
 				{ advance_clock_ms: 500 },
-				{ assert: "callback_not_called" },
-			],
+				{ assert: 'callback_not_called' }
+			]
 		},
 		{
-			id: "is_active_during_request",
-			description: "isActive() returns true while a request is in flight.",
+			id: 'is_active_during_request',
+			description: 'isActive() returns true while a request is in flight.',
 			stub: { delay_ms: 200 },
 			steps: [
-				{ call: "post", async: true },
-				{ assert: "isActive", expected: true },
+				{ call: 'post', async: true },
+				{ assert: 'isActive', expected: true },
 				{ advance_clock_ms: 200 },
-				{ assert: "isActive", expected: false },
-			],
-		},
+				{ assert: 'isActive', expected: false }
+			]
+		}
 	];
 }
-
 
 module.exports = { portContract, validateAdapter, contractTestVectors };

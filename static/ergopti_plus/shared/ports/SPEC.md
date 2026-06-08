@@ -72,28 +72,28 @@ Each `.spec.js` file exports:
 
 ## 3. Driver Compliance Table
 
-| Port | AHK Adapter | HS Adapter |
-|---|---|---|
-| KeyboardHook | `adapters/keyboard_hook.ahk` | `adapters/keyboard_hook.lua` |
-| TextSender | `adapters/text_sender.ahk` | `adapters/text_sender.lua` |
-| TooltipRenderer | `adapters/tooltip_renderer.ahk` | `adapters/tooltip_renderer.lua` |
-| HttpClient | `adapters/http_client.ahk` | `adapters/http_client.lua` |
-| TimerScheduler | `adapters/timer_scheduler.ahk` | `adapters/timer_scheduler.lua` |
-| Notifier | `adapters/notifier.ahk` | `adapters/notifier.lua` |
-| TrayMenu | `adapters/tray_menu.ahk` | `adapters/tray_menu.lua` |
-| FileSystem | `adapters/file_system.ahk` | `adapters/file_system.lua` |
+| Port                | AHK Adapter                          | HS Adapter                           |
+| ------------------- | ------------------------------------ | ------------------------------------ |
+| KeyboardHook        | `adapters/keyboard_hook.ahk`         | `adapters/keyboard_hook.lua`         |
+| TextSender          | `adapters/text_sender.ahk`           | `adapters/text_sender.lua`           |
+| TooltipRenderer     | `adapters/tooltip_renderer.ahk`      | `adapters/tooltip_renderer.lua`      |
+| HttpClient          | `adapters/http_client.ahk`           | `adapters/http_client.lua`           |
+| TimerScheduler      | `adapters/timer_scheduler.ahk`       | `adapters/timer_scheduler.lua`       |
+| Notifier            | `adapters/notifier.ahk`              | `adapters/notifier.lua`              |
+| TrayMenu            | `adapters/tray_menu.ahk`             | `adapters/tray_menu.lua`             |
+| FileSystem          | `adapters/file_system.ahk`           | `adapters/file_system.lua`           |
 | SecureFieldDetector | `adapters/secure_field_detector.ahk` | `adapters/secure_field_detector.lua` |
-| Clipboard | `adapters/clipboard.ahk` | `adapters/clipboard.lua` |
-| Storage | `adapters/storage.ahk` | `adapters/storage.lua` |
-| ProcessLifecycle | `adapters/process_lifecycle.ahk` | `adapters/process_lifecycle.lua` |
-| KeyState | `adapters/key_state.ahk` | `adapters/key_state.lua` |
-| MouseControl | `adapters/mouse_control.ahk` | `adapters/mouse_control.lua` |
-| NetworkInfo | `adapters/network_info.ahk` | `adapters/network_info.lua` |
-| WindowInfo | `adapters/window_info.ahk` | `adapters/window_info.lua` |
-| WindowManager | `adapters/window_manager.ahk` | `adapters/window_manager.lua` |
-| AppLauncher | `adapters/app_launcher.ahk` | `adapters/app_launcher.lua` |
-| Crypto | `adapters/crypto.ahk` | `adapters/crypto.lua` |
-| GraphicsRenderer | `adapters/graphics_renderer.ahk` | `adapters/graphics_renderer.lua` |
+| Clipboard           | `adapters/clipboard.ahk`             | `adapters/clipboard.lua`             |
+| Storage             | `adapters/storage.ahk`               | `adapters/storage.lua`               |
+| ProcessLifecycle    | `adapters/process_lifecycle.ahk`     | `adapters/process_lifecycle.lua`     |
+| KeyState            | `adapters/key_state.ahk`             | `adapters/key_state.lua`             |
+| MouseControl        | `adapters/mouse_control.ahk`         | `adapters/mouse_control.lua`         |
+| NetworkInfo         | `adapters/network_info.ahk`          | `adapters/network_info.lua`          |
+| WindowInfo          | `adapters/window_info.ahk`           | `adapters/window_info.lua`           |
+| WindowManager       | `adapters/window_manager.ahk`        | `adapters/window_manager.lua`        |
+| AppLauncher         | `adapters/app_launcher.ahk`          | `adapters/app_launcher.lua`          |
+| Crypto              | `adapters/crypto.ahk`                | `adapters/crypto.lua`                |
+| GraphicsRenderer    | `adapters/graphics_renderer.ahk`     | `adapters/graphics_renderer.lua`     |
 
 ---
 
@@ -121,24 +121,24 @@ A driver adapter is considered compliant with a port spec when:
 All port methods use **camelCase** matching the JS spec files. Driver-language
 adapters expose these methods under their own naming convention:
 
-| Port method | AHK name | HS name |
-|---|---|---|
-| `hook.start()` | `KL_Hook_Start()` | `M.start()` |
-| `hook.stop()` | `KL_Hook_Stop()` | `M.stop()` |
-| `sender.send(text)` | `SendFinalResult(text)` | `_send_text(text)` |
-| `tooltip.show(payload)` | `TooltipShow(items, dur)` | `M.show(content, …)` |
-| `http.post(url, body, cb)` | `LLM_RemoteGenerate(…)` | `M.generate(…)` |
-| `timer.after(delay, fn)` | `SetTimer(fn, -ms)` | `hs.timer.doAfter(s, fn)` |
-| `notifier.send(msg)` | `TrayTip(title, text)` | `M.notify(title, body, kind)` |
-| `tray.update(state)` | `UpdateTrayIcon()` | `update_icon(custom_text)` |
+| Port method                | AHK name                  | HS name                       |
+| -------------------------- | ------------------------- | ----------------------------- |
+| `hook.start()`             | `KL_Hook_Start()`         | `M.start()`                   |
+| `hook.stop()`              | `KL_Hook_Stop()`          | `M.stop()`                    |
+| `sender.send(text)`        | `SendFinalResult(text)`   | `_send_text(text)`            |
+| `tooltip.show(payload)`    | `TooltipShow(items, dur)` | `M.show(content, …)`          |
+| `http.post(url, body, cb)` | `LLM_RemoteGenerate(…)`   | `M.generate(…)`               |
+| `timer.after(delay, fn)`   | `SetTimer(fn, -ms)`       | `hs.timer.doAfter(s, fn)`     |
+| `notifier.send(msg)`       | `TrayTip(title, text)`    | `M.notify(title, body, kind)` |
+| `tray.update(state)`       | `UpdateTrayIcon()`        | `update_icon(custom_text)`    |
 
 ### 5.2 Error behavior vocabulary
 
-| Value | Meaning |
-|---|---|
-| `"throw"` | Raise an exception / AHK throw / Lua error() |
+| Value              | Meaning                                               |
+| ------------------ | ----------------------------------------------------- |
+| `"throw"`          | Raise an exception / AHK throw / Lua error()          |
 | `"log_and_return"` | Log the error and return nil/false/null — never crash |
-| `"ignore"` | No-op silently — use sparingly, document why |
+| `"ignore"`         | No-op silently — use sparingly, document why          |
 
 ### 5.3 Async vs. sync
 

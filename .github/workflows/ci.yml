@@ -44,18 +44,18 @@
 name: CI
 
 on:
-    push:
-        branches: [main, dev]
-    pull_request:
-        branches: [main, dev]
-    workflow_dispatch:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main, dev]
+  workflow_dispatch:
 
 permissions:
-    contents: read
+  contents: read
 
 concurrency:
-    group: ci-${{ github.ref }}
-    cancel-in-progress: true
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 # ========================================================
 # ========================================================
@@ -64,1045 +64,1045 @@ concurrency:
 # ========================================================
 
 jobs:
-    # ─────────────────────────────────────────────────
-    # 1.1) Hotstring TOML format
-    # ─────────────────────────────────────────────────
-    validate-hotstrings:
-        name: "Validate · hotstrings TOML"
-        runs-on: ubuntu-latest
+  # ─────────────────────────────────────────────────
+  # 1.1) Hotstring TOML format
+  # ─────────────────────────────────────────────────
+  validate-hotstrings:
+    name: 'Validate · hotstrings TOML'
+    runs-on: ubuntu-latest
 
-        steps:
-            - uses: actions/checkout@v4
+    steps:
+      - uses: actions/checkout@v4
 
-            - uses: actions/setup-python@v5
-              with:
-                  python-version: "3.12"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
 
-            - name: Check hotstring TOML files are sorted and formatted
-              run: python tools/dev/format_toml.py --hotstrings --all --check
+      - name: Check hotstring TOML files are sorted and formatted
+        run: python tools/dev/format_toml.py --hotstrings --all --check
 
-    # ─────────────────────────────────────────────────
-    # 1.2) Domain build pipeline + drift detection
-    # ─────────────────────────────────────────────────
-    validate-domain:
-        name: "Validate · domain pipeline"
-        runs-on: ubuntu-latest
+  # ─────────────────────────────────────────────────
+  # 1.2) Domain build pipeline + drift detection
+  # ─────────────────────────────────────────────────
+  validate-domain:
+    name: 'Validate · domain pipeline'
+    runs-on: ubuntu-latest
 
-        steps:
-            - uses: actions/checkout@v4
+    steps:
+      - uses: actions/checkout@v4
 
-            - uses: actions/setup-node@v4
-              with:
-                  node-version: "22"
-                  cache: "npm"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
 
-            - run: npm ci
+      - run: npm ci
 
-            - name: Run domain build pipeline
-              run: npm run build:domain
+      - name: Run domain build pipeline
+        run: npm run build:domain
 
-    # ─────────────────────────────────────────────────
-    # 1.3) JS shared layer — port compliance + PBT
-    # ─────────────────────────────────────────────────
-    validate-js:
-        name: "Validate · JS ports + properties"
-        runs-on: ubuntu-latest
+  # ─────────────────────────────────────────────────
+  # 1.3) JS shared layer — port compliance + PBT
+  # ─────────────────────────────────────────────────
+  validate-js:
+    name: 'Validate · JS ports + properties'
+    runs-on: ubuntu-latest
 
-        steps:
-            - uses: actions/checkout@v4
+    steps:
+      - uses: actions/checkout@v4
 
-            - uses: actions/setup-node@v4
-              with:
-                  node-version: "22"
-                  cache: "npm"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
 
-            - run: npm ci
+      - run: npm ci
 
-            - name: Port compliance (all 20 ports covered by adapters)
-              run: npm run test:port-compliance
+      - name: Port compliance (all 20 ports covered by adapters)
+        run: npm run test:port-compliance
 
-            - name: Property-based tests (fast-check, 27 × 1000 runs)
-              run: npm run test:properties
+      - name: Property-based tests (fast-check, 27 × 1000 runs)
+        run: npm run test:properties
 
-            - name: Mutation tests — domain layer (Stryker, break=25)
-              # Guards the shared domain spec files (Registry, HotstringMatcher)
-              run: npm run test:mutation
+      - name: Mutation tests — domain layer (Stryker, break=25)
+        # Guards the shared domain spec files (Registry, HotstringMatcher)
+        run: npm run test:mutation
 
-            - name: Convention lint (strict — banners, spacing, section headers)
-              run: npm run lint:conventions:strict
+      - name: Convention lint (strict — banners, spacing, section headers)
+        run: npm run lint:conventions:strict
 
-    # ─────────────────────────────────────────────────
-    # 1.4) Translation consistency audit
-    # ─────────────────────────────────────────────────
-    validate-translations:
-        name: "Validate · translations audit"
-        runs-on: ubuntu-latest
+  # ─────────────────────────────────────────────────
+  # 1.4) Translation consistency audit
+  # ─────────────────────────────────────────────────
+  validate-translations:
+    name: 'Validate · translations audit'
+    runs-on: ubuntu-latest
 
-        steps:
-            - uses: actions/checkout@v4
+    steps:
+      - uses: actions/checkout@v4
 
-            - uses: actions/setup-node@v4
-              with:
-                  node-version: "22"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
 
-            - name: Run translation key consistency audit
-              run: node tools/lint/audit-translations.cjs
+      - name: Run translation key consistency audit
+        run: node tools/lint/audit-translations.cjs
 
-    # ─────────────────────────────────────────────────
-    # 2.1) Hammerspoon unit tests
-    # ─────────────────────────────────────────────────
-    test-hs:
-        name: "macOS · unit tests"
-        runs-on: ubuntu-latest
-        needs: [validate-hotstrings, validate-domain, validate-js, validate-translations]
+  # ─────────────────────────────────────────────────
+  # 2.1) Hammerspoon unit tests
+  # ─────────────────────────────────────────────────
+  test-hs:
+    name: 'macOS · unit tests'
+    runs-on: ubuntu-latest
+    needs: [validate-hotstrings, validate-domain, validate-js, validate-translations]
 
-        steps:
-            - uses: actions/checkout@v4
+    steps:
+      - uses: actions/checkout@v4
 
-            - name: Install Lua 5.4 + luarocks
-              run: |
-                  sudo apt-get update
-                  sudo apt-get install -y lua5.4 liblua5.4-dev luarocks
+      - name: Install Lua 5.4 + luarocks
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y lua5.4 liblua5.4-dev luarocks
 
-            - name: Install luacheck + luafilesystem
-              # lfs is required by tests/run.lua for recursive test discovery;
-              # --lua-version 5.4 ensures luarocks links the correct runtime.
-              run: |
-                  sudo luarocks --lua-version 5.4 install luacheck
-                  sudo luarocks --lua-version 5.4 install luafilesystem
+      - name: Install luacheck + luafilesystem
+        # lfs is required by tests/run.lua for recursive test discovery;
+        # --lua-version 5.4 ensures luarocks links the correct runtime.
+        run: |
+          sudo luarocks --lua-version 5.4 install luacheck
+          sudo luarocks --lua-version 5.4 install luafilesystem
 
-            - name: Run luacheck (non-blocking)
-              # Surface warnings without failing — pre-existing style issues
-              # must not block the test step.
-              run: |
-                  luacheck static/ergopti_plus/macos/tests static/ergopti_plus/macos/lib \
-                    static/ergopti_plus/macos/modules || true
+      - name: Run luacheck (non-blocking)
+        # Surface warnings without failing — pre-existing style issues
+        # must not block the test step.
+        run: |
+          luacheck static/ergopti_plus/macos/tests static/ergopti_plus/macos/lib \
+            static/ergopti_plus/macos/modules || true
 
-            - name: Run unit + meta tests
-              working-directory: static/ergopti_plus/macos
-              run: lua5.4 tests/run.lua
+      - name: Run unit + meta tests
+        working-directory: static/ergopti_plus/macos
+        run: lua5.4 tests/run.lua
 
-    # ─────────────────────────────────────────────────
-    # 2.2) Hammerspoon E2E (virtual-keyboard harness)
-    # ─────────────────────────────────────────────────
-    e2e-hs:
-        name: "macOS · E2E"
-        runs-on: ubuntu-latest
-        needs: [test-hs]
+  # ─────────────────────────────────────────────────
+  # 2.2) Hammerspoon E2E (virtual-keyboard harness)
+  # ─────────────────────────────────────────────────
+  e2e-hs:
+    name: 'macOS · E2E'
+    runs-on: ubuntu-latest
+    needs: [test-hs]
 
-        steps:
-            - uses: actions/checkout@v4
+    steps:
+      - uses: actions/checkout@v4
 
-            - name: Install Lua 5.4 + luafilesystem
-              run: |
-                  sudo apt-get update
-                  sudo apt-get install -y lua5.4 liblua5.4-dev luarocks
-                  sudo luarocks --lua-version 5.4 install luafilesystem
+      - name: Install Lua 5.4 + luafilesystem
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y lua5.4 liblua5.4-dev luarocks
+          sudo luarocks --lua-version 5.4 install luafilesystem
 
-            - name: Run E2E virtual-keyboard harness
-              # Exercises Registry + Expander via the stub layer against
-              # hardcoded scenarios and all corpus vectors.
-              # Exit 0 = all pass, 1 = at least one failure.
-              working-directory: static/ergopti_plus/macos
-              run: lua5.4 tests/e2e/run_e2e.lua
-              timeout-minutes: 5
+      - name: Run E2E virtual-keyboard harness
+        # Exercises Registry + Expander via the stub layer against
+        # hardcoded scenarios and all corpus vectors.
+        # Exit 0 = all pass, 1 = at least one failure.
+        working-directory: static/ergopti_plus/macos
+        run: lua5.4 tests/e2e/run_e2e.lua
+        timeout-minutes: 5
 
-    # ─────────────────────────────────────────────────
-    # 2.3) Gate: macOS driver fully green
-    # ─────────────────────────────────────────────────
-    macos-ok:
-        name: "macOS · ✅ all green"
-        runs-on: ubuntu-latest
-        needs: [test-hs, e2e-hs]
-        if: always()
+  # ─────────────────────────────────────────────────
+  # 2.3) Gate: macOS driver fully green
+  # ─────────────────────────────────────────────────
+  macos-ok:
+    name: 'macOS · ✅ all green'
+    runs-on: ubuntu-latest
+    needs: [test-hs, e2e-hs]
+    if: always()
 
-        steps:
-            - name: Assert all macOS jobs passed
-              run: |
-                  failed=0
-                  for job_result in "${{ needs.test-hs.result }}" "${{ needs.e2e-hs.result }}"; do
-                      if [[ "$job_result" == "failure" || "$job_result" == "cancelled" ]]; then
-                          failed=1
-                      fi
-                  done
-                  if [[ $failed -eq 1 ]]; then
-                      echo "macOS driver: one or more jobs failed."
-                      echo "  test-hs : ${{ needs.test-hs.result }}"
-                      echo "  e2e-hs  : ${{ needs.e2e-hs.result }}"
-                      exit 1
+    steps:
+      - name: Assert all macOS jobs passed
+        run: |
+          failed=0
+          for job_result in "${{ needs.test-hs.result }}" "${{ needs.e2e-hs.result }}"; do
+              if [[ "$job_result" == "failure" || "$job_result" == "cancelled" ]]; then
+                  failed=1
+              fi
+          done
+          if [[ $failed -eq 1 ]]; then
+              echo "macOS driver: one or more jobs failed."
+              echo "  test-hs : ${{ needs.test-hs.result }}"
+              echo "  e2e-hs  : ${{ needs.e2e-hs.result }}"
+              exit 1
+          fi
+          echo "macOS driver: all jobs passed (or skipped)."
+          echo "  test-hs : ${{ needs.test-hs.result }}"
+          echo "  e2e-hs  : ${{ needs.e2e-hs.result }}"
+
+  # =============================================
+  # =============================================
+  # ======= 3/ Windows driver branch ============
+  # =============================================
+  # =============================================
+
+  # ─────────────────────────────────────────────────
+  # 3.1) AHK unit tests
+  # ─────────────────────────────────────────────────
+  test-ahk:
+    name: 'Windows · unit tests'
+    runs-on: windows-latest
+    needs: [validate-hotstrings, validate-domain, validate-js, validate-translations]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache AutoHotkey runtime
+        id: cache-ahk
+        uses: actions/cache@v4
+        with:
+          path: C:\AutoHotkey
+          key: ahk-v2.0.19-windows
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
+          cache: 'npm'
+
+      - run: npm ci
+        shell: pwsh
+
+      - name: Build features manifest
+        run: npm run build:manifest
+        shell: pwsh
+
+      - name: Manifest parity (AHK ↔ HS codegen equivalence)
+        run: npm run test:manifest-parity
+        shell: pwsh
+
+      - name: Download AutoHotkey v2 runtime
+        if: steps.cache-ahk.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          Invoke-WebRequest `
+              -Uri "https://github.com/AutoHotkey/AutoHotkey/releases/download/v2.0.19/AutoHotkey_2.0.19.zip" `
+              -OutFile "$env:TEMP\AHK.zip" -UseBasicParsing
+          Expand-Archive -Path "$env:TEMP\AHK.zip" -DestinationPath "C:\AutoHotkey" -Force
+
+      - name: Verify AHK source encoding (UTF-8 BOM + CRLF)
+        # AHK v2 silently aborts mid-file on encoding drift — catch it
+        # before it causes silent test failures with no error message.
+        shell: pwsh
+        run: |
+          $ahkFiles = Get-ChildItem `
+              -Path "${{ github.workspace }}\static\ergopti_plus\windows" `
+              -Recurse -Filter "*.ahk" |
+              Where-Object { -not $_.FullName.Contains("vendor") }
+          $failures = @()
+          foreach ($file in $ahkFiles) {
+              $bytes = [System.IO.File]::ReadAllBytes($file.FullName)
+              if ($bytes.Length -lt 3 -or
+                  $bytes[0] -ne 0xEF -or $bytes[1] -ne 0xBB -or $bytes[2] -ne 0xBF) {
+                  $failures += "MISSING BOM : $($file.FullName)"; continue
+              }
+              $content = [System.IO.File]::ReadAllText(
+                  $file.FullName, [System.Text.Encoding]::UTF8)
+              if (($content -replace "`r`n", "") -match "`n") {
+                  $failures += "BARE LF : $($file.FullName)"
+              }
+          }
+          if ($failures.Count -gt 0) {
+              $failures | ForEach-Object { Write-Host "  $_" }
+              Write-Error "AHK encoding violations detected."
+              exit 1
+          }
+          Write-Host "Encoding OK — $($ahkFiles.Count) file(s) verified."
+
+      - name: Disable Windows Defender real-time scanning for AHK tests
+        shell: pwsh
+        run: |
+          # Defender holds intermittent exclusive scan locks on any file the AHK
+          # test suite writes — including temp files in A_Temp — causing FileRead /
+          # FileAppend calls to block for the full 240 s watchdog window.
+          # -DisableRealtimeMonitoring requires admin; add path exclusions as a
+          # belt-and-suspenders fallback that works even without that flag.
+          Set-MpPreference -DisableRealtimeMonitoring $true -ErrorAction SilentlyContinue
+          Add-MpPreference -ExclusionPath "$env:TEMP"           -ErrorAction SilentlyContinue
+          Add-MpPreference -ExclusionPath "${{ github.workspace }}" -ErrorAction SilentlyContinue
+          Add-MpPreference -ExclusionProcess "AutoHotkey64.exe" -ErrorAction SilentlyContinue
+          Write-Host "Defender exclusions applied."
+
+      - name: Run AHK test suite
+        shell: pwsh
+        timeout-minutes: 15
+        run: |
+          $ahk = Get-ChildItem "C:\AutoHotkey" -Filter "AutoHotkey64.exe" |
+              Select-Object -First 1 -ExpandProperty FullName
+          if (-not $ahk) { Write-Error "AutoHotkey64.exe not found."; exit 2 }
+          $runner = "${{ github.workspace }}\static\ergopti_plus\windows\tests\run_all.ahk"
+          if (-not (Test-Path $runner)) {
+              Write-Error "Test runner not found at $runner"; exit 2
+          }
+          $resultsFile = "$env:TEMP\ergopti_test_results.txt"
+          Remove-Item $resultsFile -Force -ErrorAction SilentlyContinue
+          Write-Host "AHK runtime : $ahk"
+          Write-Host "Test runner : $runner"
+          Write-Host "------------------------------------------------------------"
+          # AHK writes TAP output to test_results.txt (FileAppend to "*"/stdout
+          # blocks when AHK runs without an inherited console handle, so the
+          # file is the only reliable output channel in CI).
+          # Tail-read the results file while AHK runs for real-time CI log output.
+          $proc = Start-Process -FilePath $ahk -ArgumentList $runner -NoNewWindow -PassThru
+          $fstream = $null
+          $reader  = $null
+          $sw = [System.Diagnostics.Stopwatch]::StartNew()
+          while (-not $proc.HasExited) {
+              if ($null -eq $fstream -and (Test-Path $resultsFile)) {
+                  try {
+                      $fstream = [System.IO.FileStream]::new($resultsFile,
+                          [System.IO.FileMode]::Open,
+                          [System.IO.FileAccess]::Read,
+                          [System.IO.FileShare]::ReadWrite)
+                      $reader = [System.IO.StreamReader]::new($fstream)
+                  } catch {
+                      # AHK may still hold an exclusive write lock; retry next tick
+                      Start-Sleep -Milliseconds 100
+                  }
+              }
+              if ($null -ne $reader) {
+                  $line = $reader.ReadLine()
+                  if ($null -ne $line) { Write-Host $line } else { Start-Sleep -Milliseconds 100 }
+              } else {
+                  Start-Sleep -Milliseconds 100
+              }
+          }
+          if ($null -ne $reader) {
+              while ($null -ne ($line = $reader.ReadLine())) { Write-Host $line }
+              $reader.Close(); $fstream.Close()
+          }
+          $exit = $proc.ExitCode
+          Write-Host "------------------------------------------------------------"
+          Write-Host "AHK exit code: $exit"
+          if (-not (Test-Path $resultsFile)) {
+              Write-Error "test_results.txt not created — AHK may have crashed at startup."; exit 2
+          }
+          $summary = Get-Content $resultsFile | Select-String "^#" | Select-Object -Last 1
+          Write-Host $summary
+          if ($exit -ne 0) {
+              Write-Error "Test suite failed (exit $exit)."; exit $exit
+          }
+
+      - name: Check for AHK compiler warnings
+        shell: pwsh
+        timeout-minutes: 5
+        run: |
+          $ahk = Get-ChildItem "C:\AutoHotkey" -Filter "AutoHotkey64.exe" |
+              Select-Object -First 1 -ExpandProperty FullName
+          $runner = "${{ github.workspace }}\static\ergopti_plus\windows\tests\run_all.ahk"
+          # Pass --dry-run so AHK parses all files and emits warnings, then
+          # exits immediately without running any Test() callbacks. This keeps
+          # the warning check fast (~seconds) regardless of corpus size.
+          $output = & cmd /c "`"$ahk`" `"$runner`" --dry-run 2>&1"
+          $warnings = $output | Where-Object { $_ -match "^Warning:" }
+          if ($warnings) {
+              $warnings | ForEach-Object { Write-Host "  $_" }
+              Write-Error "$($warnings.Count) AHK compiler warning(s) — fix before merging."
+              exit 1
+          }
+          Write-Host "No AHK compiler warnings."
+
+  # ─────────────────────────────────────────────────
+  # 3.2) AHK E2E (pure engine injection, headless)
+  # ─────────────────────────────────────────────────
+  e2e-ahk:
+    name: 'Windows · E2E'
+    runs-on: windows-latest
+    needs: [test-ahk]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache AutoHotkey runtime
+        id: cache-ahk
+        uses: actions/cache@v4
+        with:
+          path: C:\AutoHotkey
+          key: ahk-v2.0.19-windows
+
+      - name: Download AutoHotkey v2 runtime
+        if: steps.cache-ahk.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          Invoke-WebRequest `
+              -Uri "https://github.com/AutoHotkey/AutoHotkey/releases/download/v2.0.19/AutoHotkey_2.0.19.zip" `
+              -OutFile "$env:TEMP\AHK.zip" -UseBasicParsing
+          Expand-Archive -Path "$env:TEMP\AHK.zip" -DestinationPath "C:\AutoHotkey" -Force
+
+      - name: Verify E2E runner encoding
+        shell: pwsh
+        run: |
+          $file = "${{ github.workspace }}\static\ergopti_plus\windows\tests\e2e\run_e2e.ahk"
+          $bytes = [System.IO.File]::ReadAllBytes($file)
+          if ($bytes[0] -ne 0xEF -or $bytes[1] -ne 0xBB -or $bytes[2] -ne 0xBF) {
+              Write-Error "run_e2e.ahk is missing UTF-8 BOM."; exit 1
+          }
+          $content = [System.IO.File]::ReadAllText($file, [System.Text.Encoding]::UTF8)
+          if (($content -replace "`r`n", "") -match "`n") {
+              Write-Error "run_e2e.ahk contains bare LF line endings."; exit 1
+          }
+          Write-Host "Encoding OK: UTF-8 BOM + CRLF."
+
+      - name: Build features manifest
+        shell: pwsh
+        run: npm ci; npm run build:manifest
+
+      - name: Run E2E suite (Strategy A — pure engine injection)
+        shell: pwsh
+        timeout-minutes: 5
+        run: |
+          $ahk = Get-ChildItem "C:\AutoHotkey" -Filter "AutoHotkey64.exe" |
+              Select-Object -First 1 -ExpandProperty FullName
+          if (-not $ahk) { Write-Error "AutoHotkey64.exe not found."; exit 2 }
+          $runner = "${{ github.workspace }}\static\ergopti_plus\windows\tests\e2e\run_e2e.ahk"
+          $resultsFile = "${{ github.workspace }}\static\ergopti_plus\windows\tests\e2e\test_results.txt"
+          Remove-Item $resultsFile -Force -ErrorAction SilentlyContinue
+          Write-Host "AHK runtime : $ahk"
+          Write-Host "E2E runner  : $runner"
+          Write-Host "------------------------------------------------------------"
+          # Same approach as the unit test suite: AHK writes TAP output to
+          # test_results.txt (FileAppend to "*" blocks without a console handle).
+          # Tail-read the file for real-time CI log output.
+          $proc = Start-Process -FilePath $ahk -ArgumentList $runner -NoNewWindow -PassThru
+          $fstream = $null; $reader = $null
+          while (-not $proc.HasExited) {
+              if ($null -eq $fstream -and (Test-Path $resultsFile)) {
+                  try {
+                      $fstream = [System.IO.FileStream]::new($resultsFile,
+                          [System.IO.FileMode]::Open,
+                          [System.IO.FileAccess]::Read,
+                          [System.IO.FileShare]::ReadWrite)
+                      $reader = [System.IO.StreamReader]::new($fstream)
+                  } catch {
+                      # AHK may still hold an exclusive write lock; retry next tick
+                      Start-Sleep -Milliseconds 100
+                  }
+              }
+              if ($null -ne $reader) {
+                  $line = $reader.ReadLine()
+                  if ($null -ne $line) { Write-Host $line } else { Start-Sleep -Milliseconds 100 }
+              } else { Start-Sleep -Milliseconds 100 }
+          }
+          if ($null -ne $reader) {
+              while ($null -ne ($line = $reader.ReadLine())) { Write-Host $line }
+              $reader.Close(); $fstream.Close()
+          }
+          $exit = $proc.ExitCode
+          Write-Host "------------------------------------------------------------"
+          Write-Host "Exit code: $exit"
+          if (-not (Test-Path $resultsFile)) {
+              Write-Error "test_results.txt not created — AHK may have crashed at startup."; exit 2
+          }
+          if ($exit -ne 0) {
+              Write-Error "E2E suite failed (exit $exit)."; exit $exit
+          }
+
+  # ─────────────────────────────────────────────────
+  # 3.3) Gate: Windows driver fully green
+  # ─────────────────────────────────────────────────
+  windows-ok:
+    name: 'Windows · ✅ all green'
+    runs-on: ubuntu-latest
+    needs: [test-ahk, e2e-ahk]
+    if: always()
+
+    steps:
+      - name: Assert all Windows jobs passed
+        run: |
+          failed=0
+          for job_result in "${{ needs.test-ahk.result }}" "${{ needs.e2e-ahk.result }}"; do
+              if [[ "$job_result" == "failure" || "$job_result" == "cancelled" ]]; then
+                  failed=1
+              fi
+          done
+          if [[ $failed -eq 1 ]]; then
+              echo "Windows driver: one or more jobs failed."
+              echo "  test-ahk : ${{ needs.test-ahk.result }}"
+              echo "  e2e-ahk  : ${{ needs.e2e-ahk.result }}"
+              exit 1
+          fi
+          echo "Windows driver: all jobs passed (or skipped)."
+          echo "  test-ahk : ${{ needs.test-ahk.result }}"
+          echo "  e2e-ahk  : ${{ needs.e2e-ahk.result }}"
+
+  # ============================================
+  # ============================================
+  # ======= 4/ Linux driver branch =============
+  # ============================================
+  # ============================================
+
+  # ─────────────────────────────────────────────────
+  # 4.1) Linux Lua driver tests
+  # ─────────────────────────────────────────────────
+  test-linux:
+    name: 'Linux · unit tests'
+    runs-on: ubuntu-22.04
+    needs: [validate-hotstrings, validate-domain, validate-js, validate-translations]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install LuaJIT
+        run: sudo apt-get update -qq && sudo apt-get install -y luajit
+
+      - name: Run Linux driver test suite
+        working-directory: static/ergopti_plus/linux
+        run: luajit tests/run.lua
+
+  # ─────────────────────────────────────────────────
+  # 4.2) Gate: Linux driver fully green
+  # ─────────────────────────────────────────────────
+  linux-ok:
+    name: 'Linux · ✅ all green'
+    runs-on: ubuntu-latest
+    needs: [test-linux]
+    if: always()
+
+    steps:
+      - name: Assert all Linux jobs passed
+        run: |
+          if [[ "${{ needs.test-linux.result }}" == "failure" || \
+                "${{ needs.test-linux.result }}" == "cancelled" ]]; then
+              echo "Linux driver: test-linux failed."
+              echo "  test-linux : ${{ needs.test-linux.result }}"
+              exit 1
+          fi
+          echo "Linux driver: all jobs passed (or skipped)."
+          echo "  test-linux : ${{ needs.test-linux.result }}"
+
+  # =============================================================
+  # =============================================================
+  # ======= 5/ Resolve release metadata (main + dev) ============
+  # =============================================================
+  # =============================================================
+
+  resolve-release-meta:
+    name: 'Release · resolve tag + version'
+    runs-on: ubuntu-latest
+    needs: [macos-ok, windows-ok, linux-ok]
+    # Runs on push to main or dev — not on PRs
+    if: >
+      always() &&
+      github.event_name == 'push' &&
+      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev') &&
+      needs.macos-ok.result   == 'success' &&
+      needs.windows-ok.result == 'success' &&
+      needs.linux-ok.result   == 'success'
+    permissions:
+      contents: write
+    outputs:
+      tag: ${{ steps.meta.outputs.tag }}
+      version: ${{ steps.meta.outputs.version }}
+      title: ${{ steps.meta.outputs.title }}
+      prerelease: ${{ steps.meta.outputs.prerelease }}
+      skip: ${{ steps.meta.outputs.skip }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Compute tag and version
+        id: meta
+        shell: bash
+        run: |
+          set -euo pipefail
+          branch="${GITHUB_REF_NAME}"
+
+          if [ "$branch" = "main" ]; then
+              last_stable=$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname \
+                  | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1 || true)
+              if [ -z "$last_stable" ]; then
+                  last_stable="v0.0.0"
+                  range="HEAD"
+              else
+                  range="${last_stable}..HEAD"
+              fi
+              IFS='.' read -r maj min pat <<< "${last_stable#v}"
+              bump="patch"
+              while IFS= read -r subject; do
+                  [ -z "$subject" ] && continue
+                  if echo "$subject" | grep -qE '(BREAKING|!):'; then
+                      bump="major"; break
+                  elif echo "$subject" | grep -qE '^feat(\([^)]+\))?!?:'; then
+                      [ "$bump" != "major" ] && bump="minor"
                   fi
-                  echo "macOS driver: all jobs passed (or skipped)."
-                  echo "  test-hs : ${{ needs.test-hs.result }}"
-                  echo "  e2e-hs  : ${{ needs.e2e-hs.result }}"
+              done < <(git log "$range" --no-merges --pretty=format:"%s")
+              case "$bump" in
+                  major) maj=$((maj+1)); min=0; pat=0 ;;
+                  minor) min=$((min+1)); pat=0 ;;
+                  patch) pat=$((pat+1)) ;;
+              esac
+              tag="v${maj}.${min}.${pat}"
+              prerelease="false"
+              title="Ergopti ${tag}"
+          else
+              # dev branch — v0.0.0-dev.N series
+              last_dev=$(git tag --list 'v0.0.0-dev.*' --sort=-v:refname | head -1 || true)
+              if [ -z "$last_dev" ]; then
+                  next_n=1
+              else
+                  last_n="${last_dev##*.}"
+                  next_n=$((last_n + 1))
+              fi
+              tag="v0.0.0-dev.${next_n}"
+              prerelease="true"
 
-    # =============================================
-    # =============================================
-    # ======= 3/ Windows driver branch ============
-    # =============================================
-    # =============================================
-
-    # ─────────────────────────────────────────────────
-    # 3.1) AHK unit tests
-    # ─────────────────────────────────────────────────
-    test-ahk:
-        name: "Windows · unit tests"
-        runs-on: windows-latest
-        needs: [validate-hotstrings, validate-domain, validate-js, validate-translations]
-
-        steps:
-            - uses: actions/checkout@v4
-
-            - name: Cache AutoHotkey runtime
-              id: cache-ahk
-              uses: actions/cache@v4
-              with:
-                  path: C:\AutoHotkey
-                  key: ahk-v2.0.19-windows
-
-            - uses: actions/setup-node@v4
-              with:
-                  node-version: "lts/*"
-                  cache: "npm"
-
-            - run: npm ci
-              shell: pwsh
-
-            - name: Build features manifest
-              run: npm run build:manifest
-              shell: pwsh
-
-            - name: Manifest parity (AHK ↔ HS codegen equivalence)
-              run: npm run test:manifest-parity
-              shell: pwsh
-
-            - name: Download AutoHotkey v2 runtime
-              if: steps.cache-ahk.outputs.cache-hit != 'true'
-              shell: pwsh
-              run: |
-                  Invoke-WebRequest `
-                      -Uri "https://github.com/AutoHotkey/AutoHotkey/releases/download/v2.0.19/AutoHotkey_2.0.19.zip" `
-                      -OutFile "$env:TEMP\AHK.zip" -UseBasicParsing
-                  Expand-Archive -Path "$env:TEMP\AHK.zip" -DestinationPath "C:\AutoHotkey" -Force
-
-            - name: Verify AHK source encoding (UTF-8 BOM + CRLF)
-              # AHK v2 silently aborts mid-file on encoding drift — catch it
-              # before it causes silent test failures with no error message.
-              shell: pwsh
-              run: |
-                  $ahkFiles = Get-ChildItem `
-                      -Path "${{ github.workspace }}\static\ergopti_plus\windows" `
-                      -Recurse -Filter "*.ahk" |
-                      Where-Object { -not $_.FullName.Contains("vendor") }
-                  $failures = @()
-                  foreach ($file in $ahkFiles) {
-                      $bytes = [System.IO.File]::ReadAllBytes($file.FullName)
-                      if ($bytes.Length -lt 3 -or
-                          $bytes[0] -ne 0xEF -or $bytes[1] -ne 0xBB -or $bytes[2] -ne 0xBF) {
-                          $failures += "MISSING BOM : $($file.FullName)"; continue
-                      }
-                      $content = [System.IO.File]::ReadAllText(
-                          $file.FullName, [System.Text.Encoding]::UTF8)
-                      if (($content -replace "`r`n", "") -match "`n") {
-                          $failures += "BARE LF : $($file.FullName)"
-                      }
-                  }
-                  if ($failures.Count -gt 0) {
-                      $failures | ForEach-Object { Write-Host "  $_" }
-                      Write-Error "AHK encoding violations detected."
-                      exit 1
-                  }
-                  Write-Host "Encoding OK — $($ahkFiles.Count) file(s) verified."
-
-            - name: Disable Windows Defender real-time scanning for AHK tests
-              shell: pwsh
-              run: |
-                  # Defender holds intermittent exclusive scan locks on any file the AHK
-                  # test suite writes — including temp files in A_Temp — causing FileRead /
-                  # FileAppend calls to block for the full 240 s watchdog window.
-                  # -DisableRealtimeMonitoring requires admin; add path exclusions as a
-                  # belt-and-suspenders fallback that works even without that flag.
-                  Set-MpPreference -DisableRealtimeMonitoring $true -ErrorAction SilentlyContinue
-                  Add-MpPreference -ExclusionPath "$env:TEMP"           -ErrorAction SilentlyContinue
-                  Add-MpPreference -ExclusionPath "${{ github.workspace }}" -ErrorAction SilentlyContinue
-                  Add-MpPreference -ExclusionProcess "AutoHotkey64.exe" -ErrorAction SilentlyContinue
-                  Write-Host "Defender exclusions applied."
-
-            - name: Run AHK test suite
-              shell: pwsh
-              timeout-minutes: 15
-              run: |
-                  $ahk = Get-ChildItem "C:\AutoHotkey" -Filter "AutoHotkey64.exe" |
-                      Select-Object -First 1 -ExpandProperty FullName
-                  if (-not $ahk) { Write-Error "AutoHotkey64.exe not found."; exit 2 }
-                  $runner = "${{ github.workspace }}\static\ergopti_plus\windows\tests\run_all.ahk"
-                  if (-not (Test-Path $runner)) {
-                      Write-Error "Test runner not found at $runner"; exit 2
-                  }
-                  $resultsFile = "$env:TEMP\ergopti_test_results.txt"
-                  Remove-Item $resultsFile -Force -ErrorAction SilentlyContinue
-                  Write-Host "AHK runtime : $ahk"
-                  Write-Host "Test runner : $runner"
-                  Write-Host "------------------------------------------------------------"
-                  # AHK writes TAP output to test_results.txt (FileAppend to "*"/stdout
-                  # blocks when AHK runs without an inherited console handle, so the
-                  # file is the only reliable output channel in CI).
-                  # Tail-read the results file while AHK runs for real-time CI log output.
-                  $proc = Start-Process -FilePath $ahk -ArgumentList $runner -NoNewWindow -PassThru
-                  $fstream = $null
-                  $reader  = $null
-                  $sw = [System.Diagnostics.Stopwatch]::StartNew()
-                  while (-not $proc.HasExited) {
-                      if ($null -eq $fstream -and (Test-Path $resultsFile)) {
-                          try {
-                              $fstream = [System.IO.FileStream]::new($resultsFile,
-                                  [System.IO.FileMode]::Open,
-                                  [System.IO.FileAccess]::Read,
-                                  [System.IO.FileShare]::ReadWrite)
-                              $reader = [System.IO.StreamReader]::new($fstream)
-                          } catch {
-                              # AHK may still hold an exclusive write lock; retry next tick
-                              Start-Sleep -Milliseconds 100
-                          }
-                      }
-                      if ($null -ne $reader) {
-                          $line = $reader.ReadLine()
-                          if ($null -ne $line) { Write-Host $line } else { Start-Sleep -Milliseconds 100 }
-                      } else {
-                          Start-Sleep -Milliseconds 100
-                      }
-                  }
-                  if ($null -ne $reader) {
-                      while ($null -ne ($line = $reader.ReadLine())) { Write-Host $line }
-                      $reader.Close(); $fstream.Close()
-                  }
-                  $exit = $proc.ExitCode
-                  Write-Host "------------------------------------------------------------"
-                  Write-Host "AHK exit code: $exit"
-                  if (-not (Test-Path $resultsFile)) {
-                      Write-Error "test_results.txt not created — AHK may have crashed at startup."; exit 2
-                  }
-                  $summary = Get-Content $resultsFile | Select-String "^#" | Select-Object -Last 1
-                  Write-Host $summary
-                  if ($exit -ne 0) {
-                      Write-Error "Test suite failed (exit $exit)."; exit $exit
-                  }
-
-            - name: Check for AHK compiler warnings
-              shell: pwsh
-              timeout-minutes: 5
-              run: |
-                  $ahk = Get-ChildItem "C:\AutoHotkey" -Filter "AutoHotkey64.exe" |
-                      Select-Object -First 1 -ExpandProperty FullName
-                  $runner = "${{ github.workspace }}\static\ergopti_plus\windows\tests\run_all.ahk"
-                  # Pass --dry-run so AHK parses all files and emits warnings, then
-                  # exits immediately without running any Test() callbacks. This keeps
-                  # the warning check fast (~seconds) regardless of corpus size.
-                  $output = & cmd /c "`"$ahk`" `"$runner`" --dry-run 2>&1"
-                  $warnings = $output | Where-Object { $_ -match "^Warning:" }
-                  if ($warnings) {
-                      $warnings | ForEach-Object { Write-Host "  $_" }
-                      Write-Error "$($warnings.Count) AHK compiler warning(s) — fix before merging."
-                      exit 1
-                  }
-                  Write-Host "No AHK compiler warnings."
-
-    # ─────────────────────────────────────────────────
-    # 3.2) AHK E2E (pure engine injection, headless)
-    # ─────────────────────────────────────────────────
-    e2e-ahk:
-        name: "Windows · E2E"
-        runs-on: windows-latest
-        needs: [test-ahk]
-
-        steps:
-            - uses: actions/checkout@v4
-
-            - name: Cache AutoHotkey runtime
-              id: cache-ahk
-              uses: actions/cache@v4
-              with:
-                  path: C:\AutoHotkey
-                  key: ahk-v2.0.19-windows
-
-            - name: Download AutoHotkey v2 runtime
-              if: steps.cache-ahk.outputs.cache-hit != 'true'
-              shell: pwsh
-              run: |
-                  Invoke-WebRequest `
-                      -Uri "https://github.com/AutoHotkey/AutoHotkey/releases/download/v2.0.19/AutoHotkey_2.0.19.zip" `
-                      -OutFile "$env:TEMP\AHK.zip" -UseBasicParsing
-                  Expand-Archive -Path "$env:TEMP\AHK.zip" -DestinationPath "C:\AutoHotkey" -Force
-
-            - name: Verify E2E runner encoding
-              shell: pwsh
-              run: |
-                  $file = "${{ github.workspace }}\static\ergopti_plus\windows\tests\e2e\run_e2e.ahk"
-                  $bytes = [System.IO.File]::ReadAllBytes($file)
-                  if ($bytes[0] -ne 0xEF -or $bytes[1] -ne 0xBB -or $bytes[2] -ne 0xBF) {
-                      Write-Error "run_e2e.ahk is missing UTF-8 BOM."; exit 1
-                  }
-                  $content = [System.IO.File]::ReadAllText($file, [System.Text.Encoding]::UTF8)
-                  if (($content -replace "`r`n", "") -match "`n") {
-                      Write-Error "run_e2e.ahk contains bare LF line endings."; exit 1
-                  }
-                  Write-Host "Encoding OK: UTF-8 BOM + CRLF."
-
-            - name: Build features manifest
-              shell: pwsh
-              run: npm ci; npm run build:manifest
-
-            - name: Run E2E suite (Strategy A — pure engine injection)
-              shell: pwsh
-              timeout-minutes: 5
-              run: |
-                  $ahk = Get-ChildItem "C:\AutoHotkey" -Filter "AutoHotkey64.exe" |
-                      Select-Object -First 1 -ExpandProperty FullName
-                  if (-not $ahk) { Write-Error "AutoHotkey64.exe not found."; exit 2 }
-                  $runner = "${{ github.workspace }}\static\ergopti_plus\windows\tests\e2e\run_e2e.ahk"
-                  $resultsFile = "${{ github.workspace }}\static\ergopti_plus\windows\tests\e2e\test_results.txt"
-                  Remove-Item $resultsFile -Force -ErrorAction SilentlyContinue
-                  Write-Host "AHK runtime : $ahk"
-                  Write-Host "E2E runner  : $runner"
-                  Write-Host "------------------------------------------------------------"
-                  # Same approach as the unit test suite: AHK writes TAP output to
-                  # test_results.txt (FileAppend to "*" blocks without a console handle).
-                  # Tail-read the file for real-time CI log output.
-                  $proc = Start-Process -FilePath $ahk -ArgumentList $runner -NoNewWindow -PassThru
-                  $fstream = $null; $reader = $null
-                  while (-not $proc.HasExited) {
-                      if ($null -eq $fstream -and (Test-Path $resultsFile)) {
-                          try {
-                              $fstream = [System.IO.FileStream]::new($resultsFile,
-                                  [System.IO.FileMode]::Open,
-                                  [System.IO.FileAccess]::Read,
-                                  [System.IO.FileShare]::ReadWrite)
-                              $reader = [System.IO.StreamReader]::new($fstream)
-                          } catch {
-                              # AHK may still hold an exclusive write lock; retry next tick
-                              Start-Sleep -Milliseconds 100
-                          }
-                      }
-                      if ($null -ne $reader) {
-                          $line = $reader.ReadLine()
-                          if ($null -ne $line) { Write-Host $line } else { Start-Sleep -Milliseconds 100 }
-                      } else { Start-Sleep -Milliseconds 100 }
-                  }
-                  if ($null -ne $reader) {
-                      while ($null -ne ($line = $reader.ReadLine())) { Write-Host $line }
-                      $reader.Close(); $fstream.Close()
-                  }
-                  $exit = $proc.ExitCode
-                  Write-Host "------------------------------------------------------------"
-                  Write-Host "Exit code: $exit"
-                  if (-not (Test-Path $resultsFile)) {
-                      Write-Error "test_results.txt not created — AHK may have crashed at startup."; exit 2
-                  }
-                  if ($exit -ne 0) {
-                      Write-Error "E2E suite failed (exit $exit)."; exit $exit
-                  }
-
-    # ─────────────────────────────────────────────────
-    # 3.3) Gate: Windows driver fully green
-    # ─────────────────────────────────────────────────
-    windows-ok:
-        name: "Windows · ✅ all green"
-        runs-on: ubuntu-latest
-        needs: [test-ahk, e2e-ahk]
-        if: always()
-
-        steps:
-            - name: Assert all Windows jobs passed
-              run: |
-                  failed=0
-                  for job_result in "${{ needs.test-ahk.result }}" "${{ needs.e2e-ahk.result }}"; do
-                      if [[ "$job_result" == "failure" || "$job_result" == "cancelled" ]]; then
-                          failed=1
-                      fi
-                  done
-                  if [[ $failed -eq 1 ]]; then
-                      echo "Windows driver: one or more jobs failed."
-                      echo "  test-ahk : ${{ needs.test-ahk.result }}"
-                      echo "  e2e-ahk  : ${{ needs.e2e-ahk.result }}"
-                      exit 1
-                  fi
-                  echo "Windows driver: all jobs passed (or skipped)."
-                  echo "  test-ahk : ${{ needs.test-ahk.result }}"
-                  echo "  e2e-ahk  : ${{ needs.e2e-ahk.result }}"
-
-    # ============================================
-    # ============================================
-    # ======= 4/ Linux driver branch =============
-    # ============================================
-    # ============================================
-
-    # ─────────────────────────────────────────────────
-    # 4.1) Linux Lua driver tests
-    # ─────────────────────────────────────────────────
-    test-linux:
-        name: "Linux · unit tests"
-        runs-on: ubuntu-22.04
-        needs: [validate-hotstrings, validate-domain, validate-js, validate-translations]
-
-        steps:
-            - uses: actions/checkout@v4
-
-            - name: Install LuaJIT
-              run: sudo apt-get update -qq && sudo apt-get install -y luajit
-
-            - name: Run Linux driver test suite
-              working-directory: static/ergopti_plus/linux
-              run: luajit tests/run.lua
-
-    # ─────────────────────────────────────────────────
-    # 4.2) Gate: Linux driver fully green
-    # ─────────────────────────────────────────────────
-    linux-ok:
-        name: "Linux · ✅ all green"
-        runs-on: ubuntu-latest
-        needs: [test-linux]
-        if: always()
-
-        steps:
-            - name: Assert all Linux jobs passed
-              run: |
-                  if [[ "${{ needs.test-linux.result }}" == "failure" || \
-                        "${{ needs.test-linux.result }}" == "cancelled" ]]; then
-                      echo "Linux driver: test-linux failed."
-                      echo "  test-linux : ${{ needs.test-linux.result }}"
-                      exit 1
-                  fi
-                  echo "Linux driver: all jobs passed (or skipped)."
-                  echo "  test-linux : ${{ needs.test-linux.result }}"
-
-    # =============================================================
-    # =============================================================
-    # ======= 5/ Resolve release metadata (main + dev) ============
-    # =============================================================
-    # =============================================================
-
-    resolve-release-meta:
-        name: "Release · resolve tag + version"
-        runs-on: ubuntu-latest
-        needs: [macos-ok, windows-ok, linux-ok]
-        # Runs on push to main or dev — not on PRs
-        if: >
-            always() &&
-            github.event_name == 'push' &&
-            (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev') &&
-            needs.macos-ok.result   == 'success' &&
-            needs.windows-ok.result == 'success' &&
-            needs.linux-ok.result   == 'success'
-        permissions:
-            contents: write
-        outputs:
-            tag: ${{ steps.meta.outputs.tag }}
-            version: ${{ steps.meta.outputs.version }}
-            title: ${{ steps.meta.outputs.title }}
-            prerelease: ${{ steps.meta.outputs.prerelease }}
-            skip: ${{ steps.meta.outputs.skip }}
-
-        steps:
-            - uses: actions/checkout@v4
-              with:
-                  fetch-depth: 0
-
-            - name: Compute tag and version
-              id: meta
-              shell: bash
-              run: |
-                  set -euo pipefail
-                  branch="${GITHUB_REF_NAME}"
-
-                  if [ "$branch" = "main" ]; then
-                      last_stable=$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname \
-                          | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1 || true)
-                      if [ -z "$last_stable" ]; then
-                          last_stable="v0.0.0"
-                          range="HEAD"
+              # Human-readable delta since the last stable tag
+              last_stable=$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname \
+                  | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1 || true)
+              if [ -n "$last_stable" ]; then
+                  range="${last_stable}..HEAD"
+                  n_feat=0; n_fix=0; n_other=0; n_breaking=0
+                  while IFS= read -r subject; do
+                      [ -z "$subject" ] && continue
+                      if echo "$subject" | grep -qE '(BREAKING|!):'; then
+                          n_breaking=$((n_breaking+1))
+                      elif echo "$subject" | grep -qE '^feat(\([^)]+\))?!?:'; then
+                          n_feat=$((n_feat+1))
+                      elif echo "$subject" | grep -qE '^fix(\([^)]+\))?:'; then
+                          n_fix=$((n_fix+1))
                       else
-                          range="${last_stable}..HEAD"
+                          n_other=$((n_other+1))
                       fi
-                      IFS='.' read -r maj min pat <<< "${last_stable#v}"
-                      bump="patch"
-                      while IFS= read -r subject; do
-                          [ -z "$subject" ] && continue
-                          if echo "$subject" | grep -qE '(BREAKING|!):'; then
-                              bump="major"; break
-                          elif echo "$subject" | grep -qE '^feat(\([^)]+\))?!?:'; then
-                              [ "$bump" != "major" ] && bump="minor"
-                          fi
-                      done < <(git log "$range" --no-merges --pretty=format:"%s")
-                      case "$bump" in
-                          major) maj=$((maj+1)); min=0; pat=0 ;;
-                          minor) min=$((min+1)); pat=0 ;;
-                          patch) pat=$((pat+1)) ;;
-                      esac
-                      tag="v${maj}.${min}.${pat}"
-                      prerelease="false"
-                      title="Ergopti ${tag}"
+                  done < <(git log "$range" --no-merges --pretty=format:"%s")
+                  delta=""
+                  [ "$n_breaking" -gt 0 ] && delta="${delta}!! ${n_breaking} breaking, "
+                  [ "$n_feat"     -gt 0 ] && delta="${delta}✨ ${n_feat} feat, "
+                  [ "$n_fix"      -gt 0 ] && delta="${delta}🔧 ${n_fix} fix, "
+                  [ "$n_other"    -gt 0 ] && delta="${delta}📦 ${n_other} other, "
+                  delta="${delta%, }"
+                  if [ -n "$delta" ]; then
+                      title="Ergopti ${tag} — ${delta} (since ${last_stable})"
                   else
-                      # dev branch — v0.0.0-dev.N series
-                      last_dev=$(git tag --list 'v0.0.0-dev.*' --sort=-v:refname | head -1 || true)
-                      if [ -z "$last_dev" ]; then
-                          next_n=1
-                      else
-                          last_n="${last_dev##*.}"
-                          next_n=$((last_n + 1))
-                      fi
-                      tag="v0.0.0-dev.${next_n}"
-                      prerelease="true"
-
-                      # Human-readable delta since the last stable tag
-                      last_stable=$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname \
-                          | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1 || true)
-                      if [ -n "$last_stable" ]; then
-                          range="${last_stable}..HEAD"
-                          n_feat=0; n_fix=0; n_other=0; n_breaking=0
-                          while IFS= read -r subject; do
-                              [ -z "$subject" ] && continue
-                              if echo "$subject" | grep -qE '(BREAKING|!):'; then
-                                  n_breaking=$((n_breaking+1))
-                              elif echo "$subject" | grep -qE '^feat(\([^)]+\))?!?:'; then
-                                  n_feat=$((n_feat+1))
-                              elif echo "$subject" | grep -qE '^fix(\([^)]+\))?:'; then
-                                  n_fix=$((n_fix+1))
-                              else
-                                  n_other=$((n_other+1))
-                              fi
-                          done < <(git log "$range" --no-merges --pretty=format:"%s")
-                          delta=""
-                          [ "$n_breaking" -gt 0 ] && delta="${delta}!! ${n_breaking} breaking, "
-                          [ "$n_feat"     -gt 0 ] && delta="${delta}✨ ${n_feat} feat, "
-                          [ "$n_fix"      -gt 0 ] && delta="${delta}🔧 ${n_fix} fix, "
-                          [ "$n_other"    -gt 0 ] && delta="${delta}📦 ${n_other} other, "
-                          delta="${delta%, }"
-                          if [ -n "$delta" ]; then
-                              title="Ergopti ${tag} — ${delta} (since ${last_stable})"
-                          else
-                              title="Ergopti ${tag} (since ${last_stable})"
-                          fi
-                      else
-                          title="Ergopti ${tag}"
-                      fi
+                      title="Ergopti ${tag} (since ${last_stable})"
                   fi
+              else
+                  title="Ergopti ${tag}"
+              fi
+          fi
 
-                  # Skip if the tag already exists (duplicate push guard)
-                  if git ls-remote --tags origin "refs/tags/$tag" | grep -q "$tag"; then
-                      echo "Tag '$tag' already exists — skipping release."
-                      echo "skip=true" >> "$GITHUB_OUTPUT"
-                      echo "tag=$tag"               >> "$GITHUB_OUTPUT"
-                      echo "version=${tag#v}"       >> "$GITHUB_OUTPUT"
-                      echo "title=$title"           >> "$GITHUB_OUTPUT"
-                      echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
-                      exit 0
-                  fi
+          # Skip if the tag already exists (duplicate push guard)
+          if git ls-remote --tags origin "refs/tags/$tag" | grep -q "$tag"; then
+              echo "Tag '$tag' already exists — skipping release."
+              echo "skip=true" >> "$GITHUB_OUTPUT"
+              echo "tag=$tag"               >> "$GITHUB_OUTPUT"
+              echo "version=${tag#v}"       >> "$GITHUB_OUTPUT"
+              echo "title=$title"           >> "$GITHUB_OUTPUT"
+              echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
+              exit 0
+          fi
 
-                  version="${tag#v}"
-                  echo "tag=$tag"               >> "$GITHUB_OUTPUT"
-                  echo "version=$version"       >> "$GITHUB_OUTPUT"
-                  echo "title=$title"           >> "$GITHUB_OUTPUT"
-                  echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
-                  echo "skip=false"             >> "$GITHUB_OUTPUT"
-                  echo "Resolved: tag=$tag version=$version prerelease=$prerelease"
-                  echo "Title: $title"
+          version="${tag#v}"
+          echo "tag=$tag"               >> "$GITHUB_OUTPUT"
+          echo "version=$version"       >> "$GITHUB_OUTPUT"
+          echo "title=$title"           >> "$GITHUB_OUTPUT"
+          echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
+          echo "skip=false"             >> "$GITHUB_OUTPUT"
+          echo "Resolved: tag=$tag version=$version prerelease=$prerelease"
+          echo "Title: $title"
 
-    # =========================================================
-    # =========================================================
-    # ======= 6/ Build release assets (all three platforms) ===
-    # =========================================================
-    # =========================================================
+  # =========================================================
+  # =========================================================
+  # ======= 6/ Build release assets (all three platforms) ===
+  # =========================================================
+  # =========================================================
 
-    # ─────────────────────────────────────────────────
-    # 6.1) macOS — ErgoptiPlus.app + Sparkle appcast
-    # ─────────────────────────────────────────────────
-    build-macos:
-        name: "Release · macOS build"
-        needs: resolve-release-meta
-        if: needs.resolve-release-meta.outputs.skip == 'false'
-        runs-on: macos-latest
+  # ─────────────────────────────────────────────────
+  # 6.1) macOS — ErgoptiPlus.app + Sparkle appcast
+  # ─────────────────────────────────────────────────
+  build-macos:
+    name: 'Release · macOS build'
+    needs: resolve-release-meta
+    if: needs.resolve-release-meta.outputs.skip == 'false'
+    runs-on: macos-latest
+    env:
+      SPARKLE_ED_PRIVATE_KEY: ${{ secrets.SPARKLE_ED_PRIVATE_KEY }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Build ErgoptiPlus.app
+        shell: bash
         env:
-            SPARKLE_ED_PRIVATE_KEY: ${{ secrets.SPARKLE_ED_PRIVATE_KEY }}
+          ERGOPTI_VERSION: ${{ needs.resolve-release-meta.outputs.version }}
+          ERGOPTI_BUILD: ${{ github.run_number }}
+          ERGOPTI_CHANNEL: main
+          SPARKLE_PUBLIC_KEY: ${{ secrets.SPARKLE_PUBLIC_KEY }}
+          GH_OWNER: ${{ github.repository_owner }}
+          GH_REPO: ${{ github.event.repository.name }}
+        run: bash tools/build/build_macos_app.sh
 
-        steps:
-            - uses: actions/checkout@v4
-              with:
-                  fetch-depth: 0
+      - name: Install Sparkle signing tool
+        if: ${{ env.SPARKLE_ED_PRIVATE_KEY != '' }}
+        shell: bash
+        env:
+          SPARKLE_VERSION: '2.9.2'
+        run: |
+          set -euo pipefail
+          curl -fsSLo /tmp/Sparkle.tar.xz \
+              "https://github.com/sparkle-project/Sparkle/releases/download/${SPARKLE_VERSION}/Sparkle-${SPARKLE_VERSION}.tar.xz"
+          mkdir -p /tmp/sparkle-dist
+          tar -xJf /tmp/Sparkle.tar.xz -C /tmp/sparkle-dist
+          echo "SIGN_UPDATE=/tmp/sparkle-dist/bin/sign_update" >> "$GITHUB_ENV"
 
-            - name: Build ErgoptiPlus.app
-              shell: bash
-              env:
-                  ERGOPTI_VERSION: ${{ needs.resolve-release-meta.outputs.version }}
-                  ERGOPTI_BUILD: ${{ github.run_number }}
-                  ERGOPTI_CHANNEL: main
-                  SPARKLE_PUBLIC_KEY: ${{ secrets.SPARKLE_PUBLIC_KEY }}
-                  GH_OWNER: ${{ github.repository_owner }}
-                  GH_REPO: ${{ github.event.repository.name }}
-              run: bash tools/build/build_macos_app.sh
+      - name: Sign zip with Sparkle EdDSA key
+        if: ${{ env.SPARKLE_ED_PRIVATE_KEY != '' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '%s' "$SPARKLE_ED_PRIVATE_KEY" > /tmp/sparkle_priv.key
+          "$SIGN_UPDATE" -f /tmp/sparkle_priv.key build/macos/ErgoptiPlus.app.zip \
+              > build/macos/_ErgoptiPlus.app.zip.sig
+          rm -f /tmp/sparkle_priv.key
+          echo "Sparkle EdDSA signature written to _ErgoptiPlus.app.zip.sig"
 
-            - name: Install Sparkle signing tool
-              if: ${{ env.SPARKLE_ED_PRIVATE_KEY != '' }}
-              shell: bash
-              env:
-                  SPARKLE_VERSION: "2.9.2"
-              run: |
-                  set -euo pipefail
-                  curl -fsSLo /tmp/Sparkle.tar.xz \
-                      "https://github.com/sparkle-project/Sparkle/releases/download/${SPARKLE_VERSION}/Sparkle-${SPARKLE_VERSION}.tar.xz"
-                  mkdir -p /tmp/sparkle-dist
-                  tar -xJf /tmp/Sparkle.tar.xz -C /tmp/sparkle-dist
-                  echo "SIGN_UPDATE=/tmp/sparkle-dist/bin/sign_update" >> "$GITHUB_ENV"
+      - name: Generate Sparkle appcast
+        if: ${{ env.SPARKLE_ED_PRIVATE_KEY != '' }}
+        shell: bash
+        env:
+          ERGOPTI_VERSION: ${{ needs.resolve-release-meta.outputs.version }}
+          ERGOPTI_BUILD: ${{ github.run_number }}
+          ERGOPTI_CHANNEL: main
+          SPARKLE_SIG_FILE: build/macos/_ErgoptiPlus.app.zip.sig
+          ZIP_PATH: build/macos/ErgoptiPlus.app.zip
+          GH_OWNER: ${{ github.repository_owner }}
+          GH_REPO: ${{ github.event.repository.name }}
+          OUTPUT_PATH: build/macos/appcast-main.xml
+        run: bash tools/build/generate_appcast.sh
 
-            - name: Sign zip with Sparkle EdDSA key
-              if: ${{ env.SPARKLE_ED_PRIVATE_KEY != '' }}
-              shell: bash
-              run: |
-                  set -euo pipefail
-                  printf '%s' "$SPARKLE_ED_PRIVATE_KEY" > /tmp/sparkle_priv.key
-                  "$SIGN_UPDATE" -f /tmp/sparkle_priv.key build/macos/ErgoptiPlus.app.zip \
-                      > build/macos/_ErgoptiPlus.app.zip.sig
-                  rm -f /tmp/sparkle_priv.key
-                  echo "Sparkle EdDSA signature written to _ErgoptiPlus.app.zip.sig"
+      - name: Package latest keylayout bundle
+        shell: bash
+        # Released as Ergopti_macOS.zip — keyboard layout only, no app.
+        run: |
+          set -euo pipefail
+          latest=$(ls -d static/ergopti/macos/bundles/*.bundle | sort -V | tail -1)
+          bundle_name=$(basename "$latest")
+          (cd static/ergopti/macos/bundles && zip -r "../../../../build/macos/Ergopti_macOS.zip" "$bundle_name")
+          echo "Packaged keylayout: $bundle_name → Ergopti_macOS.zip"
 
-            - name: Generate Sparkle appcast
-              if: ${{ env.SPARKLE_ED_PRIVATE_KEY != '' }}
-              shell: bash
-              env:
-                  ERGOPTI_VERSION: ${{ needs.resolve-release-meta.outputs.version }}
-                  ERGOPTI_BUILD: ${{ github.run_number }}
-                  ERGOPTI_CHANNEL: main
-                  SPARKLE_SIG_FILE: build/macos/_ErgoptiPlus.app.zip.sig
-                  ZIP_PATH: build/macos/ErgoptiPlus.app.zip
-                  GH_OWNER: ${{ github.repository_owner }}
-                  GH_REPO: ${{ github.event.repository.name }}
-                  OUTPUT_PATH: build/macos/appcast-main.xml
-              run: bash tools/build/generate_appcast.sh
+      - name: Rename appcast for upload
+        shell: bash
+        run: |
+          [ -f build/macos/appcast-main.xml ] && mv build/macos/appcast-main.xml build/macos/_appcast-main.xml || true
 
-            - name: Package latest keylayout bundle
-              shell: bash
-              # Released as Ergopti_macOS.zip — keyboard layout only, no app.
-              run: |
-                  set -euo pipefail
-                  latest=$(ls -d static/ergopti/macos/bundles/*.bundle | sort -V | tail -1)
-                  bundle_name=$(basename "$latest")
-                  (cd static/ergopti/macos/bundles && zip -r "../../../../build/macos/Ergopti_macOS.zip" "$bundle_name")
-                  echo "Packaged keylayout: $bundle_name → Ergopti_macOS.zip"
+      - name: Upload macOS artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: assets-macos
+          retention-days: 1
+          path: |
+            build/macos/ErgoptiPlus.app.zip
+            build/macos/Ergopti_macOS.zip
+            build/macos/_ErgoptiPlus.app.zip.sig
+            build/macos/_appcast-main.xml
 
-            - name: Rename appcast for upload
-              shell: bash
-              run: |
-                  [ -f build/macos/appcast-main.xml ] && mv build/macos/appcast-main.xml build/macos/_appcast-main.xml || true
+  # ─────────────────────────────────────────────────
+  # 6.2) Windows — ErgoptiPlus.exe + keyboard layout
+  # ─────────────────────────────────────────────────
+  build-windows:
+    name: 'Release · Windows build'
+    needs: resolve-release-meta
+    if: needs.resolve-release-meta.outputs.skip == 'false'
+    runs-on: windows-latest
 
-            - name: Upload macOS artifacts
-              uses: actions/upload-artifact@v4
-              with:
-                  name: assets-macos
-                  retention-days: 1
-                  path: |
-                      build/macos/ErgoptiPlus.app.zip
-                      build/macos/Ergopti_macOS.zip
-                      build/macos/_ErgoptiPlus.app.zip.sig
-                      build/macos/_appcast-main.xml
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-    # ─────────────────────────────────────────────────
-    # 6.2) Windows — ErgoptiPlus.exe + keyboard layout
-    # ─────────────────────────────────────────────────
-    build-windows:
-        name: "Release · Windows build"
-        needs: resolve-release-meta
-        if: needs.resolve-release-meta.outputs.skip == 'false'
-        runs-on: windows-latest
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
 
-        steps:
-            - uses: actions/checkout@v4
-              with:
-                  fetch-depth: 0
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
 
-            - name: Set up Python
-              uses: actions/setup-python@v5
-              with:
-                  python-version: "3.12"
+      - name: Install Node dependencies
+        run: npm ci
+        shell: bash
 
-            - name: Set up Node.js
-              uses: actions/setup-node@v4
-              with:
-                  node-version: "22"
-                  cache: "npm"
+      - name: Generate features manifest
+        run: npm run build:manifest
+        shell: bash
 
-            - name: Install Node dependencies
-              run: npm ci
-              shell: bash
+      - name: Regenerate hotstrings_generated.ahk
+        run: python tools/locale/compile_hotstrings.py
+        shell: bash
 
-            - name: Generate features manifest
-              run: npm run build:manifest
-              shell: bash
+      - name: Build static asset bundle
+        run: python tools/build/build_static_bundle.py
+        shell: bash
 
-            - name: Regenerate hotstrings_generated.ahk
-              run: python tools/locale/compile_hotstrings.py
-              shell: bash
+      - name: Stamp BUNDLE_VERSION, BUNDLE_RELEASE_URL, BUNDLE_CHANNEL
+        shell: pwsh
+        run: |
+          $version = "${{ needs.resolve-release-meta.outputs.version }}"
+          $tag     = "${{ needs.resolve-release-meta.outputs.tag }}"
+          if (-not $tag) { $tag = $version }
+          $prerelease = "${{ needs.resolve-release-meta.outputs.prerelease }}"
+          $channel = if ($prerelease -eq 'true') { 'dev' } else { 'main' }
+          $owner   = "${{ github.repository_owner }}"
+          $repo    = "${{ github.event.repository.name }}"
+          $releaseUrl = "https://github.com/$owner/$repo/releases/tag/$tag"
+          $bundlePath = "${{ github.workspace }}\static\ergopti_plus\windows\lib\bundle.ahk"
+          $text = Get-Content -Raw -Path $bundlePath
+          $text = $text.Replace("__BUNDLE_VERSION__",     $version)
+          $text = $text.Replace("__BUNDLE_RELEASE_URL__", $releaseUrl)
+          $text = $text.Replace("__BUNDLE_CHANNEL__",     $channel)
+          Set-Content -Path $bundlePath -Value $text -Encoding UTF8 -NoNewline
+          Write-Host "BUNDLE_VERSION     stamped: $version"
+          Write-Host "BUNDLE_RELEASE_URL stamped: $releaseUrl"
+          Write-Host "BUNDLE_CHANNEL     stamped: $channel"
 
-            - name: Build static asset bundle
-              run: python tools/build/build_static_bundle.py
-              shell: bash
+      - name: Download AutoHotkey v2 runtime and Ahk2Exe
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          Invoke-WebRequest -Uri "https://github.com/AutoHotkey/AutoHotkey/releases/download/v2.0.19/AutoHotkey_2.0.19.zip" -OutFile "$env:TEMP\AHK.zip" -UseBasicParsing
+          Expand-Archive -Path "$env:TEMP\AHK.zip" -DestinationPath "$env:TEMP\AutoHotkey" -Force
+          gh release download --repo AutoHotkey/Ahk2Exe --pattern "*.zip" --dir "$env:TEMP\Ahk2ExeZip"
+          $z = Get-ChildItem "$env:TEMP\Ahk2ExeZip" -Filter "*.zip" | Select-Object -First 1
+          Expand-Archive -Path $z.FullName -DestinationPath "$env:TEMP\Ahk2Exe" -Force
 
-            - name: Stamp BUNDLE_VERSION, BUNDLE_RELEASE_URL, BUNDLE_CHANNEL
-              shell: pwsh
-              run: |
-                  $version = "${{ needs.resolve-release-meta.outputs.version }}"
-                  $tag     = "${{ needs.resolve-release-meta.outputs.tag }}"
-                  if (-not $tag) { $tag = $version }
-                  $prerelease = "${{ needs.resolve-release-meta.outputs.prerelease }}"
-                  $channel = if ($prerelease -eq 'true') { 'dev' } else { 'main' }
-                  $owner   = "${{ github.repository_owner }}"
-                  $repo    = "${{ github.event.repository.name }}"
-                  $releaseUrl = "https://github.com/$owner/$repo/releases/tag/$tag"
-                  $bundlePath = "${{ github.workspace }}\static\ergopti_plus\windows\lib\bundle.ahk"
-                  $text = Get-Content -Raw -Path $bundlePath
-                  $text = $text.Replace("__BUNDLE_VERSION__",     $version)
-                  $text = $text.Replace("__BUNDLE_RELEASE_URL__", $releaseUrl)
-                  $text = $text.Replace("__BUNDLE_CHANNEL__",     $channel)
-                  Set-Content -Path $bundlePath -Value $text -Encoding UTF8 -NoNewline
-                  Write-Host "BUNDLE_VERSION     stamped: $version"
-                  Write-Host "BUNDLE_RELEASE_URL stamped: $releaseUrl"
-                  Write-Host "BUNDLE_CHANNEL     stamped: $channel"
+      - name: Compile ErgoptiPlus.ahk
+        shell: pwsh
+        run: |
+          $ahk2exe = Get-ChildItem "$env:TEMP\Ahk2Exe" -Recurse -Filter "Ahk2Exe.exe" | Select-Object -First 1 -ExpandProperty FullName
+          $runtime = Get-ChildItem "$env:TEMP\AutoHotkey" -Filter "AutoHotkey64.exe" | Select-Object -First 1 -ExpandProperty FullName
+          $in   = "${{ github.workspace }}\static\ergopti_plus\windows\ErgoptiPlus.ahk"
+          $out  = "${{ github.workspace }}\static\ergopti_plus\windows\ErgoptiPlus.exe"
+          $icon = "${{ github.workspace }}\static\favicon.ico"
+          # /silent suppresses any Ahk2Exe GUI dialogs that would block
+          # indefinitely on a headless runner and cause a silent non-zero exit.
+          & $ahk2exe /in $in /out $out /base $runtime /icon $icon /silent
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          # Verify the EXE was actually produced — Ahk2Exe can exit 0 on a
+          # compilation warning without writing the output file.
+          if (-not (Test-Path $out)) {
+              Write-Error "Ahk2Exe reported success but $out was not created."
+              exit 1
+          }
+          Write-Host "Compiled: $out ($('{0:N0}' -f (Get-Item $out).Length) bytes)"
 
-            - name: Download AutoHotkey v2 runtime and Ahk2Exe
-              shell: pwsh
-              env:
-                  GH_TOKEN: ${{ github.token }}
-              run: |
-                  Invoke-WebRequest -Uri "https://github.com/AutoHotkey/AutoHotkey/releases/download/v2.0.19/AutoHotkey_2.0.19.zip" -OutFile "$env:TEMP\AHK.zip" -UseBasicParsing
-                  Expand-Archive -Path "$env:TEMP\AHK.zip" -DestinationPath "$env:TEMP\AutoHotkey" -Force
-                  gh release download --repo AutoHotkey/Ahk2Exe --pattern "*.zip" --dir "$env:TEMP\Ahk2ExeZip"
-                  $z = Get-ChildItem "$env:TEMP\Ahk2ExeZip" -Filter "*.zip" | Select-Object -First 1
-                  Expand-Archive -Path $z.FullName -DestinationPath "$env:TEMP\Ahk2Exe" -Force
+      - name: Rename Windows keyboard layout for upload
+        shell: bash
+        run: |
+          set -euo pipefail
+          latest_kbd=$(ls static/ergopti/windows/Ergopti_v*.exe | sort -V | tail -1)
+          cp "$latest_kbd" static/ergopti/windows/Ergopti_windows.exe
 
-            - name: Compile ErgoptiPlus.ahk
-              shell: pwsh
-              run: |
-                  $ahk2exe = Get-ChildItem "$env:TEMP\Ahk2Exe" -Recurse -Filter "Ahk2Exe.exe" | Select-Object -First 1 -ExpandProperty FullName
-                  $runtime = Get-ChildItem "$env:TEMP\AutoHotkey" -Filter "AutoHotkey64.exe" | Select-Object -First 1 -ExpandProperty FullName
-                  $in   = "${{ github.workspace }}\static\ergopti_plus\windows\ErgoptiPlus.ahk"
-                  $out  = "${{ github.workspace }}\static\ergopti_plus\windows\ErgoptiPlus.exe"
-                  $icon = "${{ github.workspace }}\static\favicon.ico"
-                  # /silent suppresses any Ahk2Exe GUI dialogs that would block
-                  # indefinitely on a headless runner and cause a silent non-zero exit.
-                  & $ahk2exe /in $in /out $out /base $runtime /icon $icon /silent
-                  if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-                  # Verify the EXE was actually produced — Ahk2Exe can exit 0 on a
-                  # compilation warning without writing the output file.
-                  if (-not (Test-Path $out)) {
-                      Write-Error "Ahk2Exe reported success but $out was not created."
-                      exit 1
-                  }
-                  Write-Host "Compiled: $out ($('{0:N0}' -f (Get-Item $out).Length) bytes)"
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: assets-windows
+          retention-days: 1
+          path: |
+            static/ergopti_plus/windows/ErgoptiPlus.exe
+            static/ergopti/windows/Ergopti_windows.exe
 
-            - name: Rename Windows keyboard layout for upload
-              shell: bash
-              run: |
-                  set -euo pipefail
-                  latest_kbd=$(ls static/ergopti/windows/Ergopti_v*.exe | sort -V | tail -1)
-                  cp "$latest_kbd" static/ergopti/windows/Ergopti_windows.exe
+  # ─────────────────────────────────────────────────
+  # 6.3) Linux — XKB keyboard layouts
+  # ─────────────────────────────────────────────────
+  build-linux:
+    name: 'Release · Linux build'
+    needs: resolve-release-meta
+    if: needs.resolve-release-meta.outputs.skip == 'false'
+    runs-on: ubuntu-latest
 
-            - name: Upload Windows artifacts
-              uses: actions/upload-artifact@v4
-              with:
-                  name: assets-windows
-                  retention-days: 1
-                  path: |
-                      static/ergopti_plus/windows/ErgoptiPlus.exe
-                      static/ergopti/windows/Ergopti_windows.exe
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-    # ─────────────────────────────────────────────────
-    # 6.3) Linux — XKB keyboard layouts
-    # ─────────────────────────────────────────────────
-    build-linux:
-        name: "Release · Linux build"
-        needs: resolve-release-meta
-        if: needs.resolve-release-meta.outputs.skip == 'false'
-        runs-on: ubuntu-latest
+      - name: Package latest XKB files
+        shell: bash
+        run: |
+          set -euo pipefail
+          latest_dir=$(ls -d static/ergopti/linux/v*_* | sort -V | tail -1)
+          dir_name=$(basename "$latest_dir")
+          mkdir -p build/linux
+          (cd static/ergopti/linux && zip -r "../../../build/linux/Ergopti_xkb.zip" "$dir_name")
+          echo "Packaged XKB: $dir_name → Ergopti_xkb.zip"
 
-        steps:
-            - uses: actions/checkout@v4
-              with:
-                  fetch-depth: 0
+      - name: Upload Linux artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: assets-linux
+          retention-days: 1
+          path: |
+            build/linux/Ergopti_xkb.zip
+            static/ergopti_plus/kanata/kanata.kbd
+            static/ergopti_plus/linux/install.sh
 
-            - name: Package latest XKB files
-              shell: bash
-              run: |
-                  set -euo pipefail
-                  latest_dir=$(ls -d static/ergopti/linux/v*_* | sort -V | tail -1)
-                  dir_name=$(basename "$latest_dir")
-                  mkdir -p build/linux
-                  (cd static/ergopti/linux && zip -r "../../../build/linux/Ergopti_xkb.zip" "$dir_name")
-                  echo "Packaged XKB: $dir_name → Ergopti_xkb.zip"
+  # ============================================================
+  # ============================================================
+  # ======= 7/ Finalize release — create + upload assets =======
+  # ============================================================
+  # ============================================================
 
-            - name: Upload Linux artifacts
-              uses: actions/upload-artifact@v4
-              with:
-                  name: assets-linux
-                  retention-days: 1
-                  path: |
-                      build/linux/Ergopti_xkb.zip
-                      static/ergopti_plus/kanata/kanata.kbd
-                      static/ergopti_plus/linux/install.sh
+  finalize-release:
+    name: 'Release · finalize'
+    needs: [resolve-release-meta, build-macos, build-windows, build-linux]
+    if: needs.resolve-release-meta.outputs.skip == 'false'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
-    # ============================================================
-    # ============================================================
-    # ======= 7/ Finalize release — create + upload assets =======
-    # ============================================================
-    # ============================================================
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          # PAT required: GITHUB_TOKEN is blocked by the repo tag
+          # creation rule; only a PAT with admin bypass can push tags.
+          token: ${{ secrets.PAT_ERGOPTI }}
 
-    finalize-release:
-        name: "Release · finalize"
-        needs: [resolve-release-meta, build-macos, build-windows, build-linux]
-        if: needs.resolve-release-meta.outputs.skip == 'false'
-        runs-on: ubuntu-latest
-        permissions:
-            contents: write
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
 
-        steps:
-            - uses: actions/checkout@v4
-              with:
-                  fetch-depth: 0
-                  # PAT required: GITHUB_TOKEN is blocked by the repo tag
-                  # creation rule; only a PAT with admin bypass can push tags.
-                  token: ${{ secrets.PAT_ERGOPTI }}
+      - name: Create git tag
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.PAT_ERGOPTI }}
+        run: |
+          set -euo pipefail
+          tag="${{ needs.resolve-release-meta.outputs.tag }}"
+          sha="${{ github.sha }}"
+          gh api repos/${{ github.repository }}/git/refs \
+              --method POST \
+              --field ref="refs/tags/${tag}" \
+              --field sha="${sha}"
+          echo "Tag '$tag' created via API."
 
-            - name: Download all build artifacts
-              uses: actions/download-artifact@v4
-              with:
-                  path: release-assets
-                  merge-multiple: true
+      - name: Create release and upload all assets atomically
+        # The release is created here — after all three build jobs have
+        # succeeded — so it is never in a half-baked state.
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag="${{ needs.resolve-release-meta.outputs.tag }}"
+          prerelease="${{ needs.resolve-release-meta.outputs.prerelease }}"
+          title="${{ needs.resolve-release-meta.outputs.title }}"
 
-            - name: Create git tag
-              shell: bash
-              env:
-                  GH_TOKEN: ${{ secrets.PAT_ERGOPTI }}
-              run: |
-                  set -euo pipefail
-                  tag="${{ needs.resolve-release-meta.outputs.tag }}"
-                  sha="${{ github.sha }}"
-                  gh api repos/${{ github.repository }}/git/refs \
-                      --method POST \
-                      --field ref="refs/tags/${tag}" \
-                      --field sha="${sha}"
-                  echo "Tag '$tag' created via API."
+          mapfile -t assets < <(find release-assets -type f)
+          echo "Assets to attach (${#assets[@]}):"
+          printf '  %s\n' "${assets[@]}"
 
-            - name: Create release and upload all assets atomically
-              # The release is created here — after all three build jobs have
-              # succeeded — so it is never in a half-baked state.
-              shell: bash
-              env:
-                  GH_TOKEN: ${{ github.token }}
-              run: |
-                  set -euo pipefail
-                  tag="${{ needs.resolve-release-meta.outputs.tag }}"
-                  prerelease="${{ needs.resolve-release-meta.outputs.prerelease }}"
-                  title="${{ needs.resolve-release-meta.outputs.title }}"
+          flags=()
+          [ "$prerelease" = "true" ] && flags+=("--prerelease")
 
-                  mapfile -t assets < <(find release-assets -type f)
-                  echo "Assets to attach (${#assets[@]}):"
-                  printf '  %s\n' "${assets[@]}"
+          gh release create "$tag" \
+              --target "${{ github.sha }}" \
+              --title "$title" \
+              --notes "Changelog will appear below — updating now." \
+              "${flags[@]}" \
+              "${assets[@]}"
 
-                  flags=()
-                  [ "$prerelease" = "true" ] && flags+=("--prerelease")
+      - name: Build changelog section
+        shell: bash
+        env:
+          EVENT: ${{ github.event_name }}
+          TAG: ${{ needs.resolve-release-meta.outputs.tag }}
+          SHA: ${{ github.sha }}
+        run: |
+          # Fetch tags so git-describe can resolve the previous release tag.
+          # The tag for the current release was just created via the API and
+          # is not yet present in the shallow clone.
+          git fetch --tags --quiet
+          python3 tools/build/build_changelog.py > "$RUNNER_TEMP/changelog.md"
+          echo "Changelog written ($(wc -l < "$RUNNER_TEMP/changelog.md") lines)."
 
-                  gh release create "$tag" \
-                      --target "${{ github.sha }}" \
-                      --title "$title" \
-                      --notes "Changelog will appear below — updating now." \
-                      "${flags[@]}" \
-                      "${assets[@]}"
+      - name: Write release body with platform sections
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.resolve-release-meta.outputs.tag }}
+          VERSION: ${{ needs.resolve-release-meta.outputs.version }}
+        run: |
+          set -euo pipefail
+          body_file="$(mktemp)"
+          if [ -s "$RUNNER_TEMP/changelog.md" ]; then
+              cat "$RUNNER_TEMP/changelog.md" >> "$body_file"
+          fi
+          cat >> "$body_file" << EOF
+          ## Ergopti $VERSION
 
-            - name: Build changelog section
-              shell: bash
-              env:
-                  EVENT: ${{ github.event_name }}
-                  TAG: ${{ needs.resolve-release-meta.outputs.tag }}
-                  SHA: ${{ github.sha }}
-              run: |
-                  # Fetch tags so git-describe can resolve the previous release tag.
-                  # The tag for the current release was just created via the API and
-                  # is not yet present in the shallow clone.
-                  git fetch --tags --quiet
-                  python3 tools/build/build_changelog.py > "$RUNNER_TEMP/changelog.md"
-                  echo "Changelog written ($(wc -l < "$RUNNER_TEMP/changelog.md") lines)."
+          Select the platform below and download the corresponding file.
+          > Timestamps are in **Paris time** (Europe/Paris, CET/CEST).
 
-            - name: Write release body with platform sections
-              shell: bash
-              env:
-                  GH_TOKEN: ${{ github.token }}
-                  TAG: ${{ needs.resolve-release-meta.outputs.tag }}
-                  VERSION: ${{ needs.resolve-release-meta.outputs.version }}
-              run: |
-                  set -euo pipefail
-                  body_file="$(mktemp)"
-                  if [ -s "$RUNNER_TEMP/changelog.md" ]; then
-                      cat "$RUNNER_TEMP/changelog.md" >> "$body_file"
-                  fi
-                  cat >> "$body_file" << EOF
-                  ## Ergopti $VERSION
+          ---
 
-                  Select the platform below and download the corresponding file.
-                  > Timestamps are in **Paris time** (Europe/Paris, CET/CEST).
+          ### macOS
 
-                  ---
+          | Asset | Description |
+          |---|---|
+          | [ErgoptiPlus.app.zip](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/ErgoptiPlus.app.zip) | macOS application (Hammerspoon + Karabiner-Elements bundled) |
+          | [Ergopti_macOS.zip](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/Ergopti_macOS.zip) | Keyboard layout bundle only — no app required |
 
-                  ### macOS
+          **Installation — app:**
+          1. Unzip \`ErgoptiPlus.app.zip\` and move \`ErgoptiPlus.app\` to \`/Applications\`.
+          2. Remove the quarantine flag (the app is not yet Apple-notarised):
+          \`\`\`bash
+          xattr -d com.apple.quarantine /Applications/ErgoptiPlus.app
+          \`\`\`
+          3. Launch the app. On first run, Karabiner-Elements will request a System Extension approval — required for key remapping.
+          4. Your personal configuration is stored in \`~/.config/ergopti_plus/\`. If this folder does not exist yet (first launch), the setup wizard will open automatically.
 
-                  | Asset | Description |
-                  |---|---|
-                  | [ErgoptiPlus.app.zip](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/ErgoptiPlus.app.zip) | macOS application (Hammerspoon + Karabiner-Elements bundled) |
-                  | [Ergopti_macOS.zip](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/Ergopti_macOS.zip) | Keyboard layout bundle only — no app required |
+          **Installation — keyboard layout only:**
+          1. Unzip \`Ergopti_macOS.zip\`.
+          2. Copy the \`.bundle\` folder to \`/Library/Keyboard Layouts/\`.
+          3. Log out and back in, then add the layout in System Settings → Keyboard → Input Sources.
 
-                  **Installation — app:**
-                  1. Unzip \`ErgoptiPlus.app.zip\` and move \`ErgoptiPlus.app\` to \`/Applications\`.
-                  2. Remove the quarantine flag (the app is not yet Apple-notarised):
-                  \`\`\`bash
-                  xattr -d com.apple.quarantine /Applications/ErgoptiPlus.app
-                  \`\`\`
-                  3. Launch the app. On first run, Karabiner-Elements will request a System Extension approval — required for key remapping.
-                  4. Your personal configuration is stored in \`~/.config/ergopti_plus/\`. If this folder does not exist yet (first launch), the setup wizard will open automatically.
+          ---
 
-                  **Installation — keyboard layout only:**
-                  1. Unzip \`Ergopti_macOS.zip\`.
-                  2. Copy the \`.bundle\` folder to \`/Library/Keyboard Layouts/\`.
-                  3. Log out and back in, then add the layout in System Settings → Keyboard → Input Sources.
+          ### 🪟 Windows
 
-                  ---
+          | Asset | Description |
+          |---|---|
+          | [ErgoptiPlus.exe](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/ErgoptiPlus.exe) | Compiled AutoHotkey executable (AHK v2 runtime bundled) |
+          | [Ergopti_windows.exe](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/Ergopti_windows.exe) | Windows keyboard layout installer — no app required |
 
-                  ### 🪟 Windows
+          **Installation — app:**
+          1. Download \`ErgoptiPlus.exe\`.
+          2. Double-click to run. On first launch, resources are extracted to \`%LOCALAPPDATA%\Ergopti\`.
+          3. Your personal configuration is stored in \`%USERPROFILE%\.config\ergopti_plus\`. If this folder does not exist yet (first launch), the setup wizard will open automatically.
 
-                  | Asset | Description |
-                  |---|---|
-                  | [ErgoptiPlus.exe](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/ErgoptiPlus.exe) | Compiled AutoHotkey executable (AHK v2 runtime bundled) |
-                  | [Ergopti_windows.exe](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/Ergopti_windows.exe) | Windows keyboard layout installer — no app required |
+          **Installation — keyboard layout only:**
+          1. Download \`Ergopti_windows.exe\` and run it as Administrator.
+          2. Log out and back in, then select the layout in Settings → Time & Language → Language & region.
 
-                  **Installation — app:**
-                  1. Download \`ErgoptiPlus.exe\`.
-                  2. Double-click to run. On first launch, resources are extracted to \`%LOCALAPPDATA%\Ergopti\`.
-                  3. Your personal configuration is stored in \`%USERPROFILE%\.config\ergopti_plus\`. If this folder does not exist yet (first launch), the setup wizard will open automatically.
+          ---
 
-                  **Installation — keyboard layout only:**
-                  1. Download \`Ergopti_windows.exe\` and run it as Administrator.
-                  2. Log out and back in, then select the layout in Settings → Time & Language → Language & region.
+          ### Linux
 
-                  ---
+          | Asset | Description |
+          |---|---|
+          | [Ergopti_xkb.zip](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/Ergopti_xkb.zip) | XKB layout files (standard, ANSI, plus, plus-ANSI variants) |
+          | [kanata.kbd](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/kanata.kbd) | Kanata config file (for Kanata users) |
 
-                  ### Linux
+          **Installation:**
+          1. Unzip \`Ergopti_xkb.zip\`.
+          2. Follow the [XKB installation guide](https://github.com/${GITHUB_REPOSITORY}/tree/main/static/ergopti/linux/xkb_installation) in the repository.
 
-                  | Asset | Description |
-                  |---|---|
-                  | [Ergopti_xkb.zip](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/Ergopti_xkb.zip) | XKB layout files (standard, ANSI, plus, plus-ANSI variants) |
-                  | [kanata.kbd](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/kanata.kbd) | Kanata config file (for Kanata users) |
+          ---
 
-                  **Installation:**
-                  1. Unzip \`Ergopti_xkb.zip\`.
-                  2. Follow the [XKB installation guide](https://github.com/${GITHUB_REPOSITORY}/tree/main/static/ergopti/linux/xkb_installation) in the repository.
-
-                  ---
-
-                  _Generated by [CI](https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID})_
-                  EOF
-                  gh release edit "$TAG" --repo "${GITHUB_REPOSITORY}" --notes-file "$body_file"
-                  echo "Release notes updated for $TAG"
+          _Generated by [CI](https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID})_
+          EOF
+          gh release edit "$TAG" --repo "${GITHUB_REPOSITORY}" --notes-file "$body_file"
+          echo "Release notes updated for $TAG"

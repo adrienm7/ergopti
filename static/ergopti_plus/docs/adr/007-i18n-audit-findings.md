@@ -11,8 +11,8 @@ Item 1.3.6 of the hexagonal-architecture sprint requires an audit of every
 user-visible string to verify it flows through the i18n system (`i18n.get()`)
 rather than being hardcoded in source files.
 
-The project rule (copilot-instructions §1) states: *"ONLY user-facing text must
-be written in French"*, and by implication all UI strings must be internationalised
+The project rule (copilot-instructions §1) states: _"ONLY user-facing text must
+be written in French"_, and by implication all UI strings must be internationalised
 through the 21-language i18n table — never hardcoded.
 
 ---
@@ -24,16 +24,16 @@ through the 21-language i18n table — never hardcoded.
 All eight `hs.dialog.alert(...)` calls in `check_for_update()` contain hardcoded
 English strings. None pass through `i18n.get()`.
 
-| Line | String (truncated) |
-|------|--------------------|
-| 117 | "Running from local source — update checking…" |
-| 124 | "Could not reach GitHub.\nCheck your internet…" |
-| 129 | "Could not parse the latest release tag…" |
-| 133 | "ErgoptiPlus is up to date.\n\nCurrent version: " |
-| 136 | "A new version is available!\n\nCurrent: " |
-| 154 | "Could not reach GitHub…" (duplicate) |
-| 160 | "Could not retrieve release information from GitHub." |
-| 165 | (another release dialog, hardcoded) |
+| Line | String (truncated)                                    |
+| ---- | ----------------------------------------------------- |
+| 117  | "Running from local source — update checking…"        |
+| 124  | "Could not reach GitHub.\nCheck your internet…"       |
+| 129  | "Could not parse the latest release tag…"             |
+| 133  | "ErgoptiPlus is up to date.\n\nCurrent version: "     |
+| 136  | "A new version is available!\n\nCurrent: "            |
+| 154  | "Could not reach GitHub…" (duplicate)                 |
+| 160  | "Could not retrieve release information from GitHub." |
+| 165  | (another release dialog, hardcoded)                   |
 
 **Fix:** add i18n keys `menu.about.update.*` covering all eight message variants;
 replace hardcoded strings with `i18n.get("menu.about.update.up_to_date")` etc.
@@ -45,13 +45,13 @@ replace hardcoded strings with `i18n.get("menu.about.update.up_to_date")` etc.
 The Karabiner onboarding error-path calls `callback(false, "…")` and
 `hs.alert.show("…")` with hardcoded French strings.
 
-| Approx. line | String |
-|--------------|--------|
-| 533 | "• Karabiner-Elements n'est pas installé" |
-| 545 | "• L'extension système (DriverKit) n'est pas activée" |
-| 553 | "\n\nL'application va être téléchargée depuis le dépôt officiel…" |
-| ~561 | "Manifest non configuré (champs TODO)." |
-| ~563 | "Mount échoué : " + err |
+| Approx. line | String                                                            |
+| ------------ | ----------------------------------------------------------------- |
+| 533          | "• Karabiner-Elements n'est pas installé"                         |
+| 545          | "• L'extension système (DriverKit) n'est pas activée"             |
+| 553          | "\n\nL'application va être téléchargée depuis le dépôt officiel…" |
+| ~561         | "Manifest non configuré (champs TODO)."                           |
+| ~563         | "Mount échoué : " + err                                           |
 
 **Fix:** add i18n keys `karabiner.onboarding.error.*`; route through `i18n.get()`.
 
@@ -59,10 +59,10 @@ The Karabiner onboarding error-path calls `callback(false, "…")` and
 
 ### Cluster C — `ErgoptiPlus.ahk` (1 MsgBox + 3–4 French log messages)
 
-| Line | Issue | Status |
-|------|-------|--------|
-| 603–605 | `MsgBox(…"Erreur de démarrage : …", "ErgoptiPlus — manifest manquant"…)` — hardcoded French UI | **Pending** — will be fixed in a dedicated commit |
-| 883–894 | Log messages in French ("ignoré", "enregistré", "Échec") — violates log rule (§4.4: English-only logs) | Fixed |
+| Line    | Issue                                                                                                  | Status                                            |
+| ------- | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------- |
+| 603–605 | `MsgBox(…"Erreur de démarrage : …", "ErgoptiPlus — manifest manquant"…)` — hardcoded French UI         | **Pending** — will be fixed in a dedicated commit |
+| 883–894 | Log messages in French ("ignoré", "enregistré", "Échec") — violates log rule (§4.4: English-only logs) | Fixed                                             |
 
 **Fix for MsgBox:** move to a dedicated startup error handler; use i18n key
 `startup.manifest_missing`. **Fix for logs:** translate to English in place
@@ -83,13 +83,13 @@ Should be `i18n.get("karabiner.lifecycle.unavailable")`.
 
 ## Total violation count
 
-| Category | Count |
-|----------|-------|
-| HS `hs.dialog.alert` hardcoded | 8 |
-| HS `hs.alert.show` / callback hardcoded | 5 |
-| AHK `MsgBox` hardcoded | 1 |
-| AHK French log messages | 3 |
-| **Total** | **17** |
+| Category                                | Count  |
+| --------------------------------------- | ------ |
+| HS `hs.dialog.alert` hardcoded          | 8      |
+| HS `hs.alert.show` / callback hardcoded | 5      |
+| AHK `MsgBox` hardcoded                  | 1      |
+| AHK French log messages                 | 3      |
+| **Total**                               | **17** |
 
 ---
 

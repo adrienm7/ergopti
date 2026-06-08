@@ -24,10 +24,7 @@
  * ==============================================================================
  */
 
-"use strict";
-
-
-
+'use strict';
 
 // ==================================================
 // ==================================================
@@ -40,8 +37,8 @@
  * @type {object}
  */
 const portContract = {
-	name: "TooltipRenderer",
-	version: "1.0.0",
+	name: 'TooltipRenderer',
+	version: '1.0.0',
 
 	/**
 	 * show(payload) — Render or update the tooltip.
@@ -74,15 +71,12 @@ const portContract = {
 	 *   @error_behavior "log_and_return".
 	 */
 	methods: {
-		show:          { arity: 1, required: true },
-		hide:          { arity: 0, required: true },
-		isVisible:     { arity: 0, required: true },
-		updateElement: { arity: 1, required: true },
-	},
+		show: { arity: 1, required: true },
+		hide: { arity: 0, required: true },
+		isVisible: { arity: 0, required: true },
+		updateElement: { arity: 1, required: true }
+	}
 };
-
-
-
 
 // ==================================================
 // ==================================================
@@ -97,24 +91,19 @@ const portContract = {
  */
 function validateAdapter(adapter) {
 	const violations = [];
-	if (!adapter || typeof adapter !== "object") {
-		return ["adapter must be a non-null object"];
+	if (!adapter || typeof adapter !== 'object') {
+		return ['adapter must be a non-null object'];
 	}
 	for (const [name, spec] of Object.entries(portContract.methods)) {
 		if (!spec.required) continue;
-		if (typeof adapter[name] !== "function") {
+		if (typeof adapter[name] !== 'function') {
 			violations.push(`missing method: ${name}`);
 		} else if (adapter[name].length !== spec.arity) {
-			violations.push(
-				`method ${name}: expected arity ${spec.arity}, got ${adapter[name].length}`
-			);
+			violations.push(`method ${name}: expected arity ${spec.arity}, got ${adapter[name].length}`);
 		}
 	}
 	return violations;
 }
-
-
-
 
 // ==================================================
 // ==================================================
@@ -129,24 +118,34 @@ function validateAdapter(adapter) {
  */
 const FIXTURE_SINGLE_ROW = [
 	{
-		type: "rect", id: "bg",
+		type: 'rect',
+		id: 'bg',
 		frame: { x: 0, y: 0, w: 200, h: 32 },
-		fill_color: { r: 0.10, g: 0.10, b: 0.10, a: 1.0 },
-		stroke_color: null, stroke_width: 1, corner_radius: 7,
+		fill_color: { r: 0.1, g: 0.1, b: 0.1, a: 1.0 },
+		stroke_color: null,
+		stroke_width: 1,
+		corner_radius: 7
 	},
 	{
-		type: "text", id: "row_text_0",
+		type: 'text',
+		id: 'row_text_0',
 		frame: { x: 14, y: 7, w: 172, h: 18 },
-		text: "example expansion", font_name: null, font_size: 14,
-		color: { r: 1, g: 1, b: 1, a: 1 }, alignment: "left", styled: null,
+		text: 'example expansion',
+		font_name: null,
+		font_size: 14,
+		color: { r: 1, g: 1, b: 1, a: 1 },
+		alignment: 'left',
+		styled: null
 	},
 	{
-		type: "rect", id: "border",
+		type: 'rect',
+		id: 'border',
 		frame: { x: 0, y: 0, w: 200, h: 32 },
 		fill_color: null,
 		stroke_color: { r: 1, g: 1, b: 1, a: 0.13 },
-		stroke_width: 1, corner_radius: 7,
-	},
+		stroke_width: 1,
+		corner_radius: 7
+	}
 ];
 
 /**
@@ -156,97 +155,101 @@ const FIXTURE_SINGLE_ROW = [
 function contractTestVectors() {
 	return [
 		{
-			id: "show_makes_visible",
-			description: "show() with valid draw_calls makes isVisible() return true.",
+			id: 'show_makes_visible',
+			description: 'show() with valid draw_calls makes isVisible() return true.',
 			input: {
 				payload: {
-					draw_calls:   FIXTURE_SINGLE_ROW,
-					position:     { x: 100, y: 200 },
-					duration_sec: 2.5,
-				},
+					draw_calls: FIXTURE_SINGLE_ROW,
+					position: { x: 100, y: 200 },
+					duration_sec: 2.5
+				}
 			},
-			assert: { is_visible_after: true },
+			assert: { is_visible_after: true }
 		},
 		{
-			id: "hide_makes_invisible",
-			description: "hide() after show() makes isVisible() return false.",
+			id: 'hide_makes_invisible',
+			description: 'hide() after show() makes isVisible() return false.',
 			steps: [
-				{ call: "show", payload: { draw_calls: FIXTURE_SINGLE_ROW, position: { x: 0, y: 0 }, duration_sec: 0 } },
-				{ call: "hide" },
-				{ assert: "isVisible", expected: false },
-			],
+				{
+					call: 'show',
+					payload: { draw_calls: FIXTURE_SINGLE_ROW, position: { x: 0, y: 0 }, duration_sec: 0 }
+				},
+				{ call: 'hide' },
+				{ assert: 'isVisible', expected: false }
+			]
 		},
 		{
-			id: "hide_before_show_is_safe",
-			description: "Calling hide() before show() is a safe no-op.",
-			steps: [
-				{ call: "hide" },
-				{ assert: "isVisible", expected: false },
-			],
+			id: 'hide_before_show_is_safe',
+			description: 'Calling hide() before show() is a safe no-op.',
+			steps: [{ call: 'hide' }, { assert: 'isVisible', expected: false }]
 		},
 		{
-			id: "auto_dismiss_fires",
-			description: "Tooltip auto-hides after duration_sec seconds.",
+			id: 'auto_dismiss_fires',
+			description: 'Tooltip auto-hides after duration_sec seconds.',
 			input: {
 				payload: {
-					draw_calls:   FIXTURE_SINGLE_ROW,
-					position:     { x: 0, y: 0 },
-					duration_sec: 0.1,
-				},
+					draw_calls: FIXTURE_SINGLE_ROW,
+					position: { x: 0, y: 0 },
+					duration_sec: 0.1
+				}
 			},
 			assert: {
 				// Test harness must advance the clock by 0.1 s and then check
-				is_visible_after_delay: { delay_sec: 0.1, expected: false },
-			},
+				is_visible_after_delay: { delay_sec: 0.1, expected: false }
+			}
 		},
 		{
-			id: "duration_zero_stays_visible",
-			description: "duration_sec=0 means no auto-dismiss; tooltip stays visible.",
+			id: 'duration_zero_stays_visible',
+			description: 'duration_sec=0 means no auto-dismiss; tooltip stays visible.',
 			input: {
 				payload: {
-					draw_calls:   FIXTURE_SINGLE_ROW,
-					position:     { x: 0, y: 0 },
-					duration_sec: 0,
-				},
+					draw_calls: FIXTURE_SINGLE_ROW,
+					position: { x: 0, y: 0 },
+					duration_sec: 0
+				}
 			},
 			assert: {
-				is_visible_after_delay: { delay_sec: 5.0, expected: true },
-			},
+				is_visible_after_delay: { delay_sec: 5.0, expected: true }
+			}
 		},
 		{
-			id: "update_element_replaces_by_id",
-			description: "updateElement() replaces the draw call with matching id.",
+			id: 'update_element_replaces_by_id',
+			description: 'updateElement() replaces the draw call with matching id.',
 			setup: {
 				show_first: {
 					draw_calls: FIXTURE_SINGLE_ROW,
 					position: { x: 0, y: 0 },
-					duration_sec: 0,
-				},
+					duration_sec: 0
+				}
 			},
 			input: {
 				draw_call: {
-					type: "text", id: "row_text_0",
+					type: 'text',
+					id: 'row_text_0',
 					frame: { x: 14, y: 7, w: 172, h: 18 },
-					text: "updated text", font_name: null, font_size: 14,
-					color: { r: 1, g: 1, b: 1, a: 1 }, alignment: "left", styled: null,
-				},
+					text: 'updated text',
+					font_name: null,
+					font_size: 14,
+					color: { r: 1, g: 1, b: 1, a: 1 },
+					alignment: 'left',
+					styled: null
+				}
 			},
-			assert: { no_exception: true, still_visible: true },
+			assert: { no_exception: true, still_visible: true }
 		},
 		{
-			id: "rendering_exception_calls_hide",
-			description: "Any rendering exception must result in isVisible()=false.",
+			id: 'rendering_exception_calls_hide',
+			description: 'Any rendering exception must result in isVisible()=false.',
 			input: {
 				payload: {
-					draw_calls:   [{ type: "invalid_type", id: "bogus" }],
-					position:     { x: 0, y: 0 },
-					duration_sec: 0,
-				},
+					draw_calls: [{ type: 'invalid_type', id: 'bogus' }],
+					position: { x: 0, y: 0 },
+					duration_sec: 0
+				}
 			},
-			assert: { is_visible_after: false },
-		},
+			assert: { is_visible_after: false }
+		}
 	];
 }
-
 
 module.exports = { portContract, validateAdapter, contractTestVectors, FIXTURE_SINGLE_ROW };

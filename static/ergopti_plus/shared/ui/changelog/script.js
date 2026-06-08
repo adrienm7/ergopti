@@ -21,19 +21,16 @@
 
 // Read native config immediately at module level — before any function runs —
 // so _currentChannel is correct even if init() runs before DOMContentLoaded.
-var _currentChannel    = (window.__changelog_channel === "dev") ? "dev" : "main";
-var _releases          = [];
-var _selectedIndex     = -1;
+var _currentChannel = window.__changelog_channel === 'dev' ? 'dev' : 'main';
+var _releases = [];
+var _selectedIndex = -1;
 var _currentReleaseUrl = null;
-var _ghOwner           = window.__changelog_gh_owner || "adrienm7";
-var _ghRepo            = window.__changelog_gh_repo  || "ergopti";
+var _ghOwner = window.__changelog_gh_owner || 'adrienm7';
+var _ghRepo = window.__changelog_gh_repo || 'ergopti';
 // Set to true once the native backend has responded for the current channel;
 // prevents the client-side fallback from overwriting native data.
-var _nativeResponded   = false;
-var _fallbackTimer     = null;
-
-
-
+var _nativeResponded = false;
+var _fallbackTimer = null;
 
 // =========================================
 // =========================================
@@ -46,10 +43,14 @@ var _fallbackTimer     = null;
  * @param {string|object} msg - The message to post.
  */
 function postBridgeMessage(msg) {
-	var payload = typeof msg === "string" ? msg : JSON.stringify(msg);
+	var payload = typeof msg === 'string' ? msg : JSON.stringify(msg);
 	if (window.chrome && window.chrome.webview) {
 		window.chrome.webview.postMessage(payload);
-	} else if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.changelog_bridge) {
+	} else if (
+		window.webkit &&
+		window.webkit.messageHandlers &&
+		window.webkit.messageHandlers.changelog_bridge
+	) {
 		window.webkit.messageHandlers.changelog_bridge.postMessage(payload);
 	}
 }
@@ -64,19 +65,24 @@ function injectReleases(releases, channel) {
 	if (!Array.isArray(releases)) return;
 	// Filter pre-releases on the JS side for the stable channel — avoids
 	// fragile server-side JSON parsing (AHK brace-depth tracker was unreliable).
-	if (channel === "main") {
-		releases = releases.filter(function (r) { return !r.prerelease; });
+	if (channel === 'main') {
+		releases = releases.filter(function (r) {
+			return !r.prerelease;
+		});
 	}
 	// Cancel the client-side fallback — native backend responded first.
 	_nativeResponded = true;
-	if (_fallbackTimer) { clearTimeout(_fallbackTimer); _fallbackTimer = null; }
+	if (_fallbackTimer) {
+		clearTimeout(_fallbackTimer);
+		_fallbackTimer = null;
+	}
 	if (channel) {
 		_currentChannel = channel;
 		// Sync channel buttons to match what the native backend actually served.
-		var btnStable = document.getElementById("btn-stable");
-		var btnDev    = document.getElementById("btn-dev");
-		if (btnStable) btnStable.classList.toggle("active", channel === "main");
-		if (btnDev)    btnDev.classList.toggle("active",    channel === "dev");
+		var btnStable = document.getElementById('btn-stable');
+		var btnDev = document.getElementById('btn-dev');
+		if (btnStable) btnStable.classList.toggle('active', channel === 'main');
+		if (btnDev) btnDev.classList.toggle('active', channel === 'dev');
 	}
 	_releases = releases;
 	_selectedIndex = -1;
@@ -94,18 +100,19 @@ function injectReleases(releases, channel) {
  * @param {string} message - Localised error message.
  */
 function injectError(message) {
-	showError(message || _t("changelog_window.error_network") || "Impossible de charger les versions.");
+	showError(
+		message || _t('changelog_window.error_network') || 'Impossible de charger les versions.'
+	);
 }
 
 // Signal readiness so the native backend can flush queued calls.
-if (document.readyState === "loading") {
-	document.addEventListener("DOMContentLoaded", function () { postBridgeMessage("ready"); });
+if (document.readyState === 'loading') {
+	document.addEventListener('DOMContentLoaded', function () {
+		postBridgeMessage('ready');
+	});
 } else {
-	postBridgeMessage("ready");
+	postBridgeMessage('ready');
 }
-
-
-
 
 // =======================================
 // =======================================
@@ -119,36 +126,33 @@ function _t(key) {
 
 /** Applies i18n strings to static data-i18n elements and dynamic labels. */
 function applyLabels() {
-	document.querySelectorAll("[data-i18n]").forEach(function (el) {
-		var key = el.getAttribute("data-i18n");
+	document.querySelectorAll('[data-i18n]').forEach(function (el) {
+		var key = el.getAttribute('data-i18n');
 		var val = _t(key);
 		if (val) el.textContent = val;
 	});
 
-	var btnStable = document.getElementById("btn-stable");
-	var btnDev    = document.getElementById("btn-dev");
-	if (btnStable) btnStable.textContent = _t("changelog_window.channel_stable") || "Stable";
-	if (btnDev)    btnDev.textContent    = _t("changelog_window.channel_dev")    || "Dev";
+	var btnStable = document.getElementById('btn-stable');
+	var btnDev = document.getElementById('btn-dev');
+	if (btnStable) btnStable.textContent = _t('changelog_window.channel_stable') || 'Stable';
+	if (btnDev) btnDev.textContent = _t('changelog_window.channel_dev') || 'Dev';
 
-	var btnGh = document.getElementById("btn-github");
-	if (btnGh) btnGh.textContent = _t("changelog_window.open_github") || "Voir sur GitHub ↗";
+	var btnGh = document.getElementById('btn-github');
+	if (btnGh) btnGh.textContent = _t('changelog_window.open_github') || 'Voir sur GitHub ↗';
 
-	var btnRetry = document.getElementById("btn-retry");
-	if (btnRetry) btnRetry.textContent = _t("changelog_window.retry") || "Réessayer";
+	var btnRetry = document.getElementById('btn-retry');
+	if (btnRetry) btnRetry.textContent = _t('changelog_window.retry') || 'Réessayer';
 }
 
 // Apply labels once i18n strings arrive (either from fetch or direct injection).
 // i18n.js calls window.i18n_apply which is re-used here.
 var _orig_i18n_apply = window.i18n_apply;
 window.i18n_apply = function (strings) {
-	if (typeof _orig_i18n_apply === "function") _orig_i18n_apply(strings);
+	if (typeof _orig_i18n_apply === 'function') _orig_i18n_apply(strings);
 	applyLabels();
 };
 // Also apply immediately in case strings are already present.
 if (window._i18n_strings) applyLabels();
-
-
-
 
 // ========================================
 // ========================================
@@ -163,23 +167,26 @@ if (window._i18n_strings) applyLabels();
 function setChannel(channel) {
 	if (channel === _currentChannel && _releases.length > 0) return;
 	_currentChannel = channel;
-	var btnStable = document.getElementById("btn-stable");
-	var btnDev    = document.getElementById("btn-dev");
-	if (btnStable) btnStable.classList.toggle("active", channel === "main");
-	if (btnDev)    btnDev.classList.toggle("active",    channel === "dev");
+	var btnStable = document.getElementById('btn-stable');
+	var btnDev = document.getElementById('btn-dev');
+	if (btnStable) btnStable.classList.toggle('active', channel === 'main');
+	if (btnDev) btnDev.classList.toggle('active', channel === 'dev');
 
 	// Ask the native backend to re-fetch; fall back to direct API call after 800 ms
 	// only if the native backend has not responded (browser preview or no bridge).
-	postBridgeMessage(JSON.stringify({ action: "fetch", channel: channel }));
+	postBridgeMessage(JSON.stringify({ action: 'fetch', channel: channel }));
 	showLoading();
 	_nativeResponded = false;
 	_releases = [];
 	_selectedIndex = -1;
-	document.getElementById("release-list").innerHTML = "";
+	document.getElementById('release-list').innerHTML = '';
 	clearContent();
 
 	// Cancel any existing fallback timer before arming a new one.
-	if (_fallbackTimer) { clearTimeout(_fallbackTimer); _fallbackTimer = null; }
+	if (_fallbackTimer) {
+		clearTimeout(_fallbackTimer);
+		_fallbackTimer = null;
+	}
 	_fallbackTimer = setTimeout(function () {
 		if (!_nativeResponded) _clientFetch(channel);
 	}, 800);
@@ -198,28 +205,33 @@ function retry() {
  * @param {string} channel
  */
 function _clientFetch(channel) {
-	var url = channel === "dev"
-		? "https://api.github.com/repos/" + _ghOwner + "/" + _ghRepo + "/releases?per_page=20"
-		: "https://api.github.com/repos/" + _ghOwner + "/" + _ghRepo + "/releases?per_page=20";
+	var url =
+		channel === 'dev'
+			? 'https://api.github.com/repos/' + _ghOwner + '/' + _ghRepo + '/releases?per_page=20'
+			: 'https://api.github.com/repos/' + _ghOwner + '/' + _ghRepo + '/releases?per_page=20';
 
-	fetch(url, { headers: { "User-Agent": "ErgoptiPlus-Changelog/1.0" } })
-		.then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
+	fetch(url, { headers: { 'User-Agent': 'ErgoptiPlus-Changelog/1.0' } })
+		.then(function (r) {
+			return r.ok ? r.json() : Promise.reject(r.status);
+		})
 		.then(function (data) {
 			if (!Array.isArray(data)) return;
-			var filtered = channel === "main"
-				? data.filter(function (r) { return !r.prerelease; })
-				: data;
+			var filtered =
+				channel === 'main'
+					? data.filter(function (r) {
+							return !r.prerelease;
+						})
+					: data;
 			// If no stable releases exist, show all releases as a courtesy.
-			if (channel === "main" && filtered.length === 0) filtered = data;
+			if (channel === 'main' && filtered.length === 0) filtered = data;
 			injectReleases(filtered, channel);
 		})
 		.catch(function (err) {
-			injectError(_t("changelog_window.error_network") || "Impossible de charger les versions. (" + err + ")");
+			injectError(
+				_t('changelog_window.error_network') || 'Impossible de charger les versions. (' + err + ')'
+			);
 		});
 }
-
-
-
 
 // ========================================
 // ========================================
@@ -233,10 +245,10 @@ function _clientFetch(channel) {
  * @return {string}
  */
 function _formatDate(iso) {
-	if (!iso) return "";
+	if (!iso) return '';
 	try {
 		var d = new Date(iso);
-		return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+		return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
 	} catch (e) {
 		return iso.slice(0, 10);
 	}
@@ -244,52 +256,51 @@ function _formatDate(iso) {
 
 /** Rebuilds the sidebar release list from _releases. */
 function renderReleaseList() {
-	var list = document.getElementById("release-list");
+	var list = document.getElementById('release-list');
 	if (!list) return;
-	list.innerHTML = "";
+	list.innerHTML = '';
 
 	if (_releases.length === 0) {
-		var empty = document.createElement("div");
-		empty.style.cssText = "color:#555;font-size:12px;padding:16px 14px;";
-		empty.textContent = _t("changelog_window.no_releases") || "Aucune version trouvée.";
+		var empty = document.createElement('div');
+		empty.style.cssText = 'color:#555;font-size:12px;padding:16px 14px;';
+		empty.textContent = _t('changelog_window.no_releases') || 'Aucune version trouvée.';
 		list.appendChild(empty);
 		return;
 	}
 
 	_releases.forEach(function (release, idx) {
-		var item = document.createElement("div");
-		item.className = "release-item" + (release.prerelease ? " prerelease" : "");
-		item.setAttribute("data-idx", idx);
-		item.onclick = function () { selectRelease(idx); };
+		var item = document.createElement('div');
+		item.className = 'release-item' + (release.prerelease ? ' prerelease' : '');
+		item.setAttribute('data-idx', idx);
+		item.onclick = function () {
+			selectRelease(idx);
+		};
 
-		var tag = document.createElement("div");
-		tag.className = "release-item-tag";
-		tag.textContent = release.tag_name || "?";
+		var tag = document.createElement('div');
+		tag.className = 'release-item-tag';
+		tag.textContent = release.tag_name || '?';
 		item.appendChild(tag);
 
-		var date = document.createElement("div");
-		date.className = "release-item-date";
+		var date = document.createElement('div');
+		date.className = 'release-item-date';
 		date.textContent = _formatDate(release.published_at);
 		item.appendChild(date);
 
 		if (release.prerelease) {
-			var badge = document.createElement("div");
-			badge.className = "release-item-badge badge-prerelease";
-			badge.textContent = _t("changelog_window.badge_prerelease") || "pre-release";
+			var badge = document.createElement('div');
+			badge.className = 'release-item-badge badge-prerelease';
+			badge.textContent = _t('changelog_window.badge_prerelease') || 'pre-release';
 			item.appendChild(badge);
 		} else if (idx === 0) {
-			var badge2 = document.createElement("div");
-			badge2.className = "release-item-badge badge-latest";
-			badge2.textContent = _t("changelog_window.badge_latest") || "latest";
+			var badge2 = document.createElement('div');
+			badge2.className = 'release-item-badge badge-latest';
+			badge2.textContent = _t('changelog_window.badge_latest') || 'latest';
 			item.appendChild(badge2);
 		}
 
 		list.appendChild(item);
 	});
 }
-
-
-
 
 // =========================================
 // =========================================
@@ -299,14 +310,14 @@ function renderReleaseList() {
 
 /** Clears the content pane and header. */
 function clearContent() {
-	var tagEl  = document.getElementById("release-tag");
-	var metaEl = document.getElementById("release-meta");
-	var bodyEl = document.getElementById("release-body");
-	var btnGh  = document.getElementById("btn-github");
-	if (tagEl)  tagEl.textContent  = "";
-	if (metaEl) metaEl.textContent = "";
-	if (bodyEl) bodyEl.innerHTML   = "";
-	if (btnGh)  btnGh.style.display = "none";
+	var tagEl = document.getElementById('release-tag');
+	var metaEl = document.getElementById('release-meta');
+	var bodyEl = document.getElementById('release-body');
+	var btnGh = document.getElementById('btn-github');
+	if (tagEl) tagEl.textContent = '';
+	if (metaEl) metaEl.textContent = '';
+	if (bodyEl) bodyEl.innerHTML = '';
+	if (btnGh) btnGh.style.display = 'none';
 	_currentReleaseUrl = null;
 }
 
@@ -319,50 +330,53 @@ function selectRelease(idx) {
 	_selectedIndex = idx;
 
 	// Update sidebar selection state.
-	document.querySelectorAll(".release-item").forEach(function (el) {
-		el.classList.toggle("selected", parseInt(el.getAttribute("data-idx"), 10) === idx);
+	document.querySelectorAll('.release-item').forEach(function (el) {
+		el.classList.toggle('selected', parseInt(el.getAttribute('data-idx'), 10) === idx);
 	});
 
 	var release = _releases[idx];
 	_currentReleaseUrl = release.html_url || null;
 
 	// Populate header.
-	var tagEl  = document.getElementById("release-tag");
-	var metaEl = document.getElementById("release-meta");
-	var btnGh  = document.getElementById("btn-github");
-	if (tagEl)  tagEl.textContent  = release.tag_name || "";
+	var tagEl = document.getElementById('release-tag');
+	var metaEl = document.getElementById('release-meta');
+	var btnGh = document.getElementById('btn-github');
+	if (tagEl) tagEl.textContent = release.tag_name || '';
 	if (metaEl) {
 		var parts = [];
 		if (release.published_at) parts.push(_formatDate(release.published_at));
-		metaEl.textContent = parts.join("  ·  ");
+		metaEl.textContent = parts.join('  ·  ');
 	}
 	if (btnGh) {
-		btnGh.style.display = _currentReleaseUrl ? "block" : "none";
+		btnGh.style.display = _currentReleaseUrl ? 'block' : 'none';
 	}
 
 	// Render markdown body.
-	var bodyEl = document.getElementById("release-body");
+	var bodyEl = document.getElementById('release-body');
 	if (!bodyEl) return;
-	var raw = release.body || "";
-	if (!raw || raw.trim() === "") {
-		bodyEl.innerHTML = "<p class=\"empty-notes\">"
-			+ (_t("changelog_window.no_notes") || "(Aucune note de version disponible.)")
-			+ "</p>";
+	var raw = release.body || '';
+	if (!raw || raw.trim() === '') {
+		bodyEl.innerHTML =
+			'<p class="empty-notes">' +
+			(_t('changelog_window.no_notes') || '(Aucune note de version disponible.)') +
+			'</p>';
 		return;
 	}
 
 	// Render via marked.js if available, else fall back to pre-formatted plain text.
-	if (typeof marked !== "undefined") {
+	if (typeof marked !== 'undefined') {
 		try {
 			marked.setOptions({ breaks: true, gfm: true });
 			bodyEl.innerHTML = marked.parse(raw);
 		} catch (e) {
-			bodyEl.innerHTML = "<pre style=\"white-space:pre-wrap;color:#c8c8cc;font-size:12px\">"
-				+ _escHtml(raw) + "</pre>";
+			bodyEl.innerHTML =
+				'<pre style="white-space:pre-wrap;color:#c8c8cc;font-size:12px">' +
+				_escHtml(raw) +
+				'</pre>';
 		}
 	} else {
-		bodyEl.innerHTML = "<pre style=\"white-space:pre-wrap;color:#c8c8cc;font-size:12px\">"
-			+ _escHtml(raw) + "</pre>";
+		bodyEl.innerHTML =
+			'<pre style="white-space:pre-wrap;color:#c8c8cc;font-size:12px">' + _escHtml(raw) + '</pre>';
 	}
 }
 
@@ -370,24 +384,21 @@ function selectRelease(idx) {
 function openOnGitHub() {
 	if (!_currentReleaseUrl) {
 		// Fall back to the releases index.
-		var fallback = "https://github.com/" + _ghOwner + "/" + _ghRepo + "/releases";
-		postBridgeMessage(JSON.stringify({ action: "open_url", url: fallback }));
+		var fallback = 'https://github.com/' + _ghOwner + '/' + _ghRepo + '/releases';
+		postBridgeMessage(JSON.stringify({ action: 'open_url', url: fallback }));
 		return;
 	}
-	postBridgeMessage(JSON.stringify({ action: "open_url", url: _currentReleaseUrl }));
+	postBridgeMessage(JSON.stringify({ action: 'open_url', url: _currentReleaseUrl }));
 }
 
 /** HTML-escapes a plain text string for safe injection into innerHTML. */
 function _escHtml(s) {
 	return String(s)
-		.replace(/&/g, "&amp;")
-		.replace(/</g, "&lt;")
-		.replace(/>/g, "&gt;")
-		.replace(/"/g, "&quot;");
+		.replace(/&/g, '&amp;')
+		.replace(/</g, '&lt;')
+		.replace(/>/g, '&gt;')
+		.replace(/"/g, '&quot;');
 }
-
-
-
 
 // ======================================
 // ======================================
@@ -396,27 +407,24 @@ function _escHtml(s) {
 // ======================================
 
 function showLoading() {
-	var overlay = document.getElementById("loading-overlay");
-	var errOverlay = document.getElementById("error-overlay");
-	if (overlay) overlay.style.display = "flex";
-	if (errOverlay) errOverlay.style.display = "none";
+	var overlay = document.getElementById('loading-overlay');
+	var errOverlay = document.getElementById('error-overlay');
+	if (overlay) overlay.style.display = 'flex';
+	if (errOverlay) errOverlay.style.display = 'none';
 }
 
 function hideLoading() {
-	var overlay = document.getElementById("loading-overlay");
-	if (overlay) overlay.style.display = "none";
+	var overlay = document.getElementById('loading-overlay');
+	if (overlay) overlay.style.display = 'none';
 }
 
 function showError(message) {
 	hideLoading();
-	var errOverlay = document.getElementById("error-overlay");
-	var errText    = document.getElementById("error-text");
-	if (errText)    errText.textContent = message;
-	if (errOverlay) errOverlay.style.display = "flex";
+	var errOverlay = document.getElementById('error-overlay');
+	var errText = document.getElementById('error-text');
+	if (errText) errText.textContent = message;
+	if (errOverlay) errOverlay.style.display = 'flex';
 }
-
-
-
 
 // ======================================
 // ======================================
@@ -426,10 +434,10 @@ function showError(message) {
 
 (function init() {
 	// Apply initial channel button state — _currentChannel already set at module level.
-	var btnStable = document.getElementById("btn-stable");
-	var btnDev    = document.getElementById("btn-dev");
-	if (btnStable) btnStable.classList.toggle("active", _currentChannel === "main");
-	if (btnDev)    btnDev.classList.toggle("active",    _currentChannel === "dev");
+	var btnStable = document.getElementById('btn-stable');
+	var btnDev = document.getElementById('btn-dev');
+	if (btnStable) btnStable.classList.toggle('active', _currentChannel === 'main');
+	if (btnDev) btnDev.classList.toggle('active', _currentChannel === 'dev');
 
 	applyLabels();
 	showLoading();

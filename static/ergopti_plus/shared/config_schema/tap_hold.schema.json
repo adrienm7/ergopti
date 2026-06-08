@@ -12,14 +12,13 @@
 			"type": "object",
 			"additionalProperties": false,
 			"properties": {
-				"keys":   { "$ref": "#/$defs/keys_map" },
+				"keys": { "$ref": "#/$defs/keys_map" },
 				"layers": { "$ref": "#/$defs/layers_map" }
 			}
 		}
 	},
 
 	"$defs": {
-
 		"keys_map": {
 			"description": "Map of physical-key names to tap-hold configuration.",
 			"type": "object",

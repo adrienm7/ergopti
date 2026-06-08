@@ -31,8 +31,6 @@
  * ==============================================================================
  */
 
-
-
 // ===================================
 // ===================================
 // ======= 1/ N-Gram Merging =======
@@ -646,12 +644,22 @@ function recompute_speed_kpi() {
 	const formula_tooltip = using_fallback
 		? `${mode_label} — ${_t('ui_typing.tooltip_cpm_simple')}`
 		: _t('ui_typing.tooltip_cpm_formula')
-			.replace('{mode}', mode_label)
-			.replace('{pure_trans}', format_number(pure_trans))
-			.replace('{thresh}', thresh_label)
-			.replace('{add_hs}', show_hs ? `  • + HS : ${format_number(add_hs)} ${_t('ui_typing.tooltip_cpm_hs_chars')}<br>` : '')
-			.replace('{add_llm}', show_llm ? `  • + IA : ${format_number(add_llm)} ${_t('ui_typing.tooltip_cpm_llm_chars')}<br>` : '')
-			.replace('{chars_total}', format_number(chars_total));
+				.replace('{mode}', mode_label)
+				.replace('{pure_trans}', format_number(pure_trans))
+				.replace('{thresh}', thresh_label)
+				.replace(
+					'{add_hs}',
+					show_hs
+						? `  • + HS : ${format_number(add_hs)} ${_t('ui_typing.tooltip_cpm_hs_chars')}<br>`
+						: ''
+				)
+				.replace(
+					'{add_llm}',
+					show_llm
+						? `  • + IA : ${format_number(add_llm)} ${_t('ui_typing.tooltip_cpm_llm_chars')}<br>`
+						: ''
+				)
+				.replace('{chars_total}', format_number(chars_total));
 
 	wpm_val_elem.innerHTML =
 		`<div style="display:flex;flex-direction:column;justify-content:center;">` +
@@ -1204,7 +1212,9 @@ function toggle_sfb_heatmap_same_key() {
 	const btn = document.getElementById('sfb_heatmap_same_key_btn');
 	if (btn) {
 		btn.classList.toggle('active', _sfb_heatmap_include_same_key);
-		btn.textContent = _sfb_heatmap_include_same_key ? _t('ui_typing.btn_doublings_included') : _t('ui_typing.btn_doublings_excluded');
+		btn.textContent = _sfb_heatmap_include_same_key
+			? _t('ui_typing.btn_doublings_included')
+			: _t('ui_typing.btn_doublings_excluded');
 	}
 	_render_sfb_heatmap_with_toggle();
 }

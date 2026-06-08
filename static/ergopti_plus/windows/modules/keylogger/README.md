@@ -8,12 +8,12 @@ Rich aggregation (n-grams, bursts, ergonomic streaks) is not yet ported; the Mac
 
 ## Ports used (`_shared/ports/`)
 
-| Port | Usage |
-|---|---|
-| `KeyboardHook` | Raw keystroke interception via AHK's built-in hook |
-| `FileSystem` | Writing `today.log`, `data.sql`, `state.json`, and `device.json` |
-| `WindowInfo` | Active app and window title for app-switch / window-switch events |
-| `TimerScheduler` | Ingest tick, idle detection, and flush scheduling |
+| Port             | Usage                                                             |
+| ---------------- | ----------------------------------------------------------------- |
+| `KeyboardHook`   | Raw keystroke interception via AHK's built-in hook                |
+| `FileSystem`     | Writing `today.log`, `data.sql`, `state.json`, and `device.json`  |
+| `WindowInfo`     | Active app and window title for app-switch / window-switch events |
+| `TimerScheduler` | Ingest tick, idle detection, and flush scheduling                 |
 
 ## Domain module (`_shared/domain/`)
 
@@ -21,13 +21,13 @@ No direct domain spec. Implements the schema defined in `_shared/data/KEYLOGGER_
 
 ## Public API
 
-| Function | Description |
-|---|---|
-| `KL_Init(config_dir)` | Initialize the keylogger for the given config root directory |
-| `KL_Start()` | Arm the keystroke hook and start the ingest timer |
-| `KL_Stop()` | Disarm the hook and flush all pending buffers |
-| `KL_AppendLog(event_map)` | Append a single event to the in-memory buffer (hot path) |
-| `KL_MarkSynthetic()` | Signal that upcoming keystrokes are expander output, not human |
+| Function                  | Description                                                    |
+| ------------------------- | -------------------------------------------------------------- |
+| `KL_Init(config_dir)`     | Initialize the keylogger for the given config root directory   |
+| `KL_Start()`              | Arm the keystroke hook and start the ingest timer              |
+| `KL_Stop()`               | Disarm the hook and flush all pending buffers                  |
+| `KL_AppendLog(event_map)` | Append a single event to the in-memory buffer (hot path)       |
+| `KL_MarkSynthetic()`      | Signal that upcoming keystrokes are expander output, not human |
 
 ## Init pattern
 

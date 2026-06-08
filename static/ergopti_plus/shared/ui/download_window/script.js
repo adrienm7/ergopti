@@ -16,7 +16,9 @@
 let globalLogLines = [];
 let globalDoneState = false;
 
-function _t(key) { return (window._i18n_strings && window._i18n_strings[key]) || null; }
+function _t(key) {
+	return (window._i18n_strings && window._i18n_strings[key]) || null;
+}
 
 /**
  * Sends a message to the native backend, supporting both WebView2 (Windows/AHK)
@@ -26,14 +28,20 @@ function _t(key) { return (window._i18n_strings && window._i18n_strings[key]) ||
 function postBridgeMessage(msg) {
 	if (window.chrome && window.chrome.webview) {
 		window.chrome.webview.postMessage(msg);
-	} else if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.dl_bridge) {
+	} else if (
+		window.webkit &&
+		window.webkit.messageHandlers &&
+		window.webkit.messageHandlers.dl_bridge
+	) {
 		window.webkit.messageHandlers.dl_bridge.postMessage(msg);
 	}
 }
 
 // Signal readiness to the AHK/Lua backend so queued JS calls can be flushed
 if (document.readyState === 'loading') {
-	document.addEventListener('DOMContentLoaded', function () { postBridgeMessage('ready'); });
+	document.addEventListener('DOMContentLoaded', function () {
+		postBridgeMessage('ready');
+	});
 } else {
 	postBridgeMessage('ready');
 }
@@ -43,14 +51,14 @@ const KIND_TITLE_KEYS = {
 	mlx_install: 'download_window.kind_mlx_install',
 	ollama_install: 'download_window.kind_ollama_install',
 	mlx_model: 'download_window.kind_mlx_model',
-	ollama_model: 'download_window.kind_ollama_model',
+	ollama_model: 'download_window.kind_ollama_model'
 };
 
 const KIND_MODES = {
 	mlx_install: 'bootstrap',
 	ollama_install: 'bootstrap',
 	mlx_model: 'download',
-	ollama_model: 'download',
+	ollama_model: 'download'
 };
 
 /**
@@ -77,8 +85,9 @@ function setKind(kind, title, subtitle) {
 	document.body.classList.add('mode-' + mode, 'kind-' + kind);
 
 	const titleEl = document.getElementById('title');
-	const kindTitle = KIND_TITLE_KEYS[kind] ? (_t(KIND_TITLE_KEYS[kind]) || kind) : kind;
-	if (titleEl) titleEl.textContent = title || kindTitle || _t('download_window.title') || 'Progression';
+	const kindTitle = KIND_TITLE_KEYS[kind] ? _t(KIND_TITLE_KEYS[kind]) || kind : kind;
+	if (titleEl)
+		titleEl.textContent = title || kindTitle || _t('download_window.title') || 'Progression';
 
 	const subtitleEl = document.getElementById('subtitle');
 	if (subtitleEl) subtitleEl.textContent = subtitle || '';
@@ -234,7 +243,10 @@ function update(percentage, downloadedSize, speed, eta, fileCount) {
 
 	const fileCountEl = document.getElementById('file-count');
 	if (fileCount) {
-		fileCountEl.textContent = (_t('download_window.file_count') || '📁 Files: %s').replace('%s', fileCount);
+		fileCountEl.textContent = (_t('download_window.file_count') || '📁 Files: %s').replace(
+			'%s',
+			fileCount
+		);
 		fileCountEl.style.display = 'block';
 	} else {
 		fileCountEl.style.display = 'none';
@@ -243,8 +255,12 @@ function update(percentage, downloadedSize, speed, eta, fileCount) {
 	const statsDetails = document.getElementById('stats-details');
 	let detailsParts = [];
 
-	if (downloadedSize) detailsParts.push((_t('download_window.size_label') || '📦 Size: ') + `<b>${downloadedSize}</b>`);
-	if (speed) detailsParts.push((_t('download_window.speed_label') || '⚡ Speed: ') + `<b>${speed}</b>`);
+	if (downloadedSize)
+		detailsParts.push(
+			(_t('download_window.size_label') || '📦 Size: ') + `<b>${downloadedSize}</b>`
+		);
+	if (speed)
+		detailsParts.push((_t('download_window.speed_label') || '⚡ Speed: ') + `<b>${speed}</b>`);
 
 	if (detailsParts.length > 0) {
 		statsDetails.innerHTML = detailsParts.join(
@@ -328,7 +344,10 @@ function done(isSuccess, message, errorKind) {
 
 	const doneMessageElement = document.getElementById('done-msg');
 	doneMessageElement.textContent =
-		message || (isSuccess ? (_t('download_window.done_success') || '✅ Done') : (_t('download_window.done_failed') || 'Download failed'));
+		message ||
+		(isSuccess
+			? _t('download_window.done_success') || '✅ Done'
+			: _t('download_window.done_failed') || 'Download failed');
 	doneMessageElement.className = isSuccess ? 'ok' : 'error'; // Show it inline inside the status-line
 
 	doneMessageElement.style.display = 'block';

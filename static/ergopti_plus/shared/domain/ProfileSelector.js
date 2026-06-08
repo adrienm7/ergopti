@@ -25,15 +25,12 @@
  * ==============================================================================
  */
 
-"use strict";
+'use strict';
 
 // NOTE: This module is shared pure logic. No direct FS/OS requires (fs, path, hs, etc.)
 // are allowed here — enforced by the meta purity test in macOS unit tests.
 // Drivers (AHK/HS) must load shared/llm/profiles.json themselves (via port/adapter)
 // and supply the data to the pure functions below.
-
-
-
 
 // ==================================================
 // ==================================================
@@ -42,10 +39,7 @@
 // ==================================================
 
 // Informational path only (no fs/path require in this pure module; drivers do the read).
-const PROFILES_JSON_PATH = "../llm/profiles.json";
-
-
-
+const PROFILES_JSON_PATH = '../llm/profiles.json';
 
 // ==================================================
 // ==================================================
@@ -87,9 +81,6 @@ function getAllProfiles(userProfiles = []) {
 	return Array.from(byId.values());
 }
 
-
-
-
 // ==================================================
 // ==================================================
 // ======= 3/ Profile Resolution =======
@@ -106,16 +97,13 @@ function getAllProfiles(userProfiles = []) {
  */
 function getActiveProfile(profileId, userProfiles = []) {
 	const all = getAllProfiles(userProfiles);
-	const found = all.find(p => p.id === profileId);
+	const found = all.find((p) => p.id === profileId);
 	if (found) return found;
 
 	// Fallback to "basic"
-	const basic = all.find(p => p.id === "basic");
+	const basic = all.find((p) => p.id === 'basic');
 	return basic ?? null;
 }
-
-
-
 
 // ==================================================
 // ==================================================
@@ -149,33 +137,28 @@ function getActiveProfile(profileId, userProfiles = []) {
 function resolveSystemPrompt(profile, vars = {}) {
 	if (!profile) return { system: null, is_batch: false };
 
-	const n        = vars.n        ?? 1;
-	const isBatch  = profile.batch === true && n > 1 && !!profile.system_multi_template;
-	const template = isBatch
-		? profile.system_multi_template
-		: (profile.system_single ?? null);
+	const n = vars.n ?? 1;
+	const isBatch = profile.batch === true && n > 1 && !!profile.system_multi_template;
+	const template = isBatch ? profile.system_multi_template : (profile.system_single ?? null);
 
 	if (!template) return { system: null, is_batch: isBatch };
 
-	const context   = vars.context   ?? "";
-	const tail      = vars.tail      ?? "";
-	const minWords  = vars.min_words ?? 1;
-	const maxWords  = vars.max_words ?? 5;
-	const language  = vars.language  ?? "fr";
+	const context = vars.context ?? '';
+	const tail = vars.tail ?? '';
+	const minWords = vars.min_words ?? 1;
+	const maxWords = vars.max_words ?? 5;
+	const language = vars.language ?? 'fr';
 
 	const system = template
-		.replace(/\{context\}/g,   context)
-		.replace(/\{tail\}/g,      tail)
+		.replace(/\{context\}/g, context)
+		.replace(/\{tail\}/g, tail)
 		.replace(/\{min_words\}/g, String(minWords))
 		.replace(/\{max_words\}/g, String(maxWords))
-		.replace(/\{n\}/g,         String(n))
-		.replace(/\{language\}/g,  language);
+		.replace(/\{n\}/g, String(n))
+		.replace(/\{language\}/g, language);
 
 	return { system, is_batch: isBatch };
 }
-
-
-
 
 // ==================================================
 // ==================================================
@@ -190,84 +173,85 @@ function resolveSystemPrompt(profile, vars = {}) {
 function profileSelectorTestVectors() {
 	return [
 		{
-			id:          "resolve_known_profile",
+			id: 'resolve_known_profile',
 			description: "getActiveProfile('basic') returns the built-in basic profile.",
-			call:        "getActiveProfile",
-			args:        ["basic", []],
-			assert:      { field: "id", value: "basic", not_null: true },
+			call: 'getActiveProfile',
+			args: ['basic', []],
+			assert: { field: 'id', value: 'basic', not_null: true }
 		},
 		{
-			id:          "resolve_unknown_falls_back_to_basic",
+			id: 'resolve_unknown_falls_back_to_basic',
 			description: "Unknown profile ID falls back to 'basic'.",
-			call:        "getActiveProfile",
-			args:        ["nonexistent_id", []],
-			assert:      { field: "id", value: "basic" },
+			call: 'getActiveProfile',
+			args: ['nonexistent_id', []],
+			assert: { field: 'id', value: 'basic' }
 		},
 		{
-			id:          "user_profile_overrides_builtin",
+			id: 'user_profile_overrides_builtin',
 			description: "User profile with id='basic' replaces the built-in basic.",
-			call:        "getActiveProfile",
-			args: [
-				"basic",
-				[{ id: "basic", system_single: "CUSTOM PROMPT {context}", batch: false }],
-			],
-			assert: { field: "system_single", starts_with: "CUSTOM PROMPT" },
+			call: 'getActiveProfile',
+			args: ['basic', [{ id: 'basic', system_single: 'CUSTOM PROMPT {context}', batch: false }]],
+			assert: { field: 'system_single', starts_with: 'CUSTOM PROMPT' }
 		},
 		{
-			id:          "get_all_profiles_includes_builtins",
-			description: "getAllProfiles([]) returns at least 3 built-in profiles.",
-			call:        "getAllProfiles",
-			args:        [[]],
-			assert:      { min_length: 3 },
+			id: 'get_all_profiles_includes_builtins',
+			description: 'getAllProfiles([]) returns at least 3 built-in profiles.',
+			call: 'getAllProfiles',
+			args: [[]],
+			assert: { min_length: 3 }
 		},
 		{
-			id:          "inject_basic_context",
-			description: "resolveSystemPrompt replaces {context} and {min_words} / {max_words}.",
-			call:        "resolveSystemPrompt",
-			args: [
-				{ id: "basic", system_single: "Context: {context} — {min_words}–{max_words} words.", batch: false },
-				{ context: "bonjour", min_words: 2, max_words: 5, language: "fr" },
-			],
-			assert: {
-				field:      "system",
-				contains:   "bonjour",
-				not_null:   true,
-			},
-		},
-		{
-			id:          "inject_language_placeholder",
-			description: "resolveSystemPrompt replaces {language}.",
-			call:        "resolveSystemPrompt",
-			args: [
-				{ id: "basic", system_single: "Default language: {language}.", batch: false },
-				{ context: "", language: "en" },
-			],
-			assert: { field: "system", contains: "en" },
-		},
-		{
-			id:          "batch_mode_uses_multi_template",
-			description: "Batch profile with n>1 returns is_batch=true.",
-			call:        "resolveSystemPrompt",
+			id: 'inject_basic_context',
+			description: 'resolveSystemPrompt replaces {context} and {min_words} / {max_words}.',
+			call: 'resolveSystemPrompt',
 			args: [
 				{
-					id: "batch_test", batch: true,
-					system_single: "Single: {context}",
-					system_multi_template: "Batch n={n}: {context}",
+					id: 'basic',
+					system_single: 'Context: {context} — {min_words}–{max_words} words.',
+					batch: false
 				},
-				{ context: "test", n: 3 },
+				{ context: 'bonjour', min_words: 2, max_words: 5, language: 'fr' }
 			],
-			assert: { field: "is_batch", value: true },
+			assert: {
+				field: 'system',
+				contains: 'bonjour',
+				not_null: true
+			}
 		},
 		{
-			id:          "null_profile_returns_null_system",
-			description: "resolveSystemPrompt(null) returns system=null.",
-			call:        "resolveSystemPrompt",
-			args:        [null, {}],
-			assert:      { field: "system", value: null },
+			id: 'inject_language_placeholder',
+			description: 'resolveSystemPrompt replaces {language}.',
+			call: 'resolveSystemPrompt',
+			args: [
+				{ id: 'basic', system_single: 'Default language: {language}.', batch: false },
+				{ context: '', language: 'en' }
+			],
+			assert: { field: 'system', contains: 'en' }
 		},
+		{
+			id: 'batch_mode_uses_multi_template',
+			description: 'Batch profile with n>1 returns is_batch=true.',
+			call: 'resolveSystemPrompt',
+			args: [
+				{
+					id: 'batch_test',
+					batch: true,
+					system_single: 'Single: {context}',
+					system_multi_template: 'Batch n={n}: {context}'
+				},
+				{ context: 'test', n: 3 }
+			],
+			assert: { field: 'is_batch', value: true }
+		},
+		{
+			id: 'null_profile_returns_null_system',
+			description: 'resolveSystemPrompt(null) returns system=null.',
+			call: 'resolveSystemPrompt',
+			args: [null, {}],
+			assert: { field: 'system', value: null }
+		}
 	];
 }
-
 
 module.exports = {
 	PROFILES_JSON_PATH,
@@ -275,5 +259,5 @@ module.exports = {
 	getAllProfiles,
 	getActiveProfile,
 	resolveSystemPrompt,
-	profileSelectorTestVectors,
+	profileSelectorTestVectors
 };

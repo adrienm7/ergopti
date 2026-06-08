@@ -6,15 +6,16 @@ Bridge between Hammerspoon and Karabiner-Elements. Manages the full lifecycle: r
 
 ## Ports used (`shared/ports/`)
 
-| Port | Usage |
-|---|---|
-| `FileSystem` | Reading/writing `config_karabiner.toml` and deploying `karabiner.json` |
+| Port               | Usage                                                                    |
+| ------------------ | ------------------------------------------------------------------------ |
+| `FileSystem`       | Reading/writing `config_karabiner.toml` and deploying `karabiner.json`   |
 | `ProcessLifecycle` | Detecting whether Karabiner-Elements is running and reloading its config |
-| `Storage` | Persisting the user config between sessions |
+| `Storage`          | Persisting the user config between sessions                              |
 
 ## Domain module (`shared/domain/`)
 
 No direct domain spec. Uses two driver-local JSON data files (Karabiner-Elements is macOS-exclusive, so these files live in the driver rather than in `shared/`):
+
 - `modules/karabiner/data/actions.json` — canonical action dictionary
 - `modules/karabiner/data/mod_combos.json` — all available two-modifier combos (tap / hold / chord slots)
 
@@ -22,13 +23,13 @@ Optionally consumes `modules.keylogger.kc_bridge` for keycode translation when a
 
 ## Public API
 
-| Function | Description |
-|---|---|
-| `M.init(state)` | Initialize with the shared core state table |
-| `M.generate_and_deploy()` | Build `karabiner.json` from current config and copy it to KE's config dir |
-| `M.reset_to_defaults()` | Wipe user config and recompute from `defaults.lua` |
-| `M.set_action(combo, slot, action)` | Update a single modifier-combo binding |
-| `M.get_config()` | Return the full in-memory config table |
+| Function                            | Description                                                               |
+| ----------------------------------- | ------------------------------------------------------------------------- |
+| `M.init(state)`                     | Initialize with the shared core state table                               |
+| `M.generate_and_deploy()`           | Build `karabiner.json` from current config and copy it to KE's config dir |
+| `M.reset_to_defaults()`             | Wipe user config and recompute from `defaults.lua`                        |
+| `M.set_action(combo, slot, action)` | Update a single modifier-combo binding                                    |
+| `M.get_config()`                    | Return the full in-memory config table                                    |
 
 ## Init pattern
 

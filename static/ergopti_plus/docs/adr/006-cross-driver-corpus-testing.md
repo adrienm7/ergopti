@@ -1,10 +1,10 @@
 # 006 — Shared test-vector corpus consumed by all drivers
 
-| Field | Value |
-|---|---|
-| **Date** | 2025-09-01 |
-| **Status** | Accepted |
-| **Deciders** | Core team |
+| Field        | Value      |
+| ------------ | ---------- |
+| **Date**     | 2025-09-01 |
+| **Status**   | Accepted   |
+| **Deciders** | Core team  |
 
 ---
 
@@ -34,12 +34,14 @@ All driver test suites **must** consume these vectors as part of their test run.
 A driver that does not pass every vector in the corpus is considered broken.
 
 Current corpus directories:
+
 - `static/ergopti_plus/shared/tests/corpus/hotstrings/vectors.json` — hotstring
   expansion input/output pairs.
 - `static/ergopti_plus/shared/tests/corpus/tap_hold/vectors.json` — tap-hold
   timing scenarios and expected key event sequences.
 
 Hammerspoon consumption is implemented in:
+
 - `tests/unit/meta/test_corpus_hotstrings.lua`
 - `tests/unit/meta/test_corpus_tap_hold.lua`
 
@@ -70,11 +72,11 @@ Hammerspoon consumption is implemented in:
 
 ## Alternatives considered
 
-| Alternative | Why rejected |
-|---|---|
-| Duplicated test cases per driver | Proven to drift; the problem this ADR solves |
-| Single test suite run under both runtimes | AHK and Lua test runners are incompatible |
-| Property-based / generative tests | Too complex for the current team size; deterministic vectors are easier to audit |
+| Alternative                               | Why rejected                                                                     |
+| ----------------------------------------- | -------------------------------------------------------------------------------- |
+| Duplicated test cases per driver          | Proven to drift; the problem this ADR solves                                     |
+| Single test suite run under both runtimes | AHK and Lua test runners are incompatible                                        |
+| Property-based / generative tests         | Too complex for the current team size; deterministic vectors are easier to audit |
 
 ## Evidence in the codebase
 

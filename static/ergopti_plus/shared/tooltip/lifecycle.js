@@ -38,11 +38,11 @@
  * ==============================================================================
  */
 
-"use strict";
+'use strict';
 
 /** @typedef {"teardown"|"suspend"|"prepare"|"reveal"} LifecyclePhase */
 
-const PHASES = ["teardown", "suspend", "prepare", "reveal"];
+const PHASES = ['teardown', 'suspend', 'prepare', 'reveal'];
 
 /**
  * Returns the ordered phase list drivers must implement.
@@ -59,30 +59,32 @@ function lifecyclePhases() {
 function lifecycleContract() {
 	return [
 		{
-			id: "teardown_border_first",
-			description: "TEARDOWN and SUSPEND always hide the border before the content surface.",
+			id: 'teardown_border_first',
+			description: 'TEARDOWN and SUSPEND always hide the border before the content surface.'
 		},
 		{
-			id: "prepare_while_hidden",
-			description: "PREPARE keeps both surfaces hidden until border bitmap and content controls are ready.",
+			id: 'prepare_while_hidden',
+			description:
+				'PREPARE keeps both surfaces hidden until border bitmap and content controls are ready.'
 		},
 		{
-			id: "reveal_atomic",
-			description: "REVEAL shows content and border together — never content alone on screen.",
+			id: 'reveal_atomic',
+			description: 'REVEAL shows content and border together — never content alone on screen.'
 		},
 		{
-			id: "prepare_failure_teardown",
-			description: "Any PREPARE exception triggers TEARDOWN so no partial overlay lingers.",
+			id: 'prepare_failure_teardown',
+			description: 'Any PREPARE exception triggers TEARDOWN so no partial overlay lingers.'
 		},
 		{
-			id: "dequeue_suspend_not_teardown",
-			description: "Stacked row expiry rebuilds use SUSPEND+PREPARE+REVEAL to avoid border-only flashes.",
-		},
+			id: 'dequeue_suspend_not_teardown',
+			description:
+				'Stacked row expiry rebuilds use SUSPEND+PREPARE+REVEAL to avoid border-only flashes.'
+		}
 	];
 }
 
 module.exports = {
 	PHASES,
 	lifecyclePhases,
-	lifecycleContract,
+	lifecycleContract
 };

@@ -29,14 +29,11 @@
  * ==============================================================================
  */
 
-"use strict";
+'use strict';
 
-const fs   = require("fs");
-const path = require("path");
-const { parse } = require("smol-toml");
-
-
-
+const fs = require('fs');
+const path = require('path');
+const { parse } = require('smol-toml');
 
 // ====================================
 // ====================================
@@ -49,26 +46,23 @@ const { parse } = require("smol-toml");
 // (ScriptInformation["PersonalTomlPath"]) and must keep loading through the
 // runtime parser.
 const BUNDLED_CATEGORIES = [
-	"distancesreduction",
-	"sfbsreduction",
-	"rolls",
-	"autocorrection",
-	"magickey",
+	'distancesreduction',
+	'sfbsreduction',
+	'rolls',
+	'autocorrection',
+	'magickey'
 ];
 
 // Literal magic-key marker used inside TOML triggers / outputs. Runtime
 // substitution is done with StrReplace(trigger, MAGIC_KEY_MARKER, MK).
-const MAGIC_KEY_MARKER = "★"; // ★
+const MAGIC_KEY_MARKER = '★'; // ★
 
-const REPO_ROOT       = path.resolve(__dirname, "..", "..");
-const TOML_SOURCE_DIR = path.join(REPO_ROOT, "static", "ergopti_plus", "shared", "hotstrings");
-const OUTPUT_DIR      = path.join(REPO_ROOT, "static", "ergopti_plus", "windows", "lib", "hotstrings");
+const REPO_ROOT = path.resolve(__dirname, '..', '..');
+const TOML_SOURCE_DIR = path.join(REPO_ROOT, 'static', 'ergopti_plus', 'shared', 'hotstrings');
+const OUTPUT_DIR = path.join(REPO_ROOT, 'static', 'ergopti_plus', 'windows', 'lib', 'hotstrings');
 
 // UTF-8 BOM prefix — required for AHK v2 source files.
-const UTF8_BOM = "﻿";
-
-
-
+const UTF8_BOM = '﻿';
 
 // ====================================
 // ====================================
@@ -84,12 +78,12 @@ const UTF8_BOM = "﻿";
 function ahkEscape(s) {
 	// Backtick is AHK's escape character — must be escaped first
 	return s
-		.replace(/`/g, "``")
-		.replace(/"/g, "`\"")
-		.replace(/\n/g, "`n")
-		.replace(/\r/g, "`r")
-		.replace(/\t/g, "`t")
-		.replace(/;/g, "`;");
+		.replace(/`/g, '``')
+		.replace(/"/g, '`"')
+		.replace(/\n/g, '`n')
+		.replace(/\r/g, '`r')
+		.replace(/\t/g, '`t')
+		.replace(/;/g, '`;');
 }
 
 /**
@@ -98,7 +92,7 @@ function ahkEscape(s) {
  * @returns {"true"|"false"} AHK bool string.
  */
 function ahkBool(value) {
-	return value ? "true" : "false";
+	return value ? 'true' : 'false';
 }
 
 /**
@@ -116,9 +110,6 @@ function triggerExpr(trigger) {
 	return `"${escaped}"`;
 }
 
-
-
-
 // ====================================
 // ====================================
 // ======= 3/ Entry emission =======
@@ -132,10 +123,10 @@ function triggerExpr(trigger) {
  * @returns {string} Flag string (e.g. "*?C").
  */
 function computeFlags(entry) {
-	let flags = "";
-	if (entry["auto_expand"])              flags += "*";
-	if (!entry["is_word"])                 flags += "?";
-	if (entry["is_case_sensitive_strict"]) flags += "C";
+	let flags = '';
+	if (entry['auto_expand']) flags += '*';
+	if (!entry['is_word']) flags += '?';
+	if (entry['is_case_sensitive_strict']) flags += 'C';
 	return flags;
 }
 
@@ -150,39 +141,35 @@ function computeFlags(entry) {
  * @param {string} section - Section name for the registry metadata.
  */
 function emitEntry(out, trigger, entry, isRepeatSection, category, section) {
-	const output      = entry["output"]              ?? "";
-	const flags       = computeFlags(entry);
+	const output = entry['output'] ?? '';
+	const flags = computeFlags(entry);
 	// Counter-intuitive flag mapping preserved from the runtime loader:
 	//   is_case_sensitive = true  → single-variant CreateHotstring
 	//   is_case_sensitive = false → all-variants CreateCaseSensitiveHotstrings
-	const isCaseSens  = entry["is_case_sensitive"]   ?? false;
-	const finalResult = entry["final_result"]        ?? false;
+	const isCaseSens = entry['is_case_sensitive'] ?? false;
+	const finalResult = entry['final_result'] ?? false;
 	// Only mark as a repeat trigger when the trigger itself contains the magic-key
 	// marker — plain-text corrections must not be gated by the repeat-specific
 	// word-position check.
-	const isRepeat    = isRepeatSection && trigger.includes(MAGIC_KEY_MARKER);
+	const isRepeat = isRepeatSection && trigger.includes(MAGIC_KEY_MARKER);
 
-	let optionsLine = (
+	let optionsLine =
 		`\t_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", ` +
 		`${ahkBool(finalResult)}, "IsRepeat", ${ahkBool(isRepeat)}` +
-		(category ? `, "Category", "${category}"` : "") +
-		(section  ? `, "Section", "${section}"`   : "") +
-		")"
-	);
+		(category ? `, "Category", "${category}"` : '') +
+		(section ? `, "Section", "${section}"` : '') +
+		')';
 	out.push(optionsLine);
 	out.push(
 		'\tif IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {\n' +
-		'\t\t_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]\n' +
-		"\t}"
+			'\t\t_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]\n' +
+			'\t}'
 	);
 
-	const fn             = isCaseSens ? "CreateHotstring" : "CreateCaseSensitiveHotstrings";
-	const outputEscaped  = ahkEscape(String(output));
+	const fn = isCaseSens ? 'CreateHotstring' : 'CreateCaseSensitiveHotstrings';
+	const outputEscaped = ahkEscape(String(output));
 	out.push(`\t${fn}("${flags}", ${triggerExpr(trigger)}, "${outputEscaped}", _GenOpts)`);
 }
-
-
-
 
 // ====================================
 // ====================================
@@ -198,18 +185,15 @@ function emitEntry(out, trigger, entry, isRepeatSection, category, section) {
 function makeMajorBanner(title) {
 	// Total expected length: prefix(2) + leftEq(7) + 1 + title + 1 + rightEq(7)
 	const expectedLen = 2 + 7 + 1 + title.length + 1 + 7;
-	const bar         = "; " + "=".repeat(expectedLen - 2);
-	const titleLine   = `; ${"=".repeat(7)} ${title} ${"=".repeat(7)}`;
+	const bar = '; ' + '='.repeat(expectedLen - 2);
+	const titleLine = `; ${'='.repeat(7)} ${title} ${'='.repeat(7)}`;
 	// 6 newlines = end-of-previous-line \n + 5 blank lines per convention
-	return "\n\n\n\n\n\n" + bar + "\n" + bar + "\n" + titleLine + "\n" + bar + "\n" + bar + "\n\n";
+	return '\n\n\n\n\n\n' + bar + '\n' + bar + '\n' + titleLine + '\n' + bar + '\n' + bar + '\n\n';
 }
 
 // Pre-built banners reused in every per-category file
-const REGISTRY_BANNER = makeMajorBanner("1/ Generated registry");
-const LOADERS_BANNER  = makeMajorBanner("2/ Generated loaders");
-
-
-
+const REGISTRY_BANNER = makeMajorBanner('1/ Generated registry');
+const LOADERS_BANNER = makeMajorBanner('2/ Generated loaders');
 
 // ====================================
 // ====================================
@@ -225,40 +209,40 @@ const LOADERS_BANNER  = makeMajorBanner("2/ Generated loaders");
 function categoryFileHeader(category) {
 	return (
 		`; static/ergopti_plus/windows/lib/hotstrings/generated_${category}.ahk\n` +
-		"\n" +
-		"; ==============================================================================\n" +
+		'\n' +
+		'; ==============================================================================\n' +
 		`; MODULE: Generated Hotstrings — ${category}\n` +
-		"; DESCRIPTION:\n" +
-		"; AUTO-GENERATED FILE — DO NOT EDIT BY HAND.\n" +
-		"; Regenerate with ``node scripts/build-hotstrings.cjs`` from the repo root\n" +
-		"; whenever the bundled TOML files under ``static/ergopti_plus/_shared/hotstrings/`` change.\n" +
-		";\n" +
-		"; Contains the ``_GenLoad_*`` loader functions and the partial\n" +
+		'; DESCRIPTION:\n' +
+		'; AUTO-GENERATED FILE — DO NOT EDIT BY HAND.\n' +
+		'; Regenerate with ``node scripts/build-hotstrings.cjs`` from the repo root\n' +
+		'; whenever the bundled TOML files under ``static/ergopti_plus/_shared/hotstrings/`` change.\n' +
+		';\n' +
+		'; Contains the ``_GenLoad_*`` loader functions and the partial\n' +
 		`; \`\`_GENERATED_HOTSTRINGS\`\` map entries for the \`\`${category}\`\` category.\n` +
-		"; Included automatically by ``hotstrings_generated.ahk``.\n" +
-		"; ==============================================================================\n"
+		'; Included automatically by ``hotstrings_generated.ahk``.\n' +
+		'; ==============================================================================\n'
 	);
 }
 
 const ENTRY_POINT_HEADER =
-	"; static/ergopti_plus/windows/lib/hotstrings/hotstrings_generated.ahk\n" +
-	"\n" +
-	"; ==============================================================================\n" +
-	"; MODULE: Generated Hotstrings Registrar — Entry Point\n" +
-	"; DESCRIPTION:\n" +
-	"; AUTO-GENERATED FILE — DO NOT EDIT BY HAND.\n" +
-	"; Regenerate with ``node scripts/build-hotstrings.cjs`` from the repo root\n" +
-	"; whenever the bundled TOML files under ``static/ergopti_plus/_shared/hotstrings/`` change.\n" +
-	";\n" +
-	"; This file is a thin entry-point that ``#Include``s one generated file per\n" +
-	"; category. Consumers that already ``#Include`` this file require no change.\n" +
-	"; ``LoadHotstringsSection`` consults ``_GENERATED_HOTSTRINGS`` first and only\n" +
-	"; falls back to the TOML parser for the ``personal`` category and for sections\n" +
-	"; this file does not cover (e.g. a freshly-added TOML file that has not yet\n" +
-	"; been recompiled).\n" +
-	"; ==============================================================================\n" +
-	"\n" +
-	"\n";
+	'; static/ergopti_plus/windows/lib/hotstrings/hotstrings_generated.ahk\n' +
+	'\n' +
+	'; ==============================================================================\n' +
+	'; MODULE: Generated Hotstrings Registrar — Entry Point\n' +
+	'; DESCRIPTION:\n' +
+	'; AUTO-GENERATED FILE — DO NOT EDIT BY HAND.\n' +
+	'; Regenerate with ``node scripts/build-hotstrings.cjs`` from the repo root\n' +
+	'; whenever the bundled TOML files under ``static/ergopti_plus/_shared/hotstrings/`` change.\n' +
+	';\n' +
+	'; This file is a thin entry-point that ``#Include``s one generated file per\n' +
+	'; category. Consumers that already ``#Include`` this file require no change.\n' +
+	'; ``LoadHotstringsSection`` consults ``_GENERATED_HOTSTRINGS`` first and only\n' +
+	'; falls back to the TOML parser for the ``personal`` category and for sections\n' +
+	'; this file does not cover (e.g. a freshly-added TOML file that has not yet\n' +
+	'; been recompiled).\n' +
+	'; ==============================================================================\n' +
+	'\n' +
+	'\n';
 
 /**
  * Emit one generated loader function and return its AHK name for the registry.
@@ -271,23 +255,23 @@ const ENTRY_POINT_HEADER =
 function emitSection(out, category, section, entries) {
 	const fnName = `_GenLoad_${category}_${section}`;
 	out.push(`${fnName}(FeatureConfig, ExtraOptions := unset) {`);
-	out.push("\tglobal ScriptInformation");
+	out.push('\tglobal ScriptInformation');
 	// Prefix every local with _Gen so #Warn LocalSameAsGlobal does not flag
 	// a clash with same-named top-level assignments elsewhere in the driver
 	out.push(
 		'\t_GenTimeAct := FeatureConfig.HasOwnProp("TimeActivationSeconds") ' +
-		"? FeatureConfig.TimeActivationSeconds : 0"
+			'? FeatureConfig.TimeActivationSeconds : 0'
 	);
 	out.push('\t_GenMK := ScriptInformation["MagicKey"]');
 
-	const isRepeatSection = (category === "magickey" && section === "repeatcorrections");
+	const isRepeatSection = category === 'magickey' && section === 'repeatcorrections';
 	for (const entryDict of entries) {
 		for (const [trigger, data] of Object.entries(entryDict)) {
 			emitEntry(out, trigger, data, isRepeatSection, category, section);
 		}
 	}
-	out.push("}");
-	out.push("");
+	out.push('}');
+	out.push('');
 	return fnName;
 }
 
@@ -300,25 +284,25 @@ function compileCategory(category) {
 	const tomlPath = path.join(TOML_SOURCE_DIR, `${category}.toml`);
 	if (!fs.existsSync(tomlPath)) {
 		process.stderr.write(`[build-hotstrings] skip (missing): ${tomlPath}\n`);
-		return { content: "", registry: [] };
+		return { content: '', registry: [] };
 	}
 
-	const raw  = fs.readFileSync(tomlPath, "utf8");
+	const raw = fs.readFileSync(tomlPath, 'utf8');
 	const data = parse(raw);
 
 	/** @type {Array<[string, string]>} */
-	const registry      = [];
+	const registry = [];
 	/** @type {string[]} */
-	const functionsOut  = [];
+	const functionsOut = [];
 
 	for (const [key, value] of Object.entries(data)) {
 		// _meta and _meta.sections are consumed by the runtime metadata loader
 		// (ApplyTomlMetadataToFeatures), not by the hotstring registrar
-		if (key.startsWith("_"))      continue;
-		if (!Array.isArray(value))    continue;
+		if (key.startsWith('_')) continue;
+		if (!Array.isArray(value)) continue;
 
 		const section = key.toLowerCase();
-		const fnName  = emitSection(functionsOut, category, section, value);
+		const fnName = emitSection(functionsOut, category, section, value);
 		registry.push([`${category}.${section}`, fnName]);
 	}
 
@@ -327,15 +311,15 @@ function compileCategory(category) {
 	for (const [k, fn] of registry) {
 		registryLines.push(`\t"${k}", ${fn},`);
 	}
-	registryLines.push(")");
+	registryLines.push(')');
 
 	const content =
 		categoryFileHeader(category) +
 		REGISTRY_BANNER +
-		registryLines.join("\n") +
+		registryLines.join('\n') +
 		LOADERS_BANNER +
-		functionsOut.join("\n") +
-		"\n";
+		functionsOut.join('\n') +
+		'\n';
 
 	return { content, registry };
 }
@@ -346,11 +330,11 @@ function compileCategory(category) {
  */
 function build() {
 	/** @type {Record<string, string>} */
-	const perCategory         = {};
+	const perCategory = {};
 	/** @type {Array<[string, string]>} */
-	const allRegistry         = [];
+	const allRegistry = [];
 	/** @type {string[]} */
-	const includedCategories  = [];
+	const includedCategories = [];
 
 	for (const category of BUNDLED_CATEGORIES) {
 		const { content, registry } = compileCategory(category);
@@ -361,31 +345,21 @@ function build() {
 	}
 
 	// Thin entry-point: #Include each per-category file then merge partial maps
-	const includeLines = includedCategories
-		.map((cat) => `#Include generated_${cat}.ahk`)
-		.join("\n");
+	const includeLines = includedCategories.map((cat) => `#Include generated_${cat}.ahk`).join('\n');
 
-	const mergeBanner = makeMajorBanner("1/ Merge per-category maps into _GENERATED_HOTSTRINGS");
-	const mergeLines  = ["global _GENERATED_HOTSTRINGS := Map()"];
+	const mergeBanner = makeMajorBanner('1/ Merge per-category maps into _GENERATED_HOTSTRINGS');
+	const mergeLines = ['global _GENERATED_HOTSTRINGS := Map()'];
 	for (const category of includedCategories) {
 		mergeLines.push(
 			`for _k, _v in _GENERATED_HOTSTRINGS_${category.toUpperCase()}` +
-			`\n\t_GENERATED_HOTSTRINGS[_k] := _v`
+				`\n\t_GENERATED_HOTSTRINGS[_k] := _v`
 		);
 	}
 
-	const entryPoint =
-		ENTRY_POINT_HEADER +
-		includeLines +
-		mergeBanner +
-		mergeLines.join("\n") +
-		"\n";
+	const entryPoint = ENTRY_POINT_HEADER + includeLines + mergeBanner + mergeLines.join('\n') + '\n';
 
 	return { perCategory, entryPoint };
 }
-
-
-
 
 // ====================================
 // ====================================
@@ -404,8 +378,8 @@ function main() {
 	 * @returns {Buffer} Buffer ready to write to disk.
 	 */
 	function toAhkBuffer(content) {
-		const crlf = content.replace(/\r\n/g, "\n").replace(/\n/g, "\r\n");
-		return Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), Buffer.from(crlf, "utf8")]);
+		const crlf = content.replace(/\r\n/g, '\n').replace(/\n/g, '\r\n');
+		return Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), Buffer.from(crlf, 'utf8')]);
 	}
 
 	const { perCategory, entryPoint } = build();
@@ -413,19 +387,21 @@ function main() {
 	let totalBytes = 0;
 	for (const [filename, content] of Object.entries(perCategory)) {
 		const outPath = path.join(OUTPUT_DIR, filename);
-		const buf     = toAhkBuffer(content);
+		const buf = toAhkBuffer(content);
 		fs.writeFileSync(outPath, buf);
 		totalBytes += buf.length;
-		process.stdout.write(`[build-hotstrings] wrote ${outPath} (${buf.length.toLocaleString()} bytes)\n`);
+		process.stdout.write(
+			`[build-hotstrings] wrote ${outPath} (${buf.length.toLocaleString()} bytes)\n`
+		);
 	}
 
-	const entryPath = path.join(OUTPUT_DIR, "hotstrings_generated.ahk");
-	const entryBuf  = toAhkBuffer(entryPoint);
+	const entryPath = path.join(OUTPUT_DIR, 'hotstrings_generated.ahk');
+	const entryBuf = toAhkBuffer(entryPoint);
 	fs.writeFileSync(entryPath, entryBuf);
 	process.stdout.write(
 		`[build-hotstrings] wrote ${entryPath} (${entryBuf.length.toLocaleString()} bytes)` +
-		` — entry-point #Including ${Object.keys(perCategory).length} category file(s)` +
-		` (${totalBytes.toLocaleString()} bytes of hotstring code)\n`
+			` — entry-point #Including ${Object.keys(perCategory).length} category file(s)` +
+			` (${totalBytes.toLocaleString()} bytes of hotstring code)\n`
 	);
 }
 

@@ -26,10 +26,7 @@
  * ==============================================================================
  */
 
-"use strict";
-
-
-
+'use strict';
 
 // ==================================================
 // ==================================================
@@ -42,8 +39,8 @@
  * @type {object}
  */
 const portContract = {
-	name: "WindowInfo",
-	version: "1.0.0",
+	name: 'WindowInfo',
+	version: '1.0.0',
 
 	/**
 	 * getFocused() — Return the identity of the currently focused window.
@@ -58,7 +55,7 @@ const portContract = {
 	 */
 	methods: {
 		getFocused: { arity: 0, required: true },
-		getAll:     { arity: 0, required: true },
+		getAll: { arity: 0, required: true }
 	},
 
 	/**
@@ -70,11 +67,8 @@ const portContract = {
 	 *   executablePath: string,  // Full path to the executable (empty on macOS)
 	 * }
 	 */
-	WINDOW_INFO_SHAPE: ["appId", "windowTitle", "bundleId", "executablePath"],
+	WINDOW_INFO_SHAPE: ['appId', 'windowTitle', 'bundleId', 'executablePath']
 };
-
-
-
 
 // ==================================================
 // ==================================================
@@ -89,24 +83,19 @@ const portContract = {
  */
 function validateAdapter(adapter) {
 	const violations = [];
-	if (!adapter || typeof adapter !== "object") {
-		return ["adapter must be a non-null object"];
+	if (!adapter || typeof adapter !== 'object') {
+		return ['adapter must be a non-null object'];
 	}
 	for (const [name, spec] of Object.entries(portContract.methods)) {
 		if (!spec.required) continue;
-		if (typeof adapter[name] !== "function") {
+		if (typeof adapter[name] !== 'function') {
 			violations.push(`missing method: ${name}`);
 		} else if (adapter[name].length !== spec.arity) {
-			violations.push(
-				`method ${name}: expected arity ${spec.arity}, got ${adapter[name].length}`
-			);
+			violations.push(`method ${name}: expected arity ${spec.arity}, got ${adapter[name].length}`);
 		}
 	}
 	return violations;
 }
-
-
-
 
 // ==================================================
 // ==================================================
@@ -121,66 +110,57 @@ function validateAdapter(adapter) {
 function contractTestVectors() {
 	return [
 		{
-			id: "get_focused_returns_object",
-			description: "getFocused() always returns a non-null object with the four required fields.",
+			id: 'get_focused_returns_object',
+			description: 'getFocused() always returns a non-null object with the four required fields.',
 			steps: [
-				{ call: "getFocused" },
+				{ call: 'getFocused' },
 				{
-					assert: "return_shape",
+					assert: 'return_shape',
 					required_fields: portContract.WINDOW_INFO_SHAPE,
-					fields_are_strings: true,
-				},
-			],
+					fields_are_strings: true
+				}
+			]
 		},
 		{
-			id: "get_focused_no_exception",
-			description: "getFocused() does not throw even when no window is focused.",
-			steps: [
-				{ call: "getFocused" },
-				{ assert: "no_exception" },
-			],
+			id: 'get_focused_no_exception',
+			description: 'getFocused() does not throw even when no window is focused.',
+			steps: [{ call: 'getFocused' }, { assert: 'no_exception' }]
 		},
 		{
-			id: "get_all_returns_array",
-			description: "getAll() returns an array (possibly empty) of WindowInfo objects.",
-			steps: [
-				{ call: "getAll" },
-				{ assert: "return_array" },
-			],
+			id: 'get_all_returns_array',
+			description: 'getAll() returns an array (possibly empty) of WindowInfo objects.',
+			steps: [{ call: 'getAll' }, { assert: 'return_array' }]
 		},
 		{
-			id: "get_all_no_exception",
-			description: "getAll() does not throw even in a restricted environment.",
-			steps: [
-				{ call: "getAll" },
-				{ assert: "no_exception" },
-			],
+			id: 'get_all_no_exception',
+			description: 'getAll() does not throw even in a restricted environment.',
+			steps: [{ call: 'getAll' }, { assert: 'no_exception' }]
 		},
 		{
-			id: "focused_fields_are_strings",
-			description: "All fields of the getFocused() result are strings (empty string when unavailable).",
+			id: 'focused_fields_are_strings',
+			description:
+				'All fields of the getFocused() result are strings (empty string when unavailable).',
 			steps: [
-				{ call: "getFocused" },
+				{ call: 'getFocused' },
 				{
-					assert: "all_fields_are_strings",
-					fields: portContract.WINDOW_INFO_SHAPE,
-				},
-			],
+					assert: 'all_fields_are_strings',
+					fields: portContract.WINDOW_INFO_SHAPE
+				}
+			]
 		},
 		{
-			id: "get_all_items_have_correct_shape",
-			description: "Every item in getAll() has the four required string fields.",
+			id: 'get_all_items_have_correct_shape',
+			description: 'Every item in getAll() has the four required string fields.',
 			steps: [
-				{ call: "getAll" },
+				{ call: 'getAll' },
 				{
-					assert: "all_items_match_shape",
+					assert: 'all_items_match_shape',
 					required_fields: portContract.WINDOW_INFO_SHAPE,
-					fields_are_strings: true,
-				},
-			],
-		},
+					fields_are_strings: true
+				}
+			]
+		}
 	];
 }
-
 
 module.exports = { portContract, validateAdapter, contractTestVectors };

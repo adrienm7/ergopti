@@ -24,18 +24,17 @@
  * ==============================================================================
  */
 
-"use strict";
+'use strict';
 
-const path = require("path");
-const fs   = require("fs");
+const path = require('path');
+const fs = require('fs');
 
-const PORTS_DIR     = path.join(__dirname, "../../static/ergopti_plus/shared/ports");
-const PASS_SYMBOL   = "✓";
-const FAIL_SYMBOL   = "✗";
+const PORTS_DIR = path.join(__dirname, '../../static/ergopti_plus/shared/ports');
+const PASS_SYMBOL = '✓';
+const FAIL_SYMBOL = '✗';
 
 let total_pass = 0;
 let total_fail = 0;
-
 
 // ==================================================
 // ==================================================
@@ -47,143 +46,141 @@ let total_fail = 0;
 // adapter. The arity of each function must match the port contract exactly.
 // When a Lua adapter method is added or removed, update this table too.
 const HS_ADAPTERS = {
-
 	KeyboardHook: {
-		start:          function(opts) {},          // arity 1
-		stop:           function() {},              // arity 0
-		isRunning:      function() {},              // arity 0
-		refreshContext: function() {},              // arity 0
-		getContext:     function() {},              // arity 0
+		start: function (opts) {}, // arity 1
+		stop: function () {}, // arity 0
+		isRunning: function () {}, // arity 0
+		refreshContext: function () {}, // arity 0
+		getContext: function () {} // arity 0
 	},
 
 	TextSender: {
-		send:       function(text, opts, cb) {},    // arity 3
-		eraseChars: function(count) {},             // arity 1
-		pressKey:   function(key, mods) {},         // arity 2
+		send: function (text, opts, cb) {}, // arity 3
+		eraseChars: function (count) {}, // arity 1
+		pressKey: function (key, mods) {} // arity 2
 	},
 
 	TooltipRenderer: {
-		show:          function(payload) {},        // arity 1
-		hide:          function() {},               // arity 0
-		isVisible:     function() {},               // arity 0
-		updateElement: function(drawCall) {},       // arity 1
+		show: function (payload) {}, // arity 1
+		hide: function () {}, // arity 0
+		isVisible: function () {}, // arity 0
+		updateElement: function (drawCall) {} // arity 1
 	},
 
 	HttpClient: {
-		post:     function(url, headers, body, cb) {}, // arity 4
-		cancel:   function() {},                    // arity 0
-		isActive: function() {},                    // arity 0
+		post: function (url, headers, body, cb) {}, // arity 4
+		cancel: function () {}, // arity 0
+		isActive: function () {} // arity 0
 	},
 
 	TimerScheduler: {
-		after:     function(delaySec, fn) {},       // arity 2
-		every:     function(intervalSec, fn) {},    // arity 2
-		cancel:    function(handle) {},             // arity 1
-		cancelAll: function() {},                   // arity 0
+		after: function (delaySec, fn) {}, // arity 2
+		every: function (intervalSec, fn) {}, // arity 2
+		cancel: function (handle) {}, // arity 1
+		cancelAll: function () {} // arity 0
 	},
 
 	Notifier: {
-		send: function(title, opts) {},             // arity 2
+		send: function (title, opts) {} // arity 2
 	},
 
 	TrayMenu: {
-		setIcon:    function(opts) {},              // arity 1
-		setMenu:    function(items) {},             // arity 1
-		setTooltip: function(text) {},              // arity 1
-		destroy:    function() {},                  // arity 0
+		setIcon: function (opts) {}, // arity 1
+		setMenu: function (items) {}, // arity 1
+		setTooltip: function (text) {}, // arity 1
+		destroy: function () {} // arity 0
 	},
 
 	FileSystem: {
-		read:   function(path) {},                  // arity 1
-		write:  function(path, content) {},         // arity 2
-		append: function(path, content) {},         // arity 2
-		exists: function(path) {},                  // arity 1
-		delete: function(path) {},                  // arity 1
+		read: function (path) {}, // arity 1
+		write: function (path, content) {}, // arity 2
+		append: function (path, content) {}, // arity 2
+		exists: function (path) {}, // arity 1
+		delete: function (path) {} // arity 1
 	},
 
 	WindowInfo: {
-		getFocused: function() {},                  // arity 0
-		getAll:     function() {},                  // arity 0
+		getFocused: function () {}, // arity 0
+		getAll: function () {} // arity 0
 	},
 
 	SecureFieldDetector: {
-		isSecureField: function() {},               // arity 0
-		isSecureApp:   function(appId) {},          // arity 1
-		refresh:       function() {},               // arity 0
+		isSecureField: function () {}, // arity 0
+		isSecureApp: function (appId) {}, // arity 1
+		refresh: function () {} // arity 0
 	},
 
 	Clipboard: {
-		read:    function() {},                     // arity 0
-		write:   function(text) {},                 // arity 1
-		save:    function() {},                     // arity 0
-		restore: function(saved) {},                // arity 1
+		read: function () {}, // arity 0
+		write: function (text) {}, // arity 1
+		save: function () {}, // arity 0
+		restore: function (saved) {} // arity 1
 	},
 
 	Storage: {
-		set:    function(key, value) {},            // arity 2
-		get:    function(key, defaultValue) {},     // arity 2
-		delete: function(key) {},                   // arity 1
-		has:    function(key) {},                   // arity 1
-		keys:   function() {},                      // arity 0
-		clear:  function() {},                      // arity 0
+		set: function (key, value) {}, // arity 2
+		get: function (key, defaultValue) {}, // arity 2
+		delete: function (key) {}, // arity 1
+		has: function (key) {}, // arity 1
+		keys: function () {}, // arity 0
+		clear: function () {} // arity 0
 	},
 
 	ProcessLifecycle: {
-		onFocusChange:    function(callback) {},    // arity 1
-		onAppLaunch:      function(callback) {},    // arity 1
-		onAppQuit:        function(callback) {},    // arity 1
-		getForegroundApp: function() {},            // arity 0
-		start:            function() {},            // arity 0
-		stop:             function() {},            // arity 0
+		onFocusChange: function (callback) {}, // arity 1
+		onAppLaunch: function (callback) {}, // arity 1
+		onAppQuit: function (callback) {}, // arity 1
+		getForegroundApp: function () {}, // arity 0
+		start: function () {}, // arity 0
+		stop: function () {} // arity 0
 	},
 
 	WindowManager: {
-		activate:   function(hwndOrSpec) {},        // arity 1
-		exists:     function(spec) {},              // arity 1
-		kill:       function(spec) {},              // arity 1
-		getList:    function() {},                  // arity 0
-		getTitle:   function(hwndOrSpec) {},        // arity 1
-		getFocused: function() {},                  // arity 0
+		activate: function (hwndOrSpec) {}, // arity 1
+		exists: function (spec) {}, // arity 1
+		kill: function (spec) {}, // arity 1
+		getList: function () {}, // arity 0
+		getTitle: function (hwndOrSpec) {}, // arity 1
+		getFocused: function () {} // arity 0
 	},
 
 	MouseControl: {
-		setPos:           function(x, y) {},        // arity 2
-		getPos:           function() {},            // arity 0
-		getMonitorCount:  function() {},            // arity 0
-		getMonitorBounds: function(n) {},           // arity 1
+		setPos: function (x, y) {}, // arity 2
+		getPos: function () {}, // arity 0
+		getMonitorCount: function () {}, // arity 0
+		getMonitorBounds: function (n) {} // arity 1
 	},
 
 	GraphicsRenderer: {
-		createWindow:  function(opts) {},           // arity 1
-		destroyWindow: function(handle) {},         // arity 1
-		drawBitmap:    function(handle, drawFn) {}, // arity 2
-		show:          function(handle) {},         // arity 1
-		hide:          function(handle) {},         // arity 1
+		createWindow: function (opts) {}, // arity 1
+		destroyWindow: function (handle) {}, // arity 1
+		drawBitmap: function (handle, drawFn) {}, // arity 2
+		show: function (handle) {}, // arity 1
+		hide: function (handle) {} // arity 1
 	},
 
 	NetworkInfo: {
-		getSsidHash:         function() {},         // arity 0
-		getSignalStrength:   function() {},         // arity 0
-		isInternetReachable: function() {},         // arity 0
-		isVpnActive:         function() {},         // arity 0
+		getSsidHash: function () {}, // arity 0
+		getSignalStrength: function () {}, // arity 0
+		isInternetReachable: function () {}, // arity 0
+		isVpnActive: function () {} // arity 0
 	},
 
 	Crypto: {
-		sha256: function(data) {},                  // arity 1
+		sha256: function (data) {} // arity 1
 	},
 
 	KeyState: {
-		KS_IsDown: function(keyName) {},            // arity 1
-		KS_IsUp:   function(keyName) {},            // arity 1
+		KS_IsDown: function (keyName) {}, // arity 1
+		KS_IsUp: function (keyName) {} // arity 1
 	},
 
 	AppLauncher: {
-		AL_Launch:         function(appPath) {},         // arity 1
-		AL_LaunchWithArgs: function(appPath, args) {},   // arity 2
-		AL_IsRunning:      function(processName) {},     // arity 1
-	},
+		AL_Launch: function (appPath) {}, // arity 1
+		AL_LaunchWithArgs: function (appPath, args) {}, // arity 2
+		AL_IsRunning: function (processName) {} // arity 1
+	}
 };
-
 
 // ===================================================
 // ===================================================
@@ -208,7 +205,7 @@ function runValidation(portName, adapter) {
 	let validateAdapter;
 	try {
 		// The spec files use module.exports = {} — load them as CommonJS.
-		const src = fs.readFileSync(specPath, "utf8");
+		const src = fs.readFileSync(specPath, 'utf8');
 		// Strip the "use strict" header and extract validateAdapter via eval
 		// in a local scope so the function definitions are accessible.
 		const wrapped = `(function() { ${src}; return validateAdapter; })()`;
@@ -219,7 +216,7 @@ function runValidation(portName, adapter) {
 		return;
 	}
 
-	if (typeof validateAdapter !== "function") {
+	if (typeof validateAdapter !== 'function') {
 		console.log(`  ${FAIL_SYMBOL}  ${portName}: spec does not export validateAdapter`);
 		total_fail++;
 		return;
@@ -238,22 +235,23 @@ function runValidation(portName, adapter) {
 	}
 }
 
-
 // ===================================================
 // ===================================================
 // ======= 3/ Test Runner ============================
 // ===================================================
 // ===================================================
 
-console.log("\nPort adapter structural compliance (Hammerspoon)");
-console.log("=".repeat(50));
+console.log('\nPort adapter structural compliance (Hammerspoon)');
+console.log('='.repeat(50));
 
 for (const [portName, adapterStub] of Object.entries(HS_ADAPTERS)) {
 	runValidation(portName, adapterStub);
 }
 
-console.log("");
-console.log(`Total: ${total_pass + total_fail} port(s) — ${total_pass} passed, ${total_fail} failed`);
-console.log("");
+console.log('');
+console.log(
+	`Total: ${total_pass + total_fail} port(s) — ${total_pass} passed, ${total_fail} failed`
+);
+console.log('');
 
 process.exit(total_fail > 0 ? 1 : 0);

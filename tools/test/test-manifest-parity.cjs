@@ -23,16 +23,21 @@
  * ==============================================================================
  */
 
-"use strict";
+'use strict';
 
-const fs   = require("fs");
-const path = require("path");
+const fs = require('fs');
+const path = require('path');
 
-const REPO_ROOT = path.resolve(__dirname, "..", "..");
+const REPO_ROOT = path.resolve(__dirname, '..', '..');
 
-const AHK_MANIFEST = path.join(REPO_ROOT, "static/ergopti_plus/windows/_generated/features_manifest.ahk");
-const HS_MANIFEST  = path.join(REPO_ROOT, "static/ergopti_plus/macos/_generated/features_manifest.lua");
-
+const AHK_MANIFEST = path.join(
+	REPO_ROOT,
+	'static/ergopti_plus/windows/_generated/features_manifest.ahk'
+);
+const HS_MANIFEST = path.join(
+	REPO_ROOT,
+	'static/ergopti_plus/macos/_generated/features_manifest.lua'
+);
 
 // ==============================================================
 // ==============================================================
@@ -47,7 +52,7 @@ const HS_MANIFEST  = path.join(REPO_ROOT, "static/ergopti_plus/macos/_generated/
  */
 function parseAhkVersion(src) {
 	const m = src.match(/"version",\s*"([^"]+)"/);
-	return m ? m[1] : "";
+	return m ? m[1] : '';
 }
 
 /**
@@ -57,7 +62,7 @@ function parseAhkVersion(src) {
  */
 function parseLuaVersion(src) {
 	const m = src.match(/M\.version\s*=\s*"([^"]+)"/);
-	return m ? m[1] : "";
+	return m ? m[1] : '';
 }
 
 /**
@@ -68,7 +73,7 @@ function parseLuaVersion(src) {
 function parseAhkSectionOrder(src) {
 	const m = src.match(/"section_order",\s*\[([^\]]+)\]/);
 	if (!m) return [];
-	return m[1].match(/"([^"]+)"/g).map(s => s.replace(/"/g, ""));
+	return m[1].match(/"([^"]+)"/g).map((s) => s.replace(/"/g, ''));
 }
 
 /**
@@ -79,7 +84,7 @@ function parseAhkSectionOrder(src) {
 function parseLuaSectionOrder(src) {
 	const m = src.match(/M\.section_order\s*=\s*\{([^}]+)\}/);
 	if (!m) return [];
-	return m[1].match(/"([^"]+)"/g).map(s => s.replace(/"/g, ""));
+	return m[1].match(/"([^"]+)"/g).map((s) => s.replace(/"/g, ''));
 }
 
 /**
@@ -91,16 +96,17 @@ function parseLuaSectionOrder(src) {
 function parseAhkSections(src) {
 	const result = new Map();
 	// Each section is: "key", Map("description_key", "...", "platforms", [...], "subsections", [...])
-	const re = /"([\w.]+)",\s*Map\("description_key",\s*"([^"]+)",\s*"platforms",\s*\[([^\]]*)\],\s*"subsections",\s*\[([^\]]*)\]\)/g;
+	const re =
+		/"([\w.]+)",\s*Map\("description_key",\s*"([^"]+)",\s*"platforms",\s*\[([^\]]*)\],\s*"subsections",\s*\[([^\]]*)\]\)/g;
 	let m;
 	while ((m = re.exec(src)) !== null) {
-		const key            = m[1];
+		const key = m[1];
 		const description_key = m[2];
-		const platforms      = m[3].match(/"([^"]+)"/g)
-			? m[3].match(/"([^"]+)"/g).map(s => s.replace(/"/g, ""))
+		const platforms = m[3].match(/"([^"]+)"/g)
+			? m[3].match(/"([^"]+)"/g).map((s) => s.replace(/"/g, ''))
 			: [];
-		const subsections    = m[4].match(/"([^"]+)"/g)
-			? m[4].match(/"([^"]+)"/g).map(s => s.replace(/"/g, ""))
+		const subsections = m[4].match(/"([^"]+)"/g)
+			? m[4].match(/"([^"]+)"/g).map((s) => s.replace(/"/g, ''))
 			: [];
 		result.set(key, { description_key, platforms, subsections });
 	}
@@ -116,16 +122,17 @@ function parseAhkSections(src) {
 function parseLuaSections(src) {
 	const result = new Map();
 	// Each section block: ["key"] = { description_key = "...", platforms = {...}, subsections = {...} }
-	const re = /\["([\w.]+)"\]\s*=\s*\{[^}]*description_key\s*=\s*"([^"]+)",[^}]*platforms\s*=\s*\{([^}]*)\},[^}]*subsections\s*=\s*\{([^}]*)\}[^}]*\}/g;
+	const re =
+		/\["([\w.]+)"\]\s*=\s*\{[^}]*description_key\s*=\s*"([^"]+)",[^}]*platforms\s*=\s*\{([^}]*)\},[^}]*subsections\s*=\s*\{([^}]*)\}[^}]*\}/g;
 	let m;
 	while ((m = re.exec(src)) !== null) {
-		const key            = m[1];
+		const key = m[1];
 		const description_key = m[2];
-		const platforms      = m[3].match(/"([^"]+)"/g)
-			? m[3].match(/"([^"]+)"/g).map(s => s.replace(/"/g, ""))
+		const platforms = m[3].match(/"([^"]+)"/g)
+			? m[3].match(/"([^"]+)"/g).map((s) => s.replace(/"/g, ''))
 			: [];
-		const subsections    = m[4].match(/"([^"]+)"/g)
-			? m[4].match(/"([^"]+)"/g).map(s => s.replace(/"/g, ""))
+		const subsections = m[4].match(/"([^"]+)"/g)
+			? m[4].match(/"([^"]+)"/g).map((s) => s.replace(/"/g, ''))
 			: [];
 		result.set(key, { description_key, platforms, subsections });
 	}
@@ -145,12 +152,12 @@ function parseLuaSections(src) {
 function parseAhkFeatures(src) {
 	const results = [];
 	// Match the fixed prefix fields
-	const rePath    = /"path",\s*"([^"]+)"/g;
-	const reId      = /"id",\s*"([^"]+)"/;
+	const rePath = /"path",\s*"([^"]+)"/g;
+	const reId = /"id",\s*"([^"]+)"/;
 	const reSection = /"section",\s*"([^"]+)"/;
-	const reType    = /"type",\s*"([^"]+)"/;
+	const reType = /"type",\s*"([^"]+)"/;
 	const reDescKey = /"description_key",\s*"([^"]+)"/;
-	const rePlat    = /"platforms",\s*\[([^\]]*)\]/;
+	const rePlat = /"platforms",\s*\[([^\]]*)\]/;
 
 	// Split on feature boundaries — each Map( starts a new feature entry
 	// Use the "path" field as the anchor to find each line
@@ -159,22 +166,22 @@ function parseAhkFeatures(src) {
 		if (!line.includes('"path"')) continue;
 		const mPath = line.match(/"path",\s*"([^"]+)"/);
 		if (!mPath) continue;
-		const mId      = line.match(reId);
+		const mId = line.match(reId);
 		const mSection = line.match(reSection);
-		const mType    = line.match(reType);
+		const mType = line.match(reType);
 		const mDescKey = line.match(reDescKey);
-		const mPlat    = line.match(rePlat);
+		const mPlat = line.match(rePlat);
 		if (!mId || !mSection || !mType || !mDescKey || !mPlat) continue;
 		const platforms = mPlat[1].match(/"([^"]+)"/g)
-			? mPlat[1].match(/"([^"]+)"/g).map(s => s.replace(/"/g, ""))
+			? mPlat[1].match(/"([^"]+)"/g).map((s) => s.replace(/"/g, ''))
 			: [];
 		results.push({
-			path:     mPath[1],
-			id:       mId[1],
-			section:  mSection[1],
-			type:     mType[1],
+			path: mPath[1],
+			id: mId[1],
+			section: mSection[1],
+			type: mType[1],
 			desc_key: mDescKey[1],
-			platforms,
+			platforms
 		});
 	}
 	return results;
@@ -194,7 +201,7 @@ function parseAhkFeatures(src) {
 function parseLuaFeatures(src) {
 	const results = [];
 	// Find the start of M.features
-	const featStart = src.indexOf("M.features");
+	const featStart = src.indexOf('M.features');
 	if (featStart === -1) return results;
 	const featSrc = src.slice(featStart);
 
@@ -203,7 +210,10 @@ function parseLuaFeatures(src) {
 
 	let i = 0;
 	while (i < lines.length) {
-		if (!lines[i].includes('path = "')) { i++; continue; }
+		if (!lines[i].includes('path = "')) {
+			i++;
+			continue;
+		}
 
 		// Collect the lines of this block until we see a line with only `},` or `}`
 		// that closes the feature block (depth 0)
@@ -214,40 +224,43 @@ function parseLuaFeatures(src) {
 		// The opening `{` of the feature entry was on a previous line (or same line)
 		let depth = 1;
 		// Count open braces on the first line
-		for (const ch of lines[i]) { if (ch === "{") depth++; else if (ch === "}") depth--; }
+		for (const ch of lines[i]) {
+			if (ch === '{') depth++;
+			else if (ch === '}') depth--;
+		}
 		while (j < lines.length && depth > 0) {
-			for (const ch of lines[j]) { if (ch === "{") depth++; else if (ch === "}") depth--; }
+			for (const ch of lines[j]) {
+				if (ch === '{') depth++;
+				else if (ch === '}') depth--;
+			}
 			blockLines.push(lines[j]);
 			j++;
 		}
 		i = j + 1;
 
-		const block = blockLines.join("\n");
-		const mPath    = block.match(/path\s*=\s*"([^"]+)"/);
-		const mId      = block.match(/\bid\s*=\s*"([^"]+)"/);
+		const block = blockLines.join('\n');
+		const mPath = block.match(/path\s*=\s*"([^"]+)"/);
+		const mId = block.match(/\bid\s*=\s*"([^"]+)"/);
 		const mSection = block.match(/section\s*=\s*"([^"]+)"/);
-		const mType    = block.match(/type\s*=\s*"([^"]+)"/);
+		const mType = block.match(/type\s*=\s*"([^"]+)"/);
 		const mDescKey = block.match(/description_key\s*=\s*"([^"]+)"/);
-		const mPlat    = block.match(/platforms\s*=\s*\{([^}]*)\}/);
+		const mPlat = block.match(/platforms\s*=\s*\{([^}]*)\}/);
 		if (!mPath || !mId || !mSection || !mType || !mDescKey || !mPlat) continue;
 
 		const platforms = mPlat[1].match(/"([^"]+)"/g)
-			? mPlat[1].match(/"([^"]+)"/g).map(s => s.replace(/"/g, ""))
+			? mPlat[1].match(/"([^"]+)"/g).map((s) => s.replace(/"/g, ''))
 			: [];
 		results.push({
-			path:     mPath[1],
-			id:       mId[1],
-			section:  mSection[1],
-			type:     mType[1],
+			path: mPath[1],
+			id: mId[1],
+			section: mSection[1],
+			type: mType[1],
 			desc_key: mDescKey[1],
-			platforms,
+			platforms
 		});
 	}
 	return results;
 }
-
-
-
 
 // ============================================================
 // ============================================================
@@ -280,7 +293,7 @@ function report() {
 	console.log(`1..${total}`);
 	let i = 1;
 	for (const r of _results) {
-		const prefix = r.ok ? "ok" : "not ok";
+		const prefix = r.ok ? 'ok' : 'not ok';
 		console.log(`${prefix} ${i++} - ${r.name}`);
 		if (!r.ok && r.detail) {
 			console.log(`  # ${r.detail}`);
@@ -293,9 +306,6 @@ function report() {
 	}
 }
 
-
-
-
 // ==================================================
 // ==================================================
 // ======= 3/ Manifest file availability ============
@@ -305,10 +315,12 @@ function report() {
 const ahkExists = fs.existsSync(AHK_MANIFEST);
 const luaExists = fs.existsSync(HS_MANIFEST);
 
-test("AHK manifest file exists", ahkExists,
-	`Expected ${AHK_MANIFEST} — run npm run build:manifest`);
-test("HS manifest file exists", luaExists,
-	`Expected ${HS_MANIFEST} — run npm run build:manifest`);
+test(
+	'AHK manifest file exists',
+	ahkExists,
+	`Expected ${AHK_MANIFEST} — run npm run build:manifest`
+);
+test('HS manifest file exists', luaExists, `Expected ${HS_MANIFEST} — run npm run build:manifest`);
 
 if (!ahkExists || !luaExists) {
 	// Cannot proceed without both files
@@ -316,11 +328,8 @@ if (!ahkExists || !luaExists) {
 	process.exit(1);
 }
 
-const ahkSrc = fs.readFileSync(AHK_MANIFEST, "utf8");
-const luaSrc = fs.readFileSync(HS_MANIFEST, "utf8");
-
-
-
+const ahkSrc = fs.readFileSync(AHK_MANIFEST, 'utf8');
+const luaSrc = fs.readFileSync(HS_MANIFEST, 'utf8');
 
 // =====================================================
 // =====================================================
@@ -331,18 +340,21 @@ const luaSrc = fs.readFileSync(HS_MANIFEST, "utf8");
 const ahkVersion = parseAhkVersion(ahkSrc);
 const luaVersion = parseLuaVersion(luaSrc);
 
-test("AHK manifest version is parseable", ahkVersion !== "",
-	`Could not extract version from ${AHK_MANIFEST}`);
-test("HS manifest version is parseable", luaVersion !== "",
-	`Could not extract version from ${HS_MANIFEST}`);
+test(
+	'AHK manifest version is parseable',
+	ahkVersion !== '',
+	`Could not extract version from ${AHK_MANIFEST}`
+);
+test(
+	'HS manifest version is parseable',
+	luaVersion !== '',
+	`Could not extract version from ${HS_MANIFEST}`
+);
 test(
 	`Version matches: "${ahkVersion}" (AHK) == "${luaVersion}" (HS)`,
-	ahkVersion === luaVersion && ahkVersion !== "",
+	ahkVersion === luaVersion && ahkVersion !== '',
 	`AHK="${ahkVersion}" HS="${luaVersion}"`
 );
-
-
-
 
 // =====================================================
 // =====================================================
@@ -353,10 +365,16 @@ test(
 const ahkOrder = parseAhkSectionOrder(ahkSrc);
 const luaOrder = parseLuaSectionOrder(luaSrc);
 
-test("AHK section_order is parseable", ahkOrder.length > 0,
-	`Extracted 0 items from AHK section_order`);
-test("HS section_order is parseable", luaOrder.length > 0,
-	`Extracted 0 items from HS section_order`);
+test(
+	'AHK section_order is parseable',
+	ahkOrder.length > 0,
+	`Extracted 0 items from AHK section_order`
+);
+test(
+	'HS section_order is parseable',
+	luaOrder.length > 0,
+	`Extracted 0 items from HS section_order`
+);
 test(
 	`section_order length matches: ${ahkOrder.length} (AHK) == ${luaOrder.length} (HS)`,
 	ahkOrder.length === luaOrder.length,
@@ -364,17 +382,10 @@ test(
 );
 
 for (let i = 0; i < Math.max(ahkOrder.length, luaOrder.length); i++) {
-	const a = ahkOrder[i] || "(missing)";
-	const l = luaOrder[i] || "(missing)";
-	test(
-		`section_order[${i}] matches: "${a}"`,
-		a === l,
-		`AHK="${a}" HS="${l}"`
-	);
+	const a = ahkOrder[i] || '(missing)';
+	const l = luaOrder[i] || '(missing)';
+	test(`section_order[${i}] matches: "${a}"`, a === l, `AHK="${a}" HS="${l}"`);
 }
-
-
-
 
 // ====================================================
 // ====================================================
@@ -383,17 +394,15 @@ for (let i = 0; i < Math.max(ahkOrder.length, luaOrder.length); i++) {
 // ====================================================
 
 const ahkSections = parseAhkSections(ahkSrc);
-const luaSections  = parseLuaSections(luaSrc);
+const luaSections = parseLuaSections(luaSrc);
 
-test("AHK sections parseable", ahkSections.size > 0,
-	`Extracted 0 sections from AHK manifest`);
-test("HS sections parseable", luaSections.size > 0,
-	`Extracted 0 sections from HS manifest`);
+test('AHK sections parseable', ahkSections.size > 0, `Extracted 0 sections from AHK manifest`);
+test('HS sections parseable', luaSections.size > 0, `Extracted 0 sections from HS manifest`);
 
 // Collect cross-platform sections (present in both drivers)
 const crossPlatformSections = new Set();
 for (const [key, info] of ahkSections) {
-	if (info.platforms.includes("ahk") && info.platforms.includes("hs")) {
+	if (info.platforms.includes('ahk') && info.platforms.includes('hs')) {
 		crossPlatformSections.add(key);
 	}
 }
@@ -421,17 +430,14 @@ for (const sectionKey of crossPlatformSections) {
 	);
 
 	// Sort both subsection arrays for stable comparison
-	const ahkSubs = [...ahkInfo.subsections].sort().join(",");
-	const luaSubs = [...luaInfo.subsections].sort().join(",");
+	const ahkSubs = [...ahkInfo.subsections].sort().join(',');
+	const luaSubs = [...luaInfo.subsections].sort().join(',');
 	test(
 		`Section "${sectionKey}" subsections match`,
 		ahkSubs === luaSubs,
 		`AHK=[${ahkSubs}] HS=[${luaSubs}]`
 	);
 }
-
-
-
 
 // ====================================================
 // ====================================================
@@ -440,19 +446,17 @@ for (const sectionKey of crossPlatformSections) {
 // ====================================================
 
 const ahkFeatures = parseAhkFeatures(ahkSrc);
-const luaFeatures  = parseLuaFeatures(luaSrc);
+const luaFeatures = parseLuaFeatures(luaSrc);
 
-test("AHK features parseable", ahkFeatures.length > 0,
-	`Extracted 0 features from AHK manifest`);
-test("HS features parseable", luaFeatures.length > 0,
-	`Extracted 0 features from HS manifest`);
+test('AHK features parseable', ahkFeatures.length > 0, `Extracted 0 features from AHK manifest`);
+test('HS features parseable', luaFeatures.length > 0, `Extracted 0 features from HS manifest`);
 
 // Cross-platform features: present in both ahk and hs
 const ahkCrossFeatures = ahkFeatures.filter(
-	f => f.platforms.includes("ahk") && f.platforms.includes("hs")
+	(f) => f.platforms.includes('ahk') && f.platforms.includes('hs')
 );
 const luaCrossFeatures = luaFeatures.filter(
-	f => f.platforms.includes("ahk") && f.platforms.includes("hs")
+	(f) => f.platforms.includes('ahk') && f.platforms.includes('hs')
 );
 
 test(
@@ -462,7 +466,7 @@ test(
 );
 
 // Build path-indexed map for HS features
-const luaFeatMap = new Map(luaCrossFeatures.map(f => [f.path, f]));
+const luaFeatMap = new Map(luaCrossFeatures.map((f) => [f.path, f]));
 
 for (const feat of ahkCrossFeatures) {
 	const luaFeat = luaFeatMap.get(feat.path);
@@ -489,8 +493,5 @@ for (const feat of ahkCrossFeatures) {
 		`AHK="${feat.desc_key}" HS="${luaFeat.desc_key}"`
 	);
 }
-
-
-
 
 report();

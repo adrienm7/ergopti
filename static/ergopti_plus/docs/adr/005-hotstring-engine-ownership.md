@@ -1,10 +1,10 @@
 # 005 — Hotstring engine canonical spec lives in `_shared/domain/`
 
-| Field | Value |
-|---|---|
-| **Date** | 2025-09-01 |
-| **Status** | Accepted |
-| **Deciders** | Core team |
+| Field        | Value      |
+| ------------ | ---------- |
+| **Date**     | 2025-09-01 |
+| **Status**   | Accepted   |
+| **Deciders** | Core team  |
 
 ---
 
@@ -15,7 +15,7 @@ The hotstring expansion pipeline has two concrete implementations:
 - **AHK driver**: `static/ergopti_plus/windows/lib/hotstrings/hotstring_engine.ahk`
   — handles trigger detection, expansion dispatch, and caret positioning.
 - **Hammerspoon driver**: `static/ergopti_plus/macos/modules/keymap/registry.lua`
-  + `expander.lua` — implements the same pipeline in Lua.
+  - `expander.lua` — implements the same pipeline in Lua.
 
 Both implementations evolved independently and diverged in edge-case handling:
 backspace-triggered corrections, nested hotstrings, and the treatment of
@@ -69,11 +69,11 @@ propagated to both driver implementations.
 
 ## Alternatives considered
 
-| Alternative | Why rejected |
-|---|---|
-| Designate one driver as authoritative | The other driver would still drift; no executable cross-check |
+| Alternative                             | Why rejected                                                   |
+| --------------------------------------- | -------------------------------------------------------------- |
+| Designate one driver as authoritative   | The other driver would still drift; no executable cross-check  |
 | Shared Lua spec run under both runtimes | AHK cannot run Lua specs; requires a second spec format anyway |
-| No spec, rely on shared corpus only | Corpus vectors test outcomes, not component-level invariants |
+| No spec, rely on shared corpus only     | Corpus vectors test outcomes, not component-level invariants   |
 
 ## Evidence in the codebase
 

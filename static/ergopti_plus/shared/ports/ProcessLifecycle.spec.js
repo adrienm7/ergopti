@@ -24,10 +24,7 @@
  * ==============================================================================
  */
 
-"use strict";
-
-
-
+'use strict';
 
 // ==================================================
 // ==================================================
@@ -40,8 +37,8 @@
  * @type {object}
  */
 const portContract = {
-	name: "ProcessLifecycle",
-	version: "1.0.0",
+	name: 'ProcessLifecycle',
+	version: '1.0.0',
 
 	/**
 	 * onFocusChange(callback) — Register a callback for frontmost-app changes.
@@ -76,17 +73,14 @@ const portContract = {
 	 *   @error_behavior "ignore".
 	 */
 	methods: {
-		onFocusChange:   { arity: 1, required: true },
-		onAppLaunch:     { arity: 1, required: true },
-		onAppQuit:       { arity: 1, required: true },
+		onFocusChange: { arity: 1, required: true },
+		onAppLaunch: { arity: 1, required: true },
+		onAppQuit: { arity: 1, required: true },
 		getForegroundApp: { arity: 0, required: true },
-		start:           { arity: 0, required: true },
-		stop:            { arity: 0, required: true },
-	},
+		start: { arity: 0, required: true },
+		stop: { arity: 0, required: true }
+	}
 };
-
-
-
 
 // ==================================================
 // ==================================================
@@ -101,24 +95,19 @@ const portContract = {
  */
 function validateAdapter(adapter) {
 	const violations = [];
-	if (!adapter || typeof adapter !== "object") {
-		return ["adapter must be a non-null object"];
+	if (!adapter || typeof adapter !== 'object') {
+		return ['adapter must be a non-null object'];
 	}
 	for (const [name, spec] of Object.entries(portContract.methods)) {
 		if (!spec.required) continue;
-		if (typeof adapter[name] !== "function") {
+		if (typeof adapter[name] !== 'function') {
 			violations.push(`missing method: ${name}`);
 		} else if (adapter[name].length !== spec.arity) {
-			violations.push(
-				`method ${name}: expected arity ${spec.arity}, got ${adapter[name].length}`
-			);
+			violations.push(`method ${name}: expected arity ${spec.arity}, got ${adapter[name].length}`);
 		}
 	}
 	return violations;
 }
-
-
-
 
 // ==================================================
 // ==================================================
@@ -137,50 +126,39 @@ function validateAdapter(adapter) {
 function contractTestVectors() {
 	return [
 		{
-			id: "getForegroundApp_returns_shape",
-			description: "getForegroundApp() returns an object with appId and windowTitle string fields.",
+			id: 'getForegroundApp_returns_shape',
+			description: 'getForegroundApp() returns an object with appId and windowTitle string fields.',
 			steps: [
-				{ call: "getForegroundApp", args: [] },
-				{ assert: "return_shape", shape: { appId: "string", windowTitle: "string" } },
-			],
+				{ call: 'getForegroundApp', args: [] },
+				{ assert: 'return_shape', shape: { appId: 'string', windowTitle: 'string' } }
+			]
 		},
 		{
-			id: "start_is_idempotent",
-			description: "Calling start() twice does not throw.",
-			steps: [
-				{ call: "start", args: [] },
-				{ call: "start", args: [] },
-				{ assert: "no_throw" },
-			],
+			id: 'start_is_idempotent',
+			description: 'Calling start() twice does not throw.',
+			steps: [{ call: 'start', args: [] }, { call: 'start', args: [] }, { assert: 'no_throw' }]
 		},
 		{
-			id: "stop_is_idempotent",
-			description: "Calling stop() twice does not throw.",
+			id: 'stop_is_idempotent',
+			description: 'Calling stop() twice does not throw.',
 			steps: [
-				{ call: "start", args: [] },
-				{ call: "stop",  args: [] },
-				{ call: "stop",  args: [] },
-				{ assert: "no_throw" },
-			],
+				{ call: 'start', args: [] },
+				{ call: 'stop', args: [] },
+				{ call: 'stop', args: [] },
+				{ assert: 'no_throw' }
+			]
 		},
 		{
-			id: "stop_before_start_is_safe",
-			description: "Calling stop() before start() does not throw.",
-			steps: [
-				{ call: "stop", args: [] },
-				{ assert: "no_throw" },
-			],
+			id: 'stop_before_start_is_safe',
+			description: 'Calling stop() before start() does not throw.',
+			steps: [{ call: 'stop', args: [] }, { assert: 'no_throw' }]
 		},
 		{
-			id: "onFocusChange_accepts_function",
-			description: "Passing a function to onFocusChange() does not throw.",
-			steps: [
-				{ call: "onFocusChange", args: ["__NOOP_CALLBACK__"] },
-				{ assert: "no_throw" },
-			],
-		},
+			id: 'onFocusChange_accepts_function',
+			description: 'Passing a function to onFocusChange() does not throw.',
+			steps: [{ call: 'onFocusChange', args: ['__NOOP_CALLBACK__'] }, { assert: 'no_throw' }]
+		}
 	];
 }
-
 
 module.exports = { portContract, validateAdapter, contractTestVectors };

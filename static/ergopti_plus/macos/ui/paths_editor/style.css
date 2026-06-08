@@ -104,7 +104,7 @@ label {
 	gap: 5px;
 }
 
-input[type="text"] {
+input[type='text'] {
 	background: #f9f9f9;
 	border: 1px solid #d0d0d0;
 	border-radius: 5px;
@@ -119,13 +119,13 @@ input[type="text"] {
 		box-shadow 0.15s;
 }
 
-input[type="text"]:focus {
+input[type='text']:focus {
 	background: #fff;
 	border-color: #007aff;
 	box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.15);
 }
 
-input[type="text"].is-default {
+input[type='text'].is-default {
 	color: #999;
 }
 

@@ -1,4 +1,4 @@
-# _shared/hotstrings/ — Cross-Driver Hotstring Data
+# \_shared/hotstrings/ — Cross-Driver Hotstring Data
 
 This directory is the **single source of truth** for all bundled hotstring data.
 Both the AHK driver (`hotstrings_generated.ahk`) and the Hammerspoon driver
@@ -64,6 +64,7 @@ flags       = ["word"]
 ## Code generation
 
 Run `npm run build:hotstrings` to regenerate:
+
 - `static/ergopti_plus/windows/lib/hotstrings/hotstrings_generated.ahk`
 - (future) `static/ergopti_plus/macos/_generated/hotstrings_registry.lua`
 - (future) `static/ergopti_plus/linux/_generated/hotstrings_registry.lua`

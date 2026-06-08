@@ -38,19 +38,16 @@
  * ==============================================================================
  */
 
-"use strict";
+'use strict';
 
 const CONSTANTS = {
-	caretOffsetX:        15,
-	caretOffsetY:        18,
-	windowOffsetY:        5,
+	caretOffsetX: 15,
+	caretOffsetY: 18,
+	windowOffsetY: 5,
 	windowBottomInsetAhk: 60,
-	windowBottomInsetHs:  40,
-	screenMargin:          5,
+	windowBottomInsetHs: 40,
+	screenMargin: 5
 };
-
-
-
 
 // ================================================
 // ================================================
@@ -79,11 +76,11 @@ const CONSTANTS = {
  */
 function resolvePosition(anchor, canvasSize, screenFrame, opts = {}) {
 	const cfg = {
-		caretOffsetX:       opts.caretOffsetX       ?? CONSTANTS.caretOffsetX,
-		caretOffsetY:       opts.caretOffsetY        ?? CONSTANTS.caretOffsetY,
-		windowOffsetY:      opts.windowOffsetY       ?? CONSTANTS.windowOffsetY,
-		windowBottomInset:  opts.windowBottomInset   ?? CONSTANTS.windowBottomInsetHs,
-		screenMargin:       opts.screenMargin        ?? CONSTANTS.screenMargin,
+		caretOffsetX: opts.caretOffsetX ?? CONSTANTS.caretOffsetX,
+		caretOffsetY: opts.caretOffsetY ?? CONSTANTS.caretOffsetY,
+		windowOffsetY: opts.windowOffsetY ?? CONSTANTS.windowOffsetY,
+		windowBottomInset: opts.windowBottomInset ?? CONSTANTS.windowBottomInsetHs,
+		screenMargin: opts.screenMargin ?? CONSTANTS.screenMargin
 	};
 
 	let posX, posY;
@@ -92,11 +89,11 @@ function resolvePosition(anchor, canvasSize, screenFrame, opts = {}) {
 		// No anchor found — centre the tooltip horizontally at the screen bottom.
 		posX = screenFrame.x + (screenFrame.w - canvasSize.w) / 2;
 		posY = screenFrame.y + screenFrame.h - canvasSize.h - cfg.windowOffsetY;
-	} else if (anchor.type === "caret" || anchor.type === "screen") {
+	} else if (anchor.type === 'caret' || anchor.type === 'screen') {
 		// Point anchor — position below-right of the caret.
 		posX = anchor.x + cfg.caretOffsetX;
 		posY = anchor.y + (anchor.h ?? 0) + cfg.caretOffsetY;
-	} else if (anchor.type === "input_box") {
+	} else if (anchor.type === 'input_box') {
 		// Wide anchor — centre tooltip under the element; flip above if it
 		// would overflow the bottom screen edge.
 		posX = anchor.x - canvasSize.w / 2;
@@ -104,7 +101,7 @@ function resolvePosition(anchor, canvasSize, screenFrame, opts = {}) {
 		if (posY + canvasSize.h > screenFrame.y + screenFrame.h) {
 			posY = anchor.y - canvasSize.h - cfg.windowOffsetY;
 		}
-	} else if (anchor.type === "window") {
+	} else if (anchor.type === 'window') {
 		// Window-bottom fallback — same centering / flip logic as input_box.
 		posX = anchor.x - canvasSize.w / 2;
 		posY = anchor.y + cfg.windowOffsetY;
@@ -138,12 +135,9 @@ function clampToScreen(pos, canvasSize, screenFrame, margin = CONSTANTS.screenMa
 
 	return {
 		x: Math.max(minX, Math.min(pos.x, maxX)),
-		y: Math.max(minY, Math.min(pos.y, maxY)),
+		y: Math.max(minY, Math.min(pos.y, maxY))
 	};
 }
-
-
-
 
 // ===============================================
 // ===============================================
@@ -177,23 +171,23 @@ function clampToScreen(pos, canvasSize, screenFrame, margin = CONSTANTS.screenMa
  * }}
  */
 function computeStackedGeometry(rows, opts = {}) {
-	const padX       = opts.padX       ?? 14;
-	const padY       = opts.padY       ?? 7;
-	const labelGap   = opts.labelGap   ?? 16;
+	const padX = opts.padX ?? 14;
+	const padY = opts.padY ?? 7;
+	const labelGap = opts.labelGap ?? 16;
 	const separatorH = opts.separatorH ?? 1;
 
-	let maxTextW  = 0;
+	let maxTextW = 0;
 	let maxLabelW = 0;
 
 	for (const row of rows) {
-		if (row.textSize.w  > maxTextW)  maxTextW  = row.textSize.w;
+		if (row.textSize.w > maxTextW) maxTextW = row.textSize.w;
 		if (row.labelSize.w > maxLabelW) maxLabelW = row.labelSize.w;
 	}
 
 	const labelZone = maxLabelW > 0 ? labelGap + maxLabelW : 0;
-	const canvasW   = padX + maxTextW + labelZone + padX;
+	const canvasW = padX + maxTextW + labelZone + padX;
 
-	let totalH  = 0;
+	let totalH = 0;
 	const rowMeta = [];
 	for (let i = 0; i < rows.length; i++) {
 		const rowH = padY + rows[i].textSize.h + padY;
@@ -243,13 +237,13 @@ function computeStackedGeometry(rows, opts = {}) {
  * }}
  */
 function computeLlmGeometry(blocks, opts = {}) {
-	const padX        = opts.padX        ?? 14;
-	const padY        = opts.padY        ?? 7;
-	const lineSpacing = opts.lineSpacing  ?? 8;
-	const hintSpacing = opts.hintSpacing  ?? 4;
+	const padX = opts.padX ?? 14;
+	const padY = opts.padY ?? 7;
+	const lineSpacing = opts.lineSpacing ?? 8;
+	const hintSpacing = opts.hintSpacing ?? 4;
 
-	const maxW     = Math.max(blocks.predsSize.w, blocks.fixedWidth ?? 0);
-	const canvasW  = maxW + padX * 2;
+	const maxW = Math.max(blocks.predsSize.w, blocks.fixedWidth ?? 0);
+	const canvasW = maxW + padX * 2;
 
 	// Decide whether hint+info fit on a single combined row.
 	const isCombined = !!(
@@ -259,7 +253,7 @@ function computeLlmGeometry(blocks, opts = {}) {
 		blocks.combinedSize.w <= maxW
 	);
 
-	let currentY  = padY;
+	let currentY = padY;
 
 	// Predictions block.
 	const predsFrame = { x: padX, y: currentY, w: maxW, h: blocks.predsSize.h };
@@ -274,8 +268,8 @@ function computeLlmGeometry(blocks, opts = {}) {
 	}
 
 	// Hint / info blocks.
-	let hintFrame    = null;
-	let infoFrame    = null;
+	let hintFrame = null;
+	let infoFrame = null;
 	let combinedFrame = null;
 
 	if (isCombined && blocks.combinedSize) {
@@ -302,12 +296,9 @@ function computeLlmGeometry(blocks, opts = {}) {
 		separatorY,
 		hintFrame,
 		infoFrame,
-		combinedFrame,
+		combinedFrame
 	};
 }
-
-
-
 
 // =====================================================
 // =====================================================
@@ -328,61 +319,60 @@ function layoutTestVectors() {
 
 	return [
 		{
-			id:          "caret_normal",
-			description: "Caret anchor — tooltip appears below-right of the insertion point.",
-			anchor:      { type: "caret", x: 500, y: 400, w: 0, h: 20 },
-			canvasSize:  canvas,
+			id: 'caret_normal',
+			description: 'Caret anchor — tooltip appears below-right of the insertion point.',
+			anchor: { type: 'caret', x: 500, y: 400, w: 0, h: 20 },
+			canvasSize: canvas,
 			screenFrame: screen,
-			expected:    { x: 515, y: 438 },  // x + 15, y + 20 + 18
+			expected: { x: 515, y: 438 } // x + 15, y + 20 + 18
 		},
 		{
-			id:          "caret_near_right_edge",
-			description: "Caret near right edge — clamped so tooltip stays on screen.",
-			anchor:      { type: "caret", x: 1800, y: 400, w: 0, h: 20 },
-			canvasSize:  canvas,
+			id: 'caret_near_right_edge',
+			description: 'Caret near right edge — clamped so tooltip stays on screen.',
+			anchor: { type: 'caret', x: 1800, y: 400, w: 0, h: 20 },
+			canvasSize: canvas,
 			screenFrame: screen,
 			// Unclamped x = 1815, but max = 1920 - 300 - 5 = 1615.
-			expected:    { x: 1615, y: 438 },
+			expected: { x: 1615, y: 438 }
 		},
 		{
-			id:          "caret_near_bottom",
-			description: "Caret near bottom — clamped upward so tooltip stays on screen.",
-			anchor:      { type: "caret", x: 500, y: 1020, w: 0, h: 20 },
-			canvasSize:  canvas,
+			id: 'caret_near_bottom',
+			description: 'Caret near bottom — clamped upward so tooltip stays on screen.',
+			anchor: { type: 'caret', x: 500, y: 1020, w: 0, h: 20 },
+			canvasSize: canvas,
 			screenFrame: screen,
 			// Unclamped y = 1058, but max = 1080 - 80 - 5 = 995.
-			expected:    { x: 515, y: 995 },
+			expected: { x: 515, y: 995 }
 		},
 		{
-			id:          "input_box_normal",
-			description: "Input-box anchor — centred below the element.",
-			anchor:      { type: "input_box", x: 960, y: 500, w: 0, h: 0 },
-			canvasSize:  canvas,
+			id: 'input_box_normal',
+			description: 'Input-box anchor — centred below the element.',
+			anchor: { type: 'input_box', x: 960, y: 500, w: 0, h: 0 },
+			canvasSize: canvas,
 			screenFrame: screen,
 			// x = 960 - 300/2 = 810, y = 500 + 5 = 505.
-			expected:    { x: 810, y: 505 },
+			expected: { x: 810, y: 505 }
 		},
 		{
-			id:          "input_box_near_bottom_flips",
-			description: "Input-box anchor near bottom — tooltip flips above the element.",
-			anchor:      { type: "input_box", x: 960, y: 1010, w: 0, h: 0 },
-			canvasSize:  canvas,
+			id: 'input_box_near_bottom_flips',
+			description: 'Input-box anchor near bottom — tooltip flips above the element.',
+			anchor: { type: 'input_box', x: 960, y: 1010, w: 0, h: 0 },
+			canvasSize: canvas,
 			screenFrame: screen,
 			// Unclamped y = 1015 → overflow (1015 + 80 > 1080) → flip: y = 1010 - 80 - 5 = 925.
-			expected:    { x: 810, y: 925 },
+			expected: { x: 810, y: 925 }
 		},
 		{
-			id:          "no_anchor_screen_center_bottom",
-			description: "No anchor — tooltip appears at screen centre-bottom.",
-			anchor:      null,
-			canvasSize:  canvas,
+			id: 'no_anchor_screen_center_bottom',
+			description: 'No anchor — tooltip appears at screen centre-bottom.',
+			anchor: null,
+			canvasSize: canvas,
 			screenFrame: screen,
 			// x = (1920 - 300) / 2 = 810, y = 1080 - 80 - 5 = 995.
-			expected:    { x: 810, y: 995 },
-		},
+			expected: { x: 810, y: 995 }
+		}
 	];
 }
-
 
 module.exports = {
 	CONSTANTS,
@@ -390,5 +380,5 @@ module.exports = {
 	clampToScreen,
 	computeStackedGeometry,
 	computeLlmGeometry,
-	layoutTestVectors,
+	layoutTestVectors
 };

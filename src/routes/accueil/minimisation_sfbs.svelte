@@ -13,8 +13,9 @@
 	</p>
 	<p>
 		Qu’est-ce qu’un <SFB /> ? C’est le fait de
-		<strong>devoir taper deux touches d’affilée avec exactement le même doigt</strong>. Par exemple, c’est taper <kbd>DE</kbd> en AZERTY : il faut d’abord utiliser le majeur gauche pour taper <kbd>D</kbd>, puis le remonter d’une rangée pour atteindre le <kbd>E</kbd>. Avec <Ergopti
-		/>, le
+		<strong>devoir taper deux touches d’affilée avec exactement le même doigt</strong>. Par exemple,
+		c’est taper <kbd>DE</kbd> en AZERTY : il faut d’abord utiliser le majeur gauche pour taper
+		<kbd>D</kbd>, puis le remonter d’une rangée pour atteindre le <kbd>E</kbd>. Avec <Ergopti />, le
 		<kbd>D</kbd>
 		est sur l’annulaire droit sur la rangée du bas et le <kbd>E</kbd> est directement sur la rangée
 		du milieu, sur le majeur gauche. Ici, c’est une alternance des mains qui permet d’éviter un <SFB
@@ -39,7 +40,8 @@
 		<strong>limiter les <em>Same Finger Bigrams</em></strong>.
 	</p>
 	<p>
-		➜ Cette tâche est bien plus difficile qu’on puisse le penser, car certaines lettres comme le <kbd>E</kbd
+		➜ Cette tâche est bien plus difficile qu’on puisse le penser, car certaines lettres comme le <kbd
+			>E</kbd
 		>
 		ou le <kbd>R</kbd> se combinent avec presque toutes les autres. Il faut alors choisir de les
 		regrouper avec les lettres faisant les bigrammes les moins fréquents. Par conséquent, la

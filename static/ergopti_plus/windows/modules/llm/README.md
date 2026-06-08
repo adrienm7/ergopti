@@ -6,13 +6,13 @@ Windows port of the LLM prediction subsystem. `llm_bridge.ahk` maintains a rolli
 
 ## Ports used (`_shared/ports/`)
 
-| Port | Usage |
-|---|---|
-| `KeyboardHook` | Intercepting printable chars and buffer-reset keys (Escape, Enter, Tab) |
-| `HttpClient` | REST calls to `api_ollama.ahk`, `api_remote.ahk` |
-| `TooltipRenderer` | Streaming token display during prediction |
-| `TimerScheduler` | Debounce timer between last keystroke and the LLM request |
-| `Storage` | Reading and writing profile / model configuration |
+| Port              | Usage                                                                   |
+| ----------------- | ----------------------------------------------------------------------- |
+| `KeyboardHook`    | Intercepting printable chars and buffer-reset keys (Escape, Enter, Tab) |
+| `HttpClient`      | REST calls to `api_ollama.ahk`, `api_remote.ahk`                        |
+| `TooltipRenderer` | Streaming token display during prediction                               |
+| `TimerScheduler`  | Debounce timer between last keystroke and the LLM request               |
+| `Storage`         | Reading and writing profile / model configuration                       |
 
 ## Domain module (`_shared/domain/`)
 
@@ -22,13 +22,13 @@ Windows port of the LLM prediction subsystem. `llm_bridge.ahk` maintains a rolli
 
 ## Public API
 
-| Function | Description |
-|---|---|
-| `LLM_Bridge_Start(opts)` | Initialize the bridge with a config `Map` and arm the keystroke hook |
-| `LLM_Bridge_Stop()` | Disarm the hook and cancel any pending request |
-| `LLM_Engine_OnKeystroke(context)` | Feed a new context string and restart the debounce timer |
-| `LLM_Engine_Cancel()` | Cancel the current in-flight request |
-| `LLM_SetProfile(name)` | Switch the active prompt profile at runtime |
+| Function                          | Description                                                          |
+| --------------------------------- | -------------------------------------------------------------------- |
+| `LLM_Bridge_Start(opts)`          | Initialize the bridge with a config `Map` and arm the keystroke hook |
+| `LLM_Bridge_Stop()`               | Disarm the hook and cancel any pending request                       |
+| `LLM_Engine_OnKeystroke(context)` | Feed a new context string and restart the debounce timer             |
+| `LLM_Engine_Cancel()`             | Cancel the current in-flight request                                 |
+| `LLM_SetProfile(name)`            | Switch the active prompt profile at runtime                          |
 
 ## Init pattern
 

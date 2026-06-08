@@ -27,10 +27,7 @@
  * ==============================================================================
  */
 
-"use strict";
-
-
-
+'use strict';
 
 // ==================================================
 // ==================================================
@@ -46,7 +43,7 @@
  */
 const THRESHOLDS = {
 	/** Maximum duration (seconds) for a contact to be classified as a tap. */
-	TAP_MAX_SEC: 0.70,
+	TAP_MAX_SEC: 0.7,
 
 	/** Maximum Manhattan-distance movement (layout units) for a tap. */
 	TAP_MAX_DELTA: 8.0,
@@ -64,11 +61,8 @@ const THRESHOLDS = {
 	 * Minimum per-frame displacement (LU) to start axis locking on 2-finger
 	 * gestures. Below this value the frame is treated as noise.
 	 */
-	LIVE_AXIS_MIN: 1.0,
+	LIVE_AXIS_MIN: 1.0
 };
-
-
-
 
 // ==================================================
 // ==================================================
@@ -90,37 +84,34 @@ const THRESHOLDS = {
  */
 const GESTURE_SLOTS = [
 	// 2-finger gestures
-	{ id: "tap_2",            fingers: 2, type: "tap",   direction: null },
-	{ id: "swipe_2_up",       fingers: 2, type: "swipe", direction: "up" },
-	{ id: "swipe_2_down",     fingers: 2, type: "swipe", direction: "down" },
-	{ id: "swipe_2_left",     fingers: 2, type: "swipe", direction: "left" },
-	{ id: "swipe_2_right",    fingers: 2, type: "swipe", direction: "right" },
-	{ id: "swipe_2_diag_ul",  fingers: 2, type: "swipe", direction: "diag_ul" },
-	{ id: "swipe_2_diag_ur",  fingers: 2, type: "swipe", direction: "diag_ur" },
-	{ id: "swipe_2_diag_dl",  fingers: 2, type: "swipe", direction: "diag_dl" },
-	{ id: "swipe_2_diag_dr",  fingers: 2, type: "swipe", direction: "diag_dr" },
+	{ id: 'tap_2', fingers: 2, type: 'tap', direction: null },
+	{ id: 'swipe_2_up', fingers: 2, type: 'swipe', direction: 'up' },
+	{ id: 'swipe_2_down', fingers: 2, type: 'swipe', direction: 'down' },
+	{ id: 'swipe_2_left', fingers: 2, type: 'swipe', direction: 'left' },
+	{ id: 'swipe_2_right', fingers: 2, type: 'swipe', direction: 'right' },
+	{ id: 'swipe_2_diag_ul', fingers: 2, type: 'swipe', direction: 'diag_ul' },
+	{ id: 'swipe_2_diag_ur', fingers: 2, type: 'swipe', direction: 'diag_ur' },
+	{ id: 'swipe_2_diag_dl', fingers: 2, type: 'swipe', direction: 'diag_dl' },
+	{ id: 'swipe_2_diag_dr', fingers: 2, type: 'swipe', direction: 'diag_dr' },
 	// 3-finger gestures
-	{ id: "tap_3",            fingers: 3, type: "tap",   direction: null },
-	{ id: "swipe_3_up",       fingers: 3, type: "swipe", direction: "up" },
-	{ id: "swipe_3_down",     fingers: 3, type: "swipe", direction: "down" },
-	{ id: "swipe_3_left",     fingers: 3, type: "swipe", direction: "left" },
-	{ id: "swipe_3_right",    fingers: 3, type: "swipe", direction: "right" },
+	{ id: 'tap_3', fingers: 3, type: 'tap', direction: null },
+	{ id: 'swipe_3_up', fingers: 3, type: 'swipe', direction: 'up' },
+	{ id: 'swipe_3_down', fingers: 3, type: 'swipe', direction: 'down' },
+	{ id: 'swipe_3_left', fingers: 3, type: 'swipe', direction: 'left' },
+	{ id: 'swipe_3_right', fingers: 3, type: 'swipe', direction: 'right' },
 	// 4-finger gestures
-	{ id: "tap_4",            fingers: 4, type: "tap",   direction: null },
-	{ id: "swipe_4_up",       fingers: 4, type: "swipe", direction: "up" },
-	{ id: "swipe_4_down",     fingers: 4, type: "swipe", direction: "down" },
-	{ id: "swipe_4_left",     fingers: 4, type: "swipe", direction: "left" },
-	{ id: "swipe_4_right",    fingers: 4, type: "swipe", direction: "right" },
+	{ id: 'tap_4', fingers: 4, type: 'tap', direction: null },
+	{ id: 'swipe_4_up', fingers: 4, type: 'swipe', direction: 'up' },
+	{ id: 'swipe_4_down', fingers: 4, type: 'swipe', direction: 'down' },
+	{ id: 'swipe_4_left', fingers: 4, type: 'swipe', direction: 'left' },
+	{ id: 'swipe_4_right', fingers: 4, type: 'swipe', direction: 'right' },
 	// 5-finger gestures
-	{ id: "tap_5",            fingers: 5, type: "tap",   direction: null },
-	{ id: "swipe_5_up",       fingers: 5, type: "swipe", direction: "up" },
-	{ id: "swipe_5_down",     fingers: 5, type: "swipe", direction: "down" },
-	{ id: "swipe_5_left",     fingers: 5, type: "swipe", direction: "left" },
-	{ id: "swipe_5_right",    fingers: 5, type: "swipe", direction: "right" },
+	{ id: 'tap_5', fingers: 5, type: 'tap', direction: null },
+	{ id: 'swipe_5_up', fingers: 5, type: 'swipe', direction: 'up' },
+	{ id: 'swipe_5_down', fingers: 5, type: 'swipe', direction: 'down' },
+	{ id: 'swipe_5_left', fingers: 5, type: 'swipe', direction: 'left' },
+	{ id: 'swipe_5_right', fingers: 5, type: 'swipe', direction: 'right' }
 ];
-
-
-
 
 // ==================================================
 // ==================================================
@@ -140,8 +131,8 @@ const GESTURE_SLOTS = [
  * @type {object}
  */
 const portContract = {
-	name: "GestureRecognizer",
-	version: "1.0.0",
+	name: 'GestureRecognizer',
+	version: '1.0.0',
 
 	/**
 	 * processFrame(frame) — Feed a raw touch frame to the recognizer.
@@ -169,15 +160,15 @@ const portContract = {
 	 *   @returns {void}
 	 */
 	methods: {
-		processFrame:       { arity: 1, required: true },
-		commitGesture:      { arity: 0, required: true },
-		reset:              { arity: 0, required: true },
-		setActionForSlot:   { arity: 2, required: true },
-		clearActionForSlot: { arity: 1, required: true },
+		processFrame: { arity: 1, required: true },
+		commitGesture: { arity: 0, required: true },
+		reset: { arity: 0, required: true },
+		setActionForSlot: { arity: 2, required: true },
+		clearActionForSlot: { arity: 1, required: true }
 	},
 
 	THRESHOLDS,
-	GESTURE_SLOTS,
+	GESTURE_SLOTS
 };
 
 /**
@@ -188,9 +179,6 @@ const portContract = {
  * @property {string|null} direction  Direction string or null for taps.
  * @property {number}      timestamp  Unix epoch ms of gesture commit.
  */
-
-
-
 
 // ==================================================
 // ==================================================
@@ -205,12 +193,12 @@ const portContract = {
  */
 function validateAdapter(adapter) {
 	const violations = [];
-	if (!adapter || typeof adapter !== "object") {
-		return ["adapter must be a non-null object"];
+	if (!adapter || typeof adapter !== 'object') {
+		return ['adapter must be a non-null object'];
 	}
 	for (const [name, spec] of Object.entries(portContract.methods)) {
 		if (!spec.required) continue;
-		if (typeof adapter[name] !== "function") {
+		if (typeof adapter[name] !== 'function') {
 			violations.push(`missing method: ${name}`);
 		} else if (adapter[name].length !== spec.arity) {
 			violations.push(`method ${name}: expected arity ${spec.arity}, got ${adapter[name].length}`);
@@ -218,9 +206,6 @@ function validateAdapter(adapter) {
 	}
 	return violations;
 }
-
-
-
 
 // ==================================================
 // ==================================================
@@ -238,61 +223,61 @@ function validateAdapter(adapter) {
 function contractTestVectors() {
 	return [
 		{
-			id:          "set_and_fire_action",
-			description: "setActionForSlot fires the callback when the gesture commits.",
+			id: 'set_and_fire_action',
+			description: 'setActionForSlot fires the callback when the gesture commits.',
 			steps: [
-				{ call: "setActionForSlot", args: ["tap_3", "recordFire"] },
+				{ call: 'setActionForSlot', args: ['tap_3', 'recordFire'] },
 				{
 					// Inject a 3-finger tap via the platform-specific path
-					inject_gesture: { slot_id: "tap_3" },
+					inject_gesture: { slot_id: 'tap_3' }
 				},
-				{ assert: "fire_count", expected: 1 },
-			],
+				{ assert: 'fire_count', expected: 1 }
+			]
 		},
 		{
-			id:          "clear_action_stops_firing",
-			description: "clearActionForSlot prevents the callback from firing.",
+			id: 'clear_action_stops_firing',
+			description: 'clearActionForSlot prevents the callback from firing.',
 			steps: [
-				{ call: "setActionForSlot",   args: ["tap_3", "recordFire"] },
-				{ call: "clearActionForSlot", args: ["tap_3"] },
-				{ inject_gesture: { slot_id: "tap_3" } },
-				{ assert: "fire_count", expected: 0 },
-			],
+				{ call: 'setActionForSlot', args: ['tap_3', 'recordFire'] },
+				{ call: 'clearActionForSlot', args: ['tap_3'] },
+				{ inject_gesture: { slot_id: 'tap_3' } },
+				{ assert: 'fire_count', expected: 0 }
+			]
 		},
 		{
-			id:          "reset_discards_gesture",
-			description: "reset() mid-gesture prevents the action from firing.",
+			id: 'reset_discards_gesture',
+			description: 'reset() mid-gesture prevents the action from firing.',
 			steps: [
-				{ call: "setActionForSlot", args: ["swipe_3_left", "recordFire"] },
-				{ inject_partial_gesture: { fingers: 3, direction: "left", partial: true } },
-				{ call: "reset", args: [] },
-				{ assert: "fire_count", expected: 0 },
-			],
+				{ call: 'setActionForSlot', args: ['swipe_3_left', 'recordFire'] },
+				{ inject_partial_gesture: { fingers: 3, direction: 'left', partial: true } },
+				{ call: 'reset', args: [] },
+				{ assert: 'fire_count', expected: 0 }
+			]
 		},
 		{
-			id:          "unknown_slot_is_logged_not_crashed",
-			description: "setActionForSlot with an unknown slotId does not throw.",
+			id: 'unknown_slot_is_logged_not_crashed',
+			description: 'setActionForSlot with an unknown slotId does not throw.',
 			steps: [
-				{ call: "setActionForSlot", args: ["nonexistent_slot", "recordFire"] },
-				{ assert: "no_exception" },
-			],
+				{ call: 'setActionForSlot', args: ['nonexistent_slot', 'recordFire'] },
+				{ assert: 'no_exception' }
+			]
 		},
 		{
-			id:          "all_gesture_slots_are_settable",
-			description: "setActionForSlot accepts every id in GESTURE_SLOTS without error.",
-			steps: GESTURE_SLOTS.map(slot => ({
-				call: "setActionForSlot", args: [slot.id, null],
-				assert: "no_exception",
-			})),
-		},
+			id: 'all_gesture_slots_are_settable',
+			description: 'setActionForSlot accepts every id in GESTURE_SLOTS without error.',
+			steps: GESTURE_SLOTS.map((slot) => ({
+				call: 'setActionForSlot',
+				args: [slot.id, null],
+				assert: 'no_exception'
+			}))
+		}
 	];
 }
-
 
 module.exports = {
 	THRESHOLDS,
 	GESTURE_SLOTS,
 	portContract,
 	validateAdapter,
-	contractTestVectors,
+	contractTestVectors
 };

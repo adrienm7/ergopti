@@ -56,12 +56,12 @@ constructs from `tests/helpers`.
 
 ## What each layer covers
 
-| Directory       | Purpose                                                       |
-|-----------------|---------------------------------------------------------------|
+| Directory       | Purpose                                                                                                                                                                                    |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `meta/`         | Architectural invariants — file headers, banner alignment, logger pairing, defaults uniqueness. Most are **warnings**, never hard failures, so legitimate refactors don't break the build. |
-| `unit/lib/`     | Pure-function libraries (`color_utils`, `text_utils`, `toml_reader`, `keycodes`, `logger`, `perf`, …). |
-| `unit/modules/` | Domain modules: keymap, llm parser/profiles/api, karabiner config, gestures, dynamic_hotstrings, keylogger, shortcuts. |
-| `integration/`  | Mac-only — exercised via a "Run Self-Tests" menu item inside Hammerspoon to validate end-to-end behavior with the real `hs.*` API. |
+| `unit/lib/`     | Pure-function libraries (`color_utils`, `text_utils`, `toml_reader`, `keycodes`, `logger`, `perf`, …).                                                                                     |
+| `unit/modules/` | Domain modules: keymap, llm parser/profiles/api, karabiner config, gestures, dynamic_hotstrings, keylogger, shortcuts.                                                                     |
+| `integration/`  | Mac-only — exercised via a "Run Self-Tests" menu item inside Hammerspoon to validate end-to-end behavior with the real `hs.*` API.                                                         |
 
 ## Updating snapshot fixtures
 
