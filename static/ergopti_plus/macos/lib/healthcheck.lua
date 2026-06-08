@@ -442,7 +442,7 @@ end
 
 --- Collects OS/runtime/screen fields into a flat table.
 --- @return table
-local function _sys_info()
+_sys_info = function()
 	local info = {}
 
 	-- Hammerspoon version
@@ -682,7 +682,7 @@ end
 --- @param snapshot table Result from M.run().
 --- @param btn_label string Translated label for the copy-and-close button.
 --- @return string Complete HTML document.
-local function _snapshot_to_html(snapshot, btn_label)
+_snapshot_to_html = function(snapshot, btn_label)
 	local s         = snapshot
 	local sys       = s.sys or {}
 	local ok_list   = s.ports_validated or {}
