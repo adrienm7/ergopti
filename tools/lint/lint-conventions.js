@@ -386,6 +386,72 @@ function fixUnbalancedInFile(file) {
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
+// Check 6 — AHK Anti-patterns
+// ──────────────────────────────────────────────────────────────────────────────
+
+function checkAhkAntiPatterns(file) {
+	const raw = readFileSync(file, 'utf8');
+	// Strip comments to check for code anti-patterns
+	const codeOnly = raw.replace(/;.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');
+	
+	if (codeOnly.includes('JSON.parse(')) {
+		warn(file, null, `JSON.parse() is not valid AHK. Use JsonParse() instead.`);
+	}
+	
+	// Check for UIA wrapper guard in hotstring_prefix_watcher.ahk
+	if (file.includes('hotstring_prefix_watcher.ahk')) {
+		if (codeOnly.includes('GetUIASelection') && !codeOnly.includes('_UIA_WRAP_PAIRS.Has')) {
+			warn(file, null, `GetUIASelection used without _UIA_WRAP_PAIRS.Has guard. This causes severe lag.`);
+		}
+	}
+
+	// Check for Lua-style comments in AHK files which evaluate as pre-decrements
+	const lines = raw.replace(/^﻿/, '').replace(/\r\n/g, '\n').split('\n');
+	lines.forEach((line, i) => {
+		if (/^\s*--\s/.test(line)) {
+			warn(file, i + 1, `Lua-style comment (-- comment) found in AHK file.`);
+		}
+	});
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Check 7 — Lua Anti-patterns
+// ──────────────────────────────────────────────────────────────────────────────
+
+function checkLuaAntiPatterns(file) {
+	const raw = readFileSync(file, 'utf8');
+	
+	if (file.includes('healthcheck.lua')) {
+		if (!raw.includes('title = "ErgoptiPlus — " .. title') && !raw.includes('title = "ErgoptiPlus ??? " .. title')) {
+			warn(file, null, `Healthcheck window title does not enforce ErgoptiPlus prefix.`);
+		}
+	}
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Check 8 — Web UI Checks
+// ──────────────────────────────────────────────────────────────────────────────
+
+function checkWebUiAntiPatterns() {
+	const scriptPath = join(REPO_ROOT, 'static/ergopti_plus/shared/ui/changelog/script.js');
+	const stylePath = join(REPO_ROOT, 'static/ergopti_plus/shared/ui/changelog/style.css');
+
+	try {
+		const script = readFileSync(scriptPath, 'utf8');
+		if (!script.includes('btnGh.style.display = "none"') && !script.includes("btnGh.style.display = 'none'")) {
+			warn(scriptPath, null, `Does not hide GitHub button on clearContent().`);
+		}
+	} catch (e) { /* ignore if missing */ }
+
+	try {
+		const style = readFileSync(stylePath, 'utf8');
+		if (!style.match(/#btn-github\s*\{[^}]*display:\s*none;/)) {
+			warn(stylePath, null, `Does not hide #btn-github by default.`);
+		}
+	} catch (e) { /* ignore if missing */ }
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
 // Runner
 // ──────────────────────────────────────────────────────────────────────────────
 
@@ -455,14 +521,21 @@ if (FIX_SPACING) {
 }
 
 // Run checks
-for (const f of ahkAll) checkFileHeader(f);
-for (const f of luaAll) checkFileHeader(f);
+for (const f of ahkAll) {
+	checkFileHeader(f);
+	checkAhkAntiPatterns(f);
+}
+for (const f of luaAll) {
+	checkFileHeader(f);
+	checkLuaAntiPatterns(f);
+}
 for (const f of tomlAll) checkTomlKeys(f);
 for (const f of [...ahkAll, ...luaAll]) {
 	checkSectionSpacing(f);
 	checkBannerAlignment(f);
 }
 checkNoCoAuthor();
+checkWebUiAntiPatterns();
 
 // Report
 console.log('');
