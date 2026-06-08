@@ -308,4 +308,9 @@ function M.start(keymap_module)
 	Logger.info(LOG, "Dynamic rules engine started successfully.")
 end
 
+--- Stops the engine and cleans up shared state.
+function M.stop()
+	_km = nil
+end
+
 return M

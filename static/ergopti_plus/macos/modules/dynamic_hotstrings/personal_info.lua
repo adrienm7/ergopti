@@ -487,4 +487,9 @@ function M.disable()
 	Logger.info(LOG, "Personal info tracking disabled.")
 end
 
+--- Stops the engine tracking.
+function M.stop()
+	M.disable()
+end
+
 return M

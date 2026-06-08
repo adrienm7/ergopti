@@ -336,7 +336,7 @@ local function create_watcher(deviceID)
 			Logger.debug(LOG, "frame#%d device=%s touches=%d", fc, tostring(deviceID),
 				type(touches) == "table" and #touches or 0)
 		end
-		pcall(Engine.process_frame, touches)
+		Logger.pcall(LOG, Engine.process_frame, touches)
 	end)
 
 	if not w then
@@ -728,6 +728,46 @@ function M.start()
 	end
 
 	Logger.success(LOG, "============== gestures module startup COMPLETE — primer events so far: %d ==============", primer_event_count)
+end
+
+--- Stops all multitouch listeners and background timers.
+function M.stop()
+	Logger.start(LOG, "Stopping gestures module…")
+	
+	CoreState.enabled = false
+
+	-- 1. Stop watchers
+	recycle_watchers({})  -- Passing empty list stops all existing ones
+	
+	-- 2. Stop eventtap primer
+	if gesture_primer then
+		pcall(function() gesture_primer:stop() end)
+		gesture_primer = nil
+		_G.ERGOPTI_GESTURE_PRIMER = nil
+	end
+
+	-- 3. Stop timers
+	if discovery_timer then
+		pcall(function() discovery_timer:stop() end)
+		discovery_timer = nil
+	end
+	if startup_probe_timer then
+		pcall(function() startup_probe_timer:stop() end)
+		startup_probe_timer = nil
+	end
+	if health_check_timer then
+		pcall(function() health_check_timer:stop() end)
+		health_check_timer = nil
+	end
+
+	-- 4. Stop sleep watcher
+	if sleep_watcher then
+		pcall(function() sleep_watcher:stop() end)
+		sleep_watcher = nil
+		_G.ERGOPTI_SLEEP_WATCHER = nil
+	end
+
+	Logger.success(LOG, "Gestures module stopped.")
 end
 
 --- Dumps a complete snapshot of the gestures runtime state to the log.

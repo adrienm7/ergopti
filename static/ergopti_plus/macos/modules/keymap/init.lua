@@ -163,6 +163,12 @@ function M.get_shift_side()
 	return CoreState.shift_side
 end
 
+--- Returns the current magic-key character (e.g. "★").
+--- @return string
+function M.get_trigger_char()
+	return CoreState.magic_key or M.DEFAULT_STATE.trigger_char
+end
+
 --- Pauses eventtap processing — all keystrokes pass through unmodified.
 function M.pause_processing()
 	CoreState.processing_paused = true
@@ -910,6 +916,11 @@ function M.stop()
 	shift_tap:stop()
 	mouse_tap:stop()
 	LLMBridge.reset_predictions()
+
+	-- Clear runtime hooks
+	CoreState.interceptors      = {}
+	CoreState.preview_providers = {}
+	
 	Logger.success(LOG, "Keymap engine stopped.")
 end
 

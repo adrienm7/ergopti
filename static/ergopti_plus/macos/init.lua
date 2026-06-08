@@ -130,6 +130,8 @@ i18n.init()
 local menu_paths         = require("ui.menu.menu_paths")
 local gestures           = require("modules.gestures")
 local keymap             = require("modules.keymap")
+-- Wire keymap → locale so trigger-character substitutions (★) use the live char.
+locale_mod.set_trigger_provider(function() return keymap.get_trigger_char and keymap.get_trigger_char() or "★" end)
 -- Expose keymap in the global table so the Hammerspoon console can call
 -- keymap.perf_report_all() / perf_enable() / perf_reset() without
 -- having to type out require("modules.keymap") each time.
@@ -787,13 +789,19 @@ end
 
 hs.shutdownCallback = function()
 	pcall(function() hs.settings.set(HS_BOOT_READY_SETTING_KEY, false) end)
-	Logger.info(LOG, "Shutdown — restoring overrides.")
+	Logger.info(LOG, "Hammerspoon is shutting down — cleaning up resources…")
+
+	-- 1. Stop core modules (releases eventtaps, timers, watchers)
+	pcall(function() if keymap and type(keymap.stop) == "function" then keymap.stop() end end)
+	pcall(function() if gestures and type(gestures.stop) == "function" then gestures.stop() end end)
+	pcall(function() if shortcuts and type(shortcuts.stop) == "function" then shortcuts.stop() end end)
+
+	-- 2. Restore system overrides
 	if type(gestures) == "table" and type(gestures.restore_all_overrides) == "function" then
 		pcall(gestures.restore_all_overrides)
-	else
-		Logger.warn(LOG, "restore_all_overrides unavailable — shutdown without restore.")
 	end
-	-- Stop Karabiner-Elements user-level helpers we spawned during priming.
+
+	-- 3. Stop Karabiner-Elements user-level helpers we spawned during priming.
 	-- IMPORTANT: use KILL_FAST_CMD (synchronous plain pkill, ~50 ms) — NOT the
 	-- async total-reset script. run_total_reset_async() spawns a detached 5-second
 	-- kill loop that survives hs.reload(): the new session launches the bridge,
@@ -807,10 +815,14 @@ hs.shutdownCallback = function()
 			Logger.info(LOG, "Shutdown KE fast kill done.")
 		end
 	end)
-	-- Terminate any running MLX server process so no orphaned Python process lingers
-	-- after Hammerspoon exits. The require is cached, so this has no startup overhead.
+
+	-- 4. Terminate any running MLX server process
 	pcall(function() require("ui.menu.menu_llm").stop_mlx_server() end)
-	-- Belt-and-braces: hs.task does not always reap its children when the
+
+	-- 5. Kill orphan child processes
+	pcall(hs.execute, "pkill -f 'ergopti_plus_expander'", true)
+	pcall(hs.execute, "pkill -f 'ergopti_plus_http_server'", true)
+end
 	-- parent dies abruptly. Kill any mlx_lm.server still bound to port 49317
 	-- so the next reload starts from a clean slate.
 	pcall(hs.execute,

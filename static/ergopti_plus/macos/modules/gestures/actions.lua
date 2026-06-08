@@ -105,6 +105,7 @@ local CLICK_COOLDOWN_SEC = 0.15
 
 local rightClickHeld    = false
 local leftClickHeld     = false
+local gestureInProgress = false
 local rightMouseTap     = nil
 local leftMouseTap      = nil
 local click_key_watcher = nil

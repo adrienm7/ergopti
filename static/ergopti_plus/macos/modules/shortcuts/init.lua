@@ -74,4 +74,10 @@ M.get_keyboard_action      = KeyboardShortcuts.get_action
 M.get_keyboard_slot_label  = KeyboardShortcuts.get_slot_label
 M.get_keyboard_assignments = KeyboardShortcuts.get_assignments
 
+function M.stop()
+	Bindings.stop()
+	ScriptControl.stop()
+	KeyboardShortcuts.stop()
+end
+
 return M
