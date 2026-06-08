@@ -21,6 +21,7 @@
 		"test:manifest-parity": "node ./tools/test/test-manifest-parity.cjs",
 		"test:ahk-encoding": "node ./tools/test/test-ahk-encoding.cjs",
 		"test:click-lock": "node ./tools/test/test-click-lock-fix.cjs",
+		"test:ui-focus": "node ./tools/test/test-ui-focus-fix.cjs",
 		"test:manifest-equivalence": "node ./tools/test/test-manifest-equivalence.cjs",
 		"test:properties": "node ./tools/test/test-properties.cjs",
 		"fix:banners": "node ./tools/lint/lint-conventions.js --fix-banners --warn-only",

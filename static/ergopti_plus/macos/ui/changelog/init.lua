@@ -258,7 +258,7 @@ function M.open(opts)
 		frame             = ui_builder.get_centered_frame(WIN_W, WIN_H),
 		title             = i18n.get("changelog_window.window_title"),
 		style_masks       = { "titled", "closable", "miniaturizable", "resizable" },
-		level             = hs.drawing.windowLevels.normal,
+		level             = hs.drawing.windowLevels.floating,
 		allow_text_entry  = false,
 		allow_new_windows = false,
 		usercontent       = _ucc,

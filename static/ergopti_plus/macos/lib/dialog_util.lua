@@ -41,7 +41,7 @@ local M = {}
 --- dialog.
 local function focus_hammerspoon()
 	local function do_focus()
-		local ok, err = pcall(hs.focus)
+		local ok, err = pcall(function() return hs.focus(true) end)
 		if not ok then
 			Logger.debug(LOG, "hs.focus raised before dialog: %s.", tostring(err))
 		end

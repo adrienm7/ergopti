@@ -554,8 +554,9 @@ function M.run_first_run_wizard()
 
 	-- Decide which step to run based on the first missing dependency in order
 	-- of the install pipeline (app → sysext → daemon running).
+	local dialog_util = require("lib.dialog_util")
 	if not report.ke_installed or not report.grabber_present then
-		local choice = hs.dialog.blockAlert(
+		local choice = dialog_util.block_alert(
 			i18n.get("karabiner.onboarding.required_title"),
 			i18n.get("karabiner.onboarding.missing_prefix") .. summary
 				.. i18n.get("karabiner.onboarding.install_body_suffix"),
@@ -567,7 +568,7 @@ function M.run_first_run_wizard()
 		end
 		M.install_karabiner_elements(function(ok_install, err_install)
 			if not ok_install then
-				hs.dialog.blockAlert(
+				dialog_util.block_alert(
 					i18n.get("karabiner.install_error_title"),
 					string.format(i18n.get("karabiner.install_error_body"), tostring(err_install)),
 					i18n.get("button.ok"), nil, "critical")
@@ -582,7 +583,7 @@ function M.run_first_run_wizard()
 	end
 
 	if not report.sysext_activated then
-		local choice = hs.dialog.blockAlert(
+		local choice = dialog_util.block_alert(
 			i18n.get("karabiner.onboarding.ext_title"),
 			i18n.get("karabiner.onboarding.ext_body"),
 			i18n.get("karabiner.onboarding.btn_open_settings"), i18n.get("common.later"), "warning")
@@ -604,7 +605,7 @@ function M.run_first_run_wizard()
 	end
 
 	if not report.grabber_running then
-		local choice = hs.dialog.blockAlert(
+		local choice = dialog_util.block_alert(
 			i18n.get("karabiner.onboarding.accessibility_title"),
 			i18n.get("karabiner.onboarding.accessibility_body"),
 			i18n.get("karabiner.onboarding.btn_open_accessibility"), i18n.get("common.later"), "warning")

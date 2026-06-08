@@ -312,7 +312,8 @@ local function commit(answers)
 	if not ok then
 		Logger.error(LOG, "commit: toml_writer failed — %s.", tostring(err))
 		close_webview()
-		hs.dialog.blockAlert(
+		local dialog = require("lib.dialog_util")
+		dialog.block_alert(
 			i18n.get("onboarding.error.title"),
 			i18n.get("onboarding.error.write_failed") .. "\n\n" .. tostring(err),
 			i18n.get("onboarding.btn.ok")
