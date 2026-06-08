@@ -74,6 +74,14 @@ function M.start(base_dir, keymap_module, info_toml_path)
 	Logger.info(LOG, "The dynamic hotstrings core initialized successfully.")
 end
 
+--- Stops both dynamic expansion engines.
+function M.stop()
+	Logger.start(LOG, "Stopping dynamic hotstrings core…")
+	PersonalInfo.stop()
+	RulesEngine.stop()
+	Logger.success(LOG, "Dynamic hotstrings core stopped.")
+end
+
 -- Proxy Personal Info UI and state controls for the menu
 M.open_editor = PersonalInfo.open_editor
 M.enable      = PersonalInfo.enable
