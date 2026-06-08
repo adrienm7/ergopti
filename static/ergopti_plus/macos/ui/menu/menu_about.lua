@@ -440,6 +440,7 @@ function M.build(ctx)
 	if not local_src then
 		local freq_items = {}
 		local current_freq_code = ""
+		-- @i18n-keys: menu.about.frequency.1m, menu.about.frequency.5m, menu.about.frequency.10m, menu.about.frequency.1h, menu.about.frequency.2h, menu.about.frequency.3h, menu.about.frequency.6h, menu.about.frequency.12h, menu.about.frequency.24h, menu.about.frequency.2d, menu.about.frequency.7d, menu.about.frequency.never
 		for _, preset in ipairs(Updater.INTERVAL_PRESETS) do
 			local label = i18n.get("menu.about.frequency." .. preset.code)
 			if preset.seconds == interval_sec then
