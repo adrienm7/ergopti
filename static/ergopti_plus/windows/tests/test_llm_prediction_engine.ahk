@@ -591,3 +591,43 @@ _LLM_TestAllSlotsPlaceholder() {
 	AssertFalse(_LLM_AllSlotsPlaceholder([]), "empty array should return false")
 }
 Test("_LLM_AllSlotsPlaceholder: checks array of slots", _LLM_TestAllSlotsPlaceholder)
+
+; ===================================================
+; ===================================================
+; ======= 12/ Pointer Dismiss (Engine Busy) =========
+; ===================================================
+; ===================================================
+
+_LLM_EngineIsBusy_TimerActive() {
+	global _LLM_Engine
+	_LLM_Engine := Map("timer_active", true)
+	AssertTrue(LLM_Engine_IsBusy(), "engine is busy when debounce timer is active")
+}
+Test("LLM_Engine_IsBusy: detects active debounce timer", _LLM_EngineIsBusy_TimerActive)
+
+_LLM_EngineIsBusy_ActiveStreams() {
+	global _LLM_Engine, _LLM_Ollama_ActiveStreams
+	_LLM_Engine := Map("timer_active", false)
+	_LLM_Ollama_ActiveStreams := [1]
+	AssertTrue(LLM_Engine_IsBusy(), "engine is busy when streams are active")
+}
+Test("LLM_Engine_IsBusy: detects active streams", _LLM_EngineIsBusy_ActiveStreams)
+
+_LLM_EngineIsBusy_ActiveOllamaAsync() {
+	global _LLM_Engine, _LLM_Ollama_ActiveStreams, _LLM_Ollama_Async
+	_LLM_Engine := Map("timer_active", false)
+	_LLM_Ollama_ActiveStreams := []
+	_LLM_Ollama_Async := Map(1, Map("cancelled", false))
+	AssertTrue(LLM_Engine_IsBusy(), "engine is busy when Ollama async request is active")
+}
+Test("LLM_Engine_IsBusy: detects active Ollama async", _LLM_EngineIsBusy_ActiveOllamaAsync)
+
+_LLM_EngineIsBusy_Idle() {
+	global _LLM_Engine, _LLM_Ollama_ActiveStreams, _LLM_Ollama_Async, _LLM_Remote_Async
+	_LLM_Engine := Map("timer_active", false)
+	_LLM_Ollama_ActiveStreams := []
+	_LLM_Ollama_Async := Map()
+	_LLM_Remote_Async := Map()
+	AssertFalse(LLM_Engine_IsBusy(), "engine is not busy when idle")
+}
+Test("LLM_Engine_IsBusy: false when idle", _LLM_EngineIsBusy_Idle)
