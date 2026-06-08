@@ -189,7 +189,10 @@ end
 --- @return string The extracted group name.
 function M.get_group_name(file)
 	if type(file) ~= "string" then return "" end
-	return file:match("^(.*)%.lua$") or file:match("^(.*)%.toml$") or file
+	-- Strip directory path if present
+	local name = file:match("([^/\\]+)$") or file
+	-- Strip extension
+	return name:match("^(.*)%.lua$") or name:match("^(.*)%.toml$") or name
 end
 
 

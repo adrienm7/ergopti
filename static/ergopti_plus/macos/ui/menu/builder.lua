@@ -57,6 +57,9 @@ local function load_ergopti_groups()
 	local groups = {}
 	for _, id in ipairs(data.hotstring_groups.ergopti or {}) do
 		groups[id] = true
+		-- Support both underscored (manifest) and flattened (file stems) IDs
+		local flattened = id:gsub("_", "")
+		if flattened ~= id then groups[flattened] = true end
 	end
 	Logger.debug(LOG, "Ergopti groups loaded from manifest (%d group(s)).", #(data.hotstring_groups.ergopti or {}))
 	return groups
@@ -251,8 +254,9 @@ function M.generate(ctx, menu_mods, actions)
 		if ctx and ctx.hotfiles and type(ctx.hotfiles) == "table" then
 			for _, f in ipairs(ctx.hotfiles) do
 				local name = ctx.get_group_name and ctx.get_group_name(f) or f
+				local flattened_name = name:gsub("_", "")
 				if name ~= "custom" and name ~= "personal" and name:sub(1, 13) ~= "personal_ext_"
-				and not ERGOPTI_GROUPS[name] then
+				and not (ERGOPTI_GROUPS[name] or ERGOPTI_GROUPS[flattened_name]) then
 					non_ergopti_filter[name] = true
 				end
 			end
