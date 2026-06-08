@@ -25,6 +25,47 @@
 global _TomlFileCache    := Map()
 global _TomlCountCache   := Map()   ; key = CategoryName|SectionName → count
 
+; Map of FilePath → Map(SectionId → Count)
+global _TomlFileSectionCounts := Map()
+
+; Helper to warm the section counts cache for a specific file.
+_TomlWarmFileCounts(FilePath) {
+    global _TomlFileSectionCounts
+    if _TomlFileSectionCounts.Has(FilePath)
+        return _TomlFileSectionCounts[FilePath]
+
+    Counts := Map()
+    if !FileExist(FilePath) {
+        _TomlFileSectionCounts[FilePath] := Counts
+        return Counts
+    }
+
+    CurrentSec := ""
+    loop parse, ReadTomlFile(FilePath), "`n", "`r" {
+        Line := Trim(A_LoopField, " `t")
+        if (Line == "" or SubStr(Line, 1, 1) == "#")
+            continue
+            
+        ; [[section]] or [section] header
+        if RegExMatch(Line, "^\[+([^\[\]]+)\]+$", &SectionMatch) {
+            CurrentSec := StrLower(Trim(SectionMatch[1]))
+            if !Counts.Has(CurrentSec)
+                Counts[CurrentSec] := 0
+            continue
+        }
+        
+        ; Match hotstring entry: key = value or key = { ... }
+        if (CurrentSec != "" and CurrentSec != "_meta" and CurrentSec != "_meta.sections") {
+            if RegExMatch(Line, '^(?:"[^"]+"|[A-Za-z0-9_.-]+)\s*=') {
+                Counts[CurrentSec] := Counts[CurrentSec] + 1
+            }
+        }
+    }
+
+    _TomlFileSectionCounts[FilePath] := Counts
+    return Counts
+}
+
 ; Per-category hotstring group configuration (default delay + tooltip color),
 ; populated lazily by ParseTomlGroupConfig and consumed by the tooltip and
 ; per-group delay gating layers. Keyed by lowercase category name. Shape:
@@ -63,56 +104,107 @@ ReadTomlFile(FilePath) {
     return Content
 }
 
+; Helper to warm the section counts cache for a specific file.
+_TomlWarmFileCounts(FilePath) {
+    global _TomlFileSectionCounts
+    if _TomlFileSectionCounts.Has(FilePath)
+        return _TomlFileSectionCounts[FilePath]
+
+    Counts := Map()
+    if !FileExist(FilePath) {
+        _TomlFileSectionCounts[FilePath] := Counts
+        return Counts
+    }
+
+    CurrentSec := ""
+    loop parse, ReadTomlFile(FilePath), "`n", "`r" {
+        Line := Trim(A_LoopField, " `t")
+        if (Line == "" or SubStr(Line, 1, 1) == "#")
+            continue
+            
+        ; [[section]] or [section] header
+        if RegExMatch(Line, "^\[+([^\[\]]+)\]+$", &SectionMatch) {
+            CurrentSec := StrLower(Trim(SectionMatch[1]))
+            if !Counts.Has(CurrentSec)
+                Counts[CurrentSec] := 0
+            continue
+        }
+        
+        ; Match hotstring entry: key = value or key = { ... }
+        if (CurrentSec != "" and CurrentSec != "_meta" and CurrentSec != "_meta.sections") {
+            if RegExMatch(Line, "^(?:`"[^`"]+`"|[A-Za-z0-9_.-]+)\s*=") {
+                Counts[CurrentSec] := Counts[CurrentSec] + 1
+            }
+        }
+    }
+
+    _TomlFileSectionCounts[FilePath] := Counts
+    return Counts
+}
+
+; Count hotstring entries inside a specific [[section]] of a TOML category file.
+; Returns 0 when the file or section does not exist.
+; Optimized to parse each file only ONCE and cache all section counts.
+CountTomlSection(CategoryName, SectionName, FilePath := "") {
+    global ScriptInformation, _SharedDir
+    if (FilePath == "") {
+        if (StrLower(CategoryName) == "personal"
+        and IsSet(ScriptInformation)
+        and ScriptInformation.Has("PersonalTomlPath")) {
+            FilePath := ScriptInformation["PersonalTomlPath"]
+        } else {
+            FilePath := _SharedDir . "\hotstrings\" . StrLower(CategoryName) . ".toml"
+        }
+    }
+    
+    Counts := _TomlWarmFileCounts(FilePath)
+    SName := StrLower(SectionName)
+    return Counts.Has(SName) ? Counts[SName] : 0
+}
+
+; Count all hotstring entries across every [[section]] in a TOML category file.
+; Returns 0 when the file does not exist or contains no matching entries.
+CountTomlHotstrings(CategoryName, FilePath := "") {
+    global ScriptInformation, _SharedDir
+    if (FilePath == "") {
+        if (StrLower(CategoryName) == "personal"
+        and IsSet(ScriptInformation)
+        and ScriptInformation.Has("PersonalTomlPath")) {
+            FilePath := ScriptInformation["PersonalTomlPath"]
+        } else {
+            FilePath := _SharedDir . "\hotstrings\" . StrLower(CategoryName) . ".toml"
+        }
+    }
+    
+    Counts := _TomlWarmFileCounts(FilePath)
+    Total := 0
+    for _, Count in Counts {
+        Total += Count
+    }
+    return Total
+}
+
 ; Evict all cache entries for a given file path so that the next call to
 ; ParseTomlGroupConfig or ReadTomlFile re-reads from disk. Called after
 ; _HCW_PatchTomlMeta writes changes to a personal TOML file.
 _ParseTomlGroupConfig_InvalidatePath(FilePath) {
-    global _TomlFileCache, HotstringGroupConfig, _TomlCountCache
+    global _TomlFileCache, HotstringGroupConfig, _TomlCountCache, _TomlFileSectionCounts
     if _TomlFileCache.Has(FilePath) {
         _TomlFileCache.Delete(FilePath)
     }
     if HotstringGroupConfig.Has(FilePath) {
         HotstringGroupConfig.Delete(FilePath)
     }
-    ; Also invalidate the count cache for this file
+    ; Also invalidate the section counts cache for this file
+    if _TomlFileSectionCounts.Has(FilePath) {
+        _TomlFileSectionCounts.Delete(FilePath)
+    }
+    ; Legacy count cache invalidation
     for Key, _ in _TomlCountCache.Clone() {
         if InStr(Key, FilePath) {
             _TomlCountCache.Delete(Key)
         }
     }
-}
-
-; Unescape a TOML double-quoted string literal (\\, \", \n, \t, \r).
-; The generator at static/hotstrings/0_generate_hotstrings.py writes
-; trigger/output with these escapes, so we mirror the inverse transform here.
-UnescapeTomlString(s) {
-    Result := ""
-    i := 1
-    n := StrLen(s)
-    while i <= n {
-        c := SubStr(s, i, 1)
-        if (c == "\" and i < n) {
-            NextChar := SubStr(s, i + 1, 1)
-            if (NextChar == "\") {
-                Result .= "\"
-            } else if (NextChar == "`"") {
-                Result .= "`""
-            } else if (NextChar == "n") {
-                Result .= "`n"
-            } else if (NextChar == "t") {
-                Result .= "`t"
-            } else if (NextChar == "r") {
-                Result .= "`r"
-            } else {
-                Result .= NextChar
-            }
-            i += 2
-        } else {
-            Result .= c
-            i += 1
-        }
-    }
-    return Result
 }
 
 ; Register every hotstring of a given [[section]] defined inside a TOML file
