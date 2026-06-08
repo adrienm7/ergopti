@@ -1572,7 +1572,9 @@ GestureStartKeyboardWatcher() {
     global GestureKeyboardHook
 
     GestureStopKeyboardWatcher()
-    GestureKeyboardHook := InputHook("L0")
+    ; L3: Level 3 (higher than Ergopti's Level 2 hotkeys)
+    ; No 'V' option: we want to suppress the key, release click, then re-send.
+    GestureKeyboardHook := InputHook("L3")
     GestureKeyboardHook.KeyOpt("{All}", "N")
     GestureKeyboardHook.OnKeyDown := GestureOnKeyDown
     GestureKeyboardHook.Start()
@@ -1590,9 +1592,19 @@ GestureStopKeyboardWatcher() {
 
 ; Callback fired on any key press while a click hold is active.
 GestureOnKeyDown(ih, vk, sc) {
+    ; Stop catching keys immediately to avoid recursion during re-send
+    ih.Stop()
+
     ; Any keystroke releases whichever button(s) are currently held
     GestureReleaseLeftClick()
     GestureReleaseRightClick()
+
+    ; Re-send the key that was just swallowed, but now that the click is released.
+    ; We use SendLevel 3 to ensure Ergopti hotkeys (at Level 2) see the key.
+    ; Use {Blind} to preserve modifier state.
+    SendLevel(3)
+    Send(Format("{Blind}{vk{:x}sc{:x}}", vk, sc))
+    SendLevel(0)
 }
 
 ; NOTE: the ~RButton / ~LButton cross-release hotkeys are registered

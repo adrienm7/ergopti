@@ -46,15 +46,15 @@ console.log('\n=== Click Lock Fix Structural Validation ===');
 
 // Check AHK Fixes
 check(
-    'AHK: InputHook level set to L3',
+    'AHK: InputHook level set to L3 and no V option',
     'static/ergopti_plus/windows/modules/gestures.ahk',
-    /InputHook\("L3"\)/
+    /InputHook\("L3"\)(?![\s\S]*InputHook\(".*V.*\)\")/
 );
 
 check(
-    'AHK: GestureDispatch releases held clicks',
+    'AHK: GestureOnKeyDown stops hook and re-sends with higher level',
     'static/ergopti_plus/windows/modules/gestures.ahk',
-    /if \(ActionName != "left_click_toggle" && ActionName != "right_click_toggle"\) \{[\s\S]*GestureReleaseLeftClick\(\)[\s\S]*GestureReleaseRightClick\(\)[\s\S]*\}/
+    /GestureOnKeyDown\(ih, vk, sc\) \{[\s\S]*ih\.Stop\(\)[\s\S]*GestureReleaseLeftClick\(\)[\s\S]*SendLevel\(3\)[\s\S]*Send\(Format\("{Blind}\{vk\{:x\}sc\{:x\}\}", vk, sc\)\)[\s\S]*\}/
 );
 
 // Check Hammerspoon Fixes
