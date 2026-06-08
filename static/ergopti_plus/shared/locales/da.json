@@ -573,6 +573,7 @@
 	"menu.debug.window_spy": "Window Spy",
 	"menu.extensions.empty": "Ingen udvidelse installeret",
 	"menu.extensions.header": "Udvidelser",
+	"menu.gestures.action_disabled": "∅ Disabled",
 	"menu.gestures.action_prefix": "Handling: ",
 	"menu.gestures.auto_configure": "🔧 Automatisk konfigurering (register)",
 	"menu.gestures.change_action": "Skift handling",

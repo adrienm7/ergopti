@@ -573,6 +573,7 @@
 	"menu.debug.window_spy": "Window Spy",
 	"menu.extensions.empty": "कोई एक्सटेंशन स्थापित नहीं",
 	"menu.extensions.header": "एक्सटेंशन",
+	"menu.gestures.action_disabled": "∅ Disabled",
 	"menu.gestures.action_prefix": "क्रिया: ",
 	"menu.gestures.auto_configure": "🔧 स्वचालित कॉन्फ़िगरेशन (रजिस्ट्री)",
 	"menu.gestures.change_action": "क्रिया बदलें",

@@ -573,6 +573,7 @@
 	"menu.debug.window_spy": "Window Spy",
 	"menu.extensions.empty": "설치된 확장 기능 없음",
 	"menu.extensions.header": "확장 기능",
+	"menu.gestures.action_disabled": "∅ Disabled",
 	"menu.gestures.action_prefix": "동작: ",
 	"menu.gestures.auto_configure": "🔧 자동 구성 (레지스트리)",
 	"menu.gestures.change_action": "동작 변경",

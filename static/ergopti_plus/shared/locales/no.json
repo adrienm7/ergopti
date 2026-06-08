@@ -573,6 +573,7 @@
 	"menu.debug.window_spy": "Window Spy",
 	"menu.extensions.empty": "Ingen utvidelse installert",
 	"menu.extensions.header": "Utvidelser",
+	"menu.gestures.action_disabled": "∅ Disabled",
 	"menu.gestures.action_prefix": "Handling: ",
 	"menu.gestures.auto_configure": "🔧 Automatisk konfigurasjon (register)",
 	"menu.gestures.change_action": "Endre handling",

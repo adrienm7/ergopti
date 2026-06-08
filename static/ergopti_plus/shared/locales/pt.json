@@ -573,6 +573,7 @@
 	"menu.debug.window_spy": "Espião de Janela",
 	"menu.extensions.empty": "Nenhuma extensão instalada",
 	"menu.extensions.header": "Extensões",
+	"menu.gestures.action_disabled": "∅ Disabled",
 	"menu.gestures.action_prefix": "Ação: ",
 	"menu.gestures.auto_configure": "🔧 Configuração automática (registro)",
 	"menu.gestures.change_action": "Alterar ação",

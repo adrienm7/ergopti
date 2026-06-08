@@ -62,11 +62,11 @@ function auditFile(filePath) {
 		? content.replace(/;.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '')
 		: content.replace(/--.*$/gm, '').replace(/--\[\[[\s\S]*?\]\]/g, '');
 
-	// Regex for t("key") or t('key')
-	const regex = /\bt\(\s*["']([^"']+)["']\s*\)/g;
+	// Regex for t("key"), i18n.get("key") or locale_mod.get("key")
+	const regex = /\b(t|i18n\.get|locale_mod\.get)\(\s*["']([^"']+)["']\s*\)/g;
 	let match;
 	while ((match = regex.exec(cleanContent)) !== null) {
-		const key = match[1];
+		const key = match[2];
 		// Skip dynamic keys (containing %s or variable lookups that are hard to audit statically)
 		if (key.includes('%') || key.startsWith('category.')) continue;
 
@@ -111,7 +111,8 @@ const REQUIRED_DYNAMIC_KEYS = [
 	'menu.about.frequency.24h',
 	'menu.about.frequency.2d',
 	'menu.about.frequency.7d',
-	'menu.about.frequency.never'
+	'menu.about.frequency.never',
+	'menu.layout.no_bundle'
 ];
 
 REQUIRED_DYNAMIC_KEYS.forEach(key => {

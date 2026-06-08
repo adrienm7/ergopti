@@ -799,6 +799,10 @@ global SpaceAroundSymbols := (_SpaceAroundSymbolsNode.Has("enabled") and _SpaceA
 RegisterPersonalFeature(Name, DefaultEnabled := false, Description := "") {
     global _PersonalShortcutsRegistry, Features
 
+    ; Normalise to lowercase so that personal shortcuts are case-insensitive
+    ; and always produce lowercase keys in config.toml.
+    Name := StrLower(Name)
+
     ; Register the description for use by the tray menu's GetMenuTitleByPath.
     if !_PersonalShortcutsRegistry.Has(Name) {
         _PersonalShortcutsRegistry[Name] := Description
@@ -844,6 +848,7 @@ RegisterPersonalFeature(Name, DefaultEnabled := false, Description := "") {
  */
 PersonalFeatureEnabled(name) {
     global Features
+    name := StrLower(name)
     try {
         return Features["shortcuts"]["personal"][name] = true
     } catch {

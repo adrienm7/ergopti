@@ -573,6 +573,7 @@
 	"menu.debug.window_spy": "Window Spy",
 	"menu.extensions.empty": "لا توجد إضافة مثبتة",
 	"menu.extensions.header": "الإضافات",
+	"menu.gestures.action_disabled": "∅ Disabled",
 	"menu.gestures.action_prefix": "الإجراء: ",
 	"menu.gestures.auto_configure": "🔧 الإعداد التلقائي (السجل)",
 	"menu.gestures.change_action": "تغيير الإجراء",

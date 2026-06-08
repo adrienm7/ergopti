@@ -483,7 +483,7 @@ TranslateLegacyPath(V1Path) {
             if !Features["shortcuts"].Has("personal") or !IsObject(Features["shortcuts"]["personal"]) {
                 Features["shortcuts"]["personal"] := Map()
             }
-            UserName := Parts[3]
+            UserName := StrLower(Parts[3])
             if !Features["shortcuts"]["personal"].Has(UserName) {
                 Features["shortcuts"]["personal"][UserName] := false
             }
