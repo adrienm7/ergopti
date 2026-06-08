@@ -213,8 +213,9 @@ end
 --- Builds the main hotstring groups menu.
 --- @param ctx table Context.
 --- @param only table|nil Optional set of group names to include (nil = all common groups).
+--- @param counts table Pre-calculated counts from HotCounter.count_all().
 --- @return table
-function M.build_groups(ctx, only)
+function M.build_groups(ctx, only, counts)
 	local top_names = {}
 	for _, f in ipairs(type(ctx.hotfiles) == "table" and ctx.hotfiles or {}) do
 		top_names[#top_names + 1] = ctx.get_group_name(f)
@@ -230,20 +231,7 @@ function M.build_groups(ctx, only)
 		local sections = ctx.keymap and type(ctx.keymap.get_sections) == "function" and ctx.keymap.get_sections(name) or nil
 		local has_secs = type(sections) == "table" and #sections > 0
 
-		local total = 0
-		local is_sec_enabled = ctx.keymap and type(ctx.keymap.is_section_enabled) == "function"
-			and ctx.keymap.is_section_enabled or nil
-		if has_secs then
-			for _, sec in ipairs(sections) do
-				if type(sec) == "table" and sec.name ~= "-" and not sec.is_module_placeholder then
-					if sec.count ~= nil then
-						local active = not is_sec_enabled or is_sec_enabled(name, sec.name)
-						if active then total = total + tonumber(sec.count) end
-					end
-				end
-			end
-		end
-
+		local total = (counts and counts.group_counts) and (counts.group_counts[name] or 0) or 0
 		local base_label = groupLabel(ctx, name)
 		local item = {
 			-- Always show count (even 0) — only enabled sections contribute
@@ -799,8 +787,9 @@ end
 --- extension TOMLs from the hotstrings/ folder + custom/dynamic hotstrings),
 --- with editor button, shortcut, and per-section toggles and counts for all groups.
 --- @param ctx table Context.
+--- @param counts table Pre-calculated counts from HotCounter.count_all().
 --- @return table|nil
-function M.build_custom(ctx)
+function M.build_custom(ctx, counts)
 	local state  = ctx.state
 	local paused = ctx.paused
 
@@ -828,27 +817,14 @@ function M.build_custom(ctx)
 	local personal_secs = all_personal_secs_by_group["personal"]
 
 	-- Total count across all personal groups + custom (for the top-level title).
-	-- Only enabled sections contribute so the count reflects what is active.
-	local total_count, has_count = 0, false
-	local is_sec_enabled_fn = ctx.keymap and type(ctx.keymap.is_section_enabled) == "function"
-		and ctx.keymap.is_section_enabled or nil
-	local function add_counts(secs, gname)
-		if type(secs) ~= "table" then return end
-		for _, sec in ipairs(secs) do
-			if type(sec) == "table" and sec.name ~= "-" and not sec.is_module_placeholder
-				and sec.count ~= nil then
-				local active = not is_sec_enabled_fn or is_sec_enabled_fn(gname, sec.name)
-				if active then
-					has_count = true
-					total_count = total_count + tonumber(sec.count)
-				end
-			end
+	-- Now uses the pre-calculated totals from the counts structure.
+	local total_count = 0
+	if counts and counts.group_counts then
+		for _, gname in ipairs(personal_group_names) do
+			total_count = total_count + (counts.group_counts[gname] or 0)
 		end
+		total_count = total_count + (counts.group_counts["custom"] or 0)
 	end
-	for _, gname in ipairs(personal_group_names) do
-		add_counts(all_personal_secs_by_group[gname], gname)
-	end
-	add_counts(custom_secs, "custom")
 
 	-- Strip leading "— " section marker for use as a plain notification label
 	local base_title = (i18n.get("menu.hotstrings.personal_header"):gsub("^— ", ""))
