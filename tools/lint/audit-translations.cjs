@@ -58,19 +58,6 @@ function auditFile(filePath) {
 	// Remove comments to avoid false positives (e.g. documentation t("sg_actions.X"))
 	const isAhk = path.extname(filePath) === '.ahk';
 
-	// Extract explicitly declared dynamic keys via @i18n-keys: comment tags
-	const i18nKeysRegex = /@i18n-keys:\s*([^\r\n]+)/g;
-	let kMatch;
-	while ((kMatch = i18nKeysRegex.exec(content)) !== null) {
-		const keys = kMatch[1].split(',').map((k) => k.trim()).filter(Boolean);
-		for (const key of keys) {
-			if (!availableKeys.has(key)) {
-				if (!missingKeys.has(key)) missingKeys.set(key, []);
-				missingKeys.get(key).push(path.relative(REPO_ROOT, filePath));
-			}
-		}
-	}
-
 	const cleanContent = isAhk
 		? content.replace(/;.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '')
 		: content.replace(/--.*$/gm, '').replace(/--\[\[[\s\S]*?\]\]/g, '');
@@ -111,6 +98,28 @@ const luaFiles = walkFiles(MACOS_DIR, ['.lua']);
 const allFiles = [...ahkFiles, ...luaFiles];
 
 allFiles.forEach(auditFile);
+
+const REQUIRED_DYNAMIC_KEYS = [
+	'menu.about.frequency.1m',
+	'menu.about.frequency.5m',
+	'menu.about.frequency.10m',
+	'menu.about.frequency.1h',
+	'menu.about.frequency.2h',
+	'menu.about.frequency.3h',
+	'menu.about.frequency.6h',
+	'menu.about.frequency.12h',
+	'menu.about.frequency.24h',
+	'menu.about.frequency.2d',
+	'menu.about.frequency.7d',
+	'menu.about.frequency.never'
+];
+
+REQUIRED_DYNAMIC_KEYS.forEach(key => {
+	if (!availableKeys.has(key)) {
+		if (!missingKeys.has(key)) missingKeys.set(key, []);
+		missingKeys.get(key).push('Dynamic key check');
+	}
+});
 
 if (missingKeys.size > 0) {
 	console.error('\x1b[31m[ERROR] Missing translation keys detected:\x1b[0m');
