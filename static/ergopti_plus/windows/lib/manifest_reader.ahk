@@ -37,6 +37,10 @@
 ; crashing at parse time.
 #Include *i ..\_generated\features_manifest.ahk
 
+; Cached indices for fast O(1) lookup
+global _MANIFEST_SECTION_INDEX := Map()
+global _MANIFEST_PATH_INDEX    := Map()
+
 
 
 
@@ -51,12 +55,26 @@
 ; false otherwise. Public accessors below all call this guard before reading
 ; the global.
 ManifestEnsureLoaded() {
+	global FEATURES_MANIFEST, _MANIFEST_SECTION_INDEX, _MANIFEST_PATH_INDEX
 	if !IsSet(FEATURES_MANIFEST) {
 		try LoggerError("Manifest",
 			"FEATURES_MANIFEST not loaded — run ``npm run build:manifest`` "
 			"and reload the driver.")
 		return false
 	}
+	
+	; Build indices on first call
+	if (_MANIFEST_PATH_INDEX.Count == 0) {
+		for _, Entry in FEATURES_MANIFEST["features"] {
+			Path := Entry["path"]
+			Sec  := Entry["section"]
+			_MANIFEST_PATH_INDEX[Path] := Entry
+			if !_MANIFEST_SECTION_INDEX.Has(Sec)
+				_MANIFEST_SECTION_INDEX[Sec] := []
+			_MANIFEST_SECTION_INDEX[Sec].Push(Entry)
+		}
+	}
+	
 	return true
 }
 
@@ -113,17 +131,11 @@ ManifestFeatures() {
 ; order. The array order in the source manifest is preserved by the codegen
 ; emitter, so callers can use this directly as the render order.
 ManifestFeaturesForSection(SectionPath) {
-	Out := []
 	if !ManifestEnsureLoaded() {
-		return Out
+		return []
 	}
-	global FEATURES_MANIFEST
-	for _, Entry in FEATURES_MANIFEST["features"] {
-		if (Entry["section"] == SectionPath) {
-			Out.Push(Entry)
-		}
-	}
-	return Out
+	global _MANIFEST_SECTION_INDEX
+	return _MANIFEST_SECTION_INDEX.Has(SectionPath) ? _MANIFEST_SECTION_INDEX[SectionPath] : []
 }
 
 ; Return the manifest entry whose canonical ``path`` matches ``V2Path`` (or
@@ -135,14 +147,14 @@ ManifestFindEntryByPath(V2Path) {
 	if !ManifestEnsureLoaded() {
 		return false
 	}
-	global FEATURES_MANIFEST
+	global _MANIFEST_PATH_INDEX
+	if _MANIFEST_PATH_INDEX.Has(V2Path)
+		return _MANIFEST_PATH_INDEX[V2Path]
+	
 	AhkVariant := "ahk." . V2Path
-	for _, Entry in FEATURES_MANIFEST["features"] {
-		EntryPath := Entry["path"]
-		if (EntryPath == V2Path or EntryPath == AhkVariant) {
-			return Entry
-		}
-	}
+	if _MANIFEST_PATH_INDEX.Has(AhkVariant)
+		return _MANIFEST_PATH_INDEX[AhkVariant]
+
 	return false
 }
 

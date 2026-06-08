@@ -116,16 +116,20 @@ global _MENU_RETRY_DELAY_MS := 150
 RegisterMenuItem(MenuObj, ItemName, Callback) {
     global _MenuDispatchCallbacks, _MenuDispatchLastFire
 
-    ; Step 1: placeholder add to let AHK allocate the Win32 item ID.
-    PlaceholderCb := (*) => ""
+    ; To avoid the double-Add penalty (placeholder then replace), we use a
+    ; mutable object to capture the ItemId AFTER the Add call, while the
+    ; closure is already registered.
+    TrackedObj := { ItemId: 0, Callback: Callback }
+    Wrapper    := (Args*) => _TrackedDispatch(TrackedObj, Args*)
+
     try {
-        MenuObj.Add(ItemName, PlaceholderCb)
+        MenuObj.Add(ItemName, Wrapper)
     } catch {
         return 0  ; Add itself failed — bail out cleanly.
     }
 
-    ; Step 2: discover the ID via Menu.Handle + GetMenuItemID. Last added
-    ; item sits at position Count - 1.
+    ; Discover the ID via Menu.Handle + GetMenuItemID. Last added item
+    ; sits at position Count - 1.
     ItemId := 0
     try {
         HMENU := MenuObj.Handle
@@ -133,87 +137,62 @@ RegisterMenuItem(MenuObj, ItemName, Callback) {
             Count := DllCall("GetMenuItemCount", "ptr", HMENU, "int")
             if (Count > 0) {
                 Raw := DllCall("GetMenuItemID", "ptr", HMENU, "int", Count - 1, "uint")
-                ; -1 (0xFFFFFFFF) indicates a separator or popup-only item —
-                ; both produce no WM_COMMAND so the bypass isn't applicable.
                 if (Raw and Raw != 0xFFFFFFFF) {
                     ItemId := Raw
                 }
             }
         }
     } catch {
-        ; Menu.Handle may be unavailable on some AHK 2.0 minors. Leave
-        ; the item with AHK's native dispatch — exactly the same coverage
-        ; as before the bypass was installed.
+        ; Menu.Handle may be unavailable.
     }
 
     if (!ItemId) {
-        ; Discovery failed — replace placeholder with the raw user callback
-        ; (since the bypass can't help, AHK's native dispatch is the only
-        ; path) and report no tracking.
-        try MenuObj.Add(ItemName, Callback)
         return 0
     }
 
-    ; Step 3: build the tracking wrapper that stamps the "last fire"
-    ; timestamp for THIS specific ItemId on every native-dispatch entry.
-    Tracked := _MakeTrackedCallback(ItemId, Callback)
-    ; Step 4: re-add under the same name — AHK 2.0 docs guarantee this
-    ; modifies the existing item rather than creating a duplicate, so the
-    ; ItemId we just read stays valid.
-    try MenuObj.Add(ItemName, Tracked)
-
+    ; Update the mutable object so the already-registered closure knows its ID
+    TrackedObj.ItemId := ItemId
     _MenuDispatchCallbacks[ItemId] := Callback
     _MenuDispatchLastFire[ItemId]  := 0
     return 1
 }
 
-; Returns a Func that stamps _MenuDispatchLastFire[ItemId] before calling
-; the user's original Callback. Extracted to a named helper so the closure
-; over (ItemId, Callback) is created once per registration, not on every
-; click.
-_MakeTrackedCallback(ItemId, Callback) {
-    return (Args*) => _TrackedDispatch(ItemId, Callback, Args*)
-}
-
-_TrackedDispatch(ItemId, Callback, Args*) {
+_TrackedDispatch(TrackedObj, Args*) {
     global _MenuDispatchLastFire
-    _MenuDispatchLastFire[ItemId] := A_TickCount
-    Callback.Call(Args*)
+    if (TrackedObj.ItemId) {
+        _MenuDispatchLastFire[TrackedObj.ItemId] := A_TickCount
+    }
+    TrackedObj.Callback.Call(Args*)
 }
 
 ; Variant for items added via ``Menu.Insert(BeforeItem, ItemName, Callback)``.
 ; AHK's Insert places the new item BEFORE the position named in BeforeItem
 ; (the "1&" / "2&" notation = 1-based position with literal trailing &) and
-; shifts everything else down. We do the same two-step placeholder + replace
-; dance, but use Insert for both steps so the position stays consistent.
+; shifts everything else down.
 ;
 ; BeforeItem accepts AHK's standard syntax: "Nname" / "&n" / "Nn&" — see
 ; AHK 2.0 Menu.Insert docs.
 RegisterMenuItemInsert(MenuObj, BeforeItem, ItemName, Callback) {
     global _MenuDispatchCallbacks, _MenuDispatchLastFire
 
-    PlaceholderCb := (*) => ""
+    TrackedObj := { ItemId: 0, Callback: Callback }
+    Wrapper    := (Args*) => _TrackedDispatch(TrackedObj, Args*)
+
     try {
-        MenuObj.Insert(BeforeItem, ItemName, PlaceholderCb)
+        MenuObj.Insert(BeforeItem, ItemName, Wrapper)
     } catch {
         return 0
     }
 
     ; Find the just-inserted item via its name — Menu.Handle gives the
-    ; HMENU, then we walk positions and match against the item text. Less
-    ; clean than the Add helper's "tail of menu" assumption, but Insert
-    ; can land anywhere so we have no shortcut.
+    ; HMENU, then we walk positions and match against the item text.
     ItemId := _FindMenuItemIdByName(MenuObj, ItemName)
     if (!ItemId) {
-        try MenuObj.Insert(BeforeItem, ItemName, Callback)
         return 0
     }
 
-    Tracked := _MakeTrackedCallback(ItemId, Callback)
-    ; Re-Add (same name) modifies the existing item's callback without
-    ; touching its position, matching the Add helper's behavior.
-    try MenuObj.Add(ItemName, Tracked)
-
+    ; Update the mutable object so the already-registered closure knows its ID
+    TrackedObj.ItemId := ItemId
     _MenuDispatchCallbacks[ItemId] := Callback
     _MenuDispatchLastFire[ItemId]  := 0
     return 1

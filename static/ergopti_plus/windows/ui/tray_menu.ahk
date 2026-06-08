@@ -221,40 +221,24 @@ SetFeatureLetterOff(FullPath) {
 	Reload
 }
 
+global _TrayTitleCache := Map()
+
 ; Retrieve a feature title by its path. The label is sourced from the
 ; canonical manifest entry's ``description_key`` (resolved against the
 ; current i18n locale via ``MenuLabelFromManifestEntry``) whenever a
 ; matching entry exists. Non-manifest features fall through to dedicated
-; handlers: Personal shortcuts use _PersonalShortcutsRegistry descriptions;
-; TapHolds variants use TapHoldVariantLabel (dynamically built from the v2
-; tuple and locale-aware i18n keys). The live ``Letter``
-; suffix appended for letter pickers is always read from Features so
-; the title reflects the user's persisted choice immediately after a Reload.
-;
-; Two runtime substitutions are layered on top of the i18n value so the
-; menu reflects live data:
-;   - ``{date}`` placeholders in DynamicHotstrings entries are replaced
-;     with the current date in the per-feature format.
-;   - Hotstring categories with a non-zero entry count get a ``" (N)"``
-;     suffix mirroring the legacy ``EnrichSectionDescriptionsWithCounts``
-;     behaviour.
+; handlers.
 GetMenuTitleByPath(FullPath) {
-	; Try the manifest+i18n first — single source of truth for declared
-	; features. Non-manifest paths fall through to per-subsystem handlers:
-	; Personal shortcuts use _PersonalShortcutsRegistry; TapHolds variants
-	; use TapHoldVariantLabel.
+	global _TrayTitleCache
+	if _TrayTitleCache.Has(FullPath)
+		return _TrayTitleCache[FullPath]
+
+	; Try the manifest+i18n first
 	V2Path := LegacyPathToManifestPath(FullPath)
 	Entry := false
+	Label := ""
 	if (V2Path != "") {
 		Entry := ManifestFindEntryByPath(V2Path)
-		; Letter pickers (Modélisation α with split schema) have no bare
-		; section entry — only ``<section>.enabled`` and ``<section>.letter``
-		; children, with the picker's description_key carried by ``.enabled``.
-		; Bare-α features (GPT, Search, TakeNote) DO have a bare section
-		; entry and resolve on the first lookup; only the split variant
-		; needs this fallback. Without it, GetMenuTitleByPath falls all the
-		; way through to the raw FullPath sentinel and the menu shows
-		; "Shortcuts.EGrave" / "Shortcuts.AGrave" / etc.
 		if (Entry == false) {
 			Entry := ManifestFindEntryByPath(V2Path . ".enabled")
 		}
@@ -269,36 +253,34 @@ GetMenuTitleByPath(FullPath) {
 					Label := Label StrUpper(State["Letter"])
 				}
 			}
-			return Label
 		}
 	}
 
-	; Personal shortcuts: description is stored in _PersonalShortcutsRegistry,
-	; not the manifest.
-	Parts := StrSplit(FullPath, ".")
-	if (Parts.Length == 3 and Parts[1] == "Shortcuts" and Parts[2] == "Personal") {
-		global _PersonalShortcutsRegistry
-		Name := Parts[3]
-		if _PersonalShortcutsRegistry.Has(Name) {
-			Desc := _PersonalShortcutsRegistry[Name]
-			return (Desc != "") ? Desc : Name
-		}
-		return Name
-	}
-
-	; TapHolds variants: labels are built dynamically from the (tap_action,
-	; hold_modifier / hold_layer) tuple via TapHoldVariantLabel so they
-	; honour the active locale without a per-variant string table.
-	if (Parts[1] == "TapHolds") {
-		if Parts.Length == 2 {
-			return TapHoldGroupLabel(Parts[2])
-		}
-		if Parts.Length == 3 {
-			return TapHoldVariantLabel(Parts[2], Parts[3])
+	if (Label == "") {
+		; Personal shortcuts
+		Parts := StrSplit(FullPath, ".")
+		if (Parts.Length == 3 and Parts[1] == "Shortcuts" and Parts[2] == "Personal") {
+			global _PersonalShortcutsRegistry
+			Name := Parts[3]
+			if _PersonalShortcutsRegistry.Has(Name) {
+				Desc := _PersonalShortcutsRegistry[Name]
+				Label := (Desc != "") ? Desc : Name
+			} else {
+				Label := Name
+			}
+		} else if (Parts[1] == "TapHolds") {
+			if Parts.Length == 2
+				Label := TapHoldGroupLabel(Parts[2])
+			else if Parts.Length == 3
+				Label := TapHoldVariantLabel(Parts[2], Parts[3])
 		}
 	}
 
-	return FullPath
+	if (Label == "")
+		Label := FullPath
+
+	_TrayTitleCache[FullPath] := Label
+	return Label
 }
 
 ; Detect whether a manifest entry corresponds to a letter-remap feature —
@@ -307,10 +289,7 @@ GetMenuTitleByPath(FullPath) {
 ;
 ;   - Bare-α (default is a Map carrying the ``letter`` key directly).
 ;   - Split-α / letter pickers (the entry IS the section's ``.enabled``
-;     child, and the letter lives in a sibling ``.letter`` entry). The
-;     resolver retrieves the sibling via ``ManifestFindEntryByPath``
-;     keyed on ``<section>.letter``; if it exists this is a letter
-;     picker and the suffix should be appended.
+;     child, and the letter lives in a sibling ``.letter`` entry).
 _ManifestEntryHasLetter(Entry) {
 	if !(IsObject(Entry) and Entry.Has("default")) {
 		return false
@@ -328,18 +307,16 @@ _ManifestEntryHasLetter(Entry) {
 	return false
 }
 
-; Apply runtime substitutions to a menu label fresh out of i18n. Handles
-; the DynamicHotstrings ``{date}`` placeholders and appends a ``" (N)"``
-; suffix to hotstring category entries that have a non-zero count.
+; Apply runtime substitutions to a menu label fresh out of i18n.
 _ApplyMenuLabelDynamicSubstitutions(Label, V1Path) {
-	; {date} substitution for the three DynamicHotstrings date entries.
+	; {date} substitution
 	if (InStr(Label, "{date}")) {
 		switch V1Path {
 			case "DynamicHotstrings.DateFr":
 				Label := StrReplace(Label, "{date}", FormatTime(, "dd/MM/yyyy"))
 			case "DynamicHotstrings.DateLongFr":
-				_Days   := ["dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"]
-				_Months := ["janvier", "février", "mars", "avril", "mai", "juin",
+				static _Days   := ["dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"]
+				static _Months := ["janvier", "février", "mars", "avril", "mai", "juin",
 				            "juillet", "août", "septembre", "octobre", "novembre", "décembre"]
 				_Long := _Days[A_WDay] . " " . FormatTime(, "d") . " " . _Months[FormatTime(, "M") + 0] . " " . FormatTime(, "yyyy")
 				Label := StrReplace(Label, "{date}", _Long)
@@ -347,9 +324,7 @@ _ApplyMenuLabelDynamicSubstitutions(Label, V1Path) {
 				Label := StrReplace(Label, "{date}", FormatTime(, "yyyy_MM_dd"))
 		}
 	}
-	; Append hotstring entry counts for the TOML-backed categories.
-	; CountTomlSection expects the TOML section name, which is now the
-	; v2 snake_case id — resolve it from the manifest path.
+	; Append hotstring entry counts
 	Parts := StrSplit(V1Path, ".")
 	if (Parts.Length == 2) {
 		switch Parts[1] {
@@ -359,15 +334,13 @@ _ApplyMenuLabelDynamicSubstitutions(Label, V1Path) {
 					V2Parts := StrSplit(V2FullPath, ".")
 					V2SecId := V2Parts[V2Parts.Length]
 					N := CountTomlSection(Parts[1], V2SecId)
-					if (N > 0) {
+					if (N > 0)
 						Label := Label . " (" . N . ")"
-					}
 				}
 			case "DynamicHotstrings":
 				N := CountDynamicSection(Parts[2])
-				if (N > 0) {
+				if (N > 0)
 					Label := Label . " (" . N . ")"
-				}
 		}
 	}
 	return Label
@@ -759,11 +732,16 @@ _LAY_LayoutFeaturesAltGr(M, _Cat) {
 
 ; ── Hotstrings dynamic handlers ────────────────────────────────────────────────
 
+global _HS_GrandTotalCache := -1
+
 ; Compute the grand total count used in the tray menu title label.
 ; Sums enabled standard, ergopti, dynamic, personal and extension entries.
 _HS_ComputeGrandTotal() {
 global Features, HotstringCategoriesStd, HotstringCategoriesErgopti
-global ScriptInformation, _ExtTotalPersonalCounterGlobal
+global ScriptInformation, _ExtTotalPersonalCounterGlobal, _HS_GrandTotalCache
+if (_HS_GrandTotalCache != -1)
+	return _HS_GrandTotalCache
+
 IsGated := IsCategoryGated("Hotstrings")
 CountFn := IsGated ? _CountEnabledForCategory : _CountAllForCategory
 Total := 0
@@ -800,7 +778,15 @@ if (PersonalTomlPath != "" and FileExist(PersonalTomlPath)) {
 }
 Total += PersonalActiveCount
 Total += IsObject(_ExtTotalPersonalCounterGlobal) ? _ExtTotalPersonalCounterGlobal.value : 0
+_HS_GrandTotalCache := Total
 return Total
+}
+
+; Invalidates hotstring-related caches.
+_HS_InvalidateCaches() {
+	global _HS_GrandTotalCache, _TomlCountCache
+	_HS_GrandTotalCache := -1
+	_TomlCountCache := Map()
 }
 
 ; Dynamic handler: magic key config entry (prefix + current char + editor).
@@ -2201,6 +2187,12 @@ _AppendPersonalShortcutsSubmenuIfAny(ShortcutsMenu) {
 
 initMenu() {
 	global SubMenus, A_TrayMenu, HotstringCategories
+	global _TrayTitleCache, _FmtCountCache, _I18nSortedLocalesCache
+	_TrayTitleCache := Map()
+	_FmtCountCache := Map()
+	_I18nSortedLocalesCache := false
+	_HS_InvalidateCaches()
+	MenuManifest_InvalidateCache()
 
 	A_TrayMenu.Delete()
 

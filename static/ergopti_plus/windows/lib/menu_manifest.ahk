@@ -30,6 +30,10 @@ global _MM_FALLBACK_STANDARD  := ["DistancesReduction", "Autocorrection", "Magic
 global _MM_FALLBACK_ERGOPTI   := ["SFBsReduction", "Rolls"]
 global _MM_FALLBACK_DYNAMIC   := ["DynamicHotstrings"]
 
+; Cached objects to avoid redundant disk I/O and JSON parsing
+global _MM_HOTSTRING_GROUPS_CACHE := false
+global _MM_DEBUG_MENU_CACHE       := false
+
 
 
 ; ========================================
@@ -71,6 +75,13 @@ _MM_ResolveIdArray(IdsArr, CategoryKeysMap, GroupName, Fallback) {
 ; ===== 1.2) Public loader =====
 ; ==============================
 
+; Invalidates all manifest-driven caches.
+MenuManifest_InvalidateCache() {
+	global _MM_HOTSTRING_GROUPS_CACHE, _MM_DEBUG_MENU_CACHE
+	_MM_HOTSTRING_GROUPS_CACHE := false
+	_MM_DEBUG_MENU_CACHE       := false
+}
+
 ; Loads ``static/ergopti_plus/shared/menu_manifest.json`` and converts the hotstring group id lists
 ; into arrays of AHK Features keys using ``hotstring_category_keys``.
 ;
@@ -82,8 +93,11 @@ _MM_ResolveIdArray(IdsArr, CategoryKeysMap, GroupName, Fallback) {
 ;
 ; On any read or parse failure the fallback hard-coded arrays are returned.
 MenuManifest_LoadHotstringGroups() {
-	global _SharedDir
+	global _SharedDir, _MM_HOTSTRING_GROUPS_CACHE
 	global _MM_FALLBACK_STANDARD, _MM_FALLBACK_ERGOPTI, _MM_FALLBACK_DYNAMIC
+
+	if (_MM_HOTSTRING_GROUPS_CACHE != false)
+		return _MM_HOTSTRING_GROUPS_CACHE
 
 	FilePath := _SharedDir . "\menu_manifest.json"
 
@@ -132,7 +146,8 @@ MenuManifest_LoadHotstringGroups() {
 	try LoggerDone("MenuManifest", "Hotstring groups loaded (%d std, %d ergopti, %d dynamic).",
 		StandardAhk.Length, ErgoptiAhk.Length, DynamicAhk.Length)
 
-	return _MM_BuildResult(StandardAhk, ErgoptiAhk, DynamicAhk)
+	_MM_HOTSTRING_GROUPS_CACHE := _MM_BuildResult(StandardAhk, ErgoptiAhk, DynamicAhk)
+	return _MM_HOTSTRING_GROUPS_CACHE
 }
 
 ; Assembles the final result object from the three resolved arrays.
@@ -167,7 +182,10 @@ _MM_BuildResult(Standard, Ergopti, Dynamic) {
 ; Filters out any entry whose ``platforms`` list exists and does not include "ahk".
 ; Returns a hard-coded fallback array on any read or parse failure.
 MenuManifest_LoadDebugMenu() {
-	global _SharedDir
+	global _SharedDir, _MM_DEBUG_MENU_CACHE
+
+	if (_MM_DEBUG_MENU_CACHE != false)
+		return _MM_DEBUG_MENU_CACHE
 
 	FilePath := _SharedDir . "\menu_manifest.json"
 
@@ -216,7 +234,8 @@ MenuManifest_LoadDebugMenu() {
 	}
 
 	try LoggerDone("MenuManifest", "Debug menu order loaded (%d item(s)).", Result.Length)
-	return Result.Length > 0 ? Result : _MM_DebugFallback()
+	_MM_DEBUG_MENU_CACHE := Result.Length > 0 ? Result : _MM_DebugFallback()
+	return _MM_DEBUG_MENU_CACHE
 }
 
 ; Hard-coded fallback — mirrors the canonical order defined in menu_manifest.json.
