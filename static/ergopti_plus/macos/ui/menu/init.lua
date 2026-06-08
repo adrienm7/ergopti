@@ -218,6 +218,10 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 
 	local function save_prefs()
 		Preferences.save(MenuPaths.get("ConfigTomlPath"), state, hotfiles, core_mods)
+		-- PERFORMANCE: Invalidate caches after saving prefs to ensure counts and
+		-- labels reflect the new state on next click.
+		if type(Builder.invalidate_cache) == "function" then Builder.invalidate_cache() end
+		if type(HotCounter.invalidate_cache) == "function" then HotCounter.invalidate_cache() end
 	end
 
 
@@ -730,10 +734,12 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			pcall(core_mods.shortcuts_mod.set_extras, actions)
 		end
 
-		-- Refresh menu on each click on the icon
+		-- Refresh menu on each click on the icon.
+		-- PERFORMANCE: do NOT call updateMenu() or any state-syncing logic inside
+		-- this callback. Builder.generate() is stateless and uses the cached
+		-- 'ctx' table. Heavy updates are triggered only by preferences changes.
 		pcall(function()
 			myMenu:setMenu(function()
-				updateMenu()
 				return Builder.generate(ctx, menu_mods, actions)
 			end)
 		end)

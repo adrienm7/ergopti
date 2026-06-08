@@ -36,11 +36,15 @@ local DEBUG_MENU_FALLBACK = {
 }
 
 
+local _ergopti_groups_cache = nil
+local _debug_menu_cache     = nil
+
 --- Loads hotstring group classification from the shared menu_manifest.json.
 --- Falls back to the hardcoded set if the file cannot be read or parsed.
 --- Logs ERROR if manifest is not found (fail-fast philosophy).
 --- @return table<string,boolean> Set of group IDs specific to the Ergopti layout.
 local function load_ergopti_groups()
+	if _ergopti_groups_cache then return _ergopti_groups_cache end
 	local manifest_path = Paths.find_from_configdir("shared/menu_manifest.json") or ""
 	local ok_r, fh = pcall(io.open, manifest_path, "r")
 	if not ok_r or not fh then
@@ -62,6 +66,7 @@ local function load_ergopti_groups()
 		if flattened ~= id then groups[flattened] = true end
 	end
 	Logger.debug(LOG, "Ergopti groups loaded from manifest (%d group(s)).", #(data.hotstring_groups.ergopti or {}))
+	_ergopti_groups_cache = groups
 	return groups
 end
 
@@ -72,6 +77,7 @@ end
 --- Logs ERROR if manifest is not found (fail-fast philosophy).
 --- @return table Array of {id} entries in display order.
 local function load_debug_menu()
+	if _debug_menu_cache then return _debug_menu_cache end
 	local manifest_path = Paths.find_from_configdir("shared/menu_manifest.json") or ""
 	local ok_r, fh = pcall(io.open, manifest_path, "r")
 	if not ok_r or not fh then
@@ -102,7 +108,15 @@ local function load_debug_menu()
 	end
 
 	Logger.debug(LOG, "Debug menu order loaded from manifest (%d item(s)).", #result)
-	return #result > 0 and result or DEBUG_MENU_FALLBACK
+	_debug_menu_cache = #result > 0 and result or DEBUG_MENU_FALLBACK
+	return _debug_menu_cache
+end
+
+
+--- Invalidates the builder caches — call after hot-reload or locale change.
+function M.invalidate_cache()
+	_ergopti_groups_cache = nil
+	_debug_menu_cache     = nil
 end
 
 
