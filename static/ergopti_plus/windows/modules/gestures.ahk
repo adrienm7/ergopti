@@ -1572,7 +1572,7 @@ GestureStartKeyboardWatcher() {
     global GestureKeyboardHook
 
     GestureStopKeyboardWatcher()
-    GestureKeyboardHook := InputHook("L3")
+    GestureKeyboardHook := InputHook("L0")
     GestureKeyboardHook.KeyOpt("{All}", "N")
     GestureKeyboardHook.OnKeyDown := GestureOnKeyDown
     GestureKeyboardHook.Start()
