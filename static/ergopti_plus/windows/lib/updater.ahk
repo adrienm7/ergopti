@@ -219,7 +219,7 @@ _Updater_ParseVersion(Tag) {
 	if !RegExMatch(Norm, "^(?P<maj>\d+)\.(?P<min>\d+)\.(?P<pat>\d+)(?:-(?P<pre>.+))?$", &M)
 		return 0
 	PreParts := 0
-	if M.HasProp("pre") and M.pre != "" {
+	if M.pre != "" {
 		PreParts := []
 		for , Part in StrSplit(M.pre, ".")
 			PreParts.Push(Part)
@@ -237,11 +237,8 @@ _Updater_ComparePreId(A, B) {
 			return -1
 		return 0
 	}
-	if (A > B)
-		return 1
-	if (A < B)
-		return -1
-	return 0
+	Cmp := StrCompare(A, B)
+	return (Cmp > 0) ? 1 : (Cmp < 0) ? -1 : 0
 }
 
 ; Returns 1 if A > B, -1 if A < B, 0 if equal (semver prerelease rules).
@@ -274,9 +271,8 @@ _Updater_CompareVersions(A, B) {
 	if (Pa == 0 or Pb == 0) {
 		Na := _Updater_NormalizeTag(A)
 		Nb := _Updater_NormalizeTag(B)
-		if (Na == Nb)
-			return 0
-		return (Na > Nb) ? 1 : -1
+		Cmp := StrCompare(Na, Nb)
+		return (Cmp > 0) ? 1 : (Cmp < 0) ? -1 : 0
 	}
 	if (Pa.Maj != Pb.Maj)
 		return (Pa.Maj > Pb.Maj) ? 1 : -1
