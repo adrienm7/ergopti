@@ -119,7 +119,7 @@ end
 --- Starts a keyboard watcher that releases all held synthetic clicks on the next keydown.
 local function start_click_key_watcher()
 	if click_key_watcher then return end
-	click_key_watcher = hs.eventtap.new({ hs.eventtap.event.types.keyDown }, function(_)
+	click_key_watcher = hs.eventtap.new({ hs.eventtap.event.types.keyDown, hs.eventtap.event.types.flagsChanged }, function(_)
 		local pos = hs.mouse.absolutePosition()
 		if leftClickHeld then
 			if leftMouseTap then pcall(function() leftMouseTap:stop() end); leftMouseTap = nil end

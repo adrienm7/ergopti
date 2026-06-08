@@ -689,7 +689,7 @@ GestureSearchWeb() {
         SelectedText := StrReplace(SelectedText, "#", "%23")
         SelectedText := StrReplace(SelectedText, "&", "%26")
         SelectedText := StrReplace(SelectedText, "+", "%2b")
-        SelectedText := StrReplace(SelectedText, "`"", "%22")
+        SelectedText := StrReplace(SelectedText, '"', "%22")
         Run(EngineQuery . SelectedText)
     }
 }
@@ -1572,7 +1572,7 @@ GestureStartKeyboardWatcher() {
     global GestureKeyboardHook
 
     GestureStopKeyboardWatcher()
-    GestureKeyboardHook := InputHook("L0")
+    GestureKeyboardHook := InputHook("L3")
     GestureKeyboardHook.KeyOpt("{All}", "N")
     GestureKeyboardHook.OnKeyDown := GestureOnKeyDown
     GestureKeyboardHook.Start()
@@ -1679,6 +1679,14 @@ GestureDispatch(slot) {
     ; still-down state and produce wrong combos on every swipe after the first.
     Send("{LCtrl up}{RCtrl up}{LShift up}{RShift up}{LWin up}{RWin up}{LAlt up}{RAlt up}")
     LoggerDebug("gestures", "Dispatching gesture: {1} -> {2}.", slot, ActionName)
+
+    ; Any tap action (other than the click-toggle itself) must deactivate a held click
+    ; so that a selection started with left_click_toggle is properly released first.
+    if (ActionName != "left_click_toggle" && ActionName != "right_click_toggle") {
+        GestureReleaseLeftClick()
+        GestureReleaseRightClick()
+    }
+
     try GESTURE_ACTIONS[ActionName].Fn()
     LoggerInfo("gestures", "Gesture {1} dispatched successfully.", slot)
 }
