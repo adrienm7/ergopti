@@ -730,8 +730,13 @@ if !Features["layout"]["ergopti_base"] {
 ; Count the exact number of hotstrings that will be generated for a DynamicHotstrings
 ; section — mirrors the same threshold logic used in hotstrings.ahk section 5.
 ; This must stay in sync with the registration code whenever prefix rules change.
+; Uses a global cache to avoid redundant calculations during menu build.
 CountDynamicSection(SectionName) {
-    global PersonalInformation
+    global PersonalInformation, _TomlCountCache
+    CacheKey := "dynamic|" . StrLower(SectionName)
+    if _TomlCountCache.Has(CacheKey)
+        return _TomlCountCache[CacheKey]
+
     Phone := PersonalInformation["phone_number"]
     FPhone := PersonalInformation["phone_number_clean"]
     Ssn := PersonalInformation["social_security_number"]
@@ -739,9 +744,10 @@ CountDynamicSection(SectionName) {
     SsnRaw := StrReplace(Ssn, " ", "")
     IbanRaw := StrReplace(Iban, " ", "")
 
+    Count := 0
     switch SectionName {
         case "DateFr", "DateLongFr", "Date", "date_fr", "date_long_fr", "date":
-            return 1
+            Count := 1
         case "PhonePrefixes", "phone_prefixes":
             N := 0
             if StrLen(Phone) >= 2
@@ -752,16 +758,23 @@ CountDynamicSection(SectionName) {
                 N += 1  ; phone[2:5]
             if StrLen(FPhone) >= 5
                 N += 1  ; fphone[1:5]
-            return N
+            Count := N
         case "SsnPrefixes", "ssn_prefixes":
             ; No-space + spaced triggers — both fire when ssn_raw has >= 5 digits
-            return StrLen(SsnRaw) >= 5 ? 2 : 0
+            Count := StrLen(SsnRaw) >= 5 ? 2 : 0
         case "IbanPrefixes", "iban_prefixes":
             ; 6 raw chars (no-space) and 7-char spaced trigger if iban_raw has >= 6 chars
-            return StrLen(IbanRaw) >= 6 ? 2 : 0
-        default:
-            return 0
+            Count := StrLen(IbanRaw) >= 6 ? 2 : 0
+        case "TextExpansionPersonalInformation", "text_expansion_personal_information":
+            N := 0
+            for Key, Val in PersonalInformation {
+                if (Val != "")
+                    N++
+            }
+            Count := N
     }
+    _TomlCountCache[CacheKey] := Count
+    return Count
 }
 
 ; The legacy ``Features["DynamicHotstrings"]`` mutation block that injected

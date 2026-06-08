@@ -67,12 +67,18 @@ ReadTomlFile(FilePath) {
 ; ParseTomlGroupConfig or ReadTomlFile re-reads from disk. Called after
 ; _HCW_PatchTomlMeta writes changes to a personal TOML file.
 _ParseTomlGroupConfig_InvalidatePath(FilePath) {
-    global _TomlFileCache, HotstringGroupConfig
+    global _TomlFileCache, HotstringGroupConfig, _TomlCountCache
     if _TomlFileCache.Has(FilePath) {
         _TomlFileCache.Delete(FilePath)
     }
     if HotstringGroupConfig.Has(FilePath) {
         HotstringGroupConfig.Delete(FilePath)
+    }
+    ; Also invalidate the count cache for this file
+    for Key, _ in _TomlCountCache.Clone() {
+        if InStr(Key, FilePath) {
+            _TomlCountCache.Delete(Key)
+        }
     }
 }
 
