@@ -57,6 +57,20 @@ function auditFile(filePath) {
 
 	// Remove comments to avoid false positives (e.g. documentation t("sg_actions.X"))
 	const isAhk = path.extname(filePath) === '.ahk';
+
+	// Extract explicitly declared dynamic keys via @i18n-keys: comment tags
+	const i18nKeysRegex = /@i18n-keys:\s*([^\r\n]+)/g;
+	let kMatch;
+	while ((kMatch = i18nKeysRegex.exec(content)) !== null) {
+		const keys = kMatch[1].split(',').map((k) => k.trim()).filter(Boolean);
+		for (const key of keys) {
+			if (!availableKeys.has(key)) {
+				if (!missingKeys.has(key)) missingKeys.set(key, []);
+				missingKeys.get(key).push(path.relative(REPO_ROOT, filePath));
+			}
+		}
+	}
+
 	const cleanContent = isAhk
 		? content.replace(/;.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '')
 		: content.replace(/--.*$/gm, '').replace(/--\[\[[\s\S]*?\]\]/g, '');
