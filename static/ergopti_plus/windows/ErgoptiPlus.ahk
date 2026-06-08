@@ -786,13 +786,6 @@ global SpaceAroundSymbols := (_SpaceAroundSymbolsNode.Has("enabled") and _SpaceA
 ; the TOML config always use the canonical lowercase-with-underscores format,
 ; regardless of the casing used in personal_shortcuts.ahk.
 ; Examples: "LaptopBrokenKey" → "laptop_broken_key", "myFeature" → "my_feature".
-_PersonalFeatureNormaliseName(Name) {
-    ; Insert an underscore before every uppercase letter that follows a
-    ; lowercase letter or digit, then lowercase the whole string.
-    Name := RegExReplace(Name, "([a-z0-9])([A-Z])", "$1_$2")
-    return StrLower(Name)
-}
-
 ; Register a behavioural toggle for a personal hotkey defined in the user's
 ; personal_shortcuts.ahk. Toggles are stored under the nested namespace
 ; Features["shortcuts"]["personal"][Name] so that user-chosen names cannot
@@ -803,13 +796,8 @@ _PersonalFeatureNormaliseName(Name) {
 ; [ahk.shortcuts.personal] section. The persisted value is already hydrated
 ; in Features at boot, so toggling via the tray survives reloads without
 ; any special lookup here — we only set the default on the very first boot.
-; Names are normalised to snake_case so PascalCase names from personal_shortcuts.ahk
-; do not produce PascalCase TOML keys that fail the lint conventions check.
 RegisterPersonalFeature(Name, DefaultEnabled := false, Description := "") {
     global _PersonalShortcutsRegistry, Features
-
-    ; Normalise to snake_case so TOML keys are always lowercase
-    Name := _PersonalFeatureNormaliseName(Name)
 
     ; Register the description for use by the tray menu's GetMenuTitleByPath.
     if !_PersonalShortcutsRegistry.Has(Name) {
@@ -851,16 +839,11 @@ RegisterPersonalFeature(Name, DefaultEnabled := false, Description := "") {
  * "Item has no value" crashes when the feature key is evaluated before
  * RegisterPersonalFeature() has run (e.g. during AHK's hotkey-condition
  * sweep on the very first keypress after a rapid reload).
- * The name is normalised to snake_case so callers using the original
- * PascalCase name (as declared in personal_shortcuts.ahk) still resolve
- * correctly after RegisterPersonalFeature has canonicalised the key.
  * @param {string} name - The feature name passed to RegisterPersonalFeature.
  * @returns {boolean} True if enabled, false if absent or disabled.
  */
 PersonalFeatureEnabled(name) {
     global Features
-    ; Normalise so PascalCase call-sites match the snake_case stored key
-    name := _PersonalFeatureNormaliseName(name)
     try {
         return Features["shortcuts"]["personal"][name] = true
     } catch {
