@@ -16,11 +16,13 @@ local hs     = hs
 local Logger = require("lib.logger")
 local LOG    = "hotstring_counter"
 
-local _count_cache = {}
+local _count_cache     = {}
+local _ext_meta_cache  = nil
 
 --- Invalidates the hotstring count cache.
 function M.invalidate_cache()
-	_count_cache = {}
+	_count_cache    = {}
+	_ext_meta_cache = nil
 end
 
 
@@ -108,9 +110,10 @@ end
 --- Counts all hotstrings across standard, ergopti, personal, and extension groups.
 --- @param ctx table Menu context (hotfiles, keymap, get_group_name, base_dir).
 --- @param ergopti_groups table<string,boolean> Set of group names specific to Ergopti layout.
---- @return table Counts: { common, ergopti, personal, ext, grand, has_common, has_ergopti, has_personal, has_ext }.
+--- @return table Counts: { common, ergopti, personal, ext, grand, has_common, has_ergopti, has_personal, has_ext, group_counts }.
 function M.count_all(ctx, ergopti_groups)
 	local fmt_grand = M.fmt_grand
+	local group_counts = {}
 
 	-- Count hotstrings for common groups split into "communs" and "ergopti"
 	local common_total, ergopti_total = 0, 0
@@ -123,6 +126,7 @@ function M.count_all(ctx, ergopti_groups)
 			local name = ctx.get_group_name and ctx.get_group_name(f) or f
 			if name ~= "custom" and name ~= "personal" and name:sub(1, 13) ~= "personal_ext_" then
 				local secs = ctx.keymap.get_sections(name)
+				local g_total = 0
 				if type(secs) == "table" then
 					for _, sec in ipairs(secs) do
 						if type(sec) == "table" and sec.name ~= "-" and not sec.is_module_placeholder
@@ -131,6 +135,7 @@ function M.count_all(ctx, ergopti_groups)
 							local active = not is_sec_enabled or is_sec_enabled(name, sec.name)
 							if active then
 								local cnt = tonumber(sec.count)
+								g_total = g_total + cnt
 								-- Support both underscored and flattened IDs for classification
 								local flattened_name = name:gsub("_", "")
 								if ergopti_groups[name] or ergopti_groups[flattened_name] then
@@ -144,6 +149,7 @@ function M.count_all(ctx, ergopti_groups)
 						end
 					end
 				end
+				group_counts[name] = g_total
 			end
 		end
 	end
@@ -164,6 +170,7 @@ function M.count_all(ctx, ergopti_groups)
 		end
 		for _, gname in ipairs(personal_group_names) do
 			local secs = ctx.keymap.get_sections(gname)
+			local g_total = 0
 			if type(secs) == "table" then
 				for _, sec in ipairs(secs) do
 					if type(sec) == "table" and sec.name ~= "-" and not sec.is_module_placeholder
@@ -172,11 +179,14 @@ function M.count_all(ctx, ergopti_groups)
 						local active = not is_sec_enabled or is_sec_enabled(gname, sec.name)
 						if active then
 							personal_has_count = true
-							personal_total = personal_total + tonumber(sec.count)
+							local cnt = tonumber(sec.count)
+							personal_total = personal_total + cnt
+							g_total = g_total + cnt
 						end
 					end
 				end
 			end
+			group_counts[gname] = g_total
 		end
 	end
 
@@ -185,66 +195,94 @@ function M.count_all(ctx, ergopti_groups)
 
 	-- Count extension hotstrings
 	local ext_total, ext_has_count = 0, false
-	local ext_root = ctx.base_dir and (ctx.base_dir .. "../../extensions/")
-	local ok_attr, attr = ext_root and pcall(hs.fs.attributes, ext_root) or false
-	if ok_attr and type(attr) == "table" and attr.mode == "directory" then
-		local ext_ids = {}
-		for fname in hs.fs.dir(ext_root) do
-			if fname ~= "." and fname ~= ".." then
-				local fpath = ext_root .. fname
-				local ok_a2, a2 = pcall(hs.fs.attributes, fpath)
-				if ok_a2 and type(a2) == "table" and a2.mode == "directory" then
-					table.insert(ext_ids, fname)
+	local ext_details = {}
+
+	if _ext_meta_cache then
+		ext_total     = _ext_meta_cache.total
+		ext_has_count = _ext_meta_cache.has_count
+		ext_details   = _ext_meta_cache.details
+	else
+		local ext_root = ctx.base_dir and (ctx.base_dir .. "../../extensions/")
+		local ok_attr, attr = ext_root and pcall(hs.fs.attributes, ext_root) or false
+		if ok_attr and type(attr) == "table" and attr.mode == "directory" then
+			local ext_ids = {}
+			for fname in hs.fs.dir(ext_root) do
+				if fname ~= "." and fname ~= ".." then
+					local fpath = ext_root .. fname
+					local ok_a2, a2 = pcall(hs.fs.attributes, fpath)
+					if ok_a2 and type(a2) == "table" and a2.mode == "directory" then
+						table.insert(ext_ids, fname)
+					end
 				end
 			end
-		end
-		table.sort(ext_ids)
+			table.sort(ext_ids)
 
-		for _, ext_id in ipairs(ext_ids) do
-			local ext_dir    = ext_root .. ext_id .. "/"
-			local hs_dir     = ext_dir .. "hotstrings/"
-			local manifest   = ext_dir .. "manifest.toml"
-			local ok_m, am   = pcall(hs.fs.attributes, manifest)
-			if not (ok_m and type(am) == "table" and am.mode == "file") then goto continue_ext end
+			for _, ext_id in ipairs(ext_ids) do
+				local ext_dir    = ext_root .. ext_id .. "/"
+				local hs_dir     = ext_dir .. "hotstrings/"
+				local manifest   = ext_dir .. "manifest.toml"
+				local ok_m, am   = pcall(hs.fs.attributes, manifest)
+				if not (ok_m and type(am) == "table" and am.mode == "file") then goto continue_ext end
 
-			local ok_hd, ahd = pcall(hs.fs.attributes, hs_dir)
-			if not (ok_hd and type(ahd) == "table" and ahd.mode == "directory") then goto continue_ext end
+				local ok_hd, ahd = pcall(hs.fs.attributes, hs_dir)
+				if not (ok_hd and type(ahd) == "table" and ahd.mode == "directory") then goto continue_ext end
 
-			local toml_stems = {}
-			for fname in hs.fs.dir(hs_dir) do
-				if fname:match("%.toml$") and not fname:match("^_") then
-					local stem = fname:match("^(.-)%.toml$")
-					if stem and stem ~= "" then table.insert(toml_stems, stem) end
+				local toml_stems = {}
+				for fname in hs.fs.dir(hs_dir) do
+					if fname:match("%.toml$") and not fname:match("^_") then
+						local stem = fname:match("^(.-)%.toml$")
+						if stem and stem ~= "" then table.insert(toml_stems, stem) end
+					end
 				end
-			end
-			table.sort(toml_stems)
+				table.sort(toml_stems)
 
-			local ext_hs_total = 0
-			for _, stem in ipairs(toml_stems) do
-				local toml_path = hs_dir .. stem .. ".toml"
-				local total, _ = count_toml_hotstrings(toml_path)
-				ext_hs_total = ext_hs_total + total
-			end
+				local ext_name = read_ext_name(manifest) or ext_id
+				local ext_hs_total = 0
+				local ext_files = {}
 
-			if ext_hs_total > 0 then ext_has_count = true end
-			ext_total = ext_total + ext_hs_total
-			::continue_ext::
+				for _, stem in ipairs(toml_stems) do
+					local toml_path = hs_dir .. stem .. ".toml"
+					local total, sections = count_toml_hotstrings(toml_path)
+					ext_hs_total = ext_hs_total + total
+					table.insert(ext_files, {
+						stem     = stem,
+						path     = toml_path,
+						total    = total,
+						sections = sections
+					})
+				end
+
+				if ext_hs_total > 0 then
+					ext_has_count = true
+					table.insert(ext_details, {
+						id    = ext_id,
+						name  = ext_name,
+						total = ext_hs_total,
+						files = ext_files
+					})
+				end
+				ext_total = ext_total + ext_hs_total
+				::continue_ext::
+			end
 		end
+		_ext_meta_cache = { total = ext_total, has_count = ext_has_count, details = ext_details }
 	end
 
 	Logger.debug(LOG, "Counted: common=%d ergopti=%d personal=%d ext=%d.", common_total, ergopti_total, personal_total, ext_total)
 
 	return {
-		common      = common_total,
-		ergopti     = ergopti_total,
-		personal    = personal_total,
-		ext         = ext_total,
-		grand       = grand_total + ext_total,
-		has_common  = common_has_count,
-		has_ergopti = ergopti_has_count,
-		has_personal= personal_has_count,
-		has_ext     = ext_has_count,
-		has_grand   = grand_has_count or ext_has_count,
+		common       = common_total,
+		ergopti      = ergopti_total,
+		personal     = personal_total,
+		ext          = ext_total,
+		ext_details  = ext_details,
+		grand        = grand_total + ext_total,
+		has_common   = common_has_count,
+		has_ergopti  = ergopti_has_count,
+		has_personal = personal_has_count,
+		has_ext      = ext_has_count,
+		has_grand    = grand_has_count or ext_has_count,
+		group_counts = group_counts,
 	}
 end
 

@@ -611,19 +611,13 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			karabiner                = karabiner,
 		}
 
-		-- Resolves <config_dir>/hammerspoon/logs/ at click-time so a user who
-		-- relocates their config folder via the paths editor picks up the new
-		-- path without needing to reload the menu
+		-- Resolves <config_dir>/hammerspoon/logs/ at click-time
 		local function logs_dir()
 			local d = MenuPaths.get_config_dir() or ""
 			if not d:match("[/\\]$") then d = d .. "/" end
 			return d .. "hammerspoon/logs/"
 		end
 
-		--- Helper that opens a path resolved through MenuPaths.get(key).
-		--- Returns silently when no path is configured (fresh install with no
-		--- personal_info.toml yet, etc.) so a gesture or shortcut binding
-		--- doesn't spawn an `open ""` shell with no target.
 		local function open_path_via_menu(key)
 			local p = MenuPaths.get(key)
 			if type(p) == "string" and p ~= "" then
@@ -631,25 +625,14 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			end
 		end
 
-		--- Action callbacks. Keys mirror the action ids declared in
-		--- modules/shortcuts/script_control.ACTION_DEFINITIONS and
-		--- modules/gestures/actions.SG_NAMES so the same handler runs whether
-		--- the user clicks the menu, fires a gesture, or hits a script-control
-		--- key slot. Anything UI-shaped (the bulk-toggle ☑/☐ entries, the
-		--- "Reset defaults" entry) lives only in the menu and keeps a
-		--- self-explanatory key.
 		local actions = {
-			-- Menu-only bulk actions (no gesture / shortcut counterpart)
 			enable_all                = function() set_all_enabled(true) end,
 			disable_all               = function() set_all_enabled(false) end,
 			reset_defaults            = function() reset_all_defaults() end,
-			-- Aliases used by the menu builder; the canonical ids below remain
-			-- the source of truth for gestures / script-control bindings.
 			open_paths                = function() hs.timer.doAfter(0.05, function() pcall(MenuPaths.open_editor) end) end,
 			reload                    = function() do_reload("menu") end,
 			quit                      = function()
 				hs.timer.doAfter(0.05, function()
-					-- Keep quit responsive: launch cleanup in background and exit.
 					pcall(function()
 						local ok_k, k = pcall(require, "modules.karabiner")
 						local ok_l, kl = pcall(require, "modules.karabiner.ke_lifecycle")
@@ -668,8 +651,6 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 				local dir = logs_dir()
 				pcall(hs.execute, string.format("mkdir -p %q && open %q", dir, dir))
 			end,
-			-- Canonical action ids (mirrored across HS gestures, HS script
-			-- control, and the AutoHotkey side):
 			open_console              = function() pcall(hs.openConsole) end,
 			open_paths_editor         = function() hs.timer.doAfter(0.05, function() pcall(MenuPaths.open_editor) end) end,
 			open_hotstrings_editor    = function()
@@ -697,16 +678,14 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 				pcall(hs.execute, string.format("mkdir -p %q && open %q", dir, dir))
 			end,
 			open_today_log            = function()
-				local Logger = require("lib.logger")
-				local path = Logger.UNIFIED_LOG_FILE
+				local path = require("lib.logger").UNIFIED_LOG_FILE
 				if type(path) ~= "string" or path == "" then
 					path = logs_dir() .. "ErgoptiPlus_" .. os.date("%Y-%m-%d") .. ".log"
 				end
 				pcall(hs.execute, string.format("open %q", path))
 			end,
 			open_error_log            = function()
-				local Logger = require("lib.logger")
-				local path = Logger.ERRORS_LOG_FILE
+				local path = require("lib.logger").ERRORS_LOG_FILE
 				if type(path) ~= "string" or path == "" then
 					path = logs_dir() .. "ErgoptiPlus_errors_" .. os.date("%Y-%m-%d") .. ".log"
 				end
@@ -727,22 +706,16 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			end,
 		}
 
-		-- Wire those callbacks into script_control so the right-Alt key slots
-		-- and the gesture-driven dispatch share one source of truth.
 		if type(core_mods.shortcuts_mod) == "table"
 			and type(core_mods.shortcuts_mod.set_extras) == "function" then
 			pcall(core_mods.shortcuts_mod.set_extras, actions)
 		end
 
-		-- Refresh menu on each click on the icon.
-		-- PERFORMANCE: do NOT call updateMenu() or any state-syncing logic inside
-		-- this callback. Builder.generate() is stateless and uses the cached
-		-- 'ctx' table. Heavy updates are triggered only by preferences changes.
-		pcall(function()
-			myMenu:setMenu(function()
-				return Builder.generate(ctx, menu_mods, actions)
-			end)
-		end)
+		-- PERFORMANCE: Pre-calculate the entire menu table and pass it directly
+		-- to hs.menubar:setMenu(). This makes clicking the icon INSTANT because
+		-- macOS doesn't have to wait for Lua to run Builder.generate() anymore.
+		local menu_table = Builder.generate(ctx, menu_mods, actions)
+		pcall(function() myMenu:setMenu(menu_table) end)
 	end
 
 	updateMenu()
