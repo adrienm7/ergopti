@@ -120,7 +120,9 @@ function M.count_all(ctx, ergopti_groups)
 							local active = not is_sec_enabled or is_sec_enabled(name, sec.name)
 							if active then
 								local cnt = tonumber(sec.count)
-								if ergopti_groups[name] then
+								-- Support both underscored and flattened IDs for classification
+								local flattened_name = name:gsub("_", "")
+								if ergopti_groups[name] or ergopti_groups[flattened_name] then
 									ergopti_has_count = true
 									ergopti_total = ergopti_total + cnt
 								else
