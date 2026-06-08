@@ -98,7 +98,11 @@ global _UIA_WRAP_PAIRS := Map(
     "{", Map("left", "{", "right", "}"),
     "}", Map("left", "{", "right", "}"),
     "<", Map("left", "<", "right", ">"),
-    ">", Map("left", "<", "right", ">")
+    ">", Map("left", "<", "right", ">"),
+    '"', Map("left", '"', "right", '"'),
+    "'", Map("left", "'", "right", "'"),
+    "«", Map("left", "«", "right", "»"),
+    "»", Map("left", "«", "right", "»")
 )
 
 
@@ -544,7 +548,7 @@ _OnPrefixChar(IH, Char) {
     if (IsSet(Features) and Features.Has("shortcuts")
         and Features["shortcuts"].Has("wrap_text_if_selected")
         and Features["shortcuts"]["wrap_text_if_selected"]
-        and !RegExMatch(Char, "[[:alnum:]]")
+        and _UIA_WRAP_PAIRS.Has(Char)
     ) {
         try {
             UIASel := GetUIASelection()
