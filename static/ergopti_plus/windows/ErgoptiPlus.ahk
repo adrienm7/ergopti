@@ -777,15 +777,7 @@ CountDynamicSection(SectionName) {
     return Count
 }
 
-; The legacy ``Features["DynamicHotstrings"]`` mutation block that injected
-; the current date and " (N)" suffix into Features v1 descriptions is gone
-; — ``_ApplyMenuLabelDynamicSubstitutions`` in ui/tray_menu.ahk replaces
-; the ``{date}`` placeholders in the i18n value at render time and
-; appends the count from CountDynamicSection. Pure runtime resolution,
-; no boot-time Features mutation.
-
-; Safe nested read — the manifest normally provides the default Map("enabled", true), but a
-; stale or missing _generated/features_manifest.ahk would leave the key absent and crash here
+; Safe nested read
 _SpaceAroundSymbolsNode := (Features.Has("hotstrings")
 	and Features["hotstrings"].Has("distances_reduction")
 	and Features["hotstrings"]["distances_reduction"].Has("space_around_symbols"))
@@ -795,33 +787,11 @@ global SpaceAroundSymbols := (_SpaceAroundSymbolsNode.Has("enabled") and _SpaceA
 
 #Include ui/tray_menu.ahk
 
-; Convert a PascalCase or camelCase name to snake_case so that keys stored in
-; the TOML config always use the canonical lowercase-with-underscores format,
-; regardless of the casing used in personal_shortcuts.ahk.
-; Examples: "LaptopBrokenKey" → "laptop_broken_key", "myFeature" → "my_feature".
-; Register a behavioural toggle for a personal hotkey defined in the user's
-; personal_shortcuts.ahk. Toggles are stored under the nested namespace
-; Features["shortcuts"]["personal"][Name] so that user-chosen names cannot
-; collide with the built-in Shortcuts entries (EGrave, MicrosoftBold, …) and
-; show up as a dedicated « Raccourcis personnels » sub-submenu inside
-; « 🎯 Raccourcis ».
-; Their on/off state is persisted in Features under the
-; [ahk.shortcuts.personal] section. The persisted value is already hydrated
-; in Features at boot, so toggling via the tray survives reloads without
-; any special lookup here — we only set the default on the very first boot.
 RegisterPersonalFeature(Name, DefaultEnabled := false, Description := "") {
     global _PersonalShortcutsRegistry, Features
-
-    ; Normalise to lowercase so that personal shortcuts are case-insensitive
-    ; and always produce lowercase keys in config.toml.
     Name := StrLower(Name)
-
-    ; Register the description for use by the tray menu's GetMenuTitleByPath.
     if !_PersonalShortcutsRegistry.Has(Name) {
         _PersonalShortcutsRegistry[Name] := Description
-
-        ; Track insertion order so the submenu respects personal_shortcuts.ahk
-        ; declaration order across reloads.
         Found := false
         for _, Item in _PersonalShortcutsRegistry["__Order"] {
             if Item == Name {
@@ -833,10 +803,6 @@ RegisterPersonalFeature(Name, DefaultEnabled := false, Description := "") {
             _PersonalShortcutsRegistry["__Order"].Push(Name)
         }
     }
-
-    ; Persist the initial enabled state into Features if no value is stored
-    ; yet. On subsequent reloads the user's persisted value already exists so
-    ; we never overwrite it with the code-level default.
     if !(IsSet(Features) and Features.Has("shortcuts")
         and Features["shortcuts"].Has("personal")
         and IsObject(Features["shortcuts"]["personal"])
@@ -850,15 +816,6 @@ RegisterPersonalFeature(Name, DefaultEnabled := false, Description := "") {
     }
 }
 
-/**
- * Safe accessor for a personal feature's enabled state.
- * Use this in #HotIf expressions instead of the raw Map lookup to avoid
- * "Item has no value" crashes when the feature key is evaluated before
- * RegisterPersonalFeature() has run (e.g. during AHK's hotkey-condition
- * sweep on the very first keypress after a rapid reload).
- * @param {string} name - The feature name passed to RegisterPersonalFeature.
- * @returns {boolean} True if enabled, false if absent or disabled.
- */
 PersonalFeatureEnabled(name) {
     global Features
     name := StrLower(name)
@@ -869,25 +826,12 @@ PersonalFeatureEnabled(name) {
     }
 }
 
-; Create the user's personal_shortcuts.ahk from PERSONAL_SHORTCUTS_TEMPLATE if
-; it does not exist yet. Best-effort: any failure is logged and ignored so a
-; read-only config dir cannot prevent the driver from starting.
 EnsurePersonalShortcutsFile(Path) {
     global PERSONAL_SHORTCUTS_TEMPLATE
-
-    ; Guard against an unusable Path early — an empty or non-string argument
-    ; would otherwise propagate into RegExReplace/FileExist and surface as a
-    ; misleading "local variable has not been assigned" error from somewhere
-    ; deep in this function.
     if (!IsSet(Path) or Type(Path) != "String" or Path == "") {
         try LoggerWarn("ErgoptiPlus", "EnsurePersonalShortcutsFile called with empty Path — skipping.")
         return
     }
-
-    ; Step 1 — make sure the user's actual file exists at _ConfigDir, creating
-    ; it from the template on first launch (and after the user renames or
-    ; deletes it). FileWasCreated drives the reload at the end so the parser
-    ; gets to see the freshly-written content during this session.
     FileWasCreated := false
     if !FileExist(Path) {
         try {
@@ -895,10 +839,6 @@ EnsurePersonalShortcutsFile(Path) {
             if (Dir != "" and !DirExist(Dir)) {
                 DirCreate(Dir)
             }
-            ; PERSONAL_SHORTCUTS_TEMPLATE is defined in ui/tray_menu.ahk which is
-            ; #Include'd before this call site. If somebody removes that include
-            ; (or renames the constant) we would otherwise crash here with the
-            ; opaque "local variable has not been assigned a value" error.
             Template := IsSet(PERSONAL_SHORTCUTS_TEMPLATE) ? PERSONAL_SHORTCUTS_TEMPLATE : ""
             FileAppend(Template, Path, "UTF-8-RAW")
             FileWasCreated := true
@@ -909,26 +849,6 @@ EnsurePersonalShortcutsFile(Path) {
             return
         }
     }
-
-    ; Step 2 — maintain a forwarding stub in the script directory. AHK's
-    ; #Include directive is parse-time and cannot resolve runtime variables
-    ; like _ConfigDir, so the static `#Include *i personal_shortcuts.ahk`
-    ; below only ever searches A_ScriptDir. We keep a tiny stub there whose
-    ; sole purpose is `#Include *i <absolute_path_to_user_file>`, redirecting
-    ; the loader to the canonical _ConfigDir copy. The inner `*i` is required
-    ; so renaming or deleting the user's file does not break script loading
-    ; before EnsurePersonalShortcutsFile gets a chance to recreate it.
-    ; In compiled mode place the stub in LocalAppData\Ergopti\_generated\ so it
-    ; never lands next to the .exe (Downloads, Desktop…). In dev mode the sibling
-    ; _generated/ folder (gitignored) keeps the source tree tidy as before.
-    ;
-    ; AHK v2's built-in ``A_LocalAppData`` can throw "This local variable has
-    ; not been assigned a value" in some compiled / restricted runtime contexts
-    ; (RDP sessions, services, ill-defined user profiles). EnvGet("LOCALAPPDATA")
-    ; is more reliable because it reads the environment block directly, and we
-    ; only fall back to ``A_LocalAppData`` inside a try so an unresolvable
-    ; built-in cannot crash the boot path. The compiled-only %USERPROFILE%
-    ; reconstruction is the last-resort safety net.
     StubDir := ""
     if A_IsCompiled {
         LocalAppData := EnvGet("LOCALAPPDATA")
@@ -974,61 +894,28 @@ EnsurePersonalShortcutsFile(Path) {
             return
         }
     }
-    ; Reload whenever either the stub or the user's file just changed on disk
-    ; — the parser's #Include chain only saw the previous state. The guard
-    ; above ensures DesiredStub matches on the next pass with no further file
-    ; creation, avoiding an infinite reload loop.
     if FileWasCreated or !StubMatches {
         try LoggerInfo("ErgoptiPlus", "Reloading to pick up freshly-written personal shortcuts chain.")
         Reload
     }
 }
 
-; Personal file and TOML loaded here — before menu build — so Features["Personal"]
-; exists by the time InitSubMenus / initMenu run. Create the file from a minimal
-; template if the user has not authored one yet, so #Include *i has something to
-; load on first launch (and the user can find it via the tray menu shortcut).
-; Outer try guards the boot path against any internal failure inside the helper
-; — the driver must keep starting even when the personal shortcuts file cannot
-; be created (read-only home, locked AppData, …); the worst case is just that
-; personal hotkeys are inert until the user fixes the permissions.
 try {
     EnsurePersonalShortcutsFile(ScriptInformation["PersonalAhkPath"])
 } catch as _epsErr {
     try LoggerError("ErgoptiPlus", "EnsurePersonalShortcutsFile failed: {1}.", _epsErr.Message)
 }
-; #InputLevel 2 is required for the user's personal hotkeys to fire after the
-; layout's key remappings (which run at the default level 0). We set it here so
-; the user does not have to know about input levels in their personal file.
 #InputLevel 2
-; In dev mode: _generated/ sits next to the script (A_ScriptDir-relative).
-; In compiled mode: %A_LocalAppData%\Ergopti\_generated\ so the .exe never
-; litters its own folder (Downloads, Desktop, etc.) with generated files.
 #Include *i _generated/personal_shortcuts.ahk
 #Include *i %A_LocalAppData%\Ergopti\_generated\personal_shortcuts.ahk
-; Reset the include working directory to the script root so subsequent
-; relative #Include paths resolve correctly. The two lines above may have
-; changed it to _generated/ (AHK shifts the context on any successful
-; directory-relative include, which breaks the next bare path include).
 #Include %A_ScriptDir%
 #InputLevel 0
-; Apply master gates: disabled category master → force every feature in that
-; category to false in Features so all #HotIf evaluations short-circuit.
 ApplyMasterGatesToFeatures()
 
-; Gestures module included here — before menu build — so GESTURE_SLOTS,
-; GESTURE_ACTIONS and GESTURE_SLOT_LABELS exist when BuildGesturesMenu runs.
 #Include modules/gestures.ahk
-
-; Load script-shortcut overrides now that GESTURE_ACTIONS is defined — the
-; reader validates each candidate action name against the registry.
 ReadScriptShortcutsConfig()
-
-; Seed keyboard shortcut assignments with defaults, then apply any user overrides.
 ReadKeyboardShortcutsConfig()
 
-; Register configurable hotkeys for each Ctrl/Win/Alt slot that has a non-"none"
-; assignment. All hotkeys call RunKeyboardShortcutAction with their slot id.
 LoggerStart("KeyboardShortcuts", "Enregistrement des hotkeys configurables…")
 _KbBoundCount := 0
 for _KbSlot, _KbAction in KeyboardShortcutAssignments {
@@ -1049,36 +936,16 @@ for _KbSlot, _KbAction in KeyboardShortcutAssignments {
 }
 LoggerSuccess("KeyboardShortcuts", "Configurable hotkeys registered (%d active).", _KbBoundCount)
 
-; Load every UI shortcut + privacy filter from the [shortcuts] section
-; of autohotkey/config.toml. CS_Load() populates both MetricsShortcuts
-; and MetricsFilters in one pass.
 CS_Load()
-
-; Expose a global flag so lib modules loaded before this point
-; (config_shortcuts, toml_helpers) can detect that SaveFullConfig() is
-; available and delegate persistence to the full writer.
 global _SaveFullConfigReady := true
-
-; Restore WPM widget state before SaveFullConfig() so that the canonical
-; write captures the correct visible/graph/colors values rather than the
-; class defaults (which are all false). Without this ordering, SaveFullConfig
-; would overwrite WpmWidgetVisible = 0 and the next reload would see that 0.
 if MetricsShortcuts.enabled
     WPMWidget_LoadConfig(_IniCache)
 
 InitSubMenus()
 initMenu()
 UpdateTrayIcon()
-
-; Defer config persistence until after the menu is visible — the write is
-; a multi-pass TOML rewrite that parses and rewrites the config file, so
-; doing it synchronously delays the tray icon appearing by ~300 ms.
-; A 500 ms one-shot timer keeps it off the critical startup path.
 SetTimer(SaveFullConfig, -500)
 
-; The keylogger storage layer + the dashboard hotkeys only come up when
-; the user has explicitly opted in. A fresh install starts OFF — this is
-; a keylogger; the privacy default must be the safe one.
 if MetricsShortcuts.enabled {
     LoggerDebug("Startup", "Metrics enabled — WPMWidget.visible=%s, show_graph=%s.",
         WPMWidget.visible, WPMWidget.show_graph)
@@ -1086,22 +953,10 @@ if MetricsShortcuts.enabled {
         WPMWidget_Show()
     if MetricsShortcuts.show_wpm_menubar
         SetTimer(WpmMenubar_Tick, 1000)
-
-    ; Use the resolved config dir (paths.toml override honoured) so the
-    ; metrics folder follows the user's relocated config when applicable.
     KL_Init(_ConfigDir . "metrics")
     MS_ApplyAll(KLUI_ToggleTyping, KLUI_ToggleApps)
-    ; Start the unified hook dispatcher BEFORE any module-specific hook
-    ; start functions so the shared InputHook and mouse Hotkeys are live
-    ; when modules subscribe via HookDispatcher.Register().
     HookDispatcher.Start()
-    ; Wire the InputHook AFTER KL_Init so Keylogger.initialized is true
-    ; by the time the first OnChar fires.
     KL_Hook_Start()
-    ; Session / idle timer + Win32 system-event handlers (lock, unlock,
-    ; sleep, wake). The hook above must already be wired so the first
-    ; KL_Watchers_OnKeystroke call from the input hook reads a sane
-    ; KLHook.last_tick.
     KL_Watchers_Start()
     KL_Mouse_Start()
     KL_Sensors_Start()
@@ -1114,27 +969,16 @@ if MetricsShortcuts.enabled {
 
 LoggerSuccess("ErgoptiPlus", "Tray menu built and icon set.")
 
-; ========================================================
-; ======= 1.4) Tray menu of the script — Functions =======
-; ========================================================
-
-; Returns a bound callback that opens the personal editor on a specific section.
-; Wrapping in a function freezes SecName by value — AHK v2 closures capture by
-; reference so a direct lambda inside a loop would always use the last iteration value.
 _MakeOpenSectionFn(SecName) {
     return (*) => OpenPersonalEditor(SecName)
 }
 
-; Sets the default section pref and refreshes checkmarks + parent title.
 _SetPersonalDefaultSection(SecName, PersonalMenu, TomlData, DefaultSectionMenu) {
     global _PrevDefaultLabel
     _EditorPrefSet("DefaultSection", SecName)
-    ; Refresh checkmarks inside the sub-menu
     DefaultSectionMenu.Uncheck(t("menu.hotstrings.default_none"))
     for _, SN in TomlData["sections_order"] {
-        if (SN == "-") {
-            continue
-        }
+        if (SN == "-") { continue }
         SD := TomlData["sections"][SN]
         try DefaultSectionMenu.Uncheck(SD["description"])
     }
@@ -1143,7 +987,6 @@ _SetPersonalDefaultSection(SecName, PersonalMenu, TomlData, DefaultSectionMenu) 
     } else if (TomlData["sections"].Has(SecName)) {
         DefaultSectionMenu.Check(TomlData["sections"][SecName]["description"])
     }
-    ; Rename the parent item to reflect the new selection
     NewLabel := (SecName == "") ? t("menu.hotstrings.default_none")
         : (TomlData["sections"].Has(SecName) ? TomlData["sections"][SecName]["description"] : SecName)
     try PersonalMenu.Rename(t("menu.hotstrings.default_category_prefix") . _PrevDefaultLabel,
@@ -1151,12 +994,10 @@ _SetPersonalDefaultSection(SecName, PersonalMenu, TomlData, DefaultSectionMenu) 
     _PrevDefaultLabel := NewLabel
 }
 
-; Freezes all closure values for use inside a loop.
 _MakeSetDefaultSectionFn(SecName, PersonalMenu, TomlData, DefaultSectionMenu) {
     return (*) => _SetPersonalDefaultSection(SecName, PersonalMenu, TomlData, DefaultSectionMenu)
 }
 
-; Toggles the close-on-add pref and the corresponding checkmark.
 _TogglePersonalCloseOnAdd(PersonalMenu) {
     Label  := t("menu.hotstrings.close_on_add")
     NewVal := (_EditorPrefGet("CloseOnAdd", "1") == "1") ? "0" : "1"
@@ -1168,27 +1009,28 @@ _TogglePersonalCloseOnAdd(PersonalMenu) {
     }
 }
 
-; Returns a closure that opens a file with the default OS application.
 _MakeOpenFileFn(FilePath) {
     return (*) => Run(FilePath)
 }
 
-; Parses an extension TOML file and returns a list of section summaries:
-; [{description, count}, ...] in the order declared in [_meta.sections].
-; Descriptions come from [_meta.sections], counts from [[section]] entries.
+global _ParseExtTomlSectionsCache := Map()
+
 _ParseExtTomlSections(FilePath) {
+    global _ParseExtTomlSectionsCache
+    if _ParseExtTomlSectionsCache.Has(FilePath)
+        return _ParseExtTomlSectionsCache[FilePath]
     Result := []
     if !FileExist(FilePath) {
+        _ParseExtTomlSectionsCache[FilePath] := Result
         return Result
     }
-    Content := FileRead(FilePath)
+    Content := ReadTomlFile(FilePath)
     Q := Chr(34)
-    ; First pass: collect descriptions from [_meta.sections] and section order
     SectionDescs := Map()
     SectionOrder := []
     InMetaSections := false
-    for _, Line in StrSplit(Content, "`n", "`r") {
-        Trimmed := Trim(Line, " `t")
+    loop parse, Content, "`n", "`r" {
+        Trimmed := Trim(A_LoopField, " `t")
         if RegExMatch(Trimmed, "^\[([^\[\]]+)\]$", &HM) {
             InMetaSections := (Trim(HM[1]) == "_meta.sections")
             continue
@@ -1197,21 +1039,17 @@ _ParseExtTomlSections(FilePath) {
             InMetaSections := false
             continue
         }
-        if !InMetaSections {
-            continue
-        }
+        if !InMetaSections { continue }
         if RegExMatch(Trimmed, '^([A-Za-z0-9_]+)\s*=\s*"((?:[^"\\]|\\.)*)"', &KM) {
             SectionKey := StrLower(KM[1])
             SectionDescs[SectionKey] := KM[2]
             SectionOrder.Push(SectionKey)
         }
     }
-    ; Second pass: count entries per section (supports [sec] and [[sec]])
     SectionCounts := Map()
     CurSec := ""
-    for _, Line in StrSplit(Content, "`n", "`r") {
-        Trimmed := Trim(Line, " `t")
-        ; Match [[section]] or [section]
+    loop parse, Content, "`n", "`r" {
+        Trimmed := Trim(A_LoopField, " `t")
         if RegExMatch(Trimmed, "^\[+([^\[\]]+)\]+$", &SecM) {
             CurSec := StrLower(Trim(SecM[1]))
             if (CurSec == "_meta" or CurSec == "_meta.sections") {
@@ -1222,48 +1060,55 @@ _ParseExtTomlSections(FilePath) {
             continue
         }
         if (CurSec != "" and Trimmed != "" and SubStr(Trimmed, 1, 1) != "#") {
-            ; Match hotstring entry: key = value or key = { ... }
-            ; Key can be "quoted" or bare words.
             if RegExMatch(Trimmed, '^(?:"[^"]+"|[A-Za-z0-9_.-]+)\s*=') {
                 SectionCounts[CurSec] := SectionCounts.Get(CurSec, 0) + 1
             }
         }
     }
-    ; Build result in [_meta.sections] order (or any section not in meta, alphabetically)
     Seen := Map()
     for _, SecKey in SectionOrder {
         Seen[SecKey] := true
-        Result.Push(Map(
-            "description", SectionDescs.Get(SecKey, SecKey),
-            "count",       SectionCounts.Get(SecKey, 0)
-        ))
+        Result.Push(Map("description", SectionDescs.Get(SecKey, SecKey), "count", SectionCounts.Get(SecKey, 0)))
     }
-    for SecKey, Cnt in SectionCounts {
-        if !Seen.Has(SecKey) {
-            Result.Push(Map("description", SecKey, "count", Cnt))
-        }
+    OtherSections := []
+    for SecKey, Count in SectionCounts {
+        if !Seen.Has(SecKey)
+            OtherSections.Push(SecKey)
     }
+    _HS_BubbleSort(OtherSections)
+    for _, SecKey in OtherSections {
+        Result.Push(Map("description", SecKey, "count", SectionCounts[SecKey]))
+    }
+    _ParseExtTomlSectionsCache[FilePath] := Result
     return Result
 }
 
+_HS_BubbleSort(Array) {
+    n := Array.Length
+    if (n < 2)
+        return
+    Loop n - 1 {
+        i := A_Index
+        Loop n - i {
+            j := A_Index
+            if (StrCompare(Array[j], Array[j + 1], false) > 0) {
+                Tmp := Array[j]; Array[j] := Array[j + 1]; Array[j + 1] := Tmp
+            }
+        }
+    }
+}
+
 MagicKeyEditor(*) {
-    ; A plain Edit control routes every keystroke through the hotstring engine
-    ; (~6000 mappings), causing severe lag on each character. Capture the new
-    ; magic key via a one-shot InputHook instead: the GUI is purely informative,
-    ; the first non-modifier key pressed becomes the new value.
     GuiToShow := Gui_Create("+AlwaysOnTop", t("dialog.magic_key.title"))
     GuiToShow.Add("Text", "w300", t("dialog.magic_key.prompt"))
     GuiToShow.Add("Text", "w300", t("button.cancel") . " → Echap")
     GuiToShow.Show("Center")
-
     IH := InputHook("L1 I", "{Escape}")
-    IH.Start()
-    IH.Wait()
-    GuiToShow.Destroy()
-
+    IH.Start(); IH.Wait(); GuiToShow.Destroy()
     if (IH.EndReason = "Stopped" && IH.Input != "")
         ModifyMagicKey(0, IH.Input)
 }
+
 ModifyMagicKey(gui, NewValue) {
     global ScriptInformation, Features, ConfigurationFile
     ScriptInformation["MagicKey"] := NewValue
@@ -1271,9 +1116,7 @@ ModifyMagicKey(gui, NewValue) {
         Features["hotstrings"]["trigger_char"] := NewValue
     }
     TOML_Write(NewValue, ConfigurationFile, "hotstrings", "trigger_char")
-
-    if (gui != 0)
-        gui.Destroy()
+    if (gui != 0) { gui.Destroy() }
     Reload
 }
 
@@ -1290,54 +1133,40 @@ ToggleRepeatKeyEnabled(*) {
 PersonalInformationEditor(*) {
     GuiToShow := Gui(, t("dialog.personal_info.title"))
     UpdatedPersonalInformation := Map()
-
     ReverseLetters := Map()
     for k, v in PersonalInformationLetters
         ReverseLetters[v] := k
-
-    ; Dynamically generate a field for each element in the Map
     for PersonalInformationKey, OldValue in PersonalInformation {
         TextToAdd := ""
-        if ReverseLetters.Has(PersonalInformationKey) {
-            TextToAdd := " (@" . ReverseLetters[PersonalInformationKey] . ScriptInformation[
-                "MagicKey"] .
-                ")"
-        }
+        if ReverseLetters.Has(PersonalInformationKey)
+            TextToAdd := " (@" . ReverseLetters[PersonalInformationKey] . ScriptInformation["MagicKey"] . ")"
         GuiToShow.SetFont("bold")
         GuiToShow.Add("Text", , PersonalInformationKey . TextToAdd)
         GuiToShow.SetFont("norm")
         NewValue := GuiToShow.Add("Edit", "w300", OldValue)
         UpdatedPersonalInformation[PersonalInformationKey] := NewValue
     }
-
-    ; OK button
-    GuiToShow.Add("Button", "w100 Center", t("button.ok")).OnEvent("Click", (*) => ProcessUserInput(GuiToShow,
-        UpdatedPersonalInformation))
-
+    GuiToShow.Add("Button", "w100 Center", t("button.ok")).OnEvent("Click", (*) => ProcessUserInput(GuiToShow, UpdatedPersonalInformation))
     GuiToShow.Show("Center")
 }
+
 ProcessUserInput(gui, edits) {
     global PersonalInformation, ScriptInformation
     changed := Map()
     for key, editControl in edits {
         NewValue := editControl.Text
         OldValue := PersonalInformation.Has(key) ? PersonalInformation[key] : ""
-        if (NewValue != OldValue)
-            changed[key] := True
+        if (NewValue != OldValue) { changed[key] := True }
         PersonalInformation[key] := NewValue
     }
     WritePersonalInfoToml(ScriptInformation["PersonalInfoTomlPath"])
     gui.Destroy()
-
     PersonalInformationSummary := ""
     for key, _ in edits {
         NewValue := PersonalInformation[key]
         line := key ": " NewValue "`n"
-        if changed.Has(key) {
-            PersonalInformationSummary := PersonalInformationSummary line
-        }
+        if changed.Has(key) { PersonalInformationSummary := PersonalInformationSummary line }
     }
-
     MsgBox(t("dialog.personal_info.saved") "`n`n" PersonalInformationSummary)
     Reload
 }
@@ -1345,57 +1174,40 @@ ProcessUserInput(gui, edits) {
 GPTLinkEditor(*) {
     global Features
     CurrentLink := ""
-    if IsSet(Features) and Features.Has("shortcuts")
-        and Features["shortcuts"].Has("gpt")
-        and IsObject(Features["shortcuts"]["gpt"])
-        and Features["shortcuts"]["gpt"].Has("link") {
+    if IsSet(Features) and Features.Has("shortcuts") and Features["shortcuts"].Has("gpt") and Features["shortcuts"]["gpt"].Has("link")
         CurrentLink := Features["shortcuts"]["gpt"]["link"]
-    }
     GuiToShow := Gui(, t("dialog.gpt_link.title"))
     NewValue := GuiToShow.Add("Edit", "w300", CurrentLink)
-
     GuiToShow.Add("Button", "w100 Center", t("button.ok")).OnEvent("Click", (*) => ModifyLink(GuiToShow, NewValue.Text))
     GuiToShow.Show("Center")
 }
+
 ModifyLink(gui, NewValue) {
     global Features, ConfigurationFile
     if IsSet(Features) and Features.Has("shortcuts") and Features["shortcuts"].Has("gpt") {
         Features["shortcuts"]["gpt"]["link"] := NewValue
     }
     TOML_Write(NewValue, ConfigurationFile, "ahk.shortcuts.gpt", "link")
-
-    gui.Destroy()
-    Reload
+    gui.Destroy(); Reload
 }
 
 global _FmtCountCache := Map()
-
-; Formats a number with spaces as thousands separators, matching HS fmt_count.
-; Uses a global cache to eliminate redundant string processing during menu builds.
 FmtCount(N) {
     global _FmtCountCache
     if _FmtCountCache.Has(N)
         return _FmtCountCache[N]
-
-    S := String(Round(N))
-    Result := ""
-    Len := StrLen(S)
+    S := String(Round(N)); Result := ""; Len := StrLen(S)
     loop Len {
         i := A_Index
         Result := SubStr(S, Len - i + 1, 1) . Result
-        if (Mod(i, 3) == 0 and i < Len) {
-            Result := " " . Result
-        }
+        if (Mod(i, 3) == 0 and i < Len) { Result := " " . Result }
     }
     _FmtCountCache[N] := Result
     return Result
 }
 
-NoAction(*) {
-}
+NoAction(*) {}
 
-; Wraps a string in section-title dashes for disabled menu headers.
-; Use instead of embedding — directly in locale values.
 MenuSectionTitle(Text) {
     return "— " . Text . " —"
 }
@@ -1408,53 +1220,28 @@ ToggleAllFeaturesOff(*) {
     ToggleAllFeatures(0)
 }
 
-; Restore factory gesture / shortcut / tap-hold assignments. Used by
-; « Valeurs par défaut » before wiping per-user config files.
 _GlobalRestoreFactoryBindings() {
     global GestureAssignments, GESTURE_SLOTS, GESTURE_FACTORY_DEFAULTS
     global KeyboardShortcutAssignments, KEYBOARD_SHORTCUT_DEFAULTS
     global ScriptShortcutAssignments, SCRIPT_SHORTCUT_SLOTS, SCRIPT_SHORTCUT_DEFAULTS
     global CategoryEnabled, _ConfigDir, _AhkSubDir
-
     if IsSet(GESTURE_FACTORY_DEFAULTS) {
         for Slot in GESTURE_SLOTS
-            GestureAssignments[Slot] := GESTURE_FACTORY_DEFAULTS.Has(Slot)
-                ? GESTURE_FACTORY_DEFAULTS[Slot] : "none"
+            GestureAssignments[Slot] := GESTURE_FACTORY_DEFAULTS.Has(Slot) ? GESTURE_FACTORY_DEFAULTS[Slot] : "none"
     }
-
-    for Slot, Action in KEYBOARD_SHORTCUT_DEFAULTS
-        KeyboardShortcutAssignments[Slot] := Action
-
-    for Slot in SCRIPT_SHORTCUT_SLOTS
-        ScriptShortcutAssignments[Slot] := SCRIPT_SHORTCUT_DEFAULTS[Slot]
-
-    for Category, _ in CategoryEnabled
-        CategoryEnabled[Category] := true
-
-    ; Deleting the user file lets LoadTapHoldToml merge shipped defaults on boot.
+    for Slot, Action in KEYBOARD_SHORTCUT_DEFAULTS { KeyboardShortcutAssignments[Slot] := Action }
+    for Slot in SCRIPT_SHORTCUT_SLOTS { ScriptShortcutAssignments[Slot] := SCRIPT_SHORTCUT_DEFAULTS[Slot] }
+    for Category, _ in CategoryEnabled { CategoryEnabled[Category] := true }
     Path := _ConfigDir . _AhkSubDir . "tap_hold.toml"
-    try {
-        if FileExist(Path)
-            FileDelete(Path)
-    } catch as Err {
-        try LoggerError("GlobalReset", "Could not delete tap_hold.toml: {1}.", Err.Message)
-    }
+    try { if FileExist(Path) { FileDelete(Path) } }
 }
 
-; Clears every user binding (gestures, keyboard/script shortcuts, tap-holds)
-; to ``none`` / empty. Called by « Tout désactiver » so features AND assignments
-; are wiped — not only the feature toggles in the menu.
 _GlobalClearAllBindings(&Updates) {
-    global GestureAssignments, GESTURE_SLOTS
-    global KeyboardShortcutAssignments, KEYBOARD_SHORTCUT_DEFAULTS
-    global ScriptShortcutAssignments, SCRIPT_SHORTCUT_SLOTS
-    global TapHold, _IniCache
-
+    global GestureAssignments, GESTURE_SLOTS, KeyboardShortcutAssignments, KEYBOARD_SHORTCUT_DEFAULTS, SCRIPT_SHORTCUT_SLOTS, ScriptShortcutAssignments, _IniCache
     for Slot in GESTURE_SLOTS {
         GestureAssignments[Slot] := "none"
         Updates.Push({ Section: "ahk.gestures", Key: Slot, Value: "none" })
     }
-
     KbWritten := Map()
     for Slot, _ in KEYBOARD_SHORTCUT_DEFAULTS {
         KeyboardShortcutAssignments[Slot] := "none"
@@ -1469,269 +1256,116 @@ _GlobalClearAllBindings(&Updates) {
             }
         }
     }
-
     for Slot in SCRIPT_SHORTCUT_SLOTS {
         ScriptShortcutAssignments[Slot] := "none"
         Updates.Push({ Section: "ahk.shortcuts.script_control", Key: Slot, Value: "none" })
     }
-
-    if IsSet(_TH_WriteTapHoldDisabled)
-        try _TH_WriteTapHoldDisabled()
+    if IsSet(_TH_WriteTapHoldDisabled) { try _TH_WriteTapHoldDisabled() }
 }
 
-; Walk every feature in ``Features`` and force its ``enabled`` flag to
-; ``Value``. Collects all mutations into a single batch — writing them one
-; by one through TOML_Write does 50+ FileOpen/Write/Close round-trips and
-; produces a visible delay in the tray menu.
-;
-; Behavior:
-; - If Value == 0 : set every feature to false recursively (including
-;                   nested Modélisation α entries and sub-Map groups).
-; - If Value == 1 : set only first-level features to true; mutually-exclusive
-;                   nested choices (AltGr sub-Maps) stay at their existing
-;                   per-key state so a "Enable all" doesn't simultaneously
-;                   enable every variant of a one-of-N picker.
 ToggleAllFeatures(Value) {
     global Features, CategoryEnabled, ConfigurationFile
-    if !IsSet(Features) {
-        return
-    }
-    Bool := (Value = true or Value = 1)
-    Updates := []
-
-    ; Recursive walker — for each Map encountered, either flip ``enabled``
-    ; if it carries one (Modélisation α) or descend into children.
+    if !IsSet(Features) { return }
+    Bool := (Value = true or Value = 1); Updates := []
     EmitFlip(SectionPath, Node) {
-        if (Type(Node) != "Map") {
-            return
-        }
-        ; Modélisation α entry: { enabled = bool, … }
+        if (Type(Node) != "Map") { return }
         if Node.Has("enabled") and (Type(Node["enabled"]) != "Map") {
             Node["enabled"] := Bool
             Updates.Push({ Section: SectionPath, Key: "enabled", Value: Bool })
             return
         }
         for K, V in Node {
-            if (Type(V) == "Map") {
-                EmitFlip(SectionPath . "." . K, V)
-            } else {
-                ; Plain bool leaf (e.g. [shortcuts] microsoft_bold = true).
-                Node[K] := Bool
-                Updates.Push({ Section: SectionPath, Key: K, Value: Bool })
-            }
+            if (Type(V) == "Map") { EmitFlip(SectionPath . "." . K, V) }
+            else { Node[K] := Bool; Updates.Push({ Section: SectionPath, Key: K, Value: Bool }) }
         }
     }
-
     if (!Bool) {
-        ; Disable everything recursively.
-        for TopKey, TopVal in Features {
-            if (Type(TopVal) != "Map") {
-                continue
-            }
-            EmitFlip(TopKey, TopVal)
-        }
+        for TopKey, TopVal in Features { if (Type(TopVal) == "Map") { EmitFlip(TopKey, TopVal) } }
     } else {
-        ; Enable only first-level/default features (do not descend into
-        ; sub-Map groups like alt_gr_lalt that hold mutually-exclusive picks).
         for TopKey, TopVal in Features {
-            if (Type(TopVal) != "Map") {
-                continue
-            }
+            if (Type(TopVal) != "Map") { continue }
             for K, V in TopVal {
                 if (Type(V) == "Map") {
-                    ; Modélisation α with .enabled — flip the leaf only,
-                    ; not the surrounding properties.
                     if V.Has("enabled") and (Type(V["enabled"]) != "Map") {
                         V["enabled"] := true
                         Updates.Push({ Section: TopKey . "." . K, Key: "enabled", Value: true })
                     }
-                    ; Sub-Map groups (alt_gr_*) without .enabled: skip — the
-                    ; user's prior single-pick stays in place.
-                } else {
-                    TopVal[K] := true
-                    Updates.Push({ Section: TopKey, Key: K, Value: true })
-                }
+                } else { TopVal[K] := true; Updates.Push({ Section: TopKey, Key: K, Value: true }) }
             }
         }
     }
-
-    ; CategoryEnabled holds the per-category master gates (Layout, Shortcuts,
-    ; Hotstrings, TapHolds). ToggleAllFeatures must flip these too so the
-    ; parent-menu checkmarks reflect the new state — Features mutations alone
-    ; are not enough when a category gate was off.
     for Category, _ in CategoryEnabled {
         CategoryEnabled[Category] := Bool
         Updates.Push({ Section: "ahk.category_enabled", Key: _CategoryEnabledKey(Category), Value: Bool })
     }
-
-    ; WPM widget lives outside Features — its three flags are persisted
-    ; under [ahk.metrics] and must be flipped explicitly.
-    WPMWidget.visible    := Bool
-    WPMWidget.use_colors := Bool
-    WPMWidget.show_graph := Bool
+    WPMWidget.visible := Bool; WPMWidget.use_colors := Bool; WPMWidget.show_graph := Bool
     Updates.Push({ Section: "ahk.metrics", Key: WPMWidgetConst.CFG_VISIBLE, Value: Bool ? "1" : "0" })
     Updates.Push({ Section: "ahk.metrics", Key: WPMWidgetConst.CFG_COLORS,  Value: Bool ? "1" : "0" })
     Updates.Push({ Section: "ahk.metrics", Key: WPMWidgetConst.CFG_GRAPH,   Value: Bool ? "1" : "0" })
-
-    if !Bool
-        _GlobalClearAllBindings(Updates)
-
+    if !Bool { _GlobalClearAllBindings(Updates) }
     TOML_BatchWrite(ConfigurationFile, Updates)
-    ; Hotstrings features are nested 3 levels deep (hotstrings.cat.id.enabled)
-    ; so EmitFlip's single-level descent misses them. Delegate to the dedicated
-    ; helper which iterates every section via _CollectAllHotstringsV1Paths.
     if Bool {
         HsBatch := []
-        for V1Path in _CollectAllHotstringsV1Paths() {
-            HsBatch.Push(Map("v1_path", V1Path . ".Enabled", "value", true))
-        }
-        if (HsBatch.Length > 0) {
-            WriteFeatureBatch(HsBatch)
-        }
+        for V1Path in _CollectAllHotstringsV1Paths() { HsBatch.Push(Map("v1_path", V1Path . ".Enabled", "value", true)) }
+        if (HsBatch.Length > 0) { WriteFeatureBatch(HsBatch) }
     }
     Reload
 }
 
-ToggleAllHotstringsOn(*) {
-    ToggleAllHotstrings(1)
-}
-ToggleAllHotstringsOff(*) {
-    ToggleAllHotstrings(0)
-}
-; Master Hotstrings gate — flips the category-level enabled flag. When
-; enabling (Value=1), also activates every individual hotstring feature
-; so "tout activer" actually checks all sub-items, not just the gate.
-; ApplyMasterGatesToFeatures (lib/master_gates.ahk) applies the gate at
-; boot so every HotIf check evaluates false while the gate is off.
+ToggleAllHotstringsOn(*) { ToggleAllHotstrings(1) }
+ToggleAllHotstringsOff(*) { ToggleAllHotstrings(0) }
 ToggleAllHotstrings(Value) {
     global CategoryEnabled, ConfigurationFile
     Bool := (Value = true or Value = 1)
     CategoryEnabled["Hotstrings"] := Bool
     TOML_Write(Bool, ConfigurationFile, "ahk.category_enabled", "hotstrings")
-    ; When enabling, also flip every individual feature to true so the
-    ; sub-menu items appear checked after the reload.
     if Bool {
         Batch := []
-        for V1Path in _CollectAllHotstringsV1Paths() {
-            Batch.Push(Map("v1_path", V1Path . ".Enabled", "value", true))
-        }
-        if (Batch.Length > 0) {
-            WriteFeatureBatch(Batch)
-        }
+        for V1Path in _CollectAllHotstringsV1Paths() { Batch.Push(Map("v1_path", V1Path . ".Enabled", "value", true)) }
+        if (Batch.Length > 0) { WriteFeatureBatch(Batch) }
     }
     Reload
 }
 
-; Returns true when the master gate for ``Categories[1]`` is on. Used
-; by initMenu to label the per-submenu master toggle and to drive the
-; parent-menu checkmark. Per-feature .Enabled flags are no longer
-; consulted here — the master gate is the single source of truth for
-; "is this category active" UX state.
 IsCategoryAllEnabled(Categories) {
-    if (Categories.Length == 0) {
-        return true
-    }
+    if (Categories.Length == 0) { return true }
     return IsCategoryGated(Categories[1])
 }
 
-; Master category gate — flips ``CategoryEnabled[Category]`` and reloads.
-; ApplyMasterGatesToFeatures (lib/master_gates.ahk) reads this flag at
-; boot and forces the corresponding Features entries to false, so a
-; flipped gate disables every HotIf for the category without altering
-; per-feature .Enabled values. Used by tray-menu master toggles for
-; Layout / Shortcuts / TapHolds.
 ToggleCategoryAllFeatures(Category, Value) {
     global CategoryEnabled, ConfigurationFile
-    Bool := (Value = true or Value = 1)
-    CategoryEnabled[Category] := Bool
-    ; v2 uses lowercase snake_case for the keys too (Layout -> layout, TapHolds -> tap_holds).
+    Bool := (Value = true or Value = 1); CategoryEnabled[Category] := Bool
     TOML_Write(Bool, ConfigurationFile, "ahk.category_enabled", _CategoryEnabledKey(Category))
     Reload
 }
 
-; Map a v1 PascalCase category name to its snake_case v2 key, used as the
-; leaf id under [category_enabled]. Hotstrings keeps the same id either way.
 _CategoryEnabledKey(Category) {
     switch Category {
         case "Layout":     return "layout"
         case "Shortcuts":  return "shortcuts"
         case "Hotstrings": return "hotstrings"
         case "TapHolds":   return "tap_holds"
-        default:
-            return StrLower(Category)
+        default: return StrLower(Category)
     }
 }
 
-; Persist the complete in-memory state to the unified autohotkey/config.toml.
-; Every feature flag, script setting, script shortcut assignment, and
-; gesture assignment is written — not just the delta from defaults.
-; Sections and keys within sections are sorted alphabetically by the
-; TOML_BatchWrite writer for stable, human-readable output.
 SaveFullConfig() {
-    global Features, ScriptInformation, ScriptShortcutAssignments
-    global GestureAssignments, KeyboardShortcutAssignments
-    global ConfigurationFile, _TOML_STRICT_CANON_IN_PROGRESS
-    global PrevCanonState
+    global Features, ScriptInformation, ScriptShortcutAssignments, GestureAssignments, KeyboardShortcutAssignments, ConfigurationFile, _TOML_STRICT_CANON_IN_PROGRESS, PrevCanonState
     Updates := []
-
-    ; Tray LLM settings (n_predictions, debounce, …) live in _LLM_Tray at
-    ; runtime. Sync before walking Features so every full save — including
-    ; the deferred boot timer — persists the menu state, not a stale snapshot.
-    if IsSet(_LLM_Tray_SyncToFeatures)
-        _LLM_Tray_SyncToFeatures()
-
-    ; Emit every feature flag from the v2 Map. ``_CollectFeatureUpdates``
-    ; walks the hierarchical Features (Map of Map of …) and produces one
-    ; v2 TOML section per nested key path.
+    if IsSet(_LLM_Tray_SyncToFeatures) { _LLM_Tray_SyncToFeatures() }
     if IsSet(Features) {
         _CollectFeatureUpdates(Updates, "", Features)
-        ; Schema marker — pinned to 2 so future migrations can recognise
-        ; the on-disk shape without sniffing section names.
         Updates.Push({ Section: "_meta", Key: "schema_version", Value: 2 })
     }
-
-    ; [script] section — locale and other script-level settings.
     Updates.Push({ Section: "script", Key: "locale", Value: I18nGetLocale() })
-    ; Persist the active log level so it survives a reload. LOGGER_MIN_LEVEL
-    ; is mutated in-memory by LoggerSetLevel; SaveFullConfig is the only path
-    ; that keeps config.toml consistent, so the value must be included here.
     global LOGGER_MIN_LEVEL, LOGGER_DEFAULT_LEVEL
     Updates.Push({ Section: "script", Key: "log_level", Value: IsSet(LOGGER_MIN_LEVEL) ? LOGGER_MIN_LEVEL : LOGGER_DEFAULT_LEVEL })
-
-    ; [hotstrings] root — MagicKey lives at hotstrings.trigger_char.
     Updates.Push({ Section: "hotstrings", Key: "trigger_char", Value: ScriptInformation["MagicKey"] })
-    ; magic_key_source_scan and magic_key_source_char are intentionally NOT
-    ; persisted here. The scan is either SC02E (Ergopti default, needs no
-    ; entry) or resolved dynamically at startup from the active OS layout
-    ; (must not be frozen or it breaks reload on layout switch). Manual
-    ; overrides can be added directly to config.toml by the user and are
-    ; respected by ReadScriptConfig without ever being rewritten here.
-
-    ; [ahk.shortcuts.script_control] — script management hotkey slots.
-    if IsSet(ScriptShortcutAssignments) {
-        for Slot, Action in ScriptShortcutAssignments {
-            Updates.Push({ Section: "ahk.shortcuts.script_control", Key: Slot, Value: Action })
-        }
-    }
-
-    ; [ahk.shortcuts.keyboard] — configurable Ctrl/Win/Alt hotkeys.
-    if IsSet(KeyboardShortcutAssignments) {
-        for Slot, Action in KeyboardShortcutAssignments {
-            Updates.Push({ Section: "ahk.shortcuts.keyboard", Key: Slot, Value: Action })
-        }
-    }
-
-    ; [ahk.gestures] — trackpad gesture slot assignments.
-    if IsSet(GestureAssignments) {
-        for Slot, Action in GestureAssignments {
-            Updates.Push({ Section: "ahk.gestures", Key: Slot, Value: Action })
-        }
-    }
-
-    ; [ahk.metrics] — keylogger feature settings + privacy filters.
+    if IsSet(ScriptShortcutAssignments) { for Slot, Action in ScriptShortcutAssignments { Updates.Push({ Section: "ahk.shortcuts.script_control", Key: Slot, Value: Action }) } }
+    if IsSet(KeyboardShortcutAssignments) { for Slot, Action in KeyboardShortcutAssignments { Updates.Push({ Section: "ahk.shortcuts.keyboard", Key: Slot, Value: Action }) } }
+    if IsSet(GestureAssignments) { for Slot, Action in GestureAssignments { Updates.Push({ Section: "ahk.gestures", Key: Slot, Value: Action }) } }
     apps := []
-    for proc, _ in MetricsFilters.disabled_apps
-        apps.Push(proc)
+    for proc, _ in MetricsFilters.disabled_apps { apps.Push(proc) }
     Updates.Push({ Section: "ahk.metrics", Key: "metrics_enabled", Value: MetricsShortcuts.enabled })
     Updates.Push({ Section: "ahk.metrics", Key: "metrics_shortcut_typing", Value: MetricsShortcuts.typing_str })
     Updates.Push({ Section: "ahk.metrics", Key: "metrics_shortcut_apps", Value: MetricsShortcuts.apps_str })
@@ -1741,191 +1375,75 @@ SaveFullConfig() {
     Updates.Push({ Section: "ahk.metrics", Key: "metrics_filter_secure_field", Value: MetricsFilters.secure_field })
     Updates.Push({ Section: "ahk.metrics", Key: "metrics_filter_system_auth", Value: MetricsFilters.system_auth })
     Updates.Push({ Section: "ahk.metrics", Key: "metrics_disabled_apps", Value: apps })
-
-    ; [ahk.metrics] — WPM widget position and display options.
     Updates.Push({ Section: "ahk.metrics", Key: WPMWidgetConst.CFG_VISIBLE, Value: WPMWidget.visible ? "1" : "0" })
     Updates.Push({ Section: "ahk.metrics", Key: WPMWidgetConst.CFG_X,       Value: String(WPMWidget.pos_x) })
     Updates.Push({ Section: "ahk.metrics", Key: WPMWidgetConst.CFG_Y,       Value: String(WPMWidget.pos_y) })
     Updates.Push({ Section: "ahk.metrics", Key: WPMWidgetConst.CFG_COLORS,  Value: WPMWidget.use_colors ? "1" : "0" })
     Updates.Push({ Section: "ahk.metrics", Key: WPMWidgetConst.CFG_GRAPH,   Value: WPMWidget.show_graph  ? "1" : "0" })
-
-    ; [llm] section — runtime state (onboarding flag + per-app overrides).
-    ; The feature-shaped LLM settings (model / profile / generation / trigger /
-    ; navigation) are already emitted by the v2 walker above; we only add
-    ; the runtime-only keys here.
     Updates.Push({ Section: "llm", Key: "onboarding_seen", Value: _LLM_Tray["onboarding_seen"] ? "1" : "0" })
     _AppOverridesStr := ""
     for _AppName, _AppProfileId in _LLM_Tray["app_profile_overrides"] {
-        if (_AppOverridesStr != "")
-            _AppOverridesStr .= ";"
+        if (_AppOverridesStr != "") { _AppOverridesStr .= ";" }
         _AppOverridesStr .= _AppName . "=" . _AppProfileId
     }
     Updates.Push({ Section: "llm", Key: "app_profile_overrides", Value: _AppOverridesStr })
-    if IsSet(_LLM_Tray_AppendPersistedUpdates)
-        _LLM_Tray_AppendPersistedUpdates(Updates)
-
-    ; [ahk.category_enabled] — master category gating state.
+    if IsSet(_LLM_Tray_AppendPersistedUpdates) { _LLM_Tray_AppendPersistedUpdates(Updates) }
     global CategoryEnabled
-    if IsSet(CategoryEnabled) {
-        for _CatName, _CatBool in CategoryEnabled {
-            Updates.Push({ Section: "ahk.category_enabled", Key: _CategoryEnabledKey(_CatName), Value: _CatBool })
-        }
-    }
-
-    ; [ahk.updater] — update channel and background-check cadence.
-    ; Both values live in the updater module's globals and must be written here
-    ; so SaveFullConfig (which rewrites the entire file from scratch) does not
-    ; silently erase the user's chosen frequency after every feature toggle.
-    global UPDATER_CHANNEL, UPDATER_CHECK_INTERVAL
-    global UPDATER_INI_SECTION, UPDATER_INI_KEY, UPDATER_INI_INTERVAL_KEY
-    if IsSet(UPDATER_CHECK_INTERVAL)
-        Updates.Push({ Section: UPDATER_INI_SECTION, Key: UPDATER_INI_INTERVAL_KEY, Value: UPDATER_CHECK_INTERVAL })
-    if IsSet(UPDATER_CHANNEL)
-        Updates.Push({ Section: UPDATER_INI_SECTION, Key: UPDATER_INI_KEY, Value: UPDATER_CHANNEL })
-
-    ; Strict schema: rewrite from scratch so stale/unknown sections and keys
-    ; are removed on each full save.
-    if FileExist(ConfigurationFile) {
-        try FileDelete(ConfigurationFile)
-    }
-
-    PrevCanonState := _TOML_STRICT_CANON_IN_PROGRESS
-    _TOML_STRICT_CANON_IN_PROGRESS := true
-    try TOML_BatchWrite(ConfigurationFile, Updates)
-    finally _TOML_STRICT_CANON_IN_PROGRESS := PrevCanonState
+    if IsSet(CategoryEnabled) { for _CatName, _CatBool in CategoryEnabled { Updates.Push({ Section: "ahk.category_enabled", Key: _CategoryEnabledKey(_CatName), Value: _CatBool }) } }
+    global UPDATER_CHANNEL, UPDATER_CHECK_INTERVAL, UPDATER_INI_SECTION, UPDATER_INI_KEY, UPDATER_INI_INTERVAL_KEY
+    if IsSet(UPDATER_CHECK_INTERVAL) { Updates.Push({ Section: UPDATER_INI_SECTION, Key: UPDATER_INI_INTERVAL_KEY, Value: UPDATER_CHECK_INTERVAL }) }
+    if IsSet(UPDATER_CHANNEL) { Updates.Push({ Section: UPDATER_INI_SECTION, Key: UPDATER_INI_KEY, Value: UPDATER_CHANNEL }) }
+    if FileExist(ConfigurationFile) { try FileDelete(ConfigurationFile) }
+    PrevCanonState := _TOML_STRICT_CANON_IN_PROGRESS; _TOML_STRICT_CANON_IN_PROGRESS := true
+    try { TOML_BatchWrite(ConfigurationFile, Updates) }
+    finally { _TOML_STRICT_CANON_IN_PROGRESS := PrevCanonState }
     TOML_FormatViaScript(ConfigurationFile)
 }
 
-; Features walker — recursively emit ``Features`` (a hierarchical Map produced by
-; ManifestBuildFeaturesMap and patched by the per-section mirrors) as TOML
-; sections in the v2 schema. Each level of Map nesting becomes a deeper
-; section path:
-;   Features["shortcuts"]["microsoft_bold"] = true
-;       -> [shortcuts] microsoft_bold = true
-;   Features["shortcuts"]["gpt"] = Map("enabled"=>true, "link"=>"…")
-;       -> [shortcuts.gpt] enabled = true; link = "…"
-;   Features["hotstrings"]["autocorrection"]["accents"] = Map("enabled"=>true, …)
-;       -> [hotstrings.autocorrection.accents] enabled = true; …
-;
-; Arrays and scalars at the root of Features (e.g. ``section_order``) are
-; skipped — they're manifest metadata, not user-tunable config. The
-; ``ahk.`` prefix that distinguishes AHK-only sections in the manifest is
-; intentionally NOT re-emitted (the v2 reader ApplyConfigToml strips it
-; on input, so round-trip equivalence is preserved without it).
 _CollectFeatureUpdates(Updates, SectionPath, Node) {
-    if (Type(Node) != "Map") {
-        return
-    }
+    if (Type(Node) != "Map") { return }
     for Key, Value in Node {
-        ; Skip manifest-only metadata at the top level (e.g. section_order array).
-        if (SectionPath == "" and Type(Value) != "Map") {
-            continue
-        }
+        if (SectionPath == "" and Type(Value) != "Map") { continue }
         Sub := (SectionPath == "") ? Key : SectionPath "." Key
-        if (Type(Value) == "Map") {
-            _CollectFeatureUpdates(Updates, Sub, Value)
-        } else {
-            Updates.Push({ Section: SectionPath, Key: Key, Value: Value })
-        }
+        if (Type(Value) == "Map") { _CollectFeatureUpdates(Updates, Sub, Value) }
+        else { Updates.Push({ Section: SectionPath, Key: Key, Value: Value }) }
     }
 }
 
 ReloadWithDefaultConfig(*) {
-    global _ConfigDir, _AhkSubDir
-    ; « Valeurs par défaut » must restore the FULL factory state, not only the
-    ; feature toggles. Three separate per-user files hold configurable state, all
-    ; under _ConfigDir\autohotkey\:
-    ;   - config.toml      → features, layout, shortcuts, gestures, LLM scalars,
-    ;                        metrics (regenerated from the shipped template).
-    ;   - tap_hold.toml    → tap/hold key assignments (regenerated from defaults).
-    ;   - api_entries.json → LLM remote endpoints + DPAPI-encrypted tokens
-    ;                        (absent file reads back as an empty list).
-    ; Deleting only config.toml left tap-holds and API entries on disk, so they
-    ; survived the reset — which is exactly the « ça réinitialise que les toggles »
-    ; complaint. Remove all three together, then reload.
-    _GlobalRestoreFactoryBindings()
+    global _ConfigDir, _AhkSubDir; _GlobalRestoreFactoryBindings()
     AhkDir := _ConfigDir . _AhkSubDir
     for FileName in ["config.toml", "tap_hold.toml", "api_entries.json"] {
         Path := AhkDir . FileName
-        try {
-            if FileExist(Path) {
-                FileDelete(Path)
-            }
-        } catch as Err {
-            try LoggerError("GlobalReset", "Could not delete {1}: {2}.", FileName, Err.Message)
-        }
+        try { if FileExist(Path) { FileDelete(Path) } }
     }
     Reload
 }
 
-; Read the user's per-slot action overrides from the config's
-; [ahk.shortcuts.script_control] section. Defaults stay in place when the
-; key is absent or the action name is unknown. Called once at boot from
-; initMenu's preamble.
 ReadScriptShortcutsConfig() {
     global ScriptShortcutAssignments, SCRIPT_SHORTCUT_SLOTS, _IniCache, GESTURE_ACTIONS
     for Slot in SCRIPT_SHORTCUT_SLOTS {
         Value := IniCacheGet(_IniCache, "ahk.shortcuts.script_control", Slot)
-        if (Value != "_" and (Value == "none" or GESTURE_ACTIONS.Has(Value))) {
+        if (Value != "_" and (Value == "none" or GESTURE_ACTIONS.Has(Value)))
             ScriptShortcutAssignments[Slot] := Value
-        }
     }
 }
 
-; Clean up after a script-management combo (AltGr+Enter/BackSpace/Delete/Escape)
-; has fired its action. Two problems are solved here, and ONLY together — fixing
-; one without the other reintroduces the other:
-;
-;   1. Stuck prefix: on an AltGr-as-Kana driver remap (_ALTGR_KANA_FIXUP) SC138
-;      IS the Kana virtual key, kept by AHK as the held prefix for the
-;      "S"-suspend-exempt script combos. After the un-suspend action the
-;      layout's SC138 hotkeys come back on with that prefix still latched, so
-;      every following keystroke lands on the AltGr/Kana layer (« AltGr bloqué »).
-;      We clear it by injecting an SC138 up.
-;   2. Leaked suffix: the custom combo already suppresses the suffix key-down,
-;      but injecting the SC138 up WHILE the suffix is still physically held makes
-;      AHK replay that suppressed key into the app — the « ça envoie enter puis
-;      sort de la pause » bug. So we first wait (bounded) for the suffix to
-;      physically lift, and only inject the prefix release once it is confirmed
-;      up. If the wait times out with the key still down we skip the inject — a
-;      possibly-latched prefix (one AltGr tap to clear) is far less bad than a
-;      stray Enter/BackSpace landing in the document.
-;
-; On non-Kana layouts the prefix is physical RAlt; nothing is injected and
-; natural key release already does the right thing, so this is a no-op.
 ResetScriptComboKeys(SuffixSC) {
     global _ALTGR_KANA_FIXUP
-    if !(IsSet(_ALTGR_KANA_FIXUP) and _ALTGR_KANA_FIXUP) {
-        return
-    }
+    if !(IsSet(_ALTGR_KANA_FIXUP) and _ALTGR_KANA_FIXUP) { return }
     KeyWait(SuffixSC, "T2")
-    if !GetKeyState(SuffixSC, "P") {
-        SendEvent("{SC138 Up}")
-    }
+    if !GetKeyState(SuffixSC, "P") { SendEvent("{SC138 Up}") }
 }
 
-; Dispatch the configured action for a script-shortcut slot. ``none`` lets the
-; underlying key fall through (the hotkey handler already SendInputs the
-; fallback in its else-branch — here we additionally return early so a slot
-; explicitly set to "none" produces no action at all).
 RunScriptShortcutAction(Slot) {
     global ScriptShortcutAssignments, GESTURE_ACTIONS, SCRIPT_SHORTCUT_FALLBACKS
     Action := ScriptShortcutAssignments.Has(Slot) ? ScriptShortcutAssignments[Slot] : "none"
-    if (Action == "none") {
-        SendInput(SCRIPT_SHORTCUT_FALLBACKS[Slot])
-        return
-    }
-    if !GESTURE_ACTIONS.Has(Action) {
-        try LoggerWarn("ScriptShortcuts", "Unknown action '{1}' for slot {2} — falling back.",
-            Action, Slot)
-        SendInput(SCRIPT_SHORTCUT_FALLBACKS[Slot])
-        return
-    }
+    if (Action == "none") { SendInput(SCRIPT_SHORTCUT_FALLBACKS[Slot]); return }
+    if !GESTURE_ACTIONS.Has(Action) { SendInput(SCRIPT_SHORTCUT_FALLBACKS[Slot]); return }
     GESTURE_ACTIONS[Action].Fn.Call()
 }
 
-; Persist a single slot assignment and reload so the new binding is picked up
-; by the tray menu hints and by future hotkey firings.
 SetScriptShortcutAction(Slot, ActionName) {
     global ScriptShortcutAssignments, ConfigurationFile
     ScriptShortcutAssignments[Slot] := ActionName
@@ -1933,100 +1451,49 @@ SetScriptShortcutAction(Slot, ActionName) {
     Reload
 }
 
-; Build the « Raccourcis de gestion du script » submenu — one entry per slot,
-; each opening a lazy GUI picker so the user can rebind the AltGr+ combos.
 BuildScriptShortcutsMenu() {
     global SCRIPT_SHORTCUT_SLOTS, SCRIPT_SHORTCUT_LABELS, ScriptShortcutAssignments, GESTURE_ACTIONS
-
     SMenu := Menu()
-    ; Each slot becomes a single clickable item that opens a lazy GUI picker —
-    ; avoids pre-building a submenu with all actions for every slot.
     for Slot in SCRIPT_SHORTCUT_SLOTS {
-        Current      := ScriptShortcutAssignments.Has(Slot) ? ScriptShortcutAssignments[Slot] : "none"
+        Current := ScriptShortcutAssignments.Has(Slot) ? ScriptShortcutAssignments[Slot] : "none"
         CurrentLabel := GESTURE_ACTIONS.Has(Current) ? _GestureActionLabel(Current) : t("dialog.action_picker.disabled")
-        SlotLabel    := SCRIPT_SHORTCUT_LABELS[Slot]
-        ; RegisterMenuItem (not raw SMenu.Add) routes the click through the
-        ; WM_COMMAND retry dispatcher. Raw SMenu.Add inherits AHK 2.0's flaky
-        ; native menu dispatch, which silently drops the click so the action
-        ; picker never opens — exactly the gesture-slot pattern at GMenu.
-        RegisterMenuItem(SMenu, SlotLabel . " : " . CurrentLabel,
-            ((_s, _l) => (*) => ShowActionPicker(_l, ScriptShortcutAssignments.Has(_s) ? ScriptShortcutAssignments[_s] : "none", (Id) => SetScriptShortcutAction(_s, Id)))(Slot, SlotLabel))
+        SlotLabel := SCRIPT_SHORTCUT_LABELS[Slot]
+        RegisterMenuItem(SMenu, SlotLabel . " : " . CurrentLabel, ((_s, _l) => (*) => ShowActionPicker(_l, ScriptShortcutAssignments.Has(_s) ? ScriptShortcutAssignments[_s] : "none", (Id) => SetScriptShortcutAction(_s, Id)))(Slot, SlotLabel))
     }
     return SMenu
 }
 
-; ============================================================
-; ============================================================
-; ======= Keyboard Shortcuts — configurable Ctrl/Win/Alt =======
-; ============================================================
-; ============================================================
-
-; Derive the AHK send-code for a slot id from its suffix when not in the
-; explicit override table. "win_a" → "#a", "ctrl_0" → "^0", "alt_space" → "!{Space}".
 _KeyboardSlotSendCode(SlotId) {
     global KEYBOARD_SHORTCUT_SEND_CODES
-    if KEYBOARD_SHORTCUT_SEND_CODES.Has(SlotId)
-        return KEYBOARD_SHORTCUT_SEND_CODES[SlotId]
-    ; Derive from slot id: "win_<key>", "ctrl_<key>", "ctrl_shift_<key>", "alt_<key>"
-    if SubStr(SlotId, 1, 10) = "ctrl_shift"
-        Mod := "^+"
-    else if SubStr(SlotId, 1, 4) = "ctrl"
-        Mod := "^"
-    else if SubStr(SlotId, 1, 3) = "win"
-        Mod := "#"
-    else if SubStr(SlotId, 1, 3) = "alt"
-        Mod := "!"
-    else
-        return ""
-    ; Extract suffix after last underscore group
-    if SubStr(SlotId, 1, 10) = "ctrl_shift"
-        Suffix := SubStr(SlotId, 12)
-    else
-        Suffix := SubStr(SlotId, InStr(SlotId, "_") + 1)
-    ; Map special suffix names to AHK key strings
-    static _SpecialMap := Map(
-        "space", "{Space}", "enter", "{Enter}",
-        "period", ".", "comma", ",", "sc029", "SC029"
-    )
-    if _SpecialMap.Has(Suffix)
-        return Mod . _SpecialMap[Suffix]
-    return Mod . Suffix
+    if KEYBOARD_SHORTCUT_SEND_CODES.Has(SlotId) { return KEYBOARD_SHORTCUT_SEND_CODES[SlotId] }
+    if SubStr(SlotId, 1, 10) = "ctrl_shift" { Mod := "^+" }
+    else if SubStr(SlotId, 1, 4) = "ctrl" { Mod := "^" }
+    else if SubStr(SlotId, 1, 3) = "win" { Mod := "#" }
+    else if SubStr(SlotId, 1, 3) = "alt" { Mod := "!" }
+    else { return "" }
+    if SubStr(SlotId, 1, 10) = "ctrl_shift" { Suffix := SubStr(SlotId, 12) }
+    else { Suffix := SubStr(SlotId, InStr(SlotId, "_") + 1) }
+    static _SpecialMap := Map("space", "{Space}", "enter", "{Enter}", "period", ".", "comma", ",", "sc029", "SC029")
+    return _SpecialMap.Has(Suffix) ? Mod . _SpecialMap[Suffix] : Mod . Suffix
 }
 
-; Read per-slot action overrides from [ahk.shortcuts.keyboard] in the v2 config TOML.
 ReadKeyboardShortcutsConfig() {
     global KeyboardShortcutAssignments, KEYBOARD_SHORTCUT_DEFAULTS, _IniCache, GESTURE_ACTIONS
-    LoggerStart("KeyboardShortcuts", "Chargement des raccourcis clavier configurables…")
-    ; Seed with defaults first
-    for Slot, Action in KEYBOARD_SHORTCUT_DEFAULTS
-        KeyboardShortcutAssignments[Slot] := Action
-    ; Apply any user overrides persisted in the TOML
-    OverrideCount := 0
+    for Slot, Action in KEYBOARD_SHORTCUT_DEFAULTS { KeyboardShortcutAssignments[Slot] := Action }
     for Slot, _ in KEYBOARD_SHORTCUT_DEFAULTS {
         Value := IniCacheGet(_IniCache, "ahk.shortcuts.keyboard", Slot)
-        if (Value != "_" and (Value == "none" or GESTURE_ACTIONS.Has(Value))) {
+        if (Value != "_" and (Value == "none" or GESTURE_ACTIONS.Has(Value)))
             KeyboardShortcutAssignments[Slot] := Value
-            OverrideCount++
-            LoggerDebug("KeyboardShortcuts", "TOML override: '%s' → '%s'.", Slot, Value)
-        }
     }
-    LoggerSuccess("KeyboardShortcuts", "Keyboard shortcuts loaded (%d default(s), %d override(s)).",
-        KEYBOARD_SHORTCUT_DEFAULTS.Count, OverrideCount)
 }
 
-; Execute the configured action for a keyboard shortcut slot.
 RunKeyboardShortcutAction(SlotId) {
     global KeyboardShortcutAssignments, GESTURE_ACTIONS
     Action := KeyboardShortcutAssignments.Has(SlotId) ? KeyboardShortcutAssignments[SlotId] : "none"
-    if (Action == "none" or !GESTURE_ACTIONS.Has(Action)) {
-        LoggerDebug("KeyboardShortcuts", "Shortcut '%s' skipped (action: '%s').", SlotId, Action)
-        return
-    }
-    LoggerDebug("KeyboardShortcuts", "Shortcut '%s' → '%s' triggered.", SlotId, Action)
+    if (Action == "none" or !GESTURE_ACTIONS.Has(Action)) { return }
     GESTURE_ACTIONS[Action].Fn.Call()
 }
 
-; Persist a slot assignment and reload.
 SetKeyboardShortcutAction(SlotId, ActionName) {
     global KeyboardShortcutAssignments, ConfigurationFile
     KeyboardShortcutAssignments[SlotId] := ActionName
@@ -2034,777 +1501,219 @@ SetKeyboardShortcutAction(SlotId, ActionName) {
     Reload
 }
 
-_MakeKeyboardShortcutHandler(SlotId, ActionName) {
-    return (*) => SetKeyboardShortcutAction(SlotId, ActionName)
-}
+_MakeKeyboardShortcutHandler(SlotId, ActionName) { return (*) => SetKeyboardShortcutAction(SlotId, ActionName) }
 
-; Convert a slot id to a human-readable label: "ctrl_shift_a" → "Ctrl + Shift + A".
 _FormatSlotLabel(SlotId) {
-    static _ModLabels := Map(
-        "ctrl_shift_", "Ctrl + Shift + ",
-        "ctrl_",       "Ctrl + ",
-        "win_",        "Win + ",
-        "alt_",        "Alt + ",
-    )
-    static _KeyNames := Map(
-        "space",  "Espace",
-        "enter",  "Entrée",
-        "period", ".",
-        "comma",  ",",
-        "sc029",  "²",
-    )
+    static _ModLabels := Map("ctrl_shift_", "Ctrl + Shift + ", "ctrl_", "Ctrl + ", "win_", "Win + ", "alt_", "Alt + ")
+    static _KeyNames := Map("space", "Espace", "enter", "Entrée", "period", ".", "comma", ",", "sc029", "²")
     for Prefix, ModLabel in _ModLabels {
         if (SubStr(SlotId, 1, StrLen(Prefix)) = Prefix) {
-            Suffix := SubStr(SlotId, StrLen(Prefix) + 1)
-            Key := _KeyNames.Has(Suffix) ? _KeyNames[Suffix] : StrUpper(Suffix)
+            Suffix := SubStr(SlotId, StrLen(Prefix) + 1); Key := _KeyNames.Has(Suffix) ? _KeyNames[Suffix] : StrUpper(Suffix)
             return ModLabel . Key
         }
     }
     return SlotId
 }
 
-; Build the "⌨️ Raccourcis clavier" submenu.
-; Inserts the four keyboard shortcut groups (Win/Ctrl/Ctrl+Shift/Alt) into
-; TargetMenu just before the item named InsertBefore.
-; Each group shows only assigned slots plus an "Ajouter…" item.
-; Clicking any item opens a lightweight GUI picker — no nested submenus built
-; up-front (which caused ~2 min load time on a 300+ slot map).
 InsertKeyboardShortcutGroups(TargetMenu, InsertBefore) {
     global KeyboardShortcutAssignments, GESTURE_ACTIONS
-    LoggerStart("KeyboardShortcutsMenu", "Insertion des groupes de raccourcis clavier…")
-
     _Groups := [
-        Map("prefix", "alt_",        "label", t("menu.shortcuts.alt_group"),        "add_label", t("menu.shortcuts.alt_add")),
-        Map("prefix", "ctrl_",       "label", t("menu.shortcuts.ctrl_group"),       "add_label", t("menu.shortcuts.ctrl_add")),
+        Map("prefix", "alt_", "label", t("menu.shortcuts.alt_group"), "add_label", t("menu.shortcuts.alt_add")),
+        Map("prefix", "ctrl_", "label", t("menu.shortcuts.ctrl_group"), "add_label", t("menu.shortcuts.ctrl_add")),
         Map("prefix", "ctrl_shift_", "label", t("menu.shortcuts.ctrl_shift_group"), "add_label", t("menu.shortcuts.ctrl_shift_add")),
-        Map("prefix", "win_",        "label", t("menu.shortcuts.win_group"),        "add_label", t("menu.shortcuts.win_add")),
+        Map("prefix", "win_", "label", t("menu.shortcuts.win_group"), "add_label", t("menu.shortcuts.win_add")),
     ]
-
-    ; Build all group menus first, then insert in reverse order so the final
-    ; menu order matches _Groups (Insert always places before InsertBefore).
-    AssignedCount := 0
     GroupMenus := []
     for GroupInfo in _Groups {
-        Prefix   := GroupInfo["prefix"]
-        GLabel   := GroupInfo["label"]
-        AddLabel := GroupInfo["add_label"]
-        GMenu    := Menu()
-
-        ; Only show slots that have a non-none assignment
+        Prefix := GroupInfo["prefix"]; GLabel := GroupInfo["label"]; AddLabel := GroupInfo["add_label"]; GMenu := Menu()
         for Slot, Action in KeyboardShortcutAssignments {
-            if (SubStr(Slot, 1, StrLen(Prefix)) != Prefix)
-                continue
-            ; Ensure exact prefix match — e.g. "ctrl_shift_v" must not appear under "ctrl_"
-            ; because "ctrl_shift_" is a longer prefix that matches first.
+            if (SubStr(Slot, 1, StrLen(Prefix)) != Prefix) { continue }
             IsExactPrefix := true
             for OtherGroup in _Groups {
                 OtherPrefix := OtherGroup["prefix"]
-                if (OtherPrefix != Prefix and StrLen(OtherPrefix) > StrLen(Prefix)
-                    and SubStr(Slot, 1, StrLen(OtherPrefix)) == OtherPrefix) {
-                    IsExactPrefix := false
-                    break
-                }
+                if (OtherPrefix != Prefix and StrLen(OtherPrefix) > StrLen(Prefix) and SubStr(Slot, 1, StrLen(OtherPrefix)) == OtherPrefix) { IsExactPrefix := false; break }
             }
-            if !IsExactPrefix
-                continue
-            if (Action == "none")
-                continue
+            if !IsExactPrefix or (Action == "none") { continue }
             ActionLabel := GESTURE_ACTIONS.Has(Action) ? _GestureActionLabel(Action) : Action
-            SlotDisplay := _FormatSlotLabel(Slot) . " : " . ActionLabel
-            GMenu.Add(SlotDisplay, ((_s) => (*) => ShowKeyboardShortcutPicker(_s))(Slot))
-            AssignedCount++
+            GMenu.Add(_FormatSlotLabel(Slot) . " : " . ActionLabel, ((_s) => (*) => ShowKeyboardShortcutPicker(_s))(Slot))
         }
-
-        ; "Add shortcut" item — opens picker with full slot list for this prefix
         GMenu.Add(AddLabel, ((_p) => (*) => ShowKeyboardSlotPicker(_p))(Prefix))
-
         GroupMenus.Push(Map("label", GLabel, "menu", GMenu))
     }
-
-    ; Insert separator first (it ends up just before the block after reversal)
     TargetMenu.Insert(InsertBefore)
-    ; Insert groups in reverse so final order is Alt / Ctrl / Ctrl+Shift / Win
     loop GroupMenus.Length {
         Idx := GroupMenus.Length - A_Index + 1
         TargetMenu.Insert(InsertBefore, GroupMenus[Idx]["label"], GroupMenus[Idx]["menu"])
     }
-
-    LoggerSuccess("KeyboardShortcutsMenu", "Groups inserted (%d active shortcut(s)).", AssignedCount)
 }
 
-; Open a two-step GUI: first pick the key slot, then pick the action.
-; Called when the user clicks "Ajouter…" for a modifier group.
 ShowKeyboardSlotPicker(Prefix) {
-    global GESTURE_ACTIONS
-
-    ; Collect all valid slots for this prefix from GESTURE_ACTIONS
-    Slots := []
+    global GESTURE_ACTIONS; Slots := []
     static _SpecialOrder := ["space", "enter", "period", "comma", "sc029"]
-    ; Letters first (a-z)
     Letters := "abcdefghijklmnopqrstuvwxyz"
-    loop StrLen(Letters) {
-        L := SubStr(Letters, A_Index, 1)
-        SlotId := Prefix . L
-        if GESTURE_ACTIONS.Has(SlotId)
-            Slots.Push(SlotId)
-    }
-    ; Digits 0-9
-    loop 10 {
-        D := SubStr("0123456789", A_Index, 1)
-        SlotId := Prefix . D
-        if GESTURE_ACTIONS.Has(SlotId)
-            Slots.Push(SlotId)
-    }
-    ; Special keys
-    for Sk in _SpecialOrder {
-        SlotId := Prefix . Sk
-        if GESTURE_ACTIONS.Has(SlotId)
-            Slots.Push(SlotId)
-    }
-
-    if (Slots.Length = 0)
-        return
-
-    ; Build display labels for the ListBox
+    loop StrLen(Letters) { SlotId := Prefix . SubStr(Letters, A_Index, 1); if GESTURE_ACTIONS.Has(SlotId) { Slots.Push(SlotId) } }
+    loop 10 { SlotId := Prefix . SubStr("0123456789", A_Index, 1); if GESTURE_ACTIONS.Has(SlotId) { Slots.Push(SlotId) } }
+    for Sk in _SpecialOrder { SlotId := Prefix . Sk; if GESTURE_ACTIONS.Has(SlotId) { Slots.Push(SlotId) } }
+    if (Slots.Length = 0) { return }
     SlotLabels := []
-    for SlotId in Slots
-        SlotLabels.Push(_GestureActionLabel(SlotId))
-
+    for SlotId in Slots { SlotLabels.Push(_GestureActionLabel(SlotId)) }
     W := Gui_Create("+AlwaysOnTop", t("dialog.keyboard_shortcut.title_prefix") . Prefix)
-    W.SetFont("s10", "Segoe UI")
-    W.MarginX := 12
-    W.MarginY := 12
+    W.SetFont("s10", "Segoe UI"); W.MarginX := 12; W.MarginY := 12
     W.Add("Text", "xm", t("dialog.keyboard_shortcut.prompt"))
     LB := W.Add("ListBox", "xm w320 r16", SlotLabels)
     W.Add("Button", "xm w80", t("button.ok")).OnEvent("Click", PickSlot)
     W.Add("Button", "x+6 w80", t("button.cancel")).OnEvent("Click", (*) => W.Destroy())
     W.Show()
-
     PickSlot(*) {
-        Idx := LB.Value
-        if (Idx = 0)
-            return
-        W.Destroy()
-        ShowKeyboardShortcutPicker(Slots[Idx])
+        Idx := LB.Value; if (Idx = 0) { return }
+        W.Destroy(); ShowKeyboardShortcutPicker(Slots[Idx])
     }
 }
 
-; Generic action picker GUI — shows a searchable list of all available actions.
-; Title     : window title string
-; Current    : currently assigned action id (or "none")
-; OnConfirm  : callback(ActionId) called when the user validates their pick
-; ShowNative : when true, prepend a "Natif" entry (id="") that clears the tap action
 ShowActionPicker(Title, Current, OnConfirm, ShowNative := false) {
-    global GESTURE_ACTION_NAMES, GESTURE_ACTIONS
-    LoggerStart("ActionPicker", "Opening action picker '%s'…", Title)
-
-    ; Build the source data: parallel arrays of ids and display labels.
-    ; Category headers are stored with id="" so ConfirmPick can ignore them.
-    ; AllItems holds {Id, Label, Cat} for re-filtering with category re-injection.
-    AllItems    := []  ; [{Id, Label, Cat}] — action rows only (no header rows)
-
-    _PushItem(Id, Label, Cat) {
-        AllItems.Push({ Id: Id, Label: Label, Cat: Cat })
-    }
-
-    ; "Natif" entry — only for tap-hold pickers where the physical key behaviour is meaningful
-    if ShowNative
-        _PushItem("__native__", t("tap_hold.tap.none"), "")
-    ; "∅ Rien" entry — absorbs the tap (no-op action), always before any group
+    global GESTURE_ACTION_NAMES, GESTURE_ACTIONS; AllItems := []
+    _PushItem(Id, Label, Cat) { AllItems.Push({ Id: Id, Label: Label, Cat: Cat }) }
+    if ShowNative { _PushItem("__native__", t("tap_hold.tap.none"), "") }
     _PushItem("none", t("dialog.action_picker.disabled"), "")
-
     CurrentCat := ""
     for ActionName in GESTURE_ACTION_NAMES {
-        if (ActionName == "--")
-            continue
-        ; "none" is already pushed above — skip it to avoid a duplicate entry
-        if (ActionName == "none")
-            continue
+        if (ActionName == "--" or ActionName == "none") { continue }
         if (SubStr(ActionName, 1, 1) = "#") {
-            ; Header keys are i18n keys (e.g. "#mouse_nav" → "sg_actions.sg_order.header.mouse_nav").
-            ; The i18n value itself starts with "#" (e.g. "#Souris et Navigation") — strip it.
             local TranslatedHeader := t("sg_actions.sg_order.header." . SubStr(ActionName, 2))
-            CurrentCat := SubStr(TranslatedHeader, 1, 1) = "#" ? SubStr(TranslatedHeader, 2) : TranslatedHeader
-            continue
+            CurrentCat := SubStr(TranslatedHeader, 1, 1) = "#" ? SubStr(TranslatedHeader, 2) : TranslatedHeader; continue
         }
-        if !GESTURE_ACTIONS.Has(ActionName)
-            continue
-        _PushItem(ActionName, _GestureActionLabel(ActionName), CurrentCat)
+        if GESTURE_ACTIONS.Has(ActionName) { _PushItem(ActionName, _GestureActionLabel(ActionName), CurrentCat) }
     }
-
-    ; Rebuilds the ListBox from a filtered subset of AllItems, injecting
-    ; category headers before the first item of each group.
-    ; Returns the parallel FilteredIds array for ConfirmPick lookups.
     BuildListRows(Items) {
-        Ids    := []
-        Labels := []
-        LastCat := Chr(0)  ; sentinel that can't match any real category
+        Ids := []; Labels := []; LastCat := Chr(0)
         for Item in Items {
-            if (Item.Cat != "" and Item.Cat != LastCat) {
-                Ids.Push("")              ; header is not selectable
-                Labels.Push("▸ " . Item.Cat)
-                LastCat := Item.Cat
-            }
-            Ids.Push(Item.Id)
-            Labels.Push("    " . Item.Label)
+            if (Item.Cat != "" and Item.Cat != LastCat) { Ids.Push(""); Labels.Push("▸ " . Item.Cat); LastCat := Item.Cat }
+            Ids.Push(Item.Id); Labels.Push("    " . Item.Label)
         }
         return { Ids: Ids, Labels: Labels }
     }
-
-    Rows        := BuildListRows(AllItems)
-    FilteredIds := Rows.Ids
-
-    ; Pre-select current action ("" means native → map to __native__ sentinel for lookup)
-    SelectedIdx := 0
-    LookupId    := (Current == "") ? "__native__" : Current
-    for i, Id in FilteredIds {
-        if (Id == LookupId) {
-            SelectedIdx := i
-            break
-        }
-    }
-
-    W := Gui_Create("+AlwaysOnTop", Title)
-    W.SetFont("s10", "Segoe UI")
-    W.MarginX := 12
-    W.MarginY := 12
+    Rows := BuildListRows(AllItems); FilteredIds := Rows.Ids; SelectedIdx := 0; LookupId := (Current == "") ? "__native__" : Current
+    for i, Id in FilteredIds { if (Id == LookupId) { SelectedIdx := i; break } }
+    W := Gui_Create("+AlwaysOnTop", Title); W.SetFont("s10", "Segoe UI"); W.MarginX := 12; W.MarginY := 12
     W.Add("Text", "xm", t("dialog.action_picker.label"))
-
-    SearchEdit  := W.Add("Edit", "xm w340")
-    LB          := W.Add("ListBox", "xm w340 r20", Rows.Labels)
-    if (SelectedIdx > 0)
-        LB.Choose(SelectedIdx)
-
+    SearchEdit := W.Add("Edit", "xm w340"); LB := W.Add("ListBox", "xm w340 r20", Rows.Labels)
+    if (SelectedIdx > 0) { LB.Choose(SelectedIdx) }
     W.Add("Button", "xm w80", t("button.ok")).OnEvent("Click", ConfirmPick)
     W.Add("Button", "x+6 w80", t("button.cancel")).OnEvent("Click", (*) => W.Destroy())
-    W.Show()
-
-    SearchEdit.OnEvent("Change", FilterList)
-
+    W.Show(); SearchEdit.OnEvent("Change", FilterList)
     FilterList(*) {
-        Query       := StrLower(SearchEdit.Value)
-        Matched     := []
-        if (Query == "") {
-            Matched := AllItems
-        } else {
-            for Item in AllItems {
-                if InStr(StrLower(Item.Label), Query)
-                    Matched.Push(Item)
-            }
-        }
-        NewRows     := BuildListRows(Matched)
-        FilteredIds := NewRows.Ids
-        LB.Delete()
-        LB.Add(NewRows.Labels)
-        ; Skip headers when pre-selecting first result
-        for i, Id in FilteredIds {
-            if (Id != "") {
-                LB.Choose(i)
-                break
-            }
-        }
+        Query := StrLower(SearchEdit.Value); Matched := []
+        if (Query == "") { Matched := AllItems } else { for Item in AllItems { if InStr(StrLower(Item.Label), Query) { Matched.Push(Item) } } }
+        NewRows := BuildListRows(Matched); FilteredIds := NewRows.Ids; LB.Delete(); LB.Add(NewRows.Labels)
+        for i, Id in FilteredIds { if (Id != "") { LB.Choose(i); break } }
     }
-
     ConfirmPick(*) {
-        Idx := LB.Value
-        if (Idx = 0)
-            return
-        ChosenId := FilteredIds[Idx]
-        ; Ignore clicks on category headers (id="" marks a non-selectable header row)
-        if (ChosenId == "")
-            return
-        W.Destroy()
-        ; "__native__" sentinel clears the tap action so the key passes through to the OS
-        ResolvedId := (ChosenId == "__native__") ? "" : ChosenId
-        LoggerSuccess("ActionPicker", "Selection confirmed → '%s'.", ResolvedId)
-        OnConfirm(ResolvedId)
+        Idx := LB.Value; if (Idx = 0) { return }
+        ChosenId := FilteredIds[Idx]; if (ChosenId == "") { return }
+        W.Destroy(); OnConfirm((ChosenId == "__native__") ? "" : ChosenId)
     }
 }
 
-; Open a GUI to pick an action for a keyboard shortcut slot.
-; Used both from the "Ajouter…" flow and from clicking an existing slot.
 ShowKeyboardShortcutPicker(SlotId) {
-    global KeyboardShortcutAssignments, GESTURE_ACTIONS
-    Current      := KeyboardShortcutAssignments.Has(SlotId) ? KeyboardShortcutAssignments[SlotId] : "none"
-    SlotDisplay  := _GestureActionLabel(SlotId)
-    ShowActionPicker(t("dialog.keyboard_shortcut.title_prefix") . SlotDisplay, Current, (Id) => SetKeyboardShortcutAction(SlotId, Id))
+    global KeyboardShortcutAssignments; Current := KeyboardShortcutAssignments.Has(SlotId) ? KeyboardShortcutAssignments[SlotId] : "none"
+    ShowActionPicker(t("dialog.keyboard_shortcut.title_prefix") . _GestureActionLabel(SlotId), Current, (Id) => SetKeyboardShortcutAction(SlotId, Id))
 }
 
 FilePathsEditor(*) {
-    global _ConfigDir, _PathsFile
-
-    W := Gui(, t("dialog.config_folder.title"))
-    W.SetFont("s10", "Segoe UI")
-    W.MarginX := 12
-    W.MarginY := 12
-
-    W.Add("Text", "xm w400", t("dialog.config_folder.label"))
-    ; Display path with forward slashes for readability
-    DirEdit := W.Add("Edit", "xm w400", StrReplace(_ConfigDir, "\", "/"))
-    W.Add("Button", "xm y+6 w80", t("common.browse")).OnEvent("Click", BrowseDir)
-
-    W.Add("Text", "xm y+14 cGray w400", t("dialog.config_folder.hint"))
-
-    W.Add("Button", "x162 y+10 w100 Default", t("button.ok")).OnEvent("Click", SaveConfigDir)
-
-    BrowseDir(*) {
-        ; Start from the current field value if it exists, otherwise fall back to
-        ; My Documents so the dialog opens somewhere useful rather than the script root.
-        StartDir := StrReplace(Trim(DirEdit.Value), "/", "\")
-        if (StartDir == "" or !DirExist(StartDir)) {
-            StartDir := A_MyDocuments
-        }
-        Selected := DirSelect("*" . StartDir, 1, t("dialog.config_folder.select_title"))
-        if (Selected != "") {
-            Selected := StrReplace(Selected, "\", "/")
-            if !RegExMatch(Selected, "/$")
-                Selected .= "/"
-            DirEdit.Value := Selected
-        }
-    }
-
-    SaveConfigDir(*) {
-        global _ConfigDir, _DefaultConfigDir, _PathsFile, ScriptInformation, ConfigurationFile
-
-        NewDir := StrReplace(Trim(DirEdit.Value), "/", "\")
-        if (NewDir == "") {
-            NewDir := _DefaultConfigDir
-        } else if !RegExMatch(NewDir, "\\$") {
-            NewDir .= "\"
-        }
-
-        W.Destroy()
-
-        if (NewDir == _ConfigDir)
-            return
-
-        ; Persist the new config dir into paths.toml
-        ; Ensure the parent folder exists — in compiled mode _PathsFile lives in
-        ; %APPDATA%\Ergopti\ which may not have been created yet on this machine.
-        try DirCreate(SubStr(_PathsFile, 1, InStr(_PathsFile, "\", , -1) - 1))
-        try {
-            f := FileOpen(_PathsFile, "w", "UTF-8")
-            if f {
-                DefaultDirFwd := StrReplace(_DefaultConfigDir, "\", "/")
-                NewDirFwd := StrReplace(NewDir, "\", "/")
-                f.Write("# Custom paths — auto-generated by ErgoptiPlus.`r`n")
-                f.Write("# Edit this file to point to your personal configuration folder.`r`n")
-                f.Write("# If absent or commented out, files are looked up in: " . DefaultDirFwd . "`r`n")
-                f.Write("`r`n")
-                if (NewDir != _DefaultConfigDir) {
-                    f.Write('ConfigDirPath = "' . NewDirFwd . '"`r`n')
-                } else {
-                    f.Write('# ConfigDirPath = "' . DefaultDirFwd . '"`r`n')
-                }
-                f.Close()
-            }
-        }
-
-        Reload
-    }
-
+    global _ConfigDir, _PathsFile; W := Gui(, t("dialog.config_folder.title")); W.SetFont("s10", "Segoe UI"); W.MarginX := 12; W.MarginY := 12
+    W.Add("Text", "xm w400", t("dialog.config_folder.label")); DirEdit := W.Add("Edit", "xm w400", StrReplace(_ConfigDir, "\", "/"))
+    W.Add("Button", "xm y+6 w80", t("common.browse")).OnEvent("Click", (*) => ( (S := DirSelect("*" . StrReplace(Trim(DirEdit.Value), "/", "\"), 1, t("dialog.config_folder.select_title"))) != "" ? DirEdit.Value := StrReplace(S, "\", "/") : 0 ))
+    W.Add("Button", "x162 y+10 w100 Default", t("button.ok")).OnEvent("Click", (*) => ( (N := StrReplace(Trim(DirEdit.Value), "/", "\")) == "" ? N := _DefaultConfigDir : 0, !RegExMatch(N, "\\$") ? N .= "\" : 0, (N != _ConfigDir ? (try DirCreate(SubStr(_PathsFile, 1, InStr(_PathsFile, "\", , -1) - 1)), (f := FileOpen(_PathsFile, "w", "UTF-8")) ? (f.Write("# Custom paths`r`nConfigDirPath = `"" . StrReplace(N, "\", "/") . "`"`r`n"), f.Close()) : 0, Reload()) : W.Destroy()) ))
     W.Show("Center")
 }
 
-ActivateEdit(*) {
-    Edit
-}
-
+ActivateEdit(*) { Edit() }
 ToggleSuspend(*) {
-    global _LastSuspendState, _ALTGR_KANA_FIXUP
-    if A_IsSuspended {
-        Suspend(0)
-    } else {
-        ; Keyboard-combo pause: SC138 (the Kana AltGr prefix) is physically held.
-        ; Wait for it to lift BEFORE suspending so the still-live AltGr layer sees
-        ; the release and clears its custom-combination prefix flag. Suspending
-        ; while SC138 is down strands that flag set — its release then lands while
-        ; the layer is disarmed — surfacing as « AltGr bloqué » after a menu/gesture
-        ; resume. A synthetic tap cannot clear it (only a real release does), so we
-        ; prevent the latch here instead. The guard makes a menu/gesture pause
-        ; (SC138 already up) suspend with no delay; T1 bounds the wait so a stuck
-        ; key can never hang the toggle.
-        if (IsSet(_ALTGR_KANA_FIXUP) and _ALTGR_KANA_FIXUP and GetKeyState("SC138", "P")) {
-            KeyWait("SC138", "T1")
-        }
-        Suspend(1)
-    }
-    UpdateTrayIcon()
-    ; Drive the pause reactor from the authoritative toggle. _LastSuspendState is
-    ; updated here too so the watchdog (which catches transitions that bypass
-    ; this function) sees the new state and does not double-fire the handlers.
-    _LastSuspendState := A_IsSuspended
-    if A_IsSuspended {
-        Ergopti_OnSuspendEnter()
-    } else {
-        Ergopti_OnSuspendResume()
-    }
-    LoggerInfo("ErgoptiPlus", "Suspend toggled: {1}.", A_IsSuspended ? "ON" : "OFF")
+    global _ALTGR_KANA_FIXUP; if !A_IsSuspended and IsSet(_ALTGR_KANA_FIXUP) and _ALTGR_KANA_FIXUP and GetKeyState("SC138", "P") { KeyWait("SC138", "T1") }
+    Suspend(-1); UpdateTrayIcon(); global _LastSuspendState := A_IsSuspended
+    if A_IsSuspended { Ergopti_OnSuspendEnter() } else { Ergopti_OnSuspendResume() }
 }
-
-; Pause reactor — entered when the script becomes suspended. Native Suspend only
-; disarms hotkeys/hotstrings; every InputHook, timer and OnMessage keeps running,
-; so the user still sees tooltips, LLM predictions, the WPM widget, etc. The
-; per-callback ``if A_IsSuspended`` guards stop NEW activity; this handler tears
-; down whatever was already live so the paused state is truly « AHK éteint ».
-Ergopti_OnSuspendEnter() {
-    try TooltipHide("Suspend", true)
-    try LLM_Tooltip_Hide(true)
-    try LLM_Engine_CancelTimer()
-}
-
-; Pause reactor — entered when the script resumes. The guards simply stop
-; early-returning once A_IsSuspended is false and the WPM tick repaints itself,
-; so the only cleanup needed is to drop any stale prefix-watcher context so
-; typing restarts at a clean word boundary instead of matching pre-pause input.
-Ergopti_OnSuspendResume() {
-    if IsSet(_ResetPrefixBuffer) {
-        try _ResetPrefixBuffer()
-    }
-}
-
-; Catches suspend transitions that bypass ToggleSuspend (a native Pause/Suspend
-; command, an external trigger, the AltGr+Enter pause-bug edge) and runs the same
-; reactor so « pause = tout éteint » holds no matter how suspend was toggled.
-; Timer callbacks are never affected by Suspend, so this keeps polling while
-; suspended — exactly what is needed to detect the resume edge.
+Ergopti_OnSuspendEnter() { try TooltipHide("Suspend", true); try LLM_Tooltip_Hide(true); try LLM_Engine_CancelTimer() }
+Ergopti_OnSuspendResume() { if IsSet(_ResetPrefixBuffer) { try _ResetPrefixBuffer() } }
 _SuspendStateWatchdog() {
-    global _LastSuspendState
-    if (A_IsSuspended == _LastSuspendState) {
-        return
-    }
-    _LastSuspendState := A_IsSuspended
-    UpdateTrayIcon()
-    if A_IsSuspended {
-        Ergopti_OnSuspendEnter()
-    } else {
-        Ergopti_OnSuspendResume()
-    }
+    global _LastSuspendState; if (A_IsSuspended == _LastSuspendState) { return }
+    _LastSuspendState := A_IsSuspended; UpdateTrayIcon()
+    if A_IsSuspended { Ergopti_OnSuspendEnter() } else { Ergopti_OnSuspendResume() }
 }
-
 UpdateTrayIcon() {
-    ; The Suspend entry now lives directly on the tray menu; tick/untick it
-    ; there since the old ScriptMgmtMenu submenu was flattened away.
-    if A_IsSuspended {
-        A_TrayMenu.Check(MenuSuspend)
-        if FileExist(IconPathDisabled) {
-            TraySetIcon(IconPathDisabled, , True)
-        }
-    } else {
-        A_TrayMenu.Uncheck(MenuSuspend)
-        if FileExist(IconPath) {
-            TraySetIcon(IconPath)
-        }
-    }
+    if A_IsSuspended { A_TrayMenu.Check(MenuSuspend); if FileExist(IconPathDisabled) { TraySetIcon(IconPathDisabled, , True) } }
+    else { A_TrayMenu.Uncheck(MenuSuspend); if FileExist(IconPath) { TraySetIcon(IconPath) } }
 }
-
-ActivateReload(*) {
-    LoggerInfo("ErgoptiPlus", "User-triggered reload.")
-    Reload
-}
-
-ActivateExitApp(*) {
-    LoggerInfo("ErgoptiPlus", "User-triggered ExitApp.")
-    ExitApp
-}
-
+ActivateReload(*) { Reload() }
+ActivateExitApp(*) { ExitApp() }
 WindowSpy(*) {
-    ; Get the directory containing the AHK executable
-    SplitPath(A_AhkPath, , &ahkDir)
-
-    ; Go up one directory
-    SplitPath(ahkDir, , &parentDir)
-
-    ; Build the path to WindowSpy.ahk
-    spyPath := parentDir "\WindowSpy.ahk"
-
-    ; Run the script if found
-    if FileExist(spyPath) {
-        Run(spyPath)
-    } else {
-        MsgBox(Format(t("ergopti.windowspy_not_found"), spyPath))
-    }
+    SplitPath(A_AhkPath, , &ahkDir); SplitPath(ahkDir, , &parentDir); spyPath := parentDir "\WindowSpy.ahk"
+    if FileExist(spyPath) { Run(spyPath) } else { MsgBox(Format(t("ergopti.windowspy_not_found"), spyPath)) }
 }
+ActivateListVars(*) { ListVars() }
+ActivateKeyHistory(*) { KeyHistory() }
+ShowHealthCheck(*) { HealthCheck_ShowWindow() }
 
-ActivateListVars(*) {
-    ListVars
-}
-
-ActivateKeyHistory(*) {
-    KeyHistory
-}
-
-; Opens a blocking dialog that displays the full healthcheck report.
-; Wired to the "Healthcheck" item in the Debug submenu of the tray menu.
-ShowHealthCheck(*) {
-    HealthCheck_ShowWindow()
-}
-
-; ================================================
-; ======= 1.5) Script management shortcuts =======
-; ================================================
-
-; We use GetKeyState("SC138", "P") to make sure the AltGr key is pressed
-; It avoids a bug where AltGr + Enter pauses the script, but then pressing BackSpace alone triggers a reload
-; This bug for example happens if the keyboard layout is QWERTY
-
-; Each combo double-checks both keys with GetKeyState — works around an
-; AltGr+Enter quirk on some QWERTY layouts where pressing BackSpace alone
-; would otherwise replay a stale AltGr+BackSpace event and reload the script.
-
-; The four script-management combos below are registered DYNAMICALLY at the
-; end of the auto-execute section via _RegisterScriptAltGrHotkeys(). Defining
-; them as static ``SC138 & X::`` blocks here would have AHK promote SC138 to a
-; prefix key at parse time — and the prefix status is parse-time-only, so it
-; would persist even after our onboarding ``IsRealAltGrPress`` short-circuit
-; made every variant evaluate false. With the registration happening after
-; Onboarding_Run returns, SC138 stays a vanilla key for the whole duration of
-; the first-run wizard, restoring native AltGr/Kana behaviour in the wizard's
-; Edit boxes (and anywhere else the user types while it is up).
-
-; Handler bodies stay as named functions so the dynamic Hotkey() calls only
-; reference them. Each handler double-checks the modifier state via
-; GetKeyState — same defensive guard as the original blocks — so a stale
-; AltGr+key ghost cannot replay the action on the next isolated keystroke.
-; After RunScriptShortcutAction returns (for actions that do — e.g. the pause
-; toggle), ResetScriptComboKeys waits for the suffix to lift then clears the
-; SC138/Kana prefix, so the combo neither leaks its key into the app nor leaves
-; AltGr stuck. Reload/ExitApp actions never return, so the reset is skipped —
-; a fresh process (or a closed one) has no latched prefix to clear anyway.
 _ScriptAltGrChordDebounce() {
-    static last_tick := 0
-    if (A_TickCount - last_tick < 80)
-        return true
-    last_tick := A_TickCount
-    return false
+    static last_tick := 0; if (A_TickCount - last_tick < 80) { return true }; last_tick := A_TickCount; return false
 }
-
-; True when the suffix key is still down and the press came from a physical
-; AltGr/Kana modifier — not a deliberate LCtrl+LAlt chord in a terminal.
 _ScriptAltGrIsPhysical(SuffixSC) {
-    global _ALTGR_KANA_FIXUP
-    if !GetKeyState(SuffixSC, "P")
-        return false
-    ; Kana layouts: the layer key is SC138 (VK_KANA), not RAlt — never accept
-    ; the ^! Ctrl+Alt fallback below, which would mis-fire in terminals.
-    if (IsSet(_ALTGR_KANA_FIXUP) and _ALTGR_KANA_FIXUP)
-        return GetKeyState("SC138", "P")
-    if GetKeyState("SC138", "P") or GetKeyState("RAlt", "P")
-        return true
-    ; Vanilla AltGr: terminals surface ^!Backspace; RAlt/SC138 can lag the
-    ; suffix key in the hook. Accept Ctrl+Alt unless it is LCtrl+LAlt only.
-    if InStr(A_ThisHotkey, "^!")
-        and GetKeyState("Ctrl", "P") and GetKeyState("Alt", "P")
-        and !(GetKeyState("LAlt", "P") and !GetKeyState("RAlt", "P")) {
-        return true
-    }
-    return false
+    global _ALTGR_KANA_FIXUP; if !GetKeyState(SuffixSC, "P") { return false }
+    if (IsSet(_ALTGR_KANA_FIXUP) and _ALTGR_KANA_FIXUP) { return GetKeyState("SC138", "P") }
+    if GetKeyState("SC138", "P") or GetKeyState("RAlt", "P") { return true }
+    return InStr(A_ThisHotkey, "^!") and GetKeyState("Ctrl", "P") and GetKeyState("Alt", "P") and !(GetKeyState("LAlt", "P") and !GetKeyState("RAlt", "P"))
 }
-
-; Replay a swallowed ^! chord when the handler decides it was not AltGr.
-_ScriptAltGrReplayCtrlAlt(SuffixKey) {
-    SendInput("^!{" . SuffixKey . "}")
-}
-
 _ScriptAltGrDispatch(SuffixSC, Slot, NativeSend, CtrlAltSuffixKey) {
-    if _ScriptAltGrChordDebounce()
-        return
-    if !_ScriptAltGrIsPhysical(SuffixSC) {
-        if InStr(A_ThisHotkey, "^!")
-            _ScriptAltGrReplayCtrlAlt(CtrlAltSuffixKey)
-        else
-            SendInput(NativeSend)
-        return
-    }
-    RunScriptShortcutAction(Slot)
-    ResetScriptComboKeys(SuffixSC)
+    if _ScriptAltGrChordDebounce() { return }
+    if !_ScriptAltGrIsPhysical(SuffixSC) { if InStr(A_ThisHotkey, "^!") { SendInput("^!{" . CtrlAltSuffixKey . "}") } else { SendInput(NativeSend) }; return }
+    RunScriptShortcutAction(Slot); ResetScriptComboKeys(SuffixSC)
 }
+_ScriptAltGrEnterHandler(*) { _ScriptAltGrDispatch("SC01C", "script_altgr_enter", "{Enter}", "Enter") }
+_ScriptAltGrBackSpaceHandler(*) { _ScriptAltGrDispatch("SC00E", "script_altgr_backspace", "{BackSpace}", "Backspace") }
+_ScriptAltGrDeleteHandler(*) { _ScriptAltGrDispatch("SC153", "script_altgr_delete", "{Delete}", "Delete") }
+_ScriptAltGrEscapeHandler(*) { _ScriptAltGrDispatch("SC001", "script_altgr_escape", "{Escape}", "Escape") }
 
-_ScriptAltGrEnterHandler(*) {
-    _ScriptAltGrDispatch("SC01C", "script_altgr_enter", "{Enter}", "Enter")
-}
-
-_ScriptAltGrBackSpaceHandler(*) {
-    _ScriptAltGrDispatch("SC00E", "script_altgr_backspace", "{BackSpace}", "Backspace")
-}
-
-_ScriptAltGrDeleteHandler(*) {
-    _ScriptAltGrDispatch("SC153", "script_altgr_delete", "{Delete}", "Delete")
-}
-
-_ScriptAltGrEscapeHandler(*) {
-    _ScriptAltGrDispatch("SC001", "script_altgr_escape", "{Escape}", "Escape")
-}
-
-; Options for script-management AltGr combos. I3 beats layout remaps (I2);
-; the ``$`` key prefix (see _ScriptAltGrHookKey) forces the keyboard hook on
-; plain modifier chords (^!X, SC00E, …) so terminals (PowerShell PSReadLine,
-; etc.) cannot win the Ctrl+Alt+<key> chord that AltGr physically emits; custom
-; prefix combos (RAlt & X, SC138 & X) already require the hook and reject ``$``;
-; S keeps AltGr+Enter usable to unsuspend after a keyboard pause.
 global _SCRIPT_ALTGR_HOTKEY_OPTS := "I3 S"
-
-; AHK v2: hook hotkeys use a ``$`` prefix on KeyName — not a Hotkey() option.
-; Custom-combination names (key1 & key2) cannot take ``$`` — AHK reports
-; "Invalid hotkey" for strings like ``$RAlt & Enter``.
-_ScriptAltGrHookKey(KeyName) {
-    if (SubStr(KeyName, 1, 1) = "$")
-        return KeyName
-    if InStr(KeyName, " & ")
-        return KeyName
-    return "$" . KeyName
-}
-
-; Registration entry point. Called once Onboarding_Run() has returned so the
-; wizard never sees SC138 as a prefix key. Each Hotkey() inherits the HotIf
-; criterion set immediately before, which mirrors what the previous static
-; ``#HotIf IsRealAltGrPress()`` block established.
+_ScriptAltGrHookKey(KeyName) { return (SubStr(KeyName, 1, 1) = "$" or InStr(KeyName, " & ")) ? KeyName : "$" . KeyName }
 _RegisterScriptAltGrHotkeys() {
-    global _SCRIPT_ALTGR_HOTKEY_OPTS
-    opts := _SCRIPT_ALTGR_HOTKEY_OPTS
-    ; HotIf() expects a callable of the form Callback(HotkeyName), so passing
-    ; the bare ``IsRealAltGrPress`` reference fails with "Invalid callback
-    ; function" — that helper takes no parameters. Wrap it in a varargs lambda
-    ; so AHK can hand it the hotkey name without tripping the signature check.
-    HotIf((*) => IsRealAltGrPress())
-    ; SC138 / RAlt custom combos (canonical on Kana-remap and vanilla layouts).
-    Hotkey(_ScriptAltGrHookKey("RAlt & Enter"),     _ScriptAltGrEnterHandler,     opts)
-    Hotkey(_ScriptAltGrHookKey("SC138 & SC01C"),    _ScriptAltGrEnterHandler,     opts)
-    Hotkey(_ScriptAltGrHookKey("RAlt & BackSpace"), _ScriptAltGrBackSpaceHandler, opts)
-    Hotkey(_ScriptAltGrHookKey("SC138 & SC00E"),    _ScriptAltGrBackSpaceHandler, opts)
-    Hotkey(_ScriptAltGrHookKey("RAlt & Delete"),    _ScriptAltGrDeleteHandler,    opts)
-    Hotkey(_ScriptAltGrHookKey("SC138 & SC153"),    _ScriptAltGrDeleteHandler,    opts)
-    Hotkey(_ScriptAltGrHookKey("RAlt & Escape"),    _ScriptAltGrEscapeHandler,    opts)
-    Hotkey(_ScriptAltGrHookKey("SC138 & SC001"),    _ScriptAltGrEscapeHandler,    opts)
-    HotIf()
-
-    ; Vanilla AltGr only: Windows emits ^! at the OS level. Kana layouts (SC138)
-    ; do not — registering ^! mirrors there would only fire from AHK-internal
-    ; modifier state and mis-trigger actions PowerShell never sees natively.
+    global _SCRIPT_ALTGR_HOTKEY_OPTS; opts := _SCRIPT_ALTGR_HOTKEY_OPTS; HotIf((*) => IsRealAltGrPress())
+    Hotkey(_ScriptAltGrHookKey("RAlt & Enter"), _ScriptAltGrEnterHandler, opts); Hotkey(_ScriptAltGrHookKey("SC138 & SC01C"), _ScriptAltGrEnterHandler, opts)
+    Hotkey(_ScriptAltGrHookKey("RAlt & BackSpace"), _ScriptAltGrBackSpaceHandler, opts); Hotkey(_ScriptAltGrHookKey("SC138 & SC00E"), _ScriptAltGrBackSpaceHandler, opts)
+    Hotkey(_ScriptAltGrHookKey("RAlt & Delete"), _ScriptAltGrDeleteHandler, opts); Hotkey(_ScriptAltGrHookKey("SC138 & SC153"), _ScriptAltGrDeleteHandler, opts)
+    Hotkey(_ScriptAltGrHookKey("RAlt & Escape"), _ScriptAltGrEscapeHandler, opts); Hotkey(_ScriptAltGrHookKey("SC138 & SC001"), _ScriptAltGrEscapeHandler, opts); HotIf()
     if !(IsSet(_ALTGR_KANA_FIXUP) and _ALTGR_KANA_FIXUP) {
-        Hotkey(_ScriptAltGrHookKey("^!Enter"),     _ScriptAltGrEnterHandler,     opts)
-        Hotkey(_ScriptAltGrHookKey("^!Backspace"), _ScriptAltGrBackSpaceHandler, opts)
-        Hotkey(_ScriptAltGrHookKey("^!Delete"),    _ScriptAltGrDeleteHandler,    opts)
-        Hotkey(_ScriptAltGrHookKey("^!Escape"),    _ScriptAltGrEscapeHandler,    opts)
+        Hotkey(_ScriptAltGrHookKey("^!Enter"), _ScriptAltGrEnterHandler, opts); Hotkey(_ScriptAltGrHookKey("^!Backspace"), _ScriptAltGrBackSpaceHandler, opts)
+        Hotkey(_ScriptAltGrHookKey("^!Delete"), _ScriptAltGrDeleteHandler, opts); Hotkey(_ScriptAltGrHookKey("^!Escape"), _ScriptAltGrEscapeHandler, opts)
     }
-
-    ; Kana remap (SC138, not RAlt): terminals never see SC138 & suffix — only
-    ; the bare suffix key while Kana is held. Plain $SC00E-style hooks gated on
-    ; GetKeyState("SC138") do not need prefix arming, so they still fire in
-    ; PowerShell where custom combos can silently fail.
     if (IsSet(_ALTGR_KANA_FIXUP) and _ALTGR_KANA_FIXUP) {
         HotIf((*) => GetKeyState("SC138", "P"))
-        Hotkey(_ScriptAltGrHookKey("SC01C"), _ScriptAltGrEnterHandler,     opts)
-        Hotkey(_ScriptAltGrHookKey("SC00E"), _ScriptAltGrBackSpaceHandler, opts)
-        Hotkey(_ScriptAltGrHookKey("SC153"), _ScriptAltGrDeleteHandler,    opts)
-        Hotkey(_ScriptAltGrHookKey("SC001"), _ScriptAltGrEscapeHandler,    opts)
-        HotIf()
+        Hotkey(_ScriptAltGrHookKey("SC01C"), _ScriptAltGrEnterHandler, opts); Hotkey(_ScriptAltGrHookKey("SC00E"), _ScriptAltGrBackSpaceHandler, opts)
+        Hotkey(_ScriptAltGrHookKey("SC153"), _ScriptAltGrDeleteHandler, opts); Hotkey(_ScriptAltGrHookKey("SC001"), _ScriptAltGrEscapeHandler, opts); HotIf()
     }
-
-    ; Suspend fallback. A pause toggled from anywhere other than the combo's own
-    ; hook thread (tray-menu « Suspendre », a gesture) rebuilds the keyboard hook
-    ; with the SC138/RAlt custom-combination prefix left un-armed, so the
-    ; ``SC138 & X`` combos above silently stop firing and the script can no longer
-    ; be un-paused from the keyboard. Re-detect the same chords as PLAIN SUFFIX
-    ; hotkeys gated on « suspended AND SC138 physically held »: a suffix hotkey
-    ; needs no prefix arming, so the menu-thread rebuild cannot break it, and it
-    ; never re-registers an SC138 prefix so it cannot latch the Kana key. They
-    ; reuse the existing handlers; the GetKeyState in the HotIf guarantees SC138
-    ; is down, so a lone Enter/BackSpace/Delete/Escape while paused is untouched
-    ; (HotIf false → native key). When the prefix IS armed (a keyboard pause) the
-    ; ``SC138 & X`` combo takes precedence, so these never double-fire.
     HotIf((*) => A_IsSuspended and GetKeyState("SC138", "P"))
-    Hotkey(_ScriptAltGrHookKey("SC01C"), _ScriptAltGrEnterHandler,     opts)
-    Hotkey(_ScriptAltGrHookKey("SC00E"), _ScriptAltGrBackSpaceHandler, opts)
-    Hotkey(_ScriptAltGrHookKey("SC153"), _ScriptAltGrDeleteHandler,    opts)
-    Hotkey(_ScriptAltGrHookKey("SC001"), _ScriptAltGrEscapeHandler,    opts)
-    HotIf()
+    Hotkey(_ScriptAltGrHookKey("SC01C"), _ScriptAltGrEnterHandler, opts); Hotkey(_ScriptAltGrHookKey("SC00E"), _ScriptAltGrBackSpaceHandler, opts)
+    Hotkey(_ScriptAltGrHookKey("SC153"), _ScriptAltGrDeleteHandler, opts); Hotkey(_ScriptAltGrHookKey("SC001"), _ScriptAltGrEscapeHandler, opts); HotIf()
 }
-
-; Auto-execute hook: at this point Onboarding_Run() has long since returned
-; (line ~395 of the auto-exec section), so registering the SC138-prefixed
-; combos now is safe — the first-run wizard ran with SC138 still acting as a
-; vanilla key.
 _RegisterScriptAltGrHotkeys()
 
-; =======================================================
-; =======================================================
-; =======================================================
-; ================ 2/ PERSONAL SHORTCUTS ================
-; =======================================================
-; =======================================================
-; =======================================================
-
-; personal_shortcuts.ahk is included earlier (before menu build) so
-; Features["Personal"] is populated before InitSubMenus/initMenu run.
-; TOML hotstrings are loaded here with maximum priority so they shadow any
-; conflicting built-in entry (registered before the layout section below).
 if Features.Has("hotstrings") and Features["hotstrings"].Has("personal") {
     for SectionName, SectionConfig in Features["hotstrings"]["personal"] {
-        if !(IsObject(SectionConfig) and Type(SectionConfig) == "Map") {
-            continue
-        }
-        if !(SectionConfig.Has("enabled") and SectionConfig["enabled"]) {
-            continue
-        }
-        ; v2 Personal keys are already the lowercase TOML section names — no
-        ; FoldAsciiLower needed. LoadHotstringsSection accepts v2 Maps directly
-        ; (it converts internally to the v1-shape object the regex/fast paths
-        ; expect).
-        LoadHotstringsSection("personal", SectionName, SectionConfig)
+        if (IsObject(SectionConfig) and SectionConfig.Has("enabled") and SectionConfig["enabled"])
+            LoadHotstringsSection("personal", SectionName, SectionConfig)
     }
 }
-
-#InputLevel 2 ; Very important, we need to be at a higher InputLevel to remap the keys into something else.
-; It is because we will then remap keys we just remapped, so the InputLevel of those other shortcuts must be lower.
-; This is especially important for the "★" key, otherwise the hotstrings involving this key won't trigger.
+#InputLevel 2
 #Include modules/layout.ahk
 #Include modules/shortcuts.ahk
 #Include modules/tap_holds.ahk
 #Include modules/hotstrings.ahk
-
-; Hotstrings are now registered — start the prefix watcher so typing a
-; partial trigger surfaces a tinted tooltip preview (parity with the
-; Hammerspoon driver). The watcher reads its own copy of the TOML registry,
-; so it works regardless of whether the fast-path generated loader or the
-; regex parser was used to register the live hotstrings.
 HotstringPrefixWatcherInit()
-
-; Final lifecycle marker — all hotkeys and hotstrings are registered, the
-; script is ready to handle keystrokes. A missing SUCCESS in the log file
-; pinpoints which #Include above failed silently.
 LoggerSuccess("ErgoptiPlus", "Driver fully initialised — ready.")
 
-
-
-
-
-; =========================================
-; =========================================
-; ======= 99/ Keyboard layout watch =======
-; =========================================
-; =========================================
-
-; Polls the foreground keyboard layout once per second. WM_INPUTLANGCHANGE
-; only reaches the focused window, so polling is the simplest cross-process
-; signal. A change means SC138 may have flipped between RAlt and Kana, and
-; #HotIf gates / _ALTGR_KANA_FIXUP must re-resolve. Reload() is the
-; cheapest way to guarantee every dependent global, hotkey and BoundFunc
-; reflects the new layout — partial in-place updates would be brittle.
 global _LAYOUT_POLL_INTERVAL_MS := 1000
 global _LAST_KEYBOARD_HKL := GetForegroundKeyboardLayout()
-
 CheckKeyboardLayoutChange() {
-    global _LAST_KEYBOARD_HKL
-    HKL := GetForegroundKeyboardLayout()
-    if (HKL = 0 or HKL = _LAST_KEYBOARD_HKL) {
-        return
-    }
-    try LoggerInfo("LayoutWatch",
-        "Keyboard layout changed (0x{1:X} → 0x{2:X}) — reloading script.",
-        _LAST_KEYBOARD_HKL, HKL)
-    _LAST_KEYBOARD_HKL := HKL
-    Reload()
+    global _LAST_KEYBOARD_HKL; HKL := GetForegroundKeyboardLayout()
+    if (HKL != 0 and HKL != _LAST_KEYBOARD_HKL) { _LAST_KEYBOARD_HKL := HKL; Reload() }
 }
-
 SetTimer(CheckKeyboardLayoutChange, _LAYOUT_POLL_INTERVAL_MS)
