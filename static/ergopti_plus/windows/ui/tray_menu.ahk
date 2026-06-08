@@ -2344,7 +2344,6 @@ initMenu() {
 		FreqMenu := Menu()
 		CurrentLabel := ""
 		CurrentCode  := ""
-		; @i18n-keys: menu.about.frequency.1m, menu.about.frequency.5m, menu.about.frequency.10m, menu.about.frequency.1h, menu.about.frequency.2h, menu.about.frequency.3h, menu.about.frequency.6h, menu.about.frequency.12h, menu.about.frequency.24h, menu.about.frequency.2d, menu.about.frequency.7d, menu.about.frequency.never
 		for _, Preset in UPDATER_INTERVAL_PRESETS {
 			Label := t("menu.about.frequency." . Preset.Code)
 			RegisterMenuItem(FreqMenu, Label, _MakeFreqSetter(Preset.Seconds))
