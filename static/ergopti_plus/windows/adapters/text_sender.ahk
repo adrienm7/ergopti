@@ -123,13 +123,6 @@ TextEraseChars(Count) {
 ;                  keystroke, OR the string "Down"/"Up" to emit a sustained
 ;                  press/release event (e.g. hold a modifier across a KeyWait).
 TextPressKey(Key, Modifiers) {
-	; Any synthetic key emission must release the touchpad click-hold lock
-	; (triple-tap selection) so that a subsequent keystroke cancels the drag.
-	if IsSet(GestureReleaseLeftClick)
-		GestureReleaseLeftClick()
-	if IsSet(GestureReleaseRightClick)
-		GestureReleaseRightClick()
-
 	; "Down" / "Up" — sustained press or release for hold-modifier patterns.
 	if (Modifiers == "Down" or Modifiers == "Up") {
 		_AHK_SendInput.Call("{" . Key . " " . Modifiers . "}")
