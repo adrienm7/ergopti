@@ -564,3 +564,30 @@ _OnVariantFail_FallsBackFromStreaming() {
 
 Test("LLM_Engine_OnVariantFail: disables streaming for WinHTTP retry",
 	_OnVariantFail_FallsBackFromStreaming)
+
+; ===================================================
+; ===================================================
+; ======= 11/ Tooltip Placeholders ==================
+; ===================================================
+; ===================================================
+
+_LLM_TestSlotIsPlaceholder() {
+	global UI_LLM_SLOT_PLACEHOLDER := "sparkle"
+	global LLM_TOOLTIP_PLACEHOLDER := "sparkle"
+	AssertTrue(_LLM_SlotIsPlaceholder(""), "empty string is placeholder")
+	AssertTrue(_LLM_SlotIsPlaceholder("sparkle"), "exact match is placeholder")
+	AssertTrue(_LLM_SlotIsPlaceholder("…"), "ellipsis is placeholder")
+	AssertTrue(_LLM_SlotIsPlaceholder("..."), "dot-dot-dot is placeholder")
+	AssertTrue(_LLM_SlotIsPlaceholder("   "), "whitespace is placeholder")
+	AssertFalse(_LLM_SlotIsPlaceholder("real text"), "real text is not placeholder")
+}
+Test("_LLM_SlotIsPlaceholder: detects placeholder strings", _LLM_TestSlotIsPlaceholder)
+
+_LLM_TestAllSlotsPlaceholder() {
+	global UI_LLM_SLOT_PLACEHOLDER := "sparkle"
+	global LLM_TOOLTIP_PLACEHOLDER := "sparkle"
+	AssertTrue(_LLM_AllSlotsPlaceholder(["", "...", "sparkle"]), "all placeholders should return true")
+	AssertFalse(_LLM_AllSlotsPlaceholder(["", "real text", "sparkle"]), "one real text should return false")
+	AssertFalse(_LLM_AllSlotsPlaceholder([]), "empty array should return false")
+}
+Test("_LLM_AllSlotsPlaceholder: checks array of slots", _LLM_TestAllSlotsPlaceholder)
