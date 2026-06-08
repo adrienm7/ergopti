@@ -294,9 +294,29 @@ _PrefixWatcherTomlPath(Category) {
 ; we capture trigger, output and the case-sensitivity flags so we can
 ; pre-compute the exact same case variants the engine registers.
 _RegisterCategoryTriggers(Category) {
-    global ScriptInformation
+    global ScriptInformation, Features, _V1CatToV2CatMap
+    ; 1. Master gate check — if the hotstrings category is disabled globally,
+    ;    stop here. The watcher index will be empty for all groups.
+    if !IsCategoryGated("Hotstrings") {
+        return 0
+    }
+
     Path := _PrefixWatcherTomlPath(Category)
     if !FileExist(Path) {
+        return 0
+    }
+
+    ; 2. Category mapping — _PREFIX_WATCHER_CATEGORIES uses lowercase but
+    ;    Features v2 uses snake_case with underscores.
+    V2Cat := Category
+    if (V2Cat == "distancesreduction")
+        V2Cat := "distances_reduction"
+    else if (V2Cat == "sfbsreduction")
+        V2Cat := "sfbs_reduction"
+    else if (V2Cat == "magickey")
+        V2Cat := "magic_key"
+
+    if !Features.Has("hotstrings") or !Features["hotstrings"].Has(V2Cat) {
         return 0
     }
 
@@ -324,6 +344,18 @@ _RegisterCategoryTriggers(Category) {
         if (CurrentSection == "") {
             continue
         }
+
+        ; 3. Section enabled check — only index triggers for sections that
+        ;    are actually enabled in the Features Map.
+        SecId := CurrentSection
+        if !Features["hotstrings"][V2Cat].Has(SecId) {
+            continue
+        }
+        FNode := Features["hotstrings"][V2Cat][SecId]
+        if !(IsObject(FNode) and FNode.Has("enabled") and FNode["enabled"]) {
+            continue
+        }
+
         if !RegExMatch(Line, EntryPattern, &Match) {
             continue
         }

@@ -782,6 +782,23 @@ if Features.Has("hotstrings") and Features["hotstrings"].Has("dynamic") {
 		}
 	}
 }
+; ── Personal hotstrings (standard file + extensions)
+PersonalActiveCount := 0
+PersonalTomlPath := IsSet(ScriptInformation) ? ScriptInformation.Get("PersonalTomlPath", "") : ""
+if (PersonalTomlPath != "" and FileExist(PersonalTomlPath)) {
+	PersonalTomlData := ReadPersonalToml()
+	for _, SecName2 in PersonalTomlData["sections_order"] {
+		if (SecName2 == "-" or !PersonalTomlData["sections"].Has(SecName2))
+			continue
+		PV2Id    := StrLower(SecName2)
+		PEnabled := Features["hotstrings"].Has("personal")
+			and Features["hotstrings"]["personal"].Has(PV2Id)
+			and Features["hotstrings"]["personal"][PV2Id]["enabled"]
+		if PEnabled
+			PersonalActiveCount += PersonalTomlData["sections"][SecName2]["entries"].Length
+	}
+}
+Total += PersonalActiveCount
 Total += IsObject(_ExtTotalPersonalCounterGlobal) ? _ExtTotalPersonalCounterGlobal.value : 0
 return Total
 }
