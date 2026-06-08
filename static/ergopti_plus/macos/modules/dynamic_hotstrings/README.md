@@ -6,10 +6,10 @@ Orchestrates dynamic text expansions that cannot be stored as static hotstring t
 
 ## Ports used (`_shared/ports/`)
 
-| Port | Usage |
-|---|---|
-| `FileSystem` | Reading the personal info TOML/JSON config file |
-| `TextSender` | Injecting expanded text via the keymap expander |
+| Port             | Usage                                                   |
+| ---------------- | ------------------------------------------------------- |
+| `FileSystem`     | Reading the personal info TOML/JSON config file         |
+| `TextSender`     | Injecting expanded text via the keymap expander         |
 | `TimerScheduler` | Debounce between trigger detection and expansion firing |
 
 ## Domain module (`_shared/domain/`)
@@ -18,12 +18,12 @@ Orchestrates dynamic text expansions that cannot be stored as static hotstring t
 
 ## Public API
 
-| Function | Description |
-|---|---|
-| `M.init(state)` | Initialize with the shared core state table |
-| `M.get_matchers()` | Return the list of dynamic matcher objects for the keymap Registry |
-| `M.reload_personal_info()` | Re-read the personal info file and rebuild `@`-tag mappings |
-| `M.set_enabled(key, value)` | Toggle an individual dynamic expansion category |
+| Function                    | Description                                                        |
+| --------------------------- | ------------------------------------------------------------------ |
+| `M.init(state)`             | Initialize with the shared core state table                        |
+| `M.get_matchers()`          | Return the list of dynamic matcher objects for the keymap Registry |
+| `M.reload_personal_info()`  | Re-read the personal info file and rebuild `@`-tag mappings        |
+| `M.set_enabled(key, value)` | Toggle an individual dynamic expansion category                    |
 
 ## Init pattern
 

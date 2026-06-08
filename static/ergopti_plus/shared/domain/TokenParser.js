@@ -30,10 +30,7 @@
  * ==============================================================================
  */
 
-"use strict";
-
-
-
+'use strict';
 
 // ==================================================
 // ==================================================
@@ -42,16 +39,13 @@
 // ==================================================
 
 /** Hex color for corrected tail words (green). */
-const COLOR_CORRECTED = "#22c55e";
+const COLOR_CORRECTED = '#22c55e';
 
 /** Hex color for new continuation words (orange). */
-const COLOR_NEW_WORDS = "#f97316";
+const COLOR_NEW_WORDS = '#f97316';
 
 /** Null means "no color" — render in the default gray. */
 const COLOR_NONE = null;
-
-
-
 
 // ==================================================
 // ==================================================
@@ -66,7 +60,7 @@ const COLOR_NONE = null;
  * @returns {string[]}
  */
 function splitWords(text) {
-	if (!text || text.trim() === "") return [];
+	if (!text || text.trim() === '') return [];
 	return text.trim().split(/\s+/);
 }
 
@@ -81,15 +75,15 @@ function splitWords(text) {
 function applyFrenchTypography(text) {
 	if (!text) return text;
 	// Straight apostrophe → typographic apostrophe
-	text = text.replace(/'/g, "’");
+	text = text.replace(/'/g, '’');
 	// Space before ?, !, ; → narrow no-break space
-	text = text.replace(/ ([?!;])/g, " $1");
+	text = text.replace(/ ([?!;])/g, ' $1');
 	// Space before : → non-breaking space
-	text = text.replace(/ :/g, " :");
+	text = text.replace(/ :/g, ' :');
 	// Space after « → non-breaking space
-	text = text.replace(/« /g, "« ");
+	text = text.replace(/« /g, '« ');
 	// Space before » → non-breaking space
-	text = text.replace(/ »/g, " »");
+	text = text.replace(/ »/g, ' »');
 	return text;
 }
 
@@ -102,11 +96,8 @@ function applyFrenchTypography(text) {
 function enforceWordLimit(text, maxWords) {
 	if (!maxWords || maxWords <= 0) return text.trimEnd();
 	const words = splitWords(text);
-	return words.slice(0, maxWords).join(" ");
+	return words.slice(0, maxWords).join(' ');
 }
-
-
-
 
 // ==================================================
 // ==================================================
@@ -151,17 +142,16 @@ function findDivergenceIndex(tailWords, correctedWords) {
 function parseAdvancedFormat(rawOutput) {
 	if (!rawOutput) return { corrected: null, next_words: null };
 	const correctedMatch = rawOutput.match(/TAIL_CORRECTED:\s*(.+)/);
-	const nextMatch      = rawOutput.match(/NEXT_WORDS:\s*(.*)/);
+	const nextMatch = rawOutput.match(/NEXT_WORDS:\s*(.*)/);
 	if (correctedMatch) {
 		return {
-			corrected:  correctedMatch[1].trim(),
-			next_words: nextMatch ? nextMatch[1].trim() : "",
+			corrected: correctedMatch[1].trim(),
+			next_words: nextMatch ? nextMatch[1].trim() : ''
 		};
 	}
 	// Not advanced format — treat entire output as continuation
 	return { corrected: null, next_words: rawOutput.trim() };
 }
-
 
 /**
  * Produces an ordered array of { text, color } chunks from the LLM output.
@@ -178,7 +168,7 @@ function parseAdvancedFormat(rawOutput) {
  * @returns {Array<{ text: string, color: string|null }>}
  */
 function parse(tail, rawOutput, opts = {}) {
-	const maxWords        = opts.max_words        || 0;
+	const maxWords = opts.max_words || 0;
 	const applyTypography = opts.apply_typography || false;
 
 	const { corrected, next_words } = parseAdvancedFormat(rawOutput);
@@ -186,15 +176,15 @@ function parse(tail, rawOutput, opts = {}) {
 
 	if (corrected !== null) {
 		// Advanced format: diff the corrected tail against the original tail
-		const tailWords      = splitWords(tail);
+		const tailWords = splitWords(tail);
 		const correctedWords = splitWords(corrected);
-		const divIdx         = findDivergenceIndex(tailWords, correctedWords);
+		const divIdx = findDivergenceIndex(tailWords, correctedWords);
 
 		// Unchanged prefix (gray — not added to the chunk array; the UI already
 		// shows the unchanged tail in the buffer so we only show the delta)
 		const changedWords = correctedWords.slice(divIdx);
 		if (changedWords.length > 0) {
-			let changedText = changedWords.join(" ");
+			let changedText = changedWords.join(' ');
 			if (applyTypography) changedText = applyFrenchTypography(changedText);
 			chunks.push({ text: changedText, color: COLOR_CORRECTED });
 		}
@@ -204,7 +194,7 @@ function parse(tail, rawOutput, opts = {}) {
 			let capped = enforceWordLimit(next_words, maxWords);
 			if (applyTypography) capped = applyFrenchTypography(capped);
 			if (capped) {
-				const separator = changedWords.length > 0 ? " " : "";
+				const separator = changedWords.length > 0 ? ' ' : '';
 				chunks.push({ text: separator + capped, color: COLOR_NEW_WORDS });
 			}
 		}
@@ -219,9 +209,6 @@ function parse(tail, rawOutput, opts = {}) {
 
 	return chunks;
 }
-
-
-
 
 // ==================================================
 // ==================================================
@@ -241,79 +228,70 @@ function parse(tail, rawOutput, opts = {}) {
 function tokenParserTestVectors() {
 	return [
 		{
-			id:        "basic_format_all_orange",
-			description: "Basic completion — entire output is orange new words.",
-			tail:      "je suis",
-			rawOutput: "content de vous voir",
-			opts:      {},
-			expected_chunks: [
-				{ text: "content de vous voir", color: COLOR_NEW_WORDS },
-			],
+			id: 'basic_format_all_orange',
+			description: 'Basic completion — entire output is orange new words.',
+			tail: 'je suis',
+			rawOutput: 'content de vous voir',
+			opts: {},
+			expected_chunks: [{ text: 'content de vous voir', color: COLOR_NEW_WORDS }]
 		},
 		{
-			id:        "advanced_format_fully_corrected",
-			description: "Advanced format where the full tail is corrected (all green).",
-			tail:      "je envoit",
+			id: 'advanced_format_fully_corrected',
+			description: 'Advanced format where the full tail is corrected (all green).',
+			tail: 'je envoit',
 			rawOutput: "TAIL_CORRECTED: j'envoie\nNEXT_WORDS: ce mail.",
-			opts:      {},
-			expected_chunks: [
-				{ text: "j'envoie",   color: COLOR_CORRECTED },
-				{ text: " ce mail.", color: COLOR_NEW_WORDS },
-			],
-		},
-		{
-			id:        "advanced_format_tail_unchanged",
-			description: "Advanced format where tail matches exactly — only new words.",
-			tail:      "bonjour comment",
-			rawOutput: "TAIL_CORRECTED: bonjour comment\nNEXT_WORDS: allez-vous ?",
-			opts:      {},
-			expected_chunks: [
-				{ text: "allez-vous ?", color: COLOR_NEW_WORDS },
-			],
-		},
-		{
-			id:        "advanced_format_partial_correction",
-			description: "Advanced format: first word unchanged, second corrected.",
-			tail:      "bonjour messieu",
-			rawOutput: "TAIL_CORRECTED: bonjour messieurs\nNEXT_WORDS: !",
-			opts:      {},
-			// "bonjour" matches, "messieu" → "messieurs" is green
-			expected_chunks: [
-				{ text: "messieurs", color: COLOR_CORRECTED },
-				{ text: " !",        color: COLOR_NEW_WORDS },
-			],
-		},
-		{
-			id:        "word_cap_applied",
-			description: "max_words=2 truncates the output to 2 words.",
-			tail:      "je",
-			rawOutput: "suis très content de vous voir",
-			opts:      { max_words: 2 },
-			expected_chunks: [
-				{ text: "suis très", color: COLOR_NEW_WORDS },
-			],
-		},
-		{
-			id:        "empty_output",
-			description: "Empty raw output returns an empty chunk array.",
-			tail:      "hello",
-			rawOutput: "",
-			opts:      {},
-			expected_chunks: [],
-		},
-		{
-			id:        "advanced_empty_next_words",
-			description: "Advanced format with empty NEXT_WORDS — only correction chunk.",
-			tail:      "je envoit",
-			rawOutput: "TAIL_CORRECTED: j'envoie\nNEXT_WORDS: ",
-			opts:      {},
+			opts: {},
 			expected_chunks: [
 				{ text: "j'envoie", color: COLOR_CORRECTED },
-			],
+				{ text: ' ce mail.', color: COLOR_NEW_WORDS }
+			]
 		},
+		{
+			id: 'advanced_format_tail_unchanged',
+			description: 'Advanced format where tail matches exactly — only new words.',
+			tail: 'bonjour comment',
+			rawOutput: 'TAIL_CORRECTED: bonjour comment\nNEXT_WORDS: allez-vous ?',
+			opts: {},
+			expected_chunks: [{ text: 'allez-vous ?', color: COLOR_NEW_WORDS }]
+		},
+		{
+			id: 'advanced_format_partial_correction',
+			description: 'Advanced format: first word unchanged, second corrected.',
+			tail: 'bonjour messieu',
+			rawOutput: 'TAIL_CORRECTED: bonjour messieurs\nNEXT_WORDS: !',
+			opts: {},
+			// "bonjour" matches, "messieu" → "messieurs" is green
+			expected_chunks: [
+				{ text: 'messieurs', color: COLOR_CORRECTED },
+				{ text: ' !', color: COLOR_NEW_WORDS }
+			]
+		},
+		{
+			id: 'word_cap_applied',
+			description: 'max_words=2 truncates the output to 2 words.',
+			tail: 'je',
+			rawOutput: 'suis très content de vous voir',
+			opts: { max_words: 2 },
+			expected_chunks: [{ text: 'suis très', color: COLOR_NEW_WORDS }]
+		},
+		{
+			id: 'empty_output',
+			description: 'Empty raw output returns an empty chunk array.',
+			tail: 'hello',
+			rawOutput: '',
+			opts: {},
+			expected_chunks: []
+		},
+		{
+			id: 'advanced_empty_next_words',
+			description: 'Advanced format with empty NEXT_WORDS — only correction chunk.',
+			tail: 'je envoit',
+			rawOutput: "TAIL_CORRECTED: j'envoie\nNEXT_WORDS: ",
+			opts: {},
+			expected_chunks: [{ text: "j'envoie", color: COLOR_CORRECTED }]
+		}
 	];
 }
-
 
 module.exports = {
 	COLOR_CORRECTED,
@@ -325,5 +303,5 @@ module.exports = {
 	findDivergenceIndex,
 	parseAdvancedFormat,
 	parse,
-	tokenParserTestVectors,
+	tokenParserTestVectors
 };

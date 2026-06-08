@@ -19,10 +19,7 @@
  * ==============================================================================
  */
 
-"use strict";
-
-
-
+'use strict';
 
 // ================================================
 // ================================================
@@ -35,8 +32,8 @@
  * @type {object}
  */
 const portContract = {
-	name: "KeyState",
-	version: "1.0.0",
+	name: 'KeyState',
+	version: '1.0.0',
 
 	/**
 	 * KS_IsDown(keyName) — Returns true when the key is physically held down.
@@ -52,12 +49,9 @@ const portContract = {
 	 */
 	methods: {
 		KS_IsDown: { arity: 1, required: true },
-		KS_IsUp:   { arity: 1, required: true },
-	},
+		KS_IsUp: { arity: 1, required: true }
+	}
 };
-
-
-
 
 // ================================================
 // ================================================
@@ -72,24 +66,19 @@ const portContract = {
  */
 function validateAdapter(adapter) {
 	const violations = [];
-	if (!adapter || typeof adapter !== "object") {
-		return ["adapter must be a non-null object"];
+	if (!adapter || typeof adapter !== 'object') {
+		return ['adapter must be a non-null object'];
 	}
 	for (const [name, spec] of Object.entries(portContract.methods)) {
 		if (!spec.required) continue;
-		if (typeof adapter[name] !== "function") {
+		if (typeof adapter[name] !== 'function') {
 			violations.push(`missing method: ${name}`);
 		} else if (adapter[name].length !== spec.arity) {
-			violations.push(
-				`method ${name}: expected arity ${spec.arity}, got ${adapter[name].length}`
-			);
+			violations.push(`method ${name}: expected arity ${spec.arity}, got ${adapter[name].length}`);
 		}
 	}
 	return violations;
 }
-
-
-
 
 // ================================================
 // ================================================
@@ -107,48 +96,44 @@ function validateAdapter(adapter) {
 function contractTestVectors() {
 	return [
 		{
-			id: "is_down_unknown_key_returns_false",
-			description: "KS_IsDown() with an unknown key name returns false.",
+			id: 'is_down_unknown_key_returns_false',
+			description: 'KS_IsDown() with an unknown key name returns false.',
 			steps: [
-				{ call: "KS_IsDown", args: ["ERGOPTI_NONEXISTENT_KEY_XYZ"] },
-				{ assert: "return_false" },
-			],
+				{ call: 'KS_IsDown', args: ['ERGOPTI_NONEXISTENT_KEY_XYZ'] },
+				{ assert: 'return_false' }
+			]
 		},
 		{
-			id: "is_up_unknown_key_returns_true",
-			description: "KS_IsUp() with an unknown key name returns true (not pressed = up).",
-			steps: [
-				{ call: "KS_IsUp", args: ["ERGOPTI_NONEXISTENT_KEY_XYZ"] },
-				{ assert: "return_true" },
-			],
+			id: 'is_up_unknown_key_returns_true',
+			description: 'KS_IsUp() with an unknown key name returns true (not pressed = up).',
+			steps: [{ call: 'KS_IsUp', args: ['ERGOPTI_NONEXISTENT_KEY_XYZ'] }, { assert: 'return_true' }]
 		},
 		{
-			id: "is_down_is_up_are_inverse",
-			description: "KS_IsDown and KS_IsUp return opposite values for the same key.",
+			id: 'is_down_is_up_are_inverse',
+			description: 'KS_IsDown and KS_IsUp return opposite values for the same key.',
 			steps: [
-				{ call: "KS_IsDown", args: ["LShift"] },
-				{ call: "KS_IsUp",   args: ["LShift"] },
-				{ assert: "return_inverse_pair" },
-			],
+				{ call: 'KS_IsDown', args: ['LShift'] },
+				{ call: 'KS_IsUp', args: ['LShift'] },
+				{ assert: 'return_inverse_pair' }
+			]
 		},
 		{
-			id: "is_down_returns_boolean",
-			description: "KS_IsDown() returns a boolean, never throws.",
+			id: 'is_down_returns_boolean',
+			description: 'KS_IsDown() returns a boolean, never throws.',
 			steps: [
-				{ call: "KS_IsDown", args: ["SC038"] },
-				{ assert: "return_type_one_of", expected: ["boolean"] },
-			],
+				{ call: 'KS_IsDown', args: ['SC038'] },
+				{ assert: 'return_type_one_of', expected: ['boolean'] }
+			]
 		},
 		{
-			id: "is_up_returns_boolean",
-			description: "KS_IsUp() returns a boolean, never throws.",
+			id: 'is_up_returns_boolean',
+			description: 'KS_IsUp() returns a boolean, never throws.',
 			steps: [
-				{ call: "KS_IsUp", args: ["SC038"] },
-				{ assert: "return_type_one_of", expected: ["boolean"] },
-			],
-		},
+				{ call: 'KS_IsUp', args: ['SC038'] },
+				{ assert: 'return_type_one_of', expected: ['boolean'] }
+			]
+		}
 	];
 }
-
 
 module.exports = { portContract, validateAdapter, contractTestVectors };

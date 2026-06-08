@@ -24,10 +24,7 @@
  * ==============================================================================
  */
 
-"use strict";
-
-
-
+'use strict';
 
 // ==================================================
 // ==================================================
@@ -40,8 +37,8 @@
  * @type {object}
  */
 const portContract = {
-	name: "TextSender",
-	version: "1.0.0",
+	name: 'TextSender',
+	version: '1.0.0',
 
 	/**
 	 * send(text, opts, callback) — Insert text at the current insertion point.
@@ -70,20 +67,17 @@ const portContract = {
 	 *   @error_behavior "log_and_return" on failure.
 	 */
 	methods: {
-		send:       { arity: 3, required: true },
+		send: { arity: 3, required: true },
 		eraseChars: { arity: 1, required: true },
-		pressKey:   { arity: 2, required: true },
+		pressKey: { arity: 2, required: true }
 	},
 
 	/**
 	 * Payload threshold above which "auto" mode switches to clipboard.
 	 * Adapters MUST respect this threshold when mode="auto".
 	 */
-	CLIPBOARD_THRESHOLD: 1000,
+	CLIPBOARD_THRESHOLD: 1000
 };
-
-
-
 
 // ==================================================
 // ==================================================
@@ -98,24 +92,19 @@ const portContract = {
  */
 function validateAdapter(adapter) {
 	const violations = [];
-	if (!adapter || typeof adapter !== "object") {
-		return ["adapter must be a non-null object"];
+	if (!adapter || typeof adapter !== 'object') {
+		return ['adapter must be a non-null object'];
 	}
 	for (const [name, spec] of Object.entries(portContract.methods)) {
 		if (!spec.required) continue;
-		if (typeof adapter[name] !== "function") {
+		if (typeof adapter[name] !== 'function') {
 			violations.push(`missing method: ${name}`);
 		} else if (adapter[name].length !== spec.arity) {
-			violations.push(
-				`method ${name}: expected arity ${spec.arity}, got ${adapter[name].length}`
-			);
+			violations.push(`method ${name}: expected arity ${spec.arity}, got ${adapter[name].length}`);
 		}
 	}
 	return violations;
 }
-
-
-
 
 // ==================================================
 // ==================================================
@@ -130,57 +119,56 @@ function validateAdapter(adapter) {
 function contractTestVectors() {
 	return [
 		{
-			id: "send_short_text_direct",
-			description: "Short text (<= threshold) completes synchronously via callback.",
-			input: { text: "hello", opts: { mode: "direct" } },
-			assert: { callback_called: true, captured_text: "hello" },
+			id: 'send_short_text_direct',
+			description: 'Short text (<= threshold) completes synchronously via callback.',
+			input: { text: 'hello', opts: { mode: 'direct' } },
+			assert: { callback_called: true, captured_text: 'hello' }
 		},
 		{
-			id: "send_long_text_clipboard",
-			description: "Text above CLIPBOARD_THRESHOLD uses clipboard mode.",
+			id: 'send_long_text_clipboard',
+			description: 'Text above CLIPBOARD_THRESHOLD uses clipboard mode.',
 			input: {
 				// 1001 'a' characters — above the 1000-char threshold
-				text: "a".repeat(1001),
-				opts: { mode: "auto" },
+				text: 'a'.repeat(1001),
+				opts: { mode: 'auto' }
 			},
 			assert: {
 				callback_called: true,
 				// Harness asserts clipboard was written with this text
-				clipboard_written: true,
-			},
+				clipboard_written: true
+			}
 		},
 		{
-			id: "erase_chars",
-			description: "eraseChars(3) emits exactly 3 Backspace events.",
+			id: 'erase_chars',
+			description: 'eraseChars(3) emits exactly 3 Backspace events.',
 			input: { count: 3 },
-			assert: { backspace_count: 3 },
+			assert: { backspace_count: 3 }
 		},
 		{
-			id: "erase_chars_zero",
-			description: "eraseChars(0) is a no-op — zero Backspace events.",
+			id: 'erase_chars_zero',
+			description: 'eraseChars(0) is a no-op — zero Backspace events.',
 			input: { count: 0 },
-			assert: { backspace_count: 0 },
+			assert: { backspace_count: 0 }
 		},
 		{
-			id: "press_key_no_modifiers",
+			id: 'press_key_no_modifiers',
 			description: "pressKey('Enter', []) emits a bare Enter keystroke.",
-			input: { key: "Enter", modifiers: [] },
-			assert: { key_emitted: "Enter", modifiers_emitted: [] },
+			input: { key: 'Enter', modifiers: [] },
+			assert: { key_emitted: 'Enter', modifiers_emitted: [] }
 		},
 		{
-			id: "press_key_with_modifier",
+			id: 'press_key_with_modifier',
 			description: "pressKey('v', ['Ctrl']) emits Ctrl+V.",
-			input: { key: "v", modifiers: ["Ctrl"] },
-			assert: { key_emitted: "v", modifiers_emitted: ["Ctrl"] },
+			input: { key: 'v', modifiers: ['Ctrl'] },
+			assert: { key_emitted: 'v', modifiers_emitted: ['Ctrl'] }
 		},
 		{
-			id: "send_nested_mode",
-			description: "Nested mode does not crash when called re-entrantly.",
-			input: { text: "nested", opts: { nested: true } },
-			assert: { callback_called: true },
-		},
+			id: 'send_nested_mode',
+			description: 'Nested mode does not crash when called re-entrantly.',
+			input: { text: 'nested', opts: { nested: true } },
+			assert: { callback_called: true }
+		}
 	];
 }
-
 
 module.exports = { portContract, validateAdapter, contractTestVectors };

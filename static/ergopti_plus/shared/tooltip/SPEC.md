@@ -21,11 +21,11 @@ static/ergopti_plus/shared/tooltip/
 
 Driver-side files that MUST stay in sync with this spec:
 
-| Driver | Constants file | Renderer |
-|---|---|---|
-| AHK | `lib/ui_style.ahk` | `lib/tooltip.ahk`, `ui/tooltip_llm.ahk` |
-| Hammerspoon | `ui/tooltip/config.lua` | `ui/tooltip/renderer.lua`, `ui/tooltip/tooltip_llm.lua` |
-| Future | Read `constants.toml` at boot or codegen from it | Implement the draw_calls[] adapter |
+| Driver      | Constants file                                   | Renderer                                                |
+| ----------- | ------------------------------------------------ | ------------------------------------------------------- |
+| AHK         | `lib/ui_style.ahk`                               | `lib/tooltip.ahk`, `ui/tooltip_llm.ahk`                 |
+| Hammerspoon | `ui/tooltip/config.lua`                          | `ui/tooltip/renderer.lua`, `ui/tooltip/tooltip_llm.lua` |
+| Future      | Read `constants.toml` at boot or codegen from it | Implement the draw_calls[] adapter                      |
 
 ---
 
@@ -47,18 +47,18 @@ that appears near the text insertion point. It shows:
 All values are defined in `constants.toml`. This table summarises the most
 important ones — refer to the TOML file for the full list.
 
-| Parameter | Value | Notes |
-|---|---|---|
-| Background | `#1A1A1A` (dark near-black) | Tinted per group via HSL mixing |
-| Corner radius | 7 layout units | GDI diameter = 14 on AHK |
-| Horizontal padding | 14 lu | Each side |
-| Vertical padding | 7 lu | Above and below each content row |
-| Border | white, alpha 0.25 (AHK) / 0.13 (HS) | 1 px stroke ring |
-| Separator | white, alpha 0.25 (AHK) / 0.09 (HS) | 1 px horizontal rule |
-| Main font (AHK) | Segoe UI, 11 pt | Windows system UI font |
-| Main font (HS) | .AppleSystemUIFont, 14 pt | macOS system UI font |
-| Hint font size | 11 lu | Trigger label, navigation hint |
-| Info font size | 10 lu | Model + timing bar (HS only) |
+| Parameter          | Value                               | Notes                            |
+| ------------------ | ----------------------------------- | -------------------------------- |
+| Background         | `#1A1A1A` (dark near-black)         | Tinted per group via HSL mixing  |
+| Corner radius      | 7 layout units                      | GDI diameter = 14 on AHK         |
+| Horizontal padding | 14 lu                               | Each side                        |
+| Vertical padding   | 7 lu                                | Above and below each content row |
+| Border             | white, alpha 0.25 (AHK) / 0.13 (HS) | 1 px stroke ring                 |
+| Separator          | white, alpha 0.25 (AHK) / 0.09 (HS) | 1 px horizontal rule             |
+| Main font (AHK)    | Segoe UI, 11 pt                     | Windows system UI font           |
+| Main font (HS)     | .AppleSystemUIFont, 14 pt           | macOS system UI font             |
+| Hint font size     | 11 lu                               | Trigger label, navigation hint   |
+| Info font size     | 10 lu                               | Model + timing bar (HS only)     |
 
 > **Why different border alphas?** macOS compositing blends layers differently
 > than Windows DWM. The AHK value (0.25) is applied to a pre-multiplied DIB
@@ -69,6 +69,7 @@ important ones — refer to the TOML file for the full list.
 
 Rows that will not fire (alternates in the same group beyond the selected one)
 are shown with:
+
 - Gray text (`white = 0.55` / `#8C8C8C`)
 - Strikethrough style
 - Dimmer label color (`white = 0.45, alpha = 0.55`)
@@ -96,11 +97,11 @@ Given an accent color `{r, g, b}` in [0.0, 1.0]:
 
 ### Driver Implementations
 
-| Driver | Function | File |
-|---|---|---|
-| AHK | `_TooltipMixTintHex(AccentHex)` | `lib/tooltip.ahk` |
-| Hammerspoon | `M.apply_tint(requested_tint)` | `ui/tooltip/renderer.lua` |
-| Reference | `mixTint(accent)` | `_shared/tooltip/tint.js` |
+| Driver      | Function                        | File                      |
+| ----------- | ------------------------------- | ------------------------- |
+| AHK         | `_TooltipMixTintHex(AccentHex)` | `lib/tooltip.ahk`         |
+| Hammerspoon | `M.apply_tint(requested_tint)`  | `ui/tooltip/renderer.lua` |
+| Reference   | `mixTint(accent)`               | `_shared/tooltip/tint.js` |
 
 The AHK function accepts and returns hex strings (`"RRGGBB"`). The HS function
 accepts and returns `{red, green, blue, alpha}` tables. The JS reference module
@@ -116,24 +117,24 @@ The canonical algorithm is implemented in `layout.js:resolvePosition()`.
 
 Each driver queries for an anchor in this priority order:
 
-| Priority | Source | Condition |
-|---|---|---|
-| 1 | Platform caret API | CaretGetPos (AHK) / AXBoundsForRange (HS) |
-| 2 | Accessibility element bounds | UIA.GetFocusedElement (AHK) / AXFrame (HS) |
-| 3 | Active window frame (bottom-centre) | Always available |
-| 4 | Screen centre-bottom | Fallback of last resort (never fails) |
+| Priority | Source                              | Condition                                  |
+| -------- | ----------------------------------- | ------------------------------------------ |
+| 1        | Platform caret API                  | CaretGetPos (AHK) / AXBoundsForRange (HS)  |
+| 2        | Accessibility element bounds        | UIA.GetFocusedElement (AHK) / AXFrame (HS) |
+| 3        | Active window frame (bottom-centre) | Always available                           |
+| 4        | Screen centre-bottom                | Fallback of last resort (never fails)      |
 
 AHK adds a step between 3 and 4: mouse cursor coordinates.
 HS adds VSCode Bridge before step 1.
 
 ### Anchor Types and Tooltip Placement
 
-| Anchor type | Placement |
-|---|---|
-| `"caret"` | Below-right: `x = anchor.x + 15`, `y = anchor.y + anchor.h + 18` |
-| `"input_box"` | Below, horizontally centred; flips above if bottom overflow |
-| `"window"` | Same as `input_box` |
-| `null` | Screen centre-bottom |
+| Anchor type   | Placement                                                        |
+| ------------- | ---------------------------------------------------------------- |
+| `"caret"`     | Below-right: `x = anchor.x + 15`, `y = anchor.y + anchor.h + 18` |
+| `"input_box"` | Below, horizontally centred; flips above if bottom overflow      |
+| `"window"`    | Same as `input_box`                                              |
+| `null`        | Screen centre-bottom                                             |
 
 ### Screen-Edge Clamping
 
@@ -282,11 +283,11 @@ the tooltip enters the **dequeue path** (canonical algorithm in `dequeue.js`):
 
 **Example:** output1 delay 1 s, output2 delay 2 s (decrement 0.2 s):
 
-| Elapsed | Visible rows |
-|---|---|
-| 0 – 0.8 s | output1 + output2 (stacked) |
-| 0.8 – 1.8 s | output2 only |
-| ≥ 1.8 s | hidden |
+| Elapsed     | Visible rows                |
+| ----------- | --------------------------- |
+| 0 – 0.8 s   | output1 + output2 (stacked) |
+| 0.8 – 1.8 s | output2 only                |
+| ≥ 1.8 s     | hidden                      |
 
 Rows with duration `0` never expire during a dequeue cycle (they stay until
 all finite rows have been pruned, or until an authoritative hide).
@@ -299,23 +300,23 @@ External hide requests (mouse move, lookup miss) are **suppressed** during an
 active dequeue cycle so longer rows are not killed when a shorter row expires.
 Authoritative hides (real keystroke, forced hide, new show) bypass the guard.
 
-| Driver | Implementation |
-|---|---|
-| AHK | `lib/tooltip.ahk` — `_TooltipDequeuePollFn`, `_TooltipDequeueActive` |
-| Hammerspoon | `ui/tooltip/dequeue.lua` + `ui/tooltip/tooltip_hotstring.lua` |
-| Reference | `dequeue.js:dequeueTestVectors()` |
+| Driver      | Implementation                                                       |
+| ----------- | -------------------------------------------------------------------- |
+| AHK         | `lib/tooltip.ahk` — `_TooltipDequeuePollFn`, `_TooltipDequeueActive` |
+| Hammerspoon | `ui/tooltip/dequeue.lua` + `ui/tooltip/tooltip_hotstring.lua`        |
+| Reference   | `dequeue.js:dequeueTestVectors()`                                    |
 
 ### 7.2 Effective duration
 
 From `constants.toml [timing]`:
 
-| Parameter | Value |
-|---|---|
-| Hotstring timeout | 2.5 s |
-| LLM timeout | 12.0 s |
-| Safety cap (duration = 0) | 3.0 s |
-| Timeout decrement | 0.15 s |
-| Timeout floor | 0.05 s |
+| Parameter                 | Value  |
+| ------------------------- | ------ |
+| Hotstring timeout         | 2.5 s  |
+| LLM timeout               | 12.0 s |
+| Safety cap (duration = 0) | 3.0 s  |
+| Timeout decrement         | 0.15 s |
+| Timeout floor             | 0.05 s |
 
 The **effective duration** is computed as:
 
@@ -341,18 +342,18 @@ tooltip lingers on screen.
 Canonical phases are defined in `lifecycle.js`. They prevent transient defects
 on Windows where the tooltip uses **two HWNDs** (content Gui + layered border):
 
-| Defect | Cause | Fix |
-|---|---|---|
-| Border ring alone | Content destroyed/hidden while border HWND stays visible | `SUSPEND` hides border before content; `TEARDOWN` destroys border first |
-| Empty tinted rectangle | Content `Show()` before controls/regions are ready | `PREPARE` uses `Show("Hide")`, apply region + border DIB, then `REVEAL` |
-| Ghost for ~3 s | Partial show path armed safety timer on a broken surface | `PREPARE` failure → immediate `TEARDOWN`; atomic `REVEAL` |
+| Defect                 | Cause                                                    | Fix                                                                     |
+| ---------------------- | -------------------------------------------------------- | ----------------------------------------------------------------------- |
+| Border ring alone      | Content destroyed/hidden while border HWND stays visible | `SUSPEND` hides border before content; `TEARDOWN` destroys border first |
+| Empty tinted rectangle | Content `Show()` before controls/regions are ready       | `PREPARE` uses `Show("Hide")`, apply region + border DIB, then `REVEAL` |
+| Ghost for ~3 s         | Partial show path armed safety timer on a broken surface | `PREPARE` failure → immediate `TEARDOWN`; atomic `REVEAL`               |
 
-| Phase | AHK | Hammerspoon |
-|---|---|---|
-| `TEARDOWN` | `TooltipHide()` | `M.hide()` / `hide_stacked()` / `hide_forced()` |
-| `SUSPEND` | `_TooltipSuspendSurfaces()` | N/A (single canvas — update elements while hidden) |
-| `PREPARE` | `_TooltipPresentStack` hidden half | `render()` sets all elements, then `canvas:show()` once |
-| `REVEAL` | `_TooltipRevealSurfaces()` | `canvas:show()` at end of `render()` |
+| Phase      | AHK                                | Hammerspoon                                             |
+| ---------- | ---------------------------------- | ------------------------------------------------------- |
+| `TEARDOWN` | `TooltipHide()`                    | `M.hide()` / `hide_stacked()` / `hide_forced()`         |
+| `SUSPEND`  | `_TooltipSuspendSurfaces()`        | N/A (single canvas — update elements while hidden)      |
+| `PREPARE`  | `_TooltipPresentStack` hidden half | `render()` sets all elements, then `canvas:show()` once |
+| `REVEAL`   | `_TooltipRevealSurfaces()`         | `canvas:show()` at end of `render()`                    |
 
 Dequeue destack rebuilds on AHK use `SUSPEND → build → REVEAL` via
 `_TooltipDequeueRebuild()` instead of full `TEARDOWN` between row expiries.

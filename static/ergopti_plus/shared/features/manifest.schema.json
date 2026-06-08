@@ -14,13 +14,12 @@
 	},
 
 	"$defs": {
-
 		"manifest_meta": {
 			"type": "object",
 			"additionalProperties": false,
 			"required": ["version"],
 			"properties": {
-				"version":       { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+				"version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
 				"config_schema": { "type": "string", "format": "uri" }
 			}
 		},
@@ -75,14 +74,16 @@
 			"additionalProperties": false,
 			"required": ["id", "description_key"],
 			"properties": {
-				"id":              { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
-				"default":         { "description": "Primitive (bool/number/string/array) OR table. Mutually optional with default_per_platform — exactly one of them must be set." },
+				"id": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+				"default": {
+					"description": "Primitive (bool/number/string/array) OR table. Mutually optional with default_per_platform — exactly one of them must be set."
+				},
 				"default_per_platform": {
 					"type": "object",
 					"additionalProperties": false,
 					"properties": {
 						"ahk": {},
-						"hs":  {}
+						"hs": {}
 					},
 					"description": "Per-platform default value. Use only when the default legitimately differs per driver."
 				},
@@ -103,14 +104,11 @@
 				}
 			},
 
-			"oneOf": [
-				{ "required": ["default"] },
-				{ "required": ["default_per_platform"] }
-			],
+			"oneOf": [{ "required": ["default"] }, { "required": ["default_per_platform"] }],
 
 			"allOf": [
 				{
-					"if":   { "properties": { "type": { "const": "enum" } }, "required": ["type"] },
+					"if": { "properties": { "type": { "const": "enum" } }, "required": ["type"] },
 					"then": { "required": ["enum_values"] }
 				}
 			]

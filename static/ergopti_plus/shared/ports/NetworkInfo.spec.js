@@ -21,10 +21,7 @@
  * ==============================================================================
  */
 
-"use strict";
-
-
-
+'use strict';
 
 // ==================================================
 // ==================================================
@@ -37,8 +34,8 @@
  * @type {object}
  */
 const portContract = {
-	name: "NetworkInfo",
-	version: "1.0.0",
+	name: 'NetworkInfo',
+	version: '1.0.0',
 
 	/**
 	 * getSsidHash() — Return a SHA-256 hex digest of the active Wi-Fi SSID.
@@ -58,15 +55,12 @@ const portContract = {
 	 *   @error_behavior "return_false".
 	 */
 	methods: {
-		getSsidHash:          { arity: 0, required: true },
-		getSignalStrength:    { arity: 0, required: true },
-		isInternetReachable:  { arity: 0, required: true },
-		isVpnActive:          { arity: 0, required: true },
-	},
+		getSsidHash: { arity: 0, required: true },
+		getSignalStrength: { arity: 0, required: true },
+		isInternetReachable: { arity: 0, required: true },
+		isVpnActive: { arity: 0, required: true }
+	}
 };
-
-
-
 
 // ==================================================
 // ==================================================
@@ -81,24 +75,19 @@ const portContract = {
  */
 function validateAdapter(adapter) {
 	const violations = [];
-	if (!adapter || typeof adapter !== "object") {
-		return ["adapter must be a non-null object"];
+	if (!adapter || typeof adapter !== 'object') {
+		return ['adapter must be a non-null object'];
 	}
 	for (const [name, spec] of Object.entries(portContract.methods)) {
 		if (!spec.required) continue;
-		if (typeof adapter[name] !== "function") {
+		if (typeof adapter[name] !== 'function') {
 			violations.push(`missing method: ${name}`);
 		} else if (adapter[name].length !== spec.arity) {
-			violations.push(
-				`method ${name}: expected arity ${spec.arity}, got ${adapter[name].length}`
-			);
+			violations.push(`method ${name}: expected arity ${spec.arity}, got ${adapter[name].length}`);
 		}
 	}
 	return violations;
 }
-
-
-
 
 // ==================================================
 // ==================================================
@@ -113,43 +102,38 @@ function validateAdapter(adapter) {
 function contractTestVectors() {
 	return [
 		{
-			id: "get_ssid_hash_returns_string_or_null",
-			description: "getSsidHash() returns a hex string or null — never throws.",
+			id: 'get_ssid_hash_returns_string_or_null',
+			description: 'getSsidHash() returns a hex string or null — never throws.',
 			steps: [
-				{ call: "getSsidHash" },
-				{ assert: "return_string_or_null" },
-				{ assert: "no_exception" },
-			],
+				{ call: 'getSsidHash' },
+				{ assert: 'return_string_or_null' },
+				{ assert: 'no_exception' }
+			]
 		},
 		{
-			id: "get_signal_strength_returns_number_or_null",
-			description: "getSignalStrength() returns a number 0-100 or null — never throws.",
+			id: 'get_signal_strength_returns_number_or_null',
+			description: 'getSignalStrength() returns a number 0-100 or null — never throws.',
 			steps: [
-				{ call: "getSignalStrength" },
-				{ assert: "return_number_or_null" },
-				{ assert: "no_exception" },
-			],
+				{ call: 'getSignalStrength' },
+				{ assert: 'return_number_or_null' },
+				{ assert: 'no_exception' }
+			]
 		},
 		{
-			id: "is_internet_reachable_returns_bool",
-			description: "isInternetReachable() always returns a boolean — never throws.",
+			id: 'is_internet_reachable_returns_bool',
+			description: 'isInternetReachable() always returns a boolean — never throws.',
 			steps: [
-				{ call: "isInternetReachable" },
-				{ assert: "return_boolean" },
-				{ assert: "no_exception" },
-			],
+				{ call: 'isInternetReachable' },
+				{ assert: 'return_boolean' },
+				{ assert: 'no_exception' }
+			]
 		},
 		{
-			id: "is_vpn_active_returns_bool",
-			description: "isVpnActive() always returns a boolean — never throws.",
-			steps: [
-				{ call: "isVpnActive" },
-				{ assert: "return_boolean" },
-				{ assert: "no_exception" },
-			],
-		},
+			id: 'is_vpn_active_returns_bool',
+			description: 'isVpnActive() always returns a boolean — never throws.',
+			steps: [{ call: 'isVpnActive' }, { assert: 'return_boolean' }, { assert: 'no_exception' }]
+		}
 	];
 }
-
 
 module.exports = { portContract, validateAdapter, contractTestVectors };

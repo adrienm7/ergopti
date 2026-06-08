@@ -523,16 +523,36 @@ function _finger_label(key) {
 }
 
 const FINGER_LABELS_FR = {
-	get l_pinky() { return _finger_label('l_pinky'); },
-	get l_ring()  { return _finger_label('l_ring'); },
-	get l_mid()   { return _finger_label('l_mid'); },
-	get l_idx()   { return _finger_label('l_idx'); },
-	get l_thumb() { return _finger_label('l_thumb'); },
-	get r_idx()   { return _finger_label('r_idx'); },
-	get r_mid()   { return _finger_label('r_mid'); },
-	get r_ring()  { return _finger_label('r_ring'); },
-	get r_pinky() { return _finger_label('r_pinky'); },
-	get r_thumb() { return _finger_label('r_thumb'); }
+	get l_pinky() {
+		return _finger_label('l_pinky');
+	},
+	get l_ring() {
+		return _finger_label('l_ring');
+	},
+	get l_mid() {
+		return _finger_label('l_mid');
+	},
+	get l_idx() {
+		return _finger_label('l_idx');
+	},
+	get l_thumb() {
+		return _finger_label('l_thumb');
+	},
+	get r_idx() {
+		return _finger_label('r_idx');
+	},
+	get r_mid() {
+		return _finger_label('r_mid');
+	},
+	get r_ring() {
+		return _finger_label('r_ring');
+	},
+	get r_pinky() {
+		return _finger_label('r_pinky');
+	},
+	get r_thumb() {
+		return _finger_label('r_thumb');
+	}
 };
 
 // Pause-threshold buckets emitted by the keylogger as cumulative cache fields.

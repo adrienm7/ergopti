@@ -1,10 +1,10 @@
 # 001 — Hexagonal architecture with ports and adapters
 
-| Field | Value |
-|---|---|
-| **Date** | 2025-09-01 |
-| **Status** | Accepted |
-| **Deciders** | Core team |
+| Field        | Value      |
+| ------------ | ---------- |
+| **Date**     | 2025-09-01 |
+| **Status**   | Accepted   |
+| **Deciders** | Core team  |
 
 ---
 
@@ -70,11 +70,11 @@ The twenty port contracts are: `FileSystem`, `HttpClient`, `KeyboardHook`,
 
 ## Alternatives considered
 
-| Alternative | Why rejected |
-|---|---|
-| Shared Lua/AHK utility library | Would tightly couple drivers to a shared runtime, breaking the hermetic test boundary |
-| Driver-specific abstraction layers | Would still require per-driver test stubs; harder to cross-validate |
-| No abstraction (status quo) | Made Linux driver addition require a full rewrite |
+| Alternative                        | Why rejected                                                                          |
+| ---------------------------------- | ------------------------------------------------------------------------------------- |
+| Shared Lua/AHK utility library     | Would tightly couple drivers to a shared runtime, breaking the hermetic test boundary |
+| Driver-specific abstraction layers | Would still require per-driver test stubs; harder to cross-validate                   |
+| No abstraction (status quo)        | Made Linux driver addition require a full rewrite                                     |
 
 ## Evidence in the codebase
 

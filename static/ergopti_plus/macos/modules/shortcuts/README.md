@@ -6,11 +6,11 @@ Orchestrates the shortcuts subsystem. Groups standard text/system utility shortc
 
 ## Ports used (`_shared/ports/`)
 
-| Port | Usage |
-|---|---|
-| `KeyboardHook` | Registering global hotkeys for all shortcut bindings |
-| `Clipboard` | Copy/paste utility shortcuts wired through `bindings.lua` |
-| `ProcessLifecycle` | Script reload and quit actions in `script_control.lua` |
+| Port               | Usage                                                     |
+| ------------------ | --------------------------------------------------------- |
+| `KeyboardHook`     | Registering global hotkeys for all shortcut bindings      |
+| `Clipboard`        | Copy/paste utility shortcuts wired through `bindings.lua` |
+| `ProcessLifecycle` | Script reload and quit actions in `script_control.lua`    |
 
 ## Domain module (`_shared/domain/`)
 
@@ -18,13 +18,13 @@ No domain spec directly consumed. The module is purely driver-side and exposes i
 
 ## Public API
 
-| Function | Description |
-|---|---|
-| `M.init(state)` | Initialize with the shared core state table |
-| `M.start()` | Register all active hotkeys |
-| `M.stop()` | Unregister all hotkeys |
+| Function                      | Description                                   |
+| ----------------------------- | --------------------------------------------- |
+| `M.init(state)`               | Initialize with the shared core state table   |
+| `M.start()`                   | Register all active hotkeys                   |
+| `M.stop()`                    | Unregister all hotkeys                        |
 | `M.set_enabled(group, value)` | Enable or disable a shortcut group at runtime |
-| `M.get_chatgpt_url()` | Return the currently configured ChatGPT URL |
+| `M.get_chatgpt_url()`         | Return the currently configured ChatGPT URL   |
 
 ## Init pattern
 

@@ -7,8 +7,8 @@
 	/** @type {Awaited<ReturnType<typeof getRelease>>} */
 	let release = null;
 	// Extrait « 2.2.1 » depuis « v2.2.1 » ou « v2.2.1-dev.3 »
-	$: tag = release?.tag?.replace(/^v/, "") ?? "…";
-	$: urlKbdEdit = release?.url("Ergopti_windows.exe") ?? "#";
+	$: tag = release?.tag?.replace(/^v/, '') ?? '…';
+	$: urlKbdEdit = release?.url('Ergopti_windows.exe') ?? '#';
 
 	onMount(async () => {
 		release = await getRelease();
@@ -40,9 +40,9 @@
 <small-space></small-space>
 
 <p>
-	Il suffit d'exécuter le fichier <code>Ergopti_windows.exe</code> et de cliquer
-	sur le bouton d'installation pour installer le pilote sur Windows. Ensuite, il est conseillé de redémarrer
-	l'ordinateur pour être sûr que le pilote soit bien pris en compte.
+	Il suffit d'exécuter le fichier <code>Ergopti_windows.exe</code> et de cliquer sur le bouton d'installation
+	pour installer le pilote sur Windows. Ensuite, il est conseillé de redémarrer l'ordinateur pour être
+	sûr que le pilote soit bien pris en compte.
 </p>
 <enhanced:img
 	class="no-upscale"
@@ -90,7 +90,8 @@
 
 <h3 id="windows-solutions">Résolution de problèmes connus</h3>
 <p>
-	Certains problèmes ont été rapportés avec le pilote Windows d'<Ergopti></Ergopti> dans quelques logiciels :
+	Certains problèmes ont été rapportés avec le pilote Windows d'<Ergopti></Ergopti> dans quelques logiciels
+	:
 </p>
 <ul>
 	<li>

@@ -16,7 +16,7 @@ import { join } from 'path';
 
 const TITLE_MAJOR_RE = /^# ======= (.+) =======$/;
 const TITLE_MINOR_RE = /^# ===== (.+) =====$/;
-const BANNER_RE      = /^# =+$/;
+const BANNER_RE = /^# =+$/;
 
 function makeBanner(length) {
 	return '# ' + '='.repeat(length - 2);
@@ -33,17 +33,19 @@ function processFile(filePath, fix) {
 		const minorMatch = line.match(TITLE_MINOR_RE);
 
 		if (majorMatch) {
-			const title    = majorMatch[1];
+			const title = majorMatch[1];
 			const expected = 18 + title.length;
 			for (const offset of [-2, -1, 1, 2]) {
-				const idx    = i + offset;
+				const idx = i + offset;
 				const banner = lines[idx];
 				if (!banner || !BANNER_RE.test(banner)) {
 					errors.push(`${filePath}:${idx + 1}  missing major-banner line around "${title}"`);
 					continue;
 				}
 				if (banner.length !== expected) {
-					errors.push(`${filePath}:${idx + 1}  major-banner length=${banner.length} expected=${expected}`);
+					errors.push(
+						`${filePath}:${idx + 1}  major-banner length=${banner.length} expected=${expected}`
+					);
 					if (fix) {
 						lines[idx] = makeBanner(expected);
 						mutated = true;
@@ -51,17 +53,19 @@ function processFile(filePath, fix) {
 				}
 			}
 		} else if (minorMatch) {
-			const title    = minorMatch[1];
+			const title = minorMatch[1];
 			const expected = 14 + title.length;
 			for (const offset of [-1, 1]) {
-				const idx    = i + offset;
+				const idx = i + offset;
 				const banner = lines[idx];
 				if (!banner || !BANNER_RE.test(banner)) {
 					errors.push(`${filePath}:${idx + 1}  missing minor-banner line around "${title}"`);
 					continue;
 				}
 				if (banner.length !== expected) {
-					errors.push(`${filePath}:${idx + 1}  minor-banner length=${banner.length} expected=${expected}`);
+					errors.push(
+						`${filePath}:${idx + 1}  minor-banner length=${banner.length} expected=${expected}`
+					);
 					if (fix) {
 						lines[idx] = makeBanner(expected);
 						mutated = true;
@@ -96,8 +100,8 @@ function walk(target, fix) {
 }
 
 const rawArgs = process.argv.slice(2);
-const fix     = rawArgs.includes('--fix');
-const targets = rawArgs.filter(a => a !== '--fix');
+const fix = rawArgs.includes('--fix');
+const targets = rawArgs.filter((a) => a !== '--fix');
 
 if (targets.length === 0) {
 	console.error('Usage: node scripts/audit-banner-alignment.js [--fix] <file_or_dir> [...]');

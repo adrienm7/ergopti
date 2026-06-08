@@ -6,10 +6,10 @@
  * produce the same isNewerVersion() results as this module.
  */
 
-"use strict";
+'use strict';
 
-const DEFAULT_GH_OWNER = "adrienm7";
-const DEFAULT_GH_REPO = "ergopti";
+const DEFAULT_GH_OWNER = 'adrienm7';
+const DEFAULT_GH_REPO = 'ergopti';
 const DEV_RELEASES_PAGE_SIZE = 10;
 
 /**
@@ -17,9 +17,9 @@ const DEV_RELEASES_PAGE_SIZE = 10;
  * @returns {string}
  */
 function normalizeTag(tag) {
-	if (tag == null) return "";
+	if (tag == null) return '';
 	let t = String(tag).trim();
-	if (t.startsWith("v") || t.startsWith("V")) t = t.slice(1);
+	if (t.startsWith('v') || t.startsWith('V')) t = t.slice(1);
 	return t;
 }
 
@@ -35,7 +35,7 @@ function parseVersion(tag) {
 		major: Number(m[1]),
 		minor: Number(m[2]),
 		patch: Number(m[3]),
-		prerelease: m[4] ? m[4].split(".") : null,
+		prerelease: m[4] ? m[4].split('.') : null
 	};
 }
 
@@ -119,7 +119,7 @@ function releaseApiUrl(channel, opts = {}) {
 	const owner = opts.owner ?? DEFAULT_GH_OWNER;
 	const repo = opts.repo ?? DEFAULT_GH_REPO;
 	const base = `https://api.github.com/repos/${owner}/${repo}/releases`;
-	if (channel === "dev") {
+	if (channel === 'dev') {
 		const page = opts.devPageSize ?? DEV_RELEASES_PAGE_SIZE;
 		return `${base}?per_page=${page}`;
 	}
@@ -133,7 +133,7 @@ function releaseApiUrl(channel, opts = {}) {
  */
 function parseTagName(json) {
 	const m = json.match(/"tag_name"\s*:\s*"([^"]+)"/);
-	return m ? m[1] : "";
+	return m ? m[1] : '';
 }
 
 /**
@@ -145,8 +145,8 @@ function parseTagName(json) {
  */
 function pickLatestPrereleaseJson(json) {
 	const chunks = splitReleasesArray(json);
-	let bestChunk = "";
-	let bestTag = "";
+	let bestChunk = '';
+	let bestTag = '';
 	for (const chunk of chunks) {
 		if (!parsePrereleaseFlag(chunk)) continue;
 		const tag = parseTagName(chunk);
@@ -174,7 +174,7 @@ function unwrapFirstPrereleaseJson(json) {
  */
 function parsePrereleaseFlag(json) {
 	const m = json.match(/"prerelease"\s*:\s*(true|false)/);
-	return m ? m[1] === "true" : false;
+	return m ? m[1] === 'true' : false;
 }
 
 /**
@@ -184,7 +184,7 @@ function parsePrereleaseFlag(json) {
 function splitReleasesArray(json) {
 	const out = [];
 	const trimmed = json.trimStart();
-	if (!trimmed.startsWith("[")) return out;
+	if (!trimmed.startsWith('[')) return out;
 	let pos = 1;
 	let depth = 0;
 	let start = 0;
@@ -194,14 +194,14 @@ function splitReleasesArray(json) {
 		const c = trimmed[pos];
 		if (inStr) {
 			if (esc) esc = false;
-			else if (c === "\\") esc = true;
+			else if (c === '\\') esc = true;
 			else if (c === '"') inStr = false;
 		} else if (c === '"') {
 			inStr = true;
-		} else if (c === "{") {
+		} else if (c === '{') {
 			if (depth === 0) start = pos;
 			depth += 1;
-		} else if (c === "}") {
+		} else if (c === '}') {
 			depth -= 1;
 			if (depth === 0 && start > 0) {
 				out.push(trimmed.slice(start, pos + 1));
@@ -219,41 +219,41 @@ function splitReleasesArray(json) {
 function versionTestVectors() {
 	return [
 		{
-			id: "prerelease_increment",
-			current: "2.5.0-dev.3",
-			latest: "2.5.0-dev.4",
-			expectNewer: true,
+			id: 'prerelease_increment',
+			current: '2.5.0-dev.3',
+			latest: '2.5.0-dev.4',
+			expectNewer: true
 		},
 		{
-			id: "prerelease_numeric_order",
-			current: "2.5.0-dev.10",
-			latest: "2.5.0-dev.4",
-			expectNewer: false,
+			id: 'prerelease_numeric_order',
+			current: '2.5.0-dev.10',
+			latest: '2.5.0-dev.4',
+			expectNewer: false
 		},
 		{
-			id: "same_prerelease",
-			current: "v2.5.0-dev.3",
-			latest: "2.5.0-dev.3",
-			expectNewer: false,
+			id: 'same_prerelease',
+			current: 'v2.5.0-dev.3',
+			latest: '2.5.0-dev.3',
+			expectNewer: false
 		},
 		{
-			id: "patch_bump",
-			current: "2.4.9",
-			latest: "2.5.0-dev.1",
-			expectNewer: true,
+			id: 'patch_bump',
+			current: '2.4.9',
+			latest: '2.5.0-dev.1',
+			expectNewer: true
 		},
 		{
-			id: "stable_over_prerelease_same_core",
-			current: "2.5.0-dev.4",
-			latest: "2.5.0",
-			expectNewer: true,
+			id: 'stable_over_prerelease_same_core',
+			current: '2.5.0-dev.4',
+			latest: '2.5.0',
+			expectNewer: true
 		},
 		{
-			id: "prerelease_not_newer_than_stable",
-			current: "2.5.0",
-			latest: "2.5.0-dev.4",
-			expectNewer: false,
-		},
+			id: 'prerelease_not_newer_than_stable',
+			current: '2.5.0',
+			latest: '2.5.0-dev.4',
+			expectNewer: false
+		}
 	];
 }
 
@@ -271,5 +271,5 @@ module.exports = {
 	unwrapFirstPrereleaseJson,
 	splitReleasesArray,
 	parsePrereleaseFlag,
-	versionTestVectors,
+	versionTestVectors
 };

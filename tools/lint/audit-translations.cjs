@@ -25,12 +25,27 @@ const missingKeys = new Map(); // key -> file[]
 
 function walkFiles(dir, ext, out = []) {
 	let entries;
-	try { entries = fs.readdirSync(dir); } catch { return out; }
+	try {
+		entries = fs.readdirSync(dir);
+	} catch {
+		return out;
+	}
 	for (const e of entries) {
-		if (e === 'node_modules' || e === '.git' || e === '_generated' || e === 'tests' || e === 'vendor') continue;
+		if (
+			e === 'node_modules' ||
+			e === '.git' ||
+			e === '_generated' ||
+			e === 'tests' ||
+			e === 'vendor'
+		)
+			continue;
 		const full = path.join(dir, e);
 		let st;
-		try { st = fs.statSync(full); } catch { continue; }
+		try {
+			st = fs.statSync(full);
+		} catch {
+			continue;
+		}
 		if (st.isDirectory()) walkFiles(full, ext, out);
 		else if (ext.includes(path.extname(e))) out.push(full);
 	}
@@ -38,41 +53,41 @@ function walkFiles(dir, ext, out = []) {
 }
 
 function auditFile(filePath) {
-    const content = fs.readFileSync(filePath, 'utf8').replace(/^\uFEFF/, '');
-    
-    // Remove comments to avoid false positives (e.g. documentation t("sg_actions.X"))
-    const isAhk = path.extname(filePath) === '.ahk';
-    const cleanContent = isAhk 
-        ? content.replace(/;.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '')
-        : content.replace(/--.*$/gm, '').replace(/--\[\[[\s\S]*?\]\]/g, '');
+	const content = fs.readFileSync(filePath, 'utf8').replace(/^\uFEFF/, '');
 
-    // Regex for t("key") or t('key')
-    const regex = /\bt\(\s*["']([^"']+)["']\s*\)/g;
-    let match;
-    while ((match = regex.exec(cleanContent)) !== null) {
-        const key = match[1];
-        // Skip dynamic keys (containing %s or variable lookups that are hard to audit statically)
-        if (key.includes('%') || key.startsWith('category.')) continue;
-        
-        if (!availableKeys.has(key)) {
-            if (!missingKeys.has(key)) missingKeys.set(key, []);
-            missingKeys.get(key).push(path.relative(REPO_ROOT, filePath));
-        }
-    }
+	// Remove comments to avoid false positives (e.g. documentation t("sg_actions.X"))
+	const isAhk = path.extname(filePath) === '.ahk';
+	const cleanContent = isAhk
+		? content.replace(/;.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '')
+		: content.replace(/--.*$/gm, '').replace(/--\[\[[\s\S]*?\]\]/g, '');
+
+	// Regex for t("key") or t('key')
+	const regex = /\bt\(\s*["']([^"']+)["']\s*\)/g;
+	let match;
+	while ((match = regex.exec(cleanContent)) !== null) {
+		const key = match[1];
+		// Skip dynamic keys (containing %s or variable lookups that are hard to audit statically)
+		if (key.includes('%') || key.startsWith('category.')) continue;
+
+		if (!availableKeys.has(key)) {
+			if (!missingKeys.has(key)) missingKeys.set(key, []);
+			missingKeys.get(key).push(path.relative(REPO_ROOT, filePath));
+		}
+	}
 }
 
 // Audit Menu Manifest
 const manifest = JSON.parse(fs.readFileSync(MANIFEST_PATH, 'utf8').replace(/^\uFEFF/, ''));
 function auditManifest(obj) {
-    if (Array.isArray(obj)) {
-        obj.forEach(auditManifest);
-    } else if (typeof obj === 'object' && obj !== null) {
-        if (obj.i18n && !availableKeys.has(obj.i18n)) {
-            if (!missingKeys.has(obj.i18n)) missingKeys.set(obj.i18n, []);
-            missingKeys.get(obj.i18n).push('static/ergopti_plus/shared/menu_manifest.json');
-        }
-        Object.values(obj).forEach(auditManifest);
-    }
+	if (Array.isArray(obj)) {
+		obj.forEach(auditManifest);
+	} else if (typeof obj === 'object' && obj !== null) {
+		if (obj.i18n && !availableKeys.has(obj.i18n)) {
+			if (!missingKeys.has(obj.i18n)) missingKeys.set(obj.i18n, []);
+			missingKeys.get(obj.i18n).push('static/ergopti_plus/shared/menu_manifest.json');
+		}
+		Object.values(obj).forEach(auditManifest);
+	}
 }
 auditManifest(manifest);
 
@@ -84,12 +99,12 @@ const allFiles = [...ahkFiles, ...luaFiles];
 allFiles.forEach(auditFile);
 
 if (missingKeys.size > 0) {
-    console.error('\x1b[31m[ERROR] Missing translation keys detected:\x1b[0m');
-    for (const [key, locations] of missingKeys) {
-        console.error(`  - \x1b[33m${key}\x1b[0m referenced in:`);
-        [...new Set(locations)].forEach(loc => console.error(`      ${loc}`));
-    }
-    process.exit(1);
+	console.error('\x1b[31m[ERROR] Missing translation keys detected:\x1b[0m');
+	for (const [key, locations] of missingKeys) {
+		console.error(`  - \x1b[33m${key}\x1b[0m referenced in:`);
+		[...new Set(locations)].forEach((loc) => console.error(`      ${loc}`));
+	}
+	process.exit(1);
 } else {
-    console.log('\x1b[32m[OK] All static translation keys are present in en.json.\x1b[0m');
+	console.log('\x1b[32m[OK] All static translation keys are present in en.json.\x1b[0m');
 }

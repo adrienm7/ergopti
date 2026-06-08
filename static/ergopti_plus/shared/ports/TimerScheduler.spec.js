@@ -23,10 +23,7 @@
  * ==============================================================================
  */
 
-"use strict";
-
-
-
+'use strict';
 
 // ==================================================
 // ==================================================
@@ -39,8 +36,8 @@
  * @type {object}
  */
 const portContract = {
-	name: "TimerScheduler",
-	version: "1.0.0",
+	name: 'TimerScheduler',
+	version: '1.0.0',
 
 	/**
 	 * after(delaySec, fn) — Schedule fn to fire once after delaySec seconds.
@@ -68,15 +65,12 @@ const portContract = {
 	 *   @error_behavior "ignore".
 	 */
 	methods: {
-		after:     { arity: 2, required: true },
-		every:     { arity: 2, required: true },
-		cancel:    { arity: 1, required: true },
-		cancelAll: { arity: 0, required: true },
-	},
+		after: { arity: 2, required: true },
+		every: { arity: 2, required: true },
+		cancel: { arity: 1, required: true },
+		cancelAll: { arity: 0, required: true }
+	}
 };
-
-
-
 
 // ==================================================
 // ==================================================
@@ -91,24 +85,19 @@ const portContract = {
  */
 function validateAdapter(adapter) {
 	const violations = [];
-	if (!adapter || typeof adapter !== "object") {
-		return ["adapter must be a non-null object"];
+	if (!adapter || typeof adapter !== 'object') {
+		return ['adapter must be a non-null object'];
 	}
 	for (const [name, spec] of Object.entries(portContract.methods)) {
 		if (!spec.required) continue;
-		if (typeof adapter[name] !== "function") {
+		if (typeof adapter[name] !== 'function') {
 			violations.push(`missing method: ${name}`);
 		} else if (adapter[name].length !== spec.arity) {
-			violations.push(
-				`method ${name}: expected arity ${spec.arity}, got ${adapter[name].length}`
-			);
+			violations.push(`method ${name}: expected arity ${spec.arity}, got ${adapter[name].length}`);
 		}
 	}
 	return violations;
 }
-
-
-
 
 // ==================================================
 // ==================================================
@@ -125,93 +114,92 @@ function validateAdapter(adapter) {
 function contractTestVectors() {
 	return [
 		{
-			id: "after_fires_once",
-			description: "after(0.5, fn) fires fn exactly once after 0.5 s.",
+			id: 'after_fires_once',
+			description: 'after(0.5, fn) fires fn exactly once after 0.5 s.',
 			steps: [
-				{ call: "after", args: [0.5, "recordFire"] },
+				{ call: 'after', args: [0.5, 'recordFire'] },
 				{ advance_clock_sec: 0.4 },
-				{ assert: "fire_count", expected: 0 },
-				{ advance_clock_sec: 0.15 },   // total 0.55 s > 0.5 s
-				{ assert: "fire_count", expected: 1 },
-				{ advance_clock_sec: 1.0 },    // no second firing
-				{ assert: "fire_count", expected: 1 },
-			],
+				{ assert: 'fire_count', expected: 0 },
+				{ advance_clock_sec: 0.15 }, // total 0.55 s > 0.5 s
+				{ assert: 'fire_count', expected: 1 },
+				{ advance_clock_sec: 1.0 }, // no second firing
+				{ assert: 'fire_count', expected: 1 }
+			]
 		},
 		{
-			id: "after_cancel_before_fire",
-			description: "cancel(handle) before the delay prevents fn from firing.",
+			id: 'after_cancel_before_fire',
+			description: 'cancel(handle) before the delay prevents fn from firing.',
 			steps: [
-				{ call: "after", args: [1.0, "recordFire"], capture_handle: true },
+				{ call: 'after', args: [1.0, 'recordFire'], capture_handle: true },
 				{ advance_clock_sec: 0.5 },
-				{ call: "cancel", handle: "captured" },
+				{ call: 'cancel', handle: 'captured' },
 				{ advance_clock_sec: 1.0 },
-				{ assert: "fire_count", expected: 0 },
-			],
+				{ assert: 'fire_count', expected: 0 }
+			]
 		},
 		{
-			id: "cancel_after_fire_is_safe",
-			description: "cancel() on an already-fired handle is a no-op.",
+			id: 'cancel_after_fire_is_safe',
+			description: 'cancel() on an already-fired handle is a no-op.',
 			steps: [
-				{ call: "after", args: [0.1, "recordFire"], capture_handle: true },
+				{ call: 'after', args: [0.1, 'recordFire'], capture_handle: true },
 				{ advance_clock_sec: 0.2 },
-				{ assert: "fire_count", expected: 1 },
-				{ call: "cancel", handle: "captured" },   // must not throw
-				{ assert: "fire_count", expected: 1 },
-			],
+				{ assert: 'fire_count', expected: 1 },
+				{ call: 'cancel', handle: 'captured' }, // must not throw
+				{ assert: 'fire_count', expected: 1 }
+			]
 		},
 		{
-			id: "every_repeats",
-			description: "every(0.5, fn) fires fn multiple times at the interval.",
+			id: 'every_repeats',
+			description: 'every(0.5, fn) fires fn multiple times at the interval.',
 			steps: [
-				{ call: "every", args: [0.5, "recordFire"] },
+				{ call: 'every', args: [0.5, 'recordFire'] },
 				{ advance_clock_sec: 0.5 },
-				{ assert: "fire_count", expected: 1 },
+				{ assert: 'fire_count', expected: 1 },
 				{ advance_clock_sec: 0.5 },
-				{ assert: "fire_count", expected: 2 },
+				{ assert: 'fire_count', expected: 2 },
 				{ advance_clock_sec: 0.5 },
-				{ assert: "fire_count", expected: 3 },
-			],
+				{ assert: 'fire_count', expected: 3 }
+			]
 		},
 		{
-			id: "every_cancel_stops_repeat",
-			description: "cancel() stops a repeating timer.",
+			id: 'every_cancel_stops_repeat',
+			description: 'cancel() stops a repeating timer.',
 			steps: [
-				{ call: "every", args: [0.5, "recordFire"], capture_handle: true },
-				{ advance_clock_sec: 1.0 },   // 2 firings
-				{ assert: "fire_count", expected: 2 },
-				{ call: "cancel", handle: "captured" },
-				{ advance_clock_sec: 1.0 },   // no more firings
-				{ assert: "fire_count", expected: 2 },
-			],
+				{ call: 'every', args: [0.5, 'recordFire'], capture_handle: true },
+				{ advance_clock_sec: 1.0 }, // 2 firings
+				{ assert: 'fire_count', expected: 2 },
+				{ call: 'cancel', handle: 'captured' },
+				{ advance_clock_sec: 1.0 }, // no more firings
+				{ assert: 'fire_count', expected: 2 }
+			]
 		},
 		{
-			id: "cancel_all_stops_all",
-			description: "cancelAll() stops all pending timers.",
+			id: 'cancel_all_stops_all',
+			description: 'cancelAll() stops all pending timers.',
 			steps: [
-				{ call: "after", args: [1.0, "recordFire"] },
-				{ call: "after", args: [2.0, "recordFire"] },
-				{ call: "every", args: [0.5, "recordFire"] },
-				{ advance_clock_sec: 0.5 },   // every fires once
-				{ assert: "fire_count", expected: 1 },
-				{ call: "cancelAll" },
-				{ advance_clock_sec: 5.0 },   // nothing else fires
-				{ assert: "fire_count", expected: 1 },
-			],
+				{ call: 'after', args: [1.0, 'recordFire'] },
+				{ call: 'after', args: [2.0, 'recordFire'] },
+				{ call: 'every', args: [0.5, 'recordFire'] },
+				{ advance_clock_sec: 0.5 }, // every fires once
+				{ assert: 'fire_count', expected: 1 },
+				{ call: 'cancelAll' },
+				{ advance_clock_sec: 5.0 }, // nothing else fires
+				{ assert: 'fire_count', expected: 1 }
+			]
 		},
 		{
-			id: "callback_exception_does_not_propagate",
-			description: "An exception thrown inside the callback does not crash the scheduler.",
+			id: 'callback_exception_does_not_propagate',
+			description: 'An exception thrown inside the callback does not crash the scheduler.',
 			steps: [
-				{ call: "after", args: [0.1, "throwError"] },
+				{ call: 'after', args: [0.1, 'throwError'] },
 				{ advance_clock_sec: 0.2 },
 				// If the scheduler is still alive (no uncaught exception), this assertion passes
-				{ call: "after", args: [0.1, "recordFire"] },
+				{ call: 'after', args: [0.1, 'recordFire'] },
 				{ advance_clock_sec: 0.2 },
-				{ assert: "fire_count", expected: 1 },
-			],
-		},
+				{ assert: 'fire_count', expected: 1 }
+			]
+		}
 	];
 }
-
 
 module.exports = { portContract, validateAdapter, contractTestVectors };

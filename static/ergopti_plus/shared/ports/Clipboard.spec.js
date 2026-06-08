@@ -24,10 +24,7 @@
  * ==============================================================================
  */
 
-"use strict";
-
-
-
+'use strict';
 
 // ================================================
 // ================================================
@@ -40,8 +37,8 @@
  * @type {object}
  */
 const portContract = {
-	name: "Clipboard",
-	version: "1.0.0",
+	name: 'Clipboard',
+	version: '1.0.0',
 
 	/**
 	 * read() — Read the current clipboard content as a UTF-8 string.
@@ -68,15 +65,12 @@ const portContract = {
 	 *   @error_behavior "return_false".
 	 */
 	methods: {
-		read:    { arity: 0, required: true },
-		write:   { arity: 1, required: true },
-		save:    { arity: 0, required: true },
-		restore: { arity: 1, required: true },
-	},
+		read: { arity: 0, required: true },
+		write: { arity: 1, required: true },
+		save: { arity: 0, required: true },
+		restore: { arity: 1, required: true }
+	}
 };
-
-
-
 
 // ================================================
 // ================================================
@@ -91,24 +85,19 @@ const portContract = {
  */
 function validateAdapter(adapter) {
 	const violations = [];
-	if (!adapter || typeof adapter !== "object") {
-		return ["adapter must be a non-null object"];
+	if (!adapter || typeof adapter !== 'object') {
+		return ['adapter must be a non-null object'];
 	}
 	for (const [name, spec] of Object.entries(portContract.methods)) {
 		if (!spec.required) continue;
-		if (typeof adapter[name] !== "function") {
+		if (typeof adapter[name] !== 'function') {
 			violations.push(`missing method: ${name}`);
 		} else if (adapter[name].length !== spec.arity) {
-			violations.push(
-				`method ${name}: expected arity ${spec.arity}, got ${adapter[name].length}`
-			);
+			violations.push(`method ${name}: expected arity ${spec.arity}, got ${adapter[name].length}`);
 		}
 	}
 	return violations;
 }
-
-
-
 
 // ================================================
 // ================================================
@@ -126,49 +115,42 @@ function validateAdapter(adapter) {
 function contractTestVectors() {
 	return [
 		{
-			id: "write_returns_true",
-			description: "write() with a valid UTF-8 string returns true.",
-			steps: [
-				{ call: "write", args: ["test"] },
-				{ assert: "return_true" },
-			],
+			id: 'write_returns_true',
+			description: 'write() with a valid UTF-8 string returns true.',
+			steps: [{ call: 'write', args: ['test'] }, { assert: 'return_true' }]
 		},
 		{
-			id: "read_after_write",
-			description: "read() returns the exact content written by write().",
+			id: 'read_after_write',
+			description: 'read() returns the exact content written by write().',
 			steps: [
-				{ call: "write", args: ["ergopti_clipboard_test_42"] },
-				{ call: "read",  args: [] },
-				{ assert: "return_equals", expected: "ergopti_clipboard_test_42" },
-			],
+				{ call: 'write', args: ['ergopti_clipboard_test_42'] },
+				{ call: 'read', args: [] },
+				{ assert: 'return_equals', expected: 'ergopti_clipboard_test_42' }
+			]
 		},
 		{
-			id: "save_returns_string_or_null",
-			description: "save() returns a string or null, never throws.",
+			id: 'save_returns_string_or_null',
+			description: 'save() returns a string or null, never throws.',
 			steps: [
-				{ call: "save", args: [] },
-				{ assert: "return_type_one_of", expected: ["string", "null"] },
-			],
+				{ call: 'save', args: [] },
+				{ assert: 'return_type_one_of', expected: ['string', 'null'] }
+			]
 		},
 		{
-			id: "restore_null_clears",
-			description: "restore(null) returns true and does not throw.",
-			steps: [
-				{ call: "restore", args: [null] },
-				{ assert: "return_true" },
-			],
+			id: 'restore_null_clears',
+			description: 'restore(null) returns true and does not throw.',
+			steps: [{ call: 'restore', args: [null] }, { assert: 'return_true' }]
 		},
 		{
-			id: "read_empty_returns_null",
-			description: "read() returns null when the clipboard is empty.",
+			id: 'read_empty_returns_null',
+			description: 'read() returns null when the clipboard is empty.',
 			steps: [
-				{ call: "restore", args: [null] },
-				{ call: "read",    args: [] },
-				{ assert: "return_null" },
-			],
-		},
+				{ call: 'restore', args: [null] },
+				{ call: 'read', args: [] },
+				{ assert: 'return_null' }
+			]
+		}
 	];
 }
-
 
 module.exports = { portContract, validateAdapter, contractTestVectors };

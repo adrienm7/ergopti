@@ -1,10 +1,10 @@
 # 003 — Single TOML schema with snake_case keys for all config
 
-| Field | Value |
-|---|---|
-| **Date** | 2025-09-01 |
-| **Status** | Accepted |
-| **Deciders** | Core team |
+| Field        | Value      |
+| ------------ | ---------- |
+| **Date**     | 2025-09-01 |
+| **Status**   | Accepted   |
+| **Deciders** | Core team  |
 
 ---
 
@@ -29,6 +29,7 @@ All TOML configuration files across all drivers **must use `snake_case` keys
 exclusively**. `PascalCase`, `camelCase`, and `kebab-case` keys are forbidden.
 
 This rule applies to:
+
 - User-editable config files (`config.toml`, `tap_hold.toml`, etc.)
 - The shared features manifest (`manifest.toml`)
 - Any TOML file generated or consumed by a driver
@@ -60,11 +61,11 @@ starts with an uppercase letter.
 
 ## Alternatives considered
 
-| Alternative | Why rejected |
-|---|---|
-| `camelCase` | Common in JSON but unusual in TOML; conflicts with Lua field naming |
-| `PascalCase` | Already proven to cause cross-driver divergence |
-| Allow mixed casing per file | Complicates the codegen step and makes config harder for users |
+| Alternative                 | Why rejected                                                        |
+| --------------------------- | ------------------------------------------------------------------- |
+| `camelCase`                 | Common in JSON but unusual in TOML; conflicts with Lua field naming |
+| `PascalCase`                | Already proven to cause cross-driver divergence                     |
+| Allow mixed casing per file | Complicates the codegen step and makes config harder for users      |
 
 ## Evidence in the codebase
 

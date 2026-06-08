@@ -35,10 +35,7 @@
  * ==============================================================================
  */
 
-"use strict";
-
-
-
+'use strict';
 
 // ==================================================
 // ==================================================
@@ -79,9 +76,6 @@ const CONTEXT_CHARS_PER_WORD = 40;
 /** Hard floor: always forward at least this many context characters. */
 const CONTEXT_MIN_CHARS = 100;
 
-
-
-
 // ==================================================
 // ==================================================
 // ======= 2/ Internal Helpers =======
@@ -95,11 +89,11 @@ const CONTEXT_MIN_CHARS = 100;
  * @returns {{ words: string[], tail: string }}
  */
 function extractTail(buffer) {
-	if (!buffer || buffer.trim() === "") return { words: [], tail: "" };
-	const words    = buffer.trim().split(/\s+/);
+	if (!buffer || buffer.trim() === '') return { words: [], tail: '' };
+	const words = buffer.trim().split(/\s+/);
 	const tailStart = Math.max(0, words.length - CONTEXT_TAIL_WORDS);
 	const tailWords = words.slice(tailStart);
-	return { words, tail: tailWords.join(" ") };
+	return { words, tail: tailWords.join(' ') };
 }
 
 /**
@@ -123,10 +117,7 @@ function computeTemperature(baseTemperature, numPredictions, autoRaise) {
 	let t = baseTemperature;
 
 	if (autoRaise && numPredictions > 1) {
-		t = Math.min(
-			TEMP_DIVERSITY_CAP,
-			t + TEMP_INCREMENT_PER_PRED * (numPredictions - 1)
-		);
+		t = Math.min(TEMP_DIVERSITY_CAP, t + TEMP_INCREMENT_PER_PRED * (numPredictions - 1));
 	}
 
 	// Snap to greedy if single prediction and temperature is effectively zero
@@ -150,9 +141,6 @@ function capContext(buffer, maxWords) {
 	if (buffer.length <= charLimit) return buffer;
 	return buffer.slice(-charLimit);
 }
-
-
-
 
 // ==================================================
 // ==================================================
@@ -189,30 +177,27 @@ function capContext(buffer, maxWords) {
  * @returns {BuildResult}
  */
 function buildParams(buffer, config = {}) {
-	const maxWords       = config.max_words       || 0;
-	const minWords       = config.min_words       || 1;
+	const maxWords = config.max_words || 0;
+	const minWords = config.min_words || 1;
 	const numPredictions = config.num_predictions || 1;
-	const temperature    = config.temperature     ?? 0.1;
-	const autoRaise      = config.auto_raise_temp || false;
-	const language       = config.language        || "fr";
+	const temperature = config.temperature ?? 0.1;
+	const autoRaise = config.auto_raise_temp || false;
+	const language = config.language || 'fr';
 
 	const { tail } = extractTail(buffer);
-	const context  = capContext(buffer, maxWords);
+	const context = capContext(buffer, maxWords);
 
 	return {
 		context,
-		context_tail:    tail,
-		max_tokens:      computeMaxTokens(maxWords),
-		temperature:     computeTemperature(temperature, numPredictions, autoRaise),
-		min_words:       minWords,
-		max_words:       maxWords,
+		context_tail: tail,
+		max_tokens: computeMaxTokens(maxWords),
+		temperature: computeTemperature(temperature, numPredictions, autoRaise),
+		min_words: minWords,
+		max_words: maxWords,
 		language,
-		num_predictions: numPredictions,
+		num_predictions: numPredictions
 	};
 }
-
-
-
 
 // ==================================================
 // ==================================================
@@ -228,78 +213,77 @@ function buildParams(buffer, config = {}) {
 function promptBuilderTestVectors() {
 	return [
 		{
-			id:     "default_config",
-			description: "Default config: token budget = DEFAULT_MAX_TOKENS, temperature = 0.",
-			buffer: "hello world",
+			id: 'default_config',
+			description: 'Default config: token budget = DEFAULT_MAX_TOKENS, temperature = 0.',
+			buffer: 'hello world',
 			config: { max_words: 0, num_predictions: 1, temperature: 0.1 },
 			expected: {
-				max_tokens:      DEFAULT_MAX_TOKENS,
-				temperature:     0,    // single pred, temp ≤ threshold → greedy
-				context_tail:    "hello world",
-				min_words:       1,
-				num_predictions: 1,
-			},
+				max_tokens: DEFAULT_MAX_TOKENS,
+				temperature: 0, // single pred, temp ≤ threshold → greedy
+				context_tail: 'hello world',
+				min_words: 1,
+				num_predictions: 1
+			}
 		},
 		{
-			id:     "token_budget_from_max_words",
-			description: "max_words=5: budget = max(15, 5*6+10) = 40.",
-			buffer: "some context",
+			id: 'token_budget_from_max_words',
+			description: 'max_words=5: budget = max(15, 5*6+10) = 40.',
+			buffer: 'some context',
 			config: { max_words: 5, num_predictions: 1, temperature: 0.5 },
 			expected: {
-				max_tokens:  40,
-				temperature: 0.5,   // single pred, temp > threshold → no snap
-			},
+				max_tokens: 40,
+				temperature: 0.5 // single pred, temp > threshold → no snap
+			}
 		},
 		{
-			id:     "min_token_floor",
-			description: "max_words=1: budget = max(15, 1*6+10) = max(15,16) = 16.",
-			buffer: "context",
+			id: 'min_token_floor',
+			description: 'max_words=1: budget = max(15, 1*6+10) = max(15,16) = 16.',
+			buffer: 'context',
 			config: { max_words: 1, num_predictions: 1, temperature: 0.1 },
-			expected: { max_tokens: 16 },
+			expected: { max_tokens: 16 }
 		},
 		{
-			id:     "auto_raise_temperature",
-			description: "auto_raise_temp with 3 predictions: t = min(1.0, 0.2 + 0.1*2) = 0.4.",
-			buffer: "le chat",
+			id: 'auto_raise_temperature',
+			description: 'auto_raise_temp with 3 predictions: t = min(1.0, 0.2 + 0.1*2) = 0.4.',
+			buffer: 'le chat',
 			config: { max_words: 3, num_predictions: 3, temperature: 0.2, auto_raise_temp: true },
-			expected: { temperature: 0.4 },
+			expected: { temperature: 0.4 }
 		},
 		{
-			id:     "temperature_diversity_cap",
-			description: "auto_raise_temp with high base: capped at TEMP_DIVERSITY_CAP = 1.0.",
-			buffer: "le chat",
+			id: 'temperature_diversity_cap',
+			description: 'auto_raise_temp with high base: capped at TEMP_DIVERSITY_CAP = 1.0.',
+			buffer: 'le chat',
 			config: { max_words: 5, num_predictions: 10, temperature: 0.9, auto_raise_temp: true },
-			expected: { temperature: TEMP_DIVERSITY_CAP },
+			expected: { temperature: TEMP_DIVERSITY_CAP }
 		},
 		{
-			id:     "context_truncation",
-			description: "Long buffer is truncated to max(100, max_words * 40) chars.",
-			buffer: "a ".repeat(200),   // 400 chars
+			id: 'context_truncation',
+			description: 'Long buffer is truncated to max(100, max_words * 40) chars.',
+			buffer: 'a '.repeat(200), // 400 chars
 			config: { max_words: 2, num_predictions: 1, temperature: 0.1 },
 			// char limit = max(100, 2*40) = max(100, 80) = 100
 			expected: {
-				context_length_max: 100,
-			},
+				context_length_max: 100
+			}
 		},
 		{
-			id:     "tail_extraction",
-			description: "context_tail contains the last 5 words of the buffer.",
-			buffer: "word1 word2 word3 word4 word5 word6 word7",
+			id: 'tail_extraction',
+			description: 'context_tail contains the last 5 words of the buffer.',
+			buffer: 'word1 word2 word3 word4 word5 word6 word7',
 			config: { max_words: 0, num_predictions: 1, temperature: 0.1 },
 			expected: {
-				context_tail: "word3 word4 word5 word6 word7",
-			},
+				context_tail: 'word3 word4 word5 word6 word7'
+			}
 		},
 		{
-			id:     "language_passthrough",
-			description: "Language from config is passed through unchanged.",
-			buffer: "some text",
-			config: { language: "en" },
-			expected: { language: "en" },
-		},
+			id: 'language_passthrough',
+			description: 'Language from config is passed through unchanged.',
+			buffer: 'some text',
+			config: { language: 'en' },
+			expected: { language: 'en' }
+		}
 	];
 }
-
 
 module.exports = {
 	CONTEXT_TAIL_WORDS,
@@ -317,5 +301,5 @@ module.exports = {
 	computeTemperature,
 	capContext,
 	buildParams,
-	promptBuilderTestVectors,
+	promptBuilderTestVectors
 };

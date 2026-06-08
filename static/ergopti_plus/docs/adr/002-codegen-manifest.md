@@ -1,10 +1,10 @@
 # 002 — Features manifest generated from TOML
 
-| Field | Value |
-|---|---|
-| **Date** | 2025-09-01 |
-| **Status** | Accepted |
-| **Deciders** | Core team |
+| Field        | Value      |
+| ------------ | ---------- |
+| **Date**     | 2025-09-01 |
+| **Status**   | Accepted   |
+| **Deciders** | Core team  |
 
 ---
 
@@ -67,11 +67,11 @@ repository so drivers can boot without running the build step.
 
 ## Alternatives considered
 
-| Alternative | Why rejected |
-|---|---|
-| Shared runtime-loaded JSON | Requires each driver to bundle a JSON parser; AHK has no native JSON |
-| Per-driver TOML + CI diff check | Drift is caught only at CI time, not prevented |
-| Hardcoded constants in each driver | Proven to diverge in practice; too expensive to maintain |
+| Alternative                        | Why rejected                                                         |
+| ---------------------------------- | -------------------------------------------------------------------- |
+| Shared runtime-loaded JSON         | Requires each driver to bundle a JSON parser; AHK has no native JSON |
+| Per-driver TOML + CI diff check    | Drift is caught only at CI time, not prevented                       |
+| Hardcoded constants in each driver | Proven to diverge in practice; too expensive to maintain             |
 
 ## Evidence in the codebase
 

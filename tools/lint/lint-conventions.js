@@ -18,13 +18,15 @@ import { join, relative, extname } from 'path';
 import { execSync } from 'child_process';
 
 // This script lives at <repo>/tools/lint/, so the repo root is two levels up.
-const REPO_ROOT = new URL('../..', import.meta.url).pathname.replace(/\/$/, '').replace(/^\/([A-Z]:)/, '$1');
+const REPO_ROOT = new URL('../..', import.meta.url).pathname
+	.replace(/\/$/, '')
+	.replace(/^\/([A-Z]:)/, '$1');
 
-const FAIL_ON_VIOLATIONS  = process.argv.includes('--fail-on-violations');
-const WARN_ONLY           = process.argv.includes('--warn-only');
-const FIX_BANNERS         = process.argv.includes('--fix-banners');
-const FIX_SPACING         = process.argv.includes('--fix-spacing');
-const FIX_UNBALANCED      = process.argv.includes('--fix-unbalanced');
+const FAIL_ON_VIOLATIONS = process.argv.includes('--fail-on-violations');
+const WARN_ONLY = process.argv.includes('--warn-only');
+const FIX_BANNERS = process.argv.includes('--fix-banners');
+const FIX_SPACING = process.argv.includes('--fix-spacing');
+const FIX_UNBALANCED = process.argv.includes('--fix-unbalanced');
 
 let totalViolations = 0;
 
@@ -41,12 +43,20 @@ function warn(file, line, msg) {
 
 function walkFiles(dir, ext, out = []) {
 	let entries;
-	try { entries = readdirSync(dir); } catch { return out; }
+	try {
+		entries = readdirSync(dir);
+	} catch {
+		return out;
+	}
 	for (const e of entries) {
 		if (e === 'node_modules' || e === '.git' || e === 'vendor') continue;
 		const full = join(dir, e);
 		let st;
-		try { st = statSync(full); } catch { continue; }
+		try {
+			st = statSync(full);
+		} catch {
+			continue;
+		}
 		if (st.isDirectory()) walkFiles(full, ext, out);
 		else if (ext.includes(extname(e))) out.push(full);
 	}
@@ -62,10 +72,10 @@ function readLines(file) {
 // Check 1 — File header comment
 // ──────────────────────────────────────────────────────────────────────────────
 
-const AHK_COMMENT  = /^;\s*\S/;
-const LUA_COMMENT  = /^---?\s*\S/;
+const AHK_COMMENT = /^;\s*\S/;
+const LUA_COMMENT = /^---?\s*\S/;
 // Path-like: contains a slash and a dot (e.g. "lib/logger.ahk")
-const PATH_LIKE    = /[/\\][^/\\]+\.[a-z]+/i;
+const PATH_LIKE = /[/\\][^/\\]+\.[a-z]+/i;
 
 function checkFileHeader(file) {
 	const lines = readLines(file);
@@ -73,9 +83,16 @@ function checkFileHeader(file) {
 	let first = null;
 	let firstIdx = 0;
 	for (let i = 0; i < Math.min(lines.length, 5); i++) {
-		if (lines[i].trim() !== '') { first = lines[i]; firstIdx = i + 1; break; }
+		if (lines[i].trim() !== '') {
+			first = lines[i];
+			firstIdx = i + 1;
+			break;
+		}
 	}
-	if (first === null) { warn(file, 1, 'File is empty or has no content in first 5 lines'); return; }
+	if (first === null) {
+		warn(file, 1, 'File is empty or has no content in first 5 lines');
+		return;
+	}
 
 	const ext = extname(file);
 	const isComment = ext === '.ahk' ? AHK_COMMENT.test(first) : LUA_COMMENT.test(first);
@@ -97,9 +114,17 @@ function checkNoCoAuthor() {
 	try {
 		// Try from origin/dev, fall back to last 20 commits
 		try {
-			log = execSync('git log origin/dev..HEAD --format=%B', { cwd: REPO_ROOT, encoding: 'utf8', stdio: ['pipe','pipe','pipe'] });
+			log = execSync('git log origin/dev..HEAD --format=%B', {
+				cwd: REPO_ROOT,
+				encoding: 'utf8',
+				stdio: ['pipe', 'pipe', 'pipe']
+			});
 		} catch {
-			log = execSync('git log -20 --format=%B', { cwd: REPO_ROOT, encoding: 'utf8', stdio: ['pipe','pipe','pipe'] });
+			log = execSync('git log -20 --format=%B', {
+				cwd: REPO_ROOT,
+				encoding: 'utf8',
+				stdio: ['pipe', 'pipe', 'pipe']
+			});
 		}
 	} catch {
 		return; // git not available
@@ -108,7 +133,9 @@ function checkNoCoAuthor() {
 	const lines = log.split('\n');
 	lines.forEach((line, i) => {
 		if (/co-authored-by/i.test(line)) {
-			console.warn(`  WARN  git-log:${i + 1}  Co-Authored-By trailer found in recent commit: ${line.trim()}`);
+			console.warn(
+				`  WARN  git-log:${i + 1}  Co-Authored-By trailer found in recent commit: ${line.trim()}`
+			);
 			totalViolations++;
 		}
 	});
@@ -155,7 +182,7 @@ function countTrailingBlanks(lines, idx) {
 }
 
 function checkSectionSpacing(file) {
-	const ext   = extname(file);
+	const ext = extname(file);
 	const isAhk = ext === '.ahk';
 	const lines = readLines(file);
 
@@ -167,15 +194,19 @@ function checkSectionSpacing(file) {
 
 		// The title line is preceded by 2 (major) or 1 (minor) banner lines.
 		// We check blank lines before the first banner line.
-		const bannerCount  = isMajor ? 2 : 1;
-		const bannerIdx    = i - bannerCount; // 0-based index of first banner line
+		const bannerCount = isMajor ? 2 : 1;
+		const bannerIdx = i - bannerCount; // 0-based index of first banner line
 		if (bannerIdx < 0) return;
 
-		const blanks       = countTrailingBlanks(lines, bannerIdx);
-		const required     = isMajor ? 5 : 3;
+		const blanks = countTrailingBlanks(lines, bannerIdx);
+		const required = isMajor ? 5 : 3;
 
 		if (blanks < required) {
-			warn(file, i + 1, `${isMajor ? 'Major' : 'Minor'} section needs ${required} blank lines before it, found ${blanks}`);
+			warn(
+				file,
+				i + 1,
+				`${isMajor ? 'Major' : 'Minor'} section needs ${required} blank lines before it, found ${blanks}`
+			);
 		}
 	});
 }
@@ -185,17 +216,17 @@ function checkSectionSpacing(file) {
 // ──────────────────────────────────────────────────────────────────────────────
 
 function checkBannerAlignment(file) {
-	const ext   = extname(file);
+	const ext = extname(file);
 	const isAhk = ext === '.ahk';
 	const prefix = isAhk ? '; ' : '--- ';
-	const lines  = readLines(file);
+	const lines = readLines(file);
 
 	lines.forEach((line, i) => {
 		// Match a title line: prefix + 5 or 7 = + space + title + space + 5 or 7 =
 		const m = line.match(/^(;|---?) (={5,7}) (.+) (={5,7})$/);
 		if (!m) return;
-		const leftEq  = m[2].length;
-		const title   = m[3];
+		const leftEq = m[2].length;
+		const title = m[3];
 		const rightEq = m[4].length;
 
 		if (leftEq !== rightEq) {
@@ -212,7 +243,11 @@ function checkBannerAlignment(file) {
 			// A banner line: prefix + one or more =
 			if (!/^(;|---?) =+$/.test(adjLine)) continue;
 			if (adjLine.length !== expectedBannerLen) {
-				warn(file, adj + 1, `Banner line length ${adjLine.length} does not match title line length ${expectedBannerLen}`);
+				warn(
+					file,
+					adj + 1,
+					`Banner line length ${adjLine.length} does not match title line length ${expectedBannerLen}`
+				);
 			}
 		}
 	});
@@ -223,25 +258,25 @@ function checkBannerAlignment(file) {
 // ──────────────────────────────────────────────────────────────────────────────
 
 function fixBannersInFile(file) {
-	const ext    = extname(file);
-	const isAhk  = ext === '.ahk';
+	const ext = extname(file);
+	const isAhk = ext === '.ahk';
 	const prefix = isAhk ? '; ' : '--- ';
-	const raw    = readFileSync(file, 'utf8');
+	const raw = readFileSync(file, 'utf8');
 	const hasBom = raw.startsWith('﻿');
-	const lines  = raw.replace(/^﻿/, '').replace(/\r\n/g, '\n').split('\n');
-	let changed  = false;
+	const lines = raw.replace(/^﻿/, '').replace(/\r\n/g, '\n').split('\n');
+	let changed = false;
 
 	for (let i = 0; i < lines.length; i++) {
 		const m = lines[i].match(/^(;|---?) (={5,7}) (.+) (={5,7})$/);
 		if (!m) continue;
 		const leftEq = m[2].length;
-		const title  = m[3];
+		const title = m[3];
 		const rightEq = m[4].length;
 		if (leftEq !== rightEq) continue; // unbalanced — skip
 
 		const expectedLen = prefix.length + leftEq + 1 + title.length + 1 + rightEq;
-		const bannerBody  = '='.repeat(expectedLen - prefix.length);
-		const bannerLine  = prefix + bannerBody;
+		const bannerBody = '='.repeat(expectedLen - prefix.length);
+		const bannerLine = prefix + bannerBody;
 
 		for (const adj of [i - 1, i + 1]) {
 			if (adj < 0 || adj >= lines.length) continue;
@@ -255,7 +290,7 @@ function fixBannersInFile(file) {
 
 	if (!changed) return false;
 
-	const enc     = isAhk ? 'utf8' : 'utf8'; // both UTF-8
+	const enc = isAhk ? 'utf8' : 'utf8'; // both UTF-8
 	const content = (hasBom ? '﻿' : '') + lines.join('\n');
 	// Preserve original line endings
 	const crlf = raw.includes('\r\n');
@@ -268,9 +303,9 @@ function fixBannersInFile(file) {
 // ──────────────────────────────────────────────────────────────────────────────
 
 function fixSpacingInFile(file) {
-	const ext   = extname(file);
+	const ext = extname(file);
 	const isAhk = ext === '.ahk';
-	const raw   = readFileSync(file, 'utf8');
+	const raw = readFileSync(file, 'utf8');
 	const hasBom = raw.startsWith('﻿');
 	const lines = raw.replace(/^﻿/, '').replace(/\r\n/g, '\n').split('\n');
 	let changed = false;
@@ -283,10 +318,10 @@ function fixSpacingInFile(file) {
 		if (!isMajor && !isMinor) continue;
 
 		const bannerCount = isMajor ? 2 : 1;
-		const bannerIdx   = i - bannerCount;
+		const bannerIdx = i - bannerCount;
 		if (bannerIdx < 0) continue;
 
-		const blanks   = countTrailingBlanks(lines, bannerIdx);
+		const blanks = countTrailingBlanks(lines, bannerIdx);
 		const required = isMajor ? 5 : 3;
 		if (blanks >= required) continue;
 
@@ -299,7 +334,7 @@ function fixSpacingInFile(file) {
 	if (!changed) return false;
 
 	const content = (hasBom ? '﻿' : '') + lines.join('\n');
-	const crlf    = raw.includes('\r\n');
+	const crlf = raw.includes('\r\n');
 	writeFileSync(file, crlf ? content.replace(/\n/g, '\r\n') : content, 'utf8');
 	return true;
 }
@@ -309,19 +344,19 @@ function fixSpacingInFile(file) {
 // ──────────────────────────────────────────────────────────────────────────────
 
 function fixUnbalancedInFile(file) {
-	const ext    = extname(file);
-	const isAhk  = ext === '.ahk';
+	const ext = extname(file);
+	const isAhk = ext === '.ahk';
 	const prefix = isAhk ? '; ' : '--- ';
-	const raw    = readFileSync(file, 'utf8');
+	const raw = readFileSync(file, 'utf8');
 	const hasBom = raw.startsWith('﻿');
-	const lines  = raw.replace(/^﻿/, '').replace(/\r\n/g, '\n').split('\n');
-	let changed  = false;
+	const lines = raw.replace(/^﻿/, '').replace(/\r\n/g, '\n').split('\n');
+	let changed = false;
 
 	for (let i = 0; i < lines.length; i++) {
 		const m = lines[i].match(/^(;|---?) (={5,7}) (.+) (={5,7})$/);
 		if (!m) continue;
-		const leftEq  = m[2].length;
-		const title   = m[3];
+		const leftEq = m[2].length;
+		const title = m[3];
 		const rightEq = m[4].length;
 		if (leftEq === rightEq) continue; // already balanced
 
@@ -332,8 +367,8 @@ function fixUnbalancedInFile(file) {
 
 		// Also fix adjacent banner lines
 		const expectedLen = prefix.length + eq + 1 + title.length + 1 + eq;
-		const bannerBody  = '='.repeat(expectedLen - prefix.length);
-		const bannerLine  = prefix + bannerBody;
+		const bannerBody = '='.repeat(expectedLen - prefix.length);
+		const bannerLine = prefix + bannerBody;
 		for (const adj of [i - 1, i + 1]) {
 			if (adj < 0 || adj >= lines.length) continue;
 			if (!/^(;|---?) =+$/.test(lines[adj])) continue;
@@ -345,7 +380,7 @@ function fixUnbalancedInFile(file) {
 	if (!changed) return false;
 
 	const content = (hasBom ? '﻿' : '') + lines.join('\n');
-	const crlf    = raw.includes('\r\n');
+	const crlf = raw.includes('\r\n');
 	writeFileSync(file, crlf ? content.replace(/\n/g, '\r\n') : content, 'utf8');
 	return true;
 }
@@ -360,14 +395,12 @@ console.log('lint-conventions: scanning…');
 const ahkSourceDirs = [
 	join(REPO_ROOT, 'static/ergopti_plus/windows/lib'),
 	join(REPO_ROOT, 'static/ergopti_plus/windows/modules'),
-	join(REPO_ROOT, 'static/ergopti_plus/windows/ui'),
+	join(REPO_ROOT, 'static/ergopti_plus/windows/ui')
 ];
-const ahkTestDirs = [
-	join(REPO_ROOT, 'static/ergopti_plus/windows/tests'),
-];
+const ahkTestDirs = [join(REPO_ROOT, 'static/ergopti_plus/windows/tests')];
 const ahkAll = [
-	...ahkSourceDirs.flatMap(d => walkFiles(d, ['.ahk'])),
-	...ahkTestDirs.flatMap(d => walkFiles(d, ['.ahk'])),
+	...ahkSourceDirs.flatMap((d) => walkFiles(d, ['.ahk'])),
+	...ahkTestDirs.flatMap((d) => walkFiles(d, ['.ahk']))
 ];
 
 // Lua files — hammerspoon driver only (skip vendor/)
@@ -375,16 +408,16 @@ const luaDirs = [
 	join(REPO_ROOT, 'static/ergopti_plus/macos/lib'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/modules'),
 	join(REPO_ROOT, 'static/ergopti_plus/macos/ui'),
-	join(REPO_ROOT, 'static/ergopti_plus/macos/tests'),
+	join(REPO_ROOT, 'static/ergopti_plus/macos/tests')
 ];
-const luaAll = luaDirs.flatMap(d => walkFiles(d, ['.lua']));
+const luaAll = luaDirs.flatMap((d) => walkFiles(d, ['.lua']));
 
 // TOML files — config repo sibling
 const tomlDirs = [
 	join(REPO_ROOT, '..', 'config', 'ergopti_plus'),
-	join(REPO_ROOT, 'static', 'drivers', '_shared'),
+	join(REPO_ROOT, 'static', 'drivers', '_shared')
 ];
-const tomlAll = tomlDirs.flatMap(d => walkFiles(d, ['.toml']));
+const tomlAll = tomlDirs.flatMap((d) => walkFiles(d, ['.toml']));
 
 console.log(`  AHK files : ${ahkAll.length}`);
 console.log(`  Lua files : ${luaAll.length}`);
@@ -422,8 +455,8 @@ if (FIX_SPACING) {
 }
 
 // Run checks
-for (const f of ahkAll)  checkFileHeader(f);
-for (const f of luaAll)  checkFileHeader(f);
+for (const f of ahkAll) checkFileHeader(f);
+for (const f of luaAll) checkFileHeader(f);
 for (const f of tomlAll) checkTomlKeys(f);
 for (const f of [...ahkAll, ...luaAll]) {
 	checkSectionSpacing(f);

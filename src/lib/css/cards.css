@@ -113,7 +113,7 @@
 	.cards {
 		grid-template-columns: repeat(3, 1fr);
 	}
-    	.cards .card:nth-child(odd) strong {
+	.cards .card:nth-child(odd) strong {
 		background: none;
 		-webkit-background-clip: border-box;
 		background-clip: border-box;

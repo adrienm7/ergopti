@@ -23,10 +23,7 @@
  * ==============================================================================
  */
 
-"use strict";
-
-
-
+'use strict';
 
 // ==================================================
 // ==================================================
@@ -39,8 +36,8 @@
  * @type {object}
  */
 const portContract = {
-	name: "TrayMenu",
-	version: "1.0.0",
+	name: 'TrayMenu',
+	version: '1.0.0',
 
 	/**
 	 * setIcon(state) — Update the tray icon to reflect the given state.
@@ -64,14 +61,14 @@ const portContract = {
 	 *   @error_behavior "ignore".
 	 */
 	methods: {
-		setIcon:    { arity: 1, required: true },
-		setMenu:    { arity: 1, required: true },
+		setIcon: { arity: 1, required: true },
+		setMenu: { arity: 1, required: true },
 		setTooltip: { arity: 1, required: true },
-		destroy:    { arity: 0, required: true },
+		destroy: { arity: 0, required: true }
 	},
 
 	/** Valid icon states. Adapters MUST accept all three. */
-	ICON_STATES: ["active", "paused", "disabled"],
+	ICON_STATES: ['active', 'paused', 'disabled']
 
 	/**
 	 * MenuNode shape (informative — not validated at runtime):
@@ -87,9 +84,6 @@ const portContract = {
 	 */
 };
 
-
-
-
 // ==================================================
 // ==================================================
 // ======= 2/ Adapter Structural Validator =======
@@ -103,24 +97,19 @@ const portContract = {
  */
 function validateAdapter(adapter) {
 	const violations = [];
-	if (!adapter || typeof adapter !== "object") {
-		return ["adapter must be a non-null object"];
+	if (!adapter || typeof adapter !== 'object') {
+		return ['adapter must be a non-null object'];
 	}
 	for (const [name, spec] of Object.entries(portContract.methods)) {
 		if (!spec.required) continue;
-		if (typeof adapter[name] !== "function") {
+		if (typeof adapter[name] !== 'function') {
 			violations.push(`missing method: ${name}`);
 		} else if (adapter[name].length !== spec.arity) {
-			violations.push(
-				`method ${name}: expected arity ${spec.arity}, got ${adapter[name].length}`
-			);
+			violations.push(`method ${name}: expected arity ${spec.arity}, got ${adapter[name].length}`);
 		}
 	}
 	return violations;
 }
-
-
-
 
 // ==================================================
 // ==================================================
@@ -133,16 +122,32 @@ function validateAdapter(adapter) {
  */
 const FIXTURE_MENU = [
 	{
-		id: "feature_hotstrings", label: "Hotstrings",
-		enabled: true, checked: true, onClick: null, children: [],
-		separator: false,
+		id: 'feature_hotstrings',
+		label: 'Hotstrings',
+		enabled: true,
+		checked: true,
+		onClick: null,
+		children: [],
+		separator: false
 	},
-	{ separator: true, id: "sep_1", label: "", enabled: true, checked: false, onClick: null, children: [] },
 	{
-		id: "reload", label: "Recharger",
-		enabled: true, checked: false, onClick: null, children: [],
-		separator: false,
+		separator: true,
+		id: 'sep_1',
+		label: '',
+		enabled: true,
+		checked: false,
+		onClick: null,
+		children: []
 	},
+	{
+		id: 'reload',
+		label: 'Recharger',
+		enabled: true,
+		checked: false,
+		onClick: null,
+		children: [],
+		separator: false
+	}
 ];
 
 /**
@@ -152,63 +157,74 @@ const FIXTURE_MENU = [
 function contractTestVectors() {
 	return [
 		{
-			id: "set_icon_active",
+			id: 'set_icon_active',
 			description: "setIcon('active') does not throw.",
-			input: { state: "active" },
-			assert: { no_exception: true },
+			input: { state: 'active' },
+			assert: { no_exception: true }
 		},
 		{
-			id: "set_icon_paused",
+			id: 'set_icon_paused',
 			description: "setIcon('paused') does not throw.",
-			input: { state: "paused" },
-			assert: { no_exception: true },
+			input: { state: 'paused' },
+			assert: { no_exception: true }
 		},
 		{
-			id: "set_icon_disabled",
+			id: 'set_icon_disabled',
 			description: "setIcon('disabled') does not throw.",
-			input: { state: "disabled" },
-			assert: { no_exception: true },
+			input: { state: 'disabled' },
+			assert: { no_exception: true }
 		},
 		{
-			id: "set_menu_renders_without_exception",
-			description: "setMenu() with a valid node tree does not throw.",
+			id: 'set_menu_renders_without_exception',
+			description: 'setMenu() with a valid node tree does not throw.',
 			input: { nodes: FIXTURE_MENU },
-			assert: { no_exception: true },
+			assert: { no_exception: true }
 		},
 		{
-			id: "set_menu_replaces_previous",
-			description: "Calling setMenu() twice replaces the menu (not appends).",
+			id: 'set_menu_replaces_previous',
+			description: 'Calling setMenu() twice replaces the menu (not appends).',
 			steps: [
-				{ call: "setMenu", args: [FIXTURE_MENU] },
-				{ call: "setMenu", args: [[{ id: "single", label: "Item", enabled: true, checked: false, onClick: null, children: [], separator: false }]] },
-				{ assert: "no_exception" },
-			],
+				{ call: 'setMenu', args: [FIXTURE_MENU] },
+				{
+					call: 'setMenu',
+					args: [
+						[
+							{
+								id: 'single',
+								label: 'Item',
+								enabled: true,
+								checked: false,
+								onClick: null,
+								children: [],
+								separator: false
+							}
+						]
+					]
+				},
+				{ assert: 'no_exception' }
+			]
 		},
 		{
-			id: "set_tooltip_does_not_throw",
-			description: "setTooltip() with any string does not throw.",
-			input: { text: "Ergopti+ actif" },
-			assert: { no_exception: true },
+			id: 'set_tooltip_does_not_throw',
+			description: 'setTooltip() with any string does not throw.',
+			input: { text: 'Ergopti+ actif' },
+			assert: { no_exception: true }
 		},
 		{
-			id: "destroy_is_safe",
-			description: "destroy() does not throw even if called without a prior setMenu.",
+			id: 'destroy_is_safe',
+			description: 'destroy() does not throw even if called without a prior setMenu.',
+			steps: [{ call: 'destroy' }, { assert: 'no_exception' }]
+		},
+		{
+			id: 'destroy_then_set_icon_is_safe',
+			description: 'Calling setIcon() after destroy() does not crash.',
 			steps: [
-				{ call: "destroy" },
-				{ assert: "no_exception" },
-			],
-		},
-		{
-			id: "destroy_then_set_icon_is_safe",
-			description: "Calling setIcon() after destroy() does not crash.",
-			steps: [
-				{ call: "destroy" },
-				{ call: "setIcon", args: ["active"] },
-				{ assert: "no_exception" },
-			],
-		},
+				{ call: 'destroy' },
+				{ call: 'setIcon', args: ['active'] },
+				{ assert: 'no_exception' }
+			]
+		}
 	];
 }
-
 
 module.exports = { portContract, validateAdapter, contractTestVectors, FIXTURE_MENU };

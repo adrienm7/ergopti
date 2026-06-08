@@ -22,10 +22,7 @@
  * ==============================================================================
  */
 
-"use strict";
-
-
-
+'use strict';
 
 // ==================================================
 // ==================================================
@@ -38,8 +35,8 @@
  * @type {object}
  */
 const portContract = {
-	name: "FileSystem",
-	version: "1.0.0",
+	name: 'FileSystem',
+	version: '1.0.0',
 
 	/**
 	 * read(path) — Read the entire contents of a file as a UTF-8 string.
@@ -73,16 +70,13 @@ const portContract = {
 	 *   @error_behavior "return_false".
 	 */
 	methods: {
-		read:   { arity: 1, required: true },
-		write:  { arity: 2, required: true },
+		read: { arity: 1, required: true },
+		write: { arity: 2, required: true },
 		append: { arity: 2, required: true },
 		exists: { arity: 1, required: true },
-		delete: { arity: 1, required: true },
-	},
+		delete: { arity: 1, required: true }
+	}
 };
-
-
-
 
 // ==================================================
 // ==================================================
@@ -97,24 +91,19 @@ const portContract = {
  */
 function validateAdapter(adapter) {
 	const violations = [];
-	if (!adapter || typeof adapter !== "object") {
-		return ["adapter must be a non-null object"];
+	if (!adapter || typeof adapter !== 'object') {
+		return ['adapter must be a non-null object'];
 	}
 	for (const [name, spec] of Object.entries(portContract.methods)) {
 		if (!spec.required) continue;
-		if (typeof adapter[name] !== "function") {
+		if (typeof adapter[name] !== 'function') {
 			violations.push(`missing method: ${name}`);
 		} else if (adapter[name].length !== spec.arity) {
-			violations.push(
-				`method ${name}: expected arity ${spec.arity}, got ${adapter[name].length}`
-			);
+			violations.push(`method ${name}: expected arity ${spec.arity}, got ${adapter[name].length}`);
 		}
 	}
 	return violations;
 }
-
-
-
 
 // ==================================================
 // ==================================================
@@ -130,81 +119,71 @@ function validateAdapter(adapter) {
  * @returns {Array<object>}
  */
 function contractTestVectors() {
-	const TEST_PATH = "__FS_TEST_PATH__";
+	const TEST_PATH = '__FS_TEST_PATH__';
 	return [
 		{
-			id: "read_missing_returns_null",
-			description: "read() on a non-existent path returns null, not an exception.",
-			steps: [
-				{ call: "read", args: [TEST_PATH + "_missing_9z3k"] },
-				{ assert: "return_null" },
-			],
+			id: 'read_missing_returns_null',
+			description: 'read() on a non-existent path returns null, not an exception.',
+			steps: [{ call: 'read', args: [TEST_PATH + '_missing_9z3k'] }, { assert: 'return_null' }]
 		},
 		{
-			id: "write_creates_file",
-			description: "write() succeeds and returns true for a writable path.",
-			steps: [
-				{ call: "write", args: [TEST_PATH, "hello"] },
-				{ assert: "return_true" },
-			],
+			id: 'write_creates_file',
+			description: 'write() succeeds and returns true for a writable path.',
+			steps: [{ call: 'write', args: [TEST_PATH, 'hello'] }, { assert: 'return_true' }]
 		},
 		{
-			id: "read_after_write",
-			description: "read() returns the content written by write().",
+			id: 'read_after_write',
+			description: 'read() returns the content written by write().',
 			steps: [
-				{ call: "write", args: [TEST_PATH, "content_42"] },
-				{ call: "read",  args: [TEST_PATH] },
-				{ assert: "return_equals", expected: "content_42" },
-			],
+				{ call: 'write', args: [TEST_PATH, 'content_42'] },
+				{ call: 'read', args: [TEST_PATH] },
+				{ assert: 'return_equals', expected: 'content_42' }
+			]
 		},
 		{
-			id: "append_adds_content",
-			description: "append() concatenates content to an existing file.",
+			id: 'append_adds_content',
+			description: 'append() concatenates content to an existing file.',
 			steps: [
-				{ call: "write",  args: [TEST_PATH, "line1"] },
-				{ call: "append", args: [TEST_PATH, "line2"] },
-				{ call: "read",   args: [TEST_PATH] },
-				{ assert: "return_contains", needle: "line2" },
-			],
+				{ call: 'write', args: [TEST_PATH, 'line1'] },
+				{ call: 'append', args: [TEST_PATH, 'line2'] },
+				{ call: 'read', args: [TEST_PATH] },
+				{ assert: 'return_contains', needle: 'line2' }
+			]
 		},
 		{
-			id: "exists_true_for_written_file",
-			description: "exists() returns true after write().",
+			id: 'exists_true_for_written_file',
+			description: 'exists() returns true after write().',
 			steps: [
-				{ call: "write",  args: [TEST_PATH, "x"] },
-				{ call: "exists", args: [TEST_PATH] },
-				{ assert: "return_true" },
-			],
+				{ call: 'write', args: [TEST_PATH, 'x'] },
+				{ call: 'exists', args: [TEST_PATH] },
+				{ assert: 'return_true' }
+			]
 		},
 		{
-			id: "exists_false_for_missing",
-			description: "exists() returns false for a path that was never written.",
+			id: 'exists_false_for_missing',
+			description: 'exists() returns false for a path that was never written.',
 			steps: [
-				{ call: "exists", args: [TEST_PATH + "_never_created_9z3k"] },
-				{ assert: "return_false" },
-			],
+				{ call: 'exists', args: [TEST_PATH + '_never_created_9z3k'] },
+				{ assert: 'return_false' }
+			]
 		},
 		{
-			id: "delete_removes_file",
-			description: "delete() returns true and the file no longer exists.",
+			id: 'delete_removes_file',
+			description: 'delete() returns true and the file no longer exists.',
 			steps: [
-				{ call: "write",  args: [TEST_PATH, "to_delete"] },
-				{ call: "delete", args: [TEST_PATH] },
-				{ assert: "return_true" },
-				{ call: "exists", args: [TEST_PATH] },
-				{ assert: "return_false" },
-			],
+				{ call: 'write', args: [TEST_PATH, 'to_delete'] },
+				{ call: 'delete', args: [TEST_PATH] },
+				{ assert: 'return_true' },
+				{ call: 'exists', args: [TEST_PATH] },
+				{ assert: 'return_false' }
+			]
 		},
 		{
-			id: "delete_missing_is_noop",
-			description: "delete() on a non-existent path returns true without error.",
-			steps: [
-				{ call: "delete", args: [TEST_PATH + "_absent_9z3k"] },
-				{ assert: "return_true" },
-			],
-		},
+			id: 'delete_missing_is_noop',
+			description: 'delete() on a non-existent path returns true without error.',
+			steps: [{ call: 'delete', args: [TEST_PATH + '_absent_9z3k'] }, { assert: 'return_true' }]
+		}
 	];
 }
-
 
 module.exports = { portContract, validateAdapter, contractTestVectors };

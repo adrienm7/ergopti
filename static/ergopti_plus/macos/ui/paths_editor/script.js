@@ -26,17 +26,16 @@ function _t(key) {
  * Handles the <title> element via document.title as a special case.
  */
 function applyDomStrings() {
-	document.querySelectorAll("[data-i18n]").forEach(function (el) {
-		var key = el.getAttribute("data-i18n");
+	document.querySelectorAll('[data-i18n]').forEach(function (el) {
+		var key = el.getAttribute('data-i18n');
 		if (_strings[key] === undefined) return;
-		if (el.tagName === "TITLE") document.title = _strings[key];
+		if (el.tagName === 'TITLE') document.title = _strings[key];
 		else el.textContent = _strings[key];
 	});
 }
 
 // Current working value for the config directory
-let _currentDir = "";
-
+let _currentDir = '';
 
 // =====================================
 // =====================================
@@ -49,7 +48,7 @@ let _currentDir = "";
  * @returns {HTMLInputElement}
  */
 function dirInput() {
-	return document.getElementById("input-config-dir");
+	return document.getElementById('input-config-dir');
 }
 
 /**
@@ -57,7 +56,7 @@ function dirInput() {
  * @returns {HTMLElement}
  */
 function dirTag() {
-	return document.getElementById("tag-config-dir");
+	return document.getElementById('tag-config-dir');
 }
 
 /**
@@ -69,11 +68,10 @@ function refreshTag() {
 	const tag = dirTag();
 	if (!inp || !tag) return;
 	const isDefault = _currentDir === _data.defaultConfigDir;
-	inp.classList.toggle("is-default", isDefault);
-	tag.textContent = isDefault ? _t("paths_editor.tag_default") : _t("paths_editor.tag_modified");
-	tag.className   = isDefault ? "tag-default" : "tag-modified";
+	inp.classList.toggle('is-default', isDefault);
+	tag.textContent = isDefault ? _t('paths_editor.tag_default') : _t('paths_editor.tag_modified');
+	tag.className = isDefault ? 'tag-default' : 'tag-modified';
 }
-
 
 // =============================================
 // =============================================
@@ -91,7 +89,7 @@ window.initData = function (data) {
 		_strings = data.strings;
 		applyDomStrings();
 	}
-	_currentDir = data.configDir || data.defaultConfigDir || "";
+	_currentDir = data.configDir || data.defaultConfigDir || '';
 	const inp = dirInput();
 	if (inp) inp.value = _currentDir;
 	refreshTag();
@@ -109,18 +107,16 @@ window.applyBrowseResult = function (path) {
 	refreshTag();
 };
 
-
 // ==========================================
 // ==========================================
 // ======= 4/ Input Listener ================
 // ==========================================
 // ==========================================
 
-dirInput().addEventListener("input", function () {
+dirInput().addEventListener('input', function () {
 	_currentDir = dirInput().value;
 	refreshTag();
 });
-
 
 // ==========================================
 // ==========================================
@@ -128,44 +124,43 @@ dirInput().addEventListener("input", function () {
 // ==========================================
 // ==========================================
 
-document.getElementById("btn-browse").addEventListener("click", function () {
+document.getElementById('btn-browse').addEventListener('click', function () {
 	setTimeout(function () {
 		try {
-			window.webkit.messageHandlers.hsPaths.postMessage({ action: "browse" });
+			window.webkit.messageHandlers.hsPaths.postMessage({ action: 'browse' });
 		} catch (e) {
-			console.error("browse postMessage failed:", e);
+			console.error('browse postMessage failed:', e);
 		}
 	}, 0);
 });
 
-document.getElementById("btn-save").addEventListener("click", function () {
+document.getElementById('btn-save').addEventListener('click', function () {
 	setTimeout(function () {
 		try {
-			window.webkit.messageHandlers.hsPaths.postMessage({ action: "save", configDir: _currentDir });
+			window.webkit.messageHandlers.hsPaths.postMessage({ action: 'save', configDir: _currentDir });
 		} catch (e) {
-			console.error("save postMessage failed:", e);
+			console.error('save postMessage failed:', e);
 		}
 	}, 0);
 });
 
-document.getElementById("btn-cancel").addEventListener("click", function () {
+document.getElementById('btn-cancel').addEventListener('click', function () {
 	setTimeout(function () {
 		try {
-			window.webkit.messageHandlers.hsPaths.postMessage({ action: "cancel" });
+			window.webkit.messageHandlers.hsPaths.postMessage({ action: 'cancel' });
 		} catch (e) {
-			console.error("cancel postMessage failed:", e);
+			console.error('cancel postMessage failed:', e);
 		}
 	}, 0);
 });
 
-document.getElementById("btn-reset").addEventListener("click", function () {
+document.getElementById('btn-reset').addEventListener('click', function () {
 	if (!_data) return;
-	_currentDir = _data.defaultConfigDir || "";
+	_currentDir = _data.defaultConfigDir || '';
 	const inp = dirInput();
 	if (inp) inp.value = _currentDir;
 	refreshTag();
 });
-
 
 // ========================================
 // ========================================
@@ -178,9 +173,9 @@ document.getElementById("btn-reset").addEventListener("click", function () {
 (function () {
 	setTimeout(function () {
 		try {
-			window.webkit.messageHandlers.hsPaths.postMessage({ action: "ready" });
+			window.webkit.messageHandlers.hsPaths.postMessage({ action: 'ready' });
 		} catch (e) {
-			console.error("ready postMessage failed:", e);
+			console.error('ready postMessage failed:', e);
 		}
 	}, 0);
-}());
+})();

@@ -24,19 +24,25 @@
  * ==============================================================================
  */
 
-"use strict";
+'use strict';
 
-const fs   = require("fs");
-const path = require("path");
+const fs = require('fs');
+const path = require('path');
 
-const REPO_ROOT = path.resolve(__dirname, "..", "..");
+const REPO_ROOT = path.resolve(__dirname, '..', '..');
 
-const AHK_MANIFEST   = path.join(REPO_ROOT, "static/ergopti_plus/windows/_generated/features_manifest.ahk");
-const HS_MANIFEST    = path.join(REPO_ROOT, "static/ergopti_plus/macos/_generated/features_manifest.lua");
-const FIXTURE_CONFIG = path.join(REPO_ROOT, "static/ergopti_plus/shared/tests/fixtures/test_config.toml");
-
-
-
+const AHK_MANIFEST = path.join(
+	REPO_ROOT,
+	'static/ergopti_plus/windows/_generated/features_manifest.ahk'
+);
+const HS_MANIFEST = path.join(
+	REPO_ROOT,
+	'static/ergopti_plus/macos/_generated/features_manifest.lua'
+);
+const FIXTURE_CONFIG = path.join(
+	REPO_ROOT,
+	'static/ergopti_plus/shared/tests/fixtures/test_config.toml'
+);
 
 // =====================================================================
 // =====================================================================
@@ -65,11 +71,11 @@ function test(name, ok, detail) {
  */
 function report() {
 	const total = _pass + _fail;
-	console.log("TAP version 14");
+	console.log('TAP version 14');
 	console.log(`1..${total}`);
 	let i = 1;
 	for (const r of _results) {
-		const prefix = r.ok ? "ok" : "not ok";
+		const prefix = r.ok ? 'ok' : 'not ok';
 		console.log(`${prefix} ${i++} - ${r.name}`);
 		if (!r.ok && r.detail) {
 			console.log(`  # ${r.detail}`);
@@ -81,9 +87,6 @@ function report() {
 		process.exit(1);
 	}
 }
-
-
-
 
 // =====================================================================
 // =====================================================================
@@ -103,25 +106,25 @@ function parseAhkCrossFeatures(src) {
 	for (const line of lines) {
 		if (!line.includes('"path"')) continue;
 		const mPath = line.match(/"path",\s*"([^"]+)"/);
-		const mId   = line.match(/"id",\s*"([^"]+)"/);
+		const mId = line.match(/"id",\s*"([^"]+)"/);
 		const mSect = line.match(/"section",\s*"([^"]+)"/);
 		const mType = line.match(/"type",\s*"([^"]+)"/);
 		const mPlat = line.match(/"platforms",\s*\[([^\]]*)\]/);
 		if (!mPath || !mId || !mSect || !mType || !mPlat) continue;
 
-		const platforms = (mPlat[1].match(/"([^"]+)"/g) || []).map(s => s.replace(/"/g, ""));
-		if (!platforms.includes("ahk") || !platforms.includes("hs")) continue;
+		const platforms = (mPlat[1].match(/"([^"]+)"/g) || []).map((s) => s.replace(/"/g, ''));
+		if (!platforms.includes('ahk') || !platforms.includes('hs')) continue;
 
 		// Extract the default value raw string (everything between "default", and the next key).
 		// The default may be: a quoted string, a boolean, a number, or a nested Map(...).
 		const defaultRaw = extractAhkDefault(line);
 
 		result.set(mPath[1], {
-			id:         mId[1],
-			section:    mSect[1],
-			type:       mType[1],
+			id: mId[1],
+			section: mSect[1],
+			type: mType[1],
 			defaultRaw,
-			platforms,
+			platforms
 		});
 	}
 	return result;
@@ -135,46 +138,55 @@ function parseAhkCrossFeatures(src) {
  */
 function parseLuaCrossFeatures(src) {
 	const result = new Map();
-	const featStart = src.indexOf("M.features");
+	const featStart = src.indexOf('M.features');
 	if (featStart === -1) return result;
 	const featSrc = src.slice(featStart);
 	const lines = featSrc.split(/\r?\n/);
 
 	let i = 0;
 	while (i < lines.length) {
-		if (!lines[i].includes('path = "')) { i++; continue; }
+		if (!lines[i].includes('path = "')) {
+			i++;
+			continue;
+		}
 
 		// Collect the block until we close the feature entry brace.
 		const blockLines = [lines[i]];
 		let j = i + 1;
 		let depth = 1;
-		for (const ch of lines[i]) { if (ch === "{") depth++; else if (ch === "}") depth--; }
+		for (const ch of lines[i]) {
+			if (ch === '{') depth++;
+			else if (ch === '}') depth--;
+		}
 		while (j < lines.length && depth > 0) {
-			for (const ch of lines[j]) { if (ch === "{") depth++; else if (ch === "}") depth--; }
+			for (const ch of lines[j]) {
+				if (ch === '{') depth++;
+				else if (ch === '}') depth--;
+			}
 			blockLines.push(lines[j]);
 			j++;
 		}
 		i = j + 1;
 
-		const block = blockLines.join("\n");
+		const block = blockLines.join('\n');
 		const mPath = block.match(/path\s*=\s*"([^"]+)"/);
-		const mId   = block.match(/\bid\s*=\s*"([^"]+)"/);
+		const mId = block.match(/\bid\s*=\s*"([^"]+)"/);
 		const mSect = block.match(/section\s*=\s*"([^"]+)"/);
 		const mType = block.match(/type\s*=\s*"([^"]+)"/);
 		const mPlat = block.match(/platforms\s*=\s*\{([^}]*)\}/);
 		if (!mPath || !mId || !mSect || !mType || !mPlat) continue;
 
-		const platforms = (mPlat[1].match(/"([^"]+)"/g) || []).map(s => s.replace(/"/g, ""));
-		if (!platforms.includes("ahk") || !platforms.includes("hs")) continue;
+		const platforms = (mPlat[1].match(/"([^"]+)"/g) || []).map((s) => s.replace(/"/g, ''));
+		if (!platforms.includes('ahk') || !platforms.includes('hs')) continue;
 
 		const defaultRaw = extractLuaDefault(block);
 
 		result.set(mPath[1], {
-			id:         mId[1],
-			section:    mSect[1],
-			type:       mType[1],
+			id: mId[1],
+			section: mSect[1],
+			type: mType[1],
 			defaultRaw,
-			platforms,
+			platforms
 		});
 	}
 	return result;
@@ -189,9 +201,9 @@ function parseLuaCrossFeatures(src) {
 function extractAhkDefault(line) {
 	// Find the position of `"default", ` and extract everything until the next `"type",`
 	const startMarker = '"default", ';
-	const endMarker   = ', "type",';
+	const endMarker = ', "type",';
 	const start = line.indexOf(startMarker);
-	if (start === -1) return "";
+	if (start === -1) return '';
 	const valueStart = start + startMarker.length;
 	const end = line.indexOf(endMarker, valueStart);
 	if (end === -1) return line.slice(valueStart).trim();
@@ -206,19 +218,25 @@ function extractAhkDefault(line) {
  * @returns {string}
  */
 function extractLuaDefault(block) {
-	const startMarker = "default =";
+	const startMarker = 'default =';
 	const start = block.indexOf(startMarker);
-	if (start === -1) return "";
+	if (start === -1) return '';
 	const valueStart = start + startMarker.length;
 	let rest = block.slice(valueStart).trimStart();
 
 	// If value starts with `{`, extract the whole balanced brace block.
-	if (rest[0] === "{") {
+	if (rest[0] === '{') {
 		let depth = 0;
 		let j = 0;
 		while (j < rest.length) {
-			if (rest[j] === "{") depth++;
-			else if (rest[j] === "}") { depth--; if (depth === 0) { j++; break; } }
+			if (rest[j] === '{') depth++;
+			else if (rest[j] === '}') {
+				depth--;
+				if (depth === 0) {
+					j++;
+					break;
+				}
+			}
 			j++;
 		}
 		return rest.slice(0, j).trim();
@@ -237,7 +255,7 @@ function extractLuaDefault(block) {
  */
 function parseAhkMapLiteral(raw) {
 	const trimmed = raw.trim();
-	if (!trimmed.startsWith("Map(")) return null;
+	if (!trimmed.startsWith('Map(')) return null;
 	// Extract contents between outermost Map( ... )
 	const inner = trimmed.slice(4, -1).trim();
 	const result = {};
@@ -277,37 +295,45 @@ function readAhkValue(src, pos) {
 		return { value: src.slice(pos + 1, end), nextIndex: end + 1 };
 	}
 	// Nested Map(...)
-	if (src.slice(pos, pos + 4) === "Map(") {
+	if (src.slice(pos, pos + 4) === 'Map(') {
 		let depth = 0;
 		let j = pos;
 		while (j < src.length) {
-			if (src[j] === "(") depth++;
-			else if (src[j] === ")") { depth--; if (depth === 0) { j++; break; } }
+			if (src[j] === '(') depth++;
+			else if (src[j] === ')') {
+				depth--;
+				if (depth === 0) {
+					j++;
+					break;
+				}
+			}
 			j++;
 		}
 		const raw = src.slice(pos, j);
 		return { value: parseAhkMapLiteral(raw), nextIndex: j };
 	}
 	// Array [...]
-	if (src[pos] === "[") {
-		const end = src.indexOf("]", pos);
+	if (src[pos] === '[') {
+		const end = src.indexOf(']', pos);
 		const inner = src.slice(pos + 1, end).trim();
-		const items = inner ? inner.split(",").map(s => {
-			const t = s.trim();
-			if (t === "true") return true;
-			if (t === "false") return false;
-			if (t.startsWith('"')) return t.slice(1, -1);
-			const n = Number(t);
-			return isNaN(n) ? t : n;
-		}) : [];
+		const items = inner
+			? inner.split(',').map((s) => {
+					const t = s.trim();
+					if (t === 'true') return true;
+					if (t === 'false') return false;
+					if (t.startsWith('"')) return t.slice(1, -1);
+					const n = Number(t);
+					return isNaN(n) ? t : n;
+				})
+			: [];
 		return { value: items, nextIndex: end + 1 };
 	}
 	// Boolean / number — read until comma or end
 	let j = pos;
-	while (j < src.length && src[j] !== "," && src[j] !== ")") j++;
+	while (j < src.length && src[j] !== ',' && src[j] !== ')') j++;
 	const token = src.slice(pos, j).trim();
-	if (token === "true") return { value: true, nextIndex: j };
-	if (token === "false") return { value: false, nextIndex: j };
+	if (token === 'true') return { value: true, nextIndex: j };
+	if (token === 'false') return { value: false, nextIndex: j };
 	const n = Number(token);
 	return { value: isNaN(n) ? token : n, nextIndex: j };
 }
@@ -320,20 +346,20 @@ function readAhkValue(src, pos) {
  */
 function parseLuaTableLiteral(raw) {
 	const trimmed = raw.trim();
-	if (!trimmed.startsWith("{")) return null;
-	const inner = trimmed.slice(1, trimmed.lastIndexOf("}")).trim();
+	if (!trimmed.startsWith('{')) return null;
+	const inner = trimmed.slice(1, trimmed.lastIndexOf('}')).trim();
 	if (!inner) return {};
 
 	// Detect whether this is a Lua array (all items are values, no `=` at top level)
 	// vs a key=value table. Split on commas first.
-	const items = splitLuaTopLevel(inner, ",");
+	const items = splitLuaTopLevel(inner, ',');
 
-	const isArray = items.every(item => !item.includes("=") || item.trim().startsWith('"'));
+	const isArray = items.every((item) => !item.includes('=') || item.trim().startsWith('"'));
 	if (isArray) {
-		return items.map(s => {
+		return items.map((s) => {
 			const t = s.trim();
-			if (t === "true") return true;
-			if (t === "false") return false;
+			if (t === 'true') return true;
+			if (t === 'false') return false;
 			if (t.startsWith('"')) return t.slice(1, t.lastIndexOf('"'));
 			const n = Number(t);
 			return isNaN(n) ? t : n;
@@ -342,12 +368,12 @@ function parseLuaTableLiteral(raw) {
 
 	const result = {};
 	for (const pair of items) {
-		const eq = pair.indexOf("=");
+		const eq = pair.indexOf('=');
 		if (eq === -1) continue;
 		const key = pair.slice(0, eq).trim();
 		const valRaw = pair.slice(eq + 1).trim();
-		if (valRaw === "true") result[key] = true;
-		else if (valRaw === "false") result[key] = false;
+		if (valRaw === 'true') result[key] = true;
+		else if (valRaw === 'false') result[key] = false;
 		else if (valRaw.startsWith('"')) result[key] = valRaw.slice(1, valRaw.lastIndexOf('"'));
 		else {
 			const n = Number(valRaw);
@@ -367,15 +393,15 @@ function splitLuaTopLevel(src, delim) {
 	const parts = [];
 	let depth = 0;
 	let inStr = false;
-	let cur = "";
+	let cur = '';
 	for (let i = 0; i < src.length; i++) {
 		const ch = src[i];
-		if (ch === '"' && (i === 0 || src[i - 1] !== "\\")) inStr = !inStr;
-		if (!inStr && (ch === "{" || ch === "(")) depth++;
-		if (!inStr && (ch === "}" || ch === ")")) depth--;
+		if (ch === '"' && (i === 0 || src[i - 1] !== '\\')) inStr = !inStr;
+		if (!inStr && (ch === '{' || ch === '(')) depth++;
+		if (!inStr && (ch === '}' || ch === ')')) depth--;
 		if (!inStr && depth === 0 && src.slice(i, i + delim.length) === delim) {
 			parts.push(cur);
-			cur = "";
+			cur = '';
 			i += delim.length - 1;
 		} else {
 			cur += ch;
@@ -396,27 +422,27 @@ function parseDefaultValue(raw, lang) {
 	if (!raw) return undefined;
 	const t = raw.trim();
 	// Primitives
-	if (t === "true")  return true;
-	if (t === "false") return false;
+	if (t === 'true') return true;
+	if (t === 'false') return false;
 	if (t.startsWith('"') && t.endsWith('"')) return t.slice(1, -1);
 	const n = Number(t);
-	if (!isNaN(n) && t !== "") return n;
+	if (!isNaN(n) && t !== '') return n;
 	// Structured types
-	if (lang === "ahk" && t.startsWith("Map(")) return parseAhkMapLiteral(t);
-	if (lang === "ahk" && t.startsWith("[")) {
+	if (lang === 'ahk' && t.startsWith('Map(')) return parseAhkMapLiteral(t);
+	if (lang === 'ahk' && t.startsWith('[')) {
 		// AHK array literal: ["a", "b"] or [true, false]
-		const inner = t.slice(1, t.lastIndexOf("]")).trim();
+		const inner = t.slice(1, t.lastIndexOf(']')).trim();
 		if (!inner) return [];
-		return inner.split(",").map(s => {
+		return inner.split(',').map((s) => {
 			const tok = s.trim();
-			if (tok === "true") return true;
-			if (tok === "false") return false;
+			if (tok === 'true') return true;
+			if (tok === 'false') return false;
 			if (tok.startsWith('"')) return tok.slice(1, -1);
 			const num = Number(tok);
 			return isNaN(num) ? tok : num;
 		});
 	}
-	if (lang === "lua" && t.startsWith("{")) return parseLuaTableLiteral(t);
+	if (lang === 'lua' && t.startsWith('{')) return parseLuaTableLiteral(t);
 	return t;
 }
 
@@ -428,16 +454,13 @@ function parseDefaultValue(raw, lang) {
  */
 function serialiseDefault(val) {
 	if (val === null || val === undefined) return String(val);
-	if (typeof val === "object" && !Array.isArray(val)) {
+	if (typeof val === 'object' && !Array.isArray(val)) {
 		const keys = Object.keys(val).sort();
-		return "{" + keys.map(k => `${k}:${serialiseDefault(val[k])}`).join(",") + "}";
+		return '{' + keys.map((k) => `${k}:${serialiseDefault(val[k])}`).join(',') + '}';
 	}
-	if (Array.isArray(val)) return "[" + val.map(serialiseDefault).join(",") + "]";
+	if (Array.isArray(val)) return '[' + val.map(serialiseDefault).join(',') + ']';
 	return String(val);
 }
-
-
-
 
 // =====================================================================
 // =====================================================================
@@ -459,16 +482,16 @@ function parseTomlFixture(src) {
 
 	const lines = src.split(/\r?\n/);
 	for (let raw of lines) {
-		const line = raw.split("#")[0].trim();
+		const line = raw.split('#')[0].trim();
 		if (!line) continue;
 
 		// Section header [a.b.c]
-		if (line.startsWith("[") && line.endsWith("]")) {
+		if (line.startsWith('[') && line.endsWith(']')) {
 			const sectionKey = line.slice(1, -1).trim();
-			currentPath = sectionKey.split(".");
+			currentPath = sectionKey.split('.');
 			cursor = root;
 			for (const part of currentPath) {
-				if (typeof cursor[part] !== "object" || cursor[part] === null) {
+				if (typeof cursor[part] !== 'object' || cursor[part] === null) {
 					cursor[part] = {};
 				}
 				cursor = cursor[part];
@@ -477,7 +500,7 @@ function parseTomlFixture(src) {
 		}
 
 		// Key = value
-		const eqIdx = line.indexOf("=");
+		const eqIdx = line.indexOf('=');
 		if (eqIdx === -1) continue;
 		const key = line.slice(0, eqIdx).trim();
 		const valRaw = line.slice(eqIdx + 1).trim();
@@ -492,19 +515,19 @@ function parseTomlFixture(src) {
  * @returns {boolean|number|string|Array}
  */
 function coerceTomlValue(raw) {
-	if (raw === "true")  return true;
-	if (raw === "false") return false;
+	if (raw === 'true') return true;
+	if (raw === 'false') return false;
 	if (raw.startsWith('"') && raw.endsWith('"')) return raw.slice(1, -1);
 
 	// Inline array ["a", "b"]
-	if (raw.startsWith("[") && raw.endsWith("]")) {
+	if (raw.startsWith('[') && raw.endsWith(']')) {
 		const inner = raw.slice(1, -1).trim();
 		if (!inner) return [];
-		return inner.split(",").map(s => coerceTomlValue(s.trim()));
+		return inner.split(',').map((s) => coerceTomlValue(s.trim()));
 	}
 
 	const num = Number(raw);
-	if (!isNaN(num) && raw !== "") return num;
+	if (!isNaN(num) && raw !== '') return num;
 	return raw;
 }
 
@@ -516,10 +539,10 @@ function coerceTomlValue(raw) {
  * @returns {*}
  */
 function tomlLookup(toml, featurePath) {
-	const parts = featurePath.split(".");
+	const parts = featurePath.split('.');
 	let node = toml;
 	for (const part of parts) {
-		if (node === null || typeof node !== "object") return undefined;
+		if (node === null || typeof node !== 'object') return undefined;
 		if (!(part in node)) return undefined;
 		node = node[part];
 	}
@@ -533,17 +556,14 @@ function tomlLookup(toml, featurePath) {
  * @returns {string}
  */
 function serialise(val) {
-	if (val === undefined) return "__ABSENT__";
-	if (typeof val === "object" && val !== null) {
+	if (val === undefined) return '__ABSENT__';
+	if (typeof val === 'object' && val !== null) {
 		const keys = Object.keys(val).sort();
-		const pairs = keys.map(k => `${k}:${serialise(val[k])}`);
-		return `{${pairs.join(",")}}`;
+		const pairs = keys.map((k) => `${k}:${serialise(val[k])}`);
+		return `{${pairs.join(',')}}`;
 	}
 	return String(val);
 }
-
-
-
 
 // =====================================================================
 // =====================================================================
@@ -551,28 +571,29 @@ function serialise(val) {
 // =====================================================================
 // =====================================================================
 
-const ahkExists     = fs.existsSync(AHK_MANIFEST);
-const luaExists     = fs.existsSync(HS_MANIFEST);
+const ahkExists = fs.existsSync(AHK_MANIFEST);
+const luaExists = fs.existsSync(HS_MANIFEST);
 const fixtureExists = fs.existsSync(FIXTURE_CONFIG);
 
-test("AHK manifest file exists", ahkExists,
-	`Expected ${AHK_MANIFEST} — run npm run build:manifest`);
-test("HS manifest file exists", luaExists,
-	`Expected ${HS_MANIFEST} — run npm run build:manifest`);
-test("Fixture config file exists", fixtureExists,
-	`Expected ${FIXTURE_CONFIG}`);
+test(
+	'AHK manifest file exists',
+	ahkExists,
+	`Expected ${AHK_MANIFEST} — run npm run build:manifest`
+);
+test('HS manifest file exists', luaExists, `Expected ${HS_MANIFEST} — run npm run build:manifest`);
+test('Fixture config file exists', fixtureExists, `Expected ${FIXTURE_CONFIG}`);
 
 if (!ahkExists || !luaExists || !fixtureExists) {
 	report();
 	process.exit(1);
 }
 
-const ahkSrc      = fs.readFileSync(AHK_MANIFEST, "utf8");
-const luaSrc      = fs.readFileSync(HS_MANIFEST, "utf8");
-const fixtureSrc  = fs.readFileSync(FIXTURE_CONFIG, "utf8");
+const ahkSrc = fs.readFileSync(AHK_MANIFEST, 'utf8');
+const luaSrc = fs.readFileSync(HS_MANIFEST, 'utf8');
+const fixtureSrc = fs.readFileSync(FIXTURE_CONFIG, 'utf8');
 const manifestSrc = fs.readFileSync(
-	path.join(REPO_ROOT, "static/ergopti_plus/shared/features/manifest.toml"),
-	"utf8"
+	path.join(REPO_ROOT, 'static/ergopti_plus/shared/features/manifest.toml'),
+	'utf8'
 );
 
 // Build the set of feature paths that use default_per_platform — their defaults
@@ -592,7 +613,7 @@ function buildPerPlatformPaths(src) {
 	// Walk through [[features.<path>]] blocks and collect ids that follow
 	// a default_per_platform key.
 	let currentSection = null;
-	let currentId      = null;
+	let currentId = null;
 	let hasPerPlatform = false;
 	for (const raw of lines) {
 		const line = raw.trim();
@@ -602,16 +623,16 @@ function buildPerPlatformPaths(src) {
 			if (hasPerPlatform && currentSection && currentId) {
 				found.add(`${currentSection}.${currentId}`);
 			}
-			currentSection  = headerMatch[1];
-			currentId       = null;
-			hasPerPlatform  = false;
+			currentSection = headerMatch[1];
+			currentId = null;
+			hasPerPlatform = false;
 			continue;
 		}
-		if (line.startsWith("id =")) {
+		if (line.startsWith('id =')) {
 			const m = line.match(/id\s*=\s*"([^"]+)"/);
 			if (m) currentId = m[1];
 		}
-		if (line.startsWith("default_per_platform")) {
+		if (line.startsWith('default_per_platform')) {
 			hasPerPlatform = true;
 		}
 	}
@@ -622,33 +643,33 @@ function buildPerPlatformPaths(src) {
 	return found;
 }
 
-
-
-
 // =====================================================================
 // =====================================================================
 // ======= 5/ Parse manifests and fixture ==============================
 // =====================================================================
 // =====================================================================
 
-const ahkFeatures     = parseAhkCrossFeatures(ahkSrc);
-const luaFeatures     = parseLuaCrossFeatures(luaSrc);
-const fixtureToml     = parseTomlFixture(fixtureSrc);
+const ahkFeatures = parseAhkCrossFeatures(ahkSrc);
+const luaFeatures = parseLuaCrossFeatures(luaSrc);
+const fixtureToml = parseTomlFixture(fixtureSrc);
 
-test("AHK manifest cross-platform features parseable",
+test(
+	'AHK manifest cross-platform features parseable',
 	ahkFeatures.size > 0,
-	`Extracted 0 cross-platform features from AHK manifest`);
+	`Extracted 0 cross-platform features from AHK manifest`
+);
 
-test("HS manifest cross-platform features parseable",
+test(
+	'HS manifest cross-platform features parseable',
 	luaFeatures.size > 0,
-	`Extracted 0 cross-platform features from HS manifest`);
+	`Extracted 0 cross-platform features from HS manifest`
+);
 
-test("Fixture config parseable",
+test(
+	'Fixture config parseable',
 	Object.keys(fixtureToml).length > 0,
-	`Failed to parse ${FIXTURE_CONFIG}`);
-
-
-
+	`Failed to parse ${FIXTURE_CONFIG}`
+);
 
 // =====================================================================
 // =====================================================================
@@ -674,9 +695,6 @@ for (const [featurePath] of luaFeatures) {
 	);
 }
 
-
-
-
 // =====================================================================
 // =====================================================================
 // ======= 7/ Default value parity =====================================
@@ -696,8 +714,8 @@ for (const [featurePath, ahkInfo] of ahkFeatures) {
 	if (PER_PLATFORM_PATHS.has(featurePath)) {
 		// Intentional per-platform divergence — verify it is actually different
 		// so stale entries in PER_PLATFORM_PATHS are caught too.
-		const ahkDefault = serialiseDefault(parseDefaultValue(ahkInfo.defaultRaw, "ahk"));
-		const luaDefault = serialiseDefault(parseDefaultValue(luaInfo.defaultRaw, "lua"));
+		const ahkDefault = serialiseDefault(parseDefaultValue(ahkInfo.defaultRaw, 'ahk'));
+		const luaDefault = serialiseDefault(parseDefaultValue(luaInfo.defaultRaw, 'lua'));
 		test(
 			`Default for "${featurePath}" correctly diverges per platform (default_per_platform)`,
 			ahkDefault !== luaDefault,
@@ -706,8 +724,8 @@ for (const [featurePath, ahkInfo] of ahkFeatures) {
 		continue;
 	}
 
-	const ahkDefault = serialiseDefault(parseDefaultValue(ahkInfo.defaultRaw, "ahk"));
-	const luaDefault = serialiseDefault(parseDefaultValue(luaInfo.defaultRaw, "lua"));
+	const ahkDefault = serialiseDefault(parseDefaultValue(ahkInfo.defaultRaw, 'ahk'));
+	const luaDefault = serialiseDefault(parseDefaultValue(luaInfo.defaultRaw, 'lua'));
 
 	test(
 		`Default for "${featurePath}" matches between AHK and HS manifests`,
@@ -715,9 +733,6 @@ for (const [featurePath, ahkInfo] of ahkFeatures) {
 		`AHK default="${ahkDefault}" | HS default="${luaDefault}"`
 	);
 }
-
-
-
 
 // =====================================================================
 // =====================================================================
@@ -741,12 +756,10 @@ for (const [featurePath, ahkInfo] of ahkFeatures) {
 	if (!luaInfo) continue;
 
 	const tomlValue = tomlLookup(fixtureToml, featurePath);
-	const ahkResolved = tomlValue !== undefined
-		? tomlValue
-		: parseDefaultValue(ahkInfo.defaultRaw, "ahk");
-	const luaResolved = tomlValue !== undefined
-		? tomlValue
-		: parseDefaultValue(luaInfo.defaultRaw, "lua");
+	const ahkResolved =
+		tomlValue !== undefined ? tomlValue : parseDefaultValue(ahkInfo.defaultRaw, 'ahk');
+	const luaResolved =
+		tomlValue !== undefined ? tomlValue : parseDefaultValue(luaInfo.defaultRaw, 'lua');
 
 	const ahkStr = serialise(ahkResolved);
 	const luaStr = serialise(luaResolved);
@@ -757,8 +770,5 @@ for (const [featurePath, ahkInfo] of ahkFeatures) {
 		`AHK="${ahkStr}" | HS="${luaStr}"`
 	);
 }
-
-
-
 
 report();

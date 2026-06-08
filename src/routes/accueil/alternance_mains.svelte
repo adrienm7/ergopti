@@ -7,14 +7,18 @@
 <section>
 	<h2>Alternance des mains</h2>
 	<p>
-		L’alternance des mains est très importante pour garantir une bonne <strong>fluidité de frappe</strong>, et donc un meilleur confort. L’objectif est d’essayer d’avoir le plus possible d’alternance des mains lors de la frappe du texte : main droite, puis main gauche, main droite, main gauche,
+		L’alternance des mains est très importante pour garantir une bonne <strong
+			>fluidité de frappe</strong
+		>, et donc un meilleur confort. L’objectif est d’essayer d’avoir le plus possible d’alternance
+		des mains lors de la frappe du texte : main droite, puis main gauche, main droite, main gauche,
 		etc.
 	</p>
 	<p>
-		Cette alternance des mains permet de <strong>ne pas surutiliser l’une des deux mains</strong> en n’en utilisant qu’une pour taper la majorité du texte. Cela se ferait en effet au détriment
-		de l’autre main qui resterait au-dessus de sa partie du clavier, à attendre de pouvoir enfin entrer
-		en jeu. Ainsi, avec une bonne alternance des mains, pendant qu’une main frappe une touche, l’autre
-		peut se replacer sur la rangée du milieu et se préparer à frapper la suivante.
+		Cette alternance des mains permet de <strong>ne pas surutiliser l’une des deux mains</strong> en
+		n’en utilisant qu’une pour taper la majorité du texte. Cela se ferait en effet au détriment de l’autre
+		main qui resterait au-dessus de sa partie du clavier, à attendre de pouvoir enfin entrer en jeu.
+		Ainsi, avec une bonne alternance des mains, pendant qu’une main frappe une touche, l’autre peut se
+		replacer sur la rangée du milieu et se préparer à frapper la suivante.
 	</p>
 	<p>
 		Si la touche suivante est sur la même main que la touche précédente (sauf éventuellement avec un
@@ -29,7 +33,8 @@
 		appelé
 		<em>ciseau</em>, car les doigts font un grand écart pour atteindre des rangées complètement
 		différentes. Au contraire,
-		<strong>en "parallélisant" les frappes sur les deux mains</strong>, le résultat se révèle bien plus satisfaisant et ces ciseaux sont évités.
+		<strong>en "parallélisant" les frappes sur les deux mains</strong>, le résultat se révèle bien
+		plus satisfaisant et ces ciseaux sont évités.
 	</p>
 	<p>
 		L’alternance des mains a une limite. Il est impossible d’alterner parfaitement à chaque frappe.

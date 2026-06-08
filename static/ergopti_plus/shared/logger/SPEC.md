@@ -14,16 +14,16 @@ The logger exposes exactly **8 variants** organised on two axes:
 _importance_ (DEBUG vs INFO vs WARNING vs ERROR) and
 _lifecycle role_ (misc, start, end).
 
-| Variant   | Axis    | Role       | Severity | Colour (guidance)   |
-|-----------|---------|------------|----------|---------------------|
-| `debug`   | DEBUG   | misc       | 10       | grey                |
-| `trace`   | DEBUG   | lifecycle start | 10  | dim cyan            |
-| `done`    | DEBUG   | lifecycle end   | 10  | dim green           |
-| `info`    | INFO    | misc       | 20       | near-black          |
-| `start`   | INFO    | lifecycle start | 20  | bright cyan         |
-| `success` | INFO    | lifecycle end   | 20  | bright green        |
-| `warn`    | WARNING | misc       | 30       | orange              |
-| `error`   | ERROR   | misc       | 40       | red                 |
+| Variant   | Axis    | Role            | Severity | Colour (guidance) |
+| --------- | ------- | --------------- | -------- | ----------------- |
+| `debug`   | DEBUG   | misc            | 10       | grey              |
+| `trace`   | DEBUG   | lifecycle start | 10       | dim cyan          |
+| `done`    | DEBUG   | lifecycle end   | 10       | dim green         |
+| `info`    | INFO    | misc            | 20       | near-black        |
+| `start`   | INFO    | lifecycle start | 20       | bright cyan       |
+| `success` | INFO    | lifecycle end   | 20       | bright green      |
+| `warn`    | WARNING | misc            | 30       | orange            |
+| `error`   | ERROR   | misc            | 40       | red               |
 
 ### 1.1 When to use each
 
@@ -71,8 +71,8 @@ LoggerWarn(Tag,    Msg, Args*)
 LoggerError(Tag,   Msg, Args*)
 ```
 
-- `Tag`  — caller-supplied module tag string, e.g. `"TapHoldLoader"`.
-- `Msg`  — format string using AHK `{N}` placeholders (e.g. `"Loaded {1} key(s)."`).
+- `Tag` — caller-supplied module tag string, e.g. `"TapHoldLoader"`.
+- `Msg` — format string using AHK `{N}` placeholders (e.g. `"Loaded {1} key(s)."`).
 - `Args` — variadic arguments substituted into `Msg`.
 
 ### 2.2 Hammerspoon / Lua
@@ -89,9 +89,9 @@ Logger.error(module_name,   msg, ...)
 ```
 
 - `module_name` — caller-supplied module tag string, e.g. `"menu_llm"`.
-- `msg`         — format string using Lua `string.format` `%` syntax
+- `msg` — format string using Lua `string.format` `%` syntax
   (e.g. `"Loaded %d key(s)."` ).
-- `...`         — variadic arguments substituted into `msg`.
+- `...` — variadic arguments substituted into `msg`.
 
 ---
 
@@ -113,6 +113,7 @@ YYYY-MM-DD HH:MM:SS:mmm
 - Separator between seconds and milliseconds is `:` (colon), not `.` (dot).
 
 Examples:
+
 ```
 2026-05-26 14:32:15:042
 2026-05-26 08:00:00:000
@@ -154,12 +155,12 @@ The caller-supplied tag is wrapped in square brackets verbatim.
 The logger MUST expose a configurable minimum severity level. Lines below the
 active level are discarded and never written to any output.
 
-| Numeric level | Covers variants              |
-|---------------|------------------------------|
+| Numeric level | Covers variants                                          |
+| ------------- | -------------------------------------------------------- |
 | 10            | DEBUG, TRACE, DONE, INFO, START, SUCCESS, WARNING, ERROR |
-| 20            | INFO, START, SUCCESS, WARNING, ERROR |
-| 30            | WARNING, ERROR               |
-| 40            | ERROR only                   |
+| 20            | INFO, START, SUCCESS, WARNING, ERROR                     |
+| 30            | WARNING, ERROR                                           |
+| 40            | ERROR only                                               |
 
 String aliases accepted by `set_level()`:
 `"debug"` → 10, `"info"` → 20, `"warning"` → 30, `"error"` → 40.
@@ -183,17 +184,17 @@ Default level: **10** (all variants active).
 
 ### 6.1 Main log
 
-| Property       | Value                                |
-|----------------|--------------------------------------|
-| Filename       | `ErgoptiPlus_YYYY-MM-DD.log`         |
-| Encoding       | UTF-8                                |
-| Line endings   | Platform-native (CRLF on Windows / LF on macOS) |
-| Rotation       | Daily — a new file is created when the calendar day changes |
+| Property       | Value                                                         |
+| -------------- | ------------------------------------------------------------- |
+| Filename       | `ErgoptiPlus_YYYY-MM-DD.log`                                  |
+| Encoding       | UTF-8                                                         |
+| Line endings   | Platform-native (CRLF on Windows / LF on macOS)               |
+| Rotation       | Daily — a new file is created when the calendar day changes   |
 | Retention      | Files older than **14 days** are deleted on the next rotation |
-| Purge strategy | Based on date in filename, not file modification time |
+| Purge strategy | Based on date in filename, not file modification time         |
 
 AHK path: `<ConfigDir>/autohotkey/logs/ErgoptiPlus_YYYY-MM-DD.log`
-HS  path:  `<ConfigDir>/hammerspoon/logs/ErgoptiPlus_YYYY-MM-DD.log`
+HS path: `<ConfigDir>/hammerspoon/logs/ErgoptiPlus_YYYY-MM-DD.log`
 
 ### 6.2 Fan-out sub-files
 
@@ -271,14 +272,14 @@ Called during the `init.lua` boot sequence.
 These features exist in one driver only and are **not** part of the shared
 contract. Both drivers are free to keep or remove them independently.
 
-| Feature                        | AHK  | HS   | Notes |
-|--------------------------------|------|------|-------|
-| Coloured console output        | ✗    | ✓    | `hs.console.printStyledText()` with per-variant RGB colour |
-| DEBUG-axis indentation         | ✗    | ✓    | 10-space prefix on DEBUG / TRACE / DONE lines in console |
-| Consecutive-line deduplication | ✗    | ✓    | Suppresses repeated identical lines; prints count summary |
-| Error notification callback    | ✗    | ✓    | Optional handler passed to `set_error_notification_handler()` |
-| `pcall` wrapper                | ✗    | ✓    | `Logger.pcall(module, fn, ...)` — wraps pcall with error logging |
-| `build` wrapper                | ✗    | ✓    | `Logger.build(module, label, fn, ctx)` — builder with error logging |
+| Feature                        | AHK | HS  | Notes                                                               |
+| ------------------------------ | --- | --- | ------------------------------------------------------------------- |
+| Coloured console output        | ✗   | ✓   | `hs.console.printStyledText()` with per-variant RGB colour          |
+| DEBUG-axis indentation         | ✗   | ✓   | 10-space prefix on DEBUG / TRACE / DONE lines in console            |
+| Consecutive-line deduplication | ✗   | ✓   | Suppresses repeated identical lines; prints count summary           |
+| Error notification callback    | ✗   | ✓   | Optional handler passed to `set_error_notification_handler()`       |
+| `pcall` wrapper                | ✗   | ✓   | `Logger.pcall(module, fn, ...)` — wraps pcall with error logging    |
+| `build` wrapper                | ✗   | ✓   | `Logger.build(module, label, fn, ctx)` — builder with error logging |
 
 ---
 
@@ -291,6 +292,7 @@ is replaced with the sentinel `"TIMESTAMP"` in expected lines so vectors are
 time-independent.
 
 Test-runner integration:
+
 - **AHK**: `tests/test_logger.ahk` includes a section that loads `test_vectors.json`
   via `JsonParse()` and asserts each expected line (with timestamp replaced).
 - **HS**: `tests/unit/lib/test_logger.lua` does the same via `require("lib.json")`.
@@ -300,6 +302,6 @@ Test-runner integration:
 ## References
 
 - AHK implementation: [`static/ergopti_plus/windows/lib/logger.ahk`](../../windows/lib/logger.ahk)
-- HS implementation:  [`static/ergopti_plus/macos/lib/logger.lua`](../../macos/lib/logger.lua)
-- Sub-file routing:   [`sub_files.toml`](./sub_files.toml)
-- Test vectors:       [`test_vectors.json`](./test_vectors.json)
+- HS implementation: [`static/ergopti_plus/macos/lib/logger.lua`](../../macos/lib/logger.lua)
+- Sub-file routing: [`sub_files.toml`](./sub_files.toml)
+- Test vectors: [`test_vectors.json`](./test_vectors.json)

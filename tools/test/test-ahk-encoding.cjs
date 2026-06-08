@@ -16,13 +16,10 @@
  * ==============================================================================
  */
 
-"use strict";
+'use strict';
 
-const fs = require("fs");
-const path = require("path");
-
-
-
+const fs = require('fs');
+const path = require('path');
 
 // ===================================
 // ===================================
@@ -30,7 +27,7 @@ const path = require("path");
 // ===================================
 // ===================================
 
-const ROOT = path.resolve(__dirname, "..", "..", "static", "ergopti_plus", "windows");
+const ROOT = path.resolve(__dirname, '..', '..', 'static', 'ergopti_plus', 'windows');
 
 /**
  * Recursively collects all .ahk files under a directory, skipping vendor/.
@@ -45,18 +42,15 @@ function collectAhkFiles(dir) {
 
 		if (entry.isDirectory()) {
 			// Skip third-party vendor files — they are not maintained here
-			if (entry.name === "vendor") continue;
+			if (entry.name === 'vendor') continue;
 			results.push(...collectAhkFiles(fullPath));
-		} else if (entry.isFile() && entry.name.endsWith(".ahk")) {
+		} else if (entry.isFile() && entry.name.endsWith('.ahk')) {
 			results.push(fullPath);
 		}
 	}
 
 	return results.sort();
 }
-
-
-
 
 // ===================================
 // ===================================
@@ -100,7 +94,6 @@ function hasBareLf(buf) {
 	return false;
 }
 
-
 // =====================================
 // =====================================
 // ======= 3/ Validation Runner =======
@@ -128,7 +121,7 @@ function run() {
 
 	for (const filePath of files) {
 		const buf = fs.readFileSync(filePath);
-		const rel = path.relative(path.resolve(__dirname, ".."), filePath).replace(/\\/g, "/");
+		const rel = path.relative(path.resolve(__dirname, '..'), filePath).replace(/\\/g, '/');
 
 		if (!hasBom(buf)) {
 			violations.push(`  MISSING BOM  : ${rel}`);
@@ -144,13 +137,15 @@ function run() {
 	const total = files.length;
 
 	if (violations.length > 0) {
-		console.error(`\nAHK encoding violations detected (${violations.length} file(s) out of ${total}):\n`);
+		console.error(
+			`\nAHK encoding violations detected (${violations.length} file(s) out of ${total}):\n`
+		);
 		for (const v of violations) {
 			console.error(v);
 		}
-		console.error("\nAll .ahk source files must be UTF-8 with BOM and CRLF line endings.");
+		console.error('\nAll .ahk source files must be UTF-8 with BOM and CRLF line endings.');
 		console.error("To fix: open the file in VS Code, set encoding to 'UTF-8 with BOM' and");
-		console.error("line endings to CRLF, then save.\n");
+		console.error('line endings to CRLF, then save.\n');
 		process.exit(1);
 	}
 

@@ -22,10 +22,7 @@
  * ==============================================================================
  */
 
-"use strict";
-
-
-
+'use strict';
 
 // ==================================================
 // ==================================================
@@ -38,8 +35,8 @@
  * @type {object}
  */
 const portContract = {
-	name: "Storage",
-	version: "1.0.0",
+	name: 'Storage',
+	version: '1.0.0',
 
 	/**
 	 * set(key, value) — Store a value under the given key.
@@ -74,17 +71,14 @@ const portContract = {
 	 *   @error_behavior "return_false".
 	 */
 	methods: {
-		set:    { arity: 2, required: true },
-		get:    { arity: 2, required: true },
+		set: { arity: 2, required: true },
+		get: { arity: 2, required: true },
 		delete: { arity: 1, required: true },
-		has:    { arity: 1, required: true },
-		keys:   { arity: 0, required: true },
-		clear:  { arity: 0, required: true },
-	},
+		has: { arity: 1, required: true },
+		keys: { arity: 0, required: true },
+		clear: { arity: 0, required: true }
+	}
 };
-
-
-
 
 // ==================================================
 // ==================================================
@@ -99,24 +93,19 @@ const portContract = {
  */
 function validateAdapter(adapter) {
 	const violations = [];
-	if (!adapter || typeof adapter !== "object") {
-		return ["adapter must be a non-null object"];
+	if (!adapter || typeof adapter !== 'object') {
+		return ['adapter must be a non-null object'];
 	}
 	for (const [name, spec] of Object.entries(portContract.methods)) {
 		if (!spec.required) continue;
-		if (typeof adapter[name] !== "function") {
+		if (typeof adapter[name] !== 'function') {
 			violations.push(`missing method: ${name}`);
 		} else if (adapter[name].length !== spec.arity) {
-			violations.push(
-				`method ${name}: expected arity ${spec.arity}, got ${adapter[name].length}`
-			);
+			violations.push(`method ${name}: expected arity ${spec.arity}, got ${adapter[name].length}`);
 		}
 	}
 	return violations;
 }
-
-
-
 
 // ==================================================
 // ==================================================
@@ -132,81 +121,74 @@ function validateAdapter(adapter) {
  * @returns {Array<object>}
  */
 function contractTestVectors() {
-	const TEST_KEY = "__ST_TEST_KEY__";
-	const MISSING_KEY = "never_set_9z3k";
+	const TEST_KEY = '__ST_TEST_KEY__';
+	const MISSING_KEY = 'never_set_9z3k';
 	return [
 		{
-			id: "set_returns_true",
-			description: "set() returns true on a simple string value.",
-			steps: [
-				{ call: "set", args: [TEST_KEY, "v"] },
-				{ assert: "return_true" },
-			],
+			id: 'set_returns_true',
+			description: 'set() returns true on a simple string value.',
+			steps: [{ call: 'set', args: [TEST_KEY, 'v'] }, { assert: 'return_true' }]
 		},
 		{
-			id: "get_after_set",
-			description: "get() returns the value previously stored by set().",
+			id: 'get_after_set',
+			description: 'get() returns the value previously stored by set().',
 			steps: [
-				{ call: "set", args: [TEST_KEY, "v"] },
-				{ call: "get", args: [TEST_KEY, null] },
-				{ assert: "return_equals", expected: "v" },
-			],
+				{ call: 'set', args: [TEST_KEY, 'v'] },
+				{ call: 'get', args: [TEST_KEY, null] },
+				{ assert: 'return_equals', expected: 'v' }
+			]
 		},
 		{
-			id: "get_missing_returns_default",
-			description: "get() returns the supplied defaultValue when the key is absent.",
+			id: 'get_missing_returns_default',
+			description: 'get() returns the supplied defaultValue when the key is absent.',
 			steps: [
-				{ call: "get", args: [MISSING_KEY, "fallback"] },
-				{ assert: "return_equals", expected: "fallback" },
-			],
+				{ call: 'get', args: [MISSING_KEY, 'fallback'] },
+				{ assert: 'return_equals', expected: 'fallback' }
+			]
 		},
 		{
-			id: "has_true_after_set",
-			description: "has() returns true for a key that was just set.",
+			id: 'has_true_after_set',
+			description: 'has() returns true for a key that was just set.',
 			steps: [
-				{ call: "set", args: [TEST_KEY, "x"] },
-				{ call: "has", args: [TEST_KEY] },
-				{ assert: "return_true" },
-			],
+				{ call: 'set', args: [TEST_KEY, 'x'] },
+				{ call: 'has', args: [TEST_KEY] },
+				{ assert: 'return_true' }
+			]
 		},
 		{
-			id: "has_false_for_missing",
-			description: "has() returns false for a key that was never stored.",
-			steps: [
-				{ call: "has", args: [MISSING_KEY] },
-				{ assert: "return_false" },
-			],
+			id: 'has_false_for_missing',
+			description: 'has() returns false for a key that was never stored.',
+			steps: [{ call: 'has', args: [MISSING_KEY] }, { assert: 'return_false' }]
 		},
 		{
-			id: "delete_removes_key",
-			description: "has() returns false for a key that was deleted.",
+			id: 'delete_removes_key',
+			description: 'has() returns false for a key that was deleted.',
 			steps: [
-				{ call: "set",    args: [TEST_KEY, "to_delete"] },
-				{ call: "delete", args: [TEST_KEY] },
-				{ call: "has",    args: [TEST_KEY] },
-				{ assert: "return_false" },
-			],
+				{ call: 'set', args: [TEST_KEY, 'to_delete'] },
+				{ call: 'delete', args: [TEST_KEY] },
+				{ call: 'has', args: [TEST_KEY] },
+				{ assert: 'return_false' }
+			]
 		},
 		{
-			id: "keys_returns_array",
-			description: "keys() returns an array (possibly empty).",
+			id: 'keys_returns_array',
+			description: 'keys() returns an array (possibly empty).',
 			steps: [
-				{ call: "keys", args: [] },
-				{ assert: "return_type", expected: "array" },
-			],
+				{ call: 'keys', args: [] },
+				{ assert: 'return_type', expected: 'array' }
+			]
 		},
 		{
-			id: "clear_empties_store",
-			description: "has() returns false for a key that existed before clear().",
+			id: 'clear_empties_store',
+			description: 'has() returns false for a key that existed before clear().',
 			steps: [
-				{ call: "set",   args: [TEST_KEY, "v"] },
-				{ call: "clear", args: [] },
-				{ call: "has",   args: [TEST_KEY] },
-				{ assert: "return_false" },
-			],
-		},
+				{ call: 'set', args: [TEST_KEY, 'v'] },
+				{ call: 'clear', args: [] },
+				{ call: 'has', args: [TEST_KEY] },
+				{ assert: 'return_false' }
+			]
+		}
 	];
 }
-
 
 module.exports = { portContract, validateAdapter, contractTestVectors };

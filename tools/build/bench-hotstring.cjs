@@ -17,13 +17,10 @@
  * ==============================================================================
  */
 
-"use strict";
+'use strict';
 
-const fs   = require("fs");
-const path = require("path");
-
-
-
+const fs = require('fs');
+const path = require('path');
 
 // ===========================
 // ===========================
@@ -35,7 +32,7 @@ const path = require("path");
 const P95_LIMIT_MS = 5;
 
 // Maximum allowed p95 regression vs stored baseline (fractional, 0.20 = 20%)
-const REGRESSION_THRESHOLD = 0.20;
+const REGRESSION_THRESHOLD = 0.2;
 
 // Number of scan iterations per benchmark run
 const ITERATION_COUNT = 10_000;
@@ -47,10 +44,7 @@ const FIXTURE_TRIGGER_COUNT = 3_300;
 const MAX_TRIGGER_LEN = 8;
 
 // Baseline file written on first run and compared on subsequent runs
-const BASELINE_PATH = path.join(__dirname, "bench-baseline.json");
-
-
-
+const BASELINE_PATH = path.join(__dirname, 'bench-baseline.json');
 
 // ===========================
 // ===========================
@@ -65,10 +59,10 @@ const BASELINE_PATH = path.join(__dirname, "bench-baseline.json");
  * @returns {string} Last code-point character, or "" for empty strings.
  */
 function tailCodepoint(s) {
-	if (!s) return "";
+	if (!s) return '';
 	// Use Array.from so multi-byte emoji / surrogate pairs count as one unit
 	const codepoints = Array.from(s);
-	return codepoints[codepoints.length - 1] ?? "";
+	return codepoints[codepoints.length - 1] ?? '';
 }
 
 /**
@@ -80,17 +74,56 @@ function tailCodepoint(s) {
 function buildFixtureRegistry() {
 	// Common French/English trigger bodies representative of the real TOML corpus
 	const BODIES = [
-		"qd", "dc", "pr", "av", "ap", "ds", "en", "et", "le", "la",
-		"les", "des", "une", "un", "ces", "ses", "que", "qui", "pas",
-		"mais", "donc", "car", "qqch", "qqn", "pdt", "pdv", "rdv",
-		"stp", "svp", "bjr", "bsr", "mdr", "lol", "asap", "fyi",
-		"tjs", "bcp", "tjrs", "ns", "vs", "cad", "ie", "eg", "nb",
+		'qd',
+		'dc',
+		'pr',
+		'av',
+		'ap',
+		'ds',
+		'en',
+		'et',
+		'le',
+		'la',
+		'les',
+		'des',
+		'une',
+		'un',
+		'ces',
+		'ses',
+		'que',
+		'qui',
+		'pas',
+		'mais',
+		'donc',
+		'car',
+		'qqch',
+		'qqn',
+		'pdt',
+		'pdv',
+		'rdv',
+		'stp',
+		'svp',
+		'bjr',
+		'bsr',
+		'mdr',
+		'lol',
+		'asap',
+		'fyi',
+		'tjs',
+		'bcp',
+		'tjrs',
+		'ns',
+		'vs',
+		'cad',
+		'ie',
+		'eg',
+		'nb'
 	];
 	// Alphabet used to generate additional unique trigger bodies
-	const ALPHA = "abcdefghijklmnopqrstuvwxyz";
+	const ALPHA = 'abcdefghijklmnopqrstuvwxyz';
 
 	const mappings = [];
-	const byTail   = new Map();
+	const byTail = new Map();
 
 	let seq = 0;
 
@@ -99,12 +132,12 @@ function buildFixtureRegistry() {
 		const tail = tailCodepoint(trigger);
 		const entry = {
 			trigger,
-			triggerBytes: Buffer.byteLength(trigger, "utf8"),
-			tlen:         Array.from(trigger).length,
+			triggerBytes: Buffer.byteLength(trigger, 'utf8'),
+			tlen: Array.from(trigger).length,
 			tail,
 			seq,
-			auto:    false,
-			isWord:  false,
+			auto: false,
+			isWord: false
 		};
 		mappings.push(entry);
 		if (!byTail.has(tail)) byTail.set(tail, []);
@@ -133,9 +166,6 @@ function buildFixtureRegistry() {
 	return { byTail, mappings };
 }
 
-
-
-
 // ==========================================
 // ==========================================
 // ======= 3/ Hot-Path Scan Simulation =======
@@ -152,12 +182,12 @@ function buildFixtureRegistry() {
  * @returns {boolean} True if a trigger matched.
  */
 function simulateScan(registry, buffer, keystroke) {
-	const tail   = tailCodepoint(keystroke);
+	const tail = tailCodepoint(keystroke);
 	const bucket = registry.byTail.get(tail);
 	if (!bucket) return false;
 
 	const fullBuf = buffer + keystroke;
-	const bufLen  = fullBuf.length;
+	const bufLen = fullBuf.length;
 
 	for (const m of bucket) {
 		// Suffix match: the buffer must end with the trigger
@@ -166,9 +196,6 @@ function simulateScan(registry, buffer, keystroke) {
 	}
 	return false;
 }
-
-
-
 
 // ==============================
 // ==============================
@@ -185,8 +212,8 @@ function simulateScan(registry, buffer, keystroke) {
 function percentile(sorted, p) {
 	if (sorted.length === 0) return 0;
 	const idx = (p / 100) * (sorted.length - 1);
-	const lo  = Math.floor(idx);
-	const hi  = Math.ceil(idx);
+	const lo = Math.floor(idx);
+	const hi = Math.ceil(idx);
 	if (lo === hi) return sorted[lo];
 	return sorted[lo] + (sorted[hi] - sorted[lo]) * (idx - lo);
 }
@@ -198,13 +225,13 @@ function percentile(sorted, p) {
  */
 function runBenchmark(registry) {
 	// Pre-generate random inputs so generation cost is outside the hot loop
-	const ALPHA      = "abcdefghijklmnopqrstuvwxyz,;.éàèùâêîôûç ";
-	const buffers    = [];
+	const ALPHA = 'abcdefghijklmnopqrstuvwxyz,;.éàèùâêîôûç ';
+	const buffers = [];
 	const keystrokes = [];
 	for (let i = 0; i < ITERATION_COUNT; i++) {
 		// Buffer: 1–20 random chars
 		const bufLen = 1 + Math.floor(Math.random() * 20);
-		let buf = "";
+		let buf = '';
 		for (let j = 0; j < bufLen; j++) {
 			buf += ALPHA[Math.floor(Math.random() * ALPHA.length)];
 		}
@@ -230,17 +257,14 @@ function runBenchmark(registry) {
 
 	const toMs = (ns) => ns / 1_000_000;
 	return {
-		p50:        toMs(percentile(latenciesNs, 50)),
-		p95:        toMs(percentile(latenciesNs, 95)),
-		p99:        toMs(percentile(latenciesNs, 99)),
-		min:        toMs(latenciesNs[0]),
-		max:        toMs(latenciesNs[latenciesNs.length - 1]),
-		iterations: ITERATION_COUNT,
+		p50: toMs(percentile(latenciesNs, 50)),
+		p95: toMs(percentile(latenciesNs, 95)),
+		p99: toMs(percentile(latenciesNs, 99)),
+		min: toMs(latenciesNs[0]),
+		max: toMs(latenciesNs[latenciesNs.length - 1]),
+		iterations: ITERATION_COUNT
 	};
 }
-
-
-
 
 // ===============================
 // ===============================
@@ -254,7 +278,7 @@ function runBenchmark(registry) {
  */
 function readBaseline() {
 	try {
-		const raw = fs.readFileSync(BASELINE_PATH, "utf8");
+		const raw = fs.readFileSync(BASELINE_PATH, 'utf8');
 		return JSON.parse(raw);
 	} catch {
 		return null;
@@ -266,11 +290,8 @@ function readBaseline() {
  * @param {{ p50: number, p95: number, p99: number, min: number, max: number }} results
  */
 function writeBaseline(results) {
-	fs.writeFileSync(BASELINE_PATH, JSON.stringify(results, null, 2) + "\n", "utf8");
+	fs.writeFileSync(BASELINE_PATH, JSON.stringify(results, null, 2) + '\n', 'utf8');
 }
-
-
-
 
 // ==========================
 // ==========================
@@ -279,17 +300,19 @@ function writeBaseline(results) {
 // ==========================
 
 (function main() {
-	console.log("=== Hotstring scan benchmark ===");
+	console.log('=== Hotstring scan benchmark ===');
 	console.log(`Building fixture registry (${FIXTURE_TRIGGER_COUNT} triggers)…`);
 
 	const registry = buildFixtureRegistry();
 	const bucketCount = registry.byTail.size;
-	console.log(`Registry built: ${registry.mappings.length} mappings, ${bucketCount} tail-char buckets.`);
+	console.log(
+		`Registry built: ${registry.mappings.length} mappings, ${bucketCount} tail-char buckets.`
+	);
 
 	console.log(`Running ${ITERATION_COUNT.toLocaleString()} iterations…`);
 	const results = runBenchmark(registry);
 
-	console.log("\nResults:");
+	console.log('\nResults:');
 	console.log(`  min  : ${results.min.toFixed(4)} ms`);
 	console.log(`  p50  : ${results.p50.toFixed(4)} ms`);
 	console.log(`  p95  : ${results.p95.toFixed(4)} ms`);
@@ -298,7 +321,9 @@ function writeBaseline(results) {
 
 	// --- Absolute gate ---
 	if (results.p95 > P95_LIMIT_MS) {
-		console.error(`\nFAIL: p95 ${results.p95.toFixed(4)} ms exceeds absolute limit of ${P95_LIMIT_MS} ms.`);
+		console.error(
+			`\nFAIL: p95 ${results.p95.toFixed(4)} ms exceeds absolute limit of ${P95_LIMIT_MS} ms.`
+		);
 		process.exit(1);
 	}
 	console.log(`\nAbsolute gate: p95 ${results.p95.toFixed(4)} ms ≤ ${P95_LIMIT_MS} ms  OK`);
@@ -306,31 +331,35 @@ function writeBaseline(results) {
 	// --- Baseline comparison ---
 	const baseline = readBaseline();
 	if (!baseline) {
-		console.log("\nNo baseline found — writing new baseline.");
+		console.log('\nNo baseline found — writing new baseline.');
 		writeBaseline(results);
 		console.log(`Baseline written to ${BASELINE_PATH}`);
 		process.exit(0);
 	}
 
 	const regression = (results.p95 - baseline.p95) / baseline.p95;
-	const pctLabel   = (regression * 100).toFixed(1);
+	const pctLabel = (regression * 100).toFixed(1);
 
 	if (regression > REGRESSION_THRESHOLD) {
 		console.error(
 			`\nFAIL: p95 regressed ${pctLabel}% vs baseline ` +
-			`(${baseline.p95.toFixed(4)} ms → ${results.p95.toFixed(4)} ms). ` +
-			`Threshold: ${(REGRESSION_THRESHOLD * 100).toFixed(0)}%.`
+				`(${baseline.p95.toFixed(4)} ms → ${results.p95.toFixed(4)} ms). ` +
+				`Threshold: ${(REGRESSION_THRESHOLD * 100).toFixed(0)}%.`
 		);
 		process.exit(1);
 	}
 
 	if (regression < 0) {
-		console.log(`\nImprovement: p95 improved ${Math.abs(regression * 100).toFixed(1)}% vs baseline — updating baseline.`);
+		console.log(
+			`\nImprovement: p95 improved ${Math.abs(regression * 100).toFixed(1)}% vs baseline — updating baseline.`
+		);
 		writeBaseline(results);
 	} else {
-		console.log(`\nRegression check: p95 +${pctLabel}% vs baseline (limit: ${(REGRESSION_THRESHOLD * 100).toFixed(0)}%)  OK`);
+		console.log(
+			`\nRegression check: p95 +${pctLabel}% vs baseline (limit: ${(REGRESSION_THRESHOLD * 100).toFixed(0)}%)  OK`
+		);
 	}
 
-	console.log("\nAll checks passed.");
+	console.log('\nAll checks passed.');
 	process.exit(0);
 })();

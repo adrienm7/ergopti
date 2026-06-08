@@ -49,10 +49,7 @@
  * ==============================================================================
  */
 
-"use strict";
-
-
-
+'use strict';
 
 // ==================================================
 // ==================================================
@@ -70,15 +67,22 @@
  * @param {number} [cornerRadius] - Rounded corner radius (default 0 = sharp).
  * @returns {object} Rect draw call.
  */
-function makeRect(id, frame, fillColor = null, strokeColor = null, strokeWidth = 1, cornerRadius = 0) {
+function makeRect(
+	id,
+	frame,
+	fillColor = null,
+	strokeColor = null,
+	strokeWidth = 1,
+	cornerRadius = 0
+) {
 	return {
-		type:          "rect",
+		type: 'rect',
 		id,
 		frame,
-		fill_color:    fillColor,
-		stroke_color:  strokeColor,
-		stroke_width:  strokeWidth,
-		corner_radius: cornerRadius,
+		fill_color: fillColor,
+		stroke_color: strokeColor,
+		stroke_width: strokeWidth,
+		corner_radius: cornerRadius
 	};
 }
 
@@ -93,9 +97,9 @@ function makeRect(id, frame, fillColor = null, strokeColor = null, strokeWidth =
  * @param {string} [alignment] - "left" | "center" | "right" (default "left").
  * @returns {object} Text draw call.
  */
-function makeText(id, frame, text, fontName, fontSize, color, alignment = "left") {
+function makeText(id, frame, text, fontName, fontSize, color, alignment = 'left') {
 	return {
-		type:      "text",
+		type: 'text',
 		id,
 		frame,
 		text,
@@ -103,7 +107,7 @@ function makeText(id, frame, text, fontName, fontSize, color, alignment = "left"
 		font_size: fontSize,
 		color,
 		alignment,
-		styled:    null,   // no styled override
+		styled: null // no styled override
 	};
 }
 
@@ -121,15 +125,15 @@ function makeText(id, frame, text, fontName, fontSize, color, alignment = "left"
  */
 function makeStyledText(id, frame, styled, fallback, color) {
 	return {
-		type:      "text",
+		type: 'text',
 		id,
 		frame,
-		text:      fallback,
-		font_name: null,     // caller controls via styled object
+		text: fallback,
+		font_name: null, // caller controls via styled object
 		font_size: null,
 		color,
-		alignment: "left",
-		styled,
+		alignment: 'left',
+		styled
 	};
 }
 
@@ -143,15 +147,12 @@ function makeStyledText(id, frame, styled, fallback, color) {
  */
 function makeSeparator(id, y, canvasW, fillColor) {
 	return {
-		type:       "separator",
+		type: 'separator',
 		id,
-		frame:      { x: 0, y, w: canvasW, h: 1 },
-		fill_color: fillColor,
+		frame: { x: 0, y, w: canvasW, h: 1 },
+		fill_color: fillColor
 	};
 }
-
-
-
 
 // =========================================================
 // =========================================================
@@ -193,50 +194,51 @@ function makeSeparator(id, y, canvasW, fillColor) {
 function composeStacked(rows, geometry, style) {
 	const calls = [];
 	const { canvasW, canvasH, rowMeta, maxTextW, maxLabelW, labelZone } = geometry;
-	const padX     = 14;   // must match what computeStackedGeometry used
-	const padY     = 7;
+	const padX = 14; // must match what computeStackedGeometry used
+	const padY = 7;
 	const labelGap = 16;
 
 	for (let i = 0; i < rows.length; i++) {
-		const row   = rows[i];
-		const meta  = rowMeta[i];
-		const topY  = meta.topY;
-		const rowH  = meta.rowH;
+		const row = rows[i];
+		const meta = rowMeta[i];
+		const topY = meta.topY;
+		const rowH = meta.rowH;
 		const isDim = row.is_dimmed;
 
 		// Background fill — tinted per row.
-		calls.push(makeRect(
-			`row_bg_${i}`,
-			{ x: 0, y: topY, w: canvasW, h: rowH },
-			row.bg_color,
-			null, 1, 0
-		));
+		calls.push(
+			makeRect(`row_bg_${i}`, { x: 0, y: topY, w: canvasW, h: rowH }, row.bg_color, null, 1, 0)
+		);
 
 		// Main text.
-		calls.push(makeText(
-			`row_text_${i}`,
-			{ x: padX, y: topY + padY, w: maxTextW, h: rowH - padY * 2 },
-			row.text,
-			style.fontName,
-			style.fontSizeMain,
-			isDim ? style.colorDim : style.colorText,
-			"left"
-		));
+		calls.push(
+			makeText(
+				`row_text_${i}`,
+				{ x: padX, y: topY + padY, w: maxTextW, h: rowH - padY * 2 },
+				row.text,
+				style.fontName,
+				style.fontSizeMain,
+				isDim ? style.colorDim : style.colorText,
+				'left'
+			)
+		);
 		// Mark dimmed rows so drivers can apply strikethrough.
 		if (isDim) calls[calls.length - 1].is_dimmed = true;
 
 		// Trigger label (right column).
 		if (row.trigger_label && labelZone > 0) {
 			const labelX = padX + maxTextW + labelGap;
-			calls.push(makeText(
-				`row_label_${i}`,
-				{ x: labelX, y: topY + padY, w: maxLabelW, h: rowH - padY * 2 },
-				row.trigger_label,
-				style.fontName,
-				style.fontSizeHint,
-				isDim ? style.colorLabelDim : style.colorLabel,
-				"right"
-			));
+			calls.push(
+				makeText(
+					`row_label_${i}`,
+					{ x: labelX, y: topY + padY, w: maxLabelW, h: rowH - padY * 2 },
+					row.trigger_label,
+					style.fontName,
+					style.fontSizeHint,
+					isDim ? style.colorLabelDim : style.colorLabel,
+					'right'
+				)
+			);
 		}
 
 		// Separator — after every row except the last.
@@ -247,29 +249,32 @@ function composeStacked(rows, geometry, style) {
 	}
 
 	// Outer border (last, so it renders on top of everything).
-	calls.push(makeRect(
-		"border",
-		{ x: 0, y: 0, w: canvasW, h: canvasH },
-		null,   // no fill — transparent interior
-		style.colorBorder,
-		1,
-		style.cornerRadius
-	));
+	calls.push(
+		makeRect(
+			'border',
+			{ x: 0, y: 0, w: canvasW, h: canvasH },
+			null, // no fill — transparent interior
+			style.colorBorder,
+			1,
+			style.cornerRadius
+		)
+	);
 
 	// Background — prepend so it is drawn first (underneath all rows).
 	// Use the first row's bg_color as the canvas-level background fallback.
-	calls.unshift(makeRect(
-		"bg",
-		{ x: 0, y: 0, w: canvasW, h: canvasH },
-		rows[0]?.bg_color ?? { r: 0.10, g: 0.10, b: 0.10, a: 1.0 },
-		null, 1, style.cornerRadius
-	));
+	calls.unshift(
+		makeRect(
+			'bg',
+			{ x: 0, y: 0, w: canvasW, h: canvasH },
+			rows[0]?.bg_color ?? { r: 0.1, g: 0.1, b: 0.1, a: 1.0 },
+			null,
+			1,
+			style.cornerRadius
+		)
+	);
 
 	return calls;
 }
-
-
-
 
 // ==================================================
 // ==================================================
@@ -308,47 +313,76 @@ function composeStacked(rows, geometry, style) {
  */
 function composeLlm(blocks, geometry, style, bgColor) {
 	const calls = [];
-	const { canvasW, canvasH, predsFrame, separatorY, hintFrame, infoFrame, combinedFrame, isCombined } = geometry;
+	const {
+		canvasW,
+		canvasH,
+		predsFrame,
+		separatorY,
+		hintFrame,
+		infoFrame,
+		combinedFrame,
+		isCombined
+	} = geometry;
 
 	// Background (rounded, tinted).
-	calls.push(makeRect("bg", { x: 0, y: 0, w: canvasW, h: canvasH },
-		bgColor, null, 1, style.cornerRadius));
+	calls.push(
+		makeRect('bg', { x: 0, y: 0, w: canvasW, h: canvasH }, bgColor, null, 1, style.cornerRadius)
+	);
 
 	// Border.
-	calls.push(makeRect("border", { x: 0, y: 0, w: canvasW, h: canvasH },
-		null, style.colorBorder, 1, style.cornerRadius));
+	calls.push(
+		makeRect(
+			'border',
+			{ x: 0, y: 0, w: canvasW, h: canvasH },
+			null,
+			style.colorBorder,
+			1,
+			style.cornerRadius
+		)
+	);
 
 	// Predictions block — stable ID "preds" for streaming partial updates.
-	calls.push(makeStyledText("preds", predsFrame,
-		blocks.preds, blocks.preds_plain,
-		{ r: 1, g: 1, b: 1, a: 1 }));
+	calls.push(
+		makeStyledText('preds', predsFrame, blocks.preds, blocks.preds_plain, {
+			r: 1,
+			g: 1,
+			b: 1,
+			a: 1
+		})
+	);
 
 	// Separator (only when there is hint/info content).
 	if (separatorY !== null) {
-		calls.push(makeSeparator("sep", separatorY, canvasW, style.colorSep));
+		calls.push(makeSeparator('sep', separatorY, canvasW, style.colorSep));
 	}
 
 	// Hint + info.
 	if (isCombined && combinedFrame) {
-		calls.push(makeStyledText("hint_info", combinedFrame,
-			blocks.combined, blocks.combined_plain, style.colorHint));
+		calls.push(
+			makeStyledText(
+				'hint_info',
+				combinedFrame,
+				blocks.combined,
+				blocks.combined_plain,
+				style.colorHint
+			)
+		);
 	} else {
 		if (hintFrame) {
-			calls.push(makeStyledText("hint", hintFrame,
-				blocks.hint, blocks.hint_plain, style.colorHint));
+			calls.push(
+				makeStyledText('hint', hintFrame, blocks.hint, blocks.hint_plain, style.colorHint)
+			);
 		}
 		// Info line — stable ID "info" for streaming TTFT/TTLT updates.
 		if (infoFrame) {
-			calls.push(makeStyledText("info", infoFrame,
-				blocks.info, blocks.info_plain, style.colorInfo));
+			calls.push(
+				makeStyledText('info', infoFrame, blocks.info, blocks.info_plain, style.colorInfo)
+			);
 		}
 	}
 
 	return calls;
 }
-
-
-
 
 // ==================================================
 // ==================================================
@@ -369,7 +403,7 @@ function composeLlm(blocks, geometry, style, bgColor) {
  * @returns {Array<object>} New array with the replacement applied.
  */
 function patchDrawCall(drawCalls, id, replacement) {
-	const idx = drawCalls.findIndex(c => c.id === id);
+	const idx = drawCalls.findIndex((c) => c.id === id);
 	if (idx === -1) return drawCalls;
 	const updated = [...drawCalls];
 	updated[idx] = replacement;
@@ -383,9 +417,8 @@ function patchDrawCall(drawCalls, id, replacement) {
  * @returns {object|null} The found draw call or null.
  */
 function findDrawCall(drawCalls, id) {
-	return drawCalls.find(c => c.id === id) ?? null;
+	return drawCalls.find((c) => c.id === id) ?? null;
 }
-
 
 module.exports = {
 	makeRect,
@@ -395,5 +428,5 @@ module.exports = {
 	composeStacked,
 	composeLlm,
 	patchDrawCall,
-	findDrawCall,
+	findDrawCall
 };

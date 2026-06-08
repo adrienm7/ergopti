@@ -2,27 +2,27 @@
 
 ## Entry fields
 
-| Field         | Type            | Required | Default | Description |
-|---------------|-----------------|----------|---------|-------------|
-| `trigger`     | string          | yes      | —       | The typed abbreviation to expand. UTF-8. |
+| Field         | Type            | Required | Default | Description                                                           |
+| ------------- | --------------- | -------- | ------- | --------------------------------------------------------------------- |
+| `trigger`     | string          | yes      | —       | The typed abbreviation to expand. UTF-8.                              |
 | `replacement` | string          | yes      | —       | The replacement text. May contain `{date}`, `{time}` template tokens. |
-| `flags`       | array\<string\> | no       | `[]`    | See flag table below. |
+| `flags`       | array\<string\> | no       | `[]`    | See flag table below.                                                 |
 
 ## Flag values
 
-| Flag              | Effect |
-|-------------------|--------|
-| `word`            | Only fires when the trigger is preceded by a non-word character (space, punctuation, start-of-buffer). |
-| `case_sensitive`  | Exact-case match required (default is case-insensitive). |
-| `auto`            | Fires without a terminator keystroke (the trigger itself is the terminator). |
-| `final`           | Skips further substitution passes after expansion. |
+| Flag             | Effect                                                                                                 |
+| ---------------- | ------------------------------------------------------------------------------------------------------ |
+| `word`           | Only fires when the trigger is preceded by a non-word character (space, punctuation, start-of-buffer). |
+| `case_sensitive` | Exact-case match required (default is case-insensitive).                                               |
+| `auto`           | Fires without a terminator keystroke (the trigger itself is the terminator).                           |
+| `final`          | Skips further substitution passes after expansion.                                                     |
 
 ## Template tokens in replacements
 
-| Token    | Replaced with |
-|----------|---------------|
+| Token    | Replaced with                                 |
+| -------- | --------------------------------------------- |
 | `{date}` | Today's date in ISO-8601 format (YYYY-MM-DD). |
-| `{time}` | Current time in HH:MM format. |
+| `{time}` | Current time in HH:MM format.                 |
 
 ## Category metadata (category.toml)
 

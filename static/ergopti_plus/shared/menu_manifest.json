@@ -20,24 +20,18 @@
 		},
 		{
 			"id": "tap_holds",
-			"platforms": [
-				"ahk"
-			]
+			"platforms": ["ahk"]
 		},
 		{
 			"id": "karabiner",
-			"platforms": [
-				"hs"
-			]
+			"platforms": ["hs"]
 		},
 		{
 			"id": "gestures"
 		},
 		{
 			"id": "apps",
-			"platforms": [
-				"hs"
-			]
+			"platforms": ["hs"]
 		},
 		{
 			"id": "---"
@@ -59,9 +53,7 @@
 		},
 		{
 			"id": "suspend",
-			"platforms": [
-				"ahk"
-			]
+			"platforms": ["ahk"]
 		},
 		{
 			"id": "reload"
@@ -93,27 +85,19 @@
 	"debug_menu": [
 		{
 			"id": "window_spy",
-			"platforms": [
-				"ahk"
-			]
+			"platforms": ["ahk"]
 		},
 		{
 			"id": "list_vars",
-			"platforms": [
-				"ahk"
-			]
+			"platforms": ["ahk"]
 		},
 		{
 			"id": "key_history",
-			"platforms": [
-				"ahk"
-			]
+			"platforms": ["ahk"]
 		},
 		{
 			"id": "console",
-			"platforms": [
-				"hs"
-			]
+			"platforms": ["hs"]
 		},
 		{
 			"id": "---"
@@ -147,9 +131,7 @@
 		{
 			"type": "feature",
 			"path": "ahk.shortcuts.screen_instant",
-			"platforms": [
-				"ahk"
-			]
+			"platforms": ["ahk"]
 		},
 		{
 			"type": "feature",
@@ -159,25 +141,19 @@
 			"type": "group",
 			"id": "modifier_combos",
 			"i18n": "menu.shortcuts.group_modifiers",
-			"platforms": [
-				"ahk"
-			]
+			"platforms": ["ahk"]
 		},
 		{
 			"type": "group",
 			"id": "ctrl_shortcuts",
 			"i18n": "menu.shortcuts.submenu_ctrl",
-			"platforms": [
-				"hs"
-			]
+			"platforms": ["hs"]
 		},
 		{
 			"type": "group",
 			"id": "cmd_shortcuts",
 			"i18n": "menu.shortcuts.submenu_cmd",
-			"platforms": [
-				"hs"
-			]
+			"platforms": ["hs"]
 		},
 		{
 			"type": "dynamic",
@@ -201,23 +177,17 @@
 		{
 			"type": "feature",
 			"path": "ahk.shortcuts.alt_gr_lalt",
-			"platforms": [
-				"ahk"
-			]
+			"platforms": ["ahk"]
 		},
 		{
 			"type": "feature",
 			"path": "ahk.shortcuts.alt_gr_caps_lock",
-			"platforms": [
-				"ahk"
-			]
+			"platforms": ["ahk"]
 		},
 		{
 			"type": "feature",
 			"path": "ahk.shortcuts.lalt_caps_lock",
-			"platforms": [
-				"ahk"
-			]
+			"platforms": ["ahk"]
 		}
 	],
 	"metrics_menu": [
@@ -257,17 +227,13 @@
 			"type": "feature",
 			"id": "wpm_menubar",
 			"i18n": "menu.metrics.show_wpm_menubar",
-			"platforms": [
-				"hs"
-			]
+			"platforms": ["hs"]
 		},
 		{
 			"type": "feature",
 			"id": "menubar_colors",
 			"i18n": "menu.metrics.colors_by_source",
-			"platforms": [
-				"hs"
-			],
+			"platforms": ["hs"],
 			"depends_on": "wpm_menubar"
 		},
 		{
@@ -315,9 +281,7 @@
 		{
 			"type": "dynamic",
 			"id": "encryption",
-			"platforms": [
-				"hs"
-			]
+			"platforms": ["hs"]
 		}
 	],
 	"layout_menu": [
@@ -335,9 +299,7 @@
 			"type": "group",
 			"id": "accented_letters",
 			"i18n": "menu.shortcuts.group_accented",
-			"platforms": [
-				"ahk"
-			]
+			"platforms": ["ahk"]
 		},
 		{
 			"type": "---"
@@ -349,9 +311,7 @@
 		{
 			"type": "dynamic",
 			"id": "active_layouts",
-			"platforms": [
-				"hs"
-			]
+			"platforms": ["hs"]
 		},
 		{
 			"type": "---"
@@ -366,30 +326,22 @@
 		{
 			"type": "letter_picker",
 			"id": "EGrave",
-			"platforms": [
-				"ahk"
-			]
+			"platforms": ["ahk"]
 		},
 		{
 			"type": "letter_picker",
 			"id": "ECirc",
-			"platforms": [
-				"ahk"
-			]
+			"platforms": ["ahk"]
 		},
 		{
 			"type": "letter_picker",
 			"id": "EAcute",
-			"platforms": [
-				"ahk"
-			]
+			"platforms": ["ahk"]
 		},
 		{
 			"type": "letter_picker",
 			"id": "AGrave",
-			"platforms": [
-				"ahk"
-			]
+			"platforms": ["ahk"]
 		}
 	],
 	"hotstrings_menu": [
@@ -473,9 +425,7 @@
 		{
 			"type": "dynamic",
 			"id": "repeat_key",
-			"platforms": [
-				"ahk"
-			]
+			"platforms": ["ahk"]
 		}
 	],
 	"dynamic_hotstrings_order": [
@@ -494,41 +444,31 @@
 			"i18n_on": "menu.gestures.on",
 			"i18n_off": "menu.gestures.off",
 			"category": "Gestures",
-			"platforms": [
-				"hs"
-			]
+			"platforms": ["hs"]
 		},
 		{
 			"type": "action",
 			"id": "auto_configure",
 			"i18n": "menu.gestures.auto_configure",
-			"platforms": [
-				"ahk"
-			]
+			"platforms": ["ahk"]
 		},
 		{
 			"type": "action",
 			"id": "manual_tutorial",
 			"i18n": "menu.gestures.manual_tutorial",
-			"platforms": [
-				"ahk"
-			]
+			"platforms": ["ahk"]
 		},
 		{
 			"type": "action",
 			"id": "disable_all",
 			"i18n": "menu.gestures.disable_all",
-			"platforms": [
-				"hs"
-			]
+			"platforms": ["hs"]
 		},
 		{
 			"type": "action",
 			"id": "restore_defaults",
 			"i18n": "menu.gestures.restore_defaults",
-			"platforms": [
-				"hs"
-			]
+			"platforms": ["hs"]
 		},
 		{
 			"type": "---"
@@ -537,68 +477,48 @@
 			"type": "feature",
 			"id": "circular_spaces",
 			"i18n": "menu.gestures.circular_spaces",
-			"platforms": [
-				"hs"
-			]
+			"platforms": ["hs"]
 		},
 		{
 			"type": "---",
-			"platforms": [
-				"hs"
-			]
+			"platforms": ["hs"]
 		},
 		{
 			"type": "dynamic",
 			"id": "gesture_slots_2",
-			"platforms": [
-				"hs"
-			]
+			"platforms": ["hs"]
 		},
 		{
 			"type": "---",
-			"platforms": [
-				"hs"
-			]
+			"platforms": ["hs"]
 		},
 		{
 			"type": "dynamic",
 			"id": "gesture_slots_3",
-			"platforms": [
-				"hs"
-			]
+			"platforms": ["hs"]
 		},
 		{
 			"type": "---",
-			"platforms": [
-				"hs"
-			]
+			"platforms": ["hs"]
 		},
 		{
 			"type": "dynamic",
 			"id": "gesture_slots_4",
-			"platforms": [
-				"hs"
-			]
+			"platforms": ["hs"]
 		},
 		{
 			"type": "---",
-			"platforms": [
-				"hs"
-			]
+			"platforms": ["hs"]
 		},
 		{
 			"type": "dynamic",
 			"id": "gesture_slots_5",
-			"platforms": [
-				"hs"
-			]
+			"platforms": ["hs"]
 		},
 		{
 			"type": "dynamic",
 			"id": "gesture_slots_ahk",
-			"platforms": [
-				"ahk"
-			]
+			"platforms": ["ahk"]
 		}
 	],
 	"gesture_slots": {
@@ -653,75 +573,56 @@
 			"i18n_on": "menu.tapholds.on",
 			"i18n_off": "menu.tapholds.off",
 			"category": "TapHolds",
-			"platforms": [
-				"ahk"
-			]
+			"platforms": ["ahk"]
 		},
 		{
 			"type": "action",
 			"id": "reset_defaults",
 			"i18n": "tap_hold.reset_defaults",
-			"platforms": [
-				"ahk"
-			]
+			"platforms": ["ahk"]
 		},
 		{
 			"type": "action",
 			"id": "disable_all",
 			"i18n": "tap_hold.disable_all",
-			"platforms": [
-				"ahk"
-			]
+			"platforms": ["ahk"]
 		},
 		{
 			"type": "---",
-			"platforms": [
-				"ahk"
-			]
+			"platforms": ["ahk"]
 		},
 		{
 			"type": "dynamic",
 			"id": "tap_hold_keys",
-			"platforms": [
-				"ahk"
-			]
+			"platforms": ["ahk"]
 		}
 	],
 	"hotstring_groups": {
-		"standard": [
-			"distances_reduction",
-			"autocorrection",
-			"magic_key"
-		],
-		"ergopti": [
-			"sfbs_reduction",
-			"rolls"
-		],
-		"dynamic": [
-			"dynamic_hotstrings"
-		]
+		"standard": ["distances_reduction", "autocorrection", "magic_key"],
+		"ergopti": ["sfbs_reduction", "rolls"],
+		"dynamic": ["dynamic_hotstrings"]
 	},
 	"word_delimiter_defs": [
-		{ "char": " ",    "i18n": "hs_config.delim_space" },
-		{ "char": "\t",   "i18n": "hs_config.delim_tab" },
-		{ "char": ".",    "label": "." },
-		{ "char": ",",    "label": "," },
-		{ "char": ";",    "label": ";" },
-		{ "char": ":",    "label": ":" },
-		{ "char": "?",    "label": "?" },
-		{ "char": "!",    "label": "!" },
-		{ "char": "'",    "label": "' (ASCII)" },
+		{ "char": " ", "i18n": "hs_config.delim_space" },
+		{ "char": "\t", "i18n": "hs_config.delim_tab" },
+		{ "char": ".", "label": "." },
+		{ "char": ",", "label": "," },
+		{ "char": ";", "label": ";" },
+		{ "char": ":", "label": ":" },
+		{ "char": "?", "label": "?" },
+		{ "char": "!", "label": "!" },
+		{ "char": "'", "label": "' (ASCII)" },
 		{ "char": "’", "label": "’ (typogr.)" },
-		{ "char": "-",    "label": "-" },
-		{ "char": "=",    "label": "=" },
-		{ "char": "(",    "label": "(" },
-		{ "char": ")",    "label": ")" },
-		{ "char": "[",    "label": "[" },
-		{ "char": "]",    "label": "]" },
-		{ "char": "/",    "label": "/" },
-		{ "char": "\\",   "label": "\\" },
-		{ "char": "+",    "label": "+" },
-		{ "char": "*",    "label": "*" }
+		{ "char": "-", "label": "-" },
+		{ "char": "=", "label": "=" },
+		{ "char": "(", "label": "(" },
+		{ "char": ")", "label": ")" },
+		{ "char": "[", "label": "[" },
+		{ "char": "]", "label": "]" },
+		{ "char": "/", "label": "/" },
+		{ "char": "\\", "label": "\\" },
+		{ "char": "+", "label": "+" },
+		{ "char": "*", "label": "*" }
 	],
 	"hotstring_category_keys": {
 		"distances_reduction": "DistancesReduction",

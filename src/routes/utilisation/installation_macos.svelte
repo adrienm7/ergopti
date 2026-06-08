@@ -6,8 +6,8 @@
 
 	/** @type {Awaited<ReturnType<typeof getRelease>>} */
 	let release = null;
-	$: tag = release?.tag?.replace(/^v/, "") ?? "…";
-	$: urlMacosBundle = release?.url("Ergopti_macOS.zip") ?? "#";
+	$: tag = release?.tag?.replace(/^v/, '') ?? '…';
+	$: urlMacosBundle = release?.url('Ergopti_macOS.zip') ?? '#';
 
 	onMount(async () => {
 		release = await getRelease();
@@ -53,8 +53,8 @@
 	>
 	> <code>Clavier</code>
 	> <code>Méthodes de saisie</code> > <code>Modifier…</code> et ajouter une disposition en appuyant
-	sur <code>+</code> en bas à gauche. Généralement, la disposition se trouvera dans la section « Français »,
-	mais elle peut aussi parfois se trouver dans « Autres ».
+	sur <code>+</code> en bas à gauche. Généralement, la disposition se trouvera dans la section « Français
+	», mais elle peut aussi parfois se trouver dans « Autres ».
 </p>
 <enhanced:img
 	src="$lib/images/macos_installation_1.jpg"
@@ -98,8 +98,8 @@
 		à la place de <kbd>ç</kbd>, etc.) ;
 	</li>
 	<li>
-		<strong>Ergopti++</strong> : Ergopti+ avec l'ajout de nombreuses touches mortes pour avoir
-		directement les roulements personnalisés dans le keylayout ;
+		<strong>Ergopti++</strong> : Ergopti+ avec l'ajout de nombreuses touches mortes pour avoir directement
+		les roulements personnalisés dans le keylayout ;
 	</li>
 </ul>
 <p>
@@ -126,7 +126,8 @@
 
 <h3 id="macos-solutions">Résolution de problèmes connus</h3>
 <p>
-	Certains problèmes ont été rapportés avec le keylayout d'<Ergopti></Ergopti> dans quelques logiciels :
+	Certains problèmes ont été rapportés avec le keylayout d'<Ergopti></Ergopti> dans quelques logiciels
+	:
 </p>
 <ul>
 	<!-- <li>

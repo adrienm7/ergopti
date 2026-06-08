@@ -3,16 +3,16 @@
 	"description": "Cross-driver regression corpus for the LLM PromptBuilder algorithm. Vectors are derived from the canonical reference in _shared/domain/PromptBuilder.js. Every Lua and AHK driver implementation MUST produce matching output for these inputs.",
 	"version": "1.0.0",
 	"constants": {
-		"CONTEXT_TAIL_WORDS":      5,
-		"DEFAULT_MAX_TOKENS":      150,
-		"MIN_MAX_TOKENS":          15,
-		"WORDS_TO_TOKENS_RATIO":   6,
-		"TOKEN_BUDGET_OVERHEAD":   10,
-		"TEMP_DIVERSITY_CAP":      1.0,
+		"CONTEXT_TAIL_WORDS": 5,
+		"DEFAULT_MAX_TOKENS": 150,
+		"MIN_MAX_TOKENS": 15,
+		"WORDS_TO_TOKENS_RATIO": 6,
+		"TOKEN_BUDGET_OVERHEAD": 10,
+		"TEMP_DIVERSITY_CAP": 1.0,
 		"TEMP_INCREMENT_PER_PRED": 0.1,
-		"GREEDY_TEMP_THRESHOLD":   0.15,
-		"CONTEXT_CHARS_PER_WORD":  40,
-		"CONTEXT_MIN_CHARS":       100
+		"GREEDY_TEMP_THRESHOLD": 0.15,
+		"CONTEXT_CHARS_PER_WORD": 40,
+		"CONTEXT_MIN_CHARS": 100
 	},
 	"vectors": [
 		{

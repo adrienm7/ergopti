@@ -28,14 +28,13 @@ function _t(key) {
 // Apply data-i18n-key / data-i18n-title-key inside a freshly cloned template
 // fragment (i18n.js cannot reach inside <template> nodes before cloning).
 function applyTemplateI18n(node) {
-	node.querySelectorAll("[data-i18n-key]").forEach(function (el) {
-		el.textContent = _t(el.getAttribute("data-i18n-key"));
+	node.querySelectorAll('[data-i18n-key]').forEach(function (el) {
+		el.textContent = _t(el.getAttribute('data-i18n-key'));
 	});
-	node.querySelectorAll("[data-i18n-title-key]").forEach(function (el) {
-		el.title = _t(el.getAttribute("data-i18n-title-key"));
+	node.querySelectorAll('[data-i18n-title-key]').forEach(function (el) {
+		el.title = _t(el.getAttribute('data-i18n-title-key'));
 	});
 }
-
 
 // ============================================================
 // 1/ Bridge primitives
@@ -52,12 +51,14 @@ function send(payload) {
 }
 
 function setData(next) {
-	if (!next || typeof next !== "object") return;
+	if (!next || typeof next !== 'object') return;
 	state = next;
 
 	// Preserve the active group across state pushes; fall back to the first group.
 	if (state.groups && state.groups.length > 0) {
-		const keys = state.groups.map(function (g) { return g.key; });
+		const keys = state.groups.map(function (g) {
+			return g.key;
+		});
 		if (!activeGroup || keys.indexOf(activeGroup) === -1) {
 			activeGroup = keys[0];
 		}
@@ -68,28 +69,27 @@ function setData(next) {
 }
 
 function closeWindow() {
-	send({ action: "close" });
+	send({ action: 'close' });
 }
 
 function resetAll() {
-	send({ action: "reset_all" });
+	send({ action: 'reset_all' });
 }
 
 function setAllGrey() {
-	send({ action: "set_all_grey" });
+	send({ action: 'set_all_grey' });
 }
-
 
 // ============================================================
 // 2/ Group selector
 // ============================================================
 
 function renderGroupSelector() {
-	const sel = document.getElementById("group-select");
+	const sel = document.getElementById('group-select');
 	if (!sel) return;
-	sel.innerHTML = "";
+	sel.innerHTML = '';
 	(state.groups || []).forEach(function (g) {
-		const o = document.createElement("option");
+		const o = document.createElement('option');
 		o.value = g.key;
 		o.textContent = g.label;
 		if (g.key === activeGroup) o.selected = true;
@@ -98,22 +98,21 @@ function renderGroupSelector() {
 }
 
 function onGroupChange() {
-	const sel = document.getElementById("group-select");
+	const sel = document.getElementById('group-select');
 	if (sel) activeGroup = sel.value;
 	render();
 }
-
 
 // ============================================================
 // 3/ Rendering
 // ============================================================
 
 function render() {
-	const main = document.getElementById("content");
-	main.innerHTML = "";
+	const main = document.getElementById('content');
+	main.innerHTML = '';
 
-	const tplCat = document.getElementById("tpl-category").content;
-	const tplSec = document.getElementById("tpl-section").content;
+	const tplCat = document.getElementById('tpl-category').content;
+	const tplSec = document.getElementById('tpl-section').content;
 
 	// Filter categories to the active group only
 	const visible = (state.categories || []).filter(function (cat) {
@@ -123,44 +122,42 @@ function render() {
 	for (const cat of visible) {
 		const node = document.importNode(tplCat, true);
 		applyTemplateI18n(node);
-		const card = node.querySelector(".cat");
+		const card = node.querySelector('.cat');
 
-		card.querySelector(".cat-title").textContent = cat.title;
+		card.querySelector('.cat-title').textContent = cat.title;
 
-		const toggle = card.querySelector("[data-role=toggle]");
-		const sectionsBox = card.querySelector(".sections");
-		toggle.addEventListener("click", () => {
-			const open = sectionsBox.hasAttribute("hidden");
+		const toggle = card.querySelector('[data-role=toggle]');
+		const sectionsBox = card.querySelector('.sections');
+		toggle.addEventListener('click', () => {
+			const open = sectionsBox.hasAttribute('hidden');
 			if (open) {
-				sectionsBox.removeAttribute("hidden");
-				toggle.classList.add("open");
+				sectionsBox.removeAttribute('hidden');
+				toggle.classList.add('open');
 			} else {
-				sectionsBox.setAttribute("hidden", "");
-				toggle.classList.remove("open");
+				sectionsBox.setAttribute('hidden', '');
+				toggle.classList.remove('open');
 			}
 		});
 
 		// File-level (category) controls
-		bindDelay(card.querySelector(".field-delay"), cat, null);
-		bindColor(card.querySelector(".field-color"), cat, null);
-		bindTooltip(card.querySelector(".field-tooltip"), cat, null);
+		bindDelay(card.querySelector('.field-delay'), cat, null);
+		bindColor(card.querySelector('.field-color'), cat, null);
+		bindTooltip(card.querySelector('.field-tooltip'), cat, null);
 
 		// Sections
 		for (const sec of cat.sections) {
 			const secNode = document.importNode(tplSec, true);
 			applyTemplateI18n(secNode);
-			secNode.querySelector(".sec-title").textContent =
-				sec.title || sec.name;
-			bindDelay(secNode.querySelector(".field-delay"), cat, sec);
-			bindColor(secNode.querySelector(".field-color"), cat, sec);
-			bindTooltip(secNode.querySelector(".field-tooltip"), cat, sec);
+			secNode.querySelector('.sec-title').textContent = sec.title || sec.name;
+			bindDelay(secNode.querySelector('.field-delay'), cat, sec);
+			bindColor(secNode.querySelector('.field-color'), cat, sec);
+			bindTooltip(secNode.querySelector('.field-tooltip'), cat, sec);
 			sectionsBox.appendChild(secNode);
 		}
 
 		main.appendChild(node);
 	}
 }
-
 
 // ============================================================
 // 4/ Field bindings
@@ -171,39 +168,38 @@ function bindDelay(field, cat, sec) {
 	const overridden = sec ? sec.delay_overridden : cat.delay_overridden;
 	// When the TOML default is 0, fall back to the global default as the hint
 	// so the user understands what value will actually be applied.
-	const defaultMs = (sec ? sec.delay_default_ms : cat.delay_default_ms)
-		|| state.global_default_delay_ms
-		|| 750;
-	const input = field.querySelector("input");
-	const reset = field.querySelector(".reset");
+	const defaultMs =
+		(sec ? sec.delay_default_ms : cat.delay_default_ms) || state.global_default_delay_ms || 750;
+	const input = field.querySelector('input');
+	const reset = field.querySelector('.reset');
 
 	input.value = ms || defaultMs;
 	input.placeholder = defaultMs;
-	field.classList.toggle("overridden", !!overridden);
+	field.classList.toggle('overridden', !!overridden);
 
-	input.addEventListener("change", () => {
+	input.addEventListener('change', () => {
 		const v = parseInt(input.value, 10);
 		if (Number.isFinite(v) && v >= 0) {
 			send({
-				action:        "set_delay",
-				category:      cat.name,
-				group:         cat.group,
-				section:       sec ? sec.name : "",
-				personal_path: cat.personal_path || "",
-				ext_id:        cat.ext_id || "",
-				ms:            v,
+				action: 'set_delay',
+				category: cat.name,
+				group: cat.group,
+				section: sec ? sec.name : '',
+				personal_path: cat.personal_path || '',
+				ext_id: cat.ext_id || '',
+				ms: v
 			});
 		}
 	});
 
-	reset.addEventListener("click", () => {
+	reset.addEventListener('click', () => {
 		send({
-			action:        "clear_delay",
-			category:      cat.name,
-			group:         cat.group,
-			section:       sec ? sec.name : "",
-			personal_path: cat.personal_path || "",
-			ext_id:        cat.ext_id || "",
+			action: 'clear_delay',
+			category: cat.name,
+			group: cat.group,
+			section: sec ? sec.name : '',
+			personal_path: cat.personal_path || '',
+			ext_id: cat.ext_id || ''
 		});
 	});
 }
@@ -211,53 +207,53 @@ function bindDelay(field, cat, sec) {
 function bindColor(field, cat, sec) {
 	const color = sec ? sec.color : cat.color;
 	const overridden = sec ? sec.color_overridden : cat.color_overridden;
-	const select = field.querySelector("select");
-	const swatch = field.querySelector(".swatch");
-	const reset = field.querySelector(".reset");
+	const select = field.querySelector('select');
+	const swatch = field.querySelector('.swatch');
+	const reset = field.querySelector('.reset');
 
 	// Build the dropdown: presets + a current-value entry when the active
 	// hex is not part of the preset list, so the user always sees the
 	// current selection clearly.
-	select.innerHTML = "";
+	select.innerHTML = '';
 	const opts = state.presets.slice();
-	const lower = (color || "").toLowerCase();
-	const known = opts.find((p) => (p.hex || "").toLowerCase() === lower);
+	const lower = (color || '').toLowerCase();
+	const known = opts.find((p) => (p.hex || '').toLowerCase() === lower);
 	if (color && !known) {
 		opts.unshift({ label: color, hex: color });
 	}
 	for (const p of opts) {
-		const o = document.createElement("option");
+		const o = document.createElement('option');
 		o.value = p.hex;
 		o.textContent = p.label;
-		if ((p.hex || "").toLowerCase() === lower) o.selected = true;
+		if ((p.hex || '').toLowerCase() === lower) o.selected = true;
 		select.appendChild(o);
 	}
-	swatch.style.background = color || "transparent";
-	field.classList.toggle("overridden", !!overridden);
+	swatch.style.background = color || 'transparent';
+	field.classList.toggle('overridden', !!overridden);
 
-	select.addEventListener("change", () => {
+	select.addEventListener('change', () => {
 		const hex = select.value;
 		if (hex) {
 			send({
-				action:        "set_color",
-				category:      cat.name,
-				group:         cat.group,
-				section:       sec ? sec.name : "",
-				personal_path: cat.personal_path || "",
-				ext_id:        cat.ext_id || "",
-				hex,
+				action: 'set_color',
+				category: cat.name,
+				group: cat.group,
+				section: sec ? sec.name : '',
+				personal_path: cat.personal_path || '',
+				ext_id: cat.ext_id || '',
+				hex
 			});
 		}
 	});
 
-	reset.addEventListener("click", () => {
+	reset.addEventListener('click', () => {
 		send({
-			action:        "clear_color",
-			category:      cat.name,
-			group:         cat.group,
-			section:       sec ? sec.name : "",
-			personal_path: cat.personal_path || "",
-			ext_id:        cat.ext_id || "",
+			action: 'clear_color',
+			category: cat.name,
+			group: cat.group,
+			section: sec ? sec.name : '',
+			personal_path: cat.personal_path || '',
+			ext_id: cat.ext_id || ''
 		});
 	});
 }
@@ -266,33 +262,33 @@ function bindTooltip(field, cat, sec) {
 	if (!field) return;
 	const showTooltip = sec ? sec.show_tooltip : cat.show_tooltip;
 	const overridden = sec ? sec.show_tooltip_overridden : cat.show_tooltip_overridden;
-	const chk = field.querySelector(".chk-tooltip");
-	const reset = field.querySelector(".reset");
+	const chk = field.querySelector('.chk-tooltip');
+	const reset = field.querySelector('.reset');
 
-	chk.checked = (showTooltip !== false);
-	field.classList.toggle("overridden", !!overridden);
+	chk.checked = showTooltip !== false;
+	field.classList.toggle('overridden', !!overridden);
 	reset.disabled = !overridden;
 
-	chk.addEventListener("change", () => {
+	chk.addEventListener('change', () => {
 		send({
-			action:        "set_tooltip",
-			category:      cat.name,
-			group:         cat.group,
-			section:       sec ? sec.name : "",
-			personal_path: cat.personal_path || "",
-			ext_id:        cat.ext_id || "",
-			show_tooltip:  chk.checked,
+			action: 'set_tooltip',
+			category: cat.name,
+			group: cat.group,
+			section: sec ? sec.name : '',
+			personal_path: cat.personal_path || '',
+			ext_id: cat.ext_id || '',
+			show_tooltip: chk.checked
 		});
 	});
 
-	reset.addEventListener("click", () => {
+	reset.addEventListener('click', () => {
 		send({
-			action:        "clear_tooltip",
-			category:      cat.name,
-			group:         cat.group,
-			section:       sec ? sec.name : "",
-			personal_path: cat.personal_path || "",
-			ext_id:        cat.ext_id || "",
+			action: 'clear_tooltip',
+			category: cat.name,
+			group: cat.group,
+			section: sec ? sec.name : '',
+			personal_path: cat.personal_path || '',
+			ext_id: cat.ext_id || ''
 		});
 	});
 }

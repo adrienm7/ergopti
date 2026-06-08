@@ -23,10 +23,7 @@
  * ==============================================================================
  */
 
-"use strict";
-
-
-
+'use strict';
 
 // ================================================
 // ================================================
@@ -39,8 +36,8 @@
  * @type {object}
  */
 const portContract = {
-	name: "AppLauncher",
-	version: "1.0.0",
+	name: 'AppLauncher',
+	version: '1.0.0',
 
 	/**
 	 * AL_Launch(appPath) — Launch an application by its executable path.
@@ -65,14 +62,11 @@ const portContract = {
 	 *   @error_behavior "return_false".
 	 */
 	methods: {
-		AL_Launch:         { arity: 1, required: true },
+		AL_Launch: { arity: 1, required: true },
 		AL_LaunchWithArgs: { arity: 2, required: true },
-		AL_IsRunning:      { arity: 1, required: true },
-	},
+		AL_IsRunning: { arity: 1, required: true }
+	}
 };
-
-
-
 
 // ================================================
 // ================================================
@@ -87,24 +81,19 @@ const portContract = {
  */
 function validateAdapter(adapter) {
 	const violations = [];
-	if (!adapter || typeof adapter !== "object") {
-		return ["adapter must be a non-null object"];
+	if (!adapter || typeof adapter !== 'object') {
+		return ['adapter must be a non-null object'];
 	}
 	for (const [name, spec] of Object.entries(portContract.methods)) {
 		if (!spec.required) continue;
-		if (typeof adapter[name] !== "function") {
+		if (typeof adapter[name] !== 'function') {
 			violations.push(`missing method: ${name}`);
 		} else if (adapter[name].length !== spec.arity) {
-			violations.push(
-				`method ${name}: expected arity ${spec.arity}, got ${adapter[name].length}`
-			);
+			violations.push(`method ${name}: expected arity ${spec.arity}, got ${adapter[name].length}`);
 		}
 	}
 	return violations;
 }
-
-
-
 
 // ================================================
 // ================================================
@@ -122,39 +111,35 @@ function validateAdapter(adapter) {
 function contractTestVectors() {
 	return [
 		{
-			id: "is_running_unknown_process_returns_false",
-			description: "AL_IsRunning() with a nonexistent process name returns false.",
+			id: 'is_running_unknown_process_returns_false',
+			description: 'AL_IsRunning() with a nonexistent process name returns false.',
 			steps: [
-				{ call: "AL_IsRunning", args: ["ergopti_nonexistent_proc_xyz.exe"] },
-				{ assert: "return_false" },
-			],
+				{ call: 'AL_IsRunning', args: ['ergopti_nonexistent_proc_xyz.exe'] },
+				{ assert: 'return_false' }
+			]
 		},
 		{
-			id: "is_running_returns_boolean",
-			description: "AL_IsRunning() returns a boolean, never throws.",
+			id: 'is_running_returns_boolean',
+			description: 'AL_IsRunning() returns a boolean, never throws.',
 			steps: [
-				{ call: "AL_IsRunning", args: ["explorer.exe"] },
-				{ assert: "return_type_one_of", expected: ["boolean"] },
-			],
+				{ call: 'AL_IsRunning', args: ['explorer.exe'] },
+				{ assert: 'return_type_one_of', expected: ['boolean'] }
+			]
 		},
 		{
-			id: "launch_does_not_throw",
-			description: "AL_Launch() with a valid path does not throw.",
-			steps: [
-				{ call: "AL_Launch", args: ["notepad.exe"] },
-				{ assert: "no_throw" },
-			],
+			id: 'launch_does_not_throw',
+			description: 'AL_Launch() with a valid path does not throw.',
+			steps: [{ call: 'AL_Launch', args: ['notepad.exe'] }, { assert: 'no_throw' }]
 		},
 		{
-			id: "launch_with_args_does_not_throw",
-			description: "AL_LaunchWithArgs() with a valid path and args does not throw.",
+			id: 'launch_with_args_does_not_throw',
+			description: 'AL_LaunchWithArgs() with a valid path and args does not throw.',
 			steps: [
-				{ call: "AL_LaunchWithArgs", args: ["notepad.exe", "C:\\test.txt"] },
-				{ assert: "no_throw" },
-			],
-		},
+				{ call: 'AL_LaunchWithArgs', args: ['notepad.exe', 'C:\\test.txt'] },
+				{ assert: 'no_throw' }
+			]
+		}
 	];
 }
-
 
 module.exports = { portContract, validateAdapter, contractTestVectors };

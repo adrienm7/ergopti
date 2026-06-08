@@ -33,7 +33,6 @@ function _t(key) {
 	return (window._i18n_strings && window._i18n_strings[key]) || key;
 }
 
-
 // ====================================
 // ====================================
 // ======= 2/ Main Chart Render =======
@@ -137,10 +136,10 @@ const GRID_COLOR = 'rgba(128,128,128,0.2)';
 // Day/month name arrays resolved at call time so i18n strings injected
 // after script parse are always reflected in axis labels.
 function days_fr() {
-	return [0,1,2,3,4,5,6].map(i => _t('ui_typing.day_' + i));
+	return [0, 1, 2, 3, 4, 5, 6].map((i) => _t('ui_typing.day_' + i));
 }
 function months_fr() {
-	return [0,1,2,3,4,5,6,7,8,9,10,11].map(i => _t('ui_typing.month_' + i));
+	return [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map((i) => _t('ui_typing.month_' + i));
 }
 
 /**
@@ -337,7 +336,8 @@ function _render_wpm_chart(wpm_pts, rgb_wpm, x_min = null, x_max = null) {
 				tooltip: {
 					callbacks: {
 						title: tooltipTitleCallback,
-						label: (ctx) => `${_t('ui_typing.dataset_speed')} : ${format_number_plain(Math.round(ctx.parsed.y))} ${_t('ui_typing.unit_mpm')}`
+						label: (ctx) =>
+							`${_t('ui_typing.dataset_speed')} : ${format_number_plain(Math.round(ctx.parsed.y))} ${_t('ui_typing.unit_mpm')}`
 					}
 				}
 			},
@@ -564,8 +564,12 @@ function _render_sparkline(ctx_id, chart_ref, data_pts, color) {
  */
 const tooltipTitleCallbackHourly = (context) => {
 	const days = [
-		_t('ui_typing.day_0'), _t('ui_typing.day_1'), _t('ui_typing.day_2'),
-		_t('ui_typing.day_3'), _t('ui_typing.day_4'), _t('ui_typing.day_5'),
+		_t('ui_typing.day_0'),
+		_t('ui_typing.day_1'),
+		_t('ui_typing.day_2'),
+		_t('ui_typing.day_3'),
+		_t('ui_typing.day_4'),
+		_t('ui_typing.day_5'),
 		_t('ui_typing.day_6')
 	];
 	const d = new Date(context[0].parsed.x);
@@ -773,8 +777,12 @@ function _render_hourly_precision_chart(pts, color, date_str, cutoff) {
  */
 const tooltipTitleCallbackMinute5 = (context) => {
 	const days = [
-		_t('ui_typing.day_0'), _t('ui_typing.day_1'), _t('ui_typing.day_2'),
-		_t('ui_typing.day_3'), _t('ui_typing.day_4'), _t('ui_typing.day_5'),
+		_t('ui_typing.day_0'),
+		_t('ui_typing.day_1'),
+		_t('ui_typing.day_2'),
+		_t('ui_typing.day_3'),
+		_t('ui_typing.day_4'),
+		_t('ui_typing.day_5'),
 		_t('ui_typing.day_6')
 	];
 	const d = new Date(context[0].parsed.x);
@@ -1079,7 +1087,11 @@ function _render_activity_calendar() {
 		if ((cursor.getDay() + 6) % 7 === 0) col++;
 	}
 
-	const weekday_labels = [_t('ui_typing.calendar_day_mon'), _t('ui_typing.calendar_day_wed'), _t('ui_typing.calendar_day_fri')]
+	const weekday_labels = [
+		_t('ui_typing.calendar_day_mon'),
+		_t('ui_typing.calendar_day_wed'),
+		_t('ui_typing.calendar_day_fri')
+	]
 		.map(
 			(lbl, i) =>
 				`<text x="0" y="${PAD_TOP + i * 2 * (CELL + GAP) + CELL - 2}" font-size="9" fill="var(--text-muted, #888)">${lbl}</text>`

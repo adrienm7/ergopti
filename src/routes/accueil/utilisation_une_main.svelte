@@ -25,7 +25,6 @@
 		<kbd>Ctrl</kbd> sont du côté gauche.
 	</p>
 
-
 	<h3>
 		Conservation des raccourcis <kbd>Ctrl</kbd> + <kbd>X</kbd>, <kbd>C</kbd>, <kbd>V</kbd> et
 		<kbd>Z</kbd>
@@ -39,8 +38,10 @@
 		+ <kbd-output>C</kbd-output>,
 		<kbd-output>Ctrl</kbd-output>
 		+ <kbd-output>V</kbd-output> et <kbd-output>Ctrl</kbd-output> + <kbd-output>Z</kbd-output>
-		sont conservés à gauche avec <Ergopti></Ergopti>. Cela permet de les réaliser sans avoir à bouger la main droite.
-		Ils sont respectivement en <kbd>Ctrl</kbd> + <kbd>Ê</kbd>, <kbd>Ctrl</kbd> +
+		sont conservés à gauche avec <Ergopti></Ergopti>. Cela permet de les réaliser sans avoir à
+		bouger la main droite. Ils sont respectivement en <kbd>Ctrl</kbd> + <kbd>Ê</kbd>,
+		<kbd>Ctrl</kbd>
+		+
 		<kbd>É</kbd>,
 		<kbd>Ctrl</kbd>
 		+ <kbd>À</kbd> et <kbd>Ctrl</kbd> + <kbd>È</kbd>.
@@ -62,16 +63,16 @@
 		La version ISO (pour claviers standards) ne peut quant à elle malheureusement pas bénéficier des
 		touches de raccourci de la version Ergodox, car les touches à sa gauche sont déjà occupées par
 		les touches
-		<kbd>Shift</kbd>, <kbd>CapsLock</kbd> et <kbd>Tab</kbd> contrairement à l’Ergodox où l’on peut
-		placer ces 3 touches sous les pouces.
+		<kbd>Shift</kbd>, <kbd>CapsLock</kbd> et <kbd>Tab</kbd> contrairement à l’Ergodox où l’on peut placer
+		ces 3 touches sous les pouces.
 	</p>
 	<p>
 		<ErgoptiPlus /> donne toutefois un moyen de contourner les limites de la version ISO grâce à un
 		<strong>mécanisme de tap-hold</strong>. L’idée du tap-hold est qu’il est possible d’assigner
 		deux actions à une même touche : une au tap (appui bref) et une au hold (maintenir pressé).
-		Grâce au tap-hold, il devient possible d’avoir le comportement suivant : presser puis relâcher un modificateur envoie
-		un raccourci, mais le presser en combinaison avec une autre touche le fait se comporter normalement. Cela permet d’intégrer des
-		touches
+		Grâce au tap-hold, il devient possible d’avoir le comportement suivant : presser puis relâcher
+		un modificateur envoie un raccourci, mais le presser en combinaison avec une autre touche le
+		fait se comporter normalement. Cela permet d’intégrer des touches
 		<kbd-output>Copier</kbd-output>, <kbd-output>Coller</kbd-output> et
 		<kbd-output>Alt+Tab</kbd-output>
 		respectivement sur

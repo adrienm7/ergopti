@@ -24,10 +24,7 @@
  * ==============================================================================
  */
 
-"use strict";
-
-
-
+'use strict';
 
 // ==================================================
 // ==================================================
@@ -40,8 +37,8 @@
  * @type {object}
  */
 const portContract = {
-	name: "WindowManager",
-	version: "1.0.0",
+	name: 'WindowManager',
+	version: '1.0.0',
 
 	/**
 	 * activate(hwndOrSpec) — Bring a window to the foreground and give it focus.
@@ -76,12 +73,12 @@ const portContract = {
 	 *   @error_behavior "return_empty_object".
 	 */
 	methods: {
-		activate:   { arity: 1, required: true },
-		exists:     { arity: 1, required: true },
-		kill:       { arity: 1, required: true },
-		getList:    { arity: 0, required: true },
-		getTitle:   { arity: 1, required: true },
-		getFocused: { arity: 0, required: true },
+		activate: { arity: 1, required: true },
+		exists: { arity: 1, required: true },
+		kill: { arity: 1, required: true },
+		getList: { arity: 0, required: true },
+		getTitle: { arity: 1, required: true },
+		getFocused: { arity: 0, required: true }
 	},
 
 	/**
@@ -92,11 +89,8 @@ const portContract = {
 	 *   process: string,  // Process name e.g. "notepad.exe" ("" when unavailable)
 	 * }
 	 */
-	FOCUSED_SHAPE: ["hwnd", "title", "process"],
+	FOCUSED_SHAPE: ['hwnd', 'title', 'process']
 };
-
-
-
 
 // ==================================================
 // ==================================================
@@ -111,24 +105,19 @@ const portContract = {
  */
 function validateAdapter(adapter) {
 	const violations = [];
-	if (!adapter || typeof adapter !== "object") {
-		return ["adapter must be a non-null object"];
+	if (!adapter || typeof adapter !== 'object') {
+		return ['adapter must be a non-null object'];
 	}
 	for (const [name, spec] of Object.entries(portContract.methods)) {
 		if (!spec.required) continue;
-		if (typeof adapter[name] !== "function") {
+		if (typeof adapter[name] !== 'function') {
 			violations.push(`missing method: ${name}`);
 		} else if (adapter[name].length !== spec.arity) {
-			violations.push(
-				`method ${name}: expected arity ${spec.arity}, got ${adapter[name].length}`
-			);
+			violations.push(`method ${name}: expected arity ${spec.arity}, got ${adapter[name].length}`);
 		}
 	}
 	return violations;
 }
-
-
-
 
 // ==================================================
 // ==================================================
@@ -141,93 +130,71 @@ function validateAdapter(adapter) {
  * @returns {Array<object>}
  */
 function contractTestVectors() {
-	const NONEXISTENT_SPEC = "ahk_exe __nonexistent_process_9z3k__.exe";
+	const NONEXISTENT_SPEC = 'ahk_exe __nonexistent_process_9z3k__.exe';
 	return [
 		{
-			id: "activate_missing_returns_false",
-			description: "activate() on a non-existent window returns false, not an exception.",
-			steps: [
-				{ call: "activate", args: [NONEXISTENT_SPEC] },
-				{ assert: "return_false" },
-			],
+			id: 'activate_missing_returns_false',
+			description: 'activate() on a non-existent window returns false, not an exception.',
+			steps: [{ call: 'activate', args: [NONEXISTENT_SPEC] }, { assert: 'return_false' }]
 		},
 		{
-			id: "exists_missing_returns_false",
-			description: "exists() returns false for a spec that matches no window.",
-			steps: [
-				{ call: "exists", args: [NONEXISTENT_SPEC] },
-				{ assert: "return_false" },
-			],
+			id: 'exists_missing_returns_false',
+			description: 'exists() returns false for a spec that matches no window.',
+			steps: [{ call: 'exists', args: [NONEXISTENT_SPEC] }, { assert: 'return_false' }]
 		},
 		{
-			id: "kill_missing_returns_false",
-			description: "kill() on a non-existent spec returns false without throwing.",
-			steps: [
-				{ call: "kill", args: [NONEXISTENT_SPEC] },
-				{ assert: "return_false" },
-			],
+			id: 'kill_missing_returns_false',
+			description: 'kill() on a non-existent spec returns false without throwing.',
+			steps: [{ call: 'kill', args: [NONEXISTENT_SPEC] }, { assert: 'return_false' }]
 		},
 		{
-			id: "get_list_returns_array",
-			description: "getList() always returns an array (possibly empty).",
-			steps: [
-				{ call: "getList" },
-				{ assert: "return_array" },
-			],
+			id: 'get_list_returns_array',
+			description: 'getList() always returns an array (possibly empty).',
+			steps: [{ call: 'getList' }, { assert: 'return_array' }]
 		},
 		{
-			id: "get_list_no_exception",
-			description: "getList() does not throw in any environment.",
-			steps: [
-				{ call: "getList" },
-				{ assert: "no_exception" },
-			],
+			id: 'get_list_no_exception',
+			description: 'getList() does not throw in any environment.',
+			steps: [{ call: 'getList' }, { assert: 'no_exception' }]
 		},
 		{
-			id: "get_title_missing_returns_empty_string",
-			description: "getTitle() on a non-existent window returns empty string.",
+			id: 'get_title_missing_returns_empty_string',
+			description: 'getTitle() on a non-existent window returns empty string.',
 			steps: [
-				{ call: "getTitle", args: [NONEXISTENT_SPEC] },
-				{ assert: "return_equals", expected: "" },
-			],
+				{ call: 'getTitle', args: [NONEXISTENT_SPEC] },
+				{ assert: 'return_equals', expected: '' }
+			]
 		},
 		{
-			id: "get_focused_returns_object",
-			description: "getFocused() returns a non-null object with the three required fields.",
+			id: 'get_focused_returns_object',
+			description: 'getFocused() returns a non-null object with the three required fields.',
 			steps: [
-				{ call: "getFocused" },
+				{ call: 'getFocused' },
 				{
-					assert: "return_shape",
-					required_fields: portContract.FOCUSED_SHAPE,
-				},
-			],
+					assert: 'return_shape',
+					required_fields: portContract.FOCUSED_SHAPE
+				}
+			]
 		},
 		{
-			id: "get_focused_no_exception",
-			description: "getFocused() does not throw even when no window is focused.",
-			steps: [
-				{ call: "getFocused" },
-				{ assert: "no_exception" },
-			],
+			id: 'get_focused_no_exception',
+			description: 'getFocused() does not throw even when no window is focused.',
+			steps: [{ call: 'getFocused' }, { assert: 'no_exception' }]
 		},
 		{
-			id: "get_focused_hwnd_is_number",
-			description: "getFocused().hwnd is always a number (0 when unavailable).",
-			steps: [
-				{ call: "getFocused" },
-				{ assert: "field_is_number", field: "hwnd" },
-			],
+			id: 'get_focused_hwnd_is_number',
+			description: 'getFocused().hwnd is always a number (0 when unavailable).',
+			steps: [{ call: 'getFocused' }, { assert: 'field_is_number', field: 'hwnd' }]
 		},
 		{
-			id: "get_focused_strings_are_strings",
-			description: "getFocused() title and process fields are always strings.",
+			id: 'get_focused_strings_are_strings',
+			description: 'getFocused() title and process fields are always strings.',
 			steps: [
-				{ call: "getFocused" },
-				{ assert: "all_fields_are_strings", fields: ["title", "process"] },
-			],
-		},
+				{ call: 'getFocused' },
+				{ assert: 'all_fields_are_strings', fields: ['title', 'process'] }
+			]
+		}
 	];
 }
-
 
 module.exports = { portContract, validateAdapter, contractTestVectors };

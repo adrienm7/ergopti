@@ -29,7 +29,7 @@
  * ==============================================================================
  */
 
-"use strict";
+'use strict';
 
 /**
  * Default tint parameters, mirroring constants.toml [tint].
@@ -43,9 +43,6 @@ const DEFAULT_SATURATION = 0.85;
  * accent color cannot be parsed. Mirrors constants.toml colors.bg_hex.
  */
 const DEFAULT_BG = { r: 0x24 / 255, g: 0x24 / 255, b: 0x24 / 255 };
-
-
-
 
 // ===========================================
 // ===========================================
@@ -63,8 +60,8 @@ const DEFAULT_BG = { r: 0x24 / 255, g: 0x24 / 255, b: 0x24 / 255 };
  * @returns {number} Hue in [0.0, 1.0).
  */
 function extractHue(r, g, b) {
-	const maxC  = Math.max(r, g, b);
-	const minC  = Math.min(r, g, b);
+	const maxC = Math.max(r, g, b);
+	const minC = Math.min(r, g, b);
 	const delta = maxC - minC;
 
 	if (delta < 0.0001) {
@@ -74,7 +71,7 @@ function extractHue(r, g, b) {
 
 	let hue;
 	if (maxC === r) {
-		hue = ((g - b) / delta % 6 + 6) % 6;
+		hue = ((((g - b) / delta) % 6) + 6) % 6;
 	} else if (maxC === g) {
 		hue = (b - r) / delta + 2;
 	} else {
@@ -91,23 +88,42 @@ function extractHue(r, g, b) {
  * @returns {{ r: number, g: number, b: number }} RGB color with components in [0.0, 1.0].
  */
 function hslToRgb(hue, saturation, lightness) {
-	const c  = (1 - Math.abs(2 * lightness - 1)) * saturation;
+	const c = (1 - Math.abs(2 * lightness - 1)) * saturation;
 	const h6 = hue * 6;
-	const x  = c * (1 - Math.abs(h6 % 2 - 1));
-	const m  = lightness - c / 2;
+	const x = c * (1 - Math.abs((h6 % 2) - 1));
+	const m = lightness - c / 2;
 
 	let nr, ng, nb;
-	if      (h6 < 1) { nr = c; ng = x; nb = 0; }
-	else if (h6 < 2) { nr = x; ng = c; nb = 0; }
-	else if (h6 < 3) { nr = 0; ng = c; nb = x; }
-	else if (h6 < 4) { nr = 0; ng = x; nb = c; }
-	else if (h6 < 5) { nr = x; ng = 0; nb = c; }
-	else             { nr = c; ng = 0; nb = x; }
+	if (h6 < 1) {
+		nr = c;
+		ng = x;
+		nb = 0;
+	} else if (h6 < 2) {
+		nr = x;
+		ng = c;
+		nb = 0;
+	} else if (h6 < 3) {
+		nr = 0;
+		ng = c;
+		nb = x;
+	} else if (h6 < 4) {
+		nr = 0;
+		ng = x;
+		nb = c;
+	} else if (h6 < 5) {
+		nr = x;
+		ng = 0;
+		nb = c;
+	} else {
+		nr = c;
+		ng = 0;
+		nb = x;
+	}
 
 	return {
 		r: Math.max(0, Math.min(1, nr + m)),
 		g: Math.max(0, Math.min(1, ng + m)),
-		b: Math.max(0, Math.min(1, nb + m)),
+		b: Math.max(0, Math.min(1, nb + m))
 	};
 }
 
@@ -126,7 +142,7 @@ function hslToRgb(hue, saturation, lightness) {
  * @returns {{ r: number, g: number, b: number }} Mixed background color in [0.0, 1.0].
  */
 function mixTint(accent, lightness = DEFAULT_LIGHTNESS, saturation = DEFAULT_SATURATION) {
-	if (!accent || typeof accent !== "object") {
+	if (!accent || typeof accent !== 'object') {
 		return { ...DEFAULT_BG };
 	}
 
@@ -144,9 +160,6 @@ function mixTint(accent, lightness = DEFAULT_LIGHTNESS, saturation = DEFAULT_SAT
 	return hslToRgb(hue, saturation, lightness);
 }
 
-
-
-
 // ===================================================
 // ===================================================
 // ======= 2/ Color format converters =======
@@ -160,8 +173,8 @@ function mixTint(accent, lightness = DEFAULT_LIGHTNESS, saturation = DEFAULT_SAT
  * @returns {{ r: number, g: number, b: number }|null} Normalized color or null.
  */
 function parseHex(hex) {
-	if (typeof hex !== "string" || hex === "") return null;
-	const h = hex.startsWith("#") ? hex.slice(1) : hex;
+	if (typeof hex !== 'string' || hex === '') return null;
+	const h = hex.startsWith('#') ? hex.slice(1) : hex;
 	if (h.length !== 6) return null;
 	const ri = parseInt(h.slice(0, 2), 16);
 	const gi = parseInt(h.slice(2, 4), 16);
@@ -181,9 +194,9 @@ function toHexNoHash(color) {
 	const g8 = Math.round(Math.max(0, Math.min(1, color.g)) * 255);
 	const b8 = Math.round(Math.max(0, Math.min(1, color.b)) * 255);
 	return (
-		r8.toString(16).toUpperCase().padStart(2, "0") +
-		g8.toString(16).toUpperCase().padStart(2, "0") +
-		b8.toString(16).toUpperCase().padStart(2, "0")
+		r8.toString(16).toUpperCase().padStart(2, '0') +
+		g8.toString(16).toUpperCase().padStart(2, '0') +
+		b8.toString(16).toUpperCase().padStart(2, '0')
 	);
 }
 
@@ -193,7 +206,7 @@ function toHexNoHash(color) {
  * @returns {string} Hex string with "#" prefix (e.g. "#1A1A1A").
  */
 function toHex(color) {
-	return "#" + toHexNoHash(color);
+	return '#' + toHexNoHash(color);
 }
 
 /**
@@ -204,10 +217,10 @@ function toHex(color) {
  */
 function toHsColor(color, alpha = 1.0) {
 	return {
-		red:   Math.max(0, Math.min(1, color.r)),
+		red: Math.max(0, Math.min(1, color.r)),
 		green: Math.max(0, Math.min(1, color.g)),
-		blue:  Math.max(0, Math.min(1, color.b)),
-		alpha: Math.max(0, Math.min(1, alpha)),
+		blue: Math.max(0, Math.min(1, color.b)),
+		alpha: Math.max(0, Math.min(1, alpha))
 	};
 }
 
@@ -222,9 +235,6 @@ function mixTintHex(accentHex) {
 	if (!accent) return toHex(DEFAULT_BG);
 	return toHex(mixTint(accent));
 }
-
-
-
 
 // ==============================================
 // ==============================================
@@ -245,50 +255,49 @@ function mixTintHex(accentHex) {
 function tintTestVectors() {
 	return [
 		{
-			id:           "red_accent",
-			description:  "Pure red accent → hue=0, produces warm near-black.",
-			accent_hex:   "#FF0000",
-			expected_hex: toHex(mixTint({ r: 1, g: 0, b: 0 })),
+			id: 'red_accent',
+			description: 'Pure red accent → hue=0, produces warm near-black.',
+			accent_hex: '#FF0000',
+			expected_hex: toHex(mixTint({ r: 1, g: 0, b: 0 }))
 		},
 		{
-			id:           "green_accent",
-			description:  "Pure green accent → hue=1/3.",
-			accent_hex:   "#00CC00",
-			expected_hex: toHex(mixTint({ r: 0, g: 0.8, b: 0 })),
+			id: 'green_accent',
+			description: 'Pure green accent → hue=1/3.',
+			accent_hex: '#00CC00',
+			expected_hex: toHex(mixTint({ r: 0, g: 0.8, b: 0 }))
 		},
 		{
-			id:           "blue_accent",
-			description:  "Medium blue accent → hue=2/3.",
-			accent_hex:   "#3388FF",
-			expected_hex: toHex(mixTint({ r: 0.2, g: 0.53, b: 1 })),
+			id: 'blue_accent',
+			description: 'Medium blue accent → hue=2/3.',
+			accent_hex: '#3388FF',
+			expected_hex: toHex(mixTint({ r: 0.2, g: 0.53, b: 1 }))
 		},
 		{
-			id:           "purple_accent",
-			description:  "Purple accent (LLM loading color from config).",
-			accent_hex:   "#AE61FF",
-			expected_hex: toHex(mixTint({ r: 0.68, g: 0.38, b: 1 })),
+			id: 'purple_accent',
+			description: 'Purple accent (LLM loading color from config).',
+			accent_hex: '#AE61FF',
+			expected_hex: toHex(mixTint({ r: 0.68, g: 0.38, b: 1 }))
 		},
 		{
-			id:           "yellow_accent",
-			description:  "Yellow accent → hue=1/6.",
-			accent_hex:   "#FFCC00",
-			expected_hex: toHex(mixTint({ r: 1, g: 0.8, b: 0 })),
+			id: 'yellow_accent',
+			description: 'Yellow accent → hue=1/6.',
+			accent_hex: '#FFCC00',
+			expected_hex: toHex(mixTint({ r: 1, g: 0.8, b: 0 }))
 		},
 		{
-			id:           "achromatic",
-			description:  "Achromatic (gray) accent → falls back to default dark background.",
-			accent_hex:   "#808080",
-			expected_hex: toHex(DEFAULT_BG),
+			id: 'achromatic',
+			description: 'Achromatic (gray) accent → falls back to default dark background.',
+			accent_hex: '#808080',
+			expected_hex: toHex(DEFAULT_BG)
 		},
 		{
-			id:           "no_accent",
-			description:  "Null accent → falls back to default dark background.",
-			accent_hex:   null,
-			expected_hex: toHex(DEFAULT_BG),
-		},
+			id: 'no_accent',
+			description: 'Null accent → falls back to default dark background.',
+			accent_hex: null,
+			expected_hex: toHex(DEFAULT_BG)
+		}
 	];
 }
-
 
 module.exports = {
 	DEFAULT_LIGHTNESS,
@@ -302,5 +311,5 @@ module.exports = {
 	toHex,
 	toHsColor,
 	mixTintHex,
-	tintTestVectors,
+	tintTestVectors
 };

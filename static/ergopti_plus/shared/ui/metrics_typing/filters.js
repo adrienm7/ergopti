@@ -24,7 +24,6 @@
  * ==============================================================================
  */
 
-
 // ============================================
 // ============================================
 // ======= 1/ Date Range Helpers =======
@@ -40,8 +39,8 @@ function get_default_date_range() {
 		app_state.manifest_dates_sorted.length > 0
 			? app_state.manifest_dates_sorted
 			: Object.keys(window.metrics_manifest).sort();
-	const today            = get_local_date_string();
-	const first_logged     = sorted_dates.length > 0 ? sorted_dates[0] : today;
+	const today = get_local_date_string();
+	const first_logged = sorted_dates.length > 0 ? sorted_dates[0] : today;
 	return { start: first_logged, end: today };
 }
 
@@ -49,12 +48,12 @@ function get_default_date_range() {
  * Writes the default date range into the date picker inputs.
  */
 function apply_default_date_range() {
-	const start_input = document.getElementById("date_start");
-	const end_input   = document.getElementById("date_end");
+	const start_input = document.getElementById('date_start');
+	const end_input = document.getElementById('date_end');
 	if (!start_input || !end_input) return;
-	const range       = get_default_date_range();
+	const range = get_default_date_range();
 	start_input.value = range.start;
-	end_input.value   = range.end;
+	end_input.value = range.end;
 }
 
 /**
@@ -64,55 +63,54 @@ function apply_default_date_range() {
  *   null → daily (multi-day); 0 → today all-day (hourly); N → last hour (hours ≥ N).
  */
 function apply_quick_date_range() {
-	const sel   = document.getElementById("quick_range");
-	const val   = sel ? sel.value : "";
+	const sel = document.getElementById('quick_range');
+	const val = sel ? sel.value : '';
 	if (!val) return;
 
 	const today = get_local_date_string();
-	const now   = new Date();
-	let start   = today;
+	const now = new Date();
+	let start = today;
 
-	if (val === "last_hour") {
+	if (val === 'last_hour') {
 		// Show the current hour and the previous one — max 2 hourly data points
 		start = today;
 		app_state.hour_cutoff = Math.max(0, now.getHours() - 1);
-	} else if (val === "today") {
+	} else if (val === 'today') {
 		start = today;
 		app_state.hour_cutoff = 0;
 	} else {
 		// All multi-day presets switch back to daily granularity
 		app_state.hour_cutoff = null;
 
-		if (val === "week") {
+		if (val === 'week') {
 			// ISO week: starts on Monday
 			const d = new Date(now);
 			const day = d.getDay() || 7;
 			d.setDate(d.getDate() - day + 1);
 			start = format_date_iso(d);
-		} else if (val === "month") {
-			start = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
-		} else if (val === "3m") {
+		} else if (val === 'month') {
+			start = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+		} else if (val === '3m') {
 			const d = new Date(now);
 			d.setMonth(d.getMonth() - 3);
 			start = format_date_iso(d);
-		} else if (val === "6m") {
+		} else if (val === '6m') {
 			const d = new Date(now);
 			d.setMonth(d.getMonth() - 6);
 			start = format_date_iso(d);
-		} else if (val === "year") {
+		} else if (val === 'year') {
 			start = `${now.getFullYear()}-01-01`;
-		} else if (val === "all") {
+		} else if (val === 'all') {
 			const range = get_default_date_range();
 			start = range.start;
 		}
 	}
 
-	document.getElementById("date_start").value = start;
-	document.getElementById("date_end").value   = today;
+	document.getElementById('date_start').value = start;
+	document.getElementById('date_end').value = today;
 
 	apply_date_app_filters();
 }
-
 
 // ==========================================
 // ==========================================
@@ -145,21 +143,22 @@ function apply_quick_date_range() {
  *            texte_final: boolean}}
  */
 function get_source_mode_flags() {
-	const hs_active  = document.getElementById("btn_toggle_hs")?.classList.contains("active")  ?? false;
-	const llm_active = document.getElementById("btn_toggle_llm")?.classList.contains("active") ?? false;
+	const hs_active = document.getElementById('btn_toggle_hs')?.classList.contains('active') ?? false;
+	const llm_active =
+		document.getElementById('btn_toggle_llm')?.classList.contains('active') ?? false;
 	return {
-		show_manual:       true,
+		show_manual: true,
 		// When the toggle is ACTIVE, include synthetic chars from that source.
 		// When inactive (default), only manual keystrokes are counted.
-		show_hs:           hs_active,
-		show_llm:          llm_active,
-		hs_raw_mode:       !hs_active,
-		llm_raw_mode:      !llm_active,
+		show_hs: hs_active,
+		show_llm: llm_active,
+		hs_raw_mode: !hs_active,
+		llm_raw_mode: !llm_active,
 		// MPM/CPM mirror the same logic — synthetic chars are added only when active
-		mpm_include_hs:    hs_active,
-		mpm_include_llm:   llm_active,
+		mpm_include_hs: hs_active,
+		mpm_include_llm: llm_active,
 		// Kept for backward compatibility with any remaining callers
-		texte_final:       false,
+		texte_final: false
 	};
 }
 
@@ -168,7 +167,7 @@ function get_source_mode_flags() {
  * When active: tables show trigger chars only; MPM still uses output chars.
  */
 function toggle_hs_source() {
-	document.getElementById("btn_toggle_hs")?.classList.toggle("active");
+	document.getElementById('btn_toggle_hs')?.classList.toggle('active');
 	compute_manifest_metrics();
 	apply_local_filters();
 }
@@ -178,7 +177,7 @@ function toggle_hs_source() {
  * When active: tables show trigger chars only; MPM still uses output chars.
  */
 function toggle_llm_source() {
-	document.getElementById("btn_toggle_llm")?.classList.toggle("active");
+	document.getElementById('btn_toggle_llm')?.classList.toggle('active');
 	compute_manifest_metrics();
 	apply_local_filters();
 }
@@ -188,7 +187,7 @@ function toggle_llm_source() {
  * @param {string} btn_id - DOM ID of the button to toggle.
  */
 function toggle_filter(btn_id) {
-	document.getElementById(btn_id).classList.toggle("active");
+	document.getElementById(btn_id).classList.toggle('active');
 	compute_manifest_metrics();
 	apply_local_filters();
 }
@@ -210,25 +209,25 @@ function reset_filters() {
 	// Ask the backend to purge its in-memory and on-disk prefetch caches so
 	// the next push carries a clean rebuild. On Windows this goes via the
 	// WebView2 postMessage channel; on macOS it goes via the _lua_request poll.
-	const clear_msg = JSON.stringify({ action: "clear_cache" });
-	if (typeof window.chrome !== "undefined" && window.chrome.webview)
+	const clear_msg = JSON.stringify({ action: 'clear_cache' });
+	if (typeof window.chrome !== 'undefined' && window.chrome.webview)
 		window.chrome.webview.postMessage(clear_msg);
 	window._lua_request = clear_msg;
 
 	apply_default_date_range();
 
 	// Default: HS, IA and case-sensitive all ON out of the box
-	document.getElementById("btn_toggle_hs")?.classList.add("active");
-	document.getElementById("btn_toggle_llm")?.classList.add("active");
+	document.getElementById('btn_toggle_hs')?.classList.add('active');
+	document.getElementById('btn_toggle_llm')?.classList.add('active');
 
 	// Restore remaining toggle buttons to their defaults
-	document.getElementById("btn_case_sensitive").classList.add("active");
+	document.getElementById('btn_case_sensitive').classList.add('active');
 
 	// Restore pause threshold and quick range selects to their defaults
-	const pause_sel = document.getElementById("pause_threshold");
-	if (pause_sel) pause_sel.value = "5000";
-	const quick_sel = document.getElementById("quick_range");
-	if (quick_sel) quick_sel.value = "";
+	const pause_sel = document.getElementById('pause_threshold');
+	if (pause_sel) pause_sel.value = '5000';
+	const quick_sel = document.getElementById('quick_range');
+	if (quick_sel) quick_sel.value = '';
 
 	// Revert to daily chart granularity
 	app_state.hour_cutoff = null;
@@ -240,7 +239,6 @@ function reset_filters() {
 	// Intentionally does NOT change app_state.current_tab
 	apply_date_app_filters();
 }
-
 
 // ==========================================
 // ==========================================
@@ -262,8 +260,8 @@ function ensure_live_refresh() {
 		request_range_data(false);
 	};
 
-	document.addEventListener("visibilitychange", () => {
+	document.addEventListener('visibilitychange', () => {
 		if (!document.hidden) refresh_if_idle();
 	});
-	window.addEventListener("focus", refresh_if_idle);
+	window.addEventListener('focus', refresh_if_idle);
 }

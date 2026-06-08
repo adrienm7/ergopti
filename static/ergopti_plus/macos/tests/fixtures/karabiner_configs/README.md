@@ -16,17 +16,17 @@ mod_combos JSON files actually resolve). The recipe:
 2. Bring the karabiner module to a known state (e.g. defaults).
 3. Run something like:
 
-       local kb = require("modules.karabiner")
-       local gen = require("modules.karabiner.generator")
-       local out = gen.build_karabiner_json(
-           kb.get_state(),
-           kb.get_actions(),
-           kb.get_tap_hold_keys(),
-           kb.get_mod_combos(),
-           kb.get_non_canonical(),
-           hs.configdir .. "/modules/karabiner/"
-       )
-       hs.json.write(out, hs.configdir .. "/tests/fixtures/karabiner_configs/defaults.json", true)
+   local kb = require("modules.karabiner")
+   local gen = require("modules.karabiner.generator")
+   local out = gen.build_karabiner_json(
+   kb.get_state(),
+   kb.get_actions(),
+   kb.get_tap_hold_keys(),
+   kb.get_mod_combos(),
+   kb.get_non_canonical(),
+   hs.configdir .. "/modules/karabiner/"
+   )
+   hs.json.write(out, hs.configdir .. "/tests/fixtures/karabiner_configs/defaults.json", true)
 
 4. Commit the resulting JSON file alongside this README.
 5. Add a corresponding `tests/unit/modules/karabiner/test_generator_snapshot.lua`

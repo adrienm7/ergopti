@@ -6,10 +6,10 @@ Captures raw multi-touch trackpad input via the undocumented macOS `touchdevice`
 
 ## Ports used (`_shared/ports/`)
 
-| Port | Usage |
-|---|---|
+| Port             | Usage                                                  |
+| ---------------- | ------------------------------------------------------ |
 | `TimerScheduler` | Adaptive wakeup probe loop and gesture debounce timers |
-| `Notifier` | User-facing feedback for gesture registration failures |
+| `Notifier`       | User-facing feedback for gesture registration failures |
 
 The raw touch frame callback arrives via `vendor.hs_asm.undocumented.touchdevice` (loaded with `pcall`; gracefully absent when unavailable).
 
@@ -19,13 +19,13 @@ The raw touch frame callback arrives via `vendor.hs_asm.undocumented.touchdevice
 
 ## Public API
 
-| Function | Description |
-|---|---|
-| `M.init(state)` | Initialize with the shared core state table |
-| `M.start()` | Subscribe to the touchdevice frame callback (arms the probe loop if the device is dormant) |
-| `M.stop()` | Unsubscribe from the frame callback |
-| `M.set_gesture(name, action)` | Bind a named gesture slot to an action key at runtime |
-| `M.get_available_actions()` | Return the full list of valid action keys from `actions.lua` |
+| Function                      | Description                                                                                |
+| ----------------------------- | ------------------------------------------------------------------------------------------ |
+| `M.init(state)`               | Initialize with the shared core state table                                                |
+| `M.start()`                   | Subscribe to the touchdevice frame callback (arms the probe loop if the device is dormant) |
+| `M.stop()`                    | Unsubscribe from the frame callback                                                        |
+| `M.set_gesture(name, action)` | Bind a named gesture slot to an action key at runtime                                      |
+| `M.get_available_actions()`   | Return the full list of valid action keys from `actions.lua`                               |
 
 ## Init pattern
 

@@ -23,10 +23,7 @@
  * ==============================================================================
  */
 
-"use strict";
-
-
-
+'use strict';
 
 // ==================================================
 // ==================================================
@@ -39,8 +36,8 @@
  * @type {object}
  */
 const portContract = {
-	name: "MouseControl",
-	version: "1.0.0",
+	name: 'MouseControl',
+	version: '1.0.0',
 
 	/**
 	 * setPos(x, y) — Move the mouse cursor to an absolute virtual-desktop position.
@@ -65,10 +62,10 @@ const portContract = {
 	 *   @error_behavior "return_zero_object".
 	 */
 	methods: {
-		setPos:           { arity: 2, required: true },
-		getPos:           { arity: 0, required: true },
-		getMonitorCount:  { arity: 0, required: true },
-		getMonitorBounds: { arity: 1, required: true },
+		setPos: { arity: 2, required: true },
+		getPos: { arity: 0, required: true },
+		getMonitorCount: { arity: 0, required: true },
+		getMonitorBounds: { arity: 1, required: true }
 	},
 
 	/**
@@ -78,12 +75,9 @@ const portContract = {
 	 * getMonitorBounds() return shape:
 	 * { left: number, top: number, right: number, bottom: number }
 	 */
-	POS_SHAPE:     ["x", "y"],
-	BOUNDS_SHAPE:  ["left", "top", "right", "bottom"],
+	POS_SHAPE: ['x', 'y'],
+	BOUNDS_SHAPE: ['left', 'top', 'right', 'bottom']
 };
-
-
-
 
 // ==================================================
 // ==================================================
@@ -98,24 +92,19 @@ const portContract = {
  */
 function validateAdapter(adapter) {
 	const violations = [];
-	if (!adapter || typeof adapter !== "object") {
-		return ["adapter must be a non-null object"];
+	if (!adapter || typeof adapter !== 'object') {
+		return ['adapter must be a non-null object'];
 	}
 	for (const [name, spec] of Object.entries(portContract.methods)) {
 		if (!spec.required) continue;
-		if (typeof adapter[name] !== "function") {
+		if (typeof adapter[name] !== 'function') {
 			violations.push(`missing method: ${name}`);
 		} else if (adapter[name].length !== spec.arity) {
-			violations.push(
-				`method ${name}: expected arity ${spec.arity}, got ${adapter[name].length}`
-			);
+			violations.push(`method ${name}: expected arity ${spec.arity}, got ${adapter[name].length}`);
 		}
 	}
 	return violations;
 }
-
-
-
 
 // ==================================================
 // ==================================================
@@ -130,86 +119,73 @@ function validateAdapter(adapter) {
 function contractTestVectors() {
 	return [
 		{
-			id: "get_pos_returns_object",
-			description: "getPos() returns a non-null object with x and y fields.",
+			id: 'get_pos_returns_object',
+			description: 'getPos() returns a non-null object with x and y fields.',
 			steps: [
-				{ call: "getPos" },
+				{ call: 'getPos' },
 				{
-					assert: "return_shape",
-					required_fields: portContract.POS_SHAPE,
-				},
-			],
+					assert: 'return_shape',
+					required_fields: portContract.POS_SHAPE
+				}
+			]
 		},
 		{
-			id: "get_pos_no_exception",
-			description: "getPos() does not throw in any environment.",
-			steps: [
-				{ call: "getPos" },
-				{ assert: "no_exception" },
-			],
+			id: 'get_pos_no_exception',
+			description: 'getPos() does not throw in any environment.',
+			steps: [{ call: 'getPos' }, { assert: 'no_exception' }]
 		},
 		{
-			id: "get_pos_fields_are_numbers",
-			description: "getPos() x and y fields are always numbers.",
+			id: 'get_pos_fields_are_numbers',
+			description: 'getPos() x and y fields are always numbers.',
 			steps: [
-				{ call: "getPos" },
-				{ assert: "all_fields_are_numbers", fields: portContract.POS_SHAPE },
-			],
+				{ call: 'getPos' },
+				{ assert: 'all_fields_are_numbers', fields: portContract.POS_SHAPE }
+			]
 		},
 		{
-			id: "set_pos_does_not_throw",
-			description: "setPos() does not throw for valid coordinates.",
-			steps: [
-				{ call: "setPos", args: [0, 0] },
-				{ assert: "no_exception" },
-			],
+			id: 'set_pos_does_not_throw',
+			description: 'setPos() does not throw for valid coordinates.',
+			steps: [{ call: 'setPos', args: [0, 0] }, { assert: 'no_exception' }]
 		},
 		{
-			id: "get_monitor_count_is_number",
-			description: "getMonitorCount() returns a number >= 0.",
-			steps: [
-				{ call: "getMonitorCount" },
-				{ assert: "return_number_gte", min: 0 },
-			],
+			id: 'get_monitor_count_is_number',
+			description: 'getMonitorCount() returns a number >= 0.',
+			steps: [{ call: 'getMonitorCount' }, { assert: 'return_number_gte', min: 0 }]
 		},
 		{
-			id: "get_monitor_count_no_exception",
-			description: "getMonitorCount() does not throw.",
-			steps: [
-				{ call: "getMonitorCount" },
-				{ assert: "no_exception" },
-			],
+			id: 'get_monitor_count_no_exception',
+			description: 'getMonitorCount() does not throw.',
+			steps: [{ call: 'getMonitorCount' }, { assert: 'no_exception' }]
 		},
 		{
-			id: "get_monitor_bounds_returns_object",
-			description: "getMonitorBounds(1) returns an object with the four bound fields.",
+			id: 'get_monitor_bounds_returns_object',
+			description: 'getMonitorBounds(1) returns an object with the four bound fields.',
 			steps: [
-				{ call: "getMonitorBounds", args: [1] },
+				{ call: 'getMonitorBounds', args: [1] },
 				{
-					assert: "return_shape",
-					required_fields: portContract.BOUNDS_SHAPE,
-				},
-			],
+					assert: 'return_shape',
+					required_fields: portContract.BOUNDS_SHAPE
+				}
+			]
 		},
 		{
-			id: "get_monitor_bounds_fields_are_numbers",
-			description: "getMonitorBounds() left/top/right/bottom fields are always numbers.",
+			id: 'get_monitor_bounds_fields_are_numbers',
+			description: 'getMonitorBounds() left/top/right/bottom fields are always numbers.',
 			steps: [
-				{ call: "getMonitorBounds", args: [1] },
-				{ assert: "all_fields_are_numbers", fields: portContract.BOUNDS_SHAPE },
-			],
+				{ call: 'getMonitorBounds', args: [1] },
+				{ assert: 'all_fields_are_numbers', fields: portContract.BOUNDS_SHAPE }
+			]
 		},
 		{
-			id: "get_monitor_bounds_invalid_index_returns_zeros",
-			description: "getMonitorBounds() on an out-of-range index returns an all-zero object.",
+			id: 'get_monitor_bounds_invalid_index_returns_zeros',
+			description: 'getMonitorBounds() on an out-of-range index returns an all-zero object.',
 			steps: [
-				{ call: "getMonitorBounds", args: [9999] },
-				{ assert: "return_shape",   required_fields: portContract.BOUNDS_SHAPE },
-				{ assert: "no_exception" },
-			],
-		},
+				{ call: 'getMonitorBounds', args: [9999] },
+				{ assert: 'return_shape', required_fields: portContract.BOUNDS_SHAPE },
+				{ assert: 'no_exception' }
+			]
+		}
 	];
 }
-
 
 module.exports = { portContract, validateAdapter, contractTestVectors };

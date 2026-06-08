@@ -22,10 +22,7 @@
  * ==============================================================================
  */
 
-"use strict";
-
-
-
+'use strict';
 
 // ==================================================
 // ==================================================
@@ -38,8 +35,8 @@
  * @type {object}
  */
 const portContract = {
-	name: "Crypto",
-	version: "1.0.0",
+	name: 'Crypto',
+	version: '1.0.0',
 
 	/**
 	 * sha256(data) — Compute the SHA-256 digest of a UTF-8 string.
@@ -48,12 +45,9 @@ const portContract = {
 	 *   @error_behavior "return_empty_string".
 	 */
 	methods: {
-		sha256: { arity: 1, required: true },
-	},
+		sha256: { arity: 1, required: true }
+	}
 };
-
-
-
 
 // ==================================================
 // ==================================================
@@ -68,24 +62,19 @@ const portContract = {
  */
 function validateAdapter(adapter) {
 	const violations = [];
-	if (!adapter || typeof adapter !== "object") {
-		return ["adapter must be a non-null object"];
+	if (!adapter || typeof adapter !== 'object') {
+		return ['adapter must be a non-null object'];
 	}
 	for (const [name, spec] of Object.entries(portContract.methods)) {
 		if (!spec.required) continue;
-		if (typeof adapter[name] !== "function") {
+		if (typeof adapter[name] !== 'function') {
 			violations.push(`missing method: ${name}`);
 		} else if (adapter[name].length !== spec.arity) {
-			violations.push(
-				`method ${name}: expected arity ${spec.arity}, got ${adapter[name].length}`
-			);
+			violations.push(`method ${name}: expected arity ${spec.arity}, got ${adapter[name].length}`);
 		}
 	}
 	return violations;
 }
-
-
-
 
 // ==================================================
 // ==================================================
@@ -100,44 +89,43 @@ function validateAdapter(adapter) {
 function contractTestVectors() {
 	return [
 		{
-			id: "sha256_returns_string",
-			description: "sha256() always returns a string — never throws.",
+			id: 'sha256_returns_string',
+			description: 'sha256() always returns a string — never throws.',
 			steps: [
-				{ call: "sha256", args: ["hello"] },
-				{ assert: "return_string" },
-				{ assert: "no_exception" },
-			],
+				{ call: 'sha256', args: ['hello'] },
+				{ assert: 'return_string' },
+				{ assert: 'no_exception' }
+			]
 		},
 		{
-			id: "sha256_returns_64_hex_chars",
-			description: "sha256() returns exactly 64 lowercase hex characters for non-empty input.",
+			id: 'sha256_returns_64_hex_chars',
+			description: 'sha256() returns exactly 64 lowercase hex characters for non-empty input.',
 			steps: [
-				{ call: "sha256", args: ["hello"] },
-				{ assert: "string_length", expected: 64 },
-				{ assert: "matches_pattern", pattern: /^[0-9a-f]{64}$/ },
-			],
+				{ call: 'sha256', args: ['hello'] },
+				{ assert: 'string_length', expected: 64 },
+				{ assert: 'matches_pattern', pattern: /^[0-9a-f]{64}$/ }
+			]
 		},
 		{
-			id: "sha256_is_deterministic",
-			description: "sha256() returns the same value for the same input on two calls.",
+			id: 'sha256_is_deterministic',
+			description: 'sha256() returns the same value for the same input on two calls.',
 			steps: [
-				{ call: "sha256", args: ["ergopti"] },
-				{ store: "first" },
-				{ call: "sha256", args: ["ergopti"] },
-				{ assert: "equals_stored", key: "first" },
-			],
+				{ call: 'sha256', args: ['ergopti'] },
+				{ store: 'first' },
+				{ call: 'sha256', args: ['ergopti'] },
+				{ assert: 'equals_stored', key: 'first' }
+			]
 		},
 		{
-			id: "sha256_empty_string",
-			description: "sha256() handles the empty string without throwing.",
+			id: 'sha256_empty_string',
+			description: 'sha256() handles the empty string without throwing.',
 			steps: [
-				{ call: "sha256", args: [""] },
-				{ assert: "return_string" },
-				{ assert: "no_exception" },
-			],
-		},
+				{ call: 'sha256', args: [''] },
+				{ assert: 'return_string' },
+				{ assert: 'no_exception' }
+			]
+		}
 	];
 }
-
 
 module.exports = { portContract, validateAdapter, contractTestVectors };

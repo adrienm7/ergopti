@@ -21,9 +21,9 @@
 
 /** @type {import('@stryker-mutator/core').PartialStrykerOptions} */
 const config = {
-	testRunner:  "command",
+	testRunner: 'command',
 	commandRunner: {
-		command: "node tools/test/test-mutation-targets.cjs",
+		command: 'node tools/test/test-mutation-targets.cjs'
 	},
 
 	mutate: [
@@ -34,13 +34,13 @@ const config = {
 		// without measuring anything real. Registry and HotstringMatcher contain
 		// the canonical algorithmic code (bucketing, sorting, matching) that the
 		// harness actually exercises — those are the meaningful mutation targets.
-		"static/ergopti_plus/shared/domain/Registry.spec.js",
-		"static/ergopti_plus/shared/domain/HotstringMatcher.spec.js",
-		"!**/node_modules/**",
+		'static/ergopti_plus/shared/domain/Registry.spec.js',
+		'static/ergopti_plus/shared/domain/HotstringMatcher.spec.js',
+		'!**/node_modules/**'
 	],
 
-	reporters:    ["html", "clear-text", "progress"],
-	htmlReporter: { fileName: "reports/mutation/mutation.html" },
+	reporters: ['html', 'clear-text', 'progress'],
+	htmlReporter: { fileName: 'reports/mutation/mutation.html' },
 
 	thresholds: {
 		// Registry.spec.js and HotstringMatcher.spec.js contain ~30% algorithmic
@@ -50,21 +50,16 @@ const config = {
 		// test quality. A realistic floor for this mixed-content architecture is
 		// 25% — below that indicates the algorithmic portions are untested.
 		break: 25,
-		low:   30,
-		high:  60,
+		low: 30,
+		high: 60
 	},
 
-	timeoutMS:     30000,
-	concurrency:   2,
-	tempDirName:   ".stryker-tmp",
-	cleanTempDir:  true,
+	timeoutMS: 30000,
+	concurrency: 2,
+	tempDirName: '.stryker-tmp',
+	cleanTempDir: true,
 
-	ignorePatterns: [
-		"_generated",
-		"node_modules",
-		"reports",
-		".stryker-tmp",
-	],
+	ignorePatterns: ['_generated', 'node_modules', 'reports', '.stryker-tmp']
 };
 
 export default config;

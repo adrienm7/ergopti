@@ -50,15 +50,15 @@ threshold (currently **50%**).
 
 The configuration lives in `stryker.config.mjs` at the project root.
 
-| Setting          | Value                                        |
-|------------------|----------------------------------------------|
-| Test runner      | `command` (runs `node scripts/test-mutation-targets.cjs`) |
+| Setting          | Value                                                                                  |
+| ---------------- | -------------------------------------------------------------------------------------- |
+| Test runner      | `command` (runs `node scripts/test-mutation-targets.cjs`)                              |
 | Mutated files    | `static/drivers/_shared/domain/**/*.js`<br>`static/drivers/_shared/ports/**/*.spec.js` |
-| Excluded         | `_generated/`, `node_modules/`               |
-| Report output    | `reports/mutation/mutation.html`             |
-| Threshold: break | 50% — run fails below this score             |
-| Threshold: low   | 65% — score shown in orange in the report   |
-| Threshold: high  | 80% — score shown in green in the report    |
+| Excluded         | `_generated/`, `node_modules/`                                                         |
+| Report output    | `reports/mutation/mutation.html`                                                       |
+| Threshold: break | 50% — run fails below this score                                                       |
+| Threshold: low   | 65% — score shown in orange in the report                                              |
+| Threshold: high  | 80% — score shown in green in the report                                               |
 
 ## Current Baseline
 
@@ -83,12 +83,12 @@ Focus investigation on **Survived** mutants. For each one, ask:
 
 ## Threshold Policy
 
-| Score     | Meaning                                       | CI action  |
-|-----------|-----------------------------------------------|------------|
-| < 50%     | Test suite provides inadequate mutation cover | Build fails |
-| 50 – 64%  | Low coverage — investigate survivors          | Warning    |
-| 65 – 79%  | Acceptable — continue improving               | Pass       |
-| ≥ 80%     | Strong coverage                               | Pass (green) |
+| Score    | Meaning                                       | CI action    |
+| -------- | --------------------------------------------- | ------------ |
+| < 50%    | Test suite provides inadequate mutation cover | Build fails  |
+| 50 – 64% | Low coverage — investigate survivors          | Warning      |
+| 65 – 79% | Acceptable — continue improving               | Pass         |
+| ≥ 80%    | Strong coverage                               | Pass (green) |
 
 When adding new domain logic, add corresponding tests to
 `scripts/test-mutation-targets.cjs` that assert the boundary conditions of the

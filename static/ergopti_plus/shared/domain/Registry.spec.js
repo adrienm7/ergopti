@@ -24,10 +24,7 @@
  * ==============================================================================
  */
 
-"use strict";
-
-
-
+'use strict';
 
 // ==================================================
 // ==================================================
@@ -60,9 +57,6 @@
  * @property {string|null} color         Hex accent color inherited from the group, or null.
  */
 
-
-
-
 // ==================================================
 // ==================================================
 // ======= 2/ Port Contract Definition =======
@@ -74,8 +68,8 @@
  * @type {object}
  */
 const portContract = {
-	name: "Registry",
-	version: "1.0.0",
+	name: 'Registry',
+	version: '1.0.0',
 
 	/**
 	 * add(trigger, replacement, opts) — Register a mapping.
@@ -111,17 +105,14 @@ const portContract = {
 	 *   @returns {number}
 	 */
 	methods: {
-		add:              { arity: 3, required: true },
-		mappingsForTail:  { arity: 1, required: true },
-		enableGroup:      { arity: 1, required: true },
-		disableGroup:     { arity: 1, required: true },
-		clear:            { arity: 0, required: true },
-		size:             { arity: 0, required: true },
-	},
+		add: { arity: 3, required: true },
+		mappingsForTail: { arity: 1, required: true },
+		enableGroup: { arity: 1, required: true },
+		disableGroup: { arity: 1, required: true },
+		clear: { arity: 0, required: true },
+		size: { arity: 0, required: true }
+	}
 };
-
-
-
 
 // ==================================================
 // ==================================================
@@ -136,12 +127,12 @@ const portContract = {
  */
 function validateAdapter(adapter) {
 	const violations = [];
-	if (!adapter || typeof adapter !== "object") {
-		return ["adapter must be a non-null object"];
+	if (!adapter || typeof adapter !== 'object') {
+		return ['adapter must be a non-null object'];
 	}
 	for (const [name, spec] of Object.entries(portContract.methods)) {
 		if (!spec.required) continue;
-		if (typeof adapter[name] !== "function") {
+		if (typeof adapter[name] !== 'function') {
 			violations.push(`missing method: ${name}`);
 		} else if (adapter[name].length !== spec.arity) {
 			violations.push(`method ${name}: expected arity ${spec.arity}, got ${adapter[name].length}`);
@@ -149,9 +140,6 @@ function validateAdapter(adapter) {
 	}
 	return violations;
 }
-
-
-
 
 // ==================================================
 // ==================================================
@@ -166,101 +154,105 @@ function validateAdapter(adapter) {
 function contractTestVectors() {
 	return [
 		{
-			id: "add_and_lookup_by_tail",
+			id: 'add_and_lookup_by_tail',
 			description: "add('btw', 'by the way') is found by mappingsForTail('w').",
 			steps: [
-				{ call: "add", args: ["btw", "by the way", {}] },
+				{ call: 'add', args: ['btw', 'by the way', {}] },
 				{
 					assert_contains: {
-						call: "mappingsForTail", args: ["w"],
-						field: "trigger", value: "btw",
-					},
-				},
-			],
+						call: 'mappingsForTail',
+						args: ['w'],
+						field: 'trigger',
+						value: 'btw'
+					}
+				}
+			]
 		},
 		{
-			id: "longest_match_first",
-			description: "Longer trigger appears before shorter when tail chars match.",
+			id: 'longest_match_first',
+			description: 'Longer trigger appears before shorter when tail chars match.',
 			steps: [
-				{ call: "add", args: ["btw",  "by the way", {}] },
-				{ call: "add", args: ["btww", "by the way, wow", {}] },
+				{ call: 'add', args: ['btw', 'by the way', {}] },
+				{ call: 'add', args: ['btww', 'by the way, wow', {}] },
 				{
 					assert_order: {
-						call: "mappingsForTail", args: ["w"],
-						expected_first_trigger: "btww",
-					},
-				},
-			],
+						call: 'mappingsForTail',
+						args: ['w'],
+						expected_first_trigger: 'btww'
+					}
+				}
+			]
 		},
 		{
-			id: "disable_group_removes_from_index",
-			description: "disableGroup removes its mappings from mappingsForTail.",
+			id: 'disable_group_removes_from_index',
+			description: 'disableGroup removes its mappings from mappingsForTail.',
 			steps: [
-				{ call: "add", args: ["btw", "by the way", { group: "test_group" }] },
-				{ call: "disableGroup", args: ["test_group"] },
+				{ call: 'add', args: ['btw', 'by the way', { group: 'test_group' }] },
+				{ call: 'disableGroup', args: ['test_group'] },
 				{
-					assert_empty: { call: "mappingsForTail", args: ["w"] },
-				},
-			],
+					assert_empty: { call: 'mappingsForTail', args: ['w'] }
+				}
+			]
 		},
 		{
-			id: "enable_group_restores_index",
-			description: "enableGroup after disableGroup restores the mappings.",
+			id: 'enable_group_restores_index',
+			description: 'enableGroup after disableGroup restores the mappings.',
 			steps: [
-				{ call: "add", args: ["btw", "by the way", { group: "g" }] },
-				{ call: "disableGroup", args: ["g"] },
-				{ call: "enableGroup",  args: ["g"] },
+				{ call: 'add', args: ['btw', 'by the way', { group: 'g' }] },
+				{ call: 'disableGroup', args: ['g'] },
+				{ call: 'enableGroup', args: ['g'] },
 				{
 					assert_contains: {
-						call: "mappingsForTail", args: ["w"],
-						field: "trigger", value: "btw",
-					},
-				},
-			],
+						call: 'mappingsForTail',
+						args: ['w'],
+						field: 'trigger',
+						value: 'btw'
+					}
+				}
+			]
 		},
 		{
-			id: "clear_empties_registry",
-			description: "clear() results in size() == 0.",
+			id: 'clear_empties_registry',
+			description: 'clear() results in size() == 0.',
 			steps: [
-				{ call: "add", args: ["a", "alpha", {}] },
-				{ call: "add", args: ["b", "beta",  {}] },
-				{ call: "clear", args: [] },
-				{ assert_equals: { call: "size", args: [], expected: 0 } },
-			],
+				{ call: 'add', args: ['a', 'alpha', {}] },
+				{ call: 'add', args: ['b', 'beta', {}] },
+				{ call: 'clear', args: [] },
+				{ assert_equals: { call: 'size', args: [], expected: 0 } }
+			]
 		},
 		{
-			id: "mapping_fields_populated",
-			description: "Mapping object has all required fields with correct types.",
+			id: 'mapping_fields_populated',
+			description: 'Mapping object has all required fields with correct types.',
 			steps: [
 				{
-					call:     "add",
-					args:     ["hello", "world", { group: "g", is_word: true }],
-					capture:  "mapping",
+					call: 'add',
+					args: ['hello', 'world', { group: 'g', is_word: true }],
+					capture: 'mapping'
 				},
 				{
 					assert_shape: {
-						variable: "mapping",
+						variable: 'mapping',
 						shape: {
-							trigger:       "string",
-							repl:          "string",
-							plain_repl:    "string",
-							is_word:       "boolean",
-							auto:          "boolean",
-							seq:           "number",
-							tlen:          "number",
-							trigger_bytes: "number",
-							tail_char:     "string",
-							has_magic:     "boolean",
-							group:         "string",
-							group_order:   "number",
-							final_result:  "boolean",
-						},
-					},
-				},
-			],
-		},
+							trigger: 'string',
+							repl: 'string',
+							plain_repl: 'string',
+							is_word: 'boolean',
+							auto: 'boolean',
+							seq: 'number',
+							tlen: 'number',
+							trigger_bytes: 'number',
+							tail_char: 'string',
+							has_magic: 'boolean',
+							group: 'string',
+							group_order: 'number',
+							final_result: 'boolean'
+						}
+					}
+				}
+			]
+		}
 	];
 }
-
 
 module.exports = { portContract, validateAdapter, contractTestVectors };

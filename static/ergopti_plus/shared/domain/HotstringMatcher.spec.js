@@ -36,10 +36,7 @@
  * ==============================================================================
  */
 
-"use strict";
-
-
-
+'use strict';
 
 // ==================================================
 // ==================================================
@@ -61,9 +58,6 @@
  * @property {string}  group              Owning group name.
  * @property {string|null} color          Hex accent color, or null.
  */
-
-
-
 
 // ==================================================
 // ==================================================
@@ -124,9 +118,6 @@
  *     return char matches /\w/ (Unicode-aware)
  */
 
-
-
-
 // ==================================================
 // ==================================================
 // ======= 3/ Port Contract Definition =======
@@ -138,8 +129,8 @@
  * @type {object}
  */
 const portContract = {
-	name: "HotstringMatcher",
-	version: "1.0.0",
+	name: 'HotstringMatcher',
+	version: '1.0.0',
 
 	/**
 	 * match(buffer, tailChar, registry, opts) — Find the best matching trigger.
@@ -159,13 +150,10 @@ const portContract = {
 	 *   @returns {MatchResult|null}
 	 */
 	methods: {
-		match:      { arity: 4, required: true },
-		matchMagic: { arity: 3, required: true },
-	},
+		match: { arity: 4, required: true },
+		matchMagic: { arity: 3, required: true }
+	}
 };
-
-
-
 
 // ==================================================
 // ==================================================
@@ -180,24 +168,19 @@ const portContract = {
  */
 function validateAdapter(adapter) {
 	const violations = [];
-	if (!adapter || typeof adapter !== "object") {
-		return ["adapter must be a non-null object"];
+	if (!adapter || typeof adapter !== 'object') {
+		return ['adapter must be a non-null object'];
 	}
 	for (const [name, spec] of Object.entries(portContract.methods)) {
 		if (!spec.required) continue;
-		if (typeof adapter[name] !== "function") {
+		if (typeof adapter[name] !== 'function') {
 			violations.push(`missing method: ${name}`);
 		} else if (adapter[name].length !== spec.arity) {
-			violations.push(
-				`method ${name}: expected arity ${spec.arity}, got ${adapter[name].length}`
-			);
+			violations.push(`method ${name}: expected arity ${spec.arity}, got ${adapter[name].length}`);
 		}
 	}
 	return violations;
 }
-
-
-
 
 // ==================================================
 // ==================================================
@@ -214,192 +197,191 @@ function validateAdapter(adapter) {
 function contractTestVectors() {
 	return [
 		{
-			id: "simple_suffix_match",
-			description: "Buffer ending with trigger is matched.",
-			registry: [{ trigger: "btw", repl: "by the way", group: "g" }],
+			id: 'simple_suffix_match',
+			description: 'Buffer ending with trigger is matched.',
+			registry: [{ trigger: 'btw', repl: 'by the way', group: 'g' }],
 			input: {
-				buffer:  "btw",
-				tailChar: "w",
-				opts:    {},
+				buffer: 'btw',
+				tailChar: 'w',
+				opts: {}
 			},
 			assert: {
-				not_null:    true,
-				trigger:     "btw",
-				replacement: "by the way",
+				not_null: true,
+				trigger: 'btw',
+				replacement: 'by the way',
 				backspace_count: 3,
-				consume_terminator: false,
-			},
+				consume_terminator: false
+			}
 		},
 		{
-			id: "no_match_wrong_tail",
-			description: "Buffer tail char not in any bucket returns null.",
-			registry: [{ trigger: "btw", repl: "by the way", group: "g" }],
+			id: 'no_match_wrong_tail',
+			description: 'Buffer tail char not in any bucket returns null.',
+			registry: [{ trigger: 'btw', repl: 'by the way', group: 'g' }],
 			input: {
-				buffer:  "xyz",
-				tailChar: "z",
-				opts:    {},
+				buffer: 'xyz',
+				tailChar: 'z',
+				opts: {}
 			},
-			assert: { is_null: true },
+			assert: { is_null: true }
 		},
 		{
-			id: "no_match_suffix_mismatch",
-			description: "Tail char matches bucket but buffer does not end with trigger.",
-			registry: [{ trigger: "btw", repl: "by the way", group: "g" }],
+			id: 'no_match_suffix_mismatch',
+			description: 'Tail char matches bucket but buffer does not end with trigger.',
+			registry: [{ trigger: 'btw', repl: 'by the way', group: 'g' }],
 			input: {
-				buffer:  "xtw",
-				tailChar: "w",
-				opts:    {},
+				buffer: 'xtw',
+				tailChar: 'w',
+				opts: {}
 			},
-			assert: { is_null: true },
+			assert: { is_null: true }
 		},
 		{
-			id: "longest_trigger_wins",
-			description: "When two triggers share the same tail, the longer one is returned.",
+			id: 'longest_trigger_wins',
+			description: 'When two triggers share the same tail, the longer one is returned.',
 			registry: [
-				{ trigger: "btw",  repl: "by the way",    group: "g" },
-				{ trigger: "btww", repl: "by the way wow", group: "g" },
+				{ trigger: 'btw', repl: 'by the way', group: 'g' },
+				{ trigger: 'btww', repl: 'by the way wow', group: 'g' }
 			],
 			input: {
-				buffer:  "btww",
-				tailChar: "w",
-				opts:    {},
+				buffer: 'btww',
+				tailChar: 'w',
+				opts: {}
 			},
 			assert: {
 				not_null: true,
-				trigger:  "btww",
-			},
+				trigger: 'btww'
+			}
 		},
 		{
-			id: "word_boundary_mid_word_blocked",
-			description: "is_word trigger does not fire when preceded by a word character.",
-			registry: [{ trigger: "the", repl: "THE", group: "g", is_word: true }],
+			id: 'word_boundary_mid_word_blocked',
+			description: 'is_word trigger does not fire when preceded by a word character.',
+			registry: [{ trigger: 'the', repl: 'THE', group: 'g', is_word: true }],
 			input: {
-				buffer:  "othe",
-				tailChar: "e",
-				opts:    {},
+				buffer: 'othe',
+				tailChar: 'e',
+				opts: {}
 			},
-			assert: { is_null: true },
+			assert: { is_null: true }
 		},
 		{
-			id: "word_boundary_start_of_buffer",
-			description: "is_word trigger fires when trigger occupies the entire buffer.",
-			registry: [{ trigger: "the", repl: "THE", group: "g", is_word: true }],
+			id: 'word_boundary_start_of_buffer',
+			description: 'is_word trigger fires when trigger occupies the entire buffer.',
+			registry: [{ trigger: 'the', repl: 'THE', group: 'g', is_word: true }],
 			input: {
-				buffer:  "the",
-				tailChar: "e",
-				opts:    {},
+				buffer: 'the',
+				tailChar: 'e',
+				opts: {}
 			},
 			assert: {
 				not_null: true,
-				trigger:  "the",
-			},
+				trigger: 'the'
+			}
 		},
 		{
-			id: "word_boundary_after_space",
-			description: "is_word trigger fires when preceded by a space.",
-			registry: [{ trigger: "the", repl: "THE", group: "g", is_word: true }],
+			id: 'word_boundary_after_space',
+			description: 'is_word trigger fires when preceded by a space.',
+			registry: [{ trigger: 'the', repl: 'THE', group: 'g', is_word: true }],
 			input: {
-				buffer:  "hello the",
-				tailChar: "e",
-				opts:    {},
+				buffer: 'hello the',
+				tailChar: 'e',
+				opts: {}
 			},
 			assert: {
 				not_null: true,
-				trigger:  "the",
-			},
+				trigger: 'the'
+			}
 		},
 		{
-			id: "word_boundary_after_punctuation",
-			description: "is_word trigger fires when preceded by punctuation.",
-			registry: [{ trigger: "the", repl: "THE", group: "g", is_word: true }],
+			id: 'word_boundary_after_punctuation',
+			description: 'is_word trigger fires when preceded by punctuation.',
+			registry: [{ trigger: 'the', repl: 'THE', group: 'g', is_word: true }],
 			input: {
-				buffer:  ".the",
-				tailChar: "e",
-				opts:    {},
+				buffer: '.the',
+				tailChar: 'e',
+				opts: {}
 			},
 			assert: {
 				not_null: true,
-				trigger:  "the",
-			},
+				trigger: 'the'
+			}
 		},
 		{
-			id: "backspace_count_consumed_terminator",
-			description: "consume_terminator adds 1 to backspace_count.",
-			registry: [{ trigger: "btw", repl: "by the way", group: "g" }],
+			id: 'backspace_count_consumed_terminator',
+			description: 'consume_terminator adds 1 to backspace_count.',
+			registry: [{ trigger: 'btw', repl: 'by the way', group: 'g' }],
 			input: {
-				buffer:  "btw",
-				tailChar: "w",
-				opts:    { terminator_consumed: true },
-			},
-			assert: {
-				not_null:           true,
-				backspace_count:    4,
-				consume_terminator: true,
-			},
-		},
-		{
-			id: "case_insensitive_default",
-			description: "Without is_case_sensitive, uppercase buffer matches lowercase trigger.",
-			registry: [{ trigger: "btw", repl: "by the way", group: "g" }],
-			input: {
-				buffer:  "BTW",
-				tailChar: "W",
-				opts:    {},
+				buffer: 'btw',
+				tailChar: 'w',
+				opts: { terminator_consumed: true }
 			},
 			assert: {
 				not_null: true,
-				trigger:  "btw",
-			},
+				backspace_count: 4,
+				consume_terminator: true
+			}
 		},
 		{
-			id: "case_sensitive_no_match",
-			description: "is_case_sensitive trigger does not match different case.",
-			registry: [{ trigger: "BTW", repl: "by the way", group: "g", is_case_sensitive: true }],
+			id: 'case_insensitive_default',
+			description: 'Without is_case_sensitive, uppercase buffer matches lowercase trigger.',
+			registry: [{ trigger: 'btw', repl: 'by the way', group: 'g' }],
 			input: {
-				buffer:  "btw",
-				tailChar: "w",
-				opts:    {},
-			},
-			assert: { is_null: true },
-		},
-		{
-			id: "case_sensitive_exact_match",
-			description: "is_case_sensitive trigger matches its exact case.",
-			registry: [{ trigger: "BTW", repl: "by the way", group: "g", is_case_sensitive: true }],
-			input: {
-				buffer:  "BTW",
-				tailChar: "W",
-				opts:    {},
+				buffer: 'BTW',
+				tailChar: 'W',
+				opts: {}
 			},
 			assert: {
 				not_null: true,
-				trigger:  "BTW",
-			},
+				trigger: 'btw'
+			}
 		},
 		{
-			id: "empty_buffer_no_match",
-			description: "Empty buffer never produces a match.",
-			registry: [{ trigger: "btw", repl: "by the way", group: "g" }],
+			id: 'case_sensitive_no_match',
+			description: 'is_case_sensitive trigger does not match different case.',
+			registry: [{ trigger: 'BTW', repl: 'by the way', group: 'g', is_case_sensitive: true }],
 			input: {
-				buffer:  "",
-				tailChar: "",
-				opts:    {},
+				buffer: 'btw',
+				tailChar: 'w',
+				opts: {}
 			},
-			assert: { is_null: true },
+			assert: { is_null: true }
 		},
 		{
-			id: "buffer_shorter_than_trigger",
-			description: "Buffer shorter than trigger cannot match.",
-			registry: [{ trigger: "afaik", repl: "as far as I know", group: "g" }],
+			id: 'case_sensitive_exact_match',
+			description: 'is_case_sensitive trigger matches its exact case.',
+			registry: [{ trigger: 'BTW', repl: 'by the way', group: 'g', is_case_sensitive: true }],
 			input: {
-				buffer:  "fai",
-				tailChar: "i",
-				opts:    {},
+				buffer: 'BTW',
+				tailChar: 'W',
+				opts: {}
 			},
-			assert: { is_null: true },
+			assert: {
+				not_null: true,
+				trigger: 'BTW'
+			}
 		},
+		{
+			id: 'empty_buffer_no_match',
+			description: 'Empty buffer never produces a match.',
+			registry: [{ trigger: 'btw', repl: 'by the way', group: 'g' }],
+			input: {
+				buffer: '',
+				tailChar: '',
+				opts: {}
+			},
+			assert: { is_null: true }
+		},
+		{
+			id: 'buffer_shorter_than_trigger',
+			description: 'Buffer shorter than trigger cannot match.',
+			registry: [{ trigger: 'afaik', repl: 'as far as I know', group: 'g' }],
+			input: {
+				buffer: 'fai',
+				tailChar: 'i',
+				opts: {}
+			},
+			assert: { is_null: true }
+		}
 	];
 }
-
 
 module.exports = { portContract, validateAdapter, contractTestVectors };

@@ -3,13 +3,13 @@
 All files in this directory are **auto-generated** and must not be edited manually.
 Run the corresponding npm script to regenerate.
 
-| File | Generator script | Status |
-|------|-----------------|--------|
-| `features_manifest.lua` | `npm run build:manifest` | ✅ Wired — `require`'d in Hammerspoon `init.lua` |
-| `terminators.lua` | `npm run codegen:terminators` | ✅ Wired — loaded by `modules.keymap.terminators` |
-| `shortcuts_bindings.lua` | `npm run codegen:shortcuts` | ✅ Wired — loaded by `modules.shortcuts` |
-| `registry.lua` | `npm run codegen:registry:hs` | ⏳ Orphaned — generated but not yet `require`'d in the driver |
-| `expander.lua` | `npm run codegen:expander:hs` | ⏳ Orphaned — generated but not yet `require`'d in the driver |
+| File                     | Generator script              | Status                                                        |
+| ------------------------ | ----------------------------- | ------------------------------------------------------------- |
+| `features_manifest.lua`  | `npm run build:manifest`      | ✅ Wired — `require`'d in Hammerspoon `init.lua`              |
+| `terminators.lua`        | `npm run codegen:terminators` | ✅ Wired — loaded by `modules.keymap.terminators`             |
+| `shortcuts_bindings.lua` | `npm run codegen:shortcuts`   | ✅ Wired — loaded by `modules.shortcuts`                      |
+| `registry.lua`           | `npm run codegen:registry:hs` | ⏳ Orphaned — generated but not yet `require`'d in the driver |
+| `expander.lua`           | `npm run codegen:expander:hs` | ⏳ Orphaned — generated but not yet `require`'d in the driver |
 
 ## Why no `prompt_builder.lua`?
 

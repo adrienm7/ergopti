@@ -25,22 +25,19 @@
  * ==============================================================================
  */
 
-"use strict";
+'use strict';
 
-const { execSync, spawnSync } = require("child_process");
-const path   = require("path");
-const fs     = require("fs");
+const { execSync, spawnSync } = require('child_process');
+const path = require('path');
+const fs = require('fs');
 
-const ROOT        = path.resolve(__dirname, "..", "..");
-const PASS_SYMBOL = "✓";
-const FAIL_SYMBOL = "✗";
-const WARN_SYMBOL = "⚠";
+const ROOT = path.resolve(__dirname, '..', '..');
+const PASS_SYMBOL = '✓';
+const FAIL_SYMBOL = '✗';
+const WARN_SYMBOL = '⚠';
 
 let total_pass = 0;
 let total_fail = 0;
-
-
-
 
 // ==================================================
 // ==================================================
@@ -54,15 +51,15 @@ let total_fail = 0;
  * @returns {{ ok: boolean, stdout: string, stderr: string }}
  */
 function runNpmScript(scriptName) {
-	const result = spawnSync(
-		"npm",
-		["run", "--silent", scriptName],
-		{ cwd: ROOT, encoding: "utf8", shell: true }
-	);
+	const result = spawnSync('npm', ['run', '--silent', scriptName], {
+		cwd: ROOT,
+		encoding: 'utf8',
+		shell: true
+	});
 	return {
-		ok:     result.status === 0,
-		stdout: result.stdout || "",
-		stderr: result.stderr || "",
+		ok: result.status === 0,
+		stdout: result.stdout || '',
+		stderr: result.stderr || ''
 	};
 }
 
@@ -78,11 +75,10 @@ function detectDrift(filePaths) {
 		const rel = path.relative(ROOT, path.resolve(ROOT, fp));
 		try {
 			// git diff --exit-code returns 1 if file differs from HEAD
-			const result = spawnSync(
-				"git",
-				["diff", "--exit-code", "--", rel],
-				{ cwd: ROOT, encoding: "utf8" }
-			);
+			const result = spawnSync('git', ['diff', '--exit-code', '--', rel], {
+				cwd: ROOT,
+				encoding: 'utf8'
+			});
 			if (result.status !== 0) {
 				drifted.push(rel);
 			}
@@ -106,16 +102,13 @@ function reportStep(stepName, ok, detail) {
 	} else {
 		console.log(`  ${FAIL_SYMBOL}  ${stepName}`);
 		if (detail) {
-			for (const line of detail.trim().split("\n")) {
+			for (const line of detail.trim().split('\n')) {
 				console.log(`       ${line}`);
 			}
 		}
 		total_fail++;
 	}
 }
-
-
-
 
 // ==================================================
 // ==================================================
@@ -131,57 +124,52 @@ function reportStep(stepName, ok, detail) {
  *   generated  — (optional) list of generated file paths to check for drift
  */
 const PIPELINE = [
-
 	// -------------------------------------------------------
 	// Step 1: Generate driver feature manifests (AHK + HS)
 	// -------------------------------------------------------
 	{
-		name: "build:manifest — generate features_manifest.{ahk,lua}",
+		name: 'build:manifest — generate features_manifest.{ahk,lua}',
 		run() {
-			const { ok, stderr } = runNpmScript("build:manifest");
+			const { ok, stderr } = runNpmScript('build:manifest');
 			return { ok, detail: ok ? undefined : stderr };
 		},
 		generated: [
-			"static/ergopti_plus/windows/_generated/features_manifest.ahk",
-			"static/ergopti_plus/windows/_generated/config_template.toml",
-			"static/ergopti_plus/windows/_generated/tap_hold_template.toml",
-			"static/ergopti_plus/macos/_generated/features_manifest.lua",
-			"static/ergopti_plus/macos/_generated/config_template.toml",
-			"static/ergopti_plus/macos/_generated/tap_hold_template.toml",
-		],
+			'static/ergopti_plus/windows/_generated/features_manifest.ahk',
+			'static/ergopti_plus/windows/_generated/config_template.toml',
+			'static/ergopti_plus/windows/_generated/tap_hold_template.toml',
+			'static/ergopti_plus/macos/_generated/features_manifest.lua',
+			'static/ergopti_plus/macos/_generated/config_template.toml',
+			'static/ergopti_plus/macos/_generated/tap_hold_template.toml'
+		]
 	},
 
 	// -------------------------------------------------------
 	// Step 2: Cross-driver manifest parity (AHK ↔ HS)
 	// -------------------------------------------------------
 	{
-		name: "test:manifest-parity — AHK ↔ HS codegen equivalence",
+		name: 'test:manifest-parity — AHK ↔ HS codegen equivalence',
 		run() {
-			const { ok, stdout, stderr } = runNpmScript("test:manifest-parity");
+			const { ok, stdout, stderr } = runNpmScript('test:manifest-parity');
 			// Extract summary line from test output (last non-empty line)
-			const lines   = (stdout + stderr).trim().split("\n").filter(Boolean);
-			const summary = lines[lines.length - 1] || "";
+			const lines = (stdout + stderr).trim().split('\n').filter(Boolean);
+			const summary = lines[lines.length - 1] || '';
 			return { ok, detail: ok ? undefined : summary };
-		},
+		}
 	},
 
 	// -------------------------------------------------------
 	// Step 3: Port adapter structural compliance (all 13 ports)
 	// -------------------------------------------------------
 	{
-		name: "test:port-compliance — 13 port adapter contracts",
+		name: 'test:port-compliance — 13 port adapter contracts',
 		run() {
-			const { ok, stdout, stderr } = runNpmScript("test:port-compliance");
-			const lines   = (stdout + stderr).trim().split("\n").filter(Boolean);
-			const summary = lines[lines.length - 1] || "";
+			const { ok, stdout, stderr } = runNpmScript('test:port-compliance');
+			const lines = (stdout + stderr).trim().split('\n').filter(Boolean);
+			const summary = lines[lines.length - 1] || '';
 			return { ok, detail: ok ? undefined : summary };
-		},
-	},
-
+		}
+	}
 ];
-
-
-
 
 // ==================================================
 // ==================================================
@@ -195,12 +183,12 @@ const PIPELINE = [
  * build:domain — flag it as a failure so CI catches it.
  */
 function runDriftCheck() {
-	const allGenerated = PIPELINE
-		.flatMap(step => step.generated || [])
-		.map(p => path.resolve(ROOT, p));
+	const allGenerated = PIPELINE.flatMap((step) => step.generated || []).map((p) =>
+		path.resolve(ROOT, p)
+	);
 
 	// Only check files that actually exist
-	const existing = allGenerated.filter(p => fs.existsSync(p));
+	const existing = allGenerated.filter((p) => fs.existsSync(p));
 
 	if (existing.length === 0) {
 		console.log(`  ${WARN_SYMBOL}  drift-check — no generated files found, skipping`);
@@ -209,10 +197,14 @@ function runDriftCheck() {
 
 	const drifted = detectDrift(existing);
 	if (drifted.length === 0) {
-		console.log(`  ${PASS_SYMBOL}  drift-check — all generated files match HEAD (${existing.length} file(s))`);
+		console.log(
+			`  ${PASS_SYMBOL}  drift-check — all generated files match HEAD (${existing.length} file(s))`
+		);
 		total_pass++;
 	} else {
-		console.log(`  ${FAIL_SYMBOL}  drift-check — ${drifted.length} generated file(s) differ from HEAD:`);
+		console.log(
+			`  ${FAIL_SYMBOL}  drift-check — ${drifted.length} generated file(s) differ from HEAD:`
+		);
 		for (const p of drifted) {
 			console.log(`       - ${p}`);
 		}
@@ -221,17 +213,14 @@ function runDriftCheck() {
 	}
 }
 
-
-
-
 // ==================================================
 // ==================================================
 // ======= 4/ Main Runner =======
 // ==================================================
 // ==================================================
 
-console.log("\nErgopti+ Domain Build Pipeline");
-console.log("=".repeat(50));
+console.log('\nErgopti+ Domain Build Pipeline');
+console.log('='.repeat(50));
 
 let pipeline_aborted = false;
 
@@ -255,14 +244,16 @@ for (const step of PIPELINE) {
 
 if (!pipeline_aborted) {
 	// All steps passed — run drift check as a final gate
-	console.log("");
-	console.log("Drift detection");
-	console.log("-".repeat(50));
+	console.log('');
+	console.log('Drift detection');
+	console.log('-'.repeat(50));
 	runDriftCheck();
 }
 
-console.log("");
-console.log(`Total: ${total_pass + total_fail} step(s) — ${total_pass} passed, ${total_fail} failed`);
-console.log("");
+console.log('');
+console.log(
+	`Total: ${total_pass + total_fail} step(s) — ${total_pass} passed, ${total_fail} failed`
+);
+console.log('');
 
 process.exit(total_fail > 0 ? 1 : 0);

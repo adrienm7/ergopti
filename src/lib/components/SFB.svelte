@@ -17,30 +17,29 @@
 	}
 
 	.tooltip {
-		display: inline-block;
 		border-bottom: 2px dotted white;
+		display: inline-block;
 		white-space: normal;
 	}
 
 	.tooltip .tooltiptext {
-		display: inline-block;
-		position: relative;
-		visibility: hidden;
-		z-index: 2;
-		box-shadow: rgba(0, 0, 0, 0.35) 0px 5px 15px;
-		border: 1px solid rgba(255, 255, 255, 0.2);
-		border-radius: 8px;
-
 		/* Enlève les dégradés de texte */
 		background-clip: unset;
 		background-color: rgba(0, 13, 27, 0.95);
-		padding: 20px;
-		width: 90%;
-		max-width: 600px;
+		border: 1px solid rgba(255, 255, 255, 0.2);
+		border-radius: 8px;
+		box-shadow: rgba(0, 0, 0, 0.35) 0px 5px 15px;
 		color: white;
-		font-weight: normal;
+		display: inline-block;
 		font-size: 1rem;
+		font-weight: normal;
 		line-height: 1.35;
+		max-width: 600px;
+		padding: 20px;
+		position: relative;
+		visibility: hidden;
+		width: 90%;
+		z-index: 2;
 		-webkit-text-fill-color: white;
 
 		/* Position the tooltip */

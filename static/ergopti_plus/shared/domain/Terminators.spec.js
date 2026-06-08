@@ -26,10 +26,7 @@
  * ==============================================================================
  */
 
-"use strict";
-
-
-
+'use strict';
 
 // ==================================================
 // ==================================================
@@ -73,43 +70,130 @@
  */
 const TERMINATOR_DEFS = [
 	// Whitespace & dashes
-	{ key: "space",      chars: [" "],        label: "␣ : Espace",                 default_enabled: true,  consume: false },
-	{ key: "nbsp",       chars: [" "],   label: "⍽ : Espace insécable",       default_enabled: false,  consume: false },
-	{ key: "nnbsp",      chars: [" "],   label: "⍽ : Espace fine insécable",  default_enabled: false,  consume: false },
-	{ key: "minus",      chars: ["-"],        label: "- : Tiret",                  default_enabled: false, consume: false },
-	{ key: "underscore", chars: ["_"],        label: "_ : Tiret bas",              default_enabled: false, consume: false },
-	{ type: "separator" },
+	{ key: 'space', chars: [' '], label: '␣ : Espace', default_enabled: true, consume: false },
+	{
+		key: 'nbsp',
+		chars: [' '],
+		label: '⍽ : Espace insécable',
+		default_enabled: false,
+		consume: false
+	},
+	{
+		key: 'nnbsp',
+		chars: [' '],
+		label: '⍽ : Espace fine insécable',
+		default_enabled: false,
+		consume: false
+	},
+	{ key: 'minus', chars: ['-'], label: '- : Tiret', default_enabled: false, consume: false },
+	{
+		key: 'underscore',
+		chars: ['_'],
+		label: '_ : Tiret bas',
+		default_enabled: false,
+		consume: false
+	},
+	{ type: 'separator' },
 	// Tab / Entrée / magic key
-	{ key: "tab",   chars: ["\t"],            label: "⇥ : Tabulation",             default_enabled: true, consume: false },
-	{ key: "enter", chars: ["\r", "\n"],      label: "⏎ : Entrée",                 default_enabled: true, consume: false },
-	{ key: "star",  chars: ["★"],             label: "★ : Touche magique",         default_enabled: true,  consume: true  },
-	{ type: "separator" },
+	{ key: 'tab', chars: ['\t'], label: '⇥ : Tabulation', default_enabled: true, consume: false },
+	{ key: 'enter', chars: ['\r', '\n'], label: '⏎ : Entrée', default_enabled: true, consume: false },
+	{ key: 'star', chars: ['★'], label: '★ : Touche magique', default_enabled: true, consume: true },
+	{ type: 'separator' },
 	// Sentence punctuation
-	{ key: "comma",     chars: [","],         label: ", : Virgule",                default_enabled: true,  consume: false },
-	{ key: "semicolon", chars: [";"],         label: "; : Point-virgule",          default_enabled: true, consume: false },
-	{ key: "period",    chars: ["."],         label: ". : Point",                  default_enabled: true, consume: false },
-	{ key: "ellipsis",  chars: ["…"],         label: "… : Points de suspension",   default_enabled: false, consume: false },
-	{ key: "exclam",    chars: ["!"],         label: "! : Point d'exclamation",    default_enabled: true, consume: false },
-	{ key: "question",  chars: ["?"],         label: "? : Point d'interrogation",  default_enabled: true, consume: false },
-	{ key: "colon",     chars: [":"],         label: ": : Deux-points",            default_enabled: true, consume: false },
-	{ type: "separator" },
+	{ key: 'comma', chars: [','], label: ', : Virgule', default_enabled: true, consume: false },
+	{
+		key: 'semicolon',
+		chars: [';'],
+		label: '; : Point-virgule',
+		default_enabled: true,
+		consume: false
+	},
+	{ key: 'period', chars: ['.'], label: '. : Point', default_enabled: true, consume: false },
+	{
+		key: 'ellipsis',
+		chars: ['…'],
+		label: '… : Points de suspension',
+		default_enabled: false,
+		consume: false
+	},
+	{
+		key: 'exclam',
+		chars: ['!'],
+		label: "! : Point d'exclamation",
+		default_enabled: true,
+		consume: false
+	},
+	{
+		key: 'question',
+		chars: ['?'],
+		label: "? : Point d'interrogation",
+		default_enabled: true,
+		consume: false
+	},
+	{ key: 'colon', chars: [':'], label: ': : Deux-points', default_enabled: true, consume: false },
+	{ type: 'separator' },
 	// Closing delimiters only (the opening ( [ { < never end a word)
-	{ key: "parenright",        chars: [")"], label: ") : Parenthèse fermante",    default_enabled: false, consume: false },
-	{ key: "braceright",        chars: ["}"], label: "} : Accolade fermante",      default_enabled: false, consume: false },
-	{ key: "bracketright",      chars: ["]"], label: "] : Crochet fermant",        default_enabled: false, consume: false },
-	{ key: "anglebracketright", chars: [">"], label: "> : Guillemet fermant",      default_enabled: false, consume: false },
-	{ type: "separator" },
+	{
+		key: 'parenright',
+		chars: [')'],
+		label: ') : Parenthèse fermante',
+		default_enabled: false,
+		consume: false
+	},
+	{
+		key: 'braceright',
+		chars: ['}'],
+		label: '} : Accolade fermante',
+		default_enabled: false,
+		consume: false
+	},
+	{
+		key: 'bracketright',
+		chars: [']'],
+		label: '] : Crochet fermant',
+		default_enabled: false,
+		consume: false
+	},
+	{
+		key: 'anglebracketright',
+		chars: ['>'],
+		label: '> : Guillemet fermant',
+		default_enabled: false,
+		consume: false
+	},
+	{ type: 'separator' },
 	// Apostrophes, quote & symbols
-	{ key: "apostrophe_typo",     chars: ["’"], label: "’ : Apostrophe typographique", default_enabled: false, consume: false },
-	{ key: "apostrophe_straight", chars: ["'"],      label: "' : Apostrophe droite",        default_enabled: false, consume: false },
-	{ key: "quote",               chars: ['"'],      label: '" : Guillemet double',         default_enabled: false, consume: false },
-	{ key: "equal",               chars: ["="],      label: "= : Égal",                     default_enabled: false, consume: false },
-	{ key: "slash",               chars: ["/"],      label: "/ : Slash",                    default_enabled: false, consume: false },
-	{ key: "backslash",           chars: ["\\"],     label: "\\ : Backslash",               default_enabled: false, consume: false },
+	{
+		key: 'apostrophe_typo',
+		chars: ['’'],
+		label: '’ : Apostrophe typographique',
+		default_enabled: false,
+		consume: false
+	},
+	{
+		key: 'apostrophe_straight',
+		chars: ["'"],
+		label: "' : Apostrophe droite",
+		default_enabled: false,
+		consume: false
+	},
+	{
+		key: 'quote',
+		chars: ['"'],
+		label: '" : Guillemet double',
+		default_enabled: false,
+		consume: false
+	},
+	{ key: 'equal', chars: ['='], label: '= : Égal', default_enabled: false, consume: false },
+	{ key: 'slash', chars: ['/'], label: '/ : Slash', default_enabled: false, consume: false },
+	{
+		key: 'backslash',
+		chars: ['\\'],
+		label: '\\ : Backslash',
+		default_enabled: false,
+		consume: false
+	}
 ];
-
-
-
 
 // ==================================================
 // ==================================================
@@ -122,8 +206,8 @@ const TERMINATOR_DEFS = [
  * @type {object}
  */
 const portContract = {
-	name: "Terminators",
-	version: "1.0.0",
+	name: 'Terminators',
+	version: '1.0.0',
 
 	/**
 	 * isTerminator(char) — True if char belongs to any enabled terminator slot.
@@ -161,21 +245,18 @@ const portContract = {
 	 *   @returns {TerminatorDef[]}
 	 */
 	methods: {
-		isTerminator:  { arity: 1, required: true },
-		isConsumed:    { arity: 1, required: true },
-		setEnabled:    { arity: 2, required: true },
-		isEnabled:     { arity: 1, required: true },
-		updateMagicKey:{ arity: 1, required: true },
-		addCustom:     { arity: 4, required: true },
-		all:           { arity: 0, required: true },
+		isTerminator: { arity: 1, required: true },
+		isConsumed: { arity: 1, required: true },
+		setEnabled: { arity: 2, required: true },
+		isEnabled: { arity: 1, required: true },
+		updateMagicKey: { arity: 1, required: true },
+		addCustom: { arity: 4, required: true },
+		all: { arity: 0, required: true }
 	},
 
 	/** Exported so adapters initialize from the same source. */
-	TERMINATOR_DEFS,
+	TERMINATOR_DEFS
 };
-
-
-
 
 // ==================================================
 // ==================================================
@@ -190,12 +271,12 @@ const portContract = {
  */
 function validateAdapter(adapter) {
 	const violations = [];
-	if (!adapter || typeof adapter !== "object") {
-		return ["adapter must be a non-null object"];
+	if (!adapter || typeof adapter !== 'object') {
+		return ['adapter must be a non-null object'];
 	}
 	for (const [name, spec] of Object.entries(portContract.methods)) {
 		if (!spec.required) continue;
-		if (typeof adapter[name] !== "function") {
+		if (typeof adapter[name] !== 'function') {
 			violations.push(`missing method: ${name}`);
 		} else if (adapter[name].length !== spec.arity) {
 			violations.push(`method ${name}: expected arity ${spec.arity}, got ${adapter[name].length}`);
@@ -203,9 +284,6 @@ function validateAdapter(adapter) {
 	}
 	return violations;
 }
-
-
-
 
 // ==================================================
 // ==================================================
@@ -220,66 +298,66 @@ function validateAdapter(adapter) {
 function contractTestVectors() {
 	return [
 		{
-			id: "space_is_terminator",
-			description: "Space is a terminator by default.",
-			input: { char: " " },
-			assert: { isTerminator: true, isConsumed: false },
+			id: 'space_is_terminator',
+			description: 'Space is a terminator by default.',
+			input: { char: ' ' },
+			assert: { isTerminator: true, isConsumed: false }
 		},
 		{
-			id: "magic_key_consumed",
-			description: "The magic key terminator is consumed (not echoed).",
-			input: { char: "★" },
-			assert: { isTerminator: true, isConsumed: true },
+			id: 'magic_key_consumed',
+			description: 'The magic key terminator is consumed (not echoed).',
+			input: { char: '★' },
+			assert: { isTerminator: true, isConsumed: true }
 		},
 		{
-			id: "letter_not_terminator",
-			description: "An ordinary letter is not a terminator.",
-			input: { char: "a" },
-			assert: { isTerminator: false },
+			id: 'letter_not_terminator',
+			description: 'An ordinary letter is not a terminator.',
+			input: { char: 'a' },
+			assert: { isTerminator: false }
 		},
 		{
-			id: "disable_then_not_terminator",
+			id: 'disable_then_not_terminator',
 			description: "After setEnabled('space', false), space is not a terminator.",
 			steps: [
-				{ call: "setEnabled", args: ["space", false] },
-				{ assert: { call: "isTerminator", args: [" "], expected: false } },
-				{ call: "setEnabled", args: ["space", true] },   // restore
-			],
+				{ call: 'setEnabled', args: ['space', false] },
+				{ assert: { call: 'isTerminator', args: [' '], expected: false } },
+				{ call: 'setEnabled', args: ['space', true] } // restore
+			]
 		},
 		{
-			id: "update_magic_key",
+			id: 'update_magic_key',
 			description: "updateMagicKey('§') makes § a consumed terminator and ★ is no longer one.",
 			steps: [
-				{ call: "updateMagicKey", args: ["§"] },
-				{ assert: { call: "isTerminator", args: ["§"], expected: true } },
-				{ assert: { call: "isConsumed",   args: ["§"], expected: true } },
-				{ assert: { call: "isTerminator", args: ["★"], expected: false } },
-			],
+				{ call: 'updateMagicKey', args: ['§'] },
+				{ assert: { call: 'isTerminator', args: ['§'], expected: true } },
+				{ assert: { call: 'isConsumed', args: ['§'], expected: true } },
+				{ assert: { call: 'isTerminator', args: ['★'], expected: false } }
+			]
 		},
 		{
-			id: "add_custom_terminator",
-			description: "addCustom adds a new slot that isTerminator recognizes.",
+			id: 'add_custom_terminator',
+			description: 'addCustom adds a new slot that isTerminator recognizes.',
 			steps: [
-				{ call: "addCustom", args: ["pipe", ["|"], "Pipe", false] },
-				{ assert: { call: "isTerminator", args: ["|"], expected: true } },
-				{ assert: { call: "isConsumed",   args: ["|"], expected: false } },
-				{ assert: { call: "isEnabled",    args: ["pipe"], expected: true } },
-			],
+				{ call: 'addCustom', args: ['pipe', ['|'], 'Pipe', false] },
+				{ assert: { call: 'isTerminator', args: ['|'], expected: true } },
+				{ assert: { call: 'isConsumed', args: ['|'], expected: false } },
+				{ assert: { call: 'isEnabled', args: ['pipe'], expected: true } }
+			]
 		},
 		{
-			id: "all_returns_catalogue",
-			description: "all() returns at least the built-in TERMINATOR_DEFS slots.",
+			id: 'all_returns_catalogue',
+			description: 'all() returns at least the built-in TERMINATOR_DEFS slots.',
 			steps: [
 				{
 					assert_min_length: {
-						call: "all", args: [],
-						min: TERMINATOR_DEFS.length,
-					},
-				},
-			],
-		},
+						call: 'all',
+						args: [],
+						min: TERMINATOR_DEFS.length
+					}
+				}
+			]
+		}
 	];
 }
-
 
 module.exports = { portContract, validateAdapter, contractTestVectors, TERMINATOR_DEFS };

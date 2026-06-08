@@ -6,12 +6,12 @@ Core engine for Ergopti+. Runs the OS-level `eventtap` loop that intercepts ever
 
 ## Ports used (`_shared/ports/`)
 
-| Port | Usage |
-|---|---|
-| `KeyboardHook` | Raw keystroke event tap (intercept + suppress) |
-| `TextSender` | Injects expanded text back into the OS |
-| `TooltipRenderer` | Displays LLM prediction suggestions |
-| `TimerScheduler` | Debounce timers for LLM calls and inactivity detection |
+| Port              | Usage                                                  |
+| ----------------- | ------------------------------------------------------ |
+| `KeyboardHook`    | Raw keystroke event tap (intercept + suppress)         |
+| `TextSender`      | Injects expanded text back into the OS                 |
+| `TooltipRenderer` | Displays LLM prediction suggestions                    |
+| `TimerScheduler`  | Debounce timers for LLM calls and inactivity detection |
 
 ## Domain module (`_shared/domain/`)
 
@@ -21,13 +21,13 @@ Core engine for Ergopti+. Runs the OS-level `eventtap` loop that intercepts ever
 
 ## Public API
 
-| Function | Description |
-|---|---|
-| `M.init(state)` | Initialize the module with the shared core state table |
-| `M.start()` | Arm the eventtap and begin intercepting keystrokes |
-| `M.stop()` | Disarm the eventtap |
+| Function                      | Description                                               |
+| ----------------------------- | --------------------------------------------------------- |
+| `M.init(state)`               | Initialize the module with the shared core state table    |
+| `M.start()`                   | Arm the eventtap and begin intercepting keystrokes        |
+| `M.stop()`                    | Disarm the eventtap                                       |
 | `M.set_delay(group, seconds)` | Update the per-group expansion delay threshold at runtime |
-| `M.is_running()` | Returns `true` if the eventtap is currently active |
+| `M.is_running()`              | Returns `true` if the eventtap is currently active        |
 
 ## Init pattern
 

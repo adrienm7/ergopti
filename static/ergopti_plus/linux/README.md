@@ -41,15 +41,15 @@ LuaJIT instead of Rust.
 
 ## Stack
 
-| Layer | Technology | Rationale |
-|-------|-----------|-----------|
-| Runtime | **LuaJIT 2.x** | Same language as the Hammerspoon driver; reuses all `_shared/lua/` modules directly. |
-| Keyboard input | **/dev/input/eventN** (evdev) | Raw 24-byte `input_event` structs; works on X11, Wayland, and TTY identically. |
-| Text injection | **ydotool** (uinput backend) | Works on both X11 and Wayland; no display-server coupling. |
-| Key remapping + tap-hold | **kanata** | Rust daemon; reads `/dev/input` + writes `uinput`; already in the repo. |
-| Notifications | **notify-send** | D-Bus `org.freedesktop.Notifications` — works on GNOME, KDE, XFCE, wlroots. |
-| Tray icon | **StatusNotifierItem** (D-Bus) | De-facto Linux standard; KDE/Plasma, GNOME (with AppIndicator ext), wlroots. |
-| HTTP | **curl** via io.popen | Zero extra dependencies; async path via lua-http planned. |
+| Layer                    | Technology                     | Rationale                                                                            |
+| ------------------------ | ------------------------------ | ------------------------------------------------------------------------------------ |
+| Runtime                  | **LuaJIT 2.x**                 | Same language as the Hammerspoon driver; reuses all `_shared/lua/` modules directly. |
+| Keyboard input           | **/dev/input/eventN** (evdev)  | Raw 24-byte `input_event` structs; works on X11, Wayland, and TTY identically.       |
+| Text injection           | **ydotool** (uinput backend)   | Works on both X11 and Wayland; no display-server coupling.                           |
+| Key remapping + tap-hold | **kanata**                     | Rust daemon; reads `/dev/input` + writes `uinput`; already in the repo.              |
+| Notifications            | **notify-send**                | D-Bus `org.freedesktop.Notifications` — works on GNOME, KDE, XFCE, wlroots.          |
+| Tray icon                | **StatusNotifierItem** (D-Bus) | De-facto Linux standard; KDE/Plasma, GNOME (with AppIndicator ext), wlroots.         |
+| HTTP                     | **curl** via io.popen          | Zero extra dependencies; async path via lua-http planned.                            |
 
 ## Directory structure
 
@@ -114,22 +114,23 @@ a systemd user service.
 
 ## Known limitations by feature
 
-| Feature | X11 | Wayland | Notes |
-|---------|-----|---------|-------|
-| Key remapping + tap-hold | ✅ kanata | ✅ kanata | Bypasses display server via `/dev/input` + `uinput` |
-| Hotstrings + metrics | ✅ | ✅ | evdev read works on both; injection via ydotool |
-| Text injection | ✅ ydotool | ✅ ydotool | Requires `ydotoold` daemon + uinput permissions |
-| Window info (active app) | ✅ xdotool | ⚠️ compositor-specific | No universal Wayland protocol |
-| Tray icon | ✅ SNI | ⚠️ partial | GNOME Wayland needs AppIndicator extension |
-| Tooltip overlay | ✅ cairo window | ❌ protocol blocks it | Use notify-send as fallback on Wayland |
-| Secure field detection | ⚠️ AT-SPI2 | ❌ not standardised | Keylogger disabled by default; opt-in only |
-| Config UI | ➡️ ergopti.com WebUI | ➡️ same | No native GUI planned |
+| Feature                  | X11                  | Wayland                | Notes                                               |
+| ------------------------ | -------------------- | ---------------------- | --------------------------------------------------- |
+| Key remapping + tap-hold | ✅ kanata            | ✅ kanata              | Bypasses display server via `/dev/input` + `uinput` |
+| Hotstrings + metrics     | ✅                   | ✅                     | evdev read works on both; injection via ydotool     |
+| Text injection           | ✅ ydotool           | ✅ ydotool             | Requires `ydotoold` daemon + uinput permissions     |
+| Window info (active app) | ✅ xdotool           | ⚠️ compositor-specific | No universal Wayland protocol                       |
+| Tray icon                | ✅ SNI               | ⚠️ partial             | GNOME Wayland needs AppIndicator extension          |
+| Tooltip overlay          | ✅ cairo window      | ❌ protocol blocks it  | Use notify-send as fallback on Wayland              |
+| Secure field detection   | ⚠️ AT-SPI2           | ❌ not standardised    | Keylogger disabled by default; opt-in only          |
+| Config UI                | ➡️ ergopti.com WebUI | ➡️ same                | No native GUI planned                               |
 
 ## Distribution support
 
 Target distributions: **Ubuntu 22.04+, Fedora 38+, Arch Linux, Debian 12+**.
 
 Requirements:
+
 - `uinput` kernel module loaded (`modprobe uinput`)
 - User in `input` group: `sudo usermod -aG input $USER` (re-login required)
 - OR udev rule: `KERNEL=="uinput", GROUP="input", MODE="0660"`
