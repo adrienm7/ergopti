@@ -1910,49 +1910,49 @@ description_key = "menu.gestures.swipe_3_down"
 
 [[features.hs.gestures]]
 id = "swipe_4_up"
-default = "mission_control"
+default = "none"
 type = "action"
 description_key = "menu.gestures.swipe_4_up"
 
 [[features.hs.gestures]]
 id = "swipe_4_down"
-default = "app_expose"
+default = "none"
 type = "action"
 description_key = "menu.gestures.swipe_4_down"
 
 [[features.hs.gestures]]
 id = "swipe_4_left"
-default = "space_next"
+default = "none"
 type = "action"
 description_key = "menu.gestures.swipe_4_left"
 
 [[features.hs.gestures]]
 id = "swipe_4_right"
-default = "space_prev"
+default = "none"
 type = "action"
 description_key = "menu.gestures.swipe_4_right"
 
 [[features.hs.gestures]]
 id = "swipe_5_up"
-default = "doc_start"
+default = "none"
 type = "action"
 description_key = "menu.gestures.swipe_5_up"
 
 [[features.hs.gestures]]
 id = "swipe_5_down"
-default = "doc_end"
+default = "none"
 type = "action"
 description_key = "menu.gestures.swipe_5_down"
 
 [[features.hs.gestures]]
 id = "swipe_5_left"
-default = "win_prev"
+default = "none"
 type = "action"
 description_key = "menu.gestures.swipe_5_left"
 
 [[features.hs.gestures]]
 id = "swipe_5_right"
-default = "win_next"
+default = "none"
 type = "action"
 description_key = "menu.gestures.swipe_5_right"
 

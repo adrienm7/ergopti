@@ -452,6 +452,54 @@ function checkWebUiAntiPatterns() {
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
+// Check 9 — macOS Gesture Defaults
+// ──────────────────────────────────────────────────────────────────────────────
+
+function checkMacOsGestureDefaults() {
+	const manifestPath = join(REPO_ROOT, 'static/ergopti_plus/shared/features/manifest.toml');
+	try {
+		const content = readFileSync(manifestPath, 'utf8');
+		// Only look at the hs.gestures section
+		const hsBlock = content.split('# ===== 5.1 hs.gestures =====')[1].split('# =================================')[0];
+		
+		const ids = ['swipe_4_up', 'swipe_4_down', 'swipe_4_left', 'swipe_4_right', 'swipe_5_up', 'swipe_5_down', 'swipe_5_left', 'swipe_5_right'];
+		
+		for (const id of ids) {
+			const regex = new RegExp(`id\\s*=\\s*"${id}"\\s*default\\s*=\\s*"([^"]+)"`, 'm');
+			const match = hsBlock.match(regex);
+			if (match && match[1] !== 'none') {
+				warn(manifestPath, null, `macOS gesture default for ${id} is "${match[1]}", expected "none".`);
+			}
+		}
+	} catch (e) { /* ignore */ }
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Check 10 — AHK String Escaping (v2 style)
+// ──────────────────────────────────────────────────────────────────────────────
+
+function checkAhkStringEscaping(file) {
+	const raw = readFileSync(file, 'utf8');
+	if (raw.includes('`"')) {
+		warn(file, null, `Found backtick-escaped quote (\`"). Prefer single-quoted strings '...' for cleaner Regex/literals in AHK v2.`);
+	}
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Check 11 — macOS Path Integrity
+// ──────────────────────────────────────────────────────────────────────────────
+
+function checkMacOsPathIntegrity() {
+	const kbdMenu = join(REPO_ROOT, 'static/ergopti_plus/macos/ui/menu/menu_keyboard_layout.lua');
+	try {
+		const content = readFileSync(kbdMenu, 'utf8');
+		if (content.includes('local BUNDLES_RELDIR = "../macos/bundles/"')) {
+			warn(kbdMenu, null, `BUNDLES_RELDIR is incorrect (relative to static/ergopti_plus/macos/). Use "../../ergopti/macos/bundles/".`);
+		}
+	} catch (e) { /* ignore */ }
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
 // Runner
 // ──────────────────────────────────────────────────────────────────────────────
 
@@ -524,6 +572,7 @@ if (FIX_SPACING) {
 for (const f of ahkAll) {
 	checkFileHeader(f);
 	checkAhkAntiPatterns(f);
+	checkAhkStringEscaping(f);
 }
 for (const f of luaAll) {
 	checkFileHeader(f);
@@ -536,6 +585,8 @@ for (const f of [...ahkAll, ...luaAll]) {
 }
 checkNoCoAuthor();
 checkWebUiAntiPatterns();
+checkMacOsGestureDefaults();
+checkMacOsPathIntegrity();
 
 // Report
 console.log('');
