@@ -78,6 +78,9 @@ global _I18nCacheEnLoaded := false
 global _I18nCacheFr := Map()
 global _I18nCacheFrLoaded := false
 
+; Map of locale code → boolean indicating if flag.png exists.
+global _I18nFlagExistsCache := Map()
+
 
 
 
@@ -163,7 +166,11 @@ _I18nLoadFile(FilePath) {
 	}
 
 	for Key, Val in Parsed {
-		_I18nCache[Key] := StrReplace(Val, "★", MagicKey)
+		; PERFORMANCE: skip StrReplace if no placeholder exists
+		if InStr(Val, "★")
+			_I18nCache[Key] := StrReplace(Val, "★", MagicKey)
+		else
+			_I18nCache[Key] := Val
 	}
 
 	_I18nCacheLoaded := true
@@ -199,7 +206,10 @@ _I18nLoadInto(Code, &Cache, &Loaded) {
 	}
 	TempCache := Map()
 	for Key, Val in Parsed {
-		TempCache[Key] := StrReplace(Val, "★", MagicKey)
+		if InStr(Val, "★")
+			TempCache[Key] := StrReplace(Val, "★", MagicKey)
+		else
+			TempCache[Key] := Val
 	}
 	Cache  := TempCache
 	Loaded := true
@@ -248,7 +258,11 @@ t(Key) {
 ; is already available in Cache. Safe to call multiple times — subsequent calls
 ; are ignored if the locale has not changed.
 I18nInit(Cache) {
-	global _I18nLocale, _I18nCacheLoaded
+	global _I18nLocale, _I18nCacheLoaded, _I18nFlagExistsCache
+	
+	if !IsSet(_I18nFlagExistsCache) || !(_I18nFlagExistsCache is Map)
+		_I18nFlagExistsCache := Map()
+
 	try LoggerTrace("i18n", "Initialising i18n…")
 	Raw := IniCacheGet(Cache, "script", "locale")
 	if Raw != "_" and Raw != "" {
@@ -336,7 +350,7 @@ _MakeLocaleSetter(Code) {
 ; Guarantees a stable display order regardless of the declaration order above.
 _I18nSortedLocales() {
 	global _I18nSortedLocalesCache
-	if _I18nSortedLocalesCache
+	if IsSet(_I18nSortedLocalesCache) and _I18nSortedLocalesCache
 		return _I18nSortedLocalesCache
 
 	Sorted := I18N_LOCALES.Clone()
@@ -364,6 +378,15 @@ _I18nSortedLocales() {
 ; @param LangMenu  Menu   The AHK Menu object to populate.
 I18nBuildLanguageMenu(LangMenu) {
 	global _I18nLocale, _StaticDir, _I18nFlagExistsCache
+	
+	; Safety initialization in case top-level auto-execute was bypassed
+	try {
+		if !IsSet(_I18nFlagExistsCache) || !(_I18nFlagExistsCache is Map)
+			_I18nFlagExistsCache := Map()
+	} catch {
+		_I18nFlagExistsCache := Map()
+	}
+		
 	try LangMenu.Delete()
 	FlagsDir := _StaticDir . "\img\flags\"
 	for Loc in _I18nSortedLocales() {
@@ -373,12 +396,17 @@ I18nBuildLanguageMenu(LangMenu) {
 		RegisterMenuItem(LangMenu, Label, _MakeLocaleSetter(Loc.Code))
 		
 		HasFlag := false
-		if _I18nFlagExistsCache.Has(Loc.Code) {
-			HasFlag := _I18nFlagExistsCache[Loc.Code]
-		} else {
+		try {
+			if _I18nFlagExistsCache.Has(Loc.Code) {
+				HasFlag := _I18nFlagExistsCache[Loc.Code]
+			} else {
+				FlagPath := FlagsDir . Loc.Code . ".png"
+				HasFlag := FileExist(FlagPath)
+				_I18nFlagExistsCache[Loc.Code] := HasFlag
+			}
+		} catch {
 			FlagPath := FlagsDir . Loc.Code . ".png"
 			HasFlag := FileExist(FlagPath)
-			_I18nFlagExistsCache[Loc.Code] := HasFlag
 		}
 		
 		if HasFlag
