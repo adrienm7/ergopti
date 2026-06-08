@@ -1368,17 +1368,26 @@ ModifyLink(gui, NewValue) {
     Reload
 }
 
+global _FmtCountCache := Map()
+
 ; Formats a number with spaces as thousands separators, matching HS fmt_count.
+; Uses a global cache to eliminate redundant string processing during menu builds.
 FmtCount(N) {
+    global _FmtCountCache
+    if _FmtCountCache.Has(N)
+        return _FmtCountCache[N]
+
     S := String(Round(N))
     Result := ""
-    loop StrLen(S) {
-        Pos := StrLen(S) - A_Index + 1
-        Result := SubStr(S, Pos, 1) . Result
-        if (Mod(A_Index, 3) == 0 and A_Index < StrLen(S)) {
+    Len := StrLen(S)
+    loop Len {
+        i := A_Index
+        Result := SubStr(S, Len - i + 1, 1) . Result
+        if (Mod(i, 3) == 0 and i < Len) {
             Result := " " . Result
         }
     }
+    _FmtCountCache[N] := Result
     return Result
 }
 

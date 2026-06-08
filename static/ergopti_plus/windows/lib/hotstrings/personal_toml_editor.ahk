@@ -129,16 +129,17 @@ NormaliseOutput(s) {
     return Result
 }
 
+global _ReadPersonalTomlCache := false
+
 ; Parse personal_hotstrings.toml into a structured object:
 ;   .sections_order  — Array of section names in meta order (or file order if no meta)
 ;   .sections        — Map(name → {description, entries[]})
 ;   .meta_description — string
-;
-; Strategy: normalise line endings to LF first so Trim and SubStr are reliable,
-; then parse line-by-line. sections_order and descriptions are extracted directly
-; from the raw file content with RegExMatch on the full string before the loop,
-; avoiding all CRLF / regex-anchor fragility.
 ReadPersonalToml() {
+    global _ReadPersonalTomlCache
+    if (_ReadPersonalTomlCache != false)
+        return _ReadPersonalTomlCache
+
     FilePath := PersonalTomlPath()
     Result := Map(
         "sections_order", [],
@@ -146,6 +147,7 @@ ReadPersonalToml() {
         "meta_description", t("editor.hotstrings.meta_desc"),
     )
     if !FileExist(FilePath) {
+        _ReadPersonalTomlCache := Result
         return Result
     }
 
@@ -254,14 +256,19 @@ ReadPersonalToml() {
             Seen[SecName] := true
         }
     }
+    _ReadPersonalTomlCache := Result
     return Result
 }
 
 ; Serialise the full TOML structure back to disk.
 ; Writes [_meta], [_meta.sections], then all [[section]] blocks.
 WritePersonalToml(Data) {
+    global _ReadPersonalTomlCache, _HS_GrandTotalCache
+    _ReadPersonalTomlCache := false ; Invalidate
+    _HS_GrandTotalCache := -1
     FilePath := PersonalTomlPath()
     Q := Chr(34)
+    ; ... rest of function ...
     Lines := []
 
     MetaDesc := Data.Has("meta_description") ? Data["meta_description"] : t("editor.hotstrings.meta_desc")
@@ -333,6 +340,8 @@ WritePersonalToml(Data) {
     return True
 }
 
+global _ReadPersonalInfoTomlCache := false
+
 ; Read personal_info.toml and populate the global PersonalInformation Map.
 ; Format:
 ;   [info]
@@ -343,7 +352,12 @@ WritePersonalToml(Data) {
 ;   …
 ; Missing file is silently skipped (defaults remain).
 ReadPersonalInfoToml(FilePath) {
-    global PersonalInformation
+    global PersonalInformation, _ReadPersonalInfoTomlCache
+    if (_ReadPersonalInfoTomlCache != false) {
+        PersonalInformation := _ReadPersonalInfoTomlCache.Clone()
+        return
+    }
+
     if !FileExist(FilePath) {
         return
     }
@@ -372,11 +386,13 @@ ReadPersonalInfoToml(FilePath) {
             }
         }
     }
+    _ReadPersonalInfoTomlCache := PersonalInformation.Clone()
 }
 
 ; Serialise PersonalInformation and PersonalInformationLetters to personal_info.toml.
 WritePersonalInfoToml(FilePath) {
-    global PersonalInformation, PersonalInformationLetters
+    global PersonalInformation, PersonalInformationLetters, _ReadPersonalInfoTomlCache
+    _ReadPersonalInfoTomlCache := false ; Invalidate
     Q := Chr(34)
     Lines := []
 

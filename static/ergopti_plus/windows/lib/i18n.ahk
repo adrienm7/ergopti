@@ -69,6 +69,9 @@ global _I18nReloadDebounceMs := 150
 global _I18nCache := Map()
 global _I18nCacheLoaded := false
 
+; Cached sorted locale list for the menu
+global _I18nSortedLocalesCache := false
+
 ; Fallback caches: English first, French second.
 global _I18nCacheEn := Map()
 global _I18nCacheEnLoaded := false
@@ -225,11 +228,12 @@ _I18nEnsureLoaded() {
 ; =============================
 ; =========================================
 
-; Return the localised string for the given dot-notation key.
+; Returns the localised string for the given dot-notation key.
 ; Falls back to the raw key name if the locale file is missing or the key is absent.
 t(Key) {
-	global _I18nCache, _I18nCacheEn, _I18nCacheEnLoaded, _I18nCacheFr, _I18nCacheFrLoaded
-	_I18nEnsureLoaded()
+	global _I18nCache, _I18nCacheLoaded, _I18nCacheEn, _I18nCacheEnLoaded, _I18nCacheFr, _I18nCacheFrLoaded
+	if !_I18nCacheLoaded
+		_I18nEnsureLoaded()
 	if _I18nCache.Has(Key)
 		return _I18nCache[Key]
 	if _I18nCacheEnLoaded and _I18nCacheEn.Has(Key)
@@ -331,6 +335,10 @@ _MakeLocaleSetter(Code) {
 ; Returns a copy of I18N_LOCALES sorted alphabetically by Name (case-insensitive).
 ; Guarantees a stable display order regardless of the declaration order above.
 _I18nSortedLocales() {
+	global _I18nSortedLocalesCache
+	if _I18nSortedLocalesCache
+		return _I18nSortedLocalesCache
+
 	Sorted := I18N_LOCALES.Clone()
 	n := Sorted.Length
 	Loop n - 1 {
@@ -344,6 +352,7 @@ _I18nSortedLocales() {
 			}
 		}
 	}
+	_I18nSortedLocalesCache := Sorted
 	return Sorted
 }
 
@@ -354,8 +363,7 @@ _I18nSortedLocales() {
 ;
 ; @param LangMenu  Menu   The AHK Menu object to populate.
 I18nBuildLanguageMenu(LangMenu) {
-	global _I18nLocale
-	global _StaticDir
+	global _I18nLocale, _StaticDir, _I18nFlagExistsCache
 	try LangMenu.Delete()
 	FlagsDir := _StaticDir . "\img\flags\"
 	for Loc in _I18nSortedLocales() {
@@ -363,9 +371,18 @@ I18nBuildLanguageMenu(LangMenu) {
 		; the value at call time rather than sharing the loop variable reference.
 		Label    := Loc.Name
 		RegisterMenuItem(LangMenu, Label, _MakeLocaleSetter(Loc.Code))
-		FlagPath := FlagsDir . Loc.Code . ".png"
-		if FileExist(FlagPath)
-			try LangMenu.SetIcon(Label, FlagPath)
+		
+		HasFlag := false
+		if _I18nFlagExistsCache.Has(Loc.Code) {
+			HasFlag := _I18nFlagExistsCache[Loc.Code]
+		} else {
+			FlagPath := FlagsDir . Loc.Code . ".png"
+			HasFlag := FileExist(FlagPath)
+			_I18nFlagExistsCache[Loc.Code] := HasFlag
+		}
+		
+		if HasFlag
+			try LangMenu.SetIcon(Label, FlagsDir . Loc.Code . ".png")
 		if Loc.Code == _I18nLocale
 			LangMenu.Check(Label)
 	}
