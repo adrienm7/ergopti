@@ -81,6 +81,7 @@ OnError(_FatalErrorHandler)
 #Include ../lib/layout/layout_altgr.ahk
 #Include ../lib/layout/layout_shift_caps.ahk
 #Include ../lib/tooltip.ahk
+#Include ../lib/updater.ahk
 ; json.ahk must precede i18n.ahk — _I18nLoadFile now delegates to JsonParse.
 #Include ../lib/registry.ahk
 #Include ../lib/json.ahk
@@ -143,6 +144,7 @@ InstallSendNoOps()
 #Include test_string_utils.ahk
 #Include test_registry.ahk
 #Include test_nav_layer_helpers.ahk
+#Include test_updater.ahk
 
 ; Shortcuts modules — dispatcher logic is testable without real hotkeys firing;
 ; the module files are #Include'd from within test_shortcuts.ahk itself so the
