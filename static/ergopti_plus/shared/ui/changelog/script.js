@@ -382,13 +382,12 @@ function selectRelease(idx) {
 
 /** Opens the currently selected release page on GitHub. */
 function openOnGitHub() {
-	if (!_currentReleaseUrl) {
+	var url = _currentReleaseUrl;
+	if (!url) {
 		// Fall back to the releases index.
-		var fallback = 'https://github.com/' + _ghOwner + '/' + _ghRepo + '/releases';
-		postBridgeMessage(JSON.stringify({ action: 'open_url', url: fallback }));
-		return;
+		url = 'https://github.com/' + _ghOwner + '/' + _ghRepo + '/releases';
 	}
-	postBridgeMessage(JSON.stringify({ action: 'open_url', url: _currentReleaseUrl }));
+	postBridgeMessage({ action: 'open_url', url: url });
 }
 
 /** HTML-escapes a plain text string for safe injection into innerHTML. */
