@@ -16,6 +16,13 @@ local hs     = hs
 local Logger = require("lib.logger")
 local LOG    = "hotstring_counter"
 
+local _count_cache = {}
+
+--- Invalidates the hotstring count cache.
+function M.invalidate_cache()
+	_count_cache = {}
+end
+
 
 
 
@@ -52,6 +59,8 @@ end
 --- @return number total Total hotstring count.
 --- @return table sections List of { name, count } per section.
 local function count_toml_hotstrings(path)
+	if _count_cache[path] then return _count_cache[path].total, _count_cache[path].sections end
+
 	local total = 0
 	local sections = {}
 	local current = nil
@@ -68,6 +77,8 @@ local function count_toml_hotstrings(path)
 		end
 	end
 	fh:close()
+
+	_count_cache[path] = { total = total, sections = sections }
 	return total, sections
 end
 
