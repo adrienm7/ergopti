@@ -1,4 +1,4 @@
-﻿; drivers/autohotkey/lib/toml_loader.ahk
+; drivers/autohotkey/lib/toml_loader.ahk
 
 ; ==============================================================================
 ; MODULE: TOML Loader
@@ -27,55 +27,6 @@ global _TomlCountCache   := Map()   ; key = CategoryName|SectionName → count
 
 ; Map of FilePath → Map(SectionId → Count)
 global _TomlFileSectionCounts := Map()
-
-; Helper to warm the section counts cache for a specific file.
-_TomlWarmFileCounts(FilePath) {
-    global _TomlFileSectionCounts
-    if _TomlFileSectionCounts.Has(FilePath)
-        return _TomlFileSectionCounts[FilePath]
-
-    Counts := Map()
-    if !FileExist(FilePath) {
-        _TomlFileSectionCounts[FilePath] := Counts
-        return Counts
-    }
-
-    CurrentSec := ""
-    loop parse, ReadTomlFile(FilePath), "`n", "`r" {
-        Line := Trim(A_LoopField, " `t")
-        if (Line == "" or SubStr(Line, 1, 1) == "#")
-            continue
-            
-        ; [[section]] or [section] header
-        if RegExMatch(Line, "^\[+([^\[\]]+)\]+$", &SectionMatch) {
-            CurrentSec := StrLower(Trim(SectionMatch[1]))
-            if !Counts.Has(CurrentSec)
-                Counts[CurrentSec] := 0
-            continue
-        }
-        
-        ; Match hotstring entry: key = value or key = { ... }
-        if (CurrentSec != "" and CurrentSec != "_meta" and CurrentSec != "_meta.sections") {
-            if RegExMatch(Line, '^(?:"[^"]+"|[A-Za-z0-9_.-]+)\s*=') {
-                Counts[CurrentSec] := Counts[CurrentSec] + 1
-            }
-        }
-    }
-
-    _TomlFileSectionCounts[FilePath] := Counts
-    return Counts
-}
-
-; Per-category hotstring group configuration (default delay + tooltip color),
-; populated lazily by ParseTomlGroupConfig and consumed by the tooltip and
-; per-group delay gating layers. Keyed by lowercase category name. Shape:
-;   {
-;       Delay:       Number | "",   ; file-level default delay in seconds
-;       Color:       String | "",   ; file-level tooltip color (hex e.g. "#e53935")
-;       ShowTooltip: true|"",       ; "" means unset (inherits default = true)
-;       Sections:    Map(name -> { Delay, Color, ShowTooltip, Description })
-;   }
-global HotstringGroupConfig := Map()
 
 ; Pre-compiled regex for a full TOML hotstring entry line. Defined once at
 ; module level so AHK does not recompile this ~100-char pattern for every line
@@ -132,7 +83,7 @@ _TomlWarmFileCounts(FilePath) {
         
         ; Match hotstring entry: key = value or key = { ... }
         if (CurrentSec != "" and CurrentSec != "_meta" and CurrentSec != "_meta.sections") {
-            if RegExMatch(Line, "^(?:`"[^`"]+`"|[A-Za-z0-9_.-]+)\s*=") {
+            if RegExMatch(Line, '^(?:"[^"]+"|[A-Za-z0-9_.-]+)\s*=') {
                 Counts[CurrentSec] := Counts[CurrentSec] + 1
             }
         }
@@ -207,28 +158,57 @@ _ParseTomlGroupConfig_InvalidatePath(FilePath) {
     }
 }
 
+; Unescape a TOML double-quoted string literal (\\, \", \n, \t, \r).
+; The generator at static/hotstrings/0_generate_hotstrings.py writes
+; trigger/output with these escapes, so we mirror the inverse transform here.
+UnescapeTomlString(s) {
+    Result := ""
+    i := 1
+    n := StrLen(s)
+    while i <= n {
+        c := SubStr(s, i, 1)
+        if (c == "\" and i < n) {
+            NextChar := SubStr(s, i + 1, 1)
+            if (NextChar == "\") {
+                Result .= "\"
+            } else if (NextChar == "`"") {
+                Result .= "`""
+            } else if (NextChar == "n") {
+                Result .= "`n"
+            } else if (NextChar == "t") {
+                Result .= "`t"
+            } else if (NextChar == "r") {
+                Result .= "`r"
+            } else {
+                Result .= NextChar
+            }
+            i += 2
+        } else {
+            Result .= c
+            i += 1
+        }
+    }
+    return Result
+}
+
+
+
+
+
+; ========================================================
+; ========================================================
+; ======= 2/ High-level hotstring section loading =======
+; ========================================================
+; ========================================================
+
 ; Register every hotstring of a given [[section]] defined inside a TOML file
 ; located under ..\hotstrings\<CategoryName>.toml (relative to the script).
 ; Hotstrings flagged as commented-out in TOML (line starting with "#") are
-; skipped, mirroring AHK source lines starting with ";". The loader reproduces
-; the exact behavior of CreateHotstring / CreateCaseSensitiveHotstrings: the
-; Python generator writes `is_case_sensitive = not case_sensitive`, so the
-; mapping back is:
-;   TOML is_case_sensitive = true  ➜ original call was CreateHotstring
-;   TOML is_case_sensitive = false ➜ original call was CreateCaseSensitiveHotstrings
+; skipped, mirroring AHK source lines starting with ";".
 LoadHotstringsSection(CategoryName, SectionName, FeatureConfig, ExtraOptions := Map()) {
-    global ScriptInformation, _GENERATED_HOTSTRINGS, _StaticDir
+    global ScriptInformation, _GENERATED_HOTSTRINGS, _SharedDir
 
-    ; Accept either shape transparently — Phase 5/7 of the sliced v2
-    ; cut-over migrated the if-gate reads to Features["hotstrings"]
-    ; [<cat>][<entry>] (v2 Maps) but the LoadHotstringsSection / generated
-    ; fast-path readers below were authored against the v1 object shape
-    ; ({Enabled, TimeActivationSeconds, ...}). Convert a v2 Map to an
-    ; equivalent v1-shape object right at the boundary so the rest of
-    ; the function (and the codegen'd fast paths in
-    ; lib/hotstrings/hotstrings_generated.ahk) keeps reading
-    ; ``FeatureConfig.PropertyName`` without modification. The generator
-    ; itself stays unchanged.
+    ; Accept either shape transparently
     if (IsObject(FeatureConfig) and Type(FeatureConfig) == "Map") {
         _V1Compat := { Enabled: false }
         if FeatureConfig.Has("enabled") {
@@ -243,11 +223,7 @@ LoadHotstringsSection(CategoryName, SectionName, FeatureConfig, ExtraOptions := 
         FeatureConfig := _V1Compat
     }
 
-    ; Per-group delay gating — override the per-feature TimeActivationSeconds
-    ; with the value resolved from the TOML metadata + user override file.
-    ; This makes the gating identical across drivers without having to keep
-    ; a separate config table per feature. The same FeatureConfig field is
-    ; consumed by both the regex fallback below and the generated fast path.
+    ; Per-group delay gating
     try {
         Resolved := HotstringsResolve(CategoryName, SectionName)
         if (Resolved.Delay != "") {
@@ -255,10 +231,7 @@ LoadHotstringsSection(CategoryName, SectionName, FeatureConfig, ExtraOptions := 
         }
     }
 
-    ; Fast path — bundled categories were pre-compiled to literal AHK calls by
-    ; ``tools/compile_hotstrings.py``. The generated loader registers the
-    ; hotstrings directly without touching the TOML file or regex parser.
-    ; ``personal`` is deliberately excluded: it can live outside the repo.
+    ; Fast path — bundled categories pre-compiled to literal AHK calls
     LoaderKey := StrLower(CategoryName) . "." . StrLower(SectionName)
     if (IsSet(_GENERATED_HOTSTRINGS)
     and StrLower(CategoryName) != "personal"
@@ -270,8 +243,6 @@ LoadHotstringsSection(CategoryName, SectionName, FeatureConfig, ExtraOptions := 
         return
     }
 
-    ; For the personal category, honour the user-configured path so the file can
-    ; live outside the Ergopti repository (e.g. in a private config folder).
     if (StrLower(CategoryName) == "personal"
     and IsSet(ScriptInformation)
     and ScriptInformation.Has("PersonalTomlPath")) {
@@ -287,8 +258,7 @@ LoadHotstringsSection(CategoryName, SectionName, FeatureConfig, ExtraOptions := 
     try LoggerTrace("TomlLoader", "Loading section [{1}.{2}]…", CategoryName, SectionName)
     Loaded := 0
 
-    TimeActivationSeconds := FeatureConfig.HasOwnProp("TimeActivationSeconds") ? FeatureConfig.TimeActivationSeconds :
-        0
+    TimeActivationSeconds := FeatureConfig.HasOwnProp("TimeActivationSeconds") ? FeatureConfig.TimeActivationSeconds : 0
     TargetSection := StrLower(SectionName)
     CurrentSection := ""
 
@@ -298,51 +268,30 @@ LoadHotstringsSection(CategoryName, SectionName, FeatureConfig, ExtraOptions := 
         if (Line == "" or SubStr(Line, 1, 1) == "#") {
             continue
         }
-
-        ; Match [[section]] or [section]
         if RegExMatch(Line, "^\[+([^\[\]]+)\]+$", &SectionMatch) {
             CurrentSection := StrLower(Trim(SectionMatch[1]))
             continue
         }
-
         if (CurrentSection != TargetSection) {
             continue
         }
-
         if !RegExMatch(Line, _HOTSTRING_ENTRY_PATTERN, &Match) {
             continue
         }
 
         Trigger := UnescapeTomlString(Match[1])
         Output := UnescapeTomlString(Match[2])
-        ; The TOML stores the magic key as the literal ``★`` character because
-        ; that is the default; at runtime the user may have re-bound it via the
-        ; tray menu, so translate it back to the current ``ScriptInformation``
-        ; value before registering the hotstring.
         Trigger := StrReplace(Trigger, "★", ScriptInformation["MagicKey"])
         IsWord := (Match[3] == "true")
         AutoExpand := (Match[4] == "true")
         IsCaseSens := (Match[5] == "true")
         FinalResult := (Match[6] == "true")
-        ; RegExMatch leaves unmatched optional groups as an empty string in
-        ; AHK v2, so compare against "true" — that correctly yields False when
-        ; the field is absent from the TOML entry (the generator default).
         StrictCase := (Match[7] == "true")
 
         Flags := ""
-        if AutoExpand {
-            Flags .= "*"
-        }
-        if !IsWord {
-            Flags .= "?"
-        }
-        ; Re-apply the original AHK ``C`` flag when the generator recorded a
-        ; strict case-sensitive match. Without this, a trigger like ``OUi``
-        ; would be matched case-insensitively at runtime and typing ``oui``
-        ; would erroneously fire the replacement.
-        if StrictCase {
-            Flags .= "C"
-        }
+        if AutoExpand { Flags .= "*" }
+        if !IsWord { Flags .= "?" }
+        if StrictCase { Flags .= "C" }
 
         Options := Map(
             "TimeActivationSeconds", TimeActivationSeconds,
@@ -354,11 +303,6 @@ LoadHotstringsSection(CategoryName, SectionName, FeatureConfig, ExtraOptions := 
             Options["OnlyText"] := ExtraOptions["OnlyText"]
         }
 
-        ; Counter-intuitive mapping — see header comment lines 87-90.
-        ; The Python generator writes ``is_case_sensitive = not case_sensitive``
-        ; so ``true`` here means we want the case-INSENSITIVE single-variant
-        ; ``CreateHotstring``, while ``false`` means we want all uppercase /
-        ; titlecase variants generated by ``CreateCaseSensitiveHotstrings``.
         if IsCaseSens {
             CreateHotstring(Flags, Trigger, Output, Options)
         } else {
@@ -371,8 +315,6 @@ LoadHotstringsSection(CategoryName, SectionName, FeatureConfig, ExtraOptions := 
 }
 
 ; Load all hotstring entries from every [[section]] in an arbitrary TOML file.
-; Used for personal extension packs dropped in the hotstrings\ folder.
-; All sections are loaded unconditionally (no per-section enable/disable toggle).
 LoadExtTomlFile(FilePath, CategoryLabel) {
     global ScriptInformation, _HOTSTRING_ENTRY_PATTERN
     if !FileExist(FilePath) {
@@ -383,14 +325,12 @@ LoadExtTomlFile(FilePath, CategoryLabel) {
     TotalLoaded := 0
     CurrentSection := ""
     SplitPath FilePath, , , , &CategoryName
-    FeatConf := { Enabled: true, TimeActivationSeconds: 0 }
     FileContent := ReadTomlFile(FilePath)
     loop parse, FileContent, "`n", "`r" {
         Line := Trim(A_LoopField, " `t")
         if (Line == "" or SubStr(Line, 1, 1) == "#") {
             continue
         }
-        ; Match [[section]] or [section]
         if RegExMatch(Line, "^\[+([^\[\]]+)\]+$", &SecM) {
             CurrentSection := StrLower(Trim(SecM[1]))
             continue
@@ -398,13 +338,10 @@ LoadExtTomlFile(FilePath, CategoryLabel) {
         if (CurrentSection == "") {
             continue
         }
-        ; Match hotstring entry: key = value or key = { ... }
         if !RegExMatch(Line, '^(?:"[^"]+"|[A-Za-z0-9_.-]+)\s*=') {
             continue
         }
         if !RegExMatch(Line, _HOTSTRING_ENTRY_PATTERN, &Match) {
-            ; Simple format: "trigger" = "replacement" (not supported by full regex)
-            ; Try to extract just trigger and output for simple entries
             if RegExMatch(Line, 'i)^(?:"([^"]+)"|([A-Za-z0-9_.-]+))\s*=\s*"([^"]+)"', &SimpleM) {
                 Trigger := (SimpleM[1] != "") ? SimpleM[1] : SimpleM[2]
                 Output  := SimpleM[3]
@@ -424,18 +361,10 @@ LoadExtTomlFile(FilePath, CategoryLabel) {
         FinalResult := (Match[6] == "true")
         StrictCase := (Match[7] == "true")
         Flags := ""
-        if AutoExpand {
-            Flags .= "*"
-        }
-        if !IsWord {
-            Flags .= "?"
-        }
-        if StrictCase {
-            Flags .= "C"
-        }
-        ; Only flag as repeat when the trigger contains the magic-key marker — plain
-        ; text corrections in repeatcorrections (e.g. "ccê" → "ccu") must bypass
-        ; the repeat-specific word-position check that blocks 1st-letter firing.
+        if AutoExpand { Flags .= "*" }
+        if !IsWord { Flags .= "?" }
+        if StrictCase { Flags .= "C" }
+        
         SectionName := CurrentSection
         IsRepeat := (StrLower(CategoryName) == "magickey" and SectionName == "repeatcorrections"
             and InStr(Trigger, ScriptInformation["MagicKey"]) > 0)
@@ -450,10 +379,7 @@ LoadExtTomlFile(FilePath, CategoryLabel) {
     try LoggerSuccess("TomlLoader", "Extension TOML '{1}': {2} entry(ies) loaded.", CategoryLabel, TotalLoaded)
 }
 
-; Fold common French accented characters to their ASCII equivalent, then
-; lowercase. Used to match the lowercase-only TOML metadata keys (e.g.
-; ``ie``) against the PascalCase Features Map keys that may contain
-; accents (e.g. ``IÉ`` in SFBsReduction).
+; Fold common French accented characters to their ASCII equivalent.
 FoldAsciiLower(Str) {
     Result := StrLower(Str)
     Result := StrReplace(Result, "à", "a")
@@ -476,27 +402,12 @@ FoldAsciiLower(Str) {
 
 
 
-; Parse the ``[_meta]`` and ``[_meta.sections.<name>]`` blocks of a category
-; TOML to extract the file-level and per-section default delay (seconds) and
-; tooltip color (hex). The result is cached in ``HotstringGroupConfig``.
-;
-; When FilePath is provided the file is loaded directly from that path and
-; cached by the absolute path — this supports extension TOMLs and any
-; personal hotstring file without requiring a category name. When FilePath is
-; empty the path is resolved from CategoryName as before.
-;
-; Recognised keys:
-;   [_meta]                       delay = <number>     color = "<hex>"
-;   [_meta.sections.<name>]       delay = <number>     color = "<hex>"
-;                                 description = "<...>"
-;
-ParseTomlGroupConfig(CategoryName, FilePath := "") {
-    global ScriptInformation, HotstringGroupConfig, _StaticDir
-    LowerCat := StrLower(CategoryName)
+; Parse the ``[_meta]`` and ``[_meta.sections.<name>]`` blocks of a category TOML.
+global HotstringGroupConfig := Map()
 
-    ; When a direct path is given, use it as the cache key so different files
-    ; with the same category name (e.g. multiple personal TOML files) are kept
-    ; separately.
+ParseTomlGroupConfig(CategoryName, FilePath := "") {
+    global ScriptInformation, HotstringGroupConfig, _SharedDir
+    LowerCat := StrLower(CategoryName)
     CacheKey := (FilePath != "") ? FilePath : LowerCat
     if HotstringGroupConfig.Has(CacheKey) {
         return HotstringGroupConfig[CacheKey]
@@ -518,7 +429,7 @@ ParseTomlGroupConfig(CategoryName, FilePath := "") {
         return Config
     }
 
-    Mode := ""              ; "" | "meta" | "meta_section"
+    Mode := ""
     CurrentSec := ""
 
     FileContent := ReadTomlFile(FilePath)
@@ -527,13 +438,9 @@ ParseTomlGroupConfig(CategoryName, FilePath := "") {
         if (Line == "" or SubStr(Line, 1, 1) == "#") {
             continue
         }
-
-        ; Stop scanning as soon as the first hotstring payload section starts —
-        ; everything below is per-entry data, not metadata.
         if (SubStr(Line, 1, 2) == "[[") {
             break
         }
-
         if RegExMatch(Line, "^\[_meta\.sections\.([A-Za-z0-9_\-]+)\]$", &SecMatch) {
             Mode := "meta_section"
             CurrentSec := StrLower(SecMatch[1])
@@ -552,7 +459,6 @@ ParseTomlGroupConfig(CategoryName, FilePath := "") {
             continue
         }
         if RegExMatch(Line, "^\[([^\[\]]+)\]$", &HeaderMatch) {
-            ; Any other [...] header (including [_meta.sections]) ends our scope.
             Mode := ""
             CurrentSec := ""
             continue
@@ -578,10 +484,6 @@ ParseTomlGroupConfig(CategoryName, FilePath := "") {
                 Sec.Description := UnescapeTomlString(DescMatch[1])
             }
         } else if (Mode == "meta_section_delays") {
-            ; [_meta.section_delays] — each ``section = <seconds>`` line sets that
-            ; section's delay override, read into the same Sections map that
-            ; HotstringsResolve consults via TomlSec.Delay (precedence: user >
-            ; section > group > global default).
             if RegExMatch(Line, "^([A-Za-z0-9_\-]+)\s*=\s*([0-9]+(?:\.[0-9]+)?)\s*$", &SDMatch) {
                 SDKey := StrLower(SDMatch[1])
                 if !Config.Sections.Has(SDKey) {
@@ -596,117 +498,7 @@ ParseTomlGroupConfig(CategoryName, FilePath := "") {
     return Config
 }
 
-; Count hotstring entries inside a specific [[section]] of a TOML category file.
-; Returns 0 when the file or section does not exist.
-; Uses the same ReadTomlFile cache to avoid redundant disk reads.
-; When FilePath is provided the file is loaded directly (for extensions or
-; multi-file personal hotstrings); CategoryName is used only for cache keying
-; when FilePath is empty.
-CountTomlSection(CategoryName, SectionName, FilePath := "") {
-    global ScriptInformation, _TomlCountCache, _StaticDir
-    CacheKey := (FilePath != "" ? FilePath : StrLower(CategoryName)) . "|" . StrLower(SectionName)
-    if _TomlCountCache.Has(CacheKey)
-        return _TomlCountCache[CacheKey]
-    if (FilePath == "") {
-        if (StrLower(CategoryName) == "personal"
-        and IsSet(ScriptInformation)
-        and ScriptInformation.Has("PersonalTomlPath")) {
-            FilePath := ScriptInformation["PersonalTomlPath"]
-        } else {
-            FilePath := _SharedDir . "\hotstrings\" . StrLower(CategoryName) . ".toml"
-        }
-    }
-    if !FileExist(FilePath) {
-        _TomlCountCache[CacheKey] := 0
-        return 0
-    }
-    Count := 0
-    Q := Chr(34)
-    TargetSection := StrLower(SectionName)
-    CurrentSection := ""
-    loop parse, ReadTomlFile(FilePath), "`n", "`r" {
-        Line := Trim(A_LoopField, " `t")
-        if (Line == "" or SubStr(Line, 1, 1) == "#") {
-            continue
-        }
-        ; Match [[section]] or [section]
-        if RegExMatch(Line, "^\[+([^\[\]]+)\]+$", &SectionMatch) {
-            CurrentSection := StrLower(Trim(SectionMatch[1]))
-            continue
-        }
-        if (SubStr(Line, 1, 1) == "[") {
-            CurrentSection := ""
-            continue
-        }
-        if (CurrentSection == TargetSection) {
-            ; Match hotstring entry: key = value or key = { ... }
-            if RegExMatch(Line, "^(?:`"[^`"]+`"|[A-Za-z0-9_.-]+)\s*=") {
-                Count++
-            }
-        }
-    }
-    _TomlCountCache[CacheKey] := Count
-    return Count
-}
-
-; Count all hotstring entries across every [[section]] in a TOML category file.
-; Returns 0 when the file does not exist or contains no matching entries.
-; Uses the same ReadTomlFile cache as the rest of the loader to avoid double I/O.
-; When FilePath is provided the file is loaded directly (for extensions or
-; multi-file personal hotstrings); CategoryName is used only for cache keying
-; when FilePath is empty.
-CountTomlHotstrings(CategoryName, FilePath := "") {
-    global ScriptInformation, _TomlCountCache, _StaticDir
-    CacheKey := (FilePath != "" ? FilePath : StrLower(CategoryName)) . "|*"
-    if _TomlCountCache.Has(CacheKey)
-        return _TomlCountCache[CacheKey]
-    if (FilePath == "") {
-        if (StrLower(CategoryName) == "personal"
-        and IsSet(ScriptInformation)
-        and ScriptInformation.Has("PersonalTomlPath")) {
-            FilePath := ScriptInformation["PersonalTomlPath"]
-        } else {
-            FilePath := _SharedDir . "\hotstrings\" . StrLower(CategoryName) . ".toml"
-        }
-    }
-    if !FileExist(FilePath) {
-        _TomlCountCache[CacheKey] := 0
-        return 0
-    }
-    Count := 0
-    Q := Chr(34)
-    InSec := false
-    loop parse, ReadTomlFile(FilePath), "`n", "`r" {
-        Line := Trim(A_LoopField, " `t")
-        if (Line == "" or SubStr(Line, 1, 1) == "#") {
-            continue
-        }
-        ; Match [[section]] or [section]
-        if RegExMatch(Line, "^\[+([^\[\]]+)\]+$", &SectionMatch) {
-            SecName := StrLower(Trim(SectionMatch[1]))
-            InSec := (SecName != "_meta" and SecName != "_meta.sections" and SecName != "_meta.section_delays")
-            continue
-        }
-        if (InSec) {
-            ; Match hotstring entry: key = value or key = { ... }
-            if RegExMatch(Line, "^(?:`"[^`"]+`"|[A-Za-z0-9_.-]+)\s*=") {
-                Count++
-            }
-        }
-    }
-    _TomlCountCache[CacheKey] := Count
-    return Count
-}
-
-
-
-
-
-; Read the sections_order array from the [_meta] block of a shared hotstrings
-; TOML file (e.g. rolls.toml).  Returns an Array whose elements are either a
-; section-name string or the sentinel string "-" (visual separator).
-; Returns an empty Array when the file does not exist or has no sections_order.
-; Uses the ReadTomlFile cache to avoid double I/O.
+; Read sections_order array from [_meta] block.
 ReadTomlSectionsOrder(CategoryName, FilePath := "") {
     global _SharedDir
     if (FilePath == "") {
@@ -721,18 +513,16 @@ ReadTomlSectionsOrder(CategoryName, FilePath := "") {
         if (Line == "" or SubStr(Line, 1, 1) == "#") {
             continue
         }
-        ; Enter / leave the [_meta] block
         if (Line == "[_meta]") {
             InMeta := true
             continue
         }
         if (InMeta and SubStr(Line, 1, 1) == "[") {
-            break  ; Left _meta block — sections_order not found
+            break
         }
         if !InMeta {
             continue
         }
-        ; Match: sections_order = ["a", "b", "-", "c"]
         if !RegExMatch(Line, "^sections_order\s*=\s*\[(.+)\]", &M) {
             continue
         }
@@ -748,36 +538,14 @@ ReadTomlSectionsOrder(CategoryName, FilePath := "") {
     return []
 }
 
-
-
-
-
-; ==========================================
-; ==========================================
-; ======= User config.toml overrides =======
-; ==========================================
-; ==========================================
-
-; Coerce a raw TOML literal into the appropriate AHK type:
-;   - "true" / "false"      → boolean (1 / 0, matching Features.Enabled style)
-;   - bare integer / float  → number
-;   - "..." quoted string   → unescaped string
-;   - anything else         → raw literal as-is
+; Coerce raw TOML literal into appropriate AHK type.
 TomlCoerceValue(Raw) {
     Trimmed := Trim(Raw, " `t")
     Lower := StrLower(Trimmed)
-    if (Lower == "true") {
-        return 1
-    }
-    if (Lower == "false") {
-        return 0
-    }
-    if RegExMatch(Trimmed, "^-?\d+$") {
-        return Integer(Trimmed)
-    }
-    if RegExMatch(Trimmed, "^-?\d+\.\d+$") {
-        return Float(Trimmed)
-    }
+    if (Lower == "true") { return 1 }
+    if (Lower == "false") { return 0 }
+    if RegExMatch(Trimmed, "^-?\d+$") { return Integer(Trimmed) }
+    if RegExMatch(Trimmed, "^-?\d+\.\d+$") { return Float(Trimmed) }
     Q := Chr(34)
     if (StrLen(Trimmed) >= 2 and SubStr(Trimmed, 1, 1) == Q
     and SubStr(Trimmed, StrLen(Trimmed), 1) == Q) {
@@ -785,4 +553,3 @@ TomlCoerceValue(Raw) {
     }
     return Trimmed
 }
-

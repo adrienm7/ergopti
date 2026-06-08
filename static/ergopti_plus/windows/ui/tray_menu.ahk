@@ -1139,11 +1139,15 @@ _HS_CategoriesErgopti(M, _Cat) {
 ; Dynamic handler: personal hotstrings (personal_hotstrings.toml + ext tree).
 global _PersonalExtTree := Map()
 global _ExtTotalPersonalCounterGlobal := { value: 0 }
+global _HS_PreScanPersonalCacheLoaded := false
 
 ; Pre-scans the personal hotstrings directory to build the tree and sum counts
 ; so they are available for menu labels and the grand total at build time.
 _HS_PreScanPersonal() {
-	global ScriptInformation, _PersonalExtTree, _ExtTotalPersonalCounterGlobal
+	global ScriptInformation, _PersonalExtTree, _ExtTotalPersonalCounterGlobal, _HS_PreScanPersonalCacheLoaded
+	if _HS_PreScanPersonalCacheLoaded
+		return
+
 	_PersonalExtTree := Map()
 	_ExtTotalPersonalCounterGlobal.value := 0
 
@@ -1175,6 +1179,13 @@ _HS_PreScanPersonal() {
 		}
 	}
 	_HS_ScanExt(RegExReplace(HsDir, "[/\\]+$"), [])
+	_HS_PreScanPersonalCacheLoaded := true
+}
+
+_HS_InvalidatePersonalCache() {
+	global _HS_PreScanPersonalCacheLoaded, _ParseExtTomlSectionsCache
+	_HS_PreScanPersonalCacheLoaded := false
+	_ParseExtTomlSectionsCache := Map()
 }
 
 _HS_GetOrCreateNode(Root, PathParts) {
