@@ -29,6 +29,6 @@ helpers.describe("LLM Models Catalogue", function()
         }
 		local obj = Models.new(deps)
 		helpers.assert_true(type(obj) == "table", "Models.new should return an object")
-		helpers.assert_true(type(obj.build) == "function", "obj.build should be a function")
+		helpers.assert_true(type(obj.get_presets) == "function", "obj.get_presets should be a function")
 	end)
 end)
