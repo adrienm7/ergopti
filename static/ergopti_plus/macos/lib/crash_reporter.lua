@@ -272,13 +272,15 @@ function M.prompt_user(report)
 	if path then
 		Logger.success(LOG, "Crash report saved at '%s'.", path)
 		-- Show only the path — no confirmation needed, report is local-only
-		pcall(hs.dialog.blockAlert,
+		local dialog = require("lib.dialog_util")
+		pcall(dialog.block_alert,
 			i18n.get("crash.report.saved_title"),
 			path,
 			i18n.get("button.ok"), "", "NSInformationalAlertStyle")
 	else
 		Logger.warn(LOG, "Crash report could not be saved.")
-		pcall(hs.dialog.blockAlert,
+		local dialog = require("lib.dialog_util")
+		pcall(dialog.block_alert,
 			i18n.get("crash.report.save_failed"),
 			"",
 			i18n.get("button.ok"), "", "NSCriticalAlertStyle")

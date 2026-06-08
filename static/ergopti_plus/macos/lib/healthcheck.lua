@@ -266,8 +266,8 @@ function M.show_window()
 	local ok_wv, wv = pcall(hs.webview.new, frame, { developerExtrasEnabled = false })
 	if not ok_wv or not wv then
 		Logger.error(LOG, "Failed to create healthcheck webview: %s.", tostring(wv))
-		pcall(hs.focus)
-		hs.dialog.blockAlert(title, plain, "OK")
+		local dialog = require("lib.dialog_util")
+		dialog.block_alert(title, plain, "OK")
 		return
 	end
 

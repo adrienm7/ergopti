@@ -169,7 +169,8 @@ function M.install_extension()
 	write_file(pkg_path, PACKAGE_JSON)
 	write_file(ext_path, EXTENSION_JS)
 	Logger.info(LOG, string.format("Extension installed in %s.", EXT_DIR))
-	hs.alert.show(i18n.get("vscode.reload_required"), 4)
+	local dialog = require("lib.dialog_util")
+	dialog.alert(i18n.get("vscode.reload_required"), 4)
 	return true
 end
 

@@ -209,31 +209,6 @@ local function load_disk_cache()
 	return data
 end
 
-local function raise_now(wv)
-	if not wv then return end
-	pcall(function() wv:show() end)
-	pcall(hs.focus)
-	local ok, win = pcall(function() return wv:hswindow() end)
-	if ok and win then pcall(function() win:focus() end) end
-end
-
-local function poll_and_set_behavior(wv, attempts)
-	if not wv then return end
-	local ok, win = pcall(function() return wv:hswindow() end)
-	if ok and win then
-		local beh    = (hs.drawing and hs.drawing.windowBehaviors) or {}
-		local target = (beh.managed or 4) + (beh.participatesInCycle or 32)
-		pcall(function() wv:behavior(target) end)
-		pcall(function() win:focus() end)
-		pcall(hs.focus)
-	elseif attempts > 0 then
-		hs.timer.doAfter(0.05, function() poll_and_set_behavior(wv, attempts - 1) end)
-	end
-end
-
-
-
-
 -- ====================================
 --- ===============================
 -- ======= 4/ Data refresh =======
@@ -417,9 +392,6 @@ function M.show()
 		M._ingest_listener_registered = true
 		Logger.debug(LOG, "Post-ingest live-update listener registered.")
 	end
-
-	raise_now(M._wv)
-	poll_and_set_behavior(M._wv, 20)
 
 	hs.timer.doAfter(0.05, function()
 		local had_cache     = prefill_from_disk_cache()

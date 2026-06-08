@@ -216,26 +216,34 @@ function M.force_focus(wv, is_new)
 	end
 
 	-- Bring to front and request system focus.
-	-- bringToFront() alone is used when hswindow() returns nil (window not yet
-	-- composited by the OS) to avoid calling raise/focus on a nil handle.
-	hs.timer.doAfter(0.05, function()
-		if type(wv.hswindow) ~= "function" then
-			pcall(function() wv:bringToFront() end)
-			pcall(hs.focus)
-			Logger.info(LOG, "Window focus applied (bringToFront fallback).")
-			return
-		end
+	-- We use a retry mechanism because hswindow() might return nil while the
+	-- window is still being composited by the OS.
+	local attempts = 0
+	local max_attempts = 20
+	local function try_focus()
+		if not wv then return end
 		local ok, win = pcall(function() return wv:hswindow() end)
+		
 		if ok and win and type(win.focus) == "function" then
+			-- Best case: we have a window handle.
 			pcall(function() win:moveToScreen(hs.screen.mainScreen()) end)
-			pcall(function() win:focus() end)
+			pcall(function() win:raise() end) -- Ensure top of Z-order
+			pcall(function() win:focus() end) -- Capture keyboard focus
+			pcall(function() hs.focus(true) end) -- Force Hammerspoon app to foreground
+			Logger.info(LOG, "Window focus applied successfully (attempt %d).", attempts + 1)
+		elseif attempts < max_attempts then
+			-- Handle not ready yet: retry shortly.
+			attempts = attempts + 1
+			hs.timer.doAfter(0.05, try_focus)
 		else
-			-- hswindow() returned nil — window not yet composited; bringToFront is safe
-			pcall(function() wv:bringToFront() end)
+			-- Final fallback: if no window handle after 1s, use the webview-level bringToFront.
+			pcall(function() wv:bringToFront(true) end)
+			pcall(function() hs.focus(true) end)
+			Logger.warn(LOG, "Window focus applied via bringToFront fallback after %d attempts.", max_attempts)
 		end
-		pcall(hs.focus)
-		Logger.info(LOG, "Window focus applied.")
-	end)
+	end
+
+	try_focus()
 end
 
 --- Centralized factory to create a webview window with consistent properties.
@@ -269,7 +277,8 @@ function M.show_webview(opts)
 		pcall(function() wv:windowStyle((masks["titled"] or 1) + (masks["closable"] or 2) + (masks["utility"] or 16)) end)
 	end
 	
-	pcall(function() wv:level(opts.level or hs.drawing.windowLevels.normal) end)
+	-- DEFAULT TO FLOATING: Ensures Ergopti UIs appear on top of other apps.
+	pcall(function() wv:level(opts.level or hs.drawing.windowLevels.floating) end)
 	pcall(function() wv:allowTextEntry(opts.allow_text_entry ~= false) end)
 	
 	pcall(function() wv:allowGestures(opts.allow_gestures == true) end)
