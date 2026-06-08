@@ -573,6 +573,7 @@
 	"menu.debug.window_spy": "Window Spy",
 	"menu.extensions.empty": "Yüklü uzantı yok",
 	"menu.extensions.header": "Uzantılar",
+	"menu.gestures.action_disabled": "∅ Disabled",
 	"menu.gestures.action_prefix": "Eylem: ",
 	"menu.gestures.auto_configure": "🔧 Otomatik yapılandır (kayıt defteri)",
 	"menu.gestures.change_action": "Eylemi değiştir",

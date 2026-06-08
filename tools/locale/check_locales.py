@@ -37,10 +37,11 @@ from pathlib import Path
 # ====================================
 # ====================================
 
-# Locale directory lives at <repo>/static/locales/ and the canonical reference
-# is en.json — every other file must mirror its key set exactly.
+# Locale directory lives at <repo>/static/ergopti_plus/shared/locales/ and the
+# canonical reference is en.json — every other file must mirror its key set exactly.
 SCRIPT_DIR   = Path(__file__).resolve().parent
-LOCALES_DIR  = SCRIPT_DIR.parent / "static" / "locales"
+REPO_ROOT    = SCRIPT_DIR.parent.parent
+LOCALES_DIR  = REPO_ROOT / "static" / "ergopti_plus" / "shared" / "locales"
 REFERENCE    = "en"
 
 

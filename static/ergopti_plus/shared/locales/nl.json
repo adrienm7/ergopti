@@ -573,6 +573,7 @@
 	"menu.debug.window_spy": "Window Spy",
 	"menu.extensions.empty": "Geen extensie geïnstalleerd",
 	"menu.extensions.header": "Extensies",
+	"menu.gestures.action_disabled": "∅ Disabled",
 	"menu.gestures.action_prefix": "Actie: ",
 	"menu.gestures.auto_configure": "🔧 Automatisch configureren (register)",
 	"menu.gestures.change_action": "Actie wijzigen",

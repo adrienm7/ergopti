@@ -573,6 +573,7 @@
 	"menu.debug.window_spy": "Window Spy",
 	"menu.extensions.empty": "Inget tillägg installerat",
 	"menu.extensions.header": "Tillägg",
+	"menu.gestures.action_disabled": "∅ Disabled",
 	"menu.gestures.action_prefix": "Åtgärd: ",
 	"menu.gestures.auto_configure": "🔧 Automatisk konfiguration (register)",
 	"menu.gestures.change_action": "Ändra åtgärd",
