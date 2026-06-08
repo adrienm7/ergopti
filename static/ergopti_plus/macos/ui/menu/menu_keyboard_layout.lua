@@ -39,7 +39,7 @@ local LOG           = "menu.keyboard_layout"
 
 -- Path of the bundles directory relative to the Hammerspoon driver root.
 -- Resolved at runtime against base_dir (which already ends with "/")
-local BUNDLES_RELDIR = "../macos/bundles/"
+local BUNDLES_RELDIR = "../../ergopti/macos/bundles/"
 
 -- Target install paths on macOS
 local USER_LAYOUTS_DIR   = os.getenv("HOME") and (os.getenv("HOME") .. "/Library/Keyboard Layouts/") or "~/Library/Keyboard Layouts/"

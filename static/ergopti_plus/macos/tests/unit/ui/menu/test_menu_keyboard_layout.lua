@@ -53,6 +53,16 @@ helpers.describe("menu_keyboard_layout.pick_latest_bundle", function()
 	helpers.it("returns nil when the directory has no Ergopti bundles", function()
 		helpers.assert_nil(kbd.pick_latest_bundle("/no/such/dir/here/"))
 	end)
+
+	helpers.it("can find actual bundles in the repository via the production BUNDLES_RELDIR", function()
+		-- base_dir for hammerspoon is static/ergopti_plus/macos/
+		local driver_root = helpers.driver_root()
+		-- BUNDLES_RELDIR is ../../ergopti/macos/bundles/
+		local bundles_dir = driver_root .. "../../ergopti/macos/bundles/"
+		local latest = kbd.pick_latest_bundle(bundles_dir)
+		helpers.assert_true(type(latest) == "string" and latest:match("^Ergopti_v[%d%.]+%.bundle$") ~= nil,
+			"Expected to find a bundle in the real repository path: " .. bundles_dir)
+	end)
 end)
 
 
