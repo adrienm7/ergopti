@@ -822,7 +822,6 @@ hs.shutdownCallback = function()
 	-- 5. Kill orphan child processes
 	pcall(hs.execute, "pkill -f 'ergopti_plus_expander'", true)
 	pcall(hs.execute, "pkill -f 'ergopti_plus_http_server'", true)
-end
 	-- parent dies abruptly. Kill any mlx_lm.server still bound to port 49317
 	-- so the next reload starts from a clean slate.
 	pcall(hs.execute,

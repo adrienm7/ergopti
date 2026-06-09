@@ -91,7 +91,7 @@ function M.build(ctx)
 	local cur_escape = state.script_control_shortcuts.escape     or "none"
 
 	return {
-		title   = "i18n.get("menu.script_control.title")",
+		title   = i18n.get("menu.script_control.title"),
 		checked = (enabled and not paused) or nil,
 		fn      = function()
 			state.script_control_enabled = not state.script_control_enabled
