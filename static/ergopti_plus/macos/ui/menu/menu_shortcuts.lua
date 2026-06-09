@@ -115,7 +115,7 @@ end
 local _BUILTIN_SYMBOLS = (function()
 	local seen, out = {}, {}
 	for _, group in ipairs(text_acts.WRAP_GROUPS or {}) do
-		for _, pair in ipairs(group) do
+		for _, pair in ipairs(group.pairs or {}) do
 			if not seen[pair.left] then
 				seen[pair.left] = true
 				table.insert(out, pair)
@@ -177,17 +177,52 @@ local function build_wrap_symbols_submenu(ctx, state, paused, shortcuts)
 	}
 	sub[#sub + 1] = { title = "-" }
 
-	-- Built-in symbols — one toggle per opening symbol, grouped exactly as the
-	-- shared catalogue (text_acts.WRAP_GROUPS) defines, with a separator between
-	-- consecutive groups so the visual grouping is not hardcoded in this file.
-	for gi, group in ipairs(text_acts.WRAP_GROUPS or {}) do
-		if gi > 1 then sub[#sub + 1] = { title = "-" } end
-		for _, pair in ipairs(group) do
+	-- Built-in symbols — each shared-catalogue group becomes its own named nested
+	-- sub-submenu so the top-level list stays short. Every group sub-submenu also
+	-- carries its own « check all / uncheck all » so a whole family can be flipped
+	-- at once. Order, grouping and labels all come from the shared catalogue.
+	for _, group in ipairs(text_acts.WRAP_GROUPS or {}) do
+		local group_pairs = group.pairs or {}
+		local group_lefts = {}
+		local group_all_on = true
+		for _, pair in ipairs(group_pairs) do
+			group_lefts[#group_lefts + 1] = pair.left
+			if sym_states[pair.left] == false then group_all_on = false end
+		end
+
+		local group_items = {}
+		-- Per-group bulk actions
+		group_items[#group_items + 1] = {
+			title    = i18n.get("menu.shortcuts.wrap_symbols_check_all"),
+			disabled = paused or nil,
+			fn       = not paused and (function(lefts)
+				return function()
+					state.wrap_symbol_states = state.wrap_symbol_states or {}
+					for _, k in ipairs(lefts) do state.wrap_symbol_states[k] = true end
+					ctx.save_prefs(); ctx.updateMenu()
+				end
+			end)(group_lefts) or nil,
+		}
+		group_items[#group_items + 1] = {
+			title    = i18n.get("menu.shortcuts.wrap_symbols_uncheck_all"),
+			disabled = paused or nil,
+			fn       = not paused and (function(lefts)
+				return function()
+					state.wrap_symbol_states = state.wrap_symbol_states or {}
+					for _, k in ipairs(lefts) do state.wrap_symbol_states[k] = false end
+					ctx.save_prefs(); ctx.updateMenu()
+				end
+			end)(group_lefts) or nil,
+		}
+		group_items[#group_items + 1] = { title = "-" }
+
+		-- One toggle per opening symbol in the group
+		for _, pair in ipairs(group_pairs) do
 			local enabled = (sym_states[pair.left] ~= false)
 			local lbl = (pair.left == pair.right)
 					and pair.left
 					or  (pair.left .. " … " .. pair.right)
-			sub[#sub + 1] = {
+			group_items[#group_items + 1] = {
 				title    = lbl,
 				checked  = (enabled and not paused) or nil,
 				disabled = paused or nil,
@@ -200,6 +235,16 @@ local function build_wrap_symbols_submenu(ctx, state, paused, shortcuts)
 				end)(pair.left) or nil,
 			}
 		end
+
+		local group_title = (type(group.i18n) == "string" and group.i18n ~= "")
+				and i18n.get(group.i18n)
+				or i18n.get("menu.shortcuts.wrap_symbols_title")
+		-- Check the parent group item when all of its symbols are enabled.
+		sub[#sub + 1] = {
+			title   = group_title,
+			menu    = group_items,
+			checked = (group_all_on and not paused) or nil,
+		}
 	end
 
 	-- Custom symbols — individual entries with a delete submenu

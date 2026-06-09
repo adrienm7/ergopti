@@ -1974,31 +1974,51 @@ _WS_BuildSymbolsMenu() {
 	global _WS_BUILTIN_GROUPS, _WS_Custom
 	Sub := Menu()
 
-	; ── Bulk actions ─────────────────────────────────────────────────────────
+	; ── Global bulk actions ──────────────────────────────────────────────────
 	RegisterMenuItem(Sub, t("menu.shortcuts.wrap_symbols_check_all"), (*) => _WS_MenuSetAll(true))
 	RegisterMenuItem(Sub, t("menu.shortcuts.wrap_symbols_uncheck_all"), (*) => _WS_MenuSetAll(false))
 	RegisterMenuItem(Sub, t("menu.global.reset_defaults"), (*) => _WS_MenuReset())
 	Sub.Add()
 
-	; ── Built-in symbols, grouped ────────────────────────────────────────────
-	; Iterate the shared catalogue's groups and insert a separator between each
-	; one, so the visual grouping defined in shared/wrap_symbols.json is mirrored
-	; here without any order hardcoded in this file.
-	for GroupIdx, Group in _WS_BUILTIN_GROUPS {
-		if (GroupIdx > 1) {
-			Sub.Add()
+	; ── Built-in symbols, one named nested sub-submenu per group ──────────────
+	; Each group from the shared catalogue becomes its own sub-submenu (titled by
+	; its i18n label) so the top-level list stays short. Every group sub-submenu
+	; carries its own « check all / uncheck all » so the user can flip a whole
+	; family at once. Order and grouping come from shared/wrap_symbols.json.
+	for _, Group in _WS_BUILTIN_GROUPS {
+		GroupMenu := Menu()
+		; Collect this group's opening chars for the per-group bulk actions.
+		GroupLefts := []
+		for _, Pair in Group["pairs"] {
+			GroupLefts.Push(Pair["left"])
 		}
-		for _, Pair in Group {
+		RegisterMenuItem(GroupMenu, t("menu.shortcuts.wrap_symbols_check_all"),
+			((Chars) => (*) => _WS_MenuSetGroup(Chars, true))(GroupLefts))
+		RegisterMenuItem(GroupMenu, t("menu.shortcuts.wrap_symbols_uncheck_all"),
+			((Chars) => (*) => _WS_MenuSetGroup(Chars, false))(GroupLefts))
+		GroupMenu.Add()
+		; Track whether every symbol in the group is enabled so the parent item
+		; can show a checkmark when the whole family is on.
+		GroupAllOn := true
+		for _, Pair in Group["pairs"] {
 			L := Pair["left"]
 			R := Pair["right"]
 			; Display label: "( … )" for asymmetric, "@" for symmetric
 			Lbl := (L != R) ? (L . " … " . R) : L
 			Enabled := WrapSymbols_IsEnabled(L)
 			; Capture L in closure so the lambda references the right char
-			RegisterMenuItem(Sub, Lbl, ((Ch) => (*) => _WS_MenuToggle(Ch))(L))
+			RegisterMenuItem(GroupMenu, Lbl, ((Ch) => (*) => _WS_MenuToggle(Ch))(L))
 			if Enabled {
-				Sub.Check(Lbl)
+				GroupMenu.Check(Lbl)
+			} else {
+				GroupAllOn := false
 			}
+		}
+		GroupLabel := (Group["i18n"] != "") ? t(Group["i18n"]) : t("menu.shortcuts.wrap_symbols_title")
+		Sub.Add(GroupLabel, GroupMenu)
+		; Check the parent group item when all of its symbols are enabled.
+		if GroupAllOn {
+			Sub.Check(GroupLabel)
 		}
 	}
 
@@ -2036,6 +2056,12 @@ _WS_MenuSetAll(Enable) {
 	} else {
 		WrapSymbols_DisableAll()
 	}
+	RebuildTrayMenu()
+}
+
+; Enable or disable every symbol in one group at once, then refresh.
+_WS_MenuSetGroup(OpenChars, Enable) {
+	WrapSymbols_SetMany(OpenChars, Enable)
 	RebuildTrayMenu()
 }
 

@@ -34,8 +34,8 @@
 ; two globals below — NEVER hardcode the list or its order here.
 ;   _WS_BUILTIN_PAIRS  — flat array of Map("left", …, "right", …), used to build
 ;                        the active-pairs lookup and the disable-all set.
-;   _WS_BUILTIN_GROUPS — array of groups (each an array of the same Maps); the
-;                        tray menu renders a separator between consecutive groups.
+;   _WS_BUILTIN_GROUPS — array of Map("i18n", key, "pairs", [pairMap, …]); the
+;                        tray menu renders each group as a NAMED nested sub-submenu.
 global _WS_BUILTIN_PAIRS  := []
 global _WS_BUILTIN_GROUPS := []
 
@@ -43,9 +43,11 @@ global _WS_BUILTIN_GROUPS := []
 ; intentionally minimal (the ASCII brackets + straight quotes) so a transient
 ; I/O failure still leaves basic wrapping usable; the real catalogue is the JSON.
 global _WS_FALLBACK_GROUPS := [
-    [ Map("left", "(", "right", ")"), Map("left", "[", "right", "]"),
-      Map("left", "{", "right", "}"), Map("left", "<", "right", ">") ],
-    [ Map("left", Chr(0x22), "right", Chr(0x22)), Map("left", "'", "right", "'") ],
+    Map("i18n", "menu.shortcuts.wrap_group_brackets", "pairs",
+        [ Map("left", "(", "right", ")"), Map("left", "[", "right", "]"),
+          Map("left", "{", "right", "}"), Map("left", "<", "right", ">") ]),
+    Map("i18n", "menu.shortcuts.wrap_group_quotes", "pairs",
+        [ Map("left", Chr(0x22), "right", Chr(0x22)), Map("left", "'", "right", "'") ]),
 ]
 
 ; ----------------------------- Runtime state ---------------------------------
@@ -115,36 +117,37 @@ _WS_LoadBuiltinCatalogue() {
         Groups := _WS_FALLBACK_GROUPS
     }
 
-    for Group in Groups {
-        if !(Group is Array)
-            continue
-        GroupArr := []
-        for P in Group {
-            ; Accept both parsed-JSON Maps and the fallback's literal Maps.
-            if !(P is Map) or !P.Has("left") or !P.Has("right")
-                continue
-            Pair := Map("left", P["left"], "right", P["right"])
-            GroupArr.Push(Pair)
-            _WS_BUILTIN_PAIRS.Push(Pair)
-        }
-        if (GroupArr.Length > 0)
-            _WS_BUILTIN_GROUPS.Push(GroupArr)
-    }
+    _WS_IngestGroups(Groups)
 
     ; A catastrophic parse that yielded nothing must still leave wrapping usable.
     if (_WS_BUILTIN_PAIRS.Length == 0) {
-        for Group in _WS_FALLBACK_GROUPS {
-            GroupArr := []
-            for P in Group {
-                Pair := Map("left", P["left"], "right", P["right"])
-                GroupArr.Push(Pair)
-                _WS_BUILTIN_PAIRS.Push(Pair)
-            }
-            _WS_BUILTIN_GROUPS.Push(GroupArr)
-        }
+        _WS_BUILTIN_GROUPS := []
+        _WS_IngestGroups(_WS_FALLBACK_GROUPS)
     }
     try LoggerDebug("WrapSymbols", "Built-in catalogue loaded ({1} pair(s) in {2} group(s)).",
         _WS_BUILTIN_PAIRS.Length, _WS_BUILTIN_GROUPS.Length)
+}
+
+; Convert a groups array (parsed JSON or the fallback — both share the shape
+; Map("i18n", key, "pairs", [Map("left", …, "right", …), …])) into the runtime
+; _WS_BUILTIN_GROUPS / _WS_BUILTIN_PAIRS structures. Skips malformed entries.
+_WS_IngestGroups(Groups) {
+    global _WS_BUILTIN_PAIRS, _WS_BUILTIN_GROUPS
+    for Group in Groups {
+        if !(Group is Map) or !Group.Has("pairs") or !(Group["pairs"] is Array)
+            continue
+        I18nKey := (Group.Has("i18n") and Group["i18n"] is String) ? Group["i18n"] : ""
+        GroupPairs := []
+        for P in Group["pairs"] {
+            if !(P is Map) or !P.Has("left") or !P.Has("right")
+                continue
+            Pair := Map("left", P["left"], "right", P["right"])
+            GroupPairs.Push(Pair)
+            _WS_BUILTIN_PAIRS.Push(Pair)
+        }
+        if (GroupPairs.Length > 0)
+            _WS_BUILTIN_GROUPS.Push(Map("i18n", I18nKey, "pairs", GroupPairs))
+    }
 }
 
 ; Returns the live active-pairs Map.  Called by the PrefixWatcher on each keystroke.
@@ -162,6 +165,24 @@ WrapSymbols_Toggle(OpenChar) {
         _WS_Disabled.Delete(OpenChar)
     } else {
         _WS_Disabled[OpenChar] := true
+    }
+    _WS_Save()
+    WrapSymbols_Rebuild()
+}
+
+; Enable or disable a set of built-in symbols at once (one save + rebuild),
+; used by the per-group « check all / uncheck all » menu actions.
+; @param OpenChars Array of opening characters to update.
+; @param Enable    true → enable (remove from disabled set), false → disable.
+WrapSymbols_SetMany(OpenChars, Enable) {
+    global _WS_Disabled
+    for _, Ch in OpenChars {
+        if Enable {
+            if _WS_Disabled.Has(Ch)
+                _WS_Disabled.Delete(Ch)
+        } else {
+            _WS_Disabled[Ch] := true
+        }
     }
     _WS_Save()
     WrapSymbols_Rebuild()

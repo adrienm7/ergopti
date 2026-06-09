@@ -106,15 +106,19 @@ end)
 -- bracket families are present. Glyphs are built via utf8.char(codepoint) so this
 -- source file stays ASCII-only and immune to encoding regressions.
 helpers.describe("wrap-symbols shared catalogue", function()
-	helpers.it("exposes ordered WRAP_GROUPS with multiple groups", function()
+	helpers.it("exposes ordered WRAP_GROUPS with labelled groups", function()
 		helpers.assert_eq(type(text_acts.WRAP_GROUPS), "table", "WRAP_GROUPS must be exposed")
 		helpers.assert_true(#text_acts.WRAP_GROUPS >= 5,
 			"the shared catalogue must load several groups (got " .. tostring(#text_acts.WRAP_GROUPS) .. ")")
-		-- Each group is a non-empty array of {left,right} pairs.
+		-- Each group carries an i18n label key and a non-empty array of {left,right} pairs.
 		for _, group in ipairs(text_acts.WRAP_GROUPS) do
-			helpers.assert_true(#group > 0, "every group must hold at least one pair")
-			helpers.assert_eq(type(group[1].left),  "string")
-			helpers.assert_eq(type(group[1].right), "string")
+			helpers.assert_eq(type(group.i18n), "string", "every group must carry an i18n label key")
+			helpers.assert_true(group.i18n:find("^menu%.shortcuts%.wrap_group_") ~= nil,
+				"group i18n key must be a wrap_group_* key, got " .. tostring(group.i18n))
+			helpers.assert_eq(type(group.pairs), "table", "every group must carry a pairs array")
+			helpers.assert_true(#group.pairs > 0, "every group must hold at least one pair")
+			helpers.assert_eq(type(group.pairs[1].left),  "string")
+			helpers.assert_eq(type(group.pairs[1].right), "string")
 		end
 	end)
 

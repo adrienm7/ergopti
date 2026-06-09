@@ -43,17 +43,20 @@ local MAX_RESELECT_CHARS = 5000   -- Safety cap: avoid freezing on huge pastes
 -- The canonical catalogue AND its grouping live in the SHARED single source of
 -- truth: ``static/ergopti_plus/shared/wrap_symbols.json`` (the same file the AHK
 -- driver reads). It is loaded once below — NEVER hardcode the list or its order
--- here. WRAP_GROUPS preserves the ordered groups (the menu draws a separator
--- between them); WRAP_PAIRS is the flattened {[char]={left,right}} lookup with
--- both the opening and closing char of each pair registered as keys.
+-- here. WRAP_GROUPS preserves the ordered groups (each {i18n=<label key>, pairs=…};
+-- the menu renders each as a named nested sub-submenu); WRAP_PAIRS is the
+-- flattened {[char]={left,right}} lookup with both the opening and closing char
+-- of each pair registered as keys.
 
 -- Emergency-only fallback used when the shared JSON cannot be read/parsed. Kept
 -- intentionally minimal (ASCII brackets + straight quotes) so a transient I/O
 -- failure still leaves basic wrapping usable; the real catalogue is the JSON.
 local FALLBACK_GROUPS = {
-	{ { left = "(", right = ")" }, { left = "[", right = "]" },
-	  { left = "{", right = "}" }, { left = "<", right = ">" } },
-	{ { left = '"', right = '"' }, { left = "'", right = "'" } },
+	{ i18n = "menu.shortcuts.wrap_group_brackets", pairs = {
+		{ left = "(", right = ")" }, { left = "[", right = "]" },
+		{ left = "{", right = "}" }, { left = "<", right = ">" } } },
+	{ i18n = "menu.shortcuts.wrap_group_quotes", pairs = {
+		{ left = '"', right = '"' }, { left = "'", right = "'" } } },
 }
 
 --- Resolves the shared/wrap_symbols.json path from this module's own on-disk
@@ -71,7 +74,7 @@ local function shared_wrap_symbols_path()
 end
 
 --- Reads the shared catalogue and returns its ordered groups, or nil on failure.
---- @return table|nil Array of groups (each an array of {left,right}).
+--- @return table|nil Array of groups (each {i18n=<label key>, pairs={{left,right},…}}).
 local function load_shared_groups()
 	local path = shared_wrap_symbols_path()
 	if not path then return nil end
@@ -85,8 +88,9 @@ local function load_shared_groups()
 	return data.groups
 end
 
--- Build WRAP_GROUPS (ordered) and WRAP_PAIRS (flattened lookup) from the shared
--- catalogue, falling back to the minimal emergency set on any failure.
+-- Build WRAP_GROUPS (ordered, each {i18n, pairs}) and WRAP_PAIRS (flattened
+-- lookup) from the shared catalogue, falling back to the minimal emergency set
+-- on any failure.
 local WRAP_GROUPS = load_shared_groups()
 if type(WRAP_GROUPS) ~= "table" or #WRAP_GROUPS == 0 then
 	Logger.warn(LOG, "Shared wrap-symbols catalogue unreadable — using emergency fallback.")
@@ -95,7 +99,7 @@ end
 
 local WRAP_PAIRS = {}
 for _, group in ipairs(WRAP_GROUPS) do
-	for _, pair in ipairs(group) do
+	for _, pair in ipairs(group.pairs or {}) do
 		if type(pair) == "table" and type(pair.left) == "string" and pair.left ~= ""
 				and type(pair.right) == "string" and pair.right ~= "" then
 			WRAP_PAIRS[pair.left] = { left = pair.left, right = pair.right }
@@ -283,9 +287,10 @@ end
 --- Callers that need a filtered or user-extended table should use build_active_wrap_pairs().
 M.WRAP_PAIRS = WRAP_PAIRS
 
---- The ordered built-in groups from the shared catalogue. Each entry is an array
---- of {left, right} pairs; the menu draws a separator between consecutive groups.
---- Exposed so the menu mirrors the shared grouping without duplicating the order.
+--- The ordered built-in groups from the shared catalogue. Each entry is
+--- {i18n=<label key>, pairs={{left,right},…}}; the menu renders each group as a
+--- named nested sub-submenu. Exposed so the menu mirrors the shared grouping and
+--- labels without duplicating the order or the catalogue.
 M.WRAP_GROUPS = WRAP_GROUPS
 
 --- Builds the active wrapping-pairs table from the built-in catalogue and user state.
