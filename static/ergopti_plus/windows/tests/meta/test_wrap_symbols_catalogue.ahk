@@ -35,13 +35,19 @@ _MetaWrapSymbolsCatalogue() {
 	AssertTrue(Groups is Array, "'groups' must be a JSON array")
 	AssertTrue(Groups.Length >= 5, "expected several groups (got " . Groups.Length . ")")
 
-	; Flatten, validating each pair's shape, and collect the opening chars.
+	; Each group is a labelled object {i18n, pairs}. Flatten, validating each
+	; pair's shape, and collect the opening chars.
 	Lefts := Map()
 	PairCount := 0
 	for Group in Groups {
-		AssertTrue(Group is Array, "each group must be a JSON array")
-		AssertTrue(Group.Length > 0, "no group may be empty")
-		for P in Group {
+		AssertTrue(Group is Map, "each group must be a JSON object")
+		AssertTrue(Group.Has("i18n") and Group["i18n"] is String and Group["i18n"] != "",
+			"each group must carry a non-empty 'i18n' label key")
+		AssertTrue(InStr(Group["i18n"], "menu.shortcuts.wrap_group_") == 1,
+			"group 'i18n' must be a wrap_group_* key, got '" . Group["i18n"] . "'")
+		AssertTrue(Group.Has("pairs") and Group["pairs"] is Array, "each group must carry a 'pairs' array")
+		AssertTrue(Group["pairs"].Length > 0, "no group may be empty")
+		for P in Group["pairs"] {
 			AssertTrue(P is Map, "each pair must be a JSON object")
 			AssertTrue(P.Has("left") and P.Has("right"), "each pair must carry 'left' and 'right'")
 			AssertTrue(P["left"] is String and P["left"] != "", "pair 'left' must be a non-empty string")
