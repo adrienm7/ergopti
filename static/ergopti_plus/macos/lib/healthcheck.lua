@@ -47,6 +47,13 @@ local _js_str
 local _he
 local _hcode
 local _snapshot_to_html
+local _collect_pause_state
+local _collect_keylogger_summary
+local _collect_llm_state
+local _collect_layout_state
+local _collect_hotstrings_state
+local _collect_logs_info
+local _collect_config_summary
 
 
 
@@ -515,7 +522,7 @@ end
 --- === Enriched collectors (maximum completeness, privacy-safe, pcall-protected) ===
 -- (Added to make the system diagnostic as complete as possible while staying robust.)
 
-local function _collect_pause_state()
+_collect_pause_state = function()
 	local st = { is_paused = false, source = "unknown" }
 	local ok, sc = pcall(require, "modules.shortcuts.script_control")
 	if ok and sc and type(sc.is_paused) == "function" then
@@ -527,7 +534,7 @@ local function _collect_pause_state()
 	return st
 end
 
-local function _collect_keylogger_summary()
+_collect_keylogger_summary = function()
 	local sum = {
 		enabled = "unknown",
 		wpm = "n/a",
@@ -556,7 +563,7 @@ local function _collect_keylogger_summary()
 	return sum
 end
 
-local function _collect_llm_state()
+_collect_llm_state = function()
 	local st = { enabled = "unknown", backend = "unknown", active_profile = "unknown", model = "n/a", n_predictions = "n/a", streaming = "n/a" }
 	local ok, llm = pcall(require, "modules.llm.init")
 	if ok and llm and type(llm.get_state) == "function" then
@@ -568,7 +575,7 @@ local function _collect_llm_state()
 	return st
 end
 
-local function _collect_layout_state()
+_collect_layout_state = function()
 	local st = { ergopti_base = "unknown", altgr = "unknown", shift = "unknown", caps = "unknown", prefix_latch = "clean" }
 	local ok, lay = pcall(require, "lib.layout")
 	if ok and lay and type(lay.is_ergopti_base) == "function" then
@@ -583,7 +590,7 @@ local function _collect_layout_state()
 	return st
 end
 
-local function _collect_hotstrings_state()
+_collect_hotstrings_state = function()
 	local st = { terminators = 0, magic_key = "", personal_count = 0, dynamic_count = 0, default_delay = "n/a" }
 	local ok_t, term = pcall(require, "modules.keymap.terminators")
 	if ok_t and term then
@@ -593,7 +600,7 @@ local function _collect_hotstrings_state()
 	return st
 end
 
-local function _collect_logs_info()
+_collect_logs_info = function()
 	local info = {
 		unified_today = "",
 		errors_today = "",
@@ -616,7 +623,7 @@ local function _collect_logs_info()
 	return info
 end
 
-local function _collect_config_summary()
+_collect_config_summary = function()
 	local sum = { overrides = 0, enabled_hotstrings = "n/a", enabled_gestures = "n/a", enabled_llm = "n/a", config_files = {} }
 	local cfgdir = hs and hs.configdir or ""
 	if cfgdir ~= "" then
