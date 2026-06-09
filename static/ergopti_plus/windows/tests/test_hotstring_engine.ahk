@@ -118,19 +118,37 @@ Test("GenerateUppercaseVariants: appends one variant per symbol substitution",
 ; UppercasedSymbols Map
 ; ==========================
 TestHE_UppercasedComma() {
+	; Regression: the "uppercase" form of a comma is the shifted-comma the layout
+	; actually emits — nbsp/nnbsp + ";"/":" — NEVER a plain ASCII space. Four
+	; variants: {nnbsp,nbsp} × {";",":"}. Anchoring on nbsp/nnbsp keeps a bare
+	; "<space>:D" emoji from ever matching a ",d → ds" comma hotstring.
 	M := _BuildUppercasedSymbols()
 	AssertTrue(M.Has(","))
-	AssertEqual(2, M[","].Length)
+	AssertEqual(4, M[","].Length)
+	; Every variant MUST start with nnbsp (U+202F) or nbsp (U+00A0) — proving the
+	; plain-space regression (which swallowed emojis) can never come back.
+	for _, Variant in M[","] {
+		FirstCh := SubStr(Variant, 1, 1)
+		AssertTrue(FirstCh == Chr(0x202F) or FirstCh == Chr(0xA0),
+			"comma variant must be nbsp/nnbsp-prefixed, not a plain space")
+	}
 }
-Test("_BuildUppercasedSymbols: contains the comma key with two variants",
+Test("_BuildUppercasedSymbols: comma key has 4 nbsp/nnbsp-prefixed variants",
 	TestHE_UppercasedComma)
 
 TestHE_UppercasedApostrophe() {
 	M := _BuildUppercasedSymbols()
 	AssertTrue(M.Has(Chr(0x27)))
-	AssertEqual(1, M[Chr(0x27)].Length)
+	; Apostrophe shifts to nnbsp/nbsp + "?" — two variants, both nbsp-prefixed.
+	AssertEqual(2, M[Chr(0x27)].Length)
+	for _, Variant in M[Chr(0x27)] {
+		FirstCh := SubStr(Variant, 1, 1)
+		AssertTrue(FirstCh == Chr(0x202F) or FirstCh == Chr(0xA0),
+			"apostrophe variant must be nbsp/nnbsp-prefixed, not a plain space")
+	}
 }
-Test("_BuildUppercasedSymbols: apostrophe key uses Chr(0x27)", TestHE_UppercasedApostrophe)
+Test("_BuildUppercasedSymbols: apostrophe key has 2 nbsp/nnbsp-prefixed variants",
+	TestHE_UppercasedApostrophe)
 
 
 
@@ -328,14 +346,14 @@ TestHE_VariantsNoSymbols() {
 Test("GenerateUppercaseVariants: no matching symbols returns only original",
 	TestHE_VariantsNoSymbols)
 
-TestHE_VariantsApostropheOneAlternative() {
+TestHE_VariantsApostropheTwoAlternatives() {
 	Sym := _BuildUppercasedSymbols()
 	V := GenerateUppercaseVariants(Chr(0x27) . "HELLO", Sym)
-	; apostrophe has 1 alternative (" ?") so total = 2 variants
-	AssertEqual(2, V.Length)
+	; apostrophe now has 2 alternatives (nnbsp+"?" and nbsp+"?") → total = 3 variants
+	AssertEqual(3, V.Length)
 }
-Test("GenerateUppercaseVariants: apostrophe generates 1 extra variant",
-	TestHE_VariantsApostropheOneAlternative)
+Test("GenerateUppercaseVariants: apostrophe generates 2 extra variants",
+	TestHE_VariantsApostropheTwoAlternatives)
 
 TestHE_VariantsSingleChar() {
 	V := GenerateUppercaseVariants("A", Map())

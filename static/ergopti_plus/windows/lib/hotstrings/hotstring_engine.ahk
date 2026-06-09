@@ -578,9 +578,24 @@ _LSCResetFrom(Chars) {
 ; Extracted into a function so the apostrophe key can be written as Chr(0x27)
 ; rather than a literal ' inside Map(), which AHK v2 would misparse as a
 ; string delimiter.
+;
+; CRITICAL — the "uppercase" form of a comma/apostrophe is NOT a plain ASCII
+; space + punctuation. On the Ergopti Shift layer the comma key emits a NARROW
+; no-break space (U+202F) followed by ";" and the period key emits U+202F + ":"
+; (see layout_shift_caps.ahk). The deadkey path emits the regular no-break
+; space (U+00A0). So a case-sensitive hotstring whose trigger contains a comma
+; must generate its shifted variants with an nbsp/nnbsp prefix — exactly what
+; the user types via Shift+comma / Shift+period. Using a plain ASCII space here
+; was a bug on two counts: (1) "nnbsp + : + D" never matched the generated
+; trigger (so ",d → ds" never produced "DS" in caps), and (2) a plain
+; "<space>:D" emoji typed after a normal word DID match and got swallowed into
+; "DS". Anchoring on nbsp/nnbsp fixes both: only the layout-emitted shifted
+; comma fires the expansion, while a bare ":D" emoji stays untouched.
 _BuildUppercasedSymbols() {
-    m := Map(",", [" " Chr(0x3B), " :"])
-    m[Chr(0x27)] := [" ?"]
+    NNBSP := Chr(0x202F)  ; U+202F — Shift+comma / Shift+period prefix
+    NBSP  := Chr(0xA0)    ; U+00A0 — deadkey (umlaut) path prefix
+    m := Map(",", [NNBSP Chr(0x3B), NNBSP ":", NBSP Chr(0x3B), NBSP ":"])
+    m[Chr(0x27)] := [NNBSP "?", NBSP "?"]
     return m
 }
 
