@@ -28,6 +28,14 @@ local notifications = require("lib.notifications")
 local i18n          = require("lib.i18n")
 local LOG           = "menu.keyboard_layout"
 
+--- Default state — feature is off by default; false on layout keys means "no change".
+--- @type table
+M.DEFAULT_STATE = {
+	layout_pause_switch_enabled = false,
+	layout_on_pause             = false,
+	layout_on_resume            = false,
+}
+
 
 
 
@@ -424,8 +432,14 @@ print(json.dumps(out))
 		-- Decode the JSON array of KeyboardLayout Name strings
 		for kl_name in raw_out:gmatch('"([^"]+)"') do
 			local display = kl_name:gsub("_", " "):gsub("%s+v%d.*$", "")
+			-- hs.keycodes.currentLayout() may return the raw KeyboardLayout Name,
+			-- the localised display name, or a version-stripped variant — accept all three.
+			local display_no_space = display:gsub("%s+", ""):lower()
+			local current_lower = current_name and current_name:lower() or nil
 			local selected = (current_name ~= nil and (
-				kl_name == current_name or display == current_name
+				kl_name == current_name
+				or display == current_name
+				or (current_lower ~= nil and display_no_space == current_lower:gsub("%s+", ""))
 			)) or false
 			out[#out + 1] = { id = kl_name, name = display, selected = selected }
 		end
@@ -1207,9 +1221,12 @@ function M.build(ctx)
 	else
 		for _, r in ipairs(records) do
 			local title    = display_for_record(r)
-			-- Pass the display name to set_input_source: hs.keycodes.setLayout expects
-			-- the localised name (e.g. "French"), not the internal KeyboardLayout Name.
-			local target_id = r.name
+			-- Pass the raw KeyboardLayout Name (r.id) to set_input_source so both
+			-- hs.keycodes.setLayout and the TIS osascript fallback receive the exact
+			-- internal name macOS uses. r.name is a formatted display string (e.g.
+			-- "Ergopti plus") that does not match the TIS database entries and causes
+			-- hs.keycodes.setLayout to silently fail for non-French layouts.
+			local target_id = r.id
 			submenu[#submenu + 1] = {
 				title   = title,
 				checked = r.selected or nil,
@@ -1225,6 +1242,86 @@ function M.build(ctx)
 						schedule_menu_refresh(update_menu)
 					end)
 				end,
+			}
+		end
+	end
+
+	-- Pause / resume layout switching — two dropdowns that let the user pick which
+	-- keyboard layout to activate automatically when the script is paused or resumed.
+	-- Nil / "auto" means "do nothing" (default). Stored in state.layout_on_pause and
+	-- state.layout_on_resume so they survive a reload via preferences.lua.
+	local state      = ctx and ctx.state
+	local save_prefs = ctx and ctx.save_prefs
+	local hs_paused_pre = ctx and ctx.paused
+
+	local function build_layout_picker_submenu(current_id, on_pick)
+		local sub = {}
+		-- false / nil / "" all mean "no automatic switch" (the default)
+		local is_auto = (current_id == nil or current_id == false or current_id == "")
+		sub[#sub + 1] = {
+			title   = i18n.get("menu.layout.layout_auto"),
+			checked = is_auto or nil,
+			fn      = function()
+				on_pick(nil)
+			end,
+		}
+		sub[#sub + 1] = { title = "-" }
+		for _, r in ipairs(records) do
+			local display = display_for_record(r)
+			local rid     = r.id
+			sub[#sub + 1] = {
+				title   = display,
+				checked = (current_id == rid) or nil,
+				fn      = function()
+					on_pick(rid)
+				end,
+			}
+		end
+		return sub
+	end
+
+	if state then
+		local feature_on = state.layout_pause_switch_enabled and true or false
+
+		submenu[#submenu + 1] = { title = "-" }
+		submenu[#submenu + 1] = {
+			title   = i18n.get("menu.layout.pause_layout_enabled"),
+			checked = feature_on or nil,
+			fn      = function()
+				state.layout_pause_switch_enabled = not feature_on
+				if save_prefs then save_prefs() end
+				if update_menu then update_menu() end
+			end,
+		}
+
+		if feature_on then
+			local cur_pause  = state.layout_on_pause
+			local cur_resume = state.layout_on_resume
+
+			local pause_label = (cur_pause and cur_pause ~= false and cur_pause ~= "")
+				and display_for_record({ id = cur_pause, name = cur_pause:gsub("_", " "):gsub("%s+v%d.*$", "") })
+				or  i18n.get("menu.layout.layout_auto")
+			submenu[#submenu + 1] = {
+				title    = string.format("%s : %s", i18n.get("menu.layout.layout_on_pause"), pause_label),
+				disabled = hs_paused_pre or nil,
+				menu     = build_layout_picker_submenu(cur_pause, function(id)
+					state.layout_on_pause = id
+					if save_prefs then save_prefs() end
+					if update_menu then update_menu() end
+				end),
+			}
+
+			local resume_label = (cur_resume and cur_resume ~= false and cur_resume ~= "")
+				and display_for_record({ id = cur_resume, name = cur_resume:gsub("_", " "):gsub("%s+v%d.*$", "") })
+				or  i18n.get("menu.layout.layout_auto")
+			submenu[#submenu + 1] = {
+				title    = string.format("%s : %s", i18n.get("menu.layout.layout_on_resume"), resume_label),
+				disabled = hs_paused_pre or nil,
+				menu     = build_layout_picker_submenu(cur_resume, function(id)
+					state.layout_on_resume = id
+					if save_prefs then save_prefs() end
+					if update_menu then update_menu() end
+				end),
 			}
 		end
 	end
