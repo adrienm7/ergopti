@@ -279,7 +279,8 @@ function M.show_window()
 	pcall(function() wv:allowTextEntry(true) end)
 	pcall(function() wv:allowNewWindows(false) end)
 	pcall(function() wv:allowGestures(false) end)
-	pcall(function() wv:level(hs.drawing.windowLevels.normal) end)
+	-- floating ensures the window appears on top of the menu bar and other apps
+	pcall(function() wv:level(hs.drawing.windowLevels.floating) end)
 
 	-- Wire up the copy-and-close button using a flag polled from Lua.
 	-- WKWebView rejects custom URL schemes (ergopti://) with NSURLErrorDomain -1002
@@ -330,17 +331,22 @@ function M.show_window()
 	pcall(function() wv:html(html) end)
 	pcall(function() wv:show() end)
 
-	hs.timer.doAfter(0.08, function()
-		pcall(hs.focus)
-		local ok_win, win = pcall(function() return wv:hswindow() end)
-		if ok_win and win and type(win.focus) == "function" then
-			pcall(function() win:focus() end)
-		else
-			pcall(function() wv:bringToFront() end)
-		end
-	end)
-
 	_window = wv
+
+	local ok_ui, ui_builder = pcall(require, "ui.ui_builder")
+	if ok_ui and ui_builder then
+		ui_builder.force_focus(wv, true)
+	else
+		hs.timer.doAfter(0.08, function()
+			pcall(hs.focus)
+			local ok_win, win = pcall(function() return wv:hswindow() end)
+			if ok_win and win and type(win.focus) == "function" then
+				pcall(function() win:focus() end)
+			else
+				pcall(function() wv:bringToFront() end)
+			end
+		end)
+	end
 end
 
 
