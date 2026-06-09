@@ -865,6 +865,7 @@
 	"menu.layout.layout_auto": "— 不更改 —",
 	"menu.layout.layout_on_pause": "脚本暂停时的布局",
 	"menu.layout.layout_on_resume": "脚本活跃时的布局",
+	"menu.layout.pause_layout_enabled": "暂停/恢复时自动切换键盘布局",
 	"menu.layout.pause_layout_section": "暂停/恢复时的键盘布局",
 	"menu.llm.about": "关于 Ergopti AI",
 	"menu.llm.about_body": "Ergopti AI — 智能键盘建议\n后端: Ollama (本地)\n版本: 1.0",

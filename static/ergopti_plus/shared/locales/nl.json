@@ -865,6 +865,7 @@
 	"menu.layout.layout_auto": "— Geen wijziging —",
 	"menu.layout.layout_on_pause": "Indeling wanneer script gepauzeerd",
 	"menu.layout.layout_on_resume": "Indeling wanneer script actief",
+	"menu.layout.pause_layout_enabled": "Indeling wisselen bij pauze / hervatten",
 	"menu.layout.pause_layout_section": "Indeling bij pauze / hervatten",
 	"menu.llm.about": "Over Ergopti AI",
 	"menu.llm.about_body": "Ergopti AI — Intelligente toetsenbordvoorstellen\nBackend: Ollama (lokaal)\nVersie: 1.0",

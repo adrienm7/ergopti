@@ -865,6 +865,7 @@
 	"menu.layout.layout_auto": "— Ingen endring —",
 	"menu.layout.layout_on_pause": "Layout når skriptet er satt på pause",
 	"menu.layout.layout_on_resume": "Layout når skriptet er aktivt",
+	"menu.layout.pause_layout_enabled": "Bytt layout ved pause / gjenopptakelse",
 	"menu.layout.pause_layout_section": "Layout ved pause / gjenopptakelse",
 	"menu.llm.about": "Om Ergopti AI",
 	"menu.llm.about_body": "Ergopti AI — Smarte tastaturforslag\nBackend: Ollama (lokal)\nVersjon: 1.0",

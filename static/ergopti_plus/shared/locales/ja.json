@@ -865,6 +865,7 @@
 	"menu.layout.layout_auto": "— 変更なし —",
 	"menu.layout.layout_on_pause": "スクリプト停止中のレイアウト",
 	"menu.layout.layout_on_resume": "スクリプト有効時のレイアウト",
+	"menu.layout.pause_layout_enabled": "一時停止/再開時にレイアウトを切り替える",
 	"menu.layout.pause_layout_section": "一時停止/再開時のレイアウト",
 	"menu.llm.about": "Ergopti AIについて",
 	"menu.llm.about_body": "Ergopti AI — スマートキーボード提案\nバックエンド: Ollama (ローカル)\nバージョン: 1.0",

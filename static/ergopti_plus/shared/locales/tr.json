@@ -865,6 +865,7 @@
 	"menu.layout.layout_auto": "— Değişiklik yok —",
 	"menu.layout.layout_on_pause": "Betik duraklatıldığında düzen",
 	"menu.layout.layout_on_resume": "Betik etkinken düzen",
+	"menu.layout.pause_layout_enabled": "Duraklatma / devam ettirmede düzeni değiştir",
 	"menu.layout.pause_layout_section": "Duraklatma / devam ettirmede düzen",
 	"menu.llm.about": "Ergopti AI Hakkında",
 	"menu.llm.about_body": "Ergopti AI — Akıllı klavye önerileri\nBackend: Ollama (yerel)\nSürüm: 1.0",

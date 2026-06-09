@@ -865,6 +865,7 @@
 	"menu.layout.layout_auto": "— Без изменений —",
 	"menu.layout.layout_on_pause": "Раскладка когда скрипт на паузе",
 	"menu.layout.layout_on_resume": "Раскладка когда скрипт активен",
+	"menu.layout.pause_layout_enabled": "Переключать раскладку при паузе / возобновлении",
 	"menu.layout.pause_layout_section": "Раскладка при паузе / возобновлении",
 	"menu.llm.about": "О Ergopti ИИ",
 	"menu.llm.about_body": "Ergopti ИИ — Умные подсказки клавиатуры\nБэкенд: Ollama (локально)\nВерсия: 1.0",

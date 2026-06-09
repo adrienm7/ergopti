@@ -865,6 +865,7 @@
 	"menu.layout.layout_auto": "— Ingen ändring —",
 	"menu.layout.layout_on_pause": "Layout när skriptet är pausat",
 	"menu.layout.layout_on_resume": "Layout när skriptet är aktivt",
+	"menu.layout.pause_layout_enabled": "Byt layout vid paus / fortsättning",
 	"menu.layout.pause_layout_section": "Layout vid paus / fortsättning",
 	"menu.llm.about": "Om Ergopti AI",
 	"menu.llm.about_body": "Ergopti AI — Smarta tangentbordsförslag\nBackend: Ollama (lokal)\nVersion: 1.0",
