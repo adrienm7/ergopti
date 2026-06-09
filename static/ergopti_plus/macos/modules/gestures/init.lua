@@ -671,7 +671,7 @@ function M.start()
 			-- Wakeup signal: gesture-class event reached us but the touchdevice
 			-- callback has not fired yet → the subscription is dormant. Recycle.
 			if not _G.ERGOPTI_GESTURES_RECEIVED_FIRST_FRAME then
-				Logger.warn(LOG, "PRIMER caught event#%d type=%d BEFORE any touchdevice frame — calling schedule_emergency_recycle()",
+				Logger.debug(LOG, "PRIMER caught event#%d type=%d BEFORE any touchdevice frame — calling schedule_emergency_recycle()",
 					primer_event_count, t)
 				schedule_emergency_recycle()
 			end
