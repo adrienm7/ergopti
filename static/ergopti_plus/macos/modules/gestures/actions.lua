@@ -120,8 +120,8 @@ end
 --- Starts a keyboard watcher that releases all held synthetic clicks on the next keydown.
 local function start_click_key_watcher()
 	if click_key_watcher then return end
-	click_key_watcher = hs.eventtap.new({ hs.eventtap.event.types.keyDown, hs.eventtap.event.types.flagsChanged }, function(_)
-		-- Tear down state synchronously so subsequent keypresses are not intercepted.
+	click_key_watcher = hs.eventtap.new({ hs.eventtap.event.types.keyDown, hs.eventtap.event.types.flagsChanged }, function(e)
+		-- Tear down all state synchronously first.
 		local releaseLeft  = leftClickHeld
 		local releaseRight = rightClickHeld
 		local tapL = leftMouseTap
@@ -132,22 +132,20 @@ local function start_click_key_watcher()
 		rightClickHeld = false
 		pcall(function() click_key_watcher:stop() end)
 		click_key_watcher = nil
-		-- Defer only the synthetic mouseUp so the keyDown propagates first and
-		-- macOS applies it to the current selection before the hold is released.
-		if releaseLeft or releaseRight then
-			local pos = hs.mouse.absolutePosition()
-			hs.timer.doAfter(0, function()
-				if releaseLeft then
-					pcall(function() hs.eventtap.event.newMouseEvent(hs.eventtap.event.types.leftMouseUp, pos):post() end)
-					Logger.info(LOG, "Synthetic Left-Click RELEASED by keydown.")
-				end
-				if releaseRight then
-					pcall(function() hs.eventtap.event.newMouseEvent(hs.eventtap.event.types.rightMouseUp, pos):post() end)
-					Logger.info(LOG, "Synthetic Right-Click RELEASED by keydown.")
-				end
-			end)
+		-- Post the mouseUp first so the app exits drag/click mode, then re-post
+		-- the original keyDown. Swallow the original so the order is guaranteed:
+		-- mouseUp → keyDown (the key watcher is already gone, no infinite loop).
+		local pos = hs.mouse.absolutePosition()
+		if releaseLeft then
+			pcall(function() hs.eventtap.event.newMouseEvent(hs.eventtap.event.types.leftMouseUp, pos):post() end)
+			Logger.info(LOG, "Synthetic Left-Click RELEASED by keydown.")
 		end
-		return false
+		if releaseRight then
+			pcall(function() hs.eventtap.event.newMouseEvent(hs.eventtap.event.types.rightMouseUp, pos):post() end)
+			Logger.info(LOG, "Synthetic Right-Click RELEASED by keydown.")
+		end
+		pcall(function() e:post() end)
+		return true
 	end)
 	pcall(function() click_key_watcher:start() end)
 end

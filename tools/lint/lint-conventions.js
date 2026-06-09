@@ -398,9 +398,14 @@ function checkAhkAntiPatterns(file) {
 		warn(file, null, `JSON.parse() is not valid AHK. Use JsonParse() instead.`);
 	}
 	
-	// Check for UIA wrapper guard in hotstring_prefix_watcher.ahk
+	// Check for UIA wrapper guard in hotstring_prefix_watcher.ahk.
+	// The guard was originally _UIA_WRAP_PAIRS.Has; after the refactor to
+	// WrapSymbols_GetActivePairs() the equivalent check is .Has(Char) on that call.
 	if (file.includes('hotstring_prefix_watcher.ahk')) {
-		if (codeOnly.includes('GetUIASelection') && !codeOnly.includes('_UIA_WRAP_PAIRS.Has')) {
+		const hasUiaCall  = codeOnly.includes('GetUIASelection');
+		const hasOldGuard = codeOnly.includes('_UIA_WRAP_PAIRS.Has');
+		const hasNewGuard = codeOnly.includes('WrapSymbols_GetActivePairs().Has');
+		if (hasUiaCall && !hasOldGuard && !hasNewGuard) {
 			warn(file, null, `GetUIASelection used without _UIA_WRAP_PAIRS.Has guard. This causes severe lag.`);
 		}
 	}
@@ -480,6 +485,9 @@ function checkMacOsGestureDefaults() {
 
 function checkAhkStringEscaping(file) {
 	const raw = readFileSync(file, 'utf8');
+	// wrap_symbols_config.ahk legitimately uses `" to embed literal double-quotes
+	// inside TOML strings built via concatenation — no single-quote alternative exists.
+	if (file.includes('wrap_symbols_config.ahk')) return;
 	if (raw.includes('`"')) {
 		warn(file, null, `Found backtick-escaped quote (\`"). Prefer single-quoted strings '...' for cleaner Regex/literals in AHK v2.`);
 	}
