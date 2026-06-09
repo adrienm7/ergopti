@@ -952,8 +952,9 @@ _snapshot_to_html = function(snapshot, btn_label)
 
 	-- CSS — mirrors the Windows healthcheck UI for consistency across platforms
 	local css = table.concat({
-		"html,body{margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:13px;color:#1a1a1a;background:#fff;}",
-		"body{padding:16px 20px;overflow-x:hidden;overflow-y:auto;word-break:break-word;}",
+		"html,body{margin:0;padding:0;height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:13px;color:#1a1a1a;background:#fff;}",
+		-- Scrollable content area with bottom padding so text is never hidden behind the fixed footer
+		"#content{padding:16px 20px 70px;overflow-x:hidden;overflow-y:auto;height:100%;box-sizing:border-box;word-break:break-word;}",
 		"h1{font-size:1.25em;margin:0 0 .6em;}",
 		"h2{font-size:1.05em;margin:1.2em 0 .3em;border-bottom:1px solid #e0e0e0;padding-bottom:.2em;color:#333;}",
 		"table{border-collapse:collapse;width:100%;margin:.4em 0 .8em;}",
@@ -963,8 +964,10 @@ _snapshot_to_html = function(snapshot, btn_label)
 		"ul{margin:.3em 0 .3em 1.2em;padding:0;}li{margin:.2em 0;}",
 		"code{background:#f3f3f3;border-radius:3px;padding:.1em .35em;font-family:'SF Mono',Menlo,monospace;font-size:.88em;}",
 		"pre{background:#1e1e1e;color:#d4d4d4;border-radius:4px;padding:.7em 1em;overflow-x:hidden;white-space:pre-wrap;word-break:break-all;font-family:'SF Mono',Menlo,monospace;font-size:.82em;line-height:1.45;}",
-		"button{padding:7px 20px;font-family:-apple-system,sans-serif;font-size:13px;background:#0078d4;color:#fff;border:none;border-radius:4px;cursor:pointer;margin-top:1em;}",
-		"button:hover{background:#106ebe;}",
+		-- Fixed footer bar — stays at bottom regardless of scroll position
+		"#footer{position:fixed;bottom:0;left:0;right:0;padding:10px 20px;background:#fff;border-top:1px solid #e0e0e0;}",
+		"#footer button{display:block;width:100%;padding:7px 20px;font-family:-apple-system,sans-serif;font-size:13px;background:#0078d4;color:#fff;border:none;border-radius:4px;cursor:pointer;}",
+		"#footer button:hover{background:#106ebe;}",
 		"em{font-style:italic;color:#666;}",
 		".ok{color:#1a7f37;font-weight:600;}.fail{color:#cf222e;font-weight:600;}",
 	}, "")
@@ -1086,6 +1089,7 @@ _snapshot_to_html = function(snapshot, btn_label)
 	return "<!DOCTYPE html><html><head><meta charset='utf-8'>"
 		.. "<style>" .. css .. "</style>"
 		.. "</head><body>"
+		.. "<div id='content'>"
 		.. "<h1>System diagnostic</h1>"
 		.. "<h2>System</h2>"           .. sys_tbl
 		.. "<h2>Session counters</h2>" .. ctr_tbl
@@ -1093,7 +1097,8 @@ _snapshot_to_html = function(snapshot, btn_label)
 		.. "<h2>Adapters (" .. #ok_list .. "/" .. total .. " OK)</h2>" .. adap_html
 		.. "<h2>Last recorded error</h2>" .. last_err_html
 		.. "<h2>Recent warnings / errors (" .. #issues .. "/100)</h2>" .. issues_html
-		.. "<br><button id='btnCopy'>" .. _he(btn_label) .. "</button>"
+		.. "</div>"
+		.. "<div id='footer'><button id='btnCopy'>" .. _he(btn_label) .. "</button></div>"
 		.. "</body></html>"
 end
 
