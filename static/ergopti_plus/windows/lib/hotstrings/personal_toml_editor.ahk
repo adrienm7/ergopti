@@ -559,7 +559,7 @@ OpenPersonalEditor(DefaultSection := "") {
     }
     _PersonalEditorSection := TargetSection
 
-    W := Gui("+Resize +MinSize700x560", t("editor.hotstrings.window_title"))
+    W := Gui_Create("+Resize +MinSize700x560", t("editor.hotstrings.window_title"))
     W.SetFont("s10", "Segoe UI")
     W.MarginX := 12
     W.MarginY := 10
