@@ -18,6 +18,48 @@ use AppleScript version "2.4"
 use scripting additions
 
 
+
+
+-- =================================
+-- =================================
+-- ======= 0/ Icon bootstrap =======
+-- =================================
+-- =================================
+
+-- Build AppIcon.icns from AppIcon.svg if missing or stale, then touch the
+-- bundle so the Dock picks up the new icon.  This mirrors the ensure_icon()
+-- logic in the App Cloner Python launcher so Encryptor is fully self-contained
+-- and does not depend on the Hammerspoon startup hook for its dock icon.
+on ensure_icon()
+	try
+		set res_dir to POSIX path of (path to resource "AppIcon.svg")
+		-- Strip the filename to get the Resources/ directory path
+		set res_dir to do shell script "dirname " & quoted form of res_dir
+		set svg_path to res_dir & "/AppIcon.svg"
+		set icns_path to res_dir & "/AppIcon.icns"
+		set script_path to res_dir & "/make_icon.sh"
+		-- Rebuild only when icns is missing or SVG is newer than icns
+		set needs_build to false
+		try
+			do shell script "test -f " & quoted form of icns_path
+		on error
+			set needs_build to true
+		end try
+		if not needs_build then
+			try
+				-- svg newer than icns → mtime of svg > mtime of icns
+				set cmp to do shell script ¬
+					"[ " & quoted form of svg_path & " -nt " & quoted form of icns_path & " ] && echo yes || echo no"
+				if cmp is "yes" then set needs_build to true
+			end try
+		end if
+		if needs_build then
+			do shell script "zsh " & quoted form of script_path & " >/dev/null 2>&1 &"
+		end if
+	end try
+end ensure_icon
+
+
 -- =========================================
 -- =========================================
 -- ======= 1/ Locale & UI strings ==========
@@ -180,6 +222,7 @@ end ask_password
 -- Called by macOS when files are dropped on the app icon or passed via
 -- `open -a Encryptor file1 file2 …`. Each file is processed in sequence.
 on open dropped_files
+	my ensure_icon()
 	set loc to my resolve_locale()
 	set locales_dir to my resolve_locales_dir()
 	set s to my load_ui(loc, locales_dir)
@@ -364,6 +407,7 @@ end process_file
 -- When launched without a file (double-click from Finder or menu),
 -- present a file picker so the user can select a file to process.
 on run
+	my ensure_icon()
 	set loc to my resolve_locale()
 	set locales_dir to my resolve_locales_dir()
 	set s to my load_ui(loc, locales_dir)
