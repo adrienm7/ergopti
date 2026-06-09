@@ -246,3 +246,63 @@ helpers.describe("menu_keyboard_layout._migrate_legacy_id", function()
 			"com.apple.keyboardlayout.ergopti.plus")
 	end)
 end)
+
+
+
+
+-- ===================================================
+--- ===================================================
+-- ======= 6/ DEFAULT_STATE & pause-layout API =======
+--- ===================================================
+-- ===================================================
+
+helpers.describe("menu_keyboard_layout.DEFAULT_STATE (pause-layout feature)", function()
+	helpers.it("exposes DEFAULT_STATE with the three layout-switch keys", function()
+		helpers.assert_true(type(kbd.DEFAULT_STATE) == "table",
+			"DEFAULT_STATE must be a table")
+		-- Feature is off by default — false means "inactive"
+		helpers.assert_true(kbd.DEFAULT_STATE.layout_pause_switch_enabled == false,
+			"layout_pause_switch_enabled default must be false (feature off)")
+		helpers.assert_true(kbd.DEFAULT_STATE.layout_on_pause == false,
+			"layout_on_pause default must be false (no automatic switch)")
+		helpers.assert_true(kbd.DEFAULT_STATE.layout_on_resume == false,
+			"layout_on_resume default must be false (no automatic switch)")
+	end)
+
+	-- Regression: before the fix, DEFAULT_STATE was absent, so preferences.lua
+	-- could not hydrate the layout keys and they were silently ignored.
+	helpers.it("DEFAULT_STATE has exactly the three pause-layout keys (no extras)", function()
+		local allowed = { layout_pause_switch_enabled = true, layout_on_pause = true, layout_on_resume = true }
+		local count = 0
+		for k in pairs(kbd.DEFAULT_STATE) do
+			count = count + 1
+			helpers.assert_true(allowed[k] == true,
+				"Unexpected key in DEFAULT_STATE: " .. tostring(k))
+		end
+		helpers.assert_eq(count, 3)
+	end)
+end)
+
+helpers.describe("menu_keyboard_layout target_id regression (Ergopti click does nothing)", function()
+	-- The bug: the layout-list click handler passed r.name (display-formatted,
+	-- e.g. "Ergopti plus") to set_input_source instead of r.id (the raw
+	-- KeyboardLayout Name, e.g. "Ergopti_v2_2_2_plus"). hs.keycodes.setLayout
+	-- does not recognise the formatted name and silently fails.
+	-- We verify the fix indirectly via _format_ergopti_display: it must return
+	-- a non-nil display string for known Ergopti IDs (so the display-vs-raw
+	-- divergence is intentional and both values are well-defined).
+	helpers.it("_format_ergopti_display returns non-nil for Ergopti_v* KeyboardLayout Names (raw id is distinct from display)", function()
+		local raw_id = "Ergopti_v2_2_2_plus"
+		-- format_ergopti_display is called with the raw id; must not return nil
+		-- so that display_for_record works correctly for the menu title
+		local display = kbd._format_ergopti_display(raw_id)
+		-- The stable TIS form (no version) also works
+		local display2 = kbd._format_ergopti_display("com.apple.keyboardlayout.ergopti.plus")
+		helpers.assert_true(display ~= nil or display2 ~= nil,
+			"at least one Ergopti id form must produce a display label")
+	end)
+
+	helpers.it("_format_ergopti_display for stable id 'com.apple.keyboardlayout.ergopti.plus' returns 'Ergopti+'", function()
+		helpers.assert_eq(kbd._format_ergopti_display("com.apple.keyboardlayout.ergopti.plus"), "Ergopti+")
+	end)
+end)

@@ -75,7 +75,7 @@ helpers.describe("toml_writer.write: meta block", function()
 
 	helpers.it("falls back to default description when meta is missing", function()
 		local body = write_and_read({})
-		helpers.assert_true(body:find("Mes hotstrings") ~= nil)
+		helpers.assert_true(body:find("menu.hotstrings.personal_header") ~= nil)
 	end)
 
 	helpers.it("emits empty sections_order when none provided", function()
