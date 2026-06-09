@@ -616,16 +616,44 @@ end
 
 
 
+--- Pure decision for the wrap eventtap, extracted so the two hard-won rules can
+--- be unit-tested without synthesising key events.
+--- Returns "wrap" when the eventtap must SUPPRESS the keystroke and wrap the
+--- selection, or "passthrough" when it must return false so the OS types the
+--- symbol itself (and never swallow it).
+--- The rules:
+---   1. Alt (Option) must NOT block wrapping — on the Ergopti layout the wrap
+---      symbols live on the AltGr layer and carry the alt flag; only Cmd/Ctrl are
+---      real shortcuts.
+---   2. When no selection is readable (nothing selected, or an app such as VS Code
+---      that does not expose AXSelectedText), pass the symbol through rather than
+---      suppressing it.
+--- @param flags table Modifier flags from the keyDown event (cmd/ctrl/alt/…).
+--- @param ch string The character the keystroke produced.
+--- @param pairs_tbl table The active {[char]={left,right}} wrap table.
+--- @param has_selection boolean Whether a non-empty selection was readable.
+--- @return string "wrap" or "passthrough".
+function M.wrap_event_decision(flags, ch, pairs_tbl, has_selection)
+	flags = type(flags) == "table" and flags or {}
+	if flags.cmd or flags.ctrl then return "passthrough" end
+	if type(ch) ~= "string" or ch == "" then return "passthrough" end
+	if type(pairs_tbl) ~= "table" or pairs_tbl[ch] == nil then return "passthrough" end
+	if not has_selection then return "passthrough" end
+	return "wrap"
+end
+
 --- Starts a keyDown eventtap that wraps the current text selection with the typed symbol.
---- When no text is selected the key event is passed through unchanged.
+--- When no text is selected (or the focused app hides its selection), the key event
+--- is passed through unchanged so the symbol is never swallowed.
 --- @param get_wrap_pairs function|nil Callback returning the live {[char]={left,right}} table.
 ---   When nil, falls back to text_acts.WRAP_PAIRS (the full built-in catalogue).
 --- @return table Fake-hotkey object with :delete().
 function M.bind_wrap_text_if_selected(get_wrap_pairs)
 	local tap = hs.eventtap.new({hs.eventtap.event.types.keyDown}, function(e)
-		-- Ignore events that carry a modifier (cmd/ctrl/alt) — those are shortcuts, not symbols
 		local flags = e:getFlags()
-		if flags.cmd or flags.ctrl or flags.alt then return false end
+		-- Fast path: Cmd/Ctrl are real shortcuts — bail before any AX probe. Alt is
+		-- intentionally allowed through (Ergopti wrap symbols are on the AltGr layer).
+		if flags.cmd or flags.ctrl then return false end
 
 		local ok_ch, ch = pcall(function() return e:getCharacters() end)
 		if not ok_ch or type(ch) ~= "string" or ch == "" then return false end
@@ -633,12 +661,23 @@ function M.bind_wrap_text_if_selected(get_wrap_pairs)
 		-- Resolve the live symbol table on every keystroke so menu changes take effect immediately
 		local pairs_tbl = type(get_wrap_pairs) == "function" and get_wrap_pairs() or text_acts.WRAP_PAIRS
 		local pair = pairs_tbl[ch]
-		if not pair then return false end
 
-		-- Delegate to text_acts which handles AX reading, clipboard swap, and restore correctly
-		text_acts.surround_selection_if_selected(ch, pair.left, pair.right)
-		-- surround_selection_if_selected types the symbol when nothing is selected,
-		-- so we always suppress the raw event to avoid double-typing.
+		-- Probe the selection ONLY for configured wrap symbols (avoids an AX call on
+		-- every other keystroke). nil = nothing selected OR the app hides
+		-- AXSelectedText (e.g. VS Code / Electron).
+		local sel = pair and text_acts.read_ax_selection() or nil
+
+		local decision = M.wrap_event_decision(flags, ch, pairs_tbl, sel ~= nil)
+		-- Per-keystroke, so DEBUG only (silent at the default WARNING level): traces
+		-- the decision for punctuation keys, which is what makes a "does not wrap
+		-- here" report diagnosable without code changes.
+		if ch:match("%w") == nil and ch:match("%s") == nil then
+			Logger.debug(LOG, "wrap key=%q alt=%s match=%s sel=%s → %s",
+				ch, tostring(flags.alt == true), tostring(pair ~= nil), tostring(sel ~= nil), decision)
+		end
+
+		if decision ~= "wrap" then return false end
+		text_acts.wrap_selection(sel, pair.left, pair.right)
 		return true
 	end)
 	tap:start()

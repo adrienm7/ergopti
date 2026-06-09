@@ -31,6 +31,12 @@ local Updater       = require("lib.updater")
 local LOG = "menu"
 local load_errors = {}
 
+-- Delay before applying the user's "resume" keyboard layout at startup / reload.
+-- The script boots in the active (non-paused) state, so the resume layout should
+-- become the active one — but only after KE's first deploy + prime have settled,
+-- so the input-source-change rebuild does not race the boot deploy.
+local STARTUP_LAYOUT_SWITCH_DELAY_SEC = 4
+
 --- Safely loads a module and logs any loading failure.
 --- @param module_id string Lua module path.
 --- @param label string Human label used in logs.
@@ -531,6 +537,19 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	
 	if type(llm_handler) == "table" and type(llm_handler.check_startup) == "function" then pcall(llm_handler.check_startup) end
 	if type(hotstring_editor.set_update_menu) == "function" then pcall(hotstring_editor.set_update_menu, function() updateMenu() end) end
+
+	-- At startup / reload the script is in the active (non-paused) state, so honour
+	-- the user's chosen "resume" layout the same way a resume would: if the
+	-- pause-layout feature is on and a resume layout is configured, make it the
+	-- active layout. Deferred so it never blocks boot and runs after KE's first
+	-- deploy/prime. schedule_pause_layout_switch(false, …) is a no-op when the
+	-- feature is off or no resume layout is set.
+	hs.timer.doAfter(STARTUP_LAYOUT_SWITCH_DELAY_SEC, function()
+		local kbd_layout_mod = menu_mods.keyboard_layout
+		if kbd_layout_mod and type(kbd_layout_mod.schedule_pause_layout_switch) == "function" then
+			pcall(kbd_layout_mod.schedule_pause_layout_switch, false, state)
+		end
+	end)
 
 	if core_mods.shortcuts_mod then
 		if type(core_mods.shortcuts_mod.set_on_pause_change) == "function" then

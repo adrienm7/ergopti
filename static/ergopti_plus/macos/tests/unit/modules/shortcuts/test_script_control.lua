@@ -305,3 +305,89 @@ helpers.describe("ScriptControl suspend-exempt regression (pause_bindings API)",
 			"shortcuts module must expose resume_bindings()")
 	end)
 end)
+
+helpers.describe("ScriptControl eventtap watchdog (tap-disable recovery regression)", function()
+	-- Regression: a blocking osascript on the run loop (the pause/resume layout
+	-- switch) can make macOS disable the script-control CGEventTap. A disabled tap
+	-- silently stops delivering events, so AltGr+Enter (right_command + Enter) no
+	-- longer toggles pause AT ALL. M.start now arms a watchdog that re-enables the
+	-- tap so the script-management shortcuts can never get permanently stuck off.
+	helpers.it("re-enables the script-control tap after macOS disables it", function()
+		local started = 0
+		local enabled = true
+		local fake_tap = {
+			start     = function() started = started + 1; enabled = true end,
+			stop      = function() enabled = false end,
+			isEnabled = function() return enabled end,
+		}
+		local orig_new = _G.hs.eventtap.new
+		_G.hs.eventtap.new = function(_, _) return fake_tap end
+
+		SC.start({}, {}, {}, nil)
+		_G.hs.eventtap.new = orig_new
+
+		-- M.start must arm a recurring watchdog timer.
+		local watchdog = _G.hs.timer.__timers[#_G.hs.timer.__timers]
+		helpers.assert_true(watchdog ~= nil and watchdog.recurring == true,
+			"M.start must arm a recurring tap watchdog")
+
+		-- macOS disables the tap → the watchdog must restart it on its next tick.
+		enabled = false
+		local started_before = started
+		watchdog:fire()
+		helpers.assert_true(started > started_before, "watchdog must restart a disabled tap")
+		helpers.assert_true(enabled, "tap must be enabled again after the watchdog runs")
+
+		-- Healthy tap → the watchdog must be a no-op (no spurious restart).
+		local started_after = started
+		watchdog:fire()
+		helpers.assert_eq(started, started_after, "watchdog must not restart an already-enabled tap")
+
+		SC.stop()
+	end)
+end)
+
+helpers.describe("Karabiner layout-change must NOT kill the script-control eventtap (regression)", function()
+	-- Regression (root cause of « pause works once then AltGr+Enter dies forever »):
+	-- the karabiner input-source watcher rebinds layout-dependent hotkeys after a
+	-- layout switch. It used to call shortcuts.stop()/start() — but stop() also tears
+	-- down the script-control eventtap and start() is a Bindings-only proxy that never
+	-- revives it, so AltGr+Enter died on the FIRST layout switch (which the pause-layout
+	-- feature triggers on every pause). The handler must rebind via pause_bindings /
+	-- resume_bindings, which leave the keycode-based eventtap alive.
+	helpers.it("karabiner/init.lua rebinds via pause_bindings/resume_bindings, never shortcuts.stop/start", function()
+		local src_path = helpers.driver_root() .. "modules/karabiner/init.lua"
+		local fh = io.open(src_path, "r")
+		helpers.assert_true(fh ~= nil, "must be able to read karabiner/init.lua")
+		local src = fh:read("*a"); fh:close()
+
+		-- The layout-rebind path must use the binding-only helpers…
+		helpers.assert_true(src:find("shortcuts.pause_bindings", 1, true) ~= nil,
+			"layout rebind must call shortcuts.pause_bindings")
+		helpers.assert_true(src:find("shortcuts.resume_bindings", 1, true) ~= nil,
+			"layout rebind must call shortcuts.resume_bindings")
+		-- …and must NEVER stop/start the whole shortcuts module (that kills script-control).
+		helpers.assert_true(src:find("pcall(shortcuts.stop)", 1, true) == nil,
+			"layout rebind must not pcall(shortcuts.stop) — it tears down the script-control eventtap")
+		helpers.assert_true(src:find("pcall(shortcuts.start)", 1, true) == nil,
+			"layout rebind must not pcall(shortcuts.start) — Bindings-only proxy never revives script-control")
+	end)
+end)
+
+helpers.describe("Karabiner layout-change must respect pause (« pause = tout éteint » regression)", function()
+	-- Regression: the pause-layout feature switches the macOS layout on every pause,
+	-- which fires the karabiner input-source watcher. That handler would M.regenerate()
+	-- the FULL Ergopti config and re-arm the binding hotkeys — silently undoing the
+	-- pause (full remapping back, user-facing shortcuts live mid-pause). It must
+	-- short-circuit while the script is paused.
+	helpers.it("karabiner/init.lua skips the layout rebuild while the script is paused", function()
+		local src_path = helpers.driver_root() .. "modules/karabiner/init.lua"
+		local fh = io.open(src_path, "r")
+		helpers.assert_true(fh ~= nil, "must be able to read karabiner/init.lua")
+		local src = fh:read("*a"); fh:close()
+		helpers.assert_true(src:find("is_paused", 1, true) ~= nil,
+			"layout-change handler must consult the pause state")
+		helpers.assert_true(src:find("Layout change ignored", 1, true) ~= nil,
+			"layout-change handler must short-circuit (and log) while paused")
+	end)
+end)
