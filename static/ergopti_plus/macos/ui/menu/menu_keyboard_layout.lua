@@ -1331,7 +1331,7 @@ function M.build(ctx)
 			and display_for_record({ id = cur_pause, name = cur_pause:gsub("_", " "):gsub("%s+v%d.*$", "") })
 			or  i18n.get("menu.layout.layout_auto")
 		submenu[#submenu + 1] = {
-			title    = string.format("%s : %s", i18n.get("menu.layout.layout_on_pause"), pause_label),
+			title    = string.format("%s : %s ↳", i18n.get("menu.layout.layout_on_pause"), pause_label),
 			-- Grayed out when the feature is disabled or the script is currently paused
 			disabled = (not feature_on) or hs_paused_pre or nil,
 			menu     = build_layout_picker_submenu(cur_pause, function(id)
@@ -1345,7 +1345,7 @@ function M.build(ctx)
 			and display_for_record({ id = cur_resume, name = cur_resume:gsub("_", " "):gsub("%s+v%d.*$", "") })
 			or  i18n.get("menu.layout.layout_auto")
 		submenu[#submenu + 1] = {
-			title    = string.format("%s : %s", i18n.get("menu.layout.layout_on_resume"), resume_label),
+			title    = string.format("%s : %s ↳", i18n.get("menu.layout.layout_on_resume"), resume_label),
 			disabled = (not feature_on) or hs_paused_pre or nil,
 			menu     = build_layout_picker_submenu(cur_resume, function(id)
 				state.layout_on_resume = id
