@@ -401,12 +401,22 @@ function checkAhkAntiPatterns(file) {
 	// Check for UIA wrapper guard in hotstring_prefix_watcher.ahk.
 	// The guard was originally _UIA_WRAP_PAIRS.Has; after the refactor to
 	// WrapSymbols_GetActivePairs() the equivalent check is .Has(Char) on that call.
+	// The map may also be snapshotted into a local first — `X := WrapSymbols_GetActivePairs()`
+	// then `X.Has(Char)` — which is the preferred form (one lookup, consistent
+	// membership-vs-value read), so that pattern counts as a valid guard too.
 	if (file.includes('hotstring_prefix_watcher.ahk')) {
 		const hasUiaCall  = codeOnly.includes('GetUIASelection');
 		const hasOldGuard = codeOnly.includes('_UIA_WRAP_PAIRS.Has');
 		const hasNewGuard = codeOnly.includes('WrapSymbols_GetActivePairs().Has');
-		if (hasUiaCall && !hasOldGuard && !hasNewGuard) {
-			warn(file, null, `GetUIASelection used without _UIA_WRAP_PAIRS.Has guard. This causes severe lag.`);
+		// Snapshot form: any var assigned from WrapSymbols_GetActivePairs() whose .Has is checked.
+		let hasSnapshotGuard = false;
+		const snapRe = /(\w+)\s*:=\s*WrapSymbols_GetActivePairs\(\)/g;
+		let snap;
+		while ((snap = snapRe.exec(codeOnly)) !== null) {
+			if (codeOnly.includes(`${snap[1]}.Has`)) { hasSnapshotGuard = true; break; }
+		}
+		if (hasUiaCall && !hasOldGuard && !hasNewGuard && !hasSnapshotGuard) {
+			warn(file, null, `GetUIASelection used without an active-pairs .Has guard. This causes severe lag.`);
 		}
 	}
 
