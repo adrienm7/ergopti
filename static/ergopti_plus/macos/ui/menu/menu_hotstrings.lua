@@ -826,8 +826,8 @@ function M.build_custom(ctx, counts)
 		total_count = total_count + (counts.group_counts["custom"] or 0)
 	end
 
-	-- Strip leading "— " section marker for use as a plain notification label
-	local base_title = (i18n.get("menu.hotstrings.personal_header"):gsub("^— ", ""))
+	-- Use category.personal for the clickable sub-item title (distinct from the greyed section header)
+	local base_title = i18n.get("category.personal")
 	-- Always show count (even 0) — only enabled sections contribute
 	local title_str  = base_title .. " (" .. fmt_count(total_count) .. ")"
 
