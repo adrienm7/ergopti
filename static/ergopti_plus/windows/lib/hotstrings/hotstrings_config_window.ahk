@@ -951,11 +951,11 @@ _HCW_GetSections(Entry) {
 		} else if InMetaSections {
 			if RegExMatch(Line, "^([A-Za-z0-9_\-]+)\s*=\s*\{([^}]+)\}\s*$", &DM) {
 				Descs[StrLower(DM[1])] := _HCW_LocaleFromInlineTable(DM[2])
-			} else if RegExMatch(Line, "^([A-Za-z0-9_\-]+)\s*=\s*`"((?:[^`"\\]|\\.)*)`"\s*$", &DM) {
+			} else if RegExMatch(Line, '^([A-Za-z0-9_\-]+)\s*=\s*"((?:[^"\\]|\\.)*)"' . '\s*$', &DM) {
 				Descs[StrLower(DM[1])] := UnescapeTomlString(DM[2])
 			}
 		} else if (InMetaSecBlock != "") {
-			if RegExMatch(Line, "^description\s*=\s*`"((?:[^`"\\]|\\.)*)`"\s*$", &DM) {
+			if RegExMatch(Line, '^description\s*=\s*"((?:[^"\\]|\\.)*)"' . '\s*$', &DM) {
 				Descs[InMetaSecBlock] := UnescapeTomlString(DM[1])
 			}
 		}
@@ -964,7 +964,7 @@ _HCW_GetSections(Entry) {
 	Order := []
 	if (SectionsOrderRaw != "") {
 		Pos := 1
-		while (RegExMatch(SectionsOrderRaw, "`"([^`"]*)`"", &Tok, Pos)) {
+		while (RegExMatch(SectionsOrderRaw, '"([^"]*)"', &Tok, Pos)) {
 			T := StrLower(Tok[1])
 			if (T != "-" and Seen.Has(T)) {
 				Order.Push(T)

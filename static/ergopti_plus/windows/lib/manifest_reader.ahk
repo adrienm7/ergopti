@@ -127,7 +127,7 @@ ManifestFeatures() {
 }
 
 ; Return the manifest entries whose ``section`` exactly matches ``SectionPath``
-; — e.g. ``"ahk.layout"`` returns the four Layout features in their declared
+; — e.g. "ahk.layout" returns the four Layout features in their declared
 ; order. The array order in the source manifest is preserved by the codegen
 ; emitter, so callers can use this directly as the render order.
 ManifestFeaturesForSection(SectionPath) {
@@ -139,7 +139,7 @@ ManifestFeaturesForSection(SectionPath) {
 }
 
 ; Return the manifest entry whose canonical ``path`` matches ``V2Path`` (or
-; ``"ahk." . V2Path`` for AHK-only sections — the lookup accepts both
+; "ahk." . V2Path for AHK-only sections — the lookup accepts both
 ; shapes since the rest of the driver works with the stripped form).
 ; Returns ``false`` when no entry matches; callers fall back to whatever
 ; default they had before (e.g. Features.Description).

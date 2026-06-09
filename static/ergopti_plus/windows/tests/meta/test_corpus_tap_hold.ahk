@@ -139,16 +139,16 @@ Test("tap_hold corpus  --  configured=false vectors have config = null", _Corpus
 _CorpusTH_BuildToml(KeyId, Cfg) {
 	Lines := "[tap_hold.keys." . KeyId . "]`r`n"
 	if Cfg.Has("tap_action") and Cfg["tap_action"] != "" {
-		Lines .= "tap_action = `"" . Cfg["tap_action"] . "`"`r`n"
+		Lines .= 'tap_action = "' . Cfg["tap_action"] . '"' . "`r`n"
 	}
 	if Cfg.Has("time_activation_seconds") {
 		Lines .= "time_activation_seconds = " . Cfg["time_activation_seconds"] . "`r`n"
 	}
 	if Cfg.Has("hold_modifier") and Cfg["hold_modifier"] != "" {
-		Lines .= "hold_modifier = `"" . Cfg["hold_modifier"] . "`"`r`n"
+		Lines .= 'hold_modifier = "' . Cfg["hold_modifier"] . '"' . "`r`n"
 	}
 	if Cfg.Has("hold_layer") and Cfg["hold_layer"] != "" {
-		Lines .= "hold_layer = `"" . Cfg["hold_layer"] . "`"`r`n"
+		Lines .= 'hold_layer = "' . Cfg["hold_layer"] . '"' . "`r`n"
 	}
 	if Cfg.Has("enabled") {
 		Lines .= "enabled = " . (Cfg["enabled"] ? "true" : "false") . "`r`n"
@@ -299,7 +299,7 @@ _CorpusTH_UnconfiguredKeyReturnsNotConfigured() {
 			continue
 		}
 		; Build an empty config that does not contain the queried key
-		Content := "[tap_hold.keys.other_key]`r`ntap_action = `"x`"`r`n"
+		Content := "[tap_hold.keys.other_key]`r`n" . 'tap_action = "x"' . "`r`n"
 		Path    := _CorpusTH_WriteToml(Content)
 		TH      := LoadTapHoldToml(Path)
 		_CorpusTH_CleanToml()

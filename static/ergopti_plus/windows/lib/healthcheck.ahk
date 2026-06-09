@@ -194,7 +194,7 @@ HealthCheck_FormatMarkdown(Snapshot := 0) {
 	Lines.Push("")
 	Lines.Push("| Field | Value |")
 	Lines.Push("|---|---|")
-	Lines.Push("| ErgoptiPlus version | ``" . Snapshot["version"] . "`` |")
+	Lines.Push("| ErgoptiPlus version | " . '``' . Snapshot["version"] . '``' . " |")
 	Lines.Push("| Uptime | " . _HealthCheck_FormatUptime(Snapshot["uptime_sec"]) . " |")
 	Lines.Push("| AutoHotkey | " . Sys["ahk_version"] . " " . Sys["ahk_bitness"] . " |")
 	Lines.Push("| Windows | " . Sys["os_name"] . " |")
@@ -208,7 +208,7 @@ HealthCheck_FormatMarkdown(Snapshot := 0) {
 	Lines.Push("| DPI | " . Sys["dpi"] . " (" . Sys["dpi_scale"] . "%) |")
 	Lines.Push("| Locale | " . Sys["locale"] . " |")
 	if Sys["config_dir"] != ""
-		Lines.Push("| Config dir | ``" . Sys["config_dir"] . "`` |")
+		Lines.Push("| Config dir | " . '``' . Sys["config_dir"] . '``' . " |")
 	Lines.Push("")
 
 	; ── Session counters ──────────────────────────────────────────────────────
@@ -230,9 +230,9 @@ HealthCheck_FormatMarkdown(Snapshot := 0) {
 	Lines.Push("## Adapters (" . OkList.Length . "/" . Total . " OK)")
 	Lines.Push("")
 	for _, Name in OkList
-		Lines.Push("- ✓ ``" . Name . "``")
+		Lines.Push("- ✓ " . '``' . Name . '``')
 	for _, Name in FailList
-		Lines.Push("- ✗ ``" . Name . "``")
+		Lines.Push("- ✗ " . '``' . Name . '``')
 	Lines.Push("")
 
 	; ── Last recorded error ───────────────────────────────────────────────────
@@ -764,7 +764,7 @@ _HealthCheck_HE(s) {
 	s := StrReplace(s, "&",  "&amp;")
 	s := StrReplace(s, "<",  "&lt;")
 	s := StrReplace(s, ">",  "&gt;")
-	s := StrReplace(s, "`"", "&quot;")
+	s := StrReplace(s, '"', "&quot;")
 	return s
 }
 

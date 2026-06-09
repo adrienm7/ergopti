@@ -943,7 +943,7 @@ TestLogger_ErrorsEdgeCases() {
 	try FileDelete(ErrorsTmp)
 
 	LoggerError("Edge", "")  ; empty
-	LoggerError("Edge", "msg with `"quotes`" and `r`n newlines and `t tabs")
+	LoggerError("Edge", 'msg with "quotes" and ' . "`r`n newlines and `t tabs")
 	LoggerError("Edge", "dedup this exact error line")
 	LoggerError("Edge", "dedup this exact error line")  ; dedup candidate
 

@@ -73,7 +73,7 @@ MenuLabelFromDescriptionKey(DescKey, Path := "", V1Path := "") {
     return DescKey
 }
 
-; Try to resolve a localised label and return ``""`` when no candidate key
+; Try to resolve a localised label and return "" when no candidate key
 ; matches an entry in the active i18n locale. Used by callers that want to
 ; chain to a different fallback source (e.g. Features.Description for
 ; user-defined personal hotstring sections) rather than show the raw key.

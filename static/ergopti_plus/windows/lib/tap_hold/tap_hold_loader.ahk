@@ -199,7 +199,7 @@ TapHoldIsConfigured(TapHold, KeyId) {
 	return Entry.Has("tap_action") or Entry.Has("hold_layer") or Entry.Has("hold_modifier")
 }
 
-; Return the configured tap action for ``KeyId`` (a string) or ``""`` if
+; Return the configured tap action for ``KeyId`` (a string) or "" if
 ; absent. Callers compare to known action ids ("enter", "tab", "backspace"…)
 ; to decide which Send() to emit.
 TapHoldTapAction(TapHold, KeyId) {
@@ -221,7 +221,7 @@ TapHoldDuration(TapHold, KeyId) {
 }
 
 ; Return the configured hold modifier for ``KeyId`` (e.g. "ctrl", "shift",
-; "alt", "alt_gr") or ``""`` if the variant doesn't activate a modifier on
+; "alt", "alt_gr") or "" if the variant doesn't activate a modifier on
 ; hold (e.g. plain tap-only variants like CapsLock-BackSpace or LAlt-BackSpace
 ; key-repeat where the held key simply repeats the tap action).
 TapHoldHoldModifier(TapHold, KeyId) {
@@ -232,7 +232,7 @@ TapHoldHoldModifier(TapHold, KeyId) {
 	return Entry.Has("hold_modifier") ? Entry["hold_modifier"] : ""
 }
 
-; Return the configured hold layer for ``KeyId`` (e.g. "nav") or ``""`` if
+; Return the configured hold layer for ``KeyId`` (e.g. "nav") or "" if
 ; the variant doesn't activate a remap layer on hold. Used to distinguish
 ; Layer-on-hold variants from modifier-on-hold variants (e.g. LAlt-BackSpace
 ; vs LAlt-BackSpaceLayer share tap_action "backspace" but only the latter

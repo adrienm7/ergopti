@@ -54,7 +54,7 @@ Test("LoadTapHoldToml: missing file returns empty scaffold", _TH_MissingFileRetu
 _TH_ParsesSingleKeyEntry() {
 	Path := _TH_Write(
 		"[tap_hold.keys.caps_lock]`r`n"
-		. "tap_action = `"enter`"`r`n"
+		. 'tap_action = "enter"' . "`r`n"
 		. "time_activation_seconds = 0.35`r`n"
 	)
 	TH := LoadTapHoldToml(Path)
@@ -68,7 +68,7 @@ Test("LoadTapHoldToml: parses a single key entry", _TH_ParsesSingleKeyEntry)
 _TH_ParsesHoldModifier() {
 	Path := _TH_Write(
 		"[tap_hold.keys.left_ctrl]`r`n"
-		. "hold_modifier = `"ctrl`"`r`n"
+		. 'hold_modifier = "ctrl"' . "`r`n"
 	)
 	TH := LoadTapHoldToml(Path)
 	_TH_Clean()
@@ -79,7 +79,7 @@ Test("LoadTapHoldToml: parses hold_modifier", _TH_ParsesHoldModifier)
 _TH_ParsesHoldLayer() {
 	Path := _TH_Write(
 		"[tap_hold.keys.space]`r`n"
-		. "hold_layer = `"nav`"`r`n"
+		. 'hold_layer = "nav"' . "`r`n"
 	)
 	TH := LoadTapHoldToml(Path)
 	_TH_Clean()
@@ -90,9 +90,9 @@ Test("LoadTapHoldToml: parses hold_layer", _TH_ParsesHoldLayer)
 _TH_ParsesMultipleKeysIndependently() {
 	Path := _TH_Write(
 		"[tap_hold.keys.caps_lock]`r`n"
-		. "tap_action = `"backspace`"`r`n"
+		. 'tap_action = "backspace"' . "`r`n"
 		. "[tap_hold.keys.right_ctrl]`r`n"
-		. "tap_action = `"tab`"`r`n"
+		. 'tap_action = "tab"' . "`r`n"
 	)
 	TH := LoadTapHoldToml(Path)
 	_TH_Clean()
@@ -105,8 +105,8 @@ Test("LoadTapHoldToml: parses multiple keys independently", _TH_ParsesMultipleKe
 _TH_ParsesLayerMappingsBlock() {
 	Path := _TH_Write(
 		"[tap_hold.layers.nav.mappings]`r`n"
-		. "h = `"arrow_left`"`r`n"
-		. "j = `"arrow_down`"`r`n"
+		. 'h = "arrow_left"' . "`r`n"
+		. 'j = "arrow_down"' . "`r`n"
 	)
 	TH := LoadTapHoldToml(Path)
 	_TH_Clean()
@@ -119,9 +119,9 @@ Test("LoadTapHoldToml: parses layer mappings block", _TH_ParsesLayerMappingsBloc
 _TH_IgnoresUnrecognisedSectionHeaders() {
 	Path := _TH_Write(
 		"[some_other_section]`r`n"
-		. "foo = `"bar`"`r`n"
+		. 'foo = "bar"' . "`r`n"
 		. "[tap_hold.keys.lalt]`r`n"
-		. "tap_action = `"one_shot_shift`"`r`n"
+		. 'tap_action = "one_shot_shift"' . "`r`n"
 	)
 	TH := LoadTapHoldToml(Path)
 	_TH_Clean()
@@ -136,7 +136,7 @@ _TH_IgnoresBlankLinesAndComments() {
 		. "`r`n"
 		. "[tap_hold.keys.tab]`r`n"
 		. "; another comment`r`n"
-		. "tap_action = `"alt_tab_monitor`"`r`n"
+		. 'tap_action = "alt_tab_monitor"' . "`r`n"
 	)
 	TH := LoadTapHoldToml(Path)
 	_TH_Clean()
@@ -231,7 +231,7 @@ TestTapHold_InheritDefaultsFalse() {
 		"[tap_hold]`r`n"
 		. "inherit_defaults = false`r`n"
 		. "[tap_hold.keys.caps_lock]`r`n"
-		. "tap_action = `"`"`r`n"  ; empty to disable
+		. 'tap_action = ""' . "`r`n"  ; empty to disable
 	)
 	TH := LoadTapHoldToml(Path, "some_defaults.toml")
 	_TH_Clean()
@@ -409,7 +409,7 @@ _TH_CleanDefaults() {
 _TH_OverlayDefaultsOnlyWhenUserMissing() {
 	DefPath := _TH_WriteDefaults(
 		"[tap_hold.keys.caps_lock]`r`n"
-		. "tap_action = `"escape`"`r`n"
+		. 'tap_action = "escape"' . "`r`n"
 		. "time_activation_seconds = 0.35`r`n"
 	)
 	TH := LoadTapHoldToml(A_ScriptDir . "\does_not_exist_user.toml", DefPath)
@@ -424,12 +424,12 @@ Test("LoadTapHoldToml overlay: defaults used when user file missing", _TH_Overla
 _TH_OverlayUserWinsOnConflict() {
 	DefPath := _TH_WriteDefaults(
 		"[tap_hold.keys.caps_lock]`r`n"
-		. "tap_action = `"escape`"`r`n"
+		. 'tap_action = "escape"' . "`r`n"
 		. "time_activation_seconds = 0.35`r`n"
 	)
 	UserPath := _TH_Write(
 		"[tap_hold.keys.caps_lock]`r`n"
-		. "tap_action = `"enter`"`r`n"
+		. 'tap_action = "enter"' . "`r`n"
 	)
 	TH := LoadTapHoldToml(UserPath, DefPath)
 	_TH_Clean()
@@ -444,11 +444,11 @@ Test("LoadTapHoldToml overlay: user value wins on conflict", _TH_OverlayUserWins
 _TH_OverlayUserOnlyKeyPreserved() {
 	DefPath := _TH_WriteDefaults(
 		"[tap_hold.keys.caps_lock]`r`n"
-		. "tap_action = `"escape`"`r`n"
+		. 'tap_action = "escape"' . "`r`n"
 	)
 	UserPath := _TH_Write(
 		"[tap_hold.keys.my_custom_key]`r`n"
-		. "hold_modifier = `"shift`"`r`n"
+		. 'hold_modifier = "shift"' . "`r`n"
 	)
 	TH := LoadTapHoldToml(UserPath, DefPath)
 	_TH_Clean()
@@ -463,7 +463,7 @@ Test("LoadTapHoldToml overlay: user-only key is preserved alongside defaults", _
 _TH_OverlayBackwardCompatNoDefaults() {
 	Path := _TH_Write(
 		"[tap_hold.keys.tab]`r`n"
-		. "tap_action = `"tab`"`r`n"
+		. 'tap_action = "tab"' . "`r`n"
 	)
 	TH := LoadTapHoldToml(Path)
 	_TH_Clean()
@@ -475,7 +475,7 @@ Test("LoadTapHoldToml overlay: backward-compatible when DefaultsFilePath omitted
 _TH_InheritDefaultsFalseSkipsShippedDefaults() {
 	DefPath := _TH_WriteDefaults(
 		"[tap_hold.keys.caps_lock]`r`n"
-		. "tap_action = `"escape`"`r`n"
+		. 'tap_action = "escape"' . "`r`n"
 	)
 	UserPath := _TH_Write(
 		"[tap_hold]`r`n"

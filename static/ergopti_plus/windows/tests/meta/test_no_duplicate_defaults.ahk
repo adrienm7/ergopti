@@ -37,7 +37,7 @@ _MetaRunDuplicateDefaultsTests() {
 	DriverRoot := StrReplace(_DriverRootRaw, "\", "/") . "/"
 	Whitelist := Map(
 		"0", true, "1", true, "true", true, "false", true,
-		"`"`"", true, "300", true, "100", true, "50", true
+		'""', true, "300", true, "100", true, "50", true
 	)
 	Seen := Map()
 	for Sub in ["lib", "modules"] {

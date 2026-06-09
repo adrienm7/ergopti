@@ -46,7 +46,7 @@
 ; ===================================
 
 ; Stamped at build time by tools/build_static_bundle.py (see CI workflow):
-; the literal string ``"__BUNDLE_VERSION__"`` below is rewritten before Ahk2Exe
+; the literal string "__BUNDLE_VERSION__" below is rewritten before Ahk2Exe
 ; runs so the compiled exe ships with a stable identifier. In dev mode the
 ; placeholder stays as-is and we treat it as ``dev`` to disable any skip.
 global BUNDLE_VERSION := "__BUNDLE_VERSION__"
@@ -125,7 +125,7 @@ _Bundle_Unzip(ZipPath, DestDir) {
 	; -NoProfile keeps cold-start fast; -Command is a single string we build
 	; via FormatTime-free concatenation to avoid quoting surprises.
 	Cmd := "powershell -NoProfile -ExecutionPolicy Bypass -Command "
-		. "`"Expand-Archive -LiteralPath '" . ZipPath . "' -DestinationPath '" . DestDir . "' -Force`""
+		. '"' . "Expand-Archive -LiteralPath '" . ZipPath . "' -DestinationPath '" . DestDir . "' -Force" . '"'
 	ExitCode := 1
 	try {
 		ExitCode := RunWait(Cmd, , "Hide")

@@ -94,8 +94,10 @@ global _MenuDispatchLastFire := Map()
 
 ; Hard ceiling on retry delay (ms) — long enough for any reasonable AHK
 ; dispatch latency, short enough that the user doesn't perceive the
-; recovered click as laggy.
-global _MENU_RETRY_DELAY_MS := 150
+; recovered click as laggy. 60ms is sufficient: AHK always dispatches
+; within the first few ms when it does so; anything above ~20ms means a
+; drop has already occurred. The original 150ms was overly conservative.
+global _MENU_RETRY_DELAY_MS := 60
 
 
 

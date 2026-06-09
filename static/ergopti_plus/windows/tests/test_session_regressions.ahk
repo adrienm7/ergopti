@@ -33,12 +33,12 @@ Test("Regression: AHK v2 Array iteration logic (index vs value)", TestReg_ArrayI
 TestReg_TomlCountingFormats() {
     TmpFile := A_Temp . "\test_counts.toml"
     Body := "[section1]`n"
-         .  "key1 = `"val1`"`n"
-         .  "key2 = { output = `"val2`", is_word = true }`n"
+         .  'key1 = "val1"' . "`n"
+         .  'key2 = { output = "val2", is_word = true }' . "`n"
          .  "[section2]`n"
-         .  "`"key3`" = `"val3`"`n"
+         .  '"key3" = "val3"' . "`n"
          .  "[[section3]]`n"
-         .  "key4 = `"val4`"`n"
+         .  'key4 = "val4"' . "`n"
     
     FileDelete(TmpFile)
     FileAppend(Body, TmpFile, "UTF-8")

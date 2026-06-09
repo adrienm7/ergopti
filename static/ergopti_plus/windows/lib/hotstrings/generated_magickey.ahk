@@ -7403,7 +7403,7 @@ _GenLoad_magickey_text_expansion_symbols_typst(FeatureConfig, ExtraOptions := un
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", "$grave$", "``", _GenOpts)
+	CreateHotstring("*C", "$grave$", '``', _GenOpts)
 	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "magickey", "Section", "text_expansion_symbols_typst")
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
@@ -9238,7 +9238,7 @@ _GenLoad_magickey_text_expansion_symbols_typst(FeatureConfig, ExtraOptions := un
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", "$quote.double$", "`"", _GenOpts)
+	CreateHotstring("*C", "$quote.double$", '"', _GenOpts)
 	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "magickey", "Section", "text_expansion_symbols_typst")
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]

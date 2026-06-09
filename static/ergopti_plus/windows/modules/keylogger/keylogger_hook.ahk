@@ -127,7 +127,7 @@ class KLHook {
     ; Previous (app, title) values + their entry tick — used to emit
     ; ``app_switch`` / ``window_switch`` events when the focused app or
     ; title changes. Mirrors HS init.lua:862 / context_tracker.lua:230.
-    ; ``"" / 0`` signals « no observation yet », so the first refresh
+    ; "" / 0 signals « no observation yet », so the first refresh
     ; only seeds the values without emitting a spurious switch from
     ; the static "Unknown" defaults.
     static prev_app := ""

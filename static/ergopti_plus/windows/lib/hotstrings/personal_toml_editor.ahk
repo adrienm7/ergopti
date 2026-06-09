@@ -70,7 +70,7 @@ PersonalInfoTomlPath() {
 ; mixes raw \n with {Enter} for the same kind of payload.
 EscapeTomlValue(s) {
     s := StrReplace(s, "\", "\\")
-    s := StrReplace(s, "`"", "\`"")
+    s := StrReplace(s, '"', '\"')
     s := StrReplace(s, "`r`n", "{Enter}")
     s := StrReplace(s, "`r", "{Enter}")
     s := StrReplace(s, "`n", "{Enter}")
@@ -866,7 +866,7 @@ _DeleteEntry(W, LV, StatusText) {
     }
     E := Entries[Row]
     Confirm := MsgBox(
-        t("editor.hotstrings.btn_delete") . " `"" . E["trigger"] . "`" → `"" . E["output"] . "`" ?",
+        t("editor.hotstrings.btn_delete") . ' "' . E["trigger"] . '" → "' . E["output"] . '" ?',
         t("editor.hotstrings.title_confirm"), "YesNo Icon?"
     )
     if Confirm != "Yes" {
@@ -955,7 +955,7 @@ _DeleteSection(W, SectionDrop, LV, TriggerEdit, OutputEdit, ChkIsWord, ChkAutoEx
         ? _PersonalEditorData["sections"][_PersonalEditorSection]["entries"].Length
         : 0
     Confirm := MsgBox(
-        t("editor.hotstrings.btn_delete") . " `"" . _PersonalEditorSection . "`" (" . EntryCount . ") ?",
+        t("editor.hotstrings.btn_delete") . ' "' . _PersonalEditorSection . '" (' . EntryCount . ') ?',
         t("editor.hotstrings.title_confirm"), "YesNo Icon?"
     )
     if Confirm != "Yes" {

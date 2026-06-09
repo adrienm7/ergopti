@@ -16,7 +16,7 @@
 ;    arg for write, identical to the Win32 API) so the migration was a
 ;    near-mechanical search-and-replace.
 ; 2. Dotted-key tolerant: keys carrying a literal dot (``Foo.Enabled``) are
-;    rendered as TOML quoted keys (``"Foo.Enabled" = true``) and unquoted
+;    rendered as TOML quoted keys ("Foo.Enabled" = true) and unquoted
 ;    on read. The driver historically uses ``Feature.Enabled`` /
 ;    ``Feature.Letter`` strings that we keep untouched at call sites.
 ; 3. Cached parser: ``TOML_Parse`` reads the full file once into a nested
@@ -442,7 +442,7 @@ TOML_RenderString(s) {
 ; Look up Section/Key in a parsed cache (the Map produced by
 ; ``ParseTomlFile``). Returns ``Default`` (defaulting to the underscore
 ; sentinel) when either the section or the key is absent. Callers compare
-; against ``"_"`` to detect missing entries cheaply.
+; against "_" to detect missing entries cheaply.
 IniCacheGet(Cache, Section, Key, Default := "_") {
     if Cache.Has(Section) and Cache[Section].Has(Key) {
         return Cache[Section][Key]

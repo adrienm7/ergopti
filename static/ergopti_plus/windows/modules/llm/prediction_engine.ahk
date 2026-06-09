@@ -402,8 +402,8 @@ LLM_Engine_FirePrediction(buffer) {
 	}
 
 	; Cache hit (prefix match): the user has typed PAST the last cached
-	; context — e.g. cache was for ``"intelligen"`` and the user is now
-	; at ``"intelligence "``. If the cached top prediction STARTS with
+	; context — e.g. cache was for "intelligen" and the user is now
+	; at "intelligence ". If the cached top prediction STARTS with
 	; the user's typed delta, the rest of the prediction is still valid
 	; and we can re-display it (sliced to whatever remains). Mirrors the
 	; "soft cache" some IDE completions use: avoid a request when the
@@ -523,7 +523,7 @@ LLM_Engine_FirePrediction(buffer) {
 		log_model := model_tag
 		; Forward the per-profile stop sequences when the profile carries
 		; them. Power-user profiles use this to clip output at custom
-		; markers (e.g. ``"```"`` for a code profile, ``"\n\n"`` for a
+		; markers (e.g. ``` for a code profile, "\n\n" for a
 		; single-paragraph profile). Empty / missing → Ollama falls back
 		; to its built-in stops.
 		stop_seqs := (profile is Map and profile.Has("stop_sequences") and profile["stop_sequences"] is Array)

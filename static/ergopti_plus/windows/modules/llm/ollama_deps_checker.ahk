@@ -272,7 +272,7 @@ LLM_Deps_RunInstaller(model, on_ready, on_failed) {
 			; We DO want a console window (no ``/B``) — winget prints
 			; live progress there, otherwise the user has no feedback
 			; that anything is happening. The window closes on its own
-			; once winget exits. Setting ``"Hide"`` on the parent cmd
+			; once winget exits. Setting "Hide" on the parent cmd
 			; keeps that wrapper invisible; only winget's own window
 			; is shown.
 			Run('cmd.exe /c start "Ollama install" /LOW winget install --id Ollama.Ollama -e --accept-package-agreements --accept-source-agreements', , "Hide")

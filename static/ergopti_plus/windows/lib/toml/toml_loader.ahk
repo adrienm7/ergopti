@@ -171,8 +171,8 @@ UnescapeTomlString(s) {
             NextChar := SubStr(s, i + 1, 1)
             if (NextChar == "\") {
                 Result .= "\"
-            } else if (NextChar == "`"") {
-                Result .= "`""
+            } else if (NextChar == '"') {
+                Result .= '"'
             } else if (NextChar == "n") {
                 Result .= "`n"
             } else if (NextChar == "t") {
@@ -473,7 +473,7 @@ ParseTomlGroupConfig(CategoryName, FilePath := "") {
         if (Mode == "meta") {
             if RegExMatch(Line, "^delay\s*=\s*([0-9]+(?:\.[0-9]+)?)\s*$", &NumMatch) {
                 Config.Delay := NumMatch[1] + 0
-            } else if RegExMatch(Line, "^color\s*=\s*`"((?:[^`"\\]|\\.)*)`"\s*$", &ColMatch) {
+            } else if RegExMatch(Line, '^color\s*=\s*"((?:[^"\\]|\\.)*)"$', &ColMatch) {
                 Config.Color := UnescapeTomlString(ColMatch[1])
             } else if RegExMatch(Line, "^show_tooltip\s*=\s*(true|false)\s*$", &BoolMatch) {
                 Config.ShowTooltip := (BoolMatch[1] == "true")
@@ -482,11 +482,11 @@ ParseTomlGroupConfig(CategoryName, FilePath := "") {
             Sec := Config.Sections[CurrentSec]
             if RegExMatch(Line, "^delay\s*=\s*([0-9]+(?:\.[0-9]+)?)\s*$", &NumMatch) {
                 Sec.Delay := NumMatch[1] + 0
-            } else if RegExMatch(Line, "^color\s*=\s*`"((?:[^`"\\]|\\.)*)`"\s*$", &ColMatch) {
+            } else if RegExMatch(Line, '^color\s*=\s*"((?:[^"\\]|\\.)*)"$', &ColMatch) {
                 Sec.Color := UnescapeTomlString(ColMatch[1])
             } else if RegExMatch(Line, "^show_tooltip\s*=\s*(true|false)\s*$", &BoolMatch) {
                 Sec.ShowTooltip := (BoolMatch[1] == "true")
-            } else if RegExMatch(Line, "^description\s*=\s*`"((?:[^`"\\]|\\.)*)`"\s*$", &DescMatch) {
+            } else if RegExMatch(Line, '^description\s*=\s*"((?:[^"\\]|\\.)*)"$', &DescMatch) {
                 Sec.Description := UnescapeTomlString(DescMatch[1])
             }
         } else if (Mode == "meta_section_delays") {

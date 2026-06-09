@@ -142,7 +142,7 @@ ApplyConfigToml(Features, FilePath) {
 
 		; Parse ``key = value``. Quoted keys are accepted for IDs that
 		; contain reserved characters (rare in the manifest-generated config).
-		if RegExMatch(Line, "^`"([^`"\\]+)`"\s*=\s*(.+)$", &Match) {
+		if RegExMatch(Line, '^"([^"\\]+)"\s*=\s*(.+)$', &Match) {
 			Key := Match[1]
 			Value := TomlCoerceValueExt(Match[2])
 		} else if RegExMatch(Line, "^([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.+)$", &Match) {

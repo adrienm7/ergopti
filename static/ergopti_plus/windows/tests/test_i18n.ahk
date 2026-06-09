@@ -37,7 +37,7 @@ _I18nTestReset() {
 TestI18n_PauseSafe() {
 	_I18nTestReset()
 	; i18n init and t() must not depend on active keyboard state
-	Path := _I18nTmpJson("{`"test.key`": `"valeur`"}")
+	Path := _I18nTmpJson('{"test.key": "valeur"}')
 	_I18nLoadFile(Path)
 	AssertEqual("valeur", t("test.key"))
 	_I18nTestReset()

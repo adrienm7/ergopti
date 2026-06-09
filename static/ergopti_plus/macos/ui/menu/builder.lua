@@ -36,8 +36,36 @@ local DEBUG_MENU_FALLBACK = {
 }
 
 
+-- Single parsed representation of menu_manifest.json for the session.
+-- Both load_ergopti_groups() and load_debug_menu() share this cache so the
+-- file is read and parsed only once, no matter how many menu rebuilds occur.
+-- Never invalidated on toggle (the manifest is a static asset that never
+-- changes at runtime); only a full hs.reload() resets this module.
+local _manifest_cache       = nil
 local _ergopti_groups_cache = nil
 local _debug_menu_cache     = nil
+
+--- Loads and caches menu_manifest.json once per session.
+--- @return table|nil Parsed manifest data, or nil on failure.
+local function load_manifest()
+	if _manifest_cache then return _manifest_cache end
+	local manifest_path = Paths.find_from_configdir("shared/menu_manifest.json") or ""
+	local ok_r, fh = pcall(io.open, manifest_path, "r")
+	if not ok_r or not fh then
+		Logger.error(LOG, "Cannot open menu_manifest.json at '%s'.", manifest_path)
+		return nil
+	end
+	local content = fh:read("*a")
+	fh:close()
+	local ok_j, data = pcall(hs.json.decode, content)
+	if not ok_j or type(data) ~= "table" then
+		Logger.error(LOG, "Failed to parse menu_manifest.json.")
+		return nil
+	end
+	_manifest_cache = data
+	Logger.debug(LOG, "menu_manifest.json loaded and cached.")
+	return data
+end
 
 --- Loads hotstring group classification from the shared menu_manifest.json.
 --- Falls back to the hardcoded set if the file cannot be read or parsed.
@@ -45,17 +73,9 @@ local _debug_menu_cache     = nil
 --- @return table<string,boolean> Set of group IDs specific to the Ergopti layout.
 local function load_ergopti_groups()
 	if _ergopti_groups_cache then return _ergopti_groups_cache end
-	local manifest_path = Paths.find_from_configdir("shared/menu_manifest.json") or ""
-	local ok_r, fh = pcall(io.open, manifest_path, "r")
-	if not ok_r or not fh then
-		Logger.error(LOG, "Cannot open menu_manifest.json at '%s' — Ergopti groups unavailable.", manifest_path)
-		return ERGOPTI_GROUPS_FALLBACK
-	end
-	local content = fh:read("*a")
-	fh:close()
-	local ok_j, data = pcall(hs.json.decode, content)
-	if not ok_j or type(data) ~= "table" or type(data.hotstring_groups) ~= "table" then
-		Logger.error(LOG, "Failed to parse menu_manifest.json — using fallback.")
+	local data = load_manifest()
+	if not data or type(data.hotstring_groups) ~= "table" then
+		Logger.error(LOG, "Cannot load Ergopti groups from manifest — using fallback.")
 		return ERGOPTI_GROUPS_FALLBACK
 	end
 	local groups = {}
@@ -78,17 +98,9 @@ end
 --- @return table Array of {id} entries in display order.
 local function load_debug_menu()
 	if _debug_menu_cache then return _debug_menu_cache end
-	local manifest_path = Paths.find_from_configdir("shared/menu_manifest.json") or ""
-	local ok_r, fh = pcall(io.open, manifest_path, "r")
-	if not ok_r or not fh then
-		Logger.error(LOG, "Cannot open menu_manifest.json for debug menu — unavailable.")
-		return DEBUG_MENU_FALLBACK
-	end
-	local content = fh:read("*a")
-	fh:close()
-	local ok_j, data = pcall(hs.json.decode, content)
-	if not ok_j or type(data) ~= "table" or type(data.debug_menu) ~= "table" then
-		Logger.error(LOG, "Failed to parse debug_menu from manifest — unavailable.")
+	local data = load_manifest()
+	if not data or type(data.debug_menu) ~= "table" then
+		Logger.error(LOG, "Failed to load debug_menu from manifest — using fallback.")
 		return DEBUG_MENU_FALLBACK
 	end
 
@@ -113,10 +125,13 @@ local function load_debug_menu()
 end
 
 
---- Invalidates the builder caches — call after hot-reload or locale change.
+--- Invalidates locale-dependent caches — call after hot-reload or locale change.
+--- Does NOT clear the manifest cache (_manifest_cache, _ergopti_groups_cache,
+--- _debug_menu_cache): these are derived from a static file and are safe to
+--- keep across toggles; only a full hs.reload() should reset them.
 function M.invalidate_cache()
-	_ergopti_groups_cache = nil
-	_debug_menu_cache     = nil
+	-- Intentionally empty: manifest-derived caches are session-stable.
+	-- HotCounter's file-content cache is similarly preserved (see hotstring_counter.lua).
 end
 
 
