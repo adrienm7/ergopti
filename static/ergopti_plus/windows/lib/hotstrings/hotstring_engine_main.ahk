@@ -214,13 +214,32 @@ HSE_Register(Flags, Trigger, Callback, Meta := unset) {
         return
     }
     HSE_SeqCounter++
+    ; Resolve the group used by HSE_EnableGroup / HSE_DisableGroup for live,
+    ; reload-free section toggling. An explicit Meta "group" always wins; when
+    ; absent we derive "<category>.<section>" from the dispatch metadata so every
+    ; hotstring loaded for a TOML section lands in its own toggleable group.
+    ; Section-less registrations (inline expansions, unit tests) stay "default".
+    ; Meta may be a Map (legacy / tests) or an object (production _MakeHotstringMeta).
     Group := "default"
     GroupOrder := 0
-    if IsSet(Meta) and Meta is Map and Meta.Has("group") {
-        Group := Meta["group"]
-    }
-    if IsSet(Meta) and Meta is Map and Meta.Has("group_order") {
-        GroupOrder := Meta["group_order"]
+    if IsSet(Meta) {
+        if Meta is Map {
+            if Meta.Has("group")
+                Group := Meta["group"]
+            if Meta.Has("group_order")
+                GroupOrder := Meta["group_order"]
+            if (Group == "default" and Meta.Has("Category") and Meta.Has("Section")
+                and Meta["Category"] != "" and Meta["Section"] != "")
+                Group := Meta["Category"] . "." . Meta["Section"]
+        } else {
+            if Meta.HasOwnProp("group")
+                Group := Meta.group
+            if Meta.HasOwnProp("group_order")
+                GroupOrder := Meta.group_order
+            if (Group == "default" and Meta.HasOwnProp("Category") and Meta.HasOwnProp("Section")
+                and Meta.Category != "" and Meta.Section != "")
+                Group := Meta.Category . "." . Meta.Section
+        }
     }
     IsStar := InStr(Flags, "*") > 0
     ; StarBase: trigger without trailing magic key (for magic-key cycling).

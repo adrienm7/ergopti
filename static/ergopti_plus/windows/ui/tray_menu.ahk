@@ -347,6 +347,15 @@ _ApplyMenuLabelDynamicSubstitutions(Label, V1Path) {
 }
 
 ToggleMenuVariableByPath(FullPath) {
+	; Fast path: pure hotstring section toggles flip their HSE group live, with
+	; no script Reload (the menu rebuilds in-process). _HS_TryLiveToggle returns
+	; false for anything not on the live whitelist (inline-generated sections,
+	; cross-dependent features, layout / tap-holds / shortcuts), which then take
+	; the persist-and-Reload path below — unchanged.
+	if _HS_TryLiveToggle(FullPath) {
+		return
+	}
+
 	; Resolve current state via Features first, falling back to Features
 	; v1 for non-manifest features (TapHolds variants especially). Without
 	; the fallback, the FIRST click on a TapHolds variant would always see
@@ -369,6 +378,119 @@ ToggleMenuVariableByPath(FullPath) {
 	Batch.Push(Map("v1_path", FullPath . ".Enabled", "value", NewValue))
 	WriteFeatureBatch(Batch)
 	Reload
+}
+
+; Attempt to apply a hotstring section toggle LIVE, without a script Reload.
+; Returns true when the toggle was fully handled (HSE group flipped, feature
+; flag persisted, tray menu rebuilt); false when FullPath is not a live-eligible
+; hotstring section — the caller then takes the persist-and-Reload path.
+;
+; Eligibility and the HSE group derivation live in
+; lib/hotstrings/hotstring_live_toggle.ahk. Two fail-safes keep this from ever
+; silently mis-toggling: an unlisted path returns false, and a live DISABLE only
+; runs when the derived group actually exists in the HSE registry (so a section
+; id mismatch degrades to Reload instead of a silent no-op).
+_HS_TryLiveToggle(FullPath) {
+	global Features, HSE_RegistryByGroup
+	Info := _HS_ResolveLiveToggle(FullPath)
+	if (Info == false) {
+		return false
+	}
+
+	NewEnabled := !_ResolveMenuItemEnabled(FullPath)
+
+	if NewEnabled {
+		if HSE_RegistryByGroup.Has(Info.group) {
+			; Registered this session (on at boot, or enabled then disabled
+			; earlier) — re-arm without re-parsing the TOML.
+			HSE_EnableGroup(Info.group)
+		} else {
+			; Off at boot — lazy-load once. Bundled categories resolve through
+			; the generated loaders; personal sections parse their TOML. Fail
+			; safe to Reload when registration unexpectedly produced no group.
+			LoadHotstringsSection(Info.loadcat, Info.section, Info.cfg)
+			if !HSE_RegistryByGroup.Has(Info.group) {
+				return false
+			}
+		}
+	} else {
+		if !HSE_RegistryByGroup.Has(Info.group) {
+			; Nothing registered to disable live — fall back to Reload.
+			return false
+		}
+		HSE_DisableGroup(Info.group)
+	}
+
+	; Persist + mirror into the in-memory Features Map (no Reload). Done only
+	; after the HSE op succeeds so a fail-safe bail above leaves all state
+	; untouched for the caller's Reload path.
+	WriteFeatureUpdate(FullPath . ".Enabled", NewEnabled)
+
+	; Keep the preview-tooltip index in lockstep with the HSE registry. The
+	; prefix watcher maintains its OWN section-filtered index (built from
+	; Features at boot), so without this rebuild a disabled section would keep
+	; previewing an expansion that no longer fires, and a freshly enabled
+	; section would fire with no tooltip. The rebuild re-reads Features (just
+	; updated above), so both directions resolve correctly.
+	if IsSet(HotstringPrefixWatcherRebuildIndex) {
+		HotstringPrefixWatcherRebuildIndex()
+	}
+
+	; Rebuild the tray in-process so the checkmark and (N) counts reflect the
+	; new state on the next open — the same rebuild LoggerSetLevel performs.
+	RebuildTrayMenu()
+	return true
+}
+
+; Resolve a v1 feature path to its live-toggle descriptor, or false when the
+; path is not an eligible hotstring section. The descriptor carries the HSE
+; group, the LoadHotstringsSection category + section (for lazy-load), and the
+; v2 Features config Map (for lazy-load options). Side-effect free.
+_HS_ResolveLiveToggle(FullPath) {
+	global Features
+	; Personal sections: "Personal.<id>" — always eligible.
+	if _HS_IsPersonalLiveToggle(FullPath) {
+		Parts := StrSplit(FullPath, ".")
+		Sec := StrLower(Parts[2])
+		if !(Features.Has("hotstrings") and Features["hotstrings"].Has("personal")
+			and Features["hotstrings"]["personal"].Has(Sec)) {
+			return false
+		}
+		return {
+			group: "personal." . Sec,
+			loadcat: "personal",
+			section: Sec,
+			cfg: Features["hotstrings"]["personal"][Sec]
+		}
+	}
+
+	; Bundled categories: translate to the v2 manifest path and check the
+	; whitelist. Anything without a manifest counterpart (TapHolds, runtime
+	; Personal) or off the whitelist returns false.
+	V2Path := LegacyPathToManifestPath(FullPath)
+	if (V2Path == "") {
+		return false
+	}
+	V2Parts := StrSplit(V2Path, ".")
+	if (V2Parts.Length != 3 or V2Parts[1] != "hotstrings") {
+		return false
+	}
+	V2Cat := V2Parts[2]
+	Section := V2Parts[3]
+	Group := _HS_DeriveLiveToggleGroup(V2Cat, Section)
+	if !_HS_IsLiveToggleGroup(Group) {
+		return false
+	}
+	if !(Features.Has("hotstrings") and Features["hotstrings"].Has(V2Cat)
+		and Features["hotstrings"][V2Cat].Has(Section)) {
+		return false
+	}
+	return {
+		group: Group,
+		loadcat: StrReplace(V2Cat, "_", ""),
+		section: Section,
+		cfg: Features["hotstrings"][V2Cat][Section]
+	}
 }
 
 ; Return the list of sibling v1 feature paths that must be force-set to false
