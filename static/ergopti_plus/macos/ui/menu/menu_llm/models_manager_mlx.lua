@@ -265,7 +265,7 @@ function M.new(deps, presets)
 			local screen = hs.screen.mainScreen()
 			local f = screen and type(screen.frame) == "function" and screen:frame() or {x=0, y=0, w=1920, h=1080}
 			
-			local W, H = 520, 400
+			local W, H = 1560, 400
 			local frame = {
 				x = math.floor(f.x + (f.w - W) / 2),
 				y = math.floor(f.y + (f.h - H) / 2),
