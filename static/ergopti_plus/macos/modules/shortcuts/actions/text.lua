@@ -59,40 +59,80 @@ local FALLBACK_GROUPS = {
 		{ left = '"', right = '"' }, { left = "'", right = "'" } } },
 }
 
---- Resolves the shared/wrap_symbols.json path from this module's own on-disk
---- location, independent of any config-dir override, so the catalogue loads
---- identically in the packaged app and in headless unit tests.
---- @return string|nil Absolute path, or nil if the source path is unresolvable.
-local function shared_wrap_symbols_path()
+--- Returns the ordered candidate paths for shared/wrap_symbols.json, most
+--- reliable first.
+---   1. The deployment-aware resolver (the same lib.paths walk that locates
+---      menu_manifest.json) — robust to packaged .app builds and symlinked
+---      ~/.hammerspoon setups where a fixed relative path does not reach the
+---      repository's shared/ directory.
+---   2. A module-relative path — covers the plain repo checkout and the headless
+---      unit tests, where lib.paths is stubbed and cannot resolve the real tree.
+--- @return table Array of path strings.
+local function shared_catalogue_candidates()
+	local candidates = {}
+	local ok_p, Paths = pcall(require, "lib.paths")
+	if ok_p and type(Paths) == "table" and type(Paths.find_from_configdir) == "function" then
+		local ok_find, resolved = pcall(Paths.find_from_configdir, "shared/wrap_symbols.json")
+		if ok_find and type(resolved) == "string" and resolved ~= "" then
+			candidates[#candidates + 1] = resolved
+		end
+	end
 	local src = debug.getinfo(1, "S").source
 	if src:sub(1, 1) == "@" then src = src:sub(2) end
 	-- src = .../ergopti_plus/macos/modules/shortcuts/actions/text.lua
 	local actions_dir = src:match("^(.*)[/\\][^/\\]+%.lua$")
-	if not actions_dir then return nil end
-	-- actions → shortcuts → modules → macos → ergopti_plus, then shared/
-	return actions_dir .. "/../../../../shared/wrap_symbols.json"
+	if actions_dir then
+		-- actions → shortcuts → modules → macos → ergopti_plus, then shared/
+		candidates[#candidates + 1] = actions_dir .. "/../../../../shared/wrap_symbols.json"
+	end
+	return candidates
 end
 
 --- Reads the shared catalogue and returns its ordered groups, or nil on failure.
+--- Tries each candidate path until one opens and parses successfully.
 --- @return table|nil Array of groups (each {i18n=<label key>, pairs={{left,right},…}}).
 local function load_shared_groups()
-	local path = shared_wrap_symbols_path()
-	if not path then return nil end
-	local fh = io.open(path, "r")
-	if not fh then return nil end
-	local content = fh:read("*a")
-	fh:close()
-	if type(content) ~= "string" or content == "" then return nil end
-	local ok, data = pcall(hs.json.decode, content)
-	if not ok or type(data) ~= "table" or type(data.groups) ~= "table" then return nil end
-	return data.groups
+	for _, path in ipairs(shared_catalogue_candidates()) do
+		local fh = io.open(path, "r")
+		if fh then
+			local content = fh:read("*a")
+			fh:close()
+			if type(content) == "string" and content ~= "" then
+				-- Strip a leading UTF-8 BOM — hs.json.decode rejects it.
+				if content:sub(1, 3) == "\239\187\191" then content = content:sub(4) end
+				local ok, data = pcall(hs.json.decode, content)
+				if ok and type(data) == "table" and type(data.groups) == "table" and #data.groups > 0 then
+					return data.groups
+				end
+			end
+		end
+	end
+	return nil
+end
+
+-- Normalize a raw groups array to the canonical {i18n, pairs} shape. Tolerates
+-- the older bare-array-of-pairs shape so a shape mismatch (e.g. a stale on-disk
+-- catalogue) can never silently empty the lookup and stop ALL wrapping.
+local function normalize_groups(raw)
+	local out = {}
+	for _, g in ipairs(raw or {}) do
+		if type(g) == "table" then
+			if type(g.pairs) == "table" then
+				out[#out + 1] = { i18n = g.i18n, pairs = g.pairs }
+			elseif type(g[1]) == "table" then
+				-- Bare array of {left,right} pairs (legacy / hand-edited shape).
+				out[#out + 1] = { i18n = nil, pairs = g }
+			end
+		end
+	end
+	return out
 end
 
 -- Build WRAP_GROUPS (ordered, each {i18n, pairs}) and WRAP_PAIRS (flattened
 -- lookup) from the shared catalogue, falling back to the minimal emergency set
 -- on any failure.
-local WRAP_GROUPS = load_shared_groups()
-if type(WRAP_GROUPS) ~= "table" or #WRAP_GROUPS == 0 then
+local WRAP_GROUPS = normalize_groups(load_shared_groups())
+if #WRAP_GROUPS == 0 then
 	Logger.warn(LOG, "Shared wrap-symbols catalogue unreadable — using emergency fallback.")
 	WRAP_GROUPS = FALLBACK_GROUPS
 end
@@ -107,6 +147,21 @@ for _, group in ipairs(WRAP_GROUPS) do
 				WRAP_PAIRS[pair.right] = { left = pair.left, right = pair.right }
 			end
 		end
+	end
+end
+
+-- Surface the catalogue size at load. An empty catalogue (a path/parse failure)
+-- would silently break ALL wrapping, so it is logged loudly as an ERROR; the
+-- healthy case is a one-shot INFO that confirms the source the catalogue came
+-- from. Kept permanently — cheap (fires once) and invaluable when wrapping
+-- mysteriously stops in a given deployment.
+do
+	local key_count = 0
+	for _ in pairs(WRAP_PAIRS) do key_count = key_count + 1 end
+	if key_count == 0 then
+		Logger.error(LOG, "Wrap catalogue is EMPTY — selection wrapping is disabled. Catalogue path/parse failed.")
+	else
+		Logger.info(LOG, "Wrap catalogue ready: %d group(s), %d lookup key(s).", #WRAP_GROUPS, key_count)
 	end
 end
 
@@ -269,9 +324,12 @@ function M.select_word()
 end
 
 --- Returns the AXSelectedText of the focused UI element, or nil if unavailable.
---- Uses the Accessibility API so no clipboard manipulation is needed.
---- @return string|nil The selected text, or nil when nothing is selected.
-local function ax_selected_text()
+--- Uses the Accessibility API so no clipboard manipulation is needed. Returns nil
+--- BOTH when nothing is selected AND when the focused app does not expose
+--- AXSelectedText (notably Electron apps such as VS Code). Callers MUST treat nil
+--- as "cannot wrap" and let the raw symbol type through, never swallow it.
+--- @return string|nil The selected text, or nil when unavailable.
+function M.read_ax_selection()
 	local ok_ax, ax = pcall(require, "hs.axuielement")
 	if not ok_ax or not ax then return nil end
 
@@ -323,28 +381,40 @@ function M.build_active_wrap_pairs(symbol_states, custom_symbols)
 	return result
 end
 
---- Wraps the current selection with left/right symbols, or types the symbol if nothing is selected.
---- Uses AXSelectedText to avoid touching the clipboard.
+--- Replaces an already-read, non-empty selection with ``left .. sel .. right``
+--- via the clipboard. The caller MUST have confirmed a selection exists (use
+--- read_ax_selection); this never types a bare symbol, so it is only ever called
+--- on the path that has decided to suppress the original keystroke.
+--- @param sel string The current selection text (non-empty).
+--- @param left string Opening symbol to prepend.
+--- @param right string Closing symbol to append.
+function M.wrap_selection(sel, left, right)
+	Logger.debug(LOG, "Wrapping %d-char selection with '%s'…'%s'.", #sel, left, right)
+	local prior = pasteboard.getContents()
+	pcall(pasteboard.setContents, left .. sel .. right)
+	timer.doAfter(0, function()
+		eventtap.keyStroke({"cmd"}, "v", 0.02)
+		timer.doAfter(0.25, function()
+			pcall(function()
+				if prior and prior ~= "" then pasteboard.setContents(prior)
+				else pasteboard.clearContents() end
+			end)
+			Logger.done(LOG, "Selection wrapped.")
+		end)
+	end)
+end
+
+--- Wraps the current selection with left/right symbols, or types the symbol if
+--- nothing is selected. Retained for compatibility; the eventtap path now reads
+--- the selection itself (read_ax_selection) so it can pass the key through
+--- untouched when no selection is available — that path never reaches here.
 --- @param symbol string The raw character typed by the user.
 --- @param left string Opening symbol to prepend.
 --- @param right string Closing symbol to append.
 function M.surround_selection_if_selected(symbol, left, right)
-	local sel = ax_selected_text()
-
+	local sel = M.read_ax_selection()
 	if sel then
-		Logger.debug(LOG, "Wrapping %d-char selection with '%s'…'%s'.", #sel, left, right)
-		local prior = pasteboard.getContents()
-		pcall(pasteboard.setContents, left .. sel .. right)
-		timer.doAfter(0, function()
-			eventtap.keyStroke({"cmd"}, "v", 0.02)
-			timer.doAfter(0.25, function()
-				pcall(function()
-					if prior and prior ~= "" then pasteboard.setContents(prior)
-					else pasteboard.clearContents() end
-				end)
-				Logger.done(LOG, "Selection wrapped.")
-			end)
-		end)
+		M.wrap_selection(sel, left, right)
 	else
 		-- No selection — type the raw symbol so the key behaves normally
 		hs.eventtap.keyStrokes(symbol)

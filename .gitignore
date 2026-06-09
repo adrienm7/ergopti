@@ -52,6 +52,9 @@ __pycache__/
 
 logs/
 *.log
+# Hammerspoon/driver runtime console dump occasionally captured at the repo root
+# for debugging — never part of the source tree.
+/log.txt
 
 
 

@@ -629,6 +629,22 @@ function M.init(file_system)
 		hs.timer.doAfter(0.5, function()
 			local new_actions = Config.load_available_actions(ACTIONS_FILE)
 			if new_actions then M.AVAILABLE_ACTIONS = new_actions end
+
+			-- A layout switch fired WHILE PAUSED is almost always the pause-layout
+			-- feature switching us off Ergopti as part of the pause itself. Redeploying
+			-- the full remapping or re-arming the binding hotkeys here would silently
+			-- undo the pause (« pause = tout éteint »): KE would get the full Ergopti
+			-- config back and the user-facing shortcuts would come alive mid-pause. So
+			-- while paused we leave the pause state untouched — the script-control rules
+			-- already deployed by M.pause() are layout-independent (fixed key_codes), so
+			-- AltGr+Enter/Backspace/Escape still work on the new layout. The eventual
+			-- resume regenerates the full config for real.
+			local ok_sc, shortcuts = pcall(require, "modules.shortcuts")
+			if ok_sc and shortcuts and type(shortcuts.is_paused) == "function" and shortcuts.is_paused() then
+				Logger.info(LOG, "Layout change ignored — script is paused (« pause = tout éteint »).")
+				return
+			end
+
 			if _state and _state.enabled then
 				M.regenerate()
 				Logger.success(LOG, "Layout-change rebuild complete — KE reloaded from '%s'.", KARABINER_OUT)
@@ -637,11 +653,15 @@ function M.init(file_system)
 			end
 			-- Rebuild Hammerspoon hotkeys so they track the new physical key positions.
 			-- hs.hotkey.bind resolves key names at bind time, so existing bindings point
-			-- at the old layout's scancodes until stop()/start() is called.
-			local ok_sc, shortcuts = pcall(require, "modules.shortcuts")
-			if ok_sc and shortcuts and type(shortcuts.stop) == "function" and type(shortcuts.start) == "function" then
-				pcall(shortcuts.stop)
-				pcall(shortcuts.start)
+			-- at the old layout's scancodes until they are re-bound. Use pause_bindings/
+			-- resume_bindings — NOT shortcuts.stop()/start(): stop() also tears down the
+			-- script-control eventtap (AltGr+Enter pause/resume) and start() is a
+			-- Bindings-only proxy that never revives it, so the un-pause shortcut would
+			-- die on the first layout switch. These helpers rebind the layout-dependent
+			-- hotkeys while leaving the keycode-based, layout-independent eventtap alive.
+			if type(shortcuts.pause_bindings) == "function" and type(shortcuts.resume_bindings) == "function" then
+				pcall(shortcuts.pause_bindings)
+				pcall(shortcuts.resume_bindings)
 				Logger.info(LOG, "Shortcuts rebound for layout '%s'.", layout_name)
 			end
 		end)

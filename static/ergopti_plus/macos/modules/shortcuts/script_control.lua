@@ -57,9 +57,17 @@ local KEYCODE_BACKSPACE = Keycodes.BACKSPACE
 local KEYCODE_RETURN    = Keycodes.RETURN
 local KEYCODE_ESCAPE    = Keycodes.ESCAPE
 
+-- The script-control eventtap lives on the main run loop. macOS disables a
+-- CGEventTap whose callback is stalled past the system timeout — and a blocking
+-- osascript on that run loop (e.g. the pause/resume layout switch) can trip it.
+-- A disabled tap silently stops delivering events, stranding the un-pause
+-- shortcut, so a watchdog re-enables it on this interval as a hard safety net.
+local TAP_WATCHDOG_INTERVAL_SEC = 2
+
 -- Module-level state
 local _is_paused       = false
 local _tap             = nil
+local _tap_watchdog    = nil
 local _key_actions     = {return_key = "script_pause_toggle", backspace = "script_reload", escape = "script_quit"}
 local _on_pause_change = nil
 local _extras          = {}
@@ -336,6 +344,17 @@ function M.start(keymap, shortcuts, gestures, karabiner)
 
 	_tap = new_tap
 	pcall(function() _tap:start() end)
+
+	-- Hard safety net: if macOS ever disables the tap (a stalled callback or a
+	-- blocking osascript on the run loop), re-enable it so the script-management
+	-- shortcuts can never get permanently stuck off.
+	if _tap_watchdog then pcall(function() _tap_watchdog:stop() end) end
+	_tap_watchdog = hs.timer.doEvery(TAP_WATCHDOG_INTERVAL_SEC, function()
+		if _tap and type(_tap.isEnabled) == "function" and not _tap:isEnabled() then
+			Logger.warn(LOG, "Script-control eventtap was disabled by macOS — re-enabling.")
+			pcall(function() _tap:start() end)
+		end
+	end)
 	Logger.success(LOG, "Script control started.")
 end
 
@@ -347,6 +366,11 @@ function M.stop()
 		Logger.debug(LOG, "M.stop(): eventtap was not running — nothing to do.")
 		Logger.success(LOG, "Script control stopped.")
 		return
+	end
+
+	if _tap_watchdog then
+		pcall(function() _tap_watchdog:stop() end)
+		_tap_watchdog = nil
 	end
 
 	if type(_tap.stop) == "function" then

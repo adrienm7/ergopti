@@ -377,3 +377,22 @@ helpers.describe("menu_keyboard_layout.schedule_pause_layout_switch (eventtap-ti
 		end)
 	end)
 end)
+
+helpers.describe("Startup applies the resume layout (regression)", function()
+	-- The pause-layout feature switches layout on pause AND resume, but the chosen
+	-- "resume" (active-state) layout was never applied at HS startup/reload — only
+	-- on an actual pause→resume cycle. The script boots in the non-paused state, so
+	-- startup must honour layout_on_resume the same way a resume would: ui/menu/init.lua
+	-- calls schedule_pause_layout_switch(false, state) once the boot settles. Behaviour
+	-- of the false→resume mapping itself is covered above; here we lock in the wiring.
+	helpers.it("ui/menu/init.lua applies the non-paused (resume) layout at startup", function()
+		local src_path = helpers.driver_root() .. "ui/menu/init.lua"
+		local fh = io.open(src_path, "r")
+		helpers.assert_true(fh ~= nil, "must be able to read ui/menu/init.lua")
+		local src = fh:read("*a"); fh:close()
+		-- The on_pause_change listener calls it with the `is_paused` variable; the
+		-- startup application is the one that passes the `false` literal (resume layout).
+		helpers.assert_true(src:find("schedule_pause_layout_switch, false", 1, true) ~= nil,
+			"startup must call schedule_pause_layout_switch with is_paused=false (resume layout)")
+	end)
+end)
