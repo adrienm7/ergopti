@@ -387,6 +387,7 @@ local function update_widget()
 				for _, d in ipairs(_wpm_history) do if d.v > max_val then max_val = d.v end end
 			end
 
+			local graph_padding = graph_margin
 			local graph_w = canvas_width - (graph_padding * 2)
 			local graph_h = canvas_height - (text_size * 2)
 			local step = graph_w / math.max(1, #_wpm_history - 1)
