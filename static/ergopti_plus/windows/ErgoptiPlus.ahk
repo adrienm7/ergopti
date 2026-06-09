@@ -495,6 +495,17 @@ global CategoryEnabled := Map(
     "Shortcuts",  true,
     "Hotstrings", true,
     "TapHolds",   true,
+    ; Per-TOML-file hotstring sub-category gates. Independent of the top
+    ; Hotstrings master above: a category file can be switched off while the
+    ; rest of the hotstrings stay live. The parent menu checkmark for each
+    ; category follows ITS gate (not whether every section is checked), and
+    ; ApplyMasterGatesToFeatures zeroes only that category's features when off.
+    ; Default on so existing configs and fresh installs are unchanged.
+    "Autocorrection",     true,
+    "DistancesReduction", true,
+    "SFBsReduction",      true,
+    "Rolls",              true,
+    "MagicKey",           true,
 )
 
 ReadCategoryEnabled(Cache) {
@@ -1399,6 +1410,10 @@ _CategoryEnabledKey(Category) {
         case "Shortcuts":  return "shortcuts"
         case "Hotstrings": return "hotstrings"
         case "TapHolds":   return "tap_holds"
+        ; Hotstring sub-category gates — snake_case to match the v2 schema.
+        case "DistancesReduction": return "distances_reduction"
+        case "SFBsReduction":      return "sfbs_reduction"
+        case "MagicKey":           return "magic_key"
         default: return StrLower(Category)
     }
 }

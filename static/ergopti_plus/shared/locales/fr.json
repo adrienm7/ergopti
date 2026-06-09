@@ -652,6 +652,8 @@
 	"menu.global.title": "Actions globales",
 	"menu.hotstrings.add_custom": "+ Ajouter un expanseur personnalisé…",
 	"menu.hotstrings.add_delimiter": "+ Ajouter un délimiteur personnalisé…",
+	"menu.hotstrings.category_off": "❌ Désactivée (cliquer pour activer)",
+	"menu.hotstrings.category_on": "✅ Activée (cliquer pour désactiver)",
 	"menu.hotstrings.check_all": "☑ Tout cocher",
 	"menu.hotstrings.close_on_add": "Fermer l'UI après ajout d'un hotstring par le raccourci",
 	"menu.hotstrings.config_item": "⚙️ Configurer délais et couleurs…",

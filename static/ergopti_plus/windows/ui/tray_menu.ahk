@@ -45,8 +45,15 @@ MenuAddItemFromManifest(MenuParent, ManifestEntry, V1CategoryPath) {
 		MenuParent.Uncheck(MenuTitle)
 	}
 
-	; Master-gate greying — same logic as MenuAddItem.
-	if !IsCategoryGated(_MasterCategoryFor(V1CategoryPath)) {
+	; Greying — off when the master category gate is off OR the per-file
+	; sub-category gate is off. The sub-category gate lets a single hotstring
+	; TOML file be switched off while the rest stay live; greying its sections
+	; keeps them from being live-toggled back on while the file is off.
+	; _MasterCategoryFor maps hotstring sub-categories to the Hotstrings master;
+	; the first path segment is the sub-category itself (a no-op extra check for
+	; non-hotstring categories, whose first segment IS their master gate).
+	if !IsCategoryGated(_MasterCategoryFor(V1CategoryPath))
+		or !IsCategoryGated(StrSplit(V1CategoryPath, ".")[1]) {
 		try MenuParent.Disable(MenuTitle)
 	}
 }
@@ -1188,10 +1195,16 @@ _HS_CategoriesStandard(M, _Cat) {
 	for _, Category in HotstringCategoriesStd {
 		if !SubMenus.Has(Category)
 			continue
-		Total := CountFn(Category)
+		; Count: enabled-only when the category is on; full count when its gate
+		; is off (mirrors the top Hotstrings master) so the user still sees what
+		; would reactivate.
+		Total := IsCategoryGated(Category) ? CountFn(Category) : _CountAllForCategory(Category)
 		Title := GetCategoryTitle(Category) . " (" . FmtCount(Total) . ")"
 		M.Add(Title, SubMenus[Category])
-		if IsGated and _IsCategoryFullyEnabled(Category)
+		; Checkmark follows the category's own enable toggle, not whether every
+		; section is checked: the category stays checked with its button on even
+		; if some or all sections inside are off.
+		if IsGated and IsCategoryGated(Category)
 			M.Check(Title)
 	}
 }
@@ -1236,10 +1249,13 @@ _HS_CategoriesErgopti(M, _Cat) {
 	for _, Category in HotstringCategoriesErgopti {
 		if !SubMenus.Has(Category)
 			continue
-		Total := CountFn(Category)
+		; Count + checkmark: same rule as the standard categories — the count
+		; falls back to the full count when the category gate is off, and the
+		; checkmark follows the category's own toggle, not its section states.
+		Total := IsCategoryGated(Category) ? CountFn(Category) : _CountAllForCategory(Category)
 		Title := GetCategoryTitle(Category) . " (" . FmtCount(Total) . ")"
 		M.Add(Title, SubMenus[Category])
-		if IsGated and _IsCategoryFullyEnabled(Category)
+		if IsGated and IsCategoryGated(Category)
 			M.Check(Title)
 	}
 }
@@ -1835,6 +1851,16 @@ InitSubMenus() {
 				}
 			}
 		}
+		; Top of the submenu: an enable/disable toggle for the whole TOML file,
+		; mirroring the module toggles (Disposition, Metrics, ...). Inserted at
+		; position 1& so it sits above the open-file item. Its state drives the
+		; parent menu checkmark (IsCategoryGated), independent of how many
+		; individual sections are checked. Capture V1Cat by value so each
+		; closure toggles its own category.
+		AddCategoryToggleItem(SubMenu,
+			t("menu.hotstrings.category_on"), t("menu.hotstrings.category_off"),
+			IsCategoryGated(V1Cat),
+			((c) => (*) => ToggleCategoryAllFeatures(c, !IsCategoryGated(c)))(V1Cat))
 		SubMenus[V1Cat] := SubMenu
 	}
 
@@ -1879,26 +1905,6 @@ _BuildDynamicHotstringsSubmenu() {
 	}
 	return SubMenu
 }
-
-; Returns true when every section in the flat category has its feature enabled.
-; Used to drive the checkmark on the category sub-menu entry.
-_IsCategoryFullyEnabled(V1Cat) {
-	global Features, _V1CatToV2CatMap
-	if !_V1CatToV2CatMap.Has(V1Cat) {
-		return false
-	}
-	V2Cat := _V1CatToV2CatMap[V1Cat]
-	if !Features["hotstrings"].Has(V2Cat) {
-		return false
-	}
-	for _, FNode in Features["hotstrings"][V2Cat] {
-		if (IsObject(FNode) and FNode.Has("enabled") and !FNode["enabled"]) {
-			return false
-		}
-	}
-	return Features["hotstrings"][V2Cat].Count > 0
-}
-
 
 ; Sum hotstring entries for a flat category (Autocorrection, Rolls, …)
 ; counting only the sections whose feature toggle is enabled in Features.
