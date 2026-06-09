@@ -454,7 +454,13 @@ function M.format_plain(snapshot)
 	table.insert(lines, string.format("Uptime           : %s", _format_uptime(s.uptime_sec)))
 	table.insert(lines, string.format("Hammerspoon      : %s", tostring(sys.hs_version or "?")))
 	table.insert(lines, string.format("macOS            : %s", tostring(sys.os_version or "?")))
+	table.insert(lines, string.format("Architecture     : %s", tostring(sys.arch or "?")))
+	table.insert(lines, string.format("CPU              : %s", tostring(sys.cpu_model or "?")))
+	table.insert(lines, string.format("Logical cores    : %s", tostring(sys.cpu_cores or "?")))
+	table.insert(lines, string.format("Total RAM        : %s", tostring(sys.ram_total or "?")))
+	table.insert(lines, string.format("Available RAM    : %s", tostring(sys.ram_free or "?")))
 	table.insert(lines, string.format("Screen           : %s", tostring(sys.screen_res or "?")))
+	table.insert(lines, string.format("DPI              : %s%s", tostring(sys.dpi or "?"), sys.retina_scale and (" (" .. sys.retina_scale .. " Retina)") or ""))
 	table.insert(lines, string.format("Locale           : %s", tostring(sys.locale or "?")))
 	if sys.config_dir and sys.config_dir ~= "" then
 		table.insert(lines, string.format("Config dir       : %s", sys.config_dir))
@@ -608,6 +614,77 @@ _sys_info = function()
 		Logger.warn(LOG, "hs.configdir is not a string.")
 	end
 	info.config_dir = config_dir
+
+	-- CPU model + core count via sysctl
+	local cpu_model = "?"
+	local cpu_cores = "?"
+	local ok_cpu, cpu_out = pcall(hs.execute, "sysctl -n machdep.cpu.brand_string 2>/dev/null")
+	if ok_cpu and type(cpu_out) == "string" and cpu_out ~= "" then
+		cpu_model = cpu_out:match("^%s*(.-)%s*$")
+	else
+		-- Apple Silicon fallback
+		local ok_ap, ap_out = pcall(hs.execute, "sysctl -n machdep.cpu.brand_string 2>/dev/null || sysctl -n hw.model 2>/dev/null")
+		if ok_ap and type(ap_out) == "string" and ap_out ~= "" then cpu_model = ap_out:match("^%s*(.-)%s*$") end
+	end
+	local ok_cores, cores_out = pcall(hs.execute, "sysctl -n hw.logicalcpu 2>/dev/null")
+	if ok_cores and type(cores_out) == "string" and cores_out ~= "" then
+		cpu_cores = cores_out:match("^%s*(.-)%s*$")
+	end
+	info.cpu_model = cpu_model
+	info.cpu_cores = cpu_cores
+	Logger.debug(LOG, "cpu_model: %s cores: %s.", cpu_model, cpu_cores)
+
+	-- Total + free RAM via host_statistics (vm_stat) — safe approximation
+	local ram_total = "?"
+	local ram_free  = "?"
+	local ok_mem, mem_out = pcall(hs.execute, "sysctl -n hw.memsize 2>/dev/null")
+	if ok_mem and type(mem_out) == "string" and mem_out ~= "" then
+		local bytes = tonumber(mem_out:match("^%s*(.-)%s*$"))
+		if bytes then ram_total = string.format("%.1f GB", bytes / 1073741824) end
+	end
+	local ok_vm, vm_out = pcall(hs.execute, "vm_stat 2>/dev/null | awk '/Pages free/ {print $3}' | tr -d '.'")
+	if ok_vm and type(vm_out) == "string" and vm_out ~= "" then
+		local pages = tonumber(vm_out:match("^%s*(.-)%s*$"))
+		if pages then ram_free = string.format("%.1f GB", pages * 4096 / 1073741824) end
+	end
+	info.ram_total = ram_total
+	info.ram_free  = ram_free
+	Logger.debug(LOG, "ram_total: %s ram_free: %s.", ram_total, ram_free)
+
+	-- Architecture
+	local arch = "?"
+	local ok_arch, arch_out = pcall(hs.execute, "uname -m 2>/dev/null")
+	if ok_arch and type(arch_out) == "string" and arch_out ~= "" then
+		arch = arch_out:match("^%s*(.-)%s*$")
+	end
+	info.arch = arch
+	Logger.debug(LOG, "arch: %s.", arch)
+
+	-- Screen DPI (points per inch from Hammerspoon screen info)
+	local dpi = "?"
+	local ok_dpi, scr_d = pcall(function() return hs.screen.mainScreen() end)
+	if ok_dpi and scr_d and type(scr_d.currentMode) == "function" then
+		local ok_md, md = pcall(function() return scr_d:currentMode() end)
+		if ok_md and md and md.w and md.h then
+			-- physicalSize is in mm; derive PPI if available
+			if type(scr_d.physicalSize) == "function" then
+				local ok_ps, ps = pcall(function() return scr_d:physicalSize() end)
+				if ok_ps and ps and ps.w and ps.w > 0 then
+					dpi = string.format("%d", math.floor(md.w / (ps.w / 25.4) + 0.5))
+				end
+			end
+			-- Retina scale factor (logical vs native pixels)
+			if type(scr_d.frame) == "function" and type(scr_d.fullFrame) == "function" then
+				local ok_f, f   = pcall(function() return scr_d:frame() end)
+				local ok_ff, ff = pcall(function() return scr_d:fullFrame() end)
+				if ok_f and f and ok_ff and ff and f.w and f.w > 0 then
+					info.retina_scale = string.format("%.1f×", ff.w / f.w)
+				end
+			end
+		end
+	end
+	info.dpi = dpi
+	Logger.debug(LOG, "dpi: %s.", dpi)
 
 	-- Short git commit hash — run git from this file's directory so it reaches
 	-- the actual repo root even when hs.configdir is ~/.hammerspoon (not a repo).
@@ -899,7 +976,13 @@ _snapshot_to_html = function(snapshot, btn_label)
 		"<tr><td>Uptime</td><td>"               .. _he(_format_uptime(s.uptime_sec)) .. "</td></tr>",
 		"<tr><td>Hammerspoon</td><td>"          .. _he(tostring(sys.hs_version or "?")) .. "</td></tr>",
 		"<tr><td>macOS</td><td>"                .. _he(tostring(sys.os_version or "?")) .. "</td></tr>",
+		"<tr><td>Architecture</td><td>"         .. _he(tostring(sys.arch or "?")) .. "</td></tr>",
+		"<tr><td>CPU</td><td>"                  .. _he(tostring(sys.cpu_model or "?")) .. "</td></tr>",
+		"<tr><td>Logical cores</td><td>"        .. _he(tostring(sys.cpu_cores or "?")) .. "</td></tr>",
+		"<tr><td>Total RAM</td><td>"            .. _he(tostring(sys.ram_total or "?")) .. "</td></tr>",
+		"<tr><td>Available RAM</td><td>"        .. _he(tostring(sys.ram_free or "?")) .. "</td></tr>",
 		"<tr><td>Screen resolution</td><td>"    .. _he(tostring(sys.screen_res or "?")) .. "</td></tr>",
+		"<tr><td>DPI</td><td>"                  .. _he(tostring(sys.dpi or "?")) .. (sys.retina_scale and (" &nbsp;<em>" .. _he(sys.retina_scale) .. " Retina</em>") or "") .. "</td></tr>",
 		"<tr><td>Locale</td><td>"               .. _he(tostring(sys.locale or "?")) .. "</td></tr>",
 	}
 	if sys.config_dir and sys.config_dir ~= "" then
@@ -946,16 +1029,71 @@ _snapshot_to_html = function(snapshot, btn_label)
 		issues_html = "<pre>" .. table.concat(lines_esc, "\n") .. "</pre>"
 	end
 
+	-- Enriched runtime sections
+	local enriched_html = ""
+	if s.pause_state or s.layout or s.llm or s.keylogger or s.hotstrings or s.logs then
+		enriched_html = enriched_html .. "<h2>Runtime state</h2><table><tr><th>Field</th><th>Value</th></tr>"
+		if s.pause_state then
+			local ps = s.pause_state
+			local pause_val = ps.is_paused
+				and ("<span class=fail>PAUSED</span> (" .. _he(tostring(ps.source or "")) .. ")")
+				or  "<span class=ok>running</span>"
+			enriched_html = enriched_html .. "<tr><td>Pause / Suspend</td><td>" .. pause_val .. "</td></tr>"
+		end
+		if s.layout then
+			local ly = s.layout
+			enriched_html = enriched_html
+				.. "<tr><td>Layout base</td><td>"  .. _he(tostring(ly.ergopti_base)) .. "</td></tr>"
+				.. "<tr><td>AltGr</td><td>"         .. _he(tostring(ly.altgr))        .. "</td></tr>"
+				.. "<tr><td>Shift</td><td>"          .. _he(tostring(ly.shift))        .. "</td></tr>"
+				.. "<tr><td>Caps</td><td>"           .. _he(tostring(ly.caps))         .. "</td></tr>"
+				.. "<tr><td>Prefix latch</td><td>"   .. _he(tostring(ly.prefix_latch)) .. "</td></tr>"
+		end
+		if s.llm then
+			local ll = s.llm
+			enriched_html = enriched_html
+				.. "<tr><td>LLM enabled</td><td>"     .. _he(tostring(ll.enabled))        .. "</td></tr>"
+				.. "<tr><td>LLM backend</td><td>"     .. _he(tostring(ll.backend))        .. "</td></tr>"
+				.. "<tr><td>LLM profile</td><td>"     .. _he(tostring(ll.active_profile)) .. "</td></tr>"
+		end
+		if s.keylogger then
+			local kl = s.keylogger
+			enriched_html = enriched_html
+				.. "<tr><td>Keylogger events</td><td>" .. _he(tostring(kl.events_session)) .. "</td></tr>"
+				.. "<tr><td>WPM</td><td>"              .. _he(tostring(kl.wpm))            .. "</td></tr>"
+				.. "<tr><td>Privacy hits</td><td>"     .. _he(tostring(kl.privacy_hits))   .. "</td></tr>"
+		end
+		if s.hotstrings then
+			local ht = s.hotstrings
+			enriched_html = enriched_html
+				.. "<tr><td>Terminators</td><td>"          .. _he(tostring(ht.terminators))    .. "</td></tr>"
+				.. "<tr><td>Personal hotstrings</td><td>"  .. _he(tostring(ht.personal_count)) .. "</td></tr>"
+				.. "<tr><td>Dynamic hotstrings</td><td>"   .. _he(tostring(ht.dynamic_count))  .. "</td></tr>"
+				.. "<tr><td>Magic key</td><td>"            .. _he(tostring(ht.magic_key))      .. "</td></tr>"
+		end
+		if s.logs then
+			local lg = s.logs
+			local log_val = (lg.unified_today and lg.unified_today ~= "") and _hcode(lg.unified_today) or "<em>n/a</em>"
+			local err_val = (lg.errors_today  and lg.errors_today  ~= "") and _hcode(lg.errors_today)  or "<em>n/a</em>"
+			enriched_html = enriched_html
+				.. "<tr><td>Log (unified)</td><td>"     .. log_val                            .. "</td></tr>"
+				.. "<tr><td>Log (errors)</td><td>"      .. err_val                            .. "</td></tr>"
+				.. "<tr><td>Ring buffer lines</td><td>" .. _he(tostring(lg.ring_lines or 0))  .. "</td></tr>"
+		end
+		enriched_html = enriched_html .. "</table>"
+	end
+
 	return "<!DOCTYPE html><html><head><meta charset='utf-8'>"
 		.. "<style>" .. css .. "</style>"
 		.. "</head><body>"
 		.. "<h1>System diagnostic</h1>"
-		.. "<h2>System</h2>"         .. sys_tbl
+		.. "<h2>System</h2>"           .. sys_tbl
 		.. "<h2>Session counters</h2>" .. ctr_tbl
+		.. enriched_html
 		.. "<h2>Adapters (" .. #ok_list .. "/" .. total .. " OK)</h2>" .. adap_html
 		.. "<h2>Last recorded error</h2>" .. last_err_html
 		.. "<h2>Recent warnings / errors (" .. #issues .. "/100)</h2>" .. issues_html
-		.. "<button id='btnCopy'>" .. _he(btn_label) .. "</button>"
+		.. "<br><button id='btnCopy'>" .. _he(btn_label) .. "</button>"
 		.. "</body></html>"
 end
 

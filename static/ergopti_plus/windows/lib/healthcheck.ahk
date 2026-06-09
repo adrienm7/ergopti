@@ -218,8 +218,8 @@ HealthCheck_FormatMarkdown(Snapshot := 0) {
 	Lines.Push("")
 	Lines.Push("| Type | Count |")
 	Lines.Push("|---|---|")
-	Lines.Push("| " . (WarnCount = 0 ? "✓" : "✗") . " Warnings | " . WarnCount . " |")
-	Lines.Push("| " . (ErrCount  = 0 ? "✓" : "✗") . " Errors   | " . ErrCount  . " |")
+	Lines.Push("| ⚠️ Warnings | " . (WarnCount = 0 ? "✅ " : "❌ ") . WarnCount . " |")
+	Lines.Push("| 🔴 Errors   | " . (ErrCount  = 0 ? "✅ " : "❌ ") . ErrCount  . " |")
 	Lines.Push("")
 
 	; ── Adapters ──────────────────────────────────────────────────────────────
