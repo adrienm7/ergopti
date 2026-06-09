@@ -791,9 +791,9 @@ KLR_NewNgramItem(c, t, e, esrc_json) {
     ; sqlite_reader.lua read_ngrams path. Without this the per-n-gram
     ; hotstring/LLM colouring is silently lost (every token reads hs=llm=0).
     if (esrc_json != "" && esrc_json != "{}") {
-        if RegExMatch(esrc_json, "`"hotstring`"\s*:\s*(\d+)", &m_hs)
+        if RegExMatch(esrc_json, '"hotstring"\s*:\s*(\d+)', &m_hs)
             item["hs"] := Integer(m_hs[1])
-        if RegExMatch(esrc_json, "`"llm`"\s*:\s*(\d+)", &m_llm)
+        if RegExMatch(esrc_json, '"llm"\s*:\s*(\d+)', &m_llm)
             item["llm"] := Integer(m_llm[1])
         item["esrc_json"] := esrc_json
     }

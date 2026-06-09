@@ -408,5 +408,5 @@ _TH_TomlFormatLine(Key, Value) {
 	S := String(Value)
 	S := StrReplace(S, "\", "\\")
 	S := StrReplace(S, '"', '\"')
-	return Key . " = `"" . S . "`""
+	return Key . ' = "' . S . '"'
 }

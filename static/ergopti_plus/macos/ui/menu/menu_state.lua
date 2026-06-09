@@ -167,8 +167,9 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 	-- Re-enable after a brief warm-up delay: on the very first presses after
 	-- a Hammerspoon restart the event tap may not be fully live, so the first
 	-- call above registers the hotkey and this second enable() ensures it is
-	-- active once the tap is stable
-	hs.timer.doAfter(1.0, function()
+	-- active once the tap is stable. 0.1s is enough — the event tap is live
+	-- well before 1s in practice; the original 1.0s was unnecessarily long.
+	hs.timer.doAfter(0.1, function()
 		if deps._metrics_hk and deps._metrics_hk[1] then pcall(function() deps._metrics_hk[1]:enable() end) end
 		if deps._apps_time_hk and deps._apps_time_hk[1] then pcall(function() deps._apps_time_hk[1]:enable() end) end
 	end)

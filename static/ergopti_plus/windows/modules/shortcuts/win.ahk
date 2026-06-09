@@ -282,7 +282,7 @@ if Features["shortcuts"]["search"]["enabled"] {
         ; Invalid Windows path characters are excluded: <>:"|?*
         FilePath := RegExMatch(
             SelectedText,
-            "^[A-Za-z]:[\\/](?:[^<>:`"|?*\r\n]+[\\/]?)*$"
+            "^[A-Za-z]:[\\/](?:[^<>:" . '"' . "|?*\r\n]+[\\/]?)*$"
         )
 
         ; Detects Windows Registry paths (optional Computer\ or Ordinateur\ prefix)
@@ -316,7 +316,7 @@ if Features["shortcuts"]["search"]["enabled"] {
             SelectedText := StrReplace(SelectedText, "#", "%23")
             SelectedText := StrReplace(SelectedText, "&", "%26")
             SelectedText := StrReplace(SelectedText, "+", "%2b")
-            SelectedText := StrReplace(SelectedText, "`"", "%22")
+            SelectedText := StrReplace(SelectedText, '"', "%22")
 
             if URLPath {
                 Run(SelectedText)

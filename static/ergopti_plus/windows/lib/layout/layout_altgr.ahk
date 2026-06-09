@@ -116,7 +116,7 @@ _BuildAltGrTables() {
                    Shifted: () => 0 },
 
         ; Top row
-        "SC010", { Plain: WrapTextIfSelected.Bind("``", "``", "``"),
+        "SC010", { Plain: WrapTextIfSelected.Bind('``', '``', '``'),
                    Shifted: SendNewResult.Bind("„") },
         "SC011", { Plain: WrapTextIfSelected.Bind("@", "@", "@"),
                    Shifted: SendNewResult.Bind("€") },

@@ -374,7 +374,7 @@ _WPMWidget_ReadTomlColor(CategoryName) {
             InMeta := false
             continue
         }
-        if InMeta and RegExMatch(Line, "^color\s*=\s*`"([^`"]+)`"", &M) {
+        if InMeta and RegExMatch(Line, '^color\s*=\s*"([^"]+)"', &M) {
             c := M[1]
             LoggerDebug("WPMWidget", "ReadTomlColor: '{1}' → raw='{2}' default='{3}'", CategoryName, c, GLOBAL_DEFAULT_COLOR)
             ; Skip the global blue fallback — it means "no category color set"

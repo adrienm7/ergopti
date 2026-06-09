@@ -171,7 +171,7 @@ _JsonParseString(&text, &pos) {
 			pos++
 			return out
 		}
-		if (c == "``") {  ; AHK escape — we won't see literal backtick in JSON
+		if (c == '``') {  ; AHK escape — we won't see literal backtick in JSON
 			pos++
 			out .= c
 			continue

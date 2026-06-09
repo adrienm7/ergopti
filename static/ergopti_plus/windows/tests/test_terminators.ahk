@@ -284,7 +284,7 @@ TestTerminators_DefaultWordDelimitersAreBasic() {
         AssertTrue(InStr(D, Ch) > 0, "default set includes a basic terminator")
     }
     ; Non-basic options must be OFF in the default set.
-    for Ch in [Chr(0x00A0), Chr(0x202F), "-", "_", "=", ")", "]", "}", ">", "/", "\", Chr(0x2026), "'", "`""] {
+    for Ch in [Chr(0x00A0), Chr(0x202F), "-", "_", "=", ")", "]", "}", ">", "/", "\", Chr(0x2026), "'", '"'] {
         AssertFalse(InStr(D, Ch) > 0, "default set excludes a non-basic option")
     }
 }

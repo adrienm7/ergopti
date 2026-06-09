@@ -1819,7 +1819,7 @@ FilePathsEditor(*) {
         try DirCreate(SubStr(_PathsFile, 1, InStr(_PathsFile, "\", , -1) - 1))
         f := FileOpen(_PathsFile, "w", "UTF-8")
         if f {
-            f.Write("# Custom paths`r`nConfigDirPath = `"" . StrReplace(N, "\", "/") . "`"`r`n")
+            f.Write('# Custom paths' . "`r`n" . 'ConfigDirPath = "' . StrReplace(N, "\", "/") . '"' . "`r`n")
             f.Close()
         }
         Reload()

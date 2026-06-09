@@ -74,7 +74,7 @@ TestPE_EscapeRoundTrip() {
 	; Plain values with no newline/tab characters round-trip exactly through
 	; Escape → Unescape. Newlines/tabs are deliberately one-way (replaced with
 	; {Enter}/{Tab} tokens at write time) so they do not feature in this test.
-	Original := "Mix of `"quotes`" and slashes\\."
+	Original := 'Mix of "quotes" and slashes\\.'
 	Recovered := UnescapeTomlString(EscapeTomlValue(Original))
 	AssertEqual(Original, Recovered)
 }
@@ -226,7 +226,7 @@ TestPE_EscapeAllSpecials() {
 	; All four special chars in one string. Backslash and double-quote stay
 	; as TOML escapes; newline / CR / tab become {Enter} / {Tab} tokens by
 	; design (one-way tokenisation locked in by the writer commit).
-	Src := "\" . "`"`n`r`t"
+	Src := "\" . '"' . "`n`r`t"
 	Esc := EscapeTomlValue(Src)
 	AssertContains(Esc, "\\")
 	AssertContains(Esc, '\"')
@@ -341,11 +341,11 @@ TestPE_PropertyRoundTripSpecialChars() {
 	; tokens by EscapeTomlValue, which is a one-way transformation.
 	SpecialSets := [
 		"\",
-		"`"",
+		'"',
 		"a\b",
 		'a"b',
-		"\`"",
-		"hello `"world`" \ done",
+		'\"',
+		'hello "world" \ done',
 	]
 	for Src in SpecialSets {
 		Recovered := UnescapeTomlString(EscapeTomlValue(Src))
@@ -369,7 +369,7 @@ TestPE_PropertyNewlinesTabsTokenised() {
 	; Backslash gets doubled and the quote escaped, so the trailing \" turns
 	; into \\\" in the on-disk representation alongside the {Enter}/{Tab}
 	; tokens that replace the newlines and tab.
-	AssertEqual("{Enter}{Enter}{Tab}\\\`"", EscapeTomlValue("`n`r`t\`""))
+	AssertEqual('{Enter}{Enter}{Tab}\\\"', EscapeTomlValue("`n`r`t\" . '"'))
 }
 Test("Property: newlines and tabs are always tokenised on write",
 	TestPE_PropertyNewlinesTabsTokenised)

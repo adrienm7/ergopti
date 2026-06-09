@@ -313,7 +313,7 @@ if Features["hotstrings"]["rolls"]["cx"]["enabled"] {
 ; === Middle row ===
 if Features["hotstrings"]["rolls"]["equal_string"]["enabled"] {
 	EqualStringOpts := Map("OnlyText", False, "TimeActivationSeconds", HotstringsResolve("rolls", "equal_string").Delay)
-	EqualStringRepl := SpaceAroundSymbols . "=" . SpaceAroundSymbols . "`"`"{Left}"
+	EqualStringRepl := SpaceAroundSymbols . "=" . SpaceAroundSymbols . '""{Left}'
 	CreateHotstring("*?", " [)", EqualStringRepl, EqualStringOpts)
 	CreateHotstring("*?", "[)", EqualStringRepl, EqualStringOpts)
 }

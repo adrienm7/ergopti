@@ -121,7 +121,7 @@ _ParseGlobalKey(Path, KeyName) {
         return ""
     }
     InGlobal := false
-    Pattern  := "^" . KeyName . "\s*=\s*`"((?:[^`"\\]|\\.)*)`"\s*$"
+    Pattern  := "^" . KeyName . "\s*=\s*" . '"' . "((?:[^" . '"' . "\\]|\\.)*)" . '"' . "\s*$"
     loop read, Path {
         Line := Trim(A_LoopReadLine, " `t")
         if (Line == "[__global__]") {
@@ -211,14 +211,14 @@ _SaveGlobalKey(KeyName, Value, _Unused := "") {
         }
         if InGlobal and SubStr(Line, 1, 1) == "[" {
             if !FieldDone and !IsEmpty {
-                Out.Push(KeyName . " = `"" . _EscapeTomlString(Value) . "`"")
+                Out.Push(KeyName . ' = "' . _EscapeTomlString(Value) . '"')
                 FieldDone := true
             }
             InGlobal := false
         }
         if InGlobal and RegExMatch(Line, Pattern) {
             if !IsEmpty and !FieldDone {
-                Out.Push(KeyName . " = `"" . _EscapeTomlString(Value) . "`"")
+                Out.Push(KeyName . ' = "' . _EscapeTomlString(Value) . '"')
                 FieldDone := true
             }
             continue  ; Skip old line (drop it when IsEmpty)
@@ -227,7 +227,7 @@ _SaveGlobalKey(KeyName, Value, _Unused := "") {
     }
 
     if InGlobal and !FieldDone and !IsEmpty {
-        Out.Push(KeyName . " = `"" . _EscapeTomlString(Value) . "`"")
+        Out.Push(KeyName . ' = "' . _EscapeTomlString(Value) . '"')
     }
 
     if !Found and !IsEmpty {
@@ -235,7 +235,7 @@ _SaveGlobalKey(KeyName, Value, _Unused := "") {
             Out.Push("")
         }
         Out.Push("[__global__]")
-        Out.Push(KeyName . " = `"" . _EscapeTomlString(Value) . "`"")
+        Out.Push(KeyName . ' = "' . _EscapeTomlString(Value) . '"')
     }
 
     while Out.Length > 1 and Out[Out.Length] == "" and Out[Out.Length - 1] == "" {
@@ -254,7 +254,7 @@ _SaveGlobalKey(KeyName, Value, _Unused := "") {
 
 _EscapeTomlString(S) {
     S := StrReplace(S, "\", "\\")
-    S := StrReplace(S, '"', '`"')
+    S := StrReplace(S, '"', '\"')
     S := StrReplace(S, "`t", "\t")
     S := StrReplace(S, "`r", "\r")
     S := StrReplace(S, "`n", "\n")
@@ -335,7 +335,7 @@ _ParseOverrides(Path) {
 
         if RegExMatch(Line, "^delay\s*=\s*([0-9]+(?:\.[0-9]+)?)\s*$", &NumMatch) {
             Target.Delay := NumMatch[1] + 0
-        } else if RegExMatch(Line, "^color\s*=\s*`"((?:[^`"\\]|\\.)*)`"\s*$", &ColMatch) {
+        } else if RegExMatch(Line, "^color\s*=\s*" . '"' . "((?:[^" . '"' . "\\]|\\.)*)" . '"' . "\s*$", &ColMatch) {
             Target.Color := UnescapeTomlString(ColMatch[1])
         } else if RegExMatch(Line, "^show_tooltip\s*=\s*(true|false)\s*$", &BoolMatch) {
             Target.ShowTooltip := (BoolMatch[1] == "true")
@@ -377,7 +377,7 @@ _SaveOverrides() {
                 Out .= "delay = " . Entry.Delay . "`n"
             }
             if (Entry.Color != "") {
-                Out .= "color = `"" . Entry.Color . "`"`n"
+                Out .= 'color = "' . Entry.Color . '"' . "`n"
             }
             if (Entry.ShowTooltip != "") {
                 Out .= "show_tooltip = " . (Entry.ShowTooltip ? "true" : "false") . "`n"
@@ -399,7 +399,7 @@ _SaveOverrides() {
                     Out .= "delay = " . S.Delay . "`n"
                 }
                 if (S.Color != "") {
-                    Out .= "color = `"" . S.Color . "`"`n"
+                    Out .= 'color = "' . S.Color . '"' . "`n"
                 }
                 if (S.ShowTooltip != "") {
                     Out .= "show_tooltip = " . (S.ShowTooltip ? "true" : "false") . "`n"

@@ -11,11 +11,11 @@
 ; 1. Single renderer: every submenu (shortcuts, metrics, layout, hotstrings,
 ;    gestures, tap_holds) is built by the same loop — structure lives in the
 ;    manifest, not in per-submenu AHK code.
-; 2. Dynamic escape hatch: items whose ``type`` is ``"dynamic"`` are routed
+; 2. Dynamic escape hatch: items whose ``type`` is "dynamic" are routed
 ;    to a caller-supplied Map of handler functions so platform-specific UI
 ;    (file trees, dialogs, runtime state) stays in the caller.
 ; 3. Platform filtering: entries with a ``platforms`` array that does not
-;    include ``"ahk"`` are silently skipped.
+;    include "ahk" are silently skipped.
 ; ==============================================================================
 
 ; Hard-coded fallback strings when platform JSON is unreadable at boot —
@@ -90,7 +90,7 @@ _MR_GetMenuDef(Key) {
 ; ==============================================
 
 ; Returns true when the entry has no ``platforms`` restriction, or when
-; ``"ahk"`` appears in its ``platforms`` array.
+; "ahk" appears in its ``platforms`` array.
 _MR_IsForAhk(Entry) {
 	if !(Entry is Map) or !Entry.Has("platforms") {
 		return true
@@ -126,8 +126,8 @@ _MR_Get(Obj, Key, Default := "") {
 
 ; Build an AHK Menu from a manifest menu definition array.
 ;
-; ``ManifestKey``   — key in ``menu_manifest.json`` (e.g. ``"shortcuts_menu"``)
-; ``CategoryName``  — v1 PascalCase master-gate category (e.g. ``"Shortcuts"``)
+; ``ManifestKey``   — key in ``menu_manifest.json`` (e.g. "shortcuts_menu")
+; ``CategoryName``  — v1 PascalCase master-gate category (e.g. "Shortcuts")
 ; ``DynamicHandlers`` — Map of id → Func to call for ``type:"dynamic"`` entries.
 ;   Each handler receives ``(Menu, CategoryName)`` and populates the menu in place.
 ; ``GroupBuilders`` — Map of group_id → Func to call for ``type:"group"`` entries.

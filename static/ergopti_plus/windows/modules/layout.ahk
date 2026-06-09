@@ -276,7 +276,7 @@ global DeadkeyMappingCurrency := Map(
 	"'", "£",
 	"-", "£",
 	"_", "€",
-	"``", "₰",
+	'``', "₰",
 	"a", "؋", "A", "₳",
 	"b", "₿", "B", "฿",
 	"c", "¢", "C", "₵",
@@ -674,8 +674,8 @@ HashtagOrQuote() {
 		LastSentCharacter == "(" or LastSentCharacter == "[")
 	and A_TimeSincePriorHotkey < (HotstringsResolve("rolls", "hashtag_quote").Delay * 1000
 	) {
-		SendNewResult("`"")
-		UpdateLastSentCharacter("`"")
+		SendNewResult('"')
+		UpdateLastSentCharacter('"')
 	} else {
 		WrapTextIfSelected("#", "#", "#")
 	}

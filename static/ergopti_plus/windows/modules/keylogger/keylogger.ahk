@@ -496,7 +496,7 @@ KL_SaveState() {
 
 KL_JsonEncode(v) {
     if (v = "")           ; AHK distinguishes empty string from unset.
-        return "`"`""
+        return '""'
     if v is Map
         return KL_JsonEncodeMap(v)
     if v is Array

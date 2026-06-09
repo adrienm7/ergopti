@@ -211,7 +211,7 @@ LLM_ParseProfileObject(obj) {
 
 	; Extract ``stop_sequences`` — optional string array. Power-user
 	; profiles can use this to clip generation at custom markers (e.g.
-	; ``"```"`` for a code profile, ``"\n\n"`` for a single-paragraph
+	; ``` for a code profile, "\n\n" for a single-paragraph
 	; profile). Empty when the field is absent — Ollama then falls back
 	; to its own built-in stops.
 	m["stop_sequences"] := []

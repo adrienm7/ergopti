@@ -16,13 +16,24 @@ local hs     = hs
 local Logger = require("lib.logger")
 local LOG    = "hotstring_counter"
 
-local _count_cache     = {}
-local _ext_meta_cache  = nil
+-- Per-file TOML entry counts, keyed by absolute path.
+-- Never cleared on toggle: TOML files do not change at runtime. The counts
+-- reflect raw entries in the files, independent of the enabled/disabled state
+-- that the menu builder applies when summing visible totals.
+local _count_cache    = {}
+
+-- Extension directory metadata (names, paths, per-file counts).
+-- Populated once on first use and kept for the session; extensions are
+-- installed/removed only on disk changes that require hs.reload() anyway.
+local _ext_meta_cache = nil
 
 --- Invalidates the hotstring count cache.
+--- Preserved for API compatibility (called by save_prefs in init.lua).
+--- Both caches are now session-stable: file content does not change on
+--- toggles, and extensions are not installed/uninstalled at runtime.
+--- A full hs.reload() resets the Lua state and thus implicitly clears them.
 function M.invalidate_cache()
-	_count_cache    = {}
-	_ext_meta_cache = nil
+	-- Intentionally left empty: caches are stable for the session lifetime.
 end
 
 

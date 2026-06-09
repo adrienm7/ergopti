@@ -1056,27 +1056,13 @@ _HS_DelimRemoveCustom(Char) {
 
 ; Dynamic handler: standard hotstring categories.
 _HS_CategoriesStandard(M, _Cat) {
-	global HotstringCategoriesStd, SubMenus, Features
+	global HotstringCategoriesStd, SubMenus
 	IsGated := IsCategoryGated("Hotstrings")
 	CountFn := IsGated ? _CountEnabledForCategory : _CountAllForCategory
-	StdTotal := 0
-	for _, Cat in HotstringCategoriesStd
-		StdTotal += CountFn(Cat)
-	DynTotal := 0
-	if Features.Has("hotstrings") and Features["hotstrings"].Has("dynamic") {
-		for DKey, DCfg in Features["hotstrings"]["dynamic"] {
-			if IsGated {
-				if (IsObject(DCfg) and DCfg.Has("enabled") and DCfg["enabled"])
-					DynTotal += CountDynamicSection(DKey)
-			} else {
-				if IsObject(DCfg)
-					DynTotal += CountDynamicSection(DKey)
-			}
-		}
-	}
-	StdTotal += DynTotal
-	; Section header is rendered by the manifest (section_header type), so
-	; we only need to add the actual category submenus here.
+	; Section header is rendered by the manifest (section_header type), so we
+	; only add the actual category submenus here. The standard + dynamic grand
+	; total is computed once by _HS_ComputeGrandTotal for the menu title —
+	; summing it again here was dead work (the result was never read).
 	for _, Category in HotstringCategoriesStd {
 		if !SubMenus.Has(Category)
 			continue
@@ -1400,7 +1386,7 @@ _HS_Extensions(M, _Cat) {
 			if FileExist(ManifestPath) {
 				try {
 					MC := FileRead(ManifestPath, "UTF-8")
-					if RegExMatch(MC, "name\s*=\s*`"([^`"]+)`"", &NM)
+					if RegExMatch(MC, 'name\s*=\s*"([^"]+)"', &NM)
 						ExtDisplayName := NM[1]
 				}
 			}
@@ -1652,7 +1638,7 @@ global _V1CatToInverseKeyMap := Map(
 ; Custom render order for the ``DynamicHotstrings`` submenu — the manifest
 ; doesn't yet model menu order or separators, so the curated UX layout is
 ; pinned here as a sidecar. Each entry is either a v1 PascalCase feature id
-; or ``"-"`` (separator). When the manifest grows ``menu_order`` /
+; or "-" (separator). When the manifest grows ``menu_order`` /
 ; ``menu_separator`` metadata this constant can move into the codegen.
 global _DYNAMIC_HOTSTRINGS_ORDER := ["DateLongFr", "DateFr", "Date",
 	"PhonePrefixes", "SsnPrefixes", "IbanPrefixes", "-",
@@ -1948,7 +1934,7 @@ _SC_Extensions(SubMenu, _Cat) {
 		if FileExist(ManifestPath) {
 			try {
 				MC := FileRead(ManifestPath, "UTF-8")
-				if RegExMatch(MC, "name\s*=\s*`"([^`"]+)`"", &NM)
+				if RegExMatch(MC, 'name\s*=\s*"([^"]+)"', &NM)
 					ExtName := NM[1]
 			}
 		}
@@ -2493,7 +2479,7 @@ global PERSONAL_SHORTCUTS_TEMPLATE := "; personal_shortcuts.ahk`r`n"
 	. ";`r`n"
 	. "; FEATURES & RATIONALE:`r`n"
 	. "; 1. Toggle-gated bindings — every binding is wrapped in`r`n"
-	. ";    #HotIf PersonalFeatureEnabled(`"<Name>`") so the matching`r`n"
+	. ';    #HotIf PersonalFeatureEnabled(' . '"' . '<Name>' . '"' . ') so the matching' . "`r`n"
 	. ";    tray-menu checkbox in « 🎯 Raccourcis » → « Raccourcis personnels » fully controls`r`n"
 	. ";    whether the binding fires, with persistence in the configuration INI.`r`n"
 	. "; 2. Two-section layout — every feature is registered in section 1 and bound`r`n"
@@ -2508,11 +2494,11 @@ global PERSONAL_SHORTCUTS_TEMPLATE := "; personal_shortcuts.ahk`r`n"
 	. "; the matching #HotIf-gated binding into section 2. The toggle then appears`r`n"
 	. "; in the tray under « 🎯 Raccourcis » → « Raccourcis personnels ». Example:`r`n"
 	. ";`r`n"
-	. ";     RegisterPersonalFeature(`"lock_screen`", true,`r`n"
-	. ";         `"Lock the workstation with Ctrl + Alt + L`")`r`n"
+	. ';     RegisterPersonalFeature(' . '"' . 'lock_screen' . '"' . ', true,' . "`r`n"
+	. ';         ' . '"' . 'Lock the workstation with Ctrl + Alt + L' . '"' . ')' . "`r`n"
 	. ";`r`n"
-	. ";     #HotIf PersonalFeatureEnabled(`"lock_screen`")`r`n"
-	. ";     ^!l:: DllCall(`"user32\LockWorkStation`")`r`n"
+	. ';     #HotIf PersonalFeatureEnabled(' . '"' . 'lock_screen' . '"' . ')' . "`r`n"
+	. ';     ^!l:: DllCall(' . '"' . 'user32\LockWorkStation' . '"' . ')' . "`r`n"
 	. ";     #HotIf`r`n"
 	. "; ==============================================================================`r`n"
 	. "`r`n"

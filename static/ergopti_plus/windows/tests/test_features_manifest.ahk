@@ -350,7 +350,7 @@ TestFMv2_ApplyUniversalScriptOverride() {
 	OldFeatures := _FM_BeginIsolated()
 	try {
 		Path := _FM_WriteFixture("script_locale",
-			"[script]`r`nlocale = `"en`"`r`n")
+			"[script]`r`nlocale = " . '"' . "en" . '"' . "`r`n")
 		Applied := ApplyConfigToml(Features, Path)
 		AssertEqual(1, Applied)
 		AssertEqual("en", Features["script"]["locale"])
@@ -398,7 +398,7 @@ TestFMv2_ApplyHsSectionIsSilentlySkipped() {
 	OldFeatures := _FM_BeginIsolated()
 	try {
 		Path := _FM_WriteFixture("hs_section",
-			"[hs.gestures]`r`nswipe_2_left = `"arrow_down`"`r`n")
+			"[hs.gestures]`r`nswipe_2_left = " . '"' . "arrow_down" . '"' . "`r`n")
 		Applied := ApplyConfigToml(Features, Path)
 		AssertEqual(0, Applied)
 		FileDelete(Path)
@@ -414,7 +414,7 @@ TestFMv2_ApplyUnknownSectionWarnsButDoesNotCrash() {
 			"[hotstrings.no_such_group]`r`n"
 			. "foo = true`r`n"
 			. "[script]`r`n"
-			. "locale = `"es`"`r`n")
+			. "locale = " . '"' . "es" . '"' . "`r`n")
 		Applied := ApplyConfigToml(Features, Path)
 		AssertEqual(1, Applied)
 		AssertEqual("es", Features["script"]["locale"])
@@ -429,7 +429,7 @@ TestFMv2_ApplyArrayValue() {
 	OldFeatures := _FM_BeginIsolated()
 	try {
 		Path := _FM_WriteFixture("array_value",
-			"[llm.navigation]`r`nval_modifiers = [`"alt`", `"ctrl`"]`r`n")
+			"[llm.navigation]`r`nval_modifiers = [" . '"' . "alt" . '"' . ", " . '"' . "ctrl" . '"' . "]`r`n")
 		Applied := ApplyConfigToml(Features, Path)
 		AssertEqual(1, Applied)
 		Arr := Features["llm"]["navigation"]["val_modifiers"]
@@ -464,7 +464,7 @@ TestFMv2_ApplyCommentsAndBlanksIgnored() {
 			. "`r`n"
 			. "[script]`r`n"
 			. "# in-section comment`r`n"
-			. "locale = `"de`"`r`n"
+			. "locale = " . '"' . "de" . '"' . "`r`n"
 			. "`r`n"
 			. "# trailing comment`r`n")
 		Applied := ApplyConfigToml(Features, Path)

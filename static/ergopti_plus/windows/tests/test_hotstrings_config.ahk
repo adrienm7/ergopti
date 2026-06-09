@@ -71,7 +71,7 @@ _HCfgTestSeedToml(Cat, Delay, Color, Sections := unset) {
 TestHotstringsConfig_ParseOverridesFileLevel() {
     Path := A_Temp . "\hotstrings_config_test_filelvl.toml"
     try FileDelete(Path)
-    FileAppend("[rolls]`ndelay = 0.4`ncolor = `"#abcdef`"`n", Path, "UTF-8")
+    FileAppend("[rolls]`ndelay = 0.4`ncolor = " . '"' . "#abcdef" . '"' . "`n", Path, "UTF-8")
     Result := _ParseOverrides(Path)
     AssertTrue(Result.Has("rolls"), "rolls override should be parsed")
     AssertEqual(0.4, Result["rolls"].Delay, "rolls delay parsed")
@@ -84,7 +84,7 @@ Test("HotstringsConfig: _ParseOverrides reads file-level delay and color",
 TestHotstringsConfig_ParseOverridesSection() {
     Path := A_Temp . "\hotstrings_config_test_sec.toml"
     try FileDelete(Path)
-    FileAppend("[rolls.ct]`ndelay = 0.2`ncolor = `"#00838f`"`n", Path, "UTF-8")
+    FileAppend("[rolls.ct]`ndelay = 0.2`ncolor = " . '"' . "#00838f" . '"' . "`n", Path, "UTF-8")
     Result := _ParseOverrides(Path)
     AssertTrue(Result.Has("rolls"), "rolls bucket created")
     AssertTrue(Result["rolls"].Sections.Has("ct"), "rolls.ct subsection parsed")

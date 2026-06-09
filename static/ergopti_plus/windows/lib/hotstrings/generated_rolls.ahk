@@ -153,7 +153,7 @@ _GenLoad_rolls_bracket_quote(FeatureConfig, ExtraOptions := unset) {
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*?", "[#", "[`"", _GenOpts)
+	CreateHotstring("*?", "[#", '["', _GenOpts)
 }
 
 _GenLoad_rolls_chevron_greater(FeatureConfig, ExtraOptions := unset) {
@@ -197,7 +197,7 @@ _GenLoad_rolls_comment_close(FeatureConfig, ExtraOptions := unset) {
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*?", "`"\", "*/", _GenOpts)
+	CreateHotstring("*?", '"\"', "*/", _GenOpts)
 }
 
 _GenLoad_rolls_comment_open(FeatureConfig, ExtraOptions := unset) {
@@ -208,7 +208,7 @@ _GenLoad_rolls_comment_open(FeatureConfig, ExtraOptions := unset) {
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*?", "\`"", "/*", _GenOpts)
+	CreateHotstring("*?", '\"', "/*", _GenOpts)
 }
 
 _GenLoad_rolls_ct(FeatureConfig, ExtraOptions := unset) {
@@ -257,12 +257,12 @@ _GenLoad_rolls_equal_string(FeatureConfig, ExtraOptions := unset) {
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*?", " [)", " = `"`"", _GenOpts)
+	CreateHotstring("*?", " [)", ' = ""', _GenOpts)
 	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", true, "IsRepeat", false, "Category", "rolls", "Section", "equal_string")
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*?", "[)", " = `"`"", _GenOpts)
+	CreateHotstring("*?", "[)", ' = ""', _GenOpts)
 }
 
 _GenLoad_rolls_ez(FeatureConfig, ExtraOptions := unset) {
@@ -284,7 +284,7 @@ _GenLoad_rolls_hashtag_close_bracket(FeatureConfig, ExtraOptions := unset) {
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*?", "#]", "`"]", _GenOpts)
+	CreateHotstring("*?", "#]", '"]', _GenOpts)
 }
 
 _GenLoad_rolls_hashtag_open_bracket(FeatureConfig, ExtraOptions := unset) {
@@ -295,7 +295,7 @@ _GenLoad_rolls_hashtag_open_bracket(FeatureConfig, ExtraOptions := unset) {
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*?", "#[", "`"]", _GenOpts)
+	CreateHotstring("*?", "#[", '"]', _GenOpts)
 }
 
 _GenLoad_rolls_hashtag_parenthesis(FeatureConfig, ExtraOptions := unset) {
@@ -306,7 +306,7 @@ _GenLoad_rolls_hashtag_parenthesis(FeatureConfig, ExtraOptions := unset) {
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*?", "#(", "`")", _GenOpts)
+	CreateHotstring("*?", "#(", '")', _GenOpts)
 }
 
 _GenLoad_rolls_hc(FeatureConfig, ExtraOptions := unset) {
@@ -365,7 +365,7 @@ _GenLoad_rolls_paren_quote(FeatureConfig, ExtraOptions := unset) {
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*?", "(#", "(`"", _GenOpts)
+	CreateHotstring("*?", "(#", '("', _GenOpts)
 }
 
 _GenLoad_rolls_sx(FeatureConfig, ExtraOptions := unset) {
