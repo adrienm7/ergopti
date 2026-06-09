@@ -198,8 +198,21 @@ _JsonParseString(&text, &pos) {
 					throw Error("JSON: invalid escape sequence at position " . pos . ".", -1)
 			}
 		} else {
-			out .= c
+			; Fast-path: copy the whole run of plain characters up to the next
+			; delimiter (" / \ / backtick) in one slice instead of appending one
+			; char at a time — the per-char ``out .= c`` is O(n^2) over the long
+			; unescaped spans that dominate locale strings (parsed once at boot
+			; for every i18n value). Behaviour is identical: the loop stops on the
+			; same delimiter the outer switch already handles
+			runStart := pos
 			pos++
+			while (pos <= len) {
+				cc := SubStr(text, pos, 1)
+				if (cc == '"' or cc == "\" or cc == '``')
+					break
+				pos++
+			}
+			out .= SubStr(text, runStart, pos - runStart)
 		}
 	}
 	throw Error("JSON: unterminated string starting near position " . pos . ".", -1)

@@ -54,6 +54,66 @@ _I18nTmpJson(Content) {
 }
 
 
+; --- _JsonParseString batched-run regression ---
+; _JsonParseString copies plain spans in one slice rather than char-by-char.
+; These drive it end-to-end through _I18nLoadFile + t() to pin that the batched
+; copy is byte-identical to the old per-char path: long unescaped runs, runs
+; that end exactly on the closing quote, and runs that resume after an escape.
+TestI18n_JsonLongPlainRun() {
+	_I18nTestReset()
+	Long := "the quick brown fox jumps over the lazy dog several times over"
+	_I18nLoadFile(_I18nTmpJson('{"k": "' . Long . '"}'))
+	AssertEqual(Long, t("k"))
+	_I18nTestReset()
+}
+Test("i18n/json: long no-escape run decodes verbatim (batched fast-path)",
+	TestI18n_JsonLongPlainRun)
+
+TestI18n_JsonRunEndsAtQuote() {
+	_I18nTestReset()
+	_I18nLoadFile(_I18nTmpJson('{"k": "abc"}'))
+	AssertEqual("abc", t("k"))
+	_I18nTestReset()
+}
+Test("i18n/json: plain run ending exactly at closing quote", TestI18n_JsonRunEndsAtQuote)
+
+TestI18n_JsonNewlineEscape() {
+	_I18nTestReset()
+	_I18nLoadFile(_I18nTmpJson('{"k": "line1\nline2 with a longer tail"}'))
+	AssertEqual("line1`nline2 with a longer tail", t("k"))
+	_I18nTestReset()
+}
+Test("i18n/json: escape then plain run resumes correctly", TestI18n_JsonNewlineEscape)
+
+TestI18n_JsonLeadingEscape() {
+	_I18nTestReset()
+	_I18nLoadFile(_I18nTmpJson('{"k": "\tindented run of plain text"}'))
+	AssertEqual("`tindented run of plain text", t("k"))
+	_I18nTestReset()
+}
+Test("i18n/json: leading escape before a plain run", TestI18n_JsonLeadingEscape)
+
+TestI18n_JsonBackslashRuns() {
+	_I18nTestReset()
+	_I18nLoadFile(_I18nTmpJson('{"k": "path\\to\\some file"}'))
+	AssertEqual("path\to\some file", t("k"))
+	_I18nTestReset()
+}
+Test("i18n/json: backslash escapes between plain runs", TestI18n_JsonBackslashRuns)
+
+TestI18n_JsonUnicodeEscape() {
+	_I18nTestReset()
+	; Build the backslash via Chr(0x5C) so the JSON source carries a real
+	; é escape that _JsonParseString must decode to é before the batched
+	; plain run " creme et plus" resumes
+	Content := '{"k": "caf' . Chr(0x5C) . 'u00e9 creme et plus"}'
+	_I18nLoadFile(_I18nTmpJson(Content))
+	AssertEqual("café creme et plus", t("k"))
+	_I18nTestReset()
+}
+Test("i18n/json: unicode escape then plain run decodes correctly", TestI18n_JsonUnicodeEscape)
+
+
 
 
 
