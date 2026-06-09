@@ -832,13 +832,13 @@ _HealthCheck_SnapshotToHtml(Snapshot, BtnLabel) {
 	SysTbl .= "</table>"
 
 	; ── Session counters table ────────────────────────────────────────────────
-	WarnOk  := WarnCount = 0 ? "<span class=ok>✓</span>" : "<span class=fail>✗</span>"
-	ErrOk   := ErrCount  = 0 ? "<span class=ok>✓</span>" : "<span class=fail>✗</span>"
+	WarnOk  := WarnCount = 0 ? "<span class=ok>✅ " . WarnCount . "</span>" : "<span class=fail>❌ " . WarnCount . "</span>"
+	ErrOk   := ErrCount  = 0 ? "<span class=ok>✅ " . ErrCount  . "</span>" : "<span class=fail>❌ " . ErrCount  . "</span>"
 	CtrTbl  := (
 		"<table>"
 		. "<tr><th>Type</th><th>Count</th></tr>"
-		. "<tr><td>" . WarnOk . " Warnings</td><td>" . WarnCount . "</td></tr>"
-		. "<tr><td>" . ErrOk  . " Errors</td><td>"   . ErrCount  . "</td></tr>"
+		. "<tr><td>⚠️ Warnings</td><td>" . WarnOk . "</td></tr>"
+		. "<tr><td>🔴 Errors</td><td>"   . ErrOk  . "</td></tr>"
 		. "</table>"
 	)
 
