@@ -22,6 +22,7 @@ local ui_restore       = require("lib.ui_restore")
 
 local Preferences   = require("ui.menu.preferences")
 local Builder       = require("ui.menu.builder")
+local HotCounter    = require("ui.menu.hotstring_counter")
 local MenuPaths     = require("ui.menu.menu_paths")
 local MenuState     = require("ui.menu.menu_state")
 local MenuWatchers  = require("ui.menu.menu_watchers")
