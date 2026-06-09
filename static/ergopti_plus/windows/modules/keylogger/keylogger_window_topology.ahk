@@ -50,8 +50,11 @@
 ; ===================================
 
 class KLTopoConst {
-    ; Poll interval (ms). 500 ms gives good responsiveness at negligible CPU.
-    static TOPO_TICK_MS      := 500
+    ; Poll interval (ms). 1500 ms still captures window move/resize events for
+    ; metrics while cutting background polling 3x — window geometry is coarse,
+    ; so the lower cadence is imperceptible in the recorded data and lightens
+    ; the periodic foreground-window probing on the shared AHK thread.
+    static TOPO_TICK_MS      := 1500
 
     ; Minimum position shift (px) to classify as a move rather than jitter.
     static MOVE_THRESHOLD_PX  := 10
