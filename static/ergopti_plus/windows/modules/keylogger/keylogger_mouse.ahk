@@ -65,8 +65,10 @@ class KLMouseConst {
     static SCROLL_BURST_GAP_MS := 400
 
     ; How often the background timer polls the cursor position (ms).
-    ; 100 ms keeps CPU near-zero while giving ~10 Hz distance sampling.
-    static PARK_CHECK_MS       := 100
+    ; 250 ms (~4 Hz) keeps background CPU minimal and eases the load on the
+    ; single AHK execution context shared with the input thread; distance and
+    ; park detection stay accurate enough for metrics at this cadence.
+    static PARK_CHECK_MS       := 250
 
     ; Cursor must remain within this radius (px) to be considered parked.
     static PARK_JITTER_PX      := 8
