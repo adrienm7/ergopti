@@ -182,3 +182,65 @@ _SecurityCorpus_RunAll() {
 }
 
 _SecurityCorpus_RunAll()
+
+
+; --- Async secure-field verdict contract (mirror of KL_PwClassStyleVerdict) ---
+; Production lives in modules/keylogger/keylogger.ahk, which the headless runner
+; cannot load, so this mirror pins the privacy-critical decision the async
+; detector depends on: the keystroke thread suppresses (fails safe) whenever the
+; Win32 layer is INCONCLUSIVE. The verdict must therefore only report
+; "conclusive" for a readable Edit or a known password class, never for an
+; unknown control (which must defer to the off-thread UIA pass).
+_KL_PwVerdictMirror(Cls, StyleHex, &Conclusive) {
+	static PASSWORD_CLASSES := Map(
+		"PasswordBox", true, "Edit;PASSWORD", true, "TPasswordEdit", true,
+		"MaskedEdit", true, "TFormPassword", true
+	)
+	if (Cls = "Edit") {
+		Conclusive := true
+		StyleNum := 0
+		try StyleNum := Integer(StyleHex)
+		return (StyleNum & 0x20) ? true : false
+	}
+	if PASSWORD_CLASSES.Has(Cls) {
+		Conclusive := true
+		return true
+	}
+	Conclusive := false
+	return false
+}
+
+_SecVerdict_EditPw() {
+	c := false
+	r := _KL_PwVerdictMirror("Edit", "0x80000020", &c)
+	AssertTrue(r && c, "Edit + ES_PASSWORD must be password AND conclusive")
+}
+Test("[secure-field] Edit+ES_PASSWORD is password and conclusive", _SecVerdict_EditPw)
+
+_SecVerdict_EditPlain() {
+	c := false
+	r := _KL_PwVerdictMirror("Edit", "0x80000000", &c)
+	AssertTrue(!r && c, "Edit without ES_PASSWORD must be not-password AND conclusive")
+}
+Test("[secure-field] Edit without ES_PASSWORD is not-password and conclusive", _SecVerdict_EditPlain)
+
+_SecVerdict_KnownClass() {
+	c := false
+	r := _KL_PwVerdictMirror("PasswordBox", "0", &c)
+	AssertTrue(r && c, "Known password class must be password AND conclusive")
+}
+Test("[secure-field] known password class is password and conclusive", _SecVerdict_KnownClass)
+
+_SecVerdict_UnknownInconclusive() {
+	c := true
+	r := _KL_PwVerdictMirror("Chrome_RenderWidgetHostHWND", "0", &c)
+	AssertTrue(!r && !c, "Unknown control must be INCONCLUSIVE so the keystroke thread fails safe pending async UIA")
+}
+Test("[secure-field] unknown control is inconclusive (fail-safe suppress)", _SecVerdict_UnknownInconclusive)
+
+_SecVerdict_RichEditInconclusive() {
+	c := true
+	r := _KL_PwVerdictMirror("RichEdit50W", "0", &c)
+	AssertTrue(!r && !c, "RichEdit50W must be inconclusive (needs UIA), not a hard not-password")
+}
+Test("[secure-field] RichEdit50W is inconclusive (needs UIA)", _SecVerdict_RichEditInconclusive)

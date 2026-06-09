@@ -1344,6 +1344,79 @@ class KLPasswordCache {
     static last_hwnd := 0
     static last_at   := 0
     static last_val  := false
+    ; HWND with an in-flight async UIA confirmation — guards the scheduler so a
+    ; burst of keystrokes on the same not-yet-classified control cannot pile up
+    ; one-shot timers.
+    static pending_hwnd := 0
+}
+
+; Known non-Edit password class names (Layer 2). Module-level so the cheap
+; synchronous classifier and the full UIA detector share one source of truth.
+global KL_PASSWORD_CLASSES := Map(
+    "PasswordBox", true,           ; WPF / UWP
+    "Edit;PASSWORD", true,         ; some older toolkits
+    "TPasswordEdit", true,         ; Delphi
+    "MaskedEdit", true,
+    "TFormPassword", true
+)
+
+; Pure Win32 class/style verdict (Layers 1-2): no OS calls, the caller passes
+; the already-read class and style. Conclusive is set true when the Win32 layer
+; alone fully decides the field — the Edit class is authoritative via its
+; ES_PASSWORD bit, and a known password class is a definite yes. When Conclusive
+; is false the control is a non-Edit / unknown one that only UIA can classify,
+; so the caller must fall through to the (off-thread) UIA layer. Kept pure so it
+; can be exercised headlessly.
+KL_PwClassStyleVerdict(Cls, Style, &Conclusive) {
+    global KL_PASSWORD_CLASSES
+    if (Cls = "Edit") {
+        Conclusive := true
+        return (Style & 0x20) ? true : false   ; ES_PASSWORD
+    }
+    if KL_PASSWORD_CLASSES.Has(Cls) {
+        Conclusive := true
+        return true
+    }
+    Conclusive := false
+    return false
+}
+
+; Cheap synchronous classification — Win32 class/style only, never UIA, so it is
+; safe to call on the keystroke thread. Conclusive mirrors KL_PwClassStyleVerdict;
+; a window that cannot be read leaves it false so the caller fails safe.
+KL_DetectPasswordCheap(hwnd, &Conclusive) {
+    Conclusive := false
+    Cls := ""
+    Style := 0
+    try {
+        Cls := WinGetClass("ahk_id " . hwnd)
+        if (Cls = "Edit")
+            Style := WinGetStyle("ahk_id " . hwnd)
+    } catch {
+        return false
+    }
+    return KL_PwClassStyleVerdict(Cls, Style, &Conclusive)
+}
+
+; Schedule a single off-thread UIA confirmation for hwnd. Guarded by pending_hwnd
+; so repeated keystrokes on the same control do not stack one-shot timers.
+KL_SchedulePasswordDetect(hwnd) {
+    if (KLPasswordCache.pending_hwnd = hwnd)
+        return
+    KLPasswordCache.pending_hwnd := hwnd
+    try SetTimer(KL_AsyncPasswordDetect.Bind(hwnd), -1)
+}
+
+; Runs on a one-shot timer, off the keystroke thread: performs the full
+; detection (including the 5-15 ms UIA round-trip) and commits the authoritative
+; verdict to the cache.
+KL_AsyncPasswordDetect(hwnd) {
+    Result := KL_DetectPasswordFor(hwnd)
+    KLPasswordCache.last_hwnd := hwnd
+    KLPasswordCache.last_at   := A_TickCount
+    KLPasswordCache.last_val  := Result
+    if (KLPasswordCache.pending_hwnd = hwnd)
+        KLPasswordCache.pending_hwnd := 0
 }
 
 KL_IsFocusedFieldPassword() {
@@ -1354,16 +1427,31 @@ KL_IsFocusedFieldPassword() {
     if !hwnd
         return false
 
-    ; Per-HWND cache.
-    if (KLPasswordCache.last_hwnd = hwnd
-        && (A_TickCount - KLPasswordCache.last_at) < KLPW_CACHE_TTL_MS)
+    ; Same HWND already classified — return the cached verdict immediately. If
+    ; it has gone stale, kick an async re-detect but still answer NOW so the
+    ; keystroke thread never blocks on a UIA round-trip for re-validation.
+    if (KLPasswordCache.last_hwnd = hwnd) {
+        if ((A_TickCount - KLPasswordCache.last_at) >= KLPW_CACHE_TTL_MS)
+            KL_SchedulePasswordDetect(hwnd)
         return KLPasswordCache.last_val
+    }
 
-    result := KL_DetectPasswordFor(hwnd)
+    ; Brand-new focus: run only the cheap Win32 classification on this thread,
+    ; never UIA. When Win32 cannot conclude (a non-Edit / unknown control such as
+    ; a browser, WPF or Electron field) fail safe — treat it as a password so the
+    ; event is suppressed, and confirm via UIA off-thread, which relaxes the
+    ; verdict to "not password" if appropriate. A password is therefore never
+    ; logged while its classification is still uncertain.
+    Conclusive := false
+    Verdict := KL_DetectPasswordCheap(hwnd, &Conclusive)
+    if !Conclusive {
+        Verdict := true
+        KL_SchedulePasswordDetect(hwnd)
+    }
     KLPasswordCache.last_hwnd := hwnd
     KLPasswordCache.last_at   := A_TickCount
-    KLPasswordCache.last_val  := result
-    return result
+    KLPasswordCache.last_val  := Verdict
+    return Verdict
 }
 
 KL_DetectPasswordFor(hwnd) {
@@ -1376,14 +1464,7 @@ KL_DetectPasswordFor(hwnd) {
                 return true
         }
         ; Layer 2 — known password class names.
-        static PASSWORD_CLASSES := Map(
-            "PasswordBox", true,           ; WPF / UWP
-            "Edit;PASSWORD", true,         ; some older toolkits
-            "TPasswordEdit", true,         ; Delphi
-            "MaskedEdit", true,
-            "TFormPassword", true
-        )
-        if PASSWORD_CLASSES.Has(cls)
+        if KL_PASSWORD_CLASSES.Has(cls)
             return true
         ; RichEdit50W is too generic to flag unconditionally — it only
         ; matters when hosted in a security dialog. Fall through to UIA.
