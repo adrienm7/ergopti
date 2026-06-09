@@ -168,6 +168,12 @@ global HSE_LastEndChar := ""
 ; disabled — typed <x>★ sequences fall through unchanged.
 global HSE_RepeatEnabled := true
 
+; Set to true by HSE_FindMatchAtEnd when a NNBSP/NBSP was stripped from the
+; buffer before matching a typographic end-char (``:`` / `` ; ``). The
+; dispatcher reads this to add +1 to the BackSpace count so the NNBSP is
+; erased together with the trigger and the end-char.
+global HSE_TypoNbspStripped := false
+
 
 
 
@@ -574,9 +580,9 @@ HSE_HardReset() {
 ; terminator (the new HSE_FeedChar keeps terminators in the buffer too,
 ; so triggers that span them — e.g. « ,a → ja » — can still match).
 HSE_ApplyExpansion(Spec, Replacement, EndChar := "") {
-    global HSE_Buffer, HSE_StartIsWordBoundary, HSE_MAX_BUFFER_LEN
+    global HSE_Buffer, HSE_StartIsWordBoundary, HSE_MAX_BUFFER_LEN, HSE_TypoNbspStripped
 
-    StripLen := Spec.Length + (EndChar != "" ? 1 : 0)
+    StripLen := Spec.Length + (EndChar != "" ? 1 : 0) + (HSE_TypoNbspStripped ? 1 : 0)
     BufLen := StrLen(HSE_Buffer)
 
     ; Strip the trigger suffix (and the end char when present). Be
@@ -697,8 +703,9 @@ HSE_TryRepeatKey(MagicKey) {
 ; ``JustTypedChar`` (end-char match).
 HSE_FindMatchAtEnd(JustTypedChar) {
     global HSE_Buffer, HSE_StartIsWordBoundary, HSE_RegistryByLastChar
-    global HSE_WORD_TERMINATORS, HSE_LastEndChar
+    global HSE_WORD_TERMINATORS, HSE_LastEndChar, HSE_TypoNbspStripped
 
+    HSE_TypoNbspStripped := false
     if (JustTypedChar == "") {
         return ""
     }
@@ -737,29 +744,59 @@ HSE_FindMatchAtEnd(JustTypedChar) {
 
     ; ── END-CHAR path ──────────────────────────────────────────────
     if IsTerminator and (BodyLastChar != "") {
-        Buckets2 := _HSE_BucketsFor(BodyLastChar)
-        for _, Bucket in Buckets2 {
-            for _, Spec in Bucket {
-                if Spec.Star {
-                    continue
-                }
-                if !HSE_SuffixMatches(BodyBuf, Spec.Trigger, Spec.CaseSensitive) {
-                    continue
-                }
-                if !_HSE_WordBoundaryAllows(BodyBuf, Spec) {
-                    continue
-                }
-                ; Star-prefix priority: suppress the end-char match only when
-                ; the just-typed end char can itself continue toward a star
-                ; trigger (e.g. magic-key press after "ia" → yields to "ia★").
-                ; Typing space after "ia" does NOT suppress because space is not
-                ; the magic key and cannot reach "ia★".
-                if _HSE_StarTriggerCoversBody(BodyBuf, Spec, JustTypedChar) {
-                    continue
-                }
-                if (BestMatch == "" or Spec.Length > BestMatch.Length) {
-                    BestMatch := Spec
-                    BestEndChar := JustTypedChar
+        ; ``:`` and ``;`` on the Ergopti Shift layer always arrive as
+        ; ``NNBSP + :``. The NNBSP lands in the buffer BEFORE the ``:``
+        ; end-char, so ``BodyBuf`` ends in ``…triggerNNBSP`` rather than
+        ; ``…trigger``. To let these typographic end-chars still fire
+        ; hotstrings we:
+        ;   1. Strip the trailing NNBSP/NBSP from BodyBuf so matching sees
+        ;      ``…trigger`` again (EffBody).
+        ;   2. Require that NNBSP/NBSP was indeed present — a bare ``:`` or
+        ;      ``;`` NOT preceded by an nbsp must NOT expand (e.g. the ``:``
+        ;      in ``:D`` must stay literal).
+        IsTypoEndChar := (JustTypedChar == ":" or JustTypedChar == Chr(0x3B))
+        EffBody := BodyBuf
+        ShouldMatch := true
+        if IsTypoEndChar {
+            LastOfBody := SubStr(BodyBuf, -1)
+            if (LastOfBody == Chr(0x202F) or LastOfBody == Chr(0xA0)) {
+                ; Strip the nbsp so the trigger can match the actual body text.
+                EffBody := SubStr(BodyBuf, 1, StrLen(BodyBuf) - 1)
+                HSE_TypoNbspStripped := true
+            } else {
+                ; A bare ``:`` / ``;`` without preceding nbsp is a mid-sequence
+                ; character (e.g. ``:D``) and must not trigger any expansion.
+                ShouldMatch := false
+            }
+        }
+        if ShouldMatch {
+            EffBodyLastChar := SubStr(EffBody, -1)
+            if (EffBodyLastChar != "") {
+                Buckets2 := _HSE_BucketsFor(EffBodyLastChar)
+                for _, Bucket in Buckets2 {
+                    for _, Spec in Bucket {
+                        if Spec.Star {
+                            continue
+                        }
+                        if !HSE_SuffixMatches(EffBody, Spec.Trigger, Spec.CaseSensitive) {
+                            continue
+                        }
+                        if !_HSE_WordBoundaryAllows(EffBody, Spec) {
+                            continue
+                        }
+                        ; Star-prefix priority: suppress the end-char match only when
+                        ; the just-typed end char can itself continue toward a star
+                        ; trigger (e.g. magic-key press after "ia" → yields to "ia★").
+                        ; Typing space after "ia" does NOT suppress because space is not
+                        ; the magic key and cannot reach "ia★".
+                        if _HSE_StarTriggerCoversBody(EffBody, Spec, JustTypedChar) {
+                            continue
+                        }
+                        if (BestMatch == "" or Spec.Length > BestMatch.Length) {
+                            BestMatch := Spec
+                            BestEndChar := JustTypedChar
+                        }
+                    }
                 }
             }
         }
@@ -921,7 +958,7 @@ global HSE_SUPPRESS_RELEASE_DELAY_MS := 60
 ; path) fall through to invoking Spec.Callback for backwards
 ; compatibility with the test-only registrations.
 HSE_DispatchMatch(Spec, EndChar) {
-    global HSE_SUPPRESS_RELEASE_DELAY_MS, _SendHook
+    global HSE_SUPPRESS_RELEASE_DELAY_MS, _SendHook, HSE_TypoNbspStripped
     if !Spec.HasOwnProp("Replacement") {
         if Spec.HasOwnProp("Callback") and Spec.Callback {
             try (Spec.Callback)(EndChar)
@@ -961,7 +998,9 @@ HSE_DispatchMatch(Spec, EndChar) {
             SendEvent("{SC138 Up}")
         }
 
-        BSCount := Spec.Length + (EndChar != "" ? 1 : 0)
+        ; +1 for the NNBSP/NBSP that was stripped before matching when the
+        ; end-char is a typographic punctuation (``:`` / `` ; ``).
+        BSCount := Spec.Length + (EndChar != "" ? 1 : 0) + (HSE_TypoNbspStripped ? 1 : 0)
         BackSpaceSeq := "{BackSpace " . BSCount . "}"
         Replacement := Spec.Replacement
         ; Allow Replacement to be a callable — resolved at fire time so
