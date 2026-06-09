@@ -535,12 +535,16 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	if core_mods.shortcuts_mod then
 		if type(core_mods.shortcuts_mod.set_on_pause_change) == "function" then
 			pcall(core_mods.shortcuts_mod.set_on_pause_change, function(is_paused)
-				-- Switch keyboard layout when pausing or resuming, if the feature is enabled
+				-- Switch keyboard layout when pausing or resuming, if the feature is enabled.
+				-- Use set_layout_by_kl_name so the localised name is resolved before calling
+				-- hs.keycodes.setLayout — the raw KeyboardLayout Name (stored in state) is not
+				-- accepted by setLayout for Ergopti variants.
 				if state.layout_pause_switch_enabled then
 					local target_layout = is_paused and state.layout_on_pause or state.layout_on_resume
 					if type(target_layout) == "string" and target_layout ~= "" then
-						if hs.keycodes and type(hs.keycodes.setLayout) == "function" then
-							pcall(hs.keycodes.setLayout, target_layout)
+						local kbd_layout_mod = menu_mods.keyboard_layout
+						if kbd_layout_mod and type(kbd_layout_mod.set_layout_by_kl_name) == "function" then
+							pcall(kbd_layout_mod.set_layout_by_kl_name, target_layout)
 						end
 					end
 				end

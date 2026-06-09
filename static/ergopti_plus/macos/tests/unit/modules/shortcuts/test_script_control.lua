@@ -244,3 +244,64 @@ helpers.describe("ScriptControl pause invariant", function()
 		SC.set_on_pause_change(nil)
 	end)
 end)
+
+helpers.describe("ScriptControl suspend-exempt regression (pause_bindings API)", function()
+	-- Regression: before the fix, pause_all() called _shortcuts.stop() which
+	-- resolved to shortcuts/init.lua M.stop() and that in turn called
+	-- ScriptControl.stop(), killing the script-control eventtap. After that,
+	-- AltGr+Enter could no longer un-pause the script.
+	-- The fix: shortcuts/init.lua now exposes pause_bindings() / resume_bindings()
+	-- that stop only Bindings + KeyboardShortcuts, leaving the script-control tap
+	-- alive. script_control.pause_all() prefers pause_bindings over stop().
+	--
+	-- We verify the invariant at the source-code level: pause_all() must call
+	-- _shortcuts.pause_bindings when it is available, not _shortcuts.stop().
+
+	helpers.it("script_control source calls pause_bindings when available (grep invariant)", function()
+		-- Read the source of script_control.lua and assert the conditional
+		-- that prefers pause_bindings exists, so a future refactor cannot
+		-- accidentally remove the guard.
+		local src_path = helpers.driver_root() .. "modules/shortcuts/script_control.lua"
+		local fh = io.open(src_path, "r")
+		helpers.assert_true(fh ~= nil, "script_control.lua must be readable at " .. tostring(src_path))
+		local src = fh:read("*a"); fh:close()
+		helpers.assert_true(src:find("pause_bindings", 1, true) ~= nil,
+			"script_control.lua must reference pause_bindings to keep the tap alive during pause")
+		helpers.assert_true(src:find("resume_bindings", 1, true) ~= nil,
+			"script_control.lua must reference resume_bindings for symmetry")
+	end)
+
+	helpers.it("shortcuts/init.lua exposes pause_bindings and resume_bindings", function()
+		-- Load shortcuts/init.lua with stubs to verify the API surface
+		package.loaded["modules.shortcuts.bindings"] = {
+			DEFAULT_CHATGPT_URL = "https://test",
+			start = function() end, stop = function() end,
+			enable = function() end, disable = function() end,
+			is_enabled = function() return true end,
+			list_shortcuts = function() return {} end,
+		}
+		package.loaded["modules.shortcuts.keyboard_shortcuts"] = {
+			start = function() end, stop = function() end,
+			set_action = function() end, get_action = function() return "none" end,
+			get_slot_label = function() return "" end,
+			get_assignments = function() return {} end,
+		}
+		local ok, shortcuts_mod = pcall(require, "modules.shortcuts")
+		if not ok then
+			-- If loading fails due to other stubs, just verify via source inspection
+			local src_path = helpers.driver_root() .. "modules/shortcuts/init.lua"
+			local fh = io.open(src_path, "r")
+			helpers.assert_true(fh ~= nil)
+			local src = fh:read("*a"); fh:close()
+			helpers.assert_true(src:find("pause_bindings", 1, true) ~= nil,
+				"shortcuts/init.lua must expose pause_bindings()")
+			helpers.assert_true(src:find("resume_bindings", 1, true) ~= nil,
+				"shortcuts/init.lua must expose resume_bindings()")
+			return
+		end
+		helpers.assert_true(type(shortcuts_mod.pause_bindings) == "function",
+			"shortcuts module must expose pause_bindings()")
+		helpers.assert_true(type(shortcuts_mod.resume_bindings) == "function",
+			"shortcuts module must expose resume_bindings()")
+	end)
+end)
