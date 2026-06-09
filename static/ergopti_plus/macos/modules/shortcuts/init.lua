@@ -80,4 +80,19 @@ function M.stop()
 	KeyboardShortcuts.stop()
 end
 
+--- Stops only the user-facing bindings and keyboard shortcuts, leaving the
+--- script-control eventtap alive so AltGr+Enter/Escape/Backspace can still
+--- un-pause the script. Called by pause_all() in script_control.lua instead
+--- of stop() which would also kill the script-control tap itself.
+function M.pause_bindings()
+	Bindings.stop()
+	KeyboardShortcuts.stop()
+end
+
+--- Restores user-facing bindings after a pause. Symmetric to pause_bindings().
+function M.resume_bindings()
+	Bindings.start()
+	KeyboardShortcuts.start()
+end
+
 return M

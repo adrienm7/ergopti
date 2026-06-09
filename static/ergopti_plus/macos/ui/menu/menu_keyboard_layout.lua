@@ -458,19 +458,45 @@ print(json.dumps(out))
 	return out
 end
 
---- Activates the given keyboard layout. First tries hs.keycodes.setLayout
---- (works when the bundle's localisation is intact); on failure, runs
---- TISSelectInputSource via osascript in an isolated subprocess so that any
---- TIS-side error cannot crash Hammerspoon.
---- @param raw_id string Either the localised name or the TISInputSourceID.
+--- Activates the given keyboard layout.
+--- Strategy (in order):
+---   1. hs.keycodes.setLayout(localised_name) — works for standard layouts and
+---      Ergopti when the bundle localisation is intact. "French" and "Ergopti+"
+---      are the forms macOS publishes; the raw KeyboardLayout Name (e.g.
+---      "Ergopti_v2_2_2_plus") is NOT accepted by setLayout.
+---   2. hs.keycodes.setLayout(kl_name) — fallback using the internal name in case
+---      the localised form differs from what hs.keycodes expects.
+---   3. TISSelectInputSource via osascript with the stable TIS ID resolved from
+---      kl_name through build_kl_name_to_tis_id() — covers Ergopti variants on
+---      macOS Sequoia where setLayout fails for third-party bundles.
+--- @param localised_name string The display / localised name (r.name), e.g. "French".
+--- @param kl_name string The raw KeyboardLayout Name (r.id), e.g. "Ergopti_v2_2_2_plus".
 --- @return boolean true on success.
-local function set_input_source(raw_id)
+local function set_input_source(localised_name, kl_name)
 	if hs.keycodes and type(hs.keycodes.setLayout) == "function" then
-		local ok = pcall(hs.keycodes.setLayout, raw_id)
-		if ok then
-			Logger.info(LOG, "Active layout switched to '%s' (hs.keycodes).", raw_id)
-			return true
+		-- Try the localised name first — this is what hs.keycodes expects
+		if type(localised_name) == "string" and localised_name ~= "" then
+			local ok = pcall(hs.keycodes.setLayout, localised_name)
+			if ok then
+				Logger.info(LOG, "Active layout switched to '%s' (hs.keycodes, localised).", localised_name)
+				return true
+			end
 		end
+		-- Try the raw KeyboardLayout Name as a secondary candidate
+		if type(kl_name) == "string" and kl_name ~= "" and kl_name ~= localised_name then
+			local ok = pcall(hs.keycodes.setLayout, kl_name)
+			if ok then
+				Logger.info(LOG, "Active layout switched to '%s' (hs.keycodes, kl_name).", kl_name)
+				return true
+			end
+		end
+	end
+	-- Resolve the stable TIS ID for Ergopti variants via the installed bundle map,
+	-- then fall back to using kl_name directly as the TIS ID for standard layouts.
+	local tis_id = kl_name or localised_name or ""
+	if type(kl_name) == "string" and kl_name ~= "" then
+		local kl_map = build_kl_name_to_tis_id() or {}
+		tis_id = kl_map[kl_name] or kl_name
 	end
 	local script = string.format([[
 use framework "Carbon"
@@ -485,13 +511,13 @@ on run
 	end if
 	return "MISS"
 end run
-]], raw_id:gsub('"', '\\"'))
+]], tis_id:gsub('"', '\\"'))
 	local ok, out = run_osascript_isolated(script)
 	if ok and out and tostring(out):find("OK") then
-		Logger.info(LOG, "Active layout switched to '%s' (TIS subprocess).", raw_id)
+		Logger.info(LOG, "Active layout switched to '%s' (TIS subprocess, tis_id=%s).", localised_name or kl_name, tis_id)
 		return true
 	end
-	Logger.warn(LOG, "Failed to switch active layout to '%s' (out=%s).", raw_id, tostring(out))
+	Logger.warn(LOG, "Failed to switch active layout to '%s' / '%s' (tis_id=%s, out=%s).", tostring(localised_name), tostring(kl_name), tis_id, tostring(out))
 	return false
 end
 
@@ -1221,12 +1247,11 @@ function M.build(ctx)
 	else
 		for _, r in ipairs(records) do
 			local title    = display_for_record(r)
-			-- Pass the raw KeyboardLayout Name (r.id) to set_input_source so both
-			-- hs.keycodes.setLayout and the TIS osascript fallback receive the exact
-			-- internal name macOS uses. r.name is a formatted display string (e.g.
-			-- "Ergopti plus") that does not match the TIS database entries and causes
-			-- hs.keycodes.setLayout to silently fail for non-French layouts.
-			local target_id = r.id
+			-- Capture both the localised name (r.name, used by hs.keycodes.setLayout)
+			-- and the raw KeyboardLayout Name (r.id, used to resolve the stable TIS ID
+			-- for Ergopti variants). set_input_source tries them in order.
+			local target_localised = r.name
+			local target_kl_name   = r.id
 			submenu[#submenu + 1] = {
 				title   = title,
 				checked = r.selected or nil,
@@ -1238,7 +1263,7 @@ function M.build(ctx)
 					-- Defer the TIS call out of the menu-click frame so the
 					-- input-source change notification doesn't re-enter HS.
 					defer_tis_call(function()
-						set_input_source(target_id)
+						set_input_source(target_localised, target_kl_name)
 						schedule_menu_refresh(update_menu)
 					end)
 				end,
@@ -1294,36 +1319,35 @@ function M.build(ctx)
 			end,
 		}
 
-		if feature_on then
-			local cur_pause  = state.layout_on_pause
-			local cur_resume = state.layout_on_resume
+		local cur_pause  = state.layout_on_pause
+		local cur_resume = state.layout_on_resume
 
-			local pause_label = (cur_pause and cur_pause ~= false and cur_pause ~= "")
-				and display_for_record({ id = cur_pause, name = cur_pause:gsub("_", " "):gsub("%s+v%d.*$", "") })
-				or  i18n.get("menu.layout.layout_auto")
-			submenu[#submenu + 1] = {
-				title    = string.format("%s : %s", i18n.get("menu.layout.layout_on_pause"), pause_label),
-				disabled = hs_paused_pre or nil,
-				menu     = build_layout_picker_submenu(cur_pause, function(id)
-					state.layout_on_pause = id
-					if save_prefs then save_prefs() end
-					if update_menu then update_menu() end
-				end),
-			}
+		local pause_label = (cur_pause and cur_pause ~= false and cur_pause ~= "")
+			and display_for_record({ id = cur_pause, name = cur_pause:gsub("_", " "):gsub("%s+v%d.*$", "") })
+			or  i18n.get("menu.layout.layout_auto")
+		submenu[#submenu + 1] = {
+			title    = string.format("%s : %s", i18n.get("menu.layout.layout_on_pause"), pause_label),
+			-- Grayed out when the feature is disabled or the script is currently paused
+			disabled = (not feature_on) or hs_paused_pre or nil,
+			menu     = build_layout_picker_submenu(cur_pause, function(id)
+				state.layout_on_pause = id
+				if save_prefs then save_prefs() end
+				if update_menu then update_menu() end
+			end),
+		}
 
-			local resume_label = (cur_resume and cur_resume ~= false and cur_resume ~= "")
-				and display_for_record({ id = cur_resume, name = cur_resume:gsub("_", " "):gsub("%s+v%d.*$", "") })
-				or  i18n.get("menu.layout.layout_auto")
-			submenu[#submenu + 1] = {
-				title    = string.format("%s : %s", i18n.get("menu.layout.layout_on_resume"), resume_label),
-				disabled = hs_paused_pre or nil,
-				menu     = build_layout_picker_submenu(cur_resume, function(id)
-					state.layout_on_resume = id
-					if save_prefs then save_prefs() end
-					if update_menu then update_menu() end
-				end),
-			}
-		end
+		local resume_label = (cur_resume and cur_resume ~= false and cur_resume ~= "")
+			and display_for_record({ id = cur_resume, name = cur_resume:gsub("_", " "):gsub("%s+v%d.*$", "") })
+			or  i18n.get("menu.layout.layout_auto")
+		submenu[#submenu + 1] = {
+			title    = string.format("%s : %s", i18n.get("menu.layout.layout_on_resume"), resume_label),
+			disabled = (not feature_on) or hs_paused_pre or nil,
+			menu     = build_layout_picker_submenu(cur_resume, function(id)
+				state.layout_on_resume = id
+				if save_prefs then save_prefs() end
+				if update_menu then update_menu() end
+			end),
+		}
 	end
 
 	-- J→★ remapping lives here because it configures the physical key, not hotstring behaviour.
@@ -1392,5 +1416,26 @@ M._extract_ergopti_version = extract_ergopti_version
 M._format_ergopti_display  = format_ergopti_display
 M._is_legacy_ergopti_id    = is_legacy_ergopti_id
 M._migrate_legacy_id       = migrate_legacy_id
+
+--- Switches the active keyboard layout given a raw KeyboardLayout Name (as stored
+--- in state.layout_on_pause / state.layout_on_resume). Resolves the localised name
+--- from the live HIToolbox list so hs.keycodes.setLayout receives the correct form.
+--- Falls back to the TIS osascript path when setLayout fails (Ergopti on Sequoia).
+--- @param kl_name string Raw KeyboardLayout Name from HIToolbox, e.g. "Ergopti_v2_2_2_plus".
+--- @return boolean true on success.
+function M.set_layout_by_kl_name(kl_name)
+	if type(kl_name) ~= "string" or kl_name == "" then return false end
+	-- Resolve the localised display name from the live record list so
+	-- hs.keycodes.setLayout gets the correct form (e.g. "French", "Ergopti+").
+	local localised = kl_name
+	local records   = list_active_keyboard_layouts()
+	for _, r in ipairs(records) do
+		if r.id == kl_name then
+			localised = (type(r.name) == "string" and r.name ~= "") and r.name or kl_name
+			break
+		end
+	end
+	return set_input_source(localised, kl_name)
+end
 
 return M

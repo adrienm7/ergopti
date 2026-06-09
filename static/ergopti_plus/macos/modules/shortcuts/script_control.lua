@@ -135,7 +135,12 @@ local function pause_all()
 	if ok_tt and tt and type(tt.hide_forced) == "function" then
 		pcall(function() tt.hide_forced() end)
 	end
-	if _shortcuts and type(_shortcuts.stop) == "function" then
+	-- Use pause_bindings() rather than stop() so the script-control eventtap
+	-- itself stays alive — stop() would also call ScriptControl.stop() and
+	-- kill this very tap, making AltGr+Enter unable to un-pause.
+	if _shortcuts and type(_shortcuts.pause_bindings) == "function" then
+		pcall(function() _shortcuts.pause_bindings() end)
+	elseif _shortcuts and type(_shortcuts.stop) == "function" then
 		pcall(function() _shortcuts.stop() end)
 	end
 	if _gestures and type(_gestures.disable_all) == "function" then
@@ -151,7 +156,9 @@ local function resume_all()
 	if _keymap and type(_keymap.resume_processing) == "function" then
 		pcall(function() _keymap.resume_processing() end)
 	end
-	if _shortcuts and type(_shortcuts.start) == "function" then
+	if _shortcuts and type(_shortcuts.resume_bindings) == "function" then
+		pcall(function() _shortcuts.resume_bindings() end)
+	elseif _shortcuts and type(_shortcuts.start) == "function" then
 		pcall(function() _shortcuts.start() end)
 	end
 	if _gestures and type(_gestures.enable_all) == "function" then
