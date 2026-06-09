@@ -218,10 +218,11 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 
 	local function save_prefs()
 		Preferences.save(MenuPaths.get("ConfigTomlPath"), state, hotfiles, core_mods)
-		-- PERFORMANCE: Invalidate caches after saving prefs to ensure counts and
-		-- labels reflect the new state on next click.
 		if type(Builder.invalidate_cache) == "function" then Builder.invalidate_cache() end
 		if type(HotCounter.invalidate_cache) == "function" then HotCounter.invalidate_cache() end
+		-- Rebuild and re-register the menu table so toggles and state changes
+		-- are visible immediately on the next click (not just after a reload).
+		if type(updateMenu) == "function" then updateMenu() end
 	end
 
 

@@ -1,4 +1,4 @@
-; drivers/autohotkey/lib/toml_loader.ahk
+﻿; drivers/autohotkey/lib/toml_loader.ahk
 
 ; ==============================================================================
 ; MODULE: TOML Loader
@@ -195,11 +195,11 @@ UnescapeTomlString(s) {
 
 
 
-; ========================================================
-; ========================================================
+; =======================================================
+; =======================================================
 ; ======= 2/ High-level hotstring section loading =======
-; ========================================================
-; ========================================================
+; =======================================================
+; =======================================================
 
 ; Register every hotstring of a given [[section]] defined inside a TOML file
 ; located under ..\hotstrings\<CategoryName>.toml (relative to the script).
@@ -289,9 +289,12 @@ LoadHotstringsSection(CategoryName, SectionName, FeatureConfig, ExtraOptions := 
         StrictCase := (Match[7] == "true")
 
         Flags := ""
-        if AutoExpand { Flags .= "*" }
-        if !IsWord { Flags .= "?" }
-        if StrictCase { Flags .= "C" }
+        if AutoExpand
+            Flags .= "*"
+        if !IsWord
+            Flags .= "?"
+        if StrictCase
+            Flags .= "C"
 
         Options := Map(
             "TimeActivationSeconds", TimeActivationSeconds,
@@ -361,10 +364,13 @@ LoadExtTomlFile(FilePath, CategoryLabel) {
         FinalResult := (Match[6] == "true")
         StrictCase := (Match[7] == "true")
         Flags := ""
-        if AutoExpand { Flags .= "*" }
-        if !IsWord { Flags .= "?" }
-        if StrictCase { Flags .= "C" }
-        
+        if AutoExpand
+            Flags .= "*"
+        if !IsWord
+            Flags .= "?"
+        if StrictCase
+            Flags .= "C"
+
         SectionName := CurrentSection
         IsRepeat := (StrLower(CategoryName) == "magickey" and SectionName == "repeatcorrections"
             and InStr(Trigger, ScriptInformation["MagicKey"]) > 0)
@@ -542,10 +548,14 @@ ReadTomlSectionsOrder(CategoryName, FilePath := "") {
 TomlCoerceValue(Raw) {
     Trimmed := Trim(Raw, " `t")
     Lower := StrLower(Trimmed)
-    if (Lower == "true") { return 1 }
-    if (Lower == "false") { return 0 }
-    if RegExMatch(Trimmed, "^-?\d+$") { return Integer(Trimmed) }
-    if RegExMatch(Trimmed, "^-?\d+\.\d+$") { return Float(Trimmed) }
+    if (Lower == "true")
+        return 1
+    if (Lower == "false")
+        return 0
+    if RegExMatch(Trimmed, "^-?\d+$")
+        return Integer(Trimmed)
+    if RegExMatch(Trimmed, "^-?\d+\.\d+$")
+        return Float(Trimmed)
     Q := Chr(34)
     if (StrLen(Trimmed) >= 2 and SubStr(Trimmed, 1, 1) == Q
     and SubStr(Trimmed, StrLen(Trimmed), 1) == Q) {
