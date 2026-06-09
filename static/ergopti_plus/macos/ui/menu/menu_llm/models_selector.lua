@@ -134,35 +134,123 @@ function M.build(ctx)
 		end
 	end
 
-	--- Prompts the user for a custom model identifier and persists it.
+	--- Opens a wide webview dialog so the full model URL fits without truncation.
+	--- hs.dialog.textPrompt is too narrow for long HuggingFace identifiers; this
+	--- webview replacement gives the input field the full window width.
 	local function prompt_add_user_model()
-		local hint = (active_backend == "mlx")
+		local hint  = (active_backend == "mlx")
 			and i18n.get("menu.llm.mlx_model_hint")
 			or  i18n.get("menu.llm.ollama_model_hint")
-		local ok, ret_a, ret_b = pcall(dialog.text_prompt,
-			i18n.get("menu.llm.add_custom_model"),
-			hint,
-			"", i18n.get("button.add"), i18n.get("button.cancel"))
-		if not ok then
-			Logger.warn(LOG, "Custom model dialog raised — aborting add.")
+		local title = i18n.get("menu.llm.add_custom_model")
+
+		local ok_uc, uc = pcall(hs.webview.usercontent.new, "addCustomModel")
+		if not ok_uc or not uc then
+			Logger.error(LOG, "Failed to create usercontent bridge for custom model dialog.")
 			return
 		end
-		-- hs.dialog.textPrompt return order varies across macOS builds — handle both
-		local picked_btn, picked_text
-		if ret_a == i18n.get("button.add") or ret_a == i18n.get("button.cancel") then
-			picked_btn, picked_text = ret_a, ret_b
-		else
-			picked_text, picked_btn = ret_a, ret_b
+
+		local _wv = nil
+
+		local function close_wv()
+			if _wv then
+				pcall(function() _wv:delete() end)
+				_wv = nil
+			end
 		end
-		if picked_btn ~= i18n.get("button.add") then return end
-		local name = (type(picked_text) == "string" and picked_text or ""):gsub("^%s+", ""):gsub("%s+$", "")
-		if name == "" then
-			pcall(dialog.alert, i18n.get("menu.llm.custom_model_title"), i18n.get("menu.llm.empty_model_id"), "OK")
+
+		uc:setCallback(function(message)
+			local body = message and message.body
+			if type(body) ~= "table" then return end
+			if body.action == "cancel" then
+				close_wv()
+			elseif body.action == "add" then
+				local name = type(body.value) == "string" and body.value:gsub("^%s+", ""):gsub("%s+$", "") or ""
+				close_wv()
+				if name == "" then
+					pcall(dialog.alert, i18n.get("menu.llm.custom_model_title"), i18n.get("menu.llm.empty_model_id"), "OK")
+					return
+				end
+				add_user_model(active_backend, name)
+				save_prefs()
+				switch_model(name)
+			end
+		end)
+
+		local ok_ui, ui_builder = pcall(require, "ui.ui_builder")
+		if not ok_ui or not ui_builder then
+			Logger.error(LOG, "Failed to load ui_builder for custom model dialog.")
 			return
 		end
-		add_user_model(active_backend, name)
-		save_prefs()
-		switch_model(name)
+
+		-- Escape a string for HTML attribute and text content
+		local function he(s)
+			return s:gsub("&", "&amp;"):gsub("<", "&lt;"):gsub(">", "&gt;"):gsub('"', "&quot;")
+		end
+
+		local css = table.concat({
+			"*{box-sizing:border-box;margin:0;padding:0;}",
+			"body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:13px;",
+			"background:#f5f5f7;display:flex;flex-direction:column;justify-content:center;",
+			"height:100vh;padding:18px 20px;gap:10px;}",
+			"label{font-weight:600;color:#1a1a1a;font-size:13px;}",
+			"input{width:100%;padding:7px 10px;font-size:13px;border:1px solid #c6c6c8;",
+			"border-radius:6px;outline:none;background:#fff;}",
+			"input:focus{border-color:#0078d4;box-shadow:0 0 0 2px rgba(0,120,212,.2);}",
+			".row{display:flex;gap:8px;justify-content:flex-end;}",
+			"button{padding:6px 18px;font-size:13px;border-radius:6px;border:none;cursor:pointer;}",
+			".btn-cancel{background:#e5e5ea;color:#1a1a1a;}",
+			".btn-cancel:hover{background:#d1d1d6;}",
+			".btn-add{background:#0078d4;color:#fff;}",
+			".btn-add:hover{background:#106ebe;}",
+		}, "")
+
+		local html = "<!DOCTYPE html><html><head><meta charset='utf-8'>"
+			.. "<style>" .. css .. "</style></head><body>"
+			.. "<label>" .. he(title) .. "</label>"
+			.. "<input id='inp' type='text' placeholder='" .. he(hint) .. "' autofocus />"
+			.. "<div class='row'>"
+			.. "<button class='btn-cancel' id='btnCancel'>" .. he(i18n.get("button.cancel")) .. "</button>"
+			.. "<button class='btn-add'    id='btnAdd'>"    .. he(i18n.get("button.add"))    .. "</button>"
+			.. "</div>"
+			.. "<script>"
+			.. "var uc=window.webkit.messageHandlers.addCustomModel;"
+			.. "function submit(){uc.postMessage({action:'add',value:document.getElementById('inp').value});}"
+			.. "function cancel(){uc.postMessage({action:'cancel'});}"
+			.. "document.getElementById('btnAdd').onclick=submit;"
+			.. "document.getElementById('btnCancel').onclick=cancel;"
+			.. "document.getElementById('inp').addEventListener('keydown',function(e){"
+			.. "if(e.key==='Enter')submit();"
+			.. "if(e.key==='Escape')cancel();"
+			.. "});"
+			.. "</script>"
+			.. "</body></html>"
+
+		local masks = hs.webview.windowMasks
+		_wv = ui_builder.show_webview({
+			frame       = ui_builder.get_centered_frame(720, 155),
+			title       = title,
+			style_masks = (masks["titled"] or 1) + (masks["closable"] or 2),
+			usercontent = uc,
+			html_string = html,
+			inject_i18n = false,
+			on_close    = function() _wv = nil end,
+			on_navigation = function(action)
+				if action == "didFinishNavigation" then
+					-- Focus the input field after the page loads
+					hs.timer.doAfter(0.05, function()
+						if _wv then
+							pcall(function()
+								_wv:evaluateJavaScript("document.getElementById('inp').focus();")
+							end)
+						end
+					end)
+				end
+				return true
+			end,
+		})
+		if not _wv then
+			Logger.error(LOG, "show_webview returned nil for custom model dialog.")
+		end
 	end
 
 
