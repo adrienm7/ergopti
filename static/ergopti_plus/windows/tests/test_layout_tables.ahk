@@ -222,6 +222,59 @@ Test("LayerDispatch: unknown SC is silently ignored", TestLT_LayerDispatchUnknow
 
 
 ; ==========================
+; Shift-layer French typography — exact nbsp/nnbsp prefix per punctuation
+; ==========================
+; Regression guard for the Ergopti layout emulation (AHK only — macOS uses
+; Karabiner): Shift+period must emit a full no-break space (NBSP, U+00A0)
+; before ":" while Shift+comma emits a NARROW no-break space (NNBSP, U+202F)
+; before ";". The two spaces are visually identical but distinct codepoints,
+; and downstream hotstring case variants key off the exact prefix the layout
+; emits — swapping NBSP and NNBSP silently broke matching.
+
+; Returns the SendNewResult payload whose final character is TargetChar,
+; skipping the " " / "{BackSpace}" pokes that ActivateHotstrings emits first.
+_LT_RecordedSymbolFor(TargetChar) {
+	global _Stub_RecordedSends
+	for _, Rec in _Stub_RecordedSends {
+		if (Rec.fn == "SendNewResult" && SubStr(Rec.args[1], -1) == TargetChar) {
+			return Rec.args[1]
+		}
+	}
+	return ""
+}
+
+; Hooks are installed globally by run_all.ahk, so these tests only reset the
+; recorders and read back the captured SendNewResult payloads — they must NOT
+; install/uninstall hooks themselves (that would tear down the shared hook for
+; every later test in the process).
+TestLT_ShiftPeriodEmitsNbspColon() {
+	ResetHotstringRecorders()
+	LayerDispatch("SC022", SHIFT_SYMBOLS)   ; Shift+period -> ":" on Ergopti
+	Payload := _LT_RecordedSymbolFor(":")
+	AssertEqual(Chr(0xA0) ":", Payload,
+		"Shift+period emits NBSP (U+00A0) + colon per French typography")
+	AssertEqual(Chr(0xA0), SubStr(Payload, 1, 1),
+		"the colon prefix is a full no-break space, never the narrow NNBSP")
+}
+Test("SHIFT_SYMBOLS: Shift+period emits NBSP + colon (not NNBSP)",
+	TestLT_ShiftPeriodEmitsNbspColon)
+
+TestLT_ShiftCommaEmitsNnbspSemicolon() {
+	ResetHotstringRecorders()
+	LayerDispatch("SC02F", SHIFT_SYMBOLS)   ; Shift+comma -> semicolon on Ergopti
+	Payload := _LT_RecordedSymbolFor(Chr(0x3B))
+	AssertEqual(Chr(0x202F) Chr(0x3B), Payload,
+		"Shift+comma emits NNBSP (U+202F) + semicolon per French typography")
+	AssertEqual(Chr(0x202F), SubStr(Payload, 1, 1),
+		"the semicolon prefix is the narrow no-break space, never the full NBSP")
+}
+Test("SHIFT_SYMBOLS: Shift+comma emits NNBSP + semicolon (not NBSP)",
+	TestLT_ShiftCommaEmitsNnbspSemicolon)
+
+
+
+
+; ==========================
 ; SHIFTED_LETTERS — spot-check key entries
 ; ==========================
 TestLT_ShiftedLettersMiddleRow() {

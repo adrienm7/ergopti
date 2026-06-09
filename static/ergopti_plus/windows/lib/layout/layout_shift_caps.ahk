@@ -67,16 +67,21 @@ _BuildShiftCapsTables() {
 		"SC030", "K", "SC031", "M", "SC032", "D", "SC033", "L", "SC034", "P",
 	)
 
-	; Shift-layer symbol overrides. The French-typography keys get a thin
+	; Shift-layer symbol overrides. The French-typography keys get a
 	; non-breaking space prefix and an ``ActivateHotstrings`` poke so the
 	; pending hotstring buffer is committed before the new symbol arrives.
+	; The space TYPE follows the French typographic rule and differs per
+	; punctuation: ":" takes a full no-break space (NBSP, U+00A0) while ";",
+	; "!" and "?" take a NARROW no-break space (NNBSP, U+202F). Getting this
+	; wrong is not cosmetic — downstream hotstring matching keys off the exact
+	; prefix the layout emits (see _BuildUppercasedSymbols / UPPER_TRIGGERS).
 	SHIFT_SYMBOLS := Map(
 		"SC039", () => WrapTextIfSelected("-", "-", "-"),
 		"SC029", () => (ActivateHotstrings(), SendNewResult(Chr(0x202F) "€")),
 		"SC00C", () => (ActivateHotstrings(), SendNewResult(Chr(0x202F) "%")),
 		"SC00D", SendNewResult.Bind("º"),
 		"SC01B", SendNewResult.Bind("_"),
-		"SC022", () => (ActivateHotstrings(), SendNewResult(Chr(0x202F) ":")),
+		"SC022", () => (ActivateHotstrings(), SendNewResult(Chr(0xA0) ":")),
 		"SC02B", () => (ActivateHotstrings(), SendNewResult(Chr(0x202F) "!")),
 		"SC02F", () => (ActivateHotstrings(), SendNewResult(Chr(0x202F) Chr(0x3B))),
 		"SC035", () => (ActivateHotstrings(), SendNewResult(Chr(0x202F) "?")),

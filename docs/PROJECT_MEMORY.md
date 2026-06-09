@@ -704,12 +704,22 @@ _The "uppercase" form of a comma/apostrophe/period in case-variant generation MU
 
 Case-insensitive hotstrings whose trigger contains `,` / `'` / `.` auto-generate
 title/upper-case variants. On the Ergopti Shift layer those keys do NOT shift to
-an uppercase letter — Shift+comma emits `NNBSP(U+202F);`, Shift+period emits
-`NNBSP:`, Shift+apostrophe emits `NNBSP?` (the deadkey path emits the regular
-`NBSP(U+00A0)`). So the shifted form of e.g. the `,d → ds` SFB-reduction
-hotstring is `NNBSP:D → DS` / `NNBSP;d → Ds`, not `,D`.
+an uppercase letter — they shift to a no-break-space-prefixed punctuation. Per
+**French typography the space TYPE differs**: Shift+comma emits `NNBSP(U+202F);`
+(narrow), Shift+period emits `NBSP(U+00A0):` (full), Shift+apostrophe emits
+`NNBSP?`. The deadkey path (¨+s / ¨+n) can also produce either no-break space.
 
-The single source of truth for these mappings:
+Two distinct concerns — keep them apart:
+
+- **Emission** (AHK ONLY — macOS input goes through Karabiner, not in this repo):
+  the layout must emit the EXACT pairing above (`:`→NBSP, `;`/`!`/`?`→NNBSP).
+  Lives in `SHIFT_SYMBOLS` in `windows/lib/layout/layout_shift_caps.ahk`. Pinned
+  by `test_layout_tables.ahk` (Shift+period → NBSP+`:`, Shift+comma → NNBSP+`;`).
+- **Matching** (both platforms): the case-variant tables are deliberately
+  LENIENT — `DS` must come out regardless of WHICH no-break space precedes the
+  punctuation. So they pair BOTH no-break spaces with BOTH `:` and `;`.
+
+The single source of truth for the matching tables:
 - **AHK**: `_BuildUppercasedSymbols()` in `windows/lib/hotstrings/hotstring_engine.ahk`.
 - **macOS**: `M.UPPER_TRIGGERS["," / "'" / "."]` in `shared/lua/text_utils/init.lua`
   (consumed by `trig_upper`/`trig_title`, which handle the symbol at ANY position
@@ -717,24 +727,28 @@ The single source of truth for these mappings:
   only covers comma-FIRST and is a redundant secondary path).
 
 **Why:** Both platforms originally used a plain ASCII space (`" :"`, `" ;"`,
-`" ?"`). That was wrong on two counts: (1) `NNBSP:D` typed via the layout never
-matched the space-prefixed trigger, so caps never produced `DS`; and (2) a bare
-`<space>:D` — the `:D` emoji typed after a normal word — DID match the
-space-prefixed trigger and got swallowed into `DS`. The user types the emoji as
-`<space>:` (plain space), the expansion as `NNBSP:` (shifted) — anchoring on
-nbsp/nnbsp is the ONLY thing that separates the two.
+`" ?"`). That was wrong on two counts: (1) the nbsp/nnbsp-prefixed form typed via
+the layout never matched the space-prefixed trigger, so caps never produced `DS`;
+and (2) a bare `<space>:D` — the `:D` emoji typed after a normal word — DID match
+the space-prefixed trigger and got swallowed into `DS`. The user types the emoji
+as `<space>:` (plain space), the shifted comma as a no-break space — anchoring on
+nbsp/nnbsp is the ONLY thing that separates the two. A later fix corrected the
+EMISSION (Shift+period was wrongly emitting `NNBSP:`; French typography wants
+`NBSP:`) while keeping MATCHING lenient so `DS` fires for any no-break space.
 
 **How to apply:**
 
 - Never put a plain space in these symbol-shift tables. Use `Chr(0x202F)` /
   `Chr(0xA0)` (AHK) or `"\226\128\175"` / `"\194\160"` (Lua).
-- Comma → all four of `{nnbsp,nbsp} × {":",";"}`; apostrophe → `{nnbsp,nbsp} × "?"`;
-  period (macOS) → `{nnbsp,nbsp} × ":"`.
-- Regression tests pin BOTH halves: nnbsp-prefixed fires with correct casing, and
-  the plain-`<space>` variant is NEVER registered (emoji safety). AHK:
-  `test_hotstring_engine_main.ahk` (HSE comma-shift / plain-space colon-D),
-  `test_hotstring_engine.ahk`, `test_hotstrings_full.ahk` (variant counts).
-  macOS: `test_hotstring_registry_regressions.lua`.
+- Emission pairing (AHK layout): `:` → NBSP, `;` / `!` / `?` → NNBSP.
+- Matching tables stay lenient: comma → all four of `{nnbsp,nbsp} × {":",";"}`;
+  apostrophe → `{nnbsp,nbsp} × "?"`; period (macOS) → `{nnbsp,nbsp} × ":"`.
+- Regression tests pin all of it: emission (`test_layout_tables.ahk`), lenient
+  matching with correct casing AND plain-`<space>` never registered (emoji
+  safety). AHK: `test_hotstring_engine_main.ahk` (HSE comma-shift / plain-space
+  colon-D), `test_hotstring_engine.ahk`, `test_hotstrings_full.ahk` (variant
+  counts), `test_layout_tables.ahk` (emission). macOS:
+  `test_hotstring_registry_regressions.lua`.
 
 ### project-ahk-v2-semicolon-in-string
 
