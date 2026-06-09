@@ -154,6 +154,7 @@ function M.run()
 			version = info.version
 		end
 	end
+	Logger.debug(LOG, "Driver version: %s.", version)
 
 	local loaded_adapters  = {}
 	local ports_validated  = {}
@@ -166,6 +167,7 @@ function M.run()
 			Logger.warn(LOG, "Adapter '%s' could not be loaded: %s.", spec.id, tostring(mod))
 		else
 			table.insert(loaded_adapters, spec.id)
+			Logger.debug(LOG, "Adapter '%s' loaded.", spec.id)
 
 			-- Validate each method in the contract
 			local all_ok = true
@@ -178,6 +180,7 @@ function M.run()
 
 			if all_ok then
 				table.insert(ports_validated, spec.id)
+				Logger.debug(LOG, "Adapter '%s' contract validated.", spec.id)
 			else
 				table.insert(failed_adapters, spec.id .. " (contract incomplete)")
 			end
@@ -185,12 +188,17 @@ function M.run()
 	end
 
 	local uptime_sec = os.time() - _load_time
+	Logger.debug(LOG, "Uptime: %ds.", uptime_sec)
 
 	-- Collect recent WARNING/ERROR lines from the in-memory ring buffer
 	local recent_issues = {}
 	local warn_count    = 0
 	local err_count     = 0
 	local all_lines     = Logger.ring_buffer_snapshot()
+	if not all_lines then
+		Logger.error(LOG, "Logger.ring_buffer_snapshot() returned nil — ring buffer unavailable.")
+		all_lines = {}
+	end
 	for _, line in ipairs(all_lines) do
 		if line:find("%[WARNING%]") or line:find("%[ERROR%]") then
 			table.insert(recent_issues, line)
@@ -206,6 +214,20 @@ function M.run()
 		end
 		recent_issues = trimmed
 	end
+	Logger.debug(LOG, "Ring buffer: %d line(s), %d warning(s), %d error(s).",
+		#all_lines, warn_count, err_count)
+
+	-- Run each enriched collector in a protected call so a single broken
+	-- collector cannot abort the entire healthcheck.
+	local function safe_collect(name, fn)
+		local ok, val = pcall(fn)
+		if not ok then
+			Logger.error(LOG, "Collector '%s' crashed: %s.", name, tostring(val))
+			return nil
+		end
+		Logger.debug(LOG, "Collector '%s' done.", name)
+		return val
+	end
 
 	local result = {
 		version         = version,
@@ -217,15 +239,14 @@ function M.run()
 		warn_count      = warn_count,
 		err_count       = err_count,
 		recent_issues   = recent_issues,
-		sys             = _sys_info(),
-		-- Enriched for maximum diagnostic value (developer-facing, privacy-safe)
-		pause_state     = _collect_pause_state(),
-		keylogger       = _collect_keylogger_summary(),
-		llm             = _collect_llm_state(),
-		layout          = _collect_layout_state(),
-		hotstrings      = _collect_hotstrings_state(),
-		logs            = _collect_logs_info(),
-		config          = _collect_config_summary(),
+		sys             = safe_collect("sys_info",            _sys_info),
+		pause_state     = safe_collect("pause_state",         _collect_pause_state),
+		keylogger       = safe_collect("keylogger_summary",   _collect_keylogger_summary),
+		llm             = safe_collect("llm_state",           _collect_llm_state),
+		layout          = safe_collect("layout_state",        _collect_layout_state),
+		hotstrings      = safe_collect("hotstrings_state",    _collect_hotstrings_state),
+		logs            = safe_collect("logs_info",           _collect_logs_info),
+		config          = safe_collect("config_summary",      _collect_config_summary),
 	}
 
 	Logger.success(LOG, "Healthcheck complete — %d adapter(s) OK, %d failed, uptime %ds.",
@@ -238,15 +259,30 @@ end
 --- Opens a dedicated webview window displaying the healthcheck report.
 --- Text is fully selectable and copyable. Replaces any existing window (singleton).
 function M.show_window()
+	Logger.start(LOG, "Opening healthcheck window…")
+
 	if _window then
+		Logger.debug(LOG, "Closing existing healthcheck window before reopening.")
 		pcall(function() _window:delete() end)
 		_window = nil
 	end
 
-	local snapshot  = M.run()
-	local plain     = M.format_plain(snapshot)
+	local ok_snap, snapshot = pcall(M.run)
+	if not ok_snap or not snapshot then
+		Logger.error(LOG, "M.run() failed — cannot show healthcheck window: %s.", tostring(snapshot))
+		return
+	end
+
+	local ok_plain, plain = pcall(M.format_plain, snapshot)
+	if not ok_plain or not plain then
+		Logger.error(LOG, "M.format_plain() failed: %s.", tostring(plain))
+		plain = "(format error)"
+	end
 
 	local i18n_ok, i18n = pcall(require, "lib.i18n")
+	if not i18n_ok then
+		Logger.warn(LOG, "lib.i18n unavailable — using key names as labels.")
+	end
 	local t = (i18n_ok and type(i18n) == "table" and type(i18n.get) == "function")
 		and function(k) return i18n.get(k) end
 		or  function(k) return k end
@@ -256,10 +292,23 @@ function M.show_window()
 		title = "ErgoptiPlus — " .. title
 	end
 	local btn_label = t("healthcheck.copy_and_close") or "Copy to clipboard and close"
-	local html      = _snapshot_to_html(snapshot, btn_label)
 
-	local screen = hs.screen.mainScreen()
-	local sf     = screen and type(screen.frame) == "function" and screen:frame()
+	local ok_html, html = pcall(_snapshot_to_html, snapshot, btn_label)
+	if not ok_html or not html then
+		Logger.error(LOG, "_snapshot_to_html() failed: %s.", tostring(html))
+		-- Fall back to plain-text alert rather than showing a blank window
+		local ok_d, dialog = pcall(require, "lib.dialog_util")
+		if ok_d and dialog then
+			dialog.block_alert(title, plain, "OK")
+		end
+		return
+	end
+
+	local ok_scr, screen = pcall(function() return hs.screen.mainScreen() end)
+	if not ok_scr or not screen then
+		Logger.warn(LOG, "hs.screen.mainScreen() failed — using default frame.")
+	end
+	local sf = (ok_scr and screen and type(screen.frame) == "function" and screen:frame())
 		or { x = 0, y = 0, w = 1440, h = 900 }
 
 	local W, H = 700, 600
@@ -269,58 +318,79 @@ function M.show_window()
 		w = W,
 		h = H,
 	}
+	Logger.debug(LOG, "Webview frame: x=%d y=%d w=%d h=%d.", frame.x, frame.y, frame.w, frame.h)
 
 	local ok_wv, wv = pcall(hs.webview.new, frame, { developerExtrasEnabled = false })
 	if not ok_wv or not wv then
-		Logger.error(LOG, "Failed to create healthcheck webview: %s.", tostring(wv))
-		local dialog = require("lib.dialog_util")
-		dialog.block_alert(title, plain, "OK")
+		Logger.error(LOG, "hs.webview.new() failed — falling back to text alert: %s.", tostring(wv))
+		local ok_d, dialog = pcall(require, "lib.dialog_util")
+		if ok_d and dialog then
+			dialog.block_alert(title, plain, "OK")
+		end
 		return
 	end
+	Logger.debug(LOG, "Webview created.")
 
 	local masks = hs.webview.windowMasks
-	pcall(function()
+	local ok_style, style_err = pcall(function()
 		wv:windowStyle((masks["titled"] or 1) + (masks["closable"] or 2) + (masks["miniaturizable"] or 4))
 	end)
+	if not ok_style then Logger.warn(LOG, "windowStyle() failed: %s.", tostring(style_err)) end
+
 	pcall(function() wv:windowTitle(title) end)
 	pcall(function() wv:allowTextEntry(true) end)
 	pcall(function() wv:allowNewWindows(false) end)
 	pcall(function() wv:allowGestures(false) end)
+
 	-- floating ensures the window appears on top of the menu bar and other apps
-	pcall(function() wv:level(hs.drawing.windowLevels.floating) end)
+	local ok_lvl, lvl_err = pcall(function() wv:level(hs.drawing.windowLevels.floating) end)
+	if not ok_lvl then Logger.warn(LOG, "wv:level(floating) failed: %s.", tostring(lvl_err)) end
 
 	-- Wire up the copy-and-close button using a flag polled from Lua.
 	-- WKWebView rejects custom URL schemes (ergopti://) with NSURLErrorDomain -1002
 	-- before willNavigate fires, so we set a JS global instead and poll it.
 	local _poll_timer = nil
 	local function stop_poll()
-		if _poll_timer then _poll_timer:stop(); _poll_timer = nil end
+		if _poll_timer then
+			_poll_timer:stop()
+			_poll_timer = nil
+			Logger.debug(LOG, "Copy-button poll timer stopped.")
+		end
 	end
 
-	pcall(function()
+	local ok_wcb, wcb_err = pcall(function()
 		wv:windowCallback(function(action)
+			Logger.debug(LOG, "Window callback: action='%s'.", tostring(action))
 			if action == "closing" or action == "closed" then
 				stop_poll()
 				_window = nil
 			end
 		end)
 	end)
+	if not ok_wcb then Logger.warn(LOG, "windowCallback() failed: %s.", tostring(wcb_err)) end
 
-	pcall(function()
+	local ok_ncb, ncb_err = pcall(function()
 		wv:navigationCallback(function(action, _)
+			Logger.debug(LOG, "Navigation callback: action='%s'.", tostring(action))
 			if action == "didFinishNavigation" then
 				-- Inject a flag variable and a click handler that sets it
-				wv:evaluateJavaScript(
-					"window.__hs_copy_requested = false;"
-					.. "document.getElementById('btnCopy').onclick=function(){"
-					.. "window.__hs_copy_requested=true;"
-					.. "};"
-				)
+				local ok_js, js_err = pcall(function()
+					wv:evaluateJavaScript(
+						"window.__hs_copy_requested = false;"
+						.. "document.getElementById('btnCopy').onclick=function(){"
+						.. "window.__hs_copy_requested=true;"
+						.. "};"
+					)
+				end)
+				if not ok_js then
+					Logger.warn(LOG, "JS injection failed: %s.", tostring(js_err))
+				end
 				-- Poll every 200 ms for the flag; stop and clean up when triggered
 				_poll_timer = hs.timer.new(0.2, function()
 					if not wv then stop_poll(); return end
 					wv:evaluateJavaScript("window.__hs_copy_requested", function(result)
 						if result == true then
+							Logger.debug(LOG, "Copy button clicked — copying plain text to clipboard.")
 							hs.pasteboard.setContents(plain)
 							stop_poll()
 							if _window then
@@ -331,19 +401,28 @@ function M.show_window()
 					end)
 				end)
 				_poll_timer:start()
+				Logger.debug(LOG, "Copy-button poll timer started.")
 			end
 		end)
 	end)
+	if not ok_ncb then Logger.warn(LOG, "navigationCallback() failed: %s.", tostring(ncb_err)) end
 
-	pcall(function() wv:html(html) end)
-	pcall(function() wv:show() end)
+	local ok_h, h_err = pcall(function() wv:html(html) end)
+	if not ok_h then Logger.error(LOG, "wv:html() failed: %s.", tostring(h_err)) end
+
+	local ok_sh, sh_err = pcall(function() wv:show() end)
+	if not ok_sh then
+		Logger.error(LOG, "wv:show() failed — window will not appear: %s.", tostring(sh_err))
+	end
 
 	_window = wv
 
 	local ok_ui, ui_builder = pcall(require, "ui.ui_builder")
 	if ok_ui and ui_builder then
+		Logger.debug(LOG, "Delegating focus to ui_builder.force_focus().")
 		ui_builder.force_focus(wv, true)
 	else
+		Logger.warn(LOG, "ui.ui_builder unavailable (%s) — using fallback focus.", tostring(ui_builder))
 		hs.timer.doAfter(0.08, function()
 			pcall(hs.focus)
 			local ok_win, win = pcall(function() return wv:hswindow() end)
@@ -354,6 +433,8 @@ function M.show_window()
 			end
 		end)
 	end
+
+	Logger.success(LOG, "Healthcheck window opened.")
 end
 
 
@@ -462,43 +543,69 @@ _sys_info = function()
 	local hs_ver = "?"
 	if hs and hs.processInfo and type(hs.processInfo) == "table" then
 		local v = hs.processInfo.version
-		if type(v) == "string" and v ~= "" then hs_ver = v end
+		if type(v) == "string" and v ~= "" then hs_ver = v
+		else Logger.warn(LOG, "hs.processInfo.version is absent or empty.") end
+	else
+		Logger.warn(LOG, "hs.processInfo is unavailable.")
 	end
 	info.hs_version = hs_ver
+	Logger.debug(LOG, "hs_version: %s.", hs_ver)
 
 	-- macOS version
 	local os_ver = "?"
 	local ok_host, hs_host = pcall(require, "hs.host")
-	if ok_host and hs_host and type(hs_host.operatingSystemVersionString) == "function" then
+	if not ok_host then
+		Logger.warn(LOG, "hs.host unavailable: %s.", tostring(hs_host))
+	elseif type(hs_host.operatingSystemVersionString) ~= "function" then
+		Logger.warn(LOG, "hs.host.operatingSystemVersionString is not a function.")
+	else
 		local ok_v, v = pcall(hs_host.operatingSystemVersionString)
-		if ok_v and type(v) == "string" then os_ver = v end
+		if ok_v and type(v) == "string" then os_ver = v
+		else Logger.warn(LOG, "operatingSystemVersionString() failed: %s.", tostring(v)) end
 	end
 	info.os_version = os_ver
+	Logger.debug(LOG, "os_version: %s.", os_ver)
 
 	-- Primary screen resolution
 	local res = "?"
 	local ok_scr, scr = pcall(function() return hs.screen.mainScreen() end)
-	if ok_scr and scr and type(scr.currentMode) == "function" then
+	if not ok_scr or not scr then
+		Logger.warn(LOG, "hs.screen.mainScreen() unavailable: %s.", tostring(scr))
+	elseif type(scr.currentMode) ~= "function" then
+		Logger.warn(LOG, "screen.currentMode is not a function.")
+	else
 		local ok_m, m = pcall(function() return scr:currentMode() end)
 		if ok_m and m and m.w and m.h then
 			res = m.w .. "×" .. m.h
+		else
+			Logger.warn(LOG, "screen:currentMode() failed or returned incomplete data: %s.", tostring(m))
 		end
 	end
 	info.screen_res = res
+	Logger.debug(LOG, "screen_res: %s.", res)
 
 	-- System locale — hs.host.locale is a table; current() is the function
 	local locale = "?"
-	if ok_host and hs_host and type(hs_host.locale) == "table"
-			and type(hs_host.locale.current) == "function" then
-		local ok_l, l = pcall(hs_host.locale.current)
-		if ok_l and type(l) == "string" and l ~= "" then locale = l end
+	if ok_host and hs_host then
+		if type(hs_host.locale) ~= "table" then
+			Logger.warn(LOG, "hs.host.locale is not a table.")
+		elseif type(hs_host.locale.current) ~= "function" then
+			Logger.warn(LOG, "hs.host.locale.current is not a function.")
+		else
+			local ok_l, l = pcall(hs_host.locale.current)
+			if ok_l and type(l) == "string" and l ~= "" then locale = l
+			else Logger.warn(LOG, "locale.current() failed: %s.", tostring(l)) end
+		end
 	end
 	info.locale = locale
+	Logger.debug(LOG, "locale: %s.", locale)
 
 	-- Config directory
 	local config_dir = ""
 	if hs and type(hs.configdir) == "string" then
 		config_dir = hs.configdir
+	else
+		Logger.warn(LOG, "hs.configdir is not a string.")
 	end
 	info.config_dir = config_dir
 
@@ -513,8 +620,11 @@ _sys_info = function()
 	local ok_git, out = pcall(hs.execute, "git -C " .. _this_dir .. " rev-parse --short HEAD 2>/dev/null")
 	if ok_git and type(out) == "string" and out ~= "" then
 		git_hash = out:match("^%s*(.-)%s*$")
+	else
+		Logger.warn(LOG, "git rev-parse failed (not a git repo or git not on PATH): %s.", tostring(out))
 	end
 	info.git_hash = git_hash
+	Logger.debug(LOG, "git_hash: %s.", git_hash)
 
 	return info
 end
@@ -525,12 +635,17 @@ end
 _collect_pause_state = function()
 	local st = { is_paused = false, source = "unknown" }
 	local ok, sc = pcall(require, "modules.shortcuts.script_control")
-	if ok and sc and type(sc.is_paused) == "function" then
+	if not ok then
+		Logger.warn(LOG, "script_control unavailable: %s.", tostring(sc))
+		st.source = "script_control (unavailable)"
+	elseif type(sc.is_paused) ~= "function" then
+		Logger.warn(LOG, "script_control.is_paused is not a function.")
+		st.source = "script_control (contract missing)"
+	else
 		st.is_paused = not not sc.is_paused()
 		st.source = "script_control"
-	else
-		st.source = "script_control (unavailable)"
 	end
+	Logger.debug(LOG, "Pause state: is_paused=%s source=%s.", tostring(st.is_paused), st.source)
 	return st
 end
 
@@ -545,58 +660,100 @@ _collect_keylogger_summary = function()
 		notes = "High-severity (WARNING/ERROR) also written to dedicated ErgoptiPlus_errors_*.log (see Debug > Open Error Log)",
 	}
 	local ok_l, logm = pcall(require, "modules.keylogger.log_manager")
-	if ok_l and logm and type(logm.get_paths) == "function" then
+	if not ok_l then
+		Logger.warn(LOG, "log_manager unavailable: %s.", tostring(logm))
+	elseif type(logm.get_paths) ~= "function" then
+		Logger.warn(LOG, "log_manager.get_paths is not a function.")
+	else
 		local p = logm.get_paths() or {}
-		sum.today_log = p.unified or ""
-		sum.errors_log = p.errors or ""
+		sum.today_log  = p.unified or ""
+		sum.errors_log = p.errors  or ""
 	end
 	local ok_a, agg = pcall(require, "modules.keylogger.aggregator")
-	if ok_a and agg and type(agg.get_stats) == "function" then
+	if not ok_a then
+		Logger.warn(LOG, "keylogger.aggregator unavailable: %s.", tostring(agg))
+	elseif type(agg.get_stats) ~= "function" then
+		Logger.warn(LOG, "aggregator.get_stats is not a function.")
+	else
 		local s = agg.get_stats() or {}
 		sum.events_session = s.events or sum.events_session
-		sum.wpm = s.wpm or sum.wpm
+		sum.wpm            = s.wpm    or sum.wpm
 	end
 	local ok_p, priv = pcall(require, "modules.keylogger.privacy")
-	if ok_p and priv and type(priv.get_hit_count) == "function" then
+	if not ok_p then
+		Logger.warn(LOG, "keylogger.privacy unavailable: %s.", tostring(priv))
+	elseif type(priv.get_hit_count) ~= "function" then
+		Logger.warn(LOG, "privacy.get_hit_count is not a function.")
+	else
 		sum.privacy_hits = priv.get_hit_count() or 0
 	end
+	Logger.debug(LOG, "Keylogger: events=%s wpm=%s privacy_hits=%s.",
+		tostring(sum.events_session), tostring(sum.wpm), tostring(sum.privacy_hits))
 	return sum
 end
 
 _collect_llm_state = function()
 	local st = { enabled = "unknown", backend = "unknown", active_profile = "unknown", model = "n/a", n_predictions = "n/a", streaming = "n/a" }
 	local ok, llm = pcall(require, "modules.llm.init")
-	if ok and llm and type(llm.get_state) == "function" then
+	if not ok then
+		Logger.warn(LOG, "modules.llm.init unavailable: %s.", tostring(llm))
+	elseif type(llm.get_state) ~= "function" then
+		Logger.warn(LOG, "llm.get_state is not a function.")
+	else
 		local s = llm.get_state() or {}
-		st.enabled = tostring(s.llm_enabled or "unknown")
-		st.backend = s.llm_backend or st.backend
-		st.active_profile = s.llm_active_profile or st.active_profile
+		st.enabled        = tostring(s.llm_enabled       or "unknown")
+		st.backend        = s.llm_backend                or st.backend
+		st.active_profile = s.llm_active_profile         or st.active_profile
 	end
+	Logger.debug(LOG, "LLM: enabled=%s backend=%s profile=%s.",
+		tostring(st.enabled), tostring(st.backend), tostring(st.active_profile))
 	return st
 end
 
 _collect_layout_state = function()
 	local st = { ergopti_base = "unknown", altgr = "unknown", shift = "unknown", caps = "unknown", prefix_latch = "clean" }
 	local ok, lay = pcall(require, "lib.layout")
-	if ok and lay and type(lay.is_ergopti_base) == "function" then
+	if not ok then
+		Logger.warn(LOG, "lib.layout unavailable: %s.", tostring(lay))
+	elseif type(lay.is_ergopti_base) ~= "function" then
+		Logger.warn(LOG, "layout.is_ergopti_base is not a function.")
+	else
 		st.ergopti_base = lay.is_ergopti_base() and "on" or "off"
 	end
 	local ok_ks, ks = pcall(require, "adapters.key_state")
-	if ok_ks and ks then
-		if type(ks.get_altgr) == "function" then st.altgr = ks.get_altgr() and "active" or "off" end
-		if type(ks.get_shift) == "function" then st.shift = ks.get_shift() and "active" or "off" end
-		if type(ks.get_caps) == "function" then st.caps = ks.get_caps() and "active" or "off" end
+	if not ok_ks then
+		Logger.warn(LOG, "adapters.key_state unavailable: %s.", tostring(ks))
+	else
+		if type(ks.get_altgr) == "function" then st.altgr = ks.get_altgr() and "active" or "off"
+		else Logger.warn(LOG, "key_state.get_altgr is not a function.") end
+		if type(ks.get_shift) == "function" then st.shift = ks.get_shift() and "active" or "off"
+		else Logger.warn(LOG, "key_state.get_shift is not a function.") end
+		if type(ks.get_caps) == "function" then st.caps = ks.get_caps() and "active" or "off"
+		else Logger.warn(LOG, "key_state.get_caps is not a function.") end
 	end
+	Logger.debug(LOG, "Layout: base=%s altgr=%s shift=%s caps=%s.",
+		tostring(st.ergopti_base), tostring(st.altgr), tostring(st.shift), tostring(st.caps))
 	return st
 end
 
 _collect_hotstrings_state = function()
 	local st = { terminators = 0, magic_key = "", personal_count = 0, dynamic_count = 0, default_delay = "n/a" }
 	local ok_t, term = pcall(require, "modules.keymap.terminators")
-	if ok_t and term then
-		if type(term.count) == "function" then st.terminators = term.count() end
-		if type(term.get_magic_key) == "function" then st.magic_key = term.get_magic_key() or "" end
+	if not ok_t then
+		Logger.warn(LOG, "modules.keymap.terminators unavailable: %s.", tostring(term))
+	else
+		if type(term.count) == "function" then
+			st.terminators = term.count()
+		else
+			Logger.warn(LOG, "terminators.count is not a function.")
+		end
+		if type(term.get_magic_key) == "function" then
+			st.magic_key = term.get_magic_key() or ""
+		else
+			Logger.warn(LOG, "terminators.get_magic_key is not a function.")
+		end
 	end
+	Logger.debug(LOG, "Hotstrings: terminators=%d magic_key='%s'.", st.terminators, tostring(st.magic_key))
 	return st
 end
 
@@ -609,27 +766,38 @@ _collect_logs_info = function()
 		note = "Dedicated errors sink (WARNING/ERROR only) keeps the main daily log smaller and easier to read.",
 	}
 	local ok, logm = pcall(require, "modules.keylogger.log_manager")
-	if ok and logm and type(logm.get_paths) == "function" then
+	if not ok then
+		Logger.warn(LOG, "log_manager unavailable for logs_info: %s.", tostring(logm))
+	elseif type(logm.get_paths) ~= "function" then
+		Logger.warn(LOG, "log_manager.get_paths is not a function.")
+	else
 		local p = logm.get_paths() or {}
-		info.unified_today = p.unified or ""
-		info.errors_today = p.errors or ""
-		info.errors_sink_active = (p.errors and p.errors ~= "")
+		info.unified_today     = p.unified or ""
+		info.errors_today      = p.errors  or ""
+		info.errors_sink_active = (p.errors and p.errors ~= "") or false
 	end
-	local ok_l, Logger = pcall(require, "lib.logger")
-	if ok_l and Logger and type(Logger.ring_buffer_snapshot) == "function" then
+	-- Logger is already required at module level; re-require only to check ring_buffer_snapshot
+	if type(Logger.ring_buffer_snapshot) == "function" then
 		local rb = Logger.ring_buffer_snapshot() or {}
 		info.ring_lines = #rb
+	else
+		Logger.warn(LOG, "Logger.ring_buffer_snapshot is not a function.")
 	end
+	Logger.debug(LOG, "Logs info: ring_lines=%d errors_sink_active=%s.",
+		info.ring_lines, tostring(info.errors_sink_active))
 	return info
 end
 
 _collect_config_summary = function()
 	local sum = { overrides = 0, enabled_hotstrings = "n/a", enabled_gestures = "n/a", enabled_llm = "n/a", config_files = {} }
 	local cfgdir = hs and hs.configdir or ""
-	if cfgdir ~= "" then
+	if cfgdir == "" then
+		Logger.warn(LOG, "hs.configdir is empty — cannot locate config files.")
+	else
 		table.insert(sum.config_files, cfgdir .. "/config.toml")
 		table.insert(sum.config_files, cfgdir .. "/tap_hold.toml")
 	end
+	Logger.debug(LOG, "Config summary: cfgdir='%s' files=%d.", cfgdir, #sum.config_files)
 	return sum
 end
 
