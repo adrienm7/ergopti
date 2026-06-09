@@ -77,13 +77,18 @@ end)
 --- ==============================================================================
 --- Regression: ",d -> ds" shifted-comma case variants must anchor on nbsp/nnbsp.
 ---
---- On the Ergopti Shift layer the comma key emits nnbsp/nbsp + ";" and the period
---- key emits nnbsp/nbsp + ":". So the "uppercase" comma in a case-insensitive
---- hotstring is the nbsp-prefixed punctuation, NEVER a plain ASCII space. This
---- mirrors the AHK _BuildUppercasedSymbols fix: the shifted-comma variants must be
---- generated with an nbsp/nnbsp prefix so that
----   - "nnbsp + : + D" expands to "DS" (uppercase) and "nnbsp + ; + d" to "Ds"
----     (titlecase), exactly the casing the user expects from caps-comma + d;
+--- On the Ergopti Shift layer the comma key emits NNBSP + ";" and the period key
+--- emits NBSP + ":" (French typography pairs ";" with the narrow space and ":"
+--- with the full one). The precise emission lives in the AHK layout only -- macOS
+--- input goes through Karabiner -- so the "uppercase" comma in a case-insensitive
+--- hotstring is a no-break-space-prefixed punctuation, NEVER a plain ASCII space.
+--- Matching is deliberately LENIENT: "DS" must come out regardless of which
+--- no-break space precedes the punctuation. This mirrors the AHK
+--- _BuildUppercasedSymbols table -- the shifted-comma variants are generated with
+--- an nbsp/nnbsp prefix so that
+---   - any of "{nnbsp,nbsp} + {:,;} + D" expands to "DS" (uppercase) and the
+---     lowercase-d forms to "Ds" (titlecase), exactly the casing the user expects
+---     from caps-comma + d;
 ---   - a bare "<space>:D" (the ":D" emoji typed after a normal word) NEVER matches
 ---     the comma hotstring and stays literal.
 --- ==============================================================================

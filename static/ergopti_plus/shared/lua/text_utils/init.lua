@@ -380,16 +380,20 @@ for k, v in pairs(M.UPPER_LETTERS) do M.UPPER_TRIGGERS[k] = v end
 --
 -- CRITICAL -- the "uppercase" form of a comma/apostrophe/period is NOT a plain
 -- ASCII space + punctuation. On the Ergopti Shift layer the comma key emits a
--- NARROW no-break space (U+202F) + ";", the period key emits U+202F + ":" and
--- the apostrophe key emits U+202F + "?"; the deadkey path emits the regular
--- no-break space (U+00A0). Anchoring on nbsp/nnbsp is what makes "nnbsp + : + D"
--- expand to "DS" while a bare "<space>:D" (the ":D" emoji typed after a normal
--- word) stays literal. A plain ASCII space here was a bug on two counts: it
--- never matched the layout-emitted shifted punctuation, and it DID match a
--- space-prefixed emoji and swallowed it into the expansion. Mirrors the AHK
--- _BuildUppercasedSymbols fix in hotstring_engine.ahk.
-local _NNBSP = "\226\128\175"  -- U+202F -- Shift+comma / Shift+period / Shift+apostrophe prefix
-local _NBSP  = "\194\160"      -- U+00A0 -- deadkey (umlaut) path prefix
+-- NARROW no-break space (NNBSP, U+202F) + ";", the period key emits a full
+-- no-break space (NBSP, U+00A0) + ":" and the apostrophe key emits NNBSP + "?"
+-- (French typography pairs ";" with the narrow space and ":" with the full one).
+-- That precise emission lives in the AHK layout only -- macOS input goes through
+-- Karabiner -- so these tables are the MATCHING side and stay deliberately
+-- lenient: they pair both no-break spaces with both ":" and ";" so "DS" expands
+-- regardless of which no-break space landed in the buffer, while a bare
+-- "<space>:D" (the ":D" emoji typed after a normal word) stays literal. A plain
+-- ASCII space here was a bug on two counts: it never matched the layout-emitted
+-- shifted punctuation, and it DID match a space-prefixed emoji and swallowed it
+-- into the expansion. Mirrors the AHK _BuildUppercasedSymbols table in
+-- hotstring_engine.ahk.
+local _NNBSP = "\226\128\175"  -- U+202F -- narrow no-break space (Shift+comma, before ";")
+local _NBSP  = "\194\160"      -- U+00A0 -- full no-break space (Shift+period, before ":")
 M.UPPER_TRIGGERS["'"] = { _NNBSP .. "?", _NBSP .. "?" }
 M.UPPER_TRIGGERS[","] = { _NNBSP .. ":", _NNBSP .. ";", _NBSP .. ":", _NBSP .. ";" }
 M.UPPER_TRIGGERS["."] = { _NNBSP .. ":", _NBSP .. ":" }

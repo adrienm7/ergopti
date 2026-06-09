@@ -512,34 +512,47 @@ Test("HSE bare semicolon + vowel fires unconditionally (in-word, not gated)",
 
 ; ── ",d → ds" SFB-reduction hotstring: shifted-comma case variants ──
 ; The base trigger ",d" (auto_expand=true, is_word=false, is_case_sensitive=false)
-; expands to "ds". On the Ergopti Shift layer the comma key emits nnbsp/nbsp + ";"
-; (and the period key emits nnbsp/nbsp + ":"), so the "uppercase" comma is the
-; nbsp-prefixed punctuation — NEVER a plain ASCII space. These tests pin the
-; regression where _BuildUppercasedSymbols used a plain space: (1) "nnbsp + : + D"
-; never matched (so caps never produced "DS"), and (2) a bare "<space>:D" emoji
-; DID match and got swallowed into "DS".
+; expands to "ds". On the Ergopti Shift layer the comma key emits NNBSP + ";" and
+; the period key emits NBSP + ":", so the "uppercase" comma is a no-break-space-
+; prefixed punctuation — NEVER a plain ASCII space. Matching is deliberately
+; lenient: "DS" must come out regardless of WHICH no-break space precedes the
+; punctuation. These tests pin two regressions from when _BuildUppercasedSymbols
+; used a plain space: (1) the nbsp/nnbsp-prefixed forms never matched (so caps
+; never produced "DS"), and (2) a bare "<space>:D" emoji DID match and got
+; swallowed into "DS".
 TestHSE_CommaShiftCaseVariantsFire() {
-    HSE_TestReset()
-    ; Register exactly the production ",d → ds" entry (flags: * auto, ? in-word).
-    CreateCaseSensitiveHotstrings("*?", ",d", "ds")
+    NNBSP := Chr(0x202F)
+    NBSP  := Chr(0xA0)
+    Colon := ":"
+    Semi  := Chr(0x3B)
 
-    ; nnbsp + ":" + "D" (shifted period + shifted d) → uppercase "DS".
-    HSE_FeedChar(Chr(0x202F))
-    HSE_FeedChar(":")
-    Match := HSE_FeedChar("D")
-    AssertTrue(Match != "", "nnbsp + : + D must fire the shifted-comma variant")
-    AssertEqual("DS", Match.Replacement, "uppercase D yields uppercase replacement DS")
+    ; "DS" must come out for every no-break-space + punctuation combination —
+    ; the layout pairs NBSP with ":" and NNBSP with ";", but the deadkey path
+    ; and matching leniency make all four prefixes valid "shifted commas".
+    Combos := [[NNBSP, Colon], [NBSP, Colon], [NNBSP, Semi], [NBSP, Semi]]
+    for _, Combo in Combos {
+        HSE_TestReset()
+        ; Register exactly the production ",d → ds" entry (flags: * auto, ? in-word).
+        CreateCaseSensitiveHotstrings("*?", ",d", "ds")
+        HSE_FeedChar(Combo[1])
+        HSE_FeedChar(Combo[2])
+        Match := HSE_FeedChar("D")
+        AssertTrue(Match != "",
+            "shifted-comma variant must fire for a no-break-space + punctuation prefix")
+        AssertEqual("DS", Match.Replacement,
+            "uppercase D yields uppercase replacement DS regardless of nbsp/nnbsp type")
+    }
 
-    ; nnbsp + ";" + "d" (shifted comma + lowercase d) → titlecase "Ds".
+    ; Lowercase vowel after the shifted comma yields titlecase "Ds".
     HSE_TestReset()
     CreateCaseSensitiveHotstrings("*?", ",d", "ds")
-    HSE_FeedChar(Chr(0x202F))
-    HSE_FeedChar(Chr(0x3B))
+    HSE_FeedChar(NNBSP)
+    HSE_FeedChar(Semi)
     Match2 := HSE_FeedChar("d")
     AssertTrue(Match2 != "", "nnbsp + semicolon + d must fire the shifted-comma variant")
     AssertEqual("Ds", Match2.Replacement, "lowercase d yields titlecase replacement Ds")
 }
-Test("HSE comma-shift case variants fire on nnbsp + punctuation",
+Test("HSE comma-shift case variants fire on any nbsp/nnbsp + punctuation",
     TestHSE_CommaShiftCaseVariantsFire)
 
 TestHSE_PlainSpaceColonDDoesNotFire() {

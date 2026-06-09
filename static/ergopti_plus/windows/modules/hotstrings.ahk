@@ -109,11 +109,12 @@ if Features["hotstrings"]["distances_reduction"]["comma_j"]["enabled"] {
 	CreateHotstring("*?C", ",'", "j'", CommaJOptions)
 
 	; Uppercase-J variants: Shift+SC02F sends nnbsp (U+202F)+; and Shift+SC022
-	; sends nnbsp+: on the Ergopti layout; ¨+s produces nbsp (U+00A0). Both act
-	; as the "shifted comma" — the Shift capitalises the J, so the lowercase
-	; comma "je" becomes "Je". The vowel's own case carries through: a lowercase
-	; vowel yields titlecase ("Je"), a Shift-held uppercase vowel yields all-caps
-	; ("JE") — case-sensitive triggers are registered for each variant.
+	; sends nbsp (U+00A0)+: on the Ergopti layout (French typography pairs ";"
+	; with the narrow space and ":" with the full one); ¨+s also produces nbsp.
+	; All act as the "shifted comma" — the Shift capitalises the J, so the
+	; lowercase comma "je" becomes "Je". The vowel's own case carries through: a
+	; lowercase vowel yields titlecase ("Je"), a Shift-held uppercase vowel yields
+	; all-caps ("JE") — case-sensitive triggers are registered for each variant.
 	; Registered explicitly here because CreateCaseSensitiveHotstrings cannot
 	; handle triggers that contain a terminator character (like : or ;) as an
 	; internal part of the trigger — the HSE end-char path would intercept it.
