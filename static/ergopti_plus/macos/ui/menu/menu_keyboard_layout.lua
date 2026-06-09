@@ -1443,4 +1443,39 @@ function M.set_layout_by_kl_name(kl_name)
 	return set_input_source(localised, kl_name)
 end
 
+--- Schedules the pause / resume keyboard-layout switch on a DEFERRED run-loop
+--- cycle instead of running it inline.
+---
+--- This MUST be deferred and never called synchronously from the pause-change
+--- callback: that callback runs inside the script-control eventtap callback
+--- (script_control.dispatch_action → _on_pause_change), and set_layout_by_kl_name
+--- spawns BLOCKING /usr/bin/osascript subprocesses (run_osascript_isolated — one
+--- to enumerate the TIS sources, one to select the target). Stalling the eventtap
+--- callback for the hundreds of ms those take makes macOS disable the tap with
+--- kCGEventTapDisabledByTimeout, after which AltGr+Enter stops toggling pause
+--- entirely. Deferring lets the eventtap callback return immediately so the tap
+--- stays alive.
+--- @param is_paused boolean Current pause state (true just entered pause).
+--- @param state table Menu state exposing layout_pause_switch_enabled / layout_on_pause / layout_on_resume.
+--- @param schedule function|nil Injectable scheduler(fn) for tests; defaults to hs.timer.doAfter(0, fn).
+--- @return string|nil The target layout that was scheduled, or nil when no switch is needed.
+function M.schedule_pause_layout_switch(is_paused, state, schedule)
+	if type(state) ~= "table" or not state.layout_pause_switch_enabled then return nil end
+	local target = is_paused and state.layout_on_pause or state.layout_on_resume
+	-- Nil / false / "auto" / "" all mean « do nothing » (the dropdowns default to false).
+	if type(target) ~= "string" or target == "" then return nil end
+	-- Resolve hs.timer lazily so the module stays loadable in the cross-platform
+	-- test harness where hs is absent and the scheduler is injected.
+	if type(schedule) ~= "function" then
+		schedule = function(fn) hs.timer.doAfter(0, fn) end
+	end
+	schedule(function()
+		-- Look the setter up on M at call time so a test stub on the module is honoured.
+		if type(M.set_layout_by_kl_name) == "function" then
+			pcall(M.set_layout_by_kl_name, target)
+		end
+	end)
+	return target
+end
+
 return M

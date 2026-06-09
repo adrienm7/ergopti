@@ -536,17 +536,14 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		if type(core_mods.shortcuts_mod.set_on_pause_change) == "function" then
 			pcall(core_mods.shortcuts_mod.set_on_pause_change, function(is_paused)
 				-- Switch keyboard layout when pausing or resuming, if the feature is enabled.
-				-- Use set_layout_by_kl_name so the localised name is resolved before calling
-				-- hs.keycodes.setLayout — the raw KeyboardLayout Name (stored in state) is not
-				-- accepted by setLayout for Ergopti variants.
-				if state.layout_pause_switch_enabled then
-					local target_layout = is_paused and state.layout_on_pause or state.layout_on_resume
-					if type(target_layout) == "string" and target_layout ~= "" then
-						local kbd_layout_mod = menu_mods.keyboard_layout
-						if kbd_layout_mod and type(kbd_layout_mod.set_layout_by_kl_name) == "function" then
-							pcall(kbd_layout_mod.set_layout_by_kl_name, target_layout)
-						end
-					end
+				-- The switch MUST stay deferred: this callback runs synchronously inside
+				-- the script-control eventtap callback, and the switch spawns blocking
+				-- osascript subprocesses that would otherwise stall the tap long enough for
+				-- macOS to disable it (killing AltGr+Enter). schedule_pause_layout_switch
+				-- owns that deferral and the « do nothing » defaults — see its docstring.
+				local kbd_layout_mod = menu_mods.keyboard_layout
+				if kbd_layout_mod and type(kbd_layout_mod.schedule_pause_layout_switch) == "function" then
+					pcall(kbd_layout_mod.schedule_pause_layout_switch, is_paused, state)
 				end
 				update_icon()
 				updateMenu()
@@ -599,6 +596,26 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			open_config = function() hs.timer.doAfter(0, function() _suppress_watcher_until = hs.timer.secondsSinceEpoch() + 8; pcall(hs.execute, "open \"" .. MenuPaths.get("ConfigTomlPath") .. "\"") end) end,
 			open_logs = function() hs.timer.doAfter(0, function() pcall(hs.execute, "open \"" .. base_dir .. "logs\"") end) end,
 		})
+
+		-- Wire the active-wrap-pairs getter eagerly at startup so the wrap-selection
+		-- eventtap honours the user's persisted per-symbol state from the very first
+		-- keystroke. The menubar menu is built lazily (only on click), so without this
+		-- the getter stays nil after a fresh launch and bind_wrap_text_if_selected
+		-- falls back to the full WRAP_PAIRS catalogue — re-wrapping a symbol the user
+		-- had disabled in a previous session until they happened to open the menu once.
+		-- The menu re-installs an identical closure when first built, so this is purely
+		-- a startup head-start, not a competing source of truth.
+		if type(core_mods.shortcuts_mod.set_wrap_pairs_getter) == "function" then
+			local ok_txt, text_acts_mod = pcall(require, "modules.shortcuts.actions.text")
+			if ok_txt and type(text_acts_mod.build_active_wrap_pairs) == "function" then
+				pcall(core_mods.shortcuts_mod.set_wrap_pairs_getter, function()
+					return text_acts_mod.build_active_wrap_pairs(
+						state.wrap_symbol_states  or {},
+						state.custom_wrap_symbols or {}
+					)
+				end)
+			end
+		end
 	end
 
 	-- ctx and actions are built once and reused across menu opens.

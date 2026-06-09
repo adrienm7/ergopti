@@ -306,3 +306,74 @@ helpers.describe("menu_keyboard_layout target_id regression (Ergopti click does 
 		helpers.assert_eq(kbd._format_ergopti_display("com.apple.keyboardlayout.ergopti.plus"), "Ergopti+")
 	end)
 end)
+
+helpers.describe("menu_keyboard_layout.schedule_pause_layout_switch (eventtap-timeout regression)", function()
+	-- Root cause: the pause/resume layout switch ran SYNCHRONOUSLY inside the
+	-- script-control eventtap callback (script_control.dispatch_action →
+	-- _on_pause_change). set_layout_by_kl_name spawns blocking /usr/bin/osascript
+	-- subprocesses (run_osascript_isolated), so the tap stalled long enough for
+	-- macOS to disable it (kCGEventTapDisabledByTimeout) — after which AltGr+Enter
+	-- no longer toggled pause AT ALL. The fix moves the switch onto a deferred
+	-- run-loop cycle; these tests prove it stays deferred and correctly gated.
+
+	-- Runs `fn(calls)` with M.set_layout_by_kl_name swapped for a recorder, then
+	-- restores the original so sibling tests see the real setter.
+	local function with_stubbed_setter(fn)
+		local original = kbd.set_layout_by_kl_name
+		local calls    = {}
+		kbd.set_layout_by_kl_name = function(name) calls[#calls + 1] = name end
+		local ok, err = pcall(fn, calls)
+		kbd.set_layout_by_kl_name = original
+		if not ok then error(err) end
+	end
+
+	helpers.it("defers the switch — set_layout_by_kl_name is NEVER called synchronously", function()
+		with_stubbed_setter(function(calls)
+			local captured = nil
+			local state = { layout_pause_switch_enabled = true, layout_on_pause = "Ergopti_v2_2_2_plus", layout_on_resume = "French" }
+			local target = kbd.schedule_pause_layout_switch(true, state, function(f) captured = f end)
+			-- It returns the pause target and schedules exactly one deferred job…
+			helpers.assert_eq(target, "Ergopti_v2_2_2_plus")
+			helpers.assert_true(type(captured) == "function", "switch must be scheduled, not run inline")
+			-- …but nothing has run yet: the eventtap callback would already have returned.
+			helpers.assert_eq(#calls, 0, "set_layout_by_kl_name must NOT run synchronously (would stall the eventtap)")
+			-- Running the deferred job performs the actual switch.
+			captured()
+			helpers.assert_eq(#calls, 1)
+			helpers.assert_eq(calls[1], "Ergopti_v2_2_2_plus")
+		end)
+	end)
+
+	helpers.it("on resume schedules the resume layout (not the pause one)", function()
+		with_stubbed_setter(function(calls)
+			local captured = nil
+			local state = { layout_pause_switch_enabled = true, layout_on_pause = "French", layout_on_resume = "Ergopti_v2_2_2_plus" }
+			local target = kbd.schedule_pause_layout_switch(false, state, function(f) captured = f end)
+			helpers.assert_eq(target, "Ergopti_v2_2_2_plus")
+			captured()
+			helpers.assert_eq(calls[1], "Ergopti_v2_2_2_plus")
+		end)
+	end)
+
+	helpers.it("does nothing when the feature is disabled (no schedule, no switch)", function()
+		with_stubbed_setter(function(calls)
+			local scheduled = false
+			local state = { layout_pause_switch_enabled = false, layout_on_pause = "French", layout_on_resume = "French" }
+			local target = kbd.schedule_pause_layout_switch(true, state, function() scheduled = true end)
+			helpers.assert_nil(target)
+			helpers.assert_true(not scheduled, "disabled feature must not schedule anything")
+			helpers.assert_eq(#calls, 0)
+		end)
+	end)
+
+	helpers.it("does nothing when the target layout is the default false / empty string", function()
+		with_stubbed_setter(function(calls)
+			local scheduled = false
+			local sched = function() scheduled = true end
+			helpers.assert_nil(kbd.schedule_pause_layout_switch(true, { layout_pause_switch_enabled = true, layout_on_pause = false }, sched))
+			helpers.assert_nil(kbd.schedule_pause_layout_switch(true, { layout_pause_switch_enabled = true, layout_on_pause = "" }, sched))
+			helpers.assert_true(not scheduled, "false / empty target must not schedule a switch")
+			helpers.assert_eq(#calls, 0)
+		end)
+	end)
+end)
