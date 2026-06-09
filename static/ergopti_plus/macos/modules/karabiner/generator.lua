@@ -635,6 +635,44 @@ local function build_script_control_sentinel_rules()
 end
 
 
+--- Builds the self-contained script-control rules kept alive in the paused
+--- Karabiner config. The normal sentinel rules (build_script_control_sentinel_rules)
+--- condition on ke_held_right_command — a variable set by the right_command tap/hold
+--- rule — but pause strips every other rule, so that variable would never get set.
+--- Here we gate the sentinels DIRECTLY on the physical modifier instead, so
+--- AltGr+Enter / Backspace / Escape keep emitting F13 / F14 / F15 (consumed by
+--- modules/shortcuts/script_control.lua) even while every other remap is off. Both
+--- right_command and right_option are accepted so either right-hand « AltGr » key
+--- un-pauses the script — the script-control shortcuts stay exempt from pause.
+--- @return table List of Karabiner rule objects (one per modifier × slot).
+function M.build_paused_script_control_rules()
+	local rules = {}
+	-- Either right-hand modifier un-pauses while the script is paused.
+	local mods = { "right_command", "right_option" }
+	for _, slot in ipairs(SCRIPT_CONTROL_SENTINEL_SLOTS) do
+		for _, mod in ipairs(mods) do
+			rules[#rules + 1] = {
+				description  = string.format(
+					"Paused script control: %s + %s → %s",
+					mod, slot.from_key, slot.sentinel
+				),
+				manipulators = {
+					{
+						type = "basic",
+						from = {
+							key_code  = slot.from_key,
+							modifiers = { mandatory = { mod }, optional = { "any" } },
+						},
+						to = { { key_code = slot.sentinel } },
+					},
+				},
+			}
+		end
+	end
+	return rules
+end
+
+
 
 
 -- ==========================================

@@ -94,20 +94,26 @@ M.TAP_HOLD_KEYS = {}
 --- Each entry defines a two-modifier simultaneous combo the user can map to an action.
 M.MOD_COMBOS = {}
 
--- Minimal karabiner.json deployed on pause: same profile structure as normal but
--- with zero rules, so KE's FSEvents watcher reloads and applies no remapping.
--- Daemons stay alive — no process kill, no restart, no Space switch.
-local EMPTY_KE_CONFIG = {
-	profiles = {
-		{
-			complex_modifications = { rules = {} },
-			devices              = { { identifiers = { is_keyboard = true }, simple_modifications = {} } },
-			name                 = "Default profile",
-			selected             = true,
-			virtual_hid_keyboard = { country_code = 0, keyboard_type_v2 = "ansi" },
+-- Builds the minimal karabiner.json deployed on pause: the same profile structure
+-- as normal but carrying only `rules` (an empty list = full native keyboard). KE's
+-- FSEvents watcher reloads and applies just those — daemons stay alive, no process
+-- kill, no restart, no Space switch. M.pause() passes the script-control rules here
+-- so AltGr+Enter / Backspace / Escape survive the pause (« exempt de pause »).
+-- @param rules table List of Karabiner rule objects to keep active while paused.
+-- @return table A karabiner.json config table ready for merge_into_existing_config.
+local function build_paused_ke_config(rules)
+	return {
+		profiles = {
+			{
+				complex_modifications = { rules = rules or {} },
+				devices              = { { identifiers = { is_keyboard = true }, simple_modifications = {} } },
+				name                 = "Default profile",
+				selected             = true,
+				virtual_hid_keyboard = { country_code = 0, keyboard_type_v2 = "ansi" },
+			}
 		}
 	}
-}
+end
 
 local _state = nil
 
@@ -486,14 +492,20 @@ end
 function M.pause()
 	if not _state or not _state.enabled then return end
 	Logger.start(LOG, "Pausing Karabiner-Elements…")
-	local merged   = Generator.merge_into_existing_config(EMPTY_KE_CONFIG, KARABINER_OUT)
+	-- Pause strips every remap so the keyboard goes native (« pause = tout éteint »),
+	-- EXCEPT the script-control rules: AltGr+Enter / Backspace / Escape must keep
+	-- working so the user can un-pause from the keyboard. They are deployed as
+	-- self-contained modifier-gated sentinel rules (no dependency on the stripped
+	-- tap/hold holder variable) — see Generator.build_paused_script_control_rules.
+	local paused_config = build_paused_ke_config(Generator.build_paused_script_control_rules())
+	local merged   = Generator.merge_into_existing_config(paused_config, KARABINER_OUT)
 	local json_str = hs.json.encode(merged, true)
 	local ok, detail = Generator.deploy_string(json_str, KARABINER_OUT)
 	if not ok then
 		Logger.error(LOG, "Pause deploy failed: %s.", detail)
 		return
 	end
-	Logger.success(LOG, "Karabiner-Elements paused (empty config deployed).")
+	Logger.success(LOG, "Karabiner-Elements paused (script-control rules retained).")
 end
 
 --- Restores the full Karabiner config so remapping resumes.

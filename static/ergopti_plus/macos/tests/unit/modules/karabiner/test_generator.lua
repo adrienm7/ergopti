@@ -420,3 +420,61 @@ helpers.describe("Generator.KE_PHYSICAL_KC_LOG constant", function()
 		)
 	end)
 end)
+
+
+
+
+helpers.describe("Generator.build_paused_script_control_rules (exempt-from-pause regression)", function()
+	-- Root cause: M.pause() used to deploy a fully empty Karabiner config, which
+	-- stripped the script-control sentinel rules — so while paused, AltGr+Enter no
+	-- longer produced the F13/F14/F15 sentinel and the user could not un-pause from
+	-- the keyboard. These self-contained, modifier-gated rules are now retained in
+	-- the paused config so the script-management shortcuts stay exempt from pause.
+	local rules = Generator.build_paused_script_control_rules()
+
+	helpers.it("emits 6 rules — 3 slots × {right_command, right_option}", function()
+		helpers.assert_true(type(rules) == "table", "must return a table")
+		helpers.assert_eq(#rules, 6)
+	end)
+
+	helpers.it("each rule is self-contained: modifier-gated, NO variable_if condition", function()
+		-- The whole point: the paused config strips the holder tap/hold rule, so the
+		-- sentinels must NOT depend on ke_held_* — they gate on a mandatory modifier.
+		for _, rule in ipairs(rules) do
+			local m = rule.manipulators[1]
+			helpers.assert_true(type(m) == "table", "rule must have a manipulator")
+			helpers.assert_nil(m.conditions, "paused rule must not use a variable_if holder condition")
+			helpers.assert_true(type(m.from.modifiers) == "table"
+				and type(m.from.modifiers.mandatory) == "table"
+				and #m.from.modifiers.mandatory == 1,
+				"paused rule must gate on a single mandatory modifier")
+		end
+	end)
+
+	helpers.it("covers both right-hand modifiers and all three script-control keys", function()
+		local mods, keys = {}, {}
+		for _, rule in ipairs(rules) do
+			local m = rule.manipulators[1]
+			mods[m.from.modifiers.mandatory[1]] = true
+			keys[m.from.key_code] = true
+		end
+		helpers.assert_true(mods.right_command, "right_command must un-pause")
+		helpers.assert_true(mods.right_option, "right_option must un-pause")
+		helpers.assert_true(keys.return_or_enter and keys.delete_or_backspace and keys.escape,
+			"all three script-control keys must be present")
+	end)
+
+	helpers.it("right_command + return emits the F13 return sentinel", function()
+		-- With the test keycode stub, F13_KARABINER_RETURN = 105 → to_name → "key_105".
+		local found = false
+		for _, rule in ipairs(rules) do
+			local m = rule.manipulators[1]
+			if m.from.modifiers.mandatory[1] == "right_command"
+				and m.from.key_code == "return_or_enter" then
+				helpers.assert_eq(m.to[1].key_code, "key_105", "return sentinel must be F13")
+				found = true
+			end
+		end
+		helpers.assert_true(found, "right_command + return rule must exist")
+	end)
+end)
