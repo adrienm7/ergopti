@@ -652,6 +652,8 @@
 	"menu.global.title": "Global actions",
 	"menu.hotstrings.add_custom": "+ Add a custom expander…",
 	"menu.hotstrings.add_delimiter": "+ Add custom delimiter…",
+	"menu.hotstrings.category_off": "❌ Disabled (click to enable)",
+	"menu.hotstrings.category_on": "✅ Enabled (click to disable)",
 	"menu.hotstrings.check_all": "☑ Check all",
 	"menu.hotstrings.close_on_add": "Close UI after adding a hotstring via shortcut",
 	"menu.hotstrings.config_item": "⚙️ Configure delays and colours…",
