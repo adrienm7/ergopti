@@ -118,6 +118,7 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 ; ``LoggerInit()`` is invoked after the configuration file is parsed so the
 ; minimum log level can be honoured from the very first INFO/START line.
 #Include lib/logger.ahk
+#Include lib/boot_profiler.ahk
 #Include lib/registry.ahk
 #Include lib/app_state.ahk
 
@@ -579,6 +580,9 @@ Updater_LoadCheckInterval()
 try Updater_StartBackgroundChecks()
 try Updater_InitTrayNotifyHandler()
 LoggerStart("ErgoptiPlus", "Booting ErgoptiPlus driver…")
+; Boot phase profiling — emits one INFO line per phase so a slow start can be
+; diagnosed from the log alone (see lib/boot_profiler.ahk).
+BootProfile_Begin()
 
 ; Load tooltip visual constants from shared/tooltip/constants.toml so the
 ; runtime values stay in sync with the TOML single source of truth.
@@ -959,9 +963,11 @@ global _ParseExtTomlSectionsCache := Map()
 if MetricsShortcuts.enabled
     WPMWidget_LoadConfig(_IniCache)
 
+BootProfile_Mark("Config, features & shortcuts loaded")
 InitSubMenus()
 initMenu()
 UpdateTrayIcon()
+BootProfile_Mark("Tray menu + icon built")
 SetTimer(SaveFullConfig, -500)
 
 if MetricsShortcuts.enabled {
@@ -985,6 +991,7 @@ if MetricsShortcuts.enabled {
     KL_Roi_Start()
 }
 
+BootProfile_Mark("Metrics/keylogger started")
 LoggerSuccess("ErgoptiPlus", "Tray menu built and icon set.")
 
 _MakeOpenSectionFn(SecName) {
@@ -2019,6 +2026,7 @@ if Features.Has("hotstrings") and Features["hotstrings"].Has("personal") {
 #Include modules/tap_holds.ahk
 #Include modules/hotstrings.ahk
 HotstringPrefixWatcherInit()
+BootProfile_Mark("Hotstrings registered + prefix watcher armed")
 LoggerSuccess("ErgoptiPlus", "Driver fully initialised — ready.")
 
 global _LAYOUT_POLL_INTERVAL_MS := 1000
