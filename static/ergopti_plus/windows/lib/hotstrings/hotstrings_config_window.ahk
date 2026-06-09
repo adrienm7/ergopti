@@ -292,7 +292,7 @@ OpenHotstringsConfigWindow() {
 		return
 	}
 
-	G := Gui("+Resize +MinSize580x320", t("hs_config.window_title"))
+	G := Gui_Create("+Resize +MinSize580x320", t("hs_config.window_title"))
 	G.SetFont("s10", "Segoe UI")
 	G.MarginX := 14
 	G.MarginY := 12
