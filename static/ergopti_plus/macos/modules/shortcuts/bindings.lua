@@ -41,6 +41,11 @@ local hotkey_labels = {}   -- User-facing French label for each shortcut
 
 local started = false
 
+-- Callback that returns the live active-wrap-pairs table.
+-- Set by M.set_wrap_pairs_getter() when the menu wires up the user's symbol state.
+-- Falls back to nil so bind_wrap_text_if_selected uses the full built-in catalogue.
+local _wrap_pairs_getter = nil
+
 -- Canonical modifier ordering used to build display labels
 local MOD_ORDER  = {"cmd", "ctrl", "alt", "shift", "fn"}
 local MOD_LABELS = {cmd = "Cmd", ctrl = "Ctrl", alt = "Alt", shift = "Shift", fn = "Fn"}
@@ -130,7 +135,7 @@ end
 
 hotkey_labels.wrap_text_if_selected = i18n.get("shortcuts.label_wrap_text")
 hotkey_defs.wrap_text_if_selected   = function()
-	return sys_acts.bind_wrap_text_if_selected()
+	return sys_acts.bind_wrap_text_if_selected(_wrap_pairs_getter)
 end
 
 -- Ctrl shortcuts — alphabetical by id (mirrors list_shortcuts() sort order)
@@ -367,6 +372,27 @@ local function sort_key(id)
 	if id:match("^ctrl_")    then return "2_" .. id end
 	if id:match("^cmd_")     then return "3_" .. id end
 	return "4_" .. id
+end
+
+--- Sets the callback used by the wrap-text eventtap to resolve the active symbol table.
+--- Call this whenever the user changes the symbol list so the tap uses the new table
+--- on the very next keystroke without needing a restart.
+--- @param getter function|nil Returns the live {[char]={left,right}} table, or nil to use defaults.
+function M.set_wrap_pairs_getter(getter)
+	_wrap_pairs_getter = type(getter) == "function" and getter or nil
+	Logger.debug(LOG, "wrap_pairs_getter updated.")
+	-- Re-arm the tap so it captures the new closure immediately
+	if hotkeys.wrap_text_if_selected then
+		local def = hotkey_defs.wrap_text_if_selected
+		if type(def) == "function" then
+			local h = hotkeys.wrap_text_if_selected
+			if type(h.delete) == "function" then pcall(function() h:delete() end) end
+			local ok, obj = pcall(def)
+			if ok and type(obj) == "table" then
+				hotkeys.wrap_text_if_selected = obj
+			end
+		end
+	end
 end
 
 --- Returns a sorted array of all registered shortcuts with their current status.

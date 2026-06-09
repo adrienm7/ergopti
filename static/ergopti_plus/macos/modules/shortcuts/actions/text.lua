@@ -40,40 +40,71 @@ local RESTORE_DELAY_SEC  = 0.15   -- Wait after re-select before restoring clipb
 local MAX_RESELECT_CHARS = 5000   -- Safety cap: avoid freezing on huge pastes
 
 -- Symbols that should wrap the selection rather than replace it.
--- Keys are the AltGr-layer characters; values are {left, right} pairs.
--- Asymmetric pairs (e.g. parentheses) use distinct open/close symbols.
-local WRAP_PAIRS = {
-	["("]  = { left = "(",  right = ")"  },
-	[")"]  = { left = "(",  right = ")"  },
-	["["]  = { left = "[",  right = "]"  },
-	["]"]  = { left = "[",  right = "]"  },
-	["{"]  = { left = "{",  right = "}"  },
-	["}"]  = { left = "{",  right = "}"  },
-	["<"]  = { left = "<",  right = ">"  },
-	[">"]  = { left = "<",  right = ">"  },
-	['"']  = { left = '"',  right = '"'  },
-	["'"]  = { left = "'",  right = "'"  },
-	["`"]  = { left = "`",  right = "`"  },
-	["*"]  = { left = "*",  right = "*"  },
-	["_"]  = { left = "_",  right = "_"  },
-	["~"]  = { left = "~",  right = "~"  },
-	["|"]  = { left = "|",  right = "|"  },
-	["/"]  = { left = "/",  right = "/"  },
-	["\\"] = { left = "\\", right = "\\" },
-	["@"]  = { left = "@",  right = "@"  },
-	["#"]  = { left = "#",  right = "#"  },
-	["%"]  = { left = "%",  right = "%"  },
-	["$"]  = { left = "$",  right = "$"  },
-	["&"]  = { left = "&",  right = "&"  },
-	["!"]  = { left = "!",  right = "!"  },
-	["?"]  = { left = "?",  right = "?"  },
-	["+"]  = { left = "+",  right = "+"  },
-	["="]  = { left = "=",  right = "="  },
-	[";"]  = { left = ";",  right = ";"  },
-	[":"]  = { left = ":",  right = ":"  },
-	["« "] = { left = "« ", right = " »" },
-	[" »"] = { left = "« ", right = " »" },
+-- The canonical catalogue AND its grouping live in the SHARED single source of
+-- truth: ``static/ergopti_plus/shared/wrap_symbols.json`` (the same file the AHK
+-- driver reads). It is loaded once below — NEVER hardcode the list or its order
+-- here. WRAP_GROUPS preserves the ordered groups (the menu draws a separator
+-- between them); WRAP_PAIRS is the flattened {[char]={left,right}} lookup with
+-- both the opening and closing char of each pair registered as keys.
+
+-- Emergency-only fallback used when the shared JSON cannot be read/parsed. Kept
+-- intentionally minimal (ASCII brackets + straight quotes) so a transient I/O
+-- failure still leaves basic wrapping usable; the real catalogue is the JSON.
+local FALLBACK_GROUPS = {
+	{ { left = "(", right = ")" }, { left = "[", right = "]" },
+	  { left = "{", right = "}" }, { left = "<", right = ">" } },
+	{ { left = '"', right = '"' }, { left = "'", right = "'" } },
 }
+
+--- Resolves the shared/wrap_symbols.json path from this module's own on-disk
+--- location, independent of any config-dir override, so the catalogue loads
+--- identically in the packaged app and in headless unit tests.
+--- @return string|nil Absolute path, or nil if the source path is unresolvable.
+local function shared_wrap_symbols_path()
+	local src = debug.getinfo(1, "S").source
+	if src:sub(1, 1) == "@" then src = src:sub(2) end
+	-- src = .../ergopti_plus/macos/modules/shortcuts/actions/text.lua
+	local actions_dir = src:match("^(.*)[/\\][^/\\]+%.lua$")
+	if not actions_dir then return nil end
+	-- actions → shortcuts → modules → macos → ergopti_plus, then shared/
+	return actions_dir .. "/../../../../shared/wrap_symbols.json"
+end
+
+--- Reads the shared catalogue and returns its ordered groups, or nil on failure.
+--- @return table|nil Array of groups (each an array of {left,right}).
+local function load_shared_groups()
+	local path = shared_wrap_symbols_path()
+	if not path then return nil end
+	local fh = io.open(path, "r")
+	if not fh then return nil end
+	local content = fh:read("*a")
+	fh:close()
+	if type(content) ~= "string" or content == "" then return nil end
+	local ok, data = pcall(hs.json.decode, content)
+	if not ok or type(data) ~= "table" or type(data.groups) ~= "table" then return nil end
+	return data.groups
+end
+
+-- Build WRAP_GROUPS (ordered) and WRAP_PAIRS (flattened lookup) from the shared
+-- catalogue, falling back to the minimal emergency set on any failure.
+local WRAP_GROUPS = load_shared_groups()
+if type(WRAP_GROUPS) ~= "table" or #WRAP_GROUPS == 0 then
+	Logger.warn(LOG, "Shared wrap-symbols catalogue unreadable — using emergency fallback.")
+	WRAP_GROUPS = FALLBACK_GROUPS
+end
+
+local WRAP_PAIRS = {}
+for _, group in ipairs(WRAP_GROUPS) do
+	for _, pair in ipairs(group) do
+		if type(pair) == "table" and type(pair.left) == "string" and pair.left ~= ""
+				and type(pair.right) == "string" and pair.right ~= "" then
+			WRAP_PAIRS[pair.left] = { left = pair.left, right = pair.right }
+			if pair.right ~= pair.left then
+				WRAP_PAIRS[pair.right] = { left = pair.left, right = pair.right }
+			end
+		end
+	end
+end
 
 
 
@@ -248,8 +279,44 @@ local function ax_selected_text()
 	return (type(sel) == "string" and sel ~= "") and sel or nil
 end
 
---- The WRAP_PAIRS table exposed for external inspection (e.g. the eventtap filter).
+--- The full built-in WRAP_PAIRS catalogue exposed for external inspection.
+--- Callers that need a filtered or user-extended table should use build_active_wrap_pairs().
 M.WRAP_PAIRS = WRAP_PAIRS
+
+--- The ordered built-in groups from the shared catalogue. Each entry is an array
+--- of {left, right} pairs; the menu draws a separator between consecutive groups.
+--- Exposed so the menu mirrors the shared grouping without duplicating the order.
+M.WRAP_GROUPS = WRAP_GROUPS
+
+--- Builds the active wrapping-pairs table from the built-in catalogue and user state.
+--- @param symbol_states table Map of symbol key → boolean (true = enabled).
+---   The key is the opening character, e.g. "(" or the asymmetric "« ".
+--- @param custom_symbols table Array of {key, left, right} for user-added pairs.
+--- @return table {[char]={left,right}} ready for the eventtap filter.
+function M.build_active_wrap_pairs(symbol_states, custom_symbols)
+	local result = {}
+	for char, pair in pairs(WRAP_PAIRS) do
+		-- Use the opening symbol as the canonical key for state lookup
+		local state_key = pair.left
+		local enabled = (type(symbol_states) ~= "table") or (symbol_states[state_key] ~= false)
+		if enabled then
+			result[char] = pair
+		end
+	end
+	if type(custom_symbols) == "table" then
+		for _, cs in ipairs(custom_symbols) do
+			if type(cs) == "table" and type(cs.left) == "string" and cs.left ~= "" then
+				local right = (type(cs.right) == "string" and cs.right ~= "") and cs.right or cs.left
+				-- Register under both opening and closing chars (mirrors WRAP_PAIRS pattern)
+				result[cs.left]  = { left = cs.left, right = right }
+				if right ~= cs.left then
+					result[right] = { left = cs.left, right = right }
+				end
+			end
+		end
+	end
+	return result
+end
 
 --- Wraps the current selection with left/right symbols, or types the symbol if nothing is selected.
 --- Uses AXSelectedText to avoid touching the clipboard.

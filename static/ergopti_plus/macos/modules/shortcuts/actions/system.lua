@@ -618,11 +618,10 @@ end
 
 --- Starts a keyDown eventtap that wraps the current text selection with the typed symbol.
 --- When no text is selected the key event is passed through unchanged.
---- Wrapping pairs (e.g. ( → ), [ → ]) come from text_acts.WRAP_PAIRS.
+--- @param get_wrap_pairs function|nil Callback returning the live {[char]={left,right}} table.
+---   When nil, falls back to text_acts.WRAP_PAIRS (the full built-in catalogue).
 --- @return table Fake-hotkey object with :delete().
-function M.bind_wrap_text_if_selected()
-	local ok_ax, ax = pcall(require, "hs.axuielement")
-
+function M.bind_wrap_text_if_selected(get_wrap_pairs)
 	local tap = hs.eventtap.new({hs.eventtap.event.types.keyDown}, function(e)
 		-- Ignore events that carry a modifier (cmd/ctrl/alt) — those are shortcuts, not symbols
 		local flags = e:getFlags()
@@ -631,34 +630,15 @@ function M.bind_wrap_text_if_selected()
 		local ok_ch, ch = pcall(function() return e:getCharacters() end)
 		if not ok_ch or type(ch) ~= "string" or ch == "" then return false end
 
-		-- Check if this character is in the wrap-pairs table
-		local pair = text_acts.WRAP_PAIRS[ch]
+		-- Resolve the live symbol table on every keystroke so menu changes take effect immediately
+		local pairs_tbl = type(get_wrap_pairs) == "function" and get_wrap_pairs() or text_acts.WRAP_PAIRS
+		local pair = pairs_tbl[ch]
 		if not pair then return false end
 
-		-- Read AXSelectedText without touching the clipboard
-		if not ok_ax or not ax then return false end
-
-		local sel = nil
-		pcall(function()
-			local el = ax.systemWideElement():attributeValue("AXFocusedUIElement")
-			if el then sel = el:attributeValue("AXSelectedText") end
-		end)
-
-		if type(sel) ~= "string" or sel == "" then return false end
-
-		-- Non-empty selection: suppress the raw keystroke and wrap instead
-		Logger.debug(LOG, "WrapTextIfSelected: wrapping %d chars with '%s'/'%s'.", #sel, pair.left, pair.right)
-		local prior = hs.pasteboard.getContents()
-		pcall(hs.pasteboard.setContents, pair.left .. sel .. pair.right)
-		hs.timer.doAfter(0, function()
-			hs.eventtap.keyStroke({"cmd"}, "v", 0.02)
-			hs.timer.doAfter(0.25, function()
-				pcall(function()
-					if prior and prior ~= "" then hs.pasteboard.setContents(prior)
-					else hs.pasteboard.clearContents() end
-				end)
-			end)
-		end)
+		-- Delegate to text_acts which handles AX reading, clipboard swap, and restore correctly
+		text_acts.surround_selection_if_selected(ch, pair.left, pair.right)
+		-- surround_selection_if_selected types the symbol when nothing is selected,
+		-- so we always suppress the raw event to avoid double-typing.
 		return true
 	end)
 	tap:start()

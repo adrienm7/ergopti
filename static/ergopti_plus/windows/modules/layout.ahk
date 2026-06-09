@@ -441,7 +441,15 @@ GetUIASelection() {
 }
 
 WrapTextIfSelected(Symbol, LeftSymbol, RightSymbol) {
-	if Features["shortcuts"]["wrap_text_if_selected"] {
+	; Two gates must pass before a selection is wrapped:
+	;   1. The master feature flag (Raccourcis > « encadrer la sélection »).
+	;   2. The per-symbol enable/disable state set from the wrap-symbols menu.
+	; The opening char (LeftSymbol) is the canonical key in the disabled set, so a
+	; disabled asymmetric pair (e.g. « ‹ … › ») stops wrapping from BOTH its opening
+	; and closing keys. Symbols absent from the catalogue (^, -) are not user-
+	; configurable and therefore always wrap — WrapSymbols_IsEnabled returns true
+	; for any char that was never disabled.
+	if (Features["shortcuts"]["wrap_text_if_selected"] and WrapSymbols_IsEnabled(LeftSymbol)) {
 		Selection := GetUIASelection()
 		if (Selection != "") {
 			; Send all the text instantly and without triggering hotstrings while typing it

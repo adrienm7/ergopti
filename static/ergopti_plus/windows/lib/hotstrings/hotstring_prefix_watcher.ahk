@@ -86,10 +86,11 @@ global _PREFIX_WATCHER_CATEGORIES := [
     "autocorrection", "magickey", "personal"
 ]
 
-; Asymmetric wrapping pairs for the UIA selection-wrap feature.
-; When the typed symbol is a closing delimiter, the pair opens with the
-; corresponding opener so the selection ends up properly bracketed.
-; Symmetric symbols (not listed here) wrap with themselves on both sides.
+; _UIA_WRAP_PAIRS is no longer the runtime lookup table.
+; The PrefixWatcher now delegates to WrapSymbols_GetActivePairs() (wrap_symbols_config.ahk)
+; so the user can enable/disable individual symbols from the menu without a Reload.
+; This global is kept as a compile-time constant for the legacy WrapTextIfSelected()
+; call in modules/layout.ahk (Win+O gesture) which does not use the active-pairs path.
 global _UIA_WRAP_PAIRS := Map(
     "(", Map("left", "(", "right", ")"),
     ")", Map("left", "(", "right", ")"),
@@ -99,10 +100,28 @@ global _UIA_WRAP_PAIRS := Map(
     "}", Map("left", "{", "right", "}"),
     "<", Map("left", "<", "right", ">"),
     ">", Map("left", "<", "right", ">"),
-    '"', Map("left", '"', "right", '"'),
+    Chr(0x22), Map("left", Chr(0x22), "right", Chr(0x22)),
     "'", Map("left", "'", "right", "'"),
-    "«", Map("left", "«", "right", "»"),
-    "»", Map("left", "«", "right", "»")
+    Chr(0x60), Map("left", Chr(0x60), "right", Chr(0x60)),
+    "*",  Map("left", "*",  "right", "*" ),
+    "_",  Map("left", "_",  "right", "_" ),
+    "~",  Map("left", "~",  "right", "~" ),
+    "|",  Map("left", "|",  "right", "|" ),
+    "/",  Map("left", "/",  "right", "/" ),
+    Chr(0x5C), Map("left", Chr(0x5C), "right", Chr(0x5C)),
+    "@",  Map("left", "@",  "right", "@" ),
+    "#",  Map("left", "#",  "right", "#" ),
+    "%",  Map("left", "%",  "right", "%" ),
+    "$",  Map("left", "$",  "right", "$" ),
+    "&",  Map("left", "&",  "right", "&" ),
+    "!",  Map("left", "!",  "right", "!" ),
+    "?",  Map("left", "?",  "right", "?" ),
+    "+",  Map("left", "+",  "right", "+" ),
+    "=",  Map("left", "=",  "right", "=" ),
+    ";",  Map("left", ";",  "right", ";" ),
+    ":",  Map("left", ":",  "right", ":" ),
+    Chr(0xAB) . " ", Map("left", Chr(0xAB) . " ", "right", " " . Chr(0xBB)),
+    " " . Chr(0xBB), Map("left", Chr(0xAB) . " ", "right", " " . Chr(0xBB))
 )
 
 
@@ -540,38 +559,39 @@ _OnPrefixChar(IH, Char) {
         LLM_Bridge_FeedCharIfActive(Char)
     if !IsCategoryGated("Hotstrings")
         return
-    ; UIA selection-wrap: when the user types a symbol (non-alphanumeric) while
-    ; text is selected, wrap the selection instead of inserting the bare symbol.
-    ; This works independently of keyboard emulation — the InputHook is in V
-    ; (pass-through) mode so the character already reached the app; we undo it
-    ; with a single BackSpace before sending the wrapped replacement.
+    ; UIA selection-wrap: when the user types a symbol while text is selected,
+    ; wrap the selection instead of inserting the bare symbol.
+    ; Active pairs come from WrapSymbols_GetActivePairs() so the user's enabled/
+    ; disabled choices and custom symbols are respected without a Reload.
+    ; IsSet(_WS_ACTIVE_PAIRS) guards against loading order issues — the global
+    ; is defined in wrap_symbols_config.ahk which is #Include'd before this file.
     if (IsSet(Features) and Features.Has("shortcuts")
         and Features["shortcuts"].Has("wrap_text_if_selected")
         and Features["shortcuts"]["wrap_text_if_selected"]
-        and _UIA_WRAP_PAIRS.Has(Char)
+        and IsSet(_WS_ACTIVE_PAIRS)
     ) {
-        try {
-            UIASel := GetUIASelection()
-            if (UIASel != "") {
-                global _UIA_WRAP_PAIRS
-                if _UIA_WRAP_PAIRS.Has(Char) {
-                    Left  := _UIA_WRAP_PAIRS[Char]["left"]
-                    Right := _UIA_WRAP_PAIRS[Char]["right"]
-                } else {
-                    Left  := Char
-                    Right := Char
+        ; Snapshot the active-pairs map once so the pair lookup is consistent
+        ; with the membership check even if WrapSymbols_Rebuild() runs concurrently.
+        _ActivePairsSnap := WrapSymbols_GetActivePairs()
+        if _ActivePairsSnap.Has(Char) {
+            try {
+                UIASel := GetUIASelection()
+                if (UIASel != "") {
+                    Pair  := _ActivePairsSnap[Char]
+                    Left  := Pair["left"]
+                    Right := Pair["right"]
+                    ; Erase the character already delivered by the pass-through hook,
+                    ; then send the wrapped replacement without re-triggering hotstrings.
+                    PrefixWatcherSuppress(true)
+                    SendEvent("{BackSpace}")
+                    SendInstant(Left . UIASel . Right)
+                    PrefixWatcherSuppress(false)
+                    _ResetPrefixBuffer()
+                    return
                 }
-                ; Erase the character already delivered by the pass-through hook,
-                ; then send the wrapped replacement without re-triggering hotstrings.
-                PrefixWatcherSuppress(true)
-                SendEvent("{BackSpace}")
-                SendInstant(Left . UIASel . Right)
-                PrefixWatcherSuppress(false)
-                _ResetPrefixBuffer()
-                return
+            } catch as _UIAErr {
+                LoggerError("PrefixWatcher", "UIA wrap error for char '{1}': {2}.", Char, _UIAErr.Message)
             }
-        } catch as _UIAErr {
-            LoggerError("PrefixWatcher", "UIA wrap error for char '{1}': {2}.", Char, _UIAErr.Message)
         }
     }
     try {

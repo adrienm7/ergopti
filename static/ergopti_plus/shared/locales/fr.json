@@ -1078,7 +1078,7 @@
 	"menu.shortcuts.alt_add": "[+ Ajouter un raccourci Alt+…]",
 	"menu.shortcuts.alt_group": "Raccourcis ⎇ Alt",
 	"menu.shortcuts.altgr_symbol": "AltGr + symbole",
-	"menu.shortcuts.wrap_symbols_title": "Symboles encadrant la sélection",
+	"menu.shortcuts.wrap_symbols_title": "↳ Symboles encadrant la sélection",
 	"menu.shortcuts.wrap_symbols_check_all": "Tout cocher",
 	"menu.shortcuts.wrap_symbols_uncheck_all": "Tout décocher",
 	"menu.shortcuts.wrap_symbols_add_custom": "[+ Ajouter un symbole…]",

@@ -195,6 +195,7 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 #Include lib/onboarding.ahk
 #Include lib/hotstrings/hotstrings_config.ahk
 #Include lib/hotstrings/hotstrings_config_window.ahk
+#Include lib/wrap_symbols_config.ahk
 #Include lib/ui_style.ahk
 #Include lib/tooltip.ahk
 #Include lib/llm_diff.ahk
@@ -332,6 +333,10 @@ global ConfigurationFile := _ConfigDir . _AhkSubDir . "config.toml"
 ; file. The override file lives in the same shared config directory used by
 ; Hammerspoon, so edits made from either menu apply to both at next reload.
 HotstringsConfigInit(_ConfigDir . "hotstrings_config.toml")
+; Load the user's wrap-symbol state (disabled set + custom pairs).
+; Must come before HotstringPrefixWatcherInit so _WS_ACTIVE_PAIRS is populated
+; before the InputHook starts intercepting keystrokes.
+WrapSymbols_Init(_ConfigDir)
 ; Apply the user's word-delimiter preference so HSE fires on the right chars.
 ; HotstringsGetWordDelimiters() returns the stored override or the canonical
 ; default — assigning it here replaces the compile-time constant in the engine.

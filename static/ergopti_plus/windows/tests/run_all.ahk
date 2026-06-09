@@ -232,6 +232,8 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 #Include meta/test_port_adapter_coverage.ahk
 #Include meta/test_no_class_global_conflict.ahk
 #Include meta/test_locale_json_valid.ahk
+#Include meta/test_wrap_symbols_gate.ahk
+#Include meta/test_wrap_symbols_catalogue.ahk
 ; ── Cross-driver corpus consumers ──
 #Include meta/test_corpus_hotstrings.ahk
 #Include meta/test_corpus_tap_hold.ahk

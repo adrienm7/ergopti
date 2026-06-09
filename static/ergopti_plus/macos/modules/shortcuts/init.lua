@@ -47,13 +47,14 @@ M.DEFAULT_STATE = {
 -- ========================================
 
 -- Proxy Bindings Methods
-M.DEFAULT_CHATGPT_URL = Bindings.DEFAULT_CHATGPT_URL
-M.list_shortcuts      = Bindings.list_shortcuts
-M.enable              = Bindings.enable
-M.disable             = Bindings.disable
-M.is_enabled          = Bindings.is_enabled
-M.start               = Bindings.start
-M.stop                = Bindings.stop
+M.DEFAULT_CHATGPT_URL    = Bindings.DEFAULT_CHATGPT_URL
+M.list_shortcuts         = Bindings.list_shortcuts
+M.enable                 = Bindings.enable
+M.disable                = Bindings.disable
+M.is_enabled             = Bindings.is_enabled
+M.start                  = Bindings.start
+M.stop                   = Bindings.stop
+M.set_wrap_pairs_getter  = Bindings.set_wrap_pairs_getter
 
 -- Proxy Script Control Methods
 M.ACTIONS               = ScriptControl.ACTIONS

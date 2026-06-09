@@ -1886,6 +1886,7 @@ _BuildShortcutsSubmenu() {
 		"script_control_shortcuts",   (M, C) => _SC_ScriptControl(M, C),
 		"extensions_shortcuts",       (M, C) => _SC_Extensions(M, C),
 		"edit_shortcuts",             (M, C) => _SC_EditAction(M, C),
+		"wrap_symbols_menu",          (M, C) => _SC_WrapSymbols(M, C),
 	)
 
 	return MenuRenderer_Build("shortcuts_menu", "Shortcuts", DynHandlers)
@@ -1959,6 +1960,126 @@ _SC_Extensions(SubMenu, _Cat) {
 ; Dynamic handler: edit personal shortcuts action button.
 _SC_EditAction(SubMenu, _Cat) {
 	RegisterMenuItem(SubMenu, t("menu.global.edit_shortcuts"), OpenPersonalShortcuts)
+}
+
+; Dynamic handler: wrap-symbols submenu (toggles per built-in symbol + custom pairs).
+; Attached as an indented sub-item directly below the wrap_text_if_selected feature row.
+_SC_WrapSymbols(SubMenu, _Cat) {
+	Sub := _WS_BuildSymbolsMenu()
+	SubMenu.Add(t("menu.shortcuts.wrap_symbols_title"), Sub)
+}
+
+; Build the full wrap-symbols menu (called by _SC_WrapSymbols and on every initMenu refresh).
+_WS_BuildSymbolsMenu() {
+	global _WS_BUILTIN_GROUPS, _WS_Custom
+	Sub := Menu()
+
+	; ── Bulk actions ─────────────────────────────────────────────────────────
+	RegisterMenuItem(Sub, t("menu.shortcuts.wrap_symbols_check_all"), (*) => _WS_MenuSetAll(true))
+	RegisterMenuItem(Sub, t("menu.shortcuts.wrap_symbols_uncheck_all"), (*) => _WS_MenuSetAll(false))
+	RegisterMenuItem(Sub, t("menu.global.reset_defaults"), (*) => _WS_MenuReset())
+	Sub.Add()
+
+	; ── Built-in symbols, grouped ────────────────────────────────────────────
+	; Iterate the shared catalogue's groups and insert a separator between each
+	; one, so the visual grouping defined in shared/wrap_symbols.json is mirrored
+	; here without any order hardcoded in this file.
+	for GroupIdx, Group in _WS_BUILTIN_GROUPS {
+		if (GroupIdx > 1) {
+			Sub.Add()
+		}
+		for _, Pair in Group {
+			L := Pair["left"]
+			R := Pair["right"]
+			; Display label: "( … )" for asymmetric, "@" for symmetric
+			Lbl := (L != R) ? (L . " … " . R) : L
+			Enabled := WrapSymbols_IsEnabled(L)
+			; Capture L in closure so the lambda references the right char
+			RegisterMenuItem(Sub, Lbl, ((Ch) => (*) => _WS_MenuToggle(Ch))(L))
+			if Enabled {
+				Sub.Check(Lbl)
+			}
+		}
+	}
+
+	; ── Custom symbols ───────────────────────────────────────────────────────
+	if (_WS_Custom.Length > 0) {
+		Sub.Add()
+		for Idx, Pair in _WS_Custom {
+			L := Pair["left"]
+			R := Pair["right"]
+			Lbl := ((L != R) ? (L . " … " . R) : L) . " — " . t("menu.shortcuts.wrap_symbols_custom_label")
+			DelSub := Menu()
+			RegisterMenuItem(DelSub, t("button.delete"), ((I) => (*) => _WS_MenuRemoveCustom(I))(Idx))
+			Sub.Add(Lbl, DelSub)
+			Sub.Check(Lbl)
+		}
+	}
+
+	; ── Add custom ───────────────────────────────────────────────────────────
+	Sub.Add()
+	RegisterMenuItem(Sub, t("menu.shortcuts.wrap_symbols_add_custom"), (*) => _WS_MenuAddCustom())
+
+	return Sub
+}
+
+; Toggle a built-in symbol and refresh the tray.
+_WS_MenuToggle(OpenChar) {
+	WrapSymbols_Toggle(OpenChar)
+	RebuildTrayMenu()
+}
+
+; Enable or disable all built-in symbols, then refresh.
+_WS_MenuSetAll(Enable) {
+	if Enable {
+		WrapSymbols_EnableAll()
+	} else {
+		WrapSymbols_DisableAll()
+	}
+	RebuildTrayMenu()
+}
+
+; Reset to factory defaults, then refresh.
+_WS_MenuReset() {
+	WrapSymbols_Reset()
+	RebuildTrayMenu()
+}
+
+; Remove a custom symbol pair (1-based index), then refresh.
+_WS_MenuRemoveCustom(Idx) {
+	WrapSymbols_RemoveCustom(Idx)
+	RebuildTrayMenu()
+}
+
+; Open a two-step GUI dialog to add a custom wrap-symbol pair.
+_WS_MenuAddCustom() {
+	; Step 1 — opening character
+	IB1 := InputBox(t("dialog.shortcuts.wrap_symbol_prompt"), t("dialog.shortcuts.wrap_symbol_title"), "w360 h140")
+	if (IB1.Result != "OK") {
+		return
+	}
+	LeftChar := Trim(IB1.Value, " `t")
+	if (StrLen(LeftChar) != 1) {
+		MsgBox(t("dialog.shortcuts.wrap_symbol_invalid"), t("dialog.shortcuts.wrap_symbol_title"), "Icon!")
+		return
+	}
+
+	; Step 2 — closing character (optional — empty means symmetric)
+	IB2 := InputBox(t("dialog.shortcuts.wrap_symbol_close_prompt"), t("dialog.shortcuts.wrap_symbol_close_title"), "w360 h140")
+	if (IB2.Result != "OK") {
+		return
+	}
+	RightChar := Trim(IB2.Value, " `t")
+	if (RightChar != "" and StrLen(RightChar) != 1) {
+		MsgBox(t("dialog.shortcuts.wrap_symbol_invalid"), t("dialog.shortcuts.wrap_symbol_close_title"), "Icon!")
+		return
+	}
+	if (RightChar == "") {
+		RightChar := LeftChar
+	}
+
+	WrapSymbols_AddCustom(LeftChar, RightChar)
+	RebuildTrayMenu()
 }
 
 ; Build the TapHolds submenu — one entry per physical key, each with a

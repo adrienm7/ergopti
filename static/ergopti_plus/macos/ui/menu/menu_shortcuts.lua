@@ -17,6 +17,7 @@ local hs = hs
 local Logger        = require("lib.logger")
 local dialog        = require("lib.dialog_util")
 local shortcuts_mod = require("modules.shortcuts")
+local text_acts     = require("modules.shortcuts.actions.text")
 local i18n          = require("lib.i18n")
 local ManifestMenu  = require("lib.manifest_menu")
 local LOG           = "menu_shortcuts"
@@ -31,8 +32,12 @@ local LOG           = "menu_shortcuts"
 -- ================================
 
 M.DEFAULT_STATE = {
-	chatgpt_url = shortcuts_mod.DEFAULT_STATE.chatgpt_url,
-	shortcuts   = shortcuts_mod.DEFAULT_STATE.shortcuts,
+	chatgpt_url          = shortcuts_mod.DEFAULT_STATE.chatgpt_url,
+	shortcuts            = shortcuts_mod.DEFAULT_STATE.shortcuts,
+	-- symbol_states: map from opening symbol → boolean (nil / true = enabled, false = disabled).
+	-- custom_wrap_symbols: array of {left, right} pairs added by the user.
+	wrap_symbol_states   = {},
+	custom_wrap_symbols  = {},
 }
 
 
@@ -101,6 +106,169 @@ local function make_shortcut_item(s, shortcuts, ctx)
 			end
 		end)(s.id) or nil,
 	}
+end
+
+-- Flattened, order-preserving list of unique opening symbols, derived from the
+-- shared catalogue's groups (text_acts.WRAP_GROUPS). Used by the bulk check/
+-- uncheck-all actions; the per-symbol menu rows iterate the groups directly so
+-- the shared grouping and order are mirrored without being hardcoded here.
+local _BUILTIN_SYMBOLS = (function()
+	local seen, out = {}, {}
+	for _, group in ipairs(text_acts.WRAP_GROUPS or {}) do
+		for _, pair in ipairs(group) do
+			if not seen[pair.left] then
+				seen[pair.left] = true
+				table.insert(out, pair)
+			end
+		end
+	end
+	return out
+end)()
+
+--- Builds the "Symboles encadrant la sélection" submenu and wires the live getter.
+--- @param ctx table Menu context.
+--- @param state table Mutable state table (uses state.wrap_symbol_states, state.custom_wrap_symbols).
+--- @param paused boolean Whether the script is currently paused.
+--- @param shortcuts table The shortcuts module (for set_wrap_pairs_getter).
+--- @return table hs.menubar submenu items list.
+local function build_wrap_symbols_submenu(ctx, state, paused, shortcuts)
+	local sym_states   = type(state.wrap_symbol_states)  == "table" and state.wrap_symbol_states  or {}
+	local custom_syms  = type(state.custom_wrap_symbols) == "table" and state.custom_wrap_symbols or {}
+
+	-- Wire the live getter so the eventtap always reflects current state
+	if type(shortcuts.set_wrap_pairs_getter) == "function" then
+		pcall(shortcuts.set_wrap_pairs_getter, function()
+			return text_acts.build_active_wrap_pairs(
+				state.wrap_symbol_states  or {},
+				state.custom_wrap_symbols or {}
+			)
+		end)
+	end
+
+	local sub = {}
+
+	-- Bulk actions
+	sub[#sub + 1] = {
+		title    = i18n.get("menu.shortcuts.wrap_symbols_check_all"),
+		disabled = paused or nil,
+		fn       = not paused and function()
+			for _, pair in ipairs(_BUILTIN_SYMBOLS) do sym_states[pair.left] = true end
+			state.wrap_symbol_states = sym_states
+			ctx.save_prefs(); ctx.updateMenu()
+		end or nil,
+	}
+	sub[#sub + 1] = {
+		title    = i18n.get("menu.shortcuts.wrap_symbols_uncheck_all"),
+		disabled = paused or nil,
+		fn       = not paused and function()
+			for _, pair in ipairs(_BUILTIN_SYMBOLS) do sym_states[pair.left] = false end
+			state.wrap_symbol_states = sym_states
+			ctx.save_prefs(); ctx.updateMenu()
+		end or nil,
+	}
+	sub[#sub + 1] = {
+		title    = i18n.get("menu.global.reset_defaults"),
+		disabled = paused or nil,
+		fn       = not paused and function()
+			state.wrap_symbol_states  = {}
+			state.custom_wrap_symbols = {}
+			ctx.save_prefs(); ctx.updateMenu()
+		end or nil,
+	}
+	sub[#sub + 1] = { title = "-" }
+
+	-- Built-in symbols — one toggle per opening symbol, grouped exactly as the
+	-- shared catalogue (text_acts.WRAP_GROUPS) defines, with a separator between
+	-- consecutive groups so the visual grouping is not hardcoded in this file.
+	for gi, group in ipairs(text_acts.WRAP_GROUPS or {}) do
+		if gi > 1 then sub[#sub + 1] = { title = "-" } end
+		for _, pair in ipairs(group) do
+			local enabled = (sym_states[pair.left] ~= false)
+			local lbl = (pair.left == pair.right)
+					and pair.left
+					or  (pair.left .. " … " .. pair.right)
+			sub[#sub + 1] = {
+				title    = lbl,
+				checked  = (enabled and not paused) or nil,
+				disabled = paused or nil,
+				fn       = not paused and (function(k)
+					return function()
+						state.wrap_symbol_states      = state.wrap_symbol_states or {}
+						state.wrap_symbol_states[k]   = not (state.wrap_symbol_states[k] ~= false)
+						ctx.save_prefs(); ctx.updateMenu()
+					end
+				end)(pair.left) or nil,
+			}
+		end
+	end
+
+	-- Custom symbols — individual entries with a delete submenu
+	if #custom_syms > 0 then
+		sub[#sub + 1] = { title = "-" }
+		for idx, cs in ipairs(custom_syms) do
+			if type(cs) == "table" and type(cs.left) == "string" and cs.left ~= "" then
+				local right   = (type(cs.right) == "string" and cs.right ~= "") and cs.right or cs.left
+				local cs_lbl  = (cs.left == right) and cs.left or (cs.left .. " … " .. right)
+				cs_lbl = cs_lbl .. " : " .. i18n.get("menu.shortcuts.wrap_symbols_custom_label")
+				local del_sub = {
+					{
+						title = i18n.get("button.delete"),
+						fn    = (function(i) return function()
+							table.remove(state.custom_wrap_symbols, i)
+							ctx.save_prefs(); ctx.updateMenu()
+						end end)(idx),
+					},
+				}
+				sub[#sub + 1] = { title = cs_lbl, menu = del_sub }
+			end
+		end
+	end
+
+	-- Add custom symbol button
+	sub[#sub + 1] = { title = "-" }
+	sub[#sub + 1] = {
+		title    = i18n.get("menu.shortcuts.wrap_symbols_add_custom"),
+		disabled = paused or nil,
+		fn       = not paused and function()
+			-- 1. Ask for opening symbol
+			local left_char
+			while true do
+				local ok_p, btn, raw = pcall(dialog.text_prompt,
+					i18n.get("dialog.shortcuts.wrap_symbol_title"),
+					i18n.get("dialog.shortcuts.wrap_symbol_prompt"),
+					"", i18n.get("button.ok"), i18n.get("button.cancel")
+				)
+				if not ok_p or btn ~= i18n.get("button.ok") or type(raw) ~= "string" then return end
+				local first = raw:match("^([%z\1-\127\194-\244][\128-\191]*)")
+				if first and first == raw and first ~= "" then left_char = first; break end
+				dialog.block_alert(
+					i18n.get("dialog.shortcuts.wrap_symbol_title"),
+					i18n.get("dialog.shortcuts.wrap_symbol_invalid"),
+					i18n.get("button.retry")
+				)
+			end
+			-- 2. Ask for closing symbol (optional — empty = symmetric)
+			local right_char
+			local ok_r, btn_r, raw_r = pcall(dialog.text_prompt,
+				i18n.get("dialog.shortcuts.wrap_symbol_close_title"),
+				i18n.get("dialog.shortcuts.wrap_symbol_close_prompt"),
+				"", i18n.get("button.ok"), i18n.get("button.cancel")
+			)
+			if not ok_r or btn_r ~= i18n.get("button.ok") then return end
+			if type(raw_r) == "string" and raw_r ~= "" then
+				local first_r = raw_r:match("^([%z\1-\127\194-\244][\128-\191]*)")
+				right_char = (first_r and first_r == raw_r) and first_r or left_char
+			else
+				right_char = left_char
+			end
+			-- 3. Persist
+			if type(state.custom_wrap_symbols) ~= "table" then state.custom_wrap_symbols = {} end
+			table.insert(state.custom_wrap_symbols, { left = left_char, right = right_char })
+			ctx.save_prefs(); ctx.updateMenu()
+		end or nil,
+	}
+
+	return sub
 end
 
 --- Builds the shortcuts sub-menu.
@@ -359,6 +527,9 @@ function M.build(ctx)
 	end
 	if wrap_item then
 		if #top_items > 0 then table.insert(top_items, { title = "-" }) end
+		-- Attach the symbols submenu so the user can toggle/add/remove symbols,
+		-- and wire the live getter into the eventtap at build time.
+		wrap_item.menu = build_wrap_symbols_submenu(ctx, state, paused, shortcuts)
 		table.insert(top_items, wrap_item)
 	end
 
