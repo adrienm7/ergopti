@@ -125,6 +125,7 @@ InstallSendNoOps()
 #Include test_logger.ahk
 #Include test_logger_contract.ahk
 #Include test_tooltip_tint_contract.ahk
+#Include test_tooltip_dequeue_regression.ahk
 #Include test_hotstring_engine.ahk
 #Include test_hotstring_engine_main.ahk
 #Include test_domain_registry.ahk

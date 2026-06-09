@@ -647,11 +647,18 @@ _TooltipDequeueRebuild(Items) {
 
     MaxMs := 0
     Now := A_TickCount
-    for , Item in _TooltipDequeueItems {
-        if (Item.ExpireMs > 0) {
-            Remaining := Max(50, Item.ExpireMs - Now)
-            if (Remaining > MaxMs)
-                MaxMs := Remaining
+    ; Snapshot before iterating — _TooltipDequeueItems may have been reset to 0
+    ; by a concurrent TooltipHide() (e.g. the safety timer firing between the
+    ; _TooltipBuildGui call above and this point). Iterating 0 throws
+    ; "Value not enumerable", which is the crash reported by the user.
+    DequeueSnapshot := _TooltipDequeueItems
+    if IsObject(DequeueSnapshot) {
+        for , Item in DequeueSnapshot {
+            if (Item.ExpireMs > 0) {
+                Remaining := Max(50, Item.ExpireMs - Now)
+                if (Remaining > MaxMs)
+                    MaxMs := Remaining
+            }
         }
     }
     if (MaxMs > 0)
