@@ -938,6 +938,7 @@ LoggerSuccess("KeyboardShortcuts", "Configurable hotkeys registered (%d active).
 
 CS_Load()
 global _SaveFullConfigReady := true
+global _ParseExtTomlSectionsCache := Map()
 if MetricsShortcuts.enabled
     WPMWidget_LoadConfig(_IniCache)
 
@@ -978,7 +979,8 @@ _SetPersonalDefaultSection(SecName, PersonalMenu, TomlData, DefaultSectionMenu) 
     _EditorPrefSet("DefaultSection", SecName)
     DefaultSectionMenu.Uncheck(t("menu.hotstrings.default_none"))
     for _, SN in TomlData["sections_order"] {
-        if (SN == "-") { continue }
+        if (SN == "-")
+            continue
         SD := TomlData["sections"][SN]
         try DefaultSectionMenu.Uncheck(SD["description"])
     }
@@ -1013,8 +1015,6 @@ _MakeOpenFileFn(FilePath) {
     return (*) => Run(FilePath)
 }
 
-global _ParseExtTomlSectionsCache := Map()
-
 _ParseExtTomlSections(FilePath) {
     global _ParseExtTomlSectionsCache
     if _ParseExtTomlSectionsCache.Has(FilePath)
@@ -1039,7 +1039,8 @@ _ParseExtTomlSections(FilePath) {
             InMetaSections := false
             continue
         }
-        if !InMetaSections { continue }
+        if !InMetaSections
+            continue
         if RegExMatch(Trimmed, '^([A-Za-z0-9_]+)\s*=\s*"((?:[^"\\]|\\.)*)"', &KM) {
             SectionKey := StrLower(KM[1])
             SectionDescs[SectionKey] := KM[2]
@@ -1084,18 +1085,20 @@ _ParseExtTomlSections(FilePath) {
 }
 
 _HS_BubbleSort(Array) {
-    n := Array.Length
-    if (n < 2)
-        return
-    Loop n - 1 {
-        i := A_Index
-        Loop n - i {
-            j := A_Index
-            if (StrCompare(Array[j], Array[j + 1], false) > 0) {
-                Tmp := Array[j]; Array[j] := Array[j + 1]; Array[j + 1] := Tmp
-            }
-        }
-    }
+	n := Array.Length
+	if (n < 2)
+		return
+	Loop n - 1 {
+		i := A_Index
+		Loop n - i {
+			j := A_Index
+			if (StrCompare(Array[j], Array[j + 1], false) > 0) {
+				Tmp := Array[j]
+				Array[j] := Array[j + 1]
+				Array[j + 1] := Tmp
+			}
+		}
+	}
 }
 
 MagicKeyEditor(*) {
@@ -1104,7 +1107,9 @@ MagicKeyEditor(*) {
     GuiToShow.Add("Text", "w300", t("button.cancel") . " → Echap")
     GuiToShow.Show("Center")
     IH := InputHook("L1 I", "{Escape}")
-    IH.Start(); IH.Wait(); GuiToShow.Destroy()
+    IH.Start()
+    IH.Wait()
+    GuiToShow.Destroy()
     if (IH.EndReason = "Stopped" && IH.Input != "")
         ModifyMagicKey(0, IH.Input)
 }
@@ -1116,7 +1121,8 @@ ModifyMagicKey(gui, NewValue) {
         Features["hotstrings"]["trigger_char"] := NewValue
     }
     TOML_Write(NewValue, ConfigurationFile, "hotstrings", "trigger_char")
-    if (gui != 0) { gui.Destroy() }
+    if (gui != 0)
+        gui.Destroy()
     Reload
 }
 
@@ -1156,7 +1162,8 @@ ProcessUserInput(gui, edits) {
     for key, editControl in edits {
         NewValue := editControl.Text
         OldValue := PersonalInformation.Has(key) ? PersonalInformation[key] : ""
-        if (NewValue != OldValue) { changed[key] := True }
+        if (NewValue != OldValue)
+            changed[key] := True
         PersonalInformation[key] := NewValue
     }
     WritePersonalInfoToml(ScriptInformation["PersonalInfoTomlPath"])
@@ -1165,7 +1172,9 @@ ProcessUserInput(gui, edits) {
     for key, _ in edits {
         NewValue := PersonalInformation[key]
         line := key ": " NewValue "`n"
-        if changed.Has(key) { PersonalInformationSummary := PersonalInformationSummary line }
+        if changed.Has(key) {
+            PersonalInformationSummary := PersonalInformationSummary line
+        }
     }
     MsgBox(t("dialog.personal_info.saved") "`n`n" PersonalInformationSummary)
     Reload
@@ -1188,7 +1197,8 @@ ModifyLink(gui, NewValue) {
         Features["shortcuts"]["gpt"]["link"] := NewValue
     }
     TOML_Write(NewValue, ConfigurationFile, "ahk.shortcuts.gpt", "link")
-    gui.Destroy(); Reload
+    gui.Destroy()
+    Reload
 }
 
 global _FmtCountCache := Map()
@@ -1196,17 +1206,21 @@ FmtCount(N) {
     global _FmtCountCache
     if _FmtCountCache.Has(N)
         return _FmtCountCache[N]
-    S := String(Round(N)); Result := ""; Len := StrLen(S)
+    S := String(Round(N))
+    Result := ""
+    Len := StrLen(S)
     loop Len {
         i := A_Index
         Result := SubStr(S, Len - i + 1, 1) . Result
-        if (Mod(i, 3) == 0 and i < Len) { Result := " " . Result }
+        if (Mod(i, 3) == 0 and i < Len)
+            Result := " " . Result
     }
     _FmtCountCache[N] := Result
     return Result
 }
 
-NoAction(*) {}
+NoAction(*) {
+}
 
 MenuSectionTitle(Text) {
     return "— " . Text . " —"
@@ -1229,11 +1243,17 @@ _GlobalRestoreFactoryBindings() {
         for Slot in GESTURE_SLOTS
             GestureAssignments[Slot] := GESTURE_FACTORY_DEFAULTS.Has(Slot) ? GESTURE_FACTORY_DEFAULTS[Slot] : "none"
     }
-    for Slot, Action in KEYBOARD_SHORTCUT_DEFAULTS { KeyboardShortcutAssignments[Slot] := Action }
-    for Slot in SCRIPT_SHORTCUT_SLOTS { ScriptShortcutAssignments[Slot] := SCRIPT_SHORTCUT_DEFAULTS[Slot] }
-    for Category, _ in CategoryEnabled { CategoryEnabled[Category] := true }
+    for Slot, Action in KEYBOARD_SHORTCUT_DEFAULTS
+        KeyboardShortcutAssignments[Slot] := Action
+    for Slot in SCRIPT_SHORTCUT_SLOTS
+        ScriptShortcutAssignments[Slot] := SCRIPT_SHORTCUT_DEFAULTS[Slot]
+    for Category, _ in CategoryEnabled
+        CategoryEnabled[Category] := true
     Path := _ConfigDir . _AhkSubDir . "tap_hold.toml"
-    try { if FileExist(Path) { FileDelete(Path) } }
+    try {
+        if FileExist(Path)
+            FileDelete(Path)
+    }
 }
 
 _GlobalClearAllBindings(&Updates) {
@@ -1260,37 +1280,52 @@ _GlobalClearAllBindings(&Updates) {
         ScriptShortcutAssignments[Slot] := "none"
         Updates.Push({ Section: "ahk.shortcuts.script_control", Key: Slot, Value: "none" })
     }
-    if IsSet(_TH_WriteTapHoldDisabled) { try _TH_WriteTapHoldDisabled() }
+    if IsSet(_TH_WriteTapHoldDisabled)
+        try _TH_WriteTapHoldDisabled()
 }
 
 ToggleAllFeatures(Value) {
     global Features, CategoryEnabled, ConfigurationFile
-    if !IsSet(Features) { return }
-    Bool := (Value = true or Value = 1); Updates := []
+    if !IsSet(Features)
+        return
+    Bool := (Value = true or Value = 1)
+    Updates := []
     EmitFlip(SectionPath, Node) {
-        if (Type(Node) != "Map") { return }
+        if (Type(Node) != "Map")
+            return
         if Node.Has("enabled") and (Type(Node["enabled"]) != "Map") {
             Node["enabled"] := Bool
             Updates.Push({ Section: SectionPath, Key: "enabled", Value: Bool })
             return
         }
         for K, V in Node {
-            if (Type(V) == "Map") { EmitFlip(SectionPath . "." . K, V) }
-            else { Node[K] := Bool; Updates.Push({ Section: SectionPath, Key: K, Value: Bool }) }
+            if (Type(V) == "Map")
+                EmitFlip(SectionPath . "." . K, V)
+            else {
+                Node[K] := Bool
+                Updates.Push({ Section: SectionPath, Key: K, Value: Bool })
+            }
         }
     }
     if (!Bool) {
-        for TopKey, TopVal in Features { if (Type(TopVal) == "Map") { EmitFlip(TopKey, TopVal) } }
+        for TopKey, TopVal in Features {
+            if (Type(TopVal) == "Map")
+            EmitFlip(TopKey, TopVal)
+        }
     } else {
         for TopKey, TopVal in Features {
-            if (Type(TopVal) != "Map") { continue }
+            if (Type(TopVal) != "Map")
+                continue
             for K, V in TopVal {
                 if (Type(V) == "Map") {
                     if V.Has("enabled") and (Type(V["enabled"]) != "Map") {
                         V["enabled"] := true
                         Updates.Push({ Section: TopKey . "." . K, Key: "enabled", Value: true })
                     }
-                } else { TopVal[K] := true; Updates.Push({ Section: TopKey, Key: K, Value: true }) }
+                } else {
+                    TopVal[K] := true
+                    Updates.Push({ Section: TopKey, Key: K, Value: true })
+                }
             }
         }
     }
@@ -1298,22 +1333,31 @@ ToggleAllFeatures(Value) {
         CategoryEnabled[Category] := Bool
         Updates.Push({ Section: "ahk.category_enabled", Key: _CategoryEnabledKey(Category), Value: Bool })
     }
-    WPMWidget.visible := Bool; WPMWidget.use_colors := Bool; WPMWidget.show_graph := Bool
+    WPMWidget.visible := Bool
+    WPMWidget.use_colors := Bool
+    WPMWidget.show_graph := Bool
     Updates.Push({ Section: "ahk.metrics", Key: WPMWidgetConst.CFG_VISIBLE, Value: Bool ? "1" : "0" })
     Updates.Push({ Section: "ahk.metrics", Key: WPMWidgetConst.CFG_COLORS,  Value: Bool ? "1" : "0" })
     Updates.Push({ Section: "ahk.metrics", Key: WPMWidgetConst.CFG_GRAPH,   Value: Bool ? "1" : "0" })
-    if !Bool { _GlobalClearAllBindings(Updates) }
+    if !Bool
+        _GlobalClearAllBindings(Updates)
     TOML_BatchWrite(ConfigurationFile, Updates)
     if Bool {
         HsBatch := []
-        for V1Path in _CollectAllHotstringsV1Paths() { HsBatch.Push(Map("v1_path", V1Path . ".Enabled", "value", true)) }
-        if (HsBatch.Length > 0) { WriteFeatureBatch(HsBatch) }
+        for V1Path in _CollectAllHotstringsV1Paths()
+            HsBatch.Push(Map("v1_path", V1Path . ".Enabled", "value", true))
+        if (HsBatch.Length > 0)
+            WriteFeatureBatch(HsBatch)
     }
     Reload
 }
 
-ToggleAllHotstringsOn(*) { ToggleAllHotstrings(1) }
-ToggleAllHotstringsOff(*) { ToggleAllHotstrings(0) }
+ToggleAllHotstringsOn(*) {
+    ToggleAllHotstrings(1)
+}
+ToggleAllHotstringsOff(*) {
+    ToggleAllHotstrings(0)
+}
 ToggleAllHotstrings(Value) {
     global CategoryEnabled, ConfigurationFile
     Bool := (Value = true or Value = 1)
@@ -1321,20 +1365,24 @@ ToggleAllHotstrings(Value) {
     TOML_Write(Bool, ConfigurationFile, "ahk.category_enabled", "hotstrings")
     if Bool {
         Batch := []
-        for V1Path in _CollectAllHotstringsV1Paths() { Batch.Push(Map("v1_path", V1Path . ".Enabled", "value", true)) }
-        if (Batch.Length > 0) { WriteFeatureBatch(Batch) }
+        for V1Path in _CollectAllHotstringsV1Paths()
+            Batch.Push(Map("v1_path", V1Path . ".Enabled", "value", true))
+        if (Batch.Length > 0)
+            WriteFeatureBatch(Batch)
     }
     Reload
 }
 
 IsCategoryAllEnabled(Categories) {
-    if (Categories.Length == 0) { return true }
+    if (Categories.Length == 0)
+        return true
     return IsCategoryGated(Categories[1])
 }
 
 ToggleCategoryAllFeatures(Category, Value) {
     global CategoryEnabled, ConfigurationFile
-    Bool := (Value = true or Value = 1); CategoryEnabled[Category] := Bool
+    Bool := (Value = true or Value = 1)
+    CategoryEnabled[Category] := Bool
     TOML_Write(Bool, ConfigurationFile, "ahk.category_enabled", _CategoryEnabledKey(Category))
     Reload
 }
@@ -1352,7 +1400,8 @@ _CategoryEnabledKey(Category) {
 SaveFullConfig() {
     global Features, ScriptInformation, ScriptShortcutAssignments, GestureAssignments, KeyboardShortcutAssignments, ConfigurationFile, _TOML_STRICT_CANON_IN_PROGRESS, PrevCanonState
     Updates := []
-    if IsSet(_LLM_Tray_SyncToFeatures) { _LLM_Tray_SyncToFeatures() }
+    if IsSet(_LLM_Tray_SyncToFeatures)
+        _LLM_Tray_SyncToFeatures()
     if IsSet(Features) {
         _CollectFeatureUpdates(Updates, "", Features)
         Updates.Push({ Section: "_meta", Key: "schema_version", Value: 2 })
@@ -1361,11 +1410,21 @@ SaveFullConfig() {
     global LOGGER_MIN_LEVEL, LOGGER_DEFAULT_LEVEL
     Updates.Push({ Section: "script", Key: "log_level", Value: IsSet(LOGGER_MIN_LEVEL) ? LOGGER_MIN_LEVEL : LOGGER_DEFAULT_LEVEL })
     Updates.Push({ Section: "hotstrings", Key: "trigger_char", Value: ScriptInformation["MagicKey"] })
-    if IsSet(ScriptShortcutAssignments) { for Slot, Action in ScriptShortcutAssignments { Updates.Push({ Section: "ahk.shortcuts.script_control", Key: Slot, Value: Action }) } }
-    if IsSet(KeyboardShortcutAssignments) { for Slot, Action in KeyboardShortcutAssignments { Updates.Push({ Section: "ahk.shortcuts.keyboard", Key: Slot, Value: Action }) } }
-    if IsSet(GestureAssignments) { for Slot, Action in GestureAssignments { Updates.Push({ Section: "ahk.gestures", Key: Slot, Value: Action }) } }
+    if IsSet(ScriptShortcutAssignments) {
+        for Slot, Action in ScriptShortcutAssignments
+            Updates.Push({ Section: "ahk.shortcuts.script_control", Key: Slot, Value: Action })
+    }
+    if IsSet(KeyboardShortcutAssignments) {
+        for Slot, Action in KeyboardShortcutAssignments
+            Updates.Push({ Section: "ahk.shortcuts.keyboard", Key: Slot, Value: Action })
+    }
+    if IsSet(GestureAssignments) {
+        for Slot, Action in GestureAssignments
+            Updates.Push({ Section: "ahk.gestures", Key: Slot, Value: Action })
+    }
     apps := []
-    for proc, _ in MetricsFilters.disabled_apps { apps.Push(proc) }
+    for proc, _ in MetricsFilters.disabled_apps
+        apps.Push(proc)
     Updates.Push({ Section: "ahk.metrics", Key: "metrics_enabled", Value: MetricsShortcuts.enabled })
     Updates.Push({ Section: "ahk.metrics", Key: "metrics_shortcut_typing", Value: MetricsShortcuts.typing_str })
     Updates.Push({ Section: "ahk.metrics", Key: "metrics_shortcut_apps", Value: MetricsShortcuts.apps_str })
@@ -1383,39 +1442,59 @@ SaveFullConfig() {
     Updates.Push({ Section: "llm", Key: "onboarding_seen", Value: _LLM_Tray["onboarding_seen"] ? "1" : "0" })
     _AppOverridesStr := ""
     for _AppName, _AppProfileId in _LLM_Tray["app_profile_overrides"] {
-        if (_AppOverridesStr != "") { _AppOverridesStr .= ";" }
+        if (_AppOverridesStr != "")
+            _AppOverridesStr .= ";"
         _AppOverridesStr .= _AppName . "=" . _AppProfileId
     }
     Updates.Push({ Section: "llm", Key: "app_profile_overrides", Value: _AppOverridesStr })
-    if IsSet(_LLM_Tray_AppendPersistedUpdates) { _LLM_Tray_AppendPersistedUpdates(Updates) }
+    if IsSet(_LLM_Tray_AppendPersistedUpdates)
+        _LLM_Tray_AppendPersistedUpdates(Updates)
     global CategoryEnabled
-    if IsSet(CategoryEnabled) { for _CatName, _CatBool in CategoryEnabled { Updates.Push({ Section: "ahk.category_enabled", Key: _CategoryEnabledKey(_CatName), Value: _CatBool }) } }
+    if IsSet(CategoryEnabled) {
+        for _CatName, _CatBool in CategoryEnabled
+            Updates.Push({ Section: "ahk.category_enabled", Key: _CategoryEnabledKey(_CatName), Value: _CatBool })
+    }
     global UPDATER_CHANNEL, UPDATER_CHECK_INTERVAL, UPDATER_INI_SECTION, UPDATER_INI_KEY, UPDATER_INI_INTERVAL_KEY
-    if IsSet(UPDATER_CHECK_INTERVAL) { Updates.Push({ Section: UPDATER_INI_SECTION, Key: UPDATER_INI_INTERVAL_KEY, Value: UPDATER_CHECK_INTERVAL }) }
-    if IsSet(UPDATER_CHANNEL) { Updates.Push({ Section: UPDATER_INI_SECTION, Key: UPDATER_INI_KEY, Value: UPDATER_CHANNEL }) }
-    if FileExist(ConfigurationFile) { try FileDelete(ConfigurationFile) }
-    PrevCanonState := _TOML_STRICT_CANON_IN_PROGRESS; _TOML_STRICT_CANON_IN_PROGRESS := true
-    try { TOML_BatchWrite(ConfigurationFile, Updates) }
-    finally { _TOML_STRICT_CANON_IN_PROGRESS := PrevCanonState }
+    if IsSet(UPDATER_CHECK_INTERVAL)
+        Updates.Push({ Section: UPDATER_INI_SECTION, Key: UPDATER_INI_INTERVAL_KEY, Value: UPDATER_CHECK_INTERVAL })
+    if IsSet(UPDATER_CHANNEL)
+        Updates.Push({ Section: UPDATER_INI_SECTION, Key: UPDATER_INI_KEY, Value: UPDATER_CHANNEL })
+    if FileExist(ConfigurationFile)
+        try FileDelete(ConfigurationFile)
+    PrevCanonState := _TOML_STRICT_CANON_IN_PROGRESS
+    _TOML_STRICT_CANON_IN_PROGRESS := true
+    try {
+        TOML_BatchWrite(ConfigurationFile, Updates)
+    } finally {
+        _TOML_STRICT_CANON_IN_PROGRESS := PrevCanonState
+    }
     TOML_FormatViaScript(ConfigurationFile)
 }
 
 _CollectFeatureUpdates(Updates, SectionPath, Node) {
-    if (Type(Node) != "Map") { return }
+    if (Type(Node) != "Map")
+        return
     for Key, Value in Node {
-        if (SectionPath == "" and Type(Value) != "Map") { continue }
+        if (SectionPath == "" and Type(Value) != "Map")
+            continue
         Sub := (SectionPath == "") ? Key : SectionPath "." Key
-        if (Type(Value) == "Map") { _CollectFeatureUpdates(Updates, Sub, Value) }
-        else { Updates.Push({ Section: SectionPath, Key: Key, Value: Value }) }
+        if (Type(Value) == "Map")
+            _CollectFeatureUpdates(Updates, Sub, Value)
+        else
+            Updates.Push({ Section: SectionPath, Key: Key, Value: Value })
     }
 }
 
 ReloadWithDefaultConfig(*) {
-    global _ConfigDir, _AhkSubDir; _GlobalRestoreFactoryBindings()
+    global _ConfigDir, _AhkSubDir
+    _GlobalRestoreFactoryBindings()
     AhkDir := _ConfigDir . _AhkSubDir
     for FileName in ["config.toml", "tap_hold.toml", "api_entries.json"] {
         Path := AhkDir . FileName
-        try { if FileExist(Path) { FileDelete(Path) } }
+        try {
+            if FileExist(Path)
+                FileDelete(Path)
+        }
     }
     Reload
 }
@@ -1431,16 +1510,24 @@ ReadScriptShortcutsConfig() {
 
 ResetScriptComboKeys(SuffixSC) {
     global _ALTGR_KANA_FIXUP
-    if !(IsSet(_ALTGR_KANA_FIXUP) and _ALTGR_KANA_FIXUP) { return }
+    if !(IsSet(_ALTGR_KANA_FIXUP) and _ALTGR_KANA_FIXUP)
+        return
     KeyWait(SuffixSC, "T2")
-    if !GetKeyState(SuffixSC, "P") { SendEvent("{SC138 Up}") }
+    if !GetKeyState(SuffixSC, "P")
+        SendEvent("{SC138 Up}")
 }
 
 RunScriptShortcutAction(Slot) {
     global ScriptShortcutAssignments, GESTURE_ACTIONS, SCRIPT_SHORTCUT_FALLBACKS
     Action := ScriptShortcutAssignments.Has(Slot) ? ScriptShortcutAssignments[Slot] : "none"
-    if (Action == "none") { SendInput(SCRIPT_SHORTCUT_FALLBACKS[Slot]); return }
-    if !GESTURE_ACTIONS.Has(Action) { SendInput(SCRIPT_SHORTCUT_FALLBACKS[Slot]); return }
+    if (Action == "none") {
+        SendInput(SCRIPT_SHORTCUT_FALLBACKS[Slot])
+        return
+    }
+    if !GESTURE_ACTIONS.Has(Action) {
+        SendInput(SCRIPT_SHORTCUT_FALLBACKS[Slot])
+        return
+    }
     GESTURE_ACTIONS[Action].Fn.Call()
 }
 
@@ -1465,21 +1552,30 @@ BuildScriptShortcutsMenu() {
 
 _KeyboardSlotSendCode(SlotId) {
     global KEYBOARD_SHORTCUT_SEND_CODES
-    if KEYBOARD_SHORTCUT_SEND_CODES.Has(SlotId) { return KEYBOARD_SHORTCUT_SEND_CODES[SlotId] }
-    if SubStr(SlotId, 1, 10) = "ctrl_shift" { Mod := "^+" }
-    else if SubStr(SlotId, 1, 4) = "ctrl" { Mod := "^" }
-    else if SubStr(SlotId, 1, 3) = "win" { Mod := "#" }
-    else if SubStr(SlotId, 1, 3) = "alt" { Mod := "!" }
-    else { return "" }
-    if SubStr(SlotId, 1, 10) = "ctrl_shift" { Suffix := SubStr(SlotId, 12) }
-    else { Suffix := SubStr(SlotId, InStr(SlotId, "_") + 1) }
+    if KEYBOARD_SHORTCUT_SEND_CODES.Has(SlotId)
+        return KEYBOARD_SHORTCUT_SEND_CODES[SlotId]
+    if SubStr(SlotId, 1, 10) = "ctrl_shift"
+        Mod := "^+"
+    else if SubStr(SlotId, 1, 4) = "ctrl"
+        Mod := "^"
+    else if SubStr(SlotId, 1, 3) = "win"
+        Mod := "#"
+    else if SubStr(SlotId, 1, 3) = "alt"
+        Mod := "!"
+    else
+        return ""
+    if SubStr(SlotId, 1, 10) = "ctrl_shift"
+        Suffix := SubStr(SlotId, 12)
+    else
+        Suffix := SubStr(SlotId, InStr(SlotId, "_") + 1)
     static _SpecialMap := Map("space", "{Space}", "enter", "{Enter}", "period", ".", "comma", ",", "sc029", "SC029")
     return _SpecialMap.Has(Suffix) ? Mod . _SpecialMap[Suffix] : Mod . Suffix
 }
 
 ReadKeyboardShortcutsConfig() {
     global KeyboardShortcutAssignments, KEYBOARD_SHORTCUT_DEFAULTS, _IniCache, GESTURE_ACTIONS
-    for Slot, Action in KEYBOARD_SHORTCUT_DEFAULTS { KeyboardShortcutAssignments[Slot] := Action }
+    for Slot, Action in KEYBOARD_SHORTCUT_DEFAULTS
+        KeyboardShortcutAssignments[Slot] := Action
     for Slot, _ in KEYBOARD_SHORTCUT_DEFAULTS {
         Value := IniCacheGet(_IniCache, "ahk.shortcuts.keyboard", Slot)
         if (Value != "_" and (Value == "none" or GESTURE_ACTIONS.Has(Value)))
@@ -1490,7 +1586,8 @@ ReadKeyboardShortcutsConfig() {
 RunKeyboardShortcutAction(SlotId) {
     global KeyboardShortcutAssignments, GESTURE_ACTIONS
     Action := KeyboardShortcutAssignments.Has(SlotId) ? KeyboardShortcutAssignments[SlotId] : "none"
-    if (Action == "none" or !GESTURE_ACTIONS.Has(Action)) { return }
+    if (Action == "none" or !GESTURE_ACTIONS.Has(Action))
+        return
     GESTURE_ACTIONS[Action].Fn.Call()
 }
 
@@ -1501,14 +1598,17 @@ SetKeyboardShortcutAction(SlotId, ActionName) {
     Reload
 }
 
-_MakeKeyboardShortcutHandler(SlotId, ActionName) { return (*) => SetKeyboardShortcutAction(SlotId, ActionName) }
+_MakeKeyboardShortcutHandler(SlotId, ActionName) {
+    return (*) => SetKeyboardShortcutAction(SlotId, ActionName)
+}
 
 _FormatSlotLabel(SlotId) {
     static _ModLabels := Map("ctrl_shift_", "Ctrl + Shift + ", "ctrl_", "Ctrl + ", "win_", "Win + ", "alt_", "Alt + ")
     static _KeyNames := Map("space", "Espace", "enter", "Entrée", "period", ".", "comma", ",", "sc029", "²")
     for Prefix, ModLabel in _ModLabels {
         if (SubStr(SlotId, 1, StrLen(Prefix)) = Prefix) {
-            Suffix := SubStr(SlotId, StrLen(Prefix) + 1); Key := _KeyNames.Has(Suffix) ? _KeyNames[Suffix] : StrUpper(Suffix)
+            Suffix := SubStr(SlotId, StrLen(Prefix) + 1)
+            Key := _KeyNames.Has(Suffix) ? _KeyNames[Suffix] : StrUpper(Suffix)
             return ModLabel . Key
         }
     }
@@ -1525,15 +1625,23 @@ InsertKeyboardShortcutGroups(TargetMenu, InsertBefore) {
     ]
     GroupMenus := []
     for GroupInfo in _Groups {
-        Prefix := GroupInfo["prefix"]; GLabel := GroupInfo["label"]; AddLabel := GroupInfo["add_label"]; GMenu := Menu()
+        Prefix := GroupInfo["prefix"]
+        GLabel := GroupInfo["label"]
+        AddLabel := GroupInfo["add_label"]
+        GMenu := Menu()
         for Slot, Action in KeyboardShortcutAssignments {
-            if (SubStr(Slot, 1, StrLen(Prefix)) != Prefix) { continue }
+            if (SubStr(Slot, 1, StrLen(Prefix)) != Prefix)
+                continue
             IsExactPrefix := true
             for OtherGroup in _Groups {
                 OtherPrefix := OtherGroup["prefix"]
-                if (OtherPrefix != Prefix and StrLen(OtherPrefix) > StrLen(Prefix) and SubStr(Slot, 1, StrLen(OtherPrefix)) == OtherPrefix) { IsExactPrefix := false; break }
+                if (OtherPrefix != Prefix and StrLen(OtherPrefix) > StrLen(Prefix) and SubStr(Slot, 1, StrLen(OtherPrefix)) == OtherPrefix) {
+                    IsExactPrefix := false
+                    break
+                }
             }
-            if !IsExactPrefix or (Action == "none") { continue }
+            if !IsExactPrefix or (Action == "none")
+                continue
             ActionLabel := GESTURE_ACTIONS.Has(Action) ? _GestureActionLabel(Action) : Action
             GMenu.Add(_FormatSlotLabel(Slot) . " : " . ActionLabel, ((_s) => (*) => ShowKeyboardShortcutPicker(_s))(Slot))
         }
@@ -1548,151 +1656,330 @@ InsertKeyboardShortcutGroups(TargetMenu, InsertBefore) {
 }
 
 ShowKeyboardSlotPicker(Prefix) {
-    global GESTURE_ACTIONS; Slots := []
+    global GESTURE_ACTIONS
+    Slots := []
     static _SpecialOrder := ["space", "enter", "period", "comma", "sc029"]
     Letters := "abcdefghijklmnopqrstuvwxyz"
-    loop StrLen(Letters) { SlotId := Prefix . SubStr(Letters, A_Index, 1); if GESTURE_ACTIONS.Has(SlotId) { Slots.Push(SlotId) } }
-    loop 10 { SlotId := Prefix . SubStr("0123456789", A_Index, 1); if GESTURE_ACTIONS.Has(SlotId) { Slots.Push(SlotId) } }
-    for Sk in _SpecialOrder { SlotId := Prefix . Sk; if GESTURE_ACTIONS.Has(SlotId) { Slots.Push(SlotId) } }
-    if (Slots.Length = 0) { return }
+    loop StrLen(Letters) {
+        SlotId := Prefix . SubStr(Letters, A_Index, 1)
+        if GESTURE_ACTIONS.Has(SlotId)
+            Slots.Push(SlotId)
+    }
+    loop 10 {
+        SlotId := Prefix . SubStr("0123456789", A_Index, 1)
+        if GESTURE_ACTIONS.Has(SlotId)
+            Slots.Push(SlotId)
+    }
+    for Sk in _SpecialOrder {
+        SlotId := Prefix . Sk
+        if GESTURE_ACTIONS.Has(SlotId)
+            Slots.Push(SlotId)
+    }
+    if (Slots.Length = 0)
+        return
     SlotLabels := []
-    for SlotId in Slots { SlotLabels.Push(_GestureActionLabel(SlotId)) }
+    for SlotId in Slots
+        SlotLabels.Push(_GestureActionLabel(SlotId))
     W := Gui_Create("+AlwaysOnTop", t("dialog.keyboard_shortcut.title_prefix") . Prefix)
-    W.SetFont("s10", "Segoe UI"); W.MarginX := 12; W.MarginY := 12
+    W.SetFont("s10", "Segoe UI")
+    W.MarginX := 12
+    W.MarginY := 12
     W.Add("Text", "xm", t("dialog.keyboard_shortcut.prompt"))
     LB := W.Add("ListBox", "xm w320 r16", SlotLabels)
     W.Add("Button", "xm w80", t("button.ok")).OnEvent("Click", PickSlot)
     W.Add("Button", "x+6 w80", t("button.cancel")).OnEvent("Click", (*) => W.Destroy())
     W.Show()
     PickSlot(*) {
-        Idx := LB.Value; if (Idx = 0) { return }
-        W.Destroy(); ShowKeyboardShortcutPicker(Slots[Idx])
+        Idx := LB.Value
+        if (Idx = 0)
+            return
+        W.Destroy()
+        ShowKeyboardShortcutPicker(Slots[Idx])
     }
 }
 
 ShowActionPicker(Title, Current, OnConfirm, ShowNative := false) {
-    global GESTURE_ACTION_NAMES, GESTURE_ACTIONS; AllItems := []
-    _PushItem(Id, Label, Cat) { AllItems.Push({ Id: Id, Label: Label, Cat: Cat }) }
-    if ShowNative { _PushItem("__native__", t("tap_hold.tap.none"), "") }
+    global GESTURE_ACTION_NAMES, GESTURE_ACTIONS
+    AllItems := []
+    _PushItem(Id, Label, Cat) {
+        AllItems.Push({ Id: Id, Label: Label, Cat: Cat })
+    }
+    if ShowNative
+        _PushItem("__native__", t("tap_hold.tap.none"), "")
     _PushItem("none", t("dialog.action_picker.disabled"), "")
     CurrentCat := ""
     for ActionName in GESTURE_ACTION_NAMES {
-        if (ActionName == "--" or ActionName == "none") { continue }
+        if (ActionName == "--" or ActionName == "none")
+            continue
         if (SubStr(ActionName, 1, 1) = "#") {
             local TranslatedHeader := t("sg_actions.sg_order.header." . SubStr(ActionName, 2))
-            CurrentCat := SubStr(TranslatedHeader, 1, 1) = "#" ? SubStr(TranslatedHeader, 2) : TranslatedHeader; continue
+            CurrentCat := SubStr(TranslatedHeader, 1, 1) = "#" ? SubStr(TranslatedHeader, 2) : TranslatedHeader
+            continue
         }
-        if GESTURE_ACTIONS.Has(ActionName) { _PushItem(ActionName, _GestureActionLabel(ActionName), CurrentCat) }
+        if GESTURE_ACTIONS.Has(ActionName)
+            _PushItem(ActionName, _GestureActionLabel(ActionName), CurrentCat)
     }
     BuildListRows(Items) {
-        Ids := []; Labels := []; LastCat := Chr(0)
+        Ids := []
+        Labels := []
+        LastCat := Chr(0)
         for Item in Items {
-            if (Item.Cat != "" and Item.Cat != LastCat) { Ids.Push(""); Labels.Push("▸ " . Item.Cat); LastCat := Item.Cat }
-            Ids.Push(Item.Id); Labels.Push("    " . Item.Label)
+            if (Item.Cat != "" and Item.Cat != LastCat) {
+                Ids.Push("")
+                Labels.Push("▸ " . Item.Cat)
+                LastCat := Item.Cat
+            }
+            Ids.Push(Item.Id)
+            Labels.Push("    " . Item.Label)
         }
         return { Ids: Ids, Labels: Labels }
     }
-    Rows := BuildListRows(AllItems); FilteredIds := Rows.Ids; SelectedIdx := 0; LookupId := (Current == "") ? "__native__" : Current
-    for i, Id in FilteredIds { if (Id == LookupId) { SelectedIdx := i; break } }
-    W := Gui_Create("+AlwaysOnTop", Title); W.SetFont("s10", "Segoe UI"); W.MarginX := 12; W.MarginY := 12
+    Rows := BuildListRows(AllItems)
+    FilteredIds := Rows.Ids
+    SelectedIdx := 0
+    LookupId := (Current == "") ? "__native__" : Current
+    for i, Id in FilteredIds {
+        if (Id == LookupId) {
+            SelectedIdx := i
+            break
+        }
+    }
+    W := Gui_Create("+AlwaysOnTop", Title)
+    W.SetFont("s10", "Segoe UI")
+    W.MarginX := 12
+    W.MarginY := 12
     W.Add("Text", "xm", t("dialog.action_picker.label"))
-    SearchEdit := W.Add("Edit", "xm w340"); LB := W.Add("ListBox", "xm w340 r20", Rows.Labels)
-    if (SelectedIdx > 0) { LB.Choose(SelectedIdx) }
+    SearchEdit := W.Add("Edit", "xm w340")
+    LB := W.Add("ListBox", "xm w340 r20", Rows.Labels)
+    if (SelectedIdx > 0)
+        LB.Choose(SelectedIdx)
     W.Add("Button", "xm w80", t("button.ok")).OnEvent("Click", ConfirmPick)
     W.Add("Button", "x+6 w80", t("button.cancel")).OnEvent("Click", (*) => W.Destroy())
-    W.Show(); SearchEdit.OnEvent("Change", FilterList)
+    W.Show()
+    SearchEdit.OnEvent("Change", FilterList)
     FilterList(*) {
-        Query := StrLower(SearchEdit.Value); Matched := []
-        if (Query == "") { Matched := AllItems } else { for Item in AllItems { if InStr(StrLower(Item.Label), Query) { Matched.Push(Item) } } }
-        NewRows := BuildListRows(Matched); FilteredIds := NewRows.Ids; LB.Delete(); LB.Add(NewRows.Labels)
-        for i, Id in FilteredIds { if (Id != "") { LB.Choose(i); break } }
+        Query := StrLower(SearchEdit.Value)
+        Matched := []
+        if (Query == "") {
+            Matched := AllItems
+        } else {
+            for Item in AllItems {
+                if InStr(StrLower(Item.Label), Query)
+                    Matched.Push(Item)
+            }
+        }
+        NewRows := BuildListRows(Matched)
+        FilteredIds := NewRows.Ids
+        LB.Delete()
+        LB.Add(NewRows.Labels)
+        for i, Id in FilteredIds {
+            if (Id != "") {
+                LB.Choose(i)
+                break
+            }
+        }
     }
     ConfirmPick(*) {
-        Idx := LB.Value; if (Idx = 0) { return }
-        ChosenId := FilteredIds[Idx]; if (ChosenId == "") { return }
-        W.Destroy(); OnConfirm((ChosenId == "__native__") ? "" : ChosenId)
+        Idx := LB.Value
+        if (Idx = 0)
+            return
+        ChosenId := FilteredIds[Idx]
+        if (ChosenId == "")
+            return
+        W.Destroy()
+        OnConfirm((ChosenId == "__native__") ? "" : ChosenId)
     }
 }
 
 ShowKeyboardShortcutPicker(SlotId) {
-    global KeyboardShortcutAssignments; Current := KeyboardShortcutAssignments.Has(SlotId) ? KeyboardShortcutAssignments[SlotId] : "none"
+    global KeyboardShortcutAssignments
+    Current := KeyboardShortcutAssignments.Has(SlotId) ? KeyboardShortcutAssignments[SlotId] : "none"
     ShowActionPicker(t("dialog.keyboard_shortcut.title_prefix") . _GestureActionLabel(SlotId), Current, (Id) => SetKeyboardShortcutAction(SlotId, Id))
 }
 
 FilePathsEditor(*) {
-    global _ConfigDir, _PathsFile; W := Gui(, t("dialog.config_folder.title")); W.SetFont("s10", "Segoe UI"); W.MarginX := 12; W.MarginY := 12
-    W.Add("Text", "xm w400", t("dialog.config_folder.label")); DirEdit := W.Add("Edit", "xm w400", StrReplace(_ConfigDir, "\", "/"))
+    global _ConfigDir, _PathsFile
+    W := Gui(, t("dialog.config_folder.title"))
+    W.SetFont("s10", "Segoe UI")
+    W.MarginX := 12
+    W.MarginY := 12
+    W.Add("Text", "xm w400", t("dialog.config_folder.label"))
+    DirEdit := W.Add("Edit", "xm w400", StrReplace(_ConfigDir, "\", "/"))
     W.Add("Button", "xm y+6 w80", t("common.browse")).OnEvent("Click", (*) => ( (S := DirSelect("*" . StrReplace(Trim(DirEdit.Value), "/", "\"), 1, t("dialog.config_folder.select_title"))) != "" ? DirEdit.Value := StrReplace(S, "\", "/") : 0 ))
-    W.Add("Button", "x162 y+10 w100 Default", t("button.ok")).OnEvent("Click", (*) => ( (N := StrReplace(Trim(DirEdit.Value), "/", "\")) == "" ? N := _DefaultConfigDir : 0, !RegExMatch(N, "\\$") ? N .= "\" : 0, (N != _ConfigDir ? (try DirCreate(SubStr(_PathsFile, 1, InStr(_PathsFile, "\", , -1) - 1)), (f := FileOpen(_PathsFile, "w", "UTF-8")) ? (f.Write("# Custom paths`r`nConfigDirPath = `"" . StrReplace(N, "\", "/") . "`"`r`n"), f.Close()) : 0, Reload()) : W.Destroy()) ))
+    ConfirmPath(*) {
+        N := StrReplace(Trim(DirEdit.Value), "/", "\")
+        if (N == "")
+            N := _DefaultConfigDir
+        if !RegExMatch(N, "\\$")
+            N .= "\"
+        if (N == _ConfigDir) {
+            W.Destroy()
+            return
+        }
+        try DirCreate(SubStr(_PathsFile, 1, InStr(_PathsFile, "\", , -1) - 1))
+        f := FileOpen(_PathsFile, "w", "UTF-8")
+        if f {
+            f.Write("# Custom paths`r`nConfigDirPath = `"" . StrReplace(N, "\", "/") . "`"`r`n")
+            f.Close()
+        }
+        Reload()
+    }
+    W.Add("Button", "x162 y+10 w100 Default", t("button.ok")).OnEvent("Click", ConfirmPath)
     W.Show("Center")
 }
 
-ActivateEdit(*) { Edit() }
-ToggleSuspend(*) {
-    global _ALTGR_KANA_FIXUP; if !A_IsSuspended and IsSet(_ALTGR_KANA_FIXUP) and _ALTGR_KANA_FIXUP and GetKeyState("SC138", "P") { KeyWait("SC138", "T1") }
-    Suspend(-1); UpdateTrayIcon(); global _LastSuspendState := A_IsSuspended
-    if A_IsSuspended { Ergopti_OnSuspendEnter() } else { Ergopti_OnSuspendResume() }
+ActivateEdit(*) {
+    Edit()
 }
-Ergopti_OnSuspendEnter() { try TooltipHide("Suspend", true); try LLM_Tooltip_Hide(true); try LLM_Engine_CancelTimer() }
-Ergopti_OnSuspendResume() { if IsSet(_ResetPrefixBuffer) { try _ResetPrefixBuffer() } }
+ToggleSuspend(*) {
+    global _ALTGR_KANA_FIXUP
+    if !A_IsSuspended and IsSet(_ALTGR_KANA_FIXUP) and _ALTGR_KANA_FIXUP and GetKeyState("SC138", "P")
+        KeyWait("SC138", "T1")
+    Suspend(-1)
+    UpdateTrayIcon()
+    global _LastSuspendState := A_IsSuspended
+    if A_IsSuspended
+        Ergopti_OnSuspendEnter()
+    else
+        Ergopti_OnSuspendResume()
+}
+Ergopti_OnSuspendEnter() {
+    try TooltipHide("Suspend", true)
+    try LLM_Tooltip_Hide(true)
+    try LLM_Engine_CancelTimer()
+}
+Ergopti_OnSuspendResume() {
+    if IsSet(_ResetPrefixBuffer)
+        try _ResetPrefixBuffer()
+}
 _SuspendStateWatchdog() {
-    global _LastSuspendState; if (A_IsSuspended == _LastSuspendState) { return }
-    _LastSuspendState := A_IsSuspended; UpdateTrayIcon()
-    if A_IsSuspended { Ergopti_OnSuspendEnter() } else { Ergopti_OnSuspendResume() }
+    global _LastSuspendState
+    if (A_IsSuspended == _LastSuspendState)
+        return
+    _LastSuspendState := A_IsSuspended
+    UpdateTrayIcon()
+    if A_IsSuspended
+        Ergopti_OnSuspendEnter()
+    else
+        Ergopti_OnSuspendResume()
 }
 UpdateTrayIcon() {
-    if A_IsSuspended { A_TrayMenu.Check(MenuSuspend); if FileExist(IconPathDisabled) { TraySetIcon(IconPathDisabled, , True) } }
-    else { A_TrayMenu.Uncheck(MenuSuspend); if FileExist(IconPath) { TraySetIcon(IconPath) } }
+    if A_IsSuspended {
+        A_TrayMenu.Check(MenuSuspend)
+        if FileExist(IconPathDisabled)
+            TraySetIcon(IconPathDisabled, , True)
+    }
+    else {
+        A_TrayMenu.Uncheck(MenuSuspend)
+        if FileExist(IconPath)
+            TraySetIcon(IconPath)
+    }
 }
-ActivateReload(*) { Reload() }
-ActivateExitApp(*) { ExitApp() }
+ActivateReload(*) {
+    Reload()
+}
+ActivateExitApp(*) {
+    ExitApp()
+}
 WindowSpy(*) {
-    SplitPath(A_AhkPath, , &ahkDir); SplitPath(ahkDir, , &parentDir); spyPath := parentDir "\WindowSpy.ahk"
-    if FileExist(spyPath) { Run(spyPath) } else { MsgBox(Format(t("ergopti.windowspy_not_found"), spyPath)) }
+    SplitPath(A_AhkPath, , &ahkDir)
+    SplitPath(ahkDir, , &parentDir)
+    spyPath := parentDir "\WindowSpy.ahk"
+    if FileExist(spyPath)
+        Run(spyPath)
+    else
+        MsgBox(Format(t("ergopti.windowspy_not_found"), spyPath))
 }
-ActivateListVars(*) { ListVars() }
-ActivateKeyHistory(*) { KeyHistory() }
-ShowHealthCheck(*) { HealthCheck_ShowWindow() }
+ActivateListVars(*) {
+    ListVars()
+}
+ActivateKeyHistory(*) {
+    KeyHistory()
+}
+ShowHealthCheck(*) {
+    HealthCheck_ShowWindow()
+}
 
 _ScriptAltGrChordDebounce() {
-    static last_tick := 0; if (A_TickCount - last_tick < 80) { return true }; last_tick := A_TickCount; return false
+    static last_tick := 0
+    if (A_TickCount - last_tick < 80)
+        return true
+    last_tick := A_TickCount
+    return false
 }
 _ScriptAltGrIsPhysical(SuffixSC) {
-    global _ALTGR_KANA_FIXUP; if !GetKeyState(SuffixSC, "P") { return false }
-    if (IsSet(_ALTGR_KANA_FIXUP) and _ALTGR_KANA_FIXUP) { return GetKeyState("SC138", "P") }
-    if GetKeyState("SC138", "P") or GetKeyState("RAlt", "P") { return true }
+    global _ALTGR_KANA_FIXUP
+    if !GetKeyState(SuffixSC, "P")
+        return false
+    if (IsSet(_ALTGR_KANA_FIXUP) and _ALTGR_KANA_FIXUP)
+        return GetKeyState("SC138", "P")
+    if GetKeyState("SC138", "P") or GetKeyState("RAlt", "P")
+        return true
     return InStr(A_ThisHotkey, "^!") and GetKeyState("Ctrl", "P") and GetKeyState("Alt", "P") and !(GetKeyState("LAlt", "P") and !GetKeyState("RAlt", "P"))
 }
 _ScriptAltGrDispatch(SuffixSC, Slot, NativeSend, CtrlAltSuffixKey) {
-    if _ScriptAltGrChordDebounce() { return }
-    if !_ScriptAltGrIsPhysical(SuffixSC) { if InStr(A_ThisHotkey, "^!") { SendInput("^!{" . CtrlAltSuffixKey . "}") } else { SendInput(NativeSend) }; return }
-    RunScriptShortcutAction(Slot); ResetScriptComboKeys(SuffixSC)
+    if _ScriptAltGrChordDebounce()
+        return
+    if !_ScriptAltGrIsPhysical(SuffixSC) {
+        if InStr(A_ThisHotkey, "^!")
+            SendInput("^!{" . CtrlAltSuffixKey . "}")
+        else
+            SendInput(NativeSend)
+        return
+    }
+    RunScriptShortcutAction(Slot)
+    ResetScriptComboKeys(SuffixSC)
 }
-_ScriptAltGrEnterHandler(*) { _ScriptAltGrDispatch("SC01C", "script_altgr_enter", "{Enter}", "Enter") }
-_ScriptAltGrBackSpaceHandler(*) { _ScriptAltGrDispatch("SC00E", "script_altgr_backspace", "{BackSpace}", "Backspace") }
-_ScriptAltGrDeleteHandler(*) { _ScriptAltGrDispatch("SC153", "script_altgr_delete", "{Delete}", "Delete") }
-_ScriptAltGrEscapeHandler(*) { _ScriptAltGrDispatch("SC001", "script_altgr_escape", "{Escape}", "Escape") }
+_ScriptAltGrEnterHandler(*) {
+    _ScriptAltGrDispatch("SC01C", "script_altgr_enter", "{Enter}", "Enter")
+}
+_ScriptAltGrBackSpaceHandler(*) {
+    _ScriptAltGrDispatch("SC00E", "script_altgr_backspace", "{BackSpace}", "Backspace")
+}
+_ScriptAltGrDeleteHandler(*) {
+    _ScriptAltGrDispatch("SC153", "script_altgr_delete", "{Delete}", "Delete")
+}
+_ScriptAltGrEscapeHandler(*) {
+    _ScriptAltGrDispatch("SC001", "script_altgr_escape", "{Escape}", "Escape")
+}
 
 global _SCRIPT_ALTGR_HOTKEY_OPTS := "I3 S"
-_ScriptAltGrHookKey(KeyName) { return (SubStr(KeyName, 1, 1) = "$" or InStr(KeyName, " & ")) ? KeyName : "$" . KeyName }
+_ScriptAltGrHookKey(KeyName) {
+    return (SubStr(KeyName, 1, 1) = "$" or InStr(KeyName, " & ")) ? KeyName : "$" . KeyName
+}
 _RegisterScriptAltGrHotkeys() {
-    global _SCRIPT_ALTGR_HOTKEY_OPTS; opts := _SCRIPT_ALTGR_HOTKEY_OPTS; HotIf((*) => IsRealAltGrPress())
-    Hotkey(_ScriptAltGrHookKey("RAlt & Enter"), _ScriptAltGrEnterHandler, opts); Hotkey(_ScriptAltGrHookKey("SC138 & SC01C"), _ScriptAltGrEnterHandler, opts)
-    Hotkey(_ScriptAltGrHookKey("RAlt & BackSpace"), _ScriptAltGrBackSpaceHandler, opts); Hotkey(_ScriptAltGrHookKey("SC138 & SC00E"), _ScriptAltGrBackSpaceHandler, opts)
-    Hotkey(_ScriptAltGrHookKey("RAlt & Delete"), _ScriptAltGrDeleteHandler, opts); Hotkey(_ScriptAltGrHookKey("SC138 & SC153"), _ScriptAltGrDeleteHandler, opts)
-    Hotkey(_ScriptAltGrHookKey("RAlt & Escape"), _ScriptAltGrEscapeHandler, opts); Hotkey(_ScriptAltGrHookKey("SC138 & SC001"), _ScriptAltGrEscapeHandler, opts); HotIf()
+    global _SCRIPT_ALTGR_HOTKEY_OPTS
+    opts := _SCRIPT_ALTGR_HOTKEY_OPTS
+    HotIf((*) => IsRealAltGrPress())
+    Hotkey(_ScriptAltGrHookKey("RAlt & Enter"), _ScriptAltGrEnterHandler, opts)
+    Hotkey(_ScriptAltGrHookKey("SC138 & SC01C"), _ScriptAltGrEnterHandler, opts)
+    Hotkey(_ScriptAltGrHookKey("RAlt & BackSpace"), _ScriptAltGrBackSpaceHandler, opts)
+    Hotkey(_ScriptAltGrHookKey("SC138 & SC00E"), _ScriptAltGrBackSpaceHandler, opts)
+    Hotkey(_ScriptAltGrHookKey("RAlt & Delete"), _ScriptAltGrDeleteHandler, opts)
+    Hotkey(_ScriptAltGrHookKey("SC138 & SC153"), _ScriptAltGrDeleteHandler, opts)
+    Hotkey(_ScriptAltGrHookKey("RAlt & Escape"), _ScriptAltGrEscapeHandler, opts)
+    Hotkey(_ScriptAltGrHookKey("SC138 & SC001"), _ScriptAltGrEscapeHandler, opts)
+    HotIf()
     if !(IsSet(_ALTGR_KANA_FIXUP) and _ALTGR_KANA_FIXUP) {
-        Hotkey(_ScriptAltGrHookKey("^!Enter"), _ScriptAltGrEnterHandler, opts); Hotkey(_ScriptAltGrHookKey("^!Backspace"), _ScriptAltGrBackSpaceHandler, opts)
-        Hotkey(_ScriptAltGrHookKey("^!Delete"), _ScriptAltGrDeleteHandler, opts); Hotkey(_ScriptAltGrHookKey("^!Escape"), _ScriptAltGrEscapeHandler, opts)
+        Hotkey(_ScriptAltGrHookKey("^!Enter"), _ScriptAltGrEnterHandler, opts)
+        Hotkey(_ScriptAltGrHookKey("^!Backspace"), _ScriptAltGrBackSpaceHandler, opts)
+        Hotkey(_ScriptAltGrHookKey("^!Delete"), _ScriptAltGrDeleteHandler, opts)
+        Hotkey(_ScriptAltGrHookKey("^!Escape"), _ScriptAltGrEscapeHandler, opts)
     }
     if (IsSet(_ALTGR_KANA_FIXUP) and _ALTGR_KANA_FIXUP) {
         HotIf((*) => GetKeyState("SC138", "P"))
-        Hotkey(_ScriptAltGrHookKey("SC01C"), _ScriptAltGrEnterHandler, opts); Hotkey(_ScriptAltGrHookKey("SC00E"), _ScriptAltGrBackSpaceHandler, opts)
-        Hotkey(_ScriptAltGrHookKey("SC153"), _ScriptAltGrDeleteHandler, opts); Hotkey(_ScriptAltGrHookKey("SC001"), _ScriptAltGrEscapeHandler, opts); HotIf()
+        Hotkey(_ScriptAltGrHookKey("SC01C"), _ScriptAltGrEnterHandler, opts)
+        Hotkey(_ScriptAltGrHookKey("SC00E"), _ScriptAltGrBackSpaceHandler, opts)
+        Hotkey(_ScriptAltGrHookKey("SC153"), _ScriptAltGrDeleteHandler, opts)
+        Hotkey(_ScriptAltGrHookKey("SC001"), _ScriptAltGrEscapeHandler, opts)
+        HotIf()
     }
     HotIf((*) => A_IsSuspended and GetKeyState("SC138", "P"))
-    Hotkey(_ScriptAltGrHookKey("SC01C"), _ScriptAltGrEnterHandler, opts); Hotkey(_ScriptAltGrHookKey("SC00E"), _ScriptAltGrBackSpaceHandler, opts)
-    Hotkey(_ScriptAltGrHookKey("SC153"), _ScriptAltGrDeleteHandler, opts); Hotkey(_ScriptAltGrHookKey("SC001"), _ScriptAltGrEscapeHandler, opts); HotIf()
+    Hotkey(_ScriptAltGrHookKey("SC01C"), _ScriptAltGrEnterHandler, opts)
+    Hotkey(_ScriptAltGrHookKey("SC00E"), _ScriptAltGrBackSpaceHandler, opts)
+    Hotkey(_ScriptAltGrHookKey("SC153"), _ScriptAltGrDeleteHandler, opts)
+    Hotkey(_ScriptAltGrHookKey("SC001"), _ScriptAltGrEscapeHandler, opts)
+    HotIf()
 }
 _RegisterScriptAltGrHotkeys()
 
@@ -1713,7 +2000,11 @@ LoggerSuccess("ErgoptiPlus", "Driver fully initialised — ready.")
 global _LAYOUT_POLL_INTERVAL_MS := 1000
 global _LAST_KEYBOARD_HKL := GetForegroundKeyboardLayout()
 CheckKeyboardLayoutChange() {
-    global _LAST_KEYBOARD_HKL; HKL := GetForegroundKeyboardLayout()
-    if (HKL != 0 and HKL != _LAST_KEYBOARD_HKL) { _LAST_KEYBOARD_HKL := HKL; Reload() }
+    global _LAST_KEYBOARD_HKL
+    HKL := GetForegroundKeyboardLayout()
+    if (HKL != 0 and HKL != _LAST_KEYBOARD_HKL) {
+        _LAST_KEYBOARD_HKL := HKL
+        Reload()
+    }
 }
 SetTimer(CheckKeyboardLayoutChange, _LAYOUT_POLL_INTERVAL_MS)
