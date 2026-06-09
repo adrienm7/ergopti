@@ -146,11 +146,11 @@ function M.write(path, data)
 	local meta_desc
 	if type(raw_desc) == "table" then
 		local code = i18n.get_locale()
-		meta_desc = raw_desc[code] or raw_desc["fr"] or "Mes hotstrings"
+		meta_desc = raw_desc[code] or raw_desc["fr"] or i18n.get("menu.hotstrings.personal_header")
 	elseif type(raw_desc) == "string" then
 		meta_desc = raw_desc
 	else
-		meta_desc = "Mes hotstrings"
+		meta_desc = i18n.get("menu.hotstrings.personal_header")
 	end
 
 	local L = {}
