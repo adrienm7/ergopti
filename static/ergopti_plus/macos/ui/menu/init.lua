@@ -583,139 +583,156 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		})
 	end
 
-	updateMenu = function()
-		local ctx = {
-			base_dir                 = base_dir,
-			state                    = state,
-			paused                   = core_mods.shortcuts_mod and type(core_mods.shortcuts_mod.is_paused) == "function" and core_mods.shortcuts_mod.is_paused() or false,
-			save_prefs               = save_prefs,
-			updateMenu               = updateMenu,
-			refresh_icon             = function() pcall(update_icon) end,
-			notify_feature           = notify_feature,
-			do_reload                = do_reload,
-			applyTriggerChar         = applyTriggerChar,
-			get_group_name           = Preferences.get_group_name,
-			keymap                   = keymap,
-			hotfiles                 = hotfiles,
-			hotfile_paths            = type(hotfile_paths) == "table" and hotfile_paths or {},
-			module_sections          = module_sections,
-			hotstring_editor         = hotstring_editor,
-			personal_info            = core_mods.dyn_hot_mod,
-			gestures                 = gestures,
-			shortcuts                = core_mods.shortcuts_mod,
-			script_control           = core_mods.shortcuts_mod,
-			apply_metrics_shortcut   = apply_metrics_shortcut,
-			apply_apps_time_shortcut = apply_apps_time_shortcut,
-			llm_handler              = llm_handler,
-			karabiner                = karabiner,
-		}
+	-- ctx and actions are built once and reused across menu opens.
+	-- Fields that must reflect live state (paused) are read inside Builder.generate()
+	-- from upvalues (state, core_mods) which are always current.
+	local function logs_dir()
+		local d = MenuPaths.get_config_dir() or ""
+		if not d:match("[/\\]$") then d = d .. "/" end
+		return d .. "hammerspoon/logs/"
+	end
 
-		-- Resolves <config_dir>/hammerspoon/logs/ at click-time
-		local function logs_dir()
-			local d = MenuPaths.get_config_dir() or ""
-			if not d:match("[/\\]$") then d = d .. "/" end
-			return d .. "hammerspoon/logs/"
+	local function open_path_via_menu(key)
+		local p = MenuPaths.get(key)
+		if type(p) == "string" and p ~= "" then
+			pcall(hs.execute, string.format("open %q", p))
 		end
+	end
 
-		local function open_path_via_menu(key)
-			local p = MenuPaths.get(key)
-			if type(p) == "string" and p ~= "" then
-				pcall(hs.execute, string.format("open %q", p))
-			end
-		end
-
-		local actions = {
-			enable_all                = function() set_all_enabled(true) end,
-			disable_all               = function() set_all_enabled(false) end,
-			reset_defaults            = function() reset_all_defaults() end,
-			open_paths                = function() hs.timer.doAfter(0.05, function() pcall(MenuPaths.open_editor) end) end,
-			reload                    = function() do_reload("menu") end,
-			quit                      = function()
-				hs.timer.doAfter(0.05, function()
-					pcall(function()
-						local ok_k, k = pcall(require, "modules.karabiner")
-						local ok_l, kl = pcall(require, "modules.karabiner.ke_lifecycle")
-						local ke_enabled = ok_k and k and type(k.get_enabled) == "function" and k.get_enabled() or false
-						local _, has_user_ke = hs.execute("/usr/bin/pgrep -x karabiner_console_user_server >/dev/null 2>&1 || /usr/bin/pgrep -x karabiner_session_monitor >/dev/null 2>&1 || /usr/bin/pgrep -x Karabiner-NotificationWindow >/dev/null 2>&1")
-						if (ke_enabled or has_user_ke == true) and ok_l and kl and type(kl.run_total_reset_async) == "function" then
-							local out, ok = kl.run_total_reset_async()
-							Logger.info(LOG, "Quit cleanup KE total reset async: ok=%s out=%s.", tostring(ok), tostring(out))
-						end
-					end)
-					pcall(function() require("ui.menu.menu_llm").stop_mlx_server() end)
-					os.exit(0)
+	local actions = {
+		enable_all                = function() set_all_enabled(true) end,
+		disable_all               = function() set_all_enabled(false) end,
+		reset_defaults            = function() reset_all_defaults() end,
+		open_paths                = function() hs.timer.doAfter(0.05, function() pcall(MenuPaths.open_editor) end) end,
+		reload                    = function() do_reload("menu") end,
+		quit                      = function()
+			hs.timer.doAfter(0.05, function()
+				pcall(function()
+					local ok_k, k = pcall(require, "modules.karabiner")
+					local ok_l, kl = pcall(require, "modules.karabiner.ke_lifecycle")
+					local ke_enabled = ok_k and k and type(k.get_enabled) == "function" and k.get_enabled() or false
+					local _, has_user_ke = hs.execute("/usr/bin/pgrep -x karabiner_console_user_server >/dev/null 2>&1 || /usr/bin/pgrep -x karabiner_session_monitor >/dev/null 2>&1 || /usr/bin/pgrep -x Karabiner-NotificationWindow >/dev/null 2>&1")
+					if (ke_enabled or has_user_ke == true) and ok_l and kl and type(kl.run_total_reset_async) == "function" then
+						local out, ok = kl.run_total_reset_async()
+						Logger.info(LOG, "Quit cleanup KE total reset async: ok=%s out=%s.", tostring(ok), tostring(out))
+					end
 				end)
-			end,
-			open_logs                 = function()
-				local dir = logs_dir()
-				pcall(hs.execute, string.format("mkdir -p %q && open %q", dir, dir))
-			end,
-			open_console              = function() pcall(hs.openConsole) end,
-			open_paths_editor         = function() hs.timer.doAfter(0.05, function() pcall(MenuPaths.open_editor) end) end,
-			open_hotstrings_editor    = function()
-				local ok, ed = pcall(require, "ui.hotstring_editor")
-				if ok and type(ed.open) == "function" then pcall(ed.open) end
-			end,
-			open_metrics_typing       = function()
-				local ok, m = pcall(require, "ui.metrics_typing")
-				if ok and type(m.toggle) == "function" then pcall(m.toggle) end
-			end,
-			open_metrics_apps         = function()
-				local ok, m = pcall(require, "ui.metrics_apps")
-				if ok and type(m.toggle) == "function" then pcall(m.toggle) end
-			end,
-			open_script_source        = function() pcall(hs.execute, string.format("open \"%sinit.lua\"", base_dir)) end,
-			open_personal_shortcuts   = function()
-				local ok, ps = pcall(require, "lib.personal_shortcuts")
-				if ok and type(ps.open) == "function" then pcall(ps.open) end
-			end,
-			open_personal_hotstrings  = function() open_path_via_menu("PersonalTomlPath") end,
-			open_personal_info        = function() open_path_via_menu("PersonalInfoTomlPath") end,
-			open_config               = function() open_path_via_menu("ConfigTomlPath") end,
-			open_logs_folder          = function()
-				local dir = logs_dir()
-				pcall(hs.execute, string.format("mkdir -p %q && open %q", dir, dir))
-			end,
-			open_today_log            = function()
-				local path = require("lib.logger").UNIFIED_LOG_FILE
-				if type(path) ~= "string" or path == "" then
-					path = logs_dir() .. "ErgoptiPlus_" .. os.date("%Y-%m-%d") .. ".log"
-				end
-				pcall(hs.execute, string.format("open %q", path))
-			end,
-			open_error_log            = function()
-				local path = require("lib.logger").ERRORS_LOG_FILE
-				if type(path) ~= "string" or path == "" then
-					path = logs_dir() .. "ErgoptiPlus_errors_" .. os.date("%Y-%m-%d") .. ".log"
-				end
-				pcall(hs.execute, string.format("open %q", path))
-			end,
-			show_setup_wizard         = function()
-				local ok, ob = pcall(require, "ui.onboarding")
-				if ok and type(ob.run_from_menu) == "function" then
-					pcall(ob.run_from_menu, MenuPaths.get("ConfigTomlPath"))
-				end
-			end,
-			set_log_level             = function(level)
-				local L = require("lib.logger")
-				L.set_level(level)
-				pcall(function() hs.settings.set("ergopti.log_level", level) end)
-				L.info("menu", "Log level set to %s.", level)
-				if type(updateMenu) == "function" then updateMenu() end
-			end,
-		}
+				pcall(function() require("ui.menu.menu_llm").stop_mlx_server() end)
+				os.exit(0)
+			end)
+		end,
+		open_logs                 = function()
+			local dir = logs_dir()
+			pcall(hs.execute, string.format("mkdir -p %q && open %q", dir, dir))
+		end,
+		open_console              = function() pcall(hs.openConsole) end,
+		open_paths_editor         = function() hs.timer.doAfter(0.05, function() pcall(MenuPaths.open_editor) end) end,
+		open_hotstrings_editor    = function()
+			local ok, ed = pcall(require, "ui.hotstring_editor")
+			if ok and type(ed.open) == "function" then pcall(ed.open) end
+		end,
+		open_metrics_typing       = function()
+			local ok, m = pcall(require, "ui.metrics_typing")
+			if ok and type(m.toggle) == "function" then pcall(m.toggle) end
+		end,
+		open_metrics_apps         = function()
+			local ok, m = pcall(require, "ui.metrics_apps")
+			if ok and type(m.toggle) == "function" then pcall(m.toggle) end
+		end,
+		open_script_source        = function() pcall(hs.execute, string.format("open \"%sinit.lua\"", base_dir)) end,
+		open_personal_shortcuts   = function()
+			local ok, ps = pcall(require, "lib.personal_shortcuts")
+			if ok and type(ps.open) == "function" then pcall(ps.open) end
+		end,
+		open_personal_hotstrings  = function() open_path_via_menu("PersonalTomlPath") end,
+		open_personal_info        = function() open_path_via_menu("PersonalInfoTomlPath") end,
+		open_config               = function() open_path_via_menu("ConfigTomlPath") end,
+		open_logs_folder          = function()
+			local dir = logs_dir()
+			pcall(hs.execute, string.format("mkdir -p %q && open %q", dir, dir))
+		end,
+		open_today_log            = function()
+			local path = require("lib.logger").UNIFIED_LOG_FILE
+			if type(path) ~= "string" or path == "" then
+				path = logs_dir() .. "ErgoptiPlus_" .. os.date("%Y-%m-%d") .. ".log"
+			end
+			pcall(hs.execute, string.format("open %q", path))
+		end,
+		open_error_log            = function()
+			local path = require("lib.logger").ERRORS_LOG_FILE
+			if type(path) ~= "string" or path == "" then
+				path = logs_dir() .. "ErgoptiPlus_errors_" .. os.date("%Y-%m-%d") .. ".log"
+			end
+			pcall(hs.execute, string.format("open %q", path))
+		end,
+		show_setup_wizard         = function()
+			local ok, ob = pcall(require, "ui.onboarding")
+			if ok and type(ob.run_from_menu) == "function" then
+				pcall(ob.run_from_menu, MenuPaths.get("ConfigTomlPath"))
+			end
+		end,
+		set_log_level             = function(level)
+			local L = require("lib.logger")
+			L.set_level(level)
+			pcall(function() hs.settings.set("ergopti.log_level", level) end)
+			L.info("menu", "Log level set to %s.", level)
+		end,
+	}
 
+	if type(core_mods.shortcuts_mod) == "table"
+		and type(core_mods.shortcuts_mod.set_extras) == "function" then
+		pcall(core_mods.shortcuts_mod.set_extras, actions)
+	end
+
+	-- ctx is a stable table of upvalue references — fields that are mutable at
+	-- runtime (state, keymap, …) are already live pointers so the menu always
+	-- reads current values without rebuilding the table on every click.
+	local ctx = {
+		base_dir                 = base_dir,
+		state                    = state,
+		save_prefs               = save_prefs,
+		notify_feature           = notify_feature,
+		do_reload                = do_reload,
+		applyTriggerChar         = applyTriggerChar,
+		get_group_name           = Preferences.get_group_name,
+		keymap                   = keymap,
+		hotfiles                 = hotfiles,
+		hotfile_paths            = type(hotfile_paths) == "table" and hotfile_paths or {},
+		module_sections          = module_sections,
+		hotstring_editor         = hotstring_editor,
+		personal_info            = core_mods.dyn_hot_mod,
+		gestures                 = gestures,
+		shortcuts                = core_mods.shortcuts_mod,
+		script_control           = core_mods.shortcuts_mod,
+		apply_metrics_shortcut   = apply_metrics_shortcut,
+		apply_apps_time_shortcut = apply_apps_time_shortcut,
+		llm_handler              = llm_handler,
+		karabiner                = karabiner,
+	}
+
+	-- updateMenu refreshes the menubar icon and re-wires script_control extras.
+	-- It does NOT rebuild the menu table — that happens lazily on each click via
+	-- the setMenu callback below, keeping toggles and state changes lag-free.
+	updateMenu = function()
+		pcall(update_icon)
 		if type(core_mods.shortcuts_mod) == "table"
 			and type(core_mods.shortcuts_mod.set_extras) == "function" then
 			pcall(core_mods.shortcuts_mod.set_extras, actions)
 		end
-
-		-- PERFORMANCE: Pre-calculate the entire menu table and pass it directly
-		-- to hs.menubar:setMenu(). This makes clicking the icon INSTANT because
-		-- macOS doesn't have to wait for Lua to run Builder.generate() anymore.
-		local menu_table = Builder.generate(ctx, menu_mods, actions)
-		pcall(function() myMenu:setMenu(menu_table) end)
 	end
+
+	ctx.updateMenu   = updateMenu
+	ctx.refresh_icon = function() pcall(update_icon) end
+
+	-- Register the menu callback once. Hammerspoon calls it only when the user
+	-- clicks the menubar icon — never on toggles — so Builder.generate() runs
+	-- at most once per user interaction, not after every state change.
+	pcall(function()
+		myMenu:setMenu(function()
+			ctx.paused = core_mods.shortcuts_mod and type(core_mods.shortcuts_mod.is_paused) == "function" and core_mods.shortcuts_mod.is_paused() or false
+			return Builder.generate(ctx, menu_mods, actions)
+		end)
+	end)
 
 	updateMenu()
 
