@@ -865,6 +865,7 @@
 	"menu.layout.layout_auto": "— कोई बदलाव नहीं —",
 	"menu.layout.layout_on_pause": "स्क्रिप्ट रुकने पर लेआउट",
 	"menu.layout.layout_on_resume": "स्क्रिप्ट सक्रिय होने पर लेआउट",
+	"menu.layout.pause_layout_enabled": "विराम / पुनः आरंभ पर लेआउट बदलें",
 	"menu.layout.pause_layout_section": "विराम / पुनः आरंभ पर लेआउट",
 	"menu.llm.about": "Ergopti AI के बारे में",
 	"menu.llm.about_body": "Ergopti AI — स्मार्ट कीबोर्ड सुझाव\nबैकएंड: Ollama (स्थानीय)\nसंस्करण: 1.0",

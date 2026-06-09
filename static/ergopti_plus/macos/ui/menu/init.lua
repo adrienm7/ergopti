@@ -533,7 +533,21 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	if type(hotstring_editor.set_update_menu) == "function" then pcall(hotstring_editor.set_update_menu, function() updateMenu() end) end
 
 	if core_mods.shortcuts_mod then
-		if type(core_mods.shortcuts_mod.set_on_pause_change) == "function" then pcall(core_mods.shortcuts_mod.set_on_pause_change, function(_) update_icon(); updateMenu() end) end
+		if type(core_mods.shortcuts_mod.set_on_pause_change) == "function" then
+			pcall(core_mods.shortcuts_mod.set_on_pause_change, function(is_paused)
+				-- Switch keyboard layout when pausing or resuming, if the feature is enabled
+				if state.layout_pause_switch_enabled then
+					local target_layout = is_paused and state.layout_on_pause or state.layout_on_resume
+					if type(target_layout) == "string" and target_layout ~= "" then
+						if hs.keycodes and type(hs.keycodes.setLayout) == "function" then
+							pcall(hs.keycodes.setLayout, target_layout)
+						end
+					end
+				end
+				update_icon()
+				updateMenu()
+			end)
+		end
 		if state.script_control_enabled then
 			pcall(core_mods.shortcuts_mod.set_shortcut_action, "return_key", state.script_control_shortcuts.return_key)
 			pcall(core_mods.shortcuts_mod.set_shortcut_action, "backspace",  state.script_control_shortcuts.backspace)

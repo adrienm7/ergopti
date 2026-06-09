@@ -865,6 +865,7 @@
 	"menu.layout.layout_auto": "— ללא שינוי —",
 	"menu.layout.layout_on_pause": "פריסה כשהסקריפט מושהה",
 	"menu.layout.layout_on_resume": "פריסה כשהסקריפט פעיל",
+	"menu.layout.pause_layout_enabled": "החלף פריסה בהשהיה / המשך",
 	"menu.layout.pause_layout_section": "פריסה בהשהיה / המשך",
 	"menu.llm.about": "אודות Ergopti AI",
 	"menu.llm.about_body": "Ergopti AI — הצעות מקלדת חכמות\nצד שרת: Ollama (מקומי)\nגרסה: 1.0",

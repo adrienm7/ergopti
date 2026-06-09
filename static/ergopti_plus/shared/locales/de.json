@@ -865,6 +865,7 @@
 	"menu.layout.layout_auto": "— Keine Änderung —",
 	"menu.layout.layout_on_pause": "Layout wenn Skript pausiert",
 	"menu.layout.layout_on_resume": "Layout wenn Skript aktiv",
+	"menu.layout.pause_layout_enabled": "Layout bei Pause / Fortsetzung wechseln",
 	"menu.layout.pause_layout_section": "Layout bei Pause / Fortsetzung",
 	"menu.llm.about": "Über Ergopti KI",
 	"menu.llm.about_body": "Ergopti KI — Intelligente Tastaturvorschläge\nBackend: Ollama (lokal)\nVersion: 1.0",

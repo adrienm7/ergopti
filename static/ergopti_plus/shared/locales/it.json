@@ -865,6 +865,7 @@
 	"menu.layout.layout_auto": "— Nessun cambio —",
 	"menu.layout.layout_on_pause": "Layout quando script in pausa",
 	"menu.layout.layout_on_resume": "Layout quando script attivo",
+	"menu.layout.pause_layout_enabled": "Cambia layout in pausa / ripresa",
 	"menu.layout.pause_layout_section": "Layout in pausa / ripresa",
 	"menu.llm.about": "Informazioni su Ergopti IA",
 	"menu.llm.about_body": "Ergopti IA — Suggerimenti intelligenti da tastiera\nBackend: Ollama (locale)\nVersione: 1.0",

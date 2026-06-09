@@ -865,6 +865,7 @@
 	"menu.layout.layout_auto": "— 변경 없음 —",
 	"menu.layout.layout_on_pause": "스크립트 일시정지 시 레이아웃",
 	"menu.layout.layout_on_resume": "스크립트 활성 시 레이아웃",
+	"menu.layout.pause_layout_enabled": "일시정지/재개 시 레이아웃 전환",
 	"menu.layout.pause_layout_section": "일시정지/재개 시 레이아웃",
 	"menu.llm.about": "Ergopti AI 정보",
 	"menu.llm.about_body": "Ergopti AI — 스마트 키보드 제안\n백엔드: Ollama (로컬)\n버전: 1.0",

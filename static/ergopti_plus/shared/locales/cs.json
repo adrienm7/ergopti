@@ -865,6 +865,7 @@
 	"menu.layout.layout_auto": "— Beze změny —",
 	"menu.layout.layout_on_pause": "Rozložení když skript pozastaven",
 	"menu.layout.layout_on_resume": "Rozložení když skript aktivní",
+	"menu.layout.pause_layout_enabled": "Přepínat rozložení při pozastavení / obnovení",
 	"menu.layout.pause_layout_section": "Rozložení při pozastavení / obnovení",
 	"menu.llm.about": "O aplikaci Ergopti AI",
 	"menu.llm.about_body": "Ergopti AI — Chytrá klávesnicová napovídání\nBackend: Ollama (lokálně)\nVerze: 1.0",

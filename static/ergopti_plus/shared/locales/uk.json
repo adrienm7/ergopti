@@ -865,6 +865,7 @@
 	"menu.layout.layout_auto": "— Без змін —",
 	"menu.layout.layout_on_pause": "Розкладка коли скрипт на паузі",
 	"menu.layout.layout_on_resume": "Розкладка коли скрипт активний",
+	"menu.layout.pause_layout_enabled": "Перемикати розкладку при паузі / відновленні",
 	"menu.layout.pause_layout_section": "Розкладка при паузі / відновленні",
 	"menu.llm.about": "Про Ergopti ШІ",
 	"menu.llm.about_body": "Ergopti ШІ — Розумні підказки клавіатури\nБекенд: Ollama (локально)\nВерсія: 1.0",

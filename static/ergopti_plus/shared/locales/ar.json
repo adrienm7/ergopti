@@ -865,6 +865,7 @@
 	"menu.layout.layout_auto": "— بدون تغيير —",
 	"menu.layout.layout_on_pause": "التخطيط عند إيقاف البرنامج",
 	"menu.layout.layout_on_resume": "التخطيط عند تشغيل البرنامج",
+	"menu.layout.pause_layout_enabled": "تغيير التخطيط عند الإيقاف / الاستئناف",
 	"menu.layout.pause_layout_section": "التخطيط عند الإيقاف / الاستئناف",
 	"menu.llm.about": "حول Ergopti AI",
 	"menu.llm.about_body": "Ergopti AI — اقتراحات لوحة مفاتيح ذكية\nالخادم الخلفي: Ollama (محلي)\nالإصدار: 1.0",

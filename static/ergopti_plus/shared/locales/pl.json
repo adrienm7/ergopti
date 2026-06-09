@@ -865,6 +865,7 @@
 	"menu.layout.layout_auto": "— Bez zmian —",
 	"menu.layout.layout_on_pause": "Układ gdy skrypt wstrzymany",
 	"menu.layout.layout_on_resume": "Układ gdy skrypt aktywny",
+	"menu.layout.pause_layout_enabled": "Zmień układ przy pauzie / wznowieniu",
 	"menu.layout.pause_layout_section": "Układ przy pauzie / wznowieniu",
 	"menu.llm.about": "O Ergopti AI",
 	"menu.llm.about_body": "Ergopti AI — Inteligentne podpowiedzi klawiatury\nBackend: Ollama (lokalne)\nWersja: 1.0",

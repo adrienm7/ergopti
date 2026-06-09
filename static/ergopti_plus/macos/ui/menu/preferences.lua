@@ -35,7 +35,7 @@ local TomlCodec = require("lib.toml_codec")
 
 
 --- Top-level TOML section names in the order they appear on disk.
-local SECTIONS = { "gestures", "hotstrings", "metrics", "llm", "shortcuts", "updater" }
+local SECTIONS = { "gestures", "hotstrings", "metrics", "llm", "shortcuts", "layout", "updater" }
 
 --- Maps every flat state key (as used in memory throughout the codebase) to
 --- its on-disk location. Fields:
@@ -111,6 +111,11 @@ local KEY_MAP = {
 	llm_pred_indent                      = { sec = "llm", path = "display", key = "pred_indent"   },
 	llm_arrow_nav_enabled                = { sec = "llm", path = "navigation", key = "arrow_nav_enabled" },
 	llm_val_modifiers                    = { sec = "llm", path = "navigation", key = "val_modifiers" },
+
+	-- ── Layout ─────────────────────────────────────────────────────────────
+	layout_pause_switch_enabled          = { sec = "layout", key = "pause_switch_enabled"    },
+	layout_on_pause                      = { sec = "layout", key = "on_pause"                },
+	layout_on_resume                     = { sec = "layout", key = "on_resume"               },
 
 	-- ── Shortcuts ──────────────────────────────────────────────────────────
 	shortcuts                            = { sec = "shortcuts", key = "enabled"              },
