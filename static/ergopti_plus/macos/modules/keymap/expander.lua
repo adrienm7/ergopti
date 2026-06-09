@@ -283,8 +283,35 @@ function M.try_terminator_expand(m, chars, char_len, is_ignored)
 	local tb          = m.trigger_bytes
 	local chars_bytes = #chars
 	local buf         = _state.buffer
-	if #buf < tb + chars_bytes then return false end
-	local buf_start   = #buf - chars_bytes - tb + 1
+
+	-- French-typography rule: ``:`` and ``;`` are emitted by the layout as
+	-- NNBSP+``:`` or NNBSP+``;``. The NNBSP (UTF-8: 0xE2 0x80 0xAF, 3 bytes)
+	-- or NBSP (UTF-8: 0xC2 0xA0, 2 bytes) lands in the buffer just before the
+	-- terminator, so the effective trigger is ``…trigger NNBSP :``.
+	-- We strip that nbsp from buf_start so matching finds the bare trigger,
+	-- and record extra_bs_bytes so the correct number of characters is deleted.
+	local NNBSP = "\xE2\x80\xAF"  -- U+202F, 3 UTF-8 bytes
+	local NBSP  = "\xC2\xA0"      -- U+00A0, 2 UTF-8 bytes
+	local extra_bs_bytes = 0
+	local is_typo_endchar = (chars == ":" or chars == ";")
+	if is_typo_endchar then
+		-- Check for NNBSP immediately before the terminator in the buffer.
+		local nnbsp_pos = #buf - chars_bytes - #NNBSP + 1
+		local nbsp_pos  = #buf - chars_bytes - #NBSP  + 1
+		if nnbsp_pos >= 1 and buf:sub(nnbsp_pos, nnbsp_pos + #NNBSP - 1) == NNBSP then
+			extra_bs_bytes = #NNBSP
+		elseif nbsp_pos >= 1 and buf:sub(nbsp_pos, nbsp_pos + #NBSP - 1) == NBSP then
+			extra_bs_bytes = #NBSP
+		else
+			-- Bare ``:`` / ``;`` without preceding nbsp: a mid-sequence char
+			-- (e.g. the ``:`` in ``:D``). Must not trigger expansion.
+			return false
+		end
+	end
+
+	local effective_chars_bytes = chars_bytes + extra_bs_bytes
+	if #buf < tb + effective_chars_bytes then return false end
+	local buf_start   = #buf - effective_chars_bytes - tb + 1
 	if buf:sub(buf_start, buf_start + tb - 1) ~= trigger then return false end
 	-- Precomputed trigger length; avoids a hot-path utf8.len call.
 	local trig_len    = m.tlen
@@ -327,6 +354,10 @@ function M.try_terminator_expand(m, chars, char_len, is_ignored)
 
 		-- In an ignored window there is no "char" kept on screen — erase it too.
 		if is_ignored then deletes = deletes + char_len end
+
+		-- When a NNBSP/NBSP was stripped before matching (typographic ``:``/`` ; ``),
+		-- add 1 extra backspace to erase the nbsp that sits between trigger and endchar.
+		if extra_bs_bytes > 0 then deletes = deletes + 1 end
 
 		M.perform_text_replacement(
 			deletes,
