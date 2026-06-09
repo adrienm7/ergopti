@@ -336,6 +336,60 @@ end
 -- ============================================
 -- ============================================
 
+--- Extracts the Ergopti version embedded in an input-source identifier.
+--- Supports both legacy ("com.apple.keyboardlayout.ergopti.v2_2_0") and
+--- current macOS-standard ("com.apple.keylayout.ergopti.v2.2.1") forms.
+--- @param name string Raw or cleaned layout name.
+--- @return table|nil Numeric version components or nil if not an Ergopti id.
+local function extract_ergopti_version(name)
+	if type(name) ~= "string" then return nil end
+	local lower = name:lower()
+	if not lower:find("ergopti", 1, true) then return nil end
+	-- Match v<major>(_|.)<minor>(_|.)<patch> after the ergopti keyword
+	local maj, min, pat = lower:match("ergopti[._]v(%d+)[._%-](%d+)[._%-](%d+)")
+	if maj then return { tonumber(maj), tonumber(min), tonumber(pat) } end
+	-- Match shorter forms like ergopti_v2.2 or ergopti.v2
+	local m1, m2 = lower:match("ergopti[._]v(%d+)[._%-](%d+)")
+	if m1 then return { tonumber(m1), tonumber(m2), 0 } end
+	local m = lower:match("ergopti[._]v(%d+)")
+	if m then return { tonumber(m), 0, 0 } end
+	-- An Ergopti layout with no version suffix is treated as version 0
+	return { 0, 0, 0 }
+end
+
+--- Renders an Ergopti input-source identifier as a human-friendly display
+--- name (e.g. "Ergopti+ v2.2.0 ANSI"). macOS normally provides this string
+--- via the bundle's InfoPlist.strings file, but bundles generated before the
+--- v2.2.2 fix used the keylayout filename as the localisation key instead of
+--- the TISInputSourceID, so hs.keycodes fell back to the raw ID. This helper
+--- recovers the pretty form purely from the ID structure.
+--- @param id string Raw or already-prefix-stripped Ergopti identifier.
+--- @return string|nil Friendly display name, or nil if the id is not Ergopti.
+local function format_ergopti_display(id)
+	if type(id) ~= "string" then return nil end
+	local lower = id:lower()
+	if not lower:find("ergopti", 1, true) then return nil end
+	-- Variant detection — order matters: ++ before +, and symbol forms before word forms.
+	-- "plus_plus" / "plus.plus" cover bundle IDs; "++" / "+" cover localised names
+	-- returned by hs.keycodes (e.g. "Ergopti+" when TIS osascript is unavailable).
+	local variant
+	if lower:find("plus_plus") or lower:find("plus%.plus") or id:find("%+%+") then
+		variant = "++"
+	elseif lower:find("plus") or id:find("%+") then
+		variant = "+"
+	else
+		variant = ""
+	end
+	local is_ansi = lower:find("ansi") ~= nil
+	local v = extract_ergopti_version(id)
+	local version_part = ""
+	if v and (v[1] ~= 0 or v[2] ~= 0 or v[3] ~= 0) then
+		version_part = string.format(" v%d.%d.%d", v[1] or 0, v[2] or 0, v[3] or 0)
+	end
+	local ansi_part = is_ansi and " ANSI" or ""
+	return "Ergopti" .. variant .. ansi_part .. version_part
+end
+
 --- Runs an AppleScript in a child osascript process so that any failure or
 --- crash inside Carbon/TIS stays contained — `hs.osascript.applescript` runs
 --- in-process and was crashing Hammerspoon on every TIS-mutating call. The
@@ -431,9 +485,14 @@ print(json.dumps(out))
 	if ok and type(raw_out) == "string" and raw_out:sub(1, 1) == "[" then
 		-- Decode the JSON array of KeyboardLayout Name strings
 		for kl_name in raw_out:gmatch('"([^"]+)"') do
-			local display = kl_name:gsub("_", " "):gsub("%s+v%d.*$", "")
-			-- hs.keycodes.currentLayout() may return the raw KeyboardLayout Name,
-			-- the localised display name, or a version-stripped variant — accept all three.
+			-- For Ergopti entries, the localised name is produced by format_ergopti_display
+			-- (e.g. "Ergopti+" for "Ergopti_v2_2_2_plus"). For other layouts, strip
+			-- underscores and version suffixes. This localised name is what
+			-- hs.keycodes.setLayout() and currentLayout() understand.
+			local ergopti_display = format_ergopti_display(kl_name)
+			local display = ergopti_display or kl_name:gsub("_", " "):gsub("%s+v%d.*$", "")
+			-- hs.keycodes.currentLayout() may return the localised display name,
+			-- the raw KeyboardLayout Name, or a version-stripped variant — accept all.
 			local display_no_space = display:gsub("%s+", ""):lower()
 			local current_lower = current_name and current_name:lower() or nil
 			local selected = (current_name ~= nil and (
@@ -778,60 +837,6 @@ local function upgrade_active_list(legacy_active)
 	end
 	Logger.error(LOG, "List upgrade failed (out=%s).", tostring(out))
 	return false
-end
-
---- Extracts the Ergopti version embedded in an input-source identifier.
---- Supports both legacy ("com.apple.keyboardlayout.ergopti.v2_2_0") and
---- current macOS-standard ("com.apple.keylayout.ergopti.v2.2.1") forms.
---- @param name string Raw or cleaned layout name.
---- @return table|nil Numeric version components or nil if not an Ergopti id.
-local function extract_ergopti_version(name)
-	if type(name) ~= "string" then return nil end
-	local lower = name:lower()
-	if not lower:find("ergopti", 1, true) then return nil end
-	-- Match v<major>(_|.)<minor>(_|.)<patch> after the ergopti keyword
-	local maj, min, pat = lower:match("ergopti[._]v(%d+)[._%-](%d+)[._%-](%d+)")
-	if maj then return { tonumber(maj), tonumber(min), tonumber(pat) } end
-	-- Match shorter forms like ergopti_v2.2 or ergopti.v2
-	local m1, m2 = lower:match("ergopti[._]v(%d+)[._%-](%d+)")
-	if m1 then return { tonumber(m1), tonumber(m2), 0 } end
-	local m = lower:match("ergopti[._]v(%d+)")
-	if m then return { tonumber(m), 0, 0 } end
-	-- An Ergopti layout with no version suffix is treated as version 0
-	return { 0, 0, 0 }
-end
-
---- Renders an Ergopti input-source identifier as a human-friendly display
---- name (e.g. "Ergopti+ v2.2.0 ANSI"). macOS normally provides this string
---- via the bundle's InfoPlist.strings file, but bundles generated before the
---- v2.2.2 fix used the keylayout filename as the localisation key instead of
---- the TISInputSourceID, so hs.keycodes fell back to the raw ID. This helper
---- recovers the pretty form purely from the ID structure.
---- @param id string Raw or already-prefix-stripped Ergopti identifier.
---- @return string|nil Friendly display name, or nil if the id is not Ergopti.
-local function format_ergopti_display(id)
-	if type(id) ~= "string" then return nil end
-	local lower = id:lower()
-	if not lower:find("ergopti", 1, true) then return nil end
-	-- Variant detection — order matters: ++ before +, and symbol forms before word forms.
-	-- "plus_plus" / "plus.plus" cover bundle IDs; "++" / "+" cover localised names
-	-- returned by hs.keycodes (e.g. "Ergopti+" when TIS osascript is unavailable).
-	local variant
-	if lower:find("plus_plus") or lower:find("plus%.plus") or id:find("%+%+") then
-		variant = "++"
-	elseif lower:find("plus") or id:find("%+") then
-		variant = "+"
-	else
-		variant = ""
-	end
-	local is_ansi = lower:find("ansi") ~= nil
-	local v = extract_ergopti_version(id)
-	local version_part = ""
-	if v and (v[1] ~= 0 or v[2] ~= 0 or v[3] ~= 0) then
-		version_part = string.format(" v%d.%d.%d", v[1] or 0, v[2] or 0, v[3] or 0)
-	end
-	local ansi_part = is_ansi and " ANSI" or ""
-	return "Ergopti" .. variant .. ansi_part .. version_part
 end
 
 --- Strips the Apple keylayout / keyboardlayout / inputmethod prefixes from a
