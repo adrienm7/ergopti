@@ -16,7 +16,7 @@ helpers.describe("shortcuts.actions.system", function()
 		-- We cannot easily assert the exact watch_types here without deep introspection of the eventtap stub,
 		-- but we can verify it doesn't crash.
 		helpers.assert_true(true, "toggle_awake should execute without errors")
-		
+
 		-- Turn it off
 		sys.toggle_awake()
 		helpers.assert_true(true, "toggle_awake should toggle off without errors")
@@ -26,18 +26,6 @@ end)
 
 
 
--- =====================================================
--- =====================================================
--- ======= wrap_event_decision (regression) ============
--- =====================================================
--- =====================================================
-
--- Locks the two hard-won wrap-eventtap rules:
---   1. Alt (Option) must NOT block wrapping — Ergopti's wrap symbols sit on the
---      AltGr layer and carry the alt flag (the original bug excluded alt, so no
---      AltGr symbol ever wrapped).
---   2. When no selection is readable (nothing selected, or an app like VS Code
---      that hides AXSelectedText), the symbol must pass through (never swallowed).
 -- ============================================================
 -- ============================================================
 -- ======= keep_awake persistent alert (regression) ===========
@@ -102,6 +90,18 @@ end)
 
 
 
+-- =====================================================
+-- =====================================================
+-- ======= wrap_event_decision (regression) ============
+-- =====================================================
+-- =====================================================
+
+-- Locks the two hard-won wrap-eventtap rules:
+--   1. Alt (Option) must NOT block wrapping — Ergopti's wrap symbols sit on the
+--      AltGr layer and carry the alt flag (the original bug excluded alt, so no
+--      AltGr symbol ever wrapped).
+--   2. When no selection is readable (nothing selected, or an app like VS Code
+--      that hides AXSelectedText), the symbol must pass through (never swallowed).
 helpers.describe("shortcuts.actions.system: wrap_event_decision", function()
 	package.loaded["lib.keycodes"] = nil
 	package.loaded["modules.shortcuts.actions.system"] = nil
