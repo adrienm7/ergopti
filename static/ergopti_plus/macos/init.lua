@@ -634,20 +634,6 @@ shortcuts.start_script_control(keymap, shortcuts, gestures, karabiner)
 
 Logger.info(LOG, "User interface initialized successfully.")
 
--- App Cloner and Encryptor both build their own icon at first launch.
--- This hook pre-generates Encryptor's icon at Hammerspoon startup so the
--- Dock shows the correct icon before the app is ever opened.
-hs.timer.doAfter(2, function()
-	local encryptor_make = hs.configdir .. "/apps/Encryptor.app/Contents/Resources/make_icon.sh"
-	local encryptor_icns = hs.configdir .. "/apps/Encryptor.app/Contents/Resources/AppIcon.icns"
-	local needs_gen  = hs.execute(string.format("test -f %q && echo yes || echo no", encryptor_icns)):find("no")
-	local has_script = hs.execute(string.format("test -f %q && echo yes || echo no", encryptor_make)):find("yes")
-	if needs_gen and has_script then
-		Logger.info(LOG, "Generating AppIcon.icns for Encryptor…")
-		pcall(hs.execute, string.format("zsh %q &", encryptor_make))
-	end
-end)
-
 
 
 -- ========================================

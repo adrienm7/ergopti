@@ -695,3 +695,63 @@ just onboarding.
 Sibling memory: [[project-locale-parity-test]].
 
 - Latest "encore plus" wave (user repeated "encore plus" after diagnostic/healthcheck enrichment + previous massive test waves): +18-25+ new regression tests focused on making the enriched Diagnostic système (healthcheck) production-hardened + filling keylogger/llm/gestures/timer/shortcuts/meta gaps for near-100% certainty. AHK additions: 5+ new Test() in test_logger.ahk Healthcheck section (active_app cache state accurate under pause in diagnostic report; features manifest + timers/scheduler visible + pause-safe; gestures/LLM/layout collectors pcall-resilient + volume + pause with errors sink visibility + AltGr latch in layout section; keylogger aggregator/rollover data in diagnostic accurate under pause + high volume + privacy); +2 in test_active_app_cache.ahk (diagnostic sees clean cache under pause, no false activations; volume + pause + re-init + pcall WinEvent resilience for snapshot); +2 in test_shortcuts.ahk (AltGr prefix latch historical regression safe across pause/resume + diagnostic must report true latch state; all dispatchers incl. Win\*/menu pause silence + 150+ volume + bad Features + diagnostic safe); +3 in test_timer_scheduler.ahk (every() must be silent under pause + diagnostic can inspect; pcall-wrapped callback ERROR routes to dedicated errors sink under pause; high volume + pause transitions + re-init preserves diagnostic scheduler visibility). HS: new describe in test_aggregator.lua ("aggregator — diagnostic (healthcheck) integration + pause" — 4 its: pure under pause + diagnostic reads safe counts + errors sink; volume+pause+rollover+unicode keeps diagnostic keylogger summary correct/privacy-safe; privacy+FS/pcall under pause still surfaces errors sink to diagnostic; bad/unicode events resilient); new describe in test_conflicts.lua (3 its for pause safety + diagnostic); notes in llm/test_profiles.lua; port_adapter_coverage.ahk lists extended for full keylogger stack, llm stack, gestures conflicts/touchdevice, keymap expander/utils etc., karabiner ke_lifecycle, adapters/timer, active_app_cache, timer_scheduler, features_manifest + healthcheck as special always-available read-only surface for paused troubleshooting. All tests: explicit project_suspend_pause_invariant, historical gotchas (errors sink, AltGr in diagnostic layout, privacy in keylogger-to-diagnostic, pcall/FS), max edges (volume 150-200+, unicode, rollover, re-init, FS/pcall no-crash). Banners: final run clean ("lint-conventions: OK — no violations found"). Tails/greps verified registration. This wave (plus accumulated prior "encore plus" in session) brings the total new regression tests in the campaign well past 250-300. Would have caught: diagnostic returning stale active_app/features/timers/keylogger-agg/LLM-profile/karabiner-grabber/AltGr-latch data or hiding the clean errors sink when user (paused) runs "Diagnostic système" to debug; silent aggregator volume corruption or PII in the troubleshooting report; stuck gesture conflicts or ke lifecycle after suspend; timer pcall errors not visible in diagnostic; wrong LLM profile in healthcheck while suspended. Newly ultra-hardened: healthcheck collectors (active_app, features, timers, gestures/LLM/layout, keylogger agg/rollover) + full keylogger aggregator diagnostic view + conflicts + timer pcall/every + shortcuts dispatchers + historical AltGr + profiles resolve + karabiner lifecycle + meta port/require coverage. Full suites (windows/tests/run_all.ahk + macos/tests/run.lua) + live test (trigger Diagnostic while A_IsSuspended/paused, errors in sink, high volume keylogger/LLM/gestures/timers, pause/resume AltGr/hotstrings, rollover, bad states) mandatory. User can say "encore plus" again.
+
+### project-shifted-comma-case-variants
+
+_The "uppercase" form of a comma/apostrophe/period in case-variant generation MUST be nbsp/nnbsp + punctuation, NEVER a plain ASCII space — anchoring on nbsp is what keeps the ":D" emoji alive._
+
+<sub>slug: `project_shifted_comma_case_variants`</sub>
+
+Case-insensitive hotstrings whose trigger contains `,` / `'` / `.` auto-generate
+title/upper-case variants. On the Ergopti Shift layer those keys do NOT shift to
+an uppercase letter — Shift+comma emits `NNBSP(U+202F);`, Shift+period emits
+`NNBSP:`, Shift+apostrophe emits `NNBSP?` (the deadkey path emits the regular
+`NBSP(U+00A0)`). So the shifted form of e.g. the `,d → ds` SFB-reduction
+hotstring is `NNBSP:D → DS` / `NNBSP;d → Ds`, not `,D`.
+
+The single source of truth for these mappings:
+- **AHK**: `_BuildUppercasedSymbols()` in `windows/lib/hotstrings/hotstring_engine.ahk`.
+- **macOS**: `M.UPPER_TRIGGERS["," / "'" / "."]` in `shared/lua/text_utils/init.lua`
+  (consumed by `trig_upper`/`trig_title`, which handle the symbol at ANY position
+  in the trigger — the comma-first alias block in `modules/keymap/registry.lua`
+  only covers comma-FIRST and is a redundant secondary path).
+
+**Why:** Both platforms originally used a plain ASCII space (`" :"`, `" ;"`,
+`" ?"`). That was wrong on two counts: (1) `NNBSP:D` typed via the layout never
+matched the space-prefixed trigger, so caps never produced `DS`; and (2) a bare
+`<space>:D` — the `:D` emoji typed after a normal word — DID match the
+space-prefixed trigger and got swallowed into `DS`. The user types the emoji as
+`<space>:` (plain space), the expansion as `NNBSP:` (shifted) — anchoring on
+nbsp/nnbsp is the ONLY thing that separates the two.
+
+**How to apply:**
+
+- Never put a plain space in these symbol-shift tables. Use `Chr(0x202F)` /
+  `Chr(0xA0)` (AHK) or `"\226\128\175"` / `"\194\160"` (Lua).
+- Comma → all four of `{nnbsp,nbsp} × {":",";"}`; apostrophe → `{nnbsp,nbsp} × "?"`;
+  period (macOS) → `{nnbsp,nbsp} × ":"`.
+- Regression tests pin BOTH halves: nnbsp-prefixed fires with correct casing, and
+  the plain-`<space>` variant is NEVER registered (emoji safety). AHK:
+  `test_hotstring_engine_main.ahk` (HSE comma-shift / plain-space colon-D),
+  `test_hotstring_engine.ahk`, `test_hotstrings_full.ahk` (variant counts).
+  macOS: `test_hotstring_registry_regressions.lua`.
+
+### project-ahk-v2-semicolon-in-string
+
+_AHK v2 treats ` ;` (space-then-semicolon) as a comment start even INSIDE a double-quoted string literal — a literal `;` in an AHK string causes a "Missing `"`" parse error._
+
+<sub>slug: `project_ahk_v2_semicolon_in_string`</sub>
+
+`x := "nnbsp + ; + d"` fails to parse with `==> Missing """`. The tokenizer ends
+the string at the ` ;` and reads the rest as a comment. Confirmed empirically
+with AutoHotkey64 v2.
+
+**Why:** Bit during the shifted-comma regression tests — an assertion message
+contained a literal `;` and the whole `run_all.ahk` suite aborted with exit
+code 2 and produced no results file (the headless failure mode is silent, same
+family as the [[project_config_v2_refactor]] encoding abort).
+
+**How to apply:** Never put a literal `;` inside an AHK v2 string. Spell the word
+("semicolon") or build it via `Chr(0x3B)` concatenation. This compounds with the
+existing ASCII-only test-suite convention (use `Chr(0xNNNN)` for non-ASCII; an
+em-dash `—` in a string literal also broke the parser the same way).

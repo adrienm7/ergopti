@@ -299,25 +299,26 @@ TestCS_TwoCharCommaFirst() {
     ResetHotstringRecorders()
     CreateCaseSensitiveHotstrings("*?", ",b", "x")
     ; lowercase ",b" — 1
-    ; uppercase variants of ",B": [",B", " ;B", " :B"] (comma → 2 upper symbols) — 3
-    ; titlecase: first char "," IS in UppercasedSymbols → for each upper symbol
-    ; register UpperSymbol + lowercase rest → " ;b", " :b" — 2
-    ; Total: 1 + 3 + 2 = 6
-    AssertEqual(6, _Stub_HotstringRegistrations.Length)
+    ; uppercase variants of ",B": [",B", nnbsp;B, nnbsp:B, nbsp;B, nbsp:B]
+    ;   (comma → 4 upper symbols {nnbsp,nbsp}×{";",":"}) — 5
+    ; titlecase: first char "," IS in UppercasedSymbols → for each of the 4 upper
+    ;   symbols register UpperSymbol + lowercase rest → 4
+    ; Total: 1 + 5 + 4 = 10
+    AssertEqual(10, _Stub_HotstringRegistrations.Length)
 }
-Test("CreateCaseSensitiveHotstrings: 2-char comma-first abbr explodes to 6 variants",
+Test("CreateCaseSensitiveHotstrings: 2-char comma-first abbr explodes to 10 variants",
     TestCS_TwoCharCommaFirst)
 
 TestCS_TwoCharCommaInside() {
     ResetHotstringRecorders()
     CreateCaseSensitiveHotstrings("*?", "a,", "x")
     ; lowercase "a," — 1
-    ; uppercase variants of "A,": ["A,", "A ;", "A :"] — 3
+    ; uppercase variants of "A,": ["A,", "A"+nnbsp;, "A"+nnbsp:, "A"+nbsp;, "A"+nbsp:] — 5
     ; titlecase: first char "a" letter, register "A," — 1
-    ; Total: 5
-    AssertEqual(5, _Stub_HotstringRegistrations.Length)
+    ; Total: 7
+    AssertEqual(7, _Stub_HotstringRegistrations.Length)
 }
-Test("CreateCaseSensitiveHotstrings: 2-char comma-inside abbr produces 5 variants",
+Test("CreateCaseSensitiveHotstrings: 2-char comma-inside abbr produces 7 variants",
     TestCS_TwoCharCommaInside)
 
 TestCS_ThreeCharAllLetters() {
@@ -332,10 +333,10 @@ Test("CreateCaseSensitiveHotstrings: 3-char letter abbr produces 3 variants",
 TestCS_ThreeCharCommaInside() {
     ResetHotstringRecorders()
     CreateCaseSensitiveHotstrings("*?", "a,b", "x")
-    ; lowercase 1 + uppercase variants of "A,B" = 3 (orig + 2 comma variants) + titlecase 1 = 5
-    AssertEqual(5, _Stub_HotstringRegistrations.Length)
+    ; lowercase 1 + uppercase variants of "A,B" = 5 (orig + 4 comma variants) + titlecase 1 = 7
+    AssertEqual(7, _Stub_HotstringRegistrations.Length)
 }
-Test("CreateCaseSensitiveHotstrings: 3-char with comma inside produces 5 variants",
+Test("CreateCaseSensitiveHotstrings: 3-char with comma inside produces 7 variants",
     TestCS_ThreeCharCommaInside)
 
 TestCS_AlwaysIncludesCFlag() {
@@ -395,12 +396,13 @@ Test("CreateCaseSensitiveHotstrings: 2-char digit-first abbr (uppercase suffix) 
 TestCS_TwoCharApostropheFirst() {
     ResetHotstringRecorders()
     CreateCaseSensitiveHotstrings("*?", Chr(0x27) . "b", "x")
-    ; Apostrophe (Chr(0x27)) is in UppercasedSymbols with one upper variant " ?".
-    ; lowercase "'b" + uppercase variants of "'B": ["'B", " ?B"] = 2 + titlecase from
-    ; symbol upgrade " ?b" = 1 → total 4.
-    AssertEqual(4, _Stub_HotstringRegistrations.Length)
+    ; Apostrophe (Chr(0x27)) is in UppercasedSymbols with two upper variants
+    ; (nnbsp+"?" and nbsp+"?").
+    ; lowercase "'b" + uppercase variants of "'B": ["'B", nnbsp?B, nbsp?B] = 3
+    ; + titlecase from symbol upgrade nnbsp?b, nbsp?b = 2 → total 6.
+    AssertEqual(6, _Stub_HotstringRegistrations.Length)
 }
-Test("CreateCaseSensitiveHotstrings: apostrophe-first 2-char abbr produces 4 variants",
+Test("CreateCaseSensitiveHotstrings: apostrophe-first 2-char abbr produces 6 variants",
     TestCS_TwoCharApostropheFirst)
 
 ; Encore plus: pause guard for full hotstring engine (project_suspend_pause_invariant)

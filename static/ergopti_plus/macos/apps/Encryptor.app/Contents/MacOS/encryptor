@@ -1,0 +1,68 @@
+#!/usr/bin/env python3
+# apps/Encryptor.app/Contents/MacOS/encryptor
+#
+# Launcher for the Encryptor bundle.
+# Python is used instead of zsh because macOS refuses to execute a plain shell
+# script as the main binary of an .app bundle (no Mach-O header).
+#
+# This launcher mirrors the App Cloner pattern:
+#   1. Build AppIcon.icns from AppIcon.svg if missing or stale (synchronously,
+#      so the Dock has the correct icon before the process is registered).
+#   2. os.execv into the real Automator droplet binary (droplet_bin), replacing
+#      this Python process entirely.  The PID is preserved, which means macOS
+#      continues to route Apple Events (open handler, drag-and-drop) correctly.
+import os
+import sys
+
+
+def ensure_icon(resources_dir: str, log_path: str) -> None:
+    """Build AppIcon.icns from AppIcon.svg if missing or stale.
+
+    Runs make_icon.sh synchronously so the icon exists before the Dock
+    registers the process.  make_icon.sh also calls lsregister and touch on
+    the bundle, which flushes the icon cache immediately.
+    """
+    import subprocess
+    svg    = os.path.join(resources_dir, "AppIcon.svg")
+    icns   = os.path.join(resources_dir, "AppIcon.icns")
+    script = os.path.join(resources_dir, "make_icon.sh")
+    if not os.path.exists(svg) or not os.path.exists(script):
+        return
+    needs_build = (
+        not os.path.exists(icns)
+        or os.path.getmtime(svg) > os.path.getmtime(icns)
+    )
+    if needs_build:
+        with open(log_path, "a") as log:
+            log.write(f"[Encryptor] regenerating icon from {svg}\n")
+        subprocess.run(["zsh", script], capture_output=True)
+
+
+def main() -> None:
+    launcher    = os.path.realpath(__file__)
+    macos_dir   = os.path.dirname(launcher)
+    contents    = os.path.dirname(macos_dir)
+    resources   = os.path.join(contents, "Resources")
+    droplet_bin = os.path.join(macos_dir, "droplet_bin")
+    log_path    = "/tmp/encryptor.log"
+
+    ensure_icon(resources, log_path)
+
+    if not os.path.exists(droplet_bin):
+        import subprocess
+        subprocess.run([
+            "osascript", "-e",
+            'display dialog "Encryptor — droplet_bin introuvable.\\n'
+            + droplet_bin
+            + '" buttons {"OK"} default button 1',
+        ], capture_output=True)
+        sys.exit(1)
+
+    # Replace this Python process with the Automator droplet.
+    # os.execv preserves the PID so macOS routes Apple Events (drag-and-drop)
+    # to the droplet as if it had been launched directly.
+    os.execv(droplet_bin, [droplet_bin] + sys.argv[1:])
+
+
+if __name__ == "__main__":
+    main()

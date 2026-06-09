@@ -510,6 +510,54 @@ Test("HSE bare semicolon + vowel fires unconditionally (in-word, not gated)",
     TestHSE_BareSemicolonVowelFiresInWord)
 
 
+; ── ",d → ds" SFB-reduction hotstring: shifted-comma case variants ──
+; The base trigger ",d" (auto_expand=true, is_word=false, is_case_sensitive=false)
+; expands to "ds". On the Ergopti Shift layer the comma key emits nnbsp/nbsp + ";"
+; (and the period key emits nnbsp/nbsp + ":"), so the "uppercase" comma is the
+; nbsp-prefixed punctuation — NEVER a plain ASCII space. These tests pin the
+; regression where _BuildUppercasedSymbols used a plain space: (1) "nnbsp + : + D"
+; never matched (so caps never produced "DS"), and (2) a bare "<space>:D" emoji
+; DID match and got swallowed into "DS".
+TestHSE_CommaShiftCaseVariantsFire() {
+    HSE_TestReset()
+    ; Register exactly the production ",d → ds" entry (flags: * auto, ? in-word).
+    CreateCaseSensitiveHotstrings("*?", ",d", "ds")
+
+    ; nnbsp + ":" + "D" (shifted period + shifted d) → uppercase "DS".
+    HSE_FeedChar(Chr(0x202F))
+    HSE_FeedChar(":")
+    Match := HSE_FeedChar("D")
+    AssertTrue(Match != "", "nnbsp + : + D must fire the shifted-comma variant")
+    AssertEqual("DS", Match.Replacement, "uppercase D yields uppercase replacement DS")
+
+    ; nnbsp + ";" + "d" (shifted comma + lowercase d) → titlecase "Ds".
+    HSE_TestReset()
+    CreateCaseSensitiveHotstrings("*?", ",d", "ds")
+    HSE_FeedChar(Chr(0x202F))
+    HSE_FeedChar(Chr(0x3B))
+    Match2 := HSE_FeedChar("d")
+    AssertTrue(Match2 != "", "nnbsp + semicolon + d must fire the shifted-comma variant")
+    AssertEqual("Ds", Match2.Replacement, "lowercase d yields titlecase replacement Ds")
+}
+Test("HSE comma-shift case variants fire on nnbsp + punctuation",
+    TestHSE_CommaShiftCaseVariantsFire)
+
+TestHSE_PlainSpaceColonDDoesNotFire() {
+    HSE_TestReset()
+    CreateCaseSensitiveHotstrings("*?", ",d", "ds")
+    ; A plain ASCII space + ":" + "D" is the ":D" emoji typed after a normal word —
+    ; it MUST NOT match the comma hotstring. Anchoring the shifted comma on
+    ; nbsp/nnbsp (not a plain space) is exactly what keeps the emoji alive.
+    HSE_FeedChar(" ")
+    HSE_FeedChar(":")
+    Match := HSE_FeedChar("D")
+    AssertEqual("", Match,
+        "<space> + : + D must NOT fire -- the ':D' emoji stays literal")
+}
+Test("HSE plain-space colon-D does not fire the comma hotstring (':D' emoji preserved)",
+    TestHSE_PlainSpaceColonDDoesNotFire)
+
+
 
 
 
