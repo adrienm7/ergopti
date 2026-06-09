@@ -121,21 +121,25 @@ end
 local function start_click_key_watcher()
 	if click_key_watcher then return end
 	click_key_watcher = hs.eventtap.new({ hs.eventtap.event.types.keyDown, hs.eventtap.event.types.flagsChanged }, function(_)
-		local pos = hs.mouse.absolutePosition()
-		if leftClickHeld then
-			if leftMouseTap then pcall(function() leftMouseTap:stop() end); leftMouseTap = nil end
-			pcall(function() hs.eventtap.event.newMouseEvent(hs.eventtap.event.types.leftMouseUp, pos):post() end)
-			leftClickHeld = false
-			Logger.info(LOG, "Synthetic Left-Click RELEASED by keydown.")
-		end
-		if rightClickHeld then
-			if rightMouseTap then pcall(function() rightMouseTap:stop() end); rightMouseTap = nil end
-			pcall(function() hs.eventtap.event.newMouseEvent(hs.eventtap.event.types.rightMouseUp, pos):post() end)
-			rightClickHeld = false
-			Logger.info(LOG, "Synthetic Right-Click RELEASED by keydown.")
-		end
-		pcall(function() click_key_watcher:stop() end)
-		click_key_watcher = nil
+		-- Defer the synthetic mouseUp so the keyDown propagates first and macOS
+		-- applies it to the current selection before we release the click hold.
+		hs.timer.doAfter(0, function()
+			local pos = hs.mouse.absolutePosition()
+			if leftClickHeld then
+				if leftMouseTap then pcall(function() leftMouseTap:stop() end); leftMouseTap = nil end
+				pcall(function() hs.eventtap.event.newMouseEvent(hs.eventtap.event.types.leftMouseUp, pos):post() end)
+				leftClickHeld = false
+				Logger.info(LOG, "Synthetic Left-Click RELEASED by keydown.")
+			end
+			if rightClickHeld then
+				if rightMouseTap then pcall(function() rightMouseTap:stop() end); rightMouseTap = nil end
+				pcall(function() hs.eventtap.event.newMouseEvent(hs.eventtap.event.types.rightMouseUp, pos):post() end)
+				rightClickHeld = false
+				Logger.info(LOG, "Synthetic Right-Click RELEASED by keydown.")
+			end
+			pcall(function() click_key_watcher:stop() end)
+			click_key_watcher = nil
+		end)
 		return false
 	end)
 	pcall(function() click_key_watcher:start() end)
