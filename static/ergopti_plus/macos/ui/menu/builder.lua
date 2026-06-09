@@ -307,8 +307,7 @@ function M.generate(ctx, menu_mods, actions)
 			for _, it in ipairs(ergopti_groups_built) do table.insert(hotstrings_menu, it) end
 		end
 
-		-- 3. Personal/custom hotstrings — "Mes hotstrings" header avoids duplication with
-		-- the sub-menu item title "Hotstrings personnels" just below it.
+		-- 3. Personal/custom hotstrings — "Mes hotstrings" (section header) vs "Hotstrings personnels" (sub-item).
 		local custom_item = type(menu_mods.hotstrings.build_custom) == "function"
 			and Logger.build(LOG, "hotstrings.build_custom", function(c) return menu_mods.hotstrings.build_custom(c, counts) end, ctx)
 		if custom_item then
