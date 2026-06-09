@@ -73,6 +73,31 @@ TestTL_UnescapeMultipleEscapes() {
 }
 Test("UnescapeTomlString: multiple escapes handled", TestTL_UnescapeMultipleEscapes)
 
+; --- Fast-path regression guards (no-backslash input must return verbatim) ---
+; The InStr fast-path returns the input untouched whenever it carries no "\".
+; These pin that the shortcut is byte-for-byte identical to the full scan for
+; the inputs that actually exercise it — plain ASCII, unicode, and strings
+; containing characters the escape handler would otherwise inspect (", n, t).
+TestTL_UnescapeFastPathUnicode() {
+	AssertEqual("café münchen — ★", UnescapeTomlString("café münchen — ★"))
+}
+Test("UnescapeTomlString: no-backslash unicode returns verbatim (fast-path)",
+	TestTL_UnescapeFastPathUnicode)
+
+TestTL_UnescapeFastPathLooksLikeEscapes() {
+	; No backslash present, so 'n'/'t'/'"' must stay literal, not decode
+	AssertEqual('ntr"quoted"', UnescapeTomlString('ntr"quoted"'))
+}
+Test("UnescapeTomlString: no-backslash escape-looking chars stay literal (fast-path)",
+	TestTL_UnescapeFastPathLooksLikeEscapes)
+
+TestTL_UnescapeTrailingBackslash() {
+	; A lone trailing backslash (i == n) hits the slow path's else branch and
+	; is preserved verbatim — guards the boundary the fast-path skips over
+	AssertEqual("abc\", UnescapeTomlString("abc\"))
+}
+Test("UnescapeTomlString: trailing lone backslash preserved", TestTL_UnescapeTrailingBackslash)
+
 TestTL_UnescapeUnknown() {
 	AssertEqual("axb", UnescapeTomlString("a\xb"))
 }
