@@ -735,3 +735,91 @@ TestHSE_EndCharTriggerSuppressedWhenEndCharLeadsToStarTrigger() {
 }
 Test("HSE end-char trigger is suppressed when the end char continues toward a star trigger",
     TestHSE_EndCharTriggerSuppressedWhenEndCharLeadsToStarTrigger)
+
+
+
+
+
+; ============================================
+; =====================================================
+; ======= 8/ Per-section grouping (live toggle) =======
+; =====================================================
+; ============================================
+
+; Each hotstring loaded for a TOML section must land in its own
+; "<category>.<section>" HSE group so HSE_EnableGroup / HSE_DisableGroup can
+; toggle the section live (no Reload). These tests pin that contract — the
+; reload-free tray toggles in ui/tray_menu.ahk depend on it.
+
+TestHSE_GroupDerivedFromObjectMeta() {
+    HSE_TestReset()
+    Spec := HSE_Register("*", "qz", (*) => "",
+        { Category: "autocorrection", Section: "errors", Replacement: "X" })
+    AssertEqual("autocorrection.errors", Spec.Group,
+        "object Meta with Category/Section derives the <category>.<section> group")
+    AssertTrue(HSE_RegistryByGroup.Has("autocorrection.errors"),
+        "the derived group is indexed in HSE_RegistryByGroup")
+}
+Test("HSE group is derived from object Meta Category/Section", TestHSE_GroupDerivedFromObjectMeta)
+
+TestHSE_GroupDerivedFromMapMeta() {
+    HSE_TestReset()
+    Spec := HSE_Register("*", "qz", (*) => "",
+        Map("Category", "rolls", "Section", "hc", "Replacement", "Y"))
+    AssertEqual("rolls.hc", Spec.Group,
+        "Map Meta with Category/Section derives the <category>.<section> group")
+}
+Test("HSE group is derived from Map Meta Category/Section", TestHSE_GroupDerivedFromMapMeta)
+
+TestHSE_SectionlessStaysDefault() {
+    HSE_TestReset()
+    Spec := HSE_Register("*", "qz", (*) => "")
+    AssertEqual("default", Spec.Group,
+        "a registration with no Category/Section keeps the default group")
+}
+Test("HSE section-less registration stays in the default group", TestHSE_SectionlessStaysDefault)
+
+TestHSE_ExplicitGroupOverridesDerived() {
+    HSE_TestReset()
+    Spec := HSE_Register("*", "qz", (*) => "",
+        Map("group", "custom_group", "Category", "rolls", "Section", "hc"))
+    AssertEqual("custom_group", Spec.Group,
+        "an explicit Meta group wins over the derived category.section")
+}
+Test("HSE explicit Meta group overrides the derived section group", TestHSE_ExplicitGroupOverridesDerived)
+
+TestHSE_DisableGroupStopsSectionFiringSiblingSurvives() {
+    HSE_TestReset()
+    ; Two star triggers ending in "z", each in its own section group.
+    HSE_Register("*", "qz", (*) => "",
+        Map("Category", "rolls", "Section", "alpha", "Replacement", "A"))
+    HSE_Register("*", "wz", (*) => "",
+        Map("Category", "rolls", "Section", "beta", "Replacement", "B"))
+
+    ; Both fire while enabled.
+    HSE_FeedReset(true)
+    HSE_FeedChar("q")
+    M := HSE_FeedChar("z")
+    AssertEqual("qz", M.Trigger, "rolls.alpha fires while enabled")
+
+    ; Disabling rolls.alpha removes only its trigger from the live index.
+    HSE_DisableGroup("rolls.alpha")
+    HSE_FeedReset(true)
+    HSE_FeedChar("q")
+    M2 := HSE_FeedChar("z")
+    AssertEqual("", M2, "rolls.alpha no longer fires once its group is disabled")
+
+    HSE_FeedReset(true)
+    HSE_FeedChar("w")
+    M3 := HSE_FeedChar("z")
+    AssertEqual("wz", M3.Trigger, "sibling section rolls.beta still fires after rolls.alpha is disabled")
+
+    ; Re-enabling rolls.alpha restores its trigger.
+    HSE_EnableGroup("rolls.alpha")
+    HSE_FeedReset(true)
+    HSE_FeedChar("q")
+    M4 := HSE_FeedChar("z")
+    AssertEqual("qz", M4.Trigger, "rolls.alpha fires again after its group is re-enabled")
+}
+Test("HSE disabling a section group stops only that section, enabling restores it",
+    TestHSE_DisableGroupStopsSectionFiringSiblingSurvives)

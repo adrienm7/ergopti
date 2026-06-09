@@ -68,6 +68,8 @@ OnError(_FatalErrorHandler)
 #Include ../lib/nav_layer_helpers.ahk
 #Include ../lib/hotstrings/hotstring_engine.ahk
 #Include ../lib/hotstrings/hotstring_engine_main.ahk
+#Include ../lib/hotstrings/hotstring_live_toggle.ahk
+#Include ../lib/hotstrings/hotstring_prefix_watcher.ahk
 ; Generated terminator catalogue (shared single source) — exercised by
 ; test_terminators.ahk and consumed by the tray / config-window delimiter menus.
 #Include ../_generated/terminators.ahk
@@ -128,6 +130,8 @@ InstallSendNoOps()
 #Include test_tooltip_dequeue_regression.ahk
 #Include test_hotstring_engine.ahk
 #Include test_hotstring_engine_main.ahk
+#Include test_hotstring_live_toggle.ahk
+#Include test_prefix_watcher_index.ahk
 #Include test_domain_registry.ahk
 #Include test_domain_expander.ahk
 #Include test_toml_loader.ahk

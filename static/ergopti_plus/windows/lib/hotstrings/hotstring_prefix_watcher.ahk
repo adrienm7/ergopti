@@ -272,6 +272,28 @@ PrefixWatcherSuppress(YesNo) {
     HSE_Suppress(YesNo)
 }
 
+; Rebuild the prefix index from the CURRENT Features state without restarting
+; the InputHook. Called after a live section toggle (ui/tray_menu.ahk
+; _HS_TryLiveToggle) so the preview tooltip stops/starts in lockstep with the
+; HSE expansion: _RegisterCategoryTriggers only indexes sections whose Features
+; "enabled" flag is set, so a freshly disabled section's triggers disappear from
+; the index and a freshly enabled one's appear — exactly what a full Reload did.
+; No-op when the watcher is not running (the index is intentionally empty then).
+HotstringPrefixWatcherRebuildIndex() {
+    global _PrefixInputHook, _PrefixIndex, _TriggerSet, _PREFIX_WATCHER_CATEGORIES
+    if !_PrefixInputHook {
+        return
+    }
+    _PrefixIndex := Map()
+    _TriggerSet := Map()
+    for _, Category in _PREFIX_WATCHER_CATEGORIES {
+        _RegisterCategoryTriggers(Category)
+    }
+    ; A just-disabled section may still have a tooltip on screen — hide it so the
+    ; preview cannot outlive the expansion it was advertising.
+    TooltipHide("LiveToggleRebuild", true)
+}
+
 ; Stop the InputHook and clear the index. Useful when the user disables the
 ; preview from the tray menu or before reloading.
 HotstringPrefixWatcherStop() {
