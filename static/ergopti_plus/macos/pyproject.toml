@@ -30,6 +30,14 @@ dependencies = [
 	# community organization page when refreshing data/llm_models.json.
 	"requests==2.32.3",
 	"beautifulsoup4==4.12.3",
+
+	# System trust store for Python TLS. The MLX download / server scripts call
+	# truststore.inject_into_ssl() so HuggingFace requests trust the macOS
+	# keychain CA roots. It was MISSING here, so `uv sync` never installed it and
+	# the download gate (`import huggingface_hub, truststore`) failed with
+	# "huggingface_hub/truststore manquants". Pin to the exact resolved version
+	# once the next `uv sync` writes it to uv.lock.
+	"truststore>=0.9.1",
 ]
 
 [tool.uv]

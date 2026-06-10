@@ -21,6 +21,12 @@ local dialog = require("lib.dialog_util")
 
 local LOG = "models_selector"
 
+-- hs.chooser objects are garbage-collected as soon as no Lua reference remains.
+-- The "browse all models" chooser was held only in a local inside the click
+-- handler, so it could be collected before macOS finished presenting it — the
+-- window flashed or never appeared. Retain it at module scope for the session.
+local _model_browser_chooser = nil
+
 
 
 
@@ -573,6 +579,8 @@ function M.build(ctx)
 			chooser:choices(filtered)
 		end)
 		chooser:choices(choices)
+		-- Retain at module scope so the chooser survives until macOS presents it.
+		_model_browser_chooser = chooser
 		chooser:show()
 	end
 
