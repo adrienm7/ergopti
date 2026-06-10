@@ -1,18 +1,21 @@
 ﻿; static/ergopti_plus/windows/tests/test_hotstring_live_toggle.ahk
 
 ; ==============================================================================
-; MODULE: Hotstring Live-Toggle Whitelist Tests
+; MODULE: Hotstring Live-Toggle Classification Tests
 ; DESCRIPTION:
-; Pins the classification that decides which hotstring section toggles are
-; applied LIVE (HSE group enable/disable, no Reload) versus which fall back to a
-; full Reload. The tray fast path (ui/tray_menu.ahk _HS_TryLiveToggle) trusts
-; this whitelist, so a misclassification here would either reload needlessly or,
-; worse, silently fail to toggle a section. These tests guard both directions.
+; Pins the inverted classification that decides which hotstring section toggles
+; rebuild in-process (no Reload) versus which must Reload. After the
+; RegisterAllHotstrings() wrap, the tray fast path (ui/tray_menu.ahk
+; _HS_TryLiveToggle) treats EVERY hotstring section as live-eligible except the
+; reload-only groups in the blocklist. These tests guard that the blocklist holds
+; exactly those exceptions: a cross-dependent or inline section must never be
+; wrongly forced onto the Reload path, and a native or layout-backed feature must
+; never be wrongly toggled live.
 ;
 ; Only the pure, dependency-light helpers from
 ; lib/hotstrings/hotstring_live_toggle.ahk are exercised here - the tray glue
-; (_HS_ResolveLiveToggle / _HS_TryLiveToggle) needs the menu and is covered by
-; live testing.
+; (_HS_TryLiveToggle / _HS_ApplyLiveToggle / RebuildHotstringsLive) needs the
+; menu and is covered by live testing.
 ; ==============================================================================
 
 
@@ -47,60 +50,66 @@ Test("HSLT derive group strips underscores from the category only",
 
 ; =========================================
 ; =========================================
-; ======= 2/ Whitelist Membership =========
+; ======= 2/ Reload-Only Blocklist ========
 ; =========================================
 ; =========================================
 
-TestHSLT_WhitelistAcceptsPureSections() {
-	AssertTrue(_HS_IsLiveToggleGroup("autocorrection.errors"))
-	AssertTrue(_HS_IsLiveToggleGroup("autocorrection.accents"))
-	AssertTrue(_HS_IsLiveToggleGroup("rolls.hc"))
-	AssertTrue(_HS_IsLiveToggleGroup("rolls.ct"))
-	AssertTrue(_HS_IsLiveToggleGroup("sfbsreduction.comma"))
-	AssertTrue(_HS_IsLiveToggleGroup("distancesreduction.qu"))
-	AssertTrue(_HS_IsLiveToggleGroup("magickey.text_expansion_symbols_typst"))
+TestHSLT_BlocklistPinsTheReloadOnlySections() {
+	; The Ê deadkey and the "..." rule register via the native AHK Hotstring()
+	; engine, skipped by the live rebuild -> they MUST Reload.
+	AssertTrue(_HS_IsReloadOnlyGroup("distancesreduction.dead_key_e_circumflex"),
+		"the deadkey is native-engine and must reload")
+	AssertTrue(_HS_IsReloadOnlyGroup("autocorrection.multiple_punctuation_marks"),
+		"the multiple-punctuation rule is native-engine and must reload")
+	; magic_key.replace lives under "hotstrings.*" but is a LAYOUT remap (J -> star)
+	; applied by modules/layout.ahk, so RegisterAllHotstrings never touches it.
+	AssertTrue(_HS_IsReloadOnlyGroup("magickey.replace"),
+		"the magic-key remap is a layout feature and must reload")
 }
-Test("HSLT whitelist accepts pure LoadHotstringsSection sections",
-	TestHSLT_WhitelistAcceptsPureSections)
+Test("HSLT blocklist pins the reload-only sections",
+	TestHSLT_BlocklistPinsTheReloadOnlySections)
 
-TestHSLT_WhitelistRejectsInlineMixedAndDependencySections() {
-	; Inline-generated (custom CreateHotstring, SpaceAroundSymbols) -> Reload.
-	AssertFalse(_HS_IsLiveToggleGroup("rolls.assign"),
-		"rolls.assign is inline-generated (SpaceAroundSymbols) and must reload")
-	AssertFalse(_HS_IsLiveToggleGroup("rolls.not_equal"))
-	AssertFalse(_HS_IsLiveToggleGroup("rolls.left_arrow"))
-	AssertFalse(_HS_IsLiveToggleGroup("rolls.equal_string"))
-	AssertFalse(_HS_IsLiveToggleGroup("rolls.english_negation"))
+TestHSLT_BlocklistRejectsEverythingElse() {
+	; Pure LoadHotstringsSection sections rebuild in-process -> not reload-only.
+	AssertFalse(_HS_IsReloadOnlyGroup("autocorrection.errors"))
+	AssertFalse(_HS_IsReloadOnlyGroup("autocorrection.accents"))
+	AssertFalse(_HS_IsReloadOnlyGroup("rolls.hc"))
+	AssertFalse(_HS_IsReloadOnlyGroup("rolls.ct"))
+	AssertFalse(_HS_IsReloadOnlyGroup("sfbsreduction.comma"))
+	AssertFalse(_HS_IsReloadOnlyGroup("distancesreduction.qu"))
+	AssertFalse(_HS_IsReloadOnlyGroup("magickey.text_expansion_symbols_typst"))
 
-	; Mixed (LoadHotstringsSection + inline supplement) -> Reload.
-	AssertFalse(_HS_IsLiveToggleGroup("autocorrection.typographic_apostrophe"),
-		"typographic_apostrophe also registers inline y'<letter> guards -> reload")
-	AssertFalse(_HS_IsLiveToggleGroup("autocorrection.caps"))
-	AssertFalse(_HS_IsLiveToggleGroup("autocorrection.multiple_punctuation_marks"))
+	; The magic-key text-expansion sections ARE registered by RegisterAllHotstrings
+	; (siblings of the reload-only magickey.replace), so they rebuild live.
+	AssertFalse(_HS_IsReloadOnlyGroup("magickey.text_expansion"),
+		"magic_key.text_expansion is a real hotstring section -> live")
+	AssertFalse(_HS_IsReloadOnlyGroup("magickey.repeat_corrections"))
 
-	; Dependency target: sfbs_reduction.bu reads magic_key.text_expansion at boot.
-	AssertFalse(_HS_IsLiveToggleGroup("magickey.text_expansion"),
-		"magic_key.text_expansion is a cross-feature dependency target -> reload")
+	; Previously Reload-only (inline / cross-dependent) sections are now live via
+	; the in-process rebuild. Regression guard for the cut-over: re-running
+	; RegisterAllHotstrings() re-evaluates their guards and recomputes
+	; SpaceAroundSymbols.
+	AssertFalse(_HS_IsReloadOnlyGroup("rolls.assign"),
+		"inline rolls operators rebuild in-process now")
+	AssertFalse(_HS_IsReloadOnlyGroup("rolls.not_equal"))
+	AssertFalse(_HS_IsReloadOnlyGroup("rolls.left_arrow"))
+	AssertFalse(_HS_IsReloadOnlyGroup("rolls.equal_string"))
+	AssertFalse(_HS_IsReloadOnlyGroup("autocorrection.typographic_apostrophe"))
+	AssertFalse(_HS_IsReloadOnlyGroup("autocorrection.caps"))
+	AssertFalse(_HS_IsReloadOnlyGroup("sfbsreduction.bu"))
+	AssertFalse(_HS_IsReloadOnlyGroup("sfbsreduction.i_e_acute"))
+	AssertFalse(_HS_IsReloadOnlyGroup("distancesreduction.comma_j"))
+	AssertFalse(_HS_IsReloadOnlyGroup("distancesreduction.comma_far_letters"))
+	AssertFalse(_HS_IsReloadOnlyGroup("dynamic.date_fr"))
+	AssertFalse(_HS_IsReloadOnlyGroup("dynamic.phone_prefixes"))
 
-	; Cross-dependent / inline sfbs sections.
-	AssertFalse(_HS_IsLiveToggleGroup("sfbsreduction.bu"))
-	AssertFalse(_HS_IsLiveToggleGroup("sfbsreduction.i_e_acute"))
-
-	; Inline comma / deadkey sections.
-	AssertFalse(_HS_IsLiveToggleGroup("distancesreduction.comma_j"))
-	AssertFalse(_HS_IsLiveToggleGroup("distancesreduction.comma_far_letters"))
-	AssertFalse(_HS_IsLiveToggleGroup("distancesreduction.dead_key_e_circumflex"))
-
-	; Dynamic sections (fire-time values, inline, group "default") -> Reload.
-	AssertFalse(_HS_IsLiveToggleGroup("dynamic.date_fr"))
-	AssertFalse(_HS_IsLiveToggleGroup("dynamic.phone_prefixes"))
-
-	; Garbage / unknown -> Reload.
-	AssertFalse(_HS_IsLiveToggleGroup(""))
-	AssertFalse(_HS_IsLiveToggleGroup("not.a.section"))
+	; Garbage / unknown -> not reload-only (the caller's manifest check rejects
+	; these before the blocklist is consulted).
+	AssertFalse(_HS_IsReloadOnlyGroup(""))
+	AssertFalse(_HS_IsReloadOnlyGroup("not.a.section"))
 }
-Test("HSLT whitelist rejects inline, mixed, and dependency-target sections",
-	TestHSLT_WhitelistRejectsInlineMixedAndDependencySections)
+Test("HSLT blocklist rejects every non-reload-only section",
+	TestHSLT_BlocklistRejectsEverythingElse)
 
 
 

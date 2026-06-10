@@ -1,32 +1,38 @@
 ﻿; static/ergopti_plus/windows/lib/hotstrings/hotstring_live_toggle.ahk
 
 ; ==============================================================================
-; MODULE: Hotstring Live-Toggle Whitelist
+; MODULE: Hotstring Live-Toggle Classification
 ; DESCRIPTION:
-; Classifies which hotstring section toggles can be applied LIVE (enable or
-; disable a HSE group at runtime, with no script Reload) versus which must
-; still trigger a full Reload.
+; Classifies which hotstring section toggles can be applied LIVE versus which
+; must still trigger a full script Reload.
 ;
-; Only sections registered PURELY via LoadHotstringsSection are eligible: a
-; single TOML section, with no inline supplemental CreateHotstring calls, no
-; cross-feature dependency, and no boot-captured global (SpaceAroundSymbols,
-; the magic key, resolved per-category delays). Everything else stays on the
-; Reload path: inline-generated sections (comma_j, rolls operators, dynamic
-; dates / phone / SSN / IBAN), dependency targets (magic_key.text_expansion is
-; read by the sfbs_reduction.bu block), and the non-hotstring categories
-; (layout, tap-holds, shortcuts, gestures).
+; Since the registration is wrapped into a single re-runnable
+; RegisterAllHotstrings() function, the live path no longer splices individual
+; HSE groups; it clears the engine and re-runs the whole registration in-process
+; (RebuildHotstringsLive in tray_menu.ahk). Re-running re-evaluates every
+; "if Features[...]" guard, so cross-dependencies (sfbs_reduction.bu reads
+; magic_key.text_expansion), inline-generated sections (comma_j, rolls operators)
+; and the boot-captured SpaceAroundSymbols all resolve correctly. So ALL hotstring
+; sections are live-eligible BY DEFAULT.
+;
+; The exceptions are the few "hotstrings.*" manifest paths that
+; RegisterAllHotstrings does NOT apply, so re-running it has no effect on them:
+;   1. Ê deadkey and "…" multiple-punctuation — registered via the native AHK
+;      Hotstring() engine, not the HSE. Re-running re-registers their enabled
+;      forms but cannot UNregister one that just became disabled, so disabling
+;      them live would strand a native trigger.
+;   2. magic_key.replace — the magic-key remap (J → ★). It lives under
+;      "hotstrings.*" but is a LAYOUT feature (modules/layout.ahk RemapKey at
+;      boot), so a hotstring rebuild does nothing for it.
 ;
 ; FEATURES & RATIONALE:
-; 1. Fail-safe by omission: an unlisted group is never toggled live, so a
-;    misclassification degrades to the correct Reload path, never to a silent
-;    no-op or a stale expansion. The caller adds a second guard (the group must
-;    actually exist in the HSE registry before a live disable) so an id mismatch
-;    also degrades to Reload.
-; 2. Pure and dependency-light: the whitelist and helpers below touch no menu,
+; 1. Inverted model: everything is live unless explicitly blocklisted. A new
+;    HSE section is automatically live-eligible — no whitelist entry to forget.
+; 2. Fail-safe blocklist: the reload-only groups are pinned by exact id, so a
+;    native or layout-backed feature can never be toggled live.
+; 3. Pure and dependency-light: the blocklist and helpers below touch no menu,
 ;    no path translator and no OS API, so they are unit-testable in isolation
 ;    (tests/test_hotstring_live_toggle.ahk) without loading the tray menu.
-; 3. Single source of truth: tray_menu.ahk derives a "<category>.<section>"
-;    group from a feature path and asks this module whether it is eligible.
 ; ==============================================================================
 
 
@@ -35,47 +41,20 @@
 
 ; =============================================
 ; =============================================
-; ======= 1/ Live-Toggle Whitelist ============
+; ======= 1/ Reload-Only Blocklist ============
 ; =============================================
 ; =============================================
 
-; HSE group strings ("<loader_category>.<section>") that are safe to enable or
-; disable live. The loader category is the LoadHotstringsSection name: the v2
-; category with underscores removed (distances_reduction -> distancesreduction,
-; sfbs_reduction -> sfbsreduction, magic_key -> magickey). Personal sections are
-; handled separately (always eligible) and are deliberately not listed here.
-;
-; A section is listed ONLY when its entire registration in modules/hotstrings.ahk
-; is a single LoadHotstringsSection call with a standalone "enabled" guard.
-global _HS_LIVE_TOGGLE_GROUPS := Map(
-	"distancesreduction.qu",                  true,
-	"distancesreduction.e_circumflex_e",      true,
-	"distancesreduction.suffixes_a",          true,
-	"sfbsreduction.comma",                    true,
-	"sfbsreduction.e_circ",                   true,
-	"sfbsreduction.e_grave",                  true,
-	"rolls.close_chevron_tag",                true,
-	"rolls.ez",                               true,
-	"rolls.comment_open",                     true,
-	"rolls.comment_close",                    true,
-	"rolls.hashtag_parenthesis",              true,
-	"rolls.hashtag_open_bracket",             true,
-	"rolls.hashtag_close_bracket",            true,
-	"rolls.hc",                               true,
-	"rolls.sx",                               true,
-	"rolls.cx",                               true,
-	"rolls.ct",                               true,
-	"autocorrection.errors",                  true,
-	"autocorrection.ou",                      true,
-	"autocorrection.suffixes_a_chaining",     true,
-	"autocorrection.minus",                   true,
-	"autocorrection.minus_apostrophe",        true,
-	"autocorrection.names",                   true,
-	"autocorrection.accents",                 true,
-	"magickey.text_expansion_auto",           true,
-	"magickey.text_expansion_emojis",         true,
-	"magickey.text_expansion_symbols",        true,
-	"magickey.text_expansion_symbols_typst",  true,
+; HSE group strings ("<loader_category>.<section>") that must NOT be toggled live
+; because RegisterAllHotstrings does not apply them via the live rebuild, so an
+; in-process rebuild has no effect and they still need a Reload. The loader
+; category drops underscores from the v2 category (distances_reduction ->
+; distancesreduction); the section id keeps its underscores. Everything NOT listed
+; here is live-eligible.
+global _HS_RELOAD_ONLY_GROUPS := Map(
+	"distancesreduction.dead_key_e_circumflex",  true,  ; native AHK Hotstring() engine
+	"autocorrection.multiple_punctuation_marks", true,  ; native AHK Hotstring() engine
+	"magickey.replace",                          true,  ; layout remap (J -> star), not a hotstring
 )
 
 
@@ -98,12 +77,13 @@ _HS_DeriveLiveToggleGroup(V2CategoryUnderscored, Section) {
 	return StrReplace(V2CategoryUnderscored, "_", "") . "." . Section
 }
 
-; Returns true when Group is a bundled section that may be toggled live.
+; Returns true when Group is not applied by the live rebuild (native-engine or
+; layout-backed) and therefore must take the Reload path instead.
 ; @param Group {String} HSE group string ("<loader_category>.<section>").
 ; @returns {Boolean}
-_HS_IsLiveToggleGroup(Group) {
-	global _HS_LIVE_TOGGLE_GROUPS
-	return _HS_LIVE_TOGGLE_GROUPS.Has(Group)
+_HS_IsReloadOnlyGroup(Group) {
+	global _HS_RELOAD_ONLY_GROUPS
+	return _HS_RELOAD_ONLY_GROUPS.Has(Group)
 }
 
 ; Returns true when FullPath is a personal hotstring section ("Personal.<id>"),
