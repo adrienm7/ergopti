@@ -2025,6 +2025,10 @@ if Features.Has("hotstrings") and Features["hotstrings"].Has("personal") {
 #Include modules/shortcuts.ahk
 #Include modules/tap_holds.ahk
 #Include modules/hotstrings.ahk
+; The module now only DEFINES RegisterAllHotstrings(); invoke it here so the
+; registration runs at the same boot point (and A_InputLevel) as before the
+; in-process refactor. A_InputLevel is still 2 from the #InputLevel 2 above.
+RegisterAllHotstrings()
 HotstringPrefixWatcherInit()
 BootProfile_Mark("Hotstrings registered + prefix watcher armed")
 LoggerSuccess("ErgoptiPlus", "Driver fully initialised — ready.")

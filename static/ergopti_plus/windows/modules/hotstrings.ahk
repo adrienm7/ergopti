@@ -9,6 +9,16 @@
 ; ==============================================================================
 
 
+; Registers every hotstring category into the engine. Wrapped in a function so
+; the whole registration can be re-run in-process (live menu toggles) instead of
+; restarting the script via Reload. Called once at boot from ErgoptiPlus.ahk
+; right after the #Include — and, in a later slice, again on every hotstring
+; toggle so the change applies hot without a full process restart.
+RegisterAllHotstrings() {
+	global Features, ScriptInformation, PersonalInformation, PersonalInformationLetters
+	global DeadkeyMappingCircumflex, SpaceAroundSymbols, PersonalInformationHotstrings
+
+
 
 
 
@@ -51,36 +61,12 @@ if Features["hotstrings"]["distances_reduction"]["dead_key_e_circumflex"]["enabl
 	DeadkeyMappingCircumflexModified.Delete("e") ; For the rolling "êe" that gives "œ"
 	DeadkeyMappingCircumflexModified.Delete("t") ; To be able to type "être"
 
-	; The "Ê" key will enable to use the other symbols on the layer if we aren't inside a word
+	; The "Ê" key will enable to use the other symbols on the layer if we aren't inside a word.
+	; The activation delay is passed explicitly so the registered callbacks stay
+	; self-contained — CreateDeadkeyHotstring / ShouldActivateDeadkey live at module
+	; scope (see end of file) and never close over this function's locals.
 	for MapKey, MappedValue in DeadkeyMappingCircumflexModified {
-		CreateDeadkeyHotstring(MapKey, MappedValue)
-	}
-
-	CreateDeadkeyHotstring(MapKey, MappedValue) {
-		; We only activate the deadkey if it is the start of a new word, as symbols aren't put in words
-		; This condition corrects problems such as writing "même" that give "mê⁂e"
-		Combination := "ê" . MapKey
-		Hotstring(
-			":*?CB0:" . Combination,
-			(*) => ShouldActivateDeadkey(Combination, MappedValue)
-		)
-	}
-
-	ShouldActivateDeadkey(Combination, MappedValue) {
-		if not IsTimeActivationExpired(GetLastSentCharacterAt(-2), DeadKeyECircumflexDelay) {
-			; We only activate the deadkey if it is the start of a new word, as symbols aren't put in words
-			; This condition corrects problems such as writing "même" that give "mê⁂e"
-			; We could simply have removed the "?" flag in the Hotstring definition, but we want to get the symbols also if we are typing numbers.
-			; For example to write 01/02 by using the / on the deadkey.
-			if (GetLastSentCharacterAt(-3) ~= "^[^A-Za-z★]$") { ; Everything except a letter
-				; Character at -1 is the key in the deadkey, character at -2 is "ê", character at -3 is character before using the deadkey
-				SendNewResult("{BackSpace 2}", False)
-				SendNewResult(MappedValue)
-			} else if (GetLastSentCharacterAt(-3) ~= "^[nN]$" and GetLastSentCharacterAt(-1) == "c") { ; Special case of the º symbol
-				SendNewResult("{BackSpace 2}", False)
-				SendNewResult(MappedValue)
-			}
-		}
+		CreateDeadkeyHotstring(MapKey, MappedValue, DeadKeyECircumflexDelay)
 	}
 }
 
@@ -536,7 +522,8 @@ if Features["hotstrings"]["dynamic"]["text_expansion_personal_information"]["ena
 		True))
 
 	; Map a letter to a value (n ➜ Nom, t ➜ 0606060606, etc.)
-	global PersonalInformationHotstrings := Map()
+	; Declared global at the top of RegisterAllHotstrings — re-init it on every run.
+	PersonalInformationHotstrings := Map()
 	for InfoKey, InfoValue in PersonalInformationLetters {
 		PersonalInformationHotstrings[InfoKey] := PersonalInformation[InfoValue]
 	}
@@ -596,6 +583,7 @@ if Features["hotstrings"]["dynamic"]["text_expansion_personal_information"]["ena
 
 	; Generate manually longer shortcuts, as increasing PatternMaxLength expands memory exponentially
 	CreateHotstringComboAuto(Combo) {
+		global PersonalInformationHotstrings
 		Value := ""
 		loop StrLen(Combo) {
 			ComboLetter := SubStr(Combo, A_Index, 1)
@@ -821,8 +809,6 @@ if Features["hotstrings"]["dynamic"]["iban_prefixes"]["enabled"] {
 ; ===== 4.6) Repeat key =====
 ; ===========================
 
-#InputLevel 1 ; Mandatory for this section to work, it needs to be below the inputlevel of the key remappings
-
 ; ★ becomes a repeat key. It will activate will the lowest priority of all hotstrings
 ; That means a letter will only be repeated if no hotstring defined above matches
 if Features["hotstrings"]["magic_key"]["repeat_corrections"]["enabled"] {
@@ -896,5 +882,47 @@ if IsSet(ScriptInformation) and ScriptInformation.Has("PersonalHotstringsDir") {
 			}
 		}
 		_LoadPersonalExtRecursive(RegExReplace(HsExtDir, "[/\\]+$"), "")
+	}
+}
+}
+
+
+
+
+
+; =================================================
+; =================================================
+; ======= 7/ Deadkey helpers (module scope) =======
+; =================================================
+; =================================================
+
+; These helpers are defined at module scope (not nested inside RegisterAllHotstrings)
+; so the hotstring callbacks they register never close over the wrapper's locals:
+; the activation delay flows in as the explicit Delay parameter. This keeps the
+; registration re-runnable without rebuilding closures on every pass.
+CreateDeadkeyHotstring(MapKey, MappedValue, Delay) {
+	; We only activate the deadkey if it is the start of a new word, as symbols aren't put in words
+	; This condition corrects problems such as writing "même" that give "mê⁂e"
+	Combination := "ê" . MapKey
+	Hotstring(
+		":*?CB0:" . Combination,
+		(*) => ShouldActivateDeadkey(Combination, MappedValue, Delay)
+	)
+}
+
+ShouldActivateDeadkey(Combination, MappedValue, Delay) {
+	if not IsTimeActivationExpired(GetLastSentCharacterAt(-2), Delay) {
+		; We only activate the deadkey if it is the start of a new word, as symbols aren't put in words
+		; This condition corrects problems such as writing "même" that give "mê⁂e"
+		; We could simply have removed the "?" flag in the Hotstring definition, but we want to get the symbols also if we are typing numbers.
+		; For example to write 01/02 by using the / on the deadkey.
+		if (GetLastSentCharacterAt(-3) ~= "^[^A-Za-z★]$") { ; Everything except a letter
+			; Character at -1 is the key in the deadkey, character at -2 is "ê", character at -3 is character before using the deadkey
+			SendNewResult("{BackSpace 2}", False)
+			SendNewResult(MappedValue)
+		} else if (GetLastSentCharacterAt(-3) ~= "^[nN]$" and GetLastSentCharacterAt(-1) == "c") { ; Special case of the º symbol
+			SendNewResult("{BackSpace 2}", False)
+			SendNewResult(MappedValue)
+		}
 	}
 }
