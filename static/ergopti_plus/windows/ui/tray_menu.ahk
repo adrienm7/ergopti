@@ -1853,13 +1853,14 @@ InitSubMenus() {
 		}
 		; Top of the submenu: an enable/disable toggle for the whole TOML file,
 		; mirroring the module toggles (Disposition, Metrics, ...). Inserted at
-		; position 1& so it sits above the open-file item. Its state drives the
-		; parent menu checkmark (IsCategoryGated), independent of how many
-		; individual sections are checked. Capture V1Cat by value so each
-		; closure toggles its own category.
-		AddCategoryToggleItem(SubMenu,
-			t("menu.hotstrings.category_on"), t("menu.hotstrings.category_off"),
-			IsCategoryGated(V1Cat),
+		; position 1& so it sits directly above the open-file item with NO
+		; separator between them. Its state drives the parent menu checkmark
+		; (IsCategoryGated), independent of how many individual sections are
+		; checked. Capture V1Cat by value so each closure toggles its own category.
+		_CatToggleLabel := IsCategoryGated(V1Cat)
+			? t("menu.hotstrings.category_on")
+			: t("menu.hotstrings.category_off")
+		RegisterMenuItemInsert(SubMenu, "1&", _CatToggleLabel,
 			((c) => (*) => ToggleCategoryAllFeatures(c, !IsCategoryGated(c)))(V1Cat))
 		SubMenus[V1Cat] := SubMenu
 	}

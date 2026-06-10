@@ -1150,7 +1150,10 @@ ToggleRepeatKeyEnabled(*) {
         Features["hotstrings"]["repeat_key_enabled"] := HSE_RepeatEnabled
     }
     TOML_Write(HSE_RepeatEnabled, ConfigurationFile, "hotstrings", "repeat_key_enabled")
-    Reload
+    ; No Reload: the repeat key is a pure runtime flag the engine reads live
+    ; (HSE_TryRepeatKey checks HSE_RepeatEnabled on every keystroke). Just
+    ; rebuild the tray so the checkmark reflects the new state.
+    RebuildTrayMenu()
 }
 
 PersonalInformationEditor(*) {
