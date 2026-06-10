@@ -808,6 +808,9 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		if menu_mods.apps and type(menu_mods.apps.prime) == "function" then
 			pcall(menu_mods.apps.prime, ctx)
 		end
+		if menu_mods.karabiner and type(menu_mods.karabiner.prime) == "function" then
+			pcall(menu_mods.karabiner.prime, ctx)
+		end
 	end)
 
 	-- Background update poller — parity with AHK ErgoptiPlus.ahk boot path.
