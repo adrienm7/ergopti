@@ -107,11 +107,18 @@ local awake_alert_id = nil
 -- Spotlight state
 local _spotlight_dismiss = nil  -- Dismiss fn for the active spotlight; nil when none active
 
--- Closes the persistent keep-awake banner, if one is currently shown
-local function close_awake_alert()
-	if awake_alert_id ~= nil then
-		pcall(hs.alert.closeSpecific, awake_alert_id)
-		awake_alert_id = nil
+-- Closes the persistent keep-awake banner, if one is currently shown.
+-- Pass deferred=true when calling from an eventtap callback so the UI
+-- operation is deferred to the main runloop (eventtap threads cannot
+-- reliably drive hs.alert).
+local function close_awake_alert(deferred)
+	if awake_alert_id == nil then return end
+	local id = awake_alert_id
+	awake_alert_id = nil
+	if deferred then
+		pcall(hs.timer.doAfter, 0, function() pcall(hs.alert.closeSpecific, id) end)
+	else
+		pcall(hs.alert.closeSpecific, id)
 	end
 end
 
@@ -296,7 +303,8 @@ function M.toggle_awake()
 				awake_timer = nil
 			end
 
-			close_awake_alert()
+			-- Defer UI call: eventtap callbacks run on a secondary thread
+			close_awake_alert(true)
 
 			-- Log duration so the dashboard accounts for the keep-awake period
 			if awake_started_at then
