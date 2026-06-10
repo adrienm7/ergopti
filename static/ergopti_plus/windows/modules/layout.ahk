@@ -678,10 +678,18 @@ _RollHashtagQuoteHandler(*) {
 }
 HashtagOrQuote() {
 	LastSentCharacter := GetLastSentCharacterAt(-1)
-	if (
-		LastSentCharacter == "(" or LastSentCharacter == "[")
-	and A_TimeSincePriorHotkey < (HotstringsResolve("rolls", "hashtag_quote").Delay * 1000
-	) {
+	; The "(" / "[" → quote conversion is the paren_quote / bracket_quote roll
+	; ("(#" → "(\"" and "[#" → "[\""). Gate each on ITS OWN feature flag so the menu
+	; toggles for those rolls actually disable it — read live, so the toggle applies
+	; with no Reload. (The SC017 hotkey itself is gated by hashtag_quote, the # roll
+	; master; this adds the per-bracket granularity the menu items advertise.)
+	_QuoteSection := (LastSentCharacter == "(") ? "paren_quote"
+		: (LastSentCharacter == "[") ? "bracket_quote"
+		: ""
+	if (_QuoteSection != ""
+		and A_TimeSincePriorHotkey < (HotstringsResolve("rolls", "hashtag_quote").Delay * 1000)
+		and Features["hotstrings"]["rolls"].Has(_QuoteSection)
+		and Features["hotstrings"]["rolls"][_QuoteSection]["enabled"]) {
 		SendNewResult('"')
 		UpdateLastSentCharacter('"')
 	} else {
