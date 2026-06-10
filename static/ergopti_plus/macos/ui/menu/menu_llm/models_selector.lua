@@ -533,6 +533,11 @@ function M.build(ctx)
 	-- =====================================================
 
 	local function open_model_browser()
+		Logger.info(LOG, "Model browser: open requested (backend=%s).", tostring(active_backend))
+		if type(hs.chooser) ~= "table" or type(hs.chooser.new) ~= "function" then
+			Logger.error(LOG, "Model browser: hs.chooser is unavailable — cannot present the window.")
+			return
+		end
 		local choices = {}
 		for _, provider in ipairs(presets) do
 			for _, family in ipairs(provider.families or {}) do
@@ -581,7 +586,10 @@ function M.build(ctx)
 		chooser:choices(choices)
 		-- Retain at module scope so the chooser survives until macOS presents it.
 		_model_browser_chooser = chooser
-		chooser:show()
+		Logger.info(LOG, "Model browser: presenting %d model(s) (backend=%s).", #choices, tostring(active_backend))
+		local ok_show = pcall(function() chooser:show() end)
+		Logger.info(LOG, "Model browser: chooser:show() returned ok=%s, visible=%s.",
+			tostring(ok_show), tostring(pcall(function() return chooser:isVisible() end)))
 	end
 
 	table.insert(menu, { title = "-" })
