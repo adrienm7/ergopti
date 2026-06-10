@@ -105,42 +105,30 @@ helpers.describe("shortcuts.actions.system: keep_awake persistent alert", functi
 		helpers.assert_eq(close_ids[1], "test-alert-uuid", "closeSpecific must receive the alert ID")
 	end)
 
-	-- Regression for the eventtap-path deferred close: when auto-deactivation fires
-	-- from an eventtap callback, close_awake_alert(true) defers the closeSpecific to
-	-- a hs.timer.doAfter(0) tick. Without the deferred path the banner persisted
-	-- indefinitely after the user moved the mouse or pressed a key.
-	helpers.it("closes the banner after the runloop tick on deferred close (eventtap path)", function()
-		local _, _, close_ids, fire_deferred = make_sys_with_alert_spy()
-		-- Simulate what close_awake_alert(true) does: it schedules closeSpecific via
-		-- doAfter rather than calling it synchronously. We verify the full contract:
-		-- nothing closed yet before the tick, then closed after.
-		local awake_alert_id_captured = "test-alert-uuid"
-		local deferred_called = false
-		-- Call the helper indirectly by exercising stop_awake (synchronous path) and
-		-- comparing with the deferred path via a direct simulation of the timer stub.
-		local fired_fns = {}
-		local timer_stub = {
-			doAfter           = function(_, fn) table.insert(fired_fns, fn) end,
-			doEvery           = function() return { stop = function() end } end,
-			secondsSinceEpoch = function() return os.time() end,
-			absoluteTime      = function() return 0 end,
-			usleep            = function() end,
-			delayed           = { new = function() return { start = function() end, stop = function() end, setDelay = function() end } end },
-		}
-		-- Directly verify: closeSpecific not called before fire, called after fire
-		local close_ids2 = {}
-		local alert_stub2 = {
-			closeSpecific = function(id) table.insert(close_ids2, id) end,
-			closeAll      = function() end,
-			show          = function() return awake_alert_id_captured end,
-		}
-		-- Simulate close_awake_alert(true) logic: schedule via doAfter(0, fn)
-		local id = awake_alert_id_captured
-		timer_stub.doAfter(0, function() alert_stub2.closeSpecific(id) end)
-		helpers.assert_eq(#close_ids2, 0, "closeSpecific must NOT fire before the runloop tick")
-		for _, fn in ipairs(fired_fns) do fn() end
-		helpers.assert_eq(#close_ids2, 1, "closeSpecific must fire after the runloop tick")
-		helpers.assert_eq(close_ids2[1], "test-alert-uuid", "correct alert ID must be passed")
+	-- Regression for the nil-ID fallback: if hs.alert.show returns nil (older
+	-- Hammerspoon builds do not return an ID), awake_alert_id stays nil and
+	-- closeSpecific is never called — the banner persists indefinitely after
+	-- auto-deactivation. close_awake_alert must call closeAll in that case.
+	helpers.it("falls back to closeAll when hs.alert.show returned nil (no ID captured)", function()
+		package.loaded["lib.keycodes"] = nil
+		package.loaded["modules.shortcuts.actions.system"] = nil
+
+		local close_all_calls    = 0
+		local close_specific_ids = {}
+
+		local sys = helpers.load_with_stubs("modules.shortcuts.actions.system", {
+			alert = setmetatable({
+				-- Simulate an older Hammerspoon that returns nil from show()
+				show          = function() return nil end,
+				closeAll      = function() close_all_calls = close_all_calls + 1 end,
+				closeSpecific = function(id) table.insert(close_specific_ids, id) end,
+			}, { __call = function(_, _) end }),
+		})
+
+		sys.toggle_awake()   -- ON  → awake_alert_id remains nil (show returned nil)
+		sys.toggle_awake()   -- OFF → close_awake_alert must call closeAll, not closeSpecific
+		helpers.assert_eq(#close_specific_ids, 0, "closeSpecific must NOT be called when ID is nil")
+		helpers.assert_true(close_all_calls >= 1, "closeAll must be called as fallback when ID is nil")
 	end)
 end)
 
