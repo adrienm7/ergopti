@@ -266,7 +266,11 @@ local CHAT_CANDIDATES = {
 	"/chat/completions",
 }
 
-local DISCOVERY_MAX_WAIT_SEC        = 60   -- Stop polling /v1/models after this much real time
+local DISCOVERY_MAX_WAIT_SEC        = 180  -- Stop polling /v1/models after this much real time
+                                           -- (a cold mlx_lm import + 2B model load can take 45-70 s+
+                                           -- on a slow disk; 60 s gave up prematurely. Warmup keeps
+                                           -- retrying regardless, but a longer window keeps the
+                                           -- discovered routes fresh and silences the scary warning).
 local DISCOVERY_POLL_INITIAL_SEC    = 1.0  -- First inter-probe delay (doubles each miss, capped below)
 local DISCOVERY_POLL_MAX_SEC        = 10.0 -- Cap for the exponential backoff interval
 -- After this many seconds of persistent model-ID mismatch, bypass the check and
