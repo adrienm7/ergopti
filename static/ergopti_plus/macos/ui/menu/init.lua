@@ -37,6 +37,13 @@ local load_errors = {}
 -- so the input-source-change rebuild does not race the boot deploy.
 local STARTUP_LAYOUT_SWITCH_DELAY_SEC = 4
 
+-- Delay before warming the menu's discovery caches (keyboard-layout HIToolbox
+-- probe, apps directory scan). Kept off the boot path so it never delays startup,
+-- but soon enough that the first user click on the menubar renders instantly
+-- instead of synchronously paying the python3 cold start + directory scans. See
+-- ui.menu.menu_keyboard_layout and ui.menu.menu_apps for the cache rationale.
+local MENU_CACHE_PRIME_DELAY_SEC = 2
+
 --- Safely loads a module and logs any loading failure.
 --- @param module_id string Lua module path.
 --- @param label string Human label used in logs.
@@ -789,6 +796,19 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	end)
 
 	updateMenu()
+
+	-- Warm the expensive menu-discovery caches off the boot path so the FIRST
+	-- click renders instantly. Without this, building the keyboard-layout and
+	-- apps submenus on first open would synchronously spawn python3 plus several
+	-- directory scans — the dominant cause of slow menubar opens.
+	hs.timer.doAfter(MENU_CACHE_PRIME_DELAY_SEC, function()
+		if menu_mods.keyboard_layout and type(menu_mods.keyboard_layout.prime) == "function" then
+			pcall(menu_mods.keyboard_layout.prime, ctx)
+		end
+		if menu_mods.apps and type(menu_mods.apps.prime) == "function" then
+			pcall(menu_mods.apps.prime, ctx)
+		end
+	end)
 
 	-- Background update poller — parity with AHK ErgoptiPlus.ahk boot path.
 	local update_channel = (type(state.update_channel) == "string" and state.update_channel ~= "")
