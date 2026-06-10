@@ -58,6 +58,14 @@ local AWAKE_JITTER_X         = 80   -- Max horizontal pixel offset per tick (vis
 local AWAKE_JITTER_Y         = 80   -- Max vertical pixel offset per tick (visible but stays near origin)
 local AWAKE_RETURN_DELAY_SEC = 0.2  -- Seconds to hold offset before returning to origin
 
+-- Grace period after activation during which the auto-deactivation watcher
+-- ignores ALL input. It must absorb three settle sources: the trigger keystroke's
+-- own key/flag events, the programmatic 1 px origin nudge, and — crucially — a
+-- rapid second Ctrl+M (toggle OFF) together with the incidental touchpad brush a
+-- laptop thumb makes while pressing it. Too short and that brush silently
+-- auto-disables keep-awake, so the next Ctrl+M re-enables instead of disabling.
+local AWAKE_ACTIVATION_GRACE_SEC = 1.0
+
 -- Spotlight ring color (circle on the screen that holds the cursor)
 local SPOTLIGHT_COLOR = {red = 1, green = 0.85, blue = 0}    -- Yellow
 
@@ -107,11 +115,11 @@ local awake_alert_id = nil
 -- Spotlight state
 local _spotlight_dismiss = nil  -- Dismiss fn for the active spotlight; nil when none active
 
--- Closes the persistent keep-awake banner.
--- We always call closeAll(0) unconditionally: closeSpecific is unreliable from
--- eventtap callbacks on some Hammerspoon builds (the call is silently ignored),
--- and the keep-awake banner is always the only long-lived alert so closing all
--- is safe. awake_alert_id is kept only for test introspection.
+-- Closes the persistent keep-awake banner. closeAll(0) is used rather than
+-- closeSpecific because the banner is always the only long-lived alert, so we
+-- never depend on the id — this works identically whether hs.alert.show returned
+-- an id or nil on this Hammerspoon build. awake_alert_id is kept only so tests
+-- can assert the activation captured a handle.
 local function close_awake_alert()
 	awake_alert_id = nil
 	pcall(hs.alert.closeAll, 0)
@@ -220,8 +228,9 @@ function M.toggle_awake()
 		end
 
 		Logger.info(LOG, "Keep-awake disabled.")
+		-- Close the persistent banner first, THEN show the transient "off" toast so
+		-- closeAll does not swallow the toast we just displayed.
 		close_awake_alert()
-		pcall(hs.alert.closeAll, 0.0)
 		pcall(hs.alert.show, i18n.get("shortcuts.keep_awake_off"), 2.0)
 	else
 		awake_active = true
@@ -266,23 +275,27 @@ function M.toggle_awake()
 		awake_input_watcher = eventtap.new(watch_types, function(_ev)
 			if not awake_active then return false end
 
-			-- Ignore events within 500ms of activation to prevent the trigger
-			-- hotkey (e.g. Ctrl+M) keyUp/keyDown from instantly deactivating it.
-			if awake_started_at and hs.timer.secondsSinceEpoch() - awake_started_at < 0.5 then
+			-- Ignore events within the activation grace window so the trigger
+			-- keystroke, the origin nudge, and a rapid second Ctrl+M (with the
+			-- touchpad brush it carries) never instantly deactivate keep-awake.
+			if awake_started_at and hs.timer.secondsSinceEpoch() - awake_started_at < AWAKE_ACTIVATION_GRACE_SEC then
 				return false
 			end
 
-			local type = _ev:getType()
+			-- Local must NOT be named `type`: that would shadow the `type()` builtin
+			-- used below (type(awake_timer.stop)), turning it into a number and
+			-- crashing the callback before the banner is ever closed.
+			local ev_type = _ev:getType()
 			-- Ignore key presses with modifiers to prevent the trigger shortcut
 			-- from instantly deactivating the keep-awake mode.
-			if type == ev.keyDown then
+			if ev_type == ev.keyDown then
 				local flags = _ev:getFlags()
 				if flags.cmd or flags.alt or flags.ctrl then
 					return false
 				end
 			end
 			-- If it's a mouse movement, only deactivate if it moved beyond the jitter area
-			if type == ev.mouseMoved and awake_origin_pos then
+			if ev_type == ev.mouseMoved and awake_origin_pos then
 				local pos = _ev:location()
 				if math.abs(pos.x - awake_origin_pos.x) <= AWAKE_JITTER_X and
 				   math.abs(pos.y - awake_origin_pos.y) <= AWAKE_JITTER_Y then
