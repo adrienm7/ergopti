@@ -107,16 +107,14 @@ local awake_alert_id = nil
 -- Spotlight state
 local _spotlight_dismiss = nil  -- Dismiss fn for the active spotlight; nil when none active
 
--- Closes the persistent keep-awake banner. Uses closeSpecific when an ID was
--- captured; falls back to closeAll so the banner always disappears even when
--- hs.alert.show returned nil (older Hammerspoon builds).
+-- Closes the persistent keep-awake banner.
+-- We always call closeAll(0) unconditionally: closeSpecific is unreliable from
+-- eventtap callbacks on some Hammerspoon builds (the call is silently ignored),
+-- and the keep-awake banner is always the only long-lived alert so closing all
+-- is safe. awake_alert_id is kept only for test introspection.
 local function close_awake_alert()
-	if awake_alert_id then
-		pcall(hs.alert.closeSpecific, awake_alert_id)
-		awake_alert_id = nil
-	else
-		pcall(hs.alert.closeAll, 0)
-	end
+	awake_alert_id = nil
+	pcall(hs.alert.closeAll, 0)
 end
 
 -- Forward declaration required because schedule_awake_tick calls itself recursively
