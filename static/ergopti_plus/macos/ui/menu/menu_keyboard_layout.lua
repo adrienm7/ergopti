@@ -90,6 +90,45 @@ local POST_INSTALL_REFRESH_DELAY = 1.5
 -- has fully unwound before the TIS call mutates input-source state.
 local TIS_CALL_DELAY = 0.1
 
+-- Discovery caches — keep the synchronous menu-open path free of subprocess
+-- spawns. Bundle discovery (directory scans + Info.plist probes) and the active-
+-- input-source probe (a python3 + `defaults export` round-trip that cold-starts
+-- in 300 ms–1 s) used to run on EVERY menubar click, the dominant source of the
+-- ~1 s open latency. They change only on install / uninstall or an input-source
+-- edit, so we memoise them for the session and refresh asynchronously off the
+-- click path — mirroring HotCounter._count_cache and Builder._manifest_cache.
+-- A full hs.reload() resets the Lua state and thus clears all of these.
+
+-- Throttle window for the async active-layout refresh (seconds). Bounds python3
+-- spawns even if the user reopens the menu rapidly.
+local ACTIVE_LAYOUTS_REFRESH_THROTTLE_SEC = 5
+
+-- highest_installed(dir) result, keyed by directory. false = "scanned, none".
+local _installed_cache = {}
+-- pick_latest_bundle(dir) result, keyed by directory. false = "scanned, none".
+local _latest_bundle_cache = {}
+-- Records from the (expensive) HIToolbox active-layout probe. nil until first
+-- computed; refreshed asynchronously so menu opens never pay the python3 cost.
+local _active_layouts_cache = nil
+-- Epoch seconds of the last async refresh (throttle anchor); 0 forces a refresh.
+local _active_layouts_last_refresh = 0
+-- Guards against overlapping async refreshes.
+local _active_layouts_refreshing = false
+
+--- Clears the bundle-discovery memo. Called after an install / upgrade changes
+--- the on-disk layout set. Exposed for unit tests.
+local function invalidate_bundle_caches()
+	_installed_cache     = {}
+	_latest_bundle_cache = {}
+end
+
+--- Clears the active-layout cache and resets the throttle so the next menu open
+--- recomputes immediately. Called after the enabled input-source set changes.
+local function invalidate_active_layouts_cache()
+	_active_layouts_cache        = nil
+	_active_layouts_last_refresh = 0
+end
+
 
 
 
@@ -153,6 +192,10 @@ end
 --- @param dir string Absolute path of the bundles directory.
 --- @return string|nil Basename of the latest bundle, or nil if none found.
 function M.pick_latest_bundle(dir)
+	if type(dir) ~= "string" or dir == "" then return nil end
+	if _latest_bundle_cache[dir] ~= nil then
+		return _latest_bundle_cache[dir] or nil
+	end
 	local best, best_ver = nil, nil
 	for _, name in ipairs(list_bundles(dir)) do
 		local ver = parse_version(name)
@@ -160,6 +203,7 @@ function M.pick_latest_bundle(dir)
 			best, best_ver = name, ver
 		end
 	end
+	_latest_bundle_cache[dir] = best or false
 	return best
 end
 
@@ -244,12 +288,17 @@ end
 --- @param dir string Absolute path of the Keyboard Layouts directory.
 --- @return table|nil { name = string, version = table } or nil if none.
 local function highest_installed(dir)
+	if type(dir) ~= "string" or dir == "" then return nil end
+	if _installed_cache[dir] ~= nil then
+		return _installed_cache[dir] or nil
+	end
 	local best
 	for _, entry in ipairs(find_installed_bundles(dir)) do
 		if not best or version_gt(entry.version, best.version) then
 			best = entry
 		end
 	end
+	_installed_cache[dir] = best or false
 	return best
 end
 
@@ -286,6 +335,7 @@ local function install_user(bundles_dir, bundle_name)
 	)
 	local out, ok = hs.execute(cmd)
 	if ok then
+		invalidate_bundle_caches()
 		Logger.success(LOG, "User install done — %s.", bundle_name)
 		pcall(notifications.notify, i18n.get("menu.layout.installed_user"), nil, "success")
 		return true
@@ -319,6 +369,7 @@ local function install_system(bundles_dir, bundle_name)
 		ok = hs.osascript.applescript(script) and true or false
 	end
 	if ok then
+		invalidate_bundle_caches()
 		Logger.success(LOG, "System install done — %s.", bundle_name)
 		pcall(notifications.notify, i18n.get("menu.layout.installed_system"), nil, "success")
 		return true
@@ -439,11 +490,12 @@ end
 --- entries when the same KeyboardLayout Name appeared in multiple plist sections.
 --- HIToolbox is the macOS source of truth — changes in System Settings are
 --- reflected immediately, without the TIS cache lag from osascript/hs.keycodes.
-local function list_active_keyboard_layouts()
-	-- Read via `defaults export` (cfprefsd) — reflects deletions made in System
-	-- Settings immediately. Reading the plist file directly returned stale entries
-	-- for layouts the user had already removed.
-	local py = [[
+-- The python that reads AppleEnabledInputSources from HIToolbox via cfprefsd.
+-- Kept as a module constant so the probe can run ASYNCHRONOUSLY (hs.task) off the
+-- menu-open path instead of blocking the click with a python3 cold start. Reading
+-- via `defaults export` (cfprefsd) reflects System Settings changes immediately,
+-- unlike reading the plist file directly which can return stale entries.
+local ACTIVE_LAYOUTS_PY = [[
 import subprocess, sys, plistlib, json
 
 DOMAIN = "com.apple.HIToolbox"
@@ -467,54 +519,137 @@ for s in sources:
         out.append(name)
 print(json.dumps(out))
 ]]
-	local tmp = os.tmpname() .. ".py"
-	local fh = io.open(tmp, "w")
-	if not fh then
-		Logger.warn(LOG, "list_active_keyboard_layouts: cannot write temp script.")
-		return {}
+
+--- Returns whether a record is the currently-selected layout, comparing the raw
+--- KeyboardLayout Name and the localised display against the current layout name.
+--- hs.keycodes.currentLayout() may return the localised display name, the raw
+--- KeyboardLayout Name, or a version-stripped variant — all three are accepted.
+--- @param kl_name string Raw KeyboardLayout Name (record id).
+--- @param display string Localised display name.
+--- @param current_name string|nil hs.keycodes.currentLayout() value.
+--- @return boolean
+local function is_record_selected(kl_name, display, current_name)
+	if not current_name then return false end
+	if kl_name == current_name or display == current_name then return true end
+	local display_no_space = display:gsub("%s+", ""):lower()
+	local current_lower    = current_name:lower():gsub("%s+", "")
+	return display_no_space == current_lower
+end
+
+--- Parses the JSON array of KeyboardLayout Names emitted by the HIToolbox probe
+--- into menu records. Pure (no I/O), so it is unit-testable and never runs a
+--- subprocess. `selected` is computed live against current_name.
+--- @param raw_out string|nil Probe stdout (a JSON array of strings).
+--- @param current_name string|nil hs.keycodes.currentLayout() value.
+--- @return table|nil records, or nil when raw_out is not a parseable array.
+local function parse_active_layouts(raw_out, current_name)
+	if type(raw_out) ~= "string" or raw_out:sub(1, 1) ~= "[" then return nil end
+	local out = {}
+	for kl_name in raw_out:gmatch('"([^"]+)"') do
+		-- For Ergopti entries the localised name is produced by format_ergopti_display
+		-- (e.g. "Ergopti+" for "Ergopti_v2_2_2_plus"). Other layouts: strip the
+		-- underscores and any version suffix. This localised name is what
+		-- hs.keycodes.setLayout() and currentLayout() understand.
+		local ergopti_display = format_ergopti_display(kl_name)
+		local display = ergopti_display or kl_name:gsub("_", " "):gsub("%s+v%d.*$", "")
+		out[#out + 1] = { id = kl_name, name = display, selected = is_record_selected(kl_name, display, current_name) }
 	end
-	fh:write(py); fh:close()
-	local raw_out, ok = hs.execute("/usr/bin/python3 " .. tmp .. " 2>&1")
-	os.remove(tmp)
-	Logger.debug(LOG, "HIToolbox defaults export raw: ok=%s out=%s.", tostring(ok), tostring(raw_out):gsub("[\r\n]", " "))
+	return out
+end
+
+--- Fast, in-process active-layout list via hs.keycodes (no subprocess). Used as
+--- the cold-cache fallback so the FIRST menu open stays instant; the accurate
+--- HIToolbox list replaces it asynchronously. May briefly show TIS-cache-lagged
+--- or duplicate entries — corrected on the next open.
+--- @param current_name string|nil hs.keycodes.currentLayout() value.
+--- @return table records (possibly empty).
+local function compute_active_layouts_fast(current_name)
+	local out = {}
+	if hs.keycodes and type(hs.keycodes.layouts) == "function" then
+		local layouts = hs.keycodes.layouts() or {}
+		for _, name in ipairs(layouts) do
+			local display = format_ergopti_display(name) or name
+			out[#out + 1] = { id = name, name = display, selected = is_record_selected(name, display, current_name) }
+		end
+	end
+	return out
+end
+
+--- Refreshes _active_layouts_cache asynchronously via hs.task so the expensive
+--- python3 + `defaults export` round-trip NEVER blocks a menu open. The probe is
+--- passed inline with `python3 -c` (a single argv element — no temp file, no
+--- shell quoting). On a headless run (no hs.task — unit tests / CLI) the probe is
+--- skipped and the previous cache is kept. on_done (if given) fires when complete.
+--- @param on_done function|nil Callback invoked after the cache is updated.
+local function refresh_active_layouts_async(on_done)
+	if _active_layouts_refreshing then
+		if on_done then pcall(on_done) end
+		return
+	end
+	_active_layouts_refreshing = true
 
 	local current_name = (hs.keycodes and type(hs.keycodes.currentLayout) == "function")
 		and hs.keycodes.currentLayout() or nil
 
-	local out = {}
-	if ok and type(raw_out) == "string" and raw_out:sub(1, 1) == "[" then
-		-- Decode the JSON array of KeyboardLayout Name strings
-		for kl_name in raw_out:gmatch('"([^"]+)"') do
-			-- For Ergopti entries, the localised name is produced by format_ergopti_display
-			-- (e.g. "Ergopti+" for "Ergopti_v2_2_2_plus"). For other layouts, strip
-			-- underscores and version suffixes. This localised name is what
-			-- hs.keycodes.setLayout() and currentLayout() understand.
-			local ergopti_display = format_ergopti_display(kl_name)
-			local display = ergopti_display or kl_name:gsub("_", " "):gsub("%s+v%d.*$", "")
-			-- hs.keycodes.currentLayout() may return the localised display name,
-			-- the raw KeyboardLayout Name, or a version-stripped variant — accept all.
-			local display_no_space = display:gsub("%s+", ""):lower()
-			local current_lower = current_name and current_name:lower() or nil
-			local selected = (current_name ~= nil and (
-				kl_name == current_name
-				or display == current_name
-				or (current_lower ~= nil and display_no_space == current_lower:gsub("%s+", ""))
-			)) or false
-			out[#out + 1] = { id = kl_name, name = display, selected = selected }
+	local function finish(raw_out)
+		_active_layouts_refreshing = false
+		local records = parse_active_layouts(raw_out, current_name)
+		if records then
+			_active_layouts_cache = records
+			Logger.debug(LOG, "Active layouts refreshed asynchronously: %d.", #records)
+		else
+			Logger.warn(LOG, "Async active-layout probe returned unparseable output — keeping previous cache.")
 		end
-	else
-		Logger.warn(LOG, "HIToolbox Python parse failed (%s) — falling back to hs.keycodes.", tostring(raw_out))
-		if hs.keycodes and type(hs.keycodes.layouts) == "function" then
-			local layouts = hs.keycodes.layouts() or {}
-			local current = (type(hs.keycodes.currentLayout) == "function") and hs.keycodes.currentLayout() or nil
-			for _, name in ipairs(layouts) do
-				out[#out + 1] = { id = name, name = name, selected = (current ~= nil and name == current) or false }
-			end
-		end
+		if on_done then pcall(on_done) end
 	end
 
-	Logger.debug(LOG, "Active layouts from HIToolbox: %d.", #out)
-	return out
+	if hs.task and type(hs.task.new) == "function" then
+		-- Non-blocking: the click handler returns immediately; the cache updates
+		-- when python3 finishes and is read on the NEXT open.
+		local ok = pcall(function()
+			local t = hs.task.new("/usr/bin/python3", function(_code, stdout, _stderr)
+				finish(stdout)
+			end, { "-c", ACTIVE_LAYOUTS_PY })
+			t:start()
+		end)
+		if not ok then finish(nil) end
+	else
+		finish(nil)
+	end
+end
+
+--- Schedules a throttled async active-layout refresh so rapid menu opens never
+--- spawn overlapping probes.
+--- @param force boolean|nil When true, bypasses the throttle (startup prime).
+local function maybe_refresh_active_layouts(force)
+	local now = (hs.timer and type(hs.timer.secondsSinceEpoch) == "function")
+		and hs.timer.secondsSinceEpoch() or nil
+	if not force and now and (now - _active_layouts_last_refresh) < ACTIVE_LAYOUTS_REFRESH_THROTTLE_SEC then
+		return
+	end
+	if now then _active_layouts_last_refresh = now end
+	refresh_active_layouts_async(nil)
+end
+
+--- Returns the active keyboard-layout records for the menu WITHOUT blocking.
+--- Serves the memoised HIToolbox result when available (recomputing the live
+--- `selected` flag so a layout switch reflects instantly), otherwise an in-process
+--- fast list. Either way it schedules a throttled async refresh so the cache is
+--- accurate for the next open. This call used to run python3 SYNCHRONOUSLY here,
+--- which is what made the menubar take ~1 s to open.
+--- @return table List of input-source records (possibly empty).
+local function list_active_keyboard_layouts()
+	local current_name = (hs.keycodes and type(hs.keycodes.currentLayout) == "function")
+		and hs.keycodes.currentLayout() or nil
+	if _active_layouts_cache then
+		for _, r in ipairs(_active_layouts_cache) do
+			r.selected = is_record_selected(r.id or "", r.name or "", current_name)
+		end
+		maybe_refresh_active_layouts(false)
+		return _active_layouts_cache
+	end
+	maybe_refresh_active_layouts(false)
+	return compute_active_layouts_fast(current_name)
 end
 
 --- Activates the given keyboard layout.
@@ -736,6 +871,7 @@ print("OK")
 
 	local out_text = tostring(out or ""):gsub("[\r\n]+$", "")
 	if ok and (out_text == "OK" or out_text == "ALREADY_PRESENT") then
+		invalidate_active_layouts_cache()
 		Logger.success(LOG, "Input source '%s' (%s) added to enabled list (%s).",
 			display, raw_id, out_text)
 		return true
@@ -832,6 +968,7 @@ local function upgrade_active_list(legacy_active)
 	Logger.start(LOG, "Upgrading %d legacy Ergopti entry(ies) in the active input-source list…", #legacy_active)
 	local ok, out = run_osascript_isolated(script)
 	if ok then
+		invalidate_active_layouts_cache()
 		Logger.success(LOG, "List upgrade applied (%s).", tostring(out))
 		return true
 	end
@@ -1421,6 +1558,27 @@ M._extract_ergopti_version = extract_ergopti_version
 M._format_ergopti_display  = format_ergopti_display
 M._is_legacy_ergopti_id    = is_legacy_ergopti_id
 M._migrate_legacy_id       = migrate_legacy_id
+
+-- Latency / cache test hooks — let the suite assert the menu-open path stays
+-- subprocess-free and that the async probe still parses HIToolbox output.
+M._parse_active_layouts         = parse_active_layouts
+M._compute_active_layouts_fast  = compute_active_layouts_fast
+M._list_active_keyboard_layouts = list_active_keyboard_layouts
+M._refresh_active_layouts_async = refresh_active_layouts_async
+M._invalidate_bundle_caches     = invalidate_bundle_caches
+M._set_active_layouts_cache     = function(records) _active_layouts_cache = records end
+
+--- Warms the discovery caches off the menu-open path so the first user click
+--- renders instantly. Safe to call repeatedly. Invoked from ui.menu.init once
+--- boot settles. See the discovery-cache notes near the top of this module.
+--- @param ctx table|nil Menu context; ctx.base_dir locates the bundles directory.
+function M.prime(ctx)
+	local base_dir = (type(ctx) == "table" and type(ctx.base_dir) == "string") and ctx.base_dir or ""
+	pcall(function() M.pick_latest_bundle(base_dir .. BUNDLES_RELDIR) end)
+	pcall(highest_installed, USER_LAYOUTS_DIR)
+	pcall(highest_installed, SYSTEM_LAYOUTS_DIR)
+	refresh_active_layouts_async(nil)
+end
 
 --- Switches the active keyboard layout given a raw KeyboardLayout Name (as stored
 --- in state.layout_on_pause / state.layout_on_resume). Resolves the localised name

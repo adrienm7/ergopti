@@ -27,6 +27,14 @@ local i18n   = require("lib.i18n")
 local LOG = "menu_apps"
 
 
+-- Session cache of discovered app bundles (names, descriptions, icons). The
+-- apps/ directory only changes on install, which requires an hs.reload() anyway,
+-- so we scan it once and reuse — keeping the `find` subprocess, the per-app
+-- Info.plist reads, and the icon loads off every menu open. Mirrors
+-- HotCounter._ext_meta_cache. Nil until the first discovery.
+local _apps_cache = nil
+
+
 -- Short descriptions shown next to each app name in the submenu
 local APP_DESCRIPTIONS = {
 	["App Cloner"] = i18n.get("menu.apps.clone_desc"),
@@ -140,6 +148,7 @@ end
 --- @param ctx table|nil Menu build context.
 --- @return table List of {name, description, path, icon} entries.
 local function discover_bundled_apps(ctx)
+	if _apps_cache then return _apps_cache end
 	local dir = apps_dir(ctx)
 	if not dir then
 		Logger.warn(LOG, "Could not resolve apps/ directory path.")
@@ -175,6 +184,7 @@ local function discover_bundled_apps(ctx)
 	end
 
 	Logger.done(LOG, "Found %d bundled app(s).", #entries)
+	_apps_cache = entries
 	return entries
 end
 
@@ -270,5 +280,14 @@ function M.build(ctx)
 		menu     = rows,
 	}
 end
+
+--- Invalidates the discovered-apps cache. Exposed for unit tests.
+function M._invalidate_apps_cache() _apps_cache = nil end
+
+--- Warms the apps cache off the menu-open path. Called from ui.menu.init once
+--- boot settles so the first click renders instantly instead of paying the
+--- directory scan + icon loads synchronously.
+--- @param ctx table Menu context (provides base_dir).
+function M.prime(ctx) pcall(discover_bundled_apps, ctx) end
 
 return M
