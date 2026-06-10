@@ -532,8 +532,7 @@ function M.build(ctx)
 	-- ===== 1.6) Browse + add custom model =====
 	-- =====================================================
 
-	local function open_model_browser()
-		Logger.info(LOG, "Model browser: open requested (backend=%s).", tostring(active_backend))
+	local function present_model_chooser()
 		if type(hs.chooser) ~= "table" or type(hs.chooser.new) ~= "function" then
 			Logger.error(LOG, "Model browser: hs.chooser is unavailable — cannot present the window.")
 			return
@@ -587,9 +586,24 @@ function M.build(ctx)
 		-- Retain at module scope so the chooser survives until macOS presents it.
 		_model_browser_chooser = chooser
 		Logger.info(LOG, "Model browser: presenting %d model(s) (backend=%s).", #choices, tostring(active_backend))
-		local ok_show = pcall(function() chooser:show() end)
-		Logger.info(LOG, "Model browser: chooser:show() returned ok=%s, visible=%s.",
-			tostring(ok_show), tostring(pcall(function() return chooser:isVisible() end)))
+		chooser:show()
+		Logger.info(LOG, "Model browser: chooser shown (visible=%s).",
+			tostring(pcall(function() return chooser:isVisible() end)))
+	end
+
+	local function open_model_browser()
+		Logger.info(LOG, "Model browser: open requested (backend=%s).", tostring(active_backend))
+		-- Defer to the next runloop tick so the menubar menu fully closes first: an
+		-- hs.chooser shown synchronously from inside the still-open menu callback can
+		-- silently fail to appear. pcall surfaces any error to the log instead of
+		-- letting the menubar callback swallow it — which is what made "Parcourir
+		-- tous les modèles" do nothing despite firing.
+		hs.timer.doAfter(0, function()
+			local ok, err = pcall(present_model_chooser)
+			if not ok then
+				Logger.error(LOG, "Model browser: failed to present — %s", tostring(err))
+			end
+		end)
 	end
 
 	table.insert(menu, { title = "-" })
