@@ -152,9 +152,20 @@ end
 function M.generate(ctx, menu_mods, actions)
 	local items = {}
 
+	-- Temporary menu-open latency instrumentation: logs the synchronous cost of
+	-- each component and the grand total with a "[menu-timing]" prefix, so a slow
+	-- click can be diagnosed straight from the logs. Remove once pinned down.
+	local function _now() return (hs.timer and hs.timer.secondsSinceEpoch) and hs.timer.secondsSinceEpoch() or 0 end
+	local _t_generate = _now()
+	local function _lap(label, since)
+		Logger.info(LOG, "[menu-timing] %-22s %6.0f ms.", tostring(label), (_now() - since) * 1000)
+	end
+
 	-- Helper function to insert only valid components and log errors
 	local function push_into(target, label, fn, arg)
+		local _t = _now()
 		local result = Logger.build(LOG, label, fn, arg)
+		_lap(label, _t)
 		if result then
 			if type(result) == "table" and result[1] ~= nil then
 				-- Result is a list (build_groups)
@@ -179,13 +190,16 @@ function M.generate(ctx, menu_mods, actions)
 	end
 
 	-- Hotstrings zone avec activation globale
+	local _t_hot = _now()
 	if type(menu_mods.hotstrings) == "table" then
 		Logger.debug(LOG, "Building hotstrings submenu…")
 
 		-- Groups that are specific to the Ergopti keyboard layout — sourced from menu_manifest.json
 		local ERGOPTI_GROUPS = load_ergopti_groups()
 
+		local _t_cnt = _now()
 		local counts = HotCounter.count_all(ctx, ERGOPTI_GROUPS)
+		_lap("hotstrings.count_all", _t_cnt)
 		local fmt_grand = HotCounter.fmt_grand
 
 		local common_total      = counts.common
@@ -374,11 +388,14 @@ function M.generate(ctx, menu_mods, actions)
 	else
 		Logger.warn(LOG, "Hotstrings module missing — submenu ignored.")
 	end
+	_lap("hotstrings(block)", _t_hot)
 
 	-- AI zone
 	if type(ctx.llm_handler) == "table" and type(ctx.llm_handler.build_item) == "function" then
 		Logger.debug(LOG, "Building AI component…")
+		local _t_llm = _now()
 		local ok_b, llm_item = pcall(ctx.llm_handler.build_item)
+		_lap("llm.build_item", _t_llm)
 		if ok_b and llm_item then
 			table.insert(items, llm_item)
 			Logger.debug(LOG, "AI component added successfully.")
@@ -509,13 +526,16 @@ function M.generate(ctx, menu_mods, actions)
 		table.insert(items, 1, _dl_item)
 	end
 
+	local _t_badge = _now()
 	CanvasBadge.prepend_to(items, ctx, function()
 		if ctx and ctx.script_control then
 			if type(ctx.script_control.toggle_script_control) == "function" then pcall(ctx.script_control.toggle_script_control) end
 			if type(ctx.script_control.toggle) == "function" then pcall(ctx.script_control.toggle) end
 		end
 	end)
+	_lap("canvas_badge", _t_badge)
 
+	_lap("TOTAL", _t_generate)
 	return items
 end
 
