@@ -37,6 +37,7 @@ Accumulated engineering knowledge for this repository — gotchas, architecture 
   - [project-touchdevice-dormancy-is-kernel](#project-touchdevice-dormancy-is-kernel) — Definitive answer that macOS touchdevice subsystem CANNOT be activated before first physical touch — it is a kernel-driver gate
   - [project-ui-dynamic-buttons](#project-ui-dynamic-buttons) — AHK UIs must use Gui_HarmoniseButtonWidths instead of hardcoded w-values; HS auto-sizes via CSS padding
   - [errors-only-log-sink](#errors-only-log-sink) — Dedicated ErgoptiPlus*errors*\*.log (WARNING/ERROR only) + menu item; crash_reports remain for uncaught fatals only
+  - [project-hs-timer-callback-errors-invisible](#project-hs-timer-callback-errors-invisible) — Errors thrown in hs.timer/eventtap callbacks are swallowed to the HS Console, never the file logger; a test stub of a method production lacks masks the dangling call (the "vert mais aucune prédiction" bug)
   - [broad-unit-test-regression-coverage](#broad-unit-test-regression-coverage) — Maximize Test()/helpers.it coverage for every feature (hotstrings, gestures, keylogger, layout, suspend/pause, menu, config, logger, etc.) in both AHK and HS to catch all regressions early. Every invariant and edge that has bitten us gets a permanent test.
   - "Oui encore plus" ultra pass: +25+ additional tests across script_control (more pause idempotence/transitions, extras under pause), karabiner (pause gate on config), port_adapter meta (explicit suspend/pause purity + adapter notes + corpus coverage), corpus meta (pause/delay/reversal corpus notes + LLM under pause), tap_hold (more pause + bad TOML graceful), personal_toml (pause guard + bad entry), llm_profiles (pause no predict), keylogger_reader (pause privacy in reports), plus extra pause in gestures engine (more reversal + pause), keylogger privacy (agg under pause, PII on errors), llm prediction (pause on timeout, volume no degrade), hotstrings_full (more pause/synthetic/delay edges), shortcuts (more pause all dispatchers, menu no raw Add, bad features graceful). Total expansion now >80 new regression tests. The suite is now the strongest it's ever been — every feature has explicit pause/suspend guards + error/edge tests for critical invariants like project_suspend_pause_invariant, project_hotstring_delay_architecture, project_gestures_reversal_detection, keylogger privacy, menu dispatcher drops, AltGr prefix latch. Time makes the tests strictly more robust. Full suites + live test before any merge.
   - Expansion added: pause/suspend guards (script_control, gestures engine/init, hotstring engine, keylogger, layout, shortcuts, LLM); reversal detection in gestures; delay edges; FS/pcall error paths; cross parity. Strategy: for any new hook/timer/dispatch/pause path, add test that would have caught the silent failure. Full suites mandatory before merge.
@@ -821,3 +822,47 @@ family as the [[project_config_v2_refactor]] encoding abort).
 ("semicolon") or build it via `Chr(0x3B)` concatenation. This compounds with the
 existing ASCII-only test-suite convention (use `Chr(0xNNNN)` for non-ASCII; an
 em-dash `—` in a string literal also broke the parser the same way).
+
+
+
+
+### project-hs-timer-callback-errors-invisible
+
+_A Lua error thrown inside an `hs.timer`/`hs.timer.delayed` callback is swallowed to the Hammerspoon Console and never reaches the file logger — so a crash on a timer-driven path is invisible in logs, and a unit-test stub that defines a method production lacks will mask the dangling call._
+
+<sub>slug: `project_hs_timer_callback_errors_invisible`</sub>
+
+Hammerspoon runs timer callbacks under its own protected call. When the callback
+errors, Hammerspoon prints the traceback to its **Console** (and the
+`~/.hammerspoon` crash log), not through our `lib.logger`, which writes the file
+the user collects. The file log therefore shows everything up to the crash and
+nothing after, with no `[ERROR]` line — the path just stops mid-way.
+
+**Why:** This masked the "vert mais aucune prédiction" bug. The LLM prediction
+engine (`modules/llm/prediction_engine.lua` `perform_check`) is fired by
+`_inactivity_timer` (an `hs.timer.delayed`). It called
+`StreamingHandler.ngram_predict(buffer)` — a function the production
+`streaming_handler.lua` never implemented (a leftover from an extraction
+refactor). Calling a `nil` field threw, the timer swallowed it, and the file log
+showed `prompt_builder: Request signature accepted` (logged just before the
+crash) but never the dispatch `[START] LLM request — model:` — so the request
+died silently and no prediction ever appeared even with a green (backend-ready)
+health dot. Worse, the unit test stubbed `ngram_predict`, so the suite stayed
+green while production crashed on every keystroke-driven request. Fixed in commit
+`173b37390` by removing the dead n-gram block; the regression in
+`test_prediction_engine.lua` §8 now mirrors the real StreamingHandler surface
+(no `ngram_predict`) and asserts `perform_check` reaches `fetch_llm_prediction`.
+
+**How to apply:**
+
+- When a timer-/eventtap-driven feature "does nothing" with no error in the file
+  log, suspect a swallowed callback error: read the Hammerspoon **Console**
+  (Console.app / `hs.console`), not just the collected file log. A path that logs
+  its entry but none of its exit branches (no dispatch, no skip-reason) is the
+  tell.
+- Keep test stubs faithful to the **real module's exported surface**. A stub that
+  provides a method production doesn't have turns a hard crash into a green test.
+  When stubbing a singleton (`StreamingHandler`, `PromptBuilder`, `AppFilter`,
+  `ApiCommon`), mirror only the functions the real module actually exports — and
+  add a regression that drives the real call path so a dangling call fails loudly.
+- See [[feedback-regression-tests]].
