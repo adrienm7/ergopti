@@ -509,7 +509,7 @@
 	"llm.generating": "⏳ מייצר…",
 	"llm.profile.advanced.label": "●●○ מתקדם — תיקון + ניבוי",
 	"llm.profile.basic.label": "●○○ בסיסי — ניבוי פשוט",
-	"llm.profile.batch_advanced.label": "●●● מתקדם אצווה — בקשה מתקדמת אחת עם %d ניבוי%s",
+	"llm.profile.batch_advanced.label": "●●● מתקדם אצווה — בקשה מתקדמת אחת עם {n} ניבוי{s}",
 	"llm.profile.raw.label": "○○○ גולמי — ללא prompt, הקשר בלבד",
 	"llm.server_mlx_ready_body": "שרת MLX מוכן.",
 	"llm.server_ollama_ready_body": "שרת Ollama מוכן.",

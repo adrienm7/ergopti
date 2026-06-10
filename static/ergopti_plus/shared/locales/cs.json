@@ -509,7 +509,7 @@
 	"llm.generating": "⏳ Generuji…",
 	"llm.profile.advanced.label": "●●○ Pokročilý — Oprava + Predikce",
 	"llm.profile.basic.label": "●○○ Základní — Jednoduchá predikce",
-	"llm.profile.batch_advanced.label": "●●● Batch Pokročilý — 1 pokročilý dotaz s %d predikcemi%s",
+	"llm.profile.batch_advanced.label": "●●● Batch Pokročilý — 1 pokročilý dotaz s {n} predikcemi{s}",
 	"llm.profile.raw.label": "○○○ Surový — Žádný prompt, jen kontext",
 	"llm.server_mlx_ready_body": "Server MLX je připraven.",
 	"llm.server_ollama_ready_body": "Server Ollama je připraven.",

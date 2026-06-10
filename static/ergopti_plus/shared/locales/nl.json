@@ -509,7 +509,7 @@
 	"llm.generating": "⏳ Genereren…",
 	"llm.profile.advanced.label": "●●○ Geavanceerd — Correctie + Voorspelling",
 	"llm.profile.basic.label": "●○○ Basis — Eenvoudige voorspelling",
-	"llm.profile.batch_advanced.label": "●●● Batch Geavanceerd — 1 geavanceerd verz. met %d voorspelling%s",
+	"llm.profile.batch_advanced.label": "●●● Batch Geavanceerd — 1 geavanceerd verz. met {n} voorspelling{s}",
 	"llm.profile.raw.label": "○○○ Rauw — Geen prompt, alleen context",
 	"llm.server_mlx_ready_body": "De MLX-server is gereed.",
 	"llm.server_ollama_ready_body": "De Ollama-server is gereed.",

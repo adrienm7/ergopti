@@ -509,7 +509,7 @@
 	"llm.generating": "⏳ A gerar…",
 	"llm.profile.advanced.label": "●●○ Avançado — Correção + Predição",
 	"llm.profile.basic.label": "●○○ Básico — Predição simples",
-	"llm.profile.batch_advanced.label": "●●● Batch Avançado — 1 req. avançada com %d predição%s",
+	"llm.profile.batch_advanced.label": "●●● Batch Avançado — 1 req. avançada com {n} predição{s}",
 	"llm.profile.raw.label": "○○○ Bruto — Sem prompt, só contexto",
 	"llm.server_mlx_ready_body": "O servidor MLX está pronto.",
 	"llm.server_ollama_ready_body": "O servidor Ollama está pronto.",

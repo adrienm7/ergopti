@@ -509,7 +509,7 @@
 	"llm.generating": "⏳ Generazione in corso…",
 	"llm.profile.advanced.label": "●●○ Avanzato — Correzione + Predizione",
 	"llm.profile.basic.label": "●○○ Base — Predizione semplice",
-	"llm.profile.batch_advanced.label": "●●● Batch Avanzato — 1 ric. avanzata con %d predizione%s",
+	"llm.profile.batch_advanced.label": "●●● Batch Avanzato — 1 ric. avanzata con {n} predizione{s}",
 	"llm.profile.raw.label": "○○○ Grezzo — Nessun prompt, solo contesto",
 	"llm.server_mlx_ready_body": "Il server MLX è pronto.",
 	"llm.server_ollama_ready_body": "Il server Ollama è pronto.",

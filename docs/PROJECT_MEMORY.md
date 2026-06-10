@@ -866,3 +866,47 @@ green while production crashed on every keystroke-driven request. Fixed in commi
   `ApiCommon`), mirror only the functions the real module actually exports — and
   add a regression that drives the real call path so a dangling call fails loudly.
 - See [[feedback-regression-tests]].
+
+
+
+
+### project-profile-label-placeholder-convention
+
+_LLM profile labels in `shared/locales/*.json` use **brace** placeholders `{n}`/`{s}` (count + plural-s), NOT printf `%d`/`%s` — the menu substitutes braces, so a printf token leaks verbatim into the UI._
+
+<sub>slug: `project_profile_label_placeholder_convention`</sub>
+
+The `llm.profile.batch_advanced.label` string carries a dynamic prediction count.
+Every consumer that renders it substitutes the **brace** placeholders `{n}`
+(count) and `{s}` (plural marker), mirroring the prompt-template convention
+(`{context}`, `{min_words}`, `{n}`): macOS via
+`ui/menu/menu_llm/profile_label.lua` `M.format` (the single source of truth, used
+by both `profiles_manager.lua` and `model_switcher.lua`), Windows via
+`LLM_Tray_GetProfileLabel` (`StrReplace` of `{n}`/`{s}`). Plain `i18n.get` /
+`t()` do **not** substitute — that is the caller's job.
+
+**Why:** The label shipped with printf `%d prédiction%s` tokens while the menu
+formatter only ever replaced `{n}`/`{s}`, so the user saw a literal
+`… avec %d prédiction%s` in the "Batch Avancé" entry. A parallel path
+(`model_switcher.lua`) used `string.format(label, n, s)` and rendered it
+correctly, which is exactly why the divergence survived — two consumers, two
+conventions, one locale string that could only satisfy one of them. Fixed by
+standardising all 21 locales on `{n}`/`{s}` and routing every macOS consumer
+through the one `ProfileLabel.format` helper.
+
+**How to apply:**
+
+- A locale value rendered as a menu label must use `{…}` placeholders; reserve
+  printf `%d`/`%s` for strings passed straight to `string.format` / `t()` +
+  `Format()` (e.g. dialog bodies, `menu.profiles.profile_label_prefix` uses `%s`
+  and is `StrReplace`d on `%s`). Never mix the two for the same string.
+- Don't format a profile label inline — call `ProfileLabel.format` (macOS) so the
+  count fallback (`DEFAULT_STATE.llm_num_predictions`) stays single-sourced.
+- Guarded forever by `macos/tests/unit/lib/test_locale_profile_labels.lua` and
+  `macos/tests/unit/menu/test_profile_label.lua`, mirrored on Windows in
+  `windows/tests/test_llm_menu_regressions.ahk` §5: all 21 locales are scanned so
+  no profile label may carry `%d`/`%s`, and `batch_advanced` must keep `{n}`/`{s}`.
+- Related: built-in profile rows in the macOS LLM menu now select on a single
+  click (no "use this profile" sub-item), matching the AHK tray; cloning a
+  read-only built-in moved to a single "Clone active profile…" entry.
+- See [[project-locale-parity-test]], [[feedback-regression-tests]].

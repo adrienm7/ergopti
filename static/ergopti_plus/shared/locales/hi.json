@@ -509,7 +509,7 @@
 	"llm.generating": "⏳ जनरेट हो रहा है…",
 	"llm.profile.advanced.label": "●●○ उन्नत — सुधार + भविष्यवाणी",
 	"llm.profile.basic.label": "●○○ बुनियादी — सरल भविष्यवाणी",
-	"llm.profile.batch_advanced.label": "●●● बैच उन्नत — 1 उन्नत अनुरोध के साथ %d भविष्यवाणी%s",
+	"llm.profile.batch_advanced.label": "●●● बैच उन्नत — 1 उन्नत अनुरोध के साथ {n} भविष्यवाणी{s}",
 	"llm.profile.raw.label": "○○○ कच्चा — कोई प्रॉम्प्ट नहीं, केवल संदर्भ",
 	"llm.server_mlx_ready_body": "MLX सर्वर तैयार है।",
 	"llm.server_ollama_ready_body": "Ollama सर्वर तैयार है।",

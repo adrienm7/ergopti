@@ -509,7 +509,7 @@
 	"llm.generating": "⏳ 생성 중…",
 	"llm.profile.advanced.label": "●●○ 고급 — 교정 + 예측",
 	"llm.profile.basic.label": "●○○ 기본 — 단순 예측",
-	"llm.profile.batch_advanced.label": "●●● 리치 배치 — %d개 예측%s 포함 1개의 고급 요청",
+	"llm.profile.batch_advanced.label": "●●● 리치 배치 — {n}개 예측{s} 포함 1개의 고급 요청",
 	"llm.profile.raw.label": "○○○ 원시 — 프롬프트 없음, 컨텍스트만",
 	"llm.server_mlx_ready_body": "MLX 서버가 준비되었습니다.",
 	"llm.server_ollama_ready_body": "Ollama 서버가 준비되었습니다.",

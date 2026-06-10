@@ -509,7 +509,7 @@
 	"llm.generating": "⏳ 生成中…",
 	"llm.profile.advanced.label": "●●○ 高度 — 修正 + 予測",
 	"llm.profile.basic.label": "●○○ 基本 — シンプルな予測",
-	"llm.profile.batch_advanced.label": "●●● バッチ高度 — %d 件の予測%sを含む 1つの高度なリクエスト",
+	"llm.profile.batch_advanced.label": "●●● バッチ高度 — {n} 件の予測{s}を含む 1つの高度なリクエスト",
 	"llm.profile.raw.label": "○○○ 未加工 — プロンプトなし、コンテキストのみ",
 	"llm.server_mlx_ready_body": "MLXサーバーの準備ができました。",
 	"llm.server_ollama_ready_body": "Ollamaサーバーの準備ができました。",

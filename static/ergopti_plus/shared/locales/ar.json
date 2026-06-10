@@ -509,7 +509,7 @@
 	"llm.generating": "⏳ جاري التوليد…",
 	"llm.profile.advanced.label": "●●○ متقدم — تصحيح + توقع",
 	"llm.profile.basic.label": "●○○ أساسي — توقع بسيط",
-	"llm.profile.batch_advanced.label": "●●● دُفعة متقدمة — طلب متقدم واحد مع %d توقع%s",
+	"llm.profile.batch_advanced.label": "●●● دُفعة متقدمة — طلب متقدم واحد مع {n} توقع{s}",
 	"llm.profile.raw.label": "○○○ خام — بلا موجّه، السياق فقط",
 	"llm.server_mlx_ready_body": "خادم MLX جاهز.",
 	"llm.server_ollama_ready_body": "خادم Ollama جاهز.",

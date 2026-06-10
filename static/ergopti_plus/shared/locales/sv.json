@@ -509,7 +509,7 @@
 	"llm.generating": "⏳ Genererar…",
 	"llm.profile.advanced.label": "●●○ Avancerad — Korrigering + Förutsägelse",
 	"llm.profile.basic.label": "●○○ Grundläggande — Enkel förutsägelse",
-	"llm.profile.batch_advanced.label": "●●● Batch Avancerad — 1 avancerad req. med %d förutsägelse%s",
+	"llm.profile.batch_advanced.label": "●●● Batch Avancerad — 1 avancerad req. med {n} förutsägelse{s}",
 	"llm.profile.raw.label": "○○○ Rått — Ingen prompt, endast kontext",
 	"llm.server_mlx_ready_body": "MLX-servern är redo.",
 	"llm.server_ollama_ready_body": "Ollama-servern är redo.",
