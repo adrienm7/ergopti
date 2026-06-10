@@ -379,6 +379,26 @@ local _dedup = { line = nil, count = 0, variant_key = nil }
 -- Must be declared here so _log() captures the variable by reference.
 local _push_ring
 
+-- Runtime error-capture state (installed by Section 7). Forward-declared here so
+-- _log() and _flush_dedup_summary() route their console writes through
+-- _console_out(), which the print() tee uses to tell the Logger's own output
+-- (already written to the file) apart from foreign prints (Hammerspoon error
+-- tracebacks, stray print()s) that must be captured into the file too.
+local _emitting   = false
+local _orig_print = nil
+
+--- Writes one line to the console via the ORIGINAL print, flagging _emitting so
+--- the print() tee installed by M.install_runtime_error_capture() skips it (the
+--- line is already persisted by _write_to_file). Falls back to the live print
+--- before capture is installed.
+--- @param line string Fully-formatted console line.
+local function _console_out(line)
+	_emitting = true
+	local p = _orig_print or print
+	pcall(p, line)
+	_emitting = false
+end
+
 
 --- ==================================
 -- ===== 3.1) File Sink Helpers =====
@@ -472,7 +492,7 @@ local function _flush_dedup_summary()
 	local indent  = (variant.level == 1) and string.rep(" ", 10) or ""
 	local summary = string.format("[%s] [logger] %s\u{2191} %d identical %s suppressed",
 		variant.label, indent, _dedup.count, word)
-	print(summary)
+	_console_out(summary)
 	local stamp = _timestamp()
 	-- Push to ring buffer before writing so the snapshot reflects dedup summaries
 	_push_ring(stamp .. " " .. summary)
@@ -514,8 +534,10 @@ local function _log(variant_key, module_name, msg, ...)
 	local stamp = _timestamp()
 
 	-- Console output: plain print (colors removed — hs.styledtext/console no longer a dependency).
+	-- Routed through _console_out so the print() tee (Section 7) does not re-capture
+	-- the Logger's own lines — they are already persisted by _write_to_file below.
 	local console_line = stamp .. " " .. line
-	print(console_line)
+	_console_out(console_line)
 
 	-- Push to the in-memory ring buffer so ring_buffer_snapshot() is always
 	-- current without requiring a file read.
@@ -706,6 +728,105 @@ function M.build(module_name, label, fn, ctx)
 		return nil
 	end
 	return result
+end
+
+
+
+
+-- ===========================================
+-- ===========================================
+-- ======= 7/ Runtime Error Capture ==========
+-- ===========================================
+-- ===========================================
+
+-- One-shot guard so the constructors are patched exactly once.
+local _capture_installed = false
+
+--- Wraps a timer callback so an uncaught error is logged WITH a traceback
+--- instead of vanishing into the Hammerspoon Console. hs.timer ignores callback
+--- return values, so discarding them here changes nothing.
+--- @param fn function The user callback.
+--- @param kind string Timer family label, surfaced in the error line.
+--- @return function The guarded callback (or fn unchanged when not a function).
+local function _guard_timer_cb(fn, kind)
+	if type(fn) ~= "function" then return fn end
+	return function(...)
+		local ok, err = xpcall(fn, debug.traceback, ...)
+		if not ok then
+			_log("ERROR", "runtime", "Uncaught error in hs.timer.%s callback: %s", kind, tostring(err))
+		end
+	end
+end
+
+--- Installs process-wide capture so EVERY diagnostic — including errors that
+--- Hammerspoon would otherwise only print to its Console — lands in the unified
+--- file log. The console is too noisy to read and cannot be exported, so the
+--- file must be self-sufficient.
+---
+--- Two complementary mechanisms:
+---   1. hs.timer.{doAfter,new,delayed.new} callbacks run under xpcall; any throw
+---      is logged at ERROR with a full traceback. This is the failure class that
+---      silently killed predictions (the dangling ngram_predict call) and the
+---      boot sequence — a throw inside a timer callback is swallowed whole by
+---      Hammerspoon's runloop and never reaches lib.logger.
+---   2. print() is teed into the file so foreign output (Hammerspoon's own error
+---      reporter, third-party modules) is captured too. The Logger's own console
+---      writes go through _console_out and are flagged via _emitting, so they are
+---      never double-written.
+---
+--- Idempotent and best-effort: every patch is guarded so capture can never block
+--- boot, and it no-ops cleanly under the headless test harness (no hs.timer).
+function M.install_runtime_error_capture()
+	if _capture_installed then return end
+	_capture_installed = true
+
+	-- 1) Tee print() — captures Hammerspoon's error tracebacks and stray prints.
+	if type(_G.print) == "function" then
+		_orig_print = _G.print
+		_G.print = function(...)
+			_orig_print(...)
+			-- Skip the Logger's own console writes (already persisted to file).
+			if _emitting then return end
+			local n = select("#", ...)
+			if n == 0 then return end
+			local parts = {}
+			for i = 1, n do parts[i] = tostring((select(i, ...))) end
+			local msg = table.concat(parts, "\t")
+			if msg == "" then return end
+			-- Persist directly (never via _log) so a traceback is not eaten by the
+			-- dedup pass and cannot recurse back through print().
+			local stamp = _timestamp()
+			for subline in (msg .. "\n"):gmatch("(.-)\n") do
+				if subline ~= "" then
+					pcall(_write_to_file, stamp, "[CONSOLE] [console] " .. subline)
+				end
+			end
+		end
+	end
+
+	-- 2) Guard hs.timer constructors so callback throws are logged, not swallowed.
+	local hs_ref = rawget(_G, "hs")
+	if type(hs_ref) == "table" and type(hs_ref.timer) == "table" then
+		local timer = hs_ref.timer
+		if type(timer.doAfter) == "function" then
+			local orig = timer.doAfter
+			timer.doAfter = function(delay, fn, ...) return orig(delay, _guard_timer_cb(fn, "doAfter"), ...) end
+		end
+		if type(timer.new) == "function" then
+			local orig = timer.new
+			timer.new = function(interval, fn, ...) return orig(interval, _guard_timer_cb(fn, "new"), ...) end
+		end
+		if type(timer.doEvery) == "function" then
+			local orig = timer.doEvery
+			timer.doEvery = function(interval, fn, ...) return orig(interval, _guard_timer_cb(fn, "doEvery"), ...) end
+		end
+		if type(timer.delayed) == "table" and type(timer.delayed.new) == "function" then
+			local orig = timer.delayed.new
+			timer.delayed.new = function(delay, fn, ...) return orig(delay, _guard_timer_cb(fn, "delayed"), ...) end
+		end
+	end
+
+	_log("INFO", "logger", "Runtime error capture installed (hs.timer guards + console tee).")
 end
 
 return M

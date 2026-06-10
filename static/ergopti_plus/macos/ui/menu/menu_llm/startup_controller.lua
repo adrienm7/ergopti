@@ -99,66 +99,76 @@ function M.new(ctx)
 			end
 		end)
 
-		-- Silence save_prefs/update_menu during bulk shortcut restoration so
-		-- the menu is not redrawn for every individual bind call.
+		-- Silence save_prefs/update_menu during bulk shortcut restoration so the
+		-- menu is not redrawn for every individual bind call. The whole restoration
+		-- is wrapped in pcall: a failure here (e.g. a menu rebuild throwing while a
+		-- profile/label change is mid-flight) must NOT abort the model-startup path
+		-- below — the MLX server has to come up even if shortcut restoration
+		-- hiccups. The error is logged loudly (and, via the runtime capture
+		-- installed in init.lua, lands in the file log) instead of silently killing
+		-- the entire LLM boot the way it did before this guard.
 		set_startup_silence(true)
-
-		if type(state.llm_trigger_shortcut) == "table" then
-			Logger.debug(LOG, string.format("Restoring trigger shortcut: %s+%s.",
-				table.concat(state.llm_trigger_shortcut.mods or {}, "+"),
-				state.llm_trigger_shortcut.key or "nil"))
-			apply_llm_shortcut(state.llm_trigger_shortcut.mods, state.llm_trigger_shortcut.key)
-		else
-			Logger.debug(LOG, "No global trigger shortcut configured.")
-		end
-
-		-- Rebuild the set of valid profile ids from built-ins + user profiles
-		local valid_profile_ids = {}
-		local builtin_count = 0
-		for _, profile in ipairs(llm_mod.BUILTIN_PROFILES or {}) do
-			if type(profile) == "table" and type(profile.id) == "string" then
-				valid_profile_ids[profile.id] = true
-				builtin_count = builtin_count + 1
-			end
-		end
-		Logger.debug(LOG, string.format("Built-in profiles loaded: %d.", builtin_count))
-
-		local user_count = 0
-		for _, profile in ipairs(type(state.llm_user_profiles) == "table" and state.llm_user_profiles or {}) do
-			if type(profile) == "table" and type(profile.id) == "string" then
-				valid_profile_ids[profile.id] = true
-				user_count = user_count + 1
-			end
-		end
-		Logger.debug(LOG, string.format("User profiles loaded: %d.", user_count))
-
-		local profile_shortcuts = type(state.llm_profile_shortcuts) == "table" and state.llm_profile_shortcuts or {}
-		local sc_count = 0
-		for _ in pairs(profile_shortcuts) do sc_count = sc_count + 1 end
-		Logger.info(LOG, string.format("Profile shortcuts loaded: %d entries.", sc_count))
-
-		for profile_id, sc in pairs(profile_shortcuts) do
-			local mods_str = (type(sc) == "table" and type(sc.mods) == "table") and table.concat(sc.mods, "+") or "nil"
-			local key_str  = (type(sc) == "table" and type(sc.key) == "string") and sc.key or "nil"
-			Logger.debug(LOG, string.format("Profile '%s': mods=%s, key=%s.", profile_id, mods_str, key_str))
-			if valid_profile_ids[profile_id] and type(sc) == "table" then
-				Logger.debug(LOG, string.format("Binding shortcut for profile '%s' on startup.", profile_id))
-				apply_llm_profile_shortcut(profile_id, sc.mods, sc.key, { silent = true })
+		local ok_restore, restore_err = pcall(function()
+			if type(state.llm_trigger_shortcut) == "table" then
+				Logger.debug(LOG, string.format("Restoring trigger shortcut: %s+%s.",
+					table.concat(state.llm_trigger_shortcut.mods or {}, "+"),
+					state.llm_trigger_shortcut.key or "nil"))
+				apply_llm_shortcut(state.llm_trigger_shortcut.mods, state.llm_trigger_shortcut.key)
 			else
-				Logger.warn(LOG, string.format("Removing invalid shortcut for profile '%s'.", profile_id))
-				apply_llm_profile_shortcut(profile_id, nil, nil, { silent = true })
+				Logger.debug(LOG, "No global trigger shortcut configured.")
 			end
-		end
 
-		Logger.debug(LOG, "Activating bound hotkeys…")
-		local trigger_hk  = get_trigger_hk()
-		local profile_hks = get_profile_hks()
-		if trigger_hk then activate_hotkey(trigger_hk) end
-		for _, hk in pairs(profile_hks) do
-			if hk then activate_hotkey(hk) end
-		end
+			-- Rebuild the set of valid profile ids from built-ins + user profiles
+			local valid_profile_ids = {}
+			local builtin_count = 0
+			for _, profile in ipairs(llm_mod.BUILTIN_PROFILES or {}) do
+				if type(profile) == "table" and type(profile.id) == "string" then
+					valid_profile_ids[profile.id] = true
+					builtin_count = builtin_count + 1
+				end
+			end
+			Logger.debug(LOG, string.format("Built-in profiles loaded: %d.", builtin_count))
 
+			local user_count = 0
+			for _, profile in ipairs(type(state.llm_user_profiles) == "table" and state.llm_user_profiles or {}) do
+				if type(profile) == "table" and type(profile.id) == "string" then
+					valid_profile_ids[profile.id] = true
+					user_count = user_count + 1
+				end
+			end
+			Logger.debug(LOG, string.format("User profiles loaded: %d.", user_count))
+
+			local profile_shortcuts = type(state.llm_profile_shortcuts) == "table" and state.llm_profile_shortcuts or {}
+			local sc_count = 0
+			for _ in pairs(profile_shortcuts) do sc_count = sc_count + 1 end
+			Logger.info(LOG, string.format("Profile shortcuts loaded: %d entries.", sc_count))
+
+			for profile_id, sc in pairs(profile_shortcuts) do
+				local mods_str = (type(sc) == "table" and type(sc.mods) == "table") and table.concat(sc.mods, "+") or "nil"
+				local key_str  = (type(sc) == "table" and type(sc.key) == "string") and sc.key or "nil"
+				Logger.debug(LOG, string.format("Profile '%s': mods=%s, key=%s.", profile_id, mods_str, key_str))
+				if valid_profile_ids[profile_id] and type(sc) == "table" then
+					Logger.debug(LOG, string.format("Binding shortcut for profile '%s' on startup.", profile_id))
+					apply_llm_profile_shortcut(profile_id, sc.mods, sc.key, { silent = true })
+				else
+					Logger.warn(LOG, string.format("Removing invalid shortcut for profile '%s'.", profile_id))
+					apply_llm_profile_shortcut(profile_id, nil, nil, { silent = true })
+				end
+			end
+
+			Logger.debug(LOG, "Activating bound hotkeys…")
+			local trigger_hk  = get_trigger_hk()
+			local profile_hks = get_profile_hks()
+			if trigger_hk then activate_hotkey(trigger_hk) end
+			for _, hk in pairs(profile_hks) do
+				if hk then activate_hotkey(hk) end
+			end
+		end)
 		set_startup_silence(false)
+		if not ok_restore then
+			Logger.error(LOG, "LLM shortcut/profile restoration failed at startup — continuing to model startup so the server still launches: %s",
+				tostring(restore_err))
+		end
 
 		if not state.llm_enabled then
 			Logger.debug(LOG, "LLM disabled at startup.")

@@ -159,6 +159,14 @@ menu_paths.init(base_dir, function() hs.timer.doAfter(0.25, function() pcall(hs.
 -- the user config dir is known. Earlier boot lines went to the fallback file.
 Logger.init_log_path(menu_paths.get_config_dir(), 14)
 
+-- Make the file log self-sufficient: capture errors that Hammerspoon would
+-- otherwise only print to its (unexportable, far-too-noisy) Console. Wraps
+-- hs.timer callbacks so a throw inside one is logged with a traceback instead of
+-- vanishing into the runloop (the failure mode that silently killed predictions
+-- and the LLM boot sequence), and tees print() into the file. Installed right
+-- after the log path is known so every capture lands in today's dated file.
+Logger.install_runtime_error_capture()
+
 -- Now safe to load modules that depend on config_dir
 local file_system        = require("adapters.file_system")
 local karabiner          = require("modules.karabiner")
