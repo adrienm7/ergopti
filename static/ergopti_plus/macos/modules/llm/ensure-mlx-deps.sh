@@ -352,7 +352,8 @@ if [ -x "$VENV_DIR/bin/python" ] && [ -f "$SYNC_HASH_FILE" ]; then
 		# when the disk check passes.
 		SP_DIR="$VENV_DIR/lib/python$PYTHON_VERSION/site-packages"
 		if [ -d "$SP_DIR/mlx_lm" ] && [ -d "$SP_DIR/huggingface_hub" ] \
-			&& [ -d "$SP_DIR/jinja2" ] && [ -d "$SP_DIR/safetensors" ]; then
+			&& [ -d "$SP_DIR/jinja2" ] && [ -d "$SP_DIR/safetensors" ] \
+				&& [ -d "$SP_DIR/truststore" ]; then
 			# Disk says the four packages are there; trust the hash and exit.
 			# The import probe is intentionally skipped here — keeping the
 			# fast path as fast as the original (~50 ms) on a healthy venv.
