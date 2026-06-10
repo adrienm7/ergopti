@@ -9,9 +9,9 @@
 --- spotlight (yellow ring indicator).
 ---
 --- FEATURES & RATIONALE:
---- 1. Keep-Awake Jitter: Moves the mouse by small random offsets and taps an
----    unmapped key (F18) so the OS considers the session active without touching
----    any power-management settings permanently.
+--- 1. Keep-Awake Jitter: Moves the mouse by small random offsets and calls
+---    hs.caffeinate.declareUserActivity() so the OS considers the session active
+---    without touching any power-management settings permanently.
 --- 2. EventTap Factories: bind_* functions return a fake-hotkey object exposing
 ---    a :delete() method, letting the bindings registry manage all shortcut
 ---    types uniformly, whether hs.hotkey or hs.eventtap underneath.
@@ -49,12 +49,7 @@ local text_acts = require("modules.shortcuts.actions.text")
 -- Physical key-code for the @ / # key (position-based, not character-based)
 local KEYCODE_AT_HASH        = 10
 
--- F18 is unmapped on most keyboards; used as a secondary wake signal for the OS.
--- The hs.eventtap.keyStroke API accepts the string form, derived here from the
--- numeric keycode owned by lib.keycodes so the registry remains the single
--- source of truth.
 local Keycodes               = require("lib.keycodes")
-local KEYCODE_F18            = Keycodes.to_name(Keycodes.F18_WAKE_OS)
 
 -- Keep-awake jitter parameters
 local AWAKE_TICK_MIN_SEC     = 1    -- Minimum interval between mouse-jitter ticks
@@ -161,8 +156,9 @@ schedule_awake_tick = function()
 				if origin then pcall(hs.mouse.absolutePosition, {x = origin.x, y = origin.y}) end
 			end)
 
-			-- Tap an unmapped key as an additional OS activity signal
-			pcall(eventtap.keyStroke, {}, KEYCODE_F18, 0)
+			-- Declare user activity so the OS resets its idle timer without generating a key event
+			-- that would be caught by the input watcher and trigger self-deactivation
+			pcall(hs.caffeinate.declareUserActivity)
 		end
 
 		schedule_awake_tick()
