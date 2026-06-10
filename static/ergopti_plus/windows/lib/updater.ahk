@@ -356,6 +356,9 @@ Updater_FetchLatestJson(Channel) {
 		Req.Open("GET", Url, false)
 		Req.SetRequestHeader("Accept", "application/vnd.github+json")
 		Req.SetRequestHeader("User-Agent", "ErgoptiPlus-Updater/1.0")
+		; 15 s connect + 30 s receive — prevents the synchronous call from
+		; blocking the AHK main thread indefinitely on a slow or flaky network.
+		Req.SetTimeouts(0, 15000, 30000, 30000)
 		if _UpdaterFetchCache.Has(Channel) {
 			Etag := _UpdaterFetchCache[Channel].Etag
 			if (Etag != "")
