@@ -12,11 +12,29 @@
 ; Registers every hotstring category into the engine. Wrapped in a function so
 ; the whole registration can be re-run in-process (live menu toggles) instead of
 ; restarting the script via Reload. Called once at boot from ErgoptiPlus.ahk
-; right after the #Include — and, in a later slice, again on every hotstring
-; toggle so the change applies hot without a full process restart.
-RegisterAllHotstrings() {
+; right after the #Include, and again on every live hotstring toggle.
+;
+; ``IncludeNative`` is true at boot (register everything) and false on a live
+; rebuild. The two native AHK Hotstring() sections (Ê deadkey, "…") are skipped
+; on a live rebuild: they live in the native engine, not the HSE, so clearing the
+; HSE never touches them — re-registering them from a menu-click thread would risk
+; the wrong input level. They keep their boot registration; toggling one of them
+; takes the Reload path instead (see hotstring_live_toggle.ahk).
+RegisterAllHotstrings(IncludeNative := true) {
 	global Features, ScriptInformation, PersonalInformation, PersonalInformationLetters
 	global DeadkeyMappingCircumflex, SpaceAroundSymbols, PersonalInformationHotstrings
+
+	; Recompute SpaceAroundSymbols from the live Features on every run, so a live
+	; toggle of distances_reduction.space_around_symbols re-bakes the rolls operator
+	; replacements (":=", "->", …) with the new spacing — a cross-dependency that
+	; would otherwise need a Reload. At boot this reproduces the exact value
+	; ErgoptiPlus.ahk computed just before the #Include.
+	_SpaceNode := (Features.Has("hotstrings")
+		and Features["hotstrings"].Has("distances_reduction")
+		and Features["hotstrings"]["distances_reduction"].Has("space_around_symbols"))
+		? Features["hotstrings"]["distances_reduction"]["space_around_symbols"]
+		: Map()
+	SpaceAroundSymbols := (_SpaceNode.Has("enabled") and _SpaceNode["enabled"]) ? " " : ""
 
 
 
@@ -64,9 +82,13 @@ if Features["hotstrings"]["distances_reduction"]["dead_key_e_circumflex"]["enabl
 	; The "Ê" key will enable to use the other symbols on the layer if we aren't inside a word.
 	; The activation delay is passed explicitly so the registered callbacks stay
 	; self-contained — CreateDeadkeyHotstring / ShouldActivateDeadkey live at module
-	; scope (see end of file) and never close over this function's locals.
-	for MapKey, MappedValue in DeadkeyMappingCircumflexModified {
-		CreateDeadkeyHotstring(MapKey, MappedValue, DeadKeyECircumflexDelay)
+	; scope (see end of file) and never close over this function's locals. These are
+	; native Hotstring() registrations, so they are skipped on a live rebuild
+	; (IncludeNative = false) — they keep their boot registration.
+	if IncludeNative {
+		for MapKey, MappedValue in DeadkeyMappingCircumflexModified {
+			CreateDeadkeyHotstring(MapKey, MappedValue, DeadKeyECircumflexDelay)
+		}
 	}
 }
 
@@ -397,12 +419,16 @@ if Features["hotstrings"]["autocorrection"]["multiple_punctuation_marks"]["enabl
 	LoadHotstringsSection("autocorrection", "multiple_punctuation_marks", Features["hotstrings"]["autocorrection"]["multiple_punctuation_marks"])
 
 	; We can't use the TimeActivationSeconds here, as previous character = current character = "."
-	Hotstring(
-		":*?B0:" . "...",
-		; Needs to be activated only after a word, otherwise can cause problem in code, like in js: [...a, ...b]
-		(*) => GetLastSentCharacterAt(-4) ~= "^[A-Za-z]$" ?
-			SendNewResult("{BackSpace 3}…", False) : ""
-	)
+	; Native Hotstring() — skipped on a live rebuild (IncludeNative = false); it
+	; keeps its boot registration so a menu-thread rebuild can't strand it.
+	if IncludeNative {
+		Hotstring(
+			":*?B0:" . "...",
+			; Needs to be activated only after a word, otherwise can cause problem in code, like in js: [...a, ...b]
+			(*) => GetLastSentCharacterAt(-4) ~= "^[A-Za-z]$" ?
+				SendNewResult("{BackSpace 3}…", False) : ""
+		)
+	}
 }
 
 if Features["hotstrings"]["autocorrection"]["suffixes_a_chaining"]["enabled"] {

@@ -388,116 +388,55 @@ ToggleMenuVariableByPath(FullPath) {
 }
 
 ; Attempt to apply a hotstring section toggle LIVE, without a script Reload.
-; Returns true when the toggle was fully handled (HSE group flipped, feature
-; flag persisted, tray menu rebuilt); false when FullPath is not a live-eligible
-; hotstring section — the caller then takes the persist-and-Reload path.
+; Returns true when the toggle was fully handled (flag persisted, registration
+; rebuilt in-process); false when FullPath is not a live-eligible hotstring
+; section — the caller then takes the persist-and-Reload path.
 ;
-; Eligibility and the HSE group derivation live in
-; lib/hotstrings/hotstring_live_toggle.ahk. Two fail-safes keep this from ever
-; silently mis-toggling: an unlisted path returns false, and a live DISABLE only
-; runs when the derived group actually exists in the HSE registry (so a section
-; id mismatch degrades to Reload instead of a silent no-op).
+; Since RegisterAllHotstrings() is re-runnable, a live toggle no longer splices a
+; single HSE group: it flips the feature flag and rebuilds the entire hotstring
+; registration in-process (RebuildHotstringsLive). Re-running re-evaluates every
+; Features guard, so cross-dependent and inline-generated sections all resolve
+; with no special cases. Only the reload-only groups (the two native-engine
+; sections and the layout-backed magic_key.replace) stay on Reload — see
+; lib/hotstrings/hotstring_live_toggle.ahk.
 _HS_TryLiveToggle(FullPath) {
-	global Features, HSE_RegistryByGroup
-	Info := _HS_ResolveLiveToggle(FullPath)
-	if (Info == false) {
-		return false
-	}
-
-	NewEnabled := !_ResolveMenuItemEnabled(FullPath)
-
-	if NewEnabled {
-		if HSE_RegistryByGroup.Has(Info.group) {
-			; Registered this session (on at boot, or enabled then disabled
-			; earlier) — re-arm without re-parsing the TOML.
-			HSE_EnableGroup(Info.group)
-		} else {
-			; Off at boot — lazy-load once. Bundled categories resolve through
-			; the generated loaders; personal sections parse their TOML. Fail
-			; safe to Reload when registration unexpectedly produced no group.
-			LoadHotstringsSection(Info.loadcat, Info.section, Info.cfg)
-			if !HSE_RegistryByGroup.Has(Info.group) {
-				return false
-			}
-		}
-	} else {
-		if !HSE_RegistryByGroup.Has(Info.group) {
-			; Nothing registered to disable live — fall back to Reload.
-			return false
-		}
-		HSE_DisableGroup(Info.group)
-	}
-
-	; Persist + mirror into the in-memory Features Map (no Reload). Done only
-	; after the HSE op succeeds so a fail-safe bail above leaves all state
-	; untouched for the caller's Reload path.
-	WriteFeatureUpdate(FullPath . ".Enabled", NewEnabled)
-
-	; Keep the preview-tooltip index in lockstep with the HSE registry. The
-	; prefix watcher maintains its OWN section-filtered index (built from
-	; Features at boot), so without this rebuild a disabled section would keep
-	; previewing an expansion that no longer fires, and a freshly enabled
-	; section would fire with no tooltip. The rebuild re-reads Features (just
-	; updated above), so both directions resolve correctly.
-	if IsSet(HotstringPrefixWatcherRebuildIndex) {
-		HotstringPrefixWatcherRebuildIndex()
-	}
-
-	; Rebuild the tray in-process so the checkmark and (N) counts reflect the
-	; new state on the next open — the same rebuild LoggerSetLevel performs.
-	RebuildTrayMenu()
-	return true
-}
-
-; Resolve a v1 feature path to its live-toggle descriptor, or false when the
-; path is not an eligible hotstring section. The descriptor carries the HSE
-; group, the LoadHotstringsSection category + section (for lazy-load), and the
-; v2 Features config Map (for lazy-load options). Side-effect free.
-_HS_ResolveLiveToggle(FullPath) {
-	global Features
-	; Personal sections: "Personal.<id>" — always eligible.
+	; Personal sections ("Personal.<id>") are always HSE-backed → live.
 	if _HS_IsPersonalLiveToggle(FullPath) {
-		Parts := StrSplit(FullPath, ".")
-		Sec := StrLower(Parts[2])
-		if !(Features.Has("hotstrings") and Features["hotstrings"].Has("personal")
-			and Features["hotstrings"]["personal"].Has(Sec)) {
-			return false
-		}
-		return {
-			group: "personal." . Sec,
-			loadcat: "personal",
-			section: Sec,
-			cfg: Features["hotstrings"]["personal"][Sec]
-		}
+		return _HS_ApplyLiveToggle(FullPath)
 	}
-
-	; Bundled categories: translate to the v2 manifest path and check the
-	; whitelist. Anything without a manifest counterpart (TapHolds, runtime
-	; Personal) or off the whitelist returns false.
+	; Bundled sections: translate to the v2 manifest path. Anything without a
+	; manifest counterpart (TapHolds, runtime Personal) or outside "hotstrings.*"
+	; is not a hotstring section → let the caller Reload.
 	V2Path := LegacyPathToManifestPath(FullPath)
 	if (V2Path == "") {
+		try LoggerDebug("Menu", "Live-toggle: '{1}' has no manifest path → Reload.", FullPath)
 		return false
 	}
 	V2Parts := StrSplit(V2Path, ".")
 	if (V2Parts.Length != 3 or V2Parts[1] != "hotstrings") {
+		try LoggerDebug("Menu", "Live-toggle: '{1}' is not a hotstring section → Reload.", V2Path)
 		return false
 	}
-	V2Cat := V2Parts[2]
-	Section := V2Parts[3]
-	Group := _HS_DeriveLiveToggleGroup(V2Cat, Section)
-	if !_HS_IsLiveToggleGroup(Group) {
+	; A few "hotstrings.*" paths are not applied by the live rebuild (the native
+	; deadkey / "…" engines, and magic_key.replace which is a layout remap), so an
+	; in-process rebuild would not apply them — they degrade to the Reload path.
+	Group := _HS_DeriveLiveToggleGroup(V2Parts[2], V2Parts[3])
+	if _HS_IsReloadOnlyGroup(Group) {
+		try LoggerDebug("Menu", "Live-toggle: '{1}' is reload-only → Reload.", Group)
 		return false
 	}
-	if !(Features.Has("hotstrings") and Features["hotstrings"].Has(V2Cat)
-		and Features["hotstrings"][V2Cat].Has(Section)) {
-		return false
-	}
-	return {
-		group: Group,
-		loadcat: StrReplace(V2Cat, "_", ""),
-		section: Section,
-		cfg: Features["hotstrings"][V2Cat][Section]
-	}
+	return _HS_ApplyLiveToggle(FullPath)
+}
+
+; Persist the flip and rebuild the whole hotstring registration in-process.
+; Always returns true — the toggle is fully handled with no Reload.
+_HS_ApplyLiveToggle(FullPath) {
+	NewEnabled := !_ResolveMenuItemEnabled(FullPath)
+	; WriteFeatureUpdate mutates the in-memory Features Map AND persists to disk,
+	; so the rebuild below re-reads the new value with no Reload.
+	WriteFeatureUpdate(FullPath . ".Enabled", NewEnabled)
+	RebuildHotstringsLive()
+	return true
 }
 
 ; Return the list of sibling v1 feature paths that must be force-set to false
@@ -2805,10 +2744,29 @@ global PERSONAL_SHORTCUTS_TEMPLATE := "; personal_shortcuts.ahk`r`n"
 	. "; (Add #HotIf-gated hotkey blocks here — see the example in the header.)`r`n"
 	. "`r`n"
 
+; Re-run the hotstring registration in-process so a section toggle takes effect
+; immediately, with no script Reload. Clears the HSE engine and its buffer, then
+; re-runs RegisterAllHotstrings(false): it re-evaluates every Features guard and
+; recomputes SpaceAroundSymbols, but SKIPS the native deadkey / "…" Hotstring()
+; registrations (they keep their boot registration — toggling one of those reloads
+; instead; see hotstring_live_toggle.ahk). Finally rebuilds the preview index and tray.
+RebuildHotstringsLive() {
+	try LoggerStart("Menu", "Rebuilding hotstrings in-process (live toggle)…")
+	HSE_RegistryClear()
+	HSE_HardReset()
+	RegisterAllHotstrings(false)
+	if IsSet(HotstringPrefixWatcherRebuildIndex) {
+		HotstringPrefixWatcherRebuildIndex()
+	}
+	RebuildTrayMenu()
+	try LoggerSuccess("Menu", "Hotstrings rebuilt in-process.")
+}
+
 ; Reconstructs the tray menu in place without a full process restart.
 ; Suitable for lightweight UI-only toggles (WPM display, color themes) that
 ; do not require re-parsing config or rebinding hotkeys. State-changing
-; toggles that write to TOML must still call Reload().
+; hotstring section toggles rebuild in-process via RebuildHotstringsLive; other
+; state-changing toggles (layout, tap-holds, shortcuts) still call Reload().
 RebuildTrayMenu() {
 	global SubMenus
 	A_TrayMenu.Delete()
