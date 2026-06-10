@@ -576,20 +576,6 @@ function M.perform_check(force_trigger, profile_name)
 		and build_info_bar_text(llm_display_name or core_llm.get_current_model(), nil, resolve_backend_label(), display_profile_now)
 		or nil
 
-	-- N-gram instant prediction: show a local word-bigram candidate immediately
-	-- (< 1 ms) while the async LLM request is in flight. It is a stream-placeholder so
-	-- it gets evicted cleanly when the first streaming token or final on_success arrives.
-	local ngram_preds = StreamingHandler.ngram_predict(buffer)
-	if #ngram_preds > 0 then
-		pending_predictions = ngram_preds
-		predictions_visible = true
-		tooltip.show_predictions(
-			ngram_preds, 1, is_ai_preview_enabled, streaming_info_bar,
-			nil, prediction_indent, normalize_mods(navigation_mods),
-			tooltip.tint("ai_prediction"), "…", math.max(#ngram_preds, num_predictions)
-		)
-	end
-
 	local model_to_use    = core_llm.get_current_model()
 	local num_preds       = params.num_preds
 
