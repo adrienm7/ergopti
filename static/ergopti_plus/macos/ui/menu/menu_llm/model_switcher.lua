@@ -25,6 +25,7 @@ local i18n          = require("lib.i18n")
 local Logger        = require("lib.logger")
 local dialog        = require("lib.dialog_util")
 local notifications = require("lib.notifications")
+local ProfileLabel  = require("ui.menu.menu_llm.profile_label")
 
 local LOG = "model_switcher"
 
@@ -207,16 +208,15 @@ function M.new(ctx)
 	--- @return string Human-readable label.
 	local function get_profile_label(profile_id)
 		local n = tonumber(state.llm_num_predictions) or llm_mod.DEFAULT_STATE.llm_num_predictions
-		local s = n > 1 and "s" or ""
 		local labels = {
 			raw              = i18n.get("llm.profile.raw.label"),
 			basic            = i18n.get("llm.profile.basic.label"),
 			advanced         = i18n.get("llm.profile.advanced.label"),
-			batch_advanced   = string.format(i18n.get("llm.profile.batch_advanced.label"), n, s),
+			batch_advanced   = ProfileLabel.format(i18n.get("llm.profile.batch_advanced.label"), n),
 			parallel_simple  = i18n.get("llm.profile.basic.label"),
 			parallel         = i18n.get("llm.profile.basic.label"),
 			batch_simple     = i18n.get("llm.profile.basic.label"),
-			batch            = string.format(i18n.get("llm.profile.batch_advanced.label"), n, s),
+			batch            = ProfileLabel.format(i18n.get("llm.profile.batch_advanced.label"), n),
 			parallel_advanced = i18n.get("llm.profile.advanced.label"),
 			base_completion  = i18n.get("llm.profile.raw.label"),
 		}

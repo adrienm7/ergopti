@@ -188,3 +188,139 @@ Test_LLM_Regression_MakeSetNHandlerCapturesEachN() {
 }
 Test("LLM regression: MakeSetNHandler captures 1/3/10 not last N only",
 	Test_LLM_Regression_MakeSetNHandlerCapturesEachN)
+
+
+
+
+; ============================================
+; 5/ profile labels - printf token never leaks into the menu
+; ============================================
+;
+; THE BUG: the "Batch Advanced" profile label leaked a literal "%d prediction%s"
+; into the menu. The locale string carried printf "%d"/"%s" tokens, but the menu
+; substitutes brace "{n}"/"{s}" placeholders (LLM_Tray_GetProfileLabel) - so the
+; printf tokens were never replaced and showed verbatim. Mirrors the Hammerspoon
+; guards in macos/tests/unit/lib/test_locale_profile_labels.lua and
+; macos/tests/unit/menu/test_profile_label.lua.
+
+; Resolves ergopti_plus/shared/locales from A_ScriptDir (= windows/tests when the
+; suite is #Include-d by run_all.ahk). Same derivation as test_locale_json_valid.
+_LLMPL_LocaleDir() {
+	SplitPath(A_ScriptDir, , &DriverDir)   ; -> windows
+	SplitPath(DriverDir, , &EpDir)         ; -> ergopti_plus
+	return EpDir . "\shared\locales"
+}
+
+; Key matches the dot-notation profile label keys (llm.profile.<id>.label).
+_LLMPL_IsProfileLabelKey(Key) {
+	return RegExMatch(Key, "^llm\.profile\.[\w]+\.label$") > 0
+}
+
+; Scans every locale file for printf tokens in profile labels. Returns a newline
+; list of "<locale>:<key>" offenders (empty string when all clean) plus the count
+; of files scanned, so the test can also fail if enumeration found nothing.
+_LLMPL_ScanPrintfLeaks(&FilesScanned) {
+	global _I18nCache
+	Offenders   := ""
+	FilesScanned := 0
+	Loop Files, _LLMPL_LocaleDir() . "\*.json" {
+		FilesScanned += 1
+		LocaleName := A_LoopFileName
+		_I18nLoadFile(A_LoopFileFullPath)
+		for Key, Val in _I18nCache {
+			if !_LLMPL_IsProfileLabelKey(Key)
+				continue
+			if (Type(Val) != "String")
+				continue
+			if (InStr(Val, "%d") || InStr(Val, "%s") || InStr(Val, "%i"))
+				Offenders .= LocaleName . ":" . Key . "  ->  " . Val . "`n"
+		}
+	}
+	return Offenders
+}
+
+Test_LLM_Regression_NoPrintfTokenInProfileLabels() {
+	FilesScanned := 0
+	Offenders := _LLMPL_ScanPrintfLeaks(&FilesScanned)
+	Assert(FilesScanned >= 21,
+		"expected at least 21 locale files scanned, got " . FilesScanned)
+	Assert(Offenders == "",
+		"printf token(s) leaked into profile label(s) - locale labels must use "
+		. "{n}/{s}, not %d/%s:`n" . Offenders)
+}
+Test("LLM regression: no printf %d/%s token in any locale profile label",
+	Test_LLM_Regression_NoPrintfTokenInProfileLabels)
+
+Test_LLM_Regression_BatchLabelKeepsBracePlaceholders() {
+	global _I18nCache
+	Missing := ""
+	Scanned := 0
+	Loop Files, _LLMPL_LocaleDir() . "\*.json" {
+		Scanned += 1
+		LocaleName := A_LoopFileName
+		_I18nLoadFile(A_LoopFileFullPath)
+		Key := "llm.profile.batch_advanced.label"
+		Val := _I18nCache.Has(Key) ? _I18nCache[Key] : ""
+		if (Type(Val) != "String" || Val == "")
+			Missing .= LocaleName . ": absent`n"
+		else if (!InStr(Val, "{n}") || !InStr(Val, "{s}"))
+			Missing .= LocaleName . ": " . Val . "`n"
+	}
+	Assert(Scanned >= 21, "expected at least 21 locale files, got " . Scanned)
+	Assert(Missing == "",
+		"batch_advanced label must keep {n} and {s} in every language:`n" . Missing)
+}
+Test("LLM regression: batch_advanced label keeps {n}/{s} in all locales",
+	Test_LLM_Regression_BatchLabelKeepsBracePlaceholders)
+
+; Source guard: LLM_Tray_GetProfileLabel must substitute the brace placeholders.
+; If a refactor swaps back to Format()/%d the locale strings stop matching and the
+; "%d prediction%s" leak returns - this pins the substitution convention at source.
+Test_LLM_Regression_GetProfileLabelUsesBraceSubstitution() {
+	body := FileRead(A_ScriptDir . "\..\ui\tray_llm\menu_profiles.ahk", "UTF-8")
+	AssertContains(body, '"{n}"',
+		"LLM_Tray_GetProfileLabel must StrReplace the {n} placeholder")
+	AssertContains(body, '"{s}"',
+		"LLM_Tray_GetProfileLabel must StrReplace the {s} placeholder")
+	Assert(!InStr(body, 'Format(t("llm.profile.batch_advanced.label")'),
+		"profile label must not be routed through Format()/%d - use {n}/{s} StrReplace")
+}
+Test("LLM regression: GetProfileLabel substitutes {n}/{s}, not printf tokens",
+	Test_LLM_Regression_GetProfileLabelUsesBraceSubstitution)
+
+; Behavioural contract: the production substitution (the exact StrReplace pair from
+; LLM_Tray_GetProfileLabel) applied to the REAL locale label must leave no leftover
+; placeholder of EITHER convention. Synthetic ASCII label covers the plural logic;
+; the real fr label covers the end-to-end reproduction (kept ASCII-safe: we only
+; assert the count appears and that no token survives, never the translated word).
+_LLMPL_FormatBrace(Label, N) {
+	S := (N > 1) ? "s" : ""
+	return StrReplace(StrReplace(Label, "{n}", N), "{s}", S)
+}
+
+Test_LLM_Regression_BraceSubstitutionLeavesNoPlaceholder() {
+	; Synthetic plural/singular behaviour.
+	AssertEqual("2 items", _LLMPL_FormatBrace("{n} item{s}", 2))
+	AssertEqual("1 item",  _LLMPL_FormatBrace("{n} item{s}", 1))
+
+	; Real fr label, end to end - no leftover token, count present.
+	global _I18nCache
+	_I18nLoadFile(_LLMPL_LocaleDir() . "\fr.json")
+	Key := "llm.profile.batch_advanced.label"
+	Assert(_I18nCache.Has(Key), "fr.json must define " . Key)
+	Label := _I18nCache[Key]
+
+	OutPlural := _LLMPL_FormatBrace(Label, 5)
+	Assert(InStr(OutPlural, "5") > 0, "count 5 must appear in: " . OutPlural)
+	Assert(!InStr(OutPlural, "{n}") && !InStr(OutPlural, "{s}"),
+		"brace placeholder leaked: " . OutPlural)
+	Assert(!InStr(OutPlural, "%d") && !InStr(OutPlural, "%s"),
+		"printf placeholder leaked: " . OutPlural)
+
+	OutSingular := _LLMPL_FormatBrace(Label, 1)
+	Assert(InStr(OutSingular, "1") > 0, "count 1 must appear in: " . OutSingular)
+	Assert(!InStr(OutSingular, "{n}") && !InStr(OutSingular, "{s}"),
+		"brace placeholder leaked (singular): " . OutSingular)
+}
+Test("LLM regression: brace substitution on real label leaves no placeholder",
+	Test_LLM_Regression_BraceSubstitutionLeavesNoPlaceholder)

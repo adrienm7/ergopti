@@ -509,7 +509,7 @@
 	"llm.generating": "⏳ Generowanie…",
 	"llm.profile.advanced.label": "●●○ Zaawansowany — Korekta + Predykcja",
 	"llm.profile.basic.label": "●○○ Podstawowy — Prosta predykcja",
-	"llm.profile.batch_advanced.label": "●●● Batch Zaawansowany — 1 zaaw. żąd. z %d predykcją%s",
+	"llm.profile.batch_advanced.label": "●●● Batch Zaawansowany — 1 zaaw. żąd. z {n} predykcją{s}",
 	"llm.profile.raw.label": "○○○ Surowy — Brak promptu, tylko kontekst",
 	"llm.server_mlx_ready_body": "Serwer MLX jest gotowy.",
 	"llm.server_ollama_ready_body": "Serwer Ollama jest gotowy.",

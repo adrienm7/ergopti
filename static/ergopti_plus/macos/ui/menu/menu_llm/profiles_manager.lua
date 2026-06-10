@@ -17,6 +17,7 @@ local shortcut_ui   = require("ui.menu.shortcut_utils")
 local Logger        = require("lib.logger")
 local i18n          = require("lib.i18n")
 local dialog        = require("lib.dialog_util")
+local ProfileLabel  = require("ui.menu.menu_llm.profile_label")
 
 local LOG = "menu_llm.profiles"
 
@@ -33,23 +34,76 @@ if not ok_pe then prompt_editor = nil end
 --- ================================
 -- ================================
 
---- Formats a profile label dynamically replacing placeholders.
---- @param label string The raw label containing placeholders.
---- @param num_preds number The number of predictions currently configured.
---- @return string The formatted label ready for UI display.
-local function format_dynamic_label(label, num_preds)
-	if type(label) ~= "string" then return "" end
-	local n = tonumber(num_preds) or llm_mod.DEFAULT_STATE.llm_num_predictions
-	local s = (n > 1) and "s" or ""
-	return label:gsub("{n}", tostring(n)):gsub("{s}", s)
-end
-
 --- Synchronizes the internal state of the LLM module with current preferences.
 --- @param state table Shared menu state.
 local function sync_profiles(state)
 	if type(state) ~= "table" then return end
 	llm_mod.set_active_profile(state.llm_active_profile or "basic")
 	llm_mod.user_profiles = type(state.llm_user_profiles) == "table" and state.llm_user_profiles or {}
+end
+
+--- Activates a profile by id: prefers the injected deps.set_llm_profile path,
+--- otherwise mutates state, syncs the engine, persists and rebuilds the menu.
+--- Single source of truth for "select this profile" so the built-in rows
+--- (single click) and the user-profile submenu share identical behaviour.
+--- @param deps table Global dependencies.
+--- @param state table Shared menu state.
+--- @param pid string Profile id to activate.
+local function select_profile(deps, state, pid)
+	if type(deps.set_llm_profile) == "function" then
+		deps.set_llm_profile(pid)
+		return
+	end
+	state.llm_active_profile = pid
+	llm_mod.set_active_profile(pid)
+	sync_profiles(state)
+	pcall(deps.save_prefs)
+	pcall(deps.update_menu)
+end
+
+--- Clones a built-in profile into an editable user profile and opens the editor.
+--- The built-in profiles in profiles.json ship with the driver and are read-only
+--- by design (any local edit would be overwritten on the next update), so cloning
+--- into a user profile is the supported way to customise their prompt. Mirrors the
+--- AHK twin's LLM_Tray_CloneActiveBuiltinProfile helper.
+--- @param deps table Global dependencies.
+--- @param state table Shared menu state.
+--- @param src table The built-in profile to clone.
+local function clone_builtin_profile(deps, state, src)
+	if type(src) ~= "table" then return end
+	local copy = {
+		id                    = "user_" .. (src.id or "profile") .. "_" .. tostring(os.time()),
+		label                 = (src.label or src.id) .. " " .. i18n.get("menu.profiles.copy_suffix"),
+		system_single         = src.system_single or "",
+		system_multi          = src.system_multi or "",
+		system_multi_template = src.system_multi_template or "",
+		batch                 = src.batch == true,
+	}
+	state.llm_user_profiles = state.llm_user_profiles or {}
+	table.insert(state.llm_user_profiles, copy)
+	state.llm_active_profile = copy.id
+	sync_profiles(state)
+	pcall(deps.save_prefs)
+	pcall(deps.update_menu)
+	-- Open the edit dialog immediately so the user lands in the prompt they can
+	-- edit, not back in the menu.
+	if prompt_editor and type(prompt_editor.open) == "function" then
+		hs.timer.doAfter(0.1, function()
+			pcall(prompt_editor.open, copy, function(updated)
+				if type(updated) == "table" then
+					for j, p in ipairs(state.llm_user_profiles) do
+						if type(p) == "table" and p.id == updated.id then
+							state.llm_user_profiles[j] = updated
+							break
+						end
+					end
+					sync_profiles(state)
+					pcall(deps.save_prefs)
+					pcall(deps.update_menu)
+				end
+			end)
+		end)
+	end
 end
 
 --- Aggregates built-in and user-created profiles into a single list.
@@ -71,7 +125,7 @@ local function active_profile_label(state)
 	local all = get_all_profiles(state)
 	for _, p in ipairs(all) do
 		if type(p) == "table" and p.id == id then 
-			return format_dynamic_label(p.label, state.llm_num_predictions) 
+			return ProfileLabel.format(p.label, state.llm_num_predictions) 
 		end
 	end
 	return tostring(id)
@@ -127,74 +181,17 @@ local function build_profile_menu(deps, models_mgr)
 			extra = i18n.get("menu.profiles.not_recommended")
 		end
 
-		local display_label = format_dynamic_label(profile.label, state.llm_num_predictions)
+		local display_label = ProfileLabel.format(profile.label, state.llm_num_predictions)
 
+		-- A single click selects the profile directly — no nested "use this
+		-- profile" sub-item. Mirrors the AHK tray where clicking a built-in row
+		-- activates it (ui/tray_llm/menu_profiles.ahk). Customising a built-in is
+		-- still reachable via the "Clone active profile…" entry further down.
 		table.insert(menu, {
 			title    = display_label .. (profile.description and ("  —  " .. profile.description) or "") .. extra,
 			checked  = (state.llm_active_profile == pid) or nil,
 			disabled = paused or nil,
-			menu     = {
-				{
-					title   = i18n.get("menu.profiles.use_profile"),
-					checked = (state.llm_active_profile == pid) or nil,
-					fn      = not paused and function()
-						if type(deps.set_llm_profile) == "function" then
-							deps.set_llm_profile(pid)
-						else
-							state.llm_active_profile = pid
-							llm_mod.set_active_profile(pid)
-							sync_profiles(state)
-							pcall(deps.save_prefs)
-							pcall(deps.update_menu)
-						end
-					end or nil,
-				},
-				{
-					-- "Clone & edit" — the built-in profiles in profiles.json
-					-- ship with the driver and are read-only by design (any
-					-- local edit would be overwritten on the next update).
-					-- Cloning into a user profile is the supported way to
-					-- customise the prompt — same intent as the AHK twin's
-					-- LLM_Tray_CloneActiveBuiltinProfile helper.
-					title = i18n.get("menu.profiles.clone_builtin"),
-					fn    = not paused and function()
-						local src = profile
-						local copy = {
-							id                    = "user_" .. (src.id or "profile") .. "_" .. tostring(os.time()),
-							label                 = (src.label or src.id) .. " " .. i18n.get("menu.profiles.copy_suffix"),
-							system_single         = src.system_single or "",
-							system_multi          = src.system_multi or "",
-							system_multi_template = src.system_multi_template or "",
-							batch                 = src.batch == true,
-						}
-						state.llm_user_profiles = state.llm_user_profiles or {}
-						table.insert(state.llm_user_profiles, copy)
-						state.llm_active_profile = copy.id
-						sync_profiles(state)
-						pcall(deps.save_prefs)
-						pcall(deps.update_menu)
-						-- Open the edit dialog immediately so the user lands
-						-- in the prompt they can edit, not the menu.
-						if prompt_editor and type(prompt_editor.open) == "function" then
-							hs.timer.doAfter(0.1, function()
-								pcall(prompt_editor.open, copy, function(updated)
-									if type(updated) == "table" then
-										for j, p in ipairs(state.llm_user_profiles) do
-											if type(p) == "table" and p.id == updated.id then
-												state.llm_user_profiles[j] = updated
-												break
-											end
-										end
-										sync_profiles(state)
-										pcall(deps.save_prefs)
-										pcall(deps.update_menu)
-									end
-								end)
-							end)
-						end
-					end or nil,
-				},
-			},
+			fn       = not paused and function() select_profile(deps, state, pid) end or nil,
 		})
 	end
 
@@ -205,7 +202,7 @@ local function build_profile_menu(deps, models_mgr)
 		table.insert(menu, { title = i18n.section("menu.profiles.header_custom_profiles"), disabled = true })
 		for i, profile in ipairs(user_profiles) do
 			local pid = profile.id
-			local display_label = format_dynamic_label(profile.label or (i18n.get("menu.profiles.custom_profile_label") .. " " .. i), state.llm_num_predictions)
+			local display_label = ProfileLabel.format(profile.label or (i18n.get("menu.profiles.custom_profile_label") .. " " .. i), state.llm_num_predictions)
 			local profile_shortcut = type(state.llm_profile_shortcuts) == "table" and state.llm_profile_shortcuts[pid] or nil
 			local item = {
 				title    = display_label,
@@ -219,17 +216,7 @@ local function build_profile_menu(deps, models_mgr)
 					title    = i18n.get("menu.profiles.use_profile"),
 					checked  = (state.llm_active_profile == pid) or nil,
 					disabled = paused or nil,
-					fn       = not paused and function()
-						if type(deps.set_llm_profile) == "function" then
-							deps.set_llm_profile(pid)
-						else
-							state.llm_active_profile = pid
-							llm_mod.set_active_profile(pid)
-							sync_profiles(state)
-							pcall(deps.save_prefs)
-							pcall(deps.update_menu)
-						end
-					end or nil,
+					fn       = not paused and function() select_profile(deps, state, pid) end or nil,
 				},
 				{
 					title    = i18n.get("menu.profiles.shortcut_prefix"),
@@ -265,7 +252,7 @@ local function build_profile_menu(deps, models_mgr)
 										sync_profiles(state)
 										pcall(deps.save_prefs)
 										pcall(deps.update_menu)
-										pcall(notifications.notify, i18n.get("profiles.updated_title"), format_dynamic_label(updated.label, state.llm_num_predictions), "success")
+										pcall(notifications.notify, i18n.get("profiles.updated_title"), ProfileLabel.format(updated.label, state.llm_num_predictions), "success")
 									end
 								end)
 							end)
@@ -304,6 +291,27 @@ local function build_profile_menu(deps, models_mgr)
 		end
 	end
 
+	-- "Clone active profile…" — built-ins ship with the driver and are read-only,
+	-- so cloning the active one into an editable user profile is the supported way
+	-- to customise its prompt. Only shown when the active profile is a built-in
+	-- (user profiles already expose Edit in their own submenu). Replaces the former
+	-- per-row "Clone & edit" sub-item that the single-click selection removed, and
+	-- mirrors the AHK tray's single clone entry (LLM_Tray_CloneActiveBuiltinProfile).
+	local active_builtin = nil
+	for _, p in ipairs(llm_mod.BUILTIN_PROFILES or {}) do
+		if type(p) == "table" and p.id == state.llm_active_profile then
+			active_builtin = p
+			break
+		end
+	end
+	if active_builtin and not paused then
+		table.insert(menu, { title = "-" })
+		table.insert(menu, {
+			title = i18n.get("menu.profiles.clone_builtin"),
+			fn    = function() clone_builtin_profile(deps, state, active_builtin) end,
+		})
+	end
+
 	table.insert(menu, { title = "-" })
 	table.insert(menu, {
 		title = i18n.get("menu.profiles.create_profile"),
@@ -319,7 +327,7 @@ local function build_profile_menu(deps, models_mgr)
 							sync_profiles(state)
 							pcall(deps.save_prefs)
 							pcall(deps.update_menu)
-							pcall(notifications.notify, i18n.get("profiles.created_title"), format_dynamic_label(new_profile.label, state.llm_num_predictions), "success")
+							pcall(notifications.notify, i18n.get("profiles.created_title"), ProfileLabel.format(new_profile.label, state.llm_num_predictions), "success")
 							Logger.info(LOG, string.format("Custom profile %s created.", new_profile.id))
 						end
 					end)

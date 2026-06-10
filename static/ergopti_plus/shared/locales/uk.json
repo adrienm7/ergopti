@@ -509,7 +509,7 @@
 	"llm.generating": "⏳ Генерація…",
 	"llm.profile.advanced.label": "●●○ Розширений — Виправлення + Передбачення",
 	"llm.profile.basic.label": "●○○ Базовий — Просте передбачення",
-	"llm.profile.batch_advanced.label": "●●● Пакетний — 1 запит з %d передбачен%s",
+	"llm.profile.batch_advanced.label": "●●● Пакетний — 1 запит з {n} передбачен{s}",
 	"llm.profile.raw.label": "○○○ Без промпту — лише контекст",
 	"llm.server_mlx_ready_body": "Сервер MLX готовий.",
 	"llm.server_ollama_ready_body": "Сервер Ollama готовий.",

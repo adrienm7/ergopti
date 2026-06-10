@@ -509,7 +509,7 @@
 	"llm.generating": "⏳ Oluşturuluyor…",
 	"llm.profile.advanced.label": "●●○ Gelişmiş — Düzeltme + Tahmin",
 	"llm.profile.basic.label": "●○○ Temel — Basit tahmin",
-	"llm.profile.batch_advanced.label": "●●● Toplu Gelişmiş — %d tahminli%s 1 gelişmiş istek",
+	"llm.profile.batch_advanced.label": "●●● Toplu Gelişmiş — {n} tahminli{s} 1 gelişmiş istek",
 	"llm.profile.raw.label": "○○○ Ham — Prompt yok, sadece bağlam",
 	"llm.server_mlx_ready_body": "MLX sunucusu hazır.",
 	"llm.server_ollama_ready_body": "Ollama sunucusu hazır.",

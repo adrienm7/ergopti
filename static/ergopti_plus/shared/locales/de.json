@@ -509,7 +509,7 @@
 	"llm.generating": "⏳ Generierung läuft…",
 	"llm.profile.advanced.label": "●●○ Erweitert — Korrektur + Vorhersage",
 	"llm.profile.basic.label": "●○○ Einfach — Einfache Vorhersage",
-	"llm.profile.batch_advanced.label": "●●● Batch Erweitert — 1 erw. Anfrage mit %d Vorhersage%s",
+	"llm.profile.batch_advanced.label": "●●● Batch Erweitert — 1 erw. Anfrage mit {n} Vorhersage{s}",
 	"llm.profile.raw.label": "○○○ Roh — Kein Prompt, nur Kontext",
 	"llm.server_mlx_ready_body": "Der MLX-Server ist bereit.",
 	"llm.server_ollama_ready_body": "Der Ollama-Server ist bereit.",
