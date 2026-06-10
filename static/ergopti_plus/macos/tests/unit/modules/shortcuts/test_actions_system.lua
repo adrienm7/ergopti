@@ -33,24 +33,22 @@ end)
 -- ============================================================
 
 -- Guards the fix for the 7b16a3f5 regression that replaced math.huge with 2.0
--- seconds (banner disappeared after 2s) and removed awake_alert_id tracking
--- (alert was never closed specifically on toggle-off, leaving stale banners).
+-- seconds (banner disappeared after 2s). Also guards the reliable-close fix:
+-- close_awake_alert always calls closeAll(0) unconditionally because
+-- closeSpecific is silently ignored from eventtap callbacks on some Hammerspoon
+-- builds, causing the banner to persist after auto-deactivation (touchpad/key).
 -- Rules:
 --   1. toggle ON  → hs.alert.show called with math.huge duration
---   2. toggle OFF → hs.alert.closeSpecific called with the ID returned at toggle ON
---   3. auto-deactivation → hs.alert.closeSpecific also called (same invariant)
+--   2. toggle OFF → hs.alert.closeAll called (banner closed unconditionally)
+--   3. auto-deactivation → same; closeAll must be called regardless of show return value
 helpers.describe("shortcuts.actions.system: keep_awake persistent alert", function()
 	-- Builds a fresh module instance with spied alert + timer stubs.
-	-- Returns sys, show_calls, close_specific_ids, and fire_deferred (flushes
-	-- all pending hs.timer.doAfter(0, …) callbacks, simulating the runloop tick
-	-- that the eventtap-path deferred close relies on).
 	local function make_sys_with_alert_spy()
 		package.loaded["lib.keycodes"] = nil
 		package.loaded["modules.shortcuts.actions.system"] = nil
 
-		local show_calls         = {}
-		local close_specific_ids = {}
-		local deferred_fns       = {}
+		local show_calls      = {}
+		local close_all_calls = 0
 
 		local sys = helpers.load_with_stubs("modules.shortcuts.actions.system", {
 			alert = setmetatable({
@@ -58,77 +56,83 @@ helpers.describe("shortcuts.actions.system: keep_awake persistent alert", functi
 					table.insert(show_calls, { msg = msg, duration = duration })
 					return "test-alert-uuid"
 				end,
-				closeAll      = function() end,
-				closeSpecific = function(id)
-					table.insert(close_specific_ids, id)
-				end,
+				closeAll      = function() close_all_calls = close_all_calls + 1 end,
+				closeSpecific = function() end,
 			}, { __call = function(_, _) end }),
-			timer = {
-				doAfter           = function(_, fn) table.insert(deferred_fns, fn) end,
-				doEvery           = function(_, fn) return { stop = function() end } end,
-				secondsSinceEpoch = function() return os.time() end,
-				absoluteTime      = function() return 0 end,
-				usleep            = function() end,
-				delayed           = { new = function(_, fn) return { start = function() end, stop = function() end, setDelay = function() end } end },
-			},
 		})
 
-		local function fire_deferred()
-			for _, fn in ipairs(deferred_fns) do fn() end
-			deferred_fns = {}
-		end
-
-		return sys, show_calls, close_specific_ids, fire_deferred
+		return sys, show_calls, close_all_calls
 	end
 
 	helpers.it("shows the on-banner with math.huge duration so it persists while active", function()
-		local sys, show_calls, _ = make_sys_with_alert_spy()
+		local sys, show_calls = make_sys_with_alert_spy()
 		sys.toggle_awake()
 		local on_call = show_calls[#show_calls]
 		helpers.assert_true(on_call ~= nil, "hs.alert.show should be called on toggle ON")
 		helpers.assert_eq(on_call.duration, math.huge, "duration must be math.huge — not a fixed timeout")
 	end)
 
-	helpers.it("closes the banner via closeSpecific on manual toggle OFF", function()
-		local sys, _, close_ids = make_sys_with_alert_spy()
-		sys.toggle_awake()   -- ON  → alert ID = "test-alert-uuid"
-		sys.toggle_awake()   -- OFF → closeSpecific("test-alert-uuid") synchronously
-		helpers.assert_true(#close_ids >= 1, "closeSpecific must be called on toggle OFF")
-		helpers.assert_eq(close_ids[1], "test-alert-uuid", "closeSpecific must receive the alert ID from toggle ON")
-	end)
-
-	helpers.it("closes the banner via closeSpecific on stop_awake", function()
-		local sys, _, close_ids = make_sys_with_alert_spy()
-		sys.toggle_awake()   -- ON
-		sys.stop_awake()     -- direct stop (e.g. module shutdown)
-		helpers.assert_true(#close_ids >= 1, "closeSpecific must be called on stop_awake")
-		helpers.assert_eq(close_ids[1], "test-alert-uuid", "closeSpecific must receive the alert ID")
-	end)
-
-	-- Regression for the nil-ID fallback: if hs.alert.show returns nil (older
-	-- Hammerspoon builds do not return an ID), awake_alert_id stays nil and
-	-- closeSpecific is never called — the banner persists indefinitely after
-	-- auto-deactivation. close_awake_alert must call closeAll in that case.
-	helpers.it("falls back to closeAll when hs.alert.show returned nil (no ID captured)", function()
+	helpers.it("closes the banner via closeAll on manual toggle OFF", function()
 		package.loaded["lib.keycodes"] = nil
 		package.loaded["modules.shortcuts.actions.system"] = nil
 
-		local close_all_calls    = 0
-		local close_specific_ids = {}
+		local close_all_calls = 0
 
 		local sys = helpers.load_with_stubs("modules.shortcuts.actions.system", {
 			alert = setmetatable({
-				-- Simulate an older Hammerspoon that returns nil from show()
+				show          = function() return "test-alert-uuid" end,
+				closeAll      = function() close_all_calls = close_all_calls + 1 end,
+				closeSpecific = function() end,
+			}, { __call = function(_, _) end }),
+		})
+
+		sys.toggle_awake()   -- ON
+		local calls_before = close_all_calls
+		sys.toggle_awake()   -- OFF → closeAll must be called
+		helpers.assert_true(close_all_calls > calls_before, "closeAll must be called on toggle OFF")
+	end)
+
+	helpers.it("closes the banner via closeAll on stop_awake", function()
+		package.loaded["lib.keycodes"] = nil
+		package.loaded["modules.shortcuts.actions.system"] = nil
+
+		local close_all_calls = 0
+
+		local sys = helpers.load_with_stubs("modules.shortcuts.actions.system", {
+			alert = setmetatable({
+				show          = function() return "test-alert-uuid" end,
+				closeAll      = function() close_all_calls = close_all_calls + 1 end,
+				closeSpecific = function() end,
+			}, { __call = function(_, _) end }),
+		})
+
+		sys.toggle_awake()   -- ON
+		local calls_before = close_all_calls
+		sys.stop_awake()     -- direct stop (e.g. module shutdown)
+		helpers.assert_true(close_all_calls > calls_before, "closeAll must be called on stop_awake")
+	end)
+
+	-- Regression guard: closeAll must be called even when hs.alert.show returns nil
+	-- (older Hammerspoon builds). This was the root cause of banners persisting after
+	-- auto-deactivation — the ID was nil so nothing was ever closed.
+	helpers.it("calls closeAll even when hs.alert.show returned nil (no ID captured)", function()
+		package.loaded["lib.keycodes"] = nil
+		package.loaded["modules.shortcuts.actions.system"] = nil
+
+		local close_all_calls = 0
+
+		local sys = helpers.load_with_stubs("modules.shortcuts.actions.system", {
+			alert = setmetatable({
 				show          = function() return nil end,
 				closeAll      = function() close_all_calls = close_all_calls + 1 end,
-				closeSpecific = function(id) table.insert(close_specific_ids, id) end,
+				closeSpecific = function() end,
 			}, { __call = function(_, _) end }),
 		})
 
 		sys.toggle_awake()   -- ON  → awake_alert_id remains nil (show returned nil)
-		sys.toggle_awake()   -- OFF → close_awake_alert must call closeAll, not closeSpecific
-		helpers.assert_eq(#close_specific_ids, 0, "closeSpecific must NOT be called when ID is nil")
-		helpers.assert_true(close_all_calls >= 1, "closeAll must be called as fallback when ID is nil")
+		local calls_before = close_all_calls
+		sys.toggle_awake()   -- OFF → closeAll must still be called
+		helpers.assert_true(close_all_calls > calls_before, "closeAll must be called even when alert ID is nil")
 	end)
 end)
 
