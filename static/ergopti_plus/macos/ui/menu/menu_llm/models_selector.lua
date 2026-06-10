@@ -567,7 +567,7 @@ function M.build(ctx)
 		end)
 		chooser:width(72)
 		chooser:placeholderText(i18n.get("menu.llm.browse_models_filter"))
-		chooser:queryChangedFn(function(query)
+		chooser:queryChangedCallback(function(query)
 			local q = (query or ""):lower()
 			if q == "" then
 				chooser:choices(choices)

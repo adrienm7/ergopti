@@ -422,15 +422,15 @@ function M.create(deps)
             probe_llm_health(state.llm_backend or "mlx", update_menu)
         end
 
-        -- Health indicator: shown only when the feature is enabled.
-        -- 🟢 = backend confirmed ready (warmup POST returned 200 + tokens) OR
-        --      last async probe succeeded (covers backends without is_ready()).
-        -- 🔴 = explicit failure on last probe.
-        -- The is_ready() check is synchronous and reflects the warmup state
-        -- accurately even on the first menu open after a model swap; the
-        -- old logic relied solely on the async probe whose result lagged
-        -- the menu paint by one open, so a freshly-warmed backend showed
-        -- red until the next menu open.
+        -- Health indicator — must be HONEST about whether predictions actually fire:
+        -- 🟢 = backend confirmed ready (warmup POST returned 200 + tokens) → the
+        --      prediction readiness gate is open, so suggestions will appear.
+        -- 🟡 = server reachable (HTTP probe ok) but the model is still warming up;
+        --      the prediction engine skips requests until warmup confirms, so a
+        --      green dot here would be a lie ("vert mais aucune prédiction").
+        -- 🔴 = server unreachable.
+        -- is_backend_ready() is synchronous and reflects the warmup state accurately
+        -- even on the first menu open after a model swap.
         local health_dot
         if not state.llm_enabled or paused then
             health_dot = ""
@@ -440,8 +440,10 @@ function M.create(deps)
                 local ok, ready = pcall(llm_mod.is_backend_ready)
                 backend_ready = ok and ready == true
             end
-            if backend_ready or _llm_health_status == true then
+            if backend_ready then
                 health_dot = "🟢 "
+            elseif _llm_health_status == true then
+                health_dot = "🟡 "
             else
                 health_dot = "🔴 "
             end
