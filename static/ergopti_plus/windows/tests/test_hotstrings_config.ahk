@@ -33,6 +33,10 @@ _HCfgTestReset() {
     for Cat in ["rolls", "sfbsreduction", "autocorrection", "distancesreduction", "magickey"] {
         HotstringGroupConfig[Cat] := { Delay: "", Color: "", ShowTooltip: "", Sections: Map() }
     }
+    ; Resetting state directly bypasses the production setters that bump the
+    ; HotstringsResolve generation, so invalidate the memo here to keep each
+    ; test case isolated from the previous one's cached resolutions.
+    HotstringsResolveBumpGen()
 }
 
 _HCfgTestSeedToml(Cat, Delay, Color, Sections := unset) {
@@ -56,6 +60,8 @@ _HCfgTestSeedToml(Cat, Delay, Color, Sections := unset) {
         }
     }
     HotstringGroupConfig[Cat] := Cfg
+    ; Seeding TOML config directly bypasses the bumped invalidation path.
+    HotstringsResolveBumpGen()
 }
 
 
@@ -327,3 +333,30 @@ TestHotstringsConfig_HighVolumeBadTomlUnderPause() {
 	AssertTrue(true, "high volume (150+) bad config under pause must degrade gracefully (no crash, no activation)")
 }
 Test("HotstringsConfig: high volume bad TOML/overrides under pause must not crash or activate (resilience)", TestHotstringsConfig_HighVolumeBadTomlUnderPause)
+
+
+; HotstringsResolve memoisation: the result is cached per (category, section)
+; and only recomputed when HotstringsResolveBumpGen is called. This pins both
+; halves of the contract — the cache is genuinely active (a stale in-place
+; mutation is NOT seen until invalidation) and a generation bump invalidates it.
+TestHSResolve_MemoAndInvalidation() {
+	global _HotstringsOverrides
+	SavedOverrides := _HotstringsOverrides
+	_HotstringsOverrides := Map()
+	_HotstringsOverrides["memotestcat"] := { Delay: 7, Color: "", ShowTooltip: "", Sections: Map() }
+	HotstringsResolveBumpGen()
+	First := HotstringsResolve("memotestcat")
+	AssertEqual(7, First.Delay, "baseline resolve must read the seeded delay")
+	; Mutate the override in place WITHOUT bumping — a live memo must still
+	; return the cached 7, proving the cache is actually in effect.
+	_HotstringsOverrides["memotestcat"].Delay := 99
+	Stale := HotstringsResolve("memotestcat")
+	AssertEqual(7, Stale.Delay, "memoised resolve must return the cached value until invalidated")
+	; Bump the generation — the next resolve must recompute and see 99.
+	HotstringsResolveBumpGen()
+	Fresh := HotstringsResolve("memotestcat")
+	AssertEqual(99, Fresh.Delay, "a generation bump must invalidate the memo")
+	_HotstringsOverrides := SavedOverrides
+	HotstringsResolveBumpGen()
+}
+Test("HotstringsResolve: result is memoised and invalidated by generation bump", TestHSResolve_MemoAndInvalidation)

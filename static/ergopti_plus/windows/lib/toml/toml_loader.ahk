@@ -146,6 +146,9 @@ _ParseTomlGroupConfig_InvalidatePath(FilePath) {
     if HotstringGroupConfig.Has(FilePath) {
         HotstringGroupConfig.Delete(FilePath)
     }
+    ; The resolved hotstring delay/color for this group may now differ, so drop
+    ; the memoised HotstringsResolve results too (defined in hotstrings_config.ahk).
+    try HotstringsResolveBumpGen()
     ; Also invalidate the section counts cache for this file
     if _TomlFileSectionCounts.Has(FilePath) {
         _TomlFileSectionCounts.Delete(FilePath)
