@@ -603,13 +603,83 @@ end
 local function build_picker_trees(karabiner, update_menu, enabled)
 	local fp = picker_fingerprint(karabiner, enabled)
 	if _picker_cache and _picker_cache.fp == fp then
+		Logger.debug(LOG, "[menu-timing] karabiner picker trees: cache HIT.")
 		return _picker_cache.tap_hold, _picker_cache.raccourcis
 	end
+	Logger.debug(LOG, "[menu-timing] karabiner picker trees: cache MISS — rebuilding.")
 	local action_index = build_action_index(karabiner)
 	local tap_hold   = build_tap_hold_items(karabiner, action_index, update_menu, enabled)
 	local raccourcis = build_raccourcis_items(karabiner, action_index, update_menu, enabled)
 	_picker_cache = { fp = fp, tap_hold = tap_hold, raccourcis = raccourcis }
 	return tap_hold, raccourcis
+end
+
+-- KE process-status probes (is_remapping_active / is_grabber_running /
+-- is_bridge_running) each spawn a pgrep / CLI-roundtrip subprocess (~30-100 ms,
+-- variable), and build() ran ~4 of them on EVERY open — the real ~240-400 ms menu
+-- cost (the picker trees above are already memoised). KE process state changes
+-- only when the daemon starts/stops, so we serve the last-known status instantly
+-- and refresh it OFF the menu-build path (deferred to the next runloop tick). The
+-- status icon is at most one open stale; is_priming() stays a live in-memory read.
+local _ke_status = nil          -- { active, grabber, bridge }
+local _ke_status_ts = 0
+local _ke_status_refreshing = false
+local KE_STATUS_REFRESH_THROTTLE = 2  -- min seconds between background refreshes
+
+local function _now_s()
+	return (hs.timer and type(hs.timer.secondsSinceEpoch) == "function") and hs.timer.secondsSinceEpoch() or 0
+end
+
+--- Synchronously reads the subprocess-backed KE status bundle. Slow — only ever
+--- called off the menu-build path (cold prime or background refresh).
+local function read_ke_status()
+	return {
+		active  = is_remapping_active(),
+		grabber = KeLifecycle.is_grabber_running(),
+		bridge  = KeLifecycle.is_bridge_running(),
+	}
+end
+
+--- Schedules a throttled background refresh of the KE status cache so menu opens
+--- never block on pgrep. The synchronous probes run on a later runloop tick.
+--- @param update_menu function|nil Menubar refresh callback.
+local function refresh_ke_status_async(update_menu)
+	if _ke_status_refreshing then return end
+	if _ke_status and (_now_s() - _ke_status_ts) < KE_STATUS_REFRESH_THROTTLE then return end
+	_ke_status_refreshing = true
+	local function run()
+		local fresh = read_ke_status()
+		_ke_status_refreshing = false
+		local changed = (not _ke_status)
+			or _ke_status.active  ~= fresh.active
+			or _ke_status.grabber ~= fresh.grabber
+			or _ke_status.bridge  ~= fresh.bridge
+		_ke_status    = fresh
+		_ke_status_ts = _now_s()
+		Logger.debug(LOG, "[menu-timing] KE status refreshed (active=%s grabber=%s bridge=%s changed=%s).",
+			tostring(fresh.active), tostring(fresh.grabber), tostring(fresh.bridge), tostring(changed))
+		-- Refresh the menubar icon when the status changed; the already-open menu is
+		-- unaffected, but the next open and the icon reflect the new state.
+		if changed and type(update_menu) == "function" then pcall(update_menu) end
+	end
+	if hs.timer and type(hs.timer.doAfter) == "function" then
+		hs.timer.doAfter(0, run)
+	else
+		run()
+	end
+end
+
+--- Returns the KE status bundle WITHOUT blocking: serves the cached value (a
+--- single cold read if empty) and schedules a background refresh.
+--- @param update_menu function|nil Menubar refresh callback.
+--- @return table { active, grabber, bridge }
+local function get_ke_status(update_menu)
+	if not _ke_status then
+		_ke_status    = read_ke_status()
+		_ke_status_ts = _now_s()
+	end
+	refresh_ke_status_async(update_menu)
+	return _ke_status
 end
 
 function M.build(ctx)
@@ -621,16 +691,16 @@ function M.build(ctx)
 		return nil
 	end
 
-	local enabled      = karabiner.get_enabled()
-	local active       = is_remapping_active()
-	-- Daemon-only signal so we can distinguish "remapping not applied because
-	-- bridge unprimed" (fixable via click) from "remapping not applied because
-	-- KE is not installed / daemon down" (user must install/check KE itself).
-	local grabber_only = KeLifecycle.is_grabber_running()
-	-- Transient state during the ~2 s prime cycle. Only meaningful when the
-	-- bridge is not yet alive; if the bridge is already running the priming
-	-- cycle is a no-op and the icon should stay green.
-	local bridge_live  = KeLifecycle.is_bridge_running()
+	local enabled = karabiner.get_enabled()
+	-- KE process status (active / grabber / bridge) is served from a cache and
+	-- refreshed in the background — the probes spawn pgrep/CLI subprocesses and
+	-- were the dominant menu-open cost. grabber_only distinguishes "remapping not
+	-- applied because bridge unprimed" (fixable via click) from "KE not installed /
+	-- daemon down". is_priming() stays a live in-memory read (no subprocess).
+	local ke_status    = get_ke_status(update_menu)
+	local active       = ke_status.active
+	local grabber_only = ke_status.grabber
+	local bridge_live  = ke_status.bridge
 	local priming      = KeLifecycle.is_priming() and not bridge_live
 	local tap_hold, raccourcis = build_picker_trees(karabiner, update_menu, enabled)
 
@@ -843,6 +913,9 @@ function M.prime(ctx)
 	if not karabiner or type(karabiner.get_enabled) ~= "function" then return end
 	local ok, enabled = pcall(karabiner.get_enabled)
 	pcall(build_picker_trees, karabiner, ctx and ctx.updateMenu, ok and enabled or false)
+	-- Warm the KE process-status cache too (the pgrep/CLI probes were the dominant
+	-- open cost); the cold read happens here, off the menu-open path.
+	pcall(get_ke_status, ctx and ctx.updateMenu)
 end
 
 -- Perf / cache test seams.
