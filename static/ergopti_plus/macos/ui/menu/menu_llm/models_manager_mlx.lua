@@ -509,6 +509,36 @@ PY
 			deps.active_tasks["mlx_server"] = nil
 		end
 
+		-- Cross-session adoption — after a Hammerspoon reload the in-memory hs.task
+		-- handle checked above is gone, but the detached Python server launched in
+		-- the previous session is still listening on 8080 with the model already
+		-- mapped into GPU memory. Sweeping it (below) and cold-reloading costs
+		-- 45-90 s on every reload — the "rond rouge / jaune trop longtemps au
+		-- démarrage" regression. A single /v1/models probe lets us adopt the live
+		-- server instead: if it already serves the target model, skip the sweep and
+		-- relaunch entirely and let the normal warmup path re-discover + prime it
+		-- (a few seconds, weights already resident). This restores the behaviour of
+		-- the old async pre-probe but synchronously with a hard 1 s curl timeout, so
+		-- it can never stall the boot path the way the async callback could.
+		if not (deps.active_tasks and deps.active_tasks["mlx_server"]) then
+			local ok_probe, body = pcall(hs.execute,
+				"/usr/bin/curl --silent --max-time 1 --no-keepalive " ..
+				"-H 'Connection: close' http://127.0.0.1:8080/v1/models")
+			if ok_probe and probe_matches_target(body) then
+				Logger.info(LOG, "Adopting MLX server from a previous session (already serving '%s' on :8080) — skipping cold restart.",
+					tostring(target_model))
+				obj._server_target = target_model
+				if type(ApiMlx) == "table" and type(ApiMlx.reset_endpoints) == "function" then
+					ApiMlx.reset_endpoints()
+				end
+				if type(ApiMlx) == "table" and type(ApiMlx.set_model_hf_path) == "function" then
+					ApiMlx.set_model_hf_path(repo)
+				end
+				if on_success then pcall(on_success) end
+				return
+			end
+		end
+
 		-- Defensive cross-session port sweep: at this point we are committed to launching
 		-- a fresh server. Any python+mlx_lm process still alive — typically a leftover from
 		-- a previous Hammerspoon session whose hs.task handle is gone, or an orphan whose
