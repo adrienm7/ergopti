@@ -100,9 +100,20 @@ local awake_focused_app = nil
 -- Eventtap that watches for any real user input while keep-awake is active;
 -- stops the jiggler immediately so the cursor doesn't fight the user.
 local awake_input_watcher = nil
+-- Handle returned by hs.alert.show so the persistent "active" banner can be
+-- dismissed precisely when keep-awake is disabled, without closing other alerts.
+local awake_alert_id = nil
 
 -- Spotlight state
 local _spotlight_dismiss = nil  -- Dismiss fn for the active spotlight; nil when none active
+
+-- Closes the persistent keep-awake banner, if one is currently shown
+local function close_awake_alert()
+	if awake_alert_id ~= nil then
+		pcall(hs.alert.closeSpecific, awake_alert_id)
+		awake_alert_id = nil
+	end
+end
 
 -- Forward declaration required because schedule_awake_tick calls itself recursively
 local schedule_awake_tick
@@ -207,6 +218,7 @@ function M.toggle_awake()
 		end
 
 		Logger.info(LOG, "Keep-awake disabled.")
+		close_awake_alert()
 		pcall(hs.alert.closeAll, 0.0)
 		pcall(hs.alert.show, i18n.get("shortcuts.keep_awake_off"), 2.0)
 	else
@@ -220,8 +232,9 @@ function M.toggle_awake()
 		end
 		math.randomseed(os.time())
 
-		pcall(hs.alert.closeAll, 0.0)
-		pcall(hs.alert.show, i18n.get("shortcuts.keep_awake_on"), 2.0)
+		close_awake_alert()
+		local _ok_alert, _alert_id = pcall(hs.alert.show, i18n.get("shortcuts.keep_awake_on"), math.huge)
+		if _ok_alert then awake_alert_id = _alert_id end
 
 		-- Record the current mouse position as the jitter origin
 		local ok_pos, pos = pcall(hs.mouse.absolutePosition)
@@ -283,7 +296,7 @@ function M.toggle_awake()
 				awake_timer = nil
 			end
 
-			pcall(hs.alert.closeAll, 0.0)
+			close_awake_alert()
 
 			-- Log duration so the dashboard accounts for the keep-awake period
 			if awake_started_at then
@@ -328,7 +341,7 @@ function M.stop_awake()
 		awake_timer = nil
 	end
 
-	pcall(hs.alert.closeAll, 0.0)
+	close_awake_alert()
 end
 
 --- Toggles the hardware CapsLock state by synthesising a raw CapsLock keystroke.
