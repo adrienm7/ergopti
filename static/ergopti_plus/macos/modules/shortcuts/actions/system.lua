@@ -107,18 +107,15 @@ local awake_alert_id = nil
 -- Spotlight state
 local _spotlight_dismiss = nil  -- Dismiss fn for the active spotlight; nil when none active
 
--- Closes the persistent keep-awake banner, if one is currently shown.
--- Pass deferred=true when calling from an eventtap callback so the UI
--- operation is deferred to the main runloop (eventtap threads cannot
--- reliably drive hs.alert).
-local function close_awake_alert(deferred)
-	if awake_alert_id == nil then return end
-	local id = awake_alert_id
-	awake_alert_id = nil
-	if deferred then
-		pcall(hs.timer.doAfter, 0, function() pcall(hs.alert.closeSpecific, id) end)
+-- Closes the persistent keep-awake banner. Uses closeSpecific when an ID was
+-- captured; falls back to closeAll so the banner always disappears even when
+-- hs.alert.show returned nil (older Hammerspoon builds).
+local function close_awake_alert()
+	if awake_alert_id then
+		pcall(hs.alert.closeSpecific, awake_alert_id)
+		awake_alert_id = nil
 	else
-		pcall(hs.alert.closeSpecific, id)
+		pcall(hs.alert.closeAll, 0)
 	end
 end
 
@@ -303,8 +300,7 @@ function M.toggle_awake()
 				awake_timer = nil
 			end
 
-			-- Defer UI call: eventtap callbacks run on a secondary thread
-			close_awake_alert(true)
+			close_awake_alert()
 
 			-- Log duration so the dashboard accounts for the keep-awake period
 			if awake_started_at then
