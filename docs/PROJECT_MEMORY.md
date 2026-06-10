@@ -27,6 +27,7 @@ Accumulated engineering knowledge for this repository — gotchas, architecture 
   - [project-gestures-startup-design](#project-gestures-startup-design) — Design choices for the macOS gestures startup path — primer-as-wakeup-signal vs burst probes
   - [project-hotstring-delay-architecture](#project-hotstring-delay-architecture) — Where hotstring expansion delays are configured, the cross-platform precedence, and the key gotchas
   - [project-hotstring-engine-internals](#project-hotstring-engine-internals) — AHK prefix-watcher InputHook captures synthetic input; OnChar must feed each char once; AHK vs Hammerspoon word-boundary framing divergence is intentional
+  - [project-hotstring-live-rebuild](#project-hotstring-live-rebuild) — Hotstring section/category toggles apply in-process via a re-runnable RegisterAllHotstrings(); native-engine + layout-backed features under hotstrings.* are the reload-only exceptions
   - [Keymap module architecture and refactor decisions](#keymap-module-architecture-and-refactor-decisions) — Structure of the keymap module, where defaults live, which files do what
   - [project-locale-parity-test](#project-locale-parity-test) — en.json is the canonical key set; tools/check_locales.py enforces parity in CI
   - [project_metrics_pipeline_17](#project-metrics-pipeline-17) — AHK metrics pipeline — bug #17 CLOSED, follow-up bugs fixed
@@ -623,6 +624,27 @@ Bug #17 "metrics population" on Windows/AHK. Verified 2026-06-02 via a 5-agent m
 - LLM path unused so llm_chars=0 and esrc llm attribution unverifiable until LLM is used.
 
 **Lint:** pre-commit husky hook runs `lint-conventions.js --fail-on-violations` and NOW BLOCKS on violations. Always `npm run fix:all` before committing.
+
+### project-hotstring-live-rebuild
+
+_Hotstring section/category toggles apply in-process (no Reload) by re-running RegisterAllHotstrings; native-engine + layout-backed features under hotstrings.\* are the reload-only exceptions_
+
+<sub>slug: `project_hotstring_live_rebuild`</sub>
+
+The whole AHK hotstring registration in `modules/hotstrings.ahk` is wrapped in one re-runnable `RegisterAllHotstrings(IncludeNative := true)` function, called once at boot (right after the `#Include` in `ErgoptiPlus.ahk`) and again on every live toggle. A menu toggle no longer Reloads the script: it flips the feature flag (`WriteFeatureUpdate`, which mutates the in-memory `Features` Map AND persists to disk) then calls `RebuildHotstringsLive()` in `ui/tray_menu.ahk` — `HSE_RegistryClear()` + `HSE_HardReset()` + `RegisterAllHotstrings(false)` + `HotstringPrefixWatcherRebuildIndex()` + `RebuildTrayMenu()`. Re-running re-evaluates every `if Features[...]` guard, so cross-dependent sections (sfbs_reduction.bu reads magic_key.text_expansion) and inline-generated ones (comma_j, rolls operators, the `SpaceAroundSymbols`-baked `:=` / `->` — recomputed at the top of each run) all apply with no per-section special-casing.
+
+**Why a re-run instead of the old HSE-group splice:** the previous approach kept a whitelist of "pure" `LoadHotstringsSection` groups and spliced them in/out of the live HSE index, which couldn't handle cross-deps or inline registrations — so ~half the sections still Reloaded. The uniform re-run handles everything except the cases below.
+
+**The reload-only exceptions** (`lib/hotstrings/hotstring_live_toggle.ahk` → `_HS_RELOAD_ONLY_GROUPS`, an inverted blocklist — everything is live unless listed):
+
+1. **Native AHK `Hotstring()` sections** — `distancesreduction.dead_key_e_circumflex` (Ê deadkey) and `autocorrection.multiple_punctuation_marks` ("…"). They register through AHK's native hotstring engine, not the HSE; `HSE_RegistryClear()` can't drop them, and re-registering them from a menu-click thread would risk the wrong `A_InputLevel`. So `RegisterAllHotstrings(false)` SKIPS them (`if IncludeNative`) on a live rebuild — they keep their boot registration — and toggling one of them Reloads.
+2. **Layout features filed under `hotstrings.*` in the manifest** — `magickey.replace` (the J→★ key remap, applied by `modules/layout.ahk` `RemapKey` at boot, not by RegisterAllHotstrings). A hotstring rebuild does nothing for it, so it Reloads. **Gotcha:** the `hotstrings.*` manifest namespace is NOT a clean 1:1 with what RegisterAllHotstrings registers — audit `Features["hotstrings"][...]` reads in non-hotstrings modules (only `modules/layout.ahk` at time of writing) before assuming a `hotstrings.*` path is live-eligible.
+
+**Category toggles** (`ToggleCategoryAllFeatures`) are live for **Rolls** and **SFBsReduction** only — every other gated hotstring category holds a reload-only feature (DistancesReduction→deadkey, Autocorrection→"…", MagicKey→replace) or is the Hotstrings master gating those. `ApplyMasterGatesToFeatures` is destructive (it zeroes `Features` for gated-off categories), so it's made reversible by a deep-clone `_HSCategorySnapshot` taken at boot BEFORE gating and refreshed each time a category is turned OFF, then restored on ON — so section toggles made while a category was on survive an off→on cycle without re-reading config (config can omit default-valued sections, so a config re-read would lose them). The layout AltGr rolls (chevron_equal, hashtag_quote) follow the gate because their `HotIf` reads the zeroed/restored `Features` live.
+
+**The `(#` / `[#` gotcha:** the `paren_quote` / `bracket_quote` rolls (menu labels `(# ➜ ("` / `[# ➜ ["`) are defined in `generated_rolls.ahk` but never loaded by RegisterAllHotstrings — on Ergopti the `(#`→`("` is actually produced by the LAYOUT `HashtagOrQuote` handler (SC017, the # key), which used to be gated only by `hashtag_quote`. Fix: gate that handler's `(`→quote on `Features[rolls][paren_quote]` and `[`→quote on `bracket_quote`, read live, so the menu items the user naturally toggles actually control it. Do NOT also load the HSE `paren_quote` — that would make `(#` need two toggles to disable.
+
+Related: [[project_hotstring_engine_internals]] (the HSE InputHook the rebuild repopulates), [[project_hotstring_delay_architecture]], [[feedback_loader_target_explicit]] (WriteFeatureUpdate mutates the live Features in place), [[feedback_test_before_merge]] (each slice — wrap, live sections, category-live — was boot-tested live before its commit).
 
 ### project-suspend-pause-invariant
 
