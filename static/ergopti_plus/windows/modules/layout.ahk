@@ -365,19 +365,9 @@ RemapKey(ScanCode, Character, AlternativeCharacter := "") {
 	global RemappedList
 	InputLevel := "I2"
 
-	; Base-layer character emit runs on EVERY keystroke — it is the dominant
-	; per-key latency. SendInput injects atomically and bypasses the OS event
-	; queue, whereas SendEvent pays a queue round-trip plus a per-key delay.
-	; The send level is unchanged (InputLevel "I2"), so the HSE InputHook still
-	; sees the injected character (hook visibility depends on send level, not
-	; send mode) and hotstrings keep firing; the HSE engine replays its own
-	; cascades, so the historical "Event needed for cascades" constraint no
-	; longer applies to this single-character emit. The Ctrl/Alt/Win variants
-	; below stay on SendEvent — a far colder path with shortcut-emulation edge
-	; cases that have not been re-validated for SendInput
 	Hotkey(
 		"*" ScanCode,
-		(*) => SendInput("{Blind}" Character) UpdateLastSentCharacter(Character),
+		(*) => SendEvent("{Blind}" Character) UpdateLastSentCharacter(Character),
 		InputLevel
 	)
 
