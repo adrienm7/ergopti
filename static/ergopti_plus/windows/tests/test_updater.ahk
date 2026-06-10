@@ -4,7 +4,8 @@
 ; MODULE: Updater Logic Tests
 ; DESCRIPTION:
 ; Unit-tests for the semver and JSON parsing functions in lib/updater.ahk.
-; Ensures prerelease ordering and version parsing work correctly.
+; Ensures prerelease ordering, version parsing, and blocking-call hygiene work
+; correctly.
 ; ==============================================================================
 
 _UpdaterTest_CompareVersions() {
@@ -44,3 +45,77 @@ _UpdaterTest_ParseVersion() {
 	AssertEqual(0, v2.PreParts)
 }
 Test("Updater: version parsing", _UpdaterTest_ParseVersion)
+
+
+; Regression: Updater_FetchLatestJson must call SetTimeouts before Req.Send()
+; so synchronous WinHttp calls cannot block the AHK main thread indefinitely.
+; Without SetTimeouts the default WinHttp timeout is ~60 s per phase — long
+; enough to freeze all keyboard input during a background update check on a
+; slow or unresponsive network.
+_UpdaterTest_FetchLatestJsonHasTimeout() {
+	; Locate lib/updater.ahk relative to the tests/ directory.
+	SplitPath(A_ScriptDir, , &WindowsDir)
+	UpdaterFile := WindowsDir . "\lib\updater.ahk"
+
+	try {
+		Source := FileRead(UpdaterFile)
+	} catch {
+		; File not found in this environment — skip rather than false-fail.
+		return
+	}
+
+	; Extract only the body of Updater_FetchLatestJson so we don't match
+	; SetTimeouts that belong to other functions (e.g. Updater_FetchReleasesListJson).
+	FnStart := InStr(Source, "Updater_FetchLatestJson(")
+	if (FnStart == 0) {
+		AssertEqual("found", "missing", "Updater_FetchLatestJson not found in updater.ahk")
+		return
+	}
+	; Walk forward to the matching closing brace of the function body.
+	Depth := 0
+	FnEnd := FnStart
+	Len := StrLen(Source)
+	InQuote := false
+	Esc := false
+	pos := FnStart
+	while (pos <= Len) {
+		c := SubStr(Source, pos, 1)
+		if InQuote {
+			if Esc {
+				Esc := false
+			} else if (c == "\") {
+				Esc := true
+			} else if (c == '"') {
+				InQuote := false
+			}
+		} else {
+			if (c == '"') {
+				InQuote := true
+			} else if (c == "{") {
+				Depth += 1
+			} else if (c == "}") {
+				Depth -= 1
+				if (Depth == 0) {
+					FnEnd := pos
+					break
+				}
+			}
+		}
+		pos += 1
+	}
+	FnBody := SubStr(Source, FnStart, FnEnd - FnStart + 1)
+
+	; SetTimeouts must appear inside this function body.
+	HasTimeout := InStr(FnBody, "SetTimeouts") > 0
+	AssertEqual(true, HasTimeout,
+		"Updater_FetchLatestJson is missing SetTimeouts — synchronous WinHttp call can block the main thread")
+
+	; SetTimeouts must appear BEFORE Req.Send() — a SetTimeouts after Send is too late.
+	TimeoutPos := InStr(FnBody, "SetTimeouts")
+	SendPos    := InStr(FnBody, "Req.Send(")
+	if (HasTimeout and SendPos > 0) {
+		AssertEqual(true, TimeoutPos < SendPos,
+			"SetTimeouts must be called before Req.Send() in Updater_FetchLatestJson")
+	}
+}
+Test("Updater: FetchLatestJson has timeout guard (regression: blocking main thread)", _UpdaterTest_FetchLatestJsonHasTimeout)

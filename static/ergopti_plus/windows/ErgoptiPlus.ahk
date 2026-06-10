@@ -931,6 +931,12 @@ try {
 #Include *i %A_LocalAppData%\Ergopti\_generated\personal_shortcuts.ahk
 #Include %A_ScriptDir%
 #InputLevel 0
+; Capture the un-gated per-section hotstring Features BEFORE gating, so a live
+; category toggle (ToggleCategoryAllFeatures) can restore a category's sections on
+; re-enable. Declared + populated here, before gating, so the auto-execute thread
+; never re-inits the Map after filling it.
+global _HSCategorySnapshot := Map()
+try _HSSnapshotAllCategories()
 ApplyMasterGatesToFeatures()
 
 #Include modules/gestures.ahk
@@ -1406,9 +1412,83 @@ IsCategoryAllEnabled(Categories) {
     return IsCategoryGated(Categories[1])
 }
 
+; Deep-clone a (possibly nested) Map. Used to snapshot per-section hotstring
+; Features so a live category toggle can restore them independently of later
+; mutations. Non-Map values are returned as-is (leaf bool / number / string).
+_HSDeepCloneMap(M) {
+    if (Type(M) != "Map") {
+        return M
+    }
+    Out := Map()
+    for K, V in M {
+        Out[K] := _HSDeepCloneMap(V)
+    }
+    return Out
+}
+
+; Snapshot one category's current (un-gated) section states into _HSCategorySnapshot.
+_HSSnapshotCategory(V2Cat) {
+    global Features, _HSCategorySnapshot
+    if (IsSet(Features) and Features.Has("hotstrings") and Features["hotstrings"].Has(V2Cat)) {
+        _HSCategorySnapshot[V2Cat] := _HSDeepCloneMap(Features["hotstrings"][V2Cat])
+    }
+}
+
+; Snapshot every hotstring category. Called once at boot, before gating.
+_HSSnapshotAllCategories() {
+    global Features
+    if (IsSet(Features) and Features.Has("hotstrings")) {
+        for V2Cat, _ in Features["hotstrings"] {
+            _HSSnapshotCategory(V2Cat)
+        }
+    }
+}
+
+; Restore a category's section states from the snapshot, in place (the category Map
+; keeps its identity; each section entry is replaced with a fresh clone).
+_HSRestoreCategory(V2Cat) {
+    global Features, _HSCategorySnapshot
+    if !(_HSCategorySnapshot.Has(V2Cat) and IsSet(Features)
+        and Features.Has("hotstrings") and Features["hotstrings"].Has(V2Cat)) {
+        return
+    }
+    Target := Features["hotstrings"][V2Cat]
+    for Section, SecMap in _HSCategorySnapshot[V2Cat] {
+        Target[Section] := _HSDeepCloneMap(SecMap)
+    }
+}
+
+; Hotstring sub-categories whose entire content the live rebuild can apply, so
+; flipping their master gate rebuilds in-process instead of Reloading. Only Rolls
+; and SFBsReduction qualify: every other gated hotstring category holds a feature
+; the rebuild can't apply (DistancesReduction -> the E-circumflex deadkey,
+; Autocorrection -> the multiple-punctuation rule, MagicKey -> the J-to-star layout
+; remap) or is the Hotstrings master that gates those too.
+_IsLiveHotstringCategory(Category) {
+    static Live := Map("Rolls", true, "SFBsReduction", true)
+    return Live.Has(Category)
+}
+
 ToggleCategoryAllFeatures(Category, Value) {
-    global CategoryEnabled, ConfigurationFile
+    global CategoryEnabled, ConfigurationFile, Features
     Bool := (Value = true or Value = 1)
+    if _IsLiveHotstringCategory(Category) {
+        ; In-process: restore (ON) or snapshot (OFF) the category's sections, flip the
+        ; gate, re-apply all master gates, then rebuild the engine — no Reload. The
+        ; snapshot-on-OFF preserves any live section toggles made while it was on.
+        V2Cat := _CategoryEnabledKey(Category)
+        try LoggerDebug("Menu", "Live category toggle: {1} -> {2}.", Category, Bool ? "ON" : "OFF")
+        if Bool {
+            _HSRestoreCategory(V2Cat)
+        } else {
+            _HSSnapshotCategory(V2Cat)
+        }
+        CategoryEnabled[Category] := Bool
+        TOML_Write(Bool, ConfigurationFile, "ahk.category_enabled", _CategoryEnabledKey(Category))
+        ApplyMasterGatesToFeatures()
+        RebuildHotstringsLive()
+        return
+    }
     CategoryEnabled[Category] := Bool
     TOML_Write(Bool, ConfigurationFile, "ahk.category_enabled", _CategoryEnabledKey(Category))
     Reload
