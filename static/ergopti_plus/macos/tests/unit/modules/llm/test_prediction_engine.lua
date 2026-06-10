@@ -61,6 +61,10 @@ package.loaded["modules.llm"] = {
 	set_llm_model_ollama    = function(_) end,
 	set_llm_streaming       = function(_) end,
 	cancel_streaming        = function() end,
+	-- Dispatch-path surface (exercised by the perform_check regression in §8).
+	is_backend_ready        = function() return true end,
+	get_active_profile      = function() return { label = "Test profile" } end,
+	fetch_llm_prediction    = function(...) end,
 }
 
 -- Stub WarmupController — used as a module singleton, not instantiated.
@@ -71,15 +75,27 @@ package.loaded["modules.llm.warmup_controller"] = {
 	stop                       = function() end,
 }
 
--- Stub PromptBuilder — build() is called inside perform_check, not at load time.
+-- Stub PromptBuilder — build() (the real export shape) is called inside
+-- perform_check. It returns (params, skip_reason, signature); a non-nil params
+-- table drives the dispatch path exercised by §8.
 package.loaded["modules.llm.prompt_builder"] = {
-	new = function() return { build = function() return "", "" end } end,
+	build = function(_buf, _cfg, _last_sig, _force)
+		return {
+			tail            = "wor",
+			context_buffer  = "hello wor",
+			max_tokens      = 64,
+			req_temperature = 0.1,
+			num_preds       = 3,
+		}, nil, "sig-1"
+	end,
 }
 
--- Stub StreamingHandler — used as a module singleton.
+-- Stub StreamingHandler — used as a module singleton. NOTE: intentionally mirrors
+-- the REAL production surface, which has NO ngram_predict. A previous stub
+-- defined ngram_predict here, masking the dangling prediction_engine call that
+-- crashed every live request (the §8 regression locks this down).
 package.loaded["modules.llm.streaming_handler"] = {
 	init                 = function(_cfg) end,
-	ngram_predict        = function(_buf) return {} end,
 	build_callbacks      = function(_cfg) return function() end, function() end, function() end end,
 	arm_watchdog         = function(_cfg) end,
 	stop_watchdog        = function() end,
@@ -87,20 +103,23 @@ package.loaded["modules.llm.streaming_handler"] = {
 	cancel_streaming     = function() end,
 }
 
--- Stub AppFilter.
+-- Stub AppFilter — the real export is is_blocked(state, apps, url_filter, secure_filter).
 package.loaded["modules.llm.app_filter"] = {
-	new = function() return { is_excluded = function() return false end } end,
+	is_blocked = function(_state, _apps, _url, _secure) return false end,
 }
 
--- Stub api_common (required inline at module level).
+-- Stub api_common (required inline at module level). get_rate_limit_min_interval_s
+-- is the real export the floor check calls; 0 means "never defer" for tests.
 package.loaded["modules.llm.api_common"] = {
 	MIN_CALL_INTERVAL_SEC = 0.5,
 	get_retry_policy      = function() return 2, 0.18, 5 end,
+	get_rate_limit_min_interval_s = function(_backend) return 0 end,
 }
 
--- Stub lib.i18n.
+-- Stub lib.i18n — perform_check uses i18n.get() for the loading label.
 package.loaded["lib.i18n"] = {
-	t = function(key) return key end,
+	t   = function(key) return key end,
+	get = function(key) return key end,
 }
 
 -- Stub lib.keycodes.
@@ -119,11 +138,18 @@ package.loaded["ui.tooltip"] = {
 	navigate              = function(_) end,
 	show                  = function() end,
 	hide                  = function() end,
+	-- Dispatch-path surface (exercised by §8).
+	set_llm_timeout       = function(_) end,
+	reset_llm_timer       = function() end,
+	show_loading          = function(...) end,
+	show_predictions      = function(...) end,
+	tint                  = function(_) return nil end,
 }
 
--- Stub modules.keylogger — get_live_stats() and log_llm_dismissed() are both called.
+-- Stub modules.keylogger — get_live_stats() returns wpm_physical (the field the
+-- adaptive debounce reads); log_llm_dismissed() is called on reset.
 package.loaded["modules.keylogger"] = {
-	get_live_stats      = function() return { wpm = 0, wpm_short = 0 } end,
+	get_live_stats      = function() return { wpm_physical = 0 } end,
 	log_llm_dismissed   = function(_, _preds) end,
 }
 
@@ -344,5 +370,55 @@ helpers.describe("prediction_engine — timer safety", function()
 
 	helpers.it("start_timer_word_end does not throw", function()
 		PE.start_timer_word_end()
+	end)
+end)
+
+
+
+
+-- =================================================================
+-- =================================================================
+-- ======= 8/ perform_check dispatch (no-prediction regression) ====
+-- =================================================================
+-- =================================================================
+-- Regression for the silent "green dot but no prediction" bug: perform_check
+-- called StreamingHandler.ngram_predict(buffer), a function the production
+-- StreamingHandler never implemented — only this test file's stub provided it.
+-- The dangling call threw inside the hs.timer.delayed callback (Hammerspoon
+-- swallowed the error to its Console), so every request died after the prompt
+-- builder accepted the signature and BEFORE the backend dispatch — no prediction
+-- ever appeared even when the backend was ready.
+--
+-- The stubs above now mirror the real StreamingHandler surface (no ngram_predict),
+-- so this test reproduces the crash before the fix and passes after it: with a
+-- ready backend and a fresh buffer, perform_check MUST reach
+-- core_llm.fetch_llm_prediction.
+
+helpers.describe("prediction_engine — perform_check dispatch", function()
+	helpers.it("dispatches a backend request when ready (no dependency on a removed ngram_predict)", function()
+		local core = package.loaded["modules.llm"]
+		local dispatched = false
+		local prev_fetch = core.fetch_llm_prediction
+		core.fetch_llm_prediction = function(...) dispatched = true end
+
+		-- Guard: the real StreamingHandler exposes no ngram_predict — calling one
+		-- would be the exact bug this test exists to catch.
+		helpers.assert_nil(
+			package.loaded["modules.llm.streaming_handler"].ngram_predict,
+			"StreamingHandler must not require an ngram_predict helper"
+		)
+
+		PE.set_llm_enabled(true)
+		PE.init({ buffer = "hello wor", mappings = {}, DELAYS = { llm_prediction = 0 } })
+
+		-- force_trigger = true bypasses the freshness and backend-floor guards so
+		-- the call goes straight to dispatch.
+		local ok, err = pcall(function() PE.perform_check(true) end)
+
+		core.fetch_llm_prediction = prev_fetch
+		PE.set_llm_enabled(false)
+
+		helpers.assert_true(ok, "perform_check must not throw on the dispatch path: " .. tostring(err))
+		helpers.assert_true(dispatched, "perform_check must dispatch fetch_llm_prediction when the backend is ready")
 	end)
 end)
