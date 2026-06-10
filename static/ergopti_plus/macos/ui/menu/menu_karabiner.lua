@@ -603,10 +603,10 @@ end
 local function build_picker_trees(karabiner, update_menu, enabled)
 	local fp = picker_fingerprint(karabiner, enabled)
 	if _picker_cache and _picker_cache.fp == fp then
-		Logger.debug(LOG, "[menu-timing] karabiner picker trees: cache HIT.")
+		Logger.debug(LOG, "Picker trees served from cache.")
 		return _picker_cache.tap_hold, _picker_cache.raccourcis
 	end
-	Logger.debug(LOG, "[menu-timing] karabiner picker trees: cache MISS — rebuilding.")
+	Logger.debug(LOG, "Picker trees rebuilt (binding fingerprint changed).")
 	local action_index = build_action_index(karabiner)
 	local tap_hold   = build_tap_hold_items(karabiner, action_index, update_menu, enabled)
 	local raccourcis = build_raccourcis_items(karabiner, action_index, update_menu, enabled)
@@ -656,7 +656,7 @@ local function refresh_ke_status_async(update_menu)
 			or _ke_status.bridge  ~= fresh.bridge
 		_ke_status    = fresh
 		_ke_status_ts = _now_s()
-		Logger.debug(LOG, "[menu-timing] KE status refreshed (active=%s grabber=%s bridge=%s changed=%s).",
+		Logger.debug(LOG, "KE status refreshed (active=%s grabber=%s bridge=%s changed=%s).",
 			tostring(fresh.active), tostring(fresh.grabber), tostring(fresh.bridge), tostring(changed))
 		-- Refresh the menubar icon when the status changed; the already-open menu is
 		-- unaffected, but the next open and the icon reflect the new state.
