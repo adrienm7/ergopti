@@ -38,6 +38,70 @@ end)
 --      AltGr symbol ever wrapped).
 --   2. When no selection is readable (nothing selected, or an app like VS Code
 --      that hides AXSelectedText), the symbol must pass through (never swallowed).
+-- ============================================================
+-- ============================================================
+-- ======= keep_awake persistent alert (regression) ===========
+-- ============================================================
+-- ============================================================
+
+-- Guards the fix for the 7b16a3f5 regression that replaced math.huge with 2.0
+-- seconds (banner disappeared after 2s) and removed awake_alert_id tracking
+-- (alert was never closed specifically on toggle-off, leaving stale banners).
+-- Rules:
+--   1. toggle ON  → hs.alert.show called with math.huge duration
+--   2. toggle OFF → hs.alert.closeSpecific called with the ID returned at toggle ON
+--   3. auto-deactivation → hs.alert.closeSpecific also called (same invariant)
+helpers.describe("shortcuts.actions.system: keep_awake persistent alert", function()
+	local function make_sys_with_alert_spy()
+		package.loaded["lib.keycodes"] = nil
+		package.loaded["modules.shortcuts.actions.system"] = nil
+
+		local show_calls         = {}
+		local close_specific_ids = {}
+
+		local sys = helpers.load_with_stubs("modules.shortcuts.actions.system", {
+			alert = setmetatable({
+				show = function(msg, duration)
+					table.insert(show_calls, { msg = msg, duration = duration })
+					return "test-alert-uuid"
+				end,
+				closeAll      = function() end,
+				closeSpecific = function(id)
+					table.insert(close_specific_ids, id)
+				end,
+			}, { __call = function(_, _) end }),
+		})
+		return sys, show_calls, close_specific_ids
+	end
+
+	helpers.it("shows the on-banner with math.huge duration so it persists while active", function()
+		local sys, show_calls, _ = make_sys_with_alert_spy()
+		sys.toggle_awake()
+		local on_call = show_calls[#show_calls]
+		helpers.assert_true(on_call ~= nil, "hs.alert.show should be called on toggle ON")
+		helpers.assert_eq(on_call.duration, math.huge, "duration must be math.huge — not a fixed timeout")
+	end)
+
+	helpers.it("closes the banner via closeSpecific on manual toggle OFF", function()
+		local sys, _, close_ids = make_sys_with_alert_spy()
+		sys.toggle_awake()   -- ON  → alert ID = "test-alert-uuid"
+		sys.toggle_awake()   -- OFF → closeSpecific("test-alert-uuid")
+		helpers.assert_true(#close_ids >= 1, "closeSpecific must be called on toggle OFF")
+		helpers.assert_eq(close_ids[1], "test-alert-uuid", "closeSpecific must receive the alert ID from toggle ON")
+	end)
+
+	helpers.it("closes the banner via closeSpecific on stop_awake", function()
+		local sys, _, close_ids = make_sys_with_alert_spy()
+		sys.toggle_awake()   -- ON
+		sys.stop_awake()     -- direct stop (e.g. module shutdown)
+		helpers.assert_true(#close_ids >= 1, "closeSpecific must be called on stop_awake")
+		helpers.assert_eq(close_ids[1], "test-alert-uuid", "closeSpecific must receive the alert ID")
+	end)
+end)
+
+
+
+
 helpers.describe("shortcuts.actions.system: wrap_event_decision", function()
 	package.loaded["lib.keycodes"] = nil
 	package.loaded["modules.shortcuts.actions.system"] = nil
