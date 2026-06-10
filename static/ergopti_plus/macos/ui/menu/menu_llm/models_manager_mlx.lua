@@ -52,6 +52,12 @@ function M.new(deps, presets)
 	deps.active_tasks = deps.active_tasks or {}
 	obj._installed_cache = nil
 	obj._installed_cache_ts = 0
+	-- Installed-models scan cache TTL. The HF hub directory only changes on a
+	-- download or delete (both invalidate the cache below), so the old 1 s TTL just
+	-- wasted ~70-120 ms re-scanning the cache on nearly every menu open. 30 s
+	-- matches the Ollama manager and keeps repeated opens off the filesystem.
+	local INSTALLED_CACHE_TTL = 30
+	local function invalidate_installed_cache() obj._installed_cache_ts = 0 end
 
 	-- Register a restart hook so api_mlx can request a fresh launch when its
 	-- discovery loop detects a model-ID mismatch it cannot resolve on its own
@@ -396,7 +402,7 @@ PY
 
 	function obj.get_installed_models()
 		local now = hs.timer.secondsSinceEpoch()
-		if type(obj._installed_cache) == "table" and (now - (obj._installed_cache_ts or 0)) < 1.0 then
+		if type(obj._installed_cache) == "table" and (now - (obj._installed_cache_ts or 0)) < INSTALLED_CACHE_TTL then
 			return obj._installed_cache
 		end
 
@@ -1362,6 +1368,7 @@ PY
 					pcall(notifications.notify, i18n.get("mlx.model_installed"), string.format(i18n.get("mlx.model_ready"), target_model), "success")
 					if download_window then pcall(download_window.complete, true, target_model) end
 					deps.state.llm_model = target_model
+						invalidate_installed_cache()
 					if deps.keymap and type(deps.keymap.set_llm_model) == "function" then pcall(deps.keymap.set_llm_model, target_model) end
 					pcall(deps.save_prefs)
 					obj.start_server(target_model, function()
@@ -1697,6 +1704,7 @@ PY
 		local safe_repo = "models--" .. repo:gsub("/", "--")
 		local path = home .. "/.cache/huggingface/hub/" .. safe_repo
 		os.execute("rm -rf " .. path)
+		invalidate_installed_cache()
 		pcall(notifications.notify, i18n.get("mlx.model_deleted"), model_name, "success")
 		pcall(deps.update_menu)
 	end

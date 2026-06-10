@@ -561,6 +561,57 @@ end
 --- Builds the complete Karabiner menu item with its submenu.
 --- @param ctx table Global UI context (must contain ctx.karabiner).
 --- @return table|nil A hs.menubar menu item with a submenu, or nil on failure.
+-- Cached tap/hold + raccourcis picker trees. Building them is the dominant cost
+-- of opening the menubar (~300-380 ms measured): 182 modifier combos × a 73-action
+-- picker each is ~40k menu tables + closures, and the old code rebuilt the whole
+-- lot on EVERY click. The trees depend only on the per-slot action bindings, the
+-- symmetric-combo toggle and the enabled flag, so we memoise them under a
+-- fingerprint of exactly those inputs and rebuild only when a binding actually
+-- changes. A click that edits a binding changes the fingerprint, so the next open
+-- rebuilds with fresh checkmarks. update_menu is a stable upvalue (set once in
+-- ui.menu.init), so the cached closures stay valid across opens.
+local _picker_cache = nil
+
+--- Cheap fingerprint of every input that affects the picker trees. Reads in-memory
+--- config accessors only (no I/O), so it is far cheaper than a rebuild.
+--- @param karabiner table The karabiner module.
+--- @param enabled boolean Whether the integration is active.
+--- @return string
+local function picker_fingerprint(karabiner, enabled)
+	local parts = { enabled and "1" or "0" }
+	local ok_sym, sym = pcall(karabiner.get_combo_symmetric)
+	parts[#parts + 1] = (ok_sym and sym) and "1" or "0"
+	local function add(getter, id)
+		local ok, v = pcall(getter, id)
+		parts[#parts + 1] = (ok and v ~= nil) and tostring(v) or "none"
+	end
+	for _, kd in ipairs(karabiner.TAP_HOLD_KEYS or {}) do
+		add(karabiner.get_tap_action,  kd.id)
+		add(karabiner.get_hold_action, kd.id)
+	end
+	for _, cd in ipairs(karabiner.MOD_COMBOS or {}) do
+		add(karabiner.get_combo_combo_action, cd.id)
+		add(karabiner.get_combo_tap_action,   cd.id)
+		add(karabiner.get_combo_hold_action,  cd.id)
+	end
+	return table.concat(parts, "|")
+end
+
+--- Returns the (memoised) tap/hold and raccourcis picker trees, rebuilding only
+--- when the binding fingerprint changes. See _picker_cache rationale above.
+--- @return table tap_hold, table raccourcis
+local function build_picker_trees(karabiner, update_menu, enabled)
+	local fp = picker_fingerprint(karabiner, enabled)
+	if _picker_cache and _picker_cache.fp == fp then
+		return _picker_cache.tap_hold, _picker_cache.raccourcis
+	end
+	local action_index = build_action_index(karabiner)
+	local tap_hold   = build_tap_hold_items(karabiner, action_index, update_menu, enabled)
+	local raccourcis = build_raccourcis_items(karabiner, action_index, update_menu, enabled)
+	_picker_cache = { fp = fp, tap_hold = tap_hold, raccourcis = raccourcis }
+	return tap_hold, raccourcis
+end
+
 function M.build(ctx)
 	local karabiner   = ctx and ctx.karabiner
 	local update_menu = ctx and ctx.updateMenu
@@ -581,9 +632,7 @@ function M.build(ctx)
 	-- cycle is a no-op and the icon should stay green.
 	local bridge_live  = KeLifecycle.is_bridge_running()
 	local priming      = KeLifecycle.is_priming() and not bridge_live
-	local action_index = build_action_index(karabiner)
-	local tap_hold     = build_tap_hold_items(karabiner, action_index, update_menu, enabled)
-	local raccourcis   = build_raccourcis_items(karabiner, action_index, update_menu, enabled)
+	local tap_hold, raccourcis = build_picker_trees(karabiner, update_menu, enabled)
 
 	-- Status icon reflects whether KE is *actually applying* our remappings.
 	-- 🟢 daemon detected AND bridge primed — remapping is genuinely active.
@@ -784,5 +833,21 @@ function M.build(ctx)
 		menu    = submenu,
 	}
 end
+
+--- Warms the picker-tree cache off the menu-open path so the first click renders
+--- instantly instead of paying the ~300-380 ms build. Called from ui.menu.init
+--- once boot settles. Safe to call repeatedly.
+--- @param ctx table Menu context (provides karabiner + updateMenu).
+function M.prime(ctx)
+	local karabiner = ctx and ctx.karabiner
+	if not karabiner or type(karabiner.get_enabled) ~= "function" then return end
+	local ok, enabled = pcall(karabiner.get_enabled)
+	pcall(build_picker_trees, karabiner, ctx and ctx.updateMenu, ok and enabled or false)
+end
+
+-- Perf / cache test seams.
+M._picker_fingerprint  = picker_fingerprint
+M._build_picker_trees  = build_picker_trees
+M._reset_picker_cache  = function() _picker_cache = nil end
 
 return M
