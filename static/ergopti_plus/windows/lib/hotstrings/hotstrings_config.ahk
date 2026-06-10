@@ -91,6 +91,15 @@ global _HotstringsConsumedDelimiters := ""
 ;   Map(category -> { Delay: Number|"", Color: String|"", ShowTooltip: true|"", Sections: Map(name -> { Delay, Color, ShowTooltip }) })
 global _HotstringsOverrides := Map()
 
+; Memoisation for HotstringsResolve — the resolved {delay, color, show_tooltip}
+; for a (category, section) pair is static between config changes, yet the prefix
+; watcher resolves it per candidate on every keystroke while a tooltip is
+; eligible. Results are cached and invalidated by bumping a generation counter on
+; any override or group-config change; stale entries are ignored and overwritten,
+; so the map stays bounded to the live keys.
+global _HSResolveCache := Map()
+global _HSResolveGen := 0
+
 
 
 
@@ -111,6 +120,7 @@ HotstringsConfigInit(OverridePath) {
     _HotstringsOverrides        := _ParseOverrides(OverridePath)
     _HotstringsWordDelimiters   := _ParseGlobalKey(OverridePath, "word_delimiters")
     _HotstringsConsumedDelimiters := _ParseGlobalKey(OverridePath, "consumed_delimiters")
+    HotstringsResolveBumpGen()
     try LoggerInfo("HotstringsConfig", "Initialized (override file: '{1}').", OverridePath)
 }
 
@@ -458,6 +468,27 @@ _SortStringsInPlace(Arr) {
 ;   4. toml.file
 ;   5. GLOBAL_DEFAULT_DELAY (delay only); color stays empty.
 HotstringsResolve(CategoryName, SectionName := "") {
+    global _HSResolveCache, _HSResolveGen
+    Key := StrLower(CategoryName) . "|" . (SectionName != "" ? FoldAsciiLower(SectionName) : "")
+    if (_HSResolveCache.Has(Key)) {
+        Cached := _HSResolveCache[Key]
+        if (Cached.gen == _HSResolveGen)
+            return Cached.val
+    }
+    Result := _HotstringsResolveUncached(CategoryName, SectionName)
+    _HSResolveCache[Key] := { gen: _HSResolveGen, val: Result }
+    return Result
+}
+
+; Invalidate every memoised HotstringsResolve result. Called from each override
+; mutation and from the TOML group-config invalidation in toml_loader.ahk.
+HotstringsResolveBumpGen() {
+    global _HSResolveGen
+    _HSResolveGen += 1
+}
+
+; Internal resolution logic (uncached); HotstringsResolve above memoises it.
+_HotstringsResolveUncached(CategoryName, SectionName := "") {
     global _HotstringsOverrides, GLOBAL_DEFAULT_DELAY
     global GLOBAL_DEFAULT_COLOR, HOTSTRINGS_CATEGORY_DEFAULT_COLORS
     Cat := StrLower(CategoryName)
@@ -651,6 +682,7 @@ HotstringsSetOverride(CategoryName, SectionName, Field, Value) {
 
     try LoggerDebug("HotstringsConfig", "Override set: {1}{2}.{3} = {4}.",
         Cat, (Sec != "") ? "." . Sec : "", Field, Value)
+    HotstringsResolveBumpGen()
     return _SaveOverrides()
 }
 
@@ -689,6 +721,7 @@ HotstringsClearOverride(CategoryName, SectionName, Field := "") {
         Cat,
         (Sec != "") ? "." . Sec : "",
         (Field != "") ? "." . Field : "")
+    HotstringsResolveBumpGen()
     return _SaveOverrides()
 }
 
@@ -700,6 +733,7 @@ HotstringsConfigReload() {
         return false
     }
     _HotstringsOverrides := _ParseOverrides(_HotstringsOverridesPath)
+    HotstringsResolveBumpGen()
     try LoggerDebug("HotstringsConfig", "Overrides reloaded from disk.")
     return true
 }
