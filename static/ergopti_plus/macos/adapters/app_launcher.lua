@@ -9,9 +9,9 @@
 --- coupling domain modules to hs-specific APIs.
 ---
 --- FEATURES & RATIONALE:
---- 1. Argument-aware launch: AL_LaunchWithArgs separates executable path from
+--- 1. Argument-aware launch: launchWithArgs separates executable path from
 ---    arguments so the adapter can quote them correctly for macOS shell semantics.
---- 2. Boolean process check: AL_IsRunning returns a boolean so callers can branch
+--- 2. Boolean process check: isRunning returns a boolean so callers can branch
 ---    on process existence without parsing PID integers or catching exceptions.
 --- 3. Fire-and-forget semantics: launches do not block waiting for the process.
 --- ==============================================================================
@@ -34,38 +34,38 @@ local LOG = "adapters.app_launcher"
 
 --- Launches an application by its executable path or bundle name.
 --- @param app_path string Absolute path, bundle ID, or app name recognised by macOS.
-function M.AL_Launch(app_path)
+function M.launch(app_path)
 	local ok, err = pcall(function()
 		hs.application.launchOrFocus(app_path)
 	end)
 	if not ok then
-		Logger.error(LOG, "AL_Launch(): failed to launch %q — %s", tostring(app_path), tostring(err))
+		Logger.error(LOG, "launch(): failed to launch %q — %s", tostring(app_path), tostring(err))
 	end
 end
 
 --- Launches an application with command-line arguments via the macOS shell.
 --- @param app_path string Absolute path to the executable.
 --- @param args     string Command-line argument string to append.
-function M.AL_LaunchWithArgs(app_path, args)
+function M.launchWithArgs(app_path, args)
 	local ok, err = pcall(function()
 		local cmd = string.format("open -a %q --args %s", app_path, tostring(args or ""))
 		hs.execute(cmd)
 	end)
 	if not ok then
-		Logger.error(LOG, "AL_LaunchWithArgs(): failed — %s", tostring(err))
+		Logger.error(LOG, "launchWithArgs(): failed — %s", tostring(err))
 	end
 end
 
 --- Returns true when at least one process with the given name is running.
 --- @param process_name string Process name as shown by the OS task list.
 --- @return boolean
-function M.AL_IsRunning(process_name)
+function M.isRunning(process_name)
 	local ok, result = pcall(function()
 		local app = hs.application.get(process_name)
 		return app ~= nil
 	end)
 	if not ok then
-		Logger.error(LOG, "AL_IsRunning(): error checking %q — %s", tostring(process_name), tostring(result))
+		Logger.error(LOG, "isRunning(): error checking %q — %s", tostring(process_name), tostring(result))
 		return false
 	end
 	return result == true
