@@ -1311,6 +1311,9 @@ global _LLM_Tooltip_Loading  := false
 global _LLM_TOOLTIP_MIN_DISPLAY_MS := 600
 ; A_TickCount when the current real prediction was rendered (0 = none / loading).
 global _LLM_Tooltip_ShownAt := 0
+; Hwnds snapshotted at prediction-show time for the +400 ms visibility probe.
+global _LLM_Tooltip_ProbeHwnd := 0
+global _LLM_Tooltip_ProbeBorderHwnd := 0
 ; Footer state — mirrors tooltip_llm.lua info/hint rows.
 global _LLM_Tooltip_ShowInfoBar := false
 global _LLM_Tooltip_InfoModel   := ""
@@ -1419,6 +1422,38 @@ LLM_TooltipShow(payload, active := 1, is_final := false) {
 	SetTimer(_TooltipTimerFn, -timeout_ms)
 	try LoggerDebug("LLM.tt", "SHOW prediction: {1} slot(s), is_final={2}, auto-hide in {3}ms (gen {4}).",
 		slots.Length, (is_final ? "true" : "false"), timeout_ms, _TooltipGeneration)
+	; Display-bug probe: the state stays "visible" for the full duration, yet the
+	; user reports the prediction window flashes and vanishes (while the loading
+	; spinner — same Gui engine — stays). Snapshot the content + border Hwnds and,
+	; 400 ms later, log whether the OS still considers them visible/topmost and
+	; where they sit. This distinguishes an external hide vs occlusion vs off-screen.
+	global _TooltipGui, _TooltipBorderGui, _LLM_Tooltip_ProbeHwnd, _LLM_Tooltip_ProbeBorderHwnd
+	_LLM_Tooltip_ProbeHwnd := (IsSet(_TooltipGui) and _TooltipGui) ? _TooltipGui.Hwnd : 0
+	_LLM_Tooltip_ProbeBorderHwnd := (IsSet(_TooltipBorderGui) and _TooltipBorderGui) ? _TooltipBorderGui.Hwnd : 0
+	SetTimer(_LLM_TooltipVisibilityProbe, -400)
+}
+
+; One-shot diagnostic armed by LLM_TooltipShow — see the probe comment there.
+_LLM_TooltipVisibilityProbe() {
+	global _LLM_Tooltip_ProbeHwnd, _LLM_Tooltip_ProbeBorderHwnd, _LLM_Tooltip_Visible
+	if !_LLM_Tooltip_ProbeHwnd
+		return
+	vis := -1, bvis := -1, topmost := "?", rect := "?"
+	try vis := DllCall("User32\IsWindowVisible", "Ptr", _LLM_Tooltip_ProbeHwnd, "Int")
+	if _LLM_Tooltip_ProbeBorderHwnd
+		try bvis := DllCall("User32\IsWindowVisible", "Ptr", _LLM_Tooltip_ProbeBorderHwnd, "Int")
+	try {
+		ex := DllCall("User32\GetWindowLongPtr", "Ptr", _LLM_Tooltip_ProbeHwnd, "Int", -20, "Ptr")
+		topmost := (ex & 0x8) ? "yes" : "no"   ; WS_EX_TOPMOST = 0x00000008
+	}
+	try {
+		r := Buffer(16, 0)
+		if DllCall("User32\GetWindowRect", "Ptr", _LLM_Tooltip_ProbeHwnd, "Ptr", r)
+			rect := Format("({1},{2})-({3},{4})",
+				NumGet(r, 0, "Int"), NumGet(r, 4, "Int"), NumGet(r, 8, "Int"), NumGet(r, 12, "Int"))
+	}
+	try LoggerDebug("LLM.tt", "PROBE +400ms: state_visible={1} os_content_visible={2} os_border_visible={3} topmost={4} rect={5}.",
+		((IsSet(_LLM_Tooltip_Visible) and _LLM_Tooltip_Visible) ? "true" : "false"), vis, bvis, topmost, rect)
 }
 
 ; Purple in-flight indicator — macOS ``show_loading`` parity (ai_loading tint).
