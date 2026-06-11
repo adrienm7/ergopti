@@ -311,6 +311,23 @@ LLM_Bridge_HasActivePredictionWork() {
 }
 
 /**
+ * True ONLY while a real prediction is on screen — never during the violet
+ * "génération en cours" loading tooltip, and never while the model is still
+ * generating. Pointer-dismiss gates on this (not HasActivePredictionWork) so
+ * idle mouse drift while waiting for a slow model can never cancel the
+ * suggestion before it appears. Mirrors macOS, which arms its dismiss watchers
+ * inside show_predictions and never during show_loading.
+ * @returns {boolean}
+ */
+_LLM_Bridge_PredictionShown() {
+	if !(IsSet(LLM_Tooltip_IsVisible) && LLM_Tooltip_IsVisible())
+		return false
+	if (IsSet(LLM_Tooltip_IsLoading) && LLM_Tooltip_IsLoading())
+		return false
+	return true
+}
+
+/**
  * Clears predictions, cancels generation, and hides the tooltip.
  * Parity with macOS LLMBridge.reset_predictions() + engine.reset().
  */
@@ -330,9 +347,13 @@ LLM_Bridge_ResetPredictions() {
 }
 
 /**
- * Entry point for mouse / touchpad / wheel activity while LLM work is active.
+ * Entry point for mouse / touchpad / wheel activity. Dismisses ONLY a displayed
+ * prediction — never during loading / generation, so the user can move the mouse
+ * freely while waiting for a slow model without losing the suggestion.
  */
 LLM_Bridge_OnPointerActivity(*) {
+	if !_LLM_Bridge_PredictionShown()
+		return
 	LLM_Bridge_ResetPredictions()
 }
 
@@ -375,8 +396,16 @@ _LLM_PointerWatch_Stop() {
 
 _LLM_PointerWatch_OnMoveTick(*) {
 	global _LLM_PointerWatch_LastX, _LLM_PointerWatch_LastY
-	if !LLM_Bridge_HasActivePredictionWork()
+	; Dismiss-on-move applies ONLY once a real prediction is on screen, never during
+	; the loading / generation phase. While no prediction is shown we drop the
+	; baseline so the NEXT prediction captures a fresh origin — otherwise mouse drift
+	; that happened while a slow model was generating would be measured against a
+	; stale origin and dismiss the suggestion the instant it appears.
+	if !_LLM_Bridge_PredictionShown() {
+		_LLM_PointerWatch_LastX := unset
+		_LLM_PointerWatch_LastY := unset
 		return
+	}
 	MouseGetPos(&x, &y)
 	if IsSet(_LLM_PointerWatch_LastX) {
 		if (x != _LLM_PointerWatch_LastX or y != _LLM_PointerWatch_LastY)
