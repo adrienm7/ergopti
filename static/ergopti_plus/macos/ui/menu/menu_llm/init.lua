@@ -29,6 +29,9 @@ local TriggerPanel     = require("ui.menu.menu_llm.trigger_panel")
 local ApiPanel         = require("ui.menu.menu_llm.api_panel")
 local ModelsSelector   = require("ui.menu.menu_llm.models_selector")
 local ModelSwitcher    = require("ui.menu.menu_llm.model_switcher")
+-- Single source of truth for the MLX server address — the health probe reads the
+-- configured port from here rather than hardcoding it.
+local ApiMlx           = require("modules.llm.api_mlx")
 local StartupCtrl      = require("ui.menu.menu_llm.startup_controller")
 local TriggerOrch      = require("ui.menu.menu_llm.trigger_orchestrator")
 
@@ -129,12 +132,9 @@ local function probe_llm_health(backend, refresh_fn)
 	if backend == "ollama" then
 		url = "http://127.0.0.1:11434/api/version"
 	else
-		-- Resolve the MLX base URL from api_mlx so the health probe follows the
-		-- configured port (shared JSON / user override), never a hardcoded 8080.
-		local ok_api, ApiMlx = pcall(require, "modules.llm.api_mlx")
-		local base = (ok_api and type(ApiMlx.get_base_url) == "function" and ApiMlx.get_base_url())
-			or "http://127.0.0.1:3460"
-		url = base .. "/v1/models"
+		-- The MLX health probe follows the configured port via api_mlx.get_base_url()
+		-- (the single source of truth) — no hardcoded port literal.
+		url = ApiMlx.get_base_url() .. "/v1/models"
 	end
 
 	hs.http.asyncGet(url, {}, function(status)

@@ -22,6 +22,9 @@ local LOG = "backend_panel"
 
 local mlx_deps_checker    = require("lib.mlx_deps_checker")
 local ollama_deps_checker = require("lib.ollama_deps_checker")
+-- Single source of truth for the MLX server port — used to free the right socket
+-- when switching away from MLX. Never hardcode the port here.
+local ApiMlx              = require("modules.llm.api_mlx")
 
 --- Returns whether the current machine has Apple Silicon.
 --- Lazily evaluated once so the shell call does not repeat on every menu open.
@@ -146,11 +149,10 @@ function M.build(ctx)
 				-- On-demand deps check — silent on the fast path.
 				check_backend_deps("ollama")
 				if models_mgr.stop_mlx_server_if_needed then models_mgr.stop_mlx_server_if_needed() end
-				-- Hard kill just in case — target the configured MLX port, not a
-				-- hardcoded 8080, so switching backends frees the right socket.
-				local ok_api, ApiMlx = pcall(require, "modules.llm.api_mlx")
-				local mlx_port = (ok_api and type(ApiMlx.get_port) == "function" and ApiMlx.get_port()) or 3460
-				os.execute("pids=$(lsof -tiTCP:" .. mlx_port .. " -sTCP:LISTEN 2>/dev/null); [ -n \"$pids\" ] && kill -9 $pids 2>/dev/null")
+				-- Hard kill just in case — target the configured MLX port (via the
+				-- api_mlx getter, the single source of truth) so switching backends
+				-- frees the right socket.
+				os.execute("pids=$(lsof -tiTCP:" .. ApiMlx.get_port() .. " -sTCP:LISTEN 2>/dev/null); [ -n \"$pids\" ] && kill -9 $pids 2>/dev/null")
 				Logger.debug(LOG, "MLX server stopped.")
 
 				if keymap and type(keymap.set_llm_backend_name) == "function" then
