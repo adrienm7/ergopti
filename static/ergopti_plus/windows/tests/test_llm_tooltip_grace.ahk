@@ -145,8 +145,14 @@ _TestGrace_TooltipCentralGuard() {
 	; The predicate the guard depends on must exist.
 	Assert(InStr(Body, "LLM_TooltipInGracePeriod() {") > 0,
 		"the LLM_TooltipInGracePeriod predicate must be defined")
+	; TooltipShow must ALSO bail during the window. Blocking the NewShow hide is
+	; not enough: TooltipShow rebuilds the shared Gui regardless, clobbering the
+	; prediction with a hotstring preview lookup. This standalone guard ("if " with
+	; no DbgTag prefix, unlike the TooltipHide one) lives only in TooltipShow.
+	Assert(InStr(Body, "if LLM_TooltipInGracePeriod()") > 0,
+		"TooltipShow must refuse to rebuild the shared surface while a prediction is in its window")
 }
-Test("grace contract: TooltipHide guard + show-time stamp + predicate present",
+Test("grace contract: TooltipHide + TooltipShow guards + show-time stamp + predicate present",
 	_TestGrace_TooltipCentralGuard)
 
 
