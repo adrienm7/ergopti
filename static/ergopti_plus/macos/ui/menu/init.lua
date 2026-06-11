@@ -529,7 +529,12 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			active_tasks   = M._active_tasks,
 			update_icon    = update_icon,
 			reset_menubar  = reset_menubar,
-			update_menu    = function() updateMenu() end,
+			-- updateMenu is a forward-declared upvalue assigned later in this file;
+			-- the LLM startup path can call ctx.update_menu() during boot BEFORE that
+			-- assignment runs, so guard it like every other updateMenu call site.
+			-- Without the guard this threw "attempt to call a nil value (upvalue
+			-- 'updateMenu')" and the swallowed error silently killed the LLM startup.
+			update_menu    = function() if type(updateMenu) == "function" then updateMenu() end end,
 			save_prefs     = save_prefs,
 			keymap         = keymap,
 			script_control = core_mods.shortcuts_mod,
@@ -543,7 +548,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	end
 	
 	if type(llm_handler) == "table" and type(llm_handler.check_startup) == "function" then pcall(llm_handler.check_startup) end
-	if type(hotstring_editor.set_update_menu) == "function" then pcall(hotstring_editor.set_update_menu, function() updateMenu() end) end
+	if type(hotstring_editor.set_update_menu) == "function" then pcall(hotstring_editor.set_update_menu, function() if type(updateMenu) == "function" then updateMenu() end end) end
 
 	-- At startup / reload the script is in the active (non-paused) state, so honour
 	-- the user's chosen "resume" layout the same way a resume would: if the
