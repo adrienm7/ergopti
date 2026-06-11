@@ -121,6 +121,30 @@ end
 --- ============================================
 -- ============================================
 
+--- Resolves the live (min, max) word bounds for prompt interpolation from the
+--- single source of truth. The canonical defaults live in shared/llm/defaults.json
+--- (surfaced as DEFAULT_STATE.llm_min_words / llm_max_words); a live user override
+--- in the user settings takes precedence. We never substitute a divergent literal:
+--- a nil in DEFAULT_STATE means the LLM module failed to initialise its defaults,
+--- which is surfaced loudly rather than silently masked with a made-up value.
+--- @param ds table DEFAULT_STATE (canonical defaults from defaults.json).
+--- @param get_setting function Reads a live user setting by key (returns nil if unset).
+--- @return number|nil min_w The resolved minimum word count.
+--- @return number|nil max_w The resolved maximum word count.
+function M._resolve_word_bounds(ds, get_setting)
+	ds = ds or {}
+	local def_min = ds.llm_min_words
+	local def_max = ds.llm_max_words
+	if def_min == nil or def_max == nil then
+		Logger.error(LOG, "resolve_word_bounds: DEFAULT_STATE is missing llm_min_words/llm_max_words — LLM defaults were not initialised from shared/llm/defaults.json.")
+	end
+
+	local min_w = tonumber(get_setting("llm_min_words")) or def_min
+	local max_w = tonumber(get_setting("llm_max_words")) or def_max
+	if min_w and max_w and max_w > 0 and max_w < min_w then max_w = min_w end
+	return min_w, max_w
+end
+
 --- Resolves the appropriate system prompt, injecting live session values.
 --- Reads min/max_words from hs.settings and the UI locale from lib.i18n so
 --- the prompt always reflects the user's current preferences.
@@ -159,20 +183,17 @@ function M.resolve_system_prompt(profile, n)
 	end
 
 	-- Lazy load Core to avoid circular dependency (init.lua requires profiles.lua).
-	local Core    = require("modules.llm.init") or {}
-	local ds      = (Core and Core.DEFAULT_STATE) or {}
-	local def_min = ds.llm_min_words or 4
-	local def_max = ds.llm_max_words or 20
+	local Core = require("modules.llm.init") or {}
+	local ds   = (Core and Core.DEFAULT_STATE) or {}
 
-	-- Read live user settings; fall back to Core defaults when absent. Guard hs/i18n for stubbed test/CI envs.
-	local settings = (hs and hs.settings) or {}
+	-- Read live user settings; fall back to the canonical Core defaults when the
+	-- user has not overridden them. Guard hs for stubbed test/CI envs.
+	local settings    = (hs and hs.settings) or {}
 	local get_setting = (settings and settings.get) or function() return nil end
-	local min_w = tonumber(get_setting("llm_min_words")) or def_min
-	local max_w = tonumber(get_setting("llm_max_words")) or def_max
-	if max_w > 0 and max_w < min_w then max_w = min_w end
+	local min_w, max_w = M._resolve_word_bounds(ds, get_setting)
 
-	prompt = prompt:gsub("{max_words}", (max_w > 0) and tostring(max_w) or "illimité")
-	prompt = prompt:gsub("{min_words}", tostring(min_w))
+	prompt = prompt:gsub("{max_words}", (max_w and max_w > 0) and tostring(max_w) or "illimité")
+	prompt = prompt:gsub("{min_words}", tostring(min_w or ""))
 
 	-- Inject the active UI locale so the model replies in the user's language.
 	local get_locale = (i18n and i18n.get_locale) or function() return "fr" end
