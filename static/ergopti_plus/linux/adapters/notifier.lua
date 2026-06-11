@@ -20,7 +20,7 @@
 
 local M = {}
 
-local Logger = require("lib.logger")
+local Logger = require("logger.shim")
 
 local LOG = "adapters.notifier"
 
