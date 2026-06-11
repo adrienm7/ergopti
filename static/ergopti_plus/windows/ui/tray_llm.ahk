@@ -94,6 +94,9 @@ _LLMTrayBuildIndentRange() {
 global _LLM_Tray := Map(
 	"enabled",                    false,
 	"backend",                    "ollama",
+	; Local Ollama daemon port. 11434 is Ollama's standard; user-overridable from
+	; the backend submenu (persisted under [llm] ollama_port) for non-standard setups.
+	"ollama_port",                11434,
 	"model",                      "",
 	"profile_id",                 "basic",
 	"user_profiles",              [],

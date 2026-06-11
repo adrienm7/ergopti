@@ -55,6 +55,18 @@ LLM_Tray_BuildBackendMenu() {
 		if (backend_id == _LLM_Tray["backend"])
 			m.Check(label)
 	}
+
+	; Ollama server port — the local daemon's port (11434 by default). Configurable
+	; so a user running Ollama on a non-standard port (or behind a proxy) can still
+	; reach it. Shown unconditionally: the user may set it before switching backend.
+	m.Add()
+	port_display := _LLM_Tray.Has("ollama_port") ? _LLM_Tray["ollama_port"] : 11434
+	RegisterMenuItem(m, StrReplace(t("menu.llm.ollama_port_label"), "%s", port_display),
+		(*) => LLM_Tray_PromptOllamaPort())
+	_LLM_MaybeAddReset(m,
+		port_display,
+		_LLM_DefaultFor("llm_ollama_port", 11434),
+		(*) => LLM_Tray_ResetOllamaPort(_LLM_DefaultFor("llm_ollama_port", 11434)))
 	return m
 }
 
