@@ -649,6 +649,10 @@ _TooltipRevealSurfaces() {
 ; this a wide tooltip anchored near the bottom-right caret overflows the screen and
 ; is clipped — the truncation reported for long predictions in a corner.
 _TooltipClampToScreen(X, Y, W, H) {
+    ; Margin kept clear of every screen edge — mirrors the shared positioning spec
+    ; (constants.toml [positioning].screen_margin = 5) that HS clamps with, so the
+    ; Windows tooltip lands at the same on-screen position as Hammerspoon.
+    static MARGIN := 5
     L := 0, T := 0, R := A_ScreenWidth, B := A_ScreenHeight
     try {
         found := false
@@ -663,15 +667,9 @@ _TooltipClampToScreen(X, Y, W, H) {
         if !found
             MonitorGetWorkArea(MonitorGetPrimary(), &L, &T, &R, &B)
     }
-    ; Pull back inside the right / bottom edge first, then never past the left / top.
-    if (X + W > R)
-        X := R - W
-    if (X < L)
-        X := L
-    if (Y + H > B)
-        Y := B - H
-    if (Y < T)
-        Y := T
+    ; clamp(x, L+margin, R-W-margin); same for y — identical to the macOS renderer.
+    X := Max(L + MARGIN, Min(X, R - W - MARGIN))
+    Y := Max(T + MARGIN, Min(Y, B - H - MARGIN))
     return { X: X, Y: Y }
 }
 
