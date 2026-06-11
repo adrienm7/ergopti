@@ -198,7 +198,12 @@ function M.auto_detect_backend(callback)
 		on_both_done()
 	end)
 
-	pcall(hs.http.asyncGet, "http://127.0.0.1:8080/v1/models", {}, function(status, body)
+	-- Resolve the MLX base URL from api_mlx so this probe follows the configured
+	-- port (shared JSON / user override), never a hardcoded 8080.
+	local ok_api, ApiMlx = pcall(require, "modules.llm.api_mlx")
+	local mlx_models_url = ((ok_api and type(ApiMlx.get_base_url) == "function" and ApiMlx.get_base_url())
+		or "http://127.0.0.1:3746") .. "/v1/models"
+	pcall(hs.http.asyncGet, mlx_models_url, {}, function(status, body)
 		mlx_ok = (status == 200) and type(body) == "string" and body:find('"object"') ~= nil
 		mlx_done = true
 		on_both_done()
@@ -210,9 +215,13 @@ end
 --- Call warmup_model() separately once the model name is known.
 function M.warm_up_connections()
 	pcall(function()
-		-- Parallel async pings to both backends (fire-and-forget)
+		-- Parallel async pings to both backends (fire-and-forget). The MLX URL
+		-- follows the configured port via api_mlx, never a hardcoded 8080.
+		local ok_api, ApiMlx = pcall(require, "modules.llm.api_mlx")
+		local mlx_base = (ok_api and type(ApiMlx.get_base_url) == "function" and ApiMlx.get_base_url())
+			or "http://127.0.0.1:3746"
 		hs.http.asyncGet("http://127.0.0.1:11434/api/version", {}, function() end)
-		hs.http.asyncGet("http://127.0.0.1:8080/v1/models",   {}, function() end)
+		hs.http.asyncGet(mlx_base .. "/v1/models",            {}, function() end)
 	end)
 end
 

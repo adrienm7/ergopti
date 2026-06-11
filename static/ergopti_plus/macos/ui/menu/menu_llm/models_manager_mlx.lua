@@ -35,11 +35,12 @@ if not ok_dw then download_window = nil end
 local ok_api_mlx, ApiMlx = pcall(require, "modules.llm.api_mlx")
 if not ok_api_mlx then ApiMlx = nil end
 
--- Single source of truth for the MLX server port: api_mlx, backed by
--- shared/llm/mlx_server.json. Resolved once so the launcher, the pre-launch sweep,
--- and the cross-session adoption probe never hardcode it. Falls back to 8080
--- (mlx_lm.server's default) when api_mlx is unavailable (stripped builds, tests).
-local MLX_PORT = (ApiMlx and type(ApiMlx.get_port) == "function" and ApiMlx.get_port()) or 8080
+-- Single source of truth for the MLX server port: api_mlx, backed by the per-user
+-- override and shared/llm/mlx_server.json. Resolved once so the launcher, the
+-- pre-launch sweep, and the cross-session adoption probe never hardcode it. Falls
+-- back to 3746 (Ergopti's dedicated default) when api_mlx is unavailable (stripped
+-- builds, tests).
+local MLX_PORT = (ApiMlx and type(ApiMlx.get_port) == "function" and ApiMlx.get_port()) or 3746
 
 local HF_TOKEN_FILE = (os.getenv("HOME") or "") .. "/.huggingface/token"
 
@@ -477,6 +478,14 @@ PY
 		Logger.info(LOG, "Ensuring MLX server for model %s…", tostring(target_model))
 		local silent_notifications = type(opts) == "table" and opts.silent_notifications == true
 
+		-- Re-resolve the port from api_mlx at launch time, not module load time: the
+		-- user may have changed it via the menu (M.set_port) since this module loaded.
+		-- Every command string below (sweep, launcher, adoption probe) reads MLX_PORT,
+		-- so refreshing this upvalue makes them all target the current port.
+		if ApiMlx and type(ApiMlx.get_port) == "function" then
+			MLX_PORT = ApiMlx.get_port()
+		end
+
 		local function probe_matches_target(body)
 			if type(body) ~= "string" or body == "" then return false end
 			local ok, parsed = pcall(hs.json.decode, body)
@@ -817,7 +826,11 @@ PY
 				-- response body, leaving the client hanging on a 200 with empty body.
 				-- Forcing serial execution sidesteps the bug entirely; for our
 				-- single-user prediction use case batching brought no benefit anyway.
-				"\"$PYTHON_BIN\" -m mlx_lm server --model \"$MODEL_ARG\" --decode-concurrency 1 --prompt-concurrency 1 > \"$MLX_FIFO\" 2>&1 & " ..
+				-- --port pins the bind port to our resolved value. mlx_lm.server
+				-- otherwise binds its own 8080 default, which would silently ignore
+				-- the shared-config / user-override port and make every client probe
+				-- the wrong address (the centralized port var would be a lie).
+				"\"$PYTHON_BIN\" -m mlx_lm server --model \"$MODEL_ARG\" --port " .. MLX_PORT .. " --decode-concurrency 1 --prompt-concurrency 1 > \"$MLX_FIFO\" 2>&1 & " ..
 				"MLX_PID=$!; " ..
 				"set +m; " ..
 				"MLX_PGID=$(ps -o pgid= -p $MLX_PID 2>/dev/null | tr -d ' ' || echo ''); " ..
