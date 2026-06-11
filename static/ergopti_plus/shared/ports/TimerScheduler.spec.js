@@ -63,12 +63,18 @@ const portContract = {
 	 *   Used during module teardown to prevent orphaned timers.
 	 *   @returns {void}
 	 *   @error_behavior "ignore".
+	 *
+	 * activeCount() — Number of timers currently armed by this scheduler.
+	 *   Exposed for diagnostics and leak detection in tests.
+	 *   @returns {number} Count of live timers (zero when idle).
+	 *   @error_behavior "ignore".
 	 */
 	methods: {
 		after: { arity: 2, required: true },
 		every: { arity: 2, required: true },
 		cancel: { arity: 1, required: true },
-		cancelAll: { arity: 0, required: true }
+		cancelAll: { arity: 0, required: true },
+		activeCount: { arity: 0, required: true }
 	}
 };
 

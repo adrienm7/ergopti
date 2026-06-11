@@ -4,97 +4,105 @@
 --- MODULE: Adapter Structural Compliance Tests
 --- DESCRIPTION:
 --- Validates that every Hammerspoon adapter in adapters/ exposes the correct
---- method surface required by the corresponding port contract in
---- static/ergopti_plus/shared/ports/. Each adapter is loaded with the hs stub,
---- and each required method is checked for existence and correct arity.
+--- method surface required by the corresponding port contract. The contract is
+--- read at runtime from the generated single source shared/ports/contracts.json
+--- (projected from shared/ports/*.spec.js by codegen-contracts-json.cjs), so the
+--- method names and arities are no longer mirrored by hand in this file — a
+--- spec change flows here automatically.
 ---
 --- RATIONALE:
 --- Port adapters are the boundary between domain logic and OS APIs. If a
 --- refactor removes or renames a method that a domain module depends on, these
 --- tests catch the regression before it reaches production — without needing
---- to run OS-level code.
+--- to run OS-level code. Reading the contract from the shared JSON means the
+--- macOS, AHK and Linux drivers all validate against the exact same source.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local json    = require("json")
 
 
 
 
--- ============================================
---- ============================================
--- ======= 1/ Port Contract Definitions =======
---- ============================================
--- ============================================
+-- ====================================================
+-- ====================================================
+-- ======= 1/ Load the Single-Source Contract =========
+-- ====================================================
+-- ====================================================
 
---- Port method contracts: { method_name → required_arity }
---- Mirrors the portContract.methods fields in each shared/ports/*.spec.js.
-local PORT_CONTRACTS = {
-	keyboard_hook = {
-		{ name = "start",          arity = 1 },
-		{ name = "stop",           arity = 0 },
-		{ name = "isRunning",      arity = 0 },
-		{ name = "refreshContext", arity = 0 },
-		{ name = "getContext",     arity = 0 },
-	},
-	text_sender = {
-		{ name = "send",       arity = 3 },
-		{ name = "eraseChars", arity = 1 },
-		{ name = "pressKey",   arity = 2 },
-	},
-	tooltip_renderer = {
-		{ name = "show",          arity = 1 },
-		{ name = "hide",          arity = 0 },
-		{ name = "isVisible",     arity = 0 },
-		{ name = "updateElement", arity = 1 },
-	},
-	http_client = {
-		{ name = "post",     arity = 4 },
-		{ name = "cancel",   arity = 0 },
-		{ name = "isActive", arity = 0 },
-	},
-	timer_scheduler = {
-		{ name = "after",     arity = 2 },
-		{ name = "every",     arity = 2 },
-		{ name = "cancel",    arity = 1 },
-		{ name = "cancelAll", arity = 0 },
-	},
-	notifier = {
-		{ name = "send", arity = 2 },
-	},
-	tray_menu = {
-		{ name = "setIcon",    arity = 1 },
-		{ name = "setMenu",    arity = 1 },
-		{ name = "setTooltip", arity = 1 },
-		{ name = "destroy",    arity = 0 },
-	},
-	file_system = {
-		{ name = "read",   arity = 1 },
-		{ name = "write",  arity = 2 },
-		{ name = "append", arity = 2 },
-		{ name = "exists", arity = 1 },
-		{ name = "delete", arity = 1 },
-	},
-	window_info = {
-		{ name = "getFocused", arity = 0 },
-		{ name = "getAll",     arity = 0 },
-	},
+local CONTRACTS_PATH = helpers.driver_root() .. "../shared/ports/contracts.json"
+
+--- Reads and decodes the shared port-contract registry. Fails loudly (rather
+--- than silently skipping) when the file is absent or malformed — a missing
+--- contract must never let compliance pass by default.
+--- @return table The decoded { ports = { … } } registry.
+local function load_contracts()
+	local fh = io.open(CONTRACTS_PATH, "r")
+	assert(fh, "contracts.json not found at " .. CONTRACTS_PATH ..
+		" — run `npm run codegen:contracts`")
+	local raw = fh:read("*a")
+	fh:close()
+	local decoded = json.decode(raw)
+	assert(type(decoded) == "table" and type(decoded.ports) == "table",
+		"contracts.json did not decode into a { ports = {…} } table")
+	return decoded
+end
+
+local CONTRACTS = load_contracts()
+
+--- Converts a snake_case adapter file name to its PascalCase port name
+--- (e.g. "keyboard_hook" -> "KeyboardHook", "http_client" -> "HttpClient").
+--- @param snake string
+--- @return string
+local function snake_to_pascal(snake)
+	local out = {}
+	for part in snake:gmatch("[^_]+") do
+		out[#out + 1] = part:sub(1, 1):upper() .. part:sub(2)
+	end
+	return table.concat(out)
+end
+
+-- The adapters this headless harness can load under the hs stub. (KeyboardHook,
+-- TextSender, … — the OS-light surface.) The remaining ports are exercised by
+-- the AHK parity test and the contracts freshness gate; expanding this list to
+-- all 20 is tracked separately so a newly-stubbable adapter can be added here.
+local ADAPTERS_UNDER_TEST = {
+	"keyboard_hook",
+	"text_sender",
+	"tooltip_renderer",
+	"http_client",
+	"timer_scheduler",
+	"notifier",
+	"tray_menu",
+	"file_system",
+	"window_info",
 }
 
 
 
 
--- ==============================================
---- ===============================================
--- ======= 2/ Compliance Test Registration =======
---- ===============================================
--- ==============================================
+-- ====================================================
+-- ====================================================
+-- ======= 2/ Compliance Test Registration ============
+-- ====================================================
+-- ====================================================
 
-for adapter_name, methods in pairs(PORT_CONTRACTS) do
-	-- Capture loop locals for closure
-	local name    = adapter_name
-	local methods_snap = methods
+for _, adapter_name in ipairs(ADAPTERS_UNDER_TEST) do
+	local name      = adapter_name
+	local port_name = snake_to_pascal(adapter_name)
 
-	helpers.describe(string.format("Adapter compliance: %s", name), function()
+	helpers.describe(string.format("Adapter compliance: %s (%s)", name, port_name), function()
+		local port = CONTRACTS.ports[port_name]
+
+		helpers.it("port contract exists in contracts.json", function()
+			helpers.assert_true(
+				type(port) == "table" and type(port.methods) == "table",
+				string.format("no contract for port %s in contracts.json", port_name)
+			)
+		end)
+
+		if type(port) ~= "table" or type(port.methods) ~= "table" then return end
+
 		local module_name = "adapters." .. name
 		local adapter = helpers.load_with_stubs(module_name)
 
@@ -107,28 +115,27 @@ for adapter_name, methods in pairs(PORT_CONTRACTS) do
 
 		if type(adapter) ~= "table" then return end
 
-		for _, spec in ipairs(methods_snap) do
-			local method_name  = spec.name
-			local req_arity    = spec.arity
-
-			helpers.it(string.format("exposes %s (arity %d)", method_name, req_arity), function()
-				helpers.assert_true(
-					type(adapter[method_name]) == "function",
-					string.format("%s.%s must be a function, got %s",
-						name, method_name, type(adapter[method_name]))
-				)
-				-- debug.getinfo returns nparams for Lua functions; use it
-				-- to check arity. C functions and variadic functions report -1.
-				local info = debug.getinfo(adapter[method_name], "u")
-				if info and info.nparams >= 0 then
-					helpers.assert_eq(
-						info.nparams, req_arity,
-						string.format("%s.%s arity", name, method_name)
+		for method_name, spec in pairs(port.methods) do
+			if spec.required then
+				local req_arity = spec.arity
+				helpers.it(string.format("exposes %s (arity %d)", method_name, req_arity), function()
+					helpers.assert_true(
+						type(adapter[method_name]) == "function",
+						string.format("%s.%s must be a function, got %s",
+							name, method_name, type(adapter[method_name]))
 					)
-				end
-				-- Note: if nparams == -1 (variadic or C function) we skip the
-				-- arity check but the existence check already passed.
-			end)
+					-- debug.getinfo returns nparams for Lua functions; C functions
+					-- and variadic functions report -1, in which case we skip the
+					-- arity check (the existence check already passed).
+					local info = debug.getinfo(adapter[method_name], "u")
+					if info and info.nparams >= 0 then
+						helpers.assert_eq(
+							info.nparams, req_arity,
+							string.format("%s.%s arity", name, method_name)
+						)
+					end
+				end)
+			end
 		end
 	end)
 end

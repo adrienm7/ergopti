@@ -42,6 +42,7 @@
 		"codegen:prompt-builder:ahk": "node ./tools/codegen/codegen-prompt-builder-ahk.cjs",
 		"codegen:prompt-builder:hs": "node ./tools/codegen/codegen-prompt-builder-hs.cjs",
 		"codegen:shortcuts": "node ./tools/codegen/codegen-shortcuts.cjs",
+		"codegen:contracts": "node ./tools/codegen/codegen-contracts-json.cjs",
 		"test:mutation": "stryker run"
 	},
 	"type": "module",

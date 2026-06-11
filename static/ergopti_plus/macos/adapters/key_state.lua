@@ -8,7 +8,7 @@
 --- the physical state of keyboard keys without coupling domain modules to hs APIs.
 ---
 --- FEATURES & RATIONALE:
---- 1. Fail-safe returns: KS_IsDown() returns false and KS_IsUp() returns true on
+--- 1. Fail-safe returns: isDown() returns false and isUp() returns true on
 ---    any error, matching the port contract error_behavior ("absent key = up").
 --- 2. Defensive pcall: hs.eventtap calls are wrapped to prevent propagation.
 --- ==============================================================================
@@ -32,7 +32,7 @@ local LOG = "adapters.key_state"
 --- Returns true when the key is physically held down.
 --- @param key_name string Platform key identifier (e.g. "shift", "ctrl", "cmd").
 --- @return boolean
-function M.KS_IsDown(key_name)
+function M.isDown(key_name)
 	local ok, result = pcall(function()
 		local flags = hs.eventtap and hs.eventtap.checkKeyboardModifiers
 			and hs.eventtap.checkKeyboardModifiers()
@@ -42,7 +42,7 @@ function M.KS_IsDown(key_name)
 		return false
 	end)
 	if not ok then
-		Logger.error(LOG, "KS_IsDown(): error checking %q — %s", tostring(key_name), tostring(result))
+		Logger.error(LOG, "isDown(): error checking %q — %s", tostring(key_name), tostring(result))
 		return false
 	end
 	return result == true
@@ -51,8 +51,8 @@ end
 --- Returns true when the key is not physically held down.
 --- @param key_name string Platform key identifier.
 --- @return boolean
-function M.KS_IsUp(key_name)
-	return not M.KS_IsDown(key_name)
+function M.isUp(key_name)
+	return not M.isDown(key_name)
 end
 
 return M
