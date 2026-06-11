@@ -644,9 +644,43 @@ _TooltipRevealSurfaces() {
 }
 
 ; PREPARE + REVEAL for a built stack. Pos = { X, Y }, Row = { Gui, W, H }.
+; Shift an anchor so the W×H tooltip stays inside the work area of the monitor
+; under it (fall back to the primary monitor, then the full virtual screen). Without
+; this a wide tooltip anchored near the bottom-right caret overflows the screen and
+; is clipped — the truncation reported for long predictions in a corner.
+_TooltipClampToScreen(X, Y, W, H) {
+    L := 0, T := 0, R := A_ScreenWidth, B := A_ScreenHeight
+    try {
+        found := false
+        Loop MonitorGetCount() {
+            MonitorGet(A_Index, &ml, &mt, &mr, &mb)
+            if (X >= ml and X < mr and Y >= mt and Y < mb) {
+                MonitorGetWorkArea(A_Index, &L, &T, &R, &B)
+                found := true
+                break
+            }
+        }
+        if !found
+            MonitorGetWorkArea(MonitorGetPrimary(), &L, &T, &R, &B)
+    }
+    ; Pull back inside the right / bottom edge first, then never past the left / top.
+    if (X + W > R)
+        X := R - W
+    if (X < L)
+        X := L
+    if (Y + H > B)
+        Y := B - H
+    if (Y < T)
+        Y := T
+    return { X: X, Y: Y }
+}
+
 _TooltipPresentStack(Pos, Row, ArmSafety := true) {
     global _TooltipShownHwnds, _TOOLTIP_HWND_TRACK_CAP, _TOOLTIP_SAFETY_SEC
     global _TooltipLastPos
+    ; Keep the whole tooltip on-screen — a wide prediction near the bottom-right
+    ; corner would otherwise overflow and be clipped.
+    Pos := _TooltipClampToScreen(Pos.X, Pos.Y, Row.W, Row.H)
     _TooltipLastPos := Pos
 
     ; PREPARE — hidden at final coordinates (Hwnd valid, nothing painted yet).
