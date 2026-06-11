@@ -125,9 +125,17 @@ local _llm_health_status = nil
 --- @param backend string "mlx" or "ollama".
 --- @param refresh_fn function Called with no args after the result is stored.
 local function probe_llm_health(backend, refresh_fn)
-	local url = (backend == "ollama")
-		and "http://127.0.0.1:11434/api/version"
-		or  "http://127.0.0.1:8080/v1/models"
+	local url
+	if backend == "ollama" then
+		url = "http://127.0.0.1:11434/api/version"
+	else
+		-- Resolve the MLX base URL from api_mlx so the health probe follows the
+		-- configured port (shared JSON / user override), never a hardcoded 8080.
+		local ok_api, ApiMlx = pcall(require, "modules.llm.api_mlx")
+		local base = (ok_api and type(ApiMlx.get_base_url) == "function" and ApiMlx.get_base_url())
+			or "http://127.0.0.1:3746"
+		url = base .. "/v1/models"
+	end
 
 	hs.http.asyncGet(url, {}, function(status)
 		-- Any HTTP response (even 4xx) means the server is reachable

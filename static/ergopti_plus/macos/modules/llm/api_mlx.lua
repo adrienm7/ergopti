@@ -36,34 +36,66 @@ local WARMUP_POST_TIMEOUT_SEC    = 30   -- Unblock _warmup_in_flight if the sing
 -- MLX server bind address — single source of truth in shared/llm/mlx_server.json
 -- so the port is never hardcoded across api_mlx, the models_manager_mlx launcher,
 -- and the init.lua boot cleanup. Loaded once at module load; every consumer reads
--- the resolved value via M.get_port() / M.get_host() / M.get_base_url(). Falls back
--- to 127.0.0.1:8080 (mlx_lm.server's default) when the file is unreadable (stripped
--- builds, headless tests). Declared this early so kill_zombie_on_port_* and the
--- endpoint constants below can both reference MLX_PORT.
+-- the resolved value via M.get_port() / M.get_host() / M.get_base_url(). The
+-- launcher passes this exact port to `mlx_lm server --port`, so the server and all
+-- clients always agree. Resolution order: (1) per-user override from the LLM menu
+-- (hs.settings key MLX_PORT_SETTING_KEY), (2) the shared JSON default, (3) the
+-- hardcoded MLX_DEFAULT_PORT fallback for stripped builds / headless tests where
+-- neither hs.configdir nor the JSON is reachable. Declared this early so
+-- kill_zombie_on_mlx_port and the endpoint constants below can both reference MLX_PORT.
 local MLX_DEFAULT_HOST = "127.0.0.1"
-local MLX_DEFAULT_PORT = 8080
+-- Dedicated, uncommon default — NOT mlx_lm.server's own 8080 (too commonly taken by
+-- other local dev/LLM servers). 3746 = "ERGO" on a phone keypad, in the registered
+-- range so the kernel never assigns it as an ephemeral port. See mlx_server.json.
+local MLX_DEFAULT_PORT = 3746
+
+-- hs.settings key holding the user's port override (set from the LLM menu). Lets a
+-- user whose chosen port collides with another local server move Ergopti's MLX
+-- server without editing any file. A valid override wins over the shared JSON.
+local MLX_PORT_SETTING_KEY = "ergopti.llm.mlx_port"
+
+-- Acceptable port bounds — reject nonsense overrides (privileged ports below 1024
+-- need root; anything above 65535 is not a valid TCP port).
+local MLX_PORT_MIN = 1024
+local MLX_PORT_MAX = 65535
+
+--- Reads a valid user port override from hs.settings, or nil when none is set.
+--- @return integer|nil
+local function read_user_port_override()
+	if type(hs) ~= "table" or type(hs.settings) ~= "table" then return nil end
+	local ok, v = pcall(hs.settings.get, MLX_PORT_SETTING_KEY)
+	if not ok then return nil end
+	v = tonumber(v)
+	if type(v) ~= "number" or v < MLX_PORT_MIN or v > MLX_PORT_MAX then return nil end
+	return math.floor(v)
+end
 
 local function load_mlx_server_config()
 	local host, port = MLX_DEFAULT_HOST, MLX_DEFAULT_PORT
+	-- 1) Shared JSON default (the value shipped with the repo).
 	local cfgdir = (type(hs) == "table" and hs.configdir) or nil
-	if not cfgdir then return host, port end
-	local candidates = {
-		cfgdir .. "/../shared/llm/mlx_server.json",
-		cfgdir .. "/../../static/ergopti_plus/shared/llm/mlx_server.json",
-	}
-	for _, p in ipairs(candidates) do
-		local fh = io.open(p, "r")
-		if fh then
-			local raw = fh:read("*a")
-			fh:close()
-			local ok, parsed = pcall(hs.json.decode, raw)
-			if ok and type(parsed) == "table" then
-				if type(parsed.host) == "string" and parsed.host ~= "" then host = parsed.host end
-				if type(parsed.port) == "number" and parsed.port > 0 then port = math.floor(parsed.port) end
-				return host, port
+	if cfgdir then
+		local candidates = {
+			cfgdir .. "/../shared/llm/mlx_server.json",
+			cfgdir .. "/../../static/ergopti_plus/shared/llm/mlx_server.json",
+		}
+		for _, p in ipairs(candidates) do
+			local fh = io.open(p, "r")
+			if fh then
+				local raw = fh:read("*a")
+				fh:close()
+				local ok, parsed = pcall(hs.json.decode, raw)
+				if ok and type(parsed) == "table" then
+					if type(parsed.host) == "string" and parsed.host ~= "" then host = parsed.host end
+					if type(parsed.port) == "number" and parsed.port > 0 then port = math.floor(parsed.port) end
+					break
+				end
 			end
 		end
 	end
+	-- 2) Per-user menu override wins over the shared default.
+	local override = read_user_port_override()
+	if override then port = override end
 	return host, port
 end
 
@@ -534,14 +566,53 @@ function M.is_ready()
 	return _is_ready
 end
 
---- @return integer The MLX server port (from shared/llm/mlx_server.json, default 8080).
+--- @return integer The MLX server port (override > shared JSON > dedicated default 3746).
 function M.get_port() return MLX_PORT end
 
 --- @return string The MLX server host (loopback).
 function M.get_host() return MLX_HOST end
 
---- @return string The MLX server base URL, e.g. "http://127.0.0.1:8080".
+--- @return string The MLX server base URL, e.g. "http://127.0.0.1:3746".
 function M.get_base_url() return MLX_BASE_URL end
+
+--- @return integer, integer The accepted port bounds [min, max] for the user override.
+function M.get_port_bounds() return MLX_PORT_MIN, MLX_PORT_MAX end
+
+--- @return integer The dedicated default port shipped with the repo (no override applied).
+function M.get_default_port() return MLX_DEFAULT_PORT end
+
+--- Changes the MLX server port at runtime and persists it as the per-user override.
+--- Rebuilds the base URL and cached endpoint routes, and resets endpoint discovery so
+--- the next warmup re-probes the server on the new port. The caller (LLM menu) is
+--- responsible for relaunching the server on the new port — this only updates the
+--- address api_mlx talks to; it does NOT move an already-running server.
+--- @param port integer The new port; must be within [MLX_PORT_MIN, MLX_PORT_MAX].
+--- @return boolean ok True when the port was accepted and applied.
+function M.set_port(port)
+	port = tonumber(port)
+	if type(port) ~= "number" or port < MLX_PORT_MIN or port > MLX_PORT_MAX then
+		Logger.error(LOG, "set_port: '%s' is out of range [%d, %d] — ignored.",
+			tostring(port), MLX_PORT_MIN, MLX_PORT_MAX)
+		return false
+	end
+	port = math.floor(port)
+	if port == MLX_PORT then
+		Logger.debug(LOG, "set_port: already on %d — no change.", port)
+		return true
+	end
+	-- Persist so the new port survives a Hammerspoon reload. read_user_port_override()
+	-- picks it up at the next module load; this in-memory update covers the live session.
+	if type(hs) == "table" and type(hs.settings) == "table" then
+		pcall(hs.settings.set, MLX_PORT_SETTING_KEY, port)
+	end
+	MLX_PORT             = port
+	MLX_BASE_URL         = string.format("http://%s:%d", MLX_HOST, MLX_PORT)
+	_completions_endpoint = MLX_BASE_URL .. "/v1/completions"
+	_chat_endpoint        = MLX_BASE_URL .. "/v1/chat/completions"
+	Logger.info(LOG, "MLX server port set to %d (base URL %s).", MLX_PORT, MLX_BASE_URL)
+	M.reset_endpoints()
+	return true
+end
 
 --- Records the full HuggingFace repository path (e.g.
 --- "mlx-community/Meta-Llama-3.1-8B-Instruct-4bit") used to launch the server.
