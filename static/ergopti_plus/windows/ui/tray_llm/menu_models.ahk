@@ -11,9 +11,11 @@
 ; FEATURES & RATIONALE:
 ; 1. Catalogue-first: when models.json provides Ollama-installable entries,
 ;    they take precedence over the locally-installed Ollama tags fallback.
-; 2. Health-aware placeholder: when Ollama is unreachable, the picker shows
-;    only the current selection + "+ Add" / "Browse" so the menu opens
-;    instantly without blocking on /api/tags.
+; 2. Always-full catalogue: the curated list (from the static models.json) is
+;    shown in full whether or not the feature is enabled or Ollama is reachable,
+;    mirroring Hammerspoon — selecting a model while off just records the choice.
+;    Only the green "installed" dot needs Ollama, so its probe is skipped (rows
+;    render dot-less) until the daemon is ready, keeping the menu non-blocking.
 ; 3. Per-iteration closure factories: the for-loop captures via ``_LLM_Tray_Make*``
 ;    factories rather than ``captured := value`` because AHK v2 closure scopes
 ;    are per-call, not per-iteration.
@@ -106,19 +108,16 @@ LLM_Tray_BuildModelMenu() {
 	m := Menu()
 	active := _LLM_Tray["model"]
 
-	; Early-exit path: backend disabled or Ollama daemon not reachable. The
-	; lightweight placeholder UX keeps the menu opening instantly without
-	; blocking on a /api/tags probe, while still exposing the "+ Add" and
-	; "Browse" actions for the user to bootstrap.
-	if !_LLM_Tray["enabled"] || !LLM_Deps_IsReady() {
-		placeholder := (active != "") ? active : t("menu.llm.no_model")
-		m.Add(placeholder, (*) => 0)
-		m.Check(placeholder)
-		m.Add()
-		RegisterMenuItem(m, t("menu.llm.add_model_entry"),     (*) => LLM_Tray_PromptAddModel())
-		RegisterMenuItem(m, t("menu.llm.browse_models_entry"), (*) => LLM_ModelBrowser_Show())
-		return m
-	}
+	; The curated catalogue is STATIC (parsed from the shared models.json), so it
+	; is listed in FULL regardless of whether the LLM feature is enabled or the
+	; Ollama daemon is reachable — exactly like the Hammerspoon driver, whose model
+	; submenu is gated only by "paused", never by the enabled flag. Picking a model
+	; while the feature is off simply records the choice; predictions resume once
+	; the user re-enables. Only the green "installed" dot needs Ollama, so the
+	; per-row install probe is skipped (rows render dot-less, with a "Download"
+	; action) until the daemon is confirmed ready — that keeps the menu instant and
+	; never blocks on a /api/tags round-trip while the feature is intentionally off.
+	deps_ready := LLM_Deps_IsReady()
 
 	; "Aucun modèle (Désactivé)" — first row of the HS menu.
 	no_label := t("menu.llm.no_model")
@@ -143,14 +142,16 @@ LLM_Tray_BuildModelMenu() {
 	; rendered as separators inside the provider submenu (matches HS's
 	; ``models_manager`` behaviour: no per-family sub-sub-menu).
 	presets := LLM_GetModelPresets()
-	presets_used := _LLM_Tray_AppendCatalogue(m, presets, active)
+	presets_used := _LLM_Tray_AppendCatalogue(m, presets, active, deps_ready)
 
 	; Catalogue fallback: when models.json fails to load OR no entry in the
 	; catalogue advertises an Ollama URL (e.g. an MLX-only catalogue), fall
 	; back to the locally-installed Ollama tag list so the user is never
-	; left without a picker.
+	; left without a picker. Probe ``ollama list`` only when the daemon is
+	; confirmed ready — otherwise the blocking GET /api/tags would freeze the
+	; menu while the feature is off (Ollama is usually not running then).
 	if (!presets_used) {
-		installed := LLM_OllamaListModels()
+		installed := deps_ready ? LLM_OllamaListModels() : []
 		if (installed.Length == 0) {
 			no_models_label := t("menu.llm.no_model")
 			m.Add(no_models_label, (*) => 0)
@@ -181,12 +182,15 @@ LLM_Tray_BuildModelMenu() {
  * Kept as a free helper rather than nested inside ``BuildModelMenu`` so the
  * provider loop reads top-to-bottom without three layers of indentation.
  *
- * @param {Menu}   m       - Target model menu being assembled.
- * @param {Array}  presets - Provider list from ``LLM_GetModelPresets``.
- * @param {string} active  - Currently selected model name (for the checkmark).
+ * @param {Menu}    m          - Target model menu being assembled.
+ * @param {Array}   presets    - Provider list from ``LLM_GetModelPresets``.
+ * @param {string}  active     - Currently selected model name (for the checkmark).
+ * @param {Boolean} deps_ready - True when the Ollama daemon is confirmed reachable;
+ *                               when false the per-row install probe is skipped so
+ *                               the menu never blocks while the feature is off.
  * @returns {Boolean} True when the catalogue produced at least one entry.
  */
-_LLM_Tray_AppendCatalogue(m, presets, active) {
+_LLM_Tray_AppendCatalogue(m, presets, active, deps_ready := true) {
 	global JSON_NULL
 	if (Type(presets) != "Array" or presets.Length == 0)
 		return false
@@ -237,8 +241,8 @@ _LLM_Tray_AppendCatalogue(m, presets, active) {
 					provider_menu.Add()
 				}
 
-				rich_title := _LLM_Tray_BuildModelRowTitle(name, active)
-				model_menu := _LLM_Tray_BuildPerModelSubmenu(name, model, ollama_url, active)
+				rich_title := _LLM_Tray_BuildModelRowTitle(name, active, deps_ready)
+				model_menu := _LLM_Tray_BuildPerModelSubmenu(name, model, ollama_url, active, deps_ready)
 				provider_menu.Add(rich_title, model_menu)
 				if (name == active)
 					provider_menu.Check(rich_title)
@@ -264,14 +268,15 @@ _LLM_Tray_AppendCatalogue(m, presets, active) {
  * installed, then the display name, then the type tag, then the parameter
  * count and approximate RAM footprint between parentheses.
  *
- * @param {string} name   - Model display name from the catalogue.
- * @param {string} active - Currently active model (kept for parity; the
- *                          green check is applied by the caller via .Check()).
+ * @param {string}  name       - Model display name from the catalogue.
+ * @param {string}  active     - Currently active model (kept for parity; the
+ *                               green check is applied by the caller via .Check()).
+ * @param {Boolean} deps_ready - When false the install probe is skipped (no dot).
  * @returns {string} Formatted row label.
  */
-_LLM_Tray_BuildModelRowTitle(name, active) {
+_LLM_Tray_BuildModelRowTitle(name, active, deps_ready := true) {
 	info := LLM_GetModelInfo(name)
-	installed := LLM_IsModelInstalled(name)
+	installed := deps_ready ? LLM_IsModelInstalled(name) : false
 	status := installed ? "🟢 " : ""
 	type_str := (info.Has("type") and info["type"] == "completion")
 		? " [📝 Complétion]"
@@ -294,13 +299,15 @@ _LLM_Tray_BuildModelRowTitle(name, active) {
  * All info rows are added as disabled items so the user cannot accidentally
  * trigger a no-op click on a spec line.
  *
- * @param {string} name       - Model display name.
- * @param {Map}    model      - Raw catalogue record (from models.json).
- * @param {string} ollama_url - Resolved Ollama URL (already verified non-empty).
- * @param {string} active     - Currently selected model name.
+ * @param {string}  name       - Model display name.
+ * @param {Map}     model      - Raw catalogue record (from models.json).
+ * @param {string}  ollama_url - Resolved Ollama URL (already verified non-empty).
+ * @param {string}  active     - Currently selected model name.
+ * @param {Boolean} deps_ready - When false the install probe is skipped: every
+ *                               model offers "Download" since nothing is confirmed.
  * @returns {Menu} The per-model submenu.
  */
-_LLM_Tray_BuildPerModelSubmenu(name, model, ollama_url, active) {
+_LLM_Tray_BuildPerModelSubmenu(name, model, ollama_url, active, deps_ready := true) {
 	global JSON_NULL
 	sub := Menu()
 
@@ -309,7 +316,7 @@ _LLM_Tray_BuildPerModelSubmenu(name, model, ollama_url, active) {
 	if (name == active)
 		sub.Check(select_label)
 
-	if LLM_IsModelInstalled(name) {
+	if (deps_ready and LLM_IsModelInstalled(name)) {
 		del_label := t("menu.llm.delete_model_cache")
 		RegisterMenuItem(sub, del_label, _LLM_Tray_MakeDeleteCacheHandler(name))
 	} else {
