@@ -31,16 +31,16 @@ if not ok_dw then download_window = nil end
 
 -- Required to inform the discovery poller of the active server PID so it can
 -- exclude it from zombie kills; safe to require here because api_mlx holds no
--- circular dependency on this file.
-local ok_api_mlx, ApiMlx = pcall(require, "modules.llm.api_mlx")
-if not ok_api_mlx then ApiMlx = nil end
+-- circular dependency on this file. A plain require (not pcall) because api_mlx is
+-- the MLX backend's core module — if it cannot load, MLX predictions are dead
+-- anyway, so failing fast is correct (and lets MLX_PORT come straight from it).
+local ApiMlx = require("modules.llm.api_mlx")
 
 -- Single source of truth for the MLX server port: api_mlx, backed by the per-user
--- override and shared/llm/mlx_server.json. Resolved once so the launcher, the
--- pre-launch sweep, and the cross-session adoption probe never hardcode it. Falls
--- back to 3460 (Ergopti's dedicated default) when api_mlx is unavailable (stripped
--- builds, tests).
-local MLX_PORT = (ApiMlx and type(ApiMlx.get_port) == "function" and ApiMlx.get_port()) or 3460
+-- override and shared/llm/mlx_server.json. Resolved from the getter — the port
+-- literal lives ONLY in api_mlx (MLX_DEFAULT_PORT) / mlx_server.json, never here.
+-- Re-resolved at launch time in start_server in case the user changed it via the menu.
+local MLX_PORT = ApiMlx.get_port()
 
 local HF_TOKEN_FILE = (os.getenv("HOME") or "") .. "/.huggingface/token"
 
