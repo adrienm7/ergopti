@@ -148,14 +148,26 @@ _MMP_JitterDoesNotDismiss() {
 }
 Test("pointer-threshold: small jitter does not dismiss", _MMP_JitterDoesNotDismiss)
 
-_MMP_DeliberateMoveDismisses() {
-	; Reaching to click elsewhere crosses far more than the threshold on either axis.
-	AssertTrue(_LLM_PointerMovedEnough(560, 400, 500, 400),
-		"a 60 px horizontal move is deliberate and must dismiss")
-	AssertTrue(_LLM_PointerMovedEnough(500, 480, 500, 400),
-		"an 80 px vertical move is deliberate and must dismiss")
+_MMP_HandLiftDoesNotDismiss() {
+	; Logged in the wild: lifting a hand off the mouse lurched it dx=12 dy=48 and
+	; dismissed an idle prediction the user was reading. A settle of a few dozen px
+	; must NOT count — it is "rien touché" from the user's point of view.
+	AssertFalse(_LLM_PointerMovedEnough(512, 448, 500, 400),
+		"a ~50 px hand-lift settle must not dismiss the prediction")
+	AssertFalse(_LLM_PointerMovedEnough(500, 480, 500, 400),
+		"an 80 px settle must not dismiss either")
 }
-Test("pointer-threshold: a deliberate move dismisses", _MMP_DeliberateMoveDismisses)
+Test("pointer-threshold: a hand lifting off the mouse does not dismiss", _MMP_HandLiftDoesNotDismiss)
+
+_MMP_DeliberateMoveDismisses() {
+	; Relocating the cursor to click/use something else crosses the screen — far past
+	; the threshold on either axis.
+	AssertTrue(_LLM_PointerMovedEnough(720, 400, 500, 400),
+		"a 220 px horizontal relocation is deliberate and must dismiss")
+	AssertTrue(_LLM_PointerMovedEnough(500, 650, 500, 400),
+		"a 250 px vertical relocation is deliberate and must dismiss")
+}
+Test("pointer-threshold: a deliberate relocation dismisses", _MMP_DeliberateMoveDismisses)
 
 _MMP_ThresholdBoundary() {
 	global _LLM_POINTER_MOVE_THRESHOLD_PX

@@ -48,13 +48,16 @@ global _LLM_PointerWatch_LastY     := unset
 global _LLM_PointerWatch_MoveFn    := unset
 global _LLM_PointerWatch_ActivityFn := unset
 global _LLM_POINTER_POLL_MS        := 50
-; Minimum cursor travel (px, per axis) before pointer movement counts as a
-; DELIBERATE dismiss rather than optical-sensor jitter or a hand merely resting on
-; the mouse. Without it a still Windows mouse's 1-2 px noise dismisses a shown
-; prediction "on its own" while the user sits still — the "arrêté, rien touché"
-; bug. macOS never saw this: a trackpad emits no events when untouched. A real
-; move to click elsewhere crosses far more than this, so click-to-dismiss is intact.
-global _LLM_POINTER_MOVE_THRESHOLD_PX := 10
+; Cursor travel (px, per axis) FROM THE ORIGIN where the prediction appeared,
+; before pointer movement counts as a DELIBERATE dismiss. It must clear two kinds
+; of incidental motion that the user considers "rien touché": optical-sensor
+; jitter / slow drift (1-3 px), AND the ~30-50 px lurch the mouse makes when a
+; hand lifts off it and it settles. A real relocation to click/use something else
+; crosses far more (200+ px across the screen), and a click dismisses regardless.
+; Measured against a FIXED origin (total displacement), not per tick, so a slow
+; deliberate move still accumulates past it; drift cannot reach it within the
+; prediction's ~20 s lifetime. Tunable — raise it if a mouse lurches further.
+global _LLM_POINTER_MOVE_THRESHOLD_PX := 100
 ; Mirrors macOS llm_bridge.lua HOTSTRING_CHAIN_OFFSET_SEC — prediction fires
 ; just after the hotstring tooltip would normally close.
 global _LLM_HOTSTRING_CHAIN_OFFSET_SEC := 0.05
@@ -451,24 +454,21 @@ _LLM_PointerWatch_OnMoveTick(*) {
 		return
 	}
 	MouseGetPos(&x, &y)
-	; First tick past the window: seed the previous-sample position, never dismiss.
+	; First tick past the window: capture the ORIGIN once and never dismiss on it.
 	if !IsSet(_LLM_PointerWatch_LastX) {
 		_LLM_PointerWatch_LastX := x
 		_LLM_PointerWatch_LastY := y
 		return
 	}
-	; Compare against the PREVIOUS sample (50 ms ago), i.e. cursor VELOCITY, not
-	; cumulative displacement. A deliberate move covers far more than the threshold
-	; in one tick; optical-sensor jitter AND slow drift stay a pixel or two per tick
-	; and so never dismiss — even sustained drift cannot accumulate across ticks,
-	; which a fixed origin would have let through. This is the "arrêté, rien touché"
-	; fix: a hand off the mouse keeps the prediction up until a real, brisk move.
-	moved := _LLM_PointerMovedEnough(x, y, _LLM_PointerWatch_LastX, _LLM_PointerWatch_LastY)
+	; Measure TOTAL displacement from that fixed origin and dismiss only once it
+	; clears the threshold — a deliberate relocation of the cursor. The origin is
+	; never reassigned, so a hand lifting off the mouse (a ~50 px settle) and any
+	; jitter/drift stay below it and keep the prediction up; only travelling well
+	; away from where the prediction appeared counts as "the user moved on". This is
+	; the "arrêté, rien touché" fix. A click still dismisses via its own hotkeys.
 	dx := Abs(x - _LLM_PointerWatch_LastX)
 	dy := Abs(y - _LLM_PointerWatch_LastY)
-	_LLM_PointerWatch_LastX := x
-	_LLM_PointerWatch_LastY := y
-	if moved
+	if _LLM_PointerMovedEnough(x, y, _LLM_PointerWatch_LastX, _LLM_PointerWatch_LastY)
 		LLM_Bridge_OnPointerActivity("move dx=" . dx . " dy=" . dy)
 }
 
