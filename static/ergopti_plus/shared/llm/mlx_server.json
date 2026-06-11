@@ -1,0 +1,5 @@
+{
+	"_comment": "Single source of truth for the local MLX inference server's bind address. mlx_lm.server is launched with no --port flag and therefore binds this port by default. The macOS Hammerspoon driver (modules/llm/api_mlx.lua) loads this file once at boot and every other consumer (models_manager_mlx launcher/sweep, the init.lua boot cleanup) reads the resolved value from api_mlx rather than hardcoding it. Change the port here to move the server everywhere in lockstep. Host stays on loopback for security; only the port is meaningfully tunable.",
+	"host": "127.0.0.1",
+	"port": 8080
+}

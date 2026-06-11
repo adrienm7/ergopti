@@ -33,6 +33,42 @@ local STREAM_CONNECT_TIMEOUT_SEC = 5    -- Fail fast if the MLX server does not 
 local STREAM_HARD_TIMEOUT_SEC    = 90   -- Kill the task if the server accepts but never sends a token; large models need up to 60 s to load weights
 local WARMUP_POST_TIMEOUT_SEC    = 30   -- Unblock _warmup_in_flight if the single-token POST never returns
 
+-- MLX server bind address — single source of truth in shared/llm/mlx_server.json
+-- so the port is never hardcoded across api_mlx, the models_manager_mlx launcher,
+-- and the init.lua boot cleanup. Loaded once at module load; every consumer reads
+-- the resolved value via M.get_port() / M.get_host() / M.get_base_url(). Falls back
+-- to 127.0.0.1:8080 (mlx_lm.server's default) when the file is unreadable (stripped
+-- builds, headless tests). Declared this early so kill_zombie_on_port_* and the
+-- endpoint constants below can both reference MLX_PORT.
+local MLX_DEFAULT_HOST = "127.0.0.1"
+local MLX_DEFAULT_PORT = 8080
+
+local function load_mlx_server_config()
+	local host, port = MLX_DEFAULT_HOST, MLX_DEFAULT_PORT
+	local cfgdir = (type(hs) == "table" and hs.configdir) or nil
+	if not cfgdir then return host, port end
+	local candidates = {
+		cfgdir .. "/../shared/llm/mlx_server.json",
+		cfgdir .. "/../../static/ergopti_plus/shared/llm/mlx_server.json",
+	}
+	for _, p in ipairs(candidates) do
+		local fh = io.open(p, "r")
+		if fh then
+			local raw = fh:read("*a")
+			fh:close()
+			local ok, parsed = pcall(hs.json.decode, raw)
+			if ok and type(parsed) == "table" then
+				if type(parsed.host) == "string" and parsed.host ~= "" then host = parsed.host end
+				if type(parsed.port) == "number" and parsed.port > 0 then port = math.floor(parsed.port) end
+				return host, port
+			end
+		end
+	end
+	return host, port
+end
+
+local MLX_HOST, MLX_PORT = load_mlx_server_config()
+
 -- Minimum interval between zombie-kill attempts during discovery. Without this
 -- guard, every 1-second poll tick would fire a separate lsof+kill task, creating
 -- a cascade of overlapping processes while the kernel is still processing the
@@ -47,10 +83,10 @@ local _last_zombie_kill_at  = 0    -- epoch time of the most-recent kill attempt
 -- SO_REUSEPORT means lsof -ti TCP:8080 only returns the bash wrapper PID (it holds
 -- the FIFO), not the Python child that actually answers HTTP — yet both must survive.
 local _active_server_pgid   = nil
--- Forward declaration: kill_zombie_on_port_8080 is defined below but called from
+-- Forward declaration: kill_zombie_on_mlx_port is defined below but called from
 -- set_active_server_pgid, which is declared before it. Lua locals are only visible after
 -- their declaration point; the forward reference here lets the upvalue resolve correctly.
-local kill_zombie_on_port_8080
+local kill_zombie_on_mlx_port
 
 -- True from the moment a new server launch begins (reset_endpoints called) until the
 -- bash script reports "[MLX] Server started with PID X PGID Y" and set_active_server_pgid
@@ -103,7 +139,7 @@ function M.set_active_server_pgid(pgid)
 	-- never arrive if the zombie answered first and discovery already resolved).
 	-- Reset the cooldown so this first post-PGID kill is never skipped by the interval guard.
 	_last_zombie_kill_at = 0
-	kill_zombie_on_port_8080()
+	kill_zombie_on_mlx_port()
 end
 
 --- Asynchronously kills all mlx_lm Python processes whose PGID differs from the
@@ -113,7 +149,7 @@ end
 --- is critical: the bash wrapper's argv contains the literal script text including
 --- "python -m mlx_lm", so a pgrep -f 'python.*mlx_lm' would also match the wrapper.
 --- Restricting $2 ~ /^[Pp]ython/ guarantees only real python processes qualify.
-kill_zombie_on_port_8080 = function()
+kill_zombie_on_mlx_port = function()
 	-- A new server was launched but its PGID is not yet known. Any unguarded kill
 	-- would hit the new Python process (already alive, PGID unknown) and crash it
 	-- before it can serve a single request. Block all zombie kills in this window;
@@ -158,7 +194,7 @@ kill_zombie_on_port_8080 = function()
 	-- For each candidate PID, compare its PGID against the active server's PGID;
 	-- kill -9 only if PGID differs. This preserves the legitimate server.
 	local cmd = "PIDS_AWK=$(ps -axo pid=,comm=,args= | awk '$2 ~ /^[Pp]ython/ && /mlx_lm/ {print $1}'); " ..
-		"PIDS_PORT=$(lsof -ti TCP:8080 2>/dev/null); " ..
+		"PIDS_PORT=$(lsof -ti TCP:" .. MLX_PORT .. " 2>/dev/null); " ..
 		"PIDS=$(printf '%s\\n%s\\n' \"$PIDS_AWK\" \"$PIDS_PORT\" | sort -u | grep -v '^$'); " ..
 		"[ -z \"$PIDS\" ] && echo 'none' && exit 0; " ..
 		"ZOMBIES=$(echo \"$PIDS\" | while read P; do " ..
@@ -204,7 +240,9 @@ local _warmup_timeout    = nil   -- hard-timeout timer; cleared on callback or c
 -- Initial values are the OpenAI-standard paths used by the long-stable
 -- mlx-lm 0.18→0.21 series; discover_endpoints overrides them at runtime
 -- whenever a probe finds a different working route.
-local MLX_BASE_URL          = "http://127.0.0.1:8080"
+-- Derived from MLX_HOST/MLX_PORT (loaded at the top of this file from
+-- shared/llm/mlx_server.json). discover_endpoints overrides the routes at runtime.
+local MLX_BASE_URL          = string.format("http://%s:%d", MLX_HOST, MLX_PORT)
 local _completions_endpoint = MLX_BASE_URL .. "/v1/completions"
 local _chat_endpoint        = MLX_BASE_URL .. "/v1/chat/completions"
 local _endpoints_discovered = false
@@ -496,6 +534,15 @@ function M.is_ready()
 	return _is_ready
 end
 
+--- @return integer The MLX server port (from shared/llm/mlx_server.json, default 8080).
+function M.get_port() return MLX_PORT end
+
+--- @return string The MLX server host (loopback).
+function M.get_host() return MLX_HOST end
+
+--- @return string The MLX server base URL, e.g. "http://127.0.0.1:8080".
+function M.get_base_url() return MLX_BASE_URL end
+
 --- Records the full HuggingFace repository path (e.g.
 --- "mlx-community/Meta-Llama-3.1-8B-Instruct-4bit") used to launch the server.
 --- Called by models_manager_mlx immediately after reset_endpoints() so the
@@ -742,7 +789,7 @@ end
 --- @param on_missing function Callback if server fails to answer.
 function M.check_availability(model_name, on_available, on_missing)
 	Logger.debug(LOG, "Checking MLX server availability…")
-	HttpClient.get("http://127.0.0.1:8080/v1/models", {}, function(r)
+	HttpClient.get(MLX_BASE_URL .. "/v1/models", {}, function(r)
 		if r.status == 200 then
 			Logger.info(LOG, "MLX server is available.")
 			if type(on_available) == "function" then pcall(on_available) end

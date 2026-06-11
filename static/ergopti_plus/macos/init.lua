@@ -217,32 +217,43 @@ Logger.debug(LOG, "Starting shortcuts module…")
 shortcuts.start()
 Logger.info(LOG, "Main modules initialized successfully.")
 
--- Hammerspoon does not always reap children on quit/reload (a SIGKILL on
--- the parent leaves orphans bound to port 49317), so a fresh boot can find
--- multiple zombie mlx_lm.server processes from previous sessions still
--- listening on the same port. The kernel then load-balances /v1/models
--- requests between them with SO_REUSEPORT, returning a different model ID
--- each time and breaking endpoint discovery permanently. Nuke them ALL
--- before any LLM code touches port 49317. Synchronous on purpose: we want
--- the port free before the warmup retry loop fires its first probe.
+-- Hammerspoon does not always reap children on quit/reload, so a fresh boot can
+-- find leftover mlx_lm.server processes from previous sessions. When SEVERAL still
+-- listen on the same port, the kernel load-balances /v1/models between them via
+-- SO_REUSEPORT, returns a different model ID each call, and breaks endpoint
+-- discovery permanently — those MUST be nuked. But a SINGLE healthy survivor is
+-- gold: its weights are already resident in GPU memory, so sparing it lets
+-- start_server's cross-session adoption reuse it and the backend is ready in
+-- seconds instead of a 45-90 s cold reload. Killing it unconditionally (the old
+-- behaviour) is exactly what made every boot/reload pay a cold start.
+--
+-- The MLX port is the single source of truth from api_mlx (shared/llm/mlx_server.json).
+-- Decision is spare-all-or-nuke-all: under SO_REUSEPORT the listening PID is
+-- unreliable to single out (bash wrapper vs Python child — see api_mlx.lua), so we
+-- never pick individual PIDs. Synchronous on purpose: the port state must settle
+-- before the warmup retry loop fires its first probe.
 do
+	local ok_mlx, ApiMlx = pcall(require, "modules.llm.api_mlx")
+	local P = tostring((ok_mlx and type(ApiMlx.get_port) == "function" and ApiMlx.get_port()) or 8080)
 	local kill_cmd =
-		-- Kill ALL mlx_lm processes regardless of port (catches old spawns
-		-- on legacy ports 8080 and 8765 that previous sessions left behind).
-		"PIDS=$(pgrep -f 'mlx_lm' 2>/dev/null); " ..
-		"if [ -n \"$PIDS\" ]; then echo \"[BOOT] killing leftover mlx_lm processes: $PIDS\"; echo \"$PIDS\" | xargs kill -9 2>/dev/null; fi; " ..
-		-- Kill anything still bound to the legacy ports + new port (paranoia).
-		"for P in 8080 8765 49317; do " ..
-		"  PIDS=$(lsof -tiTCP:$P -sTCP:LISTEN 2>/dev/null); " ..
-		"  if [ -n \"$PIDS\" ]; then echo \"[BOOT] port $P listeners: $PIDS — leaving alone (might be LM Studio etc.)\"; fi; " ..
-		"done; " ..
-		"sleep 0.3; " ..
-		-- Diagnostic: dump current state of port 49317 so we know if anything
-		-- foreign is squatting it BEFORE we try to spawn.
-		"echo \"[BOOT-DIAG] port 49317 current state:\"; lsof -i :49317 -P -n 2>/dev/null || echo \"  (port 49317 is FREE)\"; " ..
-		"echo \"[BOOT-DIAG] any python on box:\"; pgrep -af python 2>/dev/null | head -10 || echo \"  (none)\""
+		-- Count distinct LISTEN sockets on the MLX port. -sTCP:LISTEN enumerates
+		-- each SO_REUSEPORT socket separately, so this is the reliable "how many
+		-- servers are bound" signal (a bare lsof would also count transient
+		-- ESTABLISHED connections and the probe below).
+		"LISTEN_PIDS=$(lsof -nP -iTCP:" .. P .. " -sTCP:LISTEN -t 2>/dev/null | sort -u); " ..
+		"NLISTEN=$(printf '%s\\n' \"$LISTEN_PIDS\" | grep -c .); " ..
+		-- Probe /v1/models on a fresh connection (no keep-alive to a dead socket)
+		-- and extract the served model id.
+		"MODEL_ID=$(curl -s --max-time 1 --no-keepalive -H 'Connection: close' http://127.0.0.1:" .. P .. "/v1/models 2>/dev/null | sed -n 's/.*\"id\"[[:space:]]*:[[:space:]]*\"\\([^\"]*\\)\".*/\\1/p' | head -1); " ..
+		"if [ \"$NLISTEN\" = \"1\" ] && [ -n \"$MODEL_ID\" ]; then " ..
+		"  echo \"[BOOT] single healthy MLX server on :" .. P .. " (pid $LISTEN_PIDS) serving '$MODEL_ID' — sparing it so start_server can adopt it (no cold restart).\"; " ..
+		"else " ..
+		"  PIDS=$(pgrep -f 'mlx_lm' 2>/dev/null); " ..
+		"  if [ -n \"$PIDS\" ]; then echo \"[BOOT] no single healthy server on :" .. P .. " (listeners=$NLISTEN, model_id='$MODEL_ID') — nuking leftover mlx_lm: $PIDS\"; echo \"$PIDS\" | xargs kill -9 2>/dev/null; sleep 0.3; else echo \"[BOOT] no mlx_lm processes and no server on :" .. P .. " — clean slate.\"; fi; " ..
+		"fi; " ..
+		"echo \"[BOOT-DIAG] port " .. P .. " state:\"; lsof -nP -iTCP:" .. P .. " 2>/dev/null || echo \"  (port " .. P .. " is FREE)\""
 	local out, ok = hs.execute(kill_cmd, true)
-	Logger.info(LOG, "[BOOT-NUKE] mlx_lm cleanup ok=%s output=%s",
+	Logger.info(LOG, "[BOOT-NUKE] mlx_lm selective cleanup ok=%s output=%s",
 		tostring(ok), (out or ""):gsub("\n", " | "))
 end
 

@@ -35,6 +35,12 @@ if not ok_dw then download_window = nil end
 local ok_api_mlx, ApiMlx = pcall(require, "modules.llm.api_mlx")
 if not ok_api_mlx then ApiMlx = nil end
 
+-- Single source of truth for the MLX server port: api_mlx, backed by
+-- shared/llm/mlx_server.json. Resolved once so the launcher, the pre-launch sweep,
+-- and the cross-session adoption probe never hardcode it. Falls back to 8080
+-- (mlx_lm.server's default) when api_mlx is unavailable (stripped builds, tests).
+local MLX_PORT = (ApiMlx and type(ApiMlx.get_port) == "function" and ApiMlx.get_port()) or 8080
+
 local HF_TOKEN_FILE = (os.getenv("HOME") or "") .. "/.huggingface/token"
 
 
@@ -523,10 +529,10 @@ PY
 		if not (deps.active_tasks and deps.active_tasks["mlx_server"]) then
 			local ok_probe, body = pcall(hs.execute,
 				"/usr/bin/curl --silent --max-time 1 --no-keepalive " ..
-				"-H 'Connection: close' http://127.0.0.1:8080/v1/models")
+				"-H 'Connection: close' http://127.0.0.1:" .. MLX_PORT .. "/v1/models")
 			if ok_probe and probe_matches_target(body) then
-				Logger.info(LOG, "Adopting MLX server from a previous session (already serving '%s' on :8080) — skipping cold restart.",
-					tostring(target_model))
+				Logger.info(LOG, "Adopting MLX server from a previous session (already serving '%s' on :%d) — skipping cold restart.",
+					tostring(target_model), MLX_PORT)
 				obj._server_target = target_model
 				if type(ApiMlx) == "table" and type(ApiMlx.reset_endpoints) == "function" then
 					ApiMlx.reset_endpoints()
@@ -550,13 +556,13 @@ PY
 		do
 			local sweep_cmd =
 				"PIDS=$(ps -axo pid=,comm=,args= | awk '$2 ~ /^[Pp]ython/ && /mlx_lm/ {print $1}'); " ..
-				"PORT_PIDS=$(lsof -ti TCP:8080 2>/dev/null); " ..
+				"PORT_PIDS=$(lsof -ti TCP:" .. MLX_PORT .. " 2>/dev/null); " ..
 				"ALL=\"$PIDS $PORT_PIDS\"; " ..
 				"[ -n \"$(echo $ALL | tr -d ' ')\" ] && echo \"$ALL\" | tr ' ' '\\n' | sort -u | xargs kill -9 2>/dev/null; " ..
 				"rm -f /tmp/mlx_server.pid /tmp/mlx_server.pgid; " ..
 				"echo done"
 			local sweep = hs.task.new("/bin/bash", function(_c, stdout, _e)
-				Logger.debug(LOG, "Pre-launch port-8080 sweep done: %s", tostring(stdout):gsub("\n", " "))
+				Logger.debug(LOG, "Pre-launch port-%d sweep done: %s", MLX_PORT, tostring(stdout):gsub("\n", " "))
 			end, {"-c", sweep_cmd})
 			pcall(function() sweep:start() end)
 		end
@@ -624,7 +630,7 @@ PY
 				end, {
 					"--silent", "--max-time", "5", "--no-keepalive",
 					"-H", "Connection: close",
-					"http://127.0.0.1:8080/v1/models",
+					"http://127.0.0.1:" .. MLX_PORT .. "/v1/models",
 				})
 				pcall(function() probe_task:start() end)
 			end
@@ -732,16 +738,16 @@ PY
 				"sleep 3; " ..
 				"LSOF_ATTEMPTS=0; " ..
 				"while true; do " ..
-				"STALE_PIDS=$(lsof -ti TCP:8080 2>/dev/null || true); " ..
+				"STALE_PIDS=$(lsof -ti TCP:" .. MLX_PORT .. " 2>/dev/null || true); " ..
 				"if [ -z \"$STALE_PIDS\" ]; then " ..
-				"echo \"[MLX] Port 8080 free — starting server.\"; " ..
+				"echo \"[MLX] Port " .. MLX_PORT .. " free — starting server.\"; " ..
 				"break; " ..
 				"fi; " ..
 				"LSOF_ATTEMPTS=$((LSOF_ATTEMPTS + 1)); " ..
-				"echo \"[MLX] Port 8080 still occupied attempt $LSOF_ATTEMPTS (PIDs: $STALE_PIDS) — killing…\"; " ..
+				"echo \"[MLX] Port " .. MLX_PORT .. " still occupied attempt $LSOF_ATTEMPTS (PIDs: $STALE_PIDS) — killing…\"; " ..
 				"echo \"$STALE_PIDS\" | xargs kill -9 2>/dev/null || true; " ..
 				"if [ \"$LSOF_ATTEMPTS\" -ge 10 ]; then " ..
-				"echo \"[MLX] ❌ Port 8080 still occupied after 10 attempts — giving up.\"; " ..
+				"echo \"[MLX] ❌ Port " .. MLX_PORT .. " still occupied after 10 attempts — giving up.\"; " ..
 				"exit 1; " ..
 				"fi; " ..
 				"sleep 0.5; " ..
