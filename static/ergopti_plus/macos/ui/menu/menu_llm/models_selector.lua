@@ -593,15 +593,29 @@ function M.build(ctx)
 
 	local function open_model_browser()
 		Logger.info(LOG, "Model browser: open requested (backend=%s).", tostring(active_backend))
-		-- Defer to the next runloop tick so the menubar menu fully closes first: an
-		-- hs.chooser shown synchronously from inside the still-open menu callback can
+		-- Defer to the next runloop tick so the menubar menu fully closes first: a
+		-- window shown synchronously from inside the still-open menu callback can
 		-- silently fail to appear. pcall surfaces any error to the log instead of
-		-- letting the menubar callback swallow it — which is what made "Parcourir
-		-- tous les modèles" do nothing despite firing.
+		-- letting the menubar callback swallow it.
 		hs.timer.doAfter(0, function()
-			local ok, err = pcall(present_model_chooser)
-			if not ok then
-				Logger.error(LOG, "Model browser: failed to present — %s", tostring(err))
+			-- Prefer the shared web table (sortable, filterable, cross-platform);
+			-- fall back to the legacy hs.chooser list when hs.webview is absent
+			-- (headless / stripped builds) so the entry never silently no-ops.
+			local ok_mb, ModelBrowser = pcall(require, "ui.model_browser")
+			if ok_mb and type(hs.webview) == "table" then
+				local ok, err = pcall(ModelBrowser.open, {
+					presets        = presets,
+					active_backend = active_backend,
+					active_model   = state.llm_model,
+					models_mgr     = models_mgr,
+					on_select      = function(name) switch_model(name) end,
+				})
+				if ok then return end
+				Logger.error(LOG, "Model browser (web) failed — falling back to chooser: %s", tostring(err))
+			end
+			local ok2, err2 = pcall(present_model_chooser)
+			if not ok2 then
+				Logger.error(LOG, "Model browser: failed to present — %s", tostring(err2))
 			end
 		end)
 	end
