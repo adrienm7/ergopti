@@ -456,10 +456,9 @@ TooltipHide(DbgTag := "?", Force := false) {
     ; (deliberate LLM_TooltipHide), etc. This is the primary lens for the
     ; "prediction vanished the instant it appeared" class of bug.
     global _LLM_Tooltip_Visible, _LLM_Tooltip_Loading, _LLM_Tooltip_ShownAt
-    if (IsSet(_LLM_Tooltip_Visible) and (_LLM_Tooltip_Visible or _LLM_Tooltip_Loading))
-        try LoggerDebug("LLM.tt", "HIDE tag={1} force={2} (was visible={3} loading={4}).",
-            DbgTag, (Force ? "true" : "false"),
-            (_LLM_Tooltip_Visible ? "true" : "false"), (_LLM_Tooltip_Loading ? "true" : "false"))
+    _llm_on_screen  := IsSet(_LLM_Tooltip_Visible) and (_LLM_Tooltip_Visible or _LLM_Tooltip_Loading)
+    _llm_was_visible := IsSet(_LLM_Tooltip_Visible) and _LLM_Tooltip_Visible
+    _llm_was_loading := IsSet(_LLM_Tooltip_Loading) and _LLM_Tooltip_Loading
     ; Surface ownership: while a REAL prediction occupies the shared surface, the
     ; hotstring autocomplete lifecycle must never tear it down — not its buffer
     ; resets (ResetBuf), lookup misses (LookupNoMatch/LookupLen0), nor a new lookup
@@ -470,17 +469,29 @@ TooltipHide(DbgTag := "?", Force := false) {
     ; accept/dismiss ("LLM"), the prediction's own auto-hide timer ("TimerFn"), and
     ; driver suspension ("Suspend"). A real keystroke / pointer move dismisses via
     ; LLM_TooltipHide, i.e. tag "LLM", so user dismissal is unaffected.
-    if (DbgTag != "LLM" and DbgTag != "Suspend" and DbgTag != "TimerFn" and LLM_TooltipOwnsSurface())
+    if (DbgTag != "LLM" and DbgTag != "Suspend" and DbgTag != "TimerFn" and LLM_TooltipOwnsSurface()) {
+        ; Diagnostic: the prediction is PROTECTED — it stays on screen. An idle
+        ; prediction should emit KEPT for every background hotstring reset and never
+        ; a HIDE, so this line is the lens for "did it stay or vanish?".
+        if _llm_on_screen
+            try LoggerDebug("LLM.tt", "KEPT: hide tag={1} ignored — a prediction owns the surface.", DbgTag)
         return
+    }
     ; A "TimerFn"/"Suspend" hide tears the surface down without routing through
     ; LLM_TooltipHide (which is what normally clears ownership). Clear the flags here
     ; so a later hotstring preview is not blocked forever by a stale "visible" flag.
-    if ((DbgTag == "TimerFn" or DbgTag == "Suspend")
-            and IsSet(_LLM_Tooltip_Visible) and _LLM_Tooltip_Visible) {
+    if ((DbgTag == "TimerFn" or DbgTag == "Suspend") and _llm_was_visible) {
         _LLM_Tooltip_Visible := false
         _LLM_Tooltip_Loading := false
         _LLM_Tooltip_ShownAt := 0
     }
+    ; This hide actually proceeds (it passed the ownership guard) — record WHO tore
+    ; the surface down. For a shown prediction the only expected tags here are
+    ; "LLM" (user keystroke / pointer / accept), "TimerFn" (auto-hide), "Suspend".
+    if _llm_on_screen
+        try LoggerDebug("LLM.tt", "HIDE tag={1} force={2} (was visible={3} loading={4}).",
+            DbgTag, (Force ? "true" : "false"),
+            (_llm_was_visible ? "true" : "false"), (_llm_was_loading ? "true" : "false"))
     ; During an active dequeue cycle the poll timer owns the tooltip lifecycle.
     ; External callers (prefix watcher resets, lookup misses) must not interrupt
     ; it — they would hide the post-expansion rows before their time.
