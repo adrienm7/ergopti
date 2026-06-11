@@ -242,3 +242,43 @@ helpers.describe("Profiles.resolve_system_prompt", function()
 		helpers.assert_true(type(prompt) == "string" and prompt ~= "")
 	end)
 end)
+
+
+
+
+
+-- =================================================
+--- =================================================
+--- ======= 5/ word-bound single-source guard =======
+--- =================================================
+-- =================================================
+
+helpers.describe("Profiles._resolve_word_bounds (single source, no divergent fallback)", function()
+	local function no_setting() return nil end
+
+	helpers.it("reads min/max from DEFAULT_STATE (the canonical source)", function()
+		local min_w, max_w = Profiles._resolve_word_bounds(
+			{ llm_min_words = 3, llm_max_words = 15 }, no_setting)
+		helpers.assert_eq(min_w, 3)
+		helpers.assert_eq(max_w, 15)
+	end)
+
+	helpers.it("a live user setting overrides the canonical default", function()
+		local get = function(k) return (k == "llm_min_words") and "5" or nil end
+		local min_w, max_w = Profiles._resolve_word_bounds(
+			{ llm_min_words = 3, llm_max_words = 15 }, get)
+		helpers.assert_eq(min_w, 5)
+		helpers.assert_eq(max_w, 15)
+	end)
+
+	-- Regression: when DEFAULT_STATE is missing the keys (e.g. the LLM module
+	-- failed to load defaults.json), the resolver MUST NOT invent the old
+	-- divergent literals 4/20 — it returns nil and logs an error (fail loud).
+	helpers.it("never substitutes the divergent 4/20 literals when DEFAULT_STATE is empty", function()
+		local min_w, max_w = Profiles._resolve_word_bounds({}, no_setting)
+		helpers.assert_true(min_w ~= 4, "min_w must not be the old hardcoded 4")
+		helpers.assert_true(max_w ~= 20, "max_w must not be the old hardcoded 20")
+		helpers.assert_nil(min_w, "min_w should be nil when no canonical source is available")
+		helpers.assert_nil(max_w, "max_w should be nil when no canonical source is available")
+	end)
+end)
