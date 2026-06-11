@@ -254,8 +254,16 @@ LLM_Bridge_OnChar(ch) {
 	; Only hide OUR tooltip — never dismiss a hotstring overlay.
 	; Silent=true so no llm_dismissed event is emitted for a stale hide.
 	if LLM_Tooltip_IsVisible() {
-		try LoggerDebug("LLM.tt", "DISMISS: keystroke '{1}' typed while a prediction was shown.", ch)
-		LLM_Tooltip_Hide(true)
+		; Minimum-display window: a keystroke that was already in flight when the
+		; slow model finally answered must not kill the prediction before the user
+		; can perceive it. The buffer still advances below; only the dismiss is
+		; deferred. Once the window elapses, typing dismisses as usual.
+		if (IsSet(LLM_Tooltip_InGracePeriod) && LLM_Tooltip_InGracePeriod()) {
+			try LoggerDebug("LLM.tt", "KEEP: keystroke '{1}' ignored — prediction still in min-display window.", ch)
+		} else {
+			try LoggerDebug("LLM.tt", "DISMISS: keystroke '{1}' typed while a prediction was shown.", ch)
+			LLM_Tooltip_Hide(true)
+		}
 	}
 	global _LLM_Bridge_LastLogTick
 	now := A_TickCount
@@ -357,6 +365,10 @@ LLM_Bridge_ResetPredictions() {
 LLM_Bridge_OnPointerActivity(*) {
 	if !_LLM_Bridge_PredictionShown()
 		return
+	; Minimum-display window: ignore stray pointer drift in the first moments after
+	; the prediction renders so it cannot vanish before the user perceives it.
+	if (IsSet(LLM_Tooltip_InGracePeriod) && LLM_Tooltip_InGracePeriod())
+		return
 	try LoggerDebug("LLM.tt", "DISMISS: pointer activity over a shown prediction.")
 	LLM_Bridge_ResetPredictions()
 }
@@ -406,6 +418,14 @@ _LLM_PointerWatch_OnMoveTick(*) {
 	; that happened while a slow model was generating would be measured against a
 	; stale origin and dismiss the suggestion the instant it appears.
 	if !_LLM_Bridge_PredictionShown() {
+		_LLM_PointerWatch_LastX := unset
+		_LLM_PointerWatch_LastY := unset
+		return
+	}
+	; During the minimum-display window, ignore pointer drift entirely and keep the
+	; baseline fresh, so motion that happened while the prediction was settling in
+	; cannot dismiss it the instant the window opens.
+	if (IsSet(LLM_Tooltip_InGracePeriod) && LLM_Tooltip_InGracePeriod()) {
 		_LLM_PointerWatch_LastX := unset
 		_LLM_PointerWatch_LastY := unset
 		return

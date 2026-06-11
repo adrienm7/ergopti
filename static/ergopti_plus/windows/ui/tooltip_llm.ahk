@@ -152,6 +152,19 @@ LLM_Tooltip_IsLoading() {
 }
 
 /**
+ * True while a real prediction is still inside its minimum-display window — the
+ * brief span after it renders during which incidental input (an in-flight
+ * keystroke, stray pointer drift, the shared hotstring surface resetting) must
+ * not dismiss it. The bridge dismiss paths consult this for parity with the
+ * macOS prediction, which lives on its own surface and is never clobbered by the
+ * hotstring lifecycle.
+ * @returns {boolean}
+ */
+LLM_Tooltip_InGracePeriod() {
+	return LLM_TooltipInGracePeriod()
+}
+
+/**
  * Accepts the active prediction when the tooltip is showing. Used by the
  * physical Tab hotkey, tap-hold keys remapped to Tab (e.g. AltGr tap), and
  * synthetic Tab events from the prefix watcher.
