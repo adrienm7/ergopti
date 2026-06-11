@@ -126,6 +126,34 @@ Test("grace predicate: a hidden tooltip opens no window",
 
 
 
+; ===== 1.6) Surface ownership is time-independent (whole display) =====
+
+; Mirror of LLM_TooltipOwnsSurface(): a real prediction owns the shared surface
+; for its WHOLE display - no time component, unlike the grace window. This is what
+; stops a background hotstring buffer reset from blanking a prediction the user is
+; calmly reading long after it appeared ("arrete, rien touche").
+_SimulateOwnsSurface(visible, loading) {
+	if (!visible)
+		return false
+	if (loading)
+		return false
+	return true
+}
+
+_TestGrace_OwnsSurfaceWholeDisplay() {
+	Assert(_SimulateOwnsSurface(true, false),
+		"a visible, non-loading prediction owns the surface regardless of elapsed time")
+	Assert(!_SimulateOwnsSurface(true, true),
+		"the loading spinner does not own the surface")
+	Assert(!_SimulateOwnsSurface(false, false),
+		"nothing visible owns nothing")
+}
+Test("ownership predicate: a real prediction owns the surface for the whole display",
+	_TestGrace_OwnsSurfaceWholeDisplay)
+
+
+
+
 
 ; ============================================================
 ; ============================================================
@@ -135,24 +163,26 @@ Test("grace predicate: a hidden tooltip opens no window",
 
 _TestGrace_TooltipCentralGuard() {
 	Body := FileRead(A_ScriptDir . "\..\lib\tooltip.ahk", "UTF-8")
-	; Incidental hides are ignored while a prediction is in its window; the two
-	; authoritative bypass tags (deliberate LLM hide + driver suspend) pass.
-	Assert(InStr(Body, 'DbgTag != "LLM" and DbgTag != "Suspend" and LLM_TooltipInGracePeriod()') > 0,
-		"TooltipHide must ignore incidental hides while a prediction is in its min-display window")
+	; While a real prediction owns the surface, the hotstring lifecycle cannot tear
+	; it down - for the WHOLE display. Only authoritative hides pass: LLM (user
+	; dismiss/accept), TimerFn (auto-hide), Suspend.
+	Assert(InStr(Body, 'DbgTag != "LLM" and DbgTag != "Suspend" and DbgTag != "TimerFn" and LLM_TooltipOwnsSurface()') > 0,
+		"TooltipHide must ignore hotstring-lifecycle hides while a real prediction owns the surface")
 	; The window opens the instant a real prediction renders.
 	Assert(InStr(Body, "_LLM_Tooltip_ShownAt := A_TickCount") > 0,
-		"LLM_TooltipShow must stamp the show time so the window can start")
-	; The predicate the guard depends on must exist.
+		"LLM_TooltipShow must stamp the show time so the grace window can start")
+	; Both predicates must exist: ownership (whole display) + grace (min display).
+	Assert(InStr(Body, "LLM_TooltipOwnsSurface() {") > 0,
+		"the LLM_TooltipOwnsSurface predicate must be defined")
 	Assert(InStr(Body, "LLM_TooltipInGracePeriod() {") > 0,
 		"the LLM_TooltipInGracePeriod predicate must be defined")
-	; TooltipShow must ALSO bail during the window. Blocking the NewShow hide is
-	; not enough: TooltipShow rebuilds the shared Gui regardless, clobbering the
-	; prediction with a hotstring preview lookup. This standalone guard ("if " with
-	; no DbgTag prefix, unlike the TooltipHide one) lives only in TooltipShow.
-	Assert(InStr(Body, "if LLM_TooltipInGracePeriod()") > 0,
-		"TooltipShow must refuse to rebuild the shared surface while a prediction is in its window")
+	; TooltipShow must ALSO bail while the prediction owns the surface. Blocking the
+	; NewShow hide is not enough: TooltipShow rebuilds the shared Gui regardless,
+	; clobbering the prediction with a hotstring preview lookup.
+	Assert(InStr(Body, "if LLM_TooltipOwnsSurface()") > 0,
+		"TooltipShow must refuse to rebuild the shared surface while a prediction owns it")
 }
-Test("grace contract: TooltipHide + TooltipShow guards + show-time stamp + predicate present",
+Test("grace contract: TooltipHide + TooltipShow guards + ownership/grace predicates present",
 	_TestGrace_TooltipCentralGuard)
 
 
@@ -174,7 +204,7 @@ _TestGrace_BridgeGatesDismiss() {
 		"the bridge dismiss paths must gate on the min-display window")
 	; Pointer movement must dismiss only past a deliberate-move threshold, so a
 	; still mouse's optical jitter cannot blank the prediction "on its own" while
-	; the user sits idle (the "arrêté, rien touché" report).
+	; the user sits idle (the "arrete, rien touche" report).
 	Assert(InStr(Body, "_LLM_POINTER_MOVE_THRESHOLD_PX") > 0,
 		"a pointer movement threshold must exist so jitter does not dismiss")
 	Assert(InStr(Body, "_LLM_PointerMovedEnough(x, y, _LLM_PointerWatch_LastX, _LLM_PointerWatch_LastY)") > 0,

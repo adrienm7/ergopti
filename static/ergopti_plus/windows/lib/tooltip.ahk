@@ -275,17 +275,15 @@ TooltipShow(Items, DurationSec := 0) {
         return
     }
 
-    ; An LLM prediction inside its minimum-display window OWNS the shared surface.
-    ; Refuse any incidental rebuild that would clobber it before the user can see
-    ; it — chiefly the hotstring prefix watcher's per-keystroke preview lookups,
-    ; which fire on the very same keystroke the bridge already chose to KEEP. The
-    ; prediction itself renders through _TooltipBuildGuiLlm (never here), and the
-    ; LLM loading spinner sets _LLM_Tooltip_Loading before calling us — both report
-    ; "not in the window", so neither is blocked. After the window, normal
-    ; precedence resumes and the next lookup paints as usual.
-    ; NOTE: blocking the NewShow hide alone (in TooltipHide) is not enough — this
-    ; function rebuilds the Gui regardless, so the bail must live here.
-    if LLM_TooltipInGracePeriod()
+    ; While a real prediction OWNS the shared surface, refuse any incidental rebuild
+    ; that would clobber it — chiefly the hotstring prefix watcher's per-keystroke
+    ; preview lookups. The prediction itself renders through _TooltipBuildGuiLlm
+    ; (never here), and the LLM loading spinner sets _LLM_Tooltip_Loading before
+    ; calling us, so neither is blocked; only hotstring previews are deferred until
+    ; the prediction is dismissed. NOTE: blocking the NewShow hide alone (in
+    ; TooltipHide) is not enough — this function rebuilds the Gui regardless, so the
+    ; bail must live here too.
+    if LLM_TooltipOwnsSurface()
         return
 
     ; Normalise to an Array of { Text, ColorHex } objects.
@@ -457,19 +455,32 @@ TooltipHide(DbgTag := "?", Force := false) {
     ; NewShow (a fresh TooltipShow superseded it), PollEmpty (dequeue), LLM
     ; (deliberate LLM_TooltipHide), etc. This is the primary lens for the
     ; "prediction vanished the instant it appeared" class of bug.
-    global _LLM_Tooltip_Visible, _LLM_Tooltip_Loading
+    global _LLM_Tooltip_Visible, _LLM_Tooltip_Loading, _LLM_Tooltip_ShownAt
     if (IsSet(_LLM_Tooltip_Visible) and (_LLM_Tooltip_Visible or _LLM_Tooltip_Loading))
         try LoggerDebug("LLM.tt", "HIDE tag={1} force={2} (was visible={3} loading={4}).",
             DbgTag, (Force ? "true" : "false"),
             (_LLM_Tooltip_Visible ? "true" : "false"), (_LLM_Tooltip_Loading ? "true" : "false"))
-    ; LLM prediction minimum-display window: a freshly-rendered prediction must
-    ; survive long enough to be seen. Incidental hides from the SHARED hotstring
-    ; surface — the prefix watcher resetting its buffer (ResetBuf), a lookup miss
-    ; (LookupNoMatch), or a new hotstring lookup superseding it (NewShow) — are
-    ; ignored while the window is open. Deliberate, authoritative hides bypass it:
-    ; explicit LLM accept/dismiss (DbgTag "LLM") and driver suspension ("Suspend").
-    if (DbgTag != "LLM" and DbgTag != "Suspend" and LLM_TooltipInGracePeriod())
+    ; Surface ownership: while a REAL prediction occupies the shared surface, the
+    ; hotstring autocomplete lifecycle must never tear it down — not its buffer
+    ; resets (ResetBuf), lookup misses (LookupNoMatch/LookupLen0), nor a new lookup
+    ; (NewShow). Those fire from the prefix watcher's own timers and per-keystroke
+    ; scans, so without this a background reset blanked a prediction the user was
+    ; calmly reading ("arrêté, rien touché"). This holds for the WHOLE display, not
+    ; just the minimum-display window. Only authoritative hides pass: explicit LLM
+    ; accept/dismiss ("LLM"), the prediction's own auto-hide timer ("TimerFn"), and
+    ; driver suspension ("Suspend"). A real keystroke / pointer move dismisses via
+    ; LLM_TooltipHide, i.e. tag "LLM", so user dismissal is unaffected.
+    if (DbgTag != "LLM" and DbgTag != "Suspend" and DbgTag != "TimerFn" and LLM_TooltipOwnsSurface())
         return
+    ; A "TimerFn"/"Suspend" hide tears the surface down without routing through
+    ; LLM_TooltipHide (which is what normally clears ownership). Clear the flags here
+    ; so a later hotstring preview is not blocked forever by a stale "visible" flag.
+    if ((DbgTag == "TimerFn" or DbgTag == "Suspend")
+            and IsSet(_LLM_Tooltip_Visible) and _LLM_Tooltip_Visible) {
+        _LLM_Tooltip_Visible := false
+        _LLM_Tooltip_Loading := false
+        _LLM_Tooltip_ShownAt := 0
+    }
     ; During an active dequeue cycle the poll timer owns the tooltip lifecycle.
     ; External callers (prefix watcher resets, lookup misses) must not interrupt
     ; it — they would hide the post-expansion rows before their time.
@@ -1467,11 +1478,25 @@ LLM_TooltipIsVisible() {
 	return IsSet(_LLM_Tooltip_Visible) and _LLM_Tooltip_Visible
 }
 
+; True whenever a real prediction occupies the shared surface (NOT the loading
+; spinner), for the WHOLE time it is displayed. While true, the hotstring
+; autocomplete lifecycle (TooltipShow lookups, ResetBuf / LookupNoMatch hides)
+; must leave the surface alone — only the user, the prediction's own auto-hide
+; timer, or suspend may tear it down. Distinct from the grace window, which is the
+; brief minimum-display span the BRIDGE consults to debounce user dismissal.
+LLM_TooltipOwnsSurface() {
+	global _LLM_Tooltip_Visible, _LLM_Tooltip_Loading
+	if (!IsSet(_LLM_Tooltip_Visible) or !_LLM_Tooltip_Visible)
+		return false
+	if (IsSet(_LLM_Tooltip_Loading) and _LLM_Tooltip_Loading)
+		return false
+	return true
+}
+
 ; True while a real prediction is still inside its minimum-display window. The
-; incidental dismiss paths (shared-surface clobber in TooltipHide, the bridge's
-; keystroke / pointer dismissal) consult this so a prediction is never hidden the
-; instant it appears. False during loading and once the window has elapsed, so
-; normal dismiss behaviour resumes afterwards.
+; bridge's keystroke / pointer dismissal consults this so a prediction is never
+; dismissed by the user the instant it appears. False during loading and once the
+; window has elapsed, so normal dismiss behaviour resumes afterwards.
 LLM_TooltipInGracePeriod() {
 	global _LLM_Tooltip_Visible, _LLM_Tooltip_Loading, _LLM_Tooltip_ShownAt, _LLM_TOOLTIP_MIN_DISPLAY_MS
 	if (!IsSet(_LLM_Tooltip_Visible) or !_LLM_Tooltip_Visible)
