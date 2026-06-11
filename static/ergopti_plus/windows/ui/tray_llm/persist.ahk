@@ -82,6 +82,11 @@ _LLM_Tray_SyncToFeatures() {
 _LLM_Tray_AppendPersistedUpdates(Updates) {
 	global _LLM_Tray
 	Updates.Push({ Section: "llm", Key: "trigger_shortcut", Value: _LLM_Tray["trigger_shortcut"] })
+	; Ollama port lives under [llm] as a flat key (like trigger_shortcut) — it is
+	; NOT in the Features schema, so it round-trips via the TOML write here + the
+	; cache read in the saved-opts loader, not via _LLM_Tray_SyncToFeatures.
+	if _LLM_Tray.Has("ollama_port")
+		Updates.Push({ Section: "llm", Key: "ollama_port", Value: _LLM_Tray["ollama_port"] })
 	Updates.Push({ Section: "llm.navigation", Key: "nav_modifiers",
 		Value: _LLM_Tray_ModifiersStringToArray(_LLM_Tray["nav_modifiers"]) })
 	apps := _LLM_Tray.Has("disabled_apps") ? _LLM_Tray["disabled_apps"] : []
@@ -125,6 +130,9 @@ LLM_Tray_BuildSavedOpts(Cache := unset) {
 		raw := IniCacheGet(Cache, "llm", "trigger_shortcut")
 		if (raw != "_")
 			opts["trigger_shortcut"] := String(raw)
+		raw := IniCacheGet(Cache, "llm", "ollama_port")
+		if (raw != "_" and IsInteger(raw))
+			opts["ollama_port"] := Integer(raw)
 		raw := IniCacheGet(Cache, "llm.navigation", "val_modifiers")
 		if (raw != "_") {
 			arr := _LLM_Tray_CoerceIniArray(raw)

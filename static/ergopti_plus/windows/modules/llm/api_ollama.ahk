@@ -35,8 +35,12 @@
 ; =====================================
 ; =====================================
 
-; Default Ollama endpoint
-global LLM_OLLAMA_BASE_URL := "http://localhost:11434"
+; Ollama server port. 11434 is Ollama's own standard; the user can override it
+; from the tray menu (persisted under [llm] ollama_port in config.toml) when they
+; run the daemon on a non-standard port. LLM_OLLAMA_BASE_URL is DERIVED from it so
+; every request below follows the configured port — change it via LLM_Ollama_SetPort.
+global LLM_OLLAMA_PORT     := 11434
+global LLM_OLLAMA_BASE_URL := "http://localhost:" . LLM_OLLAMA_PORT
 ; Weak laptops running qwen3.5:0.8b on CPU can exceed 30 s per token batch.
 ; WinHTTP aborts the whole request when this fires — too low and the tooltip
 ; never appears despite Ollama still computing in the background.
@@ -86,6 +90,26 @@ global LLM_OLLAMA_WARMUP_TIMEOUT := 90000
 ; Warmup poll must outlive cold CPU model loads (3 s was far too short — logs
 ; showed endless "prediction deferred" with no "Model warmed up" line).
 global _LLM_OLLAMA_WARMUP_POLL_MS := 250
+
+/**
+ * Updates the Ollama server port and rebuilds LLM_OLLAMA_BASE_URL so every
+ * subsequent request targets it. Rejects non-integers and out-of-range ports
+ * (privileged < 1024, or > 65535). Called from the tray menu and at boot from
+ * LLM_Tray_Init with the persisted value.
+ * @param {Integer} port - The new Ollama port (1024-65535).
+ * @returns {Boolean} true when applied, false when rejected.
+ */
+LLM_Ollama_SetPort(port) {
+	global LLM_OLLAMA_PORT, LLM_OLLAMA_BASE_URL
+	if !IsInteger(port)
+		return false
+	port := Integer(port)
+	if (port < 1024 || port > 65535)
+		return false
+	LLM_OLLAMA_PORT     := port
+	LLM_OLLAMA_BASE_URL := "http://localhost:" . port
+	return true
+}
 
 
 

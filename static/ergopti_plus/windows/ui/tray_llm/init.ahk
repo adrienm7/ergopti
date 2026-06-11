@@ -47,7 +47,7 @@ LLM_Tray_Init(saved_opts := Map()) {
 	try ProcessSetPriority("Normal")
 
 	static _str_keys := ["model", "profile_id", "language", "temperature", "nav_modifiers", "val_modifiers", "trigger_shortcut", "backend"]
-	static _num_keys := ["n_predictions", "min_words", "max_words", "debounce_ms", "ctx_chars", "pred_indent"]
+	static _num_keys := ["n_predictions", "min_words", "max_words", "debounce_ms", "ctx_chars", "pred_indent", "ollama_port"]
 	static _bool_keys := ["enabled", "instant_on_word_end", "after_hotstring", "reset_on_nav",
 		"disable_url_bars", "disable_password_fields", "show_info_bar", "streaming",
 		"show_all_at_once", "auto_raise_temp", "auto_profile_for_model", "onboarding_seen",
@@ -72,6 +72,11 @@ LLM_Tray_Init(saved_opts := Map()) {
 	; to manifest defaults and clobber a change the user just saved.
 	if IsSet(_LLM_Tray_SyncToFeatures)
 		_LLM_Tray_SyncToFeatures()
+
+	; Apply the persisted Ollama port to the HTTP client BEFORE any request fires
+	; (bootstrap probe, warmup) so every call targets the user's configured port.
+	if IsSet(LLM_Ollama_SetPort) and _LLM_Tray.Has("ollama_port")
+		LLM_Ollama_SetPort(_LLM_Tray["ollama_port"])
 
 	; Auto-correct legacy raw-tag configs (e.g. qwen2.5:3b) before the first
 	; bootstrap / bridge start so predictions do not silently fail.

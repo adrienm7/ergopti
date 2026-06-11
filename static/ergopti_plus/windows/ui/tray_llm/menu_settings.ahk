@@ -410,6 +410,36 @@ LLM_Tray_PromptDebounce() {
 		t("menu.llm.debounce_prompt"), 50, 10000)
 }
 
+; Ollama port has its own prompt (not LLM_Tray_PromptNumeric) because applying it
+; means rebuilding the HTTP client's base URL via LLM_Ollama_SetPort, not feeding
+; the value through LLM_Engine_Init(LLM_Tray_BuildOpts()) — the port is a property
+; of the api_ollama client, not of the engine options.
+LLM_Tray_PromptOllamaPort() {
+	global _LLM_Tray
+	current := _LLM_Tray.Has("ollama_port") ? _LLM_Tray["ollama_port"] : 11434
+	ib := InputBox(t("menu.llm.ollama_port_prompt"), t("menu.llm.ollama_port_title"), "w400 h120", current)
+	if (ib.Result != "OK" || ib.Value == "")
+		return
+	if !IsInteger(ib.Value)
+		return
+	val := Integer(ib.Value)
+	if (val < 1024 || val > 65535)
+		return
+	_LLM_Tray["ollama_port"] := val
+	LLM_Ollama_SetPort(val)
+	LLM_Tray_SaveConfig()
+	LLM_Tray_Build()
+}
+
+; Resets the Ollama port to its shared default and applies it live.
+LLM_Tray_ResetOllamaPort(default_port) {
+	global _LLM_Tray
+	_LLM_Tray["ollama_port"] := default_port
+	LLM_Ollama_SetPort(default_port)
+	LLM_Tray_SaveConfig()
+	LLM_Tray_Build()
+}
+
 LLM_Tray_PromptCtxChars() {
 	LLM_Tray_PromptNumeric("ctx_chars", t("menu.llm.generation_menu_title"),
 		t("menu.llm.context_length_prompt"), 50, 10000)

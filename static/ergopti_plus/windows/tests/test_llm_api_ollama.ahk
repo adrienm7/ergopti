@@ -356,3 +356,49 @@ _OllamaStreamUid_IsNonEmpty() {
 	Assert(StrLen(uid) > 0, "UID must be non-empty")
 }
 Test("_LLM_Ollama_NextStreamUid: returns non-empty string", _OllamaStreamUid_IsNonEmpty)
+
+
+
+
+; =====================================================
+; =====================================================
+; ======= 6/ LLM_Ollama_SetPort =======================
+; =====================================================
+; =====================================================
+
+; Guards the user-configurable Ollama port: LLM_Ollama_SetPort must rebuild
+; LLM_OLLAMA_BASE_URL from the new port (so every request follows it) and reject
+; out-of-range / non-integer input without corrupting the live URL.
+
+_OllamaSetPort_ValidApplies() {
+	global LLM_OLLAMA_BASE_URL
+	ok := LLM_Ollama_SetPort(13434)
+	AssertTrue(ok, "a valid in-range port must be accepted")
+	AssertEqual("http://localhost:13434", LLM_OLLAMA_BASE_URL, "base URL must rebuild from the new port")
+	LLM_Ollama_SetPort(11434)  ; restore the default for downstream tests
+}
+Test("LLM_Ollama_SetPort: valid port applies and rebuilds the base URL", _OllamaSetPort_ValidApplies)
+
+
+_OllamaSetPort_RejectsLow() {
+	global LLM_OLLAMA_BASE_URL
+	LLM_Ollama_SetPort(11434)
+	ok := LLM_Ollama_SetPort(80)
+	AssertFalse(ok, "privileged ports below 1024 must be rejected")
+	AssertEqual("http://localhost:11434", LLM_OLLAMA_BASE_URL, "a rejected port must leave the URL unchanged")
+}
+Test("LLM_Ollama_SetPort: rejects ports below 1024", _OllamaSetPort_RejectsLow)
+
+
+_OllamaSetPort_RejectsHigh() {
+	LLM_Ollama_SetPort(11434)
+	AssertFalse(LLM_Ollama_SetPort(70000), "ports above 65535 must be rejected")
+}
+Test("LLM_Ollama_SetPort: rejects ports above 65535", _OllamaSetPort_RejectsHigh)
+
+
+_OllamaSetPort_RejectsNonInteger() {
+	LLM_Ollama_SetPort(11434)
+	AssertFalse(LLM_Ollama_SetPort("abc"), "non-integer input must be rejected")
+}
+Test("LLM_Ollama_SetPort: rejects non-integer input", _OllamaSetPort_RejectsNonInteger)
