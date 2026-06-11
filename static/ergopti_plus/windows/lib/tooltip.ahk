@@ -1311,9 +1311,6 @@ global _LLM_Tooltip_Loading  := false
 global _LLM_TOOLTIP_MIN_DISPLAY_MS := 600
 ; A_TickCount when the current real prediction was rendered (0 = none / loading).
 global _LLM_Tooltip_ShownAt := 0
-; Hwnds snapshotted at prediction-show time for the +400 ms visibility probe.
-global _LLM_Tooltip_ProbeHwnd := 0
-global _LLM_Tooltip_ProbeBorderHwnd := 0
 ; Footer state — mirrors tooltip_llm.lua info/hint rows.
 global _LLM_Tooltip_ShowInfoBar := false
 global _LLM_Tooltip_InfoModel   := ""
@@ -1403,19 +1400,23 @@ LLM_TooltipShow(payload, active := 1, is_final := false) {
 	}
 
 	LLM_TooltipRefreshChainTiming()
-	; Diagnostic: _TooltipBuildGuiLlm tears the current prediction down at its start,
-	; then builds the new one. If the BUILD throws (before the generation bump and
-	; the present), the prediction window is left destroyed with no SHOW/HIDE and no
-	; generation change — exactly the silent vanish the probe captured. Surface the
-	; exception here, then re-raise to preserve the existing control flow.
+	; _TooltipBuildGuiLlm tears the current prediction down at its start, then builds
+	; the new one. If the BUILD ever throws (a formatting bug, a malformed slot), the
+	; window is left destroyed with no SHOW/HIDE and no generation change — the
+	; prediction silently vanishes (the "clignote et part" display bug, root-caused
+	; to a misplaced StrReplace arg in the footer formatter). Guard it: log the exact
+	; failure and reset to a clean hidden state rather than leaving a ghost "visible"
+	; flag over a destroyed window, so a render error can never blank the surface
+	; without a trace again.
 	try {
 		_TooltipBuildGuiLlm(slots, _LLM_Tooltip_ActiveIdx)
 	} catch as _llm_build_err {
-		try LoggerError("LLM.tt", "BUILD-THROW in _TooltipBuildGuiLlm: {1} | file={2} line={3}.",
+		try LoggerError("LLM.tt", "Prediction render failed — hiding cleanly: {1} | file={2} line={3}.",
 			_llm_build_err.Message,
 			(_llm_build_err.HasOwnProp("File") ? _llm_build_err.File : "?"),
 			(_llm_build_err.HasOwnProp("Line") ? _llm_build_err.Line : "?"))
-		throw _llm_build_err
+		LLM_TooltipHide()
+		return
 	}
 
 	; Arm the LLM-specific auto-hide timer. The duration mirrors the macOS
@@ -1435,52 +1436,6 @@ LLM_TooltipShow(payload, active := 1, is_final := false) {
 	SetTimer(_TooltipTimerFn, -timeout_ms)
 	try LoggerDebug("LLM.tt", "SHOW prediction: {1} slot(s), is_final={2}, auto-hide in {3}ms (gen {4}).",
 		slots.Length, (is_final ? "true" : "false"), timeout_ms, _TooltipGeneration)
-	; Display-bug probe: the state stays "visible" for the full duration, yet the
-	; user reports the prediction window flashes and vanishes (while the loading
-	; spinner — same Gui engine — stays). Snapshot the content + border Hwnds and,
-	; 400 ms later, log whether the OS still considers them visible/topmost and
-	; where they sit. This distinguishes an external hide vs occlusion vs off-screen.
-	global _TooltipGui, _TooltipBorderGui, _LLM_Tooltip_ProbeHwnd, _LLM_Tooltip_ProbeBorderHwnd
-	_LLM_Tooltip_ProbeHwnd := (IsSet(_TooltipGui) and _TooltipGui) ? _TooltipGui.Hwnd : 0
-	_LLM_Tooltip_ProbeBorderHwnd := (IsSet(_TooltipBorderGui) and _TooltipBorderGui) ? _TooltipBorderGui.Hwnd : 0
-	SetTimer(_LLM_TooltipVisibilityProbe, -200)
-}
-
-; One-shot diagnostic armed by LLM_TooltipShow — see the probe comment there.
-; Beyond the window's OS visibility it records WHO still owns the surface so the
-; silent destroyer can be named: if _TooltipGui still points at the same Hwnd yet
-; the window is gone, it was DestroyWindow'd directly (hwnd-cap / teardown sweep);
-; if _TooltipGui changed, a rebuild reassigned it; the dequeue + generation fields
-; reveal whether the poll timer rebuilt it.
-_LLM_TooltipVisibilityProbe() {
-	global _LLM_Tooltip_ProbeHwnd, _LLM_Tooltip_ProbeBorderHwnd, _LLM_Tooltip_Visible
-	global _TooltipGui, _TooltipDequeueItems, _TooltipDequeueActive
-	global _TooltipShownHwnds, _TooltipShownBorderHwnds, _TooltipGeneration, _TooltipTimerGeneration
-	if !_LLM_Tooltip_ProbeHwnd
-		return
-	vis := -1, topmost := "?", rect := "?"
-	try vis := DllCall("User32\IsWindowVisible", "Ptr", _LLM_Tooltip_ProbeHwnd, "Int")
-	try {
-		ex := DllCall("User32\GetWindowLongPtr", "Ptr", _LLM_Tooltip_ProbeHwnd, "Int", -20, "Ptr")
-		topmost := (ex & 0x8) ? "yes" : "no"   ; WS_EX_TOPMOST = 0x00000008
-	}
-	try {
-		r := Buffer(16, 0)
-		if DllCall("User32\GetWindowRect", "Ptr", _LLM_Tooltip_ProbeHwnd, "Ptr", r)
-			rect := Format("({1},{2})-({3},{4})",
-				NumGet(r, 0, "Int"), NumGet(r, 4, "Int"), NumGet(r, 8, "Int"), NumGet(r, 12, "Int"))
-	}
-	cur := "0"
-	try cur := (IsSet(_TooltipGui) and _TooltipGui) ? (_TooltipGui.Hwnd . "") : "0"
-	same := (cur == (_LLM_Tooltip_ProbeHwnd . "")) ? "same" : "CHANGED"
-	dq := (IsSet(_TooltipDequeueItems) and IsObject(_TooltipDequeueItems)) ? "obj" : "0"
-	try LoggerDebug("LLM.tt", "PROBE +200ms: os_visible={1} topmost={2} rect={3} | _TooltipGui={4}({5}) dq={6} dqActive={7} hwnds={8}/{9} gen={10}/{11}.",
-		vis, topmost, rect, cur, same, dq,
-		((IsSet(_TooltipDequeueActive) and _TooltipDequeueActive) ? "1" : "0"),
-		(IsSet(_TooltipShownHwnds) ? _TooltipShownHwnds.Length : -1),
-		(IsSet(_TooltipShownBorderHwnds) ? _TooltipShownBorderHwnds.Length : -1),
-		(IsSet(_TooltipGeneration) ? _TooltipGeneration : -1),
-		(IsSet(_TooltipTimerGeneration) ? _TooltipTimerGeneration : -1))
 }
 
 ; Purple in-flight indicator — macOS ``show_loading`` parity (ai_loading tint).
@@ -1668,10 +1623,14 @@ _LLM_FormatValModifiers(valMods) {
 	if (valMods = "" or valMods = "none")
 		return ""
 	sym := valMods
-	sym := StrReplace(sym, "cmd", "⌘", , true)
-	sym := StrReplace(sym, "ctrl", "⌃", , true)
-	sym := StrReplace(sym, "alt", "⌥", , true)
-	sym := StrReplace(sym, "shift", "⇧", , true)
+	; NOTE: a 4th positional value here lands on StrReplace's &OutputVarCount param,
+	; which must be a VariableRef — passing an Integer (e.g. ``true``) throws
+	; "Parameter #5 of StrReplace requires a variable reference". The replacement is
+	; case-insensitive by default, which also tolerates "Alt"/"ALT" from config.
+	sym := StrReplace(sym, "cmd", "⌘")
+	sym := StrReplace(sym, "ctrl", "⌃")
+	sym := StrReplace(sym, "alt", "⌥")
+	sym := StrReplace(sym, "shift", "⇧")
 	return StrReplace(sym, "+", "")
 }
 
