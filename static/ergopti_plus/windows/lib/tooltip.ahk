@@ -1430,18 +1430,23 @@ LLM_TooltipShow(payload, active := 1, is_final := false) {
 	global _TooltipGui, _TooltipBorderGui, _LLM_Tooltip_ProbeHwnd, _LLM_Tooltip_ProbeBorderHwnd
 	_LLM_Tooltip_ProbeHwnd := (IsSet(_TooltipGui) and _TooltipGui) ? _TooltipGui.Hwnd : 0
 	_LLM_Tooltip_ProbeBorderHwnd := (IsSet(_TooltipBorderGui) and _TooltipBorderGui) ? _TooltipBorderGui.Hwnd : 0
-	SetTimer(_LLM_TooltipVisibilityProbe, -400)
+	SetTimer(_LLM_TooltipVisibilityProbe, -200)
 }
 
 ; One-shot diagnostic armed by LLM_TooltipShow — see the probe comment there.
+; Beyond the window's OS visibility it records WHO still owns the surface so the
+; silent destroyer can be named: if _TooltipGui still points at the same Hwnd yet
+; the window is gone, it was DestroyWindow'd directly (hwnd-cap / teardown sweep);
+; if _TooltipGui changed, a rebuild reassigned it; the dequeue + generation fields
+; reveal whether the poll timer rebuilt it.
 _LLM_TooltipVisibilityProbe() {
 	global _LLM_Tooltip_ProbeHwnd, _LLM_Tooltip_ProbeBorderHwnd, _LLM_Tooltip_Visible
+	global _TooltipGui, _TooltipDequeueItems, _TooltipDequeueActive
+	global _TooltipShownHwnds, _TooltipShownBorderHwnds, _TooltipGeneration, _TooltipTimerGeneration
 	if !_LLM_Tooltip_ProbeHwnd
 		return
-	vis := -1, bvis := -1, topmost := "?", rect := "?"
+	vis := -1, topmost := "?", rect := "?"
 	try vis := DllCall("User32\IsWindowVisible", "Ptr", _LLM_Tooltip_ProbeHwnd, "Int")
-	if _LLM_Tooltip_ProbeBorderHwnd
-		try bvis := DllCall("User32\IsWindowVisible", "Ptr", _LLM_Tooltip_ProbeBorderHwnd, "Int")
 	try {
 		ex := DllCall("User32\GetWindowLongPtr", "Ptr", _LLM_Tooltip_ProbeHwnd, "Int", -20, "Ptr")
 		topmost := (ex & 0x8) ? "yes" : "no"   ; WS_EX_TOPMOST = 0x00000008
@@ -1452,8 +1457,17 @@ _LLM_TooltipVisibilityProbe() {
 			rect := Format("({1},{2})-({3},{4})",
 				NumGet(r, 0, "Int"), NumGet(r, 4, "Int"), NumGet(r, 8, "Int"), NumGet(r, 12, "Int"))
 	}
-	try LoggerDebug("LLM.tt", "PROBE +400ms: state_visible={1} os_content_visible={2} os_border_visible={3} topmost={4} rect={5}.",
-		((IsSet(_LLM_Tooltip_Visible) and _LLM_Tooltip_Visible) ? "true" : "false"), vis, bvis, topmost, rect)
+	cur := "0"
+	try cur := (IsSet(_TooltipGui) and _TooltipGui) ? (_TooltipGui.Hwnd . "") : "0"
+	same := (cur == (_LLM_Tooltip_ProbeHwnd . "")) ? "same" : "CHANGED"
+	dq := (IsSet(_TooltipDequeueItems) and IsObject(_TooltipDequeueItems)) ? "obj" : "0"
+	try LoggerDebug("LLM.tt", "PROBE +200ms: os_visible={1} topmost={2} rect={3} | _TooltipGui={4}({5}) dq={6} dqActive={7} hwnds={8}/{9} gen={10}/{11}.",
+		vis, topmost, rect, cur, same, dq,
+		((IsSet(_TooltipDequeueActive) and _TooltipDequeueActive) ? "1" : "0"),
+		(IsSet(_TooltipShownHwnds) ? _TooltipShownHwnds.Length : -1),
+		(IsSet(_TooltipShownBorderHwnds) ? _TooltipShownBorderHwnds.Length : -1),
+		(IsSet(_TooltipGeneration) ? _TooltipGeneration : -1),
+		(IsSet(_TooltipTimerGeneration) ? _TooltipTimerGeneration : -1))
 }
 
 ; Purple in-flight indicator — macOS ``show_loading`` parity (ai_loading tint).
