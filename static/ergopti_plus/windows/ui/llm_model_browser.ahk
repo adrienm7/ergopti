@@ -178,9 +178,15 @@ _LLM_ModelBrowser_RefreshRows(lv, filter := "") {
 	global _LLM_Tray
 	lv.Delete()
 	index := LLM_GetModelIndex()
+	; The catalogue is static, so every model is listed regardless of state; the
+	; installed badge needs Ollama, so skip its blocking /api/tags scan unless the
+	; daemon is confirmed ready (mirrors the WebView2 path — a down daemon would
+	; otherwise stall the row build while the feature is off).
 	installed := Map()
-	for tag in _LLM_ModelBrowser_GetInstalledTags()
-		installed[StrLower(tag)] := true
+	if (IsSet(LLM_Deps_IsReady) and LLM_Deps_IsReady()) {
+		for tag in _LLM_ModelBrowser_GetInstalledTags()
+			installed[StrLower(tag)] := true
+	}
 	filter_lc := StrLower(filter)
 	; Two-pass population so families end up grouped together — by sorting
 	; on family first, the user can quickly see all Qwen / Gemma / Llama
@@ -421,13 +427,23 @@ _LLM_ModelBrowser_ShowWeb() {
  * Builds the normalised catalogue (name/family/params/RAM/speed/type/installed/url,
  * MoE-aware) from the shared model index and injects it via injectModels(). The
  * Windows backend is always Ollama, so the install flag reads the Ollama tag list.
+ *
+ * The catalogue is STATIC (shared/llm/models.json), so it is ALWAYS injected in
+ * full — whether or not the AI feature is enabled. Only the green "installed" dot
+ * needs Ollama, so its tag scan is skipped unless the daemon is confirmed ready.
+ * This is critical here: InjectCatalogue runs inside the WebView2 WebMessageReceived
+ * (STA COM) callback, and a synchronous /api/tags WinHttp probe against a down
+ * daemon (the usual state when the feature is OFF) stalls that callback so the
+ * injectModels() ExecuteScript never fires — leaving the user with an empty table.
  */
 _LLM_MBW_InjectCatalogue() {
 	global _LLM_Tray
 	index := LLM_GetModelIndex()
 	installed := Map()
-	for tag in _LLM_ModelBrowser_GetInstalledTags()
-		installed[StrLower(tag)] := true
+	if (IsSet(LLM_Deps_IsReady) and LLM_Deps_IsReady()) {
+		for tag in _LLM_ModelBrowser_GetInstalledTags()
+			installed[StrLower(tag)] := true
+	}
 	active := _LLM_Tray.Has("model") ? _LLM_Tray["model"] : ""
 
 	models := "", count := 0

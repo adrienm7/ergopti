@@ -24,12 +24,21 @@ global _I18nLocale := "fr"
 
 ; --- Dependency stubs (must exist at load: AHK resolves calls then) ---
 global _TestIndex := Map()
+; Controls whether the install scan runs. The catalogue must list every model
+; regardless; only the green dot needs Ollama, so the scan is gated on this.
+global _MBW_DepsReady     := true
+global _MBW_OllamaListHits := 0   ; counts the (blocking) /api/tags probe calls
 t(key)                 => key
 LoggerError(args*)     => ""
 LoggerStart(args*)     => ""
 JsonParse(s)           => Map()
 LLM_Tray_SetModel(n)   => ""
-LLM_OllamaListModels() => ["qwen3.5:2b"]
+LLM_Deps_IsReady()     => _MBW_DepsReady
+LLM_OllamaListModels() {
+	global _MBW_OllamaListHits
+	_MBW_OllamaListHits += 1
+	return ["qwen3.5:2b"]
+}
 LLM_GetModelIndex()    => _TestIndex
 LLM_GetModelInfo(n)    => (_TestIndex.Has(n) ? _TestIndex[n] : Map())
 
@@ -86,12 +95,14 @@ Test("LLM_MBW_JsStr: escapes double quotes", _MBJsStr_Escapes)
 ; =========================================================
 
 _MBInject_BuildsCatalogue() {
-	global _TestIndex, _LLM_MBW_Queue, _LLM_MBW_Ready
+	global _TestIndex, _LLM_MBW_Queue, _LLM_MBW_Ready, _MBW_DepsReady
 	; One installed dense model + one MoE model.
 	_TestIndex := Map(
 		"Qwen3.5-2B", Map("params_b", 2.0, "ram_gb", 1.8, "speed_tok_s", 90, "type", "chat", "ollama", "qwen3.5:2b"),
 		"gemma-4-E2B-it", Map("params_b", 5.12, "active_b", 2.0, "ram_gb", 3.3, "speed_tok_s", 40, "type", "chat", "ollama", "gemma:e2b")
 	)
+	; Daemon ready -> the install scan runs and Qwen is flagged installed.
+	_MBW_DepsReady := true
 	; No webview is set, so _LLM_MBW_Eval queues the JS instead of executing it.
 	_LLM_MBW_Ready := false
 	_LLM_MBW_Queue := []
@@ -107,5 +118,31 @@ _MBInject_BuildsCatalogue() {
 	AssertContains(js, "installed:true")    ; Qwen tag qwen3.5:2b is in the installed list
 }
 Test("LLM_MBW_InjectCatalogue: builds the injectModels() payload", _MBInject_BuildsCatalogue)
+
+; Regression: with the feature OFF the Ollama daemon is down, so the install
+; scan must be skipped — otherwise its synchronous /api/tags probe stalls the
+; WebView2 message callback and injectModels() never fires (empty table). The
+; full catalogue must STILL be injected; only the installed dot is dropped.
+_MBInject_DisabledStillListsAllModels() {
+	global _TestIndex, _LLM_MBW_Queue, _LLM_MBW_Ready, _MBW_DepsReady, _MBW_OllamaListHits
+	_TestIndex := Map(
+		"Qwen3.5-2B", Map("params_b", 2.0, "ram_gb", 1.8, "speed_tok_s", 90, "type", "chat", "ollama", "qwen3.5:2b"),
+		"gemma-4-E2B-it", Map("params_b", 5.12, "active_b", 2.0, "ram_gb", 3.3, "speed_tok_s", 40, "type", "chat", "ollama", "gemma:e2b")
+	)
+	_MBW_DepsReady     := false   ; feature disabled / daemon not reachable
+	_MBW_OllamaListHits := 0
+	_LLM_MBW_Ready := false
+	_LLM_MBW_Queue := []
+	_LLM_MBW_InjectCatalogue()
+
+	AssertEqual(1, _LLM_MBW_Queue.Length, "catalogue must still be injected when the daemon is not ready")
+	js := _LLM_MBW_Queue[1]
+	AssertContains(js, '"Qwen3.5-2B"')        ; every model is still listed…
+	AssertContains(js, '"gemma-4-E2B-it"')
+	AssertContains(js, "installed:false")     ; …just without the installed dot
+	Assert(!InStr(js, "installed:true"), "no model may be flagged installed while the daemon is not scanned")
+	AssertEqual(0, _MBW_OllamaListHits, "the blocking /api/tags probe must NOT run when the daemon is not ready")
+}
+Test("LLM_MBW_InjectCatalogue: lists all models without probing when the feature is off", _MBInject_DisabledStillListsAllModels)
 
 RunTests()
