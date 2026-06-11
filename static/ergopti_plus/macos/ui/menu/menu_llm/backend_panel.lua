@@ -149,7 +149,7 @@ function M.build(ctx)
 				-- Hard kill just in case — target the configured MLX port, not a
 				-- hardcoded 8080, so switching backends frees the right socket.
 				local ok_api, ApiMlx = pcall(require, "modules.llm.api_mlx")
-				local mlx_port = (ok_api and type(ApiMlx.get_port) == "function" and ApiMlx.get_port()) or 3746
+				local mlx_port = (ok_api and type(ApiMlx.get_port) == "function" and ApiMlx.get_port()) or 3460
 				os.execute("pids=$(lsof -tiTCP:" .. mlx_port .. " -sTCP:LISTEN 2>/dev/null); [ -n \"$pids\" ] && kill -9 $pids 2>/dev/null")
 				Logger.debug(LOG, "MLX server stopped.")
 
