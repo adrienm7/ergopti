@@ -66,6 +66,49 @@ end)
 
 
 
+
+-- =========================================================
+--- ============================================================
+--- ======= 1b/ DEFAULT_STATE sourced from defaults.json =======
+--- ============================================================
+-- =========================================================
+
+-- Regression: the shared scalar defaults must come from shared/llm/defaults.json
+-- (the single source) and never from a hardcoded base table re-declared in
+-- init.lua. If a divergent hardcoded value is reintroduced, these comparisons
+-- against the JSON fail.
+helpers.describe("Core.DEFAULT_STATE single source (defaults.json)", function()
+	local json = require("json")
+	local path = helpers.driver_root() .. "../shared/llm/defaults.json"
+	local fh   = io.open(path, "r")
+	local shared = fh and json.decode(fh:read("*a")) or nil
+	if fh then fh:close() end
+
+	helpers.it("defaults.json is readable (the required single source)", function()
+		helpers.assert_true(type(shared) == "table", "could not read/parse " .. path)
+	end)
+
+	if type(shared) == "table" then
+		local mirrored = {
+			"llm_temperature", "llm_num_predictions", "llm_context_length",
+			"llm_min_words", "llm_max_words", "llm_pred_indent",
+			"llm_active_profile", "llm_show_info_bar",
+		}
+		for _, k in ipairs(mirrored) do
+			helpers.it(k .. " equals the defaults.json value (not a hardcoded base)", function()
+				helpers.assert_eq(Core.DEFAULT_STATE[k], shared[k])
+			end)
+		end
+
+		helpers.it("llm_debounce derives from defaults.json llm_debounce_ms (ms -> s)", function()
+			helpers.assert_eq(Core.DEFAULT_STATE.llm_debounce, shared.llm_debounce_ms / 1000)
+		end)
+	end
+end)
+
+
+
+
 -- =====================================
 -- =====================================
 -- ======= 2/ Backend Accessors =========

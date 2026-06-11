@@ -30,112 +30,106 @@ M.BUILTIN_PROFILES = Profiles.BUILTIN_PROFILES
 --- =======================================
 -- =======================================
 
---- Loads the cross-platform defaults.json from shared/llm/ and merges its
---- values into the provided base table. Values present in the JSON override the
---- base; missing values keep the base value. HS-specific keys (model names,
---- llm_debounce in seconds) are NOT in the JSON and keep their base values.
---- @param base table Hardcoded fallback defaults to merge into.
---- @return table Merged defaults table.
-local function load_shared_defaults(base)
-	-- Resolve path: hammerspoon/ is two levels above shared/
-	local script_dir = (hs.processInfo and hs.processInfo.bundlePath) or ""
+--- Resolves shared/llm/ relative to THIS source file so the path is
+--- deterministic in production and in headless tests alike — independent of
+--- hs.configdir or the load order of lib.paths (required later in this file).
+local _SELF_DIR = (debug.getinfo(1, "S").source:gsub("^@", "")):gsub("\\", "/"):match("^(.*)/[^/]+$") or "."
+
+--- Shared scalar/boolean defaults: keys that live in shared/llm/defaults.json
+--- under the same name on every driver. Sourced EXCLUSIVELY from the JSON — the
+--- values are never re-declared here (rule 5.2 single source of truth).
+local _SHARED_SCALAR_KEYS = {
+	"llm_enabled", "llm_active_profile", "llm_temperature",
+	"llm_num_predictions", "llm_context_length", "llm_min_words",
+	"llm_max_words", "llm_pred_indent", "llm_show_info_bar",
+	"llm_streaming", "llm_streaming_multi", "llm_instant_on_word_end",
+	"llm_after_hotstring", "llm_reset_on_nav", "llm_auto_raise_temp",
+}
+
+--- HS-only defaults: keys intentionally NOT in the cross-platform defaults.json
+--- (the chosen backend, the per-backend model names, the macOS sequential/arrow
+--- toggles). These are the single source for macOS — not duplicated in the
+--- shared JSON, so there is no cross-driver drift to eliminate here.
+local _HS_ONLY_DEFAULTS = {
+	llm_backend           = "ollama",
+	llm_model_ollama      = "gemma-4-E2B-it",
+	llm_model_mlx         = "Qwen3.5-2B",
+	llm_sequential_mode   = false,
+	llm_arrow_nav_enabled = false,
+}
+
+--- Loads the cross-platform defaults.json and layers its values onto the HS-only
+--- defaults. The JSON is REQUIRED: a missing/unparseable file, or any missing
+--- shared key, is a broken install and fails loudly (rule 5.3/5.4 — no silent
+--- hardcoded fallback for the shared values).
+--- @return table The fully-populated DEFAULT_STATE table.
+local function load_shared_defaults()
+	-- Candidate paths: source-relative first (deterministic, resolves in tests),
+	-- then the installed Hammerspoon layouts. These are PATH candidates only —
+	-- not one of them is a value fallback.
 	local candidates = {
+		_SELF_DIR .. "/../../../shared/llm/defaults.json",
 		(os.getenv("HOME") or "") .. "/Library/Application Support/Hammerspoon/../../../static/ergopti_plus/shared/llm/defaults.json",
-		hs.configdir .. "/../../static/ergopti_plus/shared/llm/defaults.json",
-		hs.configdir .. "/../shared/llm/defaults.json",
+		(hs.configdir or "") .. "/../../static/ergopti_plus/shared/llm/defaults.json",
+		(hs.configdir or "") .. "/../shared/llm/defaults.json",
 	}
 
-	local raw = nil
+	local raw, used = nil, nil
 	for _, p in ipairs(candidates) do
 		local fh = io.open(p, "r")
-		if fh then raw = fh:read("*a"); fh:close(); break end
+		if fh then raw = fh:read("*a"); fh:close(); used = p; break end
 	end
 
 	if not raw or raw == "" then
-		Logger.warn(LOG, "defaults.json not found — using hardcoded defaults.")
-		return base
+		Logger.error(LOG, "shared/llm/defaults.json not found on any candidate path — LLM defaults cannot be initialised.")
+		error("ergopti_plus: shared/llm/defaults.json is required but was not found")
 	end
 
 	local ok, parsed = pcall(hs.json.decode, raw)
 	if not ok or type(parsed) ~= "table" then
-		Logger.warn(LOG, "defaults.json parse failed — using hardcoded defaults.")
-		return base
+		Logger.error(LOG, "shared/llm/defaults.json (%s) could not be parsed — LLM defaults cannot be initialised.", tostring(used))
+		error("ergopti_plus: shared/llm/defaults.json failed to parse")
 	end
 
-	-- Mapping: shared key → HS DEFAULT_STATE key (only keys that exist in both)
-	local mapping = {
-		llm_enabled             = "llm_enabled",
-		llm_active_profile      = "llm_active_profile",
-		llm_temperature         = "llm_temperature",
-		llm_num_predictions     = "llm_num_predictions",
-		llm_context_length      = "llm_context_length",
-		llm_min_words           = "llm_min_words",
-		llm_max_words           = "llm_max_words",
-		llm_pred_indent         = "llm_pred_indent",
-		llm_show_info_bar       = "llm_show_info_bar",
-		llm_streaming           = "llm_streaming",
-		llm_streaming_multi     = "llm_streaming_multi",
-		llm_instant_on_word_end = "llm_instant_on_word_end",
-		llm_after_hotstring     = "llm_after_hotstring",
-		llm_reset_on_nav        = "llm_reset_on_nav",
-		llm_auto_raise_temp     = "llm_auto_raise_temp",
-	}
-
+	-- Start from the HS-only defaults, then layer every shared value on top.
 	local merged = {}
-	for k, v in pairs(base) do merged[k] = v end
+	for k, v in pairs(_HS_ONLY_DEFAULTS) do merged[k] = v end
 
-	for shared_key, hs_key in pairs(mapping) do
-		if parsed[shared_key] ~= nil then
-			merged[hs_key] = parsed[shared_key]
+	local missing = {}
+	for _, key in ipairs(_SHARED_SCALAR_KEYS) do
+		if parsed[key] == nil then
+			missing[#missing + 1] = key
+		else
+			merged[key] = parsed[key]
 		end
 	end
 
-	-- llm_val_modifiers: shared stores ["alt"], HS stores {"alt"}
-	if type(parsed.llm_val_modifiers) == "table" then
-		merged.llm_val_modifiers = parsed.llm_val_modifiers
-	end
-	-- llm_nav_modifiers: shared stores [], HS stores {}
-	if type(parsed.llm_nav_modifiers) == "table" then
-		merged.llm_nav_modifiers = parsed.llm_nav_modifiers
+	-- Modifier arrays: shared stores ["alt"] / [] — copied verbatim.
+	for _, key in ipairs({ "llm_val_modifiers", "llm_nav_modifiers" }) do
+		if type(parsed[key]) ~= "table" then
+			missing[#missing + 1] = key
+		else
+			merged[key] = parsed[key]
+		end
 	end
 
-	-- llm_debounce_ms: shared is in ms (500), HS uses seconds (0.2) — convert
-	if type(parsed.llm_debounce_ms) == "number" then
+	-- llm_debounce: shared stores llm_debounce_ms (ms); macOS uses seconds.
+	if type(parsed.llm_debounce_ms) ~= "number" then
+		missing[#missing + 1] = "llm_debounce_ms"
+	else
 		merged.llm_debounce = parsed.llm_debounce_ms / 1000
 	end
 
-	Logger.done(LOG, "Shared defaults loaded from defaults.json.")
+	if #missing > 0 then
+		Logger.error(LOG, "shared/llm/defaults.json is missing required key(s): %s — LLM defaults incomplete.", table.concat(missing, ", "))
+		error("ergopti_plus: shared/llm/defaults.json is missing required key(s): " .. table.concat(missing, ", "))
+	end
+
+	Logger.done(LOG, "Shared LLM defaults loaded from defaults.json (%s).", tostring(used))
 	return merged
 end
 
--- Hardcoded fallback base — HS-specific keys that are not in defaults.json.
-local _BASE_DEFAULTS = {
-	llm_enabled           = false,
-	llm_backend           = "ollama",
-	llm_model_ollama      = "gemma-4-E2B-it",
-	llm_model_mlx         = "Qwen3.5-2B",
-	llm_debounce          = 0.5,
-	llm_num_predictions   = 3,
-	llm_sequential_mode   = false,
-	llm_context_length    = 500,
-	llm_temperature       = 0.1,
-	llm_min_words         = 3,
-	llm_max_words         = 15,
-	llm_arrow_nav_enabled = false,
-	llm_nav_modifiers     = {},
-	llm_show_info_bar     = true,
-	llm_val_modifiers     = {"alt"},
-	llm_pred_indent       = 0,
-	llm_active_profile    = "basic",
-	llm_reset_on_nav      = true,
-	llm_after_hotstring   = true,
-	llm_auto_raise_temp   = true,
-	llm_streaming             = true,
-	llm_streaming_multi       = true,
-	llm_instant_on_word_end   = true,
-}
-
-M.DEFAULT_STATE = load_shared_defaults(_BASE_DEFAULTS)
+M.DEFAULT_STATE = load_shared_defaults()
 
 -- Single source of truth for the streaming flag; backends receive it as a parameter
 -- on each fetch call so they hold no state of their own for this flag
