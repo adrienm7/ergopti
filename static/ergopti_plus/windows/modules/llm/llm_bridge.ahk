@@ -369,14 +369,18 @@ LLM_Bridge_ResetPredictions() {
  * prediction — never during loading / generation, so the user can move the mouse
  * freely while waiting for a slow model without losing the suggestion.
  */
-LLM_Bridge_OnPointerActivity(*) {
+LLM_Bridge_OnPointerActivity(reason := "?") {
 	if !_LLM_Bridge_PredictionShown()
 		return
 	; Minimum-display window: ignore stray pointer drift in the first moments after
 	; the prediction renders so it cannot vanish before the user perceives it.
 	if (IsSet(LLM_Tooltip_InGracePeriod) && LLM_Tooltip_InGracePeriod())
 		return
-	try LoggerDebug("LLM.tt", "DISMISS: pointer activity over a shown prediction.")
+	; ``reason`` names the exact trigger: a mouse-button / wheel hotkey passes its
+	; own name (e.g. "~LButton"), the move-tick passes "move dx=.. dy=..". This is
+	; the lens for "it vanished while I sat still" — the log says whether it was a
+	; real click, a wheel event, or pointer travel, and by how much.
+	try LoggerDebug("LLM.tt", "DISMISS: pointer activity ({1}) over a shown prediction.", reason)
 	LLM_Bridge_ResetPredictions()
 }
 
@@ -447,18 +451,25 @@ _LLM_PointerWatch_OnMoveTick(*) {
 		return
 	}
 	MouseGetPos(&x, &y)
-	; First tick past the window: capture the FIXED origin and never dismiss on it.
+	; First tick past the window: seed the previous-sample position, never dismiss.
 	if !IsSet(_LLM_PointerWatch_LastX) {
 		_LLM_PointerWatch_LastX := x
 		_LLM_PointerWatch_LastY := y
 		return
 	}
-	; Dismiss only on a deliberate move beyond the threshold (e.g. reaching to click
-	; elsewhere). The origin stays FIXED — never reassigned per tick — so slow
-	; sub-threshold drift from a resting hand never accumulates into a dismissal,
-	; which is what made the prediction vanish "on its own" while the user sat still.
-	if _LLM_PointerMovedEnough(x, y, _LLM_PointerWatch_LastX, _LLM_PointerWatch_LastY)
-		LLM_Bridge_OnPointerActivity()
+	; Compare against the PREVIOUS sample (50 ms ago), i.e. cursor VELOCITY, not
+	; cumulative displacement. A deliberate move covers far more than the threshold
+	; in one tick; optical-sensor jitter AND slow drift stay a pixel or two per tick
+	; and so never dismiss — even sustained drift cannot accumulate across ticks,
+	; which a fixed origin would have let through. This is the "arrêté, rien touché"
+	; fix: a hand off the mouse keeps the prediction up until a real, brisk move.
+	moved := _LLM_PointerMovedEnough(x, y, _LLM_PointerWatch_LastX, _LLM_PointerWatch_LastY)
+	dx := Abs(x - _LLM_PointerWatch_LastX)
+	dy := Abs(y - _LLM_PointerWatch_LastY)
+	_LLM_PointerWatch_LastX := x
+	_LLM_PointerWatch_LastY := y
+	if moved
+		LLM_Bridge_OnPointerActivity("move dx=" . dx . " dy=" . dy)
 }
 
 /**
