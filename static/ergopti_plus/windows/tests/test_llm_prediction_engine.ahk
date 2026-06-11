@@ -631,3 +631,46 @@ _LLM_EngineIsBusy_Idle() {
 	AssertFalse(LLM_Engine_IsBusy(), "engine is not busy when idle")
 }
 Test("LLM_Engine_IsBusy: false when idle", _LLM_EngineIsBusy_Idle)
+
+
+; Regression: the loading spinner must NOT replace a prediction already on screen.
+; macOS parity (prediction_engine.lua:590) — replacing a shown prediction with the
+; violet "Génération en cours…" spinner on every follow-up keystroke is the churn
+; that made suggestions vanish before the user could read them. _LLM_Engine_Show-
+; LoadingTooltip must skip the spinner while a real prediction is visible, and
+; still paint it when the screen is empty.
+_LLM_EngineShowLoading_SuppressedWhenPredictionVisible() {
+	global _LLM_Engine, _Stub_LlmTooltipCalls, _Stub_LlmTooltipVisible, _Stub_LlmTooltipLoading
+	_LLM_Engine := Map("inline_autotype", false)
+	_Stub_LlmTooltipVisible := true    ; a real prediction is on screen…
+	_Stub_LlmTooltipLoading := false   ; …not the loading spinner
+	_Stub_LlmTooltipCalls := []
+	_LLM_Engine_ShowLoadingTooltip()
+	shown := false
+	for c in _Stub_LlmTooltipCalls {
+		if (c.HasOwnProp("loading") and c.loading)
+			shown := true
+	}
+	AssertFalse(shown, "loading spinner must NOT replace a prediction already on screen")
+}
+Test("LLM engine: loading spinner suppressed while a prediction is visible", _LLM_EngineShowLoading_SuppressedWhenPredictionVisible)
+
+
+_LLM_EngineShowLoading_ShownWhenScreenEmpty() {
+	global _LLM_Engine, _Stub_LlmTooltipCalls, _Stub_LlmTooltipVisible, _Stub_LlmTooltipLoading
+	_LLM_Engine := Map("inline_autotype", false)
+	_Stub_LlmTooltipVisible := false   ; nothing on screen
+	_Stub_LlmTooltipLoading := false
+	_Stub_LlmTooltipCalls := []
+	_LLM_Engine_ShowLoadingTooltip()
+	shown := false
+	for c in _Stub_LlmTooltipCalls {
+		if (c.HasOwnProp("loading") and c.loading)
+			shown := true
+	}
+	AssertTrue(shown, "loading spinner must paint when the screen is empty")
+	; Leave the toggles in the default state so later suites are unaffected.
+	_Stub_LlmTooltipVisible := false
+	_Stub_LlmTooltipLoading := false
+}
+Test("LLM engine: loading spinner shown when no prediction is visible", _LLM_EngineShowLoading_ShownWhenScreenEmpty)

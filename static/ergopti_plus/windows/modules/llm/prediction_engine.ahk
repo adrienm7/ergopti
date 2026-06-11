@@ -630,6 +630,17 @@ _LLM_Engine_ShowLoadingTooltip() {
 	global _LLM_Engine
 	if (_LLM_Engine.Has("inline_autotype") and _LLM_Engine["inline_autotype"])
 		return
+	; macOS parity (prediction_engine.lua:590 — "only show the spinner when the
+	; screen is empty"). If a real prediction is already on screen, KEEP it while
+	; this new request generates in the background; the fresh prediction swaps in
+	; via LLM_Tooltip_Show when it lands. Replacing a shown prediction with the
+	; violet "Génération en cours…" spinner on every follow-up keystroke is the
+	; churn that made suggestions feel like they "n'ont pas le temps d'apparaître":
+	; the prediction flashed, then the next keystroke's request blanked it back to
+	; a spinner. Loading-over-loading still repaints (IsLoading → not a prediction).
+	if (IsSet(LLM_Tooltip_IsVisible) and LLM_Tooltip_IsVisible()
+			and IsSet(LLM_Tooltip_IsLoading) and !LLM_Tooltip_IsLoading())
+		return
 	_LLM_Engine_ApplyTooltipDisplayOpts(1)
 	try LLM_Tooltip_ShowLoading()
 }
