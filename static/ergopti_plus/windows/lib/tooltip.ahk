@@ -275,6 +275,19 @@ TooltipShow(Items, DurationSec := 0) {
         return
     }
 
+    ; An LLM prediction inside its minimum-display window OWNS the shared surface.
+    ; Refuse any incidental rebuild that would clobber it before the user can see
+    ; it — chiefly the hotstring prefix watcher's per-keystroke preview lookups,
+    ; which fire on the very same keystroke the bridge already chose to KEEP. The
+    ; prediction itself renders through _TooltipBuildGuiLlm (never here), and the
+    ; LLM loading spinner sets _LLM_Tooltip_Loading before calling us — both report
+    ; "not in the window", so neither is blocked. After the window, normal
+    ; precedence resumes and the next lookup paints as usual.
+    ; NOTE: blocking the NewShow hide alone (in TooltipHide) is not enough — this
+    ; function rebuilds the Gui regardless, so the bail must live here.
+    if LLM_TooltipInGracePeriod()
+        return
+
     ; Normalise to an Array of { Text, ColorHex } objects.
     if !IsObject(Items) {
         Items := [{ Text: Items, ColorHex: "", DurationSec: DurationSec }]
