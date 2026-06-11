@@ -624,6 +624,23 @@ LLM_Tooltip_Hide(accepted := false) {
     _Stub_LlmTooltipCalls.Push({ hide: true, accepted: accepted })
 }
 
+; Visibility probes used by the engine to decide whether to paint the violet
+; loading spinner (macOS parity: keep an existing prediction instead of
+; replacing it with a spinner). Default false so the spinner path runs exactly as
+; before; a test may flip these globals to simulate a prediction already on screen.
+global _Stub_LlmTooltipVisible := false
+global _Stub_LlmTooltipLoading := false
+
+LLM_Tooltip_IsVisible() {
+    global _Stub_LlmTooltipVisible
+    return _Stub_LlmTooltipVisible
+}
+
+LLM_Tooltip_IsLoading() {
+    global _Stub_LlmTooltipLoading
+    return _Stub_LlmTooltipLoading
+}
+
 LLM_Deps_IsReady() {
     return true
 }
