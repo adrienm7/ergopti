@@ -449,6 +449,14 @@ TooltipHide(DbgTag := "?", Force := false) {
         try LoggerDebug("LLM.tt", "HIDE tag={1} force={2} (was visible={3} loading={4}).",
             DbgTag, (Force ? "true" : "false"),
             (_LLM_Tooltip_Visible ? "true" : "false"), (_LLM_Tooltip_Loading ? "true" : "false"))
+    ; LLM prediction minimum-display window: a freshly-rendered prediction must
+    ; survive long enough to be seen. Incidental hides from the SHARED hotstring
+    ; surface — the prefix watcher resetting its buffer (ResetBuf), a lookup miss
+    ; (LookupNoMatch), or a new hotstring lookup superseding it (NewShow) — are
+    ; ignored while the window is open. Deliberate, authoritative hides bypass it:
+    ; explicit LLM accept/dismiss (DbgTag "LLM") and driver suspension ("Suspend").
+    if (DbgTag != "LLM" and DbgTag != "Suspend" and LLM_TooltipInGracePeriod())
+        return
     ; During an active dequeue cycle the poll timer owns the tooltip lifecycle.
     ; External callers (prefix watcher resets, lookup misses) must not interrupt
     ; it — they would hide the post-expansion rows before their time.
@@ -1254,6 +1262,20 @@ global _LLM_Tooltip_Slots    := []
 global _LLM_Tooltip_ActiveIdx := 1
 global _LLM_Tooltip_Visible  := false
 global _LLM_Tooltip_Loading  := false
+; Minimum on-screen time (ms) for a freshly-rendered prediction. Within this
+; window the prediction is immune to INCIDENTAL dismissals: the shared hotstring
+; surface resetting its buffer (ResetBuf / LookupNoMatch / a new lookup NewShow),
+; an in-flight keystroke that was already travelling when the slow model finally
+; answered, or stray pointer drift. Without it a prediction that lands mid-typing
+; is clobbered within tens of milliseconds and never gets seen — the
+; "n'a même pas le temps d'apparaître" bug. Unlike macOS, the AHK prediction
+; shares one Gui surface with the hotstring autocomplete tooltip, so it is exposed
+; to that surface's far more aggressive per-keystroke lifecycle; this window is the
+; equaliser. Deliberate user actions (Tab/Enter accept, Escape) and driver suspend
+; bypass it. Tunable; 600 ms is comfortably above human reaction time.
+global _LLM_TOOLTIP_MIN_DISPLAY_MS := 600
+; A_TickCount when the current real prediction was rendered (0 = none / loading).
+global _LLM_Tooltip_ShownAt := 0
 ; Footer state — mirrors tooltip_llm.lua info/hint rows.
 global _LLM_Tooltip_ShowInfoBar := false
 global _LLM_Tooltip_InfoModel   := ""
@@ -1324,11 +1346,14 @@ LLM_TooltipShow(payload, active := 1, is_final := false) {
 		}
 	}
 
-	global _LLM_Tooltip_Loading
+	global _LLM_Tooltip_Loading, _LLM_Tooltip_ShownAt
 	_LLM_Tooltip_Loading := false
 	_LLM_Tooltip_Slots    := slots
 	_LLM_Tooltip_ActiveIdx := Max(1, Min(Integer(active), slots.Length))
 	_LLM_Tooltip_Visible  := true
+	; Open the minimum-display window: the moment a real prediction renders, start
+	; the clock the incidental dismiss paths consult via LLM_TooltipInGracePeriod().
+	_LLM_Tooltip_ShownAt := A_TickCount
 
 	; Detect whether any slot carries diff chunks — if so use the rich Gui path.
 	has_chunks := false
@@ -1364,11 +1389,14 @@ LLM_TooltipShow(payload, active := 1, is_final := false) {
 ; Purple in-flight indicator — macOS ``show_loading`` parity (ai_loading tint).
 ; Stays visible until replaced by ``LLM_TooltipShow`` or ``LLM_TooltipHide``.
 LLM_TooltipShowLoading() {
-	global _LLM_Tooltip_Visible, _LLM_Tooltip_Loading
+	global _LLM_Tooltip_Visible, _LLM_Tooltip_Loading, _LLM_Tooltip_ShownAt
 	if A_IsSuspended
 		return
 	_LLM_Tooltip_Loading := true
 	_LLM_Tooltip_Visible  := true
+	; The violet spinner is not a real prediction — clear any grace stamp so the
+	; window cannot keep a previous prediction "protected" behind the loading state.
+	_LLM_Tooltip_ShownAt := 0
 	label := (IsSet(t)) ? t("llm.generating") : "⏳ Génération en cours…"
 	accent := _TooltipResolveAccent("ai_loading")
 	TooltipShow([{ Text: label, ColorHex: accent, IsDimmed: false, DurationSec: 0 }], 0)
@@ -1380,13 +1408,14 @@ LLM_TooltipShowLoading() {
 }
 
 LLM_TooltipHide(accepted := false) {
-	global _LLM_Tooltip_Visible, _LLM_Tooltip_Slots, _LLM_Tooltip_Loading
+	global _LLM_Tooltip_Visible, _LLM_Tooltip_Slots, _LLM_Tooltip_Loading, _LLM_Tooltip_ShownAt
 	if (_LLM_Tooltip_Visible or _LLM_Tooltip_Loading)
 		try LoggerDebug("LLM.tt", "HIDE prediction via LLM_TooltipHide (accepted={1}, was visible={2} loading={3}).",
 			(accepted ? "true" : "false"),
 			(_LLM_Tooltip_Visible ? "true" : "false"), (_LLM_Tooltip_Loading ? "true" : "false"))
 	_LLM_Tooltip_Visible := false
 	_LLM_Tooltip_Loading := false
+	_LLM_Tooltip_ShownAt := 0
 	_LLM_Tooltip_Slots   := []
 	_LLM_TooltipResetChain()
 	TooltipHide("LLM", true)
@@ -1423,6 +1452,22 @@ LLM_TooltipGetActiveIdx() {
 LLM_TooltipIsVisible() {
 	global _LLM_Tooltip_Visible
 	return IsSet(_LLM_Tooltip_Visible) and _LLM_Tooltip_Visible
+}
+
+; True while a real prediction is still inside its minimum-display window. The
+; incidental dismiss paths (shared-surface clobber in TooltipHide, the bridge's
+; keystroke / pointer dismissal) consult this so a prediction is never hidden the
+; instant it appears. False during loading and once the window has elapsed, so
+; normal dismiss behaviour resumes afterwards.
+LLM_TooltipInGracePeriod() {
+	global _LLM_Tooltip_Visible, _LLM_Tooltip_Loading, _LLM_Tooltip_ShownAt, _LLM_TOOLTIP_MIN_DISPLAY_MS
+	if (!IsSet(_LLM_Tooltip_Visible) or !_LLM_Tooltip_Visible)
+		return false
+	if (IsSet(_LLM_Tooltip_Loading) and _LLM_Tooltip_Loading)
+		return false
+	if (!IsSet(_LLM_Tooltip_ShownAt) or _LLM_Tooltip_ShownAt == 0)
+		return false
+	return (A_TickCount - _LLM_Tooltip_ShownAt) < _LLM_TOOLTIP_MIN_DISPLAY_MS
 }
 
 LLM_TooltipIsLoading() {
