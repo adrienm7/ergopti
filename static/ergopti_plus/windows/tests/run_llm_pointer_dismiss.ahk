@@ -126,7 +126,46 @@ _MMP_MoveTickGatesOnShown() {
 		"move-tick must gate dismissal on a shown prediction, not on loading/generation")
 	AssertContains(body, "_LLM_PointerWatch_LastX := unset",
 		"move-tick must reset the baseline while no prediction is shown")
+	; And it must dismiss only past the deliberate-move threshold, never on raw jitter.
+	AssertContains(body, "_LLM_PointerMovedEnough(x, y, _LLM_PointerWatch_LastX, _LLM_PointerWatch_LastY)",
+		"move-tick must dismiss only when the cursor moved past the jitter threshold")
 }
 Test("pointer-dismiss: move-tick gates on shown prediction + resets baseline", _MMP_MoveTickGatesOnShown)
+
+
+
+
+; =========================================================
+; ======= 4/ Movement threshold (no dismiss on jitter) ====
+; =========================================================
+
+_MMP_JitterDoesNotDismiss() {
+	; A still mouse drifts a pixel or two from optical-sensor noise — must NOT count.
+	AssertFalse(_LLM_PointerMovedEnough(503, 401, 500, 400),
+		"a 3 px drift must not count as a deliberate move (regression: prediction vanished while the user sat still)")
+	AssertFalse(_LLM_PointerMovedEnough(500, 400, 500, 400),
+		"no movement must not dismiss")
+}
+Test("pointer-threshold: small jitter does not dismiss", _MMP_JitterDoesNotDismiss)
+
+_MMP_DeliberateMoveDismisses() {
+	; Reaching to click elsewhere crosses far more than the threshold on either axis.
+	AssertTrue(_LLM_PointerMovedEnough(560, 400, 500, 400),
+		"a 60 px horizontal move is deliberate and must dismiss")
+	AssertTrue(_LLM_PointerMovedEnough(500, 480, 500, 400),
+		"an 80 px vertical move is deliberate and must dismiss")
+}
+Test("pointer-threshold: a deliberate move dismisses", _MMP_DeliberateMoveDismisses)
+
+_MMP_ThresholdBoundary() {
+	global _LLM_POINTER_MOVE_THRESHOLD_PX
+	; Exactly at the threshold does not dismiss (strict greater-than); one past does.
+	t := _LLM_POINTER_MOVE_THRESHOLD_PX
+	AssertFalse(_LLM_PointerMovedEnough(500 + t, 400, 500, 400),
+		"movement exactly at the threshold must not dismiss")
+	AssertTrue(_LLM_PointerMovedEnough(500 + t + 1, 400, 500, 400),
+		"movement one pixel past the threshold must dismiss")
+}
+Test("pointer-threshold: boundary is strict greater-than", _MMP_ThresholdBoundary)
 
 RunTests()
