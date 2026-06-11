@@ -172,6 +172,13 @@ _TestGrace_BridgeGatesDismiss() {
 	; Both the keystroke and the pointer dismiss paths must consult the window.
 	Assert(InStr(Body, "LLM_Tooltip_InGracePeriod()") > 0,
 		"the bridge dismiss paths must gate on the min-display window")
+	; Pointer movement must dismiss only past a deliberate-move threshold, so a
+	; still mouse's optical jitter cannot blank the prediction "on its own" while
+	; the user sits idle (the "arrêté, rien touché" report).
+	Assert(InStr(Body, "_LLM_POINTER_MOVE_THRESHOLD_PX") > 0,
+		"a pointer movement threshold must exist so jitter does not dismiss")
+	Assert(InStr(Body, "_LLM_PointerMovedEnough(x, y, _LLM_PointerWatch_LastX, _LLM_PointerWatch_LastY)") > 0,
+		"the move-tick must dismiss only when the cursor crossed the threshold")
 }
 Test("grace contract: bridge dismiss paths gate on the min-display window",
 	_TestGrace_BridgeGatesDismiss)

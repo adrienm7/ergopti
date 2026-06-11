@@ -48,6 +48,13 @@ global _LLM_PointerWatch_LastY     := unset
 global _LLM_PointerWatch_MoveFn    := unset
 global _LLM_PointerWatch_ActivityFn := unset
 global _LLM_POINTER_POLL_MS        := 50
+; Minimum cursor travel (px, per axis) before pointer movement counts as a
+; DELIBERATE dismiss rather than optical-sensor jitter or a hand merely resting on
+; the mouse. Without it a still Windows mouse's 1-2 px noise dismisses a shown
+; prediction "on its own" while the user sits still — the "arrêté, rien touché"
+; bug. macOS never saw this: a trackpad emits no events when untouched. A real
+; move to click elsewhere crosses far more than this, so click-to-dismiss is intact.
+global _LLM_POINTER_MOVE_THRESHOLD_PX := 10
 ; Mirrors macOS llm_bridge.lua HOTSTRING_CHAIN_OFFSET_SEC — prediction fires
 ; just after the hotstring tooltip would normally close.
 global _LLM_HOTSTRING_CHAIN_OFFSET_SEC := 0.05
@@ -410,11 +417,20 @@ _LLM_PointerWatch_Stop() {
 	try LoggerDebug("LLM", "Pointer-dismiss watcher stopped.")
 }
 
+; True when the cursor has travelled far enough from its origin to count as a
+; deliberate move rather than sensor jitter / a hand resting on the mouse. Pure,
+; so the threshold logic is unit-testable without a real pointer.
+_LLM_PointerMovedEnough(x, y, ox, oy) {
+	global _LLM_POINTER_MOVE_THRESHOLD_PX
+	return (Abs(x - ox) > _LLM_POINTER_MOVE_THRESHOLD_PX
+			or Abs(y - oy) > _LLM_POINTER_MOVE_THRESHOLD_PX)
+}
+
 _LLM_PointerWatch_OnMoveTick(*) {
 	global _LLM_PointerWatch_LastX, _LLM_PointerWatch_LastY
 	; Dismiss-on-move applies ONLY once a real prediction is on screen, never during
 	; the loading / generation phase. While no prediction is shown we drop the
-	; baseline so the NEXT prediction captures a fresh origin — otherwise mouse drift
+	; origin so the NEXT prediction captures a fresh one — otherwise mouse travel
 	; that happened while a slow model was generating would be measured against a
 	; stale origin and dismiss the suggestion the instant it appears.
 	if !_LLM_Bridge_PredictionShown() {
@@ -422,8 +438,8 @@ _LLM_PointerWatch_OnMoveTick(*) {
 		_LLM_PointerWatch_LastY := unset
 		return
 	}
-	; During the minimum-display window, ignore pointer drift entirely and keep the
-	; baseline fresh, so motion that happened while the prediction was settling in
+	; During the minimum-display window, ignore pointer movement entirely and keep
+	; the origin unset, so motion that happened while the prediction was settling in
 	; cannot dismiss it the instant the window opens.
 	if (IsSet(LLM_Tooltip_InGracePeriod) && LLM_Tooltip_InGracePeriod()) {
 		_LLM_PointerWatch_LastX := unset
@@ -431,12 +447,18 @@ _LLM_PointerWatch_OnMoveTick(*) {
 		return
 	}
 	MouseGetPos(&x, &y)
-	if IsSet(_LLM_PointerWatch_LastX) {
-		if (x != _LLM_PointerWatch_LastX or y != _LLM_PointerWatch_LastY)
-			LLM_Bridge_OnPointerActivity()
+	; First tick past the window: capture the FIXED origin and never dismiss on it.
+	if !IsSet(_LLM_PointerWatch_LastX) {
+		_LLM_PointerWatch_LastX := x
+		_LLM_PointerWatch_LastY := y
+		return
 	}
-	_LLM_PointerWatch_LastX := x
-	_LLM_PointerWatch_LastY := y
+	; Dismiss only on a deliberate move beyond the threshold (e.g. reaching to click
+	; elsewhere). The origin stays FIXED — never reassigned per tick — so slow
+	; sub-threshold drift from a resting hand never accumulates into a dismissal,
+	; which is what made the prediction vanish "on its own" while the user sat still.
+	if _LLM_PointerMovedEnough(x, y, _LLM_PointerWatch_LastX, _LLM_PointerWatch_LastY)
+		LLM_Bridge_OnPointerActivity()
 }
 
 /**
