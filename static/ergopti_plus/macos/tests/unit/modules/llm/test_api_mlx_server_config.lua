@@ -14,7 +14,7 @@
 ---    from host+port) rather than pinning a specific port, so the test survives a
 ---    deliberate port change in the shared config.
 --- 2. Dedicated default: with no config file and no override on the test box, the
----    getters must return Ergopti's dedicated default (127.0.0.1:3746) — NOT
+---    getters must return Ergopti's dedicated default (127.0.0.1:3460) — NOT
 ---    mlx_lm.server's collision-prone 8080, which is the whole point of moving off it.
 --- 3. Runtime override: set_port() must rebuild the base URL, reject out-of-range
 ---    values, and expose stable bounds + default-port getters for the menu layer.
@@ -28,7 +28,7 @@ local ApiMlx = require("modules.llm.api_mlx")
 -- The dedicated default shipped in shared/llm/mlx_server.json and hardcoded as the
 -- final fallback in api_mlx. Kept in sync with both; a regression that reverts the
 -- default to 8080 fails here.
-local DEDICATED_DEFAULT_PORT = 3746
+local DEDICATED_DEFAULT_PORT = 3460
 
 
 
@@ -60,7 +60,7 @@ helpers.describe("api_mlx — MLX server address getters", function()
 		helpers.assert_eq(ApiMlx.get_base_url(), expected)
 	end)
 
-	helpers.it("falls back to Ergopti's dedicated 127.0.0.1:3746 default (NOT 8080) when no config/override is present", function()
+	helpers.it("falls back to Ergopti's dedicated 127.0.0.1:3460 default (NOT 8080) when no config/override is present", function()
 		-- The test box has no shared/llm/mlx_server.json reachable from hs.configdir
 		-- and no hs.settings override, so the loader must fall back to the dedicated
 		-- default rather than mlx_lm.server's collision-prone 8080.

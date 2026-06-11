@@ -133,7 +133,7 @@ local function probe_llm_health(backend, refresh_fn)
 		-- configured port (shared JSON / user override), never a hardcoded 8080.
 		local ok_api, ApiMlx = pcall(require, "modules.llm.api_mlx")
 		local base = (ok_api and type(ApiMlx.get_base_url) == "function" and ApiMlx.get_base_url())
-			or "http://127.0.0.1:3746"
+			or "http://127.0.0.1:3460"
 		url = base .. "/v1/models"
 	end
 

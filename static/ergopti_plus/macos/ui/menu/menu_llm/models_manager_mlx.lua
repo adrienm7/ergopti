@@ -38,9 +38,9 @@ if not ok_api_mlx then ApiMlx = nil end
 -- Single source of truth for the MLX server port: api_mlx, backed by the per-user
 -- override and shared/llm/mlx_server.json. Resolved once so the launcher, the
 -- pre-launch sweep, and the cross-session adoption probe never hardcode it. Falls
--- back to 3746 (Ergopti's dedicated default) when api_mlx is unavailable (stripped
+-- back to 3460 (Ergopti's dedicated default) when api_mlx is unavailable (stripped
 -- builds, tests).
-local MLX_PORT = (ApiMlx and type(ApiMlx.get_port) == "function" and ApiMlx.get_port()) or 3746
+local MLX_PORT = (ApiMlx and type(ApiMlx.get_port) == "function" and ApiMlx.get_port()) or 3460
 
 local HF_TOKEN_FILE = (os.getenv("HOME") or "") .. "/.huggingface/token"
 

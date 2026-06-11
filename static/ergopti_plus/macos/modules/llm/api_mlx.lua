@@ -45,9 +45,10 @@ local WARMUP_POST_TIMEOUT_SEC    = 30   -- Unblock _warmup_in_flight if the sing
 -- kill_zombie_on_mlx_port and the endpoint constants below can both reference MLX_PORT.
 local MLX_DEFAULT_HOST = "127.0.0.1"
 -- Dedicated, uncommon default — NOT mlx_lm.server's own 8080 (too commonly taken by
--- other local dev/LLM servers). 3746 = "ERGO" on a phone keypad, in the registered
--- range so the kernel never assigns it as an ephemeral port. See mlx_server.json.
-local MLX_DEFAULT_PORT = 3746
+-- other local dev/LLM servers). 3460 is a stylized "ERGO" (leetspeak: 3=E, 4=R,
+-- 6=G, 0=O), in the registered range so the kernel never assigns it as an ephemeral
+-- port. See mlx_server.json.
+local MLX_DEFAULT_PORT = 3460
 
 -- hs.settings key holding the user's port override (set from the LLM menu). Lets a
 -- user whose chosen port collides with another local server move Ergopti's MLX
@@ -624,13 +625,13 @@ function M.mark_load_failed(model_name, notify)
 	end
 end
 
---- @return integer The MLX server port (override > shared JSON > dedicated default 3746).
+--- @return integer The MLX server port (override > shared JSON > dedicated default 3460).
 function M.get_port() return MLX_PORT end
 
 --- @return string The MLX server host (loopback).
 function M.get_host() return MLX_HOST end
 
---- @return string The MLX server base URL, e.g. "http://127.0.0.1:3746".
+--- @return string The MLX server base URL, e.g. "http://127.0.0.1:3460".
 function M.get_base_url() return MLX_BASE_URL end
 
 --- @return integer, integer The accepted port bounds [min, max] for the user override.

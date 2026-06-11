@@ -202,7 +202,7 @@ function M.auto_detect_backend(callback)
 	-- port (shared JSON / user override), never a hardcoded 8080.
 	local ok_api, ApiMlx = pcall(require, "modules.llm.api_mlx")
 	local mlx_models_url = ((ok_api and type(ApiMlx.get_base_url) == "function" and ApiMlx.get_base_url())
-		or "http://127.0.0.1:3746") .. "/v1/models"
+		or "http://127.0.0.1:3460") .. "/v1/models"
 	pcall(hs.http.asyncGet, mlx_models_url, {}, function(status, body)
 		mlx_ok = (status == 200) and type(body) == "string" and body:find('"object"') ~= nil
 		mlx_done = true
@@ -219,7 +219,7 @@ function M.warm_up_connections()
 		-- follows the configured port via api_mlx, never a hardcoded 8080.
 		local ok_api, ApiMlx = pcall(require, "modules.llm.api_mlx")
 		local mlx_base = (ok_api and type(ApiMlx.get_base_url) == "function" and ApiMlx.get_base_url())
-			or "http://127.0.0.1:3746"
+			or "http://127.0.0.1:3460"
 		hs.http.asyncGet("http://127.0.0.1:11434/api/version", {}, function() end)
 		hs.http.asyncGet(mlx_base .. "/v1/models",            {}, function() end)
 	end)
