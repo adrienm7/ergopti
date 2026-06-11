@@ -335,6 +335,18 @@ function M.is_backend_ready()
 	return api.is_ready() == true
 end
 
+--- Returns true when the active backend has GIVEN UP loading the current model
+--- (warmup budget exhausted, or an incompatible architecture was reported). The
+--- menu uses this to paint the status dot RED instead of leaving it on the orange
+--- "still loading" colour forever. Backends without this concept (e.g. Ollama)
+--- report false.
+--- @return boolean
+function M.is_backend_load_failed()
+	local api = get_api()
+	if type(api.is_load_failed) ~= "function" then return false end
+	return api.is_load_failed() == true
+end
+
 -- Defer backend detection entirely off the synchronous init path
 hs.timer.doAfter(0, function()
 	pcall(function() M.auto_detect_backend() end)

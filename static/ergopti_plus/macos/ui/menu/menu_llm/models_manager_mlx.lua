@@ -918,6 +918,13 @@ PY
 					pcall(notifications.notify, "MLX incompatible",
 						string.format(i18n.get("mlx.model_incompatible"), tostring(target_model)), "error")
 				end
+				-- Flip api_mlx into the failed state so the status dot turns RED at once
+				-- and the warmup retry loop stops — otherwise the HTTP server stays up,
+				-- warmup keeps retrying, and the dot is stuck orange despite this crash.
+				-- notify=false: the user-facing notification (if any) was just fired above.
+				if ApiMlx and type(ApiMlx.mark_load_failed) == "function" then
+					pcall(ApiMlx.mark_load_failed, target_model, false)
+				end
 				-- Release the caller’s prediction lock so the user can switch to a working
 				-- model without having to reload Hammerspoon
 				if on_cancel then pcall(on_cancel) end

@@ -263,6 +263,25 @@ local _is_ready          = false
 local _warmup_in_flight  = false
 local _warmup_timeout    = nil   -- hard-timeout timer; cleared on callback or cancellation
 
+-- Permanent load-failure surface. Warmup retries on every non-200, which is correct
+-- for a model that is merely SLOW to load — but a model that can NEVER load (an
+-- architecture the installed mlx-lm does not understand, a corrupt download, a hung
+-- generate thread) would otherwise retry forever, leaving the status dot stuck on
+-- the orange "still loading…" colour with no error the user can see. Once we give up
+-- (or the launcher's crash detector reports an incompatible architecture), _load_failed
+-- flips true: the menu paints the dot RED and a one-time error notification fires, so a
+-- broken model is always visible instead of an eternal orange spinner.
+local _load_failed         = false  -- true once the current model is known to be unloadable
+local _warmup_started_at   = nil    -- epoch of the first warmup attempt for the current model
+local _warmup_fail_notified = false -- guards against firing the failure notification twice
+-- Give-up budget: after this much CONTINUOUS warmup failure we stop retrying and surface
+-- the error. Deliberately generous — far longer than any legitimate cold load (8B-class
+-- weights map into GPU memory in ~60-90 s) so it only ever fires for a genuinely broken
+-- model, never for one that is merely slow. The launcher's traceback detector
+-- (models_manager_mlx) is the FAST path for the common arch-mismatch case; this is the
+-- model-agnostic backstop for failures that print no recognizable traceback.
+local WARMUP_GIVE_UP_SEC   = 120
+
 -- Discovered endpoint paths. Different mlx-lm releases have shipped completions
 -- and chat-completions under different routes (with/without the `/v1/` prefix);
 -- a silent route rename in a freshly-pulled wheel turns every request into a
@@ -566,6 +585,45 @@ function M.is_ready()
 	return _is_ready
 end
 
+--- Returns true once the current model has been given up on (warmup exhausted its
+--- budget, or the launcher reported an incompatible architecture). The menu paints
+--- the status dot RED while this holds, so a model that will never load is never
+--- shown as an eternal orange "still loading" spinner. Cleared by reset_endpoints()
+--- when a new server launch begins.
+--- @return boolean
+function M.is_load_failed()
+	return _load_failed
+end
+
+--- Marks the current model as permanently unloadable: flips readiness to false, stops
+--- the warmup retry loop, and — when notify is true — fires a single user-facing error
+--- notification. Called both by the internal warmup give-up path and by the launcher's
+--- crash detector (models_manager_mlx) so an architecture mismatch turns the dot red
+--- immediately instead of waiting out the full give-up budget.
+--- @param model_name string The model that failed (for the log/notification).
+--- @param notify boolean When true, fire the one-time error notification from here.
+function M.mark_load_failed(model_name, notify)
+	_is_ready = false
+	if _warmup_timeout then
+		pcall(function() _warmup_timeout:stop() end)
+		_warmup_timeout = nil
+	end
+	_warmup_in_flight = false
+	if not _load_failed then
+		_load_failed = true
+		Logger.error(LOG, "MLX model '%s' marked as failed to load — status dot will show red.",
+			tostring(model_name))
+	end
+	if notify and not _warmup_fail_notified then
+		_warmup_fail_notified = true
+		-- Reuse the fully-translated "incompatible — choose another model" message:
+		-- it is the correct, actionable advice for any model that never becomes ready,
+		-- whether the cause is an unsupported architecture or a hung load.
+		pcall(Notifications.notify, "MLX incompatible",
+			string.format(i18n.get("mlx.model_incompatible"), tostring(model_name)), "error")
+	end
+end
+
 --- @return integer The MLX server port (override > shared JSON > dedicated default 3746).
 function M.get_port() return MLX_PORT end
 
@@ -639,6 +697,11 @@ function M.reset_endpoints()
 	_active_server_pgid          = nil   -- cleared until the new server reports its PGID
 	_server_pgid_pending         = true  -- block zombie kills until set_active_server_pgid() fires
 	_last_zombie_kill_at         = 0     -- allow an immediate kill on the first mismatch after PGID is known
+	-- A fresh launch deserves a fresh verdict: clear any previous load-failure so a
+	-- newly selected (or relaunched) model is given the full warmup budget again.
+	_load_failed                 = false
+	_warmup_started_at           = nil
+	_warmup_fail_notified        = false
 	Logger.warn(LOG, "Endpoint discovery state reset.")
 end
 
@@ -683,10 +746,29 @@ function M.warmup(model_name, profile)
 		Logger.debug(LOG, "MLX warmup skipped — backend already ready.")
 		return
 	end
+	-- Stop dead once the model has been given up on — retrying a known-unloadable
+	-- model would spin forever and the user has already been shown the error.
+	if _load_failed then
+		Logger.debug(LOG, "MLX warmup skipped — model '%s' already marked as failed to load.", tostring(model_name))
+		return
+	end
 	-- Skip if a warmup is already in flight; otherwise the user's log shows 4
 	-- simultaneous POST requests piling up against the single-threaded server
 	if _warmup_in_flight then
 		Logger.debug(LOG, "MLX warmup skipped — request already in flight.")
+		return
+	end
+
+	-- Track CONTINUOUS warmup duration across every retry/discovery re-entry, and give
+	-- up once it exceeds the budget. This is the model-agnostic backstop that turns an
+	-- eternal orange "still loading" dot into a red "failed" dot + notification when a
+	-- model never becomes ready and prints no traceback the launcher could recognize.
+	if not _warmup_started_at then _warmup_started_at = TimerScheduler.now() end
+	local warmup_elapsed = TimerScheduler.now() - _warmup_started_at
+	if warmup_elapsed >= WARMUP_GIVE_UP_SEC then
+		Logger.error(LOG, "MLX warmup for '%s' gave up after %.0fs of failure — surfacing as load failure.",
+			tostring(model_name), warmup_elapsed)
+		M.mark_load_failed(model_name, true)
 		return
 	end
 
@@ -814,6 +896,12 @@ function M.warmup(model_name, profile)
 			if status == 200 and has_tokens then
 				local became_ready = (_is_ready ~= true)
 				_is_ready = true
+				-- A successful warmup clears the failure-tracking state so a later
+				-- transient hiccup starts its give-up budget fresh rather than from
+				-- this model's original launch time.
+				_warmup_started_at    = nil
+				_load_failed          = false
+				_warmup_fail_notified = false
 				Logger.warn(LOG, "MLX KV cache primed (profile: %s) — backend ready.",
 					(type(profile) == "table" and profile.id) or "default")
 				if became_ready then

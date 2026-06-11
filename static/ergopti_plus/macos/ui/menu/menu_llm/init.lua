@@ -436,7 +436,9 @@ function M.create(deps)
         -- 🟡 = server reachable (HTTP probe ok) but the model is still warming up;
         --      the prediction engine skips requests until warmup confirms, so a
         --      green dot here would be a lie ("vert mais aucune prédiction").
-        -- 🔴 = server unreachable.
+        -- 🔴 = server unreachable, OR the model was given up on (incompatible /
+        --      never loaded). The second case overrides orange so a broken model is
+        --      never shown as an eternal "still loading" spinner.
         -- is_backend_ready() is synchronous and reflects the warmup state accurately
         -- even on the first menu open after a model swap.
         local health_dot
@@ -448,8 +450,18 @@ function M.create(deps)
                 local ok, ready = pcall(llm_mod.is_backend_ready)
                 backend_ready = ok and ready == true
             end
+            -- A model given up on (incompatible / never loaded) must show RED even
+            -- though the HTTP server may still answer /v1/models — otherwise the dot
+            -- would stay stuck orange forever with no error the user can see.
+            local load_failed = false
+            if type(llm_mod.is_backend_load_failed) == "function" then
+                local ok, failed = pcall(llm_mod.is_backend_load_failed)
+                load_failed = ok and failed == true
+            end
             if backend_ready then
                 health_dot = "🟢 "
+            elseif load_failed then
+                health_dot = "🔴 "
             elseif _llm_health_status == true then
                 health_dot = "🟡 "
             else
