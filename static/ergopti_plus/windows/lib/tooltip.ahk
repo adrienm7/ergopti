@@ -1403,7 +1403,20 @@ LLM_TooltipShow(payload, active := 1, is_final := false) {
 	}
 
 	LLM_TooltipRefreshChainTiming()
-	_TooltipBuildGuiLlm(slots, _LLM_Tooltip_ActiveIdx)
+	; Diagnostic: _TooltipBuildGuiLlm tears the current prediction down at its start,
+	; then builds the new one. If the BUILD throws (before the generation bump and
+	; the present), the prediction window is left destroyed with no SHOW/HIDE and no
+	; generation change — exactly the silent vanish the probe captured. Surface the
+	; exception here, then re-raise to preserve the existing control flow.
+	try {
+		_TooltipBuildGuiLlm(slots, _LLM_Tooltip_ActiveIdx)
+	} catch as _llm_build_err {
+		try LoggerError("LLM.tt", "BUILD-THROW in _TooltipBuildGuiLlm: {1} | file={2} line={3}.",
+			_llm_build_err.Message,
+			(_llm_build_err.HasOwnProp("File") ? _llm_build_err.File : "?"),
+			(_llm_build_err.HasOwnProp("Line") ? _llm_build_err.Line : "?"))
+		throw _llm_build_err
+	}
 
 	; Arm the LLM-specific auto-hide timer. The duration mirrors the macOS
 	; llm_prediction delay: it defaults to UI_LLM_TIMEOUT_SEC (20 s) but is
