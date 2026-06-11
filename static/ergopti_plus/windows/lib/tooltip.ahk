@@ -439,6 +439,16 @@ TooltipHide(DbgTag := "?", Force := false) {
     global _TooltipGui, _TooltipRowGuis, _TooltipBorderGui
     global _TooltipShownHwnds, _TooltipShownBorderHwnds
     global _TooltipDequeueItems, _TooltipDequeueActive
+    ; Diagnostic (debug-only): whenever an LLM loading/prediction tooltip is on
+    ; screen, record WHO hid it. ``DbgTag`` names the caller — TimerFn (auto-hide),
+    ; NewShow (a fresh TooltipShow superseded it), PollEmpty (dequeue), LLM
+    ; (deliberate LLM_TooltipHide), etc. This is the primary lens for the
+    ; "prediction vanished the instant it appeared" class of bug.
+    global _LLM_Tooltip_Visible, _LLM_Tooltip_Loading
+    if (IsSet(_LLM_Tooltip_Visible) and (_LLM_Tooltip_Visible or _LLM_Tooltip_Loading))
+        try LoggerDebug("LLM.tt", "HIDE tag={1} force={2} (was visible={3} loading={4}).",
+            DbgTag, (Force ? "true" : "false"),
+            (_LLM_Tooltip_Visible ? "true" : "false"), (_LLM_Tooltip_Loading ? "true" : "false"))
     ; During an active dequeue cycle the poll timer owns the tooltip lifecycle.
     ; External callers (prefix watcher resets, lookup misses) must not interrupt
     ; it — they would hide the post-expansion rows before their time.
@@ -1347,6 +1357,8 @@ LLM_TooltipShow(payload, active := 1, is_final := false) {
 	}
 	timeout_ms := Round(Max(0.05, llm_timeout_sec - 0.2) * 1000)
 	SetTimer(_TooltipTimerFn, -timeout_ms)
+	try LoggerDebug("LLM.tt", "SHOW prediction: {1} slot(s), is_final={2}, auto-hide in {3}ms (gen {4}).",
+		slots.Length, (is_final ? "true" : "false"), timeout_ms, _TooltipGeneration)
 }
 
 ; Purple in-flight indicator — macOS ``show_loading`` parity (ai_loading tint).
@@ -1364,10 +1376,15 @@ LLM_TooltipShowLoading() {
 	SetTimer(_TooltipTimerFn, 0)
 	global _TooltipDequeueActive
 	_TooltipDequeueActive := false
+	try LoggerDebug("LLM.tt", "SHOW loading (no auto-hide).")
 }
 
 LLM_TooltipHide(accepted := false) {
 	global _LLM_Tooltip_Visible, _LLM_Tooltip_Slots, _LLM_Tooltip_Loading
+	if (_LLM_Tooltip_Visible or _LLM_Tooltip_Loading)
+		try LoggerDebug("LLM.tt", "HIDE prediction via LLM_TooltipHide (accepted={1}, was visible={2} loading={3}).",
+			(accepted ? "true" : "false"),
+			(_LLM_Tooltip_Visible ? "true" : "false"), (_LLM_Tooltip_Loading ? "true" : "false"))
 	_LLM_Tooltip_Visible := false
 	_LLM_Tooltip_Loading := false
 	_LLM_Tooltip_Slots   := []

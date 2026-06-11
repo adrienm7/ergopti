@@ -253,8 +253,10 @@ LLM_Bridge_OnChar(ch) {
 		return
 	; Only hide OUR tooltip — never dismiss a hotstring overlay.
 	; Silent=true so no llm_dismissed event is emitted for a stale hide.
-	if LLM_Tooltip_IsVisible()
+	if LLM_Tooltip_IsVisible() {
+		try LoggerDebug("LLM.tt", "DISMISS: keystroke '{1}' typed while a prediction was shown.", ch)
 		LLM_Tooltip_Hide(true)
+	}
 	global _LLM_Bridge_LastLogTick
 	now := A_TickCount
 	if (now - _LLM_Bridge_LastLogTick > 2000) {
@@ -337,6 +339,7 @@ LLM_Bridge_ResetPredictions() {
 		return
 	if !LLM_Bridge_HasActivePredictionWork()
 		return
+	try LoggerDebug("LLM.tt", "ResetPredictions: cancelling generation + hiding any tooltip.")
 	if (IsSet(_LLM_Engine) and _LLM_Engine.Has("reset_on_nav") and _LLM_Engine["reset_on_nav"])
 		_LLM_Bridge_Buffer := ""
 	try LLM_Tooltip_MarkChainComplete()
@@ -354,6 +357,7 @@ LLM_Bridge_ResetPredictions() {
 LLM_Bridge_OnPointerActivity(*) {
 	if !_LLM_Bridge_PredictionShown()
 		return
+	try LoggerDebug("LLM.tt", "DISMISS: pointer activity over a shown prediction.")
 	LLM_Bridge_ResetPredictions()
 }
 

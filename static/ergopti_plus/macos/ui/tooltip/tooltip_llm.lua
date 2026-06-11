@@ -156,9 +156,10 @@ end
 local function reset_idle_timer()
 	if _idle_timer and type(_idle_timer.stop) == "function" then _idle_timer:stop() end
 	local active_timeout = Config.settings.llm_timeout_sec
-	
+
 	if active_timeout > 0 then
 		_idle_timer = hs.timer.doAfter(active_timeout, M.hide)
+		Logger.debug(LOG, "Auto-hide idle timer (re)armed: %.1fs.", active_timeout)
 	end
 end
 
@@ -743,6 +744,13 @@ end
  
 
 function M.hide()
+	-- Debug lens for the "prediction vanished the instant it appeared" class of
+	-- bug: record WHO hid the tooltip. debug.getinfo(2) names the immediate
+	-- caller (file:line) — the macOS analogue of the AHK TooltipHide DbgTag.
+	local info = debug.getinfo(2, "Sl")
+	local caller = info and (tostring(info.short_src) .. ":" .. tostring(info.currentline)) or "?"
+	Logger.debug(LOG, "HIDE predictions tooltip (was showing %d) — caller %s.",
+		type(_state.raw_predictions) == "table" and #_state.raw_predictions or 0, caller)
 	pcall(function()
 		stop_watchers()
 		_state.raw_predictions    = {}
@@ -872,7 +880,13 @@ function M.show_predictions(predictions, current_index, is_enabled, info_bar, sh
 		Renderer.render(assemble_blocks(_state, render_count), _state, start_watchers)
 	end)
 
-	if not ok then Logger.error(LOG, "Crash during show_predictions initialization: " .. tostring(err) .. ".") end
+	if ok then
+		Logger.debug(LOG, "SHOW predictions: %d active, %d reserved (idle timer armed in start_watchers).",
+			type(_state.raw_predictions) == "table" and #_state.raw_predictions or 0,
+			tonumber(_state.reserved_count) or 0)
+	else
+		Logger.error(LOG, "Crash during show_predictions initialization: " .. tostring(err) .. ".")
+	end
 end
 
 function M.make_diff_styled(diff_chunks, next_words, fallback_text)
