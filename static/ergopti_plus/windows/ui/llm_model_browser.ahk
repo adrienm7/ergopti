@@ -60,6 +60,17 @@ global LLM_MB_COL_STATUS    := 7
  */
 LLM_ModelBrowser_Show() {
 	global _LLM_ModelBrowser_Gui, _LLM_Tray
+	; Prefer the shared web table (sortable/filterable, identical to the macOS
+	; browser) when WebView2 is available; fall back to the native ListView below
+	; when it is not, or if the webview fails to spin up.
+	if (_LLM_MBW_WebView2Available()) {
+		web := ""
+		try web := _LLM_ModelBrowser_ShowWeb()
+		catch as Err
+			try LoggerError("LLM.browser", "WebView2 model browser failed: {1} — falling back to ListView.", Err.Message)
+		if IsObject(web)
+			return web
+	}
 	if IsSet(_LLM_ModelBrowser_Gui) {
 		; A reused Gui that fails to refresh (e.g. models.json was edited
 		; and re-parses badly) used to fall through to rebuild a SECOND
@@ -314,4 +325,292 @@ _LLM_ModelBrowser_OnClose(*) {
 	if IsSet(_LLM_ModelBrowser_Gui) {
 		try _LLM_ModelBrowser_Gui.Hide()
 	}
+}
+
+
+
+
+; ==========================================
+; ==========================================
+; ======= 4/ WebView2 Shared Browser ========
+; ==========================================
+; ==========================================
+
+; Module-level state for the WebView2 variant — separate from the ListView Gui so
+; the two paths never clobber each other's handles.
+global _LLM_MBW_Gui        := unset
+global _LLM_MBW_WebView    := unset
+global _LLM_MBW_Controller := unset
+global _LLM_MBW_Ready      := false
+global _LLM_MBW_Queue      := []
+
+/**
+ * Builds (or brings forward) the shared web model browser in a WebView2 window.
+ * Returns the Gui on success, or "" to signal the caller to use the ListView
+ * fallback (e.g. WebView2 create failed).
+ * @returns {Gui|string}
+ */
+_LLM_ModelBrowser_ShowWeb() {
+	global _LLM_MBW_Gui, _LLM_MBW_Controller, _LLM_MBW_WebView, _LLM_MBW_Ready, _LLM_MBW_Queue, _VendorDir, _I18nLocale
+
+	; Singleton: reuse the open window and just refresh the catalogue.
+	if IsSet(_LLM_MBW_Gui) {
+		try _LLM_MBW_Gui.Restore()
+		try WinActivate(_LLM_MBW_Gui.Hwnd)
+		_LLM_MBW_InjectCatalogue()
+		return _LLM_MBW_Gui
+	}
+
+	_LLM_MBW_Ready := false
+	_LLM_MBW_Queue := []
+
+	g := Gui("+Resize +MinSize780x460", t("model_browser.window_title"))
+	g.BackColor := "0x1e1e1e"
+	g.MarginX   := 0
+	g.MarginY   := 0
+	Placeholder := g.Add("Text", "x0 y0 w900 h580", "")
+	g.OnEvent("Close",  _LLM_MBW_OnClose)
+	g.OnEvent("Escape", _LLM_MBW_OnClose)
+	g.OnEvent("Size",   _LLM_MBW_OnResize)
+	g.Show("w900 h580")
+	_LLM_MBW_Gui := g
+
+	loader := _VendorDir . "\64bit\WebView2Loader.dll"
+	udir   := A_Temp . "\ergopti_modelbrowser_wv_" . A_TickCount
+	try DirCreate(udir)
+
+	try {
+		_LLM_MBW_Controller := WebView2.create(Placeholder.Hwnd, , 0, udir, "", 0, loader)
+	} catch as Err {
+		try LoggerError("LLM.browser", "WebView2 create failed: {1}.", Err.Message)
+		try g.Destroy()
+		_LLM_MBW_Reset()
+		return ""
+	}
+
+	_LLM_MBW_WebView := _LLM_MBW_Controller.CoreWebView2
+
+	; Harden the webview — no devtools, context menu, status bar, or accelerators.
+	try {
+		s := _LLM_MBW_WebView.Settings
+		s.AreDevToolsEnabled               := false
+		s.AreDefaultContextMenusEnabled    := false
+		s.IsStatusBarEnabled               := false
+		s.AreBrowserAcceleratorKeysEnabled := false
+		s.IsSwipeNavigationEnabled         := false
+	}
+
+	; JS -> AHK bridge.
+	_LLM_MBW_WebView.WebMessageReceived(_LLM_MBW_OnWebMessage)
+
+	; Seed the i18n base + locale before the page scripts run so i18n.js resolves.
+	seed := "window.__i18n_base='" . _LLM_MBW_LocalesUrl() . "';"
+		. "window._i18n_locale='" . _I18nLocale . "';"
+	try _LLM_MBW_WebView.AddScriptToExecuteOnDocumentCreated(seed)
+
+	try _LLM_MBW_WebView.Navigate(_LLM_MBW_HtmlUrl())
+	try _LLM_MBW_Controller.Fill()
+
+	SetTimer(_LLM_MBW_SafetyFlush, -2000)
+	; Inject the locale strings (read from disk) once the page is ready.
+	_LLM_MBW_Eval(_LLM_MBW_I18nApplyScript())
+	return g
+}
+
+/**
+ * Builds the normalised catalogue (name/family/params/RAM/speed/type/installed/url,
+ * MoE-aware) from the shared model index and injects it via injectModels(). The
+ * Windows backend is always Ollama, so the install flag reads the Ollama tag list.
+ */
+_LLM_MBW_InjectCatalogue() {
+	global _LLM_Tray
+	index := LLM_GetModelIndex()
+	installed := Map()
+	for tag in _LLM_ModelBrowser_GetInstalledTags()
+		installed[StrLower(tag)] := true
+	active := _LLM_Tray.Has("model") ? _LLM_Tray["model"] : ""
+
+	models := "", count := 0
+	for name, info in index {
+		params   := (info is Map and info.Has("params_b"))    ? info["params_b"]    : 0
+		active_b := (info is Map and info.Has("active_b"))     ? info["active_b"]    : 0
+		if (active_b <= 0)
+			active_b := params
+		is_moe   := (active_b > 0 and active_b < params)
+		ram      := (info is Map and info.Has("ram_gb"))       ? info["ram_gb"]      : 0
+		speed    := (info is Map and info.Has("speed_tok_s"))  ? info["speed_tok_s"] : 0
+		mtype    := (info is Map and info.Has("type"))         ? info["type"]        : "chat"
+		ollama   := (info is Map and info.Has("ollama"))       ? info["ollama"]      : ""
+		inst     := installed.Has(StrLower(ollama))
+		family   := _LLM_ModelBrowser_GuessFamily(name)
+		url      := (ollama != "") ? ("https://ollama.com/library/" . ollama) : ""
+
+		obj := "{name:" . _LLM_MBW_JsStr(name)
+			. ",family:" . _LLM_MBW_JsStr(family)
+			. ",provider:" . _LLM_MBW_JsStr("")
+			. ",params_b:" . _LLM_MBW_Num(params)
+			. ",active_b:" . _LLM_MBW_Num(active_b)
+			. ",is_moe:" . (is_moe ? "true" : "false")
+			. ",ram_gb:" . _LLM_MBW_Num(ram)
+			. ",speed_tok_s:" . _LLM_MBW_Num(speed)
+			. ",type:" . _LLM_MBW_JsStr(mtype)
+			. ",installed:" . (inst ? "true" : "false")
+			. ",url:" . _LLM_MBW_JsStr(url)
+			. "}"
+		models .= (count > 0 ? "," : "") . obj
+		count += 1
+	}
+
+	js := "injectModels({backend:" . _LLM_MBW_JsStr("ollama")
+		. ",active:" . _LLM_MBW_JsStr(active)
+		. ",models:[" . models . "]})"
+	_LLM_MBW_Eval(js)
+}
+
+/**
+ * Evaluates JS in the WebView, queuing it until the page signals "ready".
+ * @param {string} Js
+ */
+_LLM_MBW_Eval(Js) {
+	global _LLM_MBW_WebView, _LLM_MBW_Ready, _LLM_MBW_Queue
+	if (_LLM_MBW_Ready && IsSet(_LLM_MBW_WebView)) {
+		try _LLM_MBW_WebView.ExecuteScript(Js)
+	} else {
+		_LLM_MBW_Queue.Push(Js)
+		if (_LLM_MBW_Queue.Length > 50)
+			_LLM_MBW_Queue.RemoveAt(1)
+	}
+}
+
+_LLM_MBW_FlushQueue() {
+	global _LLM_MBW_Ready, _LLM_MBW_Queue, _LLM_MBW_WebView
+	_LLM_MBW_Ready := true
+	for _, Js in _LLM_MBW_Queue {
+		if IsSet(_LLM_MBW_WebView)
+			try _LLM_MBW_WebView.ExecuteScript(Js)
+	}
+	_LLM_MBW_Queue := []
+}
+
+_LLM_MBW_SafetyFlush() {
+	if (!_LLM_MBW_Ready)
+		_LLM_MBW_FlushQueue()
+}
+
+/**
+ * Receives messages from the page. Expected payloads:
+ *   "ready"                                  — page bootstrap complete
+ *   {"action":"select_model","name":"…"}     — activate a model
+ *   {"action":"open_url","url":"…"}          — open the model page in the browser
+ */
+_LLM_MBW_OnWebMessage(Handler, Args) {
+	try Msg := Args.TryGetWebMessageAsString()
+	if !IsSet(Msg)
+		return
+
+	if (Msg == "ready") {
+		_LLM_MBW_FlushQueue()
+		_LLM_MBW_InjectCatalogue()
+		return
+	}
+
+	try Payload := JsonParse(Msg)
+	if !IsSet(Payload)
+		return
+	if !IsObject(Payload)
+		return
+
+	Action := Payload.Has("action") ? Payload["action"] : ""
+	if (Action == "select_model") {
+		Name := Payload.Has("name") ? Payload["name"] : ""
+		if (Name != "") {
+			_LLM_MBW_OnClose()
+			try LLM_Tray_SetModel(Name)
+		}
+	} else if (Action == "open_url") {
+		Url := Payload.Has("url") ? Payload["url"] : ""
+		if (Url != "")
+			try Run(Url)
+	}
+}
+
+/**
+ * Returns true when WebView2 is available and the loader DLL exists.
+ * @returns {boolean}
+ */
+_LLM_MBW_WebView2Available() {
+	global _VendorDir
+	loader := _VendorDir . "\64bit\WebView2Loader.dll"
+	return IsSet(WebView2) && FileExist(loader)
+}
+
+/** Returns the file:// URL for shared/ui/model_browser/index.html. */
+_LLM_MBW_HtmlUrl() {
+	global _SharedDir
+	base := _SharedDir . "\ui\model_browser\index.html"
+	loop files, base
+		base := A_LoopFileFullPath
+	return "file:///" . StrReplace(base, "\", "/")
+}
+
+/** Returns the file:// URL for shared/locales/ (trailing slash). */
+_LLM_MBW_LocalesUrl() {
+	global _SharedDir
+	base := _SharedDir . "\locales\"
+	return "file:///" . StrReplace(base, "\", "/")
+}
+
+/** Builds the ExecuteScript call that applies i18n strings (read from disk). */
+_LLM_MBW_I18nApplyScript() {
+	global _SharedDir, _I18nLocale
+	json_path := _SharedDir . "\locales\" . _I18nLocale . ".json"
+	json_str  := "{}"
+	if FileExist(json_path)
+		try json_str := FileRead(json_path, "UTF-8")
+	return "window._i18n_strings=" . json_str
+		. ";if(typeof window.i18n_apply==='function')window.i18n_apply(window._i18n_strings);"
+}
+
+/** Escapes a string for safe injection into a JS double-quoted literal. */
+_LLM_MBW_JsStr(s) {
+	s := StrReplace(s, "\",  "\\")
+	s := StrReplace(s, '"',  '\"')
+	s := StrReplace(s, "`n", "\n")
+	s := StrReplace(s, "`r", "")
+	s := StrReplace(s, "`t", "\t")
+	return '"' . s . '"'
+}
+
+/** Formats a number as a clean JS numeric literal (integers without a decimal). */
+_LLM_MBW_Num(v) {
+	if !IsNumber(v)
+		return "0"
+	n := v + 0
+	if (n == Round(n))
+		return String(Integer(n))
+	return Format("{:.2f}", n)
+}
+
+_LLM_MBW_OnClose(*) {
+	global _LLM_MBW_Gui
+	if IsSet(_LLM_MBW_Gui)
+		try _LLM_MBW_Gui.Destroy()
+	_LLM_MBW_Reset()
+}
+
+_LLM_MBW_OnResize(GuiObj, MinMax, Width, Height) {
+	global _LLM_MBW_Controller
+	if (MinMax == -1)
+		return
+	if IsSet(_LLM_MBW_Controller)
+		try _LLM_MBW_Controller.Fill()
+}
+
+_LLM_MBW_Reset() {
+	global _LLM_MBW_Gui, _LLM_MBW_WebView, _LLM_MBW_Controller, _LLM_MBW_Ready, _LLM_MBW_Queue
+	_LLM_MBW_Gui        := unset
+	_LLM_MBW_WebView    := unset
+	_LLM_MBW_Controller := unset
+	_LLM_MBW_Ready      := false
+	_LLM_MBW_Queue      := []
 }
