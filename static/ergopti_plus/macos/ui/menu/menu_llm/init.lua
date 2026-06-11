@@ -493,6 +493,41 @@ function M.create(deps)
                 update_menu   = update_menu,
                 DEFAULT_STATE = M.DEFAULT_STATE,
             })
+
+            -- MLX server port — Ergopti's own server, so let the user move it off
+            -- the default if it collides with another local server they run. Changing
+            -- it persists (api_mlx → hs.settings), then relaunches the server on the
+            -- new port for the current model so the change takes effect immediately.
+            local ok_api, ApiMlx = pcall(require, "modules.llm.api_mlx")
+            if ok_api and type(ApiMlx.get_port) == "function" then
+                local function restart_mlx_for_current_port()
+                    if state.llm_backend ~= "mlx" then return end
+                    pcall(models_mgr.stop_mlx_server_if_needed)
+                    if state.llm_enabled and state.llm_model and state.llm_model ~= "" then
+                        -- Silent: a port change is not a model change, so don't pop the
+                        -- recommended-profile dialog — just bring the server back up.
+                        pcall(models_mgr.check_requirements, state.llm_model, nil, nil,
+                            { silent_notifications = true })
+                    end
+                end
+                table.insert(model_submenu, { title = "-" })
+                table.insert(model_submenu, {
+                    title    = string.format(i18n.get("menu.llm.mlx_port_label"), tostring(ApiMlx.get_port())),
+                    disabled = paused or nil,
+                    fn       = not paused and function()
+                        settings_mgr.set_mlx_port(restart_mlx_for_current_port)
+                    end or nil,
+                })
+                if type(ApiMlx.get_default_port) == "function" and ApiMlx.get_port() ~= ApiMlx.get_default_port() then
+                    table.insert(model_submenu, {
+                        title    = string.format(i18n.get("menu.llm.reset_label"), tostring(ApiMlx.get_default_port())),
+                        disabled = paused or nil,
+                        fn       = not paused and function()
+                            settings_mgr.reset_mlx_port(restart_mlx_for_current_port)
+                        end or nil,
+                    })
+                end
+            end
         end
 
         table.insert(main_menu, {

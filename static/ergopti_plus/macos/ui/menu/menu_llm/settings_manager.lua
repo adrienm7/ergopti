@@ -245,8 +245,62 @@ function M.new(deps)
 		)
 	end
 	
-	function obj.reset_context_length() 
-		reset_to_default(deps, "llm_context_length", llm_mod.DEFAULT_STATE.llm_context_length, "set_llm_context_length") 
+	function obj.reset_context_length()
+		reset_to_default(deps, "llm_context_length", llm_mod.DEFAULT_STATE.llm_context_length, "set_llm_context_length")
+	end
+
+	--- Prompts for the local MLX server port and applies it. The port lives in
+	--- api_mlx (persisted to hs.settings), NOT in the LLM state table, because it is
+	--- a property of Ergopti's own MLX server — the one we launch with `--port` — and
+	--- is read by the launcher, the health probe, and the boot cleanup. On a valid
+	--- change we persist + rebuild the server URL via api_mlx.set_port, then invoke
+	--- on_applied so the caller can relaunch the server on the new port.
+	--- @param on_applied function|nil Called after a successful change (e.g. restart).
+	function obj.set_mlx_port(on_applied)
+		local ok_api, ApiMlx = pcall(require, "modules.llm.api_mlx")
+		if not ok_api or type(ApiMlx.set_port) ~= "function" then
+			Logger.warn(LOG, "set_mlx_port: api_mlx unavailable — cannot change the port.")
+			return
+		end
+		local current      = ApiMlx.get_port()
+		local default_port = ApiMlx.get_default_port()
+		local lo, hi       = ApiMlx.get_port_bounds()
+
+		local full_msg = string.format(i18n.get("menu.llm.mlx_port_prompt"), tostring(default_port))
+		local ok_p, btn, raw = pcall(dialog.text_prompt,
+			i18n.get("menu.llm.mlx_port_title"), full_msg, tostring(current),
+			i18n.get("button.ok"), i18n.get("common.cancel"))
+		if not (ok_p and btn == i18n.get("button.ok")) then return end
+
+		local new_port
+		if raw:match("^%s*$") then
+			new_port = default_port  -- empty input resets to the dedicated default
+		else
+			new_port = tonumber(raw:match("^%s*(%d+)%s*$"))
+		end
+		if not new_port or new_port < lo or new_port > hi then
+			Logger.warn(LOG, "set_mlx_port: invalid input '%s' (expected an integer %d-%d).",
+				tostring(raw), lo, hi)
+			return
+		end
+		if not ApiMlx.set_port(new_port) then return end
+		Logger.info(LOG, "MLX server port set to %d via menu.", new_port)
+		if type(on_applied) == "function" then pcall(on_applied) end
+		pcall(deps.save_prefs)
+		pcall(deps.update_menu)
+	end
+
+	--- Resets the MLX server port to its dedicated default and applies it.
+	--- @param on_applied function|nil Called after the reset (e.g. restart).
+	function obj.reset_mlx_port(on_applied)
+		local ok_api, ApiMlx = pcall(require, "modules.llm.api_mlx")
+		if not ok_api or type(ApiMlx.set_port) ~= "function" then return end
+		if ApiMlx.set_port(ApiMlx.get_default_port()) then
+			Logger.info(LOG, "MLX server port reset to default %d.", ApiMlx.get_default_port())
+			if type(on_applied) == "function" then pcall(on_applied) end
+			pcall(deps.save_prefs)
+			pcall(deps.update_menu)
+		end
 	end
 
 	--- Builds the indentation selection submenu.
