@@ -158,11 +158,11 @@ _check_or_install ydotool   ydotool         ydotool         ydotool
 _check_or_install notify-send libnotify-bin libnotify       libnotify
 
 
-# =============================================
-# =============================================
-# ======= 5/ Espanso & Kanata Install =======
-# =============================================
-# =============================================
+# =================================
+# =================================
+# ======= 5/ Kanata Install =======
+# =================================
+# =================================
 
 # Kanata releases page — fetch the latest amd64 binary if kanata is absent
 KANATA_RELEASE_URL="https://github.com/jtroo/kanata/releases/latest/download/kanata"
@@ -187,57 +187,9 @@ _install_kanata() {
 	echo "  ✔  kanata installé dans ${dest}"
 }
 
-_install_espanso() {
-	if command -v espanso >/dev/null 2>&1; then
-		echo "  ✔  espanso — déjà installé"
-		return 0
-	fi
-
-	local pkg_mgr
-	pkg_mgr=$(_detect_pkg_manager)
-	echo "  →  espanso manquant — installation en cours…"
-
-	case "$pkg_mgr" in
-		apt)
-			# Official espanso .deb for Debian/Ubuntu
-			local deb_url="https://github.com/espanso/espanso/releases/latest/download/espanso-debian-amd64.deb"
-			local tmp_deb
-			tmp_deb="$(mktemp /tmp/espanso-XXXXXX.deb)"
-			curl --silent --location --output "${tmp_deb}" "${deb_url}"
-			sudo dpkg -i "${tmp_deb}"
-			rm -f "${tmp_deb}"
-			;;
-		dnf)
-			# RPM-based distro: use the official AppImage as a universal fallback
-			local appimage_url="https://github.com/espanso/espanso/releases/latest/download/espanso-linux-x86_64.AppImage"
-			local dest="${BIN_DIR}/espanso"
-			install -d "${BIN_DIR}"
-			curl --silent --location --output "${dest}" "${appimage_url}"
-			chmod +x "${dest}"
-			;;
-		pacman)
-			# Arch: espanso is in the AUR; fall back to the AppImage to avoid
-			# requiring an AUR helper (yay/paru) in the installer
-			local appimage_url="https://github.com/espanso/espanso/releases/latest/download/espanso-linux-x86_64.AppImage"
-			local dest="${BIN_DIR}/espanso"
-			install -d "${BIN_DIR}"
-			curl --silent --location --output "${dest}" "${appimage_url}"
-			chmod +x "${dest}"
-			;;
-		*)
-			echo "Erreur : impossible d'installer espanso automatiquement." >&2
-			echo "  Téléchargez-le depuis https://espanso.org/install/linux/" >&2
-			return 1
-			;;
-	esac
-
-	echo "  ✔  espanso installé"
-}
-
 echo ""
-echo "=== Installation de espanso et kanata ==="
+echo "=== Installation de kanata ==="
 _install_kanata
-_install_espanso
 
 
 # =================================
@@ -287,58 +239,15 @@ chmod +x "${BIN_DIR}/ergopti-hotstrings"
 echo "  ✔  lanceur : ${BIN_DIR}/ergopti-hotstrings"
 
 
-# ====================================================
-# ====================================================
-# ======= 7/ Espanso Config & Match Generation =======
-# ====================================================
-# ====================================================
-
-ESPANSO_CONFIG_DIR="${HOME}/.config/espanso"
-ESPANSO_MATCH_DIR="${ESPANSO_CONFIG_DIR}/match"
-ESPANSO_CONF_DIR="${ESPANSO_CONFIG_DIR}/config"
-
-echo ""
-echo "=== Configuration d'espanso ==="
-
-install -d "${ESPANSO_MATCH_DIR}"
-install -d "${ESPANSO_CONF_DIR}"
-
-# Install the ergopti base config (symlink so updates are picked up automatically)
-ESPANSO_BASE_CONF="${ESPANSO_CONF_DIR}/ergopti.yml"
-if [ ! -f "${ESPANSO_BASE_CONF}" ]; then
-	ln -sf "${LIB_DIR}/linux/espanso/base.yml" "${ESPANSO_BASE_CONF}"
-	echo "  ✔  config espanso : ${ESPANSO_BASE_CONF}"
-else
-	echo "  ✔  config espanso existante conservée : ${ESPANSO_BASE_CONF}"
-fi
-
-# Generate espanso match YAML files from every TOML category
-GENERATOR="${LIB_DIR}/linux/modules/espanso/config_generator.lua"
-HOTSTRINGS_SRC="${LIB_DIR}/shared/hotstrings"
-
-if [ -f "${GENERATOR}" ]; then
-	for toml in "${HOTSTRINGS_SRC}/"*.toml; do
-		[ -f "${toml}" ] || continue
-		# Skip index and schema files — only process hotstring entry files
-		[[ "$(basename "${toml}")" == _* ]] && continue
-		category="$(basename "${toml}" .toml)"
-		out="${ESPANSO_MATCH_DIR}/ergopti_${category}.yml"
-		echo "  →  génération : ${out}"
-		luajit "${GENERATOR}" "${toml}" "${out}"
-	done
-else
-	echo "  Avertissement : config_generator.lua introuvable — fichiers match ignorés." >&2
-fi
-
-
 # ============================================================
 # ============================================================
-# ======= 8/ Kanata Config Symlink & Systemd Service =======
+# ======= 7/ Kanata Config Symlink & Systemd Service =======
 # ============================================================
 # ============================================================
 
 KANATA_CONFIG_DIR="${HOME}/.config/kanata"
-KANATA_SRC="${SCRIPT_DIR}/../../config/kanata/ergopti.kbd"
+# Kanata layout lives in the shared kanata/ folder one level above this driver.
+KANATA_SRC="${SCRIPT_DIR}/../kanata/kanata.kbd"
 
 echo ""
 echo "=== Configuration de kanata ==="
@@ -382,33 +291,10 @@ Environment=DISPLAY=:0
 WantedBy=graphical-session.target
 SERVICE
 
-	# espanso daemon (text expansion backend)
-	cat > "${SYSTEMD_DIR}/ergopti-espanso.service" << ESPANSO_SERVICE
-[Unit]
-Description=Ergopti — expansion de texte (espanso)
-After=graphical-session.target
-
-[Service]
-Type=simple
-ExecStart=/usr/bin/espanso daemon
-Restart=on-failure
-RestartSec=3s
-
-[Install]
-WantedBy=graphical-session.target
-ESPANSO_SERVICE
-
 	systemctl --user daemon-reload
 
 	systemctl --user enable  ergopti-hotstrings.service
 	systemctl --user restart ergopti-hotstrings.service
-
-	# Only start espanso service if the binary is available
-	if command -v espanso >/dev/null 2>&1; then
-		systemctl --user enable  ergopti-espanso.service
-		systemctl --user restart ergopti-espanso.service
-		echo "  ✔  service espanso activé et démarré"
-	fi
 
 	echo "  ✔  service ergopti-hotstrings activé et démarré"
 fi
