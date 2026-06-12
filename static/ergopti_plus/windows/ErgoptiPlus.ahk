@@ -331,6 +331,11 @@ global _AhkSubDir := "autohotkey\"
 ; expert overrides ([script] / [features]) are sections of this one file.
 global ConfigurationFile := _ConfigDir . _AhkSubDir . "config.toml"
 
+; Load the cross-driver hotstring resolution defaults (global default delay /
+; color / "personal" baseline) from shared/hotstrings/defaults.toml — the single
+; source shared with Hammerspoon. Must precede HotstringsConfigInit and the tray
+; menu build (initMenu reads GLOBAL_DEFAULT_DELAY). Fail-fast on a missing key.
+HotstringsConfigLoadSharedDefaults()
 ; Initialise the hotstrings_config module so per-group delays and tooltip
 ; colors can be resolved from the TOML metadata + the shared user override
 ; file. The override file lives in the same shared config directory used by

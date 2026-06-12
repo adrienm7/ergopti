@@ -31,11 +31,15 @@
 ; ==============================================================================
 
 ; Ultimate fallback when neither a user override nor a TOML default is set.
-; Mirrors the HS module so behaviour is identical across drivers.
-; ``GLOBAL_DEFAULT_COLOR`` is the SINGLE source of truth for "no color set" —
-; every per-category lookup that finds nothing else lands here.
-global GLOBAL_DEFAULT_DELAY := 0.75
-global GLOBAL_DEFAULT_COLOR := "#1e88e5"  ; Blue — global tooltip tint when nothing else is configured
+; LOADED AT BOOT from the shared cross-driver canon
+; (shared/hotstrings/defaults.toml) by HotstringsConfigLoadSharedDefaults() —
+; the SINGLE source shared verbatim with the Hammerspoon driver. They start
+; empty so a missing file/key fails fast (rule 5.3) rather than masking driver
+; drift behind a hardcoded literal (rules 5.2 / 5.4). ``GLOBAL_DEFAULT_COLOR``
+; remains the single source of truth for "no color set" — every per-category
+; lookup that finds nothing else lands here.
+global GLOBAL_DEFAULT_DELAY := ""
+global GLOBAL_DEFAULT_COLOR := ""
 
 ; Default activation delay (seconds) for the dynamic hotstrings (dates, phone /
 ; SSN / IBAN prefixes). Mirrors the macOS DELAYS_DEFAULT.dynamichotstrings value.
@@ -47,11 +51,13 @@ global GLOBAL_DEFAULT_COLOR := "#1e88e5"  ; Blue — global tooltip tint when no
 global DYN_HOTSTRINGS_DEFAULT_DELAY := 2.0
 
 ; Per-category baseline that overrides ``GLOBAL_DEFAULT_COLOR`` only when no
-; TOML _meta or user override sets a color. Lives next to the global default
-; so all defaults are visible in one place.
+; TOML _meta or user override sets a color. The "personal" baseline is loaded
+; from the shared canon by HotstringsConfigLoadSharedDefaults() (kept in lock-step
+; with macOS); "llm_prediction" is an AHK-only tint with no Hammerspoon
+; equivalent (it mirrors shared/tooltip/constants.toml [accent_colors]
+; ai_loading_hex), so it stays a local literal here.
 global HOTSTRINGS_CATEGORY_DEFAULT_COLORS := Map(
-    "personal",       "#6e6e73",  ; Gray — neutral baseline so user-added entries stand out only when the user picks a colour themselves
-    "llm_prediction", "#AD61FF",  ; Violet — AI loading / in-flight tooltip (macOS ai_loading; overridable in hotstring settings)
+    "llm_prediction", "#AD61FF",  ; Violet — AI loading / in-flight tooltip (AHK-only; mirrors tooltip ai_loading_hex)
 )
 
 ; Shared terminator catalogue instance — the single source of truth for the
@@ -109,6 +115,57 @@ global _HSResolveGen := 0
 ; ======= 1/ Override file I/O ==============================
 ; ============================================================
 ; ============================================================
+
+; Load the cross-driver hotstring resolution defaults — the global default
+; expansion delay, the global default tooltip color, and the per-category
+; "personal" baseline color — from the shared canon
+; (shared/hotstrings/defaults.toml), the SINGLE source shared verbatim with the
+; Hammerspoon driver. Must run once at boot BEFORE the tray menu is built (it
+; reads GLOBAL_DEFAULT_DELAY) and before any HotstringsResolve.
+;
+; A missing file or key THROWS — in production the unhandled error surfaces the
+; fatal dialog and the script exits (fail fast, rule 5.3); in the headless test
+; runner run_all.ahk's OnError handler turns it into a "not ok 0" line instead
+; of hanging on a modal. There is no compile-time fallback (rules 5.2 / 5.4).
+; @param SharedDir Optional shared/ root; defaults to the global ``_SharedDir``.
+HotstringsConfigLoadSharedDefaults(SharedDir := "") {
+    global _SharedDir, GLOBAL_DEFAULT_DELAY, GLOBAL_DEFAULT_COLOR
+    global HOTSTRINGS_CATEGORY_DEFAULT_COLORS
+    Dir  := (SharedDir != "") ? SharedDir : (IsSet(_SharedDir) ? _SharedDir : "")
+    Path := Dir . "\hotstrings\defaults.toml"
+    c    := ParseTomlFile(Path)
+    if !c.Count {
+        throw Error("shared/hotstrings/defaults.toml introuvable ou vide : " . Path)
+    }
+
+    GLOBAL_DEFAULT_DELAY := Float(_HSDefaultsRequire(c, "delays", "default_sec", Path))
+    GLOBAL_DEFAULT_COLOR := _HSDefaultsRequireHex(c, "colors", "global_default", Path)
+    HOTSTRINGS_CATEGORY_DEFAULT_COLORS["personal"] := _HSDefaultsRequireHex(c, "colors", "personal", Path)
+
+    try LoggerInfo("HotstringsConfig", "Shared defaults loaded (delay={1}s color={2} personal={3}).",
+        GLOBAL_DEFAULT_DELAY, GLOBAL_DEFAULT_COLOR, HOTSTRINGS_CATEGORY_DEFAULT_COLORS["personal"])
+}
+
+; Fetch a required key from the parsed defaults cache, throwing on absence so a
+; truncated/edited canon aborts loudly rather than resolving to "".
+_HSDefaultsRequire(c, Section, Key, Path) {
+    Val := IniCacheGet(c, Section, Key)
+    if (Val == "_") {
+        throw Error(Format("shared/hotstrings/defaults.toml — clé manquante : [{1}] {2} ({3})", Section, Key, Path))
+    }
+    return Val
+}
+
+; Like _HSDefaultsRequire but validates a "#RRGGBB" (or "RRGGBB") hex color and
+; returns it normalised WITH the leading "#" (the form every consumer expects).
+_HSDefaultsRequireHex(c, Section, Key, Path) {
+    Val := _HSDefaultsRequire(c, Section, Key, Path)
+    Hex := (SubStr(Val, 1, 1) == "#") ? SubStr(Val, 2) : Val
+    if (StrLen(Hex) != 6) {
+        throw Error(Format("shared/hotstrings/defaults.toml — couleur hex invalide : [{1}] {2} = {3}", Section, Key, Val))
+    }
+    return "#" . Hex
+}
 
 ; Initialise the module. Must be called before any Resolve/Set call.
 ; The path is shared with Hammerspoon so both drivers can read each other's

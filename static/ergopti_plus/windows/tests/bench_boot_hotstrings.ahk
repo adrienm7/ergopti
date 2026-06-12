@@ -63,6 +63,11 @@ SetWorkingDir(A_ScriptDir)
 ; The generated loaders + per-category maps (_GENERATED_HOTSTRINGS_*).
 #Include ../lib/hotstrings/hotstrings_generated.ahk
 
+; Load the shared resolution defaults (delay / color / personal) exactly as boot
+; does, so the HotstringsResolve cascade this bench times reads the production
+; fallbacks instead of the empty sentinels. _SharedDir comes from test_stubs.ahk.
+HotstringsConfigLoadSharedDefaults()
+
 
 
 

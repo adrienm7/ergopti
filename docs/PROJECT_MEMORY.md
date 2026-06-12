@@ -510,6 +510,14 @@ All AI-timeout + dynamic-delay behaviour is AHK-side and **UI/runtime — NOT co
 
 All of the above lives on branch `feat/comma-j-expansion` (not yet merged to dev as of 2026-06-04).
 
+**The three hard fallbacks are now a shared cross-driver file (A4, 2026-06-13).** `GLOBAL_DEFAULT_DELAY` (0.75 s), `GLOBAL_DEFAULT_COLOR` (#1e88e5) and the `personal` baseline (#6e6e73) used to be duplicated literals in BOTH `windows/lib/hotstrings/hotstrings_config.ahk` and `macos/modules/hotstrings_config.lua` (each claiming "single source"). They now live ONCE in `static/ergopti_plus/shared/hotstrings/defaults.toml` (`[colors] global_default / personal`, `[delays] default_sec`) and are read at boot by both drivers with a fail-fast `require_key`, exactly like `shared/tooltip/constants.toml`. Key implementation gotchas:
+
+- **AHK uses an EXPLICIT loader, never a top-level auto-read.** `HotstringsConfigLoadSharedDefaults()` is called from `ErgoptiPlus.ahk` (before `HotstringsConfigInit` and the tray menu build — `initMenu` reads `GLOBAL_DEFAULT_DELAY`). It is NOT run at the `hotstrings_config.ahk` top level because `tests/test_hotstring_aggregation.ahk` sets `_SharedDir` *after* its `#Include` of the file — a top-level read would throw at include time. This mirrors `ui_style.ahk`'s sentinel-then-loader pattern. The three globals start `""` / `Map()` sentinels.
+- **Fail-fast = THROW, not `MsgBox`+`ExitApp`.** A missing key throws an `Error`: in production the unhandled boot error surfaces the fatal dialog and exits (desired); in CI `run_all.ahk`'s `OnError` handler turns it into a `not ok 0` line (no hung modal). `MsgBox`+`ExitApp` would hang the headless runner. The macOS side `error()`s at require-time (re-required per test).
+- **`IniCacheGet`/`ParseTomlFile` return colors WITH the leading `#`** (the TOML stores `"#1e88e5"`); the loader strips+re-adds `#` to normalise. Don't double-prefix.
+- **Pre-existing trap unrelated to A4:** the focused dev runner `tests/run_hotstrings_config.ahk` reports ~14 failures (`_HSE_SourcePriority` "local variable has not been assigned a value") because it does NOT `#Include hotstring_engine_main.ahk`, which defines `_HSE_SourcePriority` — now called in the resolve priority cascade. **CI uses `run_all.ahk`, which includes it and is fully green (1372/0).** Use `run_all.ahk` to judge hotstrings_config changes, not the focused runner.
+- Out of A4 scope (still AHK-only literals): `llm_prediction #AD61FF` (no HS equivalent — mirrors tooltip `ai_loading_hex`) and `DYN_HOTSTRINGS_DEFAULT_DELAY 2.0`. Single-source tripwire tests on both drivers (`test_hotstrings_config.ahk` §SharedDefaults, `macos/.../unit/modules/test_hotstrings_defaults.lua`) assert the loaded values equal the file AND pin the canonical literals.
+
 ### project-hotstring-engine-internals
 
 _AHK prefix-watcher InputHook captures synthetic input; OnChar must feed each char once; AHK vs Hammerspoon word-boundary framing divergence is intentional_
