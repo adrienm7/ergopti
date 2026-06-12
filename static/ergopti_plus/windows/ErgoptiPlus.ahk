@@ -2096,12 +2096,14 @@ _RegisterScriptAltGrHotkeys() {
 }
 _RegisterScriptAltGrHotkeys()
 
-if Features.Has("hotstrings") and Features["hotstrings"].Has("personal") {
-    for SectionName, SectionConfig in Features["hotstrings"]["personal"] {
-        if (IsObject(SectionConfig) and SectionConfig.Has("enabled") and SectionConfig["enabled"])
-            LoadHotstringsSection("personal", SectionName, SectionConfig)
-    }
-}
+; Personal hotstrings are loaded exactly once, inside RegisterAllHotstrings()
+; below. There used to be an inline forward-order load here at #InputLevel 0,
+; but personal hotstrings register through HSE (CreateHotstring → HSE_Register),
+; not AHK-native Hotstring(), so #InputLevel never applied to them — the inline
+; loop was a pre-HSE leftover that double-registered all 263 personal specs and
+; re-parsed their TOML on every boot/reload. RegisterAllHotstrings now loads
+; them in forward order so first-declared (prominent) sections win HSE's
+; first-registered-wins collision tiebreak, matching the old effective order.
 #InputLevel 2
 #Include modules/layout.ahk
 #Include modules/shortcuts.ahk
