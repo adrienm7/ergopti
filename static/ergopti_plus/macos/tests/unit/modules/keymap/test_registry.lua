@@ -350,6 +350,23 @@ helpers.describe("Registry collision priority", function()
 		helpers.assert_eq(Registry.source_priority(nil), 10)
 	end)
 
+	-- Regression: the macOS loader registers the user's extra extension TOMLs
+	-- under the group name "personal_ext_<stem>" (init.lua), the platform analog
+	-- of Windows "ext.<id>" packages. They must score the PACKAGE tier (30), not
+	-- silently fall to common (10) as they did before the personal_ext_ branch —
+	-- otherwise the same extension file outranks common on Windows but ties it on
+	-- macOS, breaking cross-driver parity and the documented loading order
+	-- personal (50) > extension (30) > common (10).
+	helpers.it("source_priority scores personal_ext_* as the package tier (parity with Windows ext.*)", function()
+		fresh_registry()
+		helpers.assert_eq(Registry.source_priority("personal_ext_demo"), 30)
+		helpers.assert_eq(Registry.source_priority("PERSONAL_EXT_Demo"), 30)
+		-- Nested stems use "__" as the separator; still package tier.
+		helpers.assert_eq(Registry.source_priority("personal_ext_sub__group"), 30)
+		-- The bare personal file stays at the personal tier, above its extensions.
+		helpers.assert_eq(Registry.source_priority("personal"), 50)
+	end)
+
 	helpers.it("add stores an explicit opts.priority on the mapping", function()
 		local state = fresh_registry()
 		Registry.add("qp", "QP", { is_case_sensitive = true, priority = 77 })
