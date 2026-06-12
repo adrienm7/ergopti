@@ -382,22 +382,22 @@ KL_Hook_LivePush() {
 ; =====================================
 
 KL_Hook_Start() {
-    ; Idempotent — multiple Start calls are no-ops once the hook is alive.
-    if KLHook.HasOwnProp("ih") && IsObject(KLHook.ih)
+    ; Idempotent — multiple Start calls are no-ops once subscribed.
+    if KLHook.HasOwnProp("registered") && KLHook.registered
         return
 
-    ih := InputHook("V L0")
-    ; Notify on every key (no end-key needed). Without this, OnKeyDown
-    ; only fires for the keys passed to KeyOpt with the "+N" option.
-    ih.KeyOpt("{All}", "+N")
-    ; Make sure non-text keys (arrows, F-keys, Esc, BS, Enter, Tab)
-    ; still raise OnKeyDown — without this they would be silently
-    ; absorbed by the ``Input`` wrapper.
-    ih.NotifyNonText := true
-    ih.OnChar := KL_Hook_OnChar
-    ih.OnKeyDown := KL_Hook_OnKeyDown
-    ih.Start()
-    KLHook.ih := ih
+    ; Subscribe the keylogger's keyboard handlers to the shared HookDispatcher
+    ; instead of opening a second InputHook. The dispatcher already owns the
+    ; process-wide InputHook (identical "V L0" + KeyOpt {All} +N + NotifyNonText
+    ; options) and already carries the keylogger's mouse subscribers, so this
+    ; collapses one per-keystroke hook callback into the shared fan-out.
+    ; Dispatch gates on A_IsSuspended, so the handlers stay silent under pause
+    ; exactly as the standalone hook's own guard did.
+    KLHook.cb_char := KL_Hook_OnChar.Bind()
+    KLHook.cb_down := KL_Hook_OnKeyDown.Bind()
+    HookDispatcher.Register(HookDispatcherConst.EVT_KB_CHAR, KLHook.cb_char)
+    HookDispatcher.Register(HookDispatcherConst.EVT_KB_DOWN, KLHook.cb_down)
+    KLHook.registered := true
     KLHook.last_tick := A_TickCount
 
     ; Bind the flush callback once and keep the reference around so
@@ -413,10 +413,11 @@ KL_Hook_Stop() {
     if KLHook.HasOwnProp("live_push_timer") && IsObject(KLHook.live_push_timer) {
         try SetTimer(KLHook.live_push_timer, 0)
     }
-    if KLHook.HasOwnProp("ih") && IsObject(KLHook.ih) {
-        try KLHook.ih.Stop()
-        KLHook.ih := unset
+    if KLHook.HasOwnProp("cb_char") {
+        try HookDispatcher.Unregister(HookDispatcherConst.EVT_KB_CHAR, KLHook.cb_char)
+        try HookDispatcher.Unregister(HookDispatcherConst.EVT_KB_DOWN, KLHook.cb_down)
     }
+    KLHook.registered := false
     ; Final flush so the in-RAM buffer hits today.log before we leave.
     try KL_FlushBuffer()
 }
