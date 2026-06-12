@@ -66,12 +66,17 @@ function fail(msg, detail) {
 console.log('\nPort contract single-source compliance');
 console.log('='.repeat(50));
 
+// Compare line-ending-normalised so the gate is robust to git autocrlf:
+// contracts.json has no explicit .gitattributes eol rule, so it is checked out
+// CRLF on Windows while the codegen always emits LF — a raw compare would then
+// report a false "stale" on Windows checkouts.
+const normalizeEol = (s) => s.replace(/\r\n/g, '\n');
 const committed = fs.existsSync(CONTRACTS_PATH) ? fs.readFileSync(CONTRACTS_PATH, 'utf8') : null;
 const regenerated = serialise(buildContracts());
 
 if (committed === null) {
 	fail('contracts.json exists', ['file not found — run `npm run codegen:contracts`']);
-} else if (committed !== regenerated) {
+} else if (normalizeEol(committed) !== normalizeEol(regenerated)) {
 	fail('contracts.json is up to date with shared/ports/*.spec.js', [
 		'contracts.json is STALE — run `npm run codegen:contracts` and commit the result'
 	]);
