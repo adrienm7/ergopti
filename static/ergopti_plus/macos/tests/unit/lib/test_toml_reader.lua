@@ -125,3 +125,26 @@ helpers.describe("toml_reader.load", function()
 		os.remove(path)
 	end)
 end)
+
+helpers.describe("toml_reader.parse: per-entry priority", function()
+	-- Regression: parse_entry previously skipped numeric inline-table values, so a
+	-- personal hotstring's `priority = N` was silently dropped and the macOS loader
+	-- always fell back to the source default — making the per-hotstring priority
+	-- override a no-op. These pin that the numeric value is captured as a number,
+	-- and that an entry without the key reads back nil (so the cascade falls back).
+	helpers.it("captures a numeric priority key as a number", function()
+		local body = [==[
+[[s]]
+"win" = { output = "W", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false, priority = 80 }
+"def" = { output = "D", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+]==]
+		local path = write_temp("prio", body)
+		local data = reader.parse(path)
+		local e = data.sections.s.entries
+		helpers.assert_eq(e[1].trigger, "win")
+		helpers.assert_eq(e[1].priority, 80)
+		helpers.assert_eq(e[2].trigger, "def")
+		helpers.assert_eq(e[2].priority, nil)
+		os.remove(path)
+	end)
+end)
