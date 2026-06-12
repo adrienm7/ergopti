@@ -79,6 +79,16 @@ global HSE_WORD_TERMINATORS := " `t`r`n.,;:?!" . Chr(0x27) . Chr(0x2019)
 ; HSE_WORD_TERMINATORS have any effect here.
 global HSE_CONSUMED_DELIMITERS := ""
 
+; Default collision priority by hotstring SOURCE (see Spec.Priority). Higher wins
+; an equal-length tie. The cascade is individual > section > file > these source
+; defaults, so a user can always override. Bundled "common" hotstrings sit
+; lowest, third-party "package" (extension TOML) in the middle, and the user's
+; own "personal" hotstrings highest — so personal beats a package beats a common
+; trigger of the same length without any manual tuning.
+global HSE_PRIORITY_COMMON   := 10
+global HSE_PRIORITY_PACKAGE  := 30
+global HSE_PRIORITY_PERSONAL := 50
+
 
 
 
@@ -226,7 +236,7 @@ global HSE_TypoNbspStripped := false
 ; be exercised by unit tests that pass a bare Callback.
 HSE_Register(Flags, Trigger, Callback, Meta := unset) {
     global HSE_RegistryByLastChar, HSE_StarSpecs, HSE_StarPrefixSetCI, HSE_StarPrefixSetCS
-    global HSE_RegistryByGroup, HSE_DisabledGroups, HSE_SeqCounter
+    global HSE_RegistryByGroup, HSE_DisabledGroups, HSE_SeqCounter, HSE_PRIORITY_COMMON
     if (Trigger == "") {
         return
     }
@@ -285,12 +295,12 @@ HSE_Register(Flags, Trigger, Callback, Meta := unset) {
         StarBaseTail:  (StarBase != "") ? SubStr(StarBase, -1) : "",
         Group:         Group,
         GroupOrder:    GroupOrder,
-        ; Collision precedence among EQUAL-LENGTH triggers. Higher wins; the
-        ; default 50 is neutral so a registry with no explicit priorities falls
-        ; back to Seq order (the historical behaviour). The loader overrides this
-        ; via Meta (resolved individual > section > file > source default, where
-        ; source defaults are 10 common / 30 package / 50 personal).
-        Priority:      50,
+        ; Collision precedence among EQUAL-LENGTH triggers. Higher wins. Defaults
+        ; to the common-source value; the loader overrides it via Meta with the
+        ; resolved cascade (individual > section > file > source default). When no
+        ; registration sets distinct priorities every Spec shares this value, so
+        ; ties fall straight back to Seq — the pre-priority behaviour.
+        Priority:      HSE_PRIORITY_COMMON,
         FinalResult:   false,
         Color:         ""
     }
