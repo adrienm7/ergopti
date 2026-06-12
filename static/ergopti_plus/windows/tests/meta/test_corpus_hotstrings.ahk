@@ -245,3 +245,68 @@ _CorpusHS_CaseSensitiveVectorsHaveCorrectMatchFlag() {
 	}
 }
 Test("hotstring corpus  --  case-sensitive vectors: exact match flag is consistent", _CorpusHS_CaseSensitiveVectorsHaveCorrectMatchFlag)
+
+
+
+
+
+; ================================================
+; ================================================
+; ======= 4/ Collision priority resolution =======
+; ================================================
+; ================================================
+
+; Drives the shared collision corpus through the REAL engine: each mapping is
+; registered under its own source group (so cross-source same-trigger specs
+; compete instead of one shadowing the other), then the buffer is fed one char at
+; a time. The winner is whatever the final keystroke resolves — the dispatch point
+; in production. star + in-word ("*?") fires immediately on the last char and
+; bypasses the word-boundary gate, isolating the collision tie-break (length >
+; priority > first-registered). Must agree with the Hammerspoon registry on every
+; vector — the cross-driver collision contract.
+
+_CorpusHS_CollisionVectorsArePresent() {
+	Corpus := _CorpusHS_Parse()
+	AssertTrue(Corpus != "", "corpus must parse")
+	AssertTrue(Corpus.Has("collision_vectors"), "corpus must expose a collision_vectors array")
+	AssertTrue(Corpus["collision_vectors"].Length > 0, "collision_vectors must be non-empty")
+}
+Test("hotstring corpus  --  collision_vectors array is present and non-empty", _CorpusHS_CollisionVectorsArePresent)
+
+_CorpusHS_EveryCollisionVectorResolvesToExpectedWinner() {
+	global HSE_PRIORITY_COMMON
+	Corpus := _CorpusHS_Parse()
+	if Corpus = "" {
+		return
+	}
+	if not Corpus.Has("collision_vectors") {
+		return
+	}
+	for Vec in Corpus["collision_vectors"] {
+		Id := Vec.Has("id") ? Vec["id"] : "?"
+		HSE_TestReset()
+		for Mapping in Vec["mappings"] {
+			Flags := "*?" . ((Mapping.Has("is_case_sensitive") and Mapping["is_case_sensitive"] = true) ? "C" : "")
+			Grp   := Mapping.Has("group")       ? Mapping["group"]       : "g"
+			Prio  := Mapping.Has("priority")    ? Mapping["priority"]    : HSE_PRIORITY_COMMON
+			Repl  := Mapping.Has("replacement") ? Mapping["replacement"] : ""
+			HSE_Register(Flags, Mapping["trigger"], () => 0,
+				Map("group", Grp, "Priority", Prio, "Repl", Repl))
+		}
+		HSE_FeedReset(true)
+		Buffer := Vec["buffer"]
+		Match  := ""
+		loop StrLen(Buffer) {
+			Match := HSE_FeedChar(SubStr(Buffer, A_Index, 1))
+		}
+		Expected := Vec["expected"]
+		if (Expected.Has("matched") and Expected["matched"] = true) {
+			AssertTrue(Match != "", "collision vector '" . Id . "': expected a match")
+			AssertEqual(Expected["winner"], Match.Repl,
+				"collision vector '" . Id . "': wrong winner")
+		} else {
+			AssertEqual("", Match, "collision vector '" . Id . "': expected no match")
+		}
+	}
+}
+Test("hotstring corpus  --  every collision vector resolves to the expected winner", _CorpusHS_EveryCollisionVectorResolvesToExpectedWinner)
