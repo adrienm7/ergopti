@@ -40,6 +40,36 @@ global UPDATER_INI_INTERVAL_KEY    := "check_interval_seconds"
 global UPDATER_DEFAULT_INTERVAL    := 86400
 global UPDATER_CHECK_INTERVAL      := UPDATER_DEFAULT_INTERVAL
 
+; WinHttp timeout budget (ms) for the synchronous GitHub Releases / asset calls.
+; EVERY phase must be finite: WinHttp treats 0 as "infinite", so a stalled DNS
+; resolve (a connecting VPN, a captive portal, a dead resolver) blocks the
+; synchronous call — and therefore the AHK main thread, and therefore ALL
+; keyboard remapping — until the network recovers. The resolve phase used to be
+; passed as 0 here, which is exactly how the background check could freeze the
+; driver a few seconds after startup. Bounding every phase turns a permanent
+; freeze into a brief, self-healing hiccup on a flaky network.
+global UPDATER_HTTP_RESOLVE_TIMEOUT_MS := 5000     ; DNS resolution
+global UPDATER_HTTP_CONNECT_TIMEOUT_MS := 15000    ; TCP connect
+global UPDATER_HTTP_SEND_TIMEOUT_MS    := 30000    ; request send
+global UPDATER_HTTP_RECEIVE_TIMEOUT_MS := 30000    ; response receive
+
+; In-flight async background-check requests, keyed by an incrementing id. Each
+; value is a Map("http", req, "channel", ch, "on_json", cb, "url", u, "polls", n).
+; The background poller dispatches through here so its network round-trip runs
+; in WinHTTP async mode and is harvested by a poll timer — the synchronous call
+; that used to block (and freeze) the main thread near startup is gone for the
+; unprompted path. See _Updater_FetchLatestJsonAsync / _Updater_PollAsync.
+global _UpdaterAsyncRequests := Map()
+global _UpdaterAsyncCounter  := 0
+
+; Cadence + safety cap for polling an async background check to completion. The
+; poll only asks "ready yet?" (WaitForResponse(0), 0 = do not wait), so a slack
+; interval is fine — freshness does not matter for a silent check. The max-polls
+; cap is derived from the timeout budget so a wedged request can never leave a
+; poll timer running forever.
+global UPDATER_ASYNC_POLL_MS   := 250
+global UPDATER_ASYNC_MAX_POLLS := Ceil((UPDATER_HTTP_RESOLVE_TIMEOUT_MS + UPDATER_HTTP_CONNECT_TIMEOUT_MS + UPDATER_HTTP_SEND_TIMEOUT_MS + UPDATER_HTTP_RECEIVE_TIMEOUT_MS) / UPDATER_ASYNC_POLL_MS) + 20
+
 ; User-facing presets for the frequency submenu. Kept in display order so the
 ; menu renders the way users naturally read time: short to long, with the
 ; "off" row at the very bottom — a destructive choice deserves its own slot.
@@ -349,6 +379,8 @@ Updater_OpenCurrentRelease(*) {
 ; without consuming the GitHub anonymous rate-limit budget.
 Updater_FetchLatestJson(Channel) {
 	global _UpdaterFetchCache
+	global UPDATER_HTTP_RESOLVE_TIMEOUT_MS, UPDATER_HTTP_CONNECT_TIMEOUT_MS
+	global UPDATER_HTTP_SEND_TIMEOUT_MS, UPDATER_HTTP_RECEIVE_TIMEOUT_MS
 	Url := Updater_ReleaseApiUrl(Channel)
 	Json := ""
 	try {
@@ -356,41 +388,153 @@ Updater_FetchLatestJson(Channel) {
 		Req.Open("GET", Url, false)
 		Req.SetRequestHeader("Accept", "application/vnd.github+json")
 		Req.SetRequestHeader("User-Agent", "ErgoptiPlus-Updater/1.0")
-		; 15 s connect + 30 s receive — prevents the synchronous call from
-		; blocking the AHK main thread indefinitely on a slow or flaky network.
-		Req.SetTimeouts(0, 15000, 30000, 30000)
+		; Always-finite timeouts — a 0 in any slot means "infinite" to WinHttp
+		; and lets a stalled DNS resolve freeze the AHK main thread (and all
+		; keyboard remapping) until the network recovers. See the constants at
+		; the top of this file for the per-phase budget and the rationale.
+		Req.SetTimeouts(UPDATER_HTTP_RESOLVE_TIMEOUT_MS, UPDATER_HTTP_CONNECT_TIMEOUT_MS,
+			UPDATER_HTTP_SEND_TIMEOUT_MS, UPDATER_HTTP_RECEIVE_TIMEOUT_MS)
 		if _UpdaterFetchCache.Has(Channel) {
 			Etag := _UpdaterFetchCache[Channel].Etag
 			if (Etag != "")
 				Req.SetRequestHeader("If-None-Match", Etag)
 		}
 		Req.Send()
-		Status := Req.Status
-		if (Status == 304) {
-			if _UpdaterFetchCache.Has(Channel)
-				Json := _UpdaterFetchCache[Channel].Json
-			try LoggerDebug("Updater", "GitHub releases unchanged (304) for channel {1}.", Channel)
-		} else if (Status == 200) {
-			Json := Req.ResponseText
-			Etag := ""
-			try Etag := Req.GetResponseHeader("ETag")
-			if (Etag != "" and Json != "") {
-				_UpdaterFetchCache[Channel] := { Etag: Etag, Json: Json }
-			}
-		} else if (Status == 403) {
-			try LoggerWarn("Updater", "GitHub API rate limit (HTTP 403) for '{1}'.", Url)
-		} else {
-			try LoggerWarn("Updater", "GitHub API HTTP {1} for '{2}'.", Status, Url)
-		}
+		Etag := ""
+		try Etag := Req.GetResponseHeader("ETag")
+		Json := _Updater_InterpretResponse(Req.Status, Req.ResponseText, Etag, Channel, Url)
 	} catch as Err {
 		LoggerWarn("Updater", "HTTP request failed: {1}.", Err.Message)
 	}
+	return Json
+}
+
+; Interprets a completed GitHub Releases response into the single-object JSON
+; string every downstream parser expects. Shared by the synchronous fetch above
+; and the async background path so their status / ETag / array-unwrap handling
+; can never drift apart. Returns "" when there is nothing usable (304 with no
+; cached body, 403 rate limit, or any other non-200). Updates the per-channel
+; conditional-GET cache on a fresh 200.
+_Updater_InterpretResponse(Status, Body, Etag, Channel, Url) {
+	global _UpdaterFetchCache
+	Json := ""
+	if (Status == 304) {
+		if _UpdaterFetchCache.Has(Channel)
+			Json := _UpdaterFetchCache[Channel].Json
+		try LoggerDebug("Updater", "GitHub releases unchanged (304) for channel {1}.", Channel)
+	} else if (Status == 200) {
+		Json := Body
+		if (Etag != "" and Json != "")
+			_UpdaterFetchCache[Channel] := { Etag: Etag, Json: Json }
+	} else if (Status == 403) {
+		try LoggerWarn("Updater", "GitHub API rate limit (HTTP 403) for '{1}'.", Url)
+	} else {
+		try LoggerWarn("Updater", "GitHub API HTTP {1} for '{2}'.", Status, Url)
+	}
 	; Array response (dev channel) — unwrap to the highest-semver prerelease so
 	; every downstream parser receives a single-object JSON string.
-	if (Json != "" and SubStr(LTrim(Json), 1, 1) == "[") {
+	if (Json != "" and SubStr(LTrim(Json), 1, 1) == "[")
 		Json := _Updater_UnwrapLatestPrerelease(Json)
-	}
 	return Json
+}
+
+; Async, non-blocking sibling of Updater_FetchLatestJson. Dispatches the GitHub
+; Releases request in WinHTTP async mode (Open(…, true)) and returns at once;
+; OnJson(Json) is invoked later from a poll timer once the response completes
+; (Json == "" on any failure). This is what the background poller uses, so a
+; slow or stalled network can never block the AHK main thread — and therefore
+; never freeze keyboard remapping. User-initiated paths keep the synchronous
+; fetch (bounded timeouts, the user is actively waiting on the click). Mirrors
+; the WinHTTP-async + SetTimer-poll pattern used in modules/llm.
+_Updater_FetchLatestJsonAsync(Channel, OnJson) {
+	global _UpdaterFetchCache, _UpdaterAsyncRequests, _UpdaterAsyncCounter
+	global UPDATER_HTTP_RESOLVE_TIMEOUT_MS, UPDATER_HTTP_CONNECT_TIMEOUT_MS
+	global UPDATER_HTTP_SEND_TIMEOUT_MS, UPDATER_HTTP_RECEIVE_TIMEOUT_MS
+	Url := Updater_ReleaseApiUrl(Channel)
+	try {
+		Req := ComObject("WinHttp.WinHttpRequest.5.1")
+		Req.Open("GET", Url, true)
+		Req.SetRequestHeader("Accept", "application/vnd.github+json")
+		Req.SetRequestHeader("User-Agent", "ErgoptiPlus-Updater/1.0")
+		Req.SetTimeouts(UPDATER_HTTP_RESOLVE_TIMEOUT_MS, UPDATER_HTTP_CONNECT_TIMEOUT_MS,
+			UPDATER_HTTP_SEND_TIMEOUT_MS, UPDATER_HTTP_RECEIVE_TIMEOUT_MS)
+		if _UpdaterFetchCache.Has(Channel) {
+			Etag := _UpdaterFetchCache[Channel].Etag
+			if (Etag != "")
+				Req.SetRequestHeader("If-None-Match", Etag)
+		}
+		Req.Send()
+	} catch as Err {
+		try LoggerDebug("Updater", "Async check dispatch failed: {1}.", Err.Message)
+		try OnJson("")
+		return
+	}
+	_UpdaterAsyncCounter += 1
+	id := _UpdaterAsyncCounter
+	_UpdaterAsyncRequests[id] := Map(
+		"http", Req, "channel", Channel, "on_json", OnJson, "url", Url, "polls", 0)
+	_Updater_PollAsync(id)
+}
+
+; Non-blocking completion poll for one in-flight async update check. Asks WinHTTP
+; "is the response ready?" via WaitForResponse(0) (0 = do not wait); re-arms
+; itself until ready, then interprets the response and fires the stored OnJson.
+; A throw means the request errored (DNS / connect / timeout) — treated as a
+; failure that yields OnJson(""). UPDATER_ASYNC_MAX_POLLS is a belt-and-suspenders
+; cap so a wedged request can never leave a poll timer running forever.
+_Updater_PollAsync(id) {
+	global _UpdaterAsyncRequests, UPDATER_ASYNC_POLL_MS, UPDATER_ASYNC_MAX_POLLS
+	if !_UpdaterAsyncRequests.Has(id)
+		return
+	rec := _UpdaterAsyncRequests[id]
+	http := rec["http"]
+	ready := false
+	failed := false
+	try {
+		ready := http.WaitForResponse(0)
+	} catch as Err {
+		failed := true
+		try LoggerDebug("Updater", "Async check failed: {1}.", Err.Message)
+	}
+	if (!failed and !ready) {
+		rec["polls"] += 1
+		if (rec["polls"] > UPDATER_ASYNC_MAX_POLLS) {
+			failed := true
+			try LoggerWarn("Updater", "Async check exceeded its poll budget — aborting.")
+		} else {
+			SetTimer(() => _Updater_PollAsync(id), -UPDATER_ASYNC_POLL_MS)
+			return
+		}
+	}
+	OnJson   := rec["on_json"]
+	Channel  := rec["channel"]
+	Url      := rec["url"]
+	_UpdaterAsyncRequests.Delete(id)
+	Json := ""
+	if !failed {
+		try {
+			Etag := ""
+			try Etag := http.GetResponseHeader("ETag")
+			Json := _Updater_InterpretResponse(http.Status, http.ResponseText, Etag, Channel, Url)
+		} catch as Err {
+			try LoggerDebug("Updater", "Async response read failed: {1}.", Err.Message)
+			Json := ""
+		}
+	}
+	try OnJson(Json)
+}
+
+; Abandons every in-flight async update check. Called when background checks are
+; stopped (e.g. the user switches the cadence to "never") so a response landing
+; after the fact cannot still pop a notification. Dropping the registry entry
+; releases the WinHTTP object; any pending poll timer no-ops on its next tick
+; because the id is gone.
+_Updater_CancelAsyncChecks() {
+	global _UpdaterAsyncRequests
+	if (_UpdaterAsyncRequests.Count == 0)
+		return
+	_UpdaterAsyncRequests.Clear()
+	try LoggerDebug("Updater", "Cancelled all in-flight async update checks.")
 }
 
 ; Given a GitHub releases array JSON string, return the JSON object of the
@@ -433,6 +577,8 @@ Updater_ReleasesListApiUrl(Channel := "") {
 ; Fetches the releases LIST endpoint (synchronous, like ``Updater_FetchLatestJson``)
 ; and returns the raw JSON array string. Returns "" on any error.
 Updater_FetchReleasesListJson(Channel := "") {
+	global UPDATER_HTTP_RESOLVE_TIMEOUT_MS, UPDATER_HTTP_CONNECT_TIMEOUT_MS
+	global UPDATER_HTTP_SEND_TIMEOUT_MS, UPDATER_HTTP_RECEIVE_TIMEOUT_MS
 	Url := Updater_ReleasesListApiUrl(Channel)
 	Json := ""
 	try {
@@ -440,9 +586,11 @@ Updater_FetchReleasesListJson(Channel := "") {
 		Req.Open("GET", Url, false)
 		Req.SetRequestHeader("Accept", "application/vnd.github+json")
 		Req.SetRequestHeader("User-Agent", "ErgoptiPlus-Updater/1.0")
-		; 15 s connect + 30 s receive — avoids blocking the UI indefinitely
-		; on a slow connection while still giving GitHub enough headroom.
-		Req.SetTimeouts(0, 15000, 30000, 30000)
+		; Always-finite timeouts — a 0 in any slot means "infinite" to WinHttp
+		; and would let a stalled DNS resolve block the UI thread until the
+		; network recovers. See the constants at the top of this file.
+		Req.SetTimeouts(UPDATER_HTTP_RESOLVE_TIMEOUT_MS, UPDATER_HTTP_CONNECT_TIMEOUT_MS,
+			UPDATER_HTTP_SEND_TIMEOUT_MS, UPDATER_HTTP_RECEIVE_TIMEOUT_MS)
 		Req.Send()
 		if (Req.Status == 200) {
 			Json := Req.ResponseText
@@ -1105,6 +1253,9 @@ Updater_StartBackgroundChecks() {
 ; Stops the periodic timer if armed. Safe to call when nothing is running.
 Updater_StopBackgroundChecks() {
 	global _UpdaterBackgroundFn
+	; Drop any in-flight async check first so a late response cannot still pop a
+	; notification after the user disabled checks (e.g. switched to "never").
+	_Updater_CancelAsyncChecks()
 	if !IsSet(_UpdaterBackgroundFn)
 		return
 	try LoggerTrace("Updater", "Stopping background update checks…")
@@ -1113,14 +1264,13 @@ Updater_StopBackgroundChecks() {
 	try LoggerDone("Updater", "Background update checks stopped.")
 }
 
-; One iteration of the background poller: hits GitHub silently, compares
-; tags, surfaces a TrayTip on a NEW version (dedupe via LAST_NOTIFIED_TAG),
-; then re-arms itself with the current configured interval. Any failure is
-; logged and the loop continues — network blips must not silently kill the
-; updater.
+; One iteration of the background poller: re-arms itself for the next interval,
+; then dispatches a silent, ASYNCHRONOUS GitHub query. The response is harvested
+; off this tick in _Updater_HandleBackgroundResult, so the network round-trip
+; never blocks the main thread — the synchronous call here was what froze
+; keyboard remapping a few seconds after startup on a slow or stalled network.
 Updater_BackgroundTick(*) {
-	global UPDATER_CHANNEL, UPDATER_CHECK_INTERVAL, UPDATER_LAST_NOTIFIED_TAG
-	global UPDATER_LATEST_RELEASE, _UpdaterBackgroundFn
+	global UPDATER_CHANNEL, UPDATER_CHECK_INTERVAL, _UpdaterBackgroundFn
 	; Re-arm first so a thrown error below cannot leave the loop dead.
 	if IsSet(_UpdaterBackgroundFn) and UPDATER_CHECK_INTERVAL > 0 {
 		try SetTimer(_UpdaterBackgroundFn, UPDATER_CHECK_INTERVAL * 1000)
@@ -1128,7 +1278,18 @@ Updater_BackgroundTick(*) {
 	if Updater_IsLocalSource()
 		return
 	Current := Updater_CurrentVersion()
-	Json := Updater_FetchLatestJson(UPDATER_CHANNEL)
+	; ``Current`` is captured by the closure and stays valid until the async
+	; fetch completes and the callback runs.
+	_Updater_FetchLatestJsonAsync(UPDATER_CHANNEL, (Json) => _Updater_HandleBackgroundResult(Json, Current))
+}
+
+; Completion handler for a background check, invoked once the async fetch
+; finishes (Json == "" on any failure). Compares tags, dedupes via
+; LAST_NOTIFIED_TAG, and on a genuinely new release caches it, rebuilds the tray
+; menu, and surfaces a TrayTip. Any failure is logged and the loop just waits
+; for the next interval — a network blip must not silently kill the updater.
+_Updater_HandleBackgroundResult(Json, Current) {
+	global UPDATER_LAST_NOTIFIED_TAG, UPDATER_LATEST_RELEASE
 	if (Json == "") {
 		try LoggerDebug("Updater", "Background check: network unreachable.")
 		return
@@ -1310,6 +1471,8 @@ Updater_ShowAvailableUpdate(*) {
 ; pre-exit failure so the user knows it didn't work.
 Updater_DownloadAndInstall(Release) {
 	global BUNDLE_RELEASE_ASSET
+	global UPDATER_HTTP_RESOLVE_TIMEOUT_MS, UPDATER_HTTP_CONNECT_TIMEOUT_MS
+	global UPDATER_HTTP_SEND_TIMEOUT_MS, UPDATER_HTTP_RECEIVE_TIMEOUT_MS
 	if (Type(Release) != "Object" or !Release.HasProp("RawJson")) {
 		MsgBox(t("updater.install_error"), t("updater.title_update"), "Icon!")
 		return
@@ -1355,6 +1518,11 @@ Updater_DownloadAndInstall(Release) {
 		Req := ComObject("WinHttp.WinHttpRequest.5.1")
 		Req.Open("GET", AssetUrl, false)
 		Req.SetRequestHeader("User-Agent", "ErgoptiPlus-Updater/1.0")
+		; Always-finite timeouts — even this user-initiated download must not
+		; hang the main thread forever on a stalled resolve/connect or a CDN
+		; that goes silent mid-transfer. See the constants at the top of the file.
+		Req.SetTimeouts(UPDATER_HTTP_RESOLVE_TIMEOUT_MS, UPDATER_HTTP_CONNECT_TIMEOUT_MS,
+			UPDATER_HTTP_SEND_TIMEOUT_MS, UPDATER_HTTP_RECEIVE_TIMEOUT_MS)
 		Req.Send()
 		if (Req.Status != 200) {
 			try LoggerError("Updater", "Asset download returned HTTP {1}.", Req.Status)

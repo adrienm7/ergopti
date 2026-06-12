@@ -21,6 +21,7 @@ Accumulated engineering knowledge for this repository — gotchas, architecture 
   - [feedback-ui-must-be-i18n](#feedback-ui-must-be-i18n) — All user-facing UI text must go through the i18n system in 21 supported languages — never hardcode any UI string anywhere, including WebView UIs (metrics, download window, etc.).
 - **Project architecture & decisions**
   - [project-ahk-menu-dispatcher-drop](#project-ahk-menu-dispatcher-drop) — AHK 2.0 silently drops ~30-50% of tray-menu clicks. FIXED via lib/menu_dispatcher.ahk — every actionable item must use RegisterMenuItem, never raw Menu.Add.
+  - [project-updater-nonblocking-http](#project-updater-nonblocking-http) — The updater background poll must never do synchronous WinHttp on the main thread (it freezes all remapping); WinHttp SetTimeouts 0 = infinite. Use the async WinHTTP + WaitForResponse(0) + SetTimer-poll pattern.
   - [project-config-v2-refactor](#project-config-v2-refactor) — State of the v2 config schema refactor (Scope C) — branch refactor/config-schema-v2 with 5 dormant commits. Cut-over to actually migrate the AHK driver runtime is the open piece.
   - [project_debug_menu_sync](#project-debug-menu-sync) — Debug menu order is defined in shared/menu_manifest.json debug_menu — both AHK and Lua drivers consume it
   - [project-gestures-reversal-detection](#project-gestures-reversal-detection) — How direction reversals are detected in the gestures engine (x1 vs incremental)
@@ -910,3 +911,26 @@ through the one `ProfileLabel.format` helper.
   click (no "use this profile" sub-item), matching the AHK tray; cloning a
   read-only built-in moved to a single "Clone active profile…" entry.
 - See [[project-locale-parity-test]], [[feedback-regression-tests]].
+
+### project-updater-nonblocking-http
+
+_The updater background poll must never do synchronous WinHttp on the main thread (it freezes all keyboard remapping); WinHttp `SetTimeouts` treats 0 as infinite. Use the project's async WinHTTP + `WaitForResponse(0)` + `SetTimer`-poll pattern._
+
+<sub>slug: `project_updater_nonblocking_http`</sub>
+
+Two distinct foot-guns, both surfaced by a user reporting a "freeze au démarrage" tied to the update check (AHK driver, `lib/updater.ahk`):
+
+1. **`WinHttpRequest.SetTimeouts(resolve, connect, send, receive)` treats `0` as "infinite"**, not "default". The background poller called `SetTimeouts(0, 15000, 30000, 30000)` (commit `c135b2d30`) believing it bounded the call — but the **resolve (DNS) phase stayed unbounded**. On a network where DNS stalls (a connecting VPN, a captive portal, a dead resolver) the synchronous `Req.Send()` blocks forever. Every phase must be a finite, named constant (`UPDATER_HTTP_*_TIMEOUT_MS`). A regression test scans `updater.ahk` for any `SetTimeouts(0,` literal.
+
+2. **A synchronous WinHttp call on the AHK main thread freezes ALL keyboard remapping** for its whole duration — hotkey subroutines and the `Send()` of remapped keys run on the main thread, so they cannot fire while `Req.Send()` blocks. The background poller fires its first check ~30 s after boot (`FirstMs := Min(30000, …)`), so on a bad network the user perceives a "startup freeze". Bounding the timeouts only caps the duration; the real fix is to **not block the main thread at all**.
+
+**How to apply:**
+
+- The unprompted background poll uses the async path: `_Updater_FetchLatestJsonAsync` opens the request in WinHTTP async mode (`Req.Open(url, true)`), `Send()` returns immediately, and `_Updater_PollAsync` harvests it via `WaitForResponse(0)` (0 = do not wait) re-armed by a `SetTimer`. The network I/O runs on WinHTTP's own worker threads — the main thread never blocks. This is the same **WinHTTP-async + `WaitForResponse(0)` + `SetTimer`-poll** pattern used in `modules/llm/api_ollama.ahk` + `api_remote.ahk` (mirroring `hs.http.asyncPost` on macOS). A `try`-wrapped `WaitForResponse(0)` that throws = the request errored (treated as failure); a max-polls cap derived from the timeout budget guarantees no orphaned poll timer.
+- Status / ETag / array-unwrap interpretation is shared by the sync and async paths via `_Updater_InterpretResponse` (single source of truth — they must not drift).
+- **User-initiated** paths (one-click "check now", changelog, download) keep the *synchronous* fetch: the user is actively waiting on the click, and the timeouts are now bounded. Only the unprompted poll needs to be async.
+- `Updater_StopBackgroundChecks` cancels in-flight async requests so a late response cannot pop a notification after the user picks "never".
+- The `[ahk.updater] check_interval_seconds` persistence round-trip for the "never" (0) value is **correct** (verified empirically — write → parse → load yields `0` and the poller stays disarmed). The reason a "never" user can still see checks is that the default *when the key is absent* is 86400 (opt-out), and the first check fires ~30 s after boot.
+- Guarded by `windows/tests/test_updater.ahk`: timeouts all > 0, no `SetTimeouts(0,` literal, `Updater_DownloadAndInstall` sets timeouts before `Send()`, and `Updater_BackgroundTick` dispatches via `_Updater_FetchLatestJsonAsync` (never the blocking fetch).
+
+See [[feedback-regression-tests]], [[project-ahk-menu-dispatcher-drop]].
