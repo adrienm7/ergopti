@@ -181,11 +181,24 @@ _RegisterHotstring(TriggerSpec, Callback, Meta := unset) {
 ; are dropped. Abbreviations are registered as-is so the HSE bucket
 ; index stays in lockstep with the upstream registration call.
 _MirrorRegistrationToHSE(TriggerSpec, Callback, Meta := unset) {
-    if !RegExMatch(TriggerSpec, "^:([^:]*):(.+)$", &Match) {
+    ; Parse the ``:<flags>:<abbrev>`` spec with InStr rather than a per-call
+    ; RegExMatch: this runs once for EVERY hotstring registered at boot (~5400
+    ; calls), and the abbreviation was just assembled by the caller — a regex to
+    ; pull it back apart is pure overhead on the startup hot path. Semantics match
+    ; the old ``^:([^:]*):(.+)$``: flags hold no colon, the abbreviation is
+    ; everything after the second colon and must be non-empty.
+    if (SubStr(TriggerSpec, 1, 1) != ":") {
         return
     }
-    RawFlags := Match[1]
-    Abbrev := Match[2]
+    SecondColon := InStr(TriggerSpec, ":", true, 2)
+    if (!SecondColon) {
+        return
+    }
+    RawFlags := SubStr(TriggerSpec, 2, SecondColon - 2)
+    Abbrev := SubStr(TriggerSpec, SecondColon + 1)
+    if (Abbrev == "") {
+        return
+    }
     HseFlags := ""
     if InStr(RawFlags, "*") {
         HseFlags .= "*"

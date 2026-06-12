@@ -985,25 +985,35 @@ _HSE_StarTriggerCoversBody(BodyBuf, Spec, EndChar) {
 ; Called once per registration (cold path only).
 _HSE_IndexStarPrefixes(Spec) {
     global HSE_StarPrefixSetCI, HSE_StarPrefixSetCS
-    Len := Spec.Length
-    if (Len <= 1) {
+    if (Spec.Length <= 1) {
         return
     }
+    ; Pick the target set and (for the case-insensitive path) lowercase the whole
+    ; trigger ONCE up front instead of StrLower-ing every prefix and next-char
+    ; inside the loop. Lowercasing commutes with substring for these triggers, so
+    ; the keys land byte-identical — this is a pure speedup of the magic-key boot
+    ; registration, which is the single heaviest category at startup (every star
+    ; trigger walks all its prefixes here). ``Set`` aliases the global Map by
+    ; reference, so inserts below mutate the real index.
+    if Spec.CaseSensitive {
+        T := Spec.Trigger
+        Set := HSE_StarPrefixSetCS
+    } else {
+        T := StrLower(Spec.Trigger)
+        Set := HSE_StarPrefixSetCI
+    }
+    ; Build each successive prefix by appending one char rather than re-slicing
+    ; from position 1 each iteration (the old SubStr(Trigger, 1, i) was O(len^2)
+    ; in total characters copied per registration).
+    Len := StrLen(T)
+    Prefix := ""
     loop (Len - 1) {
-        Prefix := SubStr(Spec.Trigger, 1, A_Index)
-        NextChar := SubStr(Spec.Trigger, A_Index + 1, 1)
-        if Spec.CaseSensitive {
-            if !HSE_StarPrefixSetCS.Has(Prefix) {
-                HSE_StarPrefixSetCS[Prefix] := Map()
-            }
-            HSE_StarPrefixSetCS[Prefix][NextChar] := true
-        } else {
-            LowerPrefix := StrLower(Prefix)
-            if !HSE_StarPrefixSetCI.Has(LowerPrefix) {
-                HSE_StarPrefixSetCI[LowerPrefix] := Map()
-            }
-            HSE_StarPrefixSetCI[LowerPrefix][StrLower(NextChar)] := true
+        Prefix .= SubStr(T, A_Index, 1)
+        NextChar := SubStr(T, A_Index + 1, 1)
+        if !Set.Has(Prefix) {
+            Set[Prefix] := Map()
         }
+        Set[Prefix][NextChar] := true
     }
 }
 

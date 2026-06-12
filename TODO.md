@@ -153,10 +153,33 @@ generated-loader honouring, and the live preview).
 
 **Still remaining (genuine hand-off):**
 
-A. **Boot perf (Windows)** — B4 generated loaders ~800 ms (instrument/bisect first),
-   prefix-watcher index ~205 ms + layout layers ~85 ms (likely inherent). NB: Phase 5 added
-   a `HotstringsResolve` call per indexed trigger at index-build time (memoised per
-   category/section, so cheap), worth a glance if the ~205 ms prefix-watcher build regresses.
+A. **Boot perf (Windows)** — bisected. A headless micro-bench
+   (`tests/bench_boot_hotstrings.ahk`, run via AutoHotkey64) reproduces the exact
+   production registration path (`CreateHotstring` → `_MirrorRegistrationToHSE` →
+   `HSE_Register` + memoised `HotstringsResolve`; `_HotstringRegistrar` is 0 in
+   production, so no native `Hotstring()` is involved). Cold-run breakdown (~5400
+   total registrations):
+   - **magic-key text expansion ~410 ms / 3149 regs** — by far the heaviest, and a
+     higher per-reg cost (~0.13 ms vs ~0.086 ms) because every star trigger walks all
+     its prefixes in `_HSE_IndexStarPrefixes`.
+   - **autocorrection ~148 ms / 1715 regs** — dominated by `accents` (~95 ms / 1157).
+   - distances+SFBs ~50 ms, rolls ~5 ms.
+
+   Two safe, zero-behaviour optimisations landed (suite green 1348/0, 5 new pins in
+   `test_hotstring_engine_main.ahk` §3.1): `_HSE_IndexStarPrefixes` now lowercases the
+   trigger once and builds prefixes incrementally (was O(len²) slicing + per-char
+   StrLower); `_MirrorRegistrationToHSE` parses `:flags:abbrev` with InStr instead of a
+   per-registration RegExMatch. The boot log now splits the former single mark into
+   three (`Layout/shortcuts/tap-holds`, `Hotstrings registered (HSE)`, `Prefix watcher
+   index armed`) so a real boot bisects on the user's machine.
+
+   **Remaining lever is architectural, not micro:** the ~600–800 ms is dominated by the
+   sheer count (~5400) of per-registration object/closure constructions, which is
+   largely inherent. Material further wins require doing LESS at boot — defer the
+   non-critical magic-key emoji/symbol categories to a post-boot idle pass, or reduce
+   the registration count — both change time-to-availability / collision ordering, so
+   they need a deliberate decision before implementing. Prefix-watcher index ~205 ms +
+   layout layers ~85 ms remain likely inherent.
 
 ---
 

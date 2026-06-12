@@ -209,6 +209,94 @@ Test("HSE Register ignores an empty trigger",
 
 
 
+; ==================================================
+; ===== 3.1) Boot-perf registration invariants =====
+; ==================================================
+
+; These pin two startup hot-path optimisations (magic-key text expansion is the
+; single heaviest boot category — ~3100 star registrations). The behaviour they
+; lock must stay byte-identical to the pre-optimisation code, so a future refactor
+; that "simplifies" either path cannot silently change the index it builds.
+
+; _HSE_IndexStarPrefixes builds each successive prefix incrementally instead of
+; re-slicing from position 1. The resulting prefix -> next-char set must be exactly
+; {"a": {"b"}, "ab": {"c"}} for the 3-char trigger "abc".
+TestHSE_StarPrefixIndexContent() {
+    HSE_TestReset()
+    HSE_Register("*", "abc", () => 0)
+    AssertEqual(2, HSE_StarPrefixSetCI.Count,
+        "a 3-char star trigger contributes exactly two prefixes")
+    AssertTrue(HSE_StarPrefixSetCI.Has("a") and HSE_StarPrefixSetCI["a"].Has("b"),
+        "prefix 'a' maps to next-char 'b'")
+    AssertTrue(HSE_StarPrefixSetCI.Has("ab") and HSE_StarPrefixSetCI["ab"].Has("c"),
+        "prefix 'ab' maps to next-char 'c'")
+}
+Test("HSE star-prefix index builds the exact prefix -> next-char set",
+    TestHSE_StarPrefixIndexContent)
+
+; The case-insensitive path now lowercases the whole trigger ONCE before slicing.
+; A mixed-case trigger "AbC" must still yield the SAME lowercase keys as "abc" —
+; no uppercase prefix or next-char may leak into the CI set.
+TestHSE_StarPrefixIndexLowercasesCI() {
+    HSE_TestReset()
+    HSE_Register("*", "AbC", () => 0)
+    AssertTrue(HSE_StarPrefixSetCI.Has("a") and HSE_StarPrefixSetCI["a"].Has("b"),
+        "CI prefix 'A' is lowercased to 'a', next-char 'b'")
+    AssertTrue(HSE_StarPrefixSetCI.Has("ab") and HSE_StarPrefixSetCI["ab"].Has("c"),
+        "CI next-char 'C' is lowercased to 'c'")
+    AssertFalse(HSE_StarPrefixSetCI.Has("A"),
+        "no uppercase prefix key leaks into the case-insensitive set")
+}
+Test("HSE star-prefix index lowercases the case-insensitive keys once",
+    TestHSE_StarPrefixIndexLowercasesCI)
+
+; Case-sensitive star triggers keep literal case in the CS prefix set.
+TestHSE_StarPrefixIndexCSKeepsCase() {
+    HSE_TestReset()
+    HSE_Register("*C", "AbC", () => 0)
+    AssertTrue(HSE_StarPrefixSetCS.Has("A") and HSE_StarPrefixSetCS["A"].Has("b"),
+        "case-sensitive prefixes keep literal case 'A'")
+    AssertTrue(HSE_StarPrefixSetCS.Has("Ab") and HSE_StarPrefixSetCS["Ab"].Has("C"),
+        "case-sensitive next-char keeps literal case 'C'")
+    AssertEqual(0, HSE_StarPrefixSetCI.Count,
+        "a case-sensitive trigger contributes nothing to the CI set")
+}
+Test("HSE star-prefix index keeps literal case for case-sensitive triggers",
+    TestHSE_StarPrefixIndexCSKeepsCase)
+
+; _MirrorRegistrationToHSE parses the ":<flags>:<abbrev>" spec with InStr instead
+; of a regex. It must split on the SECOND colon so an abbreviation that itself
+; contains a colon (the ":=" assign roll) keeps every colon after the separator.
+TestHSE_MirrorParseAbbrevWithColon() {
+    HSE_TestReset()
+    _MirrorRegistrationToHSE(":*?B0O:a:b", () => 0)
+    AssertTrue(HSE_RegistryByLastChar.Has("b"),
+        "abbrev 'a:b' buckets under its real last char 'b'")
+    Spec := HSE_RegistryByLastChar["b"][1]
+    AssertEqual("a:b", Spec.Trigger,
+        "a colon inside the abbreviation survives the split on the second colon")
+    AssertTrue(Spec.Star, "the '*' flag is parsed from the flags portion")
+    AssertTrue(Spec.InWord, "the '?' flag is parsed from the flags portion")
+    AssertFalse(Spec.CaseSensitive, "no 'C' in the flags portion -> case-insensitive")
+}
+Test("HSE mirror-parse splits on the second colon (abbrev may contain colons)",
+    TestHSE_MirrorParseAbbrevWithColon)
+
+; A malformed spec with no second colon registers nothing (matched the old regex,
+; which required both colons and a non-empty abbreviation).
+TestHSE_MirrorParseRejectsMalformed() {
+    HSE_TestReset()
+    _MirrorRegistrationToHSE(":justflags", () => 0)
+    _MirrorRegistrationToHSE(":flags:", () => 0)
+    _MirrorRegistrationToHSE("noLeadingColon", () => 0)
+    AssertEqual(0, HSE_RegistryByLastChar.Count,
+        "specs missing the second colon, an abbrev, or the leading colon register nothing")
+}
+Test("HSE mirror-parse rejects malformed specs (no second colon / empty abbrev)",
+    TestHSE_MirrorParseRejectsMalformed)
+
+
+
 
 
 ; ============================================

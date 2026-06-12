@@ -2112,9 +2112,17 @@ _RegisterScriptAltGrHotkeys()
 ; The module now only DEFINES RegisterAllHotstrings(); invoke it here so the
 ; registration runs at the same boot point (and A_InputLevel) as before the
 ; in-process refactor. A_InputLevel is still 2 from the #InputLevel 2 above.
+; Split the former single "hotstrings + prefix watcher" mark into three so the
+; boot log bisects the late-startup cost: everything since the last mark (the
+; layout / shortcuts / tap-hold / AltGr module includes registered above), then
+; the ~5400-hotstring HSE registration, then the prefix-watcher index build. A
+; micro-bench (tests/bench_boot_hotstrings.ahk) shows magic-key text expansion is
+; the heaviest registration category by a wide margin.
+BootProfile_Mark("Layout/shortcuts/tap-holds + AltGr registered")
 RegisterAllHotstrings()
+BootProfile_Mark("Hotstrings registered (HSE)")
 HotstringPrefixWatcherInit()
-BootProfile_Mark("Hotstrings registered + prefix watcher armed")
+BootProfile_Mark("Prefix watcher index armed")
 LoggerSuccess("ErgoptiPlus", "Driver fully initialised — ready.")
 
 global _LAYOUT_POLL_INTERVAL_MS := 1000
