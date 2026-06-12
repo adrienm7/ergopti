@@ -94,23 +94,26 @@ end
 -- =============================================
 
 helpers.describe("meta: port-adapter coverage", function()
-	local shared_ports = REPO_ROOT .. "/static/ergopti_plus/shared/ports"
-	local ahk_adapters = REPO_ROOT .. "/static/ergopti_plus/windows/adapters"
-	local hs_adapters  = REPO_ROOT .. "/static/ergopti_plus/macos/adapters"
+	local shared_ports  = REPO_ROOT .. "/static/ergopti_plus/shared/ports"
+	local ahk_adapters  = REPO_ROOT .. "/static/ergopti_plus/windows/adapters"
+	local hs_adapters   = REPO_ROOT .. "/static/ergopti_plus/macos/adapters"
+	local linux_adapters = REPO_ROOT .. "/static/ergopti_plus/linux/adapters"
 
-	local spec_files  = list_files(shared_ports, "js")
-	local missing_ahk = 0
-	local missing_hs  = 0
-	local spec_count  = 0
+	local spec_files   = list_files(shared_ports, "js")
+	local missing_ahk  = 0
+	local missing_hs   = 0
+	local missing_linux = 0
+	local spec_count   = 0
 
 	for _, spec_path in ipairs(spec_files) do
 		if not spec_path:match("%.spec%.js$") then goto continue end
 		spec_count = spec_count + 1
 
-		local raw_name   = base_name(spec_path)
-		local snake_name = to_snake_case(raw_name)
-		local ahk_file   = ahk_adapters .. "/" .. snake_name .. ".ahk"
-		local hs_file    = hs_adapters  .. "/" .. snake_name .. ".lua"
+		local raw_name    = base_name(spec_path)
+		local snake_name  = to_snake_case(raw_name)
+		local ahk_file    = ahk_adapters   .. "/" .. snake_name .. ".ahk"
+		local hs_file     = hs_adapters    .. "/" .. snake_name .. ".lua"
+		local linux_file  = linux_adapters .. "/" .. snake_name .. ".lua"
 
 		local ahk_fh = io.open(ahk_file, "r")
 		if ahk_fh then
@@ -128,6 +131,16 @@ helpers.describe("meta: port-adapter coverage", function()
 			print(string.format("  WARN: HS adapter missing for port %q: expected %s", raw_name, hs_file))
 		end
 
+		-- Linux must keep up with every port too, so a new port without a Linux
+		-- adapter fails CI rather than letting the Linux driver silently lag.
+		local linux_fh = io.open(linux_file, "r")
+		if linux_fh then
+			linux_fh:close()
+		else
+			missing_linux = missing_linux + 1
+			print(string.format("  WARN: Linux adapter missing for port %q: expected %s", raw_name, linux_file))
+		end
+
 		::continue::
 	end
 
@@ -140,6 +153,11 @@ helpers.describe("meta: port-adapter coverage", function()
 	helpers.it(string.format("every port spec has a HS adapter (%d specs)", spec_count), function()
 		helpers.assert_true(missing_hs == 0,
 			string.format("%d HS adapter(s) missing for port specs", missing_hs))
+	end)
+
+	helpers.it(string.format("every port spec has a Linux adapter (%d specs)", spec_count), function()
+		helpers.assert_true(missing_linux == 0,
+			string.format("%d Linux adapter(s) missing for port specs", missing_linux))
 	end)
 end)
 
