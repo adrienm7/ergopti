@@ -555,10 +555,22 @@ _StartInputHook() {
     ; out chars injected by the hotstring engine itself.
     Hook := InputHook("V L0")
     Hook.KeyOpt("{All}", "+N")            ; notify OnKeyDown for every key
-    Hook.OnChar    := _OnPrefixChar
+    Hook.OnChar    := _OnPrefixCharProfiled
     Hook.OnKeyDown := _OnPrefixKeyDown
     Hook.Start()
     _PrefixInputHook := Hook
+}
+
+; Profiling shim around _OnPrefixChar: times the entire per-keystroke match +
+; render path with sub-millisecond precision and logs only keystrokes slower than
+; the threshold (see lib/hotpath_profiler.ahk). The InputHook binds here rather
+; than directly to _OnPrefixChar so the timing wraps every one of the hot
+; function's return paths without touching the function itself. Char is passed
+; raw so the log string is built only when a keystroke is actually slow.
+_OnPrefixCharProfiled(IH, Char) {
+    _HotStart := HotPath_Now()
+    _OnPrefixChar(IH, Char)
+    HotPath_LogIfSlow("OnChar", _HotStart, Char)
 }
 
 ; OnChar — called for every printable character produced by the active
