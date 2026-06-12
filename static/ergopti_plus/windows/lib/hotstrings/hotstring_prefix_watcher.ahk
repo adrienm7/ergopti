@@ -70,6 +70,14 @@ global _KLLastShownSuggestion := ""
 global _MIN_PREFIX_LEN := 2
 global _MAX_BUFFER_LEN := 64    ; longest trigger we expect, with margin
 
+; Per-keystroke tooltip renders are coalesced through this debounce window so the
+; ~60 ms TooltipShow rebuild (Gui destroy + recreate + layered border + DWM, per
+; the HotPath profiler) never lands on the synchronous keystroke path. Must exceed
+; a fast typist's inter-keystroke gap (~120-150 ms) so continuous typing produces
+; NO render at all; the preview then appears on the deliberate pause that precedes
+; a magic-key press. Lowered once the render itself is made cheap (GUI reuse).
+global _PREFIX_RENDER_DEBOUNCE_MS := 150
+
 ; Extended word-boundary set for tooltip lookup. Superset of HSE_WORD_TERMINATORS:
 ; we add typographic double-quotes (U+201C " and U+201D ") and the straight
 ; double-quote (U+0022 ") so that typing inside a quoted phrase (e.g. `cher"mais`)
@@ -706,7 +714,7 @@ _OnPrefixChar(IH, Char) {
                 ; should appear right away so the user knows to press ★.
                 ; Without this call, TooltipHide() would clear the display and
                 ; the next keystroke (★) would look up "ct★" instead of "ct".
-                _LookupAndRender()
+                _PrefixScheduleRender()
                 _NotifySuggestionConsumed()
             } else {
                 _ResetPrefixBuffer(true)
@@ -740,7 +748,7 @@ _OnPrefixChar(IH, Char) {
         }
         if LoggerIsDebugEnabled()
             LoggerDebug("PrefixWatcher", "DBG about to _LookupAndRender: buf='{1}' indexSize={2}.", _PrefixBuffer, _PrefixIndex.Count)
-        _LookupAndRender()
+        _PrefixScheduleRender()
     } catch as Err {
         LoggerError("PrefixWatcher", "OnChar error for char '{1}': {2}.", Char, Err.Message)
     }
@@ -975,6 +983,27 @@ KL_LogHotstringNearMiss(kind, trigger, replacement, h_type) {
 ; boundary in the buffer; everything to its right is the effective "word
 ; under typing", and that is what we look up. When no boundary is present
 ; we fall back to the full buffer.
+; Debounced render scheduler — see _PREFIX_RENDER_DEBOUNCE_MS. Each keystroke
+; re-arms a one-shot timer (negative period), so a burst of keystrokes collapses
+; into ONE trailing render once typing pauses. The flush re-runs the lookup
+; against the CURRENT buffer, so the coalesced render always reflects the latest
+; typed state. Only the visual preview is deferred — the expansion/fire path
+; (HSE_DispatchMatch) stays fully synchronous, and _ResetPrefixBuffer keeps its
+; immediate hide so a fired hotstring's tooltip vanishes at once.
+_PrefixScheduleRender() {
+    global _PREFIX_RENDER_DEBOUNCE_MS
+    SetTimer(_PrefixRenderFlush, -_PREFIX_RENDER_DEBOUNCE_MS)
+}
+_PrefixRenderFlush() {
+    SetTimer(_PrefixRenderFlush, 0)   ; belt-and-suspenders: never re-fire on its own
+    ; Runs from a timer (outside _OnPrefixChar's try), so guard it — an unhandled
+    ; exception in a timer callback would surface a blocking error dialog.
+    try
+        _LookupAndRender()
+    catch as Err
+        try LoggerError("PrefixWatcher", "Deferred render failed: {1}.", Err.Message)
+}
+
 _LookupAndRender() {
     global _PrefixBuffer, _PrefixIndex, _MIN_PREFIX_LEN, _PREFIX_WORD_BOUNDARIES, ScriptInformation
     Buffer := _PrefixBuffer
