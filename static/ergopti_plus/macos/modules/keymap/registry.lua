@@ -171,7 +171,9 @@ local function rebuild_lookup()
 	if not _state then return end
 	_state.mappings_lookup = {}
 	for _, m in ipairs(_state.mappings) do
-		local k = m.trigger .. "\0" .. tostring(m.is_word) .. "\0" .. tostring(m.auto)
+		-- Key must match add_raw's exactly, group segment included, so a rebuilt
+		-- index keeps cross-source same-trigger entries distinct (see add_raw).
+		local k = m.trigger .. "\0" .. tostring(m.is_word) .. "\0" .. tostring(m.auto) .. "\0" .. (m.group or "")
 		_state.mappings_lookup[k] = m
 	end
 end
@@ -443,10 +445,20 @@ function M.add(trigger, replacement, opts)
 	---   through all space-variant calls, so we never tokenize the same
 	---   replacement 3-4× at load time.
 	local function add_raw(t, r, a, plain_r)
-		local k        = t .. "\0" .. tostring(is_word) .. "\0" .. tostring(a)
+		-- The owning group is part of the dedup identity. Re-adding a trigger from
+		-- the SAME source (a file hot-reload) updates the entry in place for
+		-- idempotency, but the SAME trigger arriving from a DIFFERENT source — e.g.
+		-- a personal hotstring shadowing a bundled common one — must become its own
+		-- competing entry so the collision-priority sort can elect the winner. This
+		-- matches the AHK engine, which keeps every registration as a distinct spec.
+		-- Without the group segment the later-loaded source silently overwrote the
+		-- earlier one's replacement (common loads after personal at startup), so the
+		-- user's higher-priority personal hotstring lost — defeating the priority
+		-- feature for the exact scenario it exists to serve.
+		local k        = t .. "\0" .. tostring(is_word) .. "\0" .. tostring(a) .. "\0" .. (_state.current_group or "")
 		local existing = _state.mappings_lookup[k]
 		if existing then
-			-- Update replacement in place so re-loading a file refreshes the database.
+			-- Same source re-adding the trigger → refresh in place.
 			existing.repl       = r
 			existing.plain_repl = plain_r
 			if _state.current_group then existing.group = _state.current_group end
