@@ -41,7 +41,7 @@ node ./tools/test/test-no-fallbacks                # via: npm run test:no-fallba
 npm run lint:conventions                           # banners / spacing / encoding
 ```
 
-Baseline at hand-off: Node 14/14 + 6/6 · Linux 37/37 · macOS 1531/0 · AHK 1339/0.
+Baseline at hand-off: Node 14/14 + 6/6 · Linux 37/37 · macOS 1531/0 · AHK 1343/0.
 
 ### Latest session (runtime perf + hotstring collision PRIORITY)
 
@@ -139,17 +139,24 @@ as of this note — awaiting live validation):
     `[_meta]` priority + new `test_hotstrings_config.lua` round-trip + registry
     engine-consumes-override-priority (3 cascade cases).
 
+**Hotstring collision PRIORITY — feature COMPLETE (all phases, both drivers).**
+
+Phase 5 landed this session: the prefix-watcher live preview now ranks colliding
+candidates by the engine's tie-break (length > priority > registration order) so the
+non-dimmed row is exactly the mapping the engine fires — `_AddTriggerToIndex` threads the
+resolved priority (individual `priority = N` else the override cascade) onto each index
+entry, and `_LookupAndRender` sorts via `_PrefixSortCandidates` before the end-char/star
+split. macOS has no equivalent live preview, so nothing to mirror. With Phases 1-5 + the
+delays/colors section-priority UI all done, the priority feature is complete end-to-end on
+Windows and macOS (engine, cascade, source defaults, per-hotstring + per-section editing,
+generated-loader honouring, and the live preview).
+
 **Still remaining (genuine hand-off):**
 
-A. **Windows priority finish** — only **Phase 5** left: the prefix-watcher PREVIEW
-   (`hotstring_prefix_watcher.ahk` `_LookupAndRender`) shows the FIRST-registered candidate
-   per group as the live winner; it does NOT apply the engine's `length → priority → seq`
-   tie-break, so the non-dimmed preview can disagree with what actually fires. Make it sort
-   candidates by the engine's rule (entries need their resolved priority threaded into the
-   prefix index). macOS has no equivalent live preview to change.
-   (Phase 3 + the Phase-4 delays/colors UI both landed this session — see above.)
-B. **Boot perf (Windows)** — B4 generated loaders ~800 ms (instrument/bisect first),
-   prefix-watcher index ~205 ms + layout layers ~85 ms (likely inherent).
+A. **Boot perf (Windows)** — B4 generated loaders ~800 ms (instrument/bisect first),
+   prefix-watcher index ~205 ms + layout layers ~85 ms (likely inherent). NB: Phase 5 added
+   a `HotstringsResolve` call per indexed trigger at index-build time (memoised per
+   category/section, so cheap), worth a glance if the ~205 ms prefix-watcher build regresses.
 
 ---
 
