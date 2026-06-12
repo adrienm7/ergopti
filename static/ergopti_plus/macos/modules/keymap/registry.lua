@@ -59,11 +59,18 @@ local PRIORITY_PACKAGE  = 30
 local PRIORITY_PERSONAL = 50
 
 --- Source-default priority for a category name.
---- @param category string|nil Category (e.g. "personal", "ext.demo", "rolls").
+--- Mirrors the Windows _HSE_SourcePriority tiers. The macOS loader names the
+--- user's extra extension files "personal_ext_<stem>" (init.lua), which is the
+--- platform analog of Windows "ext.<id>" packages — both map to the PACKAGE
+--- tier so the documented order personal (50) > extension (30) > common (10)
+--- holds identically on both drivers. Without the personal_ext_ branch these
+--- groups silently fell to common (10) here while Windows scored them 30.
+--- @param category string|nil Category (e.g. "personal", "personal_ext_demo", "ext.demo", "rolls").
 --- @return integer The source-default priority (personal 50 / package 30 / common 10).
 local function source_priority(category)
 	local c = type(category) == "string" and category:lower() or ""
 	if c == "personal" then return PRIORITY_PERSONAL end
+	if c:sub(1, 13) == "personal_ext_" then return PRIORITY_PACKAGE end
 	if c:sub(1, 4) == "ext." then return PRIORITY_PACKAGE end
 	return PRIORITY_COMMON
 end
