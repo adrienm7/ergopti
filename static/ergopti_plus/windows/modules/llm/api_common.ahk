@@ -18,9 +18,9 @@
 ;    base temperature with the same three brackets; dedup compares against
 ;    a normalised text key; retry policy is the same multiplier / step /
 ;    extra-tokens triple.
-; 3. Hardcoded fallback: if inference.json is missing or unparseable, the
-;    fallback table keeps the engine working with the same values that
-;    were committed alongside the JSON — silent degradation, no crash.
+; 3. Fail fast: inference.json is REQUIRED. A missing/unparseable file or a
+;    missing tunable raises loudly (LoggerError + throw) instead of silently
+;    degrading to an in-code mirror that could drift from the JSON.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -34,63 +34,38 @@
 ; =====================================
 ; =====================================
 
-; Hardcoded fallback used when inference.json can't be read. Values mirror
-; the JSON committed alongside this file — keeping them here too means a
-; corrupted / missing JSON never leaves the engine in an undefined state.
-global LLM_COMMON_FALLBACK := Map(
-	"diversity_temperature", Map(
-		"step_when_base_le_0_15",  0.24,
-		"step_when_base_le_0_35",  0.18,
-		"step_default",            0.12,
-		"effective_base_floor",    0.20,
-		"max_temperature",         1.30
-	),
-	"dedup", Map(
-		"enabled_by_default", true
-	),
-	"retry", Map(
-		"max_multiplier",         2,
-		"retry_temperature_step", 0.18,
-		"retry_extra_tokens",     5
-	),
-	"rate_limit_min_interval_ms", Map(
-		"ollama", 300,
-		"mlx",    300,
-		"api",    500
-	)
-)
-
-; Loaded from inference.json on first access. ``unset`` so we can detect the
-; first call and probe the JSON exactly once per session.
+; Loaded from inference.json on first access (cached for the session). ``unset``
+; so the first call probes the JSON exactly once. There is no in-code mirror of
+; these tunables — inference.json is the single source and is required.
 global _LLM_COMMON_INFERENCE := unset
 
 /**
- * Returns the cached inference-constants table, lazy-loading from
- * inference.json on first call. Same path probe as LLM_Defaults_Load so we
- * benefit from the same discovery story and the same fallback story.
- * @returns {Map} Constants table — always non-empty (falls back to LLM_COMMON_FALLBACK).
+ * Returns the cached inference-constants table, lazy-loading from inference.json
+ * on first call. inference.json is REQUIRED: a missing/unreadable/empty file
+ * raises (fail fast) rather than substituting a hardcoded mirror.
+ * @returns {Map} Constants table parsed from inference.json.
  */
 _LLM_Common_GetInference() {
-	global _LLM_COMMON_INFERENCE, LLM_COMMON_FALLBACK, _StaticDir
+	global _LLM_COMMON_INFERENCE, _SharedDir
 	if IsSet(_LLM_COMMON_INFERENCE)
 		return _LLM_COMMON_INFERENCE
-	; Try the canonical path next to defaults.json / models.json.
+	; Canonical path next to defaults.json / models.json.
 	path := _SharedDir . "\llm\inference.json"
 	if !FileExist(path) {
-		_LLM_COMMON_INFERENCE := LLM_COMMON_FALLBACK
-		return _LLM_COMMON_INFERENCE
+		LoggerError("LLMCommon", "shared/llm/inference.json not found at '%s' — LLM inference tunables cannot be loaded.", path)
+		throw Error("ergopti_plus: shared/llm/inference.json is required but was not found")
 	}
 	raw := FSRead(path)
 	if (raw == false) {
-		_LLM_COMMON_INFERENCE := LLM_COMMON_FALLBACK
-		return _LLM_COMMON_INFERENCE
+		LoggerError("LLMCommon", "shared/llm/inference.json could not be read at '%s'.", path)
+		throw Error("ergopti_plus: shared/llm/inference.json could not be read")
 	}
-	try {
-		parsed := _LLM_Common_ParseInferenceJson(raw)
-		_LLM_COMMON_INFERENCE := parsed.Count > 0 ? parsed : LLM_COMMON_FALLBACK
-	} catch {
-		_LLM_COMMON_INFERENCE := LLM_COMMON_FALLBACK
+	parsed := _LLM_Common_ParseInferenceJson(raw)
+	if (parsed.Count == 0) {
+		LoggerError("LLMCommon", "shared/llm/inference.json parsed to an empty table — malformed JSON.")
+		throw Error("ergopti_plus: shared/llm/inference.json is present but parsed empty")
 	}
+	_LLM_COMMON_INFERENCE := parsed
 	return _LLM_COMMON_INFERENCE
 }
 
@@ -160,14 +135,15 @@ _LLM_Common_ParseSectionBody(body) {
 }
 
 /**
- * Pulls a field from inference.json with a fallback to LLM_COMMON_FALLBACK.
+ * Pulls a tunable from inference.json (the single source); raises if absent.
  * Keeps call sites readable: ``_LLM_Common_Cfg("diversity_temperature", "step_default")``.
  */
 _LLM_Common_Cfg(section, key) {
 	cfg := _LLM_Common_GetInference()
 	if (cfg.Has(section) and cfg[section].Has(key))
 		return cfg[section][key]
-	return LLM_COMMON_FALLBACK[section][key]
+	LoggerError("LLMCommon", "shared/llm/inference.json is missing tunable '%s.%s' — malformed or outdated JSON.", section, key)
+	throw Error("ergopti_plus: inference.json missing tunable " . section . "." . key)
 }
 
 /**
@@ -182,17 +158,25 @@ LLM_ApiCommon_DefaultDedupEnabled() {
 /**
  * Returns the minimum interval (milliseconds) between two prediction
  * requests for the given backend. Mirrors the HS
- * ``ApiCommon.get_rate_limit_min_interval_s`` API. Returns 300 ms for
- * unknown backends — same default as HS.
+ * ``ApiCommon.get_rate_limit_min_interval_s`` API. For an unknown backend id it
+ * returns the ollama floor from the JSON — all floors come from inference.json.
  * @param {string} backend_id - One of "ollama" / "mlx" / "api".
  * @returns {number} Floor interval in milliseconds.
  */
 LLM_ApiCommon_GetRateLimitMs(backend_id) {
 	cfg := _LLM_Common_GetInference()
-	rateMap := cfg.Has("rate_limit_min_interval_ms") ? cfg["rate_limit_min_interval_ms"] : LLM_COMMON_FALLBACK["rate_limit_min_interval_ms"]
+	if !cfg.Has("rate_limit_min_interval_ms") {
+		LoggerError("LLMCommon", "shared/llm/inference.json is missing section 'rate_limit_min_interval_ms'.")
+		throw Error("ergopti_plus: inference.json missing section rate_limit_min_interval_ms")
+	}
+	rateMap := cfg["rate_limit_min_interval_ms"]
 	if rateMap.Has(backend_id)
 		return rateMap[backend_id]
-	return 300
+	; Unknown backend id — use the ollama floor from the JSON as the default.
+	if rateMap.Has("ollama")
+		return rateMap["ollama"]
+	LoggerError("LLMCommon", "inference.json rate_limit_min_interval_ms has neither '%s' nor 'ollama'.", backend_id)
+	throw Error("ergopti_plus: inference.json rate_limit floor unavailable")
 }
 
 /**

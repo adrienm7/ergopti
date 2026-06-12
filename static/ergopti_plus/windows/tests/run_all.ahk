@@ -172,6 +172,7 @@ try FileAppend("# [marker] starting direct include of LLM production modules`r`n
 #Include ../modules/llm/profiles.ahk
 #Include test_llm_profiles.ahk
 #Include ../modules/llm/api_common.ahk
+#Include test_llm_api_common.ahk
 #Include ../modules/llm/api_ollama.ahk
 #Include ../modules/llm/api_remote.ahk
 #Include test_llm_api_ollama.ahk
