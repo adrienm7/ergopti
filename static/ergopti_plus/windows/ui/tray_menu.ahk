@@ -1733,6 +1733,7 @@ global _DYNAMIC_HOTSTRINGS_ORDER := ["DateLongFr", "DateFr", "Date",
 InitSubMenus() {
 	global SubMenus, _FLAT_HOTSTRING_V1_CATS, _LegacyTopCategoryMap, _SharedDir
 	_HS_PreScanPersonal()
+	BootProfile_Mark("MENU/InitSub: prescan personal")
 	SubMenus := Map()
 
 	; Flat hotstring categories — order = sections_order from the TOML (which
@@ -1803,15 +1804,19 @@ InitSubMenus() {
 			((c) => (*) => ToggleCategoryAllFeatures(c, !IsCategoryGated(c)))(V1Cat))
 		SubMenus[V1Cat] := SubMenu
 	}
+	BootProfile_Mark("MENU/InitSub: flat hotstring submenus")
 
 	; DynamicHotstrings — custom-ordered, with separator + injected editor.
 	SubMenus["DynamicHotstrings"] := _BuildDynamicHotstringsSubmenu()
+	BootProfile_Mark("MENU/InitSub: dynamic submenu")
 
 	; Shortcuts — Accents + WrapTextIfSelected + Modifier combos + transitional Personal.
 	SubMenus["Shortcuts"] := _BuildShortcutsSubmenu()
+	BootProfile_Mark("MENU/InitSub: shortcuts submenu")
 
 	; TapHolds — built from the v2 variant tables in tap_hold_writer.ahk.
 	SubMenus["TapHolds"] := _BuildTapHoldsSubmenu()
+	BootProfile_Mark("MENU/InitSub: tapholds submenu")
 }
 
 ; Build the DynamicHotstrings submenu directly from the manifest, honouring
@@ -2407,6 +2412,7 @@ initMenu() {
 	MenuManifest_InvalidateCache()
 
 	A_TrayMenu.Delete()
+	BootProfile_Mark("MENU/initMenu: caches reset + tray cleared")
 
 	; Shortcuts submenu — built by MenuRenderer_Build("shortcuts_menu", …).
 	; The renderer handles the category toggle, feature toggles, separator
@@ -2419,6 +2425,7 @@ initMenu() {
 	if SubMenus.Has("Shortcuts") {
 		InsertKeyboardShortcutGroups(SubMenus["Shortcuts"], t("menu.shortcuts.group_modifiers"))
 	}
+	BootProfile_Mark("MENU/initMenu: shortcuts splice")
 
 	; ── 🌐 Disposition clavier — built from manifest via MenuRenderer_Build.
 	; Dynamic handler ``layout_features`` iterates ``ahk.layout`` entries;
@@ -2439,6 +2446,7 @@ initMenu() {
 	if LayoutGated {
 		A_TrayMenu.Check(LayoutMenuTitle)
 	}
+	BootProfile_Mark("MENU/initMenu: layout built+added")
 
 	; ── Hotstrings ⚡ — built from manifest via MenuRenderer_Build.
 	; Dynamic handlers supply the runtime-dependent blocks (params, categories,
@@ -2462,13 +2470,16 @@ initMenu() {
 	_HotGroupBuilders := Map(
 		"hotstrings_params", (*) => MenuRenderer_Build("hotstrings_params_group", "Hotstrings", _HotDynHandlers),
 	)
+	BootProfile_Mark("MENU/initMenu: pre-hotstrings render")
 	HotstringsMenu := MenuRenderer_Build("hotstrings_menu", "Hotstrings", _HotDynHandlers, _HotGroupBuilders)
+	BootProfile_Mark("MENU/initMenu: hotstrings menu rendered")
 
 	HotstringsMenuTitle := t("menu.hotstrings.title") . " (" . FmtCount(_HS_ComputeGrandTotal()) . ")"
 	A_TrayMenu.Add(HotstringsMenuTitle, HotstringsMenu)
 	if HotstringsAllEnabled {
 		A_TrayMenu.Check(HotstringsMenuTitle)
 	}
+	BootProfile_Mark("MENU/initMenu: hotstrings grandtotal+added")
 
 	global _LLM_Tray_InTray
 	_LLM_Tray_InTray := false
@@ -2492,11 +2503,13 @@ initMenu() {
 		_LlmSavedOpts["app_profile_overrides"] := _LlmAppOverridesMap
 	}
 	LLM_Tray_Init(_LlmSavedOpts)
+	BootProfile_Mark("MENU/initMenu: LLM tray init")
 
 	BuildMetricsMenu()
 	if MetricsShortcuts.enabled {
 		A_TrayMenu.Check(t("menu.metrics.title"))
 	}
+	BootProfile_Mark("MENU/initMenu: metrics menu")
 
 	if SubMenus.Has("Shortcuts") {
 		A_TrayMenu.Add(GetCategoryTitle("Shortcuts"), SubMenus["Shortcuts"])
