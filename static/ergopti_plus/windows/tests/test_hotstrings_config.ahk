@@ -31,7 +31,7 @@ _HCfgTestReset() {
     ; Build a fresh empty config per category so mutations in one test do not
     ; leak into the next (each Sections map must be a distinct instance).
     for Cat in ["rolls", "sfbsreduction", "autocorrection", "distancesreduction", "magickey"] {
-        HotstringGroupConfig[Cat] := { Delay: "", Color: "", ShowTooltip: "", Sections: Map() }
+        HotstringGroupConfig[Cat] := { Delay: "", Color: "", ShowTooltip: "", Priority: "", Sections: Map() }
     }
     ; Resetting state directly bypasses the production setters that bump the
     ; HotstringsResolve generation, so invalidate the memo here to keep each
@@ -47,7 +47,7 @@ _HCfgTestSeedToml(Cat, Delay, Color, Sections := unset) {
     ; hotstrings_config.ahk reads ``TomlCfg.ShowTooltip`` directly, so seeded
     ; test configs MUST expose that property too, otherwise AHK raises a
     ; "no property named ShowTooltip" error during HotstringsResolve.
-    Cfg := { Delay: Delay, Color: Color, ShowTooltip: "", Sections: Map() }
+    Cfg := { Delay: Delay, Color: Color, ShowTooltip: "", Priority: "", Sections: Map() }
     if IsSet(Sections) {
         for SecName, SecData in Sections {
             ; Same shape contract for sections — if a caller passes a section
@@ -281,7 +281,7 @@ TestHotstringsConfig_SetOverrideRejectsUnknownField() {
     Result := HotstringsSetOverride("rolls", "", "badfield", 1.0)
     AssertFalse(Result, "setOverride returns false for unknown field")
 }
-Test("HotstringsConfig: setOverride rejects fields other than delay/color",
+Test("HotstringsConfig: setOverride rejects fields other than delay/color/show_tooltip/priority",
     TestHotstringsConfig_SetOverrideRejectsUnknownField)
 
 ; Regression (fixed 2026-06-04): the dynamic-hotstrings default activation delay
@@ -400,3 +400,83 @@ TestHSResolve_PriorityCascade() {
 }
 Test("HotstringsResolve: priority cascades section > category > source default",
 	TestHSResolve_PriorityCascade)
+
+; The delays/colors window edits priority through HotstringsSetOverride, so the
+; field must be accepted (it used to be rejected), persist as a BARE INTEGER, and
+; round-trip through _SaveOverrides -> _ParseOverrides at both file and section level.
+TestHotstringsConfig_PrioritySetClearRoundTrip() {
+	global _HotstringsOverrides, _HotstringsOverridesPath
+	SavedPath := _HotstringsOverridesPath
+	SavedOv   := _HotstringsOverrides
+	Path := A_Temp . "\hotstrings_config_prio_rt.toml"
+	try FileDelete(Path)
+	_HotstringsOverrides     := Map()
+	_HotstringsOverridesPath := Path   ; enable persistence so the save path is exercised
+
+	AssertTrue(HotstringsSetOverride("rolls", "", "priority", 25) != false,
+		"setOverride must accept the priority field at file level")
+	AssertTrue(HotstringsSetOverride("rolls", "ct", "priority", 80) != false,
+		"setOverride must accept the priority field at section level")
+
+	Reparsed := _ParseOverrides(Path)
+	AssertEqual(25, Reparsed["rolls"].Priority, "file-level priority round-trips through save/parse")
+	AssertEqual(80, Reparsed["rolls"].Sections["ct"].Priority, "section priority round-trips through save/parse")
+
+	; Clearing the field drops it from the persisted file.
+	HotstringsClearOverride("rolls", "", "priority")
+	After := _ParseOverrides(Path)
+	AssertEqual("", After.Has("rolls") ? After["rolls"].Priority : "",
+		"clearOverride removes the file-level priority key")
+
+	try FileDelete(Path)
+	_HotstringsOverridesPath := SavedPath
+	_HotstringsOverrides     := SavedOv
+	HotstringsResolveBumpGen()
+}
+Test("HotstringsConfig: priority set/clear round-trips through the override file",
+	TestHotstringsConfig_PrioritySetClearRoundTrip)
+
+; clearOverride with an empty field must wipe EVERY override field, priority
+; included — otherwise a stale priority survives a "reset all" from the window.
+TestHotstringsConfig_ClearAllFieldsClearsPriority() {
+	global _HotstringsOverrides, _HotstringsOverridesPath
+	SavedOv := _HotstringsOverrides
+	_HotstringsOverrides     := Map()
+	_HotstringsOverridesPath := ""
+	HotstringsSetOverride("rolls", "ct", "delay", 0.2)
+	HotstringsSetOverride("rolls", "ct", "priority", 77)
+	HotstringsClearOverride("rolls", "ct", "")
+	AssertEqual("", _HotstringsOverrides["rolls"].Sections["ct"].Priority,
+		"empty-field clearOverride must also clear priority")
+	_HotstringsOverrides := SavedOv
+	HotstringsResolveBumpGen()
+}
+Test("HotstringsConfig: clearOverride empty field also clears priority",
+	TestHotstringsConfig_ClearAllFieldsClearsPriority)
+
+; HotstringsResolveExt must expose Priority too — extensions edited from the
+; window default to the package tier (30), and a user override beats it.
+TestHotstringsConfig_ResolveExtPriority() {
+	global _HotstringsOverrides
+	Saved := _HotstringsOverrides
+	_HotstringsOverrides := Map()
+	HotstringsResolveBumpGen()
+	ExtPath := A_Temp . "\hotstrings_ext_prio.toml"
+	try FileDelete(ExtPath)
+	FileAppend("[_meta]`ndelay = 0.5`n", ExtPath, "UTF-8")   ; ships no priority
+
+	R := HotstringsResolveExt("demo", ExtPath, "")
+	AssertEqual(30, R.Priority,
+		"extension with no override resolves to the package source default (30)")
+
+	HotstringsSetOverride("ext.demo", "", "priority", 88)
+	R2 := HotstringsResolveExt("demo", ExtPath, "")
+	AssertEqual(88, R2.Priority,
+		"a user override beats the extension package source default")
+
+	try FileDelete(ExtPath)
+	_HotstringsOverrides := Saved
+	HotstringsResolveBumpGen()
+}
+Test("HotstringsResolveExt: exposes priority with the package source default + override",
+	TestHotstringsConfig_ResolveExtPriority)

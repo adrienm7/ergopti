@@ -444,6 +444,7 @@
 	"hs_config.label_delimiters": "Word delimiters",
 	"hs_config.label_file": "फ़ाइल:",
 	"hs_config.label_group": "समूह:",
+	"hs_config.label_priority": "प्राथमिकता",
 	"hs_config.label_section": "अनुभाग:",
 	"hs_config.label_tooltip": "टूलटिप दिखाएं",
 	"hs_config.none": "(कोई नहीं)",

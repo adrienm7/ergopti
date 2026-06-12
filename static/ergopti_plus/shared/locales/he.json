@@ -444,6 +444,7 @@
 	"hs_config.label_delimiters": "Word delimiters",
 	"hs_config.label_file": "קובץ:",
 	"hs_config.label_group": "קבוצה:",
+	"hs_config.label_priority": "עדיפות",
 	"hs_config.label_section": "סעיף:",
 	"hs_config.label_tooltip": "הצג טיפ",
 	"hs_config.none": "(ללא)",

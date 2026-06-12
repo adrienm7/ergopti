@@ -41,7 +41,7 @@ node ./tools/test/test-no-fallbacks                # via: npm run test:no-fallba
 npm run lint:conventions                           # banners / spacing / encoding
 ```
 
-Baseline at hand-off: Node 14/14 + 6/6 · Linux 37/37 · macOS 1509/0 · AHK 1305/0.
+Baseline at hand-off: Node 14/14 + 6/6 · Linux 37/37 · macOS 1531/0 · AHK 1339/0.
 
 ### Latest session (runtime perf + hotstring collision PRIORITY)
 
@@ -93,11 +93,61 @@ Landed on `dev` this session (newest last):
    hotstring sharing a common trigger is no longer overwritten in place — it competes and
    wins by priority (the feature's headline case, previously a no-op on macOS).
 
+**Section-priority editing in the delays/colors window — FULL cross-driver, DONE this session.**
+
+The delays/colors window (Windows `hotstrings_config_window.ahk`, macOS
+`ui/hotstrings_config_window/*`) now edits per-category and per-section collision
+**priority** next to delay/color/tooltip, writing to the SHARED override file
+(`hotstrings_config.toml`) — and both engines actually consume it. Landed (uncommitted
+as of this note — awaiting live validation):
+
+1. **AHK data layer** (`lib/hotstrings/hotstrings_config.ahk`): `HotstringsSetOverride` /
+   `HotstringsClearOverride` accept `priority`; `HotstringsResolveExt` exposes it (package
+   tier 30 default). `_ParseOverrides` / `_SaveOverrides` / `HotstringsResolve` already
+   carried it from the section-cascade commit.
+2. **AHK TOML defaults** (`lib/toml/toml_loader.ahk`): `ParseTomlGroupConfig` now parses
+   `[_meta] priority` + `[_meta.sections.x] priority` (the package-shipped default layer).
+3. **AHK Phase 3 — SOLVED without codegen** (`lib/hotstrings/hotstring_engine.ahk`): new
+   `_HSE_ResolveRegistrationPriority(Category, Section)`; when a caller passes no explicit
+   `Priority`, the factories resolve the override cascade via `HotstringsResolve`. The
+   generated loaders carry Category/Section but no Priority, so the ~3000 bundled hotstrings
+   now honour a user's per-section override (were stuck at the common tier 10). No codegen
+   change needed — DRY and auto-covers future generated categories.
+   ⚠ **Crash fixed (regression test added)**: the first cut passed the unset `options`
+   variable into the helper → AHK v2 `UnsetError` at the call site crashed
+   `RegisterAllHotstrings` at boot. The `IsSet(options)` guard MUST live at the caller; the
+   helper takes Category/Section only. Pinned by `test_hotstring_engine_main.ahk`
+   "factories register with no options".
+4. **AHK window UI**: Priority row (Edit + UpDown 0-100 + default hint + ↺ reset) mirroring
+   the delay row; full read/defaults/override/reset wiring; `_HCW_TomlValue` formats priority
+   as a bare integer; `_HCW_FallbackPriority` shows the source tier.
+5. **macOS shared reader** (`shared/lua/toml_codec/reader.lua`): parses `[_meta] priority`
+   (file) + per-section `[_meta.sections.x] priority` — these were never parsed, so the
+   macOS engine's section/file-priority path was dormant.
+6. **macOS data layer** (`macos/modules/hotstrings_config.lua`): priority through
+   parse/serialize/set/clear/get_user_override/get_toml_defaults (bare integer).
+7. **macOS engine** (`macos/modules/keymap/registry.lua` `load_toml`): now consults the
+   shared override file (`hotstrings_config.get_user_override`) + reader meta priority,
+   flattened to match AHK's order (user-section > user-file > meta-section > meta-file >
+   source). Replaced the dead `data.meta.section_priorities` read.
+8. **macOS window UI** (`init.lua` + `index.html` + `script.js` + `style.css`): Priority
+   field + `set_priority`/`clear_priority` for common/personal/ext; source default read from
+   `keymap.source_priority` (no 4th hardcoded copy of 10/30/50).
+9. **Locales**: `hs_config.label_priority` added to all 21 files (parity verified, 2196 keys).
+10. **Tests** (all green — macOS 1531, AHK 1339): AHK no-options crash regression + Phase 3
+    cascade + set/clear round-trip + ResolveExt + ParseTomlGroupConfig priority; macOS reader
+    `[_meta]` priority + new `test_hotstrings_config.lua` round-trip + registry
+    engine-consumes-override-priority (3 cascade cases).
+
 **Still remaining (genuine hand-off):**
 
-A. **Windows priority finish** — Phase 3 (generated/common loaders honour section
-   overrides — needs codegen), Phase 4 (UI in the delays/colors window to edit priority),
-   Phase 5 (prefix-watcher preview respects the same priority winner).
+A. **Windows priority finish** — only **Phase 5** left: the prefix-watcher PREVIEW
+   (`hotstring_prefix_watcher.ahk` `_LookupAndRender`) shows the FIRST-registered candidate
+   per group as the live winner; it does NOT apply the engine's `length → priority → seq`
+   tie-break, so the non-dimmed preview can disagree with what actually fires. Make it sort
+   candidates by the engine's rule (entries need their resolved priority threaded into the
+   prefix index). macOS has no equivalent live preview to change.
+   (Phase 3 + the Phase-4 delays/colors UI both landed this session — see above.)
 B. **Boot perf (Windows)** — B4 generated loaders ~800 ms (instrument/bisect first),
    prefix-watcher index ~205 ms + layout layers ~85 ms (likely inherent).
 

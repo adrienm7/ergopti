@@ -367,6 +367,67 @@ TestHSE_CreateHotstringForwardsPriority() {
 Test("HSE CreateHotstring forwards an explicit priority into the spec",
     TestHSE_CreateHotstringForwardsPriority)
 
+; Regression (2026-06-12): the hand loader (modules/hotstrings.ahk) calls the
+; factories with NO options at all — e.g. CreateCaseSensitiveHotstrings("*", abbr, repl).
+; The Phase 3 priority resolve must guard IsSet(options) at the CALL SITE; an earlier
+; version passed the unset ``options`` variable straight into the resolve helper, which
+; threw UnsetError ("This parameter has not been assigned a value", options) at boot and
+; crashed RegisterAllHotstrings. Reaching the assertions proves neither factory threw.
+TestHSE_FactoriesNoOptionsNoCrash() {
+    global HSE_PRIORITY_COMMON
+    HSE_TestReset()
+    CreateHotstring("*?", "qza", "out1")                 ; no options — must not throw
+    CreateCaseSensitiveHotstrings("*?", "qzb", "out2")   ; no options — the crash site
+    HSE_FeedReset(true)
+    HSE_FeedChar("q")
+    HSE_FeedChar("z")
+    M := HSE_FeedChar("a")
+    AssertTrue(M != "", "a no-options CreateHotstring trigger must still register and fire")
+    AssertEqual(HSE_PRIORITY_COMMON, M.Priority,
+        "a no-options (no category) registration lands at the common source default")
+}
+Test("HSE factories register with no options (no UnsetError) and default to common priority",
+    TestHSE_FactoriesNoOptionsNoCrash)
+
+; Phase 3: generated loaders pass Category/Section but NO Priority. The factory must
+; fold in the section/file/source override cascade via HotstringsResolve so a user's
+; per-section priority override reaches the ~3000 bundled hotstrings (previously they
+; always landed at the common tier 10, ignoring the override).
+TestHSE_NoExplicitPriorityResolvesOverrideCascade() {
+    global _HotstringsOverrides, HSE_PRIORITY_COMMON
+    Saved := _HotstringsOverrides
+    _HotstringsOverrides := Map()
+    HotstringsResolveBumpGen()
+
+    ; No override → the common source default (synthetic non-personal/ext category).
+    HSE_TestReset()
+    CreateHotstring("*?", "qzc", "o", Map("Category", "phase3cat", "Section", "names"))
+    HSE_FeedReset(true)
+    HSE_FeedChar("q")
+    HSE_FeedChar("z")
+    M := HSE_FeedChar("c")
+    AssertTrue(M != "", "trigger must fire")
+    AssertEqual(HSE_PRIORITY_COMMON, M.Priority,
+        "no override → a no-explicit-priority registration lands at the common source default")
+
+    ; A section-level override must reach the no-explicit-priority (generated-style) path.
+    HotstringsSetOverride("phase3cat", "names", "priority", 42)
+    HSE_TestReset()
+    CreateHotstring("*?", "qzd", "o", Map("Category", "phase3cat", "Section", "names"))
+    HSE_FeedReset(true)
+    HSE_FeedChar("q")
+    HSE_FeedChar("z")
+    M2 := HSE_FeedChar("d")
+    AssertTrue(M2 != "", "trigger must fire")
+    AssertEqual(42, M2.Priority,
+        "a per-section priority override reaches a no-explicit-priority (generated-style) registration")
+
+    _HotstringsOverrides := Saved
+    HotstringsResolveBumpGen()
+}
+Test("HSE no-explicit-priority registration honours the section override cascade (Phase 3)",
+    TestHSE_NoExplicitPriorityResolvesOverrideCascade)
+
 TestHSE_NonStarTriggerNeedsEndChar() {
     HSE_TestReset()
     HSE_Register("", "btw", () => 0)

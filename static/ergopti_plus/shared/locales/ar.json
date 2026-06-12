@@ -444,6 +444,7 @@
 	"hs_config.label_delimiters": "Word delimiters",
 	"hs_config.label_file": "الملف:",
 	"hs_config.label_group": "المجموعة:",
+	"hs_config.label_priority": "الأولوية",
 	"hs_config.label_section": "القسم:",
 	"hs_config.label_tooltip": "إظهار تلميح الأداة",
 	"hs_config.none": "(لا شيء)",

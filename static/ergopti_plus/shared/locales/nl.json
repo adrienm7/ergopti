@@ -444,6 +444,7 @@
 	"hs_config.label_delimiters": "Word delimiters",
 	"hs_config.label_file": "Bestand:",
 	"hs_config.label_group": "Groep:",
+	"hs_config.label_priority": "Prioriteit",
 	"hs_config.label_section": "Sectie:",
 	"hs_config.label_tooltip": "Toon tooltip",
 	"hs_config.none": "(geen)",

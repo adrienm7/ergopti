@@ -147,4 +147,26 @@ helpers.describe("toml_reader.parse: per-entry priority", function()
 		helpers.assert_eq(e[2].priority, nil)
 		os.remove(path)
 	end)
+
+	-- The collision-priority cascade also reads a FILE-level [_meta] priority and a
+	-- per-section [_meta.sections.<name>] priority. These were never parsed before, so
+	-- the macOS engine's section/file priority path was dormant — the delays/colors
+	-- window had nothing to feed it. Pin that both levels are captured as numbers.
+	helpers.it("captures file-level and per-section [_meta] priority", function()
+		local body = [==[
+[_meta]
+priority = 35
+
+[_meta.sections.foo]
+priority = 65
+
+[[foo]]
+"hi" = { output = "yo" }
+]==]
+		local path = write_temp("metaprio", body)
+		local data = reader.parse(path)
+		helpers.assert_eq(data.meta.priority, 35)
+		helpers.assert_eq(data.meta.sections.foo.priority, 65)
+		os.remove(path)
+	end)
 end)

@@ -444,6 +444,7 @@
 	"hs_config.label_delimiters": "Word delimiters",
 	"hs_config.label_file": "Dosya:",
 	"hs_config.label_group": "Grup:",
+	"hs_config.label_priority": "Öncelik",
 	"hs_config.label_section": "Bölüm:",
 	"hs_config.label_tooltip": "Araç ipucunu göster",
 	"hs_config.none": "(yok)",

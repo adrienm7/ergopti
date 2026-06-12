@@ -130,6 +130,7 @@ local function read_file_meta(toml_path)
 		delay        = parsed.meta and parsed.meta.delay,
 		color        = parsed.meta and parsed.meta.color,
 		show_tooltip = parsed.meta and parsed.meta.show_tooltip,
+		priority     = parsed.meta and parsed.meta.priority,
 		sections     = (parsed.meta and parsed.meta.sections) or {},
 	}
 end
@@ -220,12 +221,36 @@ end
 -- =========================================
 -- =========================================
 
+--- Source-default collision priority (personal 50 / package 30 / common 10) for a
+--- UI group, read from the keymap engine so the window never hardcodes a fourth
+--- copy of the tiers (the single source is shared/hotstrings/priority.json, held
+--- equal across drivers by tools/test/test-priority-parity.cjs). The keymap module
+--- is required lazily — it is loaded long before this window opens, but a headless
+--- harness may lack it, in which case the source default is simply omitted.
+--- @param group string Group key ("common", "personal", or "ext:<id>").
+--- @param name string Unique category name (the common category for the "common" group).
+--- @return number|nil The source-default priority, or nil when keymap is unavailable.
+local function source_priority_for(group, name)
+	local ok, keymap = pcall(require, "modules.keymap")
+	if not ok or type(keymap.source_priority) ~= "function" then return nil end
+	local category
+	if group == "personal" then
+		category = "personal"
+	elseif type(group) == "string" and group:sub(1, 4) == "ext:" then
+		category = "ext." .. group:sub(5)
+	else
+		category = name
+	end
+	local ok2, p = pcall(keymap.source_priority, category)
+	return ok2 and p or nil
+end
+
 --- Builds one category entry table for the UI state.
 --- @param name string Unique category name (used as mutation key).
 --- @param title string Display title.
 --- @param group string Group key ("common", "personal", or "ext:<id>").
 --- @param effective table { delay, color } from resolve/resolve_ext.
---- @param default_meta table { delay, color } TOML defaults (nil ok).
+--- @param default_meta table { delay, color, priority } TOML defaults (nil ok).
 --- @param override table|nil User override map (nil ok).
 --- @param sections table Array of { name, description }.
 --- @param sec_resolver function(sec_name) -> { effective, default_meta, override }
@@ -237,6 +262,9 @@ local function build_cat_entry(name, title, group, effective, default_meta, over
 	-- show_tooltip resolves to true when not explicitly set (safe default)
 	local eff_tooltip = effective.show_tooltip
 	if eff_tooltip == nil then eff_tooltip = true end
+
+	-- Source-default priority for the group; the per-section rows inherit it.
+	local source_prio = source_priority_for(group, name)
 
 	local cat_entry = {
 		name                  = name,
@@ -250,6 +278,9 @@ local function build_cat_entry(name, title, group, effective, default_meta, over
 		color_overridden      = override.color ~= nil,
 		show_tooltip          = eff_tooltip,
 		show_tooltip_overridden = override.show_tooltip ~= nil,
+		priority              = override.priority or default_meta.priority or source_prio,
+		priority_default      = default_meta.priority or source_prio,
+		priority_overridden   = override.priority ~= nil,
 		sections              = {},
 	}
 
@@ -271,6 +302,9 @@ local function build_cat_entry(name, title, group, effective, default_meta, over
 			color_overridden        = s_ov.color ~= nil,
 			show_tooltip            = s_tooltip,
 			show_tooltip_overridden = s_ov.show_tooltip ~= nil,
+			priority                = s_ov.priority or s_def.priority or source_prio,
+			priority_default        = s_def.priority or source_prio,
+			priority_overridden     = s_ov.priority ~= nil,
 		})
 	end
 
@@ -342,6 +376,7 @@ local function build_state()
 				delay        = file_meta.delay,
 				color        = file_meta.color,
 				show_tooltip = file_meta.show_tooltip,
+				priority     = file_meta.priority,
 			}
 
 			local entry = build_cat_entry(
@@ -355,8 +390,8 @@ local function build_state()
 				function(sec_name)
 					local sec_data = file_meta.sections[sec_name] or {}
 					return {
-						effective    = { delay = sec_data.delay, color = sec_data.color, show_tooltip = sec_data.show_tooltip },
-						default_meta = { delay = sec_data.delay, color = sec_data.color, show_tooltip = sec_data.show_tooltip },
+						effective    = { delay = sec_data.delay, color = sec_data.color, show_tooltip = sec_data.show_tooltip, priority = sec_data.priority },
+						default_meta = { delay = sec_data.delay, color = sec_data.color, show_tooltip = sec_data.show_tooltip, priority = sec_data.priority },
 						override     = {},
 					}
 				end
@@ -392,6 +427,7 @@ local function build_state()
 					return {
 						delay = parsed.meta and parsed.meta.delay,
 						color = parsed.meta and parsed.meta.color,
+						priority = parsed.meta and parsed.meta.priority,
 					}
 				end
 				return {}
@@ -413,7 +449,7 @@ local function build_state()
 							local ok2, parsed2 = pcall(function() return TomlReader.parse(toml_path) end)
 							if ok2 and parsed2 and parsed2.meta and parsed2.meta.sections then
 								local s = parsed2.meta.sections[sec_name] or {}
-								return { delay = s.delay, color = s.color, show_tooltip = s.show_tooltip }
+								return { delay = s.delay, color = s.color, show_tooltip = s.show_tooltip, priority = s.priority }
 							end
 							return {}
 						end)(),
@@ -603,6 +639,10 @@ local function on_message(msg)
 			patch_personal_toml(toml_path, sec, "show_tooltip", body.show_tooltip == true)
 		elseif action == "clear_tooltip" then
 			patch_personal_toml(toml_path, sec, "show_tooltip", nil)
+		elseif action == "set_priority" and type(body.priority) == "number" then
+			patch_personal_toml(toml_path, sec, "priority", body.priority)
+		elseif action == "clear_priority" then
+			patch_personal_toml(toml_path, sec, "priority", nil)
 		end
 
 	elseif group and group:sub(1, 4) == "ext:" then
@@ -621,6 +661,10 @@ local function on_message(msg)
 			hotstrings_config.set_override(override_key, sec, "show_tooltip", body.show_tooltip == true)
 		elseif action == "clear_tooltip" then
 			hotstrings_config.clear_override(override_key, sec, "show_tooltip")
+		elseif action == "set_priority" and type(body.priority) == "number" then
+			hotstrings_config.set_override(override_key, sec, "priority", body.priority)
+		elseif action == "clear_priority" then
+			hotstrings_config.clear_override(override_key, sec, "priority")
 		end
 
 	else
@@ -637,6 +681,10 @@ local function on_message(msg)
 			hotstrings_config.set_override(cat, sec, "show_tooltip", body.show_tooltip == true)
 		elseif action == "clear_tooltip" then
 			hotstrings_config.clear_override(cat, sec, "show_tooltip")
+		elseif action == "set_priority" and type(body.priority) == "number" then
+			hotstrings_config.set_override(cat, sec, "priority", body.priority)
+		elseif action == "clear_priority" then
+			hotstrings_config.clear_override(cat, sec, "priority")
 		else
 			return
 		end

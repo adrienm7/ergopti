@@ -153,3 +153,84 @@ helpers.describe("Registry -- shifted-comma case variants (':D' emoji safety)", 
 		helpers.assert_nil(repl_for(state, " ;d"), "<space> + ; + d must not be a trigger")
 	end)
 end)
+
+
+
+
+--- ==============================================================================
+--- Section-priority cascade: load_toml must read the user's per-section priority
+--- from the SHARED override file (modules.hotstrings_config), exactly like the AHK
+--- engine reads HotstringsResolve. The order is user-section > user-file >
+--- meta-section > meta-file > source default. Without this the macOS collision
+--- sort never sees a priority set from the delays/colors window (the engine path
+--- was dormant — the TOML reader populated no section_priorities and load_toml
+--- never consulted the override file).
+--- ==============================================================================
+
+helpers.describe("Registry — section priority from the shared override file", function()
+	package.loaded["lib.logger"] = nil
+	local _ = helpers.load_with_stubs("lib.logger")
+
+	--- Reload the registry fresh (resets module _state), mock the TOML reader and
+	--- the hotstrings_config override layer, load one single-entry group, and return
+	--- the resolved priority of that mapping.
+	--- @param toml_data table The parsed-TOML table load_toml will receive.
+	--- @param override_fn function get_user_override(name, section) -> table|nil.
+	--- @return number|nil priority, table Registry The mapping priority and module.
+	local function priority_after_load(toml_data, override_fn)
+		package.loaded["modules.keymap.registry"] = nil
+		package.loaded["modules.keymap.terminators"] = nil
+		local Registry = require("modules.keymap.registry")
+
+		local old_toml = package.loaded["lib.toml_reader"]
+		local old_hcfg = package.loaded["modules.hotstrings_config"]
+		package.loaded["lib.toml_reader"]          = { parse = function() return toml_data end }
+		package.loaded["modules.hotstrings_config"] = { get_user_override = override_fn }
+
+		local state = {
+			groups = { rolls = { enabled = true, sections = { sec1 = { enabled = true } } } },
+			mappings = {}, mappings_lookup = {}, mappings_by_tail_char = {},
+			mappings_by_star_tail_char = {}, seq_counter = 0, magic_key = "★",
+		}
+		Registry.init(state)
+		Registry.load_toml("rolls", "dummy.toml")
+
+		package.loaded["lib.toml_reader"]          = old_toml
+		package.loaded["modules.hotstrings_config"] = old_hcfg
+
+		local prio
+		for _, m in ipairs(state.mappings) do
+			if m.trigger == "trg" then prio = m.priority end
+		end
+		return prio, Registry
+	end
+
+	-- One enabled section with one entry that carries no per-entry priority.
+	local function base_data()
+		return {
+			sections_order = { "sec1" },
+			sections = { sec1 = { trg = "out" } },
+			meta = { sections = {} },
+		}
+	end
+
+	helpers.it("a user section-priority override from hotstrings_config reaches the mapping", function()
+		local prio = priority_after_load(base_data(), function(name, section)
+			if name == "rolls" and section == "sec1" then return { priority = 42 } end
+			return nil
+		end)
+		helpers.assert_eq(prio, 42, "override-file section priority must win the cascade")
+	end)
+
+	helpers.it("falls back to the TOML [_meta] section priority when no user override", function()
+		local data = base_data()
+		data.meta.sections.sec1 = { priority = 33 }
+		local prio = priority_after_load(data, function() return nil end)
+		helpers.assert_eq(prio, 33, "TOML [_meta] section priority is the next layer below the override file")
+	end)
+
+	helpers.it("falls back to the source default when nothing sets a priority", function()
+		local prio, Registry = priority_after_load(base_data(), function() return nil end)
+		helpers.assert_eq(prio, Registry.PRIORITY_COMMON, "a common group with no priority lands at the source default (10)")
+	end)
+end)

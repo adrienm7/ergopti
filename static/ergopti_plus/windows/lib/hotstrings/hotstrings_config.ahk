@@ -670,9 +670,26 @@ HotstringsResolveExt(ExtId, TomlPath, SectionName := "") {
         ShowTooltip := TomlCfg.ShowTooltip
     }
 
-    HasOverride := (UserSec != "" and (UserSec.Delay != "" or UserSec.Color != "" or UserSec.ShowTooltip != ""))
-        or  (UserCat != "" and (UserCat.Delay != "" or UserCat.Color != "" or UserCat.ShowTooltip != ""))
-    return { Delay: Delay, Color: Color, ShowTooltip: ShowTooltip, HasOverride: HasOverride }
+    ; Priority — same cascade as Delay, with the extension source default
+    ; (package tier 30) as the final fallback so a resolved priority is never
+    ; empty. HasOwnProp guards structs (TOML config / test mocks) predating the
+    ; field. The individual per-hotstring level sits above this, in the loader.
+    Priority := ""
+    if (UserSec != "" and UserSec.HasOwnProp("Priority") and UserSec.Priority != "") {
+        Priority := UserSec.Priority
+    } else if (UserCat != "" and UserCat.HasOwnProp("Priority") and UserCat.Priority != "") {
+        Priority := UserCat.Priority
+    } else if (TomlSec != "" and TomlSec.HasOwnProp("Priority") and TomlSec.Priority != "") {
+        Priority := TomlSec.Priority
+    } else if (TomlCfg.HasOwnProp("Priority") and TomlCfg.Priority != "") {
+        Priority := TomlCfg.Priority
+    } else {
+        Priority := _HSE_SourcePriority("ext." . StrLower(ExtId))
+    }
+
+    HasOverride := (UserSec != "" and (UserSec.Delay != "" or UserSec.Color != "" or UserSec.ShowTooltip != "" or (UserSec.HasOwnProp("Priority") and UserSec.Priority != "")))
+        or  (UserCat != "" and (UserCat.Delay != "" or UserCat.Color != "" or UserCat.ShowTooltip != "" or (UserCat.HasOwnProp("Priority") and UserCat.Priority != "")))
+    return { Delay: Delay, Color: Color, ShowTooltip: ShowTooltip, Priority: Priority, HasOverride: HasOverride }
 }
 
 
@@ -681,8 +698,8 @@ HotstringsResolveExt(ExtId, TomlPath, SectionName := "") {
 ; Persists immediately and refreshes the in-memory cache.
 HotstringsSetOverride(CategoryName, SectionName, Field, Value) {
     global _HotstringsOverrides
-    if (Field != "delay" and Field != "color" and Field != "show_tooltip") {
-        try LoggerError("HotstringsConfig", "SetOverride: field must be 'delay', 'color', or 'show_tooltip', got '{1}'.", Field)
+    if (Field != "delay" and Field != "color" and Field != "show_tooltip" and Field != "priority") {
+        try LoggerError("HotstringsConfig", "SetOverride: field must be 'delay', 'color', 'show_tooltip', or 'priority', got '{1}'.", Field)
         return false
     }
     Cat := StrLower(CategoryName)
@@ -706,6 +723,8 @@ HotstringsSetOverride(CategoryName, SectionName, Field, Value) {
         Target.Delay := Value
     } else if (Field == "color") {
         Target.Color := Value
+    } else if (Field == "priority") {
+        Target.Priority := Value
     } else {
         Target.ShowTooltip := Value
     }
@@ -745,6 +764,9 @@ HotstringsClearOverride(CategoryName, SectionName, Field := "") {
     }
     if (Field == "" or Field == "show_tooltip") {
         Target.ShowTooltip := ""
+    }
+    if (Field == "" or Field == "priority") {
+        Target.Priority := ""
     }
 
     try LoggerDebug("HotstringsConfig", "Override cleared: {1}{2}{3}.",

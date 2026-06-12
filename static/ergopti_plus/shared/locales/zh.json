@@ -444,6 +444,7 @@
 	"hs_config.label_delimiters": "Word delimiters",
 	"hs_config.label_file": "文件:",
 	"hs_config.label_group": "分组:",
+	"hs_config.label_priority": "优先级",
 	"hs_config.label_section": "章节：",
 	"hs_config.label_tooltip": "显示提示",
 	"hs_config.none": "（无）",

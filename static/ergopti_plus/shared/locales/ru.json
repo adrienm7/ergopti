@@ -444,6 +444,7 @@
 	"hs_config.label_delimiters": "Word delimiters",
 	"hs_config.label_file": "Файл:",
 	"hs_config.label_group": "Группа:",
+	"hs_config.label_priority": "Приоритет",
 	"hs_config.label_section": "Раздел:",
 	"hs_config.label_tooltip": "Показывать подсказку",
 	"hs_config.none": "(нет)",

@@ -215,6 +215,11 @@ main {
 .ctrl select {
 	width: 130px;
 }
+/* Priority is a small 0-100 integer — a narrow field keeps the four-control row
+   (delay / priority / color / tooltip) from overflowing the 720 px panel. */
+.field-priority .ctrl input {
+	width: 48px;
+}
 .ctrl input:focus,
 .ctrl select:focus {
 	outline: 0;

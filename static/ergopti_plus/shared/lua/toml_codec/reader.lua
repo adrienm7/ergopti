@@ -483,6 +483,8 @@ function M.parse(path)
 						result.meta.color = val
 					elseif key == "show_tooltip" and type(val) == "boolean" then
 						result.meta.show_tooltip = val
+					elseif key == "priority" and type(val) == "number" then
+						result.meta.priority = val
 					end
 				end
 
@@ -512,6 +514,8 @@ function M.parse(path)
 						entry.color = val
 					elseif key == "show_tooltip" and type(val) == "boolean" then
 						entry.show_tooltip = val
+					elseif key == "priority" and type(val) == "number" then
+						entry.priority = val
 					end
 				end
 
