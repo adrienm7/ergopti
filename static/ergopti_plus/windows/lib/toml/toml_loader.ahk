@@ -228,7 +228,6 @@ UnescapeTomlString(s) {
 ; skipped, mirroring AHK source lines starting with ";".
 LoadHotstringsSection(CategoryName, SectionName, FeatureConfig, ExtraOptions := Map()) {
     global ScriptInformation, _GENERATED_HOTSTRINGS, _SharedDir
-    global HSE_PRIORITY_COMMON, HSE_PRIORITY_PERSONAL
 
     ; Accept either shape transparently
     if (IsObject(FeatureConfig) and Type(FeatureConfig) == "Map") {
@@ -242,24 +241,22 @@ LoadHotstringsSection(CategoryName, SectionName, FeatureConfig, ExtraOptions := 
         if FeatureConfig.Has("pattern_max_length") {
             _V1Compat.PatternMaxLength := FeatureConfig["pattern_max_length"]
         }
-        ; Section-level priority override (cascade step above the source default).
-        if FeatureConfig.Has("priority") {
-            _V1Compat.Priority := FeatureConfig["priority"]
-        }
         FeatureConfig := _V1Compat
     }
 
-    ; Source default: the user's personal hotstrings outrank bundled "common"
-    ; ones of equal length. A section-level priority (if set) overrides it.
-    SourcePriority := (StrLower(CategoryName) == "personal") ? HSE_PRIORITY_PERSONAL : HSE_PRIORITY_COMMON
-    SectionPriority := (IsObject(FeatureConfig) and FeatureConfig.HasOwnProp("Priority")) ? FeatureConfig.Priority : ""
-    ResolvedPriority := (SectionPriority != "") ? SectionPriority : SourcePriority
-
-    ; Per-group delay gating
+    ; Delay and the section/file/source priority both come from the same override
+    ; cascade as color (HotstringsResolve). The resolved priority already folds in
+    ; the source-default fallback (personal 50 > package 30 > common 10); the
+    ; individual per-hotstring level overrides it per entry below. _HSE_SourcePriority
+    ; is the pre-resolve default in case HotstringsResolve throws.
+    ResolvedPriority := _HSE_SourcePriority(CategoryName)
     try {
         Resolved := HotstringsResolve(CategoryName, SectionName)
         if (Resolved.Delay != "") {
             FeatureConfig.TimeActivationSeconds := Resolved.Delay
+        }
+        if (Resolved.HasOwnProp("Priority") and Resolved.Priority != "") {
+            ResolvedPriority := Resolved.Priority
         }
     }
 
