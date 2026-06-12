@@ -71,22 +71,34 @@ Landed on `dev` this session (newest last):
   - `6c9d935bb` feat: section/category priority via the `HotstringsResolve` override
     cascade (same system as delay/color) + `_HSE_SourcePriority` fallback.
 
-**Remaining for full PRIORITY parity (this is the active hand-off):**
+**PRIORITY parity — macOS + cross-driver mutualization: DONE this session.**
 
-1. **macOS priority engine** — `macos/modules/keymap/registry.lua`: add a `priority`
-   field to the Mapping struct, insert the tie-break into `sort_mappings()` right after
-   length (`length → priority → is_word → group_order → seq`), port `_HSE_SourcePriority`
-   to a Lua `_source_priority(category)` (personal 50 / `ext.` 30 / common 10), and resolve
-   the cascade in `M.add`. Mirror the AHK engine tests in the Lua suite.
-2. **macOS priority cascade** — resolve individual > section > file > source in the Lua
-   loader / `lib/config_overrides.lua` (mirror how delay/color already cascade).
-3. **Shared corpus** — `shared/tests/corpus/hotstrings/vectors.json` is single-trigger
-   today; add collision/priority vectors (register N triggers w/ priorities → assert the
-   winner) and have BOTH drivers' corpus tests run them, so priority can never diverge.
-4. **Windows priority finish** — Phase 3 (generated/common loaders honour section
-   overrides — needs codegen, ties to A2 below), Phase 4 (UI in the delays/colors window
-   to edit priority), Phase 5 (prefix-watcher preview respects the same priority winner).
-5. **Boot perf (Windows)** — B4 generated loaders ~800 ms (instrument/bisect first),
+1. **macOS priority engine — DONE** (`c7c297852`, `20ca7e45f`): `priority` field on the
+   Mapping struct, tie-break inserted into `sort_mappings()` right after length
+   (`length → priority → is_word → group_order → seq`), `source_priority(category)`
+   (personal 50 / `ext.` 30 / common 10) + `resolve_priority()` cascade in `M.add`/
+   `load_toml`. AHK engine tests mirrored in the Lua suite.
+2. **macOS priority cascade — DONE**: individual > section > file > source resolved in the
+   Lua loader (mirrors delay/color), `[_meta] priority` / `section_priorities`.
+3. **Shared corpus — DONE** (`dc322e3da`): `collision_vectors` added to
+   `shared/tests/corpus/hotstrings/vectors.json`; BOTH drivers run them through their REAL
+   decision logic (AHK `HSE_Register`+`HSE_FeedChar`, Lua `M.add`+`sort_mappings`+tail
+   bucket), locking `length > priority > first-registered` identically.
+4. **Single source of truth — DONE** (`a80fc6723`): `shared/hotstrings/priority.json` +
+   `tools/test/test-priority-parity.cjs` CI gate holds AHK `HSE_PRIORITY_*` and Lua
+   `PRIORITY_*` equal to the JSON; can't silently diverge.
+5. **macOS source-naming + dedup correctness — DONE** (`eebf9c9ef`, `2a1d4b7a9`):
+   `personal_ext_*` groups now score the package tier (30) like Windows `ext.*` (were
+   silently 10); and the registry dedup key now includes the owning group, so a personal
+   hotstring sharing a common trigger is no longer overwritten in place — it competes and
+   wins by priority (the feature's headline case, previously a no-op on macOS).
+
+**Still remaining (genuine hand-off):**
+
+A. **Windows priority finish** — Phase 3 (generated/common loaders honour section
+   overrides — needs codegen), Phase 4 (UI in the delays/colors window to edit priority),
+   Phase 5 (prefix-watcher preview respects the same priority winner).
+B. **Boot perf (Windows)** — B4 generated loaders ~800 ms (instrument/bisect first),
    prefix-watcher index ~205 ms + layout layers ~85 ms (likely inherent).
 
 ---
