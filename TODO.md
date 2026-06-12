@@ -189,6 +189,31 @@ Do these first, top to bottom (roughly increasing risk).
 
 ### A1. Lift `parser.lua` into `shared/lua/llm/parser.lua`  *(M, fort levier)*
 
+**STATUS (in progress):**
+- ✅ **Lift done.** `macos/modules/llm/parser.lua` is now a 37-line shim over the
+  pure `shared/lua/llm/parser.lua`; `process_prediction` takes min/max words via
+  an `opts` table. macOS 1531/0, Linux 37/0.
+- ⚠️ **The plan's "TokenParser corpus" bullet was stale.** `parser_test_vectors.json`
+  already exists and tests the **response parsers** (ollama/remote JSON→text), wired
+  to macOS+AHK+Linux. `shared/domain/TokenParser.js` (a *simpler* word-level diff) is
+  the genuine orphan, but its algorithm is incompatible with the drivers' real
+  `process_prediction` (intra-word diff) — so its vectors can't be a parity target
+  without dead parallel code. Chosen direction instead: a **process_prediction**
+  cross-driver corpus from the shared Lua oracle.
+- ✅ **Built** `tools/build/gen-process-prediction-corpus.lua` (Lua oracle →
+  `shared/tests/corpus/llm/process_prediction_vectors.json`) and an AHK parity probe
+  (`tests/bench_parity_process_prediction.ahk`). The probe **found + fixed a P0 bug**:
+  the AHK `_LLM_Parser_CharLev` used 0-based array indices (illegal in AHK) and
+  indexed `a` by the inner loop var, so it **threw "Invalid index" on every
+  advanced-format prediction** — and `parser.ahk` was in **no** suite. Now wired into
+  run_all with regression tests (AHK 1354/0).
+- ⏳ **Remaining (decision needed): full row-by-row parity.** After the crash fix the
+  probe shows the AHK and Lua algorithms genuinely diverge (AHK does a simple
+  prefix-diff → `deletes` always 0 + a missing-space bug; Lua does intra-word token
+  diff → `deletes>0`, leading-space `nw`, `disable_bold`). Closing it means porting
+  the shared intra-word diff to AHK (a real `LLM_Parser_ProcessPrediction` rewrite) —
+  a deliberate scope to confirm before implementing.
+
 The LLM output parser (`macos/modules/llm/parser.lua`, ~820 lines) is ~95% pure
 (2-tier semantic token-diff, French typography, NFD→NFC, filler cleanup,
 TAIL_CORRECTED / NEXT_WORDS extraction, gray/green/orange chunk classification).

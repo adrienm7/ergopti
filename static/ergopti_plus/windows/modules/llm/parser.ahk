@@ -122,20 +122,26 @@ _LLM_Parser_CharLev(a, b) {
 		return n
 	if (n = 0)
 		return m
+	; AHK arrays are 1-based and reject index 0, so the classic 0..n Levenshtein
+	; rows are shifted by +1: array slot k holds the value for DP column k-1.
+	; (The previous port used 0-based indices — prev[0]/curr[0] — which threw
+	; "Invalid index" on every call where both strings were non-empty, i.e. on
+	; every real advanced-format prediction; it also indexed `a` by the inner
+	; loop variable instead of the outer one, mismatching the chars being compared.)
 	prev := []
-	curr := []
-	loop n + 1
-		prev[A_Index - 1] := A_Index - 1
-	loop m {
-		curr := []
-		curr[0] := A_Index
-		loop n {
-			cost := (SubStr(a, A_Index, 1) = SubStr(b, A_Index, 1)) ? 0 : 1
-			curr[A_Index] := Min(prev[A_Index] + 1, curr[A_Index - 1] + 1, prev[A_Index - 1] + cost)
+	Loop n + 1
+		prev.Push(A_Index - 1)          ; prev[k] = k-1  → DP prev[0..n]
+	Loop m {
+		i := A_Index
+		curr := [i]                     ; curr[1] = i  → DP curr[0] (first column)
+		Loop n {
+			j := A_Index
+			cost := (SubStr(a, i, 1) = SubStr(b, j, 1)) ? 0 : 1
+			curr.Push(Min(prev[j + 1] + 1, curr[j] + 1, prev[j] + cost))
 		}
 		prev := curr
 	}
-	return prev[n]
+	return prev[n + 1]
 }
 
 

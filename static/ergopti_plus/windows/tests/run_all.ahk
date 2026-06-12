@@ -180,6 +180,10 @@ try FileAppend("# [marker] starting direct include of LLM production modules`r`n
 #Include ../modules/llm/prediction_engine.ahk
 #Include test_llm_prediction_engine.ahk
 #Include test_llm_defaults.ahk
+; parser.ahk (the AHK semantic-diff parser) was previously exercised by no suite,
+; which let a crash in its Levenshtein helper survive — include it + its tests.
+#Include ../modules/llm/parser.ahk
+#Include test_llm_parser.ahk
 try FileAppend("# [marker] LLM production modules + tests included`r`n", A_Temp . "\ergopti_test_results.txt", "UTF-8")
 try FileAppend("# [marker] LLM production modules + tests included`r`n", "*")
 
