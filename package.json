@@ -19,6 +19,7 @@
 		"lint:conventions:strict": "node ./tools/lint/lint-conventions.js --fail-on-violations",
 		"test:port-compliance": "node ./tools/test/test-port-compliance.cjs",
 		"test:no-fallbacks": "node ./tools/test/test-no-fallback-literals.cjs",
+		"test:priority-parity": "node ./tools/test/test-priority-parity.cjs",
 		"test:manifest-parity": "node ./tools/test/test-manifest-parity.cjs",
 		"test:ahk-encoding": "node ./tools/test/test-ahk-encoding.cjs",
 		"test:click-lock": "node ./tools/test/test-click-lock-fix.cjs",

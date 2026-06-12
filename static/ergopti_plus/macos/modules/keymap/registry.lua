@@ -46,12 +46,14 @@ local function require_state(func_name)
 	return true
 end
 
--- Collision priority by hotstring SOURCE. Mirror of the AHK engine
--- (HSE_PRIORITY_* in hotstring_engine_main.ahk) so both drivers break a
--- same-length trigger collision identically: higher priority wins. Personal
--- hotstrings outrank "ext." packages, which outrank bundled common ones. The
--- cascade above these defaults (individual > section > file) is resolved by the
--- loader before M.add; these are the final fallback.
+-- Collision priority by hotstring SOURCE. Both drivers break a same-length
+-- trigger collision identically: higher priority wins. Personal hotstrings
+-- outrank "ext." packages, which outrank bundled common ones. The cascade above
+-- these defaults (individual > section > file) is resolved by the loader before
+-- M.add; these are the final fallback.
+-- SINGLE SOURCE OF TRUTH: shared/hotstrings/priority.json. These literals are
+-- held identical to it (and to the AHK HSE_PRIORITY_* in hotstring_engine_main.ahk)
+-- by the gate tools/test/test-priority-parity.cjs — change the JSON and all three.
 local PRIORITY_COMMON   = 10
 local PRIORITY_PACKAGE  = 30
 local PRIORITY_PERSONAL = 50
