@@ -353,6 +353,16 @@ LLM_Tray_EnsureModelReady() {
 	global _LLM_Tray
 	if (_LLM_Tray["backend"] != "ollama")
 		return
+	; Never run the blocking installed-models probe (GET /api/tags, up to a 5 s
+	; WinHTTP timeout) unless the Ollama daemon is confirmed reachable. At boot
+	; the deps state is "pending", so a dead-port connect to localhost:11434
+	; froze the synchronous menu build for ~2 s — the single largest chunk of
+	; startup time — even with the LLM feature switched off. The model
+	; auto-correct still runs once the daemon comes up: the deps-ready
+	; bridge-start path (LLM_Tray_StartBridge) calls us again with
+	; LLM_Deps_IsReady() == true, where the same probe returns in milliseconds.
+	if !LLM_Deps_IsReady()
+		return
 	model := _LLM_Tray["model"]
 	if (model == "")
 		model := _LLM_DefaultFor("llm_model", "Qwen3.5-0.8B")
