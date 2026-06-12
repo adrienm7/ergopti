@@ -149,6 +149,215 @@ _LLM_Parser_CharLev(a, b) {
 
 
 
+; ===============================================
+; ======= 1.1) Two-tier token diff (port) =======
+; ===============================================
+; Faithful AHK port of the shared Lua parser's token-level diff
+; (shared/lua/llm/parser.lua: get_chars / tokenize / token_sub_cost /
+; token_diff_ops). These drive the intra-word physical injection so the AHK
+; driver deletes only the changed characters instead of retyping whole words.
+; UTF-8 chars are iterated one codepoint at a time (BMP — French accents — only).
+
+; Split a string into an array of characters (one per codepoint).
+_LLM_Parser_GetChars(s) {
+	chars := []
+	Loop Parse, s
+		chars.Push(A_LoopField)
+	return chars
+}
+
+; Tokenize into semantic elements: words (type 1), whitespace runs (type 2) and
+; single punctuation chars (type 3). Typographic apostrophes bind to the word.
+_LLM_Parser_Tokenize(s) {
+	tokens := []
+	current := ""
+	current_type := 0
+	Loop Parse, s {
+		c := A_LoopField
+		if (c ~= "\s" or c = Chr(0x00A0) or c = Chr(0x202F))
+			t := 2
+		else if (c ~= "[\w']" or c = Chr(0x2019) or Ord(c) >= 128)
+			t := 1
+		else
+			t := 3
+		if (t = 3) {
+			if (current != "")
+				tokens.Push(current)
+			tokens.Push(c)
+			current := ""
+			current_type := 0
+		} else if (t = current_type) {
+			current .= c
+		} else {
+			if (current != "")
+				tokens.Push(current)
+			current := c
+			current_type := t
+		}
+	}
+	if (current != "")
+		tokens.Push(current)
+	return tokens
+}
+
+; Cost of substituting two tokens: 0 if equal, 1000 across types or beyond a 40%
+; edit-distance threshold (so unrelated words are never "corrected" into each
+; other), else the raw char-level Levenshtein distance.
+_LLM_Parser_TokenSubCost(t1, t2) {
+	if (t1 == t2)
+		return 0
+	type1 := (t1 ~= "\s") ? 2 : ((t1 ~= "[\w" . Chr(0x2019) . "']") ? 1 : 3)
+	type2 := (t2 ~= "\s") ? 2 : ((t2 ~= "[\w" . Chr(0x2019) . "']") ? 1 : 3)
+	if (type1 != type2)
+		return 1000
+	c1 := _LLM_Parser_GetChars(t1)
+	c2 := _LLM_Parser_GetChars(t2)
+	n1 := c1.Length
+	n2 := c2.Length
+	; matrix[i][j] for DP indices 0..n1 x 0..n2, stored 1-based at (i+1, j+1).
+	matrix := []
+	Loop n1 + 1 {
+		row := []
+		Loop n2 + 1
+			row.Push(0)
+		matrix.Push(row)
+	}
+	Loop n1 + 1
+		matrix[A_Index][1] := A_Index - 1
+	Loop n2 + 1
+		matrix[1][A_Index] := A_Index - 1
+	Loop n1 {
+		i := A_Index
+		Loop n2 {
+			j := A_Index
+			cost := (c1[i] == c2[j]) ? 0 : 1
+			matrix[i + 1][j + 1] := Min(matrix[i][j + 1] + 1, matrix[i + 1][j] + 1, matrix[i][j] + cost)
+		}
+	}
+	dist := matrix[n1 + 1][n2 + 1]
+	max_len := Max(n1, n2)
+	threshold := Max(1, Floor(max_len * 0.4))
+	if (dist > threshold)
+		return 1000
+	return dist
+}
+
+; Semi-global token diff between orig and corr. Returns an array of op Maps:
+; { type: "equal"|"del"|"ins"|"sub", t1?, t2? }. Free leading deletion on orig
+; (d[i][0] = 0) lets the corrected tail align without leading-context artifacts.
+_LLM_Parser_TokenDiffOps(orig, corr) {
+	tokens1 := _LLM_Parser_Tokenize(orig)
+	tokens2 := _LLM_Parser_Tokenize(corr)
+	len1 := tokens1.Length
+	len2 := tokens2.Length
+	; d[i][j] for DP indices 0..len1 x 0..len2, stored 1-based at (i+1, j+1).
+	d := []
+	Loop len1 + 1 {
+		row := []
+		Loop len2 + 1
+			row.Push(0)
+		d.Push(row)
+	}
+	sum2 := 0
+	Loop len2 {
+		j := A_Index
+		sum2 += _LLM_Parser_GetChars(tokens2[j]).Length
+		d[1][j + 1] := sum2
+	}
+	Loop len1 {
+		i := A_Index
+		Loop len2 {
+			j := A_Index
+			cost_del := d[i][j + 1] + _LLM_Parser_GetChars(tokens1[i]).Length
+			cost_ins := d[i + 1][j] + _LLM_Parser_GetChars(tokens2[j]).Length
+			cost_sub := d[i][j] + _LLM_Parser_TokenSubCost(tokens1[i], tokens2[j])
+			d[i + 1][j + 1] := Min(cost_del, cost_ins, cost_sub)
+		}
+	}
+	i := len1
+	j := len2
+	ops := []
+	while (i > 0 or j > 0) {
+		if (j = 0) {
+			ops.InsertAt(1, Map("type", "del", "t1", tokens1[i]))
+			i -= 1
+		} else if (i = 0) {
+			ops.InsertAt(1, Map("type", "ins", "t2", tokens2[j]))
+			j -= 1
+		} else if (tokens1[i] == tokens2[j]) {
+			ops.InsertAt(1, Map("type", "equal", "t1", tokens1[i], "t2", tokens2[j]))
+			i -= 1
+			j -= 1
+		} else {
+			cost_del := d[i][j + 1] + _LLM_Parser_GetChars(tokens1[i]).Length
+			cost_ins := d[i + 1][j] + _LLM_Parser_GetChars(tokens2[j]).Length
+			cost_sub := d[i][j] + _LLM_Parser_TokenSubCost(tokens1[i], tokens2[j])
+			min_cost := Min(cost_del, cost_ins, cost_sub)
+			if (min_cost = cost_sub) {
+				ops.InsertAt(1, Map("type", "sub", "t1", tokens1[i], "t2", tokens2[j]))
+				i -= 1
+				j -= 1
+			} else if (min_cost = cost_del) {
+				ops.InsertAt(1, Map("type", "del", "t1", tokens1[i]))
+				i -= 1
+			} else {
+				ops.InsertAt(1, Map("type", "ins", "t2", tokens2[j]))
+				j -= 1
+			}
+		}
+	}
+	return ops
+}
+
+; Extract the word tokens (letters / digits / apostrophes) of a string, used to
+; detect and strip tc/nw overlap. Mirrors the Lua get_word_tokens gmatch.
+_LLM_Parser_WordTokens(text) {
+	words := []
+	pos := 1
+	while (RegExMatch(text, "[\w" . Chr(0x2019) . "']+", &m, pos)) {
+		words.Push(m[0])
+		pos := m.Pos + m.Len
+	}
+	return words
+}
+
+; Character-level prefix/suffix isolation of two words into equal/insert chunks
+; (display only — feeds disable_bold). Mirrors the Lua intra_word_diff.
+_LLM_Parser_IntraWordDiff(w1, w2) {
+	c1 := _LLM_Parser_GetChars(w1)
+	c2 := _LLM_Parser_GetChars(w2)
+	p_len := 0
+	while (p_len < c1.Length and p_len < c2.Length and c1[p_len + 1] == c2[p_len + 1])
+		p_len += 1
+	s_len := 0
+	while (s_len < (c1.Length - p_len) and s_len < (c2.Length - p_len) and c1[c1.Length - s_len] == c2[c2.Length - s_len])
+		s_len += 1
+	prefix := ""
+	mid := ""
+	suffix := ""
+	Loop c2.Length {
+		if (A_Index <= p_len)
+			prefix .= c2[A_Index]
+		else if (A_Index <= c2.Length - s_len)
+			mid .= c2[A_Index]
+		else
+			suffix .= c2[A_Index]
+	}
+	chunks := []
+	if (prefix != "")
+		chunks.Push(Map("type", "equal", "text", prefix))
+	if (mid != "")
+		chunks.Push(Map("type", "insert", "text", mid))
+	if (suffix != "")
+		chunks.Push(Map("type", "equal", "text", suffix))
+	return chunks
+}
+
+
+
+
+
+
 ; ========================================
 ; ======= 2/ Core Processing Logic =======
 ; ========================================
@@ -208,37 +417,311 @@ LLM_Parser_ProcessPrediction(full_text, tail_text, block, min_words := 1, max_wo
 				return ""
 		}
 
-		; Build insertable text: prefer delta beyond tail when tail matches prefix of tc.
-		to_type := ""
-		if (tail_text != "" and InStr(tc, tail_text, true) = 1)
-			to_type := SubStr(tc, StrLen(tail_text) + 1)
-		else if (tail_text != "" and StrCompare(SubStr(tail_text, -Min(StrLen(tail_text), StrLen(tc))), tc, true) = 0)
-			to_type := ""
-		else
-			to_type := tc
+		; --- Faithful port of the shared Lua advanced path (intra-word token diff) ---
+		normalized_full := full_text
+		tc_norm := tc
 
-		if (nw != "") {
-			last_ch := (StrLen(to_type) > 0) ? SubStr(to_type, -1) : ""
-			first_nw := SubStr(nw, 1, 1)
-			needs_space := !(last_ch ~= "[\s'’\-]" or last_ch = " " or last_ch = " ")
-				&& !(first_nw ~= "[\s.,;)\}%]")
-			if (needs_space and to_type != "" and !InStr(to_type, " ", false))
-				to_type .= " "
-			to_type .= nw
-		} else if (to_type = "") {
-			to_type := nw
+		; Match the user's trailing spaces so we never cut mid-word.
+		if RegExMatch(normalized_full, "([\s" . Chr(0x00A0) . Chr(0x202F) . "]+)$", &mts) {
+			if !(tc_norm ~= "[\s" . Chr(0x00A0) . Chr(0x202F) . "]$")
+				tc_norm .= mts[1]
 		}
 
-		if RegExReplace(to_type, "[\s\.…]", "") = ""
+		; Strip overlap between the tail of tc_norm and the head of nw (dup words).
+		tc_words := _LLM_Parser_WordTokens(tc_norm)
+		nw_words := _LLM_Parser_WordTokens(nw)
+		overlap_words := 0
+		Loop Min(tc_words.Length, nw_words.Length) {
+			ii := A_Index
+			matched := true
+			Loop ii {
+				jj := A_Index
+				if (StrLower(tc_words[tc_words.Length - ii + jj]) != StrLower(nw_words[jj])) {
+					matched := false
+					break
+				}
+			}
+			if matched
+				overlap_words := ii
+		}
+		nw_norm := nw
+		if (overlap_words > 0) {
+			nw_toks := _LLM_Parser_Tokenize(nw_norm)
+			words_skipped := 0
+			slice_idx := 1
+			Loop nw_toks.Length {
+				ti := A_Index
+				if (nw_toks[ti] ~= "[\w" . Chr(0x2019) . "']")
+					words_skipped += 1
+				if (words_skipped = overlap_words) {
+					slice_idx := ti + 1
+					break
+				}
+			}
+			rem := ""
+			Loop nw_toks.Length {
+				if (A_Index >= slice_idx)
+					rem .= nw_toks[A_Index]
+			}
+			nw_norm := RegExReplace(rem, "^[\s" . Chr(0x00A0) . Chr(0x202F) . "]+", "")
+		}
+
+		; Space handling between tc_norm and nw_norm.
+		last_char := SubStr(tc_norm, -1)
+		first_char := SubStr(nw_norm, 1, 1)
+		needs_space := !(last_char ~= "[\s'" . Chr(0x2019) . "\-]" or last_char = Chr(0x00A0) or last_char = Chr(0x202F) or first_char ~= "[\s.,;)}%\]]" or nw_norm = "")
+		if needs_space
+			nw_norm := " " . nw_norm
+
+		; Sliding window of the buffer context, snapped to a word boundary.
+		nf_len := StrLen(normalized_full)
+		window_size := Min(nf_len, Max(60, StrLen(tc_norm) + 30))
+		orig_context := SubStr(normalized_full, nf_len - window_size + 1)
+		if (window_size < nf_len and !(orig_context ~= "^[\s" . Chr(0x00A0) . Chr(0x202F) . "]")) {
+			snap := RegExMatch(orig_context, "[\s" . Chr(0x00A0) . Chr(0x202F) . "]")
+			if (snap)
+				orig_context := SubStr(orig_context, snap)
+		}
+
+		; 1. Diff strictly against TAIL_CORRECTED.
+		ops := _LLM_Parser_TokenDiffOps(orig_context, tc_norm)
+
+		; 2. Strip leading context (free deletes + leading inserted spaces).
+		stripped_ops := []
+		while (ops.Length > 0 and ops[1]["type"] = "del")
+			stripped_ops.Push(ops.RemoveAt(1))
+		while (ops.Length > 0 and ops[1]["type"] = "ins" and ops[1]["t2"] ~= "^[\s" . Chr(0x00A0) . Chr(0x202F) . "]+$")
+			stripped_ops.Push(ops.RemoveAt(1))
+
+		; 3. Append NEXT_WORDS strictly as downstream insertions.
+		if (nw_norm != "") {
+			for ti2, tk in _LLM_Parser_Tokenize(nw_norm)
+				ops.Push(Map("type", "ins", "t2", tk))
+		}
+
+		if (ops.Length = 0)
 			return ""
 
+		; 4. Locate the first actual change in the alignment.
+		first_change_idx := -1
+		for oi, op in ops {
+			if (op["type"] != "equal") {
+				first_change_idx := oi
+				break
+			}
+		}
+
+		; Context matched perfectly; the model only appended words.
+		if (first_change_idx = -1)
+			return Map("deletes", 0, "to_type", "", "nw", nw_norm, "has_corrections", false, "chunks", [], "disable_bold", false)
+
+		; 5. Physical injection (intra-word prefix optimization on the first sub).
+		true_deletes := 0
+		true_to_type := ""
+		Loop ops.Length {
+			pidx := A_Index
+			if (pidx < first_change_idx)
+				continue
+			op := ops[pidx]
+			if (pidx = first_change_idx and op["type"] = "sub") {
+				c1 := _LLM_Parser_GetChars(op["t1"])
+				c2 := _LLM_Parser_GetChars(op["t2"])
+				p_len := 0
+				while (p_len < c1.Length and p_len < c2.Length and c1[p_len + 1] == c2[p_len + 1])
+					p_len += 1
+				true_deletes += (c1.Length - p_len)
+				Loop c2.Length {
+					if (A_Index > p_len)
+						true_to_type .= c2[A_Index]
+				}
+			} else {
+				ty := op["type"]
+				if (ty = "equal") {
+					true_deletes += StrLen(op["t1"])
+					true_to_type .= op["t2"]
+				} else if (ty = "del") {
+					true_deletes += StrLen(op["t1"])
+				} else if (ty = "ins") {
+					true_to_type .= op["t2"]
+				} else if (ty = "sub") {
+					true_deletes += StrLen(op["t1"])
+					true_to_type .= op["t2"]
+				}
+			}
+		}
+
+		; Safety circuit breaker against massive unprompted deletions.
+		max_allowed_dels := Max(20, StrLen(tc_norm) + 10)
+		if (true_deletes > max_allowed_dels)
+			return ""
+		if (RegExReplace(true_to_type, "[\s\.…]", "") = "")
+			return ""
+
+		; 6. Visual ops → display_nw / has_corrections / disable_bold.
+		first_op := ops[first_change_idx]
+		needs_anchor := false
+		if (first_op["type"] = "del") {
+			needs_anchor := true
+		} else if (first_op["type"] = "sub") {
+			vc1 := _LLM_Parser_GetChars(first_op["t1"])
+			vc2 := _LLM_Parser_GetChars(first_op["t2"])
+			if (vc1.Length > 0 and vc2.Length > 0 and vc1[1] != vc2[1])
+				needs_anchor := true
+		} else if (first_op["type"] = "ins") {
+			if (first_op["t2"] ~= "^[\w" . Chr(0x2019) . "']")
+				needs_anchor := true
+		}
+
+		visual_ops := []
+		if (needs_anchor and first_change_idx = 1 and stripped_ops.Length > 0) {
+			anchor_text := ""
+			ak := stripped_ops.Length
+			while (ak >= 1) {
+				anchor_text := stripped_ops[ak]["t1"] . anchor_text
+				if (stripped_ops[ak]["t1"] ~= "[\w" . Chr(0x2019) . "']" or Ord(stripped_ops[ak]["t1"]) >= 128)
+					break
+				ak -= 1
+			}
+			visual_ops.Push(Map("type", "equal", "t1", anchor_text, "t2", anchor_text))
+		} else if (needs_anchor) {
+			ak := first_change_idx - 1
+			while (ak >= 1) {
+				visual_ops.InsertAt(1, ops[ak])
+				if (ops[ak]["t1"] ~= "[\w" . Chr(0x2019) . "']" or Ord(ops[ak]["t1"]) >= 128)
+					break
+				ak -= 1
+			}
+		}
+		Loop ops.Length {
+			if (A_Index >= first_change_idx)
+				visual_ops.Push(ops[A_Index])
+		}
+
+		; Boundary where strictly-new (orange) words begin.
+		last_anchor_idx := 0
+		bk := visual_ops.Length
+		while (bk >= 1) {
+			vop := visual_ops[bk]
+			if (vop["type"] != "ins") {
+				t1v := vop.Has("t1") ? vop["t1"] : ""
+				if (RegExReplace(t1v, "[\s" . Chr(0x00A0) . Chr(0x202F) . "]", "") != "") {
+					last_anchor_idx := bk
+					break
+				}
+			}
+			bk -= 1
+		}
+		nw_start_idx := visual_ops.Length + 1
+		if (last_anchor_idx > 0) {
+			anchor_op := visual_ops[last_anchor_idx]
+			if (anchor_op["type"] = "del") {
+				found_word := false
+				cj := last_anchor_idx + 1
+				while (cj <= visual_ops.Length) {
+					vj := visual_ops[cj]
+					vt2 := vj.Has("t2") ? vj["t2"] : ""
+					if (vj["type"] = "ins" and vt2 ~= "[\w" . Chr(0x2019) . "']") {
+						found_word := true
+					} else if (found_word and !(vt2 ~= "[\w" . Chr(0x2019) . "']")) {
+						nw_start_idx := cj
+						break
+					}
+					cj += 1
+				}
+				if (!found_word)
+					nw_start_idx := visual_ops.Length + 1
+			} else {
+				nw_start_idx := last_anchor_idx + 1
+				while (nw_start_idx <= visual_ops.Length) {
+					vop := visual_ops[nw_start_idx]
+					vt2 := vop.Has("t2") ? vop["t2"] : ""
+					if (vop["type"] = "equal" and vt2 ~= "^[\s" . Chr(0x00A0) . Chr(0x202F) . "]+$")
+						nw_start_idx += 1
+					else
+						break
+				}
+			}
+		} else {
+			nw_start_idx := 1
+		}
+
+		display_nw := ""
+		Loop visual_ops.Length {
+			if (A_Index >= nw_start_idx) {
+				vop := visual_ops[A_Index]
+				display_nw .= vop.Has("t2") ? vop["t2"] : ""
+			}
+		}
+
+		; Drop the NW ops from the chunk source.
+		kept := []
+		Loop visual_ops.Length {
+			if (A_Index < nw_start_idx)
+				kept.Push(visual_ops[A_Index])
+		}
+		visual_ops := kept
+
+		; Build + merge UI chunks (needed for has_corrections + disable_bold).
+		raw_chunks := []
+		has_corr := false
+		for vi, op in visual_ops {
+			ty := op["type"]
+			if (ty = "equal") {
+				raw_chunks.Push(Map("type", "equal", "text", op.Has("t2") ? op["t2"] : ""))
+			} else if (ty = "ins") {
+				has_corr := true
+				raw_chunks.Push(Map("type", "insert", "text", op["t2"]))
+			} else if (ty = "sub") {
+				has_corr := true
+				w1 := op["t1"]
+				w2 := op["t2"]
+				is_word1 := (w1 ~= "[\w" . Chr(0x2019) . "']") or (Ord(w1) >= 128)
+				is_word2 := (w2 ~= "[\w" . Chr(0x2019) . "']") or (Ord(w2) >= 128)
+				if (is_word1 and is_word2) {
+					for si, sc in _LLM_Parser_IntraWordDiff(w1, w2)
+						raw_chunks.Push(sc)
+				} else {
+					raw_chunks.Push(Map("type", "insert", "text", w2))
+				}
+			} else if (ty = "del") {
+				has_corr := true
+			}
+		}
+
+		chunks := []
+		for ci, c in raw_chunks {
+			if (chunks.Length > 0 and chunks[chunks.Length]["type"] = c["type"])
+				chunks[chunks.Length]["text"] := chunks[chunks.Length]["text"] . c["text"]
+			else
+				chunks.Push(Map("type", c["type"], "text", c["text"]))
+		}
+
+		; Clear orphaned gray chunks; trip the safety guard on silent deletions.
+		only_equals := true
+		for ci2, c in chunks {
+			if (c["type"] != "equal") {
+				only_equals := false
+				break
+			}
+		}
+		if only_equals {
+			chunks := []
+			if (true_deletes > 0) {
+				appended_len := StrLen(true_to_type)
+				if (true_deletes > 10 or appended_len = 0)
+					return ""
+			}
+		}
+
+		disable_bold := (chunks.Length > 0 and chunks[chunks.Length]["type"] = "insert" and (display_nw ~= "\S") > 0)
+
 		return Map(
-			"deletes", 0,
-			"to_type", to_type,
-			"nw", nw,
-			"has_corrections", (tc != tail_text),
-			"chunks", [],
-			"disable_bold", false
+			"deletes", true_deletes,
+			"to_type", true_to_type,
+			"nw", display_nw,
+			"has_corrections", has_corr,
+			"chunks", chunks,
+			"disable_bold", disable_bold
 		)
 	}
 

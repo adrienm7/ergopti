@@ -75,6 +75,61 @@ local VECTORS = {
 		full_text = "the cat", tail_text = "the cat",
 		block = "TAIL_CORRECTED: the cats\nNEXT_WORDS: are here", min_words = 1, max_words = 15,
 	},
+	{
+		id = "advanced_accented_intra_word",
+		description = "Accented intra-word correction (prefere -> préfère).",
+		full_text = "je prefere", tail_text = "je prefere",
+		block = "TAIL_CORRECTED: je préfère\nNEXT_WORDS: ce choix", min_words = 1, max_words = 15,
+	},
+	{
+		id = "advanced_apostrophe_insert",
+		description = "Correction inserts a typographic apostrophe (l envoie -> l'envoie).",
+		full_text = "je l envoie", tail_text = "je l envoie",
+		block = "TAIL_CORRECTED: je l'envoie\nNEXT_WORDS: demain", min_words = 1, max_words = 15,
+	},
+	{
+		id = "advanced_multi_word_change",
+		description = "A whole word is replaced (beau -> froid) then new words.",
+		full_text = "il fait beau", tail_text = "il fait beau",
+		block = "TAIL_CORRECTED: il fait froid\nNEXT_WORDS: ce matin", min_words = 1, max_words = 15,
+	},
+	{
+		id = "advanced_overlap_dup_word",
+		description = "tc tail and nw head share a word — the overlap must be stripped.",
+		full_text = "je vais", tail_text = "je vais",
+		block = "TAIL_CORRECTED: je vais\nNEXT_WORDS: vais manger", min_words = 1, max_words = 15,
+	},
+	{
+		id = "advanced_punctuation_next",
+		description = "NEXT_WORDS begins with punctuation (no space inserted before it).",
+		full_text = "bonjour", tail_text = "bonjour",
+		block = "TAIL_CORRECTED: bonjour\nNEXT_WORDS: , comment allez", min_words = 1, max_words = 15,
+	},
+	{
+		id = "advanced_long_buffer_window",
+		description = "Buffer longer than the 60-char context window; correction near the end.",
+		full_text = "this is a fairly long buffer of context exceeding sixty chars here weater",
+		tail_text = "here weater",
+		block = "TAIL_CORRECTED: here weather\nNEXT_WORDS: today", min_words = 1, max_words = 15,
+	},
+	{
+		id = "advanced_append_only_no_change",
+		description = "Tail matches exactly across several words; only an append.",
+		full_text = "the cat sat", tail_text = "the cat sat",
+		block = "TAIL_CORRECTED: the cat sat\nNEXT_WORDS: on the mat", min_words = 1, max_words = 15,
+	},
+	{
+		id = "basic_next_prefix_stripped",
+		description = "Basic (no tags): a leading NEXT: label is stripped.",
+		full_text = "hello ", tail_text = "hello ",
+		block = "NEXT: world how are you", min_words = 1, max_words = 15,
+	},
+	{
+		id = "advanced_word_cap_one",
+		description = "max_words=1 keeps a single new word.",
+		full_text = "je ", tail_text = "je ",
+		block = "TAIL_CORRECTED: je\nNEXT_WORDS: suis tres content", min_words = 1, max_words = 1,
+	},
 }
 
 

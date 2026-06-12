@@ -87,3 +87,58 @@ TestLLMParser_StaleBufferDiscarded() {
 }
 Test("LLM parser: stale-buffer guard discards a disjoint correction",
 	TestLLMParser_StaleBufferDiscarded)
+
+
+
+
+; ==============================================================
+; ===== 3) Cross-driver parity corpus (process_prediction) =====
+; ==============================================================
+; The corpus is generated from the SHARED Lua parser (the canonical oracle, via
+; tools/build/gen-process-prediction-corpus.lua). Asserting the AHK port matches
+; it row-by-row pins macOS ≡ AHK for the physical injection contract — deletes /
+; to_type / nw / has_corrections / disable_bold. The `chunks` field is display-only
+; and computed differently per driver, so it is excluded from the contract.
+
+_LLMPP_IsNil(Pred) {
+	if !IsObject(Pred)
+		return true
+	if (Pred is Map)
+		return Pred.Count == 0
+	return false
+}
+
+_LLMPP_RunVector(Vec) {
+	Expd := Vec["expected"]
+	Pred := LLM_Parser_ProcessPrediction(Vec["full_text"], Vec["tail_text"],
+		Vec["block"], Vec["min_words"], Vec["max_words"])
+	if Expd["is_nil"] {
+		AssertTrue(_LLMPP_IsNil(Pred),
+			"vector " . Vec["id"] . ": expected no prediction (nil)")
+		return
+	}
+	AssertTrue(!_LLMPP_IsNil(Pred), "vector " . Vec["id"] . ": expected a prediction")
+	AssertEqual(Expd["deletes"], Pred["deletes"], "vector " . Vec["id"] . ": deletes")
+	AssertEqual(Expd["to_type"], Pred["to_type"], "vector " . Vec["id"] . ": to_type")
+	AssertEqual(Expd["nw"], Pred["nw"], "vector " . Vec["id"] . ": nw")
+	; Normalise booleans (the parser may yield 0/1 or true/false).
+	AssertEqual(Expd["has_corrections"] ? true : false, Pred["has_corrections"] ? true : false,
+		"vector " . Vec["id"] . ": has_corrections")
+	AssertEqual(Expd["disable_bold"] ? true : false, Pred["disable_bold"] ? true : false,
+		"vector " . Vec["id"] . ": disable_bold")
+}
+
+_LLMPP_RegisterCorpus() {
+	CorpusPath := A_ScriptDir . "\..\..\shared\tests\corpus\llm\process_prediction_vectors.json"
+	if !FileExist(CorpusPath) {
+		Test("LLM process_prediction corpus: file exists",
+			() => AssertTrue(false, "corpus not found: " . CorpusPath))
+		return
+	}
+	Data := JsonParse(FileRead(CorpusPath, "UTF-8"))
+	for Vec in Data["vectors"] {
+		VecCopy := Vec
+		Test("LLM pp-parity [" . Vec["id"] . "]", () => _LLMPP_RunVector(VecCopy))
+	}
+}
+_LLMPP_RegisterCorpus()
