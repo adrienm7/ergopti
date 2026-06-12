@@ -492,3 +492,35 @@ Test("TomlCoerceValue: quoted strings are unquoted and unescaped",
 	TestTL_CoerceQuotedString)
 
 
+
+
+; ==========================
+; _ParseEntryPriority — individual per-hotstring priority (top of the cascade)
+; ==========================
+TestTL_EntryPriorityExplicit() {
+	Line := '"abc" = { output = "x", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false, priority = 80 }'
+	AssertEqual(80, _ParseEntryPriority(Line, 10),
+		"an explicit priority key in the inline table must override the fallback")
+}
+Test("ParseEntryPriority: explicit priority key overrides the fallback",
+	TestTL_EntryPriorityExplicit)
+
+TestTL_EntryPriorityFallback() {
+	Line := '"abc" = { output = "x", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }'
+	AssertEqual(10, _ParseEntryPriority(Line, 10),
+		"no priority key keeps the resolved section/source fallback")
+}
+Test("ParseEntryPriority: missing priority key keeps the fallback",
+	TestTL_EntryPriorityFallback)
+
+TestTL_EntryPriorityIgnoresOutputText() {
+	; "priority = 5" sits INSIDE the output string, not as a key (not preceded by
+	; { or ,), so it must be ignored and the fallback kept.
+	Line := '"abc" = { output = "set priority = 5 now", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }'
+	AssertEqual(30, _ParseEntryPriority(Line, 30),
+		"a priority-looking substring inside the output value must NOT be parsed as a key")
+}
+Test("ParseEntryPriority: ignores a priority substring inside the output value",
+	TestTL_EntryPriorityIgnoresOutputText)
+
+
