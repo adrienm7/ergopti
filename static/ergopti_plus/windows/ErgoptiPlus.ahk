@@ -973,6 +973,7 @@ if MetricsShortcuts.enabled
 BootProfile_Mark("Config, features & shortcuts loaded")
 InitSubMenus()
 initMenu()
+BootProfile_Mark("MENU/initMenu returned (pre tray icon)")
 UpdateTrayIcon()
 BootProfile_Mark("Tray menu + icon built")
 SetTimer(SaveFullConfig, -500)
