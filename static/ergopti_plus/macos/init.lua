@@ -234,7 +234,13 @@ Logger.info(LOG, "Main modules initialized successfully.")
 -- before the warmup retry loop fires its first probe.
 do
 	local ok_mlx, ApiMlx = pcall(require, "modules.llm.api_mlx")
-	local P = tostring((ok_mlx and type(ApiMlx.get_port) == "function" and ApiMlx.get_port()) or 8080)
+	-- The MLX port is owned by api_mlx (shared/llm/mlx_server.json = 3460). Prefer
+	-- the resolved port, then api_mlx's exposed canonical default; the trailing
+	-- literal is only ever reached if api_mlx itself failed to load, and it is the
+	-- canonical 3460 — NEVER mlx_lm.server's 8080 default, which is explicitly
+	-- forbidden (commonly taken by other local servers; see mlx_server.json).
+	local P = tostring((ok_mlx and type(ApiMlx.get_port) == "function" and ApiMlx.get_port())
+		or (ok_mlx and ApiMlx.DEFAULT_PORT) or 3460)
 	local kill_cmd =
 		-- Count distinct LISTEN sockets on the MLX port. -sTCP:LISTEN enumerates
 		-- each SO_REUSEPORT socket separately, so this is the reliable "how many

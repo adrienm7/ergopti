@@ -50,6 +50,10 @@ local MLX_DEFAULT_HOST = "127.0.0.1"
 -- port. See mlx_server.json.
 local MLX_DEFAULT_PORT = 3460
 
+-- Exposed so other modules (e.g. init.lua's boot sweep) can reach the canonical
+-- default without re-typing it or falling back to the forbidden 8080.
+M.DEFAULT_PORT = MLX_DEFAULT_PORT
+
 -- hs.settings key holding the user's port override (set from the LLM menu). Lets a
 -- user whose chosen port collides with another local server move Ergopti's MLX
 -- server without editing any file. A valid override wins over the shared JSON.
