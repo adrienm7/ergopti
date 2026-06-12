@@ -43,6 +43,52 @@ npm run lint:conventions                           # banners / spacing / encodin
 
 Baseline at hand-off: Node 14/14 + 6/6 · Linux 37/37 · macOS 1509/0 · AHK 1305/0.
 
+### Latest session (runtime perf + hotstring collision PRIORITY)
+
+Landed on `dev` this session (newest last):
+
+- **Runtime perf (Windows/AHK)** — magic-key keystroke `OnChar` went 177 ms → 5.4 ms:
+  - `673112c36` perf(hotstrings): index star triggers by string — `HSE_FindMatchAtEnd`
+    star path now probes the buffer's own suffixes against `HSE_StarByTriggerCI/CS`
+    (O(buffer) instead of scanning the ~2100-entry magic-key bucket). FeedChar 21 ms → <1 ms.
+  - `0eb6d4cab` perf(hotstrings): `_PrefixCancelRender()` kills the pending debounce
+    preview before a fire, so it can't paint reentrantly inside the send (~35 ms saved).
+  - Tooltip render optims (measure-font cache + border band-scan), menu/LLM blocking
+    `LLM_OllamaListModels` probe gated on deps-ready (boot 7 s → 2 s), boot bisection mark.
+  - `e267fc4f1` perf(hotstrings): personal sections loaded ONCE at boot (the inline
+    `#InputLevel 0` loop was a pre-HSE leftover double-registering ~263 specs).
+
+- **Hotstring collision PRIORITY — Windows side DONE** (cascade: individual > section >
+  file > source-default; source defaults common 10 / package 30 / personal 50):
+  - `04e4331f8` feat: engine tie-break `length → priority → Seq`. New `Spec.Priority`,
+    helpers `_HSE_Beats` / `_HSE_EndCharBeats` (the latter preserves the star-wins-tie
+    rule), `HSE_MappingsForTail` sort updated. Inert at the default (ties fall to Seq).
+  - `4d5e56b43` feat: source defaults `HSE_PRIORITY_COMMON/PACKAGE/PERSONAL` (10/30/50)
+    threaded `Options → _MakeHotstringMeta → HSE_Register`; generated/common loaders land
+    at 10 with no regen.
+  - `3449822f8` feat: per-hotstring `priority = N` key in the TOML inline table
+    (`_ParseEntryPriority`, guarded against matching inside the output string).
+  - `6c9d935bb` feat: section/category priority via the `HotstringsResolve` override
+    cascade (same system as delay/color) + `_HSE_SourcePriority` fallback.
+
+**Remaining for full PRIORITY parity (this is the active hand-off):**
+
+1. **macOS priority engine** — `macos/modules/keymap/registry.lua`: add a `priority`
+   field to the Mapping struct, insert the tie-break into `sort_mappings()` right after
+   length (`length → priority → is_word → group_order → seq`), port `_HSE_SourcePriority`
+   to a Lua `_source_priority(category)` (personal 50 / `ext.` 30 / common 10), and resolve
+   the cascade in `M.add`. Mirror the AHK engine tests in the Lua suite.
+2. **macOS priority cascade** — resolve individual > section > file > source in the Lua
+   loader / `lib/config_overrides.lua` (mirror how delay/color already cascade).
+3. **Shared corpus** — `shared/tests/corpus/hotstrings/vectors.json` is single-trigger
+   today; add collision/priority vectors (register N triggers w/ priorities → assert the
+   winner) and have BOTH drivers' corpus tests run them, so priority can never diverge.
+4. **Windows priority finish** — Phase 3 (generated/common loaders honour section
+   overrides — needs codegen, ties to A2 below), Phase 4 (UI in the delays/colors window
+   to edit priority), Phase 5 (prefix-watcher preview respects the same priority winner).
+5. **Boot perf (Windows)** — B4 generated loaders ~800 ms (instrument/bisect first),
+   prefix-watcher index ~205 ms + layout layers ~85 ms (likely inherent).
+
 ---
 
 ## PRIORITY 1 — Mutualize the two existing drivers (AHK ↔ macOS)
