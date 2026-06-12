@@ -374,9 +374,11 @@ _RegisterCategoryTriggers(Category) {
     }
 
     ; Capture: 1=trigger, 2=output, 3=is_case_sensitive,
-    ; 4=is_case_sensitive_strict (optional, defaults to false when missing).
+    ; 4=is_case_sensitive_strict (optional), 5=priority (optional). The individual
+    ; priority is captured so the preview can rank colliding candidates by the same
+    ; tie-break the engine uses (so the non-dimmed winner matches what actually fires).
     EntryPattern :=
-        'i)^"([^"\\]*(?:\\.[^"\\]*)*)"\s*=\s*\{\s*output\s*=\s*"([^"\\]*(?:\\.[^"\\]*)*)"\s*,\s*is_word\s*=\s*(?:true|false)\s*,\s*auto_expand\s*=\s*(?:true|false)\s*,\s*is_case_sensitive\s*=\s*(true|false)\s*,\s*final_result\s*=\s*(?:true|false)(?:\s*,\s*is_case_sensitive_strict\s*=\s*(true|false))?\s*\}'
+        'i)^"([^"\\]*(?:\\.[^"\\]*)*)"\s*=\s*\{\s*output\s*=\s*"([^"\\]*(?:\\.[^"\\]*)*)"\s*,\s*is_word\s*=\s*(?:true|false)\s*,\s*auto_expand\s*=\s*(?:true|false)\s*,\s*is_case_sensitive\s*=\s*(true|false)\s*,\s*final_result\s*=\s*(?:true|false)(?:\s*,\s*is_case_sensitive_strict\s*=\s*(true|false))?(?:\s*,\s*priority\s*=\s*([0-9]+))?\s*\}'
 
     CurrentSection := ""
     Count := 0
@@ -423,13 +425,16 @@ _RegisterCategoryTriggers(Category) {
         ; the trigger only fires on the exact casing in the TOML.
         IsCaseSensitive := (Match[3] == "true")
         IsStrict := (Match.Count >= 4 and Match[4] == "true")
+        ; Individual per-hotstring priority override (top of the cascade), empty
+        ; when the entry carries no `priority = N` key.
+        Individual := (Match[5] != "") ? Match[5] + 0 : ""
         ; Substitute ★ with the user's configured magic key so the prefix
         ; index reflects what the user actually types at runtime.
         if (IsSet(ScriptInformation) and ScriptInformation.Has("MagicKey")) {
             Trigger := StrReplace(Trigger, "★", ScriptInformation["MagicKey"])
             Output  := StrReplace(Output,  "★", ScriptInformation["MagicKey"])
         }
-        _AddTriggerVariants(Trigger, Output, Category, CurrentSection, IsCaseSensitive, IsStrict)
+        _AddTriggerVariants(Trigger, Output, Category, CurrentSection, IsCaseSensitive, IsStrict, Individual)
         Count += 1
     }
     return Count
@@ -460,30 +465,30 @@ _RegisterCategoryTriggers(Category) {
 ; letter-only trigger of any length — which used to suppress the UPPER
 ; variant globally and leave typings like ``IA`` without a tooltip even
 ; though the engine still fires on the upper variant.
-_AddTriggerVariants(Trigger, Output, Category, Section, IsCaseSensitive, IsStrict) {
+_AddTriggerVariants(Trigger, Output, Category, Section, IsCaseSensitive, IsStrict, Individual := "") {
     global ScriptInformation
     if IsStrict {
         ; Strict triggers only match the exact casing in the TOML — anything
         ; else neither fires nor previews.
-        _AddTriggerToIndex(Trigger, Output, Category, Section)
+        _AddTriggerToIndex(Trigger, Output, Category, Section, Individual)
         return
     }
     if IsCaseSensitive {
         ; Single registration via plain CreateHotstring (no auto-folding) —
         ; only the literal lowercase form is matched in practice.
-        _AddTriggerToIndex(Trigger, Output, Category, Section)
+        _AddTriggerToIndex(Trigger, Output, Category, Section, Individual)
         return
     }
     LowerTrig := StrLower(Trigger)
     TitleTrig := StrTitle(Trigger)
     UpperTrig := StrUpper(Trigger)
-    _AddTriggerToIndex(LowerTrig, StrLower(Output), Category, Section)
-    _AddTriggerToIndex(TitleTrig, StrTitle(Output), Category, Section)
+    _AddTriggerToIndex(LowerTrig, StrLower(Output), Category, Section, Individual)
+    _AddTriggerToIndex(TitleTrig, StrTitle(Output), Category, Section, Individual)
     MagicSuffix := (IsSet(ScriptInformation) and ScriptInformation.Has("MagicKey"))
         ? ScriptInformation["MagicKey"] : "★"
     BodyLen := StrLen(RTrim(Trigger, MagicSuffix))
     if (BodyLen != 1) {
-        _AddTriggerToIndex(UpperTrig, StrUpper(Output), Category, Section)
+        _AddTriggerToIndex(UpperTrig, StrUpper(Output), Category, Section, Individual)
     }
 }
 
@@ -508,8 +513,8 @@ _AddTriggerVariants(Trigger, Output, Category, Section, IsCaseSensitive, IsStric
 ; (everything else) are not indexed at all — their previews would
 ; fire on a single-letter typed buffer, which is too noisy to be
 ; useful.
-_AddTriggerToIndex(Trigger, Output, Category, Section) {
-    global _PrefixIndex, _MIN_PREFIX_LEN, ScriptInformation
+_AddTriggerToIndex(Trigger, Output, Category, Section, Individual := "") {
+    global _PrefixIndex, _MIN_PREFIX_LEN, ScriptInformation, HSE_PRIORITY_COMMON
 
     MagicKey := (IsSet(ScriptInformation) and ScriptInformation.Has("MagicKey"))
         ? ScriptInformation["MagicKey"] : "★"
@@ -517,11 +522,25 @@ _AddTriggerToIndex(Trigger, Output, Category, Section) {
     Len := StrLen(Trigger)
     HasMagic := (MkLen > 0 and Len > MkLen and SubStr(Trigger, -MkLen) == MagicKey)
 
+    ; Resolve the collision priority exactly as the engine registers it: an
+    ; individual `priority = N` wins, otherwise the section/file/source override
+    ; cascade via HotstringsResolve. Stored on the entry so _LookupAndRender can
+    ; rank colliding candidates so the non-dimmed preview = the engine's fire winner.
+    if (Individual != "") {
+        Priority := Individual
+    } else {
+        Resolved := HotstringsResolve(Category, Section)
+        Priority := (Resolved.HasOwnProp("Priority") and Resolved.Priority != "")
+            ? Resolved.Priority
+            : HSE_PRIORITY_COMMON
+    }
+
     Entry := { Trigger:  Trigger,
                Output:   Output,
                Category: Category,
                Section:  Section,
-               Length:   Len }
+               Length:   Len,
+               Priority: Priority }
 
     KeyLen := HasMagic ? (Len - MkLen) : Len
     ; Magic-key triggers with a 1-char body (e.g. "c★") are allowed through
@@ -1022,6 +1041,46 @@ _PrefixRenderFlush() {
         try LoggerError("PrefixWatcher", "Deferred render failed: {1}.", Err.Message)
 }
 
+; True when candidate A outranks candidate B under the engine's collision
+; tie-break: a longer trigger wins (the engine fires the longest match), then a
+; higher priority, then — when both are equal — a false return preserves the
+; original registration order (the engine's final ``Seq`` tiebreak). HasOwnProp
+; guards keep it safe against entries built before the Priority field existed.
+_PrefixCandidateBeats(A, B) {
+    AL := A.HasOwnProp("Length") ? A.Length : 0
+    BL := B.HasOwnProp("Length") ? B.Length : 0
+    if (AL != BL) {
+        return AL > BL
+    }
+    AP := A.HasOwnProp("Priority") ? A.Priority : 0
+    BP := B.HasOwnProp("Priority") ? B.Priority : 0
+    return AP > BP
+}
+
+; Return a NEW array of the candidates ordered by _PrefixCandidateBeats. A stable
+; insertion sort (swap only on a strict beat) keeps equal-rank candidates in their
+; original order, so the first item is exactly the mapping the engine would fire.
+; The source array (the live prefix-index bucket) is never mutated.
+_PrefixSortCandidates(Candidates) {
+    Sorted := []
+    for _, E in Candidates {
+        Sorted.Push(E)
+    }
+    N := Sorted.Length
+    I := 2
+    while (I <= N) {
+        Pivot := Sorted[I]
+        J := I - 1
+        while (J >= 1 and _PrefixCandidateBeats(Pivot, Sorted[J])) {
+            Sorted[J + 1] := Sorted[J]
+            J -= 1
+        }
+        Sorted[J + 1] := Pivot
+        I += 1
+    }
+    return Sorted
+}
+
 _LookupAndRender() {
     global _PrefixBuffer, _PrefixIndex, _MIN_PREFIX_LEN, _PREFIX_WORD_BOUNDARIES, ScriptInformation
     Buffer := _PrefixBuffer
@@ -1084,7 +1143,14 @@ _LookupAndRender() {
     ; will actually fire — it is rendered normally. Every subsequent candidate
     ; of the same group is rendered dimmed + strikethrough (IsDimmed flag,
     ; consumed by tooltip.ahk's _TooltipBuildGui).
-    Candidates := _PrefixIndex[Buffer]
+    ; Rank colliding candidates by the engine's tie-break (longer trigger first,
+    ; then higher priority, then registration order) BEFORE splitting into display
+    ; groups. The split is stable, so the FIRST item in each group is the candidate
+    ; the engine would actually fire — it is rendered normally while the losers are
+    ; dimmed. Without this the non-dimmed preview was just the first-scanned trigger
+    ; (category load order), which made a personal trigger that the engine fires show
+    ; up dimmed beneath a common one it loses to.
+    Candidates := _PrefixSortCandidates(_PrefixIndex[Buffer])
     MK := ScriptInformation["MagicKey"]
     EndItems := []
     StarItems := []
