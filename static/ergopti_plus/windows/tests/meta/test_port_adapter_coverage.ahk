@@ -74,13 +74,15 @@ _MetaRunAdapterPresenceTests() {
 	RepoRoot := RegExReplace(RepoRoot, "/static/ergopti_plus/windows/tests(/meta)?$", "")
 
 	SharedPorts := RepoRoot . "/static/ergopti_plus/shared/ports"
-	AhkAdapters := RepoRoot . "/static/ergopti_plus/windows/adapters"
-	HsAdapters  := RepoRoot . "/static/ergopti_plus/macos/adapters"
+	AhkAdapters   := RepoRoot . "/static/ergopti_plus/windows/adapters"
+	HsAdapters    := RepoRoot . "/static/ergopti_plus/macos/adapters"
+	LinuxAdapters := RepoRoot . "/static/ergopti_plus/linux/adapters"
 
-	SpecFiles  := _MetaPACListFiles(SharedPorts, "js")
-	MissingAhk := 0
-	MissingHs  := 0
-	SpecCount  := 0
+	SpecFiles    := _MetaPACListFiles(SharedPorts, "js")
+	MissingAhk   := 0
+	MissingHs    := 0
+	MissingLinux := 0
+	SpecCount    := 0
 
 	for SpecPath in SpecFiles {
 		if not SpecPath ~= "i)\.spec\.js$" {
@@ -89,8 +91,9 @@ _MetaRunAdapterPresenceTests() {
 		SpecCount++
 		RawName   := _MetaPACBaseName(SpecPath)
 		SnakeName := _MetaPACToSnake(RawName)
-		AhkFile   := AhkAdapters . "/" . SnakeName . ".ahk"
-		HsFile    := HsAdapters  . "/" . SnakeName . ".lua"
+		AhkFile   := AhkAdapters   . "/" . SnakeName . ".ahk"
+		HsFile    := HsAdapters    . "/" . SnakeName . ".lua"
+		LinuxFile := LinuxAdapters . "/" . SnakeName . ".lua"
 		if not FileExist(StrReplace(AhkFile, "/", "\")) {
 			MissingAhk++
 			OutputDebug("WARN: AHK adapter missing for port '" . RawName . "': " . AhkFile)
@@ -98,6 +101,12 @@ _MetaRunAdapterPresenceTests() {
 		if not FileExist(StrReplace(HsFile, "/", "\")) {
 			MissingHs++
 			OutputDebug("WARN: HS adapter missing for port '" . RawName . "': " . HsFile)
+		}
+		; Linux must keep up with every port too, so a new port without a Linux
+		; adapter fails CI rather than letting the Linux driver silently lag.
+		if not FileExist(StrReplace(LinuxFile, "/", "\")) {
+			MissingLinux++
+			OutputDebug("WARN: Linux adapter missing for port '" . RawName . "': " . LinuxFile)
 		}
 	}
 
@@ -111,6 +120,11 @@ _MetaRunAdapterPresenceTests() {
 		Assert(MissingHs = 0, "meta: " . MissingHs . " HS adapter(s) missing  --  see OutputDebug")
 	}
 	Test("meta port coverage: every port spec has a HS adapter (" . SpecCount . " specs)", _ResultAdapterHs)
+
+	_ResultAdapterLinux() {
+		Assert(MissingLinux = 0, "meta: " . MissingLinux . " Linux adapter(s) missing  --  see OutputDebug")
+	}
+	Test("meta port coverage: every port spec has a Linux adapter (" . SpecCount . " specs)", _ResultAdapterLinux)
 }
 _MetaRunAdapterPresenceTests()
 
