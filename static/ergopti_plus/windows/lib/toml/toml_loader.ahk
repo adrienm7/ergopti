@@ -44,6 +44,18 @@ global _HOTSTRING_ENTRY_PATTERN :=
 ; ========================================================
 ; ========================================================
 
+; Extract an individual per-hotstring priority from a TOML entry line, or return
+; Fallback when the entry carries no `priority = N` key. The key must be preceded
+; by `{` or `,` so it is matched only as a real inline-table key and can never
+; collide with the word "priority" appearing inside the output string. This is
+; the top level of the priority cascade (individual > section > file > source).
+_ParseEntryPriority(Line, Fallback) {
+    if RegExMatch(Line, "i)[,{]\s*priority\s*=\s*([0-9]+)", &PrioM) {
+        return PrioM[1] + 0
+    }
+    return Fallback
+}
+
 ; Return the cached content of a TOML file, reading it from disk on first access.
 ReadTomlFile(FilePath) {
     global _TomlFileCache
@@ -316,12 +328,17 @@ LoadHotstringsSection(CategoryName, SectionName, FeatureConfig, ExtraOptions := 
         if StrictCase
             Flags .= "C"
 
+        ; Individual per-hotstring priority — the top of the cascade
+        ; (individual > section > file > source default). Falls back to the
+        ; resolved section/source value when the entry has no `priority` key.
+        EntryPriority := _ParseEntryPriority(Line, ResolvedPriority)
+
         Options := Map(
             "TimeActivationSeconds", TimeActivationSeconds,
             "FinalResult", FinalResult,
             "Category", CategoryName,
             "Section", SectionName,
-            "Priority", ResolvedPriority,
+            "Priority", EntryPriority,
         )
         if ExtraOptions.Has("OnlyText") {
             Options["OnlyText"] := ExtraOptions["OnlyText"]
@@ -395,7 +412,8 @@ LoadExtTomlFile(FilePath, CategoryLabel) {
         SectionName := CurrentSection
         IsRepeat := (StrLower(CategoryName) == "magickey" and SectionName == "repeatcorrections"
             and InStr(Trigger, ScriptInformation["MagicKey"]) > 0)
-        Options := Map("TimeActivationSeconds", 0, "FinalResult", FinalResult, "IsRepeat", IsRepeat, "Priority", HSE_PRIORITY_PACKAGE)
+        EntryPriority := _ParseEntryPriority(Line, HSE_PRIORITY_PACKAGE)
+        Options := Map("TimeActivationSeconds", 0, "FinalResult", FinalResult, "IsRepeat", IsRepeat, "Priority", EntryPriority)
         if IsCaseSens {
             CreateHotstring(Flags, Trigger, Output, Options)
         } else {
