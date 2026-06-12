@@ -907,6 +907,12 @@ _TooltipBuildGui(Items) {
     _TooltipRowGuis := [{ Gui: G, H: TotalH, W: TotalW, IsSep: false }]
 }
 
+; Cache of measurement HFONTs keyed by device-pixel height. The tooltip only
+; ever measures one font name at a couple of sizes, so creating + destroying a
+; GDI font on every call (twice per render) is pure waste. The handles live for
+; the process — a tiny, bounded GDI cache.
+global _TooltipMeasureFontCache := Map()
+
 ; Measure ``Text`` at a given font size. Delegates to _TooltipMeasureTextSize.
 _TooltipMeasureText(Text) {
     global _TOOLTIP_FONT_SIZE
@@ -934,12 +940,20 @@ _TooltipMeasureTextSize(Text, FontSize) {
     }
     HeightPx := -Round(FontSize * DPI / 72)
 
-    HFont := DllCall("Gdi32\CreateFontW",
-        "Int", HeightPx, "Int", 0, "Int", 0, "Int", 0,
-        "Int", 400, "UInt", 0, "UInt", 0, "UInt", 0,
-        "UInt", 1, "UInt", 0, "UInt", 0, "UInt", 0, "UInt", 0,
-        "WStr", _TOOLTIP_FONT_NAME,
-        "Ptr")
+    ; Reuse a cached HFONT keyed by device-pixel height (covers DPI changes too).
+    global _TooltipMeasureFontCache
+    if _TooltipMeasureFontCache.Has(HeightPx) {
+        HFont := _TooltipMeasureFontCache[HeightPx]
+    } else {
+        HFont := DllCall("Gdi32\CreateFontW",
+            "Int", HeightPx, "Int", 0, "Int", 0, "Int", 0,
+            "Int", 400, "UInt", 0, "UInt", 0, "UInt", 0,
+            "UInt", 1, "UInt", 0, "UInt", 0, "UInt", 0, "UInt", 0,
+            "WStr", _TOOLTIP_FONT_NAME,
+            "Ptr")
+        if HFont
+            _TooltipMeasureFontCache[HeightPx] := HFont
+    }
     if !HFont {
         DllCall("User32\ReleaseDC", "Ptr", 0, "Ptr", HDC)
         return Fallback
@@ -954,7 +968,7 @@ _TooltipMeasureTextSize(Text, FontSize) {
     Height := Ok ? NumGet(Size, 4, "Int") : Fallback.H
 
     DllCall("Gdi32\SelectObject", "Ptr", HDC, "Ptr", OldFont)
-    DllCall("Gdi32\DeleteObject", "Ptr", HFont)
+    ; HFont is cached for reuse — do NOT DeleteObject it here.
     DllCall("User32\ReleaseDC", "Ptr", 0, "Ptr", HDC)
 
     if (Width <= 0 or Height <= 0) {
@@ -1075,11 +1089,31 @@ _TooltipShowBorder(X, Y, W, H, Reveal := true) {
     AlphaByte := Round(_TOOLTIP_BORDER_ALPHA * 255)
     PremulPx := (AlphaByte << 24) | (AlphaByte << 16) | (AlphaByte << 8) | AlphaByte
     _hpPix := HotPath_Now()
-    loop TotalPx {
-        Offset := (A_Index - 1) * 4
-        Raw := NumGet(PixPtr, Offset, "UInt")
-        if (Raw != 0)   ; GDI painted this pixel — set correct alpha
-            NumPut("UInt", PremulPx, PixPtr, Offset)
+    ; The border is a 1 px rounded-rect OUTLINE: only the top/bottom corner bands
+    ; (rows within Diam of an edge — horizontal edges + corner arcs) and the left/
+    ; right edge columns of the middle rows can carry painted pixels; the interior
+    ; is fully transparent. Scanning only those bands turns this from O(Wp*Hp) into
+    ; O(Wp*Diam + Hp), which matters most for wide tooltips where the full scan
+    ; reached ~20 ms. Diam (the corner diameter) is a conservative band height —
+    ; the arc only reaches down by the radius (Diam/2), so it always covers every
+    ; painted corner pixel.
+    BandRows := Min(Diam, Hp)
+    LastColOff := (Wp - 1) * 4
+    loop Hp {
+        RowY := A_Index - 1
+        RowBase := RowY * Wp * 4
+        if (RowY < BandRows or RowY >= Hp - BandRows) {
+            loop Wp {
+                Offset := RowBase + (A_Index - 1) * 4
+                if (NumGet(PixPtr, Offset, "UInt") != 0)
+                    NumPut("UInt", PremulPx, PixPtr, Offset)
+            }
+        } else {
+            if (NumGet(PixPtr, RowBase, "UInt") != 0)
+                NumPut("UInt", PremulPx, PixPtr, RowBase)
+            if (NumGet(PixPtr, RowBase + LastColOff, "UInt") != 0)
+                NumPut("UInt", PremulPx, PixPtr, RowBase + LastColOff)
+        }
     }
     HotPath_LogIfSlow("Tooltip.BorderPixelLoop", _hpPix, TotalPx . " px")
 
