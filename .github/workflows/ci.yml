@@ -121,6 +121,9 @@ jobs:
       - name: Port compliance (all 20 ports covered by adapters)
         run: npm run test:port-compliance
 
+      - name: Hotstring priority parity (shared JSON ↔ AHK + Lua constants)
+        run: npm run test:priority-parity
+
       - name: Property-based tests (fast-check, 27 × 1000 runs)
         run: npm run test:properties
 
