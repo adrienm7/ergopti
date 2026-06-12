@@ -46,6 +46,32 @@ local function require_state(func_name)
 	return true
 end
 
+-- Collision priority by hotstring SOURCE. Mirror of the AHK engine
+-- (HSE_PRIORITY_* in hotstring_engine_main.ahk) so both drivers break a
+-- same-length trigger collision identically: higher priority wins. Personal
+-- hotstrings outrank "ext." packages, which outrank bundled common ones. The
+-- cascade above these defaults (individual > section > file) is resolved by the
+-- loader before M.add; these are the final fallback.
+local PRIORITY_COMMON   = 10
+local PRIORITY_PACKAGE  = 30
+local PRIORITY_PERSONAL = 50
+
+--- Source-default priority for a category name.
+--- @param category string|nil Category (e.g. "personal", "ext.demo", "rolls").
+--- @return integer The source-default priority (personal 50 / package 30 / common 10).
+local function source_priority(category)
+	local c = type(category) == "string" and category:lower() or ""
+	if c == "personal" then return PRIORITY_PERSONAL end
+	if c:sub(1, 4) == "ext." then return PRIORITY_PACKAGE end
+	return PRIORITY_COMMON
+end
+
+-- Exposed for the loader cascade and unit tests.
+M.PRIORITY_COMMON   = PRIORITY_COMMON
+M.PRIORITY_PACKAGE  = PRIORITY_PACKAGE
+M.PRIORITY_PERSONAL = PRIORITY_PERSONAL
+M.source_priority   = source_priority
+
 
 --- Returns the last UTF-8 codepoint of a string, used to bucket mappings by
 --- tail character for O(1) lookup on keystroke. Falls back to the last byte
@@ -79,7 +105,8 @@ end
 --- @field star_base_bytes     integer|nil Byte length of `star_base`; nil when not magic.
 --- @field star_base_tail_char string|nil Last UTF-8 codepoint of `star_base`; keys into _state.mappings_by_star_tail_char.
 --- @field group               string|nil Name of the owning group, when registered inside a load_file/load_toml scope.
---- @field group_order         integer Load-order rank of the owning group; acts as the primary sort tiebreaker after trigger length.
+--- @field group_order         integer Load-order rank of the owning group; tiebreaker after length and priority.
+--- @field priority            integer Collision priority (higher wins) — the first sort tiebreaker after trigger length. Resolved by the loader cascade (individual > section > file > source default 10/30/50); defaults to the common source value.
 
 
 
@@ -176,6 +203,14 @@ function M.sort_mappings()
 	Logger.trace(LOG, "Sorting %d mapping(s)…", #_state.mappings)
 	table.sort(_state.mappings, function(a, b)
 		if a.tlen ~= b.tlen then return a.tlen > b.tlen end
+		-- Explicit collision priority (higher wins) sits right after length so a
+		-- user can make a hotstring win regardless of load order — same tie-break
+		-- position as the AHK engine. Equal priority falls through to the original
+		-- word-boundary / group-order / seq tiebreakers, so behaviour is unchanged
+		-- wherever priorities are equal.
+		local ap = a.priority or PRIORITY_COMMON
+		local bp = b.priority or PRIORITY_COMMON
+		if ap ~= bp then return ap > bp end
 		if a.is_word ~= b.is_word then return a.is_word end
 		-- Stable cross-reload priority: groups keep their original insertion
 		-- order across disable/enable cycles, so two same-length triggers
@@ -362,6 +397,12 @@ function M.add(trigger, replacement, opts)
 	-- Owning section name (e.g. "comma_j"), threaded through so mapping_fires can
 	-- look up a per-section delay override. Generated aliases inherit it.
 	local section           = type(opts.section) == "string" and opts.section or nil
+	-- Resolved collision priority. The loader passes the cascade result
+	-- (individual > section > file > source default); ad-hoc M.add calls and
+	-- not-yet-migrated callers default to the common source value, which keeps
+	-- every mapping equal — so ties still fall through to the existing
+	-- word-boundary / group-order / seq tiebreakers (behaviour unchanged).
+	local priority          = type(opts.priority) == "number" and opts.priority or PRIORITY_COMMON
 
 	-- Replacements containing newlines or key directives are always "final" so
 	-- the engine does not attempt to chain another expansion on top of them.
@@ -403,6 +444,7 @@ function M.add(trigger, replacement, opts)
 			is_word      = is_word,
 			section      = section,
 			auto         = a,
+			priority     = priority,
 			seq          = _state.seq_counter,
 			tlen         = text_utils.utf8_len(t),
 			-- Byte-length cache: the main event loop compares buffer suffixes

@@ -334,3 +334,59 @@ helpers.describe("Registry.get_meta_description", function()
 		helpers.assert_eq(Registry.get_meta_description("gx"), "Description X")
 	end)
 end)
+
+
+
+
+-- Section 11: Collision priority tie-break (mirrors the AHK engine).
+
+helpers.describe("Registry collision priority", function()
+	helpers.it("source_priority ranks personal > package > common", function()
+		fresh_registry()
+		helpers.assert_eq(Registry.source_priority("personal"), 50)
+		helpers.assert_eq(Registry.source_priority("PERSONAL"), 50)
+		helpers.assert_eq(Registry.source_priority("ext.demo"), 30)
+		helpers.assert_eq(Registry.source_priority("autocorrection"), 10)
+		helpers.assert_eq(Registry.source_priority(nil), 10)
+	end)
+
+	helpers.it("add stores an explicit opts.priority on the mapping", function()
+		local state = fresh_registry()
+		Registry.add("qp", "QP", { is_case_sensitive = true, priority = 77 })
+		helpers.assert_eq(#state.mappings, 1)
+		helpers.assert_eq(state.mappings[1].priority, 77)
+	end)
+
+	helpers.it("defaults a missing priority to the common source value", function()
+		local state = fresh_registry()
+		Registry.add("qp", "QP", { is_case_sensitive = true })
+		helpers.assert_eq(state.mappings[1].priority, 10)
+	end)
+
+	helpers.it("higher priority wins an equal-length collision", function()
+		local state = fresh_registry()
+		Registry.add("yy", "Y", { is_case_sensitive = true, priority = 10 })
+		Registry.add("zz", "Z", { is_case_sensitive = true, priority = 90 })
+		Registry.sort_mappings()
+		-- Both length 2; the higher-priority trigger must sort first (without
+		-- priority, seq order would put the first-added "yy" ahead).
+		helpers.assert_eq(state.mappings[1].trigger, "zz")
+		helpers.assert_eq(state.mappings[2].trigger, "yy")
+	end)
+
+	helpers.it("priority order is independent of insertion order", function()
+		local state = fresh_registry()
+		Registry.add("zz", "Z", { is_case_sensitive = true, priority = 90 })
+		Registry.add("yy", "Y", { is_case_sensitive = true, priority = 10 })
+		Registry.sort_mappings()
+		helpers.assert_eq(state.mappings[1].trigger, "zz")
+	end)
+
+	helpers.it("longest trigger still wins over a shorter higher-priority one", function()
+		local state = fresh_registry()
+		Registry.add("ab",  "AB",  { is_case_sensitive = true, priority = 99 })
+		Registry.add("abc", "ABC", { is_case_sensitive = true, priority = 1 })
+		Registry.sort_mappings()
+		helpers.assert_eq(state.mappings[1].trigger, "abc")
+	end)
+end)
