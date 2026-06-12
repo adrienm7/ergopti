@@ -565,4 +565,30 @@ TestTL_EntryPatternPriorityOptional() {
 Test("HotstringEntryPattern: priority key stays optional",
 	TestTL_EntryPatternPriorityOptional)
 
+; ParseTomlGroupConfig must read a file-level [_meta] priority and a per-section
+; [_meta.sections.<sec>] priority into the Config struct — these are the
+; package-shipped defaults the resolve cascade reads beneath the user override.
+TestTL_ParseGroupConfigPriority() {
+	global HotstringGroupConfig
+	Path := A_Temp . "\toml_group_prio_test.toml"
+	try FileDelete(Path)
+	FileAppend(
+		"[_meta]`npriority = 35`n`n"
+		. "[_meta.sections.foo]`npriority = 65`n`n"
+		. "[[foo]]`n",
+		Path, "UTF-8")
+	; Bypass the cache so the fresh file is actually parsed.
+	if HotstringGroupConfig.Has(Path)
+		HotstringGroupConfig.Delete(Path)
+	Cfg := ParseTomlGroupConfig("", Path)
+	AssertEqual(35, Cfg.Priority, "file-level [_meta] priority must be parsed")
+	AssertTrue(Cfg.Sections.Has("foo"), "the [_meta.sections.foo] block must materialise a section")
+	AssertEqual(65, Cfg.Sections["foo"].Priority, "per-section [_meta.sections.foo] priority must be parsed")
+	if HotstringGroupConfig.Has(Path)
+		HotstringGroupConfig.Delete(Path)
+	try FileDelete(Path)
+}
+Test("ParseTomlGroupConfig: reads [_meta] and per-section priority",
+	TestTL_ParseGroupConfigPriority)
+
 

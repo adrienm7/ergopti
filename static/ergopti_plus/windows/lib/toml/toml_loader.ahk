@@ -470,7 +470,7 @@ ParseTomlGroupConfig(CategoryName, FilePath := "") {
         }
     }
 
-    Config := { Delay: "", Color: "", ShowTooltip: "", Sections: Map() }
+    Config := { Delay: "", Color: "", ShowTooltip: "", Priority: "", Sections: Map() }
     if !FileExist(FilePath) {
         HotstringGroupConfig[LowerCat] := Config
         return Config
@@ -492,7 +492,7 @@ ParseTomlGroupConfig(CategoryName, FilePath := "") {
             Mode := "meta_section"
             CurrentSec := StrLower(SecMatch[1])
             if !Config.Sections.Has(CurrentSec) {
-                Config.Sections[CurrentSec] := { Delay: "", Color: "", ShowTooltip: "", Description: "" }
+                Config.Sections[CurrentSec] := { Delay: "", Color: "", ShowTooltip: "", Priority: "", Description: "" }
             }
             continue
         }
@@ -518,6 +518,8 @@ ParseTomlGroupConfig(CategoryName, FilePath := "") {
                 Config.Color := UnescapeTomlString(ColMatch[1])
             } else if RegExMatch(Line, "^show_tooltip\s*=\s*(true|false)\s*$", &BoolMatch) {
                 Config.ShowTooltip := (BoolMatch[1] == "true")
+            } else if RegExMatch(Line, "^priority\s*=\s*([0-9]+)\s*$", &PrioMatch) {
+                Config.Priority := PrioMatch[1] + 0
             }
         } else if (Mode == "meta_section" and CurrentSec != "") {
             Sec := Config.Sections[CurrentSec]
@@ -527,6 +529,8 @@ ParseTomlGroupConfig(CategoryName, FilePath := "") {
                 Sec.Color := UnescapeTomlString(ColMatch[1])
             } else if RegExMatch(Line, "^show_tooltip\s*=\s*(true|false)\s*$", &BoolMatch) {
                 Sec.ShowTooltip := (BoolMatch[1] == "true")
+            } else if RegExMatch(Line, "^priority\s*=\s*([0-9]+)\s*$", &PrioMatch) {
+                Sec.Priority := PrioMatch[1] + 0
             } else if RegExMatch(Line, '^description\s*=\s*"((?:[^"\\]|\\.)*)"$', &DescMatch) {
                 Sec.Description := UnescapeTomlString(DescMatch[1])
             }
@@ -534,7 +538,7 @@ ParseTomlGroupConfig(CategoryName, FilePath := "") {
             if RegExMatch(Line, "^([A-Za-z0-9_\-]+)\s*=\s*([0-9]+(?:\.[0-9]+)?)\s*$", &SDMatch) {
                 SDKey := StrLower(SDMatch[1])
                 if !Config.Sections.Has(SDKey) {
-                    Config.Sections[SDKey] := { Delay: "", Color: "", ShowTooltip: "", Description: "" }
+                    Config.Sections[SDKey] := { Delay: "", Color: "", ShowTooltip: "", Priority: "", Description: "" }
                 }
                 Config.Sections[SDKey].Delay := SDMatch[2] + 0
             }

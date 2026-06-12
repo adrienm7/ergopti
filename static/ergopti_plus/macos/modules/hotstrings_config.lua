@@ -189,6 +189,13 @@ local function parse_overrides(path)
 				target.show_tooltip = (bool_val == "true")
 				goto continue
 			end
+
+			local prio = line:match("^priority%s*=%s*(%d+)%s*$")
+			if prio then
+				local p = tonumber(prio)
+				if p then target.priority = p end
+				goto continue
+			end
 		end
 
 		::continue::
@@ -218,6 +225,7 @@ local function serialize_overrides(overrides)
 	for _, cat in ipairs(cats) do
 		local entry = overrides[cat]
 		local has_file_level = entry.delay ~= nil or entry.color ~= nil or entry.show_tooltip ~= nil
+			or entry.priority ~= nil
 		if has_file_level then
 			table.insert(out, string.format("[%s]", cat))
 			if entry.delay ~= nil then
@@ -229,6 +237,9 @@ local function serialize_overrides(overrides)
 			if entry.show_tooltip ~= nil then
 				table.insert(out, string.format("show_tooltip = %s", entry.show_tooltip and "true" or "false"))
 			end
+			if entry.priority ~= nil then
+				table.insert(out, string.format("priority = %d", math.floor(entry.priority)))
+			end
 			table.insert(out, "")
 		end
 
@@ -238,7 +249,8 @@ local function serialize_overrides(overrides)
 			table.sort(secs)
 			for _, sec in ipairs(secs) do
 				local s_entry = entry.sections[sec]
-				if s_entry.delay ~= nil or s_entry.color ~= nil or s_entry.show_tooltip ~= nil then
+				if s_entry.delay ~= nil or s_entry.color ~= nil or s_entry.show_tooltip ~= nil
+					or s_entry.priority ~= nil then
 					table.insert(out, string.format("[%s.%s]", cat, sec))
 					if s_entry.delay ~= nil then
 						table.insert(out, string.format("delay = %s", tostring(s_entry.delay)))
@@ -248,6 +260,9 @@ local function serialize_overrides(overrides)
 					end
 					if s_entry.show_tooltip ~= nil then
 						table.insert(out, string.format("show_tooltip = %s", s_entry.show_tooltip and "true" or "false"))
+					end
+					if s_entry.priority ~= nil then
+						table.insert(out, string.format("priority = %d", math.floor(s_entry.priority)))
 					end
 					table.insert(out, "")
 				end
@@ -305,6 +320,7 @@ local function get_toml_meta(category)
 		delay        = parsed.meta.delay,
 		color        = parsed.meta.color,
 		show_tooltip = parsed.meta.show_tooltip,
+		priority     = parsed.meta.priority,
 		sections     = parsed.meta.sections or {},
 	}
 	return cache[category]
@@ -481,8 +497,8 @@ end
 --- @return boolean True on success.
 function M.set_override(category, section, field, value)
 	if not require_state("set_override") then return false end
-	if field ~= "delay" and field ~= "color" and field ~= "show_tooltip" then
-		Logger.error(LOG, "set_override(): field must be 'delay', 'color', or 'show_tooltip', got '%s'.", tostring(field))
+	if field ~= "delay" and field ~= "color" and field ~= "show_tooltip" and field ~= "priority" then
+		Logger.error(LOG, "set_override(): field must be 'delay', 'color', 'show_tooltip', or 'priority', got '%s'.", tostring(field))
 		return false
 	end
 
@@ -521,6 +537,7 @@ function M.clear_override(category, section, field)
 		target.delay        = nil
 		target.color        = nil
 		target.show_tooltip = nil
+		target.priority     = nil
 	end
 
 	Logger.debug(LOG, "Override cleared: %s%s%s.",
@@ -592,6 +609,7 @@ function M.get_toml_defaults(category, section)
 	return {
 		delay = (meta_sec and meta_sec.delay) or meta.delay or GLOBAL_DEFAULT_DELAY,
 		color = (meta_sec and meta_sec.color) or meta.color,
+		priority = (meta_sec and meta_sec.priority) or meta.priority,
 	}
 end
 
@@ -607,8 +625,10 @@ function M.get_user_override(category, section)
 	if not cat then return nil end
 	local target = section and (cat.sections or {})[section] or cat
 	if not target then return nil end
-	if target.delay == nil and target.color == nil and target.show_tooltip == nil then return nil end
-	return { delay = target.delay, color = target.color, show_tooltip = target.show_tooltip }
+	if target.delay == nil and target.color == nil and target.show_tooltip == nil
+		and target.priority == nil then return nil end
+	return { delay = target.delay, color = target.color, show_tooltip = target.show_tooltip,
+		priority = target.priority }
 end
 
 -- =================================================

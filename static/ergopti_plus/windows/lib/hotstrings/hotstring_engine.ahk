@@ -298,13 +298,37 @@ MicrosoftApps() {
 ; ============================================
 ; ============================================
 
+; Resolve the collision priority to register a hotstring at, for the case where
+; the caller did NOT pass an explicit ``Priority`` in its options. The hand loader
+; (LoadHotstringsSection) always passes the fully resolved cascade value
+; (individual > section > file > source) and never reaches here. The GENERATED-loader
+; path only carries Category/Section, so fold in the section/file/source override
+; cascade via HotstringsResolve so the ~3000 bundled hotstrings honour a user's
+; per-section priority override instead of always landing at the common tier (10).
+; HotstringsConfigInit runs long before RegisterAllHotstrings, so the override file
+; is loaded here; HotstringsResolve is memoised per (category, section) so this stays
+; cheap across thousands of entries. Falls back to HSE_PRIORITY_COMMON when no
+; category context is available. NB: takes Category/Section, NOT the options Map —
+; callers omit ``options`` entirely (declared ``options := unset``), and passing an
+; unset variable as an argument throws UnsetError at the call site in AHK v2, so the
+; ``IsSet(options)`` guard MUST live in the caller, never in a parameter here.
+_HSE_ResolveRegistrationPriority(Category, Section) {
+    global HSE_PRIORITY_COMMON
+    if (Category != "") {
+        Resolved := HotstringsResolve(Category, Section)
+        if (Resolved.HasOwnProp("Priority") and Resolved.Priority != "") {
+            return Resolved.Priority
+        }
+    }
+    return HSE_PRIORITY_COMMON
+}
+
 ; Public hotstring factory. The Map-based options API is kept because this
 ; runs once at startup (cold path); internally the options are decomposed
 ; into positional booleans AND the per-firing string ``BackSpaceSeq`` is
 ; pre-computed so the hot-path dispatcher ``_HotstringDispatch`` never has
 ; to run ``StrLen`` or concatenate on every keystroke.
 CreateHotstring(Flags, Abbreviation, Replacement, options := unset) {
-    global HSE_PRIORITY_COMMON
     OnlyText := (IsSet(options) and options.Has("OnlyText")) ? options["OnlyText"] : True
     FinalResult := (IsSet(options) and options.Has("FinalResult")) ? options["FinalResult"] : False
     TimeActivationSeconds := (IsSet(options) and options.Has("TimeActivationSeconds")) ? options[
@@ -312,7 +336,12 @@ CreateHotstring(Flags, Abbreviation, Replacement, options := unset) {
     IsRepeat := (IsSet(options) and options.Has("IsRepeat")) ? options["IsRepeat"] : False
     Category := (IsSet(options) and options.Has("Category")) ? options["Category"] : ""
     Section  := (IsSet(options) and options.Has("Section"))  ? options["Section"]  : ""
-    Priority := (IsSet(options) and options.Has("Priority")) ? options["Priority"] : HSE_PRIORITY_COMMON
+    ; An explicit Priority (passed by the hand loader) always wins; otherwise resolve
+    ; the override cascade from Category/Section. The IsSet(options) guard MUST be here
+    ; — passing the unset ``options`` variable into the helper would throw UnsetError.
+    Priority := (IsSet(options) and options.Has("Priority"))
+        ? options["Priority"]
+        : _HSE_ResolveRegistrationPriority(Category, Section)
 
     FlagsPortion := ":" Flags "B0O:" ; O omits the ending character from the abbreviation
     _RegisterHotstring(
@@ -460,7 +489,6 @@ IsTimeActivationExpired(PreviousCharacter, OptionTimeActivationSeconds) {
 }
 
 CreateCaseSensitiveHotstrings(Flags, Abbreviation, Replacement, options := unset) {
-    global HSE_PRIORITY_COMMON
     OnlyText := (IsSet(options) and options.Has("OnlyText")) ? options["OnlyText"] : True
     FinalResult := (IsSet(options) and options.Has("FinalResult")) ? options["FinalResult"] : False
     TimeActivationSeconds := (IsSet(options) and options.Has("TimeActivationSeconds")) ? options[
@@ -468,7 +496,12 @@ CreateCaseSensitiveHotstrings(Flags, Abbreviation, Replacement, options := unset
     IsRepeat := (IsSet(options) and options.Has("IsRepeat")) ? options["IsRepeat"] : False
     Category := (IsSet(options) and options.Has("Category")) ? options["Category"] : ""
     Section  := (IsSet(options) and options.Has("Section"))  ? options["Section"]  : ""
-    Priority := (IsSet(options) and options.Has("Priority")) ? options["Priority"] : HSE_PRIORITY_COMMON
+    ; An explicit Priority (passed by the hand loader) always wins; otherwise resolve
+    ; the override cascade from Category/Section. The IsSet(options) guard MUST be here
+    ; — passing the unset ``options`` variable into the helper would throw UnsetError.
+    Priority := (IsSet(options) and options.Has("Priority"))
+        ? options["Priority"]
+        : _HSE_ResolveRegistrationPriority(Category, Section)
 
     FlagsPortion := ":" Flags "CB0O:" ; O omits the ending character from the abbreviation
 

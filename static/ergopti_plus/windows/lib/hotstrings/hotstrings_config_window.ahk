@@ -334,6 +334,18 @@ OpenHotstringsConfigWindow() {
 	DelayDefault := G.Add("Text", "x+6 yp w300 Right", "")
 	DelayReset := G.Add("Button", "x512 yp-3 w28 h24", "↺")
 
+	; ----- Priority row ----------------------------------------------------
+	; Higher priority wins a same-trigger collision (cascade: individual >
+	; section > file > source default 10/30/50). Editing here writes the
+	; section/file override to the shared override file (or personal [_meta]),
+	; and the empty w24 spacer keeps the default hint aligned with the delay row.
+	G.Add("Text", "xm y+10 w70 h20", t("hs_config.label_priority"))
+	PriorityEdit := G.Add("Edit", "x+6 yp-3 w80 Number +Limit3")
+	PriorityUpDown := G.Add("UpDown", "Range0-100", 0)
+	G.Add("Text", "x+4 yp+3 w24", "")
+	PriorityDefault := G.Add("Text", "x+6 yp w300 Right", "")
+	PriorityReset := G.Add("Button", "x512 yp-3 w28 h24", "↺")
+
 	; ----- Color row -------------------------------------------------------
 	; The swatch is a filled Progress at value=100 — the BAR fills the whole
 	; rectangle, so we set its bar color (cXXXXXX) AND background to the same
@@ -385,6 +397,9 @@ OpenHotstringsConfigWindow() {
 		DelayEdit:    DelayEdit,
 		DelayReset:   DelayReset,
 		DelayDefault: DelayDefault,
+		PriorityEdit:    PriorityEdit,
+		PriorityReset:   PriorityReset,
+		PriorityDefault: PriorityDefault,
 		ColorDD:      ColorDD,
 		ColorSwatch:  ColorSwatch,
 		ColorReset:   ColorReset,
@@ -402,6 +417,8 @@ OpenHotstringsConfigWindow() {
 	SecDD.OnEvent("Change",     (*) => _HCW_LoadCurrent())
 	DelayEdit.OnEvent("Change", (*) => _HCW_OnDelayChanged())
 	DelayReset.OnEvent("Click", (*) => _HCW_ClearField("delay"))
+	PriorityEdit.OnEvent("Change", (*) => _HCW_OnPriorityChanged())
+	PriorityReset.OnEvent("Click", (*) => _HCW_ClearField("priority"))
 	ColorDD.OnEvent("Change",      (*) => _HCW_OnColorChanged())
 	ColorReset.OnEvent("Click",    (*) => _HCW_ClearField("color"))
 	TooltipChk.OnEvent("Click",    (*) => _HCW_OnTooltipChanged())
@@ -485,6 +502,28 @@ _HCW_LoadCurrent() {
 	}
 	_HCWWidgets.DelayDefault.Value := DefHint
 
+	; Priority — the resolver always returns a non-empty value (it folds in the
+	; source default), so the edit shows the effective priority. The default hint
+	; falls back to the source tier when neither TOML nor override sets one.
+	PrioDefVal := (Defaults.HasOwnProp("Priority") and Defaults.Priority != "")
+		? Defaults.Priority
+		: _HCW_FallbackPriority(Entry)
+	PrioVal := (Resolved.HasOwnProp("Priority") and Resolved.Priority != "")
+		? Resolved.Priority
+		: PrioDefVal
+	PrioOverridden := (Override.HasOwnProp("Priority") and Override.Priority != "")
+
+	_HCWWidgets.PriorityEdit.Value := PrioVal
+
+	PrioHint := t("hs_config.default_prefix") . PrioDefVal
+	if PrioOverridden {
+		PrioHint .= "    •  " . t("hs_config.override_active")
+		_HCWWidgets.PriorityReset.Enabled := true
+	} else {
+		_HCWWidgets.PriorityReset.Enabled := false
+	}
+	_HCWWidgets.PriorityDefault.Value := PrioHint
+
 	; Color — find the preset whose hex matches, or inject the current hex on top.
 	ColorHex := Resolved.Color
 	Idx := _HCW_ColorIndexFor(ColorHex)
@@ -547,6 +586,20 @@ _HCW_OnDelayChanged() {
 	_HCW_LoadCurrent()
 }
 
+_HCW_OnPriorityChanged() {
+	global _HCWWidgets
+	Entry := _HCW_SelectedEntry()
+	Sec := _HCW_SelectedSection(Entry)
+	Prio := _HCWWidgets.PriorityEdit.Value + 0
+	if (Prio < 0) {
+		Prio := 0
+	} else if (Prio > 100) {
+		Prio := 100
+	}
+	_HCW_SetOverride(Entry, Sec, "priority", Prio)
+	_HCW_LoadCurrent()
+}
+
 _HCW_OnColorChanged() {
 	global _HCWWidgets, _HCW_CurrentColorOptions
 	Entry := _HCW_SelectedEntry()
@@ -586,9 +639,11 @@ _HCW_ResetAll() {
 		if E.IsPersonal {
 			_HCW_PatchTomlMeta(E.Path, "", "delay", "")
 			_HCW_PatchTomlMeta(E.Path, "", "color", "")
+			_HCW_PatchTomlMeta(E.Path, "", "priority", "")
 			for _, Sec in _HCW_GetSections(E) {
 				_HCW_PatchTomlMeta(E.Path, Sec.Name, "delay", "")
 				_HCW_PatchTomlMeta(E.Path, Sec.Name, "color", "")
+				_HCW_PatchTomlMeta(E.Path, Sec.Name, "priority", "")
 			}
 		} else if E.IsExtension {
 			HotstringsClearOverride("ext." . E.ExtId, "", "")
@@ -767,16 +822,19 @@ _HCW_Resolve(Entry, Sec) {
 	}
 	if Entry.IsExtension {
 		R := HotstringsResolveExt(Entry.ExtId, Entry.Path, Sec)
-		return { Delay: R.Delay, Color: R.Color, ShowTooltip: R.ShowTooltip }
+		return { Delay: R.Delay, Color: R.Color, ShowTooltip: R.ShowTooltip,
+			Priority: (R.HasOwnProp("Priority") ? R.Priority : "") }
 	}
 	return HotstringsResolve(Entry.Key, Sec)
 }
 
-; Read effective delay, color, and show_tooltip from [_meta] of a personal TOML file,
-; applying the cascade: section → file → default (true for ShowTooltip).
+; Read effective delay, color, show_tooltip, and priority from [_meta] of a
+; personal TOML file, applying the cascade: section → file → default (true for
+; ShowTooltip; priority stays empty so the caller can fall back to the source tier).
 _HCW_ReadTomlMeta(Path, Sec) {
 	FileCfg := ParseTomlGroupConfig("__personal__", Path)
-	Result := { Delay: FileCfg.Delay, Color: FileCfg.Color, ShowTooltip: FileCfg.ShowTooltip != "" ? FileCfg.ShowTooltip : true }
+	Result := { Delay: FileCfg.Delay, Color: FileCfg.Color, ShowTooltip: FileCfg.ShowTooltip != "" ? FileCfg.ShowTooltip : true,
+		Priority: (FileCfg.HasOwnProp("Priority") ? FileCfg.Priority : "") }
 	if (Sec != "" and FileCfg.Sections.Has(StrLower(Sec))) {
 		SecCfg := FileCfg.Sections[StrLower(Sec)]
 		if (SecCfg.Delay != "") {
@@ -787,6 +845,9 @@ _HCW_ReadTomlMeta(Path, Sec) {
 		}
 		if (SecCfg.ShowTooltip != "") {
 			Result.ShowTooltip := SecCfg.ShowTooltip
+		}
+		if (SecCfg.HasOwnProp("Priority") and SecCfg.Priority != "") {
+			Result.Priority := SecCfg.Priority
 		}
 	}
 	return Result
@@ -1017,6 +1078,19 @@ _HCW_FallbackDelayMs(Entry) {
 	return Round(GLOBAL_DEFAULT_DELAY * 1000)
 }
 
+; Source-default collision priority for the current entry's group — personal 50,
+; extension 30, common 10 — matching the engine's _HSE_SourcePriority tiers. Shown
+; as the priority hint when neither the TOML nor a user override sets one.
+_HCW_FallbackPriority(Entry) {
+	if Entry.IsPersonal {
+		return _HSE_SourcePriority("personal")
+	}
+	if Entry.IsExtension {
+		return _HSE_SourcePriority("ext." . StrLower(Entry.ExtId))
+	}
+	return _HSE_SourcePriority(Entry.Key)
+}
+
 _HCW_TomlDefaults(Entry, Section) {
 	if (Entry.HasOwnProp("IsVirtual") and Entry.IsVirtual) {
 		if (Entry.Key = "llm_prediction") {
@@ -1024,10 +1098,11 @@ _HCW_TomlDefaults(Entry, Section) {
 			return {
 				Delay: UI_LLM_TIMEOUT_SEC,
 				Color: HOTSTRINGS_CATEGORY_DEFAULT_COLORS.Has("llm_prediction")
-					? HOTSTRINGS_CATEGORY_DEFAULT_COLORS["llm_prediction"] : ""
+					? HOTSTRINGS_CATEGORY_DEFAULT_COLORS["llm_prediction"] : "",
+				Priority: ""
 			}
 		}
-		return { Delay: "", Color: "" }
+		return { Delay: "", Color: "", Priority: "" }
 	}
 	if Entry.IsPersonal {
 		Cfg := ParseTomlGroupConfig("__personal__", Entry.Path)
@@ -1036,7 +1111,7 @@ _HCW_TomlDefaults(Entry, Section) {
 	} else {
 		Cfg := ParseTomlGroupConfig(Entry.Key)
 	}
-	Default := { Delay: Cfg.Delay, Color: Cfg.Color }
+	Default := { Delay: Cfg.Delay, Color: Cfg.Color, Priority: (Cfg.HasOwnProp("Priority") ? Cfg.Priority : "") }
 	if (Section != "" and Cfg.Sections.Has(StrLower(Section))) {
 		Sec := Cfg.Sections[StrLower(Section)]
 		if (Sec.Delay != "") {
@@ -1045,13 +1120,16 @@ _HCW_TomlDefaults(Entry, Section) {
 		if (Sec.Color != "") {
 			Default.Color := Sec.Color
 		}
+		if (Sec.HasOwnProp("Priority") and Sec.Priority != "") {
+			Default.Priority := Sec.Priority
+		}
 	}
 	return Default
 }
 
 _HCW_UserOverride(Entry, Section) {
 	global _HotstringsOverrides
-	Out := { Delay: "", Color: "", ShowTooltip: "" }
+	Out := { Delay: "", Color: "", ShowTooltip: "", Priority: "" }
 	if Entry.IsPersonal {
 		; The stored value IS the override — re-read [_meta] to find what is actually stored
 		Cfg := ParseTomlGroupConfig("__personal__", Entry.Path)
@@ -1059,6 +1137,7 @@ _HCW_UserOverride(Entry, Section) {
 			Out.Delay := Cfg.Delay
 			Out.Color := Cfg.Color
 			Out.ShowTooltip := Cfg.ShowTooltip
+			Out.Priority := (Cfg.HasOwnProp("Priority") ? Cfg.Priority : "")
 		} else {
 			Sec := StrLower(Section)
 			if Cfg.Sections.Has(Sec) {
@@ -1066,6 +1145,7 @@ _HCW_UserOverride(Entry, Section) {
 				Out.Delay := S.Delay
 				Out.Color := S.Color
 				Out.ShowTooltip := S.ShowTooltip
+				Out.Priority := (S.HasOwnProp("Priority") ? S.Priority : "")
 			}
 		}
 		return Out
@@ -1081,6 +1161,7 @@ _HCW_UserOverride(Entry, Section) {
 		Out.Delay := Override.Delay
 		Out.Color := Override.Color
 		Out.ShowTooltip := Override.ShowTooltip
+		Out.Priority := (Override.HasOwnProp("Priority") ? Override.Priority : "")
 	} else {
 		Sec := StrLower(Section)
 		if Override.Sections.Has(Sec) {
@@ -1088,6 +1169,7 @@ _HCW_UserOverride(Entry, Section) {
 			Out.Delay := S.Delay
 			Out.Color := S.Color
 			Out.ShowTooltip := S.ShowTooltip
+			Out.Priority := (S.HasOwnProp("Priority") ? S.Priority : "")
 		}
 	}
 	return Out
@@ -1180,7 +1262,8 @@ _HCW_PatchTomlMeta(Path, Sec, Field, Value) {
 }
 
 ; Format a value for TOML output.
-; delay → bare float (seconds); show_tooltip → bare boolean; color → quoted string.
+; delay → bare float (seconds); show_tooltip → bare boolean; priority → bare
+; integer; color → quoted string.
 _HCW_TomlValue(Field, Value) {
 	if (Field == "delay") {
 		Num := Value + 0
@@ -1188,6 +1271,9 @@ _HCW_TomlValue(Field, Value) {
 	}
 	if (Field == "show_tooltip") {
 		return Value ? "true" : "false"
+	}
+	if (Field == "priority") {
+		return Format("{:d}", Round(Value))
 	}
 	Escaped := StrReplace(Value, "\", "\\")
 	Escaped := StrReplace(Escaped, '"', '\"')

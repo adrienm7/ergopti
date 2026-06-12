@@ -142,6 +142,7 @@ function render() {
 		// File-level (category) controls
 		bindDelay(card.querySelector('.field-delay'), cat, null);
 		bindColor(card.querySelector('.field-color'), cat, null);
+		bindPriority(card.querySelector('.field-priority'), cat, null);
 		bindTooltip(card.querySelector('.field-tooltip'), cat, null);
 
 		// Sections
@@ -151,6 +152,7 @@ function render() {
 			secNode.querySelector('.sec-title').textContent = sec.title || sec.name;
 			bindDelay(secNode.querySelector('.field-delay'), cat, sec);
 			bindColor(secNode.querySelector('.field-color'), cat, sec);
+			bindPriority(secNode.querySelector('.field-priority'), cat, sec);
 			bindTooltip(secNode.querySelector('.field-tooltip'), cat, sec);
 			sectionsBox.appendChild(secNode);
 		}
@@ -195,6 +197,48 @@ function bindDelay(field, cat, sec) {
 	reset.addEventListener('click', () => {
 		send({
 			action: 'clear_delay',
+			category: cat.name,
+			group: cat.group,
+			section: sec ? sec.name : '',
+			personal_path: cat.personal_path || '',
+			ext_id: cat.ext_id || ''
+		});
+	});
+}
+
+// Collision priority (0-100, higher wins a same-trigger collision). The input
+// shows the effective value and the placeholder shows the source/TOML default,
+// so an empty field means "inherit the default". Mirrors bindDelay.
+function bindPriority(field, cat, sec) {
+	if (!field) return;
+	const value = sec ? sec.priority : cat.priority;
+	const overridden = sec ? sec.priority_overridden : cat.priority_overridden;
+	const def = sec ? sec.priority_default : cat.priority_default;
+	const input = field.querySelector('input');
+	const reset = field.querySelector('.reset');
+
+	input.value = typeof value === 'number' ? value : '';
+	if (typeof def === 'number') input.placeholder = def;
+	field.classList.toggle('overridden', !!overridden);
+
+	input.addEventListener('change', () => {
+		const v = parseInt(input.value, 10);
+		if (Number.isFinite(v) && v >= 0 && v <= 100) {
+			send({
+				action: 'set_priority',
+				category: cat.name,
+				group: cat.group,
+				section: sec ? sec.name : '',
+				personal_path: cat.personal_path || '',
+				ext_id: cat.ext_id || '',
+				priority: v
+			});
+		}
+	});
+
+	reset.addEventListener('click', () => {
+		send({
+			action: 'clear_priority',
 			category: cat.name,
 			group: cat.group,
 			section: sec ? sec.name : '',

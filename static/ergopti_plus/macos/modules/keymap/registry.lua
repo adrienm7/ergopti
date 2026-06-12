@@ -683,11 +683,25 @@ function M.load_toml(name, path)
 	local sections_info  = {}
 
 	-- Collision-priority cascade inputs (individual > section > file > source).
-	-- File and per-section levels live in [_meta], mirroring section_delays.
-	local file_priority = (type(data.meta) == "table" and type(data.meta.priority) == "number")
+	-- The shared user-override file (hotstrings_config.toml) sits ABOVE the TOML
+	-- [_meta], mirroring how the AHK engine reads HotstringsResolve: the order is
+	-- user-section > user-file > meta-section > meta-file > source default. The
+	-- override module is required lazily (it does not require us, but stay defensive
+	-- against load order / headless tests where it may be absent — gotcha G6).
+	local ok_hcfg, hcfg = pcall(require, "modules.hotstrings_config")
+	local hotstrings_config = ok_hcfg and hcfg or nil
+	local function user_priority(section_name)
+		if not hotstrings_config or type(hotstrings_config.get_user_override) ~= "function" then
+			return nil
+		end
+		local ok_ov, ov = pcall(hotstrings_config.get_user_override, name, section_name)
+		return (ok_ov and type(ov) == "table") and ov.priority or nil
+	end
+	local file_user_priority = user_priority(nil)
+	local file_meta_priority = (type(data.meta) == "table" and type(data.meta.priority) == "number")
 		and data.meta.priority or nil
-	local section_priorities = (type(data.meta) == "table" and type(data.meta.section_priorities) == "table")
-		and data.meta.section_priorities or {}
+	local meta_sections = (type(data.meta) == "table" and type(data.meta.sections) == "table")
+		and data.meta.sections or {}
 
 	local sections_order = (data.sections_order and #data.sections_order > 0)
 		and data.sections_order
@@ -745,7 +759,15 @@ function M.load_toml(name, path)
 		end
 
 		if M.is_section_enabled(name, sec_name) then
-			local sec_priority = section_priorities[sec_name]
+			-- Flatten the user/TOML layers into one effective override priority so
+			-- the order matches AHK exactly (user-section > user-file > meta-section
+			-- > meta-file). The individual per-entry priority and the source default
+			-- are applied above/below it by resolve_priority.
+			local sec_meta = meta_sections[sec_name]
+			local sec_meta_priority = (type(sec_meta) == "table" and type(sec_meta.priority) == "number")
+				and sec_meta.priority or nil
+			local override_priority = user_priority(sec_name) or file_user_priority
+				or sec_meta_priority or file_meta_priority
 			for _, entry in ipairs(entries) do
 				M.add(entry.trigger, entry.output, {
 					is_word           = entry.is_word,
@@ -753,7 +775,7 @@ function M.load_toml(name, path)
 					is_case_sensitive = entry.is_case_sensitive,
 					final_result      = entry.final_result,
 					section           = sec_name,
-					priority          = resolve_priority(entry.priority, sec_priority, file_priority, name),
+					priority          = resolve_priority(entry.priority, override_priority, nil, name),
 				})
 			end
 		else

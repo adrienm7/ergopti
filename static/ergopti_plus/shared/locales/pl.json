@@ -444,6 +444,7 @@
 	"hs_config.label_delimiters": "Word delimiters",
 	"hs_config.label_file": "Plik:",
 	"hs_config.label_group": "Grupa:",
+	"hs_config.label_priority": "Priorytet",
 	"hs_config.label_section": "Sekcja:",
 	"hs_config.label_tooltip": "Pokaż dymek",
 	"hs_config.none": "(brak)",
