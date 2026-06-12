@@ -658,6 +658,9 @@ _OnPrefixChar(IH, Char) {
             HSEMatch := HSE_TryRepeatKey(ScriptInformation["MagicKey"])
         }
         if (HSEMatch != "") {
+            ; Kill the obsolete pre-expansion preview before the send burst so it
+            ; cannot fire reentrantly inside HSE_DispatchMatch's message pump.
+            _PrefixCancelRender()
             _HseDispatchTick := HotPath_Now()
             HSE_DispatchMatch(HSEMatch, HSE_LastEndChar)
             HotPath_LogIfSlow("HSE.Dispatch", _HseDispatchTick, HSEMatch.Trigger)
@@ -999,6 +1002,15 @@ KL_LogHotstringNearMiss(kind, trigger, replacement, h_type) {
 _PrefixScheduleRender() {
     global _PREFIX_RENDER_DEBOUNCE_MS
     SetTimer(_PrefixRenderFlush, -_PREFIX_RENDER_DEBOUNCE_MS)
+}
+; Cancel any pending debounced render. Called the instant a hotstring fires:
+; the preview armed for the PRE-expansion buffer is now obsolete, and leaving
+; the timer armed lets it fire reentrantly inside HSE_DispatchMatch's SendInput
+; message pump — drawing a throwaway tooltip in the middle of the magic-key
+; expansion (~35 ms added to that keystroke at speed). The fire path schedules a
+; fresh render for the POST-expansion state itself, so nothing wanted is lost.
+_PrefixCancelRender() {
+    SetTimer(_PrefixRenderFlush, 0)
 }
 _PrefixRenderFlush() {
     SetTimer(_PrefixRenderFlush, 0)   ; belt-and-suspenders: never re-fire on its own
