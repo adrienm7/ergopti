@@ -81,8 +81,9 @@ helpers.describe("Registry.add", function()
 		local state = fresh_registry()
 		Registry.add("hi", "Hello")
 		helpers.assert_true(#state.mappings >= 1)
-		-- Lookup table populated for at least the lowercase variant
-		local key = "hi" .. "\0" .. "false" .. "\0" .. "false"
+		-- Lookup table populated for at least the lowercase variant. The dedup key
+		-- ends with the owning group ("" here, since this ad-hoc add has no group).
+		local key = "hi" .. "\0" .. "false" .. "\0" .. "false" .. "\0" .. ""
 		helpers.assert_true(state.mappings_lookup[key] ~= nil)
 	end)
 
@@ -405,6 +406,40 @@ helpers.describe("Registry collision priority", function()
 		Registry.add("abc", "ABC", { is_case_sensitive = true, priority = 1 })
 		Registry.sort_mappings()
 		helpers.assert_eq(state.mappings[1].trigger, "abc")
+	end)
+
+	-- Regression: before the group-aware dedup key, a same-trigger hotstring from a
+	-- different source overwrote the earlier one in place (same trigger\0is_word\0
+	-- auto key), keeping the FIRST entry's priority but the LAST entry's
+	-- replacement. At startup personal loads first and common second, so the user's
+	-- personal hotstring was silently clobbered by the bundled common one — the
+	-- collision-priority feature became a no-op for its headline case. The two
+	-- sources must now coexist as competing entries and the higher priority wins.
+	helpers.it("a higher-priority source wins a same-trigger collision instead of being overwritten", function()
+		local state = fresh_registry()
+		-- Mirror the production load order: personal FIRST, then a bundled common
+		-- hotstring sharing the trigger. Case-sensitive so no case variants are
+		-- generated and exactly one entry exists per source.
+		state.current_group = "personal"
+		Registry.add("abc", "PERSONAL", { is_case_sensitive = true, priority = 50 })
+		state.current_group = "common"
+		Registry.add("abc", "COMMON", { is_case_sensitive = true, priority = 10 })
+		state.current_group = nil
+		Registry.sort_mappings()
+
+		-- Both sources survive as distinct competing entries (not collapsed to one).
+		local abc_entries = {}
+		for _, m in ipairs(state.mappings) do
+			if m.trigger == "abc" then abc_entries[#abc_entries + 1] = m end
+		end
+		helpers.assert_eq(#abc_entries, 2)
+
+		-- The higher-priority personal entry is elected the winner: it sorts first
+		-- in the "c" tail bucket, so typing "abc" expands to the personal text.
+		local bucket = Registry.mappings_for_tail("c")
+		helpers.assert_true(bucket ~= nil and #bucket >= 1, "tail bucket for 'c' must exist")
+		helpers.assert_eq(bucket[1].repl, "PERSONAL")
+		helpers.assert_eq(bucket[1].priority, 50)
 	end)
 
 	helpers.it("resolve_priority follows individual > section > file > source", function()
