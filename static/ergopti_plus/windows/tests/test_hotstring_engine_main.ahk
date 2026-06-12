@@ -277,6 +277,67 @@ TestHSE_StarTriggerIndexSurvivesGroupToggle() {
 Test("HSE star by-trigger index stays in sync through group disable/enable",
     TestHSE_StarTriggerIndexSurvivesGroupToggle)
 
+; Priority tie-break: equal-length collisions resolve by higher Priority instead
+; of registration order, so a user can make a hotstring win regardless of where
+; it loads. InWord ("*?") triggers are used so the word-boundary gate never
+; interferes — these isolate the precedence logic itself.
+TestHSE_PriorityBreaksEqualLengthTie() {
+    HSE_TestReset()
+    HSE_Register("*?", "zz", () => 0, Map("group", "low",  "Priority", 10))
+    HSE_Register("*?", "zz", () => 0, Map("group", "high", "Priority", 90))
+    HSE_FeedReset(true)
+    HSE_FeedChar("z")
+    Match := HSE_FeedChar("z")
+    AssertTrue(Match != "", "a star trigger must fire")
+    AssertEqual("high", Match.Group,
+        "the higher-priority spec must win the equal-length collision, not the first-registered one")
+}
+Test("HSE higher priority wins an equal-length star collision",
+    TestHSE_PriorityBreaksEqualLengthTie)
+
+TestHSE_PriorityOrderIndependent() {
+    HSE_TestReset()
+    ; High-priority registered FIRST this time — outcome must be unchanged.
+    HSE_Register("*?", "yy", () => 0, Map("group", "high", "Priority", 90))
+    HSE_Register("*?", "yy", () => 0, Map("group", "low",  "Priority", 10))
+    HSE_FeedReset(true)
+    HSE_FeedChar("y")
+    Match := HSE_FeedChar("y")
+    AssertEqual("high", Match.Group,
+        "priority precedence must not depend on registration order")
+}
+Test("HSE priority precedence is registration-order independent",
+    TestHSE_PriorityOrderIndependent)
+
+TestHSE_EqualPriorityFallsBackToSeq() {
+    HSE_TestReset()
+    ; No explicit priority (both default 50) → first-registered wins (Seq),
+    ; preserving the historical behaviour when no priorities are set.
+    HSE_Register("*?", "ww", () => 0, Map("group", "first"))
+    HSE_Register("*?", "ww", () => 0, Map("group", "second"))
+    HSE_FeedReset(true)
+    HSE_FeedChar("w")
+    Match := HSE_FeedChar("w")
+    AssertEqual("first", Match.Group,
+        "equal priority must fall back to first-registered (Seq), the pre-priority default")
+}
+Test("HSE equal priority falls back to first-registered (Seq)",
+    TestHSE_EqualPriorityFallsBackToSeq)
+
+TestHSE_LongerBeatsHigherPriority() {
+    HSE_TestReset()
+    ; Length stays primary: a longer trigger wins even with far lower priority.
+    HSE_Register("*?", "x",  () => 0, Map("group", "short", "Priority", 99))
+    HSE_Register("*?", "vx", () => 0, Map("group", "long",  "Priority", 1))
+    HSE_FeedReset(true)
+    HSE_FeedChar("v")
+    Match := HSE_FeedChar("x")
+    AssertEqual("long", Match.Group,
+        "longest-match must stay primary — a longer trigger beats a shorter higher-priority one")
+}
+Test("HSE longest match still wins over a shorter higher-priority trigger",
+    TestHSE_LongerBeatsHigherPriority)
+
 TestHSE_NonStarTriggerNeedsEndChar() {
     HSE_TestReset()
     HSE_Register("", "btw", () => 0)

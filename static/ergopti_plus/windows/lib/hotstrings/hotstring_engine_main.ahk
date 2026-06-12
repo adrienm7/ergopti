@@ -285,6 +285,12 @@ HSE_Register(Flags, Trigger, Callback, Meta := unset) {
         StarBaseTail:  (StarBase != "") ? SubStr(StarBase, -1) : "",
         Group:         Group,
         GroupOrder:    GroupOrder,
+        ; Collision precedence among EQUAL-LENGTH triggers. Higher wins; the
+        ; default 50 is neutral so a registry with no explicit priorities falls
+        ; back to Seq order (the historical behaviour). The loader overrides this
+        ; via Meta (resolved individual > section > file > source default, where
+        ; source defaults are 10 common / 30 package / 50 personal).
+        Priority:      50,
         FinalResult:   false,
         Color:         ""
     }
@@ -379,8 +385,10 @@ HSE_MappingsForTail(TailChar) {
             Out.Push(Spec)
         }
     }
-    ; Sort: longest trigger first, then GroupOrder asc, then Seq asc.
-    ; Bubble sort is fine — registry size is small and this is called rarely.
+    ; Sort: longest trigger first, then Priority desc, then GroupOrder asc, then
+    ; Seq asc. Priority slots in right after length so it mirrors the
+    ; HSE_FindMatchAtEnd tie-break exactly. Bubble sort is fine — registry size
+    ; is small and this is called rarely.
     Len := Out.Length
     loop (Len - 1) {
         i := A_Index
@@ -388,13 +396,17 @@ HSE_MappingsForTail(TailChar) {
             j := A_Index
             A := Out[j]
             B := Out[j + 1]
+            APrio := A.HasOwnProp("Priority") ? A.Priority : 50
+            BPrio := B.HasOwnProp("Priority") ? B.Priority : 50
             Swap := false
             if (A.Length < B.Length) {
                 Swap := true
             } else if (A.Length == B.Length) {
-                if (A.GroupOrder > B.GroupOrder) {
+                if (APrio < BPrio) {
                     Swap := true
-                } else if (A.GroupOrder == B.GroupOrder and A.Seq > B.Seq) {
+                } else if (APrio == BPrio and A.GroupOrder > B.GroupOrder) {
+                    Swap := true
+                } else if (APrio == BPrio and A.GroupOrder == B.GroupOrder and A.Seq > B.Seq) {
                     Swap := true
                 }
             }
@@ -726,6 +738,41 @@ HSE_TryRepeatKey(MagicKey) {
 ; ==============================
 ; ============================================
 
+; Collision precedence between two candidate Specs of the SAME kind (both star,
+; or both end-char). The longest trigger wins; ties are broken by higher
+; Priority, then by lower Seq (first-registered) for a stable, deterministic
+; result. Returns true when Cand should replace Best.
+_HSE_Beats(Cand, Best) {
+    if (Best == "") {
+        return true
+    }
+    if (Cand.Length != Best.Length) {
+        return Cand.Length > Best.Length
+    }
+    CandPrio := Cand.HasOwnProp("Priority") ? Cand.Priority : 50
+    BestPrio := Best.HasOwnProp("Priority") ? Best.Priority : 50
+    if (CandPrio != BestPrio) {
+        return CandPrio > BestPrio
+    }
+    return Cand.Seq < Best.Seq
+}
+
+; Precedence for an end-char candidate against the current best, which may be a
+; star match carried over from the star path. A star match only yields to a
+; STRICTLY longer end-char trigger — this preserves the long-standing rule that
+; a star trigger wins an equal-length tie against an end-char trigger, so adding
+; priority never silently flips star/end-char outcomes. Among end-char
+; candidates the full _HSE_Beats tie-break (length, priority, Seq) applies.
+_HSE_EndCharBeats(Cand, Best, BestIsEndChar) {
+    if (Best == "") {
+        return true
+    }
+    if !BestIsEndChar {
+        return Cand.Length > Best.Length
+    }
+    return _HSE_Beats(Cand, Best)
+}
+
 ; Look for a trigger that fires given the just-typed char.
 ;
 ; Two paths, both scanned because they can both succeed and longest-match
@@ -782,7 +829,7 @@ HSE_FindMatchAtEnd(JustTypedChar) {
         ; Case-sensitive triggers: exact suffix key.
         if HSE_StarByTriggerCS.Has(Suffix) {
             for _, Spec in HSE_StarByTriggerCS[Suffix] {
-                if (BestMatch != "" and Spec.Length <= BestMatch.Length) {
+                if !_HSE_Beats(Spec, BestMatch) {
                     continue
                 }
                 if _HSE_WordBoundaryAllows(HSE_Buffer, Spec) {
@@ -795,7 +842,7 @@ HSE_FindMatchAtEnd(JustTypedChar) {
         LowerSuffix := StrLower(Suffix)
         if HSE_StarByTriggerCI.Has(LowerSuffix) {
             for _, Spec in HSE_StarByTriggerCI[LowerSuffix] {
-                if (BestMatch != "" and Spec.Length <= BestMatch.Length) {
+                if !_HSE_Beats(Spec, BestMatch) {
                     continue
                 }
                 if _HSE_WordBoundaryAllows(HSE_Buffer, Spec) {
@@ -856,7 +903,7 @@ HSE_FindMatchAtEnd(JustTypedChar) {
                         if _HSE_StarTriggerCoversBody(EffBody, Spec, JustTypedChar) {
                             continue
                         }
-                        if (BestMatch == "" or Spec.Length > BestMatch.Length) {
+                        if _HSE_EndCharBeats(Spec, BestMatch, BestEndChar != "") {
                             BestMatch := Spec
                             BestEndChar := JustTypedChar
                         }
