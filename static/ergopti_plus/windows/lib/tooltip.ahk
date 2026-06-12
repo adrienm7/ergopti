@@ -313,12 +313,14 @@ TooltipShow(Items, DurationSec := 0) {
     ; belt-and-suspenders guard in case TooltipHide returned early for any reason.
     SetTimer(_TooltipTimerFn, 0)
 
+    _hpBuild := HotPath_Now()
     try {
         _TooltipBuildGui(Items)
     } catch {
         TooltipHide("BuildFail", true)
         return
     }
+    HotPath_LogIfSlow("Tooltip.Build", _hpBuild, Items.Length . " item(s)")
 
     ; Cache in a local variable to prevent "Invalid index" crashes if a
     ; concurrent TooltipHide clears the global array during the
@@ -334,12 +336,14 @@ TooltipShow(Items, DurationSec := 0) {
     ; Snapshot generation before present so any exception still arms the timer
     ; correctly and the ghost cannot outlive the safety deadline.
     _TooltipTimerGeneration := _TooltipGeneration
+    _hpPresent := HotPath_Now()
     try {
         _TooltipPresentStack(Pos, Row, true)
     } catch {
         TooltipHide("ShowFail", true)
         return
     }
+    HotPath_LogIfSlow("Tooltip.Present", _hpPresent, "")
 
     ; Collect per-item durations. When items carry distinct non-zero durations,
     ; we run the dequeue path so each row gets its own lifetime. When all
@@ -1070,12 +1074,14 @@ _TooltipShowBorder(X, Y, W, H, Reveal := true) {
     TotalPx := Wp * Hp
     AlphaByte := Round(_TOOLTIP_BORDER_ALPHA * 255)
     PremulPx := (AlphaByte << 24) | (AlphaByte << 16) | (AlphaByte << 8) | AlphaByte
+    _hpPix := HotPath_Now()
     loop TotalPx {
         Offset := (A_Index - 1) * 4
         Raw := NumGet(PixPtr, Offset, "UInt")
         if (Raw != 0)   ; GDI painted this pixel — set correct alpha
             NumPut("UInt", PremulPx, PixPtr, Offset)
     }
+    HotPath_LogIfSlow("Tooltip.BorderPixelLoop", _hpPix, TotalPx . " px")
 
     ; ── Create the layered window ─────────────────────────────────────────────
     ; WS_EX_TOOLWINDOW (0x80) suppresses DWM automatic corner rounding, same as
