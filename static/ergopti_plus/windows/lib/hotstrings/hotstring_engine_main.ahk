@@ -145,6 +145,23 @@ global HSE_StarSpecs := []
 global HSE_StarPrefixSetCI := Map()   ; prefix → Map(nextChar → true), CI
 global HSE_StarPrefixSetCS := Map()   ; prefix → Map(nextChar → true), CS
 
+; Star triggers indexed by FULL trigger string, for an O(buffer-suffix) match
+; in HSE_FindMatchAtEnd instead of an O(all-star-triggers) bucket scan. Every
+; star trigger ends in the magic key, so they ALL share one last-char bucket —
+; ~2100 entries — and the old per-keystroke linear suffix test over that bucket
+; cost ~21 ms on every magic-key press. A star trigger matches iff it equals
+; some suffix of HSE_Buffer, so we probe the buffer's own suffixes (at most
+; HSE_MaxStarTriggerLen of them) against these maps. Two maps mirror the
+; case-sensitivity split used everywhere else (CI keys lowercased); values are
+; arrays of Specs because the same trigger may be registered in several groups.
+; Maintained alongside HSE_StarSpecs: incrementally in HSE_Register /
+; HSE_EnableGroup, rebuilt in HSE_DisableGroup, reset in HSE_RegistryClear.
+global HSE_StarByTriggerCI := Map()   ; lower(trigger) → [Spec, …], CI triggers
+global HSE_StarByTriggerCS := Map()   ; exact trigger  → [Spec, …], CS triggers
+; Longest registered star-trigger length — caps how many buffer suffixes we
+; probe so the lookup never exceeds the longest trigger that could match.
+global HSE_MaxStarTriggerLen := 0
+
 ; Suppression flag. When true, FeedChar / FeedBackspace / FeedReset
 ; short-circuit. The dispatch loop sets it for the duration of the
 ; SendEvent burst so its own replacement output does not feed back into
@@ -310,6 +327,7 @@ HSE_Register(Flags, Trigger, Callback, Meta := unset) {
         if Spec.Star {
             HSE_StarSpecs.Push(Spec)
             _HSE_IndexStarPrefixes(Spec)
+            _HSE_IndexStarTrigger(Spec)
         }
     }
 
@@ -329,10 +347,14 @@ HSE_Register(Flags, Trigger, Callback, Meta := unset) {
 HSE_RegistryClear() {
     global HSE_RegistryByLastChar, HSE_StarSpecs, HSE_StarPrefixSetCI, HSE_StarPrefixSetCS
     global HSE_RegistryByGroup, HSE_DisabledGroups, HSE_SeqCounter
+    global HSE_StarByTriggerCI, HSE_StarByTriggerCS, HSE_MaxStarTriggerLen
     HSE_RegistryByLastChar := Map()
     HSE_StarSpecs := []
     HSE_StarPrefixSetCI := Map()
     HSE_StarPrefixSetCS := Map()
+    HSE_StarByTriggerCI := Map()
+    HSE_StarByTriggerCS := Map()
+    HSE_MaxStarTriggerLen := 0
     HSE_RegistryByGroup := Map()
     HSE_DisabledGroups := Map()
     HSE_SeqCounter := 0
@@ -419,12 +441,14 @@ HSE_DisableGroup(Group) {
             HSE_StarSpecs := NewStarSpecs
         }
     }
-    ; Rebuild the prefix sets from the remaining star specs.
+    ; Rebuild the prefix sets and the by-trigger index from the remaining star
+    ; specs — both derive from HSE_StarSpecs, which was just spliced above.
     HSE_StarPrefixSetCI := Map()
     HSE_StarPrefixSetCS := Map()
     for _, S in HSE_StarSpecs {
         _HSE_IndexStarPrefixes(S)
     }
+    _HSE_RebuildStarTriggerIndex()
 }
 
 ; Restore all mappings in Group to the live index.
@@ -465,6 +489,7 @@ HSE_EnableGroup(Group) {
             if !AlreadyStar {
                 HSE_StarSpecs.Push(Spec)
                 _HSE_IndexStarPrefixes(Spec)
+                _HSE_IndexStarTrigger(Spec)
             }
         }
     }
@@ -742,21 +767,41 @@ HSE_FindMatchAtEnd(JustTypedChar) {
     BestEndChar := ""
 
     ; ── STAR path ──────────────────────────────────────────────────
-    Buckets := _HSE_BucketsFor(JustTypedChar)
-    for Bucket in Buckets {
-        for Spec in Bucket {
-            if !Spec.Star {
-                continue
+    ; A star trigger fires iff it equals some suffix of HSE_Buffer (the suffix
+    ; already ends in JustTypedChar, since that char was just appended). Rather
+    ; than scan every star trigger in the last-char bucket — ~2100 of them all
+    ; ending in the magic key, ~21 ms per press — probe the buffer's OWN suffixes
+    ; against the by-trigger index: at most HSE_MaxStarTriggerLen Map lookups.
+    ; Ascending suffix length means a longer trigger naturally overrides a shorter
+    ; one (the `Length <= BestMatch.Length` skip preserves the old "strictly
+    ; longer wins, first-registered breaks ties" semantics). CS map is probed
+    ; before CI, mirroring the old exact-char-bucket-before-lowercased ordering.
+    MaxSuffix := Min(BufLen, HSE_MaxStarTriggerLen)
+    loop MaxSuffix {
+        Suffix := SubStr(HSE_Buffer, -A_Index)
+        ; Case-sensitive triggers: exact suffix key.
+        if HSE_StarByTriggerCS.Has(Suffix) {
+            for _, Spec in HSE_StarByTriggerCS[Suffix] {
+                if (BestMatch != "" and Spec.Length <= BestMatch.Length) {
+                    continue
+                }
+                if _HSE_WordBoundaryAllows(HSE_Buffer, Spec) {
+                    BestMatch := Spec
+                    BestEndChar := ""
+                }
             }
-            if !HSE_SuffixMatches(HSE_Buffer, Spec.Trigger, Spec.CaseSensitive) {
-                continue
-            }
-            if !_HSE_WordBoundaryAllows(HSE_Buffer, Spec) {
-                continue
-            }
-            if (BestMatch == "" or Spec.Length > BestMatch.Length) {
-                BestMatch := Spec
-                BestEndChar := ""
+        }
+        ; Case-insensitive triggers: lowercased suffix key.
+        LowerSuffix := StrLower(Suffix)
+        if HSE_StarByTriggerCI.Has(LowerSuffix) {
+            for _, Spec in HSE_StarByTriggerCI[LowerSuffix] {
+                if (BestMatch != "" and Spec.Length <= BestMatch.Length) {
+                    continue
+                }
+                if _HSE_WordBoundaryAllows(HSE_Buffer, Spec) {
+                    BestMatch := Spec
+                    BestEndChar := ""
+                }
             }
         }
     }
@@ -886,6 +931,42 @@ _HSE_IndexStarPrefixes(Spec) {
             }
             HSE_StarPrefixSetCI[LowerPrefix][StrLower(NextChar)] := true
         }
+    }
+}
+
+; Insert one star Spec into the by-trigger index (incremental, O(1)). Keyed by
+; the full trigger so HSE_FindMatchAtEnd can resolve a magic-key match with a
+; handful of suffix lookups instead of scanning the whole magic-key bucket.
+_HSE_IndexStarTrigger(Spec) {
+    global HSE_StarByTriggerCI, HSE_StarByTriggerCS, HSE_MaxStarTriggerLen
+    if (Spec.Length > HSE_MaxStarTriggerLen) {
+        HSE_MaxStarTriggerLen := Spec.Length
+    }
+    if Spec.CaseSensitive {
+        Key := Spec.Trigger
+        if !HSE_StarByTriggerCS.Has(Key) {
+            HSE_StarByTriggerCS[Key] := []
+        }
+        HSE_StarByTriggerCS[Key].Push(Spec)
+    } else {
+        Key := StrLower(Spec.Trigger)
+        if !HSE_StarByTriggerCI.Has(Key) {
+            HSE_StarByTriggerCI[Key] := []
+        }
+        HSE_StarByTriggerCI[Key].Push(Spec)
+    }
+}
+
+; Rebuild the by-trigger index from the current HSE_StarSpecs. Used after a
+; group toggle splices the star set (HSE_DisableGroup), mirroring how the star
+; prefix sets are rebuilt there — HSE_StarSpecs is the single source of truth.
+_HSE_RebuildStarTriggerIndex() {
+    global HSE_StarSpecs, HSE_StarByTriggerCI, HSE_StarByTriggerCS, HSE_MaxStarTriggerLen
+    HSE_StarByTriggerCI := Map()
+    HSE_StarByTriggerCS := Map()
+    HSE_MaxStarTriggerLen := 0
+    for _, S in HSE_StarSpecs {
+        _HSE_IndexStarTrigger(S)
     }
 }
 
