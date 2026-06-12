@@ -228,6 +228,55 @@ TestHSE_MatchStarTriggerOnLastChar() {
 Test("HSE star trigger fires on the last char of its body",
     TestHSE_MatchStarTriggerOnLastChar)
 
+; Regression for the magic-key latency optimisation: HSE_FindMatchAtEnd resolves
+; star triggers through the by-trigger index (O(buffer-suffix) lookups) instead of
+; scanning the whole last-char bucket — the magic-key bucket alone held ~2100
+; triggers and the linear scan cost ~21 ms on every magic-key press. These guard
+; the index's two failure modes: not being populated, and drifting out of sync
+; with the live registry when a group is toggled.
+TestHSE_StarByTriggerIndexPopulated() {
+    HSE_TestReset()
+    HSE_Register("*", "abc", () => 0)
+    AssertTrue(HSE_StarByTriggerCI.Has("abc"),
+        "registering a CI star trigger must populate the by-trigger index — without it "
+        . "HSE_FindMatchAtEnd would fall back to scanning the whole last-char bucket")
+    AssertEqual(3, HSE_MaxStarTriggerLen,
+        "HSE_MaxStarTriggerLen must track the longest star trigger so suffix probing is bounded")
+}
+Test("HSE star by-trigger index is populated on registration",
+    TestHSE_StarByTriggerIndexPopulated)
+
+TestHSE_StarTriggerIndexSurvivesGroupToggle() {
+    HSE_TestReset()
+    HSE_Register("*", "qz", () => 0, Map("group", "grp_idx_test"))
+
+    ; Enabled: the by-trigger index resolves it.
+    HSE_FeedReset(true)
+    HSE_FeedChar("q")
+    Match := HSE_FeedChar("z")
+    AssertTrue(Match != "" and Match.Trigger == "qz",
+        "star trigger must match via the by-trigger index while its group is enabled")
+
+    ; Disabled: HSE_DisableGroup rebuilds the index from the spliced star set,
+    ; so the trigger must no longer resolve (the index-desync regression guard).
+    HSE_DisableGroup("grp_idx_test")
+    HSE_FeedReset(true)
+    HSE_FeedChar("q")
+    Match := HSE_FeedChar("z")
+    AssertEqual("", Match,
+        "disabling the group must drop the trigger from the by-trigger index")
+
+    ; Re-enabled: HSE_EnableGroup re-inserts into the index incrementally.
+    HSE_EnableGroup("grp_idx_test")
+    HSE_FeedReset(true)
+    HSE_FeedChar("q")
+    Match := HSE_FeedChar("z")
+    AssertTrue(Match != "" and Match.Trigger == "qz",
+        "re-enabling the group must restore the trigger to the by-trigger index")
+}
+Test("HSE star by-trigger index stays in sync through group disable/enable",
+    TestHSE_StarTriggerIndexSurvivesGroupToggle)
+
 TestHSE_NonStarTriggerNeedsEndChar() {
     HSE_TestReset()
     HSE_Register("", "btw", () => 0)
