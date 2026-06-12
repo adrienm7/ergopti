@@ -459,3 +459,62 @@ TestPE_RoundTripSpecialCharsInOutput() {
 }
 Test("Personal TOML round-trip: output with double-quotes is preserved faithfully",
 	TestPE_RoundTripSpecialCharsInOutput)
+
+
+
+
+; ==========================
+; Read/Write round-trip — per-hotstring priority
+; ==========================
+; The editor stores an optional individual collision priority on each entry.
+; Explicit values must survive the write→read cycle as numbers; entries that
+; inherit the source default must stay free of any priority key (empty on read).
+TestPE_RoundTripPriority() {
+	global ScriptInformation
+	TmpPath := A_ScriptDir . "\test_personal_prio.toml"
+	if FileExist(TmpPath) {
+		FileDelete(TmpPath)
+	}
+	OldPath := ScriptInformation["PersonalTomlPath"]
+	ScriptInformation["PersonalTomlPath"] := TmpPath
+
+	Data := Map(
+		"sections_order", ["prio"],
+		"sections", Map(
+			"prio", Map(
+				"description", "Priority",
+				"entries", [
+					Map(
+						"trigger", "win", "output", "WINNER", "is_word", true,
+						"auto_expand", true, "is_case_sensitive", false,
+						"final_result", false, "strict_case", false,
+						"priority", 90, "line_index", 0,
+					),
+					Map(
+						"trigger", "def", "output", "DEFAULT", "is_word", true,
+						"auto_expand", true, "is_case_sensitive", false,
+						"final_result", false, "strict_case", false,
+						"priority", "", "line_index", 0,
+					),
+				],
+			),
+		),
+		"meta_description", "Priority test",
+	)
+	AssertTrue(WritePersonalToml(Data))
+
+	Read := ReadPersonalToml()
+	; Index-independent lookup so the assertions hold even if the on-disk file is
+	; re-sorted by the TOML formatter.
+	PrioByTrigger := Map()
+	for E in Read["sections"]["prio"]["entries"] {
+		PrioByTrigger[E["trigger"]] := E["priority"]
+	}
+	AssertEqual(90, PrioByTrigger["win"], "an explicit priority must round-trip as a number")
+	AssertEqual("", PrioByTrigger["def"], "an inherited entry stays free of a priority key")
+
+	FileDelete(TmpPath)
+	ScriptInformation["PersonalTomlPath"] := OldPath
+}
+Test("Personal TOML round-trip: explicit per-hotstring priority is preserved",
+	TestPE_RoundTripPriority)

@@ -151,4 +151,23 @@ helpers.describe("toml roundtrip: entries", function()
 		local parsed = roundtrip(data)
 		helpers.assert_eq(parsed.meta.description, 'has "quotes"')
 	end)
+
+	helpers.it("preserves an explicit per-hotstring priority, omits it when inherited", function()
+		local data = {
+			sections_order = { "s" },
+			sections = { s = { description = "S", entries = {
+				{ trigger = "win", output = "W", is_word = true, auto_expand = true,
+				  is_case_sensitive = false, final_result = false, priority = 80 },
+				{ trigger = "def", output = "D", is_word = true, auto_expand = true,
+				  is_case_sensitive = false, final_result = false },
+			} } },
+		}
+		local parsed = roundtrip(data)
+		local by = {}
+		for _, e in ipairs(parsed.sections.s.entries) do by[e.trigger] = e end
+		-- An explicit value survives the write→parse cycle as a number.
+		helpers.assert_eq(by.win.priority, 80)
+		-- An entry that inherits stays free of the key (nil on read).
+		helpers.assert_eq(by.def.priority, nil)
+	end)
 end)

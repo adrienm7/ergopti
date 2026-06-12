@@ -368,6 +368,17 @@ helpers.describe("Registry collision priority", function()
 		helpers.assert_eq(Registry.source_priority("personal"), 50)
 	end)
 
+	-- Regression: the hotstring editor reloads personal_hotstrings.toml into the
+	-- "custom" group on a live save, while init.lua loads the same file as
+	-- "personal" at boot. Scoring "custom" at the common tier (10) would make an
+	-- edited personal hotstring lose to bundled common ones until the next restart
+	-- (where it returns to tier 50) — an invisible cross-restart inconsistency.
+	helpers.it("source_priority scores the editor's custom group at the personal tier", function()
+		fresh_registry()
+		helpers.assert_eq(Registry.source_priority("custom"), 50)
+		helpers.assert_eq(Registry.source_priority("CUSTOM"), 50)
+	end)
+
 	helpers.it("add stores an explicit opts.priority on the mapping", function()
 		local state = fresh_registry()
 		Registry.add("qp", "QP", { is_case_sensitive = true, priority = 77 })

@@ -524,3 +524,45 @@ Test("ParseEntryPriority: ignores a priority substring inside the output value",
 	TestTL_EntryPriorityIgnoresOutputText)
 
 
+
+
+; ==========================
+; _HOTSTRING_ENTRY_PATTERN — must tolerate the optional individual priority key
+; ==========================
+; Regression: _ParseEntryPriority can only fire on a line that first MATCHES the
+; entry pattern. Before the optional priority group was added, an entry carrying
+; `priority = N` failed the pattern and was silently dropped at boot — making the
+; per-hotstring priority feature a dead no-op. These pin that the pattern accepts
+; the key (with and without the optional strict flag) and still captures the rest.
+TestTL_EntryPatternAcceptsPriority() {
+	global _HOTSTRING_ENTRY_PATTERN
+	Line := '"abc" = { output = "x", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false, priority = 80 }'
+	AssertTrue(RegExMatch(Line, _HOTSTRING_ENTRY_PATTERN, &M) > 0,
+		"an entry carrying a trailing priority key must still match the boot pattern")
+	AssertEqual("80", M[8], "the priority value must be captured by the pattern")
+}
+Test("HotstringEntryPattern: accepts a trailing priority key",
+	TestTL_EntryPatternAcceptsPriority)
+
+TestTL_EntryPatternAcceptsStrictAndPriority() {
+	global _HOTSTRING_ENTRY_PATTERN
+	Line := '"abc" = { output = "x", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true, priority = 90 }'
+	AssertTrue(RegExMatch(Line, _HOTSTRING_ENTRY_PATTERN, &M) > 0,
+		"strict + priority together must match the boot pattern")
+	AssertEqual("true", M[7], "the strict flag must still be captured")
+	AssertEqual("90", M[8], "the priority value must still be captured after the strict flag")
+}
+Test("HotstringEntryPattern: accepts strict flag followed by priority",
+	TestTL_EntryPatternAcceptsStrictAndPriority)
+
+TestTL_EntryPatternPriorityOptional() {
+	global _HOTSTRING_ENTRY_PATTERN
+	Line := '"abc" = { output = "x", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }'
+	AssertTrue(RegExMatch(Line, _HOTSTRING_ENTRY_PATTERN, &M) > 0,
+		"an entry without a priority key must still match (no regression)")
+	AssertEqual("", M[8], "the priority capture is empty when the key is absent")
+}
+Test("HotstringEntryPattern: priority key stays optional",
+	TestTL_EntryPatternPriorityOptional)
+
+

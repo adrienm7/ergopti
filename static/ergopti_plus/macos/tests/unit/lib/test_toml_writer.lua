@@ -214,3 +214,34 @@ helpers.describe("toml_writer.write: escapes and tokens", function()
 		helpers.assert_true(body:find("{Enter}") ~= nil)
 	end)
 end)
+
+
+
+
+-- =================================
+-- =================================
+-- ======= 6/ Per-entry priority ===
+-- =================================
+-- =================================
+
+helpers.describe("toml_writer.write: per-entry priority", function()
+	helpers.it("emits priority only for entries that set it", function()
+		local body = write_and_read({
+			sections_order = { "s" },
+			sections = { s = { description = "S", entries = {
+				{ trigger = "win", output = "W", is_word = true, auto_expand = true,
+				  is_case_sensitive = false, final_result = false, priority = 80 },
+				{ trigger = "def", output = "D", is_word = true, auto_expand = true,
+				  is_case_sensitive = false, final_result = false },
+			} } },
+		})
+		helpers.assert_true(body ~= nil)
+		helpers.assert_true(body:find("priority = 80") ~= nil,
+			"the explicit priority must be serialized")
+		-- The inheriting entry's inline table must stay free of a priority key.
+		local def_line = body:match('"def" = %b{}')
+		helpers.assert_true(def_line ~= nil, "the inheriting entry must be present")
+		helpers.assert_true(def_line:find("priority") == nil,
+			"an inherited entry must not carry a priority key")
+	end)
+end)
