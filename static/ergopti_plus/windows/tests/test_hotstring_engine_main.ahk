@@ -338,6 +338,35 @@ TestHSE_LongerBeatsHigherPriority() {
 Test("HSE longest match still wins over a shorter higher-priority trigger",
     TestHSE_LongerBeatsHigherPriority)
 
+; Phase 2 wiring: source-default priorities and the CreateHotstring -> HSE pass-
+; through. The ranking personal > package > common is the user-facing contract —
+; personal hotstrings win an equal-length collision against a package, which wins
+; against a bundled common trigger, with no manual tuning.
+TestHSE_SourcePriorityDefaults() {
+    global HSE_PRIORITY_COMMON, HSE_PRIORITY_PACKAGE, HSE_PRIORITY_PERSONAL
+    AssertEqual(10, HSE_PRIORITY_COMMON,   "common source default must be 10")
+    AssertEqual(30, HSE_PRIORITY_PACKAGE,  "package source default must be 30")
+    AssertEqual(50, HSE_PRIORITY_PERSONAL, "personal source default must be 50")
+    AssertTrue(HSE_PRIORITY_PERSONAL > HSE_PRIORITY_PACKAGE
+        and HSE_PRIORITY_PACKAGE > HSE_PRIORITY_COMMON,
+        "source ranking must be personal > package > common")
+}
+Test("HSE source priority defaults rank personal > package > common",
+    TestHSE_SourcePriorityDefaults)
+
+TestHSE_CreateHotstringForwardsPriority() {
+    HSE_TestReset()
+    CreateHotstring("*?", "qp", "out", Map("Priority", 77))
+    HSE_FeedReset(true)
+    HSE_FeedChar("q")
+    Match := HSE_FeedChar("p")
+    AssertTrue(Match != "", "trigger must fire")
+    AssertEqual(77, Match.Priority,
+        "CreateHotstring must forward options['Priority'] into the HSE spec")
+}
+Test("HSE CreateHotstring forwards an explicit priority into the spec",
+    TestHSE_CreateHotstringForwardsPriority)
+
 TestHSE_NonStarTriggerNeedsEndChar() {
     HSE_TestReset()
     HSE_Register("", "btw", () => 0)

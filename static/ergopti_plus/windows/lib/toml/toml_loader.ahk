@@ -216,6 +216,7 @@ UnescapeTomlString(s) {
 ; skipped, mirroring AHK source lines starting with ";".
 LoadHotstringsSection(CategoryName, SectionName, FeatureConfig, ExtraOptions := Map()) {
     global ScriptInformation, _GENERATED_HOTSTRINGS, _SharedDir
+    global HSE_PRIORITY_COMMON, HSE_PRIORITY_PERSONAL
 
     ; Accept either shape transparently
     if (IsObject(FeatureConfig) and Type(FeatureConfig) == "Map") {
@@ -229,8 +230,18 @@ LoadHotstringsSection(CategoryName, SectionName, FeatureConfig, ExtraOptions := 
         if FeatureConfig.Has("pattern_max_length") {
             _V1Compat.PatternMaxLength := FeatureConfig["pattern_max_length"]
         }
+        ; Section-level priority override (cascade step above the source default).
+        if FeatureConfig.Has("priority") {
+            _V1Compat.Priority := FeatureConfig["priority"]
+        }
         FeatureConfig := _V1Compat
     }
+
+    ; Source default: the user's personal hotstrings outrank bundled "common"
+    ; ones of equal length. A section-level priority (if set) overrides it.
+    SourcePriority := (StrLower(CategoryName) == "personal") ? HSE_PRIORITY_PERSONAL : HSE_PRIORITY_COMMON
+    SectionPriority := (IsObject(FeatureConfig) and FeatureConfig.HasOwnProp("Priority")) ? FeatureConfig.Priority : ""
+    ResolvedPriority := (SectionPriority != "") ? SectionPriority : SourcePriority
 
     ; Per-group delay gating
     try {
@@ -310,6 +321,7 @@ LoadHotstringsSection(CategoryName, SectionName, FeatureConfig, ExtraOptions := 
             "FinalResult", FinalResult,
             "Category", CategoryName,
             "Section", SectionName,
+            "Priority", ResolvedPriority,
         )
         if ExtraOptions.Has("OnlyText") {
             Options["OnlyText"] := ExtraOptions["OnlyText"]
@@ -328,7 +340,7 @@ LoadHotstringsSection(CategoryName, SectionName, FeatureConfig, ExtraOptions := 
 
 ; Load all hotstring entries from every [[section]] in an arbitrary TOML file.
 LoadExtTomlFile(FilePath, CategoryLabel) {
-    global ScriptInformation, _HOTSTRING_ENTRY_PATTERN
+    global ScriptInformation, _HOTSTRING_ENTRY_PATTERN, HSE_PRIORITY_PACKAGE
     if !FileExist(FilePath) {
         try LoggerWarn("TomlLoader", "Extension TOML '{1}' not found — skipped.", FilePath)
         return
@@ -358,7 +370,7 @@ LoadExtTomlFile(FilePath, CategoryLabel) {
                 Trigger := (SimpleM[1] != "") ? SimpleM[1] : SimpleM[2]
                 Output  := SimpleM[3]
                 Trigger := StrReplace(Trigger, "★", ScriptInformation["MagicKey"])
-                Options := Map("TimeActivationSeconds", 0, "FinalResult", true)
+                Options := Map("TimeActivationSeconds", 0, "FinalResult", true, "Priority", HSE_PRIORITY_PACKAGE)
                 CreateCaseSensitiveHotstrings("", Trigger, Output, Options)
                 TotalLoaded += 1
             }
@@ -383,7 +395,7 @@ LoadExtTomlFile(FilePath, CategoryLabel) {
         SectionName := CurrentSection
         IsRepeat := (StrLower(CategoryName) == "magickey" and SectionName == "repeatcorrections"
             and InStr(Trigger, ScriptInformation["MagicKey"]) > 0)
-        Options := Map("TimeActivationSeconds", 0, "FinalResult", FinalResult, "IsRepeat", IsRepeat)
+        Options := Map("TimeActivationSeconds", 0, "FinalResult", FinalResult, "IsRepeat", IsRepeat, "Priority", HSE_PRIORITY_PACKAGE)
         if IsCaseSens {
             CreateHotstring(Flags, Trigger, Output, Options)
         } else {

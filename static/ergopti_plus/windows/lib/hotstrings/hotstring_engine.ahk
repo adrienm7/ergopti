@@ -304,6 +304,7 @@ MicrosoftApps() {
 ; pre-computed so the hot-path dispatcher ``_HotstringDispatch`` never has
 ; to run ``StrLen`` or concatenate on every keystroke.
 CreateHotstring(Flags, Abbreviation, Replacement, options := unset) {
+    global HSE_PRIORITY_COMMON
     OnlyText := (IsSet(options) and options.Has("OnlyText")) ? options["OnlyText"] : True
     FinalResult := (IsSet(options) and options.Has("FinalResult")) ? options["FinalResult"] : False
     TimeActivationSeconds := (IsSet(options) and options.Has("TimeActivationSeconds")) ? options[
@@ -311,19 +312,24 @@ CreateHotstring(Flags, Abbreviation, Replacement, options := unset) {
     IsRepeat := (IsSet(options) and options.Has("IsRepeat")) ? options["IsRepeat"] : False
     Category := (IsSet(options) and options.Has("Category")) ? options["Category"] : ""
     Section  := (IsSet(options) and options.Has("Section"))  ? options["Section"]  : ""
+    Priority := (IsSet(options) and options.Has("Priority")) ? options["Priority"] : HSE_PRIORITY_COMMON
 
     FlagsPortion := ":" Flags "B0O:" ; O omits the ending character from the abbreviation
     _RegisterHotstring(
         FlagsPortion Abbreviation,
         _MakeHotstringCallback(Replacement, Abbreviation, OnlyText, FinalResult, TimeActivationSeconds, Category, Section),
-        _MakeHotstringMeta(Replacement, Abbreviation, OnlyText, FinalResult, TimeActivationSeconds, IsRepeat, Category, Section)
+        _MakeHotstringMeta(Replacement, Abbreviation, OnlyText, FinalResult, TimeActivationSeconds, IsRepeat, Category, Section, Priority)
     )
 }
 
 ; Build the dispatch-metadata object HSE_DispatchMatch consumes. Kept next
 ; to the callback factory so the two stay in lockstep — every field used
 ; by the dispatcher has a clear origin in the original options dict.
-_MakeHotstringMeta(Replacement, Abbreviation, OnlyText, FinalResult, TimeActivationSeconds, IsRepeat := false, Category := "", Section := "") {
+; Priority defaults to 10 here — the literal mirrors HSE_PRIORITY_COMMON, which
+; an AHK v2 default-parameter expression cannot reference. Both callers
+; (CreateHotstring / CreateCaseSensitiveHotstrings) always pass the resolved
+; value, so this default only guards a hypothetical third caller.
+_MakeHotstringMeta(Replacement, Abbreviation, OnlyText, FinalResult, TimeActivationSeconds, IsRepeat := false, Category := "", Section := "", Priority := 10) {
     return {
         Replacement: Replacement,
         OnlyText: OnlyText,
@@ -332,7 +338,8 @@ _MakeHotstringMeta(Replacement, Abbreviation, OnlyText, FinalResult, TimeActivat
         PrevCharKey: SubStr(Abbreviation, -2, 1),
         IsRepeat: IsRepeat,
         Category: Category,
-        Section: Section
+        Section: Section,
+        Priority: Priority
     }
 }
 
@@ -453,6 +460,7 @@ IsTimeActivationExpired(PreviousCharacter, OptionTimeActivationSeconds) {
 }
 
 CreateCaseSensitiveHotstrings(Flags, Abbreviation, Replacement, options := unset) {
+    global HSE_PRIORITY_COMMON
     OnlyText := (IsSet(options) and options.Has("OnlyText")) ? options["OnlyText"] : True
     FinalResult := (IsSet(options) and options.Has("FinalResult")) ? options["FinalResult"] : False
     TimeActivationSeconds := (IsSet(options) and options.Has("TimeActivationSeconds")) ? options[
@@ -460,6 +468,7 @@ CreateCaseSensitiveHotstrings(Flags, Abbreviation, Replacement, options := unset
     IsRepeat := (IsSet(options) and options.Has("IsRepeat")) ? options["IsRepeat"] : False
     Category := (IsSet(options) and options.Has("Category")) ? options["Category"] : ""
     Section  := (IsSet(options) and options.Has("Section"))  ? options["Section"]  : ""
+    Priority := (IsSet(options) and options.Has("Priority")) ? options["Priority"] : HSE_PRIORITY_COMMON
 
     FlagsPortion := ":" Flags "CB0O:" ; O omits the ending character from the abbreviation
 
@@ -486,7 +495,7 @@ CreateCaseSensitiveHotstrings(Flags, Abbreviation, Replacement, options := unset
     RegisterVariant := (Abbr, Repl) => _RegisterHotstring(
         FlagsPortion Abbr,
         _MakeHotstringCallback(Repl, Abbr, OnlyText, FinalResult, TimeActivationSeconds, Category, Section),
-        _MakeHotstringMeta(Repl, Abbr, OnlyText, FinalResult, TimeActivationSeconds, IsRepeat, Category, Section)
+        _MakeHotstringMeta(Repl, Abbr, OnlyText, FinalResult, TimeActivationSeconds, IsRepeat, Category, Section, Priority)
     )
 
     RegisterVariant(AbbreviationLowerCase, ReplacementLowerCase)
