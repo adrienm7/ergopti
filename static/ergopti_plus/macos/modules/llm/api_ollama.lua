@@ -19,6 +19,50 @@ local TimerScheduler = require("adapters.timer_scheduler")
 local ShellRunner    = require("adapters.shell_runner")
 local LOG            = "llm.api_ollama"
 
+-- Ollama bind address. The default port is the single source in
+-- shared/llm/defaults.json (llm_ollama_port, surfaced via DEFAULT_STATE); a user
+-- override from the LLM menu (settings key OLLAMA_PORT_SETTING_KEY) wins so a
+-- port collision can be resolved without editing any file. Host stays loopback.
+local OLLAMA_DEFAULT_HOST     = "127.0.0.1"
+local OLLAMA_PORT_SETTING_KEY = "ergopti.llm.ollama_port"
+local OLLAMA_PORT_MIN, OLLAMA_PORT_MAX = 1024, 65535
+
+-- Persistent store for the user's port override. Routed through the Storage port
+-- adapter (not the OS settings store directly) so this module stays OS-pure; the
+-- adapter wraps the same key the LLM menu persists.
+local Storage = require("adapters.storage")
+
+--- Reads a valid user port override from persistent storage, or nil when unset.
+--- @return integer|nil
+local function read_ollama_port_override()
+	local ok, v = pcall(Storage.get, OLLAMA_PORT_SETTING_KEY)
+	if not ok then return nil end
+	v = tonumber(v)
+	if type(v) ~= "number" or v < OLLAMA_PORT_MIN or v > OLLAMA_PORT_MAX then return nil end
+	return math.floor(v)
+end
+
+--- Resolves the Ollama port: a valid user override wins, otherwise the canonical
+--- default from shared/llm/defaults.json (DEFAULT_STATE.llm_ollama_port). init is
+--- required lazily to avoid the init <-> api_ollama require cycle.
+--- @return integer
+local function resolve_ollama_port()
+	local override = read_ollama_port_override()
+	if override then return override end
+	local ok, Core = pcall(require, "modules.llm.init")
+	local ds   = ok and Core and Core.DEFAULT_STATE or nil
+	local port = ds and tonumber(ds.llm_ollama_port)
+	if port then return math.floor(port) end
+	Logger.error(LOG, "llm_ollama_port missing from DEFAULT_STATE (shared/llm/defaults.json) — LLM defaults not initialised.")
+	return 11434
+end
+
+--- Returns the Ollama base URL ("http://host:port"), honouring the user override.
+--- @return string
+function M.get_base_url()
+	return "http://" .. OLLAMA_DEFAULT_HOST .. ":" .. tostring(resolve_ollama_port())
+end
+
 local ok_kl, keylogger = pcall(require, "modules.keylogger")
 if not ok_kl then keylogger = nil end
 
@@ -106,7 +150,7 @@ function M.warmup(model_name)
 		return
 	end
 	HttpClient.post(
-		"http://127.0.0.1:11434/api/chat",
+		M.get_base_url() .. "/api/chat",
 		{ ["Content-Type"] = "application/json" },
 		encoded,
 		function(r)
@@ -166,7 +210,7 @@ function M.check_availability(model_name, on_available, on_missing)
 	if type(model_name) ~= "string" then return end
 	Logger.debug(LOG, "Checking Ollama server availability…")
 	
-	HttpClient.get("http://127.0.0.1:11434/api/tags", {}, function(r)
+	HttpClient.get(M.get_base_url() .. "/api/tags", {}, function(r)
 		if r.status ~= 200 then
 			Logger.warn(LOG, "Ollama server is unreachable.")
 			if type(on_missing) == "function" then pcall(on_missing, true) end
@@ -318,7 +362,7 @@ local function post_and_parse(model_name, system_prompt, full_text, tail_text,
 		return
 	end
 
-	HttpClient.post("http://127.0.0.1:11434/api/chat", { ["Content-Type"] = "application/json" }, encoded,
+	HttpClient.post(M.get_base_url() .. "/api/chat", { ["Content-Type"] = "application/json" }, encoded,
 		function(r)
 			local status, body = r.status, r.body
 			pcall(function()
@@ -565,7 +609,7 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 		"-s", "-N", "-X", "POST",
 		"-H", "Content-Type: application/json",
 		"--data-binary", "@" .. tmp_path,
-		"http://127.0.0.1:11434/api/chat",
+		M.get_base_url() .. "/api/chat",
 	}, on_done, on_chunk)
 	task.start()
 	_active_stream_task = task

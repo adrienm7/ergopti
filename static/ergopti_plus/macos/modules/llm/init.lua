@@ -44,6 +44,7 @@ local _SHARED_SCALAR_KEYS = {
 	"llm_max_words", "llm_pred_indent", "llm_show_info_bar",
 	"llm_streaming", "llm_streaming_multi", "llm_instant_on_word_end",
 	"llm_after_hotstring", "llm_reset_on_nav", "llm_auto_raise_temp",
+	"llm_ollama_port",
 }
 
 --- HS-only defaults: keys intentionally NOT in the cross-platform defaults.json

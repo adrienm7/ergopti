@@ -169,3 +169,33 @@ helpers.describe("ApiOllama run-loop safety", function()
 			"this blocks the Cocoa run loop and kills the menubar/timers")
 	end)
 end)
+
+
+
+
+
+-- =====================================
+--- ======================================
+--- ======= 5/ get_base_url (port) =======
+--- ======================================
+-- =====================================
+
+helpers.describe("ApiOllama.get_base_url (configurable port)", function()
+	helpers.it("exposes get_base_url as a function", function()
+		helpers.assert_eq(type(ApiOllama.get_base_url), "function")
+	end)
+
+	-- With no user override set, the port comes from the single source
+	-- (shared/llm/defaults.json llm_ollama_port = 11434, via DEFAULT_STATE) — not
+	-- from a URL hardcoded at each call site. A regression that re-hardcodes a
+	-- different port, or drops the llm_ollama_port default, fails here.
+	helpers.it("defaults to the canonical loopback URL on port 11434", function()
+		helpers.assert_eq(ApiOllama.get_base_url(), "http://127.0.0.1:11434")
+	end)
+
+	helpers.it("builds a well-formed loopback http URL", function()
+		helpers.assert_true(
+			ApiOllama.get_base_url():match("^http://127%.0%.0%.1:%d+$") ~= nil,
+			"base url must be http://127.0.0.1:<port>")
+	end)
+end)
