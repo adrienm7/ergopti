@@ -49,6 +49,10 @@ local _usercontent     = nil
 local _hotkey          = nil
 local _is_focused      = false
 local _pending_mode    = "menu"
+-- Personal source-default priority, read from shared/hotstrings/priority.json by
+-- the caller (init.lua) and forwarded to the UI as the priority field's
+-- placeholder — never hardcoded here.
+local _default_priority = nil
 
 -- Callbacks
 local _update_menu     = nil
@@ -161,6 +165,9 @@ local function load_js_data(open_mode)
 							auto_expand       = (e.auto_expand == true),
 							is_case_sensitive = (e.is_case_sensitive == true),
 							final_result      = (e.final_result == true),
+							-- Optional per-hotstring collision priority; nil (omitted
+							-- from the JSON) when the entry inherits the source default.
+							priority          = type(e.priority) == "number" and e.priority or nil,
 						})
 					end
 				end
@@ -174,14 +181,26 @@ local function load_js_data(open_mode)
 		end
 	end
 	
+	-- Personal source-default priority surfaced as the priority field's placeholder
+	-- (what a blank entry inherits). Prefer the value the caller read from
+	-- shared/hotstrings/priority.json; fall back to the engine value (kept in sync
+	-- with that same file by the parity gate). Never hardcoded here.
+	local default_priority = _default_priority
+	if type(default_priority) ~= "number"
+		and type(_keymap) == "table" and type(_keymap.source_priority) == "function" then
+		local ok, v = pcall(_keymap.source_priority, "personal")
+		if ok and type(v) == "number" then default_priority = v end
+	end
+
 	return {
-		sections        = sections,
-		trigger_char    = _prefs.trigger_char,
-		star            = STAR_CANONICAL,
-		compact_view    = _prefs.compact_view,
-		auto_close      = _prefs.auto_close,
-		default_section = _prefs.default_section,
-		open_mode       = open_mode or "menu",
+		sections         = sections,
+		trigger_char     = _prefs.trigger_char,
+		star             = STAR_CANONICAL,
+		compact_view     = _prefs.compact_view,
+		auto_close       = _prefs.auto_close,
+		default_section  = _prefs.default_section,
+		default_priority = default_priority,
+		open_mode        = open_mode or "menu",
 	}
 end
 
@@ -392,10 +411,13 @@ end
 --- @param toml_path string The absolute path to the hotstrings TOML file.
 --- @param keymap_mod table Reference to the keymap module for hotkey reloading.
 --- @param update_menu_fn function Callback to refresh the main menu UI.
-function M.init(toml_path, keymap_mod, update_menu_fn)
+--- @param default_priority number|nil Personal source-default priority, read from
+---        shared/hotstrings/priority.json by the caller (shown as the field placeholder).
+function M.init(toml_path, keymap_mod, update_menu_fn, default_priority)
 	_toml_path   = toml_path
 	_keymap      = keymap_mod
 	_update_menu = update_menu_fn
+	if type(default_priority) == "number" then _default_priority = default_priority end
 	ensure_file()
 end
 

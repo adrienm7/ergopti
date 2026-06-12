@@ -256,6 +256,10 @@ end
 M.add                   = Registry.add
 M.load_file             = Registry.load_file
 M.load_toml             = Registry.load_toml
+-- Exposed so the hotstring editor can show the personal source default (the
+-- single source kept in sync with shared/hotstrings/priority.json) instead of
+-- hardcoding it in the UI.
+M.source_priority       = Registry.source_priority
 M.is_section_enabled    = Registry.is_section_enabled
 M.disable_section       = Registry.disable_section
 M.enable_section        = Registry.enable_section

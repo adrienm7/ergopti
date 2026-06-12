@@ -555,7 +555,23 @@ keymap.defer_sort()
 -- automatically as extra personal extension groups in alphabetical order by stem.
 do
 	local personal_path = menu_paths.get("PersonalTomlPath")
-	hotstring_editor.init(personal_path, keymap)
+	-- Personal source-default priority, read from the shared single source
+	-- (shared/hotstrings/priority.json, copied into the bundle) so the editor
+	-- shows it as the priority field placeholder without hardcoding it. Falls back
+	-- to the engine value (kept identical to that file by the parity gate).
+	local personal_default_priority = keymap.source_priority and keymap.source_priority("personal") or nil
+	do
+		local fh = io.open(bundled_hotstrings_dir .. "priority.json", "r")
+		if fh then
+			local raw = fh:read("*a")
+			fh:close()
+			local ok, parsed = pcall(hs.json.decode, raw)
+			if ok and type(parsed) == "table" and type(parsed.personal) == "number" then
+				personal_default_priority = parsed.personal
+			end
+		end
+	end
+	hotstring_editor.init(personal_path, keymap, nil, personal_default_priority)
 	keymap.load_toml("personal", personal_path)
 	table.insert(hotfiles, "personal")
 	hotfile_paths["personal"] = personal_path

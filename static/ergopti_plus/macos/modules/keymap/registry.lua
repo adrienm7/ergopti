@@ -65,11 +65,16 @@ local PRIORITY_PERSONAL = 50
 --- tier so the documented order personal (50) > extension (30) > common (10)
 --- holds identically on both drivers. Without the personal_ext_ branch these
 --- groups silently fell to common (10) here while Windows scored them 30.
---- @param category string|nil Category (e.g. "personal", "personal_ext_demo", "ext.demo", "rolls").
+--- @param category string|nil Category (e.g. "personal", "custom", "personal_ext_demo", "ext.demo", "rolls").
 --- @return integer The source-default priority (personal 50 / package 30 / common 10).
 local function source_priority(category)
 	local c = type(category) == "string" and category:lower() or ""
 	if c == "personal" then return PRIORITY_PERSONAL end
+	-- "custom" is the group the hotstring editor reloads personal_hotstrings.toml
+	-- into on a live save (init.lua loads the same file as "personal" at boot).
+	-- Scoring it at the personal tier keeps an edited personal hotstring at the
+	-- same priority it gets at startup instead of silently dropping to common.
+	if c == "custom" then return PRIORITY_PERSONAL end
 	if c:sub(1, 13) == "personal_ext_" then return PRIORITY_PACKAGE end
 	if c:sub(1, 4) == "ext." then return PRIORITY_PACKAGE end
 	return PRIORITY_COMMON
