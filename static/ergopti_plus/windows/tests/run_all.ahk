@@ -168,6 +168,7 @@ InstallSendNoOps()
 try FileAppend("# [marker] starting direct include of LLM production modules`r`n", A_Temp . "\ergopti_test_results.txt", "UTF-8")
 try FileAppend("# [marker] starting direct include of LLM production modules`r`n", "*")
 #Include ../modules/llm/models.ahk
+#Include ../lib/llm_defaults.ahk
 #Include ../modules/llm/profiles.ahk
 #Include test_llm_profiles.ahk
 #Include ../modules/llm/api_common.ahk
@@ -177,6 +178,7 @@ try FileAppend("# [marker] starting direct include of LLM production modules`r`n
 #Include test_llm_api_remote.ahk
 #Include ../modules/llm/prediction_engine.ahk
 #Include test_llm_prediction_engine.ahk
+#Include test_llm_defaults.ahk
 try FileAppend("# [marker] LLM production modules + tests included`r`n", A_Temp . "\ergopti_test_results.txt", "UTF-8")
 try FileAppend("# [marker] LLM production modules + tests included`r`n", "*")
 
