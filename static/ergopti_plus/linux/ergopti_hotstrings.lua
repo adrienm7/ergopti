@@ -102,15 +102,15 @@ local DEFAULT_CONFIG_DIR = (os.getenv("HOME") or "~") .. "/.config/ergopti/hotst
 -- Terminator catalogue: loaded from the shared module so Linux and macOS
 -- recognise exactly the same set of terminator characters. The shared module
 -- owns the single source of truth (TERMINATOR_DEFS) and exposes is_terminator()
--- as an O(1) lookup against its pre-built hash set.
+-- as an O(1) lookup against its pre-built hash set. keymap.terminators ships
+-- alongside this daemon, so a require failure is a broken install — we fail
+-- loudly rather than silently degrade to a minimal {space . , newline} set that
+-- would produce wrong expansions (rule 5.3/5.4, no behavioural fallback).
 local terminators_mod = (function()
 	local ok, mod = pcall(require, "keymap.terminators")
 	if ok and mod then return mod end
-	-- Graceful fallback: if the shared module is absent (e.g. stripped install),
-	-- fall back to the minimal set to avoid a hard crash.
-	Logger.warn(LOG, "shared keymap.terminators not found — falling back to minimal terminator set.")
-	local _fallback = { [" "] = true, ["."] = true, [","] = true, ["\n"] = true }
-	return { is_terminator = function(ch) return _fallback[ch] == true end }
+	Logger.error(LOG, "shared keymap.terminators failed to load (%s) — cannot start: the terminator catalogue is the single source of truth.", tostring(mod))
+	error("ergopti_plus: shared keymap.terminators is required but failed to load")
 end)()
 
 
