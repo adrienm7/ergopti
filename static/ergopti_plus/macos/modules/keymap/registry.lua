@@ -66,11 +66,26 @@ local function source_priority(category)
 	return PRIORITY_COMMON
 end
 
+--- Resolve the effective collision priority through the cascade
+--- individual > section > file > source default. The first numeric level wins.
+--- @param individual number|nil Per-hotstring priority (from the TOML entry).
+--- @param section number|nil Section-level priority (from [_meta.section_priorities]).
+--- @param file number|nil File-level priority (from [_meta.priority]).
+--- @param category string|nil Category name, for the source-default fallback.
+--- @return integer The resolved priority.
+local function resolve_priority(individual, section, file, category)
+	if type(individual) == "number" then return individual end
+	if type(section)    == "number" then return section end
+	if type(file)       == "number" then return file end
+	return source_priority(category)
+end
+
 -- Exposed for the loader cascade and unit tests.
 M.PRIORITY_COMMON   = PRIORITY_COMMON
 M.PRIORITY_PACKAGE  = PRIORITY_PACKAGE
 M.PRIORITY_PERSONAL = PRIORITY_PERSONAL
 M.source_priority   = source_priority
+M.resolve_priority  = resolve_priority
 
 
 --- Returns the last UTF-8 codepoint of a string, used to bucket mappings by
@@ -641,6 +656,13 @@ function M.load_toml(name, path)
 	_state.current_group = name
 	local sections_info  = {}
 
+	-- Collision-priority cascade inputs (individual > section > file > source).
+	-- File and per-section levels live in [_meta], mirroring section_delays.
+	local file_priority = (type(data.meta) == "table" and type(data.meta.priority) == "number")
+		and data.meta.priority or nil
+	local section_priorities = (type(data.meta) == "table" and type(data.meta.section_priorities) == "table")
+		and data.meta.section_priorities or {}
+
 	local sections_order = (data.sections_order and #data.sections_order > 0)
 		and data.sections_order
 		or  (data.meta and data.meta.sections_order or {})
@@ -684,6 +706,7 @@ function M.load_toml(name, path)
 							auto_expand       = v.auto_expand,
 							is_case_sensitive = v.is_case_sensitive,
 							final_result      = v.final_result,
+							priority          = v.priority,
 						})
 					else
 						table.insert(entries, {
@@ -696,6 +719,7 @@ function M.load_toml(name, path)
 		end
 
 		if M.is_section_enabled(name, sec_name) then
+			local sec_priority = section_priorities[sec_name]
 			for _, entry in ipairs(entries) do
 				M.add(entry.trigger, entry.output, {
 					is_word           = entry.is_word,
@@ -703,6 +727,7 @@ function M.load_toml(name, path)
 					is_case_sensitive = entry.is_case_sensitive,
 					final_result      = entry.final_result,
 					section           = sec_name,
+					priority          = resolve_priority(entry.priority, sec_priority, file_priority, name),
 				})
 			end
 		else

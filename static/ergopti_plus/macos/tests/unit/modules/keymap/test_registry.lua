@@ -389,4 +389,17 @@ helpers.describe("Registry collision priority", function()
 		Registry.sort_mappings()
 		helpers.assert_eq(state.mappings[1].trigger, "abc")
 	end)
+
+	helpers.it("resolve_priority follows individual > section > file > source", function()
+		fresh_registry()
+		-- Individual wins over every lower level.
+		helpers.assert_eq(Registry.resolve_priority(80, 60, 40, "personal"), 80)
+		-- Section wins when there is no individual.
+		helpers.assert_eq(Registry.resolve_priority(nil, 60, 40, "personal"), 60)
+		-- File wins when there is no individual or section.
+		helpers.assert_eq(Registry.resolve_priority(nil, nil, 40, "personal"), 40)
+		-- Source default when nothing is set: personal 50, common 10.
+		helpers.assert_eq(Registry.resolve_priority(nil, nil, nil, "personal"), 50)
+		helpers.assert_eq(Registry.resolve_priority(nil, nil, nil, "autocorrection"), 10)
+	end)
 end)
