@@ -867,17 +867,14 @@ CreateHotstring("*", "clé" . ScriptInformation["MagicKey"], "🔑")
 ; config.toml, so reversing here gives "load prominent sections last".
 if Features.Has("hotstrings") and Features["hotstrings"].Has("personal") {
     _PersonalGroup := Features["hotstrings"]["personal"]
-    _PersonalKeys := []
-    for _Key, _ in _PersonalGroup {
-        _PersonalKeys.Push(_Key)
-    }
-    ; Reverse so the user's first-declared section (most prominent) loads
-    ; last — AHK fires the last registered hotstring on prefix collisions.
-    _Idx := _PersonalKeys.Length
-    while (_Idx >= 1) {
-        _SectionKey := _PersonalKeys[_Idx]
-        _Idx -= 1
-        _SectionCfg := _PersonalGroup[_SectionKey]
+    ; Forward order: the user's first-declared (most prominent) section registers
+    ; FIRST. HSE breaks equal-length trigger collisions by first-registered-wins
+    ; (lowest Seq), so loading forward makes prominent sections win — the same
+    ; effective precedence the old inline #InputLevel-0 loop produced before it
+    ; was removed (it ran forward, ahead of this block, giving prominent the
+    ; lowest Seq). The previous reverse iteration here was a stale carry-over
+    ; from AHK-native "last-registered wins" semantics, which HSE does not use.
+    for _SectionKey, _SectionCfg in _PersonalGroup {
         if !(IsObject(_SectionCfg) and _SectionCfg.Has("enabled") and _SectionCfg["enabled"]) {
             continue
         }
