@@ -73,3 +73,47 @@ _MetaCheckPrefixRenderDeferred() {
 
 Test("meta prefix: _OnPrefixChar defers the tooltip render off the keystroke path",
 	_MetaCheckPrefixRenderDeferred)
+
+; Regression for the magic-key latency spike. When a hotstring fires, the
+; debounce timer armed for the PRE-expansion buffer is still pending. Left
+; armed, it fires reentrantly inside HSE_DispatchMatch's SendInput message pump
+; and draws a throwaway tooltip in the middle of the expansion — measured at
+; ~35 ms added to the ★ keystroke at speed. The fix cancels the pending render
+; (_PrefixCancelRender) BEFORE HSE_DispatchMatch, so the obsolete preview can
+; never paint during the send. This asserts the ordering at the source level.
+_MetaCheckPrefixRenderCancelledOnFire() {
+	SplitPath(A_ScriptDir, , &WindowsDir)
+	PWFile := WindowsDir . "\lib\hotstrings\hotstring_prefix_watcher.ahk"
+
+	try {
+		Body := FileRead(PWFile)
+	} catch {
+		return
+	}
+
+	Assert(InStr(Body, "_PrefixCancelRender(") > 0,
+		"hotstring_prefix_watcher.ahk must define _PrefixCancelRender — without it the "
+		. "obsolete pre-expansion preview fires reentrantly during the magic-key send")
+
+	FnPos := InStr(Body, "_OnPrefixChar(IH, Char) {")
+	Assert(FnPos > 0,
+		"hotstring_prefix_watcher.ahk must define _OnPrefixChar(IH, Char) — entry point not found")
+
+	BodyEnd := InStr(Body, "`n}", false, FnPos)
+	if (BodyEnd == 0)
+		BodyEnd := StrLen(Body) + 1
+	FnBody := SubStr(Body, FnPos, BodyEnd - FnPos)
+
+	CancelPos   := InStr(FnBody, "_PrefixCancelRender(")
+	DispatchPos := InStr(FnBody, "HSE_DispatchMatch(")
+	Assert(CancelPos > 0,
+		"_OnPrefixChar must cancel the pending render via _PrefixCancelRender when a match fires")
+	Assert(DispatchPos > 0,
+		"_OnPrefixChar must dispatch the match via HSE_DispatchMatch")
+	Assert(CancelPos < DispatchPos,
+		"_PrefixCancelRender must run BEFORE HSE_DispatchMatch — otherwise the obsolete "
+		. "preview can still fire reentrantly inside the send's message pump")
+}
+
+Test("meta prefix: _OnPrefixChar cancels the pending render before dispatching a fire",
+	_MetaCheckPrefixRenderCancelledOnFire)
