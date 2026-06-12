@@ -537,7 +537,8 @@ body {
 	font-weight: 400;
 }
 
-.fg input[type='text'] {
+.fg input[type='text'],
+.fg input[type='number'] {
 	background: var(--surface);
 	border: 1.5px solid var(--border);
 	border-radius: 7px;
@@ -552,16 +553,30 @@ body {
 	width: 100%;
 }
 
-.fg input[type='text']:focus {
+.fg input[type='text']:focus,
+.fg input[type='number']:focus {
 	border-color: var(--accent);
 	box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.16);
 }
 
 @media (prefers-color-scheme: dark) {
-	.fg input[type='text'] {
+	.fg input[type='text'],
+	.fg input[type='number'] {
 		background: #3a3a3c;
 		border-color: #5a5a5c;
 	}
+}
+
+/* Priority is a small bounded integer, so keep its field compact rather than
+   stretching it full width like the trigger/output text inputs. */
+.fg-prio input[type='number'] {
+	width: 96px;
+}
+
+/* Distinct accent fill so the priority chip reads apart from the boolean flags. */
+.tag-prio {
+	background: var(--accent, #007aff);
+	color: #fff;
 }
 
 .cbs {

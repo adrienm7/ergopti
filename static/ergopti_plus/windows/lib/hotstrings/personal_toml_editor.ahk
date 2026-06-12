@@ -157,7 +157,8 @@ ReadPersonalToml() {
         . '\s*=\s*\{\s*output\s*=\s*' . Q . '([^' . Q . '\\]*(?:\\.[^' . Q . '\\]*)*)' . Q
         . '\s*,\s*is_word\s*=\s*(true|false)\s*,\s*auto_expand\s*=\s*(true|false)'
         . '\s*,\s*is_case_sensitive\s*=\s*(true|false)\s*,\s*final_result\s*=\s*(true|false)'
-        . '(?:\s*,\s*is_case_sensitive_strict\s*=\s*(true|false))?\s*\}'
+        . '(?:\s*,\s*is_case_sensitive_strict\s*=\s*(true|false))?'
+        . '(?:\s*,\s*priority\s*=\s*([0-9]+))?\s*\}'
 
     ; Normalise to LF so every line ends cleanly — eliminates CRLF anchor bugs
     FileContent := StrReplace(FileRead(FilePath, "UTF-8"), "`r`n", "`n")
@@ -237,6 +238,8 @@ ReadPersonalToml() {
             "is_case_sensitive", (EM[5] == "true"),
             "final_result", (EM[6] == "true"),
             "strict_case", (EM[7] == "true"),
+            ; Empty string means "inherit the source default" (no per-entry key)
+            "priority", (EM[8] != "" ? EM[8] + 0 : ""),
             "line_index", LineIndex,
         )
         Result["sections"][CurrentSection]["entries"].Push(Entry)
@@ -309,6 +312,11 @@ WritePersonalToml(Data) {
             . ", final_result = " . Final
             if E.Has("strict_case") and E["strict_case"] {
                 Line .= ", is_case_sensitive_strict = true"
+            }
+            ; Individual collision-priority override — written only when set so
+            ; entries that inherit the source default stay free of the key
+            if E.Has("priority") and E["priority"] != "" {
+                Line .= ", priority = " . E["priority"]
             }
             Line .= " }"
             Lines.Push(Line)
@@ -481,7 +489,20 @@ ReloadPersonalSection(Data, SectionName, FeatureConfig) {
         if E.Has("strict_case") and E["strict_case"] {
             Flags .= "C"
         }
-        Options := Map("TimeActivationSeconds", 0, "FinalResult", E["final_result"])
+        ; Collision priority: the individual per-hotstring override when set,
+        ; otherwise the personal source default (50). Passing Category + Priority
+        ; mirrors the boot loader so a live editor reload registers personal
+        ; hotstrings at the same tier they get at startup — without this they
+        ; silently fell back to CreateHotstring's common default (10).
+        EntryPriority := (E.Has("priority") and E["priority"] != "")
+            ? E["priority"]
+            : _HSE_SourcePriority("personal")
+        Options := Map(
+            "TimeActivationSeconds", 0,
+            "FinalResult", E["final_result"],
+            "Category", "personal",
+            "Priority", EntryPriority,
+        )
         if E["is_case_sensitive"] {
             CreateHotstring(Flags, Trigger, Output, Options)
         } else {
@@ -529,6 +550,39 @@ _EditorPrefSet(Key, Value) {
 global _PersonalEditorGui := ""
 global _PersonalEditorData := ""   ; last loaded TOML data (Map)
 global _PersonalEditorSection := "" ; currently selected section name
+; Priority Edit control. Held as a module global rather than threaded through the
+; eight form helpers (which already pass the sibling checkboxes) because adding a
+; ninth control to every signature and call site is far more error-prone than one
+; reference read by _BuildEntry / _FillFormFromSelection / _ClearForm.
+global _PersonalEditorPrioCtrl := ""
+
+; Set an Edit control's grey cue-banner (placeholder) text. Shown while the field
+; is empty; wParam 1 keeps it visible even when the control has focus.
+_SetEditCueBanner(Ctrl, Text) {
+    static EM_SETCUEBANNER := 0x1501
+    CueStr := "" . Text
+    try SendMessage(EM_SETCUEBANNER, 1, StrPtr(CueStr), Ctrl)
+}
+
+; Personal source-default priority read from the shared single source
+; (shared/hotstrings/priority.json) so the editor never hardcodes it. Falls back
+; to the engine constant — which the parity gate keeps identical to that file —
+; if the shared file cannot be read.
+_GetSharedPersonalDefault() {
+    global _SharedDir
+    try {
+        if IsSet(_SharedDir) {
+            Path := _SharedDir . "\hotstrings\priority.json"
+            if FileExist(Path) {
+                Data := JsonParse(FileRead(Path, "UTF-8"))
+                if (Data is Map and Data.Has("personal")) {
+                    return Data["personal"]
+                }
+            }
+        }
+    }
+    return _HSE_SourcePriority("personal")
+}
 
 ; Open the editor, optionally jumping to a specific section.
 ; DefaultSection — if set, the editor pre-selects that section.
@@ -559,7 +613,7 @@ OpenPersonalEditor(DefaultSection := "") {
     }
     _PersonalEditorSection := TargetSection
 
-    W := Gui_Create("+Resize +MinSize700x560", t("editor.hotstrings.window_title"))
+    W := Gui_Create("+Resize +MinSize700x610", t("editor.hotstrings.window_title"))
     W.SetFont("s10", "Segoe UI")
     W.MarginX := 12
     W.MarginY := 10
@@ -576,13 +630,14 @@ OpenPersonalEditor(DefaultSection := "") {
     ; ── Entry list ──
     LV := W.Add("ListView",
         "xm y+10 w860 r12 -Multi +LV0x10000",
-        [t("editor.hotstrings.col_trigger"), t("editor.hotstrings.col_result"), t("editor.hotstrings.col_word"), t("editor.hotstrings.col_auto"), t("editor.hotstrings.col_case"), t("editor.hotstrings.col_final")])
+        [t("editor.hotstrings.col_trigger"), t("editor.hotstrings.col_result"), t("editor.hotstrings.col_word"), t("editor.hotstrings.col_auto"), t("editor.hotstrings.col_case"), t("editor.hotstrings.col_final"), t("editor.hotstrings.col_priority")])
     LV.ModifyCol(1, 160)
-    LV.ModifyCol(2, 490)
+    LV.ModifyCol(2, 445)
     LV.ModifyCol(3, 45)
     LV.ModifyCol(4, 45)
     LV.ModifyCol(5, 50)
     LV.ModifyCol(6, 45)
+    LV.ModifyCol(7, 45)
 
     _PopulateList(LV, _PersonalEditorData, _PersonalEditorSection)
 
@@ -609,9 +664,28 @@ OpenPersonalEditor(DefaultSection := "") {
     ChkFinal := W.Add("CheckBox", "x644 y+11 w180", t("editor.hotstrings.chk_final"))
     ChkAutoExp.Value := 1
 
-    ; ── Add button + checkbox aligned, before the separator ──
+    ; ── Per-hotstring collision priority — own full-width row below the form ──
+    ; Empty Edit means "inherit the personal source default" (no key written); a
+    ; number 0-100 overrides it (higher wins). The UpDown gives 0-100 spin arrows;
+    ; the default shown as a cue banner is read from the engine (the single source
+    ; kept in sync with priority.json), never hardcoded here. The row sits below
+    ; both the output box and the checkbox stack so it can never overlap them.
     OutputEdit.GetPos(, &OutY, , &OutH)
-    BtnAdd := W.Add("Button", "xm y" . (OutY + OutH + 10) . " w110 h26", t("editor.hotstrings.btn_add"))
+    ChkFinal.GetPos(, &ChkFinalY, , &ChkFinalH)
+    PrioRowY := Max(OutY + OutH, ChkFinalY + ChkFinalH) + 12
+    W.Add("Text", "xm y" . PrioRowY . " w90 h22 +0x200", t("editor.hotstrings.priority_label"))
+    PrioEdit := W.Add("Edit", "x108 y" . PrioRowY . " w64 h22 +Number +Limit3")
+    W.Add("UpDown", "Range0-100")
+    W.Add("Text", "x190 y" . (PrioRowY + 3) . " w480 h22 cGray", t("editor.hotstrings.priority_hint"))
+    ; The UpDown seeds the buddy Edit with its low bound — clear it so the field
+    ; starts blank (= inherit) and the cue banner shows the inherited default.
+    PrioEdit.Value := ""
+    _SetEditCueBanner(PrioEdit, _GetSharedPersonalDefault())
+    global _PersonalEditorPrioCtrl := PrioEdit
+
+    ; ── Add button + checkbox aligned, before the separator ──
+    PrioEdit.GetPos(, &PrioY, , &PrioH)
+    BtnAdd := W.Add("Button", "xm y" . (PrioY + PrioH + 12) . " w110 h26", t("editor.hotstrings.btn_add"))
     CloseOnAddChk := W.Add("CheckBox", "x+10 yp+5 w120", t("editor.hotstrings.chk_close_after"))
     CloseOnAddChk.Value := (_EditorPrefGet("CloseOnAdd", "0") == "1") ? 1 : 0
 
@@ -662,7 +736,7 @@ OpenPersonalEditor(DefaultSection := "") {
     W.OnEvent("Size", (*) => _ResizeEditor(W, LV, OutputEdit, StatusText))
 
     _PersonalEditorGui := W
-    W.Show("Center w900 h640")
+    W.Show("Center w900 h690")
 }
 
 ; ─────────────────────────────────────────────────────
@@ -729,7 +803,8 @@ _PopulateList(LV, Data, SectionName) {
             E["is_word"] ? "✓" : "",
             E["auto_expand"] ? "✓" : "",
             E["is_case_sensitive"] ? "✓" : "",
-            E["final_result"] ? "✓" : "")
+            E["final_result"] ? "✓" : "",
+            (E.Has("priority") and E["priority"] != "") ? E["priority"] : "")
     }
 }
 
@@ -753,6 +828,10 @@ _FillFormFromSelection(LV, TriggerEdit, OutputEdit, ChkIsWord, ChkAutoExp, ChkCa
     ChkAutoExp.Value := E["auto_expand"] ? 1 : 0
     ChkCaseSens.Value := E["is_case_sensitive"] ? 1 : 0
     ChkFinal.Value := E["final_result"] ? 1 : 0
+    global _PersonalEditorPrioCtrl
+    if IsObject(_PersonalEditorPrioCtrl) {
+        _PersonalEditorPrioCtrl.Value := (E.Has("priority") and E["priority"] != "") ? E["priority"] : ""
+    }
 }
 
 _ClearForm(TriggerEdit, OutputEdit, ChkIsWord, ChkAutoExp, ChkCaseSens, ChkFinal) {
@@ -762,11 +841,30 @@ _ClearForm(TriggerEdit, OutputEdit, ChkIsWord, ChkAutoExp, ChkCaseSens, ChkFinal
     ChkAutoExp.Value := 1
     ChkCaseSens.Value := 0
     ChkFinal.Value := 0
+    global _PersonalEditorPrioCtrl
+    if IsObject(_PersonalEditorPrioCtrl) {
+        _PersonalEditorPrioCtrl.Value := ""
+    }
 }
 
 _BuildEntry(TriggerEdit, OutputEdit, ChkIsWord, ChkAutoExp, ChkCaseSens, ChkFinal) {
+    global _PersonalEditorPrioCtrl
     TriggerVal := Trim(TriggerEdit.Value)
     O := NormaliseOutput(OutputEdit.Value)
+    ; Read the optional priority override; an empty field means "inherit".
+    ; Clamp to the accepted 0-100 collision-priority range.
+    PrioVal := ""
+    if IsObject(_PersonalEditorPrioCtrl) {
+        Raw := Trim(_PersonalEditorPrioCtrl.Value)
+        if (Raw != "") {
+            PrioVal := Raw + 0
+            if (PrioVal < 0) {
+                PrioVal := 0
+            } else if (PrioVal > 100) {
+                PrioVal := 100
+            }
+        }
+    }
     return Map(
         "trigger", TriggerVal,
         "output", O,
@@ -775,6 +873,7 @@ _BuildEntry(TriggerEdit, OutputEdit, ChkIsWord, ChkAutoExp, ChkCaseSens, ChkFina
         "is_case_sensitive", ChkCaseSens.Value == 1,
         "final_result", ChkFinal.Value == 1,
         "strict_case", false,
+        "priority", PrioVal,
         "line_index", 0,
     )
 }
@@ -998,8 +1097,10 @@ _SwitchEditorSection(SectionName) {
 }
 
 _OnEditorClose() {
-    global _PersonalEditorGui
+    global _PersonalEditorGui, _PersonalEditorPrioCtrl
     _PersonalEditorGui := ""
+    ; Drop the reference to the now-destroyed control so no form helper touches it
+    _PersonalEditorPrioCtrl := ""
 }
 
 _ResizeEditor(W, LV, OutputEdit, StatusText) {

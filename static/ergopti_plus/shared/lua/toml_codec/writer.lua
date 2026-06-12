@@ -200,15 +200,23 @@ function M.write(path, data)
 			if type(sec.entries) == "table" then
 				for _, e in ipairs(sec.entries) do
 					if type(e) == "table" and type(e.trigger) == "string" and type(e.output) == "string" then
-						w(string.format(
-							"\"%s\" = { output = \"%s\", is_word = %s, auto_expand = %s, is_case_sensitive = %s, final_result = %s }",
+						local line = string.format(
+							"\"%s\" = { output = \"%s\", is_word = %s, auto_expand = %s, is_case_sensitive = %s, final_result = %s",
 							esc(e.trigger),
 							esc(e.output),
 							e.is_word           and "true" or "false",
 							e.auto_expand       and "true" or "false",
 							e.is_case_sensitive and "true" or "false",
 							e.final_result      and "true" or "false"
-						))
+						)
+						-- Individual collision-priority override — written only when
+						-- set so entries that inherit the source default stay free
+						-- of the key (matches the AHK editor's on-disk format).
+						local prio = tonumber(e.priority)
+						if prio then
+							line = line .. ", priority = " .. tostring(math.floor(prio))
+						end
+						w(line .. " }")
 					end
 				end
 			end

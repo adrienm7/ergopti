@@ -27,6 +27,7 @@ let dragSrcIdx = null;
 let compactView = false;
 let autoClose = false;
 let defaultSec = null;
+let defaultPrio = null;
 let openMode = 'menu';
 
 const TOKEN_NORM = {
@@ -903,6 +904,8 @@ function render() {
 				if (e.auto_expand) html += '<span class="tag on" data-f="cb-auto">Auto</span>';
 				if (e.is_case_sensitive) html += '<span class="tag on" data-f="cb-case">Casse</span>';
 				if (e.final_result) html += '<span class="tag on" data-f="cb-final">Final</span>';
+				if (typeof e.priority === 'number')
+					html += '<span class="tag on tag-prio" data-f="prio">P' + e.priority + '</span>';
 				html += '</div>';
 				html += '<span class="e-del" onclick="delEntryStop(event,' + si + ',' + ei + ')">✕</span>';
 				html += '</div>';
@@ -1016,6 +1019,22 @@ function delSec(si) {
 // ====================================
 // ====================================
 
+/**
+ * Parses the priority input into a non-negative integer, or null when empty/invalid.
+ * An empty value means "inherit the source default" (no per-hotstring override),
+ * so the key is then omitted from the saved TOML entry.
+ * @param {string} raw - The raw input value.
+ * @returns {number|null} The parsed priority or null.
+ */
+function parsePrio(raw) {
+	const s = String(raw == null ? '' : raw).trim();
+	if (s === '') return null;
+	const n = parseInt(s, 10);
+	if (!Number.isFinite(n)) return null;
+	// Clamp to the accepted collision-priority range.
+	return Math.max(0, Math.min(100, n));
+}
+
 function resetEntryForm() {
 	document.getElementById('e-trig').innerHTML = '';
 	setEditorContent(document.getElementById('e-out'), '');
@@ -1023,6 +1042,7 @@ function resetEntryForm() {
 	document.getElementById('cb-auto').checked = true;
 	document.getElementById('cb-case').checked = false;
 	document.getElementById('cb-final').checked = false;
+	document.getElementById('e-prio').value = '';
 	clearEntryErrors();
 	updateHints();
 	updateCbDescs();
@@ -1055,6 +1075,7 @@ function showEditEntry(si, ei, focusField) {
 	document.getElementById('cb-auto').checked = !!e.auto_expand;
 	document.getElementById('cb-case').checked = !!e.is_case_sensitive;
 	document.getElementById('cb-final').checked = !!e.final_result;
+	document.getElementById('e-prio').value = typeof e.priority === 'number' ? e.priority : '';
 
 	clearEntryErrors();
 	updateHints();
@@ -1066,6 +1087,7 @@ function showEditEntry(si, ei, focusField) {
 		let el = null;
 		if (focusField === 'out') el = document.getElementById('e-out');
 		else if (focusField === 'trig') el = document.getElementById('e-trig');
+		else if (focusField === 'prio') el = document.getElementById('e-prio');
 		else if (focusField && focusField.indexOf('cb-') === 0)
 			el = document.getElementById(focusField);
 		else el = document.getElementById('e-trig');
@@ -1118,6 +1140,10 @@ function saveEntry(andNew) {
 			is_case_sensitive: document.getElementById('cb-case').checked,
 			final_result: document.getElementById('cb-final').checked
 		};
+		// Optional collision-priority override; omitted when the field is blank
+		// so the entry inherits the personal source default.
+		const prio = parsePrio(document.getElementById('e-prio').value);
+		if (prio !== null) entry.priority = prio;
 
 		const si = edEntry.si;
 		if (edEntry.ei === null) D.sections[si].entries.push(entry);
@@ -1260,14 +1286,19 @@ function persist() {
 		payload.sections_order.push(s.name);
 		payload.sections[s.name] = {
 			description: s.description,
-			entries: (s.entries || []).map((e) => ({
-				trigger: e.trigger,
-				output: e.output,
-				is_word: !!e.is_word,
-				auto_expand: !!e.auto_expand,
-				is_case_sensitive: !!e.is_case_sensitive,
-				final_result: !!e.final_result
-			}))
+			entries: (s.entries || []).map((e) => {
+				const o = {
+					trigger: e.trigger,
+					output: e.output,
+					is_word: !!e.is_word,
+					auto_expand: !!e.auto_expand,
+					is_case_sensitive: !!e.is_case_sensitive,
+					final_result: !!e.final_result
+				};
+				// Carry an explicit per-hotstring priority through the save.
+				if (typeof e.priority === 'number') o.priority = e.priority;
+				return o;
+			})
 		};
 	});
 	toLua('save', payload);
@@ -1286,6 +1317,7 @@ window.initData = function (d) {
 	autoClose = !!d.auto_close;
 	defaultSec = d.default_section || null;
 	openMode = d.open_mode || 'menu';
+	setDefaultPrio(d.default_priority);
 
 	buildCmdGrid();
 	updateHints();
@@ -1314,10 +1346,23 @@ window.updateData = function (d) {
 	compactView = !!d.compact_view;
 	autoClose = !!d.auto_close;
 	defaultSec = d.default_section || null;
+	setDefaultPrio(d.default_priority);
 
 	updateHints();
 	render();
 };
+
+/**
+ * Records the personal source-default priority (sent by the Lua backend, which
+ * reads it from the engine's single source) and shows it as the priority field's
+ * placeholder — so a blank field visibly inherits that value, never a hardcoded one.
+ * @param {number|undefined} value - The default priority from the backend.
+ */
+function setDefaultPrio(value) {
+	defaultPrio = typeof value === 'number' ? value : null;
+	const pe = document.getElementById('e-prio');
+	if (pe) pe.placeholder = defaultPrio !== null ? String(defaultPrio) : '';
+}
 
 // ====================================
 // ====================================
@@ -1690,6 +1735,18 @@ document.addEventListener('selectionchange', ejectFromChip);
 document.addEventListener('click', function (e) {
 	if (!document.getElementById('ac-popup').contains(e.target)) hideAc();
 });
+
+// Keep the priority field a bare integer within the accepted 0–100 range, even
+// when typed (the number input's spinner already enforces the step and bounds).
+(function () {
+	const pe = document.getElementById('e-prio');
+	if (!pe) return;
+	pe.addEventListener('input', function () {
+		let v = this.value.replace(/[^0-9]/g, '');
+		if (v !== '') v = String(Math.min(100, parseInt(v, 10)));
+		if (v !== this.value) this.value = v;
+	});
+})();
 
 document.addEventListener('DOMContentLoaded', function () {
 	toLua('ready', {});

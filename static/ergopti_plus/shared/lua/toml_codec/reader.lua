@@ -171,9 +171,15 @@ local function parse_entry(line)
 			result[key] = false
 			i = i + 5
 		else
+			-- Numeric (or otherwise bare) value: capture the raw token up to the
+			-- next separator and coerce it. Without this an inline-table number
+			-- such as `priority = 75` would be skipped and silently lost.
+			local vs = i
 			while i <= #line and line:sub(i, i) ~= "," and line:sub(i, i) ~= "}" do
 				i = i + 1
 			end
+			local raw = line:sub(vs, i - 1):match("^%s*(.-)%s*$")
+			result[key] = tonumber(raw) or result[key]
 		end
 	end
 
@@ -186,6 +192,10 @@ local function parse_entry(line)
 		auto_expand       = result.auto_expand       or false,
 		is_case_sensitive = result.is_case_sensitive or false,
 		final_result      = result.final_result      or false,
+		-- Individual collision-priority override (top of the cascade). nil when
+		-- the entry has no `priority` key, so the loader falls back to the
+		-- section/file/source default via resolve_priority.
+		priority          = type(result.priority) == "number" and result.priority or nil,
 	}
 end
 
