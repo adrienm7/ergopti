@@ -15,9 +15,9 @@
 ;    the current value differs from the shared default — mirrors HS's pattern
 ;    of hiding the row when it would be a no-op so the menu stays compact.
 ; 2. Shared-defaults single source of truth: every "Reset" target reads from
-;    ``LLM_Defaults`` (populated from defaults.json), with the static
-;    ``_LLM_DEFAULTS_FALLBACK`` Map as a last-resort safety net when the
-;    file is missing.
+;    ``LLM_Defaults`` (populated from defaults.json — the single source). The
+;    loader fails fast if the file is missing, so there is no hardcoded mirror
+;    map; a per-call default only covers keys the loader does not parse.
 ; 3. Trigger shortcut: optional global hotkey that fires a prediction on
 ;    demand. Default Ctrl+Space mirrors Copilot's "trigger inline suggestion"
 ;    so muscle memory carries over.
@@ -366,17 +366,15 @@ LLM_Tray_PromptNumeric(key, title, prompt, min_val := 0, max_val := 0) {
 	LLM_Tray_Build()
 }
 
-; Resolve the shared default for ``shared_key`` (e.g. "llm_debounce_ms"). Prefers
-; the runtime ``LLM_Defaults`` map (populated from defaults.json) and falls back
-; to ``_LLM_DEFAULTS_FALLBACK`` so a missing file does not erase the reset rows.
-; Centralised so every "Reset to N" row in the menu hits the same single source
-; of truth (mirrors HS's llm_mod.DEFAULT_STATE[...] reads).
+; Resolve the shared default for ``shared_key`` (e.g. "llm_debounce_ms") from the
+; runtime ``LLM_Defaults`` map (populated from defaults.json — the single source).
+; The per-call ``fallback`` is a last resort only for keys the loader does not
+; parse; the old hardcoded mirror map is gone. Centralised so every "Reset to N"
+; row in the menu hits the same source (mirrors HS's llm_mod.DEFAULT_STATE reads).
 _LLM_DefaultFor(shared_key, fallback := "") {
-	global LLM_Defaults, _LLM_DEFAULTS_FALLBACK
+	global LLM_Defaults
 	if IsSet(LLM_Defaults) and Type(LLM_Defaults) == "Map" and LLM_Defaults.Has(shared_key)
 		return LLM_Defaults[shared_key]
-	if _LLM_DEFAULTS_FALLBACK.Has(shared_key)
-		return _LLM_DEFAULTS_FALLBACK[shared_key]
 	return fallback
 }
 
