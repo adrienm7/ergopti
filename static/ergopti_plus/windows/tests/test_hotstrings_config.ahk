@@ -14,6 +14,13 @@
 ; hotstring files being present at a specific location during CI.
 ; ==============================================================================
 
+; The resolution fallbacks (GLOBAL_DEFAULT_DELAY / GLOBAL_DEFAULT_COLOR /
+; HOTSTRINGS_CATEGORY_DEFAULT_COLORS["personal"]) are no longer hardcoded — they
+; load from shared/hotstrings/defaults.toml. Populate them once here (using the
+; real shared/ dir that test_stubs.ahk points _SharedDir at) so the fallback
+; assertions below see the canonical values, exactly as production does at boot.
+HotstringsConfigLoadSharedDefaults()
+
 ; Helper — wipe / seed the in-memory state for a single test case.
 ;
 ; Pre-seeds ``HotstringGroupConfig`` with empty entries for every category
@@ -188,6 +195,42 @@ TestHotstringsConfig_LlmPredictionVioletDefault() {
 }
 Test("HotstringsConfig: llm_prediction category defaults to violet AI tint",
     TestHotstringsConfig_LlmPredictionVioletDefault)
+
+; Single-source tripwire (A4 — mutualised AHK <-> macOS resolution defaults).
+; The three fallbacks now load from shared/hotstrings/defaults.toml instead of a
+; per-driver literal. This pins two things at once:
+;   1. The loader actually read the shared file — the live globals equal the
+;      values parsed straight out of defaults.toml (not a stale hardcoded value).
+;   2. The canonical values are exactly what both drivers expect. The macOS suite
+;      asserts the SAME literals against the SAME file (test_hotstrings_defaults
+;      .lua), so a drift on either driver — or an accidental edit to the shared
+;      file — turns one of these red.
+TestHotstringsConfig_SharedDefaultsAreSingleSource() {
+    global _SharedDir, GLOBAL_DEFAULT_DELAY, GLOBAL_DEFAULT_COLOR
+    global HOTSTRINGS_CATEGORY_DEFAULT_COLORS
+    Path := _SharedDir . "\hotstrings\defaults.toml"
+    c    := ParseTomlFile(Path)
+    AssertTrue(c.Count > 0, "defaults.toml is present and parses (" . Path . ")")
+
+    ; (1) The live globals equal the file — proves HotstringsConfigLoadSharedDefaults
+    ;     populated them from disk, not from a literal left behind in the module.
+    ;     Colors are normalised to the with-"#" form (exactly as the loader does)
+    ;     so the check is independent of whether the canon stores the leading "#".
+    NormHash(v) => (SubStr(v, 1, 1) == "#") ? v : "#" . v
+    AssertEqual(NormHash(IniCacheGet(c, "colors", "global_default")), GLOBAL_DEFAULT_COLOR,
+        "GLOBAL_DEFAULT_COLOR is loaded from defaults.toml [colors] global_default")
+    AssertEqual(NormHash(IniCacheGet(c, "colors", "personal")), HOTSTRINGS_CATEGORY_DEFAULT_COLORS["personal"],
+        "personal baseline is loaded from defaults.toml [colors] personal")
+    AssertEqual(Float(IniCacheGet(c, "delays", "default_sec")), GLOBAL_DEFAULT_DELAY,
+        "GLOBAL_DEFAULT_DELAY is loaded from defaults.toml [delays] default_sec")
+
+    ; (2) Pin the canonical cross-driver values so an accidental edit is caught.
+    AssertEqual("#1e88e5", GLOBAL_DEFAULT_COLOR, "canonical global default color")
+    AssertEqual("#6e6e73", HOTSTRINGS_CATEGORY_DEFAULT_COLORS["personal"], "canonical personal baseline color")
+    AssertEqual(0.75, GLOBAL_DEFAULT_DELAY, "canonical global default delay (seconds)")
+}
+Test("HotstringsConfig: resolution defaults come from the shared defaults.toml (single source)",
+    TestHotstringsConfig_SharedDefaultsAreSingleSource)
 
 TestHotstringsConfig_ResolveTomlFile() {
     _HCfgTestReset()

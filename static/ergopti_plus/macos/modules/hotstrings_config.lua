@@ -39,18 +39,22 @@ local LOG        = "hotstrings_config"
 -- =================================
 -- =================================
 
--- Ultimate fallback when neither a user override nor a TOML default is set.
--- ``GLOBAL_DEFAULT_COLOR`` is the SINGLE source of truth for "no color set" —
--- every per-category lookup that finds nothing else lands here.
-local GLOBAL_DEFAULT_DELAY = 0.75
-local GLOBAL_DEFAULT_COLOR = "#1e88e5"  -- Blue — global tooltip tint when nothing else is configured
+-- Ultimate fallbacks when neither a user override nor a TOML default is set.
+-- LOADED AT REQUIRE-TIME from the shared cross-driver canon
+-- (shared/hotstrings/defaults.toml) by load_shared_defaults() below — the
+-- SINGLE source shared verbatim with the AutoHotkey driver. They start nil so
+-- a missing file/key fails fast (rule 5.3) instead of masking driver drift
+-- behind a hardcoded literal (rules 5.2 / 5.4). ``GLOBAL_DEFAULT_COLOR`` remains
+-- the single source of truth for "no color set" — every per-category lookup
+-- that finds nothing else lands here.
+local GLOBAL_DEFAULT_DELAY = nil
+local GLOBAL_DEFAULT_COLOR = nil
 
 -- Per-category baseline that overrides ``GLOBAL_DEFAULT_COLOR`` only when no
--- TOML _meta or user override sets a color. Lives next to the global default
--- so all defaults are visible in one place.
-local CATEGORY_DEFAULT_COLORS = {
-	personal = "#6e6e73",  -- Gray — neutral baseline so user-added entries stand out only when the user picks a colour themselves
-}
+-- TOML _meta or user override sets a color. Its "personal" entry is populated
+-- from the shared canon by load_shared_defaults() — kept in one table so all
+-- per-category baselines stay visible in one place.
+local CATEGORY_DEFAULT_COLORS = {}
 
 
 -- =================================
@@ -765,5 +769,54 @@ function M.set_word_delimiters(delimiters)
 		('"' .. tostring(_state.word_delimiters) .. '"') or "(default — key removed)")
 	return true
 end
+
+
+-- ==========================================================
+--- ==========================================================
+-- ======= 8/ Bootstrap: shared cross-driver defaults =======
+--- ==========================================================
+-- ==========================================================
+
+--- Reads shared/hotstrings/defaults.toml at require-time and populates the
+--- three hard-fallback constants from the single cross-driver source. A missing
+--- file, section, or key raises an error (fail fast — no driver-side literal).
+--- The path is resolved relative to THIS file (cwd-independent), mirroring
+--- ui/tooltip/config.lua, so it behaves identically in production and in the
+--- headless unit harness (where the module is re-required per test).
+local function load_shared_defaults()
+	-- macos/modules/hotstrings_config.lua → modules → macos → ergopti_plus → /shared
+	local src = debug.getinfo(1, "S").source:gsub("^@", "")
+	local dir = src:match("^(.*)[/\\][^/\\]+$") or src        -- .../macos/modules
+	dir = dir:match("^(.*)[/\\][^/\\]+$") or dir              -- .../macos
+	local ergopti_plus = dir:match("^(.*)[/\\][^/\\]+$") or dir
+	local toml_path = ergopti_plus .. "/shared/hotstrings/defaults.toml"
+
+	local parsed   = TomlReader.parse(toml_path)
+	local sections = (type(parsed) == "table") and parsed.sections or nil
+	if type(sections) ~= "table" then
+		error("[hotstrings_config] shared/hotstrings/defaults.toml not readable: " .. toml_path)
+	end
+
+	local function require_key(section, key)
+		local s = sections[section]
+		if type(s) ~= "table" or s[key] == nil then
+			error(string.format("[hotstrings_config] missing key [%s].%s in %s", section, key, toml_path))
+		end
+		return s[key]
+	end
+
+	GLOBAL_DEFAULT_DELAY             = tonumber(require_key("delays", "default_sec"))
+	GLOBAL_DEFAULT_COLOR             = require_key("colors", "global_default")
+	CATEGORY_DEFAULT_COLORS.personal = require_key("colors", "personal")
+
+	if type(GLOBAL_DEFAULT_DELAY) ~= "number" then
+		error("[hotstrings_config] [delays].default_sec must be a number in " .. toml_path)
+	end
+
+	Logger.done(LOG, "Shared hotstring defaults loaded (delay=%.2fs color=%s personal=%s).",
+		GLOBAL_DEFAULT_DELAY, tostring(GLOBAL_DEFAULT_COLOR), tostring(CATEGORY_DEFAULT_COLORS.personal))
+end
+
+load_shared_defaults()
 
 return M

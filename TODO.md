@@ -285,6 +285,35 @@ tap-hold each hardcode their timings independently in 2-3 drivers.
 
 ### A4. Shared hotstring colors / delays  *(S-M, watch boot order)*
 
+**STATUS: ✅ DONE.**
+- ✅ Created `shared/hotstrings/defaults.toml` (`[colors] global_default / personal`,
+  `[delays] default_sec`) — the SINGLE cross-driver source. Both drivers read it at
+  boot with a fail-fast `require_key` (AHK `HotstringsConfigLoadSharedDefaults` in
+  `hotstrings_config.ahk`, called in `ErgoptiPlus.ahk` before the tray menu build /
+  any resolve; HS `load_shared_defaults` at `modules/hotstrings_config.lua`
+  require-time). The three literals (`#1e88e5` / `#6e6e73` / `0.75`) are gone from
+  both drivers.
+- ✅ Boot order handled by NOT auto-loading at the AHK file's top level (the
+  `test_hotstring_aggregation` harness sets `_SharedDir` *after* its include) —
+  explicit loader like `ui_style.ahk`. A missing key THROWS: in production the
+  unhandled error surfaces the fatal dialog and exits; in CI `run_all` the OnError
+  handler turns it into `not ok 0` (no hung MsgBox).
+- ✅ Single-source tripwire tests on BOTH drivers assert the loaded values equal the
+  file AND pin the canonical literals (`test_hotstrings_config.ahk` §SharedDefaults,
+  `macos/.../unit/modules/test_hotstrings_defaults.lua`). AHK **1372/0**, macOS
+  **1551/0**; cross-platform no-fallbacks / port-compliance / priority-parity /
+  ahk-encoding / banners all green. `shared/timings/constants.toml` comment now
+  points at `defaults.toml` as authoritative for `hotstring_expansion_ms`.
+- ⚠️ Deferred (still AHK-only, out of A4 scope): `llm_prediction #AD61FF` (no HS
+  equivalent — mirrors tooltip `ai_loading_hex`) and `DYN_HOTSTRINGS_DEFAULT_DELAY`
+  `2.0`. The follow-up bullet below (reading `UI_AI_LOADING_HEX` for
+  `llm_prediction`) is unaddressed; its boot-order gotcha is exactly why the
+  explicit-loader pattern was chosen.
+
+---
+
+Original plan, for reference:
+
 `GLOBAL_DEFAULT_COLOR` `#1e88e5`, `personal` `#6e6e73`, `GLOBAL_DEFAULT_DELAY`
 `0.75` are hardcoded identically in `macos/modules/hotstrings_config.lua` and
 `windows/lib/hotstrings/hotstrings_config.ahk` (each claiming to be "the single
