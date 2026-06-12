@@ -1,7 +1,7 @@
 {
 	"$schema": "https://ergopti.com/schema/corpus/hotstrings.v1.json",
-	"description": "Cross-driver regression corpus for hotstring expansion logic. Every vector must pass in both the AHK and Hammerspoon driver test suites without modification.",
-	"version": "1.0.0",
+	"description": "Cross-driver regression corpus for hotstring expansion logic. Every vector must pass in both the AHK and Hammerspoon driver test suites without modification. 'vectors' covers single-trigger matching/arithmetic; 'collision_vectors' covers multi-trigger collision resolution (length > priority > first-registered).",
+	"version": "1.1.0",
 	"vectors": [
 		{
 			"id": "simple_expansion",
@@ -252,6 +252,68 @@
 				"replacement": "THE",
 				"backspace_count": 3
 			}
+		}
+	],
+	"collision_vectors": [
+		{
+			"id": "priority_breaks_equal_length_tie",
+			"description": "Two equal-length triggers (same string, two sources) collide; the higher priority wins regardless of registration order. The high-priority mapping is registered LAST here. Case-sensitive triggers isolate the tie-break from case-variant generation. Tie-break order is length > priority > first-registered, identical in the AHK engine and the Hammerspoon registry.",
+			"mappings": [
+				{ "trigger": "zz", "replacement": "LOW", "priority": 10, "group": "low", "is_case_sensitive": true },
+				{ "trigger": "zz", "replacement": "HIGH", "priority": 90, "group": "high", "is_case_sensitive": true }
+			],
+			"buffer": "zz",
+			"expected": { "matched": true, "winner": "HIGH" }
+		},
+		{
+			"id": "priority_order_independent",
+			"description": "Same collision as above but the high-priority mapping is registered FIRST; the outcome must not depend on registration order.",
+			"mappings": [
+				{ "trigger": "yy", "replacement": "HIGH", "priority": 90, "group": "high", "is_case_sensitive": true },
+				{ "trigger": "yy", "replacement": "LOW", "priority": 10, "group": "low", "is_case_sensitive": true }
+			],
+			"buffer": "yy",
+			"expected": { "matched": true, "winner": "HIGH" }
+		},
+		{
+			"id": "equal_priority_falls_back_to_first_registered",
+			"description": "Equal length AND equal priority falls back to first-registered (seq), the pre-priority default preserved on both drivers.",
+			"mappings": [
+				{ "trigger": "ww", "replacement": "FIRST", "priority": 30, "group": "g1", "is_case_sensitive": true },
+				{ "trigger": "ww", "replacement": "SECOND", "priority": 30, "group": "g2", "is_case_sensitive": true }
+			],
+			"buffer": "ww",
+			"expected": { "matched": true, "winner": "FIRST" }
+		},
+		{
+			"id": "longer_trigger_beats_higher_priority",
+			"description": "Length stays primary: a longer trigger wins even against a shorter, far-higher-priority one.",
+			"mappings": [
+				{ "trigger": "x", "replacement": "SHORT", "priority": 99, "group": "short", "is_case_sensitive": true },
+				{ "trigger": "vx", "replacement": "LONG", "priority": 1, "group": "long", "is_case_sensitive": true }
+			],
+			"buffer": "vx",
+			"expected": { "matched": true, "winner": "LONG" }
+		},
+		{
+			"id": "personal_tier_beats_common_tier",
+			"description": "The personal source default (50) outranks the common source default (10) for an identical trigger — the user-facing 'my personal hotstring always wins' contract. Personal is registered FIRST, as at startup; priority, not load order, decides. This is the case the macOS group-aware dedup fix restored.",
+			"mappings": [
+				{ "trigger": "abc", "replacement": "PERSONAL", "priority": 50, "group": "personal", "is_case_sensitive": true },
+				{ "trigger": "abc", "replacement": "COMMON", "priority": 10, "group": "common", "is_case_sensitive": true }
+			],
+			"buffer": "abc",
+			"expected": { "matched": true, "winner": "PERSONAL" }
+		},
+		{
+			"id": "no_match_when_buffer_ends_outside_any_trigger",
+			"description": "When the buffer does not end with any registered trigger, nothing fires even though competing mappings exist.",
+			"mappings": [
+				{ "trigger": "qq", "replacement": "Q", "priority": 50, "group": "g1", "is_case_sensitive": true },
+				{ "trigger": "rr", "replacement": "R", "priority": 90, "group": "g2", "is_case_sensitive": true }
+			],
+			"buffer": "hello",
+			"expected": { "matched": false }
 		}
 	]
 }

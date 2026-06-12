@@ -260,3 +260,104 @@ seq_counter             = 0,
 		end
 	end)
 end)
+
+
+
+
+-- =================================================
+-- =================================================
+-- ======= 4/ Collision priority resolution ========
+-- =================================================
+-- =================================================
+
+-- Drives the shared collision corpus through the REAL registry: each mapping is
+-- added under its own source group (so cross-source same-trigger entries compete
+-- rather than collapse), the list is sorted, and the winner for the buffer is the
+-- first entry in the tail bucket whose trigger is an exact suffix. This mirrors
+-- the expander's hot-path selection and must agree with the AHK engine on every
+-- vector — the cross-driver collision contract (length > priority > first added).
+
+--- Builds a fresh, initialized registry for a single collision vector so adds
+--- never bleed across vectors.
+--- @return table The registry module reference.
+local function fresh_collision_registry()
+	package.loaded["modules.keymap.registry"] = nil
+	package.loaded["modules.keymap.terminators"] = nil
+	package.loaded["lib.logger"] = nil
+	helpers.load_with_stubs("lib.logger")
+	local R = helpers.load_with_stubs("modules.keymap.registry")
+	R.init({
+		magic_key                  = "★",
+		mappings                   = {},
+		mappings_lookup            = {},
+		mappings_by_tail_char      = {},
+		mappings_by_star_tail_char = {},
+		groups                     = {},
+		seq_counter                = 0,
+		current_group              = nil,
+		start_is_word_boundary     = true,
+	})
+	return R
+end
+
+--- Returns the replacement that fires for `buffer`, or nil when nothing matches.
+--- Collision mappings are case-sensitive, so the stored trigger is the exact
+--- match string (no case variants are generated) and a byte-wise suffix test on
+--- the sorted bucket reproduces the engine's winner.
+--- @param R table The registry module reference.
+--- @param buffer string The simulated input buffer (ASCII in the corpus).
+--- @return string|nil The winning replacement, or nil.
+local function collision_winner(R, buffer)
+	if buffer == "" then return nil end
+	local tail   = buffer:sub(-1):lower()  -- corpus collision buffers are ASCII
+	local bucket = R.mappings_for_tail(tail)
+	if not bucket then return nil end
+	for _, m in ipairs(bucket) do
+		local tl = #m.trigger
+		if #buffer >= tl and buffer:sub(-tl) == m.trigger then
+			return m.repl
+		end
+	end
+	return nil
+end
+
+helpers.describe("hotstring corpus — collision priority", function()
+	helpers.it("corpus exposes a non-empty collision_vectors array", function()
+		helpers.assert_true(corpus ~= nil, "corpus load error: " .. tostring(corpus_err))
+		helpers.assert_true(type(corpus.collision_vectors) == "table"
+			and #corpus.collision_vectors > 0,
+			"corpus.collision_vectors must be a non-empty table")
+	end)
+
+	helpers.it("every collision vector resolves to the expected winner", function()
+		if not corpus or type(corpus.collision_vectors) ~= "table" then return end
+		for _, v in ipairs(corpus.collision_vectors) do
+			helpers.assert_true(type(v.id) == "string" and v.id ~= "",
+				"collision vector missing id")
+			helpers.assert_true(type(v.mappings) == "table" and #v.mappings > 0,
+				"collision vector '" .. tostring(v.id) .. "' missing mappings")
+
+			local R = fresh_collision_registry()
+			for _, m in ipairs(v.mappings) do
+				-- Register under the mapping's own source group so two entries for
+				-- one trigger coexist and the priority sort can elect the winner.
+				R.set_group_context(m.group or "g")
+				R.add(m.trigger, m.replacement or "", {
+					is_case_sensitive = m.is_case_sensitive == true,
+					priority          = m.priority,
+				})
+			end
+			R.set_group_context(nil)
+			R.sort_mappings()
+
+			local winner = collision_winner(R, v.buffer or "")
+			if v.expected and v.expected.matched == true then
+				helpers.assert_eq(winner, v.expected.winner,
+					"collision vector '" .. v.id .. "': wrong winner")
+			else
+				helpers.assert_true(winner == nil,
+					"collision vector '" .. v.id .. "': expected no match, got '" .. tostring(winner) .. "'")
+			end
+		end
+	end)
+end)
