@@ -647,7 +647,9 @@ _OnPrefixChar(IH, Char) {
         ; keeps terminators in its buffer, which means a terminator may
         ; trigger a STAR match (e.g. a personal ``,a → ja`` rule fires
         ; on the « a », not on the comma).
+        _HseFeedTick := HotPath_Now()
         HSEMatch := HSE_FeedChar(Char)
+        HotPath_LogIfSlow("HSE.FeedChar", _HseFeedTick, Char)
         ; When no registered hotstring matched, try the engine-level repeat
         ; fallback: <x><MagicKey> repeats <x> when x is at least the 2nd
         ; letter of the current word. This replaces the now-removed [[repeat]]
@@ -656,7 +658,9 @@ _OnPrefixChar(IH, Char) {
             HSEMatch := HSE_TryRepeatKey(ScriptInformation["MagicKey"])
         }
         if (HSEMatch != "") {
+            _HseDispatchTick := HotPath_Now()
             HSE_DispatchMatch(HSEMatch, HSE_LastEndChar)
+            HotPath_LogIfSlow("HSE.Dispatch", _HseDispatchTick, HSEMatch.Trigger)
             ; Log the fired hotstring. ``h_type`` is taken from the
             ; preceding suggestion when available (richest categorisation —
             ; "autocorrection", "personal", …) and falls back to a basic
@@ -671,7 +675,9 @@ _OnPrefixChar(IH, Char) {
                 ? "repeat_key"
                 : (HSEMatch.HasOwnProp("Category") ? HSEMatch.Category : "")
             HotstringSection := HSEMatch.HasOwnProp("Section") ? HSEMatch.Section : ""
+            _KlLogTick := HotPath_Now()
             try KL_LogHotstring(HSEMatch.Trigger, HotstringRepl, HotstringHType, "", HotstringCategory, HotstringSection)
+            HotPath_LogIfSlow("KL.LogHotstring", _KlLogTick, HSEMatch.Trigger)
             ; ── Sync the watcher buffer to the post-expansion screen state ──
             ; The naive "wipe to empty" used to drop the in-word context the
             ; user is still typing inside of. After a STAR fire (no end-char),
