@@ -207,12 +207,16 @@ Do these first, top to bottom (roughly increasing risk).
   indexed `a` by the inner loop var, so it **threw "Invalid index" on every
   advanced-format prediction** — and `parser.ahk` was in **no** suite. Now wired into
   run_all with regression tests (AHK 1354/0).
-- ⏳ **Remaining (decision needed): full row-by-row parity.** After the crash fix the
-  probe shows the AHK and Lua algorithms genuinely diverge (AHK does a simple
-  prefix-diff → `deletes` always 0 + a missing-space bug; Lua does intra-word token
-  diff → `deletes>0`, leading-space `nw`, `disable_bold`). Closing it means porting
-  the shared intra-word diff to AHK (a real `LLM_Parser_ProcessPrediction` rewrite) —
-  a deliberate scope to confirm before implementing.
+- ✅ **Full row-by-row parity DONE.** Ported the shared intra-word token diff
+  (get_chars / tokenize / token_sub_cost / token_diff_ops / intra_word_diff +
+  the physical-injection and visual sections) into `LLM_Parser_ProcessPrediction`,
+  replacing the old simple prefix-diff (which left `deletes` at 0 and dropped the
+  inter-word space). The corpus now has 17 vectors (accents, apostrophes, overlap
+  stripping, 60-char window, punctuation, word caps) and **both drivers pass it
+  row-by-row** on the physical contract (deletes / to_type / nw / has_corrections /
+  disable_bold): AHK 1371/0 (`test_llm_parser.ahk` §3), macOS 1549/0
+  (`test_process_prediction_vectors.lua`, the oracle-drift tripwire). A1 is
+  complete end-to-end.
 
 The LLM output parser (`macos/modules/llm/parser.lua`, ~820 lines) is ~95% pure
 (2-tier semantic token-diff, French typography, NFD→NFC, filler cleanup,
