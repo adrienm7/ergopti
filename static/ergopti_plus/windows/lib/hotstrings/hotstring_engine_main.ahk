@@ -89,6 +89,19 @@ global HSE_PRIORITY_COMMON   := 10
 global HSE_PRIORITY_PACKAGE  := 30
 global HSE_PRIORITY_PERSONAL := 50
 
+; Source-default priority for a category — the final fallback in the cascade when
+; no override is set at the individual, section or file level. Personal beats
+; "ext." packages, which beat bundled common categories.
+_HSE_SourcePriority(CategoryName) {
+    global HSE_PRIORITY_COMMON, HSE_PRIORITY_PACKAGE, HSE_PRIORITY_PERSONAL
+    Cat := StrLower(CategoryName)
+    if (Cat == "personal")
+        return HSE_PRIORITY_PERSONAL
+    if (SubStr(Cat, 1, 4) == "ext.")
+        return HSE_PRIORITY_PACKAGE
+    return HSE_PRIORITY_COMMON
+}
+
 
 
 

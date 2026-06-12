@@ -360,3 +360,43 @@ TestHSResolve_MemoAndInvalidation() {
 	HotstringsResolveBumpGen()
 }
 Test("HotstringsResolve: result is memoised and invalidated by generation bump", TestHSResolve_MemoAndInvalidation)
+
+; Priority resolution mirrors delay/color: the override cascade (section >
+; category) sits above the source-default fallback (personal 50 > package 30 >
+; common 10). _HSE_SourcePriority is the pure source-default mapping.
+TestHSE_SourcePriorityHelper() {
+	AssertEqual(50, _HSE_SourcePriority("personal"), "personal source default")
+	AssertEqual(50, _HSE_SourcePriority("PERSONAL"), "source default is case-insensitive")
+	AssertEqual(30, _HSE_SourcePriority("ext.demo"), "extension package source default")
+	AssertEqual(10, _HSE_SourcePriority("autocorrection"), "bundled common source default")
+}
+Test("_HSE_SourcePriority maps personal=50, package=30, common=10",
+	TestHSE_SourcePriorityHelper)
+
+TestHSResolve_PriorityCascade() {
+	global _HotstringsOverrides
+	SavedOverrides := _HotstringsOverrides
+	_HotstringsOverrides := Map()
+
+	; No override at all → the source default (this is a common category).
+	HotstringsResolveBumpGen()
+	AssertEqual(10, HotstringsResolve("priotestcat", "sec").Priority,
+		"no override resolves to the common source default")
+
+	; Category-level override beats the source default.
+	_HotstringsOverrides["priotestcat"] := { Delay: "", Color: "", ShowTooltip: "", Priority: 70, Sections: Map() }
+	HotstringsResolveBumpGen()
+	AssertEqual(70, HotstringsResolve("priotestcat", "sec").Priority,
+		"category override beats the source default")
+
+	; Section-level override beats the category override.
+	_HotstringsOverrides["priotestcat"].Sections["sec"] := { Delay: "", Color: "", ShowTooltip: "", Priority: 90 }
+	HotstringsResolveBumpGen()
+	AssertEqual(90, HotstringsResolve("priotestcat", "sec").Priority,
+		"section override beats the category override")
+
+	_HotstringsOverrides := SavedOverrides
+	HotstringsResolveBumpGen()
+}
+Test("HotstringsResolve: priority cascades section > category > source default",
+	TestHSResolve_PriorityCascade)

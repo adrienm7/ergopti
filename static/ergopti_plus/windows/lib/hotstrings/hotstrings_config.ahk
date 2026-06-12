@@ -300,9 +300,9 @@ _ParseOverrides(Path) {
             CurrentCat := "ext." . StrLower(ExtSecMatch[1])
             CurrentSec := StrLower(ExtSecMatch[2])
             if !Result.Has(CurrentCat)
-                Result[CurrentCat] := { Delay: "", Color: "", ShowTooltip: "", Sections: Map() }
+                Result[CurrentCat] := { Delay: "", Color: "", ShowTooltip: "", Priority: "", Sections: Map() }
             if !Result[CurrentCat].Sections.Has(CurrentSec)
-                Result[CurrentCat].Sections[CurrentSec] := { Delay: "", Color: "", ShowTooltip: "" }
+                Result[CurrentCat].Sections[CurrentSec] := { Delay: "", Color: "", ShowTooltip: "", Priority: "" }
             continue
         }
 
@@ -311,7 +311,7 @@ _ParseOverrides(Path) {
             CurrentCat := "ext." . StrLower(ExtMatch[1])
             CurrentSec := ""
             if !Result.Has(CurrentCat)
-                Result[CurrentCat] := { Delay: "", Color: "", ShowTooltip: "", Sections: Map() }
+                Result[CurrentCat] := { Delay: "", Color: "", ShowTooltip: "", Priority: "", Sections: Map() }
             continue
         }
 
@@ -320,9 +320,9 @@ _ParseOverrides(Path) {
             CurrentCat := StrLower(SecMatch[1])
             CurrentSec := StrLower(SecMatch[2])
             if !Result.Has(CurrentCat)
-                Result[CurrentCat] := { Delay: "", Color: "", ShowTooltip: "", Sections: Map() }
+                Result[CurrentCat] := { Delay: "", Color: "", ShowTooltip: "", Priority: "", Sections: Map() }
             if !Result[CurrentCat].Sections.Has(CurrentSec)
-                Result[CurrentCat].Sections[CurrentSec] := { Delay: "", Color: "", ShowTooltip: "" }
+                Result[CurrentCat].Sections[CurrentSec] := { Delay: "", Color: "", ShowTooltip: "", Priority: "" }
             continue
         }
 
@@ -331,7 +331,7 @@ _ParseOverrides(Path) {
             CurrentCat := StrLower(CatMatch[1])
             CurrentSec := ""
             if !Result.Has(CurrentCat)
-                Result[CurrentCat] := { Delay: "", Color: "", ShowTooltip: "", Sections: Map() }
+                Result[CurrentCat] := { Delay: "", Color: "", ShowTooltip: "", Priority: "", Sections: Map() }
             continue
         }
 
@@ -349,6 +349,8 @@ _ParseOverrides(Path) {
             Target.Color := UnescapeTomlString(ColMatch[1])
         } else if RegExMatch(Line, "^show_tooltip\s*=\s*(true|false)\s*$", &BoolMatch) {
             Target.ShowTooltip := (BoolMatch[1] == "true")
+        } else if RegExMatch(Line, "^priority\s*=\s*([0-9]+)\s*$", &PrioMatch) {
+            Target.Priority := PrioMatch[1] + 0
         }
     }
 
@@ -381,7 +383,8 @@ _SaveOverrides() {
         ; when parsed back. Section headers for ext keys: [ext.name.section].
         IsExt := SubStr(Cat, 1, 4) == "ext."
 
-        if (Entry.Delay != "" or Entry.Color != "" or Entry.ShowTooltip != "") {
+        EntryPrio := Entry.HasOwnProp("Priority") ? Entry.Priority : ""
+        if (Entry.Delay != "" or Entry.Color != "" or Entry.ShowTooltip != "" or EntryPrio != "") {
             Out .= "[" . Cat . "]`n"
             if (Entry.Delay != "") {
                 Out .= "delay = " . Entry.Delay . "`n"
@@ -391,6 +394,9 @@ _SaveOverrides() {
             }
             if (Entry.ShowTooltip != "") {
                 Out .= "show_tooltip = " . (Entry.ShowTooltip ? "true" : "false") . "`n"
+            }
+            if (EntryPrio != "") {
+                Out .= "priority = " . EntryPrio . "`n"
             }
             Out .= "`n"
         }
@@ -402,7 +408,8 @@ _SaveOverrides() {
         _SortStringsInPlace(Secs)
         for _, Sec in Secs {
             S := Entry.Sections[Sec]
-            if (S.Delay != "" or S.Color != "" or S.ShowTooltip != "") {
+            SPrio := S.HasOwnProp("Priority") ? S.Priority : ""
+            if (S.Delay != "" or S.Color != "" or S.ShowTooltip != "" or SPrio != "") {
                 ; Extension: [ext.name.section] — Cat already contains the dot
                 Out .= "[" . Cat . "." . Sec . "]`n"
                 if (S.Delay != "") {
@@ -413,6 +420,9 @@ _SaveOverrides() {
                 }
                 if (S.ShowTooltip != "") {
                     Out .= "show_tooltip = " . (S.ShowTooltip ? "true" : "false") . "`n"
+                }
+                if (SPrio != "") {
+                    Out .= "priority = " . SPrio . "`n"
                 }
                 Out .= "`n"
             }
@@ -561,14 +571,34 @@ _HotstringsResolveUncached(CategoryName, SectionName := "") {
         ShowTooltip := TomlCfg.ShowTooltip
     }
 
+    ; Priority — same cascade as Delay (section > category override, then TOML
+    ; section > category default), falling back to the source default (personal
+    ; 50 > package 30 > common 10) so a resolved priority is never empty. The
+    ; individual per-hotstring level sits ABOVE this, applied in the TOML loader.
+    ; HasOwnProp guards the TOML-config structs, which may predate the field.
+    ; HasOwnProp guards every level: Priority is the newest override field, so a
+    ; struct built before it existed (or a hand-rolled test mock) may lack it.
+    Priority := ""
+    if (UserSec != "" and UserSec.HasOwnProp("Priority") and UserSec.Priority != "") {
+        Priority := UserSec.Priority
+    } else if (UserCat != "" and UserCat.HasOwnProp("Priority") and UserCat.Priority != "") {
+        Priority := UserCat.Priority
+    } else if (TomlSec != "" and TomlSec.HasOwnProp("Priority") and TomlSec.Priority != "") {
+        Priority := TomlSec.Priority
+    } else if (TomlCfg.HasOwnProp("Priority") and TomlCfg.Priority != "") {
+        Priority := TomlCfg.Priority
+    } else {
+        Priority := _HSE_SourcePriority(CategoryName)
+    }
+
     HasOverride := false
-    if (UserSec != "" and (UserSec.Delay != "" or UserSec.Color != "" or UserSec.ShowTooltip != "")) {
+    if (UserSec != "" and (UserSec.Delay != "" or UserSec.Color != "" or UserSec.ShowTooltip != "" or (UserSec.HasOwnProp("Priority") and UserSec.Priority != ""))) {
         HasOverride := true
-    } else if (UserCat != "" and (UserCat.Delay != "" or UserCat.Color != "" or UserCat.ShowTooltip != "")) {
+    } else if (UserCat != "" and (UserCat.Delay != "" or UserCat.Color != "" or UserCat.ShowTooltip != "" or (UserCat.HasOwnProp("Priority") and UserCat.Priority != ""))) {
         HasOverride := true
     }
 
-    return { Delay: Delay, Color: Color, ShowTooltip: ShowTooltip, HasOverride: HasOverride }
+    return { Delay: Delay, Color: Color, ShowTooltip: ShowTooltip, Priority: Priority, HasOverride: HasOverride }
 }
 
 ; Resolve the effective delay and color for an extension hotstring file.
@@ -659,13 +689,13 @@ HotstringsSetOverride(CategoryName, SectionName, Field, Value) {
     Sec := StrLower(SectionName)
 
     if !_HotstringsOverrides.Has(Cat) {
-        _HotstringsOverrides[Cat] := { Delay: "", Color: "", ShowTooltip: "", Sections: Map() }
+        _HotstringsOverrides[Cat] := { Delay: "", Color: "", ShowTooltip: "", Priority: "", Sections: Map() }
     }
     Entry := _HotstringsOverrides[Cat]
 
     if (Sec != "") {
         if !Entry.Sections.Has(Sec) {
-            Entry.Sections[Sec] := { Delay: "", Color: "", ShowTooltip: "" }
+            Entry.Sections[Sec] := { Delay: "", Color: "", ShowTooltip: "", Priority: "" }
         }
         Target := Entry.Sections[Sec]
     } else {
