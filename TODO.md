@@ -301,6 +301,47 @@ Decide **per artifact**:
 
 ### A3. Wire both drivers to `shared/timings/constants.toml`  *(L, needs care)*
 
+**STATUS: ✅ READER + REPRESENTATIVE MODULES DONE (2026-06-13). Broad sweep is a
+documented follow-up (per-module + hardware smoke-test), mirroring A2.**
+
+- ✅ **Dedicated fail-fast timings readers on BOTH drivers** (the reusable lever,
+  mirroring `manifest_reader`): `macos/lib/timings.lua` (`M.ms` / `M.sec`,
+  cwd-independent `debug.getinfo` load, `require_key`-style throw) and
+  `windows/lib/timings/timings_config.ahk` (`TimingsLoadShared` / `TimingsGet` /
+  `TimingsGetSec`, THROW on miss → CI-safe via run_all's OnError). Both read
+  `shared/timings/constants.toml` (values are integer ms; `_sec` accessors divide
+  by 1000). No driver-side fallbacks (rules 5.2 / 5.4).
+- ✅ **macOS modules wired** (`498c5684e`): `keylogger/init.lua` (9 thresholds),
+  `llm/prediction_engine.lua` (debounce min/max + chain fallback),
+  `gestures/engine.lua` (6 timing constants; the spatial thresholds stay local).
+  Local literals deleted.
+- ✅ **AHK modules wired** (`0a11476ee`): `keylogger_walker.ahk` `KLWConst` (6) and
+  `tap_holds/constants.ahk` (4). **Boot order solved + empirically verified**: AHK
+  v2 runs static/global initializers BEFORE the auto-execute body (probe: global
+  init → static-class init → auto-exec body → explicit call), so a consumer cannot
+  call `TimingsGet` from its own initializer. Each constant starts at sentinel 0
+  and a reassign loader (`KeyloggerWalkerLoadTimings` / `TapHoldsLoadTimings`)
+  sources it at boot in `ErgoptiPlus.ahk`, right after the hotstring defaults load
+  and well before the keylogger hook / tap-hold hotkeys arm. The old
+  `TapMinDurationMs()` magic `: 50` fallback is gone.
+- ✅ **Tripwire tests both drivers**: `macos/tests/unit/lib/test_timings.lua`
+  (accessor + fail-fast + a parity tripwire on every consumed key) and
+  `windows/tests/test_timings_config.ahk` (same + asserts the reassign loaders
+  replaced the sentinels with the canonical values). macOS **1585/0**, AHK
+  **1378/0**; lint / ahk-encoding / no-fallbacks / priority-parity green.
+- ⏭️ **Follow-up (separate item, needs hardware smoke-test per module):** extend
+  the readers to the remaining timing sites — the other `keylogger_*.ahk`
+  (watchers / hook / network / av_state / sensors / mouse / ergonomics), the
+  keep-awake (`win.ahk` / `system.lua`), `gestures/init.lua` probe timers, the
+  UI / menu / Karabiner timers, and the MLX/LLM warmup / discovery / streaming
+  watchdogs. Also fold in the A6 tooltip-sentinel cleanup. Reconcile only true
+  divergences (e.g. `llm_display_ttl_ms` ≠ a request timeout). Each wiring needs
+  the maintainer's live boot validation, exactly as flagged below.
+
+---
+
+Original plan, for reference:
+
 `shared/timings/constants.toml` self-documents ~80 constants (and even names the
 exact AHK + HS constant duplicating each), but today only a few UI sites read it
 (WPM widget, `tooltip/config.lua`, `ui_style.ahk`). keylogger / LLM / gestures /

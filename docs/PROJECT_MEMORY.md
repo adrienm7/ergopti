@@ -443,6 +443,40 @@ but the heuristic counts them. Wiring keymap added 5 such lines, so the baseline
 was re-anchored 900→905 with a comment. If you wire more modules to the manifest,
 expect to re-anchor again (the real drive-to-zero target is OS calls, not paths).
 
+**Update (2026-06-13, A3): shared timings registry now has dedicated readers on
+both drivers.** `shared/timings/constants.toml` (~80 ms constants, each naming the
+AHK + HS local it duplicated) is now read through a fail-fast reader on each side
+instead of ad-hoc per-consumer parsing:
+
+- `macos/lib/timings.lua` — `M.ms(section,key)` / `M.sec(section,key)` (ms/1000),
+  cwd-independent `debug.getinfo` load + throw on missing section/key. ZERO `hs.`
+  (it is in `lib/`, counted by the baseline — keep it pure, no `hs.` even in
+  comments). Wired: `keylogger/init.lua`, `llm/prediction_engine.lua`,
+  `gestures/engine.lua` (timing constants only — spatial gesture thresholds stay
+  local).
+- `windows/lib/timings/timings_config.ahk` — `TimingsLoadShared()` /
+  `TimingsGet()` / `TimingsGetSec()`, THROW on miss (CI-safe via run_all's
+  OnError, like the A4 hotstrings loader). Wired: `keylogger_walker.ahk`
+  (`KLWConst`) and `tap_holds/constants.ahk`.
+
+**Gotcha — AHK v2 runs static/global initializers BEFORE the auto-execute body.**
+Empirically verified with a probe: order is `global X := f()` → `class.static :=
+g()` → first auto-exec statement → explicit function call. So a consumer CANNOT
+source a value from a shared-TOML reader in its own `static`/`global` initializer
+— the reader has not loaded yet (its `TimingsLoadShared()` runs in the auto-exec
+body). **Pattern: declare the constant at sentinel `0`, then a reassign loader
+(`KeyloggerWalkerLoadTimings` / `TapHoldsLoadTimings`) sources it in the
+auto-exec body**, placed in `ErgoptiPlus.ahk` right after
+`HotstringsConfigLoadSharedDefaults()` — early enough to beat the keylogger hook
+and tap-hold hotkeys arming (both happen far later). Functions/classes are
+callable regardless of `#Include` position, so the loader can be called before
+the file that defines the consumer is textually included. This is the same
+boot-order class as the A4 hotstrings-defaults loader and the `DYN_HOTSTRINGS_DEFAULT_DELAY`
+early-config-layer gotcha. The broad remaining timing sites (other `keylogger_*.ahk`,
+keep-awake, gestures probe timers, UI/Karabiner timers, MLX/LLM warmup/discovery)
+are a follow-up needing per-module hardware smoke-test, same as the manifest-reader
+follow-up above.
+
 ### project_debug_menu_sync
 
 _Debug menu order is defined in shared/menu_manifest.json debug_menu — both AHK and Lua drivers consume it_
