@@ -157,22 +157,48 @@ HotstringEngineInit() {
 ; =======================================
 ; =======================================
 
-; Internal — registers a hotstring with HSE (the production dispatcher
-; since Session 2 of the migration). The test seam ``_HotstringRegistrar``
-; still receives the registration for harnesses that want to record what
-; was registered without firing real expansions; the AHK native engine is
-; no longer involved at all.
+; Internal — the production-lean registration path used by every CreateHotstring
+; / CreateCaseSensitiveHotstrings / CreateRawCallbackHotstring call. It hands the
+; already-known matching flags (the ``*?C`` subset) straight to HSE_Register,
+; skipping the ``:flags:B0O:abbrev`` string build AND the matching
+; ``_MirrorRegistrationToHSE`` re-parse that the old per-call path incurred on
+; every one of the ~3700 boot registrations.
 ;
-; Meta carries dispatch metadata (Replacement, OnlyText, FinalResult,
-; TimeActivationSeconds, PrevCharKey). When omitted, HSE_DispatchMatch
-; falls back to invoking Callback directly — the path used by tests that
-; register bare lambdas.
-_RegisterHotstring(TriggerSpec, Callback, Meta := unset) {
-    if _HotstringRegistrar {
-        Reg := _HotstringRegistrar
-        Reg(TriggerSpec, Callback)
+; ``Rec`` is the resolved ``_HotstringRegistrar`` (0 in production). When a test
+; has installed a recorder, the caller passes the assembled trigger-spec string
+; and a real per-spec callback, which we forward to the recorder so the
+; introspection tests (registration counts, spec strings, direct callback
+; invocation) keep working byte-for-byte. In production Rec is 0, so callers pass
+; "" / 0 for those two: HSE_DispatchMatch dispatches via ``Spec.Replacement`` and
+; never invokes the callback, so building either would be pure boot-time waste.
+_RegisterHotstringFast(Rec, HseFlags, Abbrev, TrigSpec, Callback, Meta := unset) {
+    if Rec {
+        Rec(TrigSpec, Callback)
     }
-    _MirrorRegistrationToHSE(TriggerSpec, Callback, Meta?)
+    if IsSet(Meta) {
+        HSE_Register(HseFlags, Abbrev, Callback, Meta)
+    } else {
+        HSE_Register(HseFlags, Abbrev, Callback)
+    }
+}
+
+; Extract just the matching-relevant flag letters (``*``, ``?``, ``C``) in
+; canonical order from an AHK option string — the exact subset HSE_Register
+; needs, identical to what ``_MirrorRegistrationToHSE`` recovered by re-parsing
+; the assembled spec. Computing it directly at the call site is what lets the
+; production path skip building and re-parsing the ``:flags:B0O:abbrev`` string.
+_HseFlagSubset(Flags) {
+    Out := ""
+    if InStr(Flags, "*") {
+        Out .= "*"
+    }
+    if InStr(Flags, "?") {
+        Out .= "?"
+    }
+    if InStr(Flags, "C") {
+        Out .= "C"
+    }
+    return Out
 }
 
 ; Parse the AHK ``:flags:abbrev`` trigger spec and forward to HSE_Register.
@@ -356,10 +382,16 @@ CreateHotstring(Flags, Abbreviation, Replacement, options := unset) {
         ? options["Priority"]
         : _HSE_ResolveRegistrationPriority(Category, Section)
 
-    FlagsPortion := ":" Flags "B0O:" ; O omits the ending character from the abbreviation
-    _RegisterHotstring(
-        FlagsPortion Abbreviation,
-        _MakeHotstringCallback(Replacement, Abbreviation, OnlyText, FinalResult, TimeActivationSeconds, Category, Section),
+    ; HSE_DispatchMatch fires via Spec.Replacement, so the per-spec callback closure
+    ; is only needed when a test has installed _HotstringRegistrar (it records and may
+    ; invoke it). In production (Rec == 0) we skip building the closure and the
+    ; ":flags:B0O:abbrev" string — both pure boot-time waste. The ternaries
+    ; short-circuit, so neither is constructed unless a recorder is present.
+    Rec := _HotstringRegistrar
+    _RegisterHotstringFast(
+        Rec, _HseFlagSubset(Flags), Abbreviation,
+        Rec ? (":" Flags "B0O:" Abbreviation) : "",
+        Rec ? _MakeHotstringCallback(Replacement, Abbreviation, OnlyText, FinalResult, TimeActivationSeconds, Category, Section) : 0,
         _MakeHotstringMeta(Replacement, Abbreviation, OnlyText, FinalResult, TimeActivationSeconds, IsRepeat, Category, Section, Priority)
     )
 }
@@ -378,8 +410,12 @@ CreateRawCallbackHotstring(Flags, Abbreviation, Callback, options := unset) {
     Priority := (IsSet(options) and options.Has("Priority"))
         ? options["Priority"]
         : _HSE_ResolveRegistrationPriority(Category, Section)
-    _RegisterHotstring(
-        ":" Flags "B0O:" Abbreviation,
+    ; The callback IS the dispatch here (HSE_DispatchMatch routes RawCallback specs
+    ; to it), so it is always passed; only the recorder string is gated on Rec.
+    Rec := _HotstringRegistrar
+    _RegisterHotstringFast(
+        Rec, _HseFlagSubset(Flags), Abbreviation,
+        Rec ? (":" Flags "B0O:" Abbreviation) : "",
         Callback,
         { RawCallback: true, TimeActivationSeconds: TimeActivationSeconds, PrevCharKey: SubStr(Abbreviation, -2, 1), Category: Category, Section: Section, Priority: Priority }
     )
@@ -537,7 +573,7 @@ CreateCaseSensitiveHotstrings(Flags, Abbreviation, Replacement, options := unset
         ? options["Priority"]
         : _HSE_ResolveRegistrationPriority(Category, Section)
 
-    FlagsPortion := ":" Flags "CB0O:" ; O omits the ending character from the abbreviation
+    Rec := _HotstringRegistrar
 
     ; Order matters: nbsp abbreviations must trigger before bare punctuation
     ; so the engine can delete the preceding non-breaking space correctly.
@@ -545,14 +581,11 @@ CreateCaseSensitiveHotstrings(Flags, Abbreviation, Replacement, options := unset
     ; a bare ' inside Map() as a string delimiter, causing a parse error.
     static UppercasedSymbols := _BuildUppercasedSymbols()
 
+    ; Only the lowercase forms are needed to decide and take the case-conform fast
+    ; path below; the Title / UPPER forms (4 StrXxx calls) serve solely the
+    ; explicit-variant path, so they are computed only after the conform return.
     AbbreviationLowerCase := StrLower(Abbreviation)
-    AbbreviationTitleCase := StrTitle(Abbreviation)
-    AbbreviationUpperCase := StrUpper(Abbreviation)
-    FirstChar := SubStr(Abbreviation, 1, 1)
-
     ReplacementLowerCase := StrLower(Replacement)
-    ReplacementTitleCase := StrTitle(Replacement)
-    ReplacementUpperCase := StrUpper(Replacement)
 
     ; ── Case-conform fast path ──────────────────────────────────────────────
     ; For a star trigger with no shift-symbol char (the common case — every
@@ -580,23 +613,36 @@ CreateCaseSensitiveHotstrings(Flags, Abbreviation, Replacement, options := unset
             FinalResult, TimeActivationSeconds, IsRepeat, Category, Section, Priority)
         ConformMeta.CaseConform := true
         ConformMeta.ConformOneChar := ConformOneChar
-        _RegisterHotstring(
-            ":" ConformFlags "B0O:" AbbreviationLowerCase,
-            _MakeHotstringCallback(ReplacementLowerCase, AbbreviationLowerCase, OnlyText,
-                FinalResult, TimeActivationSeconds, Category, Section),
+        _RegisterHotstringFast(
+            Rec, _HseFlagSubset(ConformFlags), AbbreviationLowerCase,
+            Rec ? (":" ConformFlags "B0O:" AbbreviationLowerCase) : "",
+            Rec ? _MakeHotstringCallback(ReplacementLowerCase, AbbreviationLowerCase, OnlyText, FinalResult, TimeActivationSeconds, Category, Section) : 0,
             ConformMeta
         )
         return
     }
+
+    ; ── Explicit-variant path ───────────────────────────────────────────────
+    ; Reached only for triggers that cannot use the conform fast path (non-star,
+    ; or containing a shift-symbol char). The Title / UPPER case forms and the
+    ; "C"-flag spec string are needed from here on, so they are built now rather
+    ; than for every conform registration above.
+    FlagsPortion := ":" Flags "CB0O:" ; O omits the ending character from the abbreviation
+    AbbreviationTitleCase := StrTitle(Abbreviation)
+    AbbreviationUpperCase := StrUpper(Abbreviation)
+    FirstChar := SubStr(Abbreviation, 1, 1)
+    ReplacementTitleCase := StrTitle(Replacement)
+    ReplacementUpperCase := StrUpper(Replacement)
 
     ; Helper closure: installs one hotstring variant with positional args
     ; baked in, plus the pre-computed ``BackSpaceSeq`` / ``PrevCharKey`` so
     ; ``_HotstringDispatch`` skips the StrLen + SubStr work on every firing.
     ; Must be a fat-arrow lambda so it closes over the outer locals; nested
     ; ``f() {}`` functions in AHK v2 do not capture the enclosing scope.
-    RegisterVariant := (Abbr, Repl) => _RegisterHotstring(
-        FlagsPortion Abbr,
-        _MakeHotstringCallback(Repl, Abbr, OnlyText, FinalResult, TimeActivationSeconds, Category, Section),
+    RegisterVariant := (Abbr, Repl) => _RegisterHotstringFast(
+        Rec, _HseFlagSubset(Flags "C"), Abbr,
+        Rec ? (FlagsPortion Abbr) : "",
+        Rec ? _MakeHotstringCallback(Repl, Abbr, OnlyText, FinalResult, TimeActivationSeconds, Category, Section) : 0,
         _MakeHotstringMeta(Repl, Abbr, OnlyText, FinalResult, TimeActivationSeconds, IsRepeat, Category, Section, Priority)
     )
 
