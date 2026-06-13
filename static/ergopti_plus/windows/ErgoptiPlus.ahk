@@ -347,6 +347,7 @@ HotstringsConfigLoadSharedDefaults()
 TimingsLoadShared()
 KeyloggerWalkerLoadTimings()
 TapHoldsLoadTimings()
+LLMApiLoadTimings()
 ; Initialise the hotstrings_config module so per-group delays and tooltip
 ; colors can be resolved from the TOML metadata + the shared user override
 ; file. The override file lives in the same shared config directory used by

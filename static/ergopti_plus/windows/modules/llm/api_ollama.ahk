@@ -49,7 +49,24 @@ global LLM_OLLAMA_TIMEOUT  := 180000  ; ms (3 min) — cold CPU inference headro
 ; Polling interval for the async path. 50 ms is the same cadence the HS side
 ; effectively gets from hs.http.asyncPost's underlying CFRunLoop tick — fine
 ; for interactive feedback (≤ 1 keystroke of latency) and cheap on CPU.
-global LLM_OLLAMA_POLL_MS := 50
+; Sentinel 0 — sourced at boot from the shared registry by LLMApiLoadTimings()
+; (read only at runtime, long after boot, so the reassign always wins).
+global LLM_OLLAMA_POLL_MS := 0
+
+; Reassign the LLM backend timing globals (Ollama + remote poll/timeout and the
+; installed-models cache TTL) from the shared registry shared/timings/constants.toml
+; at boot, so they stay in sync with the macOS driver instead of re-typing the
+; same literals. AHK v2 runs global initializers before the auto-execute body, so
+; these start at the sentinel 0 and are sourced here; every read happens at
+; runtime when a prediction fires, long after this loader runs. Fail-fast via
+; TimingsGet on a missing key.
+LLMApiLoadTimings() {
+	global LLM_OLLAMA_POLL_MS, LLM_REMOTE_TIMEOUT_MS, LLM_REMOTE_POLL_MS, LLM_INSTALLED_CACHE_TTL_MS
+	LLM_OLLAMA_POLL_MS         := TimingsGet("llm", "poll_interval_ms")
+	LLM_REMOTE_TIMEOUT_MS      := TimingsGet("llm", "request_timeout_ms")
+	LLM_REMOTE_POLL_MS         := TimingsGet("llm", "poll_interval_ms")
+	LLM_INSTALLED_CACHE_TTL_MS := TimingsGet("llm", "installed_cache_ttl_ms")
+}
 
 ; Maximum number of in-flight async requests kept in the registry. Once we
 ; exceed this, the oldest pending request is abandoned (its callback becomes
