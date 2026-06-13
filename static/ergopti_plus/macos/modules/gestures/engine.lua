@@ -13,9 +13,10 @@
 
 local M = {}
 
-local hs     = hs
-local Logger = require("lib.logger")
-local LOG    = "gestures.engine"
+local hs      = hs
+local Logger  = require("lib.logger")
+local Timings = require("lib.timings")
+local LOG     = "gestures.engine"
 
 local _state      = nil
 local _actions    = nil
@@ -35,7 +36,10 @@ local _any_touch_hook = nil
 --- =========================================
 -- =========================================
 
-local TAP_MAX_SEC    = 0.70   -- Capture slightly slow multi-finger taps
+-- Timing constants come from the shared cross-driver registry
+-- (shared/timings/constants.toml [gestures]) so AHK and macOS stay in sync;
+-- the spatial thresholds below it are driver-specific and stay local.
+local TAP_MAX_SEC    = Timings.sec("gestures", "tap_max_ms")   -- Capture slightly slow multi-finger taps
 -- Minimum centroid displacement (Manhattan distance) to confirm a swipe on commit.
 -- Intentionally larger than SWIPE_MIN so brief frémissements during a tap that
 -- were enough to lock a direction during live tracking are not misclassified as
@@ -46,8 +50,8 @@ local SWIPE_MIN_2    = 3.0    -- 2 fingers horiz/vert (left to macOS, diagonal o
 local DIAG_MIN_2     = 5.0    -- 2 fingers: minimum total distance to validate a diagonal
 local SCALE_DIV      = 3.5
 local LIVE_AXIS_MIN               = 1.0   -- Minimum signed distance to trigger non-scalable horizontal actions live
-local LIVE_REARM_SEC              = 0.08  -- Minimum delay between consecutive live axis triggers
-local LIVE_REARM_REVERSE_FAST_SEC = 0.03  -- Faster rearm when user reverses direction strongly
+local LIVE_REARM_SEC              = Timings.sec("gestures", "live_rearm_ms")          -- Minimum delay between consecutive live axis triggers
+local LIVE_REARM_REVERSE_FAST_SEC = Timings.sec("gestures", "live_rearm_reverse_ms")  -- Faster rearm when user reverses direction strongly
 local LIVE_REVERSE_FAST_MIN       = 1.5   -- Signed distance threshold to unlock fast reversal rearm
 
 -- Candidate confirmation for noisy multi-finger spikes (e.g., 3→5 transient).
@@ -58,19 +62,19 @@ local LIVE_REVERSE_FAST_MIN       = 1.5   -- Signed distance threshold to unlock
 -- 50 ms is still long enough to filter out genuine palm-spike noise (which
 -- typically lasts <30 ms / 1-2 frames at 60 Hz).
 local FINGER_CONFIRM_FRAMES = 4
-local FINGER_CONFIRM_SEC     = 0.05
+local FINGER_CONFIRM_SEC     = Timings.sec("gestures", "finger_confirm_ms")
 
 -- Candidate confirmation for noisy multi-finger drops (flickering)
 -- We are more aggressive in keeping a higher finger count active.
 local FINGER_DROP_CONFIRM_FRAMES = 8
-local FINGER_DROP_CONFIRM_SEC     = 0.20
+local FINGER_DROP_CONFIRM_SEC     = Timings.sec("gestures", "finger_drop_confirm_ms")
 
 -- Finger count stability gate before allowing ANY live trigger.
 -- Without this, a 4-finger swipe whose first frames register only 2-3 contacts
 -- fires the WRONG action (e.g., swipe_2_left=arrow_up) before the engine
 -- upgrades maxFingers to 4. Holding live fires for a short grace period gives
 -- the rest of the fingers time to land and the centroid time to stabilise.
-local FINGER_COUNT_STABLE_SEC = 0.06   -- 60 ms — fast enough to feel instant, slow enough to absorb staggered contact
+local FINGER_COUNT_STABLE_SEC = Timings.sec("gestures", "finger_count_stable_ms")   -- 60 ms — fast enough to feel instant, slow enough to absorb staggered contact
 
 -- Minimum time a peak finger count must have been seen before we treat it as
 -- the user's true intent (used to override a lower maxFingers at commit time

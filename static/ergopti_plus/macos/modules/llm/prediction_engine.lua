@@ -31,6 +31,7 @@ local PromptBuilder    = require("modules.llm.prompt_builder")
 local StreamingHandler = require("modules.llm.streaming_handler")
 local AppFilter        = require("modules.llm.app_filter")
 local Logger           = require("lib.logger")
+local Timings          = require("lib.timings")
 local i18n             = require("lib.i18n")
 local Keycodes         = require("lib.keycodes")
 local tooltip          = require("ui.tooltip")
@@ -66,13 +67,14 @@ local FAST_TYPING_WPM    = 55   -- Above this WPM, extend debounce (user still m
 local SLOW_TYPING_WPM    = 20   -- Below this WPM, shorten debounce (user paused to think)
 local DEBOUNCE_FAST_MULT = 1.5  -- Multiplier applied when WPM is above FAST_TYPING_WPM
 local DEBOUNCE_SLOW_MULT = 0.5  -- Multiplier applied when WPM is below SLOW_TYPING_WPM
--- Hard floor / ceiling so extreme WPM values don't produce unusable delays
-local DEBOUNCE_MIN_SEC   = 0.05
-local DEBOUNCE_MAX_SEC   = 0.6
+-- Hard floor / ceiling so extreme WPM values don't produce unusable delays.
+-- Sourced from the shared cross-driver registry so AHK and macOS stay in sync.
+local DEBOUNCE_MIN_SEC   = Timings.sec("llm", "prediction_debounce_min_ms")
+local DEBOUNCE_MAX_SEC   = Timings.sec("llm", "prediction_debounce_max_ms")
 
 -- ── Timing constants ──────────────────────────────────────────────────────────
 
-local CHAIN_FALLBACK_SEC  = 0.5   -- Fire chain LLM if the F16 signal is somehow missed
+local CHAIN_FALLBACK_SEC  = Timings.sec("llm", "chain_fallback_ms")   -- Fire chain LLM if the F16 signal is somehow missed
 
 -- Reference to the LLM engine defaults, used once at module load to seed Section 2
 local LLM_DEFAULTS = core_llm.DEFAULT_STATE
