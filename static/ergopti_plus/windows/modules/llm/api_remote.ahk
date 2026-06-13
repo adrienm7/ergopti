@@ -41,7 +41,7 @@
 global LLM_API_PROVIDERS := Map()
 global LLM_API_PROVIDER_ORDER := []
 
-global LLM_REMOTE_TIMEOUT_MS := 30000   ; same generous ceiling as Ollama
+global LLM_REMOTE_TIMEOUT_MS := 0   ; sentinel — sourced at boot by LLMApiLoadTimings ([llm] request_timeout_ms)
 
 
 
@@ -99,7 +99,7 @@ LLM_RemoteGenerate(Entry, SystemPrompt, FullText, Temperature := 0.1, TailText :
 ; Registry of in-flight async remote requests (parallel to _LLM_Ollama_Async).
 global _LLM_Remote_Async := Map()
 global _LLM_Remote_AsyncCounter := 0
-global LLM_REMOTE_POLL_MS := 50
+global LLM_REMOTE_POLL_MS := 0   ; sentinel — sourced at boot by LLMApiLoadTimings ([llm] poll_interval_ms)
 global LLM_REMOTE_MAX_INFLIGHT := 16
 
 /**

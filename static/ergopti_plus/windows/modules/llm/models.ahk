@@ -459,7 +459,7 @@ _LLM_IsNumber(v) {
 ; is fine for a handful of entries but becomes a perceptible stutter on a
 ; catalogue of ~50 models. The 2-second TTL keeps the menu responsive while
 ; still picking up newly-installed models within a couple of menu opens.
-global LLM_INSTALLED_CACHE_TTL_MS := 2000
+global LLM_INSTALLED_CACHE_TTL_MS := 0   ; sentinel — sourced at boot by LLMApiLoadTimings ([llm] installed_cache_ttl_ms)
 global _LLM_InstalledTagsCache := unset
 global _LLM_InstalledTagsCacheAt := 0
 
