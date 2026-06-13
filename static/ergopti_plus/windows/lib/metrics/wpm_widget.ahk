@@ -79,6 +79,12 @@ class WPMWidgetConst {
     static WINDOW_MS          := 15000
     ; Timer tick — how often the display refreshes (ms).
     static TICK_MS            := 500
+    ; Fast cursor-movement poll (ms). The display TICK_MS is far too coarse to get
+    ; the widget out of the way: it would sit over text the user is trying to read
+    ; for up to half a second after they grab the mouse. This dedicated poll hides
+    ; the surface within MOUSE_WATCH_MS of the slightest cursor movement. Polling
+    ; MouseGetPos keeps it hook-free (no global WH_MOUSE_LL install).
+    static MOUSE_WATCH_MS     := 50
     ; Graph mode dimensions (wider to show history).
     static GRAPH_W            := 220
     static GRAPH_H            := 100
@@ -168,6 +174,11 @@ class WPMWidget {
 
     ; Idle-hide state: wall clock of the last keyboard event seen by the widget.
     static _last_input_ms := 0
+
+    ; Last observed cursor position for the fast mouse-watch hide. Seeded in
+    ; WPMWidget_Show so the very first poll never fires a spurious hide.
+    static _last_mouse_x  := 0
+    static _last_mouse_y  := 0
 }
 
 
@@ -785,6 +796,14 @@ WPMWidget_Show() {
         WPMWidget_AttachWebView()
 
     SetTimer(WPMWidget_Tick, WPMWidgetConst.TICK_MS)
+
+    ; Seed the cursor position and arm the fast mouse-watch so the widget hides the
+    ; instant the cursor moves — it must never cover text the user wants to read.
+    MouseGetPos(&_seed_mx, &_seed_my)
+    WPMWidget._last_mouse_x := _seed_mx
+    WPMWidget._last_mouse_y := _seed_my
+    SetTimer(WPMWidget_MouseWatch, WPMWidgetConst.MOUSE_WATCH_MS)
+
     LoggerSuccess("WPMWidget", "Widget shown at ({1}, {2}) mode={3}, wv_ready={4}.",
         WPMWidget.pos_x, WPMWidget.pos_y, WPMWidget.show_graph ? "graph" : "compact",
         WPMWidget._graph_wv_ready)
@@ -793,6 +812,7 @@ WPMWidget_Show() {
 WPMWidget_Hide() {
     WPMWidget.visible := false
     SetTimer(WPMWidget_Tick, 0)
+    SetTimer(WPMWidget_MouseWatch, 0)
     if WPMWidget._gui
         try WPMWidget._gui.Hide()
     if WPMWidget._graph_gui
@@ -861,12 +881,9 @@ WPMWidget_Tick() {
                 gui_ref.Show("NoActivate")
                 WinSetTransparent(WPMWidgetConst.ALPHA_ACTIVE, gui_ref)
             } else {
-                ; Graph mode: keep window alive (alpha=0) so WebView2 stays active.
-                ; Compact mode: Hide() is fine, no WebView2 to preserve.
-                if WPMWidget.show_graph
-                    WinSetTransparent(0, gui_ref)
-                else
-                    gui_ref.Hide()
+                ; Graph mode keeps the window alive (alpha=0) so WebView2 stays
+                ; active; compact mode hides outright — see _WPMWidget_HideSurface.
+                _WPMWidget_HideSurface(gui_ref)
             }
         } catch {
             ; The underlying HWND was destroyed outside our control (e.g. the user
@@ -915,6 +932,38 @@ WPMWidget_Tick() {
         }
     }
     WPMWidget._last_wpm := wpm
+}
+
+
+; Hide the widget surface in a mode-appropriate way: graph mode keeps the window
+; alive at alpha 0 so the WebView2 renderer is not suspended (a hidden WebView2
+; turns ExecuteScriptAsync into a no-op), compact mode hides outright. Shared by
+; the display tick and the fast mouse-watch so both hide identically.
+_WPMWidget_HideSurface(gui_ref) {
+    if WPMWidget.show_graph
+        WinSetTransparent(0, gui_ref)
+    else
+        gui_ref.Hide()
+}
+
+
+; Fast cursor-movement watch — armed only while the widget is visible. Costs a
+; MouseGetPos plus an integer compare every MOUSE_WATCH_MS; the moment the cursor
+; moves, the surface is hidden so it never sits over text the user is reading.
+; This only ever drives the HIDE transition: the 500 ms display tick's own
+; mouse_active gate keeps it hidden afterwards and re-shows it once the user types
+; again, so no re-show bookkeeping is needed here.
+WPMWidget_MouseWatch() {
+    if !WPMWidget.visible
+        return
+    MouseGetPos(&mx, &my)
+    if (mx == WPMWidget._last_mouse_x and my == WPMWidget._last_mouse_y)
+        return
+    WPMWidget._last_mouse_x := mx
+    WPMWidget._last_mouse_y := my
+    gui_ref := WPMWidget.show_graph ? WPMWidget._graph_gui : WPMWidget._gui
+    if gui_ref
+        try _WPMWidget_HideSurface(gui_ref)
 }
 
 
