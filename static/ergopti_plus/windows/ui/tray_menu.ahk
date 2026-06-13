@@ -2402,9 +2402,26 @@ _AppendPersonalShortcutsSubmenuIfAny(ShortcutsMenu) {
 }
 
 
+; Post-"ready" population of the 21-locale language submenu — the ~156 ms (Win32
+; menu-item registration + flag-icon loads) the boot pass skips. Armed once via a
+; one-shot SetTimer from ErgoptiPlus.ahk; the live-rebuild path populates inline.
+; Wrapped in try so a transient failure can never crash the timer thread.
+BuildLanguageMenuDeferred() {
+	global _LangMenuRef, _LangMenuBuildPending
+	try {
+		if (IsSet(_LangMenuRef) and _LangMenuRef)
+			I18nBuildLanguageMenu(_LangMenuRef)
+		_LangMenuBuildPending := false
+	} catch as e {
+		try LoggerError("TrayMenu", "Deferred language-menu build failed: {1}", e.Message)
+	}
+}
+
+
 initMenu() {
 	global SubMenus, A_TrayMenu, HotstringCategories
 	global _TrayTitleCache, _FmtCountCache, _I18nSortedLocalesCache
+	global _DriverReady, _LangMenuRef, _LangMenuBuildPending
 	_TrayTitleCache := Map()
 	_FmtCountCache := Map()
 	_I18nSortedLocalesCache := false
@@ -2593,8 +2610,17 @@ initMenu() {
 	RegisterMenuItem(A_TrayMenu, t("menu.global.config_folder"), FilePathsEditor)
 
 	LangMenu := Menu()
-	I18nBuildLanguageMenu(LangMenu)
 	A_TrayMenu.Add(t("menu.global.language"), LangMenu)
+	; The 21-locale language submenu costs ~156 ms (Win32 menu-item registration +
+	; flag-icon loads). On the boot pass, defer it off the critical path (the boot
+	; tail arms BuildLanguageMenuDeferred); on a live rebuild (initMenu re-run via a
+	; -50 ms timer, already off-path) populate it synchronously. Nothing reads the
+	; submenu before the user opens it.
+	_LangMenuRef := LangMenu
+	if _DriverReady
+		I18nBuildLanguageMenu(LangMenu)
+	else
+		_LangMenuBuildPending := true
 	A_TrayMenu.Add()
 	RegisterMenuItem(A_TrayMenu, MenuSuspend, ToggleSuspend)
 	RegisterMenuItem(A_TrayMenu, t("menu.global.reload"), ActivateReload)
