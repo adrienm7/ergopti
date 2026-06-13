@@ -1141,7 +1141,7 @@ global HSE_SUPPRESS_RELEASE_DELAY_MS := 60
 ; path) fall through to invoking Spec.Callback for backwards
 ; compatibility with the test-only registrations.
 HSE_DispatchMatch(Spec, EndChar) {
-    global HSE_SUPPRESS_RELEASE_DELAY_MS, _SendHook, HSE_TypoNbspStripped
+    global HSE_SUPPRESS_RELEASE_DELAY_MS, _SendHook, HSE_TypoNbspStripped, HSE_Buffer
     if !Spec.HasOwnProp("Replacement") {
         if Spec.HasOwnProp("Callback") and Spec.Callback {
             try (Spec.Callback)(EndChar)
@@ -1157,6 +1157,30 @@ HSE_DispatchMatch(Spec, EndChar) {
         and Spec.TimeActivationSeconds > 0
         and Spec.HasOwnProp("PrevCharKey") {
         if IsTimeActivationExpired(Spec.PrevCharKey, Spec.TimeActivationSeconds) {
+            return
+        }
+    }
+
+    ; ── Case-conform gate ───────────────────────────────────────────────────
+    ; For a conform spec (registered case-insensitively by CreateCaseSensitiveHotstrings
+    ; in place of explicit lower/UPPER/Title variants), resolve the output casing
+    ; from the trigger as it was actually typed — the last Spec.Length chars still
+    ; sitting in HSE_Buffer (conform specs are always star triggers, EndChar == "",
+    ; so no end-char/nbsp offset is involved). Doing this BEFORE we take the
+    ; suppress/synthetic locks means a "mixed case → do not fire" verdict is a clean
+    ; early return with no lock state to unwind, exactly matching the old behaviour
+    ; where no spec was ever registered for a mixed-case trigger.
+    IsConform := Spec.HasOwnProp("CaseConform") and Spec.CaseConform
+    ConformedRepl := ""
+    if IsConform {
+        ResolvedRepl := Spec.Replacement
+        if HasMethod(ResolvedRepl)
+            ResolvedRepl := ResolvedRepl()
+        TypedTrigger := SubStr(HSE_Buffer, -Spec.Length)
+        DoFire := true
+        ConformedRepl := _HSE_ConformReplacement(ResolvedRepl, TypedTrigger, Spec.Trigger,
+            (Spec.HasOwnProp("ConformOneChar") and Spec.ConformOneChar), &DoFire)
+        if !DoFire {
             return
         }
     }
@@ -1185,10 +1209,12 @@ HSE_DispatchMatch(Spec, EndChar) {
         ; end-char is a typographic punctuation (``:`` / `` ; ``).
         BSCount := Spec.Length + (EndChar != "" ? 1 : 0) + (HSE_TypoNbspStripped ? 1 : 0)
         BackSpaceSeq := "{BackSpace " . BSCount . "}"
-        Replacement := Spec.Replacement
-        ; Allow Replacement to be a callable — resolved at fire time so
-        ; dynamic values (dates, live data) are computed on each keystroke.
-        if HasMethod(Replacement)
+        ; For a conform spec the replacement was already resolved + cased by the
+        ; case-conform gate above; otherwise take it straight from the Spec.
+        Replacement := IsConform ? ConformedRepl : Spec.Replacement
+        ; Allow a non-conform Replacement to be a callable — resolved at fire time
+        ; so dynamic values (dates, live data) are computed on each keystroke.
+        if (!IsConform and HasMethod(Replacement))
             Replacement := Replacement()
         OnlyText := Spec.HasOwnProp("OnlyText") ? Spec.OnlyText : true
         FinalResult := Spec.HasOwnProp("FinalResult") ? Spec.FinalResult : false

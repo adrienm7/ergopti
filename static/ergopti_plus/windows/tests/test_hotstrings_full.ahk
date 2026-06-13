@@ -242,57 +242,49 @@ _CollectSpecs() {
 TestCS_SingleCharLetter() {
     ResetHotstringRecorders()
     CreateCaseSensitiveHotstrings("*?", "a", "b")
-    ; 1-char branch: registers lowercase "a" then titlecase "A" (== uppercase).
-    AssertEqual(2, _Stub_HotstringRegistrations.Length)
-    Specs := _CollectSpecs()
-    AssertContains(Specs[1] . "|" . Specs[2], ":*?CB0O:a")
-    AssertContains(Specs[1] . "|" . Specs[2], ":*?CB0O:A")
+    ; Conform path: ONE case-insensitive spec (no "C" flag) — HSE_DispatchMatch
+    ; conforms the output casing at fire time. (Was 2 explicit variants.)
+    AssertEqual(1, _Stub_HotstringRegistrations.Length)
+    AssertEqual(":*?B0O:a", _Stub_HotstringRegistrations[1].spec)
 }
-Test("CreateCaseSensitiveHotstrings: single-char letter registers 2 variants (lowercase + titlecase)",
+Test("CreateCaseSensitiveHotstrings: single-char letter registers one conform spec",
     TestCS_SingleCharLetter)
 
 TestCS_SingleCharDigit() {
     ResetHotstringRecorders()
     CreateCaseSensitiveHotstrings("*?", "1", "2")
-    ; Even though StrLower("1") == StrUpper("1"), the 1-char branch still
-    ; calls RegisterVariant twice (lowercase + titlecase) — two registrations.
-    AssertEqual(2, _Stub_HotstringRegistrations.Length)
+    ; A digit has no case, but the conform path still collapses to one spec.
+    AssertEqual(1, _Stub_HotstringRegistrations.Length)
 }
-Test("CreateCaseSensitiveHotstrings: single-char digit still produces 2 registrations",
+Test("CreateCaseSensitiveHotstrings: single-char digit registers one conform spec",
     TestCS_SingleCharDigit)
 
 TestCS_SingleCharStarSuffix() {
     ResetHotstringRecorders()
     CreateCaseSensitiveHotstrings("*?", "a★", "x")
-    ; RTrim("a★", "★") = "a" length 1 → 1-char branch fires. 2 registrations.
-    AssertEqual(2, _Stub_HotstringRegistrations.Length)
+    ; RTrim("a★","★")="a" → 1-char abbr; conform still registers one CI spec.
+    AssertEqual(1, _Stub_HotstringRegistrations.Length)
 }
-Test("CreateCaseSensitiveHotstrings: trailing magic-key counts as 1-char abbr",
+Test("CreateCaseSensitiveHotstrings: trailing magic-key 1-char abbr registers one conform spec",
     TestCS_SingleCharStarSuffix)
 
 TestCS_TwoCharAllLetters() {
     ResetHotstringRecorders()
     CreateCaseSensitiveHotstrings("*?", "ab", "xy")
-    ; lowercase "ab" + uppercase variants (just "AB" since no symbols)
-    ; + titlecase "Ab" = 3 registrations.
-    AssertEqual(3, _Stub_HotstringRegistrations.Length)
-    Specs := _CollectSpecs()
-    Joined := Specs[1] . "|" . Specs[2] . "|" . Specs[3]
-    AssertContains(Joined, ":*?CB0O:ab")
-    AssertContains(Joined, ":*?CB0O:AB")
-    AssertContains(Joined, ":*?CB0O:Ab")
+    ; Conform path: one CI spec keyed on the lowercase trigger. (Was lower/UPPER/Title.)
+    AssertEqual(1, _Stub_HotstringRegistrations.Length)
+    AssertEqual(":*?B0O:ab", _Stub_HotstringRegistrations[1].spec)
 }
-Test("CreateCaseSensitiveHotstrings: 2-char letter abbr produces lower/upper/titlecase (3)",
+Test("CreateCaseSensitiveHotstrings: 2-char letter abbr registers one conform spec",
     TestCS_TwoCharAllLetters)
 
 TestCS_TwoCharDigitFirst() {
     ResetHotstringRecorders()
     CreateCaseSensitiveHotstrings("*?", "1b", "x")
-    ; lowercase "1b" + uppercase "1B" — first char "1" is not a letter and not
-    ; in UppercasedSymbols, so NO titlecase variant is registered. 2 total.
-    AssertEqual(2, _Stub_HotstringRegistrations.Length)
+    ; No shift-symbol char → conform path → one CI spec.
+    AssertEqual(1, _Stub_HotstringRegistrations.Length)
 }
-Test("CreateCaseSensitiveHotstrings: 2-char digit-first abbr produces only 2 variants",
+Test("CreateCaseSensitiveHotstrings: 2-char digit-first abbr registers one conform spec",
     TestCS_TwoCharDigitFirst)
 
 TestCS_TwoCharCommaFirst() {
@@ -324,10 +316,10 @@ Test("CreateCaseSensitiveHotstrings: 2-char comma-inside abbr produces 7 variant
 TestCS_ThreeCharAllLetters() {
     ResetHotstringRecorders()
     CreateCaseSensitiveHotstrings("*?", "abc", "xyz")
-    ; lowercase + 1 uppercase variant + 1 titlecase = 3
-    AssertEqual(3, _Stub_HotstringRegistrations.Length)
+    ; Conform path → one CI spec (was lowercase + UPPER + Title = 3).
+    AssertEqual(1, _Stub_HotstringRegistrations.Length)
 }
-Test("CreateCaseSensitiveHotstrings: 3-char letter abbr produces 3 variants",
+Test("CreateCaseSensitiveHotstrings: 3-char letter abbr registers one conform spec",
     TestCS_ThreeCharAllLetters)
 
 TestCS_ThreeCharCommaInside() {
@@ -339,26 +331,26 @@ TestCS_ThreeCharCommaInside() {
 Test("CreateCaseSensitiveHotstrings: 3-char with comma inside produces 7 variants",
     TestCS_ThreeCharCommaInside)
 
-TestCS_AlwaysIncludesCFlag() {
+TestCS_ConformSpecIsCaseInsensitive() {
     ResetHotstringRecorders()
     CreateCaseSensitiveHotstrings("*?", "ab", "xy")
-    for R in _Stub_HotstringRegistrations {
-        AssertContains(R.spec, "C")
-        AssertContains(R.spec, "B0O")
-    }
+    ; The conform spec DROPS the "C" flag (it now matches any case) but keeps B0
+    ; (no auto-backspace by the builtin) and O (omit end char). Exact spec string
+    ; proves the absence of "C".
+    AssertEqual(":*?B0O:ab", _Stub_HotstringRegistrations[1].spec)
 }
-Test("CreateCaseSensitiveHotstrings: every variant carries C, B0 and O flags",
-    TestCS_AlwaysIncludesCFlag)
+Test("CreateCaseSensitiveHotstrings: conform spec is case-insensitive (B0O, no C)",
+    TestCS_ConformSpecIsCaseInsensitive)
 
-TestCS_LowercaseRegistersFirst() {
+TestCS_RegistersLowercaseConformSpec() {
     ResetHotstringRecorders()
     CreateCaseSensitiveHotstrings("*?", "ab", "xy")
-    ; The first registration must be the lowercase variant — order matters
-    ; because AHK applies the most recently registered variant for ambiguous matches.
-    AssertEqual(":*?CB0O:ab", _Stub_HotstringRegistrations[1].spec)
+    ; The single conform spec is keyed on the lowercase trigger; HSE matches it
+    ; case-insensitively and conforms the output to the typed case at fire time.
+    AssertEqual(":*?B0O:ab", _Stub_HotstringRegistrations[1].spec)
 }
-Test("CreateCaseSensitiveHotstrings: lowercase variant is registered first",
-    TestCS_LowercaseRegistersFirst)
+Test("CreateCaseSensitiveHotstrings: registers the lowercase conform spec",
+    TestCS_RegistersLowercaseConformSpec)
 
 TestCS_EmptyAbbr() {
     ResetHotstringRecorders()
@@ -372,25 +364,22 @@ Test("CreateCaseSensitiveHotstrings: empty abbreviation registers only the lower
 TestCS_AlreadyUppercaseLetter() {
     ResetHotstringRecorders()
     CreateCaseSensitiveHotstrings("*?", "Z", "y")
-    ; lowercase "z" + titlecase "Z" — 2 registrations, both valid distinct triggers.
-    AssertEqual(2, _Stub_HotstringRegistrations.Length)
-    Specs := _CollectSpecs()
-    Joined := Specs[1] . "|" . Specs[2]
-    AssertContains(Joined, ":*?CB0O:z")
-    AssertContains(Joined, ":*?CB0O:Z")
+    ; Conform lowercases the trigger to one CI spec "z"; typing Z still matches it
+    ; (case-insensitive) and conforms the output at fire time.
+    AssertEqual(1, _Stub_HotstringRegistrations.Length)
+    AssertEqual(":*?B0O:z", _Stub_HotstringRegistrations[1].spec)
 }
-Test("CreateCaseSensitiveHotstrings: already-uppercase 1-char registers lower + upper",
+Test("CreateCaseSensitiveHotstrings: already-uppercase 1-char registers one lowercase conform spec",
     TestCS_AlreadyUppercaseLetter)
 
 TestCS_TwoCharStartingDigit() {
     ResetHotstringRecorders()
     CreateCaseSensitiveHotstrings("*?", "1A", "X")
-    ; lowercase "1a" + uppercase "1A" (no symbols, so just one upper variant)
-    ; Titlecase: first char "1" — not a letter (lower==upper) AND not in
-    ; UppercasedSymbols → no titlecase branch. 2 total.
-    AssertEqual(2, _Stub_HotstringRegistrations.Length)
+    ; No shift-symbol char → conform path → one CI spec keyed on lowercase "1a".
+    AssertEqual(1, _Stub_HotstringRegistrations.Length)
+    AssertEqual(":*?B0O:1a", _Stub_HotstringRegistrations[1].spec)
 }
-Test("CreateCaseSensitiveHotstrings: 2-char digit-first abbr (uppercase suffix) — 2 variants",
+Test("CreateCaseSensitiveHotstrings: 2-char digit-first abbr registers one conform spec",
     TestCS_TwoCharStartingDigit)
 
 TestCS_TwoCharApostropheFirst() {
@@ -527,11 +516,10 @@ Test("HotstringHandler: replacement preserves leading whitespace",
 TestE2E_CaseSensSingleCharLowercase() {
     ResetHotstringRecorders()
     SimulateRegularApp()
-    ; Single-char "a → b" via CreateCaseSensitiveHotstrings registers both
-    ; "a → b" and "A → B". Firing the lowercase callback yields "b".
+    ; Single-char "a → b" registers ONE conform spec. Firing its callback (the
+    ; lowercase form) yields the lowercase replacement "b".
     CreateCaseSensitiveHotstrings("*?", "a", "b")
-    AssertEqual(2, _Stub_HotstringRegistrations.Length)
-    ; Lowercase callback (registered first).
+    AssertEqual(1, _Stub_HotstringRegistrations.Length)
     Cb := _Stub_HotstringRegistrations[1].callback
     Cb()
     AssertEqual("b", _Stub_RecordedSends[2].args[1])
@@ -542,11 +530,18 @@ Test("End-to-end: case-sensitive 1-char lowercase 'a → b' fires correctly",
 TestE2E_CaseSensSingleCharUppercase() {
     ResetHotstringRecorders()
     SimulateRegularApp()
+    HSE_TestReset()
     CreateCaseSensitiveHotstrings("*?", "a", "b")
-    ; Titlecase callback is the second registration; firing it must send "B".
-    Cb := _Stub_HotstringRegistrations[2].callback
-    Cb()
-    AssertEqual("B", _Stub_RecordedSends[2].args[1])
+    ; Type the trigger as a capital. A 1-char abbr has no distinct UPPER form, so a
+    ; typed capital maps to the Title-cased replacement "B" (== upper for one char).
+    ; Case-sensitive check — AssertEqual uses != which is case-INSENSITIVE in v2.
+    HSE_FeedReset(true)
+    Match := HSE_FeedChar("A")
+    Assert(Match != "", "uppercase 'A' must match the case-insensitive conform spec")
+    HSE_DispatchMatch(Match, "")
+    Burst := _Stub_RecordedSends[1].args[1]
+    Assert(InStr(Burst, "{Text}B", true) > 0,
+        "typed 'A' must produce the conformed replacement 'B'")
 }
 Test("End-to-end: case-sensitive 1-char uppercase 'A → B' fires correctly",
     TestE2E_CaseSensSingleCharUppercase)
@@ -852,42 +847,38 @@ Test("End-to-end: CreateCaseSensitive lowercase callback sends lowercase replace
 TestE2E_CaseSensitiveUppercaseFires() {
     ResetHotstringRecorders()
     SimulateRegularApp()
+    HSE_TestReset()
     CreateCaseSensitiveHotstrings("*?", "ab", "xy")
-    ; Find the uppercase ":*?CB0O:AB" registration.
-    UpperIdx := 0
-    for i, R in _Stub_HotstringRegistrations {
-        if R.spec == ":*?CB0O:AB" {
-            UpperIdx := i
-            break
-        }
-    }
-    AssertTrue(UpperIdx > 0)
-    Cb := _Stub_HotstringRegistrations[UpperIdx].callback
-    Cb()
-    ; Uppercase callback must send the uppercase replacement "XY".
-    AssertEqual("XY", _Stub_RecordedSends[2].args[1])
+    ; Type "AB" through the engine; the conform spec must emit the UPPER-cased
+    ; replacement "XY" (case-sensitive — AssertEqual is case-insensitive in v2).
+    HSE_FeedReset(true)
+    HSE_FeedChar("A")
+    Match := HSE_FeedChar("B")
+    Assert(Match != "", "uppercase 'AB' must match the conform spec")
+    HSE_DispatchMatch(Match, "")
+    Burst := _Stub_RecordedSends[1].args[1]
+    Assert(InStr(Burst, "XY", true) > 0, "typed 'AB' must produce UPPER 'XY'")
+    Assert(!InStr(Burst, "xy", true), "must NOT emit lowercase 'xy' for UPPER input")
 }
-Test("End-to-end: CreateCaseSensitive uppercase callback sends uppercase replacement",
+Test("End-to-end: CreateCaseSensitive conform emits UPPER replacement for UPPER input",
     TestE2E_CaseSensitiveUppercaseFires)
 
 TestE2E_CaseSensitiveTitlecaseFires() {
     ResetHotstringRecorders()
     SimulateRegularApp()
+    HSE_TestReset()
     CreateCaseSensitiveHotstrings("*?", "ab", "xy")
-    TitleIdx := 0
-    for i, R in _Stub_HotstringRegistrations {
-        if R.spec == ":*?CB0O:Ab" {
-            TitleIdx := i
-            break
-        }
-    }
-    AssertTrue(TitleIdx > 0)
-    Cb := _Stub_HotstringRegistrations[TitleIdx].callback
-    Cb()
-    ; Titlecase callback must send "Xy".
-    AssertEqual("Xy", _Stub_RecordedSends[2].args[1])
+    ; Type "Ab" (Title); the conform spec must emit the Title-cased "Xy".
+    HSE_FeedReset(true)
+    HSE_FeedChar("A")
+    Match := HSE_FeedChar("b")
+    Assert(Match != "", "title-case 'Ab' must match the conform spec")
+    HSE_DispatchMatch(Match, "")
+    Burst := _Stub_RecordedSends[1].args[1]
+    Assert(InStr(Burst, "Xy", true) > 0, "typed 'Ab' must produce Title 'Xy'")
+    Assert(!InStr(Burst, "XY", true), "must NOT emit UPPER 'XY' for Title input")
 }
-Test("End-to-end: CreateCaseSensitive titlecase callback sends titlecase replacement",
+Test("End-to-end: CreateCaseSensitive conform emits Title replacement for Title input",
     TestE2E_CaseSensitiveTitlecaseFires)
 
 
