@@ -59,6 +59,7 @@
 			"additionalProperties": false,
 			"properties": {
 				"trigger_char": { "type": "string", "minLength": 1, "maxLength": 4 },
+				"repeat_key_enabled": { "type": "boolean" },
 
 				"autocorrection": { "$ref": "#/$defs/feature_group" },
 				"distances_reduction": { "$ref": "#/$defs/feature_group" },
@@ -78,15 +79,15 @@
 						"phone_prefixes": { "$ref": "#/$defs/feature_toggle" },
 						"ssn_prefixes": { "$ref": "#/$defs/feature_toggle" },
 						"text_expansion_personal_information": {
-							"allOf": [
-								{ "$ref": "#/$defs/feature_toggle" },
-								{
-									"type": "object",
-									"properties": {
-										"pattern_max_length": { "type": "integer", "minimum": 1, "maximum": 16 }
-									}
-								}
-							]
+							"description": "feature_toggle plus an optional pattern_max_length. Spelled out (not allOf with feature_toggle) because that strict toggle sets additionalProperties:false, which would otherwise reject pattern_max_length.",
+							"type": "object",
+							"additionalProperties": false,
+							"required": ["enabled"],
+							"properties": {
+								"enabled": { "type": "boolean" },
+								"time_activation_seconds": { "type": "number", "minimum": 0 },
+								"pattern_max_length": { "type": "integer", "minimum": 1, "maximum": 16 }
+							}
 						}
 					}
 				}
@@ -99,6 +100,8 @@
 			"required": ["enabled"],
 			"properties": {
 				"enabled": { "type": "boolean" },
+				"onboarding_seen": { "type": "boolean" },
+				"app_profile_overrides": { "type": ["string", "object"] },
 				"display": {
 					"type": "object",
 					"additionalProperties": false,
@@ -242,7 +245,11 @@
 				},
 				"shortcuts": { "type": "object", "additionalProperties": true },
 				"gestures": { "type": "object", "additionalProperties": true },
-				"metrics": { "type": "object", "additionalProperties": true }
+				"metrics": { "type": "object", "additionalProperties": true },
+				"category_enabled": {
+					"type": "object",
+					"additionalProperties": { "type": "boolean" }
+				}
 			}
 		},
 

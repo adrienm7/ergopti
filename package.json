@@ -21,6 +21,7 @@
 		"test:no-fallbacks": "node ./tools/test/test-no-fallback-literals.cjs",
 		"test:priority-parity": "node ./tools/test/test-priority-parity.cjs",
 		"test:manifest-parity": "node ./tools/test/test-manifest-parity.cjs",
+		"test:config-schema": "node ./tools/test/test-config-schema.cjs",
 		"test:ahk-encoding": "node ./tools/test/test-ahk-encoding.cjs",
 		"test:click-lock": "node ./tools/test/test-click-lock-fix.cjs",
 		"test:ui-focus": "node ./tools/test/test-ui-focus-fix.cjs",
