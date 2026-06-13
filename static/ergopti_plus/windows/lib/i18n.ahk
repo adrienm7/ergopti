@@ -110,6 +110,72 @@ _I18nLocalePath(Code) {
 	return _SharedDir . "\locales\" . Code . ".json"
 }
 
+; Resolve the absolute path to a locale's generated fast-parse .tsv (the flat
+; key<TAB>value form produced by tools/codegen/codegen-locales-fast.cjs). Loading
+; it is ~23x faster than JsonParse on the same locale (~8 ms vs ~190 ms for 2196
+; keys). The .json remains the source of truth; loaders fall back to it.
+_I18nLocaleFastPath(Code) {
+	global _SharedDir
+	return _SharedDir . "\locales\" . Code . ".tsv"
+}
+
+; Invert codegen-locales-fast's value escaping in a single left-to-right scan so
+; "\\" never collides with "\n"/"\r". Only called for values that contain a
+; backslash, so the common case pays nothing.
+_I18nUnescapeTSV(s) {
+	out := ""
+	i := 1
+	len := StrLen(s)
+	while (i <= len) {
+		c := SubStr(s, i, 1)
+		if (c == "\" and i < len) {
+			n := SubStr(s, i + 1, 1)
+			if (n == "n") {
+				out .= "`n"
+				i += 2
+				continue
+			}
+			if (n == "r") {
+				out .= "`r"
+				i += 2
+				continue
+			}
+			if (n == "\") {
+				out .= "\"
+				i += 2
+				continue
+			}
+		}
+		out .= c
+		i += 1
+	}
+	return out
+}
+
+; Parse a flat locale .tsv (one "key<TAB>value" record per line) into a Map,
+; unescaping values and substituting ★ with the configured MagicKey — the same
+; post-processing the JSON path applies. A tight Loop Parse keeps this ~23x faster
+; than the recursive-descent JsonParse for the identical key/value set.
+_I18nParseTSV(Content, MagicKey) {
+	m := Map()
+	Loop Parse Content, "`n", "`r" {
+		line := A_LoopField
+		if (line == "")
+			continue
+		p := InStr(line, "`t")
+		if (!p)
+			continue
+		k := SubStr(line, 1, p - 1)
+		v := SubStr(line, p + 1)
+		if InStr(v, "\")
+			v := _I18nUnescapeTSV(v)
+		if InStr(v, "★")
+			v := StrReplace(v, "★", MagicKey)
+		m[k] := v
+	}
+	return m
+}
+
 ; Detect the Windows UI language via GetLocaleInfoEx(LOCALE_SISO639LANGNAME)
 ; and map it to a supported locale code. Falls back to "en" when the detected
 ; language is not in the supported list or the API call fails.
@@ -149,10 +215,32 @@ _I18nDetectSystemLocale() {
 ; Parse the JSON file at FilePath and populate _I18nCache. Substitutes ★ with
 ; the user's configured MagicKey. Does nothing and logs a warning on file error.
 _I18nLoadFile(FilePath) {
-	global _I18nCache, _I18nCacheLoaded, ScriptInformation
+	global _I18nCache, _I18nCacheLoaded, _I18nLocale, ScriptInformation
 
 	_I18nCache       := Map()
 	_I18nCacheLoaded := false
+
+	MagicKey := IsSet(ScriptInformation) and ScriptInformation.Has("MagicKey")
+		? ScriptInformation["MagicKey"]
+		: "★"
+
+	; Fast path: the generated flat .tsv parses ~23x faster than JsonParse. The
+	; .json stays the source of truth; fall through to it if the .tsv is absent or
+	; unreadable (fresh checkout before codegen, or a stale tree). The .tsv path is
+	; derived from the SAME FilePath the caller passed (not from _I18nLocale) so a
+	; caller that loads an arbitrary locale file gets the matching .tsv beside it.
+	TsvPath := RegExReplace(FilePath, "\.json$", ".tsv")
+	if FileExist(TsvPath) {
+		try {
+			_I18nCache := _I18nParseTSV(FileRead(TsvPath, "UTF-8"), MagicKey)
+			_I18nCacheLoaded := true
+			try LoggerDone("i18n", "Locale '{1}' loaded ({2} key(s), fast).", _I18nLocale, _I18nCache.Count)
+			return
+		} catch as err {
+			_I18nCache := Map()
+			try LoggerWarn("i18n", "Fast locale '{1}' unreadable ({2}); JSON fallback.", TsvPath, err.Message)
+		}
+	}
 
 	if !FileExist(FilePath) {
 		try LoggerWarn("i18n", "Locale file not found: '{1}' — falling back to key names.", FilePath)
@@ -165,10 +253,6 @@ _I18nLoadFile(FilePath) {
 		try LoggerWarn("i18n", "Failed to read locale file '{1}'.", FilePath)
 		return
 	}
-
-	MagicKey := IsSet(ScriptInformation) and ScriptInformation.Has("MagicKey")
-		? ScriptInformation["MagicKey"]
-		: "★"
 
 	try {
 		Parsed := JsonParse(FileContent)
@@ -193,8 +277,23 @@ _I18nLoadFile(FilePath) {
 _I18nLoadInto(Code, &Cache, &Loaded) {
 	if Loaded
 		return
-	FilePath := _I18nLocalePath(Code)
 	global ScriptInformation
+	MagicKey := IsSet(ScriptInformation) and ScriptInformation.Has("MagicKey")
+		? ScriptInformation["MagicKey"] : "★"
+
+	; Fast path: the generated flat .tsv (see _I18nLoadFile); fall back to JSON.
+	TsvPath := _I18nLocaleFastPath(Code)
+	if FileExist(TsvPath) {
+		try {
+			Cache := _I18nParseTSV(FileRead(TsvPath, "UTF-8"), MagicKey)
+			Loaded := true
+			return
+		} catch as err {
+			try LoggerWarn("i18n", "Fast fallback locale '{1}' unreadable ({2}); JSON fallback.", Code, err.Message)
+		}
+	}
+
+	FilePath := _I18nLocalePath(Code)
 	if !FileExist(FilePath) {
 		try LoggerWarn("i18n", "Fallback locale file not found: '{1}'.", FilePath)
 		Loaded := false
@@ -207,8 +306,6 @@ _I18nLoadInto(Code, &Cache, &Loaded) {
 		Loaded := false
 		return
 	}
-	MagicKey := IsSet(ScriptInformation) and ScriptInformation.Has("MagicKey")
-		? ScriptInformation["MagicKey"] : "★"
 	try {
 		Parsed := JsonParse(FileContent)
 	} catch as err {

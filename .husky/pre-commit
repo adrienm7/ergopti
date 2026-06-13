@@ -30,5 +30,15 @@ if [ -n "$STAGED_AHK" ]; then
     done
 fi
 
+# Locale fast-parse parity — when any locale .json or .tsv is staged, ensure the
+# generated .tsv round-trips its .json source. A stale .tsv would silently ship an
+# outdated translation (the Windows driver loads the .tsv for speed). Regenerate
+# with: node tools/codegen/codegen-locales-fast.cjs
+STAGED_LOCALE=$(git diff --cached --name-only --diff-filter=ACM | grep -E '^static/ergopti_plus/shared/locales/[^/]+\.(json|tsv)$' || true)
+if [ -n "$STAGED_LOCALE" ]; then
+    echo "[pre-commit] Checking locale .json <-> .tsv parity…"
+    node tools/test/test-locale-fast-parity.cjs
+fi
+
 # Lint coding conventions — blocks commit on any violation.
 node tools/lint/lint-conventions.js --fail-on-violations
