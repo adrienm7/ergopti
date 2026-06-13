@@ -58,7 +58,6 @@ static/ergopti_plus/shared/
 │  ├── Registry.spec.js             # Hotstring data model + O(1) tail-char bucket lookup contract
 │  ├── Expander.spec.js             # Expansion decision engine contract + test vectors
 │  ├── Terminators.spec.js          # Terminator catalogue + enable/disable contract + TERMINATOR_DEFS
-│  ├── TokenParser.js               # Reference impl: LLM output diff coloring (green/orange/gray)
 │  ├── PromptBuilder.js             # Reference impl: context truncation + token budget + temperature
 │  ├── ProfileSelector.js           # Reference impl: profile resolve + template variable injection
 │  └── GestureRecognizer.spec.js    # Gesture slot catalogue + THRESHOLDS + recognizer contract

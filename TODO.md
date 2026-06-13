@@ -193,13 +193,17 @@ Do these first, top to bottom (roughly increasing risk).
 - ✅ **Lift done.** `macos/modules/llm/parser.lua` is now a 37-line shim over the
   pure `shared/lua/llm/parser.lua`; `process_prediction` takes min/max words via
   an `opts` table. macOS 1531/0, Linux 37/0.
-- ⚠️ **The plan's "TokenParser corpus" bullet was stale.** `parser_test_vectors.json`
-  already exists and tests the **response parsers** (ollama/remote JSON→text), wired
-  to macOS+AHK+Linux. `shared/domain/TokenParser.js` (a *simpler* word-level diff) is
-  the genuine orphan, but its algorithm is incompatible with the drivers' real
-  `process_prediction` (intra-word diff) — so its vectors can't be a parity target
-  without dead parallel code. Chosen direction instead: a **process_prediction**
-  cross-driver corpus from the shared Lua oracle.
+- ✅ **The orphaned `shared/domain/TokenParser.js` is removed (2026-06-13).** It was a
+  *simpler* word-level prefix diff with colors that didn't even match production
+  (#22c55e/#f97316 vs the canonical #40E666/#FF9E1A), consumed by zero driver, yet
+  SPEC.md called it "canonical reference". Its algorithm was superseded by the
+  deployed `process_prediction` (intra-word diff), whose cross-driver parity the
+  corpus below already pins — so a TokenParser corpus would have meant dead parallel
+  parsers. Deleted the file and corrected every doc (SPEC.md / SCHEMA.md / glossary /
+  both `llm/README.md` / COVERAGE.md / stryker.config) to name `shared/lua/llm/parser.lua`
+  (+ AHK `parser.ahk`) as the canonical diff-colorer, pinned by
+  `process_prediction_vectors.json`. (`parser_test_vectors.json` is a DIFFERENT, real
+  corpus — the response parsers, ollama/remote JSON→text — left untouched.)
 - ✅ **Built** `tools/build/gen-process-prediction-corpus.lua` (Lua oracle →
   `shared/tests/corpus/llm/process_prediction_vectors.json`) and an AHK parity probe
   (`tests/bench_parity_process_prediction.ahk`). The probe **found + fixed a P0 bug**:
@@ -227,10 +231,9 @@ The only OS coupling is two `hs.settings.get(min/max_words)` reads.
   engine already knows min/max words), then move the body to
   `shared/lua/llm/parser.lua`; macOS `parser.lua` becomes a thin
   `return require("llm.parser")` shim (like `lib/text_utils.lua`).
-- Author the missing **TokenParser golden corpus** from
-  `shared/domain/TokenParser.js` (currently consumed by zero driver) at
-  `shared/tests/corpus/llm/parser_test_vectors.json`, and assert macOS + AHK
-  (`windows/modules/llm/parser.ahk`) both pass it row-by-row.
+- ~~Author a TokenParser golden corpus from `shared/domain/TokenParser.js`~~ —
+  dropped: that reference impl was superseded/orphaned and has been deleted (see
+  STATUS above). The real parity target is `process_prediction_vectors.json`.
 - **Why**: pins the only completely-unguarded LLM domain, and the future Linux
   LLM module gets parsing for free.
 - **Risk**: medium — keep the macOS `test_parser*.lua` suites green; the shim must

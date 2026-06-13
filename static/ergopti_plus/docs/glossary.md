@@ -312,11 +312,14 @@ displayed in the tooltip as they stream in, reducing perceived latency.
 Managed by `modules/llm/streaming_handler.lua`. Controlled by the
 `llm_streaming` feature flag.
 
-**TokenParser**
-The domain module (`_shared/domain/TokenParser.js`) that diff-colours the LLM
-output for display in the tooltip: green for corrected tail words, orange for
-new continuation words, and no colour for unchanged text. Driver adapters:
-`modules/llm/parser.lua` (Hammerspoon), `ui/tooltip_llm.ahk` (AHK, partial).
+**Token diff-colouring**
+The pass that colours the LLM prediction for display in the tooltip: green for
+corrected tail words, orange for new continuation words, and no colour (gray)
+for unchanged text. Implemented by `process_prediction` in the shared Lua canon
+`shared/lua/llm/parser.lua` (Hammerspoon shim `modules/llm/parser.lua`, AHK port
+`windows/modules/llm/parser.ahk`), pinned cross-driver by
+`shared/tests/corpus/llm/process_prediction_vectors.json`. (Superseded the
+removed `TokenParser.js` word-level reference, 2026-06-13.)
 
 ---
 

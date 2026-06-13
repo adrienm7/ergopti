@@ -29,9 +29,9 @@ const config = {
 	mutate: [
 		// Only mutate domain files that contain actual algorithm logic exercised by
 		// the test harness. Domain spec files that are purely pseudocode + typedefs
-		// (Expander, GestureRecognizer, Terminators, ProfileSelector, PromptBuilder,
-		// TokenParser) produce unkillable mutants and inflate the surviving count
-		// without measuring anything real. Registry and HotstringMatcher contain
+		// (Expander, GestureRecognizer, Terminators, ProfileSelector, PromptBuilder)
+		// produce unkillable mutants and inflate the surviving count without
+		// measuring anything real. Registry and HotstringMatcher contain
 		// the canonical algorithmic code (bucketing, sorting, matching) that the
 		// harness actually exercises — those are the meaningful mutation targets.
 		'static/ergopti_plus/shared/domain/Registry.spec.js',
