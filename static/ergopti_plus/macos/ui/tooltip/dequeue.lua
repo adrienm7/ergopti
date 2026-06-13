@@ -6,8 +6,14 @@
 
 local M = {}
 
-local DEFAULT_TIMEOUT_DECREMENT_SEC = 0.2
-local DEFAULT_TIMEOUT_FLOOR_SEC = 0.05
+-- Sentinel 0 (not the real 0.2 / 0.05): every caller passes the decrement/floor
+-- from the shared-loaded tooltip config (ui/tooltip/config.lua M.timing). These
+-- defaults only apply if `opts` is missing — and a 0 there makes that omission
+-- show as no decrement/floor (an obvious symptom) instead of being masked by a
+-- plausible hardcoded value. MIN_TIMER_SEC is a genuine local floor, not a
+-- shared value, so it keeps its real value.
+local DEFAULT_TIMEOUT_DECREMENT_SEC = 0
+local DEFAULT_TIMEOUT_FLOOR_SEC = 0
 local MIN_TIMER_SEC = 0.05
 
 --- @param opts table|nil
