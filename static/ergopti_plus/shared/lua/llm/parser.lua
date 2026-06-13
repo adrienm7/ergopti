@@ -5,9 +5,11 @@
 --- DESCRIPTION:
 --- Canonical, platform-neutral Lua implementation of the LLM output parser:
 --- strips conversational fillers and applies a 2-tier semantic diffing algorithm
---- to align model predictions perfectly with the user's active buffer. Shared
---- between the Hammerspoon driver and any future Lua-based driver (Linux), and
---- the Lua counterpart of shared/domain/TokenParser.js.
+--- to align model predictions perfectly with the user's active buffer. This is
+--- the canonical cross-driver implementation of the diff-coloring contract:
+--- shared between the Hammerspoon driver and any future Lua-based driver (Linux);
+--- the AutoHotkey port is windows/modules/llm/parser.ahk, and both are pinned to
+--- the shared/tests/corpus/llm/process_prediction_vectors.json golden corpus.
 ---
 --- This module is PURE: it contains zero Hammerspoon API references. The only
 --- OS-specific inputs — the min/max word limits — are resolved by the caller and

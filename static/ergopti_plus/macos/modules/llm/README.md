@@ -17,8 +17,12 @@ Coordinates communication with local (Ollama, MLX) and remote LLM backends. Mana
 ## Domain module (`_shared/domain/`)
 
 - `PromptBuilder.js` — `prompt_builder.lua` implements this contract
-- `TokenParser.js` — `parser.lua` implements token stream parsing
 - `ProfileSelector.js` — `profiles.lua` implements profile management
+
+LLM output diff-coloring (`process_prediction`) lives in the shared Lua canon
+`shared/lua/llm/parser.lua`; `modules/llm/parser.lua` is a thin shim over it
+(AHK port: `windows/modules/llm/parser.ahk`), pinned by
+`shared/tests/corpus/llm/process_prediction_vectors.json`.
 
 ## Public API
 

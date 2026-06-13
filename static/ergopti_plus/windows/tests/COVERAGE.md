@@ -79,22 +79,21 @@ When adding a new IA menu option: extend the JSON contract, wire `ui/tray_llm/pe
 
 ## Deferred / not yet covered
 
-| Module / area                                  | Reason for deferral                                                                                                    |
-| ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `lib/tooltip.ahk` / `ui/tooltip_*.ahk`         | GDI+ drawing calls; visual output not assertable headlessly. Manual QA only.                                           |
-| `lib/ui_style.ahk`                             | Pure constants file. No logic. Verified by `test_tooltip_tint_contract.ahk` for the tint math only.                    |
-| `lib/ui_utils.ahk`                             | GUI layout helpers (`Gui_HarmoniseButtonWidths`). Requires a live Gui object.                                          |
-| `modules/llm/token_parser.ahk`                 | Diff-coloring pass; requires an integration test driving a full tooltip repaint. Deferred until TokenParser is ported. |
-| `modules/llm/api_mlx.ahk`                      | Hammerspoon-only backend (macOS MLX). AHK driver does not expose this API.                                             |
-| `modules/hotkeys.ahk`                          | Hot-key registration depends on a live AHK message pump; headless execution cannot simulate `Hotkey` side-effects.     |
-| `modules/dynamic_hotstrings/`                  | Public `start()`/`inject_data()` mainly mutate the registry; full coverage needs a seeded registry fixture.            |
-| `modules/keylogger/kc_bridge.ahk`              | File-tail watcher around an external Karabiner log file; no equivalent on Windows. N/A.                                |
-| `lib/bundle.ahk`                               | Version/update constants stamped at compile time. No runtime logic.                                                    |
-| `lib/wpm_widget.ahk`                           | Renders a live GUI overlay. Manual QA only.                                                                            |
-| Shared corpus: `prompt_builder/`               | AHK-side corpus consumer not yet written — see roadmap item 1.                                                         |
-| Shared corpus: `llm/parser_test_vectors`       | AHK-side corpus consumer not yet written — see roadmap item 1.                                                         |
-| Shared corpus: `toml/fuzz_corpus`              | AHK-side TOML fuzz harness not yet written — see roadmap item 2.                                                       |
-| Shared corpus: `security/keylogger_no_persist` | AHK privacy test exists but does not yet load the JSON corpus — see roadmap item 3.                                    |
+| Module / area                                  | Reason for deferral                                                                                                |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `lib/tooltip.ahk` / `ui/tooltip_*.ahk`         | GDI+ drawing calls; visual output not assertable headlessly. Manual QA only.                                       |
+| `lib/ui_style.ahk`                             | Pure constants file. No logic. Verified by `test_tooltip_tint_contract.ahk` for the tint math only.                |
+| `lib/ui_utils.ahk`                             | GUI layout helpers (`Gui_HarmoniseButtonWidths`). Requires a live Gui object.                                      |
+| `modules/llm/api_mlx.ahk`                      | Hammerspoon-only backend (macOS MLX). AHK driver does not expose this API.                                         |
+| `modules/hotkeys.ahk`                          | Hot-key registration depends on a live AHK message pump; headless execution cannot simulate `Hotkey` side-effects. |
+| `modules/dynamic_hotstrings/`                  | Public `start()`/`inject_data()` mainly mutate the registry; full coverage needs a seeded registry fixture.        |
+| `modules/keylogger/kc_bridge.ahk`              | File-tail watcher around an external Karabiner log file; no equivalent on Windows. N/A.                            |
+| `lib/bundle.ahk`                               | Version/update constants stamped at compile time. No runtime logic.                                                |
+| `lib/wpm_widget.ahk`                           | Renders a live GUI overlay. Manual QA only.                                                                        |
+| Shared corpus: `prompt_builder/`               | AHK-side corpus consumer not yet written — see roadmap item 1.                                                     |
+| Shared corpus: `llm/parser_test_vectors`       | AHK-side corpus consumer not yet written — see roadmap item 1.                                                     |
+| Shared corpus: `toml/fuzz_corpus`              | AHK-side TOML fuzz harness not yet written — see roadmap item 2.                                                   |
+| Shared corpus: `security/keylogger_no_persist` | AHK privacy test exists but does not yet load the JSON corpus — see roadmap item 3.                                |
 
 ## Estimated coverage
 
@@ -102,7 +101,7 @@ Of the **testable** surface (excluding GUI rendering and code that fundamentally
 requires a live AHK message pump or Windows OS interaction):
 
 - `lib/` core utilities: ~80% covered. Remaining gaps are `ui_style.ahk` (constants only), `ui_utils.ahk` (GUI helpers), `wpm_widget.ahk` (GUI overlay), and `bundle.ahk` (compile-time stamp).
-- `modules/llm/`: ~70% covered. `api_ollama`, `api_remote`, `prediction_engine`, and `profiles` covered; `token_parser` (diff-coloring) and `api_mlx` deferred.
+- `modules/llm/`: ~75% covered. `api_ollama`, `api_remote`, `prediction_engine`, `profiles`, and `parser` (the `process_prediction` diff-coloring, via `test_llm_parser.ahk`) covered; `api_mlx` deferred.
 - `modules/keylogger/`: ~70% covered. `app_categories`, `reader`, and `walker` covered; `kc_bridge` is macOS-only (N/A on Windows).
 - `modules/gestures/`: ~65% covered. Guards and state machine covered; OS-dispatch (key posting, window manipulation) requires a live AHK message pump.
 - `modules/hotstrings/`: ~85% covered. Engine, main pipeline, config, and full expansion output covered.
@@ -113,5 +112,4 @@ requires a live AHK message pump or Windows OS interaction):
 
 1. Add AHK corpus consumers for `shared/tests/corpus/prompt_builder/`, `llm/parser_test_vectors.json`, and `security/keylogger_no_persist_vectors.json` — mirrors the macOS `test_keylogger_privacy.lua` approach.
 2. Build a TOML fuzz harness that iterates `shared/tests/corpus/toml/fuzz_corpus.json` and verifies the AHK TOML loader does not crash on adversarial inputs.
-3. Port `modules/llm/token_parser.ahk` diff-coloring (green/orange/gray chunks) from the macOS renderer; add unit tests on the `TokenParser` class in isolation before wiring it into tooltip repaint.
-4. Add `test_tooltip_tint_contract.ahk` assertions: the tint mixing math (`_TooltipMixTintHex`) should be verified against the shared `[tint]` constants in `tooltip/constants.toml`.
+3. Add `test_tooltip_tint_contract.ahk` assertions: the tint mixing math (`_TooltipMixTintHex`) should be verified against the shared `[tint]` constants in `tooltip/constants.toml`.

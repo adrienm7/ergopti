@@ -17,8 +17,11 @@ Windows port of the LLM prediction subsystem. `llm_bridge.ahk` maintains a rolli
 ## Domain module (`_shared/domain/`)
 
 - `PromptBuilder.js` — `prediction_engine.ahk` builds prompts following this contract
-- `TokenParser.js` — streaming token parsing from Ollama/remote JSON responses
 - `ProfileSelector.js` — `profiles.ahk` manages profile selection following this contract
+
+LLM output diff-coloring (`process_prediction`) lives in the shared Lua canon
+`shared/lua/llm/parser.lua`; the AHK port is `modules/llm/parser.ahk`, pinned to
+the same `shared/tests/corpus/llm/process_prediction_vectors.json` golden corpus.
 
 ## Public API
 
