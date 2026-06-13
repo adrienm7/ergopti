@@ -31,6 +31,7 @@ Accumulated engineering knowledge for this repository — gotchas, architecture 
   - [project-hotstring-live-rebuild](#project-hotstring-live-rebuild) — Hotstring section/category toggles apply in-process via a re-runnable RegisterAllHotstrings(); native-engine + layout-backed features under hotstrings.* are the reload-only exceptions
   - [Keymap module architecture and refactor decisions](#keymap-module-architecture-and-refactor-decisions) — Structure of the keymap module, where defaults live, which files do what
   - [project-locale-parity-test](#project-locale-parity-test) — en.json is the canonical key set; tools/check_locales.py enforces parity in CI
+  - [project-locale-fast-cache](#project-locale-fast-cache) — The Windows driver's locale .tsv is a gitignored self-healing fast-parse cache regenerated from the canonical .json on a miss/staleness; only .json is tracked, no committed duplication
   - [project_metrics_pipeline_17](#project-metrics-pipeline-17) — AHK metrics pipeline — bug #17 CLOSED, follow-up bugs fixed
   - [project-suspend-pause-invariant](#project-suspend-pause-invariant) — Pause must fully silence ALL features (no tooltip/LLM/keylogger/widget). AHK Suspend only disarms hotkeys — InputHooks/timers/OnMessage bypass it and need explicit A_IsSuspended guards.
   - [project-macos-eventtap-no-blocking](#project-macos-eventtap-no-blocking) — Never run blocking osascript/hs.execute inside an hs.eventtap callback — macOS disables the tap (kCGEventTapDisabledByTimeout) and AltGr+Enter dies. Defer with hs.timer.doAfter(0).
@@ -750,6 +751,48 @@ fails on any drift.
   does NOT fail CI.
 
 Sibling memory: [[project-ui-dynamic-buttons]].
+
+### project-locale-fast-cache
+
+_The Windows driver's locale .tsv is a gitignored self-healing cache regenerated from the canonical .json; only .json is tracked_
+
+<sub>slug: `project_locale_fast_cache`</sub>
+
+`JsonParse` of a 2196-key locale costs ~180 ms on the boot critical path (the tray
+menu needs `t()`); parsing the flat `key<TAB>value` `.tsv` instead is ~16 ms
+(~×11). To keep that speed WITHOUT committing the same data twice, the `.tsv`
+files under `static/ergopti_plus/shared/locales/` are a **gitignored, self-healing
+cache** owned end-to-end by `lib/i18n.ahk` (`_I18nLoadLocaleMap` /
+`_I18nWriteTsvCache`): on load it uses the `.tsv` when present AND at least as new
+as the `.json` (`FileGetTime "M"` compare in `_I18nTsvIsFresh`), otherwise it
+parses the `.json`, builds the map, and rewrites the `.tsv` for the next boot. The
+`.json` is the single tracked source of truth; consumers are Windows-only (nothing
+in macOS/web reads these).
+
+**Why:** The maintainer's hard rule is no tracked duplication. The earlier design
+committed both `.json` and a codegen-generated `.tsv` (+ a node parity test +
+pre-commit guard) — the same data in git twice. The lazy cache removes the tracked
+`.tsv`, deletes the node codegen + parity infra, and makes the AHK driver the SOLE
+generator: one format on disk that cannot drift from its source (a stale `.tsv` is
+detected by mtime and rebuilt automatically).
+
+**How to apply:**
+
+- Edit only the `.json`. The driver auto-regenerates the `.tsv` on the next boot
+  whenever it is missing OR older than the `.json` (one ~180 ms boot, then fast
+  again). Never commit a `.tsv` — `.gitignore` blocks it.
+- The cache stores values with the RAW `★` placeholder (MagicKey-independent); the
+  reader substitutes the configured MagicKey at parse time. The writer escapes
+  `\` → `\\`, CR → `\r`, LF → `\n` (backslash FIRST); the reader inverts in one
+  left-to-right scan. Keep writer/reader in lockstep — `test_i18n.ahk` pins the
+  round-trip, staleness-regeneration, raw-★, and fast-path-served-without-json
+  invariants.
+- A read-only install dir just means the write fails silently and every boot uses
+  the `.json` path (correct, slower) — the cache is strictly best-effort.
+
+Sibling memory: [[project-locale-parity-test]] is the SEPARATE en.json key-set
+parity guard (`tools/check_locales.py`) — a different concern from this
+fast-parse cache.
 
 ### project_metrics_pipeline_17
 

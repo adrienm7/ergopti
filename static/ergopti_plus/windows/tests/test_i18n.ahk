@@ -49,6 +49,14 @@ _I18nTmpJson(Content) {
 	if FileExist(Path) {
 		FileDelete(Path)
 	}
+	; Clear the sibling self-healing .tsv cache that _I18nLoadFile regenerates, so a
+	; leftover from a previous case cannot be served as a "fresh" hit for this
+	; case's freshly written JSON. FileGetTime has 1-second resolution and the
+	; cases run within the same second, so a stale tsv would otherwise win.
+	TsvPath := A_Temp . "\i18n_test_locale.tsv"
+	if FileExist(TsvPath) {
+		FileDelete(TsvPath)
+	}
 	FileAppend(Content, Path, "UTF-8")
 	return Path
 }
@@ -177,6 +185,114 @@ _I18nLoadFileHandlesEmptyObject() {
 	AssertEqual(0, _I18nCache.Count)
 }
 Test("i18n _I18nLoadFile: handles empty JSON object", _I18nLoadFileHandlesEmptyObject)
+
+
+; --- Self-healing .tsv cache regressions ---
+; The .json is the single tracked source; the .tsv is a gitignored fast cache the
+; driver writes on a miss and reads when fresh. These pin: regeneration on a miss,
+; the json<->tsv escape round-trip, that ★ is stored RAW (MagicKey-independent),
+; staleness detection by mtime, and that a fresh cache is served without re-parsing.
+
+_I18nLazyCacheRegeneratesAndRoundTrips() {
+	_I18nTestReset()
+	global _I18nCache
+	TsvPath := A_Temp . "\i18n_test_locale.tsv"
+	Path := _I18nTmpJson('{"a": "alpha", "b": "beta"}')   ; _I18nTmpJson clears any old tsv
+	AssertFalse(FileExist(TsvPath), "precondition: no .tsv before the first load")
+	_I18nLoadFile(Path)
+	AssertTrue(FileExist(TsvPath), "a miss must regenerate the .tsv cache")
+	AssertEqual("alpha", _I18nCache["a"])
+	AssertEqual("beta",  _I18nCache["b"])
+	; The regenerated cache must round-trip back to the same key/value set.
+	M := _I18nParseTSV(FileRead(TsvPath, "UTF-8"), Chr(0x2605))
+	AssertEqual("alpha", M["a"])
+	AssertEqual("beta",  M["b"])
+	FileDelete(Path)
+	FileDelete(TsvPath)
+	_I18nTestReset()
+}
+Test("i18n cache: regenerates .tsv on a miss and round-trips", _I18nLazyCacheRegeneratesAndRoundTrips)
+
+_I18nLazyCacheRoundTripsEscapes() {
+	_I18nTestReset()
+	global _I18nCache
+	TsvPath := A_Temp . "\i18n_test_locale.tsv"
+	; JSON "a\\b\nc" decodes to: a + backslash + b + newline + c. Both the literal
+	; backslash and the newline must survive json -> tsv (escaped) -> map (unescaped).
+	BS := Chr(0x5C)
+	Path := _I18nTmpJson('{"k": "a' . BS . BS . 'b' . BS . 'nc"}')
+	_I18nLoadFile(Path)
+	Expected := "a" . BS . "b`nc"
+	AssertEqual(Expected, _I18nCache["k"], "backslash + newline must survive the load")
+	M := _I18nParseTSV(FileRead(TsvPath, "UTF-8"), Chr(0x2605))
+	AssertEqual(Expected, M["k"], "the regenerated .tsv must round-trip escapes exactly")
+	FileDelete(Path)
+	FileDelete(TsvPath)
+	_I18nTestReset()
+}
+Test("i18n cache: backslash + newline round-trip through the .tsv", _I18nLazyCacheRoundTripsEscapes)
+
+_I18nLazyCacheStoresRawStar() {
+	_I18nTestReset()
+	global _I18nCache, ScriptInformation
+	Saved := ScriptInformation.Has("MagicKey") ? ScriptInformation["MagicKey"] : Chr(0x2605)
+	ScriptInformation["MagicKey"] := "@@"   ; distinct key so we can tell them apart
+	TsvPath := A_Temp . "\i18n_test_locale.tsv"
+	Path := _I18nTmpJson('{"hint": "Press ' . Chr(0x2605) . ' now"}')
+	_I18nLoadFile(Path)
+	AssertEqual("Press @@ now", _I18nCache["hint"], "in-memory cache must carry the substituted MagicKey")
+	Raw := FileRead(TsvPath, "UTF-8")
+	AssertTrue(InStr(Raw, Chr(0x2605)) > 0, "the .tsv must store the RAW ★ placeholder")
+	AssertFalse(InStr(Raw, "@@") > 0, "the .tsv must NOT bake in the MagicKey (stays cache-independent)")
+	FileDelete(Path)
+	FileDelete(TsvPath)
+	ScriptInformation["MagicKey"] := Saved
+	_I18nTestReset()
+}
+Test("i18n cache: .tsv stores the raw ★ placeholder, not the MagicKey", _I18nLazyCacheStoresRawStar)
+
+_I18nLazyCacheStaleJsonRegenerates() {
+	_I18nTestReset()
+	global _I18nCache
+	TsvPath := A_Temp . "\i18n_test_locale.tsv"
+	Path := _I18nTmpJson('{"k": "v1"}')
+	_I18nLoadFile(Path)
+	AssertEqual("v1", _I18nCache["k"])
+	; Force the cache to look OLD, then rewrite the JSON (newer) WITHOUT clearing the
+	; tsv — the loader must detect the stale cache by mtime and rebuild from the JSON.
+	FileSetTime("20000101000000", TsvPath, "M")
+	_I18nTestReset()
+	FileDelete(Path)
+	FileAppend('{"k": "v2"}', Path, "UTF-8")
+	_I18nLoadFile(Path)
+	AssertEqual("v2", _I18nCache["k"], "a .tsv older than its .json must be regenerated")
+	FileDelete(Path)
+	FileDelete(TsvPath)
+	_I18nTestReset()
+}
+Test("i18n cache: stale .tsv (older than .json) is regenerated", _I18nLazyCacheStaleJsonRegenerates)
+
+_I18nLazyCacheFreshTsvServedWithoutJson() {
+	_I18nTestReset()
+	global _I18nCache
+	TsvPath := A_Temp . "\i18n_test_locale.tsv"
+	Path := A_Temp . "\i18n_test_locale.json"
+	if FileExist(Path)
+		FileDelete(Path)
+	if FileExist(TsvPath)
+		FileDelete(TsvPath)
+	; JSON says "fromjson"; a hand-written, NEWER tsv says "fromtsv". A fresh cache
+	; must be served verbatim, proving the fast path skips the JSON parse entirely.
+	FileAppend('{"k": "fromjson"}', Path, "UTF-8")
+	FileSetTime("20000101000000", Path, "M")
+	FileAppend("k`tfromtsv`n", TsvPath, "UTF-8-RAW")
+	_I18nLoadFile(Path)
+	AssertEqual("fromtsv", _I18nCache["k"], "a fresh .tsv must be served without re-parsing the .json")
+	FileDelete(Path)
+	FileDelete(TsvPath)
+	_I18nTestReset()
+}
+Test("i18n cache: a fresh .tsv is served without re-parsing the .json", _I18nLazyCacheFreshTsvServedWithoutJson)
 
 
 
