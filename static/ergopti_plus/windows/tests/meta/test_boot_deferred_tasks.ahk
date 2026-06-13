@@ -55,6 +55,7 @@ _MetaCheckBootDeferredTasks() {
 		"SetTimer(RegisterTextExpansionDeferred",
 		"SetTimer(RegisterEmojisSymbolsDeferred",
 		"SetTimer(BuildLanguageMenuDeferred",
+		"SetTimer(I18nWarmFallbacks",
 		"SetTimer(LLM_Tray_Build" ] {
 		Pos := InStr(Body, Probe)
 		Assert(Pos > 0, "ErgoptiPlus.ahk must arm '" . Probe . "...' at boot")

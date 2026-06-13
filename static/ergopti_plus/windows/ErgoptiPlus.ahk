@@ -602,11 +602,12 @@ LoggerStart("ErgoptiPlus", "Booting ErgoptiPlus driver…")
 ; diagnosed from the log alone (see lib/boot_profiler.ahk).
 BootProfile_Begin()
 
-; Eager-load the i18n locale now. It is otherwise lazy on the first t() call,
-; which lands mid-config and buries its ~200 ms parse of the ~140 KB locale JSON
-; inside a later, unrelated mark. The tray menu needs it within milliseconds
-; anyway, so preloading here surfaces the cost as its own boot phase and makes the
-; timing deterministic for future profiling.
+; Eager-load the ACTIVE i18n locale now. It is otherwise lazy on the first t()
+; call, which lands mid-config and buries its JSON parse inside a later, unrelated
+; mark. The tray menu needs it within milliseconds anyway. Only the active locale
+; is parsed here; the EN/FR fallbacks (consulted solely on a missing key) are
+; warmed off the critical path by I18nWarmFallbacks() armed after "ready" — which
+; halves the boot i18n cost on a complete locale (one parse instead of two).
 I18nPreload()
 BootProfile_Mark("i18n locale preloaded")
 
@@ -2192,6 +2193,10 @@ if _LangMenuBuildPending
 	SetTimer(BuildLanguageMenuDeferred, -LANG_MENU_DEFER_MS)
 if _LLM_Tray_BuildPending
 	SetTimer(LLM_Tray_Build, -LLM_TRAY_BUILD_DEFER_MS)
+; Warm the i18n EN/FR fallback caches off the critical path (the active locale is
+; already parsed at boot). One JSON parse, only consulted on a missing key; a miss
+; before this fires triggers a one-time lazy load inside t().
+SetTimer(I18nWarmFallbacks, -I18N_FALLBACK_WARM_DELAY_MS)
 SetTimer(RegisterTextExpansionDeferred, -HS_DEFERRED_TEXTEXP_DELAY_MS)
 SetTimer(RegisterEmojisSymbolsDeferred, -HS_DEFERRED_REGISTRATION_DELAY_MS)
 if (MetricsShortcuts.enabled and WPMWidget.visible)

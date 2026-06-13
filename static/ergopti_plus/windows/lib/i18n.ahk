@@ -65,6 +65,13 @@ global _I18nLocale := "fr"
 ; selected locale triggers a script restart.
 global _I18nReloadDebounceMs := 150
 
+; Delay (ms) before warming the EN/FR fallback caches off the boot critical path.
+; Only the active locale is parsed eagerly at boot (the tray menu needs it); the
+; fallbacks — consulted solely when a key is missing from the active locale — are
+; warmed shortly after "ready" so they never cost the user boot latency. A miss
+; that arrives before this timer fires triggers a one-time lazy load inside t().
+global I18N_FALLBACK_WARM_DELAY_MS := 200
+
 ; Flat map of key → translated string for the active locale. Populated lazily.
 global _I18nCache := Map()
 global _I18nCacheLoaded := false
@@ -77,6 +84,11 @@ global _I18nCacheEn := Map()
 global _I18nCacheEnLoaded := false
 global _I18nCacheFr := Map()
 global _I18nCacheFrLoaded := false
+
+; True once the EN/FR fallback caches have been warmed — eagerly by the deferred
+; I18nWarmFallbacks timer, or lazily on the first active-locale miss inside t().
+; Keeps t() O(1) on misses (no re-entry into _I18nEnsureFallbacksLoaded).
+global _I18nFallbacksWarmed := false
 
 ; Map of locale code → boolean indicating if flag.png exists.
 global _I18nFlagExistsCache := Map()
@@ -215,17 +227,32 @@ _I18nLoadInto(Code, &Cache, &Loaded) {
 	Loaded := true
 }
 
-; Ensure the active locale and both fallback locales are loaded.
-_I18nEnsureLoaded() {
+; Ensure ONLY the active locale is loaded — the minimum the tray menu needs at
+; boot. Kept separate from the fallback load so boot pays one JSON parse, not two.
+_I18nEnsureActiveLoaded() {
 	global _I18nCacheLoaded, _I18nLocale
-	global _I18nCacheEn, _I18nCacheEnLoaded
-	global _I18nCacheFr, _I18nCacheFrLoaded
 	if !_I18nCacheLoaded
 		_I18nLoadFile(_I18nLocalePath(_I18nLocale))
+}
+
+; Ensure the EN (then FR) fallback caches are loaded. Consulted by t() only when
+; a key is missing from the active locale. Idempotent: the per-cache Loaded flags
+; make repeat calls cheap, and _I18nFallbacksWarmed short-circuits t() afterwards.
+_I18nEnsureFallbacksLoaded() {
+	global _I18nLocale, _I18nFallbacksWarmed
+	global _I18nCacheEn, _I18nCacheEnLoaded
+	global _I18nCacheFr, _I18nCacheFrLoaded
 	if _I18nLocale != "en" and !_I18nCacheEnLoaded
 		_I18nLoadInto("en", &_I18nCacheEn, &_I18nCacheEnLoaded)
 	if _I18nLocale != "fr" and !_I18nCacheFrLoaded
 		_I18nLoadInto("fr", &_I18nCacheFr, &_I18nCacheFrLoaded)
+	_I18nFallbacksWarmed := true
+}
+
+; Ensure the active locale and both fallback locales are loaded.
+_I18nEnsureLoaded() {
+	_I18nEnsureActiveLoaded()
+	_I18nEnsureFallbacksLoaded()
 }
 
 
@@ -241,11 +268,16 @@ _I18nEnsureLoaded() {
 ; Returns the localised string for the given dot-notation key.
 ; Falls back to the raw key name if the locale file is missing or the key is absent.
 t(Key) {
-	global _I18nCache, _I18nCacheLoaded, _I18nCacheEn, _I18nCacheEnLoaded, _I18nCacheFr, _I18nCacheFrLoaded
+	global _I18nCache, _I18nCacheLoaded, _I18nFallbacksWarmed
+	global _I18nCacheEn, _I18nCacheEnLoaded, _I18nCacheFr, _I18nCacheFrLoaded
 	if !_I18nCacheLoaded
-		_I18nEnsureLoaded()
+		_I18nEnsureActiveLoaded()
 	if _I18nCache.Has(Key)
 		return _I18nCache[Key]
+	; Miss in the active locale → consult the fallbacks. They are warmed off the
+	; boot path (I18nWarmFallbacks); if a miss arrives first, load them once now.
+	if !_I18nFallbacksWarmed
+		_I18nEnsureFallbacksLoaded()
 	if _I18nCacheEnLoaded and _I18nCacheEn.Has(Key)
 		return _I18nCacheEn[Key]
 	if _I18nCacheFrLoaded and _I18nCacheFr.Has(Key)
@@ -295,14 +327,28 @@ I18nInit(Cache) {
 	try LoggerDone("i18n", "i18n initialised (locale: '{1}').", _I18nLocale)
 }
 
-; Pre-load all locale caches in a background timer so the first t() call during
-; menu construction never blocks the main thread on disk I/O.
-; Must be called after I18nInit() — schedule with SetTimer(..., -1).
+; Pre-load the ACTIVE locale cache on the boot path so the first t() call during
+; menu construction never blocks on disk I/O. The EN/FR fallback caches are NOT
+; loaded here — they are consulted only on a missing key, so warming them at boot
+; cost the user a second JSON parse for nothing on a complete locale. They are
+; warmed instead by I18nWarmFallbacks() off the critical path (or lazily on the
+; first miss inside t()). Must be called after I18nInit().
 I18nPreload() {
-	try LoggerTrace("i18n", "Preloading locale caches…")
-	_I18nEnsureLoaded()
-	try LoggerDone("i18n", "Locale caches warm ({1} keys active, {2} EN, {3} FR).",
-		_I18nCache.Count,
+	global _I18nCache
+	try LoggerTrace("i18n", "Preloading active locale cache…")
+	_I18nEnsureActiveLoaded()
+	try LoggerDone("i18n", "Active locale warm ({1} key(s)); fallbacks deferred off the boot path.",
+		_I18nCache.Count)
+}
+
+; Warm the EN/FR fallback caches off the boot critical path. Armed as a deferred
+; SetTimer after "ready" so a later missing-key lookup is a cheap map hit rather
+; than a synchronous JSON parse mid-interaction. Idempotent.
+I18nWarmFallbacks() {
+	global _I18nCacheEn, _I18nCacheEnLoaded, _I18nCacheFr, _I18nCacheFrLoaded
+	try LoggerTrace("i18n", "Warming fallback locale caches…")
+	_I18nEnsureFallbacksLoaded()
+	try LoggerDone("i18n", "Fallback caches warm ({1} EN, {2} FR).",
 		_I18nCacheEnLoaded ? _I18nCacheEn.Count : 0,
 		_I18nCacheFrLoaded ? _I18nCacheFr.Count : 0)
 }
