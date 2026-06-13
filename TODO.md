@@ -508,6 +508,63 @@ Original plan, for reference:
 
 ---
 
+## Follow-up pass (2026-06-13) — closing out the PRIORITY 1 follow-ups
+
+A second pass landed the follow-ups the A2–A6 STATUS blocks had spun off:
+
+- ✅ **A6 generator footgun fixed** (`475511ccf`): `codegen-prompt-builder-ahk.cjs`
+  no longer over-escapes string delimiters (`AQ`/`AQQ` are plain `"`/`""`);
+  regeneration is byte-identical to the committed file, so it joined the
+  `build:domain` freshness gate (now 9 steps / 8 drift-checked files).
+- ✅ **A4 llm_prediction tint** (`bf78891b3`): sourced from `UI_AI_LOADING_HEX`
+  (shared `ai_loading_hex`) via `HotstringsConfigLoadLlmPredictionColor()`; the
+  `#AD61FF` literal is gone. (`DYN_HOTSTRINGS_DEFAULT_DELAY` stays AHK-local — no
+  cross-driver counterpart.)
+- ✅ **A5 batch token scaling** (`b8ba4c8b8`): the AHK batch path now sizes
+  `num_predict` as `max_tokens * num_predictions + n*5` (`_LLM_Engine_CallTokenBudget`),
+  matching the macOS `fetch_batch` formula.
+- ✅ **A2 manifest reader extended** (`113d0dc3d`): keylogger (metrics filters +
+  encrypt), dynamic_hotstrings (6 toggles + personal_info), gestures (space_wrap)
+  now read `Manifest.default_for(...)`. shortcuts/LLM/Karabiner left by design
+  (no matching manifest paths / JSON architecture). `LUA_HS_BASELINE` 905→906.
+- ✅ **A3 macOS timings sweep DONE** (`ac931aa63`): ~38 constants across 17 modules
+  (clipboard, keep-awake, gestures probe/health + click, keylogger
+  aggregator/log_manager/kc_bridge, karabiner debounces, UI/menu/TIS delays, LLM
+  warmup/stream/discovery) now read `lib/timings`. Two intentional local
+  divergences kept + documented in place: MLX `DISCOVERY_MAX_WAIT` (180 s vs 60 s)
+  and the menu `INSTALLED_CACHE_TTL` (30 s vs 2 s).
+- ✅ **A3 AHK LLM backend timings DONE** (`589f0ce4b`): `LLM_OLLAMA_POLL_MS`,
+  `LLM_REMOTE_TIMEOUT_MS`, `LLM_REMOTE_POLL_MS`, `LLM_INSTALLED_CACHE_TTL_MS` now
+  sourced at boot via `LLMApiLoadTimings()` (reassign-at-boot), pinned by a
+  tripwire. AHK **1389/0**, macOS **1588/0**.
+
+**Still open (two items, by deliberate choice):**
+
+1. ⏭️ **AHK keylogger telemetry timings sweep.** The remaining AHK timing literals
+   live in the keylogger sub-modules (`keylogger.ahk` `KeylogConst`,
+   `keylogger_watchers`/`_hook`/`_network`/`_av_state`/`_sensors`/`_mouse`/
+   `_trigger_roi`/`_clipboard`/`_window_topology`/`_ergonomics` `*Const` classes)
+   plus a few inline `SetTimer(-N)` literals and `win.ahk` keep-awake. These were
+   **deliberately not swept** this pass because: (a) most are **AHK-only telemetry**
+   timers with **no macOS counterpart**, so wiring them yields zero cross-driver
+   mutualization (A3's actual goal); (b) those sub-modules are **not loaded by
+   `run_all.ahk`**, so the reassign-at-boot wiring would be **unverifiable in CI**
+   and carries a real **0 ms-sentinel → CPU-spin** hazard if a reassign is missed;
+   (c) three are genuine **code↔registry divergences** needing a maintainer call,
+   not a blind wire: `KLHookConst.CONTEXT_TTL_MS` (1000 vs `hook_context_ttl_ms`
+   500), `KLMouseConst.PARK_CHECK_MS` (250 vs `mouse_park_check_ms` 100),
+   `KLTopoConst.TOPO_TICK_MS` (1500 vs `topo_tick_ms` 500). To do this safely:
+   include the keylogger sub-modules in `run_all.ahk` (with the needed stubs),
+   add a single `KeyloggerLoadTimings()` batch loader + a tripwire asserting no
+   sentinel survives, reconcile the three divergences first, then smoke-test on
+   real hardware.
+2. ⏭️ **Boot perf (Windows) — the architectural lever (see §A at the top).** Still
+   needs a deliberate product decision: deferring the magic-key emoji/symbol
+   categories to a post-boot idle pass (or cutting the registration count) changes
+   time-to-availability and collision ordering, so it must be chosen, not guessed.
+
+---
+
 ## PRIORITY 2 — Linux (do this **strictly last**)
 
 Only start after Priority 1 is substantially done. Most of it is write-heavy code
