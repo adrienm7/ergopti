@@ -20,7 +20,14 @@
 ; HSE never touches them — re-registering them from a menu-click thread would risk
 ; the wrong input level. They keep their boot registration; toggling one of them
 ; takes the Reload path instead (see hotstring_live_toggle.ahk).
-RegisterAllHotstrings(IncludeNative := true) {
+;
+; ``DeferHeavy`` is true ONLY for the boot pass: it skips the heaviest magic-key
+; categories (emojis + symbols, ~3000 registrations / ~410 ms) so they do not sit
+; on the critical boot path. ErgoptiPlus.ahk then arms a one-shot post-boot timer
+; (RegisterEmojisSymbolsDeferred) that registers them off the critical path and
+; rebuilds the prefix-watcher index. A live rebuild passes false → everything is
+; registered synchronously, exactly as before.
+RegisterAllHotstrings(IncludeNative := true, DeferHeavy := false) {
 	global Features, ScriptInformation, PersonalInformation, PersonalInformationLetters
 	global DeadkeyMappingCircumflex, SpaceAroundSymbols, PersonalInformationHotstrings
 
@@ -667,27 +674,16 @@ if Features["hotstrings"]["magic_key"]["text_expansion_auto"]["enabled"] {
 
 
 
-; =======================
-; ===== 4.4) Emojis =====
-; =======================
+; ===============================================
+; ===== 4.4-4.5) Emojis & symbols (deferrable) ===
+; ===============================================
 
-if Features["hotstrings"]["magic_key"]["text_expansion_emojis"]["enabled"] {
-	LoadHotstringsSection("magickey", "text_expansion_emojis", Features["hotstrings"]["magic_key"]["text_expansion_emojis"])
-}
-
-
-
-; ========================
-; ===== 4.5) Symbols =====
-; ========================
-
-if Features["hotstrings"]["magic_key"]["text_expansion_symbols"]["enabled"] {
-	LoadHotstringsSection("magickey", "text_expansion_symbols", Features["hotstrings"]["magic_key"]["text_expansion_symbols"])
-}
-
-if Features["hotstrings"]["magic_key"]["text_expansion_symbols_typst"]["enabled"] {
-	LoadHotstringsSection("magickey", "text_expansion_symbols_typst", Features["hotstrings"]["magic_key"]["text_expansion_symbols_typst"],
-		Map("OnlyText", False))
+; The emoji + symbol categories are by far the heaviest (~3000 registrations,
+; ~410 ms). On the boot pass (DeferHeavy = true) they are skipped here and loaded
+; off the critical path by RegisterEmojisSymbolsDeferred() below; on a live
+; rebuild (DeferHeavy = false) they load inline, exactly as before.
+if !DeferHeavy {
+	_RegisterEmojisSymbolsSections()
 }
 
 
@@ -907,6 +903,56 @@ if IsSet(ScriptInformation) and ScriptInformation.Has("PersonalHotstringsDir") {
 		_LoadPersonalExtRecursive(RegExReplace(HsExtDir, "[/\\]+$"), "")
 	}
 }
+}
+
+
+
+
+
+; ==========================================================
+; ==========================================================
+; ======= 6.5/ Deferred emoji / symbol registration ========
+; ==========================================================
+; ==========================================================
+
+; Delay (ms) before the deferred emoji/symbol pass fires after boot. Long enough
+; that startup has settled and the user is very unlikely to have typed an
+; emoji/symbol trigger yet, short enough that the expansions are available within
+; a couple of seconds.
+global HS_DEFERRED_REGISTRATION_DELAY_MS := 1500
+
+; Registers the heavy magic-key emoji + symbol sections into the HSE. Shared by
+; the boot deferred pass and the live rebuild so the two code paths never diverge.
+_RegisterEmojisSymbolsSections() {
+	global Features
+	if Features["hotstrings"]["magic_key"]["text_expansion_emojis"]["enabled"] {
+		LoadHotstringsSection("magickey", "text_expansion_emojis", Features["hotstrings"]["magic_key"]["text_expansion_emojis"])
+	}
+	if Features["hotstrings"]["magic_key"]["text_expansion_symbols"]["enabled"] {
+		LoadHotstringsSection("magickey", "text_expansion_symbols", Features["hotstrings"]["magic_key"]["text_expansion_symbols"])
+	}
+	if Features["hotstrings"]["magic_key"]["text_expansion_symbols_typst"]["enabled"] {
+		LoadHotstringsSection("magickey", "text_expansion_symbols_typst", Features["hotstrings"]["magic_key"]["text_expansion_symbols_typst"],
+			Map("OnlyText", False))
+	}
+}
+
+; Post-boot idle pass: registers the emoji + symbol categories that the boot
+; RegisterAllHotstrings(…, DeferHeavy := true) skipped, then rebuilds the
+; prefix-watcher index so the live preview includes them. Armed via a one-shot
+; SetTimer from ErgoptiPlus.ahk. Wrapped in try so a transient failure can never
+; crash the timer thread and leave the driver half-initialised.
+RegisterEmojisSymbolsDeferred() {
+	try {
+		_RegisterEmojisSymbolsSections()
+		; The prefix-watcher index was armed at boot WITHOUT these categories —
+		; rebuild it so the tooltip preview ranks them like every other category.
+		try HotstringPrefixWatcherRebuildIndex()
+		try BootProfile_Mark("Emoji/symbol hotstrings registered (deferred)")
+		try LoggerInfo("Hotstrings", "Deferred emoji/symbol registration complete.")
+	} catch as e {
+		try LoggerError("Hotstrings", "Deferred emoji/symbol registration failed: {1}", e.Message)
+	}
 }
 
 
