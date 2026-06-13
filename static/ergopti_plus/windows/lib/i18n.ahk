@@ -110,16 +110,7 @@ _I18nLocalePath(Code) {
 	return _SharedDir . "\locales\" . Code . ".json"
 }
 
-; Resolve the absolute path to a locale's generated fast-parse .tsv (the flat
-; key<TAB>value form produced by tools/codegen/codegen-locales-fast.cjs). Loading
-; it is ~23x faster than JsonParse on the same locale (~8 ms vs ~190 ms for 2196
-; keys). The .json remains the source of truth; loaders fall back to it.
-_I18nLocaleFastPath(Code) {
-	global _SharedDir
-	return _SharedDir . "\locales\" . Code . ".tsv"
-}
-
-; Invert codegen-locales-fast's value escaping in a single left-to-right scan so
+; Invert _I18nWriteTsvCache's value escaping in a single left-to-right scan so
 ; "\\" never collides with "\n"/"\r". Only called for values that contain a
 ; backslash, so the common case pays nothing.
 _I18nUnescapeTSV(s) {
@@ -176,6 +167,93 @@ _I18nParseTSV(Content, MagicKey) {
 	return m
 }
 
+; True when the .tsv cache is at least as new as its .json source — i.e. it is
+; not stale after a .json edit or pull. FileGetTime's "M" form is YYYYMMDDHH24MISS,
+; which orders chronologically as a plain integer, so a direct >= comparison is
+; correct. Any stat failure returns false so the caller regenerates defensively.
+_I18nTsvIsFresh(TsvPath, JsonPath) {
+	try {
+		return FileGetTime(TsvPath, "M") >= FileGetTime(JsonPath, "M")
+	} catch {
+		return false
+	}
+}
+
+; (Re)write the flat key<TAB>value .tsv cache from a parsed locale map. The .tsv
+; is a gitignored, self-healing cache the driver owns end-to-end — the .json is
+; the single tracked source of truth, never duplicated in git. Values are escaped
+; \\ then \r then \n (backslash FIRST so it can never collide), ★ placeholders are
+; PRESERVED (the reader substitutes the MagicKey at parse time, keeping the cache
+; MagicKey-independent), LF line endings, UTF-8 without BOM. Best-effort: a
+; read-only install directory simply means every boot keeps parsing the JSON.
+_I18nWriteTsvCache(TsvPath, Parsed) {
+	try {
+		Content := ""
+		for Key, Val in Parsed {
+			Esc := Val
+			if InStr(Esc, "\")
+				Esc := StrReplace(Esc, "\", "\\")
+			if InStr(Esc, "`r")
+				Esc := StrReplace(Esc, "`r", "\r")
+			if InStr(Esc, "`n")
+				Esc := StrReplace(Esc, "`n", "\n")
+			Content .= Key . "`t" . Esc . "`n"
+		}
+		if FileExist(TsvPath)
+			FileDelete(TsvPath)
+		FileAppend(Content, TsvPath, "UTF-8-RAW")
+	} catch as err {
+		try LoggerWarn("i18n", "Could not write fast-cache '{1}' ({2}); JSON path stays active.", TsvPath, err.Message)
+	}
+}
+
+; Load one locale's flat key→value Map using the self-healing .tsv cache: parse
+; the fast .tsv when it exists AND is at least as new as the .json; otherwise
+; parse the .json (the single source of truth), build the Map, and regenerate the
+; .tsv beside it so the NEXT boot is fast. ★ is substituted with MagicKey on both
+; paths. This is the ONLY site that reads or writes a locale .tsv, so the cache
+; format lives in exactly one place.
+;
+; Returns ``{ Cache, Ok, Fast }``: Cache is the (possibly empty) map; Ok is true
+; whenever a source was parsed successfully — INCLUDING a valid but empty ``{}``,
+; which is distinct from a missing/unparseable file (Ok false → caller shows raw
+; key names); Fast records whether the .tsv cache was hit, for log clarity only.
+_I18nLoadLocaleMap(JsonPath, MagicKey) {
+	TsvPath := RegExReplace(JsonPath, "\.json$", ".tsv")
+
+	; ── Fast path: a fresh .tsv cache ──
+	if FileExist(TsvPath) and _I18nTsvIsFresh(TsvPath, JsonPath) {
+		try {
+			return { Cache: _I18nParseTSV(FileRead(TsvPath, "UTF-8"), MagicKey), Ok: true, Fast: true }
+		} catch as err {
+			try LoggerWarn("i18n", "Fast cache '{1}' unreadable ({2}); rebuilding from JSON.", TsvPath, err.Message)
+		}
+	}
+
+	; ── Slow path: parse JSON, then regenerate the cache for next boot ──
+	if !FileExist(JsonPath) {
+		try LoggerWarn("i18n", "Locale file not found: '{1}' — falling back to key names.", JsonPath)
+		return { Cache: Map(), Ok: false, Fast: false }
+	}
+	try {
+		Parsed := JsonParse(FileRead(JsonPath, "UTF-8"))
+	} catch as err {
+		try LoggerWarn("i18n", "JSON parse error in '{1}': {2}", JsonPath, err.Message)
+		return { Cache: Map(), Ok: false, Fast: false }
+	}
+	Out := Map()
+	for Key, Val in Parsed {
+		if InStr(Val, "★")
+			Out[Key] := StrReplace(Val, "★", MagicKey)
+		else
+			Out[Key] := Val
+	}
+	; Regenerate from the RAW parsed values (★ preserved) so the cache mirrors the
+	; source exactly and stays MagicKey-independent.
+	_I18nWriteTsvCache(TsvPath, Parsed)
+	return { Cache: Out, Ok: true, Fast: false }
+}
+
 ; Detect the Windows UI language via GetLocaleInfoEx(LOCALE_SISO639LANGNAME)
 ; and map it to a supported locale code. Falls back to "en" when the detected
 ; language is not in the supported list or the API call fails.
@@ -212,116 +290,34 @@ _I18nDetectSystemLocale() {
 	return "en"
 }
 
-; Parse the JSON file at FilePath and populate _I18nCache. Substitutes ★ with
-; the user's configured MagicKey. Does nothing and logs a warning on file error.
+; Populate _I18nCache for the active locale from FilePath's .json, via the
+; self-healing .tsv cache (see _I18nLoadLocaleMap). Substitutes ★ with the
+; configured MagicKey. Leaves the cache empty (caller shows raw key names) on a
+; missing/unparseable source.
 _I18nLoadFile(FilePath) {
 	global _I18nCache, _I18nCacheLoaded, _I18nLocale, ScriptInformation
-
-	_I18nCache       := Map()
-	_I18nCacheLoaded := false
-
 	MagicKey := IsSet(ScriptInformation) and ScriptInformation.Has("MagicKey")
 		? ScriptInformation["MagicKey"]
 		: "★"
-
-	; Fast path: the generated flat .tsv parses ~23x faster than JsonParse. The
-	; .json stays the source of truth; fall through to it if the .tsv is absent or
-	; unreadable (fresh checkout before codegen, or a stale tree). The .tsv path is
-	; derived from the SAME FilePath the caller passed (not from _I18nLocale) so a
-	; caller that loads an arbitrary locale file gets the matching .tsv beside it.
-	TsvPath := RegExReplace(FilePath, "\.json$", ".tsv")
-	if FileExist(TsvPath) {
-		try {
-			_I18nCache := _I18nParseTSV(FileRead(TsvPath, "UTF-8"), MagicKey)
-			_I18nCacheLoaded := true
-			try LoggerDone("i18n", "Locale '{1}' loaded ({2} key(s), fast).", _I18nLocale, _I18nCache.Count)
-			return
-		} catch as err {
-			_I18nCache := Map()
-			try LoggerWarn("i18n", "Fast locale '{1}' unreadable ({2}); JSON fallback.", TsvPath, err.Message)
-		}
-	}
-
-	if !FileExist(FilePath) {
-		try LoggerWarn("i18n", "Locale file not found: '{1}' — falling back to key names.", FilePath)
-		return
-	}
-
-	try {
-		FileContent := FileRead(FilePath, "UTF-8")
-	} catch {
-		try LoggerWarn("i18n", "Failed to read locale file '{1}'.", FilePath)
-		return
-	}
-
-	try {
-		Parsed := JsonParse(FileContent)
-	} catch as err {
-		try LoggerWarn("i18n", "JSON parse error in '{1}': {2}", FilePath, err.Message)
-		return
-	}
-
-	for Key, Val in Parsed {
-		; PERFORMANCE: skip StrReplace if no placeholder exists
-		if InStr(Val, "★")
-			_I18nCache[Key] := StrReplace(Val, "★", MagicKey)
-		else
-			_I18nCache[Key] := Val
-	}
-
-	_I18nCacheLoaded := true
-	try LoggerDone("i18n", "Locale '{1}' loaded ({2} key(s)).", _I18nLocale, _I18nCache.Count)
+	R := _I18nLoadLocaleMap(FilePath, MagicKey)
+	_I18nCache := R.Cache
+	_I18nCacheLoaded := R.Ok
+	if R.Ok
+		try LoggerDone("i18n", "Locale '{1}' loaded ({2} key(s), {3}).", _I18nLocale, _I18nCache.Count,
+			R.Fast ? "fast" : "regenerated")
 }
 
-; Load a locale into a provided Map reference. Returns true on success.
+; Load a fallback locale into a provided Map reference via the same self-healing
+; .tsv cache as the active locale. Sets Loaded true once the map is populated.
 _I18nLoadInto(Code, &Cache, &Loaded) {
 	if Loaded
 		return
 	global ScriptInformation
 	MagicKey := IsSet(ScriptInformation) and ScriptInformation.Has("MagicKey")
 		? ScriptInformation["MagicKey"] : "★"
-
-	; Fast path: the generated flat .tsv (see _I18nLoadFile); fall back to JSON.
-	TsvPath := _I18nLocaleFastPath(Code)
-	if FileExist(TsvPath) {
-		try {
-			Cache := _I18nParseTSV(FileRead(TsvPath, "UTF-8"), MagicKey)
-			Loaded := true
-			return
-		} catch as err {
-			try LoggerWarn("i18n", "Fast fallback locale '{1}' unreadable ({2}); JSON fallback.", Code, err.Message)
-		}
-	}
-
-	FilePath := _I18nLocalePath(Code)
-	if !FileExist(FilePath) {
-		try LoggerWarn("i18n", "Fallback locale file not found: '{1}'.", FilePath)
-		Loaded := false
-		return
-	}
-	try {
-		FileContent := FileRead(FilePath, "UTF-8")
-	} catch {
-		try LoggerWarn("i18n", "Failed to read fallback locale '{1}'.", Code)
-		Loaded := false
-		return
-	}
-	try {
-		Parsed := JsonParse(FileContent)
-	} catch as err {
-		try LoggerWarn("i18n", "JSON parse error in fallback locale '{1}': {2}", Code, err.Message)
-		Loaded := false
-		return
-	}
-	TempCache := Map()
-	for Key, Val in Parsed {
-		if InStr(Val, "★")
-			TempCache[Key] := StrReplace(Val, "★", MagicKey)
-		else
-			TempCache[Key] := Val
-	}
-	Cache  := TempCache
-	Loaded := true
+	R := _I18nLoadLocaleMap(_I18nLocalePath(Code), MagicKey)
+	Cache := R.Cache
+	Loaded := R.Ok
 }
 
 ; Ensure ONLY the active locale is loaded — the minimum the tray menu needs at

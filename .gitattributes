@@ -9,7 +9,3 @@
 # AHK v2 requires UTF-8 BOM + CRLF — enforce CRLF on all platforms so the
 # encoding invariant holds whether the file is checked out on Linux CI or Windows
 *.ahk text eol=crlf
-
-# Generated flat locale caches (codegen-locales-fast) are LF by construction; pin
-# LF so a CRLF checkout cannot drift them or trip the round-trip parity guard.
-*.tsv text eol=lf
