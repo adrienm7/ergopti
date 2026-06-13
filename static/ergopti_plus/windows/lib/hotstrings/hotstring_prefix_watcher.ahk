@@ -152,18 +152,19 @@ HotstringPrefixWatcherInit() {
     }
     LoggerStart("PrefixWatcher", "Initializing prefix watcher…")
 
-    EntryCount := 0
-    for _, Category in _PREFIX_WATCHER_CATEGORIES {
-        CatCount := _RegisterCategoryTriggers(Category)
-        LoggerDebug("PrefixWatcher", "DBG category '{1}': {2} trigger(s) indexed.", Category, CatCount)
-        EntryCount += CatCount
-    }
-
-    LoggerDebug("PrefixWatcher", "DBG index built: {1} trigger(s), {2} prefix bucket(s).", EntryCount, _PrefixIndex.Count)
-    LoggerDebug("PrefixWatcher", "DBG 'ct' in index: {1}.", _PrefixIndex.Has("ct") ? "YES" : "NO")
+    ; The trigger index (~3251 entries rescanned from the category TOMLs) costs
+    ; ~157-234 ms — too heavy for the boot critical path. Start the InputHook with
+    ; an EMPTY index here (cheap); the off-critical-path deferred passes build it.
+    ; RegisterTextExpansionDeferred (always armed at the boot tail, unconditional
+    ; rebuild) and RegisterEmojisSymbolsDeferred each call
+    ; HotstringPrefixWatcherRebuildIndex (a full TOML rescan) after "ready", and
+    ; that function requires the InputHook to already exist — it does, created just
+    ; below. _LookupAndRender hides the tooltip gracefully while the index is empty,
+    ; so the only visible effect is no live preview for the brief window between
+    ; "ready" and the first deferred rebuild.
     _StartInputHook()
     _InstallMouseClickResetHooks()
-    LoggerSuccess("PrefixWatcher", "Watcher started ({1} trigger(s) indexed).", EntryCount)
+    LoggerSuccess("PrefixWatcher", "Watcher started (index build deferred off the boot path).")
     ; LLM bridge must attach to this InputHook — Ollama bootstrap often
     ; completes before we exist; honour a deferred start request here.
     if (IsSet(LLM_Tray_TryStartBridge))
