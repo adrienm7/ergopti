@@ -52,7 +52,7 @@ _MetaCheckBootDeferredTasks() {
 	; sits before "ready" — exactly the regression we must prevent.
 	for _, Probe in [
 		"SetTimer(WPMWidget_Show",
-		"SetTimer(RegisterTextExpansionDeferred",
+		"SetTimer(HotstringPrefixWatcherRebuildIndex",
 		"SetTimer(RegisterEmojisSymbolsDeferred",
 		"SetTimer(BuildLanguageMenuDeferred",
 		"SetTimer(I18nWarmFallbacks",

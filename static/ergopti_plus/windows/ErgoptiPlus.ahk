@@ -2161,11 +2161,12 @@ _RegisterScriptAltGrHotkeys()
 ; micro-bench (tests/bench_boot_hotstrings.ahk) shows magic-key text expansion is
 ; the heaviest registration category by a wide margin.
 BootProfile_Mark("Layout/shortcuts/tap-holds + AltGr registered")
-; DeferHeavy := true — skip the heaviest magic-key categories on the critical boot
-; path: the text-expansion sections (~2119 regs / ~1.36 s) AND the emoji/symbol
-; sections (~3000 regs / ~410 ms). RegisterTextExpansionDeferred and
-; RegisterEmojisSymbolsDeferred (both armed below) load them off-path a moment
-; later, each rebuilding the prefix-watcher index so the preview picks them up.
+; DeferHeavy := true — skip ONLY the emoji/symbol categories on the critical boot
+; path (~3000 regs / ~410 ms); RegisterEmojisSymbolsDeferred (armed below) loads
+; them off-path a moment later and rebuilds the prefix-watcher index. The magic-key
+; text-expansion sections are the most-USED feature, so they register here ON the
+; critical path (DeferHeavy no longer skips them) — "ready" must mean the everyday
+; expansions already work. Only the preview index is warmed off-path (below).
 RegisterAllHotstrings(true)
 BootProfile_Mark("Hotstrings registered (HSE, emoji/symbol deferred)")
 HotstringPrefixWatcherInit()
@@ -2197,7 +2198,10 @@ if _LLM_Tray_BuildPending
 ; already parsed at boot). One JSON parse, only consulted on a missing key; a miss
 ; before this fires triggers a one-time lazy load inside t().
 SetTimer(I18nWarmFallbacks, -I18N_FALLBACK_WARM_DELAY_MS)
-SetTimer(RegisterTextExpansionDeferred, -HS_DEFERRED_TEXTEXP_DELAY_MS)
+; text_expansion now registers on the critical path (the most-used feature); only
+; the prefix-watcher PREVIEW index is warmed off-path here so tooltips appear
+; shortly after "ready" without paying the index build on time-to-ready.
+SetTimer(HotstringPrefixWatcherRebuildIndex, -HS_PREFIX_INDEX_WARM_DELAY_MS)
 SetTimer(RegisterEmojisSymbolsDeferred, -HS_DEFERRED_REGISTRATION_DELAY_MS)
 if (MetricsShortcuts.enabled and WPMWidget.visible)
 	SetTimer(WPMWidget_Show, -WPMWidgetConst.BOOT_SHOW_DELAY_MS)

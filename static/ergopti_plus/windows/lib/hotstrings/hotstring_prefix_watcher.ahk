@@ -155,8 +155,8 @@ HotstringPrefixWatcherInit() {
     ; The trigger index (~3251 entries rescanned from the category TOMLs) costs
     ; ~157-234 ms — too heavy for the boot critical path. Start the InputHook with
     ; an EMPTY index here (cheap); the off-critical-path deferred passes build it.
-    ; RegisterTextExpansionDeferred (always armed at the boot tail, unconditional
-    ; rebuild) and RegisterEmojisSymbolsDeferred each call
+    ; A short-delay SetTimer(HotstringPrefixWatcherRebuildIndex) at the boot tail
+    ; warms it first; RegisterEmojisSymbolsDeferred rebuilds it again later. Both call
     ; HotstringPrefixWatcherRebuildIndex (a full TOML rescan) after "ready", and
     ; that function requires the InputHook to already exist — it does, created just
     ; below. _LookupAndRender hides the tooltip gracefully while the index is empty,
