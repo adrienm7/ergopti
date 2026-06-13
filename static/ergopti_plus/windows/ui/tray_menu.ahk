@@ -2535,6 +2535,7 @@ initMenu() {
 	RegisterMenuItem(GlobalActionsMenu, t("menu.global.disable_all"), ToggleAllFeaturesOff)
 	RegisterMenuItem(GlobalActionsMenu, t("menu.global.reset_defaults"), ReloadWithDefaultConfig)
 	A_TrayMenu.Add(t("menu.global.title"), GlobalActionsMenu)
+	BootProfile_Mark("MENU/initMenu: tap-holds/gestures/global menus")
 
 	A_TrayMenu.Add()
 
@@ -2583,6 +2584,7 @@ initMenu() {
 	RegisterMenuItem(AboutMenu, t("menu.about.changelog"), Updater_ShowChangelog)
 	RegisterMenuItem(AboutMenu, t("menu.about.open_releases_page"), (*) => Run(Updater_ReleasesPageUrl()))
 	A_TrayMenu.Add(t("menu.about.title"), AboutMenu)
+	BootProfile_Mark("MENU/initMenu: about menu")
 
 	RegisterMenuItem(A_TrayMenu, t("menu.global.setup_wizard"), Onboarding_ShowFromMenu)
 
@@ -2597,6 +2599,7 @@ initMenu() {
 	RegisterMenuItem(A_TrayMenu, MenuSuspend, ToggleSuspend)
 	RegisterMenuItem(A_TrayMenu, t("menu.global.reload"), ActivateReload)
 	RegisterMenuItem(A_TrayMenu, t("menu.global.quit"), ActivateExitApp)
+	BootProfile_Mark("MENU/initMenu: language + global actions")
 
 	DebuggingMenu := Menu()
 	DebugOrder    := MenuManifest_LoadDebugMenu()
@@ -2623,6 +2626,7 @@ initMenu() {
 		}
 	}
 	A_TrayMenu.Add(t("menu.debug.title"), DebuggingMenu)
+	BootProfile_Mark("MENU/initMenu: debug menu")
 }
 
 ; Returns a menu callback bound to a specific check interval (in seconds).

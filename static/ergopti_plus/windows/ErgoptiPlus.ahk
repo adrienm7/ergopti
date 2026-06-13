@@ -602,6 +602,14 @@ LoggerStart("ErgoptiPlus", "Booting ErgoptiPlus driver…")
 ; diagnosed from the log alone (see lib/boot_profiler.ahk).
 BootProfile_Begin()
 
+; Eager-load the i18n locale now. It is otherwise lazy on the first t() call,
+; which lands mid-config and buries its ~200 ms parse of the ~140 KB locale JSON
+; inside a later, unrelated mark. The tray menu needs it within milliseconds
+; anyway, so preloading here surfaces the cost as its own boot phase and makes the
+; timing deterministic for future profiling.
+I18nPreload()
+BootProfile_Mark("i18n locale preloaded")
+
 ; Load tooltip visual constants from shared/tooltip/constants.toml so the
 ; runtime values stay in sync with the TOML single source of truth.
 ; Must run after _SharedDir is set (line ~51) and ParseTomlFile is available.
