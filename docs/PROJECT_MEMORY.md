@@ -408,6 +408,41 @@ Fixed by making the target Map explicit: `ApplyConfigTomlV2(FeaturesMap, FilePat
 
 **Out-of-scope reminders**: no backward compatibility (clean state — users delete their old config.toml and the driver regenerates from templates at first boot), [[feedback-ui-must-be-i18n]] still applies to all new UI work.
 
+**Update (2026-06-13, A2): the AHK cut-over is DONE in production; macOS started.**
+`ErgoptiPlus.ahk` now has `global Features := ManifestBuildFeaturesMap()` (live), and
+`manifest_reader.ahk` is consumed pervasively (menu_renderer, tray_menu, toml_config_loader).
+The "dormant until cut-over" docstring in `manifest_reader.ahk` is stale.
+
+The macOS side had FOUR orphaned `_generated/*.lua` (zero runtime + zero test
+consumers). A2 resolved them:
+
+- **`expander.lua` / `registry.lua` / `shortcuts_bindings.lua` were deleted** (dead
+  code, with their `codegen-{expander,registry}-hs.cjs` / `codegen-shortcuts.cjs`
+  generators + npm scripts). They were a never-wired "hexagonal migration" — the
+  hand-written `modules/keymap/{registry,expander}.lua` diverged far past the
+  pure generated contract (TOML loading, `hs.settings`, priority cascade,
+  case-variant generation, i18n), so the generated adapters could never replace
+  them. The AHK `expander.ahk`/`registry.ahk` are KEPT — unlike the macOS ones
+  they are TESTED (`test_domain_{registry,expander}.ahk`) and are the only
+  exercised impl of the shared `Registry.spec.js`/`Expander.spec.js` contracts.
+- **`features_manifest.lua` got a reader** — `macos/lib/manifest_reader.lua`
+  (counterpart of `manifest_reader.ahk`). `modules/keymap/init.lua` `DEFAULT_STATE`
+  now sources its hotstring/preview defaults via `Manifest.default_for("hs.hotstrings.<id>")`
+  / `"hotstrings.trigger_char"` (fail-fast on a missing path), so macOS keymap
+  defaults come from the same `shared/features/manifest.toml` single source as AHK.
+  The reader loads the manifest cwd-independently (`debug.getinfo` + `loadfile`),
+  not via `require`. Other macOS modules (gestures/llm/dynamic_hotstrings/keylogger)
+  still hold hand-written `DEFAULT_STATE` — wiring them is the follow-up (LLM layers
+  a runtime JSON, Karabiner has no manifest entries; both need hardware smoke-test).
+
+**Gotcha — `LUA_HS_BASELINE` counts `hs.` substrings, including manifest path
+literals.** `tests/meta/test_port_adapter_coverage.lua` guards against new `hs.*`
+OS calls by counting lines matching `hs%.` in `macos/{modules,lib}`. Manifest
+paths like `"hs.hotstrings.expansion_delay"` are STRING LITERALS, not OS calls,
+but the heuristic counts them. Wiring keymap added 5 such lines, so the baseline
+was re-anchored 900→905 with a comment. If you wire more modules to the manifest,
+expect to re-anchor again (the real drive-to-zero target is OS calls, not paths).
+
 ### project_debug_menu_sync
 
 _Debug menu order is defined in shared/menu_manifest.json debug_menu — both AHK and Lua drivers consume it_

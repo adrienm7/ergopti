@@ -22,6 +22,7 @@ local text_utils = require("lib.text_utils")
 local km_utils   = require("modules.keymap.utils")
 local Logger     = require("lib.logger")
 local Keycodes   = require("lib.keycodes")
+local Manifest   = require("lib.manifest_reader")
 
 local Registry   = require("modules.keymap.registry")
 local Expander   = require("modules.keymap.expander")
@@ -70,15 +71,20 @@ M.DELAY_KEY_TO_CATEGORY = {
 
 --- Canonical defaults exposed to menu modules (single source of truth).
 --- Menu modules MUST read from here instead of re-declaring their own values.
+--- The hotstring/preview values are sourced from the shared features manifest
+--- (`shared/features/manifest.toml` -> `_generated/features_manifest.lua`) via
+--- `lib.manifest_reader`, so they stay in lock-step with the AHK driver (which
+--- builds its whole `Features` map from the same manifest). `default_for` fails
+--- fast if a path is missing, so a renamed feature never silently becomes nil.
 M.DEFAULT_STATE = {
-	keymap                      = true,
-	expansion_delay             = 0.75,   -- Baseline inter-key delay threshold (seconds)
+	keymap                      = true,   -- Module on/off toggle (no manifest entry)
+	expansion_delay             = Manifest.default_for("hs.hotstrings.expansion_delay"),
 	delays                      = {},     -- Per-group overrides; empty = use DELAYS_DEFAULT
-	trigger_char                = "★",
-	preview_star_enabled        = true,
-	preview_autocorrect_enabled = true,
-	preview_ai_enabled          = true,
-	preview_colored_tooltips    = true,
+	trigger_char                = Manifest.default_for("hotstrings.trigger_char"),
+	preview_star_enabled        = Manifest.default_for("hs.hotstrings.preview_star_enabled"),
+	preview_autocorrect_enabled = Manifest.default_for("hs.hotstrings.preview_autocorrect_enabled"),
+	preview_ai_enabled          = Manifest.default_for("hs.hotstrings.preview_ai_enabled"),
+	preview_colored_tooltips    = Manifest.default_for("hs.hotstrings.preview_colored_tooltips"),
 }
 
 
