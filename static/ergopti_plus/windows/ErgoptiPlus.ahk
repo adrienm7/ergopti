@@ -1010,12 +1010,13 @@ SetTimer(SaveFullConfig, -500)
 if MetricsShortcuts.enabled {
     LoggerDebug("Startup", "Metrics enabled — WPMWidget.visible=%s, show_graph=%s.",
         WPMWidget.visible, WPMWidget.show_graph)
-    if WPMWidget.visible
-        ; Defer the WebView2 cold-start off the boot-critical path (see
-        ; WPMWidgetConst.BOOT_SHOW_DELAY_MS): a one-shot so it fires only once the
-        ; auto-execute boot finishes — the heavy hotstring registration then runs
-        ; without the msedgewebview2.exe startup preempting the AHK thread.
-        SetTimer(WPMWidget_Show, -WPMWidgetConst.BOOT_SHOW_DELAY_MS)
+    ; (The WebView2 widget cold-start is armed at the very END of boot — after
+    ; "Driver fully initialised" — NOT here. A timer armed mid-boot fires ~its
+    ; delay later, while the hotstring registration is still running, and AHK
+    ; preempts that auto-execute thread to run it: WebView2's ~3 s startup gets
+    ; dragged back onto the critical path, AND the interruption pumps the message
+    ; queue, painting a tray click queued during boot against a half-built menu.
+    ; See the deferred-task block after LoggerSuccess("…ready").)
     if MetricsShortcuts.show_wpm_menubar
         SetTimer(WpmMenubar_Tick, 1000)
     KL_Init(_ConfigDir . "metrics")
@@ -2160,10 +2161,26 @@ BootProfile_Mark("Hotstrings registered (HSE, emoji/symbol deferred)")
 HotstringPrefixWatcherInit()
 BootProfile_Mark("Prefix watcher index armed")
 LoggerSuccess("ErgoptiPlus", "Driver fully initialised — ready.")
-; Off-critical-path: register the heavy emoji/symbol categories once startup has
-; settled. One-shot (negative delay). Until it fires (~1.5 s), only emoji/symbol
-; expansions are unavailable; everything else is live immediately.
+
+; ── Deferred post-"ready" tasks ──────────────────────────────────────────────
+; All the heavy off-critical-path work is armed HERE, after the driver is ready,
+; rather than mid-boot. A SetTimer armed earlier fires ~its-delay later and AHK
+; preempts the still-running auto-execute (the ~5400-hotstring registration) to
+; run it — which (a) drags heavy work like the WebView2 cold-start back into
+; contention with registration, and (b) pumps the message queue mid-boot, so a
+; tray click the user queued during startup is painted against a half-built menu
+; (the "menu shows only the first items" bug). Arming after "ready" means the
+; countdowns start once the critical path is done, so they fire on the idle
+; message loop with the menu fully built and registration complete.
+;
+; Order by delay so the three never contend: the LLM submenu populates first
+; (fast, so its dropdown is ready), then the emoji/symbol pass, then the WebView2
+; widget last (its delay clears the emoji pass).
+if _LLM_Tray_BuildPending
+	SetTimer(LLM_Tray_Build, -LLM_TRAY_BUILD_DEFER_MS)
 SetTimer(RegisterEmojisSymbolsDeferred, -HS_DEFERRED_REGISTRATION_DELAY_MS)
+if (MetricsShortcuts.enabled and WPMWidget.visible)
+	SetTimer(WPMWidget_Show, -WPMWidgetConst.BOOT_SHOW_DELAY_MS)
 
 global _LAYOUT_POLL_INTERVAL_MS := 1000
 global _LAST_KEYBOARD_HKL := GetForegroundKeyboardLayout()

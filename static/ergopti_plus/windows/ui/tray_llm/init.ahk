@@ -36,7 +36,7 @@
  * @param {Map} saved_opts - Persisted settings loaded from INI/registry.
  */
 LLM_Tray_Init(saved_opts := Map()) {
-	global _LLM_Tray
+	global _LLM_Tray, _LLM_Tray_Menu, _LLM_Tray_InTray, _LLM_Tray_BuildPending
 
 	; Defensive: a previous session that crashed mid-install would have
 	; left the AHK process at PriorityClass = High (we boost it in
@@ -108,7 +108,19 @@ LLM_Tray_Init(saved_opts := Map()) {
 	; who already know what the tray menu offers. Discovery now lives
 	; purely in the menu's "IA" submenu; no opt-in nag at startup.
 
-	LLM_Tray_Build()
+	; Place the IA entry in the tray NOW (empty submenu, in its canonical position)
+	; so the top-level menu is complete the instant initMenu returns, then defer the
+	; expensive population (8 submenus + i18n lookups) to the post-"ready" boot tail.
+	; A synchronous build here blocks initMenu mid-way — measured at ~1.6 s under
+	; load — and a tray opened during that window shows only the items registered
+	; before this point (the "menu shows only the first items" bug). Re-populating
+	; _LLM_Tray_Menu in place later keeps the entry's position (see the persistent-
+	; Menu note at its declaration), so menu order is preserved.
+	if !_LLM_Tray_InTray {
+		A_TrayMenu.Add(t("menu.llm.title"), _LLM_Tray_Menu)
+		_LLM_Tray_InTray := true
+	}
+	_LLM_Tray_BuildPending := true
 
 	; Bootstrap Ollama silently on reload when the feature was already enabled.
 	; show_ui=false so the install window NEVER opens automatically — the user
