@@ -51,13 +51,16 @@ global GLOBAL_DEFAULT_COLOR := ""
 global DYN_HOTSTRINGS_DEFAULT_DELAY := 2.0
 
 ; Per-category baseline that overrides ``GLOBAL_DEFAULT_COLOR`` only when no
-; TOML _meta or user override sets a color. The "personal" baseline is loaded
-; from the shared canon by HotstringsConfigLoadSharedDefaults() (kept in lock-step
-; with macOS); "llm_prediction" is an AHK-only tint with no Hammerspoon
-; equivalent (it mirrors shared/tooltip/constants.toml [accent_colors]
-; ai_loading_hex), so it stays a local literal here.
+; TOML _meta or user override sets a color. Both baselines load at boot from the
+; shared canon — "personal" from shared/hotstrings/defaults.toml via
+; HotstringsConfigLoadSharedDefaults() (kept in lock-step with macOS), and
+; "llm_prediction" from the canonical AI loading hex
+; (shared/tooltip/constants.toml [accent_colors] ai_loading_hex, exposed as
+; UI_AI_LOADING_HEX) via HotstringsConfigLoadLlmPredictionColor(). They start
+; empty so a missing load fails fast (rule 5.3) rather than masking drift behind
+; a re-typed literal (rules 5.2 / 5.4).
 global HOTSTRINGS_CATEGORY_DEFAULT_COLORS := Map(
-    "llm_prediction", "#AD61FF",  ; Violet — AI loading / in-flight tooltip (AHK-only; mirrors tooltip ai_loading_hex)
+    "llm_prediction", "",
 )
 
 ; Shared terminator catalogue instance — the single source of truth for the
@@ -144,6 +147,21 @@ HotstringsConfigLoadSharedDefaults(SharedDir := "") {
 
     try LoggerInfo("HotstringsConfig", "Shared defaults loaded (delay={1}s color={2} personal={3}).",
         GLOBAL_DEFAULT_DELAY, GLOBAL_DEFAULT_COLOR, HOTSTRINGS_CATEGORY_DEFAULT_COLORS["personal"])
+}
+
+; Source the llm_prediction baseline tint from the canonical AI loading hex
+; (UI_AI_LOADING_HEX, loaded by UiStyle_LoadSharedConst() from
+; shared/tooltip/constants.toml [accent_colors] ai_loading_hex) so the AI tint
+; lives in ONE place instead of a re-typed literal. Must run AFTER
+; UiStyle_LoadSharedConst() — UI_AI_LOADING_HEX is "" until then — and before the
+; tray menu build / any resolve. A missing value THROWS (fail fast, no fallback).
+HotstringsConfigLoadLlmPredictionColor() {
+    global UI_AI_LOADING_HEX, HOTSTRINGS_CATEGORY_DEFAULT_COLORS
+    Hex := IsSet(UI_AI_LOADING_HEX) ? UI_AI_LOADING_HEX : ""
+    if (Hex == "") {
+        throw Error("HotstringsConfigLoadLlmPredictionColor(): UI_AI_LOADING_HEX not loaded — must run after UiStyle_LoadSharedConst().")
+    }
+    HOTSTRINGS_CATEGORY_DEFAULT_COLORS["llm_prediction"] := Hex
 }
 
 ; Fetch a required key from the parsed defaults cache, throwing on absence so a
