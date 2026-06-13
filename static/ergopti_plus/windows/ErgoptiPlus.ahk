@@ -2140,11 +2140,18 @@ _RegisterScriptAltGrHotkeys()
 ; micro-bench (tests/bench_boot_hotstrings.ahk) shows magic-key text expansion is
 ; the heaviest registration category by a wide margin.
 BootProfile_Mark("Layout/shortcuts/tap-holds + AltGr registered")
-RegisterAllHotstrings()
-BootProfile_Mark("Hotstrings registered (HSE)")
+; DeferHeavy := true — skip the emoji/symbol categories (~3000 regs / ~410 ms) on
+; the critical boot path; RegisterEmojisSymbolsDeferred (armed below) loads them
+; off-path a moment later. The prefix-watcher index it then rebuilds picks them up.
+RegisterAllHotstrings(true, true)
+BootProfile_Mark("Hotstrings registered (HSE, emoji/symbol deferred)")
 HotstringPrefixWatcherInit()
 BootProfile_Mark("Prefix watcher index armed")
 LoggerSuccess("ErgoptiPlus", "Driver fully initialised — ready.")
+; Off-critical-path: register the heavy emoji/symbol categories once startup has
+; settled. One-shot (negative delay). Until it fires (~1.5 s), only emoji/symbol
+; expansions are unavailable; everything else is live immediately.
+SetTimer(RegisterEmojisSymbolsDeferred, -HS_DEFERRED_REGISTRATION_DELAY_MS)
 
 global _LAYOUT_POLL_INTERVAL_MS := 1000
 global _LAST_KEYBOARD_HKL := GetForegroundKeyboardLayout()
