@@ -21,11 +21,12 @@
 
 local M = {}
 
-local hs     = hs
-local utf8   = utf8
-local Logger = require("lib.logger")
-local i18n   = require("lib.i18n")
-local dialog = require("lib.dialog_util")
+local hs      = hs
+local utf8    = utf8
+local Logger  = require("lib.logger")
+local Timings = require("lib.timings")
+local i18n    = require("lib.i18n")
+local dialog  = require("lib.dialog_util")
 
 local LogManager     = require("modules.keylogger.log_manager")
 local ContextTracker = require("modules.keylogger.context_tracker")
@@ -41,24 +42,27 @@ local LOG            = "keylogger"
 --- ============================
 -- ================================
 
+-- Timing thresholds come from the shared cross-driver registry
+-- (shared/timings/constants.toml [keylogger]) so the AHK and macOS keyloggers
+-- stay in sync; the comment after each names the canonical value for reference.
 -- Typing session idle threshold before a "micro-idle" event is logged (30 s)
-local MICRO_IDLE_TIMEOUT_MS      = 30 * 1000
+local MICRO_IDLE_TIMEOUT_MS      = Timings.ms("keylogger", "micro_idle_timeout_ms")
 -- Typing session idle threshold before the session is considered fully ended (5 min)
-local SESSION_TIMEOUT_MS         = 5 * 60 * 1000
+local SESSION_TIMEOUT_MS         = Timings.ms("keylogger", "session_timeout_ms")
 -- Rolling window used to compute live WPM (15 s)
-local WPM_WINDOW_MS              = 15 * 1000
+local WPM_WINDOW_MS              = Timings.ms("keylogger", "wpm_window_ms")
 -- Minimum time window for WPM calculation to avoid division by near-zero (2 s)
-local WPM_MIN_DURATION_MS        = 2000
+local WPM_MIN_DURATION_MS        = Timings.ms("keylogger", "wpm_min_duration_ms")
 -- How often the idle check and mouse-distance poll run (seconds)
-local IDLE_CHECK_INTERVAL_SEC    = 10
+local IDLE_CHECK_INTERVAL_SEC    = Timings.sec("keylogger", "idle_check_interval_ms")
 -- How often the maintenance timer fires for day-rotation and mouse polling (seconds)
-local MAINTENANCE_INTERVAL_SEC   = 5
+local MAINTENANCE_INTERVAL_SEC   = Timings.sec("keylogger", "maintenance_interval_ms")
 -- Minimum gap between system-load polls to avoid spawning top too often (5 min)
-local SYSTEM_LOAD_POLL_INTERVAL_MS = 5 * 60 * 1000
+local SYSTEM_LOAD_POLL_INTERVAL_MS = Timings.ms("keylogger", "system_load_poll_ms")
 -- Delay before synthetic input is considered a match (very fast = synthetic)
-local SYNTH_MATCH_DELAY_MS       = 3
+local SYNTH_MATCH_DELAY_MS       = Timings.ms("keylogger", "synth_match_delay_ms")
 -- Flush the buffer after this many milliseconds of inactivity (2 min)
-local AUTO_FLUSH_IDLE_MS         = 2 * 60 * 1000
+local AUTO_FLUSH_IDLE_MS         = Timings.ms("keylogger", "auto_flush_idle_ms")
 
 -- Keycodes for all modifier keys (these should not be logged as characters)
 local MODIFIER_KEYCODES = {
