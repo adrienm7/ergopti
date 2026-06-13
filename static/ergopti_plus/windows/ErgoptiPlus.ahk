@@ -1003,7 +1003,11 @@ if MetricsShortcuts.enabled {
     LoggerDebug("Startup", "Metrics enabled — WPMWidget.visible=%s, show_graph=%s.",
         WPMWidget.visible, WPMWidget.show_graph)
     if WPMWidget.visible
-        WPMWidget_Show()
+        ; Defer the WebView2 cold-start off the boot-critical path (see
+        ; WPMWidgetConst.BOOT_SHOW_DELAY_MS): a one-shot so it fires only once the
+        ; auto-execute boot finishes — the heavy hotstring registration then runs
+        ; without the msedgewebview2.exe startup preempting the AHK thread.
+        SetTimer(WPMWidget_Show, -WPMWidgetConst.BOOT_SHOW_DELAY_MS)
     if MetricsShortcuts.show_wpm_menubar
         SetTimer(WpmMenubar_Tick, 1000)
     KL_Init(_ConfigDir . "metrics")
