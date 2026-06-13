@@ -308,6 +308,29 @@ LLM_Engine_StopGeneration() {
 ; =======================================
 ; ========================================
 
+; Per-prediction token slack added to every backend call. Mirrors the macOS
+; api_*.lua ``+ num_predictions * 5`` overhead so the two drivers size the output
+; budget identically.
+global LLM_PRED_TOKEN_OVERHEAD := 5
+
+/**
+ * Per-call output-token budget for a backend request, given the shared
+ * PromptBuilder per-prediction budget and how many predictions THIS call yields
+ * (1 for a sequential-variant call, N for a single batch call that returns all
+ * N predictions in one response). Mirrors the macOS fetch_batch formula
+ * ``max_predict * num_predictions + num_predictions * 5`` so the AHK batch path
+ * is no longer under-budgeted (it previously sent the single-prediction cap for
+ * an N-prediction response, truncating it).
+ * @param {integer} maxTokens     Shared PromptBuilder per-prediction budget.
+ * @param {integer} predsPerCall  Predictions produced by this one call (>= 1).
+ * @returns {integer} The num_predict / max_tokens cap to send.
+ */
+_LLM_Engine_CallTokenBudget(maxTokens, predsPerCall) {
+	global LLM_PRED_TOKEN_OVERHEAD
+	n := (predsPerCall is Integer and predsPerCall >= 1) ? predsPerCall : 1
+	return maxTokens * n + n * LLM_PRED_TOKEN_OVERHEAD
+}
+
 /**
  * Fires the actual LLM call after the debounce period expires.
  * Skips the call if context is identical to the last result's context.
@@ -495,6 +518,11 @@ LLM_Engine_FirePrediction(buffer) {
 	)
 	is_batch_profile := (profile is Map and profile.Has("batch") and profile["batch"] == true)
 
+	; A batch call returns all N predictions in one response; a sequential-variant
+	; call returns one. Size the per-call token budget accordingly (macOS parity).
+	preds_per_call := (n_predictions > 1 and is_batch_profile) ? n_predictions : 1
+	call_tokens := _LLM_Engine_CallTokenBudget(max_tokens, preds_per_call)
+
 	_LLM_Engine["last_request_tick"] := A_TickCount
 
 	; Resolve the model + the per-backend async dispatch closure exactly
@@ -519,7 +547,7 @@ LLM_Engine_FirePrediction(buffer) {
 		model_tag := (entry is Map and entry.Has("Model")) ? entry["Model"] : (entry.HasOwnProp("Model") ? entry.Model : "")
 		log_model := model_tag
 		dispatch_fn := (temp, on_succ, on_fail) =>
-			LLM_RemoteGenerate_Async(entry, system_prompt, ctx, temp, on_succ, on_fail, tail, max_tokens)
+			LLM_RemoteGenerate_Async(entry, system_prompt, ctx, temp, on_succ, on_fail, tail, call_tokens)
 		; No remote-streaming dispatcher — disable streaming for the API
 		; backend so the engine falls back to the async non-streaming path.
 		streaming_enabled := false
@@ -535,9 +563,9 @@ LLM_Engine_FirePrediction(buffer) {
 			? profile["stop_sequences"] : ""
 		is_batch := (profile is Map and profile.Has("batch") and profile["batch"] == true)
 		dispatch_fn := (temp, on_succ, on_fail) =>
-			LLM_OllamaGenerate_Async(model_tag, system_prompt, ctx, temp, on_succ, on_fail, stop_seqs, max_tokens, is_batch, tail)
+			LLM_OllamaGenerate_Async(model_tag, system_prompt, ctx, temp, on_succ, on_fail, stop_seqs, call_tokens, is_batch, tail)
 		dispatch_stream_fn := (temp, on_partial, on_succ, on_fail) =>
-			LLM_OllamaGenerate_Streaming(model_tag, system_prompt, ctx, temp, on_partial, on_succ, on_fail, stop_seqs, max_tokens, is_batch, tail)
+			LLM_OllamaGenerate_Streaming(model_tag, system_prompt, ctx, temp, on_partial, on_succ, on_fail, stop_seqs, call_tokens, is_batch, tail)
 	}
 
 	; ── Batch vs sequential dispatch ──
