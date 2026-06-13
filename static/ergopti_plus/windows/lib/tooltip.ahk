@@ -234,8 +234,12 @@ global _TOOLTIP_HWND_TRACK_CAP := 32
 ; otherwise the user can still see the preview and press the magic key
 ; just past the deadline, where the expansion silently does not fire.
 ; Mirrors Hammerspoon's TIMEOUT_DECREMENT_SEC / TIMEOUT_FLOOR_SEC.
-global _TOOLTIP_TIMEOUT_DECREMENT_SEC := 0.2
-global _TOOLTIP_TIMEOUT_FLOOR_SEC := 0.05
+; Start at the sentinel 0 (not the real 0.2 / 0.05): Tooltip_UpdateStyles() above
+; overwrites these from the shared UI_TIMEOUT_* values at boot, so if that copy
+; ever fails to run the tooltip dismisses with no decrement/floor — an obvious
+; symptom — instead of a plausible hardcoded value masking the missing load.
+global _TOOLTIP_TIMEOUT_DECREMENT_SEC := 0
+global _TOOLTIP_TIMEOUT_FLOOR_SEC := 0
 
 ; Safety deadline applied whenever the caller passes DurationSec = 0
 ; (i.e. "stay until TooltipHide()"). Guards against ghost tooltips that
