@@ -378,6 +378,7 @@ if Features["hotstrings"]["rolls"]["assign_arrow_minus_left"]["enabled"] {
 if Features["hotstrings"]["rolls"]["ct"]["enabled"] {
 	LoadHotstringsSection("rolls", "ct", Features["hotstrings"]["rolls"]["ct"])
 }
+try BootProfile_Mark("HS sub: distances/SFBs/rolls registered")
 
 
 
@@ -501,10 +502,12 @@ if Features["hotstrings"]["autocorrection"]["caps"]["enabled"] {
 if Features["hotstrings"]["autocorrection"]["names"]["enabled"] {
 	LoadHotstringsSection("autocorrection", "names", Features["hotstrings"]["autocorrection"]["names"])
 }
+try BootProfile_Mark("HS sub: autocorrection registered (excl. accents)")
 
 if Features["hotstrings"]["autocorrection"]["accents"]["enabled"] {
 	LoadHotstringsSection("autocorrection", "accents", Features["hotstrings"]["autocorrection"]["accents"])
 }
+try BootProfile_Mark("HS sub: autocorrection.accents registered")
 
 
 
@@ -657,6 +660,7 @@ if Features["hotstrings"]["dynamic"]["text_expansion_personal_information"]["ena
 	CreateHotstringComboAuto("pntmm")
 	CreateHotstringComboAuto("pntmmd")
 }
+try BootProfile_Mark("HS sub: @-personal-info combos registered")
 
 
 
@@ -671,6 +675,7 @@ if Features["hotstrings"]["magic_key"]["text_expansion"]["enabled"] {
 if Features["hotstrings"]["magic_key"]["text_expansion_auto"]["enabled"] {
 	LoadHotstringsSection("magickey", "text_expansion_auto", Features["hotstrings"]["magic_key"]["text_expansion_auto"])
 }
+try BootProfile_Mark("HS sub: magickey core (text_expansion) registered")
 
 
 
@@ -836,6 +841,7 @@ if Features["hotstrings"]["dynamic"]["iban_prefixes"]["enabled"] {
 if Features["hotstrings"]["magic_key"]["repeat_corrections"]["enabled"] {
 	LoadHotstringsSection("magickey", "repeat_corrections", Features["hotstrings"]["magic_key"]["repeat_corrections"])
 }
+try BootProfile_Mark("HS sub: dynamic + repeat-key registered")
 
 CreateHotstring("*", "clé" . ScriptInformation["MagicKey"], "🔑")
 
@@ -903,6 +909,7 @@ if IsSet(ScriptInformation) and ScriptInformation.Has("PersonalHotstringsDir") {
 		_LoadPersonalExtRecursive(RegExReplace(HsExtDir, "[/\\]+$"), "")
 	}
 }
+try BootProfile_Mark("HS sub: personal + extension TOML registered")
 }
 
 
