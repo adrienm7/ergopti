@@ -527,8 +527,8 @@ scaling — a documented parity follow-up, not a regression.
   and uses `\bhs\.`; shared JS is confirmed clean (the old matches were all
   comments + a `months.` false positive).
 
-**Update (2026-06-13, follow-up pass): the A2–A6 follow-ups are closed; two items
-deliberately remain.** Landed: the prompt-builder generator fix (now gated), the
+**Update (2026-06-13, follow-up pass): the A2–A6 follow-ups are closed; the
+boot-perf idle-pass landed; one item deliberately remains.** Landed: the prompt-builder generator fix (now gated), the
 A4 llm_prediction tint from `UI_AI_LOADING_HEX`, the A5 AHK batch token scaling,
 the A2 manifest-reader extension (keylogger/dynamic_hotstrings/gestures), the full
 **macOS timings sweep** (~38 constants → `lib/timings`), and the **AHK LLM backend
@@ -542,6 +542,15 @@ timings** (`LLMApiLoadTimings`). Gotchas worth keeping:
 - **Two intentional macOS local timing divergences** (NOT to "fix"): MLX
   `DISCOVERY_MAX_WAIT` 180 s (vs registry 60 s — slow 8B loads) and the menu
   `INSTALLED_CACHE_TTL` 30 s (vs 2 s).
+- **Boot-perf emoji/symbol idle-pass** (`a866b13fb`): boot
+  `RegisterAllHotstrings(…, DeferHeavy := true)` skips the emoji/symbol magic-key
+  categories (~3000 regs / ~410 ms); a one-shot post-boot `SetTimer`
+  (`RegisterEmojisSymbolsDeferred`, `HS_DEFERRED_REGISTRATION_DELAY_MS` = 1500)
+  registers them off-path + rebuilds the prefix-watcher index. Live rebuilds pass
+  `DeferHeavy=false` (synchronous, unchanged). Lives in `modules/hotstrings.ahk` +
+  `ErgoptiPlus.ahk` — NOT in the CI harness, so it needs a hardware boot smoke-test.
+  Nuance: deferred = registered last → a same-trigger/same-length/same-priority
+  collision would flip the tie-break (practically nil — distinct namespaces).
 - **The AHK keylogger telemetry timings are deliberately NOT swept.** Those
   sub-modules (`keylogger_watchers/_hook/_network/_av_state/_sensors/_mouse/
   _trigger_roi/_clipboard/_window_topology/_ergonomics` + `keylogger.ahk`
