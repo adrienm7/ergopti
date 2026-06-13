@@ -17,6 +17,7 @@ local M = {}
 local hs            = hs
 local notifications = require("lib.notifications")
 local Logger        = require("lib.logger")
+local Manifest      = require("lib.manifest_reader")
 local LOG           = "gestures"
 
 local function load_touchdevice_module()
@@ -103,11 +104,14 @@ M.DEFAULT_MODES = {
 -- Default sensitivity (step) for incremental mode
 M.DEFAULT_SENSITIVITY = 3.5
 
+-- space_wrap is the one cross-driver gesture default in the shared manifest, so
+-- it is sourced from there; the `gestures` enabled flag has no manifest path, and
+-- modes/sensitivities are computed per swipe slot below (not simple defaults).
 M.DEFAULT_STATE = {
 	gestures = false,
 	modes = {},
 	sensitivities = {},
-	space_wrap = true,
+	space_wrap = Manifest.default_for("hs.gestures.space_wrap"),
 }
 
 -- Initialize modes and sensitivities

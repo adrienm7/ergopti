@@ -18,6 +18,7 @@ local M = {}
 local PersonalInfo = require("modules.dynamic_hotstrings.personal_info")
 local RulesEngine  = require("modules.dynamic_hotstrings.rules_engine")
 local Logger       = require("lib.logger")
+local Manifest     = require("lib.manifest_reader")
 local LOG          = "dynamic_hotstrings"
 
 
@@ -30,15 +31,23 @@ local LOG          = "dynamic_hotstrings"
 --- ================================
 -- ================================
 
+-- Per-category dynamic-hotstring defaults come from the shared features manifest
+-- (single cross-driver source); each entry there is a feature toggle, so we read
+-- its `.enabled` flag. Only dynamichotstrings_enabled has no manifest path (it is
+-- a macOS-local master switch), so it stays a literal.
+local function feat_enabled(path)
+	return Manifest.default_for(path).enabled
+end
+
 M.DEFAULT_STATE = {
-	personal_info                    = true,
+	personal_info                    = feat_enabled("hotstrings.dynamic.text_expansion_personal_information"),
 	dynamichotstrings_enabled        = true,
-	dynamichotstrings_datefr         = true,
-	dynamichotstrings_datelongfr     = true,
-	dynamichotstrings_date           = true,
-	dynamichotstrings_phoneprefixes  = true,
-	dynamichotstrings_ssnprefixes    = true,
-	dynamichotstrings_ibanprefixes   = true,
+	dynamichotstrings_datefr         = feat_enabled("hotstrings.dynamic.date_fr"),
+	dynamichotstrings_datelongfr     = feat_enabled("hotstrings.dynamic.date_long_fr"),
+	dynamichotstrings_date           = feat_enabled("hotstrings.dynamic.date"),
+	dynamichotstrings_phoneprefixes  = feat_enabled("hotstrings.dynamic.phone_prefixes"),
+	dynamichotstrings_ssnprefixes    = feat_enabled("hotstrings.dynamic.ssn_prefixes"),
+	dynamichotstrings_ibanprefixes   = feat_enabled("hotstrings.dynamic.iban_prefixes"),
 }
 
 

@@ -21,12 +21,13 @@
 
 local M = {}
 
-local hs      = hs
-local utf8    = utf8
-local Logger  = require("lib.logger")
-local Timings = require("lib.timings")
-local i18n    = require("lib.i18n")
-local dialog  = require("lib.dialog_util")
+local hs       = hs
+local utf8     = utf8
+local Logger   = require("lib.logger")
+local Timings  = require("lib.timings")
+local Manifest = require("lib.manifest_reader")
+local i18n     = require("lib.i18n")
+local dialog   = require("lib.dialog_util")
 
 local LogManager     = require("modules.keylogger.log_manager")
 local ContextTracker = require("modules.keylogger.context_tracker")
@@ -133,18 +134,24 @@ local SYSTEM_AUTH_BUNDLE_IDS = {
 --- ================================
 -- ================================
 
+-- The privacy filter toggles and the encrypt flag are cross-driver metrics
+-- settings sourced from the shared features manifest (single source, same as the
+-- AHK driver) via Manifest.default_for. keylogger_enabled stays false here: the
+-- macOS keylogger is opt-in by design (privacy), deliberately diverging from the
+-- AHK metrics.enabled default; the remaining keys are HS-only UI toggles with no
+-- manifest entry.
 M.DEFAULT_STATE = {
 	keylogger_enabled                = false,
 	keylogger_disabled_apps          = {},
-	keylogger_encrypt                = false,
+	keylogger_encrypt                = Manifest.default_for("metrics.encrypt"),
 	keylogger_menubar_wpm            = false,
 	keylogger_menubar_colors         = true,
 	keylogger_float_wpm              = true,
 	keylogger_float_graph            = true,
 	keylogger_float_colors           = true,
-	keylogger_private_filter_enabled      = true,
-	keylogger_secure_filter_enabled       = true,
-	keylogger_system_auth_filter_enabled  = true,
+	keylogger_private_filter_enabled      = Manifest.default_for("metrics.private_filter_enabled"),
+	keylogger_secure_filter_enabled       = Manifest.default_for("metrics.secure_filter_enabled"),
+	keylogger_system_auth_filter_enabled  = Manifest.default_for("metrics.system_auth_filter_enabled"),
 }
 
 
