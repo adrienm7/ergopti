@@ -1000,6 +1000,13 @@ if MetricsShortcuts.enabled
     WPMWidget_LoadConfig(_IniCache)
 
 BootProfile_Mark("Config, features & shortcuts loaded")
+; initMenu defers the 21-locale language submenu off the boot critical path on the
+; boot pass only. _DriverReady flips true at "ready", so a later rebuild (initMenu
+; re-run via a -50 ms timer) repopulates it synchronously instead of deferring.
+_DriverReady := false
+_LangMenuRef := ""
+_LangMenuBuildPending := false
+LANG_MENU_DEFER_MS := 120  ; short post-ready delay for the language-submenu populate
 InitSubMenus()
 initMenu()
 BootProfile_Mark("MENU/initMenu returned (pre tray icon)")
@@ -2163,6 +2170,7 @@ BootProfile_Mark("Hotstrings registered (HSE, emoji/symbol deferred)")
 HotstringPrefixWatcherInit()
 BootProfile_Mark("Prefix watcher index armed")
 LoggerSuccess("ErgoptiPlus", "Driver fully initialised — ready.")
+_DriverReady := true
 
 ; ── Deferred post-"ready" tasks ──────────────────────────────────────────────
 ; All the heavy off-critical-path work is armed HERE, after the driver is ready,
@@ -2180,6 +2188,8 @@ LoggerSuccess("ErgoptiPlus", "Driver fully initialised — ready.")
 ; dropdown is ready), then the text-expansion pass (core magic-key abbreviations,
 ; brought online quickly), then the emoji/symbol pass, then the WebView2 widget
 ; last (its delay clears the registration passes).
+if _LangMenuBuildPending
+	SetTimer(BuildLanguageMenuDeferred, -LANG_MENU_DEFER_MS)
 if _LLM_Tray_BuildPending
 	SetTimer(LLM_Tray_Build, -LLM_TRAY_BUILD_DEFER_MS)
 SetTimer(RegisterTextExpansionDeferred, -HS_DEFERRED_TEXTEXP_DELAY_MS)
