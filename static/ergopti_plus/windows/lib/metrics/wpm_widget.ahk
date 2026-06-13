@@ -85,6 +85,14 @@ class WPMWidgetConst {
     ; the surface within MOUSE_WATCH_MS of the slightest cursor movement. Polling
     ; MouseGetPos keeps it hook-free (no global WH_MOUSE_LL install).
     static MOUSE_WATCH_MS     := 50
+    ; Delay (ms) before the widget's WebView2 surface is cold-started at boot. The
+    ; WebView2 runtime spawns msedgewebview2.exe processes that hammer CPU/disk for
+    ; ~3 s; started synchronously at boot (the old behaviour) that cold-start runs
+    ; concurrently with the ~5400-hotstring HSE registration and preempts the AHK
+    ; thread, inflating time-to-ready by ~2.5 s (measured). Deferring the show as a
+    ; one-shot lets registration finish first — the widget then appears a beat after
+    ; the driver is ready, off the boot-critical path.
+    static BOOT_SHOW_DELAY_MS := 1000
     ; Graph mode dimensions (wider to show history).
     static GRAPH_W            := 220
     static GRAPH_H            := 100
