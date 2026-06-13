@@ -15,12 +15,12 @@
 ; and the boot-captured SpaceAroundSymbols all resolve correctly. So ALL hotstring
 ; sections are live-eligible BY DEFAULT.
 ;
-; The exceptions are the few "hotstrings.*" manifest paths that
-; RegisterAllHotstrings does NOT apply, so re-running it has no effect on them:
-;   1. Ê deadkey and "…" multiple-punctuation — registered via the native AHK
-;      Hotstring() engine, not the HSE. Re-running re-registers their enabled
-;      forms but cannot UNregister one that just became disabled, so disabling
-;      them live would strand a native trigger.
+; The exceptions kept reload-only:
+;   1. Ê deadkey and "…" multiple-punctuation — now HSE raw-callback hotstrings
+;      (migrated off the native AHK Hotstring() engine), so RegisterAllHotstrings
+;      DOES re-register them on a live rebuild. They are kept reload-only as a
+;      conservative default: their context-conditional dispatch is new on the HSE
+;      path, so toggling them takes the proven Reload route until verified live.
 ;   2. magic_key.replace — the magic-key remap (J → ★). It lives under
 ;      "hotstrings.*" but is a LAYOUT feature (modules/layout.ahk RemapKey at
 ;      boot), so a hotstring rebuild does nothing for it.
@@ -52,8 +52,8 @@
 ; distancesreduction); the section id keeps its underscores. Everything NOT listed
 ; here is live-eligible.
 global _HS_RELOAD_ONLY_GROUPS := Map(
-	"distancesreduction.dead_key_e_circumflex",  true,  ; native AHK Hotstring() engine
-	"autocorrection.multiple_punctuation_marks", true,  ; native AHK Hotstring() engine
+	"distancesreduction.dead_key_e_circumflex",  true,  ; HSE raw-callback; reload-only (conservative)
+	"autocorrection.multiple_punctuation_marks", true,  ; HSE raw-callback; reload-only (conservative)
 	"magickey.replace",                          true,  ; layout remap (J -> star), not a hotstring
 )
 

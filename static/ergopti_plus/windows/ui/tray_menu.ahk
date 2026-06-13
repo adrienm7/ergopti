@@ -2789,15 +2789,17 @@ global PERSONAL_SHORTCUTS_TEMPLATE := "; personal_shortcuts.ahk`r`n"
 
 ; Re-run the hotstring registration in-process so a section toggle takes effect
 ; immediately, with no script Reload. Clears the HSE engine and its buffer, then
-; re-runs RegisterAllHotstrings(false): it re-evaluates every Features guard and
-; recomputes SpaceAroundSymbols, but SKIPS the native deadkey / "…" Hotstring()
-; registrations (they keep their boot registration — toggling one of those reloads
-; instead; see hotstring_live_toggle.ahk). Finally rebuilds the preview index and tray.
+; re-runs RegisterAllHotstrings(): it re-evaluates every Features guard and
+; recomputes SpaceAroundSymbols. The Ê deadkey and "…" ellipsis are now HSE
+; raw-callback hotstrings (no native Hotstring()), so they are cleared and
+; re-registered here like every other section; they stay reload-only in the
+; blocklist, so toggling one of them DIRECTLY still reloads (see
+; hotstring_live_toggle.ahk). Finally rebuilds the preview index and tray.
 RebuildHotstringsLive() {
 	try LoggerStart("Menu", "Rebuilding hotstrings in-process (live toggle)…")
 	HSE_RegistryClear()
 	HSE_HardReset()
-	RegisterAllHotstrings(false)
+	RegisterAllHotstrings()
 	if IsSet(HotstringPrefixWatcherRebuildIndex) {
 		HotstringPrefixWatcherRebuildIndex()
 	}

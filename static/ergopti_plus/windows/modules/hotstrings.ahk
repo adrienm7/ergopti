@@ -14,12 +14,11 @@
 ; restarting the script via Reload. Called once at boot from ErgoptiPlus.ahk
 ; right after the #Include, and again on every live hotstring toggle.
 ;
-; ``IncludeNative`` is true at boot (register everything) and false on a live
-; rebuild. The two native AHK Hotstring() sections (Ê deadkey, "…") are skipped
-; on a live rebuild: they live in the native engine, not the HSE, so clearing the
-; HSE never touches them — re-registering them from a menu-click thread would risk
-; the wrong input level. They keep their boot registration; toggling one of them
-; takes the Reload path instead (see hotstring_live_toggle.ahk).
+; The Ê deadkey and the "…" ellipsis used to be native AHK Hotstring()
+; registrations, skipped on a live rebuild for input-level reasons. They are now
+; HSE raw-callback hotstrings (CreateRawCallbackHotstring), so they carry no
+; A_InputLevel dependency and register on every run — boot AND live rebuild — like
+; every other HSE section. No native Hotstring() remains in this module.
 ;
 ; ``DeferHeavy`` is true ONLY for the boot pass: it skips the heaviest magic-key
 ; categories (emojis + symbols, ~3000 registrations / ~410 ms) so they do not sit
@@ -27,7 +26,7 @@
 ; (RegisterEmojisSymbolsDeferred) that registers them off the critical path and
 ; rebuilds the prefix-watcher index. A live rebuild passes false → everything is
 ; registered synchronously, exactly as before.
-RegisterAllHotstrings(IncludeNative := true, DeferHeavy := false) {
+RegisterAllHotstrings(DeferHeavy := false) {
 	global Features, ScriptInformation, PersonalInformation, PersonalInformationLetters
 	global DeadkeyMappingCircumflex, SpaceAroundSymbols, PersonalInformationHotstrings
 
@@ -86,16 +85,14 @@ if Features["hotstrings"]["distances_reduction"]["dead_key_e_circumflex"]["enabl
 	DeadkeyMappingCircumflexModified.Delete("e") ; For the rolling "êe" that gives "œ"
 	DeadkeyMappingCircumflexModified.Delete("t") ; To be able to type "être"
 
-	; The "Ê" key will enable to use the other symbols on the layer if we aren't inside a word.
+	; The "Ê" key enables the other symbols on the layer when we aren't inside a word.
 	; The activation delay is passed explicitly so the registered callbacks stay
 	; self-contained — CreateDeadkeyHotstring / ShouldActivateDeadkey live at module
-	; scope (see end of file) and never close over this function's locals. These are
-	; native Hotstring() registrations, so they are skipped on a live rebuild
-	; (IncludeNative = false) — they keep their boot registration.
-	if IncludeNative {
-		for MapKey, MappedValue in DeadkeyMappingCircumflexModified {
-			CreateDeadkeyHotstring(MapKey, MappedValue, DeadKeyECircumflexDelay)
-		}
+	; scope (see end of file) and never close over this function's locals. They are
+	; now HSE raw-callback hotstrings (no native Hotstring()), so they register on
+	; every run — including a live rebuild — like every other HSE section.
+	for MapKey, MappedValue in DeadkeyMappingCircumflexModified {
+		CreateDeadkeyHotstring(MapKey, MappedValue, DeadKeyECircumflexDelay)
 	}
 }
 
@@ -426,17 +423,12 @@ if Features["hotstrings"]["autocorrection"]["ou"]["enabled"] {
 if Features["hotstrings"]["autocorrection"]["multiple_punctuation_marks"]["enabled"] {
 	LoadHotstringsSection("autocorrection", "multiple_punctuation_marks", Features["hotstrings"]["autocorrection"]["multiple_punctuation_marks"])
 
-	; We can't use the TimeActivationSeconds here, as previous character = current character = "."
-	; Native Hotstring() — skipped on a live rebuild (IncludeNative = false); it
-	; keeps its boot registration so a menu-thread rebuild can't strand it.
-	if IncludeNative {
-		Hotstring(
-			":*?B0:" . "...",
-			; Needs to be activated only after a word, otherwise can cause problem in code, like in js: [...a, ...b]
-			(*) => GetLastSentCharacterAt(-4) ~= "^[A-Za-z]$" ?
-				SendNewResult("{BackSpace 3}…", False) : ""
-		)
-	}
+	; We can't use the TimeActivationSeconds here, as previous character = current character = ".".
+	; Now an HSE raw-callback hotstring (no native Hotstring()): _EllipsisRawCallback
+	; expands "..." → "…" only after a letter (otherwise it breaks code like the JS
+	; spread « [...a, ...b] ») and returns a { Bs, Ins } effect for buffer resync.
+	CreateRawCallbackHotstring("*?", "...", _EllipsisRawCallback,
+		Map("Category", "autocorrection", "Section", "multiple_punctuation_marks"))
 }
 
 if Features["hotstrings"]["autocorrection"]["suffixes_a_chaining"]["enabled"] {
@@ -1017,15 +1009,22 @@ RegisterTextExpansionDeferred() {
 ; the activation delay flows in as the explicit Delay parameter. This keeps the
 ; registration re-runnable without rebuilding closures on every pass.
 CreateDeadkeyHotstring(MapKey, MappedValue, Delay) {
-	; We only activate the deadkey if it is the start of a new word, as symbols aren't put in words
-	; This condition corrects problems such as writing "même" that give "mê⁂e"
+	; The deadkey only activates at the start of a new word (symbols aren't put in
+	; words); this corrects « même » giving « mê⁂e ». Registered as an HSE
+	; raw-callback hotstring (no native Hotstring(), so no A_InputLevel dependency):
+	; the callback inspects context and conditionally expands.
 	Combination := "ê" . MapKey
-	Hotstring(
-		":*?CB0:" . Combination,
-		(*) => ShouldActivateDeadkey(Combination, MappedValue, Delay)
+	CreateRawCallbackHotstring(
+		"*?C", Combination,
+		(*) => ShouldActivateDeadkey(Combination, MappedValue, Delay),
+		Map("TimeActivationSeconds", Delay, "Category", "distancesreduction", "Section", "dead_key_e_circumflex")
 	)
 }
 
+; Returns the { Bs, Ins } buffer effect _HSE_DispatchRawCallback resyncs from: when
+; the deadkey fires it has back-spaced 2 chars (the "ê" + the key) and sent
+; MappedValue, so the net buffer change is { Bs: 2, Ins: MappedValue }; when it
+; declines it sends nothing and returns { Bs: 0, Ins: "" } (buffer untouched).
 ShouldActivateDeadkey(Combination, MappedValue, Delay) {
 	if not IsTimeActivationExpired(GetLastSentCharacterAt(-2), Delay) {
 		; We only activate the deadkey if it is the start of a new word, as symbols aren't put in words
@@ -1036,9 +1035,23 @@ ShouldActivateDeadkey(Combination, MappedValue, Delay) {
 			; Character at -1 is the key in the deadkey, character at -2 is "ê", character at -3 is character before using the deadkey
 			SendNewResult("{BackSpace 2}", False)
 			SendNewResult(MappedValue)
+			return { Bs: 2, Ins: MappedValue }
 		} else if (GetLastSentCharacterAt(-3) ~= "^[nN]$" and GetLastSentCharacterAt(-1) == "c") { ; Special case of the º symbol
 			SendNewResult("{BackSpace 2}", False)
 			SendNewResult(MappedValue)
+			return { Bs: 2, Ins: MappedValue }
 		}
 	}
+	return { Bs: 0, Ins: "" }
+}
+
+; Ellipsis raw-callback: "..." → "…", but only after a letter (otherwise it would
+; break code like the JS spread « [...a, ...b] »). Returns the { Bs, Ins } buffer
+; effect for HSE resync (back-spaces the 3 dots, inserts "…").
+_EllipsisRawCallback(*) {
+	if (GetLastSentCharacterAt(-4) ~= "^[A-Za-z]$") {
+		SendNewResult("{BackSpace 3}…", False)
+		return { Bs: 3, Ins: "…" }
+	}
+	return { Bs: 0, Ins: "" }
 }
