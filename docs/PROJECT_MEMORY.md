@@ -527,6 +527,32 @@ scaling — a documented parity follow-up, not a regression.
   and uses `\bhs\.`; shared JS is confirmed clean (the old matches were all
   comments + a `months.` false positive).
 
+**Update (2026-06-13, follow-up pass): the A2–A6 follow-ups are closed; two items
+deliberately remain.** Landed: the prompt-builder generator fix (now gated), the
+A4 llm_prediction tint from `UI_AI_LOADING_HEX`, the A5 AHK batch token scaling,
+the A2 manifest-reader extension (keylogger/dynamic_hotstrings/gestures), the full
+**macOS timings sweep** (~38 constants → `lib/timings`), and the **AHK LLM backend
+timings** (`LLMApiLoadTimings`). Gotchas worth keeping:
+- **`lib/timings` typos fail fast at require-time** — the macOS suite catches a
+  wrong section/key because it loads the modules; this is the safety net that made
+  the macOS sweep safe to do in bulk.
+- **macOS hs.* baseline is 906** now (the +1 over 905 is the
+  `hs.gestures.space_wrap` manifest PATH literal in gestures/init.lua — not an OS
+  call). Wiring more `hs.*`-prefixed manifest paths will need another re-anchor.
+- **Two intentional macOS local timing divergences** (NOT to "fix"): MLX
+  `DISCOVERY_MAX_WAIT` 180 s (vs registry 60 s — slow 8B loads) and the menu
+  `INSTALLED_CACHE_TTL` 30 s (vs 2 s).
+- **The AHK keylogger telemetry timings are deliberately NOT swept.** Those
+  sub-modules (`keylogger_watchers/_hook/_network/_av_state/_sensors/_mouse/
+  _trigger_roi/_clipboard/_window_topology/_ergonomics` + `keylogger.ahk`
+  `KeylogConst`) are AHK-only telemetry (no macOS counterpart → no mutualization
+  value) AND are **not in `run_all.ahk`**, so a reassign-at-boot wire would be
+  unverifiable in CI with a 0 ms-sentinel → CPU-spin hazard. Three are genuine
+  code↔registry divergences (`CONTEXT_TTL` 1000≠500, `PARK_CHECK` 250≠100,
+  `TOPO_TICK` 1500≠500) that need a maintainer call first. See TODO "Follow-up
+  pass" for the safe recipe (harness inclusion + batch loader + tripwire +
+  reconcile + hardware smoke-test).
+
 ### project_debug_menu_sync
 
 _Debug menu order is defined in shared/menu_manifest.json debug_menu — both AHK and Lua drivers consume it_
