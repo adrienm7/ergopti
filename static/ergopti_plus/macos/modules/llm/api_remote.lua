@@ -33,6 +33,7 @@
 local M = {}
 
 local Logger         = require("lib.logger")
+local Timings        = require("lib.timings")
 local Paths          = require("lib.paths")
 local Profiles       = require("modules.llm.profiles")
 local Parser         = require("modules.llm.parser")
@@ -127,7 +128,7 @@ end
 local MODEL_PRICES
 M.PROVIDERS, M.PROVIDER_ORDER, MODEL_PRICES = load_api_providers()
 
-local REQUEST_TIMEOUT_S = 30
+local REQUEST_TIMEOUT_S = Timings.sec("llm", "request_timeout_ms")
 
 local DEDUPLICATION_ENABLED      = ApiCommon.DEFAULT_DEDUPLICATION_ENABLED
 -- Retry policy from shared/llm/inference.json (api_common.lua) so the

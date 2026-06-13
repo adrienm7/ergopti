@@ -12,6 +12,7 @@ local M = {}
 local hs            = hs
 local notifications = require("lib.notifications")
 local Logger        = require("lib.logger")
+local Timings       = require("lib.timings")
 local i18n          = require("lib.i18n")
 local LOG           = "gestures.actions"
 
@@ -101,7 +102,8 @@ function M.trigger_lookup()
 end
 
 -- Delay to ignore the spurious mouseUp from the gesture's own finger-lift.
-local CLICK_COOLDOWN_SEC = 0.15
+-- Shared cross-driver value ([gestures] click_cooldown_ms).
+local CLICK_COOLDOWN_SEC = Timings.sec("gestures", "click_cooldown_ms")
 
 local rightClickHeld    = false
 local leftClickHeld     = false

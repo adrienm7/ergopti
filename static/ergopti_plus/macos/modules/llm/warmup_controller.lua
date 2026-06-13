@@ -21,8 +21,9 @@
 
 local M = {}
 
-local hs     = hs
-local Logger = require("lib.logger")
+local hs      = hs
+local Logger  = require("lib.logger")
+local Timings = require("lib.timings")
 
 local LOG = "llm.warmup_controller"
 
@@ -36,15 +37,15 @@ local LOG = "llm.warmup_controller"
 -- Delay before the first warmup attempt fires after schedule_warmup is called.
 -- A short delay gives the menu time to finish calling set_llm_model before the
 -- warmup fires, so the resolved model name is always correct.
-local WARMUP_INITIAL_DELAY_SEC = 2
+local WARMUP_INITIAL_DELAY_SEC = Timings.sec("llm", "warmup_initial_delay_ms")
 
 -- Starting retry interval; doubles on each failed attempt up to WARMUP_RETRY_CAP_SEC.
 -- A fast-loading backend (< 10 s) is caught within 1–2 attempts; a slow one
 -- (30+ s) is polled progressively less aggressively rather than every 5 seconds.
-local WARMUP_RETRY_BASE_SEC = 5
+local WARMUP_RETRY_BASE_SEC = Timings.sec("llm", "warmup_retry_base_ms")
 
 -- Maximum retry interval — prevents the backoff from growing unbounded.
-local WARMUP_RETRY_CAP_SEC  = 60
+local WARMUP_RETRY_CAP_SEC  = Timings.sec("llm", "warmup_retry_cap_ms")
 
 
 -- =====================================

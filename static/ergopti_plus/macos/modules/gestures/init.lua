@@ -18,6 +18,7 @@ local hs            = hs
 local notifications = require("lib.notifications")
 local Logger        = require("lib.logger")
 local Manifest      = require("lib.manifest_reader")
+local Timings       = require("lib.timings")
 local LOG           = "gestures"
 
 local function load_touchdevice_module()
@@ -483,9 +484,10 @@ function M.is_enabled()  return CoreState.enabled end
 -- for hot-plug recovery only. A wake-from-sleep watcher recreates the device
 -- on resume (the BetterTouchTool pattern), since sleep DOES tear down the
 -- subscription on some hardware.
-local STARTUP_SAFETY_PROBE_SEC   = 5.0   -- One-shot retry at +5 s if no frame yet
-local STARTUP_PHASE_TIMEOUT_SEC  = 30.0  -- Give up the aggressive phase after this
-local HEALTH_CHECK_INTERVAL_SEC  = 30.0  -- Slow cadence once frames are flowing
+-- Shared cross-driver values ([gestures]) so timers stay in sync across drivers.
+local STARTUP_SAFETY_PROBE_SEC   = Timings.sec("gestures", "startup_safety_probe_ms")  -- One-shot retry if no frame yet
+local STARTUP_PHASE_TIMEOUT_SEC  = Timings.sec("gestures", "startup_phase_timeout_ms") -- Give up the aggressive phase after this
+local HEALTH_CHECK_INTERVAL_SEC  = Timings.sec("gestures", "health_check_interval_ms") -- Slow cadence once frames are flowing
 -- Cooldown between primer-triggered emergency recycles, so a fast burst of
 -- gesture events at the moment of the first user contact does not retrigger
 -- the heavy recycle path several times in a row.

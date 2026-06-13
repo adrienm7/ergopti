@@ -24,10 +24,11 @@
 
 local M = {}
 
-local hs     = hs
-local Parser = require("modules.llm.parser")
-local Logger = require("lib.logger")
-local i18n   = require("lib.i18n")
+local hs      = hs
+local Parser  = require("modules.llm.parser")
+local Logger  = require("lib.logger")
+local Timings = require("lib.timings")
+local i18n    = require("lib.i18n")
 
 local LOG = "llm.streaming_handler"
 
@@ -38,8 +39,9 @@ local LOG = "llm.streaming_handler"
 -- =============================================
 -- =============================================
 
--- Surface partial results after this many seconds of stream stall
-local STREAM_WATCHDOG_SEC = 12.0
+-- Surface partial results after this many seconds of stream stall.
+-- Shared cross-driver value ([llm] stream_watchdog_ms).
+local STREAM_WATCHDOG_SEC = Timings.sec("llm", "stream_watchdog_ms")
 
 -- Frames per second for the streaming progress spinner
 local SPINNER_FPS = 6

@@ -23,6 +23,7 @@ local M = {}
 
 local hs            = hs
 local Logger        = require("lib.logger")
+local Timings       = require("lib.timings")
 local dialog        = require("lib.dialog_util")
 local notifications = require("lib.notifications")
 local i18n          = require("lib.i18n")
@@ -80,7 +81,8 @@ local ERGOPTI_VARIANTS = {
 -- Delay before rebuilding the menu after a bundle install. macOS reloads the
 -- input-source list asynchronously; calling hs.keycodes too quickly during
 -- that window has been observed to crash Hammerspoon. 1.5 s is a safe margin.
-local POST_INSTALL_REFRESH_DELAY = 1.5
+-- Shared cross-driver value ([ui] post_install_refresh_ms).
+local POST_INSTALL_REFRESH_DELAY = Timings.sec("ui", "post_install_refresh_ms")
 
 -- Delay before firing a TIS (Text Input Sources) call from a menu-click
 -- handler. macOS posts kTISNotifyEnabledKeyboardInputSourcesChanged /
@@ -88,7 +90,8 @@ local POST_INSTALL_REFRESH_DELAY = 1.5
 -- functions run, and Hammerspoon's hs.keycodes observers can re-enter Lua
 -- state mid-handler. Bouncing through hs.timer guarantees the menu click
 -- has fully unwound before the TIS call mutates input-source state.
-local TIS_CALL_DELAY = 0.1
+-- Shared cross-driver value ([ui] tis_call_delay_ms).
+local TIS_CALL_DELAY = Timings.sec("ui", "tis_call_delay_ms")
 
 -- Discovery caches — keep the synchronous menu-open path free of subprocess
 -- spawns. Bundle discovery (directory scans + Info.plist probes) and the active-

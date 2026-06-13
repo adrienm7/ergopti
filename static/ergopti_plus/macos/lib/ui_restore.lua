@@ -30,14 +30,16 @@
 
 local M = {}
 
-local hs     = hs
-local Logger = require("lib.logger")
+local hs      = hs
+local Logger  = require("lib.logger")
+local Timings = require("lib.timings")
 
 local LOG          = "ui_restore"
 local SETTINGS_KEY = "ergopti_ui_restore_state"
 
--- How often the deferred-reload poller wakes up to check whether all UIs closed
-local POLL_INTERVAL_SEC = 1
+-- How often the deferred-reload poller wakes up to check whether all UIs closed.
+-- Shared cross-driver value ([ui] ui_restore_poll_ms).
+local POLL_INTERVAL_SEC = Timings.sec("ui", "ui_restore_poll_ms")
 
 
 

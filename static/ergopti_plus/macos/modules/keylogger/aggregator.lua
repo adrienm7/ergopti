@@ -32,8 +32,9 @@ local json    = require("hs.json")
 local sqlite3 = require("hs.sqlite3")
 local utf8    = utf8
 
-local Logger = require("lib.logger")
-local LOG    = "keylogger.aggregator"
+local Logger  = require("lib.logger")
+local Timings = require("lib.timings")
+local LOG     = "keylogger.aggregator"
 
 local SqliteWriter = require("modules.keylogger.sqlite_writer")
 local Export       = require("modules.keylogger.export")
@@ -47,11 +48,13 @@ local Export       = require("modules.keylogger.export")
 --- ============================
 -- ==============================
 
+-- The keystroke-timing thresholds below come from the shared cross-driver
+-- registry ([keylogger]) so the AHK and macOS keyloggers classify identically.
 --- Threshold separating "active typing" from "thinking pauses".
-local THINK_PAUSE_THRESHOLD_MS = 2000
+local THINK_PAUSE_THRESHOLD_MS = Timings.ms("keylogger", "think_pause_ms")
 
 --- A pause longer than this between keystrokes breaks N-gram continuity.
-local MAX_KEYSTROKE_DELAY_MS = 5000
+local MAX_KEYSTROKE_DELAY_MS = Timings.ms("keylogger", "max_keystroke_delay_ms")
 
 --- Bucket thresholds (ms) for the "ignore pauses longer than…" UI dropdown.
 local UI_PAUSE_BUCKETS_MS = { 1000, 2000, 3000, 5000, 10000, 20000, 30000, 60000 }
@@ -60,13 +63,13 @@ local UI_PAUSE_BUCKETS_MS = { 1000, 2000, 3000, 5000, 10000, 20000, 30000, 60000
 local TRIGGER_LOOKBACK_LEN = 50
 
 --- A "burst" closes when the inter-keydown gap exceeds this.
-local BURST_GAP_MS = 1000
+local BURST_GAP_MS = Timings.ms("keylogger", "burst_gap_ms")
 
 --- Minimum chars in a burst to count toward the max-CPM record.
 local MIN_BURST_FOR_CPM = 10
 
 --- A "session" closes when the inter-keydown gap exceeds this (5 min).
-local SESSION_GAP_MS = 300000
+local SESSION_GAP_MS = Timings.ms("keylogger", "session_gap_ms")
 
 --- Burst length histogram boundaries. Last bucket is open-ended ("500+").
 local BURST_LENGTH_BUCKETS = { 1, 5, 10, 20, 50, 100, 200, 500 }
@@ -75,13 +78,13 @@ local BURST_LENGTH_BUCKETS = { 1, 5, 10, 20, 50, 100, 200, 500 }
 local SESSION_DURATIONS_CAP = 100
 
 --- Auto-repeat detection threshold (macOS auto-repeat fires every ~30 ms).
-local AUTO_REPEAT_MAX_DELAY_MS = 50
+local AUTO_REPEAT_MAX_DELAY_MS = Timings.ms("keylogger", "auto_repeat_max_delay_ms")
 
 --- A run of ≥ N consecutive manual backspaces counts as one cascade.
 local CASCADE_MIN_BS = 3
 
 --- Tap vs hold threshold for kc_hold tracking.
-local HOLD_THRESHOLD_MS = 250
+local HOLD_THRESHOLD_MS = Timings.ms("keylogger", "hold_threshold_ms")
 
 --- Window-titles cap per (device,date,app).
 local TITLE_CAP_PER_APP_DAY = 100

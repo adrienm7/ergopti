@@ -28,6 +28,7 @@ local eventtap      = hs.eventtap
 local pasteboard    = hs.pasteboard
 local notifications = require("lib.notifications")
 local Logger        = require("lib.logger")
+local Timings       = require("lib.timings")
 local i18n          = require("lib.i18n")
 
 local LOG = "shortcuts.actions.system"
@@ -51,12 +52,14 @@ local KEYCODE_AT_HASH        = 10
 
 local Keycodes               = require("lib.keycodes")
 
--- Keep-awake jitter parameters
-local AWAKE_TICK_MIN_SEC     = 1    -- Minimum interval between mouse-jitter ticks
-local AWAKE_TICK_MAX_SEC     = 5    -- Maximum interval between mouse-jitter ticks
+-- Keep-awake jitter parameters. The tick interval bounds + return delay come
+-- from the shared cross-driver registry ([keep_awake]); the pixel offsets are
+-- macOS-local (no AHK equivalent).
+local AWAKE_TICK_MIN_SEC     = Timings.sec("keep_awake", "tick_min_ms")     -- Minimum interval between mouse-jitter ticks
+local AWAKE_TICK_MAX_SEC     = Timings.sec("keep_awake", "tick_max_ms")     -- Maximum interval between mouse-jitter ticks
 local AWAKE_JITTER_X         = 80   -- Max horizontal pixel offset per tick (visible but stays near origin)
 local AWAKE_JITTER_Y         = 80   -- Max vertical pixel offset per tick (visible but stays near origin)
-local AWAKE_RETURN_DELAY_SEC = 0.2  -- Seconds to hold offset before returning to origin
+local AWAKE_RETURN_DELAY_SEC = Timings.sec("keep_awake", "return_delay_ms") -- Seconds to hold offset before returning to origin
 
 -- Grace period after activation during which the auto-deactivation watcher
 -- ignores ALL input. It must absorb three settle sources: the trigger keystroke's

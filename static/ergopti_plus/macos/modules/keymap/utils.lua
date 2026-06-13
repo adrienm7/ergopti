@@ -26,6 +26,7 @@ local shared_utils = require("keymap.utils")
 local keyStrokes  = hs.eventtap.keyStrokes
 local keyStroke   = hs.eventtap.keyStroke
 local Logger      = require("lib.logger")
+local Timings     = require("lib.timings")
 
 local LOG = "keymap.utils"
 
@@ -50,7 +51,8 @@ local PASTE_THRESHOLD = 50
 
 -- How long the clipboard is left with the pasted value before restoring the
 -- user's previous contents. Large enough to let the target app receive the paste.
-local CLIPBOARD_RESTORE_SEC = 0.15
+-- Shared cross-driver value ([debounce] clipboard_restore_ms).
+local CLIPBOARD_RESTORE_SEC = Timings.sec("debounce", "clipboard_restore_ms")
 
 -- Safety TTL (seconds) for the ignored-window cache. The cache is normally
 -- invalidated on focus-change events (hs.application.watcher + hs.window.filter),

@@ -24,9 +24,10 @@
 
 local M = {}
 
-local hs     = hs
-local Logger = require("lib.logger")
-local LOG    = "keylogger.kc_bridge"
+local hs      = hs
+local Logger  = require("lib.logger")
+local Timings = require("lib.timings")
+local LOG     = "keylogger.kc_bridge"
 
 -- Absolute path to the hand-off log file written by KE shell_command actions.
 -- Must match the KE_PHYSICAL_KC_LOG constant in modules/karabiner/generator.lua.
@@ -46,7 +47,8 @@ local MAX_DRAIN_LINES = 200
 -- Backup poller interval (seconds). hs.pathwatcher relies on FSEvents which can
 -- coalesce or miss rapid append-only writes on some macOS versions; a low-cost
 -- timer drains the log on a fixed cadence so no physical kc event is ever lost.
-local POLL_FALLBACK_SEC = 0.5
+-- Shared cross-driver value ([keylogger] kc_bridge_poll_ms).
+local POLL_FALLBACK_SEC = Timings.sec("keylogger", "kc_bridge_poll_ms")
 
 local _state      = nil   -- injected by M.init()
 local _log_manager = nil  -- injected by M.init()
