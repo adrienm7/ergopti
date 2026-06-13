@@ -668,12 +668,13 @@ try BootProfile_Mark("HS sub: @-personal-info combos registered")
 ; ===== 4.3) Text expansion with ★ =====
 ; ======================================
 
-if Features["hotstrings"]["magic_key"]["text_expansion"]["enabled"] {
-	LoadHotstringsSection("magickey", "text_expansion", Features["hotstrings"]["magic_key"]["text_expansion"])
-}
-
-if Features["hotstrings"]["magic_key"]["text_expansion_auto"]["enabled"] {
-	LoadHotstringsSection("magickey", "text_expansion_auto", Features["hotstrings"]["magic_key"]["text_expansion_auto"])
+; The magic-key text-expansion sections are the heaviest registration category
+; (~2119 case variants, ~1.36 s). On the boot pass (DeferHeavy = true) they are
+; skipped here and loaded off the critical path by RegisterTextExpansionDeferred()
+; a short moment after "ready"; on a live rebuild (DeferHeavy = false) they load
+; inline, exactly as before. Mirrors the emoji/symbol deferral below.
+if !DeferHeavy {
+	_RegisterTextExpansionSections()
 }
 try BootProfile_Mark("HS sub: magickey core (text_expansion) registered")
 
@@ -928,6 +929,12 @@ try BootProfile_Mark("HS sub: personal + extension TOML registered")
 ; a couple of seconds.
 global HS_DEFERRED_REGISTRATION_DELAY_MS := 1500
 
+; Delay (ms) before the deferred text-expansion pass fires after boot. Kept short
+; — the magic-key abbreviations are core, everyday expansions, so we bring them
+; online as soon as the boot critical path is clear, while still keeping their
+; ~1.36 s registration off time-to-ready.
+global HS_DEFERRED_TEXTEXP_DELAY_MS := 300
+
 ; Registers the heavy magic-key emoji + symbol sections into the HSE. Shared by
 ; the boot deferred pass and the live rebuild so the two code paths never diverge.
 _RegisterEmojisSymbolsSections() {
@@ -959,6 +966,39 @@ RegisterEmojisSymbolsDeferred() {
 		try LoggerInfo("Hotstrings", "Deferred emoji/symbol registration complete.")
 	} catch as e {
 		try LoggerError("Hotstrings", "Deferred emoji/symbol registration failed: {1}", e.Message)
+	}
+}
+
+; Registers the magic-key text-expansion sections into the HSE. Shared by the boot
+; deferred pass and the live rebuild so the two code paths never diverge (mirrors
+; _RegisterEmojisSymbolsSections for the emoji/symbol categories).
+_RegisterTextExpansionSections() {
+	global Features
+	if Features["hotstrings"]["magic_key"]["text_expansion"]["enabled"] {
+		LoadHotstringsSection("magickey", "text_expansion", Features["hotstrings"]["magic_key"]["text_expansion"])
+	}
+	if Features["hotstrings"]["magic_key"]["text_expansion_auto"]["enabled"] {
+		LoadHotstringsSection("magickey", "text_expansion_auto", Features["hotstrings"]["magic_key"]["text_expansion_auto"])
+	}
+}
+
+; Post-boot pass: registers the magic-key text-expansion categories the boot
+; RegisterAllHotstrings(…, DeferHeavy := true) skipped, then rebuilds the
+; prefix-watcher index so the live preview includes them. Armed via a short-delay
+; one-shot SetTimer from ErgoptiPlus.ahk (HS_DEFERRED_TEXTEXP_DELAY_MS) so the
+; ~1.36 s registration stays off time-to-ready while the abbreviations still come
+; online quickly. Wrapped in try so a transient failure can never crash the timer
+; thread and leave the driver half-initialised.
+RegisterTextExpansionDeferred() {
+	try {
+		_RegisterTextExpansionSections()
+		; The prefix-watcher index was armed at boot WITHOUT these categories —
+		; rebuild it so the tooltip preview ranks them like every other category.
+		try HotstringPrefixWatcherRebuildIndex()
+		try BootProfile_Mark("Text-expansion hotstrings registered (deferred)")
+		try LoggerInfo("Hotstrings", "Deferred text-expansion registration complete.")
+	} catch as e {
+		try LoggerError("Hotstrings", "Deferred text-expansion registration failed: {1}", e.Message)
 	}
 }
 

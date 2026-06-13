@@ -2153,9 +2153,11 @@ _RegisterScriptAltGrHotkeys()
 ; micro-bench (tests/bench_boot_hotstrings.ahk) shows magic-key text expansion is
 ; the heaviest registration category by a wide margin.
 BootProfile_Mark("Layout/shortcuts/tap-holds + AltGr registered")
-; DeferHeavy := true — skip the emoji/symbol categories (~3000 regs / ~410 ms) on
-; the critical boot path; RegisterEmojisSymbolsDeferred (armed below) loads them
-; off-path a moment later. The prefix-watcher index it then rebuilds picks them up.
+; DeferHeavy := true — skip the heaviest magic-key categories on the critical boot
+; path: the text-expansion sections (~2119 regs / ~1.36 s) AND the emoji/symbol
+; sections (~3000 regs / ~410 ms). RegisterTextExpansionDeferred and
+; RegisterEmojisSymbolsDeferred (both armed below) load them off-path a moment
+; later, each rebuilding the prefix-watcher index so the preview picks them up.
 RegisterAllHotstrings(true, true)
 BootProfile_Mark("Hotstrings registered (HSE, emoji/symbol deferred)")
 HotstringPrefixWatcherInit()
@@ -2173,11 +2175,14 @@ LoggerSuccess("ErgoptiPlus", "Driver fully initialised — ready.")
 ; countdowns start once the critical path is done, so they fire on the idle
 ; message loop with the menu fully built and registration complete.
 ;
-; Order by delay so the three never contend: the LLM submenu populates first
-; (fast, so its dropdown is ready), then the emoji/symbol pass, then the WebView2
-; widget last (its delay clears the emoji pass).
+; Order by delay so the passes never contend (same-priority AHK timers serialise,
+; they never preempt one another): the LLM submenu populates first (fast, so its
+; dropdown is ready), then the text-expansion pass (core magic-key abbreviations,
+; brought online quickly), then the emoji/symbol pass, then the WebView2 widget
+; last (its delay clears the registration passes).
 if _LLM_Tray_BuildPending
 	SetTimer(LLM_Tray_Build, -LLM_TRAY_BUILD_DEFER_MS)
+SetTimer(RegisterTextExpansionDeferred, -HS_DEFERRED_TEXTEXP_DELAY_MS)
 SetTimer(RegisterEmojisSymbolsDeferred, -HS_DEFERRED_REGISTRATION_DELAY_MS)
 if (MetricsShortcuts.enabled and WPMWidget.visible)
 	SetTimer(WPMWidget_Show, -WPMWidgetConst.BOOT_SHOW_DELAY_MS)
