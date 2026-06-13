@@ -62,7 +62,9 @@ function unescapeValue(s) {
 function parseTsv(content) {
 	if (content.charCodeAt(0) === 0xfeff) content = content.slice(1);
 	const m = {};
-	for (const line of content.split('\n')) {
+	// Split on LF and tolerate CR (a CRLF checkout via core.autocrlf must not make
+	// every value gain a trailing \r). Mirrors the AHK Loop Parse "`n","`r".
+	for (const line of content.split(/\r?\n/)) {
 		if (line === '') continue;
 		const tab = line.indexOf('\t');
 		if (tab < 0) continue;
