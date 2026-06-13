@@ -174,7 +174,7 @@ _I18nLoadFile(FilePath) {
 	}
 
 	_I18nCacheLoaded := true
-	try LoggerDone("i18n", "Locale '{1}' loaded (%d key(s)).", _I18nLocale, _I18nCache.Count)
+	try LoggerDone("i18n", "Locale '{1}' loaded ({2} key(s)).", _I18nLocale, _I18nCache.Count)
 }
 
 ; Load a locale into a provided Map reference. Returns true on success.
