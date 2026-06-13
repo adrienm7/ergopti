@@ -674,3 +674,24 @@ _LLM_EngineShowLoading_ShownWhenScreenEmpty() {
 	_Stub_LlmTooltipLoading := false
 }
 Test("LLM engine: loading spinner shown when no prediction is visible", _LLM_EngineShowLoading_ShownWhenScreenEmpty)
+
+
+; A5 follow-up — per-call token budget mirrors macOS fetch_batch scaling.
+; A sequential-variant call yields 1 prediction; a single batch call yields N.
+_LLM_EngineCallTokenBudget_Sequential() {
+	; preds_per_call = 1 -> maxTokens + 1*5
+	AssertEqual(105, _LLM_Engine_CallTokenBudget(100, 1), "sequential call = maxTokens + overhead")
+}
+Test("LLM engine: per-call token budget for a sequential variant", _LLM_EngineCallTokenBudget_Sequential)
+
+_LLM_EngineCallTokenBudget_Batch() {
+	; preds_per_call = 3 -> maxTokens*3 + 3*5 (all 3 predictions in one response)
+	AssertEqual(315, _LLM_Engine_CallTokenBudget(100, 3), "batch call scales by num_predictions")
+}
+Test("LLM engine: per-call token budget scales for a batch call", _LLM_EngineCallTokenBudget_Batch)
+
+_LLM_EngineCallTokenBudget_GuardsInvalidCount() {
+	; A non-positive / non-integer count is treated as a single prediction.
+	AssertEqual(105, _LLM_Engine_CallTokenBudget(100, 0), "zero predictions guarded to one")
+}
+Test("LLM engine: per-call token budget guards an invalid prediction count", _LLM_EngineCallTokenBudget_GuardsInvalidCount)
