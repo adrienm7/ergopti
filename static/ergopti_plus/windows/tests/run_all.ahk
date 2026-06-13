@@ -258,6 +258,7 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 #Include meta/test_text_expansion_deferred.ahk
 #Include meta/test_prefix_watcher_deferred.ahk
 #Include meta/test_native_hotstrings_migrated.ahk
+#Include test_hse_conform_double_fire.ahk
 #Include meta/test_llm_tray_deferred_build.ahk
 #Include meta/test_logger_format_placeholders.ahk
 #Include meta/test_prefix_render_deferred.ahk

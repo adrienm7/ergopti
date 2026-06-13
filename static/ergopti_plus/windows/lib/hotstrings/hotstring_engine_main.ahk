@@ -1212,7 +1212,24 @@ HSE_DispatchMatch(Spec, EndChar) {
     if Spec.HasOwnProp("TimeActivationSeconds")
         and Spec.TimeActivationSeconds > 0
         and Spec.HasOwnProp("PrevCharKey") {
-        if IsTimeActivationExpired(Spec.PrevCharKey, Spec.TimeActivationSeconds) {
+        ; The gate keys off LastSentCharacterKeyTime, which UpdateLastSentCharacter
+        ; stores by the char AS TYPED (so an UPPER "T" and a lowercase "t" are
+        ; distinct entries). A case-conform spec carries the LOWERCASE canonical
+        ; PrevCharKey, but the user may have typed the trigger in UPPER/Title — then
+        ; the lowercase key-time is never refreshed and the activation wrongly
+        ; expires (the "UPPER ct★ fires a few times then stops" regression from
+        ; collapsing the per-case variants). For a conform spec read the prev char
+        ; AS TYPED from the buffer (the char before the 1-char magic key, mirroring
+        ; PrevCharKey = SubStr(Abbreviation, -2, 1)) so the lookup hits the right
+        ; cased entry. Non-conform specs keep their precomputed per-case PrevCharKey.
+        PrevKey := Spec.PrevCharKey
+        if (Spec.HasOwnProp("CaseConform") and Spec.CaseConform) {
+            TypedPrev := SubStr(HSE_Buffer, -2, 1)
+            if (TypedPrev != "") {
+                PrevKey := TypedPrev
+            }
+        }
+        if IsTimeActivationExpired(PrevKey, Spec.TimeActivationSeconds) {
             return
         }
     }
