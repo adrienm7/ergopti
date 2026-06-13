@@ -153,6 +153,11 @@ generated-loader honouring, and the live preview).
 
 **Still remaining (genuine hand-off):**
 
+> **UPDATE (2026-06-13):** the architectural lever in §A below **has now landed** —
+> the emoji/symbol categories are deferred to a post-boot idle pass (`a866b13fb`,
+> see the "Follow-up pass" section). §A is kept for the bisection data + context;
+> it needs a hardware boot smoke-test to confirm the gain.
+
 A. **Boot perf (Windows)** — bisected. A headless micro-bench
    (`tests/bench_boot_hotstrings.ahk`, run via AutoHotkey64) reproduces the exact
    production registration path (`CreateHotstring` → `_MirrorRegistrationToHSE` →
@@ -538,7 +543,19 @@ A second pass landed the follow-ups the A2–A6 STATUS blocks had spun off:
   sourced at boot via `LLMApiLoadTimings()` (reassign-at-boot), pinned by a
   tripwire. AHK **1389/0**, macOS **1588/0**.
 
-**Still open (two items, by deliberate choice):**
+- ✅ **Boot perf (Windows) — emoji/symbol idle-pass landed** (`a866b13fb`): the
+  maintainer chose the deferral approach. The boot `RegisterAllHotstrings(…,
+  DeferHeavy := true)` now skips the emoji + symbol magic-key categories (~3000
+  regs / ~410 ms) and a one-shot post-boot `SetTimer` (`RegisterEmojisSymbolsDeferred`,
+  ~1.5 s) registers them off the critical path + rebuilds the prefix-watcher index.
+  Live rebuilds still register everything synchronously. **Needs a hardware boot
+  smoke-test** (it lives in `modules/hotstrings.ahk` + `ErgoptiPlus.ahk`, neither
+  in the CI harness): confirm the boot-time drop, that emoji/symbol expansions
+  work ~1.5 s after launch, and no same-trigger collision regression (deferred =
+  registered last, so a same-length/same-priority tie would flip — practically nil
+  given the distinct namespaces).
+
+**Still open (one item, by deliberate choice):**
 
 1. ⏭️ **AHK keylogger telemetry timings sweep.** The remaining AHK timing literals
    live in the keylogger sub-modules (`keylogger.ahk` `KeylogConst`,
@@ -558,10 +575,6 @@ A second pass landed the follow-ups the A2–A6 STATUS blocks had spun off:
    add a single `KeyloggerLoadTimings()` batch loader + a tripwire asserting no
    sentinel survives, reconcile the three divergences first, then smoke-test on
    real hardware.
-2. ⏭️ **Boot perf (Windows) — the architectural lever (see §A at the top).** Still
-   needs a deliberate product decision: deferring the magic-key emoji/symbol
-   categories to a post-boot idle pass (or cutting the registration count) changes
-   time-to-availability and collision ordering, so it must be chosen, not guessed.
 
 ---
 
