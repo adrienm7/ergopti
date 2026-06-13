@@ -144,6 +144,47 @@ const PIPELINE = [
 	},
 
 	// -------------------------------------------------------
+	// Step 1b: Regenerate the remaining faithful codegen artefacts so a source
+	// change without a re-run (or a hand-edit of a generated file) is caught by
+	// the drift gate below — the freshness half of A6. Only generators whose
+	// output is byte-faithful to the committed file are listed here:
+	//   - codegen:terminators       → terminators.{ahk,lua}
+	//   - codegen:expander:ahk      → expander.ahk   (tested adapter)
+	//   - codegen:registry          → registry.ahk   (tested adapter)
+	// contracts.json is already gated by test:port-compliance (with line-ending
+	// normalisation). prompt_builder.ahk is deliberately EXCLUDED:
+	// codegen-prompt-builder-ahk.cjs currently over-escapes string delimiters
+	// (emits `"…`" instead of "…"), so a re-run would corrupt the correct,
+	// committed file — fix that generator before adding it here (see TODO A6).
+	{
+		name: 'codegen:terminators — regenerate terminators.{ahk,lua}',
+		run() {
+			const { ok, stderr } = runNpmScript('codegen:terminators');
+			return { ok, detail: ok ? undefined : stderr };
+		},
+		generated: [
+			'static/ergopti_plus/windows/_generated/terminators.ahk',
+			'static/ergopti_plus/macos/_generated/terminators.lua'
+		]
+	},
+	{
+		name: 'codegen:expander:ahk — regenerate expander.ahk adapter',
+		run() {
+			const { ok, stderr } = runNpmScript('codegen:expander:ahk');
+			return { ok, detail: ok ? undefined : stderr };
+		},
+		generated: ['static/ergopti_plus/windows/_generated/expander.ahk']
+	},
+	{
+		name: 'codegen:registry — regenerate registry.ahk adapter',
+		run() {
+			const { ok, stderr } = runNpmScript('codegen:registry');
+			return { ok, detail: ok ? undefined : stderr };
+		},
+		generated: ['static/ergopti_plus/windows/_generated/registry.ahk']
+	},
+
+	// -------------------------------------------------------
 	// Step 2: Cross-driver manifest parity (AHK ↔ HS)
 	// -------------------------------------------------------
 	{
