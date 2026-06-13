@@ -40,9 +40,10 @@ local json    = require("hs.json")
 local sqlite3 = require("hs.sqlite3")
 local timer   = require("hs.timer")
 
-local Logger = require("lib.logger")
-local i18n   = require("lib.i18n")  -- kept for MAC_CATEGORIES_FR still used by export
-local LOG    = "keylogger.log_manager"
+local Logger  = require("lib.logger")
+local Timings = require("lib.timings")
+local i18n    = require("lib.i18n")  -- kept for MAC_CATEGORIES_FR still used by export
+local LOG     = "keylogger.log_manager"
 
 local SqliteWriter = require("modules.keylogger.sqlite_writer")
 local Aggregator   = require("modules.keylogger.aggregator")
@@ -59,11 +60,13 @@ local Metrics      = require("keylogger.metrics")
 --- ============================
 -- ==============================
 
---- Background ingest tick period (KEYLOGGER_SPEC §4).
-local INGEST_TICK_SEC = 5
+--- Background ingest tick period (KEYLOGGER_SPEC §4). Shared cross-driver value
+--- ([keylogger] ingest_tick_ms).
+local INGEST_TICK_SEC = Timings.sec("keylogger", "ingest_tick_ms")
 
---- Cap on the per-event delay credited to WPM calculation.
-local WPM_MAX_EVENT_DELAY_MS = 5000
+--- Cap on the per-event delay credited to WPM calculation. Shared cross-driver
+--- value ([keylogger] max_keystroke_delay_ms).
+local WPM_MAX_EVENT_DELAY_MS = Timings.ms("keylogger", "max_keystroke_delay_ms")
 
 
 

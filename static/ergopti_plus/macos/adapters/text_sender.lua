@@ -27,6 +27,7 @@ local M = {}
 
 local hs       = hs
 local Logger   = require("lib.logger")
+local Timings  = require("lib.timings")
 local Clipboard = require("adapters.clipboard")
 
 local LOG = "adapters.text_sender"
@@ -44,7 +45,8 @@ local CLIPBOARD_THRESHOLD = 1000
 
 -- Delay in seconds before the clipboard is restored after a paste injection.
 -- Long enough for the receiving application to process Cmd+V before we overwrite.
-local CLIPBOARD_RESTORE_DELAY_S = 0.15
+-- Shared cross-driver value ([debounce] clipboard_restore_ms).
+local CLIPBOARD_RESTORE_DELAY_S = Timings.sec("debounce", "clipboard_restore_ms")
 
 -- Paste keystroke on macOS.
 local PASTE_KEY      = "v"

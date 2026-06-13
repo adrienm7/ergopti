@@ -27,6 +27,7 @@ local M = {}
 
 local hs          = hs
 local Logger      = require("lib.logger")
+local Timings     = require("lib.timings")
 local Keycodes    = require("lib.keycodes")
 
 
@@ -42,11 +43,13 @@ local KARABINER_CLI = "/Library/Application Support/org.pqrs/Karabiner-Elements/
 
 -- macOS can emit two input-source change notifications in rapid succession
 -- during a layout switch — debouncing coalesces them into a single rebuild.
-local INPUT_SOURCE_DEBOUNCE_SEC = 0.25
+-- Shared cross-driver value ([debounce] input_source_ms).
+local INPUT_SOURCE_DEBOUNCE_SEC = Timings.sec("debounce", "input_source_ms")
 
 -- mouseMoved fires at display refresh rate (~60–120 fps); capping the
 -- subprocess check prevents CPU spikes when CapsWord is not even active.
-local CAPSWORD_CHECK_INTERVAL_S = 0.1
+-- Shared cross-driver value ([ui] capsword_check_interval_ms).
+local CAPSWORD_CHECK_INTERVAL_S = Timings.sec("ui", "capsword_check_interval_ms")
 
 -- Holds the pending debounce timer so consecutive notifications within the
 -- window supersede the previous one instead of triggering parallel rebuilds.
@@ -57,7 +60,8 @@ local _input_source_timer = nil
 local _last_known_layout = nil
 
 -- Poll interval for the HIToolbox fallback watcher.
-local LAYOUT_POLL_SEC = 2.0
+-- Shared cross-driver value ([ui] layout_poll_ms).
+local LAYOUT_POLL_SEC = Timings.sec("ui", "layout_poll_ms")
 
 -- Holds the fallback poll timer so it can be cancelled on stop.
 local _layout_poll_timer = nil

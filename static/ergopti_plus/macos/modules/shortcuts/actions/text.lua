@@ -21,6 +21,7 @@ local timer      = hs.timer
 local eventtap   = hs.eventtap
 local pasteboard = hs.pasteboard
 local Logger     = require("lib.logger")
+local Timings    = require("lib.timings")
 
 local LOG = "shortcuts.actions.text"
 
@@ -33,10 +34,12 @@ local LOG = "shortcuts.actions.text"
 --- ====================================
 -- ====================================
 
-local COPY_SETTLE_SEC    = 0.2    -- Wait after Cmd+C for clipboard to fill
-local PASTE_SETTLE_SEC   = 0.08   -- Wait before pasting the transformed text
-local RESELECT_DELAY_SEC = 0.08   -- Wait after paste before re-selecting
-local RESTORE_DELAY_SEC  = 0.15   -- Wait after re-select before restoring clipboard
+-- Clipboard settle delays come from the shared cross-driver registry
+-- (shared/timings/constants.toml [debounce]) so AHK and macOS stay in sync.
+local COPY_SETTLE_SEC    = Timings.sec("debounce", "clipboard_copy_settle_ms")  -- Wait after Cmd+C for clipboard to fill
+local PASTE_SETTLE_SEC   = Timings.sec("debounce", "clipboard_paste_settle_ms") -- Wait before pasting the transformed text
+local RESELECT_DELAY_SEC = Timings.sec("debounce", "clipboard_reselect_ms")     -- Wait after paste before re-selecting
+local RESTORE_DELAY_SEC  = Timings.sec("debounce", "clipboard_restore_ms")      -- Wait after re-select before restoring clipboard
 local MAX_RESELECT_CHARS = 5000   -- Safety cap: avoid freezing on huge pastes
 
 -- Symbols that should wrap the selection rather than replace it.

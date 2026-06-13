@@ -18,6 +18,7 @@ local HttpClient     = require("adapters.http_client").new()
 local JsonCodec      = require("adapters.json_codec")
 local TimerScheduler = require("adapters.timer_scheduler")
 local ShellRunner    = require("adapters.shell_runner")
+local Timings        = require("lib.timings")
 local LOG            = "llm.api_mlx"
 
 local ok_kl, keylogger = pcall(require, "modules.keylogger")
@@ -29,9 +30,10 @@ local DEDUPLICATION_ENABLED = false
 local _RETRY_MAX_MULT, _RETRY_TEMP_STEP, _RETRY_EXTRA_TOKENS = ApiCommon.get_retry_policy()
 local RETRY_FAILED_PREDICTION_ENABLED        = (_RETRY_MAX_MULT or 0) > 1
 local RETRY_FAILED_PREDICTION_MAX_MULTIPLIER = _RETRY_MAX_MULT
-local STREAM_CONNECT_TIMEOUT_SEC = 5    -- Fail fast if the MLX server does not accept the TCP connection
-local STREAM_HARD_TIMEOUT_SEC    = 90   -- Kill the task if the server accepts but never sends a token; large models need up to 60 s to load weights
-local WARMUP_POST_TIMEOUT_SEC    = 30   -- Unblock _warmup_in_flight if the single-token POST never returns
+-- MLX stream/warmup timeouts come from the shared cross-driver registry ([llm]).
+local STREAM_CONNECT_TIMEOUT_SEC = Timings.sec("llm", "stream_connect_timeout_ms") -- Fail fast if the MLX server does not accept the TCP connection
+local STREAM_HARD_TIMEOUT_SEC    = Timings.sec("llm", "stream_hard_timeout_ms")    -- Kill the task if the server accepts but never sends a token
+local WARMUP_POST_TIMEOUT_SEC    = Timings.sec("llm", "warmup_post_timeout_ms")    -- Unblock _warmup_in_flight if the single-token POST never returns
 
 -- MLX server bind address — single source of truth in shared/llm/mlx_server.json
 -- so the port is never hardcoded across api_mlx, the models_manager_mlx launcher,
@@ -110,7 +112,7 @@ local MLX_HOST, MLX_PORT = load_mlx_server_config()
 -- guard, every 1-second poll tick would fire a separate lsof+kill task, creating
 -- a cascade of overlapping processes while the kernel is still processing the
 -- first kill signal.
-local ZOMBIE_KILL_MIN_INTERVAL_SEC = 3.0
+local ZOMBIE_KILL_MIN_INTERVAL_SEC = Timings.sec("llm", "zombie_kill_min_interval_ms")
 
 local _last_zombie_kill_at  = 0    -- epoch time of the most-recent kill attempt
 -- PGID of the newly-launched server process group. Set by models_manager_mlx as soon
@@ -149,7 +151,7 @@ end
 --- Cooldown so we don't spam restart requests when the discovery loop fires repeatedly
 --- before the new server has had time to come up. 10 s is enough for bash to do its
 --- kill+lsof loop and for the new mlx_lm to start binding port 8080.
-local RESTART_HOOK_MIN_INTERVAL_SEC = 10.0
+local RESTART_HOOK_MIN_INTERVAL_SEC = Timings.sec("llm", "restart_hook_min_interval_ms")
 local _last_restart_hook_at = 0
 
 -- Timestamp of the most recent set_active_server_pgid() call. Used by discover_endpoints
@@ -159,7 +161,7 @@ local _last_restart_hook_at = 0
 -- though we passed the correct --model argv. Forcing a restart in this window creates
 -- an infinite restart loop. Only trust the model-ID check once the launch is "old".
 local _active_server_pgid_set_at = 0
-local FRESH_LAUNCH_GRACE_SEC     = 90  -- 8B-class models can take up to ~60s to load weights
+local FRESH_LAUNCH_GRACE_SEC     = Timings.sec("llm", "fresh_launch_grace_ms")  -- 8B-class models can take up to ~60s to load weights
 
 --- Records the PGID of the currently-launched server process group so zombie kills
 --- can exclude the entire group. Called by models_manager_mlx immediately after the
@@ -365,8 +367,8 @@ local DISCOVERY_MAX_WAIT_SEC        = 180  -- Stop polling /v1/models after this
                                            -- on a slow disk; 60 s gave up prematurely. Warmup keeps
                                            -- retrying regardless, but a longer window keeps the
                                            -- discovered routes fresh and silences the scary warning).
-local DISCOVERY_POLL_INITIAL_SEC    = 1.0  -- First inter-probe delay (doubles each miss, capped below)
-local DISCOVERY_POLL_MAX_SEC        = 10.0 -- Cap for the exponential backoff interval
+local DISCOVERY_POLL_INITIAL_SEC    = Timings.sec("llm", "discovery_poll_initial_ms")  -- First inter-probe delay (doubles each miss, capped below)
+local DISCOVERY_POLL_MAX_SEC        = Timings.sec("llm", "discovery_poll_max_ms")       -- Cap for the exponential backoff interval
 -- After this many seconds of persistent model-ID mismatch, bypass the check and
 -- proceed to POST probes. A mismatch beyond this window means either (a) the old
 -- server's socket lingered in CLOSE_WAIT and the zombie killer couldn't find the

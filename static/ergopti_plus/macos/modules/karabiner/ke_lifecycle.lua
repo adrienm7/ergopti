@@ -30,6 +30,7 @@ local M = {}
 
 local hs     = hs
 local Logger = require("lib.logger")
+local Timings = require("lib.timings")
 local Notifications = require("lib.notifications")
 local i18n   = require("lib.i18n")
 
@@ -261,7 +262,7 @@ local KE_GUI_CHECK_CMD = "/usr/bin/pgrep -fq '/Applications/Karabiner-Elements.a
 -- Polling constants for bridge-ready detection. Instead of waiting a fixed
 -- delay before checking, we poll every INTERVAL up to MAX_ATTEMPTS times
 -- so a fast daemon start resolves in ~300 ms instead of always waiting 2 s.
-local PRIME_POLL_INTERVAL_SEC = 0.3
+local PRIME_POLL_INTERVAL_SEC = Timings.sec("debounce", "karabiner_prime_poll_ms")
 local PRIME_POLL_MAX_ATTEMPTS = 45  -- 13.5 s absolute maximum (increased from 9 s for IPC readiness)
 local PRIME_FALLBACK_AFTER_ATTEMPTS = 6  -- Informational threshold only (no GUI fallback)
 local PRIME_RETRY_HEADLESS_EVERY_ATTEMPTS = 4
