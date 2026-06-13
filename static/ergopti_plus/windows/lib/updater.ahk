@@ -196,7 +196,7 @@ Updater_SetCheckInterval(Seconds) {
 		return
 	UPDATER_CHECK_INTERVAL := Seconds
 	try TOML_Write(Seconds, ConfigurationFile, UPDATER_INI_SECTION, UPDATER_INI_INTERVAL_KEY)
-	try LoggerInfo("Updater", "Background check interval set to %d s.", Seconds)
+	try LoggerInfo("Updater", "Background check interval set to {1} s.", Seconds)
 	; Apply the new cadence immediately so the user does not have to reload.
 	Updater_StopBackgroundChecks()
 	Updater_StartBackgroundChecks()
@@ -823,7 +823,7 @@ Updater_OneClickUpdate(*) {
 	try SetTimer((*) => initMenu(), -50)
 
 	Current := Updater_CurrentVersion()
-	try LoggerStart("Updater", "One-click update check (channel: %s, current: %s)…", UPDATER_CHANNEL, Current)
+	try LoggerStart("Updater", "One-click update check (channel: {1}, current: {2})…", UPDATER_CHANNEL, Current)
 	Json := Updater_FetchLatestJson(UPDATER_CHANNEL)
 	_UpdaterCheckInProgress := false
 
@@ -841,7 +841,7 @@ Updater_OneClickUpdate(*) {
 		return
 	}
 	if !_Updater_IsNewerVersion(Latest, Current) {
-		try LoggerInfo("Updater", "One-click check: already up to date (%s).", Current)
+		try LoggerInfo("Updater", "One-click check: already up to date ({1}).", Current)
 		try SetTimer((*) => initMenu(), -50)
 		TrayTip(Format(t("updater.up_to_date"), Current), t("updater.title_update"))
 		return
@@ -857,7 +857,7 @@ Updater_OneClickUpdate(*) {
 		PublishedAt: _Updater_ParsePublishedAt(Json),
 		Prerelease:  _Updater_ParsePrerelease(Json)
 	}
-	try LoggerSuccess("Updater", "One-click check: new version %s found — installing.", Latest)
+	try LoggerSuccess("Updater", "One-click check: new version {1} found — installing.", Latest)
 	try SetTimer((*) => initMenu(), -50)
 	Updater_DownloadAndInstall(UPDATER_LATEST_RELEASE)
 }

@@ -171,7 +171,7 @@ Reg_WriteExpandString(keyPath, valueName, value) {
 Reg_WriteBinary(keyPath, valueName, buf) {
 	try {
 		RegWrite(buf, "REG_BINARY", keyPath, valueName)
-		LoggerDebug("registry", "Reg_WriteBinary: {1}\{2} (%u bytes).", keyPath, valueName, buf.Size)
+		LoggerDebug("registry", "Reg_WriteBinary: {1}\{2} ({3} bytes).", keyPath, valueName, buf.Size)
 		return true
 	} catch as e {
 		LoggerError("registry", "Reg_WriteBinary failed — {1}\{2}: {3}", keyPath, valueName, e.Message)

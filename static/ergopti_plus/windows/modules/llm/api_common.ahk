@@ -52,12 +52,12 @@ _LLM_Common_GetInference() {
 	; Canonical path next to defaults.json / models.json.
 	path := _SharedDir . "\llm\inference.json"
 	if !FileExist(path) {
-		LoggerError("LLMCommon", "shared/llm/inference.json not found at '%s' — LLM inference tunables cannot be loaded.", path)
+		LoggerError("LLMCommon", "shared/llm/inference.json not found at '{1}' — LLM inference tunables cannot be loaded.", path)
 		throw Error("ergopti_plus: shared/llm/inference.json is required but was not found")
 	}
 	raw := FSRead(path)
 	if (raw == false) {
-		LoggerError("LLMCommon", "shared/llm/inference.json could not be read at '%s'.", path)
+		LoggerError("LLMCommon", "shared/llm/inference.json could not be read at '{1}'.", path)
 		throw Error("ergopti_plus: shared/llm/inference.json could not be read")
 	}
 	parsed := _LLM_Common_ParseInferenceJson(raw)
@@ -142,7 +142,7 @@ _LLM_Common_Cfg(section, key) {
 	cfg := _LLM_Common_GetInference()
 	if (cfg.Has(section) and cfg[section].Has(key))
 		return cfg[section][key]
-	LoggerError("LLMCommon", "shared/llm/inference.json is missing tunable '%s.%s' — malformed or outdated JSON.", section, key)
+	LoggerError("LLMCommon", "shared/llm/inference.json is missing tunable '{1}.{2}' — malformed or outdated JSON.", section, key)
 	throw Error("ergopti_plus: inference.json missing tunable " . section . "." . key)
 }
 
@@ -175,7 +175,7 @@ LLM_ApiCommon_GetRateLimitMs(backend_id) {
 	; Unknown backend id — use the ollama floor from the JSON as the default.
 	if rateMap.Has("ollama")
 		return rateMap["ollama"]
-	LoggerError("LLMCommon", "inference.json rate_limit_min_interval_ms has neither '%s' nor 'ollama'.", backend_id)
+	LoggerError("LLMCommon", "inference.json rate_limit_min_interval_ms has neither '{1}' nor 'ollama'.", backend_id)
 	throw Error("ergopti_plus: inference.json rate_limit floor unavailable")
 }
 

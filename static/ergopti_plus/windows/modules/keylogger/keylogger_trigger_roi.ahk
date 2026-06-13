@@ -107,7 +107,7 @@ class KLRoi {
 ; call this first so pre-init calls fail loudly rather than silently doing nothing.
 KL_Roi_RequireInit(func_name) {
 	if !Keylogger.initialized {
-		LoggerError("KLRoi", "'%s' called before KL_Init() — keylogger not initialized.", func_name)
+		LoggerError("KLRoi", "'{1}' called before KL_Init() — keylogger not initialized.", func_name)
 		return false
 	}
 	return true

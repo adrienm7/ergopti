@@ -104,7 +104,7 @@ AppState_GetNumberOfRepetitions() {
 ; available when diagnosing nav-layer behaviour.
 AppState_SetNumberOfRepetitions(NewNumber) {
 	AppState["number_of_repetitions"] := NewNumber
-	try LoggerDebug("AppState", "number_of_repetitions = %s.", NewNumber)
+	try LoggerDebug("AppState", "number_of_repetitions = {1}.", NewNumber)
 }
 
 ; Resets the repetition counter to 1 (the post-action default).

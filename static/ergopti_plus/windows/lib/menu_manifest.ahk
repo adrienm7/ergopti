@@ -143,7 +143,7 @@ MenuManifest_LoadHotstringGroups() {
 	ErgoptiAhk  := _MM_ResolveIdArray(_MM_MapGet(GroupsMap, "ergopti"),  CategoryKeysMap, "ergopti",  _MM_FALLBACK_ERGOPTI)
 	DynamicAhk  := _MM_ResolveIdArray(_MM_MapGet(GroupsMap, "dynamic"),  CategoryKeysMap, "dynamic",  _MM_FALLBACK_DYNAMIC)
 
-	try LoggerDone("MenuManifest", "Hotstring groups loaded (%d std, %d ergopti, %d dynamic).",
+	try LoggerDone("MenuManifest", "Hotstring groups loaded ({1} std, {2} ergopti, {3} dynamic).",
 		StandardAhk.Length, ErgoptiAhk.Length, DynamicAhk.Length)
 
 	_MM_HOTSTRING_GROUPS_CACHE := _MM_BuildResult(StandardAhk, ErgoptiAhk, DynamicAhk)
@@ -233,7 +233,7 @@ MenuManifest_LoadDebugMenu() {
 		Result.Push(Map("id", Id))
 	}
 
-	try LoggerDone("MenuManifest", "Debug menu order loaded (%d item(s)).", Result.Length)
+	try LoggerDone("MenuManifest", "Debug menu order loaded ({1} item(s)).", Result.Length)
 	_MM_DEBUG_MENU_CACHE := Result.Length > 0 ? Result : _MM_DebugFallback()
 	return _MM_DEBUG_MENU_CACHE
 }

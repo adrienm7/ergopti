@@ -177,7 +177,7 @@ class KLAppCat {
 ; prevent silent no-ops when the module is used before the metrics dir is ready.
 KL_AppCat_RequireInit(func_name) {
 	if (KLAppCat.file_path = "") {
-		LoggerError("KLAppCat", "'%s' called before KL_AppCat_Init() — file_path not set.", func_name)
+		LoggerError("KLAppCat", "'{1}' called before KL_AppCat_Init() — file_path not set.", func_name)
 		return false
 	}
 	return true

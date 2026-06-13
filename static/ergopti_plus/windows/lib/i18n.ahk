@@ -301,7 +301,7 @@ I18nInit(Cache) {
 I18nPreload() {
 	try LoggerTrace("i18n", "Preloading locale caches…")
 	_I18nEnsureLoaded()
-	try LoggerDone("i18n", "Locale caches warm (%d keys active, %d EN, %d FR).",
+	try LoggerDone("i18n", "Locale caches warm ({1} keys active, {2} EN, {3} FR).",
 		_I18nCache.Count,
 		_I18nCacheEnLoaded ? _I18nCacheEn.Count : 0,
 		_I18nCacheFrLoaded ? _I18nCacheFr.Count : 0)
