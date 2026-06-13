@@ -448,6 +448,45 @@ by both like they already read `accent_colors`.
 
 ### A6. Tooling / enforcement  *(S-M, low runtime risk)*
 
+**STATUS: ✅ DONE (2026-06-13).**
+
+- ✅ **Codegen freshness gate** — extended `build:domain` (the existing in-place
+  regen + `git diff` drift gate) to also regenerate and drift-check the
+  byte-faithful generators: `codegen:terminators`, `codegen:expander:ahk`,
+  `codegen:registry`. `build:domain` is now 8 steps / 7 drift-checked files, all
+  green. The gate immediately caught two stale adapters (their `Source:` header
+  still named the pre-rename lowercase spec) — regenerated + committed.
+  `contracts.json` stays gated by `test:port-compliance` (line-ending-normalised).
+  ⚠️ `prompt_builder.ahk` is deliberately EXCLUDED: `codegen-prompt-builder-ahk.cjs`
+  over-escapes string delimiters (`AQ`/`AQQ` emit `` `" `` even for delimiters →
+  invalid AHK), so re-running it CORRUPTS the correct committed file. **Follow-up:
+  fix that generator so its output is faithful, then add it to the gate.**
+- ✅ **`config.schema.json` validation** — `tools/test/test-config-schema.cjs`
+  (a dependency-free minimal JSON-Schema draft-2020-12 validator — no ajv in
+  node_modules) parses the generated `config_template.toml` with smol-toml and
+  validates it against `shared/config_schema/config.schema.json`. Wired as
+  `test:config-schema` + a `build:domain` step. The previously-zero-test schema had
+  drifted; reconciled it to the manifest (added `hotstrings.repeat_key_enabled`,
+  `llm.onboarding_seen`, `llm.app_profile_overrides`, `ahk.category_enabled`, and
+  fixed the `text_expansion_personal_information` allOf+`additionalProperties:false`
+  trap that rejected `pattern_max_length`). Both drivers' templates validate clean.
+- ✅ **AHK shared-purity meta-test flipped to hard-fail**
+  (`windows/tests/meta/test_port_adapter_coverage.ahk` §4). Audit found the only
+  matches were JSDoc comments (`hs.canvas` / `hs.webview`) + a `months.` false
+  positive from the loose `hs\.` pattern — zero real OS calls. Made the scanner
+  skip comments + tightened `hs\.`→`\bhs\.`, then required `Violations == 0`. Now
+  level with the macOS twin.
+- ✅ **Tooltip sentinels** — the dead `0.2`/`0.05` decrement/floor initializers in
+  `windows/lib/tooltip.ahk` and `macos/ui/tooltip/dequeue.lua` now start at the
+  sentinel `0`, so a missing shared load surfaces loudly instead of being masked.
+  Behaviour-neutral in normal operation (overwritten / opts always supplied).
+- Verified: macOS **1585/0**, AHK **1384/0**, `build:domain` 8/8, lint / encoding
+  / no-fallbacks / priority-parity / prettier all green.
+
+---
+
+Original plan, for reference:
+
 - **Codegen freshness gate** (extends A2's spirit): a meta-test that re-runs every
   `tools/codegen/*` generator into a temp dir and diffs against the committed
   `_generated/*` and `contracts.json`, so a hand-edited generated artifact fails

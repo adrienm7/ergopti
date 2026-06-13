@@ -497,6 +497,36 @@ drivers — extend it rather than writing a new token corpus. (3) The AHK *batch
 path still uses a single per-prediction cap, not macOS's `× num_predictions + N*5`
 scaling — a documented parity follow-up, not a regression.
 
+**Update (2026-06-13, A6): tooling/enforcement gates added.**
+- **Codegen freshness** is now part of `build:domain` (8 steps): it regenerates
+  the byte-faithful generators (`build:manifest`, `codegen:terminators`,
+  `codegen:expander:ahk`, `codegen:registry`) in place and drift-checks them via
+  `git diff` against HEAD, so a source change without a re-run, or a hand-edit of
+  a generated file, fails CI. To add a generator to the gate, push a step + its
+  outputs onto the `PIPELINE` array in `tools/build/build-domain.cjs`.
+- ⚠️ **FOOTGUN — do NOT run `npm run codegen:prompt-builder:ahk`.** That generator
+  (`codegen-prompt-builder-ahk.cjs`) uses constants `AQ='`"'` / `AQQ` and emits
+  the backtick-quote escape even for string *delimiters*, producing invalid AHK
+  (`` config.Has(`"max_words`") `` instead of `config.Has("max_words")`). The
+  COMMITTED `windows/_generated/prompt_builder.ahk` is correct (plain `"`), so
+  re-running the generator CORRUPTS it. It is excluded from the freshness gate for
+  this reason; the AHK PromptBuilder is currently effectively hand-maintained. Fix
+  the generator's delimiter escaping (only intra-string quotes need `` `" ``)
+  before re-enabling codegen for it. The cross-driver `prompt_builder/vectors.json`
+  corpus validates behaviour either way.
+- **Config schema** is now enforced: `tools/test/test-config-schema.cjs`
+  (`test:config-schema`, also a `build:domain` step) is a dependency-free minimal
+  JSON-Schema validator (there is no ajv) that checks the generated
+  `config_template.toml` against `shared/config_schema/config.schema.json`. That
+  schema had drifted (it was consumed by zero tests) and was reconciled to the
+  manifest. When the manifest gains a config key, add it to the schema or this
+  fails. Watch the `allOf` + `additionalProperties:false` trap (a strict
+  sub-schema in an `allOf` rejects sibling properties — spell the object out).
+- **AHK shared-purity §4** (`test_port_adapter_coverage.ahk`) now HARD-FAILS on a
+  direct OS call in `shared/**/*.js` (was warn-only). The scanner skips comments
+  and uses `\bhs\.`; shared JS is confirmed clean (the old matches were all
+  comments + a `months.` false positive).
+
 ### project_debug_menu_sync
 
 _Debug menu order is defined in shared/menu_manifest.json debug_menu — both AHK and Lua drivers consume it_
