@@ -67,10 +67,13 @@ function indent(text) {
 	return text.replace(/^/gm, '\t');
 }
 
-// AHK v2 escape sequences represented as JS string literals
-const AQ = '`"'; // backtick + double-quote  →  literal " in AHK strings
-const AQQ = '`"`"'; // two of the above          →  empty string literal ""
-const ASP = '` '; // backtick + space          →  literal space in AHK arrays
+// AHK string delimiter helpers represented as JS string literals.
+// AHK v2 string literals are delimited by a PLAIN double-quote; the backtick
+// escape (`") is only needed for a quote *inside* a string — which none of the
+// emitted strings contain. Using `" as a delimiter (the previous bug) produced
+// invalid AHK like config.Has(`"max_words`"), so these are plain quotes.
+const AQ = '"'; // a single AHK string delimiter:  "
+const AQQ = '""'; // an empty AHK string literal:    ""
 
 /**
  * Builds the full AHK source for the PromptBuilder class.
@@ -191,7 +194,7 @@ function buildAhkSource() {
 	lines.push('');
 	lines.push('\t\t; Split on any whitespace run to get all tokens');
 	lines.push(
-		`\t\tlocal parts := StrSplit(Trim(buffer), [${ASP}, ${AQ}\`t${AQ}, ${AQ}\`n${AQ}, ${AQ}\`r${AQ}])`
+		`\t\tlocal parts := StrSplit(Trim(buffer), [${AQ} ${AQ}, ${AQ}\`t${AQ}, ${AQ}\`n${AQ}, ${AQ}\`r${AQ}])`
 	);
 	lines.push('\t\tlocal words  := []');
 	lines.push('\t\tfor p in parts {');

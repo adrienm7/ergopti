@@ -146,16 +146,14 @@ const PIPELINE = [
 	// -------------------------------------------------------
 	// Step 1b: Regenerate the remaining faithful codegen artefacts so a source
 	// change without a re-run (or a hand-edit of a generated file) is caught by
-	// the drift gate below — the freshness half of A6. Only generators whose
-	// output is byte-faithful to the committed file are listed here:
+	// the drift gate below — the freshness half of A6. Every generator whose
+	// output is byte-faithful to its committed file is listed here:
 	//   - codegen:terminators       → terminators.{ahk,lua}
-	//   - codegen:expander:ahk      → expander.ahk   (tested adapter)
-	//   - codegen:registry          → registry.ahk   (tested adapter)
+	//   - codegen:expander:ahk      → expander.ahk        (tested adapter)
+	//   - codegen:registry          → registry.ahk        (tested adapter)
+	//   - codegen:prompt-builder:ahk → prompt_builder.ahk (string-delimiter bug fixed)
 	// contracts.json is already gated by test:port-compliance (with line-ending
-	// normalisation). prompt_builder.ahk is deliberately EXCLUDED:
-	// codegen-prompt-builder-ahk.cjs currently over-escapes string delimiters
-	// (emits `"…`" instead of "…"), so a re-run would corrupt the correct,
-	// committed file — fix that generator before adding it here (see TODO A6).
+	// normalisation); codegen:prompt-builder:hs is a documented no-op.
 	{
 		name: 'codegen:terminators — regenerate terminators.{ahk,lua}',
 		run() {
@@ -182,6 +180,14 @@ const PIPELINE = [
 			return { ok, detail: ok ? undefined : stderr };
 		},
 		generated: ['static/ergopti_plus/windows/_generated/registry.ahk']
+	},
+	{
+		name: 'codegen:prompt-builder:ahk — regenerate prompt_builder.ahk',
+		run() {
+			const { ok, stderr } = runNpmScript('codegen:prompt-builder:ahk');
+			return { ok, detail: ok ? undefined : stderr };
+		},
+		generated: ['static/ergopti_plus/windows/_generated/prompt_builder.ahk']
 	},
 
 	// -------------------------------------------------------
