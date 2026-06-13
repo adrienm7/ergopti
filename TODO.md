@@ -242,6 +242,41 @@ The only OS coupling is two `hs.settings.get(min/max_words)` reads.
 
 ### A2. Resolve the orphaned macOS codegen  *(L, the AHK-vs-macOS divergence)*
 
+**STATUS: ✅ DONE (2026-06-13).** A 4-agent investigation confirmed all four
+`macos/_generated/*.lua` were orphaned (zero runtime + zero test consumers).
+Resolved per artifact:
+
+- ✅ **expander / registry / shortcuts_bindings → deleted (dead code).** The
+  generated files were never `require`'d and could not replace the hand-written
+  `modules/keymap/{registry,expander}.lua` (which diverged far past the pure
+  contract — TOML loading, `hs.settings`, priority cascade, case-variant
+  generation, i18n). Removed `macos/_generated/{expander,registry,shortcuts_bindings}.lua`,
+  `codegen-{expander,registry}-hs.cjs`, the wholly-dead `codegen-shortcuts.cjs`
+  (+ its dead `windows/_generated/shortcuts_bindings.ahk`), and the 3 npm scripts.
+  Kept the AHK `expander.ahk`/`registry.ahk` tested adapters + the shared specs
+  (the cross-driver contract). Fixed both `_generated/README.md` (false "✅ Wired"
+  claims).
+- ✅ **features_manifest → wired (the real mutualization win).** Built
+  `macos/lib/manifest_reader.lua` (the counterpart of the AHK `manifest_reader.ahk`,
+  which already does `Features := ManifestBuildFeaturesMap()` in production) and
+  wired `modules/keymap/init.lua` `DEFAULT_STATE` to read its hotstring/preview
+  defaults from the shared manifest via `Manifest.default_for(...)` — fail-fast on
+  a missing path. macOS keymap defaults now come from the same
+  `shared/features/manifest.toml` single source as the AHK driver, with a
+  tripwire test (`tests/unit/lib/test_manifest_reader.lua`) pinning the wired
+  values. Re-anchored the `LUA_HS_BASELINE` purity baseline 900→905 (the +5 are
+  manifest PATH literals, not OS calls). LLM (runtime JSON layering) and Karabiner
+  (no manifest entries) left unwired by design.
+- Verified: macOS **1562/0**, AHK **1372/0**, `build:domain` 4/4, no-fallbacks /
+  port-compliance / priority-parity / ahk-encoding / banners / prettier all green.
+- **Follow-up (separate item):** extend the manifest reader to the other macOS
+  modules (gestures nesting, shortcuts, dynamic_hotstrings, keylogger) so they
+  too drop their hand-written `DEFAULT_STATE`. Needs hardware smoke-test per module.
+
+---
+
+Original plan, for reference:
+
 `macos/_generated/{expander,registry,shortcuts_bindings,features_manifest}.lua`
 are emitted by real generators (`tools/codegen/codegen-*-hs.cjs`,
 `build-features-manifest.js`) but **required by zero macOS module** — macOS runs a

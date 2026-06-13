@@ -38,12 +38,9 @@
 		"bench:hotstring": "node ./tools/build/bench-hotstring.cjs",
 		"codegen:registry": "node ./tools/codegen/codegen-registry-ahk.cjs",
 		"codegen:expander:ahk": "node ./tools/codegen/codegen-expander-ahk.cjs",
-		"codegen:registry:hs": "node ./tools/codegen/codegen-registry-hs.cjs",
 		"codegen:terminators": "node ./tools/codegen/codegen-terminators.cjs",
-		"codegen:expander:hs": "node ./tools/codegen/codegen-expander-hs.cjs",
 		"codegen:prompt-builder:ahk": "node ./tools/codegen/codegen-prompt-builder-ahk.cjs",
 		"codegen:prompt-builder:hs": "node ./tools/codegen/codegen-prompt-builder-hs.cjs",
-		"codegen:shortcuts": "node ./tools/codegen/codegen-shortcuts.cjs",
 		"codegen:contracts": "node ./tools/codegen/codegen-contracts-json.cjs",
 		"test:mutation": "stryker run"
 	},

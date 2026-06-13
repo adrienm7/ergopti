@@ -3,13 +3,10 @@
 All files in this directory are **auto-generated** and must not be edited manually.
 Run the corresponding npm script to regenerate.
 
-| File                     | Generator script              | Status                                                        |
-| ------------------------ | ----------------------------- | ------------------------------------------------------------- |
-| `features_manifest.lua`  | `npm run build:manifest`      | ✅ Wired — `require`'d in Hammerspoon `init.lua`              |
-| `terminators.lua`        | `npm run codegen:terminators` | ✅ Wired — loaded by `modules.keymap.terminators`             |
-| `shortcuts_bindings.lua` | `npm run codegen:shortcuts`   | ✅ Wired — loaded by `modules.shortcuts`                      |
-| `registry.lua`           | `npm run codegen:registry:hs` | ⏳ Orphaned — generated but not yet `require`'d in the driver |
-| `expander.lua`           | `npm run codegen:expander:hs` | ⏳ Orphaned — generated but not yet `require`'d in the driver |
+| File                    | Generator script              | Status                                            |
+| ----------------------- | ----------------------------- | ------------------------------------------------- |
+| `features_manifest.lua` | `npm run build:manifest`      | ✅ Wired — read via `lib/manifest_reader.lua`     |
+| `terminators.lua`       | `npm run codegen:terminators` | ✅ Wired — loaded by `modules.keymap.terminators` |
 
 ## Why no `prompt_builder.lua`?
 
@@ -23,12 +20,15 @@ No AHK-style code generation is needed because `.lua` files are portable across
 all Lua-based drivers. Run `npm run codegen:prompt-builder:hs` to confirm this
 (it is a deliberate no-op that documents the design decision).
 
-## Orphaned files
+## Why no `registry.lua` / `expander.lua` / `shortcuts_bindings.lua`?
 
-`registry.lua` and `expander.lua` contain a full Lua port of the shared
-`Registry.spec.js` / `Expander.spec.js` domain contracts. They are not yet
-wired into the main driver.
-
-**Roadmap**: Replace the legacy keymap registry/expander with these generated
-adapters once integration tests confirm parity. This is a Batch-9 /
-hexagonal-doctrine migration item.
+They used to be generated here as a planned "hexagonal migration" (consume the
+shared `Registry.spec.js` / `Expander.spec.js` adapters from both drivers), but
+the migration never happened: the hand-written `modules/keymap/registry.lua`
+(~1126 lines) and `expander.lua` diverged far past the generated pure-logic
+contract — TOML loading, `hs.settings`, the priority cascade, case-variant
+generation and i18n live only in the hand-written modules. The generated
+adapters were never `require`'d, never tested, and could not replace the
+hand-written ones without losing features. They (and `codegen-{expander,registry}-hs`,
+`codegen-shortcuts`) were removed (2026-06-13) as dead code. The shared specs
+remain canonical and are still validated on the AHK side via its tested adapters.

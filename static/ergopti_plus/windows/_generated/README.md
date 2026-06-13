@@ -7,7 +7,6 @@ Run the corresponding npm script to regenerate.
 | ------------------------ | -------------------------------------------- | ----------------------------------------------------------------- |
 | `features_manifest.ahk`  | `npm run build:manifest`                     | ✅ Wired — `#Include`'d in `ErgoptiPlus.ahk`                      |
 | `terminators.ahk`        | `npm run codegen:terminators`                | ✅ Wired — `#Include`'d in `ErgoptiPlus.ahk`                      |
-| `shortcuts_bindings.ahk` | `npm run codegen:shortcuts`                  | ✅ Wired — `#Include`'d in `ErgoptiPlus.ahk`                      |
 | `personal_shortcuts.ahk` | generated at runtime by `PersonalTomlEditor` | ✅ Wired — loaded dynamically                                     |
 | `prompt_builder.ahk`     | `npm run codegen:prompt-builder:ahk`         | ✅ Wired — `#Include`'d in tests, used by `prediction_engine.ahk` |
 | `registry.ahk`           | `npm run codegen:registry`                   | ⏳ Orphaned — generated but not yet `#Include`'d in the driver    |
