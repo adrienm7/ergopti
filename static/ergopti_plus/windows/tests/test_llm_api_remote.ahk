@@ -104,6 +104,34 @@ _RemotePayload_Anthropic_MaxTokens() {
 Test("_LLMRemoteBuildPayload: anthropic payload includes max_tokens", _RemotePayload_Anthropic_MaxTokens)
 
 
+; A5 — the output-token cap is the shared PromptBuilder budget threaded from the
+; engine (single cross-driver source), replacing the former hardcoded 256 in
+; every provider branch. Default stays 256 for callers that don't thread it.
+_RemotePayload_OpenAI_MaxTokensThreaded() {
+	p := _LLMRemoteBuildPayload("openai", "m", "s", "u", 0.1, 42)
+	AssertContains(p, '"max_tokens":42', "openai max_tokens must equal the threaded value")
+}
+Test("_LLMRemoteBuildPayload: openai max_tokens is threaded (A5)", _RemotePayload_OpenAI_MaxTokensThreaded)
+
+_RemotePayload_Gemini_MaxOutputTokensThreaded() {
+	p := _LLMRemoteBuildPayload("gemini", "m", "s", "u", 0.1, 42)
+	AssertContains(p, '"maxOutputTokens":42', "gemini maxOutputTokens must equal the threaded value")
+}
+Test("_LLMRemoteBuildPayload: gemini maxOutputTokens is threaded (A5)", _RemotePayload_Gemini_MaxOutputTokensThreaded)
+
+_RemotePayload_Anthropic_MaxTokensThreaded() {
+	p := _LLMRemoteBuildPayload("anthropic", "m", "s", "u", 0.1, 42)
+	AssertContains(p, '"max_tokens":42', "anthropic max_tokens must equal the threaded value")
+}
+Test("_LLMRemoteBuildPayload: anthropic max_tokens is threaded (A5)", _RemotePayload_Anthropic_MaxTokensThreaded)
+
+_RemotePayload_MaxTokensDefault() {
+	p := _LLMRemoteBuildPayload("openai", "m", "s", "u", 0.1)
+	AssertContains(p, '"max_tokens":256', "max_tokens defaults to 256 when not threaded")
+}
+Test("_LLMRemoteBuildPayload: max_tokens defaults to 256 when not threaded (A5)", _RemotePayload_MaxTokensDefault)
+
+
 _RemotePayload_Gemini_SystemInstruction() {
 	p := _LLMRemoteBuildPayload("gemini", "gemini-2.0-flash", "Be helpful.", "Translate", 0.3)
 	AssertContains(p, '"systemInstruction"')

@@ -409,18 +409,42 @@ by both like they already read `accent_colors`.
 
 ### A5. Thread the PromptBuilder `max_tokens` through the backends  *(M)*
 
-The shared PromptBuilder computes `max_tokens = max(15, max_words*6+10)` (default
-150) and macOS honours it, but AHK `api_ollama.ahk` re-derives
-`num_predict := Max(24, Min(96, mw*4))` and `api_remote.ahk` hardcodes
-`max_tokens:256` in three provider branches; macOS `api_mlx.lua` also clamps
-`min(0.60,…)+0.10` diverging from `inference.json`.
+**STATUS: ✅ DONE (2026-06-13). Needs the maintainer's live-model sanity check
+(token caps changed on the Windows backends — see below).**
 
-- Thread `params["max_tokens"]` from `pb.Build()` through to every backend payload
-  builder; delete the inline re-derivations. **First confirm** these are real
-  divergences and not intentional per-backend budgets (Ollama `num_predict` ≠
-  prompt budget;
-  remote providers may want a larger cap) — **needs a behavioural decision**.
-- Add a diversity-temp golden corpus covering the bracket boundaries.
+- ✅ **Divergence confirmed real.** A 2-driver investigation showed the AHK engine
+  *computes* `params["max_tokens"]` (the shared `max(15, max_words*6+10)`, default
+  150) and then **drops it on the floor**, while each backend re-derived its own
+  cap: Ollama `num_predict := Max(24, Min(96, mw*4))`, remote a hardcoded
+  `max_tokens:256` / `maxOutputTokens:256` in all three provider branches. macOS
+  already threads the value (as `max_predict`). So the AHK side was an *incomplete*
+  implementation, not an intentional per-backend budget — unifying completes the
+  design rather than overriding tuning.
+- ✅ **`api_mlx.lua` `min(0.60,…)+0.10` is TEMPERATURE retry clamping, NOT tokens**
+  (it raises the variant temp on a retry) — out of A5's scope. Removed from the
+  description; no change made there.
+- ✅ **Threaded `params["max_tokens"]` through the AHK backends**
+  (`prediction_engine.ahk` → `api_ollama.ahk` / `api_remote.ahk`): the Ollama
+  `mw*4` and the three remote `256` literals are gone; the payload builders now
+  serialize the threaded per-prediction budget verbatim (default 150 / 256 only
+  for an out-of-range value). These are output ceilings the generation rarely
+  reaches (predictions stop at the stop-sequence / line boundary), so the
+  practical effect is small, but the Windows backend caps *did* change
+  (Ollama ~60→100 at max_words=15, remote flat 256→the user's budget) — **the
+  maintainer should sanity-check prediction length/latency on a live model**.
+- ✅ **Diversity-temp / token golden corpus already exists and covers the
+  boundaries**: `shared/tests/corpus/prompt_builder/vectors.json` pins
+  `max_tokens` (150 default, `mw*6+10`, floor 16) AND temperature (greedy snap at
+  0.15, auto-raise, diversity cap 1.0) and BOTH drivers run it
+  (AHK `meta/test_corpus_prompt_builder.ahk`, macOS twin). Added AHK payload-builder
+  regression tests pinning that the threaded value reaches the wire
+  (`test_llm_api_ollama.ahk` num_predict, `test_llm_api_remote.ahk` openai/gemini/
+  anthropic max_tokens). AHK **1384/0**.
+- ⏭️ **Follow-up (macOS parity, not blocking):** the AHK *batch* path still uses a
+  single per-prediction cap rather than macOS's `max_predict * num_predictions +
+  num_predictions*5` scaling — left unchanged to avoid expanding the rare opt-in
+  batch path's behavior in this pass. Unify the batch budget formula across
+  drivers when the maintainer next validates batch profiles on a live model.
 
 ### A6. Tooling / enforcement  *(S-M, low runtime risk)*
 

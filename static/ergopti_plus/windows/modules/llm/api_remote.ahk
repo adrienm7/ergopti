@@ -62,7 +62,7 @@ global LLM_REMOTE_TIMEOUT_MS := 30000   ; same generous ceiling as Ollama
 ; Returns the generated text, or "" on any error (network, HTTP non-2xx, parse
 ; failure). Failure is silent by design so the prediction loop never crashes —
 ; the user gets no tooltip instead of an error dialog mid-typing.
-LLM_RemoteGenerate(Entry, SystemPrompt, FullText, Temperature := 0.1, TailText := "") {
+LLM_RemoteGenerate(Entry, SystemPrompt, FullText, Temperature := 0.1, TailText := "", max_tokens := 256) {
     global LLM_API_PROVIDERS, LLM_REMOTE_TIMEOUT_MS
 
     resolved := _LLMRemoteResolveEntry(Entry)
@@ -71,7 +71,7 @@ LLM_RemoteGenerate(Entry, SystemPrompt, FullText, Temperature := 0.1, TailText :
 
     req := _LLMRemote_BuildRequestContext(SystemPrompt, FullText, TailText)
     Url     := _LLMRemoteBuildUrl(resolved["BaseUrl"], resolved["Format"], resolved["Token"], resolved["Model"])
-    Payload := _LLMRemoteBuildPayload(resolved["Format"], resolved["Model"], req["system"], req["user"], Temperature)
+    Payload := _LLMRemoteBuildPayload(resolved["Format"], resolved["Model"], req["system"], req["user"], Temperature, max_tokens)
 
     try {
         Http := ComObject("WinHttp.WinHttpRequest.5.1")
@@ -116,7 +116,7 @@ global LLM_REMOTE_MAX_INFLIGHT := 16
  * @param {function}   on_fail      - Called on HTTP / parse failure.
  * @returns {Integer}  Request id, usable with LLM_RemoteCancelAsync.
  */
-LLM_RemoteGenerate_Async(Entry, SystemPrompt, FullText, Temperature, on_success, on_fail, TailText := "") {
+LLM_RemoteGenerate_Async(Entry, SystemPrompt, FullText, Temperature, on_success, on_fail, TailText := "", max_tokens := 256) {
     global _LLM_Remote_Async, _LLM_Remote_AsyncCounter, LLM_REMOTE_TIMEOUT_MS
 
     _LLM_Remote_AsyncCounter += 1
@@ -130,7 +130,7 @@ LLM_RemoteGenerate_Async(Entry, SystemPrompt, FullText, Temperature, on_success,
 
     req := _LLMRemote_BuildRequestContext(SystemPrompt, FullText, TailText)
     Url     := _LLMRemoteBuildUrl(resolved["BaseUrl"], resolved["Format"], resolved["Token"], resolved["Model"])
-    Payload := _LLMRemoteBuildPayload(resolved["Format"], resolved["Model"], req["system"], req["user"], Temperature)
+    Payload := _LLMRemoteBuildPayload(resolved["Format"], resolved["Model"], req["system"], req["user"], Temperature, max_tokens)
 
     try {
         http := ComObject("WinHttp.WinHttpRequest.5.1")
@@ -431,28 +431,32 @@ _LLMRemoteSetAuthHeaders(Http, Format, Token) {
 ; ``Format`` as a parameter would silently break every API request — the
 ; call ``Format("{:.2f}", ...)`` would try to invoke the parameter (a
 ; string, e.g. "openai") as a function and throw at runtime.
-_LLMRemoteBuildPayload(Fmt, Model, SystemPrompt, UserText, Temperature) {
+_LLMRemoteBuildPayload(Fmt, Model, SystemPrompt, UserText, Temperature, max_tokens := 256) {
     SysEsc  := _LLMRemoteJsonEscape(SystemPrompt)
     UserEsc := _LLMRemoteJsonEscape(UserText)
     ModelEsc := _LLMRemoteJsonEscape(Model)
     Temp := Format("{:.2f}", Temperature)
+    ; Output-token cap threaded from the shared PromptBuilder budget (single
+    ; cross-driver source); replaces the former hardcoded 256 in each provider
+    ; branch. Falls back to 256 only for an out-of-range value.
+    MaxTok := (max_tokens is Number and max_tokens > 0) ? Integer(max_tokens) : 256
 
     if (Fmt == "anthropic") {
         ; Anthropic Messages API: top-level ``system`` field, ``messages`` is
         ; user/assistant turns only. ``max_tokens`` is REQUIRED by Anthropic.
-        return Format('{"model":"{1}","system":"{2}","messages":[{"role":"user","content":"{3}"}],"max_tokens":256,"temperature":{4}}',
-            ModelEsc, SysEsc, UserEsc, Temp)
+        return Format('{"model":"{1}","system":"{2}","messages":[{"role":"user","content":"{3}"}],"max_tokens":{5},"temperature":{4}}',
+            ModelEsc, SysEsc, UserEsc, Temp, MaxTok)
     }
     if (Fmt == "gemini") {
         ; Gemini wraps the system instruction in ``systemInstruction`` and the
         ; user turn in ``contents.parts.text``.
-        return Format('{"systemInstruction":{"parts":[{"text":"{1}"}]},"contents":[{"role":"user","parts":[{"text":"{2}"}]}],"generationConfig":{"temperature":{3},"maxOutputTokens":256}}',
-            SysEsc, UserEsc, Temp)
+        return Format('{"systemInstruction":{"parts":[{"text":"{1}"}]},"contents":[{"role":"user","parts":[{"text":"{2}"}]}],"generationConfig":{"temperature":{3},"maxOutputTokens":{4}}}',
+            SysEsc, UserEsc, Temp, MaxTok)
     }
     ; OpenAI Chat Completions shape — covers OpenAI itself plus every
     ; OpenAI-compatible endpoint (Groq, OpenRouter, LM Studio, vLLM, …).
-    return Format('{"model":"{1}","messages":[{"role":"system","content":"{2}"},{"role":"user","content":"{3}"}],"temperature":{4},"max_tokens":256,"stream":false}',
-        ModelEsc, SysEsc, UserEsc, Temp)
+    return Format('{"model":"{1}","messages":[{"role":"system","content":"{2}"},{"role":"user","content":"{3}"}],"temperature":{4},"max_tokens":{5},"stream":false}',
+        ModelEsc, SysEsc, UserEsc, Temp, MaxTok)
 }
 
 ; Pull the generated text out of a provider response. Each branch targets the

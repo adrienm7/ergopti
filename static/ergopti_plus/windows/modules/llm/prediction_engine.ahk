@@ -373,6 +373,11 @@ LLM_Engine_FirePrediction(buffer) {
 	ctx := params["context"]
 	tail := params["context_tail"]
 	req_temp := params["temperature"]
+	; Per-prediction output-token budget computed once by the shared PromptBuilder
+	; (max(15, max_words*6+10), default 150) — the single cross-driver source.
+	; Threaded to every backend below so AHK no longer re-derives its own cap
+	; (Ollama's mw*4 / remote's hardcoded 256), matching the macOS driver.
+	max_tokens := Integer(params["max_tokens"])
 
 	if (tail == "" or StrLen(tail) < 2) {
 		try LoggerInfo("LLM", "Context too short — prediction skipped.")
@@ -514,7 +519,7 @@ LLM_Engine_FirePrediction(buffer) {
 		model_tag := (entry is Map and entry.Has("Model")) ? entry["Model"] : (entry.HasOwnProp("Model") ? entry.Model : "")
 		log_model := model_tag
 		dispatch_fn := (temp, on_succ, on_fail) =>
-			LLM_RemoteGenerate_Async(entry, system_prompt, ctx, temp, on_succ, on_fail, tail)
+			LLM_RemoteGenerate_Async(entry, system_prompt, ctx, temp, on_succ, on_fail, tail, max_tokens)
 		; No remote-streaming dispatcher — disable streaming for the API
 		; backend so the engine falls back to the async non-streaming path.
 		streaming_enabled := false
@@ -528,12 +533,11 @@ LLM_Engine_FirePrediction(buffer) {
 		; to its built-in stops.
 		stop_seqs := (profile is Map and profile.Has("stop_sequences") and profile["stop_sequences"] is Array)
 			? profile["stop_sequences"] : ""
-		mw := Integer(_LLM_Engine["max_words"])
 		is_batch := (profile is Map and profile.Has("batch") and profile["batch"] == true)
 		dispatch_fn := (temp, on_succ, on_fail) =>
-			LLM_OllamaGenerate_Async(model_tag, system_prompt, ctx, temp, on_succ, on_fail, stop_seqs, mw, is_batch, tail)
+			LLM_OllamaGenerate_Async(model_tag, system_prompt, ctx, temp, on_succ, on_fail, stop_seqs, max_tokens, is_batch, tail)
 		dispatch_stream_fn := (temp, on_partial, on_succ, on_fail) =>
-			LLM_OllamaGenerate_Streaming(model_tag, system_prompt, ctx, temp, on_partial, on_succ, on_fail, stop_seqs, mw, is_batch, tail)
+			LLM_OllamaGenerate_Streaming(model_tag, system_prompt, ctx, temp, on_partial, on_succ, on_fail, stop_seqs, max_tokens, is_batch, tail)
 	}
 
 	; ── Batch vs sequential dispatch ──
