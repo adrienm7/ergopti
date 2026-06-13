@@ -214,7 +214,10 @@ _MetaRunSharedPurityTests() {
 	RepoRoot := RegExReplace(RepoRoot, "/static/ergopti_plus/windows/tests(/meta)?$", "")
 
 	SharedDir := RepoRoot . "/static/ergopti_plus/shared"
-	ForbiddenPatterns := ["io\.open", "hs\.", "SendInput", "SendEvent", "TrayTip", "FileAppend", "FileRead"]
+	; ``\bhs\.`` (word boundary) so the Hammerspoon global is matched but not the
+	; "hs." inside ordinary words like "months." — the looser ``hs\.`` produced
+	; false positives that forced this gate to stay warn-only.
+	ForbiddenPatterns := ["io\.open", "\bhs\.", "SendInput", "SendEvent", "TrayTip", "FileAppend", "FileRead"]
 
 	SharedFiles := _MetaPACListFiles(SharedDir, "js")
 	Violations  := 0
@@ -231,29 +234,49 @@ _MetaRunSharedPurityTests() {
 		} catch {
 			continue
 		}
-		Rel     := SubStr(FilePath, InStr(FilePath, "/_shared/") + 1)
+		Rel := SubStr(FilePath, InStr(FilePath, "/shared/") + 1)
+		InBlockComment := false
 		LineNum := 0
 		for Line in StrSplit(Body, "`n", "`r") {
 			LineNum++
+			Trimmed := Trim(Line)
+			; Skip comments — a forbidden token is only a violation in real code,
+			; not when it is named in a JSDoc/block/line comment (the cross-driver
+			; webview docs legitimately mention hs.webview etc.).
+			if (InBlockComment) {
+				if InStr(Trimmed, "*/")
+					InBlockComment := false
+				continue
+			}
+			if (SubStr(Trimmed, 1, 2) == "/*") {
+				if !InStr(Trimmed, "*/")
+					InBlockComment := true
+				continue
+			}
+			if (SubStr(Trimmed, 1, 1) == "*" or SubStr(Trimmed, 1, 2) == "//") {
+				continue
+			}
+			; Strip a trailing line comment so a doc note after code is ignored.
+			Code := RegExReplace(Line, "//.*$", "")
 			for Pat in ForbiddenPatterns {
-				if Line ~= Pat {
+				if Code ~= Pat {
 					Violations++
-					OutputDebug("WARN: forbidden OS API in _shared/: " . Rel . " line " . LineNum)
+					OutputDebug("WARN: forbidden OS API in _shared/ JS: " . Rel . " line " . LineNum)
 				}
 			}
 		}
 	}
 
-	; Warn-only: pre-existing _shared/ UI files that call hs. for rendering are
-	; architectural gaps tracked separately. The invariant is informational until
-	; those files are refactored to route through port adapters.
+	; Hard-fail (A6): shared JS must be pure logic; any direct OS-level call has to
+	; route through a port adapter. The audit confirmed the only matches were doc
+	; comments + a "months." false positive — both handled above — so the real
+	; violation count is zero and this can fail the build on any new OS call. The
+	; macOS twin (hs.* baseline) already hard-fails; this brings the AHK side level.
 	_ResultSharedPurity() {
-		Assert(ScannedFiles >= 0, "shared purity scanner failed to initialise")
-		if Violations > 0 {
-			OutputDebug("NOTE: " . Violations . " OS-API call(s) in _shared/ (warn-only  --  see WARNs above)")
-		}
+		Assert(ScannedFiles > 0, "shared purity scanner found no JS files  --  check RepoRoot")
+		Assert(Violations = 0, "meta: " . Violations . " direct OS-API call(s) in _shared/ JS  --  route OS access through a port adapter (see WARNs)")
 	}
-	Test("meta shared purity: no direct OS API in _shared/ (" . ScannedFiles . " files)", _ResultSharedPurity)
+	Test("meta shared purity: no direct OS API in _shared/ JS (" . ScannedFiles . " files)", _ResultSharedPurity)
 }
 _MetaRunSharedPurityTests()
 
