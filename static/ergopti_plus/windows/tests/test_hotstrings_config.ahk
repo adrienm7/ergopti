@@ -20,6 +20,12 @@
 ; real shared/ dir that test_stubs.ahk points _SharedDir at) so the fallback
 ; assertions below see the canonical values, exactly as production does at boot.
 HotstringsConfigLoadSharedDefaults()
+; Likewise seed the llm_prediction tint: production sources it from
+; UI_AI_LOADING_HEX (set by UiStyle_LoadSharedConst), which this headless harness
+; does not run — so load that hex from the same shared file and run the loader,
+; exactly as production does, so the resolve-cascade tests below see the AI tint.
+UI_AI_LOADING_HEX := IniCacheGet(ParseTomlFile(_SharedDir . "\tooltip\constants.toml"), "accent_colors", "ai_loading_hex")
+HotstringsConfigLoadLlmPredictionColor()
 
 ; Helper — wipe / seed the in-memory state for a single test case.
 ;
@@ -231,6 +237,40 @@ TestHotstringsConfig_SharedDefaultsAreSingleSource() {
 }
 Test("HotstringsConfig: resolution defaults come from the shared defaults.toml (single source)",
     TestHotstringsConfig_SharedDefaultsAreSingleSource)
+
+; The llm_prediction baseline tint is the canonical AI loading hex from
+; shared/tooltip/constants.toml [accent_colors] ai_loading_hex (exposed as
+; UI_AI_LOADING_HEX), NOT a re-typed literal. Proves the loader copies it and
+; fails fast when the shared hex is unloaded.
+TestHotstringsConfig_LlmPredictionColorFromSharedAiHex() {
+    global _SharedDir, UI_AI_LOADING_HEX, HOTSTRINGS_CATEGORY_DEFAULT_COLORS
+    ; Pin the canonical value at its single source.
+    c := ParseTomlFile(_SharedDir . "\tooltip\constants.toml")
+    AssertEqual("#AD61FF", IniCacheGet(c, "accent_colors", "ai_loading_hex"),
+        "canonical AI loading hex in shared/tooltip/constants.toml")
+
+    savedHex   := IsSet(UI_AI_LOADING_HEX) ? UI_AI_LOADING_HEX : ""
+    savedColor := HOTSTRINGS_CATEGORY_DEFAULT_COLORS.Has("llm_prediction") ? HOTSTRINGS_CATEGORY_DEFAULT_COLORS["llm_prediction"] : ""
+    try {
+        ; (1) The loader copies UI_AI_LOADING_HEX into the llm_prediction baseline.
+        UI_AI_LOADING_HEX := "#AD61FF"
+        HotstringsConfigLoadLlmPredictionColor()
+        AssertEqual(UI_AI_LOADING_HEX, HOTSTRINGS_CATEGORY_DEFAULT_COLORS["llm_prediction"],
+            "llm_prediction baseline equals UI_AI_LOADING_HEX (single source)")
+        AssertEqual("#AD61FF", HOTSTRINGS_CATEGORY_DEFAULT_COLORS["llm_prediction"],
+            "llm_prediction resolves to the canonical AI hex")
+
+        ; (2) Fail fast: an unloaded UI_AI_LOADING_HEX must throw, not mask.
+        UI_AI_LOADING_HEX := ""
+        AssertThrows(HotstringsConfigLoadLlmPredictionColor,
+            "loader throws when UI_AI_LOADING_HEX is not loaded")
+    } finally {
+        UI_AI_LOADING_HEX := savedHex
+        HOTSTRINGS_CATEGORY_DEFAULT_COLORS["llm_prediction"] := savedColor
+    }
+}
+Test("HotstringsConfig: llm_prediction tint is sourced from the shared AI loading hex",
+    TestHotstringsConfig_LlmPredictionColorFromSharedAiHex)
 
 TestHotstringsConfig_ResolveTomlFile() {
     _HCfgTestReset()

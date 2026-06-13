@@ -605,6 +605,10 @@ BootProfile_Begin()
 ; runtime values stay in sync with the TOML single source of truth.
 ; Must run after _SharedDir is set (line ~51) and ParseTomlFile is available.
 UiStyle_LoadSharedConst()
+; Now that UI_AI_LOADING_HEX is loaded, source the llm_prediction hotstring tint
+; from it (single canonical AI loading colour) — must run after the line above
+; and before the tray menu build / any HotstringsResolve.
+HotstringsConfigLoadLlmPredictionColor()
 
 ; Log both the raw reverse-probe result (VK_RMENU → SC) and the resolved
 ; Kana-remap flag so future regressions on exotic layouts surface immediately.
