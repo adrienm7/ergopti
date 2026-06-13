@@ -106,6 +106,21 @@ _OllamaPayload_StopSequencesAbsentWhenEmpty() {
 Test("LLM_BuildOllamaPayload: stop field present (defaulted) when no stop sequences", _OllamaPayload_StopSequencesAbsentWhenEmpty)
 
 
+; A5 — num_predict is the shared PromptBuilder max_tokens threaded from the
+; engine (single cross-driver source), not the former local mw*4 re-derivation.
+_OllamaPayload_NumPredictFromMaxTokens() {
+	payload := LLM_BuildOllamaPayload("m", "s", "u", 0.1, false, "", 42)
+	AssertContains(payload, '"num_predict":42', "num_predict must equal the threaded max_tokens")
+}
+Test("LLM_BuildOllamaPayload: num_predict equals the threaded max_tokens (A5)", _OllamaPayload_NumPredictFromMaxTokens)
+
+_OllamaPayload_NumPredictDefault() {
+	payload := LLM_BuildOllamaPayload("m", "s", "u", 0.1)
+	AssertContains(payload, '"num_predict":150', "num_predict defaults to the PromptBuilder default 150")
+}
+Test("LLM_BuildOllamaPayload: num_predict defaults to PromptBuilder default (A5)", _OllamaPayload_NumPredictDefault)
+
+
 
 
 ; ===================================================

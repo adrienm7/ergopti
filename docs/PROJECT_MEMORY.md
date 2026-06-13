@@ -477,6 +477,26 @@ keep-awake, gestures probe timers, UI/Karabiner timers, MLX/LLM warmup/discovery
 are a follow-up needing per-module hardware smoke-test, same as the manifest-reader
 follow-up above.
 
+**Update (2026-06-13, A5): the AHK LLM backends now consume the shared
+PromptBuilder `max_tokens`.** The engine computed `params["max_tokens"]`
+(`max(15, max_words*6+10)`, default 150) and then **discarded it**, while
+`api_ollama.ahk` re-derived `num_predict := Max(24, Min(96, mw*4))` and
+`api_remote.ahk` hardcoded `256` in all three provider branches — macOS already
+threaded the value, so AHK was the incomplete side. Now `prediction_engine.ahk`
+threads `max_tokens` into `LLM_OllamaGenerate_Async/_Streaming` and
+`LLM_RemoteGenerate_Async`, and the payload builders serialize it verbatim
+(defaults 150 / 256 only for an out-of-range value). These are output **ceilings**
+rarely reached (generation stops at the stop-sequence/line boundary), so the
+practical effect is small — but the Windows caps did change, so it needs a
+live-model sanity check. **Gotchas for the next person:** (1) the `api_mlx.lua`
+`min(0.60, temp+0.10)` clamp is TEMPERATURE retry escalation, NOT a token limit —
+do not "fix" it as a token divergence. (2) The cross-driver
+`shared/tests/corpus/prompt_builder/vectors.json` already pins `max_tokens` AND
+the diversity-temperature curve (greedy snap 0.15, auto-raise, cap 1.0) for both
+drivers — extend it rather than writing a new token corpus. (3) The AHK *batch*
+path still uses a single per-prediction cap, not macOS's `× num_predictions + N*5`
+scaling — a documented parity follow-up, not a regression.
+
 ### project_debug_menu_sync
 
 _Debug menu order is defined in shared/menu_manifest.json debug_menu — both AHK and Lua drivers consume it_

@@ -163,7 +163,7 @@ LLM_OllamaAllowInference() {
 }
 
 LLM_OllamaGenerate(model, system_prompt, full_text, temperature := 0.1, tail_text := "") {
-	payload := LLM_BuildOllamaPayload(model, system_prompt, full_text, temperature, false, "", 15, false, tail_text)
+	payload := LLM_BuildOllamaPayload(model, system_prompt, full_text, temperature, false, "", 150, false, tail_text)
 
 	try {
 		http := ComObject("WinHttp.WinHttpRequest.5.1")
@@ -313,7 +313,7 @@ LLM_OllamaDeleteModel(tag) {
  * @param {function} on_fail       - Callback fired on any failure.
  * @returns {Integer} The request id (use with LLM_OllamaCancelAsync to abort).
  */
-LLM_OllamaGenerate_Async(model, system_prompt, full_text, temperature, on_success, on_fail, stop_sequences := "", max_words := 15, is_batch := false, tail_text := "") {
+LLM_OllamaGenerate_Async(model, system_prompt, full_text, temperature, on_success, on_fail, stop_sequences := "", max_tokens := 150, is_batch := false, tail_text := "") {
 	global _LLM_Ollama_AsyncCounter, _LLM_Ollama_Pending
 	_LLM_Ollama_AsyncCounter += 1
 	req_id := _LLM_Ollama_AsyncCounter
@@ -326,7 +326,7 @@ LLM_OllamaGenerate_Async(model, system_prompt, full_text, temperature, on_succes
 		"on_success", on_success,
 		"on_fail", on_fail,
 		"stop_sequences", stop_sequences,
-		"max_words", max_words,
+		"max_tokens", max_tokens,
 		"is_batch", is_batch,
 		"tail_text", tail_text
 	)
@@ -347,7 +347,7 @@ _LLM_Ollama_DispatchAsync(job) {
 	req_id := job["req_id"]
 	payload := LLM_BuildOllamaPayload(
 		job["model"], job["system_prompt"], job["full_text"], job["temperature"],
-		false, job["stop_sequences"], job["max_words"], job["is_batch"], job["tail_text"])
+		false, job["stop_sequences"], job["max_tokens"], job["is_batch"], job["tail_text"])
 	uid := _LLM_Ollama_NextStreamUid()
 	tmp_payload := A_Temp . "\ergopti_ollama_" . uid . ".json"
 	tmp_stdout := A_Temp . "\ergopti_ollama_" . uid . ".out"
@@ -818,9 +818,9 @@ LLM_OllamaCancelWarmupRetry() {
  * @returns {Object} A handle ``{ Pid, Cancelled }`` callers can pass to
  *                   LLM_OllamaCancelStream to terminate the curl process.
  */
-LLM_OllamaGenerate_Streaming(model, system_prompt, full_text, temperature, on_partial, on_success, on_fail, stop_sequences := "", max_words := 15, is_batch := false, tail_text := "") {
+LLM_OllamaGenerate_Streaming(model, system_prompt, full_text, temperature, on_partial, on_success, on_fail, stop_sequences := "", max_tokens := 150, is_batch := false, tail_text := "") {
 	; Build the streaming payload — ``stream:true`` flips Ollama to JSONL (/api/chat).
-	payload := LLM_BuildOllamaPayload(model, system_prompt, full_text, temperature, true, stop_sequences, max_words, is_batch, tail_text)
+	payload := LLM_BuildOllamaPayload(model, system_prompt, full_text, temperature, true, stop_sequences, max_tokens, is_batch, tail_text)
 
 	; Write the payload to a temp file (curl --data-binary @file). Avoids
 	; command-line length limits and shell escaping headaches with the JSON
@@ -1164,10 +1164,12 @@ _LLM_Ollama_BuildMessages(system_prompt, full_text, tail_text, model) {
 /**
  * Serialises parameters into an Ollama /api/chat JSON payload (macOS parity).
  */
-LLM_BuildOllamaPayload(model, system_prompt, full_text, temperature, streaming := false, stop_sequences := "", max_words := 15, is_batch := false, tail_text := "") {
+LLM_BuildOllamaPayload(model, system_prompt, full_text, temperature, streaming := false, stop_sequences := "", max_tokens := 150, is_batch := false, tail_text := "") {
 	line_mode := _LLM_Ollama_IsLineMode(system_prompt, is_batch)
-	mw := (max_words is Number and max_words > 0) ? Integer(max_words) : 15
-	num_predict := Max(24, Min(96, mw * 4))
+	; Output-token cap = the shared PromptBuilder budget threaded from the engine
+	; (single cross-driver source). No local re-derivation; falls back to the
+	; PromptBuilder default only when an out-of-range value is passed.
+	num_predict := (max_tokens is Number and max_tokens > 0) ? Integer(max_tokens) : 150
 	msgs := _LLM_Ollama_BuildMessages(system_prompt, full_text, tail_text, model)
 	msgs_json := ""
 	for _, m in msgs {
