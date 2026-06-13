@@ -364,6 +364,27 @@ CreateHotstring(Flags, Abbreviation, Replacement, options := unset) {
     )
 }
 
+; Register a "raw callback" hotstring: the callback does ALL of its own
+; conditional, variable-length sending/backspacing and returns a { Bs, Ins }
+; effect (Bs chars removed from the buffer's right, Ins appended) for HSE buffer
+; resync — see _HSE_DispatchRawCallback. Used by the formerly-native E-circumflex
+; deadkey + "..." ellipsis so no AHK-native Hotstring() (hence no A_InputLevel
+; dependency) remains. The B0O flag suffix matches CreateHotstring: the engine
+; never auto-backspaces — the callback owns the screen edit.
+CreateRawCallbackHotstring(Flags, Abbreviation, Callback, options := unset) {
+    TimeActivationSeconds := (IsSet(options) and options.Has("TimeActivationSeconds")) ? options["TimeActivationSeconds"] : 0
+    Category := (IsSet(options) and options.Has("Category")) ? options["Category"] : ""
+    Section  := (IsSet(options) and options.Has("Section"))  ? options["Section"]  : ""
+    Priority := (IsSet(options) and options.Has("Priority"))
+        ? options["Priority"]
+        : _HSE_ResolveRegistrationPriority(Category, Section)
+    _RegisterHotstring(
+        ":" Flags "B0O:" Abbreviation,
+        Callback,
+        { RawCallback: true, TimeActivationSeconds: TimeActivationSeconds, PrevCharKey: SubStr(Abbreviation, -2, 1), Category: Category, Section: Section, Priority: Priority }
+    )
+}
+
 ; Build the dispatch-metadata object HSE_DispatchMatch consumes. Kept next
 ; to the callback factory so the two stay in lockstep — every field used
 ; by the dispatcher has a clear origin in the original options dict.

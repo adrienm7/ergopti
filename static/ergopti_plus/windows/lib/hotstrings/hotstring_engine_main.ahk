@@ -1140,8 +1140,64 @@ global HSE_SUPPRESS_RELEASE_DELAY_MS := 60
 ; Specs without dispatch metadata (Replacement undefined — the unit-test
 ; path) fall through to invoking Spec.Callback for backwards
 ; compatibility with the test-only registrations.
+; Dispatch a "raw callback" hotstring (the natives migrated into the HSE: the
+; E-circumflex deadkey and the "..." ellipsis). The callback does ALL of its own
+; conditional, variable-length sending/backspacing and returns a { Bs, Ins } effect
+; (Bs chars removed from the buffer's right, Ins appended) — or a falsy value when
+; it declined to expand. We wrap it with the same prefix-watcher suppression +
+; keylogger synthetic-marking the Replacement path uses, and resync HSE_Buffer from
+; the effect so the next keystroke matches the post-expansion screen. This is what
+; lets those two former native AHK Hotstring() registrations live in the HSE — no
+; A_InputLevel dependency remains, so they register on the normal (and live-rebuild)
+; path like every other section.
+_HSE_DispatchRawCallback(Spec, EndChar) {
+    global HSE_SUPPRESS_RELEASE_DELAY_MS, HSE_Buffer, HSE_MAX_BUFFER_LEN, HSE_StartIsWordBoundary
+    if !(Spec.HasOwnProp("Callback") and Spec.Callback) {
+        return
+    }
+    HSE_Suppress(true)
+    if IsSet(PrefixWatcherSuppress) {
+        try PrefixWatcherSuppress(true)
+    }
+    try KL_MarkSynthetic("hotstring")
+    try {
+        Effect := (Spec.Callback)(EndChar)
+        ; A falsy Effect means the callback declined to expand — leave the buffer
+        ; (with the trigger chars still in it) untouched.
+        if (IsObject(Effect) and Effect.HasOwnProp("Bs")) {
+            Bs  := Effect.Bs
+            Ins := Effect.HasOwnProp("Ins") ? Effect.Ins : ""
+            BufLen := StrLen(HSE_Buffer)
+            HSE_Buffer := (BufLen >= Bs ? SubStr(HSE_Buffer, 1, BufLen - Bs) : "") . Ins
+            ; Mirror HSE_ApplyExpansion's cap so a future raw callback with a large
+            ; Ins can never grow the buffer unbounded or drift the boundary flag.
+            if (StrLen(HSE_Buffer) > HSE_MAX_BUFFER_LEN) {
+                HSE_Buffer := SubStr(HSE_Buffer, -HSE_MAX_BUFFER_LEN)
+                HSE_StartIsWordBoundary := false
+            }
+        }
+    } finally {
+        if IsSet(_ResetPrefixBuffer) {
+            try _ResetPrefixBuffer(true)
+        }
+        SetTimer((*) => HSE_Suppress(false), -HSE_SUPPRESS_RELEASE_DELAY_MS)
+        if IsSet(PrefixWatcherSuppress) {
+            SetTimer((*) => PrefixWatcherSuppress(false), -HSE_SUPPRESS_RELEASE_DELAY_MS)
+        }
+        SetTimer((*) => KL_ClearSynthetic(), -HSE_SUPPRESS_RELEASE_DELAY_MS)
+    }
+}
+
 HSE_DispatchMatch(Spec, EndChar) {
     global HSE_SUPPRESS_RELEASE_DELAY_MS, _SendHook, HSE_TypoNbspStripped, HSE_Buffer
+    ; Raw-callback specs (the natives migrated into the HSE: E-circumflex deadkey,
+    ; "..." ellipsis) do all their own conditional, variable-length send/backspace;
+    ; route them to _HSE_DispatchRawCallback so the engine never auto-strips a
+    ; trigger the callback may have left in place.
+    if (Spec.HasOwnProp("RawCallback") and Spec.RawCallback) {
+        _HSE_DispatchRawCallback(Spec, EndChar)
+        return
+    }
     if !Spec.HasOwnProp("Replacement") {
         if Spec.HasOwnProp("Callback") and Spec.Callback {
             try (Spec.Callback)(EndChar)

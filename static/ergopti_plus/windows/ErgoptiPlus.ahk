@@ -2165,7 +2165,7 @@ BootProfile_Mark("Layout/shortcuts/tap-holds + AltGr registered")
 ; sections (~3000 regs / ~410 ms). RegisterTextExpansionDeferred and
 ; RegisterEmojisSymbolsDeferred (both armed below) load them off-path a moment
 ; later, each rebuilding the prefix-watcher index so the preview picks them up.
-RegisterAllHotstrings(true, true)
+RegisterAllHotstrings(true)
 BootProfile_Mark("Hotstrings registered (HSE, emoji/symbol deferred)")
 HotstringPrefixWatcherInit()
 BootProfile_Mark("Prefix watcher index armed")
