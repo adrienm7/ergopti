@@ -225,6 +225,16 @@ LLM_Tray_ApplySharedDefaults()
 global _LLM_Tray_Menu    := Menu()
 global _LLM_Tray_InTray  := false
 
+; Set by LLM_Tray_Init when the IA submenu has been placed in the tray but its
+; (expensive) population was deferred to the post-"ready" boot tail. Read once
+; there to arm the deferred LLM_Tray_Build. See LLM_TRAY_BUILD_DEFER_MS.
+global _LLM_Tray_BuildPending := false
+
+; Delay (ms) after boot before the deferred IA submenu is populated. Armed from
+; the boot tail (post-"ready") so it never interrupts the hotstring registration;
+; short so the dropdown is ready almost immediately for a user who opens it.
+global LLM_TRAY_BUILD_DEFER_MS := 200
+
 ; Active trigger hotkey object — deleted and recreated on every shortcut change
 global _LLM_Tray_TriggerHk := unset
 
