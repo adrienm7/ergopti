@@ -367,6 +367,92 @@ Test("GenerateUppercaseVariants: single character with no symbol match",
 
 
 ; ==========================
+; _HSE_ConformReplacement
+; ==========================
+; The runtime case-conform that replaces the old explicit lower/UPPER/Title variant
+; registrations. Comparisons MUST be case-sensitive (Assert(a == b)) because AHK v2
+; AssertEqual uses != which is case-INSENSITIVE and would silently pass wrong casing.
+
+TestHE_ConformLowerStaysLower() {
+	df := false
+	r := _HSE_ConformReplacement("xy", "ab", "ab", false, &df)
+	AssertTrue(df, "lowercase typed must fire")
+	Assert(r == "xy", "lowercase typed -> lowercase replacement")
+}
+Test("_HSE_ConformReplacement: lowercase typed yields lowercase replacement",
+	TestHE_ConformLowerStaysLower)
+
+TestHE_ConformUpperMultichar() {
+	df := false
+	r := _HSE_ConformReplacement("xy", "AB", "ab", false, &df)
+	AssertTrue(df, "UPPER typed (multichar) must fire")
+	Assert(r == "XY", "UPPER typed -> UPPER replacement")
+}
+Test("_HSE_ConformReplacement: UPPER typed (multichar) yields UPPER replacement",
+	TestHE_ConformUpperMultichar)
+
+TestHE_ConformTitleMultichar() {
+	df := false
+	r := _HSE_ConformReplacement("xy", "Ab", "ab", false, &df)
+	AssertTrue(df, "Title typed must fire")
+	Assert(r == "Xy", "Title typed -> Title replacement")
+}
+Test("_HSE_ConformReplacement: Title typed yields Title replacement",
+	TestHE_ConformTitleMultichar)
+
+TestHE_ConformMixedDoesNotFire() {
+	df := true
+	_HSE_ConformReplacement("xy", "aB", "ab", false, &df)
+	AssertFalse(df, "mixed-case typed must NOT fire (old code registered no variant)")
+}
+Test("_HSE_ConformReplacement: mixed-case typed does not fire",
+	TestHE_ConformMixedDoesNotFire)
+
+TestHE_ConformOneCharCapitalIsTitle() {
+	df := false
+	; A single-char abbr has no distinct UPPER form, so a typed capital maps to the
+	; Title replacement, never the fully uppercased one.
+	r := _HSE_ConformReplacement("test", "A", "a", true, &df)
+	AssertTrue(df, "1-char capital must fire")
+	Assert(r == "Test", "1-char capital -> Title replacement, not TEST")
+}
+Test("_HSE_ConformReplacement: 1-char capital yields Title replacement",
+	TestHE_ConformOneCharCapitalIsTitle)
+
+TestHE_ConformSymbolFirstLowerStays() {
+	df := false
+	; "+m" canonical (symbol-first): lowercase typed stays lowercase.
+	r := _HSE_ConformReplacement("meilleur", "+m", "+m", false, &df)
+	AssertTrue(df, "symbol-first lowercase must fire")
+	Assert(r == "meilleur", "symbol-first lowercase -> lowercase replacement")
+}
+Test("_HSE_ConformReplacement: symbol-first lowercase stays lowercase",
+	TestHE_ConformSymbolFirstLowerStays)
+
+TestHE_ConformSymbolFirstUpper() {
+	df := false
+	r := _HSE_ConformReplacement("meilleur", "+M", "+m", false, &df)
+	AssertTrue(df, "symbol-first UPPER must fire")
+	Assert(r == "MEILLEUR", "symbol-first UPPER -> UPPER replacement")
+}
+Test("_HSE_ConformReplacement: symbol-first UPPER yields UPPER replacement",
+	TestHE_ConformSymbolFirstUpper)
+
+TestHE_ConformMagicKeyTrigger() {
+	df := false
+	Star := Chr(0x2605)  ; magic-key star, kept ASCII-safe in the test source
+	; The trailing magic key is case-neutral; conform keeps it and uppercases the rest.
+	r := _HSE_ConformReplacement("best", "CT" . Star, "ct" . Star, false, &df)
+	AssertTrue(df, "magic-key trigger typed UPPER must fire")
+	Assert(r == "BEST", "magic-key UPPER -> UPPER replacement")
+}
+Test("_HSE_ConformReplacement: magic-key trigger conforms UPPER",
+	TestHE_ConformMagicKeyTrigger)
+
+
+
+
+; ==========================
 ; SendNewResult / _SendHook
 ; ==========================
 TestHE_SendNewResultHookCalled() {

@@ -533,6 +533,41 @@ CreateCaseSensitiveHotstrings(Flags, Abbreviation, Replacement, options := unset
     ReplacementTitleCase := StrTitle(Replacement)
     ReplacementUpperCase := StrUpper(Replacement)
 
+    ; ── Case-conform fast path ──────────────────────────────────────────────
+    ; For a star trigger with no shift-symbol char (the common case — every
+    ; magic-key text-expansion entry), register ONE case-INSENSITIVE spec instead
+    ; of the lower/UPPER/Title explicit variants. HSE_DispatchMatch conforms the
+    ; replacement casing to how the trigger was typed (see _HSE_ConformReplacement),
+    ; roughly halving the magic-key registration with no observable change.
+    ; Triggers containing "," or "'" KEEP the explicit path: their UPPER forms are
+    ; DIFFERENT characters (shifted nbsp + ;/:/?) a case-insensitive match cannot
+    ; reproduce — exactly the set _BuildUppercasedSymbols enumerates.
+    IsStarTrigger := InStr(Flags, "*") > 0
+    HasShiftSymbol := false
+    for _, _ConformChar in StrSplit(Abbreviation) {
+        if UppercasedSymbols.Has(_ConformChar) {
+            HasShiftSymbol := true
+            break
+        }
+    }
+    if (IsStarTrigger and !HasShiftSymbol) {
+        ; A 1-char abbreviation (before the magic key) has no distinct UPPER form.
+        ConformOneChar := StrLen(RTrim(Abbreviation, ScriptInformation["MagicKey"])) == 1
+        ; Drop the "C" flag so any-case typing matches the single registered spec.
+        ConformFlags := StrReplace(Flags, "C")
+        ConformMeta := _MakeHotstringMeta(ReplacementLowerCase, AbbreviationLowerCase, OnlyText,
+            FinalResult, TimeActivationSeconds, IsRepeat, Category, Section, Priority)
+        ConformMeta.CaseConform := true
+        ConformMeta.ConformOneChar := ConformOneChar
+        _RegisterHotstring(
+            ":" ConformFlags "B0O:" AbbreviationLowerCase,
+            _MakeHotstringCallback(ReplacementLowerCase, AbbreviationLowerCase, OnlyText,
+                FinalResult, TimeActivationSeconds, Category, Section),
+            ConformMeta
+        )
+        return
+    }
+
     ; Helper closure: installs one hotstring variant with positional args
     ; baked in, plus the pre-computed ``BackSpaceSeq`` / ``PrevCharKey`` so
     ; ``_HotstringDispatch`` skips the StrLen + SubStr work on every firing.
@@ -663,6 +698,40 @@ StrTitle(Text) {
     } else {
         return Text
     }
+}
+
+; Case-conform a replacement to the way the user actually typed the trigger. This
+; replaces the old explicit lower/UPPER/Title variant registrations:
+; CreateCaseSensitiveHotstrings now registers ONE case-insensitive spec (for star
+; triggers without a shift-symbol char), and HSE_DispatchMatch calls this at fire
+; time to pick the output casing — roughly halving the magic-key registration
+; (~2119 -> ~1000 specs) with no observable change.
+;   - ``Repl``      the registered (lowercase) replacement.
+;   - ``Typed``     the trigger exactly as typed (the matched buffer suffix).
+;   - ``Canonical`` the registered (lowercase) trigger.
+;   - ``OneChar``   true when the abbreviation is a single character before the
+;                   magic key — such a trigger has no distinct UPPER form (the old
+;                   code registered lowercase + Title only, Title == Upper for one
+;                   letter), so a typed capital maps to the Title replacement.
+; Comparisons use ``==`` (case-SENSITIVE in AHK v2). Sets ``DoFire := false`` and
+; returns "" when the typed case is not a clean lower / UPPER / Title form: the old
+; code registered no variant for mixed case, so the hotstring must NOT fire then.
+_HSE_ConformReplacement(Repl, Typed, Canonical, OneChar, &DoFire) {
+    DoFire := true
+    if (Typed == Canonical) {
+        return Repl
+    }
+    TitleForm := StrTitle(Canonical)
+    ; "!==" is case-SENSITIVE inequality — plain "!=" is case-insensitive in AHK v2
+    ; and would treat "Ab" and "ab" as equal, collapsing the Title branch.
+    if (Typed == TitleForm and TitleForm !== Canonical) {
+        return StrTitle(Repl)
+    }
+    if (Typed == StrUpper(Canonical)) {
+        return OneChar ? StrTitle(Repl) : StrUpper(Repl)
+    }
+    DoFire := false
+    return ""
 }
 
 GenerateUppercaseVariants(AbbreviationUpperCase, UppercasedSymbols) {
