@@ -665,7 +665,7 @@ _Onboarding_PreloadFromExistingConfig(ChosenDir) {
 		_ob_gestures := (StrLower(GesturesEnabled) == "true")
 	}
 
-	try LoggerDone("onboarding", "Wizard pre-loaded (layout=%s, magic='%s', metrics=%s, gestures=%s).",
+	try LoggerDone("onboarding", "Wizard pre-loaded (layout={1}, magic='{2}', metrics={3}, gestures={4}).",
 		_ob_layout ? "true" : "false", _ob_magic_key,
 		_ob_metrics ? "true" : "false", _ob_gestures ? "true" : "false")
 }

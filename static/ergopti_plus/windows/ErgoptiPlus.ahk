@@ -980,18 +980,18 @@ for _KbSlot, _KbAction in KeyboardShortcutAssignments {
         continue
     _KbSend := _KeyboardSlotSendCode(_KbSlot)
     if (_KbSend == "") {
-        LoggerWarn("KeyboardShortcuts", "Slot '%s' skipped — send code not found.", _KbSlot)
+        LoggerWarn("KeyboardShortcuts", "Slot '{1}' skipped — send code not found.", _KbSlot)
         continue
     }
     try {
         Hotkey(_KbSend, ((_s) => (*) => RunKeyboardShortcutAction(_s))(_KbSlot))
-        LoggerDebug("KeyboardShortcuts", "Hotkey '%s' → '%s' registered.", _KbSlot, _KbAction)
+        LoggerDebug("KeyboardShortcuts", "Hotkey '{1}' → '{2}' registered.", _KbSlot, _KbAction)
         _KbBoundCount++
     } catch as _KbErr {
-        LoggerWarn("KeyboardShortcuts", "Failed to register hotkey '%s': %s.", _KbSlot, _KbErr.Message)
+        LoggerWarn("KeyboardShortcuts", "Failed to register hotkey '{1}': {2}.", _KbSlot, _KbErr.Message)
     }
 }
-LoggerSuccess("KeyboardShortcuts", "Configurable hotkeys registered (%d active).", _KbBoundCount)
+LoggerSuccess("KeyboardShortcuts", "Configurable hotkeys registered ({1} active).", _KbBoundCount)
 
 CS_Load()
 global _SaveFullConfigReady := true
@@ -1008,7 +1008,7 @@ BootProfile_Mark("Tray menu + icon built")
 SetTimer(SaveFullConfig, -500)
 
 if MetricsShortcuts.enabled {
-    LoggerDebug("Startup", "Metrics enabled — WPMWidget.visible=%s, show_graph=%s.",
+    LoggerDebug("Startup", "Metrics enabled — WPMWidget.visible={1}, show_graph={2}.",
         WPMWidget.visible, WPMWidget.show_graph)
     ; (The WebView2 widget cold-start is armed at the very END of boot — after
     ; "Driver fully initialised" — NOT here. A timer armed mid-boot fires ~its

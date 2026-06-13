@@ -174,7 +174,7 @@ SQLite_Exec(db, sql) {
         if (rc != SQLiteConst.OK) {
             ; Surface the SQLite error so callers can diagnose schema mismatches
             ; rather than silently receiving an empty result set.
-            try LoggerError("sqlite3", "sqlite3_prepare_v2 failed (rc=%d): %s", rc, SQLite_LastError(db))
+            try LoggerError("sqlite3", "sqlite3_prepare_v2 failed (rc={1}): {2}", rc, SQLite_LastError(db))
             return false
         }
         if pstmt {

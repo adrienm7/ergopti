@@ -139,7 +139,7 @@ class HookDispatcher {
 				}
 			}
 			HookDispatcher._subscribers[event_type].Push(callback_fn)
-			LoggerDebug("HookDispatcher", "Subscriber registered for '%s' (total: %d).",
+			LoggerDebug("HookDispatcher", "Subscriber registered for '{1}' (total: {2}).",
 				event_type, HookDispatcher._subscribers[event_type].Length)
 		}
 		Critical("Off")
@@ -162,7 +162,7 @@ class HookDispatcher {
 				idx := arr.Length - A_Index + 1
 				if (arr[idx].Ptr = callback_fn.Ptr) {
 					arr.RemoveAt(idx)
-					LoggerDebug("HookDispatcher", "Subscriber removed from '%s'.", event_type)
+					LoggerDebug("HookDispatcher", "Subscriber removed from '{1}'.", event_type)
 					break
 				}
 			}
@@ -319,7 +319,7 @@ class HookDispatcher {
 		Hotkey("~WheelLeft",  HookDispatcher._hk_wleft,  "On")
 
 		HookDispatcher._started := true
-		LoggerSuccess("HookDispatcher", "Unified hook dispatcher started (%d event type(s) with subscribers).",
+		LoggerSuccess("HookDispatcher", "Unified hook dispatcher started ({1} event type(s) with subscribers).",
 			HookDispatcher._subscribers.Count)
 	}
 
