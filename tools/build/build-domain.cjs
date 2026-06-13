@@ -209,6 +209,22 @@ const PIPELINE = [
 			const summary = lines[lines.length - 1] || '';
 			return { ok, detail: ok ? undefined : summary };
 		}
+	},
+
+	// -------------------------------------------------------
+	// Step 5: Generated config template conforms to the schema
+	// -------------------------------------------------------
+	{
+		name: 'test:config-schema — config_template.toml vs config.schema.json',
+		run() {
+			const { ok, stdout, stderr } = runNpmScript('test:config-schema');
+			const lines = (stdout + stderr).trim().split('\n').filter(Boolean);
+			// Surface every violation line, not just the summary, on failure.
+			const detail = lines
+				.filter((l) => l.includes('✗') || l.trim().startsWith('-'))
+				.join('\n');
+			return { ok, detail: ok ? undefined : detail || lines[lines.length - 1] || '' };
+		}
 	}
 ];
 
