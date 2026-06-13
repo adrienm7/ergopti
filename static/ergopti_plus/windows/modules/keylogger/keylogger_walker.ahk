@@ -51,20 +51,39 @@
 ; ============================
 ; ===================================
 
+; The six *_MS / *_GAP_MS timing thresholds below are sourced from the shared
+; cross-driver registry (shared/timings/constants.toml [keylogger]) by
+; KeyloggerWalkerLoadTimings(), called once at boot. They start at the sentinel
+; 0 because AHK v2 runs static initializers BEFORE the auto-execute body, so the
+; registry is not yet loaded here; reading one before the loader runs would be a
+; boot-order bug, not a silent default. The non-timing fields (bucket arrays,
+; counts, caps) are walker-specific and stay literal.
 class KLWConst {
-    static MAX_KEYSTROKE_DELAY_MS    := 5000
-    static THINK_PAUSE_MS            := 2000
+    static MAX_KEYSTROKE_DELAY_MS    := 0   ; <- keylogger.max_keystroke_delay_ms
+    static THINK_PAUSE_MS            := 0   ; <- keylogger.think_pause_ms
     static UI_PAUSE_BUCKETS_MS       := [1000, 2000, 3000, 5000, 10000, 20000, 30000, 60000]
     static TRIGGER_LOOKBACK_LEN      := 50
-    static BURST_GAP_MS              := 1000
+    static BURST_GAP_MS              := 0   ; <- keylogger.burst_gap_ms
     static MIN_BURST_FOR_CPM         := 10
-    static SESSION_GAP_MS            := 300000
+    static SESSION_GAP_MS            := 0   ; <- keylogger.session_gap_ms
     static BURST_LENGTH_BUCKETS      := [1, 5, 10, 20, 50, 100, 200, 500]
     static SESSION_DURATIONS_CAP     := 100
-    static AUTO_REPEAT_MAX_DELAY_MS  := 50
+    static AUTO_REPEAT_MAX_DELAY_MS  := 0   ; <- keylogger.auto_repeat_max_delay_ms
     static CASCADE_MIN_BS            := 3
-    static HOLD_THRESHOLD_MS         := 250
+    static HOLD_THRESHOLD_MS         := 0   ; <- keylogger.hold_threshold_ms
     static TITLE_CAP_PER_APP_DAY     := 100
+}
+
+; Reassign the KLWConst timing thresholds from the shared registry. Called once
+; from the auto-execute body at boot (after TimingsLoadShared(), before the
+; keylogger hook is armed). Fail-fast: a missing key throws via TimingsGet.
+KeyloggerWalkerLoadTimings() {
+    KLWConst.MAX_KEYSTROKE_DELAY_MS   := TimingsGet("keylogger", "max_keystroke_delay_ms")
+    KLWConst.THINK_PAUSE_MS           := TimingsGet("keylogger", "think_pause_ms")
+    KLWConst.BURST_GAP_MS             := TimingsGet("keylogger", "burst_gap_ms")
+    KLWConst.SESSION_GAP_MS           := TimingsGet("keylogger", "session_gap_ms")
+    KLWConst.AUTO_REPEAT_MAX_DELAY_MS := TimingsGet("keylogger", "auto_repeat_max_delay_ms")
+    KLWConst.HOLD_THRESHOLD_MS        := TimingsGet("keylogger", "hold_threshold_ms")
 }
 
 ; QWERTY VK → finger column. Modifiers + thumb keys absent on purpose so

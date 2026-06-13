@@ -150,6 +150,9 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 ; INI helpers extracted to their own lib so the test runner can ``#Include``
 ; them without bootstrapping the rest of the driver.
 #Include lib/toml/toml_helpers.ahk
+; Shared timing registry reader (TimingsLoadShared / TimingsGet). Needs
+; ParseTomlFile (above); consumed by the reassign-at-boot loaders below.
+#Include lib/timings/timings_config.ahk
 #Include lib/layout/layout_ergopti.ahk
 
 ; Active-app cache must come before hotstring_engine.ahk because both
@@ -336,6 +339,14 @@ global ConfigurationFile := _ConfigDir . _AhkSubDir . "config.toml"
 ; source shared with Hammerspoon. Must precede HotstringsConfigInit and the tray
 ; menu build (initMenu reads GLOBAL_DEFAULT_DELAY). Fail-fast on a missing key.
 HotstringsConfigLoadSharedDefaults()
+; Load the shared timing registry, then reassign the keylogger-walker and
+; tap-hold timing constants from it (shared/timings/constants.toml). AHK v2 runs
+; static/global initializers before this auto-execute body, so these constants
+; start at a sentinel and are sourced here — well before the keylogger hook or
+; any tap-hold hotkey arms. Fail-fast on a missing key.
+TimingsLoadShared()
+KeyloggerWalkerLoadTimings()
+TapHoldsLoadTimings()
 ; Initialise the hotstrings_config module so per-group delays and tooltip
 ; colors can be resolved from the TOML metadata + the shared user override
 ; file. The override file lives in the same shared config directory used by

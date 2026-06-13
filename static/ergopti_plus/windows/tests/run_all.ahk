@@ -62,6 +62,9 @@ OnError(_FatalErrorHandler)
 #Include ../lib/ui_style.ahk
 #Include ../lib/logger.ahk
 #Include ../lib/toml/toml_helpers.ahk
+; Shared timing registry reader (TimingsLoadShared / TimingsGet) — needs
+; ParseTomlFile above; exercised by test_timings_config.ahk.
+#Include ../lib/timings/timings_config.ahk
 #Include ../lib/active_app_cache.ahk
 #Include ../lib/window_utils.ahk
 #Include ../lib/string_utils.ahk
@@ -231,6 +234,12 @@ global _VendorDir := A_ScriptDir . "\..\vendor"
 #Include test_keylogger_walker.ahk
 #Include test_keylogger_app_categories.ahk
 #Include test_keylogger_reader.ahk
+; Shared timings (A3): tap_holds/constants.ahk defines the tap-hold timing
+; globals + TapHoldsLoadTimings() and has NO top-level hotkeys, so it is safe to
+; include here (unlike most modules/). test_timings_config exercises the shared
+; registry reader plus the keylogger-walker and tap-hold reassign-at-boot loaders.
+#Include ../modules/tap_holds/constants.ahk
+#Include test_timings_config.ahk
 try FileAppend("# [marker] keylogger modules + tests included`r`n", A_Temp . "\ergopti_test_results.txt", "UTF-8")
 try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 
