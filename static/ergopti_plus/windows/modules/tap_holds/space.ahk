@@ -95,7 +95,8 @@ _SpaceDispatch() {
 }
 
 _SpaceTap() {
-    TextPressKey("Space", "")
+    PrevCrit := A_IsCritical
+    Critical("On")
     global HSE_LastEndChar
     HSEMatch := HSE_FeedChar(" ")
     if (HSEMatch != "") {
@@ -108,11 +109,14 @@ _SpaceTap() {
         if IsSet(KL_LogHotstring)
             try KL_LogHotstring(HSEMatch.Trigger, HotstringRepl, "endchar", "", HotstringCategory, HotstringSection)
         UpdateLastSentCharacter(" ")
+        Critical(PrevCrit ? PrevCrit : "Off")
         return
     }
+    TextPressKey("Space", "")
     if IsSet(_ResetPrefixBuffer)
         try _ResetPrefixBuffer()
     UpdateLastSentCharacter(" ")
+    Critical(PrevCrit ? PrevCrit : "Off")
 }
 
 _SpaceHoldCtrl(captured) {
