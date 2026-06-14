@@ -1599,6 +1599,14 @@ GestureOnKeyDown(ih, vk, sc) {
     GestureReleaseLeftClick()
     GestureReleaseRightClick()
 
+    ; InputHooks bypass AHK Suspend, so we must gate manually. While paused,
+    ; re-send the swallowed key at level 0 (plain OS key, no Ergopti remapping)
+    ; and stop — driver is off, nothing else should happen.
+    if A_IsSuspended {
+        Send(Format("{Blind}{vk{:x}sc{:x}}", vk, sc))
+        return
+    }
+
     ; Re-send the key that was just swallowed, but now that the click is released.
     ; We use SendLevel 3 to ensure Ergopti hotkeys (at Level 2) see the key.
     ; Use {Blind} to preserve modifier state.

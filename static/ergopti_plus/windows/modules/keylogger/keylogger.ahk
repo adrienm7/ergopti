@@ -1235,11 +1235,16 @@ KL_IngestOnce() {
     pair := KL_ReadNewTodayLog()
     new_offset := pair[1]
     entries    := pair[2]
-    if (Keylogger._pending_entries.Length > 0) {
-        for _, e in Keylogger._pending_entries
-            entries.Push(e)
-        Keylogger._pending_entries := []
-    }
+    ; Atomically snapshot and clear _pending_entries under Critical so the
+    ; keystroke hook cannot Push a new entry between our Length check and
+    ; the := [] reset — without this, entries pushed after the Length check
+    ; but before the clear are silently dropped, never reaching data.sql.
+    Critical("On")
+    pending_snapshot := Keylogger._pending_entries
+    Keylogger._pending_entries := []
+    Critical("Off")
+    for _, e in pending_snapshot
+        entries.Push(e)
     if (entries.Length = 0) {
         ; Still advance today_log_offset so the cold-replay window keeps
         ; shrinking even when no entries were decodable on disk.
