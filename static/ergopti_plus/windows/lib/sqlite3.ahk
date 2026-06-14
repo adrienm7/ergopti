@@ -57,6 +57,13 @@ class SQLiteConst {
     static UTF8_PAGE  := 65001
 }
 
+_SQLite_ProgressYield(user_data) {
+    Sleep(-1)
+    return 0
+}
+
+global _SQLite_ProgressCb := CallbackCreate(_SQLite_ProgressYield, "C", 1)
+
 
 
 
@@ -142,7 +149,7 @@ SQLite_LastError(db) {
 ; =================================
 ; ===================================
 
-SQLite_Exec(db, sql) {
+SQLite_Exec(db, sql, YieldOps := 0) {
     ; winsqlite3.dll's sqlite3_exec entry point access-violates when
     ; called from AHK no matter how we shape the parameters (verified
     ; against several well-formed signatures). The standard prepare /
@@ -151,6 +158,10 @@ SQLite_Exec(db, sql) {
     ; returns a tail pointer to the leftover SQL.
     if !db
         return false
+
+    if (YieldOps > 0)
+        DllCall(SQLiteConst.DLL . "\sqlite3_progress_handler", "Ptr", db, "Int", YieldOps, "Ptr", _SQLite_ProgressCb, "Ptr", 0)
+
     n := StrPut(sql, "UTF-8")
     sql_buf := Buffer(n, 0)
     StrPut(sql, sql_buf, "UTF-8")
@@ -192,6 +203,10 @@ SQLite_Exec(db, sql) {
             break
         cur := ptail
     }
+
+    if (YieldOps > 0)
+        DllCall(SQLiteConst.DLL . "\sqlite3_progress_handler", "Ptr", db, "Int", 0, "Ptr", 0, "Ptr", 0)
+
     return true
 }
 
@@ -207,10 +222,14 @@ SQLite_Exec(db, sql) {
 
 ; Run a SELECT and return Array<Map> where each Map has column_name → value.
 ; Numeric columns come back as Number, text as String, NULL as "".
-SQLite_Query(db, sql) {
+SQLite_Query(db, sql, YieldOps := 0) {
     out := []
     if !db
         return out
+
+    if (YieldOps > 0)
+        DllCall(SQLiteConst.DLL . "\sqlite3_progress_handler", "Ptr", db, "Int", YieldOps, "Ptr", _SQLite_ProgressCb, "Ptr", 0)
+
     n := StrPut(sql, "UTF-8")
     sql_buf := Buffer(n, 0)
     StrPut(sql, sql_buf, "UTF-8")
@@ -267,6 +286,10 @@ SQLite_Query(db, sql) {
         out.Push(row)
     }
     DllCall(SQLiteConst.DLL . "\sqlite3_finalize", "Ptr", pstmt)
+
+    if (YieldOps > 0)
+        DllCall(SQLiteConst.DLL . "\sqlite3_progress_handler", "Ptr", db, "Int", 0, "Ptr", 0, "Ptr", 0)
+
     return out
 }
 
