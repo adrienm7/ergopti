@@ -440,6 +440,13 @@ _LoggerEmit(Level, Tag, Msg, Args*) {
     if _LOGGER_TEST_SINK != 0 {
         try _LOGGER_TEST_SINK(Line)
     }
+	if (Level == "WARNING") {
+		if IsSet(HealthCheck_RecordWarn)
+			HealthCheck_RecordWarn()
+	} else if (Level == "ERROR") {
+		if IsSet(HealthCheck_RecordError)
+			HealthCheck_RecordError(Body)
+	}
 	if LOGGER_LOG_PATH != "" {
 		_LOGGER_PENDING.Push(Line)
 		if LOGGER_SEVERITY[Level] >= LOGGER_SEVERITY["WARNING"] {
