@@ -22,7 +22,8 @@
 ;    widget color always matches the group color, not a hardcoded "magickey" fallback.
 ; 3. Two display modes:
 ;      - Compact: colored pill with large WPM number + small unit label.
-;      - Graph: sparkline of recent history rendered as a WebView2 canvas.
+;      - Graph: sparkline of recent history rendered natively with GDI+ into a
+;        per-pixel-alpha layered window (no WebView2 — no browser cold-start).
 ; 4. Draggable: click-drag moves the widget anywhere on screen; position
 ;    is saved to config and restored on next launch.
 ; 5. Default position: bottom-right corner, above the Windows taskbar.
@@ -85,14 +86,12 @@ class WPMWidgetConst {
     ; the surface within MOUSE_WATCH_MS of the slightest cursor movement. Polling
     ; MouseGetPos keeps it hook-free (no global WH_MOUSE_LL install).
     static MOUSE_WATCH_MS     := 50
-    ; Delay (ms) after "ready" before the widget's WebView2 surface is cold-started.
-    ; The WebView2 runtime spawns msedgewebview2.exe processes that hammer CPU/disk
-    ; for ~3 s; on the critical path that preempts the ~5400-hotstring registration
-    ; and inflates time-to-ready by ~2.5 s (measured). The show is armed from the
-    ; boot tail AFTER "Driver fully initialised", and this delay is set so it lands
-    ; after the deferred emoji/symbol pass (HS_DEFERRED_REGISTRATION_DELAY_MS plus
-    ; that pass's run time) — so the cold-start contends with neither registration
-    ; nor the emoji pass. The widget then appears a couple of seconds after ready.
+    ; Delay (ms) after "ready" before the graph widget first appears. The GDI+
+    ; renderer has no cold-start (unlike the former WebView2 canvas, whose
+    ; msedgewebview2 processes hammered CPU/disk for ~3 s and caused per-keystroke
+    ; contention during the warm-up). This delay is now just a small settle so the
+    ; widget arrives a beat after boot rather than mid-startup; it could be lowered
+    ; safely if desired.
     static BOOT_SHOW_DELAY_MS := 2500
     ; Graph mode dimensions (wider to show history).
     static GRAPH_W            := 220
@@ -116,6 +115,9 @@ class WPMWidgetConst {
     static GRAPH_HISTORY      := 40
     ; Maximum WPM assumed for graph scale.
     static GRAPH_SCALE_MAX    := 120
+    ; Graph WPM label font size, in LOGICAL pixels (the GDI+ renderer scales it by
+    ; the DPI factor). Mirrors the old WebView2 canvas TS constant.
+    static GRAPH_LABEL_PX     := 15
 }
 
 
@@ -135,10 +137,18 @@ class WPMWidget {
     static _lbl_unit      := false
     static _lbl_strip     := false   ; Darker background strip behind the unit label
 
-    ; Graph mode GUI + WebView2 handles.
+    ; Graph mode GUI (a layered window painted with GDI+ — no WebView2).
     static _graph_gui        := false
-    static _graph_wv         := false   ; WebView2 controller
-    static _graph_wv_ready   := false   ; true once NavigateToString completed
+
+    ; GDI+ handles, created once and reused for every graph render. The token is
+    ; held for the process lifetime (the graph re-renders every tick, so per-call
+    ; startup/shutdown would be pure waste). The font is in logical pixels; the
+    ; per-render world transform scales it to the correct physical size per DPI.
+    static _gdip_started     := false
+    static _gdip_token       := 0
+    static _gdip_family      := 0
+    static _gdip_font        := 0
+    static _gdip_fmt         := 0
 
     ; Visibility + position.
     static visible        := false
@@ -582,140 +592,176 @@ WPMWidget_BuildGraph() {
     g.OnEvent("Close", (*) => WPMWidget_Hide())
     OnMessage(0x0232, WPMWidget_DragEnd, 1)
 
-    WPMWidget._graph_gui      := g
-    WPMWidget._graph_wv       := false
-    WPMWidget._graph_wv_ready := false
+    WPMWidget._graph_gui := g
 }
 
 
-; Attaches WebView2 to the graph Gui after it has been shown.
-; WebView2.CreateControllerAsync requires the host window to be visible.
-; Uses the callback form of WebView2.create so the controller Ptr is fully
-; initialised before we call any methods on it — the await() form can return
-; an object whose COM Ptr is still 0 when the Promise resolves.
-WPMWidget_AttachWebView() {
-    w := WPMWidgetConst.GRAPH_W
-    h := WPMWidgetConst.GRAPH_H
+; Starts GDI+ once and creates the reusable font + centered string format. Held
+; for the process lifetime — the graph re-renders every tick, so the per-call
+; startup/shutdown the spotlight overlay uses would be pure waste here. Returns
+; true when GDI+ is ready to draw.
+WPMWidget_EnsureGdip() {
+    if WPMWidget._gdip_started
+        return true
+    DllCall("LoadLibrary", "str", "gdiplus")
+    si := Buffer(24, 0)
+    NumPut("uint", 1, si)
+    if DllCall("gdiplus\GdiplusStartup", "ptr*", &token := 0, "ptr", si, "ptr", 0) {
+        LoggerError("WPMWidget", "GdiplusStartup failed — graph mode unavailable.")
+        return false
+    }
+    WPMWidget._gdip_token := token
+
+    ; Font is in logical pixels (UnitPixel = 2); the per-render world transform
+    ; scales it to the right physical size on any DPI. GRAPH_LABEL_PX mirrors the
+    ; old WebView2 canvas (TS = 15). Fall back to Arial if Segoe UI is absent.
+    DllCall("gdiplus\GdipCreateFontFamilyFromName", "wstr", "Segoe UI", "ptr", 0, "ptr*", &family := 0)
+    if !family
+        DllCall("gdiplus\GdipCreateFontFamilyFromName", "wstr", "Arial", "ptr", 0, "ptr*", &family := 0)
+    WPMWidget._gdip_family := family
+    DllCall("gdiplus\GdipCreateFont", "ptr", family,
+        "float", WPMWidgetConst.GRAPH_LABEL_PX, "int", 0, "int", 2, "ptr*", &font := 0)
+    WPMWidget._gdip_font := font
+
+    ; Centered string format (horizontal + vertical), so the label sits in the
+    ; middle of the top zone exactly like the old canvas textAlign/textBaseline.
+    DllCall("gdiplus\GdipCreateStringFormat", "int", 0, "ushort", 0, "ptr*", &fmt := 0)
+    DllCall("gdiplus\GdipSetStringFormatAlign",     "ptr", fmt, "int", 1)   ; StringAlignmentCenter
+    DllCall("gdiplus\GdipSetStringFormatLineAlign", "ptr", fmt, "int", 1)
+    WPMWidget._gdip_fmt := fmt
+
+    WPMWidget._gdip_started := true
+    return true
+}
+
+
+; Renders the WPM graph into the layered graph window with GDI+ — the native
+; replacement for the WebView2 canvas (no ~3-5 s browser cold-start, no per-key
+; contention). Delegates the DIB + UpdateLayeredWindow lifecycle to the
+; GraphicsRenderer adapter (the same path lib/spotlight.ahk uses); GR_DrawBitmap
+; positions the bitmap at the window's current rect, so a drag never causes a jump.
+WPMWidget_RenderGraph(Label, AccentHex) {
     g := WPMWidget._graph_gui
-    if !g
+    if (!g or !WPMWidget_EnsureGdip())
         return
-    loader := _VendorDir . "\64bit\WebView2Loader.dll"
-    udir   := A_Temp . "\ergopti_wpm_wv2_" . A_TickCount
-    DirCreate(udir)
-    hwnd := g.Hwnd
-    LoggerInfo("WPMWidget", "AttachWebView hwnd=" . hwnd . " loader_exists=" . (FileExist(loader) ? "yes" : "no"))
-    try {
-        WebView2.create(hwnd, WPMWidget_OnControllerReady, 0, udir, "", 0, loader)
-    } catch as e {
-        LoggerError("WPMWidget", "WebView2 create failed: " . e.Message . " (" . e.File . ":" . e.Line . ")")
+    ; Snapshot the history so a concurrent WPMWidget_Push can't mutate it mid-draw.
+    Hist := WPMWidget._graph_hist.Clone()
+    ; The Gui is -DPIScale (physical pixels); render in logical coords scaled by
+    ; the DPI factor so the layout matches the old DPI-scaled WebView2 canvas.
+    dpi := DllCall("GetDpiForWindow", "ptr", g.Hwnd, "uint")
+    if (dpi < 72)
+        dpi := 96
+    Scale := dpi / 96.0
+
+    DrawFn(MemDC, W, H) {
+        DllCall("gdiplus\GdipCreateFromHDC", "ptr", MemDC, "ptr*", &pGfx := 0)
+        if !pGfx
+            return
+        DllCall("gdiplus\GdipSetSmoothingMode",     "ptr", pGfx, "int", 4)   ; AntiAlias
+        DllCall("gdiplus\GdipSetTextRenderingHint", "ptr", pGfx, "int", 4)   ; AntiAliasGridFit (sets alpha)
+        if (Scale != 1.0)
+            DllCall("gdiplus\GdipScaleWorldTransform", "ptr", pGfx, "float", Scale, "float", Scale, "int", 0)
+        WPMWidget_DrawGraph(pGfx, W / Scale, H / Scale, Label, AccentHex, Hist)
+        DllCall("gdiplus\GdipDeleteGraphics", "ptr", pGfx)
     }
+    GR_DrawBitmap(g.Hwnd, DrawFn)
 }
 
 
-; Called by WebView2 once the controller is fully ready.
-WPMWidget_OnControllerReady(wvc) {
-    try {
-        ; Opaque dark background — avoids white flash before the canvas renders.
-        try wvc.DefaultBackgroundColor := 0xFF1a1a2e
+; Paints the graph into a GDI+ context in LOGICAL coordinates (W x H): a rounded
+; dark pill, a filled + stroked WPM sparkline clipped to the pill, and a centered
+; WPM label. Mirrors the old canvas geometry 1:1 (PAD/LH/GH/GW/R/scale).
+WPMWidget_DrawGraph(pGfx, W, H, Label, AccentHex, Hist) {
+    static PAD := 5, CORNER_R := 8
+    static PILL_FILL   := 0xCC000000   ; rgba(0,0,0,0.8)
+    static PILL_STROKE := 0x66FFFFFF   ; rgba(255,255,255,0.4)
+    static LABEL_COLOR := 0xFFFFFFFF
+    static FILL_ALPHA  := 0x33         ; 0.2 x 255 — sparkline fill area
+    LH := WPMWidgetConst.GRAPH_LABEL_PX * 2
+    GH := H - LH - PAD * 2
+    GW := W - PAD * 2
 
-        ; Fill() resizes the WebView to match the host window client rect.
-        wvc.Fill()
+    ; Rounded-rect pill path — reused for fill, stroke and the sparkline clip.
+    pPath := WPMWidget_MakeRoundRectPath(0, 0, W, H, CORNER_R)
+    DllCall("gdiplus\GdipCreateSolidFill", "uint", PILL_FILL, "ptr*", &bgBrush := 0)
+    DllCall("gdiplus\GdipFillPath", "ptr", pGfx, "ptr", bgBrush, "ptr", pPath)
+    DllCall("gdiplus\GdipDeleteBrush", "ptr", bgBrush)
+    DllCall("gdiplus\GdipCreatePen1", "uint", PILL_STROKE, "float", 1, "int", 2, "ptr*", &bgPen := 0)
+    DllCall("gdiplus\GdipDrawPath", "ptr", pGfx, "ptr", bgPen, "ptr", pPath)
+    DllCall("gdiplus\GdipDeletePen", "ptr", bgPen)
 
-        ; WebView2 ignores the Gui's -DPIScale flag and applies the system DPI
-        ; factor internally, so the logical pixels it renders into are smaller
-        ; than the physical pixels we requested. We pass those logical dimensions
-        ; to the HTML so the canvas coordinate system matches exactly.
-        dpi := DllCall("GetDpiForWindow", "ptr", WPMWidget._graph_gui.Hwnd, "uint")
-        if (dpi < 72)
-            dpi := 96
-        scale := dpi / 96
-        w := Round(WPMWidgetConst.GRAPH_W / scale)
-        h := Round(WPMWidgetConst.GRAPH_H / scale)
-        LoggerInfo("WPMWidget", "DPI={1} scale={2} logical w={3} h={4}.", dpi, scale, w, h)
+    N := Hist.Length
+    if (N >= 2) {
+        DllCall("gdiplus\GdipSetClipPath", "ptr", pGfx, "ptr", pPath, "int", 0)   ; CombineModeReplace
+        ScaleMax := WPMWidgetConst.GRAPH_SCALE_MAX
+        Step  := GW / (N - 1)
+        BaseY := LH + PAD + GH
+        Rgb   := WPMWidget_HexToRgbInt(AccentHex)
 
-        ; Register WebMessageReceived BEFORE NavigateToString so the handler is
-        ; in place before the inline HTML script runs and posts "ready". If the
-        ; handler were registered after, the message could be lost on fast loads.
-        wvc.CoreWebView2.WebMessageReceived(WPMWidget_OnWebMessage)
+        ; Filled area under the line: N points + two baseline corners to close it.
+        ptsFill := Buffer((N + 2) * 8)
+        Loop N {
+            i := A_Index - 1
+            NumPut("float", PAD + i * Step, ptsFill, i * 8)
+            NumPut("float", BaseY - (Hist[A_Index] / ScaleMax) * GH, ptsFill, i * 8 + 4)
+        }
+        NumPut("float", PAD + (N - 1) * Step, ptsFill, N * 8),       NumPut("float", BaseY, ptsFill, N * 8 + 4)
+        NumPut("float", PAD,                  ptsFill, (N + 1) * 8), NumPut("float", BaseY, ptsFill, (N + 1) * 8 + 4)
+        DllCall("gdiplus\GdipCreateSolidFill", "uint", (FILL_ALPHA << 24) | Rgb, "ptr*", &fillBrush := 0)
+        DllCall("gdiplus\GdipFillPolygon", "ptr", pGfx, "ptr", fillBrush, "ptr", ptsFill, "int", N + 2, "int", 0)
+        DllCall("gdiplus\GdipDeleteBrush", "ptr", fillBrush)
 
-        wvc.CoreWebView2.NavigateToString(WPMWidget_GraphHtml(w, h))
-
-        WPMWidget._graph_wv := wvc
-        LoggerInfo("WPMWidget", "WebView2 controller ready — page loading.")
-
-        ; Safety fallback: if the web message is never received (e.g. WebView2
-        ; processed the inline HTML before the handler was registered), mark
-        ; ready after 2 s so the graph is not permanently stuck.
-        SetTimer(WPMWidget_FallbackReady, -2000)
-    } catch as e {
-        LoggerError("WPMWidget", "OnControllerReady failed: " . e.Message . " (" . e.File . ":" . e.Line . ")")
+        ; Stroked line over the fill.
+        ptsLine := Buffer(N * 8)
+        Loop N {
+            i := A_Index - 1
+            NumPut("float", PAD + i * Step, ptsLine, i * 8)
+            NumPut("float", BaseY - (Hist[A_Index] / ScaleMax) * GH, ptsLine, i * 8 + 4)
+        }
+        DllCall("gdiplus\GdipCreatePen1", "uint", 0xFF000000 | Rgb, "float", 2, "int", 2, "ptr*", &linePen := 0)
+        DllCall("gdiplus\GdipDrawLines", "ptr", pGfx, "ptr", linePen, "ptr", ptsLine, "int", N)
+        DllCall("gdiplus\GdipDeletePen", "ptr", linePen)
+        DllCall("gdiplus\GdipResetClip", "ptr", pGfx)
     }
+
+    ; WPM label, centered in the top zone.
+    DllCall("gdiplus\GdipCreateSolidFill", "uint", LABEL_COLOR, "ptr*", &txtBrush := 0)
+    rect := Buffer(16)
+    NumPut("float", 0, rect, 0), NumPut("float", 0, rect, 4)
+    NumPut("float", W, rect, 8), NumPut("float", LH, rect, 12)
+    DllCall("gdiplus\GdipDrawString", "ptr", pGfx, "wstr", Label, "int", -1,
+        "ptr", WPMWidget._gdip_font, "ptr", rect, "ptr", WPMWidget._gdip_fmt, "ptr", txtBrush)
+    DllCall("gdiplus\GdipDeleteBrush", "ptr", txtBrush)
+
+    DllCall("gdiplus\GdipDeletePath", "ptr", pPath)
 }
 
 
-WPMWidget_OnWebMessage(sender, args) {
-    try msg := args.TryGetWebMessageAsString()
-    catch
-        msg := ""
-    if (msg != "ready")
-        return
-    if WPMWidget._graph_wv_ready  ; already handled by fallback
-        return
-    WPMWidget._graph_wv_ready := true
-    LoggerInfo("WPMWidget", "Page ready (web message) — pushing first graph update.")
-    WPMWidget_PushGraphUpdate("0", WPMWidgetConst.COLOR_TXT_IDLE, false, false, false, true)
+; Builds a rounded-rectangle GraphicsPath (four 90-degree corner arcs). Caller
+; owns the returned path and must GdipDeletePath it.
+WPMWidget_MakeRoundRectPath(X, Y, W, H, R) {
+    d := R * 2
+    DllCall("gdiplus\GdipCreatePath", "int", 0, "ptr*", &path := 0)
+    DllCall("gdiplus\GdipAddPathArc", "ptr", path, "float", X,         "float", Y,         "float", d, "float", d, "float", 180, "float", 90)
+    DllCall("gdiplus\GdipAddPathArc", "ptr", path, "float", X + W - d, "float", Y,         "float", d, "float", d, "float", 270, "float", 90)
+    DllCall("gdiplus\GdipAddPathArc", "ptr", path, "float", X + W - d, "float", Y + H - d, "float", d, "float", d, "float", 0,   "float", 90)
+    DllCall("gdiplus\GdipAddPathArc", "ptr", path, "float", X,         "float", Y + H - d, "float", d, "float", d, "float", 90,  "float", 90)
+    DllCall("gdiplus\GdipClosePathFigure", "ptr", path)
+    return path
 }
 
 
-WPMWidget_FallbackReady() {
-    if WPMWidget._graph_wv_ready  ; web message already handled it
-        return
-    WPMWidget._graph_wv_ready := true
-    LoggerInfo("WPMWidget", "Page ready (fallback timer) — pushing first graph update.")
-    WPMWidget_PushGraphUpdate("0", WPMWidgetConst.COLOR_TXT_IDLE, false, false, false, true)
-}
-
-
-; Returns the self-contained HTML for the graph canvas.
-; Mirrors the Hammerspoon graph style: dark semi-transparent rounded pill,
-; colored fill + stroke line, WPM label at the top.
-WPMWidget_GraphHtml(w, h) {
-    ; The canvas covers the full WebView2 area. roundRect clips all drawing to
-    ; a rounded rectangle so the pill shape is preserved without relying on
-    ; window-level transparency. Background colour matches COLOR_BG_IDLE so the
-    ; Gui backdrop and the canvas surface are visually identical on load.
-    ; Hammerspoon style: black semi-transparent rounded pill, white 14px label,
-    ; colored fill+stroke graph, label centered at top.
-    bgRgba := "rgba(0,0,0,0.8)"
-    return "<!DOCTYPE html><html><head><meta charset='utf-8'><style>"
-        . "html,body{margin:0;padding:0;width:" . w . "px;height:" . h . "px;overflow:hidden;background:transparent}"
-        . "</style></head><body>"
-        . "<canvas id='c' width='" . w . "' height='" . h . "' style='position:absolute;left:0;top:0'></canvas>"
-        . "<script>"
-        . "const c=document.getElementById('c'),ctx=c.getContext('2d');"
-        . "const W=" . w . ",H=" . h . ";"
-        . "const PAD=5,TS=15,LH=TS*2,GH=H-LH-PAD*2,GW=W-PAD*2,R=8,FA=0.2;"
-        . "function rr(x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+r,r);ctx.arcTo(x+w,y+h,x+w-r,y+h,r);ctx.arcTo(x,y+h,x,y+h-r,r);ctx.arcTo(x,y,x+r,y,r);ctx.closePath();}"
-        . "function drawBg(){ctx.fillStyle='" . bgRgba . "';rr(0,0,W,H,R);ctx.fill();ctx.strokeStyle='rgba(255,255,255,0.4)';ctx.lineWidth=1;ctx.stroke();}"
-        . "function drawLabel(txt){ctx.save();ctx.fillStyle='rgba(255,255,255,1)';ctx.font=TS+'px Segoe UI,Arial';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(txt,W/2,LH/2);ctx.restore();}"
-        . "window.updateGraph=function(d){"
-        . "  ctx.clearRect(0,0,W,H);drawBg();"
-        . "  const n=d.hist?d.hist.length:0,lbl=d.label||'—';"
-        . "  if(n<2){drawLabel(lbl);return;}"
-        . "  const mx=d.scale||120,step=GW/(n-1),col='#'+(d.color||'4499ff');"
-        . "  ctx.save();rr(0,0,W,H,R);ctx.clip();"
-        . "  ctx.beginPath();ctx.moveTo(PAD,LH+PAD+GH);"
-        . "  for(let i=0;i<n;i++)ctx.lineTo(PAD+i*step,LH+PAD+GH-(d.hist[i]/mx)*GH);"
-        . "  ctx.lineTo(PAD+(n-1)*step,LH+PAD+GH);ctx.closePath();"
-        . "  ctx.globalAlpha=0.2;ctx.fillStyle=col;ctx.fill();ctx.globalAlpha=1;"
-        . "  ctx.beginPath();"
-        . "  for(let i=0;i<n;i++){const x=PAD+i*step,y=LH+PAD+GH-(d.hist[i]/mx)*GH;i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);}"
-        . "  ctx.strokeStyle=col;ctx.lineWidth=2;ctx.stroke();"
-        . "  ctx.restore();drawLabel(lbl);"
-        . "};"
-        . "drawBg();drawLabel('—');"
-        . "if(window.chrome&&window.chrome.webview)window.chrome.webview.postMessage('ready');"
-        . "</script></body></html>"
+; Parses a 6-hex color string ("#rrggbb" or "rrggbb") into a 0xRRGGBB integer for
+; GDI+ ARGB construction. Falls back to the manual blue accent on bad input.
+WPMWidget_HexToRgbInt(Hex) {
+    H := Trim(Hex)
+    if (SubStr(H, 1, 1) == "#")
+        H := SubStr(H, 2)
+    if !RegExMatch(H, "^[0-9A-Fa-f]{6}$")
+        H := "4499FF"
+    return (Integer("0x" . SubStr(H, 1, 2)) << 16)
+        | (Integer("0x" . SubStr(H, 3, 2)) << 8)
+        | Integer("0x" . SubStr(H, 5, 2))
 }
 
 
@@ -792,17 +838,17 @@ WPMWidget_Show() {
     ; Derive the top-left for the current mode from the compact anchor (pos_x/pos_y).
     WPMWidget_ShowPos(&show_x, &show_y)
 
-    ; Show the window fully transparent (alpha=0) so WebView2 can attach and
-    ; render without being visible to the user. Hide() suspends the WebView2
-    ; renderer, making ExecuteScriptAsync a no-op — transparency avoids that.
-    ; The Tick sets the real alpha when the user starts typing.
-    gui_ref.Show("x" . show_x . " y" . show_y
-        . " w" . w . " h" . h . " NoActivate")
-    WinSetTransparent(0, gui_ref)
-
-    ; WebView2 must be attached after the window is visible.
-    if WPMWidget.show_graph && !WPMWidget._graph_wv
-        WPMWidget_AttachWebView()
+    ; Both modes start invisible; the tick reveals the surface once the user types.
+    ; Graph mode is a layered GDI+ window: position + size it WHILE HIDDEN, then the
+    ; tick paints it via UpdateLayeredWindow and reveals it (per-pixel alpha rules
+    ; out WinSetTransparent here — the two layering modes are mutually exclusive).
+    ; Compact mode keeps the simple constant-alpha fade.
+    if WPMWidget.show_graph {
+        gui_ref.Show("Hide NoActivate x" . show_x . " y" . show_y . " w" . w . " h" . h)
+    } else {
+        gui_ref.Show("x" . show_x . " y" . show_y . " w" . w . " h" . h . " NoActivate")
+        WinSetTransparent(0, gui_ref)
+    }
 
     SetTimer(WPMWidget_Tick, WPMWidgetConst.TICK_MS)
 
@@ -813,9 +859,8 @@ WPMWidget_Show() {
     WPMWidget._last_mouse_y := _seed_my
     SetTimer(WPMWidget_MouseWatch, WPMWidgetConst.MOUSE_WATCH_MS)
 
-    LoggerSuccess("WPMWidget", "Widget shown at ({1}, {2}) mode={3}, wv_ready={4}.",
-        WPMWidget.pos_x, WPMWidget.pos_y, WPMWidget.show_graph ? "graph" : "compact",
-        WPMWidget._graph_wv_ready)
+    LoggerSuccess("WPMWidget", "Widget shown at ({1}, {2}) mode={3}.",
+        WPMWidget.pos_x, WPMWidget.pos_y, WPMWidget.show_graph ? "graph" : "compact")
 }
 
 WPMWidget_Hide() {
@@ -856,9 +901,8 @@ WPMWidget_Tick() {
     ; timer) so it reappears on resume with no restore bookkeeping.
     if A_IsSuspended {
         gui_ref := WPMWidget.show_graph ? WPMWidget._graph_gui : WPMWidget._gui
-        if gui_ref {
-            try (WPMWidget.show_graph ? WinSetTransparent(0, gui_ref) : gui_ref.Hide())
-        }
+        if gui_ref
+            try gui_ref.Hide()
         return
     }
 
@@ -884,75 +928,63 @@ WPMWidget_Tick() {
     mouse_active  := A_TimeIdleMouse < A_TimeIdleKeyboard
     should_show   := !keyboard_idle && !mouse_active && ((wpm > 0) || has_hs || has_ai || has_ac)
     gui_ref := WPMWidget.show_graph ? WPMWidget._graph_gui : WPMWidget._gui
-    if gui_ref {
-        try {
-            if should_show {
-                gui_ref.Show("NoActivate")
-                WinSetTransparent(WPMWidgetConst.ALPHA_ACTIVE, gui_ref)
-            } else {
-                ; Graph mode keeps the window alive (alpha=0) so WebView2 stays
-                ; active; compact mode hides outright — see _WPMWidget_HideSurface.
-                _WPMWidget_HideSurface(gui_ref)
-            }
-        } catch {
-            ; The underlying HWND was destroyed outside our control (e.g. the user
-            ; closed the window via the taskbar). Clear the stale handle so the next
-            ; tick rebuilds the Gui cleanly instead of looping into the same error.
-            if WPMWidget.show_graph
-                WPMWidget._graph_gui := false
-            else
-                WPMWidget._gui := false
-        }
-    }
-    if !should_show
+    if !gui_ref
         return
 
-    is_idle  := false
-    bg_color := WPMWidget_ResolveBgColor(is_idle, has_hs, has_ai, has_ac, WPMWidget.use_colors)
-    alpha    := WPMWidgetConst.ALPHA_ACTIVE
-    wpm_str  := String(wpm)
-    txt_col  := WPMWidgetConst.COLOR_TXT_ACTIVE
+    if !should_show {
+        try _WPMWidget_HideSurface(gui_ref)
+        return
+    }
+
+    is_idle := false
+    wpm_str := String(wpm)
+    txt_col := WPMWidgetConst.COLOR_TXT_ACTIVE
 
     if WPMWidget.show_graph {
-        if WPMWidget._graph_gui {
-            WPMWidget_PushGraphUpdate(wpm_str, txt_col, has_hs, has_ai, has_ac, is_idle)
+        ; Paint the layered window via GDI+ WHILE still hidden, then reveal it — no
+        ; flash and no browser cold-start. The catch clears a stale handle (e.g. the
+        ; user closed the window) so the next tick rebuilds cleanly.
+        try {
+            accent := WPMWidget_ResolveGraphColor(has_hs, has_ai, has_ac, WPMWidget.use_colors)
+            label  := wpm_str . " " . t("menu.metrics.wpm_unit")
+            WPMWidget_RenderGraph(label, accent)
+            GR_Show(WPMWidget._graph_gui.Hwnd)
+        } catch {
+            WPMWidget._graph_gui := false
         }
     } else {
-        if WPMWidget._gui {
-            try {
-                WPMWidget._gui.BackColor := bg_color
-                WinSetTransparent(alpha, WPMWidget._gui)
-                WinRedraw(WPMWidget._gui)
-                dark_bg := _WPMWidget_DarkenHex(bg_color)
-                if WPMWidget._lbl_strip
-                    WPMWidget._lbl_strip.Opt("Background" . dark_bg)
-                if WPMWidget._lbl_wpm && (wpm_str != WPMWidget._lbl_wpm.Value)
-                    WPMWidget._lbl_wpm.Value := wpm_str
-                if WPMWidget._lbl_wpm
-                    WPMWidget._lbl_wpm.SetFont("c" . txt_col)
-                if WPMWidget._lbl_unit
-                    WPMWidget._lbl_unit.SetFont("c" . txt_col)
-            } catch {
-                WPMWidget._gui       := false
-                WPMWidget._lbl_wpm   := false
-                WPMWidget._lbl_unit  := false
-                WPMWidget._lbl_strip := false
-            }
+        bg_color := WPMWidget_ResolveBgColor(is_idle, has_hs, has_ai, has_ac, WPMWidget.use_colors)
+        alpha    := WPMWidgetConst.ALPHA_ACTIVE
+        try {
+            WPMWidget._gui.Show("NoActivate")
+            WPMWidget._gui.BackColor := bg_color
+            WinSetTransparent(alpha, WPMWidget._gui)
+            WinRedraw(WPMWidget._gui)
+            dark_bg := _WPMWidget_DarkenHex(bg_color)
+            if WPMWidget._lbl_strip
+                WPMWidget._lbl_strip.Opt("Background" . dark_bg)
+            if WPMWidget._lbl_wpm && (wpm_str != WPMWidget._lbl_wpm.Value)
+                WPMWidget._lbl_wpm.Value := wpm_str
+            if WPMWidget._lbl_wpm
+                WPMWidget._lbl_wpm.SetFont("c" . txt_col)
+            if WPMWidget._lbl_unit
+                WPMWidget._lbl_unit.SetFont("c" . txt_col)
+        } catch {
+            WPMWidget._gui       := false
+            WPMWidget._lbl_wpm   := false
+            WPMWidget._lbl_unit  := false
+            WPMWidget._lbl_strip := false
         }
     }
     WPMWidget._last_wpm := wpm
 }
 
 
-; Hide the widget surface in a mode-appropriate way: graph mode keeps the window
-; alive at alpha 0 so the WebView2 renderer is not suspended (a hidden WebView2
-; turns ExecuteScriptAsync into a no-op), compact mode hides outright. Shared by
-; the display tick and the fast mouse-watch so both hide identically.
+; Hide the widget surface. Both modes hide outright now — the graph is a native
+; GDI+ layered window with no WebView2 renderer to keep alive. Shared by the
+; display tick and the fast mouse-watch so both hide identically.
 _WPMWidget_HideSurface(gui_ref) {
-    if WPMWidget.show_graph
-        WinSetTransparent(0, gui_ref)
-    else
-        gui_ref.Hide()
+    gui_ref.Hide()
 }
 
 
@@ -973,48 +1005,6 @@ WPMWidget_MouseWatch() {
     gui_ref := WPMWidget.show_graph ? WPMWidget._graph_gui : WPMWidget._gui
     if gui_ref
         try _WPMWidget_HideSurface(gui_ref)
-}
-
-
-; Sends updated graph data to the WebView2 canvas via postMessage.
-WPMWidget_PushGraphUpdate(wpm_str, txt_col, has_hs, has_ai, has_ac, is_idle) {
-    if !WPMWidget._graph_wv_ready
-        return
-
-    accent := WPMWidget_ResolveGraphColor(has_hs, has_ai, has_ac, WPMWidget.use_colors)
-    ; Build compact JSON array of history values.
-    hist_parts := []
-    for _, v in WPMWidget._graph_hist
-        hist_parts.Push(String(v))
-    hist_json := "[" . StrJoin(hist_parts, ",") . "]"
-
-    label := wpm_str . " " . t("menu.metrics.wpm_unit")
-    json  := '{"hist":' . hist_json
-        . ',"color":"' . accent . '"'
-        . ',"txt":"'   . txt_col . '"'
-        . ',"label":"' . label . '"'
-        . ',"scale":' . WPMWidgetConst.GRAPH_SCALE_MAX . '}'
-
-    ; Pass the JSON object directly — no extra string wrapping needed.
-    try WPMWidget._graph_wv.CoreWebView2.ExecuteScriptAsync(
-        "if(window.updateGraph)window.updateGraph(" . json . ")")
-}
-
-
-; Escapes a string for safe embedding in a JS string literal.
-JSON_Escape(s) {
-    s := StrReplace(s, "\", "\\")
-    s := StrReplace(s, '"', '\"')
-    return '"' . s . '"'
-}
-
-
-; Joins array elements with a separator.
-StrJoin(arr, sep) {
-    out := ""
-    for i, v in arr
-        out .= (i > 1 ? sep : "") . v
-    return out
 }
 
 

@@ -1584,9 +1584,7 @@ _ToggleWpmWidgetGraph(menu, label) {
 	}
 	if WPMWidget._graph_gui {
 		try WPMWidget._graph_gui.Destroy()
-		WPMWidget._graph_gui      := false
-		WPMWidget._graph_wv       := false
-		WPMWidget._graph_wv_ready := false
+		WPMWidget._graph_gui := false
 	}
 	; Reset saved position so default bottom-right is recalculated for new size.
 	WpmWidget.pos_x := -1
