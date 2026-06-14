@@ -1,6 +1,28 @@
 ﻿; tests/meta/test_metrics_focus_cache_atomic.ahk
 
+; ==============================================================================
+; MODULE: Metrics Focus Cache Atomic Meta Test
+; DESCRIPTION:
+; Static source guard for the metrics-focus-cache-atomic finding.
+;
+; MF_RefreshFocus() must not mutate individual properties of MetricsFocusCache
+; directly (which risks a torn read where a reader sees e.g. a new title with
+; an old process name). It must build a new state object and publish it via
+; a single atomic reference swap.
+;
+; The fix uses a MetricsFocusCache.state object.
+; ==============================================================================
+
 #Requires AutoHotkey v2.0
+
+
+
+
+; ===================================================
+; ===================================================
+; ======= 1/ Source scan helpers ====================
+; ===================================================
+; ===================================================
 
 _MFCA_ReadSource(RelPath) {
 	SplitPath(A_ScriptDir, , &Root)
@@ -8,33 +30,42 @@ _MFCA_ReadSource(RelPath) {
 	return FileRead(Path)
 }
 
-_MFCA_FuncBodyStripped(Src, FuncDef) {
+_MFCA_FuncBody(Src, FuncDef) {
 	Idx := InStr(Src, FuncDef)
 	if !Idx
 		return ""
 	Rest := SubStr(Src, Idx)
-	End := InStr(Rest, "`n}")
-	if End
-		Rest := SubStr(Rest, 1, End + 1)
+	; Find the first closing brace at the start of a line (no indentation).
+	if RegExMatch(Rest, "m)^\}", &Match)
+		return SubStr(Rest, 1, Match.Pos)
 	return Rest
 }
 
-_MFCA_AssertAtomicPublish() {
-	Src := _MFCA_ReadSource("lib/metrics/metrics_filters.ahk")
-	Body := _MFCA_FuncBodyStripped(Src, "MF_RefreshFocus() {")
-	Assert(Body != "", "MF_RefreshFocus must exist in lib/metrics/metrics_filters.ahk")
-	
-	CritOnIdx := InStr(Body, 'Critical("On")')
-	if !CritOnIdx
-		CritOnIdx := InStr(Body, "Critical('On')")
-	
-	Assert(CritOnIdx > 0, "MF_RefreshFocus must wrap the cache assignment in Critical('On') (metrics-focus-cache-cross-thread-race)")
-	
-	CritOffIdx := InStr(Body, 'Critical("Off")')
-	if !CritOffIdx
-		CritOffIdx := InStr(Body, "Critical('Off')")
-		
-	Assert(CritOffIdx > CritOnIdx, "MF_RefreshFocus must wrap the cache assignment in Critical('Off') (metrics-focus-cache-cross-thread-race)")
-}
 
-Test("metrics_filters: MF_RefreshFocus updates cache atomically (metrics-focus-cache-cross-thread-race)", _MFCA_AssertAtomicPublish)
+; ===================================================
+; ===================================================
+; ======= 2/ Atomicity assertion ====================
+; ===================================================
+; ===================================================
+
+_MFCA_FocusCacheIsAtomic() {
+	Src := _MFCA_ReadSource("lib/metrics/metrics_filters.ahk")
+	
+	; 1. Verify the class uses a single state object.
+	Assert(InStr(Src, "static state :=") > 0, "MetricsFocusCache must use a single 'state' object for atomic updates")
+	Assert(InStr(Src, "static process_name :=") == 0, "MetricsFocusCache must NOT have separate process_name property")
+	
+	; 2. Verify MF_RefreshFocus publishes via a single swap.
+	Body := _MFCA_FuncBody(Src, "MF_RefreshFocus() {")
+	Assert(Body != "", "MF_RefreshFocus must exist in metrics_filters.ahk")
+	
+	; Look for the assignment to .state
+	Assert(InStr(Body, "MetricsFocusCache.state :=") > 0,
+		"MF_RefreshFocus must publish the new context via a single assignment to MetricsFocusCache.state (metrics-focus-cache-atomic)")
+		
+	; 3. Verify MF_ShouldFilter captures the reference once.
+	BodySF := _MFCA_FuncBody(Src, "MF_ShouldFilter() {")
+	Assert(InStr(BodySF, "s := MetricsFocusCache.state") > 0,
+		"MF_ShouldFilter must capture the MetricsFocusCache.state reference once into a local variable (metrics-focus-cache-atomic)")
+}
+Test("metrics_filters: MF_RefreshFocus uses build-then-swap (metrics-focus-cache-atomic)", _MFCA_FocusCacheIsAtomic)
