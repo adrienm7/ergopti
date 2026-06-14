@@ -348,18 +348,23 @@ HSE_Register(Flags, Trigger, Callback, Meta := unset) {
 
     ; Only insert into the live index when the group is not disabled.
     if !HSE_DisabledGroups.Has(Group) {
-        LastChar := TailChar
-        LookupKey := Spec.CaseSensitive ? LastChar : StrLower(LastChar)
-        if !HSE_RegistryByLastChar.Has(LookupKey) {
-            HSE_RegistryByLastChar[LookupKey] := []
-        }
-        HSE_RegistryByLastChar[LookupKey].Push(Spec)
-        ; Maintain the flat star-spec index and the O(1) prefix set so
-        ; _HSE_StarTriggerCoversBody never has to scan on every terminator keystroke.
-        if Spec.Star {
-            HSE_StarSpecs.Push(Spec)
-            _HSE_IndexStarPrefixes(Spec)
-            _HSE_IndexStarTrigger(Spec)
+        _HsCrit := Critical("On")
+        try {
+            LastChar := TailChar
+            LookupKey := Spec.CaseSensitive ? LastChar : StrLower(LastChar)
+            if !HSE_RegistryByLastChar.Has(LookupKey) {
+                HSE_RegistryByLastChar[LookupKey] := []
+            }
+            HSE_RegistryByLastChar[LookupKey].Push(Spec)
+            ; Maintain the flat star-spec index and the O(1) prefix set so
+            ; _HSE_StarTriggerCoversBody never has to scan on every terminator keystroke.
+            if Spec.Star {
+                HSE_StarSpecs.Push(Spec)
+                _HSE_IndexStarPrefixes(Spec)
+                _HSE_IndexStarTrigger(Spec)
+            }
+        } finally {
+            Critical(_HsCrit)
         }
     }
 
