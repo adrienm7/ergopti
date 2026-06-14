@@ -70,12 +70,17 @@
 ; ===================================
 
 class KeylogConst {
-    static INGEST_TICK_MS         := 5000     ; Background ingest tick.
-    static INGEST_BATCH_LINES     := 5000     ; Max lines per ingest cycle.
-    static THINK_PAUSE_MS         := 2000     ; Active vs thinking pause threshold.
-    static WPM_MAX_DELAY_MS       := 5000     ; Outlier cap for WPM bucketing.
-    static MIDNIGHT_CHECK_TICK_MS := 60000    ; Day rollover check cadence.
-    static SCHEMA_VERSION         := 1
+    static INGEST_TICK_MS           := 5000     ; Background ingest tick.
+    static INGEST_BATCH_LINES       := 5000     ; Max lines per ingest cycle.
+    static THINK_PAUSE_MS           := 2000     ; Active vs thinking pause threshold.
+    static WPM_MAX_DELAY_MS         := 5000     ; Outlier cap for WPM bucketing.
+    static MIDNIGHT_CHECK_TICK_MS   := 60000    ; Day rollover check cadence.
+    ; Min keyboard-idle window before the heavy dashboard rebuild (KLWV_NotifyIngest
+    ; "live" mode, 150-300 ms) is allowed to run on the ingest timer. A typing burst
+    ; within this window defers the rebuild to the next ingest tick so the rebuild
+    ; never runs while keystrokes are being dropped by LowLevelHooksTimeout.
+    static INGEST_LIVE_PUSH_IDLE_MS := 500
+    static SCHEMA_VERSION           := 1
 }
 
 
@@ -1217,6 +1222,12 @@ KL_ReadNewTodayLog() {
 KL_IngestOnce() {
     if !Keylogger.initialized
         return
+    ; Never run the ingest tick while the driver is paused. No new events
+    ; are written during suspension (KL_AppendLog is guarded), so the tick
+    ; would do redundant I/O; more importantly, running the heavy FileAppend
+    ; + live-push while suspended violates the pause invariant.
+    if A_IsSuspended
+        return
     ; Prefer the in-RAM queue when available — it sidesteps KL_JsonDecode
     ; entirely (COM ScriptControl is x86-only and silently empties Maps
     ; on 64-bit hosts). The JSONL pass is still used to drain anything
@@ -1292,7 +1303,12 @@ KL_IngestOnce() {
     ; the freshly-projected prefetch blob to the page so the user sees
     ; the new data without reloading. No-op when no WebView2 dashboards
     ; are open (KLWV.windows is empty) or the module is not loaded.
-    try KLWV_NotifyIngest()
+    ; Guard with a keyboard-idle check: the full "live" rebuild takes
+    ; 150-300 ms; running it during a typing burst exceeds
+    ; LowLevelHooksTimeout (~300 ms) and silently drops keystrokes.
+    ; Deferred to the next ingest tick if the user typed recently.
+    if (KLHook.last_tick = 0 || A_TickCount - KLHook.last_tick >= KeylogConst.INGEST_LIVE_PUSH_IDLE_MS)
+        try KLWV_NotifyIngest()
 }
 
 KL_DayRollover() {
