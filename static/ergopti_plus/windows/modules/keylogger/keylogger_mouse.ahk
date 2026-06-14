@@ -362,69 +362,78 @@ KL_Mouse_FlushScroll() {
 ; ====================================
 
 KL_Mouse_ParkTick() {
-    CoordMode("Mouse", "Screen")
-    MouseGetPos(&mx, &my)
+	CoordMode("Mouse", "Screen")
+	MouseGetPos(&mx, &my)
 
-    ; Distance accumulation — feeds the typing flush's mouse_distance_px
-    if (KLMouse.prev_x >= 0) {
-        dx := mx - KLMouse.prev_x
-        dy := my - KLMouse.prev_y
-        d  := Sqrt(dx*dx + dy*dy)
-        if (d > 0)
-            KL_BumpMouseDistance(Round(d))
-    }
-    KLMouse.prev_x := mx
-    KLMouse.prev_y := my
+	filtered := false
+	if (!A_IsSuspended and Keylogger.initialized) {
+		try filtered := MF_ShouldFilter()
+	}
 
-    ; Park detection
-    if (KLMouse.park_last_x < 0) {
-        KLMouse.park_last_x      := mx
-        KLMouse.park_last_y      := my
-        KLMouse.park_still_since := A_TickCount
-        return
-    }
-    dx   := mx - KLMouse.park_last_x
-    dy   := my - KLMouse.park_last_y
-    moved := Sqrt(dx*dx + dy*dy)
+	if (A_IsSuspended or filtered or !Keylogger.initialized) {
+		KLMouse.prev_x := mx
+		KLMouse.prev_y := my
+		KLMouse.park_last_x := -1
+		return
+	}
 
-    if (moved > KLMouseConst.PARK_JITTER_PX) {
-        ; Cursor moved — reset stillness clock
-        KLMouse.park_last_x      := mx
-        KLMouse.park_last_y      := my
-        KLMouse.park_still_since := A_TickCount
-        return
-    }
+	; Distance accumulation — feeds the typing flush's mouse_distance_px
+	if (KLMouse.prev_x >= 0) {
+		dx := mx - KLMouse.prev_x
+		dy := my - KLMouse.prev_y
+		d  := Sqrt(dx*dx + dy*dy)
+		if (d > 0)
+			KL_BumpMouseDistance(Round(d))
+	}
+	KLMouse.prev_x := mx
+	KLMouse.prev_y := my
 
-    still_ms := A_TickCount - KLMouse.park_still_since
-    if (still_ms < KLMouseConst.PARK_IDLE_MS)
-        return
+	; Park detection
+	if (KLMouse.park_last_x < 0) {
+		KLMouse.park_last_x      := mx
+		KLMouse.park_last_y      := my
+		KLMouse.park_still_since := A_TickCount
+		return
+	}
+	dx   := mx - KLMouse.park_last_x
+	dy   := my - KLMouse.park_last_y
+	moved := Sqrt(dx*dx + dy*dy)
 
-    ; Check distance from the last park fire to avoid adjacent duplicates
-    fdx := mx - KLMouse.park_fired_x
-    fdy := my - KLMouse.park_fired_y
-    fire_dist := Sqrt(fdx*fdx + fdy*fdy)
-    if (fire_dist < KLMouseConst.PARK_MIN_MOVE_PX
-            and (A_TickCount - KLMouse.park_fired_at) < 30000)
-        return
+	if (moved > KLMouseConst.PARK_JITTER_PX) {
+		; Cursor moved — reset stillness clock
+		KLMouse.park_last_x      := mx
+		KLMouse.park_last_y      := my
+		KLMouse.park_still_since := A_TickCount
+		return
+	}
 
-    ; Emit park event
-    filtered := false
-    try filtered := MF_ShouldFilter()
-    if !filtered and Keylogger.initialized {
-        app := Keylogger.session_app
-        KL_AppendLog(Map(
-            "type",     "mouse_idle_park",
-            "app",      app,
-            "x",        mx,
-            "y",        my,
-            "still_ms", still_ms
-        ))
-        KLMouse.park_fired_x  := mx
-        KLMouse.park_fired_y  := my
-        KLMouse.park_fired_at := A_TickCount
-    }
-    ; Reset so we don't keep firing every PARK_CHECK_MS while still idle
-    KLMouse.park_still_since := A_TickCount
+	still_ms := A_TickCount - KLMouse.park_still_since
+	if (still_ms < KLMouseConst.PARK_IDLE_MS)
+		return
+
+	; Check distance from the last park fire to avoid adjacent duplicates
+	fdx := mx - KLMouse.park_fired_x
+	fdy := my - KLMouse.park_fired_y
+	fire_dist := Sqrt(fdx*fdx + fdy*fdy)
+	if (fire_dist < KLMouseConst.PARK_MIN_MOVE_PX
+			and (A_TickCount - KLMouse.park_fired_at) < 30000)
+		return
+
+	; Emit park event
+	app := Keylogger.session_app
+	KL_AppendLog(Map(
+		"type",     "mouse_idle_park",
+		"app",      app,
+		"x",        mx,
+		"y",        my,
+		"still_ms", still_ms
+	))
+	KLMouse.park_fired_x  := mx
+	KLMouse.park_fired_y  := my
+	KLMouse.park_fired_at := A_TickCount
+
+	; Reset so we don't keep firing every PARK_CHECK_MS while still idle
+	KLMouse.park_still_since := A_TickCount
 }
 
 
