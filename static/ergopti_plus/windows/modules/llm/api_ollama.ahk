@@ -1224,8 +1224,10 @@ _LLM_Ollama_ParseStreamLine(line) {
 			return ""
 		content := msg["content"]
 		return (Type(content) = "String") ? content : ""
-	} catch {
-		return ""
+	} catch as e {
+		err_substr := SubStr(line, 1, 200)
+		try LoggerError("LLM.ollama", "JSON parse failed in stream: {1}. Raw (200c): {2}", e.Message, err_substr)
+		return Map("error", true, "message", "JSON parse failed: " . e.Message)
 	}
 }
 
@@ -1253,7 +1255,10 @@ LLM_ParseOllamaChatResponse(raw) {
 				}
 			}
 		}
-	} catch {
+	} catch as e {
+		err_substr := SubStr(raw, 1, 200)
+		try LoggerError("LLM.ollama", "JSON parse failed in ChatResponse: {1}. Raw (200c): {2}", e.Message, err_substr)
+		return Map("error", true, "message", "JSON parse failed: " . e.Message)
 	}
 	; Legacy /api/generate bodies (tests + old logs).
 	return LLM_ParseOllamaResponse(raw)
