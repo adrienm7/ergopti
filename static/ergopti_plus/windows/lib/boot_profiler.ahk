@@ -35,6 +35,17 @@ BootProfile_Begin() {
 	_BOOT_PROFILE_START := A_TickCount
 	_BOOT_PROFILE_LAST  := _BOOT_PROFILE_START
 	try LoggerInfo("BootProfile", "Boot timing started.")
+	; Everything BEFORE this line is invisible to the A_TickCount marks below:
+	; AHK tokenises every #Include'd file (~228 sources incl. UIA/WebView2/sqlite3)
+	; and creates the tray icon BEFORE the first auto-execute line runs. If the user
+	; reports "the tray icon takes 1-2s to even appear", the cost is almost always
+	; HERE, not in any logged phase — so surface it explicitly as the very first mark.
+	try {
+		Uptime := BootProfile_ProcessUptimeMs()
+		if (Uptime >= 0)
+			LoggerInfo("BootProfile",
+				"Script parse + load (pre-boot, until tray icon appears): ~{1} ms.", Uptime)
+	}
 }
 
 ; Log the time since the previous mark and since BootProfile_Begin.
@@ -52,4 +63,29 @@ BootProfile_Mark(PhaseName) {
 	Total := Now - _BOOT_PROFILE_START
 	_BOOT_PROFILE_LAST := Now
 	try LoggerInfo("BootProfile", "{1}: +{2} ms (total {3} ms).", PhaseName, Delta, Total)
+}
+
+; Milliseconds elapsed since the OS spawned this process, measured against the
+; process creation FILETIME from GetProcessTimes. Unlike A_TickCount (which we can
+; only read once our own code runs), this captures the entire pre-script window —
+; AHK parsing every #Include and creating the tray icon — that precedes the first
+; executable line. A large value here pinpoints the parse phase as the slow start.
+; @returns {Integer} Elapsed milliseconds since process creation, or -1 on failure.
+BootProfile_ProcessUptimeMs() {
+	static FILETIME_TICKS_PER_MS := 10000  ; FILETIME is in 100-ns ticks → 10000 per ms
+	HProc    := DllCall("GetCurrentProcess", "Ptr")
+	Creation := Buffer(8, 0)
+	ExitT    := Buffer(8, 0)
+	KernelT  := Buffer(8, 0)
+	UserT    := Buffer(8, 0)
+	; GetProcessTimes returns each time as a FILETIME (UTC, 100-ns ticks since 1601),
+	; directly comparable to GetSystemTimeAsFileTime — their difference is wall-clock.
+	if !DllCall("GetProcessTimes", "Ptr", HProc,
+		"Ptr", Creation, "Ptr", ExitT, "Ptr", KernelT, "Ptr", UserT)
+		return -1
+	NowFt := Buffer(8, 0)
+	DllCall("GetSystemTimeAsFileTime", "Ptr", NowFt)
+	Created := NumGet(Creation, 0, "Int64")
+	Now     := NumGet(NowFt, 0, "Int64")
+	return (Now - Created) // FILETIME_TICKS_PER_MS
 }
