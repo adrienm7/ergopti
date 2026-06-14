@@ -32,9 +32,17 @@
 					"arity": 1,
 					"required": true
 				},
+				"restore_all": {
+					"arity": 1,
+					"required": false
+				},
 				"save": {
 					"arity": 0,
 					"required": true
+				},
+				"save_all": {
+					"arity": 0,
+					"required": false
 				},
 				"write": {
 					"arity": 1,

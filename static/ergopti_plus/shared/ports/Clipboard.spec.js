@@ -68,7 +68,9 @@ const portContract = {
 		read: { arity: 0, required: true },
 		write: { arity: 1, required: true },
 		save: { arity: 0, required: true },
-		restore: { arity: 1, required: true }
+		restore: { arity: 1, required: true },
+		save_all: { arity: 0, required: false },
+		restore_all: { arity: 1, required: false }
 	}
 };
 
