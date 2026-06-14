@@ -79,8 +79,14 @@ LLM_ApiToken_Encrypt(cleartext) {
  * Returns the cleartext form of a token. Handles both the encrypted form
  * (``dpapi:<base64>``) and the cleartext form (legacy configs from before
  * the encryption landing). Caller never needs to know which.
+ *
+ * On DPAPI failure the ENCRYPTED form is returned unchanged rather than an empty string.
+ * This prevents the caller from overwriting a valid encrypted blob with an empty
+ * string on the next config save, which would permanently destroy the token.
+ * Callers that use the result as an API key will get a 401 (recoverable); a
+ * silently wiped token would require the user to re-enter it (destructive).
  * @param {string} stored - The value stored on disk.
- * @returns {string} Cleartext, or "" when the decrypt failed.
+ * @returns {string} Cleartext on success; the original stored value on DPAPI failure.
  */
 LLM_ApiToken_Decrypt(stored) {
 	if (stored == "")
@@ -88,7 +94,14 @@ LLM_ApiToken_Decrypt(stored) {
 	if !LLM_ApiToken_IsEncrypted(stored)
 		return stored
 	b64 := SubStr(stored, StrLen(LLM_API_TOKEN_DPAPI_PREFIX) + 1)
-	return _LLM_DPAPI_Unprotect(b64)
+	result := _LLM_DPAPI_Unprotect(b64)
+	if (result == "") {
+		; DPAPI failed (corrupted blob, different user session, key not available).
+		; Return the encrypted form intact so the next config save does not wipe it.
+		try LoggerError("ApiTokenCrypto", "DPAPI decryption failed — returning encrypted form to prevent token loss.")
+		return stored
+	}
+	return result
 }
 
 /**
