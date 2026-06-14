@@ -485,6 +485,7 @@ LLM_Tray_PromptNavModifiers() {
 	LLM_Tray_SaveConfig()
 	LLM_Engine_Init(LLM_Tray_BuildOpts())
 	LLM_Tray_Build()
+	LLM_Tray_BindNavHotkeys()
 }
 
 LLM_Tray_PromptValModifiers() {
@@ -496,6 +497,7 @@ LLM_Tray_PromptValModifiers() {
 	LLM_Tray_SaveConfig()
 	LLM_Engine_Init(LLM_Tray_BuildOpts())
 	LLM_Tray_Build()
+	LLM_Tray_BindNavHotkeys()
 }
 
 

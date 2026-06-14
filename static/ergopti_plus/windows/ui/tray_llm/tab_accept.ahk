@@ -49,18 +49,64 @@ Tab:: {
 ; default where llm_nav_modifiers = {}. Alt+1..9 jumps directly to a
 ; slot, mirroring HS's val_modifiers = {"alt"}. Both bindings re-render
 ; the tooltip in place so the ▶ marker moves without any flicker.
-~Up:: _LLM_Nav_Cycle(-1)
-~Down:: _LLM_Nav_Cycle(1)
-!1:: _LLM_Nav_Jump(1)
-!2:: _LLM_Nav_Jump(2)
-!3:: _LLM_Nav_Jump(3)
-!4:: _LLM_Nav_Jump(4)
-!5:: _LLM_Nav_Jump(5)
-!6:: _LLM_Nav_Jump(6)
-!7:: _LLM_Nav_Jump(7)
-!8:: _LLM_Nav_Jump(8)
-!9:: _LLM_Nav_Jump(9)
-#HotIf
+global _LLM_Tray_NavHotkeysBound := []
+
+LLM_Tray_BindNavHotkeys() {
+	global _LLM_Tray, _LLM_Tray_NavHotkeysBound
+	
+	HotIf (*) => LLM_Tooltip_GetText() != ""
+	for hk in _LLM_Tray_NavHotkeysBound {
+		try Hotkey(hk, "Off")
+	}
+	_LLM_Tray_NavHotkeysBound := []
+	
+	nav_mod := _LLM_Tray.Has("nav_modifiers") ? _LLM_Tray["nav_modifiers"] : ""
+	val_mod := _LLM_Tray.Has("val_modifiers") ? _LLM_Tray["val_modifiers"] : "alt"
+	
+	nav_prefix := LLM_Tray_ShortcutToAhk(nav_mod == "" ? "dummy" : nav_mod . "+dummy")
+	if (nav_prefix != "")
+		nav_prefix := SubStr(nav_prefix, 1, -5)
+	
+	val_prefix := LLM_Tray_ShortcutToAhk(val_mod == "" ? "dummy" : val_mod . "+dummy")
+	if (val_prefix != "")
+		val_prefix := SubStr(val_prefix, 1, -5)
+
+	nav_up := "~" . nav_prefix . "Up"
+	nav_dn := "~" . nav_prefix . "Down"
+	
+	try {
+		Hotkey(nav_up, (*) => _LLM_Nav_Cycle(-1), "On")
+		_LLM_Tray_NavHotkeysBound.Push(nav_up)
+	} catch as e {
+		LoggerWarn("LLM", "Failed to bind nav_up " nav_up ": " e.Message)
+	}
+	try {
+		Hotkey(nav_dn, (*) => _LLM_Nav_Cycle(1), "On")
+		_LLM_Tray_NavHotkeysBound.Push(nav_dn)
+	} catch as e {
+		LoggerWarn("LLM", "Failed to bind nav_dn " nav_dn ": " e.Message)
+	}
+	
+	if (InStr(val_prefix, "^") || InStr(nav_prefix, "^")) {
+		LoggerWarn("LLM", "Nav/Val modifiers contain Ctrl (^), which collides with profile hotkeys (Ctrl+1..9)")
+	}
+
+	Loop 9 {
+		hk := val_prefix . A_Index
+		idx := A_Index
+		try {
+			Hotkey(hk, _LLM_Tray_MakeNavJump(idx), "On")
+			_LLM_Tray_NavHotkeysBound.Push(hk)
+		} catch as e {
+			LoggerWarn("LLM", "Failed to bind val " hk ": " e.Message)
+		}
+	}
+	HotIf
+}
+
+_LLM_Tray_MakeNavJump(idx) {
+	return (*) => _LLM_Nav_Jump(idx)
+}
 
 
 

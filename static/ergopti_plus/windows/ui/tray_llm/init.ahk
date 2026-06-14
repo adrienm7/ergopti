@@ -102,6 +102,7 @@ LLM_Tray_Init(saved_opts := Map()) {
 	; covers both fresh boots and post-Reload paths since LLM_Tray_Init is
 	; the only entry into the tray module.
 	LLM_Tray_BindProfileHotkeys()
+	LLM_Tray_BindNavHotkeys()
 
 	; (Removed) First-run LLM onboarding TrayTip — the unsolicited
 	; "Text predictions available" balloon was perceived as noise by users
