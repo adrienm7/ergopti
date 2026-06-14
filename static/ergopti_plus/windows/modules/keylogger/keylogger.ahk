@@ -627,6 +627,16 @@ KL_AppendLog(entry) {
         return
     if !(entry is Map) || !entry.Has("type")
         return
+    ; Pause must silence everything. Native Suspend only disarms hotkeys/hotstrings,
+    ; but the keylogger feeds on an InputHook + ~10 SetTimer / OnClipboardChange
+    ; sources that bypass it. KL_AppendLog is the single chokepoint every telemetry
+    ; source funnels through, so one guard here silences ALL keystroke / sensor /
+    ; clipboard capture while the driver is paused (nothing reaches today.log or the
+    ; _pending_entries data.sql queue). system_event lifecycle markers (e.g. the
+    ; "paused" marker itself) are exempt so the pause transition stays diagnosable.
+    ; See project_suspend_pause_invariant.
+    if A_IsSuspended && entry["type"] != "system_event"
+        return
     ; Privacy filters — drop anything captured while the focused window is
     ; on the user's exclusion list, in private browsing, or in a system-
     ; auth dialog. The check is cached for ~250 ms so the per-keystroke
