@@ -240,8 +240,24 @@ LLM_Tray_OnUserProfileClick(profile) {
 	} else if (choice == "No") {
 		; Edit this profile
 		LLM_Tray_PromptEditProfile(profile)
+	} else if (choice == "Cancel") {
+		confirm := MsgBox(t("menu.profiles.delete_profile") . " ?", plabel, "4 48")
+		if (confirm == "Yes") {
+			for i, p in _LLM_Tray["user_profiles"] {
+				if (p.Has("id") && p["id"] == pid) {
+					_LLM_Tray["user_profiles"].RemoveAt(i)
+					break
+				}
+			}
+			if (_LLM_Tray["profile_id"] == pid)
+				_LLM_Tray["profile_id"] := "basic"
+			LLM_Tray_SaveConfig()
+			LLM_Engine_Init(LLM_Tray_BuildOpts())
+			LLM_Tray_Build()
+			if IsSet(LLM_Tray_BindProfileHotkeys)
+				LLM_Tray_BindProfileHotkeys()
+		}
 	}
-	; Cancel = delete — we use a separate confirm to avoid accidental deletion
 }
 
 /**
