@@ -1346,6 +1346,8 @@ KL_DayRollover() {
 }
 
 KL_MidnightCheck() {
+    if A_IsSuspended
+        return
     if (Keylogger.today_log_date != "" && Keylogger.today_log_date != KL_Today())
         KL_DayRollover()
 }

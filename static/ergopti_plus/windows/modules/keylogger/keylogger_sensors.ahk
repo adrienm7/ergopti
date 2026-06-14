@@ -90,6 +90,8 @@ class KLSensors {
 KL_Sensors_Tick() {
 	if !Keylogger.initialized
 		return
+	if A_IsSuspended
+		return
 	filtered := false
 	try filtered := MF_ShouldFilter()
 	if filtered

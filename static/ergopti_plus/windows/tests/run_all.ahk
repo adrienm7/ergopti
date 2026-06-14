@@ -65,7 +65,7 @@ OnError(_FatalErrorHandler)
 ; Shared timing registry reader (TimingsLoadShared / TimingsGet) — needs
 ; ParseTomlFile above; exercised by test_timings_config.ahk.
 #Include ../lib/timings/timings_config.ahk
-#Include ../lib/active_app_cache.ahk
+
 #Include ../lib/window_utils.ahk
 #Include ../lib/string_utils.ahk
 #Include ../lib/nav_layer_helpers.ahk
@@ -158,7 +158,7 @@ InstallSendNoOps()
 #Include test_terminators.ahk
 #Include test_personal_toml_editor.ahk
 #Include test_layout_tables.ahk
-#Include test_active_app_cache.ahk
+
 #Include test_config.ahk
 #Include test_features_manifest.ahk
 #Include test_hotstrings_full.ahk
@@ -292,6 +292,7 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 #Include meta/test_ergo_roi_count_synth.ahk
 #Include meta/test_profile_delete_path.ahk
 #Include meta/test_nav_val_modifiers_wired.ahk
+#Include meta/test_no_active_app_cache.ahk
 #Include meta/test_updater_sync_winhttp_blocks.ahk
 #Include meta/test_sqlite_progress_yield.ahk
 #Include meta/test_logger_sync_warning.ahk

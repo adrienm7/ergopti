@@ -526,33 +526,30 @@ UninstallHotstringHooks() {
     _SendHook := 0
 }
 
-; ── Active-app cache simulators — bypass GetActiveApp's WinGet* calls so the
+; ── Active-app cache simulators — bypass WinGet* calls so the
 ; ── Notepad / Office branches of HotstringHandler can be exercised in tests.
 SimulateNotepadActive() {
-    global _ActiveAppCache
-    _ActiveAppCache.ts := A_TickCount
-    _ActiveAppCache.Class := "Notepad"
-    _ActiveAppCache.Exe := "notepad.exe"
-    _ActiveAppCache.IsNotepad := true
-    _ActiveAppCache.IsMicrosoftOffice := false
+    global KLHook
+    if !IsSet(KLHook)
+        KLHook := {}
+    KLHook.prev_app := "notepad.exe"
+    KLHook.prev_title := "Untitled - Notepad"
 }
 
 SimulateRegularApp() {
-    global _ActiveAppCache
-    _ActiveAppCache.ts := A_TickCount
-    _ActiveAppCache.Class := "TestApp"
-    _ActiveAppCache.Exe := "test.exe"
-    _ActiveAppCache.IsNotepad := false
-    _ActiveAppCache.IsMicrosoftOffice := false
+    global KLHook
+    if !IsSet(KLHook)
+        KLHook := {}
+    KLHook.prev_app := "test.exe"
+    KLHook.prev_title := "Test App"
 }
 
 SimulateMicrosoftOffice() {
-    global _ActiveAppCache
-    _ActiveAppCache.ts := A_TickCount
-    _ActiveAppCache.Class := "OpusApp"
-    _ActiveAppCache.Exe := "WINWORD.EXE"
-    _ActiveAppCache.IsNotepad := false
-    _ActiveAppCache.IsMicrosoftOffice := true
+    global KLHook
+    if !IsSet(KLHook)
+        KLHook := {}
+    KLHook.prev_app := "WINWORD.EXE"
+    KLHook.prev_title := "Document - Word"
 }
 
 
@@ -660,8 +657,24 @@ KL_LogLlmSuggested(app_name, count) {
     _Stub_LlmSuggestedCalls.Push({ app_name: app_name, count: count })
 }
 
+class Keylogger {
+    static synth_active := 0
+    static synth_type   := "none"
+}
+
+; Synthetic keystroke tagging. In production this lives in keylogger.ahk.
+; The test stub mirrors the depth-counter logic so test_suppress_refcount.ahk
+; can verify the refcounting behaviour.
+KL_MarkSynthetic(source) {
+    Keylogger.synth_active += 1
+    Keylogger.synth_type := source
+}
+
 ; Clears the synthetic-keystroke flag after a hotstring burst. In production
 ; this lives in keylogger.ahk (not included by the test runner). The variadic
 ; signature matches the real function so SetTimer can pass it directly.
 KL_ClearSynthetic(*) {
+    Keylogger.synth_active := Max(0, Keylogger.synth_active - 1)
+    if !Keylogger.synth_active
+        Keylogger.synth_type := "none"
 }

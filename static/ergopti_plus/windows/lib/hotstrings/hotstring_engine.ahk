@@ -322,12 +322,25 @@ GetSelection() {
     return Text
 }
 
-; Returns true when the foreground window is a Microsoft Office app or Teams.
-; Backed by the 100 ms active-app cache so the eight-app check costs one
-; ``WinGetProcessName`` per cache window instead of one ``WinActive`` per app
-; per hotstring firing.
+; Set of Microsoft Office (and Teams) executable names.
+global MICROSOFT_OFFICE_EXES := Map(
+	"Teams.exe", true,
+	"ms-teams.exe", true,
+	"ONENOTE.exe", true,
+	"olk.exe", true,
+	"OUTLOOK.EXE", true,
+	"WINWORD.EXE", true,
+	"EXCEL.EXE", true,
+	"POWERPNT.EXE", true,
+)
+
 MicrosoftApps() {
-    return GetActiveApp().IsMicrosoftOffice
+    global KLHook
+    try {
+        exe := (IsSet(KLHook) and KLHook.HasOwnProp("prev_app")) ? KLHook.prev_app : WinGetProcessName("A")
+        return MICROSOFT_OFFICE_EXES.Has(exe)
+    }
+    return false
 }
 
 
@@ -432,8 +445,12 @@ CreateRawCallbackHotstring(Flags, Abbreviation, Callback, options := unset) {
 ; (CreateHotstring / CreateCaseSensitiveHotstrings) always pass the resolved
 ; value, so this default only guards a hypothetical third caller.
 _MakeHotstringMeta(Replacement, Abbreviation, OnlyText, FinalResult, TimeActivationSeconds, IsRepeat := false, Category := "", Section := "", Priority := 10) {
+    static _NextSeq := 0
+    _NextSeq += 1
     return {
         Replacement: Replacement,
+        Trigger: Abbreviation,
+        Length: StrLen(Abbreviation),
         OnlyText: OnlyText,
         FinalResult: FinalResult,
         TimeActivationSeconds: TimeActivationSeconds,
@@ -441,7 +458,8 @@ _MakeHotstringMeta(Replacement, Abbreviation, OnlyText, FinalResult, TimeActivat
         IsRepeat: IsRepeat,
         Category: Category,
         Section: Section,
-        Priority: Priority
+        Priority: Priority,
+        Seq: _NextSeq
     }
 }
 
@@ -505,7 +523,13 @@ _HotstringDispatch(Replacement, EndChar, BackSpaceSeq, PrevCharKey, OnlyText, Fi
     try KL_MarkSynthetic("hotstring")
 
     try {
-        if GetActiveApp().IsNotepad {
+        isNotepad := false
+        global KLHook
+        try {
+            exe := (IsSet(KLHook) and KLHook.HasOwnProp("prev_app")) ? KLHook.prev_app : WinGetProcessName("A")
+            isNotepad := (exe = "notepad.exe")
+        }
+        if isNotepad {
             ; Windows 11 Notepad mis-handles hotstrings (Windows bug, not AHK),
             ; so we route replacement through the clipboard.
             SendNewResult(BackSpaceSeq, False)

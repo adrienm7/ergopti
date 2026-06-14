@@ -27,6 +27,7 @@
 ; =================================================
 
 _SRC_HSESuppressDepth() {
+	global HSE_Suppressed
 	HSE_Suppressed := 0
 	HSE_Suppress(true)
 	Assert(HSE_Suppressed = 1, "First HSE_Suppress(true) must set depth to 1")
@@ -43,13 +44,12 @@ _SRC_HSESuppressDepth() {
 Test("suppress: HSE_Suppress uses depth counter — early release does not expose engine (boolean-suppression-released-early-on-overlapping-fires)", _SRC_HSESuppressDepth)
 
 _SRC_HSESuppressFloorZero() {
+	global HSE_Suppressed
 	HSE_Suppressed := 0
 	HSE_Suppress(false)
 	Assert(HSE_Suppressed = 0, "HSE_Suppress(false) when already 0 must not go negative")
 }
 Test("suppress: HSE_Suppress(false) on a zeroed counter stays at 0 (boolean-suppression-released-early-on-overlapping-fires)", _SRC_HSESuppressFloorZero)
-
-
 
 
 ; ====================================================
@@ -59,6 +59,7 @@ Test("suppress: HSE_Suppress(false) on a zeroed counter stays at 0 (boolean-supp
 ; ====================================================
 
 _SRC_PWSuppressDepth() {
+	global _PrefixWatcherSuppressed, HSE_Suppressed
 	_PrefixWatcherSuppressed := 0
 	HSE_Suppressed := 0
 	PrefixWatcherSuppress(true)
@@ -76,6 +77,8 @@ _SRC_PWSuppressDepth() {
 	HSE_Suppressed := 0
 }
 Test("suppress: PrefixWatcherSuppress uses depth counter — early release does not expose watcher (boolean-suppression-released-early-on-overlapping-fires)", _SRC_PWSuppressDepth)
+
+
 
 
 

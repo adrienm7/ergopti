@@ -94,6 +94,8 @@ class KLNet {
 KL_Net_WifiTick() {
     if !Keylogger.initialized
         return
+    if A_IsSuspended
+        return
 
     ; Wrap the entire poll in try so a transient WLAN API failure (unavailable
     ; adapter, mid-suspend state) never surfaces as an uncaught error that would
@@ -145,6 +147,8 @@ KL_Net_WifiTick() {
 KL_Net_ReachTick() {
     if !Keylogger.initialized
         return
+    if A_IsSuspended
+        return
 
     ; Delegate to the NetworkInfo adapter — reads cached OS state, no socket.
     up := false
@@ -171,6 +175,8 @@ KL_Net_ReachTick() {
 
 KL_Net_VpnTick() {
     if !Keylogger.initialized
+        return
+    if A_IsSuspended
         return
     ; Delegate to the NetworkInfo adapter — returns true when a VPN adapter is up.
     ; The adapter name is not exposed by the port contract; we use a stable

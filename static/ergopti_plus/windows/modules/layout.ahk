@@ -471,10 +471,11 @@ GetUIASelection() {
 	if (!isSet(UIA))
 		return ""
 	try {
-		App := GetActiveApp()
-		if (App.ProcessName = "Code.exe")
+		global KLHook
+		ProcName := ""
+		try ProcName := (IsSet(KLHook) and KLHook.HasOwnProp("prev_app")) ? KLHook.prev_app : WinGetProcessName("A")
+		if (ProcName = "Code.exe")
 			return ""
-		ProcName := App.ProcessName
 		Now := A_TickCount
 		; No-TextPattern cache: skip processes that never expose TextPattern
 		if (_UIA_NO_TP_CACHE.Has(ProcName) and Now < _UIA_NO_TP_CACHE[ProcName])

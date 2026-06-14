@@ -785,7 +785,7 @@ _HSE_Beats(Cand, Best) {
     if (CandPrio != BestPrio) {
         return CandPrio > BestPrio
     }
-    return Cand.Seq < Best.Seq
+    return Cand.Seq > Best.Seq
 }
 
 ; Precedence for an end-char candidate against the current best, which may be a
@@ -1195,6 +1195,9 @@ _HSE_DispatchRawCallback(Spec, EndChar) {
 
 HSE_DispatchMatch(Spec, EndChar) {
     global HSE_SUPPRESS_RELEASE_DELAY_MS, _SendHook, HSE_TypoNbspStripped, HSE_Buffer
+    if (Spec == "") {
+        return
+    }
     ; Raw-callback specs (the natives migrated into the HSE: E-circumflex deadkey,
     ; "..." ellipsis) do all their own conditional, variable-length send/backspace;
     ; route them to _HSE_DispatchRawCallback so the engine never auto-strips a
@@ -1295,7 +1298,12 @@ HSE_DispatchMatch(Spec, EndChar) {
         if (!IsConform and HasMethod(Replacement))
             Replacement := Replacement()
         OnlyText := Spec.HasOwnProp("OnlyText") ? Spec.OnlyText : true
-        IsNotepadApp := GetActiveApp().IsNotepad
+        global KLHook
+        IsNotepadApp := false
+        try {
+            exe := (IsSet(KLHook) and KLHook.HasOwnProp("prev_app")) ? KLHook.prev_app : WinGetProcessName("A")
+            IsNotepadApp := (exe = "notepad.exe")
+        }
         SentBurst := ""   ; exactly what we injected — captured for the fire-trace
 
         if IsNotepadApp {
