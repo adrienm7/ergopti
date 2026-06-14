@@ -119,6 +119,12 @@ InstallHotstringHooks()
 #Include ../adapters/process_lifecycle.ahk
 #Include ../adapters/key_state.ahk
 #Include ../adapters/app_launcher.ahk
+; Unified input-hook dispatcher + keyboard_hook adapter. hook_dispatcher.ahk
+; defines only classes at top level (no hotkeys), so it is safe in the headless
+; runner; keyboard_hook.ahk registers/unregisters its subscribers through it.
+; Exercised by test_hook_dispatcher.ahk (BoundFunc identity + bind-once contract).
+#Include ../lib/hook_dispatcher.ahk
+#Include ../adapters/keyboard_hook.ahk
 
 ; Lock _AHK_SendText / _AHK_SendInput to no-ops AFTER the adapter has been
 ; included (the adapter sets them to real lambdas; InstallSendNoOps overwrites
@@ -129,6 +135,7 @@ InstallSendNoOps()
 #Include test_adapter_compliance_new.ahk
 #Include test_adapter_contract_vectors.ahk
 #Include test_timer_scheduler.ahk
+#Include test_hook_dispatcher.ahk
 #Include test_logger.ahk
 #Include test_logger_contract.ahk
 #Include test_tooltip_tint_contract.ahk

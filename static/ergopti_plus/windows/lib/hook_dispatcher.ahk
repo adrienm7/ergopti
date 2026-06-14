@@ -131,9 +131,15 @@ class HookDispatcher {
 			if !HookDispatcher._subscribers.Has(event_type)
 				HookDispatcher._subscribers[event_type] := Array()
 
-			; Guard against duplicate registration — compare by Ptr (identity)
+			; Guard against duplicate registration — compare by object identity.
+			; A BoundFunc (what every caller passes) has NO .Ptr property, so the
+			; previous `existing.Ptr = callback_fn.Ptr` threw "has no property named
+			; Ptr"; the bare try swallowed it and the .Push() below was skipped —
+			; silently dropping every subscriber after the first for a given event
+			; type (a whole feature went deaf to the keyboard). `==` is reference
+			; identity for objects and never throws.
 			for existing in HookDispatcher._subscribers[event_type] {
-				if (existing.Ptr = callback_fn.Ptr) {
+				if (existing == callback_fn) {
 					Critical("Off")
 					return
 				}
@@ -160,7 +166,8 @@ class HookDispatcher {
 			loop arr.Length {
 				; Iterate in reverse so removal by index does not shift unvisited items
 				idx := arr.Length - A_Index + 1
-				if (arr[idx].Ptr = callback_fn.Ptr) {
+				; Identity compare — see Register(): .Ptr throws on a BoundFunc.
+				if (arr[idx] == callback_fn) {
 					arr.RemoveAt(idx)
 					LoggerDebug("HookDispatcher", "Subscriber removed from '{1}'.", event_type)
 					break
