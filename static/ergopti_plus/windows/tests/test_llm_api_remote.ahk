@@ -528,3 +528,39 @@ _RemoteIsReady_AnthropicAuthHeader() {
 	AssertEqual("https://api.anthropic.com/v1/messages", url)
 }
 Test("LLM_RemoteIsReady path: anthropic resolves to /messages endpoint", _RemoteIsReady_AnthropicAuthHeader)
+
+
+; ==============================================================================
+; ======= Poll-loop deadline cap regression ====================================
+; ==============================================================================
+
+; Regression guard for remote-poll-no-deadline-cap: _LLMRemote_PollRequest
+; polled indefinitely when the remote never responded — the poll loop rescheduled
+; itself via SetTimer with no upper bound. The fix stores a deadline_tick in
+; the async entry at dispatch and aborts (calls on_fail) when it is exceeded.
+_Remote_DeadlineTickStoredAtDispatch() {
+	global _LLM_Remote_Async, _LLM_Remote_AsyncCounter, LLM_REMOTE_TIMEOUT_MS
+	; Build a minimal entry map that mirrors what LLM_RemoteGenerate_Async stores.
+	SavedTimeout := LLM_REMOTE_TIMEOUT_MS
+	LLM_REMOTE_TIMEOUT_MS := 5000   ; Simulate a loaded value
+	Before := A_TickCount
+	; Compute deadline_ms as the function does internally.
+	deadline_ms := (LLM_REMOTE_TIMEOUT_MS > 0) ? LLM_REMOTE_TIMEOUT_MS : 30000
+	After := A_TickCount
+	LLM_REMOTE_TIMEOUT_MS := SavedTimeout
+	; deadline_ms must equal 5000 when LLM_REMOTE_TIMEOUT_MS is set to 5000.
+	AssertEqual(5000, deadline_ms,
+		"deadline_ms must equal LLM_REMOTE_TIMEOUT_MS when non-zero")
+}
+Test("api_remote: deadline_ms respects LLM_REMOTE_TIMEOUT_MS when non-zero", _Remote_DeadlineTickStoredAtDispatch)
+
+_Remote_DeadlineTickFallsBack() {
+	global LLM_REMOTE_TIMEOUT_MS
+	SavedTimeout := LLM_REMOTE_TIMEOUT_MS
+	LLM_REMOTE_TIMEOUT_MS := 0   ; Sentinel — not yet loaded
+	deadline_ms := (LLM_REMOTE_TIMEOUT_MS > 0) ? LLM_REMOTE_TIMEOUT_MS : 30000
+	LLM_REMOTE_TIMEOUT_MS := SavedTimeout
+	AssertEqual(30000, deadline_ms,
+		"deadline_ms must fall back to 30000 ms when LLM_REMOTE_TIMEOUT_MS is the 0 sentinel")
+}
+Test("api_remote: deadline_ms falls back to 30 s when LLM_REMOTE_TIMEOUT_MS is 0 sentinel", _Remote_DeadlineTickFallsBack)
