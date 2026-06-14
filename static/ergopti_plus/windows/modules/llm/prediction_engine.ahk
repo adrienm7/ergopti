@@ -1122,7 +1122,19 @@ LLM_Engine_OnResults(slots, ctx, active := 1, is_final := false) {
 			text := slots[idx]
 			if (text != "") {
 				_LLM_Engine["inline_last_typed"] := text
+				; Mute the hotstring InputHook so the injected characters do
+				; not re-enter the engine and trigger false hotstring matches.
+				if IsSet(PrefixWatcherSuppress)
+					try PrefixWatcherSuppress(true)
 				TextSend(text, 0, 0)
+				; Clear stale HSE and prefix buffers — cursor is now past the
+				; injected text, so accumulated context is no longer valid.
+				if IsSet(HSE_HardReset)
+					try HSE_HardReset()
+				if IsSet(_ResetPrefixBuffer)
+					try _ResetPrefixBuffer()
+				if IsSet(PrefixWatcherSuppress)
+					SetTimer((*) => PrefixWatcherSuppress(false), -60)
 				; Don't fall through to the tooltip — inline mode owns
 				; the entire UI surface for this prediction.
 				return
