@@ -187,3 +187,86 @@ TestConformTA_StillExpiresWhenTypedCharStale() {
 }
 Test("HSE conform: time-activation still expires when the typed char is stale",
 	TestConformTA_StillExpiresWhenTypedCharStale)
+
+
+
+
+; =========================================
+; =========================================
+; ======= 2/ Atomic send (anti-interleave) =
+; =========================================
+; =========================================
+
+; A final_result trigger must fire as ONE atomic send burst, not the old 3 separate
+; SendFinalResult calls (BackSpace / Replacement / EndChar). The 3-call split left
+; interleave gaps where a physical key typed mid-expansion could splice into the
+; output ("trigger" + "bc" -> "outpubct"). One SendInput holds the user's
+; keystrokes until after the burst, so the only correct recorded-send count is 1.
+TestFinalResult_IsAtomicSingleBurst() {
+	global _Stub_RecordedSends
+	ResetHotstringRecorders()
+	SimulateRegularApp()
+	HSE_TestReset()
+	Star := Chr(0x2605)
+	CreateCaseSensitiveHotstrings("*", "xy" . Star, "result", Map("FinalResult", true))
+
+	HSE_FeedReset(true)
+	HSE_FeedChar("x")
+	HSE_FeedChar("y")
+	M := HSE_FeedChar(Star)
+	Assert(M != "", "final_result trigger must match")
+
+	N := _Stub_RecordedSends.Length
+	HSE_DispatchMatch(M, "")
+	Assert(_Stub_RecordedSends.Length == N + 1,
+		"final_result expansion must be ONE atomic send, got "
+		. (_Stub_RecordedSends.Length - N) . " send(s) -- a >1 split reopens the interleave race")
+
+	Burst := _Stub_RecordedSends[_Stub_RecordedSends.Length].args[1]
+	Assert(InStr(Burst, "{BackSpace") > 0 and InStr(Burst, "result") > 0,
+		"the single burst must carry BOTH the backspaces and the replacement (burst='" . Burst . "')")
+}
+Test("HSE final_result: expansion is one atomic send burst, not a 3-call split",
+	TestFinalResult_IsAtomicSingleBurst)
+
+
+
+
+; =========================================
+; =========================================
+; ======= 3/ Off-hot-path metrics logging =
+; =========================================
+; =========================================
+
+; The fired-hotstring metrics log must be ENQUEUED (O(1)), not run synchronously on
+; the fire keystroke: a disk/app-lookup spike inside KL_LogHotstring would otherwise
+; stretch OnChar past the engine's 60 ms suppress window and swallow the keys typed
+; during it ("abcd"->"acd"). This pins the producer/consumer contract: enqueue grows
+; the queue and arms the drain once; drain empties it and disarms so the heavy work
+; is the drain's, off the keystroke path.
+TestFireLog_EnqueuesAndDrainsOffHotPath() {
+	global _HSE_FireLogQueue, _HSE_FireLogScheduled
+	_HSE_FireLogQueue := []
+	_HSE_FireLogScheduled := false
+	Star := Chr(0x2605)
+
+	_HSE_QueueFireLog("ct" . Star, "cetait", "magickey", "magickey", "text_expansion")
+	_HSE_QueueFireLog("xy" . Star, "result", "magickey", "magickey", "text_expansion")
+	Assert(_HSE_FireLogQueue.Length == 2,
+		"two fires must enqueue two records (got " . _HSE_FireLogQueue.Length . ")")
+	Assert(_HSE_FireLogScheduled == true,
+		"the drain must be armed once after the first enqueue, not run inline")
+
+	; Drain synchronously (production arms it on a timer). It must empty the queue
+	; and disarm so a later fire re-arms a fresh batch. The queue is swapped out
+	; BEFORE KL_LogHotstring runs, so the contract holds even if logging no-ops.
+	_HSE_DrainFireLog()
+	Assert(_HSE_FireLogQueue.Length == 0, "drain must empty the queue")
+	Assert(_HSE_FireLogScheduled == false, "drain must disarm so the next fire re-schedules")
+
+	; Cancel the still-pending production timer armed by the enqueues so it cannot
+	; fire a stray (harmless, empty) drain during a later test that pumps messages.
+	SetTimer(_HSE_DrainFireLog, 0)
+}
+Test("HSE fire-log: metrics are enqueued and drained off the keystroke path",
+	TestFireLog_EnqueuesAndDrainsOffHotPath)

@@ -78,6 +78,19 @@ global _MAX_BUFFER_LEN := 64    ; longest trigger we expect, with margin
 ; a magic-key press. Lowered once the render itself is made cheap (GUI reuse).
 global _PREFIX_RENDER_DEBOUNCE_MS := 150
 
+; Hotstring-fired metrics logging (KL_LogHotstring: buffer flush + JSONL append +
+; per-char WPM pushes) is analytics, NOT user-facing, yet it ran synchronously on
+; the fire keystroke. A disk/app-lookup spike there pushes OnChar past the engine's
+; 60 ms suppress window, which then stretches (the deferred release can only fire
+; once OnChar returns — AHK is single-threaded) and SWALLOWS the keys typed during
+; it ("abcd"->"acd"). So the fire enqueues a lightweight record (O(1)) and a
+; one-shot timer drains it. The delay is deliberately GREATER than the suppress
+; release (HSE_SUPPRESS_RELEASE_DELAY_MS, 60 ms) so the drain can never run before —
+; and thus never delay — that release. Margin keeps it clear of timer jitter.
+global HSE_FIRE_LOG_DEFER_MS := 90
+global _HSE_FireLogQueue := []
+global _HSE_FireLogScheduled := false
+
 ; Extended word-boundary set for tooltip lookup. Superset of HSE_WORD_TERMINATORS:
 ; we add typographic double-quotes (U+201C " and U+201D ") and the straight
 ; double-quote (U+0022 ") so that typing inside a quoted phrase (e.g. `cher"mais`)
@@ -279,6 +292,37 @@ PrefixWatcherSuppress(YesNo) {
     ; already called HSE_ApplyExpansion before deferring this release,
     ; so the buffer already reflects the post-expansion screen state.
     HSE_Suppress(YesNo)
+}
+
+; Enqueue a fired-hotstring metrics record and (once) arm the drain timer. O(1)
+; and allocation-light so the fire keystroke returns immediately — the heavy
+; KL_LogHotstring work (buffer flush, JSONL append, WPM pushes) runs later, off
+; the keystroke path, via _HSE_DrainFireLog. Called from _OnPrefixChar on every
+; fire in place of a synchronous KL_LogHotstring.
+_HSE_QueueFireLog(Trigger, Replacement, HType, Category, Section) {
+    global _HSE_FireLogQueue, _HSE_FireLogScheduled, HSE_FIRE_LOG_DEFER_MS
+    _HSE_FireLogQueue.Push({ Trigger: Trigger, Replacement: Replacement,
+        HType: HType, Category: Category, Section: Section })
+    if !_HSE_FireLogScheduled {
+        _HSE_FireLogScheduled := true
+        ; Negative period = run once after the delay. The delay exceeds the
+        ; suppress release so this drain is always scheduled to fire AFTER it,
+        ; never delaying it even though both run on the single AHK thread.
+        SetTimer(_HSE_DrainFireLog, -HSE_FIRE_LOG_DEFER_MS)
+    }
+}
+
+; Drain every queued fired-hotstring record through KL_LogHotstring. Runs off the
+; keystroke path (armed by _HSE_QueueFireLog). Swaps the queue out first so fires
+; that land while we drain accumulate into a fresh batch and re-arm the timer.
+_HSE_DrainFireLog() {
+    global _HSE_FireLogQueue, _HSE_FireLogScheduled
+    _HSE_FireLogScheduled := false
+    Batch := _HSE_FireLogQueue
+    _HSE_FireLogQueue := []
+    for _, Rec in Batch {
+        try KL_LogHotstring(Rec.Trigger, Rec.Replacement, Rec.HType, "", Rec.Category, Rec.Section)
+    }
 }
 
 ; Rebuild the prefix index from the CURRENT Features state without restarting
@@ -614,8 +658,18 @@ _OnPrefixChar(IH, Char) {
     ; InputHook, so the HookDispatcher guard does not cover it.
     if A_IsSuspended
         return
-    if (_PrefixWatcherSuppressed or HSE_Suppressed)
+    if (_PrefixWatcherSuppressed or HSE_Suppressed) {
+        ; A char reached the hook DURING a send-burst suppress window. Synthetic
+        ; replacement chars are EXPECTED here (filtered out of the buffer by design);
+        ; a PHYSICAL char landing here means the user typed inside the post-fire
+        ; window — its buffer update is skipped (it still reaches the app via the
+        ; Visible hook), the desync to inspect for "abcd"->"acd" reports. Debug-gated
+        ; so this blind spot becomes visible without adding hot-path cost normally.
+        if LoggerIsDebugEnabled()
+            try LoggerDebug("HSEFire", "OnChar SUPPRESSED char='{1}' pwSup={2} hseSup={3}.",
+                Char, _PrefixWatcherSuppressed, HSE_Suppressed)
         return
+    }
     ; LLM predictions stay on even when the Hotstrings master gate is off.
     if (IsSet(LLM_Bridge_FeedCharIfActive))
         LLM_Bridge_FeedCharIfActive(Char)
@@ -657,6 +711,16 @@ _OnPrefixChar(IH, Char) {
         }
     }
     try {
+        ; Serialize the whole match -> fire -> buffer-sync region: Critical makes
+        ; this keystroke uninterruptible, so AHK cannot start the NEXT physical
+        ; key's layout-remap SendEvent thread (nor a render/suppress timer) until
+        ; this keystroke — including the synchronous HSE_DispatchMatch expansion
+        ; burst below — has fully completed. That guarantees the expansion is
+        ; emitted IN FULL before any following keystroke (no interleave / lost key
+        ; / "outpubct"). Set AFTER the UIA-wrap branch above (which Sleeps via
+        ; SendInstant) so Critical never spans a Sleep; the only other Sleep on a
+        ; fire is the Notepad clipboard path, which releases Critical itself.
+        Critical("On")
         if LoggerIsDebugEnabled()
             LoggerDebug("PrefixWatcher", "DBG OnChar: char='{1}' prefixBuf='{2}' hseBuf='{3}' suppressed={4}/{5}.", Char, _PrefixBuffer, HSE_Buffer, _PrefixWatcherSuppressed, HSE_Suppressed)
         ; Feed HSE — when HSE_FeedChar reports a match, fire the
@@ -698,9 +762,11 @@ _OnPrefixChar(IH, Char) {
                 ? "repeat_key"
                 : (HSEMatch.HasOwnProp("Category") ? HSEMatch.Category : "")
             HotstringSection := HSEMatch.HasOwnProp("Section") ? HSEMatch.Section : ""
-            _KlLogTick := HotPath_Now()
-            try KL_LogHotstring(HSEMatch.Trigger, HotstringRepl, HotstringHType, "", HotstringCategory, HotstringSection)
-            HotPath_LogIfSlow("KL.LogHotstring", _KlLogTick, HSEMatch.Trigger)
+            ; Metrics logging is analytics — enqueue it and return; the heavy
+            ; KL_LogHotstring work runs off the keystroke path (see
+            ; _HSE_QueueFireLog) so a disk/lookup spike can never stall the fire
+            ; keystroke and stretch the suppress window into a key-swallow.
+            _HSE_QueueFireLog(HSEMatch.Trigger, HotstringRepl, HotstringHType, HotstringCategory, HotstringSection)
             ; ── Sync the watcher buffer to the post-expansion screen state ──
             ; The naive "wipe to empty" used to drop the in-word context the
             ; user is still typing inside of. After a STAR fire (no end-char),
@@ -1033,7 +1099,14 @@ _PrefixCancelRender() {
     SetTimer(_PrefixRenderFlush, 0)
 }
 _PrefixRenderFlush() {
+    global _PrefixWatcherSuppressed, HSE_Suppressed
     SetTimer(_PrefixRenderFlush, 0)   ; belt-and-suspenders: never re-fire on its own
+    ; Skip while a send burst is in flight: TooltipShow is a ~20-55 ms Gui rebuild
+    ; (Build + Present + DWM border) that pumps the message loop, so running it
+    ; during an expansion could let the preview straddle the burst. The fire path
+    ; schedules a fresh render for the post-expansion state once suppression clears.
+    if (_PrefixWatcherSuppressed or HSE_Suppressed)
+        return
     ; Runs from a timer (outside _OnPrefixChar's try), so guard it — an unhandled
     ; exception in a timer callback would surface a blocking error dialog.
     try
