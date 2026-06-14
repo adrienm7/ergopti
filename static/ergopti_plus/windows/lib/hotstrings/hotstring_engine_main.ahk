@@ -192,7 +192,7 @@ global HSE_MaxStarTriggerLen := 0
 ; short-circuit. The dispatch loop sets it for the duration of the
 ; SendEvent burst so its own replacement output does not feed back into
 ; the buffer through the InputHook.
-global HSE_Suppressed := false
+global HSE_Suppressed := 0  ; depth counter (not bool) — multiple concurrent fires each hold their own level
 
 ; Surface for tests and higher layers: the most recent match returned by
 ; HSE_FeedChar. "" when no match. Reset to "" at the start of each FeedChar
@@ -640,7 +640,12 @@ HSE_FeedReset(KnownTerminatorBefore := false) {
 ; an unknown context) should call HSE_HardReset() explicitly.
 HSE_Suppress(YesNo) {
     global HSE_Suppressed
-    HSE_Suppressed := !!YesNo
+    ; Ref-count so overlapping fires each hold their own suppress level;
+    ; a single release does not expose the engine mid-burst for the second fire.
+    if YesNo
+        HSE_Suppressed += 1
+    else
+        HSE_Suppressed := Max(0, HSE_Suppressed - 1)
 }
 
 ; Force the buffer back to a known-empty state with no word-boundary
