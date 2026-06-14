@@ -2796,9 +2796,14 @@ global PERSONAL_SHORTCUTS_TEMPLATE := "; personal_shortcuts.ahk`r`n"
 RebuildHotstringsLive() {
 	try LoggerStart("Menu", "Rebuilding hotstrings in-process (live toggle)…")
 	try SetTimer(RegisterEmojisSymbolsDeferred, 0)
-	HSE_RegistryClear()
-	HSE_HardReset()
-	RegisterAllHotstrings()
+	HSE_RebuildInProgress := true
+	try {
+	    HSE_RegistryClear()
+	    HSE_HardReset()
+	    RegisterAllHotstrings()
+	} finally {
+	    HSE_RebuildInProgress := false
+	}
 	if IsSet(HotstringPrefixWatcherRebuildIndex) {
 		HotstringPrefixWatcherRebuildIndex()
 	}

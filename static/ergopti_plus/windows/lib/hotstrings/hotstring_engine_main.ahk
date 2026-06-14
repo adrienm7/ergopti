@@ -72,6 +72,10 @@ global HSE_MAX_BUFFER_LEN := 64
 ; pass once silently rewrote the ASCII apostrophe to a second U+2019, dropping
 ; U+0027 from the set — Chr() makes the codepoints explicit and tamper-proof.
 global HSE_WORD_TERMINATORS := " `t`r`n.,;:?!" . Chr(0x27) . Chr(0x2019)
+; Set to true during live registry rebuilds (RebuildHotstringsLive) to prevent
+; the OnChar reader from accessing a cleared or partially repopulated index.
+; Prevents Map-access crashes and incorrect partial matching (hse-registry-torn-read-vs-onmessage).
+global HSE_RebuildInProgress := false
 
 ; Subset of HSE_WORD_TERMINATORS whose chars are consumed (not re-injected) after
 ; an expansion fires. Empty by default — the user opts specific custom delimiters
@@ -831,6 +835,11 @@ _HSE_EndCharBeats(Cand, Best, BestIsEndChar) {
 HSE_FindMatchAtEnd(JustTypedChar) {
     global HSE_Buffer, HSE_StartIsWordBoundary, HSE_RegistryByLastChar
     global HSE_WORD_TERMINATORS, HSE_LastEndChar, HSE_TypoNbspStripped
+    global HSE_RebuildInProgress
+
+    if HSE_RebuildInProgress {
+        return ""
+    }
 
     HSE_TypoNbspStripped := false
     if (JustTypedChar == "") {
