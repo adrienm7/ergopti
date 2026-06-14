@@ -339,11 +339,11 @@ TOML_BatchWrite(Path, Updates) {
     } catch {
         return false
     }
-    if FileExist(Path)
-        try FileDelete(Path)
-    try FileMove(tmp, Path)
-    catch
-        return false
+	; Atomic replace: FileMove with overwrite=true swaps the file in one OS call.
+	; If the move fails, the original config.toml remains intact.
+	try FileMove(tmp, Path, true)
+	catch
+		return false
 
     ; Invalidate the parse cache so the next ParseTomlFile call re-reads
     ; the updated file rather than returning a stale snapshot.
