@@ -331,6 +331,8 @@ _LLM_Deps_HasWinget() {
  * a manual download, or anything else).
  */
 LLM_Deps_PollServerReady(on_ready, on_failed) {
+	if A_IsSuspended
+		return
 	global _LLM_Deps_State, _LLM_Deps_Checking, _LLM_Deps_PollTimer
 	; ASYNC probe — never call the sync LLM_OllamaIsRunning here. When
 	; Ollama isn't installed yet, that sync call blocks the message loop
@@ -424,6 +426,8 @@ LLM_Deps_Cancel() {
  * @param {Func} on_failed - Callback on failure.
  */
 LLM_Deps_PollFile(pid, on_ready, on_failed) {
+	if A_IsSuspended
+		return
 	global _LLM_Deps_OutFile, _LLM_Deps_OutPos, _LLM_Deps_Checking, _LLM_Deps_PollTimer
 
 	; Read any new bytes from the output file
