@@ -1001,18 +1001,22 @@ if MetricsShortcuts.enabled
     WPMWidget_LoadConfig(_IniCache)
 
 BootProfile_Mark("Config, features & shortcuts loaded")
-; initMenu defers the 21-locale language submenu off the boot critical path on the
-; boot pass only. _DriverReady flips true at "ready", so a later rebuild (initMenu
-; re-run via a -50 ms timer) repopulates it synchronously instead of deferring.
+; The tray menu build (~157 ms: per-category TOML submenus + manifest items) was the
+; single largest remaining time-to-ready chunk, and the menu is only needed once the
+; user right-clicks the tray. So it is DEFERRED off the boot critical path: built by
+; BuildTrayMenuDeferred armed right after "ready" (see the deferred-task block).
+; Clear AHK's stock tray items now so an early right-click in that brief window shows
+; an empty menu rather than the default Suspend/Pause that would bypass the driver.
+; _DriverReady stays false until "ready"; the deferred initMenu then builds every
+; submenu (incl. the 21-locale language one) synchronously in ONE uninterrupted
+; (Critical) pass, so the "menu shows only the first items" half-build bug cannot
+; recur. The tray ICON is already set earlier (TraySetIcon), so it stays visible.
 _DriverReady := false
 _LangMenuRef := ""
 _LangMenuBuildPending := false
 LANG_MENU_DEFER_MS := 120  ; short post-ready delay for the language-submenu populate
-InitSubMenus()
-initMenu()
-BootProfile_Mark("MENU/initMenu returned (pre tray icon)")
-UpdateTrayIcon()
-BootProfile_Mark("Tray menu + icon built")
+MENU_BUILD_DEFER_MS := 16  ; build the full tray menu first thing after "ready"
+A_TrayMenu.Delete()
 SetTimer(SaveFullConfig, -500)
 
 if MetricsShortcuts.enabled {
@@ -2018,14 +2022,44 @@ _SuspendStateWatchdog() {
     else
         Ergopti_OnSuspendResume()
 }
+; Build the full tray menu off the boot critical path (armed after "ready"). The
+; build runs under Critical so it is ONE uninterrupted pass — a tray click queued
+; during boot cannot pump the message loop mid-build and paint a half-built menu
+; (the documented "menu shows only the first items" bug). No Sleep inside, so it is
+; safe to hold Critical across it. UpdateTrayIcon runs last, once MenuSuspend exists.
+BuildTrayMenuDeferred() {
+    global _DriverReady, _LangMenuBuildPending, LANG_MENU_DEFER_MS
+    Critical("On")
+    InitSubMenus()
+    ; Build everything EXCEPT the 21-locale language submenu (~219 ms of Win32 menu
+    ; registration + flag-icon loads). Forcing _DriverReady false makes initMenu
+    ; DEFER that submenu (its boot behaviour) so THIS post-ready build stays ~157 ms
+    ; instead of ~420 ms — small enough not to lag the first keystrokes after launch.
+    ; The language submenu is then armed on its own timer below, exactly as the
+    ; original boot path did, so it never piles onto this Critical section.
+    _SavedReady := _DriverReady
+    _DriverReady := false
+    initMenu()
+    _DriverReady := _SavedReady
+    UpdateTrayIcon()
+    Critical("Off")
+    if _LangMenuBuildPending
+        SetTimer(BuildLanguageMenuDeferred, -LANG_MENU_DEFER_MS)
+    BootProfile_Mark("Tray menu built (deferred, off time-to-ready)")
+}
+
 UpdateTrayIcon() {
+    ; The MenuSuspend item exists only after BuildTrayMenuDeferred has run. This is
+    ; called from ToggleSuspend / the suspend watchdog, which can fire in the brief
+    ; pre-build window after launch — guard the check so an early suspend cannot
+    ; throw on a not-yet-built menu item. The icon swap below still happens.
     if A_IsSuspended {
-        A_TrayMenu.Check(MenuSuspend)
+        try A_TrayMenu.Check(MenuSuspend)
         if FileExist(IconPathDisabled)
             TraySetIcon(IconPathDisabled, , True)
     }
     else {
-        A_TrayMenu.Uncheck(MenuSuspend)
+        try A_TrayMenu.Uncheck(MenuSuspend)
         if FileExist(IconPath)
             TraySetIcon(IconPath)
     }
@@ -2190,6 +2224,11 @@ _DriverReady := true
 ; dropdown is ready), then the text-expansion pass (core magic-key abbreviations,
 ; brought online quickly), then the emoji/symbol pass, then the WebView2 widget
 ; last (its delay clears the registration passes).
+; Build the full tray menu off the time-to-ready path, FIRST in the deferred
+; sequence so the menu is populated within ~tens of ms of "ready". _DriverReady is
+; already true here, so the deferred initMenu builds the language submenu inline (no
+; separate _LangMenuBuildPending pass needed on this boot path).
+SetTimer(BuildTrayMenuDeferred, -MENU_BUILD_DEFER_MS)
 if _LangMenuBuildPending
 	SetTimer(BuildLanguageMenuDeferred, -LANG_MENU_DEFER_MS)
 if _LLM_Tray_BuildPending
