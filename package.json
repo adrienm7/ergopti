@@ -11,7 +11,6 @@
 		"lint": "prettier --plugin-search-dir . --check . && eslint .",
 		"format": "prettier --plugin-search-dir . --write .",
 		"prepare": "husky install",
-		"build:hotstrings": "node ./tools/build/build-hotstrings.cjs",
 		"build:manifest": "node ./tools/build/build-features-manifest.js",
 		"build:domain": "node ./tools/build/build-domain.cjs",
 		"lint:banners": "node ./tools/lint/audit-banner-alignment.js static/ergopti_plus/shared",

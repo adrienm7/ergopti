@@ -78,6 +78,7 @@ OnError(_FatalErrorHandler)
 ; test_terminators.ahk and consumed by the tray / config-window delimiter menus.
 #Include ../_generated/terminators.ahk
 #Include ../lib/toml/toml_loader.ahk
+#Include ../lib/hotstrings/hotstrings_cache.ahk
 #Include ../lib/toml/toml_config_loader.ahk
 #Include ../lib/tap_hold/tap_hold_loader.ahk
 #Include ../_generated/features_manifest.ahk
@@ -142,6 +143,7 @@ InstallSendNoOps()
 #Include test_domain_registry.ahk
 #Include test_domain_expander.ahk
 #Include test_toml_loader.ahk
+#Include test_hotstrings_cache.ahk
 #Include test_hotstrings_config.ahk
 #Include test_terminators.ahk
 #Include test_personal_toml_editor.ahk

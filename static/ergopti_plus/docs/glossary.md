@@ -190,9 +190,9 @@ per-section enabled state in `hs.settings`.
 **TOML Hotstring File**
 The canonical source format for hotstring data. Each file contains an array of
 `[[entry]]` tables with `trigger`, `replacement`, and optional `flags`. Files
-live under `_shared/hotstrings/` and are consumed by the code-generator
-(`npm run build:hotstrings`) to produce driver-specific output. Schema:
-`_shared/hotstrings/schema.md`.
+live under `_shared/hotstrings/`. The AHK driver consumes them at runtime via a
+self-healing `.tsv` cache (`lib/hotstrings/hotstrings_cache.ahk`) — no build step
+or committed generated code. Schema: `_shared/hotstrings/schema.md`.
 
 ---
 

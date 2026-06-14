@@ -839,10 +839,6 @@ jobs:
         run: npm run build:manifest
         shell: bash
 
-      - name: Regenerate hotstrings_generated.ahk
-        run: python tools/locale/compile_hotstrings.py
-        shell: bash
-
       - name: Build static asset bundle
         run: python tools/build/build_static_bundle.py
         shell: bash
