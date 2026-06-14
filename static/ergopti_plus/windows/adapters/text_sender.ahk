@@ -21,10 +21,11 @@
 ; of simulating keystrokes for large expansions.
 ;
 ; CLIPBOARD DEPENDENCY:
-; The clipboard path uses CB_Save / CB_Write / CB_Restore from the Clipboard
+; The clipboard path uses CB_SaveAll / CB_Write / CB_RestoreAll from the Clipboard
 ; port adapter (adapters/clipboard.ahk) instead of accessing A_Clipboard directly.
-; This keeps clipboard interactions testable via a stub and ensures a single
-; code path for all clipboard operations in the driver.
+; CB_SaveAll/CB_RestoreAll use ClipboardAll() so non-text content (images, files,
+; RTF) is preserved across the paste cycle. CB_Write is text-only (sets A_Clipboard
+; to a string) so the paste content itself is always text, which is correct.
 ; ==============================================================================
 
 ; Payload length threshold above which TextSend switches to clipboard injection.
@@ -99,7 +100,7 @@ _TextSenderModifierString(ModStr) {
 ; =======================================================
 
 ; Inserts text at the current insertion point.
-; Uses the Clipboard port (CB_Save / CB_Write / CB_Restore) for the clipboard
+; Uses the Clipboard port (CB_SaveAll / CB_Write / CB_RestoreAll) for the clipboard
 ; path so the interaction is mockable and the driver has one canonical clipboard
 ; code path.
 ; @param Text     {String}   The Unicode text to insert.
@@ -116,16 +117,17 @@ TextSend(Text, Opts, Callback) {
 		Mode := StrLen(Text) > TEXT_CLIPBOARD_THRESHOLD ? "clipboard" : "direct"
 
 	if Mode = "clipboard" {
-		; Save the current clipboard via the Clipboard port so we can restore it
-		; cleanly after the paste — avoids losing the user's clipboard content.
-		Saved := CB_Save()
+		; CB_SaveAll uses ClipboardAll() so non-text content (images, files, RTF)
+		; survives the paste cycle — CB_Save()/CB_Restore() are text-only and would
+		; silently destroy any non-text clipboard data the user holds.
+		Saved := CB_SaveAll()
 		CB_Write(Text)
 		ClipWait(1)
 		_AHK_SendInput.Call("^v")
 		; Restore after a short delay so the paste completes before we overwrite.
 		; Capture Saved in the closure so the timer lambda is self-contained.
 		SavedForTimer := Saved
-		SetTimer(() => CB_Restore(SavedForTimer), -TEXT_CLIPBOARD_RESTORE_DELAY_MS)
+		SetTimer(() => CB_RestoreAll(SavedForTimer), -TEXT_CLIPBOARD_RESTORE_DELAY_MS)
 	} else {
 		; SendText uses the "Text" mode that bypasses hotkey triggers and sends
 		; Unicode characters as raw keystrokes — the safest injection path.
