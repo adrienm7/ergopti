@@ -655,19 +655,10 @@ KL_AppendLog(entry) {
         return
     if !entry.Has("timestamp")
         entry["timestamp"] := KL_NowTimestamp()
-    ; Queue the live Map for the ingest tick — no JSON round-trip needed
-    ; for entries originating in this process.
-    Keylogger._pending_entries.Push(entry)
-    line := KL_JsonEncode(entry)
-    line := StrReplace(line, "`n", "\n")
-    line := StrReplace(line, "`r", "")
-    fh := KL_OpenTodayFh()
-    if !IsObject(fh)
-        return
-    fh.Write(line . "`n")
-    ; No fh.Flush() per call — the OS / FileObject already buffers efficiently
-    ; and a crash recovery would only lose a few hundred ms of in-flight events.
-    ; The ingest tick does its own Flush before reading.
+	; Queue the live Map for the ingest tick — no JSON round-trip needed
+	; for entries originating in this process. The JSON stringification and disk
+	; append are deferred to KL_IngestOnce so we never block the keystroke thread.
+	Keylogger._pending_entries.Push(entry)
 }
 
 
@@ -1237,25 +1228,44 @@ KL_IngestOnce() {
     pair := KL_ReadNewTodayLog()
     new_offset := pair[1]
     entries    := pair[2]
-    ; Atomically snapshot and clear _pending_entries under Critical so the
-    ; keystroke hook cannot Push a new entry between our Length check and
-    ; the := [] reset — without this, entries pushed after the Length check
-    ; but before the clear are silently dropped, never reaching data.sql.
-    Critical("On")
-    pending_snapshot := Keylogger._pending_entries
-    Keylogger._pending_entries := []
-    Critical("Off")
-    for _, e in pending_snapshot
-        entries.Push(e)
-    if (entries.Length = 0) {
-        ; Still advance today_log_offset so the cold-replay window keeps
-        ; shrinking even when no entries were decodable on disk.
-        if (new_offset != Keylogger.today_log_offset) {
-            Keylogger.today_log_offset := new_offset
-            KL_SaveState()
-        }
-        return
-    }
+	; Atomically snapshot and clear _pending_entries under Critical so the
+	; keystroke hook cannot Push a new entry between our Length check and
+	; the := [] reset — without this, entries pushed after the Length check
+	; but before the clear are silently dropped, never reaching data.sql.
+	Critical("On")
+	pending_snapshot := Keylogger._pending_entries
+	Keylogger._pending_entries := []
+	Critical("Off")
+	
+	; Write pending events to disk now, off the hot path.
+	if (pending_snapshot.Length > 0) {
+		fh := KL_OpenTodayFh()
+		if IsObject(fh) {
+			for _, e in pending_snapshot {
+				line := KL_JsonEncode(e)
+				line := StrReplace(line, "`n", "\n")
+				line := StrReplace(line, "`r", "")
+				fh.Write(line . "`n")
+			}
+			; Flush and advance new_offset so the next KL_ReadNewTodayLog
+			; ignores the lines we just wrote.
+			try fh.Flush()
+			new_offset := fh.Pos
+		}
+	}
+
+	for _, e in pending_snapshot
+		entries.Push(e)
+		
+	if (entries.Length = 0) {
+		; Still advance today_log_offset so the cold-replay window keeps
+		; shrinking even when no entries were decodable on disk.
+		if (new_offset != Keylogger.today_log_offset) {
+			Keylogger.today_log_offset := new_offset
+			KL_SaveState()
+		}
+		return
+	}
 
     statements := []
     for _, entry in entries {
