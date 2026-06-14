@@ -23,9 +23,24 @@
 ; Reset registry before each logical group so handles from one test do not
 ; bleed into the next.
 _TS_ResetRegistry() {
-	global _TIMER_ADAPTER_REGISTRY, _TIMER_ADAPTER_NEXT_ID
+	global _TIMER_ADAPTER_REGISTRY
+	; Disarm any REAL OS timer a prior test left armed before discarding the
+	; registry. The adapter calls the genuine AHK SetTimer, so a test that arms a
+	; handle without firing OR cancelling it (the "Fired is false" lifecycle test
+	; arms a -1 ms one-shot and only asserts the flag) leaves an overdue timer that
+	; later dispatches and, via _OneShot, Deletes an entry from whatever registry is
+	; current THEN — corrupting a later test's live count. That was the cancelAll
+	; flake (expected 3, got 2). Drain here to stop the cross-test bleed at source.
+	for _, H in _TIMER_ADAPTER_REGISTRY {
+		if (H is Map and H.Has("Fn") and H["Fn"] != 0)
+			try SetTimer(H["Fn"], 0)
+	}
 	_TIMER_ADAPTER_REGISTRY := Map()
-	_TIMER_ADAPTER_NEXT_ID  := 0
+	; Deliberately do NOT reset _TIMER_ADAPTER_NEXT_ID: ids stay monotonic across
+	; tests so that if a stale timer ever does dispatch, its now-defunct id cannot
+	; collide with — and evict — a live handle a later test registered under a
+	; reused id (_OneShot guards its Delete with Has(Id), so a defunct id is a
+	; harmless no-op). Belt-and-suspenders with the drain above.
 }
 
 
@@ -134,6 +149,34 @@ _TSTest_CancelAllDrainsRegistry() {
 	AssertEqual(0, TimerActiveCount(), "cancelAll must empty the registry")
 }
 Test("TimerScheduler — cancelAll(): drains all live handles", _TSTest_CancelAllDrainsRegistry)
+
+; Regression for the intermittent cancelAll flake (expected 3, got 2): a stale OS
+; timer leaked by an EARLIER test (armed, never fired or cancelled) must never evict
+; a LIVE handle when it finally dispatches. The old _TS_ResetRegistry reset the id
+; counter to 0 each test, so the leaked handle's id (1) was reused by a later test's
+; first handle; the leaked timer's _OneShot then Deleted that live entry, dropping
+; the count. With monotonic ids (+ the reset-time drain) the stale id is defunct and
+; _OneShot's Has(Id) guard makes its Delete a no-op. Reproduced deterministically by
+; invoking the leaked handle's bound fn directly — no real-timer timing dependency.
+_TSTest_StaleTimerCannotEvictLiveHandle() {
+	_TS_ResetRegistry()
+	; Leak a handle exactly like the "Fired is false" lifecycle test: armed via the
+	; adapter, never fired and never cancelled.
+	Leaked := TimerAfter(0.001, () => 0)
+	_TS_ResetRegistry()   ; begin a fresh logical group, as the next test would
+	; Three fresh LIVE handles — the cancelAll scenario.
+	TimerAfter(1, () => 0)
+	TimerAfter(2, () => 0)
+	TimerEvery(3, () => 0)
+	AssertEqual(3, TimerActiveCount(), "three live handles before the stale fire")
+	; Simulate the leaked OS timer finally dispatching its _OneShot wrapper.
+	Leaked["Fn"]()
+	AssertEqual(3, TimerActiveCount(),
+		"a stale leaked timer's fire must NOT evict a live handle (id-reuse regression)")
+	TimerCancelAll()   ; tidy: disarm this test's three real timers
+}
+Test("TimerScheduler — a stale leaked timer cannot evict a live handle (id-reuse regression)",
+	_TSTest_StaleTimerCannotEvictLiveHandle)
 
 _TSTest_CancelAllSafeWhenEmpty() {
 	_TS_ResetRegistry()
