@@ -777,6 +777,9 @@ LLM_OllamaScheduleWarmupRetry(model := "") {
 
 LLM_Ollama_WarmupRetryTick() {
 	global _LLM_Ollama_WarmupRetryIntervalMs, _LLM_Ollama_WarmupRetryModel, _LLM_Ollama_Async
+	; Pause must silence every LLM background activity — no HTTP while suspended.
+	if A_IsSuspended
+		return
 	if LLM_OllamaIsReady()
 		return
 	; Do not stack warmups behind an in-flight prediction — Ollama is single-queue.

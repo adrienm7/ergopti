@@ -2007,6 +2007,9 @@ Ergopti_OnSuspendEnter() {
     try TooltipHide("Suspend", true)
     try LLM_Tooltip_Hide(true)
     try LLM_Engine_CancelTimer()
+    ; Cancel the Ollama warm-up retry timer so it does not make background HTTP
+    ; calls while the driver is paused ("pause = tout éteint" invariant).
+    try LLM_OllamaCancelWarmupRetry()
 }
 Ergopti_OnSuspendResume() {
     if IsSet(_ResetPrefixBuffer)
