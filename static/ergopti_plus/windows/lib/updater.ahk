@@ -751,13 +751,17 @@ Updater_ParseBody(Json) {
 ; Tracks whether a background check is currently in progress, to disable the
 ; menu item and avoid overlapping WinHttp calls.
 global _UpdaterCheckInProgress := false
+global _UpdaterDownloadInProgress := false
 
 ; Returns a symbol indicating the current update state:
-;   "checking"   — a check is running right now (disable menu item)
-;   "available"  — a newer version is cached from a previous check
-;   "idle"       — no cached update, ready to check
+;   "checking"    — a check is running right now (disable menu item)
+;   "downloading" — an asset is downloading right now (disable menu item)
+;   "available"   — a newer version is cached from a previous check
+;   "idle"        — no cached update, ready to check
 Updater_GetUpdateState() {
-	global _UpdaterCheckInProgress, UPDATER_LATEST_RELEASE
+	global _UpdaterCheckInProgress, _UpdaterDownloadInProgress, UPDATER_LATEST_RELEASE
+	if _UpdaterDownloadInProgress
+		return "downloading"
 	if _UpdaterCheckInProgress
 		return "checking"
 	if IsSet(UPDATER_LATEST_RELEASE) and Type(UPDATER_LATEST_RELEASE) == "Object"
@@ -771,6 +775,8 @@ Updater_GetUpdateMenuLabel() {
 	State := Updater_GetUpdateState()
 	if (State == "checking")
 		return t("menu.about.update_checking")
+	if (State == "downloading")
+		return t("menu.about.update_downloading")
 	if (State == "available") {
 		global UPDATER_LATEST_RELEASE
 		Tag := UPDATER_LATEST_RELEASE.HasProp("Tag") ? UPDATER_LATEST_RELEASE.Tag : ""
@@ -813,7 +819,7 @@ Updater_OneClickUpdate(*) {
 	if Updater_IsLocalSource()
 		return
 	State := Updater_GetUpdateState()
-	if (State == "checking")
+	if (State == "checking" or State == "downloading")
 		return
 
 	; Fast path: update already cached by background poller — install straight away.
@@ -829,7 +835,12 @@ Updater_OneClickUpdate(*) {
 
 	Current := Updater_CurrentVersion()
 	try LoggerStart("Updater", "One-click update check (channel: {1}, current: {2})…", UPDATER_CHANNEL, Current)
-	Json := Updater_FetchLatestJson(UPDATER_CHANNEL)
+	
+	_Updater_FetchLatestJsonAsync(UPDATER_CHANNEL, (Json) => _Updater_OneClickUpdateCallback(Json, Current))
+}
+
+_Updater_OneClickUpdateCallback(Json, Current) {
+	global UPDATER_LATEST_RELEASE, _UpdaterCheckInProgress
 	_UpdaterCheckInProgress := false
 
 	if (Json == "") {
@@ -1498,8 +1509,6 @@ Updater_DownloadAndInstall(Release) {
 		return
 	}
 
-	; Staging dir lives under LOCALAPPDATA so the swap survives reboots and
-	; the user does not need write access to the EXE's directory.
 	LocalAppData := EnvGet("LOCALAPPDATA")
 	if (LocalAppData == "") {
 		try LocalAppData := A_LocalAppData
@@ -1517,23 +1526,63 @@ Updater_DownloadAndInstall(Release) {
 		if FileExist(NewExe)
 			FileDelete(NewExe)
 	}
-
 	try LoggerStart("Updater", "Downloading update '{1}' from {2}…", Release.Tag, AssetUrl)
+	
+	global _UpdaterDownloadInProgress
+	_UpdaterDownloadInProgress := true
+	try SetTimer((*) => initMenu(), -50)
+	
 	try {
 		Req := ComObject("WinHttp.WinHttpRequest.5.1")
-		Req.Open("GET", AssetUrl, false)
+		Req.Open("GET", AssetUrl, true)  ; async mode
 		Req.SetRequestHeader("User-Agent", "ErgoptiPlus-Updater/1.0")
-		; Always-finite timeouts — even this user-initiated download must not
-		; hang the main thread forever on a stalled resolve/connect or a CDN
-		; that goes silent mid-transfer. See the constants at the top of the file.
 		Req.SetTimeouts(UPDATER_HTTP_RESOLVE_TIMEOUT_MS, UPDATER_HTTP_CONNECT_TIMEOUT_MS,
 			UPDATER_HTTP_SEND_TIMEOUT_MS, UPDATER_HTTP_RECEIVE_TIMEOUT_MS)
 		Req.Send()
-		if (Req.Status != 200) {
-			try LoggerError("Updater", "Asset download returned HTTP {1}.", Req.Status)
-			MsgBox(t("updater.install_error_download"), t("updater.title_update"), "Icon!")
+	} catch as Err {
+		_UpdaterDownloadInProgress := false
+		try SetTimer((*) => initMenu(), -50)
+		try LoggerError("Updater", "Asset download dispatch failed: {1}.", Err.Message)
+		MsgBox(t("updater.install_error_download"), t("updater.title_update"), "Icon!")
+		return
+	}
+	
+	_Updater_PollDownloadAsync(Req, NewExe, SwapBat, CurrentExe, Release.Tag)
+}
+
+_Updater_PollDownloadAsync(Req, NewExe, SwapBat, CurrentExe, Tag, Polls := 0) {
+	global _UpdaterDownloadInProgress, UPDATER_ASYNC_POLL_MS
+	; Give the download up to 120 seconds to complete
+	MaxPolls := 120000 / UPDATER_ASYNC_POLL_MS
+	ready := false
+	failed := false
+	try {
+		ready := Req.WaitForResponse(0)
+	} catch as Err {
+		failed := true
+		try LoggerDebug("Updater", "Async download failed: {1}.", Err.Message)
+	}
+	if (!failed and !ready) {
+		Polls += 1
+		if (Polls > MaxPolls) {
+			failed := true
+			try LoggerWarn("Updater", "Async download exceeded its poll budget — aborting.")
+		} else {
+			SetTimer(() => _Updater_PollDownloadAsync(Req, NewExe, SwapBat, CurrentExe, Tag, Polls), -UPDATER_ASYNC_POLL_MS)
 			return
 		}
+	}
+	
+	_UpdaterDownloadInProgress := false
+	try SetTimer((*) => initMenu(), -50)
+	
+	if (failed or Req.Status != 200) {
+		try LoggerError("Updater", "Asset download returned HTTP {1}.", failed ? "FAIL" : Req.Status)
+		MsgBox(t("updater.install_error_download"), t("updater.title_update"), "Icon!")
+		return
+	}
+	
+	try {
 		Stream := ComObject("ADODB.Stream")
 		Stream.Type := 1     ; adTypeBinary
 		Stream.Open()
