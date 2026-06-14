@@ -130,7 +130,7 @@ KL_AV_PollVolume() {
         ; PowerShell's Get-AudioDevice equivalent. We query the default
         ; multimedia render device.
         vol   := KL_AV_GetMasterVolume()
-        muted := KL_AV_GetMasterMuted()
+        muted := KL_AV_GetMasterMuted(vol)
     }
     if (vol < 0)
         return
@@ -176,10 +176,10 @@ KL_AV_GetMasterVolume() {
     return vol
 }
 
-KL_AV_GetMasterMuted() {
-    ; No lightweight native path — default to 0 (not muted) so the mute
-    ; transition is surfaced at least when the volume drops to 0.
-    vol := KL_AV_GetMasterVolume()
+KL_AV_GetMasterMuted(vol) {
+    ; No lightweight native path — use a heuristic based on the volume level
+    ; rather than invoking the heavier IAudioEndpointVolume COM path. 
+    ; Treats volume <= 1% as muted so the transition is surfaced.
     return (vol <= 0.01) ? 1 : 0
 }
 
