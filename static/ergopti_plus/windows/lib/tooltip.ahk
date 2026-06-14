@@ -641,10 +641,19 @@ _TooltipSuspendSurfaces() {
 }
 
 ; Show content + border together after PREPARE completed while hidden.
+; The content is a normal Gui (background + text controls); the border is a
+; separate pre-painted layered window. ShowWindow only QUEUES a WM_PAINT for the
+; content, so if the message queue is busy the border (already painted via
+; UpdateLayeredWindow) can appear for up to a few hundred ms over a still-blank
+; content window — the "border alone without background" flash. UpdateWindow
+; flushes the content's paint SYNCHRONOUSLY (it bypasses the queue), so the
+; background+text are on screen BEFORE the border is revealed and the two surfaces
+; appear as one. This keeps the two-window design but removes the visible seam.
 _TooltipRevealSurfaces() {
     global _TooltipBorderGui, _TooltipRowGuis
     if (_TooltipRowGuis.Length > 0) {
         try DllCall("User32\ShowWindow", "Ptr", _TooltipRowGuis[1].Gui.Hwnd, "Int", 4)
+        try DllCall("User32\UpdateWindow", "Ptr", _TooltipRowGuis[1].Gui.Hwnd)
     }
     if _TooltipBorderGui {
         GR_Show(_TooltipBorderGui.Hwnd)
