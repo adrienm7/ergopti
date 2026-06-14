@@ -95,6 +95,7 @@ global LOGGER_RING_CURSOR := 0
 ; cannot swallow the diagnostic line.
 global LOGGER_FLUSH_INTERVAL_MS := 500
 global _LOGGER_PENDING := []
+global _LOGGER_PENDING_ERRORS := []
 global _LOGGER_FLUSH_TIMER_STARTED := False
 
 ; Sub-file fan-out: each entry maps a filename suffix to a list of tag substrings.
@@ -186,35 +187,50 @@ LoggerInit() {
 ; so a subsequent hard crash (OS kill, power loss) cannot swallow the entry
 ; sitting in the stdlib buffer — ``FileAppend`` provides no flush guarantee.
 _LoggerFlush(ForceFlush := false) {
-    global _LOGGER_PENDING, LOGGER_LOG_PATH
-    if _LOGGER_PENDING.Length == 0 {
-        return
-    }
-    if LOGGER_LOG_PATH == "" {
-        ; No path resolved — drop the queue to avoid unbounded growth.
-        _LOGGER_PENDING := []
-        return
-    }
-    ; Swap-and-clear so a concurrent emit lands in a fresh queue while we
-    ; write. AHK v2 is single-threaded for our purposes but timers and hotkey
-    ; callbacks can interleave at well-defined points.
-    Pending := _LOGGER_PENDING
-    _LOGGER_PENDING := []
-    Blob := ""
-    for _, Line in Pending {
-        Blob .= Line . "`r`n"
-    }
-    if ForceFlush {
-        try {
-            f := FileOpen(LOGGER_LOG_PATH, "a", "UTF-8")
-            if f {
-                f.Write(Blob)
-                f.Close()  ; Close forces a flush of the underlying buffer.
-            }
-        }
-        return
-    }
-    try FileAppend(Blob, LOGGER_LOG_PATH, "UTF-8")
+	global _LOGGER_PENDING, _LOGGER_PENDING_ERRORS, LOGGER_LOG_PATH, LOGGER_ERRORS_LOG_PATH
+	
+	Pending := _LOGGER_PENDING
+	_LOGGER_PENDING := []
+	PendingErr := _LOGGER_PENDING_ERRORS
+	_LOGGER_PENDING_ERRORS := []
+	
+	Blob := ""
+	for _, Line in Pending {
+		Blob .= Line . "`r`n"
+	}
+	
+	BlobErr := ""
+	for _, Line in PendingErr {
+		BlobErr .= Line . "`r`n"
+	}
+
+	if (LOGGER_LOG_PATH != "" and Blob != "") {
+		if ForceFlush {
+			try {
+				f := FileOpen(LOGGER_LOG_PATH, "a", "UTF-8")
+				if f {
+					f.Write(Blob)
+					f.Close()  ; Close forces a flush of the underlying buffer.
+				}
+			}
+		} else {
+			try FileAppend(Blob, LOGGER_LOG_PATH, "UTF-8")
+		}
+	}
+	
+	if (LOGGER_ERRORS_LOG_PATH != "" and BlobErr != "") {
+		if ForceFlush {
+			try {
+				f := FileOpen(LOGGER_ERRORS_LOG_PATH, "a", "UTF-8")
+				if f {
+					f.Write(BlobErr)
+					f.Close()
+				}
+			}
+		} else {
+			try FileAppend(BlobErr, LOGGER_ERRORS_LOG_PATH, "UTF-8")
+		}
+	}
 }
 
 _LoggerOnExitFlush(ExitReason, ExitCode) {
@@ -424,32 +440,21 @@ _LoggerEmit(Level, Tag, Msg, Args*) {
     if _LOGGER_TEST_SINK != 0 {
         try _LOGGER_TEST_SINK(Line)
     }
-    if LOGGER_LOG_PATH != "" {
-        _LOGGER_PENDING.Push(Line)
-        ; Force a synchronous, file-handle-closed flush for diagnostics that
-        ; must survive a subsequent crash — WARNING and ERROR only. Other
-        ; levels can tolerate the ~500 ms worst-case flush latency through
-        ; the buffered ``FileAppend`` path.
-        if LOGGER_SEVERITY[Level] >= LOGGER_SEVERITY["WARNING"] {
-            _LoggerFlush(true)
-        }
-    }
-    if LOGGER_SEVERITY[Level] >= LOGGER_SEVERITY["WARNING"] {
-        ; Dedicated errors-only file (WARNING + ERROR). Written synchronously
-        ; so the line survives even if the process dies shortly after.
-        ; This gives a small, focused file for quick triage without the
-        ; noise of the full daily unified log.
-        if LOGGER_ERRORS_LOG_PATH != "" {
-            try {
-                f := FileOpen(LOGGER_ERRORS_LOG_PATH, "a", "UTF-8")
-                if f {
-                    f.Write(Line . "`r`n")
-                    f.Close()
-                }
-            }
-        }
-    }
-    _LoggerFanOut(Tag, Line)
+	if LOGGER_LOG_PATH != "" {
+		_LOGGER_PENDING.Push(Line)
+		if LOGGER_SEVERITY[Level] >= LOGGER_SEVERITY["WARNING"] {
+			global _LOGGER_PENDING_ERRORS
+			_LOGGER_PENDING_ERRORS.Push(Line)
+		}
+		
+		; Force a synchronous, file-handle-closed flush for diagnostics that
+		; must survive a subsequent crash — ERROR only. Other levels can tolerate 
+		; the ~500 ms worst-case flush latency through the buffered FileAppend path.
+		if LOGGER_SEVERITY[Level] >= LOGGER_SEVERITY["ERROR"] {
+			_LoggerFlush(true)
+		}
+	}
+	_LoggerFanOut(Tag, Line)
 }
 
 ; Resolves absolute paths for every sub-file and deletes any stale sub-file
