@@ -192,6 +192,8 @@ _JsonParseString(&text, &pos) {
 				case "u":
 					; Standard JSON \uXXXX escape — decode to a single code unit.
 					hex := SubStr(text, pos, 4)
+					if !RegExMatch(hex, "^[0-9A-Fa-f]{4}$")
+						throw Error("JSON: invalid \u escape at position " . pos . ".", -1)
 					pos += 4
 					out .= Chr("0x" . hex)
 				default:
