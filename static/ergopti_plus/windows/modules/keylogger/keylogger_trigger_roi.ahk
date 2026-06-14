@@ -223,6 +223,10 @@ KL_Roi_ProcessWord(word) {
 KL_Roi_HalflifeTick() {
 	if !KL_Roi_RequireInit("KL_Roi_HalflifeTick")
 		return
+	; SetTimer bypasses Suspend — skip the iteration and KL_AppendLog call
+	; while paused so the keylogger emits nothing to disk during a pause session.
+	if A_IsSuspended
+		return
     ; We rely on the in-memory trigger_last_use map which only contains
     ; triggers seen THIS session. A full historical analysis would require
     ; querying data.sql; that is deferred to the dashboard SQL layer.
