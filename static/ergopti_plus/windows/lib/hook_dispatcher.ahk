@@ -192,6 +192,7 @@ class HookDispatcher {
 	; @param event_type {String} The event type to dispatch.
 	; @param args* Variadic — forwarded as-is to each subscriber.
 	static Dispatch(event_type, args*) {
+		static _err_cache := Map()
 		; Native Suspend only disarms hotkeys/hotstrings — this InputHook fan-out
 		; keeps firing while paused, driving the LLM bridge and keylogger. Gate the
 		; whole shared pipeline here so « pause = tout éteint » in one place.
@@ -200,7 +201,16 @@ class HookDispatcher {
 		if !HookDispatcher._subscribers.Has(event_type)
 			return
 		for cb in HookDispatcher._subscribers[event_type] {
-			try cb(args*)
+			try {
+				cb(args*)
+			} catch as e {
+				sig := event_type . ":" . e.Message
+				now := A_TickCount
+				if (!_err_cache.Has(sig) || now - _err_cache[sig] > 60000) {
+					_err_cache[sig] := now
+					try LoggerWarn("HookDispatcher", "Subscriber for '{1}' threw: {2}.", event_type, e.Message)
+				}
+			}
 		}
 	}
 
