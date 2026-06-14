@@ -341,23 +341,39 @@ HotstringsCacheEnsure() {
 		Rows.Count, Fast ? "fast" : "rebuilt")
 }
 
-; Register every cached hotstring of one section. Reproduces the old generated
+; Register cached hotstrings of one section. Reproduces the old generated
 ; _GenRegisterRows 1:1: per-row opts (TimeActivationSeconds from FeatureConfig,
 ; FinalResult, IsRepeat, Category, Section, optional OnlyText), ★ substituted at
 ; register time, and the CreateHotstring vs CreateCaseSensitiveHotstrings choice.
 ; Bound by key into _GENERATED_HOTSTRINGS and invoked from LoadHotstringsSection.
-_HsCacheRegisterSection(LoaderKey, FeatureConfig, ExtraOptions) {
+;
+; StartIdx/MaxCount carve out a contiguous row slice so the post-boot deferred
+; pass can register a heavy section (emoji/symbol, ~3000 rows) in small chunks,
+; yielding to the keystroke InputHook between chunks instead of freezing it for
+; the whole ~680 ms registration. The default StartIdx=1, MaxCount=0 registers
+; the entire section in one pass — the contract every other caller (boot
+; fast-path, live rebuild) relies on. Returns the number of rows registered so a
+; chunked driver can detect when a section is exhausted.
+_HsCacheRegisterSection(LoaderKey, FeatureConfig, ExtraOptions, StartIdx := 1, MaxCount := 0) {
 	global _HS_CACHE_ROWS, ScriptInformation, HS_CACHE_MARKER
 	if !_HS_CACHE_ROWS.Has(LoaderKey)
-		return
+		return 0
 	RowList := _HS_CACHE_ROWS[LoaderKey]
+	Total := RowList.Length
+	if (StartIdx < 1)
+		StartIdx := 1
+	if (StartIdx > Total)
+		return 0
+	EndIdx := (MaxCount > 0) ? Min(StartIdx + MaxCount - 1, Total) : Total
 	Parts := StrSplit(LoaderKey, ".",, 2)
 	Category := Parts[1]
 	Section := Parts.Length >= 2 ? Parts[2] : ""
 	TimeAct := FeatureConfig.HasOwnProp("TimeActivationSeconds") ? FeatureConfig.TimeActivationSeconds : 0
 	MagicKey := ScriptInformation["MagicKey"]
 	HasOnlyText := IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText")
-	for Row in RowList {
+	Idx := StartIdx
+	while (Idx <= EndIdx) {
+		Row := RowList[Idx]
 		Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", Row[4], "IsRepeat", Row[5],
 			"Category", Category, "Section", Section)
 		if HasOnlyText
@@ -367,5 +383,7 @@ _HsCacheRegisterSection(LoaderKey, FeatureConfig, ExtraOptions) {
 			CreateHotstring(Row[1], Trigger, Row[3], Opts)
 		else
 			CreateCaseSensitiveHotstrings(Row[1], Trigger, Row[3], Opts)
+		Idx += 1
 	}
+	return EndIdx - StartIdx + 1
 }
