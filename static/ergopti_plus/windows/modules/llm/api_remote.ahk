@@ -162,13 +162,21 @@ LLM_RemoteCancelAsync(req_id) {
     global _LLM_Remote_Async
     if !_LLM_Remote_Async.Has(req_id)
         return
-    _LLM_Remote_Async[req_id]["cancelled"] := true
+    entry := _LLM_Remote_Async[req_id]
+    entry["cancelled"] := true
+    ; Abort the live WinHTTP request immediately so it does not keep
+    ; consuming network bandwidth and the message pump stays responsive.
+    try entry["http"].Abort()
 }
 
 LLM_RemoteCancelAllAsync() {
     global _LLM_Remote_Async
-    for _id, entry in _LLM_Remote_Async
+    for _id, entry in _LLM_Remote_Async {
         entry["cancelled"] := true
+        ; Abort each live request so the WinHTTP threads are released now
+        ; rather than waiting for each poll loop's next WaitForResponse(0).
+        try entry["http"].Abort()
+    }
 }
 
 _LLMRemote_PollRequest(req_id) {
