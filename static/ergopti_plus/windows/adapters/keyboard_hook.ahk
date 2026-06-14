@@ -37,6 +37,13 @@ global _KH_ON_KEY        := 0
 global _KH_INTERCEPT     := false
 ; Whether this adapter's subscribers are currently registered with HookDispatcher.
 global _KH_RUNNING       := false
+; Bound dispatch callbacks — created ONCE (lazily, on first KHStart) and reused
+; for both Register and Unregister. HookDispatcher matches subscribers by object
+; identity (==), so a fresh _KH_DispatchChar.Bind() at KHStop is a different object
+; than the one registered at KHStart — Unregister would never match and the
+; subscriber would leak (KHStop a no-op → adapter keeps dispatching after stop).
+global _KH_CB_CHAR       := 0
+global _KH_CB_KEY        := 0
 
 
 
@@ -52,7 +59,7 @@ global _KH_RUNNING       := false
 ; creating a separate InputHook, so the process keeps a single shared hook.
 ; @param Opts {Map|0} { intercept?: bool, onChar?: Func, onKey?: Func }
 KHStart(Opts) {
-	global _KH_RUNNING, _KH_ON_CHAR, _KH_ON_KEY, _KH_INTERCEPT
+	global _KH_RUNNING, _KH_ON_CHAR, _KH_ON_KEY, _KH_INTERCEPT, _KH_CB_CHAR, _KH_CB_KEY
 	if _KH_RUNNING
 		return
 	if (Opts is Map) {
@@ -64,9 +71,14 @@ KHStart(Opts) {
 			_KH_INTERCEPT := Opts["intercept"] == true
 	}
 	KHRefreshContext()
-	; Register with the central dispatcher — no separate InputHook needed
-	HookDispatcher.Register(HookDispatcherConst.EVT_KB_CHAR, _KH_DispatchChar.Bind())
-	HookDispatcher.Register(HookDispatcherConst.EVT_KB_DOWN, _KH_DispatchKey.Bind())
+	; Register with the central dispatcher — no separate InputHook needed.
+	; Bind once and cache so KHStop can Unregister the SAME object (identity match).
+	if _KH_CB_CHAR = 0
+		_KH_CB_CHAR := _KH_DispatchChar.Bind()
+	if _KH_CB_KEY = 0
+		_KH_CB_KEY := _KH_DispatchKey.Bind()
+	HookDispatcher.Register(HookDispatcherConst.EVT_KB_CHAR, _KH_CB_CHAR)
+	HookDispatcher.Register(HookDispatcherConst.EVT_KB_DOWN, _KH_CB_KEY)
 	_KH_RUNNING := true
 }
 
@@ -74,11 +86,14 @@ KHStart(Opts) {
 ; Unregisters this adapter's subscribers from HookDispatcher; the shared
 ; InputHook itself keeps running for other subscribers.
 KHStop() {
-	global _KH_RUNNING
+	global _KH_RUNNING, _KH_CB_CHAR, _KH_CB_KEY
 	if !_KH_RUNNING
 		return
-	HookDispatcher.Unregister(HookDispatcherConst.EVT_KB_CHAR, _KH_DispatchChar.Bind())
-	HookDispatcher.Unregister(HookDispatcherConst.EVT_KB_DOWN, _KH_DispatchKey.Bind())
+	; Unregister the SAME cached BoundFunc objects registered in KHStart.
+	if _KH_CB_CHAR != 0
+		HookDispatcher.Unregister(HookDispatcherConst.EVT_KB_CHAR, _KH_CB_CHAR)
+	if _KH_CB_KEY != 0
+		HookDispatcher.Unregister(HookDispatcherConst.EVT_KB_DOWN, _KH_CB_KEY)
 	_KH_RUNNING := false
 }
 
