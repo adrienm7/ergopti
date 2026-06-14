@@ -1344,30 +1344,35 @@ GestureScreenshotRegion(Mode) {
     }
     Path := GestureScreenshotPath()
     LoggerStart("gestures", "Region screenshot to disk — opening Snip & Sketch…")
+    OldClip := ClipboardAll()
     A_Clipboard := ""
-    SendEvent("#+s")
-    ; Wait up to 30 s for the user to finish their selection
-    if !ClipWait(30, 2) {
-        LoggerWarn("gestures", "Region screenshot: no image captured (timeout or cancel).")
-        return
-    }
-    ; Save the clipboard PNG to disk via PowerShell
-    EscapedPath := StrReplace(Path, "'", "''")
-    PSScript :=
-        "Add-Type -AssemblyName System.Windows.Forms;" .
-        "Add-Type -AssemblyName System.Drawing;" .
-        "$img = [System.Windows.Forms.Clipboard]::GetImage();" .
-        "if ($img) { $img.Save('" . EscapedPath . "', [System.Drawing.Imaging.ImageFormat]::Png) }"
     try {
-        RunWait('powershell.exe -NoProfile -Sta -WindowStyle Hidden -Command "' . PSScript . '"', , "Hide")
-        if FileExist(Path) {
-            LoggerSuccess("gestures", "Region screenshot saved: '{1}'.", Path)
-            TrayTip(t("notify.screenshot_saved"), Path, "Iconi Mute")
-        } else {
-            LoggerWarn("gestures", "Region screenshot: clipboard image was not saved.")
+        SendEvent("#+s")
+        ; Wait up to 30 s for the user to finish their selection
+        if !ClipWait(30, 2) {
+            LoggerWarn("gestures", "Region screenshot: no image captured (timeout or cancel).")
+            return
         }
-    } catch as e {
-        LoggerError("gestures", "Region screenshot save failed: {1}.", e.Message)
+        ; Save the clipboard PNG to disk via PowerShell
+        EscapedPath := StrReplace(Path, "'", "''")
+        PSScript :=
+            "Add-Type -AssemblyName System.Windows.Forms;" .
+            "Add-Type -AssemblyName System.Drawing;" .
+            "$img = [System.Windows.Forms.Clipboard]::GetImage();" .
+            "if ($img) { $img.Save('" . EscapedPath . "', [System.Drawing.Imaging.ImageFormat]::Png) }"
+        try {
+            RunWait('powershell.exe -NoProfile -Sta -WindowStyle Hidden -Command "' . PSScript . '"', , "Hide")
+            if FileExist(Path) {
+                LoggerSuccess("gestures", "Region screenshot saved: '{1}'.", Path)
+                TrayTip(t("notify.screenshot_saved"), Path, "Iconi Mute")
+            } else {
+                LoggerWarn("gestures", "Region screenshot: clipboard image was not saved.")
+            }
+        } catch as e {
+            LoggerError("gestures", "Region screenshot save failed: {1}.", e.Message)
+        }
+    } finally {
+        A_Clipboard := OldClip
     }
 }
 
