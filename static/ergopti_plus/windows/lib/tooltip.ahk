@@ -1023,6 +1023,66 @@ _TooltipApplyStackedCorners() {
         DllCall("User32\SetWindowRgn", "Ptr", G.Hwnd, "Ptr", Rgn, "Int", 1)
 }
 
+; Rewrite every pixel GDI painted into the 32-bpp DIB to the premultiplied border
+; color. GDI RoundRect writes opaque white (alpha byte 0); the layered window needs
+; premultiplied alpha, so each painted pixel must be overwritten. The outline is a
+; 1 px rounded rect, so the ONLY painted pixels are:
+;   - the two horizontal straight edges (rows y=0 and y=Hp-1), spanning the width;
+;   - the corner arcs, confined to the left/right corner-column zones of the rows
+;     within Diam of the top or bottom edge;
+;   - the two vertical straight edges (columns x=0 and x=Wp-1) on the middle rows.
+; Every other pixel is transparent. Scanning only those zones keeps the cost at
+; ~2*Wp + 4*Diam^2 instead of the former 2*Diam*Wp full-band scan — the win is
+; largest for the short 1-2 row preview tooltips, where the corner band spans
+; almost the entire height and the old scan re-read the transparent interior of
+; nearly every row (the BorderPixelLoop hot-path warnings clustered there).
+; Correctness is pinned by test_tooltip_border_alpha.ahk, which compares this
+; against a full O(Wp*Hp) reference scan over real GDI RoundRect output.
+; @param PixPtr {Ptr} Base pointer of the top-down 32-bpp BGRA DIB.
+; @param Wp {Integer} Bitmap width in physical pixels.
+; @param Hp {Integer} Bitmap height in physical pixels.
+; @param Diam {Integer} Corner diameter passed to RoundRect (0 = square corners).
+; @param PremulPx {Integer} Premultiplied BGRA value to write into painted pixels.
+_TooltipFixBorderAlpha(PixPtr, Wp, Hp, Diam, PremulPx) {
+    if (Wp <= 0 or Hp <= 0)
+        return
+    BandRows := Min(Diam, Hp)
+    CornerCols := Min(Diam, Wp)
+    RightZoneStart := Wp - CornerCols   ; first column of the right corner zone
+    LastColOff := (Wp - 1) * 4
+    loop Hp {
+        RowY := A_Index - 1
+        RowBase := RowY * Wp * 4
+        if (RowY == 0 or RowY == Hp - 1) {
+            ; Horizontal straight edge — the painted run spans the full width.
+            loop Wp {
+                Offset := RowBase + (A_Index - 1) * 4
+                if (NumGet(PixPtr, Offset, "UInt") != 0)
+                    NumPut("UInt", PremulPx, PixPtr, Offset)
+            }
+        } else if (RowY < BandRows or RowY >= Hp - BandRows) {
+            ; Corner-arc row — only the left and right corner column zones can
+            ; carry painted pixels (the zones overlap harmlessly when Wp <= 2*Diam).
+            loop CornerCols {
+                Off := RowBase + (A_Index - 1) * 4
+                if (NumGet(PixPtr, Off, "UInt") != 0)
+                    NumPut("UInt", PremulPx, PixPtr, Off)
+            }
+            loop CornerCols {
+                Off := RowBase + (RightZoneStart + A_Index - 1) * 4
+                if (NumGet(PixPtr, Off, "UInt") != 0)
+                    NumPut("UInt", PremulPx, PixPtr, Off)
+            }
+        } else {
+            ; Middle row — only the two vertical edge columns.
+            if (NumGet(PixPtr, RowBase, "UInt") != 0)
+                NumPut("UInt", PremulPx, PixPtr, RowBase)
+            if (NumGet(PixPtr, RowBase + LastColOff, "UInt") != 0)
+                NumPut("UInt", PremulPx, PixPtr, RowBase + LastColOff)
+        }
+    }
+}
+
 ; Show a 1 px semi-transparent border ring that exactly overlays the tooltip.
 ; Strategy: create a WS_EX_LAYERED window and call UpdateLayeredWindow with a
 ; 32-bpp pre-multiplied-alpha DIB.  The DIB is painted via GDI RoundRect (which
@@ -1102,32 +1162,7 @@ _TooltipShowBorder(X, Y, W, H, Reveal := true) {
     AlphaByte := Round(_TOOLTIP_BORDER_ALPHA * 255)
     PremulPx := (AlphaByte << 24) | (AlphaByte << 16) | (AlphaByte << 8) | AlphaByte
     _hpPix := HotPath_Now()
-    ; The border is a 1 px rounded-rect OUTLINE: only the top/bottom corner bands
-    ; (rows within Diam of an edge — horizontal edges + corner arcs) and the left/
-    ; right edge columns of the middle rows can carry painted pixels; the interior
-    ; is fully transparent. Scanning only those bands turns this from O(Wp*Hp) into
-    ; O(Wp*Diam + Hp), which matters most for wide tooltips where the full scan
-    ; reached ~20 ms. Diam (the corner diameter) is a conservative band height —
-    ; the arc only reaches down by the radius (Diam/2), so it always covers every
-    ; painted corner pixel.
-    BandRows := Min(Diam, Hp)
-    LastColOff := (Wp - 1) * 4
-    loop Hp {
-        RowY := A_Index - 1
-        RowBase := RowY * Wp * 4
-        if (RowY < BandRows or RowY >= Hp - BandRows) {
-            loop Wp {
-                Offset := RowBase + (A_Index - 1) * 4
-                if (NumGet(PixPtr, Offset, "UInt") != 0)
-                    NumPut("UInt", PremulPx, PixPtr, Offset)
-            }
-        } else {
-            if (NumGet(PixPtr, RowBase, "UInt") != 0)
-                NumPut("UInt", PremulPx, PixPtr, RowBase)
-            if (NumGet(PixPtr, RowBase + LastColOff, "UInt") != 0)
-                NumPut("UInt", PremulPx, PixPtr, RowBase + LastColOff)
-        }
-    }
+    _TooltipFixBorderAlpha(PixPtr, Wp, Hp, Diam, PremulPx)
     HotPath_LogIfSlow("Tooltip.BorderPixelLoop", _hpPix, TotalPx . " px")
 
     ; ── Create the layered window ─────────────────────────────────────────────
