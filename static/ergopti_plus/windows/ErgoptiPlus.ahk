@@ -2010,6 +2010,7 @@ Ergopti_OnSuspendEnter() {
     ; Cancel the Ollama warm-up retry timer so it does not make background HTTP
     ; calls while the driver is paused ("pause = tout éteint" invariant).
     try LLM_OllamaCancelWarmupRetry()
+    try StopActivitySimulation()
 }
 Ergopti_OnSuspendResume() {
     if IsSet(_ResetPrefixBuffer)
