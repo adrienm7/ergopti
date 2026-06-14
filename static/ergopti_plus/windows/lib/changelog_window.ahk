@@ -286,6 +286,8 @@ _CLW_FetchAndInject(Channel) {
 
 _CLW_DoFetch(Channel) {
 	global UPDATER_GH_OWNER, UPDATER_GH_REPO
+	global UPDATER_HTTP_RESOLVE_TIMEOUT_MS, UPDATER_HTTP_CONNECT_TIMEOUT_MS
+	global UPDATER_HTTP_SEND_TIMEOUT_MS, UPDATER_HTTP_RECEIVE_TIMEOUT_MS
 
 	try LoggerTrace("Changelog", "Fetching releases (channel={1})…", Channel)
 
@@ -297,7 +299,11 @@ _CLW_DoFetch(Channel) {
 		Req.Open("GET", Url, false)
 		Req.SetRequestHeader("Accept", "application/vnd.github+json")
 		Req.SetRequestHeader("User-Agent", "ErgoptiPlus-Changelog/1.0")
-		Req.SetTimeouts(0, 10000, 20000, 20000)
+		; Resolve timeout was 0 (infinite) — on a captive network this would stall
+		; the timer thread indefinitely, blocking all subsequent timer callbacks.
+		; Reuse the shared updater constants so all network calls have the same budget.
+		Req.SetTimeouts(UPDATER_HTTP_RESOLVE_TIMEOUT_MS, UPDATER_HTTP_CONNECT_TIMEOUT_MS,
+			UPDATER_HTTP_SEND_TIMEOUT_MS, UPDATER_HTTP_RECEIVE_TIMEOUT_MS)
 		Req.Send()
 		if (Req.Status == 200)
 			Json := Req.ResponseText
