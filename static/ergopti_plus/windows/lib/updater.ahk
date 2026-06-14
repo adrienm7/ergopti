@@ -53,6 +53,11 @@ global UPDATER_HTTP_CONNECT_TIMEOUT_MS := 15000    ; TCP connect
 global UPDATER_HTTP_SEND_TIMEOUT_MS    := 30000    ; request send
 global UPDATER_HTTP_RECEIVE_TIMEOUT_MS := 30000    ; response receive
 
+; Floor for the downloaded exe size (512 KB). A real ErgoptiPlus binary is
+; several MB; anything below this is certainly a partial download or a CDN
+; error page and must not be swapped in as the production exe.
+global UPDATER_MIN_EXE_SIZE_BYTES := 524288
+
 ; In-flight async background-check requests, keyed by an incrementing id. Each
 ; value is a Map("http", req, "channel", ch, "on_json", cb, "url", u, "polls", n).
 ; The background poller dispatches through here so its network round-trip runs
@@ -1542,6 +1547,30 @@ Updater_DownloadAndInstall(Release) {
 	}
 	if !FileExist(NewExe) {
 		try LoggerError("Updater", "Download completed but file missing at '{1}'.", NewExe)
+		MsgBox(t("updater.install_error_download"), t("updater.title_update"), "Icon!")
+		return
+	}
+	; Partial-download guard: compare Content-Length to the actual saved size.
+	; A CDN truncation, network timeout, or error-page response would leave a
+	; file too small to be a valid exe. If sizes disagree, delete the partial
+	; file and abort — never swap a corrupted download into the production path.
+	ActualSize := 0
+	try ActualSize := FileGetSize(NewExe)
+	ContentLength := 0
+	try ContentLength := Integer(Req.GetResponseHeader("Content-Length"))
+	if (ContentLength > 0 and ActualSize != ContentLength) {
+		try LoggerError("Updater",
+			"Partial-download detected: Content-Length={1}, file={2} bytes — aborting.",
+			ContentLength, ActualSize)
+		try FileDelete(NewExe)
+		MsgBox(t("updater.install_error_download"), t("updater.title_update"), "Icon!")
+		return
+	}
+	if (ActualSize < UPDATER_MIN_EXE_SIZE_BYTES) {
+		try LoggerError("Updater",
+			"Downloaded file too small ({1} bytes < {2} minimum) — likely an error page, aborting.",
+			ActualSize, UPDATER_MIN_EXE_SIZE_BYTES)
+		try FileDelete(NewExe)
 		MsgBox(t("updater.install_error_download"), t("updater.title_update"), "Icon!")
 		return
 	}
