@@ -189,6 +189,8 @@ KL_Watchers_OnKeystroke() {
 ; only producer for idle_start and the in-time path for session_end —
 ; the keystroke producer above only handles retroactive session_end.
 KL_Watchers_IdleTick() {
+    if A_IsSuspended
+        return
     if !Keylogger.initialized
         return
     if !KLHook.HasOwnProp("last_tick") || KLHook.last_tick = 0
@@ -283,6 +285,8 @@ KL_Watchers_DetectShortcut(vk) {
 ; (WTS_SESSION_LOCK / UNLOCK among others). lParam is the session id,
 ; ignored here because we only registered for THIS session.
 KL_Watchers_OnSessionChange(wParam, lParam, msg, hwnd) {
+    if A_IsSuspended
+        return
     if (wParam = KLWatchConst.WTS_SESSION_LOCK) {
         try KL_LogSystemEvent("lock")
     } else if (wParam = KLWatchConst.WTS_SESSION_UNLOCK) {
@@ -296,6 +300,8 @@ KL_Watchers_OnSessionChange(wParam, lParam, msg, hwnd) {
 ; explicitly wakes the machine. Both translate to "wake" for our
 ; metrics purposes.
 KL_Watchers_OnPowerBroadcast(wParam, lParam, msg, hwnd) {
+    if A_IsSuspended
+        return
     if (wParam = KLWatchConst.PBT_APMSUSPEND) {
         try KL_LogSystemEvent("sleep")
     } else if (wParam = KLWatchConst.PBT_APMRESUMESUSPEND
