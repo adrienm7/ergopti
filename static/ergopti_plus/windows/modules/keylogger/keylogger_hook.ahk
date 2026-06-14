@@ -246,10 +246,14 @@ KL_Hook_OnChar(ih, c) {
 
     Keylogger.buffer_events.Push([c, delay, meta])
     Keylogger.buffer_text .= c
-    try KL_Ergo_OnKeystroke(delay, KLHook.last_vk)
-    try KL_Roi_OnChar(c)
-    ; Feed the real-time WPM widget with each accepted manual keystroke.
-    try WPMWidget_Push(false, false)
+    if !Keylogger.synth_active {
+        try KL_Ergo_OnKeystroke(delay, KLHook.last_vk)
+        try KL_Roi_OnChar(c)
+        ; Feed the real-time WPM widget with each accepted manual keystroke.
+        try WPMWidget_Push(false, false)
+    } else {
+        KLHook.last_tick := 0
+    }
 }
 
 KL_Hook_OnKeyDown(ih, vk, sc) {
@@ -315,7 +319,11 @@ KL_Hook_OnKeyDown(ih, vk, sc) {
     }
 
     Keylogger.buffer_events.Push([bracket, delay, meta])
-    try KL_Ergo_OnKeystroke(delay, vk, vk = 0x08)
+    if !Keylogger.synth_active {
+        try KL_Ergo_OnKeystroke(delay, vk, vk = 0x08)
+    } else {
+        KLHook.last_tick := 0
+    }
 
     ; Mirror text-buffer mutations the user just performed so the
     ; flush's ``buffer_text`` stays meaningful for downstream display.
