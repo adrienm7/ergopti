@@ -31,10 +31,24 @@
 ; =====================================
 ; =======================================
 
+global _Spotlight_State := Map(
+	"Active", false,
+	"StartX", 0,
+	"StartY", 0,
+	"Deadline", 0,
+	"CircleHwnd", 0,
+	"CrossHwnds", [],
+	"pToken", 0
+)
+
 ; Draws a filled yellow circle around (X, Y) and a red cross on every other
 ; monitor, matching the Hammerspoon spotlight visual exactly.
 ; Dismissed after DurationMs ms or as soon as the mouse moves more than 5 px.
 SpotlightMouseAt(X, Y, DurationMs) {
+	global _Spotlight_State
+	if _Spotlight_State["Active"]
+		_SpotlightDismiss()
+
 	static RING_RADIUS    := 60     ; Matches Hammerspoon SPOTLIGHT_RADIUS_PX
 	static RING_STROKE    := 6      ; Matches SPOTLIGHT_STROKE_PX
 	static FILL_ALPHA     := 102    ; 0.40 x 255 -- matches SPOTLIGHT_FILL_ALPHA
@@ -159,19 +173,52 @@ SpotlightMouseAt(X, Y, DurationMs) {
 	}
 
 	; --- Poll for mouse move or timeout, then destroy all windows ---
-	StartX := X, StartY := Y
-	Elapsed := 0
-	loop {
-		Sleep(DISMISS_POLL)
-		Elapsed += DISMISS_POLL
-		MouseGetPos(&NowX, &NowY)
-		if (Elapsed >= DurationMs or Abs(NowX - StartX) > 5 or Abs(NowY - StartY) > 5)
-			break
+	_Spotlight_State["Active"] := true
+	_Spotlight_State["StartX"] := X
+	_Spotlight_State["StartY"] := Y
+	_Spotlight_State["Deadline"] := A_TickCount + DurationMs
+	_Spotlight_State["CircleHwnd"] := CircleHwnd
+	_Spotlight_State["CrossHwnds"] := CrossHwnds
+	_Spotlight_State["pToken"] := pToken
+	
+	SetTimer(_SpotlightTick, DISMISS_POLL)
+}
+
+_SpotlightTick() {
+	global _Spotlight_State
+	if !_Spotlight_State["Active"] {
+		SetTimer(_SpotlightTick, 0)
+		return
 	}
+	if A_IsSuspended {
+		_SpotlightDismiss()
+		return
+	}
+	MouseGetPos(&NowX, &NowY)
+	if (A_TickCount >= _Spotlight_State["Deadline"] or Abs(NowX - _Spotlight_State["StartX"]) > 5 or Abs(NowY - _Spotlight_State["StartY"]) > 5) {
+		_SpotlightDismiss()
+	}
+}
 
-	GR_DestroyWindow(CircleHwnd)
-	for Hwnd in CrossHwnds
-		GR_DestroyWindow(Hwnd)
-
-	DllCall("gdiplus\GdiplusShutdown", "ptr", pToken)
+_SpotlightDismiss() {
+	global _Spotlight_State
+	SetTimer(_SpotlightTick, 0)
+	if !_Spotlight_State["Active"]
+		return
+	
+	if _Spotlight_State["CircleHwnd"]
+		try GR_DestroyWindow(_Spotlight_State["CircleHwnd"])
+	
+	for Hwnd in _Spotlight_State["CrossHwnds"] {
+		if Hwnd
+			try GR_DestroyWindow(Hwnd)
+	}
+	
+	if _Spotlight_State["pToken"]
+		DllCall("gdiplus\GdiplusShutdown", "ptr", _Spotlight_State["pToken"])
+		
+	_Spotlight_State["Active"] := false
+	_Spotlight_State["CircleHwnd"] := 0
+	_Spotlight_State["CrossHwnds"] := []
+	_Spotlight_State["pToken"] := 0
 }
