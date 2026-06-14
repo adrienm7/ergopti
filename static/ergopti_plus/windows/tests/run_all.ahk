@@ -283,6 +283,7 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 #Include meta/test_sqlite_progress_yield.ahk
 #Include meta/test_logger_sync_warning.ahk
 #Include meta/test_keylogger_deferred_write.ahk
+#Include meta/test_deadkey_timeout.ahk
 #Include meta/test_mouse_hotkey_clobber.ahk
 #Include meta/test_uia_selection_cache.ahk
 #Include meta/test_remote_poll_deadline.ahk
