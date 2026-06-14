@@ -279,16 +279,24 @@ _OnMenuCommandWmCommand(wParam, lParam, msg, hwnd) {
 ; OnMessage retry for the same item won't double-fire.
 _DispatchIfMissed(ItemId, ExpectedLastFire) {
     global _MenuDispatchCallbacks, _MenuDispatchLastFire
-    Critical
+    ; Critical is held only for the brief atomic gate — reading/updating state and
+    ; extracting the callback reference. Releasing it before Callback.Call() is
+    ; mandatory: holding Critical across an arbitrary menu action risks starving the
+    ; keyboard hook thread past the LowLevelHooksTimeout (~300 ms), causing Windows
+    ; to silently drop physical keystrokes.
+    Critical "On"
     CurrentLastFire := _MenuDispatchLastFire.Has(ItemId) ? _MenuDispatchLastFire[ItemId] : 0
     if (CurrentLastFire != ExpectedLastFire) {
+        Critical "Off"
         return  ; AHK fired the callback — bypass not needed for this click.
     }
     if !_MenuDispatchCallbacks.Has(ItemId) {
+        Critical "Off"
         return
     }
     Callback := _MenuDispatchCallbacks[ItemId]
     _MenuDispatchLastFire[ItemId] := A_TickCount
+    Critical "Off"   ; Release before the callback so the keyboard hook is never starved.
     try LoggerInfo("MenuDispatcher",
         "AHK drop detected for ItemId={1} — firing bypass dispatch.", ItemId)
     try {
