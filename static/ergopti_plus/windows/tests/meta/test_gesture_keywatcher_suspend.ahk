@@ -72,15 +72,13 @@ _GKWS_SuspendGuardInOnKeyDown() {
 }
 Test("gestures: GestureOnKeyDown has A_IsSuspended guard (clickhold-inputhook-drops-keys)", _GKWS_SuspendGuardInOnKeyDown)
 
-_GKWS_SuspendGuardBeforeLevel3() {
+_GKWS_InputHookIsNonConsuming() {
 	Src := _GKWS_ReadSource("modules/gestures.ahk")
-	Body := _GKWS_FuncBodyStripped(Src, "GestureOnKeyDown(ih, vk, sc) {")
-	Assert(Body != "", "GestureOnKeyDown must exist in modules/gestures.ahk")
-	SuspendIdx := InStr(Body, "A_IsSuspended")
-	Level3Idx  := InStr(Body, "SendLevel(3)")
-	Assert(SuspendIdx > 0, "GestureOnKeyDown must check A_IsSuspended")
-	Assert(Level3Idx > 0, "GestureOnKeyDown must call SendLevel(3) for the non-paused path")
-	Assert(SuspendIdx < Level3Idx,
-		"A_IsSuspended check must precede SendLevel(3) so a paused driver never re-injects keys at Ergopti level (clickhold-inputhook-drops-keys)")
+	Body := _GKWS_FuncBodyStripped(Src, "GestureStartKeyboardWatcher() {")
+	Assert(Body != "", "GestureStartKeyboardWatcher must exist in modules/gestures.ahk")
+	Assert(InStr(Body, 'InputHook("V L3")') > 0 || InStr(Body, "InputHook('V L3')") > 0, "GestureStartKeyboardWatcher must use 'V' option to make the hook non-consuming (clickhold-inputhook-drops-keys)")
+	
+	BodyOnKeyDown := _GKWS_FuncBodyStripped(Src, "GestureOnKeyDown(ih, vk, sc) {")
+	Assert(InStr(BodyOnKeyDown, "SendLevel") == 0, "GestureOnKeyDown must not re-send keys using SendLevel, as the hook is now non-consuming")
 }
-Test("gestures: GestureOnKeyDown A_IsSuspended guard precedes SendLevel(3) (clickhold-inputhook-drops-keys)", _GKWS_SuspendGuardBeforeLevel3)
+Test("gestures: GestureStartKeyboardWatcher uses non-consuming 'V' hook (clickhold-inputhook-drops-keys)", _GKWS_InputHookIsNonConsuming)

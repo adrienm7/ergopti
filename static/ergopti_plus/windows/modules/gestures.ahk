@@ -493,7 +493,9 @@ global GESTURE_ACTIONS := Map(
         Fn: (*) => GestureTakeNote(),
     },
     "activity_simulation", {
-        Fn: (*) => GestureToggleActivitySimulation(),
+        Fn: (*) => (
+            IsSet(ToggleActivitySimulation) ? ToggleActivitySimulation() : LoggerWarn("gestures", "Activity Simulation is disabled in shortcuts config.")
+        ),
     },
     "surround_parens", {
         Fn: (*) => SendFinalResult("{Home}({End}){Home}"),
@@ -647,26 +649,7 @@ GestureTakeNote() {
     }
 }
 
-GestureToggleActivitySimulation() {
-    global ActivitySimulation
-    ActivitySimulation := !ActivitySimulation
-    if ActivitySimulation
-        SetTimer(GestureSimulateActivity, Random(1000, 5000))
-}
 
-GestureSimulateActivity() {
-    global ActivitySimulation
-    if !ActivitySimulation
-        return
-    ; No mouse jiggle / synthetic key while the script is paused.
-    if A_IsSuspended
-        return
-    loop Random(3, 8) {
-        MCSetPos(Random(0, A_ScreenWidth), Random(0, A_ScreenHeight))
-        Sleep(Random(200, 800))
-    }
-    SendFinalResult("{VKFF}")
-}
 
 GestureSearchWeb() {
     global Features
@@ -1573,8 +1556,8 @@ GestureStartKeyboardWatcher() {
 
     GestureStopKeyboardWatcher()
     ; L3: Level 3 (higher than Ergopti's Level 2 hotkeys)
-    ; No 'V' option: we want to suppress the key, release click, then re-send.
-    GestureKeyboardHook := InputHook("L3")
+    ; 'V' option: non-consuming hook so keys pass through normally.
+    GestureKeyboardHook := InputHook("V L3")
     GestureKeyboardHook.KeyOpt("{All}", "N")
     GestureKeyboardHook.OnKeyDown := GestureOnKeyDown
     GestureKeyboardHook.Start()
@@ -1592,27 +1575,19 @@ GestureStopKeyboardWatcher() {
 
 ; Callback fired on any key press while a click hold is active.
 GestureOnKeyDown(ih, vk, sc) {
-    ; Stop catching keys immediately to avoid recursion during re-send
+    if A_IsSuspended {
+        ih.Stop()
+        GestureReleaseLeftClick()
+        GestureReleaseRightClick()
+        return
+    }
+
+    ; Stop catching keys immediately to avoid recursion
     ih.Stop()
 
     ; Any keystroke releases whichever button(s) are currently held
     GestureReleaseLeftClick()
     GestureReleaseRightClick()
-
-    ; InputHooks bypass AHK Suspend, so we must gate manually. While paused,
-    ; re-send the swallowed key at level 0 (plain OS key, no Ergopti remapping)
-    ; and stop — driver is off, nothing else should happen.
-    if A_IsSuspended {
-        Send(Format("{Blind}{vk{:x}sc{:x}}", vk, sc))
-        return
-    }
-
-    ; Re-send the key that was just swallowed, but now that the click is released.
-    ; We use SendLevel 3 to ensure Ergopti hotkeys (at Level 2) see the key.
-    ; Use {Blind} to preserve modifier state.
-    SendLevel(3)
-    Send(Format("{Blind}{vk{:x}sc{:x}}", vk, sc))
-    SendLevel(0)
 }
 
 ; NOTE: the ~RButton / ~LButton cross-release hotkeys are registered
