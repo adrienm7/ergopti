@@ -77,3 +77,36 @@ _WRS_SuspendEnterCancelsWarmupRetry() {
 		"Ergopti_OnSuspendEnter must call LLM_OllamaCancelWarmupRetry() to stop background warmup HTTP when paused")
 }
 Test("ErgoptiPlus: Ergopti_OnSuspendEnter cancels Ollama warmup retry on pause", _WRS_SuspendEnterCancelsWarmupRetry)
+_WRS_DepsPollHasSuspendGuard() {
+	Src := _WRS_ReadSource("modules/llm/ollama_deps_checker.ahk")
+	
+	Seg1 := _WRS_FuncBody(Src, "LLM_Deps_PollServerReady(on_ready, on_failed) {")
+	Assert(InStr(Seg1, "A_IsSuspended") > 0,
+		"LLM_Deps_PollServerReady must check A_IsSuspended (warmup-retry-ignores-suspend)")
+		
+	Seg2 := _WRS_FuncBody(Src, "LLM_Deps_PollFile(pid, on_ready, on_failed) {")
+	Assert(InStr(Seg2, "A_IsSuspended") > 0,
+		"LLM_Deps_PollFile must check A_IsSuspended (warmup-retry-ignores-suspend)")
+}
+Test("ollama_deps_checker: deps poll callbacks have A_IsSuspended guard", _WRS_DepsPollHasSuspendGuard)
+
+_WRS_SuspendEnterCancelsDepsPoll() {
+	Src := _WRS_ReadSource("ErgoptiPlus.ahk")
+	
+	FuncPos := InStr(Src, "Ergopti_OnSuspendEnter() {")
+	Assert(FuncPos > 0, "Ergopti_OnSuspendEnter must exist")
+	Tail := SubStr(Src, FuncPos)
+	NextFunc := InStr(Tail, "`nErgopti_On")
+	Segment := (NextFunc > 0) ? SubStr(Tail, 1, NextFunc) : Tail
+	Assert(InStr(Segment, "SetTimer(_LLM_Deps_PollTimer, 0)") > 0,
+		"Ergopti_OnSuspendEnter must stop _LLM_Deps_PollTimer when paused")
+		
+	FuncPos2 := InStr(Src, "Ergopti_OnSuspendResume() {")
+	Assert(FuncPos2 > 0, "Ergopti_OnSuspendResume must exist")
+	Tail2 := SubStr(Src, FuncPos2)
+	NextFunc2 := InStr(Tail2, "`n_SuspendStateWatchdog")
+	Segment2 := (NextFunc2 > 0) ? SubStr(Tail2, 1, NextFunc2) : Tail2
+	Assert(InStr(Segment2, "SetTimer(_LLM_Deps_PollTimer, 3000)") > 0,
+		"Ergopti_OnSuspendResume must resume _LLM_Deps_PollTimer if checking")
+}
+Test("ErgoptiPlus: Suspend toggles pause deps poll timer", _WRS_SuspendEnterCancelsDepsPoll)

@@ -2011,10 +2011,16 @@ Ergopti_OnSuspendEnter() {
     ; calls while the driver is paused ("pause = tout éteint" invariant).
     try LLM_OllamaCancelWarmupRetry()
     try StopActivitySimulation()
+    global _LLM_Deps_PollTimer
+    if IsSet(_LLM_Deps_PollTimer)
+        try SetTimer(_LLM_Deps_PollTimer, 0)
 }
 Ergopti_OnSuspendResume() {
     if IsSet(_ResetPrefixBuffer)
         try _ResetPrefixBuffer()
+    global _LLM_Deps_PollTimer, _LLM_Deps_Checking
+    if IsSet(_LLM_Deps_PollTimer) and IsSet(_LLM_Deps_Checking) and _LLM_Deps_Checking
+        try SetTimer(_LLM_Deps_PollTimer, 3000)
 }
 _SuspendStateWatchdog() {
     global _LastSuspendState
