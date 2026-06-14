@@ -176,6 +176,8 @@ if Features["shortcuts"]["move"] {
     }
 
     AwakeReturnToOrigin() {
+        if A_IsSuspended
+            return
         global ActivitySimulation, AwakeOriginX, AwakeOriginY
         if ActivitySimulation {
             MCSetPos(AwakeOriginX, AwakeOriginY)
@@ -183,6 +185,8 @@ if Features["shortcuts"]["move"] {
     }
 
     AwakeCheckMouseMoved() {
+        if A_IsSuspended
+            return
         global ActivitySimulation, AwakeOriginX, AwakeOriginY
         if not ActivitySimulation
             return
@@ -193,6 +197,8 @@ if Features["shortcuts"]["move"] {
     }
 
     AwakeCancelOnMouse(*) {
+        if A_IsSuspended
+            return
         global ActivitySimulation
         if ActivitySimulation {
             SetTimer(StopActivitySimulation, -1)
@@ -200,6 +206,8 @@ if Features["shortcuts"]["move"] {
     }
 
     AwakeCancelOnKeypress(ih, arg1:="", arg2:="") {
+        if A_IsSuspended
+            return
         ; Ignore key presses with modifiers to prevent the trigger hotkey
         ; from instantly deactivating the keep-awake mode silently.
         if Type(ih) == "InputHook" {
@@ -213,6 +221,8 @@ if Features["shortcuts"]["move"] {
     }
 
     SimulateActivity(ResetOnly := False) {
+        if A_IsSuspended
+            return
         global ActivitySimulation, AwakeOriginX, AwakeOriginY
         ; LastX/LastY track where the cursor was after the previous synthetic move,
         ; so we can distinguish a real user move from our own jitter.
