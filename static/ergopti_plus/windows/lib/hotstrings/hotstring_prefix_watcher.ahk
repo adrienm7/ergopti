@@ -192,9 +192,12 @@ HotstringPrefixWatcherInit() {
 ; word boundary on the new cursor's left. ``~`` keeps the click going
 ; through to the active window unchanged.
 _InstallMouseClickResetHooks() {
-    Hotkey("~LButton", _OnMouseClickReset)
-    Hotkey("~MButton", _OnMouseClickReset)
-    Hotkey("~RButton", _OnMouseClickReset)
+    ; Subscribe via HookDispatcher — a bare Hotkey("~LButton", …) would replace
+    ; the dispatcher's handler, silencing every other mouse subscriber including
+    ; the LLM pointer-dismiss watcher (mouse-hotkey-clobber).
+    HookDispatcher.Register(HookDispatcherConst.EVT_MS_LDOWN, _OnMouseClickReset.Bind())
+    HookDispatcher.Register(HookDispatcherConst.EVT_MS_MDOWN, _OnMouseClickReset.Bind())
+    HookDispatcher.Register(HookDispatcherConst.EVT_MS_RDOWN, _OnMouseClickReset.Bind())
 }
 
 _OnMouseClickReset(*) {

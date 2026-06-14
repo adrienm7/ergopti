@@ -396,11 +396,17 @@ _LLM_PointerWatch_Start() {
 	_LLM_PointerWatch_LastY := unset
 	if !IsSet(_LLM_PointerWatch_ActivityFn) or !(_LLM_PointerWatch_ActivityFn is Func)
 		_LLM_PointerWatch_ActivityFn := LLM_Bridge_OnPointerActivity.Bind()
-	; Pass-through hotkeys — same pattern as hotstring_prefix_watcher.ahk.
-	for key in ["~LButton", "~RButton", "~MButton", "~XButton1", "~XButton2",
-			"~WheelUp", "~WheelDown", "~WheelLeft", "~WheelRight"] {
-		try Hotkey(key, _LLM_PointerWatch_ActivityFn, "On")
+	; Subscribe via HookDispatcher for every key the dispatcher owns so we do not
+	; clobber the dispatcher's central handlers (mouse-hotkey-clobber). XButton1/2
+	; are not registered by the dispatcher — keep those as direct hotkeys.
+	for evt in [HookDispatcherConst.EVT_MS_LDOWN, HookDispatcherConst.EVT_MS_RDOWN,
+			HookDispatcherConst.EVT_MS_MDOWN, HookDispatcherConst.EVT_MS_WUP,
+			HookDispatcherConst.EVT_MS_WDN, HookDispatcherConst.EVT_MS_WLEFT,
+			HookDispatcherConst.EVT_MS_WRIGHT] {
+		HookDispatcher.Register(evt, _LLM_PointerWatch_ActivityFn)
 	}
+	try Hotkey("~XButton1", _LLM_PointerWatch_ActivityFn, "On")
+	try Hotkey("~XButton2", _LLM_PointerWatch_ActivityFn, "On")
 	if !IsSet(_LLM_PointerWatch_MoveFn) or !(_LLM_PointerWatch_MoveFn is Func)
 		_LLM_PointerWatch_MoveFn := _LLM_PointerWatch_OnMoveTick.Bind()
 	global _LLM_POINTER_POLL_MS
@@ -416,10 +422,14 @@ _LLM_PointerWatch_Stop() {
 	if IsSet(_LLM_PointerWatch_MoveFn) and (_LLM_PointerWatch_MoveFn is Func)
 		try SetTimer(_LLM_PointerWatch_MoveFn, 0)
 	if IsSet(_LLM_PointerWatch_ActivityFn) and (_LLM_PointerWatch_ActivityFn is Func) {
-		for key in ["~LButton", "~RButton", "~MButton", "~XButton1", "~XButton2",
-				"~WheelUp", "~WheelDown", "~WheelLeft", "~WheelRight"] {
-			try Hotkey(key, _LLM_PointerWatch_ActivityFn, "Off")
+		for evt in [HookDispatcherConst.EVT_MS_LDOWN, HookDispatcherConst.EVT_MS_RDOWN,
+				HookDispatcherConst.EVT_MS_MDOWN, HookDispatcherConst.EVT_MS_WUP,
+				HookDispatcherConst.EVT_MS_WDN, HookDispatcherConst.EVT_MS_WLEFT,
+				HookDispatcherConst.EVT_MS_WRIGHT] {
+			HookDispatcher.Unregister(evt, _LLM_PointerWatch_ActivityFn)
 		}
+		try Hotkey("~XButton1", _LLM_PointerWatch_ActivityFn, "Off")
+		try Hotkey("~XButton2", _LLM_PointerWatch_ActivityFn, "Off")
 	}
 	try LoggerDebug("LLM", "Pointer-dismiss watcher stopped.")
 }
