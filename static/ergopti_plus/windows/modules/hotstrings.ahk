@@ -30,6 +30,10 @@ RegisterAllHotstrings(DeferHeavy := false) {
 	global Features, ScriptInformation, PersonalInformation, PersonalInformationLetters
 	global DeadkeyMappingCircumflex, SpaceAroundSymbols, PersonalInformationHotstrings
 
+	if (!DeferHeavy) {
+		try SetTimer(RegisterEmojisSymbolsDeferred, 0)
+	}
+
 	; Recompute SpaceAroundSymbols from the live Features on every run, so a live
 	; toggle of distances_reduction.space_around_symbols re-bakes the rolls operator
 	; replacements (":=", "->", …) with the new spacing — a cross-dependency that
@@ -951,6 +955,9 @@ _RegisterEmojisSymbolsSections() {
 ; SetTimer from ErgoptiPlus.ahk. Wrapped in try so a transient failure can never
 ; crash the timer thread and leave the driver half-initialised.
 RegisterEmojisSymbolsDeferred() {
+	global HSE_RegistryByGroup
+	if (IsSet(HSE_RegistryByGroup) and (HSE_RegistryByGroup.Has("emojis.emojis") or HSE_RegistryByGroup.Has("magickey.text_expansion_emojis")))
+		return
 	try {
 		_RegisterEmojisSymbolsSections()
 		; The prefix-watcher index was armed at boot WITHOUT these categories —
