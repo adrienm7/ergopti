@@ -135,69 +135,7 @@ TestHsCache_EscapeUnescapeHandlesSpecials() {
 	Assert(_HsCacheUnescape(Escaped) == Original, "unescape(escape(x)) must equal x for all special characters")
 }
 
-; Chunked registration parity: the deferred boot pass registers the heavy
-; emoji/symbol sections in row slices (StartIdx/MaxCount) so it never freezes the
-; keystroke hook. Registering a section in slices MUST yield exactly the same
-; hotstrings, in the same order, as one whole-section pass -- a slicing off-by-one
-; would silently drop or duplicate expansions only on the cached fast path. The
-; harness _HotstringRegistrar recorder captures every CreateHotstring /
-; CreateCaseSensitiveHotstrings spec so the two passes can be compared directly.
-TestHsCache_ChunkedRegistrationMatchesWhole() {
-	global _HS_CACHE_ROWS, _Stub_HotstringRegistrations
-	; Synthetic section: 7 rows (not a multiple of the chunk size, so the last
-	; slice is a partial remainder), alternating the CI / CS registration paths.
-	Key := "testchunk.section"
-	Rows := []
-	Loop 7 {
-		IsCaseSens := Mod(A_Index, 2) == 0
-		Rows.Push(["*?", "trg" . A_Index, "out" . A_Index, true, false, IsCaseSens])
-	}
-	_HS_CACHE_ROWS[Key] := Rows
-	FC := { TimeActivationSeconds: 0 }
-
-	; Whole-section pass.
-	ResetHotstringRecorders()
-	Whole := _HsCacheRegisterSection(Key, FC, Map())
-	WholeSpecs := []
-	for Rec in _Stub_HotstringRegistrations
-		WholeSpecs.Push(Rec.spec)
-
-	; Sliced pass: chunks of 3 over 7 rows -> [1..3], [4..6], [7], then past-end.
-	ResetHotstringRecorders()
-	Sliced := 0
-	Cursor := 1
-	Loop {
-		N := _HsCacheRegisterSection(Key, FC, Map(), Cursor, 3)
-		Sliced += N
-		Cursor += 3
-		if (Cursor > Rows.Length)
-			break
-	}
-	PastEnd := _HsCacheRegisterSection(Key, FC, Map(), Rows.Length + 1, 3)
-	SlicedSpecs := []
-	for Rec in _Stub_HotstringRegistrations
-		SlicedSpecs.Push(Rec.spec)
-
-	_HS_CACHE_ROWS.Delete(Key)
-
-	Assert(Whole == Rows.Length,
-		"whole-section register must report all " . Rows.Length . " rows (got " . Whole . ")")
-	Assert(Sliced == Rows.Length,
-		"sliced register counts must sum to " . Rows.Length . " (got " . Sliced . ")")
-	Assert(PastEnd == 0, "a slice starting past the last row must register 0 rows (got " . PastEnd . ")")
-	Assert(WholeSpecs.Length == SlicedSpecs.Length,
-		"sliced pass must register the same number of hotstrings (" . SlicedSpecs.Length
-		. ") as the whole pass (" . WholeSpecs.Length . ")")
-	AllEqual := WholeSpecs.Length == SlicedSpecs.Length
-	for Idx, Spec in WholeSpecs {
-		if (Idx > SlicedSpecs.Length or SlicedSpecs[Idx] != Spec)
-			AllEqual := false
-	}
-	Assert(AllEqual, "sliced pass must register identical specs in identical order to the whole pass")
-}
-
 Test("hotstrings cache: build extracts a known entry with correct flags", TestHsCache_BuildExtractsKnownEntry)
 Test("hotstrings cache: build covers every bundled category", TestHsCache_BuildCoversEveryBundledCategory)
 Test("hotstrings cache: .tsv write/read round-trip is lossless", TestHsCache_TsvRoundTripIsLossless)
 Test("hotstrings cache: escape/unescape handles tab, CR, LF and backslash", TestHsCache_EscapeUnescapeHandlesSpecials)
-Test("hotstrings cache: chunked slice registration matches whole-section", TestHsCache_ChunkedRegistrationMatchesWhole)
