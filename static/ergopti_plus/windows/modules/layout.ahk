@@ -315,18 +315,26 @@ global InDeadKeySequence := false
 DeadKey(Mapping) {
 	global InDeadKeySequence
 	InDeadKeySequence := true
-	ih := InputHook(
-		"L1",
-		"{F1}{F2}{F3}{F4}{F5}{F6}{F7}{F8}{F9}{F10}{F11}{F12}{Left}{Right}{Up}{Down}{Home}{End}{PgUp}{PgDn}{Ins}{Numlock}{PrintScreen}{Pause}{Enter}{BackSpace}{Delete}"
-	)
-	ih.Start()
-	ih.Wait()
-	PressedKey := ih.Input
-	InDeadKeySequence := false
-	if Mapping.Has(PressedKey) {
-		SendNewResult(Mapping[PressedKey])
-	} else {
-		SendNewResult(PressedKey)
+	try {
+		ih := InputHook(
+			"L1 T2",
+			"{F1}{F2}{F3}{F4}{F5}{F6}{F7}{F8}{F9}{F10}{F11}{F12}{Left}{Right}{Up}{Down}{Home}{End}{PgUp}{PgDn}{Ins}{Numlock}{PrintScreen}{Pause}{Enter}{BackSpace}{Delete}"
+		)
+		ih.Start()
+		ih.Wait()
+		if (ih.EndReason = "Timeout") {
+			if Mapping.Has(" ")
+				SendNewResult(Mapping[" "])
+			return
+		}
+		PressedKey := ih.Input
+		if Mapping.Has(PressedKey) {
+			SendNewResult(Mapping[PressedKey])
+		} else {
+			SendNewResult(PressedKey)
+		}
+	} finally {
+		InDeadKeySequence := false
 	}
 }
 
