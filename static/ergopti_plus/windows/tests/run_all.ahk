@@ -271,6 +271,7 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 #Include meta/test_textsend_clipall.ahk
 #Include meta/test_llm_autotype_hse_suppress.ahk
 #Include meta/test_ingest_tick_guards.ahk
+#Include meta/test_uia_selection_cache.ahk
 #Include meta/test_no_coauthor_in_commits.ahk
 #Include meta/test_no_pascal_case_in_toml.ahk
 #Include meta/test_bundle_exclusions.ahk

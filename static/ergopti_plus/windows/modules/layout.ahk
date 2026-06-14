@@ -428,32 +428,71 @@ RemapKey(ScanCode, Character, AlternativeCharacter := "") {
 	}
 }
 
+; Per-process UIA selection result caches.
+; Avoids repeated synchronous COM round-trips on the keyboard thread for
+; every wrap-symbol keystroke (uia-selection-query-on-hot-path /
+; uia-selection-blocks-keyboard-thread).
+;
+; _UIA_NO_TP_CACHE: when IsTextPatternAvailable returns false for a process,
+; cache the miss so subsequent symbol keystrokes skip UIA.GetFocusedElement()
+; entirely for _UIA_NO_TP_TTL_MS.  Covers apps (games, custom win32 controls)
+; that never expose TextPattern — previously those paid the full COM cost on
+; every wrap-eligible keystroke.
+;
+; _UIA_EMPTY_SEL_CACHE: when TextPattern is available but selection is empty,
+; skip re-querying for _UIA_EMPTY_SEL_TTL_MS.  80 ms is shorter than the
+; fastest human Ctrl+A → symbol sequence so a real selection is never missed.
+global _UIA_NO_TP_CACHE    := Map()  ; ProcessName → expiry tick (no TextPattern)
+global _UIA_EMPTY_SEL_CACHE := Map() ; ProcessName → expiry tick (empty selection)
+
+; 30 s: generous re-probe window; reset automatically when the active app changes.
+_UIA_NO_TP_TTL_MS     := 30000
+; 80 ms: below fastest human Ctrl+A + symbol sequence.
+_UIA_EMPTY_SEL_TTL_MS := 80
+
 ; Returns the currently selected text via UIA TextPattern, or "" when:
 ; - UIA is unavailable
 ; - the focused element does not support TextPattern
 ; - nothing is selected (degenerate/empty range)
 ; - the selection is all blank lines (caller usually wants to skip wrapping)
 ; - we are in an Electron app (VSCode etc.) where UIA TextPattern is unreliable
+;
+; Two caches short-circuit the COM round-trip so it never runs on every
+; symbol keystroke when the user is not holding a text selection.
 GetUIASelection() {
-	if (!isSet(UIA) or WinActive("Code")) {
+	if (!isSet(UIA) or WinActive("Code"))
 		return ""
-	}
 	try {
+		ProcName := WinGetProcessName("A")
+		Now := A_TickCount
+		; No-TextPattern cache: skip processes that never expose TextPattern
+		if (_UIA_NO_TP_CACHE.Has(ProcName) and Now < _UIA_NO_TP_CACHE[ProcName])
+			return ""
+		; Empty-selection cache: skip rapid re-queries within the same symbol burst
+		if (_UIA_EMPTY_SEL_CACHE.Has(ProcName) and Now < _UIA_EMPTY_SEL_CACHE[ProcName])
+			return ""
 		el := UIA.GetFocusedElement()
+		if !el.IsTextPatternAvailable {
+			; Cache the miss so subsequent symbol keystrokes skip UIA for 30 s
+			_UIA_NO_TP_CACHE[ProcName] := Now + _UIA_NO_TP_TTL_MS
+			return ""
+		}
 		; TextPattern.GetSelection() returns IUIAutomationTextRange objects whose
 		; .GetText(-1) yields the selected string. el.GetSelection() (MSAA path) returns
 		; child elements, not text — wrong API for text selection detection.
-		if el.IsTextPatternAvailable {
-			tp := el.GetPattern("Text")
-			ranges := tp.GetSelection()
-			if (ranges.Length > 0) {
-				Text := ranges[1].GetText(-1)
-				; Blank-only selections (newlines) are not meaningful to wrap
-				if (Text != "" and !RegExMatch(Text, "^(\r\n|\r|\n)+$")) {
-					return Text
-				}
-			}
+		tp := el.GetPattern("Text")
+		ranges := tp.GetSelection()
+		if (ranges.Length > 0) {
+			Text := ranges[1].GetText(-1)
+			; Blank-only selections (newlines) are not meaningful to wrap
+			if (Text != "" and !RegExMatch(Text, "^(\r\n|\r|\n)+$"))
+				return Text
 		}
+		; TextPattern available but nothing selected — cache briefly to avoid
+		; hammering UIA during rapid symbol typing with no active selection
+		_UIA_EMPTY_SEL_CACHE[ProcName] := Now + _UIA_EMPTY_SEL_TTL_MS
+	} catch {
+		; COM failures (no focused window, UIA timeout) are treated as no selection
 	}
 	return ""
 }
