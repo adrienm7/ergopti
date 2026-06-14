@@ -273,6 +273,8 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 #Include meta/test_llm_autotype_hse_suppress.ahk
 #Include meta/test_ingest_tick_guards.ahk
 #Include meta/test_gesture_keywatcher_suspend.ahk
+#Include meta/test_activitysim_collision.ahk
+#Include meta/test_metrics_focus_cache_atomic.ahk
 #Include meta/test_mouse_hotkey_clobber.ahk
 #Include meta/test_uia_selection_cache.ahk
 #Include meta/test_remote_poll_deadline.ahk

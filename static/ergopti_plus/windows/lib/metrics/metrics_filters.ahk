@@ -104,17 +104,27 @@ MF_RefreshFocus() {
     hwnd := 0
     try hwnd := WinGetID("A")
     if !hwnd {
+        Critical("On")
         MetricsFocusCache.process_name := ""
         MetricsFocusCache.title        := ""
         MetricsFocusCache.class        := ""
         MetricsFocusCache.last_at      := A_TickCount
+        Critical("Off")
         return
     }
-    MetricsFocusCache.last_hwnd := hwnd
-    try MetricsFocusCache.process_name := WinGetProcessName("ahk_id " . hwnd)
-    try MetricsFocusCache.title        := WinGetTitle("ahk_id " . hwnd)
-    try MetricsFocusCache.class        := WinGetClass("ahk_id " . hwnd)
-    MetricsFocusCache.last_at := A_TickCount
+    
+    pn := "", t := "", c := ""
+    try pn := WinGetProcessName("ahk_id " . hwnd)
+    try t  := WinGetTitle("ahk_id " . hwnd)
+    try c  := WinGetClass("ahk_id " . hwnd)
+
+    Critical("On")
+    MetricsFocusCache.last_hwnd    := hwnd
+    MetricsFocusCache.process_name := pn
+    MetricsFocusCache.title        := t
+    MetricsFocusCache.class        := c
+    MetricsFocusCache.last_at      := A_TickCount
+    Critical("Off")
 }
 
 
