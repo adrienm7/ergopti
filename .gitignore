@@ -96,6 +96,15 @@ static/ergopti_plus/shared/ui/metrics_apps/prefetch.json
 # it is regenerated from the .json whenever missing or older than its source.
 static/ergopti_plus/shared/locales/*.tsv
 
+# Self-healing hotstrings cache. The category .toml files beside it are the single
+# tracked source of truth; the Windows driver builds/refreshes the .tsv on demand
+# (lib/hotstrings/hotstrings_cache.ahk) so the bundled hotstrings no longer ship as
+# committed generated AHK. Never tracked — rebuilt whenever missing or older than
+# any source TOML. The old generated_*.ahk bundle is ignored too, for safety.
+static/ergopti_plus/shared/hotstrings/generated_hotstrings.tsv
+static/ergopti_plus/windows/lib/hotstrings/generated_*.ahk
+static/ergopti_plus/windows/lib/hotstrings/hotstrings_generated.ahk
+
 # Corpus working copy produced by build scripts
 static/corpus/modifie/
 

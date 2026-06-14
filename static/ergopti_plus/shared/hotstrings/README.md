@@ -1,8 +1,8 @@
 # \_shared/hotstrings/ — Cross-Driver Hotstring Data
 
 This directory is the **single source of truth** for all bundled hotstring data.
-Both the AHK driver (`hotstrings_generated.ahk`) and the Hammerspoon driver
-consume data from this directory, either directly or via the code-generator.
+The AHK driver consumes it at runtime via a self-healing `.tsv` cache (no
+generated code is committed), and the Hammerspoon driver consumes it directly.
 
 ## Directory layout
 
@@ -61,12 +61,12 @@ replacement = "receive"
 flags       = ["word"]
 ```
 
-## Code generation
+## How the AHK driver consumes this
 
-Run `npm run build:hotstrings` to regenerate:
-
-- `static/ergopti_plus/windows/lib/hotstrings/hotstrings_generated.ahk`
-- (future) `static/ergopti_plus/macos/_generated/hotstrings_registry.lua`
-- (future) `static/ergopti_plus/linux/_generated/hotstrings_registry.lua`
-
-Never edit `hotstrings_generated.ahk` by hand — all changes go in the TOML files.
+There is **no build step and no committed generated code**. On boot the Windows
+driver (`lib/hotstrings/hotstrings_cache.ahk`) reads a flat
+`generated_hotstrings.tsv` cache that sits beside these TOMLs and is **gitignored**.
+If that cache is missing or older than any source `.toml`, the driver rebuilds it
+from the TOML on the spot (a one-time cost on first launch or after an edit) and
+rewrites it, so every subsequent boot is fast — the same self-healing pattern as
+the locale `.tsv` caches. Just edit the TOML files; the cache refreshes itself.

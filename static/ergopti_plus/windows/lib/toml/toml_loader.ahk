@@ -265,7 +265,11 @@ LoadHotstringsSection(CategoryName, SectionName, FeatureConfig, ExtraOptions := 
         }
     }
 
-    ; Fast path — bundled categories pre-compiled to literal AHK calls
+    ; Fast path — bundled categories served from the self-healing .tsv cache.
+    ; HotstringsCacheEnsure (lib/hotstrings/hotstrings_cache.ahk) loads the cache
+    ; once and populates _GENERATED_HOTSTRINGS with a registrar per cached section;
+    ; a cache miss leaves the map empty so we fall through to the TOML parse below.
+    HotstringsCacheEnsure()
     LoaderKey := StrLower(CategoryName) . "." . StrLower(SectionName)
     if (IsSet(_GENERATED_HOTSTRINGS)
     and StrLower(CategoryName) != "personal"

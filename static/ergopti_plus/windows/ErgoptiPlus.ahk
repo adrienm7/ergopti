@@ -206,11 +206,12 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 #Include lib/tooltip.ahk
 #Include lib/llm_diff.ahk
 #Include lib/hotstrings/hotstring_prefix_watcher.ahk
-; Auto-generated registrar for the bundled hotstring TOMLs. ``*i`` keeps the
-; driver runnable from a fresh clone before ``tools/compile_hotstrings.py`` has
-; been executed — ``LoadHotstringsSection`` falls back to the regex parser when
-; ``_GENERATED_HOTSTRINGS`` is undefined.
-#Include *i lib/hotstrings/hotstrings_generated.ahk
+; Self-healing hotstring cache for the bundled TOMLs. Replaces the old ~1 MB of
+; committed generated_*.ahk (tokenised at boot, before the tray icon could appear)
+; with a gitignored flat .tsv read at registration — the same pattern as the i18n
+; locale cache. LoadHotstringsSection ensures + consults it, falling back to the
+; runtime TOML parser on a cache miss. No generated CODE is kept in the repo.
+#Include lib/hotstrings/hotstrings_cache.ahk
 #Include lib/hotstrings/personal_toml_editor.ahk
 #Include lib/layout/layout_altgr.ahk
 #Include lib/layout/layout_shift_caps.ahk
