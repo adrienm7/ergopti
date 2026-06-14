@@ -235,11 +235,18 @@ HotstringsGetWordDelimiters() {
 ; HSE_WORD_TERMINATORS so the change takes effect without a Reload.
 HotstringsSetWordDelimiters(Delimiters) {
     global _HotstringsOverridesPath, _HotstringsWordDelimiters, HOTSTRINGS_DEFAULT_WORD_DELIMITERS
-    global HSE_WORD_TERMINATORS
+    global HSE_WORD_TERMINATORS, _PREFIX_WORD_BOUNDARIES
     _HotstringsWordDelimiters := Delimiters
     ; Mirror the live engine variable so the next keystroke already uses the
     ; updated set — mirrors the pattern used by HotstringsSetConsumedDelimiters.
     HSE_WORD_TERMINATORS := HotstringsGetWordDelimiters()
+
+    ; Also recompute the prefix watcher's boundary set (which includes quotes
+    ; not present in the engine set) if the module is loaded.
+    if IsSet(_PREFIX_WORD_BOUNDARIES) {
+        _PREFIX_WORD_BOUNDARIES := HSE_WORD_TERMINATORS . Chr(0x22) . Chr(0x201C) . Chr(0x201D)
+    }
+
     _SaveGlobalWordDelimiters(Delimiters)
 }
 
