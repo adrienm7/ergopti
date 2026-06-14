@@ -231,7 +231,12 @@ UnescapeTomlString(s) {
 ; located under ..\hotstrings\<CategoryName>.toml (relative to the script).
 ; Hotstrings flagged as commented-out in TOML (line starting with "#") are
 ; skipped, mirroring AHK source lines starting with ";".
-LoadHotstringsSection(CategoryName, SectionName, FeatureConfig, ExtraOptions := Map()) {
+; StartIdx/MaxCount are honoured ONLY on the cached fast path (the .tsv registrar
+; supports row slices); the TOML-parse fallback below ignores them and always
+; registers the whole section. The chunked deferred caller therefore passes a
+; range only when it has confirmed the section is cache-backed, so the fallback
+; never receives one and can never double-register a slice.
+LoadHotstringsSection(CategoryName, SectionName, FeatureConfig, ExtraOptions := Map(), StartIdx := 1, MaxCount := 0) {
     global ScriptInformation, _GENERATED_HOTSTRINGS, _SharedDir
 
     ; Accept either shape transparently
@@ -277,7 +282,7 @@ LoadHotstringsSection(CategoryName, SectionName, FeatureConfig, ExtraOptions := 
         try LoggerTrace("TomlLoader", "Using generated loader for [{1}.{2}].",
             CategoryName, SectionName)
         GeneratedFn := _GENERATED_HOTSTRINGS[LoaderKey]
-        GeneratedFn(FeatureConfig, ExtraOptions)
+        GeneratedFn(FeatureConfig, ExtraOptions, StartIdx, MaxCount)
         return
     }
 

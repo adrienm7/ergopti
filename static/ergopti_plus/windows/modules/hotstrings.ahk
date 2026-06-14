@@ -929,38 +929,100 @@ global HS_DEFERRED_REGISTRATION_DELAY_MS := 1500
 ; build on time-to-ready. The emoji/symbol pass rebuilds it again once those load.
 global HS_PREFIX_INDEX_WARM_DELAY_MS := 300
 
-; Registers the heavy magic-key emoji + symbol sections into the HSE. Shared by
-; the boot deferred pass and the live rebuild so the two code paths never diverge.
-_RegisterEmojisSymbolsSections() {
+; Single source of truth for WHICH emoji/symbol sections to register and how.
+; Returns an Array of { Category, Section, FeatureConfig, ExtraOptions } for every
+; ENABLED magic-key emoji/symbol section. Shared by the synchronous live rebuild
+; (_RegisterEmojisSymbolsSections) and the chunked boot-deferred pass below so the
+; two never drift on gating or load order.
+_EmojiSymbolSectionSpecs() {
 	global Features
-	if Features["hotstrings"]["magic_key"]["text_expansion_emojis"]["enabled"] {
-		LoadHotstringsSection("magickey", "text_expansion_emojis", Features["hotstrings"]["magic_key"]["text_expansion_emojis"])
-	}
-	if Features["hotstrings"]["magic_key"]["text_expansion_symbols"]["enabled"] {
-		LoadHotstringsSection("magickey", "text_expansion_symbols", Features["hotstrings"]["magic_key"]["text_expansion_symbols"])
-	}
-	if Features["hotstrings"]["magic_key"]["text_expansion_symbols_typst"]["enabled"] {
-		LoadHotstringsSection("magickey", "text_expansion_symbols_typst", Features["hotstrings"]["magic_key"]["text_expansion_symbols_typst"],
-			Map("OnlyText", False))
+	MK := Features["hotstrings"]["magic_key"]
+	Specs := []
+	if MK["text_expansion_emojis"]["enabled"]
+		Specs.Push({ Category: "magickey", Section: "text_expansion_emojis",
+			FeatureConfig: MK["text_expansion_emojis"], ExtraOptions: Map() })
+	if MK["text_expansion_symbols"]["enabled"]
+		Specs.Push({ Category: "magickey", Section: "text_expansion_symbols",
+			FeatureConfig: MK["text_expansion_symbols"], ExtraOptions: Map() })
+	if MK["text_expansion_symbols_typst"]["enabled"]
+		Specs.Push({ Category: "magickey", Section: "text_expansion_symbols_typst",
+			FeatureConfig: MK["text_expansion_symbols_typst"], ExtraOptions: Map("OnlyText", False) })
+	return Specs
+}
+
+; Registers the heavy magic-key emoji + symbol sections in ONE synchronous pass.
+; Used by the LIVE rebuild (a feature toggle / reload, where the user is not mid
+; keystroke); the boot path uses the chunked deferred pass below instead.
+_RegisterEmojisSymbolsSections() {
+	for Spec in _EmojiSymbolSectionSpecs()
+		LoadHotstringsSection(Spec.Category, Spec.Section, Spec.FeatureConfig, Spec.ExtraOptions)
+}
+
+; Rows registered per chunk on the deferred boot pass. ~150 rows is ~20-25 ms of
+; registration — short enough that a keystroke arriving mid-pass waits at most one
+; chunk, long enough that the per-chunk timer overhead stays negligible.
+global _HS_DEFERRED_CHUNK_ROWS := 150
+; Inter-chunk delay. A near-zero one-shot simply returns control to the message
+; loop so any queued OnChar runs before the next chunk — it is NOT a throttle.
+global _HS_DEFERRED_CHUNK_GAP_MS := 1
+; Sections still to register, each { Category, Section, FeatureConfig, ExtraOptions,
+; Cursor }. Drained one chunk per tick by _HsDeferredChunkTick.
+global _HS_DeferredQueue := []
+
+; Post-boot pass: registers the emoji + symbol categories the boot
+; RegisterAllHotstrings(…, DeferHeavy := true) skipped, then rebuilds the
+; prefix-watcher index so the live preview includes them. Armed via a one-shot
+; SetTimer from ErgoptiPlus.ahk. The ~3000-row load is CHUNKED across timer ticks
+; (see _HsDeferredChunkTick) so it never freezes the keystroke hook during the
+; post-boot warm-up, when the user is often already typing. Wrapped in try so a
+; transient failure can never crash the timer thread mid-startup.
+RegisterEmojisSymbolsDeferred() {
+	global _HS_DeferredQueue
+	try {
+		_HS_DeferredQueue := []
+		for Spec in _EmojiSymbolSectionSpecs()
+			_HS_DeferredQueue.Push({ Category: Spec.Category, Section: Spec.Section,
+				FeatureConfig: Spec.FeatureConfig, ExtraOptions: Spec.ExtraOptions, Cursor: 1 })
+		_HsDeferredChunkTick()
+	} catch as e {
+		try LoggerError("Hotstrings", "Deferred emoji/symbol registration failed to start: {1}", e.Message)
 	}
 }
 
-; Post-boot idle pass: registers the emoji + symbol categories that the boot
-; RegisterAllHotstrings(…, DeferHeavy := true) skipped, then rebuilds the
-; prefix-watcher index so the live preview includes them. Armed via a one-shot
-; SetTimer from ErgoptiPlus.ahk. Wrapped in try so a transient failure can never
-; crash the timer thread and leave the driver half-initialised.
-RegisterEmojisSymbolsDeferred() {
+; One chunk of the deferred registration, then re-arm on the message loop so any
+; queued keystroke runs before the next chunk. When the queue drains it rebuilds
+; the prefix-watcher index (the deferred triggers must appear in the live preview)
+; and logs completion. A section that is not cache-backed is registered whole — the
+; TOML parse fallback is not row-sliceable.
+_HsDeferredChunkTick() {
+	global _HS_DeferredQueue, _HS_CACHE_ROWS, _GENERATED_HOTSTRINGS
+	global _HS_DEFERRED_CHUNK_ROWS, _HS_DEFERRED_CHUNK_GAP_MS
 	try {
-		_RegisterEmojisSymbolsSections()
-		; The prefix-watcher index was armed at boot WITHOUT these categories —
-		; rebuild it so the tooltip preview ranks them like every other category.
-		try HotstringPrefixWatcherRebuildIndex()
-		try BootProfile_Mark("Emoji/symbol hotstrings registered (deferred)")
-		try LoggerInfo("Hotstrings", "Deferred emoji/symbol registration complete.")
+		if (_HS_DeferredQueue.Length == 0) {
+			try HotstringPrefixWatcherRebuildIndex()
+			try BootProfile_Mark("Emoji/symbol hotstrings registered (deferred, chunked)")
+			try LoggerInfo("Hotstrings", "Deferred emoji/symbol registration complete.")
+			return
+		}
+		Job := _HS_DeferredQueue[1]
+		LoaderKey := StrLower(Job.Category) . "." . StrLower(Job.Section)
+		HotstringsCacheEnsure()
+		Sliceable := IsSet(_GENERATED_HOTSTRINGS) and _GENERATED_HOTSTRINGS.Has(LoaderKey) and _HS_CACHE_ROWS.Has(LoaderKey)
+		if Sliceable {
+			LoadHotstringsSection(Job.Category, Job.Section, Job.FeatureConfig, Job.ExtraOptions,
+				Job.Cursor, _HS_DEFERRED_CHUNK_ROWS)
+			Job.Cursor += _HS_DEFERRED_CHUNK_ROWS
+			if (Job.Cursor > _HS_CACHE_ROWS[LoaderKey].Length)
+				_HS_DeferredQueue.RemoveAt(1)
+		} else {
+			LoadHotstringsSection(Job.Category, Job.Section, Job.FeatureConfig, Job.ExtraOptions)
+			_HS_DeferredQueue.RemoveAt(1)
+		}
 	} catch as e {
-		try LoggerError("Hotstrings", "Deferred emoji/symbol registration failed: {1}", e.Message)
+		try LoggerError("Hotstrings", "Deferred emoji/symbol chunk failed: {1}", e.Message)
+		_HS_DeferredQueue := []   ; abort the remaining queue rather than spin on a broken chunk
 	}
+	SetTimer(_HsDeferredChunkTick, -_HS_DEFERRED_CHUNK_GAP_MS)
 }
 
 ; Registers the magic-key text-expansion sections into the HSE. Shared by the boot
