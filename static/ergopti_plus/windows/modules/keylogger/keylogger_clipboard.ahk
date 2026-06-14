@@ -89,6 +89,8 @@ class KLClip {
 KL_Clip_OnChange(data_type) {
     if !Keylogger.initialized
         return
+    if A_IsSuspended
+        return
     filtered := false
     try filtered := MF_ShouldFilter()
     if filtered
@@ -128,6 +130,8 @@ KL_Clip_OnChange(data_type) {
 
 KL_Clip_OnPaste() {
     if !Keylogger.initialized
+        return
+    if A_IsSuspended
         return
     filtered := false
     try filtered := MF_ShouldFilter()

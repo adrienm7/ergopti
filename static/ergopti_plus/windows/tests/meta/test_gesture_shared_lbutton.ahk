@@ -41,9 +41,10 @@ _GSLB_FuncBodyStripped(Src, FuncDef) {
 	if !Idx
 		return ""
 	Rest := SubStr(Src, Idx)
-	End := InStr(Rest, "`n}")
-	if End
-		Rest := SubStr(Rest, 1, End + 1)
+	; Find the first closing brace at the start of a line (no indentation).
+	; This correctly skips nested braces inside if/loop blocks.
+	if RegExMatch(Rest, "m)^\}", &Match)
+		Rest := SubStr(Rest, 1, Match.Pos)
 	; Remove lines that start with optional whitespace then a semicolon
 	Out := ""
 	loop parse, Rest, "`n", "`r" {

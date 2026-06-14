@@ -156,8 +156,7 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 #Include lib/layout/layout_ergopti.ahk
 
 ; Active-app cache must come before hotstring_engine.ahk because both
-; ``HotstringHandler`` and ``MicrosoftApps`` consult ``GetActiveApp``.
-#Include lib/active_app_cache.ahk
+; ``HotstringHandler`` and ``MicrosoftApps``.
 #Include lib/window_utils.ahk
 #Include lib/string_utils.ahk
 #Include lib/spotlight.ahk

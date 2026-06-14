@@ -352,6 +352,8 @@ KL_Hook_OnKeyDown(ih, vk, sc) {
 ; =====================================
 
 KL_Hook_Tick() {
+    if A_IsSuspended
+        return
     ; Fire only when the buffer has something to commit. KL_IngestOnce is
     ; NOT called here — it carries a FileAppend to data.sql that runs on
     ; the same AHK thread and would block incoming keystroke callbacks,
@@ -372,6 +374,8 @@ KL_Hook_Tick() {
 }
 
 KL_Hook_LivePush() {
+    if A_IsSuspended
+        return
     ; Manifest-only rebuild — fast (~20 ms with the manifest cache warm)
     ; and enough for the KPI bar and WPM widget to update in near-real time.
     ; The full "live" rebuild (heatmaps + top-500 n-grams, ~150-300 ms) is

@@ -116,6 +116,8 @@ class KLAVState {
 KL_AV_FastTick() {
     if !Keylogger.initialized
         return
+    if A_IsSuspended
+        return
     KL_AV_PollVolume()
 }
 
@@ -195,6 +197,8 @@ KL_AV_GetMasterMuted(vol) {
 
 KL_AV_SlowTick() {
     if !Keylogger.initialized
+        return
+    if A_IsSuspended
         return
     KL_AV_ScanCapture()
     ; KL_AV_PollFocusMode() is intentionally excluded — its `loop reg "KR"`

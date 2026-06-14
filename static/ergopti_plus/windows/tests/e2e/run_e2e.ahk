@@ -49,7 +49,7 @@ global TEST_RESULTS_FILE := A_ScriptDir . "\test_results.txt"
 #Include ../../lib/app_state.ahk
 #Include ../../lib/ui_style.ahk
 #Include ../../lib/logger.ahk
-#Include ../../lib/active_app_cache.ahk
+
 #Include ../../lib/window_utils.ahk
 #Include ../../lib/string_utils.ahk
 #Include ../../lib/hotstrings/hotstring_engine.ahk
