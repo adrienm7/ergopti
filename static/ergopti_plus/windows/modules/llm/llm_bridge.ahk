@@ -479,14 +479,30 @@ _LLM_PointerWatch_OnMoveTick(*) {
  */
 LLM_Bridge_OnAccept(text) {
 	global _LLM_Bridge_Buffer
-	; Delay (ms) before clearing the synthetic flag. The TextSend below is
-	; asynchronous, so its keystrokes reach the InputHook a few ms later;
-	; clearing inline would unflag them before the keylogger captures them.
+	; Delay (ms) before releasing the suppression and the synthetic flag.
+	; The TextSend below is asynchronous — keystrokes reach the InputHook a
+	; few ms later; releasing inline would re-enable observation before the
+	; injected characters have passed through.
 	static SYNTH_CLEAR_DELAY_MS := 80
+	; Mute the hotstring InputHook before injecting the prediction so the
+	; synthetic characters do not re-enter the engine and trigger false
+	; hotstring matches on the appended text.
+	if IsSet(PrefixWatcherSuppress)
+		try PrefixWatcherSuppress(true)
 	; Tag the auto-typed prediction as synthetic so the keylogger keeps it out
 	; of the manual `chars` count and attributes it to the LLM source (esrc).
 	try KL_MarkSynthetic("llm")
 	TextSend(text, 0, 0)
+	; Clear the stale pre-prediction HSE and prefix buffers — the cursor is
+	; now past the injected text, so accumulated context is no longer valid.
+	if IsSet(HSE_HardReset)
+		try HSE_HardReset()
+	if IsSet(_ResetPrefixBuffer)
+		try _ResetPrefixBuffer()
+	; Deferred release so any characters still queued in the OS message loop
+	; are silently dropped before observation resumes.
+	if IsSet(PrefixWatcherSuppress)
+		SetTimer((*) => PrefixWatcherSuppress(false), -SYNTH_CLEAR_DELAY_MS)
 	SetTimer((*) => KL_ClearSynthetic(), -SYNTH_CLEAR_DELAY_MS)
 	_LLM_Bridge_Buffer .= text
 	; Audit event — pairs with the llm_suggested event the engine emitted
