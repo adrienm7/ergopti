@@ -2243,8 +2243,14 @@ SetTimer(I18nWarmFallbacks, -I18N_FALLBACK_WARM_DELAY_MS)
 ; shortly after "ready" without paying the index build on time-to-ready.
 SetTimer(HotstringPrefixWatcherRebuildIndex, -HS_PREFIX_INDEX_WARM_DELAY_MS)
 SetTimer(RegisterEmojisSymbolsDeferred, -HS_DEFERRED_REGISTRATION_DELAY_MS)
-if (MetricsShortcuts.enabled and WPMWidget.visible)
+if (MetricsShortcuts.enabled and WPMWidget.visible) {
+	; Graph mode: pre-create the GDI+ layered window + warm GDI+ in the quiet slot
+	; before the emoji pass, so its one-time DWM allocation is paid off the typing
+	; path rather than as a ~110 ms tooltip blip when the widget first appears.
+	if WPMWidget.show_graph
+		SetTimer(WPMWidget_PrewarmGraph, -WPMWidgetConst.PREWARM_DELAY_MS)
 	SetTimer(WPMWidget_Show, -WPMWidgetConst.BOOT_SHOW_DELAY_MS)
+}
 
 global _LAYOUT_POLL_INTERVAL_MS := 1000
 global _LAST_KEYBOARD_HKL := GetForegroundKeyboardLayout()

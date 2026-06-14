@@ -93,6 +93,12 @@ class WPMWidgetConst {
     ; widget arrives a beat after boot rather than mid-startup; it could be lowered
     ; safely if desired.
     static BOOT_SHOW_DELAY_MS := 2500
+    ; Delay (ms) after "ready" before the graph window is PRE-WARMED (created +
+    ; first hidden render + GDI+ startup) off the typing path, so the one-time DWM
+    ; window-allocation cost is not absorbed by a tooltip render when the widget
+    ; first appears (it showed up as a ~110 ms Tooltip.Present blip). Lands in the
+    ; quiet slot after the deferred menu build and before the emoji/symbol pass.
+    static PREWARM_DELAY_MS := 900
     ; Graph mode dimensions (wider to show history).
     static GRAPH_W            := 220
     static GRAPH_H            := 100
@@ -811,6 +817,42 @@ WPMWidget_DragEnd(*) {
 ; ======= 6/ Show / Hide =======
 ; ==============================
 ; ============================================
+
+; Pre-create the graph window + warm GDI+ during a quiet boot slot (armed earlier
+; than WPMWidget_Show), so the one-time DWM window-allocation and GdiplusStartup
+; cost is paid OFF the typing path. Previously that cost was absorbed by the first
+; tooltip render after the widget appeared, surfacing as a ~110 ms Tooltip.Present
+; blip (message-pump reentrancy while DWM composited the brand-new window). One
+; hidden render forces the layered surface allocation; the window stays hidden, so
+; the normal tick still reveals it only once the user actually types.
+WPMWidget_PrewarmGraph() {
+    if (!WPMWidget.visible or !WPMWidget.show_graph or A_IsSuspended)
+        return
+    if !WPMWidget._graph_gui
+        WPMWidget_BuildGraph()
+    g := WPMWidget._graph_gui
+    if !g
+        return
+    if (WPMWidget.pos_x = -1 || WPMWidget.pos_y = -1) {
+        WPMWidget_DefaultPos(&def_x, &def_y)
+        WPMWidget.pos_x := def_x
+        WPMWidget.pos_y := def_y
+    }
+    WPMWidget_ShowPos(&show_x, &show_y)
+    try {
+        ; Allocate the HWND + size WHILE HIDDEN, start GDI+, then run one hidden
+        ; render so UpdateLayeredWindow creates the layered surface now, not on the
+        ; first reveal. Leave it hidden — the tick reveals it when typing starts.
+        g.Show("Hide NoActivate x" . show_x . " y" . show_y
+            . " w" . WPMWidgetConst.GRAPH_W . " h" . WPMWidgetConst.GRAPH_H)
+        WPMWidget_EnsureGdip()
+        WPMWidget_RenderGraph("0 " . t("menu.metrics.wpm_unit"), WPMWidgetConst.COLOR_GRAPH_MANUAL)
+        LoggerDone("WPMWidget", "Graph window pre-warmed off the typing path.")
+    } catch as e {
+        LoggerError("WPMWidget", "Graph pre-warm failed: {1}", e.Message)
+    }
+}
+
 
 WPMWidget_Show() {
     LoggerStart("WPMWidget", "Showing widget (graph={1}, pos_x={2}, pos_y={3})…",
