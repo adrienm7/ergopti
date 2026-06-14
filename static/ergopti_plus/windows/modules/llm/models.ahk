@@ -297,7 +297,8 @@ _LLM_LoadPresets() {
 			return []
 		return parsed
 	} catch as e {
-		try LoggerError("LLM.models", "Failed to load models.json: {1}.", e.Message)
+		err_substr := SubStr(raw, 1, 200)
+		try LoggerError("LLM.models", "Failed to load models.json: {1}. Raw (200c): {2}", e.Message, err_substr)
 		return []
 	}
 }
