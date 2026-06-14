@@ -201,12 +201,14 @@ KL_Roi_ProcessWord(word) {
     if (KLRoi.word_counts.Count > KLRoiConst.MAX_TRACKED_WORDS) {
         ; Drop all words with count = 1 (noise)
         prune := []
+        Critical("On")
         for k, v in KLRoi.word_counts {
             if (v = 1)
                 prune.Push(k)
         }
         for _, k in prune
             KLRoi.word_counts.Delete(k)
+        Critical("Off")
     }
 }
 
@@ -234,7 +236,14 @@ KL_Roi_HalflifeTick() {
     ; not in the last HALFLIFE_WARN_DAYS worth of ticks.
     now := A_TickCount
     threshold := KLRoiConst.HALFLIFE_WARN_DAYS * 86400000
-    for trig, last_tick in KLRoi.trigger_last_use {
+    
+    Critical("On")
+    snapshot := Map()
+    for trig, last_tick in KLRoi.trigger_last_use
+        snapshot[trig] := last_tick
+    Critical("Off")
+
+    for trig, last_tick in snapshot {
         age := now - last_tick
         if (age >= threshold) {
             KL_AppendLog(Map(
