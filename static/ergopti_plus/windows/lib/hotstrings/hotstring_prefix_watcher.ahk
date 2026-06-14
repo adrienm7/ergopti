@@ -55,7 +55,7 @@ global _PrefixInputHook := 0
 ; InputHook does not mistake AHK's own output for fresh user input. After
 ; an expansion fires, the buffer would otherwise drift into ``c'était`` and
 ; surface unrelated triggers like ``taiwan`` (Taïwan) on the next refresh.
-global _PrefixWatcherSuppressed := false
+global _PrefixWatcherSuppressed := 0  ; depth counter — mirrors HSE_Suppressed refcount semantics
 
 ; Currently-suggested hotstring — populated when a tooltip transitions
 ; from hidden to visible, cleared when the tooltip hides (and a dismissed
@@ -288,7 +288,10 @@ _ResolveFireHType(Spec) {
 ; keystrokes of the next word if the user types quickly after the expansion.
 PrefixWatcherSuppress(YesNo) {
     global _PrefixWatcherSuppressed
-    _PrefixWatcherSuppressed := !!YesNo
+    if YesNo
+        _PrefixWatcherSuppressed += 1
+    else
+        _PrefixWatcherSuppressed := Max(0, _PrefixWatcherSuppressed - 1)
     ; Mirror the suppression into HSE so its parallel buffer stays aligned
     ; with the prefix watcher during send bursts. HSE_Suppress only
     ; flips the flag — the HSE buffer is NOT wiped here; HSE_DispatchMatch

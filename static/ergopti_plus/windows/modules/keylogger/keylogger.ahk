@@ -132,7 +132,7 @@ class Keylogger {
     ; st=<source> into each captured keystroke's meta; the reader keeps that
     ; output out of the manual `chars` count and the walker attributes the
     ; n-gram source (esrc). Cleared shortly after the burst (KL_ClearSynthetic).
-    static synth_active     := false
+    static synth_active     := 0      ; depth counter — overlapping fires each hold their own level
     static synth_type       := "none"
 
     ; Timers (lifecycle).
@@ -171,15 +171,17 @@ class Keylogger {
 ; `source` is "hotstring" or "llm". Always pair with a deferred KL_ClearSynthetic
 ; so the flag can never leak onto subsequent manual typing.
 KL_MarkSynthetic(source) {
-    Keylogger.synth_active := true
+    Keylogger.synth_active += 1
     Keylogger.synth_type := source
 }
 
 ; Clear the synthetic flag once the auto-typed burst has been captured. Takes a
 ; variadic param so it can be passed directly as a SetTimer callback.
 KL_ClearSynthetic(*) {
-    Keylogger.synth_active := false
-    Keylogger.synth_type := "none"
+    Keylogger.synth_active := Max(0, Keylogger.synth_active - 1)
+    ; Only reset the type label once every held level is released.
+    if !Keylogger.synth_active
+        Keylogger.synth_type := "none"
 }
 
 
