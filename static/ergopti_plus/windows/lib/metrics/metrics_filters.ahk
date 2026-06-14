@@ -91,25 +91,33 @@ MF_SaveToIni() {
 global MF_FOCUS_TTL_MS := 250
 
 class MetricsFocusCache {
-    static last_at      := 0
-    static last_hwnd    := 0
-    static process_name := ""
-    static title        := ""
-    static class        := ""
+    ; Build-then-swap pattern for atomic state updates: multiple properties
+    ; are gathered into a local object first, then published via a single
+    ; reference swap. This ensures readers (MF_ShouldFilter) never see an
+    ; inconsistent mix of old and new data (metrics-focus-cache-atomic).
+    static state := {
+        last_at:      0,
+        hwnd:         0,
+        process_name: "",
+        title:        "",
+        class:        ""
+    }
 }
 
 MF_RefreshFocus() {
-    if (A_TickCount - MetricsFocusCache.last_at) < MF_FOCUS_TTL_MS
+    if (A_TickCount - MetricsFocusCache.state.last_at) < MF_FOCUS_TTL_MS
         return
     hwnd := 0
     try hwnd := WinGetID("A")
     if !hwnd {
-        Critical("On")
-        MetricsFocusCache.process_name := ""
-        MetricsFocusCache.title        := ""
-        MetricsFocusCache.class        := ""
-        MetricsFocusCache.last_at      := A_TickCount
-        Critical("Off")
+        ; Atomic swap: publish empty context
+        MetricsFocusCache.state := {
+            last_at:      A_TickCount,
+            hwnd:         0,
+            process_name: "",
+            title:        "",
+            class:        ""
+        }
         return
     }
     
@@ -118,13 +126,14 @@ MF_RefreshFocus() {
     try t  := WinGetTitle("ahk_id " . hwnd)
     try c  := WinGetClass("ahk_id " . hwnd)
 
-    Critical("On")
-    MetricsFocusCache.last_hwnd    := hwnd
-    MetricsFocusCache.process_name := pn
-    MetricsFocusCache.title        := t
-    MetricsFocusCache.class        := c
-    MetricsFocusCache.last_at      := A_TickCount
-    Critical("Off")
+    ; Atomic swap: readers always see a consistent snapshot.
+    MetricsFocusCache.state := {
+        last_at:      A_TickCount,
+        hwnd:         hwnd,
+        process_name: pn,
+        title:        t,
+        class:        c
+    }
 }
 
 
@@ -170,9 +179,13 @@ global MF_SYSTEM_AUTH_CLASSES := Map(
 ; one of the privacy filters matches the focused window.
 MF_ShouldFilter() {
     MF_RefreshFocus()
-    proc  := StrLower(MetricsFocusCache.process_name)
-    title := MetricsFocusCache.title
-    cls   := MetricsFocusCache.class
+    
+    ; Capture the reference once so all subsequent property reads are
+    ; consistent with each other even if a background refresh occurs.
+    s := MetricsFocusCache.state
+    proc  := StrLower(s.process_name)
+    title := s.title
+    cls   := s.class
 
     ; 1. Disabled-apps list — fastest check.
     if (proc != "" && MetricsFilters.disabled_apps.Has(proc))
