@@ -12,6 +12,7 @@ Accumulated engineering knowledge for this repository — gotchas, architecture 
   - [feedback_ahk_ui_syntax_validation](#feedback-ahk-ui-syntax-validation) — AHK UI files aren't in the headless test runner; how to syntax-check them locally on Windows
   - [Coding style and conventions for this project](#coding-style-and-conventions-for-this-project) — Style rules, architecture decisions, and what to avoid when writing code for this project
   - [feedback_commit_push](#feedback-commit-push) — Never push automatically — commit only after explicit ask, push only after explicit validation
+  - [feedback-proactive-memory](#feedback-proactive-memory) — Record non-obvious learnings in this file proactively at the end of every task, without being asked
   - [feedback_fix_banners_tool](#feedback-fix-banners-tool) — npm run fix:banners auto-corrects all section banner alignment violations — run it before every commit instead of fixing manually
   - [feedback-loader-target-explicit](#feedback-loader-target-explicit) — AHK loader/writer modules that mutate a shared Map (Features etc.) must take the target Map as an explicit parameter, never reach for it via `global`
   - [No co-author trailers (Copilot, Claude, bots)](#no-co-author-trailers-copilot-claude-bots) — Never add Co-Authored-By trailers to commits — including Copilot, Claude, github-actions[bot], or any LLM/tool credit
@@ -29,6 +30,7 @@ Accumulated engineering knowledge for this repository — gotchas, architecture 
   - [project-hotstring-delay-architecture](#project-hotstring-delay-architecture) — Where hotstring expansion delays are configured, the cross-platform precedence, and the key gotchas
   - [project-hotstring-engine-internals](#project-hotstring-engine-internals) — AHK prefix-watcher InputHook captures synthetic input; OnChar must feed each char once; AHK vs Hammerspoon word-boundary framing divergence is intentional
   - [project-hotstring-live-rebuild](#project-hotstring-live-rebuild) — Hotstring section/category toggles apply in-process via a re-runnable RegisterAllHotstrings(); native-engine + layout-backed features under hotstrings.* are the reload-only exceptions
+  - [project-typing-latency-tooltip-coldstart](#project-typing-latency-tooltip-coldstart) — Tooltip render + post-boot warm-up latency: the border alpha scan optimization, why tooltip window-reuse is rejected (AHK v2 can't remove Gui controls), and the chunked deferred emoji/symbol registration
   - [Keymap module architecture and refactor decisions](#keymap-module-architecture-and-refactor-decisions) — Structure of the keymap module, where defaults live, which files do what
   - [project-locale-parity-test](#project-locale-parity-test) — en.json is the canonical key set; tools/check_locales.py enforces parity in CI
   - [project-locale-fast-cache](#project-locale-fast-cache) — The Windows driver's locale .tsv is a gitignored self-healing fast-parse cache regenerated from the canonical .json on a miss/staleness; only .json is tracked, no committed duplication
@@ -149,6 +151,23 @@ Commit freely after small autonomous changes, but stop there. Do NOT chain `&& g
 - After any commit: stop. Do not push. Wait for the user to say "push" or "pousse".
 - Step-by-step plan mode (user said "étape par étape, tu valides chacune"): also wait for explicit "ok"/"validé" before committing each step.
 - If unsure: commit is OK, push is never OK without explicit instruction.
+
+### feedback-proactive-memory
+
+_Record non-obvious learnings in this file proactively at the end of every task, without being asked_
+
+<sub>slug: `feedback_proactive_memory`</sub>
+
+At the end of any non-trivial task, record what was learned — foot-guns, architectural invariants, rejected approaches and why, conventions the user insists on — directly into this file, **without asking permission first**. Saving project knowledge is part of finishing the work, not an optional add-on to clear with the user.
+
+**Why:** the user said explicitly (2026-06-14) "tu ne devrais même pas avoir à me poser la question et devrais le faire à chaque fois tout seul" — asking "should I save this to memory?" is friction; the answer is always yes. Knowledge that evaporates between sessions forces re-investigation of things already figured out (e.g. re-attempting a refactor already proven unworkable).
+
+**How to apply:**
+
+- After finishing a task, add/update the relevant entry here (the right section + a ToC line) as a normal part of wrapping up — no confirmation prompt.
+- Capture especially: the WHY behind a decision, approaches that were tried and rejected (so they aren't re-attempted), and any silent/cryptic failure mode.
+- This is the in-repo store; do NOT spin up a separate agent-private memory file — everything lives here (see the top-of-file note and `CLAUDE.md`).
+- Committing the doc still follows [[feedback_commit_push]] (commit freely, never push without an explicit ask).
 
 ### feedback_fix_banners_tool
 
@@ -301,6 +320,26 @@ All user-facing text in the ergopti project must be served via the i18n system, 
 ---
 
 ## Project architecture & decisions
+
+### project-typing-latency-tooltip-coldstart
+
+_Tooltip render + post-boot warm-up latency: the border alpha scan optimization, why tooltip window-reuse is rejected (AHK v2 can't remove Gui controls), and the chunked deferred emoji/symbol registration_
+
+<sub>slug: `project_typing_latency_tooltip_coldstart`</sub>
+
+Findings from the runtime/typing-latency pass (2026-06-14). The `HotPath_LogIfSlow` profiler (`lib/hotpath_profiler.ahk`, QPC-based, logs only keystrokes/segments over 5 ms) is the lens — read the real `ErgoptiPlus_<date>.log` for `Slow <segment>: <ms>` lines before theorising. The recurring cost is the preview tooltip render (`Tooltip.Build` 5-7 ms + `Tooltip.Present` 11-40 ms, spiking to 62 ms), because the tooltip **destroys and recreates two top-level windows (content Gui + layered border) on every update** — the 150 ms `_PREFIX_RENDER_DEBOUNCE_MS` in `hotstring_prefix_watcher.ahk` is a workaround masking that cost.
+
+**Shipped:**
+
+- **Border alpha scan** (`6b1e4e59c`): `_TooltipShowBorder` repaints a 32-bpp DIB and rewrites every GDI-RoundRect-painted pixel to premultiplied border alpha. Extracted into `_TooltipFixBorderAlpha(PixPtr, Wp, Hp, Diam, PremulPx)`, which scans ONLY the painted zones — the two horizontal edge rows (full width) + the left/right corner-column zones of the top/bottom bands + the two vertical edge columns of middle rows — instead of the full corner band. Cost drops from ~2·Diam·Wp to ~2·Wp + 4·Diam², biggest win on short 1-2 row previews (~4-6 ms/render saved; the 5-12 ms `Tooltip.BorderPixelLoop` warnings mostly fall under the 5 ms threshold). Pinned by `tests/test_tooltip_border_alpha.ahk`, which paints a REAL GDI RoundRect and asserts the optimized scan is byte-identical to a full O(Wp·Hp) reference across six geometries — the invariant ("rewrite exactly the pixels GDI painted") is verified against the rasterizer, not a model of it.
+- **Chunked deferred emoji/symbol registration** (`e7072a7c8`): the ~3000-row emoji/symbol pass armed at T+1.5 s (`HS_DEFERRED_REGISTRATION_DELAY_MS`) ran as one synchronous ~680 ms blob that competed with the user's first keystrokes. `RegisterEmojisSymbolsDeferred` is now a self-rescheduling chunk driver (`_HsDeferredChunkTick`, 150 rows/chunk via `SetTimer(self, -1)`) so the message loop runs between chunks and OnChar is serviced. Plumbing: `_HsCacheRegisterSection` gained an optional `StartIdx`/`MaxCount` row slice (default `1,0` = whole section, unchanged for the boot fast-path + live rebuild) and returns the count; `LoadHotstringsSection` forwards the range ONLY on the cache fast-path (the TOML-parse fallback is not sliceable, so the driver passes a range only for cache-backed sections); `_EmojiSymbolSectionSpecs` is the single source of truth for which sections register, shared by the synchronous live rebuild (`_RegisterEmojisSymbolsSections`) and the chunked driver. Parity pinned by `test_hotstrings_cache.ahk` (`chunked slice registration matches whole-section`).
+
+**Rejected — do NOT re-attempt lightly:**
+
+- **Tooltip window-reuse** (keep the content Gui + border alive, mutate on update). The module docstring CLAIMS "single reused Gui… mutated on subsequent calls" but the code destroys+recreates every render — the claim is aspirational. Three blockers: (1) **AHK v2 cannot remove controls from a Gui** — only `Gui.Destroy()` the whole window — so content reuse needs a stateful control-pool rewrite (reuse by index, restyle/move/hide), high visual-regression risk in a module already full of dimmed-row / separator / LLM / dequeue edge cases; (2) the tooltip tests (`test_tooltip_*`, `test_llm_tooltip_*`) are **logic/contract-only** (arithmetic, formatters, FileRead source-greps) — they do NOT exercise the real window lifecycle, so a reuse refactor would land with no behavioral net in the module with the worst bug history ("clignote et part", "plein de tooltips", "border alone flash"); (3) border-only reuse hits a **z-order trap** — a freshly recreated content window lands above the reused (older) topmost border, hiding the ring. Marginal gain (~2-4 ms/render after the border-loop fix) for real regression risk → not worth it.
+- **WebView2 (WPM widget) cold-start de-contention**. The cold-start (`WPMWidget_Show` → `WPMWidget_AttachWebView`, armed at `BOOT_SHOW_DELAY_MS` = 2500) spawns msedgewebview2 processes that hammer CPU/disk for ~3 s and inflate `Tooltip.Present` to 30-62 ms while the user types. Every clean fix has a real tradeoff: idle-gating only partially helps (the ~3 s cold-start is longer than a typing pause, so it overlaps resumed typing); a longer fixed delay just guesses and delays the metrics; pre-warming before "ready" re-inflates the boot/time-to-icon (the existing comment moved it AFTER ready for exactly that reason — see [[project-locale-fast-cache]] neighborhood and the boot-defer ordering in [[project-ahk-menu-dispatcher-drop]]'s era). The border-loop fix already shrinks the cold-start spikes; residual jank is ~3 renders over ~3 s, one-time. Left alone by decision.
+
+Related: [[feedback-ahk-source-encoding]] (the new `.ahk` files needed BOM+CRLF), [[feedback-regression-tests]] (both wins shipped with a test), [[project-suspend-pause-invariant]] (the tooltip hot path checks `A_IsSuspended`).
 
 ### project-ahk-menu-dispatcher-drop
 
