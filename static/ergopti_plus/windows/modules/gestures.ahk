@@ -1539,9 +1539,9 @@ GestureToggleLeftClick() {
 
     ; Install a keyboard hook that releases the button on any key press
     GestureStartKeyboardWatcher()
-    ; Arm the RButton watcher dynamically — avoids installing the mouse hook
-    ; at load-time (which blocks on a headless CI runner with no hardware)
-    Hotkey("~RButton", GestureReleaseLeftClick, "On")
+    ; Subscribe via HookDispatcher so the shared ~RButton handler is preserved;
+    ; a bare Hotkey("~RButton", …) call would replace the dispatcher's handler.
+    HookDispatcher.Register("mouse_rdown", GestureReleaseLeftClick)
     LoggerInfo("gestures", "Left-click hold mode enabled.")
 }
 
@@ -1553,9 +1553,9 @@ GestureReleaseLeftClick(*) {
         return
     }
 
-    ; Disarm the RButton watcher before releasing so the Hotkey() call does
-    ; not itself trigger another GestureReleaseLeftClick invocation
-    try Hotkey("~RButton", GestureReleaseLeftClick, "Off")
+    ; Unsubscribe via HookDispatcher — Hotkey("~RButton", …, "Off") would
+    ; disable the shared ~RButton handler that the dispatcher registered.
+    HookDispatcher.Unregister("mouse_rdown", GestureReleaseLeftClick)
     LoggerDebug("gestures", "Disabling left-click hold mode…")
     Click("Left", "Up")
     GestureLeftClickHeld := False
@@ -1628,9 +1628,9 @@ GestureToggleRightClick() {
 
     ; Install a keyboard hook that releases the button on any key press
     GestureStartKeyboardWatcher()
-    ; Arm the LButton watcher dynamically — avoids installing the mouse hook
-    ; at load-time (which blocks on a hardware-less CI runner)
-    Hotkey("~LButton", GestureReleaseRightClick, "On")
+    ; Subscribe via HookDispatcher so the shared ~LButton handler is preserved;
+    ; a bare Hotkey("~LButton", …) call would replace the dispatcher's handler.
+    HookDispatcher.Register("mouse_ldown", GestureReleaseRightClick)
     LoggerInfo("gestures", "Right-click hold mode enabled.")
 }
 
@@ -1642,9 +1642,9 @@ GestureReleaseRightClick(*) {
         return
     }
 
-    ; Disarm the LButton watcher before releasing so the Hotkey() call does
-    ; not itself trigger another GestureReleaseRightClick invocation
-    try Hotkey("~LButton", GestureReleaseRightClick, "Off")
+    ; Unsubscribe via HookDispatcher — Hotkey("~LButton", …, "Off") would
+    ; disable the shared ~LButton handler that the dispatcher registered.
+    HookDispatcher.Unregister("mouse_ldown", GestureReleaseRightClick)
     LoggerDebug("gestures", "Disabling right-click hold mode…")
     Click("Right", "Up")
     GestureRightClickHeld := False
