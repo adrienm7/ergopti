@@ -263,6 +263,7 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 #Include meta/test_llm_tray_deferred_build.ahk
 #Include meta/test_logger_format_placeholders.ahk
 #Include meta/test_prefix_render_deferred.ahk
+#Include meta/test_input_serialization.ahk
 #Include meta/test_personal_load_once.ahk
 #Include meta/test_tray_llm_actions_include.ahk
 #Include meta/test_port_adapter_coverage.ahk

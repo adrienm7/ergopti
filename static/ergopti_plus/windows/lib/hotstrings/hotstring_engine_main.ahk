@@ -1290,40 +1290,79 @@ HSE_DispatchMatch(Spec, EndChar) {
         if (!IsConform and HasMethod(Replacement))
             Replacement := Replacement()
         OnlyText := Spec.HasOwnProp("OnlyText") ? Spec.OnlyText : true
-        FinalResult := Spec.HasOwnProp("FinalResult") ? Spec.FinalResult : false
+        IsNotepadApp := GetActiveApp().IsNotepad
+        SentBurst := ""   ; exactly what we injected — captured for the fire-trace
 
-        if GetActiveApp().IsNotepad {
-            ; Same Windows-11 Notepad workaround as the original engine.
-            SendNewResult(BackSpaceSeq, false)
-            SendInstant(Replacement . EndChar)
-        } else if FinalResult {
-            SendFinalResult(BackSpaceSeq, false)
-            SendFinalResult(Replacement, OnlyText)
-            if (EndChar != "") {
-                SendFinalResult(EndChar, false)
+        if IsNotepadApp {
+            ; Windows-11 Notepad mis-handles SendInput-injected hotstrings, so the
+            ; replacement is routed through the clipboard. This is the ONE remaining
+            ; non-atomic path (SendEvent backspaces + a clipboard paste); a physical
+            ; key typed mid-expansion can still interleave here, but the atomic path
+            ; is unreliable in Notepad specifically, so the trade-off stands.
+            ; SendInstant Sleeps (paste-settle); a caller may have entered Critical
+            ; (_OnPrefixChar does), and Critical MUST NOT span a Sleep — it would
+            ; yield (breaking the guarantee) and freeze all input ~200 ms. Release
+            ; Critical for this branch and restore it after. No-op when the caller
+            ; was not Critical (the space tap-hold path).
+            _NpCrit := Critical("Off")
+            try {
+                SendNewResult(BackSpaceSeq, false)
+                SendInstant(Replacement . EndChar)
+            } finally {
+                Critical(_NpCrit)
             }
+            SentBurst := BackSpaceSeq . "[clip]" . Replacement . EndChar
         } else {
-            ; SendInput is atomic — the entire backspace+replacement+endchar
-            ; burst is injected as one unit, preventing physical keystrokes
-            ; typed just after the trigger from interleaving with our send
-            ; sequence (the race that produced "Cha[letter]tGPT"-style output).
-            ; SendEvent was only needed for AHK-native-engine cascade triggering,
-            ; which HSE handles itself via its own buffer — no cascade benefit here.
+            ; SendInput is atomic: the ENTIRE backspace+replacement+endchar burst is
+            ; injected as one unit, so any physical keystroke the user types during
+            ; the expansion is buffered by the OS and delivered AFTER it — never
+            ; spliced into the middle (the race that produced "outpubct" /
+            ; "Cha[letter]tGPT"). This single path now also serves former
+            ; final_result triggers: post the SendInput migration every expansion is
+            ; non-cascading anyway, so the old 3-call SendFinalResult branch (which
+            ; sent BackSpace, Replacement and EndChar as SEPARATE SendInputs with
+            ; interleave gaps between them) was both redundant and the interleave
+            ; source — folded into this one atomic send, which additionally grants
+            ; those triggers the {Text} wrapping, consumed-delimiter handling and
+            ; UpdateLastSentCharacter the split branch silently skipped.
             ReplacementPart := OnlyText ? ("{Text}" . Replacement) : Replacement
             ; Consume the end-char when it is explicitly listed as consumed —
             ; otherwise always re-inject it so the user sees what they typed.
             EndCharPart := (EndChar != "" and !InStr(HSE_CONSUMED_DELIMITERS, EndChar)) ? EndChar : ""
             Burst := BackSpaceSeq . ReplacementPart . EndCharPart
-            ; Route through _SendHook when present (test harness) so the
-            ; entire atomic burst is recorded and assertions can inspect it.
-            ; In production _SendHook is unset and SendInput fires directly.
-            if _SendHook {
-                Hook := _SendHook
-                Hook("SendFinalResult", Burst, false)
-            } else {
-                SendInput(Burst)
+            ; Critical so AHK cannot start the next physical key's layout-remap
+            ; SendEvent thread between issuing this burst and it draining — keeping
+            ; the expansion atomic even when dispatched from a caller that is NOT
+            ; already Critical (e.g. the Space tap-hold path). Save/restore nests
+            ; safely under _OnPrefixChar's Critical. No Sleep here, so it is safe to
+            ; hold. Route through _SendHook when present (test harness) so the entire
+            ; atomic burst is recorded and assertions can inspect it; in production
+            ; _SendHook is unset and SendInput fires directly.
+            _AtCrit := Critical("On")
+            try {
+                if _SendHook {
+                    Hook := _SendHook
+                    Hook("SendFinalResult", Burst, false)
+                } else {
+                    SendInput(Burst)
+                }
+            } finally {
+                Critical(_AtCrit)
             }
             UpdateLastSentCharacter(SubStr(EndChar != "" ? EndChar : Replacement, -1))
+            SentBurst := Burst
+        }
+
+        ; ── Diagnostic fire-trace (debug only) ──────────────────────────────────
+        ; One line per expansion capturing the exact injected burst, branch and
+        ; context, so a reproduction of an interleave/drop ("outpubct",
+        ; "abcd"->"acd") can be read straight off the log. Debug-gated so normal
+        ; typing stays silent; enable via tray Debug -> Log level -> DEBUG.
+        if LoggerIsDebugEnabled() {
+            try LoggerDebug("HSEFire",
+                "FIRE trig='{1}' end='{2}' bs={3} branch={4} conform={5} burst='{6}'.",
+                Spec.Trigger, EndChar, BSCount, IsNotepadApp ? "notepad-clip" : "atomic",
+                IsConform ? 1 : 0, SentBurst)
         }
 
         ; Mirror the post-expansion screen state into the buffer so the

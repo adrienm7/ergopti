@@ -361,13 +361,31 @@ _PruneLastSentKeyTime() {
 	}
 }
 
+; Serialized remap emit — the callback every remapped key fires. SendMode is
+; "Event" globally (cascade relies on it), so each key re-sends its char via a
+; NON-atomic, interruptible SendEvent. Without serialization two fast keys can
+; start overlapping remap threads (A_MaxThreads is high; #MaxThreadsPerHotkey only
+; blocks re-entry of the SAME key) whose SendEvent injections interleave in the
+; single OS input queue and emit out of order (e.g. "comme" -> "cmooe"), and can
+; likewise splice into an in-flight hotstring expansion. Critical("On") makes this
+; callback uninterruptible, so AHK cannot start the NEXT key's remap (nor the
+; render/suppress timers, nor the watcher OnChar) until this SendEvent has fully
+; drained — restoring strict per-key ordering. Same SendEvent semantics
+; (``{Blind}`` / AltGr / modifiers unchanged); only ordering is enforced. There is
+; NO Sleep on this path, so Critical's guarantee holds (a Sleep would yield it).
+_RemapEmit(SendStr, KeyChar, *) {
+	Critical("On")
+	SendEvent(SendStr)
+	UpdateLastSentCharacter(KeyChar)
+}
+
 RemapKey(ScanCode, Character, AlternativeCharacter := "") {
 	global RemappedList
 	InputLevel := "I2"
 
 	Hotkey(
 		"*" ScanCode,
-		(*) => SendEvent("{Blind}" Character) UpdateLastSentCharacter(Character),
+		_RemapEmit.Bind("{Blind}" Character, Character),
 		InputLevel
 	)
 
@@ -376,7 +394,7 @@ RemapKey(ScanCode, Character, AlternativeCharacter := "") {
 	} else {
 		Hotkey(
 			ScanCode,
-			(*) => SendEvent("{Text}" . AlternativeCharacter) UpdateLastSentCharacter(AlternativeCharacter),
+			_RemapEmit.Bind("{Text}" . AlternativeCharacter, AlternativeCharacter),
 			InputLevel
 		)
 	}
@@ -386,12 +404,12 @@ RemapKey(ScanCode, Character, AlternativeCharacter := "") {
 	; The same happens for Win shortcuts, where we can get the shortcut on the QWERTY layer and not emulated Ergopti layer
 	Hotkey(
 		"^" ScanCode,
-		(*) => SendEvent("^" Character) UpdateLastSentCharacter(Character),
+		_RemapEmit.Bind("^" Character, Character),
 		InputLevel
 	)
 	Hotkey(
 		"!" ScanCode,
-		(*) => SendEvent("!" Character) UpdateLastSentCharacter(Character),
+		_RemapEmit.Bind("!" Character, Character),
 		"I3" ; Needs to be higher to keep the Alt shortcuts
 	)
 	if Character == "l" {
@@ -404,7 +422,7 @@ RemapKey(ScanCode, Character, AlternativeCharacter := "") {
 	} else {
 		Hotkey(
 			"#" ScanCode,
-			(*) => SendEvent("#" Character) UpdateLastSentCharacter(Character),
+			_RemapEmit.Bind("#" Character, Character),
 			InputLevel
 		)
 	}
