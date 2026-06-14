@@ -61,6 +61,34 @@ _TextSenderModifierPrefix(ModName) {
 	}
 }
 
+; Builds an AHK prefix from a space-delimited modifier STRING (the AHK-style form
+; that dozens of tap-hold / gesture call sites pass, e.g. "Shift", "Ctrl Shift",
+; "Blind"). Without this branch the modifiers were silently dropped and the bare
+; key was sent (back-Tab became a forward Tab; Ctrl+BackSpace word-delete degraded
+; to a single delete). "Blind" maps to the {Blind} prefix and is kept first so a
+; held modifier survives; unknown tokens are logged and skipped rather than
+; silently corrupting the emitted keystroke.
+_TextSenderModifierString(ModStr) {
+	Blind := ""
+	Prefix := ""
+	for Token in StrSplit(Trim(ModStr), " ") {
+		Token := Trim(Token)
+		if (Token = "")
+			continue
+		if (Token = "Blind") {
+			Blind := "{Blind}"
+			continue
+		}
+		P := _TextSenderModifierPrefix(Token)
+		if (P = "") {
+			LoggerWarn("TextSender", "TextPressKey: unknown modifier token '{1}' in '{2}' - ignored.", Token, ModStr)
+			continue
+		}
+		Prefix .= P
+	}
+	return Blind . Prefix
+}
+
 
 
 
@@ -132,6 +160,11 @@ TextPressKey(Key, Modifiers) {
 	if (Modifiers is Array) {
 		for ModStr in Modifiers
 			Prefix .= _TextSenderModifierPrefix(ModStr)
+	} else if (Modifiers is String) and (Modifiers != "") {
+		; AHK-style space-delimited modifier string ("Shift", "Ctrl Shift",
+		; "Blind", ...). Previously this fell through with Prefix "" and the bare
+		; key was emitted, silently dropping the modifier.
+		Prefix := _TextSenderModifierString(Modifiers)
 	}
 	_AHK_SendInput.Call(Prefix . "{" . Key . "}")
 }
