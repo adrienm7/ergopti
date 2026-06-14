@@ -1035,7 +1035,7 @@ _Updater_OpenChangelogWindow(Channel) {
 	)
 
 	BtnSwitch.OnEvent("Click", (*) => (
-		G.Destroy(),
+		_Updater_CloseGui(G),
 		IsLocal
 			? _Updater_OpenChangelogWindow(OtherChannel)
 			: Updater_SetChannel(OtherChannel)
@@ -1045,8 +1045,10 @@ _Updater_OpenChangelogWindow(Channel) {
 	Lb.OnEvent("DoubleClick", OpenSelected)
 	BtnInstall.OnEvent("Click", InstallSelected)
 	BtnOpen.OnEvent("Click", OpenSelected)
-	G.OnEvent("Close",  (*) => G.Destroy())
-	G.OnEvent("Escape", (*) => G.Destroy())
+	G.WVC := 0
+	G.Udir := ""
+	G.OnEvent("Close",  (*) => _Updater_CloseGui(G))
+	G.OnEvent("Escape", (*) => _Updater_CloseGui(G))
 
 	G.Show("w930 AutoSize")
 
@@ -1054,12 +1056,15 @@ _Updater_OpenChangelogWindow(Channel) {
 	if (UseWV) {
 		loader := _VendorDir . "\64bit\WebView2Loader.dll"
 		udir   := A_Temp . "\ergopti_changelog_wv_" . A_TickCount
+		WebView_SweepStaleProfiles("ergopti_changelog_wv_")
 		try DirCreate(udir)
+		G.Udir := udir
 		try {
 			; Parent the WebView2 to the RightPane control directly so Fill()
 			; covers exactly that control's client area — no manual coordinate
 			; arithmetic needed, and resize is handled automatically by the OS.
 			WVC := WebView2.create(RightPane.Hwnd, , 0, udir, "", 0, loader)
+			G.WVC := WVC
 		} catch as Err {
 			try LoggerWarn("Updater", "WebView2 create failed: {1} — falling back.", Err.Message)
 			UseWV := false
@@ -1395,12 +1400,14 @@ Updater_ShowUpdatePrompt(Release) {
 	BtnOpen    := G.Add("Button", "x+8 yp",          t("updater.update_dialog_open"))
 	BtnLater   := G.Add("Button", "x+8 yp",          t("updater.update_dialog_later"))
 
-	BtnInstall.OnEvent("Click", (*) => (G.Destroy(), Updater_DownloadAndInstall(Release)))
+	BtnInstall.OnEvent("Click", (*) => (_Updater_CloseGui(G), Updater_DownloadAndInstall(Release)))
 	BtnOpen.OnEvent("Click",    (*) => Run(Release.HasProp("HtmlUrl") and Release.HtmlUrl != ""
 		? Release.HtmlUrl : Updater_ReleasesPageUrl()))
-	BtnLater.OnEvent("Click",   (*) => G.Destroy())
-	G.OnEvent("Close",  (*) => G.Destroy())
-	G.OnEvent("Escape", (*) => G.Destroy())
+	BtnLater.OnEvent("Click",   (*) => _Updater_CloseGui(G))
+	G.WVC := 0
+	G.Udir := ""
+	G.OnEvent("Close",  (*) => _Updater_CloseGui(G))
+	G.OnEvent("Escape", (*) => _Updater_CloseGui(G))
 	G.Show("w740 AutoSize")
 
 	; Spin up WebView2 for Markdown rendering after Show() (Hwnd is valid then).
@@ -1408,10 +1415,13 @@ Updater_ShowUpdatePrompt(Release) {
 	if UseWV {
 		loader := _VendorDir . "\64bit\WebView2Loader.dll"
 		udir   := A_Temp . "\ergopti_update_wv_" . A_TickCount
+		WebView_SweepStaleProfiles("ergopti_update_wv_")
 		try DirCreate(udir)
+		G.Udir := udir
 		WVC := unset
 		try {
 			WVC := WebView2.create(BodyPane.Hwnd, , 0, udir, "", 0, loader)
+			G.WVC := WVC
 		} catch as Err {
 			try LoggerWarn("Updater", "WebView2 create failed in update prompt: {1}.", Err.Message)
 			UseWV := false
@@ -1428,6 +1438,15 @@ Updater_ShowUpdatePrompt(Release) {
 			WVC.CoreWebView2.NavigateToString(_Updater_MakeMarkdownHtml(Release.Body))
 		}
 	}
+}
+
+_Updater_CloseGui(G) {
+	if G.HasProp("WVC") && G.WVC
+		try G.WVC.Close()
+	try G.Destroy()
+	if G.HasProp("Udir") && G.Udir != ""
+		try DirDelete(G.Udir, true)
+}
 	if (!UseWV or !IsSet(WVC)) {
 		; Fallback: replace the placeholder with a plain read-only Edit.
 		BodyPane.GetPos(&bx, &by, &bw, &bh)

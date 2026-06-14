@@ -180,6 +180,7 @@ KLWV_Open(which, metrics_dir) {
     ; Spin up WebView2 inside the Gui's HWND. dataDir is unique per
     ; launch so cached state from a previous open never bleeds in.
     udir := A_Temp . "\ergopti_webview2_" . A_TickCount
+    WebView_SweepStaleProfiles("ergopti_webview2_")
     DirCreate(udir)
     loader := _VendorDir . "\64bit\WebView2Loader.dll"
 
@@ -270,6 +271,7 @@ KLWV_Close(which) {
     entry := KLWV.windows[which]
     try entry["controller"].Close()
     try entry["gui"].Destroy()
+    try DirDelete(entry["udir"], true)
     KLWV.windows.Delete(which)
 }
 
