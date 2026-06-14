@@ -75,6 +75,11 @@ class KeylogConst {
     static THINK_PAUSE_MS           := 2000     ; Active vs thinking pause threshold.
     static WPM_MAX_DELAY_MS         := 5000     ; Outlier cap for WPM bucketing.
     static MIDNIGHT_CHECK_TICK_MS   := 60000    ; Day rollover check cadence.
+    ; Min keyboard-idle window before the heavy SQL conversion and FileAppend
+    ; to data.sql is allowed to run. A typing burst within this window defers
+    ; the ingest to the next tick so the main thread never blocks while the
+    ; user is typing.
+    static INGEST_IDLE_MS           := 500
     ; Min keyboard-idle window before the heavy dashboard rebuild (KLWV_NotifyIngest
     ; "live" mode, 150-300 ms) is allowed to run on the ingest timer. A typing burst
     ; within this window defers the rebuild to the next ingest tick so the rebuild
@@ -1266,6 +1271,15 @@ KL_IngestOnce() {
 		}
 		return
 	}
+
+    ; Heavy part: SQL conversion and data.sql FileAppend.
+    ; Guard with a keyboard-idle check: the conversion + I/O can take ~100-500 ms
+    ; for large batches; running it during a typing burst exceeds
+    ; LowLevelHooksTimeout (~300 ms) and silently drops keystrokes.
+    ; Deferred to the next ingest tick if the user typed recently.
+    ; See project_keyboard_thread_priority.
+    if (IsSet(KLHook) and KLHook.last_tick != 0 and A_TickCount - KLHook.last_tick < KeylogConst.INGEST_IDLE_MS)
+        return
 
     statements := []
     for _, entry in entries {
