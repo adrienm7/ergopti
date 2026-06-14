@@ -274,23 +274,26 @@ SendFinalResult(Text, OnlyText := False) {
     }
 }
 
+_SendInstant_RestoreClipboard(OldClip) {
+	A_Clipboard := OldClip
+}
+
 SendInstant(Text) {
-    ; Function for sending immediately a big text without typing it letter by letter.
-    ; Uses try/finally so the user's clipboard is restored even on error/crash.
-    if _SendHook {
-        Hook := _SendHook
-        Hook("SendInstant", Text)
-        return
-    }
-    OldClipboard := ClipboardAll()
-    try {
-        A_Clipboard := Text
-        SendInput("^v")
-        Sleep(SEND_INSTANT_PASTE_DELAY_MS)
-    } finally {
-        A_Clipboard := OldClipboard
-        OldClipboard := ""
-    }
+	; Function for sending immediately a big text without typing it letter by letter.
+	; Uses try so the user's clipboard is restored even on error/crash.
+	if _SendHook {
+		Hook := _SendHook
+		Hook("SendInstant", Text)
+		return
+	}
+	OldClipboard := ClipboardAll()
+	try {
+		A_Clipboard := Text
+		SendInput("^v")
+		SetTimer(_SendInstant_RestoreClipboard.Bind(OldClipboard), -SEND_INSTANT_PASTE_DELAY_MS)
+	} catch {
+		A_Clipboard := OldClipboard
+	}
 }
 
 ; Leave time to trigger hotstrings between sending a character and then another one

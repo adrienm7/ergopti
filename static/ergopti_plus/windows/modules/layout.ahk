@@ -468,10 +468,13 @@ _UIA_EMPTY_SEL_TTL_MS := 80
 ; Two caches short-circuit the COM round-trip so it never runs on every
 ; symbol keystroke when the user is not holding a text selection.
 GetUIASelection() {
-	if (!isSet(UIA) or WinActive("Code"))
+	if (!isSet(UIA))
 		return ""
 	try {
-		ProcName := WinGetProcessName("A")
+		App := GetActiveApp()
+		if (App.ProcessName = "Code.exe")
+			return ""
+		ProcName := App.ProcessName
 		Now := A_TickCount
 		; No-TextPattern cache: skip processes that never expose TextPattern
 		if (_UIA_NO_TP_CACHE.Has(ProcName) and Now < _UIA_NO_TP_CACHE[ProcName])
