@@ -98,90 +98,102 @@ SpotlightMouseAt(X, Y, DurationMs) {
 		return Hwnd
 	}
 
-	; --- Draw the yellow filled circle on the cursor's screen ---
-	Size   := (RING_RADIUS + PAD) * 2
-	WinX   := X - RING_RADIUS - PAD
-	WinY   := Y - RING_RADIUS - PAD
-
-	CircleDraw(pGfx, W, H) {
-		; Filled ellipse
-		DllCall("gdiplus\GdipCreateSolidFill", "uint", YELLOW_FILL, "ptr*", &pBrush := 0)
-		DllCall("gdiplus\GdipFillEllipse",
-			"ptr", pGfx, "ptr", pBrush,
-			"float", PAD, "float", PAD,
-			"float", RING_RADIUS * 2, "float", RING_RADIUS * 2)
-		DllCall("gdiplus\GdipDeleteBrush", "ptr", pBrush)
-
-		; Stroke ellipse
-		DllCall("gdiplus\GdipCreatePen1", "uint", YELLOW_STROKE, "float", RING_STROKE, "int", 2, "ptr*", &pPen := 0)
-		DllCall("gdiplus\GdipDrawEllipse",
-			"ptr", pGfx, "ptr", pPen,
-			"float", PAD + RING_STROKE / 2, "float", PAD + RING_STROKE / 2,
-			"float", RING_RADIUS * 2 - RING_STROKE, "float", RING_RADIUS * 2 - RING_STROKE)
-		DllCall("gdiplus\GdipDeletePen", "ptr", pPen)
-	}
-
-	CircleHwnd := CreateOverlayWindow(WinX, WinY, Size, Size, CircleDraw)
-
-	; --- Draw a red cross centered on every OTHER monitor ---
-	CrossSize := (CROSS_HALF + PAD) * 2
+	CircleHwnd := 0
 	CrossHwnds := []
+	try {
+		; --- Draw the yellow filled circle on the cursor's screen ---
+		Size   := (RING_RADIUS + PAD) * 2
+		WinX   := X - RING_RADIUS - PAD
+		WinY   := Y - RING_RADIUS - PAD
 
-	MonCount := MonitorGetCount()
-	loop MonCount {
-		MonitorGet(A_Index, &ML, &MT, &MR, &MB)
-		; Skip the monitor that holds the cursor
-		if (X >= ML and X < MR and Y >= MT and Y < MB)
-			continue
-
-		CX := ML + (MR - ML) // 2
-		CY := MT + (MB - MT) // 2
-
-		CWinX := CX - CROSS_HALF - PAD
-		CWinY := CY - CROSS_HALF - PAD
-
-		CrossDraw(pGfx, W, H) {
-			HW := CROSS_WIDTH / 2
-
-			; Horizontal bar
-			DllCall("gdiplus\GdipCreateSolidFill", "uint", RED_FILL, "ptr*", &pBrush := 0)
-			DllCall("gdiplus\GdipFillRectangle",
+		CircleDraw(pGfx, W, H) {
+			; Filled ellipse
+			DllCall("gdiplus\GdipCreateSolidFill", "uint", YELLOW_FILL, "ptr*", &pBrush := 0)
+			DllCall("gdiplus\GdipFillEllipse",
 				"ptr", pGfx, "ptr", pBrush,
-				"float", PAD, "float", PAD + CROSS_HALF - HW,
-				"float", CROSS_HALF * 2, "float", CROSS_WIDTH)
-			; Vertical bar
-			DllCall("gdiplus\GdipFillRectangle",
-				"ptr", pGfx, "ptr", pBrush,
-				"float", PAD + CROSS_HALF - HW, "float", PAD,
-				"float", CROSS_WIDTH, "float", CROSS_HALF * 2)
+				"float", PAD, "float", PAD,
+				"float", RING_RADIUS * 2, "float", RING_RADIUS * 2)
 			DllCall("gdiplus\GdipDeleteBrush", "ptr", pBrush)
 
-			; Strokes
-			DllCall("gdiplus\GdipCreatePen1", "uint", RED_STROKE, "float", RING_STROKE, "int", 2, "ptr*", &pPen := 0)
-			DllCall("gdiplus\GdipDrawRectangle",
+			; Stroke ellipse
+			DllCall("gdiplus\GdipCreatePen1", "uint", YELLOW_STROKE, "float", RING_STROKE, "int", 2, "ptr*", &pPen := 0)
+			DllCall("gdiplus\GdipDrawEllipse",
 				"ptr", pGfx, "ptr", pPen,
-				"float", PAD + RING_STROKE / 2, "float", PAD + CROSS_HALF - HW + RING_STROKE / 2,
-				"float", CROSS_HALF * 2 - RING_STROKE, "float", CROSS_WIDTH - RING_STROKE)
-			DllCall("gdiplus\GdipDrawRectangle",
-				"ptr", pGfx, "ptr", pPen,
-				"float", PAD + CROSS_HALF - HW + RING_STROKE / 2, "float", PAD + RING_STROKE / 2,
-				"float", CROSS_WIDTH - RING_STROKE, "float", CROSS_HALF * 2 - RING_STROKE)
+				"float", PAD + RING_STROKE / 2, "float", PAD + RING_STROKE / 2,
+				"float", RING_RADIUS * 2 - RING_STROKE, "float", RING_RADIUS * 2 - RING_STROKE)
 			DllCall("gdiplus\GdipDeletePen", "ptr", pPen)
 		}
 
-		CrossHwnds.Push(CreateOverlayWindow(CWinX, CWinY, CrossSize, CrossSize, CrossDraw))
-	}
+		CircleHwnd := CreateOverlayWindow(WinX, WinY, Size, Size, CircleDraw)
 
-	; --- Poll for mouse move or timeout, then destroy all windows ---
-	_Spotlight_State["Active"] := true
-	_Spotlight_State["StartX"] := X
-	_Spotlight_State["StartY"] := Y
-	_Spotlight_State["Deadline"] := A_TickCount + DurationMs
-	_Spotlight_State["CircleHwnd"] := CircleHwnd
-	_Spotlight_State["CrossHwnds"] := CrossHwnds
-	_Spotlight_State["pToken"] := pToken
-	
-	SetTimer(_SpotlightTick, DISMISS_POLL)
+		; --- Draw a red cross centered on every OTHER monitor ---
+		CrossSize := (CROSS_HALF + PAD) * 2
+
+		MonCount := MonitorGetCount()
+		loop MonCount {
+			MonitorGet(A_Index, &ML, &MT, &MR, &MB)
+			; Skip the monitor that holds the cursor
+			if (X >= ML and X < MR and Y >= MT and Y < MB)
+				continue
+
+			CX := ML + (MR - ML) // 2
+			CY := MT + (MB - MT) // 2
+
+			CWinX := CX - CROSS_HALF - PAD
+			CWinY := CY - CROSS_HALF - PAD
+
+			CrossDraw(pGfx, W, H) {
+				HW := CROSS_WIDTH / 2
+
+				; Horizontal bar
+				DllCall("gdiplus\GdipCreateSolidFill", "uint", RED_FILL, "ptr*", &pBrush := 0)
+				DllCall("gdiplus\GdipFillRectangle",
+					"ptr", pGfx, "ptr", pBrush,
+					"float", PAD, "float", PAD + CROSS_HALF - HW,
+					"float", CROSS_HALF * 2, "float", CROSS_WIDTH)
+				; Vertical bar
+				DllCall("gdiplus\GdipFillRectangle",
+					"ptr", pGfx, "ptr", pBrush,
+					"float", PAD + CROSS_HALF - HW, "float", PAD,
+					"float", CROSS_WIDTH, "float", CROSS_HALF * 2)
+				DllCall("gdiplus\GdipDeleteBrush", "ptr", pBrush)
+
+				; Strokes
+				DllCall("gdiplus\GdipCreatePen1", "uint", RED_STROKE, "float", RING_STROKE, "int", 2, "ptr*", &pPen := 0)
+				DllCall("gdiplus\GdipDrawRectangle",
+					"ptr", pGfx, "ptr", pPen,
+					"float", PAD + RING_STROKE / 2, "float", PAD + CROSS_HALF - HW + RING_STROKE / 2,
+					"float", CROSS_HALF * 2 - RING_STROKE, "float", CROSS_WIDTH - RING_STROKE)
+				DllCall("gdiplus\GdipDrawRectangle",
+					"ptr", pGfx, "ptr", pPen,
+					"float", PAD + CROSS_HALF - HW + RING_STROKE / 2, "float", PAD + RING_STROKE / 2,
+					"float", CROSS_WIDTH - RING_STROKE, "float", CROSS_HALF * 2 - RING_STROKE)
+				DllCall("gdiplus\GdipDeletePen", "ptr", pPen)
+			}
+
+			CrossHwnds.Push(CreateOverlayWindow(CWinX, CWinY, CrossSize, CrossSize, CrossDraw))
+		}
+
+		; --- Poll for mouse move or timeout, then destroy all windows ---
+		_Spotlight_State["Active"] := true
+		_Spotlight_State["StartX"] := X
+		_Spotlight_State["StartY"] := Y
+		_Spotlight_State["Deadline"] := A_TickCount + DurationMs
+		_Spotlight_State["CircleHwnd"] := CircleHwnd
+		_Spotlight_State["CrossHwnds"] := CrossHwnds
+		_Spotlight_State["pToken"] := pToken
+		
+		SetTimer(_SpotlightTick, DISMISS_POLL)
+	} catch as Err {
+		if CircleHwnd
+			try GR_DestroyWindow(CircleHwnd)
+		for Hwnd in CrossHwnds {
+			if Hwnd
+				try GR_DestroyWindow(Hwnd)
+		}
+		DllCall("gdiplus\GdiplusShutdown", "ptr", pToken)
+		throw Err
+	}
 }
 
 _SpotlightTick() {
