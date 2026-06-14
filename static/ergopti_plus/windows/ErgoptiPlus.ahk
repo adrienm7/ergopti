@@ -2259,6 +2259,12 @@ global _LAYOUT_POLL_INTERVAL_MS := 1000
 global _LAST_KEYBOARD_HKL := GetForegroundKeyboardLayout()
 CheckKeyboardLayoutChange() {
     global _LAST_KEYBOARD_HKL
+    ; Skip while paused — a Reload() would restart the driver in the unpaused
+    ; state, silently clearing the user's pause without their knowledge.
+    ; The layout change is harmless to miss while paused; it will be picked up
+    ; at the next natural restart or when the user explicitly unpauses.
+    if A_IsSuspended
+        return
     HKL := GetForegroundKeyboardLayout()
     if (HKL != 0 and HKL != _LAST_KEYBOARD_HKL) {
         _LAST_KEYBOARD_HKL := HKL
