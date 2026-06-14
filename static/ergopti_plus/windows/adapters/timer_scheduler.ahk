@@ -142,6 +142,8 @@ TimerActiveCount() {
 ; explicitly via Bind to freeze it at creation time.
 _TimerAdapterMakeOneShot(Handle, Fn) {
 	_OneShot(BoundHandle, BoundFn) {
+		if A_IsSuspended
+			return
 		global _TIMER_ADAPTER_REGISTRY
 		BoundHandle["Fired"] := true
 		Id := BoundHandle.Has("Id") ? BoundHandle["Id"] : 0
@@ -149,7 +151,7 @@ _TimerAdapterMakeOneShot(Handle, Fn) {
 			_TIMER_ADAPTER_REGISTRY.Delete(Id)
 		try BoundFn()
 		catch as Err {
-			OutputDebug("TimerAdapter [one-shot] callback error: " . Err.Message)
+			try LoggerError("TimerScheduler", "one-shot callback threw: {1}", Err.Message)
 		}
 	}
 	return _OneShot.Bind(Handle, Fn)
@@ -158,11 +160,13 @@ _TimerAdapterMakeOneShot(Handle, Fn) {
 ; Builds a repeating wrapper that logs uncaught exceptions without killing the timer.
 _TimerAdapterMakeRepeating(Handle, Fn) {
 	_Repeating(BoundHandle, BoundFn) {
+		if A_IsSuspended
+			return
 		if BoundHandle["Fired"]
 			return
 		try BoundFn()
 		catch as Err {
-			OutputDebug("TimerAdapter [repeating] callback error: " . Err.Message)
+			try LoggerError("TimerScheduler", "repeating callback threw: {1}", Err.Message)
 		}
 	}
 	return _Repeating.Bind(Handle, Fn)

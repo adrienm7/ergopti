@@ -288,6 +288,8 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 #Include meta/test_keepawake_pause_gate.ahk
 #Include meta/test_mouse_park_gate.ahk
 #Include meta/test_mouse_hotkey_clobber.ahk
+#Include meta/test_timer_scheduler_pause_guard.ahk
+#Include meta/test_keylogger_watchers_pause_guard.ahk
 #Include meta/test_uia_selection_cache.ahk
 #Include meta/test_remote_poll_deadline.ahk
 #Include meta/test_download_integrity_guard.ahk
