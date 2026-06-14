@@ -281,6 +281,7 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 #Include meta/test_spotlight_non_blocking.ahk
 #Include meta/test_spotlight_gdiplus_leak.ahk
 #Include meta/test_toml_batchwrite_atomic.ahk
+#Include meta/test_webview2_temp_leak.ahk
 #Include meta/test_updater_sync_winhttp_blocks.ahk
 #Include meta/test_sqlite_progress_yield.ahk
 #Include meta/test_logger_sync_warning.ahk

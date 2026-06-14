@@ -117,11 +117,12 @@ _CLW_BuildWindow(Channel) {
 
 	; Spin up WebView2 now that the Hwnd is valid.
 	loader := _VendorDir . "\64bit\WebView2Loader.dll"
-	udir   := A_Temp . "\ergopti_changelog_wv_" . A_TickCount
-	try DirCreate(udir)
+	global _CLW_Udir := A_Temp . "\ergopti_changelog_wv_" . A_TickCount
+	WebView_SweepStaleProfiles("ergopti_changelog_wv_")
+	try DirCreate(_CLW_Udir)
 
 	try {
-		_CLW_Controller := WebView2.create(Placeholder.Hwnd, , 0, udir, "", 0, loader)
+		_CLW_Controller := WebView2.create(Placeholder.Hwnd, , 0, _CLW_Udir, "", 0, loader)
 	} catch as Err {
 		try LoggerError("Changelog", "WebView2 create failed: {1}.", Err.Message)
 		try g.Destroy()
@@ -399,12 +400,18 @@ _CLW_JsStr(s) {
  * Resets all module-level state after window close.
  */
 _CLW_Reset() {
-	global _CLW_Gui, _CLW_WebView, _CLW_Controller, _CLW_Ready, _CLW_Queue
+	global _CLW_Gui, _CLW_WebView, _CLW_Controller, _CLW_Ready, _CLW_Queue, _CLW_Udir
+	if IsSet(_CLW_Controller)
+		try _CLW_Controller.Close()
 	_CLW_Gui        := unset
 	_CLW_WebView    := unset
 	_CLW_Controller := unset
 	_CLW_Ready      := false
 	_CLW_Queue      := []
+	if IsSet(_CLW_Udir) {
+		try DirDelete(_CLW_Udir, true)
+		_CLW_Udir := unset
+	}
 }
 
 

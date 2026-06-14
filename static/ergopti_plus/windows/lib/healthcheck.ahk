@@ -300,9 +300,11 @@ HealthCheck_ShowWindow() {
 		"xm y+" . _HC_BTN_PAD . " w" . InnerW . " h" . _HC_BTN_H . " Default",
 		BtnLabel)
 
-	CloseAndCopy := (*) => (A_Clipboard := PlainText, G.Destroy())
-	G.OnEvent("Close",  (*) => G.Destroy())
-	G.OnEvent("Escape", (*) => G.Destroy())
+	G.WVC := 0
+	G.Udir := ""
+	CloseAndCopy := (*) => (A_Clipboard := PlainText, _HealthCheck_CloseGui(G))
+	G.OnEvent("Close",  (*) => _HealthCheck_CloseGui(G))
+	G.OnEvent("Escape", (*) => _HealthCheck_CloseGui(G))
 	BtnCopy.OnEvent("Click", CloseAndCopy)
 
 	G.Show("w" . _HC_WIN_W . " AutoSize")
@@ -311,12 +313,15 @@ HealthCheck_ShowWindow() {
 	if UseWV {
 		loader := _VendorDir . "\64bit\WebView2Loader.dll"
 		udir   := A_Temp . "\ergopti_hc_wv_" . A_TickCount
+		WebView_SweepStaleProfiles("ergopti_hc_wv_")
 		try DirCreate(udir)
+		G.Udir := udir
 
 		WVC := 0
 		try {
 			; Parent to ContentCtl.Hwnd — identical to updater's RightPane.Hwnd pattern.
 			WVC := WebView2.create(ContentCtl.Hwnd, , 0, udir, "", 0, loader)
+			G.WVC := WVC
 		} catch as Err {
 			try LoggerWarn("Healthcheck", "WebView2 create failed: {1} — falling back.", Err.Message)
 		}
@@ -352,7 +357,7 @@ _HealthCheck_OnWebMsg(WV, MsgArgs, PlainText, G) {
 		Msg := MsgArgs.TryGetWebMessageAsString()
 		if Msg = "copy_and_close" {
 			A_Clipboard := PlainText
-			G.Destroy()
+			_HealthCheck_CloseGui(G)
 		}
 	}
 }
@@ -363,6 +368,14 @@ _HealthCheck_AddFallbackEdit(G, HostCtl, Text) {
 	EditCtl := G.Add("Edit", "x" . X . " y" . Y . " w" . W . " h" . H
 		. " ReadOnly Multi -Wrap +VScroll", Text)
 	EditCtl.SetFont("s9", "Consolas")
+}
+
+_HealthCheck_CloseGui(G) {
+	if G.HasProp("WVC") && G.WVC
+		try G.WVC.Close()
+	try G.Destroy()
+	if G.HasProp("Udir") && G.Udir != ""
+		try DirDelete(G.Udir, true)
 }
 
 ; Formats the snapshot as a plain-text string (fallback when WebView2 is absent).

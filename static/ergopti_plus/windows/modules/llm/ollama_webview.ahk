@@ -148,7 +148,7 @@ OllamaWV_Done(is_success, msg := "") {
  * Hides and destroys the window.
  */
 OllamaWV_Close() {
-	global _OllamaWV_Gui, _OllamaWV_Controller, _OllamaWV_WebView, _OllamaWV_Ready, _OllamaWV_Queue
+	global _OllamaWV_Gui, _OllamaWV_Controller, _OllamaWV_WebView, _OllamaWV_Ready, _OllamaWV_Queue, _OllamaWV_Udir
 	_OllamaWV_Ready := false
 	_OllamaWV_Queue := []
 	if IsSet(_OllamaWV_Controller)
@@ -158,6 +158,10 @@ OllamaWV_Close() {
 	_OllamaWV_Gui        := unset
 	_OllamaWV_Controller := unset
 	_OllamaWV_WebView    := unset
+	if IsSet(_OllamaWV_Udir) {
+		try DirDelete(_OllamaWV_Udir, true)
+		_OllamaWV_Udir := unset
+	}
 }
 
 /**
@@ -231,11 +235,12 @@ OllamaWV_Create(kind, subtitle) {
 
 	; Spin up WebView2
 	loader := _VendorDir . "\64bit\WebView2Loader.dll"
-	udir   := A_Temp . "\ergopti_ollama_wv_" . A_TickCount
-	try DirCreate(udir)
+	global _OllamaWV_Udir := A_Temp . "\ergopti_ollama_wv_" . A_TickCount
+	WebView_SweepStaleProfiles("ergopti_ollama_wv_")
+	try DirCreate(_OllamaWV_Udir)
 
 	try {
-		_OllamaWV_Controller := WebView2.create(g.Hwnd, , 0, udir, "", 0, loader)
+		_OllamaWV_Controller := WebView2.create(g.Hwnd, , 0, _OllamaWV_Udir, "", 0, loader)
 	} catch as err {
 		LoggerError("LLM", "WebView2 controller creation failed: " err.Message ".")
 		try g.Destroy()

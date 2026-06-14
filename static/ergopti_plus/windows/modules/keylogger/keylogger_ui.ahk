@@ -148,15 +148,8 @@ KLUI_LaunchWindow(url, title) {
     ; lingering helper process for a few seconds after the window closes).
     ; Spinning up a fresh dir guarantees the freshest page every time and
     ; the orphan ones are cleaned up below on a best-effort basis.
-    udir_root := A_Temp . "\ergopti_metrics_edge"
-    udir := udir_root . "_" . A_TickCount
-    ; Sweep old siblings BEFORE creating the new dir so the loop never
-    ; touches the freshly-allocated path. Anything we can't delete (still
-    ; locked by Edge) gets retried on the next launch.
-    try {
-        loop files, udir_root . "_*", "D"
-            try DirDelete(A_LoopFileFullPath, true)
-    }
+    udir := A_Temp . "\ergopti_metrics_edge_" . A_TickCount
+    WebView_SweepStaleProfiles("ergopti_metrics_edge_")
     DirCreate(udir)
     ; --allow-file-access-from-files: lift the same-origin restriction that
     ; treats every file:// URL as a unique origin. Without it, the page
