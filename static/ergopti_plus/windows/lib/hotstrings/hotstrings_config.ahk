@@ -231,10 +231,15 @@ HotstringsGetWordDelimiters() {
 }
 
 ; Persist a new word-delimiter string to the [__global__] section of the
-; override file, then trigger a Reload so the engine picks up the change.
+; override file and propagate it immediately into the live engine variable
+; HSE_WORD_TERMINATORS so the change takes effect without a Reload.
 HotstringsSetWordDelimiters(Delimiters) {
     global _HotstringsOverridesPath, _HotstringsWordDelimiters, HOTSTRINGS_DEFAULT_WORD_DELIMITERS
+    global HSE_WORD_TERMINATORS
     _HotstringsWordDelimiters := Delimiters
+    ; Mirror the live engine variable so the next keystroke already uses the
+    ; updated set — mirrors the pattern used by HotstringsSetConsumedDelimiters.
+    HSE_WORD_TERMINATORS := HotstringsGetWordDelimiters()
     _SaveGlobalWordDelimiters(Delimiters)
 }
 

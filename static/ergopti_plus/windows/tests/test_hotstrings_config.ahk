@@ -563,3 +563,40 @@ TestHotstringsConfig_ResolveExtPriority() {
 }
 Test("HotstringsResolveExt: exposes priority with the package source default + override",
 	TestHotstringsConfig_ResolveExtPriority)
+
+
+; ==============================================================================
+; ======= Word-delimiter live-propagation regression ===========================
+; ==============================================================================
+
+; Regression guard for word-delimiters-not-applied-live: HotstringsSetWordDelimiters
+; was updating the config cache and the disk file but NOT the live engine variable
+; HSE_WORD_TERMINATORS — so the engine kept firing on the old set until a full Reload.
+; The fix mirrors HotstringsSetConsumedDelimiters: assign HSE_WORD_TERMINATORS in place.
+TestHotstringsConfig_SetWordDelimitersUpdatesEngineVarLive() {
+	global _HotstringsWordDelimiters, HSE_WORD_TERMINATORS
+	SavedCache  := _HotstringsWordDelimiters
+	SavedEngine := HSE_WORD_TERMINATORS
+	HotstringsSetWordDelimiters("AB")
+	EngineAfter := HSE_WORD_TERMINATORS
+	_HotstringsWordDelimiters := SavedCache
+	HSE_WORD_TERMINATORS      := SavedEngine
+	AssertEqual("AB", EngineAfter,
+		"HotstringsSetWordDelimiters must propagate to HSE_WORD_TERMINATORS immediately (no Reload needed)")
+}
+Test("HotstringsConfig: SetWordDelimiters propagates to HSE_WORD_TERMINATORS live",
+	TestHotstringsConfig_SetWordDelimitersUpdatesEngineVarLive)
+
+TestHotstringsConfig_SetWordDelimitersGetRoundTrip() {
+	global _HotstringsWordDelimiters, HSE_WORD_TERMINATORS
+	SavedCache  := _HotstringsWordDelimiters
+	SavedEngine := HSE_WORD_TERMINATORS
+	HotstringsSetWordDelimiters("XY")
+	Got := HotstringsGetWordDelimiters()
+	_HotstringsWordDelimiters := SavedCache
+	HSE_WORD_TERMINATORS      := SavedEngine
+	AssertEqual("XY", Got,
+		"HotstringsGetWordDelimiters must return the value just set by HotstringsSetWordDelimiters")
+}
+Test("HotstringsConfig: SetWordDelimiters / GetWordDelimiters round-trip",
+	TestHotstringsConfig_SetWordDelimitersGetRoundTrip)
