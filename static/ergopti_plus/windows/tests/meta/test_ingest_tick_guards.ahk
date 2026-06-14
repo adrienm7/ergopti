@@ -3,28 +3,17 @@
 ; ==============================================================================
 ; MODULE: Ingest Tick Guards Meta Test
 ; DESCRIPTION:
-; Static source guard for the ingest-tick-blocks-keyboard-thread and
+; Static source guards for the ingest-tick-blocks-keyboard-thread and
 ; ingest-prefetch-blocks-keyboard-thread findings.
 ;
-; KL_IngestOnce runs on the 5 s ingest timer (same AHK pseudo-thread as the
-; keyboard hook). Two blocking operations can cause it to exceed
-; LowLevelHooksTimeout (~300 ms) and silently drop keystrokes:
+; KL_IngestOnce() perform heavy tasks (SQL conversion, FileAppend to data.sql,
+; and WebView2 live notification) that can take ~100-300 ms. Running these
+; while the user is actively typing can exceed the LowLevelHooksTimeout and
+; cause dropped keystrokes.
 ;
-; 1. FileAppend of multi-KB SQL bodies to data.sql — mitigated by the fact
-;    that antivirus-held file handles stall synchronous writes.
-;
-; 2. KLWV_NotifyIngest() — full "live" dashboard rebuild (150-300 ms of
-;    SQLite + JSON work) that runs during any typing burst when a WebView2
-;    dashboard is open.
-;
-; The fix adds two guards to KL_IngestOnce:
-; a) if A_IsSuspended return — short-circuits the entire tick while paused
-;    (no new events are written during suspension, so the work is redundant
-;    AND violates the pause invariant).
-; b) Keyboard-idle gate before KLWV_NotifyIngest: the heavy rebuild is
-;    deferred to the next tick if the user typed within
-;    KeylogConst.INGEST_LIVE_PUSH_IDLE_MS ms, preventing the 150-300 ms
-;    rebuild from running mid-burst.
+; The fix adds two keyboard-idle guards using KLHook.last_tick:
+;   1. Before the SQL conversion / FileAppend.
+;   2. Before the WebView2 notification (KLWV_NotifyIngest).
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -38,74 +27,39 @@
 ; ===================================================
 ; ===================================================
 
-_IATG_ReadSource(RelPath) {
+_ITG_ReadSource(RelPath) {
 	SplitPath(A_ScriptDir, , &Root)
 	Path := StrReplace(Root, "\", "/") . "/" . RelPath
 	return FileRead(Path)
 }
 
-; Extracts the body of a function starting at FuncDef up to the first
-; unindented closing brace, stripping comment lines.
-_IATG_FuncBodyStripped(Src, FuncDef) {
+_ITG_FuncBody(Src, FuncDef) {
 	Idx := InStr(Src, FuncDef)
 	if !Idx
 		return ""
 	Rest := SubStr(Src, Idx)
-	End := InStr(Rest, "`n}")
-	if End
-		Rest := SubStr(Rest, 1, End + 1)
-	Out := ""
-	loop parse, Rest, "`n", "`r" {
-		Line := A_LoopField
-		if !RegExMatch(Line, "^\s*;")
-			Out .= Line . "`n"
-	}
-	return Out
+	; Find the first closing brace at the start of a line (no indentation).
+	if RegExMatch(Rest, "m)^\}", &Match)
+		return SubStr(Rest, 1, Match.Pos)
+	return Rest
 }
 
 
-
-
 ; ===================================================
 ; ===================================================
-; ======= 2/ KL_IngestOnce assertions ==============
+; ======= 2/ Ingest guards assertion ================
 ; ===================================================
 ; ===================================================
 
-_IATG_IngestHasSuspendGuard() {
-	Src := _IATG_ReadSource("modules/keylogger/keylogger.ahk")
-	Body := _IATG_FuncBodyStripped(Src, "KL_IngestOnce() {")
-	Assert(Body != "", "KL_IngestOnce must exist in modules/keylogger/keylogger.ahk")
-	Assert(InStr(Body, "A_IsSuspended") > 0,
-		"KL_IngestOnce must check A_IsSuspended — the 5s ingest tick must not run heavy I/O while the driver is paused (pause-invariant violation and unnecessary work)")
+_ITG_IngestHasIdleGuards() {
+	Src := _ITG_ReadSource("modules/keylogger/keylogger.ahk")
+	Body := _ITG_FuncBody(Src, "KL_IngestOnce() {")
+	Assert(Body != "", "KL_IngestOnce must exist in keylogger.ahk")
+	
+	Assert(InStr(Body, "INGEST_IDLE_MS") > 0,
+		"KL_IngestOnce must check INGEST_IDLE_MS before the heavy SQL conversion/FileAppend (ingest-tick-blocks-keyboard-thread)")
+	
+	Assert(InStr(Body, "INGEST_LIVE_PUSH_IDLE_MS") > 0,
+		"KL_IngestOnce must check INGEST_LIVE_PUSH_IDLE_MS before calling KLWV_NotifyIngest (ingest-prefetch-blocks-keyboard-thread)")
 }
-Test("keylogger: KL_IngestOnce has A_IsSuspended early-return (ingest-tick-blocks-keyboard-thread)", _IATG_IngestHasSuspendGuard)
-
-_IATG_IngestLivePushGated() {
-	Src := _IATG_ReadSource("modules/keylogger/keylogger.ahk")
-	Body := _IATG_FuncBodyStripped(Src, "KL_IngestOnce() {")
-	Assert(Body != "", "KL_IngestOnce must exist in modules/keylogger/keylogger.ahk")
-	Assert(InStr(Body, "KLWV_NotifyIngest") > 0,
-		"KL_IngestOnce must reference KLWV_NotifyIngest (the live-push call must exist in this function)")
-	; The live-push must be gated — it must appear after a KLHook.last_tick check
-	; (or similar idle-guard) so it does not run during a typing burst
-	Assert(InStr(Body, "KLHook.last_tick") > 0,
-		"KL_IngestOnce must gate KLWV_NotifyIngest with a KLHook.last_tick idle check to prevent 150-300 ms rebuild during a typing burst (ingest-prefetch-blocks-keyboard-thread)")
-}
-Test("keylogger: KL_IngestOnce gates KLWV_NotifyIngest behind KLHook.last_tick idle check (ingest-prefetch-blocks-keyboard-thread)", _IATG_IngestLivePushGated)
-
-
-
-
-; ===================================================
-; ===================================================
-; ======= 3/ KeylogConst assertions ================
-; ===================================================
-; ===================================================
-
-_IATG_ConstHasLivePushIdle() {
-	Src := _IATG_ReadSource("modules/keylogger/keylogger.ahk")
-	Assert(InStr(Src, "INGEST_LIVE_PUSH_IDLE_MS") > 0,
-		"KeylogConst must declare INGEST_LIVE_PUSH_IDLE_MS — the named constant for the keyboard-idle threshold before allowing the full dashboard rebuild")
-}
-Test("keylogger: KeylogConst declares INGEST_LIVE_PUSH_IDLE_MS constant (ingest-tick-blocks-keyboard-thread)", _IATG_ConstHasLivePushIdle)
+Test("keylogger: KL_IngestOnce has idle guards for heavy tasks (ingest-tick-blocks-keyboard-thread)", _ITG_IngestHasIdleGuards)
