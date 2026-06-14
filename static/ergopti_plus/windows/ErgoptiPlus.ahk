@@ -2272,6 +2272,12 @@ CheckKeyboardLayoutChange() {
     ; at the next natural restart or when the user explicitly unpauses.
     if A_IsSuspended
         return
+    ; Also skip while on a blacklisted app — avoids disruptive reloads
+    ; during games or private browsing (layout-poll-blind-reload).
+    try {
+        if IsSet(MF_ShouldFilter) && MF_ShouldFilter()
+            return
+    }
     HKL := GetForegroundKeyboardLayout()
     if (HKL != 0 and HKL != _LAST_KEYBOARD_HKL) {
         _LAST_KEYBOARD_HKL := HKL
