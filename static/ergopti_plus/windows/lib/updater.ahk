@@ -1438,6 +1438,13 @@ Updater_ShowUpdatePrompt(Release) {
 			WVC.CoreWebView2.NavigateToString(_Updater_MakeMarkdownHtml(Release.Body))
 		}
 	}
+	if (!UseWV or !IsSet(WVC)) {
+		; Fallback: replace the placeholder with a plain read-only Edit.
+		BodyPane.GetPos(&bx, &by, &bw, &bh)
+		BodyText := (Release.Body != "") ? Release.Body : t("updater.changelog_empty")
+		G.Add("Edit", "x" . bx . " y" . by . " w" . bw . " h" . bh
+			. " ReadOnly +Multi -Wrap +VScroll", BodyText)
+	}
 }
 
 _Updater_CloseGui(G) {
@@ -1447,14 +1454,7 @@ _Updater_CloseGui(G) {
 	if G.HasProp("Udir") && G.Udir != ""
 		try DirDelete(G.Udir, true)
 }
-	if (!UseWV or !IsSet(WVC)) {
-		; Fallback: replace the placeholder with a plain read-only Edit.
-		BodyPane.GetPos(&bx, &by, &bw, &bh)
-		BodyText := (Release.Body != "") ? Release.Body : t("updater.changelog_empty")
-		G.Add("Edit", "x" . bx . " y" . by . " w" . bw . " h" . bh
-			. " ReadOnly +Multi -Wrap +VScroll", BodyText)
-	}
-}
+
 
 ; Menu/notification entry point — pulls the cached release record from the
 ; last background tick when present, otherwise hits the API on the spot so
