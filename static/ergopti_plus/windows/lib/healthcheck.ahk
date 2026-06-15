@@ -879,6 +879,55 @@ _HealthCheck_SnapshotToHtml(Snapshot, BtnLabel) {
 		IssuesHtml := "<pre>" . IssuesLines . "</pre>"
 	}
 
+	; ── Enriched runtime sections ─────────────────────────────────────────────
+	EnrichedHtml := ""
+
+	if Snapshot.Has("pause_state") {
+		ps := Snapshot["pause_state"]
+		PauseVal := ps["is_paused"] ? "<span class=fail>PAUSED</span> (" . _HealthCheck_HE(ps["source"]) . ")" : "<span class=ok>running</span>"
+		EnrichedHtml .= "<h2>Runtime state</h2><table><tr><th>Field</th><th>Value</th></tr>"
+		EnrichedHtml .= "<tr><td>Pause / Suspend</td><td>" . PauseVal . "</td></tr>"
+		if Snapshot.Has("layout") {
+			ly := Snapshot["layout"]
+			EnrichedHtml .= "<tr><td>Layout base</td><td>" . _HealthCheck_HE(ly["ergopti_base"]) . "</td></tr>"
+			EnrichedHtml .= "<tr><td>AltGr</td><td>"       . _HealthCheck_HE(ly["altgr"])        . "</td></tr>"
+			EnrichedHtml .= "<tr><td>Shift</td><td>"        . _HealthCheck_HE(ly["shift"])        . "</td></tr>"
+			EnrichedHtml .= "<tr><td>Caps</td><td>"         . _HealthCheck_HE(ly["caps"])         . "</td></tr>"
+			EnrichedHtml .= "<tr><td>Prefix latch</td><td>" . _HealthCheck_HE(ly["prefix_latch"]) . "</td></tr>"
+		}
+		if Snapshot.Has("llm") {
+			ll := Snapshot["llm"]
+			EnrichedHtml .= "<tr><td>LLM enabled</td><td>"     . _HealthCheck_HE(ll["enabled"])        . "</td></tr>"
+			EnrichedHtml .= "<tr><td>LLM backend</td><td>"     . _HealthCheck_HE(ll["backend"])        . "</td></tr>"
+			EnrichedHtml .= "<tr><td>LLM profile</td><td>"     . _HealthCheck_HE(ll["active_profile"]) . "</td></tr>"
+			EnrichedHtml .= "<tr><td>LLM model</td><td>"       . _HealthCheck_HE(ll["model"])          . "</td></tr>"
+			EnrichedHtml .= "<tr><td>LLM predictions</td><td>" . _HealthCheck_HE(ll["n_predictions"])  . "</td></tr>"
+		}
+		if Snapshot.Has("keylogger") {
+			kl := Snapshot["keylogger"]
+			EnrichedHtml .= "<tr><td>Keylogger events</td><td>"  . _HealthCheck_HE(String(kl["events_session"])) . "</td></tr>"
+			EnrichedHtml .= "<tr><td>WPM</td><td>"               . _HealthCheck_HE(String(kl["wpm"]))            . "</td></tr>"
+			EnrichedHtml .= "<tr><td>Privacy hits</td><td>"      . _HealthCheck_HE(String(kl["privacy_hits"]))   . "</td></tr>"
+		}
+		if Snapshot.Has("hotstrings") {
+			hs := Snapshot["hotstrings"]
+			EnrichedHtml .= "<tr><td>Terminators</td><td>"    . _HealthCheck_HE(String(hs["terminators"]))    . "</td></tr>"
+			EnrichedHtml .= "<tr><td>Personal hotstrings</td><td>" . _HealthCheck_HE(String(hs["personal_count"])) . "</td></tr>"
+			EnrichedHtml .= "<tr><td>Dynamic hotstrings</td><td>"  . _HealthCheck_HE(String(hs["dynamic_count"]))  . "</td></tr>"
+			EnrichedHtml .= "<tr><td>Default delay</td><td>"  . _HealthCheck_HE(String(hs["default_delay"])) . "</td></tr>"
+			EnrichedHtml .= "<tr><td>Magic key</td><td>"      . _HealthCheck_HE(hs["magic_key"])             . "</td></tr>"
+		}
+		if Snapshot.Has("logs") {
+			lg := Snapshot["logs"]
+			LogVal := lg["unified_today"] != "" ? _HealthCheck_Code(lg["unified_today"]) : "<em>n/a</em>"
+			ErrVal := lg["errors_today"]  != "" ? _HealthCheck_Code(lg["errors_today"])  : "<em>n/a</em>"
+			EnrichedHtml .= "<tr><td>Log (unified)</td><td>"  . LogVal . "</td></tr>"
+			EnrichedHtml .= "<tr><td>Log (errors)</td><td>"   . ErrVal . "</td></tr>"
+			EnrichedHtml .= "<tr><td>Ring buffer lines</td><td>" . _HealthCheck_HE(String(lg["ring_lines"])) . "</td></tr>"
+		}
+		EnrichedHtml .= "</table>"
+	}
+
 	; ── Assemble full page ────────────────────────────────────────────────────
 	return (
 		"<!DOCTYPE html><html><head><meta charset='utf-8'>"
@@ -887,6 +936,7 @@ _HealthCheck_SnapshotToHtml(Snapshot, BtnLabel) {
 		. "<h1>System diagnostic</h1>"
 		. "<h2>System</h2>" . SysTbl
 		. "<h2>Session counters</h2>" . CtrTbl
+		. EnrichedHtml
 		. "<h2>Adapters (" . OkList.Length . "/" . Total . " OK)</h2>" . AdapHtml
 		. "<h2>Last recorded error</h2>" . LastErrHtml
 		. "<h2>Recent warnings / errors (" . Issues.Length . "/100)</h2>" . IssuesHtml
