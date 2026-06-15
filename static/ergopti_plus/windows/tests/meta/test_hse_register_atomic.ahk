@@ -55,7 +55,7 @@ _HRA_RegisterIsAtomic() {
 	Assert(Body != "", "HSE_Register must exist in hotstring_engine_main.ahk")
 	
 	; Verify that Critical("On") appears before the index pushes.
-	CritPos := InStr(Body, "Critical('On')")
+	CritPos := InStr(Body, 'Critical("On")')
 	PushPos := InStr(Body, 'HSE_RegistryByLastChar[LookupKey].Push')
 	
 	Assert(CritPos > 0, "HSE_Register must use Critical to ensure atomic index updates")

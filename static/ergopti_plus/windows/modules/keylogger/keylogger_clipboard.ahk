@@ -1,5 +1,12 @@
 ﻿; modules/keylogger_clipboard.ahk
 
+_KL_Clip_CharCountFromByteSize(bytes) {
+    if (bytes <= 2)
+        return 0
+    chars := (bytes // 2) - 1
+    return Min(chars, KLClipConst.MAX_CHAR_COUNT)
+}
+
 ; ==============================================================================
 ; MODULE: Keylogger Clipboard
 ; DESCRIPTION:
@@ -103,7 +110,15 @@ KL_Clip_OnChange(data_type) {
     content_type := (data_type = 1) ? "text" : "other"
     char_count   := 0
     if (data_type = 1) {
-        try char_count := Min(StrLen(A_Clipboard), KLClipConst.MAX_CHAR_COUNT)
+        try {
+            if DllCall("OpenClipboard", "Ptr", 0) {
+                if hData := DllCall("GetClipboardData", "UInt", 13, "Ptr") { ; CF_UNICODETEXT
+                    bytes := DllCall("GlobalSize", "Ptr", hData, "UPtr")
+                    char_count := _KL_Clip_CharCountFromByteSize(bytes)
+                }
+                DllCall("CloseClipboard")
+            }
+        }
     }
 
     KLClip.last_copy_tick := A_TickCount

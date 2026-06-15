@@ -23,8 +23,9 @@
 ; ============================================
 
 HSE_TestReset() {
+    global HSE_Suppressed
     HSE_RegistryClear()
-    HSE_Suppress(false)
+    HSE_Suppressed := 0
     ; HSE_Suppress(false) no longer wipes the buffer (HSE_DispatchMatch
     ; relies on the post-expansion state surviving the burst). Hard-reset
     ; here so each test starts from a known-empty buffer; HSE_FeedReset(true)

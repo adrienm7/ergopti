@@ -449,6 +449,8 @@ _LoggerEmit(Level, Tag, Msg, Args*) {
 	}
 	if LOGGER_LOG_PATH != "" {
 		_LOGGER_PENDING.Push(Line)
+	}
+	if (LOGGER_LOG_PATH != "" or LOGGER_ERRORS_LOG_PATH != "") {
 		if LOGGER_SEVERITY[Level] >= LOGGER_SEVERITY["WARNING"] {
 			global _LOGGER_PENDING_ERRORS
 			_LOGGER_PENDING_ERRORS.Push(Line)

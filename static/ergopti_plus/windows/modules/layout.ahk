@@ -476,7 +476,6 @@ _UIA_SelectionPollTick() {
         return
 
     try {
-        global KLHook
         ProcName := ""
         try ProcName := (IsSet(KLHook) and KLHook.HasOwnProp("prev_app")) ? KLHook.prev_app : WinGetProcessName("A")
         if (ProcName == "" or ProcName == "Code.exe") {

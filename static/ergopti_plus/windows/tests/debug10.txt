@@ -1,0 +1,2 @@
+After A: HSE_Buffer='', MatchA is String
+After B: HSE_Buffer='', MatchB is String

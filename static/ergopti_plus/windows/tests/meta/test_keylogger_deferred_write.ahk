@@ -13,10 +13,15 @@ _KDW_FuncBodyStripped(Src, FuncDef) {
 	if !Idx
 		return ""
 	Rest := SubStr(Src, Idx)
-	End := InStr(Rest, "`n}")
-	if End
-		Rest := SubStr(Rest, 1, End + 1)
-	return Rest
+	if RegExMatch(Rest, "m)^\}", &Match)
+		Rest := SubStr(Rest, 1, Match.Pos)
+	Out := ""
+	loop parse, Rest, "`n", "`r" {
+		Line := A_LoopField
+		if !RegExMatch(Line, "^\s*;")
+			Out .= Line . "`n"
+	}
+	return Out
 }
 
 _KDW_AssertDeferredWrite() {

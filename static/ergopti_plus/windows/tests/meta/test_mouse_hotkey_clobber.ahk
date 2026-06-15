@@ -107,7 +107,7 @@ Test("llm_bridge: _LLM_PointerWatch_Start uses HookDispatcher.Register (mouse-ho
 
 _MHCB_LLMStartNoDirectLButton() {
 	Src := _MHCB_ReadSource("modules/llm/llm_bridge.ahk")
-	Body := _MHCB_FuncBodyStripped(Src, "_LLM_PointerWatch_Start()")
+	Body := _MHCB_FuncBodyStripped(Src, "_LLM_PointerWatch_Start() {")
 	Assert(Body != "", "_LLM_PointerWatch_Start must exist in modules/llm/llm_bridge.ahk")
 	DQ := Chr(34)
 	HotkeyLButton := "Hotkey(" . DQ . "~LButton" . DQ
@@ -118,7 +118,7 @@ Test("llm_bridge: _LLM_PointerWatch_Start does not call Hotkey(~LButton) directl
 
 _MHCB_LLMStopUsesUnregister() {
 	Src := _MHCB_ReadSource("modules/llm/llm_bridge.ahk")
-	Body := _MHCB_FuncBodyStripped(Src, "_LLM_PointerWatch_Stop()")
+	Body := _MHCB_FuncBodyStripped(Src, "_LLM_PointerWatch_Stop() {")
 	Assert(Body != "", "_LLM_PointerWatch_Stop must exist in modules/llm/llm_bridge.ahk")
 	Assert(InStr(Body, "HookDispatcher.Unregister") > 0,
 		"_LLM_PointerWatch_Stop must call HookDispatcher.Unregister to undo the dispatcher-registered subscriptions (mouse-hotkey-clobber)")
