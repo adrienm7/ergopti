@@ -140,6 +140,8 @@ local CoreState = {
 	active_profile_id      = M.DEFAULT_STATE.llm_active_profile,
 	user_profiles          = {},
 	backend                = M.DEFAULT_STATE.llm_backend,
+	runtime_llm_enabled    = false,
+	background_bootstrap_started = false,
 	last_backend_check     = 0,
 	backend_check_interval = 10,
 }
@@ -339,12 +341,6 @@ function M.is_backend_load_failed()
 	return api.is_load_failed() == true
 end
 
--- Defer backend detection entirely off the synchronous init path
-hs.timer.doAfter(0, function()
-	pcall(function() M.auto_detect_backend() end)
-	pcall(function() M.warm_up_connections() end)
-end)
-
 --- Retrieves the currently active profile object.
 --- @return table The active profile object.
 function M.get_active_profile()
@@ -357,6 +353,10 @@ end
 function M.set_active_profile(id)
 	if type(id) ~= "string" then return end
 	CoreState.active_profile_id = id
+	if not CoreState.runtime_llm_enabled then
+		Logger.debug(LOG, "set_active_profile: runtime LLM disabled — skipping warmup for '%s'.", tostring(id))
+		return
+	end
 	-- Re-prime the KV cache: the new profile may have a different static prompt prefix
 	local model = M.get_current_model()
 	if type(model) == "string" and model ~= "" then
@@ -391,6 +391,35 @@ end
 --- @return string The backend identifier.
 function M.get_backend()
 	return CoreState.backend or "inconnu"
+end
+
+--- Tracks whether the runtime prediction engine currently allows LLM activity.
+--- This is intentionally distinct from persisted/default config so startup can
+--- restore profile/model state without triggering a backend warmup.
+--- @param enabled boolean True when runtime LLM activity is enabled.
+function M.set_runtime_llm_enabled(enabled)
+	CoreState.runtime_llm_enabled = (enabled == true)
+end
+
+--- Returns the current runtime LLM enabled state.
+--- @return boolean
+function M.get_runtime_llm_enabled()
+	return CoreState.runtime_llm_enabled == true
+end
+
+--- Schedules the background backend probes explicitly once boot state has
+--- confirmed that LLM is actually enabled for this session.
+function M.start_background_network_bootstrap()
+	if CoreState.background_bootstrap_started then
+		Logger.debug(LOG, "start_background_network_bootstrap: already started — skipping duplicate call.")
+		return
+	end
+	CoreState.background_bootstrap_started = true
+	Logger.debug(LOG, "Scheduling background LLM network bootstrap.")
+	hs.timer.doAfter(0, function()
+		pcall(function() M.auto_detect_backend() end)
+		pcall(function() M.warm_up_connections() end)
+	end)
 end
 
 -- Flat index: { [label] = { ollama = "...", mlx = "..." } } — built once from JSON

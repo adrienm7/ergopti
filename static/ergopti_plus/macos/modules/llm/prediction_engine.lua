@@ -190,6 +190,9 @@ end
 
 function M.set_llm_enabled(enabled)
 	is_llm_enabled = (enabled == true)
+	if type(core_llm.set_runtime_llm_enabled) == "function" then
+		core_llm.set_runtime_llm_enabled(is_llm_enabled)
+	end
 	Logger.info(LOG, "LLM %s.", is_llm_enabled and "enabled" or "disabled")
 	if not is_llm_enabled then M.reset(); return end
 	WarmupController.schedule_warmup_with_retry("set_llm_enabled")

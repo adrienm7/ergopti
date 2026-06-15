@@ -32,6 +32,10 @@ local function init_llm_source()
 	return helpers.driver_root() .. "ui/menu/menu_llm/init.lua"
 end
 
+local function driver_init_source()
+	return helpers.driver_root() .. "init.lua"
+end
+
 local function normalize_toml_array(v)
 	if type(v) == "table" then
 		local out = {}
@@ -137,6 +141,17 @@ helpers.describe("LLM menu regressions — Hammerspoon", function()
 		-- macOS has no tray_llm/actions.ahk; guard against duplicating persist in wrong layer.
 		helpers.assert_true(body:find("KEY_MAP", 1, true) ~= nil,
 			"preferences.lua must use KEY_MAP for flat persistence")
+	end)
+
+	helpers.it("driver init gates LLM backend bootstrap on the boot enabled flag", function()
+		local fh = io.open(driver_init_source(), "r")
+		helpers.assert_true(fh ~= nil, "init.lua missing")
+		local body = fh:read("*a")
+		fh:close()
+		helpers.assert_true(body:find("LLM boot disabled at startup", 1, true) ~= nil,
+			"init.lua must keep an explicit disabled-boot LLM skip path")
+		helpers.assert_true(body:find("start_background_network_bootstrap", 1, true) ~= nil,
+			"init.lua must explicitly opt into the core LLM network bootstrap only when boot LLM is enabled")
 	end)
 
 end)
