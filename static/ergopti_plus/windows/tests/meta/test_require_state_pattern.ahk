@@ -28,7 +28,8 @@ _REQUIRE_STATE_ALLOWLIST := Map(
 	"modules/gestures/actions.ahk", true,
 	"lib/adapters/secure_field_detector.ahk", true,
 	"modules/llm/ollama_deps_checker.ahk", true,
-	"lib/healthcheck.ahk", true
+	"lib/healthcheck.ahk", true,
+	"modules/layout.ahk", true
 )
 
 _MetaListAhkFilesGuardV2(Dir) {

@@ -21,15 +21,14 @@ _SGL_FuncBody(Src, FuncDef) {
 	if !Idx
 		return ""
 	Rest := SubStr(Src, Idx)
-	End := InStr(Rest, "`n}")
-	if End
-		return SubStr(Rest, 1, End + 1)
+	if RegExMatch(Rest, "m)^\}", &Match)
+		Rest := SubStr(Rest, 1, Match.Pos)
 	return Rest
 }
 
 _SGL_SpotlightHasTryCatch() {
 	Src := _SGL_ReadSource("lib/spotlight.ahk")
-	Seg := _SGL_FuncBody(Src, "SpotlightMouseAt(X, Y, DurationMs := 2000) {")
+	Seg := _SGL_FuncBody(Src, "SpotlightMouseAt(X, Y, DurationMs) {")
 	Assert(Seg != "", "SpotlightMouseAt declaration must exist")
 	
 	Assert(InStr(Seg, "try {") > 0,

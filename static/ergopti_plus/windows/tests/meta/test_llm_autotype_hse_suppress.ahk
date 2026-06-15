@@ -41,9 +41,8 @@ _LAHS_FuncBodyStripped(Src, FuncDef) {
 	if !Idx
 		return ""
 	Rest := SubStr(Src, Idx)
-	End := InStr(Rest, "`n}")
-	if End
-		Rest := SubStr(Rest, 1, End + 1)
+	if RegExMatch(Rest, "m)^\}", &Match)
+		Rest := SubStr(Rest, 1, Match.Pos)
 	Out := ""
 	loop parse, Rest, "`n", "`r" {
 		Line := A_LoopField

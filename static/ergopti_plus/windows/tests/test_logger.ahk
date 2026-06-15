@@ -48,11 +48,13 @@ Test("Logger: high volume (300+) ERROR must fill errors-only sink correctly", Te
 
 _ResetLogger() {
 	global LOGGER_RING_BUFFER, LOGGER_RING_CURSOR, LOGGER_MIN_LEVEL, _LOGGER_PENDING
-	global LOGGER_ERRORS_LOG_PATH
+	global LOGGER_LOG_PATH, LOGGER_ERRORS_LOG_PATH, _LOGGER_PENDING_ERRORS
 	LOGGER_RING_BUFFER := []
 	LOGGER_RING_CURSOR := 0
 	LOGGER_MIN_LEVEL := "DEBUG"
 	_LOGGER_PENDING := []
+	_LOGGER_PENDING_ERRORS := []
+	LOGGER_LOG_PATH := ""
 	LOGGER_ERRORS_LOG_PATH := ""
 	_LoggerRefreshFastFlags()
 }
@@ -623,6 +625,7 @@ TestLogger_ErrorsPathIsSeparate() {
 	LoggerError("ErrSink", "this-error-must-go-to-errors {1}", 123)
 	LoggerInfo("ErrSink", "this-info-must-NOT-go-to-errors")
 	LoggerDebug("ErrSink", "this-debug-must-NOT-go-to-errors")
+	_LoggerFlush(true)
 
 	; The errors file must exist and contain the high-severity messages
 	Content := ""
@@ -679,6 +682,7 @@ TestLogger_ErrorsFileReceivesFormattedArgs() {
 	try FileDelete(ErrorsTmp)
 
 	LoggerError("FmtErr", "user={1} count={2}", "bob", 7)
+	_LoggerFlush(true)
 
 	Content := FileExist(ErrorsTmp) ? FileRead(ErrorsTmp, "UTF-8") : ""
 	AssertContains(Content, "user=bob")
@@ -727,6 +731,7 @@ TestLogger_ErrorsFileAccumulatesMultipleLinesInOrder() {
 	LoggerWarn("Accum", "first-warn")
 	LoggerError("Accum", "second-error")
 	LoggerWarn("Accum", "third-warn")
+	_LoggerFlush(true)
 
 	Content := FileExist(ErrorsTmp) ? FileRead(ErrorsTmp, "UTF-8") : ""
 	; All three must be present and in chronological order (first before second before third)

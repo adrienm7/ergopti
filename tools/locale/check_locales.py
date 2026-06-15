@@ -55,7 +55,7 @@ REFERENCE    = "en"
 
 def load_locale(path: Path) -> dict[str, str]:
 	"""Load a locale JSON file as a flat dict. Raises on malformed input."""
-	with path.open(encoding="utf-8") as f:
+	with path.open(encoding="utf-8-sig") as f:
 		data = json.load(f)
 	if not isinstance(data, dict):
 		raise ValueError(f"{path.name}: top-level value must be an object")
@@ -69,7 +69,7 @@ def dump_locale(path: Path, data: dict[str, str]) -> None:
 	only touch the keys that genuinely changed.
 	"""
 	sorted_data = {k: data[k] for k in sorted(data)}
-	with path.open("w", encoding="utf-8", newline="\n") as f:
+	with path.open("w", encoding="utf-8-sig", newline="\n") as f:
 		json.dump(sorted_data, f, ensure_ascii=False, indent="\t")
 		f.write("\n")
 
