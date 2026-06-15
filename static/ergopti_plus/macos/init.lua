@@ -267,15 +267,7 @@ end
 -- MLX on Apple Silicon (≥ macOS 13) and Ollama everywhere else; a
 -- previously user-saved preference always wins. Both checkers are async
 -- and silent on the fast path, so a normal reload stays invisible.
-do
-	local active_backend = backend_detector.effective_backend()
-	Logger.info(LOG, "Bootstrapping default LLM backend: %s", active_backend)
-	if active_backend == backend_detector.BACKEND_MLX then
-		mlx_deps_checker.check_and_install_deps()
-	else
-		ollama_deps_checker.check_and_install_deps()
-	end
-end
+
 
 
 
@@ -322,6 +314,21 @@ if boot_llm_enabled == nil then
 	end
 end
 
+if boot_llm_enabled then
+	local active_backend = backend_detector.effective_backend()
+	Logger.info(LOG, "Bootstrapping default LLM backend: %s", active_backend)
+	if active_backend == backend_detector.BACKEND_MLX then
+		mlx_deps_checker.check_and_install_deps()
+	else
+		ollama_deps_checker.check_and_install_deps()
+	end
+	if ok_core_llm and type(core_llm.start_background_network_bootstrap) == "function" then
+		core_llm.start_background_network_bootstrap()
+	end
+else
+	Logger.info(LOG, "LLM boot disabled at startup — skipping backend bootstrap.")
+end
+
 local configured_hotstrings_dir = menu_paths.get("HotstringsDirPath")
 local bundled_hotstrings_dir    = base_dir .. "../shared/hotstrings/"
 local hotstrings_dir            = configured_hotstrings_dir
@@ -341,19 +348,12 @@ local function has_common_hotstring_groups(dir)
 	if not ok_attr or type(attr) ~= "table" or attr.mode ~= "directory" then
 		return false
 	end
-		if boot_llm_enabled then
-			local active_backend = backend_detector.effective_backend()
-			Logger.info(LOG, "Bootstrapping default LLM backend: %s", active_backend)
-			if active_backend == backend_detector.BACKEND_MLX then
-				mlx_deps_checker.check_and_install_deps()
-			else
-				ollama_deps_checker.check_and_install_deps()
+	for fname in hs.fs.dir(dir) do
+		if fname:match("%.toml$") and not fname:match("^_") then
+			local stem = fname:match("^(.-)%.toml$")
+			if stem and not HOTSTRINGS_EXCLUDED_STEMS[stem] then
+				return true
 			end
-			if ok_core_llm and type(core_llm.start_background_network_bootstrap) == "function" then
-				core_llm.start_background_network_bootstrap()
-			end
-		else
-			Logger.info(LOG, "LLM boot disabled at startup — skipping backend bootstrap.")
 		end
 	end
 	return false
