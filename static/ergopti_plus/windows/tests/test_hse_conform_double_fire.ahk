@@ -93,20 +93,18 @@ TestConformDF_DeferredReleaseClearsSuppression() {
 	ResetHotstringRecorders()
 	SimulateRegularApp()
 	HSE_TestReset()
-	Star := Chr(0x2605)
+	Star := ScriptInformation["MagicKey"]
 	CreateCaseSensitiveHotstrings("*?", "ct" . Star, "cetait")
 
 	HSE_FeedReset(true)
 	_ConformDF_FireCtStar(Star)
-	Assert(HSE_Suppressed == true, "dispatch must suppress feeds during the burst")
+	Assert(HSE_Suppressed > 0, "dispatch must suppress feeds during the burst")
 
 	; Pump the loop past HSE_SUPPRESS_RELEASE_DELAY_MS (60 ms) so the armed
 	; release timer actually runs.
-	Sleep(150)
-	Assert(HSE_Suppressed == false,
-		"the deferred -60 ms release must clear HSE_Suppressed (still set => the "
-		. "trigger would never feed/match again, the reported 'fires once' symptom)")
-
+	Sleep 100
+	Assert(HSE_Suppressed == 0, "suppression should be cleared after 60ms timer")
+	
 	N := _Stub_RecordedSends.Length
 	B2 := _ConformDF_FireCtStar(Star)
 	Assert(_Stub_RecordedSends.Length > N,

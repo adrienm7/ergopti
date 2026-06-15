@@ -335,7 +335,6 @@ global MICROSOFT_OFFICE_EXES := Map(
 )
 
 MicrosoftApps() {
-    global KLHook
     try {
         exe := (IsSet(KLHook) and KLHook.HasOwnProp("prev_app")) ? KLHook.prev_app : WinGetProcessName("A")
         return MICROSOFT_OFFICE_EXES.Has(exe)
@@ -524,7 +523,6 @@ _HotstringDispatch(Replacement, EndChar, BackSpaceSeq, PrevCharKey, OnlyText, Fi
 
     try {
         isNotepad := false
-        global KLHook
         try {
             exe := (IsSet(KLHook) and KLHook.HasOwnProp("prev_app")) ? KLHook.prev_app : WinGetProcessName("A")
             isNotepad := (exe = "notepad.exe")
