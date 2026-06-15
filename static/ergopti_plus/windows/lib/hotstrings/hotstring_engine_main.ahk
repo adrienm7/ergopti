@@ -649,12 +649,11 @@ HSE_FeedReset(KnownTerminatorBefore := false) {
 ; an unknown context) should call HSE_HardReset() explicitly.
 HSE_Suppress(YesNo) {
     global HSE_Suppressed
-    ; Ref-count so overlapping fires each hold their own suppress level;
-    ; a single release does not expose the engine mid-burst for the second fire.
-    if YesNo
+    if YesNo {
         HSE_Suppressed += 1
-    else
+    } else {
         HSE_Suppressed := Max(0, HSE_Suppressed - 1)
+    }
 }
 
 ; Force the buffer back to a known-empty state with no word-boundary
@@ -783,7 +782,7 @@ HSE_TryRepeatKey(MagicKey) {
 ; Priority, then by lower Seq (first-registered) for a stable, deterministic
 ; result. Returns true when Cand should replace Best.
 _HSE_Beats(Cand, Best) {
-    if (Best == "") {
+    if (!IsObject(Best)) {
         return true
     }
     if (Cand.Length != Best.Length) {
@@ -794,7 +793,10 @@ _HSE_Beats(Cand, Best) {
     if (CandPrio != BestPrio) {
         return CandPrio > BestPrio
     }
-    return Cand.Seq > Best.Seq
+    if (Cand.GroupOrder != Best.GroupOrder) {
+        return Cand.GroupOrder < Best.GroupOrder
+    }
+    return Cand.Seq < Best.Seq
 }
 
 ; Precedence for an end-char candidate against the current best, which may be a
@@ -1312,7 +1314,7 @@ HSE_DispatchMatch(Spec, EndChar) {
         if (!IsConform and HasMethod(Replacement))
             Replacement := Replacement()
         OnlyText := Spec.HasOwnProp("OnlyText") ? Spec.OnlyText : true
-        global KLHook
+        ; (KLHook global removed)
         IsNotepadApp := false
         try {
             exe := (IsSet(KLHook) and KLHook.HasOwnProp("prev_app")) ? KLHook.prev_app : WinGetProcessName("A")

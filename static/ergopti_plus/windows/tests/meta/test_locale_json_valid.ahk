@@ -73,11 +73,15 @@ _MetaRunLocaleJsonValidTests() {
 	ParseErrors   := 0
 	StructErrors  := 0
 	MissingKeys   := 0
+	MissingParityKeys := 0
 	ScannedFiles  := 0
 
 	; Required keys that must be present in every locale file.
 	; These are the minimum set that t() and the locale picker rely on.
 	RequiredKeys := ["_meta.locale", "_meta.flag", "_meta.name"]
+
+	GlobalKeySet := Map()
+	ParsedLocales := Map()
 
 	for AbsPath in Files {
 		ScannedFiles++
@@ -116,16 +120,33 @@ _MetaRunLocaleJsonValidTests() {
 			OutputDebug("LOCALE ERROR: content does not end with '}' in " . AbsPath)
 		}
 
+		if Type(Parsed) == "Map" {
+			ParsedLocales[AbsPath] := Parsed
+			for Key, _ in Parsed {
+				GlobalKeySet[Key] := true
+			}
+		}
+
 		; Verify required keys are present
-		for Key in RequiredKeys {
-			if not Parsed.Has(Key) {
-				MissingKeys++
-				OutputDebug("LOCALE ERROR: missing required key '" . Key . "' in " . AbsPath)
+		if Type(Parsed) == "Map" {
+			for Key in RequiredKeys {
+				if not Parsed.Has(Key) {
+					MissingKeys++
+					OutputDebug("LOCALE ERROR: missing required key '" . Key . "' in " . AbsPath)
+				}
 			}
 		}
 	}
 
-	TotalErrors := ParseErrors + StructErrors + MissingKeys
+	for AbsPath, Parsed in ParsedLocales {
+		for Key, _ in GlobalKeySet {
+			if not Parsed.Has(Key) {
+				MissingParityKeys++
+			}
+		}
+	}
+
+	TotalErrors := ParseErrors + StructErrors + MissingKeys + MissingParityKeys
 
 	_MetaLocaleParseResult() {
 		Assert(ParseErrors = 0,
@@ -144,6 +165,12 @@ _MetaRunLocaleJsonValidTests() {
 			"Found " . MissingKeys . " missing required key(s) across locale files — _meta.locale, _meta.flag, _meta.name must be present")
 	}
 	Test("meta locales: all required keys present (" . MissingKeys . " missing)", _MetaLocaleRequiredKeysResult)
+
+	_MetaLocaleParityResult() {
+		Assert(MissingParityKeys = 0,
+			"Found " . MissingParityKeys . " missing parity key(s) across locale files. All locales must have the exact same set of keys.")
+	}
+	Test("meta locales: all locales have complete key parity (" . MissingParityKeys . " missing)", _MetaLocaleParityResult)
 }
 
 _MetaRunLocaleJsonValidTests()
