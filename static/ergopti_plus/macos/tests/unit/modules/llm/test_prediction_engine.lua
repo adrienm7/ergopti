@@ -59,6 +59,7 @@ package.loaded["modules.llm"] = {
 	get_backend             = function() return "ollama" end,
 	set_llm_model_mlx       = function(_) end,
 	set_llm_model_ollama    = function(_) end,
+	set_runtime_llm_enabled = function(_) end,
 	set_llm_streaming       = function(_) end,
 	cancel_streaming        = function() end,
 	-- Dispatch-path surface (exercised by the perform_check regression in §8).
@@ -74,6 +75,16 @@ package.loaded["modules.llm.warmup_controller"] = {
 	start                      = function() end,
 	stop                       = function() end,
 }
+
+local runtime_llm_enabled_calls = {}
+package.loaded["modules.llm"].set_runtime_llm_enabled = function(enabled)
+	runtime_llm_enabled_calls[#runtime_llm_enabled_calls + 1] = enabled
+end
+
+local warmup_schedule_reasons = {}
+package.loaded["modules.llm.warmup_controller"].schedule_warmup_with_retry = function(reason)
+	warmup_schedule_reasons[#warmup_schedule_reasons + 1] = reason
+end
 
 -- Stub PromptBuilder — build() (the real export shape) is called inside
 -- perform_check. It returns (params, skip_reason, signature); a non-nil params
@@ -277,10 +288,15 @@ end)
 
 helpers.describe("prediction_engine — configuration setters", function()
 	helpers.it("set_llm_enabled accepts boolean", function()
+		runtime_llm_enabled_calls = {}
+		warmup_schedule_reasons = {}
 		PE.set_llm_enabled(true)
 		helpers.assert_eq(PE.get_llm_enabled(), true)
+		helpers.assert_eq(runtime_llm_enabled_calls[#runtime_llm_enabled_calls], true)
+		helpers.assert_eq(warmup_schedule_reasons[#warmup_schedule_reasons], "set_llm_enabled")
 		PE.set_llm_enabled(false)
 		helpers.assert_eq(PE.get_llm_enabled(), false)
+		helpers.assert_eq(runtime_llm_enabled_calls[#runtime_llm_enabled_calls], false)
 	end)
 
 	helpers.it("set_llm_temperature does not throw", function()

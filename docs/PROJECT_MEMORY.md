@@ -29,13 +29,14 @@ Accumulated engineering knowledge for this repository — gotchas, architecture 
   - [project-gestures-startup-design](#project-gestures-startup-design) — Design choices for the macOS gestures startup path — primer-as-wakeup-signal vs burst probes
   - [project-hotstring-delay-architecture](#project-hotstring-delay-architecture) — Where hotstring expansion delays are configured, the cross-platform precedence, and the key gotchas
   - [project-hotstring-engine-internals](#project-hotstring-engine-internals) — AHK prefix-watcher InputHook captures synthetic input; OnChar must feed each char once; AHK vs Hammerspoon word-boundary framing divergence is intentional
-  - [project-hotstring-live-rebuild](#project-hotstring-live-rebuild) — Hotstring section/category toggles apply in-process via a re-runnable RegisterAllHotstrings(); native-engine + layout-backed features under hotstrings.* are the reload-only exceptions
+  - [project-hotstring-live-rebuild](#project-hotstring-live-rebuild) — Hotstring section/category toggles apply in-process via a re-runnable RegisterAllHotstrings(); native-engine + layout-backed features under hotstrings.\* are the reload-only exceptions
   - [project-typing-latency-tooltip-coldstart](#project-typing-latency-tooltip-coldstart) — Tooltip render + post-boot warm-up latency: the border alpha scan optimization, why tooltip window-reuse is rejected (AHK v2 can't remove Gui controls), and why deferred-registration chunking was reverted
   - [Keymap module architecture and refactor decisions](#keymap-module-architecture-and-refactor-decisions) — Structure of the keymap module, where defaults live, which files do what
   - [project-locale-parity-test](#project-locale-parity-test) — en.json is the canonical key set; tools/check_locales.py enforces parity in CI
   - [project-locale-fast-cache](#project-locale-fast-cache) — The Windows driver's locale .tsv is a gitignored self-healing fast-parse cache regenerated from the canonical .json on a miss/staleness; only .json is tracked, no committed duplication
   - [project_metrics_pipeline_17](#project-metrics-pipeline-17) — AHK metrics pipeline — bug #17 CLOSED, follow-up bugs fixed
   - [project-suspend-pause-invariant](#project-suspend-pause-invariant) — Pause must fully silence ALL features (no tooltip/LLM/keylogger/widget). AHK Suspend only disarms hotkeys — InputHooks/timers/OnMessage bypass it and need explicit A_IsSuspended guards.
+  - [project-macos-llm-runtime-enable-gate](#project-macos-llm-runtime-enable-gate) — macOS must not warm up or load an LLM model from profile/model restoration alone; warmup is allowed only after the runtime LLM gate is enabled
   - [project-macos-eventtap-no-blocking](#project-macos-eventtap-no-blocking) — Never run blocking osascript/hs.execute inside an hs.eventtap callback — macOS disables the tap (kCGEventTapDisabledByTimeout) and AltGr+Enter dies. Defer with hs.timer.doAfter(0).
   - [project-macos-script-control-tap-lifecycle](#project-macos-script-control-tap-lifecycle) — The script-control eventtap (AltGr+Enter/Backspace/Escape) must survive layout switches and pause. `shortcuts.start` is a Bindings-only proxy that kills it; the pause-layout switch fires the Karabiner input-source watcher that rebuilds mid-pause. Rebind via pause_bindings/resume_bindings and skip the rebuild while paused.
   - [project-touchdevice-dormancy-is-kernel](#project-touchdevice-dormancy-is-kernel) — Definitive answer that macOS touchdevice subsystem CANNOT be activated before first physical touch — it is a kernel-driver gate
@@ -332,9 +333,9 @@ Findings from the runtime/typing-latency pass (2026-06-14). The `HotPath_LogIfSl
 **Shipped:**
 
 - **Border alpha scan** (`6b1e4e59c`): `_TooltipShowBorder` repaints a 32-bpp DIB and rewrites every GDI-RoundRect-painted pixel to premultiplied border alpha. Extracted into `_TooltipFixBorderAlpha(PixPtr, Wp, Hp, Diam, PremulPx)`, which scans ONLY the painted zones — the two horizontal edge rows (full width) + the left/right corner-column zones of the top/bottom bands + the two vertical edge columns of middle rows — instead of the full corner band. Cost drops from ~2·Diam·Wp to ~2·Wp + 4·Diam², biggest win on short 1-2 row previews (~4-6 ms/render saved; the 5-12 ms `Tooltip.BorderPixelLoop` warnings mostly fall under the 5 ms threshold). Pinned by `tests/test_tooltip_border_alpha.ahk`, which paints a REAL GDI RoundRect and asserts the optimized scan is byte-identical to a full O(Wp·Hp) reference across six geometries — the invariant ("rewrite exactly the pixels GDI painted") is verified against the rasterizer, not a model of it.
-**Tried and REVERTED — do NOT re-attempt:**
+  **Tried and REVERTED — do NOT re-attempt:**
 
-- **Chunking the deferred emoji/symbol registration** (`e7072a7c8`, reverted). The idea: register the ~3000-row emoji/symbol pass in 150-row chunks via a self-rescheduling `SetTimer(self, -1)` so the keystroke hook runs between chunks instead of through one ~547 ms blob. **It backfired badly.** A real boot log (cold WebView2, first launch post-reboot) showed the chunked pass take **+7969 ms wall-clock (~12× the blob)**: `SetTimer(-1)` hands control to the message loop between every chunk, and while WebView2 cold-starts (flooding the message queue) each chunk waits for the queue to drain, so the registration smears across the whole warm-up window — and now overlaps the WebView2 cold-start it used to finish *before* (blob done ~T+2 s, WebView2 at T+2.5 s = no overlap; chunked ran to ~T+8 s = full overlap). The premise was also wrong: AHK threads are interruptible after a ~15 ms window, so a synchronous blob never froze typing for 547 ms — the logs never showed such a freeze. **Lesson:** don't `SetTimer`-yield a CPU loop into a message loop that another cold-start is hammering; keep the blob (it is interruptible and self-contained). The `_HsCacheRegisterSection` row-range plumbing and the chunk parity test were reverted with it.
+- **Chunking the deferred emoji/symbol registration** (`e7072a7c8`, reverted). The idea: register the ~3000-row emoji/symbol pass in 150-row chunks via a self-rescheduling `SetTimer(self, -1)` so the keystroke hook runs between chunks instead of through one ~547 ms blob. **It backfired badly.** A real boot log (cold WebView2, first launch post-reboot) showed the chunked pass take **+7969 ms wall-clock (~12× the blob)**: `SetTimer(-1)` hands control to the message loop between every chunk, and while WebView2 cold-starts (flooding the message queue) each chunk waits for the queue to drain, so the registration smears across the whole warm-up window — and now overlaps the WebView2 cold-start it used to finish _before_ (blob done ~T+2 s, WebView2 at T+2.5 s = no overlap; chunked ran to ~T+8 s = full overlap). The premise was also wrong: AHK threads are interruptible after a ~15 ms window, so a synchronous blob never froze typing for 547 ms — the logs never showed such a freeze. **Lesson:** don't `SetTimer`-yield a CPU loop into a message loop that another cold-start is hammering; keep the blob (it is interruptible and self-contained). The `_HsCacheRegisterSection` row-range plumbing and the chunk parity test were reverted with it.
 
 **Shipped (later) — WPM graph widget rewritten from WebView2 to native GDI+:**
 
@@ -348,7 +349,7 @@ Findings from the runtime/typing-latency pass (2026-06-14). The `HotPath_LogIfSl
 **Two follow-up leftovers, investigated 2026-06-14 (multi-agent workflow, adversarially verified):**
 
 - **HSE dispatch spikes (78-90 ms, one 476 ms)** were **WebView2-induced contention, not inherent** — resolved by the GDI+ rewrite. Verified: a star magic-key expansion is one `Critical`-wrapped atomic `SendInput` burst (hotstring_engine_main.ahk ~1332/1347); analytics are deferred off the keystroke (`_HSE_QueueFireLog` → `SetTimer(_HSE_DrainFireLog, -90)`); the profiler times the WHOLE dispatch in wall-clock QPC, so a single-threaded block while WebView2 saturated the pump/GDI landed in the reported ms. The post-rewrite log shows the same `cdg★` trigger at 6.8-8.7 ms (worst all-session 14.1 ms). The 200 ms clipboard `SendInstant` path is **Notepad-only** (gated on window class, never fired in the log); the match path is a bounded by-trigger Map probe (NOT O(n) in the ~3000 emoji regs). **No hot-path change made** — only the existing `test_wpm_widget_native_render.ahk` guard prevents the WebView2 cause from returning.
-- **Flaky `TimerScheduler — cancelAll(): drains all live handles`** (expected 3, got 2, intermittent) — root cause: the adapter calls the REAL AHK `SetTimer` (never stubbed in the harness), and `_TSTest_AfterHandleFiredFalseInitially` arms `TimerAfter(0.001)` = `SetTimer(fn, -1)` then only asserts the flag and returns — leaking an overdue one-shot. `_TS_ResetRegistry` reset the id counter to 0 every test, so that leaked handle's id (1) was REUSED by a later test; when the leaked timer dispatched (on a framework stdout pump-yield), its `_OneShot` `Delete(1)` evicted the *current* test's live id-1 handle → count 2. Fixed **test-side**: `_TS_ResetRegistry` now (a) disarms every armed handle's `Fn` via `SetTimer(Fn, 0)` before swapping the registry, and (b) no longer resets the id counter (monotonic ids → a stale `Delete` hits a defunct id, and `_OneShot` guards with `Has(Id)`). Deterministic regression test `_TSTest_StaleTimerCannotEvictLiveHandle` reproduces the collision by invoking a leaked handle's bound fn directly (no real-timer timing). **Lesson:** the TimerScheduler adapter arms REAL OS timers even under test — any test that arms a handle must fire or cancel it, or the next `_TS_ResetRegistry` must drain it.
+- **Flaky `TimerScheduler — cancelAll(): drains all live handles`** (expected 3, got 2, intermittent) — root cause: the adapter calls the REAL AHK `SetTimer` (never stubbed in the harness), and `_TSTest_AfterHandleFiredFalseInitially` arms `TimerAfter(0.001)` = `SetTimer(fn, -1)` then only asserts the flag and returns — leaking an overdue one-shot. `_TS_ResetRegistry` reset the id counter to 0 every test, so that leaked handle's id (1) was REUSED by a later test; when the leaked timer dispatched (on a framework stdout pump-yield), its `_OneShot` `Delete(1)` evicted the _current_ test's live id-1 handle → count 2. Fixed **test-side**: `_TS_ResetRegistry` now (a) disarms every armed handle's `Fn` via `SetTimer(Fn, 0)` before swapping the registry, and (b) no longer resets the id counter (monotonic ids → a stale `Delete` hits a defunct id, and `_OneShot` guards with `Has(Id)`). Deterministic regression test `_TSTest_StaleTimerCannotEvictLiveHandle` reproduces the collision by invoking a leaked handle's bound fn directly (no real-timer timing). **Lesson:** the TimerScheduler adapter arms REAL OS timers even under test — any test that arms a handle must fire or cancel it, or the next `_TS_ResetRegistry` must drain it.
 
 Related: [[feedback-ahk-source-encoding]] (the new `.ahk` files needed BOM+CRLF), [[feedback-regression-tests]] (the border win shipped with a real-GDI parity test), [[project-suspend-pause-invariant]] (the tooltip hot path checks `A_IsSuspended`).
 
@@ -544,11 +545,12 @@ live-model sanity check. **Gotchas for the next person:** (1) the `api_mlx.lua`
 do not "fix" it as a token divergence. (2) The cross-driver
 `shared/tests/corpus/prompt_builder/vectors.json` already pins `max_tokens` AND
 the diversity-temperature curve (greedy snap 0.15, auto-raise, cap 1.0) for both
-drivers — extend it rather than writing a new token corpus. (3) The AHK *batch*
+drivers — extend it rather than writing a new token corpus. (3) The AHK _batch_
 path still uses a single per-prediction cap, not macOS's `× num_predictions + N*5`
 scaling — a documented parity follow-up, not a regression.
 
 **Update (2026-06-13, A6): tooling/enforcement gates added.**
+
 - **Codegen freshness** is now part of `build:domain` (8 steps): it regenerates
   the byte-faithful generators (`build:manifest`, `codegen:terminators`,
   `codegen:expander:ahk`, `codegen:registry`) in place and drift-checks them via
@@ -556,14 +558,14 @@ scaling — a documented parity follow-up, not a regression.
   a generated file, fails CI. To add a generator to the gate, push a step + its
   outputs onto the `PIPELINE` array in `tools/build/build-domain.cjs`.
 - ⚠️ **FOOTGUN — do NOT run `npm run codegen:prompt-builder:ahk`.** That generator
-  (`codegen-prompt-builder-ahk.cjs`) uses constants `AQ='`"'` / `AQQ` and emits
-  the backtick-quote escape even for string *delimiters*, producing invalid AHK
-  (`` config.Has(`"max_words`") `` instead of `config.Has("max_words")`). The
-  COMMITTED `windows/_generated/prompt_builder.ahk` is correct (plain `"`), so
-  re-running the generator CORRUPTS it. It is excluded from the freshness gate for
-  this reason; the AHK PromptBuilder is currently effectively hand-maintained. Fix
-  the generator's delimiter escaping (only intra-string quotes need `` `" ``)
-  before re-enabling codegen for it. The cross-driver `prompt_builder/vectors.json`
+  (`codegen-prompt-builder-ahk.cjs`) uses constants `AQ='`"'`/`AQQ` and emits
+the backtick-quote escape even for string *delimiters*, producing invalid AHK
+(`` config.Has(`"max_words`") `` instead of `config.Has("max_words")`). The
+COMMITTED `windows/\_generated/prompt_builder.ahk`is correct (plain`"`), so
+re-running the generator CORRUPTS it. It is excluded from the freshness gate for
+this reason; the AHK PromptBuilder is currently effectively hand-maintained. Fix
+the generator's delimiter escaping (only intra-string quotes need `` `" ``)
+before re-enabling codegen for it. The cross-driver `prompt_builder/vectors.json`
   corpus validates behaviour either way.
 - **Config schema** is now enforced: `tools/test/test-config-schema.cjs`
   (`test:config-schema`, also a `build:domain` step) is a dependency-free minimal
@@ -584,10 +586,11 @@ A4 llm_prediction tint from `UI_AI_LOADING_HEX`, the A5 AHK batch token scaling,
 the A2 manifest-reader extension (keylogger/dynamic_hotstrings/gestures), the full
 **macOS timings sweep** (~38 constants → `lib/timings`), and the **AHK LLM backend
 timings** (`LLMApiLoadTimings`). Gotchas worth keeping:
+
 - **`lib/timings` typos fail fast at require-time** — the macOS suite catches a
   wrong section/key because it loads the modules; this is the safety net that made
   the macOS sweep safe to do in bulk.
-- **macOS hs.* baseline is 906** now (the +1 over 905 is the
+- **macOS hs.\* baseline is 906** now (the +1 over 905 is the
   `hs.gestures.space_wrap` manifest PATH literal in gestures/init.lua — not an OS
   call). Wiring more `hs.*`-prefixed manifest paths will need another re-anchor.
 - **Two intentional macOS local timing divergences** (NOT to "fix"): MLX
@@ -604,7 +607,7 @@ timings** (`LLMApiLoadTimings`). Gotchas worth keeping:
   collision would flip the tie-break (practically nil — distinct namespaces).
 - **The AHK keylogger telemetry timings are deliberately NOT swept.** Those
   sub-modules (`keylogger_watchers/_hook/_network/_av_state/_sensors/_mouse/
-  _trigger_roi/_clipboard/_window_topology/_ergonomics` + `keylogger.ahk`
+_trigger_roi/_clipboard/_window_topology/_ergonomics` + `keylogger.ahk`
   `KeylogConst`) are AHK-only telemetry (no macOS counterpart → no mutualization
   value) AND are **not in `run_all.ahk`**, so a reassign-at-boot wire would be
   unverifiable in CI with a 0 ms-sentinel → CPU-spin hazard. Three are genuine
@@ -717,7 +720,7 @@ All of the above lives on branch `feat/comma-j-expansion` (not yet merged to dev
 
 **The three hard fallbacks are now a shared cross-driver file (A4, 2026-06-13).** `GLOBAL_DEFAULT_DELAY` (0.75 s), `GLOBAL_DEFAULT_COLOR` (#1e88e5) and the `personal` baseline (#6e6e73) used to be duplicated literals in BOTH `windows/lib/hotstrings/hotstrings_config.ahk` and `macos/modules/hotstrings_config.lua` (each claiming "single source"). They now live ONCE in `static/ergopti_plus/shared/hotstrings/defaults.toml` (`[colors] global_default / personal`, `[delays] default_sec`) and are read at boot by both drivers with a fail-fast `require_key`, exactly like `shared/tooltip/constants.toml`. Key implementation gotchas:
 
-- **AHK uses an EXPLICIT loader, never a top-level auto-read.** `HotstringsConfigLoadSharedDefaults()` is called from `ErgoptiPlus.ahk` (before `HotstringsConfigInit` and the tray menu build — `initMenu` reads `GLOBAL_DEFAULT_DELAY`). It is NOT run at the `hotstrings_config.ahk` top level because `tests/test_hotstring_aggregation.ahk` sets `_SharedDir` *after* its `#Include` of the file — a top-level read would throw at include time. This mirrors `ui_style.ahk`'s sentinel-then-loader pattern. The three globals start `""` / `Map()` sentinels.
+- **AHK uses an EXPLICIT loader, never a top-level auto-read.** `HotstringsConfigLoadSharedDefaults()` is called from `ErgoptiPlus.ahk` (before `HotstringsConfigInit` and the tray menu build — `initMenu` reads `GLOBAL_DEFAULT_DELAY`). It is NOT run at the `hotstrings_config.ahk` top level because `tests/test_hotstring_aggregation.ahk` sets `_SharedDir` _after_ its `#Include` of the file — a top-level read would throw at include time. This mirrors `ui_style.ahk`'s sentinel-then-loader pattern. The three globals start `""` / `Map()` sentinels.
 - **Fail-fast = THROW, not `MsgBox`+`ExitApp`.** A missing key throws an `Error`: in production the unhandled boot error surfaces the fatal dialog and exits (desired); in CI `run_all.ahk`'s `OnError` handler turns it into a `not ok 0` line (no hung modal). `MsgBox`+`ExitApp` would hang the headless runner. The macOS side `error()`s at require-time (re-required per test).
 - **`IniCacheGet`/`ParseTomlFile` return colors WITH the leading `#`** (the TOML stores `"#1e88e5"`); the loader strips+re-adds `#` to normalise. Don't double-prefix.
 - **Pre-existing trap unrelated to A4:** the focused dev runner `tests/run_hotstrings_config.ahk` reports ~14 failures (`_HSE_SourcePriority` "local variable has not been assigned a value") because it does NOT `#Include hotstring_engine_main.ahk`, which defines `_HSE_SourcePriority` — now called in the resolve priority cascade. **CI uses `run_all.ahk`, which includes it and is fully green (1372/0).** Use `run_all.ahk` to judge hotstrings_config changes, not the focused runner.
@@ -933,6 +936,18 @@ When the script is paused, ABSOLUTELY nothing may activate — no tooltip, no LL
 
 **macOS parity:** pause is a soft multi-flag in `modules/shortcuts/script_control.lua` (`_is_paused`, `is_paused()`); the keymap eventtap early-returns on `CoreState.processing_paused` so the preview/hotstring path is already gated. Gaps closed for parity: `pause_all()` now calls `_keymap.reset_predictions()` + `ui.tooltip.hide_forced()`; gestures `triggerLiveAxisIfNeeded` gained `if not _state.enabled then return end`; `prediction_engine.perform_check` reads `package.loaded["modules.shortcuts.script_control"].is_paused()`. Background warmup HTTP + keylogger already check pause.
 
+### project-macos-llm-runtime-enable-gate
+
+_macOS must not warm up or load an LLM model from profile/model restoration alone; only the live runtime enable gate may authorize warmup side-effects._
+
+<sub>slug: `project_macos_llm_runtime_enable_gate`</sub>
+
+Root-caused 2026-06-15 from a live bug report: the AI menu was disabled, yet `api_mlx` still tried to warm up `Qwen3.5-2B-4bit` for ~186 s and marked the model load as failed. The trigger path was non-obvious: `ui/menu/menu_llm/profiles_manager.lua` calls `sync_profiles()` during menu construction, that calls `modules.llm.set_active_profile()`, and the core used to re-prime the KV cache unconditionally on every profile change. At startup the menu also resolves the current model before the real enable/disable state is applied, so a disabled boot could still schedule a warmup/load attempt.
+
+**Invariant:** restoring profile/model state is allowed at boot, but it must be side-effect-free until the runtime prediction engine explicitly enables LLM activity. Persisted/default config is NOT enough: startup may temporarily restore state while predictions remain locked off. The canonical gate now lives in `modules/llm.init` as `CoreState.runtime_llm_enabled`, written by `prediction_engine.set_llm_enabled()` via `core_llm.set_runtime_llm_enabled()`.
+
+**How to apply:** any future warmup trigger (`set_active_profile`, model/profile restoration, startup controller, menu sync) must check the live runtime flag, not just `DEFAULT_STATE.llm_enabled`, TOML state, or menu checkbox state. A profile switch while disabled must update the active profile ID but MUST NOT hit `warmup_model()` or start an MLX/Ollama load. Regression coverage lives in `tests/unit/modules/llm/test_init.lua` and `tests/unit/modules/llm/test_prediction_engine.lua`.
+
 ### project-macos-eventtap-no-blocking
 
 _Never run blocking work (osascript / hs.execute subprocesses) synchronously inside an hs.eventtap callback — macOS disables the tap (kCGEventTapDisabledByTimeout) and the shortcut dies. Defer with hs.timer.doAfter(0, …)._
@@ -941,9 +956,9 @@ _Never run blocking work (osascript / hs.execute subprocesses) synchronously ins
 
 The script-control shortcut (AltGr+Enter → pause / resume) is an `hs.eventtap` on `keyDown` (`modules/shortcuts/script_control.lua` → `handle_key`). Its callback toggles pause via `dispatch_action`, which fires the `_on_pause_change` listener **synchronously, still inside the eventtap callback**. When the « switch keyboard layout on pause / resume » feature (`layout_pause_switch_enabled`) was wired up, that listener called `menu_keyboard_layout.set_layout_by_kl_name`, which spawns **two BLOCKING `/usr/bin/osascript` subprocesses** via `run_osascript_isolated` (`hs.execute`): one to enumerate TIS input sources, one to `TISSelectInputSource`. For Ergopti bundles those take hundreds of ms. Reported 2026-06-09.
 
-**Why it's a trap:** a CGEventTap callback that does not return fast enough is disabled by macOS with `kCGEventTapDisabledByTimeout`. Once disabled the tap stops receiving events entirely — so after the *first* AltGr+Enter (which still toggled), the tap was dead and AltGr+Enter did **nothing at all** (« rien du tout »), neither pause nor resume. The bug only surfaced once `ab20abd52` made the layout switch actually fire (before, a separate regression meant `set_input_source` silently no-op'd), so the blocking call had never really run inside the tap before — a textbook « fixing one bug unmasks another » sequence.
+**Why it's a trap:** a CGEventTap callback that does not return fast enough is disabled by macOS with `kCGEventTapDisabledByTimeout`. Once disabled the tap stops receiving events entirely — so after the _first_ AltGr+Enter (which still toggled), the tap was dead and AltGr+Enter did **nothing at all** (« rien du tout »), neither pause nor resume. The bug only surfaced once `ab20abd52` made the layout switch actually fire (before, a separate regression meant `set_input_source` silently no-op'd), so the blocking call had never really run inside the tap before — a textbook « fixing one bug unmasks another » sequence.
 
-**Fix:** the layout switch is deferred onto the next run-loop cycle so the eventtap callback returns immediately. The decision + deferral lives in `menu_keyboard_layout.schedule_pause_layout_switch(is_paused, state, schedule?)` (scheduler injectable for tests; defaults to `hs.timer.doAfter(0, …)`), and `ui/menu/init.lua`'s `_on_pause_change` listener calls it. Regression test in `tests/unit/ui/menu/test_menu_keyboard_layout.lua` asserts the switch is *scheduled*, never run synchronously.
+**Fix:** the layout switch is deferred onto the next run-loop cycle so the eventtap callback returns immediately. The decision + deferral lives in `menu_keyboard_layout.schedule_pause_layout_switch(is_paused, state, schedule?)` (scheduler injectable for tests; defaults to `hs.timer.doAfter(0, …)`), and `ui/menu/init.lua`'s `_on_pause_change` listener calls it. Regression test in `tests/unit/ui/menu/test_menu_keyboard_layout.lua` asserts the switch is _scheduled_, never run synchronously.
 
 **How to apply:** any work done inside an `hs.eventtap` callback — or anything it calls synchronously (listeners, menu rebuilds, layout switches) — must be cheap. If it shells out, touches TIS / Carbon, or does heavy I/O, wrap it in `hs.timer.doAfter(0, …)`. The gesture click-hold release path learned the same lesson the same day (deferred synthetic mouse events off the keyDown). See [[project-suspend-pause-invariant]] for the pause reactor that drives `_on_pause_change`.
 
@@ -1043,6 +1058,7 @@ Two distinct concerns — keep them apart:
   punctuation. So they pair BOTH no-break spaces with BOTH `:` and `;`.
 
 The single source of truth for the matching tables:
+
 - **AHK**: `_BuildUppercasedSymbols()` in `windows/lib/hotstrings/hotstring_engine.ahk`.
 - **macOS**: `M.UPPER_TRIGGERS["," / "'" / "."]` in `shared/lua/text_utils/init.lua`
   (consumed by `trig_upper`/`trig_title`, which handle the symbol at ANY position
@@ -1093,9 +1109,6 @@ family as the [[project_config_v2_refactor]] encoding abort).
 existing ASCII-only test-suite convention (use `Chr(0xNNNN)` for non-ASCII; an
 em-dash `—` in a string literal also broke the parser the same way).
 
-
-
-
 ### project-hs-timer-callback-errors-invisible
 
 _A Lua error thrown inside an `hs.timer`/`hs.timer.delayed` callback is swallowed to the Hammerspoon Console and never reaches the file logger — so a crash on a timer-driven path is invisible in logs, and a unit-test stub that defines a method production lacks will mask the dangling call._
@@ -1136,9 +1149,6 @@ green while production crashed on every keystroke-driven request. Fixed in commi
   `ApiCommon`), mirror only the functions the real module actually exports — and
   add a regression that drives the real call path so a dangling call fails loudly.
 - See [[feedback-regression-tests]].
-
-
-
 
 ### project-profile-label-placeholder-convention
 
@@ -1197,9 +1207,9 @@ Two distinct foot-guns, both surfaced by a user reporting a "freeze au démarrag
 
 - The unprompted background poll uses the async path: `_Updater_FetchLatestJsonAsync` opens the request in WinHTTP async mode (`Req.Open(url, true)`), `Send()` returns immediately, and `_Updater_PollAsync` harvests it via `WaitForResponse(0)` (0 = do not wait) re-armed by a `SetTimer`. The network I/O runs on WinHTTP's own worker threads — the main thread never blocks. This is the same **WinHTTP-async + `WaitForResponse(0)` + `SetTimer`-poll** pattern used in `modules/llm/api_ollama.ahk` + `api_remote.ahk` (mirroring `hs.http.asyncPost` on macOS). A `try`-wrapped `WaitForResponse(0)` that throws = the request errored (treated as failure); a max-polls cap derived from the timeout budget guarantees no orphaned poll timer.
 - Status / ETag / array-unwrap interpretation is shared by the sync and async paths via `_Updater_InterpretResponse` (single source of truth — they must not drift).
-- **User-initiated** paths (one-click "check now", changelog, download) keep the *synchronous* fetch: the user is actively waiting on the click, and the timeouts are now bounded. Only the unprompted poll needs to be async.
+- **User-initiated** paths (one-click "check now", changelog, download) keep the _synchronous_ fetch: the user is actively waiting on the click, and the timeouts are now bounded. Only the unprompted poll needs to be async.
 - `Updater_StopBackgroundChecks` cancels in-flight async requests so a late response cannot pop a notification after the user picks "never".
-- The `[ahk.updater] check_interval_seconds` persistence round-trip for the "never" (0) value is **correct** (verified empirically — write → parse → load yields `0` and the poller stays disarmed). The reason a "never" user can still see checks is that the default *when the key is absent* is 86400 (opt-out), and the first check fires ~30 s after boot.
+- The `[ahk.updater] check_interval_seconds` persistence round-trip for the "never" (0) value is **correct** (verified empirically — write → parse → load yields `0` and the poller stays disarmed). The reason a "never" user can still see checks is that the default _when the key is absent_ is 86400 (opt-out), and the first check fires ~30 s after boot.
 - Guarded by `windows/tests/test_updater.ahk`: timeouts all > 0, no `SetTimeouts(0,` literal, `Updater_DownloadAndInstall` sets timeouts before `Send()`, and `Updater_BackgroundTick` dispatches via `_Updater_FetchLatestJsonAsync` (never the blocking fetch).
 
 See [[feedback-regression-tests]], [[project-ahk-menu-dispatcher-drop]].

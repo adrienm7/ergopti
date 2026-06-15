@@ -14,6 +14,25 @@ package.loaded["lib.logger"] = nil
 local _ = helpers.load_with_stubs("lib.logger")
 
 local Core = helpers.load_with_stubs("modules.llm")
+local INITIAL_HS = _G.hs
+
+local function load_core_with_timer_spy()
+	package.loaded["tests.stubs.hs"] = nil
+	local hs_stub = require("tests.stubs.hs")
+	hs_stub.__reset()
+	local timer_spy_calls = {}
+	local timer_stub = {}
+	for k, v in pairs(hs_stub.timer or {}) do
+		timer_stub[k] = v
+	end
+	timer_stub.doAfter = function(delay, fn)
+		timer_spy_calls[#timer_spy_calls + 1] = { delay = delay, fn = fn }
+		return { stop = function() end }
+	end
+	local fresh_core = helpers.load_with_stubs("modules.llm", { timer = timer_stub })
+	_G.hs = INITIAL_HS
+	return fresh_core, timer_spy_calls, _G.hs
+end
 
 
 
@@ -25,6 +44,12 @@ local Core = helpers.load_with_stubs("modules.llm")
 -- =====================================
 
 helpers.describe("Core.DEFAULT_STATE", function()
+	helpers.it("does not schedule a network bootstrap timer at require-time", function()
+		local _, timer_spy_calls = load_core_with_timer_spy()
+		helpers.assert_eq(#timer_spy_calls, 0,
+			"modules.llm must stay side-effect free until boot explicitly enables network bootstrap")
+	end)
+
 	local required_keys = {
 		"llm_enabled", "llm_backend",
 		"llm_model_ollama", "llm_model_mlx",
@@ -60,6 +85,37 @@ helpers.describe("Core.DEFAULT_STATE", function()
 	helpers.it("llm_backend is a known identifier", function()
 		local b = Core.DEFAULT_STATE.llm_backend
 		helpers.assert_true(b == "ollama" or b == "mlx")
+	end)
+end)
+
+
+
+
+-- ===============================================
+-- ===============================================
+-- ======= 1c/ explicit network bootstrap =======
+-- ===============================================
+-- ===============================================
+
+helpers.describe("Core.start_background_network_bootstrap", function()
+	helpers.it("primes backend probes only when explicitly called", function()
+		local fresh_core, timer_spy_calls, hs_stub = load_core_with_timer_spy()
+		hs_stub = package.loaded["hs"]
+		hs_stub.http.__reset()
+		fresh_core.start_background_network_bootstrap()
+		helpers.assert_eq(#timer_spy_calls, 1,
+			"explicit bootstrap must schedule exactly one deferred timer")
+		timer_spy_calls[1].fn()
+		helpers.assert_eq(#hs_stub.http.__calls, 4,
+			"bootstrap must issue two detection probes and two connection warmups")
+	end)
+
+	helpers.it("is idempotent across duplicate calls", function()
+		local fresh_core, timer_spy_calls = load_core_with_timer_spy()
+		fresh_core.start_background_network_bootstrap()
+		fresh_core.start_background_network_bootstrap()
+		helpers.assert_eq(#timer_spy_calls, 1,
+			"duplicate bootstrap calls must not schedule extra timers")
 	end)
 end)
 
@@ -162,6 +218,36 @@ helpers.describe("Core profile accessors", function()
 		Core.set_active_profile(nil)
 		Core.set_active_profile(42)
 		helpers.assert_eq(Core.get_active_profile().id, "basic")
+	end)
+
+	helpers.it("set_active_profile does not schedule warmup while runtime LLM is disabled", function()
+		local scheduled = {}
+		local old_do_after = hs.timer.doAfter
+		hs.timer.doAfter = function(delay, fn)
+			scheduled[#scheduled + 1] = { delay = delay, fn = fn }
+			return { stop = function() end }
+		end
+		Core.set_runtime_llm_enabled(false)
+		Core.set_active_profile("advanced")
+		hs.timer.doAfter = old_do_after
+		helpers.assert_eq(#scheduled, 0,
+			"disabled runtime LLM must not schedule a profile warmup")
+	end)
+
+	helpers.it("set_active_profile schedules warmup once runtime LLM is enabled", function()
+		local scheduled = {}
+		local old_do_after = hs.timer.doAfter
+		hs.timer.doAfter = function(delay, fn)
+			scheduled[#scheduled + 1] = { delay = delay, fn = fn }
+			return { stop = function() end }
+		end
+		Core.set_llm_model_ollama("gemma-4-E2B-it")
+		Core.set_runtime_llm_enabled(true)
+		Core.set_active_profile("advanced")
+		hs.timer.doAfter = old_do_after
+		helpers.assert_eq(#scheduled, 1,
+			"enabled runtime LLM must schedule exactly one profile warmup")
+		Core.set_runtime_llm_enabled(false)
 	end)
 
 	helpers.it("get_all_profiles includes the four built-ins", function()
