@@ -1,4 +1,4 @@
-﻿{
+{
 	"_meta.flag": "🇬🇧",
 	"_meta.locale": "en",
 	"_meta.name": "English",
@@ -557,6 +557,7 @@
 	"menu.about.update.parse_error": "Could not parse the latest release tag from GitHub.",
 	"menu.about.update.up_to_date": "ErgoptiPlus is up to date.\n\nCurrent version: {version}",
 	"menu.about.update_checking": "Checking…",
+	"menu.about.update_downloading": "Downloading…",
 	"menu.about.update_installing": "Installing…",
 	"menu.about.update_now": "Update to {tag}",
 	"menu.apps.clone_desc": "Duplicate any installed app",

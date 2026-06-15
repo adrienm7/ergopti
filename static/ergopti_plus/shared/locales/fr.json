@@ -1,4 +1,4 @@
-﻿{
+{
 	"_meta.flag": "🇫🇷",
 	"_meta.locale": "fr",
 	"_meta.name": "Français",
@@ -557,6 +557,7 @@
 	"menu.about.update.parse_error": "Impossible d’analyser le tag de la dernière version depuis GitHub.",
 	"menu.about.update.up_to_date": "ErgoptiPlus est à jour.\n\nVersion actuelle : {version}",
 	"menu.about.update_checking": "Vérification…",
+	"menu.about.update_downloading": "Téléchargement…",
 	"menu.about.update_installing": "Installation…",
 	"menu.about.update_now": "Mettre à jour vers {tag}",
 	"menu.apps.clone_desc": "Dupliquer une application installée",
