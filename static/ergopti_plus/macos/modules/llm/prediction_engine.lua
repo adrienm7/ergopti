@@ -716,6 +716,12 @@ function M.reset()
 	llm_request_counter        = llm_request_counter + 1
 	fetch_request_counter      = fetch_request_counter + 1
 
+	-- Clear chain state before tearing down other resources so any fallback
+	-- timer callback that fires between now and its cancellation sees
+	-- chain_pending = false and refuses to launch a fetch (D3 audit fix).
+	chain_pending = false
+	if _chain_trigger_timer then _chain_trigger_timer:stop(); _chain_trigger_timer = nil end
+
 	StreamingHandler.reset_failure_count()
 	if tooltip.hide_forced then tooltip.hide_forced() else tooltip.hide() end
 	stop_inactivity_timer()
