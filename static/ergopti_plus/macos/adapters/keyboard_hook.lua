@@ -65,7 +65,14 @@ end
 local function _make_handler()
 	return function(event)
 		local ok, char = pcall(function() return event:getCharacters() end)
-		if ok and type(char) == "string" and #char == 1 then
+		-- Use utf8.len() instead of # (byte count) so multi-byte characters like
+		-- é, à, ñ are recognised as single printable codepoints (H3 audit fix).
+		local char_codepoints = nil
+		if ok and type(char) == "string" then
+			local ok_len, n = pcall(utf8.len, char)
+			if ok_len then char_codepoints = n end
+		end
+		if char_codepoints == 1 then
 			-- Printable character path
 			if _on_char then
 				pcall(_on_char, {
@@ -97,12 +104,17 @@ end
 -- =========================================
 -- =========================================
 
---- Starts the keyboard hook. Idempotent — safe to call while already running.
+--- Starts the keyboard hook. Always stops and nils any existing tap (enabled
+--- or disabled) before creating a new one to prevent tap leaks (H5 audit fix).
 --- @param opts table|nil { intercept?, onChar?, onKey? }
 function M.start(opts)
-	if _tap and _tap:isEnabled() then
-		Logger.debug(LOG, "start() called while already running — no-op.")
-		return
+	-- Stop any existing tap (enabled or disabled) before creating a new one.
+	-- The old guard `if _tap and _tap:isEnabled()` left a disabled-but-allocated
+	-- tap dangling, leaking the event source to the OS event queue.
+	if _tap then
+		pcall(function() _tap:stop() end)
+		_tap = nil
+		Logger.debug(LOG, "start(): previous tap stopped before creating new one.")
 	end
 	local options = type(opts) == "table" and opts or {}
 	if type(options.onChar) == "function" then _on_char = options.onChar end
