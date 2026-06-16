@@ -65,3 +65,36 @@ helpers.describe("menu_state: hotstring group sync applies only the delta", func
 			"a disabled group must NOT be re-enabled")
 	end)
 end)
+
+helpers.describe("menu_state: keylogger start is deferred off the boot path", function()
+	helpers.it("does NOT start the keylogger synchronously during sync", function()
+		-- ROOT CAUSE ENCODED: keylogger.start (~1.3 s of SQLite + rotation work) ran
+		-- inline during sync_state_to_modules and dominated boot. It must be deferred
+		-- via hs.timer; a regression to a synchronous start fails the count below.
+		local started = { count = 0 }
+		local fake_kl = {
+			set_options       = function() end,
+			set_disabled_apps = function() end,
+			start             = function() started.count = started.count + 1 end,
+			stop              = function() end,
+		}
+
+		local saved_doAfter = _G.hs.timer.doAfter
+		local deferred = {}
+		_G.hs.timer.doAfter = function(_delay, fn) deferred[#deferred + 1] = fn end  -- record, don't fire
+
+		MenuState.sync_state_to_modules(
+			{ hotstrings = {}, keylogger_enabled = true },
+			{}, false,
+			{ keymap = {}, hotstring_editor = {}, core_mods = { keylogger = fake_kl }, save_prefs = function() end }
+		)
+
+		helpers.assert_eq(started.count, 0)        -- not started inline
+		helpers.assert_true(#deferred >= 1, "keylogger start must be scheduled via hs.timer")
+
+		-- Firing the deferred callbacks must then actually start it.
+		for _, fn in ipairs(deferred) do pcall(fn) end
+		_G.hs.timer.doAfter = saved_doAfter
+		helpers.assert_eq(started.count, 1)        -- started exactly once, later
+	end)
+end)

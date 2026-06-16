@@ -440,6 +440,44 @@ local function colors_equal(a, b)
 		and a.white == b.white and a.alpha == b.alpha
 end
 
+-- Memoized text measurement. canvas:minimumTextSize() is an ObjC text-layout
+-- call and is the dominant per-keystroke cost of the hotstring preview — it runs
+-- once per row PLUS once per trigger label on EVERY keystroke a preview is shown.
+-- The measured size depends only on the string and font size (the dimmed-row
+-- strikethrough does not change metrics), so cache by "<size_tag>\0<text>". The
+-- two trigger labels ("★" / "↵") are measured on every render and now hit the
+-- cache permanently; recurring previewed words hit it across re-renders. Bounded
+-- so a long session of distinct previewed words cannot grow it without limit.
+local _text_size_cache   = {}
+local _text_size_cache_n = 0
+local TEXT_SIZE_CACHE_MAX = 4096
+
+--- Measures styled text via the canvas, caching the result by size_tag + text.
+--- @param canvas userdata The hs.canvas used for measurement.
+--- @param index integer Element index passed to minimumTextSize.
+--- @param text string The raw string to measure.
+--- @param size_tag string Distinguishes font sizes ("main" vs "hint").
+--- @param style table The styledtext style table (used only on a cache miss).
+--- @return table { w, h } size table (a private copy; safe to keep).
+local function measure_styled(canvas, index, text, size_tag, style)
+	local key    = size_tag .. "\0" .. text
+	local cached  = _text_size_cache[key]
+	if cached then return cached end
+	local sz  = canvas:minimumTextSize(index, hs.styledtext.new(text, style))
+	local out = { w = sz.w, h = sz.h }
+	if _text_size_cache_n >= TEXT_SIZE_CACHE_MAX then
+		_text_size_cache   = {}
+		_text_size_cache_n = 0
+	end
+	_text_size_cache[key] = out
+	_text_size_cache_n    = _text_size_cache_n + 1
+	return out
+end
+
+-- Exposed for the memoization regression test (the stub canvas is a no-op mock,
+-- so the cache behaviour is what is verifiable rather than the pixel sizes).
+M._measure_styled = measure_styled
+
 --- Renders a stack of hotstring rows into a single canvas.
 --- Each row is { text: string, tint: table|nil, trigger_label: string|nil }.
 --- @param rows table Array of row descriptors.
@@ -483,15 +521,14 @@ function M.render_stacked(rows, state, start_watchers_callback)
 		end
 
 		for _, row in ipairs(rows) do
-			local styled = hs.styledtext.new(row.text, build_text_style(row.dimmed))
-			local sz = temp_canvas:minimumTextSize(2, styled)
+			local sz = measure_styled(temp_canvas, 2, row.text, "main", build_text_style(row.dimmed))
 			if sz.w > max_text_w then max_text_w = sz.w end
 			table.insert(row_heights, sz.h)
 			if row.trigger_label and row.trigger_label ~= "" then
-				local lsz = temp_canvas:minimumTextSize(2, hs.styledtext.new(row.trigger_label, {
+				local lsz = measure_styled(temp_canvas, 2, row.trigger_label, "hint", {
 					font  = { name = Config.fonts.main, size = Config.sizes.hint },
 					color = { white = 0.45, alpha = 1 },
-				}))
+				})
 				if lsz.w > max_label_w then max_label_w = lsz.w end
 				table.insert(label_heights, lsz.h)
 			else

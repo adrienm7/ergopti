@@ -17,6 +17,11 @@ local hs     = hs
 local Logger = require("lib.logger")
 local LOG    = "menu_state"
 
+-- Delay before starting the keylogger engine. Its start (~1.3 s of SQLite +
+-- log-rotation work) only feeds typing metrics, so it is deferred off the boot
+-- critical path; a sub-second gap of unlogged keystrokes after boot is harmless.
+local KEYLOGGER_START_DELAY_SEC = 0.5
+
 
 
 
@@ -187,9 +192,19 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 		end
 		if type(kl.set_disabled_apps) == "function" then pcall(kl.set_disabled_apps, state.keylogger_disabled_apps or {}) end
 		if state.keylogger_enabled then
-			local _t_kl = hs.timer.secondsSinceEpoch()
-			if type(kl.start) == "function" then pcall(kl.start, core_mods.shortcuts_mod) end
-			Logger.info(LOG, "Keylogger engine start: %.1f ms.", (hs.timer.secondsSinceEpoch() - _t_kl) * 1000)
+			-- Keylogger start is the single biggest boot cost (~1.3 s: SQLite open,
+			-- log-rotation offset replay, export setup). It only feeds typing
+			-- METRICS, so missing the first fraction of a second of keystrokes is
+			-- harmless — defer it off the boot critical path so the menubar/UI become
+			-- interactive ~1.3 s sooner. The shortcuts ref is captured for the closure.
+			local _shortcuts_ref = core_mods.shortcuts_mod
+			hs.timer.doAfter(KEYLOGGER_START_DELAY_SEC, function()
+				if type(kl.start) ~= "function" then return end
+				local _t_kl = hs.timer.secondsSinceEpoch()
+				pcall(kl.start, _shortcuts_ref)
+				Logger.info(LOG, "Keylogger engine start (deferred): %.1f ms.",
+					(hs.timer.secondsSinceEpoch() - _t_kl) * 1000)
+			end)
 		else
 			if type(kl.stop) == "function" then pcall(kl.stop) end
 		end
