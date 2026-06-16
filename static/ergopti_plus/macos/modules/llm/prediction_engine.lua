@@ -116,6 +116,10 @@ local _last_request_buffer_len = 0
 -- Fires perform_check() after inactivity_debounce_sec of silence
 local _inactivity_timer = nil
 
+-- Holds the profile name to forward when the rate-limit deferral re-arms the
+-- inactivity timer; cleared by the timer callback after each deferred fire
+local _deferred_profile_name = nil
+
 -- Fallback: fires perform_check() if the F16 chain signal is somehow missed
 local _chain_trigger_timer = nil
 
@@ -324,13 +328,15 @@ end
 -- ===== 3.3) Debounce / Timer =========
 -- =====================================
 
---- Rebuilds the inactivity timer with a new debounce interval.
---- The old timer is stopped before the new one is created to avoid a double-fire race.
+--- Updates the inactivity debounce interval on the canonical timer.
+--- Uses setDelay instead of recreating the timer to preserve the single-instance invariant.
 function M.set_llm_debounce(seconds)
 	inactivity_debounce_sec = seconds
-	if _inactivity_timer then _inactivity_timer:stop() end
-	_inactivity_timer = hs.timer.delayed.new(inactivity_debounce_sec, M.perform_check)
-	Logger.debug(LOG, "Inactivity timer rebuilt: %.3fs.", inactivity_debounce_sec)
+	if _inactivity_timer then
+		_inactivity_timer:stop()
+		_inactivity_timer:setDelay(inactivity_debounce_sec)
+	end
+	Logger.debug(LOG, "Inactivity timer delay updated: %.3fs.", inactivity_debounce_sec)
 end
 
 
@@ -563,9 +569,11 @@ function M.perform_check(force_trigger, profile_name)
 			local remaining = min_interval - elapsed
 			Logger.debug(LOG, "Backend '%s' floor (%dms) — deferring %dms.",
 				backend_id, math.floor(min_interval * 1000), math.floor(remaining * 1000))
-			if _inactivity_timer then _inactivity_timer:stop() end
-			_inactivity_timer = hs.timer.delayed.new(remaining, function() M.perform_check(force_trigger, profile_name) end)
-			_inactivity_timer:start()
+			-- Reuse the single canonical timer instead of creating an orphan;
+			-- store profile_name so the callback can forward it when it fires
+			_deferred_profile_name = profile_name
+			_inactivity_timer:stop()
+			_inactivity_timer:start(remaining)
 			return
 		end
 	end
@@ -880,9 +888,14 @@ M.KEYCODE_LLM_CHAIN  = KEYCODE_LLM_CHAIN   -- Bridge uses this to detect the cha
 M.CHAIN_FALLBACK_SEC = CHAIN_FALLBACK_SEC  -- Bridge passes this to suppress_rescan_keep_buffer
 
 
--- Create the inactivity debounce timer at module load.
--- If the debounce delay changes later, set_llm_debounce() recreates this timer.
-_inactivity_timer = hs.timer.delayed.new(inactivity_debounce_sec, M.perform_check)
+-- Create the single inactivity debounce timer at module load.
+-- The callback drains _deferred_profile_name so rate-limit re-arms can forward
+-- a profile without creating a second timer object.
+_inactivity_timer = hs.timer.delayed.new(inactivity_debounce_sec, function()
+	local profile = _deferred_profile_name
+	_deferred_profile_name = nil
+	M.perform_check(false, profile)
+end)
 
 -- Enable Enter-to-accept only after the user has explicitly navigated at least once;
 -- without this guard, pressing Enter on the very first shown prediction would type a newline.
