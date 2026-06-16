@@ -1,2 +1,0 @@
-IsObject: 1
-Match == "": 0
