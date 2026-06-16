@@ -175,8 +175,10 @@ local function word_boundary_blocks(buffer, trigger, trigger_start_byte, start_i
 	if trigger_start_byte <= 1 then
 		return not start_is_word_boundary
 	end
-	local before    = buffer:sub(1, trigger_start_byte - 1)
-	local prev_off  = utf8.offset(before, -1)
+	local before             = buffer:sub(1, trigger_start_byte - 1)
+	local ok_utf8, prev_off = pcall(utf8.offset, before, -1)
+	-- Treat malformed UTF-8 the same as an absent left-hand char: no block
+	if not ok_utf8 then prev_off = nil end
 	local prev_char = prev_off and before:sub(prev_off) or ""
 	return text_utils.is_letter_char(prev_char) or prev_char == "@"
 end
@@ -464,7 +466,8 @@ function M.try_repeat_feature(chars, is_ignored)
 	if buf_len <= char_len then return false end
 
 	-- Find the offset of the magic-key in the buffer and isolate the text before it.
-	local magic_offset = utf8.offset(_state.buffer, -char_len)
+	local ok_magic, magic_offset = pcall(utf8.offset, _state.buffer, -char_len)
+	if not ok_magic then magic_offset = nil end
 	if not magic_offset then
 		Logger.warn(LOG, "try_repeat_feature: utf8.offset returned nil — skipping.")
 		return false
@@ -472,7 +475,8 @@ function M.try_repeat_feature(chars, is_ignored)
 	local before = _state.buffer:sub(1, magic_offset - 1)
 
 	-- Read the last character before the magic key.
-	local last_char_offset = utf8.offset(before, -1)
+	local ok_last, last_char_offset = pcall(utf8.offset, before, -1)
+	if not ok_last then last_char_offset = nil end
 	if not last_char_offset then return false end
 	local last_char = before:sub(last_char_offset)
 
@@ -484,7 +488,12 @@ function M.try_repeat_feature(chars, is_ignored)
 	-- fire at the start of a word (buffer = "c★"), where the user most likely
 	-- intended a text-expansion, not a repeat.
 	local before_last = last_char_offset > 1 and before:sub(1, last_char_offset - 1) or ""
-	local pred_offset = before_last ~= "" and utf8.offset(before_last, -1) or nil
+	local pred_offset
+	if before_last ~= "" then
+		local ok_pred, off_pred = pcall(utf8.offset, before_last, -1)
+		-- Malformed UTF-8 before the last char: treat predecessor as absent, block repeat
+		pred_offset = ok_pred and off_pred or nil
+	end
 	local pred_char   = pred_offset and before_last:sub(pred_offset) or ""
 	if pred_char == "" or pred_char:match("^%s$") or not text_utils.is_letter_char(pred_char) then
 		return false
@@ -610,6 +619,11 @@ function M.init(core_state, registry_mod, llm_mod)
 	if type(core_state)  ~= "table" then Logger.error(LOG, "M.init(): core_state must be a table."); return end
 	if type(registry_mod) ~= "table" then Logger.error(LOG, "M.init(): registry_mod must be a table."); return end
 	if type(llm_mod)     ~= "table" then Logger.error(LOG, "M.init(): llm_mod must be a table."); return end
+
+	if _state then
+		Logger.warn(LOG, "M.init() called more than once — ignoring duplicate call.")
+		return
+	end
 
 	Logger.start(LOG, "Initializing expander…")
 	_state    = core_state
