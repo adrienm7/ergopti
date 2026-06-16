@@ -14,7 +14,10 @@ local i18n           = require("lib.i18n")
 local Parser         = require("modules.llm.parser")
 local Profiles       = require("modules.llm.profiles")
 local ApiCommon      = require("modules.llm.api_common")
-local HttpClient     = require("adapters.http_client").new()
+local _warmup_client = require("adapters.http_client").new()  -- Dedicated client for warmup POSTs; isolated so discovery probes cannot cancel an in-flight warmup
+local _probe_client  = require("adapters.http_client").new()  -- Dedicated client for discover_endpoints() POST probes; never shares state with warmup
+local _check_client  = require("adapters.http_client").new()  -- Dedicated client for check_availability() GETs
+local _infer_client  = require("adapters.http_client").new()  -- Dedicated client for non-streaming inference POSTs in post_and_parse
 local JsonCodec      = require("adapters.json_codec")
 local TimerScheduler = require("adapters.timer_scheduler")
 local ShellRunner    = require("adapters.shell_runner")
@@ -34,6 +37,7 @@ local RETRY_FAILED_PREDICTION_MAX_MULTIPLIER = _RETRY_MAX_MULT
 local STREAM_CONNECT_TIMEOUT_SEC = Timings.sec("llm", "stream_connect_timeout_ms") -- Fail fast if the MLX server does not accept the TCP connection
 local STREAM_HARD_TIMEOUT_SEC    = Timings.sec("llm", "stream_hard_timeout_ms")    -- Kill the task if the server accepts but never sends a token
 local WARMUP_POST_TIMEOUT_SEC    = Timings.sec("llm", "warmup_post_timeout_ms")    -- Unblock _warmup_in_flight if the single-token POST never returns
+local NON_STREAM_TIMEOUT_SEC     = 8  -- Non-streaming inference hard timeout; prevents a hung server from blocking on_fail indefinitely
 
 -- MLX server bind address — single source of truth in shared/llm/mlx_server.json
 -- so the port is never hardcoded across api_mlx, the models_manager_mlx launcher,
@@ -441,7 +445,7 @@ local function discover_endpoints(on_done)
 			end
 			local path = candidates[idx]
 			local payload = probe_by_kind[kind] or probe_completions
-			HttpClient.post(MLX_BASE_URL .. path, headers, payload, function(r)
+			_probe_client.post(MLX_BASE_URL .. path, headers, payload, function(r)
 				if r.status ~= 404 and r.status ~= 0 then
 					Logger.info(LOG, "Endpoint discovery (%s): %s -> HTTP %s — accepted as live route.",
 						kind, path, tostring(r.status))
@@ -883,7 +887,7 @@ function M.warmup(model_name, profile)
 		TimerScheduler.after(2, function() M.warmup(model_name, profile) end)
 	end)
 	_warmup_timeout = _wt_handle
-	HttpClient.post(endpoint, { ["Content-Type"] = "application/json" }, payload,
+	_warmup_client.post(endpoint, { ["Content-Type"] = "application/json" }, payload,
 		function(r)
 			local status, body = r.status, r.body
 			if _warmup_timeout then
@@ -955,7 +959,7 @@ end
 --- @param on_missing function Callback if server fails to answer.
 function M.check_availability(model_name, on_available, on_missing)
 	Logger.debug(LOG, "Checking MLX server availability…")
-	HttpClient.get(MLX_BASE_URL .. "/v1/models", {}, function(r)
+	_check_client.get(MLX_BASE_URL .. "/v1/models", {}, function(r)
 		if r.status == 200 then
 			Logger.info(LOG, "MLX server is available.")
 			if type(on_available) == "function" then pcall(on_available) end
@@ -1096,14 +1100,14 @@ local function post_and_parse(model_name, system_prompt, full_text, tail_text,
 	end
 
 	local done = false
-	local timeout_handle = TimerScheduler.after(8, function()
+	local timeout_handle = TimerScheduler.after(NON_STREAM_TIMEOUT_SEC, function()
 		if done then return end
 		done = true
-		Logger.warn(LOG, "[%s] #%d TIMEOUT after 8s", model_name, req_id)
+		Logger.warn(LOG, "[%s] #%d TIMEOUT after %.0fs", model_name, req_id, NON_STREAM_TIMEOUT_SEC)
 		if type(on_fail) == "function" then pcall(on_fail) end
 	end)
 
-	HttpClient.post(endpoint, { ["Content-Type"] = "application/json" }, encoded,
+	_infer_client.post(endpoint, { ["Content-Type"] = "application/json" }, encoded,
 		function(r)
 			local status, body = r.status, r.body
 			if done then return end
@@ -1325,7 +1329,19 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 		if line:sub(1, 6) ~= "data: " then return end
 		local json_str = line:sub(7)
 		if json_str == "[DONE]" then return end
-		local obj, _ = JsonCodec.decode(json_str)
+		-- Reject structurally incomplete chunks early: a valid JSON object or array
+		-- must end with "}" or "]"; anything shorter is a split TCP chunk that
+		-- JsonCodec.decode cannot reconstruct, so skip rather than log a spurious error
+		local last_char = json_str:sub(-1)
+		if last_char ~= "}" and last_char ~= "]" then
+			Logger.debug(LOG, "process_sse_line: structurally incomplete chunk — skipping.")
+			return
+		end
+		local ok_json, obj = pcall(function() return JsonCodec.decode(json_str) end)
+		if not ok_json or not obj then
+			Logger.debug(LOG, "process_sse_line: JSON parse failed (incomplete chunk?) — skipping.")
+			return
+		end
 		if type(obj) ~= "table" or type(obj.choices) ~= "table" or not obj.choices[1] then
 			Logger.debug(LOG, "[%s] #%d SSE decode fail: type_obj=%s",
 				model_name, req_id, type(obj))
