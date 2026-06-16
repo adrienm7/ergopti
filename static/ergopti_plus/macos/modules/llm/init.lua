@@ -144,6 +144,9 @@ local CoreState = {
 	background_bootstrap_started = false,
 	last_backend_check     = 0,
 	backend_check_interval = 10,
+	-- Monotonically-increasing counter that lets on_both_done() discard stale
+	-- probe results when set_backend() is called while probes are in-flight
+	detection_generation   = 0,
 }
 
 
@@ -171,12 +174,23 @@ function M.auto_detect_backend(callback)
 
 	CoreState.last_backend_check = now
 
+	-- Capture the generation before launching probes so the closure can detect
+	-- whether set_backend() was called while the probes were in-flight; if it
+	-- was, the counter will have been bumped and our result is now stale
+	local my_generation = CoreState.detection_generation + 1
+	CoreState.detection_generation = my_generation
+
 	-- Async parallel health checks — both fire at once, state resolved in callbacks
 	local ollama_done, mlx_done = false, false
 	local ollama_ok, mlx_ok = false, false
 
 	local function on_both_done()
 		if not (ollama_done and mlx_done) then return end
+		-- Discard if an explicit set_backend() call superseded this probe run
+		if CoreState.detection_generation ~= my_generation then
+			Logger.debug(LOG, "auto_detect: stale detection result, ignoring.")
+			return
+		end
 		-- Prefer Ollama if both available, otherwise use MLX if available
 		if ollama_ok then
 			CoreState.backend = "ollama"
@@ -185,7 +199,7 @@ function M.auto_detect_backend(callback)
 		else
 			CoreState.backend = "inconnu"
 		end
-		
+
 		if type(callback) == "function" then pcall(callback, CoreState.backend) end
 	end
 
@@ -380,9 +394,13 @@ function M.cancel_streaming()
 end
 
 --- Sets the active LLM backend identifier.
+--- Bumps the detection generation so any in-flight auto_detect_backend() probe
+--- that resolves after this call treats its result as stale and discards it.
 --- @param backend string The backend identifier (e.g., "mlx", "ollama").
 function M.set_backend(backend)
 	if type(backend) == "string" and backend ~= "" then
+		-- Invalidate in-flight auto-detect probes before writing the new value
+		CoreState.detection_generation = CoreState.detection_generation + 1
 		CoreState.backend = backend
 	end
 end
