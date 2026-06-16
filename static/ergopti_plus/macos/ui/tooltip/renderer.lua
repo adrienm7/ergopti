@@ -16,6 +16,11 @@ local Logger = require("lib.logger")
 local LOG = "tooltip_renderer"
 local Config = require("ui.tooltip.config")
 
+-- Corner arc radius for ALL tooltip rounding (single + stacked canvases). Read
+-- from the shared cross-driver source (shared/tooltip/constants.toml → Config)
+-- so macOS and Windows round identically — never hardcode it here.
+local CORNER_RADIUS = Config.layout.corner_radius
+
 local ok_bridge, vscode_bridge = pcall(require, "lib.vscode_bridge")
 if not ok_bridge then vscode_bridge = nil end
 
@@ -45,8 +50,8 @@ if M.canvas then
 	M.canvas:level(hs.canvas.windowLevels.cursor)
 	M.canvas:behavior(hs.canvas.windowBehaviors.canJoinAllSpaces)
 	M.canvas:appendElements(
-		{ type = "rectangle", action = "fill", roundedRectRadii = { xRadius = 7, yRadius = 7 } },
-		{ type = "rectangle", action = "strokeAndFill", fillColor = { white = 0, alpha = 0 }, strokeColor = { white = 1, alpha = 0.13 }, strokeWidth = 1, roundedRectRadii = { xRadius = 7, yRadius = 7 } },
+		{ type = "rectangle", action = "fill", roundedRectRadii = { xRadius = CORNER_RADIUS, yRadius = CORNER_RADIUS } },
+		{ type = "rectangle", action = "strokeAndFill", fillColor = { white = 0, alpha = 0 }, strokeColor = Config.colors.border, strokeWidth = 1, roundedRectRadii = { xRadius = CORNER_RADIUS, yRadius = CORNER_RADIUS } },
 		{ type = "text" },
 		{ type = "rectangle" },
 		{ type = "text" },
@@ -54,6 +59,24 @@ if M.canvas then
 		{ type = "text", action = "skip" }
 	)
 end
+
+-- Whether hs.canvas "clip"/"resetClip" actions are available on this build. They
+-- let the stacked panel's colored row backgrounds share the border's rounded
+-- corners (the macOS analog of the AHK CreateRoundRectRgn window region). They are
+-- documented hs.canvas actions, but we probe support ONCE at load so an older
+-- build degrades to square row corners instead of a failed (hidden) tooltip.
+local STACKED_CLIP = (function()
+	local ok = pcall(function()
+		local probe = hs.canvas.new({ x = 0, y = 0, w = 1, h = 1 })
+		if not probe then error("no canvas") end
+		probe:appendElements(
+			{ type = "rectangle", action = "clip" },
+			{ type = "rectangle", action = "resetClip" }
+		)
+		if type(probe.delete) == "function" then probe:delete() end
+	end)
+	return ok == true
+end)()
 
 --- Updates a single text element without redrawing the rest of the canvas.
 --- Used by tooltip_llm during streaming to refresh the info bar / model header
@@ -354,15 +377,24 @@ M.stacked_canvas = nil
 -- Build or rebuild the stacked canvas with the correct number of elements.
 -- Each row needs: bg_rect + output_text + label_text = 3 elements.
 -- Plus separators between rows (count - 1) and one top-level border = fixed overhead.
--- Element layout per row i (1-based): base = (i-1)*3 + 1
---   [base]   : background fill rectangle
---   [base+1] : output styled text
---   [base+2] : trigger label styled text
--- After all rows:
---   [N*3+1] : separator lines (one rectangle per gap, drawn via individual elements)
---   [N*3+k] : white border strokeAndFill rectangle
+-- When clipping is available, a leading rounded-rectangle CLIP element (index 1)
+-- confines every following element to the rounded panel shape so the per-row
+-- colored backgrounds share the SAME rounded outer corners as the border (the
+-- macOS analog of the AHK CreateRoundRectRgn window region); a trailing resetClip
+-- lets the 1 px border draw crisp. Without clip support the layout is unchanged
+-- (square row corners). CLIP_OFFSET is the index shift the leading clip adds.
+local CLIP_OFFSET = STACKED_CLIP and 1 or 0
+-- Element layout per row i (1-based): base = (i-1)*3 + 1 + CLIP_OFFSET
+--   [1]        : rounded clip rectangle               (only when STACKED_CLIP)
+--   [base]     : background fill rectangle
+--   [base+1]   : output styled text
+--   [base+2]   : trigger label styled text
+--   separators : one rectangle per gap
+--   resetClip  : restores the full region for the border (only when STACKED_CLIP)
+--   border     : white strokeAndFill rectangle (last element)
 local function _ensure_stacked_canvas(row_count)
-	local needed = row_count * 3 + (row_count - 1) + 1   -- rows + separators + border
+	-- [clip] + rows + separators + [resetClip] + border
+	local needed = CLIP_OFFSET + row_count * 3 + (row_count - 1) + CLIP_OFFSET + 1
 	if M.stacked_canvas then
 		local current = #M.stacked_canvas
 		if current ~= needed then
@@ -376,6 +408,13 @@ local function _ensure_stacked_canvas(row_count)
 		M.stacked_canvas:level(hs.canvas.windowLevels.cursor)
 		M.stacked_canvas:behavior(hs.canvas.windowBehaviors.canJoinAllSpaces)
 		local elements = {}
+		if STACKED_CLIP then
+			-- [1] Rounded clip: frame + radius set per render in render_stacked.
+			table.insert(elements, {
+				type = "rectangle", action = "clip",
+				roundedRectRadii = { xRadius = CORNER_RADIUS, yRadius = CORNER_RADIUS }
+			})
+		end
 		for _ = 1, row_count do
 			table.insert(elements, { type = "rectangle", action = "fill" })
 			table.insert(elements, { type = "text", action = "fill" })
@@ -384,13 +423,18 @@ local function _ensure_stacked_canvas(row_count)
 		for _ = 1, row_count - 1 do
 			table.insert(elements, { type = "rectangle", action = "fill" })
 		end
+		if STACKED_CLIP then
+			-- Lift the clip so the border below draws at full width (clipping the
+			-- border to its own path would halve the 1 px stroke).
+			table.insert(elements, { type = "rectangle", action = "resetClip" })
+		end
 		-- Border: strokeAndFill with transparent fill so only the stroke shows.
 		table.insert(elements, {
 			type = "rectangle", action = "strokeAndFill",
 			fillColor = { white = 0, alpha = 0 },
-			strokeColor = { white = 1, alpha = 0.25 },
+			strokeColor = Config.colors.border,
 			strokeWidth = 1,
-			roundedRectRadii = { xRadius = 7, yRadius = 7 }
+			roundedRectRadii = { xRadius = CORNER_RADIUS, yRadius = CORNER_RADIUS }
 		})
 		M.stacked_canvas:appendElements(table.unpack(elements))
 	end
@@ -500,9 +544,16 @@ function M.render_stacked(rows, state, start_watchers_callback)
 
 		M.stacked_canvas:frame({ x = pos_x, y = pos_y, w = canvas_width, h = total_height })
 
-		-- Fill in per-row elements.
+		-- Rounded clip covering the whole panel — confines every row background to
+		-- the rounded shape so the colored rectangle matches the border corners.
+		if STACKED_CLIP then
+			M.stacked_canvas[1].frame            = { x = 0, y = 0, w = canvas_width, h = total_height }
+			M.stacked_canvas[1].roundedRectRadii = { xRadius = CORNER_RADIUS, yRadius = CORNER_RADIUS }
+		end
+
+		-- Fill in per-row elements (offset by the leading clip element, if present).
 		for i, row in ipairs(rows) do
-			local base   = (i - 1) * 3 + 1
+			local base   = (i - 1) * 3 + 1 + CLIP_OFFSET
 			local top_y  = row_top_y[i]
 			local row_h  = row_heights[i] + pad_y * 2
 			local bg_col = M.apply_tint(row.tint)
@@ -540,17 +591,17 @@ function M.render_stacked(rows, state, start_watchers_callback)
 			end
 		end
 
-		-- Separators between rows.
-		local sep_base = row_count * 3 + 1
+		-- Separators between rows (offset by the leading clip element, if present).
+		local sep_base = row_count * 3 + 1 + CLIP_OFFSET
 		for i = 1, row_count - 1 do
 			local sep_y = row_top_y[i] + row_heights[i] + pad_y * 2
 			M.stacked_canvas[sep_base + i - 1].frame     = { x = 0, y = sep_y, w = canvas_width, h = 1 }
-			M.stacked_canvas[sep_base + i - 1].fillColor = { white = 1, alpha = 0.25 }
+			M.stacked_canvas[sep_base + i - 1].fillColor = Config.colors.sep
 			M.stacked_canvas[sep_base + i - 1].action    = "fill"
 		end
 
-		-- Top-level border (last element).
-		local border_idx = row_count * 3 + (row_count - 1) + 1
+		-- Top-level border (last element): [clip] + rows + separators + [resetClip] + border.
+		local border_idx = CLIP_OFFSET + row_count * 3 + (row_count - 1) + CLIP_OFFSET + 1
 		M.stacked_canvas[border_idx].frame = { x = 0, y = 0, w = canvas_width, h = total_height }
 
 		M.stacked_canvas:show()
