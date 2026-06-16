@@ -209,6 +209,13 @@ end
 function M.start_input_source_watcher(on_change)
 	Logger.trace(LOG, "Registering input source watcher…")
 
+	-- Guard against double-call: overwriting _layout_poll_timer would orphan the
+	-- previous timer with no reference left to stop it
+	if _layout_poll_timer then
+		Logger.warn(LOG, "start_input_source_watcher() called twice — ignoring.")
+		return
+	end
+
 	-- Seed the initial known layout from HIToolbox
 	_last_known_layout = read_current_layout_from_hitoolbox()
 		or (pcall(function() return hs.keycodes.currentLayout() end) and hs.keycodes.currentLayout())
