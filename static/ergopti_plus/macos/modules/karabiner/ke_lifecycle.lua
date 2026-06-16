@@ -639,9 +639,16 @@ end
 --- daemon in background, then polls asynchronously via hs.timer.doAfter
 --- until the IPC roundtrip probe confirms the rules are live.
 ---
---- Fully non-blocking: Hammerspoon's event loop is never paused. The outer
---- process poll and the CLI probe retries both use hs.timer so the menu bar
---- and all other modules continue responding while KE starts up.
+--- Phase 1 — synchronous setup: two hs.execute() calls write defaults and
+--- suppress KE UI helpers before the bridge spawns. These calls block the
+--- Hammerspoon main thread for their duration (typically < 50 ms combined).
+--- Phase 2 — asynchronous polling: process detection and CLI probe retries
+--- are driven by hs.timer so the menu bar and all other modules keep
+--- responding while KE starts up.
+---
+--- IMPORTANT: do NOT call this function from an eventtap callback, a
+--- frameCallback, or any other hot-path handler. It is intended exclusively
+--- for boot-time initialisation or an explicit user action (menu item).
 ---
 --- GUI fallback is intentionally disabled: if headless priming cannot start,
 --- we fail loudly and keep behavior fully background-only.
