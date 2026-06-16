@@ -373,6 +373,13 @@ function M.build_callbacks(ctx)
 	local function on_fail()
 		if get_fetch_id() ~= my_fetch_id then return end
 
+		-- Cancel the watchdog so a stale timer cannot fire show_predictions
+		-- with empty/partial data after the request has already failed
+		if _stream_watchdog_timer then
+			_stream_watchdog_timer:stop()
+			_stream_watchdog_timer = nil
+		end
+
 		-- Track consecutive failures to detect persistent issues (e.g. server
 		-- crashed, still loading weights, or misconfigured endpoint)
 		_consecutive_llm_failures = _consecutive_llm_failures + 1
