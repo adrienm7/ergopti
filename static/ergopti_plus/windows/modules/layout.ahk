@@ -635,7 +635,7 @@ _OsLayoutDigitsAreShifted() {
 ; re-introducing the out-of-order emission Critical was added to prevent — only
 ; with the digit as the unprotected boundary (remap-emit-critical-uneven). There
 ; is no Sleep on these paths, so Critical's guarantee holds.
-SC029:: SendNewResult("$")
+SC029:: _DigitShiftSend("$")
 SC002:: _DigitRowDown("1")
 SC002 Up:: _DigitRowUp("1")
 SC003:: _DigitRowDown("2")
@@ -656,8 +656,8 @@ SC00A:: _DigitRowDown("9")
 SC00A Up:: _DigitRowUp("9")
 SC00B:: _DigitRowDown("0")
 SC00B Up:: _DigitRowUp("0")
-SC00C:: SendNewResult("%")
-SC00D:: SendNewResult("=")
+SC00C:: _DigitShiftSend("%")
+SC00D:: _DigitShiftSend("=")
 #HotIf
 
 ; Serialised digit-row emit. Critical("On") makes the SendEvent uninterruptible
