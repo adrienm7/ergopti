@@ -135,6 +135,24 @@ helpers.describe("config_overrides.apply — inline comment stripping", function
 		end)
 	end)
 
+
+	helpers.it("does NOT strip a # that appears inside a quoted string value", function()
+		stored = {}
+		_G.hs.settings.set = function(k, v) stored[k] = v end
+
+		-- M-08 (quote-aware regex): the old pattern `#.*$` would strip the # inside
+		-- the quoted value as well. The fix uses `#[^"]*$` which stops at a `"`.
+		-- `key = "has#hash" # trailing comment` must coerce to the string `has#hash`,
+		-- not to the truncated `has`.
+		with_tmp('[features]\nlog_level = "has#hash" # trailing comment\n', function(path)
+			local applied = Overrides.apply(path)
+
+			helpers.assert_true(applied >= 1, "applied count")
+			helpers.assert_eq(stored["log_level"], "has#hash",
+				"# inside quoted value must be preserved; only the trailing comment is stripped")
+		end)
+	end)
+
 end)
 
 
