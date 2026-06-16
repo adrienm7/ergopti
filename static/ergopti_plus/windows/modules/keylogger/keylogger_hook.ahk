@@ -158,12 +158,12 @@ class KLHook {
 ; ==================================
 ; ==================================
 
-KL_Hook_RefreshContext() {
+KL_Hook_RefreshContext(force := false) {
     ; Driven by SetTimer, which bypasses native Suspend — stay silent while
     ; the driver is paused so no app/title switch is observed or flushed.
     if A_IsSuspended
         return
-    if (A_TickCount - KLHook.context_at) < KLHookConst.CONTEXT_TTL_MS
+    if !force and (A_TickCount - KLHook.context_at) < KLHookConst.CONTEXT_TTL_MS
         return
     NewTitle := ""
     NewApp := ""

@@ -517,18 +517,21 @@ LLM_Bridge_OnAccept(text) {
 	; Tag the auto-typed prediction as synthetic so the keylogger keeps it out
 	; of the manual `chars` count and attributes it to the LLM source (esrc).
 	try KL_MarkSynthetic("llm")
-	TextSend(text, 0, 0)
-	; Clear the stale pre-prediction HSE and prefix buffers — the cursor is
-	; now past the injected text, so accumulated context is no longer valid.
-	if IsSet(HSE_HardReset)
-		try HSE_HardReset()
-	if IsSet(_ResetPrefixBuffer)
-		try _ResetPrefixBuffer()
-	; Deferred release so any characters still queued in the OS message loop
-	; are silently dropped before observation resumes.
-	if IsSet(PrefixWatcherSuppress)
-		SetTimer((*) => PrefixWatcherSuppress(false), -SYNTH_CLEAR_DELAY_MS)
-	SetTimer((*) => KL_ClearSynthetic(), -SYNTH_CLEAR_DELAY_MS)
+	try {
+		TextSend(text, 0, 0)
+		; Clear the stale pre-prediction HSE and prefix buffers — the cursor is
+		; now past the injected text, so accumulated context is no longer valid.
+		if IsSet(HSE_HardReset)
+			try HSE_HardReset()
+		if IsSet(_ResetPrefixBuffer)
+			try _ResetPrefixBuffer()
+	} finally {
+		; Deferred release so any characters still queued in the OS message loop
+		; are silently dropped before observation resumes.
+		if IsSet(PrefixWatcherSuppress)
+			SetTimer((*) => PrefixWatcherSuppress(false), -SYNTH_CLEAR_DELAY_MS)
+		SetTimer((*) => KL_ClearSynthetic(), -SYNTH_CLEAR_DELAY_MS)
+	}
 	_LLM_Bridge_Buffer .= text
 	; Audit event — pairs with the llm_suggested event the engine emitted
 	; when the tooltip first rendered. The pair lets a log tail compute

@@ -1147,24 +1147,27 @@ LLM_Engine_OnResults(slots, ctx, active := 1, is_final := false) {
 				; Without it the model output is recorded as words the human
 				; typed (inflating WPM, polluting n-gram stats).
 				try KL_MarkSynthetic("llm")
-				TextSend(text, 0, 0)
-				; Advance the rolling context buffer by the inserted text so the
-				; next keystroke predicts against what the document actually
-				; contains. Without this the engine's context desyncs from the
-				; document and the following prediction runs on stale context.
-				if IsSet(_LLM_Bridge_Buffer)
-					_LLM_Bridge_Buffer .= text
-				; Clear stale HSE and prefix buffers — cursor is now past the
-				; injected text, so accumulated context is no longer valid.
-				if IsSet(HSE_HardReset)
-					try HSE_HardReset()
-				if IsSet(_ResetPrefixBuffer)
-					try _ResetPrefixBuffer()
-				if IsSet(PrefixWatcherSuppress)
-					SetTimer((*) => PrefixWatcherSuppress(false), -SYNTH_CLEAR_DELAY_MS)
-				; Deferred release so any characters still queued in the OS
-				; message loop are tagged synthetic before observation resumes.
-				SetTimer((*) => KL_ClearSynthetic(), -SYNTH_CLEAR_DELAY_MS)
+				try {
+					TextSend(text, 0, 0)
+					; Advance the rolling context buffer by the inserted text so the
+					; next keystroke predicts against what the document actually
+					; contains. Without this the engine's context desyncs from the
+					; document and the following prediction runs on stale context.
+					if IsSet(_LLM_Bridge_Buffer)
+						_LLM_Bridge_Buffer .= text
+					; Clear stale HSE and prefix buffers — cursor is now past the
+					; injected text, so accumulated context is no longer valid.
+					if IsSet(HSE_HardReset)
+						try HSE_HardReset()
+					if IsSet(_ResetPrefixBuffer)
+						try _ResetPrefixBuffer()
+				} finally {
+					if IsSet(PrefixWatcherSuppress)
+						SetTimer((*) => PrefixWatcherSuppress(false), -SYNTH_CLEAR_DELAY_MS)
+					; Deferred release so any characters still queued in the OS
+					; message loop are tagged synthetic before observation resumes.
+					SetTimer((*) => KL_ClearSynthetic(), -SYNTH_CLEAR_DELAY_MS)
+				}
 				; Don't fall through to the tooltip — inline mode owns
 				; the entire UI surface for this prediction.
 				return
