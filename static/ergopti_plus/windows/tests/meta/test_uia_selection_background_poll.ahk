@@ -72,3 +72,18 @@ _USBP_SelectionIsPolledInBackground() {
 		"UIA selection poll timer must be armed with a periodic interval")
 }
 Test("layout: UIA selection is polled in background (uia-selection-blocks-keyboard-thread)", _USBP_SelectionIsPolledInBackground)
+
+; The poll tick runs on a SetTimer, which bypasses native Suspend, and does a
+; 3-hop UIA COM round-trip + an unbounded GetText(-1). It must early-return while
+; paused (« pause = tout éteint ») and skip the COM work when its only consumer
+; (WrapTextIfSelected, gated on wrap_text_if_selected) is disabled.
+_USBP_PollTickSuspendAndFeatureGated() {
+	Src := _USBP_ReadSource("modules/layout.ahk")
+	TickBody := _USBP_FuncBody(Src, "_UIA_SelectionPollTick() {")
+	Assert(TickBody != "", "_UIA_SelectionPollTick must exist in modules/layout.ahk")
+	Assert(InStr(TickBody, "A_IsSuspended") > 0,
+		"_UIA_SelectionPollTick must early-return on A_IsSuspended — SetTimer bypasses native Suspend, so the synchronous UIA COM poll would keep firing on the keyboard thread while paused (uia-poll-bypasses-suspend)")
+	Assert(InStr(TickBody, "wrap_text_if_selected") > 0,
+		"_UIA_SelectionPollTick must skip the COM round-trip when wrap_text_if_selected (its only consumer) is disabled, so non-users never pay the per-tick cost or the large-selection stall risk (uia-poll-bypasses-suspend)")
+}
+Test("layout: UIA selection poll is gated by suspend + the wrap feature flag (uia-poll-bypasses-suspend)", _USBP_PollTickSuspendAndFeatureGated)
