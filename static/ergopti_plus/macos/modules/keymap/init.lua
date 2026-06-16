@@ -340,6 +340,29 @@ function M.suppress_rescan(duration)
 	CoreState.suppress_rescan(duration)
 end
 
+--- Arms the synthetic-event counters so the main eventtap knows to skip the
+--- echoes of keystrokes that an external injector (rules_engine, personal_info)
+--- is about to emit. Must be called BEFORE the first keyStroke/keyStrokes call.
+---
+--- Arming only: does NOT emit any keystroke. The caller is responsible for
+--- also calling suppress_rescan() and keylogger.notify_synthetic() to complete
+--- the synthetic-injection contract (see docs/PROJECT_MEMORY.md §synthetic).
+---
+--- @param deletes number Number of backspace keystrokes the injector will emit.
+--- @param text    string The replacement text the injector will emit.
+function M.arm_synthetic(deletes, text)
+	if type(deletes) == "number" and deletes > 0 then
+		CoreState.expected_synthetic_deletes = CoreState.expected_synthetic_deletes + deletes
+	end
+	if type(text) == "string" and text ~= "" then
+		CoreState.expected_synthetic_chars = (CoreState.expected_synthetic_chars or "") .. text
+	end
+	-- Record the arm timestamp so the stuck-counter reset guard in onKeyDownRaw
+	-- can distinguish a legitimate idle reset from a reset that would destroy
+	-- counters just armed by an in-flight expansion (A6 audit fix).
+	CoreState.last_synthetic_arm_time = hs.timer.secondsSinceEpoch()
+end
+
 
 -- ── Perf telemetry proxies ───────────────────────────────────────────────────
 -- Exposed on M so the Hammerspoon console can toggle sampling and read the
@@ -520,7 +543,9 @@ local FAST_EXIT_KEYCODES = {
 	[105] = true,  -- F13 Karabiner Return sentinel
 	[107] = true,  -- F14 Karabiner Backspace sentinel
 	[113] = true,  -- F15 Karabiner Escape sentinel
-	[106] = true,  -- F16 LLM chain signal
+	-- F16 (keycode 106) intentionally absent: it is the LLM chain signal injected
+	-- by apply_prediction and must reach handle_llm_keys further down in this
+	-- handler. Fast-exiting it forced the 500 ms fallback timer path every time.
 	[64]  = true,  -- F17 cycle-windows hotkey
 	[131] = true,  -- LAYER_SYN_1
 	[134] = true,  -- LAYER_SYN_2
@@ -555,7 +580,10 @@ local function onKeyDownRaw(e)
 
 	-- Auto-reset stuck synthetic counters when typing resumes after a pause.
 	-- Without this, a missed synthetic event would permanently lock the engine.
-	if dt > 0.5 then
+	-- Guard: skip the reset if counters were armed within the last second — an
+	-- in-flight expansion may have set them just before this keystroke arrived
+	-- (A6 audit fix: runloop lag could cause a false 0.5 s gap right after arm).
+	if dt > 0.5 and (now - CoreState.last_synthetic_arm_time) > 1.0 then
 		CoreState.expected_synthetic_deletes = 0
 		CoreState.expected_synthetic_chars   = ""
 	end
@@ -609,6 +637,12 @@ local function onKeyDownRaw(e)
 	-- fresh word-start. Every other Cmd/Ctrl combo (cut, paste, undo,
 	-- redo, app shortcuts, …) leaves the cursor in unobservable territory.
 	if flags.cmd or flags.ctrl then
+		-- If expected_synthetic_chars is non-empty, this Cmd keystroke is the
+		-- Cmd+V echo from our own clipboard-paste expansion — do not wipe the
+		-- buffer; the synthetic chars will be consumed by the filter below.
+		if #CoreState.expected_synthetic_chars > 0 then
+			return false
+		end
 		CoreState.buffer = ""
 		CoreState.start_is_word_boundary = (keyCode == hs.keycodes.map["a"])
 		LLMBridge.check_nav_reset()
