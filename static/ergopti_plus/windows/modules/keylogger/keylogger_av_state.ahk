@@ -32,7 +32,7 @@
 ; machinery that misleads maintainers (see project rule 5.6).
 ;
 ; PRIVACY: All detection is local (no internet, no external DLL). Volume
-; queries use the IAudioEndpointVolume COM interface via DllCall; process
+; queries use the lightweight winmm waveOutGetVolume path via DllCall; process
 ; scanning uses COM WMI Win32_Process. No audio content is ever sampled.
 ; ==============================================================================
 
@@ -116,14 +116,16 @@ KL_AV_FastTick() {
 }
 
 KL_AV_PollVolume() {
-    ; Use the MMDevice COM API via DllCall to query master volume level and
-    ; mute state. Falls back gracefully if the API is unavailable (e.g.
+    ; Query the system master volume via the lightweight winmm
+    ; waveOutGetVolume path (see KL_AV_GetMasterVolume) and derive mute
+    ; heuristically. Falls back gracefully if the API is unavailable (e.g.
     ; server SKUs without audio hardware).
     vol   := -1.0
     muted := -1
     try {
-        ; CoCreateInstance IAudioEndpointVolume — minimal COM path used by
-        ; PowerShell's Get-AudioDevice equivalent. We query the default
+        ; winmm waveOutGetVolume reads the left-channel master level without
+        ; the heavier IAudioEndpointVolume COM round-trip; mute is inferred.
+        ; We query the default
         ; multimedia render device.
         vol   := KL_AV_GetMasterVolume()
         muted := KL_AV_GetMasterMuted(vol)
