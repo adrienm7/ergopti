@@ -283,6 +283,7 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 #Include meta/test_warmup_retry_suspend_guard.ahk
 #Include meta/test_halflife_tick_suspend_guard.ahk
 #Include meta/test_layout_poll_suspend_guard.ahk
+#Include meta/test_lalt_rctrl_accept_suspend_guard.ahk
 #Include meta/test_layout_poll_blacklist_guard.ahk
 #Include meta/test_layout_quiescence.ahk
 #Include meta/test_hse_register_atomic.ahk
@@ -322,6 +323,8 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 #Include meta/test_keepawake_pause_gate.ahk
 #Include meta/test_mouse_park_gate.ahk
 #Include meta/test_mouse_hotkey_clobber.ahk
+#Include meta/test_mouse_suspend_guard.ahk
+#Include meta/test_scroll_flush_fn_cleared_on_stop.ahk
 #Include meta/test_timer_scheduler_pause_guard.ahk
 #Include meta/test_keylogger_watchers_pause_guard.ahk
 #Include meta/test_uia_selection_background_poll.ahk
@@ -399,6 +402,7 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 #Include meta/test_kh_intercept_dead_flag.ahk
 #Include meta/test_kl_refresh_context_blocks_on_keystroke.ahk
 #Include meta/test_kl_stop_dead_no_exit_flush.ahk
+#Include meta/test_kl_window_switch_pre_flush.ahk
 #Include meta/test_klpf_writeatomic_delete_window.ahk
 #Include meta/test_klr_builddatabase_debug_fileappend_hot.ahk
 #Include meta/test_klw_ctx_unbounded_hist_growth.ahk
@@ -413,6 +417,7 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 #Include meta/test_no_onexit_keylogger_flush.ahk
 #Include meta/test_numeric_prompt_throws_on_nonnumeric.ahk
 #Include meta/test_oneshotshift_lalt_lshift_stuck.ahk
+#Include meta/test_oneshotshift_suspend_guard.ahk
 #Include meta/test_hold_modifier_release_bounded.ahk
 #Include meta/test_altgr_rolls_precedence.ahk
 #Include meta/test_keylogger_session_watcher_synth.ahk
@@ -438,6 +443,7 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 #Include meta/test_stream_final_flush_sleep_blocks_thread.ahk
 #Include meta/test_strict_canon_does_not_drop_stale_keys.ahk
 #Include meta/test_suspend_watchdog_no_prefix_keywait.ahk
+#Include meta/test_tab_accept_cancels_timer.ahk
 #Include meta/test_textsend_clipboard_thread.ahk
 #Include meta/test_tint_test_stale_constants_comment.ahk
 #Include meta/test_tooltip_hide_non_blocking.ahk
