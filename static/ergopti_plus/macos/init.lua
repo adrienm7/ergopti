@@ -161,10 +161,13 @@ local base_dir = script_path:match("^(.*[/\\])") or "./"
 if not base_dir:match("[/\\]$") then base_dir = base_dir .. "/" end
 
 menu_paths.init(base_dir, function() hs.timer.doAfter(0.25, function() pcall(hs.reload) end) end)
+Boot.mark("Path: config dir + paths.toml (menu_paths.init)")
 
 -- Re-point the logger to <config_dir>/logs/ErgoptiPlus_YYYY-MM-DD.log now that
 -- the user config dir is known. Earlier boot lines went to the fallback file.
+-- (The old-log retention purge is scheduled off the boot path inside this call.)
 Logger.init_log_path(menu_paths.get_config_dir(), 14)
+Boot.mark("Path: log file open (retention purge deferred)")
 
 -- Make the file log self-sufficient: capture errors that Hammerspoon would
 -- otherwise only print to its (unexportable, far-too-noisy) Console. Wraps
@@ -173,7 +176,7 @@ Logger.init_log_path(menu_paths.get_config_dir(), 14)
 -- and the LLM boot sequence), and tees print() into the file. Installed right
 -- after the log path is known so every capture lands in today's dated file.
 Logger.install_runtime_error_capture()
-Boot.mark("Path resolution + log path")
+Boot.mark("Path: runtime error capture installed")
 
 -- Now safe to load modules that depend on config_dir
 local file_system        = require("adapters.file_system")
@@ -700,6 +703,7 @@ Boot.mark("Final mapping sort + tail-index rebuild")
 -- The FileSystem adapter is injected so KE config path resolution goes through
 -- the port boundary (hs.fs.pathToAbsolute) instead of raw os.getenv("HOME").
 karabiner.init(file_system)
+Boot.mark("UI: karabiner.init")
 
 Logger.debug(LOG, "Starting user interface components…")
 menu.start(
@@ -707,13 +711,14 @@ menu.start(
 	keymap, dynamic_hotstrings, module_sections,
 	karabiner, hotfile_paths
 )
+Boot.mark("UI: menu.start (menubar + state sync + engines + LLM handler)")
 
 -- Script control is now managed through the shortcuts module
 Logger.debug(LOG, "Starting script control engine…")
 shortcuts.start_script_control(keymap, shortcuts, gestures, karabiner)
 
 Logger.info(LOG, "User interface initialized successfully.")
-Boot.mark("Menu + UI + script control start")
+Boot.mark("UI: script control start")
 
 
 

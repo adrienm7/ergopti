@@ -187,7 +187,9 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 		end
 		if type(kl.set_disabled_apps) == "function" then pcall(kl.set_disabled_apps, state.keylogger_disabled_apps or {}) end
 		if state.keylogger_enabled then
+			local _t_kl = hs.timer.secondsSinceEpoch()
 			if type(kl.start) == "function" then pcall(kl.start, core_mods.shortcuts_mod) end
+			Logger.info(LOG, "Keylogger engine start: %.1f ms.", (hs.timer.secondsSinceEpoch() - _t_kl) * 1000)
 		else
 			if type(kl.stop) == "function" then pcall(kl.stop) end
 		end
@@ -196,7 +198,9 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 	-- Start/stop engines
 	if keymap then
 		if state.keymap then
+			local _t_km = hs.timer.secondsSinceEpoch()
 			if type(keymap.start) == "function" then pcall(keymap.start) end
+			Logger.info(LOG, "Keymap engine start: %.1f ms.", (hs.timer.secondsSinceEpoch() - _t_km) * 1000)
 
 			-- Recover from a stale paused state when script control is not paused
 			local paused = core_mods.shortcuts_mod and type(core_mods.shortcuts_mod.is_paused) == "function" and core_mods.shortcuts_mod.is_paused() or false
@@ -244,16 +248,31 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 		end
 	end
 
-	-- Sync hotstrings & shortcuts
+	-- Sync hotstrings & shortcuts.
+	-- IMPORTANT (perf): apply ONLY the delta. enable_group is a no-op when the
+	-- group is already enabled (it early-returns), and disable_group is a no-op
+	-- when already disabled — so calling just the one matching the desired state
+	-- costs nothing for groups already in that state. The previous code did a
+	-- blind disable_group + enable_group round-trip for every enabled group,
+	-- which at boot (all groups enabled) re-parsed each category TOML from disk
+	-- and re-sorted all ~5355 mappings ~16× for no change — the dominant ~2 s of
+	-- the "Menu + UI + script control start" boot phase. Letting the registry's
+	-- own early-return guards short-circuit the no-ops removes that entirely.
 	if keymap then
+		local _t_sync = hs.timer.secondsSinceEpoch()
+		local _n_enable, _n_disable = 0, 0
 		for name, enabled in pairs(state.hotstrings) do
 			if enabled then
-				if type(keymap.disable_group) == "function" then pcall(keymap.disable_group, name) end
-				if type(keymap.enable_group) == "function" then pcall(keymap.enable_group, name) end
+				if type(keymap.enable_group) == "function" then pcall(keymap.enable_group, name); _n_enable = _n_enable + 1 end
 			else
-				if type(keymap.disable_group) == "function" then pcall(keymap.disable_group, name) end
+				if type(keymap.disable_group) == "function" then pcall(keymap.disable_group, name); _n_disable = _n_disable + 1 end
 			end
 		end
+		-- Timing surfaced so a regression to the disable+enable round-trip (which
+		-- reloaded every TOML and re-sorted ~5355 mappings, ~2 s at boot) is
+		-- immediately visible: a healthy delta-only sync should report ~0 ms.
+		Logger.info(LOG, "Hotstring group sync: %d enable / %d disable in %.1f ms.",
+			_n_enable, _n_disable, (hs.timer.secondsSinceEpoch() - _t_sync) * 1000)
 	end
 	if core_mods.shortcuts_mod and type(saved) == "table" and type(saved.shortcut_keys) == "table" then
 		if type(core_mods.shortcuts_mod.enable) == "function" and type(core_mods.shortcuts_mod.disable) == "function" then

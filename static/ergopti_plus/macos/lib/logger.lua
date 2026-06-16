@@ -51,6 +51,13 @@ M.ERRORS_LOG_FILE = "/tmp/ErgoptiPlus_errors_boot.log"
 -- Log directory resolved after M.init_log_path(); used by sub-file fan-out.
 local _log_dir = "/tmp/"
 
+-- Delay (seconds) after which the daily old-log purge runs. The purge spawns a
+-- `find | while read … date … rm` pipeline (several subprocesses PER log file)
+-- plus a per-sub-file `stat` — ~0.6 s of synchronous shell forks at boot when
+-- run inline. It is pure housekeeping (deleting stale files), so it is scheduled
+-- off the boot critical path; the freshly-resolved log file is already writable.
+local LOG_PURGE_DELAY_SEC = 5.0
+
 -- Topical sub-files: lines whose rendered "[tag]" matches any pattern are
 -- fan-out here in addition to the main unified file. Sub-files are ephemeral
 -- (today only) — they are a filtered view of the main log, not an archive.
@@ -303,8 +310,34 @@ function M.init_log_path(config_dir, max_age_days)
 		end
 	end)
 
-	-- Purge main log files older than max_age_days by comparing the date in the
-	-- filename (YYYY-MM-DD) rather than mtime, so moved/copied files age correctly.
+	-- Old-log purge is pure housekeeping and shell-fork-heavy — defer it off the
+	-- boot critical path. The dated log file resolved just above is already
+	-- writable, so nothing downstream waits on the purge.
+	local hs_ref = rawget(_G, "hs")
+	if hs_ref and hs_ref.timer and type(hs_ref.timer.doAfter) == "function" then
+		hs_ref.timer.doAfter(LOG_PURGE_DELAY_SEC, function()
+			pcall(M._purge_old_logs, log_dir, max_age_days)
+		end)
+	else
+		-- Headless / no timer (unit tests): run inline so behaviour is unchanged.
+		pcall(M._purge_old_logs, log_dir, max_age_days)
+	end
+end
+
+--- Deletes stale log files under `log_dir`. Split out of init_log_path() so it
+--- can be deferred off the boot critical path (it spawns several subprocesses
+--- per file) and exercised directly in tests. Two passes:
+---   1. Main daily logs older than `max_age_days`, aged by the YYYY-MM-DD date in
+---      the filename (not mtime) so moved/copied files age correctly.
+---   2. Topical sub-files, which are ephemeral (today only) — any belonging to a
+---      previous day are removed (they are a filtered view, not an archive).
+--- @param log_dir string Absolute logs directory (trailing slash).
+--- @param max_age_days integer Retention window for the main daily logs.
+function M._purge_old_logs(log_dir, max_age_days)
+	if type(log_dir) ~= "string" or log_dir == "" then return end
+	max_age_days = max_age_days or 14
+	local ShellRunner = require("adapters.shell_runner")
+
 	ShellRunner.exec(string.format(
 		"find %q -name 'ErgoptiPlus_*.log' -type f | while read f; do"
 		.. " d=$(basename \"$f\" .log | sed 's/ErgoptiPlus_//'); "
@@ -313,8 +346,6 @@ function M.init_log_path(config_dir, max_age_days)
 		.. "done 2>/dev/null",
 		log_dir, max_age_days))
 
-	-- Sub-files are ephemeral (today only). Delete any that belong to a previous
-	-- day — they are a filtered view of the main log, not an independent archive.
 	local today = os.date("%Y-%m-%d")
 	for _, sub in ipairs(SUB_LOG_NAMES) do
 		local sub_path = log_dir .. sub.name

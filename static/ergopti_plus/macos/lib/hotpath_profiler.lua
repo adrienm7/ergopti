@@ -53,6 +53,16 @@ function M.now()
 	return Timer.now_ns()
 end
 
+--- Returns elapsed milliseconds since a `M.now()` timestamp. Lets the hot path
+--- measure individual sub-segments (e.g. trigger matching vs. preview rebuild)
+--- so a slow keystroke can be attributed to a specific stage in its log line,
+--- without each call site re-deriving the nanosecond→millisecond conversion.
+--- @param start_ns number Nanosecond timestamp captured by M.now().
+--- @return number elapsed_ms Milliseconds elapsed since `start_ns`.
+function M.elapsed_ms(start_ns)
+	return (M.now() - (start_ns or 0)) / NS_PER_MS
+end
+
 --- Sets the slow-keystroke threshold in milliseconds. Lets a developer tighten or
 --- loosen the tripwire without editing the constant. Logs the new value at DEBUG.
 --- @param ms number New threshold in milliseconds.

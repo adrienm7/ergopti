@@ -834,8 +834,15 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 				and type(core_mods.shortcuts_mod.is_paused) == "function"
 				and core_mods.shortcuts_mod.is_paused() or false
 			if _menu_dirty or not _cached_menu_items or paused_now ~= _cached_paused then
+				-- Log WHY a click pays a rebuild so a "slow menu" report is diagnosable
+				-- from the log alone (dirty toggle vs. pause flip vs. cold cache).
+				Logger.debug(LOG, "Menu open → rebuild (dirty=%s, cache=%s, pause_flip=%s).",
+					tostring(_menu_dirty), tostring(_cached_menu_items ~= nil),
+					tostring(paused_now ~= _cached_paused))
 				ctx.paused = paused_now
 				rebuild_menu_cache()
+			else
+				Logger.debug(LOG, "Menu open → served from cache (instant).")
 			end
 			return _cached_menu_items or {}
 		end)
