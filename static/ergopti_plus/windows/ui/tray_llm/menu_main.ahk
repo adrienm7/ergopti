@@ -43,8 +43,8 @@ LLM_Tray_Build() {
 	try _LLM_Tray_Menu.Delete()
 
 	; Prune the dispatch-bypass Maps for THIS menu's now-deleted items. This is a
-	; single-menu rebuild (not a full tray rebuild), so the global
-	; MenuDispatcher_Reset() must NOT be used — it would wipe the dispatch
+	; single-menu rebuild (not a full tray rebuild), so the global dispatch reset
+	; must NOT be used here — it would wipe the dispatch
 	; tracking of every OTHER live tray menu. Without this per-menu prune, the
 	; dead menu-item IDs from each rebuild accumulate in
 	; _MenuDispatchCallbacks / _MenuDispatchLastFire without bound across the

@@ -161,10 +161,10 @@ Updater_SetChannel(Channel) {
 	UPDATER_CHANNEL := Channel
 	TOML_Write(Channel, ConfigurationFile, UPDATER_INI_SECTION, UPDATER_INI_KEY)
 	; Cancel in-flight async checks and stop the focus/background timers before
-	; Reload so a late WinHTTP response or a queued poll timer cannot fire a
+	; the restart so a late WinHTTP response or a queued poll timer cannot fire a
 	; callback against a half-torn-down state during the (non-instantaneous)
 	; restart. Mirrors the explicit cleanup Updater_SetCheckInterval performs
-	; for its in-process restart path instead of relying on Reload's implicit
+	; for its in-process restart path instead of relying on the implicit
 	; teardown.
 	Updater_StopBackgroundChecks()
 	Reload

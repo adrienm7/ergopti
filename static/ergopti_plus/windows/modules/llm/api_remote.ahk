@@ -637,8 +637,10 @@ _LLMRemoteNavAnthropic(root) {
 }
 
 ; Gemini: ``candidates[1].content.parts[1].text``. AHK arrays are 1-indexed, so
-; the first candidate is index 1. Concatenates every text part of the first
-; candidate so a multi-part answer is not truncated to its first fragment.
+; the first candidate is index 1. Returns the FIRST text part of the first
+; candidate — the cross-driver corpus contract (gemini_multipart_uses_first)
+; requires first-part-only, mirroring the Anthropic/OpenAI navigators; a later
+; part is a continuation/decoy, not a fragment to concatenate.
 _LLMRemoteNavGemini(root) {
     if !root.Has("candidates") or !(root["candidates"] is Array) or root["candidates"].Length < 1
         return ""
@@ -648,12 +650,11 @@ _LLMRemoteNavGemini(root) {
     content := cand["content"]
     if !content.Has("parts") or !(content["parts"] is Array)
         return ""
-    out := ""
     for _idx, part in content["parts"] {
         if (part is Map) and part.Has("text") and Type(part["text"]) == "String"
-            out .= part["text"]
+            return part["text"]
     }
-    return out
+    return ""
 }
 
 ; OpenAI Chat Completions (and every OpenAI-compatible gateway): the answer is
