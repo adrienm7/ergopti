@@ -107,7 +107,8 @@ function M.apply(file_path)
 				end
 				if key and value then
 					-- Strip inline TOML comments before coercion so  "DEBUG" # note  → "DEBUG"
-					value = value:gsub("%s*#.*$", "")
+					-- Quote-aware: stop at the first # that is not inside a quoted string
+					value = value:gsub('%s*#[^"]*$', "")
 					value = value:match("^%s*(.-)%s*$")
 					local coerced = M.coerce(value)
 					if section == "script" then
