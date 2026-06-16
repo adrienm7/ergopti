@@ -65,6 +65,16 @@ local SYNTH_MATCH_DELAY_MS       = Timings.ms("keylogger", "synth_match_delay_ms
 -- Flush the buffer after this many milliseconds of inactivity (2 min)
 local AUTO_FLUSH_IDLE_MS         = Timings.ms("keylogger", "auto_flush_idle_ms")
 
+-- How often the tap watchdog checks that the event tap is still running (seconds).
+-- Mirrors the keymap module's watchdog cadence (script_control TAP_WATCHDOG_INTERVAL_SEC = 2).
+local TAP_WATCHDOG_INTERVAL_SEC = 5
+
+-- Inter-keystroke delay (ms) beyond which any remaining synth_queue entries are
+-- considered stale and drained. An unmatched entry from a dropped synthetic
+-- keyDown would otherwise permanently tag the next real keystroke as synthetic.
+-- 500 ms is safely above any realistic expansion round-trip (C5 audit fix).
+local SYNTH_IDLE_DRAIN_MS = 500
+
 -- Keycodes for all modifier keys (these should not be logged as characters)
 local MODIFIER_KEYCODES = {
 	[54] = true, [55] = true, [56] = true, [57] = true,
@@ -282,6 +292,7 @@ local _event_tap            = nil
 local _script_control       = nil
 local _idle_timer           = nil
 local _maintenance_timer    = nil
+local _tap_watchdog_timer   = nil
 local _app_watcher          = nil
 local _win_filter           = nil
 local _caffeinate_watcher   = nil
@@ -457,7 +468,14 @@ local function handle_key(event_obj)
 		-- by both left_cmd 55 and right_cmd 54) prevent us from disambiguating
 		-- consecutive presses. Instead, we toggle a per-keycode down-timestamp:
 		-- absent → press (record now); present → release (compute hold, clear).
+		-- During a hotstring expansion the script is paused; skip modifier logging
+		-- so synthetic Shift/Ctrl/Alt held by the expander don't pollute the log.
 		if evt_type == hs.eventtap.event.types.flagsChanged then
+			if _script_control
+			and type(_script_control.is_paused) == "function"
+			and _script_control.is_paused() then
+				return
+			end
 			local keycode = event_obj:getKeyCode()
 			local flags   = event_obj:getFlags() or {}
 			if MODIFIER_KEYCODES[keycode] then
@@ -523,6 +541,15 @@ local function handle_key(event_obj)
 
 		local delay = CoreState.last_time > 0 and math.floor(now - CoreState.last_time) or 0
 		CoreState.last_time = now
+
+		-- Self-heal: drain stale synthetic queue entries after a long idle.
+		-- An unmatched entry (from a suppressed expansion or a dropped keyDown)
+		-- would permanently tag the next real keystroke as synthetic (C5 audit fix).
+		if delay > SYNTH_IDLE_DRAIN_MS and #CoreState.synth_queue > 0 then
+			Logger.warn(LOG, "Stale synth_queue drained after %d ms idle (%d entry(ies)).",
+				delay, #CoreState.synth_queue)
+			CoreState.synth_queue = {}
+		end
 
 		-- Mark session start on the first keystroke after a long idle
 		if CoreState.session_start_time == 0 then
@@ -1434,6 +1461,19 @@ function M.start(script_control)
 	end
 	_event_tap:start()
 
+	-- Tap watchdog: restarts the event tap if Hammerspoon silently disabled it
+	-- (can happen after a system wake, screen-saver unlock, or security prompt).
+	if not _tap_watchdog_timer then
+		_tap_watchdog_timer = hs.timer.new(TAP_WATCHDOG_INTERVAL_SEC, function()
+			if not CoreState.is_enabled then return end
+			if _event_tap and not _event_tap:isEnabled() then
+				Logger.warn(LOG, "Keylogger event tap found disabled — restarting.")
+				pcall(function() _event_tap:start() end)
+			end
+		end)
+	end
+	_tap_watchdog_timer:start()
+
 	-- Idle detection timer
 	if not _idle_timer then _idle_timer = hs.timer.new(IDLE_CHECK_INTERVAL_SEC, check_idle) end
 	_idle_timer:start()
@@ -1474,12 +1514,13 @@ function M.stop()
 	CoreState.is_enabled = false
 	LogManager.flush_buffer()
 
-	if _event_tap          then _event_tap:stop() end
-	if _app_watcher        then _app_watcher:stop() end
-	if _caffeinate_watcher then _caffeinate_watcher:stop() end
-	if _win_filter         then _win_filter:unsubscribeAll() end
-	if _idle_timer         then _idle_timer:stop() end
-	if _maintenance_timer  then _maintenance_timer:stop() end
+	if _event_tap            then _event_tap:stop() end
+	if _app_watcher          then _app_watcher:stop() end
+	if _caffeinate_watcher   then _caffeinate_watcher:stop() end
+	if _win_filter           then _win_filter:unsubscribeAll() end
+	if _idle_timer           then _idle_timer:stop() end
+	if _maintenance_timer    then _maintenance_timer:stop() end
+	if _tap_watchdog_timer   then _tap_watchdog_timer:stop() end
 
 	if CoreState.ax_observer then
 		pcall(function() CoreState.ax_observer:stop() end)
@@ -1492,6 +1533,10 @@ function M.stop()
 	-- Close the SQLite cache cleanly (drains any pending today.log entries
 	-- one last time before stopping). Safe to call even if init never ran.
 	pcall(LogManager.stop)
+
+	-- Discard any unmatched synthetic queue entries so a restart does not
+	-- inherit stale entries that would poison the first real keystroke (C5 fix).
+	CoreState.synth_queue = {}
 
 	Logger.success(LOG, "Keylogger engine stopped.")
 end
