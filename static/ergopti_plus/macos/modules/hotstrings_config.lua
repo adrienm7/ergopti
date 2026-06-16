@@ -188,7 +188,9 @@ local function parse_overrides(path)
 				goto continue
 			end
 
-			local bool_val = line:match("^show_tooltip%s*=%s*(true|false)%s*$")
+			-- Lua patterns have no alternation (|); test "true" and "false" separately.
+			local bool_val = line:match("^show_tooltip%s*=%s*(true)%s*$")
+				or line:match("^show_tooltip%s*=%s*(false)%s*$")
 			if bool_val then
 				target.show_tooltip = (bool_val == "true")
 				goto continue
