@@ -1,0 +1,105 @@
+﻿; tests/meta/test_stream_handle_type.ahk
+
+; ==============================================================================
+; MODULE: Stream Handle Type Meta Test
+; DESCRIPTION:
+; Static source guard for the T-W02 regression:
+; "_LLM_Ollama_RemoveStreamHandle uses IsObject/HasOwnProp, not 'is Map'".
+;
+; Stream handles returned by LLM_OllamaGenerate_Streaming are plain object
+; literals ({ Pid, Cancelled, TmpPayload, TmpStdout }), not Map instances.
+; The old implementation tested ``handle is Map``, which always evaluates to
+; false for object literals — _LLM_Ollama_RemoveStreamHandle became a permanent
+; no-op and _LLM_Ollama_ActiveStreams grew without bound across streaming calls.
+;
+; The fix replaces the ``is Map`` guard with ``IsObject`` + ``HasOwnProp("Pid")``
+; and filters entries by Pid equality. This meta-static test scans api_ollama.ahk
+; so a regression that reintroduces ``is Map`` fails the suite immediately.
+; ==============================================================================
+
+#Requires AutoHotkey v2.0
+
+
+
+
+
+; ======================================
+; ======================================
+; ======= 1/ Source scan helpers =======
+; ======================================
+; ======================================
+
+_SHT_ReadSource(RelPath) {
+	SplitPath(A_ScriptDir, , &Root)
+	Path := StrReplace(Root, "\", "/") . "/" . RelPath
+	return FileRead(Path)
+}
+
+; Extracts the body of a function identified by its declaration line.
+; Scans forward from the declaration to the first closing brace at
+; column 0 (the pattern AHK v2 uses for top-level function ends).
+_SHT_FuncBody(Src, FuncDef) {
+	Idx := InStr(Src, FuncDef)
+	if !Idx
+		return ""
+	Rest := SubStr(Src, Idx)
+	; Walk forward to find the closing "}" that ends the function at the
+	; top indentation level — the reference test uses "`n}" which is
+	; sufficient for single-level functions.
+	End := InStr(Rest, "`n}")
+	if End
+		return SubStr(Rest, 1, End + 1)
+	return Rest
+}
+
+
+
+
+
+; ==================================================
+; ==================================================
+; ======= 2/ IsObject / HasOwnProp assertion =======
+; ==================================================
+; ==================================================
+
+_SHT_AssertHandleTypeCheck() {
+	Src := _SHT_ReadSource("modules/llm/api_ollama.ahk")
+	Body := _SHT_FuncBody(Src, "_LLM_Ollama_RemoveStreamHandle(handle) {")
+	Assert(Body != "", "_LLM_Ollama_RemoveStreamHandle declaration must exist in api_ollama.ahk")
+
+	; Regression guard: the old broken check used ``is Map`` on an object literal,
+	; which always evaluates to false — the function was permanently a no-op
+	Assert(!InStr(Body, "is Map"),
+		"_LLM_Ollama_RemoveStreamHandle must NOT use 'is Map' — stream handles are object literals, not Map instances (T-W02)")
+
+	; The correct guard must use IsObject to tolerate both object literals and Maps
+	Assert(InStr(Body, "IsObject") > 0,
+		"_LLM_Ollama_RemoveStreamHandle must use IsObject() to validate the handle (T-W02)")
+
+	; HasOwnProp ensures the object actually carries a Pid before we dereference it
+	Assert(InStr(Body, "HasOwnProp") > 0,
+		"_LLM_Ollama_RemoveStreamHandle must use HasOwnProp() to check for the Pid property (T-W02)")
+}
+Test("api_ollama: _LLM_Ollama_RemoveStreamHandle uses IsObject/HasOwnProp, not 'is Map' (T-W02)", _SHT_AssertHandleTypeCheck)
+
+
+
+
+
+; ================================================
+; ================================================
+; ======= 3/ Pid-based filtering assertion =======
+; ================================================
+; ================================================
+
+_SHT_AssertPidComparison() {
+	Src := _SHT_ReadSource("modules/llm/api_ollama.ahk")
+	Body := _SHT_FuncBody(Src, "_LLM_Ollama_RemoveStreamHandle(handle) {")
+	Assert(Body != "", "_LLM_Ollama_RemoveStreamHandle declaration must exist in api_ollama.ahk")
+
+	; The rebuild loop must compare entries by their Pid property — this is the
+	; only stable identity token on a plain object literal (no Map key available)
+	Assert(InStr(Body, "Pid") > 0,
+		"_LLM_Ollama_RemoveStreamHandle must compare stream handles by Pid when rebuilding the active-streams array (T-W02)")
+}
+Test("api_ollama: _LLM_Ollama_RemoveStreamHandle rebuilds array filtering by Pid (T-W02)", _SHT_AssertPidComparison)
