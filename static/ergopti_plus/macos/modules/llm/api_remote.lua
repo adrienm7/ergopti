@@ -667,16 +667,26 @@ end
 function M.fetch_batch(full_text, tail_text, model_name, temperature,
                        max_predict, num_predictions, profile,
                        on_success, on_fail, request_id_provider, _streaming, _on_partial)
-	local effective_temp = tonumber(temperature) or 0.1
-	local system_prompt  = Profiles.resolve_system_prompt(profile, num_predictions)
-	local tokens         = (tonumber(max_predict) or 32) * num_predictions + (num_predictions * 5)
-	local is_batch       = profile.batch
-	local dedup_stats    = ApiCommon.new_dedup_stats()
-	local t0             = TimerScheduler.now()
+	local effective_temp     = tonumber(temperature) or 0.1
+	local system_prompt      = Profiles.resolve_system_prompt(profile, num_predictions)
+	local tokens             = (tonumber(max_predict) or 32) * num_predictions + (num_predictions * 5)
+	local is_batch           = profile.batch
+	local dedup_stats        = ApiCommon.new_dedup_stats()
+	local t0                 = TimerScheduler.now()
+	-- Snapshot the request id so the callback can detect if the user typed more text
+	-- while the single HTTP round-trip was in flight and discard the stale response
+	local initial_request_id = type(request_id_provider) == "function" and request_id_provider() or nil
 
 	post_and_parse(model_name, system_prompt, full_text, tail_text,
 		effective_temp, tokens, num_predictions, is_batch,
 		function(results)
+			-- Discard if the user typed new text between dispatch and callback
+			if initial_request_id
+				and type(request_id_provider) == "function"
+				and request_id_provider() ~= initial_request_id then
+				Logger.debug(LOG, "Batch response discarded (request id changed).")
+				return
+			end
 			local ms = math.floor((TimerScheduler.now() - t0) * 1000)
 			ApiCommon.log_prediction_summary(Logger, LOG, "batch", num_predictions, dedup_stats, #results)
 			if not is_batch and #results > 1 then
