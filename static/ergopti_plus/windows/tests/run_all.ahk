@@ -464,6 +464,9 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 #Include test_time_activation_fails_open_on_missing_prev_char.ahk
 #Include test_uridecode_multibyte_utf8_corruption.ahk
 
+; -- Audit finding regression tests (batch-wired) --
+#Include meta/test_audit_test_gaps.ahk
+
 ; Watchdog: kill the process if RunTests() never returns (e.g. a corpus
 ; consumer blocks on a synchronous HTTP call, an InputHook with no timeout,
 ; or a blocking dialog in a headless CI context). The CI-level timeout is
