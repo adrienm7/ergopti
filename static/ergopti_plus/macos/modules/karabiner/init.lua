@@ -125,6 +125,17 @@ local function require_state(func_name)
 	return true
 end
 
+--- Checks whether a file exists at the given path without leaking a file descriptor.
+--- io.open returns a handle on success; we must close it immediately or the GC is
+--- the only thing preventing an fd leak for the lifetime of the process.
+--- @param path string Absolute path to test.
+--- @return boolean True if the file exists and can be opened for reading.
+local function file_exists(path)
+	local f = io.open(path, "r")
+	if f then f:close() end
+	return f ~= nil
+end
+
 
 --- Opens the Karabiner-Elements GUI for the user on explicit request.
 function M.open_gui() KeLifecycle.open_gui() end
@@ -567,7 +578,7 @@ function M.init(file_system)
 		return
 	end
 
-	local first_launch = io.open(resolve_user_config(), "r") == nil
+	local first_launch = not file_exists(resolve_user_config())
 	local user_cfg     = Config.load_user_config(M.TAP_HOLD_KEYS, M.MOD_COMBOS, resolve_user_config())
 	local tab_cfg      = user_cfg.tap_hold_config and user_cfg.tap_hold_config.tab
 	if type(tab_cfg) == "table" and tab_cfg.tap == "cmd_tab" then
