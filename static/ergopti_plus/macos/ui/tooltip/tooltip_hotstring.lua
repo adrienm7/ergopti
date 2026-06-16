@@ -205,6 +205,10 @@ end
 --- in-place rather than first blanked then redrawn, which would produce a visible gap.
 function M.dismiss_silent()
 	pcall(function()
+		-- Hide the stacked canvas (hotstring preview) when transitioning away;
+		-- without this it survives the LLM tooltip transition and stays on screen
+		-- as an orphaned layer behind the new prediction canvas (E1 audit fix).
+		pcall(Renderer.hide_stacked)
 		stop_watchers()
 		_state.bg_color = nil
 		_state.is_visible = false
@@ -215,6 +219,14 @@ function M.show(content, is_llm_origin, is_enabled, background_color)
 	local ok, err = pcall(function()
 		if not is_enabled then return end
 		if content == nil or tostring(content) == "" then M.hide(); return end
+
+		-- Dismantle any active dequeue cycle before starting fresh — a stale
+		-- dequeue timer would fire after this call and replace the new content
+		-- with its pruned rows, erasing what we just rendered (E3 audit fix).
+		stop_dequeue()
+		-- Hide any surviving stacked canvas from a prior hotstring expansion
+		-- that was not cleaned up by a transition function (E1 audit fix).
+		pcall(Renderer.hide_stacked)
 
 		_state.bg_color = Config.settings.colorization_enabled and (type(background_color) == "table" and background_color or nil) or nil
 		_state.is_visible = true
@@ -243,6 +255,9 @@ function M.show_loading(content, is_enabled, background_color)
 
 		-- Stop any existing watchers/timers from a previous state before rendering
 		stop_watchers()
+		-- Hide any surviving stacked canvas from a prior hotstring preview;
+		-- the loading indicator must render above a clean surface (E1 audit fix).
+		pcall(Renderer.hide_stacked)
 
 		_state.bg_color = Config.settings.colorization_enabled and (type(background_color) == "table" and background_color or nil) or nil
 		_state.is_visible = true

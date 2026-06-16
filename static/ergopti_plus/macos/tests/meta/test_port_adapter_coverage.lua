@@ -237,7 +237,7 @@ end)
 -- The tests fail only if the count INCREASES beyond these thresholds, preventing
 -- regressions while allowing incremental clean-up of the backlog.
 -- TODO: drive all baselines to zero as modules are refactored to use port adapters.
-local LUA_HS_BASELINE       = 906  -- hs.* calls in macos/modules/ and macos/lib/ (906 not 900: +5 are "hs.hotstrings.*" manifest PATH literals in keymap/init.lua per A2, +1 is "hs.gestures.space_wrap" in gestures/init.lua per the A2 follow-up — both sourced from lib.manifest_reader, NOT OS calls; the substring heuristic counts them. The real-OS-call drive-to-zero target is unchanged.)
+local LUA_HS_BASELINE       = 909  -- hs.* calls in macos/modules/ and macos/lib/ (909: +3 vs 906 from A5/A6/E2 audit fixes — hs.timer.secondsSinceEpoch() in arm_synthetic, hs.timer.doAfter(0) + hs.timer.secondsSinceEpoch() in expander.perform_text_replacement; all are legitimate new timing/deferral calls required by the fixes)
 local LUA_IO_OS_BASELINE    = 70   -- io.open / os.execute calls in macos/modules/ and macos/lib/ (bumped after errors-sink + diagnostic + menu + sg feature work)
 
 helpers.describe("meta: shared/ code purity", function()
