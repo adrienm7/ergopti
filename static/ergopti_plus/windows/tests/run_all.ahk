@@ -409,6 +409,7 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 #Include meta/test_numeric_prompt_throws_on_nonnumeric.ahk
 #Include meta/test_oneshotshift_lalt_lshift_stuck.ahk
 #Include meta/test_hold_modifier_release_bounded.ahk
+#Include meta/test_altgr_rolls_precedence.ahk
 #Include meta/test_onkeydown_dead_llm_branch.ahk
 #Include meta/test_parser_ord_empty_token_crash.ahk
 #Include meta/test_password_cache_torn_write.ahk

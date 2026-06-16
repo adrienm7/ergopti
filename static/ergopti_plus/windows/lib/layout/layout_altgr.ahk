@@ -13,11 +13,12 @@
 ;    repeated 5-line ``if Shift then X else Y`` block from the original
 ;    layout.ahk is collapsed into a single dispatcher function.
 ; 2. The three logical sub-layers are kept as separate tables so the original
-;    registration order is preserved bit-for-bit (rolls → ErgoptiPlus
-;    overrides → ErgoptiAltGr Number row → ErgoptiAltGr base rows). AHK’s
-;    most-recently-registered-variant-wins rule depends on this ordering,
-;    so flattening the tables would silently change which binding fires when
-;    multiple Layout sub-features are simultaneously enabled.
+;    registration order is preserved bit-for-bit (ErgoptiPlus overrides →
+;    ErgoptiAltGr Number row → ErgoptiAltGr base rows, then the two rolls
+;    LAST in modules/layout.ahk so the roll variant wins its shared chord —
+;    altgr-rolls-dead-precedence). AHK’s most-recently-registered-variant-wins
+;    rule depends on this ordering, so flattening the tables would silently
+;    change which binding fires when multiple Layout sub-features are enabled.
 ; 3. Adding a new key on the AltGr layer is a one-line Map entry instead of a
 ;    six-line ``SC138 & SCxxx::`` block.
 ; 4. Action callables are built with ``Bind`` whenever possible — this avoids

@@ -855,12 +855,18 @@ _RegisterRollsAltGrHotkeys() {
 ; AltGr layer (ErgoptiPlus overrides + ErgoptiAltGr Number row + base rows).
 ; The original ~390 lines of repetitive ``SC138 & SCxxx::`` blocks are now
 ; defined as data in lib/layout_altgr.ahk and registered here through a
-; single dispatcher. Registration order is preserved so AHK's
-; "most-recently-defined variant wins" rule still resolves identically when
-; multiple Layout sub-features are simultaneously enabled.
+; single dispatcher. Registration order matters: AHK fires the
+; "most-recently-defined variant" whose #HotIf criterion is true. The AltGr
+; layer is registered FIRST, then the two rolls (SC138 & SC012 chevron_equal,
+; SC138 & SC017 hashtag_quote) LAST, so the roll variant wins the shared chord.
+; The roll handlers already replicate the exact base-row/override fallback
+; (AddRollEqual: "%" wrap under ergopti_plus else "œ"; HashtagOrQuote: "#" wrap),
+; so registering them last makes the roll feature live without changing the
+; non-roll output. Previously the rolls were registered FIRST, so the base rows
+; shadowed them and the rolls were silently dead (altgr-rolls-dead-precedence).
 ; ─────────────────────────────────────────────────────────────────────────────
-_RegisterRollsAltGrHotkeys()
 RegisterAltGrLayer()
+_RegisterRollsAltGrHotkeys()
 
 
 
