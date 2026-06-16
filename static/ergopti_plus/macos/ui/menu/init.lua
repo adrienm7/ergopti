@@ -44,6 +44,12 @@ local STARTUP_LAYOUT_SWITCH_DELAY_SEC = 4
 -- ui.menu.menu_keyboard_layout and ui.menu.menu_apps for the cache rationale.
 local MENU_CACHE_PRIME_DELAY_SEC = 2
 
+-- Debounce window for coalescing a burst of state changes (each marks the menu
+-- dirty) into a single static-menu rebuild on the next tick, instead of one
+-- rebuild per change. Short enough to feel immediate, long enough to collapse
+-- the rapid updateMenu() calls a single user action can fan out into.
+local MENU_REFRESH_COALESCE_SEC = 0.05
+
 --- Safely loads a module and logs any loading failure.
 --- @param module_id string Lua module path.
 --- @param label string Human label used in logs.
@@ -132,6 +138,17 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	local _cached_menu_items = nil
 	local _menu_dirty        = true   -- forces the first build; set true on any state change
 	local _cached_paused     = false  -- pause state baked into the cached tree
+	-- Once the prewarm build has run, the menubar is switched from the dynamic
+	-- setMenu(callback) form — which makes Hammerspoon rebuild the NATIVE NSMenu
+	-- from the Lua table on EVERY click (the residual open latency) — to a STATIC
+	-- prebuilt NSMenu that AppKit reuses, so clicks open instantly. State changes
+	-- then re-push the static menu (coalesced) instead of rebuilding per click.
+	local _menu_primed       = false
+	local _menu_refresh_timer = nil
+	-- Forward declarations so updateMenu (assigned below) can schedule a refresh
+	-- whose implementation is defined further down.
+	local schedule_menu_refresh
+	local push_static_menu
 
 	local state = Preferences.build_initial_state(hotfiles, menu_mods, core_mods)
 
@@ -800,6 +817,13 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			pcall(core_mods.shortcuts_mod.set_extras, actions)
 		end
 		_menu_dirty = true
+		-- After priming, the menu is static (no per-click callback to lazily
+		-- rebuild), so a state change must actively re-push the tree. Coalesced so
+		-- a burst of updateMenu() calls collapses into a single rebuild. Before
+		-- priming the cold callback still rebuilds on the next open, so we skip.
+		if _menu_primed and type(schedule_menu_refresh) == "function" then
+			schedule_menu_refresh()
+		end
 	end
 
 	ctx.updateMenu   = updateMenu
@@ -809,6 +833,13 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	-- is visible in the boot/runtime log (the macOS analog of the AHK menu-build
 	-- profiling). ctx.paused is refreshed here because the cached tree bakes the
 	-- master-toggle's checked/fn state from it.
+	-- Switch the menubar to a STATIC prebuilt NSMenu (built once, reused by AppKit)
+	-- so opening it is native-instant. Only meaningful once a tree exists.
+	push_static_menu = function()
+		if type(_cached_menu_items) ~= "table" then return end
+		pcall(function() myMenu:setMenu(_cached_menu_items) end)
+	end
+
 	local function rebuild_menu_cache()
 		local t0 = hs.timer.secondsSinceEpoch()
 		local ok_b, items = pcall(Builder.generate, ctx, menu_mods, actions)
@@ -817,6 +848,9 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			_cached_menu_items = items
 			_cached_paused     = ctx.paused
 			_menu_dirty        = false
+			-- Push the freshly built tree as a static native menu once primed so
+			-- subsequent opens skip the per-click native rebuild entirely.
+			if _menu_primed then push_static_menu() end
 			Logger.info(LOG, "Menu tree rebuilt in %.1f ms (%d top-level item(s)).", elapsed_ms, #items)
 		else
 			Logger.error(LOG, "Menu tree rebuild failed (%.1f ms): %s.", elapsed_ms, tostring(items))
@@ -824,25 +858,41 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	end
 	ctx.rebuild_menu_cache = rebuild_menu_cache
 
-	-- Register the menu callback once. Hammerspoon evaluates it on every click;
-	-- we return the cached tree unless a state change marked it dirty or the pause
-	-- state flipped (a cheap boolean read), in which case we rebuild ONCE on this
-	-- open and cache the result. Pure browsing then costs a single table return.
+	-- Refresh the static menu now: re-read the live pause state into ctx (the tree
+	-- bakes it) and rebuild. Coalesced by schedule_menu_refresh so bursts of state
+	-- changes cost a single rebuild on the next tick instead of one per change.
+	local function refresh_menu_now()
+		ctx.paused = core_mods.shortcuts_mod
+			and type(core_mods.shortcuts_mod.is_paused) == "function"
+			and core_mods.shortcuts_mod.is_paused() or false
+		rebuild_menu_cache()
+	end
+	schedule_menu_refresh = function()
+		if _menu_refresh_timer then return end
+		_menu_refresh_timer = hs.timer.doAfter(MENU_REFRESH_COALESCE_SEC, function()
+			_menu_refresh_timer = nil
+			pcall(refresh_menu_now)
+		end)
+	end
+
+	-- COLD path only: until the prewarm build primes the static menu (~2 s after
+	-- boot), use the dynamic callback so an early click still renders. It rebuilds
+	-- on dirty/pause-flip and returns the cache otherwise. Once primed, the prewarm
+	-- replaces this with a STATIC native menu (see below) and the callback is never
+	-- consulted again — every open is then instant.
 	pcall(function()
 		myMenu:setMenu(function()
 			local paused_now = core_mods.shortcuts_mod
 				and type(core_mods.shortcuts_mod.is_paused) == "function"
 				and core_mods.shortcuts_mod.is_paused() or false
 			if _menu_dirty or not _cached_menu_items or paused_now ~= _cached_paused then
-				-- Log WHY a click pays a rebuild so a "slow menu" report is diagnosable
-				-- from the log alone (dirty toggle vs. pause flip vs. cold cache).
-				Logger.debug(LOG, "Menu open → rebuild (dirty=%s, cache=%s, pause_flip=%s).",
+				Logger.debug(LOG, "Menu open → cold rebuild (dirty=%s, cache=%s, pause_flip=%s).",
 					tostring(_menu_dirty), tostring(_cached_menu_items ~= nil),
 					tostring(paused_now ~= _cached_paused))
 				ctx.paused = paused_now
 				rebuild_menu_cache()
 			else
-				Logger.debug(LOG, "Menu open → served from cache (instant).")
+				Logger.debug(LOG, "Menu open → served from cache (cold path).")
 			end
 			return _cached_menu_items or {}
 		end)
@@ -865,11 +915,13 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			pcall(menu_mods.karabiner.prime, ctx)
 		end
 		-- Now that the expensive submenu caches are warm, build the menu tree once
-		-- off the boot path so the user's FIRST click renders the cached tree
-		-- instantly instead of paying the full Builder.generate() cost inline.
+		-- off the boot path and PRIME the static menu: rebuild_menu_cache() pushes
+		-- it as a native NSMenu so the user's FIRST (and every) click opens
+		-- instantly, never paying the per-click native rebuild of the callback form.
 		ctx.paused = core_mods.shortcuts_mod
 			and type(core_mods.shortcuts_mod.is_paused) == "function"
 			and core_mods.shortcuts_mod.is_paused() or false
+		_menu_primed = true
 		rebuild_menu_cache()
 	end)
 

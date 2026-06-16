@@ -66,3 +66,42 @@ helpers.describe("tooltip stacked panel: rounded colored background, no clip", f
 		helpers.assert_eq(els[5].action, "skip")  -- row 2 override
 	end)
 end)
+
+helpers.describe("tooltip stacked panel: text measurement is memoized", function()
+	-- minimumTextSize() is the dominant per-keystroke preview cost; the memo must
+	-- only hit the ObjC call once per distinct (size_tag, text) pair.
+	local function counting_canvas()
+		local calls = { n = 0 }
+		local canvas = {
+			minimumTextSize = function(_self, _index, _styled)
+				calls.n = calls.n + 1
+				return { w = 10, h = 5 }
+			end,
+		}
+		return canvas, calls
+	end
+
+	helpers.it("measures an identical (tag,text) pair only once", function()
+		local canvas, calls = counting_canvas()
+		local style = { font = { name = "x", size = 14 } }
+		Renderer._measure_styled(canvas, 2, "bonjour", "main", style)
+		Renderer._measure_styled(canvas, 2, "bonjour", "main", style)
+		Renderer._measure_styled(canvas, 2, "bonjour", "main", style)
+		helpers.assert_eq(calls.n, 1)  -- two later calls served from cache
+	end)
+
+	helpers.it("re-measures when the size tag differs (label vs row text)", function()
+		local canvas, calls = counting_canvas()
+		local style = { font = { name = "x", size = 14 } }
+		Renderer._measure_styled(canvas, 2, "★", "main", style)
+		Renderer._measure_styled(canvas, 2, "★", "hint", style)  -- different font size
+		helpers.assert_eq(calls.n, 2)
+	end)
+
+	helpers.it("returns the measured size", function()
+		local canvas = counting_canvas()
+		local sz = Renderer._measure_styled(canvas, 2, "unique-token-xyz", "main", {})
+		helpers.assert_eq(sz.w, 10)
+		helpers.assert_eq(sz.h, 5)
+	end)
+end)
