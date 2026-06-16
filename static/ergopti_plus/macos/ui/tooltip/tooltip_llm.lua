@@ -89,6 +89,11 @@ local _chain_ttft_ms         = nil
 -- create a one-frame flicker between a complete chain's "premier — dernier"
 -- and the partial "premier" rebuilt from chain timing alone.
 local _chain_ttlt_ms         = nil
+-- Tracks whether the tooltip canvas is currently visible. Needed because
+-- is_visible() must return true even during the loading state (empty
+-- predictions, canvas shown with reserved slots) — raw_predictions is empty
+-- in that case so a length check would incorrectly return false.
+local _is_visible            = false
 
 --- Composes the info-bar text shown beneath the prediction list.
 ---   * `model_info` is the static "Model · Profile" header passed by
@@ -754,6 +759,7 @@ function M.hide()
 		type(_state.raw_predictions) == "table" and #_state.raw_predictions or 0, caller)
 	pcall(function()
 		stop_watchers()
+		_is_visible               = false
 		_state.raw_predictions    = {}
 		_state.current_index      = 1
 		_state.info_bar           = nil
@@ -801,10 +807,15 @@ function M.show_predictions(predictions, current_index, is_enabled, info_bar, sh
 		local active_count = type(predictions) == "table" and #predictions or 0
 		local reserved_slots = tonumber(max_reserved_count) or 0
 		
-		if active_count == 0 and reserved_slots == 0 then 
+		if active_count == 0 and reserved_slots == 0 then
 			M.hide()
-			return 
+			return
 		end
+
+		-- Mark canvas as visible before rendering; covers the loading state
+		-- (empty predictions, reserved_slots > 0) where raw_predictions is
+		-- still empty but the canvas IS shown to the user.
+		_is_visible = true
 
 		_state.raw_predictions = type(predictions) == "table" and predictions or {}
 		_state.current_index   = current_index or 1
@@ -904,7 +915,7 @@ function M.make_diff_styled(diff_chunks, next_words, fallback_text)
 end
 
 function M.is_visible()
-	return type(_state.raw_predictions) == "table" and #_state.raw_predictions > 0
+	return _is_visible
 end
 
 return M
