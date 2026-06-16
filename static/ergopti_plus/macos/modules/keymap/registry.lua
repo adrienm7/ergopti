@@ -873,6 +873,9 @@ function M.load_toml(name, path)
 	for _, m in ipairs(_state.mappings) do
 		if m.group == name then table.insert(seqs, m.seq) end
 	end
+	-- Preserve group_order across reloads: ensure_group_order() stamped it earlier,
+	-- but overwriting the table would silently drop the value and break sort stability
+	local existing_order = _state.groups[name] and _state.groups[name].group_order or nil
 	_state.groups[name] = {
 		path             = path,
 		seqs             = seqs,
@@ -880,6 +883,7 @@ function M.load_toml(name, path)
 		kind             = "toml",
 		meta_description = data.meta and data.meta.description or nil,
 		sections         = sections_info,
+		group_order      = existing_order,
 	}
 
 	Logger.success(LOG, "TOML mapping file '%s' loaded (%d total mapping(s)).", name, #_state.mappings)
