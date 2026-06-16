@@ -363,9 +363,9 @@ TOML_BatchWrite(Path, Updates) {
 ; feeds their previous values back into TOML_BatchWrite. Do not rely on this
 ; step to remove stale keys; it normalizes formatting only.
 TOML_RunStrictCanonicalization(Path) {
-    global _TOML_STRICT_CANON_IN_PROGRESS, ConfigurationFile, _SaveFullConfigReady
+    global ConfigurationFile, _SaveFullConfigReady
 
-    if (_TOML_STRICT_CANON_IN_PROGRESS = true)
+    if AppState["toml_strict_canon_in_progress"]
         return
     if !IsSet(ConfigurationFile)
         return
@@ -374,9 +374,9 @@ TOML_RunStrictCanonicalization(Path) {
     if !IsSet(_SaveFullConfigReady)
         return
 
-    _TOML_STRICT_CANON_IN_PROGRESS := true
+    AppState["toml_strict_canon_in_progress"] := true
     try SaveFullConfig()
-    finally _TOML_STRICT_CANON_IN_PROGRESS := false
+    finally AppState["toml_strict_canon_in_progress"] := false
 }
 
 TOML_RenderKey(k) {

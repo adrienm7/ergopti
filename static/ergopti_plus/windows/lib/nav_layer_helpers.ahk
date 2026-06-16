@@ -45,7 +45,7 @@ ResetNumberOfRepetitions() {
 }
 
 SetNumberOfRepetitions(NewNumber) {
-	global NumberOfRepetitions := NewNumber
+	AppState_SetNumberOfRepetitions(NewNumber)
 }
 
 ActionLayer(action) {

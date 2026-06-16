@@ -348,31 +348,9 @@ UpdateLastSentCharacter(Character) {
 	; Ring-buffer push is O(1) and does not reallocate past boot — see
 	; ``_LSCPush`` in lib/hotstring_engine.ahk.
 	_LSCPush(Character)
-
-	global LastSentCharacterKeyTime, LAST_SENT_KEY_TIME_PRUNE_AT
-	LastSentCharacterKeyTime[Character] := A_TickCount
-	; Amortised-O(1) size bound: prune only when we cross the threshold.
-	; Without this, a long typing session accumulates one entry per unique
-	; character ever emitted (including synthetic sentinels like "LAlt"),
-	; growing the Map unbounded.
-	if LastSentCharacterKeyTime.Count > LAST_SENT_KEY_TIME_PRUNE_AT {
-		_PruneLastSentKeyTime()
-	}
-}
-
-_PruneLastSentKeyTime() {
-	global LastSentCharacterKeyTime, LAST_SENT_KEY_TIME_MAX_AGE_MS
-	Cutoff := A_TickCount - LAST_SENT_KEY_TIME_MAX_AGE_MS
-	; Two-pass because AHK v2 Map does not support deletion mid-iteration.
-	ToDelete := []
-	for Char, Ts in LastSentCharacterKeyTime {
-		if Ts < Cutoff {
-			ToDelete.Push(Char)
-		}
-	}
-	for _, Char in ToDelete {
-		LastSentCharacterKeyTime.Delete(Char)
-	}
+	; Timestamp tracking and pruning are delegated to AppState so the single
+	; write path (AppState_TouchLastSentKey) owns all invariants.
+	AppState_TouchLastSentKey(Character)
 }
 
 ; Serialized remap emit — the callback every remapped key fires. SendMode is
@@ -412,7 +390,6 @@ _LockWorkstationEmit(*) {
 }
 
 RemapKey(ScanCode, Character, AlternativeCharacter := "") {
-	global RemappedList
 	InputLevel := "I2"
 
 	Hotkey(
@@ -422,7 +399,7 @@ RemapKey(ScanCode, Character, AlternativeCharacter := "") {
 	)
 
 	if AlternativeCharacter == "" {
-		RemappedList[Character] := ScanCode
+		AppState["remapped_list"][Character] := ScanCode
 	} else {
 		Hotkey(
 			ScanCode,

@@ -16,9 +16,10 @@
 ; 2. Skips any ``[hs.*]`` section silently (foreign to this driver). They live
 ;    in the same TOML by design (single user-editable file per driver) but the
 ;    HS driver is the only consumer.
-; 3. Unknown sections (not present in the post-manifest Features Map) trigger a
-;    WARN at boot but never abort — the user's config can carry stale keys that
-;    no longer exist in the manifest without breaking the driver.
+; 3. Unknown sections (not present in the post-manifest Features Map) trigger an
+;    ERROR at boot but never abort — the driver still applies every valid key so
+;    a single typo or stale section does not wipe the user's configuration. The
+;    ERROR level ensures the problem is impossible to miss during log review.
 ; 4. Dormant until cut-over: written ahead of the migration so the disruptive
 ;    PR can be focused on call-site rewrites only.
 ; ==============================================================================
@@ -172,8 +173,13 @@ ApplyConfigToml(Features, FilePath) {
 			}
 		}
 		if Failed {
-			try LoggerWarn("TomlConfigLoader",
-				"v2 override skipped — unknown section path '{1}'.", CurrentSection)
+			; An unknown section path means the user config contains a key that
+			; does not exist in the manifest — likely a typo or a stale key left
+			; over from an older schema version. Surface it as an error so it is
+			; impossible to miss in the logs, but do not abort the driver (the
+			; remaining valid keys are still applied).
+			try LoggerError("TomlConfigLoader",
+				"v2 override skipped — unknown section path '[{1}]' not found in the manifest.", CurrentSection)
 			continue
 		}
 
@@ -185,8 +191,8 @@ ApplyConfigToml(Features, FilePath) {
 			} else if IsObject(Node) {
 				Node.%Key% := Value
 			} else {
-				try LoggerWarn("TomlConfigLoader",
-					"v2 override skipped — '[{1}]' is not an object.", CurrentSection)
+				try LoggerError("TomlConfigLoader",
+					"v2 override skipped — '[{1}]' resolved to a scalar, not an object — check the manifest shape.", CurrentSection)
 				continue
 			}
 			Applied++

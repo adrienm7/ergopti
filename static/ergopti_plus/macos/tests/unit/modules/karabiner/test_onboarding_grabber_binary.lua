@@ -15,27 +15,27 @@
 
 local helpers = require("tests.helpers")
 
---- Loads a fresh onboarding module with io.open controlled by the caller.
---- @param open_fn function Replacement for io.open.
---- @return table Onboarding module instance.
-local function fresh_onboarding(open_fn)
+--- Loads a fresh onboarding module instance.
+--- @return table Onboarding module.
+local function fresh_onboarding()
 	package.loaded["lib.logger"] = nil
 	helpers.load_with_stubs("lib.logger")
-
 	package.loaded["lib.i18n"] = { get = function(k) return k end }
 	package.loaded["lib.notifications"] = { notify = function() end }
 	package.loaded["lib.dialog_util"] = { block_alert = function() return "later" end }
-
-	local orig_io_open = io.open
-	io.open = open_fn
-
 	package.loaded["modules.karabiner.onboarding"] = nil
-	local ok, mod = pcall(helpers.load_with_stubs, "modules.karabiner.onboarding")
+	return helpers.load_with_stubs("modules.karabiner.onboarding")
+end
 
-	io.open = orig_io_open
-
-	if not ok then error(mod) end
-	return mod
+--- Runs fn with io.open replaced by open_fn, then restores it.
+--- @param open_fn function Replacement for io.open.
+--- @param fn function Code to run under the patched open.
+local function with_io(open_fn, fn)
+	local orig = io.open
+	io.open = open_fn
+	local ok, err = pcall(fn)
+	io.open = orig
+	if not ok then error(err, 2) end
 end
 
 
@@ -47,38 +47,41 @@ end
 
 helpers.describe("onboarding.is_grabber_binary_present: v15/v16 detection", function()
 	helpers.it("returns true when only the v15 binary (karabiner_grabber) exists", function()
-		local mod = fresh_onboarding(function(path, _mode)
+		local mod = fresh_onboarding()
+		with_io(function(path, _)
 			if path and path:find("karabiner_grabber", 1, true)
 				and not path:find("Karabiner-Core-Service", 1, true) then
-				-- Return a fake file handle — only the nil-check matters
-				return {}, nil
+				return { close = function() end }, nil
 			end
 			return nil, "no such file"
+		end, function()
+			helpers.assert_eq(mod.is_grabber_binary_present(), true)
 		end)
-		helpers.assert_eq(mod.is_grabber_binary_present(), true)
 	end)
 
 	helpers.it("returns true when only the v16 binary (Karabiner-Core-Service) exists", function()
-		local mod = fresh_onboarding(function(path, _mode)
+		local mod = fresh_onboarding()
+		with_io(function(path, _)
 			if path and path:find("Karabiner-Core-Service", 1, true) then
-				return {}, nil
+				return { close = function() end }, nil
 			end
 			return nil, "no such file"
+		end, function()
+			helpers.assert_eq(mod.is_grabber_binary_present(), true)
 		end)
-		helpers.assert_eq(mod.is_grabber_binary_present(), true)
 	end)
 
-	helpers.it("returns true when both v15 and v16 binaries exist (dual-install or upgrade)", function()
-		local mod = fresh_onboarding(function(_path, _mode)
-			return {}, nil
+	helpers.it("returns true when both v15 and v16 binaries exist", function()
+		local mod = fresh_onboarding()
+		with_io(function(_path, _) return { close = function() end }, nil end, function()
+			helpers.assert_eq(mod.is_grabber_binary_present(), true)
 		end)
-		helpers.assert_eq(mod.is_grabber_binary_present(), true)
 	end)
 
-	helpers.it("returns false when neither v15 nor v16 binary exists (KE not installed)", function()
-		local mod = fresh_onboarding(function(_path, _mode)
-			return nil, "no such file"
+	helpers.it("returns false when neither v15 nor v16 binary exists", function()
+		local mod = fresh_onboarding()
+		with_io(function(_path, _) return nil, "no such file" end, function()
+			helpers.assert_eq(mod.is_grabber_binary_present(), false)
 		end)
-		helpers.assert_eq(mod.is_grabber_binary_present(), false)
 	end)
 end)
