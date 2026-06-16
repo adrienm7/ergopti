@@ -147,6 +147,9 @@ local CoreState = {
 	-- Monotonically-increasing counter that lets on_both_done() discard stale
 	-- probe results when set_backend() is called while probes are in-flight
 	detection_generation   = 0,
+	-- Set to true when the user explicitly picks a backend; prevents any future
+	-- auto_detect_backend() call from silently overwriting the manual choice
+	user_override_backend  = false,
 }
 
 
@@ -189,6 +192,10 @@ function M.auto_detect_backend(callback)
 		-- Discard if an explicit set_backend() call superseded this probe run
 		if CoreState.detection_generation ~= my_generation then
 			Logger.debug(LOG, "auto_detect: stale detection result, ignoring.")
+			return
+		end
+		if CoreState.user_override_backend then
+			Logger.debug(LOG, "auto_detect: user has set a manual backend override — skipping automatic write.")
 			return
 		end
 		-- Prefer Ollama if both available, otherwise use MLX if available
@@ -402,6 +409,8 @@ function M.set_backend(backend)
 		-- Invalidate in-flight auto-detect probes before writing the new value
 		CoreState.detection_generation = CoreState.detection_generation + 1
 		CoreState.backend = backend
+		-- Prevent any future auto-detection from overwriting this explicit choice
+		CoreState.user_override_backend = true
 	end
 end
 
