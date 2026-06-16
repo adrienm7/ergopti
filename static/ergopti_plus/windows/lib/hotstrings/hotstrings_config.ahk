@@ -444,6 +444,20 @@ _ParseOverrides(Path) {
     return Result
 }
 
+; Single source of truth for serialising a delay (in seconds) to its on-disk
+; TOML numeric string. Both backends MUST route through this so the shared
+; override file and a personal file's [_meta] never diverge for the same value:
+; previously the override store wrote the raw number while the config window's
+; _HCW_TomlValue quantised to 3 decimals, so the same logical delay could land
+; as two different strings (UI/engine drift). Delays are millisecond-quantised
+; everywhere — 3 decimal places of a second == whole milliseconds.
+global HOTSTRINGS_DELAY_DECIMALS := 3
+HotstringsSerialiseDelay(Value) {
+    global HOTSTRINGS_DELAY_DECIMALS
+    Num := Value + 0
+    return Format("{:." . HOTSTRINGS_DELAY_DECIMALS . "f}", Num)
+}
+
 ; Serialise the in-memory override Map back to TOML and write it to disk.
 ; Stable ordering: alphabetical category, alphabetical section.
 _SaveOverrides() {
@@ -474,7 +488,7 @@ _SaveOverrides() {
         if (Entry.Delay != "" or Entry.Color != "" or Entry.ShowTooltip != "" or EntryPrio != "") {
             Out .= "[" . Cat . "]`n"
             if (Entry.Delay != "") {
-                Out .= "delay = " . Entry.Delay . "`n"
+                Out .= "delay = " . HotstringsSerialiseDelay(Entry.Delay) . "`n"
             }
             if (Entry.Color != "") {
                 Out .= 'color = "' . Entry.Color . '"' . "`n"
@@ -500,7 +514,7 @@ _SaveOverrides() {
                 ; Extension: [ext.name.section] — Cat already contains the dot
                 Out .= "[" . Cat . "." . Sec . "]`n"
                 if (S.Delay != "") {
-                    Out .= "delay = " . S.Delay . "`n"
+                    Out .= "delay = " . HotstringsSerialiseDelay(S.Delay) . "`n"
                 }
                 if (S.Color != "") {
                     Out .= 'color = "' . S.Color . '"' . "`n"

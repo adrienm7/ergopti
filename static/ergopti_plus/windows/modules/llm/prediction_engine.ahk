@@ -291,8 +291,18 @@ LLM_Engine_IsBusy() {
 LLM_Engine_StopGeneration() {
 	global _LLM_Engine
 	LLM_Engine_CancelTimer()
-	if IsSet(_LLM_Engine)
+	if IsSet(_LLM_Engine) {
 		_LLM_Engine["request_id"] := (_LLM_Engine.Has("request_id") ? _LLM_Engine["request_id"] : 0) + 1
+		; Drop the prediction cache on every explicit stop (navigation reset,
+		; pause/suspend). The cache is keyed only on context-string equality, so
+		; without this a context the user returns to — or rebuilds after a
+		; pause/resume — would instantly replay a prediction they already
+		; dismissed, surfacing as a "ghost" suggestion. The next fire on that
+		; context must take the network path, not the cache branch.
+		_LLM_Engine["last_ctx"]     := ""
+		_LLM_Engine["last_results"] := []
+		_LLM_Engine["last_result"]  := ""
+	}
 	try LLM_OllamaCancelStreams()
 	try LLM_OllamaCancelAllAsync()
 	try LLM_RemoteCancelAllAsync()
@@ -1109,7 +1119,7 @@ _LLM_Engine_GetActiveApiEntry() {
  * @param {boolean}  is_final  - True only on the last update of a request.
  */
 LLM_Engine_OnResults(slots, ctx, active := 1, is_final := false) {
-	global _LLM_Engine
+	global _LLM_Engine, _LLM_Bridge_Buffer
 	; Inline auto-type mode (Copilot-style): the prediction is typed
 	; directly into the active app instead of being shown in a tooltip.
 	; We only auto-type on the FINAL render — typing per-token from
@@ -1117,6 +1127,11 @@ LLM_Engine_OnResults(slots, ctx, active := 1, is_final := false) {
 	; to roll back. Letting the variant complete first means one
 	; deterministic SendText burst with a known length.
 	if (is_final and _LLM_Engine.Has("inline_autotype") and _LLM_Engine["inline_autotype"]) {
+		; Delay (ms) before releasing the synthetic flag. The TextSend below is
+		; asynchronous — the injected characters reach the InputHook a few ms
+		; later; clearing inline would re-enable manual observation before the
+		; burst has passed through. Mirrors LLM_Bridge_OnAccept (rule 5.2).
+		static SYNTH_CLEAR_DELAY_MS := 80
 		if (slots.Length > 0) {
 			idx := Max(1, Min(active, slots.Length))
 			text := slots[idx]
@@ -1126,7 +1141,19 @@ LLM_Engine_OnResults(slots, ctx, active := 1, is_final := false) {
 				; not re-enter the engine and trigger false hotstring matches.
 				if IsSet(PrefixWatcherSuppress)
 					try PrefixWatcherSuppress(true)
+				; Tag the auto-typed prediction as synthetic so the keylogger
+				; keeps it out of the manual ``chars`` count and attributes it
+				; to the LLM source — same PII guard as LLM_Bridge_OnAccept.
+				; Without it the model output is recorded as words the human
+				; typed (inflating WPM, polluting n-gram stats).
+				try KL_MarkSynthetic("llm")
 				TextSend(text, 0, 0)
+				; Advance the rolling context buffer by the inserted text so the
+				; next keystroke predicts against what the document actually
+				; contains. Without this the engine's context desyncs from the
+				; document and the following prediction runs on stale context.
+				if IsSet(_LLM_Bridge_Buffer)
+					_LLM_Bridge_Buffer .= text
 				; Clear stale HSE and prefix buffers — cursor is now past the
 				; injected text, so accumulated context is no longer valid.
 				if IsSet(HSE_HardReset)
@@ -1134,7 +1161,10 @@ LLM_Engine_OnResults(slots, ctx, active := 1, is_final := false) {
 				if IsSet(_ResetPrefixBuffer)
 					try _ResetPrefixBuffer()
 				if IsSet(PrefixWatcherSuppress)
-					SetTimer((*) => PrefixWatcherSuppress(false), -60)
+					SetTimer((*) => PrefixWatcherSuppress(false), -SYNTH_CLEAR_DELAY_MS)
+				; Deferred release so any characters still queued in the OS
+				; message loop are tagged synthetic before observation resumes.
+				SetTimer((*) => KL_ClearSynthetic(), -SYNTH_CLEAR_DELAY_MS)
 				; Don't fall through to the tooltip — inline mode owns
 				; the entire UI surface for this prediction.
 				return

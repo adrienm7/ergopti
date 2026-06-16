@@ -145,16 +145,40 @@ KLPF_DbgWrite(path, line) {
 }
 
 KLPF_WriteAtomic(path, content) {
+    ; Publish the tmp file onto ``path`` with the same atomic-rename primitive
+    ; KL_WriteAtomic (keylogger.ahk) uses: MoveFileExW(MOVEFILE_REPLACE_EXISTING
+    ; | MOVEFILE_WRITE_THROUGH) is a kernel-level directory-entry swap with NO
+    ; absent-file window. The previous FileDelete(path) + FileMove sequence left
+    ; a gap where ``path`` did not exist — a dashboard fetch('./prefetch.json')
+    ; landing between the two saw a 404, and an AV/indexer transiently holding
+    ; the freshly-deleted name made FileMove fail with no retry, stranding the
+    ; page on stale data. We retry the rename once to ride out a transient AV /
+    ; indexer lock before giving up.
+    ;
+    ; The tmp write stays UTF-8-RAW (no BOM): the JSON is fetched and parsed by
+    ; the dashboard, and we never want a BOM in the served blob. The function
+    ; keeps its boolean contract — false leaves the previous prefetch file
+    ; intact so the page degrades to old data rather than to an empty state.
+    static MOVEFILE_REPLACE_EXISTING := 0x1
+    static MOVEFILE_WRITE_THROUGH    := 0x8
+    static FLAGS := MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH
+    static RETRY_DELAY_MS            := 50
+
     tmp := path . ".tmp"
     try FileDelete(tmp)
     try FileAppend(content, tmp, "UTF-8-RAW")
     catch
         return false
-    if FileExist(path)
-        try FileDelete(path)
-    try FileMove(tmp, path)
-    catch
-        return false
+
+    if !DllCall("Kernel32\MoveFileExW", "Str", tmp, "Str", path,
+            "UInt", FLAGS, "Int") {
+        Sleep RETRY_DELAY_MS
+        if !DllCall("Kernel32\MoveFileExW", "Str", tmp, "Str", path,
+                "UInt", FLAGS, "Int") {
+            try FileDelete(tmp)
+            return false
+        }
+    }
     return true
 }
 

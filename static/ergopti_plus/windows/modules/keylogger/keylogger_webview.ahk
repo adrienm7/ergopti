@@ -194,6 +194,12 @@ KLWV_Open(which, metrics_dir) {
     } catch as err {
         try FileAppend("[" . A_Now . "] FAIL controller create: " . err.Message . " | " . err.File . ":" . err.Line .
             "`r`n", log, "UTF-8")
+        ; Surface to the central logger too — webview.log is invisible to the
+        ; standard diagnostics, so a half-installed WebView2 Runtime would
+        ; otherwise fail silently (rule 5.3: never swallow without LoggerError).
+        try LoggerError("Keylogger",
+            "KLWV_Open: WebView2 controller create failed ('{1}') at {2}:{3} — dashboard cannot open.",
+            err.Message, err.File, err.Line)
         try g.Destroy()
         return false
     }
@@ -232,6 +238,11 @@ KLWV_Open(which, metrics_dir) {
         webview.Navigate(asset)
     } catch as err {
         try FileAppend("[" . A_Now . "] FAIL navigate: " . err.Message . "`r`n", log, "UTF-8")
+        ; Navigation failure leaves a blank window; mirror it to the central
+        ; logger so the failure is diagnosable without trawling webview.log.
+        try LoggerWarn("Keylogger",
+            "KLWV_Open: WebView2 navigate to '{1}' failed ('{2}').",
+            asset, err.Message)
     }
     ; The chrome.webview.postMessage('ready') handshake from JS goes
     ; through ICoreWebView2WebMessageReceived which thqby's wrapper

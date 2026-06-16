@@ -366,6 +366,14 @@ _LLM_Parser_IntraWordDiff(w1, w2) {
  * Parses one model block into a prediction Map (macOS process_prediction).
  * Returns "" when the block should count as a failed variant.
  *
+ * Crash firewall: the actual parsing lives in _LLM_Parser_ProcessPredictionImpl
+ * and is invoked here under try/catch. ProcessPrediction runs deep inside the
+ * async poll / SetTimer callbacks of the prediction engine, where AHK SWALLOWS
+ * any thrown exception — a crash on adversarial model output (an unexpected
+ * token shape the prefix/suffix anchor loops did not anticipate) would silently
+ * abort the variant with zero diagnostics. Catching here degrades such an edge
+ * crash to a failed variant WITH a warning log line instead of a silent swallow.
+ *
  * @param {string} full_text - Capped context buffer.
  * @param {string} tail_text - Last N words of the buffer.
  * @param {string} block - Raw model output for one prediction.
@@ -374,6 +382,30 @@ _LLM_Parser_IntraWordDiff(w1, w2) {
  * @returns {Map|""} { to_type, nw, deletes, chunks, has_corrections, disable_bold }
  */
 LLM_Parser_ProcessPrediction(full_text, tail_text, block, min_words := 1, max_words := 15) {
+	try {
+		return _LLM_Parser_ProcessPredictionImpl(full_text, tail_text, block, min_words, max_words)
+	} catch as err {
+		; Snippet of the offending block so the log carries enough context to
+		; reproduce the edge input that tripped the parser.
+		snippet := (Type(block) = "String") ? SubStr(block, 1, 120) : Type(block)
+		try LoggerWarn("LLM.parser", "ProcessPrediction crashed on model output — variant dropped: {1} | block: «{2}».", err.Message, snippet)
+		return ""
+	}
+}
+
+/**
+ * Internal implementation of LLM_Parser_ProcessPrediction — see that function
+ * for the contract. Kept private so the public entry point can wrap it in the
+ * crash firewall (the async callbacks that drive it swallow thrown errors).
+ *
+ * @param {string} full_text
+ * @param {string} tail_text
+ * @param {string} block
+ * @param {number} min_words
+ * @param {number} max_words
+ * @returns {Map|""}
+ */
+_LLM_Parser_ProcessPredictionImpl(full_text, tail_text, block, min_words := 1, max_words := 15) {
 	if (Type(block) != "String" or block = "")
 		return ""
 	full_text := (Type(full_text) = "String") ? full_text : ""
@@ -577,8 +609,11 @@ LLM_Parser_ProcessPrediction(full_text, tail_text, block, min_words := 1, max_wo
 			anchor_text := ""
 			ak := stripped_ops.Length
 			while (ak >= 1) {
-				anchor_text := stripped_ops[ak]["t1"] . anchor_text
-				if (stripped_ops[ak]["t1"] ~= "[\w" . Chr(0x2019) . "']" or Ord(stripped_ops[ak]["t1"]) >= 128)
+				; stripped_ops may hold leading-space "ins" ops (t2 only, no t1);
+				; default to "" so neither concat nor Ord() throws "Key not found".
+				stk := stripped_ops[ak].Has("t1") ? stripped_ops[ak]["t1"] : ""
+				anchor_text := stk . anchor_text
+				if (stk != "" and (stk ~= "[\w" . Chr(0x2019) . "']" or Ord(stk) >= 128))
 					break
 				ak -= 1
 			}
@@ -587,7 +622,10 @@ LLM_Parser_ProcessPrediction(full_text, tail_text, block, min_words := 1, max_wo
 			ak := first_change_idx - 1
 			while (ak >= 1) {
 				visual_ops.InsertAt(1, ops[ak])
-				if (ops[ak]["t1"] ~= "[\w" . Chr(0x2019) . "']" or Ord(ops[ak]["t1"]) >= 128)
+				; ops[ak] may be an "ins" op (t2 only, no t1) — guard the key access
+				; and skip empty tokens so Ord() never sees an absent value.
+				atk := ops[ak].Has("t1") ? ops[ak]["t1"] : ""
+				if (atk != "" and (atk ~= "[\w" . Chr(0x2019) . "']" or Ord(atk) >= 128))
 					break
 				ak -= 1
 			}
@@ -673,10 +711,12 @@ LLM_Parser_ProcessPrediction(full_text, tail_text, block, min_words := 1, max_wo
 				raw_chunks.Push(Map("type", "insert", "text", op["t2"]))
 			} else if (ty = "sub") {
 				has_corr := true
-				w1 := op["t1"]
-				w2 := op["t2"]
-				is_word1 := (w1 ~= "[\w" . Chr(0x2019) . "']") or (Ord(w1) >= 128)
-				is_word2 := (w2 ~= "[\w" . Chr(0x2019) . "']") or (Ord(w2) >= 128)
+				; A "sub" op always carries both tokens, but guard the key access
+				; and skip empty tokens so Ord() never operates on an absent value.
+				w1 := op.Has("t1") ? op["t1"] : ""
+				w2 := op.Has("t2") ? op["t2"] : ""
+				is_word1 := (w1 != "") and ((w1 ~= "[\w" . Chr(0x2019) . "']") or (Ord(w1) >= 128))
+				is_word2 := (w2 != "") and ((w2 ~= "[\w" . Chr(0x2019) . "']") or (Ord(w2) >= 128))
 				if (is_word1 and is_word2) {
 					for si, sc in _LLM_Parser_IntraWordDiff(w1, w2)
 						raw_chunks.Push(sc)

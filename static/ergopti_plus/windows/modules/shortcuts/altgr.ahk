@@ -144,12 +144,27 @@ AltGrCapsLockShortcut() {
     }
 }
 
+; Idempotence latch for _RegisterAltGrShortcutsHotkeys. A second call would
+; stack a fresh HotIf closure on the same SC138 combos, orphaning the previous
+; criterion and silently shifting the SC138-as-prefix latch semantics. The
+; guard turns any future in-process re-arm (the AltGr layer already does
+; in-process toggling elsewhere) into a logged no-op instead of a silent
+; double registration.
+global _AltGrShortcutsRegistered := false
+
 ; Dynamic registration entry point -- called once Onboarding_Run() has returned
 ; so the wizard never sees SC138 as a prefix key. Each Hotkey() pair below
 ; mirrors the criterion of the previous static ``#HotIf`` block: AHK won't fire
 ; the combo unless the feature is enabled AND the press came through a real
 ; AltGr / Kana modifier.
 _RegisterAltGrShortcutsHotkeys() {
+    global _AltGrShortcutsRegistered
+    ; Single-call contract: re-running would orphan the prior HotIf criterion.
+    if _AltGrShortcutsRegistered {
+        LoggerWarn("shortcuts", "_RegisterAltGrShortcutsHotkeys called more than once -- ignoring duplicate AltGr combo registration.")
+        return
+    }
+    LoggerStart("shortcuts", "Registering AltGr shortcut combos (SC138 + LAlt / CapsLock)…")
     ; I3 — same priority as script-management AltGr combos. Custom prefix combos
     ; (SC138 & suffix) already use the keyboard hook; a leading ``$`` is invalid.
     opts := "I3"
@@ -158,6 +173,8 @@ _RegisterAltGrShortcutsHotkeys() {
     HotIf((*) => IsAltGrCapsLockEnabled() and IsRealAltGrPress())
     Hotkey("SC138 & SC03A", (*) => AltGrCapsLockShortcut(), opts)
     HotIf()
+    _AltGrShortcutsRegistered := true
+    LoggerSuccess("shortcuts", "AltGr shortcut combos registered.")
 }
 
 ; Auto-execute hook: shortcuts.ahk is #Include'd at line 2176 of ErgoptiPlus.ahk

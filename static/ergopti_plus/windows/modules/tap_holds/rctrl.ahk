@@ -122,10 +122,16 @@ SC11D:: {
 		OneShotShift()
 		return
 	}
-	; Long press — arm Shift until key-up.
+	; Long press — arm Shift until key-up, releasing it in a finally so it can
+	; NEVER latch. The wait is capped (U T<timeout>) so a lost SC11D key-up
+	; (focus stolen by a UAC prompt, Suspend toggled mid-press) cannot block the
+	; release forever and leave Shift stuck Down.
 	TextPressKey("LShift", "Down")
-	KeyWait("SC11D", "U")
-	TextPressKey("LShift", "Up")
+	try {
+		KeyWait("SC11D", "U T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC)
+	} finally {
+		TextPressKey("LShift", "Up")
+	}
 }
 #HotIf
 

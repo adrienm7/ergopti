@@ -30,8 +30,15 @@ DisableCapsWord() {
     UpdateCapsLockLED()
 }
 
+; UpdateCapsLockLED is the SINGLE owner of the physical CapsLock LED. Three
+; logical states can independently want the LED lit: CapsWord, the nav layer,
+; and a real hardware CapsLock toggle (AltGr+CapsLock). Computing the LED from
+; the OR of all three — instead of letting each state drive SetCapsLockState
+; on its own — keeps the LED a reliable indicator no matter how the three are
+; interleaved. ToggleCapsLock flips the hardware toggle then routes through
+; here so the LED can never disagree with the union of the logical states.
 UpdateCapsLockLED() {
-    if CapsWordEnabled or LayerEnabled {
+    if CapsWordEnabled or LayerEnabled or GetKeyState("CapsLock", "T") {
         SetCapsLockState("On")
     } else {
         SetCapsLockState("Off")

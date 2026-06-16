@@ -95,13 +95,21 @@ CrashReport_Build(ErrorObj) {
 
 	; ── Full system info (mirrors healthcheck _HealthCheck_SysInfo + enriched fields) ──────────
 	Sys := _CrashReport_SysInfo()
+	; Run the healthcheck EXACTLY ONCE per crash and reuse its result for both the
+	; enriched system fields and the adapter / session block below. HealthCheck_Run
+	; re-validates every port adapter and is non-trivial work; the error handler
+	; fires at an arbitrary point (potentially mid-keystroke) with the keyboard
+	; already degraded, so a second redundant run only widens the input-dead window.
+	HC := ""
+	try HC := HealthCheck_Run()
 	; Pull a few safe enriched fields from the live healthcheck for even richer crash reports (pause state, key logs paths, etc.)
 	try {
-		HC := HealthCheck_Run()
-		if HC.Has("pause_state")
-			Sys["pause_at_crash"] := HC["pause_state"]["is_paused"] ? "paused" : "running"
-		if HC.Has("logs") {
-			Sys["errors_log_path"] := HC["logs"]["errors_today"]
+		if (HC != "") {
+			if HC.Has("pause_state")
+				Sys["pause_at_crash"] := HC["pause_state"]["is_paused"] ? "paused" : "running"
+			if HC.Has("logs") {
+				Sys["errors_log_path"] := HC["logs"]["errors_today"]
+			}
 		}
 	} catch {
 		; never let diagnostic enrichment break a crash report
@@ -131,17 +139,19 @@ CrashReport_Build(ErrorObj) {
 	}
 	StuckModsStr := (StuckMods.Length > 0) ? _CrashReport_JoinArr(StuckMods) : "none"
 
-	; ── Adapter / port status (mirrors healthcheck HealthCheck_Run) ──────────
+	; ── Adapter / port status (mirrors the healthcheck adapter validation) ──────────
+	; Reuse the single healthcheck result captured above — never re-run it.
 	AdaptersOk     := ""
 	AdaptersFailed := ""
 	WarnCount      := "0"
 	ErrCount       := "0"
 	try {
-		HC := HealthCheck_Run()
-		AdaptersOk     := _CrashReport_JoinArr(HC["ports_validated"])
-		AdaptersFailed := _CrashReport_JoinArr(HC["failed_adapters"])
-		WarnCount      := String(HC["warn_count"])
-		ErrCount       := String(HC["err_count"])
+		if (HC != "") {
+			AdaptersOk     := _CrashReport_JoinArr(HC["ports_validated"])
+			AdaptersFailed := _CrashReport_JoinArr(HC["failed_adapters"])
+			WarnCount      := String(HC["warn_count"])
+			ErrCount       := String(HC["err_count"])
+		}
 	}
 
 	; ── Module state ──────────────────────────────────────────────────────────

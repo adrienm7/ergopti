@@ -47,10 +47,22 @@
 ; slow paste targets (Teams/Word) without blocking perceptibly.
 global SEND_INSTANT_PASTE_DELAY_MS := 200
 
-; Timeout (s) for ClipWait in GetSelection. Most apps fill the clipboard
-; in <100 ms; 2 s is a conservative ceiling before we return an empty
-; string and restore the original clipboard.
-global GET_SELECTION_TIMEOUT_SEC := 2
+; Process-wide reentrancy guard for SendInstant's clipboard dance. The
+; deferred restore (SetTimer above) keeps A_Clipboard = payload for
+; SEND_INSTANT_PASTE_DELAY_MS; if a second SendInstant fires in that window
+; (e.g. a fast follow-up wrap key) it would overwrite A_Clipboard before the
+; first paste settled, racing the not-yet-restored clipboard and corrupting
+; the user's data. While this flag is true a second SendInstant skips the
+; clipboard route entirely (send-instant-sleep-clipboard-on-keyboard-thread).
+global _SEND_INSTANT_CLIP_BUSY := false
+
+; Timeout (s) for ClipWait in GetSelection. A real selection copies in
+; <100 ms; GetSelection runs on the keyboard thread (case-conversion /
+; web-search chords), so this doubles as a LowLevelHooksTimeout exposure
+; window. 0.5 s is a tight interactive ceiling: long enough for any
+; responsive app, short enough that a non-responsive one cannot stall input
+; for seconds. On timeout GetSelection returns "" and callers no-op.
+global GET_SELECTION_TIMEOUT_SEC := 0.5
 
 ; Delay (ms) used by ActivateHotstrings between the Space poke and the
 ; BackSpace. Kept explicit so we can tune it in one place without
@@ -275,29 +287,60 @@ SendFinalResult(Text, OnlyText := False) {
 }
 
 _SendInstant_RestoreClipboard(OldClip) {
+	global _SEND_INSTANT_CLIP_BUSY
 	A_Clipboard := OldClip
+	; Release the reentrancy guard only after the original clipboard is back,
+	; so the next SendInstant sees a quiescent clipboard before it dances again.
+	_SEND_INSTANT_CLIP_BUSY := false
 }
 
 SendInstant(Text) {
 	; Function for sending immediately a big text without typing it letter by letter.
 	; Uses try so the user's clipboard is restored even on error/crash.
+	global _SEND_INSTANT_CLIP_BUSY
 	if _SendHook {
 		Hook := _SendHook
 		Hook("SendInstant", Text)
 		return
 	}
+	; Reentrancy guard: a previous SendInstant's deferred restore has not run
+	; yet, so the clipboard still holds its payload. Touching A_Clipboard now
+	; would race the in-flight paste/restore — fall back to the clipboard-free
+	; {Text} route so the two dances never interleave.
+	if _SEND_INSTANT_CLIP_BUSY {
+		SendEvent("{Text}" Text)
+		return
+	}
 	OldClipboard := ClipboardAll()
+	_SEND_INSTANT_CLIP_BUSY := true
 	try {
 		A_Clipboard := Text
 		SendInput("^v")
 		SetTimer(_SendInstant_RestoreClipboard.Bind(OldClipboard), -SEND_INSTANT_PASTE_DELAY_MS)
 	} catch {
 		A_Clipboard := OldClipboard
+		_SEND_INSTANT_CLIP_BUSY := false
 	}
 }
 
-; Leave time to trigger hotstrings between sending a character and then another one
+; Commit any pending end-char hotstring before the next symbol is emitted.
+; The space/backspace dance pokes the engine: the injected space round-trips
+; through the prefix-watcher InputHook, fires any end-char-gated trigger, then
+; the backspace removes it. The Sleep gives the OS message loop time to deliver
+; the space's char event to the InputHook before the backspace lands.
+;
+; That Sleep parks the keyboard dispatch thread for ACTIVATE_HOTSTRINGS_DELAY_MS
+; on EVERY Shift French-punctuation key — a hot, default key set. Gate the whole
+; dance on there actually being a pending abbreviation in the engine buffer: when
+; HSE_Buffer is empty (the common case — punctuation typed at a word boundary or
+; after a space) there is nothing to commit, so we skip the space/backspace pair
+; AND its blocking Sleep entirely. IsSet guards the load order: the engine buffer
+; global lives in hotstring_engine_main.ahk, included alongside this file.
 ActivateHotstrings() {
+    ; Nothing to flush — no pending abbreviation, so skip the costly poke + Sleep.
+    if (IsSet(HSE_Buffer) and HSE_Buffer == "") {
+        return
+    }
     SendNewResult(" ")
     if !_SendHook {
         Sleep(ACTIVATE_HOTSTRINGS_DELAY_MS)
@@ -313,7 +356,16 @@ GetSelection() {
     try {
         A_Clipboard := ""
         SendEvent("^c")
-        ClipWait(GET_SELECTION_TIMEOUT_SEC)
+        ; Fail FAST: if the app never answered the Ctrl+C within the interactive
+        ; window, ClipWait returns 0. Treat that as "no selection" and return ""
+        ; so callers no-op — otherwise we would paste whatever stale content the
+        ; restored clipboard holds, duplicating old text on a timeout.
+        if !ClipWait(GET_SELECTION_TIMEOUT_SEC) {
+            LoggerWarn("hotstring_engine",
+                "GetSelection: ClipWait timed out after {1}s; returning empty selection.",
+                GET_SELECTION_TIMEOUT_SEC)
+            return ""
+        }
         Text := A_Clipboard
     } finally {
         A_Clipboard := OldClipboard
@@ -572,9 +624,16 @@ _HotstringDispatch(Replacement, EndChar, BackSpaceSeq, PrevCharKey, OnlyText, Fi
 IsTimeActivationExpired(PreviousCharacter, OptionTimeActivationSeconds) {
     ; Don't activate the hotstring if taped too slowly
     Now := A_TickCount
-    CharacterSentTime := LastSentCharacterKeyTime.Has(PreviousCharacter) ? LastSentCharacterKeyTime[PreviousCharacter] :
-        Now
     if OptionTimeActivationSeconds > 0 {
+        ; Fail CLOSED: a missing timestamp means we cannot prove the prior char
+        ; was typed recently (it may have been pruned by LAST_SENT_KEY_TIME_MAX_AGE_MS
+        ; after a long pause), so the time gate must treat it as expired rather
+        ; than defaulting to "now" — which would let a deliberately-paused trigger
+        ; fire as if it had just been typed.
+        if !LastSentCharacterKeyTime.Has(PreviousCharacter) {
+            return True
+        }
+        CharacterSentTime := LastSentCharacterKeyTime[PreviousCharacter]
         ; We need to convert into milliseconds, hence the multiplication by 1000
         if (Now - CharacterSentTime > OptionTimeActivationSeconds * 1000) {
             return True

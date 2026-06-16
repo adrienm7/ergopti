@@ -75,11 +75,14 @@ OneShotShiftFix() {
     global OneShotShiftEnabled := False
 }
 
+; Flips the real hardware CapsLock toggle, then delegates the LED to
+; UpdateCapsLockLED — the single LED owner — so the indicator stays the OR of
+; CapsWord, the nav layer, and the hardware toggle. Setting the LED directly
+; here would bypass that owner and let the LED desync from CapsWord/layer
+; intent (e.g. turning the LED off via SetCapsLockState("Off") while the nav
+; layer is still active).
 ToggleCapsLock() {
     global CapsWordEnabled := False
-    if GetKeyState("CapsLock", "T") {
-        SetCapsLockState("Off")
-    } else {
-        SetCapsLockState("On")
-    }
+    SetCapsLockState(GetKeyState("CapsLock", "T") ? "Off" : "On")
+    UpdateCapsLockLED()
 }

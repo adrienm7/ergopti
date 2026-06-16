@@ -355,19 +355,13 @@ TOML_BatchWrite(Path, Updates) {
     return true
 }
 
-; Reformat a TOML file using the centralized Python formatter (format_toml.py).
-; Ensures consistent === headers ===, sorted sections and keys across all config files.
-; Mirrors the pattern used by toml_writer.lua on the Hammerspoon side.
-TOML_FormatViaScript(Path) {
-    RepoRoot := RegExReplace(A_ScriptDir, "\\?static\\drivers\\autohotkey$", "") . "\"
-    FormatScript := RepoRoot . "tools\format_toml.py"
-    if FileExist(FormatScript)
-        RunWait(Format('python "{}" "{}"', FormatScript, Path), , "Hide")
-}
-
-; Enforce a strict schema on the unified driver config: after any successful
-; TOML write targeting ConfigurationFile, rebuild the file from the in-memory
-; state via SaveFullConfig so stale sections/keys are dropped.
+; Re-canonicalize the unified driver config: after any successful TOML write
+; targeting ConfigurationFile, re-serialize via SaveFullConfig so the on-disk
+; layout (section order, sorted keys, spacing) is normalized.
+; NOTE: this is a read-modify-MERGE, not a from-scratch rebuild. Sections and
+; keys that SaveFullConfig does not re-collect are PRESERVED — the parse cache
+; feeds their previous values back into TOML_BatchWrite. Do not rely on this
+; step to remove stale keys; it normalizes formatting only.
 TOML_RunStrictCanonicalization(Path) {
     global _TOML_STRICT_CANON_IN_PROGRESS, ConfigurationFile, _SaveFullConfigReady
 
@@ -509,7 +503,11 @@ ReadPathsToml(FilePath) {
         }
     }
 
-    loop parse, FileRead(FilePath), "`n", "`r" {
+    ; Read as UTF-8 to match the writer (FileOpen(..., "UTF-8")) and every other
+    ; reader in this unit. A BOM-less paths.toml hand-saved as UTF-8 would otherwise
+    ; be decoded with the system codepage, turning a non-ASCII ConfigDirPath
+    ; (accented Windows home dir) into mojibake and silently losing the user's config.
+    loop parse, FileRead(FilePath, "UTF-8"), "`n", "`r" {
         Line := Trim(A_LoopField, " `t")
         if (Line == "" or SubStr(Line, 1, 1) == "#") {
             continue

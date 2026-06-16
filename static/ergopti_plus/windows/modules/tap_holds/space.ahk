@@ -148,9 +148,13 @@ _SpaceHoldAlt(captured) {
 }
 
 _SpaceHoldAltGr(captured) {
+    ; RAlt is pressed once at the top and released once below — a balanced
+    ; Down/Up pair. The captured char is sent while RAlt is already held, so
+    ; it must NOT re-press the modifier (re-pressing left RAlt logically held
+    ; after the single Up, leaking AltGr onto the next keystrokes).
     SendInput("{RAlt Down}")
     if (captured != "" and captured != " ")
-        SendInput("{RAlt Down}" . captured)
+        SendInput(captured)
     KeyWait("SC039", "U T2")
     SendInput("{RAlt Up}")
 }

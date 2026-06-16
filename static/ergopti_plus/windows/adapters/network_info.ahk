@@ -44,6 +44,16 @@ global NI_WLAN_INTF_OPCODE_CURRENT_CONNECTION := 7
 ; Win32 ERROR_SUCCESS
 global NI_ERROR_SUCCESS                       := 0
 
+; DOT11_SSID field offsets inside WLAN_CONNECTION_ATTRIBUTES (64-bit layout)
+global NI_WLAN_OFFSET_SSID_LEN                := 520  ; uSSIDLength (UInt)
+global NI_WLAN_OFFSET_SSID_DATA               := 524  ; ucSSID octet buffer
+global NI_WLAN_OFFSET_SIGNAL_QUALITY          := 576  ; wlanSignalQuality (UInt)
+; Maximum DOT11_SSID payload — ucSSID is a fixed 32-octet buffer
+global NI_WLAN_MAX_SSID_LEN                   := 32
+; Smallest cbData that can still hold the signal-quality field at +576 (4 bytes).
+; Guards against a truncated WlanQueryInterface result before NumGet'ing +576.
+global NI_WLAN_MIN_CONN_ATTR_SIZE             := 580
+
 ; IP_ADAPTER_ADDRESSES offsets on 64-bit Windows (v1 base structure)
 global NI_ADAPTER_OFFSET_OPER_STATUS          := 56   ; IF_OPER_STATUS field
 global NI_ADAPTER_OFFSET_FRIENDLY_NAME        := 64   ; PWCHAR FriendlyName
@@ -75,8 +85,28 @@ global NI_VPN_NAME_HINTS := [
 ; ===========================================================
 ; ===========================================================
 
+; Builds a stable, encoding-independent hash input from the raw DOT11_SSID
+; octets. 802.11 SSIDs are opaque octet strings — decoding them as UTF-8 is a
+; heuristic that mojibakes non-UTF-8 access points, yielding an unstable hash
+; that fails to identify the same physical network across polls. We instead
+; serialise the exact octets as a fixed two-hex-digits-per-byte string so the
+; digest is a deterministic function of the true network identifier regardless
+; of its byte encoding.
+;
+; @param pBytes Pointer to the first SSID octet (caller passes pData + offset).
+; @param len    Number of valid SSID octets (uSSIDLength, already bounds-checked).
+; @returns A lowercase hex string of exactly len*2 characters.
+_NI_SsidOctetsToHashInput(pBytes, len) {
+    out := ""
+    Loop len
+        out .= Format("{:02x}", NumGet(pBytes, A_Index - 1, "UChar"))
+    return out
+}
+
+
 ; Queries wlanapi.dll for the first connected Wi-Fi interface. Returns a Map
-; with "ssid" (string) and "signal_pct" (integer 0-100) on success, or an
+; with "ssid" (an encoding-independent hex serialisation of the raw SSID octets,
+; suitable for hashing) and "signal_pct" (integer 0-100) on success, or an
 ; empty Map when no Wi-Fi adapter is connected or the API is unavailable.
 ;
 ; Why native wlanapi rather than netsh: WScript.Shell.Exec spawns a visible
@@ -132,18 +162,24 @@ _NI_QueryWlan() {
             "Ptr*",  &pData,
             "UInt*", &valueType,
             "UInt")
-        if (rc = NI_ERROR_SUCCESS and pData) {
-            ssid_len := NumGet(pData, 520, "UInt")
-            if (ssid_len > 0 and ssid_len <= 32) {
-                ssid       := StrGet(pData + 524, ssid_len, "UTF-8")
-                signal_pct := NumGet(pData, 576, "UInt")
+        ; Bounds check: WlanQueryInterface must have returned a buffer large
+        ; enough to hold the signal-quality field at +576; a truncated result
+        ; would make the +576 NumGet read past the allocation.
+        if (rc = NI_ERROR_SUCCESS and pData and cbData >= NI_WLAN_MIN_CONN_ATTR_SIZE) {
+            ssid_len := NumGet(pData, NI_WLAN_OFFSET_SSID_LEN, "UInt")
+            if (ssid_len > 0 and ssid_len <= NI_WLAN_MAX_SSID_LEN) {
+                ; Hash the raw octets (not a UTF-8 re-decode) so the digest is
+                ; stable for non-UTF-8 SSIDs — see _NI_SsidOctetsToHashInput.
+                ssid       := _NI_SsidOctetsToHashInput(pData + NI_WLAN_OFFSET_SSID_DATA, ssid_len)
+                signal_pct := NumGet(pData, NI_WLAN_OFFSET_SIGNAL_QUALITY, "UInt")
                 if (signal_pct > 100)
                     signal_pct := 100
                 result["ssid"]       := ssid
                 result["signal_pct"] := signal_pct
             }
-            DllCall("Wlanapi\WlanFreeMemory", "Ptr", pData)
         }
+        if (rc = NI_ERROR_SUCCESS and pData)
+            DllCall("Wlanapi\WlanFreeMemory", "Ptr", pData)
         if (result.Count > 0)
             break
     }
@@ -244,6 +280,10 @@ NI_IsVpnActive() {
             }
             p := NumGet(p, NI_ADAPTER_OFFSET_NEXT, "Ptr")
         }
+        ; No matching VPN adapter found. Return a genuine boolean false rather
+        ; than falling off the end (an AHK v2 function with no return yields "",
+        ; violating the NetworkInfo.spec.js boolean contract on the common path).
+        return false
     } catch {
         return false
     }

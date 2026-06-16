@@ -97,9 +97,15 @@ SC038:: {
 
 	TextPressKey("LAlt", "Up")
 	OneShotShift()
+	; Arm LShift for the hold, then release it in a finally so it can NEVER latch.
+	; The wait is capped (U T<timeout>) so a lost SC038 key-up (focus stolen by a
+	; UAC prompt, Suspend toggled mid-press) cannot block the release forever.
 	TextPressKey("LShift", "Down")
-	KeyWait("SC038")
-	TextPressKey("LShift", "Up")
+	try {
+		KeyWait("SC038", "U T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC)
+	} finally {
+		TextPressKey("LShift", "Up")
+	}
 }
 #HotIf
 
@@ -122,8 +128,8 @@ SC038::
 
 	Now := A_TickCount
 	CharacterSentTime := LastSentCharacterKeyTime.Has("LAlt") ? LastSentCharacterKeyTime["LAlt"] : Now
-	tap := (Now - CharacterSentTime <= TapHoldDuration(TapHold, "left_alt") * 1000)
-	if tap {
+	tap := ((Now - CharacterSentTime) <= TapHoldDuration(TapHold, "left_alt") * 1000)
+	if (tap and (Now - CharacterSentTime) >= TapMinDurationMs()) { ; TapMinDurationMs floor suppresses spurious taps when LAlt is brushed mid-roll
 		LLM_Tooltip_FireTabOrAccept("")
 	}
 }
@@ -290,8 +296,8 @@ $SC038:: {
 
 	Now := A_TickCount
 	CharacterSentTime := LastSentCharacterKeyTime.Has("LAlt") ? LastSentCharacterKeyTime["LAlt"] : Now
-	tap := (Now - CharacterSentTime <= TapHoldDuration(TapHold, "left_alt") * 1000)
-	if (tap and A_PriorKey == "LAlt") {
+	tap := ((Now - CharacterSentTime) <= TapHoldDuration(TapHold, "left_alt") * 1000)
+	if (tap and (Now - CharacterSentTime) >= TapMinDurationMs() and A_PriorKey == "LAlt") { ; TapMinDurationMs floor suppresses spurious taps when LAlt is brushed mid-roll
 		_LAltDispatch()
 	}
 }

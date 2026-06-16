@@ -36,6 +36,20 @@ global TEXT_CLIPBOARD_THRESHOLD := 1000
 ; Long enough for the receiving application to process Ctrl+V before we overwrite.
 global TEXT_CLIPBOARD_RESTORE_DELAY_MS := 150
 
+; Maximum time (seconds) to wait for CB_Write to settle on the clipboard before
+; pasting. Small and finite so the deferred worker never stalls perceptibly: most
+; apps fill the clipboard in <100 ms, and on timeout we bail loudly rather than
+; pasting stale content (fail-fast, project rule 5.3). A full second here would
+; have starved the keyboard hook when the wait ran on the input-gating thread —
+; the whole round-trip now runs on a one-shot timer off that thread.
+global TEXT_CLIPBOARD_WAIT_TIMEOUT_SEC := 0.2
+
+; Monotonic counter bumped on every clipboard-mode TextSend. Each deferred restore
+; captures the value current at its scheduling and no-ops if a later injection has
+; advanced the counter — this serialises overlapping save/restore windows so a
+; stale restore can never clobber a clipboard a newer injection just wrote.
+global _TEXT_CLIPBOARD_GENERATION := 0
+
 ; Injectable send primitives — point at the real AHK built-ins by default.
 ; The test runner replaces these globals with no-op lambdas so no keystroke
 ; ever reaches the OS during a dry run (mirrors the _SendHook pattern).
@@ -107,7 +121,7 @@ _TextSenderModifierString(ModStr) {
 ; @param Opts     {Map|0}    { mode?: "direct"|"clipboard"|"auto" }
 ; @param Callback {Func|0}   Called with no arguments on completion.
 TextSend(Text, Opts, Callback) {
-	global TEXT_CLIPBOARD_THRESHOLD, TEXT_CLIPBOARD_RESTORE_DELAY_MS
+	global TEXT_CLIPBOARD_THRESHOLD
 	Mode := "auto"
 	if (Opts is Map) and Opts.Has("mode") and Opts["mode"] != ""
 		Mode := Opts["mode"]
@@ -117,17 +131,11 @@ TextSend(Text, Opts, Callback) {
 		Mode := StrLen(Text) > TEXT_CLIPBOARD_THRESHOLD ? "clipboard" : "direct"
 
 	if Mode = "clipboard" {
-		; CB_SaveAll uses ClipboardAll() so non-text content (images, files, RTF)
-		; survives the paste cycle — CB_Save()/CB_Restore() are text-only and would
-		; silently destroy any non-text clipboard data the user holds.
-		Saved := CB_SaveAll()
-		CB_Write(Text)
-		ClipWait(1)
-		_AHK_SendInput.Call("^v")
-		; Restore after a short delay so the paste completes before we overwrite.
-		; Capture Saved in the closure so the timer lambda is self-contained.
-		SavedForTimer := Saved
-		SetTimer(() => CB_RestoreAll(SavedForTimer), -TEXT_CLIPBOARD_RESTORE_DELAY_MS)
+		; The clipboard round-trip (write + blocking ClipWait + paste) is deferred
+		; onto a one-shot timer so it NEVER runs on the input-gating keyboard thread.
+		; Blocking there on ClipWait would starve the low-level hook and drop the
+		; user's next keystrokes; running it off-thread lets the hotkey return at once.
+		SetTimer(() => _TextSendClipboard(Text), -1)
 	} else {
 		; SendText uses the "Text" mode that bypasses hotkey triggers and sends
 		; Unicode characters as raw keystrokes — the safest injection path.
@@ -136,6 +144,57 @@ TextSend(Text, Opts, Callback) {
 
 	if Callback != 0
 		try Callback()
+}
+
+; Performs the clipboard save / write / wait / paste / restore round-trip.
+; Runs on a one-shot timer (off the keyboard thread) so the blocking ClipWait
+; cannot starve the low-level keyboard hook. Bails loudly without pasting if the
+; clipboard never settles, and guards the restore with a generation counter so a
+; later injection's clipboard is never clobbered by this call's stale restore.
+; @param Text {String} The Unicode text to inject via clipboard paste.
+_TextSendClipboard(Text) {
+	global TEXT_CLIPBOARD_RESTORE_DELAY_MS, TEXT_CLIPBOARD_WAIT_TIMEOUT_SEC, _TEXT_CLIPBOARD_GENERATION
+
+	; Claim this injection's slot. The restore closure below compares against this
+	; snapshot and no-ops if a newer clipboard-mode TextSend has since taken over.
+	_TEXT_CLIPBOARD_GENERATION += 1
+	Generation := _TEXT_CLIPBOARD_GENERATION
+
+	; CB_SaveAll uses ClipboardAll() so non-text content (images, files, RTF)
+	; survives the paste cycle — CB_Save()/CB_Restore() are text-only and would
+	; silently destroy any non-text clipboard data the user holds.
+	Saved := CB_SaveAll()
+	CB_Write(Text)
+
+	; Wait for the clipboard to actually hold our text before pasting. On timeout
+	; we MUST NOT paste — Ctrl+V would inject the previous clipboard content. Bail
+	; loudly and restore the saved snapshot instead of pasting blindly.
+	if !ClipWait(TEXT_CLIPBOARD_WAIT_TIMEOUT_SEC) {
+		LoggerError("TextSender", "TextSend: clipboard did not settle within {1}s - skipping paste to avoid injecting stale content.", TEXT_CLIPBOARD_WAIT_TIMEOUT_SEC)
+		CB_RestoreAll(Saved)
+		return
+	}
+
+	_AHK_SendInput.Call("^v")
+
+	; Restore after a short delay so the paste completes before we overwrite.
+	; The closure no-ops if a newer injection advanced the generation counter,
+	; so two rapid clipboard sends never let an earlier restore clobber the later.
+	SavedForTimer := Saved
+	GenerationForTimer := Generation
+	SetTimer(() => _TextSendRestoreClipboard(SavedForTimer, GenerationForTimer), -TEXT_CLIPBOARD_RESTORE_DELAY_MS)
+}
+
+; Restores a clipboard snapshot taken by _TextSendClipboard, but only if no newer
+; clipboard-mode injection has started since. Serialises overlapping restores so a
+; stale restore can never overwrite a clipboard a later injection just populated.
+; @param Saved      {ClipboardAll|String} Snapshot returned by CB_SaveAll().
+; @param Generation {Integer}             Counter value captured at scheduling.
+_TextSendRestoreClipboard(Saved, Generation) {
+	global _TEXT_CLIPBOARD_GENERATION
+	if (Generation != _TEXT_CLIPBOARD_GENERATION)
+		return
+	CB_RestoreAll(Saved)
 }
 
 ; Emits Count Backspace keystrokes synchronously.

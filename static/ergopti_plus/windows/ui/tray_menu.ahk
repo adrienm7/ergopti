@@ -1204,6 +1204,14 @@ global _PersonalExtTree := Map()
 global _ExtTotalPersonalCounterGlobal := { value: 0 }
 global _HS_PreScanPersonalCacheLoaded := false
 
+; Hard cap on how deep the recursive ext-toml scan descends. The scanned tree is
+; a user-writable folder, so a directory junction/symlink pointing at an ancestor
+; would make a naive recursion loop forever — AHK has no tail-call optimisation,
+; so that ends in a fatal stack-overflow-class error that takes down the (often
+; deferred, Critical) menu build. 16 levels is far deeper than any real personal
+; hotstrings layout; past it we stop descending and warn.
+global _HS_SCAN_MAX_DEPTH := 16
+
 ; Pre-scans the personal hotstrings directory to build the tree and sum counts
 ; so they are available for menu labels and the grand total at build time.
 _HS_PreScanPersonal() {
@@ -1221,12 +1229,28 @@ _HS_PreScanPersonal() {
 	if !DirExist(HsDir)
 		return
 
-	_HS_ScanExt(CurrentDir, PathParts) {
+	; ``Depth`` caps descent and ``Visited`` is a set of canonical (lowercased)
+	; absolute directory paths already entered — together they guarantee the walk
+	; terminates even on a junction/symlink cycle in the user's folder.
+	_HS_ScanExt(CurrentDir, PathParts, Depth, Visited) {
+		global _HS_SCAN_MAX_DEPTH
+		if (Depth > _HS_SCAN_MAX_DEPTH) {
+			try LoggerWarn("Hotstrings", "Personal ext scan hit max depth {1} at '{2}' — not descending further (directory cycle?).", _HS_SCAN_MAX_DEPTH, CurrentDir)
+			return
+		}
+		; Canonicalise so two spellings of the same directory collapse to one key;
+		; a re-visit means we are inside a cycle and must stop.
+		Canonical := StrLower(RegExReplace(CurrentDir, "[/\\]+$"))
+		if Visited.Has(Canonical) {
+			try LoggerWarn("Hotstrings", "Personal ext scan revisited '{1}' — skipping to break a directory cycle.", CurrentDir)
+			return
+		}
+		Visited[Canonical] := true
 		Loop Files CurrentDir . "\*", "DF" {
 			if (A_LoopFileAttrib ~= "D") {
 				NewParts := PathParts.Clone()
 				NewParts.Push(A_LoopFileName)
-				_HS_ScanExt(A_LoopFileFullPath, NewParts)
+				_HS_ScanExt(A_LoopFileFullPath, NewParts, Depth + 1, Visited)
 			} else if (A_LoopFileName ~= "i)\.toml$") {
 				if (PathParts.Length == 0 and A_LoopFileName == "personal_hotstrings.toml")
 					continue
@@ -1241,7 +1265,15 @@ _HS_PreScanPersonal() {
 			}
 		}
 	}
-	_HS_ScanExt(RegExReplace(HsDir, "[/\\]+$"), [])
+	; Wrap the whole walk: a runaway/failed scan must degrade to "no extension
+	; hotstrings" rather than crash the (often deferred, Critical) menu build.
+	try {
+		_HS_ScanExt(RegExReplace(HsDir, "[/\\]+$"), [], 1, Map())
+	} catch as Err {
+		try LoggerError("Hotstrings", "Personal ext scan failed ({1}) — degrading to no extension hotstrings.", Err.Message)
+		_PersonalExtTree := Map()
+		_ExtTotalPersonalCounterGlobal.value := 0
+	}
 	_HS_PreScanPersonalCacheLoaded := true
 }
 
@@ -2013,10 +2045,26 @@ _SC_Extensions(SubMenu, _Cat) {
 		ExtMenu   := Menu()
 		BuilderFn := "BuildExtMenu_" . StrReplace(ExtId, "-", "_")
 		if IsSet(%BuilderFn%) and HasMethod(%BuilderFn%) {
+			BuildFailed := false
 			try {
 				%BuilderFn%(ExtMenu, ExtName)
 			} catch as Err {
-				LoggerWarn("Extensions", "BuildExtMenu for '{1}' threw: {2}.", ExtId, Err.Message)
+				; A broken bundled extension is user-actionable, so fail LOUD:
+				; ERROR (not a Warn the user never reads) plus a visible disabled
+				; row in the submenu so a crashed builder is not indistinguishable
+				; from an absent one.
+				LoggerError("Extensions", "BuildExtMenu for '{1}' threw: {2}.", ExtId, Err.Message)
+				BuildFailed := true
+			}
+			; Even a builder that returns without throwing may have populated
+			; nothing (bad TOML, missing global) — an empty submenu is just as
+			; opaque, so surface the same marker.
+			if (BuildFailed or _ExtMenuItemCount(ExtMenu) == 0) {
+				if !BuildFailed
+					LoggerError("Extensions", "BuildExtMenu for '{1}' added no items — extension menu is empty.", ExtId)
+				ErrLabel := t("common.error_prefix") . ExtId
+				ExtMenu.Add(ErrLabel, (*) => NoAction())
+				ExtMenu.Disable(ErrLabel)
 			}
 		} else {
 			LoggerWarn("Extensions", "No BuildExtMenu_{1} function found — menu.ahk not loaded?", StrReplace(ExtId, "-", "_"))
@@ -2026,6 +2074,19 @@ _SC_Extensions(SubMenu, _Cat) {
 		}
 		SubMenu.Add(ExtName, ExtMenu)
 	}
+}
+
+; Returns how many items a Menu currently holds, via its native HMENU. Used to
+; tell a builder that populated nothing from one that succeeded. Returns 0 if the
+; handle is unavailable so the caller treats an inaccessible menu as empty (and
+; thus shows the error marker) rather than silently passing it through.
+_ExtMenuItemCount(MenuObj) {
+	try {
+		HMENU := MenuObj.Handle
+		if (HMENU)
+			return DllCall("GetMenuItemCount", "ptr", HMENU, "int")
+	}
+	return 0
 }
 
 ; Dynamic handler: edit personal shortcuts action button.
@@ -2818,6 +2879,11 @@ RebuildHotstringsLive() {
 ; state-changing toggles (layout, tap-holds, shortcuts) still call Reload().
 RebuildTrayMenu() {
 	global SubMenus
+	; Clear the dispatch bypass Maps BEFORE deleting + repopulating the menu.
+	; AHK reuses freed menu-item IDs after Menu.Delete(); a stale entry left in
+	; the Maps could bind a reused ID to a different item's callback and fire
+	; the WRONG action on a dropped-click retry (see menu_dispatcher.ahk).
+	MenuDispatcher_Reset()
 	A_TrayMenu.Delete()
 	SubMenus := Map()
 	InitSubMenus()

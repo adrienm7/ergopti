@@ -1,0 +1,94 @@
+﻿; tests/meta/test_remap_emit_critical_uneven.ahk
+
+; ==============================================================================
+; MODULE: Layout Emit Serialization Meta Test
+; DESCRIPTION:
+; Static source guard for finding "remap-emit-critical-uneven".
+;
+; SendMode is "Event" (globally interruptible). _RemapEmit wraps its SendEvent in
+; Critical("On") so remapped letters cannot interleave in the single OS input
+; queue, but the digit-row and shifted-symbol emitters were left NON-Critical.
+; A digit handler firing between two remapped letters could start its SendEvent
+; while a letter's SendEvent was still draining, re-introducing the exact
+; out-of-order emission Critical was added to prevent - only with the digit as
+; the unprotected boundary.
+;
+; The fix routes the digit-row down/up emits (_DigitRowDown / _DigitRowUp) and
+; the shifted-symbol emit (_DigitShiftSend) through the SAME Critical("On")
+; contract as _RemapEmit. This is a meta-static test because layout.ahk
+; registers top-level hotkeys and cannot be #Included by the headless runner;
+; it scans source text so a new non-serialised emitter fails the suite.
+; ==============================================================================
+
+#Requires AutoHotkey v2.0
+
+
+
+
+
+; ======================================
+; ======================================
+; ======= 1/ Source scan helpers =======
+; ======================================
+; ======================================
+
+_RECU_ReadSource(RelPath) {
+	SplitPath(A_ScriptDir, , &Root)
+	Path := StrReplace(Root, "\", "/") . "/" . RelPath
+	return FileRead(Path)
+}
+
+_RECU_FuncBody(Src, FuncDef) {
+	Idx := InStr(Src, FuncDef)
+	if !Idx
+		return ""
+	Rest := SubStr(Src, Idx)
+	End := InStr(Rest, "`n}")
+	if End
+		return SubStr(Rest, 1, End + 1)
+	return Rest
+}
+
+; Asserts the function FuncDef exists in Src and its body wraps the emit in
+; Critical("On") - the shared atomicity contract.
+_RECU_AssertEmitterIsCritical(Src, FuncDef) {
+	Body := _RECU_FuncBody(Src, FuncDef)
+	Assert(Body != "", FuncDef . " must exist in layout.ahk (remap-emit-critical-uneven)")
+	Assert(InStr(Body, "Critical(") > 0,
+		FuncDef . " must serialise its SendEvent with Critical so it cannot interleave with a remapped letter's emit (remap-emit-critical-uneven)")
+}
+
+
+
+
+
+; ====================================================
+; ====================================================
+; ======= 2/ Critical-serialization assertions =======
+; ====================================================
+; ====================================================
+
+_RECU_AssertDigitRowEmittersCritical() {
+	Src := _RECU_ReadSource("modules/layout.ahk")
+	_RECU_AssertEmitterIsCritical(Src, "_DigitRowDown(Digit, *) {")
+	_RECU_AssertEmitterIsCritical(Src, "_DigitRowUp(Digit, *) {")
+}
+Test("layout: digit-row emitters are Critical-serialised (remap-emit-critical-uneven)", _RECU_AssertDigitRowEmittersCritical)
+
+_RECU_AssertShiftSymbolEmitterCritical() {
+	Src := _RECU_ReadSource("modules/layout.ahk")
+	_RECU_AssertEmitterIsCritical(Src, "_DigitShiftSend(Symbol, *) {")
+}
+Test("layout: shifted-symbol emitter is Critical-serialised (remap-emit-critical-uneven)", _RECU_AssertShiftSymbolEmitterCritical)
+
+_RECU_AssertNumberRowRoutesThroughHelpers() {
+	Src := _RECU_ReadSource("modules/layout.ahk")
+	; The inline number-row hotkeys must delegate to the serialised helpers
+	; rather than calling SendEvent("{1 Down}") directly (the old non-Critical
+	; path). A regression that inlines a bare SendEvent again drops this token.
+	Assert(InStr(Src, "_DigitRowDown(") > 0,
+		"the number-row hotkeys must delegate to _DigitRowDown so the emit is Critical-serialised (remap-emit-critical-uneven)")
+	Assert(InStr(Src, "_DigitRowUp(") > 0,
+		"the number-row hotkeys must delegate to _DigitRowUp so the emit is Critical-serialised (remap-emit-critical-uneven)")
+}
+Test("layout: number-row hotkeys delegate to the serialised emit helpers (remap-emit-critical-uneven)", _RECU_AssertNumberRowRoutesThroughHelpers)

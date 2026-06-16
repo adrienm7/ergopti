@@ -42,7 +42,12 @@ if Features["shortcuts"]["paste_without_formatting"] {
 
     PasteWithoutFormatting(*) {
         if not WinActive("ahk_exe EXCEL.EXE") {
-            A_Clipboard := A_Clipboard
+            ; Strip rich formatting only when the clipboard holds text. CB_Read()
+            ; returns "" for non-text payloads (image/file list); the self-assign
+            ; round-trip on those would destroy them, so we skip the strip and
+            ; paste the content as-is instead.
+            if CB_Read() != ""
+                A_Clipboard := A_Clipboard
             SendFinalResult("^v")
         } else {
             SendFinalResult("^+v")

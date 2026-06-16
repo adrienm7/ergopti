@@ -83,6 +83,13 @@ _TooltipTimerFn() {
 _TooltipDequeuePollFn() {
     global _TooltipDequeueItems, _TooltipGeneration, _TooltipTimerGeneration
     global _TooltipDequeueActive
+    ; SetTimer callbacks BYPASS native Suspend (it only disarms hotkeys/hotstrings),
+    ; so this 100 ms poll can otherwise rebuild/reveal a tooltip while the driver is
+    ; paused — up to ~5 times inside the 500 ms _SuspendStateWatchdog gap when suspend
+    ; is toggled OUTSIDE ToggleSuspend. « pause = AHK éteint »: bail out and leave the
+    ; items untouched; they are re-evaluated on resume or torn down by the watchdog.
+    if A_IsSuspended
+        return
     static _PollCount := 0
     _PollCount += 1
     if (_TooltipDequeueItems == 0 or !IsObject(_TooltipDequeueItems))
@@ -454,6 +461,16 @@ TooltipShow(Items, DurationSec := 0) {
 ;   4. Defensive sweep through every tracked Hwnd in case a Gui.Destroy
 ;      silently failed earlier — DestroyWindow on a stale handle is a
 ;      harmless no-op so this is safe to run unconditionally.
+;
+; INVARIANT — MUST STAY NON-BLOCKING: the hotstring fire path reaches here under
+; the Critical held by _OnPrefixChar (via HSE_DispatchMatch -> _ResetPrefixBuffer
+; -> TooltipHide). Holding Critical across a Sleep/WinWait/ClipWait/MsgSleep would
+; yield the thread and freeze the low-level keyboard hook for that duration,
+; dropping keys typed right after an expansion. Every teardown step here is a
+; synchronous Win32 call (DllCall / Gui.Destroy / SetTimer), never a blocking
+; wait. Do NOT add a fade-out, animation await, or any blocking call: defer such
+; work onto a SetTimer instead. The meta test test_tooltip_hide_non_blocking.ahk
+; pins this by rejecting any blocking token inside this body.
 TooltipHide(DbgTag := "?", Force := false) {
     global _TooltipGui, _TooltipRowGuis, _TooltipBorderGui
     global _TooltipShownHwnds, _TooltipShownBorderHwnds
@@ -1128,9 +1145,15 @@ _TooltipShowBorder(X, Y, W, H, Reveal := true) {
     DllCall("User32\ReleaseDC", "Ptr", 0, "Ptr", ScreenDC)
 
     if (!HBmp or !MemDC) {
-        if HBmp DllCall("Gdi32\DeleteObject", "Ptr", HBmp)
-            if MemDC DllCall("Gdi32\DeleteDC", "Ptr", MemDC)
-                return
+        ; Release whichever handle DID succeed, then always bail. Without explicit
+        ; braces, AHK v2's single-line `if` would chain the DeleteDC and return under
+        ; the first `if HBmp`, so the surviving MemDC leaked and the function pressed
+        ; on with a null bitmap — a slow GDI-handle leak under object pressure.
+        if (HBmp)
+            DllCall("Gdi32\DeleteObject", "Ptr", HBmp)
+        if (MemDC)
+            DllCall("Gdi32\DeleteDC", "Ptr", MemDC)
+        return
     }
     OldBmp := DllCall("Gdi32\SelectObject", "Ptr", MemDC, "Ptr", HBmp, "Ptr")
 

@@ -412,6 +412,10 @@ if Features["shortcuts"]["title_case"] {
 
     ConvertToTitleCase(*) {
         Text := GetSelection()
+        ; No-op on an empty/failed capture: GetSelection returns "" on a ClipWait
+        ; timeout, and pasting "" would only clobber the clipboard with a stale paste.
+        if (Text = "")
+            return
 
         ; Pattern to detect if text is already in title case:
         ; Each word starts with an uppercase letter (including accented),
@@ -441,6 +445,10 @@ if Features["shortcuts"]["uppercase"] {
 
     ConvertToUppercase(*) {
         Text := GetSelection()
+        ; No-op on an empty/failed capture: GetSelection returns "" on a ClipWait
+        ; timeout, and pasting "" would only clobber the clipboard with a stale paste.
+        if (Text = "")
+            return
         ; Check if the selected text contains at least one lowercase letter
         if RegExMatch(Text, "[a-zà-ÿ]") {
             SendInstant(Format("{:U}", Text)) ; Convert to uppercase

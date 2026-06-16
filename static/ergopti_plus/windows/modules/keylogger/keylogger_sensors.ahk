@@ -195,4 +195,10 @@ KL_Sensors_Stop() {
 		try SetTimer(KLSensors.tick_fn, 0)
 		KLSensors.tick_fn := unset
 	}
+	; Statics survive Stop/Start for the AHK instance lifetime; invalidate the
+	; CPU baseline so the first tick after a re-Start re-establishes a fresh
+	; delta instead of straddling the off-period and emitting a bogus sample.
+	KLSensors.prev_idle   := -1
+	KLSensors.prev_kernel := -1
+	KLSensors.prev_user   := -1
 }

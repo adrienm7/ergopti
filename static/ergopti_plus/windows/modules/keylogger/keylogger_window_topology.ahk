@@ -69,6 +69,12 @@ class KLTopoConst {
     ; Debounce ticks — a change must persist this many consecutive ticks
     ; before we log it.
     static DEBOUNCE_TICKS      := 2
+
+    ; Virtual-desktop heuristic: minimum gap (ms) since the INCOMING window was
+    ; last seen as foreground before we call the focus change a probable desktop
+    ; switch rather than a fast Alt+Tab. Alt+Tab brings a window back almost
+    ; immediately, so a long unseen gap is the discriminator.
+    static DESKTOP_SWITCH_MIN_GAP_MS := 3000
 }
 
 
@@ -130,10 +136,15 @@ KL_Topo_Tick() {
         return
 
     ; Virtual desktop heuristic — new foreground hwnd that we've seen
-    ; recently but not as foreground for > 2 s (Alt+Tab brings it back
-    ; immediately; desktop switch takes longer)
+    ; recently but not as foreground for > DESKTOP_SWITCH_MIN_GAP_MS (Alt+Tab
+    ; brings it back immediately; a desktop switch takes longer). The reference
+    ; windows must be captured BEFORE seen_hwnds/prev_hwnd are overwritten:
+    ; the alive-check is on the OUTGOING window (prev_hwnd) and the gap is on
+    ; the INCOMING window (hwnd). Reading them after the writes below would mix
+    ; stale and fresh state and worsen the documented Alt+Tab false positives.
     if (hwnd != KLTopo.prev_hwnd and KLTopo.prev_hwnd != 0) {
-        KL_Topo_CheckVirtualDesktop(hwnd)
+        incoming_last_seen := KLTopo.seen_hwnds.Has(hwnd) ? KLTopo.seen_hwnds[hwnd] : 0
+        KL_Topo_CheckVirtualDesktop(KLTopo.prev_hwnd, incoming_last_seen)
     }
     KLTopo.prev_hwnd := hwnd
     KLTopo.seen_hwnds[hwnd] := A_TickCount
@@ -242,25 +253,35 @@ KL_Topo_LogEvent(kind, data) {
     KL_AppendLog(e)
 }
 
-KL_Topo_CheckVirtualDesktop(new_hwnd) {
-    ; If the previous hwnd is still alive (not destroyed) but we switched
-    ; to a different one, it is likely a virtual desktop switch.
+; Emits a virtual_desktop_switch event when the focus change looks like a
+; desktop switch rather than a fast Alt+Tab. The alive-check is on the OUTGOING
+; window (outgoing_hwnd) and the gap is computed on the INCOMING window via
+; incoming_last_seen, both captured by the caller before module state is mutated.
+KL_Topo_CheckVirtualDesktop(outgoing_hwnd, incoming_last_seen) {
+    ; If the previous (outgoing) hwnd is still alive (not destroyed) but we
+    ; switched to a different one, it may be a virtual desktop switch.
     try {
-        if WinExist("ahk_id " . KLTopo.prev_hwnd) {
-            ; Seen before and still alive → plausible desktop switch
-            last_seen := KLTopo.seen_hwnds.Has(new_hwnd)
-                ? KLTopo.seen_hwnds[new_hwnd] : 0
-            gap := A_TickCount - last_seen
-            ; If we haven't seen this hwnd in > 3 s it's more likely a
-            ; desktop switch than a fast Alt+Tab
-            if (gap > 3000 or last_seen = 0) {
-                KL_AppendLog(Map(
-                    "type", "virtual_desktop_switch",
-                    "app",  Keylogger.session_app
-                ))
-            }
+        prev_alive := WinExist("ahk_id " . outgoing_hwnd) != 0
+        if KL_Topo_IsLikelyDesktopSwitch(prev_alive, incoming_last_seen, A_TickCount) {
+            KL_AppendLog(Map(
+                "type", "virtual_desktop_switch",
+                "app",  Keylogger.session_app
+            ))
         }
     }
+}
+
+; Pure decision for the virtual-desktop heuristic — no OS calls, no shared
+; state, so it is unit-testable in isolation. Returns true only when the
+; OUTGOING window is still alive AND the INCOMING window was either never seen
+; or last seen longer than DESKTOP_SWITCH_MIN_GAP_MS ago. A recent re-visit
+; (small gap) is treated as a plain Alt+Tab and returns false.
+KL_Topo_IsLikelyDesktopSwitch(prev_alive, incoming_last_seen, now) {
+    if !prev_alive
+        return false
+    if (incoming_last_seen = 0)
+        return true
+    return (now - incoming_last_seen) > KLTopoConst.DESKTOP_SWITCH_MIN_GAP_MS
 }
 
 
