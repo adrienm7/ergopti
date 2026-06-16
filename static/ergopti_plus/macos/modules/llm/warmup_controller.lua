@@ -115,6 +115,12 @@ function M.schedule_warmup_with_retry(reason)
 			Logger.debug(LOG, "[WARMUP-LOOP] Backend ready — stopping retry chain.")
 			return
 		end
+		-- A failed load is a permanent terminal state; retrying would be pointless
+		-- and would produce an infinite timer chain that never resolves
+		if _core_llm.is_backend_load_failed and _core_llm.is_backend_load_failed() then
+			Logger.debug(LOG, "[WARMUP-LOOP] Backend load failed — stopping retry chain.")
+			return
+		end
 		local current = _core_llm.get_current_model()
 		-- Compute next interval before the attempt so it is available in all branches.
 		local next_interval = math.min(current_interval * 2, WARMUP_RETRY_CAP_SEC)
