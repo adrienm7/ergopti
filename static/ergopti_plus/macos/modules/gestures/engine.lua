@@ -837,7 +837,7 @@ function M.init(core_state, actions_mod)
 		Logger.error(LOG, "M.init(): core_state must be a table — module non-functional.")
 		return
 	end
-	Logger.debug(LOG, "Initializing gestures engine dependencies…")
+	Logger.start(LOG, "Initializing gestures engine dependencies…")
 	_state   = core_state
 	_actions = actions_mod
 	
@@ -854,7 +854,7 @@ function M.init(core_state, actions_mod)
 		end
 	end
 	
-	Logger.info(LOG, "Gestures engine dependencies initialized.")
+	Logger.success(LOG, "Gestures engine dependencies initialized.")
 end
 
 --- Registers a callback fired on every frame where at least one finger touches
