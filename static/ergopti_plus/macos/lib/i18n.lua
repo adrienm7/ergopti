@@ -193,6 +193,22 @@ function M.set_locale(code)
 	end)
 end
 
+--- Persists the locale to the settings store WITHOUT changing the in-memory
+--- locale or scheduling a reload. The onboarding wizard needs this: it performs
+--- its OWN single reload after writing config.toml, and set_locale()'s debounced
+--- reload would race that. After the reload, M.init() reads this persisted value,
+--- so the user's chosen language actually survives the wizard (set_locale_no_reload
+--- only touches memory, which the reload discards).
+--- @param code string A known locale code.
+function M.persist_locale(code)
+	if not is_known(code) then
+		Logger.warn(LOG, "persist_locale: unknown locale '%s' — ignoring.", code)
+		return
+	end
+	hs.settings.set(SETTINGS_KEY, code)
+	Logger.debug(LOG, "Locale '%s' persisted to settings (no reload).", code)
+end
+
 --- Changes the active locale in memory only, without triggering a reload.
 --- Used by the onboarding wizard so subsequent steps render in the new locale
 --- without restarting the script mid-wizard.

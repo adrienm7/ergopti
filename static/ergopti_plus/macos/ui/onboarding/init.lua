@@ -262,6 +262,24 @@ local function to_bool(value)
 	return (value == true or value == "true") and "true" or "false"
 end
 
+--- Builds the config.toml update list from the wizard answers, using the CANONICAL
+--- HS config schema (ui/menu/preferences.lua KEY_MAP) — lowercase sections, clean
+--- ``enabled`` flags. Pure (no I/O) so the schema is unit-testable: a regression
+--- to AHK-style keys (which the macOS loader ignores, silently dropping every
+--- wizard choice) is caught by tests/unit/ui/test_onboarding_config_schema.lua.
+--- @param answers table The wizard answers (use_ergopti, magic_key, use_metrics, use_gestures).
+--- @return table Array of { section, key, value } updates for toml_writer.batch_write.
+function M._build_config_updates(answers)
+	answers = type(answers) == "table" and answers or {}
+	return {
+		-- use_ergopti = "use the Ergopti hotstring engine" → [hotstrings].enabled.
+		{ section = "hotstrings", key = "enabled",      value = to_bool(answers.use_ergopti)  },
+		{ section = "hotstrings", key = "trigger_char", value = answers.magic_key or "★"       },
+		{ section = "metrics",    key = "enabled",      value = to_bool(answers.use_metrics)   },
+		{ section = "gestures",   key = "enabled",      value = to_bool(answers.use_gestures)  },
+	}
+end
+
 --- Closes the webview cleanly.
 local function close_webview()
 	if _webview then
@@ -292,18 +310,18 @@ local function commit(answers)
 	end
 
 	local locale = type(answers.locale) == "string" and answers.locale ~= "" and answers.locale or "en"
-	local updates = {
-		{ section = "Script",    key = "Locale",          value = locale                            },
-		{ section = "Layout",    key = "ErgoptiBase",     value = to_bool(answers.use_ergopti)      },
-		{ section = "Layout",    key = "ErgoptiAltGr",    value = to_bool(answers.use_ergopti)      },
-		{ section = "Layout",    key = "ErgoptiPlus",     value = to_bool(answers.use_ergopti)      },
-		{ section = "Hotstrings", key = "MagicKey",       value = answers.magic_key or "*"          },
-		{ section = "Metrics",   key = "metrics_enabled", value = to_bool(answers.use_metrics)      },
-		{ section = "Gestures",  key = "Enabled",         value = to_bool(answers.use_gestures)     },
-	}
+	-- Build the updates with the CANONICAL HS schema (see M._build_config_updates).
+	-- The wizard previously wrote AHK-style keys the macOS loader never reads, so
+	-- every choice was silently dropped on the post-wizard reload — the
+	-- "metrics + gestures not active after the wizard" bug. Locale is persisted
+	-- separately (hs.settings), not via config.toml, so it is handled below.
+	local updates = M._build_config_updates(answers)
 
-	-- Switch to the chosen locale before writing so success messages are translated
+	-- Switch to the chosen locale before writing so success messages are translated,
+	-- AND persist it to hs.settings so it survives the reload below (the in-memory
+	-- set_locale_no_reload alone is wiped by the reload — that lost the language too).
 	i18n.set_locale_no_reload(locale)
+	pcall(i18n.persist_locale, locale)
 
 	local ok, err = pcall(function()
 		toml_writer.batch_write(_config_path, updates)
