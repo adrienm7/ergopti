@@ -274,4 +274,27 @@ helpers.describe("llm.init — set_backend() override survives probe completion"
 			"empty-string set_backend must be ignored; prior valid override must survive")
 	end)
 
+
+	helpers.it("user_override_backend flag blocks a SUBSEQUENT auto_detect call after set_backend", function()
+		-- H-12 fix (user_override_backend flag): a NEW auto_detect_backend() call
+		-- launched AFTER set_backend() must also be blocked, not just in-flight probes.
+		-- Without the flag, a background timer calling auto_detect again would silently
+		-- overwrite the manual choice once the new probes completed.
+		local LLM, fire_probes = load_llm_init_with_deferred_probes(
+			200, '{"version":"0.5.0"}',   -- Ollama: healthy
+			404, ""                        -- MLX: not available
+		)
+
+		-- User explicitly sets the backend before any auto-detect
+		LLM.set_backend("api")
+
+		-- A new auto_detect call fires AFTER the manual choice (e.g. background poll)
+		LLM.auto_detect_backend()
+		fire_probes()
+
+		-- The user_override_backend flag must have prevented the probe from writing
+		helpers.assert_eq(LLM.get_backend(), "api",
+			"user_override_backend flag must block a subsequent auto_detect from overwriting the manual choice")
+	end)
+
 end)
