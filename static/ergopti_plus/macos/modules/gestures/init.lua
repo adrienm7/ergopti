@@ -363,11 +363,13 @@ local function create_watcher(deviceID)
 		ok_run and tostring(running) or "err", ok_alive and tostring(alive) or "err")
 end
 
---- Force-kills and restarts all watchers to reset HID states.
-local function recycle_watchers()
+--- Force-kills all watchers and optionally re-attaches new ones.
+--- @param reattach boolean When true (default) re-attaches after stopping; when false only detaches.
+local function recycle_watchers(reattach)
+	if reattach == nil then reattach = true end
 	local before = count_watchers()
-	Logger.info(LOG, "recycle_watchers: BEGIN (watchers_before=%d, first_frame=%s)",
-		before, tostring(_G.ERGOPTI_GESTURES_RECEIVED_FIRST_FRAME))
+	Logger.info(LOG, "recycle_watchers: BEGIN (watchers_before=%d, first_frame=%s, reattach=%s)",
+		before, tostring(_G.ERGOPTI_GESTURES_RECEIVED_FIRST_FRAME), tostring(reattach))
 	local stopped = 0
 	for id, w in pairs(touch_watchers) do
 		local ok = pcall(function() w:stop() end)
@@ -378,14 +380,16 @@ local function recycle_watchers()
 		stopped = stopped + 1
 	end
 
-	local devices = enumerate_devices()
-	if #devices == 0 then
-		Logger.error(LOG, "  recycle_watchers: no devices found — gestures will not work")
-	else
-		Logger.info(LOG, "  recycle_watchers: found %d device(s) to attach", #devices)
-		for i, id in ipairs(devices) do
-			Logger.debug(LOG, "    device #%d: id=%s", i, tostring(id))
-			pcall(create_watcher, id)
+	if reattach then
+		local devices = enumerate_devices()
+		if #devices == 0 then
+			Logger.error(LOG, "  recycle_watchers: no devices found — gestures will not work")
+		else
+			Logger.info(LOG, "  recycle_watchers: found %d device(s) to attach", #devices)
+			for i, id in ipairs(devices) do
+				Logger.debug(LOG, "    device #%d: id=%s", i, tostring(id))
+				pcall(create_watcher, id)
+			end
 		end
 	end
 	Logger.info(LOG, "recycle_watchers: END (watchers_after=%d, stopped=%d)", count_watchers(), stopped)
@@ -742,8 +746,8 @@ function M.stop()
 	
 	CoreState.enabled = false
 
-	-- 1. Stop watchers
-	recycle_watchers({})  -- Passing empty list stops all existing ones
+	-- 1. Stop watchers — detach only, no re-attachment on teardown
+	recycle_watchers(false)
 	
 	-- 2. Stop eventtap primer
 	if gesture_primer then
@@ -756,14 +760,6 @@ function M.stop()
 	if discovery_timer then
 		pcall(function() discovery_timer:stop() end)
 		discovery_timer = nil
-	end
-	if startup_probe_timer then
-		pcall(function() startup_probe_timer:stop() end)
-		startup_probe_timer = nil
-	end
-	if health_check_timer then
-		pcall(function() health_check_timer:stop() end)
-		health_check_timer = nil
 	end
 
 	-- 4. Stop sleep watcher
