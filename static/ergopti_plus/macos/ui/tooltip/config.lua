@@ -285,6 +285,10 @@ local function load_from_shared()
 	M.colors.bg       = { white = require_key("colors", "bg_white"), alpha = require_key("colors", "bg_alpha") }
 	M.colors.bg_alpha = require_key("colors", "canvas_alpha_hs")
 	M.colors.sep      = { white = require_key("colors", "sep_white"), alpha = require_key("colors", "sep_alpha_hs") }
+	-- Border ring color, read from the shared source so the single AND stacked
+	-- canvases (and the AHK driver via its own *_ahk alpha) round-trip the same
+	-- look. border_alpha_hs is the canvas-tuned alpha; never hardcode it.
+	M.colors.border   = { white = require_key("colors", "border_white"), alpha = require_key("colors", "border_alpha_hs") }
 	M.colors.hint     = { white = require_key("colors", "hint_white"), alpha = require_key("colors", "hint_alpha") }
 	M.colors.info_bar = { white = require_key("colors", "info_white"), alpha = require_key("colors", "info_alpha") }
 	M.colors.invis    = { white = require_key("colors", "invis_white"), alpha = require_key("colors", "invis_alpha") }
