@@ -510,6 +510,22 @@ sg("script_save_reload",      function()
 end)
 sg("script_quit",                         function()
 	pcall(function() hs.closeConsole() end)
+	-- Tear down Karabiner-Elements BEFORE exiting. os.exit() terminates the Lua
+	-- VM abruptly and BYPASSES the Hammerspoon shutdown callback (where the normal
+	-- KE kill lives), so on this quit path KE would otherwise keep running with the
+	-- Ergopti rules — leaving the physical keyboard remapped after HS is gone.
+	-- karabiner.kill() runs the robust launchctl-bootout teardown SYNCHRONOUSLY
+	-- (so launchd cannot respawn the remapper) and respects a user-managed KE
+	-- install (leaves it untouched when HS did not own the bridge). Because it
+	-- blocks until KE is down, the keyboard is guaranteed free before os.exit.
+	-- Lazy-required so this low-level action module carries no load-time
+	-- dependency on the Karabiner module.
+	pcall(function()
+		local ok_kb, karabiner = pcall(require, "modules.karabiner")
+		if ok_kb and type(karabiner) == "table" and type(karabiner.kill) == "function" then
+			karabiner.kill()
+		end
+	end)
 	pcall(function() hs.timer.doAfter(0.1, function() os.exit(0) end) end)
 end)
 
