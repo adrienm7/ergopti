@@ -92,14 +92,18 @@ Test("_LLMRemoteParseResponse: openai canonical choice still resolves (remote-pa
 ; ===============================================================
 ; ===============================================================
 
-; Gemini answer split across two parts must be joined, not truncated to part 1.
-_RPFCM_Gemini_JoinsParts() {
+; Gemini: the first text part of the first candidate is the answer — the
+; cross-driver corpus contract (gemini_multipart_uses_first) takes the FIRST
+; part, consistent with the first-match policy this whole file verifies for the
+; anthropic/openai navigators. A later part is a continuation/decoy, not a
+; fragment to concatenate.
+_RPFCM_Gemini_UsesFirstPart() {
 	body := '{"candidates":[{"content":{"parts":[{"text":"foo"},{"text":"bar"}]}}]}'
 	result := _LLMRemoteParseResponse("gemini", body)
-	AssertEqual("foobar", result,
-		"gemini parser must concatenate every text part of the first candidate")
+	AssertEqual("foo", result,
+		"gemini parser must return the FIRST text part of the first candidate (remote-parse-first-content-match)")
 }
-Test("_LLMRemoteParseResponse: gemini joins multiple text parts (remote-parse-first-content-match)", _RPFCM_Gemini_JoinsParts)
+Test("_LLMRemoteParseResponse: gemini uses the first text part (remote-parse-first-content-match)", _RPFCM_Gemini_UsesFirstPart)
 
 
 ; Malformed body (HTTP error page) must still return "" via the regex fallback,
