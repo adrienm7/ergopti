@@ -70,18 +70,28 @@ local _cached_role = nil
 -- ==================================
 -- ==================================
 
---- Re-reads the focused element via hs.axuielement and caches its AXRole.
+--- Re-reads the focused element via hs.axuielement and caches its AXRole and AXSubrole.
+--- Uses applicationElementForPID + AXFocusedUIElement — the only stable HS API for this.
+--- hs.axuielement.focusedElement() does not exist in Hammerspoon; accessing the focused
+--- element requires going through the application's accessibility tree (H2 audit fix).
 --- Errors are silently ignored; _cached_role is set to nil on failure.
 function M.refresh()
 	local ok, err = pcall(function()
-		if not (hs.axuielement and hs.axuielement.focusedElement) then
+		if not (hs.axuielement and hs.axuielement.applicationElementForPID) then
 			_cached_role = nil
 			return
 		end
 
-		local element = hs.axuielement.focusedElement()
-		if element then
-			_cached_role = element.AXRole
+		local app = hs.application.frontmostApplication()
+		if not app then _cached_role = nil; return end
+
+		local pid    = app:pid()
+		local app_el = hs.axuielement.applicationElementForPID(pid)
+		if not app_el then _cached_role = nil; return end
+
+		local focused = app_el:attributeValue("AXFocusedUIElement")
+		if focused then
+			_cached_role = focused:attributeValue("AXRole")
 		else
 			_cached_role = nil
 		end
