@@ -724,6 +724,12 @@ Logger.info(LOG, string.format("Final mapping sort completed in %.1fms.",
 	(hs.timer.secondsSinceEpoch() - _sort_t0) * 1000))
 Boot.mark("Final mapping sort + tail-index rebuild")
 
+-- Start the keymap eventtap engine after all TOML groups are loaded and sorted.
+-- This call was previously auto-invoked at the end of modules/keymap/init.lua
+-- (M-13 fix), which started the taps before Karabiner and hotstrings were ready.
+keymap.start()
+Boot.mark("Keymap engine started")
+
 
 
 
@@ -934,10 +940,18 @@ hs.shutdownCallback = function()
 		end)
 	end
 
-	-- 4. Terminate any running MLX server process
+	-- 4. Flush the keylogger buffer so in-memory keystrokes are not lost on reload
+	pcall(function()
+		local ok_kl, kl = pcall(require, "modules.keylogger")
+		if ok_kl and kl and type(kl.stop) == "function" then
+			kl.stop()
+		end
+	end)
+
+	-- 5. Terminate any running MLX server process
 	pcall(function() require("ui.menu.menu_llm").stop_mlx_server() end)
 
-	-- 5. Kill orphan child processes
+	-- 6. Kill orphan child processes
 	pcall(hs.execute, "pkill -f 'ergopti_plus_expander'", true)
 	pcall(hs.execute, "pkill -f 'ergopti_plus_http_server'", true)
 	-- parent dies abruptly. Kill any mlx_lm.server still bound to port 49317
