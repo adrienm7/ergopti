@@ -608,6 +608,8 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 	local task = ShellRunner.spawn("/usr/bin/curl", {
 		"-s", "-N", "-X", "POST",
 		"-H", "Content-Type: application/json",
+		"--connect-timeout", "5",   -- abort if TCP handshake exceeds 5 s (Ollama dead)
+		"--max-time", "60",         -- hard ceiling: streaming must finish within 60 s
 		"--data-binary", "@" .. tmp_path,
 		M.get_base_url() .. "/api/chat",
 	}, on_done, on_chunk)
