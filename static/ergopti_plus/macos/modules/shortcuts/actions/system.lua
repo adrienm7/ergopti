@@ -61,6 +61,16 @@ local AWAKE_JITTER_X         = 80   -- Max horizontal pixel offset per tick (vis
 local AWAKE_JITTER_Y         = 80   -- Max vertical pixel offset per tick (visible but stays near origin)
 local AWAKE_RETURN_DELAY_SEC = Timings.sec("keep_awake", "return_delay_ms") -- Seconds to hold offset before returning to origin
 
+-- No-op key code posted on every keep-awake tick to signal KEYBOARD activity.
+-- Warping the cursor does NOT post a CGEvent, so it never resets the system HID
+-- idle counter that presence-aware apps (Microsoft Teams) read — which is why
+-- Teams went "absent" despite the visible jiggle. A real F18 key event resets
+-- that counter; F18 types nothing, fires no shortcut, and the keymap engine
+-- fast-exits it (FAST_EXIT_KEYCODES). This is the macOS analog of the AHK
+-- driver's {VKFF} empty keystroke. Single source of truth: shared/lua/keycodes
+-- (F18_WAKE_OS), the same code the keymap reserves.
+local KEEP_AWAKE_WAKE_KEY    = Keycodes.F18_WAKE_OS
+
 -- Grace period after activation during which the auto-deactivation watcher
 -- ignores ALL input. It must absorb three settle sources: the trigger keystroke's
 -- own key/flag events, the programmatic 1 px origin nudge, and — crucially — a
@@ -131,6 +141,18 @@ end
 -- Forward declaration required because schedule_awake_tick calls itself recursively
 local schedule_awake_tick
 
+--- Posts a single no-op F18 key event (down + up) to register KEYBOARD activity
+--- with the OS and with presence-aware apps. Exposed as M._emit_activity_keystroke
+--- so the regression test can assert it fires. The auto-deactivation watcher
+--- ignores this exact key code so our own jiggle never disables keep-awake.
+local function emit_activity_keystroke()
+	pcall(function()
+		hs.eventtap.event.newKeyEvent({}, KEEP_AWAKE_WAKE_KEY, true):post()
+		hs.eventtap.event.newKeyEvent({}, KEEP_AWAKE_WAKE_KEY, false):post()
+	end)
+end
+M._emit_activity_keystroke = emit_activity_keystroke
+
 
 
 
@@ -180,10 +202,15 @@ schedule_awake_tick = function()
 				if origin then pcall(hs.mouse.absolutePosition, {x = origin.x, y = origin.y}) end
 			end)
 
-			-- Declare user activity so the OS resets its idle timer without generating a key event
-			-- that would be caught by the input watcher and trigger self-deactivation
+			-- Declare user activity so the OS resets its display-idle / power assertion
 			pcall(hs.caffeinate.declareUserActivity)
 		end
+
+		-- Post the F18 no-op keystroke EVERY tick (independent of mouse origin): it
+		-- is the only thing here that resets the HID idle counter Teams reads, so it
+		-- is what actually keeps presence "available". declareUserActivity above only
+		-- covers display sleep, not app-level presence.
+		emit_activity_keystroke()
 
 		schedule_awake_tick()
 	end)
@@ -292,6 +319,12 @@ function M.toggle_awake()
 			-- Ignore key presses with modifiers to prevent the trigger shortcut
 			-- from instantly deactivating the keep-awake mode.
 			if ev_type == ev.keyDown then
+				-- Our own F18 jiggle keystroke must never count as "the user is back".
+				-- F18 is reserved for this purpose (no physical key emits it), so a
+				-- keycode match is unambiguous — no timing window needed.
+				if _ev:getKeyCode() == KEEP_AWAKE_WAKE_KEY then
+					return false
+				end
 				local flags = _ev:getFlags()
 				if flags.cmd or flags.alt or flags.ctrl then
 					return false
