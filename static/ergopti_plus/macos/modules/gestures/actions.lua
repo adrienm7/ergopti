@@ -21,6 +21,7 @@ local _state = nil
 --- Binds the global shared state reference.
 --- @param core_state table The shared state object from the core module.
 function M.init(core_state)
+	Logger.start(LOG, "Initializing…")
 	if _state then
 		Logger.warn(LOG, "M.init() called more than once — ignoring duplicate call.")
 		return
@@ -30,6 +31,7 @@ function M.init(core_state)
 		return
 	end
 	_state = core_state
+	Logger.success(LOG, "Initialized.")
 end
 
 
