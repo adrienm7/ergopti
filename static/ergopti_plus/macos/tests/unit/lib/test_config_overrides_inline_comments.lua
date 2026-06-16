@@ -1,0 +1,146 @@
+--- tests/unit/lib/test_config_overrides_inline_comments.lua
+
+--- ==============================================================================
+--- MODULE: Config Overrides — Inline Comment Stripping Regression Test
+--- DESCRIPTION:
+--- Regression test asserting that TOML inline comments (everything from the
+--- first unquoted `#` to end of line) are stripped from values before coercion.
+--- Before the fix, `log_level = "DEBUG" # this is a comment` would coerce to
+--- the raw string `"DEBUG" # this is a comment` instead of `"DEBUG"`. This test
+--- encodes that exact failure mode so the bug can never silently return.
+---
+--- FEATURES & RATIONALE:
+--- 1. Isolated Store: Overrides hs.settings with an in-memory table so that
+---    every call to hs.settings.set() from M.apply() is fully observable
+---    without touching the canonical shared stub.
+--- 2. Both Value Types: Covers string values (quoted) and numeric values to
+---    confirm that comment stripping happens before type coercion in both cases.
+--- 3. Canonical Restore: The canonical hs.settings reference is restored after
+---    the suite so no state leaks into subsequent test files.
+--- ==============================================================================
+
+local helpers = require("tests.helpers")
+
+-- Override hs.settings with a local in-memory store so we can inspect exactly
+-- what M.apply() passed to hs.settings.set without touching the canonical stub.
+-- The canonical SETTINGS_STORE is restored at the end of this file.
+local stored = {}
+_G.hs = _G.hs or {}
+local _ORIGINAL_SETTINGS = _G.hs.settings
+_G.hs.settings = {
+	set = function(key, value) stored[key] = value end,
+	get = function(key) return stored[key] end,
+}
+
+local Overrides = helpers.load_with_stubs("lib.config_overrides")
+-- helpers.load_with_stubs calls __reset() which reinstalls the canonical
+-- hs.settings stub; re-apply the inspectable override so the suites below
+-- still write into the local `stored` table.
+_G.hs.settings = {
+	set = function(key, value) stored[key] = value end,
+	get = function(key) return stored[key] end,
+}
+
+
+
+
+-- ================================================================
+--- ================================================================
+-- ======= 1/ Inline Comment Stripping ([features] section) =======
+--- ================================================================
+-- ================================================================
+
+helpers.describe("config_overrides.apply — inline comment stripping", function()
+
+	-- Helper: write content to a temp file, run apply(), then clean up
+	local function with_tmp(content, fn)
+		local path = os.tmpname()
+		local fh = io.open(path, "w")
+		fh:write(content)
+		fh:close()
+		fn(path)
+		os.remove(path)
+	end
+
+	helpers.it("strips an inline comment from a quoted string value in [features]", function()
+		stored = {}
+		_G.hs.settings.set = function(k, v) stored[k] = v end
+
+		-- The raw line is: log_level = "DEBUG" # this is a comment
+		-- After stripping the inline comment the value must coerce to "DEBUG",
+		-- not to the raw string `"DEBUG" # this is a comment`.
+		with_tmp('[features]\nlog_level = "DEBUG" # this is a comment\n', function(path)
+			local applied = Overrides.apply(path)
+
+			helpers.assert_true(applied >= 1, "applied count")
+			helpers.assert_eq(stored["log_level"], "DEBUG", "log_level after comment strip")
+		end)
+	end)
+
+
+	helpers.it("strips an inline comment from a numeric value in [features]", function()
+		stored = {}
+		_G.hs.settings.set = function(k, v) stored[k] = v end
+
+		-- The raw line is: some_value = 42 # numeric comment
+		-- After stripping, the value string is "42" which must coerce to the
+		-- number 42, not to the string "42 # numeric comment".
+		with_tmp('[features]\nsome_value = 42 # numeric comment\n', function(path)
+			local applied = Overrides.apply(path)
+
+			helpers.assert_true(applied >= 1, "applied count")
+			helpers.assert_eq(stored["some_value"], 42, "some_value after comment strip")
+		end)
+	end)
+
+
+	helpers.it("strips inline comments in [script] section as well", function()
+		stored = {}
+		_G.hs.settings.set = function(k, v) stored[k] = v end
+
+		with_tmp('[script]\nLogLevel = "INFO" # developer note\n', function(path)
+			local applied = Overrides.apply(path)
+
+			helpers.assert_true(applied >= 1, "applied count")
+			helpers.assert_eq(stored["LogLevel"], "INFO", "LogLevel after comment strip")
+		end)
+	end)
+
+
+	helpers.it("handles a value with no inline comment unchanged", function()
+		stored = {}
+		_G.hs.settings.set = function(k, v) stored[k] = v end
+
+		-- Sanity-check: plain values (no comment) must still coerce correctly
+		with_tmp('[features]\nlog_level = "WARN"\n', function(path)
+			local applied = Overrides.apply(path)
+
+			helpers.assert_true(applied >= 1, "applied count")
+			helpers.assert_eq(stored["log_level"], "WARN", "log_level without comment")
+		end)
+	end)
+
+
+	helpers.it("handles a standalone comment line without counting it as an override", function()
+		stored = {}
+		_G.hs.settings.set = function(k, v) stored[k] = v end
+
+		-- A line that is only a comment must be silently skipped; the count
+		-- must reflect only the real key=value entries.
+		with_tmp('[features]\n# full-line comment\nlog_level = "DEBUG"\n', function(path)
+			local applied = Overrides.apply(path)
+
+			helpers.assert_eq(applied, 1, "only the real entry is counted")
+			helpers.assert_eq(stored["log_level"], "DEBUG", "log_level set correctly")
+		end)
+	end)
+
+end)
+
+
+-- Restore the canonical hs.settings so subsequent test files loaded in the
+-- same runner process do not observe the local `stored` table instead of the
+-- shared SETTINGS_STORE from the canonical stub.
+if _ORIGINAL_SETTINGS then
+	_G.hs.settings = _ORIGINAL_SETTINGS
+end

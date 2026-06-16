@@ -102,9 +102,13 @@ function M.apply(file_path)
 				-- key = value — accept both bare and "quoted" keys
 				local key, value = trimmed:match("^\"([^\"\\]+)\"%s*=%s*(.+)$")
 				if not key then
-					key, value = trimmed:match("^([%w_]+)%s*=%s*(.+)$")
+					-- Accept dots so that dotted keys like llm.enabled are not silently dropped
+					key, value = trimmed:match("^([%w_.]+)%s*=%s*(.+)$")
 				end
 				if key and value then
+					-- Strip inline TOML comments before coercion so  "DEBUG" # note  → "DEBUG"
+					value = value:gsub("%s*#.*$", "")
+					value = value:match("^%s*(.-)%s*$")
 					local coerced = M.coerce(value)
 					if section == "script" then
 						hs.settings.set(key, coerced)
