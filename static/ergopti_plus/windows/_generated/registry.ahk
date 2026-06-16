@@ -105,7 +105,7 @@ class Registry {
 
 		; Guard: detect duplicate trigger within the same group
 		for existing in this._all_mappings {
-			if (existing["trigger"] = trigger && existing["group"] = group) {
+			if (existing.trigger = trigger && existing.group = group) {
 				LoggerWarn("registry", "Add: duplicate trigger '{1}' in group '{2}' — skipped.", trigger, group)
 				return false
 			}
@@ -116,12 +116,12 @@ class Registry {
 		; AHK strings are UTF-16; byte length = char count * 2
 		local trigger_bytes    := tlen * 2
 		; Tail char = last UTF-16 code unit (SubStr with negative offset)
-		local tail_char        := SubStr(trigger, -1)
+		local tail_char        := SubStr(trigger, -0)
 		; Magic-key fields — star_base is trigger without trailing magic char
 		local star_base        := has_magic ? SubStr(trigger, 1, tlen - 1) : trigger
 		local star_base_len    := StrLen(star_base)
 		local star_base_bytes  := star_base_len * 2
-		local star_base_tail   := star_base_len > 0 ? SubStr(star_base, -1) : ""
+		local star_base_tail   := star_base_len > 0 ? SubStr(star_base, -0) : ""
 		; plain_repl = repl with tokens resolved to literal text (precomputed)
 		; For now plain_repl mirrors repl; a token resolver can inject here later
 		local plain_repl       := repl
