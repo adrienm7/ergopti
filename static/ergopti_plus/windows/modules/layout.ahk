@@ -496,6 +496,21 @@ global _UIA_SelectionPollTimer := unset
 ; COM round-trip off the synchronous keyboard path (uia-selection-blocks-keyboard-thread).
 _UIA_SelectionPollTick() {
     global _UIA_SelectionCache, UIA, _UIA_NO_TP_CACHE, _UIA_NO_TP_TTL_MS
+    ; SetTimer bypasses native Suspend — a paused driver must do ZERO UIA work
+    ; (« pause = tout éteint »): the 3-hop COM round-trip + unbounded GetText(-1)
+    ; would keep firing every 500 ms on the keyboard thread while paused.
+    if A_IsSuspended {
+        _UIA_SelectionCache := ""
+        return
+    }
+    ; The ONLY consumer of the cache is WrapTextIfSelected, gated on this flag.
+    ; When the wrap feature is off, skip the COM round-trip entirely so non-users
+    ; never pay the per-tick cost or the large-selection keyboard-thread stall
+    ; risk (uia-poll-bypasses-suspend).
+    if !Features["shortcuts"]["wrap_text_if_selected"] {
+        _UIA_SelectionCache := ""
+        return
+    }
     if (!IsSet(UIA))
         return
 
