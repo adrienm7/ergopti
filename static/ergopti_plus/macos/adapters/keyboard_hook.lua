@@ -49,7 +49,11 @@ local _context   = { appId = "", windowTitle = "" }
 local function _read_context()
 	local ok, app = pcall(hs.application.frontmostApplication)
 	if ok and app then
-		_context.appId      = (pcall(function() return app:bundleID() end) and app:bundleID()) or ""
+		-- Capture the return value inside pcall so bundleID() is never called a
+		-- second time outside protection (the app object may become invalid between
+		-- the two calls — H-25 audit fix)
+		local ok_bid, bid = pcall(function() return app:bundleID() end)
+		_context.appId = (ok_bid and type(bid) == "string" and bid) or ""
 		_context.windowTitle = ""
 		local ok_w, win = pcall(function() return app:focusedWindow() end)
 		if ok_w and win then
@@ -116,6 +120,10 @@ function M.start(opts)
 		_tap = nil
 		Logger.debug(LOG, "start(): previous tap stopped before creating new one.")
 	end
+	-- Clear all callbacks before reading opts so no stale references from a
+	-- previous lifecycle survive a restart where the new caller omits them (M-12 audit fix)
+	_on_char = nil
+	_on_key  = nil
 	local options = type(opts) == "table" and opts or {}
 	if type(options.onChar) == "function" then _on_char = options.onChar end
 	if type(options.onKey)  == "function" then _on_key  = options.onKey  end
