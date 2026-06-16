@@ -1,0 +1,128 @@
+﻿; tests/meta/test_mouse_suspend_guard.ahk
+
+; ==============================================================================
+; MODULE: Mouse Suspend Guard Meta Test
+; DESCRIPTION:
+; Static source guards for the T-W01 "mouse-handlers-bypass-suspend" finding.
+;
+; KL_Mouse_OnLUp, KL_Mouse_OnRUp, KL_Mouse_AccumScroll and KL_Mouse_FlushScroll
+; are registered via HookDispatcher (mouse button hooks) and SetTimer (scroll
+; burst flush). None of these paths go through KL_AppendLog's chokepoint guard
+; before reaching KL_BumpMouseClick or writing telemetry — they bypass native
+; AHK Suspend and fire regardless of A_IsSuspended.
+;
+; The fixes:
+; 1. KL_Mouse_OnLUp / KL_Mouse_OnRUp: add `if A_IsSuspended { ... return }`
+;    BEFORE the call to KL_BumpMouseClick so click-distance counters are not
+;    bumped while the driver is paused.
+; 2. KL_Mouse_AccumScroll: add `if A_IsSuspended return` at the top so scroll
+;    ticks are not accumulated and no timer is armed while paused.
+; 3. KL_Mouse_FlushScroll: add `if A_IsSuspended return` at the top so a timer
+;    that slipped through the pause transition cannot flush stale scroll data.
+; 4. KL_Mouse_Stop: `scroll_flush_fn := unset` must appear after the timer
+;    cancellation so re-entry cannot re-arm a stale timer reference.
+;
+; This is a meta-static test (scans source text) because keylogger_mouse.ahk
+; registers top-level HookDispatcher subscribers and cannot be #Included by the
+; headless runner without pulling in the full driver.
+; ==============================================================================
+
+#Requires AutoHotkey v2.0
+
+
+
+
+
+; ======================================
+; ======================================
+; ======= 1/ Source scan helpers =======
+; ======================================
+; ======================================
+
+_MMSG_ReadSource(RelPath) {
+	SplitPath(A_ScriptDir, , &Root)
+	Path := StrReplace(Root, "\", "/") . "/" . RelPath
+	return FileRead(Path)
+}
+
+_MMSG_FuncBody(Src, FuncDef) {
+	Idx := InStr(Src, FuncDef)
+	if !Idx
+		return ""
+	Rest := SubStr(Src, Idx)
+	End := InStr(Rest, "`n}")
+	if End
+		return SubStr(Rest, 1, End + 1)
+	return Rest
+}
+
+
+
+
+
+; ====================================================
+; ====================================================
+; ======= 2/ Suspend-guard ordering assertions =======
+; ====================================================
+; ====================================================
+
+_MMSG_LUpGuardBeforeBump() {
+	Src := _MMSG_ReadSource("modules/keylogger/keylogger_mouse.ahk")
+	Body := _MMSG_FuncBody(Src, "KL_Mouse_OnLUp(*) {")
+	Assert(Body != "", "KL_Mouse_OnLUp must exist in keylogger_mouse.ahk")
+	PosGuard := InStr(Body, "A_IsSuspended")
+	PosBump  := InStr(Body, "KL_BumpMouseClick")
+	Assert(PosGuard > 0,
+		"KL_Mouse_OnLUp must check A_IsSuspended — mouse button hooks bypass Suspend; without this guard KL_BumpMouseClick fires while the driver is paused")
+	Assert(PosBump > 0,
+		"KL_Mouse_OnLUp must call KL_BumpMouseClick")
+	Assert(PosGuard < PosBump,
+		"KL_Mouse_OnLUp: A_IsSuspended guard must appear BEFORE KL_BumpMouseClick so the click counter is not bumped while paused")
+}
+Test("mouse: KL_Mouse_OnLUp has A_IsSuspended guard before KL_BumpMouseClick", _MMSG_LUpGuardBeforeBump)
+
+
+_MMSG_RUpGuardBeforeBump() {
+	Src := _MMSG_ReadSource("modules/keylogger/keylogger_mouse.ahk")
+	Body := _MMSG_FuncBody(Src, "KL_Mouse_OnRUp(*) {")
+	Assert(Body != "", "KL_Mouse_OnRUp must exist in keylogger_mouse.ahk")
+	PosGuard := InStr(Body, "A_IsSuspended")
+	PosBump  := InStr(Body, "KL_BumpMouseClick")
+	Assert(PosGuard > 0,
+		"KL_Mouse_OnRUp must check A_IsSuspended — mouse button hooks bypass Suspend; without this guard KL_BumpMouseClick fires while the driver is paused")
+	Assert(PosBump > 0,
+		"KL_Mouse_OnRUp must call KL_BumpMouseClick")
+	Assert(PosGuard < PosBump,
+		"KL_Mouse_OnRUp: A_IsSuspended guard must appear BEFORE KL_BumpMouseClick so the click counter is not bumped while paused")
+}
+Test("mouse: KL_Mouse_OnRUp has A_IsSuspended guard before KL_BumpMouseClick", _MMSG_RUpGuardBeforeBump)
+
+
+_MMSG_AccumScrollHasSuspendGuard() {
+	Src := _MMSG_ReadSource("modules/keylogger/keylogger_mouse.ahk")
+	Body := _MMSG_FuncBody(Src, "KL_Mouse_AccumScroll(delta) {")
+	Assert(Body != "", "KL_Mouse_AccumScroll must exist in keylogger_mouse.ahk")
+	Assert(InStr(Body, "A_IsSuspended") > 0,
+		"KL_Mouse_AccumScroll must check A_IsSuspended — SetTimer-backed scroll accumulation bypasses Suspend; without this guard ticks are counted and a flush timer is armed while paused")
+}
+Test("mouse: KL_Mouse_AccumScroll has A_IsSuspended guard", _MMSG_AccumScrollHasSuspendGuard)
+
+
+_MMSG_FlushScrollHasSuspendGuard() {
+	Src := _MMSG_ReadSource("modules/keylogger/keylogger_mouse.ahk")
+	Body := _MMSG_FuncBody(Src, "KL_Mouse_FlushScroll() {")
+	Assert(Body != "", "KL_Mouse_FlushScroll must exist in keylogger_mouse.ahk")
+	Assert(InStr(Body, "A_IsSuspended") > 0,
+		"KL_Mouse_FlushScroll must check A_IsSuspended — a one-shot timer armed before pause fires after Suspend is set; without this guard stale scroll data is flushed to the log while paused")
+}
+Test("mouse: KL_Mouse_FlushScroll has A_IsSuspended guard", _MMSG_FlushScrollHasSuspendGuard)
+
+
+_MMSG_StopClearsScrollFlushFn() {
+	Src := _MMSG_ReadSource("modules/keylogger/keylogger_mouse.ahk")
+	Body := _MMSG_FuncBody(Src, "KL_Mouse_Stop() {")
+	Assert(Body != "", "KL_Mouse_Stop must exist in keylogger_mouse.ahk")
+	Assert(InStr(Body, "scroll_flush_fn := unset") > 0,
+		"KL_Mouse_Stop must set scroll_flush_fn := unset after cancelling the timer so re-entry cannot re-arm the stale bound reference")
+}
+Test("mouse: KL_Mouse_Stop clears scroll_flush_fn after cancellation", _MMSG_StopClearsScrollFlushFn)
