@@ -176,7 +176,9 @@ local function ends_with_trigger(buffer, trigger, is_word)
 	if is_word ~= true then return true end
 	local before      = buffer:sub(1, #buffer - #trigger)
 	if #before == 0 then return true end
-	local prev_offset = utf8.offset(before, -1)
+	-- Guard against malformed UTF-8: LuaJIT raises a C-level error on bad sequences
+	local ok_utf8, prev_offset = pcall(utf8.offset, before, -1)
+	if not ok_utf8 then prev_offset = nil end
 	local prev_char   = prev_offset and before:sub(prev_offset) or ""
 	-- Block when the character immediately before the trigger is a letter or "@".
 	if prev_char == "@" or text_utils.is_letter_char(prev_char) then return false end
@@ -387,7 +389,9 @@ function M.update_preview(buf)
 
 	-- Walk static mappings via the tail-char indexes.
 	if #matches == 0 then
-		local poff          = utf8.offset(buf, -1)
+		-- Guard against malformed UTF-8: LuaJIT raises a C-level error on bad sequences
+		local ok_poff, poff = pcall(utf8.offset, buf, -1)
+		if not ok_poff then poff = nil end
 		local buf_tail_char = poff and buf:sub(poff) or ""
 
 		local function group_active(mapping)
@@ -399,8 +403,9 @@ function M.update_preview(buf)
 		local repeat_enabled = _state.is_repeat_feature_enabled()
 		local function is_repetition_star(mapping, star_base)
 			if not repeat_enabled then return false end
-			local offset = utf8.offset(star_base, -1)
-			if not offset then return false end
+			-- Guard against malformed UTF-8: LuaJIT raises a C-level error on bad sequences
+			local ok_rep, offset = pcall(utf8.offset, star_base, -1)
+			if not ok_rep or not offset then return false end
 			return mapping.plain_repl == star_base .. star_base:sub(offset)
 		end
 
@@ -679,6 +684,10 @@ function M.apply_prediction(idx)
 
 	M.reset_predictions()
 
+	-- Arm the synthetic-event window before mutating counters so the A6 guard in
+	-- onKeyDownRaw sees a fresh timestamp and does not clear the counters mid-expansion.
+	_state.last_synthetic_arm_time = hs.timer.secondsSinceEpoch()
+
 	-- Issue deletions then type the completion into the HID event queue.
 	_state.expected_synthetic_deletes = _state.expected_synthetic_deletes + delete_count
 	for _ = 1, delete_count do keyStroke({}, "delete", 0) end
@@ -848,6 +857,11 @@ function M.init(core_state, keymap_defaults)
 	end
 	if type(keymap_defaults) ~= "table" then
 		Logger.error(LOG, "M.init(): keymap_defaults must be a table (got %s) — bridge non-functional.", type(keymap_defaults))
+		return
+	end
+
+	if _state then
+		Logger.warn(LOG, "M.init() called more than once — ignoring duplicate call.")
 		return
 	end
 
