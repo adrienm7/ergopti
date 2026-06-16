@@ -62,8 +62,13 @@ _EnterHoldModKey() {
 	; Long press — arm modifier, stay armed until key-up.
 	ModKey := _EnterHoldModKey()
 	TextPressKey(ModKey, "Down")
-	KeyWait("Enter", "U")
-	TextPressKey(ModKey, "Up")
+	; Bound the wait and release in a finally so a lost key-up or thrown Send can
+	; never latch the modifier Down (tap_holds/constants.ahk explains the cap)
+	try {
+		KeyWait("Enter", "U T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC)
+	} finally {
+		TextPressKey(ModKey, "Up")
+	}
 }
 #HotIf
 

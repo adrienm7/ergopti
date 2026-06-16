@@ -147,9 +147,14 @@ SC03A:: {
 		_CapsLockDispatch(CtrlActivated)
 		return
 	}
-	; Long press — modifier stays armed until key-up.
-	KeyWait("CapsLock", "U")
-	TextPressKey(ModKey, "Up")
+	; Long press — modifier stays armed until key-up. Bound the wait and release
+	; the modifier in a finally so a lost key-up (UAC focus steal, Suspend toggled
+	; mid-press) or a thrown Send can never latch Ctrl/Shift/Alt/Win Down forever
+	try {
+		KeyWait("CapsLock", "U T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC)
+	} finally {
+		TextPressKey(ModKey, "Up")
+	}
 }
 #HotIf
 

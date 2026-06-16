@@ -1,0 +1,116 @@
+﻿; tests/meta/test_hold_modifier_release_bounded.ahk
+
+; ==============================================================================
+; MODULE: Generic Hold-Modifier Bounded-Release Guard Meta Test
+; DESCRIPTION:
+; Static source guard for the hold-modifier-unbounded-keywait finding.
+;
+; The GENERIC "hold = ctrl/shift/alt/win" tap-hold long-press branches arm a
+; synthetic modifier Down, then wait on KeyWait for the PHYSICAL key to be
+; released, then send the modifier Up. The buggy form did this with an
+; UNBOUNDED KeyWait and no try/finally: if the key-up event was lost (focus
+; stolen by a UAC prompt, the global Suspend hotkey toggled mid-press) or a
+; Send threw, the modifier Up was skipped and Ctrl/Shift/Alt/Win latched Down
+; system-wide (every subsequent keystroke becomes a chord).
+;
+; The one_shot_shift paths were already hardened (oneshotshift-lalt-lshift-stuck)
+; but these generic branches were missed. The fix wraps each long-press
+; arm/release pair in try { KeyWait(.., "U T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC) }
+; finally { TextPressKey(ModKey, "Up") } so the release ALWAYS runs and the wait
+; is bounded.
+;
+; Meta-static (scans source text) because modules/tap_holds/*.ahk register
+; top-level #HotIf hotkeys and cannot be #Included by the headless runner. If a
+; long-press branch regresses to a bare unbounded KeyWait or drops the finally,
+; this test fails.
+; ==============================================================================
+
+#Requires AutoHotkey v2.0
+
+
+
+
+; ==================================================
+; ==================================================
+; ======= 1/ Source scan helpers ===================
+; ==================================================
+; ==================================================
+
+; Reads a windows/-relative source file. A_ScriptDir is the runner dir (tests/);
+; its parent is the windows/ driver root.
+_HMRB_ReadSource(RelPath) {
+	SplitPath(A_ScriptDir, , &Root)
+	Path := StrReplace(Root, "\", "/") . "/" . RelPath
+	return FileRead(Path)
+}
+
+; Extracts the body of a single hotkey block: from the Anchor (a substring on the
+; block's #HotIf line) to the first closing brace at column 0 (top-level hotkey
+; blocks close with `}` flush-left; inner if/try/finally blocks close indented).
+_HMRB_Block(Src, Anchor) {
+	Idx := InStr(Src, Anchor)
+	if !Idx
+		return ""
+	Rest := SubStr(Src, Idx)
+	End := InStr(Rest, "`n}")
+	if End
+		return SubStr(Rest, 1, End + 1)
+	return Rest
+}
+
+; Asserts the generic hold-modifier long-press block bounds its wait and releases
+; the modifier in a finally, and that no bare unbounded KeyWait(key, "U") remains.
+_HMRB_AssertBounded(RelPath, Anchor, Where) {
+	Q := Chr(34)
+	Src := _HMRB_ReadSource(RelPath)
+	Body := _HMRB_Block(Src, Anchor)
+	Assert(Body != "", Where . " generic hold-modifier #HotIf block must exist")
+	Assert(InStr(Body, "STUCK_MODIFIER_RELEASE_TIMEOUT_SEC") > 0,
+		Where . " long-press KeyWait must be capped by STUCK_MODIFIER_RELEASE_TIMEOUT_SEC so a lost key-up cannot block the modifier release forever")
+	Assert(InStr(Body, "finally") > 0,
+		Where . " must release the modifier in a finally so a lost key-up or thrown Send can never latch Ctrl/Shift/Alt/Win Down")
+	Assert(InStr(Body, "KeyWait") > 0, Where . " must still KeyWait for the physical release")
+	; A bare unbounded wait ends with the literal "U") — the capped form is "U T".
+	Assert(InStr(Body, "KeyWait(") > 0 and !InStr(Body, Q . "U" . Q . ")"),
+		Where . " must not use a bare unbounded KeyWait(key, " . Q . "U" . Q . ") — use the capped " . Q . "U T" . Q . " . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC form")
+}
+
+
+
+
+; ==================================================
+; ==================================================
+; ======= 2/ Per-block guard assertions ============
+; ==================================================
+; ==================================================
+
+_HMRB_CapsLockGuarded() {
+	_HMRB_AssertBounded("modules/tap_holds/capslock.ahk", "_CapsLockHasHoldModifier() and not LayerEnabled", "capslock.ahk 2.3")
+}
+Test("tap-holds: CapsLock generic hold-modifier release is bounded + in finally (hold-modifier-unbounded-keywait)", _HMRB_CapsLockGuarded)
+
+_HMRB_EnterGuarded() {
+	Q := Chr(34)
+	; Full #HotIf condition — the bare "enter" call also appears in _EnterHoldModKey().
+	_HMRB_AssertBounded("modules/tap_holds/enter.ahk", "TapHoldHoldModifier(TapHold, " . Q . "enter" . Q . ") != " . Q . Q . " and not LayerEnabled", "enter.ahk 9.1")
+}
+Test("tap-holds: Enter generic hold-modifier release is bounded + in finally (hold-modifier-unbounded-keywait)", _HMRB_EnterGuarded)
+
+_HMRB_LAltBackspaceGuarded() {
+	Q := Chr(34)
+	; Full #HotIf condition — the bare backspace check also appears in _LAltIsSpecialTap().
+	_HMRB_AssertBounded("modules/tap_holds/lalt.ahk", "TapHoldTapAction(TapHold, " . Q . "left_alt" . Q . ") == " . Q . "backspace" . Q . " and TapHoldHoldModifier(TapHold, " . Q . "left_alt" . Q . ") != " . Q . Q, "lalt.ahk 4.6")
+}
+Test("tap-holds: LAlt backspace hold-modifier release is bounded + in finally (hold-modifier-unbounded-keywait)", _HMRB_LAltBackspaceGuarded)
+
+_HMRB_LAltGenericGuarded() {
+	Q := Chr(34)
+	_HMRB_AssertBounded("modules/tap_holds/lalt.ahk", "not _LAltIsSpecialTap() and TapHoldHoldModifier(TapHold, " . Q . "left_alt" . Q . ")", "lalt.ahk 4.7")
+}
+Test("tap-holds: LAlt generic hold-modifier release is bounded + in finally (hold-modifier-unbounded-keywait)", _HMRB_LAltGenericGuarded)
+
+_HMRB_RCtrlGenericGuarded() {
+	Q := Chr(34)
+	_HMRB_AssertBounded("modules/tap_holds/rctrl.ahk", "not _RCtrlIsSpecialTap() and TapHoldHoldModifier(TapHold, " . Q . "right_ctrl" . Q . ")", "rctrl.ahk 7.4")
+}
+Test("tap-holds: RCtrl generic hold-modifier release is bounded + in finally (hold-modifier-unbounded-keywait)", _HMRB_RCtrlGenericGuarded)
