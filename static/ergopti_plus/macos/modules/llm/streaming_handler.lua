@@ -385,9 +385,11 @@ function M.build_callbacks(ctx)
 		_consecutive_llm_failures = _consecutive_llm_failures + 1
 		if _consecutive_llm_failures >= CONSECUTIVE_FAIL_WARN_THRESHOLD then
 			_consecutive_llm_failures = 0  -- Reset so the notification is not spammed
-			if _core_llm.get_backend() == "mlx" then
-				Logger.warn(LOG, "Repeated MLX failures (%d consecutive) — server may be down or misconfigured.",
-					CONSECUTIVE_FAIL_WARN_THRESHOLD)
+			local current_backend = _core_llm.get_backend()
+			-- Warn for every backend — not just MLX — so silent failure modes are surfaced
+			Logger.warn(LOG, "Repeated LLM failures (%d consecutive) on backend '%s' — server may be down or misconfigured.",
+				CONSECUTIVE_FAIL_WARN_THRESHOLD, tostring(current_backend))
+			if current_backend == "mlx" then
 				pcall(function()
 					hs.notify.new(nil, {
 						title           = i18n.get("notify.llm_mlx_failures_title"),
