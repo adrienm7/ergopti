@@ -102,3 +102,51 @@ _HD_KeyboardHookStartStopDetaches() {
 	AssertEqual(BaseDown, HookDispatcher._subscribers[DownEvt].Length, "KHStop detaches the key subscriber (same cached ref)")
 }
 Test("keyboard_hook KHStart then KHStop fully detaches its subscribers", _HD_KeyboardHookStartStopDetaches)
+
+
+
+
+
+; ==================================================
+; ==================================================
+; ======= 3/ Self-unregister during dispatch =======
+; ==================================================
+; ==================================================
+
+; A subscriber that Unregisters ITSELF from within its own dispatched callback —
+; mirrors GestureReleaseLeftClick/RightClick (gestures.ahk), which call
+; HookDispatcher.Unregister from inside the handler. Module-level named functions
+; so Register and the in-callback Unregister pass the identical Func object.
+global _HD_SelfUnregEvt := ""
+global _HD_SelfUnregHits := []
+
+_HD_SelfUnregSub(*) {
+	global _HD_SelfUnregEvt, _HD_SelfUnregHits
+	_HD_SelfUnregHits.Push("a")
+	HookDispatcher.Unregister(_HD_SelfUnregEvt, _HD_SelfUnregSub)
+}
+
+_HD_PeerSub(*) {
+	global _HD_SelfUnregHits
+	_HD_SelfUnregHits.Push("b")
+}
+
+_HD_DispatchSelfUnregisterDoesNotSkipPeer() {
+	global _HD_SelfUnregEvt, _HD_SelfUnregHits
+	_HD_SelfUnregEvt := "test_evt_selfunreg_" . A_TickCount
+	_HD_SelfUnregHits := []
+	; Self-unregistering sub registered FIRST, plain peer SECOND. If Dispatch
+	; walks the LIVE array, RemoveAt of the first shifts the peer into the
+	; already-passed slot 1 and the enumerator skips it (Hits == ["a"]).
+	HookDispatcher.Register(_HD_SelfUnregEvt, _HD_SelfUnregSub)
+	HookDispatcher.Register(_HD_SelfUnregEvt, _HD_PeerSub)
+	HookDispatcher.Dispatch(_HD_SelfUnregEvt)
+	AssertEqual(2, _HD_SelfUnregHits.Length,
+		"a subscriber that unregisters itself mid-dispatch must not skip the peer that follows it — Dispatch must iterate a snapshot (.Clone()), not the live array")
+	AssertEqual("b", _HD_SelfUnregHits[2], "the peer must still fire after the self-unregistering subscriber")
+	; The self-unregistering sub must have actually been removed from the registry.
+	remaining := HookDispatcher._subscribers.Has(_HD_SelfUnregEvt) ? HookDispatcher._subscribers[_HD_SelfUnregEvt].Length : 0
+	AssertEqual(1, remaining, "the self-unregistering subscriber must be removed from the live registry while the peer remains")
+	HookDispatcher.Unregister(_HD_SelfUnregEvt, _HD_PeerSub)
+}
+Test("HookDispatcher.Dispatch does not skip a peer when a subscriber self-unregisters (dispatch-skips-peer-on-self-unregister)", _HD_DispatchSelfUnregisterDoesNotSkipPeer)

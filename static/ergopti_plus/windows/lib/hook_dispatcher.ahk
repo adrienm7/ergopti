@@ -200,7 +200,15 @@ class HookDispatcher {
 			return
 		if !HookDispatcher._subscribers.Has(event_type)
 			return
-		for cb in HookDispatcher._subscribers[event_type] {
+		; Iterate a SNAPSHOT, not the live array. A subscriber may Unregister
+		; itself synchronously from within its own callback (e.g. the gesture
+		; click-hold release calls HookDispatcher.Unregister from inside the
+		; dispatched handler). arr.RemoveAt() under a live `for` enumerator shifts
+		; the next, not-yet-visited peer into an already-passed slot, silently
+		; skipping it for this event (dispatch-skips-peer-on-self-unregister).
+		; Clone() is a shallow copy of references, so identity-based Unregister
+		; still mutates the live array while this loop stays stable.
+		for cb in HookDispatcher._subscribers[event_type].Clone() {
 			try {
 				cb(args*)
 			} catch as e {
