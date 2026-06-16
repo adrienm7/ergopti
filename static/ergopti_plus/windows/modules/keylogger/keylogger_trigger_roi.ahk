@@ -334,7 +334,13 @@ KL_Roi_HalflifeTick() {
     Critical("Off")
 
     for trig, last_tick in snapshot {
-        age := now - last_tick
+        ; Wrap-safe delta: A_TickCount overflows at ~49.7 days (~4,294,967,295 ms).
+        ; Clamp to 0 when the wrap-corrected age exceeds 7 days — an age that large
+        ; after a counter wrap would be a bogus reading, not a real half-life signal.
+        age := (now - last_tick + 0x100000000) & 0xFFFFFFFF
+        static MAX_SANE_AGE_MS := 604800000  ; 7 days in ms — sanity clamp
+        if (age > MAX_SANE_AGE_MS)
+            age := 0
         if (age >= threshold) {
             KL_AppendLog(Map(
                 "type",    "trigger_halflife",

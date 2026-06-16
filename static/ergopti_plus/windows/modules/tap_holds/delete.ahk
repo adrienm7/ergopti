@@ -59,8 +59,11 @@ _DeleteHoldModKey() {
 	}
 	ModKey := _DeleteHoldModKey()
 	TextPressKey(ModKey, "Down")
-	KeyWait("Delete", "U")
-	TextPressKey(ModKey, "Up")
+	try {
+		KeyWait("Delete", "U T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC)
+	} finally {
+		TextPressKey(ModKey, "Up")
+	}
 }
 #HotIf
 
@@ -81,8 +84,11 @@ _DeleteHoldModKey() {
 		return
 	}
 	ActivateLayer()
-	KeyWait("Delete", "U")
-	DisableLayer()
+	try {
+		KeyWait("Delete", "U T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC)
+	} finally {
+		DisableLayer()
+	}
 }
 #HotIf
 

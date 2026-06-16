@@ -135,24 +135,40 @@ TextSend(Text, Opts, Callback) {
 		; onto a one-shot timer so it NEVER runs on the input-gating keyboard thread.
 		; Blocking there on ClipWait would starve the low-level hook and drop the
 		; user's next keystrokes; running it off-thread lets the hotkey return at once.
-		SetTimer(() => _TextSendClipboard(Text), -1)
+		; CB_SaveAll() is called synchronously HERE (before the timer fires) so that
+		; two rapid TextSend calls cannot race: each captures its own clipboard state
+		; before either timer runs, eliminating the TOCTOU window where the second
+		; CB_SaveAll would snapshot the first injection's text instead of the original.
+		; Callback is passed into _TextSendClipboard and fired there after Ctrl+V, so
+		; callers that depend on the callback being synchronised with injection completion
+		; are never notified before the paste actually lands.
+		Saved := CB_SaveAll()
+		SetTimer(() => _TextSendClipboard(Text, Saved, Callback), -1)
 	} else {
 		; SendText uses the "Text" mode that bypasses hotkey triggers and sends
 		; Unicode characters as raw keystrokes — the safest injection path.
 		_AHK_SendText.Call(Text)
+		if Callback != 0
+			try Callback()
 	}
-
-	if Callback != 0
-		try Callback()
 }
 
-; Performs the clipboard save / write / wait / paste / restore round-trip.
+; Performs the clipboard write / wait / paste / restore round-trip.
 ; Runs on a one-shot timer (off the keyboard thread) so the blocking ClipWait
 ; cannot starve the low-level keyboard hook. Bails loudly without pasting if the
 ; clipboard never settles, and guards the restore with a generation counter so a
 ; later injection's clipboard is never clobbered by this call's stale restore.
-; @param Text {String} The Unicode text to inject via clipboard paste.
-_TextSendClipboard(Text) {
+; The caller (TextSend) must call CB_SaveAll() synchronously before scheduling
+; this timer and pass the resulting snapshot as Saved — this eliminates the TOCTOU
+; race where a second rapid injection would capture the first injection's clipboard
+; text rather than the user's original clipboard content.
+; Callback is invoked after Ctrl+V is sent (still on the timer thread) so callers
+; are never notified before the paste lands — fixing the race where the direct
+; try Callback() in TextSend would fire before the deferred timer even started.
+; @param Text     {String}             The Unicode text to inject via clipboard paste.
+; @param Saved    {ClipboardAll|String} Snapshot already captured by the caller.
+; @param Callback {Func|0}             Optional zero-arity completion callback.
+_TextSendClipboard(Text, Saved, Callback := 0) {
 	global TEXT_CLIPBOARD_RESTORE_DELAY_MS, TEXT_CLIPBOARD_WAIT_TIMEOUT_SEC, _TEXT_CLIPBOARD_GENERATION
 
 	; Claim this injection's slot. The restore closure below compares against this
@@ -160,10 +176,6 @@ _TextSendClipboard(Text) {
 	_TEXT_CLIPBOARD_GENERATION += 1
 	Generation := _TEXT_CLIPBOARD_GENERATION
 
-	; CB_SaveAll uses ClipboardAll() so non-text content (images, files, RTF)
-	; survives the paste cycle — the text-only save/restore variants would
-	; silently destroy any non-text clipboard data the user holds.
-	Saved := CB_SaveAll()
 	CB_Write(Text)
 
 	; Wait for the clipboard to actually hold our text before pasting. On timeout
@@ -176,6 +188,12 @@ _TextSendClipboard(Text) {
 	}
 
 	_AHK_SendInput.Call("^v")
+
+	; Fire the completion callback now that the paste keystroke has been emitted.
+	; Placed before the restore timer so callers can inspect A_Clipboard while it
+	; still holds the injected text, but after ^v so the paste is guaranteed to land.
+	if Callback != 0
+		try Callback()
 
 	; Restore after a short delay so the paste completes before we overwrite.
 	; The closure no-ops if a newer injection advanced the generation counter,

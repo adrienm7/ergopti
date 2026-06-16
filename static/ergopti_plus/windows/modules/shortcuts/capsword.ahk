@@ -14,11 +14,11 @@
 
 
 
-; ==============================
+; ===========================
 ; ===========================
 ; ======= 6/ CAPSWORD =======
 ; ===========================
-; ==============================
+; ===========================
 
 ToggleCapsWord() {
     global CapsWordEnabled := not CapsWordEnabled
@@ -67,6 +67,9 @@ SC01C::
 {
     if (GestureLeftClickHeld) {
         GestureReleaseLeftClick()
+    }
+    if (GestureRightClickHeld) {
+        GestureReleaseRightClick()
     }
     DisableCapsWord()
 }

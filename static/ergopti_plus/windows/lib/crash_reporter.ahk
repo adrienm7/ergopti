@@ -347,11 +347,18 @@ _CrashReport_SysInfo() {
 
 	GitHash := ""
 	try {
-		TmpFile := A_Temp . "\ergopti_cr_hash_" . A_TickCount . ".txt"
-		RunWait(A_ComSpec . " /c git -C " . Chr(34) . A_ScriptDir . Chr(34)
+		TmpFile := A_Temp . "\ergopti_cr_hash_" . A_TickCount . "_" . A_PtrSize . ".txt"
+		; Use Run (non-blocking) instead of RunWait to avoid a 30-second hang when
+		; git is unavailable or the repo is on a disconnected network drive.
+		Run(A_ComSpec . " /c git -C " . Chr(34) . A_ScriptDir . Chr(34)
 			. " rev-parse --short HEAD > " . Chr(34) . TmpFile . Chr(34), , "Hide")
-		GitHash := Trim(FileRead(TmpFile, "UTF-8"))
-		FileDelete(TmpFile)
+		Deadline := A_TickCount + 500
+		while (!FileExist(TmpFile) and A_TickCount < Deadline)
+			Sleep(50)
+		if FileExist(TmpFile) {
+			GitHash := Trim(FileRead(TmpFile, "UTF-8"))
+			try FileDelete(TmpFile)
+		}
 	}
 	Info["git_hash"] := GitHash
 
@@ -361,7 +368,9 @@ _CrashReport_SysInfo() {
 ; Returns an ISO-8601 UTC timestamp string.
 ; @return {String} Timestamp in the form "YYYY-MM-DDTHH:MM:SSZ".
 _CrashReport_IsoTimestamp() {
-	return FormatTime(, "yyyy-MM-ddTHH:mm:ssZ")
+	; A_NowUTC gives UTC time; FormatTime with no first arg gives local time.
+	; The trailing 'Z' must be a UTC value, not local time relabelled as UTC.
+	return FormatTime(A_NowUTC, "yyyy-MM-ddTHH:mm:ss") . "Z"
 }
 
 ; FNV-1a 32-bit fold: stable, non-reversible hex digest of a string.

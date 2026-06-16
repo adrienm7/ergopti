@@ -190,12 +190,25 @@ _JsonParseString(&text, &pos) {
 				case "r": out .= "`r"
 				case "t": out .= "`t"
 				case "u":
-					; Standard JSON \uXXXX escape — decode to a single code unit.
+					; Standard JSON \uXXXX escape — decode with surrogate-pair support.
 					hex := SubStr(text, pos, 4)
 					if !RegExMatch(hex, "^[0-9A-Fa-f]{4}$")
 						throw Error("JSON: invalid \u escape at position " . pos . ".", -1)
 					pos += 4
-					out .= Chr("0x" . hex)
+					cp := Integer("0x" . hex)
+					; UTF-16 surrogate pair: high surrogate (D800-DBFF) must be followed
+					; by a low surrogate (DC00-DFFF) to form a non-BMP codepoint.
+					if (cp >= 0xD800 and cp <= 0xDBFF and SubStr(text, pos, 2) == "\u") {
+						hex2 := SubStr(text, pos + 2, 4)
+						if RegExMatch(hex2, "^[0-9A-Fa-f]{4}$") {
+							low := Integer("0x" . hex2)
+							if (low >= 0xDC00 and low <= 0xDFFF) {
+								pos += 6
+								cp := 0x10000 + (cp - 0xD800) * 0x400 + (low - 0xDC00)
+							}
+						}
+					}
+					out .= Chr(cp)
 				default:
 					throw Error("JSON: invalid escape sequence at position " . pos . ".", -1)
 			}

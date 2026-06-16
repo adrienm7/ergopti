@@ -429,6 +429,8 @@ _RegisterCategoryTriggers(Category, IndexTarget := "", SetTarget := "") {
 
     Path := _PrefixWatcherTomlPath(Category)
     if !FileExist(Path) {
+        if (StrLower(Category) == "personal")
+            try LoggerWarn("PrefixWatcher", "Personal TOML not found at configured path: {1}.", Path)
         return 0
     }
 
@@ -1280,7 +1282,12 @@ _LookupAndRender() {
         ; which removes each row individually as its deadline passes.
         ExpansionDelay := (Cfg.Delay != "") ? Cfg.Delay : 0
         TooltipDuration := ExpansionDelay
-        IsMagic := InStr(Entry.Trigger, MK) > 0
+        ; Only triggers whose LAST chars ARE the magic key qualify as star
+        ; triggers — a trigger containing MK in its body (but not as a suffix)
+        ; must be classified as an end-char trigger, otherwise it lands in the
+        ; wrong display bucket and shows the wrong completion key label
+        MkLen := StrLen(MK)
+        IsMagic := (MkLen > 0 and StrLen(Entry.Trigger) > MkLen and SubStr(Entry.Trigger, -MkLen) == MK)
         ; Trigger label shown on the right side of the row:
         ;   ★ (or the configured magic key) for star triggers,
         ;   ↵  for end-char-gated triggers (space / punctuation / enter).

@@ -2,6 +2,8 @@
 ; AUTO-GENERATED from shared/domain/Terminators.spec.js.
 ; DO NOT EDIT BY HAND — run `npm run codegen:terminators` to refresh.
 
+#Requires AutoHotkey v2.0
+
 ; ==============================================================================
 ; CLASS: Terminators
 ; DESCRIPTION:

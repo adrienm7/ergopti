@@ -27,11 +27,11 @@
 
 
 
-; ==============================
+; ===============================
 ; ===============================
 ; ======= 1/ Buffer State =======
 ; ===============================
-; ==============================
+; ===============================
 
 global _LLM_Bridge_Buffer := ""
 global _LLM_Bridge_Active := false
@@ -68,11 +68,11 @@ global _LLM_MIN_TOOLTIP_DURATION_SEC   := 0.05
 
 
 
-; ==========================================
+; =================================
 ; =================================
 ; ======= 2/ Initialisation =======
 ; =================================
-; ==========================================
+; =================================
 
 /**
  * Starts the LLM bridge with the given configuration.
@@ -152,6 +152,7 @@ LLM_Bridge_Stop() {
 		return
 	_LLM_Bridge_Active := false
 	_LLM_Bridge_Buffer := ""
+	try LLM_Engine_StopGeneration()   ; Cancel in-flight HTTP before disabling the engine
 	LLM_Engine_SetEnabled(false)
 	try LLM_OllamaCancelWarmupRetry()
 	LLM_Tooltip_Hide()
@@ -188,8 +189,16 @@ LLM_Bridge_FeedKeyDownIfActive(vk) {
 	if (vk = 0x08)
 		LLM_Bridge_OnBackspace()
 	else if (vk = 0x09) {
-		if (IsSet(LLM_Tooltip_TryAcceptTab) and LLM_Tooltip_TryAcceptTab())
+		; Skip if an accept is already in progress from the Tab hotkey path to
+		; avoid double-injection when the InputHook and the hotkey fire together.
+		if (IsSet(_LLM_AcceptInProgress) and _LLM_AcceptInProgress)
 			return
+		if (IsSet(LLM_Tooltip_TryAcceptTab) and LLM_Tooltip_TryAcceptTab()) {
+			; Cancel the debounce timer so a stale prediction does not flash
+			; the tooltip again immediately after the user accepted the suggestion
+			LLM_Engine_CancelTimer()
+			return
+		}
 		LLM_Bridge_OnFlush()
 	} else if (vk = 0x0D or vk = 0x1B)
 		LLM_Bridge_OnFlush()
@@ -285,7 +294,8 @@ LLM_Bridge_OnChar(ch) {
 	}
 	global _LLM_Bridge_LastLogTick
 	now := A_TickCount
-	if (now - _LLM_Bridge_LastLogTick > 2000) {
+	; Wrap-safe tick delta: A_TickCount overflows at ~49.7 days
+	if (((now - _LLM_Bridge_LastLogTick + 0x100000000) & 0xFFFFFFFF) > 2000) {
 		_LLM_Bridge_LastLogTick := now
 		try LoggerInfo("LLM", "Keystroke buffered ({1} chars) — debounce pending.", StrLen(_LLM_Bridge_Buffer))
 	}
@@ -402,8 +412,11 @@ _LLM_PointerWatch_Start() {
 	_LLM_PointerWatch_Armed := true
 	_LLM_PointerWatch_LastX := unset
 	_LLM_PointerWatch_LastY := unset
-	if !IsSet(_LLM_PointerWatch_ActivityFn) or !(_LLM_PointerWatch_ActivityFn is Func)
-		_LLM_PointerWatch_ActivityFn := LLM_Bridge_OnPointerActivity.Bind()
+	; Always create a fresh Func object on each arm so the previous stop/start
+	; cycle cannot leave a stale closure still registered in HookDispatcher — a
+	; second Register with the SAME Func object would fire the handler twice per
+	; event if HookDispatcher does not deduplicate by identity
+	_LLM_PointerWatch_ActivityFn := LLM_Bridge_OnPointerActivity.Bind()
 	; Subscribe via HookDispatcher for every key the dispatcher owns so we do not
 	; clobber the dispatcher's central handlers (mouse-hotkey-clobber). XButton1/2
 	; are not registered by the dispatcher — keep those as direct hotkeys.
@@ -415,8 +428,9 @@ _LLM_PointerWatch_Start() {
 	}
 	try Hotkey("~XButton1", _LLM_PointerWatch_ActivityFn, "On")
 	try Hotkey("~XButton2", _LLM_PointerWatch_ActivityFn, "On")
-	if !IsSet(_LLM_PointerWatch_MoveFn) or !(_LLM_PointerWatch_MoveFn is Func)
-		_LLM_PointerWatch_MoveFn := _LLM_PointerWatch_OnMoveTick.Bind()
+	; Similarly create a fresh move-tick closure so SetTimer can cancel the old
+	; one cleanly even if _LLM_PointerWatch_Stop was called without cancelling
+	_LLM_PointerWatch_MoveFn := _LLM_PointerWatch_OnMoveTick.Bind()
 	global _LLM_POINTER_POLL_MS
 	SetTimer(_LLM_PointerWatch_MoveFn, _LLM_POINTER_POLL_MS)
 	try LoggerDebug("LLM", "Pointer-dismiss watcher armed.")
@@ -453,6 +467,8 @@ _LLM_PointerMovedEnough(x, y, ox, oy) {
 
 _LLM_PointerWatch_OnMoveTick(*) {
 	global _LLM_PointerWatch_LastX, _LLM_PointerWatch_LastY
+	local _c := Critical("On")
+	try {
 	; AHK SetTimer threads bypass native Suspend, so this poll keeps firing
 	; (MouseGetPos + branch) ~20x/s while the driver is paused. Inert it here so
 	; "pause = tout eteint" holds even if the suspend reactor's _Stop call is ever
@@ -495,6 +511,9 @@ _LLM_PointerWatch_OnMoveTick(*) {
 	dy := Abs(y - _LLM_PointerWatch_LastY)
 	if _LLM_PointerMovedEnough(x, y, _LLM_PointerWatch_LastX, _LLM_PointerWatch_LastY)
 		LLM_Bridge_OnPointerActivity("move dx=" . dx . " dy=" . dy)
+	} finally {
+		Critical(_c)
+	}
 }
 
 /**

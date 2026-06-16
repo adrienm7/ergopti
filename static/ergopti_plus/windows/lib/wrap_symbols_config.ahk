@@ -373,9 +373,12 @@ _WS_Save() {
             Lines .= "left  = `"" . _WS_EscapeToml(Pair["left"])  . "`"`n"
             Lines .= "right = `"" . _WS_EscapeToml(Pair["right"]) . "`"`n"
         }
-        FH := FileOpen(_WS_Config_Path, "w", "UTF-8")
-        FH.Write(Lines)
-        FH.Close()
+        ; Atomic write: stage to a sibling .tmp file then rename over the target
+        ; so a crash between truncate and write never leaves a half-empty TOML file
+        Tmp := _WS_Config_Path . ".tmp"
+        try FileDelete(Tmp)
+        FileAppend(Lines, Tmp, "UTF-8")
+        FileMove(Tmp, _WS_Config_Path, true)
         try LoggerDebug("WrapSymbols", "Saved: {1} disabled, {2} custom.", _WS_Disabled.Count, _WS_Custom.Length)
     } catch as Err {
         try LoggerError("WrapSymbols", "Could not save wrap_symbols.toml: {1}.", Err.Message)
@@ -390,8 +393,10 @@ _WS_EscapeToml(S) {
 }
 
 ; Minimal TOML string unescaping — reverses _WS_EscapeToml.
+; \\ must be replaced FIRST so that \" is not consumed before \\ can turn \\\"
+; into the correct two-character sequence \" (backslash + quote).
 _WS_UnescapeToml(S) {
-    S := StrReplace(S, "\" . Chr(0x22), Chr(0x22))
     S := StrReplace(S, "\\", "\")
+    S := StrReplace(S, "\" . Chr(0x22), Chr(0x22))
     return S
 }

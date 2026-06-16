@@ -74,7 +74,8 @@ ReadTomlFile(FilePath) {
     if _TomlFileCache.Has(FilePath) {
         return _TomlFileCache[FilePath]
     }
-    Content := FileRead(FilePath, "UTF-8")
+    Content := ""
+    try Content := FileRead(FilePath, "UTF-8")
     _TomlFileCache[FilePath] := Content
     return Content
 }
@@ -373,9 +374,9 @@ LoadHotstringsSection(CategoryName, SectionName, FeatureConfig, ExtraOptions := 
         }
 
         if IsCaseSens {
-            CreateHotstring(Flags, Trigger, Output, Options)
-        } else {
             CreateCaseSensitiveHotstrings(Flags, Trigger, Output, Options)
+        } else {
+            CreateHotstring(Flags, Trigger, Output, Options)
         }
         Loaded += 1
     }
@@ -443,9 +444,9 @@ LoadExtTomlFile(FilePath, CategoryLabel) {
         EntryPriority := _ParseEntryPriority(Line, HSE_PRIORITY_PACKAGE)
         Options := Map("TimeActivationSeconds", 0, "FinalResult", FinalResult, "IsRepeat", IsRepeat, "Priority", EntryPriority)
         if IsCaseSens {
-            CreateHotstring(Flags, Trigger, Output, Options)
-        } else {
             CreateCaseSensitiveHotstrings(Flags, Trigger, Output, Options)
+        } else {
+            CreateHotstring(Flags, Trigger, Output, Options)
         }
         TotalLoaded += 1
     }

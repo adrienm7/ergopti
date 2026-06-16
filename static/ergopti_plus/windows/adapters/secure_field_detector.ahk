@@ -56,10 +56,10 @@ global SFD_SECURE_APPS := Map(
 ; @return {Boolean} True on success, false on error.
 SFD_IsSecureField() {
 	try {
-		local FocusedCtrl := ControlGetFocus(A)
+		local FocusedCtrl := ControlGetFocus("A")
 		if FocusedCtrl = ""
 			return false
-		local Style := ControlGetStyle(FocusedCtrl, A)
+		local Style := ControlGetStyle(FocusedCtrl, "A")
 		; ES_PASSWORD = 0x20 — password edit field marker set by CreateWindowEx
 		return (Style & 0x20) ? true : false
 	} catch {

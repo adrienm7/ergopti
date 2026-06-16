@@ -144,6 +144,13 @@ LLM_Engine_ApplySharedDefaults()
  */
 LLM_Engine_Init(opts) {
 	global _LLM_Engine
+	; Stop any in-flight generation when the backend changes so a WinHTTP
+	; response from the old provider cannot land into the new backend's context.
+	if (IsSet(_LLM_Engine) and _LLM_Engine.Has("backend") and opts.Has("backend") and _LLM_Engine["backend"] != opts["backend"]) {
+		try LLM_Engine_StopGeneration()
+		if IsSet(_LLM_Engine)
+			_LLM_Engine["last_request_tick"] := 0
+	}
 	_LLM_Engine["enabled"] := true
 
 	static _keys := ["model", "profile_id", "backend", "n_predictions", "min_words", "max_words",
@@ -200,17 +207,25 @@ LLM_Engine_SetEnabled(state) {
  */
 LLM_Engine_OnKeystroke(buffer) {
 	global _LLM_Engine
-	if !_LLM_Engine["enabled"]
-		return
+	local _c := Critical("On")
+	try {
+		if !_LLM_Engine["enabled"]
+			return
 
-	LLM_Engine_CancelTimer()
+		LLM_Engine_CancelTimer()
 
-	; Arm debounce timer — closure captures the full buffer. PromptBuilder
-	; (macOS parity) derives capped context + tail inside FirePrediction.
-	_LLM_Engine["last_buffer"] := buffer
-	_LLM_Engine["pending_timer"] := LLM_Engine_FirePrediction.Bind(buffer)
-	SetTimer(_LLM_Engine["pending_timer"], -_LLM_Engine["debounce_ms"])
-	_LLM_Engine["timer_active"] := true
+		; Arm debounce timer — closure captures the full buffer. PromptBuilder
+		; (macOS parity) derives capped context + tail inside FirePrediction.
+		_LLM_Engine["last_buffer"] := buffer
+		_LLM_Engine["pending_timer"] := LLM_Engine_FirePrediction.Bind(buffer)
+		SetTimer(_LLM_Engine["pending_timer"], -_LLM_Engine["debounce_ms"])
+		_LLM_Engine["timer_active"] := true
+		; Capture the source window so the accept guard can verify the user
+		; hasn't switched focus between prediction trigger and Tab press
+		try _LLM_Engine["source_hwnd"] := WinGetID("A")
+	} finally {
+		Critical(_c)
+	}
 }
 
 /**
@@ -249,14 +264,19 @@ LLM_Engine_StartTimer(delaySec := "", buffer := "") {
  */
 LLM_Engine_CancelTimer() {
 	global _LLM_Engine
-	; Always clear state so callers that pre-delete pending_timer still get a clean
-	; result. The timer_active guard is skipped intentionally — an extra no-op
-	; SetTimer(0) on an already-elapsed timer is harmless and avoids subtle
-	; state divergence when the guard and the actual timer state disagree.
-	if _LLM_Engine.Has("pending_timer") and IsObject(_LLM_Engine["pending_timer"])
-		SetTimer(_LLM_Engine["pending_timer"], 0)
-	_LLM_Engine["pending_timer"] := ""
-	_LLM_Engine["timer_active"]  := false
+	local _c := Critical("On")
+	try {
+		; Always clear state so callers that pre-delete pending_timer still get a clean
+		; result. The timer_active guard is skipped intentionally — an extra no-op
+		; SetTimer(0) on an already-elapsed timer is harmless and avoids subtle
+		; state divergence when the guard and the actual timer state disagree.
+		if _LLM_Engine.Has("pending_timer") and IsObject(_LLM_Engine["pending_timer"])
+			SetTimer(_LLM_Engine["pending_timer"], 0)
+		_LLM_Engine["pending_timer"] := ""
+		_LLM_Engine["timer_active"]  := false
+	} finally {
+		Critical(_c)
+	}
 }
 
 /**
@@ -290,22 +310,27 @@ LLM_Engine_IsBusy() {
  */
 LLM_Engine_StopGeneration() {
 	global _LLM_Engine
-	LLM_Engine_CancelTimer()
-	if IsSet(_LLM_Engine) {
-		_LLM_Engine["request_id"] := (_LLM_Engine.Has("request_id") ? _LLM_Engine["request_id"] : 0) + 1
-		; Drop the prediction cache on every explicit stop (navigation reset,
-		; pause/suspend). The cache is keyed only on context-string equality, so
-		; without this a context the user returns to — or rebuilds after a
-		; pause/resume — would instantly replay a prediction they already
-		; dismissed, surfacing as a "ghost" suggestion. The next fire on that
-		; context must take the network path, not the cache branch.
-		_LLM_Engine["last_ctx"]     := ""
-		_LLM_Engine["last_results"] := []
-		_LLM_Engine["last_result"]  := ""
+	local _c := Critical("On")
+	try {
+		LLM_Engine_CancelTimer()
+		if IsSet(_LLM_Engine) {
+			_LLM_Engine["request_id"] := (_LLM_Engine.Has("request_id") ? _LLM_Engine["request_id"] : 0) + 1
+			; Drop the prediction cache on every explicit stop (navigation reset,
+			; pause/suspend). The cache is keyed only on context-string equality, so
+			; without this a context the user returns to — or rebuilds after a
+			; pause/resume — would instantly replay a prediction they already
+			; dismissed, surfacing as a "ghost" suggestion. The next fire on that
+			; context must take the network path, not the cache branch.
+			_LLM_Engine["last_ctx"]     := ""
+			_LLM_Engine["last_results"] := []
+			_LLM_Engine["last_result"]  := ""
+		}
+		try LLM_OllamaCancelStreams()
+		try LLM_OllamaCancelAllAsync()
+		try LLM_RemoteCancelAllAsync()
+	} finally {
+		Critical(_c)
 	}
-	try LLM_OllamaCancelStreams()
-	try LLM_OllamaCancelAllAsync()
-	try LLM_RemoteCancelAllAsync()
 }
 
 
@@ -338,7 +363,7 @@ global LLM_PRED_TOKEN_OVERHEAD := 5
 _LLM_Engine_CallTokenBudget(maxTokens, predsPerCall) {
 	global LLM_PRED_TOKEN_OVERHEAD
 	n := (predsPerCall is Integer and predsPerCall >= 1) ? predsPerCall : 1
-	return maxTokens * n + n * LLM_PRED_TOKEN_OVERHEAD
+	return Max(5, maxTokens * n + n * LLM_PRED_TOKEN_OVERHEAD)
 }
 
 /**
@@ -348,6 +373,8 @@ _LLM_Engine_CallTokenBudget(maxTokens, predsPerCall) {
  */
 LLM_Engine_FirePrediction(buffer) {
 	global _LLM_Engine
+	local _c := Critical("On")
+	try {
 	_LLM_Engine["timer_active"] := false
 
 	; A debounce timer armed just before the user paused must not fire an HTTP
@@ -372,7 +399,8 @@ LLM_Engine_FirePrediction(buffer) {
 	backend_now := _LLM_Engine.Has("backend") ? _LLM_Engine["backend"] : "ollama"
 	if (backend_now = "ollama" and IsSet(LLM_OllamaAllowInference) and !LLM_OllamaAllowInference()) {
 		static _LLM_LastDeferLogTick := 0
-		if (A_TickCount - _LLM_LastDeferLogTick > 5000) {
+		; Wrap-safe tick delta: A_TickCount overflows at ~49.7 days
+		if (((A_TickCount - _LLM_LastDeferLogTick + 0x100000000) & 0xFFFFFFFF) > 5000) {
 			_LLM_LastDeferLogTick := A_TickCount
 			try LoggerInfo("LLM", "Ollama warmup in progress — prediction deferred (retry shortly).")
 		}
@@ -434,7 +462,9 @@ LLM_Engine_FirePrediction(buffer) {
 	if (ctx == _LLM_Engine["last_ctx"] && _LLM_Engine.Has("last_results")
 			and Type(_LLM_Engine["last_results"]) == "Array"
 			and _LLM_Engine["last_results"].Length > 0) {
-		try LLM_OllamaCancelStreams()
+		; Cancel both curl streams and in-flight WinHTTP requests so no stale
+		; response lands after the cache hit is already rendered.
+		try LLM_OllamaCancelAllAsync()
 		LLM_Engine_OnResults(_LLM_Engine["last_results"], ctx, 1, true)
 		return
 	}
@@ -466,9 +496,10 @@ LLM_Engine_FirePrediction(buffer) {
 			}
 		}
 		if (sliced.Length > 0) {
-			; Same race fix as the exact-match cache branch above: bump
-			; request_id so late callbacks bail; WinHTTP stays in flight.
-			try LLM_OllamaCancelStreams()
+			; Same race fix as the exact-match cache branch above: cancel all
+			; in-flight WinHTTP requests and curl streams so no stale response
+			; clobbers the cache hit render.
+			try LLM_OllamaCancelAllAsync()
 			LLM_Engine_OnResults(sliced, ctx, 1, true)
 			return
 		}
@@ -484,8 +515,11 @@ LLM_Engine_FirePrediction(buffer) {
 	min_interval := LLM_ApiCommon_GetRateLimitMs(backend)
 	now := A_TickCount
 	last := _LLM_Engine.Has("last_request_tick") ? _LLM_Engine["last_request_tick"] : 0
-	if (last > 0 and (now - last) < min_interval) {
-		remaining := min_interval - (now - last)
+	; Wrap-safe delta: A_TickCount overflows at ~49.7 days; the mask keeps the
+	; result in [0, 0xFFFFFFFF] regardless of counter direction
+	elapsed_since_last := (now - last + 0x100000000) & 0xFFFFFFFF
+	if (last > 0 and elapsed_since_last < min_interval) {
+		remaining := min_interval - elapsed_since_last
 		; Same reasoning as LLM_Engine_OnKeystroke: keep a reference to the
 		; closure so the next CancelTimer call can actually cancel it.
 		_LLM_Engine["pending_timer"] := LLM_Engine_FirePrediction.Bind(buffer)
@@ -511,7 +545,7 @@ LLM_Engine_FirePrediction(buffer) {
 	; Falls back to the global profile when the active app has no
 	; override or the override id is unknown.
 	effective_profile_id := _LLM_Engine_ResolveProfileIdForApp(_LLM_Engine["profile_id"])
-	profile       := LLM_GetActiveProfile(effective_profile_id)
+	profile       := LLM_GetActiveProfile(effective_profile_id, _LLM_Engine.Has("user_profiles") ? _LLM_Engine["user_profiles"] : [])
 	n_predictions := Max(1, Integer(_LLM_Engine["n_predictions"]))
 	; Inline auto-type mode forces a single variant: typing N
 	; alternatives sequentially into the active document would produce
@@ -637,6 +671,9 @@ LLM_Engine_FirePrediction(buffer) {
 	)
 	_LLM_Engine_ShowLoadingTooltip()
 	_LLM_Engine_DispatchVariant(state)
+	} finally {
+		Critical(_c)
+	}
 }
 
 ; Push footer/display state into the tooltip module before every paint.
@@ -1010,7 +1047,8 @@ _LLM_Engine_FinalizeRequest(state) {
 		; into ``state`` at FirePrediction time so streaming + sequential +
 		; batch all read the same wallclock.
 		if state.Has("request_start") and state["request_start"] > 0
-			evt["elapsed_ms"] := A_TickCount - state["request_start"]
+			; Wrap-safe: A_TickCount rolls over at ~49.7 days
+			evt["elapsed_ms"] := (A_TickCount - state["request_start"] + 0x100000000) & 0xFFFFFFFF
 		if state.Has("prompt_tokens")     and state["prompt_tokens"]     > 0
 			evt["prompt_tokens"] := state["prompt_tokens"]
 		if state.Has("completion_tokens") and state["completion_tokens"] > 0
@@ -1181,9 +1219,13 @@ LLM_Engine_OnResults(slots, ctx, active := 1, is_final := false) {
 	; against a partial token would be meaningless.
 	display_slots := slots
 	if (is_final and IsSet(LLM_Diff_Compute)) {
-		buf_tail := _LLM_Engine.Has("last_ctx") ? _LLM_Engine["last_ctx"] : ""
+		; Use the context that produced THIS prediction as the diff anchor,
+		; not last_ctx — which is only updated on success and would be stale
+		; after a failed request, causing the diff to compute against the
+		; wrong baseline if the user typed more since the last accepted prediction
+		buf_tail := ctx
 		; Use only the last 200 chars of the context as the diff anchor — the
-		; full context is too long and makes prefix-matching meaningless.
+		; full context is too long and makes prefix-matching meaningless
 		if (StrLen(buf_tail) > 200)
 			buf_tail := SubStr(buf_tail, -199)
 		display_slots := []

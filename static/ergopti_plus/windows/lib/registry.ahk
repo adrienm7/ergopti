@@ -24,11 +24,12 @@
 
 
 
-; =============================================
-; =============================================
-; ======= 1/ Constants ========================
-; =============================================
-; =============================================
+
+; ============================
+; ============================
+; ======= 1/ Constants =======
+; ============================
+; ============================
 
 ; Sentinel returned by Reg_Read when the key or value is absent.
 global REG_NOT_FOUND := "__REG_NOT_FOUND__"
@@ -36,11 +37,12 @@ global REG_NOT_FOUND := "__REG_NOT_FOUND__"
 
 
 
-; =============================================
-; =============================================
-; ======= 2/ Read Operations ==================
-; =============================================
-; =============================================
+
+; ==================================
+; ==================================
+; ======= 2/ Read Operations =======
+; ==================================
+; ==================================
 
 ; Reads a registry string or expanded-string value.
 ; Returns the value on success, or `fallback` (default "") when the key or
@@ -87,7 +89,7 @@ Reg_ReadDword(keyPath, valueName, fallback := 0) {
 ; Returns Buffer  - The raw binary data, or an empty Buffer.
 Reg_ReadBinary(keyPath, valueName) {
 	try {
-		val := RegRead(keyPath, valueName, "REG_BINARY")
+		val := RegRead(keyPath, valueName)
 		return val
 	} catch as e {
 		LoggerDebug("registry", "Reg_ReadBinary failed — {1}\{2}: {3}", keyPath, valueName, e.Message)
@@ -98,11 +100,12 @@ Reg_ReadBinary(keyPath, valueName) {
 
 
 
-; =============================================
-; =============================================
-; ======= 3/ Write Operations =================
-; =============================================
-; =============================================
+
+; ===================================
+; ===================================
+; ======= 3/ Write Operations =======
+; ===================================
+; ===================================
 
 ; Writes a REG_DWORD value.
 ; Returns true on success, false on failure.
@@ -182,11 +185,12 @@ Reg_WriteBinary(keyPath, valueName, buf) {
 
 
 
-; =============================================
-; =============================================
-; ======= 4/ Delete Operations ================
-; =============================================
-; =============================================
+
+; ====================================
+; ====================================
+; ======= 4/ Delete Operations =======
+; ====================================
+; ====================================
 
 ; Deletes a single registry value.
 ; Returns true on success (including when the value was already absent),
@@ -231,11 +235,12 @@ Reg_DeleteKey(keyPath) {
 
 
 
-; =============================================
-; =============================================
-; ======= 5/ Enumeration ======================
-; =============================================
-; =============================================
+
+; ==============================
+; ==============================
+; ======= 5/ Enumeration =======
+; ==============================
+; ==============================
 
 ; Enumerates all values under a registry key.
 ; Returns an Array of objects: [ {name, type, data}, … ] in enumeration order.
@@ -300,7 +305,7 @@ Reg_KeyExists(keyPath) {
 	} catch as e {
 		; ERROR_FILE_NOT_FOUND (2) or ERROR_PATH_NOT_FOUND (3) = key absent.
 		if (e.Extra != 2 and e.Extra != 3)
-			LoggerDebug("registry", "Reg_KeyExists sub-key probe error — {1}: {2}", keyPath, e.Message)
+			LoggerWarn("registry", "Reg_KeyExists sub-key probe error — {1}: {2}", keyPath, e.Message)
 		return false
 	}
 	try {
@@ -309,7 +314,7 @@ Reg_KeyExists(keyPath) {
 		}
 	} catch as e {
 		if (e.Extra != 2 and e.Extra != 3)
-			LoggerDebug("registry", "Reg_KeyExists value probe error — {1}: {2}", keyPath, e.Message)
+			LoggerWarn("registry", "Reg_KeyExists value probe error — {1}: {2}", keyPath, e.Message)
 		return false
 	}
 	; No error thrown but neither sub-keys nor named values were found — the key
@@ -320,8 +325,8 @@ Reg_KeyExists(keyPath) {
 	} catch as e {
 		if (e.Extra = 2 or e.Extra = 3)
 			return false
-		; Any other error: key may exist but is inaccessible.
-		LoggerDebug("registry", "Reg_KeyExists probe error — {1}: {2}", keyPath, e.Message)
+		; Any other error: key may exist but is inaccessible
+		LoggerWarn("registry", "Reg_KeyExists probe error — {1}: {2}", keyPath, e.Message)
 		return false
 	}
 }

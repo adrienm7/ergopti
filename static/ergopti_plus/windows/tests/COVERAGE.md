@@ -77,6 +77,46 @@ When adding a new IA menu option: extend the JSON contract, wire `ui/tray_llm/pe
 | `meta/test_corpus_tap_hold.ahk`          | Tap-hold corpus golden vectors (14 cases)           |
 | `meta/test_corpus_hotstrings.ahk`        | Hotstrings integration corpus (12 cases)            |
 
+### Audit-fix regression meta-tests (batch-wired, June 2026)
+
+| Test file                                           | Fix guarded                                                                       |
+| --------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `meta/test_generated_substr_minus_one.ahk`          | `SubStr(trigger, -0)` → `SubStr(trigger, -1)` in `_generated/registry.ahk` and `_generated/expander.ahk` |
+| `meta/test_toml_multiline_array_depth.ahk`          | Multi-line TOML array uses bracket-depth counter + quote state (not naive `InStr(Line, "]")`) |
+| `meta/test_toml_unescape_ordering.ahk`              | `_WS_UnescapeToml` replaces `\\` before `\"` to avoid corrupting `\\"` sequences |
+| `meta/test_clipboard_sentinel.ahk`                  | `CB_Save` returns `"__CB_SAVE_ERROR__"` sentinel; `CB_Restore` skips on sentinel |
+| `meta/test_textsend_callback_wired.ahk`             | `_TextSendClipboard` receives and fires `Callback` after paste (not before)       |
+| `meta/test_is_category_all_enabled_loop.ahk`        | `IsCategoryAllEnabled` loops over ALL categories (not just `Categories[1]`)       |
+| `meta/test_regread_no_type_arg.ahk`                 | `Reg_ReadBinary` calls `RegRead` with 2 args only (no v1 `REG_BINARY` third arg) |
+| `meta/test_logger_dedup_tick.ahk`                   | Logger error dedup uses `_LastErrTime` + 5000 ms window (not permanent suppression) |
+| `meta/test_hse_endchar_consumed_delimiters.ahk`     | `HSE_ApplyExpansion` guards `EndChar` with `!InStr(HSE_CONSUMED_DELIMITERS, EndChar)` |
+| `meta/test_prefix_watcher_magic_suffix.ahk`         | `HasMagic` uses trailing-suffix `SubStr(Trigger, -MkLen) == MagicKey`, not `InStr` |
+| `meta/test_deadkey_uses_dynamic_magic_key.ahk`      | `ShouldActivateDeadkey` reads `ScriptInformation["MagicKey"]` at runtime (not hardcoded star) |
+| `meta/test_parse_overrides_seen_sections.ahk`       | `_ParseOverrides` tracks `SeenSections` and warns via `LoggerWarn` on duplicates  |
+| `meta/test_llm_getactiveprofile_arg.ahk`            | All `LLM_GetActiveProfile` calls pass `user_profiles` as second argument          |
+| `meta/test_tickcount_wrap_safe.ahk`                 | TickCount deltas use `(now - last + 0x100000000) & 0xFFFFFFFF` in prediction engine + bridge |
+| `meta/test_llm_token_budget_min5.ahk`               | `_LLM_Engine_CallTokenBudget` returns `Max(5, ...)` to guarantee minimum budget   |
+| `meta/test_llm_parser_nul_strip.ahk`                | `_LLM_Parser_CleanModelOutput` strips `[\x00-\x08\x0B\x0C\x0E-\x1F]` via `RegExReplace` |
+| `meta/test_altgr_hotif_dynamic.ahk`                 | `IsAltGrLAltEnabled` delegates to `_AnyShortcutEnabled` (runtime, not boot-time global) |
+| `meta/test_ergo_pinky_modifier_skip.ahk`            | `KL_Ergo_UpdatePinky` early-returns for modifier VKs 0x10-0x12, 0xA0-0xA5, 0x5B/0x5C |
+| `meta/test_watchers_idle_end_ordering.ahk`          | `KL_Watchers_IdleTick` emits `idle_end` before `session_end`                     |
+| `meta/test_timer_scheduler_ms_guard.ahk`            | `TimerEvery` clamps `Ms := 1` when `Ms <= 0` to prevent silent timer removal     |
+| `meta/test_http_cancel_aborts.ahk`                  | `HTTPCancel` calls `.Abort()` before zeroing `_HTTP_ACTIVE_REQUEST := 0`         |
+| `meta/test_keyboard_hook_vk_format.ahk`             | VK codes formatted with `{:02X}` (zero-padded), not single-digit `{1:X}`         |
+| `meta/test_plc_stop_clears_callbacks.ahk`           | `PLC_Stop` clears all three callback arrays to `[]` to prevent duplicate fires   |
+| `meta/test_toml_coerce_quoted_commas.ahk`           | `TomlCoerceValueExt` uses quote-aware character scanner (not naive `StrSplit(Inner, ",")`) |
+| `meta/test_i18n_setlocale_resets_fallback.ahk`      | `I18nSetLocale` resets `_I18nFallbacksWarmed := false` so next `t()` rebuilds    |
+| `meta/test_ws_save_atomic.ahk`                      | `_WS_Save` stages write to `.tmp` then renames via `FileMove` (atomic write)     |
+| `meta/test_tapholdwriter_int_before_bool.ahk`       | `_TH_TomlFormatLine` checks `Integer/Float` before `== true` (AHK 0 falsiness)  |
+| `meta/test_llm_tray_toggle_reentrancy.ahk`          | `LLM_Tray_OnToggle` guards with `static _Toggling := false` for re-entrancy     |
+| `meta/test_llm_tray_tab_source_hwnd.ahk`            | `LLM_Tray_TryAcceptTabGuarded` checks `source_hwnd` + `WinExist` before accepting |
+| `meta/test_modelbrowser_sort_callback.ahk`          | `_LLM_ModelBrowser_Sort` uses `Array.Sort(comparator)` O(n log n), not bubble sort |
+| `meta/test_space_taphold_configurable.ahk`          | `SPACE_HOLD_INPUT_TIMEOUT_FACTOR` constant replaces hardcoded `T3` in space tap-hold |
+| `meta/test_terminators_requires_directive.ahk`      | `_generated/terminators.ahk` has `#Requires AutoHotkey v2.0` near top of file    |
+| `meta/test_layout_poll_pending_hkl.ahk`             | `_ShouldReloadForHkl` preserves `pendingHkl` when `curHkl == 0` (transient unreadable) |
+| `meta/test_llmbridge_stop_order.ahk`                | `LLM_Bridge_Stop` calls `StopGeneration()` before `SetEnabled(false)`            |
+| `meta/test_llmdiff_has_corrections_ltrim.ahk`       | `HasCorrections` evaluated AFTER `LTrim(chunks[1].text)` so whitespace chunks excluded |
+
 ## Deferred / not yet covered
 
 | Module / area                                  | Reason for deferral                                                                                                |

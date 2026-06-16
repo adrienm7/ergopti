@@ -130,6 +130,8 @@ SC038::
 	CharacterSentTime := LastSentCharacterKeyTime.Has("LAlt") ? LastSentCharacterKeyTime["LAlt"] : Now
 	tap := ((Now - CharacterSentTime) <= TapHoldDuration(TapHold, "left_alt") * 1000)
 	if (tap and (Now - CharacterSentTime) >= TapMinDurationMs()) { ; TapMinDurationMs floor suppresses spurious taps when LAlt is brushed mid-roll
+		if A_IsSuspended
+			return
 		LLM_Tooltip_FireTabOrAccept("")
 	}
 }

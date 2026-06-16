@@ -2859,12 +2859,23 @@ RebuildHotstringsLive() {
 	try SetTimer(RegisterEmojisSymbolsDeferred, 0)
 	HSE_RebuildInProgress := true
 	try {
-	    HSE_RegistryClear()
-	    HSE_HardReset()
-	    RegisterAllHotstrings()
+		; Wrap clear + re-register in Critical so an InputHook OnChar callback
+		; cannot observe an empty or partially-populated registry mid-rebuild
+		_RblCrit := Critical("On")
+		try {
+			HSE_RegistryClear()
+			RegisterAllHotstrings()
+		} finally {
+			Critical(_RblCrit)
+		}
 	} finally {
-	    HSE_RebuildInProgress := false
+		HSE_RebuildInProgress := false
 	}
+	; HardReset only after the registry is fully populated and the guard is
+	; cleared; skip when a send burst is in flight (HSE_Suppressed > 0) so we
+	; do not clobber a live expansion's buffer state
+	if HSE_Suppressed == 0
+		HSE_HardReset()
 	if IsSet(HotstringPrefixWatcherRebuildIndex) {
 		HotstringPrefixWatcherRebuildIndex()
 	}

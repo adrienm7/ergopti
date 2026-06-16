@@ -45,6 +45,12 @@ UriDecode(s) {
 		Ch := SubStr(s, Pos, 1)
 		if (Ch == "%" and Pos + 2 <= Len) {
 			Hex := SubStr(s, Pos + 1, 2)
+			; Validate hex digits before Integer() to avoid TypeError on malformed input
+			if !RegExMatch(Hex, "^[0-9A-Fa-f]{2}$") {
+				ByteLen += StrPut(Ch, Buf.Ptr + ByteLen, Buf.Size - ByteLen, "UTF-8") - 1
+				Pos += 1
+				continue
+			}
 			NumPut("UChar", Integer("0x" . Hex) & 0xFF, Buf, ByteLen)
 			ByteLen += 1
 			Pos += 3

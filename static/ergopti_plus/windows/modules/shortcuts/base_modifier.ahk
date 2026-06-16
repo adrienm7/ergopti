@@ -15,11 +15,11 @@
 
 
 
-; ===============================
+; ================================
 ; ================================
 ; ======= 2/ BASE MODIFIER =======
 ; ================================
-; ===============================
+; ================================
 
 ; LAlt v2 tap-hold variants intercept SC038, so the bare SC038 & SC03A
 ; combo can only fire when LAlt remains a plain modifier (no tap-hold

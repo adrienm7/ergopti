@@ -348,9 +348,21 @@ UpdateLastSentCharacter(Character) {
 	; Ring-buffer push is O(1) and does not reallocate past boot — see
 	; ``_LSCPush`` in lib/hotstring_engine.ahk.
 	_LSCPush(Character)
-	; Timestamp tracking and pruning are delegated to AppState so the single
-	; write path (AppState_TouchLastSentKey) owns all invariants.
 	AppState_TouchLastSentKey(Character)
+}
+
+; Single write path for timestamp tracking. Pruning keeps the map size bounded
+; so it never grows unboundedly across a long session.
+AppState_TouchLastSentKey(Character) {
+	global LastSentCharacterKeyTime, LAST_SENT_KEY_TIME_MAX_AGE_MS, LAST_SENT_KEY_TIME_PRUNE_AT
+	LastSentCharacterKeyTime[Character] := A_TickCount
+	if LastSentCharacterKeyTime.Count > LAST_SENT_KEY_TIME_PRUNE_AT {
+		Now := A_TickCount
+		for k, ts in LastSentCharacterKeyTime.Clone() {
+			if (Now - ts > LAST_SENT_KEY_TIME_MAX_AGE_MS)
+				LastSentCharacterKeyTime.Delete(k)
+		}
+	}
 }
 
 ; Serialized remap emit — the callback every remapped key fires. SendMode is

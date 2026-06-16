@@ -142,16 +142,15 @@ class HookDispatcher {
 			; type (a whole feature went deaf to the keyboard). `==` is reference
 			; identity for objects and never throws.
 			for existing in HookDispatcher._subscribers[event_type] {
-				if (existing == callback_fn) {
-					Critical("Off")
+				if (existing == callback_fn)
 					return
-				}
 			}
 			HookDispatcher._subscribers[event_type].Push(callback_fn)
 			LoggerDebug("HookDispatcher", "Subscriber registered for '{1}' (total: {2}).",
 				event_type, HookDispatcher._subscribers[event_type].Length)
+		} finally {
+			Critical("Off")
 		}
-		Critical("Off")
 	}
 
 	; Removes a previously registered callback.

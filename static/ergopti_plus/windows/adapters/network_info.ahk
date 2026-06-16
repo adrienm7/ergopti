@@ -56,7 +56,10 @@ global NI_WLAN_MIN_CONN_ATTR_SIZE             := 580
 
 ; IP_ADAPTER_ADDRESSES offsets on 64-bit Windows (v1 base structure)
 global NI_ADAPTER_OFFSET_OPER_STATUS          := 56   ; IF_OPER_STATUS field
-global NI_ADAPTER_OFFSET_FRIENDLY_NAME        := 64   ; PWCHAR FriendlyName
+; IP_ADAPTER_ADDRESSES x64 layout: 9 × 8-byte Ptr fields before FriendlyName
+; (Next, AdapterName, FirstUnicast, FirstAnycast, FirstMulticast, FirstDnsServer,
+;  DnsSuffix, Description, FriendlyName) = offset 72, NOT 64.
+global NI_ADAPTER_OFFSET_FRIENDLY_NAME        := 72   ; PWCHAR FriendlyName
 global NI_ADAPTER_OFFSET_NEXT                 := 8    ; PIP_ADAPTER_ADDRESSES Next
 
 ; GetAdaptersAddresses flags (skip address lists we do not need)
@@ -141,51 +144,56 @@ _NI_QueryWlan() {
     ; WLAN_INTERFACE_INFO_LIST: dwNumberOfItems(4) + dwIndex(4) = 8 bytes header.
     ; Each WLAN_INTERFACE_INFO = GUID(16) + WCHAR[256](512) + isState(4) = 532 bytes.
     nItems := NumGet(pIfaceList, 0, "UInt")
-    Loop nItems {
-        pIface := pIfaceList + 8 + (A_Index - 1) * 532
-        ; isState at offset 528 (GUID 16 + description 512). State 1 = connected.
-        if (NumGet(pIface, 528, "UInt") != 1)
-            continue
+    ; finally guarantees pIfaceList and hClient are always freed even if an
+    ; exception is thrown inside the loop body (e.g. from a bad NumGet address
+    ; or an unexpected DllCall failure that the loop body does not catch itself).
+    try {
+        Loop nItems {
+            pIface := pIfaceList + 8 + (A_Index - 1) * 532
+            ; isState at offset 528 (GUID 16 + description 512). State 1 = connected.
+            if (NumGet(pIface, 528, "UInt") != 1)
+                continue
 
-        guid := Buffer(16, 0)
-        DllCall("RtlMoveMemory", "Ptr", guid, "Ptr", pIface, "UPtr", 16)
+            guid := Buffer(16, 0)
+            DllCall("RtlMoveMemory", "Ptr", guid, "Ptr", pIface, "UPtr", 16)
 
-        pData     := 0
-        cbData    := 0
-        valueType := 0
-        rc := DllCall("Wlanapi\WlanQueryInterface",
-            "Ptr",   hClient,
-            "Ptr",   guid,
-            "UInt",  NI_WLAN_INTF_OPCODE_CURRENT_CONNECTION,
-            "Ptr",   0,
-            "UInt*", &cbData,
-            "Ptr*",  &pData,
-            "UInt*", &valueType,
-            "UInt")
-        ; Bounds check: WlanQueryInterface must have returned a buffer large
-        ; enough to hold the signal-quality field at +576; a truncated result
-        ; would make the +576 NumGet read past the allocation.
-        if (rc = NI_ERROR_SUCCESS and pData and cbData >= NI_WLAN_MIN_CONN_ATTR_SIZE) {
-            ssid_len := NumGet(pData, NI_WLAN_OFFSET_SSID_LEN, "UInt")
-            if (ssid_len > 0 and ssid_len <= NI_WLAN_MAX_SSID_LEN) {
-                ; Hash the raw octets (not a UTF-8 re-decode) so the digest is
-                ; stable for non-UTF-8 SSIDs — see _NI_SsidOctetsToHashInput.
-                ssid       := _NI_SsidOctetsToHashInput(pData + NI_WLAN_OFFSET_SSID_DATA, ssid_len)
-                signal_pct := NumGet(pData, NI_WLAN_OFFSET_SIGNAL_QUALITY, "UInt")
-                if (signal_pct > 100)
-                    signal_pct := 100
-                result["ssid"]       := ssid
-                result["signal_pct"] := signal_pct
+            pData     := 0
+            cbData    := 0
+            valueType := 0
+            rc := DllCall("Wlanapi\WlanQueryInterface",
+                "Ptr",   hClient,
+                "Ptr",   guid,
+                "UInt",  NI_WLAN_INTF_OPCODE_CURRENT_CONNECTION,
+                "Ptr",   0,
+                "UInt*", &cbData,
+                "Ptr*",  &pData,
+                "UInt*", &valueType,
+                "UInt")
+            ; Bounds check: WlanQueryInterface must have returned a buffer large
+            ; enough to hold the signal-quality field at +576; a truncated result
+            ; would make the +576 NumGet read past the allocation.
+            if (rc = NI_ERROR_SUCCESS and pData and cbData >= NI_WLAN_MIN_CONN_ATTR_SIZE) {
+                ssid_len := NumGet(pData, NI_WLAN_OFFSET_SSID_LEN, "UInt")
+                if (ssid_len > 0 and ssid_len <= NI_WLAN_MAX_SSID_LEN) {
+                    ; Hash the raw octets (not a UTF-8 re-decode) so the digest is
+                    ; stable for non-UTF-8 SSIDs — see _NI_SsidOctetsToHashInput.
+                    ssid       := _NI_SsidOctetsToHashInput(pData + NI_WLAN_OFFSET_SSID_DATA, ssid_len)
+                    signal_pct := NumGet(pData, NI_WLAN_OFFSET_SIGNAL_QUALITY, "UInt")
+                    if (signal_pct > 100)
+                        signal_pct := 100
+                    result["ssid"]       := ssid
+                    result["signal_pct"] := signal_pct
+                }
             }
+            if (rc = NI_ERROR_SUCCESS and pData)
+                DllCall("Wlanapi\WlanFreeMemory", "Ptr", pData)
+            if (result.Count > 0)
+                break
         }
-        if (rc = NI_ERROR_SUCCESS and pData)
-            DllCall("Wlanapi\WlanFreeMemory", "Ptr", pData)
-        if (result.Count > 0)
-            break
+    } finally {
+        DllCall("Wlanapi\WlanFreeMemory", "Ptr", pIfaceList)
+        DllCall("Wlanapi\WlanCloseHandle", "Ptr", hClient, "Ptr", 0)
     }
-
-    DllCall("Wlanapi\WlanFreeMemory", "Ptr", pIfaceList)
-    DllCall("Wlanapi\WlanCloseHandle", "Ptr", hClient, "Ptr", 0)
     return result
 }
 

@@ -558,7 +558,11 @@ ReadCategoryEnabled(Cache) {
 ; tray-menu rendering (to label the master toggle and parent menu).
 IsCategoryGated(Category) {
     global CategoryEnabled
-    return CategoryEnabled.Has(Category) ? CategoryEnabled[Category] : true
+    if !CategoryEnabled.Has(Category) {
+        try LoggerWarn("MasterGates", "IsCategoryGated: unknown category '{1}' — defaulting to gated.", Category)
+        return true
+    }
+    return CategoryEnabled[Category]
 }
 
 ReadScriptConfig(Cache) {
@@ -1049,10 +1053,9 @@ if MetricsShortcuts.enabled {
     KL_Init(_ConfigDir . "metrics")
     MS_ApplyAll(KLUI_ToggleTyping, KLUI_ToggleApps)
     HookDispatcher.Start()
-    ; Release the unified InputHook explicitly on a plain ExitApp (e.g. the tray
-    ; "Quit" item). Reload() tears the whole process down so this is redundant on
-    ; that path, but a non-Reload exit otherwise leaves the OS to reclaim the hook.
-    OnExit((*) => HookDispatcher.Stop())
+    ; HookDispatcher.Stop() is called by Ergopti_OnShutdown (registered below via
+    ; OnExit) — do NOT register a second anonymous OnExit lambda here; double-Stop
+    ; can trigger a "hook already released" error on some AHK builds.
     KL_Hook_Start()
     KL_Watchers_Start()
     KL_Mouse_Start()
@@ -1071,7 +1074,7 @@ BootProfile_Mark("Metrics/keylogger started")
 ; unconditionally: the handler is fully try-wrapped and KL_Stop is a no-op when
 ; metrics are disabled (Keylogger.initialized stays false).
 OnExit(Ergopti_OnShutdown)
-LoggerSuccess("ErgoptiPlus", "Tray menu built and icon set.")
+LoggerInfo("ErgoptiPlus", "Tray menu built and icon set.")
 
 _MakeOpenSectionFn(SecName) {
     return (*) => OpenPersonalEditor(SecName)
@@ -1480,9 +1483,13 @@ ToggleAllHotstrings(Value) {
 }
 
 IsCategoryAllEnabled(Categories) {
-    if (Categories.Length == 0)
-        return true
-    return IsCategoryGated(Categories[1])
+	if (Categories.Length == 0)
+		return true
+	for Cat in Categories {
+		if !IsCategoryGated(Cat)
+			return false
+	}
+	return true
 }
 
 ; Deep-clone a (possibly nested) Map. Used to snapshot per-section hotstring
@@ -1583,6 +1590,13 @@ _CategoryEnabledKey(Category) {
 
 SaveFullConfig() {
     global Features, ScriptInformation, ScriptShortcutAssignments, GestureAssignments, KeyboardShortcutAssignments, ConfigurationFile, _TOML_STRICT_CANON_IN_PROGRESS, PrevCanonState
+    ; Guard: the driver must be fully initialised before writing config — prevents
+    ; a partial config flush triggered by the -500 ms boot timer from clobbering the
+    ; user's file with uninitialised defaults (e.g. before Features or GestureAssignments
+    ; have been populated by ApplyConfigToml and the deferred tray-menu build).
+    global _DriverReady
+    if !_DriverReady
+        return
     Updates := []
     if IsSet(_LLM_Tray_SyncToFeatures)
         _LLM_Tray_SyncToFeatures()
@@ -2056,6 +2070,9 @@ Ergopti_OnSuspendEnter() {
     ; is active.
     try _LLM_PointerWatch_Stop()
     try StopActivitySimulation()
+    ; Reset OneShotShift so a shift armed just before suspension is not applied
+    ; to the first keystroke after resume ("pause = tout éteint" invariant)
+    global OneShotShiftEnabled := False
     global _LLM_Deps_PollTimer
     if IsSet(_LLM_Deps_PollTimer)
         try SetTimer(_LLM_Deps_PollTimer, 0)

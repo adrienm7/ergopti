@@ -112,7 +112,10 @@ _LLMD_GetStringArray(raw, key, dflt := "") {
 		vals.Push(elem[1])
 		pos := elem.Pos + elem.Len
 	}
-	return (vals.Length > 0) ? _LLMD_JoinArray(vals, ",") : dflt
+	; Key is present — return the join even when the array is empty ([]).
+	; Returning dflt for an explicit [] would be wrong: the caller cannot
+	; distinguish "key absent" from "key set to empty list".
+	return _LLMD_JoinArray(vals, ",")
 }
 
 /**

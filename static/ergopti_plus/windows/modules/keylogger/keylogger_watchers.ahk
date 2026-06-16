@@ -206,13 +206,14 @@ KL_Watchers_IdleTick() {
     }
 
     if (KLWatch.is_session_active and gap >= KLWatchConst.SESSION_TIMEOUT_MS) {
+        ; Emit idle_end before session_end so the event log is properly paired —
+        ; a dangling idle_start without an idle_end corrupts idle-time aggregates
+        if KLWatch.is_idle {
+            try KL_LogSession("idle_end", A_TickCount - KLWatch.idle_started_at)
+        }
+        KLWatch.is_idle := false
         try KL_LogSession("session_end", KLHook.last_tick - KLWatch.session_started_at)
         KLWatch.is_session_active := false
-        ; A session ending implies the active idle (if any) is no longer
-        ; meaningful — the user closed the laptop, walked away, etc.
-        ; Drop the idle flag silently rather than emit an idle_end whose
-        ; pair was already absorbed into session_end.
-        KLWatch.is_idle := false
     }
 }
 

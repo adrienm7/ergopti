@@ -409,18 +409,20 @@ TapHoldVariantLabel(V1KeyId, Variant) {
 ; (quoted), booleans, and numbers; arrays and nested tables are not used
 ; in this schema.
 _TH_TomlFormatLine(Key, Value) {
-	if (Value = true) {
-		return Key . " = true"
-	}
-	if (Value = false) {
-		return Key . " = false"
-	}
+	; Check numeric types first — integer 0 satisfies (Value = false) in AHK v2,
+	; so the Type() guard must come before any boolean comparison
 	if (Type(Value) == "Integer" or Type(Value) == "Float") {
 		return Key . " = " . Value
+	}
+	if (Value == true) {
+		return Key . " = true"
+	}
+	if (Value == false) {
+		return Key . " = false"
 	}
 	; String — quote, escape backslashes and quotes.
 	S := String(Value)
 	S := StrReplace(S, "\", "\\")
-	S := StrReplace(S, '"', '\"')
+	S := StrReplace(S, Chr(0x22), "\" . Chr(0x22))
 	return Key . ' = "' . S . '"'
 }

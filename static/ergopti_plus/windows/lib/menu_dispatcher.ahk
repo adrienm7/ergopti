@@ -490,7 +490,7 @@ _DispatchIfMissed(ItemId, ExpectedLastFire) {
     try LoggerInfo("MenuDispatcher",
         "AHK drop detected for ItemId={1} — firing bypass dispatch.", ItemId)
     try {
-        Callback.Call("bypass_dispatch")
+        Callback.Call("", 0, 0)
     } catch as Err {
         try LoggerError("MenuDispatcher",
             "Bypass dispatch for ItemId={1} threw: {2}.", ItemId, Err.Message)

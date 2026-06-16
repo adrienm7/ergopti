@@ -79,12 +79,16 @@ HTTPPost(Url, Headers, Body, Callback) {
 		try Callback(Result)
 }
 
-; Marks any in-flight request as cancelled. Because AHK WinHttp is synchronous,
-; this sets a flag so that the result is discarded if the request is still running
-; and a new post() arrives while waiting (defensive no-op in practice).
+; Aborts any in-flight WinHttp request and clears the active-request slot.
+; Calling Abort() on the COM object interrupts the synchronous Send() call so
+; the blocked HTTPPost thread unwinds immediately rather than waiting for the
+; full HTTP_TIMEOUT_MS to elapse.
 HTTPCancel() {
 	global _HTTP_ACTIVE_REQUEST
-	_HTTP_ACTIVE_REQUEST := 0
+	if _HTTP_ACTIVE_REQUEST != 0 {
+		try _HTTP_ACTIVE_REQUEST.Abort()
+		_HTTP_ACTIVE_REQUEST := 0
+	}
 }
 
 ; Returns true if a request is currently in flight.

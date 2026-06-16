@@ -1,4 +1,4 @@
-﻿; drivers/autohotkey/lib/app_state.ahk
+﻿; static/ergopti_plus/windows/lib/app_state.ahk
 
 ; ==============================================================================
 ; MODULE: Application State

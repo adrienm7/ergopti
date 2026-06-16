@@ -1604,6 +1604,9 @@ LLM_TooltipShowLoading() {
 
 LLM_TooltipHide(accepted := false) {
 	global _LLM_Tooltip_Visible, _LLM_Tooltip_Slots, _LLM_Tooltip_Loading, _LLM_Tooltip_ShownAt
+	; Critical ensures the multi-variable write (Visible, Loading, Slots) is
+	; not interleaved with the #HotIf thread reading them in LLM_TooltipGetText.
+	local _c := Critical("On")
 	if (_LLM_Tooltip_Visible or _LLM_Tooltip_Loading)
 		try LoggerDebug("LLM.tt", "HIDE prediction via LLM_TooltipHide (accepted={1}, was visible={2} loading={3}).",
 			(accepted ? "true" : "false"),
@@ -1612,26 +1615,32 @@ LLM_TooltipHide(accepted := false) {
 	_LLM_Tooltip_Loading := false
 	_LLM_Tooltip_ShownAt := 0
 	_LLM_Tooltip_Slots   := []
+	Critical(_c)
 	_LLM_TooltipResetChain()
 	TooltipHide("LLM", true)
 }
 
 LLM_TooltipGetText() {
 	global _LLM_Tooltip_Visible, _LLM_Tooltip_Slots, _LLM_Tooltip_ActiveIdx
-	if !_LLM_Tooltip_Visible or _LLM_Tooltip_Slots.Length == 0
-		return ""
-	idx := _LLM_Tooltip_ActiveIdx
-	if (idx < 1 or idx > _LLM_Tooltip_Slots.Length)
-		return ""
-	text := _LLM_SlotGetText(_LLM_Tooltip_Slots[idx])
-	if (text != "")
-		return text
-	for s in _LLM_Tooltip_Slots {
-		SlotText := _LLM_SlotGetText(s)
-		if (SlotText != "")
-			return SlotText
+	; Critical serialises the multi-variable read against the timer callbacks
+	; that write _LLM_Tooltip_Visible / _LLM_Tooltip_Slots. Without it the
+	; #HotIf evaluator (a separate low-priority thread) can see Visible=true
+	; but Slots already cleared by a concurrent LLM_TooltipHide().
+	local _c := Critical("On")
+	try {
+		if !_LLM_Tooltip_Visible or _LLM_Tooltip_Slots.Length == 0
+			return ""
+		idx := _LLM_Tooltip_ActiveIdx
+		if (idx < 1 or idx > _LLM_Tooltip_Slots.Length)
+			return ""
+		; Return only the active slot — never fall back to a different slot than
+		; the one the user selected (▶ marker). If the active slot is a
+		; placeholder the Tab key passes through naturally via the empty-string
+		; return, avoiding silent injection of the wrong prediction.
+		return _LLM_SlotGetText(_LLM_Tooltip_Slots[idx])
+	} finally {
+		Critical(_c)
 	}
-	return ""
 }
 
 LLM_TooltipGetSlots() {

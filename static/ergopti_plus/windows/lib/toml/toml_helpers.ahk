@@ -99,10 +99,25 @@ ParseTomlFile(Path) {
 
         ; --- Continuation of a multi-line array ---
         if (PendingKey != "") {
+            ; Skip blank lines and comments inside a multi-line array
+            Stripped := Trim(Line)
+            if (Stripped == "" or SubStr(Stripped, 1, 1) == "#") {
+                continue
+            }
             PendingVal .= " " . Line
-            ; Once the closing ] is on a line by itself (or at end of val),
-            ; the accumulation is done
-            if InStr(Line, "]") {
+            ; Count unquoted ] to detect the real closing bracket — ignores ] inside strings
+            InStr2 := false
+            Depth := 0
+            Loop Parse PendingVal {
+                c := A_LoopField
+                if (c == '"')
+                    InStr2 := !InStr2
+                if (!InStr2 and c == "[")
+                    Depth++
+                if (!InStr2 and c == "]")
+                    Depth--
+            }
+            if (Depth <= 0) {
                 if !Sections.Has(Section)
                     Sections[Section] := Map()
                 Sections[Section][PendingKey] := TOML_CoerceValue(Trim(PendingVal))
@@ -200,8 +215,10 @@ TOML_CoerceValue(raw) {
 }
 
 TOML_Unescape(s) {
-    s := StrReplace(s, '\"', '"')
+    ; Process \\ FIRST so later replacements cannot misinterpret the resulting
+    ; single backslash (e.g. "\\n" must yield literal "\n", not a newline).
     s := StrReplace(s, "\\", "\")
+    s := StrReplace(s, '\"', '"')
     s := StrReplace(s, "\n", "`n")
     s := StrReplace(s, "\t", "`t")
     s := StrReplace(s, "\r", "`r")
@@ -363,8 +380,10 @@ TOML_BatchWrite(Path, Updates) {
 ; feeds their previous values back into TOML_BatchWrite. Do not rely on this
 ; step to remove stale keys; it normalizes formatting only.
 TOML_RunStrictCanonicalization(Path) {
-    global ConfigurationFile, _SaveFullConfigReady
+    global ConfigurationFile, _SaveFullConfigReady, AppState
 
+    if !IsSet(AppState) or !AppState.Has("toml_strict_canon_in_progress")
+        return
     if AppState["toml_strict_canon_in_progress"]
         return
     if !IsSet(ConfigurationFile)

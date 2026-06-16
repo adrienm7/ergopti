@@ -206,11 +206,14 @@ CS_WriteShortcutsSection(new_kv) {
     new_body := CS_ReplaceSection(body, CS_SECTION, rendered)
 
     tmp := path . ".tmp"
-    try FileDelete(tmp)
-    FileAppend(new_body, tmp, "UTF-8")
-    if FileExist(path)
-        FileDelete(path)
-    FileMove(tmp, path)
+    try {
+        try FileDelete(tmp)
+        FileAppend(new_body, tmp, "UTF-8")
+        FileMove(tmp, path, 1)   ; overwrite=1 is atomic on NTFS — no bare FileDelete(path) needed
+    } catch as Err {
+        try FileDelete(tmp)
+        try LoggerError("ConfigShortcuts", "Could not write config.toml: {1}.", Err.Message)
+    }
 }
 
 ; Render a single section to its [section]\nkey = value\n… form. A

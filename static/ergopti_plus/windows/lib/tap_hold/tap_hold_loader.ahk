@@ -48,15 +48,16 @@ LoadTapHoldToml(FilePath, DefaultsFilePath := "") {
 	Result := Map("keys", Map(), "layers", Map())
 	InheritDefaults := true
 
-	; When the user file opts out via [tap_hold] inherit_defaults = false
-	; (written by « Tout désactiver »), skip the shipped defaults overlay so
-	; every tap/hold slot stays empty after reload.
-	if FileExist(FilePath) {
-		Meta := Map("keys", Map(), "layers", Map())
-		_TapHold_ParseFileInto(FilePath, Meta)
-		if Meta.Has("inherit_defaults")
-			InheritDefaults := !!Meta["inherit_defaults"]
-	}
+	; Parse the user file once into UserData. Extract inherit_defaults from
+	; the result so we do not need a second pre-flight read of the same file.
+	; The data is later merged on top of the defaults overlay so the final
+	; order is still: defaults → user (user wins per-key).
+	UserData := Map("keys", Map(), "layers", Map())
+	if FileExist(FilePath)
+		_TapHold_ParseFileInto(FilePath, UserData)
+
+	if UserData.Has("inherit_defaults")
+		InheritDefaults := !!UserData["inherit_defaults"]
 
 	; Load shared defaults first when the caller supplies the path. Missing
 	; defaults file is non-fatal (logs a debug notice and continues).
@@ -77,10 +78,14 @@ LoadTapHoldToml(FilePath, DefaultsFilePath := "") {
 	}
 	try LoggerStart("TapHoldLoader", "Loading tap-hold config from '{1}'…", FilePath)
 
-	; Merge user file on top of defaults. Per-key fields overwrite default
-	; fields individually so a user entry that sets only tap_action still
-	; inherits time_activation_seconds from the default for that key.
-	_TapHold_ParseFileInto(FilePath, Result)
+	; Merge user data (already parsed above) on top of defaults.
+	; Per-key fields overwrite default fields individually so a user entry
+	; that sets only tap_action still inherits time_activation_seconds from
+	; the default for that key.
+	for k, v in UserData["keys"]
+		Result["keys"][k] := v
+	for k, v in UserData["layers"]
+		Result["layers"][k] := v
 
 	; Truncated-write sentinel: the user file exists yet the merged config has
 	; zero keys AND the user did NOT explicitly opt out via inherit_defaults =

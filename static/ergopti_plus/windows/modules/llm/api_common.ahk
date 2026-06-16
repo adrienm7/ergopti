@@ -115,6 +115,14 @@ _LLM_Common_ParseInferenceJson(raw) {
  */
 _LLM_Common_ParseSectionBody(body) {
 	out := Map()
+	; Quoted string values — matched before numbers/booleans so "true" and "123"
+	; inside quotes are preserved as strings rather than coerced
+	pos_str := 1
+	while RegExMatch(body, '"([A-Za-z_0-9]+)"\s*:\s*"([^"]*)"', &ms, pos_str) {
+		if (SubStr(ms[1], 1, 1) != "_")
+			out[ms[1]] := ms[2]
+		pos_str := ms.Pos + ms.Len
+	}
 	; Numbers and booleans
 	pos := 1
 	while RegExMatch(body, '"([A-Za-z_0-9]+)"\s*:\s*(-?[0-9]+(?:\.[0-9]+)?|true|false)', &m, pos) {
@@ -345,7 +353,6 @@ _LLM_ApiCommon_PredText(pred) {
 LLM_ApiCommon_LogSummary(mode, requested, stats, kept_count) {
 	candidates := (IsObject(stats) and stats.Has("candidates")) ? stats["candidates"] : 0
 	duplicates := (IsObject(stats) and stats.Has("duplicates")) ? stats["duplicates"] : 0
-	try LoggerInfo("llm.api_common",
-		"Résumé prédictions [{1}]: demandées={2}, candidates={3}, doublons={4}, retenues={5}",
+	try LoggerDebug("LLMCommon", "Prediction summary [{1}]: requested={2}, candidates={3}, duplicates={4}, kept={5}.",
 		mode, requested, candidates, duplicates, kept_count)
 }

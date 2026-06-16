@@ -64,6 +64,10 @@ TimerAfter(DelaySec, Fn) {
 	Handle := Map("Fn", 0, "Interval", 0, "Fired", false, "Id", _TimerAdapterNextId())
 	; Convert seconds to the negative milliseconds AHK uses for one-shot timers.
 	Ms := -Round(DelaySec * 1000)
+	; AHK v2 treats SetTimer(fn, 0) as cancel, not immediate-one-shot; use -1 ms
+	; as the minimum delay when DelaySec rounds to zero.
+	if Ms = 0
+		Ms := -1
 	; Wrap Fn in a closure that marks the handle fired and calls the user callback.
 	BoundFn := _TimerAdapterMakeOneShot(Handle, Fn)
 	Handle["Fn"] := BoundFn
@@ -82,6 +86,11 @@ TimerEvery(IntervalSec, Fn) {
 	global _TIMER_ADAPTER_REGISTRY
 	Handle := Map("Fn", 0, "Interval", 0, "Fired", false, "Id", _TimerAdapterNextId())
 	Ms := Round(IntervalSec * 1000)
+	; AHK treats SetTimer with interval=0 as a cancel; clamp to 1ms minimum so a
+	; near-zero interval still fires as a true repeating timer rather than silently
+	; defaulting to the 250ms AHK fallback
+	if Ms <= 0
+		Ms := 1
 	; Wrap Fn so uncaught exceptions are logged without crashing the timer thread.
 	BoundFn := _TimerAdapterMakeRepeating(Handle, Fn)
 	Handle["Fn"] := BoundFn

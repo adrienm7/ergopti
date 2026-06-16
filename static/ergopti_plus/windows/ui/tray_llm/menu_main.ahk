@@ -38,7 +38,11 @@
  */
 LLM_Tray_Build() {
 	global _LLM_Tray, _LLM_Tray_Menu, _LLM_Tray_InTray
-
+	static _Building := false
+	if _Building
+		return
+	_Building := true
+	try {
 	; Clear all existing items so we can repopulate in place.
 	try _LLM_Tray_Menu.Delete()
 
@@ -170,5 +174,8 @@ LLM_Tray_Build() {
 		try A_TrayMenu.Check(t("menu.llm.title"))
 	} else {
 		try A_TrayMenu.Uncheck(t("menu.llm.title"))
+	}
+	} finally {
+		_Building := false
 	}
 }

@@ -307,8 +307,10 @@ SendInstant(Text) {
 	; yet, so the clipboard still holds its payload. Touching A_Clipboard now
 	; would race the in-flight paste/restore — fall back to the clipboard-free
 	; {Text} route so the two dances never interleave.
+	; SendInput (not SendEvent) is used here to stay atomic and avoid interleaving
+	; with the InputHook, which processes SendEvent characters as physical input.
 	if _SEND_INSTANT_CLIP_BUSY {
-		SendEvent("{Text}" Text)
+		SendInput("{Text}" Text)
 		return
 	}
 	OldClipboard := ClipboardAll()

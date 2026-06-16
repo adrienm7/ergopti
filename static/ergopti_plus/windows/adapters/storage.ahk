@@ -116,14 +116,17 @@ ST_Keys() {
 }
 
 ; Deletes every value under STORAGE_REG_BASE by iterating ST_Keys().
-; @return {Boolean} True on success, false on error.
+; Returns false if any individual key deletion fails.
+; @return {Boolean} True only when every key was deleted without error.
 ST_Clear() {
 	try {
-		local Keys := ST_Keys()
+		local Keys   := ST_Keys()
+		local AllOk  := true
 		for K in Keys {
-			ST_Delete(K)
+			if !ST_Delete(K)
+				AllOk := false
 		}
-		return true
+		return AllOk
 	} catch {
 		return false
 	}

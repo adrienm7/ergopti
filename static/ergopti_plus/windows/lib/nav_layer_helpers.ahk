@@ -45,7 +45,20 @@ ResetNumberOfRepetitions() {
 }
 
 SetNumberOfRepetitions(NewNumber) {
-	AppState_SetNumberOfRepetitions(NewNumber)
+	global NumberOfRepetitions := NewNumber
+}
+
+; Wrapper used by nav_layer.ahk hotkeys to read the repetition counter without
+; coupling hotkey code to the global variable name directly.
+AppState_GetNumberOfRepetitions() {
+	global NumberOfRepetitions
+	return NumberOfRepetitions
+}
+
+; Wrapper used by layout.ahk / nav_layer_helpers to update the repetition
+; counter through a single named write path.
+AppState_SetNumberOfRepetitions(N) {
+	global NumberOfRepetitions := N
 }
 
 ActionLayer(action) {

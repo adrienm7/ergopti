@@ -302,7 +302,16 @@ _LLMRemote_TrimAsyncRegistry() {
     global _LLM_Remote_Async, LLM_REMOTE_MAX_INFLIGHT
     if (_LLM_Remote_Async.Count < LLM_REMOTE_MAX_INFLIGHT)
         return
-    for oldest_id, _entry in _LLM_Remote_Async {
+    for oldest_id, oldest_entry in _LLM_Remote_Async {
+        ; Abort the live WinHTTP request so the COM object + socket are
+        ; released now rather than lingering until WinHTTP's own timeout.
+        if oldest_entry.Has("http")
+            try oldest_entry["http"].Abort()
+        ; Honour the async contract: exactly one of on_success / on_fail must
+        ; fire. Without this the caller (e.g. the prediction engine slot state
+        ; machine) hangs forever waiting for a callback that will never arrive.
+        if oldest_entry.Has("on_fail") and oldest_entry["on_fail"] is Func
+            try oldest_entry["on_fail"].Call()
         _LLM_Remote_Async.Delete(oldest_id)
         return
     }

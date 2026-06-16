@@ -60,8 +60,11 @@ _BackspaceHoldModKey() {
 	}
 	ModKey := _BackspaceHoldModKey()
 	TextPressKey(ModKey, "Down")
-	KeyWait("BackSpace", "U")
-	TextPressKey(ModKey, "Up")
+	try {
+		KeyWait("BackSpace", "U T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC)
+	} finally {
+		TextPressKey(ModKey, "Up")
+	}
 }
 #HotIf
 
@@ -82,8 +85,11 @@ _BackspaceHoldModKey() {
 		return
 	}
 	ActivateLayer()
-	KeyWait("BackSpace", "U")
-	DisableLayer()
+	try {
+		KeyWait("BackSpace", "U T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC)
+	} finally {
+		DisableLayer()
+	}
 }
 #HotIf
 

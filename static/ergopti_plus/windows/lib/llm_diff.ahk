@@ -93,11 +93,15 @@ LLM_Diff_Compute(buffer_tail, prediction) {
 	if (chunks.Length > 0 and chunks[1].type == "equal")
 		chunks[1].text := LTrim(chunks[1].text)
 
+	; Evaluate HasCorrections after the trim so a chunk that becomes empty
+	; after stripping leading spaces is not counted as a real correction
+	has_corrections := (chunks.Length > 0 and chunks[1].type == "equal" and chunks[1].text != "")
+
 	return {
 		Text:           prediction,
 		Chunks:         chunks,
 		NextWords:      insert_text,
-		HasCorrections: (equal_text != "")
+		HasCorrections: has_corrections
 	}
 }
 
@@ -126,7 +130,7 @@ _LLM_Diff_Tokenize(text) {
 
 	loop parse, text {
 		c := A_LoopField
-		if RegExMatch(c, "[\w']")
+		if RegExMatch(c, "[\w']") or Ord(c) >= 128   ; >= 128 catches accented, CJK, emoji, etc.
 			t := 1
 		else if (c == " " or c == "`t" or Ord(c) == 160)   ; 160 = nbsp
 			t := 2
