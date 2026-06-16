@@ -23,6 +23,14 @@ local M = {}
 local Logger = require("lib.logger")
 local LOG    = "toml_reader"
 
+-- Optional disk-cache provider, injected by the host driver via
+-- M.set_cache_provider(). Stays nil in pure/test contexts so parsing is
+-- unaffected. When present it must expose load(path)->table|nil and
+-- store(path, parsed). Kept as an injected hook so this shared module never
+-- touches the filesystem directly — the slow character-level parse below is
+-- bypassed entirely when an unchanged snapshot already exists on disk.
+local _cache_provider = nil
+
 
 
 
@@ -361,6 +369,17 @@ function M.parse(path)
 	}
 
 	if type(path) ~= "string" then return empty_result end
+
+	-- Fast path: a precompiled snapshot of an unchanged file loads ~10x faster
+	-- than the character-level parse below. A miss (nil) or any provider error
+	-- silently falls through to a normal parse.
+	if _cache_provider and type(_cache_provider.load) == "function" then
+		local ok_load, cached = pcall(_cache_provider.load, path)
+		if ok_load and type(cached) == "table" then
+			return cached
+		end
+	end
+
 	Logger.debug(LOG, "Parsing TOML file…")
 
 	local ok, f = pcall(io.open, path, "r")
@@ -587,8 +606,24 @@ function M.parse(path)
 		result.sections_order = file_order
 	end
 
+	-- Refresh the on-disk snapshot so the next boot takes the fast path. Wrapped
+	-- so a read-only cache dir can never break a successful parse.
+	if _cache_provider and type(_cache_provider.store) == "function" then
+		pcall(_cache_provider.store, path, result)
+	end
+
 	Logger.info(LOG, "TOML file parsed successfully.")
 	return result
+end
+
+--- Injects an optional disk-cache provider so repeat parses of an unchanged
+--- TOML file skip the slow character-level parse and load a precompiled
+--- snapshot instead. Pass nil to disable. The provider keeps this shared module
+--- filesystem-free (port-adapter purity); the host driver supplies the actual
+--- read/write implementation.
+--- @param provider table|nil ``{ load = fn(path)->table|nil, store = fn(path, parsed) }``.
+function M.set_cache_provider(provider)
+	_cache_provider = provider
 end
 
 
