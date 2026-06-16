@@ -178,6 +178,27 @@ Boot.mark("Path: log file open (retention purge deferred)")
 Logger.install_runtime_error_capture()
 Boot.mark("Path: runtime error capture installed")
 
+-- TOML hotstring snapshot cache. The shared parser walks every source byte by
+-- hand, which dominates the "Hotstring groups registered" boot phase; caching the
+-- parsed result as a precompiled Lua chunk makes every boot with unchanged files
+-- load ~10x faster. Wired here — before any keymap.load_toml — so the first boot
+-- after a file change re-parses and refreshes the snapshot, every later boot reads
+-- it, and the same-boot delay-reading pass also hits the snapshot. Kept in an
+-- adapter so shared/ stays filesystem-free (the reader sees only a load/store hook).
+do
+	local ok_cache, toml_cache = pcall(require, "adapters.toml_cache")
+	if ok_cache and type(toml_cache) == "table" and type(toml_cache.init) == "function" then
+		toml_cache.init((hs.configdir or ".") .. "/cache/toml_hotstrings")
+		local ok_reader, toml_reader = pcall(require, "lib.toml_reader")
+		if ok_reader and type(toml_reader) == "table" and type(toml_reader.set_cache_provider) == "function" then
+			toml_reader.set_cache_provider(toml_cache)
+		end
+	else
+		Logger.warn(LOG, "TOML hotstring cache adapter unavailable — falling back to full parsing.")
+	end
+end
+Boot.mark("TOML hotstring cache wired")
+
 -- Now safe to load modules that depend on config_dir
 local file_system        = require("adapters.file_system")
 local karabiner          = require("modules.karabiner")
