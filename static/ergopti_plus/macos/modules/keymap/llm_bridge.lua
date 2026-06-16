@@ -663,7 +663,12 @@ function M.apply_prediction(idx)
 	local _, emitted_str = km_utils.emit_text(text_to_type)
 	_state.expected_synthetic_chars = _state.expected_synthetic_chars .. emitted_str
 
-	if emitted_str ~= "" then keylogger.notify_synthetic(emitted_str, "llm", delete_count) end
+	-- Notify even when emitted_str is empty (paste path): the keylogger must
+	-- still see the delete_count backspaces as synthetic, otherwise it counts
+	-- them as human corrections and desynchronises its rolling buffer.
+	if delete_count > 0 or emitted_str ~= "" then
+		keylogger.notify_synthetic(emitted_str, "llm", delete_count)
+	end
 	keylogger.log_llm_accepted(text_to_type, nil, all_preds, idx, delete_count, deleted_text)
 
 	-- Update the in-memory buffer to reflect the accepted completion.

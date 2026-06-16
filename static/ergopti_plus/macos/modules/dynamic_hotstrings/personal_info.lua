@@ -23,6 +23,9 @@ local LOG      = "personal_info"
 local ok_editor, ui_editor = pcall(require, "ui.personal_info_editor")
 if not ok_editor then ui_editor = nil end
 
+local ok_kl, keylogger = pcall(require, "modules.keylogger")
+if not ok_kl then keylogger = nil end
+
 
 
 
@@ -236,9 +239,26 @@ local function do_expand(combo)
 
 	_replacing = true
 
-	-- Suppress keymap rescan to avoid interference during injection
-	if _keymap and type(_keymap.suppress_rescan) == "function" then
-		_keymap.suppress_rescan()
+	-- Suppress keymap rescan to avoid interference during injection, and arm
+	-- the synthetic counters so backspace + text echoes are not treated as real
+	-- keystrokes. Both calls must precede the actual keystroke injection.
+	if _keymap then
+		if type(_keymap.suppress_rescan) == "function" then
+			_keymap.suppress_rescan()
+		end
+		if type(_keymap.arm_synthetic) == "function" then
+			-- Build the emitted text: values joined by tab characters
+			local emitted = table.concat(parts, "\t")
+			_keymap.arm_synthetic(n_back, emitted)
+		end
+	end
+
+	-- Notify the keylogger so the injected keystrokes are tagged synthetic and
+	-- never stored as human typing. Personal data (IBAN, SSN, phone, credit
+	-- card) must not reach the keylogger's character buffer or n-gram tables.
+	if keylogger and type(keylogger.notify_synthetic) == "function" then
+		local emitted = table.concat(parts, "\t")
+		pcall(keylogger.notify_synthetic, emitted, "hotstring", n_back, "personal")
 	end
 
 	local ok, err = pcall(function()
