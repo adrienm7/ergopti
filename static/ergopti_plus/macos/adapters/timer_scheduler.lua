@@ -141,6 +141,19 @@ function M.now()
 	return ok and t or os.time()
 end
 
+--- Returns a high-resolution monotonic timestamp in nanoseconds. Wraps
+--- hs.timer.absoluteTime() (the macOS analog of QueryPerformanceCounter) so the
+--- sub-millisecond hot-path profiler has no direct hs.timer dependency. Falls
+--- back to secondsSinceEpoch scaled to ns when absoluteTime is unavailable.
+--- @return number Nanoseconds from an arbitrary monotonic origin.
+function M.now_ns()
+	if hs and hs.timer and hs.timer.absoluteTime then
+		local ok, t = pcall(hs.timer.absoluteTime)
+		if ok and t then return t end
+	end
+	return M.now() * 1e9
+end
+
 --- Suspends execution for the given number of microseconds.
 --- Wraps hs.timer.usleep(). Use sparingly — this blocks the Lua thread.
 --- @param microseconds integer Number of microseconds to sleep.

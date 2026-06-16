@@ -18,6 +18,7 @@ local LOG = "tooltip_llm"
 
 local Config = require("ui.tooltip.config")
 local Renderer = require("ui.tooltip.renderer")
+local HotPath = require("lib.hotpath_profiler")
 
 local MAC_KEYCODES_NUMBERS = {
 	[18] = 1, [19] = 2, [20] = 3, [21] = 4, [23] = 5,
@@ -790,6 +791,10 @@ function M.navigate(delta)
 end
 
 function M.show_predictions(predictions, current_index, is_enabled, info_bar, shortcut_modifier, indent, navigation_modifiers, background_color, loading_text, max_reserved_count)
+	-- Latency tripwire: this runs on the streaming hot path (re-fired per token),
+	-- so a slow assemble/width-calc/render surfaces as one WARNING instead of an
+	-- invisible per-keystroke drag. Silent when the render is fast.
+	local _hot_t0 = HotPath.now()
 	local ok, err = pcall(function()
 		if not is_enabled then return end
 		
@@ -887,6 +892,7 @@ function M.show_predictions(predictions, current_index, is_enabled, info_bar, sh
 	else
 		Logger.error(LOG, "Crash during show_predictions initialization: " .. tostring(err) .. ".")
 	end
+	HotPath.log_if_slow("tooltip.show_predictions", _hot_t0, "LLM prediction render")
 end
 
 function M.make_diff_styled(diff_chunks, next_words, fallback_text)

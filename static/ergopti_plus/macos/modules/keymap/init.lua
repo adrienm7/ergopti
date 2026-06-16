@@ -29,6 +29,7 @@ local Expander   = require("modules.keymap.expander")
 local LLMBridge  = require("modules.keymap.llm_bridge")
 local CoreStateM = require("modules.keymap.state")
 local Perf       = require("lib.perf")
+local HotPath    = require("lib.hotpath_profiler")
 
 local M   = {}
 local LOG = "keymap"
@@ -793,9 +794,16 @@ end
 --- @param e table Event parameters.
 --- @return boolean Pass-through result from the inner handler.
 local function onKeyDown(e)
+	-- Always-on latency tripwire (ported from the AHK hot-path profiler): two
+	-- monotonic clock reads per keystroke, logging a WARNING only when a keystroke
+	-- exceeds the slow threshold. Normal typing stays silent; a real hitch surfaces
+	-- with the offending char + buffer tail so "typing feels slow" is diagnosable
+	-- from the log alone. Opt-in Perf.sample below adds the p50/p99 distribution.
+	local t0_hot = HotPath.now()
 	local t0 = Perf.is_enabled() and Perf.now() or nil
 	local ok, result = pcall(onKeyDownRaw, e)
 	if t0 then Perf.sample("keymap_keydown", t0) end
+	HotPath.log_if_slow("keydown", t0_hot, _tc_chars)
 	if not ok then
 		Logger.error(LOG, "Keyboard interception failure: %s.", tostring(result))
 		-- An uncaught error inside the callback can cause macOS to disable the

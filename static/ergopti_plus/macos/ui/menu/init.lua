@@ -123,6 +123,16 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	local updateMenu
 	local _suppress_watcher_until = 0
 
+	-- Menu-cache state. Builder.generate() is expensive (counts every hotstring
+	-- group, builds the layout/apps/karabiner submenus, renders the badge), and
+	-- Hammerspoon evaluates the setMenu callback on EVERY click — so rebuilding it
+	-- per click was the ~1 s menu-open latency. We cache the generated tree and
+	-- only rebuild when a state change marks it dirty (or the pause state flips),
+	-- so the common "open → browse → close" path returns the cached tree instantly.
+	local _cached_menu_items = nil
+	local _menu_dirty        = true   -- forces the first build; set true on any state change
+	local _cached_paused     = false  -- pause state baked into the cached tree
+
 	local state = Preferences.build_initial_state(hotfiles, menu_mods, core_mods)
 
 
@@ -234,6 +244,9 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		Preferences.save(MenuPaths.get("ConfigTomlPath"), state, hotfiles, core_mods)
 		if type(Builder.invalidate_cache) == "function" then Builder.invalidate_cache() end
 		if type(HotCounter.invalidate_cache) == "function" then HotCounter.invalidate_cache() end
+		-- A persisted preference change (group/section toggle, trigger char, …)
+		-- alters the menu tree → force a rebuild on the next open.
+		_menu_dirty = true
 	end
 
 
@@ -776,27 +789,55 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		karabiner                = karabiner,
 	}
 
-	-- updateMenu refreshes the menubar icon and re-wires script_control extras.
-	-- It does NOT rebuild the menu table — that happens lazily on each click via
-	-- the setMenu callback below, keeping toggles and state changes lag-free.
+	-- updateMenu refreshes the menubar icon and re-wires script_control extras,
+	-- then marks the cached menu tree dirty so the NEXT open reflects the change.
+	-- It does NOT rebuild synchronously — the rebuild happens lazily, once, on the
+	-- next click via the setMenu callback below, keeping toggles lag-free.
 	updateMenu = function()
 		pcall(update_icon)
 		if type(core_mods.shortcuts_mod) == "table"
 			and type(core_mods.shortcuts_mod.set_extras) == "function" then
 			pcall(core_mods.shortcuts_mod.set_extras, actions)
 		end
+		_menu_dirty = true
 	end
 
 	ctx.updateMenu   = updateMenu
 	ctx.refresh_icon = function() pcall(update_icon) end
 
-	-- Register the menu callback once. Hammerspoon calls it only when the user
-	-- clicks the menubar icon — never on toggles — so Builder.generate() runs
-	-- at most once per user interaction, not after every state change.
+	-- Rebuilds and caches the full menubar tree, timing the build so a slow menu
+	-- is visible in the boot/runtime log (the macOS analog of the AHK menu-build
+	-- profiling). ctx.paused is refreshed here because the cached tree bakes the
+	-- master-toggle's checked/fn state from it.
+	local function rebuild_menu_cache()
+		local t0 = hs.timer.secondsSinceEpoch()
+		local ok_b, items = pcall(Builder.generate, ctx, menu_mods, actions)
+		local elapsed_ms = (hs.timer.secondsSinceEpoch() - t0) * 1000
+		if ok_b and type(items) == "table" then
+			_cached_menu_items = items
+			_cached_paused     = ctx.paused
+			_menu_dirty        = false
+			Logger.info(LOG, "Menu tree rebuilt in %.1f ms (%d top-level item(s)).", elapsed_ms, #items)
+		else
+			Logger.error(LOG, "Menu tree rebuild failed (%.1f ms): %s.", elapsed_ms, tostring(items))
+		end
+	end
+	ctx.rebuild_menu_cache = rebuild_menu_cache
+
+	-- Register the menu callback once. Hammerspoon evaluates it on every click;
+	-- we return the cached tree unless a state change marked it dirty or the pause
+	-- state flipped (a cheap boolean read), in which case we rebuild ONCE on this
+	-- open and cache the result. Pure browsing then costs a single table return.
 	pcall(function()
 		myMenu:setMenu(function()
-			ctx.paused = core_mods.shortcuts_mod and type(core_mods.shortcuts_mod.is_paused) == "function" and core_mods.shortcuts_mod.is_paused() or false
-			return Builder.generate(ctx, menu_mods, actions)
+			local paused_now = core_mods.shortcuts_mod
+				and type(core_mods.shortcuts_mod.is_paused) == "function"
+				and core_mods.shortcuts_mod.is_paused() or false
+			if _menu_dirty or not _cached_menu_items or paused_now ~= _cached_paused then
+				ctx.paused = paused_now
+				rebuild_menu_cache()
+			end
+			return _cached_menu_items or {}
 		end)
 	end)
 
@@ -816,6 +857,13 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		if menu_mods.karabiner and type(menu_mods.karabiner.prime) == "function" then
 			pcall(menu_mods.karabiner.prime, ctx)
 		end
+		-- Now that the expensive submenu caches are warm, build the menu tree once
+		-- off the boot path so the user's FIRST click renders the cached tree
+		-- instantly instead of paying the full Builder.generate() cost inline.
+		ctx.paused = core_mods.shortcuts_mod
+			and type(core_mods.shortcuts_mod.is_paused) == "function"
+			and core_mods.shortcuts_mod.is_paused() or false
+		rebuild_menu_cache()
 	end)
 
 	-- Background update poller — parity with AHK ErgoptiPlus.ahk boot path.

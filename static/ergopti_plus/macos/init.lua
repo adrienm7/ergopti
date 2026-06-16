@@ -118,6 +118,12 @@ do
 	end
 end
 
+-- Boot-phase profiler — ported from the AHK driver. Begin timing as early as the
+-- logger is ready so every subsequent Boot.mark() reports its delta + running
+-- total in the boot log, making a slow startup self-diagnosing (no profiler attach).
+local Boot               = require("lib.boot_profiler")
+Boot.begin()
+
 local i18n               = require("lib.i18n")
 local locale_mod         = require("lib.locale")
 local crash_reporter     = require("lib.crash_reporter")
@@ -138,6 +144,7 @@ locale_mod.set_trigger_provider(function() return keymap.get_trigger_char and ke
 _G.keymap = keymap
 local shortcuts          = require("modules.shortcuts")
 local dynamic_hotstrings = require("modules.dynamic_hotstrings")
+Boot.mark("Core module requires")
 
 -- ===================================
 -- ===================================
@@ -166,6 +173,7 @@ Logger.init_log_path(menu_paths.get_config_dir(), 14)
 -- and the LLM boot sequence), and tees print() into the file. Installed right
 -- after the log path is known so every capture lands in today's dated file.
 Logger.install_runtime_error_capture()
+Boot.mark("Path resolution + log path")
 
 -- Now safe to load modules that depend on config_dir
 local file_system        = require("adapters.file_system")
@@ -184,6 +192,7 @@ local ui_restore         = require("lib.ui_restore")
 Logger.set_error_notification_handler(function(module_name, message)
 	pcall(notifications.notify, i18n.get("common.error_prefix") .. tostring(module_name), message, "error")
 end)
+Boot.mark("Config-dependent module requires")
 
 -- Global uncaught-error handler: offer the user an opt-in crash report.
 -- Hammerspoon surfaces unhandled errors via hs.crash.crashLog, but there is no
@@ -216,6 +225,7 @@ gestures.start()
 Logger.debug(LOG, "Starting shortcuts module…")
 shortcuts.start()
 Logger.info(LOG, "Main modules initialized successfully.")
+Boot.mark("Gestures + shortcuts pre-start")
 
 -- Hammerspoon does not always reap children on quit/reload, so a fresh boot can
 -- find leftover mlx_lm.server processes from previous sessions. When SEVERAL still
@@ -262,6 +272,8 @@ do
 	Logger.info(LOG, "[BOOT-NUKE] mlx_lm selective cleanup ok=%s output=%s",
 		tostring(ok), (out or ""):gsub("\n", " | "))
 end
+
+Boot.mark("MLX server cleanup")
 
 -- Background deps check for the active LLM backend. The detector picks
 -- MLX on Apple Silicon (≥ macOS 13) and Ollama everywhere else; a
@@ -328,6 +340,8 @@ if boot_llm_enabled then
 else
 	Logger.info(LOG, "LLM boot disabled at startup — skipping backend bootstrap.")
 end
+
+Boot.mark("LLM backend bootstrap")
 
 local configured_hotstrings_dir = menu_paths.get("HotstringsDirPath")
 local bundled_hotstrings_dir    = base_dir .. "../shared/hotstrings/"
@@ -553,6 +567,7 @@ local hotfile_paths = {}
 -- Loading order determines group_order (asc = higher priority), so personal
 -- hotstrings must be registered FIRST to beat same-length common hotstrings.
 keymap.defer_sort()
+Boot.mark("TOML discovery + ordering")
 
 
 
@@ -662,12 +677,14 @@ for _, fname in ipairs(toml_fnames) do
 end
 Logger.info(LOG, string.format("Loaded %d TOML hotstring file(s) in %.1fms.",
 	#toml_fnames, (hs.timer.secondsSinceEpoch() - _toml_load_t0) * 1000))
+Boot.mark("Hotstring groups registered (personal + dynamic + common)")
 
 -- Single final sort covering personal + dynamic + common TOML groups.
 local _sort_t0 = hs.timer.secondsSinceEpoch()
 keymap.flush_sort()
 Logger.info(LOG, string.format("Final mapping sort completed in %.1fms.",
 	(hs.timer.secondsSinceEpoch() - _sort_t0) * 1000))
+Boot.mark("Final mapping sort + tail-index rebuild")
 
 
 
@@ -696,6 +713,7 @@ Logger.debug(LOG, "Starting script control engine…")
 shortcuts.start_script_control(keymap, shortcuts, gestures, karabiner)
 
 Logger.info(LOG, "User interface initialized successfully.")
+Boot.mark("Menu + UI + script control start")
 
 
 
@@ -836,6 +854,8 @@ end
 -- =====================================
 -- ====================================
 
+Boot.mark("File watchers armed")
+
 hs.shutdownCallback = function()
 	pcall(function() hs.settings.set(HS_BOOT_READY_SETTING_KEY, false) end)
 	Logger.info(LOG, "Hammerspoon is shutting down — cleaning up resources…")
@@ -886,6 +906,7 @@ hs.timer.doAfter(2, function()
 	pcall(function() require("ui.ui_builder").warmup_webkit() end)
 end)
 
+Boot.mark("Boot complete (post-init deferrals scheduled)")
 Logger.info(LOG, "════════════════════════════════════════════════════════════")
 Logger.info(LOG, "✅ Hammerspoon boot SUCCESSFUL.")
 Logger.info(LOG, "════════════════════════════════════════════════════════════")
