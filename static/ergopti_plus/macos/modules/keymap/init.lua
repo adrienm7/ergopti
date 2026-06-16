@@ -341,6 +341,26 @@ function M.suppress_rescan(duration)
 	CoreState.suppress_rescan(duration)
 end
 
+--- Centralized entry point for external modules (rules_engine, personal_info)
+--- to emit synthetic keystrokes and accurately sync the core buffer.
+function M.inject_dynamic(deletes, result_text, emit_action, source_variant)
+	Expander.perform_text_replacement(
+		deletes,
+		emit_action,
+		function()
+			local ok, start_pos = pcall(utf8.offset, CoreState.buffer, -deletes)
+			if not ok or not start_pos or deletes >= #CoreState.buffer then
+				start_pos = 1
+			end
+			CoreState.buffer = (CoreState.buffer:sub(1, start_pos - 1) or "") .. result_text
+		end,
+		true, -- is_final (suppress rescan)
+		false, -- is_ignored
+		"hotstring",
+		source_variant
+	)
+end
+
 --- Arms the synthetic-event counters so the main eventtap knows to skip the
 --- echoes of keystrokes that an external injector (rules_engine, personal_info)
 --- is about to emit. Must be called BEFORE the first keyStroke/keyStrokes call.

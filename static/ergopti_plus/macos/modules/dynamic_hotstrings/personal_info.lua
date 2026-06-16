@@ -236,42 +236,45 @@ local function do_expand(combo)
 	Logger.debug(LOG, "Injecting personal data…")
 	local n_back = 1 + #combo
 	local parts  = resolve_combo(combo)
-
 	_replacing = true
-
-	-- Suppress keymap rescan to avoid interference during injection, and arm
-	-- the synthetic counters so backspace + text echoes are not treated as real
-	-- keystrokes. Both calls must precede the actual keystroke injection.
-	if _keymap then
-		if type(_keymap.suppress_rescan) == "function" then
-			_keymap.suppress_rescan()
-		end
-		if type(_keymap.arm_synthetic) == "function" then
-			-- Build the emitted text: values joined by tab characters
-			local emitted = table.concat(parts, "\t")
-			_keymap.arm_synthetic(n_back, emitted)
-		end
-	end
-
-	-- Notify the keylogger so the injected keystrokes are tagged synthetic and
-	-- never stored as human typing. Personal data (IBAN, SSN, phone, credit
-	-- card) must not reach the keylogger's character buffer or n-gram tables.
-	if keylogger and type(keylogger.notify_synthetic) == "function" then
-		local emitted = table.concat(parts, "\t")
-		pcall(keylogger.notify_synthetic, emitted, "hotstring", n_back, "personal")
-	end
+	local emitted = table.concat(parts, "\t")
 
 	local ok, err = pcall(function()
-		-- Delete the typed combo characters
-		for _ = 1, n_back do
-			eventtap.keyStroke({}, "delete", 0)
-		end
-
-		-- Insert the resolved strings with tabs in between
-		for i, value in ipairs(parts) do
-			eventtap.keyStrokes(value)
-			if i < #parts then
-				eventtap.keyStroke({}, "tab", 0)
+		if _keymap and type(_keymap.inject_dynamic) == "function" then
+			_keymap.inject_dynamic(n_back, emitted, function()
+				local c = 0
+				local ok_tu, text_utils = pcall(require, "lib.text_utils")
+				for i, value in ipairs(parts) do
+					eventtap.keyStrokes(value)
+					if ok_tu and type(text_utils.utf8_len) == "function" then
+						c = c + text_utils.utf8_len(value)
+					else
+						c = c + #value
+					end
+					if i < #parts then
+						eventtap.keyStroke({}, "tab", 0)
+						c = c + 1
+					end
+				end
+				return c, emitted
+			end, "personal")
+		else
+			-- Fallback
+			if _keymap then
+				if type(_keymap.suppress_rescan) == "function" then _keymap.suppress_rescan() end
+				if type(_keymap.arm_synthetic) == "function" then _keymap.arm_synthetic(n_back, emitted) end
+			end
+			if keylogger and type(keylogger.notify_synthetic) == "function" then
+				pcall(keylogger.notify_synthetic, emitted, "hotstring", n_back, "personal")
+			end
+			for _ = 1, n_back do
+				eventtap.keyStroke({}, "delete", 0)
+			end
+			for i, value in ipairs(parts) do
+				eventtap.keyStrokes(value)
+				if i < #parts then
+					eventtap.keyStroke({}, "tab", 0)
+				end
 			end
 		end
 	end)
