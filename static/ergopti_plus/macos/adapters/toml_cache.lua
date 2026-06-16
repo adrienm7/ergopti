@@ -16,9 +16,13 @@
 ---    the filesystem (io.open) and Hammerspoon APIs (hs.fs) — so the shared
 ---    reader stays pure. The reader sees only an injected load/store hook.
 --- 2. Robust invalidation: a snapshot is served only when the source file's
----    modification time AND size match the values captured when it was written,
----    and the embedded schema version matches. Any mismatch (or a missing /
----    corrupt snapshot) is a silent miss that falls back to a normal parse.
+---    modification time, size, AND a content fingerprint match the values
+---    captured when it was written, and the embedded schema version matches.
+---    The fingerprint guards against HFS+ 1-second mtime resolution where an
+---    edit + reload within the same wall-clock second would otherwise return a
+---    stale snapshot when the file size happened to stay the same. Any mismatch
+---    (or a missing / corrupt snapshot) is a silent miss that falls back to a
+---    normal parse.
 --- 3. Fail-safe: every filesystem call is wrapped in pcall. A read-only cache
 ---    dir, a partial write, or a syntax error in a snapshot degrades to a parse,
 ---    never to a crash or — worse — stale data.
@@ -43,7 +47,13 @@ local LOG    = "adapters.toml_cache"
 --- the table returned by reader.parse() changes, so stale snapshots written by
 --- an older parser are rejected (treated as a miss) instead of fed back with a
 --- now-incompatible structure.
-local CACHE_VERSION = 1
+--- Bumped from 1→2 when the content fingerprint field `fp` was added.
+local CACHE_VERSION = 2
+
+--- Number of bytes read from the source file to build the content fingerprint.
+--- 512 bytes is enough to catch any realistic same-second edit while keeping the
+--- overhead to a single small read that occurs only when mtime+size already match.
+local FINGERPRINT_READ_BYTES = 512
 
 --- djb2 hash seed and modulus (32-bit) used to derive a collision-resistant
 --- snapshot filename from the full source path.
@@ -136,6 +146,29 @@ local function source_attr(path)
 	return { mtime = a.modification, size = a.size }
 end
 
+--- Computes a 32-bit FNV-1a-like fingerprint over the first FINGERPRINT_READ_BYTES
+--- of a source file. Called only when mtime and size already match, so the extra
+--- io.open is on the rarely-taken "same-second edit" path, not the happy path.
+--- @param path string Absolute source path.
+--- @return number|nil 32-bit non-negative integer, or nil if the file cannot be read.
+local function content_fingerprint(path)
+	local ok, result = pcall(function()
+		local f = io.open(path, "rb")
+		if not f then return nil end
+		local chunk = f:read(FINGERPRINT_READ_BYTES)
+		f:close()
+		if not chunk then return nil end
+		-- FNV-1a-like: XOR then multiply, kept in 32-bit range
+		local h = 2166136261
+		for i = 1, #chunk do
+			h = ((h ~ chunk:byte(i)) * 16777619) & 0xFFFFFFFF
+		end
+		return h
+	end)
+	if not ok then return nil end
+	return result
+end
+
 --- 32-bit djb2 hash of a string, used to disambiguate snapshot filenames.
 --- @param s string Input.
 --- @return number Non-negative 32-bit integer.
@@ -226,6 +259,16 @@ function M.load(path)
 		return nil
 	end
 
+	-- mtime and size match, but on HFS+ the mtime resolution is 1 second, so a
+	-- same-second edit with an unchanged file size would pass the checks above and
+	-- serve stale data — guard with the stored content fingerprint
+	local fp = content_fingerprint(path)
+	if fp ~= snap.fp then
+		Logger.debug(LOG, "Fingerprint mismatch for '%s' — invalidating stale snapshot.", path)
+		_misses = _misses + 1
+		return nil
+	end
+
 	_hits = _hits + 1
 	Logger.debug(LOG, "Snapshot hit for '%s'.", path)
 	return snap.data
@@ -240,11 +283,20 @@ function M.store(path, parsed)
 	local attr = source_attr(path)
 	if not attr then return end
 
+	-- Capture the fingerprint at write time so the reader can verify it later;
+	-- a nil fingerprint (unreadable file) aborts the store to avoid writing an
+	-- un-verifiable snapshot that would always miss on the next load
+	local fp = content_fingerprint(path)
+	if not fp then
+		Logger.warn(LOG, "store(): could not fingerprint '%s' — snapshot not written.", path)
+		return
+	end
+
 	local parts = {}
 	serialize(parsed, parts)
 	local body = string.format(
-		"return {ver=%d,mtime=%.17g,size=%.17g,data=%s}\n",
-		CACHE_VERSION, attr.mtime, attr.size, table.concat(parts))
+		"return {ver=%d,mtime=%.17g,size=%.17g,fp=%d,data=%s}\n",
+		CACHE_VERSION, attr.mtime, attr.size, fp, table.concat(parts))
 
 	local ok = pcall(function()
 		local fh = io.open(snapshot_path(path), "w")
