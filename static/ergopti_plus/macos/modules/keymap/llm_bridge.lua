@@ -438,16 +438,39 @@ function M.update_preview(buf)
 			for _, mapping in ipairs(tail_bucket) do
 				local ga = group_active(mapping)
 				local c2 = not (mapping.is_word == false and mapping.auto == true)
-				local c3 = ends_with_trigger(buf, mapping.trigger, mapping.is_word)
-				local c4 = mapping.plain_repl ~= mapping.trigger
-				if ga and c2 and c3 and c4 then
-					matches[#matches + 1] = {
-						repl       = mapping.repl,
-						plain_repl = mapping.plain_repl,
-						input      = mapping.trigger,
-						type       = "autocorrect",
-						group      = mapping.group,
-					}
+				if ga and c2 then
+					-- A case-conform entry (registered lowercase-only) matches
+					-- case-insensitively; conform the previewed text to the typed
+					-- casing so the row mirrors exactly what the engine will emit.
+					-- Normal entries keep the byte-exact match + stored replacement.
+					local matched_input, matched_plain
+					if mapping.case_conform then
+						local tb = #mapping.trigger
+						if #buf >= tb then
+							local typed = buf:sub(-tb)
+							if text_utils.trig_lower(typed) == mapping.trigger
+								and ends_with_trigger(buf, typed, mapping.is_word) then
+								local conformed = text_utils.conform_replacement(mapping.plain_repl, typed, mapping.trigger)
+								if conformed and conformed ~= typed then
+									matched_input = typed
+									matched_plain = conformed
+								end
+							end
+						end
+					elseif ends_with_trigger(buf, mapping.trigger, mapping.is_word)
+						and mapping.plain_repl ~= mapping.trigger then
+						matched_input = mapping.trigger
+						matched_plain = mapping.plain_repl
+					end
+					if matched_input then
+						matches[#matches + 1] = {
+							repl       = matched_plain,
+							plain_repl = matched_plain,
+							input      = matched_input,
+							type       = "autocorrect",
+							group      = mapping.group,
+						}
+					end
 				end
 			end
 		end

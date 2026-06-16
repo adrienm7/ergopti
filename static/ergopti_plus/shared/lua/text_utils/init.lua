@@ -527,4 +527,36 @@ function M.repl_title(s)
 	return M.repl_upper(first) .. s:sub(#first + 1)
 end
 
+--- Conforms a lowercase replacement's case to how the trigger was actually typed.
+--- This is the fire-time half of the case-conform optimisation (the macOS mirror
+--- of the AHK _HSE_ConformReplacement): the registry stores ONE lowercase spec
+--- instead of separate lower/Title/UPPER variants, and the expander calls this
+--- when the spec fires to pick the output casing from the typed trigger.
+---
+--- Returns nil when the typed case is not a clean lower / Title / UPPER form — the
+--- hotstring must then NOT fire, exactly as the old code registered no variant for
+--- a mixed-case trigger. Comparisons are case-SENSITIVE (Lua == on bytes).
+---
+--- Eligible triggers carry no shift-symbol chars, so trig_title/trig_upper each
+--- yield a single variant; the Title check precedes the UPPER check so a
+--- single-character body (Title == UPPER) correctly maps a typed capital to Title.
+--- @param repl_lower string The registered (lowercase) replacement.
+--- @param typed string The trigger exactly as typed (the matched buffer suffix).
+--- @param canonical_lower string The registered (lowercase) trigger.
+--- @return string|nil The conformed replacement, or nil to suppress the fire.
+function M.conform_replacement(repl_lower, typed, canonical_lower)
+	if typed == canonical_lower then
+		return repl_lower
+	end
+	local title = M.trig_title(canonical_lower)[1]
+	if title and typed == title and title ~= canonical_lower then
+		return M.repl_title(repl_lower)
+	end
+	local upper = M.trig_upper(canonical_lower)[1]
+	if upper and typed == upper then
+		return M.repl_upper(repl_lower)
+	end
+	return nil
+end
+
 return M

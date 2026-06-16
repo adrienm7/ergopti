@@ -217,11 +217,34 @@ function M.try_auto_expand(m, char_len, is_ignored)
 	if not require_state("try_auto_expand") then return false end
 
 	local trigger = m.trigger
-	-- Byte-direct suffix match: two strings equal byte-for-byte are necessarily
-	-- UTF-8 equivalent, so utf8_ends_with's extra utf8.len/utf8.offset hops are
-	-- pure overhead on the hot path. m.trigger_bytes is precomputed at load time.
+	-- m.trigger_bytes is precomputed at load time. Case-mapping preserves the byte
+	-- length for every char in our charset (ASCII letters + French accents: a/A,
+	-- é/É, … are all same-width in UTF-8), so the byte index math below is valid for
+	-- a cased typed form just as it is for the lowercase canonical.
 	local tb = m.trigger_bytes
-	if #_state.buffer < tb or _state.buffer:sub(-tb) ~= trigger then return false end
+	if #_state.buffer < tb then return false end
+	local typed = _state.buffer:sub(-tb)
+
+	-- Match + case resolution. A case-conform entry (registered lowercase-only,
+	-- standing in for the lower/Title/UPPER trio) matches case-INSENSITIVELY and
+	-- conforms its replacement to the typed casing at fire time; a normal entry
+	-- matches byte-for-byte (two strings equal byte-for-byte are UTF-8 equivalent,
+	-- so no utf8.* hops on the hot path). eff_repl/eff_plain are the EFFECTIVE
+	-- replacement for THIS firing — conformed for conform entries, stored otherwise.
+	local eff_repl, eff_plain
+	if m.case_conform then
+		if text_utils.trig_lower(typed) ~= trigger then return false end
+		local conformed = text_utils.conform_replacement(m.plain_repl, typed, trigger)
+		-- nil means the typed case was mixed (not a clean lower/Title/UPPER): the
+		-- old code registered no variant for it, so the hotstring must NOT fire.
+		if conformed == nil then return false end
+		eff_repl  = conformed   -- conform entries are plain text (gated at registration)
+		eff_plain = conformed
+	else
+		if typed ~= trigger then return false end
+		eff_repl  = m.repl
+		eff_plain = m.plain_repl
+	end
 
 	-- Word-boundary check (delegated to shared helper). tstart_byte is the
 	-- 1-based byte index where the trigger begins inside the buffer.
@@ -230,12 +253,10 @@ function M.try_auto_expand(m, char_len, is_ignored)
 		return false
 	end
 
-	-- Use the precomputed plain_repl; tokens_from_repl() is only called below
-	-- when we actually need to emit tokens (replacements with {Token} directives)
-	local repl_text = m.plain_repl
+	local repl_text = eff_plain
 
-	-- No-op guard: skip when the plain-text expansion equals the trigger.
-	if repl_text == trigger then
+	-- No-op guard: skip when the plain-text expansion equals what was typed.
+	if repl_text == typed then
 		if m.final_result then _state.suppress_rescan() end
 		if not is_ignored and tooltip.hide_forced then tooltip.hide_forced() elseif not is_ignored and tooltip.hide then tooltip.hide() end
 		return true
@@ -250,9 +271,11 @@ function M.try_auto_expand(m, char_len, is_ignored)
 	local screen_len       = trig_len - char_offset
 	local deletes, to_type = screen_len, repl_text
 
-	if repl_text == m.repl then
-		-- Simple text replacement: find the longest shared prefix to minimise backspaces.
-		local screen = text_utils.utf8_sub(trigger, 1, screen_len)
+	if repl_text == eff_repl then
+		-- Simple text replacement: find the longest shared prefix to minimise
+		-- backspaces. Compare against the TYPED (cased) trigger, not the lowercase
+		-- canonical, so the kept on-screen prefix matches what is actually shown.
+		local screen = text_utils.utf8_sub(typed, 1, screen_len)
 		local common = text_utils.get_common_prefix_utf8(screen, repl_text)
 		deletes = screen_len - common
 		to_type = text_utils.utf8_sub(repl_text, common + 1)
@@ -273,7 +296,7 @@ function M.try_auto_expand(m, char_len, is_ignored)
 	if keylogger and type(keylogger.log_hotstring) == "function" then
 		pcall(keylogger.log_hotstring, trigger, repl_text)
 	end
-	Logger.debug(LOG, "Auto-expand: '%s' → '%s'.", trigger, repl_text)
+	Logger.debug(LOG, "Auto-expand: '%s' → '%s'.", typed, repl_text)
 	return true
 end
 

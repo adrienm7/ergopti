@@ -114,6 +114,31 @@ local function tail_codepoint(s)
 	return s:sub(-1)
 end
 
+--- True when the trigger ends with the configured magic key (★ by default).
+--- Such triggers are previewed through the case-SENSITIVE star bucket, so they
+--- are excluded from the case-conform fast path to leave that path untouched.
+--- @param t string The (already magic-key-substituted) trigger.
+--- @return boolean
+local function has_magic_trigger(t)
+	local mk = _state and _state.magic_key
+	if type(mk) ~= "string" or mk == "" then return false end
+	return #t >= #mk and t:sub(-#mk) == mk
+end
+
+--- True when any codepoint of the trigger is a "shift-symbol" — a char whose
+--- uppercase form is NOT a simple case fold but a DIFFERENT character (or set of
+--- characters): the comma, apostrophe, and period, whose Ergopti Shift forms are
+--- nbsp/nnbsp + ";"/":"/"?" (see text_utils.UPPER_TRIGGERS, table-valued entries).
+--- These cannot use the case-conform fast path and keep the explicit-variant path.
+--- @param t string The trigger to inspect.
+--- @return boolean
+local function trigger_has_shift_symbol(t)
+	for c in t:gmatch("[%z\1-\127\194-\244][\128-\191]*") do
+		if type(text_utils.UPPER_TRIGGERS[c]) == "table" then return true end
+	end
+	return false
+end
+
 --- @class Mapping
 --- Single hotstring entry stored in _state.mappings. Every field is populated
 --- once in add_raw() so the per-keystroke hot path (expander + llm_bridge
@@ -128,6 +153,7 @@ end
 --- @field tlen                integer UTF-8 codepoint length of `trigger`.
 --- @field trigger_bytes       integer Byte length of `trigger`; replaces repeated `#trigger` calls in the hot path.
 --- @field tail_char           string  Last UTF-8 codepoint of `trigger`; keys into _state.mappings_by_tail_char.
+--- @field case_conform        boolean|nil True when this single lowercase entry stands in for the lower/Title/UPPER trio; the expander conforms the replacement's case to the typed trigger at fire time (text_utils.conform_replacement). nil on explicit-variant and case-sensitive entries.
 --- @field final_result        boolean True when the replacement is a finalized string (skip further substitution passes).
 --- @field has_magic           boolean True when `trigger` ends with the magic key.
 --- @field star_base           string|nil When has_magic, `trigger` minus the trailing magic key; nil otherwise.
@@ -197,10 +223,11 @@ local function rebuild_tail_indexes()
 	local tail_idx = {}
 	local star_idx = {}
 	for _, m in ipairs(_state.mappings) do
-		-- tail_char is already lowercased at add_raw() time; :lower() here is a
-		-- defensive no-op kept so a future direct mutation cannot silently break
-		-- bucket lookups. The expander's hot-path always queries lowercase tails.
-		local tc = m.tail_char:lower()
+		-- tail_char is already Unicode-lowercased (trig_lower) at add_raw() time, so
+		-- it is used directly as the bucket key. The expander's hot path queries the
+		-- same lowercase key via mappings_for_tail (also trig_lower), so an accented
+		-- uppercase tail typed by the user lands in the same bucket as registration.
+		local tc = m.tail_char
 		local bucket = tail_idx[tc]
 		if not bucket then
 			bucket = {}
@@ -263,12 +290,12 @@ end
 --- @return table|nil Array of mapping entries, or nil.
 function M.mappings_for_tail(tail_char)
 	if not _state or type(tail_char) ~= "string" then return nil end
-	-- Buckets are keyed by the trigger's last codepoint LOWERCASED (see add_raw's
-	-- tail_char). The lookup MUST lowercase too, otherwise an uppercase last char
-	-- (e.g. the "E" of the ";E" → "JE" J trigger) probes an empty bucket and the
-	-- auto-expansion never fires. ASCII-only :lower() mirrors the registration
-	-- (accented codepoints are unchanged on both sides, so they still match).
-	return _state.mappings_by_tail_char[tail_char:lower()]
+	-- Buckets are keyed by the trigger's last codepoint Unicode-LOWERCASED (see
+	-- add_raw's tail_char). The lookup MUST apply the same fold, otherwise an
+	-- uppercase last char probes an empty bucket and the auto-expansion never fires.
+	-- trig_lower (not ASCII :lower()) covers accented capitals — "Ê" → "ê" — so a
+	-- case-conform entry registered only in lowercase still matches UPPERCASE input.
+	return _state.mappings_by_tail_char[text_utils.trig_lower(tail_char)]
 end
 
 --- Returns the bucket of has_magic mappings whose star_base ends with
@@ -449,7 +476,7 @@ function M.add(trigger, replacement, opts)
 	---   caller computes this once per replacement variant and threads it
 	---   through all space-variant calls, so we never tokenize the same
 	---   replacement 3-4× at load time.
-	local function add_raw(t, r, a, plain_r)
+	local function add_raw(t, r, a, plain_r, conform)
 		-- The owning group is part of the dedup identity. Re-adding a trigger from
 		-- the SAME source (a file hot-reload) updates the entry in place for
 		-- idempotency, but the SAME trigger arriving from a DIFFERENT source — e.g.
@@ -494,8 +521,16 @@ function M.add(trigger, replacement, opts)
 			trigger_bytes = #t,
 			-- Last UTF-8 codepoint of the trigger, used later to bucket mappings
 			-- by tail character so run_trigger_checks can skip any mapping whose
-			-- last char does not match the just-typed character
-			tail_char    = tail_codepoint(t):lower(),
+			-- last char does not match the just-typed character. Unicode-lowercased
+			-- (trig_lower, not ASCII :lower()) so an accented uppercase tail typed by
+			-- the user — "Ê" — resolves to the same bucket as the lowercase "ê"
+			-- registration. This is what lets a case-conform entry (registered in
+			-- lowercase only) match an UPPERCASE-typed trigger whose tail is accented.
+			tail_char    = text_utils.trig_lower(tail_codepoint(t)),
+			-- True when this single entry stands in for the lower/Title/UPPER trio:
+			-- the expander conforms the replacement's case to the typed trigger at
+			-- fire time instead of the registry pre-generating three variants.
+			case_conform = conform or nil,
 			final_result = is_final,
 			has_magic    = has_magic,
 			star_base    = star_base,
@@ -523,37 +558,62 @@ function M.add(trigger, replacement, opts)
 	--- @param t string The trigger.
 	--- @param r string The replacement.
 	--- @param plain_r string Precomputed plain_text of r.
-	local function add_with_space_variants(t, r, plain_r)
-		add_raw(t, r, is_auto, plain_r)
+	local function add_with_space_variants(t, r, plain_r, conform)
+		add_raw(t, r, is_auto, plain_r, conform)
 		-- Only generate space variants for triggers that contain spaces but do not
 		-- *start* with a space (starting-space triggers are word-boundary guards).
 		local starts_with_space = t:match("^[ \194\160\226\128\175]") ~= nil
 		if not starts_with_space and t:match(" ") then
-			add_raw((t:gsub(" ", "\194\160")),   r, is_auto, plain_r)  -- regular nbsp
-			add_raw((t:gsub(" ", "\226\128\175")), r, is_auto, plain_r) -- narrow nbsp
+			add_raw((t:gsub(" ", "\194\160")),   r, is_auto, plain_r, conform)  -- regular nbsp
+			add_raw((t:gsub(" ", "\226\128\175")), r, is_auto, plain_r, conform) -- narrow nbsp
 		end
 	end
 
-	-- Tokenize+plaintext each distinct replacement exactly once per M.add call.
-	-- Without this cache the same replacement text is re-tokenized for every
-	-- case and space variant (3-4× per entry × ~3.3k TOML rows at startup).
+	-- Tokenize+plaintext the base replacement exactly once per M.add call. The
+	-- Title/UPPER replacement plain-text forms are computed lazily below, only on
+	-- the explicit-variant path (the case-conform path never needs them, which is
+	-- the bulk of the corpus at startup).
 	local lower_trig       = text_utils.trig_lower(trigger)
-	local title_repl       = text_utils.repl_title(replacement)
-	local upper_repl       = text_utils.repl_upper(replacement)
 	local plain_repl_base  = km_utils.plain_text(km_utils.tokens_from_repl(replacement))
-	local plain_repl_title = km_utils.plain_text(km_utils.tokens_from_repl(title_repl))
-	local plain_repl_upper = km_utils.plain_text(km_utils.tokens_from_repl(upper_repl))
+
+	-- ── Case-conform fast path (mirrors AHK CreateCaseSensitiveHotstrings) ──────
+	-- An auto (immediate), case-insensitive trigger whose replacement is plain
+	-- text and whose trigger carries no shift-symbol char (',', '\'', '.') is
+	-- registered as ONE lowercase entry; the expander conforms the replacement's
+	-- case to the typed trigger at fire time. This collapses the lower/Title/UPPER
+	-- explosion (~2119 magic-key specs → ~1000) — the dominant startup + memory
+	-- cost. Triggers WITH shift-symbols keep the explicit path because their UPPER
+	-- forms are DIFFERENT characters (nbsp+;/:/?) a case-fold cannot reproduce; the
+	-- exclusion of has_magic keeps the case-sensitive star-preview path untouched.
+	local use_conform = (not is_case_sensitive)
+		and is_auto
+		and (not has_magic_trigger(lower_trig))
+		and (plain_repl_base == replacement)
+		and (not trigger_has_shift_symbol(lower_trig))
+
+	-- Title/UPPER replacement forms are needed by BOTH the explicit-variant path
+	-- and the comma-alias block further down; computed once here unless the
+	-- conform fast path applies (it needs neither, which is the common case).
+	local title_repl, upper_repl, plain_repl_title, plain_repl_upper
+	if not use_conform then
+		title_repl       = text_utils.repl_title(replacement)
+		upper_repl       = text_utils.repl_upper(replacement)
+		plain_repl_title = km_utils.plain_text(km_utils.tokens_from_repl(title_repl))
+		plain_repl_upper = km_utils.plain_text(km_utils.tokens_from_repl(upper_repl))
+	end
 
 	if is_case_sensitive then
-		add_with_space_variants(trigger, replacement, plain_repl_base)
+		add_with_space_variants(trigger, replacement, plain_repl_base, false)
+	elseif use_conform then
+		add_with_space_variants(lower_trig, replacement, plain_repl_base, true)
 	else
 		local title_trigs = text_utils.trig_title(lower_trig)
 		local upper_trigs = text_utils.trig_upper(lower_trig)
 
-		add_with_space_variants(lower_trig, replacement, plain_repl_base)
+		add_with_space_variants(lower_trig, replacement, plain_repl_base, false)
 
 		for _, tt in ipairs(title_trigs) do
-			if tt ~= lower_trig then add_with_space_variants(tt, title_repl, plain_repl_title) end
+			if tt ~= lower_trig then add_with_space_variants(tt, title_repl, plain_repl_title, false) end
 		end
 
 		for _, ut in ipairs(upper_trigs) do
@@ -569,7 +629,7 @@ function M.add(trigger, replacement, opts)
 				if ut == tt then is_title = true; break end
 			end
 			if ut ~= lower_trig and not is_title then
-				add_with_space_variants(ut, upper_repl, plain_repl_upper)
+				add_with_space_variants(ut, upper_repl, plain_repl_upper, false)
 			end
 		end
 	end
