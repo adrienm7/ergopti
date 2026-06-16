@@ -51,10 +51,14 @@ _POETC_ReadSource(RelPath) {
 ; Returns the body of a function from its declaration to the first flush-left
 ; closing brace. Robust to body length. Returns "" when the declaration is absent.
 _POETC_FuncBody(Src, FuncDef) {
-	Idx := InStr(Src, FuncDef)
+	; Match the column-0 DEFINITION (preceded by a newline), not an indented call
+	; site of the same name — e.g. `_LLM_Parser_ProcessPredictionImpl(full_text`
+	; appears first as a `return …(…)` call inside the wrapper, which would
+	; otherwise yield the wrapper's tiny body instead of the real implementation.
+	Idx := InStr(Src, "`n" . FuncDef)
 	if !Idx
 		return ""
-	Rest := SubStr(Src, Idx)
+	Rest := SubStr(Src, Idx + 1)
 	End := InStr(Rest, "`n}")
 	if End
 		return SubStr(Rest, 1, End + 1)

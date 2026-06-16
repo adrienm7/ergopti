@@ -161,7 +161,7 @@ _TextSendClipboard(Text) {
 	Generation := _TEXT_CLIPBOARD_GENERATION
 
 	; CB_SaveAll uses ClipboardAll() so non-text content (images, files, RTF)
-	; survives the paste cycle — CB_Save()/CB_Restore() are text-only and would
+	; survives the paste cycle — the text-only save/restore variants would
 	; silently destroy any non-text clipboard data the user holds.
 	Saved := CB_SaveAll()
 	CB_Write(Text)

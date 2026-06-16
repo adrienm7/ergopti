@@ -52,13 +52,15 @@ _LAHS_FuncBodyStripped(Src, FuncDef) {
 	return Out
 }
 
-; Extracts a window of source around Anchor (±500 chars) and strips comments.
+; Extracts a window of source around Anchor and strips comments. The window
+; reaches well past the anchor (the inline auto-type block carries verbose
+; rationale comments between the anchor assignment and the HSE_HardReset call).
 _LAHS_WindowStripped(Src, Anchor) {
 	Idx := InStr(Src, Anchor)
 	if !Idx
 		return ""
 	Start := Max(1, Idx - 500)
-	Win := SubStr(Src, Start, 1000)
+	Win := SubStr(Src, Start, 2500)
 	Out := ""
 	loop parse, Win, "`n", "`r" {
 		Line := A_LoopField

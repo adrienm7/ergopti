@@ -148,10 +148,10 @@ KLPF_WriteAtomic(path, content) {
     ; Publish the tmp file onto ``path`` with the same atomic-rename primitive
     ; KL_WriteAtomic (keylogger.ahk) uses: MoveFileExW(MOVEFILE_REPLACE_EXISTING
     ; | MOVEFILE_WRITE_THROUGH) is a kernel-level directory-entry swap with NO
-    ; absent-file window. The previous FileDelete(path) + FileMove sequence left
-    ; a gap where ``path`` did not exist — a dashboard fetch('./prefetch.json')
+    ; absent-file window. The previous delete-then-move sequence left
+    ; a gap where the destination did not exist — a dashboard fetch('./prefetch.json')
     ; landing between the two saw a 404, and an AV/indexer transiently holding
-    ; the freshly-deleted name made FileMove fail with no retry, stranding the
+    ; the freshly-deleted name made the move fail with no retry, stranding the
     ; page on stale data. We retry the rename once to ride out a transient AV /
     ; indexer lock before giving up.
     ;
