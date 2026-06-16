@@ -32,6 +32,7 @@ Accumulated engineering knowledge for this repository — gotchas, architecture 
   - [project-hotstring-live-rebuild](#project-hotstring-live-rebuild) — Hotstring section/category toggles apply in-process via a re-runnable RegisterAllHotstrings(); native-engine + layout-backed features under hotstrings.\* are the reload-only exceptions
   - [project-typing-latency-tooltip-coldstart](#project-typing-latency-tooltip-coldstart) — Tooltip render + post-boot warm-up latency: the border alpha scan optimization, why tooltip window-reuse is rejected (AHK v2 can't remove Gui controls), and why deferred-registration chunking was reverted
   - [Keymap module architecture and refactor decisions](#keymap-module-architecture-and-refactor-decisions) — Structure of the keymap module, where defaults live, which files do what
+  - [project-hs-synthetic-injection-choke-point](#project-hs-synthetic-injection-choke-point) — The macOS driver has TWO synthetic-keystroke trackers (keymap expected_synthetic_* + keylogger synth_queue); injectors that bypass perform_text_replacement desync them and can corrupt typed output — see AUDIT_HAMMERSPOON_BUGS.md
   - [project-locale-parity-test](#project-locale-parity-test) — en.json is the canonical key set; tools/check_locales.py enforces parity in CI
   - [project-locale-fast-cache](#project-locale-fast-cache) — The Windows driver's locale .tsv is a gitignored self-healing fast-parse cache regenerated from the canonical .json on a miss/staleness; only .json is tracked, no committed duplication
   - [project_metrics_pipeline_17](#project-metrics-pipeline-17) — AHK metrics pipeline — bug #17 CLOSED, follow-up bugs fixed
@@ -776,6 +777,43 @@ _Structure of the keymap module, where defaults live, which files do what_
 - Logger.trace/done pairs for routine internal operations (emit, sort).
 - Setters log at DEBUG level.
 
+### project-hs-synthetic-injection-choke-point
+
+_The macOS driver tracks self-emitted synthetic keystrokes in TWO independent places; any injector that bypasses the expander choke point desyncs them and can corrupt typed output_
+
+<sub>slug: `project_hs_synthetic_injection_choke_point`</sub>
+
+The Hammerspoon driver runs **two independent CGEvent taps** that each see the
+app's own synthetic keystrokes and each keep their own "skip my synthetic
+output" bookkeeping:
+
+- **keymap tap** (`modules/keymap/init.lua`): `CoreState.expected_synthetic_deletes` + `expected_synthetic_chars`, plus `suppress_rescan()` / `no_rescan_until` to stop emitted text from re-entering `run_trigger_checks`.
+- **keylogger tap** (`modules/keylogger/init.lua`): a separate `CoreState.synth_queue`, fed only by `M.notify_synthetic()` and drained in `handle_key`.
+
+`expander.perform_text_replacement` is the **single correct choke point**: it
+arms both counters, calls `suppress_rescan`, calls `keylogger.notify_synthetic`,
+and resyncs the buffer. `llm_bridge.apply_prediction` mostly mirrors it.
+
+**Foot-gun (the class of bug found in the 2026-06 HS audit, see
+`AUDIT_HAMMERSPOON_BUGS.md` at repo root):** injectors that emit raw
+`hs.eventtap.keyStroke("delete")` + `emit_text` **outside** that choke point
+desync the two trackers. `dynamic_hotstrings/rules_engine` is the worst case —
+it calls neither `suppress_rescan` nor the counters nor `notify_synthetic`, so
+its emitted text can re-trigger a nested expansion (corrupted on-screen output)
+and is logged as human typing. `personal_info.do_expand` calls `suppress_rescan`
+(so the keymap is protected) but still skips `notify_synthetic` (private data
+logged as human keystrokes). The paste branch (`emit_text` returns `(1,"")` for
+>50 chars or codepoints >U+FFFF) leaves `expected_synthetic_chars` empty and the
+synthetic Cmd+V then hits the Cmd/Ctrl buffer-wipe branch.
+
+**How to apply:** never emit synthetic deletes/text from a new injector with raw
+`hs.eventtap` calls. Route it through `perform_text_replacement` or a shared
+`keymap.inject_replacement(deletes, text, variant)` helper so the bookkeeping is
+guaranteed. The two synthetic trackers must also stay in sync on recovery: the
+keymap self-heals (`dt > 0.5s` reset) but the keylogger `synth_queue` currently
+has no idle drain. Related: [[project_keymap_architecture]],
+[[feedback_regression_tests]].
+
 ### project-locale-parity-test
 
 _en.json is the canonical key set; tools/check_locales.py enforces parity in CI_
@@ -1213,3 +1251,52 @@ Two distinct foot-guns, both surfaced by a user reporting a "freeze au démarrag
 - Guarded by `windows/tests/test_updater.ahk`: timeouts all > 0, no `SetTimeouts(0,` literal, `Updater_DownloadAndInstall` sets timeouts before `Send()`, and `Updater_BackgroundTick` dispatches via `_Updater_FetchLatestJsonAsync` (never the blocking fetch).
 
 See [[feedback-regression-tests]], [[project-ahk-menu-dispatcher-drop]].
+
+### project-audit-reverify-2026-06-16
+
+_The 2026-06-14 audit's tracking JSONs and roadmap [x] checkboxes are UNRELIABLE — re-verified against source: 148/154 actually fixed, 11 real bugs remain (3 high)_
+
+<sub>slug: `project_audit_reverify_2026_06_16`</sub>
+
+Re-verification of the 170-finding audit (`docs/AUDIT_ergoptiplus_ahk_2026-06-14.md`) against the **current source** on 2026-06-16. Headline: the audit's machine-tracking is not trustworthy and must never be taken at face value.
+
+- **`tools/dev/_audit_status.json`, `_verify_results.json`, `_impl_results.json` and the roadmap `[x]` checkboxes contradict each other and the source.** `_audit_status.json` showed only 6/170 `checked:true` while `_verify_results.json` marked all 170 `status:"done"` — yet several "done" entries' own `evidence` field says the fix is absent ("still only does LoggerWarn on catch"). **Ground truth is the source code, located by symbol (function/var names), not by the stale line numbers in the finding `files` arrays (lines have drifted).**
+- **Actual state: 148/154 re-checked findings are genuinely fixed** (most with a regression test). Only **11 real issues remain**, fully detailed (symptom, file:line proof, fix, regression test) in the root report **`BUGS_RESTANTS_ergoptiplus_2026-06-16.md`**.
+- **3 HIGH still open**: (1) generic hold-modifier long-press uses an unbounded `KeyWait(..,"U")` with no `try/finally` (capslock/enter/lalt/rctrl) → a lost key-up latches Ctrl/Alt/Win down system-wide (the `one_shot_shift` paths were hardened by #77, the generic ones were missed); (2) `_LLM_Ollama_Pending` survives `LLM_OllamaCancelAllAsync` and re-dispatches curl+PII-temp-write after suspend; (3) AltGr rolls (`chevron_equal`/`hashtag_quote`/`paren_quote`/`bracket_quote`) are registered BEFORE `RegisterAltGrLayer()` so the "last-registered variant wins" rule makes them dead in the default config (swap the two calls at `modules/layout.ahk:862-863`).
+- **The expansion core is sound** re the user's "triggerabcd→outpuabtcd/outputbcd" fear: the main dispatch is one atomic `SendInput(Burst)` under `Critical` (`hotstring_engine_main.ahk:1375-1394`); suppression + synthetic-tag are depth counters. The only residual reorder path is `remap-emit-critical-uneven` (low): `$`/`%`/`=` number-row keys emit via the non-`Critical` `SendNewResult` and can transpose with the next remapped letter (`=a`→`a=`). The Notepad clipboard path is the one acknowledged non-atomic exception (by design).
+- **Caveat on the changelog finding (Bug 5):** the synchronous WinHTTP on `_Updater_OpenChangelogWindow` is a *deliberately accepted* trade-off — [[project-updater-nonblocking-http]] documents that user-initiated fetches (check-now / changelog / download) intentionally stay synchronous because the user is actively waiting on the click. It is listed as optional hardening, not an oversight.
+
+**How to apply:** when resuming this audit, read the 11 remaining bugs from the root report; do NOT trust `tools/dev/_*` tracking files. The re-verified structured payload is `tools/dev/_reverify_payload.json`; the 170 known titles (for dedup) are `tools/dev/_known_titles.txt`. See [[feedback-regression-tests]], [[project-hotstring-engine-internals]], [[project-suspend-pause-invariant]], [[feedback-ahk-suspend-prefix-latch]].
+
+### project-audit-hs-fixes-2026-06-16
+
+_8 Hammerspoon macOS audit bugs fixed in one session (A3/A5/A6/C5/D3/D4/E1-E3/H2-H5), each with a regression test_
+
+<sub>slug: `project_audit_hs_fixes_2026_06_16`</sub>
+
+Fixed in order, each in its own commit on `dev`:
+
+**A5** — `emit_text()` / `emit_tokens()` returned `(1, "")` on the paste path; the empty string left `expected_synthetic_chars` empty, so the Cmd+V echo reached the `flags.cmd` branch which unconditionally wiped the buffer. Fix: return `(utf8_len, text)` on paste; add an `expected_synthetic_chars` non-empty guard in the Cmd branch.
+
+**A6** — The 0.5 s stuck-counter reset in `onKeyDownRaw` could wipe `expected_synthetic_deletes / expected_synthetic_chars` just set by an in-flight expansion if the runloop lagged. Fix: `CoreState.last_synthetic_arm_time` field + both `arm_synthetic()` and `perform_text_replacement()` set it; the reset guard now also requires `(now - last_synthetic_arm_time) > 1.0`.
+
+**A3** — `dynamic_hotstrings/rules_engine.lua` deferred injection via `doAfter(0)`, creating a window where a real keystroke could interleave. Fix: emit synchronously inside the interceptor (CGEventPost is non-blocking); release `_is_injecting` immediately without a second timer.
+
+**C5** — `keylogger.synth_queue` was never drained on idle; a dropped synthetic `keyDown` left an unmatched entry that would permanently tag the next real keystroke as synthetic. Fix: drain after `delay > SYNTH_IDLE_DRAIN_MS (500 ms)` with a `Logger.warn`; also clear in `M.stop()`.
+
+**D3** — `prediction_engine.M.reset()` did not clear `chain_pending` or stop `_chain_trigger_timer`; a late-firing fallback could call `perform_check()` on stale state. Fix: clear `chain_pending = false` and stop/nil the timer at the very top of `M.reset()`, before any other teardown.
+
+**D4** — `streaming_handler.on_success()` reset `_consecutive_llm_failures = 0` before the stale-fetch-id guard. A stale success silently zeroed the counter. Fix: move the reset after the guard.
+
+**E1/E2/E3** — Three tooltip lifecycle bugs:
+- E1: stacked hotstring canvas survived LLM transitions; `hide_stacked()` was only called from `hide_forced()`. Added `pcall(Renderer.hide_stacked)` in `dismiss_silent()`, `show()`, and `show_loading()`.
+- E2: `update_preview()` inside `perform_text_replacement()` was synchronous, arming a keyDown watcher before synthetic echoes cleared; those echoes triggered `hide_forced()` and destroyed the chained preview. Fix: wrap in `hs.timer.doAfter(0, ...)` so all synthetic events are consumed first. The `test_expander.lua` assertion for update_preview now calls `hs.timer.__fire_all()` to flush the stub.
+- E3: `M.show()` did not stop an active dequeue cycle; a stale timer could overwrite the new content. Fix: call `stop_dequeue()` at the top of `M.show()`.
+
+**H2-H5** — Four dormant adapter contract violations:
+- H2: `hs.axuielement.focusedElement()` does not exist; use `applicationElementForPID(pid):attributeValue("AXFocusedUIElement")`.
+- H3: `#char` (byte count) rejects multi-byte chars; use `utf8.len()` via pcall.
+- H4: `checkKeyboardModifiers()` only accepts canonical names; add `KEY_NORMALISATION` map for LShift/RShift → shift etc.
+- H5: `start()` leaked a disabled-but-allocated tap; unconditionally stop and nil any existing tap before creating a new one.
+
+**Test coverage:** 8 new regression test files, 1 existing test file updated. Lua baseline bumped from 906 to 909 to account for 3 legitimate new `hs.timer` calls (A5/A6/E2). All 1639 Lua unit tests pass.

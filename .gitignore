@@ -113,6 +113,8 @@ test_results.txt
 
 # Scratch / debug artifacts — never part of the source tree (see also /log.txt).
 # These accumulate from ad-hoc debugging of the AHK driver and the test runner.
+tools/dev/_known_titles.txt
+tools/dev/_reverify_payload.json
 test_out.txt
 test_output.txt
 run_all_out.txt
