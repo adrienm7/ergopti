@@ -60,24 +60,6 @@ if M.canvas then
 	)
 end
 
--- Whether hs.canvas "clip"/"resetClip" actions are available on this build. They
--- let the stacked panel's colored row backgrounds share the border's rounded
--- corners (the macOS analog of the AHK CreateRoundRectRgn window region). They are
--- documented hs.canvas actions, but we probe support ONCE at load so an older
--- build degrades to square row corners instead of a failed (hidden) tooltip.
-local STACKED_CLIP = (function()
-	local ok = pcall(function()
-		local probe = hs.canvas.new({ x = 0, y = 0, w = 1, h = 1 })
-		if not probe then error("no canvas") end
-		probe:appendElements(
-			{ type = "rectangle", action = "clip" },
-			{ type = "rectangle", action = "resetClip" }
-		)
-		if type(probe.delete) == "function" then probe:delete() end
-	end)
-	return ok == true
-end)()
-
 --- Updates a single text element without redrawing the rest of the canvas.
 --- Used by tooltip_llm during streaming to refresh the info bar / model header
 --- without recreating the canvas — `hs.canvas` element assignment is the
@@ -374,27 +356,62 @@ end
 -- interfere). Created lazily on first render_stacked() call.
 M.stacked_canvas = nil
 
+-- Builds the canvas element descriptors for a `row_count`-row stacked tooltip.
+-- Pure (no canvas side effects) so the structure is unit-testable even though the
+-- stub hs.canvas is a no-op mock.
+--
+-- A SINGLE rounded background rectangle (element 1) is the colored panel: it gets
+-- apply_tint() and rounds to match the border, so the colored rectangle shares
+-- the border's rounded corners. This replaces TWO earlier broken approaches —
+-- per-row SHARP fills that poked outside the rounded corners (the original bug),
+-- and a rounded action="clip" element that rendered as a SOLID RED fill on builds
+-- that do not honor the clip action (its default fillColor is red), turning the
+-- whole tooltip red. Per-row backgrounds remain available but are drawn (rounded)
+-- only when a row's tint differs from the panel's (rare — alternatives usually
+-- share the firing row's category color), so the common case is one clean panel.
+--
+-- Element layout (1-based):
+--   [1]                     : rounded panel background fill (the colored rectangle)
+--   row i: base = (i-1)*3+2  : [base] per-row bg override (skip unless tint differs)
+--                              [base+1] output styled text
+--                              [base+2] trigger label styled text
+--   separators              : sep_base = row_count*3 + 2, one rectangle per gap
+--   border                  : last element = row_count*4 + 1, rounded stroke
+function M._build_stacked_elements(row_count)
+	local elements = {}
+	-- [1] Rounded panel background — the single colored, rounded rectangle.
+	elements[#elements + 1] = {
+		type = "rectangle", action = "fill",
+		roundedRectRadii = { xRadius = CORNER_RADIUS, yRadius = CORNER_RADIUS },
+	}
+	for _ = 1, row_count do
+		-- Per-row tint override: rounded too, so a differing top/bottom row still
+		-- matches the panel corners; skipped unless render_stacked enables it.
+		elements[#elements + 1] = {
+			type = "rectangle", action = "skip",
+			roundedRectRadii = { xRadius = CORNER_RADIUS, yRadius = CORNER_RADIUS },
+		}
+		elements[#elements + 1] = { type = "text", action = "fill" }
+		elements[#elements + 1] = { type = "text", action = "fill" }
+	end
+	for _ = 1, row_count - 1 do
+		elements[#elements + 1] = { type = "rectangle", action = "fill" }
+	end
+	-- Border: strokeAndFill with transparent fill so only the rounded stroke shows.
+	elements[#elements + 1] = {
+		type = "rectangle", action = "strokeAndFill",
+		fillColor = { white = 0, alpha = 0 },
+		strokeColor = Config.colors.border,
+		strokeWidth = 1,
+		roundedRectRadii = { xRadius = CORNER_RADIUS, yRadius = CORNER_RADIUS },
+	}
+	return elements
+end
+
 -- Build or rebuild the stacked canvas with the correct number of elements.
--- Each row needs: bg_rect + output_text + label_text = 3 elements.
--- Plus separators between rows (count - 1) and one top-level border = fixed overhead.
--- When clipping is available, a leading rounded-rectangle CLIP element (index 1)
--- confines every following element to the rounded panel shape so the per-row
--- colored backgrounds share the SAME rounded outer corners as the border (the
--- macOS analog of the AHK CreateRoundRectRgn window region); a trailing resetClip
--- lets the 1 px border draw crisp. Without clip support the layout is unchanged
--- (square row corners). CLIP_OFFSET is the index shift the leading clip adds.
-local CLIP_OFFSET = STACKED_CLIP and 1 or 0
--- Element layout per row i (1-based): base = (i-1)*3 + 1 + CLIP_OFFSET
---   [1]        : rounded clip rectangle               (only when STACKED_CLIP)
---   [base]     : background fill rectangle
---   [base+1]   : output styled text
---   [base+2]   : trigger label styled text
---   separators : one rectangle per gap
---   resetClip  : restores the full region for the border (only when STACKED_CLIP)
---   border     : white strokeAndFill rectangle (last element)
 local function _ensure_stacked_canvas(row_count)
-	-- [clip] + rows + separators + [resetClip] + border
-	local needed = CLIP_OFFSET + row_count * 3 + (row_count - 1) + CLIP_OFFSET + 1
+	local elements = M._build_stacked_elements(row_count)
+	local needed = #elements
 	if M.stacked_canvas then
 		local current = #M.stacked_canvas
 		if current ~= needed then
@@ -407,38 +424,20 @@ local function _ensure_stacked_canvas(row_count)
 		if not M.stacked_canvas then return false end
 		M.stacked_canvas:level(hs.canvas.windowLevels.cursor)
 		M.stacked_canvas:behavior(hs.canvas.windowBehaviors.canJoinAllSpaces)
-		local elements = {}
-		if STACKED_CLIP then
-			-- [1] Rounded clip: frame + radius set per render in render_stacked.
-			table.insert(elements, {
-				type = "rectangle", action = "clip",
-				roundedRectRadii = { xRadius = CORNER_RADIUS, yRadius = CORNER_RADIUS }
-			})
-		end
-		for _ = 1, row_count do
-			table.insert(elements, { type = "rectangle", action = "fill" })
-			table.insert(elements, { type = "text", action = "fill" })
-			table.insert(elements, { type = "text", action = "fill" })
-		end
-		for _ = 1, row_count - 1 do
-			table.insert(elements, { type = "rectangle", action = "fill" })
-		end
-		if STACKED_CLIP then
-			-- Lift the clip so the border below draws at full width (clipping the
-			-- border to its own path would halve the 1 px stroke).
-			table.insert(elements, { type = "rectangle", action = "resetClip" })
-		end
-		-- Border: strokeAndFill with transparent fill so only the stroke shows.
-		table.insert(elements, {
-			type = "rectangle", action = "strokeAndFill",
-			fillColor = { white = 0, alpha = 0 },
-			strokeColor = Config.colors.border,
-			strokeWidth = 1,
-			roundedRectRadii = { xRadius = CORNER_RADIUS, yRadius = CORNER_RADIUS }
-		})
 		M.stacked_canvas:appendElements(table.unpack(elements))
 	end
 	return true
+end
+
+--- Compares two canvas color tables by value (handles RGBA and white forms).
+--- @param a table|nil
+--- @param b table|nil
+--- @return boolean True when both describe the same color.
+local function colors_equal(a, b)
+	if a == b then return true end
+	if type(a) ~= "table" or type(b) ~= "table" then return false end
+	return a.red == b.red and a.green == b.green and a.blue == b.blue
+		and a.white == b.white and a.alpha == b.alpha
 end
 
 --- Renders a stack of hotstring rows into a single canvas.
@@ -544,23 +543,31 @@ function M.render_stacked(rows, state, start_watchers_callback)
 
 		M.stacked_canvas:frame({ x = pos_x, y = pos_y, w = canvas_width, h = total_height })
 
-		-- Rounded clip covering the whole panel — confines every row background to
-		-- the rounded shape so the colored rectangle matches the border corners.
-		if STACKED_CLIP then
-			M.stacked_canvas[1].frame            = { x = 0, y = 0, w = canvas_width, h = total_height }
-			M.stacked_canvas[1].roundedRectRadii = { xRadius = CORNER_RADIUS, yRadius = CORNER_RADIUS }
-		end
+		-- Rounded panel background — ONE colored rectangle spanning the whole stack,
+		-- rounded to match the border so the colored rectangle is itself rounded.
+		-- Tinted from the (firing) first row; per-row overrides below handle the
+		-- rare case where alternatives carry a different category color.
+		local panel_col = M.apply_tint(rows[1].tint)
+		M.stacked_canvas[1].frame     = { x = 0, y = 0, w = canvas_width, h = total_height }
+		M.stacked_canvas[1].fillColor = panel_col
 
-		-- Fill in per-row elements (offset by the leading clip element, if present).
+		-- Fill in per-row elements (offset by the leading panel-background element).
 		for i, row in ipairs(rows) do
-			local base   = (i - 1) * 3 + 1 + CLIP_OFFSET
+			local base   = (i - 1) * 3 + 2
 			local top_y  = row_top_y[i]
 			local row_h  = row_heights[i] + pad_y * 2
 			local bg_col = M.apply_tint(row.tint)
 
-			-- Background.
-			M.stacked_canvas[base].frame     = { x = 0, y = top_y, w = canvas_width, h = row_h }
-			M.stacked_canvas[base].fillColor = bg_col
+			-- Per-row background override: only when this row's tint differs from the
+			-- panel (the panel already paints the common case). Rounded so a differing
+			-- top/bottom row still matches the outer corners.
+			if colors_equal(bg_col, panel_col) then
+				M.stacked_canvas[base].action = "skip"
+			else
+				M.stacked_canvas[base].action    = "fill"
+				M.stacked_canvas[base].frame     = { x = 0, y = top_y, w = canvas_width, h = row_h }
+				M.stacked_canvas[base].fillColor = bg_col
+			end
 
 			-- Output text (gray + strikethrough when row.dimmed; see build_text_style).
 			local styled_text = hs.styledtext.new(row.text, build_text_style(row.dimmed))
@@ -591,8 +598,8 @@ function M.render_stacked(rows, state, start_watchers_callback)
 			end
 		end
 
-		-- Separators between rows (offset by the leading clip element, if present).
-		local sep_base = row_count * 3 + 1 + CLIP_OFFSET
+		-- Separators between rows (offset by the leading panel-background element).
+		local sep_base = row_count * 3 + 2
 		for i = 1, row_count - 1 do
 			local sep_y = row_top_y[i] + row_heights[i] + pad_y * 2
 			M.stacked_canvas[sep_base + i - 1].frame     = { x = 0, y = sep_y, w = canvas_width, h = 1 }
@@ -600,8 +607,8 @@ function M.render_stacked(rows, state, start_watchers_callback)
 			M.stacked_canvas[sep_base + i - 1].action    = "fill"
 		end
 
-		-- Top-level border (last element): [clip] + rows + separators + [resetClip] + border.
-		local border_idx = CLIP_OFFSET + row_count * 3 + (row_count - 1) + CLIP_OFFSET + 1
+		-- Top-level border (last element): panel + rows + separators + border.
+		local border_idx = row_count * 4 + 1
 		M.stacked_canvas[border_idx].frame = { x = 0, y = 0, w = canvas_width, h = total_height }
 
 		M.stacked_canvas:show()
