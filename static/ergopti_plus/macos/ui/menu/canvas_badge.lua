@@ -111,9 +111,12 @@ function M.prepend_to(items, ctx, on_click)
 
 	Logger.debug(LOG, "Canvas badge built (canvas_w=%d pill_w=%d paused=%s).", canvas_w, pill_w, tostring(paused))
 
+	local img = canvas_obj:imageFromCanvas()
+	-- Release the NSWindow handle immediately; the image is already captured
+	canvas_obj:delete()
 	table.insert(items, 1, {
 		title = "",
-		image = canvas_obj:imageFromCanvas(),
+		image = img,
 		fn    = on_click,
 	})
 	table.insert(items, 2, { title = "-" })
