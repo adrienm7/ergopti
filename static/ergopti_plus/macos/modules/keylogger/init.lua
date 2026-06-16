@@ -409,6 +409,16 @@ local function handle_key(event_obj)
 	local ok, err = pcall(function()
 		if not CoreState.is_enabled then return end
 
+		-- If the script control module signals a pause (e.g. during hotstring expansion),
+		-- flush and skip — we do not want to interleave expansion events with real typing
+		if _script_control
+		and type(_script_control.is_paused) == "function"
+		and _script_control.is_paused()
+		then
+			LogManager.flush_buffer()
+			return
+		end
+
 		-- Fast-path guards: skip private/secure contexts when the respective filter is enabled
 		if CoreState.private_filter_enabled and CoreState.is_private_window then return end
 		if CoreState.secure_field_filter_enabled and CoreState.is_secure_field then return end
@@ -471,11 +481,6 @@ local function handle_key(event_obj)
 		-- During a hotstring expansion the script is paused; skip modifier logging
 		-- so synthetic Shift/Ctrl/Alt held by the expander don't pollute the log.
 		if evt_type == hs.eventtap.event.types.flagsChanged then
-			if _script_control
-			and type(_script_control.is_paused) == "function"
-			and _script_control.is_paused() then
-				return
-			end
 			local keycode = event_obj:getKeyCode()
 			local flags   = event_obj:getFlags() or {}
 			if MODIFIER_KEYCODES[keycode] then
@@ -501,16 +506,6 @@ local function handle_key(event_obj)
 		end
 
 		if evt_type ~= hs.eventtap.event.types.keyDown then return end
-
-		-- If the script control module signals a pause (e.g. during hotstring expansion),
-		-- flush and skip — we do not want to interleave expansion events with real typing
-		if _script_control
-		and type(_script_control.is_paused) == "function"
-		and _script_control.is_paused()
-		then
-			LogManager.flush_buffer()
-			return
-		end
 
 		local flags   = event_obj:getFlags() or {}
 		local keycode = event_obj:getKeyCode()
