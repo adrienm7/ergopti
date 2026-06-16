@@ -226,7 +226,17 @@ KL_Hook_RefreshContext() {
 ; KL_Watchers_OnKeystroke is driven BEFORE the watermark advances so the watcher
 ; still reads the gap from the previous keystroke.
 KL_Hook_NoteActivity() {
-    try KL_Watchers_OnKeystroke()
+    ; Do NOT drive the session/idle watcher for SYNTHETIC (auto-typed) keystrokes.
+    ; Hotstring expansion and LLM inline-autotype flow through this same InputHook
+    ; tagged s=1; without this guard the first synthetic char of a burst reaches
+    ; KL_Watchers_OnKeystroke with the real pre-idle last_tick and fabricates an
+    ; idle_end / session_start from pure machine output, corrupting the
+    ; active-time and idle/session aggregates. Mirrors the ergo/ROI/WPM synth
+    ; guard in KL_Hook_OnChar (session-watcher-fed-synthetic). The watermark still
+    ; advances below; OnChar/OnKeyDown zero it for synthetic so the next real key
+    ; restarts the typing clock.
+    if !Keylogger.synth_active
+        try KL_Watchers_OnKeystroke()
     now := A_TickCount
     delay := (KLHook.last_tick > 0) ? (now - KLHook.last_tick) : 0
     KLHook.last_tick := now
