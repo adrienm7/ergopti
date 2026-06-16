@@ -249,13 +249,16 @@ function M.build_callbacks(ctx)
 	-- ── Success callback ──────────────────────────────────────────────────────
 
 	local function on_success(raw_predictions, elapsed_ms, is_final, is_batch_progressive)
-		_consecutive_llm_failures = 0  -- Reset on every response regardless of content
 		-- Suppress intermediate batches in all-at-once mode (batch_progressive = fetch_batch reveal)
 		if not is_final and not is_streaming_multi and not is_batch_progressive then return end
 		if get_fetch_id() ~= my_fetch_id then
 			Logger.debug(LOG, "Stale LLM callback ignored (expected %d, current %d).", my_fetch_id, get_fetch_id())
 			return
 		end
+		-- Reset the consecutive-failure counter only for non-stale responses; a
+		-- stale success must not mask real failures counted since the new request
+		-- was dispatched (D4 audit fix — reset moved after the stale guard).
+		_consecutive_llm_failures = 0
 
 		if is_final and _stream_watchdog_timer then
 			_stream_watchdog_timer:stop()
