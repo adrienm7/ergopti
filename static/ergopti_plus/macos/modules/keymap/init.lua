@@ -416,6 +416,13 @@ local _tc_dt           = 0
 local _tc_complex_mult = 1
 local _tc_is_ignored   = false
 
+-- Hot-path sub-segment timings (milliseconds) for the slow-keystroke log line.
+-- Populated only when Perf sampling is enabled (DEBUG builds) so steady-state
+-- typing pays nothing; nil means "not measured this keystroke". They let a slow
+-- keydown be attributed to trigger matching vs. LLM/tooltip preview rebuild.
+local _tc_dbg_checks_ms  = nil
+local _tc_dbg_preview_ms = nil
+
 --- Per-mapping delay + group-enable gate, module-level to avoid closure allocation.
 --- @param m table The mapping entry.
 --- @return boolean True when the current timing/group state allows m to fire.
@@ -766,16 +773,26 @@ local function onKeyDownRaw(e)
 
 	-- In ignored windows we still want repeatable features to work,
 	-- but must run them asynchronously to avoid blocking the event queue.
+	-- DEBUG-only sub-segment timing (Perf gate): attribute a slow keystroke to
+	-- trigger matching vs. preview rebuild in the HotPath warning line.
+	local hot_dbg = Perf.is_enabled()
 	if is_ignored then
 		hs.timer.doAfter(0, run_trigger_checks)
 	else
-		if run_trigger_checks() then return true end
+		local ck0 = hot_dbg and HotPath.now() or nil
+		local fired = run_trigger_checks()
+		if ck0 then _tc_dbg_checks_ms = HotPath.elapsed_ms(ck0) end
+		if fired then return true end
 	end
 
 	-- No trigger fired — the buffer is still the one we appended `chars` to,
 	-- so refresh the preview now (expander.update_preview is only reached
 	-- when an expansion happens, which we just ruled out).
-	if not is_ignored then LLMBridge.update_preview(CoreState.buffer) end
+	if not is_ignored then
+		local pv0 = hot_dbg and HotPath.now() or nil
+		LLMBridge.update_preview(CoreState.buffer)
+		if pv0 then _tc_dbg_preview_ms = HotPath.elapsed_ms(pv0) end
+	end
 
 	-- Enter / Tab with no predictions visible clears prediction state.
 	-- When predictions ARE visible, Tab is consumed upstream by handle_llm_keys
@@ -801,9 +818,18 @@ local function onKeyDown(e)
 	-- from the log alone. Opt-in Perf.sample below adds the p50/p99 distribution.
 	local t0_hot = HotPath.now()
 	local t0 = Perf.is_enabled() and Perf.now() or nil
+	-- Clear last keystroke's sub-segment timings so a slow line never reports
+	-- stale figures from an earlier keystroke that took a different branch.
+	_tc_dbg_checks_ms, _tc_dbg_preview_ms = nil, nil
 	local ok, result = pcall(onKeyDownRaw, e)
 	if t0 then Perf.sample("keymap_keydown", t0) end
-	HotPath.log_if_slow("keydown", t0_hot, _tc_chars)
+	-- Enrich the slow-keystroke detail with the per-stage breakdown when measured.
+	local hot_detail = _tc_chars
+	if _tc_dbg_checks_ms or _tc_dbg_preview_ms then
+		hot_detail = string.format("%s | match=%.2fms preview=%.2fms",
+			tostring(_tc_chars), _tc_dbg_checks_ms or 0, _tc_dbg_preview_ms or 0)
+	end
+	HotPath.log_if_slow("keydown", t0_hot, hot_detail)
 	if not ok then
 		Logger.error(LOG, "Keyboard interception failure: %s.", tostring(result))
 		-- An uncaught error inside the callback can cause macOS to disable the
