@@ -829,6 +829,14 @@ end
 --- @param core_state table The shared state object.
 --- @param actions_mod table The actions registry module reference.
 function M.init(core_state, actions_mod)
+	if _state then
+		Logger.warn(LOG, "M.init() called more than once — ignoring duplicate call.")
+		return
+	end
+	if type(core_state) ~= "table" then
+		Logger.error(LOG, "M.init(): core_state must be a table — module non-functional.")
+		return
+	end
 	Logger.debug(LOG, "Initializing gestures engine dependencies…")
 	_state   = core_state
 	_actions = actions_mod
