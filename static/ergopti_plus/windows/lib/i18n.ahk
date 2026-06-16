@@ -453,12 +453,13 @@ I18nWarmFallbacks() {
 ; so only the last selected locale triggers a script restart, preventing a
 ; stale intermediate language from landing when the user switches quickly.
 I18nSetLocale(Code) {
-	global _I18nLocale, _I18nCacheLoaded, ConfigurationFile, _I18nReloadDebounceMs
+	global _I18nLocale, _I18nCacheLoaded, _I18nFallbacksWarmed, ConfigurationFile, _I18nReloadDebounceMs
 	if _I18nLocale == Code
 		return
 	try LoggerStart("i18n", "Switching locale to '{1}'…", Code)
-	_I18nLocale      := Code
-	_I18nCacheLoaded := false
+	_I18nLocale           := Code
+	_I18nCacheLoaded      := false
+	_I18nFallbacksWarmed  := false
 	try TOML_BatchWrite(ConfigurationFile, [{ Section: "script", Key: "locale", Value: Code }])
 	; Cancel any previously scheduled reload, then arm a new one.
 	; Using a negative period makes SetTimer fire once after the delay.

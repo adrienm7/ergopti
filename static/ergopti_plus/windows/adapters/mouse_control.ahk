@@ -69,14 +69,16 @@ MCSetPos(X, Y) {
 }
 
 ; Returns the current absolute cursor position.
+; Uses DllCall("GetCursorPos") instead of MouseGetPos so the result is always
+; in absolute virtual-desktop coordinates regardless of any active CoordMode setting.
 ; @return {Map} { "x": Integer, "y": Integer } (both 0 on error).
 MCGetPos() {
 	local Info := _MCZeroPos()
 	try {
-		local CX := 0, CY := 0
-		MouseGetPos(&CX, &CY)
-		Info["x"] := CX
-		Info["y"] := CY
+		local POINT := Buffer(8, 0)   ; POINT struct = two 32-bit ints
+		DllCall("GetCursorPos", "Ptr", POINT)
+		Info["x"] := NumGet(POINT, 0, "Int")
+		Info["y"] := NumGet(POINT, 4, "Int")
 	}
 	return Info
 }

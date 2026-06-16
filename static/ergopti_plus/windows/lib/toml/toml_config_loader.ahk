@@ -40,17 +40,35 @@
 TomlCoerceValueExt(Raw) {
 	Trimmed := Trim(Raw, " `t")
 
-	; Array literal — naive single-line split on commas. Acceptable because the
-	; manifest-generated templates never contain commas inside string values.
+	; Array literal — quote-aware split so commas inside quoted strings are not
+	; treated as element separators (e.g. ["foo, bar", "baz"] must yield two
+	; items, not three). Uses the same algorithm as CS_CoerceValue.
 	if (StrLen(Trimmed) >= 2
 		and SubStr(Trimmed, 1, 1) == "["
 		and SubStr(Trimmed, StrLen(Trimmed), 1) == "]") {
 		Inner := SubStr(Trimmed, 2, StrLen(Trimmed) - 2)
 		Result := []
 		if (Trim(Inner) != "") {
-			for _, Item in StrSplit(Inner, ",") {
-				Result.Push(TomlCoerceValueExt(Trim(Item, " `t")))
+			in_str  := false
+			escaped := false
+			cur     := ""
+			for ch in StrSplit(Inner) {
+				c := ch
+				if escaped {
+					escaped := false
+				} else if (c == "\") {
+					escaped := true
+				} else if (c == Chr(0x22)) {
+					in_str := !in_str
+				} else if (!in_str && c == ",") {
+					Result.Push(TomlCoerceValueExt(Trim(cur, " `t")))
+					cur := ""
+					continue
+				}
+				cur .= c
 			}
+			if (Trim(cur, " `t") != "")
+				Result.Push(TomlCoerceValueExt(Trim(cur, " `t")))
 		}
 		return Result
 	}

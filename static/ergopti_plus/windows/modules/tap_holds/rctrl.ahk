@@ -97,6 +97,8 @@ SC11D::
 	tap := KeyWait("RControl", "T" . TapHoldDuration(TapHold, "right_ctrl"))
 	if (tap and A_PriorKey == "RControl") {
 		TextPressKey("RCtrl", "Up")
+		if A_IsSuspended  ; Hotkeys suspended — skip LLM accept to avoid ghost action
+			return
 		LLM_Tooltip_FireTabOrAccept("")
 	}
 }

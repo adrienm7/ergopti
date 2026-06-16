@@ -22,6 +22,9 @@
 ; sentinel for the text-only pair (CB_Read/CB_Save/CB_Restore): CB_Read
 ; returns "" for a non-text or empty clipboard, and CB_Restore("") explicitly
 ; clears the clipboard.
+; CB_Save uses the distinct error sentinel "__CB_SAVE_ERROR__" when the clipboard
+; is locked or otherwise inaccessible, so callers can distinguish a genuine
+; read failure from a legitimately empty clipboard.
 ; CB_SaveAll/CB_RestoreAll use ClipboardAll() which round-trips ALL formats
 ; (CF_BITMAP, CF_HDROP, HTML, RTF). Use these whenever the caller may hold
 ; non-text content that must survive the snapshot/restore cycle.
@@ -64,21 +67,28 @@ CB_Write(Text) {
 }
 
 ; Snapshots the current clipboard and returns it for later restoration.
+; Returns "__CB_SAVE_ERROR__" when the clipboard is locked so callers can
+; distinguish a read failure from a legitimately empty clipboard.
 ; The caller is responsible for passing the returned value to CB_Restore.
-; @return {String} Current clipboard text, or  if empty or non-text.
+; @return {String} Current clipboard text, "" if empty/non-text, or "__CB_SAVE_ERROR__" on failure.
 CB_Save() {
 	try {
 		return A_Clipboard
-	} catch {
-		return 
+	} catch as Err {
+		try LoggerWarn("Clipboard", "CB_Save failed: {1}.", Err.Message)
+		return "__CB_SAVE_ERROR__"
 	}
 }
 
 ; Restores a previously saved clipboard snapshot.
-; Passing  explicitly clears the clipboard rather than leaving stale content.
-; @param Saved {String} Value previously returned by CB_Save(), or  to clear.
-; @return {Boolean} True on success, false on error.
+; Skips the restore when Saved is the error sentinel "__CB_SAVE_ERROR__" so a
+; failed CB_Save never overwrites the clipboard with a garbage value.
+; Passing "" explicitly clears the clipboard rather than leaving stale content.
+; @param Saved {String} Value previously returned by CB_Save(), or "" to clear.
+; @return {Boolean} True on success, false on error or when Saved is the error sentinel.
 CB_Restore(Saved) {
+	if (Saved == "__CB_SAVE_ERROR__")
+		return false
 	try {
 		A_Clipboard := Saved
 		return true
@@ -99,13 +109,11 @@ CB_SaveAll() {
 }
 
 ; Restores a previously saved all-formats clipboard snapshot.
-; Nulls Saved after assignment so AHK can free the internal buffer.
 ; @param Saved {ClipboardAll|String} Value previously returned by CB_SaveAll().
 ; @return {Boolean} True on success, false on error.
 CB_RestoreAll(Saved) {
 	try {
 		A_Clipboard := Saved
-		Saved := ""
 		return true
 	} catch {
 		return false

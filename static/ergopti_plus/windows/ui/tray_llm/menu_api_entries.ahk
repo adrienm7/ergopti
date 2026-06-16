@@ -402,9 +402,12 @@ _LLM_Tray_PersistApiEntries() {
 	if (parent != "" and !DirExist(parent))
 		try DirCreate(parent)
 	try {
-		if FileExist(path)
-			FileDelete(path)
-		FileAppend(body, path, "UTF-8")
+		tmp := path . ".tmp"
+		try FileDelete(tmp)
+		FileAppend(body, tmp, "UTF-8")
+		; FileMove with overwrite=1 is atomic within the same volume — avoids a
+		; zero-byte window between FileDelete and FileAppend on crash/power-loss.
+		FileMove(tmp, path, 1)
 	}
 }
 

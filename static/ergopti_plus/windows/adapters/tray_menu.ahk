@@ -81,7 +81,11 @@ TrayMenuSetMenu(Items) {
 ; Sets the tooltip shown when the user hovers over the tray icon.
 ; @param Text {String} Tooltip text (Windows clips at ~127 characters).
 TrayMenuSetTooltip(Text) {
-	try A_IconTip := Text
+	try {
+		A_IconTip := Text
+	} catch as Err {
+		try LoggerWarn("TrayMenu", "TrayMenuSetTooltip failed: {1}.", Err.Message)
+	}
 }
 
 ; Resets the tray icon and menu to AHK defaults.

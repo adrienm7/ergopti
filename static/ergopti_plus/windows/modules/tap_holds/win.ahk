@@ -56,8 +56,11 @@ _WinHoldModKey() {
 	}
 	ModKey := _WinHoldModKey()
 	TextPressKey(ModKey, "Down")
-	KeyWait("LWin", "U")
-	TextPressKey(ModKey, "Up")
+	try {
+		KeyWait("LWin", "U T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC)
+	} finally {
+		TextPressKey(ModKey, "Up")
+	}
 }
 #HotIf
 
@@ -78,8 +81,11 @@ _WinHoldModKey() {
 		return
 	}
 	ActivateLayer()
-	KeyWait("LWin", "U")
-	DisableLayer()
+	try {
+		KeyWait("LWin", "U T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC)
+	} finally {
+		DisableLayer()
+	}
 }
 #HotIf
 

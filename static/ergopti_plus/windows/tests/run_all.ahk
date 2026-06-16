@@ -474,6 +474,41 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 #Include test_uridecode_multibyte_utf8_corruption.ahk
 
 ; -- Audit finding regression tests (batch-wired) --
+#Include meta/test_generated_substr_minus_one.ahk
+#Include meta/test_toml_multiline_array_depth.ahk
+#Include meta/test_toml_unescape_ordering.ahk
+#Include meta/test_clipboard_sentinel.ahk
+#Include meta/test_textsend_callback_wired.ahk
+#Include meta/test_is_category_all_enabled_loop.ahk
+#Include meta/test_regread_no_type_arg.ahk
+#Include meta/test_logger_dedup_tick.ahk
+#Include meta/test_hse_endchar_consumed_delimiters.ahk
+#Include meta/test_prefix_watcher_magic_suffix.ahk
+#Include meta/test_deadkey_uses_dynamic_magic_key.ahk
+#Include meta/test_parse_overrides_seen_sections.ahk
+#Include meta/test_llm_getactiveprofile_arg.ahk
+#Include meta/test_tickcount_wrap_safe.ahk
+#Include meta/test_llm_token_budget_min5.ahk
+#Include meta/test_llm_parser_nul_strip.ahk
+#Include meta/test_altgr_hotif_dynamic.ahk
+#Include meta/test_ergo_pinky_modifier_skip.ahk
+#Include meta/test_watchers_idle_end_ordering.ahk
+#Include meta/test_timer_scheduler_ms_guard.ahk
+#Include meta/test_http_cancel_aborts.ahk
+#Include meta/test_keyboard_hook_vk_format.ahk
+#Include meta/test_plc_stop_clears_callbacks.ahk
+#Include meta/test_toml_coerce_quoted_commas.ahk
+#Include meta/test_i18n_setlocale_resets_fallback.ahk
+#Include meta/test_ws_save_atomic.ahk
+#Include meta/test_tapholdwriter_int_before_bool.ahk
+#Include meta/test_llm_tray_toggle_reentrancy.ahk
+#Include meta/test_llm_tray_tab_source_hwnd.ahk
+#Include meta/test_modelbrowser_sort_callback.ahk
+#Include meta/test_space_taphold_configurable.ahk
+#Include meta/test_terminators_requires_directive.ahk
+#Include meta/test_layout_poll_pending_hkl.ahk
+#Include meta/test_llmbridge_stop_order.ahk
+#Include meta/test_llmdiff_has_corrections_ltrim.ahk
 #Include meta/test_audit_test_gaps.ahk
 
 ; Watchdog: kill the process if RunTests() never returns (e.g. a corpus

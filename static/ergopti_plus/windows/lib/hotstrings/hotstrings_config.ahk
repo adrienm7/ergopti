@@ -375,6 +375,8 @@ _ParseOverrides(Path) {
     Content := FileRead(Path, "UTF-8")
     CurrentCat := ""
     CurrentSec := ""
+    ; Tracks every section key already seen to detect duplicates
+    SeenSections := Map()
 
     loop parse, Content, "`n", "`r" {
         Line := Trim(A_LoopField, " `t")
@@ -386,6 +388,10 @@ _ParseOverrides(Path) {
         if RegExMatch(Line, "^\[ext\.([A-Za-z0-9_\-]+)\.([A-Za-z0-9_\-]+)\]$", &ExtSecMatch) {
             CurrentCat := "ext." . StrLower(ExtSecMatch[1])
             CurrentSec := StrLower(ExtSecMatch[2])
+            SectionName := CurrentCat . "." . CurrentSec
+            if SeenSections.Has(SectionName)
+                try LoggerWarn("HotstringsConfig", "Duplicate section '[{1}]' in overrides file — later values will override earlier.", SectionName)
+            SeenSections[SectionName] := true
             if !Result.Has(CurrentCat)
                 Result[CurrentCat] := { Delay: "", Color: "", ShowTooltip: "", Priority: "", Sections: Map() }
             if !Result[CurrentCat].Sections.Has(CurrentSec)
@@ -397,6 +403,10 @@ _ParseOverrides(Path) {
         if RegExMatch(Line, "^\[ext\.([A-Za-z0-9_\-]+)\]$", &ExtMatch) {
             CurrentCat := "ext." . StrLower(ExtMatch[1])
             CurrentSec := ""
+            SectionName := CurrentCat
+            if SeenSections.Has(SectionName)
+                try LoggerWarn("HotstringsConfig", "Duplicate section '[{1}]' in overrides file — later values will override earlier.", SectionName)
+            SeenSections[SectionName] := true
             if !Result.Has(CurrentCat)
                 Result[CurrentCat] := { Delay: "", Color: "", ShowTooltip: "", Priority: "", Sections: Map() }
             continue
@@ -406,6 +416,10 @@ _ParseOverrides(Path) {
         if RegExMatch(Line, "^\[([A-Za-z0-9_\-]+)\.([A-Za-z0-9_\-]+)\]$", &SecMatch) {
             CurrentCat := StrLower(SecMatch[1])
             CurrentSec := StrLower(SecMatch[2])
+            SectionName := CurrentCat . "." . CurrentSec
+            if SeenSections.Has(SectionName)
+                try LoggerWarn("HotstringsConfig", "Duplicate section '[{1}]' in overrides file — later values will override earlier.", SectionName)
+            SeenSections[SectionName] := true
             if !Result.Has(CurrentCat)
                 Result[CurrentCat] := { Delay: "", Color: "", ShowTooltip: "", Priority: "", Sections: Map() }
             if !Result[CurrentCat].Sections.Has(CurrentSec)
@@ -417,6 +431,10 @@ _ParseOverrides(Path) {
         if RegExMatch(Line, "^\[([A-Za-z0-9_\-]+)\]$", &CatMatch) {
             CurrentCat := StrLower(CatMatch[1])
             CurrentSec := ""
+            SectionName := CurrentCat
+            if SeenSections.Has(SectionName)
+                try LoggerWarn("HotstringsConfig", "Duplicate section '[{1}]' in overrides file — later values will override earlier.", SectionName)
+            SeenSections[SectionName] := true
             if !Result.Has(CurrentCat)
                 Result[CurrentCat] := { Delay: "", Color: "", ShowTooltip: "", Priority: "", Sections: Map() }
             continue

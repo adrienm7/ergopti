@@ -22,13 +22,9 @@
 ; ==================================
 ; ==================================
 
-; Pre-computed at boot -- evaluated once instead of 10 OR comparisons per key press.
-global _ALTGR_LALT_ENABLED := _AnyShortcutEnabled("alt_gr_lalt")
-
 ; Returns true when at least one entry in
-; ``Features["shortcuts"][<group>]`` is a true bool. Used by the boot-time
-; ``_ALTGR_*_ENABLED`` gates so the multi-OR check happens once instead of
-; on every key press routed through the gated combo.
+; ``Features["shortcuts"][<group>]`` is a true bool. Called live on every
+; #HotIf evaluation so tray-menu changes take effect without a reload.
 _AnyShortcutEnabled(Group) {
     global Features
     if !Features.Has("shortcuts") or !Features["shortcuts"].Has(Group) {
@@ -42,12 +38,11 @@ _AnyShortcutEnabled(Group) {
     return false
 }
 
-; Wrapper required: #HotIf re-evaluates its expression every time the hotkey
-; is tested. If the global is read before auto-execute has assigned it, AHK
-; raises "global variable has not been assigned a value".
+; Wrapper required: #HotIf re-evaluates its expression on every hotkey test.
+; Delegates to _AnyShortcutEnabled() so runtime config changes (e.g. tray
+; toggle) take effect immediately without a reload.
 IsAltGrLAltEnabled() {
-    global _ALTGR_LALT_ENABLED
-    return IsSet(_ALTGR_LALT_ENABLED) ? _ALTGR_LALT_ENABLED : False
+	return _AnyShortcutEnabled("alt_gr_lalt")
 }
 
 ; Dynamic registration of SC138 & SC038 -- see _RegisterAltGrShortcutsHotkeys
@@ -105,14 +100,11 @@ AltGrLAltShortcut() {
     }
 }
 
-global _ALTGR_CAPSLOCK_ENABLED := _AnyShortcutEnabled("alt_gr_caps_lock")
-
-; Wrapper required: #HotIf re-evaluates its expression every time the hotkey
-; is tested. If the global is read before auto-execute has assigned it, AHK
-; raises "global variable has not been assigned a value".
+; Wrapper required: #HotIf re-evaluates its expression on every hotkey test.
+; Delegates to _AnyShortcutEnabled() so runtime config changes (e.g. tray
+; toggle) take effect immediately without a reload.
 IsAltGrCapsLockEnabled() {
-    global _ALTGR_CAPSLOCK_ENABLED
-    return IsSet(_ALTGR_CAPSLOCK_ENABLED) ? _ALTGR_CAPSLOCK_ENABLED : False
+	return _AnyShortcutEnabled("alt_gr_caps_lock")
 }
 
 ; SC138 & SC03A is also registered dynamically (see _RegisterAltGrShortcutsHotkeys

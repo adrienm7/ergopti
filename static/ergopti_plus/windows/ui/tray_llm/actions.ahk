@@ -79,23 +79,36 @@ _LLM_Tray_OnWarningInstallClick(ItemName := "", ItemPos := 0, MenuObj := 0) {
 }
 
 LLM_Tray_OnToggle(*) {
-	global _LLM_Tray
-	_LLM_Tray["enabled"] := !_LLM_Tray["enabled"]
-	LoggerInfo("LLM", "Toggle clicked — enabled: " (_LLM_Tray["enabled"] ? "true" : "false") ".")
-	LLM_Tray_SaveConfig()
-	LLM_Tray_Build()
-	if _LLM_Tray["enabled"] {
-		LLM_Tray_EnsureModelReady()
-		SetTimer(() => LLM_Tray_BootstrapOllama(true), -1)
-	} else {
-		; OFF flow — kill any in-flight Ollama install AND close the
-		; WebView so the user's Cancel intent reaches every layer.
-		; Without these, toggling OFF mid-install would leave the
-		; hidden powershell.exe running and the install window open.
-		try LLM_Deps_Cancel()
-		try OllamaWV_Close()
-		try LLM_OllamaCancelWarmupRetry()
-		LLM_Bridge_Stop()
+	static _Toggling := false
+	if _Toggling
+		return
+	_Toggling := true
+	try {
+		global _LLM_Tray
+		_LLM_Tray["enabled"] := !_LLM_Tray["enabled"]
+		LoggerInfo("LLM", "Toggle clicked — enabled: " (_LLM_Tray["enabled"] ? "true" : "false") ".")
+		LLM_Tray_SaveConfig()
+		LLM_Tray_Build()
+		if _LLM_Tray["enabled"] {
+			; Re-arm the health probe timer so the dot updates promptly
+			; after re-enabling without waiting for the next 10 s tick
+			SetTimer(_LLM_Tray_FireHealthProbe, 10000)
+			LLM_Tray_EnsureModelReady()
+			SetTimer(() => LLM_Tray_BootstrapOllama(true), -1)
+		} else {
+			; Cancel the health probe timer — no point pinging a disabled feature
+			SetTimer(_LLM_Tray_FireHealthProbe, 0)
+			; OFF flow — kill any in-flight Ollama install AND close the
+			; WebView so the user's Cancel intent reaches every layer.
+			; Without these, toggling OFF mid-install would leave the
+			; hidden powershell.exe running and the install window open.
+			try LLM_Deps_Cancel()
+			try OllamaWV_Close()
+			try LLM_OllamaCancelWarmupRetry()
+			LLM_Bridge_Stop()
+		}
+	} finally {
+		_Toggling := false
 	}
 }
 

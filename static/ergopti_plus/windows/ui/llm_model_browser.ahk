@@ -237,35 +237,32 @@ _LLM_ModelBrowser_Sort(names) {
 	out := []
 	for n in names
 		out.Push(n)
-	; Two-key sort via stable bubble — array sizes (~100) make the cost
-	; negligible and an array-of-Maps custom sort comparator in AHK v2 is
-	; clunkier than this loop.
-	swapped := true
-	while swapped {
-		swapped := false
-		loop out.Length - 1 {
-			i := A_Index
-			a := out[i], b := out[i+1]
-			af := _LLM_ModelBrowser_GuessFamily(a)
-			bf := _LLM_ModelBrowser_GuessFamily(b)
-			cmp := StrCompare(af, bf, false)
-			if (cmp == 0) {
-				; Guard the secondary sort key the same way RefreshRows
-				; guards its column reads. Missing ``params_b`` should
-				; not throw — it should sort as 0 (unknown size first).
-				info_a := LLM_GetModelInfo(a)
-				info_b := LLM_GetModelInfo(b)
-				ap := (info_a is Map and info_a.Has("params_b")) ? info_a["params_b"] : 0
-				bp := (info_b is Map and info_b.Has("params_b")) ? info_b["params_b"] : 0
-				cmp := (ap < bp) ? -1 : (ap > bp ? 1 : 0)
-			}
-			if (cmp > 0) {
-				out[i] := b, out[i+1] := a
-				swapped := true
-			}
-		}
-	}
+	; Two-key comparator: family ascending, then params_b ascending within
+	; each family. Missing params_b entries sort as 0 (unknown size first).
+	out.Sort((a, b) => _LLM_ModelBrowser_Compare(a, b))
 	return out
+}
+
+/**
+ * Two-key comparator for model names: family ascending, then params_b
+ * ascending. Returns negative / zero / positive per AHK v2 sort convention.
+ *
+ * @param {string} a - First model name.
+ * @param {string} b - Second model name.
+ * @returns {number} Comparison result.
+ */
+_LLM_ModelBrowser_Compare(a, b) {
+	af := _LLM_ModelBrowser_GuessFamily(a)
+	bf := _LLM_ModelBrowser_GuessFamily(b)
+	cmp := StrCompare(af, bf, false)
+	if (cmp != 0)
+		return cmp
+	; Guard the secondary sort key — missing params_b sorts as 0
+	info_a := LLM_GetModelInfo(a)
+	info_b := LLM_GetModelInfo(b)
+	ap := (info_a is Map and info_a.Has("params_b")) ? info_a["params_b"] : 0
+	bp := (info_b is Map and info_b.Has("params_b")) ? info_b["params_b"] : 0
+	return (ap < bp) ? -1 : (ap > bp ? 1 : 0)
 }
 
 /**
@@ -610,9 +607,17 @@ _LLM_MBW_Num(v) {
 
 _LLM_MBW_OnClose(*) {
 	global _LLM_MBW_Gui
-	if IsSet(_LLM_MBW_Gui)
-		try _LLM_MBW_Gui.Destroy()
+	; Save the Gui reference BEFORE Reset clears the global, then close the
+	; WebView2 controller first (while the parent window is still alive) and
+	; only destroy the Gui afterwards — the WebView2 spec requires Controller
+	; to be closed before its host HWND is destroyed
+	saved_gui := IsSet(_LLM_MBW_Gui) ? _LLM_MBW_Gui : 0
 	_LLM_MBW_Reset()
+	try {
+		if saved_gui
+			saved_gui.Destroy()
+	}
+	_LLM_MBW_Gui := unset   ; Always clear the reference, even if Destroy threw
 }
 
 _LLM_MBW_OnResize(GuiObj, MinMax, Width, Height) {

@@ -301,6 +301,13 @@ KL_Ergo_CheckBsBurst(now) {
 ; ==========================================
 
 KL_Ergo_UpdatePinky(vk, now, app) {
+    ; Modifier keys don't break a physical pinky streak — skip them
+    if (vk == 0x10 or vk == 0x11 or vk == 0x12   ; generic Shift/Ctrl/Alt
+     or vk == 0xA0 or vk == 0xA1                  ; LShift, RShift
+     or vk == 0xA2 or vk == 0xA3                  ; LCtrl, RCtrl
+     or vk == 0xA4 or vk == 0xA5                  ; LAlt, RAlt
+     or vk == 0x5B or vk == 0x5C)                 ; LWin, RWin
+        return
     if !KLErgoConst.PINKY_VKS.Has(vk) {
         KLErgo.pinky_run := 0
         return

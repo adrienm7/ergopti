@@ -15,6 +15,21 @@
 
 
 
+; ============================
+; ============================
+; ======= 1/ Constants =======
+; ============================
+; ============================
+
+; Multiplier applied to the tap-hold duration to derive the InputHook capture
+; window — long enough that any realistic next keystroke lands before the hook
+; times out, but short enough to avoid an indefinite wait if no key follows
+global SPACE_HOLD_INPUT_TIMEOUT_FACTOR := 15
+
+
+
+
+
 ; ==============================
 ; ========================
 ; ======= 5/ SPACE =======
@@ -42,17 +57,20 @@
 ; SendInput bypasses the prefix-watcher InputHook.
 
 SpaceTapHold(HoldFn) {
-    TimeoutSec := TapHoldDuration(TapHold, "space")
-    tap := KeyWait("SC039", "T" . TimeoutSec)
-    if tap {
-        _SpaceTapOrDispatch()
-        return
-    }
-    ih := InputHook("L1 T3")
-    ih.Start()
-    ih.Wait()
-    HoldFn.Call(ih.Input)
-    KeyWait("SC039", "U T2")
+	TimeoutSec := TapHoldDuration(TapHold, "space")
+	tap := KeyWait("SC039", "T" . TimeoutSec)
+	if tap {
+		_SpaceTapOrDispatch()
+		return
+	}
+	; Scale the InputHook window proportionally to the hold threshold so a
+	; slow typist never hits the timeout prematurely on any configured duration
+	InputTimeoutSec := TimeoutSec * SPACE_HOLD_INPUT_TIMEOUT_FACTOR
+	ih := InputHook("L1 T" . Round(InputTimeoutSec, 1))
+	ih.Start()
+	ih.Wait()
+	HoldFn.Call(ih.Input)
+	KeyWait("SC039", "U T2")
 }
 
 SpaceTapHoldLayer() {
@@ -70,8 +88,11 @@ SpaceTapHoldLayer() {
     }
     UpdateLastSentCharacter("Space")
     ActivateLayer()
-    KeyWait("SC039", "U")
-    DisableLayer()
+    try {
+        KeyWait("SC039", "U T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC)
+    } finally {
+        DisableLayer()
+    }
 }
 
 ; Tap: send the configured tap action, or native Space if none / "space".
@@ -130,13 +151,16 @@ _SpaceHoldCtrl(captured) {
 }
 
 _SpaceHoldShift(captured) {
-    SendInput("{LShift Down}")
-    ; captured is already layout-translated — re-sending it with + would
-    ; double-translate (Shift applied to the already-shifted char). Drop it:
-    ; the user holds Space+Shift to capitalise subsequent keys, not the one
-    ; that triggered the hold detection.
-    KeyWait("SC039", "U T2")
-    SendInput("{LShift Up}")
+	SendInput("{LShift Down}")
+	; Send the captured key with Shift so the hold keystroke is not swallowed;
+	; skip space/empty to avoid a redundant Shift+Space on spurious captures
+	if (captured != "" and captured != " ")
+		SendInput("+" . captured)
+	try {
+		KeyWait("SC039", "U T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC)
+	} finally {
+		SendInput("{LShift Up}")
+	}
 }
 
 _SpaceHoldAlt(captured) {

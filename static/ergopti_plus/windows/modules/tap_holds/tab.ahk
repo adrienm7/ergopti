@@ -94,8 +94,11 @@ $SC00F:: {
 		_TabDispatch()
 		return
 	}
-	KeyWait("SC00F", "U")
-	TextPressKey(ModKey, "Up")
+	try {
+		KeyWait("SC00F", "U T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC)
+	} finally {
+		TextPressKey(ModKey, "Up")
+	}
 }
 #HotIf
 
@@ -116,8 +119,11 @@ $SC00F:: {
 		return
 	}
 	ActivateLayer()
-	KeyWait("SC00F", "U")
-	DisableLayer()
+	try {
+		KeyWait("SC00F", "U T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC)
+	} finally {
+		DisableLayer()
+	}
 }
 #HotIf
 

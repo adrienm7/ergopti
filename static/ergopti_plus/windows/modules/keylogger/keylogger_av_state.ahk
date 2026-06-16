@@ -176,9 +176,11 @@ KL_AV_GetMasterVolume() {
 
 KL_AV_GetMasterMuted(vol) {
     ; No lightweight native path — use a heuristic based on the volume level
-    ; rather than invoking the heavier IAudioEndpointVolume COM path. 
-    ; Treats volume <= 1% as muted so the transition is surfaced.
-    return (vol <= 0.01) ? 1 : 0
+    ; rather than invoking the heavier IAudioEndpointVolume COM path.
+    ; Only literally-zero volume is treated as muted: 0.01 (1%) is audible
+    ; and must not be misclassified as muted, which would cause false
+    ; volume_change "muted" events on systems with default low-volume settings
+    return (vol <= 0.0) ? 1 : 0
 }
 
 
@@ -278,9 +280,11 @@ KL_AV_Start() {
         return
     KLAVState.fast_fn := KL_AV_FastTick.Bind()
     KLAVState.slow_fn := KL_AV_SlowTick.Bind()
-    ; Warm-up after 3 s so the initial volume baseline is set before
-    ; the first user interaction
-    SetTimer(KLAVState.fast_fn, -3000)
+    ; Warm-up one-shot uses a dedicated Bind() reference so it doesn't clobber
+    ; the recurring timer — AHK replaces a timer when the same function reference
+    ; is passed twice, so using fast_fn for both calls would cancel the recurring
+    ; timer as soon as the one-shot fires
+    SetTimer(() => KL_AV_PollVolume(), -3000)
     SetTimer(KLAVState.fast_fn, KLAVConst.AVSTATE_TICK_MS)
     SetTimer(KLAVState.slow_fn, KLAVConst.SLOW_TICK_MS)
 }

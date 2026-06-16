@@ -21,6 +21,10 @@
 
 /**
  * Removes XML-style thinking segments from model output.
+ * Handles both <think>…</think> (DeepSeek / Qwen3) and <thinking>…</thinking>
+ * (Claude extended-thinking / some Ollama bridges). Uses non-greedy .*? so that
+ * when multiple blocks appear only the content between matching tags is stripped,
+ * not everything from the first opening tag to the last closing tag.
  * @param {string} text
  * @returns {string}
  */
@@ -28,7 +32,14 @@ LLM_Parser_StripThinking(text) {
 	if (Type(text) != "String")
 		return ""
 	out := text
-	out := RegExReplace(out, "i)<think>[\s\S]*?</think>\s*", "")
+	; Strip <thinking>…</thinking> first (longer tag — no overlap with <think>).
+	; The s) flag makes . match newlines; .*? stops at the FIRST </thinking>.
+	out := RegExReplace(out, "s)i)<thinking>.*?</thinking>\s*", "")
+	; Strip any unclosed </thinking> remnant (truncated model output).
+	out := RegExReplace(out, "i)</thinking>\s*", "")
+	; Strip <think>…</think> (DeepSeek / Qwen3 short tag).
+	out := RegExReplace(out, "s)i)<think>.*?</think>\s*", "")
+	; Strip any unclosed </think> remnant.
 	out := RegExReplace(out, "i)</think>\s*", "")
 	return out
 }
@@ -77,6 +88,8 @@ _LLM_Parser_CleanModelOutput(text) {
 	out := RegExReplace(out, "i)TAIL_CORRECTED\s*:", "TAIL_CORRECTED:")
 	out := RegExReplace(out, "i)NEXT_WORDS\s*:", "NEXT_WORDS:")
 	out := RegExReplace(out, "im)(^|\n)(NEXT)\s*:", "$1NEXT_WORDS:")
+	; Strip NUL bytes and other non-printable ASCII control characters (but keep \t, \n, \r)
+	out := RegExReplace(out, "[\x00-\x08\x0B\x0C\x0E-\x1F]", "")
 	return out
 }
 
@@ -406,7 +419,7 @@ LLM_Parser_ProcessPrediction(full_text, tail_text, block, min_words := 1, max_wo
  * @returns {Map|""}
  */
 _LLM_Parser_ProcessPredictionImpl(full_text, tail_text, block, min_words := 1, max_words := 15) {
-	if (Type(block) != "String" or block = "")
+	if (Type(block) != "String" or StrLen(Trim(block)) == 0)
 		return ""
 	full_text := (Type(full_text) = "String") ? full_text : ""
 	tail_text := (Type(tail_text) = "String") ? tail_text : ""

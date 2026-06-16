@@ -225,7 +225,11 @@ KL_Hook_RefreshContext(force := false) {
 ;
 ; KL_Watchers_OnKeystroke is driven BEFORE the watermark advances so the watcher
 ; still reads the gap from the previous keystroke.
-KL_Hook_NoteActivity() {
+;
+; @param already_called bool  When true, KL_Watchers_OnKeystroke was already
+;                             invoked in the shortcut branch; skip it here to
+;                             guarantee exactly one call per physical keydown.
+KL_Hook_NoteActivity(already_called := false) {
     ; Do NOT drive the session/idle watcher for SYNTHETIC (auto-typed) keystrokes.
     ; Hotstring expansion and LLM inline-autotype flow through this same InputHook
     ; tagged s=1; without this guard the first synthetic char of a burst reaches
@@ -235,7 +239,11 @@ KL_Hook_NoteActivity() {
     ; guard in KL_Hook_OnChar (session-watcher-fed-synthetic). The watermark still
     ; advances below; OnChar/OnKeyDown zero it for synthetic so the next real key
     ; restarts the typing clock.
-    if !Keylogger.synth_active
+    ;
+    ; Skip when already_called is true — the shortcut branch already fired the
+    ; watcher for this same physical keydown; a second call here would duplicate
+    ; session/idle accounting for chords that are also special keys (H-01 fix).
+    if !Keylogger.synth_active and !already_called
         try KL_Watchers_OnKeystroke()
     now := A_TickCount
     delay := (KLHook.last_tick > 0) ? (now - KLHook.last_tick) : 0
@@ -326,6 +334,12 @@ KL_Hook_OnKeyDown(ih, vk, sc) {
     ; chords on letter / digit / function keys are caught — those VKs
     ; are not in KLHOOK_SPECIAL because OnChar handles their printable
     ; output, but with modifiers held they are shortcuts to log.
+    ;
+    ; activity_already_noted tracks whether KL_Watchers_OnKeystroke was
+    ; already called in the shortcut branch so KL_Hook_NoteActivity can
+    ; skip it and avoid a double invocation for chords that are also
+    ; special keys (e.g. Ctrl+Left, Ctrl+BS) (H-01 fix).
+    activity_already_noted := false
     if Keylogger.initialized {
         sk := ""
         try sk := KL_Watchers_DetectShortcut(vk)
@@ -336,8 +350,13 @@ KL_Hook_OnKeyDown(ih, vk, sc) {
             ; presses (which most apps consume before OnChar can fire)
             ; doesn't fall back to the SESSION_TIMEOUT_MS clock and have
             ; its own session_start re-fire on every chord.
-            try KL_Watchers_OnKeystroke()
-            KLHook.last_tick := A_TickCount
+            ; Guard: skip entirely during synthetic auto-type so hotstring
+            ; expansions never corrupt the session/idle aggregates (H-02 fix).
+            if !Keylogger.synth_active {
+                try KL_Watchers_OnKeystroke()
+                KLHook.last_tick := A_TickCount
+                activity_already_noted := true
+            }
         }
     }
 
@@ -351,7 +370,9 @@ KL_Hook_OnKeyDown(ih, vk, sc) {
     ; Advance the activity watermark + drive the session/idle machine BEFORE the
     ; privacy filter, for the same reason as OnChar: a filtered special key was
     ; still physically pressed, so the timing watermark must not lag behind it.
-    delay := KL_Hook_NoteActivity()
+    ; Pass the flag so KL_Hook_NoteActivity skips the watcher when the shortcut
+    ; branch already called it for this same physical keydown (H-01 fix).
+    delay := KL_Hook_NoteActivity(activity_already_noted)
 
     filtered := false
     try filtered := MF_ShouldFilter()
@@ -479,7 +500,7 @@ KL_Hook_Start() {
 }
 
 KL_Hook_Stop() {
-    if KLHook.HasOwnProp("flush_timer") {
+    if KLHook.HasOwnProp("flush_timer") && IsObject(KLHook.flush_timer) {
         try SetTimer(KLHook.flush_timer, 0)
     }
     if KLHook.HasOwnProp("context_timer") && IsObject(KLHook.context_timer) {

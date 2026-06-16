@@ -178,6 +178,11 @@ LoggerInit() {
         OnExit(_LoggerOnExitFlush)
         _LOGGER_FLUSH_TIMER_STARTED := True
     }
+    ; Drain any lines that were emitted before LoggerInit resolved the log path.
+    ; Without this flush, every _LoggerEmit call that fired during early boot
+    ; (before LOGGER_LOG_PATH was set) would silently stay in the pending queue
+    ; until the next periodic tick (~500 ms), or be lost entirely on a crash.
+    _LoggerFlush(false)
 }
 
 ; Drain the pending-lines queue into the log file in a single FileAppend.
@@ -188,17 +193,24 @@ LoggerInit() {
 ; sitting in the stdlib buffer — ``FileAppend`` provides no flush guarantee.
 _LoggerFlush(ForceFlush := false) {
 	global _LOGGER_PENDING, _LOGGER_PENDING_ERRORS, LOGGER_LOG_PATH, LOGGER_ERRORS_LOG_PATH
-	
-	Pending := _LOGGER_PENDING
-	_LOGGER_PENDING := []
-	PendingErr := _LOGGER_PENDING_ERRORS
-	_LOGGER_PENDING_ERRORS := []
-	
+	; Prevent the timer from re-entering while we swap-and-drain the pending queues.
+	; Without Critical, a hotkey or OnMessage callback fired mid-swap could push a
+	; line into the OLD array reference that we have already captured — losing it.
+	local _crit := Critical("On")
+	try {
+		Pending := _LOGGER_PENDING
+		_LOGGER_PENDING := []
+		PendingErr := _LOGGER_PENDING_ERRORS
+		_LOGGER_PENDING_ERRORS := []
+	} finally {
+		Critical(_crit)
+	}
+
 	Blob := ""
 	for _, Line in Pending {
 		Blob .= Line . "`r`n"
 	}
-	
+
 	BlobErr := ""
 	for _, Line in PendingErr {
 		BlobErr .= Line . "`r`n"
@@ -217,7 +229,7 @@ _LoggerFlush(ForceFlush := false) {
 			try FileAppend(Blob, LOGGER_LOG_PATH, "UTF-8")
 		}
 	}
-	
+
 	if (LOGGER_ERRORS_LOG_PATH != "" and BlobErr != "") {
 		if ForceFlush {
 			try {
@@ -394,10 +406,10 @@ LoggerRingBufferSnapshot() {
 ; never raises so a logging failure cannot break the driver. Hot-path-safe.
 _LoggerEmit(Level, Tag, Msg, Args*) {
     global LOGGER_LOG_PATH, LOGGER_MIN_LEVEL, LOGGER_SEVERITY, _LOGGER_PENDING
+    ; Safety net for unknown levels — the public wrappers already short-circuit
+    ; on the per-level fast-path flags, so a severity comparison here would be
+    ; a redundant second filter. Only guard against a completely unrecognised Level.
     if !LOGGER_SEVERITY.Has(Level) {
-        return
-    }
-    if LOGGER_SEVERITY[Level] < LOGGER_SEVERITY[LOGGER_MIN_LEVEL] {
         return
     }
     Body := Msg
@@ -426,14 +438,17 @@ _LoggerEmit(Level, Tag, Msg, Args*) {
 
     ; ── ERROR deduplication ──
     ; Suppress identical consecutive ERROR messages (same tag and body) to
-    ; prevent log flooding during tight loops or repeat failures.
-    static _LastErrTag := "", _LastErrBody := ""
+    ; prevent log flooding during tight loops or repeat failures. The 5000 ms
+    ; window ensures the same error is re-emitted after a cooldown period so
+    ; it is never suppressed forever.
+    static _LastErrTag := "", _LastErrBody := "", _LastErrTime := 0
     if (Level == "ERROR") {
-        if (Tag == _LastErrTag and Body == _LastErrBody) {
+        if (Tag == _LastErrTag and Body == _LastErrBody and (A_TickCount - _LastErrTime) < 5000) {
             return
         }
         _LastErrTag := Tag
         _LastErrBody := Body
+        _LastErrTime := A_TickCount
     }
 
     _LoggerPushRing(Line)
@@ -447,21 +462,23 @@ _LoggerEmit(Level, Tag, Msg, Args*) {
 		if IsSet(HealthCheck_RecordError)
 			HealthCheck_RecordError(Body)
 	}
-	if LOGGER_LOG_PATH != "" {
-		_LOGGER_PENDING.Push(Line)
+	; Always enqueue the line unconditionally so pre-init messages (emitted
+	; before LoggerInit has resolved LOGGER_LOG_PATH) survive until the first
+	; flush. _LoggerFlush() skips the FileAppend when the path is still empty,
+	; and LoggerInit() calls _LoggerFlush(false) to drain them once the path
+	; is known.
+	_LOGGER_PENDING.Push(Line)
+	if LOGGER_SEVERITY[Level] >= LOGGER_SEVERITY["WARNING"] {
+		global _LOGGER_PENDING_ERRORS
+		_LOGGER_PENDING_ERRORS.Push(Line)
 	}
-	if (LOGGER_LOG_PATH != "" or LOGGER_ERRORS_LOG_PATH != "") {
-		if LOGGER_SEVERITY[Level] >= LOGGER_SEVERITY["WARNING"] {
-			global _LOGGER_PENDING_ERRORS
-			_LOGGER_PENDING_ERRORS.Push(Line)
-		}
-		
-		; Force a synchronous, file-handle-closed flush for diagnostics that
-		; must survive a subsequent crash — ERROR only. Other levels can tolerate 
-		; the ~500 ms worst-case flush latency through the buffered FileAppend path.
-		if LOGGER_SEVERITY[Level] >= LOGGER_SEVERITY["ERROR"] {
-			_LoggerFlush(true)
-		}
+
+	; Force a synchronous, file-handle-closed flush for diagnostics that
+	; must survive a subsequent crash — WARNING and above. A WARNING that
+	; immediately precedes a hard crash would be swallowed by the 500 ms
+	; buffered path; forcing a flush here ensures it lands on disk.
+	if LOGGER_SEVERITY[Level] >= LOGGER_SEVERITY["WARNING"] {
+		_LoggerFlush(true)
 	}
 	_LoggerFanOut(Tag, Line)
 }

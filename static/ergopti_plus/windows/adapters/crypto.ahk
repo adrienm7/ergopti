@@ -63,13 +63,14 @@ CryptoSha256(Data) {
         for b in hash_bytes
             out .= Format("{:02x}", b)
         return out
+    } catch {
+        ; DJB2 fallback when .NET COM classes are unavailable — returns an 8-char
+        ; hex string so callers can detect degraded mode by checking length != 64
+        h := 5381
+        loop StrLen(Data) {
+            h := ((h << 5) + h) + Ord(SubStr(Data, A_Index, 1))
+            h := h & 0xFFFFFFFF
+        }
+        return Format("{:08x}", h)
     }
-    ; DJB2 fallback when .NET COM classes are unavailable — returns an 8-char
-    ; hex string so callers can detect degraded mode by checking length != 64
-    h := 5381
-    loop StrLen(Data) {
-        h := ((h << 5) + h) + Ord(SubStr(Data, A_Index, 1))
-        h := h & 0xFFFFFFFF
-    }
-    return Format("{:08x}", h)
 }

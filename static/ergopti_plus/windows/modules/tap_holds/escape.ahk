@@ -56,8 +56,11 @@ _EscapeHoldModKey() {
 	}
 	ModKey := _EscapeHoldModKey()
 	TextPressKey(ModKey, "Down")
-	KeyWait("Escape", "U")
-	TextPressKey(ModKey, "Up")
+	try {
+		KeyWait("Escape", "U T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC)
+	} finally {
+		TextPressKey(ModKey, "Up")
+	}
 }
 #HotIf
 

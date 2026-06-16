@@ -33,6 +33,10 @@
 ; ====================================
 ; ===================================
 
+; Re-entrancy guard: prevents double-injection when Tab fires via both the
+; #HotIf hotkey path and the InputHook FeedKeyDown path in the same tick.
+global _LLM_AcceptInProgress := false
+
 ; LLM tooltip chrome — loaded from shared/tooltip/constants.toml via ui_style.ahk.
 ; Compile-time sentinels overwritten by Tooltip_LlmUiSyncFromShared() at boot.
 LLM_TOOLTIP_ACTIVE_PREFIX   := ""
@@ -171,12 +175,20 @@ LLM_Tooltip_InGracePeriod() {
  * @returns {boolean} True when a prediction was accepted.
  */
 LLM_Tooltip_TryAcceptTab() {
+	global _LLM_AcceptInProgress
+	if _LLM_AcceptInProgress
+		return false
 	if !LLM_Tooltip_IsVisible()
 		return false
 	text := LLM_Tooltip_GetText()
 	if (text == "")
 		return false
-	LLM_Bridge_OnAccept(text)
+	_LLM_AcceptInProgress := true
+	try {
+		LLM_Bridge_OnAccept(text)
+	} finally {
+		_LLM_AcceptInProgress := false
+	}
 	return true
 }
 

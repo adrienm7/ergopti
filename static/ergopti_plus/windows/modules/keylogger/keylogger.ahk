@@ -180,17 +180,27 @@ class Keylogger {
 ; `source` is "hotstring" or "llm". Always pair with a deferred KL_ClearSynthetic
 ; so the flag can never leak onto subsequent manual typing.
 KL_MarkSynthetic(source) {
-    Keylogger.synth_active += 1
-    Keylogger.synth_type := source
+    local _c := Critical("On")
+    try {
+        Keylogger.synth_active += 1
+        Keylogger.synth_type := source
+    } finally {
+        Critical(_c)
+    }
 }
 
 ; Clear the synthetic flag once the auto-typed burst has been captured. Takes a
 ; variadic param so it can be passed directly as a SetTimer callback.
 KL_ClearSynthetic(*) {
-    Keylogger.synth_active := Max(0, Keylogger.synth_active - 1)
-    ; Only reset the type label once every held level is released.
-    if !Keylogger.synth_active
-        Keylogger.synth_type := "none"
+    local _c := Critical("On")
+    try {
+        Keylogger.synth_active := Max(0, Keylogger.synth_active - 1)
+        ; Only reset the type label once every held level is released.
+        if !Keylogger.synth_active
+            Keylogger.synth_type := "none"
+    } finally {
+        Critical(_c)
+    }
 }
 
 
@@ -720,7 +730,14 @@ KL_AppendLog(entry) {
     ; cost is negligible. Wrapped in try so an unloaded module degrades
     ; gracefully (filters stay off rather than crashing the hot path).
     filtered := false
-    try filtered := MF_ShouldFilter()
+    try {
+        filtered := MF_ShouldFilter()
+    } catch {
+        ; Module not loaded or error — fail closed (treat as filtered) so sensitive
+        ; data is never logged when the privacy module is unavailable.
+        filtered := true
+        try LoggerWarn("Keylogger", "MF_ShouldFilter unavailable — defaulting to filtered.")
+    }
     if filtered
         return
     if !entry.Has("timestamp")

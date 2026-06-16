@@ -176,8 +176,11 @@ $SC03A:: {
 
 	UpdateLastSentCharacter("CapsLock")
 	ActivateLayer()
-	KeyWait("CapsLock")
-	DisableLayer()
+	try {
+		KeyWait("CapsLock", "U T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC)
+	} finally {
+		DisableLayer()
+	}
 
 	Now           := A_TickCount
 	CharTime      := LastSentCharacterKeyTime.Has("CapsLock") ? LastSentCharacterKeyTime["CapsLock"] : Now

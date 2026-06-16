@@ -13,11 +13,11 @@
 
 
 
-; ==============================
+; ============================
 ; ============================
 ; ======= 1/ Constants =======
 ; ============================
-; ==============================
+; ============================
 
 ; The tap-hold timing constants below are sourced from the shared cross-driver
 ; registry (shared/timings/constants.toml [tap_hold]) by TapHoldsLoadTimings(),
@@ -72,18 +72,18 @@ TapHoldsLoadTimings() {
 
 
 
-; ======================================================
+; =======================================
 ; =======================================
 ; ======= 2/ Generic tap dispatch =======
 ; =======================================
-; ======================================================
+; =======================================
 
 ; Fire the tap action configured for KeyId by delegating to GESTURE_ACTIONS.
 ; This is the single dispatch point for all simple tap-hold keys — no per-action
 ; switch needed. capslock.ahk and altgr.ahk keep their own dispatch because they
 ; require Blind modifiers, UpdateLastSentCharacter, or CtrlActivated wrapping.
 _TapHoldFireAction(KeyId) {
-	global GESTURE_ACTIONS
+	global GESTURE_ACTIONS, TapHold
 	ActionId := TapHoldTapAction(TapHold, KeyId)
 	if GESTURE_ACTIONS.Has(ActionId) {
 		GESTURE_ACTIONS[ActionId].Fn.Call()

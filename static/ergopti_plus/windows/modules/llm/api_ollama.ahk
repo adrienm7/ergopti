@@ -101,6 +101,9 @@ global _LLM_Ollama_WarmupRetryIntervalMs := 5000
 global _LLM_Ollama_WarmupStartedTick := 0
 ; Monotonic id so stale warmup poll chains bail after a newer warmup starts.
 global _LLM_Ollama_WarmupGeneration := 0
+; Tracks the current in-flight warmup WinHTTP object so overlapping retries can
+; abort the previous request before issuing a new one — prevents object leaks
+global _LLM_Ollama_WarmupHttp := 0
 ; Warmup uses a shorter ceiling than real predictions — a hung warmup must not
 ; block the server for 3 min while the user is typing real requests.
 global LLM_OLLAMA_WARMUP_TIMEOUT := 90000
@@ -431,6 +434,10 @@ _LLM_Ollama_DrainPending() {
 	; SetTimer poll ticks bypass native Suspend, so this guard is the chokepoint.
 	if A_IsSuspended
 		return
+	; Engine disabled at runtime (user toggled off) — do not re-dispatch pending
+	; jobs; on_fail already fired when the job was displaced from the pending slot.
+	if (IsSet(_LLM_Engine) and !_LLM_Engine["enabled"])
+		return
 	if (_LLM_Ollama_Async.Count > 0)
 		return
 	if !(_LLM_Ollama_Pending is Map)
@@ -510,7 +517,8 @@ LLM_OllamaNoteInferenceSuccess() {
 		return
 	_LLM_Ollama_IsReady := true
 	try LoggerInfo("LLM.ollama", "Model ready — first successful prediction.")
-	LLM_OllamaCancelWarmupRetry()
+	; First real prediction succeeded — backoff can safely reset for the next cycle
+	LLM_OllamaCancelWarmupRetry(true)
 }
 
 /**
@@ -721,7 +729,18 @@ _LLM_Ollama_TrimAsyncRegistry() {
 	if (_LLM_Ollama_Async.Count < LLM_OLLAMA_MAX_INFLIGHT)
 		return
 	; Maps preserve insertion order in AHK v2 — first key = oldest.
-	for oldest_id, _entry in _LLM_Ollama_Async {
+	for oldest_id, oldest_entry in _LLM_Ollama_Async {
+		; Kill the curl child so it does not keep writing to the temp file
+		; after we abandon the registry entry — the PID would otherwise
+		; accumulate until it expires naturally (up to 3 min).
+		if oldest_entry.Has("pid") and oldest_entry["pid"] > 0
+			try ProcessClose(oldest_entry["pid"])
+		_LLM_Ollama_CleanupCurlFiles(oldest_entry)
+		; Honour the async contract: exactly one of on_success / on_fail must
+		; fire. Without this the caller (e.g. the prediction engine slot state
+		; machine) hangs forever waiting for a callback that will never arrive.
+		if oldest_entry.Has("on_fail") and oldest_entry["on_fail"] is Func
+			try oldest_entry["on_fail"].Call()
 		_LLM_Ollama_Async.Delete(oldest_id)
 		return
 	}
@@ -746,28 +765,36 @@ _LLM_Ollama_TrimAsyncRegistry() {
  */
 LLM_OllamaWarmup(model) {
 	global _LLM_Ollama_IsReady, _LLM_Ollama_WarmupGeneration, LLM_OLLAMA_WARMUP_TIMEOUT
+		, _LLM_Ollama_WarmupHttp
 	if (model == "")
 		return
 	if _LLM_Ollama_IsReady
 		return
+	; Abort any in-flight warmup request before issuing a new one — overlapping
+	; retries would otherwise leak WinHTTP COM objects and hold server connections
+	if (_LLM_Ollama_WarmupHttp != 0) {
+		try _LLM_Ollama_WarmupHttp.Abort()
+		_LLM_Ollama_WarmupHttp := 0
+	}
 	_LLM_Ollama_WarmupGeneration += 1
 	gen := _LLM_Ollama_WarmupGeneration
 	payload := LLM_BuildOllamaPayload(model, "", " ", 0, false, "", 1, false)
 	payload := RegExReplace(payload, '"num_predict":\d+', '"num_predict":1', , 1)
 	try {
-		http := ComObject("WinHttp.WinHttpRequest.5.1")
-		http.Open("POST", LLM_OLLAMA_BASE_URL "/api/chat", true)
-		http.SetTimeouts(LLM_OLLAMA_WARMUP_TIMEOUT, LLM_OLLAMA_WARMUP_TIMEOUT,
+		_LLM_Ollama_WarmupHttp := ComObject("WinHttp.WinHttpRequest.5.1")
+		_LLM_Ollama_WarmupHttp.Open("POST", LLM_OLLAMA_BASE_URL "/api/chat", true)
+		_LLM_Ollama_WarmupHttp.SetTimeouts(LLM_OLLAMA_WARMUP_TIMEOUT, LLM_OLLAMA_WARMUP_TIMEOUT,
 			LLM_OLLAMA_WARMUP_TIMEOUT, LLM_OLLAMA_WARMUP_TIMEOUT)
-		_LLM_Ollama_SendUtf8(http, payload)
+		_LLM_Ollama_SendUtf8(_LLM_Ollama_WarmupHttp, payload)
 		warmup_deadline := A_TickCount + LLM_OLLAMA_WARMUP_TIMEOUT
-		_LLM_Ollama_PollGeneric(http,
+		_LLM_Ollama_PollGeneric(_LLM_Ollama_WarmupHttp,
 			(status, _body) => _LLM_Ollama_OnWarmupDone(status, gen),
 			() => _LLM_Ollama_OnWarmupPollFailed("timeout", gen),
 			warmup_deadline,
 			_LLM_OLLAMA_WARMUP_POLL_MS)
 	} catch as e {
 		try LoggerWarn("LLM.ollama", "Warmup POST failed: {1}.", e.Message)
+		_LLM_Ollama_WarmupHttp := 0
 		_LLM_Ollama_OnWarmupPollFailed("send", gen)
 	}
 }
@@ -786,7 +813,8 @@ _LLM_Ollama_OnWarmupDone(status, gen := 0) {
 	if (status = 200) {
 		_LLM_Ollama_IsReady := true
 		try LoggerInfo("LLM.ollama", "Model warmed up — ready for predictions.")
-		LLM_OllamaCancelWarmupRetry()
+		; Warmup succeeded — reset the backoff so a future warmup cycle starts fresh
+		LLM_OllamaCancelWarmupRetry(true)
 	} else {
 		try LoggerInfo("LLM.ollama", "Warmup finished with HTTP {1} — will retry.", status)
 	}
@@ -838,14 +866,27 @@ LLM_Ollama_WarmupRetryTick() {
 	LLM_OllamaScheduleWarmupRetry(_LLM_Ollama_WarmupRetryModel)
 }
 
-LLM_OllamaCancelWarmupRetry() {
+LLM_OllamaCancelWarmupRetry(reset_backoff := false) {
 	global _LLM_Ollama_WarmupRetryFn, _LLM_Ollama_WarmupRetryIntervalMs, _LLM_Ollama_WarmupStartedTick
+		, _LLM_Ollama_IsReady, _LLM_Ollama_WarmupHttp
 	if (IsSet(_LLM_Ollama_WarmupRetryFn) && _LLM_Ollama_WarmupRetryFn) {
 		SetTimer(_LLM_Ollama_WarmupRetryFn, 0)
 		_LLM_Ollama_WarmupRetryFn := unset
 	}
-	_LLM_Ollama_WarmupRetryIntervalMs := 5000
-	_LLM_Ollama_WarmupStartedTick := 0
+	if (_LLM_Ollama_WarmupHttp != 0) {
+		try _LLM_Ollama_WarmupHttp.Abort()
+		_LLM_Ollama_WarmupHttp := 0
+	}
+	; Only reset the backoff interval on warmup success — callers that merely cancel
+	; (e.g. LLM_Bridge_Stop on driver teardown) must not reset it, otherwise a slow
+	; server would restart the full backoff ramp from 5 s every time the driver
+	; is re-enabled without Ollama actually being ready
+	if reset_backoff
+		_LLM_Ollama_WarmupRetryIntervalMs := 5000
+	; Only reset the started tick when warmup was successful — resetting unconditionally
+	; re-triggers the 8 s grace window on every model change, delaying first predictions
+	if _LLM_Ollama_IsReady
+		_LLM_Ollama_WarmupStartedTick := 0
 }
 
 
@@ -1023,11 +1064,14 @@ _LLM_Ollama_StreamFinalFlush(handle, state, on_partial, on_success, on_fail) {
 
 _LLM_Ollama_RemoveStreamHandle(handle) {
 	global _LLM_Ollama_ActiveStreams
-	if !(handle is Map) or !handle.Has("Pid")
+	; Stream handles are object literals ({ Pid, Cancelled, … }), not Map instances —
+	; ``handle is Map`` always fails and made this function a permanent no-op,
+	; leaving _LLM_Ollama_ActiveStreams grow without bound across streaming calls
+	if !IsObject(handle) or !handle.HasOwnProp("Pid")
 		return
 	next := []
 	for _, h in _LLM_Ollama_ActiveStreams {
-		if !(h is Map) or h["Pid"] != handle["Pid"]
+		if !IsObject(h) or h.Pid != handle.Pid
 			next.Push(h)
 	}
 	_LLM_Ollama_ActiveStreams := next
@@ -1308,7 +1352,7 @@ _LLM_Ollama_ParseStreamLine(line) {
 	} catch as e {
 		err_substr := SubStr(line, 1, 200)
 		try LoggerError("LLM.ollama", "JSON parse failed in stream: {1}. Raw (200c): {2}", e.Message, err_substr)
-		return Map("error", true, "message", "JSON parse failed: " . e.Message)
+		return ""
 	}
 }
 
@@ -1339,7 +1383,7 @@ LLM_ParseOllamaChatResponse(raw) {
 	} catch as e {
 		err_substr := SubStr(raw, 1, 200)
 		try LoggerError("LLM.ollama", "JSON parse failed in ChatResponse: {1}. Raw (200c): {2}", e.Message, err_substr)
-		return Map("error", true, "message", "JSON parse failed: " . e.Message)
+		return ""
 	}
 	; Legacy /api/generate bodies (tests + old logs).
 	return LLM_ParseOllamaResponse(raw)
@@ -1365,5 +1409,24 @@ LLM_UnescapeJSON(s) {
 	s := StrReplace(s, "\t",  "`t")
 	s := StrReplace(s, '\"', '"')
 	s := StrReplace(s, "\\", "\")
+
+	; Decode \uXXXX Unicode escape sequences
+	out := ""
+	pos := 1
+	len := StrLen(s)
+	while pos <= len {
+		if (SubStr(s, pos, 2) == "\u") {
+			hex := SubStr(s, pos + 2, 4)
+			if RegExMatch(hex, "^[0-9A-Fa-f]{4}$") {
+				out .= Chr(Integer("0x" . hex))
+				pos += 6
+				continue
+			}
+		}
+		out .= SubStr(s, pos, 1)
+		pos++
+	}
+	s := out
+
 	return s
 }

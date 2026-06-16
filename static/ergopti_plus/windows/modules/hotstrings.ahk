@@ -1020,7 +1020,8 @@ ShouldActivateDeadkey(Combination, MappedValue, Delay) {
 		; This condition corrects problems such as writing "même" that give "mê⁂e"
 		; We could simply have removed the "?" flag in the Hotstring definition, but we want to get the symbols also if we are typing numbers.
 		; For example to write 01/02 by using the / on the deadkey.
-		if (GetLastSentCharacterAt(-3) ~= "^[^A-Za-z★]$") { ; Everything except a letter
+		MK := (IsSet(ScriptInformation) and ScriptInformation.Has("MagicKey")) ? ScriptInformation["MagicKey"] : "★"
+		if (GetLastSentCharacterAt(-3) ~= "^[^A-Za-z" . MK . "]$") { ; Everything except a letter or the configured magic key
 			; Character at -1 is the key in the deadkey, character at -2 is "ê", character at -3 is character before using the deadkey
 			SendNewResult("{BackSpace 2}", False)
 			SendNewResult(MappedValue)

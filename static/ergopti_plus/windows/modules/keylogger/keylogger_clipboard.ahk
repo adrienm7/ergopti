@@ -113,8 +113,13 @@ KL_Clip_OnChange(data_type) {
         try {
             if DllCall("OpenClipboard", "Ptr", 0) {
                 if hData := DllCall("GetClipboardData", "UInt", 13, "Ptr") { ; CF_UNICODETEXT
-                    bytes := DllCall("GlobalSize", "Ptr", hData, "UPtr")
-                    char_count := _KL_Clip_CharCountFromByteSize(bytes)
+                    ptr := DllCall("GlobalLock", "Ptr", hData, "Ptr")
+                    if ptr {
+                        bytes := DllCall("GlobalSize", "Ptr", hData, "UPtr")
+                        DllCall("GlobalUnlock", "Ptr", hData)
+                        ; char_count = bytes / 2 - 1 (UTF-16 with null terminator)
+                        char_count := _KL_Clip_CharCountFromByteSize(bytes)
+                    }
                 }
                 DllCall("CloseClipboard")
             }

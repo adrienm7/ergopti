@@ -153,8 +153,6 @@ class KLMouse {
 
 KL_Mouse_OnLDown(*) {
     try {
-        KLMouse.lbtn_down_x    := A_CaretX  ; fallback — updated below
-        KLMouse.lbtn_down_y    := A_CaretY
         CoordMode("Mouse", "Screen")
         MouseGetPos(&mx, &my)
         KLMouse.lbtn_down_x    := mx
@@ -165,6 +163,10 @@ KL_Mouse_OnLDown(*) {
 }
 
 KL_Mouse_OnLUp(*) {
+    if A_IsSuspended {
+        KLMouse.lbtn_held := false
+        return
+    }
     if !KLMouse.lbtn_held
         return
     KLMouse.lbtn_held := false
@@ -182,7 +184,8 @@ KL_Mouse_OnLUp(*) {
             return
         if !Keylogger.initialized
             return
-        try KL_Hook_RefreshContext(true)
+        ; Use an async one-shot timer so context refresh doesn't block the hook thread
+        try SetTimer(KL_Hook_RefreshContext.Bind(), -1)
         if (dist >= KLMouseConst.DRAG_MIN_PX) {
             KL_Mouse_LogDrag("left",
                 KLMouse.lbtn_down_x, KLMouse.lbtn_down_y,
@@ -205,6 +208,10 @@ KL_Mouse_OnRDown(*) {
 }
 
 KL_Mouse_OnRUp(*) {
+    if A_IsSuspended {
+        KLMouse.rbtn_held := false
+        return
+    }
     if !KLMouse.rbtn_held
         return
     KLMouse.rbtn_held := false
@@ -222,7 +229,8 @@ KL_Mouse_OnRUp(*) {
             return
         if !Keylogger.initialized
             return
-        try KL_Hook_RefreshContext(true)
+        ; Use an async one-shot timer so context refresh doesn't block the hook thread
+        try SetTimer(KL_Hook_RefreshContext.Bind(), -1)
         if (dist >= KLMouseConst.DRAG_MIN_PX) {
             KL_Mouse_LogDrag("right",
                 KLMouse.rbtn_down_x, KLMouse.rbtn_down_y,
@@ -245,6 +253,10 @@ KL_Mouse_OnMDown(*) {
 }
 
 KL_Mouse_OnMUp(*) {
+    if A_IsSuspended {
+        KLMouse.mbtn_held := false
+        return
+    }
     if !KLMouse.mbtn_held
         return
     KLMouse.mbtn_held := false
@@ -258,7 +270,8 @@ KL_Mouse_OnMUp(*) {
             return
         if !Keylogger.initialized
             return
-        try KL_Hook_RefreshContext(true)
+        ; Use an async one-shot timer so context refresh doesn't block the hook thread
+        try SetTimer(KL_Hook_RefreshContext.Bind(), -1)
         KL_Mouse_LogClick("middle", KLMouse.mbtn_down_x, KLMouse.mbtn_down_y)
     }
 }
@@ -290,6 +303,8 @@ KL_Mouse_OnWheelLeft(*) {
 }
 
 KL_Mouse_AccumScroll(delta) {
+    if A_IsSuspended
+        return
     now := A_TickCount
     if (KLMouse.scroll_last > 0
             and (now - KLMouse.scroll_last) > KLMouseConst.SCROLL_BURST_GAP_MS) {
@@ -306,6 +321,8 @@ KL_Mouse_AccumScroll(delta) {
 }
 
 KL_Mouse_AccumScrollH(delta) {
+    if A_IsSuspended
+        return
     now := A_TickCount
     if (KLMouse.scroll_last > 0
             and (now - KLMouse.scroll_last) > KLMouseConst.SCROLL_BURST_GAP_MS) {
@@ -320,6 +337,8 @@ KL_Mouse_AccumScrollH(delta) {
 }
 
 KL_Mouse_FlushScroll() {
+    if A_IsSuspended
+        return
     if (KLMouse.scroll_ticks = 0 and KLMouse.scroll_h_ticks = 0)
         return
     filtered := false
@@ -336,7 +355,8 @@ KL_Mouse_FlushScroll() {
         return
     if !Keylogger.initialized
         return
-    try KL_Hook_RefreshContext(true)
+    ; Use an async one-shot timer so context refresh doesn't block the hook thread
+    try SetTimer(KL_Hook_RefreshContext.Bind(), -1)
     duration_ms := A_TickCount - start
     dir := (h_ticks != 0) ? "horizontal" : ((ticks > 0) ? "up" : "down")
     total := (h_ticks != 0) ? Abs(h_ticks) : Abs(ticks)
@@ -444,11 +464,11 @@ KL_Mouse_ParkTick() {
 
 
 
-; =====================================
+; ==============================
 ; ==============================
 ; ======= 6/ Log helpers =======
 ; ==============================
-; =====================================
+; ==============================
 
 KL_Mouse_LogClick(button, x, y) {
     KL_AppendLog(Map(
@@ -529,7 +549,8 @@ KL_Mouse_Stop() {
     }
     if KLMouse.HasOwnProp("scroll_flush_fn") && IsObject(KLMouse.scroll_flush_fn) {
         try SetTimer(KLMouse.scroll_flush_fn, 0)
-        try KL_Mouse_FlushScroll()   ; drain pending scroll burst
+        KLMouse.scroll_flush_fn := unset   ; clear ref before drain so re-entry can't re-arm a stale timer
+        try KL_Mouse_FlushScroll()         ; drain pending scroll burst
     }
     ; Unregister subscribers from HookDispatcher — the shared Hotkeys
     ; remain active for any other modules still listening.

@@ -80,6 +80,9 @@ KHStart(Opts) {
 				try LoggerWarn("KeyboardHook", "intercept=true requested but unsupported — the shared visible InputHook cannot suppress events per-subscriber; the key will still pass through.")
 		}
 	}
+	; Warn if neither callback was supplied — events will be dispatched to no one
+	if (_KH_ON_CHAR = 0 and _KH_ON_KEY = 0)
+		try LoggerWarn("KeyboardHook", "KHStart called with both onChar and onKey = 0 — no events will be dispatched.")
 	KHRefreshContext()
 	; Register with the central dispatcher — no separate InputHook needed.
 	; Bind once and cache so KHStop can Unregister the SAME object (identity match).
@@ -104,6 +107,10 @@ KHStop() {
 		HookDispatcher.Unregister(HookDispatcherConst.EVT_KB_CHAR, _KH_CB_CHAR)
 	if _KH_CB_KEY != 0
 		HookDispatcher.Unregister(HookDispatcherConst.EVT_KB_DOWN, _KH_CB_KEY)
+	; Reset cached callbacks so a subsequent KHStart() creates fresh BoundFunc
+	; objects and can re-register with HookDispatcher (identity-based guard).
+	_KH_CB_CHAR := 0
+	_KH_CB_KEY  := 0
 	_KH_RUNNING := false
 }
 
@@ -160,6 +167,6 @@ _KH_DispatchKey(IH, VK, SC) {
 	global _KH_ON_KEY, _KH_CONTEXT
 	if _KH_ON_KEY = 0
 		return
-	Evt := Map("key", Format("{1:X}", VK), "timestamp", A_TickCount, "appId", _KH_CONTEXT["appId"])
+	Evt := Map("key", Format("{:02X}", VK), "timestamp", A_TickCount, "appId", _KH_CONTEXT["appId"])
 	try _KH_ON_KEY(Evt)
 }

@@ -143,12 +143,15 @@ PLC_Start() {
 ; Stops the focus-change polling timer. Idempotent - safe to call repeatedly.
 ; @return {void}
 PLC_Stop() {
-	global PLC_Running
+	global PLC_Running, PLC_FocusCallbacks, PLC_LaunchCallbacks, PLC_QuitCallbacks
 	try {
 		if !PLC_Running
 			return
 		SetTimer(PLC_Poll, 0)
 		PLC_Running := false
+		PLC_FocusCallbacks  := []
+		PLC_LaunchCallbacks := []
+		PLC_QuitCallbacks   := []
 	} catch {
 		return
 	}
@@ -185,7 +188,9 @@ PLC_Poll() {
 		if NewApp != PLC_LastAppId or NewTitle != PLC_LastWindowTitle {
 			PLC_LastAppId       := NewApp
 			PLC_LastWindowTitle := NewTitle
-			for Cb in PLC_FocusCallbacks {
+			; Iterate a snapshot so a callback registering a new subscriber
+			; during the loop does not corrupt the array enumerator.
+			for Cb in PLC_FocusCallbacks.Clone() {
 				try Cb(NewApp, NewTitle)
 			}
 		}

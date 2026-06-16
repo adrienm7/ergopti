@@ -138,21 +138,28 @@ LLM_ResolveSystemPrompt(profile, n, min_words, max_words, language := "en") {
 
 /**
  * Parses profiles.json from _shared/llm/ and returns an array of Map objects.
+ * Uses JsonParse for robustness — the hand-rolled brace-depth parser broke on
+ * system prompts that contained literal { or } characters.
  * @returns {Array} Array of profile Map objects.
  */
-LLM_LoadProfilesJSON() {
-	profiles_path := LLM_GetSharedPath("profiles.json")
-	profiles := []
-
-	raw := FSRead(profiles_path)
-	if (raw != false) {
-		try {
-			profiles := LLM_ParseProfilesJSON(raw)
-		} catch {
-			; File malformed — return empty, callers fall back to raw
+LLM_LoadProfilesJSON(path := "") {
+	if (path == "")
+		path := LLM_GetSharedPath("profiles.json")
+	try {
+		raw := FileRead(path, "UTF-8")
+		parsed := JsonParse(raw)
+		if Type(parsed) != "Array"
+			return []
+		profiles := []
+		for item in parsed {
+			if Type(item) == "Object" or Type(item) == "Map"
+				profiles.Push(item)
 		}
+		return profiles
+	} catch as Err {
+		try LoggerError("LLM.profiles", "profiles.json parse failed — using raw fallback: {1}.", Err.Message)
+		return []
 	}
-	return profiles
 }
 
 /**

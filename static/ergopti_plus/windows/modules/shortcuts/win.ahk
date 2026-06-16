@@ -383,7 +383,9 @@ if Features["shortcuts"]["search"]["enabled"] {
         PathWithSlash := StrReplace(Path, "\", "/")
         A_Clipboard := PathWithSlash
 
-        SetTimer ChangeButtonNames, 50
+        ; One-shot timer (-50 ms): fires once only, so it auto-cancels even if the
+        ; MsgBox is dismissed before the timer tick, preventing an infinite loop.
+        SetTimer ChangeButtonNames, -50
         ; The shared locale strings use printf-style ``%s`` for cross-platform
         ; compatibility with the Hammerspoon driver. AHK v2's Format() expects
         ; ``{1}``-style placeholders and would leave ``%s`` verbatim, so the
@@ -398,8 +400,7 @@ if Features["shortcuts"]["search"]["enabled"] {
     }
     ChangeButtonNames() {
         if not WMExists(t("dialog.path_copy.title"))
-            return ; Keep waiting
-        SetTimer ChangeButtonNames, 0
+            return
         WMActivate(t("dialog.path_copy.title"))
         ControlSetText(t("dialog.path_copy.btn_quit"), "Button1") ; Note: ControlSetText has no port adapter — AHK-specific UI manipulation
         ControlSetText(t("dialog.path_copy.btn_backslash"), "Button2") ; Note: ControlSetText has no port adapter — AHK-specific UI manipulation
@@ -512,7 +513,9 @@ SC029:: {
     }
     PicsDir   := EnvGet("USERPROFILE") . "\Pictures\screenshots"
     DirCreate(PicsDir)
-    Timestamp := FormatTime(, "yyyy_MM_dd_HH") . "h" . FormatTime(, "mm") . "min" . FormatTime(, "ss") . "sec"
+    ; Capture the timestamp once to avoid minute-boundary inconsistency across three calls
+    Now       := A_Now
+    Timestamp := FormatTime(Now, "yyyy_MM_dd_HH") . "h" . FormatTime(Now, "mm") . "min" . FormatTime(Now, "ss") . "sec"
     FilePath  := PicsDir . "\screenshot_" . Timestamp . ".png"
 
     ; Write a temp PS1 script to avoid all inline quoting issues
@@ -584,7 +587,6 @@ if Features["shortcuts"]["open_downloads"] {
         Path := SubStr(Url, 9)
         Path := StrReplace(Path, "/", "\")
         ; Decode percent-encoded characters (spaces, accents, ...)
-        Path := RegExReplace(Path, "%([0-9A-Fa-f]{2})", "$0")
         Path := UriDecode(Path)
         return Path
     }

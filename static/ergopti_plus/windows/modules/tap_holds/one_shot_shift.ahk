@@ -22,12 +22,22 @@
 ; ========================================
 
 OneShotShift() {
+    ; Skip entirely when the script is suspended — an in-flight InputHook would
+    ; intercept keystrokes that belong to other applications while AHK is paused
+    if A_IsSuspended
+        return
     global OneShotShiftEnabled := True
-    TimeoutSec := IsSet(ONE_SHOT_SHIFT_TIMEOUT_SEC) ? ONE_SHOT_SHIFT_TIMEOUT_SEC : 2
+    TimeoutSec := (IsSet(ONE_SHOT_SHIFT_TIMEOUT_SEC) and ONE_SHOT_SHIFT_TIMEOUT_SEC > 0) ? ONE_SHOT_SHIFT_TIMEOUT_SEC : 2
     ihvText := InputHook("L1 T" . TimeoutSec . " E", "=%$.', " . ScriptInformation["MagicKey"])
     ihvText.KeyOpt("{BackSpace}{Enter}{Delete}", "E") ; End keys to not swallow
     ihvText.Start()
     ihvText.Wait()
+    ; Guard against a suspend that arrived while Wait() was blocking — discard
+    ; the captured input and leave the shift state clean for the next resume
+    if A_IsSuspended {
+        global OneShotShiftEnabled := False
+        return
+    }
     SpecialCharacter := ""
 
     if (ihvText.EndKey == "=") {

@@ -522,37 +522,46 @@ HSE_EnableGroup(Group) {
     if !HSE_RegistryByGroup.Has(Group) {
         return
     }
-    ; Re-insert each spec into the live index.
-    for _, Spec in HSE_RegistryByGroup[Group] {
-        LookupKey := Spec.CaseSensitive ? Spec.TailChar : StrLower(Spec.TailChar)
-        if !HSE_RegistryByLastChar.Has(LookupKey) {
-            HSE_RegistryByLastChar[LookupKey] := []
-        }
-        ; Avoid duplicates (idempotent enable).
-        AlreadyIn := false
-        for _, S in HSE_RegistryByLastChar[LookupKey] {
-            if (S.Seq == Spec.Seq) {
-                AlreadyIn := true
-                break
+    ; ATOMICITY — same contract as HSE_DisableGroup: re-inserting specs into the live
+    ; index must not be observed half-done by _OnPrefixChar running on the hook thread.
+    ; Without Critical, the reader can see a partially re-populated bucket and match
+    ; against stale (duplicate or missing) specs for the rebuild duration.
+    _EgCrit := Critical("On")
+    try {
+        ; Re-insert each spec into the live index.
+        for _, Spec in HSE_RegistryByGroup[Group] {
+            LookupKey := Spec.CaseSensitive ? Spec.TailChar : StrLower(Spec.TailChar)
+            if !HSE_RegistryByLastChar.Has(LookupKey) {
+                HSE_RegistryByLastChar[LookupKey] := []
             }
-        }
-        if !AlreadyIn {
-            HSE_RegistryByLastChar[LookupKey].Push(Spec)
-        }
-        if Spec.Star {
-            AlreadyStar := false
-            for _, S in HSE_StarSpecs {
+            ; Avoid duplicates (idempotent enable).
+            AlreadyIn := false
+            for _, S in HSE_RegistryByLastChar[LookupKey] {
                 if (S.Seq == Spec.Seq) {
-                    AlreadyStar := true
+                    AlreadyIn := true
                     break
                 }
             }
-            if !AlreadyStar {
-                HSE_StarSpecs.Push(Spec)
-                _HSE_IndexStarPrefixes(Spec)
-                _HSE_IndexStarTrigger(Spec)
+            if !AlreadyIn {
+                HSE_RegistryByLastChar[LookupKey].Push(Spec)
+            }
+            if Spec.Star {
+                AlreadyStar := false
+                for _, S in HSE_StarSpecs {
+                    if (S.Seq == Spec.Seq) {
+                        AlreadyStar := true
+                        break
+                    }
+                }
+                if !AlreadyStar {
+                    HSE_StarSpecs.Push(Spec)
+                    _HSE_IndexStarPrefixes(Spec)
+                    _HSE_IndexStarTrigger(Spec)
+                }
             }
         }
+    } finally {
+        Critical(_EgCrit)
     }
 }
 
@@ -690,6 +699,7 @@ HSE_HardReset() {
 ; so triggers that span them — e.g. « ,a → ja » — can still match).
 HSE_ApplyExpansion(Spec, Replacement, EndChar := "") {
     global HSE_Buffer, HSE_StartIsWordBoundary, HSE_MAX_BUFFER_LEN, HSE_TypoNbspStripped
+    global HSE_CONSUMED_DELIMITERS
 
     StripLen := Spec.Length + (EndChar != "" ? 1 : 0) + (HSE_TypoNbspStripped ? 1 : 0)
     BufLen := StrLen(HSE_Buffer)
@@ -705,10 +715,12 @@ HSE_ApplyExpansion(Spec, Replacement, EndChar := "") {
     }
 
     ; Append the replacement, then the end character if any.
+    ; Consumed delimiters are swallowed by the dispatcher and never re-injected
+    ; into the app — appending them to the buffer here would desync it with the
+    ; actual screen state and make the next trigger match against a ghost char.
     HSE_Buffer .= Replacement
-    if (EndChar != "") {
+    if (EndChar != "" and !InStr(HSE_CONSUMED_DELIMITERS, EndChar))
         HSE_Buffer .= EndChar
-    }
 
     if (StrLen(HSE_Buffer) > HSE_MAX_BUFFER_LEN) {
         HSE_Buffer := SubStr(HSE_Buffer, -HSE_MAX_BUFFER_LEN)
@@ -1200,9 +1212,11 @@ _HSE_DispatchRawCallback(Spec, EndChar) {
         ; A falsy Effect means the callback declined to expand — leave the buffer
         ; (with the trigger chars still in it) untouched.
         if (IsObject(Effect) and Effect.HasOwnProp("Bs")) {
-            Bs  := Effect.Bs
-            Ins := Effect.HasOwnProp("Ins") ? Effect.Ins : ""
             BufLen := StrLen(HSE_Buffer)
+            Bs  := Max(0, Min(Effect.Bs, BufLen))
+            if (Bs != Effect.Bs)
+                try LoggerWarn("HSE", "Raw callback returned Bs=%d out of range [0,%d] — clamped.", Effect.Bs, BufLen)
+            Ins := Effect.HasOwnProp("Ins") ? Effect.Ins : ""
             HSE_Buffer := (BufLen >= Bs ? SubStr(HSE_Buffer, 1, BufLen - Bs) : "") . Ins
             ; Mirror HSE_ApplyExpansion's cap so a future raw callback with a large
             ; Ins can never grow the buffer unbounded or drift the boundary flag.
