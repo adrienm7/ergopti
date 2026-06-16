@@ -135,12 +135,11 @@ TestShortcuts_RetrieveScancodeUnmapped() {
 Test("Shortcuts/utils: RetrieveScancode returns sc<hex> for unmapped key", TestShortcuts_RetrieveScancodeUnmapped)
 
 TestShortcuts_RetrieveScancodeRemapped() {
-	; When RemappedList contains an override, RetrieveScancode returns it verbatim.
-	global RemappedList
-	RemappedList["z"] := "scDEAD"
+	; When AppState["remapped_list"] contains an override, RetrieveScancode returns it verbatim.
+	AppState["remapped_list"]["z"] := "scDEAD"
 	Result := RetrieveScancode("z")
 	AssertEqual("scDEAD", Result, "remapped scancode should be returned verbatim")
-	RemappedList.Delete("z")
+	AppState["remapped_list"].Delete("z")
 }
 Test("Shortcuts/utils: RetrieveScancode honours RemappedList overrides", TestShortcuts_RetrieveScancodeRemapped)
 

@@ -32,6 +32,10 @@ global _AHK_DRY_RUN := (A_Args.Length > 0 && A_Args[1] == "--dry-run")
 ; subsequent file registers its cases or invokes assertions inside lambdas.
 #Include test_framework.ahk
 
+; AppState — must come before test_stubs.ahk because the stubs reference
+; AppState fields directly, and before any lib/ file that reads AppState.
+#Include ../lib/app_state.ahk
+
 ; Stubs second — they define ScriptInformation, Features, SendNewResult,
 ; WrapTextIfSelected, DeadKey, ToggleCapsLock, etc., which lib/ files
 ; reference at definition (Bind) time or at call time during tests.

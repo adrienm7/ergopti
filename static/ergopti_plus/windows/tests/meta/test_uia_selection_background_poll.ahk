@@ -87,3 +87,13 @@ _USBP_PollTickSuspendAndFeatureGated() {
 		"_UIA_SelectionPollTick must skip the COM round-trip when wrap_text_if_selected (its only consumer) is disabled, so non-users never pay the per-tick cost or the large-selection stall risk (uia-poll-bypasses-suspend)")
 }
 Test("layout: UIA selection poll is gated by suspend + the wrap feature flag (uia-poll-bypasses-suspend)", _USBP_PollTickSuspendAndFeatureGated)
+
+_USBP_SelectionCacheInitialized() {
+	Src := _USBP_ReadSource("modules/layout.ahk")
+	; An unset global causes return _UIA_SelectionCache inside GetUIASelection
+	; to throw "variable has not been assigned" on the first WrapTextIfSelected
+	; call, before the poll timer has fired even once
+	Assert(InStr(Src, "global _UIA_SelectionCache :=") > 0,
+		"layout.ahk must initialize _UIA_SelectionCache at declaration — an unset global causes GetUIASelection to throw on first call before the poll timer fires (uia-selection-cache-unassigned 2026-06-16)")
+}
+Test("layout: _UIA_SelectionCache is initialized at declaration, not left unset (uia-selection-cache-unassigned)", _USBP_SelectionCacheInitialized)

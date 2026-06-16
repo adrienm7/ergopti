@@ -95,3 +95,12 @@ _DSG_SafeHotkeyGuardsRegistration() {
 		"_SafeHotkey() must log a WARNING on a rejected hotkey rather than failing silently")
 }
 Test("HookDispatcher: _SafeHotkey guards each Hotkey registration (dispatcher-start-unguarded-hotkeys-leak-ih)", _DSG_SafeHotkeyGuardsRegistration)
+
+_DSG_IhInitializedToFalse() {
+	Src := _DSG_ReadSource("lib/hook_dispatcher.ahk")
+	; `unset` static properties raise PropertyError when read via `is` —
+	; `false` lets the reuse guard evaluate without throwing on first boot
+	Assert(InStr(Src, "static _ih := false") > 0,
+		"HookDispatcher must declare ``static _ih := false`` — without the initializer, ``HookDispatcher._ih is InputHook`` raises PropertyError before any InputHook exists (hook-dispatcher-ih-property-error 2026-06-16)")
+}
+Test("HookDispatcher: static _ih is initialized to false, not left unset (hook-dispatcher-ih-property-error)", _DSG_IhInitializedToFalse)
