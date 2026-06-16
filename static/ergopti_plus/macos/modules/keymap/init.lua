@@ -517,9 +517,11 @@ local function run_trigger_checks()
 		local chars_b    = #chars
 		local before_end = #buf - chars_b
 		if before_end > 0 then
-			local prev_sub = buf:sub(1, before_end)
-			local poff     = utf8.offset(prev_sub, -1)
-			if poff then
+			local prev_sub      = buf:sub(1, before_end)
+			local ok_poff, poff = pcall(utf8.offset, prev_sub, -1)
+			-- Malformed UTF-8 in the buffer tail is non-fatal: skip terminator expansion
+			-- for this keystroke rather than propagating a pcall error up the hot path
+			if ok_poff and poff then
 				local prev_char  = prev_sub:sub(poff)
 				local term_bucket = Registry.mappings_for_tail(prev_char)
 				if term_bucket then
@@ -797,7 +799,16 @@ local function onKeyDownRaw(e)
 	-- trigger matching vs. preview rebuild in the HotPath warning line.
 	local hot_dbg = Perf.is_enabled()
 	if is_ignored then
-		hs.timer.doAfter(0, run_trigger_checks)
+		-- Capture all five upvalues read by run_trigger_checks/mapping_fires into a
+		-- closure at scheduling time — a second fast keystroke can overwrite them
+		-- before the deferred call runs, causing stale data to be used (H-19 fix)
+		hs.timer.doAfter(0, (function(chars, len, dt, mult, ign)
+			return function()
+				_tc_chars, _tc_char_len, _tc_dt, _tc_complex_mult, _tc_is_ignored
+					= chars, len, dt, mult, ign
+				run_trigger_checks()
+			end
+		end)(_tc_chars, _tc_char_len, _tc_dt, _tc_complex_mult, _tc_is_ignored))
 	else
 		local ck0 = hot_dbg and HotPath.now() or nil
 		local fired = run_trigger_checks()
@@ -1022,5 +1033,4 @@ function M.stop()
 	Logger.success(LOG, "Keymap engine stopped.")
 end
 
-M.start()
 return M
