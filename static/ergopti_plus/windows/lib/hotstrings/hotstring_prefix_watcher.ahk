@@ -343,11 +343,25 @@ HotstringPrefixWatcherRebuildIndex() {
     if !_PrefixInputHook {
         return
     }
-    _PrefixIndex := Map()
-    _TriggerSet := Map()
-    for _, Category in _PREFIX_WATCHER_CATEGORIES {
-        _RegisterCategoryTriggers(Category)
+    ; Pause invariant: SetTimer callbacks bypass native Suspend, and the sibling
+    ; InputHook callbacks (_OnPrefixChar / _OnPrefixKeyDown) all early-return on
+    ; A_IsSuspended. Mirror that here so a rebuild armed before Pause does not
+    ; quietly churn the index while the user expects the watcher to be silent.
+    if A_IsSuspended {
+        return
     }
+    ; Build-then-swap so a concurrent OnChar preview lookup never observes an
+    ; empty or partially-populated index mid-rebuild. The fresh maps are built
+    ; in locals and assigned to the live globals in a single statement each at
+    ; the end — the reader always sees either the old index or the complete new
+    ; one, never the transient empty Map() that an in-place clear would expose.
+    NewIndex := Map()
+    NewSet := Map()
+    for _, Category in _PREFIX_WATCHER_CATEGORIES {
+        _RegisterCategoryTriggers(Category, NewIndex, NewSet)
+    }
+    _PrefixIndex := NewIndex
+    _TriggerSet := NewSet
     ; A just-disabled section may still have a tooltip on screen — hide it so the
     ; preview cannot outlive the expansion it was advertising.
     TooltipHide("LiveToggleRebuild", true)
@@ -397,8 +411,16 @@ _PrefixWatcherTomlPath(Category) {
 ; index. Returns the number of entries registered. Lightweight regex scan —
 ; we capture trigger, output and the case-sensitivity flags so we can
 ; pre-compute the exact same case variants the engine registers.
-_RegisterCategoryTriggers(Category) {
-    global ScriptInformation, Features, _V1CatToV2CatMap
+; IndexTarget / SetTarget — optional Maps to populate. When omitted they
+; resolve to the live globals (the historical behaviour every direct caller
+; relies on); HotstringPrefixWatcherRebuildIndex passes fresh locals instead so
+; it can build the whole index off to the side and swap it in atomically.
+_RegisterCategoryTriggers(Category, IndexTarget := "", SetTarget := "") {
+    global ScriptInformation, Features, _V1CatToV2CatMap, _PrefixIndex, _TriggerSet
+    if !IsObject(IndexTarget)
+        IndexTarget := _PrefixIndex
+    if !IsObject(SetTarget)
+        SetTarget := _TriggerSet
     ; 1. Master gate check — if the hotstrings category is disabled globally,
     ;    stop here. The watcher index will be empty for all groups.
     if !IsCategoryGated("Hotstrings") {
@@ -485,7 +507,7 @@ _RegisterCategoryTriggers(Category) {
             Trigger := StrReplace(Trigger, "★", ScriptInformation["MagicKey"])
             Output  := StrReplace(Output,  "★", ScriptInformation["MagicKey"])
         }
-        _AddTriggerVariants(Trigger, Output, Category, CurrentSection, IsCaseSensitive, IsStrict, Individual)
+        _AddTriggerVariants(Trigger, Output, Category, CurrentSection, IsCaseSensitive, IsStrict, Individual, IndexTarget, SetTarget)
         Count += 1
     }
     return Count
@@ -516,30 +538,30 @@ _RegisterCategoryTriggers(Category) {
 ; letter-only trigger of any length — which used to suppress the UPPER
 ; variant globally and leave typings like ``IA`` without a tooltip even
 ; though the engine still fires on the upper variant.
-_AddTriggerVariants(Trigger, Output, Category, Section, IsCaseSensitive, IsStrict, Individual := "") {
+_AddTriggerVariants(Trigger, Output, Category, Section, IsCaseSensitive, IsStrict, Individual := "", IndexTarget := "", SetTarget := "") {
     global ScriptInformation
     if IsStrict {
         ; Strict triggers only match the exact casing in the TOML — anything
         ; else neither fires nor previews.
-        _AddTriggerToIndex(Trigger, Output, Category, Section, Individual)
+        _AddTriggerToIndex(Trigger, Output, Category, Section, Individual, IndexTarget, SetTarget)
         return
     }
     if IsCaseSensitive {
         ; Single registration via plain CreateHotstring (no auto-folding) —
         ; only the literal lowercase form is matched in practice.
-        _AddTriggerToIndex(Trigger, Output, Category, Section, Individual)
+        _AddTriggerToIndex(Trigger, Output, Category, Section, Individual, IndexTarget, SetTarget)
         return
     }
     LowerTrig := StrLower(Trigger)
     TitleTrig := StrTitle(Trigger)
     UpperTrig := StrUpper(Trigger)
-    _AddTriggerToIndex(LowerTrig, StrLower(Output), Category, Section, Individual)
-    _AddTriggerToIndex(TitleTrig, StrTitle(Output), Category, Section, Individual)
+    _AddTriggerToIndex(LowerTrig, StrLower(Output), Category, Section, Individual, IndexTarget, SetTarget)
+    _AddTriggerToIndex(TitleTrig, StrTitle(Output), Category, Section, Individual, IndexTarget, SetTarget)
     MagicSuffix := (IsSet(ScriptInformation) and ScriptInformation.Has("MagicKey"))
         ? ScriptInformation["MagicKey"] : "★"
     BodyLen := StrLen(RTrim(Trigger, MagicSuffix))
     if (BodyLen != 1) {
-        _AddTriggerToIndex(UpperTrig, StrUpper(Output), Category, Section, Individual)
+        _AddTriggerToIndex(UpperTrig, StrUpper(Output), Category, Section, Individual, IndexTarget, SetTarget)
     }
 }
 
@@ -564,8 +586,14 @@ _AddTriggerVariants(Trigger, Output, Category, Section, IsCaseSensitive, IsStric
 ; (everything else) are not indexed at all — their previews would
 ; fire on a single-letter typed buffer, which is too noisy to be
 ; useful.
-_AddTriggerToIndex(Trigger, Output, Category, Section, Individual := "") {
-    global _PrefixIndex, _MIN_PREFIX_LEN, ScriptInformation, HSE_PRIORITY_COMMON
+_AddTriggerToIndex(Trigger, Output, Category, Section, Individual := "", IndexTarget := "", SetTarget := "") {
+    global _PrefixIndex, _TriggerSet, _MIN_PREFIX_LEN, ScriptInformation, HSE_PRIORITY_COMMON
+    ; Default to the live globals so existing direct callers (and the test
+    ; suite) keep populating _PrefixIndex / _TriggerSet exactly as before.
+    if !IsObject(IndexTarget)
+        IndexTarget := _PrefixIndex
+    if !IsObject(SetTarget)
+        SetTarget := _TriggerSet
 
     MagicKey := (IsSet(ScriptInformation) and ScriptInformation.Has("MagicKey"))
         ? ScriptInformation["MagicKey"] : "★"
@@ -603,12 +631,12 @@ _AddTriggerToIndex(Trigger, Output, Category, Section, Individual := "") {
         return
     }
     Prefix := SubStr(Trigger, 1, KeyLen)
-    if (!_PrefixIndex.Has(Prefix) or Type(_PrefixIndex[Prefix]) != "Array") {
-        _PrefixIndex[Prefix] := []
+    if (!IndexTarget.Has(Prefix) or Type(IndexTarget[Prefix]) != "Array") {
+        IndexTarget[Prefix] := []
     }
-    _PrefixIndex[Prefix].Push(Entry)
+    IndexTarget[Prefix].Push(Entry)
     ; Register exact trigger in the flat set for near-miss lookups
-    _TriggerSet[StrLower(Trigger)] := Entry
+    SetTarget[StrLower(Trigger)] := Entry
 }
 
 
@@ -931,15 +959,18 @@ _OnPrefixKeyDown(IH, VK, SC) {
             if (VK == 0x09 and IsSet(LLM_Tooltip_TryAcceptTab) and LLM_Tooltip_TryAcceptTab())
                 return
             HSE_FeedReset(true)
+            ; Flush the rolling LLM context on Tab (when no suggestion was
+            ; accepted above) and Enter, mirroring the macOS reset_on_nav
+            ; contract. Previously the Enter flush lived in an unreachable
+            ; trailing else-if and silently never ran on this hook path.
+            if (IsSet(LLM_Bridge_FeedKeyDownIfActive))
+                LLM_Bridge_FeedKeyDownIfActive(VK)
         } else if (VK == 0x1B
                 or VK == 0x25 or VK == 0x26
                 or VK == 0x27 or VK == 0x28) {
             ; Arrow keys and Escape move the cursor to an unknown position,
             ; but the next typed run starts fresh — treat as word boundary.
             HSE_FeedReset(true)
-            if (IsSet(LLM_Bridge_FeedKeyDownIfActive))
-                LLM_Bridge_FeedKeyDownIfActive(VK)
-        } else if (VK == 0x09 or VK == 0x0D or VK == 0x1B) {
             if (IsSet(LLM_Bridge_FeedKeyDownIfActive))
                 LLM_Bridge_FeedKeyDownIfActive(VK)
         }

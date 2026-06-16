@@ -464,38 +464,52 @@ HSE_DisableGroup(Group) {
         return
     }
     HSE_DisabledGroups[Group] := true
-    ; Remove each spec from the live index.
-    for _, Spec in HSE_RegistryByGroup[Group] {
-        LookupKey := Spec.CaseSensitive ? Spec.TailChar : StrLower(Spec.TailChar)
-        if HSE_RegistryByLastChar.Has(LookupKey) {
-            Bucket := HSE_RegistryByLastChar[LookupKey]
-            NewBucket := []
-            for _, S in Bucket {
-                if (S.Seq !== Spec.Seq) {
-                    NewBucket.Push(S)
+    ; ATOMICITY — same contract as HSE_Register: the splice below resets the whole
+    ; star prefix set / by-trigger index to empty before re-indexing the survivors,
+    ; opening a wide window where an OnChar reader (HSE_FindMatchAtEnd) would see an
+    ; empty star index and drop every star expansion for the rebuild duration. This
+    ; is wrapped in Critical so the reader thread never preempts mid-rebuild and the
+    ; index is never observed empty. Critical is safe here: every step is in-memory
+    ; (Map/Array mutation), no Sleep. NOTE for any future re-wiring of group toggling
+    ; to a live menu path: keep this Critical wrap — without it the dead-path race
+    ; this guards becomes a live high-severity star-expansion drop.
+    _DgCrit := Critical("On")
+    try {
+        ; Remove each spec from the live index.
+        for _, Spec in HSE_RegistryByGroup[Group] {
+            LookupKey := Spec.CaseSensitive ? Spec.TailChar : StrLower(Spec.TailChar)
+            if HSE_RegistryByLastChar.Has(LookupKey) {
+                Bucket := HSE_RegistryByLastChar[LookupKey]
+                NewBucket := []
+                for _, S in Bucket {
+                    if (S.Seq !== Spec.Seq) {
+                        NewBucket.Push(S)
+                    }
                 }
+                HSE_RegistryByLastChar[LookupKey] := NewBucket
             }
-            HSE_RegistryByLastChar[LookupKey] := NewBucket
-        }
-        ; Remove from star index if applicable.
-        if Spec.Star {
-            NewStarSpecs := []
-            for _, S in HSE_StarSpecs {
-                if (S.Seq !== Spec.Seq) {
-                    NewStarSpecs.Push(S)
+            ; Remove from star index if applicable.
+            if Spec.Star {
+                NewStarSpecs := []
+                for _, S in HSE_StarSpecs {
+                    if (S.Seq !== Spec.Seq) {
+                        NewStarSpecs.Push(S)
+                    }
                 }
+                HSE_StarSpecs := NewStarSpecs
             }
-            HSE_StarSpecs := NewStarSpecs
         }
+        ; Rebuild the prefix sets and the by-trigger index from the remaining star
+        ; specs — both derive from HSE_StarSpecs, which was just spliced above.
+        HSE_StarPrefixSetCI := Map()
+        HSE_StarPrefixSetCS := Map()
+        for _, S in HSE_StarSpecs {
+            _HSE_IndexStarPrefixes(S)
+        }
+        _HSE_RebuildStarTriggerIndex()
+    } finally {
+        Critical(_DgCrit)
     }
-    ; Rebuild the prefix sets and the by-trigger index from the remaining star
-    ; specs — both derive from HSE_StarSpecs, which was just spliced above.
-    HSE_StarPrefixSetCI := Map()
-    HSE_StarPrefixSetCS := Map()
-    for _, S in HSE_StarSpecs {
-        _HSE_IndexStarPrefixes(S)
-    }
-    _HSE_RebuildStarTriggerIndex()
 }
 
 ; Restore all mappings in Group to the live index.

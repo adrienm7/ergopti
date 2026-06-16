@@ -55,6 +55,18 @@ class KLRoiConst {
     ; Maximum number of words tracked simultaneously (prevents memory growth)
     static MAX_TRACKED_WORDS    := 500
 
+    ; Target size the tracking map is shrunk to when it exceeds the cap. The
+    ; prune always brings the map strictly below MAX_TRACKED_WORDS down to this
+    ; target so a single saturated word cannot re-trigger a full scan on the
+    ; very next word boundary — the guard stays amortised-O(1), not O(n)/word.
+    static PRUNE_TARGET_WORDS   := 250
+
+    ; Hard cap on the in-progress word buffer length. A delimiter-free run
+    ; (pasted JWT, long token) longer than this is discarded rather than
+    ; accumulated char-by-char, keeping KL_Roi_OnChar O(1) per keystroke and
+    ; avoiding holding a secret-like token in RAM until a boundary appears.
+    static MAX_INPROGRESS_WORD_LEN := 64
+
     ; Flush ROI snapshot every N fired hotstrings
     static ROI_SNAPSHOT_EVERY   := 10
 
@@ -85,6 +97,11 @@ class KLRoi {
     ; Map(lower_word → count)
     static word_counts          := Map()
     static current_word         := ""   ; in-progress word buffer
+
+    ; Set true once the in-progress run exceeds MAX_INPROGRESS_WORD_LEN. The
+    ; whole run (not a 64-char fragment of it) is then discarded at the next
+    ; boundary so an over-long token never becomes a trigger candidate.
+    static word_overflowed      := false
 
     ; Triggers seen this session (for half-life tracking)
     ; Map(trigger → last_use_tick)
@@ -163,12 +180,29 @@ KL_Roi_OnChar(c) {
     ; Word characters — accumulate
     if (c != " " and c != "`t" and c != "`n" and c != "`r"
             and c != "." and c != "," and c != "!" and c != "?") {
+        ; Once the run exceeds the buffer cap, stop accumulating and mark it
+        ; overflowed: such a delimiter-free run (pasted JWT, long token) is not
+        ; a real word candidate, and growing it char-by-char would turn this
+        ; O(1) hot-path append into an O(n) concat per key. The full run is
+        ; discarded at the boundary, not kept as a 64-char fragment.
+        if (KLRoi.word_overflowed)
+            return
+        if (StrLen(KLRoi.current_word) >= KLRoiConst.MAX_INPROGRESS_WORD_LEN) {
+            KLRoi.current_word := ""
+            KLRoi.word_overflowed := true
+            return
+        }
         KLRoi.current_word .= c
         return
     }
-    ; Word boundary — flush current word
+    ; Word boundary — flush current word, then reset the buffer + overflow flag
     word := KLRoi.current_word
     KLRoi.current_word := ""
+    overflowed := KLRoi.word_overflowed
+    KLRoi.word_overflowed := false
+    ; Discard an over-long run entirely so it never becomes a candidate
+    if (overflowed)
+        return
     KL_Roi_ProcessWord(word)
 }
 
@@ -197,19 +231,75 @@ KL_Roi_ProcessWord(word) {
         ))
     }
 
-    ; Prune the tracking map when it grows too large
-    if (KLRoi.word_counts.Count > KLRoiConst.MAX_TRACKED_WORDS) {
-        ; Drop all words with count = 1 (noise)
-        prune := []
-        Critical("On")
-        for k, v in KLRoi.word_counts {
-            if (v = 1)
-                prune.Push(k)
-        }
-        for _, k in prune
-            KLRoi.word_counts.Delete(k)
-        Critical("Off")
+    ; Prune the tracking map when it grows too large. The prune is GUARANTEED
+    ; to bring the map strictly below MAX_TRACKED_WORDS (down to
+    ; PRUNE_TARGET_WORDS) so a saturated map cannot re-trigger this full scan on
+    ; every subsequent word boundary — keeping the guard amortised, not O(n)
+    ; per word once the cap is reached.
+    if (KLRoi.word_counts.Count > KLRoiConst.MAX_TRACKED_WORDS)
+        KL_Roi_PruneWordCounts()
+}
+
+
+
+; ===========================================
+; ===== 4.1) Bounded tracking-map prune =====
+; ===========================================
+
+; Shrinks word_counts to PRUNE_TARGET_WORDS, guaranteed to leave it strictly
+; below MAX_TRACKED_WORDS. First drops count = 1 noise; if that is not enough,
+; evicts the lowest-count entries until the target is reached. Bounded so the
+; map always falls back under the cap and the next word cannot immediately
+; re-trigger another full scan (keeps the saturation guard amortised).
+KL_Roi_PruneWordCounts() {
+    Critical("On")
+    ; Pass 1 — drop single-occurrence noise (the cheapest, most disposable words)
+    prune := []
+    for k, v in KLRoi.word_counts {
+        if (v = 1)
+            prune.Push(k)
     }
+    for _, k in prune
+        KLRoi.word_counts.Delete(k)
+
+    ; Pass 2 — if still over target (map saturated with count >= 2 entries),
+    ; evict the lowest-count entries until the map is down to the target. This
+    ; is what guarantees the map drops below the cap even when no count = 1
+    ; words exist, so the guard cannot degrade to O(n) on every word.
+    if (KLRoi.word_counts.Count > KLRoiConst.PRUNE_TARGET_WORDS) {
+        ; Collect (key, count) pairs, then insertion-sort ascending by count so
+        ; the lowest-frequency (most disposable) words are evicted first. The
+        ; array is at most MAX_TRACKED_WORDS entries and this runs only on the
+        ; rare prune path, so a simple insertion sort is preferred over cleverness.
+        keys := []
+        counts := []
+        for k, v in KLRoi.word_counts {
+            keys.Push(k)
+            counts.Push(v)
+        }
+        i := 2
+        n := keys.Length
+        while (i <= n) {
+            cur_key := keys[i]
+            cur_cnt := counts[i]
+            j := i - 1
+            while (j >= 1 && counts[j] > cur_cnt) {
+                keys[j + 1] := keys[j]
+                counts[j + 1] := counts[j]
+                j -= 1
+            }
+            keys[j + 1] := cur_key
+            counts[j + 1] := cur_cnt
+            i += 1
+        }
+        excess := KLRoi.word_counts.Count - KLRoiConst.PRUNE_TARGET_WORDS
+        i := 1
+        while (i <= excess && i <= keys.Length) {
+            KLRoi.word_counts.Delete(keys[i])
+            i += 1
+        }
+    }
+    Critical("Off")
 }
 
 

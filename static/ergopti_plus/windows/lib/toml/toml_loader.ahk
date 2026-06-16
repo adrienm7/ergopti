@@ -39,6 +39,13 @@ global _TomlFileSectionCounts := Map()
 global _HOTSTRING_ENTRY_PATTERN :=
     'i)^"([^"\\]*(?:\\.[^"\\]*)*)"\s*=\s*\{\s*output\s*=\s*"([^"\\]*(?:\\.[^"\\]*)*)"\s*,\s*is_word\s*=\s*(true|false)\s*,\s*auto_expand\s*=\s*(true|false)\s*,\s*is_case_sensitive\s*=\s*(true|false)\s*,\s*final_result\s*=\s*(true|false)(?:\s*,\s*is_case_sensitive_strict\s*=\s*(true|false))?(?:\s*,\s*priority\s*=\s*([0-9]+))?\s*\}'
 
+; Simple `key = "value"` entry shape that LoadExtTomlFile also registers (as a
+; CreateCaseSensitiveHotstrings call) when the full inline-table pattern misses.
+; Defined once here so the displayed count helpers can recognise EXACTLY the two
+; shapes that actually get registered, never a looser `key =` form that would
+; over-count malformed or non-entry lines versus the registered rows.
+global _HOTSTRING_SIMPLE_ENTRY_PATTERN := 'i)^(?:"([^"]+)"|([A-Za-z0-9_.-]+))\s*=\s*"([^"]+)"'
+
 
 
 
@@ -74,7 +81,7 @@ ReadTomlFile(FilePath) {
 
 ; Helper to warm the section counts cache for a specific file.
 _TomlWarmFileCounts(FilePath) {
-    global _TomlFileSectionCounts
+    global _TomlFileSectionCounts, _HOTSTRING_ENTRY_PATTERN, _HOTSTRING_SIMPLE_ENTRY_PATTERN
     if _TomlFileSectionCounts.Has(FilePath)
         return _TomlFileSectionCounts[FilePath]
 
@@ -99,8 +106,18 @@ _TomlWarmFileCounts(FilePath) {
         }
         
         ; Match hotstring entry: key = value or key = { ... }
-        if (CurrentSec != "" and CurrentSec != "_meta" and CurrentSec != "_meta.sections") {
-            if RegExMatch(Line, '^(?:"[^"]+"|[A-Za-z0-9_.-]+)\s*=') {
+        ; Skip every metadata block, not just the two flat forms: equality checks
+        ; let the dotted per-section form ([_meta.sections.<x>], [_meta.section_delays])
+        ; written by the config window slip through, so its delay/color/priority lines
+        ; were miscounted as hotstrings. Mirror _HotstringsCacheBuildRows' convention.
+        ; Count a line only when it matches one of the two shapes the loaders
+        ; actually register: the full inline-table entry (LoadHotstringsSection /
+        ; LoadExtTomlFile) or the simple key="value" entry (LoadExtTomlFile
+        ; fallback). A looser `key =` test over-counted non-entry lines, so the
+        ; displayed count could exceed the registered/cached row count.
+        if (CurrentSec != "" and CurrentSec != "_meta" and !InStr(CurrentSec, "_meta.")) {
+            if (RegExMatch(Line, _HOTSTRING_ENTRY_PATTERN)
+            or RegExMatch(Line, _HOTSTRING_SIMPLE_ENTRY_PATTERN)) {
                 Counts[CurrentSec] := Counts[CurrentSec] + 1
             }
         }
@@ -277,7 +294,12 @@ LoadHotstringsSection(CategoryName, SectionName, FeatureConfig, ExtraOptions := 
         try LoggerTrace("TomlLoader", "Using generated loader for [{1}.{2}].",
             CategoryName, SectionName)
         GeneratedFn := _GENERATED_HOTSTRINGS[LoaderKey]
-        GeneratedFn(FeatureConfig, ExtraOptions)
+        ; Thread the section/file/source-resolved priority into the cache registrar
+        ; so a cached entry with no individual override registers at the SAME
+        ; priority the TOML fallback would compute via _ParseEntryPriority(Line,
+        ; ResolvedPriority). Without this the fast/cached path and the fallback
+        ; could resolve different collision priorities for the same TOML.
+        GeneratedFn(FeatureConfig, ExtraOptions, ResolvedPriority)
         return
     }
 
@@ -363,7 +385,7 @@ LoadHotstringsSection(CategoryName, SectionName, FeatureConfig, ExtraOptions := 
 
 ; Load all hotstring entries from every [[section]] in an arbitrary TOML file.
 LoadExtTomlFile(FilePath, CategoryLabel) {
-    global ScriptInformation, _HOTSTRING_ENTRY_PATTERN, HSE_PRIORITY_PACKAGE
+    global ScriptInformation, _HOTSTRING_ENTRY_PATTERN, _HOTSTRING_SIMPLE_ENTRY_PATTERN, HSE_PRIORITY_PACKAGE
     if !FileExist(FilePath) {
         try LoggerWarn("TomlLoader", "Extension TOML '{1}' not found — skipped.", FilePath)
         return
@@ -389,7 +411,7 @@ LoadExtTomlFile(FilePath, CategoryLabel) {
             continue
         }
         if !RegExMatch(Line, _HOTSTRING_ENTRY_PATTERN, &Match) {
-            if RegExMatch(Line, 'i)^(?:"([^"]+)"|([A-Za-z0-9_.-]+))\s*=\s*"([^"]+)"', &SimpleM) {
+            if RegExMatch(Line, _HOTSTRING_SIMPLE_ENTRY_PATTERN, &SimpleM) {
                 Trigger := (SimpleM[1] != "") ? SimpleM[1] : SimpleM[2]
                 Output  := SimpleM[3]
                 Trigger := StrReplace(Trigger, "★", ScriptInformation["MagicKey"])
@@ -476,7 +498,11 @@ ParseTomlGroupConfig(CategoryName, FilePath := "") {
 
     Config := { Delay: "", Color: "", ShowTooltip: "", Priority: "", Sections: Map() }
     if !FileExist(FilePath) {
-        HotstringGroupConfig[LowerCat] := Config
+        ; Cache the missing-file result under CacheKey (the same key the lookup at
+        ; the top of this function checks and that _ParseTomlGroupConfig_InvalidatePath
+        ; deletes). Keying it under LowerCat instead made explicit-path calls never
+        ; cache-hit and left a stale empty Config unreachable by invalidation.
+        HotstringGroupConfig[CacheKey] := Config
         return Config
     }
 

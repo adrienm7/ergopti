@@ -77,9 +77,10 @@ TestHsCache_BuildExtractsKnownEntry() {
 	Assert(AssignRows.Length == 4, "rolls.assign must register exactly 4 entries (got " . AssignRows.Length . ")")
 	; First TOML entry is  ' #!' = { output = ' := ', is_word=false, auto_expand=true,
 	; is_case_sensitive=true, final_result=true }  -> flags *? and caseSens true.
-	Expected := ["*?", " #!", " := ", true, false, true]
+	; The 7th element is the per-entry priority override, empty here (no `priority =`).
+	Expected := ["*?", " #!", " := ", true, false, true, ""]
 	Assert(_HsCacheRowsEqual(AssignRows[1], Expected),
-		"rolls.assign first row must extract as [*?, ' #!', ' := ', final, !repeat, caseSens]")
+		"rolls.assign first row must extract as [*?, ' #!', ' := ', final, !repeat, caseSens, no-priority-override]")
 }
 
 TestHsCache_BuildCoversEveryBundledCategory() {

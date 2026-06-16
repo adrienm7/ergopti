@@ -268,10 +268,12 @@ Test("GetLastSentCharacterAt: ring wrap keeps only the newest CAP entries",
 TestHE_TimeoutMissingKey() {
 	global LastSentCharacterKeyTime
 	LastSentCharacterKeyTime := Map()
-	; Key not in map; implementation falls back to Now, so never expired
-	AssertFalse(IsTimeActivationExpired("x", 1))
+	; Key not in map: the prior char's timestamp may have been pruned after a
+	; long pause, so the gate must fail CLOSED (expired) rather than defaulting
+	; to "now" and firing a deliberately-paused trigger as if just typed.
+	AssertTrue(IsTimeActivationExpired("x", 1))
 }
-Test("IsTimeActivationExpired: missing key in map never triggers expiry",
+Test("IsTimeActivationExpired: missing key in map fails closed (expired)",
 	TestHE_TimeoutMissingKey)
 
 TestHE_TimeoutExactBoundary() {
@@ -509,7 +511,12 @@ Test("SendInstant: routes through _SendHook when installed", TestHE_SendInstantH
 ; ActivateHotstrings
 ; ==========================
 TestHE_ActivateHotstringsEmitsSpaceThenBackspace() {
+	global HSE_Buffer
 	ResetHotstringRecorders()
+	; A pending abbreviation in the engine buffer is what makes the flush poke
+	; necessary — seed one so the dance actually runs (the gate now skips it on
+	; an empty buffer, see activate-hotstrings-sleep-on-keyboard-thread).
+	HSE_Buffer := "ia"
 	ActivateHotstrings()
 	; Expect exactly 2 sends: SendNewResult(" ") then SendNewResult("{BackSpace}", False)
 	AssertEqual(2, _Stub_RecordedSends.Length)

@@ -185,6 +185,12 @@ _LLMRemote_PollRequest(req_id) {
         return
     entry := _LLM_Remote_Async[req_id]
     if entry["cancelled"] {
+        ; Abort the in-flight WinHTTP request before dropping our reference.
+        ; Without this the COM object + its socket stay resident until WinHTTP's
+        ; own receive timeout fires — a provider that accepts the connection but
+        ; never responds keeps the request alive far longer than intended.
+        if entry.Has("http")
+            try entry["http"].Abort()
         _LLM_Remote_Async.Delete(req_id)
         return
     }
@@ -193,6 +199,10 @@ _LLMRemote_PollRequest(req_id) {
     ; this cap. Calls on_fail() and cleans up so callers never hang indefinitely.
     if (entry.Has("deadline_tick") and A_TickCount >= entry["deadline_tick"]) {
         on_fail := entry["on_fail"]
+        ; Abort the stalled request so the COM object + socket are released now
+        ; rather than lingering until WinHTTP's internal receive timeout fires.
+        if entry.Has("http")
+            try entry["http"].Abort()
         _LLM_Remote_Async.Delete(req_id)
         try LoggerWarn("LLM.remote", "Poll deadline exceeded for req_id={1} — aborting.", req_id)
         try on_fail()
@@ -366,6 +376,96 @@ LLM_RemoteIsReady(Entry) {
     }
 }
 
+; Per-phase timeout (ms) for the readiness ping. Same value the sync path
+; used, but here it is non-blocking: WinHTTP runs the request on its own
+; thread and we poll for completion, so even a hung connect never freezes
+; the main message pump.
+global LLM_REMOTE_READY_PING_TIMEOUT_MS := 2000
+; Absolute-time cap (ms) for the readiness poll loop. Sized one cadence above
+; the per-phase timeout so a silent connection drop (no WinHTTP timeout fires)
+; still ends the timer chain promptly instead of polling forever.
+global LLM_REMOTE_READY_PING_DEADLINE_MS := 3000
+; Poll cadence (ms) for the readiness ping. A reachability check does not need
+; sub-100 ms reactivity, so a relaxed cadence keeps timer pressure off the
+; message loop (mirrors LLM_OllamaIsRunning_Async's 500 ms).
+global LLM_REMOTE_READY_PING_POLL_MS := 250
+
+/**
+ * Async variant of LLM_RemoteIsReady. Same probe (provider /models endpoint),
+ * but the WinHTTP request is opened async and polled, so the caller (the tray
+ * save path) returns immediately and the message pump keeps running. Invokes
+ * ``on_result(bool)`` from a polling tick once the ping resolves, times out,
+ * or fails. Mirrors LLM_OllamaIsRunning_Async.
+ *
+ * @param {Map|Object} Entry     - API entry record (Provider / BaseUrl / Token).
+ * @param {function}   on_result - Callback receiving the boolean reachability.
+ */
+LLM_RemoteIsReady_Async(Entry, on_result) {
+    global LLM_API_PROVIDERS
+    global LLM_REMOTE_READY_PING_TIMEOUT_MS, LLM_REMOTE_READY_PING_DEADLINE_MS
+
+    ProviderId := _LLMRemoteEntryGet(Entry, "Provider", "openai_compat")
+    if !LLM_API_PROVIDERS.Has(ProviderId) {
+        try on_result(false)
+        return
+    }
+    Provider := LLM_API_PROVIDERS[ProviderId]
+    BaseUrl  := _LLMRemoteEntryGet(Entry, "BaseUrl", Provider["BaseUrl"])
+    Token    := _LLMRemoteEntryGet(Entry, "Token", "")
+    if (BaseUrl == "" or Token == "") {
+        try on_result(false)
+        return
+    }
+
+    ProvFmt := Provider["Format"]
+    PingUrl := ""
+    if (ProvFmt == "openai" or ProvFmt == "anthropic") {
+        PingUrl := RTrim(BaseUrl, "/") . "/models"
+    } else if (ProvFmt == "gemini") {
+        PingUrl := RTrim(BaseUrl, "/") . "/models?key=" . Token
+    }
+    if (PingUrl == "") {
+        try on_result(false)
+        return
+    }
+
+    try {
+        Http := ComObject("WinHttp.WinHttpRequest.5.1")
+        Http.Open("GET", PingUrl, true)
+        Http.SetTimeouts(LLM_REMOTE_READY_PING_TIMEOUT_MS, LLM_REMOTE_READY_PING_TIMEOUT_MS,
+                        LLM_REMOTE_READY_PING_TIMEOUT_MS, LLM_REMOTE_READY_PING_TIMEOUT_MS)
+        _LLMRemoteSetAuthHeaders(Http, ProvFmt, Token)
+        Http.Send()
+    } catch {
+        try on_result(false)
+        return
+    }
+    _LLMRemote_PollReady(Http, on_result, A_TickCount + LLM_REMOTE_READY_PING_DEADLINE_MS)
+}
+
+; Polling tick for LLM_RemoteIsReady_Async. Re-arms itself on a relaxed cadence
+; until the response is ready or the absolute-time deadline passes, then aborts
+; the in-flight request and reports the result exactly once.
+_LLMRemote_PollReady(Http, on_result, deadline_tick) {
+    global LLM_REMOTE_READY_PING_POLL_MS
+    ready := false
+    try ready := Http.WaitForResponse(0)
+    if !ready {
+        if (A_TickCount >= deadline_tick) {
+            ; Abort the stalled request so the COM object + socket are released
+            ; now rather than lingering until WinHTTP's own timeout fires.
+            try Http.Abort()
+            try on_result(false)
+            return
+        }
+        SetTimer(() => _LLMRemote_PollReady(Http, on_result, deadline_tick), -LLM_REMOTE_READY_PING_POLL_MS)
+        return
+    }
+    status := 0
+    try status := Http.Status
+    try on_result(status >= 200 and status < 300)
+}
+
 
 
 
@@ -482,13 +582,100 @@ _LLMRemoteBuildPayload(Fmt, Model, SystemPrompt, UserText, Temperature, max_toke
         ModelEsc, SysEsc, UserEsc, Temp, MaxTok)
 }
 
-; Pull the generated text out of a provider response. Each branch targets the
-; canonical "first choice / first candidate / first content block" path. When
-; the regex misses (HTTP error body, malformed JSON), returns "" — the caller
-; treats that the same as a network failure: no tooltip, no crash.
+; Pull the generated text out of a provider response. First navigates the
+; canonical JSON path per format with JsonParse (the same parser the Ollama
+; path uses), which is robust against multi-block / reasoning shapes where the
+; FIRST "content"/"text" string is NOT the answer (e.g. an Anthropic ``thinking``
+; block preceding the ``text`` block, or an OpenRouter ``reasoning`` field before
+; ``choices``). Only when the structured navigation misses (HTTP error body, a
+; shape we don't model, malformed JSON) does it fall back to the legacy
+; first-match regex. Returns "" when both miss — the caller treats that the same
+; as a network failure: no tooltip, no crash.
 _LLMRemoteParseResponse(Format, Body) {
     if (Body == "")
         return ""
+    structured := _LLMRemoteParseStructured(Format, Body)
+    if (structured != "")
+        return structured
+    return _LLMRemoteParseResponseRegex(Format, Body)
+}
+
+; Structured-navigation parse: walks the documented response tree for the
+; format and returns the answer text, or "" when the expected path is absent
+; (so the caller can fall back to the regex). Wrapped in try because JsonParse
+; throws on malformed bodies (HTTP error pages) — that just means "fall back".
+_LLMRemoteParseStructured(Format, Body) {
+    try {
+        root := JsonParse(Body)
+    } catch {
+        return ""
+    }
+    if !(root is Map)
+        return ""
+    if (Format == "anthropic")
+        return _LLMRemoteNavAnthropic(root)
+    if (Format == "gemini")
+        return _LLMRemoteNavGemini(root)
+    return _LLMRemoteNavOpenAI(root)
+}
+
+; Anthropic Messages: ``content`` is an ARRAY of blocks; the answer is the first
+; block with ``type == "text"`` — NOT necessarily the first block, which may be
+; a ``thinking`` block. Returns the text already JSON-unescaped by JsonParse.
+_LLMRemoteNavAnthropic(root) {
+    if !root.Has("content") or !(root["content"] is Array)
+        return ""
+    for _idx, block in root["content"] {
+        if !(block is Map)
+            continue
+        if !block.Has("type") or block["type"] != "text"
+            continue
+        if block.Has("text") and Type(block["text"]) == "String"
+            return block["text"]
+    }
+    return ""
+}
+
+; Gemini: ``candidates[1].content.parts[1].text``. AHK arrays are 1-indexed, so
+; the first candidate is index 1. Concatenates every text part of the first
+; candidate so a multi-part answer is not truncated to its first fragment.
+_LLMRemoteNavGemini(root) {
+    if !root.Has("candidates") or !(root["candidates"] is Array) or root["candidates"].Length < 1
+        return ""
+    cand := root["candidates"][1]
+    if !(cand is Map) or !cand.Has("content") or !(cand["content"] is Map)
+        return ""
+    content := cand["content"]
+    if !content.Has("parts") or !(content["parts"] is Array)
+        return ""
+    out := ""
+    for _idx, part in content["parts"] {
+        if (part is Map) and part.Has("text") and Type(part["text"]) == "String"
+            out .= part["text"]
+    }
+    return out
+}
+
+; OpenAI Chat Completions (and every OpenAI-compatible gateway): the answer is
+; ``choices[1].message.content``. Navigating to that exact field skips any
+; sibling ``reasoning`` field (OpenRouter) or other decoy "content"-like keys
+; that a first-match regex would grab by mistake.
+_LLMRemoteNavOpenAI(root) {
+    if !root.Has("choices") or !(root["choices"] is Array) or root["choices"].Length < 1
+        return ""
+    choice := root["choices"][1]
+    if !(choice is Map) or !choice.Has("message") or !(choice["message"] is Map)
+        return ""
+    msg := choice["message"]
+    if msg.Has("content") and Type(msg["content"]) == "String"
+        return msg["content"]
+    return ""
+}
+
+; Legacy first-match regex fallback. Kept verbatim from the original parser so a
+; provider shape the structured navigator does not model still extracts SOMETHING
+; rather than nothing — the same lenient behaviour the engine shipped before.
+_LLMRemoteParseResponseRegex(Format, Body) {
     if (Format == "anthropic") {
         ; { "content": [ { "type": "text", "text": "..." } ], ... }
         if RegExMatch(Body, 'm)"text"\s*:\s*"((?:[^"\\]|\\.)*)"', &m)

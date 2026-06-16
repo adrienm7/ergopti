@@ -445,31 +445,33 @@ Test("Hotstrings full: prefix watcher suppresses synthetic input", TestHSFull_Sy
 ; =======================================================
 ; ============================================
 
-TestHH_PriorKeyMissingNeverExpires() {
+TestHH_PriorKeyMissingFailsClosed() {
     global LastSentCharacterKeyTime
     ResetHotstringRecorders()
     SimulateRegularApp()
-    ; Map is empty — IsTimeActivationExpired falls back to Now, so diff == 0
-    ; and the timeout cannot be exceeded regardless of OptionTimeActivationSeconds.
+    ; Map is empty — the prior char's timestamp may have been pruned after a
+    ; long pause, so IsTimeActivationExpired must fail CLOSED (expired) and the
+    ; time-gated expansion must be suppressed (0 sends), not fire as if typed now.
     LastSentCharacterKeyTime := Map()
     _TestCallHotstring("ab", "x", "", true, false, 1)
-    AssertEqual(3, _Stub_RecordedSends.Length)
+    AssertEqual(0, _Stub_RecordedSends.Length)
 }
-Test("HotstringHandler: prior key absent from timing Map never expires",
-    TestHH_PriorKeyMissingNeverExpires)
+Test("HotstringHandler: prior key absent from timing Map fails closed (suppressed)",
+    TestHH_PriorKeyMissingFailsClosed)
 
-TestHH_PriorKeyDifferentCharNeverBlocksOther() {
+TestHH_PriorKeyDifferentCharFailsClosed() {
     global LastSentCharacterKeyTime
     ResetHotstringRecorders()
     SimulateRegularApp()
     ; The handler asks IsTimeActivationExpired for SubStr("xy", -2, 1) == "x".
-    ; "y" being stale must NOT block expansion gated on "x".
+    ; Only "y" is tracked, so the gate char "x" has no timestamp — we cannot
+    ; prove "x" was typed recently, so the gate fails CLOSED (suppressed).
     LastSentCharacterKeyTime := Map("y", A_TickCount - 60000)
     _TestCallHotstring("xy", "z", "", true, false, 1)
-    AssertEqual(3, _Stub_RecordedSends.Length)
+    AssertEqual(0, _Stub_RecordedSends.Length)
 }
-Test("HotstringHandler: stale timing for an unrelated character does not block expansion",
-    TestHH_PriorKeyDifferentCharNeverBlocksOther)
+Test("HotstringHandler: absent gate-char timing fails closed (suppressed)",
+    TestHH_PriorKeyDifferentCharFailsClosed)
 
 TestHH_NotepadFinalResultStillNotepad() {
     ResetHotstringRecorders()
@@ -892,7 +894,11 @@ Test("End-to-end: CreateCaseSensitive conform emits Title replacement for Title 
 ; ============================================
 
 TestAH_SendsTwoCalls() {
+    global HSE_Buffer
     ResetHotstringRecorders()
+    ; Seed a pending abbreviation so the flush dance runs — the gate skips it
+    ; on an empty buffer (activate-hotstrings-sleep-on-keyboard-thread).
+    HSE_Buffer := "ia"
     ActivateHotstrings()
     AssertEqual(2, _Stub_RecordedSends.Length)
 }
@@ -900,7 +906,9 @@ Test("ActivateHotstrings: produces exactly 2 send calls (Space + BackSpace)",
     TestAH_SendsTwoCalls)
 
 TestAH_FirstSendIsSpace() {
+    global HSE_Buffer
     ResetHotstringRecorders()
+    HSE_Buffer := "ia"
     ActivateHotstrings()
     AssertEqual("SendNewResult", _Stub_RecordedSends[1].fn)
     AssertEqual(" ", _Stub_RecordedSends[1].args[1])
@@ -908,7 +916,9 @@ TestAH_FirstSendIsSpace() {
 Test("ActivateHotstrings: first send is a literal space", TestAH_FirstSendIsSpace)
 
 TestAH_SecondSendIsBackspace() {
+    global HSE_Buffer
     ResetHotstringRecorders()
+    HSE_Buffer := "ia"
     ActivateHotstrings()
     AssertEqual("SendNewResult", _Stub_RecordedSends[2].fn)
     AssertEqual("{BackSpace}", _Stub_RecordedSends[2].args[1])

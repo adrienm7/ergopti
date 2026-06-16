@@ -49,7 +49,9 @@ global HS_CACHE_MARKER := "★"
 global _GENERATED_HOTSTRINGS := Map()
 
 ; cat.sec → Array of rows; each row is [flags, trigger, output, finalResult,
-; isRepeat, isCaseSens]. Populated once from the .tsv (or a TOML rebuild).
+; isRepeat, isCaseSens, priorityOverride]. priorityOverride is the per-entry
+; `priority = N` value or "" (no override). Populated once from the .tsv (or a
+; TOML rebuild).
 global _HS_CACHE_ROWS := Map()
 
 ; True once the cache has been loaded (or rebuilt) this session — the ensure
@@ -79,17 +81,22 @@ _HotstringsCacheTomlPath(Category) {
 	return _SharedDir . "\hotstrings\" . Category . ".toml"
 }
 
-; True when the .tsv is at least as new as EVERY bundled TOML — i.e. not stale
+; True when the .tsv is STRICTLY newer than EVERY bundled TOML — i.e. not stale
 ; after a TOML edit or pull. FileGetTime "M" is YYYYMMDDHH24MISS, ordering
-; chronologically as a plain integer. Any stat failure returns false so the
-; caller rebuilds defensively (mirrors _I18nTsvIsFresh).
+; chronologically as a plain integer. The comparison is `>=` (a TOML whose mtime
+; equals the .tsv's is treated as stale): mtime is second-granular and a rebuild
+; writes the .tsv in the SAME wall-clock second it read the TOMLs, so a TOML
+; re-saved within that second would otherwise tie and be served stale until the
+; next boot. Equal-second ties rebuild — the safe direction (one extra rebuild on
+; the rare tie, never a silently ignored edit). Any stat failure returns false so
+; the caller rebuilds defensively (mirrors _I18nTsvIsFresh).
 _HotstringsCacheIsFresh(TsvPath) {
 	global HS_BUNDLED_CATEGORIES
 	try {
 		TsvTime := FileGetTime(TsvPath, "M")
 		for Category in HS_BUNDLED_CATEGORIES {
 			TomlPath := _HotstringsCacheTomlPath(Category)
-			if FileExist(TomlPath) and FileGetTime(TomlPath, "M") > TsvTime
+			if FileExist(TomlPath) and FileGetTime(TomlPath, "M") >= TsvTime
 				return false
 		}
 		return true
@@ -178,8 +185,8 @@ _HsCacheUnescape(Value) {
 ; Parse every bundled category TOML into a Map(cat.sec → Array of rows), using the
 ; SAME line-based scan + _HOTSTRING_ENTRY_PATTERN as the runtime LoadHotstringsSection
 ; fallback, so the cache reproduces that reference behaviour exactly. Each row is
-; [flags, trigger(raw, ★ preserved), output, finalResult, isRepeat, isCaseSens].
-; Runs only on a cache miss (first launch or after a TOML edit).
+; [flags, trigger(raw, ★ preserved), output, finalResult, isRepeat, isCaseSens,
+; priorityOverride]. Runs only on a cache miss (first launch or after a TOML edit).
 _HotstringsCacheBuildRows() {
 	global HS_BUNDLED_CATEGORIES, HS_CACHE_MARKER, _HOTSTRING_ENTRY_PATTERN
 	Rows := Map()
@@ -219,15 +226,26 @@ _HotstringsCacheBuildRows() {
 			if StrictCase
 				Flags .= "C"
 
-			; isRepeat replicates the generator's exact test (category "magickey",
-			; section literally "repeatcorrections", trigger carrying the marker).
-			; Preserved verbatim — behaviour-preserving, not corrected here.
-			IsRepeat := (CategoryLower == "magickey" and CurrentSection == "repeatcorrections" and InStr(Trigger, HS_CACHE_MARKER))
+			; IsRepeat is owned end-to-end by the engine-level repeat fallback
+			; (HSE_TryRepeatKey, hotstring_engine_main.ahk), so the runtime TOML
+			; fallback LoadHotstringsSection does NOT set it. The cache and that
+			; fallback MUST use byte-identical IsRepeat logic to register the same
+			; TOML the same way, so the cache stores it false unconditionally too.
+			; (The old per-row test matched a snake_case-renamed section literal that
+			; no longer matched the [[repeat_corrections]] header, so it never fired.)
+			IsRepeat := false
+
+			; Individual per-hotstring priority override (the top of the cascade
+			; individual > section > file > source). Empty when the entry carries no
+			; `priority = N` key — the registrar then applies the resolved section/
+			; source priority it receives, reproducing the TOML fallback's
+			; _ParseEntryPriority(Line, ResolvedPriority) cascade 1:1.
+			PriorityOverride := _ParseEntryPriority(Line, "")
 
 			Key := CategoryLower . "." . CurrentSection
 			if !Rows.Has(Key)
 				Rows[Key] := []
-			Rows[Key].Push([Flags, Trigger, Output, FinalResult, IsRepeat, IsCaseSens])
+			Rows[Key].Push([Flags, Trigger, Output, FinalResult, IsRepeat, IsCaseSens, PriorityOverride])
 		}
 	}
 	return Rows
@@ -244,8 +262,9 @@ _HotstringsCacheBuildRows() {
 ; ====================================================
 
 ; Serialise a Map(cat.sec → rows) to the flat .tsv. One record per hotstring:
-; cat<TAB>sec<TAB>flags<TAB>trigger<TAB>output<TAB>final<TAB>repeat<TAB>caseSens.
+; cat<TAB>sec<TAB>flags<TAB>trigger<TAB>output<TAB>final<TAB>repeat<TAB>caseSens<TAB>priority.
 ; Trigger/output are escaped (see _HsCacheEscape); ★ is preserved; bools are 1/0;
+; the priority column is the per-entry override (a small int) or empty when none;
 ; LF endings, UTF-8 without BOM. Best-effort: a read-only directory simply means
 ; every boot keeps rebuilding from the TOML (mirrors _I18nWriteTsvCache).
 _HotstringsCacheWriteTsv(TsvPath, Rows) {
@@ -259,7 +278,7 @@ _HotstringsCacheWriteTsv(TsvPath, Rows) {
 				Line := Category . "`t" . Section . "`t" . Row[1] . "`t"
 				Line .= _HsCacheEscape(Row[2]) . "`t" . _HsCacheEscape(Row[3]) . "`t"
 				Line .= (Row[4] ? "1" : "0") . "`t" . (Row[5] ? "1" : "0") . "`t"
-				Line .= (Row[6] ? "1" : "0") . "`n"
+				Line .= (Row[6] ? "1" : "0") . "`t" . (Row.Length >= 7 ? Row[7] : "") . "`n"
 				Content .= Line
 			}
 		}
@@ -272,8 +291,13 @@ _HotstringsCacheWriteTsv(TsvPath, Rows) {
 }
 
 ; Parse a flat .tsv back into a Map(cat.sec → Array of rows). Lines with fewer
-; than the 8 expected columns are skipped defensively. Only trigger/output are
-; unescaped; cat/sec/flags are identifier-safe and stored raw.
+; than the 9 expected columns are skipped defensively. The 9-column requirement
+; also bumps the cache format: an old 8-column .tsv yields zero rows here, so
+; HotstringsCacheEnsure rebuilds it from the TOML (picking up the new priority
+; column) instead of serving a priority-less cache. Only trigger/output are
+; unescaped; cat/sec/flags/priority are identifier-safe and stored raw. An empty
+; priority column means "no per-entry override" — the registrar then applies the
+; resolved section/source priority it receives.
 _HotstringsCacheReadTsv(Content) {
 	Rows := Map()
 	loop parse, Content, "`n", "`r" {
@@ -281,10 +305,10 @@ _HotstringsCacheReadTsv(Content) {
 		if (Line == "")
 			continue
 		Fields := StrSplit(Line, "`t")
-		if Fields.Length < 8
+		if Fields.Length < 9
 			continue
 		Key := Fields[1] . "." . Fields[2]
-		Row := [Fields[3], _HsCacheUnescape(Fields[4]), _HsCacheUnescape(Fields[5]), (Fields[6] == "1"), (Fields[7] == "1"), (Fields[8] == "1")]
+		Row := [Fields[3], _HsCacheUnescape(Fields[4]), _HsCacheUnescape(Fields[5]), (Fields[6] == "1"), (Fields[7] == "1"), (Fields[8] == "1"), Fields[9]]
 		if !Rows.Has(Key)
 			Rows[Key] := []
 		Rows[Key].Push(Row)
@@ -341,13 +365,17 @@ HotstringsCacheEnsure() {
 		Rows.Count, Fast ? "fast" : "rebuilt")
 }
 
-; Register every cached hotstring of one section. Reproduces the old generated
-; _GenRegisterRows 1:1: per-row opts (TimeActivationSeconds from FeatureConfig,
-; FinalResult, IsRepeat, Category, Section, optional OnlyText), ★ substituted at
-; register time, and the CreateHotstring vs CreateCaseSensitiveHotstrings choice.
-; Bound by key into _GENERATED_HOTSTRINGS and invoked from LoadHotstringsSection.
-_HsCacheRegisterSection(LoaderKey, FeatureConfig, ExtraOptions) {
-	global _HS_CACHE_ROWS, ScriptInformation, HS_CACHE_MARKER
+; Register every cached hotstring of one section. Reproduces the runtime TOML
+; fallback (LoadHotstringsSection) 1:1: per-row opts (TimeActivationSeconds from
+; FeatureConfig, FinalResult, IsRepeat, Category, Section, Priority, optional
+; OnlyText), ★ substituted at register time, and the CreateHotstring vs
+; CreateCaseSensitiveHotstrings choice. ResolvedPriority is the section/file/source
+; priority the caller already resolved (HotstringsResolve cascade); a per-row
+; priority override beats it, exactly as _ParseEntryPriority(Line, ResolvedPriority)
+; does on the TOML path. Bound by key into _GENERATED_HOTSTRINGS and invoked from
+; LoadHotstringsSection.
+_HsCacheRegisterSection(LoaderKey, FeatureConfig, ExtraOptions, ResolvedPriority := "") {
+	global _HS_CACHE_ROWS, ScriptInformation, HS_CACHE_MARKER, HSE_PRIORITY_COMMON
 	if !_HS_CACHE_ROWS.Has(LoaderKey)
 		return
 	RowList := _HS_CACHE_ROWS[LoaderKey]
@@ -357,9 +385,15 @@ _HsCacheRegisterSection(LoaderKey, FeatureConfig, ExtraOptions) {
 	TimeAct := FeatureConfig.HasOwnProp("TimeActivationSeconds") ? FeatureConfig.TimeActivationSeconds : 0
 	MagicKey := ScriptInformation["MagicKey"]
 	HasOnlyText := IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText")
+	; The section/file/source-resolved priority the caller passes is the cascade
+	; fallback applied to any entry without its own `priority = N`. When the caller
+	; omits it (older call sites) fall back to the common default so an entry never
+	; registers with an empty priority.
+	BasePriority := (ResolvedPriority != "") ? ResolvedPriority : HSE_PRIORITY_COMMON
 	for Row in RowList {
+		EntryPriority := (Row.Length >= 7 and Row[7] != "") ? (Row[7] + 0) : BasePriority
 		Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", Row[4], "IsRepeat", Row[5],
-			"Category", Category, "Section", Section)
+			"Category", Category, "Section", Section, "Priority", EntryPriority)
 		if HasOnlyText
 			Opts["OnlyText"] := ExtraOptions["OnlyText"]
 		Trigger := StrReplace(Row[2], HS_CACHE_MARKER, MagicKey)

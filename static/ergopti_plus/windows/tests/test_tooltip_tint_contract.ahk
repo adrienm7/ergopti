@@ -34,7 +34,9 @@
 
 ; Hard-coded cross-driver tint test vectors, mirroring tintTestVectors() from
 ; static/ergopti_plus/shared/tooltip/tint.js. Values are computed by the JS
-; reference at DEFAULT_LIGHTNESS=0.10 / DEFAULT_SATURATION=0.40.
+; reference at the canonical constants.toml [tint] defaults
+; lightness=0.13 / saturation=0.85 (the same values seeded below into
+; UI_TINT_LIGHTNESS / UI_TINT_SATURATION — keep all three in sync).
 ; When the algorithm constants change, regenerate with:
 ;   node -e "const t=require('./static/ergopti_plus/shared/tooltip/tint.js'); ..."
 _GetTintVectors() {

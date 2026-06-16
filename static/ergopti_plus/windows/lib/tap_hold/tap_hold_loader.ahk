@@ -82,6 +82,17 @@ LoadTapHoldToml(FilePath, DefaultsFilePath := "") {
 	; inherits time_activation_seconds from the default for that key.
 	_TapHold_ParseFileInto(FilePath, Result)
 
+	; Truncated-write sentinel: the user file exists yet the merged config has
+	; zero keys AND the user did NOT explicitly opt out via inherit_defaults =
+	; false. The only legitimate way to reach an empty keys map is the explicit
+	; opt-out (« Tout desactiver »), so an empty config here most likely means a
+	; crash/power loss truncated the file mid-write. Surface it loudly instead
+	; of silently leaving every tap-hold disabled.
+	if (Result["keys"].Count == 0 and InheritDefaults) {
+		try LoggerWarn("TapHoldLoader", "tap_hold.toml at '{1}' exists but parsed to 0 key(s) without inherit_defaults=false — possible truncated/corrupt write.",
+			FilePath)
+	}
+
 	try LoggerSuccess("TapHoldLoader", "Tap-hold config loaded ({1} key(s), {2} layer(s)).",
 		Result["keys"].Count, Result["layers"].Count)
 	return Result

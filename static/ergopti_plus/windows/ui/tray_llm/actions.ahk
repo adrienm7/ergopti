@@ -202,6 +202,13 @@ LLM_Tray_SetModel(tag) {
 
 _LLM_Tray_FireHealthProbe() {
 	global _LLM_Tray
+	; Pause invariant: SetTimer callbacks bypass native Suspend, so this 10 s
+	; health tick keeps pinging Ollama (and can trigger a full tray rebuild)
+	; while the user believes the driver is fully paused. Mirror the guard used
+	; in hotstring_prefix_watcher.ahk / tooltip.ahk / keylogger so the probe is
+	; inert during suspend; the next unpaused tick refreshes the dot.
+	if A_IsSuspended
+		return
 	; Only probe Ollama for now. The API backend has its own readiness path
 	; (the per-entry ping in api_remote.ahk) and the user-facing health dot
 	; for a remote provider depends on the same probe, which we can layer
@@ -230,8 +237,11 @@ _LLM_Tray_OnHealthProbeDone(reachable) {
 	_LLM_Tray["last_health_status"] := new_status
 	; Only repaint when the status actually flipped — avoids an infinite
 	; rebuild loop and keeps the menu stable when the user is not staring
-	; at it.
-	if (prev != new_status)
+	; at it. Also skip the rebuild while suspended: a probe fired just before
+	; Pause could still land here and churn the tray menu, violating the
+	; "pause silences everything" invariant. The stashed status above still
+	; updates so the next unpaused build paints the correct dot.
+	if (prev != new_status and !A_IsSuspended)
 		LLM_Tray_Build()
 }
 

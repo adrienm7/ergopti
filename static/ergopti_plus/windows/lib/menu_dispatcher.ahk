@@ -109,6 +109,131 @@ global _MENU_RETRY_DELAY_MS := 60
 ; ===============================
 ; ==============================================================
 
+; Clear both dispatch Maps. MUST be called at the very start of any tray
+; rebuild (RebuildTrayMenu / BuildTrayMenuDeferred) BEFORE A_TrayMenu.Delete()
+; and the InitSubMenus()/initMenu() re-registration pass. AHK allocates menu
+; command IDs from an internal pool and REUSES freed IDs after Menu.Delete().
+; If the stale entries survive a rebuild, a reused ID can map to a DIFFERENT
+; item's callback: _DispatchIfMissed's double-fire guard compares an
+; ExpectedLastFire snapshotted at click time (often 0 for a first click)
+; against _MenuDispatchLastFire[ItemId], which RegisterMenuItem resets to 0 for
+; the reused ID — so the 0 == 0 guard passes and the WRONG callback fires.
+; Resetting here guarantees a reused ID always maps to the current item or is
+; absent (so _DispatchIfMissed's Has() guard no-ops). Also prevents the
+; unbounded growth of both Maps when a rebuild shrinks the menu and never
+; re-registers the dropped IDs.
+MenuDispatcher_Reset() {
+    global _MenuDispatchCallbacks, _MenuDispatchLastFire
+    _MenuDispatchCallbacks := Map()
+    _MenuDispatchLastFire  := Map()
+}
+
+; Per-menu prune for rebuilders that delete + repopulate a SINGLE menu in place
+; (e.g. LLM_Tray_Build), as opposed to a full tray rebuild that can call
+; MenuDispatcher_Reset(). Call this right AFTER MenuObj.Delete(): the deleted
+; items' IDs are gone from the live HMENU, so any _MenuDispatchCallbacks /
+; _MenuDispatchLastFire entry NOT in the current GetMenuItemID set for THIS
+; menu is dead and is dropped. A global reset cannot be used here because the
+; other live menus (main tray, language submenu) keep their registered items
+; and must retain their dispatch entries. Without this prune the two Maps grow
+; without bound across the very frequent LLM-menu rebuilds (each rebuild adds
+; fresh IDs and the previous pass's IDs are never re-added once the item count
+; shrinks). Reuses freed IDs are still re-added by RegisterMenuItem during the
+; same rebuild, so live items keep their tracking.
+MenuDispatcher_PruneMenu(MenuObj) {
+    global _MenuDispatchCallbacks, _MenuDispatchLastFire
+
+    ; Collect the IDs currently live in this menu's HMENU.
+    LiveIds := Map()
+    try {
+        HMENU := MenuObj.Handle
+        if (HMENU) {
+            Count := DllCall("GetMenuItemCount", "ptr", HMENU, "int")
+            Loop Count {
+                Id := DllCall("GetMenuItemID", "ptr", HMENU, "int", A_Index - 1, "uint")
+                if (Id and Id != 0xFFFFFFFF) {
+                    LiveIds[Id] := true
+                }
+            }
+        }
+    } catch {
+        ; Menu.Handle may be unavailable — without a reliable live set we cannot
+        ; tell live IDs from dead ones, so skip the prune rather than risk
+        ; dropping a still-registered item's tracking.
+        return
+    }
+
+    ; Drop every tracked ID that no longer corresponds to a live item in THIS
+    ; menu. An ID owned by ANOTHER menu also has no entry in LiveIds, so we must
+    ; only prune IDs that were registered for the menu being rebuilt. We cannot
+    ; know an ID's owning menu from the Maps alone, so we restrict the prune to
+    ; IDs absent from LiveIds AND whose item is gone from EVERY tracked menu —
+    ; in practice the rebuilder calls this immediately after deleting its own
+    ; items, and a freed Win32 ID is no longer reported by GetMenuItemID for any
+    ; menu until re-added. Collect dead IDs first to avoid mutating during
+    ; enumeration.
+    DeadIds := []
+    for Id in _MenuDispatchCallbacks {
+        if !LiveIds.Has(Id) and !_MenuDispatchIdIsLiveAnywhere(Id) {
+            DeadIds.Push(Id)
+        }
+    }
+    for Id in DeadIds {
+        _MenuDispatchCallbacks.Delete(Id)
+        if _MenuDispatchLastFire.Has(Id) {
+            _MenuDispatchLastFire.Delete(Id)
+        }
+    }
+    if (DeadIds.Length > 0) {
+        try LoggerDebug("MenuDispatcher",
+            "Pruned {1} dead menu-item ID(s) after a single-menu rebuild.", DeadIds.Length)
+    }
+}
+
+; Reports whether a Win32 menu-item ID is still present in ANY currently
+; registered tray menu. Used by MenuDispatcher_PruneMenu to avoid dropping an
+; entry that belongs to a DIFFERENT live menu than the one being rebuilt: a
+; freed ID is reported by GetMenuItemID for no menu, while a live ID owned by
+; another submenu still shows up there. We probe the tray root and walk one
+; level of submenus (the tray hierarchy is shallow). Returns true on any match.
+_MenuDispatchIdIsLiveAnywhere(ItemId) {
+    try {
+        TrayHandle := A_TrayMenu.Handle
+        if (TrayHandle and _MenuDispatchHandleHasId(TrayHandle, ItemId, true)) {
+            return true
+        }
+    } catch {
+        ; Tray menu may not exist yet (very early boot) — treat as not live.
+    }
+    return false
+}
+
+; Walks a single HMENU for ItemId. When Recurse is true, also descends into each
+; popup submenu one level (GetSubMenu returns the child HMENU for a popup item),
+; which is enough for the shallow tray hierarchy. Returns true on first match.
+_MenuDispatchHandleHasId(HMENU, ItemId, Recurse) {
+    try {
+        Count := DllCall("GetMenuItemCount", "ptr", HMENU, "int")
+        Loop Count {
+            Pos := A_Index - 1
+            Id := DllCall("GetMenuItemID", "ptr", HMENU, "int", Pos, "uint")
+            if (Id == ItemId and Id != 0xFFFFFFFF) {
+                return true
+            }
+            if (Recurse) {
+                Sub := DllCall("GetSubMenu", "ptr", HMENU, "int", Pos, "ptr")
+                if (Sub and _MenuDispatchHandleHasId(Sub, ItemId, false)) {
+                    return true
+                }
+            }
+        }
+    } catch {
+        ; Probe failure — report not found so the conservative path keeps the
+        ; entry only if PruneMenu's own LiveIds set claims it.
+    }
+    return false
+}
+
 ; Add a menu item that participates in the dispatch bypass. Behaves like
 ; ``MenuObj.Add(ItemName, Callback)`` but additionally records the
 ; callback so the OnMessage handler can re-dispatch if AHK drops the
@@ -186,9 +311,22 @@ RegisterMenuItemInsert(MenuObj, BeforeItem, ItemName, Callback) {
         return 0
     }
 
-    ; Find the just-inserted item via its name — Menu.Handle gives the
-    ; HMENU, then we walk positions and match against the item text.
-    ItemId := _FindMenuItemIdByName(MenuObj, ItemName)
+    ; Resolve the inserted item's ID by POSITION first. Insert places the new
+    ; item BEFORE the 1-based position named in BeforeItem ("N&"), so the new
+    ; item itself lands AT that position (index N-1). Position is unambiguous;
+    ; the text-match fallback below binds the wrong ID when two items in the
+    ; same HMENU share a label.
+    InsertPos := _ParseInsertPosition(BeforeItem)
+    ItemId := 0
+    if (InsertPos > 0) {
+        ItemId := _MenuItemIdAtPosition(MenuObj, InsertPos - 1)
+    }
+    ; Fall back to a UNIQUE text match only when the position cannot be derived
+    ; (BeforeItem given as a name, not "N&"). A non-unique label degrades to
+    ; native dispatch (returns 0) rather than binding the wrong ID.
+    if (!ItemId) {
+        ItemId := _FindUniqueMenuItemIdByName(MenuObj, ItemName)
+    }
     if (!ItemId) {
         return 0
     }
@@ -200,16 +338,60 @@ RegisterMenuItemInsert(MenuObj, BeforeItem, ItemName, Callback) {
     return 1
 }
 
-; Walk a Menu's items and return the Win32 ItemId of the entry whose
-; visible text matches ItemName. Returns 0 when nothing matches or
-; Menu.Handle is unavailable. Length-tolerant: GetMenuString tells us
-; how many chars to allocate via its return value when nBuffer is 0.
-_FindMenuItemIdByName(MenuObj, ItemName) {
+; Parse the leading 1-based position out of AHK's "N&" Insert notation
+; (e.g. "1&" -> 1, "2&" -> 2). Returns 0 for the name form ("SomeLabel") or
+; any string that does not start with a positive integer followed by "&", so
+; the caller falls back to a (unique) text match.
+_ParseInsertPosition(BeforeItem) {
+    if (Type(BeforeItem) != "String") {
+        return 0
+    }
+    if !RegExMatch(BeforeItem, "^(\d+)&$", &M) {
+        return 0
+    }
+    Pos := Integer(M[1])
+    return (Pos >= 1) ? Pos : 0
+}
+
+; Read the Win32 ItemId of the entry at a 0-based position via GetMenuItemID.
+; Position-based discovery is unambiguous, unlike text matching — two items
+; sharing a label cannot collide. Returns 0 when the menu has no handle, the
+; index is out of range, or the id is the GetMenuItemID failure sentinel.
+_MenuItemIdAtPosition(MenuObj, Index) {
     try {
         HMENU := MenuObj.Handle
         if (!HMENU) {
             return 0
         }
+        Count := DllCall("GetMenuItemCount", "ptr", HMENU, "int")
+        if (Index < 0 or Index >= Count) {
+            return 0
+        }
+        Id := DllCall("GetMenuItemID", "ptr", HMENU, "int", Index, "uint")
+        if (Id and Id != 0xFFFFFFFF) {
+            return Id
+        }
+    } catch {
+        ; Menu.Handle may be unavailable — degrade to native dispatch.
+    }
+    return 0
+}
+
+; Walk a Menu's items and return the Win32 ItemId of the entry whose visible
+; text matches ItemName, but ONLY when that text is UNIQUE in the menu. If two
+; or more items share the label the match is ambiguous, so this returns 0 —
+; the caller then degrades to AHK's native dispatch rather than binding the
+; wrong (typically the first-occurrence) ID. Returns 0 when nothing matches or
+; Menu.Handle is unavailable. Length-tolerant: GetMenuString tells us how many
+; chars to allocate via its return value when nBuffer is 0.
+_FindUniqueMenuItemIdByName(MenuObj, ItemName) {
+    try {
+        HMENU := MenuObj.Handle
+        if (!HMENU) {
+            return 0
+        }
+        FoundId := 0
+        Matches := 0
         Count := DllCall("GetMenuItemCount", "ptr", HMENU, "int")
         Loop Count {
             Pos := A_Index - 1
@@ -227,9 +409,17 @@ _FindMenuItemIdByName(MenuObj, ItemName) {
             if (Text == ItemName) {
                 Id := DllCall("GetMenuItemID", "ptr", HMENU, "int", Pos, "uint")
                 if (Id and Id != 0xFFFFFFFF) {
-                    return Id
+                    Matches++
+                    FoundId := Id
                 }
             }
+        }
+        if (Matches == 1) {
+            return FoundId
+        }
+        if (Matches > 1) {
+            try LoggerWarn("MenuDispatcher",
+                "Ambiguous insert label (matched {1} items) — degrading to native dispatch.", Matches)
         }
     } catch {
         ; Same fallback policy as RegisterMenuItem — bypass coverage

@@ -30,6 +30,19 @@
 global _HCWGui      := 0
 global _HCWWidgets  := 0
 
+; Debounce window for the numeric Edit fields (delay / priority). Their "Change"
+; event fires on every keystroke, but persisting on every digit rewrites the
+; override file (and, for personal entries, re-reads + re-serialises the whole
+; TOML) per character. We coalesce a burst of edits into a single write fired
+; once the user pauses typing. Negative value = one-shot SetTimer.
+global _HCW_NUMERIC_DEBOUNCE_MS := 250
+; Pending debounced numeric write captured at arm time:
+; { Field, Entry, Sec, Value }. Each keystroke re-arms it with the latest
+; widget value AND the still-current selection, so the final value lands on the
+; entry the user was actually editing even if they switch selection or close the
+; window before the timer fires. 0 when no write is pending.
+global _HCW_PendingNumericWrite := 0
+
 ; Unified entry list — rebuilt each time the window opens.
 ; Shape: { Key, Label, Path, IsPersonal, IsExtension, ExtId, ExtName, Group }
 global _HCW_CATEGORY_LIST := []
@@ -414,7 +427,7 @@ OpenHotstringsConfigWindow() {
 
 	GroupDD.OnEvent("Change",   (*) => _HCW_OnGroupChanged())
 	FileDD.OnEvent("Change",    (*) => _HCW_OnFileChanged())
-	SecDD.OnEvent("Change",     (*) => _HCW_LoadCurrent())
+	SecDD.OnEvent("Change",     (*) => _HCW_OnSectionChanged())
 	DelayEdit.OnEvent("Change", (*) => _HCW_OnDelayChanged())
 	DelayReset.OnEvent("Click", (*) => _HCW_ClearField("delay"))
 	PriorityEdit.OnEvent("Change", (*) => _HCW_OnPriorityChanged())
@@ -445,6 +458,9 @@ OpenHotstringsConfigWindow() {
 ; Rebuild the file dropdown whenever the group selection changes.
 _HCW_OnGroupChanged() {
 	global _HCWWidgets
+	; Persist any pending numeric edit before the selection moves, otherwise the
+	; debounced write would target the previous entry or be silently dropped.
+	_HCW_FlushNumericWrite()
 	GroupKey := _HCW_SelectedGroupKey()
 	Files := _HCW_FilesForGroup(GroupKey)
 	Items := []
@@ -462,6 +478,8 @@ _HCW_OnGroupChanged() {
 ; Rebuild the section dropdown whenever the file selection changes.
 _HCW_OnFileChanged() {
 	global _HCWWidgets, _HCW_FILE_LEVEL_LABEL
+	; Commit any pending numeric edit to its captured entry before re-selecting.
+	_HCW_FlushNumericWrite()
 	Entry := _HCW_SelectedEntry()
 	Items := [_HCW_FILE_LEVEL_LABEL]
 	Sections := _HCW_GetSections(Entry)
@@ -471,6 +489,14 @@ _HCW_OnFileChanged() {
 	_HCWWidgets.SecDD.Delete()
 	_HCWWidgets.SecDD.Add(Items)
 	_HCWWidgets.SecDD.Choose(1)
+	_HCW_LoadCurrent()
+}
+
+; Refresh the controls when the section selection changes. Commits any pending
+; numeric edit to its captured entry first so a debounced write is never lost
+; when the user jumps to another section before the timer fires.
+_HCW_OnSectionChanged() {
+	_HCW_FlushNumericWrite()
 	_HCW_LoadCurrent()
 }
 
@@ -582,8 +608,8 @@ _HCW_OnDelayChanged() {
 	if (Ms < 0) {
 		Ms := 0
 	}
-	_HCW_SetOverride(Entry, Sec, "delay", Ms / 1000)
-	_HCW_LoadCurrent()
+	; Coalesce a burst of digits into a single write — see _HCW_ArmNumericWrite.
+	_HCW_ArmNumericWrite("delay", Entry, Sec, Ms / 1000)
 }
 
 _HCW_OnPriorityChanged() {
@@ -596,7 +622,38 @@ _HCW_OnPriorityChanged() {
 	} else if (Prio > 100) {
 		Prio := 100
 	}
-	_HCW_SetOverride(Entry, Sec, "priority", Prio)
+	; Coalesce a burst of digits into a single write — see _HCW_ArmNumericWrite.
+	_HCW_ArmNumericWrite("priority", Entry, Sec, Prio)
+}
+
+; Arm (or re-arm) the debounce timer for a numeric field. Each new keystroke
+; cancels the previous one-shot timer and starts a fresh window, so the
+; expensive _HCW_SetOverride / _HCW_LoadCurrent runs once when the user pauses
+; rather than on every digit. The clamped value AND the current selection are
+; captured here so the write lands on the right entry even if the user switches
+; selection or closes the window before the timer fires.
+_HCW_ArmNumericWrite(Field, Entry, Sec, Value) {
+	global _HCW_PendingNumericWrite, _HCW_NUMERIC_DEBOUNCE_MS
+	_HCW_PendingNumericWrite := { Field: Field, Entry: Entry, Sec: Sec, Value: Value }
+	SetTimer(_HCW_FlushNumericWrite, -_HCW_NUMERIC_DEBOUNCE_MS)
+}
+
+; Fired once the numeric-edit burst settles. Persists the single captured
+; override and refreshes the controls. Safe to call eagerly (e.g. on selection
+; change or window close) to commit an in-flight edit; it is a no-op when no
+; write is pending.
+_HCW_FlushNumericWrite() {
+	global _HCW_PendingNumericWrite
+	Pending := _HCW_PendingNumericWrite
+	if !IsObject(Pending) {
+		return
+	}
+	; Clear the pending slot AND cancel the armed one-shot timer first so an
+	; eager flush followed by the timer firing cannot persist the same write
+	; twice.
+	_HCW_PendingNumericWrite := 0
+	SetTimer(_HCW_FlushNumericWrite, 0)
+	_HCW_SetOverride(Pending.Entry, Pending.Sec, Pending.Field, Pending.Value)
 	_HCW_LoadCurrent()
 }
 
@@ -691,6 +748,9 @@ _HCW_SetAllGrey() {
 
 _HCW_OnClose() {
 	global _HCWGui, _HCWWidgets
+	; Commit any numeric edit still inside the debounce window before tearing
+	; down the widgets, otherwise the last value the user typed would be lost.
+	_HCW_FlushNumericWrite()
 	_HCWGui := 0
 	_HCWWidgets := 0
 }
@@ -1266,8 +1326,9 @@ _HCW_PatchTomlMeta(Path, Sec, Field, Value) {
 ; integer; color → quoted string.
 _HCW_TomlValue(Field, Value) {
 	if (Field == "delay") {
-		Num := Value + 0
-		return Format("{:.3f}", Num)
+		; Single source of truth shared with the override store so the same
+		; logical delay can never serialise to two different strings.
+		return HotstringsSerialiseDelay(Value)
 	}
 	if (Field == "show_tooltip") {
 		return Value ? "true" : "false"

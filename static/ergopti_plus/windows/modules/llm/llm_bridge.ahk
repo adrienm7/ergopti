@@ -272,7 +272,15 @@ LLM_Bridge_OnChar(ch) {
 			try LoggerDebug("LLM.tt", "KEEP: keystroke '{1}' ignored — prediction still in min-display window.", ch)
 		} else {
 			try LoggerDebug("LLM.tt", "DISMISS: keystroke '{1}' typed while a prediction was shown.", ch)
-			LLM_Tooltip_Hide(true)
+			; Defer the tooltip teardown off the InputHook thread: the dismiss tears
+			; down a multi-window layered overlay (DeferWindowPos batch + Gui Destroy),
+			; and a slow DWM compositor can stretch that past Windows'
+			; LowLevelHooksTimeout, dropping the in-flight or next physical key. The
+			; hook stays fast — buffer + engine feed below are cheap — while the
+			; expensive GDI/DWM work runs on a fresh thread once the hook returns
+			; (mirrors the auto-hide TimerFn, which already runs off-thread). Silent=true
+			; so no llm_dismissed event is emitted for this stale hide.
+			SetTimer((*) => LLM_Tooltip_Hide(true), -1)
 		}
 	}
 	global _LLM_Bridge_LastLogTick
@@ -445,6 +453,13 @@ _LLM_PointerMovedEnough(x, y, ox, oy) {
 
 _LLM_PointerWatch_OnMoveTick(*) {
 	global _LLM_PointerWatch_LastX, _LLM_PointerWatch_LastY
+	; AHK SetTimer threads bypass native Suspend, so this poll keeps firing
+	; (MouseGetPos + branch) ~20x/s while the driver is paused. Inert it here so
+	; "pause = tout eteint" holds even if the suspend reactor's _Stop call is ever
+	; bypassed — the timer is also stopped from Ergopti_OnSuspendEnter, but this
+	; guard is the cheap, local safety net.
+	if A_IsSuspended
+		return
 	; Dismiss-on-move applies ONLY once a real prediction is on screen, never during
 	; the loading / generation phase. While no prediction is shown we drop the
 	; origin so the NEXT prediction captures a fresh one — otherwise mouse travel

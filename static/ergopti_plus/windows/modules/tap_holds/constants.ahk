@@ -47,6 +47,15 @@ global KEY_REPEAT_INTERVAL_MS := 0
 ; character before giving up and leaving the shift state active.
 global ONE_SHOT_SHIFT_TIMEOUT_SEC := 0
 
+; Failsafe ceiling (s) on any KeyWait that holds a SYNTHETIC modifier Down while
+; waiting for the physical tap-hold key to be released. The arm/release pair is
+; guarded by try/finally, but an unbounded wait could still latch the modifier
+; forever if the key-up event is lost (focus stolen by a UAC prompt, the global
+; Suspend hotkey toggled mid-press, etc.). Capping the wait guarantees the paired
+; Up runs within a bounded time so the modifier can never stay stuck. Not a
+; tunable behaviour, so it stays a fixed local constant rather than a registry key.
+global STUCK_MODIFIER_RELEASE_TIMEOUT_SEC := 5
+
 ; Reassign the tap-hold timing constants from the shared registry. Called once
 ; from the auto-execute body at boot (after TimingsLoadShared(), before any
 ; tap-hold hotkey arms). Fail-fast: a missing key throws via TimingsGet.

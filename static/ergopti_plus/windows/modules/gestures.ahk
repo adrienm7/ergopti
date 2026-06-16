@@ -706,6 +706,10 @@ GestureTeleportMouse() {
 
 GestureToggleUppercase() {
     Text := GetSelection()
+    ; No-op on an empty/failed capture: GetSelection returns "" on a ClipWait
+    ; timeout, and pasting "" would only clobber the clipboard with a stale paste.
+    if (Text = "")
+        return
     if RegExMatch(Text, "[a-zà-ÿ]")
         SendInstant(Format("{:U}", Text))
     else
@@ -714,6 +718,9 @@ GestureToggleUppercase() {
 
 GestureToggleTitleCase() {
     Text := GetSelection()
+    ; No-op on an empty/failed capture (see GestureToggleUppercase).
+    if (Text = "")
+        return
     TitleCasePattern :=
         "^(?:[A-ZÉÈÀÙÂÊÎÔÛÇ][a-zéèàùâêîôûç0-9''\(\),.\-:;!?\-]*[ \t\r\n]+)*[A-ZÉÈÀÙÂÊÎÔÛÇ][a-zéèàùâêîôûç0-9''\(\),.\-:;!?\-]*$"
     UpperCasePattern := "^[A-ZÉÈÀÙÂÊÎÔÛÇ0-9''\(\),.\-:;!?\s]+$"
@@ -723,10 +730,32 @@ GestureToggleTitleCase() {
         SendInstant(Format("{:T}", Text))
 }
 
+; Deferred clipboard restore for GesturePastePlain. Runs on a negative-delay
+; SetTimer so the synthetic ^v has already consumed the coerced text before the
+; user's original (possibly non-text) clipboard is put back.
+_GesturePastePlainRestore(OldClip) {
+    A_Clipboard := OldClip
+}
+
 GesturePastePlain() {
     if not WinActive("ahk_exe EXCEL.EXE") {
-        A_Clipboard := A_Clipboard
-        SendFinalResult("^v")
+        ; Strip rich formatting only when the clipboard holds text. CB_Read()
+        ; returns "" for non-text payloads (image/file list); the self-assign
+        ; round-trip on those would destroy them, so we skip the strip and
+        ; paste the content as-is instead.
+        if CB_Read() != "" {
+            ; Snapshot the FULL clipboard (all formats) before coercing to
+            ; plain text. A_Clipboard := A_Clipboard keeps only the text form,
+            ; silently dropping any image/HTML/RTF the user may still want, so
+            ; we restore the original after the paste settles — mirroring
+            ; SendInstant's save/paste/deferred-restore guarantee.
+            OldClip := ClipboardAll()
+            A_Clipboard := A_Clipboard
+            SendFinalResult("^v")
+            SetTimer(_GesturePastePlainRestore.Bind(OldClip), -SEND_INSTANT_PASTE_DELAY_MS)
+        } else {
+            SendFinalResult("^v")
+        }
     } else {
         SendFinalResult("^+v")
     }
@@ -1015,6 +1044,14 @@ global _GestureWinOrder   := []   ; Array of HWNDs, index 1 = most recently manu
 global _GestureCycling    := False
 global _GestureWinHook    := 0    ; DllCall hook handle
 
+; Upper bound on the recency tracker. WinEvent fires on every foreground change,
+; so on a machine left running for days opening/closing thousands of transient
+; windows the list would otherwise grow without limit — costing an O(n) prune on
+; every win_next/win_prev gesture and slowly climbing memory. Stale HWNDs are
+; filtered out at read time (_GestureOrderedWindows), so dropping the oldest
+; tracked entries past this cap only loses deep history no cycle would reach.
+global GESTURE_WIN_ORDER_MAX := 64
+
 
 
 
@@ -1147,7 +1184,12 @@ GestureGetCyclableWindows(ProcessFilter := "") {
 ; Ignored when _GestureCycling is True so our own WinActivate calls do not
 ; corrupt the manually-built recency order.
 _GestureOnForeground(hWinEventHook, Event, HWnd, IdObject, IdChild, Thread, Time) {
-    global _GestureWinOrder, _GestureCycling
+    global _GestureWinOrder, _GestureCycling, GESTURE_WIN_ORDER_MAX
+    ; Do not churn the tracker while paused — the driver is inert and any
+    ; recency recorded now would be stale by the time it resumes.
+    if (A_IsSuspended) {
+        return
+    }
     if (_GestureCycling) {
         return
     }
@@ -1155,9 +1197,14 @@ _GestureOnForeground(hWinEventHook, Event, HWnd, IdObject, IdChild, Thread, Time
     if (IdObject != 0) {
         return
     }
-    ; Remove existing entry for this HWND, then prepend it (most-recent first)
+    ; Remove existing entry for this HWND, then prepend it (most-recent first).
+    ; Stop copying once the cap is reached so the list cannot grow unbounded on
+    ; long-running sessions; oldest entries past the cap are dropped.
     NewOrder := [HWnd]
     for _, H in _GestureWinOrder {
+        if (NewOrder.Length >= GESTURE_WIN_ORDER_MAX) {
+            break
+        }
         if (H != HWnd) {
             NewOrder.Push(H)
         }

@@ -197,22 +197,36 @@ _LLM_Tray_PromptApiEntry(EditId) {
 	LLM_Tray_SaveConfig()
 
 	; Token validation: hit the provider's /models endpoint once with the
-	; freshly-saved credentials so the user finds out NOW (with an
-	; explicit TrayTip) instead of mid-typing with an empty tooltip and
-	; no idea why. LLM_RemoteIsReady uses a 2 s timeout so even an
-	; unreachable host doesn't block the menu visibly.
-	try {
-		if LLM_RemoteIsReady(new_entry) {
-			TrayTip(StrReplace(t("menu.llm.api_validated_body"), "%s", new_name),
-				t("menu.llm.api_validated_title"), "Iconi")
-		} else {
-			TrayTip(StrReplace(t("menu.llm.api_unreachable_body"), "%s", new_name),
-				t("menu.llm.api_unreachable_title"), "Icon!")
-		}
-	}
+	; freshly-saved credentials so the user finds out NOW (with an explicit
+	; TrayTip) instead of mid-typing with an empty tooltip and no idea why.
+	; This MUST be async: the synchronous LLM_RemoteIsReady ran a blocking
+	; WinHTTP GET on the main thread, freezing the whole driver (and dropping
+	; the user's next keystrokes via LowLevelHooksTimeout) for up to 2 s when
+	; the BaseUrl was unreachable. LLM_RemoteIsReady_Async polls instead, so
+	; the save path returns immediately and the result is surfaced from the
+	; poll callback once it resolves.
+	try LLM_RemoteIsReady_Async(new_entry, _LLM_Tray_MakeApiValidationHandler(new_name))
 
 	LLM_Engine_Init(LLM_Tray_BuildOpts())
 	LLM_Tray_Build()
+}
+
+; Builds the async validation callback for an API save. Captured ``Name`` is
+; bound at save time so a later edit/save does not relabel an in-flight TrayTip.
+; Kept as a factory (not an inline closure) so the captured value is explicit
+; and the save path reads as a single non-blocking dispatch.
+_LLM_Tray_MakeApiValidationHandler(Name) {
+	return (reachable) => _LLM_Tray_OnApiValidationDone(reachable, Name)
+}
+
+_LLM_Tray_OnApiValidationDone(reachable, Name) {
+	if (reachable) {
+		TrayTip(StrReplace(t("menu.llm.api_validated_body"), "%s", Name),
+			t("menu.llm.api_validated_title"), "Iconi")
+	} else {
+		TrayTip(StrReplace(t("menu.llm.api_unreachable_body"), "%s", Name),
+			t("menu.llm.api_unreachable_title"), "Icon!")
+	}
 }
 
 _LLM_Tray_RemoveActiveApiEntry() {

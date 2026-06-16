@@ -17,8 +17,8 @@
 ; 3. Last error capture: reads the module-level _HealthCheckLastError variable
 ;    set by HealthCheck_RecordError() so callers can surface the most recent
 ;    failure without parsing log files.
-; 4. Uptime: computes milliseconds elapsed since HealthCheck_Init() was first
-;    called (stored in _HealthCheckStartMs) and converts to whole seconds.
+; 4. Uptime: computes milliseconds elapsed since this module was loaded
+;    (captured in _HealthCheckStartMs at parse time) and converts to whole seconds.
 ; 5. System info: captures OS version (including build number), CPU, RAM, AHK
 ;    runtime, screen resolution, locale, and config directory for a complete
 ;    at-a-glance snapshot.
@@ -30,7 +30,9 @@
 
 #Requires AutoHotkey v2.0
 
-; Module-level state — populated by HealthCheck_Init().
+; Module-level state. _HealthCheckStartMs anchors the uptime origin at module
+; load (parse time) — there is no separate init step; this is the single source
+; of truth for the start tick, also read by crash_reporter.ahk.
 global _HealthCheckStartMs   := A_TickCount
 global _HealthCheckLastError := ""
 global _HealthCheckWarnCount := 0
@@ -101,7 +103,7 @@ HealthCheck_RecordWarn() {
 ;   "ports_validated" -> Array   adapter ids whose full contract was satisfied
 ;   "failed_adapters" -> Array   adapter ids that failed load or contract check
 ;   "last_error"      -> String  most recent error (empty string if none)
-;   "uptime_sec"      -> Integer seconds since HealthCheck_Init()
+;   "uptime_sec"      -> Integer seconds since module load (_HealthCheckStartMs)
 ;   "warn_count"      -> Integer number of WARNING-level lines emitted this session
 ;   "err_count"       -> Integer number of errors recorded via HealthCheck_RecordError
 ;   "sys"             -> Map     OS/runtime/hardware snapshot (see _HealthCheck_SysInfo)

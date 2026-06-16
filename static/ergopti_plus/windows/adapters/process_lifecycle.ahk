@@ -67,13 +67,18 @@ global PLC_POLL_MS         := 250
 
 ; Registers a callback invoked whenever the foreground window changes.
 ; The callback signature is: Callback(AppId, WindowTitle).
-; Non-function values are silently ignored.
+; Non-callable values are rejected with a WARNING (never silently dropped).
 ; @param Callback {Func} A callable object to append to PLC_FocusCallbacks.
 PLC_OnFocusChange(Callback) {
 	try {
-		; Guard: only accept genuine callable objects
-		if Type(Callback) = "Func"
+		; Guard: accept any callable (Func, Closure, BoundFunc, or any object
+		; exposing Call). Type(Callback)="Func" was too narrow - it rejected
+		; closures and bound methods (the idiomatic way to register instance
+		; handlers), silently dropping them. HasMethod covers every callable.
+		if HasMethod(Callback, "Call")
 			PLC_FocusCallbacks.Push(Callback)
+		else
+			LoggerWarn("ProcessLifecycle", "onFocusChange rejected a non-callable callback (type {1}).", Type(Callback))
 	} catch {
 		return
 	}
@@ -85,8 +90,10 @@ PLC_OnFocusChange(Callback) {
 ; @param Callback {Func} A callable object to append to PLC_LaunchCallbacks.
 PLC_OnAppLaunch(Callback) {
 	try {
-		if Type(Callback) = "Func"
+		if HasMethod(Callback, "Call")
 			PLC_LaunchCallbacks.Push(Callback)
+		else
+			LoggerWarn("ProcessLifecycle", "onAppLaunch rejected a non-callable callback (type {1}).", Type(Callback))
 	} catch {
 		return
 	}
@@ -97,8 +104,10 @@ PLC_OnAppLaunch(Callback) {
 ; @param Callback {Func} A callable object to append to PLC_QuitCallbacks.
 PLC_OnAppQuit(Callback) {
 	try {
-		if Type(Callback) = "Func"
+		if HasMethod(Callback, "Call")
 			PLC_QuitCallbacks.Push(Callback)
+		else
+			LoggerWarn("ProcessLifecycle", "onAppQuit rejected a non-callable callback (type {1}).", Type(Callback))
 	} catch {
 		return
 	}
@@ -162,6 +171,14 @@ PLC_Stop() {
 ; permanently disrupt subsequent poll cycles.
 PLC_Poll() {
 	global PLC_LastAppId, PLC_LastWindowTitle
+	; Pause invariant: a suspended driver must be fully silent. This SetTimer
+	; callback is not gated by native Suspend, so early-return while suspended -
+	; otherwise focus changes keep being observed and fanned out to the
+	; registered callbacks (which downstream feed keylogger app-switch events)
+	; while the user expects every feature paused. The timer is periodic, so
+	; polling resumes automatically on unpause; no re-arm is needed.
+	if A_IsSuspended
+		return
 	try {
 		local NewApp   := WinGetProcessName("A")
 		local NewTitle := WinGetTitle("A")

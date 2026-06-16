@@ -163,8 +163,8 @@ AppPicker_BuildRows(initial) {
             ; "Default IME" that the user has no business unchecking.
             if !DllCall("IsWindowVisible", "Ptr", hwnd)
                 continue
-            t := WinGetTitle("ahk_id " . hwnd)
-            if (t = "")
+            winTitle := WinGetTitle("ahk_id " . hwnd)
+            if (winTitle = "")
                 continue
             proc := StrLower(WinGetProcessName("ahk_id " . hwnd))
             if (proc = "" || seen.Has(proc))

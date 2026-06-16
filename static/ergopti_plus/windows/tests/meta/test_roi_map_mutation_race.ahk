@@ -31,13 +31,17 @@ _RMMR_AssertHalflifeTickAtomic() {
 }
 
 _RMMR_AssertProcessWordAtomic() {
+	; The prune now lives in the dedicated KL_Roi_PruneWordCounts helper (extracted
+	; for the bounded/guaranteed-shrinking fix), which KL_Roi_ProcessWord invokes
+	; once the cap is exceeded. The atomicity guarantee moved with it, so assert
+	; the helper holds the Critical section.
 	Src := _RMMR_ReadSource("modules/keylogger/keylogger_trigger_roi.ahk")
-	Body := _RMMR_FuncBodyStripped(Src, "KL_Roi_ProcessWord(word) {")
-	Assert(Body != "", "KL_Roi_ProcessWord must exist in keylogger_trigger_roi.ahk")
-	
+	Body := _RMMR_FuncBodyStripped(Src, "KL_Roi_PruneWordCounts() {")
+	Assert(Body != "", "KL_Roi_PruneWordCounts must exist in keylogger_trigger_roi.ahk")
+
 	CritOnIdx := InStr(Body, 'Critical("On")')
-	Assert(CritOnIdx > 0, "KL_Roi_ProcessWord must use Critical('On') for prune logic (roi-map-mutation-during-enumeration-race)")
+	Assert(CritOnIdx > 0, "KL_Roi_PruneWordCounts must use Critical('On') for prune logic (roi-map-mutation-during-enumeration-race)")
 }
 
 Test("keylogger_trigger_roi: KL_Roi_HalflifeTick enumerates map atomically (roi-map-mutation-during-enumeration-race)", _RMMR_AssertHalflifeTickAtomic)
-Test("keylogger_trigger_roi: KL_Roi_ProcessWord prunes map atomically (roi-map-mutation-during-enumeration-race)", _RMMR_AssertProcessWordAtomic)
+Test("keylogger_trigger_roi: KL_Roi_PruneWordCounts prunes map atomically (roi-map-mutation-during-enumeration-race)", _RMMR_AssertProcessWordAtomic)

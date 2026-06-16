@@ -314,6 +314,12 @@ global InDeadKeySequence := false
 
 DeadKey(Mapping) {
 	global InDeadKeySequence
+	; "Pause = tout eteint" invariant: a live InputHook bypasses native Suspend,
+	; so guard the dead-key state machine here. Without this, a dead-key keypress
+	; that slips through while the driver is paused would still arm the InputHook
+	; and capture/remap the user's next physical key (deadkey-inputhook-no-timeout-no-suspend-guard).
+	if A_IsSuspended
+		return
 	InDeadKeySequence := true
 	try {
 		ih := InputHook(
@@ -387,6 +393,24 @@ _RemapEmit(SendStr, KeyChar, *) {
 	UpdateLastSentCharacter(KeyChar)
 }
 
+; Win + remapped-L locks the workstation. Locking is a focus-destroying,
+; context-unknown event (like a mouse click or Ctrl+V), so it must reset the
+; hotstring feed and prefix buffer — otherwise the pre-lock word context would
+; still abut the cursor after unlock and mis-/non-fire the first word typed
+; (win-l-lock-no-watcher-reset). No character is emitted (the OS lock screen
+; eats the key), so we intentionally do NOT push 'l' into the last-sent ring.
+; Critical("On") routes this through the same serialised emit contract as
+; _RemapEmit so it cannot reorder relative to a neighbouring remap, and the two
+; statements are explicit lines so a refactor cannot silently drop one
+; (lock-workstation-lambda-implicit-concat).
+_LockWorkstationEmit(*) {
+	Critical("On")
+	DllCall("LockWorkStation")
+	HSE_FeedReset(false)
+	if IsSet(_ResetPrefixBuffer)
+		_ResetPrefixBuffer()
+}
+
 RemapKey(ScanCode, Character, AlternativeCharacter := "") {
 	global RemappedList
 	InputLevel := "I2"
@@ -424,7 +448,7 @@ RemapKey(ScanCode, Character, AlternativeCharacter := "") {
 		; Solves a bug of # + remapped letter L not triggering the Lock shortcup
 		Hotkey(
 			"#" ScanCode,
-			(*) => DllCall("LockWorkStation") UpdateLastSentCharacter(Character),
+			_LockWorkstationEmit,
 			InputLevel
 		)
 	} else {
@@ -506,8 +530,12 @@ _UIA_SelectionPollTick() {
                 return
             }
         }
-    } catch {
-        ; COM failure
+    } catch as e {
+        ; A bare catch-less try here would discard UIA/COM failures silently
+        ; (project rule 5.3). Log at WARNING so a chronically failing automation
+        ; provider is diagnosable (uia-error-swallowed-silently). The poll then
+        ; degrades to "no selection" below, which is the safe fallback.
+        try LoggerWarn("Layout", "UIA selection probe failed: {1}.", e.Message)
     }
     _UIA_SelectionCache := ""
 }
@@ -585,30 +613,51 @@ _OsLayoutDigitsAreShifted() {
 ; One example is on the password box of https://github.com/login/device where they implemented an AutoShift in the boxes
 
 ; === Number row ===
+; All digit-row emitters route their SendEvent through Critical("On") so they
+; share the SAME atomicity contract as _RemapEmit. SendMode is "Event" (globally
+; interruptible), so a non-Critical digit handler could start its SendEvent while
+; a neighbouring remapped letter's SendEvent is still draining the OS input queue,
+; re-introducing the out-of-order emission Critical was added to prevent — only
+; with the digit as the unprotected boundary (remap-emit-critical-uneven). There
+; is no Sleep on these paths, so Critical's guarantee holds.
 SC029:: SendNewResult("$")
-SC002:: SendEvent("{1 Down}") UpdateLastSentCharacter("1")
-SC002 Up:: SendEvent("{1 Up}")
-SC003:: SendEvent("{2 Down}") UpdateLastSentCharacter("2")
-SC003 Up:: SendEvent("{2 Up}")
-SC004:: SendEvent("{3 Down}") UpdateLastSentCharacter("3")
-SC004 Up:: SendEvent("{3 Up}")
-SC005:: SendEvent("{4 Down}") UpdateLastSentCharacter("4")
-SC005 Up:: SendEvent("{4 Up}")
-SC006:: SendEvent("{5 Down}") UpdateLastSentCharacter("5")
-SC006 Up:: SendEvent("{5 Up}")
-SC007:: SendEvent("{6 Down}") UpdateLastSentCharacter("6")
-SC007 Up:: SendEvent("{6 Up}")
-SC008:: SendEvent("{7 Down}") UpdateLastSentCharacter("7")
-SC008 Up:: SendEvent("{7 Up}")
-SC009:: SendEvent("{8 Down}") UpdateLastSentCharacter("8")
-SC009 Up:: SendEvent("{8 Up}")
-SC00A:: SendEvent("{9 Down}") UpdateLastSentCharacter("9")
-SC00A Up:: SendEvent("{9 Up}")
-SC00B:: SendEvent("{0 Down}") UpdateLastSentCharacter("0")
-SC00B Up:: SendEvent("{0 Up}")
+SC002:: _DigitRowDown("1")
+SC002 Up:: _DigitRowUp("1")
+SC003:: _DigitRowDown("2")
+SC003 Up:: _DigitRowUp("2")
+SC004:: _DigitRowDown("3")
+SC004 Up:: _DigitRowUp("3")
+SC005:: _DigitRowDown("4")
+SC005 Up:: _DigitRowUp("4")
+SC006:: _DigitRowDown("5")
+SC006 Up:: _DigitRowUp("5")
+SC007:: _DigitRowDown("6")
+SC007 Up:: _DigitRowUp("6")
+SC008:: _DigitRowDown("7")
+SC008 Up:: _DigitRowUp("7")
+SC009:: _DigitRowDown("8")
+SC009 Up:: _DigitRowUp("8")
+SC00A:: _DigitRowDown("9")
+SC00A Up:: _DigitRowUp("9")
+SC00B:: _DigitRowDown("0")
+SC00B Up:: _DigitRowUp("0")
 SC00C:: SendNewResult("%")
 SC00D:: SendNewResult("=")
 #HotIf
+
+; Serialised digit-row emit. Critical("On") makes the SendEvent uninterruptible
+; so it cannot interleave with a neighbouring remapped letter's emit in the
+; single OS input queue (remap-emit-critical-uneven). Down and Up are split so
+; the key's auto-repeat / release timing is preserved exactly as before.
+_DigitRowDown(Digit, *) {
+	Critical("On")
+	SendEvent("{" Digit " Down}")
+	UpdateLastSentCharacter(Digit)
+}
+_DigitRowUp(Digit, *) {
+	Critical("On")
+	SendEvent("{" Digit " Up}")
+}
 
 ; On OS layouts where digits are behind Shift (e.g. AZERTY, bépo), swap
 ; the layers: Shift+digit-key produces the OS native symbol (passthrough),
@@ -643,6 +692,10 @@ if Features["layout"]["direct_access_digits"] and _OsLayoutDigitsAreShifted() {
 ; Top-level helper for the shifted-symbol send — must be at module scope so
 ; AHK v2 hoists it before the if-block above executes.
 _DigitShiftSend(Symbol, *) {
+	; Critical("On") so this shifted-symbol emit shares the one atomicity
+	; contract with _RemapEmit / _DigitRowDown and cannot interleave with a
+	; neighbouring remap's SendEvent (remap-emit-critical-uneven).
+	Critical("On")
 	; SendEvent {Text} bypasses the keyboard hook and sends the Unicode
 	; character directly, so the SC002–SC00B digit remaps never interfere.
 	SendEvent("{Text}" . Symbol)

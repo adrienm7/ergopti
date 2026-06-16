@@ -60,27 +60,30 @@ _TSCA_FuncBodyStripped(Src, FuncDef) {
 ; ===================================================
 ; ===================================================
 
+; The clipboard round-trip lives in the _TextSendClipboard helper (TextSend now
+; only defers to it via a one-shot timer to keep the keyboard thread free), so the
+; SaveAll/RestoreAll assertions scan that helper's body rather than TextSend's.
 _TSCA_TextSendUsesSaveAll() {
 	Src := _TSCA_ReadSource("adapters/text_sender.ahk")
-	Body := _TSCA_FuncBodyStripped(Src, "TextSend(Text, Opts, Callback) {")
-	Assert(Body != "", "TextSend must exist in adapters/text_sender.ahk")
+	Body := _TSCA_FuncBodyStripped(Src, "_TextSendClipboard(Text) {")
+	Assert(Body != "", "_TextSendClipboard must exist in adapters/text_sender.ahk")
 	Assert(!InStr(Body, "CB_Save()"),
-		"TextSend must NOT call CB_Save() — it is text-only and destroys non-text clipboard content; use CB_SaveAll() instead")
+		"The clipboard branch must NOT call CB_Save() — it is text-only and destroys non-text clipboard content; use CB_SaveAll() instead")
 	Assert(InStr(Body, "CB_SaveAll()") > 0,
-		"TextSend clipboard branch must call CB_SaveAll() to preserve all clipboard formats")
+		"The clipboard branch must call CB_SaveAll() to preserve all clipboard formats")
 }
-Test("text_sender: TextSend clipboard branch uses CB_SaveAll instead of CB_Save (textsend-clip-destroys-nontext)", _TSCA_TextSendUsesSaveAll)
+Test("text_sender: clipboard branch uses CB_SaveAll instead of CB_Save (textsend-clip-destroys-nontext)", _TSCA_TextSendUsesSaveAll)
 
 _TSCA_TextSendUsesRestoreAll() {
 	Src := _TSCA_ReadSource("adapters/text_sender.ahk")
-	Body := _TSCA_FuncBodyStripped(Src, "TextSend(Text, Opts, Callback) {")
-	Assert(Body != "", "TextSend must exist in adapters/text_sender.ahk")
-	Assert(!InStr(Body, "CB_Restore("),
-		"TextSend must NOT call CB_Restore() — it is text-only; use CB_RestoreAll() instead")
-	Assert(InStr(Body, "CB_RestoreAll(") > 0,
-		"TextSend clipboard branch must call CB_RestoreAll() to restore all clipboard formats")
+	; CB_RestoreAll is called from both _TextSendClipboard (timeout bail) and the
+	; deferred _TextSendRestoreClipboard helper, so assert against the whole file.
+	Assert(!InStr(Src, "CB_Restore("),
+		"The clipboard branch must NOT call CB_Restore() — it is text-only; use CB_RestoreAll() instead")
+	Assert(InStr(Src, "CB_RestoreAll(") > 0,
+		"The clipboard branch must call CB_RestoreAll() to restore all clipboard formats")
 }
-Test("text_sender: TextSend clipboard branch uses CB_RestoreAll instead of CB_Restore (textsend-clip-destroys-nontext)", _TSCA_TextSendUsesRestoreAll)
+Test("text_sender: clipboard branch uses CB_RestoreAll instead of CB_Restore (textsend-clip-destroys-nontext)", _TSCA_TextSendUsesRestoreAll)
 
 
 

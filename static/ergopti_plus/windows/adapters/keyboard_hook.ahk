@@ -26,7 +26,10 @@
 ; INTERCEPT MODE:
 ; When opts["intercept"] is true the flag is stored but has no effect at this
 ; layer — AHK's shared InputHook runs in visible ("V") mode and cannot suppress
-; events selectively per subscriber.
+; events selectively per subscriber. Rather than silently swallow an inert
+; option, KHStart emits a WARNING so the unsupported capability is loud (see the
+; "no silent behavioral fallback" rule, CLAUDE.md 5.4) while keeping the option
+; in the port contract (shared/ports/KeyboardHook.spec.js).
 ; ==============================================================================
 
 ; Cached context (appId = process name, windowTitle = window caption).
@@ -67,8 +70,15 @@ KHStart(Opts) {
 			_KH_ON_CHAR := Opts["onChar"]
 		if Opts.Has("onKey") and Opts["onKey"] != 0
 			_KH_ON_KEY := Opts["onKey"]
-		if Opts.Has("intercept")
+		if Opts.Has("intercept") {
 			_KH_INTERCEPT := Opts["intercept"] == true
+			; The shared InputHook runs in visible ("V") mode, so intercept=true
+			; cannot suppress events per-subscriber at this layer. Surface the
+			; unsupported capability loudly instead of silently honoring a flag
+			; that does nothing (CLAUDE.md 5.4 — no silent behavioral fallback).
+			if _KH_INTERCEPT
+				try LoggerWarn("KeyboardHook", "intercept=true requested but unsupported — the shared visible InputHook cannot suppress events per-subscriber; the key will still pass through.")
+		}
 	}
 	KHRefreshContext()
 	; Register with the central dispatcher — no separate InputHook needed.

@@ -235,11 +235,16 @@ WPMWidget_Push(is_hs := false, is_ai := false, is_ac := false, category := "", s
     cap  := WPMWidgetConst.RING_CAP
     head := WPMWidget._ring_head
     entry := Map("t", A_TickCount, "hs", is_hs, "ai", is_ai, "ac", is_ac)
+    ; Guard the ring mutation so the WPMWidget_Calc enumeration (running on the
+    ; tick timer) can never observe a half-grown array or a slot written mid-walk.
+    ; The region has no Send/Sleep/blocking call, so Critical cannot starve the hook.
+    Critical("On")
     if (WPMWidget._ring.Length < cap)
         WPMWidget._ring.Push(entry)
     else
         WPMWidget._ring[head + 1] := entry
     WPMWidget._ring_head := Mod(head + 1, cap)
+    Critical("Off")
     now_t := A_TickCount
     WPMWidget._last_tick     := now_t
     WPMWidget._last_input_ms := now_t
@@ -250,7 +255,10 @@ WPMWidget_Push(is_hs := false, is_ai := false, is_ac := false, category := "", s
         WPMWidget._last_hs_tick     := now_t
         WPMWidget._last_hs_category := (category != "") ? category : "magickey"
         WPMWidget._last_hs_section  := section
-        LoggerDebug("WPMWidget", "Push hs: category='{1}' section='{2}' stored='{3}'", category, section, WPMWidget._last_hs_category)
+        ; Per-keystroke hot path — gate the arg-array build behind the cached flag
+        ; so nothing is interpolated when DEBUG is off (logger.ahk convention).
+        if LoggerIsDebugEnabled()
+            LoggerDebug("WPMWidget", "Push hs: category='{1}' section='{2}' stored='{3}'", category, section, WPMWidget._last_hs_category)
     }
     if is_ai
         WPMWidget._last_ai_tick := now_t
@@ -269,6 +277,10 @@ WPMWidget_Calc() {
     has_ac := false
     earliest := now
     latest   := 0
+    ; Walk the ring under Critical so a concurrent WPMWidget_Push (keyboard thread)
+    ; cannot grow the array or overwrite a slot mid-enumeration — the loop sees a
+    ; consistent snapshot. No Send/Sleep/blocking call here, so the hook is safe.
+    Critical("On")
     for _, ev in WPMWidget._ring {
         t := ev["t"]
         if (t < cutoff)
@@ -285,6 +297,7 @@ WPMWidget_Calc() {
         if (t > latest)
             latest := t
     }
+    Critical("Off")
     if (count < 2)
         return Map("wpm", 0, "has_hs", has_hs, "has_ai", has_ai, "has_ac", has_ac)
     ; Use now as the right edge (mirrors Hammerspoon): as time passes after the

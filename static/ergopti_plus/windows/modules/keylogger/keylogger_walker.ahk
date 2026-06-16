@@ -63,6 +63,12 @@ class KLWConst {
     static THINK_PAUSE_MS            := 0   ; <- keylogger.think_pause_ms
     static UI_PAUSE_BUCKETS_MS       := [1000, 2000, 3000, 5000, 10000, 20000, 30000, 60000]
     static TRIGGER_LOOKBACK_LEN      := 50
+    ; Cap for ctx["hist"], the per-app backspace-attribution ring. Backspace
+    ; only ever pops the most recent entry, and the deepest n-gram read back is
+    ; the heptagram (7 chars), so 8 entries are always enough to attribute any
+    ; correction. Without this cap hist grows ~linearly with chars typed since
+    ; the last pause-break and is re-serialised into state.json every tick.
+    static HIST_CAP                  := 8
     static BURST_GAP_MS              := 0   ; <- keylogger.burst_gap_ms
     static MIN_BURST_FOR_CPM         := 10
     static SESSION_GAP_MS            := 0   ; <- keylogger.session_gap_ms
@@ -598,6 +604,8 @@ KLW_WalkTypingEntry(entry) {
                     bs_entry["tg"] := p2 . p1 . "[BS]"
                 }
                 backtrack.Push(bs_entry)
+                if (backtrack.Length > KLWConst.HIST_CAP)
+                    backtrack.RemoveAt(1)
                 p6 := p5, p5 := p4, p4 := p3, p3 := p2, p2 := p1, p1 := "[BS]"
             } else {
                 k_c  := char
@@ -797,6 +805,8 @@ KLW_WalkTypingEntry(entry) {
                 }
 
                 backtrack.Push(entry_marks)
+                if (backtrack.Length > KLWConst.HIST_CAP)
+                    backtrack.RemoveAt(1)
                 p6 := p5, p5 := p4, p4 := p3, p3 := p2, p2 := p1, p1 := k_c
             }
         }

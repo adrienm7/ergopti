@@ -53,11 +53,11 @@
 
 
 
-; ===================================
+; ============================
 ; ============================
 ; ======= 1/ Constants =======
 ; ============================
-; ===================================
+; ============================
 
 class KLHookConst {
     ; Hot path → today.log. 500 ms keeps the live dashboard reactive
@@ -70,6 +70,17 @@ class KLHookConst {
     ; double Win32 calls (WinGetTitle + WinGetProcessName) at high typing
     ; speed while still detecting app switches within 1 s.
     static CONTEXT_TTL_MS := 1000
+
+    ; Context refresh now runs on its own SetTimer rather than lazily from
+    ; the keystroke callbacks. WinGetTitle / WinGetProcessName send messages
+    ; to the foreground window's thread (WM_GETTEXT etc.) and can BLOCK when
+    ; that thread is busy or Not Responding (a common Electron/Office cold-
+    ; start state). Running them on the cooperative keyboard-hook thread would
+    ; stall the in-flight keystroke past LowLevelHooksTimeout and drop it —
+    ; precisely at an app switch, when the user is starting to type. A 250 ms
+    ; timer detects app/title switches promptly while keeping the hook path
+    ; free of any blocking Win32 call.
+    static CONTEXT_REFRESH_MS := 250
 
     ; Debounce window for the live dashboard push after a flush. Coalesces
     ; rapid typing bursts into a single KLWV_NotifyIngest call so the
@@ -101,15 +112,16 @@ global KLHOOK_SPECIAL := Map(
 
 
 
-; ===================================
+; ===============================
 ; ===============================
 ; ======= 2/ Module state =======
 ; ===============================
-; ===================================
+; ===============================
 
 class KLHook {
     static ih := unset           ; the live InputHook object
     static flush_timer := unset  ; bound function reference for SetTimer
+    static context_timer := unset  ; bound ref for the off-thread context refresh
     static live_push_timer := unset  ; one-shot debounce for KLWV_NotifyIngest
     static last_tick := 0        ; A_TickCount of the last captured event
 
@@ -140,13 +152,17 @@ class KLHook {
 
 
 
-; ====================================
+; ==================================
 ; ==================================
 ; ======= 3/ Context refresh =======
 ; ==================================
-; ====================================
+; ==================================
 
 KL_Hook_RefreshContext() {
+    ; Driven by SetTimer, which bypasses native Suspend — stay silent while
+    ; the driver is paused so no app/title switch is observed or flushed.
+    if A_IsSuspended
+        return
     if (A_TickCount - KLHook.context_at) < KLHookConst.CONTEXT_TTL_MS
         return
     NewTitle := ""
@@ -192,36 +208,62 @@ KL_Hook_RefreshContext() {
 
 
 
+; ===================================
+; ===== 3.1) Activity watermark =====
+; ===================================
+
+; Advances the last_tick watermark and drives the session / idle state machine
+; for one physical keypress, returning the inter-keystroke delay in ms relative
+; to the PREVIOUS captured key (0 if this is the first).
+;
+; This must run for EVERY physical key the user presses — including ones whose
+; content is privacy-filtered. The key WAS pressed; only its content must be
+; dropped, not the timing watermark. If we skipped the watermark on filtered
+; keys, the next unfiltered key would compute a giant delay (now - the tick
+; before the whole filtered interlude), fabricating a think-pause, breaking the
+; walker's burst, and emitting a spurious retroactive idle / session_end.
+;
+; KL_Watchers_OnKeystroke is driven BEFORE the watermark advances so the watcher
+; still reads the gap from the previous keystroke.
+KL_Hook_NoteActivity() {
+    try KL_Watchers_OnKeystroke()
+    now := A_TickCount
+    delay := (KLHook.last_tick > 0) ? (now - KLHook.last_tick) : 0
+    KLHook.last_tick := now
+    return delay
+}
 
 
-; =========================================
+
+
+
+; ======================================
 ; ======================================
 ; ======= 4/ InputHook callbacks =======
 ; ======================================
-; =========================================
+; ======================================
 
 KL_Hook_OnChar(ih, c) {
     ; The keylogger records nothing while the script is paused — its InputHook is
     ; separate from HookDispatcher, so it needs its own guard.
     if A_IsSuspended
         return
-    ; Privacy filters short-circuit before any allocation.
+    if !Keylogger.initialized
+        return
+
+    ; Advance the activity watermark + drive the session/idle machine BEFORE the
+    ; privacy filter. A filtered key (password field, private browsing, …) is
+    ; still a physical keypress: only its content is dropped, not the timing —
+    ; otherwise the next unfiltered key computes a giant delay across the whole
+    ; filtered interlude and poisons the burst / think-pause / session metrics.
+    delay := KL_Hook_NoteActivity()
+
+    ; Privacy filters short-circuit before any allocation, but AFTER the
+    ; watermark has already advanced above.
     filtered := false
     try filtered := MF_ShouldFilter()
     if filtered
         return
-    if !Keylogger.initialized
-        return
-
-    KL_Hook_RefreshContext()
-
-    ; Drive the session / idle state machine BEFORE last_tick is updated,
-    ; so the watcher reads the gap from the previous keystroke.
-    try KL_Watchers_OnKeystroke()
-
-    now := A_TickCount
-    delay := (KLHook.last_tick > 0) ? (now - KLHook.last_tick) : 0
-    KLHook.last_tick := now
 
     ; Per-keystroke metadata. The walker reads ``kc`` for ergonomic
     ; streaks and writes it to ngram_keycodes; ``sc`` is the hardware
@@ -293,21 +335,18 @@ KL_Hook_OnKeyDown(ih, vk, sc) {
     if !KLHOOK_SPECIAL.Has(vk)
         return
 
+    if !Keylogger.initialized
+        return
+
+    ; Advance the activity watermark + drive the session/idle machine BEFORE the
+    ; privacy filter, for the same reason as OnChar: a filtered special key was
+    ; still physically pressed, so the timing watermark must not lag behind it.
+    delay := KL_Hook_NoteActivity()
+
     filtered := false
     try filtered := MF_ShouldFilter()
     if filtered
         return
-    if !Keylogger.initialized
-        return
-
-    KL_Hook_RefreshContext()
-
-    ; Drive the session / idle state machine BEFORE last_tick is updated.
-    try KL_Watchers_OnKeystroke()
-
-    now := A_TickCount
-    delay := (KLHook.last_tick > 0) ? (now - KLHook.last_tick) : 0
-    KLHook.last_tick := now
 
     bracket := KLHOOK_SPECIAL[vk]
     meta := Map("kc", vk, "sk", sc)
@@ -345,11 +384,11 @@ KL_Hook_OnKeyDown(ih, vk, sc) {
 
 
 
-; =====================================
+; =================================
 ; =================================
 ; ======= 5/ Periodic flush =======
 ; =================================
-; =====================================
+; =================================
 
 KL_Hook_Tick() {
     if A_IsSuspended
@@ -387,11 +426,11 @@ KL_Hook_LivePush() {
 
 
 
-; =====================================
+; ============================
 ; ============================
 ; ======= 6/ Lifecycle =======
 ; ============================
-; =====================================
+; ============================
 
 KL_Hook_Start() {
     ; Idempotent — multiple Start calls are no-ops once subscribed.
@@ -416,11 +455,25 @@ KL_Hook_Start() {
     ; SetTimer(…, 0) can stop it cleanly later.
     KLHook.flush_timer := KL_Hook_Tick.Bind()
     SetTimer(KLHook.flush_timer, KLHookConst.FLUSH_PERIOD_MS)
+
+    ; Window-context refresh runs on its OWN timer, NOT lazily from the
+    ; keystroke callbacks. WinGetTitle / WinGetProcessName can block on a busy
+    ; or Not-Responding foreground window; doing that on the keyboard-hook
+    ; thread would stall the in-flight keystroke past LowLevelHooksTimeout and
+    ; drop it. Off-thread, the hook path reads the cached session_app / title
+    ; with zero Win32 cost. Seed once immediately so the first keystroke has a
+    ; valid context before the timer's first tick.
+    KL_Hook_RefreshContext()
+    KLHook.context_timer := KL_Hook_RefreshContext.Bind()
+    SetTimer(KLHook.context_timer, KLHookConst.CONTEXT_REFRESH_MS)
 }
 
 KL_Hook_Stop() {
     if KLHook.HasOwnProp("flush_timer") {
         try SetTimer(KLHook.flush_timer, 0)
+    }
+    if KLHook.HasOwnProp("context_timer") && IsObject(KLHook.context_timer) {
+        try SetTimer(KLHook.context_timer, 0)
     }
     if KLHook.HasOwnProp("live_push_timer") && IsObject(KLHook.live_push_timer) {
         try SetTimer(KLHook.live_push_timer, 0)

@@ -160,6 +160,13 @@ Updater_SetChannel(Channel) {
 		return
 	UPDATER_CHANNEL := Channel
 	TOML_Write(Channel, ConfigurationFile, UPDATER_INI_SECTION, UPDATER_INI_KEY)
+	; Cancel in-flight async checks and stop the focus/background timers before
+	; Reload so a late WinHTTP response or a queued poll timer cannot fire a
+	; callback against a half-torn-down state during the (non-instantaneous)
+	; restart. Mirrors the explicit cleanup Updater_SetCheckInterval performs
+	; for its in-process restart path instead of relying on Reload's implicit
+	; teardown.
+	Updater_StopBackgroundChecks()
 	Reload
 }
 
@@ -197,8 +204,22 @@ Updater_LoadCheckInterval() {
 ; same item is what triggered this call (the user sees their click confirmed).
 Updater_SetCheckInterval(Seconds) {
 	global UPDATER_CHECK_INTERVAL, ConfigurationFile, UPDATER_INI_SECTION, UPDATER_INI_INTERVAL_KEY
-	if (Type(Seconds) != "Integer" or Seconds < 0)
+	; Coerce defensively: a valid cadence may arrive as a String ("300") or
+	; Float (300.0) — e.g. from a config migration or a future caller, since
+	; Updater_LoadCheckInterval reads strings from TOML. An exact Type() ==
+	; "Integer" test would silently drop those. Reject only genuinely invalid
+	; input (non-numeric or negative) and LoggerWarn so a bad value is visible
+	; in the log rather than disappearing without a trace.
+	try {
+		Seconds := Integer(Seconds)
+	} catch {
+		try LoggerWarn("Updater", "Ignoring non-numeric check interval: {1}.", Seconds)
 		return
+	}
+	if (Seconds < 0) {
+		try LoggerWarn("Updater", "Ignoring negative check interval: {1}.", Seconds)
+		return
+	}
 	UPDATER_CHECK_INTERVAL := Seconds
 	try TOML_Write(Seconds, ConfigurationFile, UPDATER_INI_SECTION, UPDATER_INI_INTERVAL_KEY)
 	try LoggerInfo("Updater", "Background check interval set to {1} s.", Seconds)
@@ -1296,6 +1317,12 @@ Updater_BackgroundTick(*) {
 	if IsSet(_UpdaterBackgroundFn) and UPDATER_CHECK_INTERVAL > 0 {
 		try SetTimer(_UpdaterBackgroundFn, UPDATER_CHECK_INTERVAL * 1000)
 	}
+	; Pause invariant: a suspended driver must be fully silent. SetTimer
+	; callbacks are not gated by native Suspend, so we re-arm above (so the
+	; loop survives pause and resumes cleanly) but skip the network dispatch,
+	; the TrayTip and the tray-menu rebuild while suspended.
+	if A_IsSuspended
+		return
 	if Updater_IsLocalSource()
 		return
 	Current := Updater_CurrentVersion()
@@ -1469,10 +1496,21 @@ Updater_ShowAvailableUpdate(*) {
 		MsgBox(t("updater.local_source"), t("updater.title_update"), "Iconi")
 		return
 	}
-	; No cached release — synchronously fetch one. ``T2`` ensures the
-	; placeholder dialog auto-dismisses after 2s if the user is impatient.
+	; No cached release — fetch one ASYNCHRONOUSLY so the network round-trip
+	; never blocks the AHK main thread (a synchronous WinHttp.Send here would
+	; freeze keyboard remapping and drop keystrokes for the whole resolve /
+	; connect / receive budget on a stalled or captive-portal network). ``T2``
+	; auto-dismisses the brief "Verification…" notice; the actual update prompt
+	; is surfaced from the async callback once the response arrives.
 	MsgBox(Format(t("updater.checking"), UPDATER_CHANNEL), t("updater.title_update"), "Iconi T2")
-	Json := Updater_FetchLatestJson(UPDATER_CHANNEL)
+	_Updater_FetchLatestJsonAsync(UPDATER_CHANNEL, (Json) => _Updater_ShowAvailableUpdateCallback(Json))
+}
+
+; Completion handler for the async fetch dispatched by Updater_ShowAvailableUpdate
+; when no release is cached. Mirrors the synchronous tail it replaced: surfaces a
+; localized error on failure, otherwise builds the release record and shows the
+; update prompt. Runs off a poll timer so it never blocks the main thread.
+_Updater_ShowAvailableUpdateCallback(Json) {
 	if (Json == "") {
 		MsgBox(t("updater.no_connection"), t("updater.title_update"), "Icon!")
 		return

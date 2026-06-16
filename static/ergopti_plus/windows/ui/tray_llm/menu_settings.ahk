@@ -357,6 +357,12 @@ LLM_Tray_PromptNumeric(key, title, prompt, min_val := 0, max_val := 0) {
 	ib := InputBox(prompt, title, "w400 h120", _LLM_Tray[key])
 	if (ib.Result != "OK" || ib.Value == "")
 		return
+	; Reject non-numeric typos before converting — Integer() throws on a bad
+	; string (e.g. "abc" or "12,5"), and this runs in a menu-callback thread
+	; where the error would surface as an unhandled AHK dialog (mirrors the
+	; IsInteger guard in LLM_Tray_PromptOllamaPort)
+	if !IsInteger(ib.Value)
+		return
 	val := Integer(ib.Value)
 	if (min_val > 0 && val < min_val) || (max_val > 0 && val > max_val)
 		return
@@ -453,6 +459,10 @@ LLM_Tray_PromptMaxWords() {
 	ib := InputBox(t("menu.llm.max_words_prompt"), t("menu.llm.generation_menu_title"), "w400 h120", _LLM_Tray["max_words"])
 	if (ib.Result != "OK" || ib.Value == "")
 		return
+	; Reject non-numeric typos before converting — Integer() throws on a bad
+	; string in this menu-callback thread (mirrors LLM_Tray_PromptOllamaPort)
+	if !IsInteger(ib.Value)
+		return
 	val := Integer(ib.Value)
 	if (val < 0)
 		return
@@ -467,7 +477,14 @@ LLM_Tray_PromptTemperature() {
 	ib := InputBox(t("menu.llm.temperature_prompt"), t("menu.llm.generation_menu_title"), "w400 h120", _LLM_Tray["temperature"])
 	if (ib.Result != "OK" || ib.Value == "")
 		return
-	val := Float(ib.Value)
+	; Accept the comma-decimal habit common on a French keyboard (the project's
+	; UI locale) by normalising "12,5" to "12.5" before validating
+	raw := StrReplace(ib.Value, ",", ".")
+	; Reject non-numeric typos before converting — Float() throws on a bad
+	; string in this menu-callback thread (mirrors LLM_Tray_PromptOllamaPort)
+	if !IsNumber(raw)
+		return
+	val := Float(raw)
 	if (val < 0.0 || val > 2.0)
 		return
 	_LLM_Tray["temperature"] := Format("{:.2f}", val)

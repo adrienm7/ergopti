@@ -176,8 +176,12 @@ $SC03A:: {
 
 	Now           := A_TickCount
 	CharTime      := LastSentCharacterKeyTime.Has("CapsLock") ? LastSentCharacterKeyTime["CapsLock"] : Now
-	tap           := (Now - CharTime <= TapHoldDuration(TapHold, "caps_lock") * 1000)
-	if tap {
+	tap           := ((Now - CharTime) <= TapHoldDuration(TapHold, "caps_lock") * 1000)
+	if (
+		tap
+		and (Now - CharTime) >= TapMinDurationMs()
+		and A_PriorKey == "CapsLock"
+	) { ; A_PriorKey + TapMinDurationMs floor suppress spurious taps when CapsLock is brushed mid-roll
 		_CapsLockDispatch(False)
 	}
 }

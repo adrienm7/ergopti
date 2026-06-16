@@ -289,16 +289,35 @@ Reg_EnumSubKeys(keyPath) {
 ; Param keyPath - Full registry path to test.
 ; Returns boolean - True if the key exists.
 Reg_KeyExists(keyPath) {
+	; A key that holds only named values (no sub-keys, no (Default) value) is a
+	; perfectly valid existing key — the common case for an app settings key.
+	; Probe sub-keys and values independently; only the default-value RegRead is
+	; a last-resort fallback, so existence never hinges on a (Default) being set.
 	try {
 		Loop Reg, keyPath, "K" {
 			return true
 		}
-		; No error thrown but nothing found — key exists but has no sub-keys
-		; (which is still a valid key). Use a direct RegRead as a probe.
+	} catch as e {
+		; ERROR_FILE_NOT_FOUND (2) or ERROR_PATH_NOT_FOUND (3) = key absent.
+		if (e.Extra != 2 and e.Extra != 3)
+			LoggerDebug("registry", "Reg_KeyExists sub-key probe error — {1}: {2}", keyPath, e.Message)
+		return false
+	}
+	try {
+		Loop Reg, keyPath, "V" {
+			return true
+		}
+	} catch as e {
+		if (e.Extra != 2 and e.Extra != 3)
+			LoggerDebug("registry", "Reg_KeyExists value probe error — {1}: {2}", keyPath, e.Message)
+		return false
+	}
+	; No error thrown but neither sub-keys nor named values were found — the key
+	; exists but is empty. Use a direct RegRead of its (Default) value as a probe.
+	try {
 		RegRead(keyPath, "")
 		return true
 	} catch as e {
-		; ERROR_FILE_NOT_FOUND (2) or ERROR_PATH_NOT_FOUND (3) = key absent.
 		if (e.Extra = 2 or e.Extra = 3)
 			return false
 		; Any other error: key may exist but is inaccessible.

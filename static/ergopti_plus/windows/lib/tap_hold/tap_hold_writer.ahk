@@ -278,11 +278,18 @@ _TH_WriteTapHoldDisabled() {
 	Content := "# Cleared by Ergopti+ global disable — shipped defaults are not inherited.`r`n"
 		. "[tap_hold]`r`n"
 		. "inherit_defaults = false`r`n"
+	; Atomic write: stage the content in a sibling temp file, then rename over
+	; the target. FileMove with overwrite=true is atomic on NTFS, so a crash or
+	; power loss never leaves a half-written tap_hold.toml that the loader would
+	; misread as an empty (all-disabled) config.
+	Tmp := Path . ".tmp"
 	try {
-		if FileExist(Path)
-			FileDelete(Path)
-		FileAppend(Content, Path, "UTF-8-RAW")
+		if FileExist(Tmp)
+			FileDelete(Tmp)
+		FileAppend(Content, Tmp, "UTF-8-RAW")
+		FileMove(Tmp, Path, true)
 	} catch as Err {
+		try FileDelete(Tmp)
 		try LoggerError("TapHoldWriter", "Could not write disabled tap_hold.toml: {1}.", Err.Message)
 	}
 }
@@ -349,14 +356,21 @@ _TH_WriteTapHoldToml() {
 		Content .= L . "`r`n"
 	}
 
+	; Atomic write: stage the content in a sibling temp file, then rename over
+	; the target. FileMove with overwrite=true is atomic on NTFS, so a crash or
+	; power loss between the old non-atomic FileDelete and FileAppend can no
+	; longer leave a truncated tap_hold.toml that silently drops every remap.
+	Tmp := Path . ".tmp"
 	try {
-		if FileExist(Path) {
-			FileDelete(Path)
+		if FileExist(Tmp) {
+			FileDelete(Tmp)
 		}
-		FileAppend(Content, Path, "UTF-8-RAW")
+		FileAppend(Content, Tmp, "UTF-8-RAW")
+		FileMove(Tmp, Path, true)
 		try LoggerDebug("TapHoldWriter", "tap_hold.toml rewritten ({1} key(s)).",
 			TapHold.Has("keys") ? TapHold["keys"].Count : 0)
 	} catch as Err {
+		try FileDelete(Tmp)
 		try LoggerError("TapHoldWriter", "Could not write tap_hold.toml: {1}.", Err.Message)
 	}
 }

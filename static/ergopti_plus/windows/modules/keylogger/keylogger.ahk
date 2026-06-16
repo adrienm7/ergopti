@@ -494,6 +494,67 @@ KL_SaveState() {
 
 
 
+; =========================================
+; ===== 6.1) Event-id collision guard =====
+; =========================================
+; A Reload mid-burst can lose the final flush window, leaving the persisted
+; next_event_id in state.json LAGGING the true max id already written to
+; data.sql. On the next launch KL_AllocEventId would then re-mint ids that
+; already exist, and the schema's `INSERT OR IGNORE INTO events_* (device_id,
+; id, ...)` SILENTLY DROPS the colliding rows — permanent, invisible data
+; loss. The defence does not trust state.json alone: at startup it scans the
+; existing data.sql for the highest id already persisted for THIS device and
+; starts after it. Pure helpers (no OS calls beyond the one FileRead in
+; KL_ScanMaxEventId) so the resolve arithmetic stays unit-testable.
+
+; Scans a data.sql text body for the highest event id already persisted for
+; the given device-id SQL literal (e.g. "'uuid'"). Every INSERT row has the
+; shape `... VALUES (<device_id_lit>, <id>, ...)`, so we anchor on the literal
+; immediately followed by the id field. Returns 0 when no row matches (fresh
+; device / empty file). Pure: takes the text, never reads the disk itself.
+KL_ScanMaxEventId(sql_text, device_id_lit) {
+    max_id := 0
+    if (sql_text = "" || device_id_lit = "")
+        return 0
+    ; Anchor: "VALUES (" then the device literal, then ", " then the id digits.
+    ; RegExMatch with a start position walks every INSERT line in the body.
+    needle := "VALUES \(" . _KL_RegexEscape(device_id_lit) . ",\s*(\d+)"
+    pos := 1
+    while (found := RegExMatch(sql_text, needle, &m, pos)) {
+        id := Integer(m[1])
+        if (id > max_id)
+            max_id := id
+        pos := found + StrLen(m[0])
+    }
+    return max_id
+}
+
+; Escapes the RegEx metacharacters that can appear in a UUID SQL literal —
+; the wrapping single quotes are literal, and a UUID is hex+dashes, but the
+; doubled-quote escaping in KL_SqlStr could in theory inject other chars, so
+; escape defensively rather than trusting the device-id shape.
+_KL_RegexEscape(s) {
+    static META := "\.*?+[]{}()|^$"
+    out := ""
+    Loop Parse, s {
+        c := A_LoopField
+        out .= InStr(META, c) ? ("\" . c) : c
+    }
+    return out
+}
+
+; Single source of truth for the starting next_event_id: the larger of the
+; value persisted in state.json and one past the highest id already in
+; data.sql. Pure arithmetic so it can be exercised headlessly. A persisted
+; value that is AHEAD of the file (the normal case) wins; a persisted value
+; that LAGS the file (the Reload-mid-burst data-loss case) is corrected up.
+KL_ResolveStartId(persisted_next_id, max_id_in_sql) {
+    candidate := max_id_in_sql + 1
+    return (persisted_next_id > candidate) ? persisted_next_id : candidate
+}
+
+
+
 
 
 ; =================================
@@ -1409,6 +1470,22 @@ class KLPasswordCache {
     static pending_hwnd := 0
 }
 
+; Publishes a (hwnd, at, val) verdict to the password cache as a single logical
+; commit. last_hwnd is the COMMIT FLAG and is therefore written LAST: the
+; keystroke reader matches on last_hwnd, so by the time it observes the new
+; hwnd, last_val and last_at already correspond to that hwnd. Without this
+; ordering an interrupt between the writes (KL_AsyncPasswordDetect runs on a
+; separate pseudo-thread from the reader) could expose last_hwnd matched but
+; last_val still holding the previous control's verdict — a single-keystroke
+; privacy leak (password char logged) or metric suppression at field
+; transitions. The single source of truth for cache-write ordering: every
+; writer goes through here, never touches the fields in another order.
+KL_CommitPwCache(hwnd, at, val) {
+    KLPasswordCache.last_val  := val
+    KLPasswordCache.last_at   := at
+    KLPasswordCache.last_hwnd := hwnd   ; commit flag — must be assigned LAST
+}
+
 ; Known non-Edit password class names (Layer 2). Module-level so the cheap
 ; synchronous classifier and the full UIA detector share one source of truth.
 global KL_PASSWORD_CLASSES := Map(
@@ -1471,9 +1548,10 @@ KL_SchedulePasswordDetect(hwnd) {
 ; verdict to the cache.
 KL_AsyncPasswordDetect(hwnd) {
     Result := KL_DetectPasswordFor(hwnd)
-    KLPasswordCache.last_hwnd := hwnd
-    KLPasswordCache.last_at   := A_TickCount
-    KLPasswordCache.last_val  := Result
+    ; Commit through the publish-after-fill helper: last_hwnd is written LAST so
+    ; the keystroke reader (a different pseudo-thread) can never see this hwnd
+    ; matched while last_val still holds the previous control's verdict.
+    KL_CommitPwCache(hwnd, A_TickCount, Result)
     if (KLPasswordCache.pending_hwnd = hwnd)
         KLPasswordCache.pending_hwnd := 0
 }
@@ -1507,9 +1585,11 @@ KL_IsFocusedFieldPassword() {
         Verdict := true
         KL_SchedulePasswordDetect(hwnd)
     }
-    KLPasswordCache.last_hwnd := hwnd
-    KLPasswordCache.last_at   := A_TickCount
-    KLPasswordCache.last_val  := Verdict
+    ; Same publish-after-fill commit as the async path — writer and reader are
+    ; the same thread here, so the ordering is not strictly required, but routing
+    ; every write through the helper keeps a single source of truth for the
+    ; cache-write order and prevents a future edit from reintroducing the torn write.
+    KL_CommitPwCache(hwnd, A_TickCount, Verdict)
     return Verdict
 }
 
@@ -1598,6 +1678,19 @@ KL_Init(metrics_dir) {
     KL_EnsureGitignore()
     KL_WriteDeviceJson(obj)
     KL_LoadState()
+
+    ; Harden next_event_id against id reuse: never trust state.json alone. A
+    ; Reload mid-burst can leave the persisted counter lagging the true max id
+    ; already in data.sql; re-minting those ids would be silently dropped by
+    ; the schema's INSERT OR IGNORE. Resolve to one past the highest persisted
+    ; id so a new event can never collide with an existing one.
+    sql_text := ""
+    try {
+        if FileExist(Keylogger.data_sql_path)
+            sql_text := FileRead(Keylogger.data_sql_path, "UTF-8")
+    }
+    max_id := KL_ScanMaxEventId(sql_text, Keylogger._device_id_lit)
+    Keylogger.next_event_id := KL_ResolveStartId(Keylogger.next_event_id, max_id)
 
     if (Keylogger.today_log_date = "")
         Keylogger.today_log_date := KL_Today()

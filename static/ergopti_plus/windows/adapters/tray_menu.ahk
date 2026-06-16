@@ -57,14 +57,20 @@ TrayMenuSetMenu(Items) {
 			continue
 		IsSep := Item.Has("separator") and Item["separator"]
 		if IsSep {
-			try A_TrayMenu.AddStandard()
+			; A separator is a zero-argument Add(). AddStandard() instead appends
+			; the entire default AHK script-control menu (Exit / Reload / Suspend),
+			; which the product UI deliberately hides — never use it here.
+			try A_TrayMenu.Add()
 			continue
 		}
 		ItemTitle := Item.Has("title") ? Item["title"] : ""
 		ItemFn    := Item.Has("fn")    ? Item["fn"]    : 0
 		if ItemTitle = "" or ItemFn = 0
 			continue
-		try A_TrayMenu.Add(ItemTitle, ItemFn)
+		; Route actionable items through RegisterMenuItem so they participate in
+		; the menu_dispatcher WM_COMMAND retry path. Raw Menu.Add does not, so AHK
+		; 2.0's intermittent dispatch drop would silently lose ~1 click in 3.
+		try RegisterMenuItem(A_TrayMenu, ItemTitle, ItemFn)
 		if Item.Has("checked") and Item["checked"]
 			try A_TrayMenu.Check(ItemTitle)
 		if Item.Has("disabled") and Item["disabled"]

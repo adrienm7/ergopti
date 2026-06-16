@@ -20,15 +20,16 @@
 ;    from speakers to headphones correlates with calls / focus music).
 ; 3. Screen recording detection — queries the running process list for
 ;    known capture / conferencing executables (OBS, Teams presenter mode,
-;    Zoom share, etc.) every AVSTATE_TICK_MS. Emits screen_recording_start
+;    Zoom share, etc.) every SLOW_TICK_MS. Emits screen_recording_start
 ;    and screen_recording_end events when capture software enters or leaves
 ;    the running process list.
-; 4. Focus mode state — Windows 10+ Focus Assist (quiet hours) state is
-;    readable from the registry key
-;    HKCU\Software\Microsoft\Windows\CurrentVersion\CloudStore\Store\
-;    Cache\DefaultAccount\$$windows.data.notifications.quiethoursstate.
-;    We poll this at a 30 s cadence and emit focus_mode_start / end when
-;    the state transitions. This identifies self-imposed deep work windows.
+;
+; NOTE: Windows Focus Assist (quiet hours) detection was removed. The only
+; known local read path (a recursive registry-key walk of the deep CloudStore
+; tree) blocks the AHK main thread for ~30 s on some Windows builds,
+; reintroducing a keyboard lockup. The feature stays out until a non-blocking
+; source (WNF / notification API) is available, rather than shipping inert
+; machinery that misleads maintainers (see project rule 5.6).
 ;
 ; PRIVACY: All detection is local (no internet, no external DLL). Volume
 ; queries use the IAudioEndpointVolume COM interface via DllCall; process
@@ -51,7 +52,7 @@ class KLAVConst {
     ; Fast tick for volume polling
     static AVSTATE_TICK_MS      := 1000
 
-    ; Slow tick for focus mode + capture process scanning
+    ; Slow tick for capture-process scanning
     static SLOW_TICK_MS         := 30000
 
     ; Minimum volume level change (0-100) to log as a volume_change event
@@ -67,10 +68,6 @@ class KLAVConst {
         "sharex.exe", "greenshot.exe",
         "win10screenshot.exe"
     ]
-
-    ; Registry path for Windows Focus Assist state
-    static FOCUS_REG_ROOT := "HKCU\Software\Microsoft\Windows\CurrentVersion\"
-        . "CloudStore\Store\Cache\DefaultAccount"
 }
 
 
@@ -94,9 +91,6 @@ class KLAVState {
     ; Capture process baseline
     static capture_active   := false
     static capture_exe      := ""
-
-    ; Focus mode baseline
-    static focus_active     := false
 
     ; Lifecycle
     static fast_fn          := unset
@@ -189,11 +183,11 @@ KL_AV_GetMasterMuted(vol) {
 
 
 
-; ==================================================
-; ====================================================
-; ======= 4/ Capture process scan + focus mode =======
-; ====================================================
-; ==================================================
+; =======================================
+; =======================================
+; ======= 4/ Capture process scan =======
+; =======================================
+; =======================================
 
 KL_AV_SlowTick() {
     if !Keylogger.initialized
@@ -201,10 +195,6 @@ KL_AV_SlowTick() {
     if A_IsSuspended
         return
     KL_AV_ScanCapture()
-    ; KL_AV_PollFocusMode() is intentionally excluded — its `loop reg "KR"`
-    ; walk on a deep CloudStore path blocks the AHK main thread under some
-    ; Windows builds, causing the same 30-second keyboard lockup as the
-    ; previous WMI call.
 }
 
 KL_AV_ScanCapture() {
@@ -271,38 +261,6 @@ _KL_AV_FindCaptureExeSnapshot() {
     return found
 }
 
-KL_AV_PollFocusMode() {
-    ; Focus Assist state: 0 = off, 1 = priority only, 2 = alarms only.
-    ; The key path is well-known but the sub-key name under DefaultAccount
-    ; changes per Windows build. We look for any sub-key containing
-    ; "quiethoursstate" and read its Data\Data value (DWORD).
-    state_val := 0
-    try {
-        root := KLAVConst.FOCUS_REG_ROOT
-        ; Enumerate sub-keys to find the quiethoursstate bucket
-        loop reg root, "KR" {
-            if InStr(A_LoopRegName, "quiethoursstate") {
-                ; Data is a binary value; first DWORD is the state
-                ; Absent key means Focus is off — REG_NOT_FOUND sentinel signals that cleanly
-                raw := Reg_Read(root . "\" . A_LoopRegName . "\Current\InitialDownloadData", "Data", REG_NOT_FOUND)
-                ; raw is the raw binary — state is encoded in the first 4 bytes;
-                ; any present value (even empty string) means Focus is active
-                if (raw != REG_NOT_FOUND and raw != "")
-                    state_val := 1
-                break
-            }
-        }
-    }
-    now_focus := (state_val > 0)
-    if (now_focus and !KLAVState.focus_active) {
-        KLAVState.focus_active := true
-        KL_AppendLog(Map("type", "focus_mode_start", "app", Keylogger.session_app))
-    } else if (!now_focus and KLAVState.focus_active) {
-        KLAVState.focus_active := false
-        KL_AppendLog(Map("type", "focus_mode_end", "app", Keylogger.session_app))
-    }
-}
-
 
 
 
@@ -341,8 +299,5 @@ KL_AV_Stop() {
             "app",  Keylogger.session_app,
             "exe",  KLAVState.capture_exe
         ))
-    }
-    if KLAVState.focus_active {
-        try KL_AppendLog(Map("type", "focus_mode_end", "app", Keylogger.session_app))
     }
 }

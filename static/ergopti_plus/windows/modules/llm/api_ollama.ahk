@@ -108,6 +108,15 @@ global LLM_OLLAMA_WARMUP_TIMEOUT := 90000
 ; showed endless "prediction deferred" with no "Model warmed up" line).
 global _LLM_OLLAMA_WARMUP_POLL_MS := 250
 
+; Streaming end-of-stream flush: the curl child's stdout file can lag the
+; process exit by a few ms, so after the child is gone we re-read the file a
+; few more times before declaring the result empty. These were a blocking
+; Sleep(40) loop inside the timer callback (up to 200 ms of frozen message
+; pump — dropped keystrokes the moment streaming is re-enabled); they now drive
+; a re-armed one-shot timer so the pump stays live between reads.
+global _LLM_OLLAMA_STREAM_FLUSH_MAX_RETRIES := 5
+global _LLM_OLLAMA_STREAM_FLUSH_RETRY_MS := 40
+
 /**
  * Updates the Ollama server port and rebuilds LLM_OLLAMA_BASE_URL so every
  * subsequent request targets it. Rejects non-integers and out-of-range ports
@@ -349,6 +358,14 @@ LLM_OllamaGenerate_Async(model, system_prompt, full_text, temperature, on_succes
 	)
 	global _LLM_Ollama_Async
 	if (_LLM_Ollama_Async.Count > 0) {
+		; Latest-only coalescing keeps a single pending slot. If a previous job
+		; is already waiting there, it is being superseded and will never run —
+		; honour the async contract (exactly one of on_success / on_fail fires)
+		; by failing the displaced job before overwriting it. Without this a
+		; future consumer that advances a state machine on the callback would
+		; stall forever on the dropped job.
+		if (_LLM_Ollama_Pending is Map and _LLM_Ollama_Pending.Has("on_fail"))
+			try _LLM_Ollama_Pending["on_fail"]()
 		_LLM_Ollama_Pending := job
 		try LoggerInfo("LLM.ollama", "Ollama busy — coalescing request #{1} until slot free.", req_id)
 		return req_id
@@ -365,9 +382,15 @@ _LLM_Ollama_DispatchAsync(job) {
 	payload := LLM_BuildOllamaPayload(
 		job["model"], job["system_prompt"], job["full_text"], job["temperature"],
 		false, job["stop_sequences"], job["max_tokens"], job["is_batch"], job["tail_text"])
+	; Reap any crash-orphaned payload files before writing a new one. The
+	; non-streaming path is the hot path that actually creates these PII files,
+	; so the sweeper must run here too — coupling it only to the (currently
+	; dead) streaming path left orphans accumulating forever after a hard kill.
+	_LLM_Ollama_StreamCleanupOrphans()
 	uid := _LLM_Ollama_NextStreamUid()
-	tmp_payload := A_Temp . "\ergopti_ollama_" . uid . ".json"
-	tmp_stdout := A_Temp . "\ergopti_ollama_" . uid . ".out"
+	tmp_dir := _LLM_Ollama_TempDir()
+	tmp_payload := tmp_dir . "\ergopti_ollama_" . uid . ".json"
+	tmp_stdout := tmp_dir . "\ergopti_ollama_" . uid . ".out"
 	if !FSWrite(tmp_payload, payload) {
 		try LoggerWarn("LLM.ollama", "Failed to write curl payload file.")
 		try job["on_fail"]()
@@ -651,6 +674,11 @@ _LLM_Ollama_PollGeneric(http, on_ok, on_err, deadline := 0, poll_ms := 0) {
 	try ready := http.WaitForResponse(0)
 	if !ready {
 		if (A_TickCount >= deadline) {
+			; Abort the in-flight request before dropping our reference — a
+			; server that accepts the connection but never responds would
+			; otherwise keep the COM object + socket resident until WinHTTP's
+			; own timeout fires, long after we have stopped polling it.
+			try http.Abort()
 			try on_err()
 			return
 		}
@@ -848,13 +876,14 @@ LLM_OllamaGenerate_Streaming(model, system_prompt, full_text, temperature, on_pa
 	; two streams fired in the same millisecond can't share a file.
 	_LLM_Ollama_StreamCleanupOrphans()
 	uid := _LLM_Ollama_NextStreamUid()
-	tmp_payload := A_Temp . "\ergopti_ollama_" . uid . ".json"
+	tmp_dir := _LLM_Ollama_TempDir()
+	tmp_payload := tmp_dir . "\ergopti_ollama_" . uid . ".json"
 	if !FSWrite(tmp_payload, payload) {
 		try on_fail()
 		return { Pid: 0, Cancelled: false }
 	}
 
-	tmp_stdout := A_Temp . "\ergopti_ollama_" . uid . ".out"
+	tmp_stdout := tmp_dir . "\ergopti_ollama_" . uid . ".out"
 	; Launch curl.exe directly (not cmd /c): hidden cmd often lacks curl on PATH and
 	; shell redirects (> file) silently produce empty/missing stdout — logs showed
 	; "Streaming finished with empty response. No stdout file."
@@ -930,25 +959,39 @@ _LLM_Ollama_StreamPoll(handle, state, on_partial, on_success, on_fail) {
 		SetTimer(() => _LLM_Ollama_StreamPoll(handle, state, on_partial, on_success, on_fail), -LLM_OLLAMA_POLL_MS)
 		return
 	}
-	; Process exited: flush whatever is left on disk one last time before
-	; declaring success. The cmd redirect can lag the child exit by a few ms.
-	loop 5 {
-		try {
-			fh := FileOpen(handle.TmpStdout, "r", "UTF-8")
-			if IsObject(fh) {
-				fh.Pos := state["last_pos"]
-				chunk := fh.Read()
-				state["last_pos"] := fh.Pos
-				fh.Close()
-				if (chunk != "") {
-					_LLM_Ollama_ConsumeStreamChunk(chunk, state, on_partial)
-				}
+	; Process exited: flush whatever is left on disk before declaring the
+	; result. The child's stdout can lag its exit by a few ms, so hand off to
+	; the re-armed flush tick (no blocking Sleep) which retries the read a
+	; bounded number of times until content appears or the file is confirmed
+	; empty.
+	_LLM_Ollama_StreamFinalFlush(handle, state, on_partial, on_success, on_fail)
+}
+
+; Non-blocking end-of-stream flush. Reads any bytes the child wrote after exit;
+; if the accumulator is still empty but the stdout file is non-empty (flush
+; lag), it re-arms itself as a one-shot timer instead of Sleep()ing so the AHK
+; message pump keeps pumping. Bounded by _LLM_OLLAMA_STREAM_FLUSH_MAX_RETRIES.
+_LLM_Ollama_StreamFinalFlush(handle, state, on_partial, on_success, on_fail) {
+	global _LLM_OLLAMA_STREAM_FLUSH_MAX_RETRIES, _LLM_OLLAMA_STREAM_FLUSH_RETRY_MS
+	try {
+		fh := FileOpen(handle.TmpStdout, "r", "UTF-8")
+		if IsObject(fh) {
+			fh.Pos := state["last_pos"]
+			chunk := fh.Read()
+			state["last_pos"] := fh.Pos
+			fh.Close()
+			if (chunk != "") {
+				_LLM_Ollama_ConsumeStreamChunk(chunk, state, on_partial)
 			}
-		} catch {
 		}
-		if (state["acc"] != "" or !FileExist(handle.TmpStdout) or FileGetSize(handle.TmpStdout) = 0)
-			break
-		Sleep(40)
+	} catch {
+	}
+	retries := state.Has("flush_retries") ? state["flush_retries"] : 0
+	more_to_read := (!FileExist(handle.TmpStdout) or FileGetSize(handle.TmpStdout) = 0) ? false : true
+	if (state["acc"] == "" and more_to_read and retries < _LLM_OLLAMA_STREAM_FLUSH_MAX_RETRIES) {
+		state["flush_retries"] := retries + 1
+		SetTimer(() => _LLM_Ollama_StreamFinalFlush(handle, state, on_partial, on_success, on_fail), -_LLM_OLLAMA_STREAM_FLUSH_RETRY_MS)
+		return
 	}
 	final := state["acc"]
 	_LLM_Ollama_CleanupStreamFiles(handle)
@@ -1063,6 +1106,25 @@ _LLM_Ollama_NextStreamUid() {
 	return A_TickCount . "_" . _LLM_Ollama_StreamCounter
 }
 
+; Per-instance hardened temp directory for the curl payload + stdout files. The
+; payload carries the user's typed context (potential PII), so it must not land
+; in the shared %TEMP% root where a sibling process / clipboard manager / sync
+; agent can read it. Routing every file through a private subdirectory keyed on
+; the current PID both narrows the exposure surface (the dir is created with the
+; user's default ACL, not world-shared) and lets the orphan sweeper scope its
+; glob to ``ergopti_ollama_*`` files this driver actually owns. Created lazily on
+; first use; falls back to A_Temp only if the directory cannot be created so a
+; locked-down %TEMP% never silently breaks predictions.
+_LLM_Ollama_TempDir() {
+	dir := A_Temp . "\ergopti_llm_" . DllCall("GetCurrentProcessId")
+	if !FileExist(dir) {
+		try DirCreate(dir)
+	}
+	; Fail-safe: if the private dir is unavailable, degrade to A_Temp rather
+	; than dropping the prediction entirely.
+	return FileExist(dir) ? dir : A_Temp
+}
+
 ; Wipes any leftover ``ergopti_ollama_*`` temp files older than 60 s. Runs
 ; before each new stream so a previous AHK instance that crashed mid-stream
 ; (Power loss, hard kill, …) never leaks files indefinitely. The 60 s
@@ -1070,9 +1132,13 @@ _LLM_Ollama_NextStreamUid() {
 ; legitimate in-flight stream on a fresh AHK instance is younger than that.
 _LLM_Ollama_StreamCleanupOrphans() {
 	now := A_Now
-	loop files, A_Temp . "\ergopti_ollama_*.json"
+	; Sweep both the per-instance hardened dir (where payloads now live) and the
+	; legacy A_Temp root (older builds wrote directly there; a crash from one of
+	; those leaves orphans we must still reap). Recursive ``FR`` reaches the
+	; PID-keyed subdirectories created by _LLM_Ollama_TempDir().
+	loop files, A_Temp . "\ergopti_ollama_*.json", "FR"
 		_LLM_Ollama_TryDeleteIfOld(A_LoopFilePath, A_LoopFileTimeModified, now)
-	loop files, A_Temp . "\ergopti_ollama_*.out"
+	loop files, A_Temp . "\ergopti_ollama_*.out", "FR"
 		_LLM_Ollama_TryDeleteIfOld(A_LoopFilePath, A_LoopFileTimeModified, now)
 }
 

@@ -298,16 +298,31 @@ class HookDispatcher {
 		LoggerStart("HookDispatcher", "Starting unified hook dispatcher…")
 
 		; ── InputHook ────────────────────────────────────────────────────────
-		ih := InputHook(HookDispatcherConst.INPUT_HOOK_OPTS)
-		; Notify on every key (no end-key filter needed)
-		ih.KeyOpt("{All}", "+N")
-		; Non-text keys (arrows, F-keys, Esc, BS, Enter) must raise OnKeyDown
-		ih.NotifyNonText := true
-		ih.OnChar    := HookDispatcher._OnChar.Bind(HookDispatcher)
-		ih.OnKeyDown := HookDispatcher._OnKeyDown.Bind(HookDispatcher)
-		ih.OnKeyUp   := HookDispatcher._OnKeyUp.Bind(HookDispatcher)
-		ih.Start()
-		HookDispatcher._ih := ih
+		; Reuse a live InputHook if one already exists. A partial Start failure
+		; (a mouse Hotkey throwing below) leaves _started false but the InputHook
+		; live; without this guard a retry would create a SECOND InputHook racing
+		; the first for the key stream — the multi-hook contention this module
+		; exists to prevent.
+		if HookDispatcher._ih is InputHook {
+			ih := HookDispatcher._ih
+		} else {
+			ih := InputHook(HookDispatcherConst.INPUT_HOOK_OPTS)
+			; Notify on every key (no end-key filter needed)
+			ih.KeyOpt("{All}", "+N")
+			; Non-text keys (arrows, F-keys, Esc, BS, Enter) must raise OnKeyDown
+			ih.NotifyNonText := true
+			ih.OnChar    := HookDispatcher._OnChar.Bind(HookDispatcher)
+			ih.OnKeyDown := HookDispatcher._OnKeyDown.Bind(HookDispatcher)
+			ih.OnKeyUp   := HookDispatcher._OnKeyUp.Bind(HookDispatcher)
+			ih.Start()
+			HookDispatcher._ih := ih
+		}
+
+		; The InputHook (the only non-recoverable resource) is now live, so the
+		; dispatcher is functionally started. Set the flag BEFORE the optional
+		; mouse hotkeys so a later per-hotkey failure cannot leave _started false
+		; with a live hook (which would invite the duplicate-InputHook race above).
+		HookDispatcher._started := true
 
 		; ── Mouse Hotkeys ─────────────────────────────────────────────────────
 		; Bind once, store references so Stop() can disable them cleanly.
@@ -324,24 +339,42 @@ class HookDispatcher {
 		HookDispatcher._hk_wright := HookDispatcher._OnWheelRight.Bind(HookDispatcher)
 		HookDispatcher._hk_wleft  := HookDispatcher._OnWheelLeft.Bind(HookDispatcher)
 
-		Hotkey("~LButton",    HookDispatcher._hk_ldown,  "On")
-		Hotkey("~LButton Up", HookDispatcher._hk_lup,    "On")
-		Hotkey("~RButton",    HookDispatcher._hk_rdown,  "On")
-		Hotkey("~RButton Up", HookDispatcher._hk_rup,    "On")
-		Hotkey("~MButton",    HookDispatcher._hk_mdown,  "On")
-		Hotkey("~MButton Up", HookDispatcher._hk_mup,    "On")
-		Hotkey("~WheelUp",    HookDispatcher._hk_wup,    "On")
-		Hotkey("~WheelDown",  HookDispatcher._hk_wdn,    "On")
-		Hotkey("~WheelRight", HookDispatcher._hk_wright, "On")
-		Hotkey("~WheelLeft",  HookDispatcher._hk_wleft,  "On")
+		; Guard each Hotkey() individually: on a hardened machine or unusual input
+		; stack a single wheel/button registration can be rejected. Aborting the
+		; whole Start on one rejection would leave a live InputHook with _started
+		; mis-set; instead log a WARNING and keep the rest of the pipeline up.
+		HookDispatcher._SafeHotkey("~LButton",    HookDispatcher._hk_ldown)
+		HookDispatcher._SafeHotkey("~LButton Up", HookDispatcher._hk_lup)
+		HookDispatcher._SafeHotkey("~RButton",    HookDispatcher._hk_rdown)
+		HookDispatcher._SafeHotkey("~RButton Up", HookDispatcher._hk_rup)
+		HookDispatcher._SafeHotkey("~MButton",    HookDispatcher._hk_mdown)
+		HookDispatcher._SafeHotkey("~MButton Up", HookDispatcher._hk_mup)
+		HookDispatcher._SafeHotkey("~WheelUp",    HookDispatcher._hk_wup)
+		HookDispatcher._SafeHotkey("~WheelDown",  HookDispatcher._hk_wdn)
+		HookDispatcher._SafeHotkey("~WheelRight", HookDispatcher._hk_wright)
+		HookDispatcher._SafeHotkey("~WheelLeft",  HookDispatcher._hk_wleft)
 
-		HookDispatcher._started := true
 		LoggerSuccess("HookDispatcher", "Unified hook dispatcher started ({1} event type(s) with subscribers).",
 			HookDispatcher._subscribers.Count)
 	}
 
+	; Registers a single mouse Hotkey, logging a WARNING (instead of throwing) if
+	; the OS rejects it. Used by Start() so one unsupported mouse event cannot
+	; abort the whole start sequence and orphan the live InputHook.
+	; @param key_name {String} The Hotkey() key spec (e.g. "~WheelLeft").
+	; @param callback_fn {Func} The bound handler to register.
+	static _SafeHotkey(key_name, callback_fn) {
+		try {
+			Hotkey(key_name, callback_fn, "On")
+		} catch as e {
+			LoggerWarn("HookDispatcher", "Mouse hotkey '{1}' could not be registered: {2}.", key_name, e.Message)
+		}
+	}
+
 	; Releases the InputHook and disables all mouse Hotkeys.
-	; Safe to call when not started.
+	; Safe to call when not started. Registered as the process OnExit handler from
+	; ErgoptiPlus.ahk so the InputHook is released explicitly on a plain ExitApp,
+	; not just when Reload() tears the process down.
 	static Stop() {
 		if !HookDispatcher._started
 			return
@@ -366,6 +399,24 @@ class HookDispatcher {
 			try Hotkey("~WheelRight", HookDispatcher._hk_wright, "Off")
 			try Hotkey("~WheelLeft",  HookDispatcher._hk_wleft,  "Off")
 		}
+
+		; Reset the hotkey references to unset so a subsequent Start() rebinds
+		; cleanly rather than reusing stale BoundFuncs.
+		HookDispatcher._hk_ldown  := unset
+		HookDispatcher._hk_lup    := unset
+		HookDispatcher._hk_rdown  := unset
+		HookDispatcher._hk_rup    := unset
+		HookDispatcher._hk_mdown  := unset
+		HookDispatcher._hk_mup    := unset
+		HookDispatcher._hk_wup    := unset
+		HookDispatcher._hk_wdn    := unset
+		HookDispatcher._hk_wright := unset
+		HookDispatcher._hk_wleft  := unset
+
+		; Clear the subscriber registry so a fresh Start() begins with an empty
+		; fan-out table. Without this a Stop()/Start() cycle would inherit the
+		; previous (possibly stale) subscribers and double-fire every event.
+		HookDispatcher._subscribers := Map()
 
 		HookDispatcher._started := false
 		LoggerSuccess("HookDispatcher", "Unified hook dispatcher stopped.")

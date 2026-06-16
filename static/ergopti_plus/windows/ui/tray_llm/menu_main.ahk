@@ -42,6 +42,15 @@ LLM_Tray_Build() {
 	; Clear all existing items so we can repopulate in place.
 	try _LLM_Tray_Menu.Delete()
 
+	; Prune the dispatch-bypass Maps for THIS menu's now-deleted items. This is a
+	; single-menu rebuild (not a full tray rebuild), so the global
+	; MenuDispatcher_Reset() must NOT be used — it would wipe the dispatch
+	; tracking of every OTHER live tray menu. Without this per-menu prune, the
+	; dead menu-item IDs from each rebuild accumulate in
+	; _MenuDispatchCallbacks / _MenuDispatchLastFire without bound across the
+	; very frequent LLM_Tray_Build() passes (settings tweaks, model pulls).
+	try MenuDispatcher_PruneMenu(_LLM_Tray_Menu)
+
 	; Enable / Disable toggle. The checked state MUST reflect
 	; ``_LLM_Tray["enabled"]`` alone — that's the user's intent. We keep a
 	; separate ``_llm_is_operational`` flag (enabled AND deps ready) for the

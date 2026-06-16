@@ -42,5 +42,18 @@ _USWB_AssertDownloadAndInstallAsync() {
 	Assert(AsyncReqIdx > 0, "Updater_DownloadAndInstall must use async WinHTTP Open (sync-winhttp-blocks-keyboard-on-user-check)")
 }
 
+_USWB_AssertShowAvailableUpdateAsync() {
+	Src := _USWB_ReadSource("lib/updater.ahk")
+	Body := _USWB_FuncBodyStripped(Src, "Updater_ShowAvailableUpdate(*) {")
+	Assert(Body != "", "Updater_ShowAvailableUpdate must exist in lib/updater.ahk")
+
+	SyncIdx := InStr(Body, "Updater_FetchLatestJson(")
+	Assert(!SyncIdx, "Updater_ShowAvailableUpdate must not call synchronous Updater_FetchLatestJson — it blocks keyboard remapping on the menu/notification path (sync-winhttp-blocks-keyboard-on-user-check)")
+
+	AsyncIdx := InStr(Body, "_Updater_FetchLatestJsonAsync(")
+	Assert(AsyncIdx > 0, "Updater_ShowAvailableUpdate must use _Updater_FetchLatestJsonAsync (sync-winhttp-blocks-keyboard-on-user-check)")
+}
+
 Test("updater: OneClickUpdate is async (sync-winhttp-blocks-keyboard-on-user-check)", _USWB_AssertOneClickUpdateAsync)
 Test("updater: DownloadAndInstall is async (sync-winhttp-blocks-keyboard-on-user-check)", _USWB_AssertDownloadAndInstallAsync)
+Test("updater: ShowAvailableUpdate is async (sync-winhttp-blocks-keyboard-on-user-check)", _USWB_AssertShowAvailableUpdateAsync)
