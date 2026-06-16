@@ -163,6 +163,12 @@ KL_Hook_RefreshContext(force := false) {
     ; the driver is paused so no app/title switch is observed or flushed.
     if A_IsSuspended
         return
+    ; Guard against the timer firing before KL_Init() has completed — the
+    ; KL_LogAppSwitch / KL_LogWindowSwitch calls below require an initialized
+    ; keylogger instance; without this guard a fast startup race could crash
+    ; or write a corrupted switch event (H-16 fix).
+    if !Keylogger.initialized
+        return
     if !force and (A_TickCount - KLHook.context_at) < KLHookConst.CONTEXT_TTL_MS
         return
     NewTitle := ""
@@ -195,6 +201,10 @@ KL_Hook_RefreshContext(force := false) {
     if (NewTitle != KLHook.prev_title) {
         if (KLHook.prev_title != "" and KLHook.prev_app != "") {
             duration := Now - KLHook.title_entered_at
+            ; Flush before logging so the typing buffer is attributed to
+            ; the previous window context, not the new one. Mirrors the
+            ; flush that already precedes KL_LogAppSwitch above (M-01 fix).
+            try KL_FlushBuffer()
             try KL_LogWindowSwitch(KLHook.prev_app, KLHook.prev_title, NewTitle, duration)
         }
         KLHook.prev_title := NewTitle
