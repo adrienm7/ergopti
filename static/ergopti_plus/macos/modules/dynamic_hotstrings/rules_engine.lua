@@ -86,39 +86,56 @@ local function interceptor(event, km_buffer)
 
 	Logger.debug(LOG, "Injecting dynamic rule for suffix '%s'…", rule.suffix)
 
-	if keylogger and type(keylogger.log_hotstring) == "function" then
-		pcall(keylogger.log_hotstring, rule.suffix .. _trigger, result)
+	-- Arm the keymap synthetic counters BEFORE deferring injection so that the
+	-- backspace and text echoes arriving in onKeyDownRaw are recognised as
+	-- synthetic and not treated as real keystrokes or hotstring triggers.
+	-- suppress_rescan() is called first so the deferred delete echoes cannot
+	-- re-enter run_trigger_checks during the 0 ms gap before the callback runs.
+	-- We do NOT call keylogger.log_hotstring here: the result may contain private
+	-- data (phone number, SSN, IBAN) whose plaintext must never reach the log.
+	if _km then
+		if type(_km.suppress_rescan) == "function" then _km.suppress_rescan() end
+		if type(_km.arm_synthetic) == "function" then _km.arm_synthetic(n_back, result) end
 	end
 
-	hs.timer.doAfter(0, function()
-		_is_injecting = true
+	-- Notify the keylogger so it marks these keystrokes as synthetic instead of
+	-- human typing — critical for privacy (the result can be personal data) and
+	-- for accurate WPM/n-gram metrics.
+	if keylogger and type(keylogger.notify_synthetic) == "function" then
+		pcall(keylogger.notify_synthetic, result, "hotstring", n_back, "dynamic")
+	end
 
-		local ok, err = pcall(function()
-			-- Delete the suffix characters typed so far
-			for _ = 1, n_back do
-				hs.eventtap.keyStroke({}, "delete", 0)
-			end
+	-- Emit synchronously inside the interceptor — CGEventPost() is non-blocking
+	-- so keyStroke() calls are safe here. Doing this synchronously eliminates the
+	-- interleaving window that existed when injection was deferred via doAfter(0):
+	-- a real keystroke arriving in the 0 ms gap could slip between the "consume"
+	-- return and the deferred callback execution (A3 audit fix).
+	_is_injecting = true
 
-			-- Emit the actual result
-			if km_utils and type(km_utils.emit_text) == "function" then
-				km_utils.emit_text(result)
-			else
-				hs.eventtap.keyStrokes(result)
-			end
-		end)
-
-		if not ok then
-			Logger.error(LOG, "Dynamic rule injection failed: %s.", tostring(err))
+	local ok, err = pcall(function()
+		-- Delete the suffix characters typed so far
+		for _ = 1, n_back do
+			hs.eventtap.keyStroke({}, "delete", 0)
 		end
 
-		-- Always release the flag, even on error, so future injections are not blocked.
-		hs.timer.doAfter(0.15, function()
-			_is_injecting = false
-			if ok then
-				Logger.info(LOG, "Dynamic rule injection completed.")
-			end
-		end)
+		-- Emit the actual result
+		if km_utils and type(km_utils.emit_text) == "function" then
+			km_utils.emit_text(result)
+		else
+			hs.eventtap.keyStrokes(result)
+		end
 	end)
+
+	if not ok then
+		Logger.error(LOG, "Dynamic rule injection failed: %s.", tostring(err))
+	end
+
+	-- Release the injecting flag immediately — no timer needed now that emission
+	-- is synchronous; keeping it true beyond this point would block re-entrancy.
+	_is_injecting = false
+	if ok then
+		Logger.info(LOG, "Dynamic rule injection completed.")
+	end
 
 	return "consume"
 end
