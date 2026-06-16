@@ -139,6 +139,10 @@ class Keylogger {
     ; n-gram source (esrc). Cleared shortly after the burst (KL_ClearSynthetic).
     static synth_active     := 0      ; depth counter — overlapping fires each hold their own level
     static synth_type       := "none"
+    ; Set to true by KL_Stop() before the final flush so the suspend guard in
+    ; KL_AppendLog and KL_IngestOnce is bypassed during shutdown (quit-while-paused
+    ; would otherwise silently discard the buffered metrics).
+    static _shutting_down   := false
 
     ; Timers (lifecycle).
     static _ingest_timer    := unset
@@ -708,7 +712,7 @@ KL_AppendLog(entry) {
     ; _pending_entries data.sql queue). system_event lifecycle markers (e.g. the
     ; "paused" marker itself) are exempt so the pause transition stays diagnosable.
     ; See project_suspend_pause_invariant.
-    if A_IsSuspended && entry["type"] != "system_event"
+    if A_IsSuspended && entry["type"] != "system_event" && !Keylogger._shutting_down
         return
     ; Privacy filters — drop anything captured while the focused window is
     ; on the user's exclusion list, in private browsing, or in a system-
@@ -1285,7 +1289,7 @@ KL_IngestOnce() {
     ; are written during suspension (KL_AppendLog is guarded), so the tick
     ; would do redundant I/O; more importantly, running the heavy FileAppend
     ; + live-push while suspended violates the pause invariant.
-    if A_IsSuspended
+    if A_IsSuspended && !Keylogger._shutting_down
         return
     ; Prefer the in-RAM queue when available — it sidesteps KL_JsonDecode
     ; entirely (COM ScriptControl is x86-only and silently empties Maps
@@ -1734,6 +1738,10 @@ KL_Stop() {
         SetTimer(Keylogger._ingest_timer, 0)
     if Keylogger.HasProp("_midnight_timer")
         SetTimer(Keylogger._midnight_timer, 0)
+    ; Allow the final flush to proceed even when the driver is paused — without
+    ; this flag, KL_AppendLog and KL_IngestOnce would both bail on A_IsSuspended
+    ; and quit-while-paused would silently lose all buffered metrics.
+    Keylogger._shutting_down := true
     KL_FlushBuffer()
     KL_IngestOnce()
     KL_SaveState()
