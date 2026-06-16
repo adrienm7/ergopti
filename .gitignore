@@ -111,6 +111,19 @@ static/corpus/modifie/
 # Test files
 test_results.txt
 
+# Scratch / debug artifacts — never part of the source tree (see also /log.txt).
+# These accumulate from ad-hoc debugging of the AHK driver and the test runner.
+test_out.txt
+test_output.txt
+run_all_out.txt
+e2e_output.txt
+out.txt
+err.txt
+static/ergopti_plus/windows/debug*.ahk
+static/ergopti_plus/windows/debug*.txt
+static/ergopti_plus/windows/tests/debug*.txt
+static/ergopti_plus/scratch/
+
 # Stryker mutation testing temporary directory
 .stryker-tmp/
 
