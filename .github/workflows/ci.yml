@@ -350,7 +350,11 @@ jobs:
           # blocks when AHK runs without an inherited console handle, so the
           # file is the only reliable output channel in CI).
           # Tail-read the results file while AHK runs for real-time CI log output.
-          $proc = Start-Process -FilePath $ahk -ArgumentList $runner -NoNewWindow -PassThru
+          # /ErrorStdOut routes load-time (parse / nonexistent-function / missing
+          # #Include) errors to stderr and exits non-zero instead of popping a modal
+          # dialog that no one can dismiss headlessly — which otherwise hangs the
+          # runner until the 15 min step timeout. Must precede the script path.
+          $proc = Start-Process -FilePath $ahk -ArgumentList "/ErrorStdOut `"$runner`"" -NoNewWindow -PassThru
           $fstream = $null
           $reader  = $null
           $sw = [System.Diagnostics.Stopwatch]::StartNew()
@@ -400,8 +404,16 @@ jobs:
           # Pass --dry-run so AHK parses all files and emits warnings, then
           # exits immediately without running any Test() callbacks. This keeps
           # the warning check fast (~seconds) regardless of corpus size.
-          $output = & cmd /c "`"$ahk`" `"$runner`" --dry-run 2>&1"
+          # /ErrorStdOut keeps a parse/load error from popping a modal dialog that
+          # would hang this step headlessly; the error text is captured via 2>&1.
+          $output = & cmd /c "`"$ahk`" /ErrorStdOut `"$runner`" --dry-run 2>&1"
           $warnings = $output | Where-Object { $_ -match "^Warning:" }
+          $errors   = $output | Where-Object { $_ -match "^Error:" }
+          if ($errors) {
+              $errors | ForEach-Object { Write-Host "  $_" }
+              Write-Error "$($errors.Count) AHK load-time error(s) — fix before merging."
+              exit 1
+          }
           if ($warnings) {
               $warnings | ForEach-Object { Write-Host "  $_" }
               Write-Error "$($warnings.Count) AHK compiler warning(s) — fix before merging."
@@ -470,7 +482,9 @@ jobs:
           # Same approach as the unit test suite: AHK writes TAP output to
           # test_results.txt (FileAppend to "*" blocks without a console handle).
           # Tail-read the file for real-time CI log output.
-          $proc = Start-Process -FilePath $ahk -ArgumentList $runner -NoNewWindow -PassThru
+          # /ErrorStdOut: see unit-test step — fail fast on load errors instead of
+          # hanging on an undismissable modal dialog in the headless runner.
+          $proc = Start-Process -FilePath $ahk -ArgumentList "/ErrorStdOut `"$runner`"" -NoNewWindow -PassThru
           $fstream = $null; $reader = $null
           while (-not $proc.HasExited) {
               if ($null -eq $fstream -and (Test-Path $resultsFile)) {

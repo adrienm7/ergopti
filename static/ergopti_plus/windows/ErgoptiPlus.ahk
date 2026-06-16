@@ -2264,23 +2264,29 @@ if (MetricsShortcuts.enabled and WPMWidget.visible) {
 
 global _LAYOUT_POLL_INTERVAL_MS := 1000
 global _LAST_KEYBOARD_HKL := GetForegroundKeyboardLayout()
+global _PENDING_KEYBOARD_HKL := 0
+
+; The quiescence decision is a pure function extracted to lib/ so the headless
+; test suite can exercise it without #including this whole entry point (which
+; registers every hotkey at load). Single source of truth — defined once there,
+; consumed here and by tests/meta/test_layout_quiescence.ahk.
+#Include lib/layout_poll_helper.ahk
+
 CheckKeyboardLayoutChange() {
-    global _LAST_KEYBOARD_HKL
-    ; Skip while paused — a Reload() would restart the driver in the unpaused
-    ; state, silently clearing the user's pause without their knowledge.
-    ; The layout change is harmless to miss while paused; it will be picked up
-    ; at the next natural restart or when the user explicitly unpauses.
-    if A_IsSuspended
-        return
-    ; Also skip while on a blacklisted app — avoids disruptive reloads
-    ; during games or private browsing (layout-poll-blind-reload).
+    global _LAST_KEYBOARD_HKL, _PENDING_KEYBOARD_HKL, HSE_Suppressed, _PrefixWatcherSuppressed
+    
+    suspended := A_IsSuspended
+    isBlacklisted := false
     try {
         if IsSet(MF_ShouldFilter) && MF_ShouldFilter()
-            return
+            isBlacklisted := true
     }
-    HKL := GetForegroundKeyboardLayout()
-    if (HKL != 0 and HKL != _LAST_KEYBOARD_HKL) {
-        _LAST_KEYBOARD_HKL := HKL
+    
+    curHkl := GetForegroundKeyboardLayout()
+    hseSup := (IsSet(HSE_Suppressed)) ? HSE_Suppressed : 0
+    pwSup := (IsSet(_PrefixWatcherSuppressed)) ? _PrefixWatcherSuppressed : 0
+    
+    if _ShouldReloadForHkl(curHkl, &_LAST_KEYBOARD_HKL, &_PENDING_KEYBOARD_HKL, suspended, isBlacklisted, hseSup, pwSup, A_TimeIdlePhysical) {
         Reload()
     }
 }
