@@ -127,6 +127,20 @@ Boot.begin()
 local i18n               = require("lib.i18n")
 local locale_mod         = require("lib.locale")
 local crash_reporter     = require("lib.crash_reporter")
+local reload_guard       = require("lib.reload_guard")
+
+-- Tell a reload apart from a real quit. A fresh boot starts with the sentinel
+-- cleared, then every controlled hs.reload() drops it again right before the VM
+-- re-execs; the shutdown handler reads it to keep the Karabiner bridge alive
+-- across reloads (a real quit, where no reload was marked, still tears it down).
+reload_guard.clear()
+do
+	local _orig_reload = hs.reload
+	hs.reload = function(...)
+		pcall(reload_guard.mark_reload)
+		return _orig_reload(...)
+	end
+end
 
 -- Wire i18n → locale so set_locale() updates the JSON loader's active locale.
 -- Must run before any menu builder calls i18n.get() or locale_mod.get().
@@ -903,13 +917,22 @@ hs.shutdownCallback = function()
 	-- but the zombie kill script from the old session immediately terminates it,
 	-- causing 30 consecutive poll failures. KILL_FAST_CMD completes before HS
 	-- reloads so there is no race with the newly spawned bridge.
-	pcall(function()
-		local ok_l, kl = pcall(require, "modules.karabiner.ke_lifecycle")
-		if ok_l and kl and kl.KILL_FAST_CMD then
-			hs.execute(kl.KILL_FAST_CMD)
-			Logger.info(LOG, "Shutdown KE fast kill done.")
-		end
-	end)
+	-- Skip the KE teardown entirely on a reload: the root grabber reloads
+	-- karabiner.json via FSEvents, so killing the user-level bridge here would
+	-- needlessly drop remapping and, on some KE versions, cascade the grabber
+	-- down — surfacing the native "install Karabiner" prompt on the next boot.
+	-- Only a genuine quit (no reload sentinel) should stop remapping.
+	if reload_guard.is_reloading() then
+		Logger.info(LOG, "Reload in progress — leaving KE bridge alive (FSEvents will reapply the config).")
+	else
+		pcall(function()
+			local ok_l, kl = pcall(require, "modules.karabiner.ke_lifecycle")
+			if ok_l and kl and kl.KILL_FAST_CMD then
+				hs.execute(kl.KILL_FAST_CMD)
+				Logger.info(LOG, "Shutdown KE fast kill done (genuine quit).")
+			end
+		end)
+	end
 
 	-- 4. Terminate any running MLX server process
 	pcall(function() require("ui.menu.menu_llm").stop_mlx_server() end)
