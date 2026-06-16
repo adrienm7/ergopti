@@ -427,6 +427,10 @@ _LLM_Ollama_DispatchAsync(job) {
 ; Sends the latest coalesced job once the in-flight slot is free.
 _LLM_Ollama_DrainPending() {
 	global _LLM_Ollama_Async, _LLM_Ollama_Pending
+	; A paused driver must never re-dispatch (network POST + PII temp-file write).
+	; SetTimer poll ticks bypass native Suspend, so this guard is the chokepoint.
+	if A_IsSuspended
+		return
 	if (_LLM_Ollama_Async.Count > 0)
 		return
 	if !(_LLM_Ollama_Pending is Map)
@@ -473,7 +477,7 @@ LLM_OllamaCancelStreams() {
 }
 
 LLM_OllamaCancelAllAsync() {
-	global _LLM_Ollama_Async
+	global _LLM_Ollama_Async, _LLM_Ollama_Pending
 	for _id, entry in _LLM_Ollama_Async {
 		entry["cancelled"] := true
 		if entry.Has("http") {
@@ -483,6 +487,17 @@ LLM_OllamaCancelAllAsync() {
 		}
 	}
 	LLM_OllamaCancelStreams()
+	; Drop any coalesced-but-not-yet-dispatched job. Otherwise the already-armed
+	; poll tick discovers the cancelled in-flight entry, deletes it, and calls
+	; _LLM_Ollama_DrainPending() which re-dispatches the pending job — a fresh
+	; curl POST + PII temp-file write — AFTER the driver was suspended (the engine
+	; calls this from Ergopti_OnSuspendEnter -> LLM_Engine_StopGeneration). Honour
+	; the async contract by failing the displaced job exactly once before dropping.
+	if (_LLM_Ollama_Pending is Map) {
+		if _LLM_Ollama_Pending.Has("on_fail")
+			try _LLM_Ollama_Pending["on_fail"]()
+		_LLM_Ollama_Pending := ""
+	}
 }
 
 /**

@@ -311,6 +311,26 @@ _OllamaCancelAllAsync_NoOpOnEmptyRegistry() {
 Test("LLM_OllamaCancelAllAsync: no-op when registry is empty", _OllamaCancelAllAsync_NoOpOnEmptyRegistry)
 
 
+; A coalesced job is parked in _LLM_Ollama_Pending while one request is in flight.
+; On suspend the engine calls LLM_OllamaCancelAllAsync; it must DROP the pending
+; job so the already-armed poll tick cannot re-dispatch it (a fresh curl POST +
+; PII temp-file write) after the driver is paused, and must fail the displaced
+; job exactly once (async contract). Regression: ollama-pending-survives-suspend.
+_OllamaCancelAllAsync_ClearsPendingAndFailsOnce() {
+	global _LLM_Ollama_Async, _LLM_Ollama_Pending
+	_LLM_Ollama_Async := Map()
+	_LLM_Ollama_Async[99910] := Map("http", "", "on_success", (*) => 0, "on_fail", (*) => 0, "cancelled", false)
+	failed := 0
+	_LLM_Ollama_Pending := Map("on_success", (*) => 0, "on_fail", (*) => failed += 1)
+	LLM_OllamaCancelAllAsync()
+	AssertFalse(_LLM_Ollama_Pending is Map, "LLM_OllamaCancelAllAsync must clear _LLM_Ollama_Pending so a poll tick cannot re-dispatch curl + a PII write after suspend")
+	AssertEqual(1, failed, "the displaced pending job's on_fail must fire exactly once")
+	_LLM_Ollama_Async.Delete(99910)
+	_LLM_Ollama_Pending := ""
+}
+Test("LLM_OllamaCancelAllAsync: clears the coalesced pending job and fails it once (ollama-pending-survives-suspend)", _OllamaCancelAllAsync_ClearsPendingAndFailsOnce)
+
+
 
 
 ; ===================================================
