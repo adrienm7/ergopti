@@ -182,6 +182,7 @@ KL_Mouse_OnLUp(*) {
             return
         if !Keylogger.initialized
             return
+        try KL_Hook_RefreshContext(true)
         if (dist >= KLMouseConst.DRAG_MIN_PX) {
             KL_Mouse_LogDrag("left",
                 KLMouse.lbtn_down_x, KLMouse.lbtn_down_y,
@@ -221,6 +222,7 @@ KL_Mouse_OnRUp(*) {
             return
         if !Keylogger.initialized
             return
+        try KL_Hook_RefreshContext(true)
         if (dist >= KLMouseConst.DRAG_MIN_PX) {
             KL_Mouse_LogDrag("right",
                 KLMouse.rbtn_down_x, KLMouse.rbtn_down_y,
@@ -256,6 +258,7 @@ KL_Mouse_OnMUp(*) {
             return
         if !Keylogger.initialized
             return
+        try KL_Hook_RefreshContext(true)
         KL_Mouse_LogClick("middle", KLMouse.mbtn_down_x, KLMouse.mbtn_down_y)
     }
 }
@@ -333,6 +336,7 @@ KL_Mouse_FlushScroll() {
         return
     if !Keylogger.initialized
         return
+    try KL_Hook_RefreshContext(true)
     duration_ms := A_TickCount - start
     dir := (h_ticks != 0) ? "horizontal" : ((ticks > 0) ? "up" : "down")
     total := (h_ticks != 0) ? Abs(h_ticks) : Abs(ticks)
