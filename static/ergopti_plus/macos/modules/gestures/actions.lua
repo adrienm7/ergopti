@@ -21,6 +21,14 @@ local _state = nil
 --- Binds the global shared state reference.
 --- @param core_state table The shared state object from the core module.
 function M.init(core_state)
+	if _state then
+		Logger.warn(LOG, "M.init() called more than once — ignoring duplicate call.")
+		return
+	end
+	if type(core_state) ~= "table" then
+		Logger.error(LOG, "M.init(): core_state must be a table — module non-functional.")
+		return
+	end
 	_state = core_state
 end
 
@@ -286,10 +294,13 @@ end
 --- Navigates between macOS Spaces (Desktops).
 local function spaceNav(goNext)
 	local key_code = goNext and 124 or 123 -- 124=Right, 123=Left
-	pcall(hs.osascript.applescript, string.format(
-		"tell application \"System Events\" to key code %d using {control down}",
-		key_code
-	))
+	-- Deferred so the AppleScript call never blocks the gesture frameCallback
+	hs.timer.doAfter(0, function()
+		pcall(hs.osascript.applescript, string.format(
+			"tell application \"System Events\" to key code %d using {control down}",
+			key_code
+		))
+	end)
 end
 
 local CMD_LETTERS = {
@@ -405,8 +416,18 @@ sg("maximize",                     function()
 end)
 sg("space_prev",             function() spaceNav(false) end)
 sg("space_next",               function() spaceNav(true) end)
-sg("mission_control",        function() pcall(hs.osascript.applescript, "tell application \"System Events\" to key code 160") end)
-sg("app_expose",                  function() pcall(hs.osascript.applescript, "tell application \"System Events\" to key code 125 using {control down}") end)
+sg("mission_control",        function()
+	-- Deferred so the AppleScript call never blocks the gesture frameCallback
+	hs.timer.doAfter(0, function()
+		pcall(hs.osascript.applescript, "tell application \"System Events\" to key code 160")
+	end)
+end)
+sg("app_expose",                  function()
+	-- Deferred so the AppleScript call never blocks the gesture frameCallback
+	hs.timer.doAfter(0, function()
+		pcall(hs.osascript.applescript, "tell application \"System Events\" to key code 125 using {control down}")
+	end)
+end)
 
 -- Cursor movement
 sg("word_prev",                function() postKeyStroke({"alt"}, "left") end)
@@ -447,33 +468,66 @@ sg("sel_word_prev",     function() postKeyStroke({"shift", "alt"}, "left") end)
 sg("sel_word_next",       function() postKeyStroke({"shift", "alt"}, "right") end)
 
 -- System
-sg("screenshot_window_clipboard",     function() pcall(hs.execute, "screencapture -cw") end)
-sg("screenshot_window_save",          function() pcall(hs.execute, "screencapture -w ~/Pictures/screenshots/win_$(date +%Y%m%d%H%M%S).png") end)
-sg("screenshot_region_clipboard",      function() pcall(hs.execute, "screencapture -ci") end)
-sg("screenshot_region_save",           function() pcall(hs.execute, "screencapture -i ~/Pictures/screenshots/reg_$(date +%Y%m%d%H%M%S).png") end)
-sg("screenshot_fullscreen_clipboard",   function() pcall(hs.execute, "screencapture -c") end)
-sg("screenshot_fullscreen_save",        function() pcall(hs.execute, "screencapture ~/Pictures/screenshots/full_$(date +%Y%m%d%H%M%S).png") end)
+sg("screenshot_window_clipboard",     function()
+	-- Deferred so hs.execute never blocks the gesture frameCallback
+	hs.timer.doAfter(0, function() pcall(hs.execute, "screencapture -cw") end)
+end)
+sg("screenshot_window_save",          function()
+	hs.timer.doAfter(0, function() pcall(hs.execute, "screencapture -w ~/Pictures/screenshots/win_$(date +%Y%m%d%H%M%S).png") end)
+end)
+sg("screenshot_region_clipboard",      function()
+	hs.timer.doAfter(0, function() pcall(hs.execute, "screencapture -ci") end)
+end)
+sg("screenshot_region_save",           function()
+	hs.timer.doAfter(0, function() pcall(hs.execute, "screencapture -i ~/Pictures/screenshots/reg_$(date +%Y%m%d%H%M%S).png") end)
+end)
+sg("screenshot_fullscreen_clipboard",   function()
+	hs.timer.doAfter(0, function() pcall(hs.execute, "screencapture -c") end)
+end)
+sg("screenshot_fullscreen_save",        function()
+	hs.timer.doAfter(0, function() pcall(hs.execute, "screencapture ~/Pictures/screenshots/full_$(date +%Y%m%d%H%M%S).png") end)
+end)
 
 sg("lock_screen",                    function() pcall(hs.caffeinate.lockScreen) end)
-sg("notification_center",          function() pcall(hs.osascript.applescript, "tell application \"System Events\" to click menu bar item \"Notification Center\" of menu bar 1 of application process \"ControlCenter\"") end)
+sg("notification_center",          function()
+	-- Deferred so the AppleScript call never blocks the gesture frameCallback
+	hs.timer.doAfter(0, function()
+		pcall(hs.osascript.applescript, "tell application \"System Events\" to click menu bar item \"Notification Center\" of menu bar 1 of application process \"ControlCenter\"")
+	end)
+end)
 
 -- Applications and Stats
 sg("open_metrics_typing",            function() pcall(function() require("ui.metrics_overlay").toggle("typing") end) end)
 sg("open_metrics_apps",        function() pcall(function() require("ui.metrics_overlay").toggle("apps") end) end)
 sg("open_hotstrings_editor",    function() pcall(function() require("ui.hotstrings_editor").show() end) end)
 sg("open_paths_editor",            function() pcall(function() require("ui.paths_editor").show() end) end)
-sg("open_script_source",               function() pcall(hs.execute, string.format("open %q", hs.configdir)) end)
-sg("open_personal_shortcuts",     function() pcall(hs.execute, string.format("open %q/personal_shortcuts.toml", hs.configdir)) end)
+sg("open_script_source",               function()
+	-- Deferred so hs.execute never blocks the gesture frameCallback
+	hs.timer.doAfter(0, function() pcall(hs.execute, string.format("open %q", hs.configdir)) end)
+end)
+sg("open_personal_shortcuts",     function()
+	hs.timer.doAfter(0, function() pcall(hs.execute, string.format("open %q/personal_shortcuts.toml", hs.configdir)) end)
+end)
 sg("open_personal_hotstrings",    function()
+	-- Resolve path eagerly (requires only Lua, no shell), then defer the shell open
 	local ok_mp, mp = pcall(require, "ui.menu.menu_paths")
 	local p = ok_mp and type(mp.get) == "function" and mp.get("PersonalTomlPath")
-	if p and p ~= "" then pcall(hs.execute, string.format("open %q", p))
-	else pcall(hs.execute, string.format("open %q/hotstrings/personal_hotstrings.toml", hs.configdir)) end
+	hs.timer.doAfter(0, function()
+		if p and p ~= "" then pcall(hs.execute, string.format("open %q", p))
+		else pcall(hs.execute, string.format("open %q/hotstrings/personal_hotstrings.toml", hs.configdir)) end
+	end)
 end)
-sg("open_personal_info",               function() pcall(hs.execute, string.format("open %q/personal_info.toml", hs.configdir)) end)
-sg("open_config",                    function() pcall(hs.execute, string.format("open %q/config.toml", hs.configdir)) end)
-sg("open_logs_folder",                function() pcall(hs.execute, string.format("open %q/logs", hs.configdir)) end)
+sg("open_personal_info",               function()
+	hs.timer.doAfter(0, function() pcall(hs.execute, string.format("open %q/personal_info.toml", hs.configdir)) end)
+end)
+sg("open_config",                    function()
+	hs.timer.doAfter(0, function() pcall(hs.execute, string.format("open %q/config.toml", hs.configdir)) end)
+end)
+sg("open_logs_folder",                function()
+	hs.timer.doAfter(0, function() pcall(hs.execute, string.format("open %q/logs", hs.configdir)) end)
+end)
 sg("open_today_log",                   function()
+	-- Resolve the path synchronously (pure Lua), then open in a deferred shell call
 	local ok_p, path = pcall(function()
 		local ok_u, utils = pcall(require, "lib.utils")
 		if ok_u and type(utils.get_logs_dir) == "function" then
@@ -481,9 +535,10 @@ sg("open_today_log",                   function()
 		end
 		return hs.configdir .. "/logs/ErgoptiPlus_" .. os.date("%Y-%m-%d") .. ".log"
 	end)
-	pcall(hs.execute, string.format("open %q", path))
+	hs.timer.doAfter(0, function() pcall(hs.execute, string.format("open %q", path)) end)
 end)
 sg("open_error_log",                   function()
+	-- Resolve the path synchronously (pure Lua), then open in a deferred shell call
 	local ok_p, path = pcall(function()
 		local ok_l, Logger = pcall(require, "lib.logger")
 		if ok_l and type(Logger) == "table" and type(Logger.ERRORS_LOG_FILE) == "string" and Logger.ERRORS_LOG_FILE ~= "" then
@@ -495,7 +550,7 @@ sg("open_error_log",                   function()
 		end
 		return hs.configdir .. "/logs/ErgoptiPlus_errors_" .. os.date("%Y-%m-%d") .. ".log"
 	end)
-	pcall(hs.execute, string.format("open %q", path))
+	hs.timer.doAfter(0, function() pcall(hs.execute, string.format("open %q", path)) end)
 end)
 
 -- Script management
