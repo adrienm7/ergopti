@@ -494,18 +494,13 @@ function M.ingest_once()
 		return
 	end
 
+	-- Build the SQL text upfront; write to data.sql only AFTER the SQLite
+	-- transaction commits successfully — a failed COMMIT must not leave
+	-- unreplayable statements in the append-only source-of-truth file.
 	local batch_text = string.format(
 		"\n-- === ingest batch %s (offset %d -> %d, %d entry(ies)) ===\nBEGIN TRANSACTION;\n%s\nCOMMIT;\n",
 		_now_ts(), Rotation.get_offset(), new_offset, #entries,
 		table.concat(statements, "\n"))
-
-	local f, err = io.open(_paths.data_sql_path, "a")
-	if not f then
-		Logger.error(LOG, "Cannot append to data.sql at %s: %s.",
-			_paths.data_sql_path, tostring(err))
-		return
-	end
-	f:write(batch_text); f:close()
 
 	local ok, exec_err = pcall(function()
 		db:exec("BEGIN TRANSACTION;")
@@ -549,6 +544,20 @@ function M.ingest_once()
 		Logger.error(LOG, "Ingest batch rolled back: %s.", tostring(exec_err))
 		pcall(function() db:exec("ROLLBACK;") end)
 		return
+	end
+
+	-- SQLite transaction committed — now safe to append to data.sql (the
+	-- source-of-truth SQL log). Writing here rather than before the COMMIT
+	-- ensures data.sql never contains statements that were not persisted.
+	local f, ferr = io.open(_paths.data_sql_path, "a")
+	if not f then
+		Logger.error(LOG, "Cannot append to data.sql at %s: %s.",
+			_paths.data_sql_path, tostring(ferr))
+		-- SQLite is already committed; continue so the offset advances and
+		-- the entries are not replayed. data.sql may be slightly behind, but
+		-- it can be reconstructed from the SQLite cache at any time.
+	else
+		f:write(batch_text); f:close()
 	end
 
 	Rotation.set_offset(new_offset, Rotation.get_date())

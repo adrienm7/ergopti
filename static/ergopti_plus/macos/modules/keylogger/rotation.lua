@@ -171,14 +171,10 @@ end
 function M.read_new_entries()
 	if not _require_init("read_new_entries") then return {}, _today_log_offset end
 
-	-- Day rollover: yesterday's offset is meaningless once the date changes
+	-- The offset is only reset by M.rollover(); resetting it here would cause
+	-- double-aggregation when day_rollover() calls ingest_once() at midnight
+	-- (the date has already changed but the old today.log still needs draining).
 	local today = _today()
-	if _today_log_date and _today_log_date ~= today then
-		Logger.info(LOG, "Day rollover detected (%s -> %s); resetting tail offset.",
-			_today_log_date, today)
-		_today_log_date   = today
-		_today_log_offset = 0
-	end
 	if not _today_log_date then _today_log_date = today end
 
 	local attrs = fs.attributes(_paths.today_log_path)
