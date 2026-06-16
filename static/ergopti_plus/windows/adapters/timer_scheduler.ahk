@@ -56,6 +56,12 @@ _TimerAdapterNextId() {
 
 ; Schedules Fn to fire once after DelaySec seconds.
 ; Returns an opaque handle Map that can be passed to TimerCancel.
+;
+; RE-REGISTRATION WARNING: Each call allocates a NEW OS timer handle. Calling
+; TimerAfter() twice with the same Fn registers TWO independent timers — the
+; first handle no longer cancels the second. Always call TimerCancel(handle)
+; before calling TimerAfter() again if you intend to replace an existing timer.
+;
 ; @param DelaySec   {Float}    Delay in seconds (fractional values accepted).
 ; @param Fn         {Callable} Zero-arity function to invoke.
 ; @return {Map}  Opaque cancellation handle.
@@ -79,6 +85,12 @@ TimerAfter(DelaySec, Fn) {
 
 ; Schedules Fn to fire repeatedly every IntervalSec seconds.
 ; The first firing happens after IntervalSec (not immediately).
+;
+; RE-REGISTRATION WARNING: Each call allocates a NEW OS timer handle. Calling
+; TimerEvery() twice with the same Fn registers TWO independent timers — the
+; first handle no longer cancels the second. Always call TimerCancel(handle)
+; before calling TimerEvery() again if you intend to replace an existing timer.
+;
 ; @param IntervalSec {Float}    Repeat interval in seconds.
 ; @param Fn          {Callable} Zero-arity function to invoke.
 ; @return {Map}  Opaque cancellation handle.
