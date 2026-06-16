@@ -237,7 +237,7 @@ end)
 -- The tests fail only if the count INCREASES beyond these thresholds, preventing
 -- regressions while allowing incremental clean-up of the backlog.
 -- TODO: drive all baselines to zero as modules are refactored to use port adapters.
-local LUA_HS_BASELINE       = 909  -- hs.* calls in macos/modules/ and macos/lib/ (909: +3 vs 906 from A5/A6/E2 audit fixes — hs.timer.secondsSinceEpoch() in arm_synthetic, hs.timer.doAfter(0) + hs.timer.secondsSinceEpoch() in expander.perform_text_replacement; all are legitimate new timing/deferral calls required by the fixes)
+local LUA_HS_BASELINE       = 911  -- hs.* calls in macos/modules/ and macos/lib/ (911: +2 vs 909 — the keep-awake jiggler in shortcuts/actions/system.lua posts an F18 no-op key (newKeyEvent down+up) every tick so the HID idle counter resets and Teams stays "available"; warping the cursor alone does not. system.lua is the OS-actions boundary and already posts events directly, so these two synthetic-key posts are legitimate. Earlier: +3 vs 906 from A5/A6/E2 audit timing fixes.)
 local LUA_IO_OS_BASELINE    = 70   -- io.open / os.execute calls in macos/modules/ and macos/lib/ (bumped after errors-sink + diagnostic + menu + sg feature work)
 
 helpers.describe("meta: shared/ code purity", function()

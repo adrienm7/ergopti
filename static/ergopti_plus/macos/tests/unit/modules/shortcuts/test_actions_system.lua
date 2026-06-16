@@ -195,6 +195,55 @@ helpers.describe("shortcuts.actions.system: keep_awake persistent alert", functi
 		helpers.assert_true(ok, "watcher callback must not error within the grace window")
 		helpers.assert_eq(close_all.count, before, "input within the grace window must not auto-deactivate")
 	end)
+
+	-- Regression for the dropped "empty keystroke": keep-awake must post a real
+	-- no-op key (F18) every tick so the HID idle counter resets and Teams stays
+	-- "available". Warping the mouse alone never resets that counter. The watcher
+	-- must recognise THIS key as synthetic and not self-deactivate.
+	local F18 = require("lib.keycodes").F18_WAKE_OS
+
+	-- A fake keyDown CGEvent with the given keycode and no modifiers.
+	local function fake_key_event(keycode)
+		return {
+			getType    = function() return _G.hs.eventtap.event.types.keyDown end,
+			getKeyCode = function() return keycode end,
+			getFlags   = function() return {} end,
+			location   = function() return { x = 0, y = 0 } end,
+		}
+	end
+
+	helpers.it("_emit_activity_keystroke posts the F18 wake key (down + up)", function()
+		package.loaded["lib.keycodes"] = nil
+		package.loaded["modules.shortcuts.actions.system"] = nil
+		local sys = helpers.load_with_stubs("modules.shortcuts.actions.system")
+		local hs  = _G.hs
+
+		local posted = {}
+		hs.eventtap.event.newKeyEvent = function(_mods, key, isDown)
+			return { key = key, isDown = isDown, post = function() posted[#posted + 1] = { key = key, isDown = isDown } end }
+		end
+
+		sys._emit_activity_keystroke()
+		helpers.assert_eq(#posted, 2, "must post a key-down and a key-up")
+		helpers.assert_eq(posted[1].key, F18, "wake key must be F18 (the keymap-reserved no-op)")
+		helpers.assert_eq(posted[1].isDown, true)
+		helpers.assert_eq(posted[2].isDown, false)
+	end)
+
+	helpers.it("watcher ignores the synthetic F18 wake key but deactivates on a real key", function()
+		local _sys, clock, close_all, captured = activate_with_watcher()
+		clock.now = clock.now + 100   -- past the activation grace window
+
+		local before = close_all.count
+		local ok1 = pcall(captured.cb, fake_key_event(F18))
+		helpers.assert_true(ok1, "watcher must not error on the synthetic wake key")
+		helpers.assert_eq(close_all.count, before, "the F18 jiggle key must NOT auto-deactivate keep-awake")
+
+		-- A genuine, unmodified keypress (keycode 0 = 'a') means the user is back.
+		local ok2 = pcall(captured.cb, fake_key_event(0))
+		helpers.assert_true(ok2, "watcher must not error on a real key")
+		helpers.assert_true(close_all.count > before, "a real keypress must auto-deactivate keep-awake")
+	end)
 end)
 
 
