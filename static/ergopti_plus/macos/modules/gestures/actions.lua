@@ -67,7 +67,12 @@ local function ax(name, prev_fn, next_fn, scalable)
 end
 
 --- Registers a discrete single-fire action.
-local function sg(name, fn)
+--- Accepts an optional label string as second argument so callers can pass
+--- (name, label, fn) without breaking the two-argument form (name, fn).
+--- Without this guard the 3-arg form silently bound the label string as fn,
+--- making every modifier+letter/digit action a no-op.
+local function sg(name, label_or_fn, fn_arg)
+	local fn = type(fn_arg) == "function" and fn_arg or label_or_fn
 	SG[name] = { fn = fn }
 end
 
