@@ -93,8 +93,11 @@ class HookDispatcher {
 	; Map<event_type_string, Array<Func>> — populated by Register().
 	static _subscribers := Map()
 
-	; Live InputHook instance, or unset when stopped.
-	static _ih := unset
+	; Live InputHook instance, or false when not yet started / after Stop().
+	; Using false (not unset) so `_ih is InputHook` never throws on first boot
+	; or after a Stop()/Start() cycle — `unset` makes the property unreadable
+	; and the `is` operator raises PropertyError before it can evaluate.
+	static _ih := false
 
 	; Bound references for mouse Hotkey() calls so Stop() can disable them.
 	static _hk_ldown  := unset
@@ -391,7 +394,7 @@ class HookDispatcher {
 		; Release InputHook
 		if HookDispatcher._ih is InputHook {
 			try HookDispatcher._ih.Stop()
-			HookDispatcher._ih := unset
+			HookDispatcher._ih := false
 		}
 
 		; Disable mouse Hotkeys

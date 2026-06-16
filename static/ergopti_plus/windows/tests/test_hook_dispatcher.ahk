@@ -150,3 +150,47 @@ _HD_DispatchSelfUnregisterDoesNotSkipPeer() {
 	HookDispatcher.Unregister(_HD_SelfUnregEvt, _HD_PeerSub)
 }
 Test("HookDispatcher.Dispatch does not skip a peer when a subscriber self-unregisters (dispatch-skips-peer-on-self-unregister)", _HD_DispatchSelfUnregisterDoesNotSkipPeer)
+
+
+
+
+
+; ===============================================================
+; ===============================================================
+; ======= 4/ _ih initialised as readable false, not unset =======
+; ===============================================================
+; ===============================================================
+
+; Regression guard for the crash reported 2026-06-16:
+;   PropertyError: "This value of type 'Class' has no property named '_ih'."
+;   hook_dispatcher.ahk (314): If HookDispatcher._ih is InputHook
+;
+; Root cause: `static _ih := unset` declares the property as unreadable.
+; The `is` operator reads the left-hand side before evaluating — accessing
+; an unset property raises PropertyError. The same crash reproduced on any
+; Stop()/Start() cycle because Stop() also reset `_ih := unset`.
+; Fix: use `false` as the sentinel (a non-object value that `is InputHook`
+; safely evaluates to false without throwing).
+
+_HD_IhInitialisedReadable() {
+	; `_ih` must be readable immediately — no PropertyError on first access.
+	; Before the fix, this line itself threw: "has no property named '_ih'".
+	ihVal := HookDispatcher._ih
+	AssertEqual(false, ihVal, "_ih must be false (readable sentinel) on a fresh class, not unset")
+}
+Test("HookDispatcher._ih is initialised as false (readable), not unset — prevents PropertyError on Start() boot", _HD_IhInitialisedReadable)
+
+_HD_IhIsInputHookCheckDoesNotThrow() {
+	; The exact expression from Start() line 314 must not throw when _ih is false.
+	; Before the fix, `unset is InputHook` raised PropertyError before evaluation.
+	threw := false
+	result := false
+	try {
+		result := HookDispatcher._ih is InputHook
+	} catch {
+		threw := true
+	}
+	AssertEqual(false, threw, "'_ih is InputHook' must not throw when _ih is the false sentinel")
+	AssertEqual(false, result, "'false is InputHook' must evaluate to false")
+}
+Test("HookDispatcher._ih is InputHook does not throw when _ih is the false sentinel", _HD_IhIsInputHookCheckDoesNotThrow)

@@ -1332,3 +1332,20 @@ Fixed in order, each in its own commit on `dev`:
 - H5: `start()` leaked a disabled-but-allocated tap; unconditionally stop and nil any existing tap before creating a new one.
 
 **Test coverage:** 8 new regression test files, 1 existing test file updated. Lua baseline bumped from 906 to 909 to account for 3 legitimate new `hs.timer` calls (A5/A6/E2). All 1639 Lua unit tests pass.
+
+### project-ahk-v2-static-unset-unreadable
+
+_In AHK v2, `static _prop := unset` leaves the property unreadable — accessing it with `is` or any read raises PropertyError. Use `false` (or another concrete value) as the "not yet set" sentinel._
+
+<sub>slug: `project_ahk_v2_static_unset_unreadable`</sub>
+
+Crash reported 2026-06-16 (`PropertyError: "This value of type 'Class' has no property named '_ih'."`) in `hook_dispatcher.ahk:314`. Root cause: `static _ih := unset` was used to declare the live InputHook holder. In AHK v2 the `unset` keyword marks a property as having no value — and the `is` operator (as well as plain reads) raises `PropertyError` before it can evaluate. The same bug was latent in `Stop()` which reset `_ih := unset`, so a `Stop()`/`Start()` cycle would crash identically.
+
+**Why:** `unset` is a valid AHK v2 expression for "this parameter/variable has no value", but it is NOT a concrete value you can store and read back. `HasOwnProp("_ih")` may still return true (the slot exists), but any read — including the left-hand side of `is` — throws.
+
+**Fix:** replace the `unset` sentinel with `false` (an integer that is never `is InputHook`). The `is InputHook` check in `Start()` and `Stop()` works transparently because `false is InputHook` evaluates to `false` without throwing.
+
+**How to apply:**
+- Never use `static _prop := unset` as a "not-yet-initialized" holder when the property will be tested with `is` or read unconditionally before assignment. Use `false`, `0`, or `""` instead.
+- If you must use `unset` (e.g., for optional parameters), guard reads with `HasOwnProp` + a manual `is`-safe nil check, never bare `obj._prop is SomeClass`.
+- Regression tests in `test_hook_dispatcher.ahk` section 4 encode the exact PropertyError path.
