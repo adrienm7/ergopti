@@ -941,14 +941,20 @@ function M.disable_group(name)
 	g.enabled = false
 
 	-- Purge all mappings belonging to this group from the live list.
-	if g.path ~= nil then
-		local kept = {}
-		for _, m in ipairs(_state.mappings) do
-			if m.group ~= name then table.insert(kept, m) end
-		end
-		_state.mappings = kept
-		rebuild_lookup()
+	-- Programmatic groups (g.path == nil, e.g. "dynamichotstrings") must be
+	-- purged too — their mappings are re-created by enable_group's post-load
+	-- hook, so leaving them here would fire disabled hotstrings indefinitely.
+	-- rebuild_tail_indexes() is required after the purge so the O(1) buckets
+	-- used by the hot-path (mappings_by_tail_char) no longer point at the
+	-- removed entries; previously only rebuild_lookup() was called, leaving
+	-- stale bucket pointers that caused disabled hotstrings to still trigger.
+	local kept = {}
+	for _, m in ipairs(_state.mappings) do
+		if m.group ~= name then table.insert(kept, m) end
 	end
+	_state.mappings = kept
+	rebuild_lookup()
+	rebuild_tail_indexes()
 
 	Logger.debug(LOG, "Group '%s' disabled (%d mapping(s) remaining).", name, #_state.mappings)
 end
