@@ -1,8 +1,5 @@
 ﻿; tests/meta/test_clipboard_ram_leak.ahk
 
-#Requires AutoHotkey v2.0
-#Include ../../lib/testing.ahk
-
 ; ==============================================================================
 ; MODULE: Clipboard RAM Leak Meta Test
 ; DESCRIPTION:
@@ -65,9 +62,14 @@ _CRL_AssertCharCountLogic() {
     AssertEqual(_KL_Clip_CharCountFromByteSize(4), 1, "4 bytes (1 char + null) -> 1 char")
     AssertEqual(_KL_Clip_CharCountFromByteSize(200), 99, "200 bytes -> 99 chars")
     
-    ; Test MAX_CHAR_COUNT clamping (defined as 10000 in keylogger_clipboard.ahk)
-    ; 30000 bytes = 14999 chars -> clamped to 10000
-    AssertEqual(_KL_Clip_CharCountFromByteSize(30000), 10000, "Must clamp to MAX_CHAR_COUNT (10000)")
+    ; A payload under the cap returns the exact wide-char count.
+    ; 30000 bytes = (30000 // 2) - 1 = 14999 chars, still below MAX_CHAR_COUNT.
+    AssertEqual(_KL_Clip_CharCountFromByteSize(30000), 14999, "30000 bytes -> 14999 chars (still under the cap)")
+
+    ; Above the cap the count clamps to MAX_CHAR_COUNT (read from the constant so
+    ; this test cannot drift from the production value).
+    ; 300000 bytes = 149999 chars -> clamped to MAX_CHAR_COUNT.
+    AssertEqual(_KL_Clip_CharCountFromByteSize(300000), KLClipConst.MAX_CHAR_COUNT, "Above-cap byte size clamps to MAX_CHAR_COUNT")
 }
 
 Test("keylogger_clipboard: KL_Clip_OnChange does not materialise A_Clipboard into RAM (clipboard-reads-entire-clipboard-into-ram)", _CRL_AssertNoAClipboardRef)

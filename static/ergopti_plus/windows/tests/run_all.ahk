@@ -87,6 +87,9 @@ OnError(_FatalErrorHandler)
 #Include ../lib/hotstrings/personal_toml_editor.ahk
 #Include ../lib/layout/layout_altgr.ahk
 #Include ../lib/layout/layout_shift_caps.ahk
+; Pure layout-poll quiescence decision (no OS deps, no top-level hotkeys) —
+; exercised by meta/test_layout_quiescence.ahk and consumed by ErgoptiPlus.ahk.
+#Include ../lib/layout_poll_helper.ahk
 #Include ../lib/tooltip.ahk
 #Include ../lib/updater.ahk
 ; json.ahk must precede i18n.ahk — _I18nLoadFile now delegates to JsonParse.
@@ -243,6 +246,13 @@ global _VendorDir := A_ScriptDir . "\..\vendor"
 #Include ../modules/keylogger/keylogger_walker.ahk
 #Include ../modules/keylogger/keylogger_app_categories.ahk
 #Include ../modules/keylogger/keylogger_reader.ahk
+; keylogger_clipboard.ahk defines _KL_Clip_CharCountFromByteSize + KLClipConst,
+; both exercised functionally by meta/test_clipboard_ram_leak.ahk. It contains
+; only class + function definitions at top level (the Hotkey()/OnClipboardChange
+; calls live inside KL_Clip_Start), so it is headless-safe. Without this include
+; the test's direct call to _KL_Clip_CharCountFromByteSize is a load-time
+; "nonexistent function" error that hangs the headless runner with no output.
+#Include ../modules/keylogger/keylogger_clipboard.ahk
 #Include test_keylogger_walker.ahk
 #Include test_keylogger_app_categories.ahk
 #Include test_keylogger_reader.ahk
@@ -258,6 +268,7 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 ; ── Meta tests (codebase hygiene, no production includes needed) ──
 #Include meta/test_file_headers.ahk
 #Include meta/test_section_headers.ahk
+#Include meta/test_run_all_include_integrity.ahk
 #Include meta/test_logger_pairing.ahk
 #Include meta/test_no_duplicate_defaults.ahk
 #Include meta/test_require_state_pattern.ahk
@@ -269,6 +280,7 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 #Include meta/test_halflife_tick_suspend_guard.ahk
 #Include meta/test_layout_poll_suspend_guard.ahk
 #Include meta/test_layout_poll_blacklist_guard.ahk
+#Include meta/test_layout_quiescence.ahk
 #Include meta/test_hse_register_atomic.ahk
 #Include meta/test_hse_rebuild_guard.ahk
 #Include meta/test_gesture_shared_lbutton.ahk
