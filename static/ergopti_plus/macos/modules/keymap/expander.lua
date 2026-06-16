@@ -76,6 +76,12 @@ function M.perform_text_replacement(deletes, emit_action, buffer_action, is_fina
 	Logger.trace(LOG, "Performing replacement (%d deletion(s))…", deletes)
 
 	_state.expected_synthetic_deletes = _state.expected_synthetic_deletes + deletes
+	-- Record the arm timestamp so the stuck-counter reset guard in onKeyDownRaw
+	-- does not wipe these counters if a runloop lag creates a false 0.5 s gap
+	-- between the arm and the first synthetic echo (A6 audit fix).
+	if hs and hs.timer then
+		_state.last_synthetic_arm_time = hs.timer.secondsSinceEpoch()
+	end
 	if not is_ignored and tooltip.hide_forced then tooltip.hide_forced() elseif not is_ignored and tooltip.hide then tooltip.hide() end
 
 	for _ = 1, deletes do keyStroke({}, "delete", 0) end
@@ -111,7 +117,14 @@ function M.perform_text_replacement(deletes, emit_action, buffer_action, is_fina
 	end
 
 	-- Re-evaluate preview on the updated buffer to support chained autocorrections.
-	if not is_ignored then _llm.update_preview(_state.buffer) end
+	-- Deferred via doAfter(0) so all synthetic echoes produced by the expansion
+	-- (deletes + chars) have already been processed by onKeyDownRaw before the
+	-- watcher armed by update_preview sees any keyDown event. Without this
+	-- deferral the synthetic chars trigger the preview watcher and call
+	-- hide_forced(), destroying the chained preview immediately (E2 audit fix).
+	if not is_ignored then
+		hs.timer.doAfter(0, function() _llm.update_preview(_state.buffer) end)
+	end
 
 	if is_final then _state.suppress_rescan(1.0) end
 
@@ -368,8 +381,13 @@ function M.try_terminator_expand(m, chars, char_len, is_ignored)
 				if not consume_term then
 					if chars == "\r" or chars == "\n" then
 						keyStroke({}, "return", 0)
+						-- Track the re-typed terminator so expected_synthetic_chars
+						-- and notify_synthetic see it; without this the keylogger
+						-- flushes its buffer mid-expansion on the Enter/Tab echo.
+						s = s .. chars
 					elseif chars == "\t" then
 						keyStroke({}, "tab", 0)
+						s = s .. chars
 					else
 						keyStrokes(chars)
 						s = s .. chars
