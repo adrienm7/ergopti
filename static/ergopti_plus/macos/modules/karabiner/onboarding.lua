@@ -57,7 +57,10 @@ local CACHE_DIR = (os.getenv("HOME") or "") .. "/Library/Caches/Ergopti/karabine
 
 -- Filesystem signposts revealing the install state of KE.
 local KE_APP_PATH      = "/Applications/Karabiner-Elements.app"
-local KE_GRABBER_BIN   = "/Library/Application Support/org.pqrs/Karabiner-Elements/bin/karabiner_grabber"
+-- v15 and earlier shipped karabiner_grabber; v16 (May 2026) renamed it to
+-- Karabiner-Core-Service. Both live under the same bin/ directory.
+local KE_GRABBER_BIN      = "/Library/Application Support/org.pqrs/Karabiner-Elements/bin/karabiner_grabber"
+local KE_GRABBER_BIN_V16  = "/Library/Application Support/org.pqrs/Karabiner-Elements/bin/Karabiner-Core-Service"
 local KE_SYSEXT_BUNDLE = "org.pqrs.Karabiner-DriverKit-VirtualHIDDevice"
 
 -- macOS deep-links into the relevant System Settings panes. The scheme is
@@ -157,10 +160,12 @@ function M.is_ke_app_installed()
 	return file_exists(KE_APP_PATH)
 end
 
---- True when the grabber binary exists on disk, independent of run state.
+--- True when a KE daemon binary exists on disk, independent of run state.
+--- Accepts either the v15 name (karabiner_grabber) or the v16+ name
+--- (Karabiner-Core-Service) so an upgrade does not falsely trigger the wizard.
 --- @return boolean
 function M.is_grabber_binary_present()
-	return file_exists(KE_GRABBER_BIN)
+	return file_exists(KE_GRABBER_BIN) or file_exists(KE_GRABBER_BIN_V16)
 end
 
 --- True when the karabiner_grabber root daemon is currently running.
