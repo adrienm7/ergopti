@@ -964,7 +964,9 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		if type(updateMenu) == "function" then updateMenu() end
 	end)
 
-	pcall(notifications.notify, i18n.get("menu.script_ready"), nil, "success")
+	-- No "script ready" notification: boot is now ~1 s (like the AHK driver), so a
+	-- per-launch banner is pure noise. Notifications are reserved for things the
+	-- user genuinely needs to act on or wait for — LLM and Karabiner.
 	return myMenu, configWatcher
 end
 
