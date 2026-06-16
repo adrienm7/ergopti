@@ -223,6 +223,9 @@ helpers.describe("keymap.expander: perform_text_replacement", function()
 			function() buf_called = true ; s.buffer = "hewrld" end,
 			false, false, "test"
 		)
+		-- update_preview is now deferred via hs.timer.doAfter(0) (E2 audit fix)
+		-- so we must fire pending timers before asserting on llm.previews.
+		if hs and hs.timer and hs.timer.__fire_all then hs.timer.__fire_all() end
 
 		helpers.assert_eq(emit_called, true)
 		helpers.assert_eq(buf_called,  true)
