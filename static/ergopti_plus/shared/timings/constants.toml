@@ -55,6 +55,9 @@ stream_hard_timeout_ms = 90000
 # MLX warmup: unblock _warmup_in_flight if the single-token POST never returns.
 warmup_post_timeout_ms = 30000
 
+# MLX non-streaming inference: prevents a hung server from blocking on_fail indefinitely.
+non_stream_timeout_ms = 8000
+
 # Initial delay before the first warmup attempt after startup.
 warmup_initial_delay_ms = 2000
 
