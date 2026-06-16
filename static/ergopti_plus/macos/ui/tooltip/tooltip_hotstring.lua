@@ -159,7 +159,11 @@ local function arm_dequeue_timer()
 	end
 	if not _dequeue_rows then return end
 	local delay = Dequeue.next_expiry_delay_sec(_dequeue_rows, hs.timer.secondsSinceEpoch(), _dequeue_opts)
-	if delay > 0 then
+	if delay and delay <= 0 then
+		-- All rows are permanent (no expire_at), so fire _dequeue_tick immediately;
+		-- without this _dequeue_rows stays non-nil and M.hide() is blocked forever (M-10)
+		hs.timer.doAfter(0, _dequeue_tick)
+	else
 		_dequeue_timer = hs.timer.doAfter(delay, _dequeue_tick)
 	end
 end
@@ -293,7 +297,10 @@ function M.show_stacked(rows, is_enabled)
 		if not is_enabled then return end
 		if not rows or #rows == 0 then M.hide(); return end
 
-		local is_rebuild = rows[1] and rows[1].expire_at ~= nil
+		-- Use the canonical Dequeue analysis so that any row (not just row[1])
+		-- carrying an expire_at stamp is detected — checking only the first row
+		-- caused premature stop_dequeue() on partial-expiry rebuilds (M-09)
+		local is_rebuild = Dequeue.analyze_durations(rows, _dequeue_opts)
 		if not is_rebuild then
 			stop_dequeue()
 		end
