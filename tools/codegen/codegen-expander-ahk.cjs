@@ -326,7 +326,7 @@ function buildAhkSource() {
 	lines.push('\t; Param starBase - The trigger string without its trailing magic-key character.');
 	lines.push('\t; Returns Array  - Sorted array of matching Mapping objects.');
 	lines.push('\t_BuildStarBucket(starBase) {');
-	lines.push('\t\tlocal starTailChar := (StrLen(starBase) > 0) ? SubStr(starBase, -0) : ""');
+	lines.push('\t\tlocal starTailChar := (StrLen(starBase) > 0) ? SubStr(starBase, -1) : ""');
 	lines.push('\t\tif (starTailChar = "") {');
 	lines.push('\t\t\treturn []');
 	lines.push('\t\t}');
