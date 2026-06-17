@@ -222,17 +222,19 @@ KL_Net_Start() {
     KLNet.wifi_fn  := KL_Net_WifiTick.Bind()
     KLNet.reach_fn := KL_Net_ReachTick.Bind()
     KLNet.vpn_fn   := KL_Net_VpnTick.Bind()
-    ; Stagger initial fires to avoid a simultaneous WMI + netsh + WinHTTP burst
-    SetTimer(KLNet.wifi_fn,  -5000)
-    SetTimer(KLNet.reach_fn, -8000)
-    SetTimer(KLNet.vpn_fn,   -11000)
-    SetTimer(KLNet.wifi_fn,  KLNetConst.NETWORK_TICK_MS)
-    SetTimer(KLNet.reach_fn, KLNetConst.REACH_TICK_MS)
-    SetTimer(KLNet.vpn_fn,   KLNetConst.VPN_TICK_MS)
+    ; Stagger initial fires to avoid a simultaneous WMI + netsh + WinHTTP burst.
+    ; Each starter fires its tick once after the delay, then arms the repeating timer.
+    ; Stored in KLNet so KL_Net_Stop() can cancel them during the stagger window.
+    KLNet.wifi_start_fn  := () => (KLNet.wifi_fn(),  SetTimer(KLNet.wifi_fn,  KLNetConst.NETWORK_TICK_MS))
+    KLNet.reach_start_fn := () => (KLNet.reach_fn(), SetTimer(KLNet.reach_fn, KLNetConst.REACH_TICK_MS))
+    KLNet.vpn_start_fn   := () => (KLNet.vpn_fn(),   SetTimer(KLNet.vpn_fn,   KLNetConst.VPN_TICK_MS))
+    SetTimer(KLNet.wifi_start_fn,  -5000)
+    SetTimer(KLNet.reach_start_fn, -8000)
+    SetTimer(KLNet.vpn_start_fn,   -11000)
 }
 
 KL_Net_Stop() {
-    for prop in ["wifi_fn", "reach_fn", "vpn_fn"] {
+    for prop in ["wifi_start_fn", "reach_start_fn", "vpn_start_fn", "wifi_fn", "reach_fn", "vpn_fn"] {
         if KLNet.HasOwnProp(prop) && IsObject(KLNet.%prop%) {
             try SetTimer(KLNet.%prop%, 0)
             KLNet.%prop% := unset
