@@ -10,7 +10,8 @@
 --- path, so any machine running KE v16 returned grabber_present=false, causing
 --- run_first_run_wizard() to surface a spurious "daemon absent" install dialog
 --- on every boot and reload even though KE was fully operational.
---- The fix: check BOTH the v15 and v16 binary paths.
+--- The fix: check the v15 path, v16 path, AND karabiner_cli (stable across all
+--- KE versions) so any future daemon rename is also handled by the cli fallback.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -78,7 +79,19 @@ helpers.describe("onboarding.is_grabber_binary_present: v15/v16 detection", func
 		end)
 	end)
 
-	helpers.it("returns false when neither v15 nor v16 binary exists", function()
+	helpers.it("returns true when only karabiner_cli exists (stable fallback across all KE versions)", function()
+		local mod = fresh_onboarding()
+		with_io(function(path, _)
+			if path and path:find("karabiner_cli", 1, true) then
+				return { close = function() end }, nil
+			end
+			return nil, "no such file"
+		end, function()
+			helpers.assert_eq(mod.is_grabber_binary_present(), true)
+		end)
+	end)
+
+	helpers.it("returns false when no KE binary exists (v15, v16, or cli)", function()
 		local mod = fresh_onboarding()
 		with_io(function(_path, _) return nil, "no such file" end, function()
 			helpers.assert_eq(mod.is_grabber_binary_present(), false)

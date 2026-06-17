@@ -61,6 +61,9 @@ local KE_APP_PATH      = "/Applications/Karabiner-Elements.app"
 -- Karabiner-Core-Service. Both live under the same bin/ directory.
 local KE_GRABBER_BIN      = "/Library/Application Support/org.pqrs/Karabiner-Elements/bin/karabiner_grabber"
 local KE_GRABBER_BIN_V16  = "/Library/Application Support/org.pqrs/Karabiner-Elements/bin/Karabiner-Core-Service"
+-- karabiner_cli is present in all KE versions (v14-v16+) and never renamed,
+-- making it the most reliable signal that the full PKG stack is installed.
+local KE_CLI_BIN          = "/Library/Application Support/org.pqrs/Karabiner-Elements/bin/karabiner_cli"
 local KE_SYSEXT_BUNDLE = "org.pqrs.Karabiner-DriverKit-VirtualHIDDevice"
 
 -- macOS deep-links into the relevant System Settings panes. The scheme is
@@ -161,11 +164,12 @@ function M.is_ke_app_installed()
 end
 
 --- True when a KE daemon binary exists on disk, independent of run state.
---- Accepts either the v15 name (karabiner_grabber) or the v16+ name
---- (Karabiner-Core-Service) so an upgrade does not falsely trigger the wizard.
+--- Accepts the v15 name (karabiner_grabber), v16+ name (Karabiner-Core-Service),
+--- or karabiner_cli (stable across all KE versions) so any upgrade permutation
+--- returns true without needing to track every daemon rename going forward.
 --- @return boolean
 function M.is_grabber_binary_present()
-	return file_exists(KE_GRABBER_BIN) or file_exists(KE_GRABBER_BIN_V16)
+	return file_exists(KE_GRABBER_BIN) or file_exists(KE_GRABBER_BIN_V16) or file_exists(KE_CLI_BIN)
 end
 
 --- True when the karabiner_grabber root daemon is currently running.
