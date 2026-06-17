@@ -87,8 +87,9 @@ helpers.describe("Audit-hs-final fixes", function()
 			"engine.lua: lastFirePos must be updated with the same jump offsets as startPos"
 		)
 		-- Verify both are updated in the same compensation block
+		-- Window of 700 bytes: long comments with UTF-8 chars push lastFirePos past 650 bytes
 		local comp_start = src:find("StartPos Compensation", 1, true)
-		local comp_block = comp_start and src:sub(comp_start, comp_start + 400) or ""
+		local comp_block = comp_start and src:sub(comp_start, comp_start + 700) or ""
 		assert(
 			comp_block:find("gs%.lastFirePos", 1, false),
 			"engine.lua: lastFirePos compensation must be inside the centroid-jump block"
@@ -143,8 +144,10 @@ helpers.describe("Audit-hs-final fixes", function()
 		assert(src, "modules/karabiner/watchers.lua must be readable")
 		-- The bug: hs.task.new(...):start() chained with no nil-check — crashes
 		-- if the CLI binary is missing and hs.task.new() returns nil.
+		-- Use [^\n]* (not .-) because in Lua 5.4 the dot matches newlines,
+		-- which would bridge the %b() close paren to a :start() call many lines later.
 		assert(
-			not src:find("hs%.task%.new%b().-:start%(%)", 1, false),
+			not src:find("hs%.task%.new%b()[^\n]*:start%(%)", 1, false),
 			"karabiner/watchers.lua: hs.task.new() result must not chain directly to :start() — nil-check required"
 		)
 	end)
