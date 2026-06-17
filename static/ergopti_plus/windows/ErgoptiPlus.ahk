@@ -1657,8 +1657,10 @@ SaveFullConfig() {
         Updates.Push({ Section: UPDATER_INI_SECTION, Key: UPDATER_INI_INTERVAL_KEY, Value: UPDATER_CHECK_INTERVAL })
     if IsSet(UPDATER_CHANNEL)
         Updates.Push({ Section: UPDATER_INI_SECTION, Key: UPDATER_INI_KEY, Value: UPDATER_CHANNEL })
-    if FileExist(ConfigurationFile)
-        try FileDelete(ConfigurationFile)
+    ; Do NOT FileDelete before writing — TOML_BatchWrite already performs an
+    ; atomic write (temp file + rename). A FileDelete here creates a data-loss
+    ; window: if a Reload() or thread interrupt fires between the delete and the
+    ; write, the user's config is permanently gone with no replacement.
     PrevCanonState := _TOML_STRICT_CANON_IN_PROGRESS
     _TOML_STRICT_CANON_IN_PROGRESS := true
     try {
@@ -2157,8 +2159,13 @@ BuildTrayMenuDeferred() {
     ; original boot path did, so it never piles onto this Critical section.
     _SavedReady := _DriverReady
     _DriverReady := false
-    initMenu()
-    _DriverReady := _SavedReady
+    ; Restore _DriverReady even if initMenu() throws (I/O error, parse failure…);
+    ; leaving it false permanently would silently block all async saves thereafter.
+    try {
+        initMenu()
+    } finally {
+        _DriverReady := _SavedReady
+    }
     UpdateTrayIcon()
     Critical("Off")
     if _LangMenuBuildPending

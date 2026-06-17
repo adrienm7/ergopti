@@ -339,6 +339,11 @@ DeadKey(Mapping) {
 		} else {
 			SendNewResult(PressedKey)
 		}
+		; Re-send EndKeys (Enter, BackSpace, Delete) consumed by the InputHook.
+		; Without the "V" option the hook swallows them; the user's newline,
+		; delete or erase would disappear silently after a dead-key sequence.
+		if (ih.EndReason = "EndKey")
+			Send("{" . ih.EndKey . "}")
 	} finally {
 		InDeadKeySequence := false
 	}
