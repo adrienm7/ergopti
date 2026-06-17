@@ -169,7 +169,8 @@ _TimerAdapterMakeOneShot(Handle, Fn) {
 			; while the script is suspended (timer-scheduler-oneshot-suspend fix).
 			; The registry entry is intentionally kept intact until the callback
 			; actually fires.
-			SetTimer(_OneShot.Bind(BoundHandle, BoundFn), -500)
+			requeued := _OneShot.Bind(BoundHandle, BoundFn)
+			SetTimer(requeued, -500)
 			return
 		}
 		global _TIMER_ADAPTER_REGISTRY

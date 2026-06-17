@@ -49,7 +49,8 @@ _GSNF_StripComments(Src) {
 }
 
 _GSNF_ExtractFunc(Src, FuncName) {
-	Idx := InStr(Src, FuncName . "()")
+	; Search for the definition (with trailing " {") to avoid matching call sites.
+	Idx := InStr(Src, FuncName . "() {")
 	if !Idx
 		return ""
 	; Grab up to 1500 chars to cover the function body
