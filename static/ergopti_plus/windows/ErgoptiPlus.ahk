@@ -1595,8 +1595,12 @@ SaveFullConfig() {
     ; user's file with uninitialised defaults (e.g. before Features or GestureAssignments
     ; have been populated by ApplyConfigToml and the deferred tray-menu build).
     global _DriverReady
-    if !_DriverReady
+    if !_DriverReady {
+        ; Reschedule rather than dropping the save — the boot timer is one-shot
+        ; so silently returning would lose any config changes made during init
+        SetTimer(SaveFullConfig, -100)
         return
+    }
     Updates := []
     if IsSet(_LLM_Tray_SyncToFeatures)
         _LLM_Tray_SyncToFeatures()

@@ -1218,12 +1218,16 @@ _GestureOnForeground(hWinEventHook, Event, HWnd, IdObject, IdChild, Thread, Time
     _GestureWinOrder := NewOrder
 }
 
-; Cleans up the WinEvent hook on script exit.
+; Cleans up the WinEvent hook and its machine-code thunk on script exit.
 _GestureUnhook(*) {
-    global _GestureWinHook
+    global _GestureWinHook, _GestureCallbackPtr
     if (_GestureWinHook) {
         DllCall("UnhookWinEvent", "Ptr", _GestureWinHook)
         _GestureWinHook := 0
+    }
+    if (_GestureCallbackPtr) {
+        CallbackFree(_GestureCallbackPtr)
+        _GestureCallbackPtr := 0
     }
 }
 
@@ -2017,14 +2021,18 @@ if (RawAutoConfig == "1" or RawAutoConfig == "true") {
 ; Skipped in the headless test runner (_AHK_DRY_RUN is defined by run_all.ahk)
 ; because SetWinEventHook with OUTOFCONTEXT keeps a message-loop reference alive
 ; and prevents ExitApp from returning promptly in a console-less CI process.
-_GestureWinOrder := []
-_GestureWinHook  := 0
+_GestureWinOrder   := []
+_GestureWinHook    := 0
+_GestureCallbackPtr := 0
 if !IsSet(_AHK_DRY_RUN) {
+    ; Store the callback pointer so _GestureUnhook can free it with CallbackFree,
+    ; preventing the fixed-size thunk leak on every script reload
+    _GestureCallbackPtr := CallbackCreate(_GestureOnForeground, "F", 7)
     _GestureWinHook := DllCall("SetWinEventHook",
         "UInt", 0x0003,           ; EVENT_SYSTEM_FOREGROUND
         "UInt", 0x0003,
         "Ptr",  0,
-        "Ptr",  CallbackCreate(_GestureOnForeground, "F", 7),
+        "Ptr",  _GestureCallbackPtr,
         "UInt", 0,
         "UInt", 0,
         "UInt", 0x0000)           ; WINEVENT_OUTOFCONTEXT

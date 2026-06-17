@@ -12,6 +12,10 @@
 
 #Requires AutoHotkey v2.0
 
+; Raise the per-interval hotkey limit once at load time so rapid wheel events
+; never trigger the "too many hotkeys" warning before the first WheelUp/Down fires
+A_MaxHotkeysPerInterval := 1000
+
 
 
 
@@ -64,11 +68,9 @@ SC039:: return ; Necessary to do this, otherwise Space keeps being sent while it
 ; The base layer will become this one when the navigation layer variable is set to True
 
 *WheelUp:: {
-    A_MaxHotkeysPerInterval := 1000 ; Reduce messages saying too many hotkeys pressed in the interval
     ActionLayer("{Volume_Up " . AppState_GetNumberOfRepetitions() . "}") ; Turn on the volume by scrolling up
 }
 *WheelDown:: {
-    A_MaxHotkeysPerInterval := 1000 ; Reduce messages saying too many hotkeys pressed in the interval
     ActionLayer("{Volume_Down " . AppState_GetNumberOfRepetitions() . "}") ; Turn down the volume by scrolling down
 }
 
