@@ -744,7 +744,7 @@ _LLM_Ollama_TrimAsyncRegistry() {
 	; AHK v2 Maps do NOT guarantee insertion order — always find the
 	; numerically smallest key explicitly so the truly oldest request is
 	; killed, not a random one (trim-async-registry-map-order fix).
-	oldest_id := 0xFFFFFFFFFFFFFFFF
+	oldest_id := 0x7FFFFFFFFFFFFFFF
 	for id in _LLM_Ollama_Async
 		if (id < oldest_id)
 			oldest_id := id

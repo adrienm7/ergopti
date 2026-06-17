@@ -57,13 +57,15 @@ _OTR_FuncBody(Src, FuncDecl) {
 
 _OTR_TrimUsesMinId() {
 	Src := _OTR_StripComments(_OTR_ReadSource("modules/llm/api_ollama.ahk"))
-	Body := _OTR_FuncBody(Src, "_LLM_Ollama_TrimAsyncRegistry()")
+	; Use the definition pattern (with trailing " {") to avoid matching the call site.
+	Body := _OTR_FuncBody(Src, "_LLM_Ollama_TrimAsyncRegistry() {")
 
 	Assert(Body != "", "_LLM_Ollama_TrimAsyncRegistry must exist in api_ollama.ahk")
 
-	; The fix searches explicitly for the minimum numeric ID
-	Assert(InStr(Body, "0xFFFFFFFFFFFFFFFF") > 0,
-		"TrimAsyncRegistry must initialise oldest_id := 0xFFFFFFFFFFFFFFFF for explicit min search (trim-async-registry-map-order)")
+	; The fix searches explicitly for the minimum numeric ID.
+	; 0x7FFFFFFFFFFFFFFF is the max signed 64-bit integer — a safe "larger than any real ID" sentinel.
+	Assert(InStr(Body, "0x7FFFFFFFFFFFFFFF") > 0,
+		"TrimAsyncRegistry must initialise oldest_id := 0x7FFFFFFFFFFFFFFF for explicit min search (trim-async-registry-map-order)")
 	Assert(RegExMatch(Body, "if\s*\(\s*id\s*<\s*oldest_id\s*\)") > 0,
 		"TrimAsyncRegistry must scan for the min ID with 'if (id < oldest_id)' (trim-async-registry-map-order)")
 
