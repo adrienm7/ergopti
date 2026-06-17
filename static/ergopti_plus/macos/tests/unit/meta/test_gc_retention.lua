@@ -14,7 +14,7 @@
 --- completion callback (using the closure over the local task variable).
 --- ==============================================================================
 
-local assert = require("luassert") or assert
+local helpers = require("tests.helpers")
 
 local function read_source(rel_path)
 	local base = (debug.getinfo(1, "S").source or ""):match("^@(.+/tests/)") or ""
@@ -38,33 +38,33 @@ local function assert_gc_pinned(rel_path)
 		.. "add M._active_tasks = {} and pin each task before :start()")
 end
 
-describe("GC retention: hs.task pinning", function()
+helpers.describe("GC retention: hs.task pinning", function()
 
 	-- Regression guard: each of these files was flagged by the expert audit as
 	-- spawning bare hs.task.new() with no GC protection. The fix adds an
 	-- _active_tasks table so the task survives until its callback fires.
 
-	it("menu_about: unzip and rm tasks are pinned", function()
+	helpers.it("menu_about: unzip and rm tasks are pinned", function()
 		assert_gc_pinned("ui/menu/menu_about.lua")
 	end)
 
-	it("models_manager_ollama: ollama-list task is pinned", function()
+	helpers.it("models_manager_ollama: ollama-list task is pinned", function()
 		assert_gc_pinned("ui/menu/menu_llm/models_manager_ollama.lua")
 	end)
 
-	it("models_manager_mlx: sweep and probe tasks are pinned", function()
+	helpers.it("models_manager_mlx: sweep and probe tasks are pinned", function()
 		assert_gc_pinned("ui/menu/menu_llm/models_manager_mlx.lua")
 	end)
 
-	it("onboarding: shasum / curl / hdiutil / osascript tasks are pinned", function()
+	helpers.it("onboarding: shasum / curl / hdiutil / osascript tasks are pinned", function()
 		assert_gc_pinned("modules/karabiner/onboarding.lua")
 	end)
 
-	it("menu_apps: open task is pinned", function()
+	helpers.it("menu_apps: open task is pinned", function()
 		assert_gc_pinned("ui/menu/menu_apps.lua")
 	end)
 
-	it("dialog_util: no direct hs.task.new (replaced with hs.timer.doAfter)", function()
+	helpers.it("dialog_util: no direct hs.task.new (replaced with hs.timer.doAfter)", function()
 		local src = read_source("lib/dialog_util.lua")
 		assert(src, "dialog_util.lua must exist")
 		-- After the fix, dialog_util uses hs.timer.doAfter instead of hs.task.
@@ -72,7 +72,7 @@ describe("GC retention: hs.task pinning", function()
 			"dialog_util: hs.task.new must be replaced with hs.timer.doAfter to avoid GC kill")
 	end)
 
-	it("shell_runner: canonical GC-root table is present", function()
+	helpers.it("shell_runner: canonical GC-root table is present", function()
 		local src = read_source("adapters/shell_runner.lua")
 		assert(src, "shell_runner.lua must exist")
 		assert(src:find("_active_tasks", 1, false),
