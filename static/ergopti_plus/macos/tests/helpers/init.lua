@@ -86,6 +86,14 @@ function M.load_with_stubs(module_name, hs_overrides)
 	-- second, making all keystroke assertions see 0 entries.
 	package.loaded["hs"] = hs_stub
 
+	-- Clear any partial or stubbed lib.text_utils installed by a previous test file
+	-- (e.g. test_apply_prediction_arms_guard.lua installs a minimal stub that lacks
+	-- utf8_len / repl_title). Without this, modules that capture text_utils at
+	-- require-time get the stub instead of the full shared module, causing
+	-- "attempt to call a nil value (field 'utf8_len')" crashes in subsequent tests.
+	-- text_utils/init.lua is pure Lua with no hs deps, so reloading it is safe.
+	package.loaded["lib.text_utils"] = nil
+
 	-- Always inject a minimal lib.i18n stub so that modules calling i18n.get()
 	-- at require-time (terminators, conflicts, actions, profiles …) never crash
 	-- with "attempt to call a nil value (field 'get')". The real lib.i18n depends
