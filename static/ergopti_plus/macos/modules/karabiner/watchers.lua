@@ -130,11 +130,17 @@ local function deactivate_capsword()
 		-- silently. hs.hid.capslock.set is the only reliable way to toggle the LED.
 		pcall(hs.hid.capslock.set, false)
 	end, {"--get-variable", "capsword"})
-	-- If task is nil (CLI binary absent) or fails to start, the callback never fires — release the lock
-	-- so subsequent pointer events are not permanently blocked (karabiner-capsword-lock-leak).
-	if not task or not task:start() then
+	-- Nil means the CLI binary is absent; release the lock immediately so the guard is not permanent.
+	if not task then
 		_capsword_check_pending = false
-		Logger.error(LOG, "CapsWord check task failed to start.")
+		Logger.error(LOG, "CapsWord check task is nil — CLI binary absent (karabiner-capsword-lock-leak).")
+		return
+	end
+	-- If task:start() returns false the callback never fires — release the lock so subsequent
+	-- pointer events are not permanently blocked (karabiner-capsword-lock-leak).
+	if not task:start() then
+		_capsword_check_pending = false
+		Logger.error(LOG, "CapsWord check task failed to start (karabiner-capsword-lock-leak).")
 	end
 end
 
