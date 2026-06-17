@@ -58,7 +58,10 @@ local function extract_on_fail_body(src)
 	while pos <= #src do
 		local token, token_end = src:match("([%w_]+)()", pos)
 		if not token then break end
-		if token == "function" then
+		-- Count all Lua block openers that require a closing `end`; without
+		-- this, an inline `if … then return end` on the first line of on_fail
+		-- would drop depth back to 0 immediately, cutting off the rest of the body.
+		if token == "function" or token == "if" or token == "for" or token == "while" then
 			depth = depth + 1
 			started = true
 		elseif token == "end" and started then
