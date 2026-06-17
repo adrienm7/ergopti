@@ -1,4 +1,4 @@
---- tests/unit/modules/gestures/test_finger_upgrade_scroll_guard.lua
+﻿--- tests/unit/modules/gestures/test_finger_upgrade_scroll_guard.lua
 
 --- ==============================================================================
 --- MODULE: modules.gestures.engine — 3-finger upgrade guard during scroll
@@ -15,9 +15,11 @@
 --- swipe_3_up/swipe_3_down.
 ---
 --- Fix: the fast-path is now skipped when `lockedDir` is set AND the incoming
---- finger count is active on that axis (`not finger_count_is_inert(n, lockedDir)`).
---- In that case the candidate-confirmation path is used, requiring
---- FINGER_CONFIRM_FRAMES and FINGER_CONFIRM_SEC before promotion.
+--- finger count is active on that axis AND a live action has already fired
+--- (liveAxisSign ~= nil). This means a stray 3rd finger mid-scroll (after the
+--- 2-finger action already fired) goes through candidate confirmation, while a
+--- genuine 3-finger gesture whose 3rd contact lands before any action fires
+--- takes the fast-path immediately — keeping real 3-finger swipes instant.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -63,6 +65,18 @@ helpers.describe("gestures.engine — fast-path excludes active-axis count upgra
 			src:find("not new_count_active_on_locked_axis", 1, true) ~= nil,
 			"modules.gestures.engine: fast-path must be disabled when the incoming " ..
 			"finger count has active actions on the locked axis"
+		)
+	end)
+
+	helpers.it("guard also checks liveAxisSign to allow genuine 3-finger gestures", function()
+		local src = read_source("modules.gestures.engine")
+		-- The guard must additionally check liveAxisSign ~= nil so that a real
+		-- 3-finger gesture (3rd finger lands before any live fire) still takes
+		-- the fast-path and fires immediately without candidate-path delay.
+		helpers.assert_true(
+			src:find("liveAxisSign ~= nil", 1, true) ~= nil,
+			"modules.gestures.engine: new_count_active_on_locked_axis guard must " ..
+			"also require liveAxisSign ~= nil so genuine 3-finger swipes are instant"
 		)
 	end)
 
@@ -133,11 +147,15 @@ helpers.describe("gestures.engine — 3-finger upgrade blocked on vertical scrol
 		-- Stub state: 2-finger scroll with vertical actions on finger 3, but not
 		-- horizontal — mirrors the default gesture configuration.
 		local fired_slots = {}
+		-- swipe_2_down is active so the live-fire path triggers on 2-finger scroll
+		-- (setting liveAxisSign). The guard requires liveAxisSign ~= nil to block
+		-- the fast-path upgrade: without a prior live fire the 3rd finger would be
+		-- accepted immediately as a genuine 3-finger gesture (correct new behaviour).
 		local stub_state = {
 			enabled = true,
 			ga = {
 				swipe_2_up    = "none",
-				swipe_2_down  = "none",
+				swipe_2_down  = "scroll_down", -- live action: sets liveAxisSign during scroll
 				swipe_2_left  = "none",
 				swipe_2_right = "none",
 				swipe_3_up    = "tab_prev",    -- active: this must NOT fire on scroll
@@ -146,8 +164,8 @@ helpers.describe("gestures.engine — 3-finger upgrade blocked on vertical scrol
 				swipe_3_right = "word_next",
 				tap_2 = "none", tap_3 = "none", tap_4 = "none", tap_5 = "none",
 			},
-			modes         = { swipe_3_up = "x1", swipe_3_down = "x1" },
-			sensitivities = { swipe_3_up = 3.5,  swipe_3_down = 3.5 },
+			modes         = { swipe_2_down = "x1", swipe_3_up = "x1", swipe_3_down = "x1" },
+			sensitivities = { swipe_2_down = 0.01, swipe_3_up = 3.5, swipe_3_down = 3.5 },
 		}
 
 		local stub_actions = {

@@ -1,4 +1,4 @@
---- modules/gestures/engine.lua
+﻿--- modules/gestures/engine.lua
 
 --- ==============================================================================
 --- MODULE: Gestures Engine
@@ -724,13 +724,15 @@ function M.process_frame(touches)
 				--
 				-- Exception: when a direction is already locked AND the INCOMING
 				-- finger count has active actions on that axis (e.g., swipe_3_up
-				-- during a 2-finger vertical scroll), skip the fast-path and
-				-- require full candidate confirmation. Without this guard, a stray
-				-- 3rd finger contact during 2-finger scroll instantly upgrades
-				-- maxFingers and fires tab_prev/tab_next on every scroll.
+				-- during a 2-finger vertical scroll), skip the fast-path only when
+				-- a live action has already fired in this gesture (liveAxisSign ~= nil).
+				-- A stray 3rd finger mid-scroll arrives AFTER a live fire; a genuine
+				-- 3-finger gesture lands all fingers before any action fires, so
+				-- liveAxisSign is still nil and the fast-path accepts it immediately.
 				local inert = finger_count_is_inert(gs.maxFingers, gs.lockedDir)
 				local new_count_active_on_locked_axis = gs.lockedDir ~= nil
 					and not finger_count_is_inert(n, gs.lockedDir)
+					and gs.liveAxisSign ~= nil
 				local use_fast_path = (n <= gs.maxFingers + 1 or inert)
 					and not new_count_active_on_locked_axis
 				if use_fast_path then
