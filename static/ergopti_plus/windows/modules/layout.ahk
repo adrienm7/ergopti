@@ -402,6 +402,7 @@ _LockWorkstationEmit(*) {
 }
 
 RemapKey(ScanCode, Character, AlternativeCharacter := "") {
+	global RemappedList
 	InputLevel := "I2"
 
 	Hotkey(
@@ -411,7 +412,7 @@ RemapKey(ScanCode, Character, AlternativeCharacter := "") {
 	)
 
 	if AlternativeCharacter == "" {
-		AppState["remapped_list"][Character] := ScanCode
+		RemappedList[Character] := ScanCode
 	} else {
 		Hotkey(
 			ScanCode,

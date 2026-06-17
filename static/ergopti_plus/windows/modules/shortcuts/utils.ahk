@@ -28,8 +28,9 @@ AddShortcut(Modifier, Letter, Callback) {
 }
 
 RetrieveScancode(Letter) {
-    if AppState["remapped_list"].Has(Letter) {
-        return AppState["remapped_list"][Letter]
+    global RemappedList
+    if RemappedList.Has(Letter) {
+        return RemappedList[Letter]
     }
     return Format("sc{:x}", GetKeySC(Letter))
 }
