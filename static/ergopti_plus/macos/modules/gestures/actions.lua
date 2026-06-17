@@ -267,7 +267,11 @@ function M.toggle_left_click()
 		if t == evTypes.leftMouseUp then
 			-- Swallow the spurious finger-lift mouseUp within the cooldown window.
 			if hs.timer.secondsSinceEpoch() - t0 < CLICK_COOLDOWN_SEC then return true end
-			hs.timer.doAfter(0, M.toggle_left_click)
+			-- Guard: click_key_watcher may have already released leftClickHeld
+			-- synchronously before this deferred callback fires (race window between
+			-- the mouseUp eventtap and a concurrent key-down event). Re-toggling
+			-- from a false state would silently re-engage the hold.
+			hs.timer.doAfter(0, function() if leftClickHeld then M.toggle_left_click() end end)
 			return true
 		end
 		-- Convert mouseMoved to leftMouseDragged so apps see a proper drag event.

@@ -49,8 +49,11 @@ function M.read(path)
 			Logger.debug(LOG, "read(): cannot open '%s' — %s", path, tostring(err))
 			return nil
 		end
-		local content = fh:read("*a")
+		-- Inner pcall ensures fh:close() always runs even when read() panics
+		-- (e.g. an I/O error mid-read on a file that was truncated after open)
+		local read_ok, content = pcall(function() return fh:read("*a") end)
 		fh:close()
+		if not read_ok then return nil end
 		return content
 	end)
 

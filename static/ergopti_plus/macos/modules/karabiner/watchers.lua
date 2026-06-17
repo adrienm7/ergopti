@@ -114,14 +114,16 @@ local function deactivate_capsword()
 
 		-- Clear the KE variable first so the engine does not re-activate CapsWord
 		-- when it sees the subsequent LED state change.
-		hs.task.new(KARABINER_CLI, function(_, _, _)
+		local inner_task = hs.task.new(KARABINER_CLI, function(_, _, _)
 			-- macOS sometimes re-displays the CapsLock indicator after a single
 			-- LED reset (race with the Karabiner virtual CapsLock state machine).
 			-- A second unconditional set 150 ms later ensures the indicator stays off.
 			pcall(hs.hid.capslock.set, false)
 			hs.timer.doAfter(0.15, function() pcall(hs.hid.capslock.set, false) end)
 			Logger.done(LOG, "CapsWord deactivated via pointer event.")
-		end, {"--set-variable", "capsword", "0"}):start()
+		end, {"--set-variable", "capsword", "0"})
+		-- Nil-check: hs.task.new() returns nil when the CLI binary is absent
+		if inner_task then inner_task:start() end
 
 		-- hs.eventtap.keyStroke does not work for CapsLock on macOS — CapsLock is
 		-- a flagsChanged event, not a regular keyDown/keyUp, so keyStroke fails
@@ -299,7 +301,7 @@ local function cycle_windows_in_app()
 	if not app then return end
 
 	local visible = {}
-	for _, w in ipairs(app:allWindows()) do
+	for _, w in ipairs(app:allWindows() or {}) do
 		if w:isStandard() and not w:isMinimized() then
 			visible[#visible + 1] = w
 		end
@@ -403,7 +405,7 @@ end
 --- @return hs.hotkey The enabled hotkey instance.
 function M.start_cycle_windows_hotkey()
 	Logger.trace(LOG, "Registering cycle-windows hotkey (F17)…")
-	local hotkey = hs.hotkey.new({}, KEYCODE_F17_NAME, cycle_windows_in_app)
+	local hotkey = hs.hotkey.new({}, KEYCODE_F17_NAME, function() pcall(cycle_windows_in_app) end)
 	hotkey:enable()
 	Logger.done(LOG, "Cycle-windows hotkey registered.")
 	return hotkey

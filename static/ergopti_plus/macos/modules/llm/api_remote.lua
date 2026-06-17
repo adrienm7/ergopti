@@ -38,7 +38,9 @@ local Paths          = require("lib.paths")
 local Profiles       = require("modules.llm.profiles")
 local Parser         = require("modules.llm.parser")
 local ApiCommon      = require("modules.llm.api_common")
-local HttpClient     = require("adapters.http_client").new()
+local _http_adapter  = require("adapters.http_client")
+local _infer_client  = _http_adapter.new()   -- used for inference POST requests
+local _check_client  = _http_adapter.new()   -- used for health-check GET requests
 local JsonCodec      = require("adapters.json_codec")
 local TimerScheduler = require("adapters.timer_scheduler")
 local LOG            = "llm.api_remote"
@@ -223,7 +225,7 @@ local function build_url(base_url, format, model, token)
 	end
 	if format == "gemini" then
 		-- Gemini: /models/<model>:generateContent?key=<token>
-		local enc = HttpClient.encodeForQuery(token)
+		local enc = _http_adapter.encodeForQuery(token)
 		return base .. "/models/" .. model .. ":generateContent?key=" .. enc
 	end
 	-- OpenAI / OpenAI-compatible
@@ -410,13 +412,13 @@ function M.warmup(_model_name, _profile)
 	local format = provider.format
 	local ping_url
 	if format == "gemini" then
-		local enc = HttpClient.encodeForQuery(token)
+		local enc = _http_adapter.encodeForQuery(token)
 		ping_url = rtrim_slash(base) .. "/models?key=" .. enc
 	else
 		ping_url = rtrim_slash(base) .. "/models"
 	end
 
-	HttpClient.get(ping_url, build_headers(format, token), function(r)
+	_check_client.get(ping_url, build_headers(format, token), function(r)
 		local was_ready = _is_ready
 		_is_ready = r.ok
 		if _is_ready and not was_ready then
@@ -460,13 +462,13 @@ function M.check_availability(_model_name, on_available, on_missing)
 	local format = provider.format
 	local url
 	if format == "gemini" then
-		local enc = HttpClient.encodeForQuery(entry.token)
+		local enc = _http_adapter.encodeForQuery(entry.token)
 		url = rtrim_slash(base) .. "/models?key=" .. enc
 	else
 		url = rtrim_slash(base) .. "/models"
 	end
 
-	HttpClient.get(url, build_headers(format, entry.token), function(r)
+	_check_client.get(url, build_headers(format, entry.token), function(r)
 		if r.ok then
 			if type(on_available) == "function" then pcall(on_available) end
 		else
@@ -554,7 +556,7 @@ local function post_and_parse(model_name, system_prompt, full_text, tail_text,
 	Logger.debug(LOG, "[%s] #%d POST -> %s (provider=%s, %d chars prompt)",
 		model, req_id, url, provider.format, #(user_prompt or ""))
 
-	HttpClient.post(url, headers, encoded, function(r)
+	_infer_client.post(url, headers, encoded, function(r)
 		local status, body = r.status, r.body
 		pcall(function()
 			local ms = math.floor((TimerScheduler.now() - t0) * 1000)
