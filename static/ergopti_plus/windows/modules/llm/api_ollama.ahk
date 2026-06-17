@@ -541,7 +541,20 @@ _LLM_Ollama_PollRequest(req_id, parser) {
 	}
 	http := entry["http"]
 	ready := false
-	try ready := http.WaitForResponse(0)
+	try {
+		ready := http.WaitForResponse(0)
+	} catch as com_err {
+		; A COM exception here means the connection dropped (WiFi cut, Ollama
+		; restarted). Abandon immediately — re-queuing would produce a busy-loop
+		; at 50 ms saturating the CPU until the 3-minute global timeout fires
+		; (ollama-com-exception-busy-loop fix).
+		try LoggerWarn("LLM.ollama", "WaitForResponse threw COM error — aborting req {1}: {2}", req_id, com_err.Message)
+		on_fail := entry["on_fail"]
+		_LLM_Ollama_Async.Delete(req_id)
+		try on_fail()
+		_LLM_Ollama_DrainPending()
+		return
+	}
 	if !ready {
 		if (entry.Has("deadline") and A_TickCount >= entry["deadline"]) {
 			elapsed := entry.Has("start_tick") ? (A_TickCount - entry["start_tick"]) : 0
@@ -728,22 +741,28 @@ _LLM_Ollama_TrimAsyncRegistry() {
 	global _LLM_Ollama_Async, LLM_OLLAMA_MAX_INFLIGHT
 	if (_LLM_Ollama_Async.Count < LLM_OLLAMA_MAX_INFLIGHT)
 		return
-	; Maps preserve insertion order in AHK v2 — first key = oldest.
-	for oldest_id, oldest_entry in _LLM_Ollama_Async {
-		; Kill the curl child so it does not keep writing to the temp file
-		; after we abandon the registry entry — the PID would otherwise
-		; accumulate until it expires naturally (up to 3 min).
-		if oldest_entry.Has("pid") and oldest_entry["pid"] > 0
-			try ProcessClose(oldest_entry["pid"])
-		_LLM_Ollama_CleanupCurlFiles(oldest_entry)
-		; Honour the async contract: exactly one of on_success / on_fail must
-		; fire. Without this the caller (e.g. the prediction engine slot state
-		; machine) hangs forever waiting for a callback that will never arrive.
-		if oldest_entry.Has("on_fail") and oldest_entry["on_fail"] is Func
-			try oldest_entry["on_fail"].Call()
-		_LLM_Ollama_Async.Delete(oldest_id)
+	; AHK v2 Maps do NOT guarantee insertion order — always find the
+	; numerically smallest key explicitly so the truly oldest request is
+	; killed, not a random one (trim-async-registry-map-order fix).
+	oldest_id := 0xFFFFFFFFFFFFFFFF
+	for id in _LLM_Ollama_Async
+		if (id < oldest_id)
+			oldest_id := id
+	if !_LLM_Ollama_Async.Has(oldest_id)
 		return
-	}
+	oldest_entry := _LLM_Ollama_Async[oldest_id]
+	; Kill the curl child so it does not keep writing to the temp file
+	; after we abandon the registry entry — the PID would otherwise
+	; accumulate until it expires naturally (up to 3 min).
+	if oldest_entry.Has("pid") and oldest_entry["pid"] > 0
+		try ProcessClose(oldest_entry["pid"])
+	_LLM_Ollama_CleanupCurlFiles(oldest_entry)
+	; Honour the async contract: exactly one of on_success / on_fail must
+	; fire. Without this the caller (e.g. the prediction engine slot state
+	; machine) hangs forever waiting for a callback that will never arrive.
+	if oldest_entry.Has("on_fail") and oldest_entry["on_fail"] is Func
+		try oldest_entry["on_fail"].Call()
+	_LLM_Ollama_Async.Delete(oldest_id)
 }
 
 

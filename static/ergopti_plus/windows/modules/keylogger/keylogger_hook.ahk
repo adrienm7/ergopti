@@ -279,145 +279,162 @@ KL_Hook_OnChar(ih, c) {
     if !Keylogger.initialized
         return
 
-    ; Advance the activity watermark + drive the session/idle machine BEFORE the
-    ; privacy filter. A filtered key (password field, private browsing, …) is
-    ; still a physical keypress: only its content is dropped, not the timing —
-    ; otherwise the next unfiltered key computes a giant delay across the whole
-    ; filtered interlude and poisons the burst / think-pause / session metrics.
-    delay := KL_Hook_NoteActivity()
-
-    ; Privacy filters short-circuit before any allocation, but AFTER the
-    ; watermark has already advanced above.
-    filtered := false
-    try filtered := MF_ShouldFilter()
-    if filtered
-        return
-
-    ; Per-keystroke metadata. The walker reads ``kc`` for ergonomic
-    ; streaks and writes it to ngram_keycodes; ``sc`` is the hardware
-    ; scancode used by the Windows heatmap.
-    meta := Map()
+    ; An uncaught exception inside an InputHook callback silently disables the
+    ; hook permanently. Wrap the entire body so any runtime error is logged and
+    ; swallowed — subsequent keystrokes must continue to reach the callback
+    ; (keylogger-hook-global-try fix).
     try {
-        if (KLHook.last_vk > 0)
-            meta["kc"] := KLHook.last_vk
-        ; ``sk`` (scan-key) — hardware scancode. Distinct from ``sc``
-        ; which the walker reserves for "shortcut key" identifiers.
-        if (KLHook.last_sc > 0)
-            meta["sk"] := KLHook.last_sc
-    }
+        ; Advance the activity watermark + drive the session/idle machine BEFORE the
+        ; privacy filter. A filtered key (password field, private browsing, …) is
+        ; still a physical keypress: only its content is dropped, not the timing —
+        ; otherwise the next unfiltered key computes a giant delay across the whole
+        ; filtered interlude and poisons the burst / think-pause / session metrics.
+        delay := KL_Hook_NoteActivity()
 
-    ; Stamp the synthetic source while the script is auto-typing (hotstring
-    ; expansion / LLM acceptance) so this keystroke is kept out of the manual
-    ; `chars` count and attributed correctly in the n-gram source histogram.
-    if Keylogger.synth_active {
-        meta["s"] := 1
-        meta["st"] := Keylogger.synth_type
-    }
+        ; Privacy filters short-circuit before any allocation, but AFTER the
+        ; watermark has already advanced above.
+        filtered := false
+        try filtered := MF_ShouldFilter()
+        if filtered
+            return
 
-    Keylogger.buffer_events.Push([c, delay, meta])
-    Keylogger.buffer_text .= c
-    if !Keylogger.synth_active {
-        try KL_Ergo_OnKeystroke(delay, KLHook.last_vk)
-        try KL_Roi_OnChar(c)
-        ; Feed the real-time WPM widget with each accepted manual keystroke.
-        try WPMWidget_Push(false, false)
-    } else {
-        KLHook.last_tick := 0
+        ; Per-keystroke metadata. The walker reads ``kc`` for ergonomic
+        ; streaks and writes it to ngram_keycodes; ``sc`` is the hardware
+        ; scancode used by the Windows heatmap.
+        meta := Map()
+        try {
+            if (KLHook.last_vk > 0)
+                meta["kc"] := KLHook.last_vk
+            ; ``sk`` (scan-key) — hardware scancode. Distinct from ``sc``
+            ; which the walker reserves for "shortcut key" identifiers.
+            if (KLHook.last_sc > 0)
+                meta["sk"] := KLHook.last_sc
+        }
+
+        ; Stamp the synthetic source while the script is auto-typing (hotstring
+        ; expansion / LLM acceptance) so this keystroke is kept out of the manual
+        ; `chars` count and attributed correctly in the n-gram source histogram.
+        if Keylogger.synth_active {
+            meta["s"] := 1
+            meta["st"] := Keylogger.synth_type
+        }
+
+        Keylogger.buffer_events.Push([c, delay, meta])
+        Keylogger.buffer_text .= c
+        if !Keylogger.synth_active {
+            try KL_Ergo_OnKeystroke(delay, KLHook.last_vk)
+            try KL_Roi_OnChar(c)
+            ; Feed the real-time WPM widget with each accepted manual keystroke.
+            try WPMWidget_Push(false, false)
+        } else {
+            KLHook.last_tick := 0
+        }
+    } catch as kl_err {
+        try LoggerError("keylogger_hook", "KL_Hook_OnChar unhandled exception — hook kept alive: {1}", kl_err.Message)
     }
 }
 
 KL_Hook_OnKeyDown(ih, vk, sc) {
     if A_IsSuspended
         return
-    ; Always stash (vk, sc) for the next OnChar callback — printable
-    ; characters reach OnChar after this fires, and we need the sc to
-    ; populate the heatmap. Wrap defensively: an uncaught error inside
-    ; an InputHook callback silently disables the hook.
-    try {
-        if IsNumber(vk)
-            KLHook.last_vk := vk
-        if IsNumber(sc)
-            KLHook.last_sc := sc
-    }
 
-    ; Shortcut detection runs BEFORE the special-keys early return so
-    ; chords on letter / digit / function keys are caught — those VKs
-    ; are not in KLHOOK_SPECIAL because OnChar handles their printable
-    ; output, but with modifiers held they are shortcuts to log.
-    ;
-    ; activity_already_noted tracks whether KL_Watchers_OnKeystroke was
-    ; already called in the shortcut branch so KL_Hook_NoteActivity can
-    ; skip it and avoid a double invocation for chords that are also
-    ; special keys (e.g. Ctrl+Left, Ctrl+BS) (H-01 fix).
-    activity_already_noted := false
-    if Keylogger.initialized {
-        sk := ""
-        try sk := KL_Watchers_DetectShortcut(vk)
-        if (sk != "") {
-            try KL_LogShortcut(sk, Keylogger.session_app)
-            ; A shortcut counts as user activity. Drive the session/idle
-            ; machine and bump last_tick so a stream of Ctrl+S / Ctrl+C
-            ; presses (which most apps consume before OnChar can fire)
-            ; doesn't fall back to the SESSION_TIMEOUT_MS clock and have
-            ; its own session_start re-fire on every chord.
-            ; Guard: skip entirely during synthetic auto-type so hotstring
-            ; expansions never corrupt the session/idle aggregates (H-02 fix).
-            if !Keylogger.synth_active {
-                try KL_Watchers_OnKeystroke()
-                KLHook.last_tick := A_TickCount
-                activity_already_noted := true
+    ; An uncaught exception inside an InputHook callback silently disables the
+    ; hook permanently. Wrap the entire body so any runtime error is logged and
+    ; swallowed — subsequent keystrokes must continue to reach the callback
+    ; (keylogger-hook-global-try fix).
+    try {
+        ; Always stash (vk, sc) for the next OnChar callback — printable
+        ; characters reach OnChar after this fires, and we need the sc to
+        ; populate the heatmap. Wrap defensively: an uncaught error inside
+        ; an InputHook callback silently disables the hook.
+        try {
+            if IsNumber(vk)
+                KLHook.last_vk := vk
+            if IsNumber(sc)
+                KLHook.last_sc := sc
+        }
+
+        ; Shortcut detection runs BEFORE the special-keys early return so
+        ; chords on letter / digit / function keys are caught — those VKs
+        ; are not in KLHOOK_SPECIAL because OnChar handles their printable
+        ; output, but with modifiers held they are shortcuts to log.
+        ;
+        ; activity_already_noted tracks whether KL_Watchers_OnKeystroke was
+        ; already called in the shortcut branch so KL_Hook_NoteActivity can
+        ; skip it and avoid a double invocation for chords that are also
+        ; special keys (e.g. Ctrl+Left, Ctrl+BS) (H-01 fix).
+        activity_already_noted := false
+        if Keylogger.initialized {
+            sk := ""
+            try sk := KL_Watchers_DetectShortcut(vk)
+            if (sk != "") {
+                try KL_LogShortcut(sk, Keylogger.session_app)
+                ; A shortcut counts as user activity. Drive the session/idle
+                ; machine and bump last_tick so a stream of Ctrl+S / Ctrl+C
+                ; presses (which most apps consume before OnChar can fire)
+                ; doesn't fall back to the SESSION_TIMEOUT_MS clock and have
+                ; its own session_start re-fire on every chord.
+                ; Guard: skip entirely during synthetic auto-type so hotstring
+                ; expansions never corrupt the session/idle aggregates (H-02 fix).
+                if !Keylogger.synth_active {
+                    try KL_Watchers_OnKeystroke()
+                    KLHook.last_tick := A_TickCount
+                    activity_already_noted := true
+                }
             }
         }
-    }
 
-    ; Special keys only — printable chars are handled by OnChar above.
-    if !KLHOOK_SPECIAL.Has(vk)
-        return
+        ; Special keys only — printable chars are handled by OnChar above.
+        if !KLHOOK_SPECIAL.Has(vk)
+            return
 
-    if !Keylogger.initialized
-        return
+        if !Keylogger.initialized
+            return
 
-    ; Advance the activity watermark + drive the session/idle machine BEFORE the
-    ; privacy filter, for the same reason as OnChar: a filtered special key was
-    ; still physically pressed, so the timing watermark must not lag behind it.
-    ; Pass the flag so KL_Hook_NoteActivity skips the watcher when the shortcut
-    ; branch already called it for this same physical keydown (H-01 fix).
-    delay := KL_Hook_NoteActivity(activity_already_noted)
+        ; Advance the activity watermark + drive the session/idle machine BEFORE the
+        ; privacy filter, for the same reason as OnChar: a filtered special key was
+        ; still physically pressed, so the timing watermark must not lag behind it.
+        ; Pass the flag so KL_Hook_NoteActivity skips the watcher when the shortcut
+        ; branch already called it for this same physical keydown (H-01 fix).
+        delay := KL_Hook_NoteActivity(activity_already_noted)
 
-    filtered := false
-    try filtered := MF_ShouldFilter()
-    if filtered
-        return
+        filtered := false
+        try filtered := MF_ShouldFilter()
+        if filtered
+            return
 
-    bracket := KLHOOK_SPECIAL[vk]
-    meta := Map("kc", vk, "sk", sc)
-    ; Synthetic backspaces emitted by an expansion correcting its own output
-    ; carry the source too, so the walker can net them out of hs/llm chars.
-    if Keylogger.synth_active {
-        meta["s"] := 1
-        meta["st"] := Keylogger.synth_type
-    }
+        bracket := KLHOOK_SPECIAL[vk]
+        meta := Map("kc", vk, "sk", sc)
+        ; Synthetic backspaces emitted by an expansion correcting its own output
+        ; carry the source too, so the walker can net them out of hs/llm chars.
+        if Keylogger.synth_active {
+            meta["s"] := 1
+            meta["st"] := Keylogger.synth_type
+        }
 
-    Keylogger.buffer_events.Push([bracket, delay, meta])
-    if !Keylogger.synth_active {
-        try KL_Ergo_OnKeystroke(delay, vk, vk = 0x08)
-    } else {
-        KLHook.last_tick := 0
-    }
+        Keylogger.buffer_events.Push([bracket, delay, meta])
+        if !Keylogger.synth_active {
+            try KL_Ergo_OnKeystroke(delay, vk, vk = 0x08)
+        } else {
+            KLHook.last_tick := 0
+        }
 
-    ; Mirror text-buffer mutations the user just performed so the
-    ; flush's ``buffer_text`` stays meaningful for downstream display.
-    switch vk {
-        case 0x08:  ; BS — drop the last UTF-16 unit if any.
-            n := StrLen(Keylogger.buffer_text)
-            if (n > 0)
-                Keylogger.buffer_text := SubStr(Keylogger.buffer_text, 1, n - 1)
-        case 0x0D:
-            Keylogger.buffer_text .= "`n"
-        case 0x09:
-            Keylogger.buffer_text .= "`t"
-            ; Arrow keys, Esc, F-keys etc. do not insert any character so
-            ; we leave buffer_text untouched.
+        ; Mirror text-buffer mutations the user just performed so the
+        ; flush's ``buffer_text`` stays meaningful for downstream display.
+        switch vk {
+            case 0x08:  ; BS — drop the last UTF-16 unit if any.
+                n := StrLen(Keylogger.buffer_text)
+                if (n > 0)
+                    Keylogger.buffer_text := SubStr(Keylogger.buffer_text, 1, n - 1)
+            case 0x0D:
+                Keylogger.buffer_text .= "`n"
+            case 0x09:
+                Keylogger.buffer_text .= "`t"
+                ; Arrow keys, Esc, F-keys etc. do not insert any character so
+                ; we leave buffer_text untouched.
+        }
+    } catch as kl_err {
+        try LoggerError("keylogger_hook", "KL_Hook_OnKeyDown unhandled exception — hook kept alive: {1}", kl_err.Message)
     }
 }
 

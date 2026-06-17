@@ -187,34 +187,6 @@ function M.new(deps, presets, ram_getter)
 		end
 	end
 
-	local function wait_for_ollama_api(retries)
-		retries = tonumber(retries) or 20
-		local done = false
-		local success = false
-
-		for i = 1, retries do
-			local pct = math.floor((i / retries) * 100)
-			update_progress_ui(pct, string.format(i18n.get("ollama.starting_service"), i, retries))
-			
-			local ok, result = pcall(hs.execute, "curl -s http://localhost:11434/api/version 2>/dev/null")
-			if ok and result and result:find('"version"') then
-				success = true
-				done = true
-				break
-			end
-			
-			if i < retries then
-				hs.timer.usleep(200 * 1000)  -- 200ms between attempts
-			end
-		end
-
-		if success then
-			update_progress_ui(100, i18n.get("ollama.service_ready"))
-		end
-
-		return success
-	end
-
 	local function get_ollama_repo(model_name)
 		for _, provider in ipairs(presets) do
 			for _, family in ipairs(provider.families or {}) do
