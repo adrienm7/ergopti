@@ -154,7 +154,9 @@ KL_Watchers_OnKeystroke() {
     last := KLHook.last_tick
 
     if (last > 0) {
-        gap := now - last
+        ; Mask to 32-bit unsigned so the subtraction stays non-negative across
+        ; the A_TickCount rollover at ~49.7 days uptime.
+        gap := (now - last) & 0xFFFFFFFF
         ; Exclude idle / away time from per-app focus durations. The app/title
         ; focus-entry timestamps advance by any gap long enough to count as a
         ; micro-idle or a session break, so the next app_switch / window_switch
@@ -174,7 +176,7 @@ KL_Watchers_OnKeystroke() {
             ; The idle tick missed this gap — likely the script was
             ; suspended (laptop lid, sleep, debugger pause). Close the
             ; session retroactively up to the last observed keystroke.
-            try KL_LogSession("session_end", last - KLWatch.session_started_at)
+            try KL_LogSession("session_end", (last - KLWatch.session_started_at) & 0xFFFFFFFF)
             KLWatch.is_session_active := false
         }
     }
@@ -196,7 +198,7 @@ KL_Watchers_IdleTick() {
     if !KLHook.HasOwnProp("last_tick") || KLHook.last_tick = 0
         return
     now := A_TickCount
-    gap := now - KLHook.last_tick
+    gap := (now - KLHook.last_tick) & 0xFFFFFFFF
 
     if (!KLWatch.is_idle and KLWatch.is_session_active
             and gap >= KLWatchConst.MICRO_IDLE_TIMEOUT_MS) {
@@ -209,10 +211,10 @@ KL_Watchers_IdleTick() {
         ; Emit idle_end before session_end so the event log is properly paired —
         ; a dangling idle_start without an idle_end corrupts idle-time aggregates
         if KLWatch.is_idle {
-            try KL_LogSession("idle_end", A_TickCount - KLWatch.idle_started_at)
+            try KL_LogSession("idle_end", (A_TickCount - KLWatch.idle_started_at) & 0xFFFFFFFF)
         }
         KLWatch.is_idle := false
-        try KL_LogSession("session_end", KLHook.last_tick - KLWatch.session_started_at)
+        try KL_LogSession("session_end", (KLHook.last_tick - KLWatch.session_started_at) & 0xFFFFFFFF)
         KLWatch.is_session_active := false
     }
 }

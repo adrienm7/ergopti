@@ -341,16 +341,22 @@ KL_Mouse_FlushScroll() {
         return
     if (KLMouse.scroll_ticks = 0 and KLMouse.scroll_h_ticks = 0)
         return
-    filtered := false
-    try filtered := MF_ShouldFilter()
-    ticks    := KLMouse.scroll_ticks
-    h_ticks  := KLMouse.scroll_h_ticks
-    start    := KLMouse.scroll_start
-    ; Reset before doing IO so a rapid re-entry doesn't double-log
+
+    ; Snapshot and reset atomically before calling MF_ShouldFilter, which can
+    ; yield the thread. Scrolls arriving during MF_ShouldFilter would otherwise
+    ; be captured in the locals but then cleared, losing them silently.
+    Critical("On")
+    ticks   := KLMouse.scroll_ticks
+    h_ticks := KLMouse.scroll_h_ticks
+    start   := KLMouse.scroll_start
     KLMouse.scroll_ticks   := 0
     KLMouse.scroll_h_ticks := 0
     KLMouse.scroll_start   := 0
     KLMouse.scroll_last    := 0
+    Critical("Off")
+
+    filtered := false
+    try filtered := MF_ShouldFilter()
     if filtered
         return
     if !Keylogger.initialized

@@ -766,9 +766,32 @@ KL_FlushBuffer() {
         && Keylogger.session_scrolls = 0)
         return
 
+    ; Atomically snapshot and reset the shared buffer so that Critical InputHook
+    ; callbacks (KL_Hook_OnChar) that fire between the snapshot and the reset
+    ; go into the freshly cleared buffer and are never lost silently.
+    Critical("On")
+    snap_events  := Keylogger.buffer_events
+    snap_text    := Keylogger.buffer_text
+    snap_clicks  := Keylogger.session_clicks
+    snap_scrolls := Keylogger.session_scrolls
+    snap_dist    := Keylogger.mouse_distance
+    snap_pause   := Keylogger.current_pause_ms
+    Keylogger.buffer_events    := []
+    Keylogger.buffer_text      := ""
+    Keylogger.rich_chunks      := []
+    Keylogger.last_time        := 0
+    Keylogger.session_clicks   := 0
+    Keylogger.session_scrolls  := 0
+    Keylogger.mouse_distance   := 0
+    Keylogger.last_flush_time  := A_TickCount
+    Critical("Off")
+
+    if (snap_events.Length = 0 && snap_clicks = 0 && snap_scrolls = 0)
+        return
+
     total_time_ms := 0
     total_chars   := 0
-    for _, ev in Keylogger.buffer_events {
+    for _, ev in snap_events {
         meta := ev[3]
         if !(meta is Map) || !meta.Has("s") || !meta["s"] {
             d := ev[2]
@@ -785,7 +808,7 @@ KL_FlushBuffer() {
 
     entry := Map(
         "type",              "typing",
-        "text",              Keylogger.buffer_text,
+        "text",              snap_text,
         "rich_text",         "",
         "app",               Keylogger.session_app,
         "app_category",      app_cat,
@@ -795,23 +818,14 @@ KL_FlushBuffer() {
         "layout",            Keylogger.session_layout,
         "is_fullscreen",     0,
         "in_meeting",        0,
-        "mouse_clicks",      Keylogger.session_clicks,
-        "mouse_scrolls",     Keylogger.session_scrolls,
-        "mouse_distance_px", Keylogger.mouse_distance,
-        "pause_before_ms",   Keylogger.current_pause_ms,
+        "mouse_clicks",      snap_clicks,
+        "mouse_scrolls",     snap_scrolls,
+        "mouse_distance_px", snap_dist,
+        "pause_before_ms",   snap_pause,
         "wpm",               Round(wpm, 1),
-        "events",            Keylogger.buffer_events
+        "events",            snap_events
     )
     KL_AppendLog(entry)
-
-    Keylogger.buffer_events    := []
-    Keylogger.buffer_text      := ""
-    Keylogger.rich_chunks      := []
-    Keylogger.last_time        := 0
-    Keylogger.session_clicks   := 0
-    Keylogger.session_scrolls  := 0
-    Keylogger.mouse_distance   := 0
-    Keylogger.last_flush_time  := A_TickCount
 }
 
 
