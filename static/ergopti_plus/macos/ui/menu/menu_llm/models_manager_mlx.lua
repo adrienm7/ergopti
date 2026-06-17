@@ -17,6 +17,10 @@ local ui_builder = require("ui.ui_builder")
 local Logger = require("lib.logger")
 local i18n = require("lib.i18n")
 
+-- GC-root table: every live hs.task is pinned here so Lua's garbage collector
+-- cannot SIGTERM it mid-run (hs.task held only in a local is collected on return).
+M._active_tasks = {}
+
 -- Optional dependency: the auto-bootstrap status lives in this module so we
 -- can differentiate "still installing" from "definitively failed" when the
 -- MLX import probe below fails. If the module is absent (unusual layout),
@@ -570,10 +574,14 @@ PY
 				"[ -n \"$(echo $ALL | tr -d ' ')\" ] && echo \"$ALL\" | tr ' ' '\\n' | sort -u | xargs kill -9 2>/dev/null; " ..
 				"rm -f /tmp/mlx_server.pid /tmp/mlx_server.pgid; " ..
 				"echo done"
-			local sweep = hs.task.new("/bin/bash", function(_c, stdout, _e)
+			local sweep = hs.task.new("/bin/bash", function(_, stdout)
+				M._active_tasks[sweep] = nil  -- sweep captured by closure
 				Logger.debug(LOG, "Pre-launch port-%d sweep done: %s", MLX_PORT, tostring(stdout):gsub("\n", " "))
 			end, {"-c", sweep_cmd})
-			pcall(function() sweep:start() end)
+			if sweep then
+				M._active_tasks[sweep] = true
+				pcall(function() sweep:start() end)
+			end
 		end
 
 		-- Skip the async pre-probe: if a server is already listening, probe_server_ready
@@ -627,7 +635,8 @@ PY
 				-- Use curl --no-keepalive so each probe opens a fresh TCP connection.
 				-- hs.http pools connections and reuses a keep-alive socket to a zombie
 				-- server, making this probe see the zombie's stale model ID indefinitely.
-				local probe_task = hs.task.new("/usr/bin/curl", function(exit_code, stdout, _)
+				local probe_task = hs.task.new("/usr/bin/curl", function(exit_code, stdout)
+					M._active_tasks[probe_task] = nil  -- probe_task captured by closure
 					if startup_closed or startup_confirmed then return end
 					if exit_code == 0 and probe_matches_target(stdout or "") then
 						mark_server_ready()
@@ -641,7 +650,10 @@ PY
 					"-H", "Connection: close",
 					"http://127.0.0.1:" .. MLX_PORT .. "/v1/models",
 				})
+			if probe_task then
+				M._active_tasks[probe_task] = true
 				pcall(function() probe_task:start() end)
+			end
 			end
 
 			-- Every line of MLX stdout/stderr gets:

@@ -21,4 +21,15 @@ _THS_Check() {
 	Assert(InStr(Src, 'LoggerWarn("HookDispatcher"') > 0, "HookDispatcher must log subscriber exceptions")
 }
 
+; Regression guard: the catch block must escalate to the global error handler so
+; modifier-release logic (_ShouldReleaseModifier) runs when a subscriber throws
+; during a Ctrl/Shift/Alt keydown. Before this fix the modifier stayed logically
+; stuck after any subscriber exception, requiring a script restart.
+_THS_CheckModifierRelease() {
+	Src := _THS_ReadSource("lib/hook_dispatcher.ahk")
+	Assert(InStr(Src, "ErgoptiGlobalErrorHandler(e") > 0,
+		"HookDispatcher catch must call ErgoptiGlobalErrorHandler(e, ...) to release stuck modifiers")
+}
+
 Test("HookDispatcher: logs swallowed subscriber exceptions", _THS_Check)
+Test("HookDispatcher: catch escalates to ErgoptiGlobalErrorHandler for modifier release", _THS_CheckModifierRelease)

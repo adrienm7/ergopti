@@ -134,7 +134,6 @@ class Keylogger {
     static session_clicks   := 0
     static session_scrolls  := 0
     static mouse_distance   := 0
-    static current_pause_ms := 0
 
     ; Synthetic keystroke tagging. When the script auto-types (hotstring
     ; expansion, LLM acceptance) the resulting keystrokes still flow through
@@ -780,7 +779,10 @@ KL_FlushBuffer() {
     snap_clicks  := Keylogger.session_clicks
     snap_scrolls := Keylogger.session_scrolls
     snap_dist    := Keylogger.mouse_distance
-    snap_pause   := Keylogger.current_pause_ms
+    ; The delay of the first keystroke in the buffer is the inter-burst gap:
+    ; the time elapsed since the previous burst ended. Using the stale
+    ; current_pause_ms field (always 0) was producing null analytics.
+    snap_pause   := (snap_events.Length > 0) ? snap_events[1][2] : 0
     Keylogger.buffer_events    := []
     Keylogger.buffer_text      := ""
     Keylogger.rich_chunks      := []
