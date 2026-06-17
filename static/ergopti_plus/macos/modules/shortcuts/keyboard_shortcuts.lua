@@ -228,6 +228,10 @@ end
 
 --- Starts the keyboard shortcuts module: loads assignments and binds all active slots.
 function M.start()
+	if _started then
+		Logger.warn(LOG, "M.start() called more than once — ignoring duplicate call.")
+		return
+	end
 	Logger.start(LOG, "Starting keyboard shortcuts…")
 	load_assignments()
 	for slot, action in pairs(_actions) do

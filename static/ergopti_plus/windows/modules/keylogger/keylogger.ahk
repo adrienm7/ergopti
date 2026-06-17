@@ -86,6 +86,11 @@ class KeylogConst {
     ; never runs while keystrokes are being dropped by LowLevelHooksTimeout.
     static INGEST_LIVE_PUSH_IDLE_MS := 500
     static SCHEMA_VERSION           := 1
+    ; Tail size (bytes) read from data.sql at startup to scan for the max event id.
+    ; data.sql is append-only and per-device, so the highest id is always near the
+    ; end of the file. Reading 64 KB covers thousands of recent INSERTs while keeping
+    ; startup I/O O(1) regardless of total file size (which can reach 100+ MB).
+    static DATA_SQL_SCAN_TAIL_BYTES := 65536
 }
 
 
@@ -1719,10 +1724,19 @@ KL_Init(metrics_dir) {
     ; already in data.sql; re-minting those ids would be silently dropped by
     ; the schema's INSERT OR IGNORE. Resolve to one past the highest persisted
     ; id so a new event can never collide with an existing one.
+    ; Read only the TAIL of data.sql — it is append-only and per-device, so the
+    ; highest id is always near the end. 64 KB covers thousands of recent INSERTs
+    ; and keeps startup I/O O(1) on 100+ MB files (keylogger-scan-max-id-performance).
     sql_text := ""
     try {
-        if FileExist(Keylogger.data_sql_path)
-            sql_text := FileRead(Keylogger.data_sql_path, "UTF-8")
+        if FileExist(Keylogger.data_sql_path) {
+            fh := FileOpen(Keylogger.data_sql_path, "r", "UTF-8")
+            if IsObject(fh) {
+                fh.Seek(Max(0, fh.Length - KeylogConst.DATA_SQL_SCAN_TAIL_BYTES), 0)
+                sql_text := fh.Read()
+                fh.Close()
+            }
+        }
     }
     max_id := KL_ScanMaxEventId(sql_text, Keylogger._device_id_lit)
     Keylogger.next_event_id := KL_ResolveStartId(Keylogger.next_event_id, max_id)

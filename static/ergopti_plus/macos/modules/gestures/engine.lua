@@ -362,8 +362,12 @@ local function triggerLiveAxisIfNeeded(slot, pos, now, axis)
 			if local_sign ~= 0 and local_sign ~= gs.liveAxisSign and math.abs(local_delta) >= LIVE_AXIS_MIN then
 				Logger.info(LOG, string.format("INCREMENTAL REVERSAL DETECTED slot=%s axis=%s local_delta=%.2f prevSign=%d newSign=%d — rebasing startPos to (%.1f,%.1f)",
 					slot, axis, local_delta, gs.liveAxisSign, local_sign, pos.x, pos.y))
-				gs.startPos       = pos
-				gs.endPos         = pos
+				-- Clone pos: startPos and endPos must not alias the same table; the
+				-- centroid-jump compensator mutates gs.startPos.x/y in place, which
+				-- would corrupt gs.endPos if they point to the same table
+				-- (gesture-engine-table-mutation).
+				gs.startPos       = {x = pos.x, y = pos.y}
+				gs.endPos         = {x = pos.x, y = pos.y}
 				gs.stepsCommitted = 0
 				gs.liveAxisSign   = nil
 				gs.lastFirePos    = nil
@@ -390,8 +394,8 @@ local function triggerLiveAxisIfNeeded(slot, pos, now, axis)
 			-- the early detector above (e.g., sudden centroid jump from finger count change).
 			Logger.info(LOG, string.format("INCREMENTAL FALLBACK REBASE slot=%s axis=%s sd=%.2f targetSteps=%d prevSteps=%d diff=%d",
 				slot, axis, sd, targetSteps, gs.stepsCommitted, diff))
-			gs.startPos       = pos
-			gs.endPos         = pos
+			gs.startPos       = {x = pos.x, y = pos.y}
+			gs.endPos         = {x = pos.x, y = pos.y}
 			gs.stepsCommitted = 0
 			gs.liveAxisSign   = nil
 			gs.lastFirePos    = nil
@@ -432,8 +436,8 @@ local function triggerLiveAxisIfNeeded(slot, pos, now, axis)
 	gs.liveAxisSign = sign
 	gs.liveAxisSlot = slot
 	gs.lastLiveFire = now
-	gs.startPos     = pos
-	gs.endPos       = pos
+	gs.startPos     = {x = pos.x, y = pos.y}
+	gs.endPos       = {x = pos.x, y = pos.y}
 	gs.stepsCommitted = 0
 end
 
@@ -646,8 +650,8 @@ function M.process_frame(touches)
 			end
 			gs.active         = true
 			gs.startTime      = now
-			gs.startPos       = pos
-			gs.endPos         = pos
+			gs.startPos       = {x = pos.x, y = pos.y}
+			gs.endPos         = {x = pos.x, y = pos.y}
 			gs.maxFingers     = n
 			gs.lastN          = n
 			gs.stepsCommitted = 0
@@ -784,8 +788,8 @@ function M.process_frame(touches)
 					Logger.debug(LOG, "Rapid re-tap detected (%d finger(s)) — committing and restarting.", n)
 					if gs.startPos then pcall(commitGesture, now) end
 					gs.startTime      = now
-					gs.startPos       = pos
-					gs.endPos         = pos
+					gs.startPos       = {x = pos.x, y = pos.y}
+					gs.endPos         = {x = pos.x, y = pos.y}
 					gs.lockedDir      = nil
 					gs.stepsCommitted = 0
 					gs.lifting        = false

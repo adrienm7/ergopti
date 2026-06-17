@@ -424,13 +424,14 @@ local function discover_endpoints(on_done)
 			Logger.warn(LOG, "MLX endpoints resolved: completions=%s, chat=%s.",
 				_completions_endpoint, _chat_endpoint)
 		end
-		-- Fire only the most-recent callback — it reflects the currently
-		-- active model. Earlier callbacks are stale (issued before a model
-		-- switch) and would trigger warmup POSTs for the wrong model, which
-		-- causes an avalanche of discovery + warmup cycles on the new server.
+		-- Fire all enqueued callbacks — each warmup caller that arrived during
+		-- the discovery probe deserves to be notified so none are silently dropped
+		-- (mlx-discovery-callbacks-loss). All callers requested the same model
+		-- (model switches clear the queue via reset_endpoints()), so firing all
+		-- of them is correct and idempotent.
 		local cbs = _discovery_pending_callbacks
 		_discovery_pending_callbacks = {}
-		if #cbs > 0 then pcall(cbs[#cbs]) end
+		for _, cb in ipairs(cbs) do pcall(cb) end
 	end
 
 	local function run_post_probes()
