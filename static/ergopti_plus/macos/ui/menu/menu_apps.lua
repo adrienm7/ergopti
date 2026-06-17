@@ -202,8 +202,6 @@ end
 --- @return table The menu item representing the Applications submenu.
 function M.build(ctx)
 	Logger.trace(LOG, "Building applications submenu…")
-	local paused = ctx and ctx.paused
-
 	local apps = discover_bundled_apps(ctx)
 	local rows = {}
 
@@ -218,7 +216,6 @@ function M.build(ctx)
 		table.insert(rows, {
 			title    = label,
 			image    = app.icon,
-			disabled = paused,
 			fn       = function()
 				Logger.info(LOG, "Opening bundled app '%s'…", app_name)
 				-- Resolve locale: Hammerspoon active locale → system locale → "en".
@@ -276,7 +273,6 @@ function M.build(ctx)
 	Logger.done(LOG, "Applications submenu built (%d item(s)).", #rows)
 	return {
 		title    = i18n.get("menu.apps.title"),
-		disabled = paused,
 		menu     = rows,
 	}
 end
