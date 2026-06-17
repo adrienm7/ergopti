@@ -56,7 +56,7 @@ local function extract_on_fail_body(src)
 	local depth = 0
 	local started = false
 	while pos <= #src do
-		local token, token_end = src:match("()([%w_]+)()", pos)
+		local token, token_end = src:match("([%w_]+)()", pos)
 		if not token then break end
 		if token == "function" then
 			depth = depth + 1
