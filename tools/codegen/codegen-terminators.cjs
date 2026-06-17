@@ -136,6 +136,7 @@ function generateAhk() {
 		`; static/ergopti_plus/windows/_generated/terminators.ahk`,
 		`; AUTO-GENERATED from shared/domain/Terminators.spec.js.`,
 		`; DO NOT EDIT BY HAND — run \`npm run codegen:terminators\` to refresh.`,
+		`#Requires AutoHotkey v2.0`,
 		``,
 		`; ==============================================================================`,
 		`; CLASS: Terminators`,
