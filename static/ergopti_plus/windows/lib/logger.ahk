@@ -477,7 +477,7 @@ _LoggerEmit(Level, Tag, Msg, Args*) {
 	; must survive a subsequent crash — WARNING and above. A WARNING that
 	; immediately precedes a hard crash would be swallowed by the 500 ms
 	; buffered path; forcing a flush here ensures it lands on disk.
-	if LOGGER_SEVERITY[Level] >= LOGGER_SEVERITY["WARNING"] {
+	if LOGGER_SEVERITY[Level] >= LOGGER_SEVERITY["ERROR"] {
 		_LoggerFlush(true)
 	}
 	_LoggerFanOut(Tag, Line)

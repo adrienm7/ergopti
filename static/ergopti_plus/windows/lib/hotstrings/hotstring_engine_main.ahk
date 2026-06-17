@@ -1215,7 +1215,7 @@ _HSE_DispatchRawCallback(Spec, EndChar) {
             BufLen := StrLen(HSE_Buffer)
             Bs  := Max(0, Min(Effect.Bs, BufLen))
             if (Bs != Effect.Bs)
-                try LoggerWarn("HSE", "Raw callback returned Bs=%d out of range [0,%d] — clamped.", Effect.Bs, BufLen)
+                try LoggerWarn("HSE", "Raw callback returned Bs={1} out of range [0,{2}] — clamped.", Effect.Bs, BufLen)
             Ins := Effect.HasOwnProp("Ins") ? Effect.Ins : ""
             HSE_Buffer := (BufLen >= Bs ? SubStr(HSE_Buffer, 1, BufLen - Bs) : "") . Ins
             ; Mirror HSE_ApplyExpansion's cap so a future raw callback with a large

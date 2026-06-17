@@ -239,7 +239,7 @@ class Expander {
 	; Param starBase - The trigger string without its trailing magic-key character.
 	; Returns Array  - Sorted array of matching Mapping objects.
 	_BuildStarBucket(starBase) {
-		local starTailChar := (StrLen(starBase) > 0) ? SubStr(starBase, -0) : ""
+		local starTailChar := (StrLen(starBase) > 0) ? SubStr(starBase, -1) : ""
 		if (starTailChar = "") {
 			return []
 		}

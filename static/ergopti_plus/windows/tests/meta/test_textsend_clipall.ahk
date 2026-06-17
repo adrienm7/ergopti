@@ -65,7 +65,7 @@ _TSCA_FuncBodyStripped(Src, FuncDef) {
 ; SaveAll/RestoreAll assertions scan that helper's body rather than TextSend's.
 _TSCA_TextSendUsesSaveAll() {
 	Src := _TSCA_ReadSource("adapters/text_sender.ahk")
-	Body := _TSCA_FuncBodyStripped(Src, "_TextSendClipboard(Text) {")
+	Body := _TSCA_FuncBodyStripped(Src, "_TextSendClipboard(Text, Saved, Callback := 0) {")
 	Assert(Body != "", "_TextSendClipboard must exist in adapters/text_sender.ahk")
 	Assert(!InStr(Body, "CB_Save()"),
 		"The clipboard branch must NOT call CB_Save() — it is text-only and destroys non-text clipboard content; use CB_SaveAll() instead")

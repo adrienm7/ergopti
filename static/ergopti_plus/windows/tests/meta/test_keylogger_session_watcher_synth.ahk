@@ -63,7 +63,7 @@ _KSW_FuncBody(Src, Decl) {
 
 _KSW_WatcherGatedBySynth() {
 	Src := _KSW_ReadSource("modules/keylogger/keylogger_hook.ahk")
-	Body := _KSW_FuncBody(Src, "KL_Hook_NoteActivity() {")
+	Body := _KSW_FuncBody(Src, "KL_Hook_NoteActivity(")
 	Assert(Body != "", "KL_Hook_NoteActivity() must exist in keylogger_hook.ahk")
 	Assert(InStr(Body, "KL_Watchers_OnKeystroke") > 0,
 		"KL_Hook_NoteActivity must still drive KL_Watchers_OnKeystroke for real keystrokes")

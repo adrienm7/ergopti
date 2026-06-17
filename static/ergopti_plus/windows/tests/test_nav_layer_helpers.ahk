@@ -21,6 +21,7 @@
 _NL_ActivateLayerSetsEnabled() {
 	global LayerEnabled := false
 	global NumberOfRepetitions := 5
+	global CapsWordEnabled := false
 	ResetStubRecorders()
 	ActivateLayer()
 	AssertTrue(LayerEnabled)
@@ -30,6 +31,7 @@ Test("ActivateLayer: sets LayerEnabled to true", _NL_ActivateLayerSetsEnabled)
 _NL_ActivateLayerResetsRepetitions() {
 	global LayerEnabled := false
 	global NumberOfRepetitions := 7
+	global CapsWordEnabled := false
 	ResetStubRecorders()
 	ActivateLayer()
 	AssertEqual(1, NumberOfRepetitions)
@@ -38,6 +40,7 @@ Test("ActivateLayer: resets NumberOfRepetitions to 1", _NL_ActivateLayerResetsRe
 
 _NL_DisableLayerSetsDisabled() {
 	global LayerEnabled := true
+	global CapsWordEnabled := false
 	ResetStubRecorders()
 	DisableLayer()
 	AssertFalse(LayerEnabled)

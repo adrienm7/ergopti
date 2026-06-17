@@ -110,7 +110,7 @@ _TSCT_ClipWaitTimeoutIsSmall() {
 	Src := _TSCT_ReadSource("adapters/text_sender.ahk")
 	Assert(InStr(Src, "TEXT_CLIPBOARD_WAIT_TIMEOUT_SEC := 0.2") > 0,
 		"A small finite ClipWait timeout constant (0.2 s) must be defined so the wait never stalls perceptibly")
-	Body := _TSCT_FuncBodyStripped(Src, "_TextSendClipboard(Text) {")
+	Body := _TSCT_FuncBodyStripped(Src, "_TextSendClipboard(Text, Saved, Callback := 0) {")
 	Assert(Body != "", "_TextSendClipboard helper must exist")
 	Assert(!InStr(Body, "ClipWait(1)"),
 		"_TextSendClipboard must NOT call ClipWait(1) - a full second blocks far too long; use the small finite TEXT_CLIPBOARD_WAIT_TIMEOUT_SEC")
@@ -132,7 +132,7 @@ Test("text_sender: clipboard ClipWait uses a small finite timeout (textsend-clip
 ; ClipWait's boolean must gate the paste: on timeout, no ^v and a loud LoggerError.
 _TSCT_ClipWaitReturnChecked() {
 	Src := _TSCT_ReadSource("adapters/text_sender.ahk")
-	Body := _TSCT_FuncBodyStripped(Src, "_TextSendClipboard(Text) {")
+	Body := _TSCT_FuncBodyStripped(Src, "_TextSendClipboard(Text, Saved, Callback := 0) {")
 	Assert(Body != "", "_TextSendClipboard helper must exist")
 	Assert(InStr(Body, "if !ClipWait(") > 0,
 		"_TextSendClipboard must consult ClipWait's return value - a timeout must abort the paste, not be treated as success (fail-fast rule 5.3)")
