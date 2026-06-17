@@ -94,6 +94,12 @@ M.TAP_HOLD_KEYS = {}
 --- Each entry defines a two-modifier simultaneous combo the user can map to an action.
 M.MOD_COMBOS = {}
 
+-- Session guard: prevent the first-run wizard from firing more than once per
+-- Hammerspoon session. hs.reload() re-requires all modules so this flag resets
+-- to false each time — but within a single boot a second M.init() call (e.g.
+-- from a menu "Reload") must not re-prompt the user.
+local _wizard_ran_this_session = false
+
 -- Builds the minimal karabiner.json deployed on pause: the same profile structure
 -- as normal but carrying only `rules` (an empty list = full native keyboard). KE's
 -- FSEvents watcher reloads and applies just those — daemons stay alive, no process
@@ -691,7 +697,10 @@ function M.init(file_system)
 	-- only surfaces a dialog when a KE dependency is missing; otherwise it
 	-- exits silently. Pcall-wrapped so any onboarding failure cannot prevent
 	-- the bridge itself from finishing initialization.
-	if _state.enabled then
+	-- The session guard prevents the dialog from re-appearing on every
+	-- hs.reload() within the same Hammerspoon session.
+	if _state.enabled and not _wizard_ran_this_session then
+		_wizard_ran_this_session = true
 		hs.timer.doAfter(2.0, function()
 			pcall(function()
 				local Onboarding = require("modules.karabiner.onboarding")

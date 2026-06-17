@@ -1527,7 +1527,7 @@ function M.build(ctx)
 		submenu[#submenu + 1] = { title = "-" }
 		submenu[#submenu + 1] = {
 			title    = replace_label,
-			checked  = (replace_enabled and not hs_paused) or nil,
+			checked  = replace_enabled or nil,
 			disabled = not replace_group_on or hs_paused or nil,
 			fn       = (replace_group_on and not hs_paused) and function()
 				if ctx and ctx.keymap then

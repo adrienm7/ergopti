@@ -236,7 +236,7 @@ function M.build_groups(ctx, only, counts)
 		local item = {
 			-- Always show count (even 0) — only enabled sections contribute
 			title   = base_label .. " (" .. fmt_count(total) .. ")",
-			checked = (enabled and not ctx.paused) or nil,
+			checked = enabled or nil,
 			fn      = toggleGroupFn(ctx, name),
 		}
 
@@ -305,7 +305,7 @@ function M.build_groups(ctx, only, counts)
 						lbl = ctx.applyTriggerChar(lbl)
 						sec_menu[#sec_menu + 1] = {
 							title    = sec.count ~= nil and (lbl .. " (" .. fmt_count(sec.count) .. ")") or lbl,
-							checked  = (sec_on and not ctx.paused) or nil,
+							checked  = sec_on or nil,
 							fn       = (enabled and not ctx.paused)
 									   and toggleSectionFn(ctx, name, sec.name, lbl) or nil,
 							disabled = not enabled or ctx.paused or nil,
@@ -335,7 +335,7 @@ local function buildBubbleItem(ctx, label, enabled_key, set_enabled_fn, notify_l
 
 	return {
 		title    = label,
-		checked  = (state[enabled_key] and not paused) or nil,
+		checked  = state[enabled_key] or nil,
 		disabled = paused or nil,
 		fn       = not paused and function()
 			state[enabled_key] = not state[enabled_key]
@@ -451,7 +451,7 @@ function M.build_management(ctx)
 
 				exp_sub[#exp_sub + 1] = {
 					title    = ctx.applyTriggerChar(lbl),
-					checked  = (enabled_t and not paused) or nil,
+					checked  = enabled_t or nil,
 					disabled = paused or nil,
 					fn       = not paused and (function(k, l) return function()
 						local nv = true
@@ -508,7 +508,7 @@ function M.build_management(ctx)
 
 		exp_sub[#exp_sub + 1] = {
 			title    = ct_lbl,
-			checked  = (enabled_t and not paused) or nil,
+			checked  = enabled_t or nil,
 			menu     = ct_sub,
 			disabled = paused or nil,
 		}
@@ -988,7 +988,7 @@ function M.build_custom(ctx, counts)
 				lbl = ctx.applyTriggerChar(lbl)
 				target[#target + 1] = {
 					title    = sec.count ~= nil and (lbl .. " (" .. fmt_count(sec.count) .. ")") or lbl,
-					checked  = (sec_on and not paused) or nil,
+					checked  = sec_on or nil,
 					fn       = (group_enabled and not paused)
 							   and toggleSectionFn(ctx, group_name, sec.name, lbl) or nil,
 					disabled = not group_enabled or paused or nil,
@@ -1153,7 +1153,7 @@ function M.build_custom(ctx, counts)
 	local both_enabled = all_personal_enabled and custom_enabled
 	return {
 		title   = title_str,
-		checked = (both_enabled and not paused) or nil,
+		checked = both_enabled or nil,
 		fn      = function()
 			local will_enable = not both_enabled
 			-- Toggle all personal groups

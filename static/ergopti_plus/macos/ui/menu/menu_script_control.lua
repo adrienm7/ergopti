@@ -72,7 +72,7 @@ function M.build(ctx)
 			else
 				table.insert(sub, {
 					title    = label,
-					checked  = ((current == act) and not paused) or nil,
+					checked  = (current == act) or nil,
 					disabled = not enabled or paused or nil,
 					fn       = (enabled and not paused) and (function(a) return function()
 						state.script_control_shortcuts[keyname] = a
@@ -92,7 +92,7 @@ function M.build(ctx)
 
 	return {
 		title   = i18n.get("menu.script_control.title"),
-		checked = (enabled and not paused) or nil,
+		checked = enabled or nil,
 		fn      = function()
 			state.script_control_enabled = not state.script_control_enabled
 			if type(sc_module.set_shortcut_action) == "function" then

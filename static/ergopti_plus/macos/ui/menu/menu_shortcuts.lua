@@ -90,7 +90,7 @@ local function make_shortcut_item(s, shortcuts, ctx)
 	local pk     = pretty_key(s.id, state)
 	return {
 		title    = pk .. (desc ~= "" and (" : " .. desc) or ""),
-		checked  = (is_on and not paused) or nil,
+		checked  = is_on or nil,
 		disabled = not state.shortcuts or paused or nil,
 		fn       = (state.shortcuts and not paused) and (function(id)
 			return function()
@@ -224,7 +224,7 @@ local function build_wrap_symbols_submenu(ctx, state, paused, shortcuts)
 					or  (pair.left .. " … " .. pair.right)
 			group_items[#group_items + 1] = {
 				title    = lbl,
-				checked  = (enabled and not paused) or nil,
+				checked  = enabled or nil,
 				disabled = paused or nil,
 				fn       = not paused and (function(k)
 					return function()
@@ -243,7 +243,7 @@ local function build_wrap_symbols_submenu(ctx, state, paused, shortcuts)
 		sub[#sub + 1] = {
 			title   = group_title,
 			menu    = group_items,
-			checked = (group_all_on and not paused) or nil,
+			checked = group_all_on or nil,
 		}
 	end
 
@@ -328,7 +328,7 @@ function M.build(ctx)
 
 	local item = {
 		title   = i18n.get("menu.shortcuts.title"),
-		checked = (state.shortcuts and not paused) or nil,
+		checked = state.shortcuts or nil,
 		fn      = function()
 			state.shortcuts = not state.shortcuts
 			if state.shortcuts then
@@ -438,7 +438,7 @@ function M.build(ctx)
 				else
 					table.insert(sub, {
 						title    = label,
-						checked  = ((current == act) and not paused) or nil,
+						checked  = (current == act) or nil,
 						disabled = not enabled or paused or nil,
 						fn       = (enabled and not paused) and (function(a) return function()
 							state.script_control_shortcuts[keyname] = a
