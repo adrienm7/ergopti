@@ -256,7 +256,7 @@ KL_Hook_NoteActivity(already_called := false) {
     if !Keylogger.synth_active and !already_called
         try KL_Watchers_OnKeystroke()
     now := A_TickCount
-    delay := (KLHook.last_tick > 0) ? (now - KLHook.last_tick) : 0
+    delay := (KLHook.last_tick > 0) ? ((now - KLHook.last_tick) & 0xFFFFFFFF) : 0
     KLHook.last_tick := now
     return delay
 }
