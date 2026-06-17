@@ -341,7 +341,11 @@ local function create_watcher(deviceID)
 			Logger.debug(LOG, "frame#%d device=%s touches=%d", fc, tostring(deviceID),
 				type(touches) == "table" and #touches or 0)
 		end
-		Logger.pcall(LOG, Engine.process_frame, touches)
+		if not Logger.pcall(LOG, Engine.process_frame, touches) then
+				-- process_frame threw after startScrollBlock() may have engaged.
+				-- Force a full state reset so the user can still scroll.
+				pcall(Engine.emergency_reset)
+			end
 	end)
 
 	if not w then

@@ -881,4 +881,13 @@ function M.set_any_touch_hook(hook)
 	_any_touch_hook = hook
 end
 
+--- Forces all gesture-tracking state back to idle and clears the scroll block.
+--- Called from the frame-callback error path when process_frame throws: without
+--- this, a crash after startScrollBlock() leaves isBlockingScroll=true and the
+--- user can never scroll again until Hammerspoon is reloaded. Idempotent.
+function M.emergency_reset()
+	Logger.warn(LOG, "emergency_reset() called — forcing gesture state reset and scroll unblock.")
+	resetGS()
+end
+
 return M
