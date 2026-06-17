@@ -47,7 +47,7 @@ _TTUO_UnescapeOrderingCheck() {
 	Assert(BackslashPos > 0,
 		'_WS_UnescapeToml must replace \\ with \ (StrReplace for double-backslash not found)')
 
-	QuotePos := InStr(Snippet, "StrReplace(S, " . Chr(0x22) . "\" . Chr(0x22) . Chr(0x22))
+	QuotePos := InStr(Snippet, "StrReplace(S, " . Chr(0x22) . "\" . Chr(0x22) . " . Chr(0x22)")
 	Assert(QuotePos > 0,
 		'_WS_UnescapeToml must replace \" with " (StrReplace for backslash-quote not found)')
 

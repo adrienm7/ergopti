@@ -66,7 +66,7 @@ _TLPPH_ZeroHklPreservesPending() {
 	ZeroPos := InStr(Body, "curHkl == 0")
 	Assert(ZeroPos > 0, "curHkl == 0 check must exist (already asserted above)")
 	; Get the 3 lines after the zero check (up to ~200 chars) — the early return is inline
-	Vicinity := SubStr(Body, ZeroPos, 200)
+	Vicinity := SubStr(Body, ZeroPos, 80)
 	Assert(InStr(Vicinity, "pendingHkl := 0") = 0,
 		"_ShouldReloadForHkl must NOT reset pendingHkl := 0 in the curHkl == 0 branch — that would restart the two-poll confirmation window on transient unreadable polls")
 }

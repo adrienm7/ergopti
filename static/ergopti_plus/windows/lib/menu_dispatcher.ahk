@@ -488,7 +488,7 @@ _DispatchIfMissed(ItemId, ExpectedLastFire) {
     _MenuDispatchLastFire[ItemId] := A_TickCount
     Critical "Off"   ; Release before the callback so the keyboard hook is never starved.
     try LoggerInfo("MenuDispatcher",
-        "AHK drop detected for ItemId={1} — firing bypass dispatch.", ItemId)
+        "AHK drop detected for ItemId={1} — firing bypass_dispatch.", ItemId)
     try {
         Callback.Call("", 0, 0)
     } catch as Err {

@@ -656,7 +656,7 @@ _LLM_OllamaParseAsyncBody(body, on_success, on_fail, entry := "") {
 		if (entry is Map) and entry.Has("payload_snip")
 			payload_hint := " Payload: «" . entry["payload_snip"] . "»."
 		try LoggerWarn("LLM.ollama", "Ollama returned an empty prediction (parse miss). Body: «{1}».{2}", snip, payload_hint)
-		try on_fail()
+		try on_fail(Map("error", true, "message", "empty prediction"))
 		return
 	}
 	snip := StrLen(text) > 60 ? SubStr(text, 1, 60) . "…" : text
@@ -1043,12 +1043,20 @@ _LLM_Ollama_StreamFinalFlush(handle, state, on_partial, on_success, on_fail) {
 	} catch {
 	}
 	retries := state.Has("flush_retries") ? state["flush_retries"] : 0
-	more_to_read := (!FileExist(handle.TmpStdout) or FileGetSize(handle.TmpStdout) = 0) ? false : true
+	; Retry when the output file is still empty — curl may have just finished
+	; but not yet flushed its OS write buffer. Conversely, if the file exists
+	; and has data, we have already drained it above; no retry needed.
+	more_to_read := (!FileExist(handle.TmpStdout) or FileGetSize(handle.TmpStdout) = 0)
 	if (state["acc"] == "" and more_to_read and retries < _LLM_OLLAMA_STREAM_FLUSH_MAX_RETRIES) {
 		state["flush_retries"] := retries + 1
 		SetTimer(() => _LLM_Ollama_StreamFinalFlush(handle, state, on_partial, on_success, on_fail), -_LLM_OLLAMA_STREAM_FLUSH_RETRY_MS)
 		return
 	}
+	; Flush any leftover (last JSON line that did not end with \n).
+	; Without this the final token of a response that lacks a trailing newline
+	; is silently lost, producing "Streaming finished with empty response".
+	if (state.Has("leftover") and state["leftover"] != "")
+		_LLM_Ollama_ConsumeStreamChunk(state["leftover"] . "`n", state, on_partial)
 	final := state["acc"]
 	_LLM_Ollama_CleanupStreamFiles(handle)
 	_LLM_Ollama_RemoveStreamHandle(handle)
@@ -1071,7 +1079,10 @@ _LLM_Ollama_RemoveStreamHandle(handle) {
 		return
 	next := []
 	for _, h in _LLM_Ollama_ActiveStreams {
-		if !IsObject(h) or h.Pid != handle.Pid
+		; Compare by object reference, not by PID — Windows reuses PIDs of
+		; short-lived processes; a PID collision would silently remove the
+		; wrong (still-active) handle from the registry.
+		if h != handle
 			next.Push(h)
 	}
 	_LLM_Ollama_ActiveStreams := next
