@@ -85,3 +85,17 @@ _AOPS_ThresholdsSingleSource() {
 		"ErgoptiPlus.ahk must remain the single source for LAST_SENT_KEY_TIME_PRUNE_AT (appstate-orphaned-parallel-state)")
 }
 Test("app_state: prune thresholds have a single source in ErgoptiPlus.ahk (appstate-orphaned-parallel-state)", _AOPS_ThresholdsSingleSource)
+
+; RemappedList is the canonical global for remap tracking (declared in ErgoptiPlus.ahk).
+; layout.ahk and shortcuts/utils.ahk previously referenced the removed AppState Map via
+; AppState["remapped_list"], which caused an UnsetError crash on boot (AppState is unset).
+_AOPS_NoRemappedListViaAppState() {
+	LayoutSrc   := _AOPS_ReadSource("modules/layout.ahk")
+	ShortcutSrc := _AOPS_ReadSource("modules/shortcuts/utils.ahk")
+	; Search for the string key used in the removed AppState Map
+	Assert(InStr(LayoutSrc, "remapped_list") == 0,
+		"modules/layout.ahk must not access AppState[remapped_list] - use RemappedList directly (appstate-orphaned-parallel-state)")
+	Assert(InStr(ShortcutSrc, "remapped_list") == 0,
+		"modules/shortcuts/utils.ahk must not access AppState[remapped_list] - use RemappedList directly (appstate-orphaned-parallel-state)")
+}
+Test("app_state: remapped_list accessed via RemappedList, not AppState (appstate-orphaned-parallel-state)", _AOPS_NoRemappedListViaAppState)
