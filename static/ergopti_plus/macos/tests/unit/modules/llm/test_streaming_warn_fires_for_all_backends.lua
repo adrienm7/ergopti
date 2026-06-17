@@ -49,7 +49,7 @@ end
 --- @return string Function body text, or empty string if not found.
 local function extract_on_fail_body(src)
 	-- Find the `local on_fail` declaration and collect until the closing `end`
-	local start_idx = src:find("local on_fail")
+	local start_idx = src:find("function on_fail")
 	if not start_idx then return "" end
 	-- Walk from there to find the matching `end` at the same nesting depth
 	local pos = start_idx

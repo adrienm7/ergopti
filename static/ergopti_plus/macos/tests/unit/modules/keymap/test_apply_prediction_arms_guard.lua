@@ -295,6 +295,24 @@ helpers.describe("apply_prediction: guard-arm ordering invariant", function()
 	end)
 
 
+	helpers.it("text_utils stub does not leak into subsequent test files (stub-isolation regression)", function()
+		-- This file installs a partial lib.text_utils stub at module level (section 1.9)
+		-- that lacks utf8_len, repl_title, etc. Without helpers.load_with_stubs clearing
+		-- package.loaded["lib.text_utils"], subsequent test files (test_expander.lua,
+		-- test_utils.lua, test_hotstring_properties.lua) receive the stub instead of the
+		-- real module and crash with "attempt to call a nil value (field 'utf8_len')".
+		-- This regression test verifies that after load_with_stubs is called, the real
+		-- lib.text_utils with utf8_len is available.
+		package.loaded["lib.text_utils"] = nil
+		local real_tu = helpers.load_with_stubs("lib.text_utils")
+		helpers.assert_eq(type(real_tu), "table",
+			"lib.text_utils must be a table after load_with_stubs")
+		helpers.assert_eq(type(real_tu.utf8_len), "function",
+			"lib.text_utils.utf8_len must be a real function after load_with_stubs (not a stub artifact)")
+		helpers.assert_eq(type(real_tu.repl_title), "function",
+			"lib.text_utils.repl_title must be a real function after load_with_stubs (not a stub artifact)")
+	end)
+
 	helpers.it("does not touch last_synthetic_arm_time when no prediction is available", function()
 		-- Swap out the engine stub so consume() returns nil (no prediction)
 		package.loaded["modules.keymap.llm_bridge"] = nil

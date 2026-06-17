@@ -24,6 +24,13 @@ local helpers = require("tests.helpers")
 local CACHE_DIR = helpers.driver_root() .. "tests/scratch_test_dir"
 local SRC = CACHE_DIR .. "/fake_hotstrings_" .. tostring(os.time()) .. ".toml"
 
+-- content_fingerprint() opens the source file in binary mode to hash its bytes;
+-- without a real file on disk, io.open returns nil and store() aborts silently.
+do
+	local fh = io.open(SRC, "w")
+	if fh then fh:write("# fake toml content for fingerprinting"); fh:close() end
+end
+
 -- Controllable source attributes, read by the adapter via the stubbed hs.fs.
 local cur_mtime, cur_size = 1000.5, 4242
 
@@ -126,6 +133,7 @@ helpers.describe("adapters.toml_cache: snapshot round-trip + invalidation", func
 		helpers.assert_true(disabled.stats().enabled == false, "stats must report disabled")
 	end)
 
-	-- Cleanup: remove the snapshot file this run created.
+	-- Cleanup: remove the snapshot and the temporary source file this run created.
 	os.remove(snapshot_path(SRC))
+	os.remove(SRC)
 end)

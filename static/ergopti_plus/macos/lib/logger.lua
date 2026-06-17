@@ -575,7 +575,10 @@ local function _log(variant_key, module_name, msg, ...)
 	_push_ring(console_line)
 
 	-- Forward to the test sink when registered (never in production builds).
-	if _test_sink then pcall(_test_sink, console_line) end
+	-- Map "WARNING" to "warn" to match the lowercase short-name convention used
+	-- by the shared logger, so test assertions like `if variant == "warn"` work.
+	local sink_variant = variant_key == "WARNING" and "warn" or string.lower(variant_key)
+	if _test_sink then pcall(_test_sink, console_line, sink_variant) end
 
 	_write_to_file(stamp, line)
 
