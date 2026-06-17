@@ -19,9 +19,10 @@
 
 local helpers = require("tests.helpers")
 
--- A real, already-existing writable dir for snapshot files (hs.fs.mkdir is
--- stubbed out in tests, so we cannot create one; scratch_test_dir ships in repo).
-local CACHE_DIR = helpers.driver_root() .. "tests/scratch_test_dir"
+-- Use the OS temp directory: scratch_test_dir is gitignored and absent in CI,
+-- so io.open(SRC, "w") would silently fail there, leaving content_fingerprint()
+-- unable to read the file and causing store() to abort without writing a snapshot.
+local CACHE_DIR = (os.getenv("TMPDIR") or os.getenv("TMP") or "/tmp"):gsub("[/\\]+$", "")
 local SRC = CACHE_DIR .. "/fake_hotstrings_" .. tostring(os.time()) .. ".toml"
 
 -- content_fingerprint() opens the source file in binary mode to hash its bytes;
