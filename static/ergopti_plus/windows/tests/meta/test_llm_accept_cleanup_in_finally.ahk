@@ -87,9 +87,9 @@ _LACF_BridgeKLClearInFinally() {
 	Src := _LACF_ReadSource("modules/llm/llm_bridge.ahk")
 	Body := _LACF_FuncBody(Src, "LLM_Bridge_OnAccept(text) {")
 	Assert(Body != "", "LLM_Bridge_OnAccept must exist in modules/llm/llm_bridge.ahk")
-	Finally := _LACF_AfterFinally(Body)
-	Assert(Finally != "", "LLM_Bridge_OnAccept must have a } finally { block (llm-accept-cleanup-in-finally)")
-	Assert(InStr(Finally, "KL_ClearSynthetic") > 0,
+	FinallyBlock := _LACF_AfterFinally(Body)
+	Assert(FinallyBlock != "", "LLM_Bridge_OnAccept must have a } finally { block (llm-accept-cleanup-in-finally)")
+	Assert(InStr(FinallyBlock, "KL_ClearSynthetic") > 0,
 		"KL_ClearSynthetic timer must appear in the finally block of LLM_Bridge_OnAccept -- moving it inline after TextSend leaves KL_Synthetic permanently set on TextSend failure (llm-accept-cleanup-in-finally)")
 }
 Test("llm_bridge: KL_ClearSynthetic timer is scheduled from the finally block (llm-accept-cleanup-in-finally)", _LACF_BridgeKLClearInFinally)
@@ -99,9 +99,9 @@ Test("llm_bridge: KL_ClearSynthetic timer is scheduled from the finally block (l
 _LACF_BridgePrefixSupInFinally() {
 	Src := _LACF_ReadSource("modules/llm/llm_bridge.ahk")
 	Body := _LACF_FuncBody(Src, "LLM_Bridge_OnAccept(text) {")
-	Finally := _LACF_AfterFinally(Body)
-	Assert(Finally != "", "LLM_Bridge_OnAccept must have a } finally { block (llm-accept-cleanup-in-finally)")
-	Assert(InStr(Finally, "PrefixWatcherSuppress(false)") > 0,
+	FinallyBlock := _LACF_AfterFinally(Body)
+	Assert(FinallyBlock != "", "LLM_Bridge_OnAccept must have a } finally { block (llm-accept-cleanup-in-finally)")
+	Assert(InStr(FinallyBlock, "PrefixWatcherSuppress(false)") > 0,
 		"PrefixWatcherSuppress(false) timer must be scheduled from the finally block of LLM_Bridge_OnAccept -- a stuck suppression silences the hotstring engine permanently (llm-accept-cleanup-in-finally)")
 }
 Test("llm_bridge: PrefixWatcherSuppress release timer is scheduled from the finally block (llm-accept-cleanup-in-finally)", _LACF_BridgePrefixSupInFinally)
@@ -128,9 +128,9 @@ _LACF_EngineKLClearInFinally() {
 	Src := _LACF_ReadSource("modules/llm/prediction_engine.ahk")
 	Body := _LACF_FuncBody(Src, "LLM_Engine_OnResults(slots, ctx, active := 1, is_final := false) {")
 	Assert(Body != "", "LLM_Engine_OnResults must exist in modules/llm/prediction_engine.ahk")
-	Finally := _LACF_AfterFinally(Body)
-	Assert(Finally != "", "LLM_Engine_OnResults must have a } finally { block in its auto-type path (llm-accept-cleanup-in-finally)")
-	Assert(InStr(Finally, "KL_ClearSynthetic") > 0,
+	FinallyBlock := _LACF_AfterFinally(Body)
+	Assert(FinallyBlock != "", "LLM_Engine_OnResults must have a } finally { block in its auto-type path (llm-accept-cleanup-in-finally)")
+	Assert(InStr(FinallyBlock, "KL_ClearSynthetic") > 0,
 		"KL_ClearSynthetic timer must appear in the finally block of LLM_Engine_OnResults' auto-type path (llm-accept-cleanup-in-finally)")
 }
 Test("prediction_engine: KL_ClearSynthetic is scheduled from the finally block (llm-accept-cleanup-in-finally)", _LACF_EngineKLClearInFinally)
