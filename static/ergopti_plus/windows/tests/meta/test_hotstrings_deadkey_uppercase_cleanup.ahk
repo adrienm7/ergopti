@@ -88,4 +88,4 @@ _HSDU_ETExplicitlyDeleted() {
 	Assert(RegExMatch(Src, 'DeadkeyMappingCircumflexModified\.Delete\("T"\)'),
 		'hotstrings.ahk must call DeadkeyMappingCircumflexModified.Delete("T") (hotstrings-deadkey-uppercase-duplicate)')
 }
-Test("hotstrings: \"E\" and \"T\" are explicitly removed from DeadkeyMappingCircumflexModified (hotstrings-deadkey-uppercase-duplicate)", _HSDU_ETExplicitlyDeleted)
+Test('hotstrings: "E" and "T" are explicitly removed from DeadkeyMappingCircumflexModified (hotstrings-deadkey-uppercase-duplicate)', _HSDU_ETExplicitlyDeleted)
