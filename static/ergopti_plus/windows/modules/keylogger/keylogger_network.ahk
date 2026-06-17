@@ -223,14 +223,32 @@ KL_Net_Start() {
     KLNet.reach_fn := KL_Net_ReachTick.Bind()
     KLNet.vpn_fn   := KL_Net_VpnTick.Bind()
     ; Stagger initial fires to avoid a simultaneous WMI + netsh + WinHTTP burst.
-    ; Each starter fires its tick once after the delay, then arms the repeating timer.
-    ; Stored in KLNet so KL_Net_Stop() can cancel them during the stagger window.
-    KLNet.wifi_start_fn  := () => (KLNet.wifi_fn(),  SetTimer(KLNet.wifi_fn,  KLNetConst.NETWORK_TICK_MS))
-    KLNet.reach_start_fn := () => (KLNet.reach_fn(), SetTimer(KLNet.reach_fn, KLNetConst.REACH_TICK_MS))
-    KLNet.vpn_start_fn   := () => (KLNet.vpn_fn(),   SetTimer(KLNet.vpn_fn,   KLNetConst.VPN_TICK_MS))
+    ; Starters are named global functions (not arrow lambdas) because AHK v2
+    ; parses (f(), g()) as calling f with g() as an argument, not as a comma
+    ; sequence — causing KL_Net_VpnTick to receive an unexpected parameter.
+    ; Stored as BoundFuncs in KLNet so KL_Net_Stop() can cancel them by reference.
+    KLNet.wifi_start_fn  := KL_Net_WifiStarter.Bind()
+    KLNet.reach_start_fn := KL_Net_ReachStarter.Bind()
+    KLNet.vpn_start_fn   := KL_Net_VpnStarter.Bind()
     SetTimer(KLNet.wifi_start_fn,  -5000)
     SetTimer(KLNet.reach_start_fn, -8000)
     SetTimer(KLNet.vpn_start_fn,   -11000)
+}
+
+; One-shot starter functions for KL_Net_Start() — fire the tick once then arm
+; the repeating timer. Named functions avoid the AHK v2 comma-expression parsing
+; ambiguity that would make (f(), g()) pass g() as an argument to f.
+KL_Net_WifiStarter() {
+    KLNet.wifi_fn()
+    SetTimer(KLNet.wifi_fn, KLNetConst.NETWORK_TICK_MS)
+}
+KL_Net_ReachStarter() {
+    KLNet.reach_fn()
+    SetTimer(KLNet.reach_fn, KLNetConst.REACH_TICK_MS)
+}
+KL_Net_VpnStarter() {
+    KLNet.vpn_fn()
+    SetTimer(KLNet.vpn_fn, KLNetConst.VPN_TICK_MS)
 }
 
 KL_Net_Stop() {

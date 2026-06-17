@@ -155,9 +155,10 @@ local function content_fingerprint(path)
 	local ok, result = pcall(function()
 		local f = io.open(path, "rb")
 		if not f then return nil end
-		local chunk = f:read(FINGERPRINT_READ_BYTES)
+		-- Inner pcall ensures f:close() always runs on unexpected read errors
+		local read_ok, chunk = pcall(function() return f:read(FINGERPRINT_READ_BYTES) end)
 		f:close()
-		if not chunk then return nil end
+		if not read_ok or not chunk then return nil end
 		-- FNV-1a-like: XOR then multiply, kept in 32-bit range
 		local h = 2166136261
 		for i = 1, #chunk do
@@ -301,8 +302,11 @@ function M.store(path, parsed)
 	local ok = pcall(function()
 		local fh = io.open(snapshot_path(path), "w")
 		if not fh then error("open failed") end
-		fh:write(body)
+		-- Inner pcall ensures fh:close() always runs even when write() panics
+		-- (e.g. disk-full — without this the file descriptor leaks)
+		local write_ok, write_err = pcall(function() fh:write(body) end)
 		fh:close()
+		if not write_ok then error(write_err) end
 	end)
 	if ok then
 		_writes = _writes + 1

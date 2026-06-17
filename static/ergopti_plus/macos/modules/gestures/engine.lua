@@ -689,6 +689,12 @@ function M.process_frame(touches)
 				local jumpY = pos.y - gs.endPos.y
 				gs.startPos.x = gs.startPos.x + jumpX
 				gs.startPos.y = gs.startPos.y + jumpY
+				-- lastFirePos is used by the reversal detector (local_delta = pos − lastFirePos).
+				-- Without this compensation the detector sees the full centroid jump as
+				-- movement in the opposite direction and fires a spurious reversal.
+				if gs.lastFirePos then
+					gs.lastFirePos = {x = gs.lastFirePos.x + jumpX, y = gs.lastFirePos.y + jumpY}
+				end
 				Logger.debug(LOG, string.format("Centroid jump compensated: n %d -> %d (jump: %.1f, %.1f).", gs.lastN or 0, n, jumpX, jumpY))
 			end
 			gs.lastN = n
