@@ -465,10 +465,11 @@ local function commitGesture(now)
 	-- one finger lifting early (n drops from 4 to 3 before the candidate path
 	-- can confirm 4 as the new maxFingers). Without this, the commit would
 	-- fire the 3-finger action instead of the 4-finger one.
-	local mf = gs.maxFingers
-	if gs.peakN and gs.peakN > mf and (gs.peakNFrames or 0) >= FINGER_CONFIRM_FRAMES then
-		Logger.info(LOG, "commitGesture: PEAK OVERRIDE — using peakN=%d (held %d frames) over maxFingers=%d",
-			gs.peakN, gs.peakNFrames, mf)
+	local mf           = gs.maxFingers
+	local peak_elapsed = now - (gs.peakNFirstSeen or now)
+	if gs.peakN and gs.peakN > mf and peak_elapsed >= PEAK_FINGERS_CONFIRM_MS then
+		Logger.info(LOG, "commitGesture: PEAK OVERRIDE — using peakN=%d (held %.3fs) over maxFingers=%d",
+			gs.peakN, peak_elapsed, mf)
 		mf = gs.peakN
 	end
 

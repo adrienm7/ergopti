@@ -120,6 +120,12 @@ local COMPLEX_DELAY_MULT = 2
 -- it cannot inadvertently stretch an expansion on an unrelated later key.
 local COMPLEX_CARRY_SEC = 0.3
 
+-- Maximum time to wait for in-flight synthetic events before treating them as
+-- lost and resetting the filter counters. Under normal macOS operation synthetic
+-- events arrive in < 50 ms; this generous ceiling handles extreme OS load without
+-- letting a stale arm permanently block the auto-reset.
+local SYNTHETIC_STALE_SEC = 5.0
+
 -- Central memory struct passed via reference to all sub-modules. The shape,
 -- invariants, and default seeding live in modules/keymap/state.lua; keeping
 -- them out of init.lua prevents three separate files (Registry, Expander,
@@ -610,10 +616,16 @@ local function onKeyDownRaw(e)
 
 	-- Auto-reset stuck synthetic counters when typing resumes after a pause.
 	-- Without this, a missed synthetic event would permanently lock the engine.
-	-- Guard: skip the reset if counters were armed within the last second — an
-	-- in-flight expansion may have set them just before this keystroke arrived
-	-- (A6 audit fix: runloop lag could cause a false 0.5 s gap right after arm).
-	if dt > 0.5 and (now - CoreState.last_synthetic_arm_time) > 1.0 then
+	-- Guard: skip the reset while events are still pending (in-flight) unless
+	-- the arm is older than SYNTHETIC_STALE_SEC — at that point we assume the
+	-- events were truly lost and recover. This replaces the old fixed 1.0 s
+	-- arm-age check, which could incorrectly reset counters just before delayed
+	-- synthetic events arrived (race condition under extreme OS load).
+	local pending_deletes = CoreState.expected_synthetic_deletes or 0
+	local pending_chars   = CoreState.expected_synthetic_chars   or ""
+	local arm_age         = now - (CoreState.last_synthetic_arm_time or 0)
+	local events_in_flight = pending_deletes > 0 or #pending_chars > 0
+	if dt > 0.5 and (not events_in_flight or arm_age > SYNTHETIC_STALE_SEC) then
 		CoreState.expected_synthetic_deletes = 0
 		CoreState.expected_synthetic_chars   = ""
 	end

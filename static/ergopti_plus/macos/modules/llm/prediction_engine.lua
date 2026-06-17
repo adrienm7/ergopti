@@ -616,7 +616,7 @@ function M.perform_check(force_trigger, profile_name)
 		local text_lower = to_type:lower()
 		local prev_char  = buffer:match(".*(%S)")
 		local first_ch   = to_type:match("^%s*(.)") or ""
-		local ends_sent  = prev_char and prev_char:match("[%.%!%?…:;]") ~= nil
+		local ends_sent  = (prev_char == nil) or (prev_char:match("[%.%!%?…:;\n]") ~= nil)
 		return (text_lower:match("^%s*suite%s+finale") ~= nil)
 			or (text_lower:match("^%s*</") ~= nil)
 			or (text_lower:match("^%s*vous avez besoin de plus") ~= nil)
