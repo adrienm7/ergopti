@@ -42,14 +42,14 @@ _ShouldReloadForHkl(curHkl, &lastHkl, &pendingHkl, suspended, isBlacklisted, hse
 		return false
 	if isBlacklisted
 		return false
-	; Layout momentarily unreadable — don't clear pending candidate, try again next poll
-	if (curHkl == 0)
-		return false
-	; No change from the last reloaded layout — clear any pending candidate and bail
+	; No change from the last reloaded layout — clear any stale pending candidate and bail
 	if (curHkl == lastHkl) {
 		pendingHkl := 0
 		return false
 	}
+	; Layout momentarily unreadable — preserve any pending candidate for the next poll
+	if (curHkl == 0)
+		return false
 	; First sighting of a changed layout — record it and wait for a confirming poll.
 	if (pendingHkl != curHkl) {
 		pendingHkl := curHkl

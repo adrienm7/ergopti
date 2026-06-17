@@ -90,8 +90,9 @@ _LLMSF_LeftoverFlushedBeforeFinalCheck() {
 		or InStr(Src, "ConsumeStreamChunk(state[" . Chr(34) . "leftover" . Chr(34) . "]") > 0,
 		"api_ollama.ahk must flush leftover by calling ConsumeStreamChunk with it before the final result check (llm-stream-leftover-not-flushed)")
 
-	; The flush must append a synthetic newline so the JSON line is parsed as complete
-	Assert(InStr(Src, "state[" . Chr(34) . "leftover" . Chr(34) . "] . " . Chr(34) . "`n" . Chr(34)) > 0,
+	; The flush must append a synthetic newline so the JSON line is parsed as complete.
+	; Chr(96) is the AHK backtick char (0x60); Chr(96)."n" matches the two-char literal backtick+n in source.
+	Assert(InStr(Src, "state[" . Chr(34) . "leftover" . Chr(34) . "] . " . Chr(34) . Chr(96) . "n" . Chr(34)) > 0,
 		"api_ollama.ahk must append a newline to leftover before flushing — the last JSON line may lack a trailing newline (llm-stream-leftover-not-flushed)")
 }
 Test("api_ollama: StreamFinalFlush flushes state[leftover] with synthetic newline before result check (llm-stream-leftover-not-flushed)", _LLMSF_LeftoverFlushedBeforeFinalCheck)

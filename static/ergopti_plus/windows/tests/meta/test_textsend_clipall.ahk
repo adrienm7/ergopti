@@ -60,13 +60,14 @@ _TSCA_FuncBodyStripped(Src, FuncDef) {
 ; ===================================================
 ; ===================================================
 
-; The clipboard round-trip lives in the _TextSendClipboard helper (TextSend now
-; only defers to it via a one-shot timer to keep the keyboard thread free), so the
-; SaveAll/RestoreAll assertions scan that helper's body rather than TextSend's.
+; CB_SaveAll() is called synchronously in TextSend's clipboard branch (before
+; the timer fires) to capture the original clipboard before any write; the
+; pre-saved snapshot is then passed into the deferred _TextSendClipboard.
+; Scanning TextSend's body ensures the synchronous save is present.
 _TSCA_TextSendUsesSaveAll() {
 	Src := _TSCA_ReadSource("adapters/text_sender.ahk")
-	Body := _TSCA_FuncBodyStripped(Src, "_TextSendClipboard(Text, Saved, Callback := 0) {")
-	Assert(Body != "", "_TextSendClipboard must exist in adapters/text_sender.ahk")
+	Body := _TSCA_FuncBodyStripped(Src, "TextSend(Text, Opts, Callback) {")
+	Assert(Body != "", "TextSend must exist in adapters/text_sender.ahk")
 	Assert(!InStr(Body, "CB_Save()"),
 		"The clipboard branch must NOT call CB_Save() — it is text-only and destroys non-text clipboard content; use CB_SaveAll() instead")
 	Assert(InStr(Body, "CB_SaveAll()") > 0,

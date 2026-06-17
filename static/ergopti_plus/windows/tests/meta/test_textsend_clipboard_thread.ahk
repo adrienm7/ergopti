@@ -158,7 +158,7 @@ _TSCT_RestoreGuardedByGeneration() {
 	Assert(InStr(Src, "_TEXT_CLIPBOARD_GENERATION") > 0,
 		"A module generation counter (_TEXT_CLIPBOARD_GENERATION) must exist to serialise overlapping clipboard restores")
 
-	WriteBody := _TSCT_FuncBodyStripped(Src, "_TextSendClipboard(Text) {")
+	WriteBody := _TSCT_FuncBodyStripped(Src, "_TextSendClipboard(Text, Saved, Callback := 0) {")
 	Assert(InStr(WriteBody, "_TEXT_CLIPBOARD_GENERATION += 1") > 0,
 		"_TextSendClipboard must bump the generation counter so each injection claims a unique slot")
 
