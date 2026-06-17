@@ -365,7 +365,7 @@ function M.generate(ctx, menu_mods, actions)
 			table.insert(items, {
 				title = hotstrings_title,
 				menu = hotstrings_menu,
-				checked = all_enabled and not ctx.paused or nil,
+				checked = all_enabled or nil,
 				fn = not ctx.paused and toggle_all_hotstrings or nil
 			})
 		else

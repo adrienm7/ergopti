@@ -721,8 +721,19 @@ function M.process_frame(touches)
 				-- "all directions") means a horizontal swipe benefits from
 				-- 2-finger HORIZONTAL being "none" even if 2-finger vertical or
 				-- diagonal is bound.
+				--
+				-- Exception: when a direction is already locked AND the INCOMING
+				-- finger count has active actions on that axis (e.g., swipe_3_up
+				-- during a 2-finger vertical scroll), skip the fast-path and
+				-- require full candidate confirmation. Without this guard, a stray
+				-- 3rd finger contact during 2-finger scroll instantly upgrades
+				-- maxFingers and fires tab_prev/tab_next on every scroll.
 				local inert = finger_count_is_inert(gs.maxFingers, gs.lockedDir)
-				if n <= gs.maxFingers + 1 or inert then
+				local new_count_active_on_locked_axis = gs.lockedDir ~= nil
+					and not finger_count_is_inert(n, gs.lockedDir)
+				local use_fast_path = (n <= gs.maxFingers + 1 or inert)
+					and not new_count_active_on_locked_axis
+				if use_fast_path then
 					Logger.info(LOG, string.format("Finger join (fast-path): %d → %d (inert_at_%d_on_%s=%s)",
 						gs.maxFingers, n, gs.maxFingers, tostring(gs.lockedDir), tostring(inert)))
 					gs.maxFingers = n

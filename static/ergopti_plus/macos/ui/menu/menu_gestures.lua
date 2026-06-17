@@ -66,7 +66,7 @@ function M.build(ctx)
 
 	local item = {
 		title   = i18n.get("menu.gestures.title"),
-		checked = (state.gestures and not paused) or nil,
+		checked = state.gestures or nil,
 		fn      = function()
 			local new_state = not state.gestures
 			if new_state then

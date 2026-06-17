@@ -948,12 +948,15 @@ shift_tap = eventtap.new(
 	end
 )
 
+-- scrollWheel is intentionally excluded: scroll events are high-frequency
+-- (60 Hz+) and firing check_nav_reset()/reset_predictions() on every frame
+-- causes severe lag when the LLM menu is active (ObjC dispatch per frame).
+-- Scroll does not move the text cursor, so no buffer reset is needed here.
 mouse_tap = eventtap.new(
 	{
 		eventtap.event.types.leftMouseDown,
 		eventtap.event.types.rightMouseDown,
 		eventtap.event.types.middleMouseDown,
-		eventtap.event.types.scrollWheel,
 	},
 	function()
 		local ok, result = pcall(function()
