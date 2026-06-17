@@ -633,14 +633,18 @@ GestureTakeNote() {
     PreviousTitleMatchMode := A_TitleMatchMode
     try {
         SetTitleMatchMode(2)
-        if WMExists(FileName) {
-            WMActivate(FileName)
-            WinWaitActive(FileName, , 3)
+        ; Qualify with ahk_exe notepad.exe to avoid stealing focus from any
+        ; other window (Explorer, browser tab…) whose title happens to contain
+        ; the note filename (e.g. "Notes.txt" in the address bar).
+        NotepadMatch := FileName . " ahk_exe notepad.exe"
+        if WMExists(NotepadMatch) {
+            WMActivate(NotepadMatch)
+            WinWaitActive(NotepadMatch, , 3)
         } else {
             Run('notepad.exe "' . FilePath . '"')
             WinWait(FileName, , 7)
-            WMActivate(FileName)
-            WinWaitActive(FileName, , 3)
+            WMActivate(FileName . " ahk_exe notepad.exe")
+            WinWaitActive(FileName . " ahk_exe notepad.exe", , 3)
         }
         WinMaximize()
         Sleep(100)
