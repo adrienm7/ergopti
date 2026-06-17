@@ -1,0 +1,120 @@
+﻿; tests/meta/test_keylogger_flush_atomic.ahk
+
+; ==============================================================================
+; MODULE: Keylogger Flush Atomic Snapshot Meta Test
+; DESCRIPTION:
+; Static source guard for the "keylogger-flush-race-condition" audit finding.
+;
+; ROOT CAUSE ENCODED:
+; KL_FlushBuffer() and KL_Mouse_FlushScroll() both accessed and then cleared
+; shared buffer state in two separate steps. A Critical InputHook callback
+; (KL_Hook_OnChar) can interrupt a timer pseudo-thread between those two steps,
+; writing a new event into the buffer that is then wiped by the deferred clear —
+; losing that event permanently without any error signal.
+;
+; The fix uses an atomic snapshot: under Critical("On"), all fields are copied
+; into local snap_* variables AND cleared in the same critical section. Only
+; after Critical("Off") is released does processing begin on the local copies.
+;
+; This meta-static test verifies the pattern is present and ordered correctly so
+; a regression (splitting the snapshot from the reset, or moving Critical("Off")
+; before the reset) immediately fails CI.
+; ==============================================================================
+
+#Requires AutoHotkey v2.0
+
+
+
+
+; ==================================================
+; ==================================================
+; ======= 1/ KL_FlushBuffer atomic snapshot ========
+; ==================================================
+; ==================================================
+
+_KLFA_ReadSource(RelPath) {
+	SplitPath(A_ScriptDir, , &Root)
+	return FileRead(StrReplace(Root, "/", "\") . "\" . StrReplace(RelPath, "/", "\"), "UTF-8")
+}
+
+_KLFA_StripComments(Src) {
+	Out := ""
+	for Line in StrSplit(Src, "`n", "`r") {
+		if !RegExMatch(Line, "^\s*;")
+			Out .= Line . "`n"
+	}
+	return Out
+}
+
+_KLFA_FuncBody(Src, FuncDef) {
+	Idx := InStr(Src, FuncDef)
+	if !Idx
+		return ""
+	Rest := SubStr(Src, Idx)
+	End := InStr(Rest, "`n}")
+	if End
+		return SubStr(Rest, 1, End + 1)
+	return Rest
+}
+
+_KLFA_FlushBufferCritical() {
+	Raw := _KLFA_ReadSource("modules/keylogger/keylogger.ahk")
+	Src := _KLFA_StripComments(Raw)
+	Body := _KLFA_FuncBody(Src, "KL_FlushBuffer() {")
+	Assert(Body != "", "KL_FlushBuffer() must exist in modules/keylogger/keylogger.ahk")
+
+	Assert(InStr(Body, "Critical(" . Chr(34) . "On" . Chr(34) . ")") > 0,
+		"KL_FlushBuffer must open a Critical section before reading shared buffer state (keylogger-flush-race-condition)")
+
+	Assert(InStr(Body, "snap_events") > 0,
+		"KL_FlushBuffer must snapshot buffer_events into snap_events before clearing (keylogger-flush-race-condition)")
+
+	Assert(InStr(Body, "Critical(" . Chr(34) . "Off" . Chr(34) . ")") > 0,
+		"KL_FlushBuffer must release Critical after the atomic snapshot")
+
+	; Ordering: Critical(On) must precede the snapshot, which must precede Critical(Off)
+	PosOn   := InStr(Body, "Critical(" . Chr(34) . "On" . Chr(34) . ")")
+	PosSnap := InStr(Body, "snap_events")
+	PosOff  := InStr(Body, "Critical(" . Chr(34) . "Off" . Chr(34) . ")")
+	Assert(PosOn < PosSnap,
+		"Critical(On) must appear before snap_events — snapshot must be taken inside the lock")
+	Assert(PosSnap < PosOff,
+		"snap_events must appear before Critical(Off) — buffer reset must complete inside the lock")
+}
+Test("keylogger: KL_FlushBuffer takes an atomic snapshot under Critical(On) before clearing (keylogger-flush-race-condition)", _KLFA_FlushBufferCritical)
+
+
+
+
+
+; =======================================================
+; =======================================================
+; ======= 2/ KL_Mouse_FlushScroll atomic snapshot =======
+; =======================================================
+; =======================================================
+
+_KLFA_MouseFlushScrollCritical() {
+	Raw := _KLFA_ReadSource("modules/keylogger/keylogger_mouse.ahk")
+	Src := _KLFA_StripComments(Raw)
+	Body := _KLFA_FuncBody(Src, "KL_Mouse_FlushScroll() {")
+	Assert(Body != "", "KL_Mouse_FlushScroll() must exist in modules/keylogger/keylogger_mouse.ahk")
+
+	Assert(InStr(Body, "Critical(" . Chr(34) . "On" . Chr(34) . ")") > 0,
+		"KL_Mouse_FlushScroll must open a Critical section before reading KLMouse scroll state")
+
+	Assert(InStr(Body, "KLMouse.scroll_ticks   := 0") > 0 or InStr(Body, "KLMouse.scroll_ticks := 0") > 0,
+		"KL_Mouse_FlushScroll must clear KLMouse.scroll_ticks inside the Critical section")
+
+	Assert(InStr(Body, "Critical(" . Chr(34) . "Off" . Chr(34) . ")") > 0,
+		"KL_Mouse_FlushScroll must release Critical after the atomic snapshot")
+
+	Assert(InStr(Body, "MF_ShouldFilter") > 0,
+		"KL_Mouse_FlushScroll must still call MF_ShouldFilter after releasing Critical")
+
+	; Critical(Off) must come before MF_ShouldFilter so the lock is released before any yielding call
+	PosOff := InStr(Body, "Critical(" . Chr(34) . "Off" . Chr(34) . ")")
+	PosMF  := InStr(Body, "MF_ShouldFilter")
+	Assert(PosOff < PosMF,
+		"Critical(Off) must appear before MF_ShouldFilter — the critical lock must be released before any call that can yield the thread")
+}
+Test("keylogger: KL_Mouse_FlushScroll releases Critical before MF_ShouldFilter (keylogger-flush-race-condition)", _KLFA_MouseFlushScrollCritical)
