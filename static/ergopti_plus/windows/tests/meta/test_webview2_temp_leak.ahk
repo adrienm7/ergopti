@@ -39,4 +39,19 @@ _TWTL_AllHosts() {
 	_TWTL_CheckHost("modules/llm/ollama_webview.ahk", "ergopti_ollama_wv_", "DirDelete(_OllamaWV_Udir, true)")
 	_TWTL_CheckHost("ui/llm_model_browser.ahk", "ergopti_modelbrowser_wv_", "DirDelete(_LLM_MBW_Udir, true)")
 }
+
+; Regression guard: OllamaWV_Close() used to call DirDelete synchronously right
+; after Controller.Close() (which is async). Edge's child processes still held a
+; file lock for a few hundred ms, so DirDelete failed silently and the temp folder
+; leaked. The fix defers deletion via SetTimer. This test verifies the deferred
+; pattern is present so the synchronous race cannot be reintroduced.
+_TWTL_OllamaWVDeferredDelete() {
+	Src := _TWTL_ReadSource("modules/llm/ollama_webview.ahk")
+	Assert(InStr(Src, "SetTimer") > 0,
+		"OllamaWV_Close must use SetTimer to defer udir deletion (async Edge lock race)")
+	Assert(InStr(Src, "_OllamaWV_DeferredDirDelete") > 0,
+		"OllamaWV_Close must call _OllamaWV_DeferredDirDelete via SetTimer (not DirDelete inline)")
+}
+
 Test("WebView2 hosts: sweep stale profiles and delete on close", _TWTL_AllHosts)
+Test("OllamaWV_Close: udir deletion is deferred via SetTimer to avoid Edge file lock race", _TWTL_OllamaWVDeferredDelete)

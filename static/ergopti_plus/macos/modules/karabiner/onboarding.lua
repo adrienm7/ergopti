@@ -44,6 +44,10 @@ if not ok_notif then Notifications = nil end
 
 local LOG = "karabiner.onboarding"
 
+-- GC-root table: every live hs.task is pinned here so Lua's garbage collector
+-- cannot SIGTERM it mid-run (hs.task held only in a local is collected on return).
+M._active_tasks = {}
+
 -- Resolve our own directory at load time so the manifest lookup works whether
 -- this file is symlinked, run from the project tree, or deployed elsewhere.
 local _SELF_DIR = (debug.getinfo(1, "S").source:sub(2):match("^(.*[/\\])") or "./")
@@ -236,7 +240,8 @@ end
 --- @param expected_sha string Expected SHA-256, lowercase hex.
 --- @param callback function fun(ok: boolean, err: string|nil)
 local function verify_sha256_async(path, expected_sha, callback)
-	local task = hs.task.new("/usr/bin/shasum", function(rc, stdout, _)
+	local task = hs.task.new("/usr/bin/shasum", function(rc, stdout)
+		M._active_tasks[task] = nil  -- task captured by closure; clears the GC-root pin
 		if rc ~= 0 or type(stdout) ~= "string" then
 			callback(false, "shasum exit code " .. tostring(rc))
 			return
@@ -254,6 +259,8 @@ local function verify_sha256_async(path, expected_sha, callback)
 	end, { "-a", "256", path })
 	if not task or not task:start() then
 		callback(false, "Failed to start shasum task.")
+	else
+		M._active_tasks[task] = true
 	end
 end
 
@@ -269,6 +276,7 @@ local function download_async(url, dest, callback)
 		hs.execute(string.format("/bin/mkdir -p %q", parent))
 	end
 	local task = hs.task.new("/usr/bin/curl", function(rc, _, stderr)
+		M._active_tasks[task] = nil  -- task captured by closure; clears the GC-root pin
 		if rc ~= 0 then
 			callback(false, "curl rc=" .. tostring(rc) .. " stderr=" .. tostring(stderr))
 			return
@@ -277,6 +285,8 @@ local function download_async(url, dest, callback)
 	end, { "-L", "--fail", "--silent", "--show-error", "--output", dest, url })
 	if not task or not task:start() then
 		callback(false, "Failed to start curl task.")
+	else
+		M._active_tasks[task] = true
 	end
 end
 
@@ -285,6 +295,7 @@ end
 --- @param callback function fun(ok: boolean, mount_point_or_err: string)
 local function mount_dmg_async(dmg_path, callback)
 	local task = hs.task.new("/usr/bin/hdiutil", function(rc, stdout, stderr)
+		M._active_tasks[task] = nil  -- task captured by closure; clears the GC-root pin
 		if rc ~= 0 or type(stdout) ~= "string" then
 			callback(false, "hdiutil rc=" .. tostring(rc) .. " stderr=" .. tostring(stderr))
 			return
@@ -302,6 +313,8 @@ local function mount_dmg_async(dmg_path, callback)
 	end, { "attach", "-nobrowse", dmg_path })
 	if not task or not task:start() then
 		callback(false, "Failed to start hdiutil task.")
+	else
+		M._active_tasks[task] = true
 	end
 end
 
@@ -342,6 +355,7 @@ local function run_pkg_with_sudo_async(pkg_path, callback)
 		escaped
 	)
 	local task = hs.task.new("/usr/bin/osascript", function(rc, _, stderr)
+		M._active_tasks[task] = nil  -- task captured by closure; clears the GC-root pin
 		if rc ~= 0 then
 			callback(false, "osascript rc=" .. tostring(rc) .. " stderr=" .. tostring(stderr))
 			return
@@ -350,6 +364,8 @@ local function run_pkg_with_sudo_async(pkg_path, callback)
 	end, { "-e", script })
 	if not task or not task:start() then
 		callback(false, "Failed to start osascript task.")
+	else
+		M._active_tasks[task] = true
 	end
 end
 

@@ -220,6 +220,11 @@ class HookDispatcher {
 					_err_cache[sig] := now
 					try LoggerWarn("HookDispatcher", "Subscriber for '{1}' threw: {2}.", event_type, e.Message)
 				}
+				; Escalate to the global handler so modifier-release logic runs.
+				; A subscriber exception during a Ctrl/Shift/Alt keydown would
+				; otherwise leave the modifier virtually stuck — the global handler
+				; calls _ShouldReleaseModifier() which fixes it.
+				try ErgoptiGlobalErrorHandler(e, "Continue")
 			}
 		}
 	}

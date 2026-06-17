@@ -26,6 +26,10 @@ local i18n   = require("lib.i18n")
 
 local LOG = "menu_apps"
 
+-- GC-root table: every live hs.task is pinned here so Lua's garbage collector
+-- cannot SIGTERM it mid-run (hs.task held only in a local is collected on return).
+M._active_tasks = {}
+
 
 -- Session cache of discovered app bundles (names, descriptions, icons). The
 -- apps/ directory only changes on install, which requires an hs.reload() anyway,
@@ -246,6 +250,7 @@ function M.build(ctx)
 				local task = hs.task.new(
 					"/usr/bin/open",
 					function(code, _, stderr)
+						M._active_tasks[task] = nil  -- task captured by closure; clears the GC-root pin
 						if code ~= 0 then
 							Logger.error(LOG, "open '%s' exited %d: %s.", app_name, code, stderr)
 						end
@@ -258,8 +263,10 @@ function M.build(ctx)
 						app_path,
 					}
 				)
+				M._active_tasks[task] = true
 				local ok_start, err = pcall(function() task:start() end)
 				if not ok_start then
+					M._active_tasks[task] = nil
 					Logger.error(LOG, "Failed to launch '%s': %s.", app_name, tostring(err))
 				end
 			end,

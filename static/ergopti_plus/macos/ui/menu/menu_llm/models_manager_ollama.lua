@@ -17,6 +17,9 @@ local notifications = require("lib.notifications")
 local Logger        = require("lib.logger")
 local i18n          = require("lib.i18n")
 
+-- GC-root table: hs.task objects pinned here survive until their callback fires.
+local _active_tasks = {}
+
 local LOG = "menu_llm.ollama"
 
 local ok_dw, download_window = pcall(require, "ui.download_window")
@@ -223,8 +226,11 @@ function M.new(deps, presets, ram_getter)
 		if _installed_loading then return end
 		_installed_loading = true
 		local bin = get_ollama_path() or "/usr/local/bin/ollama"
-		-- hs.task is non-blocking unlike hs.execute
+		-- hs.task is non-blocking unlike hs.execute.
+		-- Pinned to _active_tasks so the GC cannot SIGTERM it before the callback
+		-- fires and resets _installed_loading — a GC kill would deadlock the lock.
 		local task = hs.task.new(bin, function(code, stdout)
+			_active_tasks[task] = nil  -- task captured by closure; clears the GC-root pin
 			_installed_loading = false
 			local installed = {}
 			if code == 0 and type(stdout) == "string" then
@@ -236,7 +242,10 @@ function M.new(deps, presets, ram_getter)
 			_installed_cache = installed
 			_installed_cache_time = hs.timer.secondsSinceEpoch()
 		end, {"list"})
-		if task then pcall(function() task:start() end) end
+		if task then
+			_active_tasks[task] = true
+			pcall(function() task:start() end)
+		end
 	end
 
 	function obj.get_installed_models()

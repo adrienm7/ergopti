@@ -159,8 +159,13 @@ OllamaWV_Close() {
 	_OllamaWV_Controller := unset
 	_OllamaWV_WebView    := unset
 	if IsSet(_OllamaWV_Udir) {
-		try DirDelete(_OllamaWV_Udir, true)
+		UdirToDelete := _OllamaWV_Udir
 		_OllamaWV_Udir := unset
+		; Edge's child msedgewebview2.exe processes hold an exclusive file lock on
+		; the user-data directory for a few hundred ms after Controller.Close().
+		; Deleting synchronously here races that lock and fails silently, leaking
+		; the temp folder. A 1 s delay lets the children exit before we sweep.
+		SetTimer(_OllamaWV_DeferredDirDelete.Bind(UdirToDelete), -1000)
 	}
 }
 
@@ -429,6 +434,16 @@ OllamaWV_OnWebMessage(sender, args) {
 ; ======= 5/ Helpers =======
 ; ==========================
 ; ==========================================
+
+/**
+ * Deletes a directory if it still exists. Called via SetTimer so the deletion
+ * is deferred until after Edge's child processes release their file locks.
+ * @param {string} dir - Absolute path of the user-data directory to remove.
+ */
+_OllamaWV_DeferredDirDelete(dir) {
+	if DirExist(dir)
+		try DirDelete(dir, true)
+}
 
 /**
  * Escapes a string for safe embedding in a JS string literal.

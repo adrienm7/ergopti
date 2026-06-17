@@ -29,6 +29,11 @@ local changelog = require("ui.changelog")
 local Updater   = require("lib.updater")
 local LOG       = "menu_about"
 
+-- GC-root table: every live hs.task is pinned here so Lua's garbage collector
+-- cannot SIGTERM it mid-run (Hammerspoon GC pitfall: hs.task held only in a
+-- local variable is collected once the enclosing function returns).
+M._active_tasks = {}
+
 -- Detect source vs bundled at module load time so DEFAULT_STATE carries the
 -- right channel seed before preferences.lua hydrates the shared state table.
 local _BUNDLED_ID = "com.ergopti.app"
@@ -196,7 +201,10 @@ local function replace_and_reload(zip_path, update_menu_fn)
 
 	-- Unzip is a blocking shell call; run it via hs.task so we don't freeze the
 	-- menubar. The callback fires on the main thread when the task exits.
+	-- The task is pinned to M._active_tasks so the GC cannot SIGTERM it while
+	-- it is still running (hs.task held only in a local is collected on return).
 	local task = hs.task.new("/usr/bin/unzip", function(exit_code, _, stderr)
+		M._active_tasks[task] = nil  -- task captured by closure; clears the GC-root pin
 		if exit_code ~= 0 then
 			Logger.error(LOG, "unzip failed (exit %d): %s.", exit_code, stderr or "")
 			dialog.block_alert(i18n.get("common.error_title"), i18n.get("menu.about.update.install_error"), i18n.get("button.ok"))
@@ -237,8 +245,10 @@ local function replace_and_reload(zip_path, update_menu_fn)
 		end
 
 		-- Remove the now-redundant backup and temp files (best-effort).
+		-- hs.execute for synchronous cleanup: rm is fast and we are already
+		-- inside an async callback, so blocking here is fine; no GC risk.
 		os.remove(zip_path)
-		hs.task.new("/bin/rm", nil, { "-rf", backup_app, tmp_dir }):start()
+		pcall(hs.execute, string.format("/bin/rm -rf %q %q", backup_app, tmp_dir))
 
 		Logger.success(LOG, "Update installed at %s — reloading.", target)
 		Updater.clear_cached_release()
@@ -246,6 +256,7 @@ local function replace_and_reload(zip_path, update_menu_fn)
 		hs.timer.doAfter(0.3, function() hs.reload() end)
 	end, { "-o", zip_path, "-d", tmp_dir })
 
+	M._active_tasks[task] = true
 	task:start()
 end
 

@@ -56,12 +56,17 @@ local function focus_hammerspoon()
 	-- Modal dialogs (hs.dialog.*) block the main thread and its default runloop,
 	-- meaning hs.timer.doAfter will NOT fire until AFTER the dialog is dismissed!
 	-- To guarantee the dialog receives keyboard focus (especially when opened
-	-- from a menubar click, which steals focus), we spawn a detached background
-	-- process that waits 100ms and asks macOS to aggressively activate Hammerspoon.
+	-- from a menubar click, which steals focus), we defer an hs.execute call by
+	-- 100ms via hs.timer.doAfter. Using hs.timer instead of hs.task avoids the
+	-- GC pitfall: hs.task held only in a local is silently SIGTERM'd if the GC
+	-- runs before the 100ms sleep finishes; hs.timer has its own strong reference.
 	pcall(function()
 		local bundlePath = hs.processInfo.bundlePath
 		if bundlePath then
-			hs.task.new("/bin/sh", nil, {"-c", "sleep 0.1 && open '" .. bundlePath .. "'"}):start()
+			local safe_path = bundlePath:gsub("'", "'\\''")
+			hs.timer.doAfter(0.1, function()
+				pcall(hs.execute, "open '" .. safe_path .. "'")
+			end)
 		end
 	end)
 end
