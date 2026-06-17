@@ -13,7 +13,11 @@ local i18n    = require("lib.i18n")
 local Parser         = require("modules.llm.parser")
 local Profiles       = require("modules.llm.profiles")
 local ApiCommon      = require("modules.llm.api_common")
-local HttpClient     = require("adapters.http_client").new()
+-- Two independent HTTP clients: one for long inference POST requests, one for
+-- quick health-check GETs on /api/tags. A single shared client would cancel
+-- an in-flight completion whenever a background availability ping arrived.
+local _infer_client  = require("adapters.http_client").new()
+local _check_client  = require("adapters.http_client").new()
 local JsonCodec      = require("adapters.json_codec")
 local TimerScheduler = require("adapters.timer_scheduler")
 local ShellRunner    = require("adapters.shell_runner")
@@ -149,7 +153,7 @@ function M.warmup(model_name)
 		Logger.error(LOG, "warmup: encode failed — %s", tostring(enc_err))
 		return
 	end
-	HttpClient.post(
+	_infer_client.post(
 		M.get_base_url() .. "/api/chat",
 		{ ["Content-Type"] = "application/json" },
 		encoded,
@@ -210,7 +214,7 @@ function M.check_availability(model_name, on_available, on_missing)
 	if type(model_name) ~= "string" then return end
 	Logger.debug(LOG, "Checking Ollama server availability…")
 	
-	HttpClient.get(M.get_base_url() .. "/api/tags", {}, function(r)
+	_check_client.get(M.get_base_url() .. "/api/tags", {}, function(r)
 		if r.status ~= 200 then
 			Logger.warn(LOG, "Ollama server is unreachable.")
 			if type(on_missing) == "function" then pcall(on_missing, true) end
@@ -362,7 +366,7 @@ local function post_and_parse(model_name, system_prompt, full_text, tail_text,
 		return
 	end
 
-	HttpClient.post(M.get_base_url() .. "/api/chat", { ["Content-Type"] = "application/json" }, encoded,
+	_infer_client.post(M.get_base_url() .. "/api/chat", { ["Content-Type"] = "application/json" }, encoded,
 		function(r)
 			local status, body = r.status, r.body
 			pcall(function()

@@ -560,6 +560,15 @@ function M.build(ctx)
 			return
 		end
 		table.sort(choices, function(a, b) return a.text < b.text end)
+		-- Delete the previous instance before creating a new one; without this,
+		-- every call to present_model_chooser leaks one C-backed chooser object
+		-- onto the heap because the old _model_browser_chooser reference is simply
+		-- overwritten without releasing the native panel.
+		if _model_browser_chooser then
+			local stale = _model_browser_chooser
+			_model_browser_chooser = nil
+			pcall(function() stale:delete() end)
+		end
 		local chooser = hs.chooser.new(function(choice)
 			if choice and choice.m_name then
 				switch_model(choice.m_name)

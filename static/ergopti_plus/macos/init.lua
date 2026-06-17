@@ -954,11 +954,26 @@ hs.shutdownCallback = function()
 	-- 6. Kill orphan child processes
 	pcall(hs.execute, "pkill -f 'ergopti_plus_expander'", true)
 	pcall(hs.execute, "pkill -f 'ergopti_plus_http_server'", true)
-	-- parent dies abruptly. Kill any mlx_lm.server still bound to port 49317
-	-- so the next reload starts from a clean slate.
-	pcall(hs.execute,
-		"pgrep -f 'mlx_lm.*server' | xargs kill -9 2>/dev/null; " ..
-		"lsof -tiTCP:49317 -sTCP:LISTEN | xargs kill -9 2>/dev/null", true)
+	-- Kill any orphan mlx_lm.server using the live port from api_mlx so that
+	-- user overrides set via the LLM settings menu are respected at shutdown.
+	-- Falling back to the compile-time default (3460) if the module is absent.
+	pcall(function()
+		local ok_m, am = pcall(require, "modules.llm.api_mlx")
+		local p = (ok_m and type(am.get_port) == "function" and tostring(am.get_port()))
+		       or (ok_m and tostring(am.DEFAULT_PORT))
+		       or "3460"
+		hs.execute(
+			"pgrep -f 'mlx_lm.*server' | xargs kill -9 2>/dev/null; " ..
+			"lsof -tiTCP:" .. p .. " -sTCP:LISTEN | xargs kill -9 2>/dev/null", true)
+	end)
+	-- Stop all path-watchers that were pinned at module scope to survive GC.
+	-- Explicit :stop() prevents stray file-system callbacks from firing during
+	-- the Lua state teardown window.
+	if type(_G.script_watchers) == "table" then
+		for _, w in ipairs(_G.script_watchers) do
+			pcall(function() w:stop() end)
+		end
+	end
 	Logger.info(LOG, "Hammerspoon arrêté")
 end
 
