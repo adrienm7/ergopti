@@ -71,9 +71,14 @@ helpers.describe("adapters/shell_runner.lua: GC protection (shell-runner-gc-kill
 
 	helpers.it("hs.task.new uses wrapped_on_done, not the raw on_done", function()
 		local src = strip_comments(read_source("adapters/shell_runner.lua"))
+		-- Three call-site forms are accepted:
+		--   Direct:  hs.task.new(executable, wrapped_on_done, ...)
+		--   pcall 2-arg:  hs.task.new, wrapped_on_done
+		--   pcall 3-arg:  pcall(hs.task.new, executable, wrapped_on_done, ...) — the form used in shell_runner
 		helpers.assert_true(
 			src:find("hs%.task%.new%s*,%s*wrapped_on_done") ~= nil
-			or src:find("hs%.task%.new%([^,]+,%s*wrapped_on_done") ~= nil,
+			or src:find("hs%.task%.new%([^,]+,%s*wrapped_on_done") ~= nil
+			or src:find("hs%.task%.new,%s*[^,]+,%s*wrapped_on_done") ~= nil,
 			"hs.task.new must receive wrapped_on_done so the GC-root removal fires on exit (shell-runner-gc-kill)")
 	end)
 

@@ -13,6 +13,8 @@
 ---   7. modules/llm/api_remote.lua: shared HttpClient cancels in-flight inference
 --- ==============================================================================
 
+local helpers = require("tests.helpers")
+
 local function read_src(rel)
 	local base = (debug.getinfo(1, "S").source or ""):match("^@(.+/tests/)") or ""
 	local full  = base .. "../../" .. rel
@@ -23,14 +25,14 @@ local function read_src(rel)
 	return s
 end
 
-describe("Audit-hs-final fixes", function()
+helpers.describe("Audit-hs-final fixes", function()
 
 
 	-- ==================================================
 	-- ===== 1) file_system.lua: read() FD leak fixed
 	-- ==================================================
 
-	it("file_system.lua M.read must close fh even when fh:read() panics", function()
+	helpers.it("file_system.lua M.read must close fh even when fh:read() panics", function()
 		local src = read_src("adapters/file_system.lua")
 		assert(src, "adapters/file_system.lua must be readable")
 		-- The fix: inner pcall around fh:read("*a") so fh:close() always runs.
@@ -45,7 +47,7 @@ describe("Audit-hs-final fixes", function()
 	-- ===== 2) toml_cache.lua: M.store FD leak fixed
 	-- ===================================================
 
-	it("toml_cache.lua M.store must close fh even when fh:write() panics", function()
+	helpers.it("toml_cache.lua M.store must close fh even when fh:write() panics", function()
 		local src = read_src("adapters/toml_cache.lua")
 		assert(src, "adapters/toml_cache.lua must be readable")
 		-- The fix: inner pcall around fh:write(body) with fh:close() outside.
@@ -60,7 +62,7 @@ describe("Audit-hs-final fixes", function()
 	-- ===== 3) toml_cache.lua: content_fingerprint FD leak fixed
 	-- ==========================================================
 
-	it("toml_cache.lua content_fingerprint must close f even when f:read() panics", function()
+	helpers.it("toml_cache.lua content_fingerprint must close f even when f:read() panics", function()
 		local src = read_src("adapters/toml_cache.lua")
 		assert(src, "adapters/toml_cache.lua must be readable")
 		-- The fix: inner pcall around f:read(...) with f:close() outside.
@@ -75,7 +77,7 @@ describe("Audit-hs-final fixes", function()
 	-- ===== 4) engine.lua: lastFirePos compensated on centroid jump
 	-- =========================================================
 
-	it("engine.lua must compensate lastFirePos on finger-count centroid jump", function()
+	helpers.it("engine.lua must compensate lastFirePos on finger-count centroid jump", function()
 		local src = read_src("modules/gestures/engine.lua")
 		assert(src, "modules/gestures/engine.lua must be readable")
 		-- The bug: startPos was adjusted by jumpX/jumpY but lastFirePos was not.
@@ -99,7 +101,7 @@ describe("Audit-hs-final fixes", function()
 	-- ===== 5) actions.lua: leftMouseTap doAfter race fixed
 	-- ========================================================
 
-	it("actions.lua leftMouseTap must guard on leftClickHeld before re-toggling", function()
+	helpers.it("actions.lua leftMouseTap must guard on leftClickHeld before re-toggling", function()
 		local src = read_src("modules/gestures/actions.lua")
 		assert(src, "modules/gestures/actions.lua must be readable")
 		-- The bug: doAfter(0, M.toggle_left_click) fired unconditionally. If
@@ -121,7 +123,7 @@ describe("Audit-hs-final fixes", function()
 	-- ===== 6a) karabiner/watchers.lua: allWindows() nil-crash fixed
 	-- =======================================================================
 
-	it("karabiner/watchers.lua must guard allWindows() against nil return", function()
+	helpers.it("karabiner/watchers.lua must guard allWindows() against nil return", function()
 		local src = read_src("modules/karabiner/watchers.lua")
 		assert(src, "modules/karabiner/watchers.lua must be readable")
 		-- The bug: app:allWindows() can return nil if the app exits mid-call.
@@ -137,7 +139,7 @@ describe("Audit-hs-final fixes", function()
 	-- ===== 6b) karabiner/watchers.lua: inner hs.task nil-check added
 	-- =======================================================================
 
-	it("karabiner/watchers.lua inner hs.task must be nil-checked before :start()", function()
+	helpers.it("karabiner/watchers.lua inner hs.task must be nil-checked before :start()", function()
 		local src = read_src("modules/karabiner/watchers.lua")
 		assert(src, "modules/karabiner/watchers.lua must be readable")
 		-- The bug: hs.task.new(...):start() chained with no nil-check — crashes
@@ -153,7 +155,7 @@ describe("Audit-hs-final fixes", function()
 	-- ===== 6c) karabiner/watchers.lua: F17 hotkey wrapped in pcall
 	-- =======================================================================
 
-	it("karabiner/watchers.lua F17 cycle-windows hotkey must use pcall wrapper", function()
+	helpers.it("karabiner/watchers.lua F17 cycle-windows hotkey must use pcall wrapper", function()
 		local src = read_src("modules/karabiner/watchers.lua")
 		assert(src, "modules/karabiner/watchers.lua must be readable")
 		-- The other hotkeys (Shift+F17, Alt+F17) already wrap their callback in pcall.
@@ -169,7 +171,7 @@ describe("Audit-hs-final fixes", function()
 	-- ===== 7) api_remote.lua: split into _infer_client + _check_client
 	-- =====================================================================
 
-	it("api_remote.lua must use separate _infer_client and _check_client", function()
+	helpers.it("api_remote.lua must use separate _infer_client and _check_client", function()
 		local src = read_src("modules/llm/api_remote.lua")
 		assert(src, "modules/llm/api_remote.lua must be readable")
 		-- The bug: single HttpClient used for both POST inference and GET health-checks.

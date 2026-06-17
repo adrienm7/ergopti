@@ -14,6 +14,8 @@
 ---      (api_ollama.lua)
 --- ==============================================================================
 
+local helpers = require("tests.helpers")
+
 local function read_source(rel_path)
 	local base = (debug.getinfo(1, "S").source or ""):match("^@(.+/tests/)") or ""
 	local full  = base .. "../../" .. rel_path
@@ -24,14 +26,14 @@ local function read_source(rel_path)
 	return src
 end
 
-describe("Audit-senior Hammerspoon fixes", function()
+helpers.describe("Audit-senior Hammerspoon fixes", function()
 
 
 	-- =========================================
 	-- ===== 1) MLX port — no hardcoded 49317
 	-- =========================================
 
-	it("init.lua shutdownCallback must not hard-code port 49317 for MLX kill", function()
+	helpers.it("init.lua shutdownCallback must not hard-code port 49317 for MLX kill", function()
 		local src = read_source("init.lua")
 		assert(src, "init.lua must be readable")
 		-- The bug: lsof -tiTCP:49317 regardless of user-configured port.
@@ -52,7 +54,7 @@ describe("Audit-senior Hammerspoon fixes", function()
 	-- ===== 2) script_watchers — explicit :stop() loop
 	-- ==================================================
 
-	it("init.lua shutdownCallback must stop all script_watchers", function()
+	helpers.it("init.lua shutdownCallback must stop all script_watchers", function()
 		local src = read_source("init.lua")
 		assert(src, "init.lua must be readable")
 		-- The bug: _G.script_watchers pinned to prevent GC but never :stop()'d.
@@ -68,7 +70,7 @@ describe("Audit-senior Hammerspoon fixes", function()
 	-- ===== 3a) Scroll deadlock — M.emergency_reset() exported
 	-- ============================================================
 
-	it("engine.lua must export M.emergency_reset() for scroll unblock on crash", function()
+	helpers.it("engine.lua must export M.emergency_reset() for scroll unblock on crash", function()
 		local src = read_source("modules/gestures/engine.lua")
 		assert(src, "modules/gestures/engine.lua must be readable")
 		-- The bug: process_frame can crash after startScrollBlock(); isBlockingScroll
@@ -91,7 +93,7 @@ describe("Audit-senior Hammerspoon fixes", function()
 	-- ===== 3b) Scroll deadlock — error path in gestures/init.lua calls it
 	-- ======================================================================
 
-	it("gestures/init.lua frame callback must call emergency_reset on process_frame error", function()
+	helpers.it("gestures/init.lua frame callback must call emergency_reset on process_frame error", function()
 		local src = read_source("modules/gestures/init.lua")
 		assert(src, "modules/gestures/init.lua must be readable")
 		-- The fix adds: if not Logger.pcall(...) then pcall(Engine.emergency_reset) end
@@ -107,7 +109,7 @@ describe("Audit-senior Hammerspoon fixes", function()
 	-- ===== 4) Chooser leak — stale instance deleted before new creation
 	-- =====================================================================
 
-	it("models_selector.lua must delete old chooser before creating a new one", function()
+	helpers.it("models_selector.lua must delete old chooser before creating a new one", function()
 		local src = read_source("ui/menu/menu_llm/models_selector.lua")
 		assert(src, "models_selector.lua must be readable")
 		-- The bug: _model_browser_chooser is overwritten without calling :delete(),
@@ -125,7 +127,7 @@ describe("Audit-senior Hammerspoon fixes", function()
 	-- ===== 5) HTTP client singleton — split into infer + check clients
 	-- ====================================================================
 
-	it("api_ollama.lua must use separate _infer_client and _check_client", function()
+	helpers.it("api_ollama.lua must use separate _infer_client and _check_client", function()
 		local src = read_source("modules/llm/api_ollama.lua")
 		assert(src, "modules/llm/api_ollama.lua must be readable")
 		-- The bug: a single HttpClient is reused for both inference POST /api/chat
