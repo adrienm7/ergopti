@@ -538,13 +538,20 @@ Test("LLM_OllamaAllowInference: grace period after warmup start",
 _FirePrediction_DoesNotCancelOllamaAsync() {
 	global _LLM_Engine, _LLM_Ollama_Async, _LLM_Ollama_IsReady
 	_LLM_Ollama_IsReady := true
+	; Init first so the backend-change guard in LLM_Engine_Init fires LLM_Engine_
+	; StopGeneration (which calls LLM_OllamaCancelAllAsync) on an EMPTY async map.
+	; Seeding _LLM_Ollama_Async before Init caused the fake entry to be cancelled
+	; by the backend-switch stop, not by FirePrediction — the test was catching the
+	; wrong event.
 	_LLM_Ollama_Async := Map()
-	fake_http := Map()
-	_LLM_Ollama_Async[99] := Map("http", fake_http, "on_success", (*) => "", "on_fail", (*) => "",
-		"cancelled", false)
 	LLM_Engine_Init(Map("backend", "api", "api_entries", [], "debounce_ms", 500))
 	_LLM_Engine["last_ctx"] := ""
 	_LLM_Engine["last_results"] := []
+	; Inject the fake in-flight WinHTTP entry AFTER Init so StopGeneration cannot
+	; reach it — we are now testing only what FirePrediction does.
+	fake_http := Map()
+	_LLM_Ollama_Async[99] := Map("http", fake_http, "on_success", (*) => "", "on_fail", (*) => "",
+		"cancelled", false)
 	LLM_Engine_FirePrediction("enough context here for a real tail segment")
 	AssertFalse(_LLM_Ollama_Async[99]["cancelled"],
 		"FirePrediction must not cancel in-flight WinHTTP — request_id handles staleness")

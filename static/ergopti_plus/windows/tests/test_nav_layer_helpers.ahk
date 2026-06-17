@@ -20,7 +20,7 @@
 
 _NL_ActivateLayerSetsEnabled() {
 	global LayerEnabled := false
-	AppState["number_of_repetitions"] := 5
+	global NumberOfRepetitions := 5
 	ResetStubRecorders()
 	ActivateLayer()
 	AssertTrue(LayerEnabled)
@@ -29,10 +29,10 @@ Test("ActivateLayer: sets LayerEnabled to true", _NL_ActivateLayerSetsEnabled)
 
 _NL_ActivateLayerResetsRepetitions() {
 	global LayerEnabled := false
-	AppState["number_of_repetitions"] := 7
+	global NumberOfRepetitions := 7
 	ResetStubRecorders()
 	ActivateLayer()
-	AssertEqual(1, AppState["number_of_repetitions"])
+	AssertEqual(1, NumberOfRepetitions)
 }
 Test("ActivateLayer: resets NumberOfRepetitions to 1", _NL_ActivateLayerResetsRepetitions)
 
@@ -55,29 +55,29 @@ Test("DisableLayer: sets LayerEnabled to false", _NL_DisableLayerSetsDisabled)
 ; ==============================================
 
 _NL_SetRepetitionsSetsCounter() {
-	AppState["number_of_repetitions"] := 1
+	global NumberOfRepetitions := 1
 	SetNumberOfRepetitions(4)
-	AssertEqual(4, AppState["number_of_repetitions"])
+	AssertEqual(4, NumberOfRepetitions)
 }
 Test("SetNumberOfRepetitions: sets the global counter", _NL_SetRepetitionsSetsCounter)
 
 _NL_SetRepetitionsAcceptsTen() {
 	SetNumberOfRepetitions(10)
-	AssertEqual(10, AppState["number_of_repetitions"])
+	AssertEqual(10, NumberOfRepetitions)
 }
 Test("SetNumberOfRepetitions: accepts value 10", _NL_SetRepetitionsAcceptsTen)
 
 _NL_ResetRepetitionsResetsToOne() {
-	AppState["number_of_repetitions"] := 9
+	global NumberOfRepetitions := 9
 	ResetNumberOfRepetitions()
-	AssertEqual(1, AppState["number_of_repetitions"])
+	AssertEqual(1, NumberOfRepetitions)
 }
 Test("ResetNumberOfRepetitions: resets counter to 1", _NL_ResetRepetitionsResetsToOne)
 
 _NL_ResetRepetitionsIdempotent() {
-	AppState["number_of_repetitions"] := 1
+	global NumberOfRepetitions := 1
 	ResetNumberOfRepetitions()
-	AssertEqual(1, AppState["number_of_repetitions"])
+	AssertEqual(1, NumberOfRepetitions)
 }
 Test("ResetNumberOfRepetitions: idempotent when already 1", _NL_ResetRepetitionsIdempotent)
 
@@ -93,11 +93,11 @@ Test("ResetNumberOfRepetitions: idempotent when already 1", _NL_ResetRepetitions
 
 ; ActionLayer calls SendInput then ResetNumberOfRepetitions.
 ; In the test runner SendInput is a real OS call — we only verify the
-; side-effect that is safe to observe: AppState["number_of_repetitions"] is reset to 1.
+; side-effect that is safe to observe: NumberOfRepetitions is reset to 1.
 _NL_ActionLayerResetsRepetitions() {
-	AppState["number_of_repetitions"] := 3
+	global NumberOfRepetitions := 3
 	; Send a no-op key sequence that produces no visible effect in CI
 	ActionLayer("{LShift}")
-	AssertEqual(1, AppState["number_of_repetitions"])
+	AssertEqual(1, NumberOfRepetitions)
 }
 Test("ActionLayer: resets NumberOfRepetitions after firing", _NL_ActionLayerResetsRepetitions)

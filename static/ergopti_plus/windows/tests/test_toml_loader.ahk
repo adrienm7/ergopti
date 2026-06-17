@@ -316,9 +316,12 @@ TestTL_LoadHotstringsBasic() {
 	if FileExist(TmpPath) {
 		FileDelete(TmpPath)
 	}
-	; Use is_case_sensitive=true so CreateHotstring (non-variant) is called
+	; Use is_case_sensitive=true + auto_expand=true (adds the * flag) so
+	; CreateCaseSensitiveHotstrings takes the conform fast path and registers
+	; exactly one spec — the explicit-variant path (auto_expand=false) registers
+	; three (lower/UPPER/Title) and would break the count assertion.
 	Content := "[[greetings]]`r`n"
-	         . '"hi" = { output = "hello", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }`r`n'
+	         . '"hi" = { output = "hello", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }`r`n'
 	FileAppend(Content, TmpPath, "UTF-8")
 
 	; Redirect to our temp file via ScriptInformation["PersonalTomlPath"]
@@ -396,7 +399,7 @@ TestTL_LoadHotstringsCommentedLines() {
 	}
 	Content := "[[sect]]`r`n"
 	         . "# this line is a comment and should be skipped`r`n"
-	         . '"real" = { output = "kept", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }`r`n'
+	         . '"real" = { output = "kept", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }`r`n'
 	FileAppend(Content, TmpPath, "UTF-8")
 
 	global ScriptInformation
@@ -420,9 +423,9 @@ TestTL_LoadHotstringsMultipleEntries() {
 		FileDelete(TmpPath)
 	}
 	Content := "[[words]]`r`n"
-	         . '"aa" = { output = "alpha", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }`r`n'
-	         . '"bb" = { output = "beta",  is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }`r`n'
-	         . '"cc" = { output = "gamma", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }`r`n'
+	         . '"aa" = { output = "alpha", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }`r`n'
+	         . '"bb" = { output = "beta",  is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }`r`n'
+	         . '"cc" = { output = "gamma", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }`r`n'
 	FileAppend(Content, TmpPath, "UTF-8")
 
 	global ScriptInformation
@@ -446,7 +449,7 @@ TestTL_LoadExtTomlFileUsesCurrentSection() {
 		FileDelete(TmpPath)
 	}
 	Content := "[[custom]]`r`n"
-	         . '"aa" = { output = "alpha", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }`r`n'
+	         . '"aa" = { output = "alpha", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }`r`n'
 	FileAppend(Content, TmpPath, "UTF-8")
 
 	ResetHotstringRecorders()
