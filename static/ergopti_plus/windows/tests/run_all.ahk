@@ -516,6 +516,11 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 #Include meta/test_llmbridge_stop_order.ahk
 #Include meta/test_llmdiff_has_corrections_ltrim.ahk
 #Include meta/test_audit_test_gaps.ahk
+#Include meta/test_keylogger_flush_atomic.ahk
+#Include meta/test_keylogger_tick_overflow.ahk
+#Include meta/test_llm_streaming_fixes.ahk
+#Include meta/test_layout_deadkey_endkey.ahk
+#Include meta/test_savefullconfig_no_delete.ahk
 
 ; Watchdog: kill the process if RunTests() never returns (e.g. a corpus
 ; consumer blocks on a synchronous HTTP call, an InputHook with no timeout,
