@@ -86,20 +86,21 @@ Test("api_ollama: _LLM_Ollama_RemoveStreamHandle uses IsObject/HasOwnProp, not '
 
 
 
-; ================================================
-; ================================================
-; ======= 3/ Pid-based filtering assertion =======
-; ================================================
-; ================================================
+; ==============================================================
+; ==============================================================
+; ======= 3/ Object-reference filtering assertion ==============
+; ==============================================================
+; ==============================================================
 
-_SHT_AssertPidComparison() {
+_SHT_AssertObjectReferenceComparison() {
 	Src := _SHT_ReadSource("modules/llm/api_ollama.ahk")
 	Body := _SHT_FuncBody(Src, "_LLM_Ollama_RemoveStreamHandle(handle) {")
 	Assert(Body != "", "_LLM_Ollama_RemoveStreamHandle declaration must exist in api_ollama.ahk")
 
-	; The rebuild loop must compare entries by their Pid property — this is the
-	; only stable identity token on a plain object literal (no Map key available)
-	Assert(InStr(Body, "Pid") > 0,
-		"_LLM_Ollama_RemoveStreamHandle must compare stream handles by Pid when rebuilding the active-streams array (T-W02)")
+	; The correct fix compares by OBJECT REFERENCE (h != handle), not by Pid.
+	; Windows reuses PIDs of short-lived processes; a PID collision would silently
+	; remove the wrong still-active handle from the registry (T-W02 fix).
+	Assert(InStr(Body, "h != handle") > 0,
+		"_LLM_Ollama_RemoveStreamHandle must filter by object reference (h != handle), not by PID (T-W02)")
 }
-Test("api_ollama: _LLM_Ollama_RemoveStreamHandle rebuilds array filtering by Pid (T-W02)", _SHT_AssertPidComparison)
+Test("api_ollama: _LLM_Ollama_RemoveStreamHandle filters by object reference, not PID (T-W02)", _SHT_AssertObjectReferenceComparison)

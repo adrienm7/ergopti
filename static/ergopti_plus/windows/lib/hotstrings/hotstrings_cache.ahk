@@ -282,9 +282,15 @@ _HotstringsCacheWriteTsv(TsvPath, Rows) {
 				Content .= Line
 			}
 		}
-		if FileExist(TsvPath)
-			FileDelete(TsvPath)
-		FileAppend(Content, TsvPath, "UTF-8-RAW")
+		; Write to a temp file and rename atomically — FileDelete+FileAppend is
+		; a two-step operation that leaves the cache empty between the two calls
+		; if the script crashes or another instance starts at that instant
+		; (hotstrings-cache-non-atomic-write fix).
+		TmpPath := TsvPath . ".tmp"
+		if FileExist(TmpPath)
+			FileDelete(TmpPath)
+		FileAppend(Content, TmpPath, "UTF-8-RAW")
+		FileMove(TmpPath, TsvPath, 1)
 	} catch as err {
 		try LoggerWarn("Hotstrings", "Could not write hotstring cache '{1}' ({2}); TOML path stays active.", TsvPath, err.Message)
 	}

@@ -163,8 +163,15 @@ TimerActiveCount() {
 ; explicitly via Bind to freeze it at creation time.
 _TimerAdapterMakeOneShot(Handle, Fn) {
 	_OneShot(BoundHandle, BoundFn) {
-		if A_IsSuspended
+		if A_IsSuspended {
+			; One-shot SetTimer with a negative delay never re-fires on its own.
+			; Re-queue the callback for 500ms later so it is not silently lost
+			; while the script is suspended (timer-scheduler-oneshot-suspend fix).
+			; The registry entry is intentionally kept intact until the callback
+			; actually fires.
+			SetTimer(_OneShot.Bind(BoundHandle, BoundFn), -500)
 			return
+		}
 		global _TIMER_ADAPTER_REGISTRY
 		BoundHandle["Fired"] := true
 		Id := BoundHandle.Has("Id") ? BoundHandle["Id"] : 0

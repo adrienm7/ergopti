@@ -26,6 +26,12 @@ local Logger = require("lib.logger")
 
 local LOG = "adapters.shell_runner"
 
+-- Holds strong references to every live hs.task so Lua's GC cannot kill
+-- a subprocess before its on_done callback fires (Hammerspoon GC pitfall:
+-- an hs.task not referenced from a GC root is collected and the OS process
+-- is killed silently mid-run).
+M._active_tasks = {}
+
 
 -- =========================================
 -- =========================================
@@ -87,18 +93,29 @@ function M.spawn(executable, args, on_done, on_chunk)
 		end
 	end
 
+	-- Wrap on_done to release the GC-root reference once the subprocess exits.
+	local function wrapped_on_done(task, exit_code, stdout, stderr)
+		M._active_tasks[task] = nil
+		if type(on_done) == "function" then
+			pcall(on_done, task, exit_code, stdout, stderr)
+		end
+	end
+
 	-- Build the hs.task — choose 3-arg or 4-arg form depending on on_chunk.
 	local ok, task_or_err
 	if type(on_chunk) == "function" then
-		ok, task_or_err = pcall(hs.task.new, executable, on_done, on_chunk, args)
+		ok, task_or_err = pcall(hs.task.new, executable, wrapped_on_done, on_chunk, args)
 	else
-		ok, task_or_err = pcall(hs.task.new, executable, on_done, args)
+		ok, task_or_err = pcall(hs.task.new, executable, wrapped_on_done, args)
 	end
 
 	if not ok then
 		Logger.error(LOG, "spawn(): hs.task.new('%s') failed — %s", tostring(executable), tostring(task_or_err))
 	else
 		_task = task_or_err
+		-- Pin the task in M._active_tasks so the GC cannot collect it while
+		-- the subprocess is still running (shell-runner-gc-kill fix).
+		M._active_tasks[_task] = true
 	end
 
 	--- Starts the spawned subprocess.

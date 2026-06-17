@@ -223,11 +223,14 @@ function M.write(path, data)
 		end
 	end
 
-	local ok, fh = pcall(io.open, path, "w")
+	-- Write to a temp file first so a crash or HS reload mid-write cannot
+	-- truncate the live config (toml-non-atomic-write fix).
+	local tmp_path = path .. ".tmp"
+	local ok, fh = pcall(io.open, tmp_path, "w")
 	if not ok or not fh then
-		Logger.error(LOG, "Failed to open file for writing.")
+		Logger.error(LOG, "Failed to open temp file for writing.")
 		-- UI error message kept in French
-		return false, "Impossible d'ouvrir le fichier en écriture : " .. tostring(path)
+		return false, "Impossible d'ouvrir le fichier en écriture : " .. tostring(tmp_path)
 	end
 
 	local write_ok, write_err = pcall(function()
@@ -238,7 +241,17 @@ function M.write(path, data)
 
 	if not write_ok then
 		Logger.error(LOG, string.format("Error during TOML write: %s.", tostring(write_err)))
+		pcall(os.remove, tmp_path)
 		return false, "Erreur lors de l'écriture : " .. tostring(write_err)
+	end
+
+	-- Atomic rename: on POSIX this is a single syscall — the config either
+	-- has its old content or its new content, never a half-written state.
+	local rename_ok, rename_err = os.rename(tmp_path, path)
+	if not rename_ok then
+		Logger.error(LOG, "Failed to rename temp TOML file: %s.", tostring(rename_err))
+		pcall(os.remove, tmp_path)
+		return false, "Erreur lors du déplacement du fichier temporaire."
 	end
 
 	Logger.info(LOG, "TOML configuration saved successfully.")
@@ -353,9 +366,10 @@ function M.batch_write(path, updates)
 		end
 	end
 
-	local fh_w, err_w = io.open(path, "w")
+	local tmp_w = path .. ".tmp"
+	local fh_w, err_w = io.open(tmp_w, "w")
 	if not fh_w then
-		Logger.error(LOG, "batch_write: cannot open '%s' for writing — %s.", path, tostring(err_w))
+		Logger.error(LOG, "batch_write: cannot open '%s' for writing — %s.", tmp_w, tostring(err_w))
 		return false, tostring(err_w)
 	end
 	local content = table.concat(lines, "\n")
@@ -363,7 +377,14 @@ function M.batch_write(path, updates)
 	pcall(function() fh_w:close() end)
 	if not ok_w then
 		Logger.error(LOG, "batch_write: write failed — %s.", tostring(err2))
+		pcall(os.remove, tmp_w)
 		return false, tostring(err2)
+	end
+	local ok_mv = os.rename(tmp_w, path)
+	if not ok_mv then
+		Logger.error(LOG, "batch_write: rename '%s' → '%s' failed.", tmp_w, path)
+		pcall(os.remove, tmp_w)
+		return false, "rename failed"
 	end
 	Logger.info(LOG, "batch_write: wrote %d line(s) to '%s'.", #lines, path)
 	return true

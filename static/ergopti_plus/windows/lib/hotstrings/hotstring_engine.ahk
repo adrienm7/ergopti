@@ -362,7 +362,11 @@ GetSelection() {
         ; window, ClipWait returns 0. Treat that as "no selection" and return ""
         ; so callers no-op — otherwise we would paste whatever stale content the
         ; restored clipboard holds, duplicating old text on a timeout.
-        if !ClipWait(GET_SELECTION_TIMEOUT_SEC) {
+        ; The second arg 1 makes ClipWait accept ANY clipboard format (images,
+        ; files, native objects), not just text. Without it, a selected image
+        ; causes ClipWait to time out after GET_SELECTION_TIMEOUT_SEC regardless
+        ; and freezes the UI for 500ms (getselection-clipwait-binary-freeze fix).
+        if !ClipWait(GET_SELECTION_TIMEOUT_SEC, 1) {
             LoggerWarn("hotstring_engine",
                 "GetSelection: ClipWait timed out after {1}s; returning empty selection.",
                 GET_SELECTION_TIMEOUT_SEC)

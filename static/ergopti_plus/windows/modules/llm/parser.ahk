@@ -49,7 +49,10 @@ LLM_Parser_StripThinking(text) {
  * @param {string} raw
  * @returns {Array}
  */
-LLM_Parser_SplitBlocks(raw) {
+; max_count (default 0 = unlimited) caps output to prevent a hallucinating
+; model from allocating memory for thousands of === separators before the
+; caller's slots.Length guard fires (llm-split-batch-no-cap fix).
+LLM_Parser_SplitBlocks(raw, max_count := 0) {
 	blocks := []
 	if (raw == "")
 		return blocks
@@ -60,6 +63,8 @@ LLM_Parser_SplitBlocks(raw) {
 		if (piece != "")
 			blocks.Push(piece)
 		pos := m.Pos + m.Len
+		if (max_count > 0 and blocks.Length >= max_count)
+			break
 	}
 	if (blocks.Length == 0 and raw != "")
 		blocks.Push(Trim(raw, " `t`r`n"))
@@ -883,7 +888,10 @@ LLM_Parser_ParseResponse(raw, full_text, tail_text, min_words, max_words, is_bat
 	stats := LLM_ApiCommon_NewDedupStats()
 	slots := []
 	if is_batch {
-		for _, block in LLM_Parser_SplitBlocks(raw) {
+		; Pass n_predictions as the hard cap so a hallucinating model cannot
+		; generate thousands of === separators and saturate memory before the
+		; slots.Length guard ever fires (llm-split-batch-no-cap fix).
+		for _, block in LLM_Parser_SplitBlocks(raw, n_predictions) {
 			if (slots.Length >= n_predictions)
 				break
 			pred := LLM_Parser_ProcessPrediction(full_text, tail_text, block, min_words, max_words)
