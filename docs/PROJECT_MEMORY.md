@@ -48,6 +48,7 @@ Accumulated engineering knowledge for this repository — gotchas, architecture 
   - [project-ui-dynamic-buttons](#project-ui-dynamic-buttons) — AHK UIs must use Gui_HarmoniseButtonWidths instead of hardcoded w-values; HS auto-sizes via CSS padding
   - [errors-only-log-sink](#errors-only-log-sink) — Dedicated ErgoptiPlus*errors*\*.log (WARNING/ERROR only) + menu item; crash_reports remain for uncaught fatals only
   - [project-hs-timer-callback-errors-invisible](#project-hs-timer-callback-errors-invisible) — Errors thrown in hs.timer/eventtap callbacks are swallowed to the HS Console, never the file logger; a test stub of a method production lacks masks the dangling call (the "vert mais aucune prédiction" bug)
+  - [project-macos-audit-2026-06-17-bugs](#project-macos-audit-2026-06-17-bugs) — Three macOS bugs fixed: LLM noise filter nil-vs-false Lua foot-gun, gesture peak confirmation was framerate-dependent (dead constant), synthetic-event reset race under OS load
   - [broad-unit-test-regression-coverage](#broad-unit-test-regression-coverage) — Maximize Test()/helpers.it coverage for every feature (hotstrings, gestures, keylogger, layout, suspend/pause, menu, config, logger, etc.) in both AHK and HS to catch all regressions early. Every invariant and edge that has bitten us gets a permanent test.
   - "Oui encore plus" ultra pass: +25+ additional tests across script_control (more pause idempotence/transitions, extras under pause), karabiner (pause gate on config), port_adapter meta (explicit suspend/pause purity + adapter notes + corpus coverage), corpus meta (pause/delay/reversal corpus notes + LLM under pause), tap_hold (more pause + bad TOML graceful), personal_toml (pause guard + bad entry), llm_profiles (pause no predict), keylogger_reader (pause privacy in reports), plus extra pause in gestures engine (more reversal + pause), keylogger privacy (agg under pause, PII on errors), llm prediction (pause on timeout, volume no degrade), hotstrings_full (more pause/synthetic/delay edges), shortcuts (more pause all dispatchers, menu no raw Add, bad features graceful). Total expansion now >80 new regression tests. The suite is now the strongest it's ever been — every feature has explicit pause/suspend guards + error/edge tests for critical invariants like project_suspend_pause_invariant, project_hotstring_delay_architecture, project_gestures_reversal_detection, keylogger privacy, menu dispatcher drops, AltGr prefix latch. Time makes the tests strictly more robust. Full suites + live test before any merge.
   - Expansion added: pause/suspend guards (script_control, gestures engine/init, hotstring engine, keylogger, layout, shortcuts, LLM); reversal detection in gestures; delay edges; FS/pcall error paths; cross parity. Strategy: for any new hook/timer/dispatch/pause path, add test that would have caught the silent failure. Full suites mandatory before merge.
@@ -1375,3 +1376,27 @@ Crash reported 2026-06-16 (`PropertyError: "This value of type 'Class' has no pr
 - Never use `static _prop := unset` as a "not-yet-initialized" holder when the property will be tested with `is` or read unconditionally before assignment. Use `false`, `0`, or `""` instead.
 - If you must use `unset` (e.g., for optional parameters), guard reads with `HasOwnProp` + a manual `is`-safe nil check, never bare `obj._prop is SomeClass`.
 - Regression tests in `test_hook_dispatcher.ahk` section 4 encode the exact PropertyError path.
+
+### project-macos-audit-2026-06-17-bugs
+
+_Three silent bugs found in the macOS driver: LLM noise filter suppressed uppercase at doc-start, gesture peak confirmation was framerate-dependent, synthetic-event reset could race with delayed OS delivery_
+
+<sub>slug: `project_macos_audit_2026_06_17`</sub>
+
+Three bugs fixed in the macOS driver (commit on dev branch 2026-06-17):
+
+**1. `prediction_engine.lua` — `is_noise_pred` uppercase filter at doc-start**
+`local ends_sent = prev_char and prev_char:match(...)` returns **nil** (not false) when `prev_char` is nil (empty or whitespace-only buffer). `not nil` is `true` in Lua, so the uppercase-capital gate silently suppressed all predictions beginning with a capital letter at document start or after whitespace-only buffers. Fix: `(prev_char == nil) or (prev_char:match(...))` — nil prev_char is now treated as an implicit sentence boundary.
+NRT: `tests/unit/modules/llm/test_noise_filter_regression.lua`.
+
+**2. `gestures/engine.lua` — framerate-dependent peak confirmation (dead code)**
+`commitGesture` used `(gs.peakNFrames or 0) >= FINGER_CONFIRM_FRAMES` to decide whether to override `maxFingers` with the peak finger count. The constant `PEAK_FINGERS_CONFIRM_MS = 0.05` was defined but **never used** (dead code). At 120 Hz ProMotion, 4 frames ≈ 33 ms < 50 ms, so the confirmation fired too early. Fix: `local peak_elapsed = now - (gs.peakNFirstSeen or now)` compared against `PEAK_FINGERS_CONFIRM_MS`.
+NRT: `tests/unit/modules/gestures/test_peak_override_regression.lua`.
+
+**3. `keymap/init.lua` — synthetic-event reset could race with delayed OS delivery**
+The stuck-counter guard `if dt > 0.5 and arm_age > 1.0 then reset` discarded in-flight synthetic events if the OS delayed their delivery past 1 s. Under extreme OS load, the events would then arrive unfiltered and duplicate characters. Fix: skip the reset when events are still pending (`expected_synthetic_deletes > 0` or `expected_synthetic_chars != ""`), unless `arm_age > SYNTHETIC_STALE_SEC = 5.0 s` (cleanup for truly lost events).
+NRT: `tests/unit/modules/keymap/test_synthetic_reset_guard.lua`.
+
+**Why:** Lua `nil and expr` evaluates to `nil` (not `false`) — `not nil` is `true`. This is the same foot-gun as `prev_char:match(...)` in multiple places in the codebase.
+
+**How to apply:** When writing `local x = condition and expr`, always verify the `condition == nil` case. If nil is possible, use `(condition ~= nil) and expr` or `condition == nil or (condition and expr)` as appropriate.
