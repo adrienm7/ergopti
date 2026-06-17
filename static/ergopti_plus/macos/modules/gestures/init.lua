@@ -536,6 +536,10 @@ start_startup_probe_loop = function()
 	-- One-shot safety recycle: in the rare case the very first attach was
 	-- somehow dropped, give it ONE retry. Beyond that, recycling is futile.
 	hs.timer.doAfter(STARTUP_SAFETY_PROBE_SEC, function()
+		-- Ghost-timer guard: if M.stop() was called while this timer was pending,
+		-- do not kick or recycle — CoreState.enabled is the canonical stopped signal
+		-- (gesture-engine-ghost-timer).
+		if not CoreState.enabled then return end
 		if _G.ERGOPTI_GESTURES_RECEIVED_FIRST_FRAME then return end
 		Logger.info(LOG, "Safety-net recycle at +%.1fs (no frame yet) — one-shot, will not retry further",
 			STARTUP_SAFETY_PROBE_SEC)
@@ -589,6 +593,7 @@ local function schedule_emergency_recycle()
 	Logger.warn(LOG, "schedule_emergency_recycle: SCHEDULED in 20ms (first_frame=%s, watchers=%d)",
 		tostring(_G.ERGOPTI_GESTURES_RECEIVED_FIRST_FRAME), count_watchers())
 	hs.timer.doAfter(0.02, function()
+		if not CoreState.enabled then return end
 		if _G.ERGOPTI_GESTURES_RECEIVED_FIRST_FRAME then
 			Logger.done(LOG, "Emergency recycle ABORTED — first frame arrived in the meantime.")
 			return

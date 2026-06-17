@@ -302,6 +302,33 @@ _SplitBatch_MultilineBlockPreserved() {
 Test("_LLM_Engine_SplitBatchBlocks: multiline block is preserved as one block", _SplitBatch_MultilineBlockPreserved)
 
 
+_SplitBatch_MaxCountCap() {
+	; A hallucinating model that emits 20 "===" separators must not flood the
+	; tooltip with 20 blocks when n_predictions = 3 (llm-split-batch-no-cap).
+	raw := "A===B===C===D===E===F===G===H===I===J===K===L===M===N===O===P===Q===R===S===T"
+	; Without cap: all 20 blocks
+	all_blocks := _LLM_Engine_SplitBatchBlocks(raw)
+	Assert(all_blocks.Length > 5,
+		"Without cap, SplitBatchBlocks must return all blocks from a long hallucination")
+	; With cap of 3: exactly 3 blocks
+	capped := _LLM_Engine_SplitBatchBlocks(raw, 3)
+	AssertEqual(3, capped.Length)
+	AssertEqual("A", capped[1])
+	AssertEqual("B", capped[2])
+	AssertEqual("C", capped[3])
+}
+Test("_LLM_Engine_SplitBatchBlocks: max_count cap stops parsing after N blocks (llm-split-batch-no-cap)", _SplitBatch_MaxCountCap)
+
+
+_SplitBatch_MaxCountZeroMeansUnlimited() {
+	; max_count = 0 (the default) must NOT limit output
+	raw := "A===B===C===D===E"
+	blocks := _LLM_Engine_SplitBatchBlocks(raw, 0)
+	AssertEqual(5, blocks.Length)
+}
+Test("_LLM_Engine_SplitBatchBlocks: max_count=0 is unlimited (default behaviour preserved)", _SplitBatch_MaxCountZeroMeansUnlimited)
+
+
 
 
 ; =====================================================

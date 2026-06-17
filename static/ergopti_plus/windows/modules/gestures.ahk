@@ -576,16 +576,18 @@ GestureScreenshotInstant() {
     DirCreate(PicsDir)
     Timestamp := FormatTime(, "yyyy_MM_dd_HH") . "h" . FormatTime(, "mm") . "min" . FormatTime(, "ss") . "sec"
     FilePath  := PicsDir . "\screenshot_" . Timestamp . ".png"
-    TmpScript := A_Temp . "\hs_screenshot.ps1"
-    ScriptContent := "Add-Type -AssemblyName System.Drawing`n"
-        . "$bmp = New-Object System.Drawing.Bitmap(" . WW . ", " . WH . ")`n"
-        . "$g = [System.Drawing.Graphics]::FromImage($bmp)`n"
-        . "$g.CopyFromScreen(" . WX . ", " . WY . ", 0, 0, $bmp.Size)`n"
-        . "$bmp.Save('" . FilePath . "')`n"
-        . "$g.Dispose(); $bmp.Dispose()"
-    FileDelete(TmpScript)
-    FileAppend(ScriptContent, TmpScript, "UTF-8")
-    RunWait('powershell -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "' . TmpScript . '"',, "Hide")
+    ; Inline the capture code via -Command instead of writing a temp .ps1 file.
+    ; A fixed temp-file path caused a race condition: rapid successive calls had the
+    ; second PowerShell instance overwrite the file while the first was still reading it
+    ; (gesture-screenshot-tempfile-race). Inlining eliminates the shared-file bottleneck
+    ; and removes the need for FileDelete + FileAppend on the hotkey thread.
+    PsCode := "Add-Type -AssemblyName System.Drawing;"
+        . "$bmp=New-Object System.Drawing.Bitmap(" . WW . "," . WH . ");"
+        . "$g=[System.Drawing.Graphics]::FromImage($bmp);"
+        . "$g.CopyFromScreen(" . WX . "," . WY . ",0,0,$bmp.Size);"
+        . "$bmp.Save('" . FilePath . "');"
+        . "$g.Dispose();$bmp.Dispose()"
+    Run('powershell -NoProfile -NonInteractive -WindowStyle Hidden -Command "' . PsCode . '"',, "Hide")
     TrayTip(StrReplace(t("notify.screenshot_saved_path"), "%s", FilePath), t("notify.screenshot_title"), "Iconi Mute")
 }
 

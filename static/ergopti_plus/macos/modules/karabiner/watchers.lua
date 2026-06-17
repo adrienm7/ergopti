@@ -66,6 +66,11 @@ local LAYOUT_POLL_SEC = Timings.sec("ui", "layout_poll_ms")
 -- Holds the fallback poll timer so it can be cancelled on stop.
 local _layout_poll_timer = nil
 
+-- Previous hs.keycodes.inputSourceChanged callback saved before start_input_source_watcher
+-- installs its own, so stop_input_source_watcher can restore it instead of passing nil
+-- (karabiner-input-source-changed-overwrite).
+local _previous_input_source_cb = nil
+
 -- Timestamp (fractional seconds) of the last CapsWord subprocess check.
 local _capsword_last_check_s = 0
 
@@ -101,7 +106,7 @@ local function deactivate_capsword()
 	_capsword_check_pending   = true
 
 	-- Async get: unblocks the main loop immediately; callback fires on completion
-	hs.task.new(KARABINER_CLI, function(exit_code, stdout, _)
+	local task = hs.task.new(KARABINER_CLI, function(exit_code, stdout, _)
 		_capsword_check_pending = false
 		if exit_code ~= 0 or tonumber(stdout) ~= 1 then return end
 
@@ -122,7 +127,13 @@ local function deactivate_capsword()
 		-- a flagsChanged event, not a regular keyDown/keyUp, so keyStroke fails
 		-- silently. hs.hid.capslock.set is the only reliable way to toggle the LED.
 		pcall(hs.hid.capslock.set, false)
-	end, {"--get-variable", "capsword"}):start()
+	end, {"--get-variable", "capsword"})
+	-- If task:start() fails the callback never fires — release the lock immediately
+	-- so subsequent pointer events are not permanently blocked (karabiner-capsword-lock-leak).
+	if not task:start() then
+		_capsword_check_pending = false
+		Logger.error(LOG, "CapsWord check task failed to start.")
+	end
 end
 
 --- Starts the eventtap watching for any pointer event that signals the user
@@ -222,6 +233,10 @@ function M.start_input_source_watcher(on_change)
 		or nil
 	Logger.debug(LOG, "Initial layout: '%s'.", tostring(_last_known_layout))
 
+	-- Save the previous global callback so stop_input_source_watcher can restore it
+	-- rather than passing nil (which would clear callbacks registered by other modules).
+	_previous_input_source_cb = hs.keycodes.inputSourceChanged()
+
 	-- Primary: hs.keycodes notification (fires immediately on most macOS versions)
 	hs.keycodes.inputSourceChanged(function()
 		Logger.debug(LOG, "Input source notification received — debouncing (%.0fms)…",
@@ -251,7 +266,10 @@ end
 --- and cancels any pending debounced rebuild.
 function M.stop_input_source_watcher()
 	Logger.trace(LOG, "Stopping input source watcher…")
-	pcall(function() hs.keycodes.inputSourceChanged(nil) end)
+	-- Restore the previous callback rather than passing nil, so that any
+	-- callback registered before this module started is not silently dropped.
+	pcall(function() hs.keycodes.inputSourceChanged(_previous_input_source_cb) end)
+	_previous_input_source_cb = nil
 	if _input_source_timer then
 		pcall(function() _input_source_timer:stop() end)
 		_input_source_timer = nil

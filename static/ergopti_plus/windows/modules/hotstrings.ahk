@@ -85,9 +85,18 @@ if Features["hotstrings"]["distances_reduction"]["dead_key_e_circumflex"]["enabl
 		)
 		; Necessary for things to work, as we define them already
 		DeadkeyMappingCircumflexModified.Delete(Vowel)
+		; Also remove the uppercase variant — CreateCaseSensitiveHotstrings registers
+		; both cases; leaving the uppercase entry in the Map causes a duplicate
+		; registration in the CreateDeadkeyHotstring loop below, wasting CPU at startup
+		; and on every live rebuild (hotstrings-deadkey-uppercase-duplicate).
+		UpperVowel := StrUpper(Vowel)
+		if (UpperVowel != Vowel)
+			DeadkeyMappingCircumflexModified.Delete(UpperVowel)
 	}
 	DeadkeyMappingCircumflexModified.Delete("e") ; For the rolling "êe" that gives "œ"
+	DeadkeyMappingCircumflexModified.Delete("E") ; Uppercase variant of the above
 	DeadkeyMappingCircumflexModified.Delete("t") ; To be able to type "être"
+	DeadkeyMappingCircumflexModified.Delete("T") ; Uppercase variant of the above
 
 	; The "Ê" key enables the other symbols on the layer when we aren't inside a word.
 	; The activation delay is passed explicitly so the registered callbacks stay

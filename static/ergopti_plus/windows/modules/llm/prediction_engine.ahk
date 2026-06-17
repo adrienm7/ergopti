@@ -781,7 +781,10 @@ _LLM_Engine_OnBatchFail(state) {
 ; block and drops empties. Mirrors HS's Parser.split_blocks behaviour
 ; (modules/llm/parser.lua) so the same model output yields the same
 ; predictions on both drivers.
-_LLM_Engine_SplitBatchBlocks(raw) {
+; ``max_count`` (default 0 = unlimited) caps the output to prevent a
+; hallucinating model from generating dozens of separators and saturating the
+; tooltip or parser with unbounded allocations (llm-split-batch-no-cap).
+_LLM_Engine_SplitBatchBlocks(raw, max_count := 0) {
 	blocks := []
 	if (raw == "")
 		return blocks
@@ -799,6 +802,9 @@ _LLM_Engine_SplitBatchBlocks(raw) {
 		if (piece != "")
 			blocks.Push(piece)
 		pos := m.Pos + m.Len
+		; Stop early when the caller requested a hard cap (llm-split-batch-no-cap)
+		if (max_count > 0 and blocks.Length >= max_count)
+			break
 	}
 	if (blocks.Length == 0 and raw != "")
 		blocks.Push(Trim(raw, " `t`r`n"))

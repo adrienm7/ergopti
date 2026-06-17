@@ -338,6 +338,10 @@ end
 --- @param karabiner table|nil Optional Karabiner module (must expose pause / resume).
 --- @param keylogger table|nil Optional Keylogger module (must expose pause / resume).
 function M.start(keymap, shortcuts, gestures, karabiner, keylogger)
+	if _tap then
+		Logger.warn(LOG, "M.start() called more than once — ignoring duplicate call.")
+		return
+	end
 	Logger.start(LOG, "Starting script control…")
 
 	_keymap    = type(keymap)    == "table" and keymap    or nil
