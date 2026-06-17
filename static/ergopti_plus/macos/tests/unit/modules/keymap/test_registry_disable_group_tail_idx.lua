@@ -63,6 +63,12 @@ helpers.describe("Registry.disable_group: tail-index consistency", function()
 		Registry.add("beta", "BETA", { is_case_sensitive = true })
 		Registry.set_group_context(nil)
 
+		-- Trigger the O(1) tail index build. M.add() only inserts into state.mappings;
+		-- sort_mappings() calls rebuild_tail_indexes() which populates
+		-- mappings_by_tail_char. This mirrors the normal load_file()/load_group()
+		-- completion path that sorts and indexes before the engine goes live.
+		Registry.sort_mappings()
+
 		-- Confirm the mapping was registered and the tail bucket is populated.
 		local before_count = #state.mappings
 		helpers.assert_true(before_count >= 1, "mapping must be registered before disable")

@@ -35,8 +35,9 @@ _TTUO_UnescapeOrderingCheck() {
 	Src := _TTUO_ReadSource("lib/wrap_symbols_config.ahk")
 	Assert(Src != "", "lib/wrap_symbols_config.ahk must be readable")
 
-	; Locate the function body
-	FuncStart := InStr(Src, "_WS_UnescapeToml(")
+	; Locate the function DEFINITION (not call sites — the function is called earlier
+	; in the file, so searching only the opening token lands on a call site)
+	FuncStart := InStr(Src, "_WS_UnescapeToml(S) {")
 	Assert(FuncStart > 0, "_WS_UnescapeToml must be defined in lib/wrap_symbols_config.ahk")
 
 	; Extract a window large enough to cover the two-line body (500 chars is ample)
