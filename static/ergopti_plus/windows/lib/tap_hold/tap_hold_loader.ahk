@@ -82,10 +82,35 @@ LoadTapHoldToml(FilePath, DefaultsFilePath := "") {
 	; Per-key fields overwrite default fields individually so a user entry
 	; that sets only tap_action still inherits time_activation_seconds from
 	; the default for that key.
-	for k, v in UserData["keys"]
-		Result["keys"][k] := v
-	for k, v in UserData["layers"]
-		Result["layers"][k] := v
+	; NOTE: must iterate field-by-field, NOT assign the whole user Map, or the
+	; defaults-populated Map for that key is replaced entirely and inherited
+	; fields (e.g. time_activation_seconds) are lost.
+	for k, v in UserData["keys"] {
+		if !Result["keys"].Has(k)
+			Result["keys"][k] := Map()
+		; hold_modifier / hold_layer are mutually exclusive: evict the opposite
+		; field that may have come from the defaults overlay.
+		if v.Has("hold_modifier") and Result["keys"][k].Has("hold_layer")
+			Result["keys"][k].Delete("hold_layer")
+		else if v.Has("hold_layer") and Result["keys"][k].Has("hold_modifier")
+			Result["keys"][k].Delete("hold_modifier")
+		for field, val in v
+			Result["keys"][k][field] := val
+	}
+	for k, v in UserData["layers"] {
+		if !Result["layers"].Has(k)
+			Result["layers"][k] := Map("mappings", Map())
+		for field, val in v {
+			if (field == "mappings") {
+				if !Result["layers"][k].Has("mappings")
+					Result["layers"][k]["mappings"] := Map()
+				for mk, mv in val
+					Result["layers"][k]["mappings"][mk] := mv
+			} else {
+				Result["layers"][k][field] := val
+			}
+		}
+	}
 
 	; Truncated-write sentinel: the user file exists yet the merged config has
 	; zero keys AND the user did NOT explicitly opt out via inherit_defaults =
