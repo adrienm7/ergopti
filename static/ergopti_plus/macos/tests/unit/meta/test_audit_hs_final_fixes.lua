@@ -14,12 +14,11 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local DRIVER_ROOT = helpers.driver_root()
 
 local function read_src(rel)
-	local base = (debug.getinfo(1, "S").source or ""):match("^@(.+/tests/)") or ""
-	local full  = base .. "../../" .. rel
-	local f     = io.open(full, "r")
-	if not f then return nil, "cannot open: " .. full end
+	local f = io.open(DRIVER_ROOT .. rel, "r")
+	if not f then return nil, "cannot open: " .. DRIVER_ROOT .. rel end
 	local s = f:read("*a")
 	f:close()
 	return s
