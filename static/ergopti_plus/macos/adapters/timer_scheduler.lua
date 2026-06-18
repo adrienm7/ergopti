@@ -33,10 +33,12 @@ local LOG = "adapters.timer_scheduler"
 -- =========================================
 -- =========================================
 
--- Weak-value table of all live timer handles issued by this adapter instance.
--- Using weak references prevents the registry itself from keeping timers alive
--- after all other references are dropped.
-local _live_timers = setmetatable({}, { __mode = "v" })
+-- Strong table of all live timer handles issued by this adapter instance.
+-- Strong references ensure cancelAll() can reach fire-and-forget timers even
+-- after the caller drops its handle reference — weak values allowed GC to erase
+-- the entry before cancelAll() could call stop() (adapters-input-2).
+-- Timers remove themselves from this table on fire (after()) or on cancel().
+local _live_timers = {}
 
 -- Monotonically increasing ID used to key entries in _live_timers.
 local _next_id = 0
@@ -61,6 +63,7 @@ function M.after(delaySec, fn)
 	local handle = { fired = false, id = _new_id() }
 	local ok, timer_or_err = pcall(hs.timer.doAfter, delaySec, function()
 		handle.fired = true
+		_live_timers[handle.id] = nil
 		local ok_fn, err = pcall(fn)
 		if not ok_fn then
 			Logger.error(LOG, "after() callback raised: %s", tostring(err))

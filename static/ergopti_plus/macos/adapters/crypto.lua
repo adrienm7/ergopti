@@ -45,7 +45,9 @@ function M.sha256(data)
 		local output = hs.execute(cmd)
 		if type(output) ~= "string" then return "" end
 		-- openssl output format: "SHA2-256(stdin)= <hex>" or "(stdin)= <hex>"
-		local digest = output:match("[0-9a-f]+%s*$")
+		-- Anchoring on "=" prevents spurious matches on words like "here" whose
+		-- last character happens to be a valid hex digit (e.g. "e").
+		local digest = output:match("%=%s*([0-9a-f]+)%s*$")
 		if not digest then return "" end
 		return (digest:gsub("%s+", ""))
 	end)
