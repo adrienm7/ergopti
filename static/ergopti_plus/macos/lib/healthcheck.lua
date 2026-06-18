@@ -35,7 +35,7 @@ local LOG = "healthcheck"
 -- Module load timestamp — used to approximate driver uptime.
 local _load_time = os.time()
 
--- Last error captured by M.record_error(); reset to nil on each M.run() call.
+-- Last error captured by M.record_error(); persists until the next record_error() call.
 local _last_error = nil
 
 -- Reference to the currently open webview window (singleton — one at a time).
