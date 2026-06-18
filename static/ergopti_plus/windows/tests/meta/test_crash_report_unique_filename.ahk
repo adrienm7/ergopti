@@ -53,7 +53,7 @@ Test("crash_reporter: CrashReport_Save contains FileExist uniqueness loop (crash
 _CRUN_HasTruncatingWrite() {
 	Src := _CRUN_ReadSource("lib/crash_reporter.ahk")
 	Assert(InStr(Src, "FileOpen(FName, " . Chr(0x22) . "w" . Chr(0x22)) > 0,
-		"crash_reporter.ahk must use FileOpen(FName, ""w"") truncating write instead of FileAppend")
+		'crash_reporter.ahk must use FileOpen(FName, "w") truncating write instead of FileAppend')
 }
 Test("crash_reporter: CrashReport_Save uses FileOpen truncating write (crash-report-same-second-collision)", _CRUN_HasTruncatingWrite)
 
