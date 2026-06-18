@@ -351,10 +351,16 @@ local function interceptor(event, _km_buffer)
 		if char == "@" then
 			local full_trigger = (_km_buffer or "") .. "@"
 			if _keymap then
-				local exact = (_keymap.has_exact_trigger and _keymap.has_exact_trigger(full_trigger)) or false
-				local pref  = (_keymap.has_trigger_prefix and _keymap.has_trigger_prefix(full_trigger)) or false
-				local suff  = (_keymap.has_trigger_suffix and _keymap.has_trigger_suffix(full_trigger)) or false
-				
+				-- Single-pass scan: classify_trigger returns all three flags in
+				-- one O(N) loop instead of the former three separate N-scans.
+				local exact, pref, suff = false, false, false
+				if _keymap.classify_trigger then
+					exact, pref, suff = _keymap.classify_trigger(full_trigger)
+				else
+					exact = (_keymap.has_exact_trigger  and _keymap.has_exact_trigger(full_trigger))  or false
+					pref  = (_keymap.has_trigger_prefix and _keymap.has_trigger_prefix(full_trigger)) or false
+					suff  = (_keymap.has_trigger_suffix and _keymap.has_trigger_suffix(full_trigger)) or false
+				end
 				if exact or pref or suff then
 					return nil
 				end

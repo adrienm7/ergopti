@@ -307,43 +307,56 @@ function M.mappings_for_star_tail(tail_char)
 	return _state.mappings_by_star_tail_char[tail_char]
 end
 
+--- Returns all three trigger-membership flags in a single O(N) pass.
+--- Replaces the former triple-scan pattern (has_exact_trigger + has_trigger_prefix
+--- + has_trigger_suffix) that iterated _state.mappings three times per keystroke on
+--- the synchronous eventtap path when personal-info is active and the user presses
+--- `@`. Early-exits the loop as soon as all three bits are known.
+--- @param str string The buffer to test against all registered triggers.
+--- @return boolean exact True when `str` matches a trigger exactly.
+--- @return boolean prefix True when `str` is a prefix of any trigger.
+--- @return boolean suffix True when `str` is a suffix of any trigger.
+function M.classify_trigger(str)
+	if not _state or type(str) ~= "string" or str == "" then
+		return false, false, false
+	end
+	local n     = #str
+	local exact = false
+	local pref  = false
+	local suff  = false
+	for _, m in ipairs(_state.mappings) do
+		local t = m.trigger
+		if not exact and t == str              then exact = true end
+		if not pref  and t:sub(1,  n) == str  then pref  = true end
+		if not suff  and t:sub(-n)    == str  then suff  = true end
+		if exact and pref and suff then break end
+	end
+	return exact, pref, suff
+end
+
 --- Returns true when `str` matches a registered trigger exactly.
---- Used by the personal-info interceptor to yield to the hotstring engine when
---- the typed sequence is already a known hotstring trigger.
+--- Kept for backward compatibility with call sites that need a single boolean.
 --- @param str string The string to test.
 --- @return boolean
 function M.has_exact_trigger(str)
-	if not _state or type(str) ~= "string" or str == "" then return false end
-	for _, m in ipairs(_state.mappings) do
-		if m.trigger == str then return true end
-	end
-	return false
+	local exact = M.classify_trigger(str)
+	return exact
 end
 
 --- Returns true when `str` is a prefix of any registered trigger.
---- Allows the personal-info interceptor to detect that the current buffer
---- could grow into a known hotstring and stay out of its way.
 --- @param str string The string to test.
 --- @return boolean
 function M.has_trigger_prefix(str)
-	if not _state or type(str) ~= "string" or str == "" then return false end
-	local n = #str
-	for _, m in ipairs(_state.mappings) do
-		if m.trigger:sub(1, n) == str then return true end
-	end
-	return false
+	local _, pref = M.classify_trigger(str)
+	return pref
 end
 
 --- Returns true when `str` is a suffix of any registered trigger.
 --- @param str string The string to test.
 --- @return boolean
 function M.has_trigger_suffix(str)
-	if not _state or type(str) ~= "string" or str == "" then return false end
-	local n = #str
-	for _, m in ipairs(_state.mappings) do
-		if m.trigger:sub(-n) == str then return true end
-	end
-	return false
+	local _, _, suff = M.classify_trigger(str)
+	return suff
 end
 
 
