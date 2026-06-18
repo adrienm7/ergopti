@@ -147,7 +147,10 @@ function M.prune_expired(rows, now_sec, opts)
 	local remaining = {}
 	for _, row in ipairs(rows) do
 		local exp = row[expire_field]
-		if not exp or now_sec < exp then
+		-- Keep the row when: exp is nil/false (never set), exp == 0 (explicit
+		-- "never expires" sentinel — consistent with has_expiry_stamp()), or
+		-- the deadline has not yet passed.
+		if not exp or exp == 0 or now_sec < exp then
 			table.insert(remaining, row)
 		end
 	end
