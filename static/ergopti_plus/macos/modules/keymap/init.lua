@@ -1040,11 +1040,17 @@ function M.stop()
 	shift_tap:stop()
 	mouse_tap:stop()
 	LLMBridge.reset_predictions()
+	-- Stop the escape trap so it does not intercept Escape after reload
+	-- (escape-trap-ghost-tap).
+	LLMBridge.stop()
+	-- Unsubscribe focus-change watchers so callbacks do not accumulate across
+	-- reloads (watcher-leak-on-reload).
+	km_utils.stop()
 
 	-- Clear runtime hooks
 	CoreState.interceptors      = {}
 	CoreState.preview_providers = {}
-	
+
 	Logger.success(LOG, "Keymap engine stopped.")
 end
 

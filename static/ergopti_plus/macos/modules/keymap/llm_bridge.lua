@@ -877,6 +877,17 @@ function M.init(core_state, keymap_defaults)
 		tostring(_state.buffer or ""), #(_state.mappings or {}))
 end
 
+--- Stops the persistent Escape trap event tap and releases the reference.
+--- Must be called from keymap/init.lua M.stop() so that Escape is not
+--- intercepted after the module is unloaded (escape-trap-ghost-tap).
+function M.stop()
+	if _escape_trap then
+		pcall(function() _escape_trap:stop() end)
+		_escape_trap = nil
+		Logger.debug(LOG, "Escape trap stopped.")
+	end
+end
+
 -- Wire tooltip callbacks so the tooltip module can call back into the bridge.
 -- Closures ensure the functions are resolved at call time, not at bind time.
 tooltip.set_accept_callback(function(idx) M.apply_prediction(idx) end)

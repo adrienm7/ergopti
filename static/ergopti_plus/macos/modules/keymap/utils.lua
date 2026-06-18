@@ -339,4 +339,23 @@ function M.is_ignored_window(ignored_titles, ignored_patterns, now)
 	return false
 end
 
+--- Stops the ignored-window watchers and unsubscribes from the window filter.
+--- Must be called from keymap/init.lua M.stop() to prevent callbacks from firing
+--- after the module is unloaded (watcher-leak-on-reload).
+function M.stop()
+	if _ignored_win_app_watcher then
+		pcall(function() _ignored_win_app_watcher:stop() end)
+		_ignored_win_app_watcher = nil
+		Logger.debug(LOG, "Ignored-window cache: application watcher stopped.")
+	end
+	if _ignored_win_win_filter then
+		pcall(function()
+			_ignored_win_win_filter:unsubscribe(invalidate_ignored_win_cache)
+		end)
+		_ignored_win_win_filter = nil
+		Logger.debug(LOG, "Ignored-window cache: window filter unsubscribed.")
+	end
+	_ignored_win_cache_dirty = true
+end
+
 return M
