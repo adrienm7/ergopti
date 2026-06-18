@@ -27,9 +27,10 @@ local helpers = require("tests.helpers")
 -- ==============================================================================
 
 helpers.describe("llm.app_filter — is_blocked empty-name guard", function()
-	local AppFilter
 
-	-- A minimal fake window whose focused app has a nil name
+	-- Each fake app must include all three methods that is_blocked() calls on the
+	-- front object (bundleID, path, name). The default hs.application stub only has
+	-- name/bundleID, causing 'attempt to call a nil value (method path)' at line 196.
 	local function make_nameless_front()
 		return {
 			bundleID  = function() return "com.test.unknown" end,
@@ -46,34 +47,43 @@ helpers.describe("llm.app_filter — is_blocked empty-name guard", function()
 		}
 	end
 
+	-- get_focused_app() in app_filter calls hs.window.focusedWindow() first; the
+	-- default stub returns nil, so the fallback hs.application.frontmostApplication()
+	-- is used. We override frontmostApplication on the live hs stub (which app_filter
+	-- captured as `local hs = hs` — same table reference) to inject our fake app.
+	local function set_front(fake_app)
+		_G.hs.application.frontmostApplication = function() return fake_app end
+	end
+
 	helpers.it("does NOT block a nameless app when exclusion is name-only", function()
-		AppFilter = helpers.load_with_stubs("modules.llm.app_filter")
+		local AF = helpers.load_with_stubs("modules.llm.app_filter")
+		set_front(make_nameless_front())
 
 		local exclusions = { { name = "Slack" } }
-		-- Fake state: no URL-bar front, the focused front is the nameless app
 		local state = { is_url_bar_focused = false }
-		-- Override the function that gets the frontmost app
-		local result = AppFilter.is_blocked(state, exclusions, false, false, make_nameless_front())
+		local result = AF.is_blocked(state, exclusions, false, false)
 		helpers.assert_true(result == false,
 			"is_blocked must return false for a nameless app even when a name-only exclusion is set")
 	end)
 
 	helpers.it("DOES block a matching named app (non-regression)", function()
-		AppFilter = helpers.load_with_stubs("modules.llm.app_filter")
+		local AF = helpers.load_with_stubs("modules.llm.app_filter")
+		set_front(make_named_front("Slack"))
 
 		local exclusions = { { name = "Slack" } }
 		local state = { is_url_bar_focused = false }
-		local result = AppFilter.is_blocked(state, exclusions, false, false, make_named_front("Slack"))
+		local result = AF.is_blocked(state, exclusions, false, false)
 		helpers.assert_true(result == true,
 			"is_blocked must still return true for an app whose name matches the exclusion")
 	end)
 
 	helpers.it("does NOT block a non-matching named app", function()
-		AppFilter = helpers.load_with_stubs("modules.llm.app_filter")
+		local AF = helpers.load_with_stubs("modules.llm.app_filter")
+		set_front(make_named_front("Terminal"))
 
 		local exclusions = { { name = "Slack" } }
 		local state = { is_url_bar_focused = false }
-		local result = AppFilter.is_blocked(state, exclusions, false, false, make_named_front("Terminal"))
+		local result = AF.is_blocked(state, exclusions, false, false)
 		helpers.assert_true(result == false,
 			"is_blocked must return false for an app that does not match any exclusion")
 	end)
