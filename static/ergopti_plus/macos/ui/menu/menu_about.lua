@@ -379,6 +379,11 @@ function M.build(ctx)
 
 	local interval_sec = tonumber(state.update_check_interval_seconds) or Updater.get_check_interval()
 
+	-- Forward-declared because set_channel and set_check_interval both reference it,
+	-- but the definition appears below them. Without this the name resolves to a global
+	-- nil at the call site and restart_background_checks receives nil as its callback.
+	local update_menu_fn
+
 	local function set_channel(c)
 		state.update_channel = c
 		if type(ctx.save_prefs) == "function" then ctx.save_prefs() end
@@ -404,7 +409,7 @@ function M.build(ctx)
 
 	-- Callback passed to the update flow so it can trigger a menu rebuild when
 	-- the state machine transitions (checking → available → installing → idle).
-	local function update_menu_fn()
+	function update_menu_fn()
 		if type(ctx.updateMenu) == "function" then ctx.updateMenu() end
 	end
 

@@ -655,6 +655,11 @@ local function list_active_keyboard_layouts()
 	return compute_active_layouts_fast(current_name)
 end
 
+-- Forward-declared because set_input_source (below) calls it in its TIS fallback
+-- path, but the definition appears later in the file. Without this the name resolves
+-- to a global nil at the call site (silently) and the fallback never runs.
+local build_kl_name_to_tis_id
+
 --- Activates the given keyboard layout.
 --- Strategy (in order):
 ---   1. hs.keycodes.setLayout(localised_name) — works for standard layouts and
@@ -727,7 +732,7 @@ end
 --- for every variant in the currently installed bundle. Returns nil if no bundle is installed.
 --- Example: { ["Ergopti_v2_2_2_plus"] = "com.apple.keyboardlayout.ergopti.plus", ... }
 --- @return table|nil
-local function build_kl_name_to_tis_id()
+function build_kl_name_to_tis_id()
 	local sb_sys  = highest_installed(SYSTEM_LAYOUTS_DIR)
 	local sb_user = highest_installed(USER_LAYOUTS_DIR)
 	local sb      = sb_sys or sb_user
