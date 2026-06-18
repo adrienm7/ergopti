@@ -273,6 +273,24 @@ function M.it(name, fn)
 	end
 end
 
+--- Builds a minimal lib.logger stub suitable for injection via package.loaded.
+--- All log methods are no-ops so modules can log without crashing in headless tests.
+--- @return table Logger stub with the same public API as lib/logger.lua.
+function M.make_logger_stub()
+	local noop = function() end
+	return {
+		debug   = noop, trace   = noop, done    = noop,
+		info    = noop, start   = noop, success = noop,
+		warn    = noop, error   = noop,
+		set_level = noop, set_sink = noop, is_enabled = function() return false end,
+		ring_buffer_snapshot = function() return {} end,
+		pcall   = function(_, fn, ...) return pcall(fn, ...) end,
+		build   = function() return noop end,
+		install_runtime_error_capture = noop,
+		init_log_path = noop,
+	}
+end
+
 --- Returns the global test result tally.
 --- @return table {passed, failed, failures}
 function M.get_results() return _suite_results end
