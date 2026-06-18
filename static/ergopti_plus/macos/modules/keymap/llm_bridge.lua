@@ -117,9 +117,11 @@ local is_autocorrect_preview_enabled = nil  -- Set in M.init()
 -- Sourced from LLM_DEFAULTS so both this module and menu_llm share the same value.
 
 -- Chain LLM immediately after a hotstring tooltip closes.
-local fire_llm_after_hotstring   = LLM_DEFAULTS.llm_after_hotstring
+-- Guard against nil LLM_DEFAULTS so modules.llm stub omitting DEFAULT_STATE
+-- does not crash the load-time expression (adapters-input-2 pattern).
+local fire_llm_after_hotstring   = LLM_DEFAULTS and LLM_DEFAULTS.llm_after_hotstring
 -- Clear the buffer when the user presses an arrow key or Escape outside prediction mode.
-local reset_buffer_on_navigation = LLM_DEFAULTS.llm_reset_on_nav
+local reset_buffer_on_navigation = LLM_DEFAULTS and LLM_DEFAULTS.llm_reset_on_nav
 
 -- Memoization of plain-text projections for strings returned by preview
 -- providers. Each keystroke used to call tokens_from_repl() + plain_text()
