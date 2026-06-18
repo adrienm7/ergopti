@@ -47,13 +47,16 @@ local MOD_SYMBOLS = {
 	alt        = "⌥",
 }
 
--- Slot prefix → hs.hotkey modifier list
+-- Slot prefix → hs.hotkey modifier list.
+-- Stored as an ordered array (longest prefix first) so slot_to_hotkey()
+-- and slot_label() use ipairs() and never mistake "cmd_shift_x" for "cmd_x"
+-- due to non-deterministic pairs() iteration.
 local SLOT_MODS = {
-	["cmd_"]            = {"cmd"},
-	["cmd_shift_"]      = {"cmd", "shift"},
-	["hs_ctrl_"]        = {"ctrl"},
-	["hs_ctrl_shift_"]  = {"ctrl", "shift"},
-	["hs_option_"]      = {"alt"},
+	{ "hs_ctrl_shift_",  {"ctrl", "shift"} },
+	{ "cmd_shift_",      {"cmd",  "shift"} },
+	{ "hs_ctrl_",        {"ctrl"} },
+	{ "hs_option_",      {"alt"} },
+	{ "cmd_",            {"cmd"} },
 }
 
 -- Special key suffix → hs.hotkey key name
@@ -84,7 +87,8 @@ M.DEFAULTS = {
 --- @param slot_id string e.g. "cmd_a", "hs_ctrl_0", "hs_option_space".
 --- @return table|nil mods, string|nil key
 local function slot_to_hotkey(slot_id)
-	for prefix, mods in pairs(SLOT_MODS) do
+	for _, entry in ipairs(SLOT_MODS) do
+		local prefix, mods = entry[1], entry[2]
 		if slot_id:sub(1, #prefix) == prefix then
 			local suffix = slot_id:sub(#prefix + 1)
 			local key = SPECIAL_KEYS[suffix] or suffix
@@ -98,7 +102,8 @@ end
 --- @param slot_id string
 --- @return string
 local function slot_label(slot_id)
-	for prefix, mods in pairs(SLOT_MODS) do
+	for _, entry in ipairs(SLOT_MODS) do
+		local prefix, mods = entry[1], entry[2]
 		if slot_id:sub(1, #prefix) == prefix then
 			local suffix = slot_id:sub(#prefix + 1)
 			local key_display = suffix:sub(1,1):upper() .. suffix:sub(2)
