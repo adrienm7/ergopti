@@ -197,6 +197,19 @@ KL_Ergo_UpdateBlock(delay_ms, now, app, is_bs) {
                 "chars",        KLErgo.block_chars
             ))
         }
+        ; Close any open flow window before discarding the block — without this the
+        ; JSONL log is left with a dangling flow_window_start that has no matching end
+        if KLErgo.flow_active {
+            flow_dur := (now - delay_ms) - KLErgo.flow_start
+            block_ms_flow := (now - delay_ms) - KLErgo.block_start
+            wpm_flow := (block_ms_flow > 0)
+                ? Round((KLErgo.block_chars / 5) / (block_ms_flow / 60000), 1)
+                : 0
+            KL_LogErgoEvent("flow_window_end", KLErgo.flow_app, Map(
+                "duration_ms", flow_dur,
+                "wpm",         wpm_flow
+            ))
+        }
         KLErgo.block_start   := 0
         KLErgo.block_chars   := 0
         KLErgo.block_warned  := false
