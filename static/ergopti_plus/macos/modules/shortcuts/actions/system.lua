@@ -172,7 +172,10 @@ schedule_awake_tick = function()
 		awake_timer = nil
 	end
 
-	local interval = math.random(AWAKE_TICK_MIN_SEC, AWAKE_TICK_MAX_SEC)
+	-- math.random(m, n) requires integer bounds in Lua 5.4; the tick bounds come from
+	-- Timings.sec() which returns floats, so use the float-safe uniform form instead.
+	local span = AWAKE_TICK_MAX_SEC - AWAKE_TICK_MIN_SEC
+	local interval = AWAKE_TICK_MIN_SEC + math.random() * span
 	awake_timer = timer.doAfter(interval, function()
 		if not awake_active then return end
 
@@ -553,7 +556,13 @@ function M.bind_instant_screenshot()
 		-- Capture the window ID synchronously before the eventtap returns; defer the
 		-- filesystem ops and screencapture to avoid blocking the CGEventTap callback
 		-- thread — blocking calls here exceed the dispatch deadline and disable the tap.
-		local id   = w:id()
+		local id = w:id()
+		-- Borderless or system windows can return nil for :id(); screencapture -l
+		-- requires a valid CGWindowID so we must bail out rather than concat nil.
+		if not id then
+			notifications.notify(i18n.get("shortcuts.no_active_window"), nil, "warning")
+			return true
+		end
 		local home = os.getenv("HOME") or "~"
 		local dir  = home .. "/Pictures/screenshots"
 		local filename = string.format("%s/screenshot_%s.png", dir, os.date("%Y_%m_%d_%Hh_%Mmin_%Ss"))
