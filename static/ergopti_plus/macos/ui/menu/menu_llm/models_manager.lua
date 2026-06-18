@@ -336,6 +336,9 @@ function M.new(deps)
 				body, i18n.get("menu.llm.btn_download"), i18n.get("common.cancel"), msg:find("⚠️") and "warning" or "informational")
 				
 			if ok_c and choice == i18n.get("menu.llm.btn_download") then
+				-- Clear any stale abort flag from a previous cancelled download so
+				-- update_icon() calls in the new download are not silently no-oped.
+				if type(deps.clear_download_abort) == "function" then pcall(deps.clear_download_abort) end
 				do_download()
 			else
 				if type(on_cancel) == "function" then pcall(on_cancel) end
