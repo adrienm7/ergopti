@@ -451,7 +451,10 @@ local function discover_endpoints(on_done)
 			local path = candidates[idx]
 			local payload = probe_by_kind[kind] or probe_completions
 			_probe_client.post(MLX_BASE_URL .. path, headers, payload, function(r)
-				if r.status ~= 404 and r.status ~= 0 then
+				-- Accept only positive HTTP status codes — NSURLError codes are negative integers
+				-- (e.g. -1 = connection refused/reset); the module comment at the top explicitly
+				-- states we do NOT accept -1 as a hit, but the original guard only rejected 404 and 0.
+				if type(r.status) == "number" and r.status >= 200 and r.status ~= 404 then
 					Logger.info(LOG, "Endpoint discovery (%s): %s -> HTTP %s — accepted as live route.",
 						kind, path, tostring(r.status))
 					pcall(on_resolved, MLX_BASE_URL .. path)
@@ -789,6 +792,22 @@ function M.warmup(model_name, profile)
 		return
 	end
 
+	-- Make sure we know which routes the live mlx-lm install exposes BEFORE we
+	-- send the warmup itself. Without this, a route rename in a freshly
+	-- installed mlx-lm wheel turns every warmup into a 404 with no recovery.
+	-- NOTE: the give-up timer is stamped AFTER this short-circuit so that the
+	-- discovery window (up to DISCOVERY_MAX_WAIT_SEC = 180s) does not eat into
+	-- the warmup budget (WARMUP_GIVE_UP_SEC = 120s) — a large model that takes
+	-- 120-180s to map into GPU would otherwise trigger a false failure.
+	if not _endpoints_discovered then
+		Logger.debug(LOG, "warmup() — endpoints not yet discovered, triggering discovery…")
+		-- Record the model we are waiting for so the discovery poll can reject a
+		-- /v1/models 200 from the old server (still alive for ~2 s during model switch).
+		_expected_model_id = model_name
+		discover_endpoints(function() M.warmup(model_name, profile) end)
+		return
+	end
+
 	-- Track CONTINUOUS warmup duration across every retry/discovery re-entry, and give
 	-- up once it exceeds the budget. This is the model-agnostic backstop that turns an
 	-- eternal orange "still loading" dot into a red "failed" dot + notification when a
@@ -799,18 +818,6 @@ function M.warmup(model_name, profile)
 		Logger.error(LOG, "MLX warmup for '%s' gave up after %.0fs of failure — surfacing as load failure.",
 			tostring(model_name), warmup_elapsed)
 		M.mark_load_failed(model_name, true)
-		return
-	end
-
-	-- Make sure we know which routes the live mlx-lm install exposes BEFORE we
-	-- send the warmup itself. Without this, a route rename in a freshly
-	-- installed mlx-lm wheel turns every warmup into a 404 with no recovery.
-	if not _endpoints_discovered then
-		Logger.debug(LOG, "warmup() — endpoints not yet discovered, triggering discovery…")
-		-- Record the model we are waiting for so the discovery poll can reject a
-		-- /v1/models 200 from the old server (still alive for ~2 s during model switch).
-		_expected_model_id = model_name
-		discover_endpoints(function() M.warmup(model_name, profile) end)
 		return
 	end
 
@@ -1535,8 +1542,12 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 	end
 
 	-- Write payload to a temp file so curl reads it directly — avoids the
-	-- stdin-pipe/streaming-callback conflict in hs.task
-	local tmp_path = os.tmpname() .. "_mlx_stream.json"
+	-- stdin-pipe/streaming-callback conflict in hs.task.
+	-- os.tmpname() creates an empty file at the base path; remove it immediately
+	-- so only the suffixed path (which we own) exists in /tmp.
+	local _tmp_base = os.tmpname()
+	local tmp_path = _tmp_base .. "_mlx_stream.json"
+	os.remove(_tmp_base)
 	local fh = io.open(tmp_path, "w")
 	if not fh then
 		Logger.error(LOG, "Failed to open temp file '%s' for MLX streaming payload.", tmp_path)
