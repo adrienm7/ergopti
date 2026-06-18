@@ -170,10 +170,15 @@ function M.update_ax_observer(app_pid)
 	-- Watch for focus changes across the whole application
 	pcall(function() observer:addWatcher(app_element, "AXFocusedUIElementChanged") end)
 
-	-- Bootstrap: also watch the currently focused element for value changes
+	-- Bootstrap: also watch the currently focused element for value changes.
+	-- _last_focused_element must be set here so the focus-change handler's
+	-- removeWatcher call fires on E1 when E2 gets focus; without this assignment
+	-- the guard `if _last_focused_element` is always nil on the first switch and
+	-- the bootstrap watcher leaks (orphaned watchers accumulate per app activation).
 	local focused = app_element:attributeValue("AXFocusedUIElement")
 	if focused then
 		pcall(function() observer:addWatcher(focused, "AXValueChanged") end)
+		_last_focused_element = focused
 		local ok_val, val = pcall(function() return focused:attributeValue("AXValue") end)
 		if ok_val and type(val) == "string" then _last_ax_value = val end
 		update_secure_field_state(focused)
