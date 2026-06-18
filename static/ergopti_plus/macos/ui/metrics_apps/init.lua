@@ -71,8 +71,11 @@ end
 
 local MAX_ICON_LOOKUPS_PER_OPEN = 30
 
-local CONFIG_DIR      = hs.configdir .. "/data"
-local CATEGORIES_FILE = CONFIG_DIR .. "/app_categories.json"
+local CONFIG_DIR          = hs.configdir .. "/data"
+local CATEGORIES_FILE     = CONFIG_DIR .. "/app_categories.json"
+-- Fallback category assigned to an uncategorised app on first edit.
+-- Single source of truth; duplicated "Général" literals were a bug (ui-windows-b-1).
+local DEFAULT_APP_CATEGORY = "Général"
 
 --- On-disk snapshot of the last successful render (instant pre-fill).
 local UI_TMP_DIR    = (os.getenv("TMPDIR") or "/tmp/"):gsub("/?$", "/")
@@ -238,7 +241,7 @@ local function prompt_pick_app()
 	chooser = hs.chooser.new(function(choice)
 		if not choice then return end
 		local cats    = load_categories()
-		local current = cats[choice.text] or { type = "Général", score = 0 }
+		local current = cats[choice.text] or { type = DEFAULT_APP_CATEGORY, score = 0 }
 		M.prompt_category(choice.text, current.type, current.score)
 	end)
 	chooser:placeholderText("Choisir une application à classer…")
@@ -255,7 +258,7 @@ local function handle_bridge_message(msg)
 	local act = body.action
 	if act == "edit" then
 		local app_name = tostring(body.app or "")
-		local cat      = tostring(body.cat or "Général")
+		local cat      = tostring(body.cat or DEFAULT_APP_CATEGORY)
 		local score    = tonumber(body.score) or 0
 		hs.timer.doAfter(0, function() M.prompt_category(app_name, cat, score) end)
 	elseif act == "pick" then
