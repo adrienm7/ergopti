@@ -116,10 +116,15 @@ local function handle_ax_value_changed(element)
 	local now = hs.timer.absoluteTime() / 1000000
 	-- Only act if: more than 100 ms since last keystroke, both values non-empty,
 	-- and the change is larger than 1 character (single-char changes are normal typing)
+	-- Use utf8.len for character counting: a single accented char like 'é' is 2
+	-- bytes, so #val would differ by 2 and falsely trigger the "> 1" threshold.
+	-- utf8.len returns nil on malformed sequences; fall back to byte length.
+	local val_chars      = utf8.len(val)           or #val
+	local last_val_chars = utf8.len(_last_ax_value) or #_last_ax_value
 	if (now - _state.last_time) > 100
-	and #val > 0
-	and #_last_ax_value > 0
-	and math.abs(#val - #_last_ax_value) > 1
+	and val_chars > 0
+	and last_val_chars > 0
+	and math.abs(val_chars - last_val_chars) > 1
 	then
 		Logger.debug(LOG, "Native autocorrect detected in '%s' — flushing buffer.", _state.session_app_name)
 		_log_manager.flush_buffer()
@@ -267,9 +272,11 @@ function M.update_private_status()
 	if ok_ax and ax_win then
 		local doc_url = ax_win:attributeValue("AXDocument")
 		if type(doc_url) == "string" and doc_url:sub(1, 7) == "file://" then
-			-- Pure-Lua percent-decode to avoid hs.http dependency
+			-- Pure-Lua percent-decode to avoid hs.http dependency.
+			-- Note: '+' must NOT be decoded as space here — '+' is a literal path
+			-- character in file:// URIs (only form-encoded bodies use + for space).
 			local path = doc_url:sub(8)
-			_state.session_document_path = path:gsub("+", " "):gsub("%%(%x%x)", function(h)
+			_state.session_document_path = path:gsub("%%(%x%x)", function(h)
 				return string.char(tonumber(h, 16))
 			end)
 		end

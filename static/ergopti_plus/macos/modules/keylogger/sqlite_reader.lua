@@ -515,10 +515,11 @@ function M.read_range_split_today(sqlite_path, start_date, end_date, selected_ap
 	end
 
 	-- Historical: anything strictly before today.
+	-- Compute yesterday via os.time subtraction to avoid manual day arithmetic that
+	-- produces invalid dates on the 1st of a month (2026-01-00, 2026-03-00, …).
+	local yesterday_str = os.date("%Y-%m-%d", os.time() - 86400)
 	local historical = M.read_ngrams(sqlite_path, start_date,
-		(hist_end and hist_end < today_str) and hist_end or
-			(string.format("%s", today_str:sub(1, 4) .. "-" .. today_str:sub(6, 7) .. "-" ..
-				string.format("%02d", tonumber(today_str:sub(9, 10)) - 1))),
+		(hist_end and hist_end < today_str) and hist_end or yesterday_str,
 		selected_apps)
 
 	-- Today: per-app ngram dict for each selected app.
