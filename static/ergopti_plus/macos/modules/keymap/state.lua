@@ -109,6 +109,7 @@ function M.new(defaults, delays_default)
 		preview_providers          = {},
 		expected_synthetic_chars   = "",
 		expected_synthetic_deletes = 0,
+		expected_synthetic_pastes  = 0,
 		-- Epoch timestamp (seconds) of the last arm_synthetic() / perform_text_replacement()
 		-- call. Used by the stuck-counter reset guard in onKeyDownRaw to avoid wiping
 		-- counters that were just armed by an in-flight expansion (A6 audit fix).

@@ -628,6 +628,7 @@ local function onKeyDownRaw(e)
 	if dt > 0.5 and (not events_in_flight or arm_age > SYNTHETIC_STALE_SEC) then
 		CoreState.expected_synthetic_deletes = 0
 		CoreState.expected_synthetic_chars   = ""
+		CoreState.expected_synthetic_pastes  = 0
 	end
 
 	-- Wipe the buffer after the user pauses long enough that the next keystroke
@@ -643,9 +644,14 @@ local function onKeyDownRaw(e)
 	local flags = e:getFlags()
 
 	-- 1. Ignore our own synthetic "Delete" keystrokes to prevent double-deletion.
+	-- Guard with a source-PID check so a human Backspace pressed during an in-flight
+	-- expansion does not incorrectly consume a slot and desync the buffer (Bug 1 fix).
 	if keyCode == Keycodes.BACKSPACE and CoreState.expected_synthetic_deletes > 0 then
-		CoreState.expected_synthetic_deletes = CoreState.expected_synthetic_deletes - 1
-		return false
+		local source_pid = e:getProperty(hs.eventtap.event.properties.eventSourceUnixProcessID)
+		if source_pid == hs.processInfo.processID then
+			CoreState.expected_synthetic_deletes = CoreState.expected_synthetic_deletes - 1
+			return false
+		end
 	end
 
 	-- Cache hit guaranteed: is_ignored_window was already called above and returned
@@ -683,6 +689,14 @@ local function onKeyDownRaw(e)
 		-- Cmd+V echo from our own clipboard-paste expansion — do not wipe the
 		-- buffer; the synthetic chars will be consumed by the filter below.
 		if #CoreState.expected_synthetic_chars > 0 then
+			return false
+		end
+		-- When a paste expansion is in flight, the Cmd+V echo must be swallowed
+		-- without wiping the buffer. Use a dedicated counter so expected_synthetic_chars
+		-- is not polluted with paste text that Cmd+V never echoes individually.
+		if flags.cmd and keyCode == hs.keycodes.map["v"]
+			and (CoreState.expected_synthetic_pastes or 0) > 0 then
+			CoreState.expected_synthetic_pastes = CoreState.expected_synthetic_pastes - 1
 			return false
 		end
 		CoreState.buffer = ""

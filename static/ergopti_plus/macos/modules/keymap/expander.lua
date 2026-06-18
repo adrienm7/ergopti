@@ -98,6 +98,15 @@ function M.perform_text_replacement(deletes, emit_action, buffer_action, is_fina
 	-- Guard against a nil field: the E2E stub state may not include this slot.
 	_state.expected_synthetic_chars = (_state.expected_synthetic_chars or "") .. emitted_str
 
+	-- When the emission used clipboard paste, register the expected Cmd+V echoes
+	-- in a dedicated counter instead of expected_synthetic_chars. Paste does not
+	-- produce individual character echoes, so expected_synthetic_chars must stay
+	-- empty to avoid absorbing real keystrokes typed after the expansion.
+	local paste_ops = km_utils.take_paste_ops and km_utils.take_paste_ops() or 0
+	if paste_ops > 0 then
+		_state.expected_synthetic_pastes = (_state.expected_synthetic_pastes or 0) + paste_ops
+	end
+
 	if keylogger and type(keylogger.notify_synthetic) == "function" then
 		keylogger.notify_synthetic(emitted_str, source_type or "hotstring", deletes, source_variant)
 	end

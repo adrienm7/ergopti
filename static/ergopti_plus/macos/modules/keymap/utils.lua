@@ -71,11 +71,12 @@ local IGNORED_WIN_TTL_SEC = 5.0
 
 -- Clipboard serialisation state for the paste path.
 -- When two paste expansions overlap within CLIPBOARD_RESTORE_SEC of each other,
--- naively reading getContents() on the second paste yields the first expansion's
--- text rather than the user's real clipboard. This pair guarantees that only one
+-- naively reading readAllData() on the second paste yields the first expansion's
+-- data rather than the user's real clipboard. This trio guarantees that only one
 -- "original" value is ever saved and that the final doAfter always restores it.
-local _paste_saved_original = nil   -- user's clipboard at the time of the first paste
+local _paste_saved_original = nil   -- user's full clipboard data (table from readAllData) at first paste
 local _paste_pending_timer  = nil   -- the active restore timer, if any
+local _paste_ops_pending    = 0     -- count of Cmd+V echos yet to arrive (consumed by expander)
 
 --- Returns true when the text is long enough or unicode-heavy enough that
 --- clipboard-paste should be preferred over simulated keystrokes.
@@ -93,9 +94,21 @@ function M.should_paste(text)
 	return false
 end
 
+--- Atomically reads and resets the pending paste-ops counter.
+--- Called by expander.lua immediately after emit_action() to detect whether
+--- any token was delivered via clipboard paste rather than keystrokes. The
+--- returned count is added to CoreState.expected_synthetic_pastes so the
+--- keydown handler can swallow the Cmd+V echoes without wiping the buffer.
+--- @return number Paste operations fired since the last call (usually 0 or 1).
+function M.take_paste_ops()
+	local n = _paste_ops_pending
+	_paste_ops_pending = 0
+	return n
+end
+
 --- Emits a sequence of tokens by simulating keystrokes or pasting via the clipboard.
 --- @param tokens table The token list produced by tokens_from_repl().
---- @return number, string Total characters emitted and the concatenated plain-text portion.
+--- @return number, string Total characters emitted and the keystroke portion only (paste chars excluded).
 function M.emit_tokens(tokens)
 	if type(tokens) ~= "table" then
 		Logger.error(LOG, "emit_tokens: tokens must be a table (got %s).", type(tokens))
@@ -117,25 +130,30 @@ function M.emit_tokens(tokens)
 			if M.should_paste(tok.value) then
 				-- Serialise clipboard ownership: if a restore is already pending,
 				-- cancel it but keep _paste_saved_original (the user's real
-				-- clipboard) — reading getContents() now would return the first
-				-- expansion's text rather than what the user had copied.
+				-- clipboard) — reading readAllData() now would return the first
+				-- expansion's data rather than what the user had copied.
 				if _paste_pending_timer then
 					pcall(function() _paste_pending_timer:stop() end)
 					_paste_pending_timer = nil
 				else
-					_paste_saved_original = hs.pasteboard.getContents()
+					-- Preserve all clipboard types (images, RTF, etc.), not just plain text.
+					_paste_saved_original = hs.pasteboard.readAllData()
 				end
 				hs.pasteboard.setContents(tok.value)
 				keyStroke({ "cmd" }, "v", 0)
 				local ok_l, tok_len = pcall(text_utils.utf8_len, tok.value)
-				count       = count + (ok_l and tok_len or 1)
-				emitted_str = emitted_str .. tok.value
+				count              = count + (ok_l and tok_len or 1)
+				_paste_ops_pending = _paste_ops_pending + 1
 				-- Restore clipboard asynchronously after the target app has received the paste.
 				local saved = _paste_saved_original
 				_paste_pending_timer = hs.timer.doAfter(CLIPBOARD_RESTORE_SEC, function()
 					_paste_pending_timer  = nil
 					_paste_saved_original = nil
-					pcall(hs.pasteboard.setContents, saved or "")
+					if type(saved) == "table" and next(saved) ~= nil then
+						pcall(hs.pasteboard.writeAllData, saved)
+					else
+						pcall(hs.pasteboard.setContents, "")
+					end
 				end)
 			else
 				keyStrokes(tok.value)
@@ -169,7 +187,8 @@ function M.emit_text(text)
 			pcall(function() _paste_pending_timer:stop() end)
 			_paste_pending_timer = nil
 		else
-			_paste_saved_original = hs.pasteboard.getContents()
+			-- Preserve all clipboard types (images, RTF, etc.), not just plain text.
+			_paste_saved_original = hs.pasteboard.readAllData()
 		end
 		hs.pasteboard.setContents(text)
 		keyStroke({ "cmd" }, "v", 0)
@@ -177,14 +196,21 @@ function M.emit_text(text)
 		_paste_pending_timer = hs.timer.doAfter(CLIPBOARD_RESTORE_SEC, function()
 			_paste_pending_timer  = nil
 			_paste_saved_original = nil
-			pcall(hs.pasteboard.setContents, saved or "")
+			if type(saved) == "table" and next(saved) ~= nil then
+				pcall(hs.pasteboard.writeAllData, saved)
+			else
+				pcall(hs.pasteboard.setContents, "")
+			end
 		end)
 		Logger.done(LOG, "Text pasted via clipboard.")
-		-- Return the real character count and text so callers can populate
-		-- expected_synthetic_chars; without this the Cmd+V echo reaches the
-		-- handler with an empty queue and the buffer is wiped unconditionally.
+		-- Signal the pending Cmd+V echo to expander via the paste counter, NOT
+		-- via expected_synthetic_chars. Returning text as emitted_str would fill
+		-- expected_synthetic_chars with text that Cmd+V never echoes back as
+		-- individual keystrokes, causing subsequent real keystrokes matching the
+		-- expansion prefix to be silently absorbed (paste-synthetic-chars-leak).
+		_paste_ops_pending = _paste_ops_pending + 1
 		local ok_l, l = pcall(text_utils.utf8_len, text)
-		return (ok_l and l or 1), text
+		return (ok_l and l or 1), ""
 	end
 
 	keyStrokes(text)
