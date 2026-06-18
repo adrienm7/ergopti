@@ -392,6 +392,15 @@ local function build_shortcut_key(event_obj, flags, keycode)
 	return table.concat(parts, "+")
 end
 
+--- Returns true when the script-control module signals that the script is paused.
+--- Used as a fast guard in all timer/watcher callbacks so no data is written
+--- to the log while the user has explicitly suspended the keylogger.
+local function _is_paused()
+	return _script_control
+		and type(_script_control.is_paused) == "function"
+		and _script_control.is_paused()
+end
+
 
 
 
@@ -835,6 +844,7 @@ end
 --- Idle check: runs every IDLE_CHECK_INTERVAL_SEC seconds.
 --- Logs micro-idle events and clears abandoned sessions.
 local function check_idle()
+	if _is_paused() then return end
 	local now = hs.timer.absoluteTime() / 1000000
 
 	if CoreState.session_last_active > 0 then
@@ -868,6 +878,7 @@ end
 --- Day-rotation check: runs every second via the maintenance timer.
 --- When midnight passes, flushes and archives the previous day's data.
 local function perform_maintenance()
+	if _is_paused() then return end
 	local today = os.date("%Y-%m-%d")
 	if _current_day ~= today then
 		Logger.start(LOG, "Midnight rotation: archiving %s…", _current_day)
@@ -887,6 +898,7 @@ end
 --- Handles system sleep, wake, lock, and unlock events.
 --- @param event number The caffeinate watcher event constant.
 local function caffeinate_cb(event)
+	if _is_paused() then return end
 	local now = hs.timer.absoluteTime() / 1000000
 	if event == hs.caffeinate.watcher.systemWillSleep
 	or event == hs.caffeinate.watcher.screensDidSleep
@@ -950,6 +962,7 @@ local function init_hardware_watchers()
 	if hs.wifi and hs.wifi.watcher then
 		local ok, w = pcall(function()
 			return hs.wifi.watcher.new(function()
+				if _is_paused() then return end
 				local ssid = hs.wifi.currentNetwork()
 				LogManager.log_system_event("wifi_change", { ssid = ssid or "Disconnected" })
 				Logger.debug(LOG, "Wi-Fi changed: %s.", ssid or "Disconnected")
@@ -961,6 +974,7 @@ local function init_hardware_watchers()
 	if hs.battery and hs.battery.watcher then
 		local ok, w = pcall(function()
 			return hs.battery.watcher.new(function()
+				if _is_paused() then return end
 				local level      = hs.battery.percentage()
 				local is_charging = hs.battery.isCharging()
 				local source     = hs.battery.powerSource()
@@ -985,6 +999,7 @@ local function init_hardware_watchers()
 	if hs.spaces and hs.spaces.watcher then
 		pcall(function()
 			_spaces_watcher = hs.spaces.watcher.new(function(space_id)
+				if _is_paused() then return end
 				LogManager.log_system_event("space_change", { space_id = space_id })
 			end)
 			_spaces_watcher:start()
@@ -995,6 +1010,7 @@ local function init_hardware_watchers()
 	if hs.audiodevice and hs.audiodevice.watcher then
 		local ok = pcall(function()
 			hs.audiodevice.watcher.setCallback(function(event_code)
+				if _is_paused() then return end
 				-- "vOut " = output volume changed, "mOut " = output mute toggled
 				if event_code == "vOut " or event_code == "mOut " then
 					local device = hs.audiodevice.defaultOutputDevice()
