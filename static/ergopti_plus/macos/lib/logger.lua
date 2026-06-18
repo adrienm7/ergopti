@@ -528,6 +528,19 @@ local function _flush_dedup_summary()
 	-- Push to ring buffer before writing so the snapshot reflects dedup summaries
 	_push_ring(stamp .. " " .. summary)
 	_write_to_file(stamp, summary)
+	-- Mirror suppression summary to the errors-only log when the suppressed
+	-- messages were WARNING or ERROR; without this the errors-only file only
+	-- shows the first occurrence and silently omits the repeat count.
+	if variant.level >= M.LEVELS.WARNING then
+		local err_full = stamp .. " " .. summary .. "\n"
+		pcall(function()
+			local f = io.open(M.ERRORS_LOG_FILE, "a")
+			if f then
+				f:write(err_full)
+				f:close()
+			end
+		end)
+	end
 	_dedup.count       = 0
 	_dedup.line        = nil
 	_dedup.variant_key = nil
