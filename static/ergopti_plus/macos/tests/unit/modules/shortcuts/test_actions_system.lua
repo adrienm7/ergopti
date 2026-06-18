@@ -305,105 +305,240 @@ end)
 -- ====================================================================================
 -- ====================================================================================
 
+-- Shared factory used by shortcuts-actions-1 and shortcuts-actions-2 tests.
+-- Returns (sys, spy) where spy = { captured_cb, do_after_calls, exec_calls }.
+-- Uses a table reference for captured_cb so updates made when bind_instant_screenshot()
+-- calls eventtap.new are visible AFTER the call (Lua scalars are returned by value;
+-- updating an upvalue after the function returns cannot be seen by the caller).
+-- window_override: optional `window` stub table (defaults to a window with id=42).
+local function make_sys_screenshot_spies(window_override)
+	package.loaded["lib.keycodes"] = nil
+	package.loaded["modules.shortcuts.actions.system"] = nil
+	-- lib.notifications uses hs.notify under the hood — stub it so the deferred
+	-- screencapture callback (and the nil-id guard branch) don't crash in headless tests.
+	package.loaded["lib.notifications"] = { notify = function() end }
+
+	local spy = { captured_cb = nil, do_after_calls = {}, exec_calls = {} }
+
+	local sys = helpers.load_with_stubs("modules.shortcuts.actions.system", {
+		eventtap = {
+			new = function(_types, cb)
+				spy.captured_cb = cb
+				return { start = function() end, stop = function() end, isEnabled = function() return true end }
+			end,
+			event = {
+				types      = { keyDown = 10 },
+				newKeyEvent = function() return { post = function() end } end,
+			},
+		},
+		timer = {
+			doAfter  = function(delay, fn) table.insert(spy.do_after_calls, { delay = delay, fn = fn }) return { stop = function() end } end,
+			doEvery  = function(_d, _fn) return { start = function() end, stop = function() end } end,
+			new      = function(_d, _fn) return { start = function() end, stop = function() end } end,
+			secondsSinceEpoch = function() return 0 end,
+			absoluteTime      = function() return 0 end,
+			usleep   = function() end,
+		},
+		execute  = function(cmd) table.insert(spy.exec_calls, cmd) return "", true, "exit", 0 end,
+		window   = window_override or {
+			frontmostWindow = function()
+				return { id = function() return 42 end }
+			end,
+		},
+	})
+
+	return sys, spy
+end
+
 -- Regression: two synchronous hs.execute calls (mkdir + screencapture) were running
 -- inline on the CGEventTap thread, regularly exceeding the dispatch deadline and
 -- silently disabling the tap (kCGEventTapDisabledByTimeout). The fix defers them via
 -- hs.timer.doAfter(0, ...) and returns true immediately from the callback.
 helpers.describe("shortcuts.actions.system: bind_instant_screenshot defers exec (shortcuts-actions-1 regression)", function()
 
-	local function make_sys_with_spies()
-		package.loaded["lib.keycodes"] = nil
-		package.loaded["modules.shortcuts.actions.system"] = nil
-
-		local captured_cb   = nil
-		local do_after_calls = {}
-		local exec_calls    = {}
-
-		local sys = helpers.load_with_stubs("modules.shortcuts.actions.system", {
-			eventtap = {
-				new = function(_types, cb)
-					captured_cb = cb
-					return { start = function() end, stop = function() end, isEnabled = function() return true end }
-				end,
-				event = {
-					types      = { keyDown = 10 },
-					newKeyEvent = function() return { post = function() end } end,
-				},
-			},
-			timer = {
-				doAfter  = function(delay, fn) table.insert(do_after_calls, { delay = delay, fn = fn }) return { stop = function() end } end,
-				doEvery  = function(_d, _fn) return { start = function() end, stop = function() end } end,
-				new      = function(_d, _fn) return { start = function() end, stop = function() end } end,
-				secondsSinceEpoch = function() return 0 end,
-				absoluteTime      = function() return 0 end,
-				usleep   = function() end,
-			},
-			execute  = function(cmd) table.insert(exec_calls, cmd) return "", true, "exit", 0 end,
-			window   = {
-				frontmostWindow = function()
-					return { id = function() return 42 end }
-				end,
-			},
-		})
-
-		return sys, captured_cb, do_after_calls, exec_calls
-	end
-
 	helpers.it("invoking the eventtap callback does NOT call hs.execute inline", function()
-		local _sys, captured_cb, _do_after_calls, exec_calls = make_sys_with_spies()
+		local _sys, spy = make_sys_screenshot_spies()
 		_sys.bind_instant_screenshot()
 
-		helpers.assert_true(captured_cb ~= nil, "bind_instant_screenshot must register an eventtap callback")
+		helpers.assert_true(spy.captured_cb ~= nil, "bind_instant_screenshot must register an eventtap callback")
 
 		-- Simulate the @ key with no modifiers
 		local fake_event = {
 			getKeyCode = function() return 10 end,
 			getFlags   = function() return {} end,
 		}
-		captured_cb(fake_event)
+		spy.captured_cb(fake_event)
 
-		helpers.assert_eq(#exec_calls, 0,
+		helpers.assert_eq(#spy.exec_calls, 0,
 			"hs.execute must NOT be called inline in the eventtap callback (would block CGEventTap thread)")
 	end)
 
 	helpers.it("invoking the eventtap callback schedules a doAfter(0) with the capture work", function()
-		local _sys, captured_cb, do_after_calls, _exec_calls = make_sys_with_spies()
+		local _sys, spy = make_sys_screenshot_spies()
 		_sys.bind_instant_screenshot()
 
 		local fake_event = {
 			getKeyCode = function() return 10 end,
 			getFlags   = function() return {} end,
 		}
-		captured_cb(fake_event)
+		spy.captured_cb(fake_event)
 
-		helpers.assert_true(#do_after_calls >= 1,
+		helpers.assert_true(#spy.do_after_calls >= 1,
 			"a doAfter must be scheduled for the deferred screenshot work")
-		helpers.assert_eq(do_after_calls[#do_after_calls].delay, 0,
+		helpers.assert_eq(spy.do_after_calls[#spy.do_after_calls].delay, 0,
 			"the deferred callback must be scheduled with delay 0 (next run-loop tick)")
 	end)
 
 	helpers.it("running the deferred callback issues the mkdir and screencapture calls", function()
-		local _sys, captured_cb, do_after_calls, exec_calls = make_sys_with_spies()
+		local _sys, spy = make_sys_screenshot_spies()
 		_sys.bind_instant_screenshot()
 
 		local fake_event = {
 			getKeyCode = function() return 10 end,
 			getFlags   = function() return {} end,
 		}
-		captured_cb(fake_event)
+		spy.captured_cb(fake_event)
 
 		-- Fire the deferred work
-		local deferred = do_after_calls[#do_after_calls]
+		local deferred = spy.do_after_calls[#spy.do_after_calls]
 		helpers.assert_true(deferred ~= nil, "deferred callback must have been scheduled")
 		deferred.fn()
 
 		local has_mkdir  = false
 		local has_screen = false
-		for _, cmd in ipairs(exec_calls) do
+		for _, cmd in ipairs(spy.exec_calls) do
 			if cmd:find("mkdir",       1, true) then has_mkdir  = true end
 			if cmd:find("screencapture", 1, true) then has_screen = true end
 		end
 		helpers.assert_true(has_mkdir,  "deferred callback must run mkdir -p")
 		helpers.assert_true(has_screen, "deferred callback must run screencapture")
 	end)
+end)
+
+
+
+
+-- ======================================================================================
+-- ======================================================================================
+-- ======= bind_instant_screenshot guards nil window id (shortcuts-actions-2) ===========
+-- ======================================================================================
+-- ======================================================================================
+
+-- Regression: when hs.window.frontmostWindow():id() returns nil (borderless or
+-- system windows without a CGWindowID), the old code fell through to
+-- "screencapture -l " .. id which concat'd nil and raised an error inside the
+-- deferred closure — the screenshot was silently skipped and the eventtap
+-- consumed the keystroke without providing feedback.
+-- Fix: validate id before constructing the command and show the same warning
+-- the "no active window" branch already shows.
+helpers.describe("shortcuts.actions.system: bind_instant_screenshot guards nil window ID (shortcuts-actions-2 regression)", function()
+
+	helpers.it("does NOT run screencapture when window id is nil", function()
+		local nil_id_window = {
+			frontmostWindow = function()
+				return { id = function() return nil end }
+			end,
+		}
+		local _sys, spy = make_sys_screenshot_spies(nil_id_window)
+		_sys.bind_instant_screenshot()
+
+		local fake_event = {
+			getKeyCode = function() return 10 end,
+			getFlags   = function() return {} end,
+		}
+		helpers.assert_true(spy.captured_cb ~= nil, "eventtap must have been registered")
+		-- The callback must not raise even when id() returns nil
+		local ok = pcall(spy.captured_cb, fake_event)
+		helpers.assert_true(ok, "eventtap callback must not raise when window id is nil")
+
+		-- Run any deferred work that was scheduled
+		for _, call in ipairs(spy.do_after_calls) do
+			if call.fn then pcall(call.fn) end
+		end
+		-- The nil-id guard must bail out before scheduling screencapture
+		local found_screencapture = false
+		for _, cmd in ipairs(spy.exec_calls) do
+			if cmd:find("screencapture", 1, true) then found_screencapture = true end
+		end
+		helpers.assert_true(not found_screencapture,
+			"screencapture must NOT be called when window id is nil")
+	end)
+
+	helpers.it("source: id nil-check appears before the deferred screencapture command", function()
+		local src_path = helpers.driver_root() .. "modules/shortcuts/actions/system.lua"
+		local fh = io.open(src_path, "r")
+		helpers.assert_true(fh ~= nil, "system.lua must be readable")
+		local src = fh:read("*a"); fh:close()
+
+		-- The guard must check `not id` before the deferred block that uses id.
+		-- Use the actual pcall invocation pattern (not the comment line that also mentions
+		-- screencapture -l, which appears one line before the guard and would give a false
+		-- position: "-- ... screencapture -l" → comment is found first, then "if not id").
+		local guard_pos = src:find("if not id then", 1, true)
+		local defer_pos = src:find('pcall(hs.execute, "screencapture -l ', 1, true)
+		helpers.assert_true(guard_pos ~= nil,
+			"system.lua must have an 'if not id then' guard for the nil window ID case")
+		helpers.assert_true(defer_pos ~= nil,
+			"system.lua must still contain the screencapture -l command in the deferred path")
+		helpers.assert_true(guard_pos < defer_pos,
+			"the nil-id guard must appear before the screencapture -l command")
+	end)
+
+end)
+
+
+
+
+-- =======================================================================================
+-- =======================================================================================
+-- ======= schedule_awake_tick float random bounds (shortcuts-actions-3) =================
+-- =======================================================================================
+-- =======================================================================================
+
+-- Regression: math.random(m, n) requires integer-representable bounds in Lua 5.4.
+-- AWAKE_TICK_MIN_SEC and AWAKE_TICK_MAX_SEC come from Timings.sec() which returns
+-- floats (ms / 1000). If a maintainer sets tick_min_ms to e.g. 1500 (→ 1.5),
+-- math.random(1.5, 5.0) raises "no integer representation". The fix switches to
+-- the float-safe uniform form: min + math.random() * span.
+helpers.describe("shortcuts.actions.system: schedule_awake_tick float random bounds (shortcuts-actions-3 regression)", function()
+
+	helpers.it("source: uses math.random() (no-arg) not math.random(m, n) for the tick interval", function()
+		local src_path = helpers.driver_root() .. "modules/shortcuts/actions/system.lua"
+		local fh = io.open(src_path, "r")
+		helpers.assert_true(fh ~= nil, "system.lua must be readable")
+		local src = fh:read("*a"); fh:close()
+
+		-- The buggy form passes the float bounds directly to math.random(m, n).
+		local has_buggy = src:find("math.random(AWAKE_TICK_MIN_SEC, AWAKE_TICK_MAX_SEC)", 1, true) ~= nil
+		helpers.assert_true(
+			not has_buggy,
+			"system.lua must NOT use math.random(AWAKE_TICK_MIN_SEC, AWAKE_TICK_MAX_SEC) — "
+			.. "that form requires integer bounds and raises on float values (shortcuts-actions-3)"
+		)
+
+		-- The float-safe form uses the zero-arg math.random() for a [0,1) uniform draw.
+		local has_float_safe = src:find("math.random()", 1, true) ~= nil
+		helpers.assert_true(
+			has_float_safe,
+			"system.lua must use math.random() (no-arg) for the tick interval to support float bounds"
+		)
+	end)
+
+	helpers.it("source: span variable is computed before the interval assignment", function()
+		local src_path = helpers.driver_root() .. "modules/shortcuts/actions/system.lua"
+		local fh = io.open(src_path, "r")
+		helpers.assert_true(fh ~= nil)
+		local src = fh:read("*a"); fh:close()
+
+		-- The float-safe pattern requires a span = max - min intermediate variable.
+		local span_pos    = src:find("local span = AWAKE_TICK_MAX_SEC", 1, true)
+		local interval_pos = src:find("AWAKE_TICK_MIN_SEC + math.random()", 1, true)
+		helpers.assert_true(span_pos ~= nil,
+			"system.lua must compute 'local span = AWAKE_TICK_MAX_SEC - AWAKE_TICK_MIN_SEC'")
+		helpers.assert_true(interval_pos ~= nil,
+			"system.lua must compute interval as AWAKE_TICK_MIN_SEC + math.random() * span")
+		helpers.assert_true(span_pos < interval_pos,
+			"span must be computed before the interval assignment")
+	end)
+
 end)
