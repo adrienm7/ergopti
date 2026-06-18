@@ -598,8 +598,12 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 	end
 
 	-- Write payload to a temp file so curl reads it directly — avoids the
-	-- stdin-pipe/streaming-callback conflict in hs.task
-	local tmp_path = os.tmpname() .. "_ollama_stream.json"
+	-- stdin-pipe/streaming-callback conflict in hs.task.
+	-- os.tmpname() creates an empty file at the base path; remove it immediately
+	-- so only the suffixed path (which we own) exists in /tmp.
+	local _tmp_base = os.tmpname()
+	local tmp_path = _tmp_base .. "_ollama_stream.json"
+	os.remove(_tmp_base)
 	local fh = io.open(tmp_path, "w")
 	if not fh then
 		Logger.error(LOG, "Failed to open temp file '%s' for Ollama streaming payload.", tmp_path)
