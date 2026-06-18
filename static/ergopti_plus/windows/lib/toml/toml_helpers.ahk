@@ -298,7 +298,13 @@ TOML_BatchWrite(Path, Updates) {
     if (Updates.Length = 0)
         return true
 
-    Sections := ParseTomlFile(Path)
+    Cached := ParseTomlFile(Path)
+    ; Deep-copy the cached Map before mutating: ParseTomlFile returns the
+    ; live cache object by reference, so mutating it directly would corrupt
+    ; the cache on any write failure, leaving un-persisted values in memory.
+    Sections := Cached.Clone()
+    for sec in Sections
+        Sections[sec] := Sections[sec].Clone()
     ; Track section order so the on-disk layout stays stable across writes.
     ; ``ParseTomlFile`` already iterates the file in declaration order, so
     ; ``for`` over the resulting Map preserves it; we rebuild the order
@@ -371,18 +377,29 @@ TOML_BatchWrite(Path, Updates) {
     try FileDelete(tmp)
     try {
         f := FileOpen(tmp, "w", "UTF-8")
-        if !f
+        if !f {
+            global _ParseTomlCache
+            if _ParseTomlCache.Has(Path)
+                _ParseTomlCache.Delete(Path)
             return false
+        }
         f.Write(body)
         f.Close()
     } catch {
+        global _ParseTomlCache
+        if _ParseTomlCache.Has(Path)
+            _ParseTomlCache.Delete(Path)
         return false
     }
 	; Atomic replace: FileMove with overwrite=true swaps the file in one OS call.
 	; If the move fails, the original config.toml remains intact.
 	try FileMove(tmp, Path, true)
-	catch
+	catch {
+		global _ParseTomlCache
+		if _ParseTomlCache.Has(Path)
+			_ParseTomlCache.Delete(Path)
 		return false
+	}
 
     ; Invalidate the parse cache so the next ParseTomlFile call re-reads
     ; the updated file rather than returning a stale snapshot.
