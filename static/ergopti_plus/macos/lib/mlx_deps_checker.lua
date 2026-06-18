@@ -312,17 +312,19 @@ local function make_streaming_handler()
 			end
 		end
 
-		-- Advance the progress bar on EVERY known marker, including the
-		-- *_INSTALLED / *_DONE pair markers that PROGRESS_LABELS skips for
-		-- step-label updates. Without this loop the bar would stay frozen at
-		-- the first step's percentage even as later phases complete.
+		-- Advance the progress bar: collect all new matching marker pcts and
+		-- call set_progress once with the maximum. pairs() has non-deterministic
+		-- order so multiple matches per chunk could call set_progress with
+		-- decreasing values, regressing the bar (lib-deps-2).
+		local max_pct = nil
 		for marker, pct in pairs(MARKER_PROGRESS) do
 			local progress_key = "progress:" .. marker
 			if not shown[progress_key] and chunk_contains(stdout_chunk, marker) then
 				shown[progress_key] = true
-				pcall(llm_progress.set_progress, pct)
+				if not max_pct or pct > max_pct then max_pct = pct end
 			end
 		end
+		if max_pct then pcall(llm_progress.set_progress, max_pct) end
 		return true
 	end
 end
