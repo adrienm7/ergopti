@@ -229,10 +229,22 @@ function M.save(report)
 	Logger.start(LOG, "Saving crash report to disk…")
 
 	local dir = _reports_dir()
+	-- Recursive mkdir: create every missing ancestor before the leaf directory.
+	-- The single 2-level approach (parent + dir) fails when two or more ancestors
+	-- are absent simultaneously (lib-update-05).
 	pcall(function()
-		local parent = dir:match("^(.*[/\\])[^/\\]+[/\\]?$") or dir
-		if not hs.fs.attributes(parent) then hs.fs.mkdir(parent) end
-		if not hs.fs.attributes(dir)    then hs.fs.mkdir(dir)    end
+		local path = dir:gsub("[/\\]$", "")
+		local segments = {}
+		for seg in path:gmatch("[^/\\]+") do
+			segments[#segments + 1] = seg
+		end
+		local built = path:sub(1, 1) == "/" and "/" or ""
+		for _, seg in ipairs(segments) do
+			built = built .. seg .. "/"
+			if not hs.fs.attributes(built) then
+				hs.fs.mkdir(built)
+			end
+		end
 	end)
 
 	local ts    = (report.timestamp or os.date("!%Y-%m-%dT%H:%M:%SZ")):gsub(":", "-")
