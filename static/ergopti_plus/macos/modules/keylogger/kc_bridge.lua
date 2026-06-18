@@ -419,6 +419,9 @@ function M.stop()
 		_poll_timer:stop()
 		_poll_timer = nil
 	end
+	-- Clear any keys held at stop time. Without this, a key pressed before stop()
+	-- and released after start() computes (now - old_down_at) as an aberrant hold_ms.
+	_pending_down = {}
 	Logger.done(LOG, "KE physical-kc bridge stopped.")
 end
 
