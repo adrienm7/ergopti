@@ -432,6 +432,9 @@ function M.show()
 							os.remove(UI_CACHE_FILE)
 							M._range_cache    = {}
 							M._manifest_cache = nil
+							-- Also clear _last_query so push_live_update does not re-issue
+							-- a fetch against the freshly wiped state (ui-windows-b-3).
+							M._last_query = nil
 							Logger.info(LOG, "Caches cleared by user reset.")
 						else
 							M._last_query = query
