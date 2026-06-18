@@ -454,10 +454,10 @@ global SCRIPT_SHORTCUT_SLOTS := [
     "script_altgr_escape",
 ]
 global SCRIPT_SHORTCUT_LABELS := Map(
-    "script_altgr_enter",    t("sg_labels.script_altgr_enter"),
-    "script_altgr_backspace", t("sg_labels.script_altgr_backspace"),
-    "script_altgr_delete",   t("sg_labels.script_altgr_delete"),
-    "script_altgr_escape",   t("sg_labels.script_altgr_escape"),
+    "script_altgr_enter",     "sg_labels.script_altgr_enter",
+    "script_altgr_backspace", "sg_labels.script_altgr_backspace",
+    "script_altgr_delete",    "sg_labels.script_altgr_delete",
+    "script_altgr_escape",    "sg_labels.script_altgr_escape",
 )
 global SCRIPT_SHORTCUT_DEFAULTS := Map(
     "script_altgr_enter", "script_pause_toggle",
@@ -769,7 +769,7 @@ if !Features["layout"]["ergopti_base"] {
 			_CharBuf := Buffer(10, 0)
 			_Len := DllCall("ToUnicodeEx",
 				"UInt", _VK, "UInt", _SC, "Ptr", _KeyState,
-				"Ptr", _CharBuf, "Int", 4, "UInt", 0, "Ptr", _HKL, "Int")
+				"Ptr", _CharBuf, "Int", 4, "UInt", 0x4, "Ptr", _HKL, "Int")
 			if _Len <= 0
 				continue
 			_Ch := StrGet(_CharBuf, _Len, "UTF-16")
@@ -1742,7 +1742,7 @@ BuildScriptShortcutsMenu() {
     for Slot in SCRIPT_SHORTCUT_SLOTS {
         Current := ScriptShortcutAssignments.Has(Slot) ? ScriptShortcutAssignments[Slot] : "none"
         CurrentLabel := GESTURE_ACTIONS.Has(Current) ? _GestureActionLabel(Current) : t("dialog.action_picker.disabled")
-        SlotLabel := SCRIPT_SHORTCUT_LABELS[Slot]
+        SlotLabel := t(SCRIPT_SHORTCUT_LABELS[Slot])
         RegisterMenuItem(SMenu, SlotLabel . " : " . CurrentLabel, ((_s, _l) => (*) => ShowActionPicker(_l, ScriptShortcutAssignments.Has(_s) ? ScriptShortcutAssignments[_s] : "none", (Id) => SetScriptShortcutAction(_s, Id)))(Slot, SlotLabel))
     }
     return SMenu
@@ -2213,11 +2213,13 @@ ShowHealthCheck(*) {
     HealthCheck_ShowWindow()
 }
 
-_ScriptAltGrChordDebounce() {
-    static last_tick := 0
-    if (A_TickCount - last_tick < 80)
+_ScriptAltGrChordDebounce(Slot) {
+    static last := Map()
+    now := A_TickCount
+    prev := last.Has(Slot) ? last[Slot] : 0
+    if ((now - prev) & 0xFFFFFFFF) < 80
         return true
-    last_tick := A_TickCount
+    last[Slot] := now
     return false
 }
 _ScriptAltGrIsPhysical(SuffixSC) {
@@ -2231,7 +2233,7 @@ _ScriptAltGrIsPhysical(SuffixSC) {
     return InStr(A_ThisHotkey, "^!") and GetKeyState("Ctrl", "P") and GetKeyState("Alt", "P") and !(GetKeyState("LAlt", "P") and !GetKeyState("RAlt", "P"))
 }
 _ScriptAltGrDispatch(SuffixSC, Slot, NativeSend, CtrlAltSuffixKey) {
-    if _ScriptAltGrChordDebounce()
+    if _ScriptAltGrChordDebounce(Slot)
         return
     if !_ScriptAltGrIsPhysical(SuffixSC) {
         if InStr(A_ThisHotkey, "^!")
