@@ -238,16 +238,23 @@ KL_Net_Start() {
 ; One-shot starter functions for KL_Net_Start() — fire the tick once then arm
 ; the repeating timer. Named functions avoid the AHK v2 comma-expression parsing
 ; ambiguity that would make (f(), g()) pass g() as an argument to f.
+; The BoundFunc is copied to a local variable before calling: calling
+; KLNet.xxx_fn() directly treats it as a class method and passes KLNet as an
+; implicit first argument, which makes the zero-param tick functions throw
+; "too many parameters".
 KL_Net_WifiStarter() {
-    KLNet.wifi_fn()
+    fn := KLNet.wifi_fn
+    fn()
     SetTimer(KLNet.wifi_fn, KLNetConst.NETWORK_TICK_MS)
 }
 KL_Net_ReachStarter() {
-    KLNet.reach_fn()
+    fn := KLNet.reach_fn
+    fn()
     SetTimer(KLNet.reach_fn, KLNetConst.REACH_TICK_MS)
 }
 KL_Net_VpnStarter() {
-    KLNet.vpn_fn()
+    fn := KLNet.vpn_fn
+    fn()
     SetTimer(KLNet.vpn_fn, KLNetConst.VPN_TICK_MS)
 }
 

@@ -752,7 +752,13 @@ end
 --- Stops all multitouch listeners and background timers.
 function M.stop()
 	Logger.start(LOG, "Stopping gestures module…")
-	
+
+	-- 0. Release any held synthetic clicks BEFORE disabling so the mouse-up
+	--    events are still dispatched while the module is logically running.
+	--    Skipping this leaves the OS stuck with a button held down
+	--    (gesture-stuck-click-on-stop).
+	pcall(Actions.force_cleanup)
+
 	CoreState.enabled = false
 
 	-- 1. Stop watchers — detach only, no re-attachment on teardown

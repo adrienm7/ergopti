@@ -400,7 +400,16 @@ local function has_common_hotstring_groups(dir)
 	if not ok_attr or type(attr) ~= "table" or attr.mode ~= "directory" then
 		return false
 	end
-	for fname in hs.fs.dir(dir) do
+	-- hs.fs.dir() throws on inaccessible / deleted directories; wrap in pcall
+	-- so a permission error or race-deleted folder does not abort initialisation
+	-- (init-fsdir-pcall).
+	local ok_iter, dir_iter = pcall(hs.fs.dir, dir)
+	if not ok_iter then
+		Logger.error(LOG, "Cannot iterate hotstrings directory '%s' — %s.",
+			tostring(dir), tostring(dir_iter))
+		return false
+	end
+	for fname in dir_iter do
 		if fname:match("%.toml$") and not fname:match("^_") then
 			local stem = fname:match("^(.-)%.toml$")
 			if stem and not HOTSTRINGS_EXCLUDED_STEMS[stem] then
