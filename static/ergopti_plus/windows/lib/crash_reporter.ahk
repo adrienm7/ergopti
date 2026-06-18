@@ -246,13 +246,23 @@ CrashReport_Save(Report) {
 
 	try DirCreate(ReportDir)
 
-	Ts    := Report.Has("timestamp") ? Report["timestamp"] : _CrashReport_IsoTimestamp()
-	FName := ReportDir . StrReplace(Ts, ":", "-") . ".json"
+	Ts   := Report.Has("timestamp") ? Report["timestamp"] : _CrashReport_IsoTimestamp()
+	Base := ReportDir . StrReplace(Ts, ":", "-")
+	FName := Base . ".json"
+	n := 1
+	while FileExist(FName) {
+		FName := Base . "_" . n . ".json"
+		n += 1
+	}
 
 	JsonStr := _CrashReport_ToJson(Report)
 
 	try {
-		FileAppend(JsonStr, FName, "UTF-8-RAW")
+		; Truncating write (mode "w") — unique suffix loop above prevents a same-second incident
+		; from appending into the first report and producing invalid JSON
+		f := FileOpen(FName, "w", "UTF-8-RAW")
+		f.Write(JsonStr)
+		f.Close()
 		try LoggerSuccess("CrashReporter", "Crash report saved: {1}.", FName)
 		return FName
 	} catch as WriteErr {
