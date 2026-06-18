@@ -30,8 +30,12 @@ local LOG   = "personal_info_editor"
 --- ====================================
 -- ====================================
 
-local SERVER_PORT = 18743
+local SERVER_PORT       = 18743
+-- Auto-close the server if the browser tab is closed without submitting or
+-- cancelling. 10 minutes is generous enough for a form this size.
+local SESSION_TIMEOUT_SEC = 600
 local _srv        = nil
+local _timeout    = nil
 
 -- Field definitions for the form. Keys match the preferences table.
 local FIELDS = {
@@ -161,6 +165,22 @@ end
 --- =============================
 -- =============================
 
+--- Stops the HTTP server and cancels the watchdog timer.
+local function stop_server()
+	if _timeout then _timeout:stop(); _timeout = nil end
+	if _srv and type(_srv.stop) == "function" then
+		pcall(function() _srv:stop() end)
+		_srv = nil
+		Logger.info(LOG, "Editor server stopped.")
+	end
+end
+
+--- Closes the editor and releases the HTTP port.
+--- Call this when the parent UI is dismissed or the module is torn down.
+function M.close()
+	stop_server()
+end
+
 --- Opens the editor in the system’s default web browser.
 --- @param current_info table Current data used to populate form fields.
 --- @param save_callback function Invoked when the user submits the form.
@@ -204,22 +224,12 @@ function M.open(current_info, save_callback)
 			end
 			
 			-- Gracefully shut down the server after the response is sent
-			timer.doAfter(0.5, function() 
-				if _srv and type(_srv.stop) == "function" then 
-					pcall(function() _srv:stop() end)
-					_srv = nil 
-				end 
-			end)
+			timer.doAfter(0.5, stop_server)
 			return build_html_ok(), 200, { ["Content-Type"] = "text/html; charset=utf-8" }
-			
+
 		-- 5. Cancellation handler
 		elseif path == "/cancel" then
-			timer.doAfter(0.5, function() 
-				if _srv and type(_srv.stop) == "function" then 
-					pcall(function() _srv:stop() end)
-					_srv = nil 
-				end 
-			end)
+			timer.doAfter(0.5, stop_server)
 			return "", 200, {}
 		end
 		
@@ -239,6 +249,13 @@ function M.open(current_info, save_callback)
 		-- Open the browser to the local server address
 		pcall(hs.execute, string.format("open \"http://127.0.0.1:%d/\"", SERVER_PORT))
 		Logger.info(LOG, string.format("Editor server active on port %d.", SERVER_PORT))
+
+		-- Watchdog: stop the server after SESSION_TIMEOUT_SEC even if the user
+		-- closed the browser tab without submitting or cancelling (ui-windows-b-5).
+		_timeout = timer.doAfter(SESSION_TIMEOUT_SEC, function()
+			Logger.warn(LOG, "Session timed out — stopping idle editor server.")
+			stop_server()
+		end)
 	else
 		Logger.error(LOG, "Failed to initialize local HTTP server.")
 	end
