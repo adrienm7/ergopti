@@ -374,10 +374,10 @@ KL_Watchers_Stop() {
     ; closing counterpart.
     if KLWatch.is_idle {
         KLWatch.is_idle := false
-        try KL_LogSession("idle_end", A_TickCount - KLWatch.idle_started_at)
+        try KL_LogSession("idle_end", (A_TickCount - KLWatch.idle_started_at) & 0xFFFFFFFF)
     }
     if KLWatch.is_session_active {
-        try KL_LogSession("session_end", A_TickCount - KLWatch.session_started_at)
+        try KL_LogSession("session_end", (A_TickCount - KLWatch.session_started_at) & 0xFFFFFFFF)
         KLWatch.is_session_active := false
     }
 }

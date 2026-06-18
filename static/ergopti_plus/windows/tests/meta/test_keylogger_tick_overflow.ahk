@@ -88,3 +88,36 @@ _KLTO_HookWrapSafe() {
 		"keylogger_hook.ahk must mask the (now - last_tick) delay with & 0xFFFFFFFF")
 }
 Test("keylogger: keylogger_hook.ahk uses & 0xFFFFFFFF mask on inter-keystroke delay (keylogger-tickcount-overflow)", _KLTO_HookWrapSafe)
+
+
+
+
+
+; ==========================================================================
+; ==========================================================================
+; ======= 3/ KL_Watchers_Stop drain paths use masked durations (F31) =======
+; ==========================================================================
+; ==========================================================================
+
+_KLTO_WatchersStopDrainMasked() {
+	Raw := _KLTO_ReadSource("modules/keylogger/keylogger_watchers.ahk")
+	Src := _KLTO_StripComments(Raw)
+	Assert(Src != "", "modules/keylogger/keylogger_watchers.ahk must be readable")
+
+	; Negative: bare unmasked idle_end subtraction must NOT appear
+	Assert(!InStr(Src, 'KL_LogSession("idle_end", A_TickCount - KLWatch.idle_started_at)'),
+		"keylogger_watchers.ahk must NOT use bare unmasked A_TickCount - KLWatch.idle_started_at in drain (F31)")
+
+	; Negative: bare unmasked session_end subtraction must NOT appear
+	Assert(!InStr(Src, 'KL_LogSession("session_end", A_TickCount - KLWatch.session_started_at)'),
+		"keylogger_watchers.ahk must NOT use bare unmasked A_TickCount - KLWatch.session_started_at in drain (F31)")
+
+	; Positive: masked idle_end form must be present
+	Assert(InStr(Src, 'KL_LogSession("idle_end", (A_TickCount - KLWatch.idle_started_at) & 0xFFFFFFFF)') > 0,
+		"keylogger_watchers.ahk must use (A_TickCount - KLWatch.idle_started_at) & 0xFFFFFFFF in drain (F31)")
+
+	; Positive: masked session_end form must be present
+	Assert(InStr(Src, 'KL_LogSession("session_end", (A_TickCount - KLWatch.session_started_at) & 0xFFFFFFFF)') > 0,
+		"keylogger_watchers.ahk must use (A_TickCount - KLWatch.session_started_at) & 0xFFFFFFFF in drain (F31)")
+}
+Test("keylogger: KL_Watchers_Stop drain paths mask A_TickCount durations with & 0xFFFFFFFF (F31)", _KLTO_WatchersStopDrainMasked)
