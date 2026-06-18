@@ -237,11 +237,15 @@ _KL_AV_FindCaptureExeSnapshot() {
     if (snap = -1 or snap = 0) {
         return ""
     }
-    ; PROCESSENTRY32W: dwSize(4) + cntUsage(4) + th32ProcessID(4) + th32DefaultHeapID(8) +
-    ; th32ModuleID(4) + cntThreads(4) + th32ParentProcessID(4) + pcPriClassBase(4) +
-    ; dwFlags(4) + szExeFile(MAX_PATH*2 = 520 bytes) = total 560 bytes
-    entry := Buffer(560, 0)
-    NumPut("UInt", 560, entry, 0)   ; dwSize must be set before Process32First
+    ; PROCESSENTRY32W layout on x64: dwSize(0-4)+cntUsage(4-8)+th32ProcessID(8-12)+
+    ; [4-byte pad](12-16)+th32DefaultHeapID(16-24)+th32ModuleID(24-28)+cntThreads(28-32)+
+    ; th32ParentProcessID(32-36)+pcPriClassBase(36-40)+dwFlags(40-44)+
+    ; szExeFile[260]*2=520 bytes(44-564) rounded up to 568 for 8-byte alignment.
+    ; Windows validates dwSize and returns ERROR_BAD_LENGTH (24) on mismatch — the
+    ; old value of 560 skipped the 8-byte alignment tail, permanently breaking detection.
+    PE32_SIZE := 568   ; sizeof(PROCESSENTRY32W) on x64 — 520-byte szExeFile + fields + 8-byte alignment padding
+    entry := Buffer(PE32_SIZE, 0)
+    NumPut("UInt", PE32_SIZE, entry, 0)   ; dwSize must be set before Process32FirstW
     found := ""
     if DllCall("Process32FirstW", "Ptr", snap, "Ptr", entry) {
         ; AHK v2 has no break N — use a flag to exit the outer loop.
@@ -260,6 +264,8 @@ _KL_AV_FindCaptureExeSnapshot() {
                 break
             }
         }
+    } else {
+        try LoggerWarn("KL_AV", "Process32FirstW failed (A_LastError={1}) — capture detection skipped.", A_LastError)
     }
     DllCall("CloseHandle", "Ptr", snap)
     return found

@@ -1290,7 +1290,8 @@ _Onboarding_Commit() {
 	; state which still reflects defaults (the wizard never called Reload).
 	; Without this guard, TOML_BatchWrite would immediately trigger
 	; SaveFullConfig() which would overwrite the wizard's values with false.
-	AppState["toml_strict_canon_in_progress"] := true
+	global _TOML_STRICT_CANON_IN_PROGRESS
+	_TOML_STRICT_CANON_IN_PROGRESS := true
 
 	; If the user picked a custom config directory in the StepConfigDir
 	; wizard step, persist it to paths.toml BEFORE writing config.toml —

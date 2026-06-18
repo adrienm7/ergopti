@@ -114,3 +114,39 @@ _HMRB_RCtrlGenericGuarded() {
 	_HMRB_AssertBounded("modules/tap_holds/rctrl.ahk", "not _RCtrlIsSpecialTap() and TapHoldHoldModifier(TapHold, " . Q . "right_ctrl" . Q . ")", "rctrl.ahk 7.4")
 }
 Test("tap-holds: RCtrl generic hold-modifier release is bounded + in finally (hold-modifier-unbounded-keywait)", _HMRB_RCtrlGenericGuarded)
+
+_HMRB_SpaceCtrlGuarded() {
+	Src := _HMRB_ReadSource("modules/tap_holds/space.ahk")
+	Body := _HMRB_Block(Src, "_SpaceHoldCtrl(captured)")
+	_HMRB_AssertBounded("modules/tap_holds/space.ahk", "_SpaceHoldCtrl(captured)", "space.ahk _SpaceHoldCtrl")
+	; Magic-number guard: T2 must have been replaced by the named constant
+	Assert(!InStr(Body, "U T2"), "space.ahk _SpaceHoldCtrl must not contain magic number " . Chr(34) . "U T2" . Chr(34) . " — use STUCK_MODIFIER_RELEASE_TIMEOUT_SEC")
+}
+Test("tap-holds: Space-Ctrl hold-modifier release is bounded + in finally (hold-modifier-unbounded-keywait)", _HMRB_SpaceCtrlGuarded)
+
+_HMRB_SpaceAltGuarded() {
+	Src := _HMRB_ReadSource("modules/tap_holds/space.ahk")
+	Body := _HMRB_Block(Src, "_SpaceHoldAlt(captured)")
+	_HMRB_AssertBounded("modules/tap_holds/space.ahk", "_SpaceHoldAlt(captured)", "space.ahk _SpaceHoldAlt")
+	; Magic-number guard: T2 must have been replaced by the named constant
+	Assert(!InStr(Body, "U T2"), "space.ahk _SpaceHoldAlt must not contain magic number " . Chr(34) . "U T2" . Chr(34) . " — use STUCK_MODIFIER_RELEASE_TIMEOUT_SEC")
+}
+Test("tap-holds: Space-Alt hold-modifier release is bounded + in finally (hold-modifier-unbounded-keywait)", _HMRB_SpaceAltGuarded)
+
+_HMRB_SpaceAltGrGuarded() {
+	Src := _HMRB_ReadSource("modules/tap_holds/space.ahk")
+	Body := _HMRB_Block(Src, "_SpaceHoldAltGr(captured)")
+	_HMRB_AssertBounded("modules/tap_holds/space.ahk", "_SpaceHoldAltGr(captured)", "space.ahk _SpaceHoldAltGr")
+	; Magic-number guard: T2 must have been replaced by the named constant
+	Assert(!InStr(Body, "U T2"), "space.ahk _SpaceHoldAltGr must not contain magic number " . Chr(34) . "U T2" . Chr(34) . " — use STUCK_MODIFIER_RELEASE_TIMEOUT_SEC")
+}
+Test("tap-holds: Space-AltGr hold-modifier release is bounded + in finally (hold-modifier-unbounded-keywait)", _HMRB_SpaceAltGrGuarded)
+
+_HMRB_SpaceWinGuarded() {
+	Src := _HMRB_ReadSource("modules/tap_holds/space.ahk")
+	Body := _HMRB_Block(Src, "_SpaceHoldWin(captured)")
+	_HMRB_AssertBounded("modules/tap_holds/space.ahk", "_SpaceHoldWin(captured)", "space.ahk _SpaceHoldWin")
+	; Magic-number guard: T2 must have been replaced by the named constant
+	Assert(!InStr(Body, "U T2"), "space.ahk _SpaceHoldWin must not contain magic number " . Chr(34) . "U T2" . Chr(34) . " — use STUCK_MODIFIER_RELEASE_TIMEOUT_SEC")
+}
+Test("tap-holds: Space-Win hold-modifier release is bounded + in finally (hold-modifier-unbounded-keywait)", _HMRB_SpaceWinGuarded)

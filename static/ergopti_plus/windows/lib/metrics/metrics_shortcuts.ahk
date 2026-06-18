@@ -64,7 +64,6 @@ class MetricsShortcuts {
     static typing_ahk        := ""    ; e.g. "^!m"  (active hotkey string)
     static apps_ahk          := ""
     ; Real-time WPM display prefs.
-    static show_wpm_menubar       := false  ; Show live WPM in the tray tooltip
     static wpm_menubar_colors     := false  ; Color-code menubar WPM by keystroke origin
 }
 
@@ -118,10 +117,9 @@ MS_ToAhkSyntax(human) {
             mods .= METRICS_MOD_MAP[m]
     }
 
-    ; Normalise multi-letter keys (e.g. "f1") — AHK accepts them as-is.
-    if (StrLen(key) = 1)
-        return mods . key
-    return mods . "{" . key . "}"
+    ; Both single-char ("m") and named ("f1", "space", "enter") keys are valid
+    ; Hotkey() names as bare concatenation — braces are Send syntax only.
+    return mods . key
 }
 
 

@@ -694,6 +694,15 @@ function M.apply_prediction(idx)
 
 	local _, emitted_str = km_utils.emit_text(text_to_type)
 	_state.expected_synthetic_chars = _state.expected_synthetic_chars .. emitted_str
+	-- Drain paste-ops: emit_text takes the clipboard-paste path for accented text
+	-- (contains_high_unicode) or text > 50 codepoints. When it does, the Cmd+V echo
+	-- arrives as a keyDown event; without marking it synthetic, onKeyDownRaw treats
+	-- it as a real Cmd+V and wipes the rolling buffer. The counter also leaks to the
+	-- next expansion if not drained here, silently swallowing a genuine Cmd+V.
+	local paste_ops = km_utils.take_paste_ops and km_utils.take_paste_ops() or 0
+	if paste_ops > 0 then
+		_state.expected_synthetic_pastes = (_state.expected_synthetic_pastes or 0) + paste_ops
+	end
 
 	-- Notify even when emitted_str is empty (paste path): the keylogger must
 	-- still see the delete_count backspaces as synthetic, otherwise it counts

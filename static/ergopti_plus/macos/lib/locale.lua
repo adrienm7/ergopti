@@ -158,7 +158,10 @@ function M.get(key)
 	if _get_trigger then
 		local ok, trigger = pcall(_get_trigger)
 		if ok and type(trigger) == "string" and trigger ~= "" then
-			s = s:gsub("★", trigger)
+			-- Escape "%" in the replacement: gsub treats "%" as a capture
+			-- escape, so a user-chosen trigger of "%" would otherwise raise
+			-- "invalid use of '%' in replacement string" and crash menu builds.
+			s = (s:gsub("★", (trigger:gsub("%%", "%%%%"))))
 		end
 	end
 	return s

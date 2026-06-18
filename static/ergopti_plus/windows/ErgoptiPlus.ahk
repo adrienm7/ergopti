@@ -1048,8 +1048,6 @@ if MetricsShortcuts.enabled {
     ; dragged back onto the critical path, AND the interruption pumps the message
     ; queue, painting a tray click queued during boot against a half-built menu.
     ; See the deferred-task block after LoggerSuccess("…ready").)
-    if MetricsShortcuts.show_wpm_menubar
-        SetTimer(WpmMenubar_Tick, 1000)
     KL_Init(_ConfigDir . "metrics")
     MS_ApplyAll(KLUI_ToggleTyping, KLUI_ToggleApps)
     HookDispatcher.Start()
@@ -1628,7 +1626,6 @@ SaveFullConfig() {
     Updates.Push({ Section: "ahk.metrics", Key: "metrics_enabled", Value: MetricsShortcuts.enabled })
     Updates.Push({ Section: "ahk.metrics", Key: "metrics_shortcut_typing", Value: MetricsShortcuts.typing_str })
     Updates.Push({ Section: "ahk.metrics", Key: "metrics_shortcut_apps", Value: MetricsShortcuts.apps_str })
-    Updates.Push({ Section: "ahk.metrics", Key: "metrics_show_wpm_menubar", Value: MetricsShortcuts.show_wpm_menubar })
     Updates.Push({ Section: "ahk.metrics", Key: "metrics_wpm_menubar_colors", Value: MetricsShortcuts.wpm_menubar_colors })
     Updates.Push({ Section: "ahk.metrics", Key: "metrics_filter_private_browsing", Value: MetricsFilters.private_browsing })
     Updates.Push({ Section: "ahk.metrics", Key: "metrics_filter_secure_field", Value: MetricsFilters.secure_field })

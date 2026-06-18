@@ -480,6 +480,7 @@ HotstringsSerialiseDelay(Value) {
 ; Stable ordering: alphabetical category, alphabetical section.
 _SaveOverrides() {
     global _HotstringsOverrides, _HotstringsOverridesPath
+    global _HotstringsWordDelimiters, _HotstringsConsumedDelimiters
     if (_HotstringsOverridesPath == "") {
         return false
     }
@@ -489,6 +490,17 @@ _SaveOverrides() {
         . "# Ne pas mélanger les sections : chaque [category] et [category.section]`n"
         . "# ne doit apparaître qu'une seule fois.`n`n"
 
+    ; Re-emit [__global__] so a category/section edit never erases the
+    ; cross-driver word/consumed delimiter customisation.
+    if (_HotstringsWordDelimiters != "" or _HotstringsConsumedDelimiters != "") {
+        Out .= "[__global__]`n"
+        if (_HotstringsWordDelimiters != "")
+            Out .= 'word_delimiters = "' . _HotstringsWordDelimiters . '"`n'
+        if (_HotstringsConsumedDelimiters != "")
+            Out .= 'consumed_delimiters = "' . _HotstringsConsumedDelimiters . '"`n'
+        Out .= "`n"
+    }
+
     Cats := []
     for Cat in _HotstringsOverrides {
         Cats.Push(Cat)
@@ -496,6 +508,8 @@ _SaveOverrides() {
     _SortStringsInPlace(Cats)
 
     for _, Cat in Cats {
+        if (Cat == "__global__")   ; reserved — handled above
+            continue
         Entry := _HotstringsOverrides[Cat]
         ; Extension keys are stored as "ext.name" — the header must be written
         ; as [ext.name] (2 segments), not [ext.name] which would be ambiguous

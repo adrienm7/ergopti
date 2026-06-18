@@ -559,13 +559,22 @@ _HealthCheck_SysInfo() {
 	}
 	Info["config_dir"] := ConfigDir
 
-	; Short git commit hash of the running source tree
+	; Short git commit hash of the running source tree.
+	; Use non-blocking Run + bounded poll so a stalled git (unavailable, network
+	; drive, credential prompt) cannot freeze the main pseudo-thread — this path
+	; also runs on the crash handler where the keyboard is already degraded.
 	GitHash := ""
 	try {
-		TmpFile := A_Temp . "\ergopti_githash_" . A_TickCount . ".txt"
-		RunWait(A_ComSpec . " /c git -C " . Chr(34) . A_ScriptDir . Chr(34) . " rev-parse --short HEAD > " . Chr(34) . TmpFile . Chr(34), , "Hide")
-		GitHash := Trim(FileRead(TmpFile, "UTF-8"))
-		FileDelete(TmpFile)
+		TmpFile := A_Temp . "\ergopti_githash_" . A_TickCount . "_" . A_PtrSize . ".txt"
+		Run(A_ComSpec . " /c git -C " . Chr(34) . A_ScriptDir . Chr(34)
+			. " rev-parse --short HEAD > " . Chr(34) . TmpFile . Chr(34), , "Hide")
+		Deadline := A_TickCount + 500
+		while (!FileExist(TmpFile) and A_TickCount < Deadline)
+			Sleep(50)
+		if FileExist(TmpFile) {
+			GitHash := Trim(FileRead(TmpFile, "UTF-8"))
+			try FileDelete(TmpFile)
+		}
 	}
 	Info["git_hash"] := GitHash
 

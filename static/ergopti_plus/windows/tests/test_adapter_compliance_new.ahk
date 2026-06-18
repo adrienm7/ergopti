@@ -164,6 +164,40 @@ _ST_Keys_ReturnsArray() {
 }
 Test("ST_Keys: returns an Array", _ST_Keys_ReturnsArray)
 
+_ST_Keys_ReturnsStrings() {
+	; ST_Keys must return key-name strings, not {name,type,data} record objects.
+	; Before the fix Reg_EnumValues was returned raw -> Type(k) = "Object".
+	ST_Set("__ergopti_k1_test9z3k", "v1")
+	ST_Set("__ergopti_k2_test9z3k", "v2")
+	local Keys := ST_Keys()
+	local AllStrings := true, SawK1 := false
+	for k in Keys {
+		if (Type(k) != "String")
+			AllStrings := false
+		if (k == "__ergopti_k1_test9z3k")
+			SawK1 := true
+	}
+	ST_Delete("__ergopti_k1_test9z3k")
+	ST_Delete("__ergopti_k2_test9z3k")
+	AssertTrue(AllStrings, "ST_Keys must return key-name strings, not record objects")
+	AssertTrue(SawK1, "ST_Keys must include keys that were just set")
+}
+Test("storage: ST_Keys returns key-name strings", _ST_Keys_ReturnsStrings)
+
+_ST_Clear_EmptiesStore() {
+	; ST_Clear must actually delete all stored values.
+	; Before the fix objects were passed to RegDelete -> throws -> nothing deleted.
+	ST_Set("__ergopti_c1_test9z3k", "v1")
+	ST_Set("__ergopti_c2_test9z3k", "v2")
+	ST_Clear()
+	local Gone := !ST_Has("__ergopti_c1_test9z3k") && !ST_Has("__ergopti_c2_test9z3k")
+	; Cleanup in case of failure
+	ST_Delete("__ergopti_c1_test9z3k")
+	ST_Delete("__ergopti_c2_test9z3k")
+	AssertTrue(Gone, "ST_Clear must remove all stored values from the registry")
+}
+Test("storage: ST_Clear empties the store", _ST_Clear_EmptiesStore)
+
 
 
 

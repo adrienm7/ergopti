@@ -226,9 +226,13 @@ KL_AppCat_Save() {
     obj := Map()
     for k, v in KLAppCat.categories
         obj[k] := v
-    try FileDelete(KLAppCat.file_path)
-    try FileAppend(KL_JsonEncodeObject(obj), KLAppCat.file_path, "UTF-8")
-    KLAppCat.dirty := false
+    try {
+        KL_WriteAtomic(KLAppCat.file_path, KL_JsonEncodeObject(obj))
+        KLAppCat.dirty := false   ; Only clear once the atomic rename succeeded
+    } catch as e {
+        try LoggerError("KLAppCat", "Failed to persist app_categories.json: {1}", e.Message)
+        ; Leave dirty=true so KL_AppCat_DeferredSave retries on the next tick
+    }
 }
 
 ; Deferred save — called by timer so rapid new-app discoveries are

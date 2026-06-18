@@ -194,38 +194,38 @@ MenuDispatcher_PruneMenu(MenuObj) {
 ; registered tray menu. Used by MenuDispatcher_PruneMenu to avoid dropping an
 ; entry that belongs to a DIFFERENT live menu than the one being rebuilt: a
 ; freed ID is reported by GetMenuItemID for no menu, while a live ID owned by
-; another submenu still shows up there. We probe the tray root and walk one
-; level of submenus (the tray hierarchy is shallow). Returns true on any match.
+; another submenu still shows up there. We probe the tray root and descend
+; recursively with cycle protection to reach items at any depth (depth 2-3 is
+; reachable through Shortcuts → modifier_combos → items). Returns true on any
+; match.
 _MenuDispatchIdIsLiveAnywhere(ItemId) {
     try {
         TrayHandle := A_TrayMenu.Handle
-        if (TrayHandle and _MenuDispatchHandleHasId(TrayHandle, ItemId, true)) {
+        if (TrayHandle and _MenuDispatchHandleHasId(TrayHandle, ItemId, Map()))
             return true
-        }
     } catch {
         ; Tray menu may not exist yet (very early boot) — treat as not live.
     }
     return false
 }
 
-; Walks a single HMENU for ItemId. When Recurse is true, also descends into each
-; popup submenu one level (GetSubMenu returns the child HMENU for a popup item),
-; which is enough for the shallow tray hierarchy. Returns true on first match.
-_MenuDispatchHandleHasId(HMENU, ItemId, Recurse) {
+; Walks HMENU for ItemId, descending into every popup submenu recursively.
+; Seen guards against cycles (circular HMENU references) by tracking every
+; handle already visited. Returns true on first match.
+_MenuDispatchHandleHasId(HMENU, ItemId, Seen) {
+    if (Seen.Has(HMENU))
+        return false
+    Seen[HMENU] := true
     try {
         Count := DllCall("GetMenuItemCount", "ptr", HMENU, "int")
         Loop Count {
             Pos := A_Index - 1
             Id := DllCall("GetMenuItemID", "ptr", HMENU, "int", Pos, "uint")
-            if (Id == ItemId and Id != 0xFFFFFFFF) {
+            if (Id == ItemId and Id != 0xFFFFFFFF)
                 return true
-            }
-            if (Recurse) {
-                Sub := DllCall("GetSubMenu", "ptr", HMENU, "int", Pos, "ptr")
-                if (Sub and _MenuDispatchHandleHasId(Sub, ItemId, false)) {
-                    return true
-                }
-            }
+            Sub := DllCall("GetSubMenu", "ptr", HMENU, "int", Pos, "ptr")
+            if (Sub and _MenuDispatchHandleHasId(Sub, ItemId, Seen))
+                return true
         }
     } catch {
         ; Probe failure — report not found so the conservative path keeps the
