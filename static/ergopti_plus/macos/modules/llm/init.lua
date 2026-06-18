@@ -140,6 +140,11 @@ local CoreState = {
 	active_profile_id      = M.DEFAULT_STATE.llm_active_profile,
 	user_profiles          = {},
 	backend                = M.DEFAULT_STATE.llm_backend,
+	-- Seed per-backend model names from DEFAULT_STATE so get_current_model()
+	-- returns a non-nil string before any setter is called (e.g. on a fresh
+	-- install where no llm_model_* key is persisted yet).
+	llm_model_ollama       = M.DEFAULT_STATE.llm_model_ollama,
+	llm_model_mlx          = M.DEFAULT_STATE.llm_model_mlx,
 	runtime_llm_enabled    = false,
 	background_bootstrap_started = false,
 	last_backend_check     = 0,
