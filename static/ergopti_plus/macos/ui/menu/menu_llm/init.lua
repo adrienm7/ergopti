@@ -177,8 +177,16 @@ end
 -- ===== 1.1) Shortcut Title Formatting =====
 --- ==========================================
 
+--- Returns true when the mods table contains the sentinel "none" value
+--- (regardless of position), indicating the shortcut is disabled.
+local function mods_has_none(mods)
+    if not mods then return false end
+    for _, m in ipairs(mods) do if m == "none" then return true end end
+    return false
+end
+
 local function format_shortcut_title(action, mods, none_label, mod_label)
-    if not mods or (#mods == 1 and mods[1] == "none") then
+    if not mods or mods_has_none(mods) then
         return action .. " : " .. i18n.get("common.disabled")
     elseif #mods == 0 then
         return action .. " : " .. none_label
