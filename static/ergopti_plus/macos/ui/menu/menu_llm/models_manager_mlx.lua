@@ -419,6 +419,10 @@ PY
 
 		local installed = {}
 		local home = os.getenv("HOME")
+		if not home then
+			Logger.error(LOG, "get_installed_models: HOME env var not set — cannot scan MLX cache.")
+			return installed
+		end
 		local hub_dir = home .. "/.cache/huggingface/hub/"
 		Logger.debug(LOG, "Scanning MLX installed models cache…")
 		for _, provider in ipairs(presets) do
