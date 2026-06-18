@@ -24,6 +24,17 @@ local notifications = require("lib.notifications")
 
 local LOG = "api_panel"
 
+-- Monotone counter for unique entry IDs.  os.time() alone has 1-second
+-- resolution, so two entries created within the same second get the same id.
+-- The seq suffix makes every id distinct regardless of wall-clock resolution.
+local _entry_seq = 0
+
+-- Monotone counter for add-entry validation probes.  A probe started for entry
+-- A that resolves after the user has already selected entry B must not revert
+-- the active selection back to pre-A.  Callbacks capture their own gen and
+-- bail out when the global has moved on.
+local _add_gen = 0
+
 --- Wraps pcall and logs Logger.error when the wrapped call fails.
 --- @param name string Short label identifying the call site.
 --- @param fn function The function to call.
@@ -147,7 +158,10 @@ function M.build(ctx)
 						"",
 						i18n.get("menu.llm.api_prompt_name")) or ""
 
-					local id = string.format("%s-%d", pid, os.time())
+					-- Unique id: seq suffix prevents collision when two entries are
+					-- created within the same second (os.time() resolution = 1s).
+					_entry_seq = _entry_seq + 1
+					local id = string.format("%s-%d-%d", pid, os.time(), _entry_seq)
 					local new_entry = {
 						id       = id,
 						provider = pid,
@@ -168,8 +182,13 @@ function M.build(ctx)
 					api_remote.set_entries(clone)
 					api_remote.set_active_entry_id(id)
 					update_menu()
+					-- Capture generation so a stale callback for a superseded add
+					-- does not clobber the active selection made after this one.
+					_add_gen = _add_gen + 1
+					local my_add_gen = _add_gen
 					api_remote.check_availability(new_entry.model,
 						function()
+							if my_add_gen ~= _add_gen then return end
 							-- Credentials accepted — NOW persist + warmup.
 							pcall_log("persist_api_entries(add_entry_ok)", llm_mod.persist_api_entries)
 							WarmupCtrl.warmup("api_add_entry")
@@ -179,15 +198,20 @@ function M.build(ctx)
 								"success")
 						end,
 						function(_unreachable)
+							if my_add_gen ~= _add_gen then return end
 							-- Validation failed: roll the in-memory list back so the
-							-- bogus token never lands in Keychain. The user sees the
-							-- menu snap back and a toast explaining why.
+							-- bogus token never lands in Keychain. Only revert the
+							-- active selection if it has not been changed by the user
+							-- since this probe was launched.
 							local rolled = {}
 							for _, x in ipairs(api_remote.get_entries() or {}) do
 								if x.id ~= id then table.insert(rolled, x) end
 							end
 							api_remote.set_entries(rolled)
-							api_remote.set_active_entry_id(previous_active_id)
+							local cur_id = api_remote.get_active_entry_id and api_remote.get_active_entry_id() or ""
+							if cur_id == id then
+								api_remote.set_active_entry_id(previous_active_id)
+							end
 							pcall_log("notify(api_unreachable)", notifications.notify,
 								i18n.get("menu.llm.api_unreachable_title"),
 								string.format(i18n.get("menu.llm.api_unreachable_body"), new_entry.label),
