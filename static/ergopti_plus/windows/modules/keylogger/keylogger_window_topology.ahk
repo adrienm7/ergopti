@@ -228,6 +228,7 @@ KL_Topo_Tick() {
     ; Debounce — require DEBOUNCE_TICKS consecutive ticks with same change_type
     if (change_type = KLTopo.pending_type) {
         KLTopo.pending_ticks += 1
+        KLTopo.pending_data  := change_data   ; keep the most recent geometry, not the overshoot
     } else {
         KLTopo.pending_type  := change_type
         KLTopo.pending_data  := change_data
