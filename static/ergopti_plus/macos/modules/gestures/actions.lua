@@ -218,7 +218,10 @@ function M.toggle_right_click()
 		if t == evTypes.rightMouseUp then
 			-- Swallow the spurious finger-lift mouseUp within the cooldown window.
 			if hs.timer.secondsSinceEpoch() - t0 < CLICK_COOLDOWN_SEC then return true end
-			hs.timer.doAfter(0, M.toggle_right_click)
+			-- Guard mirrors the left-click path: if rightClickHeld was already
+			-- cleared by a concurrent key-down event before this callback fires,
+			-- re-toggling would create a phantom hold.
+			hs.timer.doAfter(0, function() if rightClickHeld then M.toggle_right_click() end end)
 			return true
 		end
 		-- Convert idle mouseMoved to rightMouseDragged for apps that need it.
@@ -414,7 +417,7 @@ sg("snap_left",              function()
 end)
 sg("snap_right",             function()
 	local win = hs.window.focusedWindow()
-	if win then pcall(function() win:maximize() end) end
+	if win then pcall(function() win:moveToUnit(hs.layout.right50) end) end
 end)
 sg("maximize",                     function()
 	local win = hs.window.focusedWindow()
