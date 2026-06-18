@@ -101,10 +101,11 @@ local LM = helpers.load_with_stubs("modules.keylogger.log_manager", hs_overrides
 -- ======================================================
 
 helpers.describe("log_manager — public surface", function()
-	helpers.it("exposes init, stop, flush_buffer, and log_* delegates", function()
-		helpers.assert_eq(type(LM.init),             "function")
-		helpers.assert_eq(type(LM.stop),             "function")
-		helpers.assert_eq(type(LM.flush_buffer),     "function")
+	helpers.it("exposes init, stop, ensure_ingest_running, flush_buffer, and log_* delegates", function()
+		helpers.assert_eq(type(LM.init),                   "function")
+		helpers.assert_eq(type(LM.stop),                   "function")
+		helpers.assert_eq(type(LM.ensure_ingest_running),  "function")
+		helpers.assert_eq(type(LM.flush_buffer),           "function")
 		helpers.assert_eq(type(LM.append_log),       "function")
 		helpers.assert_eq(type(LM.log_app_switch),   "function")
 		helpers.assert_eq(type(LM.log_shortcut),     "function")
@@ -484,5 +485,124 @@ helpers.describe("log_manager — log delegate entry points", function()
 		helpers.assert_eq(entry.type,        "system_event")
 		helpers.assert_eq(entry.action,      "passive_period")
 		helpers.assert_eq(entry.duration_ms, 120000)
+	end)
+end)
+
+
+
+
+-- ==========================================================================================
+-- ==========================================================================================
+-- ======= 7/ ensure_ingest_running re-arms timer after stop (e2e-async-lifecycle-2) =======
+-- ==========================================================================================
+-- ==========================================================================================
+
+-- Timer-tracking override: replaces hs.timer with a stub that flips a boolean
+-- when start()/stop() are called so tests can assert the ingest timer lifecycle
+-- without inspecting the private _ingest_timer handle.
+local lm_timer_running = false
+
+local hs_tracking_overrides = {
+	fs = {
+		attributes = function() return nil end,
+		dir        = function() return function() return nil end end,
+	},
+	execute = function() return "" end,
+	timer = {
+		new = function(_interval, _cb)
+			return {
+				start = function() lm_timer_running = true end,
+				stop  = function() lm_timer_running = false end,
+			}
+		end,
+		doAfter      = function() end,
+		absoluteTime = function() return 0 end,
+		secondsSinceEpoch = function() return 0 end,
+	},
+}
+
+local function make_lm_lifecycle_state()
+	return {
+		LOG_DIR              = "/tmp/test_ergopti_lifecycle",
+		buffer_events        = {},
+		buffer_text          = "",
+		rich_chunks          = {},
+		session_mouse_clicks  = 0,
+		session_mouse_scrolls = 0,
+		mouse_distance_px     = 0,
+		last_flush_time       = 0,
+		last_time             = 0,
+		pending_keyup         = {},
+		today_idx             = {},
+		manifest              = {},
+	}
+end
+
+helpers.describe("log_manager — ensure_ingest_running lifecycle (e2e-async-lifecycle-2)", function()
+
+	helpers.it("ingest timer is running after init", function()
+		lm_timer_running = false
+		local lm = helpers.load_with_stubs("modules.keylogger.log_manager", hs_tracking_overrides)
+		lm.init(make_lm_lifecycle_state())
+		helpers.assert_true(lm_timer_running,
+			"ingest timer must be started by M.init()")
+	end)
+
+	helpers.it("stop() halts the ingest timer", function()
+		lm_timer_running = false
+		local lm = helpers.load_with_stubs("modules.keylogger.log_manager", hs_tracking_overrides)
+		lm.init(make_lm_lifecycle_state())
+		lm.stop()
+		helpers.assert_eq(lm_timer_running, false,
+			"ingest timer must be stopped after M.stop()")
+	end)
+
+	helpers.it("ensure_ingest_running() re-arms timer after stop (regression)", function()
+		-- Pre-fix: no ensure_ingest_running() — the ingest loop stayed dead after stop().
+		-- Post-fix: calling it after stop() recreates and starts the ingest timer.
+		lm_timer_running = false
+		local lm = helpers.load_with_stubs("modules.keylogger.log_manager", hs_tracking_overrides)
+		lm.init(make_lm_lifecycle_state())
+		lm.stop()
+		lm.ensure_ingest_running()
+		helpers.assert_true(lm_timer_running,
+			"ingest timer must be re-armed by ensure_ingest_running() after stop()")
+	end)
+
+	helpers.it("ensure_ingest_running() is a no-op before init", function()
+		lm_timer_running = false
+		local lm = helpers.load_with_stubs("modules.keylogger.log_manager", hs_tracking_overrides)
+		local ok = pcall(function() lm.ensure_ingest_running() end)
+		helpers.assert_true(ok, "ensure_ingest_running() before init must not raise")
+		helpers.assert_eq(lm_timer_running, false,
+			"ensure_ingest_running() before init must not start a timer")
+	end)
+
+	helpers.it("ensure_ingest_running() is a no-op when timer already running", function()
+		-- Calling it again while init is still running must not create a second timer.
+		lm_timer_running = false
+		local created_count = 0
+		local tracking_overrides_2 = {
+			fs      = hs_tracking_overrides.fs,
+			execute = hs_tracking_overrides.execute,
+			timer = {
+				new = function(_i, _cb)
+					created_count = created_count + 1
+					return {
+						start = function() lm_timer_running = true end,
+						stop  = function() lm_timer_running = false end,
+					}
+				end,
+				doAfter      = function() end,
+				absoluteTime = function() return 0 end,
+				secondsSinceEpoch = function() return 0 end,
+			},
+		}
+		local lm = helpers.load_with_stubs("modules.keylogger.log_manager", tracking_overrides_2)
+		lm.init(make_lm_lifecycle_state())
+		local after_init = created_count
+		lm.ensure_ingest_running()
+		helpers.assert_eq(created_count, after_init,
+			"ensure_ingest_running() must NOT create a second timer when already running")
 	end)
 end)

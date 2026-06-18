@@ -688,6 +688,20 @@ function M.init(core_state)
 		_device_id:sub(1, 8) .. "…", _device_obj.name)
 end
 
+--- Re-creates the ingest timer if it was stopped by M.stop() without a
+--- full re-init. Safe to call when already running (_ingest_timer exists)
+--- or before init (_state is nil): both cases are no-ops. Called
+--- unconditionally from keylogger M.start() so the ingest loop survives
+--- toggle OFF/ON without requiring a full re-initialization.
+function M.ensure_ingest_running()
+	if not _state or _ingest_timer then return end
+	_ingest_timer = timer.new(INGEST_TICK_SEC, function()
+		pcall(M.ingest_once)
+	end)
+	_ingest_timer:start()
+	Logger.done(LOG, "Ingest timer re-armed after stop/start cycle.")
+end
+
 --- Stop the ingest timer and close the SQLite cache cleanly.
 function M.stop()
 	if _ingest_timer then _ingest_timer:stop(); _ingest_timer = nil end

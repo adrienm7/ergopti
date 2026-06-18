@@ -87,8 +87,9 @@ local KC = helpers.load_with_stubs("modules.keylogger.kc_bridge", hs_overrides)
 -- ======================================================
 
 helpers.describe("kc_bridge — public surface", function()
-	helpers.it("exposes init, is_ke_managed_output_kc, refresh_managed_set, get_stats, stop", function()
+	helpers.it("exposes init, start, is_ke_managed_output_kc, refresh_managed_set, get_stats, stop", function()
 		helpers.assert_eq(type(KC.init),                    "function")
+		helpers.assert_eq(type(KC.start),                   "function")
 		helpers.assert_eq(type(KC.is_ke_managed_output_kc), "function")
 		helpers.assert_eq(type(KC.refresh_managed_set),     "function")
 		helpers.assert_eq(type(KC.get_stats),               "function")
@@ -266,5 +267,87 @@ helpers.describe("kc_bridge — M.init()", function()
 		kc.init(state, nil, {}, {})
 		local ok = pcall(function() kc.init(state, nil, {}, {}) end)
 		helpers.assert_true(ok)
+	end)
+end)
+
+
+
+
+-- ======================================================================
+-- ======================================================================
+-- ======= 6/ kc_bridge stop/start cycle (e2e-async-lifecycle-1) =======
+-- ======================================================================
+-- ======================================================================
+
+-- State flags mutated by the tracking stubs below.
+local lc_watcher_running = false
+local lc_timer_running   = false
+
+-- hs overrides that track watcher/timer running state via closures.
+local hs_lifecycle_overrides = {
+	keycodes = { map = { cmd = 55, shift = 56 } },
+	pathwatcher = {
+		new = function(_path, _cb)
+			return {
+				start = function() lc_watcher_running = true  end,
+				stop  = function() lc_watcher_running = false end,
+			}
+		end,
+	},
+	timer = {
+		new = function(_interval, _cb)
+			return {
+				start = function() lc_timer_running = true  end,
+				stop  = function() lc_timer_running = false end,
+			}
+		end,
+		absoluteTime = function() return 0 end,
+	},
+}
+
+helpers.describe("kc_bridge — stop/start lifecycle (e2e-async-lifecycle-1)", function()
+
+	helpers.it("watcher and timer are running after init", function()
+		lc_watcher_running = false
+		lc_timer_running   = false
+		local kc = helpers.load_with_stubs("modules.keylogger.kc_bridge", hs_lifecycle_overrides)
+		kc.init({ ok = true }, nil, {}, {})
+		helpers.assert_true(lc_watcher_running,
+			"path watcher must be running after init")
+		helpers.assert_true(lc_timer_running,
+			"poll timer must be running after init")
+	end)
+
+	helpers.it("stop() halts both watcher and timer", function()
+		lc_watcher_running = false
+		lc_timer_running   = false
+		local kc = helpers.load_with_stubs("modules.keylogger.kc_bridge", hs_lifecycle_overrides)
+		kc.init({ ok = true }, nil, {}, {})
+		kc.stop()
+		helpers.assert_eq(lc_watcher_running, false,
+			"path watcher must be stopped after stop()")
+		helpers.assert_eq(lc_timer_running, false,
+			"poll timer must be stopped after stop()")
+	end)
+
+	helpers.it("start() re-arms watcher and timer after stop (regression)", function()
+		-- Pre-fix: no M.start() existed — the bridge stayed dead after stop().
+		-- Post-fix: M.start() calls _arm_watchers() which re-creates nil handles.
+		lc_watcher_running = false
+		lc_timer_running   = false
+		local kc = helpers.load_with_stubs("modules.keylogger.kc_bridge", hs_lifecycle_overrides)
+		kc.init({ ok = true }, nil, {}, {})
+		kc.stop()
+		kc.start()
+		helpers.assert_true(lc_watcher_running,
+			"path watcher must be re-armed by start() after stop()")
+		helpers.assert_true(lc_timer_running,
+			"poll timer must be re-armed by start() after stop()")
+	end)
+
+	helpers.it("start() before init is a safe no-op", function()
+		local kc = helpers.load_with_stubs("modules.keylogger.kc_bridge", hs_lifecycle_overrides)
+		local ok = pcall(function() kc.start() end)
+		helpers.assert_true(ok, "M.start() before M.init() must not raise")
 	end)
 end)
