@@ -41,6 +41,18 @@ local _last_error = nil
 -- Reference to the currently open webview window (singleton — one at a time).
 local _window = nil
 
+-- Poll timer for the copy-button JS flag; module-level so show_window() can
+-- stop the PREVIOUS timer when reopening (a local would be orphaned on reopen).
+local _poll_timer = nil
+
+local function _stop_poll()
+	if _poll_timer then
+		_poll_timer:stop()
+		_poll_timer = nil
+		Logger.debug(LOG, "Copy-button poll timer stopped.")
+	end
+end
+
 local _sys_info
 local _format_uptime
 local _js_str
@@ -263,6 +275,7 @@ function M.show_window()
 
 	if _window then
 		Logger.debug(LOG, "Closing existing healthcheck window before reopening.")
+		_stop_poll()
 		pcall(function() _window:delete() end)
 		_window = nil
 	end
@@ -349,20 +362,14 @@ function M.show_window()
 	-- Wire up the copy-and-close button using a flag polled from Lua.
 	-- WKWebView rejects custom URL schemes (ergopti://) with NSURLErrorDomain -1002
 	-- before willNavigate fires, so we set a JS global instead and poll it.
-	local _poll_timer = nil
-	local function stop_poll()
-		if _poll_timer then
-			_poll_timer:stop()
-			_poll_timer = nil
-			Logger.debug(LOG, "Copy-button poll timer stopped.")
-		end
-	end
+	-- _poll_timer and _stop_poll() are module-level so reopening the window
+	-- can stop the previous timer before orphaning it.
 
 	local ok_wcb, wcb_err = pcall(function()
 		wv:windowCallback(function(action)
 			Logger.debug(LOG, "Window callback: action='%s'.", tostring(action))
 			if action == "closing" or action == "closed" then
-				stop_poll()
+				_stop_poll()
 				_window = nil
 			end
 		end)
@@ -387,12 +394,12 @@ function M.show_window()
 				end
 				-- Poll every 200 ms for the flag; stop and clean up when triggered
 				_poll_timer = hs.timer.new(0.2, function()
-					if not wv then stop_poll(); return end
+					if not wv then _stop_poll(); return end
 					wv:evaluateJavaScript("window.__hs_copy_requested", function(result)
 						if result == true then
 							Logger.debug(LOG, "Copy button clicked — copying plain text to clipboard.")
 							hs.pasteboard.setContents(plain)
-							stop_poll()
+							_stop_poll()
 							if _window then
 								pcall(function() _window:delete() end)
 								_window = nil
