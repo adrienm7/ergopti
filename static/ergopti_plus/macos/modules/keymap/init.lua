@@ -335,6 +335,7 @@ M.set_preview_colored_tooltips    = LLMBridge.set_preview_colored_tooltips
 M.trigger_prediction = LLMBridge._perform_llm_check
 M.reset_predictions  = LLMBridge.reset_predictions
 
+M.classify_trigger   = Registry.classify_trigger
 M.has_exact_trigger  = Registry.has_exact_trigger
 M.has_trigger_prefix = Registry.has_trigger_prefix
 M.has_trigger_suffix = Registry.has_trigger_suffix
