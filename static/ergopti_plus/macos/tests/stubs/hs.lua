@@ -481,6 +481,14 @@ M.application = {
 M.window = {
 	focusedWindow = function() return nil end,
 	frontmostWindow = function() return nil end,
+	filter = {
+		default = {
+			subscribe   = function(self, events, cb) end,
+			unsubscribe = function(self, cb) end,
+		},
+		windowFocused      = "windowFocused",
+		windowTitleChanged = "windowTitleChanged",
+	},
 }
 
 M.pathwatcher = {
