@@ -25,6 +25,7 @@ local _update_state       = "idle"
 local _cached_release     = nil
 local _last_notified_tag  = ""
 local _bg_timer           = nil
+local _boot_timer         = nil  -- one-shot boot-check; tracked so stop_background_checks() can cancel it
 local _check_interval_sec = DEFAULT_INTERVAL_SEC
 -- Per-channel ETag cache for conditional GET (304 does not count vs rate limit).
 local _fetch_cache        = {}
@@ -400,6 +401,10 @@ function M.stop_background_checks()
 		pcall(function() _bg_timer:stop() end)
 		_bg_timer = nil
 	end
+	if _boot_timer then
+		pcall(function() _boot_timer:stop() end)
+		_boot_timer = nil
+	end
 end
 
 function M.start_background_checks(channel, interval_sec, update_menu_fn)
@@ -418,7 +423,8 @@ function M.start_background_checks(channel, interval_sec, update_menu_fn)
 	_bg_timer = hs.timer.doEvery(_check_interval_sec, function()
 		background_tick(channel, update_menu_fn)
 	end)
-	hs.timer.doAfter(first_delay, function()
+	_boot_timer = hs.timer.doAfter(first_delay, function()
+		_boot_timer = nil
 		background_tick(channel, update_menu_fn)
 	end)
 end
