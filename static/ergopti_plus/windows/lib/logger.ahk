@@ -443,7 +443,7 @@ _LoggerEmit(Level, Tag, Msg, Args*) {
     ; it is never suppressed forever.
     static _LastErrTag := "", _LastErrBody := "", _LastErrTime := 0
     if (Level == "ERROR") {
-        if (Tag == _LastErrTag and Body == _LastErrBody and (A_TickCount - _LastErrTime) < 5000) {
+        if (Tag == _LastErrTag and Body == _LastErrBody and ((A_TickCount - _LastErrTime + 0x100000000) & 0xFFFFFFFF) < 5000) {
             return
         }
         _LastErrTag := Tag
