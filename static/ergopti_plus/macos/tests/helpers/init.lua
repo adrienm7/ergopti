@@ -231,24 +231,38 @@ end
 -- =================================
 
 local _suite_results = { passed = 0, failed = 0, failures = {} }
+local _before_each_fn = nil
 
 --- Declares a test suite (analogous to busted’s `describe`).
 --- @param name string Suite name, printed in the output.
 --- @param fn function Suite body that calls `it()`.
 function M.describe(name, fn)
 	print(string.format("\n=== %s ===", name))
+	-- Save and reset before_each so nested describes don’t inherit the outer hook
+	local prev_before_each = _before_each_fn
+	_before_each_fn = nil
 	local ok, err = pcall(fn)
+	_before_each_fn = prev_before_each
 	if not ok then
 		print(string.format("  ! suite error: %s", tostring(err)))
 		_suite_results.failed = _suite_results.failed + 1
 	end
 end
 
+--- Registers a function to run before each subsequent `it()` in the current describe block.
+--- @param fn function Setup function to run before each test.
+function M.before_each(fn)
+	_before_each_fn = fn
+end
+
 --- Declares a single test case (analogous to busted’s `it`).
 --- @param name string Test name, printed in the output.
 --- @param fn function Test body.
 function M.it(name, fn)
-	local ok, err = pcall(fn)
+	local ok, err = pcall(function()
+		if _before_each_fn then _before_each_fn() end
+		fn()
+	end)
 	if ok then
 		_suite_results.passed = _suite_results.passed + 1
 		print("  ok   " .. name)
