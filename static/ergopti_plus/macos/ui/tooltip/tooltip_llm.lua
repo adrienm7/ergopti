@@ -218,7 +218,11 @@ local function start_watchers()
 	local event_types = hs.eventtap.event.types
 	
 	-- Mouse Watcher
-	local ok_mouse, watcher_mouse = pcall(hs.eventtap.new, { event_types.mouseMoved, event_types.leftMouseDown, event_types.rightMouseDown, event_types.scrollWheel }, function(_)
+	-- mouseMoved intentionally excluded: trackpad fires it at 200+ Hz, which adds
+	-- HID-thread latency on every pointer event while the tooltip is visible. Clicks
+	-- and scrolls are sufficient for dismissal; pure mouse movement should not
+	-- interfere with input delivery.
+	local ok_mouse, watcher_mouse = pcall(hs.eventtap.new, { event_types.leftMouseDown, event_types.rightMouseDown, event_types.scrollWheel }, function(_)
 		if type(_state.on_cancel) == "function" then pcall(_state.on_cancel) end
 		M.hide()
 		return false

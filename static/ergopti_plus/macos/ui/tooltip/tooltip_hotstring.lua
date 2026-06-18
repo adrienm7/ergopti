@@ -108,9 +108,11 @@ local function start_watchers()
 	
 	local event_types = hs.eventtap.event.types
 	
-	-- Mouse events use hide() which respects the dequeue guard: a mouse move
-	-- during a dequeue cycle does not interrupt stacked rows with longer durations.
-	local ok_mouse, watcher_mouse = pcall(hs.eventtap.new, { event_types.mouseMoved, event_types.leftMouseDown, event_types.rightMouseDown, event_types.scrollWheel }, function()
+	-- mouseMoved intentionally excluded: trackpad fires it at 200+ Hz, adding
+	-- HID-thread latency while the tooltip is visible. Clicks and scrolls are
+	-- sufficient for dismissal; pure mouse movement must not block input delivery.
+	-- The dequeue-cycle comment still holds for the remaining event types.
+	local ok_mouse, watcher_mouse = pcall(hs.eventtap.new, { event_types.leftMouseDown, event_types.rightMouseDown, event_types.scrollWheel }, function()
 		M.hide()
 		return false
 	end)
