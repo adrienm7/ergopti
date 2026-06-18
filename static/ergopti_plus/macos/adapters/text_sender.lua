@@ -67,6 +67,10 @@ local PASTE_MODIFIER = { "cmd" }
 --- @param opts     table|nil    { mode?: "direct"|"clipboard"|"auto" }
 --- @param callback function|nil Called with no arguments on completion.
 function M.send(text, opts, callback)
+	if type(text) ~= "string" then
+		Logger.error(LOG, "M.send() requires a string, got %s — ignoring call.", type(text))
+		return
+	end
 	local options = type(opts) == "table" and opts or {}
 	local mode    = type(options.mode) == "string" and options.mode or "auto"
 
