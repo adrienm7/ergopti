@@ -79,7 +79,14 @@ function M.now()
 	if hs and hs.timer and hs.timer.absoluteTime then
 		return hs.timer.absoluteTime()
 	end
-	return (hs.timer.secondsSinceEpoch() or 0) * 1e9
+	-- hs.timer.absoluteTime is unavailable — fall back defensively.
+	-- Guard hs.timer before indexing it: in a headless/stripped context
+	-- hs.timer may be nil, which would throw on .secondsSinceEpoch().
+	if hs and hs.timer and hs.timer.secondsSinceEpoch then
+		local ok, t = pcall(hs.timer.secondsSinceEpoch)
+		if ok and type(t) == "number" then return t * 1e9 end
+	end
+	return os.time() * 1e9
 end
 
 
