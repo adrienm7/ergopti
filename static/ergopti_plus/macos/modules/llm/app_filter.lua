@@ -200,7 +200,11 @@ function M.is_blocked(state, excluded_apps, url_bar_filter_enabled, secure_field
 		local has_path = type(app.appPath) == "string" and app.appPath ~= ""
 		local has_bid  = type(app.bundleID) == "string" and app.bundleID ~= ""
 		local configured_name = type(app.name) == "string" and app.name:lower() or ""
-		local same_name = (not has_path and not has_bid and configured_name ~= ""
+		-- Guard: name must also be non-empty. Without this, an empty name (app
+		-- whose hs:name() returns nil) causes ("slack"):find("", 1, true) = 1,
+		-- so every name-only exclusion entry would match any nameless app.
+		local same_name = (not has_path and not has_bid
+			and configured_name ~= "" and name ~= ""
 			and (configured_name == name
 			or name:find(configured_name, 1, true)
 			or configured_name:find(name, 1, true)))

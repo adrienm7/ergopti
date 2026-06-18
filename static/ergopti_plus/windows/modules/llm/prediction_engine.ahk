@@ -757,8 +757,7 @@ _LLM_Engine_OnBatchSuccess(state, text, meta := "") {
 		state["est_cost_usd"]      := (state.Has("est_cost_usd")      ? state["est_cost_usd"]      : 0.0) + (meta.Has("est_cost_usd")    ? meta["est_cost_usd"]      : 0.0)
 	}
 	slots := _LLM_Engine_ParseSlots(text, state)
-	state["slots"]       := slots
-	state["dedup_stats"] := LLM_ApiCommon_NewDedupStats()
+	state["slots"] := slots
 	_LLM_Engine_FinalizeRequest(state)
 }
 
@@ -840,7 +839,8 @@ _LLM_Engine_DispatchVariant(state) {
 	preview_slots := []
 	for _, s in state["slots"]
 		preview_slots.Push(s)
-	while (preview_slots.Length < variant_idx)
+	pad_to := Min(variant_idx, state["requested"])
+	while (preview_slots.Length < pad_to)
 		preview_slots.Push(LLM_TOOLTIP_PLACEHOLDER)
 	has_real_slot := false
 	for _, s in preview_slots {
@@ -1021,7 +1021,7 @@ _LLM_Engine_FinalizeRequest(state) {
 	; external code still reading that field keeps working.
 	_LLM_Engine["last_result"]  := state["slots"][1]
 
-	try LLM_ApiCommon_LogSummary("sequential", state["requested"], state["dedup_stats"], state["slots"].Length)
+	try LLM_ApiCommon_LogSummary((state.Has("is_batch") and state["is_batch"]) ? "batch" : "sequential", state["requested"], state["dedup_stats"], state["slots"].Length)
 	try LoggerInfo("LLM", "Prediction received — {1} suggestion(s).", state["slots"].Length)
 	global _LLM_Ollama_IsReady
 	_LLM_Ollama_IsReady := true
@@ -1129,7 +1129,8 @@ _LLM_Engine_ParseSlots(raw, state) {
 		state.Has("min_words") ? state["min_words"] : 1,
 		state.Has("max_words") ? state["max_words"] : 15,
 		is_batch,
-		state["requested"]
+		state["requested"],
+		&(state["dedup_stats"])
 	)
 }
 
