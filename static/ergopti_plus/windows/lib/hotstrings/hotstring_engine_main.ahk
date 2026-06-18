@@ -1361,14 +1361,18 @@ HSE_DispatchMatch(Spec, EndChar) {
             ; yield (breaking the guarantee) and freeze all input ~200 ms. Release
             ; Critical for this branch and restore it after. No-op when the caller
             ; was not Critical (the space tap-hold path).
+            ; Mirror the atomic branch's consumed-delimiter guard so a space
+            ; (or any other consumed end-char) is not re-injected after the
+            ; clipboard paste — same contract as the SendInput path.
+            EndCharEmitted := (EndChar != "" and !InStr(HSE_CONSUMED_DELIMITERS, EndChar)) ? EndChar : ""
             _NpCrit := Critical("Off")
             try {
                 SendNewResult(BackSpaceSeq, false)
-                SendInstant(Replacement . EndChar)
+                SendInstant(Replacement . EndCharEmitted)
             } finally {
                 Critical(_NpCrit)
             }
-            SentBurst := BackSpaceSeq . "[clip]" . Replacement . EndChar
+            SentBurst := BackSpaceSeq . "[clip]" . Replacement . EndCharEmitted
         } else {
             ; SendInput is atomic: the ENTIRE backspace+replacement+endchar burst is
             ; injected as one unit, so any physical keystroke the user types during
