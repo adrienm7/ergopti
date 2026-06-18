@@ -177,6 +177,9 @@ end
 -- Holds the pending reload callback while at least one registered UI is open
 local _pending_reload_fn = nil
 local _poll_timer        = nil
+-- Reentrancy guard: prevents a second defer_reload() called from inside fn()
+-- from double-firing (fast-path would fire immediately since no UI is open)
+local _reload_in_flight  = false
 
 --- Returns true if at least one registered UI is currently open.
 local function any_ui_open()
@@ -194,8 +197,18 @@ end
 --- @param reload_fn function Zero-argument function that performs the reload.
 function M.defer_reload(reload_fn)
 	if not any_ui_open() then
+		if _reload_in_flight then
+			-- A reload is already executing on the call stack; defer this new
+			-- request rather than firing immediately — avoids double-fire when
+			-- fn() itself calls defer_reload() and no UI is open at that point.
+			_pending_reload_fn = reload_fn
+			return
+		end
 		-- Fast path: nothing to protect, fire right away
-		reload_fn()
+		_reload_in_flight = true
+		local ok, err = pcall(reload_fn)
+		_reload_in_flight = false
+		if not ok then Logger.error(LOG, "defer_reload fast-path error: %s.", tostring(err)) end
 		return
 	end
 
@@ -229,7 +242,10 @@ function M.defer_reload(reload_fn)
 
 		if fn then
 			Logger.info(LOG, "All protected UIs closed — firing deferred reload.")
-			fn()
+			_reload_in_flight = true
+			local ok, err = pcall(fn)
+			_reload_in_flight = false
+			if not ok then Logger.error(LOG, "defer_reload timer-path error: %s.", tostring(err)) end
 		end
 	end)
 	_poll_timer:start()
