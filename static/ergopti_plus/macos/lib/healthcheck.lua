@@ -392,6 +392,10 @@ function M.show_window()
 				if not ok_js then
 					Logger.warn(LOG, "JS injection failed: %s.", tostring(js_err))
 				end
+				-- Stop any previous poll timer before arming a new one; a second
+				-- didFinishNavigation (re-navigation or webview redraw) would otherwise
+				-- orphan the existing timer and leave two timers polling in parallel.
+				_stop_poll()
 				-- Poll every 200 ms for the flag; stop and clean up when triggered
 				_poll_timer = hs.timer.new(0.2, function()
 					if not wv then _stop_poll(); return end
