@@ -53,6 +53,7 @@ local SUCCESS_AUTO_HIDE_SEC = 1.5
 
 local _bootstrap_state      = "pending"
 local _last_failure_message = nil
+local _task_running         = false  -- reentrancy guard: prevents duplicate concurrent tasks
 
 
 
@@ -172,6 +173,10 @@ end
 --- call repeatedly: the underlying script is idempotent and exits silently
 --- when nothing needs doing.
 function M.check_and_install_deps()
+	if _task_running then
+		Logger.debug(LOG, "check_and_install_deps() called while a task is already running — ignoring duplicate call.")
+		return
+	end
 	Logger.start(LOG, "Bootstrapping Ollama backend…")
 	local project_root = resolve_project_root()
 	if not project_root then
@@ -191,6 +196,7 @@ function M.check_and_install_deps()
 
 	local task
 	task = hs.task.new("/bin/bash", function(exit_code, stdout, stderr)
+		_task_running = false
 		local combined = (stdout or "") .. (stderr or "")
 		forward_chunk(stdout or "")
 		forward_chunk(stderr or "")
@@ -234,7 +240,9 @@ function M.check_and_install_deps()
 
 	pcall(function() task:setStreamingCallback(make_streaming_handler()) end)
 
+	_task_running = true
 	if not pcall(function() task:start() end) then
+		_task_running = false
 		Logger.error(LOG, "Failed to start hs.task for Ollama bootstrap script.")
 		_bootstrap_state = "failed"
 		_last_failure_message = i18n.get("ollama.deps_task_start_failed")
