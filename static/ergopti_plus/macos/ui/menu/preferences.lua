@@ -309,9 +309,19 @@ local function flatten_from_disk(grouped)
 				else
 					-- Scalar value
 					if sec_name == "gestures" and disk_key ~= "enabled" then
-						-- Gesture action slot merged into [gestures]
-						if not flat.gesture_actions then flat.gesture_actions = {} end
-						flat.gesture_actions[disk_key] = disk_val
+						-- Check the reverse map first: keys like space_wrap have a flat
+						-- state entry (gesture_space_wrap) via KEY_MAP and must not be
+						-- merged into gesture_actions — that would create a phantom slot
+						-- and leave the real state key un-restored on reload.
+						local lookup = sec_name .. ":" .. disk_key
+						local fk     = _reverse_scalar[lookup]
+						if fk then
+							flat[fk] = disk_val
+						else
+							-- Gesture action slot (tap_2, pinch_2, etc.) merged into [gestures]
+							if not flat.gesture_actions then flat.gesture_actions = {} end
+							flat.gesture_actions[disk_key] = disk_val
+						end
 					else
 						local lookup = sec_name .. ":" .. disk_key
 						local fk     = _reverse_scalar[lookup]
@@ -427,7 +437,13 @@ function M.save(prefs_file, state, hotfiles, core_mods)
 	existing.gesture_actions = (gestures and type(gestures.get_all_actions) == "function") and gestures.get_all_actions() or {}
 	existing.gesture_modes = (gestures and type(gestures.get_all_modes) == "function") and gestures.get_all_modes() or {}
 	existing.gesture_sensitivities = (gestures and type(gestures.get_all_sensitivities) == "function") and gestures.get_all_sensitivities() or {}
-	existing.gesture_space_wrap = (gestures and type(gestures.get_space_wrap) == "function") and gestures.get_space_wrap() or true
+	-- Explicit if/else avoids the Lua nil-vs-false trap: `fn() or true` returns
+	-- true when fn() returns false, incorrectly overriding a disabled space-wrap.
+	if gestures and type(gestures.get_space_wrap) == "function" then
+		existing.gesture_space_wrap = gestures.get_space_wrap()
+	else
+		existing.gesture_space_wrap = true
+	end
 
 	existing.shortcut_keys = {}
 	local shortcuts_mod = core_mods.shortcuts_mod
