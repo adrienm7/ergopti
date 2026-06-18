@@ -295,3 +295,115 @@ helpers.describe("shortcuts.actions.system: wrap_event_decision", function()
 		helpers.assert_eq(sys.wrap_event_decision({}, "(", PAIRS, true), "wrap")
 	end)
 end)
+
+
+
+
+-- ====================================================================================
+-- ====================================================================================
+-- ======= bind_instant_screenshot defers blocking calls (shortcuts-actions-1) ========
+-- ====================================================================================
+-- ====================================================================================
+
+-- Regression: two synchronous hs.execute calls (mkdir + screencapture) were running
+-- inline on the CGEventTap thread, regularly exceeding the dispatch deadline and
+-- silently disabling the tap (kCGEventTapDisabledByTimeout). The fix defers them via
+-- hs.timer.doAfter(0, ...) and returns true immediately from the callback.
+helpers.describe("shortcuts.actions.system: bind_instant_screenshot defers exec (shortcuts-actions-1 regression)", function()
+
+	local function make_sys_with_spies()
+		package.loaded["lib.keycodes"] = nil
+		package.loaded["modules.shortcuts.actions.system"] = nil
+
+		local captured_cb   = nil
+		local do_after_calls = {}
+		local exec_calls    = {}
+
+		local sys = helpers.load_with_stubs("modules.shortcuts.actions.system", {
+			eventtap = {
+				new = function(_types, cb)
+					captured_cb = cb
+					return { start = function() end, stop = function() end, isEnabled = function() return true end }
+				end,
+				event = {
+					types      = { keyDown = 10 },
+					newKeyEvent = function() return { post = function() end } end,
+				},
+			},
+			timer = {
+				doAfter  = function(delay, fn) table.insert(do_after_calls, { delay = delay, fn = fn }) return { stop = function() end } end,
+				doEvery  = function(_d, _fn) return { start = function() end, stop = function() end } end,
+				new      = function(_d, _fn) return { start = function() end, stop = function() end } end,
+				secondsSinceEpoch = function() return 0 end,
+				absoluteTime      = function() return 0 end,
+				usleep   = function() end,
+			},
+			execute  = function(cmd) table.insert(exec_calls, cmd) return "", true, "exit", 0 end,
+			window   = {
+				frontmostWindow = function()
+					return { id = function() return 42 end }
+				end,
+			},
+		})
+
+		return sys, captured_cb, do_after_calls, exec_calls
+	end
+
+	helpers.it("invoking the eventtap callback does NOT call hs.execute inline", function()
+		local _sys, captured_cb, _do_after_calls, exec_calls = make_sys_with_spies()
+		_sys.bind_instant_screenshot()
+
+		helpers.assert_true(captured_cb ~= nil, "bind_instant_screenshot must register an eventtap callback")
+
+		-- Simulate the @ key with no modifiers
+		local fake_event = {
+			getKeyCode = function() return 10 end,
+			getFlags   = function() return {} end,
+		}
+		captured_cb(fake_event)
+
+		helpers.assert_eq(#exec_calls, 0,
+			"hs.execute must NOT be called inline in the eventtap callback (would block CGEventTap thread)")
+	end)
+
+	helpers.it("invoking the eventtap callback schedules a doAfter(0) with the capture work", function()
+		local _sys, captured_cb, do_after_calls, _exec_calls = make_sys_with_spies()
+		_sys.bind_instant_screenshot()
+
+		local fake_event = {
+			getKeyCode = function() return 10 end,
+			getFlags   = function() return {} end,
+		}
+		captured_cb(fake_event)
+
+		helpers.assert_true(#do_after_calls >= 1,
+			"a doAfter must be scheduled for the deferred screenshot work")
+		helpers.assert_eq(do_after_calls[#do_after_calls].delay, 0,
+			"the deferred callback must be scheduled with delay 0 (next run-loop tick)")
+	end)
+
+	helpers.it("running the deferred callback issues the mkdir and screencapture calls", function()
+		local _sys, captured_cb, do_after_calls, exec_calls = make_sys_with_spies()
+		_sys.bind_instant_screenshot()
+
+		local fake_event = {
+			getKeyCode = function() return 10 end,
+			getFlags   = function() return {} end,
+		}
+		captured_cb(fake_event)
+
+		-- Fire the deferred work
+		local deferred = do_after_calls[#do_after_calls]
+		helpers.assert_true(deferred ~= nil, "deferred callback must have been scheduled")
+		deferred.fn()
+
+		local has_mkdir  = false
+		local has_screen = false
+		for _, cmd in ipairs(exec_calls) do
+			if cmd:find("mkdir",       1, true) then has_mkdir  = true end
+			if cmd:find("screencapture", 1, true) then has_screen = true end
+		end
+		helpers.assert_true(has_mkdir,  "deferred callback must run mkdir -p")
+		helpers.assert_true(has_screen, "deferred callback must run screencapture")
+	end)
+end)

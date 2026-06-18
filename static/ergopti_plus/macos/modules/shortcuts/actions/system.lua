@@ -550,14 +550,18 @@ function M.bind_instant_screenshot()
 			return true
 		end
 
-		local id       = w:id()
-		local home     = os.getenv("HOME") or "~"
-		local dir      = home .. "/Pictures/screenshots"
-		pcall(hs.execute, "mkdir -p \"" .. dir .. "\"")
-
+		-- Capture the window ID synchronously before the eventtap returns; defer the
+		-- filesystem ops and screencapture to avoid blocking the CGEventTap callback
+		-- thread — blocking calls here exceed the dispatch deadline and disable the tap.
+		local id   = w:id()
+		local home = os.getenv("HOME") or "~"
+		local dir  = home .. "/Pictures/screenshots"
 		local filename = string.format("%s/screenshot_%s.png", dir, os.date("%Y_%m_%d_%Hh_%Mmin_%Ss"))
-		pcall(hs.execute, "screencapture -l " .. id .. " \"" .. filename .. "\"")
-		notifications.notify(string.format(i18n.get("shortcuts.saved"), filename), nil, "success")
+		hs.timer.doAfter(0, function()
+			pcall(hs.execute, "mkdir -p \"" .. dir .. "\"")
+			pcall(hs.execute, "screencapture -l " .. id .. " \"" .. filename .. "\"")
+			notifications.notify(string.format(i18n.get("shortcuts.saved"), filename), nil, "success")
+		end)
 		return true
 	end)
 	tap:start()
