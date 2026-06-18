@@ -678,3 +678,26 @@ KL_ClearSynthetic(*) {
     if !Keylogger.synth_active
         Keylogger.synth_type := "none"
 }
+
+; Atomic file write — in production lives in keylogger.ahk (not included by
+; the test runner). The test stub does a direct write without the rename dance;
+; atomicity is not required in a single-process test environment.
+KL_WriteAtomic(path, content) {
+    f := FileOpen(path, "w", "UTF-8")
+    if !f
+        throw Error("KL_WriteAtomic stub: cannot open " . path)
+    f.Write(content)
+    f.Close()
+}
+
+; Minimal flat JSON object decoder — in production lives in keylogger.ahk.
+; Handles the flat-object format produced by KL_JsonEncodeObject.
+KL_JsonDecode(s) {
+    result := Map()
+    pos := 1
+    while RegExMatch(s, '"([^"\\]*)"\s*:\s*"([^"\\]*)"', &m, pos) {
+        result[m[1]] := m[2]
+        pos := m.Pos + m.Len
+    }
+    return result
+}

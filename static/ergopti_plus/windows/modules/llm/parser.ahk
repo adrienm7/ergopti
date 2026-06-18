@@ -881,7 +881,7 @@ _LLM_Parser_ProcessPredictionImpl(full_text, tail_text, block, min_words := 1, m
  * Full post-API parse path — mirrors api_ollama.lua post_and_parse.
  * @returns {Array} Slot strings (to_type) ready for the tooltip.
  */
-LLM_Parser_ParseResponse(raw, full_text, tail_text, min_words, max_words, is_batch, n_predictions, &out_stats?) {
+LLM_Parser_ParseResponse(raw, full_text, tail_text, min_words, max_words, is_batch, n_predictions, &out_stats := "") {
 	raw := LLM_Parser_StripThinking(raw)
 	if (raw = "")
 		return []
