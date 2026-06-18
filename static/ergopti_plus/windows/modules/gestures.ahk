@@ -740,21 +740,32 @@ GestureToggleTitleCase() {
 ; SetTimer so the synthetic ^v has already consumed the coerced text before the
 ; user's original (possibly non-text) clipboard is put back.
 _GesturePastePlainRestore(OldClip) {
+    global _SEND_INSTANT_CLIP_BUSY
     A_Clipboard := OldClip
+    _SEND_INSTANT_CLIP_BUSY := false
 }
 
 GesturePastePlain() {
+    global _SEND_INSTANT_CLIP_BUSY
     if not WinActive("ahk_exe EXCEL.EXE") {
         ; Strip rich formatting only when the clipboard holds text. CB_Read()
         ; returns "" for non-text payloads (image/file list); the self-assign
         ; round-trip on those would destroy them, so we skip the strip and
         ; paste the content as-is instead.
         if CB_Read() != "" {
+            ; Skip the save/restore dance while SendInstant is already mid-flight
+            ; to avoid a second thread trampling the in-flight clipboard before
+            ; the first paste settles.
+            if _SEND_INSTANT_CLIP_BUSY {
+                SendFinalResult("^v")
+                return
+            }
             ; Snapshot the FULL clipboard (all formats) before coercing to
             ; plain text. A_Clipboard := A_Clipboard keeps only the text form,
             ; silently dropping any image/HTML/RTF the user may still want, so
-            ; we restore the original after the paste settles — mirroring
+            ; we restore the original after the paste settles -- mirroring
             ; SendInstant's save/paste/deferred-restore guarantee.
+            _SEND_INSTANT_CLIP_BUSY := true
             OldClip := ClipboardAll()
             A_Clipboard := A_Clipboard
             SendFinalResult("^v")
