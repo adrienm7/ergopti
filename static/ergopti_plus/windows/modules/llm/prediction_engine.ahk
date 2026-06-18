@@ -1121,8 +1121,9 @@ _LLM_Engine_ResolveProfileIdForApp(default_id) {
 ; only touch one place.
 ; Parse raw model output into tooltip slot strings (macOS Parser + insert_prediction).
 _LLM_Engine_ParseSlots(raw, state) {
-	is_batch := state.Has("is_batch") and state["is_batch"]
-	return LLM_Parser_ParseResponse(
+	is_batch  := state.Has("is_batch") and state["is_batch"]
+	dedup_ref := state["dedup_stats"]
+	result    := LLM_Parser_ParseResponse(
 		raw,
 		state["ctx"],
 		state.Has("ctx_tail") ? state["ctx_tail"] : state["ctx"],
@@ -1130,8 +1131,10 @@ _LLM_Engine_ParseSlots(raw, state) {
 		state.Has("max_words") ? state["max_words"] : 15,
 		is_batch,
 		state["requested"],
-		&(state["dedup_stats"])
+		&dedup_ref
 	)
+	state["dedup_stats"] := dedup_ref
+	return result
 }
 
 _LLM_Engine_GetActiveApiEntry() {
