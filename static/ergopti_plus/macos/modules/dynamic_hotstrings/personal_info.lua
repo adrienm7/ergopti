@@ -113,8 +113,12 @@ local function parse_toml_section(content, section)
 		elseif in_section then
 			local key, val = line:match('^(%w+)%s*=%s*"(.*)"$')
 			if key then
-				-- Unescape basic TOML sequences
-				val = val:gsub("\\n", "\n"):gsub("\\t", "\t"):gsub('\\"', '"'):gsub("\\\\", "\\")
+				-- Single-pass unescape: process \\(.) left-to-right so \\n is correctly
+			-- decoded as backslash+n, not as newline (the chained-gsub bug corrupted
+			-- \\n because \n was replaced before \\  was resolved)
+			val = val:gsub('\\(.)', function(c)
+					return ({n="\n", t="\t", ['"']='"', ['\\']='\\'})[c] or ('\\'..c)
+				end)
 				result[key] = val
 			end
 		end

@@ -124,8 +124,10 @@ local function parse_overrides(path)
 		if in_global then
 			local wd = line:match("^word_delimiters%s*=%s*\"(.-)\"%s*$")
 			if wd then
-				-- Basic TOML string unescaping: \n → newline, \t → tab, \\ → backslash
-				wd = wd:gsub("\\n", "\n"):gsub("\\t", "\t"):gsub("\\\\", "\\")
+				-- Single-pass unescape so \\n decodes as backslash+n not newline
+				wd = wd:gsub('\\(.)', function(c)
+						return ({n="\n", t="\t", ['\\']='\\'})[c] or ('\\'..c)
+					end)
 				word_delimiters = wd
 			end
 			goto continue
@@ -375,7 +377,7 @@ end
 --- @return table { delay = number, color = string|nil, has_override = boolean }
 function M.resolve(category, section)
 	if not require_state("resolve") then
-		return { delay = GLOBAL_DEFAULT_DELAY, color = nil, has_override = false }
+		return { delay = GLOBAL_DEFAULT_DELAY, color = nil, show_tooltip = true, has_override = false }
 	end
 
 	local user = _state.overrides[category] or { sections = {} }
@@ -434,7 +436,7 @@ end
 --- @return table { delay = number, color = string|nil, has_override = boolean }
 function M.resolve_ext(ext_id, toml_path, section)
 	if not require_state("resolve_ext") then
-		return { delay = GLOBAL_DEFAULT_DELAY, color = GLOBAL_DEFAULT_COLOR, has_override = false }
+		return { delay = GLOBAL_DEFAULT_DELAY, color = GLOBAL_DEFAULT_COLOR, show_tooltip = true, has_override = false }
 	end
 
 	local override_key = "ext." .. ext_id:lower()
