@@ -27,6 +27,11 @@ local _last_notified_tag  = ""
 local _bg_timer           = nil
 local _boot_timer         = nil  -- one-shot boot-check; tracked so stop_background_checks() can cancel it
 local _check_interval_sec = DEFAULT_INTERVAL_SEC
+-- Monotonic counter; bumped on start/stop. Async callbacks capture their own
+-- generation before launching asyncGet and discard their response when the
+-- global has moved on, preventing a stale in-flight response from clobbering
+-- _cached_release / _update_state with data from the wrong channel.
+local _poll_generation    = 0
 -- Per-channel ETag cache for conditional GET (304 does not count vs rate limit).
 local _fetch_cache        = {}
 
@@ -372,7 +377,14 @@ local function background_tick(channel, update_menu_fn)
 	if M.is_local_source() or _check_interval_sec <= 0 then return end
 	local current = M.current_version()
 	local url = M.release_api_url(channel)
+	-- Capture generation before the async call so a channel switch mid-flight
+	-- can be detected and the stale response discarded.
+	local gen = _poll_generation
 	hs.http.asyncGet(url, fetch_headers(channel), function(status, body, response_headers)
+		if gen ~= _poll_generation then
+			Logger.debug(LOG, "Background check: stale response discarded (gen %d != %d).", gen, _poll_generation)
+			return
+		end
 		body = resolve_fetch_body(channel, status, body, response_headers)
 		if not body then return end
 		body = normalize_release_json(body, channel)
@@ -397,6 +409,8 @@ local function background_tick(channel, update_menu_fn)
 end
 
 function M.stop_background_checks()
+	-- Bump generation to invalidate any in-flight asyncGet callbacks.
+	_poll_generation = _poll_generation + 1
 	if _bg_timer then
 		pcall(function() _bg_timer:stop() end)
 		_bg_timer = nil
