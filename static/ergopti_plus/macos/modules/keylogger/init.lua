@@ -588,6 +588,10 @@ local function handle_key(event_obj)
 					-- Extremely fast keystroke — almost certainly synthetic even if char differs
 					is_synthetic = true
 					synth_type   = next_synth.type
+					-- Pop the queue even on a char-mismatch fast-path: without this pop the
+					-- head entry stays and re-matches every subsequent fast keystroke,
+					-- tagging all rapid typing as synthetic until a >500 ms gap clears it.
+					table.remove(CoreState.synth_queue, 1)
 				end
 			end
 		end
@@ -772,6 +776,9 @@ local function handle_key(event_obj)
 		local metrics_typing = package.loaded["ui.metrics_typing.init"]
 		if metrics_typing and metrics_typing._wv ~= nil then
 			LogManager.flush_buffer()
+			-- flush_buffer resets CoreState.last_time to 0; re-seed it so the
+			-- next keystroke computes a correct inter-key delay instead of 0.
+			CoreState.last_time = now
 		end
 
 	end)
