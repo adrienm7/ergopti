@@ -197,6 +197,9 @@ function M.read_manifest(sqlite_path, start_date, end_date)
 	end
 
 	-- agg_app_day_burst.
+	-- GROUP BY date, app, length_buckets_json — accumulate scalars and merge
+	-- histogram buckets in Lua to avoid MIN(length_buckets_json) losing data
+	-- when multiple devices contribute rows for the same (date, app).
 	for r in db:nrows(string.format([[
 		SELECT date, app,
 		       SUM(count_total)        AS count_total,
@@ -205,19 +208,24 @@ function M.read_manifest(sqlite_path, start_date, end_date)
 		       SUM(inter_delay_count)  AS inter_count,
 		       SUM(inter_delay_sum)    AS inter_sum,
 		       SUM(inter_delay_sumsq)  AS inter_sumsq,
-		       MIN(length_buckets_json) AS length_buckets_json
+		       length_buckets_json
 		FROM agg_app_day_burst %s
-		GROUP BY date, app
+		GROUP BY date, app, length_buckets_json
 	]], date_filter())) do
 		local a = _get(manifest, r.date, r.app)
-		a.burst_count_total       = r.count_total or 0
-		a.burst_max_cpm           = r.max_cpm or 0
-		a.burst_max_chars         = r.max_chars or 0
-		a.burst_inter_delay_count = r.inter_count or 0
-		a.burst_inter_delay_sum   = r.inter_sum or 0
-		a.burst_inter_delay_sumsq = r.inter_sumsq or 0
+		a.burst_count_total       = (a.burst_count_total       or 0) + (r.count_total or 0)
+		a.burst_max_cpm           = math.max(a.burst_max_cpm   or 0,   r.max_cpm   or 0)
+		a.burst_max_chars         = math.max(a.burst_max_chars or 0,   r.max_chars or 0)
+		a.burst_inter_delay_count = (a.burst_inter_delay_count or 0) + (r.inter_count or 0)
+		a.burst_inter_delay_sum   = (a.burst_inter_delay_sum   or 0) + (r.inter_sum   or 0)
+		a.burst_inter_delay_sumsq = (a.burst_inter_delay_sumsq or 0) + (r.inter_sumsq or 0)
 		local ok, lb = pcall(json.decode, r.length_buckets_json or "{}")
-		if ok and type(lb) == "table" then a.burst_length_buckets = lb end
+		if ok and type(lb) == "table" then
+			if not a.burst_length_buckets then a.burst_length_buckets = {} end
+			for k, v in pairs(lb) do
+				a.burst_length_buckets[k] = (a.burst_length_buckets[k] or 0) + (v or 0)
+			end
+		end
 	end
 
 	-- agg_app_day_session.
@@ -325,33 +333,57 @@ function M.read_manifest(sqlite_path, start_date, end_date)
 	end
 
 	-- agg_app_day_hourly.
+	-- GROUP BY date, app, hour, e_buckets_json to avoid MIN(e_buckets_json) loss
+	-- on multi-device installs; accumulate scalars and merge buckets in Lua.
 	for r in db:nrows(string.format([[
 		SELECT date, app, hour,
 		       SUM(c) AS c, SUM(e) AS e, SUM(em) AS em, SUM(es) AS es,
-		       MIN(e_buckets_json) AS e_buckets_json
+		       e_buckets_json
 		FROM agg_app_day_hourly %s
-		GROUP BY date, app, hour
+		GROUP BY date, app, hour, e_buckets_json
 	]], date_filter())) do
 		local a = _get(manifest, r.date, r.app)
-		local h = { c = r.c or 0, e = r.e or 0, em = r.em or 0, es = r.es or 0, e_buckets = {} }
+		local h = a.hourly[r.hour]
+		if not h then
+			h = { c = 0, e = 0, em = 0, es = 0, e_buckets = {} }
+			a.hourly[r.hour] = h
+		end
+		h.c  = h.c  + (r.c  or 0)
+		h.e  = h.e  + (r.e  or 0)
+		h.em = h.em + (r.em or 0)
+		h.es = h.es + (r.es or 0)
 		local ok, buckets = pcall(json.decode, r.e_buckets_json or "{}")
-		if ok and type(buckets) == "table" then h.e_buckets = buckets end
-		a.hourly[r.hour] = h
+		if ok and type(buckets) == "table" then
+			for k, v in pairs(buckets) do
+				h.e_buckets[k] = (h.e_buckets[k] or 0) + (v or 0)
+			end
+		end
 	end
 
 	-- agg_app_day_hourly_min5.
+	-- Same multi-device fix: GROUP BY slot, e_buckets_json; accumulate in Lua.
 	for r in db:nrows(string.format([[
 		SELECT date, app, slot,
 		       SUM(c) AS c, SUM(e) AS e, SUM(es) AS es,
-		       MIN(e_buckets_json) AS e_buckets_json
+		       e_buckets_json
 		FROM agg_app_day_hourly_min5 %s
-		GROUP BY date, app, slot
+		GROUP BY date, app, slot, e_buckets_json
 	]], date_filter())) do
 		local a = _get(manifest, r.date, r.app)
-		local h = { c = r.c or 0, e = r.e or 0, es = r.es or 0, e_buckets = {} }
+		local h = a.hourly_min5[r.slot]
+		if not h then
+			h = { c = 0, e = 0, es = 0, e_buckets = {} }
+			a.hourly_min5[r.slot] = h
+		end
+		h.c  = h.c  + (r.c  or 0)
+		h.e  = h.e  + (r.e  or 0)
+		h.es = h.es + (r.es or 0)
 		local ok, buckets = pcall(json.decode, r.e_buckets_json or "{}")
-		if ok and type(buckets) == "table" then h.e_buckets = buckets end
-		a.hourly_min5[r.slot] = h
+		if ok and type(buckets) == "table" then
+			for k, v in pairs(buckets) do
+				h.e_buckets[k] = (h.e_buckets[k] or 0) + (v or 0)
+			end
+		end
 	end
 
 	db:close()
@@ -412,28 +444,36 @@ function M.read_ngrams(sqlite_path, start_date, end_date, selected_apps)
 	local app_filter = (selected_apps and #selected_apps > 0) and selected_apps or nil
 	local where = build_filter(app_filter)
 
+	-- GROUP BY token, esrc_json so multi-device rows are not collapsed via
+	-- MIN(esrc_json) — each distinct blob gets its own row and is merged in Lua.
 	for code, tbl in pairs(NGRAM_TYPE_TABLE) do
 		for r in db:nrows(string.format([[
 			SELECT token,
 			       SUM(c)  AS c,
 			       SUM(td) AS t,
 			       SUM(e)  AS e,
-			       MIN(esrc_json) AS esrc_json
+			       esrc_json
 			FROM %s %s
-			GROUP BY token
+			GROUP BY token, esrc_json
 		]], tbl, where)) do
-			local item = { c = r.c or 0, t = r.t or 0, e = r.e or 0, hs = 0, llm = 0, o = 0 }
+			local item = out[code][r.token]
+			if not item then
+				item = { c = 0, t = 0, e = 0, hs = 0, llm = 0, o = 0 }
+				out[code][r.token] = item
+			end
+			item.c = item.c + (r.c or 0)
+			item.t = item.t + (r.t or 0)
+			item.e = item.e + (r.e or 0)
 			local ok, src = pcall(json.decode, r.esrc_json or "{}")
 			if ok and type(src) == "table" then
-				item.hs  = src.hotstring or 0
-				item.llm = src.llm       or 0
+				item.hs  = item.hs  + (src.hotstring or 0)
+				item.llm = item.llm + (src.llm       or 0)
 				for k, v in pairs(src) do
 					if k ~= "hotstring" and k ~= "llm" and k ~= "none" then
 						item.o = item.o + (v or 0)
 					end
 				end
 			end
-			out[code][r.token] = item
 		end
 	end
 
@@ -491,23 +531,33 @@ function M.read_range_split_today(sqlite_path, start_date, end_date, selected_ap
 			for _, a in ipairs(selected_apps) do table.insert(quoted, _q(a)) end
 			app_clause = " AND app IN (" .. table.concat(quoted, ",") .. ")"
 		end
+		-- GROUP BY app, token, esrc_json so multi-device rows produce separate
+		-- rows per distinct blob — accumulated in Lua to avoid MIN(esrc_json) collapse.
 		for code, tbl in pairs(NGRAM_TYPE_TABLE) do
 			for r in db:nrows(string.format([[
 				SELECT app, token,
 				       SUM(c) AS c, SUM(td) AS t, SUM(e) AS e,
-				       MIN(esrc_json) AS esrc_json
+				       esrc_json
 				FROM %s
 				WHERE date = %s %s
-				GROUP BY app, token
+				GROUP BY app, token, esrc_json
 			]], tbl, _q(today_str), app_clause)) do
 				if not today_idx[r.app] then
 					today_idx[r.app] = { c={},bg={},tg={},qg={},pg={},hx={},hp={},w={},sc={},sc_bg={},w_bg={},kc={} }
 				end
-				local item = { c = r.c or 0, t = r.t or 0, e = r.e or 0, hs = 0, llm = 0, o = 0 }
+				local item = today_idx[r.app][code] and today_idx[r.app][code][r.token]
+				if not item then
+					item = { c = 0, t = 0, e = 0, hs = 0, llm = 0, o = 0 }
+					if not today_idx[r.app][code] then today_idx[r.app][code] = {} end
+					today_idx[r.app][code][r.token] = item
+				end
+				item.c = item.c + (r.c or 0)
+				item.t = item.t + (r.t or 0)
+				item.e = item.e + (r.e or 0)
 				local ok, src = pcall(json.decode, r.esrc_json or "{}")
 				if ok and type(src) == "table" then
-					item.hs  = src.hotstring or 0
-					item.llm = src.llm       or 0
+					item.hs  = item.hs  + (src.hotstring or 0)
+					item.llm = item.llm + (src.llm       or 0)
 					for k, v in pairs(src) do
 						if k ~= "hotstring" and k ~= "llm" and k ~= "none" then
 							item.o = item.o + (v or 0)
