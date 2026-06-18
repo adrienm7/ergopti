@@ -34,11 +34,11 @@ LLM_Parser_StripThinking(text) {
 	out := text
 	; Strip <thinking>…</thinking> first (longer tag — no overlap with <think>).
 	; The s) flag makes . match newlines; .*? stops at the FIRST </thinking>.
-	out := RegExReplace(out, "s)i)<thinking>.*?</thinking>\s*", "")
+	out := RegExReplace(out, "si)<thinking>.*?</thinking>\s*", "")
 	; Strip any unclosed </thinking> remnant (truncated model output).
 	out := RegExReplace(out, "i)</thinking>\s*", "")
 	; Strip <think>…</think> (DeepSeek / Qwen3 short tag).
-	out := RegExReplace(out, "s)i)<think>.*?</think>\s*", "")
+	out := RegExReplace(out, "si)<think>.*?</think>\s*", "")
 	; Strip any unclosed </think> remnant.
 	out := RegExReplace(out, "i)</think>\s*", "")
 	return out
