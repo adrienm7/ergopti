@@ -373,9 +373,10 @@ function M.new(ctx)
 					llm_mod.set_active_profile(rec_profile)
 					save_prefs(); update_menu()
 				else
+					-- User refused — the profile is already cur_profile; no setter call
+					-- or save needed. Re-applying set_active_profile without persisting
+					-- left LLM internal state out of sync with disk (ui-menu-llm-core-5).
 					Logger.info(LOG, string.format("Profile kept at %s (refused).", cur_profile))
-					state.llm_active_profile = cur_profile
-					llm_mod.set_active_profile(cur_profile)
 				end
 			end
 		elseif opts.force_dialog then
