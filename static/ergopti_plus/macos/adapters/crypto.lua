@@ -36,13 +36,18 @@ local LOG = "adapters.crypto"
 function M.sha256(data)
 	local ok, result = pcall(function()
 		if type(data) ~= "string" then return "" end
-		-- Shell out to openssl — available on every macOS installation
-		local cmd = string.format("printf '%%s' %q | openssl dgst -sha256 -hex 2>/dev/null", data)
+		-- POSIX single-quoting: replace every ' in data with '\'' so the shell
+		-- never interprets $, backticks, backslash-newline or other expansions.
+		-- %q (Lua double-quoting) is NOT shell-safe and would mangle newlines and
+		-- dollar signs, producing wrong digests or allowing shell injection.
+		local q = "'" .. data:gsub("'", "'\\''") .. "'"
+		local cmd = "printf '%s' " .. q .. " | openssl dgst -sha256 -hex 2>/dev/null"
 		local output = hs.execute(cmd)
 		if type(output) ~= "string" then return "" end
 		-- openssl output format: "SHA2-256(stdin)= <hex>" or "(stdin)= <hex>"
-		local hex = output:match("[0-9a-f]+%s*$") or ""
-		return hex:gsub("%s+", "")
+		local digest = output:match("[0-9a-f]+%s*$")
+		if not digest then return "" end
+		return (digest:gsub("%s+", ""))
 	end)
 	if not ok then
 		Logger.error(LOG, "sha256(): unexpected error — %s", tostring(result))
