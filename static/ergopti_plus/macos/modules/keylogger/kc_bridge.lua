@@ -298,6 +298,38 @@ function M.refresh_managed_set(tap_hold_config, available_actions)
 	build_managed_output_set(tap_hold_config, available_actions)
 end
 
+--- Arms the path watcher and backup poll timer. Idempotent: skips creation when
+--- the handles already exist so stop/start cycles can call this repeatedly.
+--- Must only be called after _state is set.
+local function _arm_watchers()
+	if not _state then return end
+
+	-- Touch: hs.pathwatcher binds to an inode; the file must exist before
+	-- watcher:start() or creation events may be missed on some macOS versions.
+	local fh_touch = io.open(KC_LOG_PATH, "a")
+	if fh_touch then fh_touch:close()
+	else Logger.warn(LOG, "Cannot create '%s' — bridge may not receive KE events.", KC_LOG_PATH)
+	end
+
+	if not _watcher then
+		_watcher = hs.pathwatcher.new(KC_LOG_PATH, function()
+			local ok, err = pcall(drain_log)
+			if not ok then Logger.error(LOG, "drain_log() raised (watcher): %s.", tostring(err)) end
+		end)
+		_watcher:start()
+		Logger.trace(LOG, "Path watcher armed.")
+	end
+
+	if not _poll_timer then
+		_poll_timer = hs.timer.new(POLL_FALLBACK_SEC, function()
+			local ok, err = pcall(drain_log)
+			if not ok then Logger.error(LOG, "drain_log() raised (poll): %s.", tostring(err)) end
+		end)
+		_poll_timer:start()
+		Logger.trace(LOG, "Poll timer armed.")
+	end
+end
+
 --- Initializes the bridge: wires dependencies, builds the suppression set, and
 --- starts watching KC_LOG_PATH for new physical key events.
 --- @param core_state table The shared keylogger CoreState table.
@@ -325,17 +357,6 @@ function M.init(core_state, log_manager, tap_hold_config, available_actions)
 		Logger.warn(LOG, "No tap_hold_config or available_actions — suppression set empty.")
 	end
 
-	-- Ensure the log file exists BEFORE the watcher starts: hs.pathwatcher binds
-	-- to an inode and may miss creation events if the file does not yet exist.
-	-- Touching it here also lets the KE shell_command "echo … >> file" succeed
-	-- on first write without a parent-directory race.
-	local fh_touch = io.open(KC_LOG_PATH, "a")
-	if fh_touch then
-		fh_touch:close()
-	else
-		Logger.warn(LOG, "Cannot create '%s' — bridge may not receive KE events.", KC_LOG_PATH)
-	end
-
 	-- Set _file_offset to current end so we ignore stale lines from a prior session
 	-- (those have already been counted in the persisted kc dict on disk).
 	local fh_init = io.open(KC_LOG_PATH, "r")
@@ -345,27 +366,23 @@ function M.init(core_state, log_manager, tap_hold_config, available_actions)
 		Logger.debug(LOG, "KC log opened (%d bytes) — draining only future writes.", _file_offset)
 	end
 
-	-- Path watcher fires whenever the log file is written to by KE shell_command
-	_watcher = hs.pathwatcher.new(KC_LOG_PATH, function(_paths)
-		local ok, err = pcall(drain_log)
-		if not ok then
-			Logger.error(LOG, "drain_log() raised (watcher): %s.", tostring(err))
-		end
-	end)
-	_watcher:start()
-
-	-- Backup poll timer — covers FSEvents misses. Cheap: only opens the file and
-	-- seeks to _file_offset; bails out immediately when there is no new data.
-	if _poll_timer then _poll_timer:stop() end
-	_poll_timer = hs.timer.new(POLL_FALLBACK_SEC, function()
-		local ok, err = pcall(drain_log)
-		if not ok then
-			Logger.error(LOG, "drain_log() raised (poll): %s.", tostring(err))
-		end
-	end)
-	_poll_timer:start()
+	_arm_watchers()
 
 	Logger.success(LOG, "KE physical-kc bridge initialized (watching '%s').", KC_LOG_PATH)
+end
+
+--- Re-arms the path watcher and poll timer after a stop/start cycle.
+--- Idempotent: _arm_watchers() skips creation when handles already exist, so
+--- calling start() while already running is a safe no-op. Calling it before
+--- M.init() is also a no-op (no _state yet). Called unconditionally from
+--- keylogger M.start() so the bridge survives toggle OFF/ON.
+function M.start()
+	if not _state then
+		Logger.warn(LOG, "M.start() called before M.init() — bridge not functional.")
+		return
+	end
+	_arm_watchers()
+	Logger.done(LOG, "KE bridge watchers ensured.")
 end
 
 --- Injects the LogManager reference after deferred initialization.

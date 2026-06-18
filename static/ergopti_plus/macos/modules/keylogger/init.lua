@@ -1414,8 +1414,12 @@ function M.start(script_control)
 		_state = true
 		LogManager.init(CoreState)
 		ContextTracker.init(CoreState, LogManager)
-		KcBridge.set_log_manager(LogManager)
 	end
+	-- Re-wire and re-arm on every start so stop/start cycles keep the bridge
+	-- and ingest loop alive. Both calls are idempotent when already running.
+	KcBridge.set_log_manager(LogManager)
+	KcBridge.start()
+	LogManager.ensure_ingest_running()
 
 	CoreState.is_enabled    = true
 	CoreState.last_flush_time = hs.timer.absoluteTime() / 1000000
