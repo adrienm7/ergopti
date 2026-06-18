@@ -343,14 +343,19 @@ local function build_tap_hold_rule(key_def, tap_action, hold_action, action_inde
 		}
 	end
 
+	-- POSIX-safe quoting helper: wraps a string in single quotes and escapes any
+	-- embedded single quotes so neither key_code nor the log path can be used
+	-- for shell injection (e.g. a config dir containing an apostrophe).
+	local function sq(s) return "'" .. tostring(s):gsub("'", "'\\''") .. "'" end
+
 	-- Append the physical key_code name to the bridge log on every key_down so
 	-- Hammerspoon can credit the correct physical key in the heatmap instead of
 	-- the remapped output key that the event tap would otherwise observe.
 	to_events[#to_events + 1] = {
 		shell_command = string.format(
-			"echo '%s' >> '%s'",
-			key_code,
-			KE_PHYSICAL_KC_LOG
+			"echo %s >> %s",
+			sq(key_code),
+			sq(KE_PHYSICAL_KC_LOG)
 		),
 	}
 
@@ -360,9 +365,9 @@ local function build_tap_hold_rule(key_def, tap_action, hold_action, action_inde
 	-- bridge's discriminator; bare "<key_code>" lines remain press events.
 	after_key_up_tail[#after_key_up_tail + 1] = {
 		shell_command = string.format(
-			"echo 'U:%s' >> '%s'",
-			key_code,
-			KE_PHYSICAL_KC_LOG
+			"echo %s >> %s",
+			sq("U:" .. tostring(key_code)),
+			sq(KE_PHYSICAL_KC_LOG)
 		),
 	}
 
