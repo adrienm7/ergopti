@@ -199,7 +199,7 @@ local function ensure_ram_cache(presets, is_mlx)
 			for _, m in ipairs(family.models or {}) do
 				if type(m) == "table" and type(m.name) == "string" then
 					local req = m.hardware_requirements or {}
-					local hw = is_mlx and req.mlx or req.ollama or {}
+					local hw = is_mlx and (req.mlx or {}) or (req.ollama or {})
 					if type(hw.ram_gb) == "number" then
 						_model_ram_cache[cache_key][m.name] = hw.ram_gb
 						local base = m.name:match("^(.-):")
@@ -244,7 +244,7 @@ local function get_model_size_logic(model_name, presets, is_mlx)
 			for _, m in ipairs(family.models or {}) do
 				if type(m) == "table" and (m.name == model_name or m.name .. ":latest" == model_name) then
 					local req = m.hardware_requirements or {}
-					local hw = is_mlx and req.mlx or req.ollama or {}
+					local hw = is_mlx and (req.mlx or {}) or (req.ollama or {})
 					if type(hw.download_gb) == "number" then out.download_gb = hw.download_gb end
 					if type(hw.ram_gb) == "number" then out.ram_gb = hw.ram_gb end
 					return out
