@@ -334,9 +334,31 @@ _LLM_ApiCommon_PredText(pred) {
 
 
 
+
+; ===========================================
+; ===========================================
+; ======= 4/ Timer / Deadline Helpers =======
+; ===========================================
+; ===========================================
+
+/**
+ * Returns true when the elapsed time since start_tick meets or exceeds timeout_ms.
+ * Uses modular subtraction so comparisons remain correct across the 32-bit
+ * A_TickCount wrap that occurs after ~49.7 days of uptime.
+ * @param {Integer} start_tick  - A_TickCount captured when the operation started.
+ * @param {Integer} timeout_ms  - Maximum allowed duration in milliseconds.
+ * @returns {Integer} 1 (true) when timed out, 0 (false) otherwise.
+ */
+_LLM_DeadlineExpired(start_tick, timeout_ms) {
+	return (((A_TickCount - start_tick) + 0x100000000) & 0xFFFFFFFF) >= timeout_ms
+}
+
+
+
+
 ; =====================================
 ; =====================================
-; ======= 4/ Logging Helpers ==========
+; ======= 5/ Logging Helpers ==========
 ; =====================================
 ; =====================================
 
