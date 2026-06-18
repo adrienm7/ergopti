@@ -94,6 +94,15 @@ function M.load_with_stubs(module_name, hs_overrides)
 	-- text_utils/init.lua is pure Lua with no hs deps, so reloading it is safe.
 	package.loaded["lib.text_utils"] = nil
 
+	-- Clear any toml_codec stub installed at module level by test files that
+	-- treat it as a native C library (e.g. test_config.lua). The real codec is
+	-- pure Lua and loads fine in CI; the stub's encode() returns "" which
+	-- causes preferences.save() to write an empty TOML file and all persistence
+	-- tests to see flat = {}.
+	package.loaded["lib.toml_codec"]   = nil
+	package.loaded["toml_codec"]       = nil
+	package.loaded["toml_codec.codec"] = nil
+
 	-- Always inject a minimal lib.i18n stub so that modules calling i18n.get()
 	-- at require-time (terminators, conflicts, actions, profiles …) never crash
 	-- with "attempt to call a nil value (field 'get')". The real lib.i18n depends

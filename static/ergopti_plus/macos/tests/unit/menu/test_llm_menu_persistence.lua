@@ -163,17 +163,6 @@ helpers.describe("LLM menu persistence — disk round-trip", function()
 			prefs.save(tmp, state, {}, {})
 			local flat = prefs.load(tmp)
 
-			-- CI debug: if flat is empty, emit the file content so we can see what was written
-			if next(flat) == nil then
-				local _dbg_fh = io.open(tmp, "r")
-				if _dbg_fh then
-					io.stderr:write("[CI-DEBUG] TOML for " .. label .. ":\n" .. _dbg_fh:read("*a") .. "\n")
-					_dbg_fh:close()
-				else
-					io.stderr:write("[CI-DEBUG] file missing: " .. tostring(tmp) .. "\n")
-				end
-			end
-
 			local got = flat[hs.flat_key]
 			local flat_ok = values_equal(hs.sample, got, hs)
 			if not flat_ok and got == nil and hs and hs.persist == "nested" then

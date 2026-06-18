@@ -87,6 +87,7 @@ helpers.describe("apply_prediction — paste-ops drain (keymap-bridge-001)", fun
 
 		-- engine stub: always returns one prediction with our long text
 		package.loaded["modules.keymap.llm.engine"] = {
+			init            = function() end,
 			is_visible      = function() return true end,
 			get_predictions = function() return {{text=long_text, display=long_text}} end,
 			consume         = function(_, _) return { deletes = 0, to_type = long_text } end,
@@ -142,7 +143,7 @@ helpers.describe("apply_prediction — paste-ops drain (keymap-bridge-001)", fun
 		end
 
 		local state = make_state("hello world, this is a test buffer prefix")
-		bridge.init(state)
+		bridge.init(state, {})
 
 		-- Before fix: expected_synthetic_pastes stayed 0 even after a paste-path acceptance
 		-- After fix:  expected_synthetic_pastes == 1 and take_paste_ops() returns 0
@@ -164,6 +165,7 @@ helpers.describe("apply_prediction — paste-ops drain (keymap-bridge-001)", fun
 		package.loaded["modules.keymap.utils"] = km_stub
 
 		package.loaded["modules.keymap.llm.engine"] = {
+			init            = function() end,
 			is_visible      = function() return true end,
 			get_predictions = function() return {{text=short_text, display=short_text}} end,
 			consume         = function(_, _) return { deletes = 0, to_type = short_text } end,
@@ -200,7 +202,7 @@ helpers.describe("apply_prediction — paste-ops drain (keymap-bridge-001)", fun
 		if not ok then return end  -- stubs not sufficient in this env, skip
 
 		local state = make_state("prefix")
-		bridge.init(state)
+		bridge.init(state, {})
 		bridge.apply_prediction(1)
 
 		helpers.assert_eq(state.expected_synthetic_pastes, 0,
