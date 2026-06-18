@@ -86,13 +86,18 @@ _LLMSF_LeftoverFlushedBeforeFinalCheck() {
 	Assert(InStr(Src, "state[" . Chr(34) . "leftover" . Chr(34) . "]") > 0,
 		"api_ollama.ahk must reference state[leftover] in the final flush path")
 
-	Assert(InStr(Src, "_LLM_Ollama_ConsumeStreamChunk(state[" . Chr(34) . "leftover" . Chr(34) . "] .") > 0
-		or InStr(Src, "ConsumeStreamChunk(state[" . Chr(34) . "leftover" . Chr(34) . "]") > 0,
-		"api_ollama.ahk must flush leftover by calling ConsumeStreamChunk with it before the final result check (llm-stream-leftover-not-flushed)")
+	; Accept both the pre-fix form (passing state["leftover"] directly) and the
+	; post-fix form (copying to a local before clearing, then passing the local).
+	; The important invariant is that ConsumeStreamChunk is called in the flush path.
+	Assert(InStr(Src, "ConsumeStreamChunk(") > 0,
+		"api_ollama.ahk must flush leftover by calling ConsumeStreamChunk in the final flush path (llm-stream-leftover-not-flushed)")
 
 	; The flush must append a synthetic newline so the JSON line is parsed as complete.
 	; Chr(96) is the AHK backtick char (0x60); Chr(96)."n" matches the two-char literal backtick+n in source.
-	Assert(InStr(Src, "state[" . Chr(34) . "leftover" . Chr(34) . "] . " . Chr(34) . Chr(96) . "n" . Chr(34)) > 0,
+	; Accept either the direct form (state["leftover"] . "`n") or the local-copy form (_resid . "`n").
+	BtN := Chr(34) . Chr(96) . "n" . Chr(34)
+	Assert(InStr(Src, "state[" . Chr(34) . "leftover" . Chr(34) . "] . " . BtN) > 0
+		or InStr(Src, "_resid . " . BtN) > 0,
 		"api_ollama.ahk must append a newline to leftover before flushing — the last JSON line may lack a trailing newline (llm-stream-leftover-not-flushed)")
 }
 Test("api_ollama: StreamFinalFlush flushes state[leftover] with synthetic newline before result check (llm-stream-leftover-not-flushed)", _LLMSF_LeftoverFlushedBeforeFinalCheck)

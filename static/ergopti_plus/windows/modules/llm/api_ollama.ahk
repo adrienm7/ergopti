@@ -249,7 +249,7 @@ LLM_OllamaIsRunning_Async(on_result) {
 		; reactivity for a check that fires every 10 s, and the tighter
 		; loop was firing ~60 timer callbacks per probe, contesting the
 		; message loop with the InputHook and dropping user keystrokes.
-		_LLM_Ollama_PollGeneric(http, (status, _body) => on_result(status == 200), () => on_result(false), 0, 500)
+		_LLM_Ollama_PollGeneric(http, (status, _body) => on_result(status == 200), () => on_result(false), 0, 0, 500)
 	} catch {
 		try on_result(false)
 	}
@@ -417,13 +417,12 @@ _LLM_Ollama_DispatchAsync(job) {
 		return
 	}
 	_LLM_Ollama_TrimAsyncRegistry()
-	deadline := A_TickCount + LLM_OLLAMA_TIMEOUT + 5000
 	payload_snip := StrLen(payload) > 160 ? SubStr(payload, 1, 160) . "…" : payload
 	_LLM_Ollama_Async[req_id] := Map(
 		"pid", pid, "tmp_payload", tmp_payload, "tmp_stdout", tmp_stdout,
 		"on_success", job["on_success"], "on_fail", job["on_fail"],
-		"cancelled", false, "deadline", deadline, "start_tick", A_TickCount,
-		"payload_snip", payload_snip)
+		"cancelled", false, "start_tick", A_TickCount,
+		"timeout_ms", LLM_OLLAMA_TIMEOUT + 5000, "payload_snip", payload_snip)
 	_LLM_Ollama_PollCurl(req_id)
 }
 
@@ -556,8 +555,8 @@ _LLM_Ollama_PollRequest(req_id, parser) {
 		return
 	}
 	if !ready {
-		if (entry.Has("deadline") and A_TickCount >= entry["deadline"]) {
-			elapsed := entry.Has("start_tick") ? (A_TickCount - entry["start_tick"]) : 0
+		if (entry.Has("start_tick") and entry.Has("timeout_ms") and _LLM_DeadlineExpired(entry["start_tick"], entry["timeout_ms"])) {
+			elapsed := A_TickCount - entry["start_tick"]
 			try LoggerWarn("LLM.ollama", "Ollama request timed out after {1} ms.", elapsed)
 			on_fail := entry["on_fail"]
 			_LLM_Ollama_Async.Delete(req_id)
@@ -611,7 +610,7 @@ _LLM_Ollama_PollCurl(req_id) {
 		_LLM_Ollama_DrainPending()
 		return
 	}
-	if (entry.Has("deadline") and A_TickCount >= entry["deadline"]) {
+	if (entry.Has("start_tick") and entry.Has("timeout_ms") and _LLM_DeadlineExpired(entry["start_tick"], entry["timeout_ms"])) {
 		if entry.Has("pid") and entry["pid"] > 0
 			try ProcessClose(entry["pid"])
 		elapsed := entry.Has("start_tick") ? (A_TickCount - entry["start_tick"]) : 0
@@ -692,14 +691,16 @@ _LLM_OllamaParseAsyncBody(body, on_success, on_fail, entry := "") {
  * the AHK message loop and caused the InputHook to drop keystrokes —
  * the user's typing felt like characters were being eaten at random.
  */
-_LLM_Ollama_PollGeneric(http, on_ok, on_err, deadline := 0, poll_ms := 0) {
-	; First entry — compute the deadline once and bind it to subsequent
-	; ticks. 3000 ms is generous enough for any local Ollama call (the
-	; WinHTTP per-phase timeout is 2 s) but short enough to guarantee
-	; the timer chain ends within a few hundred milliseconds of the
-	; underlying request actually failing.
-	if (deadline == 0)
-		deadline := A_TickCount + 3000
+_LLM_Ollama_PollGeneric(http, on_ok, on_err, start_tick := 0, timeout_ms := 0, poll_ms := 0) {
+	; First entry — record the start tick once so subsequent recursive ticks
+	; can compute elapsed time correctly across the 32-bit A_TickCount wrap.
+	; 3000 ms is generous enough for any local Ollama call (the WinHTTP
+	; per-phase timeout is 2 s) but short enough to guarantee the timer chain
+	; ends within a few hundred milliseconds of the request actually failing.
+	if (start_tick == 0)
+		start_tick := A_TickCount
+	if (timeout_ms == 0)
+		timeout_ms := 3000
 	; Default poll cadence — callers that don't care use LLM_OLLAMA_POLL_MS
 	; (50 ms, optimal for prediction latency). The health probe overrides
 	; this with 500 ms because reactivity on a 10 s timer is irrelevant.
@@ -709,7 +710,7 @@ _LLM_Ollama_PollGeneric(http, on_ok, on_err, deadline := 0, poll_ms := 0) {
 	ready := false
 	try ready := http.WaitForResponse(0)
 	if !ready {
-		if (A_TickCount >= deadline) {
+		if _LLM_DeadlineExpired(start_tick, timeout_ms) {
 			; Abort the in-flight request before dropping our reference — a
 			; server that accepts the connection but never responds would
 			; otherwise keep the COM object + socket resident until WinHTTP's
@@ -718,7 +719,7 @@ _LLM_Ollama_PollGeneric(http, on_ok, on_err, deadline := 0, poll_ms := 0) {
 			try on_err()
 			return
 		}
-		SetTimer(() => _LLM_Ollama_PollGeneric(http, on_ok, on_err, deadline, poll_ms), -poll_ms)
+		SetTimer(() => _LLM_Ollama_PollGeneric(http, on_ok, on_err, start_tick, timeout_ms, poll_ms), -poll_ms)
 		return
 	}
 	try {
@@ -805,12 +806,10 @@ LLM_OllamaWarmup(model) {
 		_LLM_Ollama_WarmupHttp.SetTimeouts(LLM_OLLAMA_WARMUP_TIMEOUT, LLM_OLLAMA_WARMUP_TIMEOUT,
 			LLM_OLLAMA_WARMUP_TIMEOUT, LLM_OLLAMA_WARMUP_TIMEOUT)
 		_LLM_Ollama_SendUtf8(_LLM_Ollama_WarmupHttp, payload)
-		warmup_deadline := A_TickCount + LLM_OLLAMA_WARMUP_TIMEOUT
 		_LLM_Ollama_PollGeneric(_LLM_Ollama_WarmupHttp,
 			(status, _body) => _LLM_Ollama_OnWarmupDone(status, gen),
 			() => _LLM_Ollama_OnWarmupPollFailed("timeout", gen),
-			warmup_deadline,
-			_LLM_OLLAMA_WARMUP_POLL_MS)
+			A_TickCount, LLM_OLLAMA_WARMUP_TIMEOUT, _LLM_OLLAMA_WARMUP_POLL_MS)
 	} catch as e {
 		try LoggerWarn("LLM.ollama", "Warmup POST failed: {1}.", e.Message)
 		_LLM_Ollama_WarmupHttp := 0
@@ -983,7 +982,7 @@ LLM_OllamaGenerate_Streaming(model, system_prompt, full_text, temperature, on_pa
 	; JSONL lines, fire on_partial for each. When the process exits, fire
 	; on_success with the accumulated text.
 	state := Map("acc", "", "last_pos", 0, "start_tick", A_TickCount,
-		"deadline", A_TickCount + LLM_OLLAMA_TIMEOUT + 5000)
+		"timeout_ms", LLM_OLLAMA_TIMEOUT + 5000)
 	global _LLM_Ollama_ActiveStreams
 	_LLM_Ollama_ActiveStreams.Push(handle)
 	_LLM_Ollama_StreamPoll(handle, state, on_partial, on_success, on_fail)
@@ -1005,7 +1004,7 @@ _LLM_Ollama_StreamPoll(handle, state, on_partial, on_success, on_fail) {
 		try on_fail()
 		return
 	}
-	if (state.Has("deadline") and A_TickCount >= state["deadline"]) {
+	if (state.Has("start_tick") and state.Has("timeout_ms") and _LLM_DeadlineExpired(state["start_tick"], state["timeout_ms"])) {
 		if (handle.Pid > 0)
 			try ProcessClose(handle.Pid)
 		_LLM_Ollama_CleanupStreamFiles(handle)
@@ -1074,8 +1073,14 @@ _LLM_Ollama_StreamFinalFlush(handle, state, on_partial, on_success, on_fail) {
 	; Flush any leftover (last JSON line that did not end with \n).
 	; Without this the final token of a response that lacks a trailing newline
 	; is silently lost, producing "Streaming finished with empty response".
-	if (state.Has("leftover") and state["leftover"] != "")
-		_LLM_Ollama_ConsumeStreamChunk(state["leftover"] . "`n", state, on_partial)
+	; Clear the stored leftover BEFORE passing it to ConsumeStreamChunk — that
+	; function prepends state["leftover"] itself, so leaving it set would double
+	; the content and corrupt the accumulated result.
+	if (state.Has("leftover") and state["leftover"] != "") {
+		_resid := state["leftover"]
+		state["leftover"] := ""
+		_LLM_Ollama_ConsumeStreamChunk(_resid . "`n", state, on_partial)
+	}
 	final := state["acc"]
 	_LLM_Ollama_CleanupStreamFiles(handle)
 	_LLM_Ollama_RemoveStreamHandle(handle)
