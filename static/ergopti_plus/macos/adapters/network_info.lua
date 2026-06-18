@@ -40,11 +40,17 @@ local LOG = "adapters.network_info"
 local function sha256_hex(s)
 	if type(s) ~= "string" or s == "" then return "" end
 	local ok, out = pcall(function()
-		local cmd = string.format("printf '%%s' %q | openssl dgst -sha256 -hex 2>/dev/null", s)
+		-- POSIX single-quoting prevents shell injection and wrong digests on data
+		-- containing $, backticks or newlines (unlike Lua %q which uses "..." syntax)
+		local q = "'" .. s:gsub("'", "'\\''") .. "'"
+		local cmd = "printf '%s' " .. q .. " | openssl dgst -sha256 -hex 2>/dev/null"
 		return hs.execute(cmd)
 	end)
 	if not ok or type(out) ~= "string" then return "" end
-	return out:match("[0-9a-f]+%s*$"):gsub("%s+", "") or ""
+	-- Nil-check the match: openssl may not be available (returns empty stdout)
+	local digest = out:match("[0-9a-f]+%s*$")
+	if not digest then return "" end
+	return (digest:gsub("%s+", ""))
 end
 
 
