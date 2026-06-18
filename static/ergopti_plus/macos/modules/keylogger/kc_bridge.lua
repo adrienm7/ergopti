@@ -252,18 +252,15 @@ local function drain_log()
 			drained, _drained_total)
 	end
 
-	-- Truncate the file once we have read everything up to EOF so the file never
-	-- grows unboundedly.  Only truncate when we are at the end (no partial read).
-	local fh_size = io.open(KC_LOG_PATH, "r")
-	if fh_size then
-		local current_size = fh_size:seek("end") or 0
-		fh_size:close()
-		if _file_offset >= current_size and current_size > 0 then
-			local fh_trunc = io.open(KC_LOG_PATH, "w")
-			if fh_trunc then
-				fh_trunc:close()
-				_file_offset = 0
-			end
+	-- Truncate once we have consumed everything that existed when we opened.
+	-- Compare against file_size (snapshot at open time), not a re-queried size —
+	-- a second io.open here introduces a TOCTOU window where KE can append between
+	-- the close above and the new open, causing those fresh lines to be wiped.
+	if _file_offset >= file_size and file_size > 0 then
+		local fh_trunc = io.open(KC_LOG_PATH, "w")
+		if fh_trunc then
+			fh_trunc:close()
+			_file_offset = 0
 		end
 	end
 end
