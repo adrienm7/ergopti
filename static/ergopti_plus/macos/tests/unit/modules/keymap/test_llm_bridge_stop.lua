@@ -68,29 +68,29 @@ helpers.describe("llm_bridge M.stop(): stops the escape trap (escape-trap-ghost-
 	helpers.it("M.stop() calls :stop() on the eventtap created by arm_escape_trap()", function()
 		package.loaded["modules.keymap.llm_bridge"] = nil
 
-		local trap_stopped = false
-		local mock_trap    = {
-			start  = function(self) return self end,
-			stop   = function(self) trap_stopped = true end,
-		}
-
-		-- Intercept hs.eventtap.new to return the mock trap
-		local orig_eventtap_new = hs.eventtap.new
-		hs.eventtap.new = function(types, cb) return mock_trap end
-
-		local Bridge = helpers.load_with_stubs("modules.keymap.llm_bridge")
-
-		-- Arm the trap by simulating what tooltip.set_on_show_callback does
-		-- (it stores arm_escape_trap as a callback; we fire it via the stub)
+		-- Intercept tooltip before the module loads so the module-level wiring
+		-- binds to our stub instead of the real tooltip.
 		local show_cb = nil
 		local orig_tooltip = package.loaded["lib.tooltip"] or {}
 		local orig_set_on_show = orig_tooltip.set_on_show_callback
 		orig_tooltip.set_on_show_callback = function(cb) show_cb = cb end
 		package.loaded["lib.tooltip"] = orig_tooltip
 
-		-- Reload so the module-level wiring runs with our intercepted tooltip
+		-- Load the module — module-level code runs and calls
+		-- tooltip.set_on_show_callback(arm_escape_trap), storing arm_escape_trap in show_cb.
 		package.loaded["modules.keymap.llm_bridge"] = nil
-		Bridge = helpers.load_with_stubs("modules.keymap.llm_bridge")
+		local Bridge = helpers.load_with_stubs("modules.keymap.llm_bridge")
+
+		-- Intercept hs.eventtap.new on the CURRENT _G.hs (replaced by load_with_stubs above).
+		-- Must happen after the reload so the module's arm_escape_trap() closure uses
+		-- this interception rather than the previous stub instance.
+		local trap_stopped = false
+		local mock_trap    = {
+			start  = function(self) return self end,
+			stop   = function(self) trap_stopped = true end,
+		}
+		local orig_eventtap_new = hs.eventtap.new
+		hs.eventtap.new = function(types, cb) return mock_trap end
 
 		-- Trigger arm_escape_trap() via the stored show callback
 		if type(show_cb) == "function" then

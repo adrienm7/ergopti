@@ -551,12 +551,16 @@ do
 end
 
 local toml_set = {}
-for fname in hs.fs.dir(hotstrings_dir) do
-	-- Skip manifest/index files (prefixed with _) — they are metadata, not hotstring groups
-	if fname:match("%.toml$") and not fname:match("^_") then
-		local stem = fname:match("^(.-)%.toml$")
-		if stem and not HOTSTRINGS_EXCLUDED_STEMS[stem] then
-			toml_set[stem] = fname
+-- hs.fs.dir() throws on inaccessible/deleted directories; wrap in pcall
+local ok_toml_iter, toml_dir_iter = pcall(hs.fs.dir, hotstrings_dir)
+if ok_toml_iter and toml_dir_iter then
+	for fname in toml_dir_iter do
+		-- Skip manifest/index files (prefixed with _) — they are metadata, not hotstring groups
+		if fname:match("%.toml$") and not fname:match("^_") then
+			local stem = fname:match("^(.-)%.toml$")
+			if stem and not HOTSTRINGS_EXCLUDED_STEMS[stem] then
+				toml_set[stem] = fname
+			end
 		end
 	end
 end
@@ -667,17 +671,21 @@ do
 		if not (ok_attr and type(attr) == "table" and attr.mode == "directory") then return end
 
 		local items = {}
-		for fname in hs.fs.dir(dir) do
-			if fname ~= "." and fname ~= ".." and not fname:match("^_") then
-				local fpath = dir .. "/" .. fname
-				local ok_a, a = pcall(hs.fs.attributes, fpath)
-				if ok_a and type(a) == "table" then
-					if a.mode == "directory" then
-						table.insert(items, { type = "dir", name = fname, path = fpath })
-					elseif a.mode == "file" and fname:match("%.toml$") and (prefix ~= "" or fname ~= "personal_hotstrings.toml") then
-						local stem = fname:match("^(.-)%.toml$")
-						if stem and stem ~= "" then
-							table.insert(items, { type = "file", name = fname, stem = stem, path = fpath })
+		-- hs.fs.dir() throws on inaccessible/deleted directories; wrap in pcall
+		local ok_scan_iter, scan_dir_iter = pcall(hs.fs.dir, dir)
+		if ok_scan_iter and scan_dir_iter then
+			for fname in scan_dir_iter do
+				if fname ~= "." and fname ~= ".." and not fname:match("^_") then
+					local fpath = dir .. "/" .. fname
+					local ok_a, a = pcall(hs.fs.attributes, fpath)
+					if ok_a and type(a) == "table" then
+						if a.mode == "directory" then
+							table.insert(items, { type = "dir", name = fname, path = fpath })
+						elseif a.mode == "file" and fname:match("%.toml$") and (prefix ~= "" or fname ~= "personal_hotstrings.toml") then
+							local stem = fname:match("^(.-)%.toml$")
+							if stem and stem ~= "" then
+								table.insert(items, { type = "file", name = fname, stem = stem, path = fpath })
+							end
 						end
 					end
 				end
@@ -841,19 +849,22 @@ do
 		w:start()
 		table.insert(_G.script_watchers, w)
 
-		for fname in hs.fs.dir(dir) do
-			if fname ~= "." and fname ~= ".." then
-				local path = dir .. "/" .. fname
-				local ok_a, a = pcall(hs.fs.attributes, path)
-				if ok_a and type(a) == "table" then
-					if a.mode == "directory" then
-						watch_personal_hotstrings_dir(path)
-					elseif a.mode == "file" and fname:match("%.toml$") then
-						local fw = hs.pathwatcher.new(path, function()
-							schedule_reload(i18n.get("init.reload_hotstrings"))
-						end)
-						fw:start()
-						table.insert(_G.script_watchers, fw)
+		local ok_watch_iter, watch_dir_iter = pcall(hs.fs.dir, dir)
+		if ok_watch_iter and watch_dir_iter then
+			for fname in watch_dir_iter do
+				if fname ~= "." and fname ~= ".." then
+					local path = dir .. "/" .. fname
+					local ok_a, a = pcall(hs.fs.attributes, path)
+					if ok_a and type(a) == "table" then
+						if a.mode == "directory" then
+							watch_personal_hotstrings_dir(path)
+						elseif a.mode == "file" and fname:match("%.toml$") then
+							local fw = hs.pathwatcher.new(path, function()
+								schedule_reload(i18n.get("init.reload_hotstrings"))
+							end)
+							fw:start()
+							table.insert(_G.script_watchers, fw)
+						end
 					end
 				end
 			end
@@ -888,16 +899,18 @@ do
 	-- ==================================
 
 	-- Safety net for in-place edits that directory watchers may miss
-	for fname in hs.fs.dir(hotstrings_dir) do
-		if fname:match("%.toml$") or fname:match("_index%.json$") then
-			local w = hs.pathwatcher.new(hotstrings_dir .. fname, function()
-				schedule_reload(i18n.get("init.reload_hotstrings"))
-			end)
-			w:start()
-			table.insert(_G.script_watchers, w)
+	local ok_per_file_iter, per_file_iter = pcall(hs.fs.dir, hotstrings_dir)
+	if ok_per_file_iter and per_file_iter then
+		for fname in per_file_iter do
+			if fname:match("%.toml$") or fname:match("_index%.json$") then
+				local w = hs.pathwatcher.new(hotstrings_dir .. fname, function()
+					schedule_reload(i18n.get("init.reload_hotstrings"))
+				end)
+				w:start()
+				table.insert(_G.script_watchers, w)
+			end
 		end
 	end
-end
 
 
 
