@@ -265,6 +265,14 @@ shortcuts.start()
 Logger.info(LOG, "Main modules initialized successfully.")
 Boot.mark("Gestures + shortcuts pre-start")
 
+-- Fast-path LLM check: if LLM is explicitly disabled in hs.settings, skip the
+-- synchronous MLX cleanup (lsof + curl) — its sole consumer is the warmup retry
+-- loop which is also gated on LLM being enabled. When the setting is nil (user
+-- has never set it), be conservative and run the cleanup so stale servers are
+-- evicted regardless. The full boot_llm_enabled computation (including TOML/
+-- defaults fallback) runs later and shadows this variable for all subsequent code.
+local boot_llm_enabled = hs.settings.get("llm.enabled") ~= false
+
 -- Hammerspoon does not always reap children on quit/reload, so a fresh boot can
 -- find leftover mlx_lm.server processes from previous sessions. When SEVERAL still
 -- listen on the same port, the kernel load-balances /v1/models between them via
@@ -280,6 +288,7 @@ Boot.mark("Gestures + shortcuts pre-start")
 -- unreliable to single out (bash wrapper vs Python child — see api_mlx.lua), so we
 -- never pick individual PIDs. Synchronous on purpose: the port state must settle
 -- before the warmup retry loop fires its first probe.
+if boot_llm_enabled then
 do
 	local ok_mlx, ApiMlx = pcall(require, "modules.llm.api_mlx")
 	-- The MLX port is owned by api_mlx (shared/llm/mlx_server.json = 3460). Prefer
@@ -311,6 +320,7 @@ do
 		tostring(ok), (out or ""):gsub("\n", " | "))
 end
 
+end -- if boot_llm_enabled
 Boot.mark("MLX server cleanup")
 
 -- Background deps check for the active LLM backend. The detector picks
