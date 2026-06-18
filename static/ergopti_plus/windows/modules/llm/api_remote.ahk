@@ -145,15 +145,16 @@ LLM_RemoteGenerate_Async(Entry, SystemPrompt, FullText, Temperature, on_success,
     }
 
     _LLMRemote_TrimAsyncRegistry()
-    ; Compute the absolute-time deadline so the poll loop can self-cancel when
-    ; WinHTTP silently stalls (CDN silent drop, network change mid-request).
+    ; Record the start tick and timeout duration so the poll loop can self-cancel
+    ; when WinHTTP silently stalls (CDN silent drop, network change mid-request).
+    ; Uses wrap-safe elapsed-delta arithmetic via _LLM_DeadlineExpired.
     ; Falls back to 30 s when LLM_REMOTE_TIMEOUT_MS is still the 0 sentinel.
-    deadline_ms := (LLM_REMOTE_TIMEOUT_MS > 0) ? LLM_REMOTE_TIMEOUT_MS : 30000
+    timeout_ms := (LLM_REMOTE_TIMEOUT_MS > 0) ? LLM_REMOTE_TIMEOUT_MS : 30000
     _LLM_Remote_Async[req_id] := Map(
         "http", http, "format", resolved["Format"],
         "model_id_at_dispatch", resolved["Model"],
         "on_success", on_success, "on_fail", on_fail, "cancelled", false,
-        "deadline_tick", A_TickCount + deadline_ms)
+        "start_tick", A_TickCount, "timeout_ms", timeout_ms)
     _LLMRemote_PollRequest(req_id)
     return req_id
 }
@@ -194,10 +195,11 @@ _LLMRemote_PollRequest(req_id) {
         _LLM_Remote_Async.Delete(req_id)
         return
     }
-    ; Absolute-time deadline guard: if the response never arrives (CDN silent
-    ; drop, network change mid-request), the poll loop would run forever without
-    ; this cap. Calls on_fail() and cleans up so callers never hang indefinitely.
-    if (entry.Has("deadline_tick") and A_TickCount >= entry["deadline_tick"]) {
+    ; Wrap-safe deadline guard: if the response never arrives (CDN silent drop,
+    ; network change mid-request), the poll loop would run forever without this
+    ; cap. Uses elapsed-delta arithmetic via _LLM_DeadlineExpired so the guard
+    ; remains correct across the 32-bit A_TickCount wrap (~49.7 days uptime).
+    if (entry.Has("start_tick") and entry.Has("timeout_ms") and _LLM_DeadlineExpired(entry["start_tick"], entry["timeout_ms"])) {
         on_fail := entry["on_fail"]
         ; Abort the stalled request so the COM object + socket are released now
         ; rather than lingering until WinHTTP's internal receive timeout fires.
@@ -449,25 +451,26 @@ LLM_RemoteIsReady_Async(Entry, on_result) {
         try on_result(false)
         return
     }
-    _LLMRemote_PollReady(Http, on_result, A_TickCount + LLM_REMOTE_READY_PING_DEADLINE_MS)
+    _LLMRemote_PollReady(Http, on_result, A_TickCount, LLM_REMOTE_READY_PING_DEADLINE_MS)
 }
 
 ; Polling tick for LLM_RemoteIsReady_Async. Re-arms itself on a relaxed cadence
-; until the response is ready or the absolute-time deadline passes, then aborts
-; the in-flight request and reports the result exactly once.
-_LLMRemote_PollReady(Http, on_result, deadline_tick) {
+; until the response is ready or the elapsed time exceeds timeout_ms, then aborts
+; the in-flight request and reports the result exactly once. Uses wrap-safe
+; elapsed-delta arithmetic via _LLM_DeadlineExpired.
+_LLMRemote_PollReady(Http, on_result, start_tick, timeout_ms) {
     global LLM_REMOTE_READY_PING_POLL_MS
     ready := false
     try ready := Http.WaitForResponse(0)
     if !ready {
-        if (A_TickCount >= deadline_tick) {
+        if _LLM_DeadlineExpired(start_tick, timeout_ms) {
             ; Abort the stalled request so the COM object + socket are released
             ; now rather than lingering until WinHTTP's own timeout fires.
             try Http.Abort()
             try on_result(false)
             return
         }
-        SetTimer(() => _LLMRemote_PollReady(Http, on_result, deadline_tick), -LLM_REMOTE_READY_PING_POLL_MS)
+        SetTimer(() => _LLMRemote_PollReady(Http, on_result, start_tick, timeout_ms), -LLM_REMOTE_READY_PING_POLL_MS)
         return
     }
     status := 0
