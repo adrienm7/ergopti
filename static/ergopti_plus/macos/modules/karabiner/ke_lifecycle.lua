@@ -132,6 +132,7 @@ if /usr/bin/sudo -n true 2>/dev/null; then
 fi
 /usr/bin/pkill -f "org.pqrs|karabiner|Karabiner" 2>/dev/null || true
 /bin/rm -f /tmp/ergopti_ke_primed_v2.txt /tmp/ergopti_ke_hs_owner_v1.txt 2>/dev/null || true
+/bin/rm -f "$0" 2>/dev/null || true
 exit 0
 ]]
 
