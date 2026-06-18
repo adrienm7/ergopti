@@ -186,6 +186,8 @@ SQLite_Exec(db, sql, YieldOps := 0) {
             ; Surface the SQLite error so callers can diagnose schema mismatches
             ; rather than silently receiving an empty result set.
             try LoggerError("sqlite3", "sqlite3_prepare_v2 failed (rc={1}): {2}", rc, SQLite_LastError(db))
+            if (YieldOps > 0)
+                DllCall(SQLiteConst.DLL . "\sqlite3_progress_handler", "Ptr", db, "Int", 0, "Ptr", 0, "Ptr", 0)
             return false
         }
         if pstmt {
@@ -242,8 +244,11 @@ SQLite_Query(db, sql, YieldOps := 0) {
         "Ptr", 0,
         "Int")
     pstmt := NumGet(pstmt_buf, 0, "Ptr")
-    if (rc != SQLiteConst.OK || !pstmt)
+    if (rc != SQLiteConst.OK || !pstmt) {
+        if (YieldOps > 0)
+            DllCall(SQLiteConst.DLL . "\sqlite3_progress_handler", "Ptr", db, "Int", 0, "Ptr", 0, "Ptr", 0)
         return out
+    }
 
     ; Cache column names once — sqlite3_column_name returns a UTF-8 ptr
     ; whose lifetime is tied to the statement, so it is safe to reuse
