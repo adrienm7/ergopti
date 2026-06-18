@@ -113,6 +113,7 @@ TimerEvery(IntervalSec, Fn) {
 }
 
 ; Cancels a previously scheduled timer. Safe to call on a nil or already-fired handle.
+; Also cancels any pending re-queue timer created when the script was suspended.
 ; @param Handle {Map|0} Token returned by TimerAfter or TimerEvery.
 TimerCancel(Handle) {
 	global _TIMER_ADAPTER_REGISTRY
@@ -121,6 +122,12 @@ TimerCancel(Handle) {
 	BoundFn := Handle.Has("Fn") ? Handle["Fn"] : 0
 	if BoundFn != 0
 		SetTimer(BoundFn, 0)
+	; Cancel any re-queued one-shot timer that was created during a suspend window.
+	; Without this, the re-queued timer has no reference and fires indefinitely after
+	; the original handle is cancelled.
+	RequeuedFn := Handle.Has("RequeuedFn") ? Handle["RequeuedFn"] : 0
+	if RequeuedFn != 0
+		SetTimer(RequeuedFn, 0)
 	Handle["Fired"] := true
 	Id := Handle.Has("Id") ? Handle["Id"] : 0
 	if Id != 0 and _TIMER_ADAPTER_REGISTRY.Has(Id)
@@ -169,10 +176,17 @@ _TimerAdapterMakeOneShot(Handle, Fn) {
 			; while the script is suspended (timer-scheduler-oneshot-suspend fix).
 			; The registry entry is intentionally kept intact until the callback
 			; actually fires.
+			; Store the re-queued closure in the handle so TimerCancel can reach it
+			; and cancel it if the caller cancels before the suspend window lifts.
 			requeued := _OneShot.Bind(BoundHandle, BoundFn)
+			BoundHandle["RequeuedFn"] := requeued
 			SetTimer(requeued, -500)
 			return
 		}
+		; Clear any stored re-queue reference now that we are actually firing,
+		; so TimerCancel does not attempt a redundant SetTimer(fn, 0) call.
+		if BoundHandle.Has("RequeuedFn")
+			BoundHandle.Delete("RequeuedFn")
 		global _TIMER_ADAPTER_REGISTRY
 		BoundHandle["Fired"] := true
 		Id := BoundHandle.Has("Id") ? BoundHandle["Id"] : 0
