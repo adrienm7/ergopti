@@ -58,6 +58,12 @@ local WARMUP_RETRY_CAP_SEC  = Timings.sec("llm", "warmup_retry_cap_ms")
 local _core_llm        = nil
 local _get_llm_enabled = nil
 
+-- Monotonic generation counter. Incremented each time a new retry chain is
+-- started (or M.stop() is called). Closures capture their own my_gen and
+-- bail out when they discover the global has moved on, ensuring at most one
+-- live retry chain at any given time.
+local _warmup_gen = 0
+
 
 -- =====================================
 -- =====================================
@@ -103,10 +109,16 @@ function M.schedule_warmup_with_retry(reason)
 		Logger.debug(LOG, "%s: warmup skipped — backend model not resolved yet.", reason)
 		return
 	end
-	Logger.debug(LOG, "Scheduling warmup for '%s' in %.0fs (from %s).",
-		resolved, WARMUP_INITIAL_DELAY_SEC, reason)
+	-- Bump the generation counter to cancel any in-flight retry chain from a
+	-- previous call (e.g. a toggle or model switch that arrived before ready).
+	_warmup_gen = _warmup_gen + 1
+	local my_gen = _warmup_gen
+	Logger.debug(LOG, "Scheduling warmup for '%s' in %.0fs (from %s, gen=%d).",
+		resolved, WARMUP_INITIAL_DELAY_SEC, reason, my_gen)
 
 	local function try_warmup(current_interval)
+		-- Stale chain — a newer schedule_warmup_with_retry or M.stop() arrived
+		if my_gen ~= _warmup_gen then return end
 		if not _get_llm_enabled() then
 			Logger.debug(LOG, "[WARMUP-LOOP] LLM disabled — stopping retry chain.")
 			return
@@ -144,6 +156,13 @@ end
 -- ======= 5/ Module Lifecycle ================
 -- ============================================
 -- ============================================
+
+--- Cancels the currently active retry chain, if any.
+--- Safe to call before M.init() or when no chain is running.
+function M.stop()
+	_warmup_gen = _warmup_gen + 1
+	Logger.debug(LOG, "Warmup retry chain cancelled (gen bumped to %d).", _warmup_gen)
+end
 
 --- Initializes the warmup controller with its required dependencies.
 --- Must be called exactly once before schedule_warmup_with_retry.
