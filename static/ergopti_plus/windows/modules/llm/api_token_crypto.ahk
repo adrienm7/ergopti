@@ -138,18 +138,18 @@ _LLM_DPAPI_Protect(cleartext) {
 	; Strip the trailing null StrPut wrote — DPAPI doesn't care about it
 	; and excluding it makes the round-tripped string exact.
 	in_size := bytes.Size - 1
-	in_blob := Buffer(8 + A_PtrSize, 0)
+	in_blob := Buffer(4 + A_PtrSize, 0)
 	NumPut("UInt", in_size, in_blob, 0)
-	NumPut("Ptr",  bytes.Ptr, in_blob, 8)
+	NumPut("Ptr",  bytes.Ptr, in_blob, A_PtrSize)  ; pbData follows cbData at native pointer alignment
 
 	ent := Buffer(StrPut(LLM_API_TOKEN_DPAPI_ENTROPY, "UTF-8"))
 	StrPut(LLM_API_TOKEN_DPAPI_ENTROPY, ent, "UTF-8")
 	ent_size := ent.Size - 1
-	ent_blob := Buffer(8 + A_PtrSize, 0)
+	ent_blob := Buffer(4 + A_PtrSize, 0)
 	NumPut("UInt", ent_size, ent_blob, 0)
-	NumPut("Ptr",  ent.Ptr,  ent_blob, 8)
+	NumPut("Ptr",  ent.Ptr,  ent_blob, A_PtrSize)
 
-	out_blob := Buffer(8 + A_PtrSize, 0)
+	out_blob := Buffer(4 + A_PtrSize, 0)
 	; CRYPTPROTECT_UI_FORBIDDEN = 0x1 — never prompt the user.
 	ok := DllCall("Crypt32\CryptProtectData",
 		"Ptr",  in_blob.Ptr,
@@ -164,7 +164,7 @@ _LLM_DPAPI_Protect(cleartext) {
 		return ""
 
 	out_size := NumGet(out_blob, 0, "UInt")
-	out_ptr  := NumGet(out_blob, 8, "Ptr")
+	out_ptr  := NumGet(out_blob, A_PtrSize, "Ptr")
 	if (out_size == 0 or out_ptr == 0)
 		return ""
 
@@ -181,18 +181,18 @@ _LLM_DPAPI_Unprotect(b64) {
 	if (in_buf == "" or in_buf.Size == 0)
 		return ""
 
-	in_blob := Buffer(8 + A_PtrSize, 0)
+	in_blob := Buffer(4 + A_PtrSize, 0)
 	NumPut("UInt", in_buf.Size, in_blob, 0)
-	NumPut("Ptr",  in_buf.Ptr,  in_blob, 8)
+	NumPut("Ptr",  in_buf.Ptr,  in_blob, A_PtrSize)
 
 	ent := Buffer(StrPut(LLM_API_TOKEN_DPAPI_ENTROPY, "UTF-8"))
 	StrPut(LLM_API_TOKEN_DPAPI_ENTROPY, ent, "UTF-8")
 	ent_size := ent.Size - 1
-	ent_blob := Buffer(8 + A_PtrSize, 0)
+	ent_blob := Buffer(4 + A_PtrSize, 0)
 	NumPut("UInt", ent_size, ent_blob, 0)
-	NumPut("Ptr",  ent.Ptr,  ent_blob, 8)
+	NumPut("Ptr",  ent.Ptr,  ent_blob, A_PtrSize)
 
-	out_blob := Buffer(8 + A_PtrSize, 0)
+	out_blob := Buffer(4 + A_PtrSize, 0)
 	ok := DllCall("Crypt32\CryptUnprotectData",
 		"Ptr",  in_blob.Ptr,
 		"Ptr",  0,
@@ -206,7 +206,7 @@ _LLM_DPAPI_Unprotect(b64) {
 		return ""
 
 	out_size := NumGet(out_blob, 0, "UInt")
-	out_ptr  := NumGet(out_blob, 8, "Ptr")
+	out_ptr  := NumGet(out_blob, A_PtrSize, "Ptr")
 	if (out_size == 0 or out_ptr == 0)
 		return ""
 

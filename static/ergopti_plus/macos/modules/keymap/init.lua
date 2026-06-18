@@ -748,6 +748,11 @@ local function onKeyDownRaw(e)
 		elseif dt < 0.02 then
 			-- Tolerance window for macOS UTF-8 multi-event decomposition / regrouping.
 			return false
+		else
+			-- A real keystroke arrived > 20 ms after the arm and does not match the head
+			-- of the synthetic buffer — the buffer is stale. Purge it so future real
+			-- keystrokes are not silently absorbed by an expired synthetic expectation.
+			CoreState.expected_synthetic_chars = ""
 		end
 	end
 

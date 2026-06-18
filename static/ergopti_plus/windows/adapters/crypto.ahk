@@ -52,7 +52,7 @@ CryptoSha256(Data) {
         stream.Type     := 2   ; text mode — write the string
         stream.Charset  := "utf-8"
         stream.WriteText(Data)
-        stream.Position := 0
+        stream.Position := 3   ; skip the 3-byte UTF-8 BOM ADODB.Stream prepends when Charset := "utf-8"
         stream.Type     := 1   ; binary mode — read back as byte array
         raw := stream.Read()
         stream.Close()

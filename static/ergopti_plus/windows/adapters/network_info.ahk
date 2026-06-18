@@ -54,13 +54,14 @@ global NI_WLAN_MAX_SSID_LEN                   := 32
 ; Guards against a truncated WlanQueryInterface result before NumGet'ing +576.
 global NI_WLAN_MIN_CONN_ATTR_SIZE             := 580
 
-; IP_ADAPTER_ADDRESSES offsets on 64-bit Windows (v1 base structure)
-global NI_ADAPTER_OFFSET_OPER_STATUS          := 56   ; IF_OPER_STATUS field
-; IP_ADAPTER_ADDRESSES x64 layout: 9 × 8-byte Ptr fields before FriendlyName
-; (Next, AdapterName, FirstUnicast, FirstAnycast, FirstMulticast, FirstDnsServer,
-;  DnsSuffix, Description, FriendlyName) = offset 72, NOT 64.
-global NI_ADAPTER_OFFSET_FRIENDLY_NAME        := 72   ; PWCHAR FriendlyName
-global NI_ADAPTER_OFFSET_NEXT                 := 8    ; PIP_ADAPTER_ADDRESSES Next
+; IP_ADAPTER_ADDRESSES offsets — architecture-dependent.
+; x64 layout: ULONG(4)+IfIndex(4)+8ptr×Next+AdapterName+…+DnsSuffix+Description = 56 (DnsSuffix ptr),
+;             +8 = 64 (Description ptr), +8 = 72 (FriendlyName ptr),
+;             then PhysicalAddress[8]+PhysicalAddressLength(4)+Flags(4)+Mtu(4)+IfType(4)+OperStatus(4) = offset 104.
+; x86 layout: pointers are 4 bytes; OperStatus is at offset 68, FriendlyName at 40.
+global NI_ADAPTER_OFFSET_OPER_STATUS          := (A_PtrSize == 8) ? 104 : 68   ; IF_OPER_STATUS field
+global NI_ADAPTER_OFFSET_FRIENDLY_NAME        := (A_PtrSize == 8) ? 72  : 40   ; PWCHAR FriendlyName
+global NI_ADAPTER_OFFSET_NEXT                 := 8    ; PIP_ADAPTER_ADDRESSES Next (same on x86/x64)
 
 ; GetAdaptersAddresses flags (skip address lists we do not need)
 global NI_GAA_FLAG_SKIP_UNICAST               := 0x0001
