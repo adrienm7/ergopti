@@ -40,15 +40,32 @@ if Features["shortcuts"]["paste_without_formatting"] {
     ; would break the user's expected workflow).
     AddShortcut("^+", "v", PasteWithoutFormatting)
 
+    ; Deferred clipboard restore for PasteWithoutFormatting. Runs on a negative-delay
+    ; SetTimer so the synthetic ^v has already consumed the coerced text before the
+    ; user's original (possibly non-text) clipboard is put back.
+    _PasteWithoutFormattingRestore(OldClip) {
+        A_Clipboard := OldClip
+    }
+
     PasteWithoutFormatting(*) {
         if not WinActive("ahk_exe EXCEL.EXE") {
             ; Strip rich formatting only when the clipboard holds text. CB_Read()
             ; returns "" for non-text payloads (image/file list); the self-assign
             ; round-trip on those would destroy them, so we skip the strip and
             ; paste the content as-is instead.
-            if CB_Read() != ""
+            if CB_Read() != "" {
+                ; Snapshot the FULL clipboard (all formats) before coercing to
+                ; plain text. A_Clipboard := A_Clipboard keeps only the text form,
+                ; silently dropping any image/HTML/RTF the user may still want, so
+                ; we restore the original after the paste settles -- mirroring
+                ; GesturePastePlain's save/paste/deferred-restore guarantee.
+                OldClip := ClipboardAll()
                 A_Clipboard := A_Clipboard
-            SendFinalResult("^v")
+                SendFinalResult("^v")
+                SetTimer(_PasteWithoutFormattingRestore.Bind(OldClip), -SEND_INSTANT_PASTE_DELAY_MS)
+            } else {
+                SendFinalResult("^v")
+            }
         } else {
             SendFinalResult("^+v")
         }
