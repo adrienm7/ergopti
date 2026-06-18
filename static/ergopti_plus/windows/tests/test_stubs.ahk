@@ -683,11 +683,20 @@ KL_ClearSynthetic(*) {
 ; the test runner). The test stub does a direct write without the rename dance;
 ; atomicity is not required in a single-process test environment.
 KL_WriteAtomic(path, content) {
-    f := FileOpen(path, "w", "UTF-8")
-    if !f
-        throw Error("KL_WriteAtomic stub: cannot open " . path)
-    f.Write(content)
-    f.Close()
+    try FileDelete(path)
+    FileAppend(content, path, "UTF-8")
+}
+
+; Array join helper — in production lives in keylogger.ahk (not included).
+; Concatenates array elements with sep between each pair.
+KL_JoinArray(arr, sep) {
+    out := ""
+    for i, v in arr {
+        if (i > 1)
+            out .= sep
+        out .= v
+    }
+    return out
 }
 
 ; Minimal flat JSON object decoder — in production lives in keylogger.ahk.
