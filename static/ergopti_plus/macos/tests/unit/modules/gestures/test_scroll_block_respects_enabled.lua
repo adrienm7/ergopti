@@ -53,16 +53,25 @@ helpers.describe("gestures.engine scroll-block — respects enabled flag (gestur
 		-- The n == 0 branch must call stopScrollBlock() unconditionally so the block
 		-- is always released when fingers lift, regardless of enabled state.
 		-- We verify by finding stopScrollBlock at line context where n == 0 is checked.
+		-- NOTE: search from n0_pos, not from 1, because stopScrollBlock is also defined
+		-- as a local function earlier in the file; we need the CALL SITE inside the block.
 		local n0_pos  = src:find("if n == 0 then", 1, true)
-		local stop_pos = src:find("stopScrollBlock()", 1, true)
 		helpers.assert_true(n0_pos ~= nil, "n == 0 branch must exist")
-		helpers.assert_true(stop_pos ~= nil, "stopScrollBlock() must exist")
-		helpers.assert_true(stop_pos > n0_pos,
-			"stopScrollBlock() must appear after the n == 0 block begins")
-		-- The stop call must not be behind an enabled guard.
-		local guarded_stop = src:find("_state%.enabled.*stopScrollBlock", 1, false)
-		helpers.assert_true(guarded_stop == nil,
-			"stopScrollBlock() must NOT be guarded by _state.enabled — it must always release the block")
+		local stop_pos = src:find("stopScrollBlock()", n0_pos, true)
+		helpers.assert_true(stop_pos ~= nil,
+			"stopScrollBlock() must be called within the n == 0 block")
+		-- The stop call must not be behind an enabled guard. Scan line by line to avoid
+		-- Lua's cross-line '.' matching: we want to verify no SINGLE LINE has both
+		-- _state.enabled and stopScrollBlock together.
+		local guarded_stop_line = nil
+		for line in src:gmatch("[^\n]+") do
+			if line:find("_state%.enabled", 1, false) and line:find("stopScrollBlock", 1, true) then
+				guarded_stop_line = line
+				break
+			end
+		end
+		helpers.assert_true(guarded_stop_line == nil,
+			"stopScrollBlock() must NOT be on the same line as an _state.enabled check")
 	end)
 
 end)
