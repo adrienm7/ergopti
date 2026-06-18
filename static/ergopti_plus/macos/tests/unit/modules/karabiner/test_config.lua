@@ -5,13 +5,20 @@
 --- DESCRIPTION:
 --- Validates the data shaping helpers in karabiner/config.lua: building the
 --- default state, computing the non-canonical combo set, and the user-config
---- migration logic for legacy combo formats.
+--- migration logic for legacy combo formats and new-key seeding.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
 
 package.loaded["lib.logger"] = nil
 local _ = helpers.load_with_stubs("lib.logger")
+
+-- toml_codec is a native C library not available in the headless test runner;
+-- stub it out so the module loads without crashing. _load_toml_file is then
+-- monkey-patched per test where TOML parsing matters.
+local _toml_stub = { encode = function() return "" end, decode = function() return {} end }
+package.loaded["toml_codec"]     = _toml_stub
+package.loaded["lib.toml_codec"] = _toml_stub
 
 local Config = helpers.load_with_stubs("modules.karabiner.config")
 
@@ -103,6 +110,55 @@ end)
 -- ======= 2/ compute_non_canonical =========
 -- =========================================
 -- =========================================
+
+-- karabiner-gen-2 regression: new tap/hold keys added after a user saved their
+-- config must be seeded from Defaults, not silently left as nil/none.
+helpers.describe("Config.load_user_config — new tap/hold key seeding (karabiner-gen-2)", function()
+	helpers.it("seeds a new tap/hold key from Defaults when it is absent from the saved config", function()
+		-- Monkey-patch _load_toml_file to return a persisted config that only
+		-- knows about "escape" — "caps_lock" was added in a later release.
+		local original_load = Config._load_toml_file
+		Config._load_toml_file = function(_path)
+			return {
+				tap_holds = {
+					timeout_ms           = 200,
+					sticky_timeout_ms    = 500,
+					config               = { escape = { tap = "escape", hold = "escape" } },
+				},
+				mod_combos = { simultaneous_threshold_ms = 50, config = {} },
+			}
+		end
+
+		local tap_hold_keys = {
+			{ id = "escape",    label = "Esc" },
+			{ id = "caps_lock", label = "Caps" },  -- new key not in the saved config
+		}
+
+		local state = Config.load_user_config(tap_hold_keys, {}, "/fake/path.toml")
+
+		-- Restore original function
+		Config._load_toml_file = original_load
+
+		-- The saved key must still be intact
+		helpers.assert_eq(state.tap_hold_config.escape.tap, "escape")
+
+		-- The new key must be seeded — it comes from Defaults.tap_hold["caps_lock"]
+		-- or falls back to "none"/"none" if not listed, but must NOT be nil.
+		helpers.assert_true(
+			state.tap_hold_config.caps_lock ~= nil,
+			"New tap/hold key 'caps_lock' must be seeded from defaults, not nil (karabiner-gen-2)"
+		)
+		helpers.assert_true(
+			type(state.tap_hold_config.caps_lock.tap) == "string",
+			"Seeded tap/hold 'caps_lock' must have a string .tap field (karabiner-gen-2)"
+		)
+		helpers.assert_true(
+			type(state.tap_hold_config.caps_lock.hold) == "string",
+			"Seeded tap/hold 'caps_lock' must have a string .hold field (karabiner-gen-2)"
+		)
+	end)
+end)
+
 
 helpers.describe("Config.compute_non_canonical_combos", function()
 	helpers.it("returns empty when no reverse pairs exist", function()
