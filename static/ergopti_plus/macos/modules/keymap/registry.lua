@@ -1163,7 +1163,10 @@ function M.update_trigger_char(char)
 			local new_tr = base .. char
 			m.trigger             = new_tr
 			m.trigger_bytes       = #new_tr
-			m.tail_char           = tail_codepoint(new_tr):lower()
+			-- trig_lower (not ASCII :lower()) is required here so that accented
+			-- capital tails ("Ê") are lowercased to "ê" — matching the trig_lower
+			-- used at add_raw() time and in mappings_for_tail bucket lookup.
+			m.tail_char           = text_utils.trig_lower(tail_codepoint(new_tr))
 			m.tlen                = text_utils.utf8_len(new_tr)
 			m.has_magic           = true
 			m.star_base           = base
