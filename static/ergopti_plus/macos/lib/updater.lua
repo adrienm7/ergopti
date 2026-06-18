@@ -120,7 +120,11 @@ function M.compare_versions(a, b)
 	if not pa or not pb then
 		local na, nb = M.normalize_tag(a), M.normalize_tag(b)
 		if na == nb then return 0 end
-		return na > nb and 1 or -1
+		-- Non-semver fallback: lexicographic comparison is wrong for tags like
+		-- "10" vs "9". Treat ambiguous ordering as non-newer (fail-closed) and
+		-- warn so the issue is visible.
+		Logger.warn(LOG, "compare_versions: non-semver tags '%s'/'%s' — treating as equal.", na, nb)
+		return 0
 	end
 	if pa.major ~= pb.major then return pa.major > pb.major and 1 or -1 end
 	if pa.minor ~= pb.minor then return pa.minor > pb.minor and 1 or -1 end
