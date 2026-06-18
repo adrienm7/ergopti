@@ -402,8 +402,10 @@ function M.new(deps, presets, ram_getter)
 	--- @param target_model string The model to check.
 	--- @param on_success function Callback executed when ready.
 	--- @param on_cancel function Callback executed when cancelled.
-	function obj.check_requirements(target_model, on_success, on_cancel)
+	--- @param opts table|nil Options: `silent_notifications` (boolean) suppresses repair toasts.
+	function obj.check_requirements(target_model, on_success, on_cancel, opts)
 		if not target_model or target_model == "" then return end
+		local silent = type(opts) == "table" and opts.silent_notifications == true
 		Logger.debug(LOG, string.format("Checking Ollama requirements for %s…", target_model))
 		
 		ensure_ollama_running(function()
@@ -427,7 +429,9 @@ function M.new(deps, presets, ram_getter)
 					if type(on_success) == "function" then on_success() end
 				end, function(_, is_load_error)
 					if is_load_error and get_ollama_path() then
-						pcall(notifications.notify, i18n.get("ollama.model_repair_title"), string.format(i18n.get("ollama.model_repair"), target_model), "info")
+						if not silent then
+							pcall(notifications.notify, i18n.get("ollama.model_repair_title"), string.format(i18n.get("ollama.model_repair"), target_model), "info")
+						end
 						obj.pull_model(target_model, repo, on_success)
 						return
 					end
