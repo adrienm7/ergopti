@@ -1324,7 +1324,11 @@ _HCW_PatchTomlMeta(Path, Sec, Field, Value) {
 			NewContent .= "`n"
 		}
 	}
-	try FileOpen(Path, "w", "UTF-8").Write(NewContent)
+	try {
+		FileOpen(Path, "w", "UTF-8").Write(NewContent)
+	} catch as Err {
+		try LoggerError("HotstringsConfigWindow", "Failed to write TOML meta to '{1}': {2}.", Path, Err.Message)
+	}
 }
 
 ; Format a value for TOML output.
