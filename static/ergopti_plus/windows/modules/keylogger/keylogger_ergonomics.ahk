@@ -237,7 +237,7 @@ KL_Ergo_UpdateBlock(delay_ms, now, app, is_bs) {
         ))
     }
 
-    ; Flow detection — sustained WPM within the current block
+    ; Flow detection — sustained WPM within the current block (may emit flow_window_start via KL_Ergo_CheckFlow)
     KL_Ergo_CheckFlow(now, app)
 }
 

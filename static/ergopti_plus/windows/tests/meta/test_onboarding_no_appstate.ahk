@@ -75,7 +75,7 @@ Test("onboarding: _Onboarding_Commit does not access AppState (UnsetError crash 
 
 _ONA_CommitUsesStrictCanonGlobal() {
 	Src := _ONA_ReadSource("lib\onboarding.ahk")
-	Seg := _ONA_FuncBody(Src, "_Onboarding_Commit()")
+	Seg := _ONA_FuncBody(Src, "_Onboarding_Commit() {")
 	Assert(Seg != "", "_Onboarding_Commit declaration must exist in lib/onboarding.ahk")
 	; Must use the correct plain global instead of the removed Map entry
 	Assert(InStr(Seg, "_TOML_STRICT_CANON_IN_PROGRESS") > 0,
