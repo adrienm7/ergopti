@@ -47,7 +47,7 @@ helpers.describe("keylogger pause wiring — source-level invariant (e2e-pause-s
 		local fh = io.open(src_path, "r")
 		helpers.assert_true(fh ~= nil, "keylogger/init.lua must be readable at " .. tostring(src_path))
 		local src = fh:read("*a"); fh:close()
-		helpers.assert_true(src:find("_script_control%.is_paused", 1, true) ~= nil,
+		helpers.assert_true(src:find("_script_control.is_paused", 1, true) ~= nil,
 			"keylogger/init.lua must poll _script_control.is_paused — the real silence mechanism")
 	end)
 
