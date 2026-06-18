@@ -31,7 +31,7 @@ _PTME_PatchTomlMetaHasCatch() {
 	Src := _PTME_ReadSource("lib/hotstrings/hotstrings_config_window.ahk")
 	Assert(Src != "", "Source file hotstrings_config_window.ahk must exist")
 
-	Body := _PTME_FuncBody(Src, "_HCW_PatchTomlMeta(Path, TargetHeader, Field, Value) {")
+	Body := _PTME_FuncBody(Src, "_HCW_PatchTomlMeta(Path, Sec, Field, Value) {")
 	Assert(Body != "", "_HCW_PatchTomlMeta declaration must exist")
 
 	Assert(InStr(Body, "catch") > 0,

@@ -95,7 +95,7 @@ Test("keylogger: KL_AppendLog suspend guard includes _shutting_down bypass (kl-s
 
 _KSFS_IngestOnceGuardBypasses() {
 	Src := _KSFS_ReadSource("modules/keylogger/keylogger.ahk")
-	Body := _KSFS_FuncBody(Src, "KL_IngestOnce() {")
+	Body := _KSFS_FuncBody(Src, "KL_IngestOnce(force := false) {")
 	Assert(Body != "", "KL_IngestOnce() must exist in keylogger.ahk")
 	Assert(InStr(Body, "A_IsSuspended") > 0,
 		"KL_IngestOnce must still guard on A_IsSuspended (kl-stop-flush-defeated-by-suspend)")

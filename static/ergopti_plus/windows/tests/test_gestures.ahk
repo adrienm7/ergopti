@@ -123,6 +123,10 @@ TestGestures_NoneReturnsZero() {
 Test("Gestures: none action Fn returns 0", TestGestures_NoneReturnsZero)
 
 TestGestures_RegistrySizeMatchesNames() {
+    ; Ensure GESTURE_ACTION_NAMES is populated — SetTimer(-0) defers the
+    ; catalog load past the synchronous test phase in headless CI runners.
+    if (GESTURE_ACTION_NAMES.Length = 0)
+        _GestureLoadActionCatalog()
     ; Filter the visual sentinels from GESTURE_ACTION_NAMES before comparing
     ; with GESTURE_ACTIONS.Count � every real action must have exactly one
     ; entry in both lists, but separators and headers live only on the menu
