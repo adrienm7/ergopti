@@ -406,8 +406,11 @@ function M.show(opts)
 
         eval("resetUI()")
         eval(string.format("setKind(%s,null,null)", js_str(_kind)))
-        local safe = M._current_model:gsub("'", "\\'"):gsub("\"", "\\\"")
-        eval("setModel(\"" .. safe .. "\")")
+        -- _current_model is nil for bootstrap kinds (mlx_install, ollama_install)
+        if M._current_model then
+            local safe = M._current_model:gsub("'", "\\'"):gsub("\"", "\\\"")
+            eval("setModel(\"" .. safe .. "\")")
+        end
         return
     end
 
@@ -418,8 +421,10 @@ function M.show(opts)
     ensure_webview(i18n.get("mlx.download_title"))
 
     eval(string.format("setKind(%s,null,null)", js_str(_kind)))
-    local safe = M._current_model:gsub("'", "\\'"):gsub("\"", "\\\"")
-    eval("setModel(\"" .. safe .. "\")")
+    if M._current_model then
+        local safe = M._current_model:gsub("'", "\\'"):gsub("\"", "\\\"")
+        eval("setModel(\"" .. safe .. "\")")
+    end
 end
 
 --- Updates the UI with current download metrics. Download mode only.
