@@ -284,6 +284,14 @@ function M.estimate_position()
 	local caret = M.get_caret(5)
 	if not caret or not caret.active then return nil end
 
+	-- Guard required numeric fields: a POST body like {"active":true} without
+	-- line/visibleStartLine/character would throw on the arithmetic below.
+	if type(caret.line) ~= "number"
+		or type(caret.visibleStartLine) ~= "number"
+		or type(caret.character) ~= "number" then
+		return nil
+	end
+
 	local editor_frame = get_editor_ax_frame()
 	if not editor_frame then return nil end
 
