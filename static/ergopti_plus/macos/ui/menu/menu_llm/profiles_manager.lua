@@ -24,6 +24,10 @@ local LOG = "menu_llm.profiles"
 local ok_pe, prompt_editor = pcall(require, "ui.prompt_editor")
 if not ok_pe then prompt_editor = nil end
 
+-- Monotone counter to make profile ids unique even when two clones are
+-- created within the same second (os.time() resolution = 1s).
+local _profile_seq = 0
+
 
 
 
@@ -71,8 +75,11 @@ end
 --- @param src table The built-in profile to clone.
 local function clone_builtin_profile(deps, state, src)
 	if type(src) ~= "table" then return end
+	-- Unique id: seq suffix prevents collision when two profiles are cloned
+	-- within the same second (os.time() resolution = 1s).
+	_profile_seq = _profile_seq + 1
 	local copy = {
-		id                    = "user_" .. (src.id or "profile") .. "_" .. tostring(os.time()),
+		id                    = "user_" .. (src.id or "profile") .. "_" .. tostring(os.time()) .. "_" .. _profile_seq,
 		label                 = (src.label or src.id) .. " " .. i18n.get("menu.profiles.copy_suffix"),
 		system_single         = src.system_single or "",
 		system_multi          = src.system_multi or "",

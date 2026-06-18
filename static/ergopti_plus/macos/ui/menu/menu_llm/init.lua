@@ -128,6 +128,10 @@ local _llm_health_status = nil
 --- @param backend string "mlx" or "ollama".
 --- @param refresh_fn function Called with no args after the result is stored.
 local function probe_llm_health(backend, refresh_fn)
+	-- In API backend mode there is no local server to probe. Skip the health
+	-- check entirely to avoid lighting the orange "warming" indicator based on
+	-- a residual MLX server that happens to be listening on the same port.
+	if backend == "api" then return end
 	local url
 	if backend == "ollama" then
 		url = "http://127.0.0.1:11434/api/version"
