@@ -57,7 +57,7 @@ _ATG_FuncBodyStripped(Src, Decl) {
 _ATG_MetricsTicksGatedOnSuspend() {
 	Checks := Map(
 		"modules/keylogger/keylogger_sensors.ahk", "KL_Sensors_Tick()",
-		"modules/keylogger/keylogger.ahk",         "KL_IngestOnce()",
+		"modules/keylogger/keylogger.ahk",         "KL_IngestOnce(",
 		"modules/keylogger/keylogger_hook.ahk",    "KL_Hook_Tick()")
 	for RelPath, Decl in Checks {
 		Body := _ATG_FuncBodyStripped(_ATG_ReadSource(RelPath), Decl)
@@ -83,7 +83,7 @@ Test("metrics: the recurring keylogger/metrics ticks gate on A_IsSuspended (metr
 ; =========================================================
 
 _ATG_IngestDrainIsAtomic() {
-	Body := _ATG_FuncBodyStripped(_ATG_ReadSource("modules/keylogger/keylogger.ahk"), "KL_IngestOnce()")
+	Body := _ATG_FuncBodyStripped(_ATG_ReadSource("modules/keylogger/keylogger.ahk"), "KL_IngestOnce(")
 	Assert(Body != "", "KL_IngestOnce() must exist in keylogger.ahk")
 	Assert(InStr(Body, "Critical(") > 0,
 		"KL_IngestOnce must wrap the pending-entries drain in Critical() so the keystroke hook cannot append between snapshot and clear (pending-entries-cross-thread-race)")

@@ -201,7 +201,7 @@ TestKLAppCat_SaveRoundTrip() {
 	KL_AppCat_Save()
 	; Reload from disk
 	KLAppCat.categories := Map()
-	KL_AppCat_Load()
+	KL_AppCat_Reload()
 	AssertEqual("productive", KL_AppCat_Get("TestApp.exe"), "saved category must survive reload")
 	KLAppCat.dirty := false
 	try FileDelete(TmpPath)

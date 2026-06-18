@@ -89,7 +89,7 @@ _SSSL_AssertMenuResolvesViaT() {
 	FuncIdx := InStr(Src, "BuildScriptShortcutsMenu(")
 	Assert(FuncIdx > 0, "BuildScriptShortcutsMenu must exist in ErgoptiPlus.ahk")
 	Rest := SubStr(Src, FuncIdx)
-	End := InStr(Rest, "`nreturn ")
+	End := InStr(Rest, "return ")
 	Assert(End > 0, "BuildScriptShortcutsMenu must contain a return statement")
 	Body := SubStr(Rest, 1, End + 10)
 

@@ -37,7 +37,7 @@
 ; =============================================
 
 _ONA_ReadSource(RelPath) {
-	Root := A_ScriptDir . "\..\.."
+	Root := A_ScriptDir . "\.."
 	return FileRead(Root . "\" . RelPath)
 }
 

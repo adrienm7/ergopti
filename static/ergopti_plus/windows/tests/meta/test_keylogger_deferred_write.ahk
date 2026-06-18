@@ -32,7 +32,7 @@ _KDW_AssertDeferredWrite() {
 	InlineWriteIdx := InStr(AppendBody, "fh.Write(")
 	Assert(!InlineWriteIdx, "KL_AppendLog must NOT call fh.Write() inline (kl-synchronous-disk-write-on-keystroke)")
 	
-	IngestBody := _KDW_FuncBodyStripped(Src, "KL_IngestOnce() {")
+	IngestBody := _KDW_FuncBodyStripped(Src, "KL_IngestOnce(force := false) {")
 	
 	DeferredWriteIdx := InStr(IngestBody, "fh.Write(")
 	Assert(DeferredWriteIdx > 0, "KL_IngestOnce must write pending_snapshot to disk (kl-synchronous-disk-write-on-keystroke)")

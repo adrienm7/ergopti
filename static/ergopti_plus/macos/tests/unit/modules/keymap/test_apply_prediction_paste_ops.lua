@@ -85,8 +85,9 @@ helpers.describe("apply_prediction — paste-ops drain (keymap-bridge-001)", fun
 		local km_stub = make_km_utils_stub()
 		package.loaded["modules.keymap.utils"] = km_stub
 
-		-- engine stub: always returns one prediction with our long text
-		package.loaded["modules.keymap.llm.engine"] = {
+		-- engine stub: always returns one prediction with our long text.
+		-- llm_bridge requires "modules.llm.prediction_engine", not the keymap-local path.
+		package.loaded["modules.llm.prediction_engine"] = {
 			init            = function() end,
 			is_visible      = function() return true end,
 			get_predictions = function() return {{text=long_text, display=long_text}} end,
@@ -164,7 +165,7 @@ helpers.describe("apply_prediction — paste-ops drain (keymap-bridge-001)", fun
 		local km_stub = make_km_utils_stub()
 		package.loaded["modules.keymap.utils"] = km_stub
 
-		package.loaded["modules.keymap.llm.engine"] = {
+		package.loaded["modules.llm.prediction_engine"] = {
 			init            = function() end,
 			is_visible      = function() return true end,
 			get_predictions = function() return {{text=short_text, display=short_text}} end,

@@ -198,7 +198,7 @@ KL_Ergo_UpdateBlock(delay_ms, now, app, is_bs) {
             ))
         }
         ; Close any open flow window before discarding the block — without this the
-        ; JSONL log is left with a dangling flow_window_start that has no matching end
+        ; JSONL log is left with a dangling open-flow event that has no matching end
         if KLErgo.flow_active {
             flow_dur := (now - delay_ms) - KLErgo.flow_start
             block_ms_flow := (now - delay_ms) - KLErgo.block_start

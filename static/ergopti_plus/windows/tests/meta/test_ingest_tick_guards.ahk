@@ -53,7 +53,7 @@ _ITG_FuncBody(Src, FuncDef) {
 
 _ITG_IngestHasIdleGuards() {
 	Src := _ITG_ReadSource("modules/keylogger/keylogger.ahk")
-	Body := _ITG_FuncBody(Src, "KL_IngestOnce() {")
+	Body := _ITG_FuncBody(Src, "KL_IngestOnce(force := false) {")
 	Assert(Body != "", "KL_IngestOnce must exist in keylogger.ahk")
 	
 	Assert(InStr(Body, "INGEST_IDLE_MS") > 0,
