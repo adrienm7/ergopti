@@ -1116,7 +1116,11 @@ function M.build_custom(ctx, counts)
 						for _, sec in ipairs(g_secs_for_count) do
 							if type(sec) == "table" and sec.name ~= "-" and not sec.is_module_placeholder
 								and sec.count ~= nil then
-								local active = not is_sec_enabled_fn or is_sec_enabled_fn(gname, sec.name)
+								-- `is_sec_enabled_fn` was never defined in this scope (ui-menu-layout-hot-2);
+								-- use the same ctx.keymap pattern used everywhere else in this file.
+								local sec_enabled_fn = ctx.keymap and type(ctx.keymap.is_section_enabled) == "function"
+									and ctx.keymap.is_section_enabled or nil
+								local active = not sec_enabled_fn or sec_enabled_fn(gname, sec.name)
 								if active then g_count = g_count + tonumber(sec.count) end
 							end
 						end
