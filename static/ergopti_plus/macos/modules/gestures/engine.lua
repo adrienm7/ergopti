@@ -264,10 +264,14 @@ local function computeDir(dx, dy, mf)
 	elseif angle <= 25 then 
 		return "horiz"
 	else
-		-- Diagnostic: only lock diagonal if user really meant it (both axes moved significantly)
+		-- Lock diagonal only when total Manhattan distance (adx+ady) meets the threshold.
+		-- The previous guard required each axis to independently exceed diagMin, which
+		-- doubled the required travel (e.g. 10 units for diagMin=5, not 5). Using the
+		-- already-computed `dist` matches the "minimum total distance" intent and makes
+		-- 45° diagonals detectable at the same distance as straight swipes.
 		local diagMin = (mf == 2) and DIAG_MIN_2 or (min * 1.5)
-		if adx >= diagMin and ady >= diagMin then return "diag" end
-		
+		if dist >= diagMin then return "diag" end
+
 		-- Fallback to dominant axis if not enough "diagonal-ness"
 		return (adx >= ady) and "horiz" or "vert"
 	end

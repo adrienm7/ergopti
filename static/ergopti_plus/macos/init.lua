@@ -295,7 +295,7 @@ do
 		-- servers are bound" signal (a bare lsof would also count transient
 		-- ESTABLISHED connections and the probe below).
 		"LISTEN_PIDS=$(lsof -nP -iTCP:" .. P .. " -sTCP:LISTEN -t 2>/dev/null | sort -u); " ..
-		"NLISTEN=$(printf '%s\\n' \"$LISTEN_PIDS\" | grep -c .); " ..
+		"NLISTEN=$(printf '%s\\n' \"$LISTEN_PIDS\" | grep -c . || true); " ..
 		-- Probe /v1/models on a fresh connection (no keep-alive to a dead socket)
 		-- and extract the served model id.
 		"MODEL_ID=$(curl -s --max-time 1 --no-keepalive -H 'Connection: close' http://127.0.0.1:" .. P .. "/v1/models 2>/dev/null | sed -n 's/.*\"id\"[[:space:]]*:[[:space:]]*\"\\([^\"]*\\)\".*/\\1/p' | head -1); " ..

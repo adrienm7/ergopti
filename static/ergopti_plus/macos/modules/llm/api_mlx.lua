@@ -136,6 +136,10 @@ local kill_zombie_on_mlx_port
 -- is called. During this window the new Python process is already alive but its PGID is
 -- unknown, so any unguarded kill -9 would massacre it. Block all zombie kills while pending.
 local _server_pgid_pending  = false
+-- Safety-timeout handle: if the Python server crashes before printing its PGID line,
+-- set_active_server_pgid() is never called and _server_pgid_pending stays true forever,
+-- permanently disabling kill_zombie_on_mlx_port. The timer clears the flag after 15 s.
+local _pgid_pending_timeout = nil
 
 -- Optional callback registered by models_manager_mlx so api_mlx can request a fresh
 -- server launch when discovery detects a model-ID mismatch that the zombie killer
@@ -709,6 +713,20 @@ function M.reset_endpoints()
 	_active_server_pgid          = nil   -- cleared until the new server reports its PGID
 	_server_pgid_pending         = true  -- block zombie kills until set_active_server_pgid() fires
 	_last_zombie_kill_at         = 0     -- allow an immediate kill on the first mismatch after PGID is known
+	-- Cancel any previous safety timeout so rapid successive resets don't stack.
+	if _pgid_pending_timeout then
+		pcall(TimerScheduler.cancel, _pgid_pending_timeout)
+		_pgid_pending_timeout = nil
+	end
+	-- Safety-timeout: if the server crashes before emitting its PID line, this clears
+	-- the pending flag so kill_zombie_on_mlx_port is not blocked for the whole session.
+	_pgid_pending_timeout = TimerScheduler.after(15.0, function()
+		if _server_pgid_pending then
+			Logger.warn(LOG, "PGID pending timeout (15s) — unblocking zombie kills.")
+			_server_pgid_pending  = false
+			_pgid_pending_timeout = nil
+		end
+	end)
 	-- A fresh launch deserves a fresh verdict: clear any previous load-failure so a
 	-- newly selected (or relaunched) model is given the full warmup budget again.
 	_load_failed                 = false

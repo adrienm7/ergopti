@@ -160,10 +160,8 @@ class HookDispatcher {
 	static Unregister(event_type, callback_fn) {
 		Critical("On")
 		try {
-			if !HookDispatcher._subscribers.Has(event_type) {
-				Critical("Off")
+			if !HookDispatcher._subscribers.Has(event_type)
 				return
-			}
 			arr := HookDispatcher._subscribers[event_type]
 			loop arr.Length {
 				; Iterate in reverse so removal by index does not shift unvisited items
@@ -175,8 +173,9 @@ class HookDispatcher {
 					break
 				}
 			}
+		} finally {
+			Critical("Off")
 		}
-		Critical("Off")
 	}
 
 
