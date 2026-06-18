@@ -133,3 +133,64 @@ TestAuditV5_UnregisterFinally() {
 	)
 }
 Test("Audit-v5: HookDispatcher.Unregister uses finally block to release Critical", TestAuditV5_UnregisterFinally)
+
+
+
+
+
+; =======================================================================================
+; =======================================================================================
+; ======= 5/ graphics_renderer.ahk -- DrawFn throw is caught and gates the upload =======
+; =======================================================================================
+; =======================================================================================
+
+TestAuditV5_GrDrawBitmapDrawFnCatch() {
+	Src := _AuditV5_ReadSrc("adapters\graphics_renderer.ahk")
+
+	; Locate GR_DrawBitmap so checks are scoped to that function only
+	FnStart := InStr(Src, "GR_DrawBitmap(")
+	; The next top-level function starts after the closing brace of the finally block
+	FnEnd := InStr(Src, "`r`n}`r`n`r`n`r`n`r`n", FnStart)
+	FnBlock := SubStr(Src, FnStart, FnEnd - FnStart)
+
+	; The bug: bare "try DrawFn(...)" with no catch -- exceptions are silently swallowed.
+	; The fix: a catch block captures the exception and logs it via OutputDebug.
+	AssertFalse(
+		RegExMatch(FnBlock, "try DrawFn\([^)]+\)\s*\r?\n\s*;"),
+		"GR_DrawBitmap must not have a bare try DrawFn(...) with no catch block"
+	)
+	AssertTrue(
+		InStr(FnBlock, "catch as Err"),
+		"GR_DrawBitmap must have a catch block after try DrawFn(...)"
+	)
+	AssertTrue(
+		InStr(FnBlock, "OutputDebug("),
+		"GR_DrawBitmap catch block must call OutputDebug to surface the DrawFn error"
+	)
+
+
+	; =========================================================
+	; ===== 5.1) UpdateLayeredWindow is inside if Painted =====
+	; =========================================================
+
+	; The fix also gates UpdateLayeredWindow on Painted so a failed paint does not
+	; commit a partial or blank bitmap to the layered window.
+	AssertTrue(
+		InStr(FnBlock, "Painted := true"),
+		"GR_DrawBitmap must set Painted := true before try DrawFn(...)"
+	)
+	AssertTrue(
+		InStr(FnBlock, "Painted := false"),
+		"GR_DrawBitmap catch block must set Painted := false"
+	)
+
+	; Verify UpdateLayeredWindow is subordinate to "if Painted {" by checking that
+	; "if Painted {" appears before the UpdateLayeredWindow DllCall in the block.
+	PaintedGuardPos := InStr(FnBlock, "if Painted {")
+	UpdatePos       := InStr(FnBlock, "UpdateLayeredWindow")
+	AssertTrue(
+		PaintedGuardPos > 0 and UpdatePos > PaintedGuardPos,
+		'UpdateLayeredWindow must appear after the "if Painted {" guard in GR_DrawBitmap'
+	)
+}
+Test("Audit-v5 (F46): GR_DrawBitmap catches DrawFn exception and gates UpdateLayeredWindow on Painted", TestAuditV5_GrDrawBitmapDrawFnCatch)
