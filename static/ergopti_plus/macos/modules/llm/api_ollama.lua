@@ -100,6 +100,13 @@ end
 -- Delay before launching Ollama after killing a stale instance (seconds)
 local OLLAMA_KILL_SETTLE_SEC = 0.1
 
+-- curl --max-time ceiling for streaming requests (seconds).
+-- STREAM_TMPFILE_CLEANUP_SEC is the safety-net delay before removing the
+-- payload temp file; it must be strictly greater than STREAM_MAX_TIME_SEC so
+-- the file is never deleted while curl is still reading it.
+local STREAM_MAX_TIME_SEC      = 60
+local STREAM_TMPFILE_CLEANUP_SEC = 70
+
 -- Ensure Ollama daemon is running — fully async to avoid blocking the Cocoa
 -- run loop. Previous implementation used synchronous hs.execute + usleep which
 -- permanently corrupted the CFRunLoop and killed timers/menubar/eventtaps.
@@ -546,6 +553,9 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 
 	-- Completion callback: fired when curl exits
 	local function on_done(_, remaining, _)
+		-- Remove the payload temp file as soon as curl exits so it doesn't linger
+		-- for the full STREAM_TMPFILE_CLEANUP_SEC fallback window.
+		os.remove(tmp_path)
 		-- Generation check: a newer request superseded this stream — don't touch
 		-- shared state (otherwise we untrack the active stream and leak its task)
 		if my_generation ~= _stream_generation then
@@ -617,7 +627,7 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 		"-s", "-N", "-X", "POST",
 		"-H", "Content-Type: application/json",
 		"--connect-timeout", "5",   -- abort if TCP handshake exceeds 5 s (Ollama dead)
-		"--max-time", "60",         -- hard ceiling: streaming must finish within 60 s
+		"--max-time", tostring(STREAM_MAX_TIME_SEC),  -- hard ceiling; also drives cleanup delay
 		"--data-binary", "@" .. tmp_path,
 		M.get_base_url() .. "/api/chat",
 	}, on_done, on_chunk)
@@ -625,8 +635,9 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 	_active_stream_task = task
 	Logger.debug(LOG, "[%s] #%d STREAM task started (payload: %s).", model_name, req_id, tmp_path)
 
-	-- Clean up the temp file once the task has had time to read it
-	TimerScheduler.after(10, function()
+	-- Safety-net: remove the payload temp file even if on_done fires late or not
+	-- at all. Delay must be > STREAM_MAX_TIME_SEC so curl has finished reading.
+	TimerScheduler.after(STREAM_TMPFILE_CLEANUP_SEC, function()
 		os.remove(tmp_path)
 	end)
 end
