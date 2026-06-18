@@ -499,10 +499,13 @@ local function patch_personal_toml(toml_path, section, field, value)
 		and ("[_meta.sections." .. section .. "]")
 		or  "[_meta]"
 
-	-- Scan once: find the header line and collect its span until next header
+	-- Scan once: find the header line and collect its span until next header.
+	-- field_lines collects ALL indices of duplicate field= lines so that a
+	-- hand-authored TOML with two delay= in the same block does not leave a
+	-- stale copy behind after patching.
 	local header_line = nil
-	local field_line  = nil   -- index of an existing field=… inside the block
-	local next_header = nil   -- index of the next [section] after our block
+	local field_lines = {}  -- all indices of existing field=… inside the block
+	local next_header = nil -- index of the next [section] after our block
 
 	for i, ln in ipairs(lines) do
 		local trimmed = ln:match("^%s*(.-)%s*$")
@@ -513,7 +516,7 @@ local function patch_personal_toml(toml_path, section, field, value)
 				-- Entered a new TOML section — stop scanning
 				next_header = i
 			elseif trimmed:match("^" .. field .. "%s*=") then
-				field_line = i
+				table.insert(field_lines, i)
 			end
 		end
 	end
@@ -530,9 +533,13 @@ local function patch_personal_toml(toml_path, section, field, value)
 		end
 		local new_line = field .. " = " .. val_str
 
-		if field_line then
-			-- Replace the existing field line
-			lines[field_line] = new_line
+		if #field_lines > 0 then
+			-- Replace the first occurrence; remove all extras in reverse order
+			-- so earlier indices remain valid during removal.
+			lines[field_lines[1]] = new_line
+			for k = #field_lines, 2, -1 do
+				table.remove(lines, field_lines[k])
+			end
 		elseif header_line then
 			-- Insert the new field right after the header
 			table.insert(lines, header_line + 1, new_line)
@@ -543,9 +550,9 @@ local function patch_personal_toml(toml_path, section, field, value)
 			table.insert(lines, new_line)
 		end
 	else
-		-- Remove the field line if it exists
-		if field_line then
-			table.remove(lines, field_line)
+		-- Remove all occurrences in reverse order so earlier indices stay valid
+		for k = #field_lines, 1, -1 do
+			table.remove(lines, field_lines[k])
 		end
 	end
 

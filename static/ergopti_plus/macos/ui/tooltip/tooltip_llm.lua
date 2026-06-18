@@ -122,12 +122,14 @@ local function format_info_line(model_info, ttft_ms, ttlt_ms, for_sizing)
 	local has_ttft = type(ttft_ms) == "number" and ttft_ms > 0
 	local has_ttlt = type(ttlt_ms) == "number" and ttlt_ms > 0
 
-	-- Sizing pass: pretend both timings are present (with realistic worst-case
-	-- values) so the canvas frame is wide enough for the eventual full line.
-	-- Real renders always use the actual values (no placeholder text shown).
+	-- Sizing pass: pretend both timings are present with a generous worst-case
+	-- value so the canvas frame is wide enough for the eventual full line.
+	-- 9999 ms → "9.99 s"; TTLT can exceed 10s on slow models → use 999000 ms
+	-- ("999.00 s") to guarantee the placeholder is never narrower than real data.
+	local SIZING_PLACEHOLDER_MS = 999000
 	if for_sizing then
-		if not has_ttft then ttft_ms = 9999 ; has_ttft = true end
-		if not has_ttlt then ttlt_ms = 9999 ; has_ttlt = true end
+		if not has_ttft then ttft_ms = SIZING_PLACEHOLDER_MS ; has_ttft = true end
+		if not has_ttlt then ttlt_ms = SIZING_PLACEHOLDER_MS ; has_ttlt = true end
 	end
 
 	if not has_model and not has_ttft and not has_ttlt then
