@@ -322,6 +322,10 @@ end
 
 --- Stops the engine and cleans up shared state.
 function M.stop()
+	-- Clear the date rules registered at start time; without this, a subsequent
+	-- start() call would call register_date_rules() again and duplicate all three
+	-- rules in the shared engine (dynhotstrings-5).
+	SharedEngine.reset_rules()
 	_km = nil
 end
 
