@@ -162,6 +162,11 @@ end
 
 local CONFIG     = _load_shared_const()
 local IDLE_HIDE_S = CONFIG.idle_hide_s
+-- Minimum interval between mouseMoved updates of _last_mouse_sec.
+-- Each mouseMoved fires hundreds of times/sec; without throttling, every
+-- move re-enters the Lua VM, adding jitter to the input pipeline.
+-- Non-move events (clicks, scrollWheel) bypass the throttle and always win.
+local MOUSE_MOVE_THROTTLE_SEC = 0.2
 
 
 
@@ -492,8 +497,14 @@ function M.start(show_graph)
 			hs.eventtap.event.types.leftMouseDown,
 			hs.eventtap.event.types.rightMouseDown,
 			hs.eventtap.event.types.scrollWheel,
-		}, function()
-			_last_mouse_sec = hs.timer.absoluteTime() / 1000000000
+		}, function(e)
+			local now = hs.timer.absoluteTime() / 1000000000
+			local is_move = e:getType() == hs.eventtap.event.types.mouseMoved
+			-- Throttle mouseMoved: only update at most every MOUSE_MOVE_THROTTLE_SEC.
+			-- Click and scroll events bypass the throttle — they must always register.
+			if not is_move or (now - _last_mouse_sec) >= MOUSE_MOVE_THROTTLE_SEC then
+				_last_mouse_sec = now
+			end
 			return false  -- do not consume the event
 		end)
 		_mouse_tap:start()
