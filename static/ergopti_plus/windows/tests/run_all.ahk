@@ -544,6 +544,23 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 #Include test_audit_v4_fixes.ahk
 #Include test_hotstrings_escape_braces.ahk
 #Include meta/test_hotstrings_combo_auto_escaping.ahk
+#Include meta/test_ergo_flow_gap_end.ahk
+#Include meta/test_config_window_patch_toml_meta_error.ahk
+#Include meta/test_capsword_mouse_clobber.ahk
+#Include test_timer_scheduler_suspend.ahk
+#Include meta/test_magic_key_probe_deadkey_safe.ahk
+#Include meta/test_script_shortcut_labels_locale.ahk
+#Include meta/test_altgr_chord_debounce_per_slot.ahk
+#Include meta/test_roi_halflife_threshold_reachable.ahk
+#Include meta/test_hse_notepad_consumed_delimiter.ahk
+#Include test_llm_parser_dedup_stats.ahk
+#Include meta/test_paste_without_formatting_restore.ahk
+#Include meta/test_hold_layer_release_bounded.ahk
+#Include meta/test_toml_batchwrite_cache_coherence.ahk
+#Include meta/test_topology_debounce_settled_geometry.ahk
+#Include meta/test_crash_report_unique_filename.ahk
+#Include meta/test_gesture_paste_plain_busy_guard.ahk
+#Include test_llm_deadline_wrap.ahk
 
 ; Watchdog: kill the process if RunTests() never returns (e.g. a corpus
 ; consumer blocks on a synchronous HTTP call, an InputHook with no timeout,
