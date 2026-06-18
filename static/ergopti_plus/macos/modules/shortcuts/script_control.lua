@@ -76,7 +76,6 @@ local _keymap     = nil
 local _shortcuts  = nil
 local _gestures   = nil
 local _karabiner  = nil
-local _keylogger  = nil
 
 
 
@@ -158,12 +157,6 @@ local function pause_all()
 	if _karabiner and type(_karabiner.pause) == "function" then
 		pcall(function() _karabiner.pause() end)
 	end
-	-- Silence the keylogger eventtap so it does not record keystrokes while the
-	-- script is suspended — an active tap during pause would log phantom activity
-	-- with no corresponding processing context
-	if _keylogger and type(_keylogger.pause) == "function" then
-		pcall(function() _keylogger.pause() end)
-	end
 end
 
 --- Resumes all registered modules gracefully.
@@ -181,11 +174,6 @@ local function resume_all()
 	end
 	if _karabiner and type(_karabiner.resume) == "function" then
 		pcall(function() _karabiner.resume() end)
-	end
-	-- Re-arm the keylogger eventtap symmetrically so logging resumes with the
-	-- rest of the pipeline
-	if _keylogger and type(_keylogger.resume) == "function" then
-		pcall(function() _keylogger.resume() end)
 	end
 end
 
@@ -336,8 +324,7 @@ end
 --- @param shortcuts table Shortcuts module (must expose start / stop).
 --- @param gestures table Gestures module (must expose enable_all / disable_all).
 --- @param karabiner table|nil Optional Karabiner module (must expose pause / resume).
---- @param keylogger table|nil Optional Keylogger module (must expose pause / resume).
-function M.start(keymap, shortcuts, gestures, karabiner, keylogger)
+function M.start(keymap, shortcuts, gestures, karabiner)
 	if _tap then
 		Logger.warn(LOG, "M.start() called more than once — ignoring duplicate call.")
 		return
@@ -348,7 +335,6 @@ function M.start(keymap, shortcuts, gestures, karabiner, keylogger)
 	_shortcuts = type(shortcuts) == "table" and shortcuts or nil
 	_gestures  = type(gestures)  == "table" and gestures  or nil
 	_karabiner = type(karabiner) == "table" and karabiner or nil
-	_keylogger = type(keylogger) == "table" and keylogger or nil
 
 	if not _keymap    then Logger.warn(LOG, "M.start(): keymap module not provided — pause/resume will be partial.") end
 	if not _shortcuts then Logger.warn(LOG, "M.start(): shortcuts module not provided — pause/resume will be partial.") end
