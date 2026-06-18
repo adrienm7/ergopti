@@ -107,8 +107,15 @@ function M.apply(file_path)
 				end
 				if key and value then
 					-- Strip inline TOML comments before coercion so  "DEBUG" # note  → "DEBUG"
-					-- Quote-aware: stop at the first # that is not inside a quoted string
-					value = value:gsub('%s*#[^"]*$', "")
+					-- Quote-aware: quoted strings are extracted through their closing quote;
+					-- unquoted values strip from the first # (old `[^"]*$` pattern stopped
+					-- at a " inside the comment, leaving the remainder unsplit — lib-config-1).
+					if value:sub(1, 1) == '"' then
+						-- Keep only through the closing double-quote; any trailing `# …` is a comment
+						value = value:match('^"[^"]*"') or value
+					else
+						value = value:gsub('%s*#.*$', "")
+					end
 					value = value:match("^%s*(.-)%s*$")
 					local coerced = M.coerce(value)
 					if section == "script" then
