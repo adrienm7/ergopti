@@ -179,6 +179,7 @@ local function resetGS()
 		lifting        = false,
 		liveAxisSign   = nil,
 		liveAxisSlot   = nil,  -- Slot of the most recent live fire (separate from sign — different slots are unrelated)
+		hadLiveFire    = false, -- Sticky flag: true once any live fire fired; NOT cleared on rebase (unlike liveAxisSign)
 		lastLiveFire   = 0,
 		lastFirePos    = nil,  -- Position of the most recent incremental fire (for reversal detection)
 		lastN          = nil,
@@ -391,6 +392,7 @@ local function triggerLiveAxisIfNeeded(slot, pos, now, axis)
 			end
 			gs.stepsCommitted = targetSteps
 			gs.liveAxisSign   = (sd > 0) and 1 or -1
+			gs.hadLiveFire    = true
 			gs.lastFirePos    = pos
 			gs.lastLiveFire   = now
 		elseif diff < 0 then
@@ -439,6 +441,7 @@ local function triggerLiveAxisIfNeeded(slot, pos, now, axis)
 	-- Rebase after each live trigger so a quick direction reversal can fire promptly.
 	gs.liveAxisSign = sign
 	gs.liveAxisSlot = slot
+	gs.hadLiveFire  = true
 	gs.lastLiveFire = now
 	gs.startPos     = {x = pos.x, y = pos.y}
 	gs.endPos       = {x = pos.x, y = pos.y}
@@ -485,7 +488,11 @@ local function commitGesture(now)
 	-- the lift residue as a tap and fire the tap action ON TOP OF the
 	-- legitimate swipe action — e.g., a 4-finger down swipe firing
 	-- app_expose during the swipe, then app_window_previous on lift.
-	local had_live_fire = (gs.liveAxisSign ~= nil)
+	-- Use the sticky hadLiveFire flag (not liveAxisSign) so a direction reversal
+	-- that clears liveAxisSign via rebase does not hide the prior live fire from
+	-- the tap guard below — without this, the rebase-then-lift path fires a
+	-- spurious tap even though the gesture already triggered an action.
+	local had_live_fire = gs.hadLiveFire
 	local total_delta = math.abs(dx) + math.abs(dy)
 	Logger.debug(LOG, "commitGesture: dx=%.2f dy=%.2f total_delta=%.2f TAP_MAX_DELTA=%.2f TAP_MAX_SEC=%.2f had_live_fire=%s",
 		dx, dy, total_delta, TAP_MAX_DELTA, TAP_MAX_SEC, tostring(had_live_fire))
@@ -663,6 +670,7 @@ function M.process_frame(touches)
 			gs.lifting        = false
 			gs.liveAxisSign   = nil
 			gs.liveAxisSlot   = nil
+			gs.hadLiveFire    = false
 			gs.lastLiveFire   = 0
 			gs.lastFirePos    = nil
 			gs.fingerCountChangedAt = now
@@ -806,8 +814,15 @@ function M.process_frame(touches)
 					gs.lifting        = false
 					gs.liveAxisSign   = nil
 					gs.liveAxisSlot   = nil
+					gs.hadLiveFire    = false
 					gs.lastFirePos    = nil
 					gs.fingerCountChangedAt = now
+					-- Reset peak finger state so the new gesture's finger count is
+					-- evaluated independently (peakN from the committed gesture must
+					-- not influence the peak override for the fresh one).
+					gs.peakN          = n
+					gs.peakNFirstSeen = now
+					gs.peakNFrames    = 1
 					return
 				end
 			end
