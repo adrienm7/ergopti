@@ -130,11 +130,19 @@ class WPMWidgetConst {
 
 
 
-; ===================================
+; Wrap-safe 32-bit TickCount delta: handles the ~49.7-day counter rollover
+; that makes a naive (now - last) subtraction return a huge negative number.
+_WPMWidget_TickDelta(now, last) => ((now - last + 0x100000000) & 0xFFFFFFFF)
+
+
+
+
+
+; ===============================
 ; ===============================
 ; ======= 2/ Module state =======
 ; ===============================
-; ===================================
+; ===============================
 
 class WPMWidget {
     ; Compact mode GUI handles.
@@ -269,12 +277,11 @@ WPMWidget_Push(is_hs := false, is_ai := false, is_ac := false, category := "", s
 
 ; Compute current WPM from the ring buffer.
 WPMWidget_Calc() {
-    now    := A_TickCount
-    cutoff := now - WPMWidgetConst.WINDOW_MS
-    count  := 0
-    has_hs := false
-    has_ai := false
-    has_ac := false
+    now      := A_TickCount
+    count    := 0
+    has_hs   := false
+    has_ai   := false
+    has_ac   := false
     earliest := now
     latest   := 0
     ; Walk the ring under Critical so a concurrent WPMWidget_Push (keyboard thread)
@@ -283,7 +290,8 @@ WPMWidget_Calc() {
     Critical("On")
     for _, ev in WPMWidget._ring {
         t := ev["t"]
-        if (t < cutoff)
+        ; Wrap-safe age check: skip events older than the rolling window
+        if (_WPMWidget_TickDelta(now, t) > WPMWidgetConst.WINDOW_MS)
             continue
         count++
         if ev["hs"]
@@ -303,7 +311,7 @@ WPMWidget_Calc() {
     ; Use now as the right edge (mirrors Hammerspoon): as time passes after the
     ; last keystroke the window grows and WPM decays naturally to 0.
     ; latest - earliest would freeze the WPM at the last typed value.
-    elapsed_ms := Max(now - earliest, WPMWidgetConst.WPM_MIN_DURATION_MS)
+    elapsed_ms := Max(_WPMWidget_TickDelta(now, earliest), WPMWidgetConst.WPM_MIN_DURATION_MS)
     wpm := (count / 5) / (elapsed_ms / 60000)
     return Map("wpm", Round(wpm), "has_hs", has_hs, "has_ai", has_ai, "has_ac", has_ac)
 }
@@ -966,9 +974,9 @@ WPMWidget_Tick() {
     wpm    := result["wpm"]
     ; Source color active for COLOR_HOLD_MS after the last event — long enough
     ; for the 500 ms tick to always catch even very short burst expansions.
-    has_hs := (now - WPMWidget._last_hs_tick) < WPMWidgetConst.COLOR_HOLD_MS
-    has_ai := (now - WPMWidget._last_ai_tick) < WPMWidgetConst.COLOR_HOLD_MS
-    has_ac := (now - WPMWidget._last_ac_tick) < WPMWidgetConst.COLOR_HOLD_MS
+    has_hs := _WPMWidget_TickDelta(now, WPMWidget._last_hs_tick) < WPMWidgetConst.COLOR_HOLD_MS
+    has_ai := _WPMWidget_TickDelta(now, WPMWidget._last_ai_tick) < WPMWidgetConst.COLOR_HOLD_MS
+    has_ac := _WPMWidget_TickDelta(now, WPMWidget._last_ac_tick) < WPMWidgetConst.COLOR_HOLD_MS
 
     ; Update graph history.
     WPMWidget._graph_hist.Push(wpm)
@@ -977,7 +985,7 @@ WPMWidget_Tick() {
 
     ; Hide after IDLE_HIDE_MS of keyboard inactivity.
     keyboard_idle := WPMWidget._last_input_ms > 0
-        && (now - WPMWidget._last_input_ms) > WPMWidgetConst.IDLE_HIDE_MS
+        && _WPMWidget_TickDelta(now, WPMWidget._last_input_ms) > WPMWidgetConst.IDLE_HIDE_MS
     ; Hide immediately if the mouse/touchpad was used more recently than the last keystroke —
     ; A_TimeIdleMouse is built into AHK and requires no hook install.
     mouse_active  := A_TimeIdleMouse < A_TimeIdleKeyboard
