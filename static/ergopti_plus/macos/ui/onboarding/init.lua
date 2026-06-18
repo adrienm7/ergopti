@@ -280,6 +280,47 @@ function M._build_config_updates(answers)
 	}
 end
 
+--- Extracts wizard answers from a decoded config.toml table.
+--- Reads the canonical HS lowercase schema first ([hotstrings].enabled,
+--- [hotstrings].trigger_char, [metrics].enabled, [gestures].enabled) so a
+--- config written by commit() round-trips correctly. Falls back to the AHK
+--- PascalCase schema (Layout.ErgoptiBase, Hotstrings.MagicKey, …) for users
+--- migrating a Windows config file.
+--- @param parsed table Decoded TOML as a Lua table.
+--- @return table { use_ergopti, magic_key, use_metrics, use_gestures }
+function M._answers_from_config(parsed)
+	if type(parsed) ~= "table" then return {} end
+	-- Canonical lowercase sections (written by commit / _build_config_updates)
+	local hs_sec  = type(parsed.hotstrings) == "table" and parsed.hotstrings or {}
+	local met_sec = type(parsed.metrics)    == "table" and parsed.metrics    or {}
+	local ges_sec = type(parsed.gestures)   == "table" and parsed.gestures   or {}
+	-- AHK PascalCase fallback (Windows config import)
+	local layout_ahk     = type(parsed.Layout)     == "table" and parsed.Layout     or {}
+	local hotstr_ahk     = type(parsed.Hotstrings)  == "table" and parsed.Hotstrings or {}
+	local metrics_ahk    = type(parsed.Metrics)     == "table" and parsed.Metrics    or {}
+	local gestures_ahk   = type(parsed.Gestures)    == "table" and parsed.Gestures   or {}
+	-- Prefer canonical schema; fall back to AHK keys only when canonical absent
+	local has_canonical_ergopti = hs_sec.enabled ~= nil
+	local use_ergopti = has_canonical_ergopti
+		and (hs_sec.enabled == true or hs_sec.enabled == "true")
+		or  (layout_ahk.ErgoptiBase == true or layout_ahk.ErgoptiAltGr == true or layout_ahk.ErgoptiPlus == true)
+	local magic_key = (type(hs_sec.trigger_char) == "string" and hs_sec.trigger_char ~= "" and hs_sec.trigger_char)
+		or (type(hotstr_ahk.MagicKey) == "string" and hotstr_ahk.MagicKey ~= "" and hotstr_ahk.MagicKey)
+		or nil
+	local use_metrics = (met_sec.enabled ~= nil)
+		and (met_sec.enabled == true or met_sec.enabled == "true")
+		or  (metrics_ahk.metrics_enabled == true)
+	local use_gestures = (ges_sec.enabled ~= nil)
+		and (ges_sec.enabled == true or ges_sec.enabled == "true")
+		or  (gestures_ahk.Enabled == true)
+	return {
+		use_ergopti  = use_ergopti  or false,
+		magic_key    = magic_key,
+		use_metrics  = use_metrics  or false,
+		use_gestures = use_gestures or false,
+	}
+end
+
 --- Closes the webview cleanly.
 local function close_webview()
 	if _webview then
@@ -449,21 +490,9 @@ local function handle_message(body)
 				if ok_read and type(content) == "string" then
 					local ok_dec, parsed = pcall(toml_codec.decode, content)
 					if ok_dec and type(parsed) == "table" then
-						-- Mirror the AHK helper: any Ergopti layout switch ON
-						-- counts as "use Ergopti". A nil section yields false.
-						local layout = parsed.Layout or {}
-						local hotstrings = parsed.Hotstrings or {}
-						local metrics = parsed.Metrics or {}
-						local gestures = parsed.Gestures or {}
-						local answers = {
-							use_ergopti  = (layout.ErgoptiBase == true)
-								or (layout.ErgoptiAltGr == true)
-								or (layout.ErgoptiPlus == true),
-							magic_key    = type(hotstrings.MagicKey) == "string" and hotstrings.MagicKey ~= ""
-								and hotstrings.MagicKey or nil,
-							use_metrics  = metrics.metrics_enabled == true,
-							use_gestures = gestures.Enabled == true,
-						}
+						-- Read the canonical lowercase schema written by commit();
+						-- fall back to AHK PascalCase for Windows config migration.
+						local answers = M._answers_from_config(parsed)
 						-- Strip nils so Object.assign on the JS side does not
 						-- overwrite the default magic key with undefined.
 						local clean = {}
