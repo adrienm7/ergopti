@@ -123,8 +123,11 @@ SC038::
 	UpdateLastSentCharacter("LAlt")
 
 	ActivateLayer()
-	KeyWait("SC038")
-	DisableLayer()
+	try {
+		KeyWait("SC038", "U T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC)
+	} finally {
+		DisableLayer()
+	}
 
 	Now := A_TickCount
 	CharacterSentTime := LastSentCharacterKeyTime.Has("LAlt") ? LastSentCharacterKeyTime["LAlt"] : Now
@@ -218,8 +221,11 @@ SC038::
 		return
 	}
 	ActivateLayer()
-	KeyWait("SC038", "U")
-	DisableLayer()
+	try {
+		KeyWait("SC038", "U T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC)
+	} finally {
+		DisableLayer()
+	}
 }
 #HotIf
 
@@ -303,8 +309,11 @@ $SC038:: {
 	UpdateLastSentCharacter("LAlt")
 
 	ActivateLayer()
-	KeyWait("SC038")
-	DisableLayer()
+	try {
+		KeyWait("SC038", "U T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC)
+	} finally {
+		DisableLayer()
+	}
 
 	Now := A_TickCount
 	CharacterSentTime := LastSentCharacterKeyTime.Has("LAlt") ? LastSentCharacterKeyTime["LAlt"] : Now

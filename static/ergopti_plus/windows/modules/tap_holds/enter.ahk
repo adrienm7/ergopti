@@ -90,8 +90,11 @@ _EnterHoldModKey() {
 	}
 	; Long press — activate layer until key-up.
 	ActivateLayer()
-	KeyWait("Enter", "U")
-	DisableLayer()
+	try {
+		KeyWait("Enter", "U T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC)
+	} finally {
+		DisableLayer()
+	}
 }
 #HotIf
 

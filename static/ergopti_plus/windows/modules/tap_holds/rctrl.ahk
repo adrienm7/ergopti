@@ -182,8 +182,11 @@ $SC11D:: {
 		return
 	}
 	ActivateLayer()
-	KeyWait("SC11D", "U")
-	DisableLayer()
+	try {
+		KeyWait("SC11D", "U T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC)
+	} finally {
+		DisableLayer()
+	}
 }
 #HotIf
 

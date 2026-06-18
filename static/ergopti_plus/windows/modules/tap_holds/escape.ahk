@@ -81,8 +81,11 @@ _EscapeHoldModKey() {
 		return
 	}
 	ActivateLayer()
-	KeyWait("Escape", "U")
-	DisableLayer()
+	try {
+		KeyWait("Escape", "U T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC)
+	} finally {
+		DisableLayer()
+	}
 }
 #HotIf
 
