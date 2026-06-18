@@ -275,7 +275,10 @@ local function start_watchers()
 				local has_other_modifiers = flags.cmd or flags.alt or flags.ctrl or (flags.shift == true)
 				if not has_other_modifiers then
 					-- Tab always accepts directly, regardless of prior navigation
-					if type(_state.on_accept) == "function" then _state.on_accept(_state.current_index) end
+					if type(_state.on_accept) == "function" then
+						local ok_acc, err_acc = pcall(_state.on_accept, _state.current_index)
+						if not ok_acc then Logger.error(LOG, "on_accept failed: %s.", tostring(err_acc)) end
+					end
 					return true
 				end
 				if type(_state.on_cancel) == "function" then pcall(_state.on_cancel) end
@@ -293,11 +296,17 @@ local function start_watchers()
 				--   • Otherwise, Enter is just a normal newline — close the tooltip but
 				--     let the keystroke flow through to the application.
 				if _state.navigation_started then
-					if type(_state.on_accept) == "function" then _state.on_accept(_state.current_index) end
+					if type(_state.on_accept) == "function" then
+						local ok_acc, err_acc = pcall(_state.on_accept, _state.current_index)
+						if not ok_acc then Logger.error(LOG, "on_accept failed: %s.", tostring(err_acc)) end
+					end
 					return true
 				end
 				if _state.enter_validates then
-					if type(_state.on_accept) == "function" then _state.on_accept(_state.current_index) end
+					if type(_state.on_accept) == "function" then
+						local ok_acc, err_acc = pcall(_state.on_accept, _state.current_index)
+						if not ok_acc then Logger.error(LOG, "on_accept failed: %s.", tostring(err_acc)) end
+					end
 					return true
 				end
 				if type(_state.on_cancel) == "function" then pcall(_state.on_cancel) end
@@ -347,7 +356,10 @@ local function start_watchers()
 				local pred_index = MAC_KEYCODES_NUMBERS[keycode]
 				local preds_count = type(_state.raw_predictions) == "table" and #_state.raw_predictions or 0
 				if pred_index <= preds_count then 
-					if type(_state.on_accept) == "function" then _state.on_accept(pred_index) end 
+					if type(_state.on_accept) == "function" then
+						local ok_acc, err_acc = pcall(_state.on_accept, pred_index)
+						if not ok_acc then Logger.error(LOG, "on_accept failed: %s.", tostring(err_acc)) end
+					end
 				end
 				return true
 			end
