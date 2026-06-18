@@ -642,7 +642,7 @@ function M.process_frame(touches)
 		return
 	end
 
-	if n >= 3 then startScrollBlock() end
+	if n >= 3 and _state and _state.enabled then startScrollBlock() end
 
 	if n >= 2 then
 		local pos = avgPos(touches)

@@ -380,7 +380,7 @@ local function interceptor(event, _km_buffer)
 				_state = STATE_IDLE
 				_combo = ""
 				
-				timer.doAfter(0, function() do_expand(combo) end)
+				do_expand(combo)
 				return "consume"
 			end
 			
