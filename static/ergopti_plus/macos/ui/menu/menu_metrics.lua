@@ -487,9 +487,12 @@ function M.build(ctx)
 					end
 
 					local files = {}
-					for file in fs.dir(log_dir) do
-						if file:match("%.log%.gz$") and not file:match("%.enc$") then
-							table.insert(files, log_dir .. "/" .. file)
+					local dir_iter = fs.dir(log_dir)
+					if dir_iter then
+						for file in dir_iter do
+							if file:match("%.log%.gz$") and not file:match("%.enc$") then
+								table.insert(files, log_dir .. "/" .. file)
+							end
 						end
 					end
 					state.keylogger_encrypt = true
@@ -513,9 +516,12 @@ function M.build(ctx)
 					if not ok_p or btn ~= "OK" or type(pwd) ~= "string" or pwd == "" then return end
 
 					local files = {}
-					for file in fs.dir(log_dir) do
-						if file:match("%.enc$") then
-							table.insert(files, log_dir .. "/" .. file)
+					local dir_iter2 = fs.dir(log_dir)
+					if dir_iter2 then
+						for file in dir_iter2 do
+							if file:match("%.enc$") then
+								table.insert(files, log_dir .. "/" .. file)
+							end
 						end
 					end
 					state.keylogger_encrypt = false
