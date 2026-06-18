@@ -111,10 +111,10 @@ global LOGGER_SUB_FILES := []
 ; Hardcoded fallback used when sub_files.toml cannot be found. Covers the
 ; minimum set of AHK-only sub-files required for production log triage.
 global LOGGER_SUB_FILES_FALLBACK := [
-    Map("name", "ErgoptiPlus_gestures.log", "tags", ["gestures"]),
-    Map("name", "ErgoptiPlus_layout.log", "tags", ["LayoutShift", "LayoutCaps", "LayoutAltGr"]),
-    Map("name", "ErgoptiPlus_dispatch.log", "tags", ["Dispatch", "ScriptShortcuts", "TomlLoader"]),
-    Map("name", "ErgoptiPlus_tray.log", "tags", ["ErgoptiPlus"]),
+    Map("name", "ErgoptiPlus_gestures.log", "tags", ["[gestures"]),
+    Map("name", "ErgoptiPlus_layout.log", "tags", ["[LayoutShift]", "[LayoutCaps]", "[LayoutAltGr]"]),
+    Map("name", "ErgoptiPlus_dispatch.log", "tags", ["[Dispatch]", "[ScriptShortcuts]", "[TomlLoader]"]),
+    Map("name", "ErgoptiPlus_tray.log", "tags", ["[ErgoptiPlus]"]),
 ]
 
 ; Resolved absolute paths for each sub-file (populated by LoggerInit).
@@ -505,16 +505,18 @@ _LoggerInitSubFiles(LogDir) {
     }
 }
 
-; Appends Line to every sub-file whose tag list contains Tag. Best-effort —
-; never raises so a sub-file I/O error cannot break the main logging path.
+; Appends Line to every sub-file whose tag list contains a pattern that is a
+; substring of Line. Patterns in sub_files.toml are bracketed fragments like
+; "[LayoutShift]" matched against the full formatted log line — exact tag
+; equality would never match because the line already wraps the tag in brackets.
 _LoggerFanOut(Tag, Line) {
     global LOGGER_SUB_FILES, _LOGGER_SUB_PATHS
     if !IsSet(_LOGGER_SUB_PATHS) or _LOGGER_SUB_PATHS.Count == 0 {
         return
     }
     for _, Entry in LOGGER_SUB_FILES {
-        for _, TagPattern in Entry["tags"] {
-            if (Tag = TagPattern) {
+        for _, Pat in Entry["tags"] {
+            if InStr(Line, Pat, true) {   ; case-sensitive substring vs full line
                 SubPath := _LOGGER_SUB_PATHS[Entry["name"]]
                 try FileAppend(Line . "`r`n", SubPath, "UTF-8")
                 break
@@ -524,23 +526,26 @@ _LoggerFanOut(Tag, Line) {
 }
 
 ; Parses _shared/logger/sub_files.toml and populates LOGGER_SUB_FILES with the
-; entries whose platforms array includes "autohotkey". Falls back to LOGGER_SUB_FILES_FALLBACK
+; entries whose platforms array includes "ahk". Falls back to LOGGER_SUB_FILES_FALLBACK
 ; when the file is absent or unreadable so the driver stays functional in stripped builds.
 ;
 ; The parser handles the fixed schema:
 ;   [[sub_files]]
 ;   name     = "gestures"
-;   platforms = ["autohotkey", "hs"]
+;   platforms = ["ahk", "hs"]
 ;   patterns = ["[gestures", "gesture"]
 ;
 ; Unknown keys (description) are silently skipped. Arrays may span multiple lines.
 ; The file is NOT the general-purpose TOML parser because [[array_of_tables]] is
 ; outside the scope of toml_helpers.ahk — this dedicated reader is intentionally minimal.
 _LoggerLoadSubFilesToml(ScriptDir) {
-    global LOGGER_SUB_FILES, LOGGER_SUB_FILES_FALLBACK
-    ; Resolve path: ScriptDir\..\..\..\shared\logger\sub_files.toml
-    ; (autohotkey/ → ergopti_plus/ → shared/logger/)
-    TomlPath := ScriptDir . "..\..\..\shared\logger\sub_files.toml"
+    global LOGGER_SUB_FILES, LOGGER_SUB_FILES_FALLBACK, _SharedDir
+    ; Prefer the canonical _SharedDir resolved at boot by ErgoptiPlus.ahk; fall back
+    ; to the corrected one-level relative path (windows/ → ergopti_plus/shared/).
+    if (IsSet(_SharedDir) and _SharedDir != "")
+        TomlPath := _SharedDir . "\logger\sub_files.toml"
+    else
+        TomlPath := ScriptDir . "..\shared\logger\sub_files.toml"
     if !FileExist(TomlPath) {
         LOGGER_SUB_FILES := LOGGER_SUB_FILES_FALLBACK
         return
@@ -572,10 +577,10 @@ _LoggerLoadSubFilesToml(ScriptDir) {
         if CurrentEntry = "" {
             return
         }
-        ; Only include entries that list "autohotkey" in their platforms array
+        ; Only include entries that list "ahk" in their platforms array
         IsAhk := false
         for _, P in CurrentPlatforms {
-            if (P = "autohotkey") {
+            if (P = "ahk") {
                 IsAhk := true
                 break
             }

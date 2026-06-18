@@ -14,11 +14,11 @@
 
 
 
-; ==================================================
-; ==================================================
+; =================================================
+; =================================================
 ; ======= 1/ DEFAULTS vocabulary check ============
-; ==================================================
-; ==================================================
+; =================================================
+; =================================================
 
 _KLAppCat_Defaults_CodeExeIsProductive() {
 	AssertEqual("productive", KLAppCatConst.DEFAULTS["code.exe"])
@@ -85,11 +85,11 @@ Test("KLAppCatConst.DEFAULTS: notepad.exe -> productive", _KLAppCat_Defaults_Not
 
 
 
-; =============================================
-; =============================================
+; ============================================
+; ============================================
 ; ======= 2/ KL_AppCat_Get — lookup ==========
-; =============================================
-; =============================================
+; ============================================
+; ============================================
 
 ; Seed a clean in-memory map before each test group so tests are isolated.
 _KLAppCat_SeedMap() {
@@ -161,3 +161,49 @@ _KLAppCat_Get_NeverSeenAppSetsDirty() {
 	AssertTrue(KLAppCat.dirty)
 }
 Test("KL_AppCat_Get: unseen app sets dirty flag", _KLAppCat_Get_NeverSeenAppSetsDirty)
+
+
+
+
+
+; ================================================
+; ================================================
+; ======= 3/ KL_AppCat_Save — atomic write =======
+; ================================================
+; ================================================
+
+; Reset helper — clears all KLAppCat state so save tests start from a blank slate.
+_KLAppCatReset() {
+	KLAppCat.file_path  := ""
+	KLAppCat.categories := Map()
+	KLAppCat.dirty      := false
+}
+
+TestKLAppCat_SaveIsDirtyOnWriteFailure() {
+	; When KL_WriteAtomic fails, dirty must stay true so deferred-save retries.
+	; Before the fix KLAppCat.dirty was cleared unconditionally after swallowed FileAppend.
+	_KLAppCatReset()
+	KLAppCat.file_path := A_Temp . "\ergopti_test_appcat_nope\nonexistent\path.json"
+	KLAppCat.dirty := true
+	KL_AppCat_Save()
+	AssertTrue(KLAppCat.dirty, "dirty must stay true when save fails (deferred-save must retry)")
+	KLAppCat.file_path := ""  ; cleanup
+}
+Test("keylogger_app_categories: dirty stays true on write failure", TestKLAppCat_SaveIsDirtyOnWriteFailure)
+
+TestKLAppCat_SaveRoundTrip() {
+	; After a successful save+reload, a custom category must survive.
+	_KLAppCatReset()
+	TmpPath := A_Temp . "\ergopti_test_appcat_" . A_TickCount . ".json"
+	KLAppCat.file_path := TmpPath
+	KLAppCat.categories["TestApp.exe"] := "productive"
+	KLAppCat.dirty := true
+	KL_AppCat_Save()
+	; Reload from disk
+	KLAppCat.categories := Map()
+	KL_AppCat_Load()
+	AssertEqual("productive", KL_AppCat_Get("TestApp.exe"), "saved category must survive reload")
+	KLAppCat.dirty := false
+	try FileDelete(TmpPath)
+}
+Test("keylogger_app_categories: save round-trips a custom category", TestKLAppCat_SaveRoundTrip)

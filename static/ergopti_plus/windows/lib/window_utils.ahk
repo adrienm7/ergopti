@@ -96,7 +96,8 @@ AltTabMonitor() {
 		; - Shell_TrayWnd: Windows taskbar
 		; - Progman: desktop background
 		; - WorkerW: hidden background windows
-		if ["Shell_TrayWnd", "Progman", "WorkerW"].Has(WinGetClass(WindowId)) {
+		WindowClass := WinGetClass(WindowId)
+		if (WindowClass == "Shell_TrayWnd" || WindowClass == "Progman" || WindowClass == "WorkerW") {
 			continue
 		}
 

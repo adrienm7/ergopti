@@ -50,3 +50,22 @@ _WU_ReturnsIntegerIndex() {
 	AssertTrue(Result is Integer, "return value should be Integer, got " . Type(Result))
 }
 Test("GetMonitorFromPoint: returns integer index", _WU_ReturnsIntegerIndex)
+
+_WU_ArrayHasIsIndexNotMembership() {
+	; Array.Has tests integer-index presence in AHK v2, NOT value membership.
+	; A string arg coerces to 0 and index 0 never exists -> always false.
+	; This documents why the old blacklist was dead code.
+	AssertEqual(0, ["Shell_TrayWnd", "Progman", "WorkerW"].Has("Progman"),
+		"Array.Has(string) must always be 0 — index-based, not value-membership")
+}
+Test("window_utils: Array.Has(string) is index-presence, never value-membership", _WU_ArrayHasIsIndexNotMembership)
+
+_WU_SystemClassMembershipExcludesDesktop() {
+	; Guards the || membership check that replaced the broken Array.Has
+	IsSystem := (c) => (c == "Shell_TrayWnd" || c == "Progman" || c == "WorkerW")
+	AssertTrue(IsSystem("Progman"), "desktop class Progman must be excluded from Alt-Tab")
+	AssertTrue(IsSystem("WorkerW"), "WorkerW must be excluded from Alt-Tab")
+	AssertTrue(IsSystem("Shell_TrayWnd"), "taskbar must be excluded from Alt-Tab")
+	AssertFalse(IsSystem("CabinetWClass"), "real Explorer window must NOT be excluded")
+}
+Test("window_utils: system window class blacklist works with || membership", _WU_SystemClassMembershipExcludesDesktop)

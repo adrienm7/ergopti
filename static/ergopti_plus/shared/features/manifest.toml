@@ -1756,12 +1756,6 @@ type = "string"
 description_key = "menu.ahk.metrics.metrics_shortcut_apps"
 
 [[features.ahk.metrics]]
-id = "metrics_show_wpm_menubar"
-default = false
-type = "boolean"
-description_key = "menu.ahk.metrics.metrics_show_wpm_menubar"
-
-[[features.ahk.metrics]]
 id = "metrics_wpm_menubar_colors"
 default = false
 type = "boolean"

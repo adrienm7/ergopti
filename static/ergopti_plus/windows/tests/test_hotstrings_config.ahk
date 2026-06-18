@@ -600,3 +600,56 @@ TestHotstringsConfig_SetWordDelimitersGetRoundTrip() {
 }
 Test("HotstringsConfig: SetWordDelimiters / GetWordDelimiters round-trip",
 	TestHotstringsConfig_SetWordDelimitersGetRoundTrip)
+
+
+; ==============================================================================
+; ======= F06 — _SaveOverrides must preserve [__global__] delimiters ===========
+; ==============================================================================
+
+; Regression guard (F06 — 2026-06-18): _SaveOverrides rebuilt the file from the
+; _HotstringsOverrides Map only, never touching _HotstringsWordDelimiters /
+; _HotstringsConsumedDelimiters. Any category or section edit therefore silently
+; erased the [__global__] block — user-configured terminators vanished on disk.
+; The fix re-emits [__global__] at the top of every full-file rebuild.
+TestHotstringsConfig_SaveOverridesPreservesGlobalDelimiters() {
+	global _HotstringsOverrides, _HotstringsOverridesPath
+	global _HotstringsWordDelimiters, _HotstringsConsumedDelimiters
+
+	SavedPath     := _HotstringsOverridesPath
+	SavedOv       := _HotstringsOverrides
+	SavedWordDel  := _HotstringsWordDelimiters
+	SavedConsumed := _HotstringsConsumedDelimiters
+
+	Path := A_Temp . "\hotstrings_config_f06_global.toml"
+	try FileDelete(Path)
+
+	; Wire up a real file so _SaveOverrides actually writes to disk
+	_HotstringsOverrides     := Map()
+	_HotstringsOverridesPath := Path
+
+	; 1. Set custom delimiters — _SaveGlobalKey writes [__global__] to disk
+	_HotstringsWordDelimiters   := "AB"
+	_HotstringsConsumedDelimiters := "A"
+
+	; 2. Trigger _SaveOverrides via a category edit (full-file rebuild)
+	HotstringsSetOverride("rolls", "", "delay", 1.2)
+
+	; 3. Read the delimiter back from disk directly — _SaveOverrides must have
+	;    re-emitted [__global__] during the rebuild, not clobbered it
+	WordDelOnDisk     := _ParseGlobalKey(Path, "word_delimiters")
+	ConsumedDelOnDisk := _ParseGlobalKey(Path, "consumed_delimiters")
+
+	try FileDelete(Path)
+	_HotstringsOverridesPath      := SavedPath
+	_HotstringsOverrides          := SavedOv
+	_HotstringsWordDelimiters     := SavedWordDel
+	_HotstringsConsumedDelimiters := SavedConsumed
+	HotstringsResolveBumpGen()
+
+	; 4. Assert the custom delimiters survived the rebuild
+	AssertEqual("AB", WordDelOnDisk,
+		"[__global__] word_delimiters must survive a subsequent _SaveOverrides")
+	AssertEqual("A", ConsumedDelOnDisk,
+		"[__global__] consumed_delimiters must survive a subsequent _SaveOverrides")
+}
+Test("hotstrings_config: _SaveOverrides preserves [__global__] delimiters", TestHotstringsConfig_SaveOverridesPreservesGlobalDelimiters)

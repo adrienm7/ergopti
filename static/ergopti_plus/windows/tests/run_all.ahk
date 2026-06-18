@@ -160,6 +160,7 @@ InstallSendNoOps()
 #Include test_domain_registry.ahk
 #Include test_domain_expander.ahk
 #Include test_toml_loader.ahk
+#Include test_toml_helpers_roundtrip.ahk
 #Include test_hotstrings_cache.ahk
 #Include test_hotstrings_config.ahk
 #Include test_terminators.ahk
@@ -181,6 +182,11 @@ InstallSendNoOps()
 ; the module files are #Include'd from within test_shortcuts.ahk itself so the
 ; include paths are resolved relative to the tests/ directory.
 #Include test_shortcuts.ahk
+
+; Metrics shortcuts — MS_ToAhkSyntax is pure logic (no OS calls, no hotkeys
+; registered at top level) so the file is safe to include in the headless runner.
+#Include ../lib/metrics/metrics_shortcuts.ahk
+#Include test_metrics_shortcut_named_key.ahk
 
 ; LLM modules — pure-logic subset (profiles, models, api_common, api_ollama,
 ; api_remote, prediction_engine) included here to test JSON parsing, profile
@@ -344,6 +350,7 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 #Include test_hse_conform_double_fire.ahk
 #Include meta/test_llm_tray_deferred_build.ahk
 #Include meta/test_logger_format_placeholders.ahk
+#Include meta/test_logger_sub_files_routing.ahk
 #Include meta/test_prefix_render_deferred.ahk
 #Include meta/test_input_serialization.ahk
 #Include meta/test_personal_load_once.ahk
@@ -415,6 +422,7 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 #Include meta/test_menu_dispatch_callbacks_unbounded_growth.ahk
 #Include meta/test_ni_isvpnactive_missing_return.ahk
 #Include meta/test_no_onexit_keylogger_flush.ahk
+#Include meta/test_onboarding_no_appstate.ahk
 #Include meta/test_numeric_prompt_throws_on_nonnumeric.ahk
 #Include meta/test_oneshotshift_lalt_lshift_stuck.ahk
 #Include meta/test_oneshotshift_suspend_guard.ahk
@@ -530,8 +538,12 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 #Include meta/test_timer_scheduler_oneshot_suspend.ahk
 #Include meta/test_hotstrings_cache_atomic_write.ahk
 #Include meta/test_keylogger_hook_global_try.ahk
+#Include meta/test_keylogger_idle_defer_preserves_pending.ahk
+#Include meta/test_keylogger_rollover_force_ingest.ahk
 #Include meta/test_klnet_starter_deref.ahk
 #Include test_audit_v4_fixes.ahk
+#Include test_hotstrings_escape_braces.ahk
+#Include meta/test_hotstrings_combo_auto_escaping.ahk
 
 ; Watchdog: kill the process if RunTests() never returns (e.g. a corpus
 ; consumer blocks on a synchronous HTTP call, an InputHook with no timeout,

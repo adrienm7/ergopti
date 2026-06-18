@@ -109,7 +109,11 @@ ST_Has(Key) {
 ; @return {Array} Array of key name strings; empty Array on error or no keys.
 ST_Keys() {
 	try {
-		return Reg_EnumValues(STORAGE_REG_BASE)
+		local Records := Reg_EnumValues(STORAGE_REG_BASE)
+		local Names := []
+		for Rec in Records
+			Names.Push(Rec.name)
+		return Names
 	} catch {
 		return []
 	}

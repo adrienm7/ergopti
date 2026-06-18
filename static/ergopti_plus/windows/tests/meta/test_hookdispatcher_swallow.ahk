@@ -31,5 +31,30 @@ _THS_CheckModifierRelease() {
 		"HookDispatcher catch must call ErgoptiGlobalErrorHandler(e, ...) to release stuck modifiers")
 }
 
+_THS_EscalationIsThrottled() {
+	Src := _THS_ReadSource("lib/hook_dispatcher.ahk")
+	; Find the catch region. The escalation must appear inside the throttle if-block,
+	; not after it — otherwise every exception fires the heavyweight crash handler per keystroke.
+	; Verify: the ErgoptiGlobalErrorHandler call must not appear AFTER the closing brace of
+	; the throttle block within the catch.
+	; Simple check: the token after the throttle block's _err_cache[sig] := now assignment
+	; must contain ErgoptiGlobalErrorHandler before the next unindented block closes.
+	CacheAssignIdx := InStr(Src, "_err_cache[sig] := now")
+	EscalateIdx    := InStr(Src, "ErgoptiGlobalErrorHandler(e")
+	; Also check that ErgoptiGlobalErrorHandler appears WITHIN 300 chars of the cache assignment
+	; (inside the if block, not floating after it).
+	Assert(EscalateIdx > CacheAssignIdx, "ErgoptiGlobalErrorHandler must appear after throttle cache assignment")
+	Assert((EscalateIdx - CacheAssignIdx) < 400,
+		"ErgoptiGlobalErrorHandler must be inside the throttle block, not floating outside it after the closing brace")
+}
+
+_THS_DeltaIsWrapSafe() {
+	Src := _THS_ReadSource("lib/hook_dispatcher.ahk")
+	Assert(InStr(Src, "& 0xFFFFFFFF") > 0,
+		"error cache delta must use 32-bit wrap mask to avoid 49-day suppression")
+}
+
 Test("HookDispatcher: logs swallowed subscriber exceptions", _THS_Check)
 Test("HookDispatcher: catch escalates to ErgoptiGlobalErrorHandler for modifier release", _THS_CheckModifierRelease)
+Test("hook_dispatcher: ErgoptiGlobalErrorHandler escalation is throttled (not per-keystroke)", _THS_EscalationIsThrottled)
+Test("hook_dispatcher: error cache delta uses 32-bit wrap mask", _THS_DeltaIsWrapSafe)

@@ -215,14 +215,36 @@ TOML_CoerceValue(raw) {
 }
 
 TOML_Unescape(s) {
-    ; Process \\ FIRST so later replacements cannot misinterpret the resulting
-    ; single backslash (e.g. "\\n" must yield literal "\n", not a newline).
-    s := StrReplace(s, "\\", "\")
-    s := StrReplace(s, '\"', '"')
-    s := StrReplace(s, "\n", "`n")
-    s := StrReplace(s, "\t", "`t")
-    s := StrReplace(s, "\r", "`r")
-    return s
+	; Single left-to-right pass prevents the sequential-StrReplace ordering bug where
+	; \\ → \ first would let the bare backslash combine with the next char on a later
+	; pass (e.g. "C:\\notes" → "C:\notes" → "C:<NL>otes" with the old approach).
+	if !InStr(s, "\")
+		return s
+	Result := "", i := 1, n := StrLen(s)
+	while (i <= n) {
+		c := SubStr(s, i, 1)
+		if (c == "\" and i < n) {
+			nc := SubStr(s, i + 1, 1)
+			if (nc == "\") {
+				Result .= "\"
+			} else if (nc == '"') {
+				Result .= '"'
+			} else if (nc == "n") {
+				Result .= "`n"
+			} else if (nc == "t") {
+				Result .= "`t"
+			} else if (nc == "r") {
+				Result .= "`r"
+			} else {
+				Result .= nc
+			}
+			i += 2
+		} else {
+			Result .= c
+			i += 1
+		}
+	}
+	return Result
 }
 
 
@@ -380,11 +402,11 @@ TOML_BatchWrite(Path, Updates) {
 ; feeds their previous values back into TOML_BatchWrite. Do not rely on this
 ; step to remove stale keys; it normalizes formatting only.
 TOML_RunStrictCanonicalization(Path) {
-    global ConfigurationFile, _SaveFullConfigReady, AppState
+    global ConfigurationFile, _SaveFullConfigReady, _TOML_STRICT_CANON_IN_PROGRESS
 
-    if !IsSet(AppState) or !AppState.Has("toml_strict_canon_in_progress")
+    if !IsSet(_TOML_STRICT_CANON_IN_PROGRESS)
         return
-    if AppState["toml_strict_canon_in_progress"]
+    if _TOML_STRICT_CANON_IN_PROGRESS
         return
     if !IsSet(ConfigurationFile)
         return
@@ -393,9 +415,9 @@ TOML_RunStrictCanonicalization(Path) {
     if !IsSet(_SaveFullConfigReady)
         return
 
-    AppState["toml_strict_canon_in_progress"] := true
+    _TOML_STRICT_CANON_IN_PROGRESS := true
     try SaveFullConfig()
-    finally AppState["toml_strict_canon_in_progress"] := false
+    finally _TOML_STRICT_CANON_IN_PROGRESS := false
 }
 
 TOML_RenderKey(k) {

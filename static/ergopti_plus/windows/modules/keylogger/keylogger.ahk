@@ -1320,7 +1320,7 @@ KL_ReadNewTodayLog() {
     return [new_offset, entries]
 }
 
-KL_IngestOnce() {
+KL_IngestOnce(force := false) {
     if !Keylogger.initialized
         return
     ; Never run the ingest tick while the driver is paused. No new events
@@ -1328,6 +1328,12 @@ KL_IngestOnce() {
     ; would do redundant I/O; more importantly, running the heavy FileAppend
     ; + live-push while suspended violates the pause invariant.
     if A_IsSuspended && !Keylogger._shutting_down
+        return
+    ; Guard against running the heavy SQL/I/O path during a typing burst.
+    ; Moved BEFORE the pending-entries drain so we never clear _pending_entries
+    ; from RAM and then defer — that would leave entries on disk only, where
+    ; KL_JsonDecode is a no-op on 64-bit and entries are silently lost.
+    if (!force and IsSet(KLHook) and KLHook.last_tick != 0 and A_TickCount - KLHook.last_tick < KeylogConst.INGEST_IDLE_MS)
         return
     ; Prefer the in-RAM queue when available — it sidesteps KL_JsonDecode
     ; entirely (COM ScriptControl is x86-only and silently empties Maps
@@ -1376,14 +1382,11 @@ KL_IngestOnce() {
 	}
 
     ; Heavy part: SQL conversion and data.sql FileAppend.
-    ; Guard with a keyboard-idle check: the conversion + I/O can take ~100-500 ms
-    ; for large batches; running it during a typing burst exceeds
-    ; LowLevelHooksTimeout (~300 ms) and silently drops keystrokes.
-    ; Deferred to the next ingest tick if the user typed recently.
-    ; See project_keyboard_thread_priority.
-    if (IsSet(KLHook) and KLHook.last_tick != 0 and A_TickCount - KLHook.last_tick < KeylogConst.INGEST_IDLE_MS)
-        return
-
+    ; The keyboard-idle guard that defers this work during typing bursts is now
+    ; at the very top of this function (before the pending-entries drain) so that
+    ; we never clear _pending_entries from RAM and then return without persisting
+    ; to SQL — which would silently lose events on 64-bit hosts where KL_JsonDecode
+    ; is a no-op.
     statements := []
     for _, entry in entries {
         for _, sql in KL_BuildInserts(entry)
@@ -1448,7 +1451,9 @@ KL_IngestOnce() {
 KL_DayRollover() {
     if !Keylogger.initialized
         return
-    KL_IngestOnce()
+    ; Force a full ingest regardless of typing activity — we are about to delete
+    ; today.log, so any un-ingested lines must reach data.sql now or be lost.
+    KL_IngestOnce(true)
     try FileAppend(
         "`n-- === day rollover " . Keylogger.today_log_date . " -> " . KL_Today() . " ===`n",
         Keylogger.data_sql_path, "UTF-8")

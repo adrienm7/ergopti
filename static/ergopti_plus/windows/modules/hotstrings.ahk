@@ -585,14 +585,25 @@ if Features["hotstrings"]["dynamic"]["text_expansion_personal_information"]["ena
 
 	; In case email is "^a" we want to send raw string and not Ctrl + A
 	EscapeSpecialChars(text) {
-		text := StrReplace(text, "{", "{{}")
-		text := StrReplace(text, "}", "{}}")
-		text := StrReplace(text, "^", "{Asc 94}")
-		text := StrReplace(text, "~", "{Asc 126}")
-		text := StrReplace(text, "+", "{+}")
-		text := StrReplace(text, "!", "{!}")
-		text := StrReplace(text, "#", "{#}")
-		return text
+		; Escape braces atomically so the '{' -> '{{}'  expansion does not feed a
+		; '}' into a later StrReplace pass (which would corrupt '{' into '{{{}}}')
+		escaped := ""
+		loop parse, text {
+			c := A_LoopField
+			if (c == "{")
+				escaped .= "{{}"
+			else if (c == "}")
+				escaped .= "{}}"
+			else
+				escaped .= c
+		}
+		; The remaining escapes do not emit '{' or '}' so sequential StrReplace is safe
+		escaped := StrReplace(escaped, "^", "{Asc 94}")
+		escaped := StrReplace(escaped, "~", "{Asc 126}")
+		escaped := StrReplace(escaped, "+", "{+}")
+		escaped := StrReplace(escaped, "!", "{!}")
+		escaped := StrReplace(escaped, "#", "{#}")
+		return escaped
 	}
 
 	Generate(keys, hotstrings, combo, len) {
@@ -628,7 +639,7 @@ if Features["hotstrings"]["dynamic"]["text_expansion_personal_information"]["ena
 		Value := ""
 		loop StrLen(Combo) {
 			ComboLetter := SubStr(Combo, A_Index, 1)
-			Value := Value . PersonalInformationHotstrings[ComboLetter] . "{Tab}"
+			Value := Value . EscapeSpecialChars(PersonalInformationHotstrings[ComboLetter]) . "{Tab}"
 		}
 		CreateHotstring("*", "@" . Combo . ScriptInformation["MagicKey"], Value, Map("OnlyText", False).Set(
 			"FinalResult", True))

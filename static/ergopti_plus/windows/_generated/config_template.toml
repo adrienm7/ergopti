@@ -441,7 +441,6 @@ filter_private_browsing = true
 metrics_enabled = true
 metrics_shortcut_typing = ""
 metrics_shortcut_apps = ""
-metrics_show_wpm_menubar = false
 metrics_wpm_menubar_colors = false
 metrics_filter_secure_field = true
 metrics_filter_system_auth = true

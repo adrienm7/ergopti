@@ -215,15 +215,17 @@ class HookDispatcher {
 			} catch as e {
 				sig := event_type . ":" . e.Message
 				now := A_TickCount
-				if (!_err_cache.Has(sig) || now - _err_cache[sig] > 60000) {
+				if (!_err_cache.Has(sig) || ((now - _err_cache[sig]) & 0xFFFFFFFF) > 60000) {
 					_err_cache[sig] := now
 					try LoggerWarn("HookDispatcher", "Subscriber for '{1}' threw: {2}.", event_type, e.Message)
+					; Escalate to the global handler so modifier-release logic runs.
+					; A subscriber exception during a Ctrl/Shift/Alt keydown would
+					; otherwise leave the modifier virtually stuck — the global handler
+					; calls _ShouldReleaseModifier() which fixes it.
+					; Escalate (releases stuck modifiers, builds crash report) at most once
+					; per signature per 60s — never per keystroke under a persistent fault.
+					try ErgoptiGlobalErrorHandler(e, "Continue")
 				}
-				; Escalate to the global handler so modifier-release logic runs.
-				; A subscriber exception during a Ctrl/Shift/Alt keydown would
-				; otherwise leave the modifier virtually stuck — the global handler
-				; calls _ShouldReleaseModifier() which fixes it.
-				try ErgoptiGlobalErrorHandler(e, "Continue")
 			}
 		}
 	}

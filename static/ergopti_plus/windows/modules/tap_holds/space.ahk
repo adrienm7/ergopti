@@ -141,13 +141,16 @@ _SpaceTap() {
 }
 
 _SpaceHoldCtrl(captured) {
-    SendInput("{LCtrl Down}")
-    ; Use ^ prefix so the key is sent as Ctrl+<key> regardless of layout.
-    ; captured is already the translated char (e.g. 'a'), ^ applies Ctrl to it.
-    if (captured != "" and captured != " ")
-        SendInput("^" . captured)
-    KeyWait("SC039", "U T2")
-    SendInput("{LCtrl Up}")
+	SendInput("{LCtrl Down}")
+	; Use ^ prefix so the key is sent as Ctrl+<key> regardless of layout;
+	; captured is already the translated char (e.g. 'a'), ^ applies Ctrl to it
+	if (captured != "" and captured != " ")
+		SendInput("^" . captured)
+	try {
+		KeyWait("SC039", "U T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC)
+	} finally {
+		SendInput("{LCtrl Up}")
+	}
 }
 
 _SpaceHoldShift(captured) {
@@ -164,31 +167,40 @@ _SpaceHoldShift(captured) {
 }
 
 _SpaceHoldAlt(captured) {
-    SendInput("{LAlt Down}")
-    if (captured != "" and captured != " ")
-        SendInput("!" . captured)
-    KeyWait("SC039", "U T2")
-    SendInput("{LAlt Up}")
+	SendInput("{LAlt Down}")
+	if (captured != "" and captured != " ")
+		SendInput("!" . captured)
+	try {
+		KeyWait("SC039", "U T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC)
+	} finally {
+		SendInput("{LAlt Up}")
+	}
 }
 
 _SpaceHoldAltGr(captured) {
-    ; RAlt is pressed once at the top and released once below — a balanced
-    ; Down/Up pair. The captured char is sent while RAlt is already held, so
-    ; it must NOT re-press the modifier (re-pressing left RAlt logically held
-    ; after the single Up, leaking AltGr onto the next keystrokes).
-    SendInput("{RAlt Down}")
-    if (captured != "" and captured != " ")
-        SendInput(captured)
-    KeyWait("SC039", "U T2")
-    SendInput("{RAlt Up}")
+	; RAlt is pressed once at the top and released once below — a balanced
+	; Down/Up pair. The captured char is sent while RAlt is already held, so
+	; it must NOT re-press the modifier (re-pressing RAlt while it is logically
+	; held would leak AltGr onto subsequent keystrokes)
+	SendInput("{RAlt Down}")
+	if (captured != "" and captured != " ")
+		SendInput(captured)
+	try {
+		KeyWait("SC039", "U T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC)
+	} finally {
+		SendInput("{RAlt Up}")
+	}
 }
 
 _SpaceHoldWin(captured) {
-    SendInput("{LWin Down}")
-    if (captured != "" and captured != " ")
-        SendInput("#" . captured)
-    KeyWait("SC039", "U T2")
-    SendInput("{LWin Up}")
+	SendInput("{LWin Down}")
+	if (captured != "" and captured != " ")
+		SendInput("#" . captured)
+	try {
+		KeyWait("SC039", "U T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC)
+	} finally {
+		SendInput("{LWin Up}")
+	}
 }
 
 ; Tap-only (hold=none, tap action set to something other than space).

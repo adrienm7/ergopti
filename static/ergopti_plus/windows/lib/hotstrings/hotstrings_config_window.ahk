@@ -691,7 +691,7 @@ _HCW_ClearField(Field) {
 }
 
 _HCW_ResetAll() {
-	global _HCW_CATEGORY_LIST, _HCWGui
+	global _HCW_CATEGORY_LIST, _HCWGui, _HCWWidgets
 	for _, E in _HCW_CATEGORY_LIST {
 		if E.IsPersonal {
 			_HCW_PatchTomlMeta(E.Path, "", "delay", "")
@@ -714,9 +714,15 @@ _HCW_ResetAll() {
 			}
 		}
 	}
+	; Flush any pending debounce timer before controls are destroyed
+	_HCW_FlushNumericWrite()
 	if (_HCWGui != 0) {
 		_HCWGui.Destroy()
 	}
+	; Destroy() does not fire OnEvent('Close'), so clear globals manually to
+	; prevent OpenHotstringsConfigWindow from trying to Show() a destroyed Gui
+	_HCWGui := 0
+	_HCWWidgets := 0
 	TrayTip(t("hs_config.notify_reset_all"), t("hs_config.btn_reset_all"), "Iconi Mute")
 }
 
