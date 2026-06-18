@@ -272,6 +272,11 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	-- ===== 1.2) Module Synchronization =====
 	-- =======================================
 
+	-- Forward-declared so apply_metrics_shortcut and apply_apps_time_shortcut
+	-- (defined below) capture these as upvalues rather than seeing global nil.
+	local _metrics_hk_box   = {}
+	local _apps_time_hk_box = {}
+
 	local _metrics_hk = nil
 	local function apply_metrics_shortcut(mods, key)
 		if _metrics_hk then pcall(function() _metrics_hk:delete() end); _metrics_hk = nil end
@@ -328,9 +333,9 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	-- Build the dependency bag for MenuState.sync_state_to_modules
 	-- _metrics_hk and _apps_time_hk are boxed in single-element tables so
 	-- MenuState can read their current value even after they are reassigned
-	-- by apply_metrics_shortcut / apply_apps_time_shortcut
-	local _metrics_hk_box   = {}
-	local _apps_time_hk_box = {}
+	-- by apply_metrics_shortcut / apply_apps_time_shortcut.
+	-- (Boxes forward-declared above so apply_metrics/apps_time_shortcut can
+	-- capture them as upvalues at definition time.)
 
 	local function sync_state_to_modules(saved, config_absent)
 		MenuState.sync_state_to_modules(state, saved, config_absent, {
