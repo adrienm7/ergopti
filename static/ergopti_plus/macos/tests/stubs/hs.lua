@@ -489,8 +489,10 @@ M.pathwatcher = {
 
 M.urlevent = { bind = function() end }
 M.pasteboard = {
-	getContents = function() return "" end,
-	setContents = function(_) return true end,
+	getContents  = function() return "" end,
+	setContents  = function(_) return true end,
+	readAllData  = function() return {} end,
+	writeAllData = function(_) return true end,
 }
 M.osascript = { applescript = function(_) return false, nil, "" end }
 M.spaces = {
