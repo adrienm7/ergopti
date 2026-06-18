@@ -166,8 +166,12 @@ function M.install_extension()
 		return false
 	end
 
-	write_file(pkg_path, PACKAGE_JSON)
-	write_file(ext_path, EXTENSION_JS)
+	local ok_pkg = write_file(pkg_path, PACKAGE_JSON)
+	local ok_ext = write_file(ext_path, EXTENSION_JS)
+	if not ok_pkg or not ok_ext then
+		Logger.error(LOG, "Extension install failed — could not write to '%s'.", EXT_DIR)
+		return false
+	end
 	Logger.info(LOG, string.format("Extension installed in %s.", EXT_DIR))
 	local dialog = require("lib.dialog_util")
 	dialog.alert(i18n.get("vscode.reload_required"), 4)
