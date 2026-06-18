@@ -98,7 +98,10 @@ local function forward_chunk(chunk)
 	for line in chunk:gmatch("([^\n\r]+)") do
 		if line:match("%S") and not KNOWN_MARKERS[line] then
 			Logger.info(LOG, "[script] %s", line)
+			-- set_detail shows the latest line at a glance; append_log preserves
+			-- the full audit trail — mirroring the mlx_deps_checker behaviour.
 			pcall(llm_progress.set_detail, line)
+			pcall(llm_progress.append_log, line)
 		end
 	end
 end
