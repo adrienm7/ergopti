@@ -180,10 +180,14 @@ function M.set_enabled(value)
 	if _state.enabled then
 		M.regenerate()
 	elseif was_enabled then
-		-- Only kill if we were the ones running KE — do not touch an independently
-		-- running KE instance if the feature was already off before this call.
-		pcall(function() hs.execute(KeLifecycle.KILL_CMD) end)
-		Logger.info(LOG, "KE daemons stopped (feature disabled).")
+		local hs_owned = type(KeLifecycle.is_hs_owned_bridge) == "function"
+			and KeLifecycle.is_hs_owned_bridge() or false
+		if hs_owned then
+			pcall(function() hs.execute(KeLifecycle.KILL_CMD) end)
+			Logger.info(LOG, "KE daemons stopped (feature disabled).")
+		else
+			Logger.info(LOG, "Feature disabled but KE left alive — session appears user-managed.")
+		end
 	end
 end
 

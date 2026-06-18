@@ -345,8 +345,11 @@ local function notify_karabiner_ready()
 
 			local now = hs.timer.secondsSinceEpoch()
 			if (now - _last_karabiner_ready_notify_at) < KARABINER_READY_NOTIFY_COOLDOWN_SEC then
-				Logger.debug(LOG, "Karabiner ready notification skipped (cooldown %.1fs).",
+				Logger.debug(LOG, "Karabiner ready notification skipped (cooldown %.1fs) — will retry.",
 					KARABINER_READY_NOTIFY_COOLDOWN_SEC)
+				-- Re-arm the pending flag so flush_pending_ready_notification delivers
+				-- the notification once the cooldown window expires.
+				_pending_karabiner_ready_notify = true
 				return
 			end
 			_last_karabiner_ready_notify_at = now
