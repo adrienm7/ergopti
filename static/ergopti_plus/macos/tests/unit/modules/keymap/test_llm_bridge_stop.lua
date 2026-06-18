@@ -70,11 +70,12 @@ helpers.describe("llm_bridge M.stop(): stops the escape trap (escape-trap-ghost-
 
 		-- Intercept tooltip before the module loads so the module-level wiring
 		-- binds to our stub instead of the real tooltip.
+		-- llm_bridge.lua requires "ui.tooltip", not "lib.tooltip".
 		local show_cb = nil
-		local orig_tooltip = package.loaded["lib.tooltip"] or {}
+		local orig_tooltip = package.loaded["ui.tooltip"] or {}
 		local orig_set_on_show = orig_tooltip.set_on_show_callback
 		orig_tooltip.set_on_show_callback = function(cb) show_cb = cb end
-		package.loaded["lib.tooltip"] = orig_tooltip
+		package.loaded["ui.tooltip"] = orig_tooltip
 
 		-- Load the module — module-level code runs and calls
 		-- tooltip.set_on_show_callback(arm_escape_trap), storing arm_escape_trap in show_cb.
@@ -104,6 +105,7 @@ helpers.describe("llm_bridge M.stop(): stops the escape trap (escape-trap-ghost-
 		if orig_set_on_show then
 			orig_tooltip.set_on_show_callback = orig_set_on_show
 		end
+		package.loaded["ui.tooltip"] = orig_tooltip
 
 		helpers.assert_true(trap_stopped,
 			"M.stop() must call :stop() on the escape trap eventtap (escape-trap-ghost-tap)")
