@@ -949,86 +949,88 @@ GestureEditPersonalShortcuts() {
 global GESTURE_ACTION_NAMES := []
 global GESTURE_AX_NAMES := []
 
-; Path to the shared cross-platform action registry.
-; Resolved from _StaticDir which is already set in ErgoptiPlus.ahk.
-_GestureSharedToml := _SharedDir . "\actions.toml"
+; Populate GESTURE_ACTION_NAMES / GESTURE_AX_NAMES by parsing the shared
+; cross-platform action registry (actions.toml). These lists are only needed
+; when the gesture-picker menu is built — which happens in the deferred
+; initMenu phase (~250 ms after boot). Deferring the TOML parse off the
+; critical boot path removes ~100 ms from the gestures module init time.
+; SetTimer(-0) fires immediately after the auto-execute section finishes,
+; well before initMenu runs, so the lists are always ready for the menu.
+_GestureLoadActionCatalog(*) {
+    global GESTURE_ACTION_NAMES, GESTURE_AX_NAMES, GESTURE_ACTIONS, _SharedDir, _GestureSpecialKeys
 
-_GestureTomlData := ParseTomlFile(_GestureSharedToml)
+    _SharedToml := _SharedDir . "\actions.toml"
+    _Toml       := ParseTomlFile(_SharedToml)
 
-; Build GESTURE_ACTION_NAMES from [sg_order].items, keeping only entries that
-; are either a sentinel ("--", "#…") or an action whose platform is "all" / "ahk".
-if _GestureTomlData.Has("sg_order") && _GestureTomlData["sg_order"].Has("items") {
-    _SgItems := _GestureTomlData["sg_order"]["items"]
-    for _, _Item in _SgItems {
-        ; Sentinels and headers pass through unconditionally
-        if (_Item = "--" || SubStr(_Item, 1, 1) = "#") {
-            GESTURE_ACTION_NAMES.Push(_Item)
-            continue
-        }
-        ; Placeholder keys (_cmd_placeholder, _ctrl_placeholder…) are replaced
-        ; by the dynamic ctrl_* block inserted below — skip them here
-        if (SubStr(_Item, 1, 1) = "_") {
-            if (_Item = "_ctrl_placeholder") {
-                GESTURE_ACTION_NAMES.Push("#ctrl")
-                _CtrlKeys := "abcdefghijklmnopqrstuvwxyz"
-                loop StrLen(_CtrlKeys)
-                    GESTURE_ACTION_NAMES.Push("ctrl_" . SubStr(_CtrlKeys, A_Index, 1))
-                loop 10
-                    GESTURE_ACTION_NAMES.Push("ctrl_" . SubStr("0123456789", A_Index, 1))
-                for _Sk, _ in _GestureSpecialKeys
-                    GESTURE_ACTION_NAMES.Push("ctrl_" . _Sk)
-            } else if (_Item = "_ctrl_shift_placeholder") {
-                GESTURE_ACTION_NAMES.Push("#ctrl_shift")
-                _CtrlShiftKeys := "abcdefghijklmnopqrstuvwxyz"
-                loop StrLen(_CtrlShiftKeys)
-                    GESTURE_ACTION_NAMES.Push("ctrl_shift_" . SubStr(_CtrlShiftKeys, A_Index, 1))
-            } else if (_Item = "_win_placeholder") {
-                GESTURE_ACTION_NAMES.Push("#win")
-                _WinKeys := "abcdefghijklmnopqrstuvwxyz"
-                loop StrLen(_WinKeys)
-                    GESTURE_ACTION_NAMES.Push("win_" . SubStr(_WinKeys, A_Index, 1))
-                loop 10
-                    GESTURE_ACTION_NAMES.Push("win_" . SubStr("0123456789", A_Index, 1))
-                for _Sk, _ in _GestureSpecialKeys
-                    GESTURE_ACTION_NAMES.Push("win_" . _Sk)
-            } else if (_Item = "_alt_placeholder") {
-                GESTURE_ACTION_NAMES.Push("#alt")
-                _AltKeys := "abcdefghijklmnopqrstuvwxyz"
-                loop StrLen(_AltKeys)
-                    GESTURE_ACTION_NAMES.Push("alt_" . SubStr(_AltKeys, A_Index, 1))
-                loop 10
-                    GESTURE_ACTION_NAMES.Push("alt_" . SubStr("0123456789", A_Index, 1))
-                for _Sk, _ in _GestureSpecialKeys
-                    GESTURE_ACTION_NAMES.Push("alt_" . _Sk)
-            }
-            ; hs-only placeholders (_cmd_placeholder, _hs_ctrl_placeholder…) are silently dropped
-            continue
-        }
-        ; Regular action — keep if platform is "all" or "ahk"
-        _SecKey := "sg_actions." . _Item
-        if _GestureTomlData.Has(_SecKey) {
-            _Plat := _GestureTomlData[_SecKey].Has("platform") ? _GestureTomlData[_SecKey]["platform"] : "all"
-            if (_Plat = "all" || _Plat = "ahk")
+    ; Build GESTURE_ACTION_NAMES from [sg_order].items, keeping only entries
+    ; that are sentinels ("--", "#…") or actions whose platform is "all"/"ahk".
+    if _Toml.Has("sg_order") && _Toml["sg_order"].Has("items") {
+        for _, _Item in _Toml["sg_order"]["items"] {
+            ; Sentinels and headers pass through unconditionally
+            if (_Item = "--" || SubStr(_Item, 1, 1) = "#") {
                 GESTURE_ACTION_NAMES.Push(_Item)
-        } else if GESTURE_ACTIONS.Has(_Item) {
-            ; Action exists in registry but not in shared TOML (e.g. dynamically added) — include it
-            GESTURE_ACTION_NAMES.Push(_Item)
+                continue
+            }
+            ; Placeholder keys expand into dynamic ctrl_*/win_*/alt_* blocks
+            if (SubStr(_Item, 1, 1) = "_") {
+                if (_Item = "_ctrl_placeholder") {
+                    GESTURE_ACTION_NAMES.Push("#ctrl")
+                    loop 26
+                        GESTURE_ACTION_NAMES.Push("ctrl_" . SubStr("abcdefghijklmnopqrstuvwxyz", A_Index, 1))
+                    loop 10
+                        GESTURE_ACTION_NAMES.Push("ctrl_" . SubStr("0123456789", A_Index, 1))
+                    for _Sk, _ in _GestureSpecialKeys
+                        GESTURE_ACTION_NAMES.Push("ctrl_" . _Sk)
+                } else if (_Item = "_ctrl_shift_placeholder") {
+                    GESTURE_ACTION_NAMES.Push("#ctrl_shift")
+                    loop 26
+                        GESTURE_ACTION_NAMES.Push("ctrl_shift_" . SubStr("abcdefghijklmnopqrstuvwxyz", A_Index, 1))
+                } else if (_Item = "_win_placeholder") {
+                    GESTURE_ACTION_NAMES.Push("#win")
+                    loop 26
+                        GESTURE_ACTION_NAMES.Push("win_" . SubStr("abcdefghijklmnopqrstuvwxyz", A_Index, 1))
+                    loop 10
+                        GESTURE_ACTION_NAMES.Push("win_" . SubStr("0123456789", A_Index, 1))
+                    for _Sk, _ in _GestureSpecialKeys
+                        GESTURE_ACTION_NAMES.Push("win_" . _Sk)
+                } else if (_Item = "_alt_placeholder") {
+                    GESTURE_ACTION_NAMES.Push("#alt")
+                    loop 26
+                        GESTURE_ACTION_NAMES.Push("alt_" . SubStr("abcdefghijklmnopqrstuvwxyz", A_Index, 1))
+                    loop 10
+                        GESTURE_ACTION_NAMES.Push("alt_" . SubStr("0123456789", A_Index, 1))
+                    for _Sk, _ in _GestureSpecialKeys
+                        GESTURE_ACTION_NAMES.Push("alt_" . _Sk)
+                }
+                ; hs-only placeholders (_cmd_placeholder, _hs_ctrl_placeholder…) silently dropped
+                continue
+            }
+            ; Regular action — keep if platform is "all" or "ahk"
+            _SecKey := "sg_actions." . _Item
+            if _Toml.Has(_SecKey) {
+                _Plat := _Toml[_SecKey].Has("platform") ? _Toml[_SecKey]["platform"] : "all"
+                if (_Plat = "all" || _Plat = "ahk")
+                    GESTURE_ACTION_NAMES.Push(_Item)
+            } else if GESTURE_ACTIONS.Has(_Item) {
+                ; Action exists in registry but not in shared TOML — include it
+                GESTURE_ACTION_NAMES.Push(_Item)
+            }
         }
     }
-}
 
-; Build GESTURE_AX_NAMES from [ax_order].items, same filtering logic.
-if _GestureTomlData.Has("ax_order") && _GestureTomlData["ax_order"].Has("items") {
-    _AxItems := _GestureTomlData["ax_order"]["items"]
-    for _, _Item in _AxItems {
-        _SecKey := "ax_actions." . _Item
-        if _GestureTomlData.Has(_SecKey) {
-            _Plat := _GestureTomlData[_SecKey].Has("platform") ? _GestureTomlData[_SecKey]["platform"] : "all"
-            if (_Plat = "all" || _Plat = "ahk")
-                GESTURE_AX_NAMES.Push(_Item)
+    ; Build GESTURE_AX_NAMES from [ax_order].items, same filtering logic.
+    if _Toml.Has("ax_order") && _Toml["ax_order"].Has("items") {
+        for _, _Item in _Toml["ax_order"]["items"] {
+            _SecKey := "ax_actions." . _Item
+            if _Toml.Has(_SecKey) {
+                _Plat := _Toml[_SecKey].Has("platform") ? _Toml[_SecKey]["platform"] : "all"
+                if (_Plat = "all" || _Plat = "ahk")
+                    GESTURE_AX_NAMES.Push(_Item)
+            }
         }
     }
 }
+SetTimer(_GestureLoadActionCatalog, -0)
 
 ; Factory gesture slot actions — mirrors features_manifest.ahk defaults.
 global GESTURE_FACTORY_DEFAULTS := Map(

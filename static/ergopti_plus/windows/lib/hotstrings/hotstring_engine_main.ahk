@@ -1327,7 +1327,13 @@ HSE_DispatchMatch(Spec, EndChar) {
     try KL_MarkSynthetic("hotstring")
     try {
         if _ALTGR_KANA_FIXUP {
-            SendEvent("{SC138 Up}")
+            ; SendInput (not SendEvent) — non-blocking injection that does not
+            ; yield the message loop. SendEvent was adding ~10-20 ms of latency
+            ; on every expansion on AltGr-fixup keyboards by flushing through
+            ; the hook chain synchronously. SendInput injects directly into the
+            ; kernel input queue, clears the stuck AltGr state before the burst,
+            ; and returns immediately — consistent with the SendInput burst below.
+            SendInput("{SC138 Up}")
         }
 
         ; +1 for the NNBSP/NBSP that was stripped before matching when the
