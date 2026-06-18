@@ -353,6 +353,14 @@ end
 --- @param entry table The decoded JSONL event entry.
 --- @return table Array of SQL statement strings.
 function M.build_inserts(entry)
+	-- Guard: a missing or non-string timestamp raises inside every _builders
+	-- call (e.timestamp:sub(1,10)), halting the ingest loop permanently because
+	-- the throw escapes ingest_once and the offset never advances past the poison
+	-- line. Coerce to the current wall-clock time so the entry is stored rather
+	-- than causing a permanent stall.
+	if type(entry.timestamp) ~= "string" then
+		entry.timestamp = _now_ts()
+	end
 	local t = entry.type
 	if t == "typing" then
 		return { _builders.typing(entry, _alloc_event_id()) }

@@ -194,7 +194,8 @@ function M.read_new_entries()
 		local line = fh:read("*l")
 		if not line then break end
 		local ok, entry = pcall(json.decode, line)
-		if ok and type(entry) == "table" and type(entry.type) == "string" then
+		if ok and type(entry) == "table" and type(entry.type) == "string"
+		   and type(entry.timestamp) == "string" then
 			table.insert(out, { entry = entry, raw = line })
 		end
 		lines = lines + 1
