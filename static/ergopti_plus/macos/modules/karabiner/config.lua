@@ -250,6 +250,18 @@ function M.load_user_config(tap_hold_keys, mod_combos, user_config_path)
 	if type(tap_holds.config) ~= "table" then
 		Logger.warn(LOG, "Missing tap_hold_config in saved config — using defaults.")
 		tap_holds.config = defaults.tap_hold_config
+	else
+		-- Seed any tap/hold keys missing from the persisted config (new keys added after save)
+		for _, key_def in ipairs(tap_hold_keys) do
+			if not tap_holds.config[key_def.id] then
+				local d = Defaults.tap_hold[key_def.id]
+				Logger.info(LOG, "New tap/hold key '%s' not in saved config — seeding from defaults.", key_def.id)
+				tap_holds.config[key_def.id] = {
+					tap  = d and d[1] or "none",
+					hold = d and d[2] or "none",
+				}
+			end
+		end
 	end
 
 	if type(combos.config) ~= "table" then
