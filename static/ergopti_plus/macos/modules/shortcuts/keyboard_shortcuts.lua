@@ -252,6 +252,10 @@ end
 
 --- Stops the keyboard shortcuts module and releases all hotkeys.
 function M.stop()
+	if not _started then
+		Logger.warn(LOG, "stop() called before start() — nothing to stop.")
+		return
+	end
 	Logger.start(LOG, "Stopping keyboard shortcuts…")
 	for slot in pairs(_hotkeys) do
 		unbind_slot(slot)
