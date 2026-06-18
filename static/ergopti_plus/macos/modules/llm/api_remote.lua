@@ -60,6 +60,9 @@ if not ok_kl then keylogger = nil end
 --- Loaded from shared/llm/api_providers.json at require time (AHK twin loads the
 --- same file). Adding a provider = one entry in the JSON plus (optionally) a
 --- new format branch in build_payload / parse_response below.
+--- Returns (providers_table, order_array, prices_table) on success, or three
+--- empty-catalogue equivalents on any failure so that a corrupted JSON file
+--- never aborts the full keymap-engine require chain.
 local function load_api_providers()
 	local path = Paths.shared_llm_path("api_providers.json")
 	if not path then
@@ -67,64 +70,84 @@ local function load_api_providers()
 		-- is not on disk in the lua cwd. Profile substitution tests often pass profile objects
 		-- directly and don't need the full catalogue.
 		if Logger and Logger.warn then Logger.warn("llm.api_remote", "api_providers.json not found via Paths — using empty catalogue (test/CI graceful)") end
-		return { provider_order = {}, providers = {}, model_prices = {} }
+		return {}, {}, {}
 	end
-	local fh = io.open(path, "r")
-	if not fh then
-		error("api_providers.json unreadable at " .. tostring(path))
-	end
-	local raw = fh:read("*a")
-	fh:close()
-	local ok, root = pcall(JsonCodec.decode, raw)
-	if not ok or type(root) ~= "table" then
-		error("api_providers.json parse failed at " .. tostring(path))
-	end
-	local order = root.provider_order
-	local providers = root.providers
-	local prices = root.model_prices
-	if type(order) ~= "table" or #order == 0 then
-		error("api_providers.json: provider_order must be a non-empty array")
-	end
-	if type(providers) ~= "table" then
-		error("api_providers.json: providers must be an object")
-	end
-	if type(prices) ~= "table" then
-		error("api_providers.json: model_prices must be an object")
-	end
-	local out_providers = {}
-	for _, pid in ipairs(order) do
-		if type(pid) ~= "string" or pid == "" then
-			error("api_providers.json: invalid provider_order entry")
+
+	-- Wrap the entire parse/validate phase in pcall so a corrupted or schema-
+	-- mismatched file degrades to an empty catalogue instead of raising at require
+	-- time, which would abort the full keymap → llm → api_remote require chain.
+	local ok, providers, order, prices = pcall(function()
+		local fh = io.open(path, "r")
+		if not fh then
+			Logger.error("llm.api_remote", "api_providers.json unreadable at %s — empty catalogue.", tostring(path))
+			return {}, {}, {}
 		end
-		local desc = providers[pid]
-		if type(desc) ~= "table" then
-			error("api_providers.json: missing providers." .. pid)
+		local raw = fh:read("*a")
+		fh:close()
+		local parse_ok, root = pcall(JsonCodec.decode, raw)
+		if not parse_ok or type(root) ~= "table" then
+			Logger.error("llm.api_remote", "api_providers.json parse failed at %s — empty catalogue.", tostring(path))
+			return {}, {}, {}
 		end
-		for _, key in ipairs({ "label", "base_url", "default_model", "format" }) do
-			if desc[key] == nil then
-				error("api_providers.json: providers." .. pid .. " missing " .. key)
+		local p_order    = root.provider_order
+		local p_providers = root.providers
+		local p_prices   = root.model_prices
+		if type(p_order) ~= "table" or #p_order == 0
+			or type(p_providers) ~= "table" or type(p_prices) ~= "table"
+		then
+			Logger.error("llm.api_remote", "api_providers.json: invalid top-level structure — empty catalogue.")
+			return {}, {}, {}
+		end
+		local out_providers = {}
+		for _, pid in ipairs(p_order) do
+			if type(pid) ~= "string" or pid == "" then
+				Logger.warn("llm.api_remote", "api_providers.json: skipping invalid provider_order entry.")
+			else
+				local desc = p_providers[pid]
+				if type(desc) ~= "table" then
+					Logger.warn("llm.api_remote", "api_providers.json: missing providers.%s — skipped.", tostring(pid))
+				else
+					local missing_key = false
+					for _, key in ipairs({ "label", "base_url", "default_model", "format" }) do
+						if desc[key] == nil then
+							Logger.warn("llm.api_remote", "api_providers.json: providers.%s missing %s — skipped.", pid, key)
+							missing_key = true
+						end
+					end
+					local fmt = desc.format
+					if not missing_key then
+						if fmt ~= "openai" and fmt ~= "anthropic" and fmt ~= "gemini" then
+							Logger.warn("llm.api_remote", "api_providers.json: providers.%s invalid format '%s' — skipped.", pid, tostring(fmt))
+						else
+							out_providers[pid] = {
+								label         = tostring(desc.label),
+								base_url      = tostring(desc.base_url),
+								default_model = tostring(desc.default_model),
+								format        = fmt,
+							}
+						end
+					end
+				end
 			end
 		end
-		local fmt = desc.format
-		if fmt ~= "openai" and fmt ~= "anthropic" and fmt ~= "gemini" then
-			error("api_providers.json: providers." .. pid .. " has invalid format")
+		local out_prices = {}
+		for model, row in pairs(p_prices) do
+			if type(row) == "table" and row["in"] ~= nil and row["out"] ~= nil then
+				out_prices[model] = { ["in"] = row["in"], ["out"] = row["out"] }
+			else
+				Logger.warn("llm.api_remote", "api_providers.json: model_prices.%s skipped (missing in/out).", tostring(model))
+			end
 		end
-		out_providers[pid] = {
-			label         = tostring(desc.label),
-			base_url      = tostring(desc.base_url),
-			default_model = tostring(desc.default_model),
-			format        = fmt,
-		}
+		Logger.info("llm.api_remote", "Loaded API provider catalogue (%d providers) from %s", #p_order, path)
+		return out_providers, p_order, out_prices
+	end)
+
+	if not ok then
+		-- pcall itself failed (should never happen given the guards above, but be safe)
+		Logger.error("llm.api_remote", "api_providers.json: unexpected error during load — empty catalogue: %s", tostring(providers))
+		return {}, {}, {}
 	end
-	local out_prices = {}
-	for model, row in pairs(prices) do
-		if type(row) ~= "table" or row["in"] == nil or row["out"] == nil then
-			error("api_providers.json: model_prices." .. tostring(model) .. " must have in/out")
-		end
-		out_prices[model] = { ["in"] = row["in"], ["out"] = row["out"] }
-	end
-	Logger.info(LOG, "Loaded API provider catalogue (%d providers) from %s", #order, path)
-	return out_providers, order, out_prices
+	return providers or {}, order or {}, prices or {}
 end
 
 local MODEL_PRICES
