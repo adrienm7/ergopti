@@ -172,38 +172,50 @@ GR_DrawBitmap(Handle, DrawFn) {
 	try {
 		; Delegate all painting to the caller — they receive the memory DC and
 		; dimensions so they can call GDI primitives or create a GDI+ Graphics.
+		Painted := true
 		try DrawFn(MemDC, W, H)
+		catch as Err {
+			Painted := false
+			; Log via OutputDebug rather than a logger — this adapter has no logger
+			; dependency by design, and a silent swallow would leave a blank bitmap
+			; committed to the layered window with no diagnostic trail.
+			try OutputDebug("GR_DrawBitmap: DrawFn threw - " . Err.Message)
+		}
 
-		; Commit the painted bitmap to the layered window. The window position
-		; is taken directly from the HWND so no coordinate arithmetic is needed.
-		WinRect := Buffer(16, 0)
-		DllCall("User32\GetWindowRect", "Ptr", Handle, "Ptr", WinRect)
-		WinX := NumGet(WinRect, 0, "Int")
-		WinY := NumGet(WinRect, 4, "Int")
+		; Only commit the bitmap when painting succeeded — uploading a partial or
+		; blank bitmap on a DrawFn failure produces a worse result than doing nothing.
+		if Painted {
+			; Commit the painted bitmap to the layered window. The window position
+			; is taken directly from the HWND so no coordinate arithmetic is needed.
+			WinRect := Buffer(16, 0)
+			DllCall("User32\GetWindowRect", "Ptr", Handle, "Ptr", WinRect)
+			WinX := NumGet(WinRect, 0, "Int")
+			WinY := NumGet(WinRect, 4, "Int")
 
-		PtDest := Buffer(8, 0)
-		NumPut("Int", WinX, PtDest, 0)
-		NumPut("Int", WinY, PtDest, 4)
-		SizeSrc := Buffer(8, 0)
-		NumPut("Int", W, SizeSrc, 0)
-		NumPut("Int", H, SizeSrc, 4)
-		PtSrc  := Buffer(8, 0)   ; Origin (0, 0) inside MemDC
-		Blend  := Buffer(4, 0)
-		NumPut("UChar", 0,   Blend, 0)   ; BlendOp = AC_SRC_OVER
-		NumPut("UChar", 0,   Blend, 1)   ; BlendFlags
-		NumPut("UChar", 255, Blend, 2)   ; SourceConstantAlpha = 255 (per-pixel alpha)
-		NumPut("UChar", 1,   Blend, 3)   ; AlphaFormat = AC_SRC_ALPHA
+			PtDest := Buffer(8, 0)
+			NumPut("Int", WinX, PtDest, 0)
+			NumPut("Int", WinY, PtDest, 4)
+			SizeSrc := Buffer(8, 0)
+			NumPut("Int", W, SizeSrc, 0)
+			NumPut("Int", H, SizeSrc, 4)
+			PtSrc  := Buffer(8, 0)   ; Origin (0, 0) inside MemDC
+			Blend  := Buffer(4, 0)
+			NumPut("UChar", 0,   Blend, 0)   ; BlendOp = AC_SRC_OVER
+			NumPut("UChar", 0,   Blend, 1)   ; BlendFlags
+			NumPut("UChar", 255, Blend, 2)   ; SourceConstantAlpha = 255 (per-pixel alpha)
+			NumPut("UChar", 1,   Blend, 3)   ; AlphaFormat = AC_SRC_ALPHA
 
-		DllCall("User32\UpdateLayeredWindow",
-			"Ptr",  Handle,
-			"Ptr",  0,        ; hdcDst = NULL — use the screen DC implicitly
-			"Ptr",  PtDest,
-			"Ptr",  SizeSrc,
-			"Ptr",  MemDC,
-			"Ptr",  PtSrc,
-			"UInt", 0,
-			"Ptr",  Blend,
-			"UInt", 2)        ; ULW_ALPHA
+			DllCall("User32\UpdateLayeredWindow",
+				"Ptr",  Handle,
+				"Ptr",  0,        ; hdcDst = NULL — use the screen DC implicitly
+				"Ptr",  PtDest,
+				"Ptr",  SizeSrc,
+				"Ptr",  MemDC,
+				"Ptr",  PtSrc,
+				"UInt", 0,
+				"Ptr",  Blend,
+				"UInt", 2)        ; ULW_ALPHA
+		}
 	} finally {
 		DllCall("Gdi32\SelectObject", "Ptr", MemDC, "Ptr", OldBmp)
 		DllCall("Gdi32\DeleteObject", "Ptr", HBmp)
