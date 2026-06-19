@@ -68,7 +68,8 @@ _USBR_CheckNoBareDelete() {
 	Src := _USBR_ReadSource("lib/updater.ahk")
 	Assert(Src != "", "lib/updater.ahk must be readable")
 
-	Body := _USBR_FuncBody(Src, "_Updater_PollDownloadAsync(")
+	; Use the full parameter list to anchor on the definition, not the call site
+	Body := _USBR_FuncBody(Src, "_Updater_PollDownloadAsync(Req, NewExe, SwapBat, CurrentExe, Tag, Polls")
 	Assert(Body != "", "_Updater_PollDownloadAsync must be present in updater.ahk")
 
 	; Old risky delete-then-move must not be the swap pattern
@@ -80,7 +81,8 @@ _USBR_CheckBakRenamePresent() {
 	Src := _USBR_ReadSource("lib/updater.ahk")
 	Assert(Src != "", "lib/updater.ahk must be readable")
 
-	Body := _USBR_FuncBody(Src, "_Updater_PollDownloadAsync(")
+	; Use the full parameter list to anchor on the definition, not the call site
+	Body := _USBR_FuncBody(Src, "_Updater_PollDownloadAsync(Req, NewExe, SwapBat, CurrentExe, Tag, Polls")
 	Assert(Body != "", "_Updater_PollDownloadAsync must be present in updater.ahk")
 
 	; Swap script must rename to .bak before the move
@@ -96,7 +98,8 @@ _USBR_CheckBakDeletedOnSuccess() {
 	Src := _USBR_ReadSource("lib/updater.ahk")
 	Assert(Src != "", "lib/updater.ahk must be readable")
 
-	Body := _USBR_FuncBody(Src, "_Updater_PollDownloadAsync(")
+	; Use the full parameter list to anchor on the definition, not the call site
+	Body := _USBR_FuncBody(Src, "_Updater_PollDownloadAsync(Req, NewExe, SwapBat, CurrentExe, Tag, Polls")
 	Assert(Body != "", "_Updater_PollDownloadAsync must be present in updater.ahk")
 
 	; The .bak must be deleted after a confirmed successful move
