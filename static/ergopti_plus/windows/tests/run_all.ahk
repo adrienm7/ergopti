@@ -624,6 +624,7 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 #Include meta/test_backspace_repeat_suspend_guard.ahk
 #Include meta/test_prefix_render_flush_suspend_guard.ahk
 #Include meta/test_gesture_dispatch_logs_failure.ahk
+#Include meta/test_ollama_installer_sync_winhttp_blocks.ahk
 
 ; Watchdog: kill the process if RunTests() never returns (e.g. a corpus
 ; consumer blocks on a synchronous HTTP call, an InputHook with no timeout,
