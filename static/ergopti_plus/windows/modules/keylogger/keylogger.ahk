@@ -1333,7 +1333,7 @@ KL_IngestOnce(force := false) {
     ; Moved BEFORE the pending-entries drain so we never clear _pending_entries
     ; from RAM and then defer — that would leave entries on disk only, where
     ; KL_JsonDecode is a no-op on 64-bit and entries are silently lost.
-    if (!force and IsSet(KLHook) and KLHook.last_tick != 0 and A_TickCount - KLHook.last_tick < KeylogConst.INGEST_IDLE_MS)
+    if (!force and IsSet(KLHook) and KLHook.last_tick != 0 and (A_TickCount - KLHook.last_tick) & 0xFFFFFFFF < KeylogConst.INGEST_IDLE_MS)
         return
     ; Prefer the in-RAM queue when available — it sidesteps KL_JsonDecode
     ; entirely (COM ScriptControl is x86-only and silently empties Maps
@@ -1459,7 +1459,7 @@ KL_IngestOnce(force := false) {
     ; 150-300 ms; running it during a typing burst exceeds
     ; LowLevelHooksTimeout (~300 ms) and silently drops keystrokes.
     ; Deferred to the next ingest tick if the user typed recently.
-    if (KLHook.last_tick = 0 || A_TickCount - KLHook.last_tick >= KeylogConst.INGEST_LIVE_PUSH_IDLE_MS)
+    if (KLHook.last_tick = 0 || (A_TickCount - KLHook.last_tick) & 0xFFFFFFFF >= KeylogConst.INGEST_LIVE_PUSH_IDLE_MS)
         try KLWV_NotifyIngest()
 }
 
@@ -1635,7 +1635,7 @@ KL_IsFocusedFieldPassword() {
     ; it has gone stale, kick an async re-detect but still answer NOW so the
     ; keystroke thread never blocks on a UIA round-trip for re-validation.
     if (KLPasswordCache.last_hwnd = hwnd) {
-        if ((A_TickCount - KLPasswordCache.last_at) >= KLPW_CACHE_TTL_MS)
+        if (((A_TickCount - KLPasswordCache.last_at) & 0xFFFFFFFF) >= KLPW_CACHE_TTL_MS)
             KL_SchedulePasswordDetect(hwnd)
         return KLPasswordCache.last_val
     }

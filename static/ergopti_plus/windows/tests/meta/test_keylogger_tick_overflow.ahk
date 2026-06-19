@@ -121,3 +121,87 @@ _KLTO_WatchersStopDrainMasked() {
 		"keylogger_watchers.ahk must use (A_TickCount - KLWatch.session_started_at) & 0xFFFFFFFF in drain (F31)")
 }
 Test("keylogger: KL_Watchers_Stop drain paths mask A_TickCount durations with & 0xFFFFFFFF (F31)", _KLTO_WatchersStopDrainMasked)
+
+
+
+
+; =========================================================================
+; =========================================================================
+; ======= 4/ keylogger_hook.ahk -- context_at TTL comparison (tickcount-wrap)
+; =========================================================================
+; =========================================================================
+
+_KLTO_HookContextAtWrapSafe() {
+	Raw := _KLTO_ReadSource("modules/keylogger/keylogger_hook.ahk")
+	Src := _KLTO_StripComments(Raw)
+	Assert(Src != "", "modules/keylogger/keylogger_hook.ahk must be readable")
+
+	; Negative: bare subtraction on context_at must not appear
+	Assert(!InStr(Src, "(A_TickCount - KLHook.context_at) < KLHookConst.CONTEXT_TTL_MS"),
+		"keylogger_hook.ahk must not use bare (A_TickCount - KLHook.context_at) without & 0xFFFFFFFF mask (tickcount-wrap)")
+
+	; Positive: masked form must be present
+	Assert(InStr(Src, "(KLHook.context_at) & 0xFFFFFFFF) < KLHookConst.CONTEXT_TTL_MS") > 0,
+		"keylogger_hook.ahk must mask context_at TTL comparison with & 0xFFFFFFFF (tickcount-wrap)")
+}
+Test("keylogger: keylogger_hook.ahk context_at TTL uses & 0xFFFFFFFF mask (tickcount-wrap)", _KLTO_HookContextAtWrapSafe)
+
+
+
+
+; =========================================================================
+; =========================================================================
+; ======= 5/ keylogger.ahk -- ingest idle and password-cache guards (tickcount-wrap)
+; =========================================================================
+; =========================================================================
+
+_KLTO_KeyloggerIngestWrapSafe() {
+	Raw := _KLTO_ReadSource("modules/keylogger/keylogger.ahk")
+	Src := _KLTO_StripComments(Raw)
+	Assert(Src != "", "modules/keylogger/keylogger.ahk must be readable")
+
+	; Ingest idle guard must be masked
+	Assert(!RegExMatch(Src, "A_TickCount - KLHook\.last_tick < KeylogConst\.INGEST_IDLE_MS"),
+		"keylogger.ahk must not use bare A_TickCount - KLHook.last_tick < INGEST_IDLE_MS without mask (tickcount-wrap)")
+	Assert(InStr(Src, "KLHook.last_tick) & 0xFFFFFFFF < KeylogConst.INGEST_IDLE_MS") > 0,
+		"keylogger.ahk must mask ingest idle guard with & 0xFFFFFFFF (tickcount-wrap)")
+
+	; Live-push idle guard must be masked
+	Assert(!RegExMatch(Src, "A_TickCount - KLHook\.last_tick >= KeylogConst\.INGEST_LIVE_PUSH_IDLE_MS"),
+		"keylogger.ahk must not use bare A_TickCount - KLHook.last_tick >= INGEST_LIVE_PUSH_IDLE_MS without mask (tickcount-wrap)")
+	Assert(InStr(Src, "KLHook.last_tick) & 0xFFFFFFFF >= KeylogConst.INGEST_LIVE_PUSH_IDLE_MS") > 0,
+		"keylogger.ahk must mask live-push idle guard with & 0xFFFFFFFF (tickcount-wrap)")
+
+	; Password cache TTL must be masked
+	Assert(InStr(Src, "(KLPasswordCache.last_at) & 0xFFFFFFFF) >= KLPW_CACHE_TTL_MS") > 0,
+		"keylogger.ahk must mask password cache TTL with & 0xFFFFFFFF (tickcount-wrap)")
+}
+Test("keylogger: keylogger.ahk ingest and password-cache guards use & 0xFFFFFFFF mask (tickcount-wrap)", _KLTO_KeyloggerIngestWrapSafe)
+
+
+
+
+; =========================================================================
+; =========================================================================
+; ======= 6/ keylogger_mouse.ahk -- park idle and dedup guards (tickcount-wrap)
+; =========================================================================
+; =========================================================================
+
+_KLTO_MouseParkWrapSafe() {
+	Raw := _KLTO_ReadSource("modules/keylogger/keylogger_mouse.ahk")
+	Src := _KLTO_StripComments(Raw)
+	Assert(Src != "", "modules/keylogger/keylogger_mouse.ahk must be readable")
+
+	; park_still_since must be masked before comparison
+	Assert(!InStr(Src, "still_ms := A_TickCount - KLMouse.park_still_since"),
+		"keylogger_mouse.ahk must not assign still_ms from bare A_TickCount - park_still_since (tickcount-wrap)")
+	Assert(InStr(Src, "still_ms := (A_TickCount - KLMouse.park_still_since) & 0xFFFFFFFF") > 0,
+		"keylogger_mouse.ahk must mask park_still_since delta with & 0xFFFFFFFF (tickcount-wrap)")
+
+	; park_fired_at dedup guard must be masked
+	Assert(!InStr(Src, "(A_TickCount - KLMouse.park_fired_at) < 30000"),
+		"keylogger_mouse.ahk must not use bare (A_TickCount - park_fired_at) without & 0xFFFFFFFF mask (tickcount-wrap)")
+	Assert(InStr(Src, "(KLMouse.park_fired_at) & 0xFFFFFFFF) < 30000") > 0,
+		"keylogger_mouse.ahk must mask park_fired_at dedup guard with & 0xFFFFFFFF (tickcount-wrap)")
+}
+Test("keylogger: keylogger_mouse.ahk park idle and dedup guards use & 0xFFFFFFFF mask (tickcount-wrap)", _KLTO_MouseParkWrapSafe)
