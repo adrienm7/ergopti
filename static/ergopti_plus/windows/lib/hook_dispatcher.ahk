@@ -193,7 +193,7 @@ class HookDispatcher {
 	; @param event_type {String} The event type to dispatch.
 	; @param args* Variadic — forwarded as-is to each subscriber.
 	static Dispatch(event_type, args*) {
-		static _err_cache := Map()
+		static _err_cache := Map()  ; Cap: .Count >= 256 triggers .Clear() before each .Has(sig) de-dup
 		; Native Suspend only disarms hotkeys/hotstrings — this InputHook fan-out
 		; keeps firing while paused, driving the LLM bridge and keylogger. Gate the
 		; whole shared pipeline here so « pause = tout éteint » in one place.

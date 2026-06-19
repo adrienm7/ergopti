@@ -23,6 +23,7 @@ Accumulated engineering knowledge for this repository — gotchas, architecture 
   - [feedback-ui-must-be-i18n](#feedback-ui-must-be-i18n) — All user-facing UI text must go through the i18n system in 21 supported languages — never hardcode any UI string anywhere, including WebView UIs (metrics, download window, etc.).
 - **Project architecture & decisions**
   - [project-ahk-menu-dispatcher-drop](#project-ahk-menu-dispatcher-drop) — AHK 2.0 silently drops ~30-50% of tray-menu clicks. FIXED via lib/menu_dispatcher.ahk — every actionable item must use RegisterMenuItem, never raw Menu.Add.
+  - [project-ahk-invariant-incomplete-application](#project-ahk-invariant-incomplete-application) — Every AHK-driver hardening invariant (Critical-emit, suspend-guard, async-HTTP, RegisterMenuItem) is applied per-site; the recurring bug is the ONE missed sibling site or the guarantee defeated by indirection. Audit the whole class, not the documented site.
   - [project-updater-nonblocking-http](#project-updater-nonblocking-http) — The updater background poll must never do synchronous WinHttp on the main thread (it freezes all remapping); WinHttp SetTimeouts 0 = infinite. Use the async WinHTTP + WaitForResponse(0) + SetTimer-poll pattern.
   - [project-config-v2-refactor](#project-config-v2-refactor) — State of the v2 config schema refactor (Scope C) — branch refactor/config-schema-v2 with 5 dormant commits. Cut-over to actually migrate the AHK driver runtime is the open piece.
   - [project_debug_menu_sync](#project-debug-menu-sync) — Debug menu order is defined in shared/menu_manifest.json debug_menu — both AHK and Lua drivers consume it
@@ -1419,3 +1420,23 @@ NRT: `tests/unit/modules/keymap/test_synthetic_reset_guard.lua`.
 **Why:** Lua `nil and expr` evaluates to `nil` (not `false`) — `not nil` is `true`. This is the same foot-gun as `prev_char:match(...)` in multiple places in the codebase.
 
 **How to apply:** When writing `local x = condition and expr`, always verify the `condition == nil` case. If nil is possible, use `(condition ~= nil) and expr` or `condition == nil or (condition and expr)` as appropriate.
+
+### project-ahk-invariant-incomplete-application
+
+_Every AHK-driver hardening invariant is applied per call-site; the recurring bug is the one missed sibling site, or a guarantee defeated one call level down by indirection — audit the whole class, not the documented site._
+
+<sub>slug: `project_ahk_invariant_incomplete_application`</sub>
+
+The adversarial AHK audit of 2026-06-19 (full report: `AUDIT_AHK_2026-06-19.md` at the repo root) found **0 critical, 5 high, 3 medium, 4 low** confirmed bugs in an otherwise very-well-defended driver (~300 existing tests already guard hundreds of these classes). The striking pattern: **none was a brand-new class** — each was a known, already-fixed invariant that had **one sibling site still un-migrated**, or a guarantee that held at the call site but was **defeated by indirection**. Two reusable lessons:
+
+1. **Invariants are per-site, not global — find the missed sibling.** The keystroke-emit `Critical("On")` serialization invariant (`remap-emit-critical-uneven`) is enforced on `_RemapEmit` + the whole digit row, but **not** on the Shift/CapsLock (`LayerDispatch`) and AltGr (`AltGrShiftDispatch`) emit paths (audit H1). Sync-WinHttp was eliminated in `updater.ahk` but the **changelog window** is a separate sync path (H5). The suspend guard is on `Updater_BackgroundTick`'s *dispatch* but not its *completion* handler (M2), nor the LAlt/RCtrl backspace-repeat loops (L1), nor `_PrefixRenderFlush` (L2). `TOML_CoerceValue`'s array-split escape bug was fixed in **both** sister coercers (`CS_CoerceValue`, `TomlCoerceValueExt`) but a third copy remained (L3). The lone un-migrated `RegisterMenuItem` actionable site is `InsertKeyboardShortcutGroups` (H4). **When auditing any documented fix, grep the whole codebase for the same class and check every sibling, not just the documented function.**
+
+2. **A non-blocking / safe guarantee can be defeated by indirection — and a guard test scoped to one function's body misses it.** `ErgoptiGlobalErrorHandler` is *designed* non-blocking (its own comment explains a modal starves the keyboard hook) yet calls `CrashReport_PromptUser`, which puts up a modal `MsgBox` one level down (H2); the guard test `test_global_error_handler_sendevent_storm.ahk` only asserts `MsgBox` absence in the *handler's* body, so the indirection sails through. Likewise a bare `try fn()` with no `catch` + an unconditional "success" log hides the throw from `OnError` AND falsely reports success (L4 gestures dispatch; same class as the swallowed-callback foot-gun `[[project_lua_closure_before_local_nil_global]]`).
+
+**How to apply:**
+
+- A regression test that greps a single function body is necessary but not sufficient for a transitive guarantee — assert the invariant holds in **every** function in the class (or at minimum in the helper the guarded function calls). Encode the ROOT CAUSE per `[[feedback_regression_tests]]`.
+- "`guarded`" in AHK usually means try-wrapped against *throws*. `MsgBox`/`Send`/`Sleep`/sync-`WinHttp` **block**, they don't throw — a `try {}` gives zero protection against a blocking call on the input thread.
+- `SetTimer(fn, -1)` does NOT offload to another thread (a real comment in `changelog_window.ahk` wrongly claimed it did); callbacks run on the single AHK pseudo-thread when the message loop yields — the same thread that remaps every keystroke. A synchronous network/COM/shell call inside a `SetTimer` callback freezes typing.
+
+Related: [[project_ahk_menu_dispatcher_drop]], [[project_updater_nonblocking_http]], [[project_suspend_pause_invariant]], [[project_lua_closure_before_local_nil_global]], [[feedback_regression_tests]].

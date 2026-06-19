@@ -548,8 +548,13 @@ LLM_Bridge_OnAccept(text) {
 			try HSE_HardReset()
 		if IsSet(_ResetPrefixBuffer)
 			try _ResetPrefixBuffer()
-	} catch {
-		; Ensure suppression is always released even when TextSend throws.
+	} catch as _e {
+		; Re-throw after the finally block releases guards, so the caller sees
+		; the original error and no suppression state is left armed.
+		throw _e
+	} finally {
+		; Ensure suppression is always released even when TextSend throws —
+		; the finally block runs whether the try body succeeded or threw.
 		try KL_ClearSynthetic()
 		if IsSet(PrefixWatcherSuppress)
 			try PrefixWatcherSuppress(false)

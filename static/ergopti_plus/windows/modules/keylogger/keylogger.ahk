@@ -1389,6 +1389,7 @@ KL_IngestOnce(force := false) {
     ; Protect KLW.batch from being reset by the live-push timer mid-walk.
     ; The timer fires from an interrupt thread and would call KLW_ResetBatch(),
     ; tearing a partially accumulated batch and producing incomplete UPSERT data.
+    ; Critical('On') saves the caller's prior Critical state before the walk loop.
     local _crit_walk := Critical("On")
     try {
         for _, entry in entries {
@@ -1633,7 +1634,7 @@ KL_IsFocusedFieldPassword() {
     ; it has gone stale, kick an async re-detect but still answer NOW so the
     ; keystroke thread never blocks on a UIA round-trip for re-validation.
     if (KLPasswordCache.last_hwnd = hwnd) {
-        if (((A_TickCount - KLPasswordCache.last_at) & 0xFFFFFFFF) >= KLPW_CACHE_TTL_MS)
+        if ((A_TickCount - (KLPasswordCache.last_at) & 0xFFFFFFFF) >= KLPW_CACHE_TTL_MS)
             KL_SchedulePasswordDetect(hwnd)
         return KLPasswordCache.last_val
     }

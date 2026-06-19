@@ -1685,7 +1685,7 @@ LLM_TooltipInGracePeriod() {
 		return false
 	if (!IsSet(_LLM_Tooltip_ShownAt) or _LLM_Tooltip_ShownAt == 0)
 		return false
-	return ((A_TickCount - _LLM_Tooltip_ShownAt) & 0xFFFFFFFF) < _LLM_TOOLTIP_MIN_DISPLAY_MS
+	return (A_TickCount - (_LLM_Tooltip_ShownAt) & 0xFFFFFFFF) < _LLM_TOOLTIP_MIN_DISPLAY_MS
 }
 
 LLM_TooltipIsLoading() {

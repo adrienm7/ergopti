@@ -498,11 +498,10 @@ _LoggerEmit(Level, Tag, Msg, Args*) {
 		_LOGGER_PENDING_ERRORS.Push(Line)
 	}
 
-	; Force a synchronous, file-handle-closed flush for diagnostics that
-	; must survive a subsequent crash — WARNING and above. A WARNING that
-	; immediately precedes a hard crash would be swallowed by the 500 ms
-	; buffered path; forcing a flush here ensures it lands on disk.
-	if LOGGER_SEVERITY[Level] >= LOGGER_SEVERITY["WARNING"] {
+	; Force a synchronous, file-handle-closed flush for ERROR and above only.
+	; WARNING lines are safely batched; flushing on every WARNING would cause
+	; double-writes when the buffered path also flushes during the same tick.
+	if LOGGER_SEVERITY[Level] >= LOGGER_SEVERITY["ERROR"] {
 		_LoggerFlush(true)
 	}
 	_LoggerFanOut(Tag, Line)

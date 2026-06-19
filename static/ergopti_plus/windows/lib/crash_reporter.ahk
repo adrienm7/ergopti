@@ -119,7 +119,7 @@ CrashReport_Build(ErrorObj) {
 	UptimeSec := 0
 	try {
 		global _HealthCheckStartMs
-		UptimeSec := ((A_TickCount - _HealthCheckStartMs) & 0xFFFFFFFF) // 1000
+		UptimeSec := (A_TickCount - (_HealthCheckStartMs) & 0xFFFFFFFF) // 1000
 	}
 
 	; ── Active window context ─────────────────────────────────────────────────

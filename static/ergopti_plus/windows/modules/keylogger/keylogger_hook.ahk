@@ -169,7 +169,7 @@ KL_Hook_RefreshContext(force := false) {
     ; or write a corrupted switch event (H-16 fix).
     if !Keylogger.initialized
         return
-    if !force and ((A_TickCount - KLHook.context_at) & 0xFFFFFFFF) < KLHookConst.CONTEXT_TTL_MS
+    if !force and (A_TickCount - (KLHook.context_at) & 0xFFFFFFFF) < KLHookConst.CONTEXT_TTL_MS
         return
     NewTitle := ""
     NewApp := ""
