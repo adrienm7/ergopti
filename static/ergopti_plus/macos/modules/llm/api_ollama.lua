@@ -139,8 +139,13 @@ local function ensure_ollama_running()
 	kill_handle.start()
 end
 
--- Deferred off the synchronous require path; fires on next run loop iteration
-TimerScheduler.after(0, function() pcall(ensure_ollama_running) end)
+--- Ensures the Ollama daemon is running.
+--- Must be called by the LLM orchestrator only when the effective backend is
+--- Ollama — calling it unconditionally at require-time launches Ollama even for
+--- MLX or API users who never selected it.
+function M.ensure_running()
+	pcall(ensure_ollama_running)
+end
 
 --- Sends a minimal 1-token inference to load model weights into GPU memory.
 --- Called once after the model is configured; subsequent real requests then
