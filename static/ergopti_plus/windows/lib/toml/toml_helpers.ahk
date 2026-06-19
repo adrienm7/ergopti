@@ -201,14 +201,21 @@ TOML_CoerceValue(raw) {
         if (body = "")
             return out
         in_str := false
+        escaped := false
         cur := ""
         loop parse, body {
             c := A_LoopField
-            if (c = '"' && SubStr(cur, -1) != "\")
+            if escaped {
+                escaped := false
+            } else if (c = "\") {
+                escaped := true
+            } else if (c = '"') {
                 in_str := !in_str
+            }
             if (!in_str && c = ",") {
                 out.Push(TOML_CoerceValue(Trim(cur)))
                 cur := ""
+                escaped := false
                 continue
             }
             cur .= c

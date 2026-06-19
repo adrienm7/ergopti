@@ -83,3 +83,17 @@ _TTHRT_NoBackslash() {
 	AssertEqual("hello world", TOML_Unescape("hello world"), "plain string passes through unchanged")
 }
 Test("toml_helpers: TOML_Unescape plain string is unchanged", _TTHRT_NoBackslash)
+
+
+_TTHRT_ArraySplitEscapedBackslash() {
+	; ["a\\", "b"] should yield two elements: "a\" and "b"
+	; The old accumulator lookbehind saw "\" in cur before the closing quote
+	; and wrongly kept in_str=true, merging the comma as part of the first element.
+	Q := Chr(34)
+	raw := "[" . Q . "a\\" . Q . ", " . Q . "b" . Q . "]"
+	result := TOML_CoerceValue(raw)
+	AssertEqual(2, result.Length, "TOML_CoerceValue: escaped backslash array must yield 2 elements")
+	AssertEqual("a\", result[1], "TOML_CoerceValue: first element must be a backslash")
+	AssertEqual("b", result[2], "TOML_CoerceValue: second element must be b")
+}
+Test("toml_helpers: TOML_CoerceValue splits array with escaped-backslash element correctly", _TTHRT_ArraySplitEscapedBackslash)
