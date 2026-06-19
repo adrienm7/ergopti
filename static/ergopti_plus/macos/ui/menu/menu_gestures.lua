@@ -67,7 +67,15 @@ function M.build(ctx)
 	local item = {
 		title   = i18n.get("menu.gestures.title"),
 		checked = state.gestures or nil,
-		fn      = function()
+		-- Disabled while the script is paused. The gesture engine's only gate is the
+		-- shared CoreState.enabled flag, which pause_all() drives via disable_all().
+		-- Toggling the feature during pause would write that SAME flag: enabling it
+		-- makes gestures fire while « tout est éteint », and disabling it desyncs the
+		-- pre-pause snapshot so resume_all() re-enables against the user's intent.
+		-- Pause owns the gesture state until resume restores it — mirror the
+		-- hotstrings master toggle, which is likewise pause-gated.
+		disabled = paused or nil,
+		fn      = (not paused) and function()
 			local new_state = not state.gestures
 			if new_state then
 				-- Show warning when activating gestures
@@ -77,16 +85,16 @@ function M.build(ctx)
 			end
 			state.gestures = new_state
 			if gestures then
-				if state.gestures then 
-					if type(gestures.enable_all) == "function" then pcall(gestures.enable_all) end 
-				else 
-					if type(gestures.disable_all) == "function" then pcall(gestures.disable_all) end 
+				if state.gestures then
+					if type(gestures.enable_all) == "function" then pcall(gestures.enable_all) end
+				else
+					if type(gestures.disable_all) == "function" then pcall(gestures.disable_all) end
 				end
 			end
 			ctx.save_prefs()
 			ctx.notify_feature(i18n.get("menu.gestures.notify_title"), state.gestures)
 			ctx.updateMenu()
-		end,
+		end or nil,
 	}
 
 
