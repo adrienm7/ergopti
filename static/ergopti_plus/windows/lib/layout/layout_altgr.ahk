@@ -273,6 +273,7 @@ AltGrShiftDispatch(SC, Table, *) {
     ; remap hotkeys and produce the correct base-layer character.
     Entry := Table[SC]
     Cb := GetKeyState("Shift", "P") ? Entry.Shifted : Entry.Plain
+    Critical("On")   ; Serialize the AltGr emit like _RemapEmit
     Cb()
 }
 

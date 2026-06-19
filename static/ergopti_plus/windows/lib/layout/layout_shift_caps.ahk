@@ -120,10 +120,12 @@ _BuildShiftCapsTables() {
 LayerDispatch(SC, SymbolMap, *) {
 	if SymbolMap.Has(SC) {
 		Cb := SymbolMap[SC]
+		; No Critical here — symbol callbacks may Sleep (ActivateHotstrings)
 		Cb()
 		return
 	}
 	if SHIFTED_LETTERS.Has(SC) {
+		Critical("On")   ; Serialize the letter emit like _RemapEmit
 		SendNewResult(SHIFTED_LETTERS[SC])
 	}
 }

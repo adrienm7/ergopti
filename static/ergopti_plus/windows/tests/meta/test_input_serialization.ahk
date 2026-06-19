@@ -101,3 +101,92 @@ _MetaCheckInputSerialization() {
 
 Test("meta input: keystroke path is Critical-serialized (no fast-typing reorder / expansion interleave)",
 	_MetaCheckInputSerialization)
+
+
+
+
+; =====================================
+; =====================================
+; ======= 2/ Layer dispatchers ========
+; =====================================
+; =====================================
+
+; Extracts the body of a named function via balanced brace-walking.
+_MIS_FuncBody(Src, FuncName) {
+	Idx := InStr(Src, FuncName)
+	if (!Idx)
+		return ""
+	OpenPos := InStr(Src, "{", , Idx)
+	if (!OpenPos)
+		return ""
+	depth := 0
+	i := OpenPos
+	Len := StrLen(Src)
+	while (i <= Len) {
+		ch := SubStr(Src, i, 1)
+		if (ch == "{")
+			depth++
+		else if (ch == "}") {
+			depth--
+			if (depth <= 0)
+				return SubStr(Src, Idx, i - Idx + 1)
+		}
+		i++
+	}
+	return SubStr(Src, Idx)
+}
+
+; HIGH-01: LayerDispatch (Shift/CapsLock layer) re-emitted SHIFTED_LETTERS via
+; SendNewResult with no Critical, so a second fast key could start its remap
+; thread mid-send and reorder the output. The pure-letter emit path must now be
+; serialized with Critical("On"). The symbol-callback branch must stay OUT of
+; Critical because those callbacks may Sleep (ActivateHotstrings).
+_MIS_CheckLayerDispatchCritical() {
+	SplitPath(A_ScriptDir, , &WindowsDir)
+	Src := ""
+	try Src := FileRead(WindowsDir . "\lib\layout\layout_shift_caps.ahk")
+	Assert(Src != "", "layout_shift_caps.ahk must be readable")
+
+	Body := _MIS_FuncBody(Src, "LayerDispatch(SC, SymbolMap, *) {")
+	Assert(Body != "", "LayerDispatch(SC, SymbolMap, *) must exist in layout_shift_caps.ahk")
+
+	CritPos := InStr(Body, 'Critical("On")')
+	Assert(CritPos > 0, "LayerDispatch must call Critical(On) before the letter emit (HIGH-01)")
+	EmitPos := InStr(Body, "SendNewResult(SHIFTED_LETTERS")
+	Assert(EmitPos > 0, "LayerDispatch must emit SHIFTED_LETTERS via SendNewResult")
+	Assert(CritPos < EmitPos,
+		"LayerDispatch must enter Critical(On) BEFORE SendNewResult(SHIFTED_LETTERS) so the letter emit serializes (HIGH-01)")
+
+	; The symbol-callback branch (Cb()) must NOT be preceded by Critical — those
+	; callbacks may Sleep (ActivateHotstrings) and a Sleep under Critical breaks
+	; the no-yield guarantee. Cb() appears before the letter emit in source order.
+	CbPos := InStr(Body, "Cb()")
+	Assert(CbPos > 0, "LayerDispatch must still invoke the symbol callback Cb()")
+	Assert(CbPos < CritPos,
+		"LayerDispatch must NOT enter Critical before the symbol callback Cb() — symbol callbacks may Sleep (HIGH-01)")
+}
+
+; HIGH-01: AltGrShiftDispatch invoked its AltGr emit callback with no Critical,
+; so a fast follow-up key could interleave its remap SendEvent. The Cb() emit
+; must now be serialized with Critical("On") just before the call.
+_MIS_CheckAltGrShiftDispatchCritical() {
+	SplitPath(A_ScriptDir, , &WindowsDir)
+	Src := ""
+	try Src := FileRead(WindowsDir . "\lib\layout\layout_altgr.ahk")
+	Assert(Src != "", "layout_altgr.ahk must be readable")
+
+	Body := _MIS_FuncBody(Src, "AltGrShiftDispatch(SC, Table, *) {")
+	Assert(Body != "", "AltGrShiftDispatch(SC, Table, *) must exist in layout_altgr.ahk")
+
+	CritPos := InStr(Body, 'Critical("On")')
+	Assert(CritPos > 0, "AltGrShiftDispatch must call Critical(On) before its emit (HIGH-01)")
+	CbPos := InStr(Body, "Cb()")
+	Assert(CbPos > 0, "AltGrShiftDispatch must invoke the emit callback Cb()")
+	Assert(CritPos < CbPos,
+		"AltGrShiftDispatch must enter Critical(On) BEFORE Cb() so the AltGr emit serializes (HIGH-01)")
+}
+
+Test("meta input: LayerDispatch serializes letter emit with Critical (HIGH-01)",
+	_MIS_CheckLayerDispatchCritical)
+Test("meta input: AltGrShiftDispatch serializes emit with Critical (HIGH-01)",
+	_MIS_CheckAltGrShiftDispatchCritical)
