@@ -38,7 +38,8 @@ global _Spotlight_State := Map(
 	"Deadline", 0,
 	"CircleHwnd", 0,
 	"CrossHwnds", [],
-	"pToken", 0
+	"pToken", 0,
+	"hGdiplus", 0
 )
 
 ; Draws a filled yellow circle around (X, Y) and a red cross on every other
@@ -64,8 +65,9 @@ SpotlightMouseAt(X, Y, DurationMs) {
 	static RED_FILL       := 0x66E61A0D   ; alpha=0x66, R=230, G=26, B=13
 	static RED_STROKE     := 0xE6E61A0D   ; alpha=0xE6
 
-	; GDI+ startup -- shared token for all windows drawn this call
-	DllCall("LoadLibrary", "str", "gdiplus")
+	; GDI+ startup — store the module handle so it can be released with FreeLibrary
+	; in _SpotlightDismiss() after GdiplusShutdown, ensuring the DLL ref-count is balanced
+	_Spotlight_State["hGdiplus"] := DllCall("LoadLibrary", "str", "gdiplus", "ptr")
 	si := Buffer(24, 0)
 	NumPut("uint", 1, si)
 	DllCall("gdiplus\GdiplusStartup", "ptr*", &pToken := 0, "ptr", si, "ptr", 0)
@@ -192,6 +194,9 @@ SpotlightMouseAt(X, Y, DurationMs) {
 				try GR_DestroyWindow(Hwnd)
 		}
 		DllCall("gdiplus\GdiplusShutdown", "ptr", pToken)
+		if _Spotlight_State["hGdiplus"]
+			DllCall("FreeLibrary", "ptr", _Spotlight_State["hGdiplus"])
+		_Spotlight_State["hGdiplus"] := 0
 		throw Err
 	}
 }
@@ -228,9 +233,12 @@ _SpotlightDismiss() {
 	
 	if _Spotlight_State["pToken"]
 		DllCall("gdiplus\GdiplusShutdown", "ptr", _Spotlight_State["pToken"])
-		
+	if _Spotlight_State["hGdiplus"]
+		DllCall("FreeLibrary", "ptr", _Spotlight_State["hGdiplus"])
+
 	_Spotlight_State["Active"] := false
 	_Spotlight_State["CircleHwnd"] := 0
 	_Spotlight_State["CrossHwnds"] := []
 	_Spotlight_State["pToken"] := 0
+	_Spotlight_State["hGdiplus"] := 0
 }
