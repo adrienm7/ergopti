@@ -211,6 +211,25 @@ function M.persist_next_event_id()
 		"UPDATE meta SET value='%d' WHERE key='next_event_id';", _next_event_id))
 end
 
+--- Returns the current event-id counter. Used to snapshot it before an ingest
+--- transaction so it can be restored on rollback.
+--- @return number
+function M.get_next_event_id()
+	return _next_event_id
+end
+
+--- Restores the event-id counter. build_inserts() allocates ids via
+--- _alloc_event_id() BEFORE the transaction commits; on a rolled-back batch the
+--- in-memory counter would stay advanced while the persisted meta value is undone,
+--- so the retried (offset-unchanged) batch would re-key the same entries with NEW
+--- ids and bypass the (device_id, id) INSERT OR IGNORE idempotency — leaving a
+--- permanent id gap that desyncs a peer replaying data.sql. Restoring on rollback
+--- makes the retry reuse the exact same ids.
+--- @param n number
+function M.set_next_event_id(n)
+	if type(n) == "number" then _next_event_id = n end
+end
+
 
 
 
