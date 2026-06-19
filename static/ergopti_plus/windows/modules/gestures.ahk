@@ -721,7 +721,7 @@ GestureToggleUppercase() {
         SendInstant(Format("{:U}", Text))
     else
         SendInstant(Format("{:L}", Text))
-    SetTimer((*) => (try KL_ClearSynthetic()), -300)
+    SetTimer((*) => KL_ClearSynthetic(), -300)
 }
 
 GestureToggleTitleCase() {
@@ -737,7 +737,7 @@ GestureToggleTitleCase() {
         SendInstant(Format("{:L}", Text))
     else
         SendInstant(Format("{:T}", Text))
-    SetTimer((*) => (try KL_ClearSynthetic()), -300)
+    SetTimer((*) => KL_ClearSynthetic(), -300)
 }
 
 ; Deferred clipboard restore for GesturePastePlain. Runs on a negative-delay

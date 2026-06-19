@@ -438,7 +438,7 @@ if Features["shortcuts"]["title_case"] {
             ; Otherwise, convert to TitleCase
             SendInstant(Format("{:T}", Text))
         }
-        SetTimer((*) => (try KL_ClearSynthetic()), -300)
+        SetTimer((*) => KL_ClearSynthetic(), -300)
     }
 }
 
@@ -459,7 +459,7 @@ if Features["shortcuts"]["uppercase"] {
         } else {
             SendInstant(Format("{:L}", Text)) ; Convert to lowercase
         }
-        SetTimer((*) => (try KL_ClearSynthetic()), -300)
+        SetTimer((*) => KL_ClearSynthetic(), -300)
     }
 }
 
