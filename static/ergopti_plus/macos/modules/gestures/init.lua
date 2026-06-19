@@ -784,6 +784,10 @@ function M.stop()
 		_G.ERGOPTI_SLEEP_WATCHER = nil
 	end
 
+	-- 5. Stop engine (releases scroll-blocker eventtap; must come after primer/watchers
+	--    so any in-flight frame processing sees CoreState.enabled=false first)
+	pcall(Engine.stop)
+
 	Logger.success(LOG, "Gestures module stopped.")
 end
 
