@@ -1,0 +1,98 @@
+﻿; tests/meta/test_logger_fanout_batched.ahk
+
+; ==============================================================================
+; MODULE: Logger Fan-out Batched Meta Test
+; DESCRIPTION:
+; Regression guard ensuring _LoggerFanOut does not call FileAppend synchronously
+; on every matching log line. Fan-out lines must be buffered in
+; _LOGGER_SUB_PENDING and drained in batches by _LoggerFlush, the same pattern
+; used by the main log queue.
+;
+; SCOPE: source introspection of lib/logger.ahk.
+; ==============================================================================
+
+#Requires AutoHotkey v2.0
+
+
+
+
+; ===================================================
+; ===================================================
+; ======= 1/ Source scan helpers ====================
+; ===================================================
+; ===================================================
+
+_LFOB_ReadSource(RelPath) {
+	SplitPath(A_ScriptDir, , &WindowsDir)
+	SplitPath(WindowsDir, , &Root)
+	Path := Root . "\" . StrReplace(RelPath, "/", "\")
+	return FileRead(Path)
+}
+
+_LFOB_FuncBody(Src, FnDecl) {
+	FnPos := InStr(Src, FnDecl)
+	if (!FnPos)
+		return ""
+	depth := 0
+	i := FnPos
+	Len := StrLen(Src)
+	while (i <= Len) {
+		ch := SubStr(Src, i, 1)
+		if (ch == "{")
+			depth++
+		else if (ch == "}") {
+			depth--
+			if (depth <= 0)
+				return SubStr(Src, FnPos, i - FnPos + 1)
+		}
+		i++
+	}
+	return SubStr(Src, FnPos)
+}
+
+
+; ===================================================
+; ===================================================
+; ======= 2/ Test implementations ===================
+; ===================================================
+; ===================================================
+
+_LFOB_CheckFanOutNoDirectAppend() {
+	Src := _LFOB_ReadSource("lib/logger.ahk")
+	Assert(Src != "", "lib/logger.ahk must be readable")
+
+	FanOut := _LFOB_FuncBody(Src, "_LoggerFanOut(")
+	Assert(FanOut != "", "_LoggerFanOut must exist in lib/logger.ahk")
+
+	Assert(!InStr(FanOut, "FileAppend"),
+		"_LoggerFanOut must not call FileAppend directly — buffer in _LOGGER_SUB_PENDING and drain in _LoggerFlush")
+}
+
+_LFOB_CheckSubPendingQueue() {
+	Src := _LFOB_ReadSource("lib/logger.ahk")
+	Assert(Src != "", "lib/logger.ahk must be readable")
+
+	Assert(InStr(Src, "_LOGGER_SUB_PENDING"),
+		"lib/logger.ahk must declare _LOGGER_SUB_PENDING for batched fan-out line buffering")
+}
+
+_LFOB_CheckFlushDrainsSubPending() {
+	Src := _LFOB_ReadSource("lib/logger.ahk")
+	Assert(Src != "", "lib/logger.ahk must be readable")
+
+	Flush := _LFOB_FuncBody(Src, "_LoggerFlush(")
+	Assert(Flush != "", "_LoggerFlush must exist in lib/logger.ahk")
+
+	Assert(InStr(Flush, "_LOGGER_SUB_PENDING"),
+		"_LoggerFlush must drain _LOGGER_SUB_PENDING to write batched fan-out lines")
+}
+
+
+Test("meta logger-fanout: _LoggerFanOut does not call FileAppend directly",
+	_LFOB_CheckFanOutNoDirectAppend)
+
+Test("meta logger-fanout: _LOGGER_SUB_PENDING queue declared for fan-out batching",
+	_LFOB_CheckSubPendingQueue)
+
+Test("meta logger-fanout: _LoggerFlush drains _LOGGER_SUB_PENDING",
+	_LFOB_CheckFlushDrainsSubPending)
