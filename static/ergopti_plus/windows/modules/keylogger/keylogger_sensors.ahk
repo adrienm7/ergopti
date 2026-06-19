@@ -31,7 +31,7 @@
 ;
 ; LIFECYCLE:
 ; - KL_Sensors_Start is called after KL_Mouse_Start() in ErgoptiPlus.ahk.
-; - KL_Sensors_Stop() cancels the timer.
+; - KL_Sensors_Stop cancels the timer.
 ; ==============================================================================
 
 #Requires Autohotkey v2.0+

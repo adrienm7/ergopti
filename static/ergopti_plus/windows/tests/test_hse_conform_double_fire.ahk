@@ -23,7 +23,7 @@
 ;   1. Released:  simulate the deferred suppression release between fires (the
 ;      synchronous harness cannot run a -60 ms SetTimer itself) -- proves the pure
 ;      buffer-carry-over + conform logic re-fires.
-;   2. Real timer: let the production -60 ms SetTimer((*) => HSE_Suppress(false))
+;   2. Real timer: let the production -60 ms SetTimer((*) => PrefixWatcherSuppress(false))
 ;      actually fire (a Sleep pumps the AHK message loop) -- proves the deferred
 ;      release path itself clears suppression so the next keystroke feeds again.
 ; ==============================================================================
@@ -101,8 +101,9 @@ TestConformDF_DeferredReleaseClearsSuppression() {
 	Assert(HSE_Suppressed > 0, "dispatch must suppress feeds during the burst")
 
 	; Pump the loop past HSE_SUPPRESS_RELEASE_DELAY_MS (60 ms) so the armed
-	; release timer actually runs.
-	Sleep 100
+	; release timer actually runs. 150 ms gives 2.5× headroom over the 60 ms
+	; timer — enough for CI schedulers with variable thread wake latency.
+	Sleep 150
 	Assert(HSE_Suppressed == 0, "suppression should be cleared after 60ms timer")
 	
 	N := _Stub_RecordedSends.Length
