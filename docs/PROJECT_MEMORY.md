@@ -24,6 +24,7 @@ Accumulated engineering knowledge for this repository — gotchas, architecture 
 - **Project architecture & decisions**
   - [project-ahk-menu-dispatcher-drop](#project-ahk-menu-dispatcher-drop) — AHK 2.0 silently drops ~30-50% of tray-menu clicks. FIXED via lib/menu_dispatcher.ahk — every actionable item must use RegisterMenuItem, never raw Menu.Add.
   - [project-ahk-invariant-incomplete-application](#project-ahk-invariant-incomplete-application) — Every AHK-driver hardening invariant (Critical-emit, suspend-guard, async-HTTP, RegisterMenuItem) is applied per-site; the recurring bug is the ONE missed sibling site or the guarantee defeated by indirection. Audit the whole class, not the documented site.
+  - [project-ahk-test-suite-critical-leak](#project-ahk-test-suite-critical-leak) — Critical("On") in layout/hotkey callbacks is safe in production but leaks into the main thread when invoked directly by tests, silently hanging background timers
   - [project-updater-nonblocking-http](#project-updater-nonblocking-http) — The updater background poll must never do synchronous WinHttp on the main thread (it freezes all remapping); WinHttp SetTimeouts 0 = infinite. Use the async WinHTTP + WaitForResponse(0) + SetTimer-poll pattern.
   - [project-config-v2-refactor](#project-config-v2-refactor) — State of the v2 config schema refactor (Scope C) — branch refactor/config-schema-v2 with 5 dormant commits. Cut-over to actually migrate the AHK driver runtime is the open piece.
   - [project_debug_menu_sync](#project-debug-menu-sync) — Debug menu order is defined in shared/menu_manifest.json debug_menu — both AHK and Lua drivers consume it
@@ -1440,3 +1441,31 @@ The adversarial AHK audit of 2026-06-19 (full report: `AUDIT_AHK_2026-06-19.md` 
 - `SetTimer(fn, -1)` does NOT offload to another thread (a real comment in `changelog_window.ahk` wrongly claimed it did); callbacks run on the single AHK pseudo-thread when the message loop yields — the same thread that remaps every keystroke. A synchronous network/COM/shell call inside a `SetTimer` callback freezes typing.
 
 Related: [[project_ahk_menu_dispatcher_drop]], [[project_updater_nonblocking_http]], [[project_suspend_pause_invariant]], [[project_lua_closure_before_local_nil_global]], [[feedback_regression_tests]].
+
+### project-ahk-test-suite-critical-leak
+
+_Critical("On") in layout/hotkey callbacks is safe in production but leaks into the main thread when invoked directly by tests, silently hanging background timers_
+
+<sub>slug: `project_ahk_test_suite_critical_leak`</sub>
+
+Ergopti uses a custom test framework (`test_framework.ahk`) for its AutoHotkey codebase, executing all tests sequentially within a single auto-execute thread.
+
+1. **In Production (Hotkeys/Timers):** Calling `Critical("On")` inside a hotkey or timer callback is perfectly safe. AHK creates a pseudo-thread for the callback, and when it returns, the previous thread resumes with its own `Critical` setting restored automatically.
+2. **In Tests (Direct Invocation):** The test framework runs sequentially on the **main auto-execute thread**. If a test directly invokes a function (e.g. `AltGrShiftDispatch` or `LayerDispatch`) that calls `Critical("On")` without manually restoring it, that `Critical` state permanently "leaks" into the main thread.
+
+**The Consequence:**
+If the main thread becomes permanently `Critical`, AHK will **block all background timers** from firing for the remainder of the test suite (even during `Sleep` calls). Tests that rely on `SetTimer` (e.g., hotstring engine suppression releases) will silently hang or fail.
+
+**How to apply:**
+- Always wrap standalone `Critical("On")` acquisitions in functions in a `try...finally` block, explicitly restoring the previous state:
+  `utohotkey
+  _AtCrit := Critical("On")
+  try {
+      ; ... your critical code ...
+  } finally {
+      Critical(_AtCrit)
+  }
+  ``r
+- The test framework (`test_framework.ahk`) now includes a safety check that throws `Test LEAKED Critical: <TestName>` and resets the state to `0` if a test forgets to restore it, preventing cascading failures and quickly catching new occurrences.
+
+Related: [[project_ahk_invariant_incomplete_application]]
