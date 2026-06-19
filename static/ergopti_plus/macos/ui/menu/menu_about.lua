@@ -205,8 +205,16 @@ local function replace_and_reload(zip_path, update_menu_fn)
 	-- menubar. The callback fires on the main thread when the task exits.
 	-- The task is pinned to M._active_tasks so the GC cannot SIGTERM it while
 	-- it is still running (hs.task held only in a local is collected on return).
-	local task = hs.task.new("/usr/bin/unzip", function(exit_code, _, stderr)
-		M._active_tasks[task] = nil  -- task captured by closure; clears the GC-root pin
+	-- Forward-declare the handle so the completion closure captures it as a real
+	-- UPVALUE. `local task = hs.task.new(..., function() ... task ... end)` binds
+	-- the NIL GLOBAL `task` inside the callback — Lua scopes the local only AFTER
+	-- the full statement completes — so `M._active_tasks[task] = nil` raised
+	-- "table index is nil" on the callback's first line, swallowed by
+	-- Hammerspoon's hs.task pcall to the Console, wedging the update at
+	-- "installing" forever (the project_lua_closure_before_local_nil_global class).
+	local unzip_task
+	unzip_task = hs.task.new("/usr/bin/unzip", function(exit_code, _, stderr)
+		if unzip_task then M._active_tasks[unzip_task] = nil end  -- guarded clear: never write a nil key
 		if exit_code ~= 0 then
 			Logger.error(LOG, "unzip failed (exit %d): %s.", exit_code, stderr or "")
 			dialog.block_alert(i18n.get("common.error_title"), i18n.get("menu.about.update.install_error"), i18n.get("button.ok"))
@@ -258,8 +266,8 @@ local function replace_and_reload(zip_path, update_menu_fn)
 		hs.timer.doAfter(0.3, function() hs.reload() end)
 	end, { "-o", zip_path, "-d", tmp_dir })
 
-	M._active_tasks[task] = true
-	task:start()
+	M._active_tasks[unzip_task] = true
+	unzip_task:start()
 end
 
 --- One-click update entry point.
