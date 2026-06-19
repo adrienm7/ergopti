@@ -33,7 +33,10 @@ helpers.assert_true(
 -- Test 3: format_shortcut_title must call mods_has_none.
 local fn_start = src:find("local function format_shortcut_title", 1, true)
 helpers.assert_true(fn_start ~= nil, "menu_llm/init.lua must contain format_shortcut_title (ui-menu-llm-core-6)")
-local fn_body = src:sub(fn_start, fn_start + 300)
+-- Window widened from 300 to 800: the F-HIGH-6 wrong-type guard (a comment block
+-- + `if type(mods) ~= "table" then …`) now precedes the mods_has_none(mods) call,
+-- pushing it past the old 300-char window. Still asserts the call is present.
+local fn_body = src:sub(fn_start, fn_start + 800)
 local calls_helper = fn_body:find("mods_has_none(mods)", 1, true) ~= nil
 helpers.assert_true(
 	calls_helper,
