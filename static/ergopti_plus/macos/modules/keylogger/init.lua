@@ -1536,13 +1536,13 @@ function M.stop()
 	CoreState.is_enabled = false
 	LogManager.flush_buffer()
 
-	if _event_tap            then _event_tap:stop() end
-	if _app_watcher          then _app_watcher:stop() end
-	if _caffeinate_watcher   then _caffeinate_watcher:stop() end
-	if _win_filter           then _win_filter:unsubscribeAll() end
-	if _idle_timer           then _idle_timer:stop() end
-	if _maintenance_timer    then _maintenance_timer:stop() end
-	if _tap_watchdog_timer   then _tap_watchdog_timer:stop() end
+	if _event_tap            then _event_tap:stop();            _event_tap          = nil end
+	if _app_watcher          then _app_watcher:stop();          _app_watcher        = nil end
+	if _caffeinate_watcher   then _caffeinate_watcher:stop();   _caffeinate_watcher = nil end
+	if _win_filter           then _win_filter:unsubscribeAll(); _win_filter         = nil end
+	if _idle_timer           then _idle_timer:stop();           _idle_timer         = nil end
+	if _maintenance_timer    then _maintenance_timer:stop();     _maintenance_timer  = nil end
+	if _tap_watchdog_timer   then _tap_watchdog_timer:stop();   _tap_watchdog_timer = nil end
 
 	if CoreState.ax_observer then
 		pcall(function() CoreState.ax_observer:stop() end)
