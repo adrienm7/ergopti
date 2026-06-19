@@ -40,6 +40,60 @@ local Bindings = helpers.load_with_stubs("modules.shortcuts.bindings")
 -- ULTIMATE encore plus: pause on bindings registry + volume + bad input.
 -- Bindings are declarative; real hotkey dispatch must be gated by script_control.
 
+-- ==================================================================================================
+-- ==================================================================================================
+-- ======= 1/ M.disable() persists across stop/start cycle (shortcuts-bindings-reenable-on-resume) =
+-- ==================================================================================================
+-- ==================================================================================================
+
+helpers.describe("bindings — disable persists across stop/start (shortcuts-bindings-reenable-on-resume)", function()
+
+	local function read_source()
+		local src_path = helpers.driver_root() .. "modules/shortcuts/bindings.lua"
+		local fh = io.open(src_path, "r")
+		helpers.assert_true(fh ~= nil, "bindings.lua must be readable")
+		local src = fh:read("*a"); fh:close()
+		return src
+	end
+
+	helpers.it("source declares _disabled_set to track intentionally-disabled shortcuts", function()
+		local src = read_source()
+		helpers.assert_true(
+			src:find("_disabled_set", 1, true) ~= nil,
+			"bindings.lua must declare _disabled_set to persist disabled shortcuts across stop/start (shortcuts-bindings-reenable-on-resume)"
+		)
+	end)
+
+	helpers.it("M.start() skips shortcuts in _disabled_set", function()
+		local src = read_source()
+		-- The start() loop must guard on _disabled_set[name] in addition to hotkeys[name]
+		helpers.assert_true(
+			src:find("_disabled_set[name]", 1, true) ~= nil,
+			"M.start() must check _disabled_set[name] before binding each shortcut (shortcuts-bindings-reenable-on-resume)"
+		)
+	end)
+
+	helpers.it("M.disable() sets _disabled_set[name] = true", function()
+		local src = read_source()
+		helpers.assert_true(
+			src:find("_disabled_set[name] = true", 1, true) ~= nil,
+			"M.disable() must set _disabled_set[name] = true (shortcuts-bindings-reenable-on-resume)"
+		)
+	end)
+
+	helpers.it("M.enable() clears _disabled_set[name]", function()
+		local src = read_source()
+		helpers.assert_true(
+			src:find("_disabled_set[name] = nil", 1, true) ~= nil,
+			"M.enable() must clear _disabled_set[name] so the shortcut is re-bindable on next start() (shortcuts-bindings-reenable-on-resume)"
+		)
+	end)
+
+end)
+
+
+
+
 helpers.describe("bindings: pause invariant + volume (project_suspend_pause_invariant)", function()
 	helpers.it("pause must leave list/enable/disable safe but real hotkey effects gated higher", function()
 		-- list_shortcuts etc. are pure; the hs.hotkey.bind side and action execution are gated.

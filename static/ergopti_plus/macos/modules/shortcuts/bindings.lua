@@ -39,6 +39,11 @@ local hotkeys       = {}   -- Active hotkey/tap objects, keyed by shortcut id
 local hotkey_defs   = {}   -- Factory functions that create and return a hotkey object
 local hotkey_labels = {}   -- User-facing French label for each shortcut
 
+-- Shortcuts explicitly disabled via M.disable() survive a stop/start cycle so
+-- that a resume after focus loss cannot silently re-enable a hotkey the caller
+-- intentionally turned off (shortcuts-bindings-reenable-on-resume).
+local _disabled_set = {}
+
 local started = false
 
 -- Callback that returns the live active-wrap-pairs table.
@@ -263,7 +268,11 @@ function M.start()
 	started = true
 
 	for name, def in pairs(hotkey_defs) do
-		if not hotkeys[name] then
+		-- Skip hotkeys that are already active OR that were explicitly disabled
+		-- via M.disable() — the _disabled_set persists across stop/start cycles
+		-- so that resume after focus loss cannot silently re-enable them
+		-- (shortcuts-bindings-reenable-on-resume).
+		if not hotkeys[name] and not _disabled_set[name] then
 			local ok, obj = pcall(def)
 			if ok and type(obj) == "table" then
 				hotkeys[name] = obj
@@ -326,6 +335,7 @@ function M.enable(name)
 		Logger.error(LOG, "M.enable(): unknown hotkey '%s'.", name)
 		return
 	end
+	_disabled_set[name] = nil
 	local ok, obj = pcall(def)
 	if ok and type(obj) == "table" then
 		hotkeys[name] = obj
@@ -353,6 +363,7 @@ function M.disable(name)
 		pcall(function() h:disable() end)
 	end
 	hotkeys[name] = nil
+	_disabled_set[name] = true
 	Logger.debug(LOG, "Hotkey '%s' disabled.", name)
 end
 
