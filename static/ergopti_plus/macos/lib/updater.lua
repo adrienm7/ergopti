@@ -427,6 +427,9 @@ end
 
 function M.start_background_checks(channel, interval_sec, update_menu_fn)
 	M.stop_background_checks()
+	-- Clear any cached release from a previous channel so stale update data from
+	-- one channel does not bleed into another when the user switches channels.
+	M.clear_cached_release()
 	M.set_check_interval(interval_sec)
 	if M.is_local_source() then
 		Logger.debug(LOG, "Local source — background checks disabled.")
