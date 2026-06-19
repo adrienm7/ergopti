@@ -624,8 +624,15 @@ local function onKeyDownRaw(e)
 	-- synthetic events arrived (race condition under extreme OS load).
 	local pending_deletes = CoreState.expected_synthetic_deletes or 0
 	local pending_chars   = CoreState.expected_synthetic_chars   or ""
+	-- Pastes are a THIRD synthetic counter and the SOLE in-flight marker for a
+	-- 0-delete paste expansion (LLM completions + >50-codepoint/high-unicode
+	-- hotstrings emit via Cmd+V, leaving deletes==0 and chars==""). Omitting it
+	-- here let a stall before the Cmd+V echo wipe the rebuilt buffer and log a
+	-- phantom Cmd+V; the SYNTHETIC_STALE_SEC escape hatch still recovers a truly
+	-- lost echo.
+	local pending_pastes  = CoreState.expected_synthetic_pastes  or 0
 	local arm_age         = now - (CoreState.last_synthetic_arm_time or 0)
-	local events_in_flight = pending_deletes > 0 or #pending_chars > 0
+	local events_in_flight = pending_deletes > 0 or #pending_chars > 0 or pending_pastes > 0
 	if dt > 0.5 and (not events_in_flight or arm_age > SYNTHETIC_STALE_SEC) then
 		CoreState.expected_synthetic_deletes = 0
 		CoreState.expected_synthetic_chars   = ""

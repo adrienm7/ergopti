@@ -32,8 +32,10 @@ end
 --- @param pending_chars string Expected synthetic characters not yet filtered.
 --- @param STALE_SEC number Maximum arm age before forced cleanup.
 --- @return boolean True if the reset should fire.
-local function new_guard_fires(dt, arm_age, pending_deletes, pending_chars, STALE_SEC)
-	local events_in_flight = pending_deletes > 0 or #pending_chars > 0
+--- @param pending_pastes number|nil Expected synthetic Cmd+V echoes not yet filtered.
+local function new_guard_fires(dt, arm_age, pending_deletes, pending_chars, STALE_SEC, pending_pastes)
+	pending_pastes = pending_pastes or 0
+	local events_in_flight = pending_deletes > 0 or #pending_chars > 0 or pending_pastes > 0
 	return dt > 0.5 and (not events_in_flight or arm_age > STALE_SEC)
 end
 
@@ -100,6 +102,20 @@ helpers.describe("synthetic reset guard fixed formula: no reset with events in f
 			"stale arm (age > 5 s) must force a cleanup reset even if items appear pending")
 	end)
 
+	helpers.it("does NOT reset when only a PASTE echo is pending (F-MED-1, arm_age = 1.5 s)", function()
+		-- A 0-delete paste expansion (LLM completion / >50-cp hotstring) leaves
+		-- deletes==0 and chars=="" — the paste counter is the ONLY in-flight marker.
+		local fires = new_guard_fires(0.9, 1.5, 0, "", STALE, 1)
+		helpers.assert_eq(fires, false,
+			"with 1 pending paste echo at arm_age=1.5 s the reset must not fire (else the Cmd+V echo wipes the buffer)")
+	end)
+
+	helpers.it("DOES reset a stale pending paste once arm_age exceeds STALE_SEC", function()
+		local fires = new_guard_fires(0.9, 5.1, 0, "", STALE, 1)
+		helpers.assert_eq(fires, true,
+			"a truly lost paste echo (arm_age > 5 s) must still be cleaned up")
+	end)
+
 	helpers.it("does NOT reset when dt <= 0.5 (user typing continuously)", function()
 		-- The dt guard ensures we only reset during a genuine typing pause
 		local fires = new_guard_fires(0.3, 6.0, 0, "", STALE)
@@ -146,6 +162,17 @@ helpers.describe("synthetic reset guard: production source contains the fix", fu
 		helpers.assert_true(
 			src:find("events_in_flight", 1, true) ~= nil,
 			"source must check events_in_flight before resetting")
+
+		-- F-MED-1: the in-flight predicate must count pastes too, or a 0-delete
+		-- paste expansion (its echo the sole in-flight marker) is wiped on a stall.
+		local eif_line = src:match("events_in_flight%s*=[^\n]*")
+		helpers.assert_true(eif_line ~= nil, "source must compute an events_in_flight predicate")
+		helpers.assert_true(
+			eif_line:find("pending_pastes", 1, true) ~= nil,
+			"events_in_flight must include pending_pastes (the paste echo is the only in-flight marker for a 0-delete paste expansion)")
+		helpers.assert_true(
+			src:find("pending_pastes%s*=%s*CoreState%.expected_synthetic_pastes", 1, false) ~= nil,
+			"pending_pastes must be read from CoreState.expected_synthetic_pastes")
 
 		-- Old fixed-threshold pattern (> 1.0) must be replaced in the guard block
 		helpers.assert_eq(
