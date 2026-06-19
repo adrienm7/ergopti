@@ -438,8 +438,16 @@ function M.create(deps)
         
         -- Trigger a fresh async probe on every menu open so the indicator stays accurate.
         -- The result arrives after the menu is shown; the next open will display it.
+        -- Pass a guarded callback that only calls update_menu when _llm_health_status
+        -- actually changes: passing update_menu directly causes a build → probe →
+        -- update_menu → build loop at ~10-20 rebuilds/second with live HTTP requests.
         if state.llm_enabled and not paused then
-            probe_llm_health(state.llm_backend or "mlx", update_menu)
+            local probe_snapshot = _llm_health_status
+            probe_llm_health(state.llm_backend or "mlx", function()
+                if _llm_health_status ~= probe_snapshot then
+                    pcall(update_menu)
+                end
+            end)
         end
 
         -- Health indicator — must be HONEST about whether predictions actually fire:
