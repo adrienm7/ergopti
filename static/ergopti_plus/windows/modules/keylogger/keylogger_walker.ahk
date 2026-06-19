@@ -987,6 +987,22 @@ KLW_JsonEscape(m) {
     return KLW_SqlEscape(KL_JsonEncode(m))
 }
 
+; Build a SQLite expression that merges excluded.esrc_json INTO the stored
+; esrc_json by summing each key present in the incoming batch item.  A plain
+; assignment (esrc_json=excluded.esrc_json) would clobber all prior counts;
+; this instead keeps a running sum per source type across flush cycles.
+KLW_EsrcMergeExpr(EsrcMap) {
+    if (!IsObject(EsrcMap) || EsrcMap.Count == 0)
+        return "COALESCE(esrc_json,'{}') "
+    Expr := "json_set(COALESCE(esrc_json,'{}') "
+    for k, _ in EsrcMap {
+        SafeKey := StrReplace(StrReplace(k, "\", "\\"), "'", "''")
+        Expr .= ",'" . "$." . SafeKey . "',COALESCE(json_extract(esrc_json,'$." . SafeKey . "'),0)+COALESCE(json_extract(excluded.esrc_json,'$." . SafeKey . "'),0) "
+    }
+    Expr .= ")"
+    return Expr
+}
+
 ; Split a Chr(1)-delimited composite key into N parts.
 KLW_SplitKey(k, n) {
     parts := []
@@ -1057,11 +1073,12 @@ KLW_BuildBatchSql() {
         for key, item in tbl {
             parts := KLW_SplitKey(key, 3)
             out .= Format(
-                "INSERT INTO {1} (device_id, date, app, token, c, td, cd, e, esrc_json) VALUES ({2},{3},{4},{5},{6},{7},{8},{9},{10}) ON CONFLICT(device_id, date, app, token) DO UPDATE SET c=c+excluded.c,td=td+excluded.td,cd=cd+excluded.cd,e=e+excluded.e,esrc_json=excluded.esrc_json;`n",
+                "INSERT INTO {1} (device_id, date, app, token, c, td, cd, e, esrc_json) VALUES ({2},{3},{4},{5},{6},{7},{8},{9},{10}) ON CONFLICT(device_id, date, app, token) DO UPDATE SET c=c+excluded.c,td=td+excluded.td,cd=cd+excluded.cd,e=e+excluded.e,esrc_json={11};`n",
                 tbl_name, d,
                 KLW_SqlEscape(parts[1]), KLW_SqlEscape(parts[2]), KLW_SqlEscape(parts[3]),
                 item["c"], item["td"], item["cd"], item["e"],
-                KLW_JsonEscape(item["esrc"]))
+                KLW_JsonEscape(item["esrc"]),
+                KLW_EsrcMergeExpr(item["esrc"]))
         }
     }
 
