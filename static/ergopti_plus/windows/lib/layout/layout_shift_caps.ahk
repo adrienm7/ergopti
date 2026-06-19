@@ -131,11 +131,30 @@ LayerDispatch(SC, SymbolMap, *) {
 ; Register both the Shift layer (``+SCxxx``) and the CapsLock layer
 ; (``SCxxx`` gated by ``GetCapsLockCondition``). Iterates the merged set of
 ; SCs (letters ∪ symbols) so every binding is created exactly once.
+; Scancodes for the digit row (1–0).  When direct_access_digits is enabled and
+; the OS layout puts digits behind Shift, modules/layout.ahk registers global
+; +SCxxx passthrough hotkeys for these positions.  Registering them again here
+; with an ergopti_base criterion would shadow the passthrough because AHK picks
+; a criterion variant over a global variant whenever the criterion is met.
+; Excluding these SCs from RegisterShiftLayer keeps the two sets disjoint.
+global _SHIFT_DIGIT_SCS := Map(
+	"SC002", true, "SC003", true, "SC004", true, "SC005", true, "SC006", true,
+	"SC007", true, "SC008", true, "SC009", true, "SC00A", true, "SC00B", true,
+)
+
 RegisterShiftLayer() {
 	_BuildShiftCapsTables()
 	try LoggerStart("LayoutShift", "Registering Shift layer hotkeys…")
+	; When the OS-layout-shifted-digit passthrough is active, skip SC002..SC00B
+	; so the global passthrough variant is not shadowed by an ergopti_base variant.
+	SkipDigitRow := IsSet(Features)
+		&& Features["layout"]["direct_access_digits"]
+		&& IsSet(_OsLayoutDigitsAreShifted)
+		&& _OsLayoutDigitsAreShifted()
 	HotIf((*) => Features["layout"]["ergopti_base"])
 	for SC in SHIFTED_LETTERS {
+		if (SkipDigitRow && _SHIFT_DIGIT_SCS.Has(SC))
+			continue
 		Hotkey("+" . SC, LayerDispatch.Bind(SC, SHIFT_SYMBOLS), "I2")
 	}
 	for SC in SHIFT_SYMBOLS {
