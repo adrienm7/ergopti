@@ -604,6 +604,7 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 #Include meta/test_walker_batch_critical.ahk
 #Include meta/test_async_password_detect_suspend_guard.ahk
 #Include meta/test_sensors_warmup_distinct_callback.ahk
+#Include meta/test_kltopo_seen_hwnds_cap.ahk
 
 ; Watchdog: kill the process if RunTests() never returns (e.g. a corpus
 ; consumer blocks on a synchronous HTTP call, an InputHook with no timeout,
