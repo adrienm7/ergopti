@@ -535,3 +535,49 @@ helpers.describe("ScriptControl pause stops the LLM warmup retry chain (F-LOW-2)
 			"pause_all must call warmup_controller.stop() so backend warmup POSTs stop during pause")
 	end)
 end)
+
+
+helpers.describe("ScriptControl pause invariant actually quiesces the modules (F-INFO-3 / G2)", function()
+	-- The prior pause-invariant test only checks the is_paused() boolean, so a
+	-- regression deleting the internal pause_all() call (the original G2 bug, where
+	-- the public path quiesced nothing) would stay green. This drives the public
+	-- pause_all()/resume_all() with SPY modules and asserts the real quiescence calls.
+	helpers.it("pause_all invokes the real quiescence calls, resume_all the symmetric restores", function()
+		local calls = {}
+		local function rec(name) return function() calls[name] = (calls[name] or 0) + 1 end end
+		local keymap_spy = {
+			pause_processing  = rec("km_pause"),
+			resume_processing = rec("km_resume"),
+			reset_predictions = rec("km_reset"),
+		}
+		local shortcuts_spy = {
+			pause_bindings      = rec("sc_pause"),
+			resume_bindings     = rec("sc_resume"),
+			is_bindings_started = function() return true end,
+		}
+		local gestures_spy = {
+			disable_all = rec("g_disable"),
+			enable_all  = rec("g_enable"),
+			is_enabled  = function() return true end,
+		}
+		local karabiner_spy = { pause = rec("k_pause"), resume = rec("k_resume") }
+
+		SC.stop()  -- release any tap from an earlier describe
+		SC.start(keymap_spy, shortcuts_spy, gestures_spy, karabiner_spy)
+
+		SC.pause_all()
+		helpers.assert_true((calls.km_pause or 0) >= 1, "pause must call keymap.pause_processing")
+		helpers.assert_true((calls.km_reset or 0) >= 1, "pause must call keymap.reset_predictions")
+		helpers.assert_true((calls.sc_pause or 0) >= 1, "pause must call shortcuts.pause_bindings")
+		helpers.assert_true((calls.g_disable or 0) >= 1, "pause must call gestures.disable_all")
+		helpers.assert_true((calls.k_pause or 0) >= 1, "pause must call karabiner.pause")
+
+		SC.resume_all()
+		helpers.assert_true((calls.km_resume or 0) >= 1, "resume must call keymap.resume_processing")
+		helpers.assert_true((calls.sc_resume or 0) >= 1, "resume must restore shortcuts.resume_bindings (was running pre-pause)")
+		helpers.assert_true((calls.g_enable or 0) >= 1, "resume must restore gestures.enable_all (was enabled pre-pause)")
+		helpers.assert_true((calls.k_resume or 0) >= 1, "resume must call karabiner.resume")
+
+		SC.stop()
+	end)
+end)
