@@ -170,32 +170,6 @@ Managed by [Husky](https://typicode.github.io/husky/). The hook runs in order:
 | 6    | `uv run python … 0_generate_hotstrings.py` | Regenerate TOML hotstrings from the cleaned AHK       |
 | 7    | `git add static/hotstrings/*.toml`         | Stage the regenerated TOML files                      |
 
----
-
-## 🧪 AutoHotkey Test Suite (`run_all.ahk`)
-
-Ergopti uses a custom test framework for its AutoHotkey codebase, executing all tests sequentially within a single auto-execute thread.
-
-### ⚠️ Architectural Trap: `Critical("On")` Leaks
-
-A major trap when writing or testing AutoHotkey code is how `Critical("On")` interacts with the test framework:
-
-1. **In Production (Hotkeys/Timers):** Calling `Critical("On")` inside a hotkey or timer callback is perfectly safe. AHK creates a pseudo-thread for the callback, and when it returns, the previous thread resumes with its own `Critical` setting restored automatically.
-2. **In Tests (Direct Invocation):** The test framework runs sequentially on the **main auto-execute thread**. If a test directly invokes a function that calls `Critical("On")` without manually restoring it, that `Critical` state permanently "leaks" into the main thread.
-
-**The Consequence:**
-If the main thread becomes permanently `Critical`, AHK will **block all background timers** from firing for the remainder of the test suite (even during `Sleep` calls). Tests that rely on `SetTimer` (e.g., hotstring engine suppression releases) will silently hang or fail.
-
-**The Solution:**
-Always wrap standalone `Critical("On")` acquisitions in functions in a `try...finally` block, explicitly restoring the previous state:
-
-```autohotkey
-_AtCrit := Critical("On")
-try {
-    ; ... your critical code ...
-} finally {
-    Critical(_AtCrit)
-}
 ```
 
-> **Note:** The test framework (`test_framework.ahk`) now includes a safety check that throws `Test LEAKED Critical: <TestName>` and resets the state to `0` if a test forgets to restore it, preventing cascading failures.
+```
