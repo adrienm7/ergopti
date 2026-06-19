@@ -224,7 +224,7 @@ end
 function M.show(content, is_llm_origin, is_enabled, background_color)
 	local ok, err = pcall(function()
 		if not is_enabled then return end
-		if content == nil or tostring(content) == "" then M.hide(); return end
+		if content == nil or tostring(content) == "" then M.hide_forced(); return end
 
 		-- Dismantle any active dequeue cycle before starting fresh — a stale
 		-- dequeue timer would fire after this call and replace the new content
@@ -257,7 +257,7 @@ end
 function M.show_loading(content, is_enabled, background_color)
 	local ok, err = pcall(function()
 		if not is_enabled then return end
-		if content == nil or tostring(content) == "" then M.hide(); return end
+		if content == nil or tostring(content) == "" then M.hide_forced(); return end
 
 		-- Stop any existing watchers/timers from a previous state before rendering
 		stop_watchers()
@@ -297,7 +297,7 @@ end
 function M.show_stacked(rows, is_enabled)
 	local ok, err = pcall(function()
 		if not is_enabled then return end
-		if not rows or #rows == 0 then M.hide(); return end
+		if not rows or #rows == 0 then M.hide_forced(); return end
 
 		-- Use the canonical Dequeue analysis so that any row (not just row[1])
 		-- carrying an expire_at stamp is detected — checking only the first row
