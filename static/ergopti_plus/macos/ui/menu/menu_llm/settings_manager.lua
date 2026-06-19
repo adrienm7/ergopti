@@ -335,7 +335,9 @@ function M.new(deps)
 	--- Dynamic builder for modifier menus.
 	local function build_modifier_menu(key, default_mods, hs_fn)
 		local current_mods = hs.settings.get(key)
-		if current_mods == nil then current_mods = default_mods end
+		-- Fail closed on a non-table (corrupt/AHK-migrated plist): table.concat on a
+		-- string would raise and blank the submenu (same class as format_shortcut_title).
+		if type(current_mods) ~= "table" then current_mods = default_mods end
 		local current_str = table.concat(current_mods, "+")
 		local paused = deps.script_control and type(deps.script_control.is_paused) == "function" and deps.script_control.is_paused() or false
 
