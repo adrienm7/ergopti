@@ -644,8 +644,8 @@ GestureTakeNote() {
             WinWaitActive(NotepadMatch, , 3)
         } else {
             Run('notepad.exe "' . FilePath . '"')
-            WinWait(FileName, , 7)
-            WMActivate(FileName . " ahk_exe notepad.exe")
+            WinWait(NotepadMatch, , 7)
+            WMActivate(NotepadMatch)
             WinWaitActive(FileName . " ahk_exe notepad.exe", , 3)
         }
         WinMaximize()
