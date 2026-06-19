@@ -2273,12 +2273,12 @@ _BuildTapHoldsSubmenu() {
 
 ; Dynamic handler: reset-defaults action button.
 _TH_DynResetDefaults(M, _Cat) {
-	M.Add(t("tap_hold.reset_defaults"), _TH_ResetAllToDefaults)
+	RegisterMenuItem(M, t("tap_hold.reset_defaults"), _TH_ResetAllToDefaults)
 }
 
 ; Dynamic handler: disable-all action button.
 _TH_DynDisableAll(M, _Cat) {
-	M.Add(t("tap_hold.disable_all"), _TH_DisableAll)
+	RegisterMenuItem(M, t("tap_hold.disable_all"), _TH_DisableAll)
 }
 
 ; Dynamic handler: per-key tap/hold entries.
@@ -2302,14 +2302,14 @@ _TH_DynKeys(M, _Cat) {
 		KeyMenu := Menu()
 
 		DisableLabel := t("tap_hold.action.disable")
-		KeyMenu.Add(DisableLabel, _TH_MakeDisableFn(KeyId))
+		RegisterMenuItem(KeyMenu, DisableLabel, _TH_MakeDisableFn(KeyId))
 		if !IsConfigured
 			KeyMenu.Disable(DisableLabel)
 
 		KeyMenu.Add()
 
 		TapPickerLabel := StrReplace(t("tap_hold.picker.tap"), "%s", TapLbl)
-		KeyMenu.Add(TapPickerLabel, _TH_MakeTapPickerFn(KeyId, KeyLabel, TapLbl))
+		RegisterMenuItem(KeyMenu, TapPickerLabel, _TH_MakeTapPickerFn(KeyId, KeyLabel, TapLbl))
 
 		HoldPickerLabel := StrReplace(t("tap_hold.picker.hold"), "%s", HoldLbl)
 		HoldPickerMenu  := _BuildHoldPickerSubmenu(KeyId)
@@ -2421,7 +2421,7 @@ _BuildHoldPickerSubmenu(KeyId) {
 	for _, HoldOpt in _TH_HoldOptions {
 		Label    := t(HoldOpt["i18n"])
 		IsActive := IsTapHoldHoldActive(KeyId, HoldOpt)
-		PickerMenu.Add(Label, _TH_MakeHoldFn(KeyId, HoldOpt))
+		RegisterMenuItem(PickerMenu, Label, _TH_MakeHoldFn(KeyId, HoldOpt))
 		if IsActive {
 			PickerMenu.Check(Label)
 		}
