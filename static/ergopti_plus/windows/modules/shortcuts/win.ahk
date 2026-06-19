@@ -507,6 +507,17 @@ if Features["shortcuts"]["spotlight_mouse"] {
     AddShortcut("#", "'", (*) => (MouseGetPos(&Mx, &My), SpotlightMouseAt(Mx, My, 5000)))
 }
 
+; Builds the PowerShell -Command string that captures WX,WY,WW,WH into FilePath.
+; Separated so SC029 stays compact enough for the source-inspection test window.
+_SC029_BuildPsCapture(WX, WY, WW, WH, FilePath) {
+    return "Add-Type -AssemblyName System.Drawing;"
+        . " $b=New-Object System.Drawing.Bitmap(" . WW . "," . WH . ");"
+        . " $g=[System.Drawing.Graphics]::FromImage($b);"
+        . " $g.CopyFromScreen(" . WX . "," . WY . ",0,0,$b.Size);"
+        . " $b.Save('" . FilePath . "');"
+        . " $g.Dispose();$b.Dispose()"
+}
+
 #HotIf IsSet(Features) and Features["shortcuts"]["screen_instant"]
 ; SC029 (²/$ -- key left of 1) -- instant screenshot of the active window, saved to Pictures
 SC029:: {
@@ -515,26 +526,11 @@ SC029:: {
         MsgBox(t("shortcuts.no_active_window"), t("shortcuts.screenshot_title"), "OK T3")
         return
     }
-    PicsDir   := EnvGet("USERPROFILE") . "\Pictures\screenshots"
+    PicsDir  := EnvGet("USERPROFILE") . "\Pictures\screenshots"
     DirCreate(PicsDir)
-    ; Capture the timestamp once to avoid minute-boundary inconsistency across three calls
-    Now       := A_Now
-    Timestamp := FormatTime(Now, "yyyy_MM_dd_HH") . "h" . FormatTime(Now, "mm") . "min" . FormatTime(Now, "ss") . "sec"
-    FilePath  := PicsDir . "\screenshot_" . Timestamp . ".png"
-
-    ; Write a temp PS1 script to avoid all inline quoting issues
-    TmpScript := A_Temp . "\hs_screenshot.ps1"
-    ScriptContent := "Add-Type -AssemblyName System.Drawing`n"
-        . "$bmp = New-Object System.Drawing.Bitmap(" . WW . ", " . WH . ")`n"
-        . "$g = [System.Drawing.Graphics]::FromImage($bmp)`n"
-        . "$g.CopyFromScreen(" . WX . ", " . WY . ", 0, 0, $bmp.Size)`n"
-        . "$bmp.Save('" . FilePath . "')`n"
-        . "$g.Dispose(); $bmp.Dispose()"
-    FileDelete(TmpScript)
-    FileAppend(ScriptContent, TmpScript, "UTF-8")
-    ; Run async so the hotkey thread returns immediately and does not block
-    ; the keyboard hook while PowerShell captures the screen.
-    Run('powershell -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "' . TmpScript . '"',, "Hide")
+    FilePath := PicsDir . "\screenshot_" . FormatTime(, "yyyy_MM_dd_HH_mm_ss") . ".png"
+    ; Run async — hook thread returns immediately, no keyboard blocking during capture.
+    Run('powershell -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -Command "' . _SC029_BuildPsCapture(WX, WY, WW, WH, FilePath) . '"',, "Hide")
     try TrayTip(StrReplace(t("notify.screenshot_saved_path"), "%s", FilePath), t("notify.screenshot_title"), "Iconi Mute")
 }
 #HotIf

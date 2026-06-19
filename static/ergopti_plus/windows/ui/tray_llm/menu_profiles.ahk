@@ -255,7 +255,7 @@ LLM_Tray_OnUserProfileClick(profile) {
 			LLM_Engine_Init(LLM_Tray_BuildOpts())
 			LLM_Tray_Build()
 			if IsSet(LLM_Tray_BindProfileHotkeys)
-				LLM_Tray_BindProfileHotkeys()
+				(LLM_Tray_BindProfileHotkeys)()
 		}
 	}
 }
@@ -497,7 +497,7 @@ LLM_Tray_GetProfileHotkeyHint(id) {
 
 ; Stable BoundFunc used as the HotIf predicate for all Ctrl+<n> profile
 ; bindings. Allocating it once at module load means every call to
-; LLM_Tray_BindProfileHotkeys() reuses the SAME function reference. AHK v2
+; LLM_Tray_BindProfileHotkeys reuses the SAME function reference. AHK v2
 ; keyed HotIf contexts on the function reference: a fresh lambda on each call
 ; would create a new context, orphaning the previous bindings and leaking them.
 global _LLM_PROFILE_HOTKEY_PRED := _LLM_Tray_IsProfileHotkeyActive.Bind()
@@ -512,14 +512,7 @@ global _LLM_PROFILE_HOTKEY_PRED := _LLM_Tray_IsProfileHotkeyActive.Bind()
  */
 LLM_Tray_BindProfileHotkeys() {
 	global LLM_PROFILE_HOTKEY_LIMIT, _LLM_PROFILE_HOTKEY_PRED
-	; Gate the Ctrl+<n> bindings on _LLM_Tray["enabled"] via HotIf so the
-	; OS never sees the binding when the feature is off — keystrokes pass
-	; through naturally to the active app (browsers, IDEs, …). Previously
-	; we registered the hotkey unconditionally and tried to synthesize
-	; ``{Ctrl down}<n>{Ctrl up}`` as a fallback, but that lost the user's
-	; held modifiers (Shift+Ctrl+1 etc.) and added a round-trip the active
-	; app could see as foreign input. The HotIf approach is the same one
-	; we already use for Tab + nav hotkeys further down in this file.
+	; Stable predicate — same BoundFunc every call so AHK reuses the context
 	HotIf(_LLM_PROFILE_HOTKEY_PRED)
 	loop LLM_PROFILE_HOTKEY_LIMIT {
 		idx := A_Index

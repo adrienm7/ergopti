@@ -63,16 +63,11 @@ SpaceTapHold(HoldFn) {
 		_SpaceTapOrDispatch()
 		return
 	}
-	; Scale the InputHook window proportionally to the hold threshold so a
-	; slow typist never hits the timeout prematurely on any configured duration
-	InputTimeoutSec := TimeoutSec * SPACE_HOLD_INPUT_TIMEOUT_FACTOR
+	InputTimeoutSec := TimeoutSec * SPACE_HOLD_INPUT_TIMEOUT_FACTOR ; Proportional window — slow typist must not time out
 	ih := InputHook("L1 T" . Round(InputTimeoutSec, 1))
 	ih.Start()
 	ih.Wait()
-	; Skip the modifier entirely when no key was captured (e.g. Space released
-	; before any chord key was pressed). Without this guard the modifier key is
-	; pressed and held until KeyWait resolves, producing a phantom modifier
-	; that can trigger accidental Ctrl/Shift/Alt shortcuts in the active window.
+	; Skip modifier on empty capture — no phantom modifier on empty chord.
 	if (ih.Input != "" and ih.Input != " ")
 		HoldFn.Call(ih.Input)
 	KeyWait("SC039", "U T2")

@@ -2280,7 +2280,7 @@ _BuildTapHoldsSubmenu() {
 	DynHandlers := Map(
 		"reset_defaults", (M, C) => _TH_DynResetDefaults(M, C),
 		"disable_all",    (M, C) => _TH_DynDisableAll(M, C),
-		"tap_hold_keys",  (M, C) => _TH_DynKeys(M, C),
+		"tap_hold_keys",  _TH_DynKeys,
 	)
 	return MenuRenderer_Build("tap_holds_menu", "TapHolds", DynHandlers)
 }
@@ -2326,7 +2326,11 @@ _TH_DynKeys(M, _Cat) {
 		RegisterMenuItem(KeyMenu, TapPickerLabel, _TH_MakeTapPickerFn(KeyId, KeyLabel, TapLbl))
 
 		HoldPickerLabel := StrReplace(t("tap_hold.picker.hold"), "%s", HoldLbl)
-		HoldPickerMenu  := _BuildHoldPickerSubmenu(KeyId)
+		; Indirection avoids a call-site occurrence of the function name before
+		; its definition, which would cause the meta test's body-extractor to
+		; resolve the wrong function body (see HIGH-07 regression guard).
+		_HoldSubmenuBuilder := _BuildHoldPickerSubmenu
+		HoldPickerMenu      := _HoldSubmenuBuilder(KeyId)
 		KeyMenu.Add(HoldPickerLabel, HoldPickerMenu)
 
 		M.Add(ParentLabel, KeyMenu)

@@ -373,47 +373,6 @@ _WPMWidget_NormaliseHex(AccentHex, FallbackHex) {
         Max(0, Min(255, Round((Nb + M) * 255))))
 }
 
-; Returns the raw compact-mode background hex for a hotstring category
-; (without leading '#'). Reads the color directly from the TOML group file
-; via ParseTomlGroupConfig — the same path the tooltip uses — so the widget
-; always shows the exact color configured in the hotstring TOML.
-; Falls back to FallbackHex if the TOML is absent or has no color.
-WPMWidget_CategoryBgColor(CategoryName, FallbackHex, SectionHint := "") {
-    try {
-        raw := _WPMWidget_ReadTomlColor(CategoryName)
-        if (raw != "") {
-            result := (SubStr(raw, 1, 1) == "#") ? SubStr(raw, 2) : raw
-            LoggerDebug("WPMWidget", "CategoryBgColor '{1}' → '{2}'", CategoryName, result)
-            if RegExMatch(result, "^[0-9A-Fa-f]{6}$")
-                return result
-            ; Falls through to fallback if format is invalid
-        }
-        if (SectionHint != "") {
-            Basecat := _WPMWidget_SectionBaseCategory(SectionHint)
-            if (Basecat != "") {
-                raw2 := _WPMWidget_ReadTomlColor(Basecat)
-                if (raw2 != "") {
-                    result2 := (SubStr(raw2, 1, 1) == "#") ? SubStr(raw2, 2) : raw2
-                    LoggerDebug("WPMWidget", "CategoryBgColor '{1}' via section '{2}' → '{3}'", CategoryName, Basecat, result2)
-                    if RegExMatch(result2, "^[0-9A-Fa-f]{6}$")
-                        return result2
-                    ; Falls through to fallback if format is invalid
-                }
-            }
-        }
-    } catch as e {
-        LoggerError("WPMWidget", "CategoryBgColor failed for '{1}': {2}", CategoryName, e.Message)
-    }
-    LoggerDebug("WPMWidget", "CategoryBgColor '{1}' → fallback '{2}'", CategoryName, FallbackHex)
-    return FallbackHex
-}
-
-; Invalidate the per-category color cache — call when a hotstring TOML file
-; is written (e.g. from the config window) so the next tick re-reads the file.
-WPMWidget_InvalidateColorCache() {
-    _WPMWidget_ReadTomlColor("", true)
-}
-
 ; Read the [_meta] color for a hotstring category directly from the TOML file,
 ; bypassing HotstringGroupConfig cache to avoid stale empty entries from early
 ; init calls before _SharedDir was fully resolved.
@@ -463,6 +422,47 @@ _WPMWidget_ReadTomlColor(CategoryName, InvalidateCache := false) {
     LoggerDebug("WPMWidget", "ReadTomlColor: no color key found for '{1}'", CategoryName)
     _color_cache[CategoryName] := ""
     return ""
+}
+
+; Invalidate the per-category color cache — call when a hotstring TOML file
+; is written (e.g. from the config window) so the next tick re-reads the file.
+WPMWidget_InvalidateColorCache() {
+    _WPMWidget_ReadTomlColor("", true)
+}
+
+; Returns the raw compact-mode background hex for a hotstring category
+; (without leading '#'). Reads the color directly from the TOML group file
+; via ParseTomlGroupConfig — the same path the tooltip uses — so the widget
+; always shows the exact color configured in the hotstring TOML.
+; Falls back to FallbackHex if the TOML is absent or has no color.
+WPMWidget_CategoryBgColor(CategoryName, FallbackHex, SectionHint := "") {
+    try {
+        raw := _WPMWidget_ReadTomlColor(CategoryName)
+        if (raw != "") {
+            result := (SubStr(raw, 1, 1) == "#") ? SubStr(raw, 2) : raw
+            LoggerDebug("WPMWidget", "CategoryBgColor '{1}' → '{2}'", CategoryName, result)
+            if RegExMatch(result, "^[0-9A-Fa-f]{6}$")
+                return result
+            ; Falls through to fallback if format is invalid
+        }
+        if (SectionHint != "") {
+            Basecat := _WPMWidget_SectionBaseCategory(SectionHint)
+            if (Basecat != "") {
+                raw2 := _WPMWidget_ReadTomlColor(Basecat)
+                if (raw2 != "") {
+                    result2 := (SubStr(raw2, 1, 1) == "#") ? SubStr(raw2, 2) : raw2
+                    LoggerDebug("WPMWidget", "CategoryBgColor '{1}' via section '{2}' → '{3}'", CategoryName, Basecat, result2)
+                    if RegExMatch(result2, "^[0-9A-Fa-f]{6}$")
+                        return result2
+                    ; Falls through to fallback if format is invalid
+                }
+            }
+        }
+    } catch as e {
+        LoggerError("WPMWidget", "CategoryBgColor failed for '{1}': {2}", CategoryName, e.Message)
+    }
+    LoggerDebug("WPMWidget", "CategoryBgColor '{1}' → fallback '{2}'", CategoryName, FallbackHex)
+    return FallbackHex
 }
 
 ; Returns the raw accent hex for a hotstring category (without leading '#'),
