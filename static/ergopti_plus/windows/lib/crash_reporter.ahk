@@ -240,7 +240,7 @@ CrashReport_Save(Report) {
 	try BaseDir := _ConfigDir
 	if (BaseDir == "")
 		try BaseDir := EnvGet("USERPROFILE") . "\.config\ergopti_plus\"
-	if (!BaseDir ~= "[/\\]$")
+	if !(BaseDir ~= "[/\\]$")
 		BaseDir .= "\"
 	ReportDir := BaseDir . _CrashReporter_Subdir . "\"
 
