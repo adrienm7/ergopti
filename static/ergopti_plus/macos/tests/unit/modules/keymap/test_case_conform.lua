@@ -73,8 +73,11 @@ end)
 -- =========================================
 
 local function fresh_registry()
-	package.loaded["modules.keymap.registry"] = nil
+	package.loaded["modules.keymap.registry"]    = nil
 	package.loaded["modules.keymap.terminators"] = nil
+	package.loaded["modules.keymap.utils"]       = nil
+	package.loaded["lib.text_utils"]             = nil
+	package.loaded["text_utils"]                 = nil
 	local R = require("modules.keymap.registry")
 	local state = State.new({ trigger_char = "★", expansion_delay = 0.4 }, {})
 	R.init(state)
@@ -153,9 +156,14 @@ local function fresh_engine()
 		set_buffer       = function() end,
 		log_hotstring    = function() end,
 	}
+	-- Reset all keymap sub-modules so no stale stub (e.g. a utils stub from another
+	-- test that lacks emit_tokens/emit_text) poisons the registry or expander.
 	package.loaded["modules.keymap.registry"]   = nil
 	package.loaded["modules.keymap.terminators"] = nil
 	package.loaded["modules.keymap.expander"]   = nil
+	package.loaded["modules.keymap.utils"]      = nil
+	package.loaded["lib.text_utils"]            = nil
+	package.loaded["text_utils"]                = nil
 	local R = require("modules.keymap.registry")
 	local E = require("modules.keymap.expander")
 	local state = State.new({ trigger_char = "★", expansion_delay = 0.4 }, {})
