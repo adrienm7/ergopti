@@ -337,6 +337,10 @@ DeadKey(Mapping) {
 		if Mapping.Has(PressedKey) {
 			SendNewResult(Mapping[PressedKey])
 		} else {
+			; Standard OS behaviour: emit the dead-key base char (mapped to " ")
+			; then the untransformed key, so ¨ + q produces ¨q, not just q.
+			if Mapping.Has(" ")
+				SendNewResult(Mapping[" "])
 			SendNewResult(PressedKey)
 		}
 		; Re-send EndKeys (Enter, BackSpace, Delete) consumed by the InputHook.

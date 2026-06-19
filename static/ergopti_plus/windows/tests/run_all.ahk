@@ -535,6 +535,7 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 #Include meta/test_keylogger_tick_overflow.ahk
 #Include meta/test_llm_streaming_fixes.ahk
 #Include meta/test_layout_deadkey_endkey.ahk
+#Include meta/test_deadkey_unmapped_base_char.ahk
 #Include meta/test_savefullconfig_no_delete.ahk
 #Include meta/test_keylogger_scan_max_id_tail.ahk
 #Include meta/test_gesture_screenshot_no_tempfile.ahk
