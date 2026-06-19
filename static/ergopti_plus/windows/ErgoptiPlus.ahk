@@ -644,12 +644,20 @@ HotstringsConfigLoadLlmPredictionColor()
 ; SC=0 means VK_RMENU is not mapped → Kana-like remap; non-zero means RAlt
 ; exists on this layout → standard AltGr. The resolved flag also accounts for
 ; any manual TOML override from [Script] AltGrIsKanaRemap.
+_DetectHKL := GetForegroundKeyboardLayout()
+if _DetectHKL = 0
+    _DetectHKL := DllCall("GetKeyboardLayout", "UInt", A_ThreadID, "Ptr")
+if _DetectHKL = 0 {
+    _HklBufDetect := Buffer(A_PtrSize, 0)
+    DllCall("SystemParametersInfo", "UInt", 0x0059, "UInt", 0, "Ptr", _HklBufDetect, "UInt", 0)
+    _DetectHKL := NumGet(_HklBufDetect, 0, "Ptr")
+}
 _DetectSC := DllCall("MapVirtualKeyExW",
     "UInt", 0xA5, "UInt", 4,
-    "Ptr", GetForegroundKeyboardLayout(), "UInt")
+    "Ptr", _DetectHKL, "UInt")
 LoggerInfo("AltGrDetect",
     "HKL=0x{1:X}, VK_RMENU→SC=0x{2:X}, _ALTGR_KANA_FIXUP={3}.",
-    GetForegroundKeyboardLayout(), _DetectSC,
+    _DetectHKL, _DetectSC,
     _ALTGR_KANA_FIXUP ? "true" : "false")
 
 ; Under this text is the configuration of the features, especially whether or not they are enabled.
