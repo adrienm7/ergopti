@@ -2254,6 +2254,13 @@ _ScriptAltGrDispatch(SuffixSC, Slot, NativeSend, CtrlAltSuffixKey) {
             SendInput(NativeSend)
         return
     }
+    ; AHK suspend bypasses #HotIf and timer pseudo-threads; a chord that was
+    ; physically started before suspend was toggled can land here while the
+    ; driver is paused. Pass the keystroke natively rather than running an action.
+    if A_IsSuspended {
+        SendInput(NativeSend)
+        return
+    }
     RunScriptShortcutAction(Slot)
     ResetScriptComboKeys(SuffixSC)
 }
