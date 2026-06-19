@@ -41,6 +41,17 @@
 ; ============================
 ; ==========================================
 
+; Sentinel wrapper that carries boolean intent through TOML_RenderValue.
+; AHK v2 has no distinct boolean type: `true` IS integer 1 and `false` IS 0,
+; so IsNumber() matches both and the renderer would emit "1"/"0" instead of
+; the TOML literals "true"/"false". Wrapping a value in TOML_Bool() before
+; passing it to TOML_Write/TOML_BatchWrite marks it unambiguously as boolean.
+class TOML_Bool {
+	__New(v) {
+		this.Value := v ? true : false
+	}
+}
+
 ; In-place alphabetical sort of a simple Array of strings via bubble sort.
 ; The arrays are at most a few hundred entries; O(n²) is fine.
 SortArray(arr) {
@@ -447,8 +458,12 @@ TOML_RenderKey(k) {
 }
 
 TOML_RenderValue(v) {
-    ; Numbers before booleans: in AHK, ``false`` is integer 0, so ``0 = false``
-    ; is true and would serialize pred_indent=0 as ``false``.
+    ; TOML_Bool sentinel: boolean intent carried explicitly from the call site.
+    ; Must be checked before IsNumber() — TOML_Bool wraps true/false as integers
+    ; so IsNumber() would match them and emit "1"/"0" otherwise.
+    if (v is TOML_Bool)
+        return v.Value ? "true" : "false"
+    ; Arrays before numbers so nested array items iterate correctly.
     if (v is Array) {
         parts := []
         for s in v

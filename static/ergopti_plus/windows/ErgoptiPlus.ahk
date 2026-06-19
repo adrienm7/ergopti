@@ -1630,13 +1630,13 @@ SaveFullConfig() {
     apps := []
     for proc, _ in MetricsFilters.disabled_apps
         apps.Push(proc)
-    Updates.Push({ Section: "ahk.metrics", Key: "metrics_enabled", Value: MetricsShortcuts.enabled })
+    Updates.Push({ Section: "ahk.metrics", Key: "metrics_enabled", Value: TOML_Bool(MetricsShortcuts.enabled) })
     Updates.Push({ Section: "ahk.metrics", Key: "metrics_shortcut_typing", Value: MetricsShortcuts.typing_str })
     Updates.Push({ Section: "ahk.metrics", Key: "metrics_shortcut_apps", Value: MetricsShortcuts.apps_str })
     Updates.Push({ Section: "ahk.metrics", Key: "metrics_wpm_menubar_colors", Value: MetricsShortcuts.wpm_menubar_colors })
-    Updates.Push({ Section: "ahk.metrics", Key: "metrics_filter_private_browsing", Value: MetricsFilters.private_browsing })
-    Updates.Push({ Section: "ahk.metrics", Key: "metrics_filter_secure_field", Value: MetricsFilters.secure_field })
-    Updates.Push({ Section: "ahk.metrics", Key: "metrics_filter_system_auth", Value: MetricsFilters.system_auth })
+    Updates.Push({ Section: "ahk.metrics", Key: "metrics_filter_private_browsing", Value: TOML_Bool(MetricsFilters.private_browsing) })
+    Updates.Push({ Section: "ahk.metrics", Key: "metrics_filter_secure_field", Value: TOML_Bool(MetricsFilters.secure_field) })
+    Updates.Push({ Section: "ahk.metrics", Key: "metrics_filter_system_auth", Value: TOML_Bool(MetricsFilters.system_auth) })
     Updates.Push({ Section: "ahk.metrics", Key: "metrics_disabled_apps", Value: apps })
     Updates.Push({ Section: "ahk.metrics", Key: WPMWidgetConst.CFG_VISIBLE, Value: WPMWidget.visible ? "1" : "0" })
     Updates.Push({ Section: "ahk.metrics", Key: WPMWidgetConst.CFG_X,       Value: String(WPMWidget.pos_x) })
@@ -1656,7 +1656,7 @@ SaveFullConfig() {
     global CategoryEnabled
     if IsSet(CategoryEnabled) {
         for _CatName, _CatBool in CategoryEnabled
-            Updates.Push({ Section: "ahk.category_enabled", Key: _CategoryEnabledKey(_CatName), Value: _CatBool })
+            Updates.Push({ Section: "ahk.category_enabled", Key: _CategoryEnabledKey(_CatName), Value: TOML_Bool(_CatBool) })
     }
     global UPDATER_CHANNEL, UPDATER_CHECK_INTERVAL, UPDATER_INI_SECTION, UPDATER_INI_KEY, UPDATER_INI_INTERVAL_KEY
     if IsSet(UPDATER_CHECK_INTERVAL)
