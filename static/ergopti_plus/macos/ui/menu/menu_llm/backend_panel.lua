@@ -110,13 +110,10 @@ function M.build(ctx)
 
 				local target_model = get_display_model_name(state.llm_model_mlx or llm_mod.DEFAULT_STATE.llm_model_mlx or "")
 				if target_model and target_model ~= "" then
+					-- switch_model already calls models_mgr.check_requirements, which starts
+					-- the MLX server. A second redundant check 0.5 s later would race it and
+					-- try to spawn a second server process against the same port.
 					switch_model(target_model)
-					-- Force server to start to be certain
-					if type(models_mgr.force_mlx_check) == "function" then
-						hs.timer.doAfter(0.5, function()
-							models_mgr.force_mlx_check(target_model, nil, nil, { silent_notifications = true })
-						end)
-					end
 				else
 					state.llm_model = ""
 					if keymap and type(keymap.set_llm_model) == "function" then
