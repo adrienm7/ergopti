@@ -174,18 +174,22 @@ LLM_Deps_AsyncCheck(default_model, on_ready, on_failed, show_ui) {
  * Phase 2 of the async bootstrap: performs the blocking HTTP reachability
  * check and either fast-paths (already running) or launches the installer.
  */
-LLM_Deps_DoCheck(default_model, on_ready, on_failed, show_ui) {
+LLM_Deps_DoCheck(default_model, on_ready?, on_failed?, show_ui?) {
 	global _LLM_Deps_Checking, _LLM_Deps_State
 
 	t_start := A_TickCount
 	LoggerInfo("LLM", "DoCheck — checking if Ollama is running…")
-	running := LLM_OllamaIsRunning()
+	LLM_OllamaIsRunning_Async((running) => _LLM_Deps_DoCheck_Result(running, t_start, default_model, on_ready?, on_failed?, show_ui?))
+}
+
+_LLM_Deps_DoCheck_Result(running, t_start, default_model, on_ready?, on_failed?, show_ui?) {
+	global _LLM_Deps_Checking, _LLM_Deps_State
 	LoggerInfo("LLM", "DoCheck — Ollama reachability check took " (A_TickCount - t_start) " ms, result=" (running ? "running" : "not running") ".")
 	if running {
 		LoggerInfo("LLM", "Ollama already running — fast path, state → ready.")
 		_LLM_Deps_State    := "ready"
 		_LLM_Deps_Checking := false
-		if show_ui && OllamaWV_IsAlive()
+		if IsSet(show_ui) && show_ui && OllamaWV_IsAlive()
 			OllamaWV_Close()
 		if IsSet(on_ready)
 			on_ready()
@@ -194,14 +198,14 @@ LLM_Deps_DoCheck(default_model, on_ready, on_failed, show_ui) {
 
 	; When called from the auto-boot path (show_ui=false), do not open the
 	; install window — the user has not asked for an installation.
-	if !show_ui {
+	if IsSet(show_ui) && !show_ui {
 		LoggerInfo("LLM", "Ollama not running but show_ui=false — silent abort, state stays pending.")
 		_LLM_Deps_Checking := false
 		return
 	}
 
 	LoggerInfo("LLM", "Ollama not running — launching installer…")
-	LLM_Deps_RunInstaller(default_model, on_ready, on_failed)
+	LLM_Deps_RunInstaller(default_model, on_ready?, on_failed?)
 }
 
 
@@ -249,7 +253,7 @@ LLM_Deps_DoCheck(default_model, on_ready, on_failed, show_ui) {
  * @param {Func} on_failed - Callback on failure (rare — only when we
  *                           can't even launch the installer).
  */
-LLM_Deps_RunInstaller(model, on_ready, on_failed) {
+LLM_Deps_RunInstaller(model, on_ready?, on_failed?) {
 	global _LLM_Deps_PollTimer, _LLM_Deps_Checking
 
 	; Boost AHK's own priority BEFORE we kick the installer off. Any heavy
@@ -298,7 +302,7 @@ LLM_Deps_RunInstaller(model, on_ready, on_failed) {
 
 	; Poll the daemon every 3 s. When it answers, fire on_ready.
 	LoggerInfo("LLM", "Polling http://localhost:11434 every 3 s until Ollama responds…")
-	_LLM_Deps_PollTimer := () => LLM_Deps_PollServerReady(on_ready, on_failed)
+	_LLM_Deps_PollTimer := () => LLM_Deps_PollServerReady(on_ready?, on_failed?)
 	SetTimer(_LLM_Deps_PollTimer, 3000)
 }
 
@@ -328,7 +332,7 @@ _LLM_Deps_HasWinget() {
  * considered done (regardless of HOW the user installed it — via winget,
  * a manual download, or anything else).
  */
-LLM_Deps_PollServerReady(on_ready, on_failed) {
+LLM_Deps_PollServerReady(on_ready?, on_failed?) {
 	if A_IsSuspended
 		return
 	global _LLM_Deps_State, _LLM_Deps_Checking, _LLM_Deps_PollTimer
@@ -339,7 +343,7 @@ LLM_Deps_PollServerReady(on_ready, on_failed) {
 	; install — the user's typing lagged hard for as long as the install
 	; ran. The async version dispatches the probe to WinHTTP's
 	; background thread and the result lands in a separate callback.
-	try LLM_OllamaIsRunning_Async((reachable) => _LLM_Deps_OnPollProbeResult(reachable, on_ready, on_failed))
+	try LLM_OllamaIsRunning_Async((reachable) => _LLM_Deps_OnPollProbeResult(reachable, on_ready?, on_failed?))
 }
 
 /**
@@ -348,7 +352,7 @@ LLM_Deps_PollServerReady(on_ready, on_failed) {
  * reachable, we finalise the install; otherwise we just wait for the
  * next 3 s tick — no work done on the main thread.
  */
-_LLM_Deps_OnPollProbeResult(reachable, on_ready, on_failed) {
+_LLM_Deps_OnPollProbeResult(reachable, on_ready?, on_failed?) {
 	global _LLM_Deps_State, _LLM_Deps_Checking, _LLM_Deps_PollTimer
 	if !reachable
 		return    ; still not up — next tick will probe again
@@ -423,7 +427,7 @@ LLM_Deps_Cancel() {
  * @param {Func} on_ready - Callback on success.
  * @param {Func} on_failed - Callback on failure.
  */
-LLM_Deps_PollFile(pid, on_ready, on_failed) {
+LLM_Deps_PollFile(pid, on_ready?, on_failed?) {
 	if A_IsSuspended
 		return
 	global _LLM_Deps_OutFile, _LLM_Deps_OutPos, _LLM_Deps_Checking, _LLM_Deps_PollTimer
@@ -457,7 +461,11 @@ LLM_Deps_PollFile(pid, on_ready, on_failed) {
 	; We cannot read the exit code from shell.Run. Instead we verify
 	; Ollama reachability directly — if the server answers, install succeeded.
 	LoggerInfo("LLM", "Verifying Ollama reachability after PS1 exit…")
-	if LLM_OllamaIsRunning() {
+	LLM_OllamaIsRunning_Async((running) => _LLM_Deps_OnPs1Exit_Result(running, on_ready?, on_failed?))
+}
+
+_LLM_Deps_OnPs1Exit_Result(running, on_ready?, on_failed?) {
+	if running {
 		LoggerInfo("LLM", "Ollama confirmed running — state → ready.")
 		OllamaWV_Done(true, t("llm.deps.done_success"))
 		global _LLM_Deps_State := "ready"
@@ -465,7 +473,7 @@ LLM_Deps_PollFile(pid, on_ready, on_failed) {
 			on_ready()
 	} else {
 		LoggerError("LLM", "PS1 exited but Ollama is not reachable.")
-		LLM_Deps_Fail(t("llm.deps.fail_server_not_responding"), on_failed)
+		LLM_Deps_Fail(t("llm.deps.fail_server_not_responding"), on_failed?)
 	}
 }
 
