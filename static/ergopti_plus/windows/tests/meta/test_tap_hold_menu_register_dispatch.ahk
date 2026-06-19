@@ -1,4 +1,4 @@
-; tests/meta/test_tap_hold_menu_register_dispatch.ahk
+﻿; tests/meta/test_tap_hold_menu_register_dispatch.ahk
 
 ; ==============================================================================
 ; MODULE: TapHolds Menu RegisterMenuItem Dispatch Meta Test
