@@ -987,10 +987,10 @@ KLW_JsonEscape(m) {
     return KLW_SqlEscape(KL_JsonEncode(m))
 }
 
-; Build a SQLite expression that merges excluded.esrc_json INTO the stored
-; esrc_json by summing each key present in the incoming batch item.  A plain
-; assignment (esrc_json=excluded.esrc_json) would clobber all prior counts;
-; this instead keeps a running sum per source type across flush cycles.
+; Build a SQLite expression that merges the incoming esrc_json INTO the stored
+; esrc_json by summing each key present in the batch item.  A plain column
+; assignment would clobber all prior counts accumulated across flush cycles;
+; this instead keeps a running sum per source type.
 KLW_EsrcMergeExpr(EsrcMap) {
     if (!IsObject(EsrcMap) || EsrcMap.Count == 0)
         return "COALESCE(esrc_json,'{}') "

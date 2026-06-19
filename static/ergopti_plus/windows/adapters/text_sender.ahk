@@ -143,7 +143,7 @@ TextSend(Text, Opts, Callback) {
 		; callers that depend on the callback being synchronised with injection completion
 		; are never notified before the paste actually lands.
 		Saved := CB_SaveAll()
-		SetTimer(() => _TextSendClipboard(Text, Saved, Callback), -1)
+		SetTimer(_TextSendClipboard.Bind(Text, Saved, Callback), -1)
 	} else {
 		; SendText uses the "Text" mode that bypasses hotkey triggers and sends
 		; Unicode characters as raw keystrokes — the safest injection path.
