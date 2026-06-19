@@ -267,9 +267,19 @@ local function flatten_from_disk(grouped)
 				if type(disk_val) == "table" then
 					-- Could be: a known nested table, a sub-path table, or (rarely)
 					-- a nested table inside [gestures] — treat those as action slots.
+					-- First try the scalar reverse map: some flat keys (e.g. metrics_shortcut,
+					-- apps_time_shortcut) map to a top-level section:key but their on-disk value
+					-- is a structured table {mods, key}. Without this early check they fall into
+					-- the sub-path branch which iterates inner keys and finds nothing.
+					local top_scalar_fk = _reverse_scalar[sec_name .. ":" .. disk_key]
+					if top_scalar_fk then
+						flat[top_scalar_fk] = disk_val
+					end
 					local nested_fk = _reverse_nested[sec_name .. ":" .. disk_key]
 					if nested_fk then
 						flat[nested_fk] = disk_val
+					elseif top_scalar_fk then
+						-- Already handled above — skip sub-path processing
 					elseif sec_name == "gestures" then
 						-- Defensive: a table inside [gestures] is treated as gesture_actions
 						if not flat.gesture_actions then flat.gesture_actions = {} end
