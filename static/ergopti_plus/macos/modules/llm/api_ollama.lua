@@ -514,6 +514,25 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 		return
 	end
 
+	-- Write payload to a temp file so curl reads it directly — avoids the
+	-- stdin-pipe/streaming-callback conflict in hs.task.
+	-- os.tmpname() creates an empty file at the base path; remove it immediately
+	-- so only the suffixed path (which we own) exists in /tmp.
+	-- Declared BEFORE on_done so the closure captures the real `tmp_path` upvalue
+	-- (Lua lexical scoping: a local declared after the closure resolves to the
+	-- nil global, making os.remove(tmp_path) throw and abort the whole callback).
+	local _tmp_base = os.tmpname()
+	local tmp_path = _tmp_base .. "_ollama_stream.json"
+	os.remove(_tmp_base)
+	local fh = io.open(tmp_path, "w")
+	if not fh then
+		Logger.error(LOG, "Failed to open temp file '%s' for Ollama streaming payload.", tmp_path)
+		if type(on_fail) == "function" then pcall(on_fail) end
+		return
+	end
+	fh:write(encoded)
+	fh:close()
+
 	local accumulated = ""
 	local line_buf    = ""
 
@@ -606,22 +625,6 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 		end
 		if type(on_success) == "function" then pcall(on_success, results) end
 	end
-
-	-- Write payload to a temp file so curl reads it directly — avoids the
-	-- stdin-pipe/streaming-callback conflict in hs.task.
-	-- os.tmpname() creates an empty file at the base path; remove it immediately
-	-- so only the suffixed path (which we own) exists in /tmp.
-	local _tmp_base = os.tmpname()
-	local tmp_path = _tmp_base .. "_ollama_stream.json"
-	os.remove(_tmp_base)
-	local fh = io.open(tmp_path, "w")
-	if not fh then
-		Logger.error(LOG, "Failed to open temp file '%s' for Ollama streaming payload.", tmp_path)
-		if type(on_fail) == "function" then pcall(on_fail) end
-		return
-	end
-	fh:write(encoded)
-	fh:close()
 
 	local task = ShellRunner.spawn("/usr/bin/curl", {
 		"-s", "-N", "-X", "POST",
