@@ -1349,6 +1349,11 @@ Updater_BackgroundTick(*) {
 ; menu, and surfaces a TrayTip. Any failure is logged and the loop just waits
 ; for the next interval — a network blip must not silently kill the updater.
 _Updater_HandleBackgroundResult(Json, Current) {
+	; A stale async callback can land after the script was suspended (e.g. password
+	; field, manual pause). Surfacing a notification or rebuilding the menu then is
+	; both pointless and disruptive — bail before touching any state.
+	if A_IsSuspended
+		return
 	global UPDATER_LAST_NOTIFIED_TAG, UPDATER_LATEST_RELEASE
 	if (Json == "") {
 		try LoggerDebug("Updater", "Background check: network unreachable.")

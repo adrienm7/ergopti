@@ -30,8 +30,11 @@
 ; =================================================
 
 _UCSG_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &WindowsDir)
-	SplitPath(WindowsDir, , &Root)
+	; A_ScriptDir is the runner dir (tests/); its parent is the windows/ driver
+	; root. A single split is correct — the runner is tests/run_all.ahk, not a
+	; per-file script under tests/meta/, so do NOT split twice (that overshoots to
+	; ergopti_plus/ and makes every FileRead miss).
+	SplitPath(A_ScriptDir, , &Root)
 	Path := Root . "\" . StrReplace(RelPath, "/", "\")
 	return FileRead(Path)
 }
@@ -93,3 +96,6 @@ Test("meta updater-callback-suspend: _Updater_OneClickUpdateCallback guards A_Is
 
 Test("meta updater-callback-suspend: _Updater_ShowAvailableUpdateCallback guards A_IsSuspended",
 	() => _UCSG_CheckFnHasSuspendGuard("_Updater_ShowAvailableUpdateCallback(Json) {"))
+
+Test("meta updater-callback-suspend: _Updater_HandleBackgroundResult guards A_IsSuspended",
+	() => _UCSG_CheckFnHasSuspendGuard("_Updater_HandleBackgroundResult(Json, Current) {"))
