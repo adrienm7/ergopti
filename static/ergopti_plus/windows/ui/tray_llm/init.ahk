@@ -146,4 +146,7 @@ LLM_Tray_Init(saved_opts := Map()) {
 	; the same flip-guard as the on-open probe, so a stable backend
 	; doesn't trigger spurious rebuilds.
 	SetTimer(_LLM_Tray_FireHealthProbe, 10000)
+
+	global _LLM_Tray_Loaded
+	_LLM_Tray_Loaded := true
 }

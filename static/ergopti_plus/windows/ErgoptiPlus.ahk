@@ -1605,7 +1605,12 @@ SaveFullConfig() {
         return
     }
     Updates := []
-    if IsSet(_LLM_Tray_SyncToFeatures)
+    ; Only sync LLM state into Features if LLM_Tray_Init() has already run and
+    ; populated _LLM_Tray with the user's persisted values. Calling it before
+    ; init would push module-level defaults (e.g. enabled=false) over the user's
+    ; saved settings, corrupting the config file.
+    global _LLM_Tray_Loaded
+    if IsSet(_LLM_Tray_SyncToFeatures) && (IsSet(_LLM_Tray_Loaded) && _LLM_Tray_Loaded)
         _LLM_Tray_SyncToFeatures()
     if IsSet(Features) {
         _CollectFeatureUpdates(Updates, "", Features)

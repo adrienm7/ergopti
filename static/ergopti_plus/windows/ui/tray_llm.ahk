@@ -224,6 +224,11 @@ LLM_Tray_ApplySharedDefaults()
 ; in place is the only way to keep the canonical menu position.
 global _LLM_Tray_Menu    := Menu()
 global _LLM_Tray_InTray  := false
+; Becomes true once LLM_Tray_Init() has run and _LLM_Tray holds the user's
+; persisted values. SaveFullConfig() gates _LLM_Tray_SyncToFeatures on this
+; flag so a boot-timer flush fired before LLM_Tray_Init can never clobber the
+; user's saved LLM settings with module-level defaults.
+global _LLM_Tray_Loaded  := false
 
 ; Set by LLM_Tray_Init when the IA submenu has been placed in the tray but its
 ; (expensive) population was deferred to the post-"ready" boot tail. Read once
