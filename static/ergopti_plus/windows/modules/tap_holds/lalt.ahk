@@ -189,6 +189,8 @@ SC038::
 		TextPressKey("BackSpace", "") ; Event keeps hotstring engine in sync
 		Sleep(KEY_REPEAT_INITIAL_DELAY_MS)
 		while KS_IsDown("SC038") { ; key-repeat loop while LAlt physically held
+			if A_IsSuspended
+				break
 			TextPressKey("BackSpace", "")
 			Sleep(KEY_REPEAT_INTERVAL_MS)
 		}

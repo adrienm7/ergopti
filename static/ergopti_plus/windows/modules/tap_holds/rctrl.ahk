@@ -75,6 +75,8 @@ SC11D::
 		TextPressKey("BackSpace", "")
 		Sleep(KEY_REPEAT_INITIAL_DELAY_MS)
 		while KS_IsDown("SC11D") { ; key-repeat loop while RCtrl physically held
+			if A_IsSuspended
+				break
 			TextPressKey("BackSpace", "")
 			Sleep(KEY_REPEAT_INTERVAL_MS)
 		}
