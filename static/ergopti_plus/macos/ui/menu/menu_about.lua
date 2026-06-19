@@ -233,8 +233,11 @@ local function replace_and_reload(zip_path, update_menu_fn)
 			return
 		end
 
-		-- Atomic swap: rename current → .bak, rename new → current location.
-		-- On APFS (same volume) rename is atomic. Cross-volume falls back to copy.
+		-- Swap: rename current → .bak, rename new → current location. os.rename is
+		-- rename(2): atomic on the SAME volume, but cross-volume it returns EXDEV
+		-- with NO copy fallback. backup_app (target .. ".bak") lives in target's
+		-- directory, so the restore below is always intra-volume; only new_app sits
+		-- on the tmp volume, so only the new→target rename can fail cross-volume.
 		local ok_bak = os.rename(target, backup_app)
 		if not ok_bak then
 			Logger.error(LOG, "Could not move current .app to backup at %s.", backup_app)
@@ -245,9 +248,16 @@ local function replace_and_reload(zip_path, update_menu_fn)
 		end
 		local ok_mv = os.rename(new_app, target)
 		if not ok_mv then
-			-- Attempt to restore from backup before bailing.
-			os.rename(backup_app, target)
-			Logger.error(LOG, "Could not move new .app to %s — restored backup.", target)
+			-- Restore from backup before bailing, and CHECK the result: an unchecked
+			-- restore that silently failed would leave the running app only at .bak
+			-- (target missing) while the log falsely claimed success.
+			local ok_restore = os.rename(backup_app, target)
+			if ok_restore then
+				Logger.error(LOG, "Could not move new .app to %s — restored the previous version.", target)
+			else
+				Logger.error(LOG, "Could not move new .app to %s AND restore failed — the previous app is at %s.",
+					target, backup_app)
+			end
 			dialog.block_alert(i18n.get("common.error_title"), i18n.get("menu.about.update.install_error"), i18n.get("button.ok"))
 			Updater.set_update_state("idle")
 			update_menu_fn()
