@@ -385,6 +385,16 @@ LLM_Engine_FirePrediction(buffer) {
 	if !_LLM_Engine["enabled"] || buffer == ""
 		return
 
+	; Honour the disable_password_fields user preference: call the port adapter
+	; only when the flag is on, so prediction is silently skipped in secure
+	; fields without logging noise when the feature is disabled.
+	if (_LLM_Engine.Has("disable_password_fields") && _LLM_Engine["disable_password_fields"]) {
+		if IsSet(SFD_IsSecureField) && SFD_IsSecureField() {
+			try LoggerInfo("LLM", "Prediction suppressed — password field detected.")
+			return
+		}
+	}
+
 	; ── Bump the request id ──
 	; Every async callback closes over the id it saw at dispatch time. If
 	; the engine's current id has moved on, the callback bails — mirrors

@@ -53,11 +53,21 @@ global SFD_SECURE_APPS := Map(
 ; Returns true if the focused control carries the ES_PASSWORD style, false otherwise.
 ; Uses ControlGetStyle which inspects the Win32 ES_PASSWORD flag (0x20) — the
 ; most reliable heuristic without full UIAutomation COM registration.
+; The ES_PASSWORD bit is only meaningful on Edit controls; checking it on other
+; control classes (ComboBox, ListView, etc.) risks false positives because
+; those classes may set the same bit for unrelated reasons.
 ; @return {Boolean} True on success, false on error.
 SFD_IsSecureField() {
 	try {
 		local FocusedCtrl := ControlGetFocus("A")
 		if FocusedCtrl = ""
+			return false
+		; Guard: ES_PASSWORD (0x20) is only defined for Edit controls; other
+		; Win32 class families reuse the same bit position for different meanings.
+		; ControlGetClassNN returns e.g. "Edit1", "RichEdit20W1" etc. — the name
+		; always starts with the Win32 class prefix before the index digit.
+		local ClassNN := ControlGetClassNN(FocusedCtrl, "A")
+		if !RegExMatch(ClassNN, "i)^(Edit|RichEdit)")
 			return false
 		local Style := ControlGetStyle(FocusedCtrl, "A")
 		; ES_PASSWORD = 0x20 — password edit field marker set by CreateWindowEx
