@@ -78,3 +78,16 @@ _GPPBG_AssertRestoreClearsGuard() {
 		"_GesturePastePlainRestore must clear _SEND_INSTANT_CLIP_BUSY so the next operation can take the clipboard route (gesture-paste-plain-bypass-busy-guard)")
 }
 Test("gestures: deferred restore releases the reentrancy guard (gesture-paste-plain-bypass-busy-guard)", _GPPBG_AssertRestoreClearsGuard)
+
+; HIGH-03: the paste block (clipboard coerce + ^v + restore-timer arm) is wrapped
+; in try/catch. If the send throws, the catch must restore the original clipboard
+; AND clear _SEND_INSTANT_CLIP_BUSY — otherwise the guard latches true forever and
+; every subsequent plain-paste silently falls through to the bypass branch.
+_GPPBG_AssertCatchReleasesGuard() {
+	Src := _GPPBG_ReadSource("modules/gestures.ahk")
+	Body := _GPPBG_FuncBody(Src, "GesturePastePlain() {")
+	Assert(Body != "", "GesturePastePlain() declaration must exist in gestures.ahk")
+	Assert(RegExMatch(Body, "catch[\s\S]*?_SEND_INSTANT_CLIP_BUSY := false") > 0,
+		"GesturePastePlain catch block must reset _SEND_INSTANT_CLIP_BUSY := false so a throw mid-paste does not latch the guard forever (HIGH-03)")
+}
+Test("gestures: GesturePastePlain catch releases the busy guard on throw (HIGH-03)", _GPPBG_AssertCatchReleasesGuard)
