@@ -181,3 +181,65 @@ helpers.describe("tooltip.show(): stops dequeue on entry (E3)", function()
 		helpers.assert_eq(call_order[2], "render")
 	end)
 end)
+
+
+-- ======================================================================
+-- ======================================================================
+-- ======= 4/ show / show_loading / show_stacked use hide_forced =======
+-- ======================================================================
+-- ======================================================================
+
+helpers.describe("tooltip: empty content uses hide_forced, not hide (F32 regression)", function()
+
+	helpers.it("show('') path calls hide_forced not hide in source", function()
+		-- The bug: show(nil) and show('') called M.hide(), which is blocked
+		-- while a dequeue cycle is running. The tooltip stayed visible even though
+		-- the caller explicitly asked to show nothing. Fix: use hide_forced().
+		local src_path = helpers.driver_root() .. "ui/tooltip/tooltip_hotstring.lua"
+		local fh = io.open(src_path, "r")
+		helpers.assert_true(fh ~= nil, "tooltip_hotstring.lua must be readable")
+		local src = fh:read("*a"); fh:close()
+
+		-- Find the M.show function body and assert it uses hide_forced on empty content
+		local show_body = src:match("function M%.show%(.-\nend")
+		helpers.assert_true(show_body ~= nil, "M.show must be present")
+		-- Must call hide_forced (not plain hide) when content is empty
+		helpers.assert_true(
+			show_body:find("hide_forced", 1, true) ~= nil,
+			"M.show must call hide_forced() for empty/nil content, not hide()")
+		-- The unguarded M.hide() pattern must not appear in the empty-content branch
+		-- (a plain `M.hide()` call used alone on the empty-check line is the bug)
+		local empty_check_line = show_body:match("tostring%(content%) ==[^\n]+")
+		helpers.assert_true(empty_check_line ~= nil, "empty-content guard must exist in M.show")
+		helpers.assert_true(
+			empty_check_line:find("hide_forced", 1, true) ~= nil,
+			"the empty-content guard in M.show must call hide_forced()")
+	end)
+
+	helpers.it("show_loading('') path calls hide_forced in source", function()
+		local src_path = helpers.driver_root() .. "ui/tooltip/tooltip_hotstring.lua"
+		local fh = io.open(src_path, "r")
+		helpers.assert_true(fh ~= nil)
+		local src = fh:read("*a"); fh:close()
+
+		local load_body = src:match("function M%.show_loading%(.-\nend")
+		helpers.assert_true(load_body ~= nil, "M.show_loading must be present")
+		helpers.assert_true(
+			load_body:find("hide_forced", 1, true) ~= nil,
+			"M.show_loading must call hide_forced() for empty/nil content")
+	end)
+
+	helpers.it("show_stacked with empty rows calls hide_forced in source", function()
+		local src_path = helpers.driver_root() .. "ui/tooltip/tooltip_hotstring.lua"
+		local fh = io.open(src_path, "r")
+		helpers.assert_true(fh ~= nil)
+		local src = fh:read("*a"); fh:close()
+
+		local stack_body = src:match("function M%.show_stacked%(.-\nend")
+		helpers.assert_true(stack_body ~= nil, "M.show_stacked must be present")
+		helpers.assert_true(
+			stack_body:find("hide_forced", 1, true) ~= nil,
+			"M.show_stacked must call hide_forced() for empty/nil rows")
+	end)
+
+end)
