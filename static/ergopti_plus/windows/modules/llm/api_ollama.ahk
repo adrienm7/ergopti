@@ -186,7 +186,7 @@ LLM_OllamaAllowInference() {
 	if !(IsSet(LLM_Deps_IsReady) and LLM_Deps_IsReady())
 		return false
 	if (_LLM_Ollama_WarmupStartedTick > 0
-			and (A_TickCount - _LLM_Ollama_WarmupStartedTick) >= 8000)
+			and ((A_TickCount - _LLM_Ollama_WarmupStartedTick) & 0xFFFFFFFF) >= 8000)
 		return true
 	return false
 }

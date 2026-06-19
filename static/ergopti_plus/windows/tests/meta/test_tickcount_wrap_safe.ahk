@@ -111,3 +111,26 @@ _TTCWS_WpmWidgetWrapSafe() {
 		"wpm_widget.ahk must use the wrap-safe constant 0x100000000 in TickCount delta computation (F35)")
 }
 Test("wpm_widget: TickCount delta uses wrap-safe (now - last + 0x100000000) & 0xFFFFFFFF formula (F35)", _TTCWS_WpmWidgetWrapSafe)
+
+
+
+
+; ========================================================================
+; ========================================================================
+; ======= 5/ api_ollama.ahk -- warmup elapsed comparison (tickcount-wrap)
+; ========================================================================
+; ========================================================================
+
+_TTCWS_OllamaWarmupWrapSafe() {
+	Src := _TTCWS_StripLineComments(_TTCWS_ReadSource("modules/llm/api_ollama.ahk"))
+	Assert(Src != "", "modules/llm/api_ollama.ahk must be readable")
+
+	; Negative: bare subtraction on warmup tick must not appear in a comparison
+	Assert(!InStr(Src, "(A_TickCount - _LLM_Ollama_WarmupStartedTick) >= 8000"),
+		"api_ollama.ahk must not compare warmup elapsed time without & 0xFFFFFFFF mask (tickcount-wrap)")
+
+	; Positive: masked form must be present
+	Assert(InStr(Src, "(_LLM_Ollama_WarmupStartedTick) & 0xFFFFFFFF) >= 8000") > 0,
+		"api_ollama.ahk must mask warmup elapsed comparison with & 0xFFFFFFFF (tickcount-wrap)")
+}
+Test("api_ollama: warmup elapsed comparison uses & 0xFFFFFFFF mask (tickcount-wrap)", _TTCWS_OllamaWarmupWrapSafe)
