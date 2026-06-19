@@ -408,6 +408,8 @@ _LLM_Tray_PersistApiEntries() {
 		; FileMove with overwrite=1 is atomic within the same volume — avoids a
 		; zero-byte window between FileDelete and FileAppend on crash/power-loss.
 		FileMove(tmp, path, 1)
+	} catch as e {
+		try LoggerError("LLM", "Failed to persist API entries to '{1}': {2}", path, e.Message)
 	}
 }
 
