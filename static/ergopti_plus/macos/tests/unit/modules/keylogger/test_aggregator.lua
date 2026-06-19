@@ -44,6 +44,16 @@ package.loaded["modules.keylogger.sqlite_writer"] = {
 	init   = function() end,
 }
 
+-- lib.timings reads a shared TOML file at module level; a prior test may have
+-- installed a partial stub (sec-only) that lacks ms(), causing a "nil value"
+-- crash when aggregator.lua initialises its module-level timing constants.
+-- Inject a complete stub before the load so the real TOML path is never hit
+-- and the module loads cleanly in CI regardless of test ordering.
+package.loaded["lib.timings"] = {
+	ms  = function(_section, _key) return 1000 end,
+	sec = function(_section, _key) return 1.0  end,
+}
+
 local AGG = helpers.load_with_stubs("modules.keylogger.aggregator")
 
 

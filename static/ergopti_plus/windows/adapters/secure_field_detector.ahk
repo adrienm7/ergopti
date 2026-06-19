@@ -62,9 +62,10 @@ SFD_IsSecureField() {
 		local FocusedCtrl := ControlGetFocus("A")
 		if FocusedCtrl = ""
 			return false
-		; Guard: ES_PASSWORD (0x20) is only defined for Edit controls; other
-		; Win32 class families reuse the same bit position for different meanings.
-		; ControlGetClassNN returns e.g. "Edit1", "RichEdit20W1" etc. — the name
+		; ES_PASSWORD (0x20) is only defined for Edit controls; checking it on
+		; other Win32 class families risks false positives because those classes
+		; may assign a different meaning to the same style bit.
+		; ControlGetClassNN returns e.g. "Edit1", "RichEdit20W1" — the name
 		; always starts with the Win32 class prefix before the index digit.
 		local ClassNN := ControlGetClassNN(FocusedCtrl, "A")
 		if !RegExMatch(ClassNN, "i)^(Edit|RichEdit)")
