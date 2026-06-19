@@ -1432,19 +1432,46 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 		end
 	end
 
+	-- Arms (or re-arms) the stream IDLE watchdog: if no further token arrives
+	-- within STREAM_HARD_TIMEOUT_SEC, the server is hung — terminate the task and
+	-- fire on_fail so the UI never freezes and the single-request MLX connection
+	-- is freed. Re-arming on every chunk (rather than cancelling after the first)
+	-- bounds a MID-STREAM stall too: the prior code cancelled the watchdog on the
+	-- first token, leaving a server that sent >=1 token then hung with NO bound at
+	-- all — curl blocked forever, on_done never fired, every later prediction was
+	-- blocked behind the held-open connection.
+	local function arm_stream_idle_watchdog()
+		if _active_stream_timeout then
+			TimerScheduler.cancel(_active_stream_timeout)
+			_active_stream_timeout = nil
+		end
+		_active_stream_timeout = TimerScheduler.after(STREAM_HARD_TIMEOUT_SEC, function()
+			_active_stream_timeout = nil
+			-- Only fire if this stream is still the current one
+			if my_generation ~= _stream_generation then return end
+			if _active_stream_task then
+				Logger.warn(LOG, "[%s] #%d STREAM idle timeout (%gs) — terminating hung task.",
+					model_name, req_id, STREAM_HARD_TIMEOUT_SEC)
+				_active_stream_task.terminate()
+				_active_stream_task       = nil
+				_active_stream_has_chunks = false
+				if type(on_fail) == "function" then pcall(on_fail) end
+			end
+		end)
+	end
+
 	-- Streaming callback: fired each time curl writes a chunk to stdout
 	local function on_chunk(_, chunk, stderr_chunk)
 		if not chunk or chunk == "" then return true end
 		-- Generation check: if a newer request superseded us, discard chunks silently
 		if my_generation ~= _stream_generation then return false end
-		-- First chunk received — server is alive; cancel the hard-timeout watchdog and mark stream active
+		-- First chunk received — server is alive (logged once for diagnostics).
 		if not _active_stream_has_chunks then
 			_active_stream_has_chunks = true
-			if _active_stream_timeout then
-				TimerScheduler.cancel(_active_stream_timeout)
-				_active_stream_timeout = nil
-			end
 		end
+		-- Re-arm the idle watchdog on EVERY chunk so a mid-stream stall is bounded,
+		-- not just a pre-first-token hang (the watchdog used to be cancelled here).
+		arm_stream_idle_watchdog()
 		Logger.debug(LOG, "[%s] #%d STREAM chunk (%d bytes): '%s'",
 			model_name, req_id, #chunk, chunk:sub(1, 120))
 		line_buf = line_buf .. chunk
@@ -1566,6 +1593,11 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 		"-s", "-N", "-X", "POST",
 		"-H", "Content-Type: application/json",
 		"--connect-timeout", tostring(STREAM_CONNECT_TIMEOUT_SEC),
+		-- Hard ceiling on TOTAL stream duration so curl ALWAYS exits and on_done
+		-- runs even if the server stalls mid-stream (mirrors the Ollama backend).
+		-- Without this a post-first-token hang left curl blocked forever, holding
+		-- the single-request MLX connection open against every later prediction.
+		"--max-time", tostring(STREAM_HARD_TIMEOUT_SEC),
 		"--data-binary", "@" .. tmp_path,
 		endpoint,
 	}, on_done, on_chunk)
@@ -1574,22 +1606,11 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 	_active_stream_has_chunks = false
 	Logger.debug(LOG, "[%s] #%d STREAM task started (payload: %s).", model_name, req_id, tmp_path)
 
-	-- Hard-timeout: if no token has arrived within STREAM_HARD_TIMEOUT_SEC, the server
-	-- accepted the connection but is hung — terminate the task and fire on_fail so the
-	-- UI does not freeze indefinitely showing the loading spinner.
-	_active_stream_timeout = TimerScheduler.after(STREAM_HARD_TIMEOUT_SEC, function()
-		_active_stream_timeout = nil
-		-- Only fire if this stream is still the current one
-		if my_generation ~= _stream_generation then return end
-		if _active_stream_task then
-			Logger.warn(LOG, "[%s] #%d STREAM hard timeout (%gs) — terminating hung task.",
-				model_name, req_id, STREAM_HARD_TIMEOUT_SEC)
-			_active_stream_task.terminate()
-			_active_stream_task    = nil
-			_active_stream_has_chunks = false
-			if type(on_fail) == "function" then pcall(on_fail) end
-		end
-	end)
+	-- Idle watchdog: bound the stream in-process too (belt-and-suspenders with
+	-- --max-time). Armed now and re-armed on every chunk (see on_chunk), so a hung
+	-- server — connection accepted but no further tokens — is terminated and
+	-- surfaced via on_fail instead of freezing the UI on a stuck spinner.
+	arm_stream_idle_watchdog()
 
 	-- Clean up the temp file once the task has had time to read it
 	TimerScheduler.after(10, function()
