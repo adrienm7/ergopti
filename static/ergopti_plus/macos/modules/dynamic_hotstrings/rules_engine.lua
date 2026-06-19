@@ -146,7 +146,16 @@ end
 
 --- Generates and registers all prefix-based hotstrings based on the user's personal data.
 local function register_prefix_entries()
-	if not _km or type(_personal_data) ~= "table" then return end
+	if type(_personal_data) ~= "table" then return end
+	if not _km then
+		-- Personal data is present but the keymap is not wired yet. This happens
+		-- when inject_data() runs BEFORE start() (the production order), so the
+		-- registration is deferred to M.start(), which calls us again once _km is
+		-- set. Surface it so a genuinely missing wiring never fails silently — the
+		-- absence of phone/SSN/IBAN prefix hotstrings used to be invisible.
+		Logger.warn(LOG, "register_prefix_entries: personal data present but keymap not wired yet — deferring to M.start().")
+		return
+	end
 	Logger.debug(LOG, "Registering prefix-based dynamic hotstrings…")
 
 	local opts = { is_word = false, auto_expand = true, is_case_sensitive = true }
@@ -295,6 +304,16 @@ function M.start(keymap_module)
 	if _km.register_lua_group then
 		_km.register_lua_group(GROUP_NAME, loc("dynamichotstrings.group_label"), _sections)
 	end
+
+	-- Register the phone/SSN/IBAN prefix hotstrings NOW that _km is wired. This
+	-- must NOT rely on the post_load_hook below: register_lua_group already marks
+	-- the group enabled, and on a default boot menu_state applies group state
+	-- delta-only, so enable_group("dynamichotstrings") early-returns as a no-op
+	-- and the hook never fires — leaving every prefix mapping unregistered. The
+	-- direct call here is the single guaranteed registration; the hook still
+	-- covers a later disable→re-enable cycle. inject_data() set _personal_data
+	-- before start() ran, so the data is available here.
+	register_prefix_entries()
 
 	if _km.set_post_load_hook then
 		_km.set_post_load_hook(GROUP_NAME, function()
