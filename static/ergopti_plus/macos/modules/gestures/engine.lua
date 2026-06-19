@@ -360,9 +360,19 @@ local function triggerLiveAxisIfNeeded(slot, pos, now, axis)
 		-- to come all the way back through the original origin. This makes reverse
 		-- swipes feel as responsive as fresh ones.
 		if gs.liveAxisSign and gs.lastFirePos then
-			local local_delta = (axis == "horiz")
-				and (pos.x - gs.lastFirePos.x)
-				or  (pos.y - gs.lastFirePos.y)
+			local local_delta
+			if axis == "horiz" then
+				local_delta = pos.x - gs.lastFirePos.x
+			elseif axis == "vert" then
+				local_delta = pos.y - gs.lastFirePos.y
+			else
+				-- Diagonal: project movement along the 45° diagonal signed direction
+				-- (same convention as signedDistAxis) so reversal detection is axis-aware.
+				local ddx = pos.x - gs.lastFirePos.x
+				local ddy = pos.y - gs.lastFirePos.y
+				local mag = math.sqrt(ddx*ddx + ddy*ddy)
+				local_delta = ((ddx + ddy > 0) and 1 or -1) * mag
+			end
 			local local_sign = (local_delta > 0) and 1 or (local_delta < 0 and -1 or 0)
 			if local_sign ~= 0 and local_sign ~= gs.liveAxisSign and math.abs(local_delta) >= LIVE_AXIS_MIN then
 				Logger.info(LOG, string.format("INCREMENTAL REVERSAL DETECTED slot=%s axis=%s local_delta=%.2f prevSign=%d newSign=%d — rebasing startPos to (%.1f,%.1f)",
