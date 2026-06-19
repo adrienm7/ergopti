@@ -1388,24 +1388,32 @@ KL_IngestOnce(force := false) {
     ; to SQL — which would silently lose events on 64-bit hosts where KL_JsonDecode
     ; is a no-op.
     statements := []
-    for _, entry in entries {
-        for _, sql in KL_BuildInserts(entry)
-            statements.Push(sql)
-        ; Walk for aggregations (n-grams, bursts, sessions, …). The walker
-        ; accumulates into KLW.batch; we flush below as a single SQL block
-        ; appended to data.sql in the same transaction as the raw INSERTs.
-        try {
-            t := entry["type"]
-            if (t = "typing") {
-                KLW_WalkTypingEntry(entry)
-            } else if (t = "app_switch") {
-                KLW_WalkAppSwitch(entry)
-            } else if (t = "window_switch") {
-                KLW_WalkWindowSwitch(entry)
-            } else if (t = "system_event") {
-                KLW_WalkSystemEvent(entry)
+    ; Protect KLW.batch from being reset by the live-push timer mid-walk.
+    ; The timer fires from an interrupt thread and would call KLW_ResetBatch(),
+    ; tearing a partially accumulated batch and producing incomplete UPSERT data.
+    local _crit_walk := Critical("On")
+    try {
+        for _, entry in entries {
+            for _, sql in KL_BuildInserts(entry)
+                statements.Push(sql)
+            ; Walk for aggregations (n-grams, bursts, sessions, …). The walker
+            ; accumulates into KLW.batch; we flush below as a single SQL block
+            ; appended to data.sql in the same transaction as the raw INSERTs.
+            try {
+                t := entry["type"]
+                if (t = "typing") {
+                    KLW_WalkTypingEntry(entry)
+                } else if (t = "app_switch") {
+                    KLW_WalkAppSwitch(entry)
+                } else if (t = "window_switch") {
+                    KLW_WalkWindowSwitch(entry)
+                } else if (t = "system_event") {
+                    KLW_WalkSystemEvent(entry)
+                }
             }
         }
+    } finally {
+        Critical(_crit_walk)
     }
     ; KLW.batch is NOT flushed to data.sql here anymore. The walker keeps
     ; accumulating in RAM; KLR_InjectKlwBatch drains it into the in-memory

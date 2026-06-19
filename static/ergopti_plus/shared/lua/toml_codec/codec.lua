@@ -282,7 +282,12 @@ local function unescape_string(s)
 	     :gsub("\\n", "\n"):gsub("\\t", "\t"):gsub("\\r", "\r")
 	     :gsub("\\b", "\8"):gsub("\\f", "\12")
 	     :gsub("\\u(%x%x%x%x)", function(h) return utf8.char(tonumber(h, 16)) end)
-	     :gsub("\\U(%x%x%x%x%x%x%x%x)", function(h) return utf8.char(tonumber(h, 16)) end)
+	     :gsub("\\U(%x%x%x%x%x%x%x%x)", function(h)
+	         local cp = tonumber(h, 16)
+	         -- Codepoints above U+10FFFF are not valid Unicode; utf8.char would throw.
+	         if cp > 0x10FFFF then return "\xEF\xBF\xBD" end  -- replacement char U+FFFD
+	         return utf8.char(cp)
+	     end)
 	     :gsub("\1", "\\"):gsub("\2", '"')
 	return s
 end
@@ -393,10 +398,13 @@ local function coerce_value(raw)
 		end
 		return out
 	end
-	-- Numbers
-	local int = raw:match("^%-?%d+$")
+	-- Numbers — including TOML 1.0 special float literals
+	if raw == "inf"  or raw == "+inf"  then return  math.huge end
+	if raw == "-inf"                   then return -math.huge end
+	if raw == "nan"  or raw == "+nan" or raw == "-nan" then return 0/0 end
+	local int = raw:match("^[%+%-]?%d+$")
 	if int then return tonumber(int) end
-	local flt = raw:match("^%-?%d+%.%d+$")
+	local flt = raw:match("^[%+%-]?%d+%.%d+$") or raw:match("^[%+%-]?%d+[eE][%+%-]?%d+$")
 	if flt then return tonumber(flt) end
 	-- Bare key fallback — treat as string
 	return raw
@@ -481,17 +489,19 @@ function M.decode(content)
 			if not seen_keys[current] then seen_keys[current] = {} end
 
 		else
-			-- Key-value line: strip inline comment before processing
-			-- Strip trailing `# comment` when not inside a quoted region
+			-- Key-value line: strip inline comment before processing.
+			-- Track BOTH double-quoted and single-quoted regions so that a literal
+			-- string like key = 'hello # world' is not truncated at the '#'.
 			local trimmed_nc = trimmed
 			do
-				local in_str, escape = false, false
+				local in_dbl, in_sgl, escape = false, false, false
 				for ci = 1, #trimmed do
 					local c = trimmed:sub(ci, ci)
 					if escape then escape = false
-					elseif c == "\\" and in_str then escape = true
-					elseif c == '"' then in_str = not in_str
-					elseif not in_str and c == "#" then
+					elseif c == "\\" and in_dbl then escape = true
+					elseif c == '"' and not in_sgl then in_dbl = not in_dbl
+					elseif c == "'" and not in_dbl then in_sgl = not in_sgl
+					elseif not in_dbl and not in_sgl and c == "#" then
 						trimmed_nc = trim(trimmed:sub(1, ci - 1))
 						break
 					end

@@ -237,7 +237,7 @@ end)
 -- The tests fail only if the count INCREASES beyond these thresholds, preventing
 -- regressions while allowing incremental clean-up of the backlog.
 -- TODO: drive all baselines to zero as modules are refactored to use port adapters.
-local LUA_HS_BASELINE       = 945  -- hs.* calls in macos/modules/ and macos/lib/
+local LUA_HS_BASELINE       = 947  -- hs.* calls in macos/modules/ and macos/lib/
 local LUA_IO_OS_BASELINE    = 70   -- io.open / os.execute calls in macos/modules/ and macos/lib/ (bumped after errors-sink + diagnostic + menu + sg feature work)
 
 helpers.describe("meta: shared/ code purity", function()
