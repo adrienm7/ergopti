@@ -324,7 +324,6 @@ _LLMRemote_TrimAsyncRegistry() {
             try oldest_entry["on_fail"].Call()
         _LLM_Remote_Async.Delete(oldest_id)
         return
-    }
 }
 
 ; Resolves an entry record to a normalised Map(Provider, Format, BaseUrl,

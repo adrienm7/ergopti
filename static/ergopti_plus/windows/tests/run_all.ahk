@@ -278,6 +278,7 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", A_Temp . "\e
 try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 
 ; ── Meta tests (codebase hygiene, no production includes needed) ──
+#Include meta/test_ahk_brace_balance.ahk
 #Include meta/test_file_headers.ahk
 #Include meta/test_section_headers.ahk
 #Include meta/test_run_all_include_integrity.ahk
