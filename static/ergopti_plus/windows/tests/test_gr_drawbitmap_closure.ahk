@@ -57,7 +57,9 @@ class _GDB_B {
 ; documentation for anyone wondering why HasMethod was chosen over Type().
 _GDB_TypeSemanticsCheck() {
 	; Non-capturing nested function — Type returns "Func"
-	plain(dc, w, h) {}
+	plain(dc, w, h) {
+		return
+	}
 	Assert(Type(plain) == "Func",
 		"A non-capturing nested function must have Type 'Func'")
 	Assert(HasMethod(plain, "Call"),
@@ -92,7 +94,9 @@ _GDB_CallableGuardLogic() {
 	}
 
 	; Plain func — must pass
-	plain(dc, w, h) {}
+	plain(dc, w, h) {
+		return
+	}
 	Assert(_check(plain),
 		"HasMethod guard must accept a plain Func")
 
