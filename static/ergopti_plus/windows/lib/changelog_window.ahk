@@ -276,8 +276,8 @@ _CLW_OnWebMessage(Handler, Args) {
 ; ==========================================
 
 /**
- * Fetches releases from GitHub (synchronous WinHTTP) and injects them via JS.
- * Runs in a new thread via SetTimer to avoid blocking the UI.
+ * Fetches releases from GitHub (asynchronous WinHTTP) and injects them via JS.
+ * Defers to next message-loop tick; fetch is non-blocking async WinHttp.
  * @param {string} Channel - "main" or "dev".
  */
 _CLW_FetchAndInject(Channel) {
@@ -293,11 +293,14 @@ _CLW_DoFetch(Channel) {
 	try LoggerTrace("Changelog", "Fetching releases (channel={1})…", Channel)
 
 	Url := "https://api.github.com/repos/" . UPDATER_GH_OWNER . "/" . UPDATER_GH_REPO . "/releases?per_page=20"
-	Json := ""
 
 	try {
 		Req := ComObject("WinHttp.WinHttpRequest.5.1")
-		Req.Open("GET", Url, false)
+		; Open async (true) so Send returns immediately and a slow or stalled
+		; network can never block the AHK main thread — and therefore never freeze
+		; keyboard remapping. Completion is harvested via a non-blocking SetTimer
+		; poll, mirroring _Updater_FetchLatestJsonAsync / _Updater_PollAsync.
+		Req.Open("GET", Url, true)
 		Req.SetRequestHeader("Accept", "application/vnd.github+json")
 		Req.SetRequestHeader("User-Agent", "ErgoptiPlus-Changelog/1.0")
 		; Resolve timeout was 0 (infinite) — on a captive network this would stall
@@ -306,10 +309,53 @@ _CLW_DoFetch(Channel) {
 		Req.SetTimeouts(UPDATER_HTTP_RESOLVE_TIMEOUT_MS, UPDATER_HTTP_CONNECT_TIMEOUT_MS,
 			UPDATER_HTTP_SEND_TIMEOUT_MS, UPDATER_HTTP_RECEIVE_TIMEOUT_MS)
 		Req.Send()
-		if (Req.Status == 200)
-			Json := Req.ResponseText
 	} catch as Err {
 		try LoggerWarn("Changelog", "GitHub API request failed: {1}.", Err.Message)
+		ErrMsg := _CLW_JsStr(t("changelog_window.error_network"))
+		_CLW_Eval("injectError(" . ErrMsg . ")")
+		return
+	}
+
+	; Arm the non-blocking completion poll for this request.
+	_CLW_PollFetch(Req, Channel, 0)
+}
+
+; Non-blocking completion poll for one in-flight async changelog fetch. Asks
+; WinHTTP "is the response ready?" via WaitForResponse(0) (0 = do not wait) and
+; re-arms itself until ready, then harvests ResponseText and injects it. The
+; poll budget mirrors the updater's so a wedged request can never leave a timer
+; running forever.
+_CLW_PollFetch(Req, Channel, Polls) {
+	global UPDATER_ASYNC_POLL_MS, UPDATER_ASYNC_MAX_POLLS
+
+	ready  := false
+	failed := false
+	try {
+		ready := Req.WaitForResponse(0)
+	} catch as Err {
+		failed := true
+		try LoggerWarn("Changelog", "GitHub API request failed: {1}.", Err.Message)
+	}
+
+	if (!failed and !ready) {
+		Polls += 1
+		if (Polls > UPDATER_ASYNC_MAX_POLLS) {
+			failed := true
+			try LoggerWarn("Changelog", "GitHub API request exceeded its poll budget — aborting.")
+		} else {
+			SetTimer(() => _CLW_PollFetch(Req, Channel, Polls), -UPDATER_ASYNC_POLL_MS)
+			return
+		}
+	}
+
+	Json := ""
+	if !failed {
+		try {
+			if (Req.Status == 200)
+				Json := Req.ResponseText
+		} catch as Err {
+			try LoggerWarn("Changelog", "GitHub API response read failed: {1}.", Err.Message)
+		}
 	}
 
 	if (Json == "") {
