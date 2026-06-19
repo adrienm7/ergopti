@@ -113,46 +113,6 @@ _TextSenderModifierString(ModStr) {
 ; =======================================================
 ; =======================================================
 
-; Inserts text at the current insertion point.
-; Uses the Clipboard port (CB_SaveAll / CB_Write / CB_RestoreAll) for the clipboard
-; path so the interaction is mockable and the driver has one canonical clipboard
-; code path.
-; @param Text     {String}   The Unicode text to insert.
-; @param Opts     {Map|0}    { mode?: "direct"|"clipboard"|"auto" }
-; @param Callback {Func|0}   Called with no arguments on completion.
-TextSend(Text, Opts, Callback) {
-	global TEXT_CLIPBOARD_THRESHOLD
-	Mode := "auto"
-	if (Opts is Map) and Opts.Has("mode") and Opts["mode"] != ""
-		Mode := Opts["mode"]
-
-	; Resolve "auto" to a concrete strategy based on payload length.
-	if Mode = "auto"
-		Mode := StrLen(Text) > TEXT_CLIPBOARD_THRESHOLD ? "clipboard" : "direct"
-
-	if Mode = "clipboard" {
-		; The clipboard round-trip (write + blocking ClipWait + paste) is deferred
-		; onto a one-shot timer so it NEVER runs on the input-gating keyboard thread.
-		; Blocking there on ClipWait would starve the low-level hook and drop the
-		; user's next keystrokes; running it off-thread lets the hotkey return at once.
-		; CB_SaveAll() is called synchronously HERE (before the timer fires) so that
-		; two rapid TextSend calls cannot race: each captures its own clipboard state
-		; before either timer runs, eliminating the TOCTOU window where the second
-		; CB_SaveAll would snapshot the first injection's text instead of the original.
-		; Callback is passed into _TextSendClipboard and fired there after Ctrl+V, so
-		; callers that depend on the callback being synchronised with injection completion
-		; are never notified before the paste actually lands.
-		Saved := CB_SaveAll()
-		SetTimer(_TextSendClipboard.Bind(Text, Saved, Callback), -1)
-	} else {
-		; SendText uses the "Text" mode that bypasses hotkey triggers and sends
-		; Unicode characters as raw keystrokes — the safest injection path.
-		_AHK_SendText.Call(Text)
-		if Callback != 0
-			try Callback()
-	}
-}
-
 ; Performs the clipboard write / wait / paste / restore round-trip.
 ; Runs on a one-shot timer (off the keyboard thread) so the blocking ClipWait
 ; cannot starve the low-level keyboard hook. Bails loudly without pasting if the
@@ -220,6 +180,46 @@ _TextSendRestoreClipboard(Saved, Generation) {
 	if (Generation != _TEXT_CLIPBOARD_GENERATION)
 		return
 	CB_RestoreAll(Saved)
+}
+
+; Inserts text at the current insertion point.
+; Uses the Clipboard port (CB_SaveAll / CB_Write / CB_RestoreAll) for the clipboard
+; path so the interaction is mockable and the driver has one canonical clipboard
+; code path.
+; @param Text     {String}   The Unicode text to insert.
+; @param Opts     {Map|0}    { mode?: "direct"|"clipboard"|"auto" }
+; @param Callback {Func|0}   Called with no arguments on completion.
+TextSend(Text, Opts, Callback) {
+	global TEXT_CLIPBOARD_THRESHOLD
+	Mode := "auto"
+	if (Opts is Map) and Opts.Has("mode") and Opts["mode"] != ""
+		Mode := Opts["mode"]
+
+	; Resolve "auto" to a concrete strategy based on payload length.
+	if Mode = "auto"
+		Mode := StrLen(Text) > TEXT_CLIPBOARD_THRESHOLD ? "clipboard" : "direct"
+
+	if Mode = "clipboard" {
+		; The clipboard round-trip (write + blocking ClipWait + paste) is deferred
+		; onto a one-shot timer so it NEVER runs on the input-gating keyboard thread.
+		; Blocking there on ClipWait would starve the low-level hook and drop the
+		; user's next keystrokes; running it off-thread lets the hotkey return at once.
+		; CB_SaveAll() is called synchronously HERE (before the timer fires) so that
+		; two rapid TextSend calls cannot race: each captures its own clipboard state
+		; before either timer runs, eliminating the TOCTOU window where the second
+		; CB_SaveAll would snapshot the first injection's text instead of the original.
+		; Callback is passed into _TextSendClipboard and fired there after Ctrl+V, so
+		; callers that depend on the callback being synchronised with injection completion
+		; are never notified before the paste actually lands.
+		Saved := CB_SaveAll()
+		SetTimer(() => _TextSendClipboard(Text, Saved, Callback), -1)
+	} else {
+		; SendText uses the "Text" mode that bypasses hotkey triggers and sends
+		; Unicode characters as raw keystrokes — the safest injection path.
+		_AHK_SendText.Call(Text)
+		if Callback != 0
+			try Callback()
+	}
 }
 
 ; Emits Count Backspace keystrokes synchronously.
