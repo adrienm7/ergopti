@@ -67,7 +67,12 @@ class KLSensorConst {
 ; ===================================
 
 class KLSensors {
-	static tick_fn := unset
+	static tick_fn      := unset
+	; Separate BoundFunc for the warm-up one-shot so it does not share a
+	; SetTimer registration with tick_fn — AHK replaces the previous period
+	; when the same function reference is re-registered, which would cancel
+	; the warm-up before it ever fires.
+	static warmup_fn    := unset
 
 	; Last GetSystemTimes snapshot for CPU delta computation.
 	; FILETIME values are 64-bit 100-ns ticks stored as two 32-bit DWORDs
@@ -183,14 +188,21 @@ KL_Sensors_Tick() {
 KL_Sensors_Start() {
 	if KLSensors.HasOwnProp("tick_fn") && IsObject(KLSensors.tick_fn)
 		return
-	KLSensors.tick_fn := KL_Sensors_Tick.Bind()
-	; Fire once shortly after start so the dashboard has initial data
-	; without waiting the full 60 s.
-	SetTimer(KLSensors.tick_fn, -2000)
+	KLSensors.tick_fn   := KL_Sensors_Tick.Bind()
+	; The warm-up one-shot uses a distinct BoundFunc so that registering the
+	; periodic timer below does not cancel the warm-up. AHK replaces the
+	; period of an existing timer when the same function reference is
+	; re-registered; two distinct references get two independent timer slots.
+	KLSensors.warmup_fn := KL_Sensors_Tick.Bind()
+	SetTimer(KLSensors.warmup_fn, -2000)
 	SetTimer(KLSensors.tick_fn, KLSensorConst.SENSOR_TICK_MS)
 }
 
 KL_Sensors_Stop() {
+	if KLSensors.HasOwnProp("warmup_fn") && IsObject(KLSensors.warmup_fn) {
+		try SetTimer(KLSensors.warmup_fn, 0)
+		KLSensors.warmup_fn := unset
+	}
 	if KLSensors.HasOwnProp("tick_fn") && IsObject(KLSensors.tick_fn) {
 		try SetTimer(KLSensors.tick_fn, 0)
 		KLSensors.tick_fn := unset
