@@ -532,7 +532,9 @@ SC029:: {
         . "$g.Dispose(); $bmp.Dispose()"
     FileDelete(TmpScript)
     FileAppend(ScriptContent, TmpScript, "UTF-8")
-    RunWait('powershell -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "' . TmpScript . '"',, "Hide")
+    ; Run async so the hotkey thread returns immediately and does not block
+    ; the keyboard hook while PowerShell captures the screen.
+    Run('powershell -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "' . TmpScript . '"',, "Hide")
     try TrayTip(StrReplace(t("notify.screenshot_saved_path"), "%s", FilePath), t("notify.screenshot_title"), "Iconi Mute")
 }
 #HotIf
