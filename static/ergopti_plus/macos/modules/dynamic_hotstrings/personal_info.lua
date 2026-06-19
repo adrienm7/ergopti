@@ -263,10 +263,15 @@ local function do_expand(combo)
 				return c, emitted
 			end, "personal")
 		else
-			-- Fallback
+			-- Fallback: emit raw keystrokes without inject_dynamic.
+			-- Only arm the synthetic delete count — not the replacement text. The
+			-- replacement contains inter-field tabs fired as real keyStroke events,
+			-- which the keymap buffer does not see as literal \t chars, so passing
+			-- emitted to arm_synthetic would leave expected_synthetic_chars with an
+			-- unmatched \t that permanently desyncs the buffer counter.
 			if _keymap then
+				if type(_keymap.arm_synthetic) == "function" then _keymap.arm_synthetic(n_back, "") end
 				if type(_keymap.suppress_rescan) == "function" then _keymap.suppress_rescan() end
-				if type(_keymap.arm_synthetic) == "function" then _keymap.arm_synthetic(n_back, emitted) end
 			end
 			if keylogger and type(keylogger.notify_synthetic) == "function" then
 				pcall(keylogger.notify_synthetic, emitted, "hotstring", n_back, "personal")
