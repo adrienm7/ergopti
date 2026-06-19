@@ -25,6 +25,10 @@
 
 local helpers = require("tests.helpers")
 
+-- A prior test (e.g. test_backend_detector_respects_user_override) may have
+-- installed a minimal api_mlx stub that lacks get_port, which models_manager_mlx
+-- calls at module level. Clear it so the real implementation is loaded fresh.
+package.loaded["modules.llm.api_mlx"]                = nil
 package.loaded["ui.menu.menu_llm.models_manager_mlx"] = nil
 local MlxMgr = require("ui.menu.menu_llm.models_manager_mlx")
 

@@ -22,6 +22,13 @@
 
 local helpers = require("tests.helpers")
 
+-- Force a fresh config load by clearing the config and the TOML reader cache so
+-- that no stale cache-provider state from a prior test produces a partial parse
+-- (e.g. missing the [typography] section that config.lua requires).
+package.loaded["ui.tooltip.config"] = nil
+package.loaded["toml_codec.reader"] = nil
+package.loaded["lib.toml_reader"]   = nil
+
 local Renderer = helpers.load_with_stubs("ui.tooltip.renderer")
 
 helpers.describe("tooltip stacked panel: rounded colored background, no clip", function()

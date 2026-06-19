@@ -239,6 +239,47 @@ end)
 --- =============================================
 -- =============================================
 
+-- ============================================================================
+--- ============================================================================
+-- ======= 7/ kill_async script-race fix (ke-kill-async-script-race) ==========
+--- ============================================================================
+-- ============================================================================
+
+helpers.describe("KELifecycle.kill_async — unique temp script path (ke-kill-async-script-race)", function()
+	helpers.it("source does NOT use os.time() as the script suffix", function()
+		-- os.time() has 1-second precision: two rapid calls within the same second
+		-- produce the same path, overwriting the script the first nohup is reading.
+		-- Only the kill_async script path is guarded here; other functions in the file
+		-- may legitimately use os.time() for rate-limiting or unrelated naming.
+		local src_path = helpers.driver_root() .. "modules/karabiner/ke_lifecycle.lua"
+		local fh = io.open(src_path, "r")
+		helpers.assert_true(fh ~= nil, "ke_lifecycle.lua must be readable")
+		local src = fh:read("*a"); fh:close()
+		-- The bug was: ke_kill_async path used os.time() as a suffix.
+		-- Match only the kill_async-specific format string to avoid false positives
+		-- from other functions (e.g. run_total_reset_async) that may use os.time().
+		local kill_async_with_ostime = src:find("ke_kill_async[^\"']*os%.time", 1, false)
+		helpers.assert_true(
+			kill_async_with_ostime == nil,
+			"kill_async must NOT use os.time() as the script suffix — use sub-second precision instead (ke-kill-async-script-race)"
+		)
+	end)
+
+	helpers.it("source uses hs.timer.secondsSinceEpoch() for the script suffix", function()
+		local src_path = helpers.driver_root() .. "modules/karabiner/ke_lifecycle.lua"
+		local fh = io.open(src_path, "r")
+		helpers.assert_true(fh ~= nil)
+		local src = fh:read("*a"); fh:close()
+		helpers.assert_true(
+			src:find("secondsSinceEpoch()", 1, true) ~= nil,
+			"kill_async must use hs.timer.secondsSinceEpoch() for microsecond-precision path uniqueness (ke-kill-async-script-race)"
+		)
+	end)
+end)
+
+
+
+
 helpers.describe("KELifecycle.KILL_CMD / KILL_FAST_CMD", function()
 	helpers.it("KILL_CMD is a non-empty string containing launchctl", function()
 		local KE, _ = fresh_ke()

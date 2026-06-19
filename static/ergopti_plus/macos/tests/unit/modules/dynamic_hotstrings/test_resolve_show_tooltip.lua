@@ -41,7 +41,11 @@ helpers.describe("hotstrings_config.resolve early-return — show_tooltip defaul
 				}
 			end,
 		}
-		return helpers.load_with_stubs("modules.hotstrings_config")
+		local mod = helpers.load_with_stubs("modules.hotstrings_config")
+		-- Clear the stub so it doesn't leak into subsequent test files that require
+		-- the real lib.toml_reader (e.g. ui.tooltip.config reads constants.toml).
+		package.loaded["lib.toml_reader"] = nil
+		return mod
 	end
 
 	helpers.it("M.resolve() returns show_tooltip=true when called before M.init()", function()
