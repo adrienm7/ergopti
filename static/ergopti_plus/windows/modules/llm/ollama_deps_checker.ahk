@@ -268,15 +268,13 @@ LLM_Deps_RunInstaller(model, on_ready, on_failed) {
 	if winget_available {
 		LoggerInfo("LLM", "Handing off to winget install Ollama.Ollama (BelowNormal priority)…")
 		try {
-			; ``start /LOW`` launches winget in BelowNormal priority.
-			; We DO want a console window (no ``/B``) — winget prints
-			; live progress there, otherwise the user has no feedback
-			; that anything is happening. The window closes on its own
-			; once winget exits. Setting "Hide" on the parent cmd
-			; keeps that wrapper invisible; only winget's own window
-			; is shown.
-			Run('cmd.exe /c start "Ollama install" /LOW winget install --id Ollama.Ollama -e --accept-package-agreements --accept-source-agreements', , "Hide")
-			LoggerInfo("LLM", "winget command launched.")
+			; Launch winget directly so the captured PID is the real process
+			; tree root.  taskkill /F /T can then reach it on Cancel.
+			; We deliberately omit cmd /c start so the PID is not an ephemeral
+			; cmd wrapper that exits immediately and leaves winget detached.
+			global _LLM_Deps_InstallerPid
+			Run('winget install --id Ollama.Ollama -e --accept-package-agreements --accept-source-agreements', , "Hide", &_LLM_Deps_InstallerPid)
+			LoggerInfo("LLM", "winget command launched (PID=" _LLM_Deps_InstallerPid ").")
 		} catch as err {
 			LoggerError("LLM", "winget launch failed: " err.Message ".")
 			winget_available := false
