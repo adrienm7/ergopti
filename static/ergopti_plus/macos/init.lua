@@ -240,10 +240,15 @@ Boot.mark("Config-dependent module requires")
 -- every timer/callback, but we also expose a direct entry point here so any
 -- module can call it after a pcall failure it cannot recover from.
 _G.ergopti_report_crash = function(err, ctx)
-	pcall(function()
+	-- Surface a failure WITHIN the reporter loudly instead of swallowing it — a
+	-- crash-while-reporting-a-crash used to vanish with no trace.
+	local ok, perr = pcall(function()
 		local report = crash_reporter.report(err, ctx)
 		crash_reporter.prompt_user(report)
 	end)
+	if not ok then
+		Logger.error(LOG, "Crash reporter itself failed: %s.", tostring(perr))
+	end
 end
 
 
