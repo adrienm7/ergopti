@@ -79,7 +79,8 @@ _LFOB_CheckFlushDrainsSubPending() {
 	Src := _LFOB_ReadSource("lib/logger.ahk")
 	Assert(Src != "", "lib/logger.ahk must be readable")
 
-	Flush := _LFOB_FuncBody(Src, "_LoggerFlush(")
+	; Target the function definition, not the earlier call site inside LoggerInit
+	Flush := _LFOB_FuncBody(Src, "_LoggerFlush(ForceFlush")
 	Assert(Flush != "", "_LoggerFlush must exist in lib/logger.ahk")
 
 	Assert(InStr(Flush, "_LOGGER_SUB_PENDING"),

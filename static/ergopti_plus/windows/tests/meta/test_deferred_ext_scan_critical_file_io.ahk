@@ -105,13 +105,18 @@ _DESC_PrescanWarmedBeforeCritical() {
 	Seg := _DESC_FuncBodyFlat(Src, "BuildTrayMenuDeferred() {")
 	Assert(Seg != "", "BuildTrayMenuDeferred() must exist in ErgoptiPlus.ahk")
 
-	; Match the EXECUTABLE sequence: the extensions prescan immediately followed
-	; (only whitespace/newlines between) by Critical(On). Matching the contiguous
-	; code lines side-steps the comment prose that mentions Critical(On) earlier.
+	; Strip comments so prose that mentions Critical("On") cannot fool the
+	; positional check — only executable code lines count.
+	Code := _DESC_StripComments(Seg)
 	Q := Chr(34)
-	Pattern := "_HS_PreScanExtensions\(\)\s+Critical\(" . Q . "On" . Q . "\)"
-	Assert(RegExMatch(Seg, Pattern) > 0,
-		"_HS_PreScanExtensions() must run on the line immediately BEFORE Critical(On) in BuildTrayMenuDeferred — warming the extensions cache off-Critical keeps the file I/O out of the keyboard-hook starvation window (MEDIUM-03)")
+	CritPos := InStr(Code, "Critical(" . Q . "On" . Q . ")")
+	PreScanPos := InStr(Code, "_HS_PreScanExtensions()")
+	Assert(PreScanPos > 0,
+		"_HS_PreScanExtensions() must be called in BuildTrayMenuDeferred")
+	Assert(CritPos > 0,
+		'Critical("On") must be called in BuildTrayMenuDeferred')
+	Assert(PreScanPos < CritPos,
+		'_HS_PreScanExtensions() must run BEFORE Critical("On") in BuildTrayMenuDeferred — warming the extensions cache off-Critical keeps the file I/O out of the keyboard-hook starvation window (MEDIUM-03)')
 }
 
 _DESC_ExtMenuDoesNoFileIO() {
