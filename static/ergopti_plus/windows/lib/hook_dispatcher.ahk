@@ -215,6 +215,8 @@ class HookDispatcher {
 			} catch as e {
 				sig := event_type . ":" . e.Message
 				now := A_TickCount
+				if (_err_cache.Count >= 256)
+					_err_cache.Clear()
 				if (!_err_cache.Has(sig) || ((now - _err_cache[sig]) & 0xFFFFFFFF) > 60000) {
 					_err_cache[sig] := now
 					try LoggerWarn("HookDispatcher", "Subscriber for '{1}' threw: {2}.", event_type, e.Message)
