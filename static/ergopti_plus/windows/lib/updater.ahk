@@ -1705,21 +1705,31 @@ _Updater_PollDownloadAsync(Req, NewExe, SwapBat, CurrentExe, Tag, Polls := 0) {
 	; the batch %VARS% without escape gymnastics. Each `r`n is concatenated
 	; from a double-quoted neighbour because escape sequences only resolve
 	; inside double-quoted AHK strings.
+	; The swap batch renames the current exe to .bak first, then moves the
+	; downloaded exe into its place.  If the move fails (e.g. different drive,
+	; permission error, or AV lock), the .bak is renamed back so the install
+	; does not end in a bricked, missing exe.  Only on success is the .bak
+	; deleted and the fresh binary relaunched.
+	BakExe := CurrentExe . ".bak"
 	BatLines := "@echo off`r`n"
 		. "setlocal`r`n"
 		. "set NEW_EXE=" . NewExe . "`r`n"
 		. "set CUR_EXE=" . CurrentExe . "`r`n"
+		. "set BAK_EXE=" . BakExe . "`r`n"
 		. "timeout /t 2 /nobreak >nul 2>&1`r`n"
 		. ":retry`r`n"
-		. 'del /q "%CUR_EXE%" >nul 2>&1' . "`r`n"
+		. 'rename "%CUR_EXE%" "' . SubStr(CurrentExe, InStr(CurrentExe, "\", false, -1) + 1) . '.bak" >nul 2>&1' . "`r`n"
 		. 'if exist "%CUR_EXE%" (' . "`r`n"
 		. "    timeout /t 1 /nobreak >nul 2>&1`r`n"
 		. "    goto retry`r`n"
 		. ")`r`n"
 		. 'move /y "%NEW_EXE%" "%CUR_EXE%" >nul 2>&1' . "`r`n"
-		. 'if exist "%CUR_EXE%" (' . "`r`n"
-		. '    start "" "%CUR_EXE%"' . "`r`n"
+		. 'if not exist "%CUR_EXE%" (' . "`r`n"
+		. '    rename "%BAK_EXE%" "' . SubStr(CurrentExe, InStr(CurrentExe, "\", false, -1) + 1) . '" >nul 2>&1' . "`r`n"
+		. "    goto :eof`r`n"
 		. ")`r`n"
+		. 'del /q "%BAK_EXE%" >nul 2>&1' . "`r`n"
+		. 'start "" "%CUR_EXE%"' . "`r`n"
 		. "goto :eof`r`n"
 	try {
 		if FileExist(SwapBat)
