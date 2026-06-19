@@ -29,6 +29,14 @@ local EXT_ID        = "hs-caret-bridge"
 local EXT_VERSION   = "0.0.3"
 local EXT_DIR       = os.getenv("HOME") .. "/.vscode/extensions/" .. EXT_ID .. "-" .. EXT_VERSION
 
+-- AX frame cache: the accessibility call can block for up to 100 ms on a
+-- busy VSCode instance. Cache the result for FRAME_CACHE_TTL_S so that rapid
+-- consecutive calls to estimate_position() (one per streaming token) do not
+-- each stall the Hammerspoon main thread (vscode-bridge-blocking-ax-call).
+local _ax_frame_cache  = nil
+local _ax_frame_ts     = 0
+local FRAME_CACHE_TTL_S = 0.2
+
 -- VSCode rendering constants for pixel math.
 M.LINE_HEIGHT  = 19
 M.CHAR_WIDTH   = 7.65
@@ -250,9 +258,17 @@ function M.is_vscode()
 	return app ~= nil and app:bundleID() == "com.microsoft.VSCode"
 end
 
---- Extracts the accessibility frame of the active editor to bound the calculation.
---- @return table|nil The bounds frame table.
+--- Extracts the accessibility frame of the active editor, with a short-lived cache.
+--- The raw AX call can block the Hammerspoon main thread for up to 100 ms on a
+--- busy VSCode instance. Caching for FRAME_CACHE_TTL_S ensures that rapid calls
+--- (e.g. one per streaming token) pay the AX cost at most once per 200 ms
+--- (vscode-bridge-blocking-ax-call).
+--- @return table|nil The bounds frame table, or nil on error / empty editor.
 local function get_editor_ax_frame()
+	local now = hs.timer.secondsSinceEpoch()
+	if _ax_frame_cache ~= nil and (now - _ax_frame_ts) < FRAME_CACHE_TTL_S then
+		return _ax_frame_cache
+	end
 	local ok, frame = pcall(function()
 		local ax      = require("hs.axuielement")
 		local focused = ax.systemWideElement():attributeValue("AXFocusedUIElement")
@@ -263,7 +279,10 @@ local function get_editor_ax_frame()
 		end
 		return nil
 	end)
-	return ok and frame or nil
+	local result = ok and frame or nil
+	_ax_frame_cache = result
+	_ax_frame_ts    = now
+	return result
 end
 
 
