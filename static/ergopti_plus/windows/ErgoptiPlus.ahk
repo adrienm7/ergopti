@@ -1821,9 +1821,9 @@ InsertKeyboardShortcutGroups(TargetMenu, InsertBefore) {
             if !IsExactPrefix or (Action == "none")
                 continue
             ActionLabel := GESTURE_ACTIONS.Has(Action) ? _GestureActionLabel(Action) : Action
-            GMenu.Add(_FormatSlotLabel(Slot) . " : " . ActionLabel, ((_s) => (*) => ShowKeyboardShortcutPicker(_s))(Slot))
+            RegisterMenuItem(GMenu, _FormatSlotLabel(Slot) . " : " . ActionLabel, ((_s) => (*) => ShowKeyboardShortcutPicker(_s))(Slot))
         }
-        GMenu.Add(AddLabel, ((_p) => (*) => ShowKeyboardSlotPicker(_p))(Prefix))
+        RegisterMenuItem(GMenu, AddLabel, ((_p) => (*) => ShowKeyboardSlotPicker(_p))(Prefix))
         GroupMenus.Push(Map("label", GLabel, "menu", GMenu))
     }
     TargetMenu.Insert(InsertBefore)
