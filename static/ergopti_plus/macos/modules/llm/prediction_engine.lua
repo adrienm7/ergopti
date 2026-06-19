@@ -614,14 +614,19 @@ function M.perform_check(force_trigger, profile_name)
 	local function is_noise_pred(to_type)
 		if not to_type or to_type:gsub("[%s%.…]", "") == "" then return true end
 		local text_lower = to_type:lower()
-		local prev_char  = buffer:match(".*(%S)")
+		-- Anchor to the end of the buffer ((%S)%s*$) instead of a greedy .*
+		-- scan from position 1, which is O(N) on a large context buffer.
+		local prev_char  = buffer:match("(%S)%s*$")
 		local first_ch   = to_type:match("^%s*(.)") or ""
 		local ends_sent  = (prev_char == nil) or (prev_char:match("[%.%!%?…:;\n]") ~= nil)
+		-- Cache buffer:lower() once — repeated calls on a 10 k-word context are
+		-- each O(N) allocations on this hot streaming path.
+		local buffer_low = buffer:lower()
 		return (text_lower:match("^%s*suite%s+finale") ~= nil)
 			or (text_lower:match("^%s*</") ~= nil)
 			or (text_lower:match("^%s*vous avez besoin de plus") ~= nil)
 			or (text_lower:match("^%s*vous etes les plus") ~= nil)
-			or (text_lower:match("^%s*vous%s") ~= nil and buffer:lower():match("vous") == nil)
+			or (text_lower:match("^%s*vous%s") ~= nil and buffer_low:match("vous") == nil)
 			or (first_ch:match("[A-Z]") ~= nil and not ends_sent)
 			or (to_type:find(":", 1, true) ~= nil)
 	end
