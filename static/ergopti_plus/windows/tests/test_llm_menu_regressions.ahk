@@ -382,8 +382,8 @@ Test_LLM_Regression_ModelMenuSkipsInstallProbeWhenNotReady() {
 		"row title must skip the install probe when Ollama is not confirmed ready")
 	AssertContains(body, "deps_ready and LLM_IsModelInstalled(name)",
 		"per-model submenu must skip the install probe when Ollama is not confirmed ready")
-	AssertContains(body, "installed := deps_ready ? LLM_OllamaListModels() : []",
-		"installed-tags fallback must not probe ollama list while the daemon is not ready")
+	AssertContains(body, "installed := deps_ready ? _LLM_GetInstalledTagsCached() : []",
+		"installed-tags fallback must not probe ollama list directly (must use cached version to avoid blocking)")
 }
 Test("LLM regression: install probe is skipped (non-blocking) until deps are ready",
 	Test_LLM_Regression_ModelMenuSkipsInstallProbeWhenNotReady)

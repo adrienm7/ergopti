@@ -151,7 +151,7 @@ LLM_Tray_BuildModelMenu() {
 	; confirmed ready — otherwise the blocking GET /api/tags would freeze the
 	; menu while the feature is off (Ollama is usually not running then).
 	if (!presets_used) {
-		installed := deps_ready ? LLM_OllamaListModels() : []
+		installed := deps_ready ? _LLM_GetInstalledTagsCached() : []
 		if (installed.Length == 0) {
 			no_models_label := t("menu.llm.no_model")
 			m.Add(no_models_label, (*) => 0)

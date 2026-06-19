@@ -142,11 +142,9 @@ _SpaceTap() {
 
 _SpaceHoldCtrl(captured) {
 	SendInput("{LCtrl Down}")
-	; Use ^ prefix so the key is sent as Ctrl+<key> regardless of layout;
-	; captured is already the translated char (e.g. 'a'), ^ applies Ctrl to it
-	if (captured != "" and captured != " ")
-		SendInput("^" . captured)
 	try {
+		if (captured != "" and captured != " ")
+			try SendInput("^" . RegExReplace(captured, "([!#^+{}])", "{$1}"))
 		KeyWait("SC039", "U T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC)
 	} finally {
 		SendInput("{LCtrl Up}")
@@ -155,11 +153,11 @@ _SpaceHoldCtrl(captured) {
 
 _SpaceHoldShift(captured) {
 	SendInput("{LShift Down}")
-	; Send the captured key with Shift so the hold keystroke is not swallowed;
-	; skip space/empty to avoid a redundant Shift+Space on spurious captures
-	if (captured != "" and captured != " ")
-		SendInput("+" . captured)
 	try {
+		; Send the captured key with Shift so the hold keystroke is not swallowed;
+		; skip space/empty to avoid a redundant Shift+Space on spurious captures
+		if (captured != "" and captured != " ")
+			try SendInput("+" . RegExReplace(captured, "([!#^+{}])", "{$1}"))
 		KeyWait("SC039", "U T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC)
 	} finally {
 		SendInput("{LShift Up}")
@@ -168,9 +166,9 @@ _SpaceHoldShift(captured) {
 
 _SpaceHoldAlt(captured) {
 	SendInput("{LAlt Down}")
-	if (captured != "" and captured != " ")
-		SendInput("!" . captured)
 	try {
+		if (captured != "" and captured != " ")
+			try SendInput("!" . RegExReplace(captured, "([!#^+{}])", "{$1}"))
 		KeyWait("SC039", "U T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC)
 	} finally {
 		SendInput("{LAlt Up}")
@@ -183,9 +181,9 @@ _SpaceHoldAltGr(captured) {
 	; it must NOT re-press the modifier (re-pressing RAlt while it is logically
 	; held would leak AltGr onto subsequent keystrokes)
 	SendInput("{RAlt Down}")
-	if (captured != "" and captured != " ")
-		SendInput(captured)
 	try {
+		if (captured != "" and captured != " ")
+			try SendInput(RegExReplace(captured, "([!#^+{}])", "{$1}"))
 		KeyWait("SC039", "U T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC)
 	} finally {
 		SendInput("{RAlt Up}")
@@ -194,9 +192,9 @@ _SpaceHoldAltGr(captured) {
 
 _SpaceHoldWin(captured) {
 	SendInput("{LWin Down}")
-	if (captured != "" and captured != " ")
-		SendInput("#" . captured)
 	try {
+		if (captured != "" and captured != " ")
+			try SendInput("#" . RegExReplace(captured, "([!#^+{}])", "{$1}"))
 		KeyWait("SC039", "U T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC)
 	} finally {
 		SendInput("{LWin Up}")

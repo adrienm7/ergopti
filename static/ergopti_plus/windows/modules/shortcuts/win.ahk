@@ -135,16 +135,20 @@ if Features["shortcuts"]["move"] {
         SimulateActivity(True)
         SetTimer(SimulateActivity, Random(AWAKE_TICK_MIN_MS, AWAKE_TICK_MAX_MS))
         ; Arm mouse-button cancel hooks
-        Hotkey("~*$LButton", AwakeCancelOnMouse, "On")
-        Hotkey("~*$RButton", AwakeCancelOnMouse, "On")
-        Hotkey("~*$MButton", AwakeCancelOnMouse, "On")
+        try {
+            Hotkey("~*$LButton", AwakeCancelOnMouse, "On")
+            Hotkey("~*$RButton", AwakeCancelOnMouse, "On")
+            Hotkey("~*$MButton", AwakeCancelOnMouse, "On")
+        }
         ; Start a fast timer to instantly detect if the user moves the mouse
         SetTimer(AwakeCheckMouseMoved, 150)
         ; Use InputHook to detect any keypress -- does not conflict with other hotkeys
-        AwakeInputHook := InputHook("L0 I")
-        AwakeInputHook.OnChar := AwakeCancelOnKeypress
-        AwakeInputHook.OnKeyDown := AwakeCancelOnKeypress
-        AwakeInputHook.Start()
+        try {
+            AwakeInputHook := InputHook("L0 I")
+            AwakeInputHook.OnChar := AwakeCancelOnKeypress
+            AwakeInputHook.OnKeyDown := AwakeCancelOnKeypress
+            AwakeInputHook.Start()
+        }
         try TrayTip(t("keepawake.started"), t("keepawake.title"), "Iconi Mute")
     }
 
