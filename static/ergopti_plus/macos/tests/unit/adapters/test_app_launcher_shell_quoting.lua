@@ -3,12 +3,11 @@
 --- ==============================================================================
 --- MODULE: Regression — app_launcher.launchWithArgs quotes shell arguments
 --- DESCRIPTION:
---- Guards against the bug where launchWithArgs built the shell command as
+--- Guards against the regression where launchWithArgs built the shell command as
 --- string.format("open -a %q --args %s", app_path, args) with %s for the args.
 --- Shell metacharacters (spaces, &, ;, $) in args would be interpreted by /bin/sh,
 --- enabling command injection.
----
---- Fix (2026-06-19): each arg is now single-quote POSIX escaped (shq helper).
+--- Each arg is now single-quote POSIX escaped via the shq() helper.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")

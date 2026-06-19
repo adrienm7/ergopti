@@ -590,6 +590,14 @@ sg("script_quit",                         function()
 			karabiner.kill()
 		end
 	end)
+	-- Flush in-memory keystrokes before exiting — os.exit(0) bypasses
+	-- hs.shutdownCallback where the normal keylogger flush lives.
+	pcall(function()
+		local ok_kl, kl = pcall(require, "modules.keylogger")
+		if ok_kl and type(kl) == "table" and type(kl.stop) == "function" then
+			kl.stop()
+		end
+	end)
 	pcall(function() hs.timer.doAfter(0.1, function() os.exit(0) end) end)
 end)
 
