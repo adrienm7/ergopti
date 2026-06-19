@@ -84,7 +84,7 @@ _TSCGR_CheckGenerationRecheck() {
 
 	; After ClipWait there must be a generation re-check before the paste.
 	ClipWaitPos  := InStr(Body, "ClipWait(")
-	RecheckPos   := InStr(Body, "Generation != _TEXT_CLIPBOARD_GENERATION", , ClipWaitPos)
+	RecheckPos   := InStr(Body, "Generation != _TEXT_CLIPBOARD_GENERATION", , Max(1, ClipWaitPos))
 	SendInputPos := InStr(Body, "_AHK_SendInput.Call")
 
 	Assert(ClipWaitPos > 0, "_TextSendClipboard must call ClipWait()")

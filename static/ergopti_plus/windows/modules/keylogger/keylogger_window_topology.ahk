@@ -140,6 +140,12 @@ KL_Topo_Tick() {
     if (hwnd = 0)
         return
 
+    ; Bound seen_hwnds to SEEN_HWNDS_CAP entries — flush when full so memory
+    ; growth stays O(1). Clear before reading so the virtual desktop check below
+    ; treats this tick as a cold-start (incoming_last_seen = 0) on cap events.
+    if (KLTopo.seen_hwnds.Count >= KLTopoConst.SEEN_HWNDS_CAP)
+        KLTopo.seen_hwnds.Clear()
+
     ; Virtual desktop heuristic — new foreground hwnd that we've seen
     ; recently but not as foreground for > DESKTOP_SWITCH_MIN_GAP_MS (Alt+Tab
     ; brings it back immediately; a desktop switch takes longer). The reference
@@ -152,8 +158,6 @@ KL_Topo_Tick() {
         KL_Topo_CheckVirtualDesktop(KLTopo.prev_hwnd, incoming_last_seen)
     }
     KLTopo.prev_hwnd := hwnd
-    if (KLTopo.seen_hwnds.Count >= KLTopoConst.SEEN_HWNDS_CAP)
-        KLTopo.seen_hwnds.Clear()
     KLTopo.seen_hwnds[hwnd] := A_TickCount
 
     ; Get current geometry. WinGetPos with output parameters leaves them

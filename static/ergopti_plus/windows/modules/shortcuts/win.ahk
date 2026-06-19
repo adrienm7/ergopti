@@ -201,7 +201,7 @@ if Features["shortcuts"]["move"] {
             return
         global ActivitySimulation
         if ActivitySimulation {
-            SetTimer(StopActivitySimulation, -1)
+            StopActivitySimulation()
         }
     }
 
@@ -216,7 +216,7 @@ if Features["shortcuts"]["move"] {
         }
         global ActivitySimulation
         if ActivitySimulation {
-            SetTimer(StopActivitySimulation, -1)
+            StopActivitySimulation()
         }
     }
 
