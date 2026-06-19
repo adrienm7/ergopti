@@ -80,6 +80,13 @@ package.loaded["modules.keylogger.export"] = {
 	sync_foreign_data_sql   = function() end,
 }
 
+-- lib.timings reads a shared TOML file at module level; a prior test may have
+-- installed a partial stub (sec-only) that lacks ms(), causing a load failure.
+package.loaded["lib.timings"] = {
+	ms  = function(_section, _key) return 1000 end,
+	sec = function(_section, _key) return 1.0  end,
+}
+
 -- Provide hs overrides that avoid real I/O.
 local hs_overrides = {
 	fs = {
