@@ -406,13 +406,13 @@ if FileExist(IconPath)
 ; Auto-create driver and shared subfolders under _ConfigDir on first launch.
 ; autohotkey/ holds driver-specific files; hotstrings/ holds the shared TOML
 ; files so a Mac+PC setup can keep both side by side without name collision.
-DirCreate(_ConfigDir . _AhkSubDir)
-DirCreate(_ConfigDir . "hotstrings")
+try DirCreate(_ConfigDir . _AhkSubDir)
+try DirCreate(_ConfigDir . "hotstrings")
 ; Bootstrap an empty personal_hotstrings.toml if it does not exist yet so the
 ; user always has a file to open rather than a confusing error.
 _PersonalTomlBootstrap := _ConfigDir . "hotstrings\personal_hotstrings.toml"
 if !FileExist(_PersonalTomlBootstrap)
-    FileAppend("", _PersonalTomlBootstrap)
+    try FileAppend("", _PersonalTomlBootstrap)
 
 global ScriptInformation := Map(
     "MagicKey", "★",
