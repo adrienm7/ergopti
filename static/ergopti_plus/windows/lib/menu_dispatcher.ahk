@@ -467,6 +467,18 @@ _OnMenuCommandWmCommand(wParam, lParam, msg, hwnd) {
 ; click, AHK's dispatcher dropped the call and we run the callback
 ; ourselves. The bypass dispatch also updates LastFire so a follow-on
 ; OnMessage retry for the same item won't double-fire.
+;
+; Known limitation: the guard compares the EXPECTED LastFire (snapshot at
+; click time) against the CURRENT value. Two rapid clicks on DIFFERENT items
+; that share a recycled ItemId within the retry window can produce a scenario
+; where both clicks see the same CurrentLastFire==ExpectedLastFire==0 (the
+; second click resets LastFire to 0 via RegisterMenuItem before
+; _DispatchIfMissed fires for the first click). The net effect is a spurious
+; bypass dispatch for the second click: the callback runs once via AHK's
+; native path and once via _DispatchIfMissed. This is rare (requires a full
+; menu rebuild interleaved with two fast clicks), cosmetically benign
+; (most callbacks are idempotent), and structurally unavoidable without a
+; per-click sequence counter — a more invasive change deferred for now.
 _DispatchIfMissed(ItemId, ExpectedLastFire) {
     global _MenuDispatchCallbacks, _MenuDispatchLastFire
     ; Critical is held only for the brief atomic gate — reading/updating state and
