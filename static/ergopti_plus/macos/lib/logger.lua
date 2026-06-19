@@ -789,6 +789,32 @@ end
 -- One-shot guard so the constructors are patched exactly once.
 local _capture_installed = false
 
+-- Crash-report forwarding: an uncaught timer-callback error is a genuine runtime
+-- crash. Forward it to the global crash reporter (wired by init.lua as
+-- _G.ergopti_report_crash) so a report lands on disk — without this the reporter
+-- module was unreachable dead code and a real crash left no artifact. Debounced
+-- so a storm of errors in a fast timer cannot write hundreds of report files, and
+-- re-entrancy-guarded so a failure WHILE building a report cannot recurse.
+local CRASH_REPORT_MIN_INTERVAL_SEC = 30
+local _last_crash_report_time = 0
+local _in_crash_report = false
+
+--- Forwards an uncaught runtime error to the global crash reporter, if wired.
+--- Best-effort: never throws, never recurses, never spams.
+--- @param err any The error value / traceback captured by the guard.
+--- @param context string Where the error originated (e.g. "timer:doAfter").
+local function _forward_crash(err, context)
+	if _in_crash_report then return end
+	local reporter = rawget(_G, "ergopti_report_crash")
+	if type(reporter) ~= "function" then return end
+	local now = os.time()
+	if (now - _last_crash_report_time) < CRASH_REPORT_MIN_INTERVAL_SEC then return end
+	_last_crash_report_time = now
+	_in_crash_report = true
+	pcall(reporter, err, { driver = "hammerspoon", source = context })
+	_in_crash_report = false
+end
+
 --- Wraps a timer callback so an uncaught error is logged WITH a traceback
 --- instead of vanishing into the Hammerspoon Console. hs.timer ignores callback
 --- return values, so discarding them here changes nothing.
@@ -801,6 +827,7 @@ local function _guard_timer_cb(fn, kind)
 		local ok, err = xpcall(fn, debug.traceback, ...)
 		if not ok then
 			_log("ERROR", "runtime", "Uncaught error in hs.timer.%s callback: %s", kind, tostring(err))
+			_forward_crash(err, "timer:" .. kind)
 		end
 	end
 end
