@@ -152,7 +152,7 @@ LLM_LoadProfilesJSON(path := "") {
 			return []
 		profiles := []
 		for item in parsed {
-			if Type(item) == "Object" or Type(item) == "Map"
+			if Type(item) == "Map"
 				profiles.Push(item)
 		}
 		return profiles
