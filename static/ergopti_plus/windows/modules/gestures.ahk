@@ -716,10 +716,12 @@ GestureToggleUppercase() {
     ; timeout, and pasting "" would only clobber the clipboard with a stale paste.
     if (Text = "")
         return
+    try KL_MarkSynthetic("case-transform")
     if RegExMatch(Text, "[a-zà-ÿ]")
         SendInstant(Format("{:U}", Text))
     else
         SendInstant(Format("{:L}", Text))
+    SetTimer((*) => (try KL_ClearSynthetic()), -300)
 }
 
 GestureToggleTitleCase() {
@@ -730,10 +732,12 @@ GestureToggleTitleCase() {
     TitleCasePattern :=
         "^(?:[A-ZÉÈÀÙÂÊÎÔÛÇ][a-zéèàùâêîôûç0-9''\(\),.\-:;!?\-]*[ \t\r\n]+)*[A-ZÉÈÀÙÂÊÎÔÛÇ][a-zéèàùâêîôûç0-9''\(\),.\-:;!?\-]*$"
     UpperCasePattern := "^[A-ZÉÈÀÙÂÊÎÔÛÇ0-9''\(\),.\-:;!?\s]+$"
+    try KL_MarkSynthetic("case-transform")
     if RegExMatch(Text, TitleCasePattern)
         SendInstant(Format("{:L}", Text))
     else
         SendInstant(Format("{:T}", Text))
+    SetTimer((*) => (try KL_ClearSynthetic()), -300)
 }
 
 ; Deferred clipboard restore for GesturePastePlain. Runs on a negative-delay

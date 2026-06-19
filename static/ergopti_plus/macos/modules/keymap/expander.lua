@@ -517,6 +517,11 @@ function M.try_repeat_feature(chars, is_ignored)
 	end
 
 	_state.expected_synthetic_chars = _state.expected_synthetic_chars .. last_char
+	-- Update the arm timestamp so the stuck-counter reset guard does not wipe
+	-- expected_synthetic_chars if run-loop lag creates a false gap before the echo.
+	if hs and hs.timer then
+		_state.last_synthetic_arm_time = hs.timer.secondsSinceEpoch()
+	end
 
 	if keylogger and type(keylogger.notify_synthetic) == "function" then
 		keylogger.notify_synthetic(last_char, "hotstring", is_ignored and 1 or 0, "repeat_key")
