@@ -566,9 +566,19 @@ function M.update_preview(buf)
 		end
 
 		-- Chain: arm the LLM timer so it fires just as the tooltip window closes.
+		-- When a preview IS shown, wait for it to close (min_timeout + offset). When
+		-- NO row is enabled (preview disabled, or the group's show_tooltip=false),
+		-- min_timeout is nil and tooltip_timeout fell back to INFINITE_TOOLTIP_SEC —
+		-- the 24 h "never auto-dismiss a VISIBLE tooltip" sentinel, which is wrong as
+		-- a real LLM delay: there is no tooltip to wait for, so the chained prediction
+		-- must fire promptly. Using the sentinel armed the LLM for ~24 h (it never
+		-- fired) and every further matching keystroke re-armed the same 24 h timer.
 		if fire_llm_after_hotstring and llm_on then
-			Logger.debug(LOG, "LLM chain scheduled in %.3gs.", tooltip_timeout + HOTSTRING_CHAIN_OFFSET_SEC)
-			engine.start_timer(tooltip_timeout + HOTSTRING_CHAIN_OFFSET_SEC)
+			local chain_delay = any_enabled
+				and (tooltip_timeout + HOTSTRING_CHAIN_OFFSET_SEC)
+				or HOTSTRING_CHAIN_OFFSET_SEC
+			Logger.debug(LOG, "LLM chain scheduled in %.3gs.", chain_delay)
+			engine.start_timer(chain_delay)
 		end
 
 		local trigger_key = primary_match.input or last_word
