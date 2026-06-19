@@ -404,15 +404,31 @@ WPMWidget_CategoryBgColor(CategoryName, FallbackHex, SectionHint := "") {
     return FallbackHex
 }
 
+; Invalidate the per-category color cache — call when a hotstring TOML file
+; is written (e.g. from the config window) so the next tick re-reads the file.
+WPMWidget_InvalidateColorCache() {
+    _WPMWidget_ReadTomlColor("", true)
+}
+
 ; Read the [_meta] color for a hotstring category directly from the TOML file,
 ; bypassing HotstringGroupConfig cache to avoid stale empty entries from early
 ; init calls before _SharedDir was fully resolved.
 ; Returns "" when the file is absent or has no color key.
-_WPMWidget_ReadTomlColor(CategoryName) {
+; Results are memoized in a static Map keyed by CategoryName; call
+; WPMWidget_InvalidateColorCache() to flush the cache after a TOML save.
+_WPMWidget_ReadTomlColor(CategoryName, InvalidateCache := false) {
+    static _color_cache := Map()
+    if (InvalidateCache) {
+        _color_cache.Clear()
+        return ""
+    }
+    if _color_cache.Has(CategoryName)
+        return _color_cache[CategoryName]
     global _SharedDir, GLOBAL_DEFAULT_COLOR
     FilePath := _SharedDir . "\hotstrings\" . StrLower(CategoryName) . ".toml"
     if !FileExist(FilePath) {
         LoggerDebug("WPMWidget", "ReadTomlColor: file not found for '{1}': {2}", CategoryName, FilePath)
+        _color_cache[CategoryName] := ""
         return ""
     }
     FileContent := FileRead(FilePath, "UTF-8")
@@ -435,10 +451,13 @@ _WPMWidget_ReadTomlColor(CategoryName) {
             c := M[1]
             LoggerDebug("WPMWidget", "ReadTomlColor: '{1}' → raw='{2}' default='{3}'", CategoryName, c, GLOBAL_DEFAULT_COLOR)
             ; Skip the global blue fallback — it means "no category color set"
-            return (c != GLOBAL_DEFAULT_COLOR) ? c : ""
+            result := (c != GLOBAL_DEFAULT_COLOR) ? c : ""
+            _color_cache[CategoryName] := result
+            return result
         }
     }
     LoggerDebug("WPMWidget", "ReadTomlColor: no color key found for '{1}'", CategoryName)
+    _color_cache[CategoryName] := ""
     return ""
 }
 
