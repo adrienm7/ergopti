@@ -104,3 +104,50 @@ _NL_ActionLayerResetsRepetitions() {
 	AssertEqual(1, NumberOfRepetitions)
 }
 Test("ActionLayer: resets NumberOfRepetitions after firing", _NL_ActionLayerResetsRepetitions)
+
+
+
+
+; =====================================================================
+; =====================================================================
+; ======= 4/ MaxHotkeysPerInterval symmetry (layer-rate-limit) ========
+; =====================================================================
+; =====================================================================
+
+_NL_DisableLayerRaisesLimit() {
+	global LayerEnabled := true
+	global CapsWordEnabled := false
+	ResetStubRecorders()
+	; Start from the default so the raise is observable.
+	A_MaxHotkeysPerInterval := 70
+	DisableLayer()
+	Assert(A_MaxHotkeysPerInterval > 70,
+		"DisableLayer must raise A_MaxHotkeysPerInterval above the default 70 to allow nav-layer key bursts")
+}
+Test("DisableLayer: raises A_MaxHotkeysPerInterval above default (layer-rate-limit)", _NL_DisableLayerRaisesLimit)
+
+
+_NL_ActivateLayerRestoresLimit() {
+	global LayerEnabled := false
+	global CapsWordEnabled := false
+	ResetStubRecorders()
+	; Simulate the state left by DisableLayer.
+	A_MaxHotkeysPerInterval := 150
+	ActivateLayer()
+	Assert(A_MaxHotkeysPerInterval < 150,
+		"ActivateLayer must restore A_MaxHotkeysPerInterval to the AHK default — DisableLayer raised it and ActivateLayer must undo that")
+}
+Test("ActivateLayer: restores A_MaxHotkeysPerInterval after DisableLayer raised it (layer-rate-limit)", _NL_ActivateLayerRestoresLimit)
+
+
+_NL_DisableActivateCycleRestoresLimit() {
+	global LayerEnabled := true
+	global CapsWordEnabled := false
+	ResetStubRecorders()
+	A_MaxHotkeysPerInterval := 70
+	DisableLayer()
+	ActivateLayer()
+	Assert(A_MaxHotkeysPerInterval <= 70,
+		"After Disable→Activate cycle A_MaxHotkeysPerInterval must not remain elevated")
+}
+Test("ActivateLayer after DisableLayer: A_MaxHotkeysPerInterval restored to default (layer-rate-limit)", _NL_DisableActivateCycleRestoresLimit)

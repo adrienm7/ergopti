@@ -28,14 +28,26 @@
 ; ======================================
 ; ======================================
 
+; Default A_MaxHotkeysPerInterval as shipped by AHK v2 — restored on
+; ActivateLayer to undo the elevated limit that DisableLayer sets.
+global _NAV_DEFAULT_MAX_HOTKEYS := 70
+
 ActivateLayer() {
 	global LayerEnabled := True
+	; Restore the standard rate limit — DisableLayer raised it to let the
+	; nav layer send many synthetic keys; once the layer is off the elevated
+	; limit is no longer needed and must be reset to avoid masking accidental
+	; hotkey storms in the normal typing path.
+	A_MaxHotkeysPerInterval := _NAV_DEFAULT_MAX_HOTKEYS
 	ResetNumberOfRepetitions()
 	UpdateCapsLockLED()
 }
 
 DisableLayer() {
 	global LayerEnabled := False
+	; Raise the per-interval cap while the nav layer is active so rapid
+	; navigation bursts (e.g. Ctrl+Shift+Right held down) do not trigger
+	; AHK's "too many hotkeys" warning.
 	A_MaxHotkeysPerInterval := 150
 	UpdateCapsLockLED()
 }
