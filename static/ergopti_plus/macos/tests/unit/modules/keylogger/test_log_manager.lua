@@ -82,8 +82,15 @@ package.loaded["modules.keylogger.export"] = {
 
 -- lib.timings reads a shared TOML file at module level; a prior test may have
 -- installed a partial stub (sec-only) that lacks ms(), causing a load failure.
+-- Return the real canonical value for max_keystroke_delay_ms so the WPM-cap test
+-- sees 5000 ms (= 2.4 WPM for one capped event) rather than 1000 ms (= 12.0).
+local _TIMINGS_MS = {
+	keylogger = { max_keystroke_delay_ms = 5000 },
+}
 package.loaded["lib.timings"] = {
-	ms  = function(_section, _key) return 1000 end,
+	ms  = function(section, key)
+		return (_TIMINGS_MS[section] or {})[key] or 1000
+	end,
 	sec = function(_section, _key) return 1.0  end,
 }
 

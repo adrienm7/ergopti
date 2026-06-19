@@ -13,6 +13,12 @@ local helpers = require("tests.helpers")
 package.loaded["lib.logger"] = nil
 local _ = helpers.load_with_stubs("lib.logger")
 
+-- A prior test may have installed a stub modules.llm.profiles (with empty
+-- get_all_profiles) that would leak into this file's top-level require.
+-- Force the real implementation to be reloaded so profile accessors work.
+package.loaded["modules.llm.profiles"]   = nil
+package.loaded["llm.profile_selector"]   = nil
+
 local Core = helpers.load_with_stubs("modules.llm")
 local INITIAL_HS = _G.hs
 
