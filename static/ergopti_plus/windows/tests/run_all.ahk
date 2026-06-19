@@ -561,6 +561,7 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 #Include meta/test_hold_layer_release_bounded.ahk
 #Include meta/test_toml_batchwrite_cache_coherence.ahk
 #Include meta/test_topology_debounce_settled_geometry.ahk
+#Include meta/test_topology_single_append.ahk
 #Include meta/test_crash_report_unique_filename.ahk
 #Include meta/test_gesture_paste_plain_busy_guard.ahk
 #Include test_llm_deadline_wrap.ahk

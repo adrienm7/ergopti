@@ -236,8 +236,9 @@ KL_Topo_Tick() {
     }
 
     if (KLTopo.pending_ticks >= KLTopoConst.DEBOUNCE_TICKS) {
-        KLTopo.pending_data["type"] := change_type
-        KL_AppendLog(KLTopo.pending_data)
+        ; KL_Topo_LogEvent sets the "type" key itself — the inline assignment and
+        ; direct KL_AppendLog were redundant, causing every topology event to be
+        ; written twice to today.log and data.sql (double-counting all metrics).
         KL_Topo_LogEvent(change_type, KLTopo.pending_data)
         KLTopo.pending_ticks := 0
         KLTopo.pending_type  := ""
