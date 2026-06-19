@@ -75,6 +75,11 @@ class KLTopoConst {
     ; switch rather than a fast Alt+Tab. Alt+Tab brings a window back almost
     ; immediately, so a long unseen gap is the discriminator.
     static DESKTOP_SWITCH_MIN_GAP_MS := 3000
+
+    ; Maximum number of entries to keep in KLTopo.seen_hwnds. Window handles
+    ; are recycled by the OS but in a long session many unique values accumulate.
+    ; When the map reaches this cap it is cleared so memory stays bounded.
+    static SEEN_HWNDS_CAP := 512
 }
 
 
@@ -147,6 +152,8 @@ KL_Topo_Tick() {
         KL_Topo_CheckVirtualDesktop(KLTopo.prev_hwnd, incoming_last_seen)
     }
     KLTopo.prev_hwnd := hwnd
+    if (KLTopo.seen_hwnds.Count >= KLTopoConst.SEEN_HWNDS_CAP)
+        KLTopo.seen_hwnds.Clear()
     KLTopo.seen_hwnds[hwnd] := A_TickCount
 
     ; Get current geometry. WinGetPos with output parameters leaves them
@@ -342,4 +349,8 @@ KL_Topo_Stop() {
         try SetTimer(KLTopo.tick_fn, 0)
         KLTopo.tick_fn := unset
     }
+    ; Free the hwnd history — it is only meaningful while the tracker is
+    ; running and would otherwise accumulate across Stop/Start cycles.
+    KLTopo.seen_hwnds.Clear()
+    KLTopo.prev_hwnd := 0
 }
