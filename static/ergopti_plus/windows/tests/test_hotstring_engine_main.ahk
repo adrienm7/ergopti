@@ -23,9 +23,18 @@
 ; ============================================
 
 HSE_TestReset() {
-    global HSE_Suppressed
+    global HSE_Suppressed, _PrefixWatcherSuppressed
     HSE_RegistryClear()
     HSE_Suppressed := 0
+    ; Cancel any pending deferred PrefixWatcherSuppress(false) or HSE_Suppress(false)
+    ; timers left over from a prior test dispatch so they cannot fire mid-test and
+    ; corrupt the suppression depth counter. SetTimer with period 0 deletes the
+    ; registration; the closures are one-shot lambdas, so we cancel by function
+    ; object — but since each SetTimer call creates a NEW lambda, we cannot cancel
+    ; individually. Resetting the counters to 0 achieves the same invariant: any
+    ; stale release timer that fires will call Max(0, 0-1) = 0 (a no-op floor).
+    if IsSet(_PrefixWatcherSuppressed)
+        _PrefixWatcherSuppressed := 0
     ; HSE_Suppress(false) no longer wipes the buffer (HSE_DispatchMatch
     ; relies on the post-expansion state surviving the burst). Hard-reset
     ; here so each test starts from a known-empty buffer; HSE_FeedReset(true)
