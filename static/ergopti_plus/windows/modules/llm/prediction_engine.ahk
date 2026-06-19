@@ -385,9 +385,10 @@ LLM_Engine_FirePrediction(buffer) {
 	if !_LLM_Engine["enabled"] || buffer == ""
 		return
 
-	; Honour the disable_password_fields user preference: call the port adapter
-	; only when the flag is on, so prediction is silently skipped in secure
-	; fields without logging noise when the feature is disabled.
+	; Honour the disable_password_fields user preference: skip prediction in
+	; password/secure fields to avoid leaking typed credentials into the LLM
+	; context. Gate is only active when the flag is on to avoid the OS call
+	; on every keystroke when the user has not opted in.
 	if (_LLM_Engine.Has("disable_password_fields") && _LLM_Engine["disable_password_fields"]) {
 		if IsSet(SFD_IsSecureField) && SFD_IsSecureField() {
 			try LoggerInfo("LLM", "Prediction suppressed — password field detected.")

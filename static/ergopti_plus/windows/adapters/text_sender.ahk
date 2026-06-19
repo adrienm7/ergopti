@@ -187,8 +187,8 @@ _TextSendClipboard(Text, Saved, Callback := 0) {
 		return
 	}
 
-	; Re-check generation after ClipWait: a newer injection may have taken over
-	; the clipboard slot while we were waiting, so our paste would clobber its text.
+	; A newer injection may have taken over the clipboard slot while we were
+	; blocked inside ClipWait; pasting now would clobber its content.
 	if (Generation != _TEXT_CLIPBOARD_GENERATION) {
 		CB_RestoreAll(Saved)
 		return

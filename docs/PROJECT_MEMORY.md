@@ -11,6 +11,7 @@ Accumulated engineering knowledge for this repository — gotchas, architecture 
   - [feedback-ahk-suspend-prefix-latch](#feedback-ahk-suspend-prefix-latch) — AHK Kana custom-combination prefix latches across Suspend; fix at the source, synthetic key events can't clear it
   - [feedback_ahk_ui_syntax_validation](#feedback-ahk-ui-syntax-validation) — AHK UI files aren't in the headless test runner; how to syntax-check them locally on Windows
   - [Coding style and conventions for this project](#coding-style-and-conventions-for-this-project) — Style rules, architecture decisions, and what to avoid when writing code for this project
+  - [project-lua-closure-before-local-nil-global](#project-lua-closure-before-local-nil-global) — A `local` declared textually AFTER a closure that uses it is not captured: the closure binds the nil global, and an hs.task/ShellRunner pcall swallows the resulting error silently
   - [feedback_commit_push](#feedback-commit-push) — Never push automatically — commit only after explicit ask, push only after explicit validation
   - [feedback-proactive-memory](#feedback-proactive-memory) — Record non-obvious learnings in this file proactively at the end of every task, without being asked
   - [feedback_fix_banners_tool](#feedback-fix-banners-tool) — npm run fix:banners auto-corrects all section banner alignment violations — run it before every commit instead of fixing manually
@@ -140,6 +141,24 @@ Follow `.github/copilot-instructions.md` strictly. Key rules:
 **Why:** The user has an explicit copilot-instructions.md and consistently enforces these conventions.
 
 **How to apply:** Before writing any new code in this repo, re-read the instructions. When refactoring, prioritize removing duplicated defaults and silent error swallowing.
+
+### project-lua-closure-before-local-nil-global
+
+_A `local` declared textually AFTER a closure that uses it is not captured — the closure binds the nil global, and a pcall in the hs.task/ShellRunner wrapper swallows the resulting error silently_
+
+<sub>slug: `project_lua_closure_before_local_nil_global`</sub>
+
+In Lua, `local function f() ... uses x ... end` only captures `x` as an upvalue if `local x` appears **lexically before** the closure. If `local x` is declared *below* the closure, the reference inside `f` resolves to the global `_G.x` (nil), not the later local. This is a sharp foot-gun in async callbacks: the closure looks correct, but at call time the variable is nil.
+
+**Why:** found 2026-06-19 by the senior-audit workflow as the single `critical` finding (F1 in `AUDIT_HAMMERSPOON_2026-06-19.md`). In `modules/llm/api_ollama.lua`, the streaming `on_done` closure (declared ~line 555) calls `os.remove(tmp_path)` as its first statement, but the only `local tmp_path` is ~line 615 — below the closure. So `tmp_path` was the nil global, `os.remove(nil)` threw, and because `ShellRunner`/`hs.task` invoke the completion callback inside a `pcall`, the error was swallowed: the ENTIRE `on_done` body aborted on its first line on every stream completion. With `llm_streaming=true` by default, Ollama streaming predictions silently never appeared. The pre-existing regression test only grepped that the literal `os.remove(tmp_path)` string was present inside `on_done`, so it stayed green while the runtime value was nil — a false-green.
+
+**How to apply:**
+
+- When a closure (especially an `hs.task`/`ShellRunner`/`hs.timer` callback) references a `local`, verify the `local` is declared ABOVE the closure. Hoist temp-file/state creation above the callbacks that consume it (mirror how `api_mlx.lua` is ordered).
+- Errors thrown inside `hs.task`/`hs.timer`/`hs.eventtap` callbacks are swallowed by their pcall wrapper to the HS Console, never the file logger — see [[project_hs_timer_callback_errors_invisible]]. A nil-global closure bug is therefore invisible at runtime; only careful reading or a behavioral test catches it.
+- Regression tests for this class must encode the ROOT CAUSE: assert the `local` declaration index is **before** the closure definition index in the source (`src:find("local tmp_path%s*=") < src:find("local function on_done(", 1, true)`), not merely that the using line exists. A string-grep that the call is present is a false-green.
+
+Related: [[feedback_regression_tests]] (encode the root cause, not the symptom), [[project_hs_timer_callback_errors_invisible]] (why the throw was invisible), [[feedback_coding_style]] (fail-fast / no silent error swallowing).
 
 ### feedback_commit_push
 
