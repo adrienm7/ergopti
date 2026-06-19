@@ -173,6 +173,13 @@ clipboard_restore_ms = 150
 # HS: ke_lifecycle.lua PRIME_POLL_INTERVAL_SEC / PRIME_RULES_PROBE_RETRY_INTERVAL_SEC.
 karabiner_prime_poll_ms = 300
 
+# macOS TIS settle: the keycode map is updated asynchronously by the Text Input
+# Source subsystem AFTER the input-source-changed notification. Wait this long
+# before rebuilding the Karabiner config so the NEW layout's keycode map is read
+# (too short → wrong physical keys generated in karabiner.json).
+# HS: karabiner/init.lua LAYOUT_TIS_SETTLE_SEC.
+layout_tis_settle_ms = 500
+
 # Hotstring global default expansion delay.
 # AUTHORITATIVE SOURCE: shared/hotstrings/defaults.toml [delays] default_sec (0.75 s),
 # read at boot by both drivers (AHK GLOBAL_DEFAULT_DELAY / HS GLOBAL_DEFAULT_DELAY).

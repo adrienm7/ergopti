@@ -33,12 +33,20 @@ local Config      = require("modules.karabiner.config")
 local Generator   = require("modules.karabiner.generator")
 local KeLifecycle = require("modules.karabiner.ke_lifecycle")
 local Watchers    = require("modules.karabiner.watchers")
+local Timings     = require("lib.timings")
 
 -- Optional: keylogger may not be loaded in all deployments
 local ok_kcb, KcBridge = pcall(require, "modules.keylogger.kc_bridge")
 if not ok_kcb then KcBridge = nil end
 
 local LOG = "karabiner"
+
+-- macOS TIS settle delay: the keycode map is updated asynchronously by the Text
+-- Input Source subsystem AFTER the input-source-changed notification fires. Wait
+-- this long before rebuilding the Karabiner config so key_code_for_char() reads
+-- the NEW layout's keycode map, not the previous one. Sourced from the Timings
+-- registry (was a bare 0.5 inline literal) so it is tunable cross-driver in one place.
+local LAYOUT_TIS_SETTLE_SEC = Timings.sec("debounce", "layout_tis_settle_ms")
 
 -- Resolve the directory that contains this init.lua at load time.
 -- Works whether the file is symlinked, run from the project, or deployed.
@@ -654,7 +662,7 @@ function M.init(file_system)
 			pcall(function() _layout_rebuild_timer:stop() end)
 			_layout_rebuild_timer = nil
 		end
-		_layout_rebuild_timer = hs.timer.doAfter(0.5, function()
+		_layout_rebuild_timer = hs.timer.doAfter(LAYOUT_TIS_SETTLE_SEC, function()
 			_layout_rebuild_timer = nil
 			local new_actions = Config.load_available_actions(ACTIONS_FILE)
 			if new_actions then M.AVAILABLE_ACTIONS = new_actions end
