@@ -170,6 +170,8 @@ TimerActiveCount() {
 ; explicitly via Bind to freeze it at creation time.
 _TimerAdapterMakeOneShot(Handle, Fn) {
 	_OneShot(BoundHandle, BoundFn) {
+		if BoundHandle["Fired"]
+			return
 		if A_IsSuspended {
 			; One-shot SetTimer with a negative delay never re-fires on its own.
 			; Re-queue the callback for 500ms later so it is not silently lost
