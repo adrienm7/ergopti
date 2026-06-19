@@ -44,11 +44,26 @@ function M.launch(app_path)
 end
 
 --- Launches an application with command-line arguments via the macOS shell.
+--- Each argument is single-quote escaped to prevent shell metachar injection.
 --- @param app_path string Absolute path to the executable.
---- @param args     string Command-line argument string to append.
+--- @param args     string|table Single arg string or list of arg strings to append.
 function M.launchWithArgs(app_path, args)
 	local ok, err = pcall(function()
-		local cmd = string.format("open -a %q --args %s", app_path, tostring(args or ""))
+		-- Single-quote POSIX escape: replace each ' with '\'' and wrap in '…'
+		local function shq(s)
+			return "'" .. tostring(s):gsub("'", "'\\''") .. "'"
+		end
+		local quoted_args
+		if type(args) == "table" then
+			local parts = {}
+			for _, a in ipairs(args) do
+				table.insert(parts, shq(a))
+			end
+			quoted_args = table.concat(parts, " ")
+		else
+			quoted_args = shq(args or "")
+		end
+		local cmd = string.format("open -a %q --args %s", app_path, quoted_args)
 		hs.execute(cmd)
 	end)
 	if not ok then
