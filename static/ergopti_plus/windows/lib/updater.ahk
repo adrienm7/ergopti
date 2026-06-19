@@ -190,8 +190,15 @@ Updater_LoadCheckInterval() {
 		UPDATER_CHECK_INTERVAL := UPDATER_DEFAULT_INTERVAL
 		return
 	}
-	; ``raw + 0`` coerces to a number; we floor at 0 so a malformed entry
-	; downgrades to "never" rather than crashing the background poller.
+	; Validate before arithmetic — AHK v2 throws a TypeError on a non-numeric
+	; string in arithmetic (e.g. "fast" + 0), it does NOT silently coerce to 0
+	; as the old comment claimed. A malformed entry falls back to the default
+	; instead of aborting the boot auto-execute section.
+	if !IsNumber(raw) {
+		try LoggerWarn("Updater", "Ignoring non-numeric check_interval_seconds '{1}' — using default ({2} s).", raw, UPDATER_DEFAULT_INTERVAL)
+		UPDATER_CHECK_INTERVAL := UPDATER_DEFAULT_INTERVAL
+		return
+	}
 	seconds := Integer(raw + 0)
 	if (seconds < 0)
 		seconds := 0
