@@ -80,13 +80,13 @@ function M.apply(file_path)
 	if type(file_path) ~= "string" or file_path == "" then return 0 end
 	local fh = io.open(file_path, "r")
 	if not fh then
-		Logger.debug(LOG, "config.toml not found at '{1}' — skipping overrides.", file_path)
+		Logger.debug(LOG, "config.toml not found at '%s' — skipping overrides.", file_path)
 		return 0
 	end
 	local content = fh:read("*a")
 	fh:close()
 
-	Logger.start(LOG, "Applying user overrides from '{1}'…", file_path)
+	Logger.start(LOG, "Applying user overrides from '%s'…", file_path)
 	local applied = 0
 	local section = nil
 
@@ -121,18 +121,18 @@ function M.apply(file_path)
 					if section == "script" then
 						hs.settings.set(key, coerced)
 						applied = applied + 1
-						Logger.debug(LOG, "Override [script].{1} = {2}.", key, tostring(coerced))
+						Logger.debug(LOG, "Override [script].%s = %s.", key, tostring(coerced))
 					elseif section == "features" then
 						hs.settings.set(key, coerced)
 						applied = applied + 1
-						Logger.debug(LOG, "Override [features].{1} = {2}.", key, tostring(coerced))
+						Logger.debug(LOG, "Override [features].%s = %s.", key, tostring(coerced))
 					end
 				end
 			end
 		end
 	end
 
-	Logger.success(LOG, "User overrides applied ({1} value(s)).", applied)
+	Logger.success(LOG, "User overrides applied (%d value(s)).", applied)
 	return applied
 end
 
