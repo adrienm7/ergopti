@@ -97,8 +97,11 @@ LLM_Tray_BindNavHotkeys() {
 			LoggerWarn("LLM", "Nav/Val modifiers contain Ctrl (^), which collides with profile hotkeys (Ctrl+1..9)")
 		}
 
-		Loop 9 {
-			hk := val_prefix . A_Index
+		Loop 10 {
+			; Digit key 0 maps to slot 10 so the user can jump to any of the up-to-10
+			; prediction candidates without lifting their hand.
+			Digit := (A_Index == 10) ? "0" : A_Index
+			hk := val_prefix . Digit
 			idx := A_Index
 			try {
 				Hotkey(hk, _LLM_Tray_MakeNavJump(idx), "On")
