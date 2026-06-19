@@ -871,6 +871,11 @@ _Updater_OneClickUpdateCallback(Json, Current) {
 	global UPDATER_LATEST_RELEASE, _UpdaterCheckInProgress
 	_UpdaterCheckInProgress := false
 
+	; The fetch callback arrives on an AHK pseudo-thread that bypasses native
+	; Suspend. Skip all UI and install work while the script is paused.
+	if A_IsSuspended
+		return
+
 	if (Json == "") {
 		try LoggerWarn("Updater", "One-click check: network unreachable.")
 		try SetTimer((*) => initMenu(), -50)
@@ -1518,6 +1523,8 @@ Updater_ShowAvailableUpdate(*) {
 ; localized error on failure, otherwise builds the release record and shows the
 ; update prompt. Runs off a poll timer so it never blocks the main thread.
 _Updater_ShowAvailableUpdateCallback(Json) {
+	if A_IsSuspended
+		return
 	if (Json == "") {
 		MsgBox(t("updater.no_connection"), t("updater.title_update"), "Icon!")
 		return
