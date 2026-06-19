@@ -1774,8 +1774,12 @@ GestureDispatch(slot) {
         GestureReleaseRightClick()
     }
 
-    try GESTURE_ACTIONS[ActionName].Fn()
-    LoggerInfo("gestures", "Gesture {1} dispatched successfully.", slot)
+    try {
+        GESTURE_ACTIONS[ActionName].Fn()
+        LoggerInfo("gestures", "Gesture {1} dispatched successfully.", slot)
+    } catch as e {
+        try LoggerError("gestures", "Gesture {1} action '{2}' threw: {3}.", slot, ActionName, e.Message)
+    }
 }
 
 
