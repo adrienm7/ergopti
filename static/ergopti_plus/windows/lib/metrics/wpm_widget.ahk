@@ -928,13 +928,8 @@ WPMWidget_Show() {
     ; Graph mode is a layered GDI+ window: position + size it WHILE HIDDEN, then the
     ; tick paints it via UpdateLayeredWindow and reveals it (per-pixel alpha rules
     ; out WinSetTransparent here — the two layering modes are mutually exclusive).
-    ; Compact mode keeps the simple constant-alpha fade.
-    if WPMWidget.show_graph {
-        gui_ref.Show("Hide NoActivate x" . show_x . " y" . show_y . " w" . w . " h" . h)
-    } else {
-        gui_ref.Show("x" . show_x . " y" . show_y . " w" . w . " h" . h . " NoActivate")
-        WinSetTransparent(0, gui_ref)
-    }
+    ; Compact mode uses the same "Hide" approach — no flash on startup.
+    gui_ref.Show("Hide NoActivate x" . show_x . " y" . show_y . " w" . w . " h" . h)
 
     SetTimer(WPMWidget_Tick, WPMWidgetConst.TICK_MS)
 
