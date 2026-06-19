@@ -151,18 +151,26 @@ function M.build(ctx)
 
 	-- Sync widget visibility on every build so a reload restores the saved state.
 	-- Keylogger start/stop is handled by sync_state_to_modules in init.lua.
+	-- Gate the WPM UIs on pause too: pause_all() never tears them down, but the
+	-- pause-change listener calls updateMenu() (this build), so honouring the pause
+	-- state HERE is what stops the widget's 0.2 s timer + mouse eventtap and the
+	-- menubar's 0.5 s timer while « tout est éteint », and restarts them on resume.
+	-- Without it the WPM timers kept polling get_live_stats() and re-rendering the
+	-- canvas under pause.
+	local paused = script_control and type(script_control.is_paused) == "function"
+		and script_control.is_paused() or false
 	if state.keylogger_enabled then
 		local WpmMenubar = require("ui.wpm.wpm_menubar")
 		if type(WpmMenubar.set_use_source_colors) == "function" then
 			WpmMenubar.set_use_source_colors(state.keylogger_menubar_colors)
 		end
-		if state.keylogger_menubar_wpm then WpmMenubar.start() else WpmMenubar.stop() end
+		if state.keylogger_menubar_wpm and not paused then WpmMenubar.start() else WpmMenubar.stop() end
 
 		local WpmWidget = require("ui.wpm.wpm_widget")
 		if type(WpmWidget.set_use_source_colors) == "function" then
 			WpmWidget.set_use_source_colors(state.keylogger_float_colors)
 		end
-		if state.keylogger_float_wpm then
+		if state.keylogger_float_wpm and not paused then
 			WpmWidget.start(state.keylogger_float_graph)
 		else
 			WpmWidget.stop()
