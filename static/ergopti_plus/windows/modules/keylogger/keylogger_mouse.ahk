@@ -437,7 +437,7 @@ KL_Mouse_ParkTick() {
 		return
 	}
 
-	still_ms := A_TickCount - KLMouse.park_still_since
+	still_ms := (A_TickCount - KLMouse.park_still_since) & 0xFFFFFFFF
 	if (still_ms < KLMouseConst.PARK_IDLE_MS)
 		return
 
@@ -446,7 +446,7 @@ KL_Mouse_ParkTick() {
 	fdy := my - KLMouse.park_fired_y
 	fire_dist := Sqrt(fdx*fdx + fdy*fdy)
 	if (fire_dist < KLMouseConst.PARK_MIN_MOVE_PX
-			and (A_TickCount - KLMouse.park_fired_at) < 30000)
+			and ((A_TickCount - KLMouse.park_fired_at) & 0xFFFFFFFF) < 30000)
 		return
 
 	; Emit park event
