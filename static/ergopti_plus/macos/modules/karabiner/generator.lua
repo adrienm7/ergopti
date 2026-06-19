@@ -207,13 +207,32 @@ local function build_action_index(available_actions)
 	return index
 end
 
---- Returns true when two karabiner_to arrays produce identical JSON output.
+--- Recursively compares two values for structural equality.
+--- Lua table iteration order is non-deterministic, so hs.json.encode(a) ==
+--- hs.json.encode(b) can produce false negatives when two logically identical
+--- tables happen to iterate in different key orders (karabiner-generator-json-dedup).
+--- @param a any First value.
+--- @param b any Second value.
+--- @return boolean
+local function deep_equal(a, b)
+	if type(a) ~= type(b) then return false end
+	if type(a) ~= "table" then return a == b end
+	for k, v in pairs(a) do
+		if not deep_equal(v, b[k]) then return false end
+	end
+	for k in pairs(b) do
+		if a[k] == nil then return false end
+	end
+	return true
+end
+
+--- Returns true when two karabiner_to arrays are structurally identical.
 --- Used to detect tap == hold (in which case to_if_alone is omitted).
 --- @param a table First karabiner_to array.
 --- @param b table Second karabiner_to array.
 --- @return boolean
 local function same_output(a, b)
-	return hs.json.encode(a) == hs.json.encode(b)
+	return deep_equal(a, b)
 end
 
 --- Returns the name of the "physically held" Karabiner variable for a given key.

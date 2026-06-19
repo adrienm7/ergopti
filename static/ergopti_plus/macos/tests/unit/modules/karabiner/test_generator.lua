@@ -478,3 +478,77 @@ helpers.describe("Generator.build_paused_script_control_rules (exempt-from-pause
 		helpers.assert_true(found, "right_command + return rule must exist")
 	end)
 end)
+
+
+
+
+-- ====================================================================================================
+-- ====================================================================================================
+-- ======= 9/ same_output uses deep_equal, not hs.json.encode (karabiner-generator-json-dedup) =======
+-- ====================================================================================================
+-- ====================================================================================================
+
+helpers.describe("Generator — same_output uses deep structural equality (karabiner-generator-json-dedup)", function()
+
+	helpers.it("source does NOT use hs.json.encode comparison in same_output", function()
+		local src_path = helpers.driver_root() .. "modules/karabiner/generator.lua"
+		local fh = io.open(src_path, "r")
+		helpers.assert_true(fh ~= nil, "generator.lua must be readable")
+		local src = fh:read("*a"); fh:close()
+		-- hs.json.encode on two logically identical Lua tables can return different
+		-- strings because Lua hash-table iteration order is non-deterministic.
+		helpers.assert_true(
+			src:find("hs.json.encode(a) == hs.json.encode(b)", 1, true) == nil,
+			"same_output must NOT compare hs.json.encode strings — use deep_equal (karabiner-generator-json-dedup)"
+		)
+	end)
+
+	helpers.it("source defines a deep_equal function", function()
+		local src_path = helpers.driver_root() .. "modules/karabiner/generator.lua"
+		local fh = io.open(src_path, "r")
+		helpers.assert_true(fh ~= nil)
+		local src = fh:read("*a"); fh:close()
+		helpers.assert_true(
+			src:find("local function deep_equal", 1, true) ~= nil,
+			"generator.lua must define a local deep_equal function (karabiner-generator-json-dedup)"
+		)
+	end)
+
+	helpers.it("deep_equal returns true for structurally identical tables regardless of iteration order", function()
+		-- Inline the logic extracted from generator.lua to verify correctness
+		local function deep_equal(a, b)
+			if type(a) ~= type(b) then return false end
+			if type(a) ~= "table" then return a == b end
+			for k, v in pairs(a) do
+				if not deep_equal(v, b[k]) then return false end
+			end
+			for k in pairs(b) do
+				if a[k] == nil then return false end
+			end
+			return true
+		end
+
+		local a = { key_code = "a", modifiers = { mandatory = {"cmd"} } }
+		local b = { modifiers = { mandatory = {"cmd"} }, key_code = "a" }
+		helpers.assert_true(deep_equal(a, b), "deep_equal must match tables with same keys in any order")
+	end)
+
+	helpers.it("deep_equal returns false when one table has an extra key", function()
+		local function deep_equal(a, b)
+			if type(a) ~= type(b) then return false end
+			if type(a) ~= "table" then return a == b end
+			for k, v in pairs(a) do
+				if not deep_equal(v, b[k]) then return false end
+			end
+			for k in pairs(b) do
+				if a[k] == nil then return false end
+			end
+			return true
+		end
+
+		local a = { key_code = "a" }
+		local b = { key_code = "a", extra = true }
+		helpers.assert_true(not deep_equal(a, b), "deep_equal must return false when b has extra key")
+	end)
+
+end)
