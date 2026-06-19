@@ -190,6 +190,14 @@ local function mods_has_none(mods)
 end
 
 local function format_shortcut_title(action, mods, none_label, mod_label)
+    -- Fail closed on a wrong-typed value: a corrupt or AHK-migrated hs.settings
+    -- entry can hold a STRING where a table is expected, and table.concat(string)
+    -- raises. Because the whole AI submenu builder runs inside a pcall, that throw
+    -- silently blanked the entire LLM submenu from the menubar. Treat any non-table
+    -- as "disabled" before the concat can ever run.
+    if type(mods) ~= "table" then
+        return action .. " : " .. i18n.get("common.disabled")
+    end
     if not mods or mods_has_none(mods) then
         return action .. " : " .. i18n.get("common.disabled")
     elseif #mods == 0 then
@@ -661,11 +669,13 @@ function M.create(deps)
         local nav_menu_items = {}
 
         local nav_mods = hs.settings.get("llm_nav_modifiers")
-        if nav_mods == nil then nav_mods = llm_mod.DEFAULT_STATE.llm_nav_modifiers end
+        -- Fail closed to the canonical default on any non-table (corrupt/AHK plist),
+        -- so both the engine setter and format_shortcut_title get a valid table.
+        if type(nav_mods) ~= "table" then nav_mods = llm_mod.DEFAULT_STATE.llm_nav_modifiers end
         if keymap and type(keymap.set_llm_nav_modifiers) == "function" then pcall(keymap.set_llm_nav_modifiers, nav_mods) end
 
         local val_mods = hs.settings.get("llm_val_modifiers")
-        if val_mods == nil then val_mods = llm_mod.DEFAULT_STATE.llm_val_modifiers end
+        if type(val_mods) ~= "table" then val_mods = llm_mod.DEFAULT_STATE.llm_val_modifiers end
         if keymap and type(keymap.set_llm_val_modifiers) == "function" then pcall(keymap.set_llm_val_modifiers, val_mods) end
 
         local num_preds_safe = tonumber(state.llm_num_predictions) or llm_mod.DEFAULT_STATE.llm_num_predictions
