@@ -399,17 +399,28 @@ function M.show_window()
 				-- Poll every 200 ms for the flag; stop and clean up when triggered
 				_poll_timer = hs.timer.new(0.2, function()
 					if not wv then _stop_poll(); return end
-					wv:evaluateJavaScript("window.__hs_copy_requested", function(result)
-						if result == true then
-							Logger.debug(LOG, "Copy button clicked — copying plain text to clipboard.")
-							hs.pasteboard.setContents(plain)
-							_stop_poll()
-							if _window then
-								pcall(function() _window:delete() end)
-								_window = nil
+					-- Wrap in pcall: a natively-closed webview is NOT nil in Lua but
+					-- becomes "dead userdata" — a stale Lua handle whose backing C object
+					-- is gone. :evaluateJavaScript() on a dead userdata raises a runtime
+					-- error every 200 ms until Hammerspoon is force-quit
+					-- (healthcheck-webview-dead-userdata).
+					local ok_ev, ev_err = pcall(function()
+						wv:evaluateJavaScript("window.__hs_copy_requested", function(result)
+							if result == true then
+								Logger.debug(LOG, "Copy button clicked — copying plain text to clipboard.")
+								hs.pasteboard.setContents(plain)
+								_stop_poll()
+								if _window then
+									pcall(function() _window:delete() end)
+									_window = nil
+								end
 							end
-						end
+						end)
 					end)
+					if not ok_ev then
+						Logger.warn(LOG, "evaluateJavaScript on dead webview — stopping poll: %s.", tostring(ev_err))
+						_stop_poll()
+					end
 				end)
 				_poll_timer:start()
 				Logger.debug(LOG, "Copy-button poll timer started.")
