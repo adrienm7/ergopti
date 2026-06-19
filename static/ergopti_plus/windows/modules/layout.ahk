@@ -416,9 +416,8 @@ RemapKey(ScanCode, Character, AlternativeCharacter := "") {
 		InputLevel
 	)
 
-	if AlternativeCharacter == "" {
-		RemappedList[Character] := ScanCode
-	} else {
+	RemappedList[Character] := ScanCode
+	if AlternativeCharacter != "" {
 		Hotkey(
 			ScanCode,
 			_RemapEmit.Bind("{Text}" . AlternativeCharacter, AlternativeCharacter),
