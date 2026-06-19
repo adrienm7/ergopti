@@ -570,6 +570,69 @@ _Updater_CancelAsyncChecks() {
 	try LoggerDebug("Updater", "Cancelled all in-flight async update checks.")
 }
 
+; Async, non-blocking sibling of Updater_FetchReleasesListJson. Dispatches the
+; GitHub releases-list request in WinHTTP async mode (Open(…, true)) and returns
+; at once; OnJson(Json) is invoked from a poll timer once the response completes
+; (Json == "" on any failure). Used by _Updater_OpenChangelogWindow so the
+; changelog GUI build never blocks the keyboard hook on a slow network.
+_Updater_FetchReleasesListJsonAsync(Channel, OnJson) {
+	global UPDATER_HTTP_RESOLVE_TIMEOUT_MS, UPDATER_HTTP_CONNECT_TIMEOUT_MS
+	global UPDATER_HTTP_SEND_TIMEOUT_MS, UPDATER_HTTP_RECEIVE_TIMEOUT_MS
+	Url := Updater_ReleasesListApiUrl(Channel)
+	try {
+		Req := ComObject("WinHttp.WinHttpRequest.5.1")
+		Req.Open("GET", Url, true)
+		Req.SetRequestHeader("Accept", "application/vnd.github+json")
+		Req.SetRequestHeader("User-Agent", "ErgoptiPlus-Updater/1.0")
+		Req.SetTimeouts(UPDATER_HTTP_RESOLVE_TIMEOUT_MS, UPDATER_HTTP_CONNECT_TIMEOUT_MS,
+			UPDATER_HTTP_SEND_TIMEOUT_MS, UPDATER_HTTP_RECEIVE_TIMEOUT_MS)
+		Req.Send()
+	} catch as Err {
+		try LoggerDebug("Updater", "Async releases-list dispatch failed: {1}.", Err.Message)
+		try OnJson("")
+		return
+	}
+	_Updater_PollReleasesListAsync(Req, Url, OnJson, 0)
+}
+
+; Non-blocking completion poll for one in-flight async releases-list fetch.
+; Mirrors _Updater_PollAsync but without the ETag / _InterpretResponse machinery
+; (the releases list is always returned in full — no 304 caching).
+_Updater_PollReleasesListAsync(Req, Url, OnJson, Polls) {
+	global UPDATER_ASYNC_POLL_MS, UPDATER_ASYNC_MAX_POLLS
+	ready  := false
+	failed := false
+	try {
+		ready := Req.WaitForResponse(0)
+	} catch as Err {
+		failed := true
+		try LoggerDebug("Updater", "Async releases-list poll failed: {1}.", Err.Message)
+	}
+	if (!failed and !ready) {
+		Polls += 1
+		if (Polls > UPDATER_ASYNC_MAX_POLLS) {
+			failed := true
+			try LoggerWarn("Updater", "Async releases-list exceeded poll budget — aborting.")
+		} else {
+			SetTimer(() => _Updater_PollReleasesListAsync(Req, Url, OnJson, Polls), -UPDATER_ASYNC_POLL_MS)
+			return
+		}
+	}
+	Json := ""
+	if !failed {
+		try {
+			if (Req.Status == 200) {
+				Json := Req.ResponseText
+			} else {
+				try LoggerWarn("Updater", "Releases-list HTTP {1} for '{2}'.", Req.Status, Url)
+			}
+		} catch as Err {
+			try LoggerDebug("Updater", "Async releases-list response read failed: {1}.", Err.Message)
+		}
+	}
+	try OnJson(Json)
+}
+
 ; Given a GitHub releases array JSON string, return the JSON object of the
 ; highest-semver prerelease entry. GitHub orders by publish date, not semver;
 ; a stable release at the top must not cause us to miss a newer prerelease
@@ -938,14 +1001,21 @@ _Updater_RefreshInstallBtn(BtnInstall, Releases, Idx, IsLocal) {
 }
 
 ; Internal helper — builds (or rebuilds) the changelog GUI for a given channel.
-; The notes pane uses WebView2 (NavigateToString) to render Markdown so the
-; user sees formatted headings, bold text, lists and links instead of raw text.
-; Falls back to a plain-text Edit when WebView2 is unavailable.
+; Dispatches an async WinHTTP fetch so the keyboard hook is not blocked while
+; GitHub responds; _Updater_BuildChangelogGui builds the window once JSON lands.
 _Updater_OpenChangelogWindow(Channel) {
+	_Updater_FetchReleasesListJsonAsync(Channel, (Json) => _Updater_BuildChangelogGui(Json, Channel))
+}
+
+; Constructs the changelog Gui from the already-fetched releases JSON.
+; Separated from _Updater_OpenChangelogWindow so the WinHTTP call runs async.
+; The notes pane uses WebView2 (NavigateToString) for Markdown rendering and
+; falls back to a plain-text Edit when WebView2 is unavailable.
+_Updater_BuildChangelogGui(Json, Channel) {
 	global _VendorDir
-	Json := Updater_FetchReleasesListJson(Channel)
 	if (Json == "") {
-		MsgBox(t("updater.no_connection"), t("updater.title_changelog"), "Icon!")
+		; Surface non-blocking — a modal MsgBox here would starve the keyboard hook
+		try NotifierSend(t("updater.no_connection"), Map("title", t("updater.title_changelog"), "level", "warning"))
 		return
 	}
 

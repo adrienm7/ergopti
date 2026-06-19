@@ -86,3 +86,26 @@ _CLFA_FetchIsAsync() {
 		"changelog_window must harvest the response via the non-blocking WaitForResponse(0) poll (HIGH-05)")
 }
 Test("meta changelog-fetch-async: _CLW_DoFetch uses async WinHttp poll, not sync open (HIGH-05)", _CLFA_FetchIsAsync)
+
+
+
+
+; =========================================================
+; ===== 3/ Fallback-path guard (WebView2-unavailable) =====
+; =========================================================
+
+; _Updater_OpenChangelogWindow is the WebView2-unavailable fallback for the
+; changelog window. Before HIGH-05 it called Updater_FetchReleasesListJson
+; synchronously — the same class of blocking-WinHTTP-on-the-keyboard-thread
+; bug as _CLW_DoFetch. The fix delegates to _Updater_FetchReleasesListJsonAsync
+; so the GUI is built in a poll-timer callback rather than inline.
+_CLFA_FallbackIsAsync() {
+	Src := _CLFA_ReadSource("lib/updater.ahk")
+	Body := _CLFA_FuncBody(Src, "_Updater_OpenChangelogWindow(Channel) {")
+	Assert(Body != "", "_Updater_OpenChangelogWindow must exist in lib/updater.ahk")
+	Assert(!InStr(Body, "Updater_FetchReleasesListJson("),
+		"_Updater_OpenChangelogWindow must not call the sync Updater_FetchReleasesListJson — it blocks the keyboard hook (HIGH-05 fallback)")
+	Assert(InStr(Body, "_Updater_FetchReleasesListJsonAsync(") > 0,
+		"_Updater_OpenChangelogWindow must dispatch via _Updater_FetchReleasesListJsonAsync (HIGH-05 fallback)")
+}
+Test("meta changelog-fetch-async: _Updater_OpenChangelogWindow uses async fetch (HIGH-05 fallback)", _CLFA_FallbackIsAsync)
