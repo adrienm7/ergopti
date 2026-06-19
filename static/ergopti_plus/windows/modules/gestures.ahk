@@ -1232,8 +1232,15 @@ _GestureOnForeground(hWinEventHook, Event, HWnd, IdObject, IdChild, Thread, Time
 }
 
 ; Cleans up the WinEvent hook and its machine-code thunk on script exit.
+; Also force-releases any held mouse button so a Reload or ExitApp triggered
+; while a click-toggle hold is active does not leave the button stuck OS-wide.
 _GestureUnhook(*) {
     global _GestureWinHook, _GestureCallbackPtr
+    ; Release any OS-level held button before tearing down — the in-process
+    ; release paths (InputHook key-watcher, HookDispatcher cross-release) never
+    ; run during process exit, so the physical button stays down without this.
+    try GestureReleaseLeftClick()
+    try GestureReleaseRightClick()
     if (_GestureWinHook) {
         DllCall("UnhookWinEvent", "Ptr", _GestureWinHook)
         _GestureWinHook := 0
