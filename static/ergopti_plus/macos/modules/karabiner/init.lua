@@ -183,8 +183,10 @@ function M.set_enabled(value)
 		local hs_owned = type(KeLifecycle.is_hs_owned_bridge) == "function"
 			and KeLifecycle.is_hs_owned_bridge() or false
 		if hs_owned then
-			pcall(function() hs.execute(KeLifecycle.KILL_CMD) end)
-			Logger.info(LOG, "KE daemons stopped (feature disabled).")
+			-- Use kill_async to avoid blocking the main run loop ≥3 s
+			-- (KILL_CMD has a 3-pass sleep loop — synchronous execution stalls HS).
+			pcall(function() KeLifecycle.kill_async() end)
+			Logger.info(LOG, "KE daemons stop requested asynchronously (feature disabled).")
 		else
 			Logger.info(LOG, "Feature disabled but KE left alive — session appears user-managed.")
 		end

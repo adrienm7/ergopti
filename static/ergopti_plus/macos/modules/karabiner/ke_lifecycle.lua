@@ -194,6 +194,38 @@ function M.run_total_reset_async()
 end
 
 
+--- Stops all user-level KE agents in background (non-blocking).
+--- KILL_CMD has `for pass in 1 2 3; do ... sleep 1; done` — running it on the
+--- main thread blocks ≥3 s. This wrapper backgrounds it via nohup so the main
+--- run loop is never stalled (e.g. during M.set_enabled(false) from the menu).
+--- @return boolean ok True when the background process was launched.
+function M.kill_async()
+	-- Write KILL_CMD to a temp script to avoid shell quoting issues with nohup.
+	local script_path = string.format("/tmp/ergopti_ke_kill_async_%d.sh", os.time())
+	local fh = io.open(script_path, "w")
+	if not fh then
+		Logger.error(LOG, "kill_async: cannot write temp script '%s'.", script_path)
+		return false
+	end
+	fh:write("#!/bin/sh\n")
+	fh:write(KARABINER_KILL_CMD)
+	fh:write("\n/bin/rm -f \"$0\" 2>/dev/null\n")
+	fh:close()
+	hs.execute(string.format("/bin/chmod +x %q", script_path))
+	local cmd = string.format(
+		"/usr/bin/nohup /bin/sh %q >/tmp/ergopti_ke_kill_async.log 2>&1 </dev/null &",
+		script_path
+	)
+	local _, ok = hs.execute(cmd)
+	if ok then
+		Logger.trace(LOG, "KE kill launched asynchronously (%s).", script_path)
+	else
+		Logger.error(LOG, "kill_async: failed to background KE kill script.")
+	end
+	return ok == true
+end
+
+
 -- Per-session priming: launching Karabiner-Menu causes it to read
 -- karabiner.json and push the rules to Core-Service via IPC. Karabiner-Menu
 -- maintains the IPC link as long as it runs, so remapping stays alive

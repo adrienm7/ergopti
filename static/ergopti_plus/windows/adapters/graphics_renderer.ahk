@@ -177,7 +177,9 @@ GR_DrawBitmap(Handle, DrawFn) {
 	try {
 		; Delegate all painting to the caller — they receive the memory DC and
 		; dimensions so they can call GDI primitives or create a GDI+ Graphics.
-		if Type(DrawFn) == "Func" {
+		; HasMethod accepts Func, Closure, and BoundFunc — Type()=="Func" rejected
+		; closures (capturing nested functions), making spotlight and WPM invisible.
+		if HasMethod(DrawFn, "Call") {
 			DrawFn(MemDC, W, H)
 
 			; Commit the painted bitmap to the layered window (only reached when
