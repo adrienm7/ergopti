@@ -312,6 +312,14 @@ _TH_WriteTapHoldToml() {
 	Lines.Push("# in-memory state, so customisations made via direct editing round-trip.")
 	Lines.Push("")
 
+	; Root [tap_hold] section — emit inherit_defaults when it is false so
+	; the loader does not re-merge shipped defaults on the next reload.
+	if TapHold.Has("inherit_defaults") and !TapHold["inherit_defaults"] {
+		Lines.Push("[tap_hold]")
+		Lines.Push("inherit_defaults = false")
+		Lines.Push("")
+	}
+
 	; Keys section.
 	if TapHold.Has("keys") {
 		for KeyId, Entry in TapHold["keys"] {
