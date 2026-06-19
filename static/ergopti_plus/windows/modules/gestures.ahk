@@ -1844,7 +1844,7 @@ GestureRegWriteDword(ValueName, Value, &ErrorsRef) {
 ; Configures Windows touchpad gestures via the registry so that all 10 gesture
 ; slots send Ctrl+Win+Shift+F1..F10 without any manual Settings configuration.
 ; Writes the master enables, per-direction enables, Custom*Tap sentinels,
-; KeyParams (encoded as (VK<<8)|7), and resets the new-system *Action values
+; KeyParams (encoded as (VK<<16)|7), and resets the new-system *Action values
 ; to 65535 so the old KeyParams system takes precedence.
 ; Returns true on success, false if any registry write failed.
 GestureAutoConfigureRegistry() {
