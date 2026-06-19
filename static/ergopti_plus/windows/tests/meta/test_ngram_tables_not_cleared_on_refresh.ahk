@@ -74,7 +74,7 @@ _NTNC_CheckNgramNotInClear() {
 	for _, Tbl in ["ngram_chars", "ngram_bigrams", "ngram_trigrams",
 	               "ngram_quadgrams", "ngram_words", "ngram_keycodes",
 	               "ngram_shortcuts"] {
-		Assert(!InStr(Body, """" . Tbl . """"),
+		Assert(!InStr(Body, '"' . Tbl . '"'),
 			"KLR_ClearAggregates must not delete " . Tbl . " — ngram history survives from data.sql")
 	}
 }
@@ -87,7 +87,7 @@ _NTNC_CheckAggStillCleared() {
 	Assert(Body != "", "KLR_ClearAggregates must be present in keylogger_reader.ahk")
 
 	; The agg_* tables must still be cleared
-	Assert(InStr(Body, """agg_app_day"""),
+	Assert(InStr(Body, '"agg_app_day"'),
 		"KLR_ClearAggregates must still clear agg_app_day (only ngrams are exempt)")
 }
 

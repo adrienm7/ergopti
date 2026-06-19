@@ -76,7 +76,7 @@ _SDPS_CheckDigitSCsMapExists() {
 	; All ten digit-row scancodes must be listed
 	for _, SC in ["SC002", "SC003", "SC004", "SC005", "SC006",
 	              "SC007", "SC008", "SC009", "SC00A", "SC00B"] {
-		Assert(InStr(Src, """" . SC . """"),
+		Assert(InStr(Src, '"' . SC . '"'),
 			"_SHIFT_DIGIT_SCS must include " . SC)
 	}
 }
