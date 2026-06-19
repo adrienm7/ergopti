@@ -255,13 +255,11 @@ _JsonParseNumber(&text, &pos) {
 			break
 	}
 	s := SubStr(text, start, pos - start)
-	; Validate before coercion. The value dispatch routes ANY unrecognised
-	; leading char here (catch-all number branch), and a lone "-" / "e" / "+"
-	; consumes characters without forming a real number. Without this guard the
-	; ``s + 0`` below surfaces AHK's internal "Expected a Number but got a
-	; String." — masking the fact that the failure is a JSON syntax error at a
-	; known position. Require at least one digit with an optional leading minus.
-	if (s == "" or !RegExMatch(s, "^-?\d"))
+	; Validate before coercion using the full JSON number grammar so malformed
+	; inputs like "1.2.3", "1e", "123-456" are caught here rather than
+	; propagating to AHK's + 0 coercion which surfaces a confusing internal error.
+	; JSON number: -?(0|[1-9][0-9]*)(\.[0-9]+)?([eE][+-]?[0-9]+)?
+	if (s == "" or !RegExMatch(s, "^-?(0|[1-9][0-9]*)(\.[0-9]+)?([eE][+-]?[0-9]+)?$"))
 		throw Error("JSON: invalid number at position " . start . ".", -1)
 	; Coerce to number — AHK's ``+ 0`` returns Integer or Float depending on
 	; whether the source had a decimal point or exponent.

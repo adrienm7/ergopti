@@ -86,5 +86,22 @@ _JNME_ValidNumbersStillParse() {
 	; The guard must not break genuine numbers — regression-proof the happy path.
 	AssertEqual(42, JsonParse("42"), "JsonParse('42') must still parse to 42 after the validation guard")
 	AssertEqual(-7, JsonParse("-7"), "JsonParse('-7') must still parse to -7 after the validation guard")
+	AssertEqual(3.14, JsonParse("3.14"), "JsonParse('3.14') must still parse to 3.14 after full-regex guard")
 }
 Test("JSON parser: valid numbers still parse after number guard (json-number-misleading-error)", _JNME_ValidNumbersStillParse)
+
+_JNME_MalformedMultiDotThrows() {
+	Msg := _JNME_CaptureThrowMessage("[1.2.3]")
+	Assert(Msg != "", "JsonParse('[1.2.3]') must throw — double decimal point is not valid JSON")
+	Assert(InStr(Msg, "JSON") > 0,
+		"Malformed '1.2.3' must throw a JSON-position error, not silently pass — got: " . Msg)
+}
+Test("JSON parser: malformed '1.2.3' throws JSON-position error (full-regex guard)", _JNME_MalformedMultiDotThrows)
+
+_JNME_BareExponentThrows() {
+	Msg := _JNME_CaptureThrowMessage("1e")
+	Assert(Msg != "", "JsonParse('1e') must throw — exponent with no digits is not valid JSON")
+	Assert(InStr(Msg, "JSON") > 0,
+		"Malformed '1e' must throw a JSON-position error — got: " . Msg)
+}
+Test("JSON parser: malformed '1e' throws JSON-position error (full-regex guard)", _JNME_BareExponentThrows)
