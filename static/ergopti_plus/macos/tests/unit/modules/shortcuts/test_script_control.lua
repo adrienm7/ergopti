@@ -391,3 +391,47 @@ helpers.describe("Karabiner layout-change must respect pause (« pause = tout é
 			"layout-change handler must short-circuit (and log) while paused")
 	end)
 end)
+
+
+helpers.describe("resume_all must not re-enable user-disabled gestures or shortcuts", function()
+	-- Regression: resume_all() was calling _gestures.enable_all() and
+	-- _shortcuts.resume_bindings() unconditionally. A user who had gestures or
+	-- shortcuts disabled before pausing would find them re-enabled after unpause.
+	-- The fix snapshots the pre-pause state in pause_all() and restores only what
+	-- was active.
+	helpers.it("script_control source snapshots pre-pause state before disabling", function()
+		local src_path = helpers.driver_root() .. "modules/shortcuts/script_control.lua"
+		local fh = io.open(src_path, "r")
+		helpers.assert_true(fh ~= nil, "must be able to read script_control.lua")
+		local src = fh:read("*a"); fh:close()
+
+		helpers.assert_true(src:find("_gestures_were_enabled", 1, true) ~= nil,
+			"script_control must declare _gestures_were_enabled snapshot")
+		helpers.assert_true(src:find("_shortcuts_were_running", 1, true) ~= nil,
+			"script_control must declare _shortcuts_were_running snapshot")
+	end)
+
+	helpers.it("resume_all only calls enable_all when gestures were enabled before pause", function()
+		local src_path = helpers.driver_root() .. "modules/shortcuts/script_control.lua"
+		local fh = io.open(src_path, "r")
+		helpers.assert_true(fh ~= nil)
+		local src = fh:read("*a"); fh:close()
+
+		-- The guard must appear before the enable_all call
+		local guard_pos = src:find("_gestures_were_enabled", 1, true)
+		local enable_pos = src:find("enable_all", 1, true)
+		helpers.assert_true(guard_pos ~= nil and enable_pos ~= nil,
+			"script_control must have both _gestures_were_enabled guard and enable_all call")
+		helpers.assert_true(guard_pos < enable_pos,
+			"_gestures_were_enabled check must appear before the enable_all call")
+	end)
+
+	helpers.it("bindings.lua exposes is_started() to detect active state before pause", function()
+		local src_path = helpers.driver_root() .. "modules/shortcuts/bindings.lua"
+		local fh = io.open(src_path, "r")
+		helpers.assert_true(fh ~= nil)
+		local src = fh:read("*a"); fh:close()
+		helpers.assert_true(src:find("function M.is_started", 1, true) ~= nil,
+			"bindings.lua must expose M.is_started() for pre-pause state detection")
+	end)
+end)

@@ -96,4 +96,10 @@ function M.resume_bindings()
 	KeyboardShortcuts.start()
 end
 
+--- Returns true when the binding layer is active (started and not stopped).
+--- @return boolean
+function M.is_bindings_started()
+	return Bindings.is_started()
+end
+
 return M
