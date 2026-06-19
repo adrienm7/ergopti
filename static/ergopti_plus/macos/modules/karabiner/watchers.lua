@@ -29,6 +29,7 @@ local hs          = hs
 local Logger      = require("lib.logger")
 local Timings     = require("lib.timings")
 local Keycodes    = require("lib.keycodes")
+local ShellRunner = require("adapters.shell_runner")
 
 
 local LOG = "karabiner"
@@ -65,6 +66,8 @@ local LAYOUT_POLL_SEC = Timings.sec("ui", "layout_poll_ms")
 
 -- Holds the fallback poll timer so it can be cancelled on stop.
 local _layout_poll_timer = nil
+-- Guard so the async fallback poll never piles up concurrent `defaults` reads.
+local _layout_poll_pending = false
 
 -- Previous hs.keycodes.inputSourceChanged callback saved before start_input_source_watcher
 -- installs its own, so stop_input_source_watcher can restore it instead of passing nil
@@ -191,16 +194,40 @@ end
 --- =======================================
 -- =======================================
 
---- Reads the current keyboard layout name from HIToolbox (AppleSelectedInputSources).
+--- Parses the KeyboardLayout Name out of `defaults read … AppleSelectedInputSources`.
+--- @param raw string|nil The raw `defaults` output.
+--- @return string|nil The layout name, or nil when absent.
+local function parse_layout_name(raw)
+	if type(raw) ~= "string" or raw == "" then return nil end
+	return raw:match('"KeyboardLayout Name"%s*=%s*"([^"]+)"')
+		or raw:match("KeyboardLayout Name%s*=%s*([^;%s]+)")
+end
+
+--- Reads the current keyboard layout name from HIToolbox SYNCHRONOUSLY.
 --- More reliable than hs.keycodes.currentLayout() on Sequoia which can return
---- stale values from the TIS cache.
+--- stale values from the TIS cache. Used only on the infrequent paths (the
+--- one-time boot seed + the notification callback); the periodic fallback poll
+--- reads ASYNCHRONOUSLY (read_layout_async) so it never blocks the run loop.
 --- @return string|nil
 local function read_current_layout_from_hitoolbox()
 	local raw, ok = hs.execute("defaults read com.apple.HIToolbox AppleSelectedInputSources 2>/dev/null")
-	if not ok or type(raw) ~= "string" or raw == "" then return nil end
-	local name = raw:match('"KeyboardLayout Name"%s*=%s*"([^"]+)"')
-		or raw:match("KeyboardLayout Name%s*=%s*([^;%s]+)")
-	return name
+	if not ok then return nil end
+	return parse_layout_name(raw)
+end
+
+--- Reads the current keyboard layout name ASYNCHRONOUSLY via the ShellRunner
+--- adapter (off the main run loop). The previous fallback poll spawned a
+--- SYNCHRONOUS `defaults` subprocess on the main loop every LAYOUT_POLL_SEC for
+--- the whole session — exactly the steady-state main-loop cost the profilers aim
+--- to eliminate, and worse on the Sequoia machines this poll exists for.
+--- @param callback fun(layout_name: string|nil)
+local function read_layout_async(callback)
+	ShellRunner.spawn("/usr/bin/defaults",
+		{ "read", "com.apple.HIToolbox", "AppleSelectedInputSources" },
+		function(exit_code, stdout, _)
+			if exit_code ~= 0 then callback(nil); return end
+			callback(parse_layout_name(stdout))
+		end)
 end
 
 --- Fires the on_change callback with proper debouncing, updating _last_known_layout.
@@ -259,12 +286,18 @@ function M.start_input_source_watcher(on_change)
 	-- Fallback: poll HIToolbox every LAYOUT_POLL_SEC — catches layout changes that
 	-- didn't trigger hs.keycodes.inputSourceChanged (Sequoia regression).
 	_layout_poll_timer = hs.timer.doEvery(LAYOUT_POLL_SEC, function()
-		local current = read_current_layout_from_hitoolbox()
-		if current and current ~= _last_known_layout then
-			Logger.info(LOG, "Layout poll detected change: '%s' → '%s'.",
-				tostring(_last_known_layout), current)
-			fire_layout_change(on_change, current)
-		end
+		-- Read HIToolbox ASYNCHRONOUSLY (off the main run loop). Skip if a read is
+		-- already in flight so back-to-back ticks under load cannot pile up tasks.
+		if _layout_poll_pending then return end
+		_layout_poll_pending = true
+		read_layout_async(function(current)
+			_layout_poll_pending = false
+			if current and current ~= _last_known_layout then
+				Logger.info(LOG, "Layout poll detected change: '%s' → '%s'.",
+					tostring(_last_known_layout), current)
+				fire_layout_change(on_change, current)
+			end
+		end)
 	end)
 
 	Logger.done(LOG, "Input source watcher registered (poll every %.0fs).", LAYOUT_POLL_SEC)
