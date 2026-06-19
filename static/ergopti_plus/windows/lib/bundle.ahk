@@ -88,7 +88,7 @@ global _BundleDir := ""
 ; folder (no version suffix) so disk usage stays bounded — on version change
 ; the folder is wiped by Bundle_Init() before the new bundle is extracted.
 _Bundle_ResolveDir() {
-	return A_AppData . "\..\Local\Ergopti\bundle"
+	return A_LocalAppData . "\Ergopti\bundle"
 }
 
 ; Reads the marker file's first line; returns "" if the file is missing or
