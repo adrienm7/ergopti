@@ -986,9 +986,10 @@ hs.shutdownCallback = function()
 	-- 5. Terminate any running MLX server process
 	pcall(function() require("ui.menu.menu_llm").stop_mlx_server() end)
 
-	-- 6. Kill orphan child processes
-	pcall(hs.execute, "pkill -f 'ergopti_plus_expander'", true)
-	pcall(hs.execute, "pkill -f 'ergopti_plus_http_server'", true)
+	-- 6. Kill orphan child processes — shared with the script_quit action via
+	-- menu_llm.terminate_helper_processes() so the os.exit quit path performs the
+	-- identical teardown and the two paths can never drift.
+	pcall(function() require("ui.menu.menu_llm").terminate_helper_processes() end)
 	-- Kill any orphan mlx_lm.server on genuine quit only — not on reload.
 	-- Boot logic deliberately spares a healthy server across sessions; killing it
 	-- on every reload makes the cold-restart avoidance dead code.
