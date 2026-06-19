@@ -1038,6 +1038,16 @@ MENU_BUILD_DEFER_MS := 16  ; build the full tray menu first thing after "ready"
 A_TrayMenu.Delete()
 SetTimer(SaveFullConfig, -500)
 
+; HookDispatcher owns the process-wide mouse Hotkeys consumed by four independent
+; features (hotstring prefix-watcher click-reset, CapsWord cancel, gesture
+; click-toggle cross-release, LLM tooltip dismiss-on-click). None of those are
+; gated by the keylogger/metrics flag, so Start() must be unconditional here.
+; Start() is idempotent (guarded by _started), so a stray second call is harmless.
+; HookDispatcher.Stop() is called by Ergopti_OnShutdown (registered below via
+; OnExit) — do NOT register a second anonymous OnExit lambda here; double-Stop
+; can trigger a "hook already released" error on some AHK builds.
+HookDispatcher.Start()
+
 if MetricsShortcuts.enabled {
     LoggerDebug("Startup", "Metrics enabled — WPMWidget.visible={1}, show_graph={2}.",
         WPMWidget.visible, WPMWidget.show_graph)
@@ -1050,10 +1060,7 @@ if MetricsShortcuts.enabled {
     ; See the deferred-task block after LoggerSuccess("…ready").)
     KL_Init(_ConfigDir . "metrics")
     MS_ApplyAll(KLUI_ToggleTyping, KLUI_ToggleApps)
-    HookDispatcher.Start()
-    ; HookDispatcher.Stop() is called by Ergopti_OnShutdown (registered below via
-    ; OnExit) — do NOT register a second anonymous OnExit lambda here; double-Stop
-    ; can trigger a "hook already released" error on some AHK builds.
+    ; HookDispatcher is already started unconditionally above.
     KL_Hook_Start()
     KL_Watchers_Start()
     KL_Mouse_Start()
