@@ -415,7 +415,7 @@ _LLM_TagFromUrl(url) {
  * @returns {number} Parameter count in billions.
  */
 _LLM_ParseBillions(s) {
-	if (s == "" or not IsObject(s) and s == "N/A")
+	if (s == "" or IsObject(s) or s == "N/A")
 		return 0.0
 	if !RegExMatch(s, "^([0-9]+(?:\.[0-9]+)?)\s*([BbMm]?)", &m)
 		return 0.0
