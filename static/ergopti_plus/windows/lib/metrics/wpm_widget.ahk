@@ -384,7 +384,9 @@ WPMWidget_CategoryBgColor(CategoryName, FallbackHex, SectionHint := "") {
         if (raw != "") {
             result := (SubStr(raw, 1, 1) == "#") ? SubStr(raw, 2) : raw
             LoggerDebug("WPMWidget", "CategoryBgColor '{1}' → '{2}'", CategoryName, result)
-            return result
+            if RegExMatch(result, "^[0-9A-Fa-f]{6}$")
+                return result
+            ; Falls through to fallback if format is invalid
         }
         if (SectionHint != "") {
             Basecat := _WPMWidget_SectionBaseCategory(SectionHint)
@@ -393,7 +395,9 @@ WPMWidget_CategoryBgColor(CategoryName, FallbackHex, SectionHint := "") {
                 if (raw2 != "") {
                     result2 := (SubStr(raw2, 1, 1) == "#") ? SubStr(raw2, 2) : raw2
                     LoggerDebug("WPMWidget", "CategoryBgColor '{1}' via section '{2}' → '{3}'", CategoryName, Basecat, result2)
-                    return result2
+                    if RegExMatch(result2, "^[0-9A-Fa-f]{6}$")
+                        return result2
+                    ; Falls through to fallback if format is invalid
                 }
             }
         }
@@ -1051,11 +1055,13 @@ WPMWidget_Tick() {
                 WPMWidget._lbl_wpm.SetFont("c" . txt_col)
             if WPMWidget._lbl_unit
                 WPMWidget._lbl_unit.SetFont("c" . txt_col)
-        } catch {
+        } catch as _e {
+            try LoggerError("WPMWidget", "Compact mode tick threw — rebuilding widget: {1}.", _e.Message)
             WPMWidget._gui       := false
             WPMWidget._lbl_wpm   := false
             WPMWidget._lbl_unit  := false
             WPMWidget._lbl_strip := false
+            try WPMWidget_BuildCompact()
         }
     }
     WPMWidget._last_wpm := wpm
