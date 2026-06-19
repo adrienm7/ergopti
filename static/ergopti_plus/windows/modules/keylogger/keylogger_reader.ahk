@@ -354,21 +354,22 @@ KLR_ApplyIncremental(db, md, logPath) {
 ; ================================================================
 ; =================================================================
 
-; Delete all agg_* and ngram_* rows from the in-memory DB so that
-; KLR_RebuildAggregates can recalculate them cleanly from events_*.
-; Called once per refresh cycle before KLR_RebuildAggregates.
+; Delete all agg_* rows from the in-memory DB so that KLR_RebuildAggregates
+; can recalculate them cleanly from events_*.  Called once per refresh cycle
+; before KLR_RebuildAggregates.
+;
+; Ngram tables are intentionally NOT cleared here: their data comes from the
+; persisted data.sql file (loaded on open) and from KLW.batch injected by
+; KLR_InjectKlwBatch.  Clearing them would wipe historical ngram counts that
+; are never repopulated by KLR_RebuildAggregates, leaving statistics empty
+; until the next walker flush.
 KLR_ClearAggregates(db) {
 	for tbl in ["agg_app_day", "agg_app_day_buckets", "agg_app_day_burst",
 	            "agg_app_day_session", "agg_app_day_chars_class",
 	            "agg_app_day_errors", "agg_app_day_ergo", "agg_app_day_layouts",
 	            "agg_app_day_kc_hold", "agg_app_day_titles",
 	            "agg_app_day_hourly", "agg_app_day_hourly_min5",
-	            "agg_app_day_switches_to", "agg_system_day",
-	            "ngram_chars", "ngram_bigrams", "ngram_trigrams",
-	            "ngram_quadgrams", "ngram_pentagrams", "ngram_hexagrams",
-	            "ngram_heptagrams", "ngram_words", "ngram_word_bigrams",
-	            "ngram_shortcuts", "ngram_shortcut_bigrams",
-	            "ngram_keycodes", "ngram_scancodes"]
+	            "agg_app_day_switches_to", "agg_system_day"]
 		try SQLite_Exec(db, "DELETE FROM " . tbl . ";")
 }
 
