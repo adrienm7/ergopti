@@ -58,3 +58,46 @@ helpers.describe("personal_info interceptor — synchronous do_expand (dynhotstr
 	end)
 
 end)
+
+
+helpers.describe("personal_info fallback — arm_synthetic must not pass emitted text", function()
+	-- Regression: the fallback injection path called arm_synthetic(n_back, emitted)
+	-- where emitted = table.concat(parts, "\t"). The keymap's arm_synthetic stores
+	-- emitted in expected_synthetic_chars, expecting to see those chars appear in the
+	-- key stream. But the fallback fires tab-separated values as individual keyStrokes
+	-- with real keyStroke("tab") events — the keymap sees a navigation-tab (which
+	-- resets the buffer), not a literal \t char. The expected_synthetic_chars counter
+	-- was then never satisfied, permanently desyncing the buffer state.
+	-- Fix: the fallback calls arm_synthetic(n_back, "") — registering only the delete
+	-- count — and relies on suppress_rescan() to prevent spurious hotstring matches.
+
+	helpers.it("fallback path calls arm_synthetic with empty string, not emitted", function()
+		local src_path = helpers.driver_root() .. "modules/dynamic_hotstrings/personal_info.lua"
+		local fh = io.open(src_path, "r")
+		helpers.assert_true(fh ~= nil, "personal_info.lua must be readable")
+		local src = fh:read("*a"); fh:close()
+
+		-- Verify the fallback does NOT pass emitted to arm_synthetic
+		helpers.assert_true(
+			src:find('arm_synthetic(n_back, emitted)', 1, true) == nil,
+			"fallback must not pass emitted to arm_synthetic — tab chars in emitted desync the buffer"
+		)
+		-- And does pass an empty string instead
+		helpers.assert_true(
+			src:find('arm_synthetic(n_back, "")', 1, true) ~= nil,
+			"fallback must call arm_synthetic(n_back, \"\") so expected_synthetic_chars stays unset"
+		)
+	end)
+
+	helpers.it("fallback path calls suppress_rescan after arm_synthetic", function()
+		local src_path = helpers.driver_root() .. "modules/dynamic_hotstrings/personal_info.lua"
+		local fh = io.open(src_path, "r")
+		helpers.assert_true(fh ~= nil)
+		local src = fh:read("*a"); fh:close()
+		helpers.assert_true(
+			src:find("suppress_rescan", 1, true) ~= nil,
+			"fallback must call suppress_rescan() to prevent hotstring re-triggering after injection"
+		)
+	end)
+
+end)
