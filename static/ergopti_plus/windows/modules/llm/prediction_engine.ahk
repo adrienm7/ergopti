@@ -629,6 +629,7 @@ LLM_Engine_FirePrediction(buffer) {
 			"system_prompt", system_prompt,
 			"requested",     n_predictions,
 			"base_temp",     req_temp,
+			"dedup_stats",   LLM_ApiCommon_NewDedupStats(),
 			"dispatch_fn",   dispatch_fn,
 			"request_start", A_TickCount
 		)
@@ -1122,7 +1123,10 @@ _LLM_Engine_ResolveProfileIdForApp(default_id) {
 ; Parse raw model output into tooltip slot strings (macOS Parser + insert_prediction).
 _LLM_Engine_ParseSlots(raw, state) {
 	is_batch  := state.Has("is_batch") and state["is_batch"]
-	dedup_ref := state["dedup_stats"]
+	; Defensive: batch state did not always include dedup_stats before the fix;
+	; fall back to a fresh stats object so a missing key never throws in the
+	; async callback (which swallows exceptions silently).
+	dedup_ref := state.Has("dedup_stats") ? state["dedup_stats"] : LLM_ApiCommon_NewDedupStats()
 	result    := LLM_Parser_ParseResponse(
 		raw,
 		state["ctx"],

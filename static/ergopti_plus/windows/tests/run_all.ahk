@@ -212,6 +212,7 @@ try FileAppend("# [marker] starting direct include of LLM production modules`r`n
 ; which let a crash in its Levenshtein helper survive — include it + its tests.
 #Include ../modules/llm/parser.ahk
 #Include test_llm_parser.ahk
+#Include meta/test_llm_batch_dedup_stats.ahk
 try FileAppend("# [marker] LLM production modules + tests included`r`n", A_Temp . "\ergopti_test_results.txt", "UTF-8")
 try FileAppend("# [marker] LLM production modules + tests included`r`n", "*")
 
