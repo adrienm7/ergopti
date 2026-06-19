@@ -94,6 +94,13 @@ local _last_failure_message = nil
 -- get their on_complete called without launching a second bash process.
 local _pending_callbacks = {}
 
+-- Explicit boolean tracking whether a bootstrap task is currently running.
+-- Cannot use #_pending_callbacks > 0 as the guard: when on_complete is nil
+-- (most internal callers), no entry is added to the queue and the guard
+-- never fires — allowing two concurrent bootstrap processes to race and
+-- both write the same .venv directory.
+local _task_running = false
+
 
 
 
@@ -347,7 +354,9 @@ end
 ---   true on success, false on failure. Safe to call repeatedly; only the
 ---   first invocation runs the script, subsequent ones queue the callback.
 -- Fires all pending callbacks with the given result and clears the queue.
+-- Also clears _task_running so the next ensure_bootstrap() call can launch.
 local function fire_pending_callbacks(ok)
+	_task_running = false
 	local cbs = _pending_callbacks
 	_pending_callbacks = {}
 	for _, cb in ipairs(cbs) do
@@ -367,8 +376,9 @@ function M.check_and_install_deps(on_complete)
 	end
 
 	-- Script is already running — queue the callback instead of launching a
-	-- second bash process in parallel.
-	if #_pending_callbacks > 0 then
+	-- second bash process in parallel. Guard on _task_running (not on
+	-- #_pending_callbacks) so nil-callback callers are also blocked.
+	if _task_running then
 		if type(on_complete) == "function" then
 			table.insert(_pending_callbacks, on_complete)
 		end
@@ -536,6 +546,9 @@ function M.check_and_install_deps(on_complete)
 	Logger.debug(LOG, "hs.task created successfully")
 
 	Logger.debug(LOG, "Starting hs.task…")
+	-- Arm the reentrancy guard before task:start() so any callback that fires
+	-- synchronously (unlikely but possible) sees _task_running = true.
+	_task_running = true
 	if not pcall(function() task:start() end) then
 		Logger.error(LOG, "Failed to start hs.task for MLX bootstrap script.")
 		_bootstrap_state = "failed"
