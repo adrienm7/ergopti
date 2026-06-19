@@ -158,6 +158,17 @@ function M.stop_mlx_server()
 	end
 end
 
+--- Kills the orphan helper processes spawned for the local LLM backends (the
+--- expander + http server). Shared by the genuine-quit shutdown callback AND the
+--- script_quit action: script_quit exits via os.exit(0), which bypasses
+--- hs.shutdownCallback, so it must perform the identical teardown. Centralising it
+--- here means the two quit paths can never drift (the bug was that script_quit
+--- killed Karabiner + flushed the keylogger but left the MLX server + helpers alive).
+function M.terminate_helper_processes()
+	pcall(hs.execute, "pkill -f 'ergopti_plus_expander'", true)
+	pcall(hs.execute, "pkill -f 'ergopti_plus_http_server'", true)
+end
+
 
 
 

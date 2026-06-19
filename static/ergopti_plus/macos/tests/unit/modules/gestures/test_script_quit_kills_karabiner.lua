@@ -49,4 +49,32 @@ helpers.describe("gestures.actions: script_quit tears down Karabiner before exit
 		helpers.assert_eq(killed.count, 1)  -- Karabiner torn down exactly once
 		helpers.assert_true(exit_scheduled, "the quit must still schedule the process exit afterwards")
 	end)
+
+	helpers.it("also terminates the MLX server + orphan helper processes (F-MED-7)", function()
+		-- os.exit(0) bypasses hs.shutdownCallback where the MLX/orphan kills live,
+		-- so script_quit must perform the identical teardown or the mlx_lm.server
+		-- keeps holding GPU memory + the MLX port and the helper processes orphan.
+		local mlx_stopped, helpers_killed = 0, 0
+		package.loaded["modules.karabiner"] = { kill = function() end }
+		package.loaded["ui.menu.menu_llm"] = {
+			stop_mlx_server            = function() mlx_stopped = mlx_stopped + 1 end,
+			terminate_helper_processes = function() helpers_killed = helpers_killed + 1 end,
+		}
+
+		local saved_exit    = os.exit
+		local saved_doAfter = _G.hs.timer.doAfter
+		os.exit = function() error("os.exit must not run during the test") end
+		_G.hs.timer.doAfter = function(_delay, _fn) end  -- record-never-fire
+
+		local ok = pcall(Actions.execute_single, "script_quit")
+
+		os.exit = saved_exit
+		_G.hs.timer.doAfter = saved_doAfter
+		package.loaded["modules.karabiner"] = nil
+		package.loaded["ui.menu.menu_llm"] = nil
+
+		helpers.assert_true(ok, "executing script_quit must not raise")
+		helpers.assert_eq(mlx_stopped, 1, "script_quit must stop the MLX server (os.exit bypasses the shutdown callback)")
+		helpers.assert_eq(helpers_killed, 1, "script_quit must terminate the orphan helper processes")
+	end)
 end)

@@ -598,6 +598,18 @@ sg("script_quit",                         function()
 			kl.stop()
 		end
 	end)
+	-- Terminate the MLX server + orphan helper processes — os.exit(0) likewise
+	-- bypasses the HS shutdown callback where these kills live, so without
+	-- duplicating them the mlx_lm.server keeps holding GPU memory + the MLX port and the
+	-- ergopti_plus_expander / ergopti_plus_http_server helpers survive as orphans.
+	-- Shared with that callback via menu_llm so the two quit paths cannot drift.
+	pcall(function()
+		local ok_llm, menu_llm = pcall(require, "ui.menu.menu_llm")
+		if ok_llm and type(menu_llm) == "table" then
+			if type(menu_llm.stop_mlx_server) == "function" then menu_llm.stop_mlx_server() end
+			if type(menu_llm.terminate_helper_processes) == "function" then menu_llm.terminate_helper_processes() end
+		end
+	end)
 	pcall(function() hs.timer.doAfter(0.1, function() os.exit(0) end) end)
 end)
 
