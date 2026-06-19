@@ -146,7 +146,7 @@ HealthCheck_Run() {
 		}
 	}
 
-	UptimeSec := (A_TickCount - _HealthCheckStartMs) // 1000
+	UptimeSec := ((A_TickCount - _HealthCheckStartMs) & 0xFFFFFFFF) // 1000
 
 	; Collect the last 100 WARNING / ERROR lines from the ring buffer
 	RecentIssues := _HealthCheck_RecentIssues(100)

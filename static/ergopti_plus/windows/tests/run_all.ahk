@@ -508,6 +508,7 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 #Include meta/test_parse_overrides_seen_sections.ahk
 #Include meta/test_llm_getactiveprofile_arg.ahk
 #Include meta/test_tickcount_wrap_safe.ahk
+#Include meta/test_tickcount_lib_wrap.ahk
 #Include meta/test_llm_token_budget_min5.ahk
 #Include meta/test_llm_parser_nul_strip.ahk
 #Include meta/test_altgr_hotif_dynamic.ahk
