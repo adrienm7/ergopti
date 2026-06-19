@@ -1623,8 +1623,9 @@ Updater_DownloadAndInstall(Release) {
 
 _Updater_PollDownloadAsync(Req, NewExe, SwapBat, CurrentExe, Tag, Polls := 0) {
 	global _UpdaterDownloadInProgress, UPDATER_ASYNC_POLL_MS
-	; Give the download up to 120 seconds to complete
-	MaxPolls := 120000 / UPDATER_ASYNC_POLL_MS
+	; Give the download up to 600 seconds to complete — slow connections on
+	; large releases need more headroom than the old 120-second ceiling allowed.
+	MaxPolls := 600000 / UPDATER_ASYNC_POLL_MS
 	ready := false
 	failed := false
 	try {
