@@ -46,8 +46,7 @@
 
 _ULIG_ReadSource(RelPath) {
 	SplitPath(A_ScriptDir, , &WindowsDir)
-	SplitPath(WindowsDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . StrReplace(RelPath, "\", "/")
+	Path := StrReplace(WindowsDir, "\", "/") . "/" . StrReplace(RelPath, "\", "/")
 	return FileRead(Path)
 }
 

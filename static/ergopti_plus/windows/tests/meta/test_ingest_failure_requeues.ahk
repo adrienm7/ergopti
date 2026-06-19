@@ -40,9 +40,8 @@
 ; =====================================================
 
 _IFR_ReadSource(RelPath) {
-	; A_ScriptDir is tests/meta/; go up two levels to reach the driver root.
-	Root := A_ScriptDir . "\..\.."
-	return FileRead(Root . "\" . StrReplace(RelPath, "/", "\"))
+	SplitPath(A_ScriptDir, , &WindowsDir)
+	return FileRead(WindowsDir . "\" . StrReplace(RelPath, "/", "\"))
 }
 
 ; Extracts the body of the FileAppend catch block inside KL_IngestOnce.

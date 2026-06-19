@@ -32,8 +32,7 @@
 
 _DIPC_ReadSource(RelPath) {
 	SplitPath(A_ScriptDir, , &WindowsDir)
-	SplitPath(WindowsDir, , &Root)
-	Path := Root . "\" . StrReplace(RelPath, "/", "\")
+	Path := WindowsDir . "\" . StrReplace(RelPath, "/", "\")
 	return FileRead(Path)
 }
 
