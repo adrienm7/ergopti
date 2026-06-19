@@ -77,6 +77,11 @@ local _shortcuts  = nil
 local _gestures   = nil
 local _karabiner  = nil
 
+-- Pre-pause snapshots: only re-enable sub-systems that were active before the
+-- pause, so a user-disabled gesture or shortcut set stays off after unpause.
+local _gestures_were_enabled  = false
+local _shortcuts_were_running = false
+
 
 
 
@@ -126,6 +131,11 @@ end
 --- Uses pause_processing() on keymap so the script-control tap stays alive,
 --- allowing the user to un-pause without reloading.
 local function pause_all()
+	-- Snapshot which sub-systems are active so resume_all() can restore exactly
+	-- the pre-pause state rather than unconditionally re-enabling everything.
+	_gestures_were_enabled  = _gestures  and type(_gestures.is_enabled) == "function"  and _gestures.is_enabled()  or false
+	_shortcuts_were_running = _shortcuts and type(_shortcuts.is_bindings_started) == "function" and _shortcuts.is_bindings_started() or false
+
 	if _keymap and type(_keymap.pause_processing) == "function" then
 		pcall(function() _keymap.pause_processing() end)
 	end
@@ -160,17 +170,22 @@ local function pause_all()
 end
 
 --- Resumes all registered modules gracefully.
+--- Only re-enables sub-systems that were active before pause_all() was called.
 local function resume_all()
 	if _keymap and type(_keymap.resume_processing) == "function" then
 		pcall(function() _keymap.resume_processing() end)
 	end
-	if _shortcuts and type(_shortcuts.resume_bindings) == "function" then
-		pcall(function() _shortcuts.resume_bindings() end)
-	elseif _shortcuts and type(_shortcuts.start) == "function" then
-		pcall(function() _shortcuts.start() end)
+	if _shortcuts_were_running then
+		if _shortcuts and type(_shortcuts.resume_bindings) == "function" then
+			pcall(function() _shortcuts.resume_bindings() end)
+		elseif _shortcuts and type(_shortcuts.start) == "function" then
+			pcall(function() _shortcuts.start() end)
+		end
 	end
-	if _gestures and type(_gestures.enable_all) == "function" then
-		pcall(function() _gestures.enable_all() end)
+	if _gestures_were_enabled then
+		if _gestures and type(_gestures.enable_all) == "function" then
+			pcall(function() _gestures.enable_all() end)
+		end
 	end
 	if _karabiner and type(_karabiner.resume) == "function" then
 		pcall(function() _karabiner.resume() end)

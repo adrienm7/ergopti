@@ -306,6 +306,10 @@ function M.stop()
 	Logger.success(LOG, "Shortcuts bindings stopped.")
 end
 
+--- Returns true when bindings have been started and not yet stopped.
+--- @return boolean
+function M.is_started() return started end
+
 --- Enables a single named hotkey by running its factory function.
 --- @param name string The shortcut identifier.
 function M.enable(name)
