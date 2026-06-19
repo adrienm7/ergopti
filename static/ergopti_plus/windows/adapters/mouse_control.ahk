@@ -21,7 +21,7 @@
 ; MCGetMonitorBounds() returns a Map: { "left", "top", "right", "bottom" }
 ;
 ; COORDINATE SYSTEM:
-; All coordinates are absolute virtual-desktop pixels. SetPhysicalCursorPos
+; All coordinates are absolute virtual-desktop pixels. SetCursorPos
 ; via DllCall is used for setPos to bypass CoordMode and avoid relative offsets.
 ;
 ; FAIL-SAFE:
