@@ -719,6 +719,14 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 					end
 				end)
 				pcall(function() require("ui.menu.menu_llm").stop_mlx_server() end)
+				-- Flush keylogger before os.exit() — it bypasses hs.shutdownCallback
+				-- where the normal flush lives.
+				pcall(function()
+					local ok_kl, kl = pcall(require, "modules.keylogger")
+					if ok_kl and type(kl) == "table" and type(kl.stop) == "function" then
+						kl.stop()
+					end
+				end)
 				os.exit(0)
 			end)
 		end,
