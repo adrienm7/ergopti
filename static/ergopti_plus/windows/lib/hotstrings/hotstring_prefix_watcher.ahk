@@ -1140,6 +1140,10 @@ _PrefixCancelRender() {
 _PrefixRenderFlush() {
     global _PrefixWatcherSuppressed, HSE_Suppressed
     SetTimer(_PrefixRenderFlush, 0)   ; belt-and-suspenders: never re-fire on its own
+    ; A render queued just before suspend must not paint a preview while paused —
+    ; timer callbacks bypass native Suspend, so guard it explicitly.
+    if A_IsSuspended
+        return
     ; Skip while a send burst is in flight: TooltipShow is a ~20-55 ms Gui rebuild
     ; (Build + Present + DWM border) that pumps the message loop, so running it
     ; during an expansion could let the preview straddle the burst. The fire path
