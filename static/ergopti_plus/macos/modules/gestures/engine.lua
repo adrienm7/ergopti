@@ -900,6 +900,19 @@ function M.init(core_state, actions_mod)
 	Logger.success(LOG, "Gestures engine dependencies initialized.")
 end
 
+--- Stops the engine and releases the scroll-blocker eventtap.
+--- Must be called from gestures init.lua M.stop() so the tap is not left armed
+--- across reloads (N reloads without stop → N concurrent scroll eventtaps).
+function M.stop()
+	if scrollBlocker then
+		pcall(function() scrollBlocker:stop() end)
+		scrollBlocker = nil
+	end
+	_state   = nil
+	_actions = nil
+	Logger.done(LOG, "Gestures engine stopped.")
+end
+
 --- Registers a callback fired on every frame where at least one finger touches
 --- the trackpad. Pass nil to unregister.
 --- @param hook fun()|nil
