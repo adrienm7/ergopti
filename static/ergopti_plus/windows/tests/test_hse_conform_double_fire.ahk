@@ -101,9 +101,9 @@ TestConformDF_DeferredReleaseClearsSuppression() {
 	Assert(HSE_Suppressed > 0, "dispatch must suppress feeds during the burst")
 
 	; Pump the loop past HSE_SUPPRESS_RELEASE_DELAY_MS (60 ms) so the armed
-	; release timer actually runs. 150 ms gives 2.5× headroom over the 60 ms
+	; release timer actually runs. 500 ms gives ~8× headroom over the 60 ms
 	; timer — enough for CI schedulers with variable thread wake latency.
-	Sleep 150
+	Sleep 500
 	Assert(HSE_Suppressed == 0, "suppression should be cleared after 60ms timer")
 	
 	N := _Stub_RecordedSends.Length
