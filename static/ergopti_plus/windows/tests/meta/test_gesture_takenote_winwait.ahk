@@ -66,12 +66,12 @@ _GTN_WinWaitIsQualified() {
 	; Negative: bare WinWait on filename alone must not appear after Run()
 	; (TitleMatchMode 2 means any open window containing the filename matches)
 	RunIdx    := InStr(Body, "Run(")
-	BareWait  := InStr(Body, "WinWait(FileName,", RunIdx)
+	BareWait  := InStr(Body, "WinWait(FileName,", false, RunIdx)
 	Assert(BareWait = 0,
 		"GestureTakeNote must not use WinWait(FileName, ...) after Run() — any window with the filename in its title would match (gesture-takenote-winwait-unqualified)")
 
 	; Positive: WinWait must use NotepadMatch (which includes ahk_exe notepad.exe)
-	QualWait := InStr(Body, "WinWait(NotepadMatch,", RunIdx)
+	QualWait := InStr(Body, "WinWait(NotepadMatch,", false, RunIdx)
 	Assert(QualWait > 0,
 		"GestureTakeNote must use WinWait(NotepadMatch, ...) after Run() to restrict the wait to notepad.exe (gesture-takenote-winwait-unqualified)")
 }

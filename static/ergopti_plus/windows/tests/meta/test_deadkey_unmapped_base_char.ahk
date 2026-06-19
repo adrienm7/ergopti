@@ -73,7 +73,7 @@ _DKUBC_UnmappedKeyEmitsBaseChar() {
 	PkIdx   := InStr(Body, "SendNewResult(PressedKey)")
 	; PressedKey is sent in the if-branch too -- pick the occurrence AFTER the else
 	ElseIdx := InStr(Body, "} else {")
-	PkAfterElse := InStr(Body, "SendNewResult(PressedKey)", ElseIdx)
+	PkAfterElse := InStr(Body, "SendNewResult(PressedKey)", false, ElseIdx)
 	Assert(BaseIdx > 0 and PkAfterElse > 0 and BaseIdx < PkAfterElse,
 		"DeadKey else branch must emit Mapping[" . Chr(34) . " " . Chr(34) . "] before PressedKey (deadkey-unmapped-absorbs-base-char)")
 }

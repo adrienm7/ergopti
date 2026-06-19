@@ -7,7 +7,7 @@
 ; when TapHold["inherit_defaults"] is false.
 ;
 ; The bug: _TH_WriteTapHoldToml rewrote tap_hold.toml from the in-memory
-; TapHold map but never emitted the [tap_hold] root section with
+; TapHold map but never emitted the [tap_hold] WindowsDir section with
 ; inherit_defaults = false.  When the user disabled all tap-holds via the tray
 ; menu, _TH_WriteTapHoldDisabled wrote inherit_defaults = false once, but any
 ; subsequent individual key change via _TH_WriteTapHoldToml wiped that line.
@@ -35,8 +35,7 @@
 
 _TWHID_ReadSource(RelPath) {
 	SplitPath(A_ScriptDir, , &WindowsDir)
-	SplitPath(WindowsDir, , &Root)
-	Path := Root . "\" . StrReplace(RelPath, "/", "\")
+	Path := WindowsDir . "\" . StrReplace(RelPath, "/", "\")
 	return FileRead(Path)
 }
 
@@ -86,9 +85,9 @@ _TWHID_CheckWriterEmitsRootSection() {
 	Body := _TWHID_FuncBody(Src, "_TH_WriteTapHoldToml() {")
 	Assert(Body != "", "_TH_WriteTapHoldToml must be present in tap_hold_writer.ahk")
 
-	; Must emit a [tap_hold] root section (the header for the flag)
+	; Must emit a [tap_hold] WindowsDir section (the header for the flag)
 	Assert(InStr(Body, '"[tap_hold]"'),
-		"_TH_WriteTapHoldToml must emit the [tap_hold] root section when inherit_defaults is false")
+		"_TH_WriteTapHoldToml must emit the [tap_hold] WindowsDir section when inherit_defaults is false")
 }
 
 _TWHID_CheckLoaderReadsInheritDefaults() {
@@ -103,7 +102,7 @@ _TWHID_CheckLoaderReadsInheritDefaults() {
 Test("meta tap-hold-writer: _TH_WriteTapHoldToml emits inherit_defaults when false",
 	_TWHID_CheckWriterEmitsInheritDefaults)
 
-Test("meta tap-hold-writer: _TH_WriteTapHoldToml emits [tap_hold] root section for inherit_defaults",
+Test("meta tap-hold-writer: _TH_WriteTapHoldToml emits [tap_hold] WindowsDir section for inherit_defaults",
 	_TWHID_CheckWriterEmitsRootSection)
 
 Test("meta tap-hold-writer: tap_hold_loader reads inherit_defaults to skip default merging",
