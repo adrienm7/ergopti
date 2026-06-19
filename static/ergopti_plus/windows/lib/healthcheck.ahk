@@ -568,8 +568,8 @@ _HealthCheck_SysInfo() {
 		TmpFile := A_Temp . "\ergopti_githash_" . A_TickCount . "_" . A_PtrSize . ".txt"
 		Run(A_ComSpec . " /c git -C " . Chr(34) . A_ScriptDir . Chr(34)
 			. " rev-parse --short HEAD > " . Chr(34) . TmpFile . Chr(34), , "Hide")
-		Deadline := A_TickCount + 500
-		while (!FileExist(TmpFile) and A_TickCount < Deadline)
+		StartTick := A_TickCount
+		while (!FileExist(TmpFile) and ((A_TickCount - StartTick) & 0xFFFFFFFF) < 500)
 			Sleep(50)
 		if FileExist(TmpFile) {
 			GitHash := Trim(FileRead(TmpFile, "UTF-8"))

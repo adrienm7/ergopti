@@ -191,7 +191,7 @@ KL_Ergo_UpdateBlock(delay_ms, now, app, is_bs) {
     ; A gap >= BLOCK_BREAK_MS resets the block
     if (KLErgo.block_start > 0 and delay_ms >= KLErgoConst.BLOCK_BREAK_MS) {
         if KLErgo.block_warned {
-            block_ms := now - delay_ms - KLErgo.block_start
+            block_ms := (now - delay_ms - KLErgo.block_start) & 0xFFFFFFFF
             KL_LogErgoEvent("continuous_typing_block_end", KLErgo.block_app, Map(
                 "duration_ms",  block_ms,
                 "chars",        KLErgo.block_chars
@@ -200,8 +200,8 @@ KL_Ergo_UpdateBlock(delay_ms, now, app, is_bs) {
         ; Close any open flow window before discarding the block — without this the
         ; JSONL log is left with a dangling open-flow event that has no matching end
         if KLErgo.flow_active {
-            flow_dur := (now - delay_ms) - KLErgo.flow_start
-            block_ms_flow := (now - delay_ms) - KLErgo.block_start
+            flow_dur := (now - delay_ms - KLErgo.flow_start) & 0xFFFFFFFF
+            block_ms_flow := (now - delay_ms - KLErgo.block_start) & 0xFFFFFFFF
             wpm_flow := (block_ms_flow > 0)
                 ? Round((KLErgo.block_chars / 5) / (block_ms_flow / 60000), 1)
                 : 0
@@ -226,9 +226,9 @@ KL_Ergo_UpdateBlock(delay_ms, now, app, is_bs) {
 
     ; Warn once after BLOCK_WARN_MS in the same block
     if (!KLErgo.block_warned
-            and (now - KLErgo.block_start) >= KLErgoConst.BLOCK_WARN_MS) {
+            and ((now - KLErgo.block_start) & 0xFFFFFFFF) >= KLErgoConst.BLOCK_WARN_MS) {
         KLErgo.block_warned := true
-        block_ms := now - KLErgo.block_start
+        block_ms := (now - KLErgo.block_start) & 0xFFFFFFFF
         wpm := (block_ms > 0) ? Round((KLErgo.block_chars / 5) / (block_ms / 60000), 1) : 0
         KL_LogErgoEvent("continuous_typing_block", KLErgo.block_app, Map(
             "duration_ms", block_ms,
@@ -261,7 +261,7 @@ KL_Ergo_CheckFlow(now, app) {
     }
     ; Count chars in the last FLOW_WINDOW_MS window
     ; Approximation: use the block's running WPM
-    block_ms := now - KLErgo.block_start
+    block_ms := (now - KLErgo.block_start) & 0xFFFFFFFF
     if (block_ms < KLErgoConst.FLOW_WINDOW_MS)
         return
 
@@ -277,7 +277,7 @@ KL_Ergo_CheckFlow(now, app) {
     } else {
         if KLErgo.flow_active {
             KLErgo.flow_active := false
-            dur := now - KLErgo.flow_start
+            dur := (now - KLErgo.flow_start) & 0xFFFFFFFF
             KL_LogErgoEvent("flow_window_end", KLErgo.flow_app, Map(
                 "duration_ms", dur,
                 "wpm",         wpm

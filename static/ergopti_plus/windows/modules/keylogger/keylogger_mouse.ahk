@@ -176,7 +176,7 @@ KL_Mouse_OnLUp(*) {
         dx       := mx - KLMouse.lbtn_down_x
         dy       := my - KLMouse.lbtn_down_y
         dist     := Sqrt(dx*dx + dy*dy)
-        duration := A_TickCount - KLMouse.lbtn_down_tick
+        duration := (A_TickCount - KLMouse.lbtn_down_tick) & 0xFFFFFFFF
         KL_BumpMouseClick()
         filtered := false
         try filtered := MF_ShouldFilter()
@@ -221,7 +221,7 @@ KL_Mouse_OnRUp(*) {
         dx       := mx - KLMouse.rbtn_down_x
         dy       := my - KLMouse.rbtn_down_y
         dist     := Sqrt(dx*dx + dy*dy)
-        duration := A_TickCount - KLMouse.rbtn_down_tick
+        duration := (A_TickCount - KLMouse.rbtn_down_tick) & 0xFFFFFFFF
         KL_BumpMouseClick()
         filtered := false
         try filtered := MF_ShouldFilter()
@@ -363,7 +363,7 @@ KL_Mouse_FlushScroll() {
         return
     ; Use an async one-shot timer so context refresh doesn't block the hook thread
     try SetTimer(KL_Hook_RefreshContext.Bind(), -1)
-    duration_ms := A_TickCount - start
+    duration_ms := (A_TickCount - start) & 0xFFFFFFFF
     dir := (h_ticks != 0) ? "horizontal" : ((ticks > 0) ? "up" : "down")
     total := (h_ticks != 0) ? Abs(h_ticks) : Abs(ticks)
     velocity := (duration_ms > 0) ? Round(total / (duration_ms / 1000.0), 2) : 0
