@@ -2120,6 +2120,10 @@ BuildTrayMenuDeferred() {
     ; only the warm cache — the Critical span then covers ONLY the pure Win32
     ; Menu.Add / RegisterMenuItem pass that must be one uninterrupted block.
     _HS_PreScanPersonal()
+    ; Same rationale for the bundled-extensions scan: it does DirExist/Loop Files/
+    ; FileRead over the extensions tree. Warm its cache off-Critical too so the
+    ; under-Critical _HS_Extensions call hits only the warm cache.
+    _HS_PreScanExtensions()
     Critical("On")
     ; Clear the dispatch bypass Maps BEFORE the InitSubMenus()/initMenu()
     ; re-registration pass. AHK reuses freed menu-item IDs after Menu.Delete();
