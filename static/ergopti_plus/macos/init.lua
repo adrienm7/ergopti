@@ -948,26 +948,24 @@ hs.shutdownCallback = function()
 		pcall(gestures.restore_all_overrides)
 	end
 
-	-- 3. Stop Karabiner-Elements user-level helpers we spawned during priming.
-	-- IMPORTANT: use KILL_FAST_CMD (synchronous plain pkill, ~50 ms) — NOT the
-	-- async total-reset script. run_total_reset_async() spawns a detached 5-second
-	-- kill loop that survives hs.reload(): the new session launches the bridge,
-	-- but the zombie kill script from the old session immediately terminates it,
-	-- causing 30 consecutive poll failures. KILL_FAST_CMD completes before HS
-	-- reloads so there is no race with the newly spawned bridge.
-	-- Skip the KE teardown entirely on a reload: the root grabber reloads
-	-- karabiner.json via FSEvents, so killing the user-level bridge here would
-	-- needlessly drop remapping and, on some KE versions, cascade the grabber
-	-- down — surfacing the native "install Karabiner" prompt on the next boot.
-	-- Only a genuine quit (no reload sentinel) should stop remapping.
+	-- 3. Tear down the Karabiner-Elements bridge — but ONLY on a genuine quit.
+	-- Skip it entirely on a reload: the root grabber reapplies karabiner.json via
+	-- FSEvents, so killing the user-level bridge here would needlessly drop
+	-- remapping and, on some KE versions, cascade the grabber down — surfacing the
+	-- native "install Karabiner" prompt on the next boot. Only a genuine quit (no
+	-- reload sentinel) should stop remapping.
 	if reload_guard.is_reloading() then
 		Logger.info(LOG, "Reload in progress — leaving KE bridge alive (FSEvents will reapply the config).")
 	else
+		-- Genuine quit: use karabiner.kill(), which runs the launchctl BOOTOUT
+		-- (KILL_CMD) synchronously. A bare pkill (KILL_FAST_CMD) is respawned within
+		-- milliseconds by launchd's KeepAlive plist, so the keyboard would stay
+		-- remapped after HS has exited. kill() also gates on is_hs_owned_bridge,
+		-- leaving a user-managed KE setup untouched (a bare pkill killed it blindly).
 		pcall(function()
-			local ok_l, kl = pcall(require, "modules.karabiner.ke_lifecycle")
-			if ok_l and kl and kl.KILL_FAST_CMD then
-				hs.execute(kl.KILL_FAST_CMD)
-				Logger.info(LOG, "Shutdown KE fast kill done (genuine quit).")
+			if karabiner and type(karabiner.kill) == "function" then
+				karabiner.kill()
+				Logger.info(LOG, "Shutdown KE bridge torn down via bootout (genuine quit).")
 			end
 		end)
 	end
