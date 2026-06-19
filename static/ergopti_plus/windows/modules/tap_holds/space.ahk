@@ -69,7 +69,12 @@ SpaceTapHold(HoldFn) {
 	ih := InputHook("L1 T" . Round(InputTimeoutSec, 1))
 	ih.Start()
 	ih.Wait()
-	HoldFn.Call(ih.Input)
+	; Skip the modifier entirely when no key was captured (e.g. Space released
+	; before any chord key was pressed). Without this guard the modifier key is
+	; pressed and held until KeyWait resolves, producing a phantom modifier
+	; that can trigger accidental Ctrl/Shift/Alt shortcuts in the active window.
+	if (ih.Input != "" and ih.Input != " ")
+		HoldFn.Call(ih.Input)
 	KeyWait("SC039", "U T2")
 }
 
