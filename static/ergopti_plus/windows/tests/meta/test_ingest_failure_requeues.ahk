@@ -1,0 +1,115 @@
+﻿; tests/meta/test_ingest_failure_requeues.ahk
+
+; ==============================================================================
+; MODULE: Keylogger Ingest Failure Re-queue Meta Test
+; DESCRIPTION:
+; Regression guard for HIGH-04: fix-ingest-failure-requeues-pending.
+;
+; KL_IngestOnce atomically snapshots and clears _pending_entries under Critical
+; (lines 1349-1352 of keylogger.ahk) before the heavy SQL conversion and
+; data.sql FileAppend. If FileAppend fails, the catch block used to log and
+; return without re-queuing pending_snapshot onto _pending_entries.
+;
+; On 64-bit hosts, KL_JsonDecode is a no-op, so today.log (the JSONL disk pass)
+; yields zero decodable entries. The next tick therefore also sees an empty
+; entries array, advances the offset, and returns — the events that were only
+; in pending_snapshot are gone forever with no error logged.
+;
+; The fix adds a Critical-guarded re-queue in the catch block:
+;   for i, e in pending_snapshot
+;       Keylogger._pending_entries.InsertAt(i, e)
+; Today_log_offset is left unchanged so the next tick retries the same chunk.
+;
+; This test asserts:
+;   (a) The re-queue (InsertAt) appears inside the FileAppend catch block.
+;   (b) The re-queue is wrapped in Critical("On") / Critical("Off").
+;   (c) today_log_offset is NOT advanced inside the catch block.
+;
+; SCOPE: source introspection of modules/keylogger/keylogger.ahk.
+; ==============================================================================
+
+#Requires AutoHotkey v2.0
+
+
+
+
+; =====================================================
+; =====================================================
+; ======= 1/ Source scan helpers ======================
+; =====================================================
+; =====================================================
+
+_IFR_ReadSource(RelPath) {
+	; A_ScriptDir is tests/meta/; go up two levels to reach the driver root.
+	Root := A_ScriptDir . "\..\.."
+	return FileRead(Root . "\" . StrReplace(RelPath, "/", "\"))
+}
+
+; Extracts the body of the FileAppend catch block inside KL_IngestOnce.
+; Returns the substring from the catch opening brace to the matching close.
+_IFR_ExtractCatchBody(Src) {
+	; Locate the FileAppend line on data_sql_path.
+	FAPos := InStr(Src, "FileAppend(body, Keylogger.data_sql_path")
+	if (!FAPos)
+		return ""
+	; Find the catch keyword after the FileAppend.
+	CatchPos := InStr(Src, "catch as err {", , FAPos)
+	if (!CatchPos)
+		return ""
+	; Walk forward to find the matching closing brace.
+	depth := 0
+	i := CatchPos
+	Len := StrLen(Src)
+	while (i <= Len) {
+		ch := SubStr(Src, i, 1)
+		if (ch == "{")
+			depth++
+		else if (ch == "}") {
+			depth--
+			if (depth <= 0)
+				return SubStr(Src, CatchPos, i - CatchPos + 1)
+		}
+		i++
+	}
+	return SubStr(Src, CatchPos)
+}
+
+
+; ===================================================
+; ===================================================
+; ======= 2/ Test implementations ===================
+; ===================================================
+; ===================================================
+
+_IFR_CheckRequeueOnFailure() {
+	Src := _IFR_ReadSource("modules/keylogger/keylogger.ahk")
+	Assert(Src != "", "modules/keylogger/keylogger.ahk must be readable")
+
+	CatchBody := _IFR_ExtractCatchBody(Src)
+	Assert(CatchBody != "",
+		"FileAppend catch block on data_sql_path must be present in KL_IngestOnce")
+
+	; (a) Re-queue via InsertAt must be present in the catch block.
+	Assert(InStr(CatchBody, "InsertAt"),
+		"FileAppend catch block must re-queue pending_snapshot via InsertAt (HIGH-04 fix-ingest-failure-requeues-pending)")
+
+	; The re-queue must reference pending_snapshot entries.
+	Assert(InStr(CatchBody, "pending_snapshot"),
+		"FileAppend catch block must reference pending_snapshot to re-queue the consumed entries")
+
+	; (b) The re-queue must be wrapped in Critical to prevent a concurrent Push
+	;     from the keystroke hook from interleaving with the InsertAt.
+	Assert(InStr(CatchBody, 'Critical("On")'),
+		'FileAppend catch block must wrap the re-queue in Critical("On")')
+	Assert(InStr(CatchBody, 'Critical("Off")'),
+		'FileAppend catch block must wrap the re-queue in Critical("Off")')
+
+	; (c) today_log_offset must NOT be advanced in the catch block
+	;     (the next tick must retry the same chunk).
+	Assert(!InStr(CatchBody, "today_log_offset :="),
+		"FileAppend catch block must NOT advance today_log_offset — next tick must retry the same chunk")
+}
+
+
+Test("meta fix-ingest-failure-requeues-pending: FileAppend catch re-queues pending_snapshot onto _pending_entries",
+	_IFR_CheckRequeueOnFailure)

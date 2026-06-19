@@ -1427,10 +1427,17 @@ KL_IngestOnce(force := false) {
 
     try FileAppend(body, Keylogger.data_sql_path, "UTF-8")
     catch as err {
-        ; Ingest failure must not lose data — leave today_log_offset alone
-        ; so the next tick retries the same chunk. Log and bail.
+        ; Re-queue consumed entries so the next tick retries them.
+        ; On 64-bit hosts KL_JsonDecode is a no-op, so today.log is not a
+        ; fallback — pending_snapshot is the ONLY source of these events in RAM
+        ; and must be preserved across a transient data.sql write failure.
+        Critical("On")
+        for i, e in pending_snapshot
+            Keylogger._pending_entries.InsertAt(i, e)
+        Critical("Off")
+        ; Leave today_log_offset alone so the next tick retries the same chunk.
         if Keylogger.HasProp("log") && IsObject(Keylogger.log)
-            Keylogger.log.Error("Cannot append to data.sql: " . err.Message)
+            Keylogger.log.Error("Cannot append to data.sql: " . err.Message . " — " . pending_snapshot.Length . " entry(ies) re-queued.")
         return
     }
     Keylogger.today_log_offset := new_offset
