@@ -1356,27 +1356,6 @@ ToggleAllFeaturesOff(*) {
     ToggleAllFeatures(0)
 }
 
-_GlobalRestoreFactoryBindings() {
-    global GestureAssignments, GESTURE_SLOTS, GESTURE_FACTORY_DEFAULTS
-    global KeyboardShortcutAssignments, KEYBOARD_SHORTCUT_DEFAULTS
-    global ScriptShortcutAssignments, SCRIPT_SHORTCUT_SLOTS, SCRIPT_SHORTCUT_DEFAULTS
-    global CategoryEnabled, _ConfigDir, _AhkSubDir
-    if IsSet(GESTURE_FACTORY_DEFAULTS) {
-        for Slot in GESTURE_SLOTS
-            GestureAssignments[Slot] := GESTURE_FACTORY_DEFAULTS.Has(Slot) ? GESTURE_FACTORY_DEFAULTS[Slot] : "none"
-    }
-    for Slot, Action in KEYBOARD_SHORTCUT_DEFAULTS
-        KeyboardShortcutAssignments[Slot] := Action
-    for Slot in SCRIPT_SHORTCUT_SLOTS
-        ScriptShortcutAssignments[Slot] := SCRIPT_SHORTCUT_DEFAULTS[Slot]
-    for Category, _ in CategoryEnabled
-        CategoryEnabled[Category] := true
-    Path := _ConfigDir . _AhkSubDir . "tap_hold.toml"
-    try {
-        if FileExist(Path)
-            FileDelete(Path)
-    }
-}
 
 _GlobalClearAllBindings(&Updates) {
     global GestureAssignments, GESTURE_SLOTS, KeyboardShortcutAssignments, KEYBOARD_SHORTCUT_DEFAULTS, SCRIPT_SHORTCUT_SLOTS, ScriptShortcutAssignments, _IniCache
@@ -1429,27 +1408,9 @@ ToggleAllFeatures(Value) {
             }
         }
     }
-    if (!Bool) {
-        for TopKey, TopVal in Features {
-            if (Type(TopVal) == "Map")
+    for TopKey, TopVal in Features {
+        if (Type(TopVal) == "Map")
             EmitFlip(TopKey, TopVal)
-        }
-    } else {
-        for TopKey, TopVal in Features {
-            if (Type(TopVal) != "Map")
-                continue
-            for K, V in TopVal {
-                if (Type(V) == "Map") {
-                    if V.Has("enabled") and (Type(V["enabled"]) != "Map") {
-                        V["enabled"] := true
-                        Updates.Push({ Section: TopKey . "." . K, Key: "enabled", Value: true })
-                    }
-                } else {
-                    TopVal[K] := true
-                    Updates.Push({ Section: TopKey, Key: K, Value: true })
-                }
-            }
-        }
     }
     for Category, _ in CategoryEnabled {
         CategoryEnabled[Category] := Bool
@@ -1705,7 +1666,6 @@ _CollectFeatureUpdates(Updates, SectionPath, Node) {
 
 ReloadWithDefaultConfig(*) {
     global _ConfigDir, _AhkSubDir
-    _GlobalRestoreFactoryBindings()
     AhkDir := _ConfigDir . _AhkSubDir
     for FileName in ["config.toml", "tap_hold.toml", "api_entries.json"] {
         Path := AhkDir . FileName
@@ -2065,12 +2025,7 @@ _SuspendDrainPrefix() {
 ToggleSuspend(*) {
     _SuspendDrainPrefix()
     Suspend(-1)
-    UpdateTrayIcon()
-    global _LastSuspendState := A_IsSuspended
-    if A_IsSuspended
-        Ergopti_OnSuspendEnter()
-    else
-        Ergopti_OnSuspendResume()
+    _SuspendStateWatchdog()
 }
 Ergopti_OnSuspendEnter() {
     try TooltipHide("Suspend", true)

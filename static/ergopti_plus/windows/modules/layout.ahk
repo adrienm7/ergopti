@@ -468,18 +468,10 @@ RemapKey(ScanCode, Character, AlternativeCharacter := "") {
 ; entirely for _UIA_NO_TP_TTL_MS.  Covers apps (games, custom win32 controls)
 ; that never expose TextPattern — previously those paid the full COM cost on
 ; every wrap-eligible keystroke.
-;
-; _UIA_EMPTY_SEL_CACHE: when TextPattern is available but selection is empty,
-; skip re-querying for _UIA_EMPTY_SEL_TTL_MS.  80 ms is shorter than the
-; fastest human Ctrl+A → symbol sequence so a real selection is never missed.
-global _UIA_NO_TP_CACHE    := Map()  ; ProcessName → expiry tick (no TextPattern)
-global _UIA_EMPTY_SEL_CACHE := Map() ; ProcessName → expiry tick (empty selection)
+global _UIA_NO_TP_CACHE := Map()  ; ProcessName → expiry tick (no TextPattern)
 
 ; 30 s: generous re-probe window; reset automatically when the active app changes.
 _UIA_NO_TP_TTL_MS     := 30000
-; 80 ms: below fastest human Ctrl+A + symbol sequence.
-_UIA_EMPTY_SEL_TTL_MS := 80
-
 ; Returns the currently selected text via UIA TextPattern, or "" when:
 ; - UIA is unavailable
 ; - the focused element does not support TextPattern

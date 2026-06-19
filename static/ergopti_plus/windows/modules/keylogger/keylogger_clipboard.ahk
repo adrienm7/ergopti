@@ -159,7 +159,7 @@ KL_Clip_OnPaste() {
         return
 
     now := A_TickCount
-    copy_lag := (KLClip.last_copy_tick > 0) ? (now - KLClip.last_copy_tick) : -1
+    copy_lag := (KLClip.last_copy_tick > 0) ? ((now - KLClip.last_copy_tick) & 0xFFFFFFFF) : -1
 
     KL_AppendLog(Map(
         "type",         "clipboard_paste",
@@ -172,10 +172,9 @@ KL_Clip_OnPaste() {
     ; Burst detection
     KLClip.paste_ticks.Push(now)
     ; Prune ticks outside the window
-    cutoff := now - KLClipConst.PASTE_BURST_WINDOW_MS
     fresh := []
     for _, t in KLClip.paste_ticks {
-        if (t >= cutoff)
+        if (((now - t) & 0xFFFFFFFF) <= KLClipConst.PASTE_BURST_WINDOW_MS)
             fresh.Push(t)
     }
     KLClip.paste_ticks := fresh

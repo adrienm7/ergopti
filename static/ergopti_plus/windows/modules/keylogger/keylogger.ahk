@@ -531,20 +531,18 @@ KL_SaveState() {
 ; immediately followed by the id field. Returns 0 when no row matches (fresh
 ; device / empty file). Pure: takes the text, never reads the disk itself.
 KL_ScanMaxEventId(sql_text, device_id_lit) {
-    max_id := 0
-    if (sql_text = "" || device_id_lit = "")
+    ; O(1) search: the file is append-only, so the highest ID is always at the end.
+    ; Find the last occurrence of the device literal.
+    prefix := "VALUES (" . device_id_lit . ","
+    pos := InStr(sql_text, prefix, false, -1)
+    if (!pos)
         return 0
-    ; Anchor: "VALUES (" then the device literal, then ", " then the id digits.
-    ; RegExMatch with a start position walks every INSERT line in the body.
-    needle := "VALUES \(" . _KL_RegexEscape(device_id_lit) . ",\s*(\d+)"
-    pos := 1
-    while (found := RegExMatch(sql_text, needle, &m, pos)) {
-        id := Integer(m[1])
-        if (id > max_id)
-            max_id := id
-        pos := found + StrLen(m[0])
-    }
-    return max_id
+    
+    pos += StrLen(prefix)
+    if (RegExMatch(sql_text, "^\s*(\d+)", &m, pos))
+        return Integer(m[1])
+    
+    return 0
 }
 
 ; Escapes the RegEx metacharacters that can appear in a UUID SQL literal —

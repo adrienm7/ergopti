@@ -305,7 +305,14 @@ _LLMRemote_TrimAsyncRegistry() {
     global _LLM_Remote_Async, LLM_REMOTE_MAX_INFLIGHT
     if (_LLM_Remote_Async.Count < LLM_REMOTE_MAX_INFLIGHT)
         return
-    for oldest_id, oldest_entry in _LLM_Remote_Async {
+    oldest_id := 0x7FFFFFFFFFFFFFFF
+    for id in _LLM_Remote_Async {
+        if (id < oldest_id)
+            oldest_id := id
+    }
+    if !_LLM_Remote_Async.Has(oldest_id)
+        return
+    oldest_entry := _LLM_Remote_Async[oldest_id]
         ; Abort the live WinHTTP request so the COM object + socket are
         ; released now rather than lingering until WinHTTP's own timeout.
         if oldest_entry.Has("http")
