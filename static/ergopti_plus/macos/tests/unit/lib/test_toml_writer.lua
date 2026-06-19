@@ -245,3 +245,35 @@ helpers.describe("toml_writer.write: per-entry priority", function()
 			"an inherited entry must not carry a priority key")
 	end)
 end)
+
+
+-- ==========================================================================
+-- ==========================================================================
+-- ======= 2/ Format script path pattern ====================================
+-- ==========================================================================
+-- ==========================================================================
+
+helpers.describe("toml_writer: get_format_script_path uses correct repo-root pattern", function()
+	helpers.it("shared writer source uses 'static[/\\\\]' to strip path, not 'static[/\\\\]drivers[/\\\\]'", function()
+		-- The writer lives under static/ergopti_plus/shared/lua/toml_codec/.
+		-- The old gsub pattern `static[/\]drivers[/\].*` never matched that path,
+		-- so get_format_script_path() returned the full source path unchanged
+		-- instead of stripping back to the repo root.
+		local shared_writer_path = helpers.driver_root()
+			:gsub("[/\\]macos[/\\]?$", "")
+			.. "/shared/lua/toml_codec/writer.lua"
+		local fh = io.open(shared_writer_path, "r")
+		helpers.assert_true(fh ~= nil, "shared/lua/toml_codec/writer.lua must be readable")
+		local src = fh:read("*a"); fh:close()
+
+		-- Must NOT contain the old wrong pattern
+		helpers.assert_true(
+			src:find("static[^/\n]*drivers", 1, false) == nil,
+			"writer.lua must not reference 'static/.../drivers' in the repo-root strip pattern")
+
+		-- Must contain the correct pattern that strips from 'static/' onward
+		helpers.assert_true(
+			src:find('"static[', 1, true) ~= nil or src:find("'static[", 1, true) ~= nil,
+			"writer.lua must strip from 'static[/\\\\]' to reach the repo root")
+	end)
+end)
