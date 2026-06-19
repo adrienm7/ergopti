@@ -525,6 +525,9 @@ function M.build(ctx)
 				ext_name = ext_name,
 				hs       = hs,
 			}
+			-- Fall through to the real global environment for standard builtins
+			-- (string, math, table, pairs, …) not explicitly listed above.
+			setmetatable(sandbox, { __index = _G })
 			sandbox._G = sandbox
 
 			local ok_load, chunk_or_err = pcall(loadfile, menu_lua)
