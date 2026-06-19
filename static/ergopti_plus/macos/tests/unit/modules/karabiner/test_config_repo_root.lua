@@ -1,14 +1,18 @@
 --- tests/unit/modules/karabiner/test_config_repo_root.lua
 
---- Regression test for karabiner-gen-1: save_user_config() constructed the
---- repo-root path with the pattern "static/drivers/..." which no longer
---- matches the actual layout "static/ergopti_plus/macos/...". The gsub
---- returned the unchanged _script_dir (deep inside the tree), so
---- _format_script pointed nowhere and the TOML formatter never ran.
+--- Regression tests for karabiner/config.lua save_user_config path and
+--- run-loop blocking.
 ---
---- Fix: changed the pattern to "static/.*$" (strips everything from "static/"
---- onwards) so the repo root is correctly resolved regardless of the sub-path
---- under static/.
+--- Former bug (karabiner-gen-1): save_user_config built the repo-root path
+--- with the pattern "static/drivers/..." which never matched the real layout
+--- "static/ergopti_plus/macos/...". The gsub returned the unchanged script
+--- dir, so the format script path pointed nowhere.
+---
+--- Former bug (karabiner-gen-2): save_user_config called os.execute("python3
+--- format_toml.py ...") synchronously on every config save, blocking the
+--- Hammerspoon main run loop for 100-500 ms on each setter call.
+--- The formatter was cosmetic only — TomlCodec.encode already emits valid TOML.
+--- Fix: removed the synchronous os.execute call entirely.
 
 local helpers = require("tests.helpers")
 
@@ -17,25 +21,26 @@ local fh = io.open(src_path, "r")
 if not fh then error("config.lua not readable at: " .. src_path) end
 local src = fh:read("*a") ; fh:close()
 
--- Test 1: The old pattern that references the non-existent "drivers" sub-tree must be gone.
+-- Test 1: The old path pattern that referenced the non-existent "drivers" sub-tree must be gone.
 local has_old_pattern = src:find('"static[/\\\\]drivers[/\\\\]', 1, true) ~= nil
 helpers.assert_true(
 	not has_old_pattern,
-	'config.lua must not use "static/drivers/" pattern for repo-root (path never existed in this layout) (karabiner-gen-1)'
+	'config.lua must not use "static/drivers/" pattern for repo-root (path never existed in this layout)'
 )
 
--- Test 2: The corrected pattern that strips from "static/" onward must be present.
-local has_new_pattern = src:find('"static[/\\\\]', 1, true) ~= nil
+-- Test 2: save_user_config must not call os.execute with a Python formatter —
+-- that call blocked the run loop synchronously on every settings change.
+local has_sync_format = src:find('os.execute', 1, true) ~= nil
 helpers.assert_true(
-	has_new_pattern,
-	'config.lua must use "static/" pattern (without sub-path) for repo-root gsub (karabiner-gen-1)'
+	not has_sync_format,
+	'config.lua must not call os.execute (synchronous Python formatter blocks the run loop)'
 )
 
--- Test 3: The format script is still referenced via _repo_root (formatter path not hardcoded).
-local has_format_script = src:find('_repo_root .. "/tools/format_toml.py"', 1, true) ~= nil
+-- Test 3: The Python format_toml.py call must not be present.
+local has_format_py = src:find('format_toml.py', 1, true) ~= nil
 helpers.assert_true(
-	has_format_script,
-	'config.lua must build _format_script from _repo_root .. "/tools/format_toml.py" (karabiner-gen-1)'
+	not has_format_py,
+	'config.lua must not reference format_toml.py (formatter removed — TomlCodec already emits valid TOML)'
 )
 
 print("[PASS] test_config_repo_root")
