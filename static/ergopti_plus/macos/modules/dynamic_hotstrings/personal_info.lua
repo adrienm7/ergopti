@@ -340,7 +340,13 @@ local function interceptor(event, _km_buffer)
 	-- Handle backspace during collection
 	if kc == 51 then
 		if _state == STATE_COLLECTING then
-			if #_combo > 0 then
+			-- Alt+Backspace deletes an entire word on macOS, so trimming one char
+			-- from _combo would leave it out of sync with the actual screen content.
+			-- Reset to IDLE so the next @-trigger starts a clean collection.
+			if flags.alt then
+				_state = STATE_IDLE
+				_combo = ""
+			elseif #_combo > 0 then
 				_combo = _combo:sub(1, -2)
 			else
 				_state = STATE_IDLE
