@@ -40,7 +40,7 @@ local function get_format_script_path()
 	local _script_dir = _src:match("^(.*[/\\])")
 	-- Walk up from static/ergopti_plus/shared/lua/toml_codec/ to repo root
 	local _repo_root = _script_dir
-		:gsub("static[/\\]drivers[/\\].*$", "")
+		:gsub("static[/\\].*$", "")
 		:gsub("[/\\]$", "")
 	return _repo_root .. "/tools/format_toml.py"
 end
