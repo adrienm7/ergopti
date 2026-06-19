@@ -1113,6 +1113,15 @@ end
 --- @param source_variant string|nil Optional sub-type for UI rendering.
 --- @param deleted_text string|nil The text that will be erased by the backspaces.
 function M.notify_synthetic(text, source_type, deletes, source_variant, deleted_text)
+	-- When the keylogger is OFF there is no consumer for synth_queue (handle_key
+	-- returns at the is_enabled guard, so the idle-drain self-heal never runs).
+	-- Queuing here while disabled is pure leak/poison: the queue and the WPM window
+	-- grow unbounded across a session of hotstring use, and the FIRST real
+	-- keystrokes after the user later enables the keylogger get mis-tagged
+	-- synthetic against the stale head. Gate on is_enabled like the sibling
+	-- log_hotstring / log_llm. Expander notifies unconditionally on every expansion.
+	if not CoreState.is_enabled then return end
+
 	Logger.debug(LOG, "Queuing synthetic text from '%s' (%d delete(s), %d char(s))…",
 		source_type, deletes or 0, text and (utf8.len(text) or #text) or 0)
 
@@ -1439,6 +1448,14 @@ function M.start(script_control)
 
 	CoreState.is_enabled    = true
 	CoreState.last_flush_time = hs.timer.absoluteTime() / 1000000
+
+	-- Clear any synthetic-tracking state so a queue accumulated before this enable
+	-- (or left over from a prior session) cannot mis-tag the FIRST real keystrokes
+	-- as synthetic. notify_synthetic now gates on is_enabled, but the clear also
+	-- guards the stop→start cycle. Mirrors the teardown in M.stop.
+	CoreState.synth_queue        = {}
+	CoreState.recent_typing_eff  = {}
+	CoreState.recent_typing_phys = {}
 
 	-- Application watcher
 	if not _app_watcher then
