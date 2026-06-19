@@ -32,10 +32,18 @@
 
 #Requires AutoHotkey v2.0
 
-; Stub classes used by the callable-guard tests — must be top-level in AHK v2
+; Stub classes used by the callable-guard tests - must be top-level in AHK v2
 ; (classes inside functions are a parse error).
-class _GDB_Dummy { noop(dc, w, h) {} }
-class _GDB_B     { m(dc, w, h) {}    }
+class _GDB_Dummy {
+    noop(dc, w, h) {
+        return
+    }
+}
+class _GDB_B {
+    m(dc, w, h) {
+        return
+    }
+}
 
 
 
