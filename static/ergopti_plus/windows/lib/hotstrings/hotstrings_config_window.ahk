@@ -551,17 +551,16 @@ _HCW_LoadCurrent() {
 	_HCWWidgets.PriorityDefault.Value := PrioHint
 
 	; Color — find the preset whose hex matches, or inject the current hex on top.
+	; Rebuild the dropdown first, then re-query the index so the position is
+	; always derived from the current option list rather than a pre-rebuild snapshot.
 	ColorHex := Resolved.Color
-	Idx := _HCW_ColorIndexFor(ColorHex)
-	if (Idx == 0 and ColorHex != "") {
+	if (ColorHex != "" and !_HCW_HexInPresets(ColorHex))
 		_HCW_RebuildColorDropdown(ColorHex)
-		Idx := 1
-	} else if (Idx == 0) {
+	else
 		_HCW_RebuildColorDropdown("")
+	Idx := _HCW_ColorIndexFor(ColorHex)
+	if (Idx == 0)
 		Idx := 1
-	} else {
-		_HCW_RebuildColorDropdown("")
-	}
 	_HCWWidgets.ColorDD.Choose(Idx)
 	; ``Resolved.Color`` is now guaranteed non-empty by the resolver — when
 	; nothing is set anywhere, it returns the global default. Repaint BOTH
