@@ -1203,6 +1203,8 @@ _HS_CategoriesErgopti(M, _Cat) {
 global _PersonalExtTree := Map()
 global _ExtTotalPersonalCounterGlobal := { value: 0 }
 global _HS_PreScanPersonalCacheLoaded := false
+global _HS_ExtensionsCacheLoaded := false
+global _HS_ExtensionsCache := []
 
 ; Hard cap on how deep the recursive ext-toml scan descends. The scanned tree is
 ; a user-writable folder, so a directory junction/symlink pointing at an ancestor
@@ -1278,9 +1280,50 @@ _HS_PreScanPersonal() {
 }
 
 _HS_InvalidatePersonalCache() {
-	global _HS_PreScanPersonalCacheLoaded, _ParseExtTomlSectionsCache
+	global _HS_PreScanPersonalCacheLoaded, _ParseExtTomlSectionsCache, _HS_ExtensionsCacheLoaded
 	_HS_PreScanPersonalCacheLoaded := false
 	_ParseExtTomlSectionsCache := Map()
+	_HS_ExtensionsCacheLoaded := false
+}
+
+; Pre-scans the bundled extensions directory to build the extension data
+; so it is available for menu labels without doing file I/O under Critical.
+_HS_PreScanExtensions() {
+	global _StaticDir, _HS_ExtensionsCacheLoaded, _HS_ExtensionsCache
+	if _HS_ExtensionsCacheLoaded
+		return
+	ExtensionsBaseDir := _StaticDir . "\extensions\"
+	_HS_ExtensionsCache := []
+	if DirExist(ExtensionsBaseDir) {
+		Loop Files ExtensionsBaseDir . "*", "D" {
+			ExtId          := A_LoopFileName
+			ExtDir         := A_LoopFileFullPath
+			ManifestPath   := ExtDir . "\manifest.toml"
+			ExtDisplayName := ExtId
+			if FileExist(ManifestPath) {
+				try {
+					MC := FileRead(ManifestPath, "UTF-8")
+					if RegExMatch(MC, "name\s*=\s*" . Chr(34) . "([^" . Chr(34) . "]+)" . Chr(34), &NM)
+						ExtDisplayName := NM[1]
+				}
+			}
+			HsDir     := ExtDir . "\hotstrings\"
+			TomlFiles := []
+			if DirExist(HsDir) {
+				Loop Files HsDir . "*.toml" {
+					FileSections := _ParseExtTomlSections(A_LoopFileFullPath)
+					FileCount := 0
+					for _, FS in FileSections
+						FileCount += FS["count"]
+					SplitPath A_LoopFileFullPath, , , , &FileStem
+					TomlFiles.Push({ path: A_LoopFileFullPath, stem: FileStem
+						, sections: FileSections, count: FileCount })
+				}
+			}
+			_HS_ExtensionsCache.Push({ id: ExtId, name: ExtDisplayName, toml_files: TomlFiles })
+		}
+	}
+	_HS_ExtensionsCacheLoaded := true
 }
 
 _HS_GetOrCreateNode(Root, PathParts) {
@@ -1482,40 +1525,11 @@ _HS_RenderTree(Tree, ParentMenu) {
 
 ; Dynamic handler: bundled extension hotstrings.
 _HS_Extensions(M, _Cat) {
-	global _StaticDir
-	ExtensionsBaseDir := _StaticDir . "\extensions\"
-	BundledExtensions := []
-	ExtTotal := 0
-	if DirExist(ExtensionsBaseDir) {
-		Loop Files ExtensionsBaseDir . "*", "D" {
-			ExtId          := A_LoopFileName
-			ExtDir         := A_LoopFileFullPath
-			ManifestPath   := ExtDir . "\manifest.toml"
-			ExtDisplayName := ExtId
-			if FileExist(ManifestPath) {
-				try {
-					MC := FileRead(ManifestPath, "UTF-8")
-					if RegExMatch(MC, 'name\s*=\s*"([^"]+)"', &NM)
-						ExtDisplayName := NM[1]
-				}
-			}
-			HsDir     := ExtDir . "\hotstrings\"
-			TomlFiles := []
-			if DirExist(HsDir) {
-				Loop Files HsDir . "*.toml" {
-					FileSections := _ParseExtTomlSections(A_LoopFileFullPath)
-					FileCount := 0
-					for _, FS in FileSections
-						FileCount += FS["count"]
-					ExtTotal += FileCount
-					SplitPath A_LoopFileFullPath, , , , &FileStem
-					TomlFiles.Push({ path: A_LoopFileFullPath, stem: FileStem
-						, sections: FileSections, count: FileCount })
-				}
-			}
-			BundledExtensions.Push({ id: ExtId, name: ExtDisplayName, toml_files: TomlFiles })
-		}
-	}
+	global _HS_ExtensionsCache
+	; Use the pre-warmed cache so menu build never does file I/O here — the heavy
+	; DirExist/Loop Files/FileRead scan runs in _HS_PreScanExtensions off-Critical.
+	_HS_PreScanExtensions()
+	BundledExtensions := _HS_ExtensionsCache
 	if (BundledExtensions.Length == 0) {
 		EmptyLabel := t("menu.extensions.empty")
 		M.Add(EmptyLabel, (*) => NoAction())
