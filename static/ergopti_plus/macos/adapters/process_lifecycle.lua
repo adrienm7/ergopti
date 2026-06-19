@@ -144,8 +144,15 @@ function M.start()
 		end)
 	end)
 
-	_running = true
-	Logger.debug(LOG, "start(): watchers started.")
+	-- Only mark as running if at least one watcher was actually created.
+	-- If both pcalls failed (accessibility permission denied), leaving _running=true
+	-- would make every subsequent start() a no-op, permanently disabling app events.
+	if _app_watcher ~= nil or _window_filter ~= nil then
+		_running = true
+		Logger.debug(LOG, "start(): watchers started.")
+	else
+		Logger.warn(LOG, "start(): no watchers created — accessibility permission likely denied.")
+	end
 end
 
 --- Stops the application and window-focus watchers and releases their resources.
