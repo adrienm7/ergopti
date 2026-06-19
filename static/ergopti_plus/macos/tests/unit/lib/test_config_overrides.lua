@@ -126,3 +126,19 @@ end)
 if _ORIGINAL_SETTINGS then
 	_G.hs.settings = _ORIGINAL_SETTINGS
 end
+
+helpers.describe("config_overrides source: no {N} log placeholders", function()
+	-- Regression: Logger calls in config_overrides.lua used Python-style {1} / {2}
+	-- format placeholders instead of Lua's %s / %d. Logger.debug / Logger.start /
+	-- Logger.success passed those to string.format, which treated them as literal
+	-- brace-sequences and left them in the output — keys and paths were never shown.
+	helpers.it("source uses %s / %d placeholders, not {N}", function()
+		local src_path = helpers.driver_root() .. "lib/config_overrides.lua"
+		local fh = io.open(src_path, "r")
+		helpers.assert_true(fh ~= nil, "lib/config_overrides.lua must be readable")
+		local src = fh:read("*a"); fh:close()
+		helpers.assert_true(
+			src:find("{1}", 1, true) == nil and src:find("{2}", 1, true) == nil,
+			"config_overrides.lua must not use {N} log placeholders — use %s / %d instead")
+	end)
+end)
