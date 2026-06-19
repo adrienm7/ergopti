@@ -523,11 +523,6 @@ _LLM_PointerWatch_OnMoveTick(*) {
  */
 LLM_Bridge_OnAccept(text) {
 	global _LLM_Bridge_Buffer
-	; Delay (ms) before releasing the suppression and the synthetic flag.
-	; The TextSend below is asynchronous — keystrokes reach the InputHook a
-	; few ms later; releasing inline would re-enable observation before the
-	; injected characters have passed through.
-	static SYNTH_CLEAR_DELAY_MS := 80
 	; Mute the hotstring InputHook before injecting the prediction so the
 	; synthetic characters do not re-enter the engine and trigger false
 	; hotstring matches on the appended text.
@@ -536,20 +531,28 @@ LLM_Bridge_OnAccept(text) {
 	; Tag the auto-typed prediction as synthetic so the keylogger keeps it out
 	; of the manual `chars` count and attributes it to the LLM source (esrc).
 	try KL_MarkSynthetic("llm")
+	; Completion callback: runs after TextSend has finished emitting all
+	; keystrokes. Releasing the synthetic flag and the prefix-watcher
+	; suppression here (rather than on a fixed timer) ensures the guards are
+	; held for exactly as long as the injection is observable — even for
+	; multi-sentence predictions that take longer than 80 ms to drain.
+	; The callback also resyncs the LSC ring to the trailing chars of the
+	; injected text so dead-key and ellipsis decisions see the prediction's
+	; tail, not pre-prediction characters.
+	_InjectCallback := _LLM_Bridge_OnInjectComplete.Bind(text)
 	try {
-		TextSend(text, 0, 0)
+		TextSend(text, 0, _InjectCallback)
 		; Clear the stale pre-prediction HSE and prefix buffers — the cursor is
 		; now past the injected text, so accumulated context is no longer valid.
 		if IsSet(HSE_HardReset)
 			try HSE_HardReset()
 		if IsSet(_ResetPrefixBuffer)
 			try _ResetPrefixBuffer()
-	} finally {
-		; Deferred release so any characters still queued in the OS message loop
-		; are silently dropped before observation resumes.
+	} catch {
+		; Ensure suppression is always released even when TextSend throws.
+		try KL_ClearSynthetic()
 		if IsSet(PrefixWatcherSuppress)
-			SetTimer((*) => PrefixWatcherSuppress(false), -SYNTH_CLEAR_DELAY_MS)
-		SetTimer((*) => KL_ClearSynthetic(), -SYNTH_CLEAR_DELAY_MS)
+			try PrefixWatcherSuppress(false)
 	}
 	_LLM_Bridge_Buffer .= text
 	; Audit event — pairs with the llm_suggested event the engine emitted
@@ -569,4 +572,24 @@ LLM_Bridge_OnAccept(text) {
 	; an ``llm_dismissed`` event — we'd double-count this suggestion as
 	; both accepted AND dismissed.
 	LLM_Tooltip_Hide(true)
+}
+
+; Invoked by TextSend after all keystrokes for an accepted/injected prediction
+; have been emitted. Releases the keylogger synthetic flag and the prefix-watcher
+; suppression that were armed in LLM_Bridge_OnAccept before injection, and
+; resyncs the LSC ring to the trailing characters of the injected text.
+; @param {string} InjectedText - The prediction text that was injected.
+_LLM_Bridge_OnInjectComplete(InjectedText, *) {
+	try KL_ClearSynthetic()
+	if IsSet(PrefixWatcherSuppress)
+		try PrefixWatcherSuppress(false)
+	; Resync the last-sent-character ring so dead-key and ellipsis consumers
+	; see the prediction's tail rather than pre-prediction characters.
+	if IsSet(_LSCResetFrom) {
+		Tail := []
+		N := Min(StrLen(InjectedText), 5)
+		loop N
+			Tail.Push(SubStr(InjectedText, StrLen(InjectedText) - N + A_Index, 1))
+		try _LSCResetFrom(Tail)
+	}
 }
