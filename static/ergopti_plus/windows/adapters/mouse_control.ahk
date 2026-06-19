@@ -21,8 +21,10 @@
 ; MCGetMonitorBounds() returns a Map: { "left", "top", "right", "bottom" }
 ;
 ; COORDINATE SYSTEM:
-; All coordinates are absolute virtual-desktop pixels. SetCursorPos
-; via DllCall is used for setPos to bypass CoordMode and avoid relative offsets.
+; All coordinates are physical (DPI-unscaled) virtual-desktop pixels.
+; SetPhysicalCursorPos / GetPhysicalCursorPos are used so coordinates remain
+; consistent on high-DPI monitors without relying on the process DPI-awareness
+; mode or AHK's CoordMode setting.
 ;
 ; FAIL-SAFE:
 ; All OS calls are wrapped in try/catch. If the cursor or monitor cannot be
@@ -57,26 +59,27 @@ _MCZeroBounds() {
 ; ========================================
 ; ========================================
 
-; Moves the mouse cursor to an absolute virtual-desktop position.
-; Uses DllCall("SetCursorPos") to bypass AHK CoordMode for deterministic
-; behaviour regardless of any active CoordMode setting in the calling script.
-; @param X {Integer} Horizontal pixel coordinate.
-; @param Y {Integer} Vertical pixel coordinate.
+; Moves the mouse cursor to an absolute physical-pixel position.
+; Uses SetPhysicalCursorPos so the coordinates are DPI-unscaled and correct
+; on high-DPI monitors, independent of the process DPI-awareness mode or
+; any active AHK CoordMode setting.
+; @param X {Integer} Horizontal physical pixel coordinate.
+; @param Y {Integer} Vertical physical pixel coordinate.
 MCSetPos(X, Y) {
 	try {
-		DllCall("SetCursorPos", "Int", X, "Int", Y)
+		DllCall("SetPhysicalCursorPos", "Int", X, "Int", Y)
 	}
 }
 
-; Returns the current absolute cursor position.
-; Uses DllCall("GetCursorPos") instead of MouseGetPos so the result is always
-; in absolute virtual-desktop coordinates regardless of any active CoordMode setting.
+; Returns the current cursor position in physical pixels.
+; Uses GetPhysicalCursorPos so coordinates match what SetPhysicalCursorPos
+; writes, ensuring a set/get round-trip is lossless on high-DPI displays.
 ; @return {Map} { "x": Integer, "y": Integer } (both 0 on error).
 MCGetPos() {
 	local Info := _MCZeroPos()
 	try {
 		local POINT := Buffer(8, 0)   ; POINT struct = two 32-bit ints
-		DllCall("GetCursorPos", "Ptr", POINT)
+		DllCall("GetPhysicalCursorPos", "Ptr", POINT)
 		Info["x"] := NumGet(POINT, 0, "Int")
 		Info["y"] := NumGet(POINT, 4, "Int")
 	}
