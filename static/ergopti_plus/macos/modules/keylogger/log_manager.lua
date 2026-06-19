@@ -483,6 +483,13 @@ function M.ingest_once()
 	local entries, new_offset = Rotation.read_new_entries()
 	if #entries == 0 then return end
 
+	-- Snapshot the event-id counter BEFORE build_inserts allocates ids: if the
+	-- transaction below rolls back, the offset is not advanced and this exact batch
+	-- is re-read next tick — restoring the counter makes the retry reuse the same
+	-- ids so INSERT OR IGNORE dedups them, rather than re-keying with fresh ids and
+	-- leaving a permanent id gap (which desyncs a data.sql peer replay).
+	local saved_event_id = SqliteWriter.get_next_event_id()
+
 	local statements = {}
 	for _, item in ipairs(entries) do
 		for _, sql in ipairs(SqliteWriter.build_inserts(item.entry)) do
@@ -543,6 +550,9 @@ function M.ingest_once()
 	if not ok then
 		Logger.error(LOG, "Ingest batch rolled back: %s.", tostring(exec_err))
 		pcall(function() db:exec("ROLLBACK;") end)
+		-- Undo the event-id allocations from the rolled-back build_inserts so the
+		-- next retry of this same (offset-unchanged) batch reuses identical ids.
+		SqliteWriter.set_next_event_id(saved_event_id)
 		return
 	end
 
