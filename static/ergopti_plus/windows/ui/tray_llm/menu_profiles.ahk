@@ -495,6 +495,13 @@ LLM_Tray_GetProfileHotkeyHint(id) {
 	return ""
 }
 
+; Stable BoundFunc used as the HotIf predicate for all Ctrl+<n> profile
+; bindings. Allocating it once at module load means every call to
+; LLM_Tray_BindProfileHotkeys() reuses the SAME function reference. AHK v2
+; keyed HotIf contexts on the function reference: a fresh lambda on each call
+; would create a new context, orphaning the previous bindings and leaking them.
+global _LLM_PROFILE_HOTKEY_PRED := _LLM_Tray_IsProfileHotkeyActive.Bind()
+
 /**
  * Registers Ctrl+1 … Ctrl+9 globally so the user can switch profiles from
  * any focused app. Idempotent — calling this on every menu rebuild is safe
@@ -504,7 +511,7 @@ LLM_Tray_GetProfileHotkeyHint(id) {
  * apps expect).
  */
 LLM_Tray_BindProfileHotkeys() {
-	global LLM_PROFILE_HOTKEY_LIMIT
+	global LLM_PROFILE_HOTKEY_LIMIT, _LLM_PROFILE_HOTKEY_PRED
 	; Gate the Ctrl+<n> bindings on _LLM_Tray["enabled"] via HotIf so the
 	; OS never sees the binding when the feature is off — keystrokes pass
 	; through naturally to the active app (browsers, IDEs, …). Previously
@@ -513,7 +520,7 @@ LLM_Tray_BindProfileHotkeys() {
 	; held modifiers (Shift+Ctrl+1 etc.) and added a round-trip the active
 	; app could see as foreign input. The HotIf approach is the same one
 	; we already use for Tab + nav hotkeys further down in this file.
-	HotIf((*) => _LLM_Tray_IsProfileHotkeyActive())
+	HotIf(_LLM_PROFILE_HOTKEY_PRED)
 	loop LLM_PROFILE_HOTKEY_LIMIT {
 		idx := A_Index
 		key := "^" . idx
