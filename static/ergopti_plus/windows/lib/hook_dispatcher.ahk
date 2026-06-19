@@ -129,7 +129,7 @@ class HookDispatcher {
 	; @param event_type {String} One of the HookDispatcherConst.EVT_* values.
 	; @param callback_fn {Func} The function to call when the event fires.
 	static Register(event_type, callback_fn) {
-		Critical("On")
+		local _prev_crit := Critical("On")
 		try {
 			if !HookDispatcher._subscribers.Has(event_type)
 				HookDispatcher._subscribers[event_type] := Array()
@@ -149,7 +149,7 @@ class HookDispatcher {
 			LoggerDebug("HookDispatcher", "Subscriber registered for '{1}' (total: {2}).",
 				event_type, HookDispatcher._subscribers[event_type].Length)
 		} finally {
-			Critical("Off")
+			Critical(_prev_crit)
 		}
 	}
 
@@ -158,7 +158,7 @@ class HookDispatcher {
 	; @param event_type {String} The event type to unsubscribe from.
 	; @param callback_fn {Func} The function to remove.
 	static Unregister(event_type, callback_fn) {
-		Critical("On")
+		local _prev_crit := Critical("On")
 		try {
 			if !HookDispatcher._subscribers.Has(event_type)
 				return
@@ -174,7 +174,7 @@ class HookDispatcher {
 				}
 			}
 		} finally {
-			Critical("Off")
+			Critical(_prev_crit)
 		}
 	}
 
