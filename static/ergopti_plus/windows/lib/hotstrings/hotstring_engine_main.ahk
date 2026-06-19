@@ -1202,9 +1202,17 @@ _HSE_DispatchRawCallback(Spec, EndChar) {
     if !(Spec.HasOwnProp("Callback") and Spec.Callback) {
         return
     }
-    HSE_Suppress(true)
+    ; Route through PrefixWatcherSuppress when available — it delegates to
+    ; HSE_Suppress internally, so a SINGLE matched pair (true/false) keeps
+    ; HSE_Suppressed balanced at depth 1. The direct HSE_Suppress(true) path is
+    ; the fallback for contexts where the prefix watcher is not loaded (tools/,
+    ; standalone tests). Mixing both paths would double-increment HSE_Suppressed
+    ; to 2, requiring two release timers to fire — a timing assumption that breaks
+    ; in CI environments where timer ordering is not guaranteed.
     if IsSet(PrefixWatcherSuppress) {
         try PrefixWatcherSuppress(true)
+    } else {
+        HSE_Suppress(true)
     }
     try KL_MarkSynthetic("hotstring")
     try {
@@ -1229,9 +1237,13 @@ _HSE_DispatchRawCallback(Spec, EndChar) {
         if IsSet(_ResetPrefixBuffer) {
             try _ResetPrefixBuffer(true)
         }
-        SetTimer((*) => HSE_Suppress(false), -HSE_SUPPRESS_RELEASE_DELAY_MS)
+        ; Release via the same path used to suppress — a single matched pair keeps
+        ; HSE_Suppressed balanced. The PrefixWatcherSuppress path handles both the
+        ; prefix-watcher counter and HSE_Suppressed in one call.
         if IsSet(PrefixWatcherSuppress) {
             SetTimer((*) => PrefixWatcherSuppress(false), -HSE_SUPPRESS_RELEASE_DELAY_MS)
+        } else {
+            SetTimer((*) => HSE_Suppress(false), -HSE_SUPPRESS_RELEASE_DELAY_MS)
         }
         SetTimer((*) => KL_ClearSynthetic(), -HSE_SUPPRESS_RELEASE_DELAY_MS)
     }
@@ -1310,7 +1322,13 @@ HSE_DispatchMatch(Spec, EndChar) {
         }
     }
 
-    HSE_Suppress(true)
+    ; Route through PrefixWatcherSuppress when available — it delegates to
+    ; HSE_Suppress internally, so a SINGLE matched pair (true/false) keeps
+    ; HSE_Suppressed balanced at depth 1. The direct HSE_Suppress(true) path is
+    ; the fallback for contexts where the prefix watcher is not loaded (tools/,
+    ; standalone tests). Mixing both paths would double-increment HSE_Suppressed
+    ; to 2, requiring two release timers to fire — a timing assumption that breaks
+    ; in CI environments where timer ordering is not guaranteed.
     ; Mirror _HotstringDispatch's PrefixWatcherSuppress guard: mute the
     ; prefix watcher for the duration of the send burst so the backspaces
     ; and replacement characters do not pollute _PrefixBuffer and stale the
@@ -1319,6 +1337,8 @@ HSE_DispatchMatch(Spec, EndChar) {
     ; the pre-expansion context, causing incorrect tooltip lookups afterward.
     if IsSet(PrefixWatcherSuppress) {
         try PrefixWatcherSuppress(true)
+    } else {
+        HSE_Suppress(true)
     }
     ; Tag the backspace+replacement burst as synthetic so the keylogger keeps
     ; it out of the manual `chars` count and attributes the resulting n-grams
@@ -1446,9 +1466,13 @@ HSE_DispatchMatch(Spec, EndChar) {
         if IsSet(_ResetPrefixBuffer) {
             try _ResetPrefixBuffer(true)
         }
-        SetTimer((*) => HSE_Suppress(false), -HSE_SUPPRESS_RELEASE_DELAY_MS)
+        ; Release via the same path used to suppress — a single matched pair keeps
+        ; HSE_Suppressed balanced. The PrefixWatcherSuppress path handles both the
+        ; prefix-watcher counter and HSE_Suppressed in one call.
         if IsSet(PrefixWatcherSuppress) {
             SetTimer((*) => PrefixWatcherSuppress(false), -HSE_SUPPRESS_RELEASE_DELAY_MS)
+        } else {
+            SetTimer((*) => HSE_Suppress(false), -HSE_SUPPRESS_RELEASE_DELAY_MS)
         }
         ; Release the synthetic flag on the same flush window as the suppression
         ; — clearing inline would let trailing replacement keystrokes look manual.

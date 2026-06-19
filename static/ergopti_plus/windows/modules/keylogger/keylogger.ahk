@@ -1395,9 +1395,7 @@ KL_IngestOnce(force := false) {
         for _, entry in entries {
             for _, sql in KL_BuildInserts(entry)
                 statements.Push(sql)
-            ; Walk for aggregations (n-grams, bursts, sessions, …). The walker
-            ; accumulates into KLW.batch; we flush below as a single SQL block
-            ; appended to data.sql in the same transaction as the raw INSERTs.
+            ; Walk KLW aggregations (n-grams, bursts, sessions, …).
             try {
                 t := entry["type"]
                 if (t = "typing") {
