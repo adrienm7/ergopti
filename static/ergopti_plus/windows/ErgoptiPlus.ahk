@@ -2045,6 +2045,9 @@ Ergopti_OnSuspendEnter() {
     ; éteint" invariant). Re-armed from Ergopti_OnSuspendResume when the bridge
     ; is active.
     try _LLM_PointerWatch_Stop()
+    ; Cancel in-flight background update checks so a stale async callback cannot
+    ; surface a TrayTip or rebuild the menu while paused ("pause = tout éteint").
+    try _Updater_CancelAsyncChecks()
     try StopActivitySimulation()
     ; Reset OneShotShift so a shift armed just before suspension is not applied
     ; to the first keystroke after resume ("pause = tout éteint" invariant)
