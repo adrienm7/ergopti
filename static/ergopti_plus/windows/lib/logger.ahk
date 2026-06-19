@@ -120,6 +120,10 @@ global LOGGER_SUB_FILES_FALLBACK := [
 ; Resolved absolute paths for each sub-file (populated by LoggerInit).
 global _LOGGER_SUB_PATHS := Map()
 
+; Per-sub-file pending queues — keyed by sub-file name; drained by _LoggerFlush
+; alongside the main pending queue so fan-out lines are batched, not synchronous.
+global _LOGGER_SUB_PENDING := Map()
+
 ; Optional test sink — when set to a Callable, every emitted line is forwarded
 ; to it in addition to the ring buffer and pending-queue paths. Lets unit tests
 ; capture log output without filesystem I/O. Set via LoggerSetTestSink() and
@@ -193,6 +197,7 @@ LoggerInit() {
 ; sitting in the stdlib buffer — ``FileAppend`` provides no flush guarantee.
 _LoggerFlush(ForceFlush := false) {
 	global _LOGGER_PENDING, _LOGGER_PENDING_ERRORS, LOGGER_LOG_PATH, LOGGER_ERRORS_LOG_PATH
+	global _LOGGER_SUB_PENDING, _LOGGER_SUB_PATHS
 	; Prevent the timer from re-entering while we swap-and-drain the pending queues.
 	; Without Critical, a hotkey or OnMessage callback fired mid-swap could push a
 	; line into the OLD array reference that we have already captured — losing it.
@@ -242,6 +247,26 @@ _LoggerFlush(ForceFlush := false) {
 		} else {
 			try FileAppend(BlobErr, LOGGER_ERRORS_LOG_PATH, "UTF-8")
 		}
+	}
+
+	; Drain per-sub-file queues with a single FileAppend each, same batch approach
+	; as the main log, avoiding one FileAppend call per matching log line.
+	local _crit2 := Critical("On")
+	try {
+		SubSnap := _LOGGER_SUB_PENDING.Clone()
+		_LOGGER_SUB_PENDING := Map()
+	} finally {
+		Critical(_crit2)
+	}
+	for Name, Lines in SubSnap {
+		if !_LOGGER_SUB_PATHS.Has(Name)
+			continue
+		SubBlob := ""
+		for _, SLine in Lines {
+			SubBlob .= SLine . "`r`n"
+		}
+		if SubBlob != ""
+			try FileAppend(SubBlob, _LOGGER_SUB_PATHS[Name], "UTF-8")
 	}
 }
 
@@ -510,15 +535,17 @@ _LoggerInitSubFiles(LogDir) {
 ; "[LayoutShift]" matched against the full formatted log line — exact tag
 ; equality would never match because the line already wraps the tag in brackets.
 _LoggerFanOut(Tag, Line) {
-    global LOGGER_SUB_FILES, _LOGGER_SUB_PATHS
+    global LOGGER_SUB_FILES, _LOGGER_SUB_PATHS, _LOGGER_SUB_PENDING
     if !IsSet(_LOGGER_SUB_PATHS) or _LOGGER_SUB_PATHS.Count == 0 {
         return
     }
     for _, Entry in LOGGER_SUB_FILES {
         for _, Pat in Entry["tags"] {
             if InStr(Line, Pat, true) {   ; case-sensitive substring vs full line
-                SubPath := _LOGGER_SUB_PATHS[Entry["name"]]
-                try FileAppend(Line . "`r`n", SubPath, "UTF-8")
+                Name := Entry["name"]
+                if !_LOGGER_SUB_PENDING.Has(Name)
+                    _LOGGER_SUB_PENDING[Name] := []
+                _LOGGER_SUB_PENDING[Name].Push(Line)
                 break
             }
         }
