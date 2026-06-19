@@ -98,7 +98,8 @@ M.MOD_COMBOS = {}
 -- Hammerspoon session. hs.reload() re-requires all modules so this flag resets
 -- to false each time — but within a single boot a second M.init() call (e.g.
 -- from a menu "Reload") must not re-prompt the user.
-local _wizard_ran_this_session = false
+local _wizard_ran_this_session  = false
+local _layout_rebuild_timer     = nil  -- Stored so rapid layout changes cancel the pending rebuild
 
 -- Builds the minimal karabiner.json deployed on pause: the same profile structure
 -- as normal but carrying only `rules` (an empty list = full native keyboard). KE's
@@ -649,7 +650,12 @@ function M.init(file_system)
 		-- subsystem asynchronously after the notification fires. Without the delay,
 		-- key_code_for_char() would still read the previous layout's keycode map and
 		-- generate wrong physical keys in the Karabiner config.
-		hs.timer.doAfter(0.5, function()
+		if _layout_rebuild_timer then
+			pcall(function() _layout_rebuild_timer:stop() end)
+			_layout_rebuild_timer = nil
+		end
+		_layout_rebuild_timer = hs.timer.doAfter(0.5, function()
+			_layout_rebuild_timer = nil
 			local new_actions = Config.load_available_actions(ACTIONS_FILE)
 			if new_actions then M.AVAILABLE_ACTIONS = new_actions end
 
@@ -742,6 +748,10 @@ function M.stop()
 	end
 	if type(Watchers.stop_alt_tab_apps_tracker) == "function" then
 		Watchers.stop_alt_tab_apps_tracker()
+	end
+	if _layout_rebuild_timer then
+		pcall(function() _layout_rebuild_timer:stop() end)
+		_layout_rebuild_timer = nil
 	end
 	Watchers.stop_input_source_watcher()
 	Logger.success(LOG, "Karabiner bridge stopped.")
