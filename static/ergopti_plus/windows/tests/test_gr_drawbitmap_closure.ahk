@@ -32,7 +32,10 @@
 
 #Requires AutoHotkey v2.0
 
-
+; Stub classes used by the callable-guard tests — must be top-level in AHK v2
+; (classes inside functions are a parse error).
+class _GDB_Dummy { noop(dc, w, h) {} }
+class _GDB_B     { m(dc, w, h) {}    }
 
 
 
@@ -65,7 +68,6 @@ _GDB_TypeSemanticsCheck() {
 		"Old guard Type(closure)=='Func' must be FALSE — this is the root cause of CRIT-01")
 
 	; BoundFunc via ObjBindMethod
-	class _GDB_Dummy { noop(dc, w, h) {} }
 	bf := ObjBindMethod(_GDB_Dummy(), "noop")
 	Assert(Type(bf) == "BoundFunc",
 		"ObjBindMethod result must have Type 'BoundFunc'")
@@ -93,7 +95,6 @@ _GDB_CallableGuardLogic() {
 		"HasMethod guard must accept a Closure — this is the regression fix for CRIT-01")
 
 	; BoundFunc — must pass
-	class _GDB_B { m(dc, w, h) {} }
 	bf := ObjBindMethod(_GDB_B(), "m")
 	Assert(_check(bf),
 		"HasMethod guard must accept a BoundFunc")
