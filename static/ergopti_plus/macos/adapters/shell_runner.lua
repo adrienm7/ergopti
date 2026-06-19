@@ -67,7 +67,7 @@ end
 ---
 --- @param executable string Absolute path to the binary (e.g. "/usr/bin/curl").
 --- @param args        table  Array of string arguments (no shell expansion).
---- @param on_done     function|nil Completion callback: fn(task, exit_code, stdout).
+--- @param on_done     function|nil Completion callback: fn(exit_code, stdout, stderr).
 --- @param on_chunk    function|nil Streaming callback: fn(task, stdout_chunk, stderr_chunk).
 ---        When nil, the 3-argument hs.task.new() form is used (no streaming).
 --- @return table Handle with start() and terminate() methods.
@@ -77,6 +77,8 @@ function M.spawn(executable, args, on_done, on_chunk)
 
 	local function _safe_terminate()
 		if _task then
+			-- Release the GC pin before terminate() in case on_done never fires.
+			M._active_tasks[_task] = nil
 			pcall(function() _task:terminate() end)
 			_task = nil
 		end
@@ -94,10 +96,13 @@ function M.spawn(executable, args, on_done, on_chunk)
 	end
 
 	-- Wrap on_done to release the GC-root reference once the subprocess exits.
-	local function wrapped_on_done(task, exit_code, stdout, stderr)
-		M._active_tasks[task] = nil
+	-- hs.task completion callback signature is (exitCode, stdOut, stdErr) — no
+	-- task object is passed. Use the closure upvalue `_task` for the GC-pin release,
+	-- not the first argument (which would be the exit code integer).
+	local function wrapped_on_done(exit_code, stdout, stderr)
+		M._active_tasks[_task] = nil
 		if type(on_done) == "function" then
-			pcall(on_done, task, exit_code, stdout, stderr)
+			pcall(on_done, exit_code, stdout, stderr)
 		end
 	end
 

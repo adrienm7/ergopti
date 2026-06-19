@@ -463,6 +463,7 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 #Include meta/test_topo_checkvirtualdesktop_stale_prev_hwnd.ahk
 #Include meta/test_traymenu_separator_addstandard.ahk
 #Include meta/test_traymenu_setmenu_raw_add.ahk
+#Include meta/test_tap_hold_menu_register_dispatch.ahk
 #Include meta/test_ui_launch_error_msgbox_on_timer_thread.ahk
 #Include meta/test_uia_error_logged.ahk
 #Include meta/test_updater_focus_poll_suspend_guard.ahk
