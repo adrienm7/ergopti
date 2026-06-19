@@ -64,8 +64,22 @@ function M.read(path)
 	return result
 end
 
+--- Ensures all intermediate directories on the path exist.
+--- Walks up the directory chain and creates any missing nodes via hs.fs.mkdir.
+--- Silently succeeds when the full chain already exists.
+--- @param dir string Absolute directory path to create.
+local function ensure_dir(dir)
+	if not dir or dir == "" or dir == "/" then return end
+	-- Skip if the directory already exists
+	if hs.fs.attributes(dir, "mode") == "directory" then return end
+	-- Recursively ensure the parent exists first
+	local parent = dir:match("^(.+)/[^/]+$")
+	if parent and parent ~= dir then ensure_dir(parent) end
+	pcall(function() hs.fs.mkdir(dir) end)
+end
+
 --- Writes content to a file, overwriting any existing content.
---- Creates parent directories if hs.fs.mkdir is available.
+--- Creates parent directories when they do not exist.
 --- @param path    string Absolute path to the file.
 --- @param content string UTF-8 content to write.
 --- @return boolean true on success, false on any error.
@@ -77,6 +91,11 @@ function M.write(path, content)
 	content = type(content) == "string" and content or ""
 
 	local ok, result = pcall(function()
+		-- Guarantee parent directories exist; io.open("w") fails silently on a
+		-- fresh machine where the containing folder has never been created
+		-- (filesystem-adapter-missing-mkdir).
+		local dir = path:match("^(.+)/[^/]+$")
+		if dir then ensure_dir(dir) end
 		local fh, err = io.open(path, "w")
 		if not fh then
 			Logger.error(LOG, "write(): cannot open '%s' for writing — %s", path, tostring(err))
