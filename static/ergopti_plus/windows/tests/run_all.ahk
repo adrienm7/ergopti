@@ -616,6 +616,14 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 #Include meta/test_profile_hotkey_stable_pred.ahk
 #Include meta/test_updater_download_timeout.ahk
 #Include meta/test_mouse_control_physical_cursor.ahk
+#Include meta/test_crash_prompt_blocking_msgbox.ahk
+#Include meta/test_keyboard_shortcut_groups_register_dispatch.ahk
+#Include meta/test_changelog_fetch_async.ahk
+#Include meta/test_deferred_ext_scan_critical_file_io.ahk
+#Include meta/test_wpm_compact_color_validation.ahk
+#Include meta/test_backspace_repeat_suspend_guard.ahk
+#Include meta/test_prefix_render_flush_suspend_guard.ahk
+#Include meta/test_gesture_dispatch_logs_failure.ahk
 
 ; Watchdog: kill the process if RunTests() never returns (e.g. a corpus
 ; consumer blocks on a synchronous HTTP call, an InputHook with no timeout,

@@ -282,11 +282,11 @@ CrashReport_PromptUser(Report) {
 
 	if (FilePath != "") {
 		try LoggerSuccess("CrashReporter", "Crash report saved at '{1}'.", FilePath)
-		; Show only the path — no confirmation needed, report is local-only
-		MsgBox(FilePath, t("crash.report.saved_title"), "OK Iconi")
+		; Surface non-blocking — a modal MsgBox on the input thread starves the keyboard hook
+		try NotifierSend(FilePath, Map("title", t("crash.report.saved_title"), "level", "info"))
 	} else {
 		try LoggerWarn("CrashReporter", "Crash report could not be saved.")
-		MsgBox(t("crash.report.save_failed"), t("crash.report.saved_title"), "OK Icon!")
+		try NotifierSend(t("crash.report.save_failed"), Map("title", t("crash.report.saved_title"), "level", "warning"))
 	}
 }
 
