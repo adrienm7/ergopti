@@ -170,6 +170,15 @@ local function pause_all()
 	if _keymap and type(_keymap.reset_predictions) == "function" then
 		pcall(function() _keymap.reset_predictions() end)
 	end
+	-- Stop the LLM warmup retry chain. It runs on its own self-rescheduling timer
+	-- chain gated only on the LLM feature toggle (which pause does not change), so a cold-start
+	-- warmup in flight would keep POSTing to the backend through the pause —
+	-- reset_predictions() does not touch it. stop() bumps the warmup generation so
+	-- the next armed try_warmup self-discards. Require-guarded for stripped builds.
+	local ok_wc, wc = pcall(require, "modules.llm.warmup_controller")
+	if ok_wc and wc and type(wc.stop) == "function" then
+		pcall(function() wc.stop() end)
+	end
 	local ok_tt, tt = pcall(require, "ui.tooltip")
 	if ok_tt and tt and type(tt.hide_forced) == "function" then
 		pcall(function() tt.hide_forced() end)

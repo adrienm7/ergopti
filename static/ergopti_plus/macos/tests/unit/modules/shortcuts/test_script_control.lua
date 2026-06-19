@@ -516,3 +516,22 @@ helpers.describe("ScriptControl — physical F13/F14/F15 must not misfire pause/
 
 	SC.stop()
 end)
+
+
+helpers.describe("ScriptControl pause stops the LLM warmup retry chain (F-LOW-2)", function()
+	-- The warmup retry chain runs on its own hs.timer chain gated only on the LLM
+	-- feature toggle, which pause does not change — so a cold-start warmup in flight
+	-- kept POSTing to the backend through the pause (« pause = tout éteint »
+	-- violation). pause_all() must cancel it via warmup_controller.stop().
+	helpers.it("pause_all() invokes warmup_controller.stop()", function()
+		local stopped = 0
+		package.loaded["modules.llm.warmup_controller"] = { stop = function() stopped = stopped + 1 end }
+
+		SC.pause_all()
+		SC.resume_all()  -- restore the un-paused state for any later test
+
+		package.loaded["modules.llm.warmup_controller"] = nil
+		helpers.assert_true(stopped >= 1,
+			"pause_all must call warmup_controller.stop() so backend warmup POSTs stop during pause")
+	end)
+end)
