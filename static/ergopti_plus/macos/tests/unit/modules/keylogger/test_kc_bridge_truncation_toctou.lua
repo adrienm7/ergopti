@@ -40,4 +40,25 @@ helpers.assert_true(
 	"kc_bridge.lua must still truncate via io.open(KC_LOG_PATH, \"w\") when at EOF (keylogger-support-2)"
 )
 
+-- F-MED-2: the SPECIFIC re-query TOCTOU above was closed, but the reclaim still
+-- fired on EVERY drain-to-EOF and blind-wiped the whole file, losing any line KE
+-- appended in the close→reopen window. The fix (a) gates the reclaim on a size
+-- cap so it is rare, and (b) PRESERVES the unread tail instead of wiping it.
+
+-- Test 4: the reclaim must be cap-gated, not unconditional on `file_size > 0`.
+helpers.assert_true(
+	src:find("file_size > KC_LOG_MAX_BYTES", 1, true) ~= nil,
+	"kc_bridge.lua reclaim must be gated on `file_size > KC_LOG_MAX_BYTES` (F-MED-2)"
+)
+helpers.assert_true(
+	src:find("file_size > 0 then", 1, true) == nil,
+	"the old unconditional `file_size > 0` truncate-on-every-EOF must be gone (F-MED-2)"
+)
+
+-- Test 5: the reclaim must rewrite the preserved tail, not blind-wipe the file.
+helpers.assert_true(
+	src:find("fh_trunc:write(tail)", 1, true) ~= nil,
+	"kc_bridge.lua reclaim must rewrite the preserved tail so a concurrent KE append survives (F-MED-2)"
+)
+
 print("[PASS] test_kc_bridge_truncation_toctou")
