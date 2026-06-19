@@ -191,8 +191,13 @@ local _last_mouse_sec    = 0    -- wall clock of the last mouse/touchpad event
 -- Persisted across sessions via hs.settings so drag survives a Hammerspoon reload.
 local _SETTINGS_X = "ergopti.wpm_widget.pos_x"
 local _SETTINGS_Y = "ergopti.wpm_widget.pos_y"
-local _pos_x      = hs.settings.get(_SETTINGS_X)
-local _pos_y      = hs.settings.get(_SETTINGS_Y)
+-- Coerce with tonumber: a corrupt / hand-edited plist can return a STRING here,
+-- which is only guarded by `if not _pos_x` downstream (a non-empty string passes)
+-- and then flows into arithmetic (_pos_x + compact_w …) and hs.canvas geometry,
+-- raising in the timer/layout callback (swallowed to the HS Console). tonumber
+-- yields nil for a non-numeric value so the existing default-recompute fires.
+local _pos_x      = tonumber(hs.settings.get(_SETTINGS_X))
+local _pos_y      = tonumber(hs.settings.get(_SETTINGS_Y))
 
 -- Drag state.
 local _drag_start_mouse = nil
