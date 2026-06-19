@@ -125,8 +125,12 @@ LayerDispatch(SC, SymbolMap, *) {
 		return
 	}
 	if SHIFTED_LETTERS.Has(SC) {
-		Critical("On")   ; Serialize the letter emit like _RemapEmit
-		SendNewResult(SHIFTED_LETTERS[SC])
+		_AtCrit := Critical("On")   ; Serialize the letter emit like _RemapEmit
+        try {
+		    SendNewResult(SHIFTED_LETTERS[SC])
+        } finally {
+            Critical(_AtCrit)
+        }
 	}
 }
 

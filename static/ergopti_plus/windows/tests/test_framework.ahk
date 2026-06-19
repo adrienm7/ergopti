@@ -180,6 +180,9 @@ _TestPrint(Line) {
 RunTests() {
 	global TEST_REGISTRY, TEST_PASS_COUNT, TEST_FAIL_COUNT, _AHK_DRY_RUN
 	global TEST_RESULTS_FILE, TEST_RESULTS_CANONICAL
+    if (A_IsCritical != 0) {
+        throw Error("RunTests started with A_IsCritical=" . A_IsCritical)
+    }
 	if !IsSet(_AHK_DRY_RUN)
 		_AHK_DRY_RUN := false
 	; Per-process results path unless a runner already chose a custom file (e2e).
@@ -202,6 +205,10 @@ RunTests() {
 		Detail := ""
 		try {
 			TestEntry.callback.Call()
+            if (A_IsCritical != 0) {
+                Critical("Off") ; Reset for the next tests
+                throw Error("Test LEAKED Critical: " . TestEntry.name)
+            }
 		} catch as e {
 			Status := "not ok"
 			Detail := " — " . e.Message . " [" . e.File . ":" . e.Line . "]"
