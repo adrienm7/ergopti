@@ -105,7 +105,7 @@ class MetricsFocusCache {
 }
 
 MF_RefreshFocus() {
-    if (A_TickCount - MetricsFocusCache.state.last_at) < MF_FOCUS_TTL_MS
+    if ((A_TickCount - MetricsFocusCache.state.last_at) & 0xFFFFFFFF) < MF_FOCUS_TTL_MS
         return
     hwnd := 0
     try hwnd := WinGetID("A")
