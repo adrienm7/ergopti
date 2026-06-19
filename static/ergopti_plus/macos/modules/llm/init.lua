@@ -206,6 +206,10 @@ function M.auto_detect_backend(callback)
 		-- Prefer Ollama if both available, otherwise use MLX if available
 		if ollama_ok then
 			CoreState.backend = "ollama"
+			-- Ensure the Ollama daemon is running now that we know it is the active
+			-- backend — doing this at api_ollama require-time would launch Ollama for
+			-- MLX/API users who never selected it.
+			pcall(function() ApiOllama.ensure_running() end)
 		elseif mlx_ok then
 			CoreState.backend = "mlx"
 		else
@@ -416,6 +420,9 @@ function M.set_backend(backend)
 		CoreState.backend = backend
 		-- Prevent any future auto-detection from overwriting this explicit choice
 		CoreState.user_override_backend = true
+		if backend == "ollama" then
+			pcall(function() ApiOllama.ensure_running() end)
+		end
 	end
 end
 
