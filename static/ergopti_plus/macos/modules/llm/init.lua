@@ -15,6 +15,7 @@ local ApiOllama = require("modules.llm.api_ollama")
 local ApiMlx    = require("modules.llm.api_mlx")
 local ApiRemote = require("modules.llm.api_remote")
 local Logger    = require("lib.logger")
+local TimerScheduler = require("adapters.timer_scheduler")
 
 local LOG = "llm.core"
 
@@ -324,9 +325,17 @@ function M.persist_api_entries()
 	pcall(function() hs.settings.set(API_ENTRY_ID_KEY, ApiRemote.get_active_entry_id()) end)
 end
 
--- Restore persisted state before the first prediction can fire. ``hs.settings``
--- is synchronous and cheap, so we don't defer this off the require path.
-pcall(M.load_api_entries)
+-- Restore persisted state before the first prediction can fire. The hs.settings
+-- READ is cheap, but load_api_entries also DECRYPTS each keychain-referenced
+-- token via a BLOCKING `security find-generic-password` shell-out (and can raise
+-- a modal Keychain-unlock prompt). Running that synchronously on the require path
+-- blocked boot BEFORE the keyboard eventtap was even created — N stored entries =
+-- N blocking subprocess spawns, and a locked Keychain froze the whole run loop on
+-- a modal prompt. Defer it past tap creation with doAfter(0): it still runs on the
+-- very next run-loop tick, long before any keystroke can trigger a prediction, but
+-- no longer gates eventtap setup. Routed through the TimerScheduler adapter (not a
+-- raw timer call) per the module OS-API purity convention.
+TimerScheduler.after(0, function() pcall(M.load_api_entries) end)
 
 --- Primes the backend model and its KV cache with the active profile's system prompt.
 --- Must be called after both model and profile are configured; runs async so it does
