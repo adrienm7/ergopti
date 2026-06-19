@@ -165,9 +165,9 @@ _RegisterAltGrShortcutsHotkeys() {
     ; (SC138 & suffix) already use the keyboard hook; a leading ``$`` is invalid.
     opts := "I3"
     HotIf((*) => IsAltGrLAltEnabled() and IsRealAltGrPress())
-    Hotkey("SC138 & SC038", (*) => AltGrLAltShortcut(), opts)
+    try Hotkey("SC138 & SC038", (*) => AltGrLAltShortcut(), opts)
     HotIf((*) => IsAltGrCapsLockEnabled() and IsRealAltGrPress())
-    Hotkey("SC138 & SC03A", (*) => AltGrCapsLockShortcut(), opts)
+    try Hotkey("SC138 & SC03A", (*) => AltGrCapsLockShortcut(), opts)
     HotIf()
     _AltGrShortcutsRegistered := true
     LoggerSuccess("shortcuts", "AltGr shortcut combos registered.")
