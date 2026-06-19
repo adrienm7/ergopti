@@ -427,6 +427,7 @@ if Features["shortcuts"]["title_case"] {
         ; Pattern to detect if text is all uppercase (including accented), digits, spaces, and allowed symbols
         UpperCasePattern := "^[A-ZÉÈÀÙÂÊÎÔÛÇ0-9''\(\),.\-:;!?\s]+$"
 
+        try KL_MarkSynthetic("case-transform")
         if RegExMatch(Text, TitleCasePattern) {
             ; Text is Title Case -> convert to lowercase
             SendInstant(Format("{:L}", Text))
@@ -437,6 +438,7 @@ if Features["shortcuts"]["title_case"] {
             ; Otherwise, convert to TitleCase
             SendInstant(Format("{:T}", Text))
         }
+        SetTimer((*) => (try KL_ClearSynthetic()), -300)
     }
 }
 
@@ -451,11 +453,13 @@ if Features["shortcuts"]["uppercase"] {
         if (Text = "")
             return
         ; Check if the selected text contains at least one lowercase letter
+        try KL_MarkSynthetic("case-transform")
         if RegExMatch(Text, "[a-zà-ÿ]") {
             SendInstant(Format("{:U}", Text)) ; Convert to uppercase
         } else {
             SendInstant(Format("{:L}", Text)) ; Convert to lowercase
         }
+        SetTimer((*) => (try KL_ClearSynthetic()), -300)
     }
 }
 
