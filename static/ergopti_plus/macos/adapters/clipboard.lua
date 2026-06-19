@@ -71,11 +71,13 @@ function M.write(text)
 	return true
 end
 
---- Saves the current clipboard contents and returns them.
---- @return string|nil The saved clipboard text, or nil if empty or non-text.
+--- Saves ALL current clipboard data (all pasteboard types: text, images, files, etc.).
+--- Uses readAllData() so non-text content (images, RTF, file URLs) is preserved.
+--- Returns nil when the clipboard is empty; a truthy table otherwise.
+--- @return table|nil Pasteboard data table, or nil if empty.
 function M.save()
 	local ok, result = pcall(function()
-		return hs.pasteboard.getContents()
+		return hs.pasteboard.readAllData()
 	end)
 
 	if not ok then
@@ -83,24 +85,26 @@ function M.save()
 		return nil
 	end
 
-	if type(result) ~= "string" or result == "" then
+	-- readAllData() returns an empty table when clipboard is empty
+	if type(result) ~= "table" or next(result) == nil then
 		return nil
 	end
 
-	Logger.debug(LOG, "save(): %d char(s) saved from clipboard", #result)
+	Logger.debug(LOG, "save(): clipboard snapshot taken (%d type(s)).", #(result or {}))
 	return result
 end
 
 --- Restores the clipboard to a previously saved value.
 --- Clears the clipboard when saved is nil.
---- @param saved string|nil The text to restore, or nil to clear.
+--- Uses writeAllData() to restore all pasteboard types, not just text.
+--- @param saved table|nil The pasteboard data to restore, or nil to clear.
 --- @return boolean True on success, false on error.
 function M.restore(saved)
 	local ok, err = pcall(function()
 		if saved == nil then
 			hs.pasteboard.clearContents()
 		else
-			hs.pasteboard.setContents(saved)
+			hs.pasteboard.writeAllData(saved)
 		end
 	end)
 
