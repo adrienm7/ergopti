@@ -771,9 +771,15 @@ GesturePastePlain() {
             ; SendInstant's save/paste/deferred-restore guarantee.
             _SEND_INSTANT_CLIP_BUSY := true
             OldClip := ClipboardAll()
-            A_Clipboard := A_Clipboard
-            SendFinalResult("^v")
-            SetTimer(_GesturePastePlainRestore.Bind(OldClip), -SEND_INSTANT_PASTE_DELAY_MS)
+            try {
+                A_Clipboard := A_Clipboard
+                SendFinalResult("^v")
+                SetTimer(_GesturePastePlainRestore.Bind(OldClip), -SEND_INSTANT_PASTE_DELAY_MS)
+            } catch as e {
+                A_Clipboard := OldClip
+                _SEND_INSTANT_CLIP_BUSY := false
+                try LoggerError("gestures", "GesturePastePlain threw during paste — clipboard and guard restored: {1}.", e.Message)
+            }
         } else {
             SendFinalResult("^v")
         }
