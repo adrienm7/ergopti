@@ -1609,6 +1609,11 @@ KL_SchedulePasswordDetect(hwnd) {
 ; detection (including the 5-15 ms UIA round-trip) and commits the authoritative
 ; verdict to the cache.
 KL_AsyncPasswordDetect(hwnd) {
+    ; Timer callbacks fire even while the script is suspended. Skip detection
+    ; while suspended so UIA / Win32 round-trips do not run when the keylogger
+    ; is intentionally paused.
+    if A_IsSuspended
+        return
     Result := KL_DetectPasswordFor(hwnd)
     ; Commit through the publish-after-fill helper: last_hwnd is written LAST so
     ; the keystroke reader (a different pseudo-thread) can never see this hwnd
