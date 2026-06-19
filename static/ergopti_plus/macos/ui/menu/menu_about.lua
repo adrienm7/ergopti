@@ -158,12 +158,12 @@ local function download_to_file(url, dest, cb)
 			cb(false, i18n.get("menu.about.update.network_error"))
 			return
 		end
-		-- hs.http returns the body as a string; write it as raw bytes via hs.fs.
-		local ok, err = hs.fs.mkdir(hs.fs.pathComponent(dest, "parentDirectory") or "/tmp")
-		if not ok and err ~= "File exists" then
-			Logger.warn(LOG, "mkdir failed (non-fatal): %s", tostring(err))
-		end
 		-- Write binary via io.open in "wb" mode — safe for .zip payloads.
+		-- hs.fs.pathComponent(dest, "parentDirectory") does not exist in Hammerspoon's
+		-- hs.fs — calling it would throw inside the asyncGet callback (swallowed to
+		-- the HS Console), cb would never fire, and the update state machine would
+		-- stay stuck at "installing" forever. The dest path is always inside the
+		-- system temp dir which exists by definition, so no mkdir is needed.
 		local fh, ferr = io.open(dest, "wb")
 		if not fh then
 			Logger.error(LOG, "Cannot open %s for writing: %s.", dest, tostring(ferr))
@@ -193,7 +193,9 @@ local function replace_and_reload(zip_path, update_menu_fn)
 		return
 	end
 
-	local tmp_dir    = os.tmpname():gsub("[^/]+$", "ergopti_update_" .. os.time())
+	-- os.tmpname() creates an orphaned /tmp/lua_XXXXXX file as a side effect.
+	-- Use hs.fs.temporaryDirectory() to build the path without leaving a stray file.
+	local tmp_dir    = (hs.fs.temporaryDirectory() or "/tmp") .. "ergopti_update_" .. os.time()
 	local new_app    = tmp_dir .. "/" .. "ErgoptiPlus.app"
 	local backup_app = target .. ".bak"
 
@@ -276,7 +278,7 @@ local function one_click_update(channel, update_menu_fn)
 		Updater.set_update_state("installing")
 		update_menu_fn()
 		Logger.start(LOG, "Installing cached update %s…", cached.tag)
-		local zip_path = os.tmpname() .. "_ErgoptiPlus.app.zip"
+		local zip_path = (hs.fs.temporaryDirectory() or "/tmp") .. "ErgoptiPlus_" .. os.time() .. ".app.zip"
 		download_to_file(cached.zip_url, zip_path, function(ok, err)
 			if not ok then
 				dialog.block_alert(i18n.get("common.error_title"), err, i18n.get("button.ok"))
@@ -336,7 +338,7 @@ local function one_click_update(channel, update_menu_fn)
 		Updater.set_update_state("installing")
 		update_menu_fn()
 
-		local zip_path = os.tmpname() .. "_ErgoptiPlus.app.zip"
+		local zip_path = (hs.fs.temporaryDirectory() or "/tmp") .. "ErgoptiPlus_" .. os.time() .. ".app.zip"
 		download_to_file(zip_url, zip_path, function(ok, err)
 			if not ok then
 				dialog.block_alert(i18n.get("common.error_title"), err, i18n.get("button.ok"))
