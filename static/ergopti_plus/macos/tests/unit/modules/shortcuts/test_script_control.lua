@@ -39,6 +39,10 @@ package.loaded["modules.gestures.actions"] = {
   AX_NAMES = {}
 }
 
+-- Force a fresh adapters.key_state so it captures THIS file's hs stub (the F-CRIT-1
+-- sentinel guard delegates the live right-AltGr query to that adapter).
+package.loaded["adapters.key_state"] = nil
+
 local SC = helpers.load_with_stubs("modules.shortcuts.script_control")
 
 
@@ -434,4 +438,81 @@ helpers.describe("resume_all must not re-enable user-disabled gestures or shortc
 		helpers.assert_true(src:find("function M.is_started", 1, true) ~= nil,
 			"bindings.lua must expose M.is_started() for pre-pause state detection")
 	end)
+end)
+
+
+helpers.describe("ScriptControl — physical F13/F14/F15 must not misfire pause/reload/quit (F-CRIT-1)", function()
+	-- Root cause: the F13/F14/F15 SENTINEL keycodes ARE the real physical keycodes
+	-- of those keys (present on extended keyboards). handle_key dispatched them
+	-- UNCONDITIONALLY before any modifier check, so a bare F15 press fired
+	-- script_quit (os.exit + Karabiner teardown), F14 reloaded, F13 paused — with
+	-- no modifier. The fix requires a right-hand AltGr to be physically held — the
+	-- invariant of every genuine KE-emitted sentinel — so a stray function key (or
+	-- a LEFT-modifier + function key) is passed through instead of dispatched.
+
+	-- Spy on the centralized dispatcher: SC.dispatch_action routes every non-pause
+	-- action through GestActions.execute_single. Patch the SAME table SC captured
+	-- at require time so the reference resolves to our spy.
+	local dispatched
+	package.loaded["modules.gestures.actions"].execute_single = function(a) dispatched = a end
+
+	-- Capture the eventtap handler so we can drive handle_key directly.
+	local handler
+	local orig_new = _G.hs.eventtap.new
+	_G.hs.eventtap.new = function(_, fn)
+		handler = fn
+		return { start = function() end, stop = function() end, isEnabled = function() return true end }
+	end
+
+	-- Device-specific right/left modifier masks (mirror real macOS rawFlagMasks).
+	_G.hs.eventtap.event.rawFlagMasks = {
+		deviceRightCommand   = 0x10,
+		deviceRightAlternate = 0x40,
+		deviceLeftCommand    = 0x08,
+		deviceLeftAlternate  = 0x20,
+	}
+	-- Controllable live physical modifier state read by is_right_modifier_held().
+	local live_mods = { _raw = 0 }
+	_G.hs.eventtap.checkKeyboardModifiers = function() return live_mods end
+
+	-- log_shortcut_if_available() (reached only on dispatch) reads the frontmost
+	-- app title; the bare stub lacks :title(), so give it one (real hs.application
+	-- always exposes it).
+	_G.hs.application = _G.hs.application or {}
+	_G.hs.application.frontmostApplication = function() return { title = function() return "TestApp" end } end
+
+	SC.stop()              -- ensure no tap survives from an earlier describe
+	SC.start({}, {}, {}, nil)
+	_G.hs.eventtap.new = orig_new
+	helpers.assert_true(type(handler) == "function", "script-control tap handler must be captured")
+
+	-- F15_KARABINER_ESCAPE per the lib.keycodes stub above (0x6C) → escape slot → script_quit.
+	local ESCAPE_SENTINEL = 0x6C
+	local function make_event(code) return { getKeyCode = function() return code end } end
+
+	helpers.it("a bare physical F15 (no modifier held) does NOT dispatch and passes through", function()
+		dispatched = nil
+		live_mods = { _raw = 0 }
+		local consumed = handler(make_event(ESCAPE_SENTINEL))
+		helpers.assert_eq(dispatched, nil, "stray physical F15 must never dispatch a script-control action")
+		helpers.assert_eq(consumed, false, "stray physical F15 must pass through to the OS")
+	end)
+
+	helpers.it("F15 with a LEFT command held still does NOT dispatch", function()
+		dispatched = nil
+		live_mods = { _raw = 0x08 }  -- left command only
+		local consumed = handler(make_event(ESCAPE_SENTINEL))
+		helpers.assert_eq(dispatched, nil, "left-modifier + F15 is not a sentinel context")
+		helpers.assert_eq(consumed, false)
+	end)
+
+	helpers.it("a genuine sentinel (right AltGr physically held) DOES dispatch the bound action", function()
+		dispatched = nil
+		live_mods = { _raw = 0x40 }  -- right option held (KE-active: rcmd remapped to ropt)
+		local consumed = handler(make_event(ESCAPE_SENTINEL))
+		helpers.assert_eq(dispatched, "script_quit", "a genuine right-AltGr sentinel must dispatch its action")
+		helpers.assert_eq(consumed, true, "a genuine sentinel must be consumed")
+	end)
+
+	SC.stop()
 end)

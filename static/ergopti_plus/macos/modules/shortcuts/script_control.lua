@@ -27,6 +27,7 @@ local i18n          = require("lib.i18n")
 
 local Engine    = require("modules.gestures.engine")
 local GestActions = require("modules.gestures.actions")
+local KeyState  = require("adapters.key_state")
 
 local LOG = "shortcuts.script_control"
 
@@ -116,6 +117,26 @@ local function is_right_cmd_only(e)
 	local left_cmd  = masks.deviceLeftCommand  or 0
 	if right_cmd == 0 then return false end
 	return (raw & right_cmd) ~= 0 and (raw & left_cmd) == 0
+end
+
+--- Returns true when a right-hand AltGr modifier is physically held right now.
+---
+--- The F13/F14/F15 sentinel keycodes ARE the real physical keys on extended
+--- keyboards, so a bare F13/F14/F15 press is byte-identical (by keycode) to a
+--- KE-emitted sentinel and cannot be told apart by the event flags alone (the KE
+--- rule emits a bare key with no modifier — see karabiner/generator.lua
+--- build_script_control_sentinel_rules / build_paused_script_control_rules). The
+--- ONE invariant that always holds for a genuine sentinel and never for a stray
+--- function-key press is that the user is physically holding a right-hand AltGr
+--- at the moment the sentinel arrives (right_option when KE is active and has
+--- remapped right_command, right_command when KE is paused). The live modifier
+--- query is delegated to the KeyState adapter so this module performs no direct
+--- OS call. We read the LIVE state rather than the sentinel event's own flags
+--- because the two legitimate KE paths carry different (and sometimes no)
+--- modifier flags on the emitted event, whereas the physical AltGr is held in both.
+--- @return boolean True if a right command or right option is currently down.
+local function is_right_modifier_held()
+	return KeyState.is_right_altgr_held()
 end
 
 
@@ -264,18 +285,25 @@ local function handle_key(e)
 	local ok, code = pcall(function() return e:getKeyCode() end)
 	if not ok or type(code) ~= "number" then return false end
 
-	-- Primary path: sentinel keycodes from KE's script-control rules.
+	-- Primary path: sentinel keycodes from KE's script-control rules. These ARE
+	-- the physical F13/F14/F15 keycodes, so a bare function-key press on an
+	-- extended keyboard would otherwise dispatch pause/reload/QUIT with no
+	-- modifier. Require a right-hand AltGr to be physically held — the invariant
+	-- of every genuine KE sentinel — and pass a stray function key through.
 	if code == KEYCODE_BACKSPACE_SENTINEL then
+		if not is_right_modifier_held() then return false end
 		log_shortcut_if_available("Alt+Backspace")
 		dispatch_action(_key_actions.backspace)
 		return true
 	end
 	if code == KEYCODE_RETURN_SENTINEL then
+		if not is_right_modifier_held() then return false end
 		log_shortcut_if_available("Alt+Enter")
 		dispatch_action(_key_actions.return_key)
 		return true
 	end
 	if code == KEYCODE_ESCAPE_SENTINEL then
+		if not is_right_modifier_held() then return false end
 		log_shortcut_if_available("Alt+Escape")
 		dispatch_action(_key_actions.escape)
 		return true
