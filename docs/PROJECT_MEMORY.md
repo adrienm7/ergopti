@@ -160,8 +160,47 @@ In Lua, `local function f() ... uses x ... end` only captures `x` as an upvalue 
 - When a closure (especially an `hs.task`/`ShellRunner`/`hs.timer` callback) references a `local`, verify the `local` is declared ABOVE the closure. Hoist temp-file/state creation above the callbacks that consume it (mirror how `api_mlx.lua` is ordered).
 - Errors thrown inside `hs.task`/`hs.timer`/`hs.eventtap` callbacks are swallowed by their pcall wrapper to the HS Console, never the file logger — see [[project_hs_timer_callback_errors_invisible]]. A nil-global closure bug is therefore invisible at runtime; only careful reading or a behavioral test catches it.
 - Regression tests for this class must encode the ROOT CAUSE: assert the `local` declaration index is **before** the closure definition index in the source (`src:find("local tmp_path%s*=") < src:find("local function on_done(", 1, true)`), not merely that the using line exists. A string-grep that the call is present is a false-green.
+- **Specific pattern to watch in `hs.task` GC-pin management**: `local task = hs.task.new(... function() M._active_tasks[task] = nil end)` looks correct but binds nil. The fix is always the 2-line split: `local task; task = hs.task.new(...)` plus `if task then M._active_tasks[task] = nil end` inside the callback. Found in 9 additional sites in the 2026-06-20 audit: `modules/karabiner/onboarding.lua` (×4), `ui/menu/menu_apps.lua` (×1), `ui/menu/menu_llm/models_manager_mlx.lua` (×3), `ui/menu/menu_llm/models_manager_ollama.lua` (×1).
 
 Related: [[feedback_regression_tests]] (encode the root cause, not the symptom), [[project_hs_timer_callback_errors_invisible]] (why the throw was invisible), [[feedback_coding_style]] (fail-fast / no silent error swallowing).
+
+### project-hs-sentinel-key-misfire
+
+_F13/F14/F15 are real physical keys macOS can emit; using them as Karabiner synthetic sentinels without gating on the right-AltGr state fires `script_suspend`/`script_reload`/`script_quit` on a bare key press_
+
+<sub>slug: `project_hs_sentinel_key_misfire`</sub>
+
+The shortcuts module uses F13/F14/F15 as sentinel keycodes that Karabiner injects when the right-AltGr modifier is held. These are also real physical keys present on extended keyboards (or remapped by Karabiner profiles). Before the 2026-06-19 fix (commit `10065c106`), `handle_key` in `shortcuts/script_control.lua` dispatched the sentinel branches unconditionally — so pressing a physical F15 on a full-size keyboard with no AltGr held fired `script_quit`, silently killing the driver.
+
+**Why:** Invisible because: (a) no error is raised — the quit path runs cleanly; (b) `hs.eventtap` callback errors are swallowed to Console anyway. From the user's perspective the driver "just dies."
+
+**How to apply:**
+- Always gate sentinel branches on `KeyState.is_right_altgr_held()` (the adapter checks raw device-specific HID modifier masks, not the OS-level modifiers that can desync under Karabiner remapping).
+- Never use a key that the OS or hardware can emit natively as a sentinel without this gate. If Karabiner injects it, it should also be the one guarding it.
+- Regression test: `tests/unit/modules/shortcuts/test_script_control.lua` asserts the gate.
+
+Related: [[project_hs_timer_callback_errors_invisible]], [[project_lua_closure_before_local_nil_global]].
+
+---
+
+### project-hs-purity-ratchet-counts-comments
+
+_The `hs.*` purity ratchet in `test_port_adapter_coverage.lua` counts the substring `hs.` everywhere in source files — including comments and string literals — so a comment that mentions `hs.timer.new` increments the counter_
+
+<sub>slug: `project_hs_purity_ratchet_counts_comments`</sub>
+
+The OS-purity ratchet (`tests/meta/test_port_adapter_coverage.lua`) counts occurrences of the literal substring `hs.` in all `.lua` files under `modules/` and `lib/` (excluding `adapters/`, `ui/`, and root `init.lua`). It then asserts the total is ≤ 950. The grep is a raw substring count, not an AST parse — it counts comments.
+
+**Consequence:** Writing a comment like `-- Formerly used hs.timer.new directly` adds 1 to the count. If the baseline is exactly 950 and you add such a comment, the ratchet fails. Conversely, if you reword a comment to avoid `hs.` (e.g., `-- Formerly used the timer scheduler directly`), the count drops and the baseline stays at 950 — but it feels wrong to hide how the API is referenced in comments.
+
+**How to apply:**
+- Keep comments in `modules/` and `lib/` neutral about `hs.*` calls when possible. Route the OS call through an adapter and mention the adapter in the comment, not the raw `hs.` API.
+- If a comment genuinely needs to reference the `hs.` API name (e.g., documenting a foot-gun), accept the ratchet increment and update the baseline in the test with a brief note.
+- Current baseline: `hs.*` count = 950, `io.open`/`os.execute` count = 70.
+
+Related: [[project_lua_closure_before_local_nil_global]] (the audit where this was discovered).
+
+---
 
 ### feedback_commit_push
 
