@@ -512,6 +512,7 @@
 	"layout.ergoptialtgr": "Emuleer de AltGr-laag van de Ergopti-indeling",
 	"layout.ergoptibase": "Emuleer de basislaag van de Ergopti-indeling",
 	"layout.ergoptiplus": "Pas de kleine AltGr-wijzigingen van Ergopti➕ toe",
+	"layout.ctrlmagicsave": "Ctrl+★ stuurt Ctrl+S",
 	"llm.deps.browser_install_tip": "Download Ollama voor Windows van de pagina die net in je browser is geopend, voer het installatieprogramma uit en kom terug — de verbinding wordt automatisch gedetecteerd.",
 	"llm.deps.done_success": "✅ Ollama klaar",
 	"llm.deps.fail_server_not_responding": "Installatieprogramma beëindigd, maar de Ollama-server reageert niet.",

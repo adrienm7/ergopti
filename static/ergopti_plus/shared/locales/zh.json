@@ -512,6 +512,7 @@
 	"layout.ergoptialtgr": "模拟 Ergopti 布局的 AltGr 层",
 	"layout.ergoptibase": "模拟 Ergopti 布局的基础层",
 	"layout.ergoptiplus": "应用 Ergopti➕ 的 AltGr 小幅调整",
+	"layout.ctrlmagicsave": "Ctrl+★ 发送 Ctrl+S",
 	"llm.deps.browser_install_tip": "请从浏览器打开的页面下载 Windows 版 Ollama，运行安装程序后返回 — 连接将被自动检测。",
 	"llm.deps.done_success": "✅ Ollama 已就绪",
 	"llm.deps.fail_server_not_responding": "安装程序已退出，但 Ollama 服务器没有响应。",

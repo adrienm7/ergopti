@@ -512,6 +512,7 @@
 	"layout.ergoptialtgr": "Ergopti düzeninin AltGr katmanını taklit et",
 	"layout.ergoptibase": "Ergopti düzeninin temel katmanını taklit et",
 	"layout.ergoptiplus": "Ergopti➕'ın küçük AltGr değişikliklerini uygula",
+	"layout.ctrlmagicsave": "Ctrl+★, Ctrl+S gönderir",
 	"llm.deps.browser_install_tip": "Tarayıcınızda açılan sayfadan Windows için Ollama'yı indirin, yükleyiciyi çalıştırın ve buraya dönün — bağlantı otomatik olarak algılanacak.",
 	"llm.deps.done_success": "✅ Ollama hazır",
 	"llm.deps.fail_server_not_responding": "Yükleyici tamamlandı, ancak Ollama sunucusu yanıt vermiyor.",

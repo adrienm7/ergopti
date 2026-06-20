@@ -325,6 +325,11 @@
 			"type": "feature",
 			"path": "hotstrings.magic_key.replace",
 			"i18n": "menu.layout.replace"
+		},
+		{
+			"type": "feature",
+			"path": "ahk.layout.ctrl_magic_save",
+			"platforms": ["ahk"]
 		}
 	],
 	"accented_letters_group": [

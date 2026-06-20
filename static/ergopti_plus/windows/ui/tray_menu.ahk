@@ -789,9 +789,12 @@ _LAY_LayoutFeaturesBase(M, _Cat) {
 
 ; Dynamic handler: AltGr / digit-shift features (direct_access_digits,
 ; ergopti_alt_gr, ergopti_plus) — usable without the Ergopti base layer.
+; ctrl_magic_save is excluded here: it is placed explicitly at the bottom of
+; the layout menu, after the magic-key replace option it depends on.
 _LAY_LayoutFeaturesAltGr(M, _Cat) {
+	static STANDALONE_IDS := Map("ergopti_base", true, "ctrl_magic_save", true)
 	for _, LayoutEntry in ManifestFeaturesForSection("ahk.layout") {
-		if (LayoutEntry["id"] != "ergopti_base") {
+		if !STANDALONE_IDS.Has(LayoutEntry["id"]) {
 			MenuAddItemFromManifest(M, LayoutEntry, "Layout")
 		}
 	}

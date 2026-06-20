@@ -512,6 +512,7 @@
 	"layout.ergoptialtgr": "ErgoptiレイアウトのAltGr層をエミュレート",
 	"layout.ergoptibase": "Ergoptiレイアウトのベース層をエミュレート",
 	"layout.ergoptiplus": "Ergopti➕のマイナーなAltGr変更を適用",
+	"layout.ctrlmagicsave": "Ctrl+★ は Ctrl+S を送信",
 	"llm.deps.browser_install_tip": "ブラウザで開いたページから Windows 用 Ollama をダウンロードし、インストーラを実行してここに戻ってください。接続は自動的に検出されます。",
 	"llm.deps.done_success": "✅ Ollama 準備完了",
 	"llm.deps.fail_server_not_responding": "インストーラーが終了しましたが、Ollamaサーバーが応答しません。",

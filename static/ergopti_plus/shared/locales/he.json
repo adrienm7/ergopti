@@ -512,6 +512,7 @@
 	"layout.ergoptialtgr": "חיקוי שכבת ה-AltGr של פריסת Ergopti",
 	"layout.ergoptibase": "חיקוי השכבה הבסיסית של פריסת Ergopti",
 	"layout.ergoptiplus": "החל את שינויי ה-AltGr המינוריים של Ergopti➕",
+	"layout.ctrlmagicsave": "Ctrl+★ שולח Ctrl+S",
 	"llm.deps.browser_install_tip": "הורד את Ollama עבור Windows מהדף שנפתח בדפדפן, הפעל את תוכנת ההתקנה וחזור לכאן — החיבור יזוהה אוטומטית.",
 	"llm.deps.done_success": "✅ Ollama מוכן",
 	"llm.deps.fail_server_not_responding": "תוכנית ההתקנה סיימה אך שרת Ollama אינו מגיב.",
