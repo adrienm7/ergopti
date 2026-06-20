@@ -36,31 +36,24 @@
 ; =====================================
 
 _MetaCheckLlmTrayInitOrder() {
-	; Locate tray_menu.ahk relative to the tests/ directory.
-	SplitPath(A_ScriptDir, , &WindowsDir)
-	TrayMenuFile := WindowsDir . "\ui\tray_menu.ahk"
+	; Scope the check to initMenu()'s body (now in ui/menu/menu_init.ahk) via the
+	; location-independent driver-source helper, so the order assertion survives
+	; the menu decomposition. The reset must come before the LLM_Tray_Init() call.
+	Body := _DriverFuncBody("initMenu")
+	Assert(Body != "", "initMenu() must exist in the driver source")
 
-	try {
-		Body := FileRead(TrayMenuFile)
-	} catch {
-		return
-	}
-
-	; The fix requires that _LLM_Tray_InTray := false appears BEFORE the
-	; LLM_Tray_Init() call inside initMenu(). We verify by finding the byte
-	; offset of both strings: the reset must come first.
 	ResetPos := InStr(Body, "_LLM_Tray_InTray := false")
 	InitPos  := InStr(Body, "LLM_Tray_Init(")
 
 	Assert(ResetPos > 0,
-		"tray_menu.ahk must set _LLM_Tray_InTray := false before LLM_Tray_Init() "
+		"initMenu() must set _LLM_Tray_InTray := false before LLM_Tray_Init() "
 		. "to prevent the boot-time race condition that hides the IA menu entry")
 
 	Assert(InitPos > 0,
-		"tray_menu.ahk must call LLM_Tray_Init() — entry point not found")
+		"initMenu() must call LLM_Tray_Init() — entry point not found")
 
 	Assert(ResetPos < InitPos,
-		"_LLM_Tray_InTray := false must appear before LLM_Tray_Init() in tray_menu.ahk "
+		"_LLM_Tray_InTray := false must appear before LLM_Tray_Init() in initMenu() "
 		. "(found reset at offset " . ResetPos . ", LLM_Tray_Init at offset " . InitPos . ")")
 }
 

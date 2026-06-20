@@ -33,14 +33,6 @@
 ; ==================================================
 ; ==================================================
 
-; Reads a windows/-relative source file. A_ScriptDir is the runner dir (tests/);
-; its parent is the windows/ driver root.
-_PESUR_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
-}
-
 ; Returns the function body from its declaration to the first flush-left closing
 ; brace. Returns "" when the declaration is absent.
 _PESUR_FuncBody(Src, FuncDef) {
@@ -64,16 +56,15 @@ _PESUR_FuncBody(Src, FuncDef) {
 ; ==================================================
 
 _PESUR_HasDepthCapConstant() {
-	Src := _PESUR_ReadSource("ui/tray_menu.ahk")
+	Src := _DriverSourceConcat()
 	Assert(InStr(Src, "_HS_SCAN_MAX_DEPTH") > 0,
-		"tray_menu.ahk must define _HS_SCAN_MAX_DEPTH -- the recursive personal ext scan needs a depth cap so a directory cycle cannot stack-overflow the menu build")
+		"the driver source must define _HS_SCAN_MAX_DEPTH -- the recursive personal ext scan needs a depth cap so a directory cycle cannot stack-overflow the menu build")
 }
 Test("tray_menu: personal ext scan has a depth-cap constant (personal-ext-scan-unbounded-recursion)", _PESUR_HasDepthCapConstant)
 
 _PESUR_ScanHasCycleGuards() {
-	Src := _PESUR_ReadSource("ui/tray_menu.ahk")
 	Seg := _DriverFuncBody("_HS_PreScanPersonal")
-	Assert(Seg != "", "_HS_PreScanPersonal() declaration must exist in tray_menu.ahk")
+	Assert(Seg != "", "_HS_PreScanPersonal() declaration must exist in the driver source")
 	Assert(InStr(Seg, "_HS_SCAN_MAX_DEPTH") > 0,
 		"_HS_ScanExt must consult _HS_SCAN_MAX_DEPTH and stop descending past the cap")
 	Assert(InStr(Seg, "Visited") > 0,
@@ -82,9 +73,8 @@ _PESUR_ScanHasCycleGuards() {
 Test("tray_menu: _HS_ScanExt has depth + visited-set cycle guards (personal-ext-scan-unbounded-recursion)", _PESUR_ScanHasCycleGuards)
 
 _PESUR_TopLevelScanWrappedInTryCatch() {
-	Src := _PESUR_ReadSource("ui/tray_menu.ahk")
 	Seg := _DriverFuncBody("_HS_PreScanPersonal")
-	Assert(Seg != "", "_HS_PreScanPersonal() declaration must exist in tray_menu.ahk")
+	Assert(Seg != "", "_HS_PreScanPersonal() declaration must exist in the driver source")
 	; The top-level walk must be inside a try { ... } catch so a runaway/failed
 	; scan degrades to no extension hotstrings instead of crashing the build.
 	TryIdx := InStr(Seg, "try {")

@@ -33,14 +33,6 @@
 ; ==================================================
 ; ==================================================
 
-; Reads a windows/-relative source file. A_ScriptDir is the runner dir (tests/);
-; its parent is the windows/ driver root.
-_EBFD_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
-}
-
 ; Returns the function body from its declaration to the first flush-left closing
 ; brace. Returns "" when the declaration is absent.
 _EBFD_FuncBody(Src, FuncDef) {
@@ -64,9 +56,8 @@ _EBFD_FuncBody(Src, FuncDef) {
 ; ==================================================
 
 _EBFD_CatchFailsLoud() {
-	Src := _EBFD_ReadSource("ui/tray_menu.ahk")
 	Seg := _DriverFuncBody("_SC_Extensions")
-	Assert(Seg != "", "_SC_Extensions(SubMenu, _Cat) declaration must exist in tray_menu.ahk")
+	Assert(Seg != "", "_SC_Extensions declaration must exist in the driver source")
 	; The thrown-builder branch must log an ERROR, not merely a Warn the user
 	; never reads.
 	Assert(InStr(Seg, "LoggerError(" . Chr(34) . "Extensions") > 0,
@@ -75,9 +66,8 @@ _EBFD_CatchFailsLoud() {
 Test("tray_menu: extension builder failure logs an ERROR (ext-builder-fn-dynamic-call-swallow)", _EBFD_CatchFailsLoud)
 
 _EBFD_RendersVisibleErrorRow() {
-	Src := _EBFD_ReadSource("ui/tray_menu.ahk")
 	Seg := _DriverFuncBody("_SC_Extensions")
-	Assert(Seg != "", "_SC_Extensions(SubMenu, _Cat) declaration must exist in tray_menu.ahk")
+	Assert(Seg != "", "_SC_Extensions declaration must exist in the driver source")
 	; A failed/empty builder must produce a visible disabled marker built from a
 	; localised error prefix plus the ExtId, so it is not mistaken for an absent
 	; extension.
@@ -87,15 +77,15 @@ _EBFD_RendersVisibleErrorRow() {
 Test("tray_menu: extension builder failure shows a visible disabled row (ext-builder-fn-dynamic-call-swallow)", _EBFD_RendersVisibleErrorRow)
 
 _EBFD_ValidatesItemsPopulated() {
-	Src := _EBFD_ReadSource("ui/tray_menu.ahk")
+	Src := _DriverSourceConcat()
 	Seg := _DriverFuncBody("_SC_Extensions")
-	Assert(Seg != "", "_SC_Extensions(SubMenu, _Cat) declaration must exist in tray_menu.ahk")
+	Assert(Seg != "", "_SC_Extensions declaration must exist in the driver source")
 	; A builder may return without throwing yet populate nothing; the fix counts
 	; the items added and treats zero as a failure.
 	Assert(InStr(Seg, "_ExtMenuItemCount(") > 0,
 		"_SC_Extensions must validate the builder populated at least one item (via _ExtMenuItemCount) so a silently-empty submenu also surfaces the error marker")
 	; And the counting helper itself must exist.
 	Assert(InStr(Src, "_ExtMenuItemCount(MenuObj) {") > 0,
-		"tray_menu.ahk must define the _ExtMenuItemCount helper used to detect an empty extension submenu")
+		"the driver source must define the _ExtMenuItemCount helper used to detect an empty extension submenu")
 }
 Test("tray_menu: extension builder result is validated for emptiness (ext-builder-fn-dynamic-call-swallow)", _EBFD_ValidatesItemsPopulated)
