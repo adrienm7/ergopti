@@ -512,6 +512,7 @@
 	"layout.ergoptialtgr": "Emuluj warstwę AltGr układu Ergopti",
 	"layout.ergoptibase": "Emuluj warstwę bazową układu Ergopti",
 	"layout.ergoptiplus": "Zastosuj drobne zmiany AltGr Ergopti➕",
+	"layout.ctrlmagicsave": "Ctrl+★ wysyła Ctrl+S",
 	"llm.deps.browser_install_tip": "Pobierz Ollama dla Windows ze strony otwartej w przeglądarce, uruchom instalator i wróć tutaj — połączenie zostanie wykryte automatycznie.",
 	"llm.deps.done_success": "✅ Ollama gotowy",
 	"llm.deps.fail_server_not_responding": "Instalator zakończył działanie, ale serwer Ollama nie odpowiada.",

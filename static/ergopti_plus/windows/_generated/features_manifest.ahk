@@ -171,6 +171,7 @@ global FEATURES_MANIFEST := Map(
         Map("path", "ahk.layout.direct_access_digits", "id", "direct_access_digits", "section", "ahk.layout", "default", true, "type", "boolean", "description_key", "menu.layout.direct_access_digits", "platforms", ["ahk"]),
         Map("path", "ahk.layout.ergopti_alt_gr", "id", "ergopti_alt_gr", "section", "ahk.layout", "default", true, "type", "boolean", "description_key", "menu.layout.ergopti_alt_gr", "platforms", ["ahk"]),
         Map("path", "ahk.layout.ergopti_plus", "id", "ergopti_plus", "section", "ahk.layout", "default", true, "type", "boolean", "description_key", "menu.layout.ergopti_plus", "platforms", ["ahk"]),
+        Map("path", "ahk.layout.ctrl_magic_save", "id", "ctrl_magic_save", "section", "ahk.layout", "default", false, "type", "boolean", "description_key", "menu.layout.ctrl_magic_save", "platforms", ["ahk"]),
         Map("path", "ahk.shortcuts.open_downloads", "id", "open_downloads", "section", "ahk.shortcuts", "default", true, "type", "boolean", "description_key", "menu.ahk.shortcuts.open_downloads", "platforms", ["ahk"]),
         Map("path", "ahk.shortcuts.move", "id", "move", "section", "ahk.shortcuts", "default", true, "type", "boolean", "description_key", "menu.ahk.shortcuts.move", "platforms", ["ahk"]),
         Map("path", "ahk.shortcuts.screen", "id", "screen", "section", "ahk.shortcuts", "default", true, "type", "boolean", "description_key", "menu.ahk.shortcuts.screen", "platforms", ["ahk"]),

@@ -63,6 +63,7 @@ global _LegacyLayoutKeyMap := Map(
     "DirectAccessDigits", "direct_access_digits",
     "ErgoptiAltGr",       "ergopti_alt_gr",
     "ErgoptiPlus",        "ergopti_plus",
+    "CtrlMagicSave",      "ctrl_magic_save",
 )
 
 global _LegacyShortcutsBoolKeyMap := Map(

@@ -740,6 +740,11 @@ if Features["hotstrings"]["magic_key"]["replace"]["enabled"] {
 	MagicSrcScan := ScriptInformation["MagicKeySourceScan"]
 	MagicSrcChar := ScriptInformation["MagicKeySourceChar"]
 	RemapKey(MagicSrcScan, MagicSrcChar, ScriptInformation["MagicKey"])
+	if Features["layout"]["ctrl_magic_save"] {
+		; InputLevel 3 overrides the Ctrl+source-scan → "^★" binding
+		; that RemapKey installs at InputLevel 2, routing to Ctrl+S instead.
+		Hotkey("^" . MagicSrcScan, (*) => SendFinalResult("^s"), "I3")
+	}
 }
 
 ; Win + ★ opens the personal TOML hotstring editor.

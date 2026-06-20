@@ -1246,6 +1246,12 @@ default = true
 type = "boolean"
 description_key = "menu.layout.ergopti_plus"
 
+[[features.ahk.layout]]
+id = "ctrl_magic_save"
+default = false
+type = "boolean"
+description_key = "menu.layout.ctrl_magic_save"
+
 
 
 # =============================

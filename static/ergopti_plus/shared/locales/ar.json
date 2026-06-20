@@ -512,6 +512,7 @@
 	"layout.ergoptialtgr": "محاكاة طبقة AltGr لتخطيط Ergopti",
 	"layout.ergoptibase": "محاكاة الطبقة الأساسية لتخطيط Ergopti",
 	"layout.ergoptiplus": "تطبيق تعديلات AltGr الطفيفة لـ Ergopti➕",
+	"layout.ctrlmagicsave": "Ctrl+★ يُرسل Ctrl+S",
 	"llm.deps.browser_install_tip": "نزّل Ollama لنظام Windows من الصفحة التي فُتحت في متصفحك، شغّل المثبّت، ثم عُد إلى هنا — سيتم اكتشاف الاتصال تلقائيًا.",
 	"llm.deps.done_success": "✅ Ollama جاهز",
 	"llm.deps.fail_server_not_responding": "انتهى المثبّت لكن خادم Ollama لا يستجيب.",
