@@ -319,12 +319,11 @@ end
 --- @param pos table Current centroid position.
 --- @param now number Current timestamp.
 local function triggerLiveAxisIfNeeded(slot, pos, now, axis)
-	-- Do not fire live actions while gestures are disabled/paused. The commit
-	-- path already gates on _state.enabled; the low-latency live-fire path must
-	-- match it, otherwise a swipe performed while the script is paused still
-	-- executes real system actions (word_next, tab_next, …). Mirrors AHK, where
-	-- the gesture dispatch hotkeys are disarmed by native Suspend.
-	if not _state.enabled then return end
+	-- Do not fire live actions while gestures are disabled or pause-suspended. The
+	-- commit path gates on both axes; this live-fire path must match it, otherwise
+	-- a swipe performed while the script is paused still executes real system
+	-- actions (word_next, tab_next, …). Mirrors AHK native Suspend.
+	if not _state.enabled or _state.suspended then return end
 	if not slot or not _state.ga[slot] or _state.ga[slot] == "none" then return end
 	local action = _state.ga[slot]
 
@@ -468,9 +467,9 @@ local function commitGesture(now)
 		tostring(_state.enabled), gs.maxFingers, sp, ep, tostring(gs.lockedDir),
 		tostring(gs.liveAxisSign), gs.stepsCommitted, now - (gs.startTime or now))
 
-	if not _state.enabled or not gs.startPos or not gs.endPos then
-		Logger.warn(LOG, "commitGesture: SKIP (enabled=%s startPos=%s endPos=%s)",
-			tostring(_state.enabled), sp, ep)
+	if not _state.enabled or _state.suspended or not gs.startPos or not gs.endPos then
+		Logger.warn(LOG, "commitGesture: SKIP (enabled=%s suspended=%s startPos=%s endPos=%s)",
+			tostring(_state.enabled), tostring(_state.suspended), sp, ep)
 		return
 	end
 
@@ -659,7 +658,7 @@ function M.process_frame(touches)
 		return
 	end
 
-	if n >= 3 and _state and _state.enabled then startScrollBlock() end
+	if n >= 3 and _state and _state.enabled and not _state.suspended then startScrollBlock() end
 
 	if n >= 2 then
 		local pos = avgPos(touches)

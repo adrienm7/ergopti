@@ -33,15 +33,18 @@ helpers.describe("gestures.engine scroll-block — respects enabled flag (gestur
 		helpers.assert_true(fh ~= nil, "gestures/engine.lua must be readable")
 		local src = fh:read("*a"); fh:close()
 
-		-- Locate the n >= 3 branch that calls startScrollBlock.
-		local branch_pos = src:find("n >= 3 and _state and _state%.enabled", 1, false)
+		-- Locate the n >= 3 branch that calls startScrollBlock. The gate now also
+		-- checks _state.suspended so a paused engine cannot activate scroll-block
+		-- even if the user feature flag is true.
+		local branch_pos = src:find("n >= 3 and _state and _state%.enabled and not _state%.suspended", 1, false)
 		helpers.assert_true(branch_pos ~= nil,
-			"the n >= 3 startScrollBlock branch must contain '_state and _state.enabled' guard")
+			"the n >= 3 startScrollBlock branch must contain 'enabled and not suspended' guard")
 
 		-- Verify the guard precedes the call on the same line.
-		local guarded_call = src:find("n >= 3 and _state and _state%.enabled then startScrollBlock", 1, false)
+		local guarded_call = src:find(
+			"n >= 3 and _state and _state%.enabled and not _state%.suspended then startScrollBlock", 1, false)
 		helpers.assert_true(guarded_call ~= nil,
-			"startScrollBlock() must be gated by the full 'n >= 3 and _state and _state.enabled' expression")
+			"startScrollBlock() must be gated by the full enabled+suspended expression")
 	end)
 
 	helpers.it("source: stopScrollBlock() on n == 0 remains unconditional (guard must not be added there)", function()

@@ -156,6 +156,7 @@ M.AXIS_SLOTS = {
 
 local CoreState = {
 	enabled        = true,
+	suspended      = false,  -- set by pause/resume (separate from the user feature flag)
 	ga             = {},
 	modes          = {},
 	sensitivities  = {},
@@ -469,6 +470,21 @@ function M.disable_all() CoreState.enabled = false end
 function M.enable(name)  if name == "all" then CoreState.enabled = true  end end
 function M.disable(name) if name == "all" then CoreState.enabled = false end end
 function M.is_enabled()  return CoreState.enabled end
+
+-- Suspend/resume keep the user feature flag (enabled) intact while enforcing
+-- "pause = everything off". The engine gate checks BOTH axes: a gesture only
+-- fires when enabled==true AND suspended==false. This means toggling gestures
+-- ON/OFF via the menu during pause has the correct effect at resume — we never
+-- clobber the user's intent with a stale snapshot.
+function M.suspend()
+	CoreState.suspended = true
+	Logger.debug(LOG, "Gestures suspended (feature flag preserved).")
+end
+function M.resume()
+	CoreState.suspended = false
+	Logger.debug(LOG, "Gestures resumed.")
+end
+function M.is_suspended() return CoreState.suspended end
 
 -- Startup-phase timing.
 --
