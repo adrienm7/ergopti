@@ -65,16 +65,15 @@ Chemin identique d'un driver à l'autre → l'analogue se trouve au même endroi
 
 **But.** Rendre le manifest source unique **imposée**, et transformer l'`UnsetItemError` opaque (crash `ctrl_magic_save`, [layout.ahk:743]) en erreur nommée et actionnable.
 
-- [ ] Régénérer + commiter `windows/_generated/config_template.toml` (périmé — prouvé) — **commit séparé, AVANT le gate**.
-- [ ] Ajouter le script `codegen` parapluie (`build:manifest` + `build:domain` + tous les `codegen:*`) dans `package.json`.
-- [ ] Ajouter l'étape CI drift gate : `npm run codegen && git diff --exit-code` sur **tous** les artefacts générés trackés (les deux `_generated/`, `shared/lua/.../terminators_catalogue.lua`, `shared/ports/contracts.json`).
-- [ ] Corriger `tools/test/test-manifest-parity.cjs` : supprimer/réparer l'exclusion des flags `platforms=['ahk']` (le trou exact qui a laissé passer `ctrl_magic_save`).
-- [ ] **Nouveau** check statique node : tout site de lecture de feature (AHK + Lua) a une entrée manifest correspondante (couvre les flags ahk-only).
-- [ ] Accesseur AHK `FeatureEnabled(path)` / `FeatureValue(path)` (+ `FeatureSet(path,val)` pour les ~10 sites d'écriture) dans `lib/manifest_reader.ahk`. **🔴 LIT LA MAP `Features` LIVE** (mutée par `master_gates.ahk` + éditeurs), le manifest ne sert qu'à composer le message d'erreur nommé.
-- [ ] Remplacer les 31 lectures brutes `Features[..][..]` (23 dans l'entrée, 8 dans `layout.ahk`) par l'accesseur.
-- [ ] Régressions : (a) chemin inconnu → erreur **nommée** (pas `UnsetItemError`) ; (b) feature zéro-tée par un master gate → `false` **live** via l'accesseur.
+- [x] Régénérer + commiter `windows/_generated/config_template.toml` (périmé — prouvé) — commit séparé `fix(codegen): sync config_template + schema`. A aussi révélé que `config.schema.json` (hand-maintained) rejetait `ctrl_magic_save` → corrigé.
+- [x] Script `codegen` parapluie ajouté dans `package.json` (= `npm run build:domain`, qui régénère + vérifie).
+- [x] Drift gate CI : **existe déjà** dans `build:domain` (drift-check sur 8 fichiers générés + `contracts.json` via port-compliance), **et la CI le lance déjà** (`ci.yml:102`). Vérifié : il a bien attrapé le `config_template` périmé.
+- [x] **Nouveau** check statique `tools/test/test-feature-read-sites.js` : tout site de lecture `Features[...]` AHK (279 sites) résout contre la map construite depuis le manifest — couvre les flags ahk-only. Câblé dans `build:domain` (step 10) → tourne en CI.
+- [x] Régression : self-test **toujours actif** dans le guard, encode la classe de crash exacte — forme buggée `Features["ahk.layout"]["ctrl_magic_save"]` **rejetée**, forme correcte `Features["layout"][...]` **acceptée**, clé inconnue **rejetée**.
+- [x] `test-manifest-parity.cjs` laissé tel quel : son exclusion des flags `platforms=['ahk']` est **correcte** (la parité est cross-driver ; un flag ahk-only n'existe pas côté HS). Le trou réel — l'absence de contrôle interne des flags ahk-only — est désormais comblé par le guard ci-dessus.
+- [ ] ~~Accesseur AHK `FeatureEnabled/FeatureValue/FeatureSet` + conversion des sites~~ → **REPORTÉ en P4**. Raison : il y a **294** sites `Features[...]` (pas 31), beaucoup dans des `#HotIf ... IsSet(Features)` — une conversion de masse à l'aveugle (sans lancer le driver GUI) est risquée, et ajouter un accesseur dormant violerait §5.6 (pas de code mort). Le guard statique atteint l'objectif anti-crash sans toucher au runtime. La migration vers un accesseur fail-fast (lisant la **map live**) se fera dans P4 où l'entrée est réécrite et vérifiable.
 
-**Vérif.** Valeurs de flags byte-identiques pour tout chemin existant **après** `ApplyMasterGatesToFeatures` et après une écriture simulée ; drift gate vert ; retirer volontairement une entrée manifest → échec CI lisible (plus de crash runtime).
+**Vérif. ✅** `build:domain` 10/10 vert (guard inclus) ; `config_template` + schéma synchronisés ; suite node verte ; le guard distingue précisément la forme buggée de la forme correcte.
 
 ---
 
