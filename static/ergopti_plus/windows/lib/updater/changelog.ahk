@@ -268,15 +268,17 @@ _Updater_BuildChangelogGui(Json, Channel) {
 	BtnOpen.GetPos(, &btny, , &btnh)
 	RightPaneH := (btny + btnh) - lby
 
-	; Decide whether to use WebView2 for Markdown rendering.
-	UseWV := IsSet(WebView2) && FileExist(_VendorDir . "\64bit\WebView2Loader.dll")
+	; Decide whether to use WebView2 for Markdown rendering. Skip it (and use the
+	; native Edit fallback below) when free RAM is too low to absorb the cold start.
+	UseWV := IsSet(WebView2) && FileExist(_VendorDir . "\64bit\WebView2Loader.dll") && !WebView_ShouldUseNativeFallback()
 
 	; Placeholder control that occupies the right-pane slot; the WebView2
 	; control will be positioned on top of it after Gui.Show().
 	RightPane := G.Add("Text", "x+10 y" . lby . " w" . RightColW . " h" . RightPaneH, "")
 
 	; ── WebView2 controller (created after Show so the Hwnd is valid) ─────────
-	WVC := unset   ; controller reference, kept in closure scope
+	WVC := unset           ; controller reference, kept in closure scope
+	RightPaneEdit := unset ; native fallback Edit, populated when WebView2 is off
 
 	; Builds a self-contained HTML page that renders the given Markdown string.
 	; The JS renderer covers the Markdown subset used in GitHub release notes:
@@ -290,7 +292,7 @@ _Updater_BuildChangelogGui(Json, Channel) {
 	ShowBody := (md) => (
 		UseWV && IsSet(WVC)
 			? WVC.CoreWebView2.NavigateToString(MakeHtml(md))
-			: 0
+			: (IsSet(RightPaneEdit) ? (RightPaneEdit.Value := md) : 0)
 	)
 
 	OpenSelected := (*) => (
@@ -365,6 +367,22 @@ _Updater_BuildChangelogGui(Json, Channel) {
 				; Empty-state: pass an empty string so the JS renderer shows the centred message.
 				ShowBody("")
 			}
+		}
+	}
+
+	; Native fallback: a selectable read-only Edit over the right-pane slot, showing
+	; the raw Markdown. Used when WebView2 is unavailable or free RAM is too low.
+	if (!UseWV) {
+		RightPane.GetPos(&rpx, &rpy, &rpw, &rph)
+		RightPaneEdit := G.Add("Edit", "x" . rpx . " y" . rpy . " w" . rpw . " h" . rph
+			. " ReadOnly +Multi -Wrap +VScroll", "")
+		RightPaneEdit.SetFont("s9", "Consolas")
+		if (HasReleases) {
+			Lb.Choose(1)
+			ShowBody(Releases[1].Body)
+			_Updater_RefreshInstallBtn(BtnInstall, Releases, 1, IsLocal)
+		} else {
+			ShowBody(t("updater.changelog_empty"))
 		}
 	}
 }

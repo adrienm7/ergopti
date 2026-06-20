@@ -41,6 +41,35 @@ WebView_SharedEnvironment(loader) {
 }
 
 
+; Below this much free physical RAM (MiB), a WebView window that has a native
+; equivalent skips the Edge/Chromium cold start and uses that native view
+; instead. Chromium needs real headroom to boot; on a thrashing machine the cold
+; start costs many seconds, so a plain native view beats a styled WebView that
+; takes a minute to appear. Tunable -- raise it to prefer native more often,
+; lower it to prefer the richer WebView.
+global WEBVIEW_MIN_AVAIL_RAM_MB := 1536
+
+; Returns available physical RAM in MiB, or -1 when the OS query fails.
+WebView_AvailRamMb() {
+	MemStatus := Buffer(64, 0)
+	NumPut("UInt", 64, MemStatus, 0)   ; dwLength -- required before the call
+	if !DllCall("GlobalMemoryStatusEx", "Ptr", MemStatus)
+		return -1
+	return NumGet(MemStatus, 16, "UInt64") / 1048576   ; ullAvailPhys
+}
+
+; True when free RAM is too low to comfortably boot Chromium, so a WebView window
+; should use its native fallback. An unknown reading never gates (returns false),
+; leaving the WebView path to be attempted as before.
+WebView_ShouldUseNativeFallback() {
+	global WEBVIEW_MIN_AVAIL_RAM_MB
+	Avail := WebView_AvailRamMb()
+	if Avail < 0
+		return false
+	return Avail < WEBVIEW_MIN_AVAIL_RAM_MB
+}
+
+
 ; Helper to clear stale WebView2 user-data profile directories.
 ; Call immediately before DirCreate(udir) and after controller.Close()/Gui.Destroy().
 WebView_SweepStaleProfiles(prefix) {
