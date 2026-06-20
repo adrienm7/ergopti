@@ -8,7 +8,7 @@ local prefs   = helpers.load_with_stubs("ui.menu.preferences")
 local codec   = helpers.load_with_stubs("lib.toml_codec")
 
 local function contract_path()
-	return helpers.driver_root() .. "../shared/llm/menu_persistence_contract.json"
+	return helpers.shared("llm/menu_persistence_contract.json")
 end
 
 local function load_contract_entry(id)

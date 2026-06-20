@@ -29,8 +29,7 @@ local helpers = require("tests.helpers")
 -- ==========================================
 
 -- Resolve shared/lua path relative to the driver root
-local driver_root = helpers.driver_root()
-local shared_lua  = driver_root .. "../shared/lua/"
+local shared_lua  = helpers.shared("lua/")
 
 -- Prepend shared/lua/ to the Lua package path so require("llm.xxx") resolves
 local orig_path = package.path

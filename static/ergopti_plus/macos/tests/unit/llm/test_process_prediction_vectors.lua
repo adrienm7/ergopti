@@ -23,13 +23,12 @@ package.loaded["lib.logger"] = nil
 helpers.load_with_stubs("lib.logger")
 
 -- Put shared/lua on the path so require("llm.parser") resolves to the oracle.
-local driver_root = helpers.driver_root()
-local shared_lua  = driver_root .. "../shared/lua/"
+local shared_lua  = helpers.shared("lua/")
 package.path = shared_lua .. "?.lua;" .. shared_lua .. "?/init.lua;" .. package.path
 
 local parser = require("llm.parser")
 
-local corpus_path = driver_root .. "../shared/tests/corpus/llm/process_prediction_vectors.json"
+local corpus_path = helpers.shared("tests/corpus/llm/process_prediction_vectors.json")
 
 
 

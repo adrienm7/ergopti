@@ -23,8 +23,7 @@ local helpers = require("tests.helpers")
 package.loaded["lib.logger"] = nil
 local _ = helpers.load_with_stubs("lib.logger")
 
-local driver_root = helpers.driver_root()
-local defaults_path = driver_root .. "../shared/hotstrings/defaults.toml"
+local defaults_path = helpers.shared("hotstrings/defaults.toml")
 
 --- Build a unique writable temp path (the module itself creates the file).
 local function temp_path(name)

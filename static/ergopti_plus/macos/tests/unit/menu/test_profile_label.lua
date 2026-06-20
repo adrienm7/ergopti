@@ -28,7 +28,7 @@ local ProfileLabel = require("ui.menu.menu_llm.profile_label")
 --- @param code string Locale code (e.g. "fr").
 --- @return string|nil Raw file contents, or nil when unreadable.
 local function read_locale(code)
-	local path = helpers.driver_root() .. "../shared/locales/" .. code .. ".json"
+	local path = helpers.shared("locales/" .. code .. ".json")
 	local fh = io.open(path, "r")
 	if not fh then return nil end
 	local raw = fh:read("*a")

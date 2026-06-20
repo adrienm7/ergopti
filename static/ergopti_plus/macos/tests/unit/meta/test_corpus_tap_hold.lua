@@ -32,8 +32,7 @@ local helpers = require("tests.helpers")
 -- ========================================
 -- ========================================
 
-local driver_root = helpers.driver_root()
-local corpus_path = driver_root .. "../shared/tests/corpus/tap_hold/vectors.json"
+local corpus_path = helpers.shared("tests/corpus/tap_hold/vectors.json")
 
 local function read_corpus()
 	local fh = io.open(corpus_path, "r")

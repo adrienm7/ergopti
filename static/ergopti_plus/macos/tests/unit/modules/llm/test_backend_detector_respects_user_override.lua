@@ -104,14 +104,10 @@ local function load_llm_init_with_deferred_probes(ollama_status, ollama_body, ml
 		set_locale = function() end,
 	}
 	package.loaded["lib.paths"] = {
-		shared = function(rel)
-			local root = helpers.driver_root() .. "../shared"
-			if rel and rel ~= "" then return root .. "/" .. rel end
-			return root
-		end,
-		shared_root = function() return helpers.driver_root() .. "../shared" end,
+		shared = function(rel) return helpers.shared(rel) end,
+		shared_root = function() return helpers.shared() end,
 		shared_llm_path = function(name)
-			return helpers.driver_root() .. "../shared/llm/" .. name
+			return helpers.shared("llm/" .. name)
 		end,
 		find_from_configdir = function(relative_target)
 			return helpers.driver_root() .. "../../" .. relative_target

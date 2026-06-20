@@ -146,7 +146,7 @@ end
 -- Load the shared security corpus so vector definitions stay in one place.
 -- The corpus path is two levels above the HS driver root: shared/ lives at
 -- static/ergopti_plus/shared/ while we are under static/ergopti_plus/macos/.
-local _corpus_path = helpers.driver_root() .. "../shared/tests/corpus/security/keylogger_no_persist_vectors.json"
+local _corpus_path = helpers.shared("tests/corpus/security/keylogger_no_persist_vectors.json")
 
 --- Reads and JSON-decodes the corpus file.
 --- @return table|nil corpus, string|nil err

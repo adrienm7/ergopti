@@ -31,7 +31,7 @@ helpers.describe("karabiner: layout-settle delay is a registry constant, not a m
 	end)
 
 	helpers.it("constants.toml defines layout_tis_settle_ms", function()
-		local path = helpers.driver_root() .. "../shared/timings/constants.toml"
+		local path = helpers.shared("timings/constants.toml")
 		local fh = io.open(path, "r"); helpers.assert_true(fh ~= nil, "cannot open constants.toml")
 		local toml = fh:read("*a"); fh:close()
 		helpers.assert_true(toml:find("layout_tis_settle_ms", 1, true) ~= nil,

@@ -21,7 +21,7 @@ local helpers = require("tests.helpers")
 -- Path to the shared test vectors file, resolved relative to the driver root.
 -- static/ergopti_plus/macos/ and static/ergopti_plus/shared/ are siblings, so
 -- shared/ is one level up from the driver root.
-local SHARED_VECTORS_PATH = helpers.driver_root() .. "../shared/logger/test_vectors.json"
+local SHARED_VECTORS_PATH = helpers.shared("logger/test_vectors.json")
 
 
 

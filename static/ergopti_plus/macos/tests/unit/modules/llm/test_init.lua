@@ -141,7 +141,7 @@ end)
 -- against the JSON fail.
 helpers.describe("Core.DEFAULT_STATE single source (defaults.json)", function()
 	local json = require("json")
-	local path = helpers.driver_root() .. "../shared/llm/defaults.json"
+	local path = helpers.shared("llm/defaults.json")
 	local fh   = io.open(path, "r")
 	local shared = fh and json.decode(fh:read("*a")) or nil
 	if fh then fh:close() end
