@@ -43,25 +43,13 @@ end
 --- @param rel string Relative path under static/ergopti_plus/shared/.
 --- @return string|nil Absolute path if found, nil if missing (ERROR logged).
 local function resolve_shared_constants_path(rel)
-	-- Primary: resolve from this module's source directory for dev/runtime parity.
-	local source = debug.getinfo(1, "S").source or ""
-	source = source:sub(1, 1) == "@" and source:sub(2) or source
-	local this_dir = source:match("^(.*)/[^/]+$") or ""
-	if this_dir ~= "" then
-		-- ui/wpm sits under macos/ui/wpm, so shared is three levels up.
-		local by_module = this_dir .. "/../../../shared/" .. rel
-		if file_exists(by_module) then
-			Logger.debug(LOG, "resolve_shared_constants_path('%s'): module path OK.", rel)
-			return by_module
-		end
-	end
-
-	-- Secondary: walk up from driver base for non-standard layouts.
-	-- This is a pragmatic fallback but will fail loudly if not found.
-	local by_find = Paths.find_from_configdir("static/ergopti_plus/shared/" .. rel)
-	if by_find and file_exists(by_find) then
-		Logger.debug(LOG, "resolve_shared_constants_path('%s'): upward search OK.", rel)
-		return by_find
+	-- Resolved through the single shared-tree resolver (Paths.shared), which
+	-- performs the dual-root upward walk — robust to dev checkouts, packaged
+	-- .app builds and symlinked ~/.hammerspoon setups alike.
+	local path = Paths.shared(rel)
+	if path and file_exists(path) then
+		Logger.debug(LOG, "resolve_shared_constants_path('%s'): resolved via Paths.shared.", rel)
+		return path
 	end
 
 	-- FAIL FAST: path not found — do not silently degrade.

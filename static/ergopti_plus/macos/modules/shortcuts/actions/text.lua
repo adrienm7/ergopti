@@ -21,6 +21,7 @@ local timer      = hs.timer
 local eventtap   = hs.eventtap
 local pasteboard = hs.pasteboard
 local Logger     = require("lib.logger")
+local Paths      = require("lib.paths")
 local Timings    = require("lib.timings")
 
 local LOG = "shortcuts.actions.text"
@@ -62,52 +63,24 @@ local FALLBACK_GROUPS = {
 		{ left = '"', right = '"' }, { left = "'", right = "'" } } },
 }
 
---- Returns the ordered candidate paths for shared/wrap_symbols.json, most
---- reliable first.
----   1. The deployment-aware resolver (the same lib.paths walk that locates
----      menu_manifest.json) — robust to packaged .app builds and symlinked
----      ~/.hammerspoon setups where a fixed relative path does not reach the
----      repository's shared/ directory.
----   2. A module-relative path — covers the plain repo checkout and the headless
----      unit tests, where lib.paths is stubbed and cannot resolve the real tree.
---- @return table Array of path strings.
-local function shared_catalogue_candidates()
-	local candidates = {}
-	local ok_p, Paths = pcall(require, "lib.paths")
-	if ok_p and type(Paths) == "table" and type(Paths.find_from_configdir) == "function" then
-		local ok_find, resolved = pcall(Paths.find_from_configdir, "shared/wrap_symbols.json")
-		if ok_find and type(resolved) == "string" and resolved ~= "" then
-			candidates[#candidates + 1] = resolved
-		end
-	end
-	local src = debug.getinfo(1, "S").source
-	if src:sub(1, 1) == "@" then src = src:sub(2) end
-	-- src = .../ergopti_plus/macos/modules/shortcuts/actions/text.lua
-	local actions_dir = src:match("^(.*)[/\\][^/\\]+%.lua$")
-	if actions_dir then
-		-- actions → shortcuts → modules → macos → ergopti_plus, then shared/
-		candidates[#candidates + 1] = actions_dir .. "/../../../../shared/wrap_symbols.json"
-	end
-	return candidates
-end
-
 --- Reads the shared catalogue and returns its ordered groups, or nil on failure.
---- Tries each candidate path until one opens and parses successfully.
+--- The path is resolved through the single shared-tree resolver (Paths.shared),
+--- which performs the dual-root upward walk — robust to packaged .app builds and
+--- symlinked ~/.hammerspoon setups alike.
 --- @return table|nil Array of groups (each {i18n=<label key>, pairs={{left,right},…}}).
 local function load_shared_groups()
-	for _, path in ipairs(shared_catalogue_candidates()) do
-		local fh = io.open(path, "r")
-		if fh then
-			local content = fh:read("*a")
-			fh:close()
-			if type(content) == "string" and content ~= "" then
-				-- Strip a leading UTF-8 BOM — hs.json.decode rejects it.
-				if content:sub(1, 3) == "\239\187\191" then content = content:sub(4) end
-				local ok, data = pcall(hs.json.decode, content)
-				if ok and type(data) == "table" and type(data.groups) == "table" and #data.groups > 0 then
-					return data.groups
-				end
-			end
+	local path = Paths.shared("wrap_symbols.json")
+	if type(path) ~= "string" or path == "" then return nil end
+	local fh = io.open(path, "r")
+	if not fh then return nil end
+	local content = fh:read("*a")
+	fh:close()
+	if type(content) == "string" and content ~= "" then
+		-- Strip a leading UTF-8 BOM — hs.json.decode rejects it.
+		if content:sub(1, 3) == "\239\187\191" then content = content:sub(4) end
+		local ok, data = pcall(hs.json.decode, content)
+		if ok and type(data) == "table" and type(data.groups) == "table" and #data.groups > 0 then
+			return data.groups
 		end
 	end
 	return nil

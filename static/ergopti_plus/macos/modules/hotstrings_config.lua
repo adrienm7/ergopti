@@ -29,6 +29,7 @@
 
 local M = {}
 local Logger     = require("lib.logger")
+local Paths      = require("lib.paths")
 local TomlReader = require("lib.toml_reader")
 local LOG        = "hotstrings_config"
 
@@ -788,12 +789,10 @@ end
 --- ui/tooltip/config.lua, so it behaves identically in production and in the
 --- headless unit harness (where the module is re-required per test).
 local function load_shared_defaults()
-	-- macos/modules/hotstrings_config.lua → modules → macos → ergopti_plus → /shared
-	local src = debug.getinfo(1, "S").source:gsub("^@", "")
-	local dir = src:match("^(.*)[/\\][^/\\]+$") or src        -- .../macos/modules
-	dir = dir:match("^(.*)[/\\][^/\\]+$") or dir              -- .../macos
-	local ergopti_plus = dir:match("^(.*)[/\\][^/\\]+$") or dir
-	local toml_path = ergopti_plus .. "/shared/hotstrings/defaults.toml"
+	-- Resolved through the single shared-tree resolver (Paths.shared) so the
+	-- shared root lives in exactly one place, cwd-independent in production and
+	-- in the headless unit harness.
+	local toml_path = Paths.shared("hotstrings/defaults.toml")
 
 	local parsed   = TomlReader.parse(toml_path)
 	local sections = (type(parsed) == "table") and parsed.sections or nil

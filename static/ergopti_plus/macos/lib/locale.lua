@@ -55,32 +55,13 @@ end
 --- @param code string Locale code, e.g. ``"fr"``.
 --- @return string Absolute path to the JSON file, or empty string if not found (ERROR logged).
 local function locale_path(code)
-	-- Primary: resolve from this module's location, not hs.configdir.
-	-- Module-local resolution is stable in both dev and packaged app runtimes.
-	local source = debug.getinfo(1, "S").source or ""
-	source = source:sub(1, 1) == "@" and source:sub(2) or source
-	-- Normalize Windows separators: package.searchpath substitutes the OS
-	-- directory separator ("\") for the final "?" segment, yielding a mixed
-	-- path like ".../macos/lib\locale.lua". A forward-slash-only match would
-	-- then drop the "lib" segment and resolve the wrong locale directory.
-	source = source:gsub("\\", "/")
-	local this_dir = source:match("^(.*)/[^/]+$") or ""
-	if this_dir ~= "" then
-		local by_module = this_dir .. "/../../shared/locales/" .. code .. ".json"
-		if file_exists(by_module) then
-			Logger.debug(LOG, "locale_path('%s'): module path OK.", code)
-			return by_module
-		end
-	end
-
-	-- Secondary: walk up from hs.configdir for non-standard layouts.
-	local dir = Paths.find_from_configdir("static/ergopti_plus/shared/locales")
-	if dir then
-		local by_find = dir .. "/" .. code .. ".json"
-		if file_exists(by_find) then
-			Logger.debug(LOG, "locale_path('%s'): upward search OK.", code)
-			return by_find
-		end
+	-- Resolve through the single shared-tree resolver. Paths.shared already
+	-- performs the dual-root upward walk (hs.configdir + module dir), so it
+	-- works in dev checkouts, packaged .app builds and ~/.hammerspoon symlinks.
+	local path = Paths.shared("locales/" .. code .. ".json")
+	if path and file_exists(path) then
+		Logger.debug(LOG, "locale_path('%s'): resolved via Paths.shared.", code)
+		return path
 	end
 
 	-- FAIL FAST: locale file not found — do not silently degrade.

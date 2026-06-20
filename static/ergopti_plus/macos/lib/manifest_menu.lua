@@ -45,7 +45,7 @@ local function get_manifest_root()
 	if _cache ~= nil then
 		return _cache
 	end
-	local path = Paths.find_from_configdir("shared/menu_manifest.json") or ""
+	local path = Paths.shared("menu_manifest.json") or ""
 	local ok_r, fh = pcall(io.open, path, "r")
 	if not ok_r or not fh then
 		Logger.error(LOG, "Cannot open menu_manifest.json at '%s'.", path)

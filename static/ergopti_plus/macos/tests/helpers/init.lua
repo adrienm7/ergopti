@@ -120,6 +120,19 @@ function M.load_with_stubs(module_name, hs_overrides)
 	-- tests. Without this, io.open fails or returns nil path, causing "not found"
 	-- errors in tests that load api_remote or exercise catalogue-dependent code.
 	package.loaded["lib.paths"] = {
+		-- Single shared-tree resolver: maps a path relative to shared/ onto the
+		-- repo's shared/ directory next to the driver. Mirrors the production
+		-- Paths.shared contract (nil/"" → the shared root dir).
+		shared = function(rel)
+			local root = M.driver_root() .. "../shared"
+			if rel and rel ~= "" then
+				return root .. "/" .. rel
+			end
+			return root
+		end,
+		shared_root = function()
+			return M.driver_root() .. "../shared"
+		end,
 		shared_llm_path = function(name)
 			return M.driver_root() .. "../shared/llm/" .. name
 		end,

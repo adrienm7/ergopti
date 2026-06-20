@@ -27,6 +27,7 @@ local json    = require("hs.json")
 local sqlite3 = require("hs.sqlite3")
 
 local Logger = require("lib.logger")
+local Paths  = require("lib.paths")
 local LOG    = "keylogger.sqlite_writer"
 
 
@@ -90,14 +91,9 @@ end
 --- ===================================
 -- ======================================
 
---- Resolve the schema.sql path relative to this source file.
---- This file lives at modules/keylogger/, so four levels up reaches
---- static/ergopti_plus/ → shared/data/db/.
-local _SCHEMA_SQL_PATH = (function()
-	local src = debug.getinfo(1, "S").source:sub(2)
-	local dir = src:match("^(.*[/\\])")
-	return dir .. "../../../shared/data/db/schema.sql"
-end)()
+--- Resolve the canonical schema.sql path through the single shared-tree
+--- resolver (Paths.shared) so the shared root lives in exactly one place.
+local _SCHEMA_SQL_PATH = Paths.shared("data/db/schema.sql")
 
 --- Read the canonical schema.sql from disk.
 --- @return string|nil The full DDL text, or nil on IO error.

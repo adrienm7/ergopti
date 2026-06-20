@@ -24,6 +24,7 @@
 local M = {}
 
 local Logger     = require("lib.logger")
+local Paths      = require("lib.paths")
 local ui_builder = require("ui.ui_builder")
 local i18n       = require("lib.i18n")
 
@@ -43,32 +44,10 @@ local _ucc      = nil
 local _ready    = false
 local _queued   = {}
 
--- Absolute path of this file's directory.
-local _own_dir = (function()
-	local src = (debug.getinfo(1, "S") or {}).source or ""
-	src = src:gsub("^@", "")
-	return src:match("^(.*[/\\])") or "./"
-end)()
-
--- The shared UI assets live in …/ergopti_plus/shared/ui/changelog/.
--- Walk up from this file's own directory to find the sibling shared/ tree.
--- This is resilient to any absolute prefix and works both in a symlink
--- ~/.hammerspoon setup and in a direct repo checkout.
-local ASSETS_DIR = (function()
-	-- Walk up from _own_dir looking for the shared/ui/changelog/ sibling.
-	local current = _own_dir:gsub("[/\\]+$", "")
-	for _ = 1, 10 do
-		local candidate = current .. "/shared/ui/changelog/"
-		local ok, attr = pcall(hs.fs.attributes, candidate .. "index.html")
-		if ok and attr then return candidate end
-		local parent = current:match("^(.*)[/\\][^/\\]+$")
-		if not parent or parent == current then break end
-		current = parent
-	end
-	-- Absolute fallback: derive from known path component.
-	return _own_dir:gsub("macos/ui/changelog/$", "shared/ui/changelog/")
-		:gsub("macos/ui/changelog/", "shared/ui/changelog/")
-end)()
+-- The shared UI assets live in …/ergopti_plus/shared/ui/changelog/. Resolved
+-- through the single shared-tree resolver (Paths.shared); the trailing slash is
+-- preserved because the consumer concatenates "index.html" onto this directory.
+local ASSETS_DIR = (Paths.shared("ui/changelog") or "") .. "/"
 
 
 

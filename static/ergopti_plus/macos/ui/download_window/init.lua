@@ -28,6 +28,7 @@
 local M = {}
 
 local Logger     = require("lib.logger")
+local Paths      = require("lib.paths")
 local ui_builder = require("ui.ui_builder")
 local i18n       = require("lib.i18n")
 
@@ -45,15 +46,11 @@ local _is_hiding = false
 local _kind      = nil      -- Active kind, if any (mlx_install, ollama_install, mlx_model, ollama_model)
 local _mode      = "download" -- "download" (model download) or "bootstrap" (engine install)
 
-local _src  = debug.getinfo(1, "S").source:sub(2)
-local _own_dir   = _src:match("^(.*[/\\])") or "./"
--- HTML/CSS/JS assets live in the cross-platform shared/ folder so all
--- drivers benefit from the same UI without duplication.
--- Replace the macOS-driver segment with the cross-platform shared segment.
-local ASSETS_DIR = _own_dir:gsub(
-	"macos/ui/download_window/",
-	"shared/ui/download_window/"
-)
+-- HTML/CSS/JS assets live in the cross-platform shared/ folder so all drivers
+-- benefit from the same UI without duplication. Resolved through the single
+-- shared-tree resolver (Paths.shared); the trailing slash is preserved because
+-- ui_builder concatenates asset filenames directly onto this directory.
+local ASSETS_DIR = (Paths.shared("ui/download_window") or "") .. "/"
 
 
 -- Per-kind presets (titles / subtitles / accent colors). Kept in Lua so

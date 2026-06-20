@@ -355,7 +355,11 @@ helpers.describe("meta: lua module OS-API purity baseline", function()
 	for _, f in ipairs(lua_module_files) do all_lua_files[#all_lua_files + 1] = f end
 	for _, f in ipairs(lua_lib_files)    do all_lua_files[#all_lua_files + 1] = f end
 
-	local hs_count, hs_details   = count_lua_pattern(all_lua_files, "hs%.",    adapters_dir)
+	-- Frontier guard (%f[%w]) so the pattern matches the Hammerspoon global `hs.`
+	-- only at a word boundary — NOT the trailing "hs." inside identifiers such as
+	-- `Paths.shared` (the centralised shared-tree resolver), which would otherwise
+	-- inflate the count with a false positive.
+	local hs_count, hs_details   = count_lua_pattern(all_lua_files, "%f[%w]hs%.", adapters_dir)
 	local io_count, io_details   = count_lua_pattern(all_lua_files, "io%.open", adapters_dir)
 	local os_count, os_details   = count_lua_pattern(all_lua_files, "os%.execute", adapters_dir)
 	local total_io_os            = io_count + os_count

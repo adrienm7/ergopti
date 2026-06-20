@@ -33,6 +33,12 @@ helpers.describe("api_remote — malformed api_providers.json does not crash req
 			fh:close()
 		end
 		package.loaded["lib.paths"] = {
+			shared = function(rel)
+				local root = helpers.driver_root() .. "../shared"
+				if rel and rel ~= "" then return root .. "/" .. rel end
+				return root
+			end,
+			shared_root = function() return helpers.driver_root() .. "../shared" end,
 			shared_llm_path = function(name)
 				if name == "api_providers.json" then return tmp_path end
 				return nil
@@ -97,6 +103,12 @@ helpers.describe("api_remote — malformed api_providers.json does not crash req
 	helpers.it("still loads normally when JSON is valid", function()
 		-- Reset to the real shared path (test helpers default)
 		package.loaded["lib.paths"] = {
+			shared = function(rel)
+				local root = helpers.driver_root() .. "../shared"
+				if rel and rel ~= "" then return root .. "/" .. rel end
+				return root
+			end,
+			shared_root = function() return helpers.driver_root() .. "../shared" end,
 			shared_llm_path = function(name)
 				return helpers.driver_root() .. "../shared/llm/" .. name
 			end,

@@ -22,6 +22,7 @@
 local M = {}
 local hs     = hs
 local Logger = require("lib.logger")
+local Paths  = require("lib.paths")
 local i18n   = require("lib.i18n")
 
 local LOG = "menu_apps"
@@ -235,14 +236,11 @@ function M.build(ctx)
 						locale_code = "en"
 					end
 				end
-				-- Resolve the locales directory relative to the Hammerspoon config root.
-				-- hs.configdir resolves to .../static/ergopti_plus/macos/;
-				-- the shared locales live at .../static/ergopti_plus/shared/locales/.
-				-- AppleScript apps read this to load UI strings for any locale without
-				-- hardcoding translations; adding a new locale to shared/locales/
-				-- automatically works in the apps.
-				local config_base = (hs.configdir or ""):match("^(.*)/ergopti_plus/macos") or ""
-				local locales_dir = config_base .. "/ergopti_plus/shared/locales"
+				-- Resolve the shared locales directory through the single shared-tree
+				-- resolver (Paths.shared). AppleScript apps read this to load UI strings
+				-- for any locale without hardcoding translations; adding a new locale to
+				-- shared/locales/ automatically works in the apps.
+				local locales_dir = Paths.shared("locales") or ""
 				-- Launch the .app bundle via `open --env` so the locale variables
 				-- are injected directly into the launched app's environment.
 				-- `setEnvironment` on the `open` process itself does not propagate

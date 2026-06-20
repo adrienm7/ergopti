@@ -30,6 +30,7 @@
 
 local M = {}
 local Logger = require("lib.logger")
+local Paths = require("lib.paths")
 local TomlReader = require("lib.toml_reader")
 local LOG = "timings"
 
@@ -49,11 +50,7 @@ local MS_PER_SEC = 1000
 --- malformed parse raises an error (fail fast — no driver-side fallbacks).
 --- @return table The parsed `sections` table ([section][key] = number).
 local function load_registry()
-	local src          = debug.getinfo(1, "S").source:gsub("^@", "")
-	local dir          = src:match("^(.*)[/\\][^/\\]+$") or src   -- .../macos/lib
-	local macos        = dir:match("^(.*)[/\\][^/\\]+$") or dir   -- .../macos
-	local ergopti_plus = macos:match("^(.*)[/\\][^/\\]+$") or macos -- .../ergopti_plus
-	local toml_path    = ergopti_plus .. "/shared/timings/constants.toml"
+	local toml_path = Paths.shared("timings/constants.toml")
 
 	local parsed   = TomlReader.parse(toml_path)
 	local sections = (type(parsed) == "table") and parsed.sections or nil

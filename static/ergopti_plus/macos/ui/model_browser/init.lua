@@ -22,6 +22,7 @@
 local M = {}
 
 local Logger     = require("lib.logger")
+local Paths      = require("lib.paths")
 local ui_builder = require("ui.ui_builder")
 local i18n       = require("lib.i18n")
 
@@ -39,30 +40,11 @@ local _queued    = {}
 local _on_select = nil   -- callback(name) invoked when the user picks a model
 local _ctx       = nil   -- last-opened context, kept for catalogue refresh
 
--- Absolute path of this file's directory.
-local _own_dir = (function()
-	local src = (debug.getinfo(1, "S") or {}).source or ""
-	src = src:gsub("^@", "")
-	return src:match("^(.*[/\\])") or "./"
-end)()
-
--- The shared UI assets live in …/ergopti_plus/shared/ui/model_browser/.
--- Walk up from this file's own directory to find the sibling shared/ tree so the
--- resolution is resilient to any absolute prefix (symlinked ~/.hammerspoon or a
--- direct repo checkout).
-local ASSETS_DIR = (function()
-	local current = _own_dir:gsub("[/\\]+$", "")
-	for _ = 1, 10 do
-		local candidate = current .. "/shared/ui/model_browser/"
-		local ok, attr = pcall(hs.fs.attributes, candidate .. "index.html")
-		if ok and attr then return candidate end
-		local parent = current:match("^(.*)[/\\][^/\\]+$")
-		if not parent or parent == current then break end
-		current = parent
-	end
-	return _own_dir:gsub("macos/ui/model_browser/$", "shared/ui/model_browser/")
-		:gsub("macos/ui/model_browser/", "shared/ui/model_browser/")
-end)()
+-- The shared UI assets live in …/ergopti_plus/shared/ui/model_browser/. Resolved
+-- through the single shared-tree resolver (Paths.shared); the trailing slash is
+-- preserved because ui_builder concatenates asset filenames directly onto this
+-- directory.
+local ASSETS_DIR = (Paths.shared("ui/model_browser") or "") .. "/"
 
 
 
