@@ -1106,13 +1106,6 @@ description_key = "menu.shortcuts.paste_without_formatting"
 platforms = ["ahk"]
 
 [[features.shortcuts]]
-id = "save"
-default = false
-type = "boolean"
-description_key = "menu.shortcuts.save"
-platforms = ["ahk"]
-
-[[features.shortcuts]]
 id = "select_line"
 default = true
 type = "boolean"
@@ -1258,12 +1251,6 @@ description_key = "menu.layout.ergopti_plus"
 # =============================
 # ===== 4.2 ahk.shortcuts =====
 # =============================
-
-[[features.ahk.shortcuts]]
-id = "ctrl_j"
-default = false
-type = "boolean"
-description_key = "menu.ahk.shortcuts.ctrl_j"
 
 [[features.ahk.shortcuts]]
 id = "open_downloads"
