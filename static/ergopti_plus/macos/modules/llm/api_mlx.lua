@@ -30,7 +30,7 @@ if not ok_kl then keylogger = nil end
 
 local _req_counter = 0
 local DEDUPLICATION_ENABLED = false
--- Retry policy comes from _shared/llm/inference.json (see api_common.lua).
+-- Retry policy comes from _shared/modules/llm/inference.json (see api_common.lua).
 local _RETRY_MAX_MULT, _RETRY_TEMP_STEP, _RETRY_EXTRA_TOKENS = ApiCommon.get_retry_policy()
 local RETRY_FAILED_PREDICTION_ENABLED        = (_RETRY_MAX_MULT or 0) > 1
 local RETRY_FAILED_PREDICTION_MAX_MULTIPLIER = _RETRY_MAX_MULT
@@ -40,7 +40,7 @@ local STREAM_HARD_TIMEOUT_SEC    = Timings.sec("llm", "stream_hard_timeout_ms") 
 local WARMUP_POST_TIMEOUT_SEC    = Timings.sec("llm", "warmup_post_timeout_ms")    -- Unblock _warmup_in_flight if the single-token POST never returns
 local NON_STREAM_TIMEOUT_SEC     = Timings.sec("llm", "non_stream_timeout_ms")  -- Non-streaming inference hard timeout; prevents a hung server from blocking on_fail indefinitely
 
--- MLX server bind address — single source of truth in _shared/llm/mlx_server.json
+-- MLX server bind address — single source of truth in _shared/modules/llm/mlx_server.json
 -- so the port is never hardcoded across api_mlx, the models_manager_mlx launcher,
 -- and the init.lua boot cleanup. Loaded once at module load; every consumer reads
 -- the resolved value via M.get_port() / M.get_host() / M.get_base_url(). The
@@ -87,7 +87,7 @@ local function load_mlx_server_config()
 	-- 1) Shared JSON default (the value shipped with the repo). Resolved through
 	-- the single shared-tree resolver (Paths.shared), which performs the dual-root
 	-- upward walk — robust to packaged .app builds and symlinked setups alike.
-	local p = Paths.shared("llm/mlx_server.json")
+	local p = Paths.shared("modules/llm/mlx_server.json")
 	if type(p) == "string" and p ~= "" then
 		local fh = io.open(p, "r")
 		if fh then
@@ -303,7 +303,7 @@ local WARMUP_GIVE_UP_SEC   = 120
 -- mlx-lm 0.18→0.21 series; discover_endpoints overrides them at runtime
 -- whenever a probe finds a different working route.
 -- Derived from MLX_HOST/MLX_PORT (loaded at the top of this file from
--- _shared/llm/mlx_server.json). discover_endpoints overrides the routes at runtime.
+-- _shared/modules/llm/mlx_server.json). discover_endpoints overrides the routes at runtime.
 local MLX_BASE_URL          = string.format("http://%s:%d", MLX_HOST, MLX_PORT)
 local _completions_endpoint = MLX_BASE_URL .. "/v1/completions"
 local _chat_endpoint        = MLX_BASE_URL .. "/v1/chat/completions"

@@ -34,8 +34,8 @@ const config = {
 		// measuring anything real. Registry and HotstringMatcher contain
 		// the canonical algorithmic code (bucketing, sorting, matching) that the
 		// harness actually exercises — those are the meaningful mutation targets.
-		'static/ergopti_plus/_shared/domain/Registry.spec.js',
-		'static/ergopti_plus/_shared/domain/HotstringMatcher.spec.js',
+		'static/ergopti_plus/_shared/core/domain/Registry.spec.js',
+		'static/ergopti_plus/_shared/core/domain/HotstringMatcher.spec.js',
 		'!**/node_modules/**'
 	],
 

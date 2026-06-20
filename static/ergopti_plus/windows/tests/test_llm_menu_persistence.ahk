@@ -4,7 +4,7 @@
 ; MODULE: LLM Menu Persistence Tests
 ; DESCRIPTION:
 ; Guards the tray IA menu against config regressions (menu change not written
-; to config.toml on reload). Driven by _shared/llm/menu_persistence_contract.json.
+; to config.toml on reload). Driven by _shared/modules/llm/menu_persistence_contract.json.
 ;
 ; Three layers per AHK contract entry:
 ;   1. Wiring: tray_key appears in ui/tray_llm/persist.ahk (sync or append).
@@ -12,7 +12,7 @@
 ;   3. Disk: TOML round-trip via the same collect path SaveFullConfig uses.
 ;
 ; Run (from windows/tests): AutoHotkey64.exe /ErrorStdOut run_llm_menu_persistence.ahk
-; Schema + static wiring (any OS): python ../../_shared/llm/validate_menu_persistence_contract.py
+; Schema + static wiring (any OS): python ../../_shared/modules/llm/validate_menu_persistence_contract.py
 ; ==============================================================================
 
 
@@ -27,7 +27,7 @@
 ; =============================================
 
 _LLM_Persist_ContractPath() {
-	return A_ScriptDir . "\..\..\_shared\llm\menu_persistence_contract.json"
+	return A_ScriptDir . "\..\..\_shared\modules\llm\menu_persistence_contract.json"
 }
 
 _LLM_Persist_LoadContract() {

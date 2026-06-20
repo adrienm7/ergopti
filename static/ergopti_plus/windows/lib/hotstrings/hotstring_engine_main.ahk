@@ -89,7 +89,7 @@ global HSE_CONSUMED_DELIMITERS := ""
 ; lowest, third-party "package" (extension TOML) in the middle, and the user's
 ; own "personal" hotstrings highest — so personal beats a package beats a common
 ; trigger of the same length without any manual tuning.
-; SINGLE SOURCE OF TRUTH: _shared/hotstrings/priority.json. These literals are
+; SINGLE SOURCE OF TRUTH: _shared/modules/hotstrings/priority.json. These literals are
 ; held identical to it (and to the macOS PRIORITY_* in registry.lua) by the gate
 ; tools/test/test-priority-parity.cjs — change the JSON and all three together.
 global HSE_PRIORITY_COMMON   := 10

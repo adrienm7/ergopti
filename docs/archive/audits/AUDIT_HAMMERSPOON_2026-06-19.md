@@ -232,7 +232,7 @@ The privacy guards `return` before `synth_queue` consumption, leaving stale entr
 `try_warmup` aborts only on LLM-disabled/backend-ready/load-failed — gated on the feature toggle, which pause does not change. `pause_all` cancels predictions/streaming but never `WarmupController.stop()`, so warmup POSTs keep firing during pause (cold-start window). Async, so no G4 symptom — but a pause-invariant violation. **Fix:** `pause_all` calls `warmup_controller.stop()`; resume re-arms only if the gate is still on. **Test:** `test_warmup_stops_on_pause.lua`.
 
 ### F-LOW-3 — Layout-settle delay `0.5 s` is a hardcoded magic number, bypassing the `Timings` single-source registry
-- **Confidence:** confirmed · **G4 / §5.1-5.2** · Files: [karabiner/init.lua:649-657](static/ergopti_plus/macos/modules/karabiner/init.lua#L649-L657), [_shared/timings/constants.toml](static/ergopti_plus/_shared/timings/constants.toml).
+- **Confidence:** confirmed · **G4 / §5.1-5.2** · Files: [karabiner/init.lua:649-657](static/ergopti_plus/macos/modules/karabiner/init.lua#L649-L657), [_shared/modules/timings/constants.toml](static/ergopti_plus/_shared/modules/timings/constants.toml).
 Every sibling timing in this hot path is `Timings.sec`-sourced; the load-bearing 0.5 s TIS-settle (absorbs the async `hs.keycodes.map` update — too short → wrong keycodes in `karabiner.json`) is the only inline literal. **Fix:** add `layout_tis_settle_ms = 500` to `[debounce]` and source it via `Timings.sec`. **Test:** assert no bare `doAfter(0.5` for the rebuild + the TOML key exists.
 
 ### F-LOW-4 — Synchronous `hs.execute("defaults read HIToolbox")` runs every 2 s on the main loop in the layout fallback poll

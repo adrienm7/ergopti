@@ -447,9 +447,9 @@ def build_final_json(v0_filepath: str, output_filepath: str) -> None:
 
 if __name__ == "__main__":
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    # Source and output files now live in _shared/llm/ — two levels up from this
-    # script (hammerspoon/data/ → hammerspoon/ → drivers/ → _shared/llm/).
-    shared_llm_dir = os.path.normpath(os.path.join(script_dir, "../../_shared/llm"))
+    # Source and output files now live in _shared/modules/llm/ — two levels up from this
+    # script (hammerspoon/data/ → hammerspoon/ → drivers/ → _shared/modules/llm/).
+    shared_llm_dir = os.path.normpath(os.path.join(script_dir, "../../_shared/modules/llm"))
     v0_path = os.path.join(shared_llm_dir, "models_v0.json")
     final_path = os.path.join(shared_llm_dir, "models.json")
 

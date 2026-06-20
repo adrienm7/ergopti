@@ -44,7 +44,7 @@
 ; ===================================
 
 class WPMWidgetConst {
-    ; ── Values loaded at runtime from _shared/wpm_widget/constants.toml ──────────
+    ; ── Values loaded at runtime from _shared/modules/wpm_widget/constants.toml ──────────
     ; Populated by WPMWidget_LoadSharedConst() — zero fallback values here so a
     ; missing TOML is detected immediately rather than silently using stale data.
     ; [compact]
@@ -69,10 +69,10 @@ class WPMWidgetConst {
     static ALPHA_ACTIVE       := 0
     static ALPHA_IDLE         := 0
 
-    ; ── Values loaded from _shared/timings/constants.toml ────────────────────────
+    ; ── Values loaded from _shared/modules/timings/constants.toml ────────────────────────
     static IDLE_HIDE_MS       := 0
     ; How long the hotstring source color stays visible after the last fire.
-    ; Loaded from _shared/timings/constants.toml [ui] wpm_color_hold_ms.
+    ; Loaded from _shared/modules/timings/constants.toml [ui] wpm_color_hold_ms.
     static COLOR_HOLD_MS      := 0
 
     ; ── AHK-only constants (no shared TOML equivalent needed) ───────────────────
@@ -388,7 +388,7 @@ _WPMWidget_ReadTomlColor(CategoryName, InvalidateCache := false) {
     if _color_cache.Has(CategoryName)
         return _color_cache[CategoryName]
     global _SharedDir, GLOBAL_DEFAULT_COLOR
-    FilePath := _SharedDir . "\hotstrings\" . StrLower(CategoryName) . ".toml"
+    FilePath := _SharedDir . "\modules\hotstrings\" . StrLower(CategoryName) . ".toml"
     if !FileExist(FilePath) {
         LoggerDebug("WPMWidget", "ReadTomlColor: file not found for '{1}': {2}", CategoryName, FilePath)
         _color_cache[CategoryName] := ""
@@ -1141,17 +1141,17 @@ WPMWidget_MouseWatch() {
 ; =====================================
 ; ============================================
 
-; Reads _shared/wpm_widget/constants.toml and _shared/timings/constants.toml at
+; Reads _shared/modules/wpm_widget/constants.toml and _shared/modules/timings/constants.toml at
 ; startup and populates the zero-initialised fields of WPMWidgetConst.
 ; Logs an error and leaves the zeros in place if the file cannot be found.
 WPMWidget_LoadSharedConst() {
     global _SharedDir
-    wpm_path     := _SharedDir . "\wpm_widget\constants.toml"
-    timings_path := _SharedDir . "\timings\constants.toml"
+    wpm_path     := _SharedDir . "\modules\wpm_widget\constants.toml"
+    timings_path := _SharedDir . "\modules\timings\constants.toml"
 
     wpm_c := ParseTomlFile(wpm_path)
     if !wpm_c.Count {
-        LoggerError("WPMWidget", "_shared/wpm_widget/constants.toml not found — widget non-functional.")
+        LoggerError("WPMWidget", "_shared/modules/wpm_widget/constants.toml not found — widget non-functional.")
         return
     }
 
@@ -1181,13 +1181,13 @@ WPMWidget_LoadSharedConst() {
     WPMWidgetConst.ALPHA_ACTIVE := Integer(IniCacheGet(wpm_c, "transparency", "alpha_active", "220"))
     WPMWidgetConst.ALPHA_IDLE   := Integer(IniCacheGet(wpm_c, "transparency", "alpha_idle",   "140"))
 
-    ; _shared/timings/constants.toml
+    ; _shared/modules/timings/constants.toml
     tim_c := ParseTomlFile(timings_path)
     if tim_c.Count {
         WPMWidgetConst.IDLE_HIDE_MS  := Integer(IniCacheGet(tim_c, "ui", "wpm_widget_idle_hide_ms", "3000"))
         WPMWidgetConst.COLOR_HOLD_MS := Integer(IniCacheGet(tim_c, "ui", "wpm_color_hold_ms",       "1000"))
     } else {
-        LoggerError("WPMWidget", "_shared/timings/constants.toml not found — IDLE_HIDE_MS and COLOR_HOLD_MS defaulting.")
+        LoggerError("WPMWidget", "_shared/modules/timings/constants.toml not found — IDLE_HIDE_MS and COLOR_HOLD_MS defaulting.")
         WPMWidgetConst.IDLE_HIDE_MS  := 3000
         WPMWidgetConst.COLOR_HOLD_MS := 1000
     }

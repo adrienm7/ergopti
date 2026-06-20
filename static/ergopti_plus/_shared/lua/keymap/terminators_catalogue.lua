@@ -1,5 +1,5 @@
 --- static/ergopti_plus/_shared/lua/keymap/terminators_catalogue.lua
---- AUTO-GENERATED from _shared/domain/Terminators.spec.js.
+--- AUTO-GENERATED from _shared/core/domain/Terminators.spec.js.
 --- DO NOT EDIT BY HAND — run `npm run codegen:terminators` to refresh.
 
 --- ==============================================================================

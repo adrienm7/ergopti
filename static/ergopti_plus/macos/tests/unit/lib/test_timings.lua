@@ -4,7 +4,7 @@
 --- MODULE: Shared Timings Reader Tests (Hammerspoon)
 --- DESCRIPTION:
 --- A3 — macOS now reads its timing constants from the cross-driver registry
---- `_shared/timings/constants.toml` via `lib.timings` instead of hardcoding the
+--- `_shared/modules/timings/constants.toml` via `lib.timings` instead of hardcoding the
 --- same literals in each module. These tests pin:
 ---   1. `M.ms` returns the raw millisecond value and fails fast on a bad
 ---      section/key.

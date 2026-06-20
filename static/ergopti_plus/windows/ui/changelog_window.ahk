@@ -404,12 +404,12 @@ _CLW_HtmlUrl() {
 }
 
 /**
- * Returns the file:// URL for _shared/locales/ (trailing slash).
+ * Returns the file:// URL for _shared/data/locales/ (trailing slash).
  * @returns {string}
  */
 _CLW_LocalesUrl() {
 	global _SharedDir
-	base := _SharedDir . "\locales\"
+	base := _SharedDir . "\data\locales\"
 	return "file:///" . StrReplace(base, "\", "/")
 }
 
@@ -420,7 +420,7 @@ _CLW_LocalesUrl() {
  */
 _CLW_I18nApplyScript() {
 	global _SharedDir, _I18nLocale
-	json_path := _SharedDir . "\locales\" . _I18nLocale . ".json"
+	json_path := _SharedDir . "\data\locales\" . _I18nLocale . ".json"
 	json_str  := "{}"
 	if FileExist(json_path)
 		try json_str := FileRead(json_path, "UTF-8")

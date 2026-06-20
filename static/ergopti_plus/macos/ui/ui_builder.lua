@@ -26,7 +26,7 @@ local LOG = "ui_builder"
 -- HS session is enough.
 local _html_cache = {}
 
--- Absolute file:// URL to the shared static/ergopti_plus/_shared/locales/ directory.
+-- Absolute file:// URL to the shared static/ergopti_plus/_shared/data/locales/ directory.
 -- Computed once at module-load time from this file's own path.
 -- Injected into every webview as window.__i18n_base so that the browser-side
 -- i18n.js fetch() resolves locale JSON files correctly even when the HTML is
@@ -35,7 +35,7 @@ local _locales_base_url = (function()
 	-- Resolved through the single shared-tree resolver (Paths.shared); the
 	-- trailing slash is preserved because the browser-side fetch() concatenates
 	-- the locale filename directly onto this base.
-	local locales = (Paths.shared("locales") or "") .. "/"
+	local locales = (Paths.shared("data/locales") or "") .. "/"
 	-- Normalise to forward slashes and prepend file:// so fetch() accepts it
 	locales = locales:gsub("\\", "/")
 	if not locales:match("^/") then locales = "/" .. locales end

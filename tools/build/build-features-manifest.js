@@ -6,7 +6,7 @@
 //      directory on first boot.
 //
 // Inputs:
-//   static/ergopti_plus/_shared/features/manifest.toml
+//   static/ergopti_plus/_shared/modules/features/manifest.toml
 //   static/ergopti_plus/_shared/tap_hold/defaults.toml
 //
 // Outputs:
@@ -31,7 +31,7 @@ const { shared } = sharedPaths;
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, '..', '..');
 
-const MANIFEST_PATH = shared('features/manifest.toml');
+const MANIFEST_PATH = shared('modules/features/manifest.toml');
 
 const OUT_AHK_DIR = resolve(REPO_ROOT, 'static/ergopti_plus/windows/_generated');
 const OUT_HS_DIR = resolve(REPO_ROOT, 'static/ergopti_plus/macos/_generated');
@@ -217,7 +217,7 @@ function ahkLiteral(value) {
 function renderAhkManifest(manifest, sections, features) {
 	const lines = [];
 	lines.push('; _generated/features_manifest.ahk');
-	lines.push('; AUTO-GENERATED from _shared/features/manifest.toml.');
+	lines.push('; AUTO-GENERATED from _shared/modules/features/manifest.toml.');
 	lines.push('; DO NOT EDIT BY HAND — run `npm run build:manifest` to refresh.');
 	lines.push('');
 	lines.push('global FEATURES_MANIFEST := Map(');
@@ -297,7 +297,7 @@ function luaLiteral(value, indent = '') {
 function renderLuaManifest(manifest, sections, features) {
 	const lines = [];
 	lines.push('--- _generated/features_manifest.lua');
-	lines.push('--- AUTO-GENERATED from _shared/features/manifest.toml.');
+	lines.push('--- AUTO-GENERATED from _shared/modules/features/manifest.toml.');
 	lines.push('--- DO NOT EDIT BY HAND — run `npm run build:manifest` to refresh.');
 	lines.push('');
 	lines.push('local M = {}');
@@ -379,7 +379,7 @@ function tomlValueLiteral(value) {
 // inside [section].
 function renderConfigTemplate(manifest, sections, features, platform) {
 	const banner = `# _generated/config_template.toml
-# AUTO-GENERATED from _shared/features/manifest.toml.
+# AUTO-GENERATED from _shared/modules/features/manifest.toml.
 # DO NOT EDIT BY HAND — run \`npm run build:manifest\` to refresh.
 # This is the default v2 config copied into config/ergopti_plus/${platform}/
 # on first boot. After that, the user owns the copy.

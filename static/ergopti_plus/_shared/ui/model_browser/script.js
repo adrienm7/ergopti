@@ -13,7 +13,7 @@
  * 1. Bridge-agnostic: postBridgeMessage() targets WebView2 (window.chrome.webview)
  *    or WKWebView (window.webkit.messageHandlers.model_browser_bridge) automatically.
  * 2. Backend pushes data: the native side builds the normalised model list (params,
- *    RAM, speed, type, installed flag) from _shared/llm/models.json + an install scan,
+ *    RAM, speed, type, installed flag) from _shared/modules/llm/models.json + an install scan,
  *    so the page stays platform-neutral and never reads files itself.
  * 3. Pure client interaction: search, column sort, and selection are all in-page;
  *    only the final "use this model" / "open source page" actions cross the bridge.

@@ -4,7 +4,7 @@
 
 Windows port of the LLM prediction subsystem. `llm_bridge.ahk` maintains a rolling typing-context buffer by intercepting printable keystrokes and backspace, then fires a debounced async request to the prediction engine. `prediction_engine.ahk` sends requests to Ollama (local) or a remote endpoint and streams tokens into a tooltip. `profiles.ahk` manages prompt profiles. `models.ahk` handles model listing and selection.
 
-## Ports used (`_shared/ports/`)
+## Ports used (`_shared/core/ports/`)
 
 | Port              | Usage                                                                   |
 | ----------------- | ----------------------------------------------------------------------- |
@@ -14,7 +14,7 @@ Windows port of the LLM prediction subsystem. `llm_bridge.ahk` maintains a rolli
 | `TimerScheduler`  | Debounce timer between last keystroke and the LLM request               |
 | `Storage`         | Reading and writing profile / model configuration                       |
 
-## Domain module (`_shared/domain/`)
+## Domain module (`_shared/core/domain/`)
 
 - `PromptBuilder.js` — `prediction_engine.ahk` builds prompts following this contract
 - `ProfileSelector.js` — `profiles.ahk` manages profile selection following this contract

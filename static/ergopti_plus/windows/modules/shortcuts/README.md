@@ -4,14 +4,14 @@
 
 Windows port of the shortcuts subsystem. Registers global hotkeys for AltGr combos, CapsLock remap, modifier-layer shortcuts (LAlt, LShift+LCtrl, RCtrl), navigation helpers, and one-shot shift. Each sub-file handles one logical shortcut group and is included by the main AHK entry point after onboarding completes.
 
-## Ports used (`_shared/ports/`)
+## Ports used (`_shared/core/ports/`)
 
 | Port           | Usage                                                                             |
 | -------------- | --------------------------------------------------------------------------------- |
 | `KeyboardHook` | Registering all `#HotIf`-gated hotkeys                                            |
 | `WindowInfo`   | Context guards (`WinActive`, window class checks) used by several shortcut groups |
 
-## Domain module (`_shared/domain/`)
+## Domain module (`_shared/core/domain/`)
 
 No domain spec directly consumed. The module reads its enabled state from the shared `Features` map populated at startup.
 

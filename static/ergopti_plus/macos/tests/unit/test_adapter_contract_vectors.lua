@@ -4,7 +4,7 @@
 --- MODULE: Adapter Contract Behaviour Tests
 --- DESCRIPTION:
 --- Executes the contractTestVectors() scenarios defined in each
---- _shared/ports/*.spec.js — translated into Lua so they run under the
+--- _shared/core/ports/*.spec.js — translated into Lua so they run under the
 --- standard hs-stub test runner without a Node.js dependency.
 ---
 --- RATIONALE:

@@ -5,7 +5,7 @@
 ; DESCRIPTION:
 ; Regression coverage for modules/llm/api_common.ahk after the hardcoded
 ; LLM_COMMON_FALLBACK mirror was removed. The inference tunables now come
-; exclusively from _shared/llm/inference.json; a missing file or tunable raises
+; exclusively from _shared/modules/llm/inference.json; a missing file or tunable raises
 ; (fail fast) instead of silently serving a diverging in-code copy.
 ; ==============================================================================
 

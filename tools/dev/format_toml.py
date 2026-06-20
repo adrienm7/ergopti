@@ -35,11 +35,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from tools.lib.paths import shared  # noqa: E402
 
 HOTSTRING_FILES = [
-    shared("hotstrings", "distancesreduction.toml"),
-    shared("hotstrings", "sfbsreduction.toml"),
-    shared("hotstrings", "rolls.toml"),
-    shared("hotstrings", "autocorrection.toml"),
-    shared("hotstrings", "magickey.toml"),
+    shared("modules/hotstrings", "distancesreduction.toml"),
+    shared("modules/hotstrings", "sfbsreduction.toml"),
+    shared("modules/hotstrings", "rolls.toml"),
+    shared("modules/hotstrings", "autocorrection.toml"),
+    shared("modules/hotstrings", "magickey.toml"),
 ]
 
 _REPO_ROOT = Path(__file__).parent.parent.parent

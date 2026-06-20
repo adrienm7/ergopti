@@ -4,7 +4,7 @@
 ; MODULE: TrayMenu Adapter (AutoHotkey)
 ; DESCRIPTION:
 ; AHK v2 implementation of the TrayMenu port contract defined in
-; static/ergopti_plus/_shared/ports/TrayMenu.spec.js. Wraps the AHK v2 A_TrayMenu
+; static/ergopti_plus/_shared/core/ports/TrayMenu.spec.js. Wraps the AHK v2 A_TrayMenu
 ; and TraySetIcon APIs behind the four canonical functions (TrayMenuSetIcon,
 ; TrayMenuSetMenu, TrayMenuSetTooltip, TrayMenuDestroy) so domain modules can
 ; manage the Windows tray icon without coupling to AHK-specific APIs.

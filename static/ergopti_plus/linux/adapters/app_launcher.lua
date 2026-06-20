@@ -4,7 +4,7 @@
 --- MODULE: AppLauncher Adapter (Linux)
 --- DESCRIPTION:
 --- Linux implementation of the AppLauncher port contract defined in
---- static/ergopti_plus/_shared/ports/AppLauncher.spec.js. Wraps pgrep/nohup
+--- static/ergopti_plus/_shared/core/ports/AppLauncher.spec.js. Wraps pgrep/nohup
 --- to launch applications and query process existence without coupling domain
 --- modules to platform-specific APIs.
 ---

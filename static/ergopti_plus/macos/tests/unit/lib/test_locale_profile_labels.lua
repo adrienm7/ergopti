@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Locale Profile-Label Integrity Tests
 --- DESCRIPTION:
---- Cross-language guard for the profile labels stored in _shared/locales/*.json.
+--- Cross-language guard for the profile labels stored in _shared/data/locales/*.json.
 ---
 --- THE CONTRACT (encodes the root cause of the "%d prédiction%s" bug):
 --- Profile labels ("llm.profile.<id>.label") are rendered through a brace-style
@@ -34,7 +34,7 @@ local COUNT_LABEL_KEY = "llm.profile.batch_advanced.label"
 --- @param code string Locale code (e.g. "fr").
 --- @return table|nil Map of key → value, or nil when the file is unreadable.
 local function profile_labels(code)
-	local path = helpers.shared("locales/" .. code .. ".json")
+	local path = helpers.shared("data/locales/" .. code .. ".json")
 	local fh = io.open(path, "r")
 	if not fh then return nil end
 	local raw = fh:read("*a")

@@ -6,7 +6,7 @@
  * DESCRIPTION:
  * Static check that every literal feature-flag read site in the AHK driver
  * resolves against the Features map that the driver builds at runtime from the
- * single source of truth (_shared/features/manifest.toml). It exists to kill the
+ * single source of truth (_shared/modules/features/manifest.toml). It exists to kill the
  * class of bug behind the layout.ahk UnsetItemError crash: a feature read at a
  * path the manifest does not back (e.g. a section-prefix mismatch, or a feature
  * removed from the manifest but still read), which AHK surfaces only at runtime
@@ -33,7 +33,7 @@ import sharedPaths from '../lib/paths.cjs';
 const { shared } = sharedPaths;
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, '..', '..');
-const MANIFEST_PATH = shared('features/manifest.toml');
+const MANIFEST_PATH = shared('modules/features/manifest.toml');
 const AHK_ROOT = resolve(REPO_ROOT, 'static/ergopti_plus/windows');
 
 // Directories whose .ahk files are NOT hand-written driver code reading the
@@ -291,7 +291,7 @@ for (const f of failures) {
 	console.log(`     ${f.file}:${f.line}`);
 	console.log(`        Features["${f.path.split('.').join('"]["')}"]  — key "${f.missing}" not in manifest`);
 }
-console.log(`\n  Fix: add the feature to _shared/features/manifest.toml and run "npm run codegen",`);
+console.log(`\n  Fix: add the feature to _shared/modules/features/manifest.toml and run "npm run codegen",`);
 console.log(`       or correct the read path. (This is the layout.ahk ctrl_magic_save crash class.)`);
 console.log('');
 process.exit(1);

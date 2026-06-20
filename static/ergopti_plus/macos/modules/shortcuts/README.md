@@ -4,7 +4,7 @@
 
 Orchestrates the shortcuts subsystem. Groups standard text/system utility shortcuts (`bindings.lua`), keyboard-layer shortcuts (`keyboard_shortcuts.lua`), and script lifecycle controls — pause, reload, quit — (`script_control.lua`) behind a single unified API surface for the UI menu.
 
-## Ports used (`_shared/ports/`)
+## Ports used (`_shared/core/ports/`)
 
 | Port               | Usage                                                     |
 | ------------------ | --------------------------------------------------------- |
@@ -12,7 +12,7 @@ Orchestrates the shortcuts subsystem. Groups standard text/system utility shortc
 | `Clipboard`        | Copy/paste utility shortcuts wired through `bindings.lua` |
 | `ProcessLifecycle` | Script reload and quit actions in `script_control.lua`    |
 
-## Domain module (`_shared/domain/`)
+## Domain module (`_shared/core/domain/`)
 
 No domain spec directly consumed. The module is purely driver-side and exposes its own `M.DEFAULT_STATE` as the canonical source for shortcut defaults.
 

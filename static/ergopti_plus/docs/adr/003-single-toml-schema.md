@@ -52,7 +52,7 @@ starts with an uppercase letter.
 ### Negative / Trade-offs
 
 - Existing TOML files that used PascalCase required a migration pass.
-- The migration is documented in `static/ergopti_plus/_shared/features/_migration_v1_to_v2.md`.
+- The migration is documented in `static/ergopti_plus/_shared/modules/features/_migration_v1_to_v2.md`.
 
 ### Neutral
 
@@ -70,5 +70,5 @@ starts with an uppercase letter.
 ## Evidence in the codebase
 
 - Enforcement test: `static/ergopti_plus/macos/tests/meta/test_no_pascal_case_in_toml.lua`
-- Source manifest (all snake_case): `static/ergopti_plus/_shared/features/manifest.toml`
-- Migration guide: `static/ergopti_plus/_shared/features/_migration_v1_to_v2.md`
+- Source manifest (all snake_case): `static/ergopti_plus/_shared/modules/features/manifest.toml`
+- Migration guide: `static/ergopti_plus/_shared/modules/features/_migration_v1_to_v2.md`

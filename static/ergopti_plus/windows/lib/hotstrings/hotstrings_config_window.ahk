@@ -1012,7 +1012,7 @@ _HCW_GetSections(Entry) {
 				and ScriptInformation.Has("PersonalTomlPath")) {
 			Path := ScriptInformation["PersonalTomlPath"]
 		} else {
-			Path := _SharedDir . "\hotstrings\" . StrLower(Cat) . ".toml"
+			Path := _SharedDir . "\modules\hotstrings\" . StrLower(Cat) . ".toml"
 		}
 	}
 	Sections := []
@@ -1127,7 +1127,7 @@ _HCW_StatusPath(Entry, Sec) {
 		Stem := RegExReplace(FileName, "\.toml$", "")
 		Rel := "extensions/" . Entry.ExtId . "/hotstrings/" . Stem . ".toml"
 	} else {
-		Rel := "hotstrings/" . StrLower(Entry.Key) . ".toml"
+		Rel := "modules/hotstrings/" . StrLower(Entry.Key) . ".toml"
 	}
 	if (Sec != "") {
 		Rel .= "  [" . Sec . "]"

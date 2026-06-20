@@ -4,7 +4,7 @@
 
 Core engine for Ergopti+. Runs the OS-level `eventtap` loop that intercepts every keystroke in real time, maintains the typing buffer, measures inter-key delays, and routes each event to the Registry, LLM Bridge, and Expander. This module is the single source of truth for all keymap-wide defaults.
 
-## Ports used (`_shared/ports/`)
+## Ports used (`_shared/core/ports/`)
 
 | Port              | Usage                                                  |
 | ----------------- | ------------------------------------------------------ |
@@ -13,7 +13,7 @@ Core engine for Ergopti+. Runs the OS-level `eventtap` loop that intercepts ever
 | `TooltipRenderer` | Displays LLM prediction suggestions                    |
 | `TimerScheduler`  | Debounce timers for LLM calls and inactivity detection |
 
-## Domain module (`_shared/domain/`)
+## Domain module (`_shared/core/domain/`)
 
 - `HotstringMatcher.spec.js` — the Registry implements this contract for trigger lookup
 - `Expander.spec.js` — the Expander sub-module implements this contract

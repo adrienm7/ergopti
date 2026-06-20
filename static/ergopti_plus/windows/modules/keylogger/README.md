@@ -6,7 +6,7 @@ Windows port of the Hammerspoon keylogger. Intercepts every keystroke via the AH
 
 Rich aggregation (n-grams, bursts, ergonomic streaks) is not yet ported; the Mac-side Hammerspoon walker handles those tables for any synced Windows device.
 
-## Ports used (`_shared/ports/`)
+## Ports used (`_shared/core/ports/`)
 
 | Port             | Usage                                                             |
 | ---------------- | ----------------------------------------------------------------- |
@@ -15,7 +15,7 @@ Rich aggregation (n-grams, bursts, ergonomic streaks) is not yet ported; the Mac
 | `WindowInfo`     | Active app and window title for app-switch / window-switch events |
 | `TimerScheduler` | Ingest tick, idle detection, and flush scheduling                 |
 
-## Domain module (`_shared/domain/`)
+## Domain module (`_shared/core/domain/`)
 
 No direct domain spec. Implements the schema defined in `_shared/data/KEYLOGGER_SPEC.md`. Per-device isolation uses a UUID derived from the Windows `MachineGuid` registry key.
 

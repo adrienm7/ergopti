@@ -5,8 +5,8 @@
 --- DESCRIPTION:
 --- Validates the two shared Lua LLM modules against their cross-driver test
 --- vectors, ensuring the Lua implementations stay in sync with the JS reference
---- implementations in _shared/domain/PromptBuilder.js and
---- _shared/domain/ProfileSelector.js.
+--- implementations in _shared/core/domain/PromptBuilder.js and
+--- _shared/core/domain/ProfileSelector.js.
 ---
 --- COVERAGE:
 --- 1. PromptBuilder — every vector from M.test_vectors() is executed against

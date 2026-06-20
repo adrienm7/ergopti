@@ -9,7 +9,7 @@
 --- matches on every keypress.
 ---
 --- Implements the matching algorithm defined in:
----   static/ergopti_plus/_shared/domain/HotstringMatcher.spec.js
+---   static/ergopti_plus/_shared/core/domain/HotstringMatcher.spec.js
 ---
 --- FEATURES & RATIONALE:
 --- 1. Tail-char bucketing: mappings are indexed by the last codepoint of their

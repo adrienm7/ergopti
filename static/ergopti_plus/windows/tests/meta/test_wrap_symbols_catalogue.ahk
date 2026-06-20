@@ -22,11 +22,11 @@
 
 _MetaWrapSymbolsCatalogue() {
 	SplitPath(A_ScriptDir, , &DriverRootRaw)
-	JsonPath := DriverRootRaw . "\..\_shared\wrap_symbols.json"
-	AssertTrue(FileExist(JsonPath) != "", "_shared/wrap_symbols.json must exist at '" . JsonPath . "'")
+	JsonPath := DriverRootRaw . "\..\_shared\modules\wrap_symbols\wrap_symbols.json"
+	AssertTrue(FileExist(JsonPath) != "", "_shared/modules/wrap_symbols/wrap_symbols.json must exist at '" . JsonPath . "'")
 
 	Content := FileRead(JsonPath, "UTF-8")
-	AssertTrue(Content != "", "_shared/wrap_symbols.json must not be empty")
+	AssertTrue(Content != "", "_shared/modules/wrap_symbols/wrap_symbols.json must not be empty")
 
 	Root := JsonParse(Content)
 	AssertTrue(Root is Map, "wrap_symbols.json root must be a JSON object")

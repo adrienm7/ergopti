@@ -5,11 +5,11 @@
 --- DESCRIPTION:
 --- Canonical Lua implementation of the LLM profile registry and prompt variable
 --- injector, shared between the Hammerspoon driver and any future Lua-based
---- driver. Loads the built-in profile catalogue from _shared/llm/profiles.json,
+--- driver. Loads the built-in profile catalogue from _shared/modules/llm/profiles.json,
 --- merges user-defined overrides, resolves the active profile by ID, and
 --- performs template variable substitution.
 ---
---- This module is the Lua counterpart of _shared/domain/ProfileSelector.js.
+--- This module is the Lua counterpart of _shared/core/domain/ProfileSelector.js.
 --- All logic and fallback behaviour MUST stay in sync with the JS reference.
 ---
 --- FEATURES & RATIONALE:
@@ -36,7 +36,7 @@ local M = {}
 -- =============================================
 
 -- Resolve profiles.json path relative to this file's location.
--- _shared/lua/llm/ -> _shared/llm/profiles.json
+-- _shared/lua/llm/ -> _shared/modules/llm/profiles.json
 local _PROFILES_JSON_PATH = nil
 
 --- Returns the absolute path to profiles.json.
@@ -49,8 +49,8 @@ local function get_profiles_path()
 	if src and src:sub(1, 1) == "@" then
 		local dir = src:sub(2):match("^(.+)[/\\][^/\\]+$")
 		if dir then
-			-- Navigate up two levels: llm/ -> lua/ -> _shared/ -> llm/profiles.json
-			local candidate = dir .. "/../../llm/profiles.json"
+			-- Navigate up two levels: llm/ -> lua/ -> _shared/ -> modules/llm/profiles.json
+			local candidate = dir .. "/../../modules/llm/profiles.json"
 			local fh = io.open(candidate, "r")
 			if fh then
 				fh:close()

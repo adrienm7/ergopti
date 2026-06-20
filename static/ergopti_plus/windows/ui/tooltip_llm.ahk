@@ -37,7 +37,7 @@
 ; #HotIf hotkey path and the InputHook FeedKeyDown path in the same tick.
 global _LLM_AcceptInProgress := false
 
-; LLM tooltip chrome — loaded from _shared/tooltip/constants.toml via ui_style.ahk.
+; LLM tooltip chrome — loaded from _shared/modules/tooltip/constants.toml via ui_style.ahk.
 ; Compile-time sentinels overwritten by Tooltip_LlmUiSyncFromShared() at boot.
 LLM_TOOLTIP_ACTIVE_PREFIX   := ""
 LLM_TOOLTIP_INACTIVE_PREFIX := ""   ; built dynamically from pred_indent

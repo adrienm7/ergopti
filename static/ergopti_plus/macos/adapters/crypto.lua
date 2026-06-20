@@ -4,7 +4,7 @@
 --- MODULE: Crypto Adapter (Hammerspoon)
 --- DESCRIPTION:
 --- Hammerspoon implementation of the Crypto port contract defined in
---- static/ergopti_plus/_shared/ports/Crypto.spec.js. Provides a SHA-256 digest
+--- static/ergopti_plus/_shared/core/ports/Crypto.spec.js. Provides a SHA-256 digest
 --- function without coupling domain modules to any specific crypto library.
 ---
 --- FEATURES & RATIONALE:

@@ -2,7 +2,7 @@
 
 ; ==========================================
 ; AUTO-GENERATED — do not edit manually
-; Source: static/ergopti_plus/_shared/domain/Expander.spec.js
+; Source: static/ergopti_plus/_shared/core/domain/Expander.spec.js
 ; Run: npm run codegen:expander:ahk
 ; ==========================================
 

@@ -10,7 +10,7 @@
  * port contract, a README, and a checklist of what still needs implementing.
  *
  * FEATURES & RATIONALE:
- * 1. Ports-driven: scans _shared/ports/*.spec.js so the list of adapters to
+ * 1. Ports-driven: scans _shared/core/ports/*.spec.js so the list of adapters to
  *    stub is always in sync with the canonical port definitions.
  * 2. Language-aware: --lang lua generates .lua stubs; --lang ahk generates
  *    .ahk stubs. Defaults to lua.
@@ -98,7 +98,7 @@ function buildAdapterStub(driverName, portName, lang) {
 	const ext = FILE_EXT[lang];
 	const snakeName = toSnakeCase(portName);
 	const filePath = `static/ergopti_plus/${driverName}/adapters/${snakeName}${ext}`;
-	const specRef = `static/ergopti_plus/_shared/ports/${portName}.spec.js`;
+	const specRef = `static/ergopti_plus/_shared/core/ports/${portName}.spec.js`;
 
 	if (lang === 'lua') {
 		return [
@@ -194,7 +194,7 @@ function buildDriverReadme(driverName, ports, domains, lang) {
 		``,
 		`\`\`\``,
 		`${driverName}/`,
-		`  adapters/    One file per port contract (see _shared/ports/)`,
+		`  adapters/    One file per port contract (see _shared/core/ports/)`,
 		`  modules/     Internal domain-specific modules`,
 		`  tests/       Unit and integration tests`,
 		`  lib/         Utilities shared across this driver`,
@@ -232,7 +232,7 @@ function buildAdaptersReadme(driverName, ports, lang) {
 	const rows = ports
 		.map((p) => {
 			const file = toSnakeCase(p) + ext;
-			return `| \`${file}\` | \`${p}\` | \`_shared/ports/${p}.spec.js\` | ❌ TODO |`;
+			return `| \`${file}\` | \`${p}\` | \`_shared/core/ports/${p}.spec.js\` | ❌ TODO |`;
 		})
 		.join('\n');
 
@@ -240,7 +240,7 @@ function buildAdaptersReadme(driverName, ports, lang) {
 		`# ${driverName} — Adapters`,
 		``,
 		`Each file in this directory implements one port contract from`,
-		`\`static/ergopti_plus/_shared/ports/\`.`,
+		`\`static/ergopti_plus/_shared/core/ports/\`.`,
 		``,
 		`| File | Port | Spec | Status |`,
 		`|------|------|------|--------|`,
@@ -342,9 +342,9 @@ function main() {
 Done. Next steps:
 ─────────────────────────────────────────────────────────────────
   [ ] Implement each adapter stub in static/ergopti_plus/${driverName}/adapters/
-      (${ports.length} files — one per port contract in _shared/ports/)
+      (${ports.length} files — one per port contract in _shared/core/ports/)
 
-  [ ] Satisfy the domain specs listed in static/ergopti_plus/_shared/domain/
+  [ ] Satisfy the domain specs listed in static/ergopti_plus/_shared/core/domain/
       (${domains.length} specs: ${domains.join(', ')})
 
   [ ] Add driver entry-point under static/ergopti_plus/${driverName}/

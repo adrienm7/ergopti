@@ -33,7 +33,7 @@
 ; =======================================
 ; =======================================
 
-; Loaded from _shared/llm/api_providers.json at boot (see _LLMRemote_LoadCatalog).
+; Loaded from _shared/modules/llm/api_providers.json at boot (see _LLMRemote_LoadCatalog).
 ; Each provider ID maps to Label / BaseUrl / DefaultModel / Format — same
 ; schema as the HS twin. Adding a provider = one entry in api_providers.json
 ; plus (optionally) a new Format branch in _LLMRemoteBuildPayload /
@@ -744,12 +744,12 @@ _LLMRemoteJsonUnescape(s) {
 ; ============================================
 
 /**
- * Loads provider descriptors + model prices from _shared/llm/api_providers.json.
+ * Loads provider descriptors + model prices from _shared/modules/llm/api_providers.json.
  * Fail-fast when the file is missing or malformed — same contract as the HS twin.
  */
 _LLMRemote_LoadCatalog() {
     global LLM_API_PROVIDERS, LLM_API_PROVIDER_ORDER, LLM_REMOTE_MODEL_PRICES, _SharedDir
-    path := _SharedDir . "\llm\api_providers.json"
+    path := _SharedDir . "\modules\llm\api_providers.json"
     if !FileExist(path)
         throw Error("api_providers.json not found at " . path)
     try {

@@ -15,7 +15,7 @@
 ;
 ; This module is the AHK counterpart of:
 ;   static/ergopti_plus/_shared/lua/llm/prompt_builder.lua
-;   static/ergopti_plus/_shared/domain/PromptBuilder.js
+;   static/ergopti_plus/_shared/core/domain/PromptBuilder.js
 ; All constants and algorithms MUST stay in sync with those references.
 ;
 ; CONSTANTS (canonical — all drivers MUST use these exact values):

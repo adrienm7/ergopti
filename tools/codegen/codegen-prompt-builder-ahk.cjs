@@ -105,7 +105,7 @@ function buildAhkSource() {
 	lines.push(';');
 	lines.push('; This module is the AHK counterpart of:');
 	lines.push(';   ' + sharedRel('lua/llm/prompt_builder.lua'));
-	lines.push(';   ' + sharedRel('domain/PromptBuilder.js'));
+	lines.push(';   ' + sharedRel('core/domain/PromptBuilder.js'));
 	lines.push('; All constants and algorithms MUST stay in sync with those references.');
 	lines.push(';');
 	lines.push('; CONSTANTS (canonical — all drivers MUST use these exact values):');

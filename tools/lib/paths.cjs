@@ -48,7 +48,7 @@ function shared(...segments) {
  * Resolves a repo-relative (forward-slash) path inside the _shared/ tree. Useful
  * for tools that join against their own REPO_ROOT or print the path verbatim.
  * @param {...string} segments - Path segments under _shared/.
- * @returns {string} Repo-relative path, e.g. "static/ergopti_plus/_shared/ports/contracts.json".
+ * @returns {string} Repo-relative path, e.g. "static/ergopti_plus/_shared/core/ports/contracts.json".
  */
 function sharedRel(...segments) {
 	return [SHARED_REL, ...segments].join('/');

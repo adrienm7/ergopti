@@ -6,7 +6,7 @@
 --- Platform-neutral logger core shared by all Ergopti+ drivers. Provides the
 --- canonical log-line formatter, ring buffer, severity level filter, and the
 --- eight variants (debug/trace/done/info/start/success/warn/error) as specified
---- in static/ergopti_plus/_shared/logger/SPEC.md.
+--- in static/ergopti_plus/_shared/modules/logger/SPEC.md.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Pure Lua 5.3+: no driver-specific APIs — no hs.console, no file I/O, no

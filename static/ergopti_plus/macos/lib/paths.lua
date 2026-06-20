@@ -144,15 +144,15 @@ function M.shared(rel)
 	return root
 end
 
---- Resolves a file inside ``_shared/llm/``. Thin wrapper over M.shared kept for
+--- Resolves a file inside ``_shared/modules/llm/``. Thin wrapper over M.shared kept for
 --- call-site readability.
 --- @param filename string|nil File name (e.g. ``"models.json"``). Nil → directory path.
 --- @return string|nil Absolute path, or nil when the shared tree is unreachable.
 function M.shared_llm_path(filename)
 	if filename and filename ~= "" then
-		return M.shared("llm/" .. filename)
+		return M.shared("modules/llm/" .. filename)
 	end
-	return M.shared("llm")
+	return M.shared("modules/llm")
 end
 
 return M

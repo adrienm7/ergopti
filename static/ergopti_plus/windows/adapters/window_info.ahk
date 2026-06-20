@@ -4,7 +4,7 @@
 ; MODULE: WindowInfo Adapter (AutoHotkey)
 ; DESCRIPTION:
 ; AHK v2 implementation of the WindowInfo port contract defined in
-; static/ergopti_plus/_shared/ports/WindowInfo.spec.js. Wraps AHK v2's
+; static/ergopti_plus/_shared/core/ports/WindowInfo.spec.js. Wraps AHK v2's
 ; WinGetTitle, WinGetProcessName, WinGetList, and WinGetID built-ins behind
 ; the two canonical functions (WIGetFocused, WIGetAll) so domain modules can
 ; query foreground-window identity without coupling to AHK-specific APIs.

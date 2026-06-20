@@ -24,7 +24,7 @@ local ShellRunner    = require("adapters.shell_runner")
 local LOG            = "llm.api_ollama"
 
 -- Ollama bind address. The default port is the single source in
--- _shared/llm/defaults.json (llm_ollama_port, surfaced via DEFAULT_STATE); a user
+-- _shared/modules/llm/defaults.json (llm_ollama_port, surfaced via DEFAULT_STATE); a user
 -- override from the LLM menu (settings key OLLAMA_PORT_SETTING_KEY) wins so a
 -- port collision can be resolved without editing any file. Host stays loopback.
 local OLLAMA_DEFAULT_HOST     = "127.0.0.1"
@@ -47,7 +47,7 @@ local function read_ollama_port_override()
 end
 
 --- Resolves the Ollama port: a valid user override wins, otherwise the canonical
---- default from _shared/llm/defaults.json (DEFAULT_STATE.llm_ollama_port). init is
+--- default from _shared/modules/llm/defaults.json (DEFAULT_STATE.llm_ollama_port). init is
 --- required lazily to avoid the init <-> api_ollama require cycle.
 --- @return integer
 local function resolve_ollama_port()
@@ -57,7 +57,7 @@ local function resolve_ollama_port()
 	local ds   = ok and Core and Core.DEFAULT_STATE or nil
 	local port = ds and tonumber(ds.llm_ollama_port)
 	if port then return math.floor(port) end
-	Logger.error(LOG, "llm_ollama_port missing from DEFAULT_STATE (_shared/llm/defaults.json) — LLM defaults not initialised.")
+	Logger.error(LOG, "llm_ollama_port missing from DEFAULT_STATE (_shared/modules/llm/defaults.json) — LLM defaults not initialised.")
 	return 11434
 end
 
@@ -73,7 +73,7 @@ if not ok_kl then keylogger = nil end
 local _req_counter = 0
 local _ollama_started = false
 local DEDUPLICATION_ENABLED = ApiCommon.DEFAULT_DEDUPLICATION_ENABLED
--- Retry policy lives in _shared/llm/inference.json so the AHK twin can read
+-- Retry policy lives in _shared/modules/llm/inference.json so the AHK twin can read
 -- the same numbers. ``max_mult`` is the upper bound on attempts as a
 -- multiple of requested_predictions; ``retry_temp_step`` is added on top of
 -- the diversity step for the 2nd attempt; ``retry_extra_tokens`` gives the

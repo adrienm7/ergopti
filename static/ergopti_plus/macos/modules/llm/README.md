@@ -2,19 +2,19 @@
 
 ## Purpose
 
-Coordinates communication with local (Ollama, MLX) and remote LLM backends. Manages backend detection, profile selection, streaming response parsing, warmup scheduling, and exposes a unified prediction API to `keymap/llm_bridge.lua`. Loads cross-platform defaults from `_shared/llm/defaults.json` so the same tuning applies on every driver.
+Coordinates communication with local (Ollama, MLX) and remote LLM backends. Manages backend detection, profile selection, streaming response parsing, warmup scheduling, and exposes a unified prediction API to `keymap/llm_bridge.lua`. Loads cross-platform defaults from `_shared/modules/llm/defaults.json` so the same tuning applies on every driver.
 
-## Ports used (`_shared/ports/`)
+## Ports used (`_shared/core/ports/`)
 
 | Port               | Usage                                                                      |
 | ------------------ | -------------------------------------------------------------------------- |
 | `HttpClient`       | REST calls to Ollama/MLX APIs and remote endpoints                         |
-| `FileSystem`       | Reading `_shared/llm/defaults.json` and shell-script dependency installers |
+| `FileSystem`       | Reading `_shared/modules/llm/defaults.json` and shell-script dependency installers |
 | `TimerScheduler`   | Debounce timer between keystrokes and the actual LLM request               |
 | `TooltipRenderer`  | Streaming token display during prediction                                  |
 | `ProcessLifecycle` | Launching and watching the Ollama/MLX background process                   |
 
-## Domain module (`_shared/domain/`)
+## Domain module (`_shared/core/domain/`)
 
 - `PromptBuilder.js` — `prompt_builder.lua` implements this contract
 - `ProfileSelector.js` — `profiles.lua` implements profile management
@@ -42,4 +42,4 @@ LLM.init(shared_state)
 -- keymap/llm_bridge.lua calls LLM.request() on every keystroke debounce
 ```
 
-Cross-platform defaults are loaded from `_shared/llm/defaults.json` at init time and merged into `M.DEFAULT_STATE`. HS-specific keys (model names, `llm_debounce` in seconds) are not in the JSON and keep their hardcoded base values.
+Cross-platform defaults are loaded from `_shared/modules/llm/defaults.json` at init time and merged into `M.DEFAULT_STATE`. HS-specific keys (model names, `llm_debounce` in seconds) are not in the JSON and keep their hardcoded base values.

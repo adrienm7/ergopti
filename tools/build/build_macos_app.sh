@@ -346,10 +346,10 @@ assemble_app() {
 	cp -R "$REPO_ROOT/static/ergopti_plus/_shared"      "$static_root/drivers/_shared"
 
 	# Static assets.
-	cp -R "$REPO_ROOT/static/ergopti_plus/_shared/menu_manifest.json" "$static_root/"
+	cp -R "$REPO_ROOT/static/ergopti_plus/_shared/modules/menu/menu_manifest.json" "$static_root/"
 	cp -R "$REPO_ROOT/static/version.json"        "$static_root/" 2>/dev/null || true
-	cp -R "$REPO_ROOT/static/ergopti_plus/_shared/locales"            "$static_root/"
-	cp -R "$REPO_ROOT/static/ergopti_plus/_shared/hotstrings"         "$static_root/"
+	cp -R "$REPO_ROOT/static/ergopti_plus/_shared/data/locales"            "$static_root/"
+	cp -R "$REPO_ROOT/static/ergopti_plus/_shared/modules/hotstrings"         "$static_root/"
 	cp -R "$REPO_ROOT/static/img"                 "$static_root/"
 
 	# Bundle third-party tools so they are available on first launch with no

@@ -4,7 +4,7 @@
 --- MODULE: Shared Timings Reader (Hammerspoon)
 --- DESCRIPTION:
 --- Fail-fast reader over the cross-driver timing registry at
---- `_shared/timings/constants.toml`. That TOML file is the single authoritative
+--- `_shared/modules/timings/constants.toml`. That TOML file is the single authoritative
 --- source for every tunable timing in the project (debounces, timeouts, poll
 --- intervals, …) and even names the AHK + HS constant that each value used to
 --- duplicate. This module exposes those values to the macOS driver so the
@@ -46,16 +46,16 @@ local MS_PER_SEC = 1000
 -- ==================================
 -- ==================================
 
---- Reads _shared/timings/constants.toml relative to this file. Missing file or a
+--- Reads _shared/modules/timings/constants.toml relative to this file. Missing file or a
 --- malformed parse raises an error (fail fast — no driver-side fallbacks).
 --- @return table The parsed `sections` table ([section][key] = number).
 local function load_registry()
-	local toml_path = Paths.shared("timings/constants.toml")
+	local toml_path = Paths.shared("modules/timings/constants.toml")
 
 	local parsed   = TomlReader.parse(toml_path)
 	local sections = (type(parsed) == "table") and parsed.sections or nil
 	if type(sections) ~= "table" then
-		error("[timings] _shared/timings/constants.toml not readable: " .. toml_path)
+		error("[timings] _shared/modules/timings/constants.toml not readable: " .. toml_path)
 	end
 	return sections
 end

@@ -4,7 +4,7 @@
 --- MODULE: Clipboard Adapter (Hammerspoon)
 --- DESCRIPTION:
 --- Hammerspoon implementation of the Clipboard port contract defined in
---- static/ergopti_plus/_shared/ports/Clipboard.spec.js. Wraps hs.pasteboard behind
+--- static/ergopti_plus/_shared/core/ports/Clipboard.spec.js. Wraps hs.pasteboard behind
 --- four canonical methods (read, write, save, restore) so domain modules can
 --- interact with the system clipboard without coupling to hs APIs.
 ---

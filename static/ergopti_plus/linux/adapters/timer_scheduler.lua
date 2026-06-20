@@ -4,7 +4,7 @@
 --- MODULE: TimerScheduler Adapter (Linux)
 --- DESCRIPTION:
 --- Linux implementation of the TimerScheduler port contract defined in
---- static/ergopti_plus/_shared/ports/TimerScheduler.spec.js. Provides the four
+--- static/ergopti_plus/_shared/core/ports/TimerScheduler.spec.js. Provides the four
 --- canonical port methods (after, every, cancel, cancelAll) using LuaJIT's
 --- luv (libuv) timer handles so domain modules can schedule deferred work
 --- without a direct dependency on any OS-level timer API.

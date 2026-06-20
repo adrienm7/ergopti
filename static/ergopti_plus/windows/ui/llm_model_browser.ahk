@@ -426,7 +426,7 @@ _LLM_ModelBrowser_ShowWeb() {
  * MoE-aware) from the shared model index and injects it via injectModels(). The
  * Windows backend is always Ollama, so the install flag reads the Ollama tag list.
  *
- * The catalogue is STATIC (_shared/llm/models.json), so it is ALWAYS injected in
+ * The catalogue is STATIC (_shared/modules/llm/models.json), so it is ALWAYS injected in
  * full — whether or not the AI feature is enabled. Only the green "installed" dot
  * needs Ollama, so its tag scan is skipped unless the daemon is confirmed ready.
  * This is critical here: InjectCatalogue runs inside the WebView2 WebMessageReceived
@@ -567,17 +567,17 @@ _LLM_MBW_HtmlUrl() {
 	return "file:///" . StrReplace(base, "\", "/")
 }
 
-/** Returns the file:// URL for _shared/locales/ (trailing slash). */
+/** Returns the file:// URL for _shared/data/locales/ (trailing slash). */
 _LLM_MBW_LocalesUrl() {
 	global _SharedDir
-	base := _SharedDir . "\locales\"
+	base := _SharedDir . "\data\locales\"
 	return "file:///" . StrReplace(base, "\", "/")
 }
 
 /** Builds the ExecuteScript call that applies i18n strings (read from disk). */
 _LLM_MBW_I18nApplyScript() {
 	global _SharedDir, _I18nLocale
-	json_path := _SharedDir . "\locales\" . _I18nLocale . ".json"
+	json_path := _SharedDir . "\data\locales\" . _I18nLocale . ".json"
 	json_str  := "{}"
 	if FileExist(json_path)
 		try json_str := FileRead(json_path, "UTF-8")

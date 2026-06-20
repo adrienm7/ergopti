@@ -139,7 +139,7 @@ CountTomlSection(CategoryName, SectionName, FilePath := "") {
         and ScriptInformation.Has("PersonalTomlPath")) {
             FilePath := ScriptInformation["PersonalTomlPath"]
         } else {
-            FilePath := _SharedDir . "\hotstrings\" . StrLower(CategoryName) . ".toml"
+            FilePath := _SharedDir . "\modules\hotstrings\" . StrLower(CategoryName) . ".toml"
         }
     }
     
@@ -158,7 +158,7 @@ CountTomlHotstrings(CategoryName, FilePath := "") {
         and ScriptInformation.Has("PersonalTomlPath")) {
             FilePath := ScriptInformation["PersonalTomlPath"]
         } else {
-            FilePath := _SharedDir . "\hotstrings\" . StrLower(CategoryName) . ".toml"
+            FilePath := _SharedDir . "\modules\hotstrings\" . StrLower(CategoryName) . ".toml"
         }
     }
     
@@ -309,7 +309,7 @@ LoadHotstringsSection(CategoryName, SectionName, FeatureConfig, ExtraOptions := 
     and ScriptInformation.Has("PersonalTomlPath")) {
         FilePath := ScriptInformation["PersonalTomlPath"]
     } else {
-        FilePath := _SharedDir . "\hotstrings\" . CategoryName . ".toml"
+        FilePath := _SharedDir . "\modules\hotstrings\" . CategoryName . ".toml"
     }
     if !FileExist(FilePath) {
         try LoggerWarn("TomlLoader", "Section [{1}.{2}]: file {3} not found.",
@@ -493,7 +493,7 @@ ParseTomlGroupConfig(CategoryName, FilePath := "") {
             and ScriptInformation.Has("PersonalTomlPath")) {
             FilePath := ScriptInformation["PersonalTomlPath"]
         } else {
-            FilePath := _SharedDir . "\hotstrings\" . LowerCat . ".toml"
+            FilePath := _SharedDir . "\modules\hotstrings\" . LowerCat . ".toml"
         }
     }
 
@@ -584,7 +584,7 @@ ParseTomlGroupConfig(CategoryName, FilePath := "") {
 ReadTomlSectionsOrder(CategoryName, FilePath := "") {
     global _SharedDir
     if (FilePath == "") {
-        FilePath := _SharedDir . "\hotstrings\" . StrLower(CategoryName) . ".toml"
+        FilePath := _SharedDir . "\modules\hotstrings\" . StrLower(CategoryName) . ".toml"
     }
     if !FileExist(FilePath) {
         return []

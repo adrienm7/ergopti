@@ -474,7 +474,7 @@ function checkWebUiAntiPatterns() {
 // ──────────────────────────────────────────────────────────────────────────────
 
 function checkMacOsGestureDefaults() {
-	const manifestPath = shared('features/manifest.toml');
+	const manifestPath = shared('modules/features/manifest.toml');
 	try {
 		const content = readFileSync(manifestPath, 'utf8');
 		// Only look at the hs.gestures section

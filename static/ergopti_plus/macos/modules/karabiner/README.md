@@ -4,7 +4,7 @@
 
 Bridge between Hammerspoon and Karabiner-Elements. Manages the full lifecycle: reading and writing `config_karabiner.toml`, generating `karabiner.json` entirely in Lua from in-memory state, deploying it to the Karabiner-Elements config directory, and watching for KE process events. Loads action and modifier-combo definitions from `modules/karabiner/data/` so the menu and the generator are always in sync.
 
-## Ports used (`_shared/ports/`)
+## Ports used (`_shared/core/ports/`)
 
 | Port               | Usage                                                                    |
 | ------------------ | ------------------------------------------------------------------------ |
@@ -12,7 +12,7 @@ Bridge between Hammerspoon and Karabiner-Elements. Manages the full lifecycle: r
 | `ProcessLifecycle` | Detecting whether Karabiner-Elements is running and reloading its config |
 | `Storage`          | Persisting the user config between sessions                              |
 
-## Domain module (`_shared/domain/`)
+## Domain module (`_shared/core/domain/`)
 
 No direct domain spec. Uses two driver-local JSON data files (Karabiner-Elements is macOS-exclusive, so these files live in the driver rather than in `_shared/`):
 

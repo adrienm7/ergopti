@@ -8,7 +8,7 @@
 --- Derives all backend request parameters from the current buffer and a
 --- configuration object. No OS calls; fully deterministic and unit-testable.
 ---
---- This module is the Lua counterpart of _shared/domain/PromptBuilder.js.
+--- This module is the Lua counterpart of _shared/core/domain/PromptBuilder.js.
 --- All constants and algorithms MUST stay in sync with the JS reference.
 ---
 --- CONSTANTS (canonical — all drivers MUST use these exact values):

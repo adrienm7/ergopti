@@ -99,7 +99,7 @@ MenuManifest_LoadHotstringGroups() {
 	if (_MM_HOTSTRING_GROUPS_CACHE != false)
 		return _MM_HOTSTRING_GROUPS_CACHE
 
-	FilePath := _SharedDir . "\menu_manifest.json"
+	FilePath := _SharedDir . "\modules\menu\menu_manifest.json"
 
 	; Guard: file must exist before we attempt to read it
 	if !FileExist(FilePath) {
@@ -187,7 +187,7 @@ MenuManifest_LoadDebugMenu() {
 	if (_MM_DEBUG_MENU_CACHE != false)
 		return _MM_DEBUG_MENU_CACHE
 
-	FilePath := _SharedDir . "\menu_manifest.json"
+	FilePath := _SharedDir . "\modules\menu\menu_manifest.json"
 
 	if !FileExist(FilePath) {
 		try LoggerWarn("MenuManifest", "manifest not found — using fallback debug menu order.")

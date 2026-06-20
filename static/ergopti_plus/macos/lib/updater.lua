@@ -1,7 +1,7 @@
 --- lib/updater.lua
 ---
 --- Cross-driver updater engine (version compare, GitHub fetch, background poller).
---- Canonical algorithms: _shared/updater/version.js
+--- Canonical algorithms: _shared/modules/updater/version.js
 
 local M = {}
 

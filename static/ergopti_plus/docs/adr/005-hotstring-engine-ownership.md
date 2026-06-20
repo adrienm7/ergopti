@@ -1,4 +1,4 @@
-# 005 — Hotstring engine canonical spec lives in `_shared/domain/`
+# 005 — Hotstring engine canonical spec lives in `_shared/core/domain/`
 
 | Field        | Value      |
 | ------------ | ---------- |
@@ -30,7 +30,7 @@ specification existed that both drivers could be validated against.
 ## Decision
 
 The **canonical behavioural specification** for the hotstring engine lives in
-`static/ergopti_plus/_shared/domain/` as a set of JavaScript spec files
+`static/ergopti_plus/_shared/core/domain/` as a set of JavaScript spec files
 (`HotstringMatcher.spec.js`, `Expander.spec.js`, `Registry.spec.js`,
 `Terminators.spec.js`). These specs define the expected input/output
 behaviour for every component of the pipeline via test vectors.
@@ -40,7 +40,7 @@ logical assertions expressed in those specs (either directly or via the
 cross-driver corpus — see ADR-006). If a driver's behaviour diverges from the
 spec, the driver is wrong, not the spec.
 
-New algorithm changes must first update the `_shared/domain/` spec, then be
+New algorithm changes must first update the `_shared/core/domain/` spec, then be
 propagated to both driver implementations.
 
 ## Consequences
@@ -56,7 +56,7 @@ propagated to both driver implementations.
 
 ### Negative / Trade-offs
 
-- The `_shared/domain/` specs are written in JavaScript (to stay in the Node
+- The `_shared/core/domain/` specs are written in JavaScript (to stay in the Node
   test ecosystem), while the implementations are in Lua and AHK. Translating
   spec assertions into driver-specific test idioms requires manual effort.
 - Any spec change must be propagated to two driver test suites.
@@ -77,6 +77,6 @@ propagated to both driver implementations.
 
 ## Evidence in the codebase
 
-- Domain specs: `static/ergopti_plus/_shared/domain/HotstringMatcher.spec.js`, `Expander.spec.js`, `Registry.spec.js`, `Terminators.spec.js`
+- Domain specs: `static/ergopti_plus/_shared/core/domain/HotstringMatcher.spec.js`, `Expander.spec.js`, `Registry.spec.js`, `Terminators.spec.js`
 - Hammerspoon driver tests: `static/ergopti_plus/macos/tests/unit/modules/keymap/test_expander.lua`, `test_registry.lua`, `test_terminators.lua`
-- Domain spec documentation: `static/ergopti_plus/_shared/domain/SPEC.md`
+- Domain spec documentation: `static/ergopti_plus/_shared/core/domain/SPEC.md`

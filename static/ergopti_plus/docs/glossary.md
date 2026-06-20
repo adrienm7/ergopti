@@ -55,7 +55,7 @@ hotstring processing.
 The module responsible for executing a hotstring expansion once the
 **→ HotstringMatcher** has identified a match. It calculates the number of
 backspaces to issue, emits the replacement text, and updates the
-**→ CoreState** buffer. Domain spec: `_shared/domain/Expander.spec.js`.
+**→ CoreState** buffer. Domain spec: `_shared/core/domain/Expander.spec.js`.
 Implementations: `modules/keymap/expander.lua` (Hammerspoon),
 `modules/hotstrings.ahk` (AHK).
 
@@ -64,7 +64,7 @@ The pure matching algorithm that, given the current **→ Buffer** and the last
 typed character, queries the **→ Registry** for candidates in the
 **→ Tail-Char Bucket** and applies **→ Word Boundary** and case-sensitivity
 rules to select the longest matching trigger. Domain spec:
-`_shared/domain/HotstringMatcher.spec.js`. Shared Lua implementation:
+`_shared/core/domain/HotstringMatcher.spec.js`. Shared Lua implementation:
 `_shared/lua/hotstring_engine/init.lua`.
 
 **Interceptor**
@@ -84,13 +84,13 @@ A special trigger character (default `★`, Unicode U+2605) that fires an
 expansion without a terminator. Used for manual expansions and to repeat the
 last character correction. Stored in `CoreState.magic_key` and updated by
 `Registry.update_trigger_char()`. Hotstring data lives in
-`_shared/hotstrings/magic_key/`.
+`_shared/modules/hotstrings/magic_key/`.
 
 **Registry**
 The in-memory data store for all hotstring mappings, groups, sections, and
 terminators. Provides O(1) lookup via **→ Tail-Char Bucket** indexing and
 manages the enable/disable lifecycle of hotstring groups. Domain spec:
-`_shared/domain/Registry.spec.js`. Implementations:
+`_shared/core/domain/Registry.spec.js`. Implementations:
 `modules/keymap/registry.lua` (Hammerspoon),
 `lib/hotstrings/hotstring_engine.ahk` (AHK).
 
@@ -110,13 +110,13 @@ by the last Unicode codepoint of their trigger. On every keypress, only the
 bucket for the typed character is examined, keeping the hot-path cost
 proportional to the bucket size rather than the total number of mappings.
 See `_shared/lua/hotstring_engine/init.lua` and
-`_shared/domain/HotstringMatcher.spec.js`.
+`_shared/core/domain/HotstringMatcher.spec.js`.
 
 **Terminator**
 A keypress (space, punctuation, Enter, etc.) that signals the end of a
 potential hotstring trigger and triggers expansion if the buffer matches.
 The full catalogue of enabled terminators is managed by the Terminators
-module. Domain spec: `_shared/domain/Terminators.spec.js`. Implementations:
+module. Domain spec: `_shared/core/domain/Terminators.spec.js`. Implementations:
 `modules/keymap/terminators.lua` (Hammerspoon),
 `lib/hotstrings/hotstring_prefix_watcher.ahk` (AHK).
 
@@ -133,7 +133,7 @@ boundary. Enforced by the **→ HotstringMatcher**.
 **Autocorrection**
 A category of hotstrings that silently fixes common typos, accent errors,
 and casing mistakes as the user types. Stored in
-`_shared/hotstrings/autocorrection/`. Entries typically carry the `word` flag
+`_shared/modules/hotstrings/autocorrection/`. Entries typically carry the `word` flag
 to avoid false positives mid-word.
 
 **Category**
@@ -145,14 +145,14 @@ by the Registry and the UI menu.
 **Dead Key Expansion**
 A hotstring that maps a dead-key sequence (e.g. typing `e^`) to a precomposed
 Unicode character (e.g. `ê`). Stored under
-`_shared/hotstrings/distances_reduction/dead_key_*.toml`. See also
+`_shared/modules/hotstrings/distances_reduction/dead_key_*.toml`. See also
 **→ Distances Reduction**.
 
 **Distances Reduction**
 A hotstring category that replaces awkward key-reach sequences with shorter
 alternatives to reduce finger travel. Examples: `qu` → `qu` with a closer
 key, or combining vowel + modifier into a single typed sequence. Stored in
-`_shared/hotstrings/distances_reduction/`.
+`_shared/modules/hotstrings/distances_reduction/`.
 
 **Dynamic Hotstrings**
 Hotstrings whose replacement is computed at expansion time rather than being
@@ -174,7 +174,7 @@ macOS) for persistence across reloads.
 A hotstring category for sequences that arise naturally from fast bidirectional
 finger rolls on the keyboard (e.g. typing `->`). These are ergonomic shortcuts
 for coding symbols and writing patterns. Stored in
-`_shared/hotstrings/rolls/`.
+`_shared/modules/hotstrings/rolls/`.
 
 **SFB (Same-Finger Bigram)**
 A bigram (two-character sequence) where both characters are typed with the same
@@ -190,9 +190,9 @@ per-section enabled state in `hs.settings`.
 **TOML Hotstring File**
 The canonical source format for hotstring data. Each file contains an array of
 `[[entry]]` tables with `trigger`, `replacement`, and optional `flags`. Files
-live under `_shared/hotstrings/`. The AHK driver consumes them at runtime via a
+live under `_shared/modules/hotstrings/`. The AHK driver consumes them at runtime via a
 self-healing `.tsv` cache (`lib/hotstrings/hotstrings_cache.ahk`) — no build step
-or committed generated code. Schema: `_shared/hotstrings/schema.md`.
+or committed generated code. Schema: `_shared/modules/hotstrings/schema.md`.
 
 ---
 
@@ -251,7 +251,7 @@ for the timing logic: `_shared/tests/corpus/tap_hold/vectors.json`.
 When multiple predictions are requested (`num_predictions > 1`), the
 **→ PromptBuilder** optionally raises the temperature for each successive
 prediction to encourage diversity. The formula and cap (`TEMP_DIVERSITY_CAP
-= 1.0`) are defined in `_shared/domain/PromptBuilder.js`.
+= 1.0`) are defined in `_shared/core/domain/PromptBuilder.js`.
 
 **Backend**
 The local inference server that processes LLM requests. Supported backends
@@ -269,7 +269,7 @@ queue drains, creating a seamless chained prediction flow. Implemented in
 The **→ PromptBuilder** limits the forwarded typing context to a length
 proportional to the predicted output, cutting LLM prefill tokens and reducing
 time-to-first-token (TTFT). Canonical constant: `CONTEXT_TAIL_WORDS = 5`.
-See `_shared/domain/PromptBuilder.js`.
+See `_shared/core/domain/PromptBuilder.js`.
 
 **Debounce**
 A configurable delay (default: `llm_debounce` seconds) after the last keypress
@@ -291,17 +291,17 @@ LLM-specific logic here.
 **Profile**
 A named LLM system-prompt template that determines how the LLM is instructed
 to behave. Built-in profiles (`raw`, `basic`, `advanced`, `batch_advanced`)
-are defined in `_shared/llm/profiles.json`. The active profile is selected via
+are defined in `_shared/modules/llm/profiles.json`. The active profile is selected via
 `modules/llm/profiles.lua`. See also **→ ProfileSelector**.
 
 **ProfileSelector**
-The domain module (`_shared/domain/ProfileSelector.js`) that loads the profile
+The domain module (`_shared/core/domain/ProfileSelector.js`) that loads the profile
 catalogue from `profiles.json`, merges user-defined overrides, resolves the
 active profile by ID, and injects template variables (`{context}`, `{tail}`,
 `{min_words}`, etc.) into the system prompt.
 
 **PromptBuilder**
-The domain module (`_shared/domain/PromptBuilder.js`) that constructs the
+The domain module (`_shared/core/domain/PromptBuilder.js`) that constructs the
 complete LLM request parameters from the user's buffer and configuration:
 context string, tail excerpt, token budget, and temperature. See also
 **→ Context Truncation**, **→ Adaptive Temperature**.
@@ -329,7 +329,7 @@ removed `TokenParser.js` word-level reference, 2026-06-13.)
 Once the **→ GestureRecognizer** commits a gesture to a horizontal or vertical
 axis, cross-axis noise is ignored for the remainder of that gesture. This
 prevents diagonal drift from mis-classifying a clean swipe. Documented in
-`_shared/domain/GestureRecognizer.spec.js`.
+`_shared/core/domain/GestureRecognizer.spec.js`.
 
 **Centroid**
 The average position of all active touch points in a touch frame. The
@@ -341,7 +341,7 @@ to determine gesture direction and magnitude. Computed in
 The domain module that processes raw touch frame data, computes the centroid
 and movement vector, applies threshold constants, and emits a normalised
 gesture event (e.g. `swipe_3_left`, `tap_3`). Domain spec:
-`_shared/domain/GestureRecognizer.spec.js`. Implementation:
+`_shared/core/domain/GestureRecognizer.spec.js`. Implementation:
 `modules/gestures/engine.lua`.
 
 **Gesture Slot**
@@ -415,7 +415,7 @@ ADR-001.
 
 **Codegen (Code Generation)**
 The build-time process that reads the authoritative TOML manifest
-(`_shared/features/manifest.toml`) and emits driver-specific feature
+(`_shared/modules/features/manifest.toml`) and emits driver-specific feature
 registries and config templates. Run via `npm run build:manifest`. Generated
 files live under `_generated/` directories and are committed to the repository.
 See ADR-002.
@@ -433,13 +433,13 @@ Each driver implements the nine **→ Port** adapters and consumes the
 shared domain modules. All live under `static/drivers/<driver>/`.
 
 **Domain Module**
-A pure, platform-agnostic module in `_shared/domain/` that contains only
+A pure, platform-agnostic module in `_shared/core/domain/` that contains only
 business logic — no OS API calls, no file I/O, no driver imports. Domain
 modules are specified as JavaScript spec files and ported faithfully to each
 driver's runtime language. See ADR-005.
 
 **Features Manifest**
-The single authoritative TOML file (`_shared/features/manifest.toml`) that
+The single authoritative TOML file (`_shared/modules/features/manifest.toml`) that
 declares all user-configurable features with their default values. All
 driver-specific feature registries are generated from this file. See ADR-002.
 
@@ -457,18 +457,18 @@ active language. Ergopti+ supports 21 languages. All UI text must go through
 See `copilot-instructions.md` §1 and ADR-007.
 
 **Manifest Schema**
-A JSON Schema file (`_shared/features/manifest.schema.json`) that validates
+A JSON Schema file (`_shared/modules/features/manifest.schema.json`) that validates
 the structure of the features manifest. Prevents malformed entries from
 reaching the codegen step.
 
 **Port**
-A formal JavaScript interface contract stored in `_shared/ports/` as a
+A formal JavaScript interface contract stored in `_shared/core/ports/` as a
 `*.spec.js` file. Each port defines method signatures, parameter shapes, return
 values, and compliance test vectors. The nine ports are: `Clipboard`,
 `FileSystem`, `HttpClient`, `KeyboardHook`, `Notifier`, `ProcessLifecycle`,
 `SecureFieldDetector`, `Storage`, `TextSender`, `TimerScheduler`,
 `TooltipRenderer`, `TrayMenu`, `WindowInfo`. See ADR-001 and
-`_shared/ports/SPEC.md`.
+`_shared/core/ports/SPEC.md`.
 
 **Port Compliance**
 Verified by `npm run test:port-compliance`, which runs the contract test

@@ -4,7 +4,7 @@
 ; MODULE: TooltipRenderer Adapter (AutoHotkey)
 ; DESCRIPTION:
 ; AHK v2 implementation of the TooltipRenderer port contract defined in
-; static/ergopti_plus/_shared/ports/TooltipRenderer.spec.js. Wraps the existing
+; static/ergopti_plus/_shared/core/ports/TooltipRenderer.spec.js. Wraps the existing
 ; lib/tooltip.ahk subsystem behind the four canonical functions
 ; (TooltipRShow, TooltipRHide, TooltipRIsVisible, TooltipRUpdateElement) so
 ; domain modules can control tooltip display without coupling to the AHK-

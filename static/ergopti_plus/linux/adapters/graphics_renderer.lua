@@ -4,7 +4,7 @@
 --- MODULE: GraphicsRenderer Adapter (Linux)
 --- DESCRIPTION:
 --- Linux implementation of the GraphicsRenderer port contract defined in
---- static/ergopti_plus/_shared/ports/GraphicsRenderer.spec.js. Provides a
+--- static/ergopti_plus/_shared/core/ports/GraphicsRenderer.spec.js. Provides a
 --- minimal overlay-window interface backed by a yad/zenity child process for
 --- simple graphics, or a no-op stub when neither tool is available.
 ---

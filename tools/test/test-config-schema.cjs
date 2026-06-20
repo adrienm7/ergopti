@@ -6,7 +6,7 @@
  * DESCRIPTION:
  * Validates the generated `config_template.toml` (the default config copied into
  * the user profile on first boot, for BOTH drivers) against the strict JSON
- * Schema at `_shared/config_schema/config.schema.json`. Until now that schema was
+ * Schema at `_shared/core/config_schema/config.schema.json`. Until now that schema was
  * consumed by zero tests, so it silently drifted from the manifest-generated
  * template. This gate keeps the two in lock-step: a manifest change that the
  * schema does not allow (or a schema that forbids a real key) fails CI.
@@ -31,7 +31,7 @@ const TOML = require('smol-toml');
 const { shared } = require('../lib/paths.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const SCHEMA_PATH = shared('config_schema/config.schema.json');
+const SCHEMA_PATH = shared('core/config_schema/config.schema.json');
 const TARGETS = [
 	'static/ergopti_plus/windows/_generated/config_template.toml',
 	'static/ergopti_plus/macos/_generated/config_template.toml'

@@ -4,7 +4,7 @@
 ; MODULE: Adapter Contract Behaviour Tests (AutoHotkey)
 ; DESCRIPTION:
 ; Executes the contractTestVectors() scenarios defined in each
-; _shared/ports/*.spec.js — translated into AHK so they run under the
+; _shared/core/ports/*.spec.js — translated into AHK so they run under the
 ; standard run_all.ahk test runner without any external dependency.
 ;
 ; APPROACH:

@@ -104,7 +104,7 @@ _ISRMM_TomlFallbackOmitsIsRepeat() {
 Test("toml loader: LoadHotstringsSection omits IsRepeat, matching the cache (isrepeat-section-name-mismatch-latent-divergence)", _ISRMM_TomlFallbackOmitsIsRepeat)
 
 _ISRMM_RealHeaderHasUnderscore() {
-	Toml := _ISRMM_ReadSharedSource("hotstrings/magickey.toml")
+	Toml := _ISRMM_ReadSharedSource("modules/hotstrings/magickey.toml")
 	; The real section header carries the underscore the old cache literal lacked.
 	Assert(InStr(Toml, "[[repeat_corrections]]") > 0,
 		"magickey.toml must declare the [[repeat_corrections]] header - proving the old 'repeatcorrections' literal could never have matched")

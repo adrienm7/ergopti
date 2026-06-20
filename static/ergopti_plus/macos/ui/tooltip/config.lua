@@ -4,7 +4,7 @@
 --- MODULE: Tooltip Configuration
 --- DESCRIPTION:
 --- Hammerspoon-side loader for the cross-driver tooltip visual constants.
---- The canonical source of truth is _shared/tooltip/constants.toml — every
+--- The canonical source of truth is _shared/modules/tooltip/constants.toml — every
 --- value exposed on M.* is read from that file at require-time. Missing file
 --- or key → error (fail fast). No driver-side fallback values.
 ---
@@ -47,7 +47,7 @@ local M = {}
 local Logger = require("lib.logger")
 local LOG = "tooltip_config"
 
--- Populated strictly from _shared/tooltip/constants.toml at require-time (fail fast).
+-- Populated strictly from _shared/modules/tooltip/constants.toml at require-time (fail fast).
 M.fonts = {}
 M.sizes = {}
 M.layout = {}
@@ -195,12 +195,12 @@ end
 
 
 -- =====================================================================
---- ======================================================================
--- ======= 3/ Bootstrap: load from _shared/tooltip/constants.toml =======
---- ======================================================================
+--- ==============================================================================
+-- ======= 3/ Bootstrap: load from _shared/modules/tooltip/constants.toml =======
+--- ==============================================================================
 -- =====================================================================
 
---- Reads _shared/tooltip/constants.toml at require-time. Missing file, section,
+--- Reads _shared/modules/tooltip/constants.toml at require-time. Missing file, section,
 --- or key → error (fail fast — no driver-side fallback values).
 local function load_from_shared()
 	local toml_reader = require("lib.toml_reader")
@@ -216,10 +216,10 @@ local function load_from_shared()
 		return ergopti_plus .. "/_shared"
 	end)()
 
-	local toml_path = shared_path .. "/tooltip/constants.toml"
+	local toml_path = shared_path .. "/modules/tooltip/constants.toml"
 	local c = toml_reader.parse(toml_path)
 	if type(c) ~= "table" or type(c.sections) ~= "table" then
-		error("[tooltip/config] _shared/tooltip/constants.toml not readable")
+		error("[tooltip/config] _shared/modules/tooltip/constants.toml not readable")
 	end
 
 	local function require_key(section, key)

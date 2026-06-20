@@ -4,7 +4,7 @@
 --- MODULE: MouseControl Adapter (Linux)
 --- DESCRIPTION:
 --- Linux implementation of the MouseControl port contract defined in
---- static/ergopti_plus/_shared/ports/MouseControl.spec.js. Wraps xdotool and
+--- static/ergopti_plus/_shared/core/ports/MouseControl.spec.js. Wraps xdotool and
 --- xrandr to move the cursor and query monitor geometry without coupling domain
 --- modules to platform-specific APIs.
 ---

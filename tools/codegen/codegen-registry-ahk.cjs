@@ -6,7 +6,7 @@
  * DESCRIPTION:
  * Generates `static/ergopti_plus/windows/_generated/registry.ahk` from the
  * Registry domain contract defined in
- * `static/ergopti_plus/_shared/domain/Registry.spec.js`.
+ * `static/ergopti_plus/_shared/core/domain/Registry.spec.js`.
  *
  * FEATURES & RATIONALE:
  * 1. Single source of truth: the generated file derives its class contract
@@ -27,7 +27,7 @@ const { sharedRel } = require('../lib/paths.cjs');
 
 const ROOT = path.resolve(__dirname, '../..');
 const OUT_PATH = path.resolve(ROOT, 'static/ergopti_plus/windows/_generated/registry.ahk');
-const SPEC_REL = sharedRel('domain/Registry.spec.js');
+const SPEC_REL = sharedRel('core/domain/Registry.spec.js');
 
 // ==================================================
 // ==================================================
