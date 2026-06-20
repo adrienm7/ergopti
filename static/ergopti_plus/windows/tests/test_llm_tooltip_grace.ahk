@@ -162,7 +162,7 @@ Test("ownership predicate: a real prediction owns the surface for the whole disp
 ; ============================================================
 
 _TestGrace_TooltipCentralGuard() {
-	Body := FileRead(A_ScriptDir . "\..\lib\tooltip.ahk", "UTF-8")
+	Body := _DriverDirConcat("ui/tooltip")
 	; While a real prediction owns the surface, the hotstring lifecycle cannot tear
 	; it down - for the WHOLE display. Only authoritative hides pass: LLM (user
 	; dismiss/accept), TimerFn (auto-hide), Suspend.
@@ -187,7 +187,7 @@ Test("grace contract: TooltipHide + TooltipShow guards + ownership/grace predica
 
 
 _TestGrace_HideResetsStamp() {
-	Body := FileRead(A_ScriptDir . "\..\lib\tooltip.ahk", "UTF-8")
+	Body := _DriverDirConcat("ui/tooltip")
 	; Hiding the prediction must clear the stamp so a later show starts a fresh
 	; window and a stale stamp can never keep a vanished prediction "protected".
 	Assert(InStr(Body, "_LLM_Tooltip_ShownAt := 0") > 0,

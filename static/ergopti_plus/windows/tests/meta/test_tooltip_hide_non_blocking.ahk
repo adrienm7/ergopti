@@ -32,12 +32,6 @@
 ; ===================================================
 ; ===================================================
 
-_TTHNB_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
-}
-
 ; Returns the function body from its declaration to the first closing brace at
 ; column 0 (AHK functions close flush-left; inner blocks close indented). Starts
 ; AFTER the declaration line so any tokens in the preceding docstring are excluded.
@@ -59,9 +53,9 @@ _TTHNB_FuncBody(Src, FuncDef) {
 ; ===================================================
 
 _TTHNB_TooltipHideIsNonBlocking() {
-	Src := _TTHNB_ReadSource("lib/tooltip.ahk")
+	Src := _DriverDirConcat("ui/tooltip")
 	Body := _DriverFuncBody("TooltipHide")
-	Assert(Body != "", "TooltipHide(DbgTag := ...) declaration must exist in lib/tooltip.ahk")
+	Assert(Body != "", "TooltipHide(DbgTag := ...) declaration must exist in the tooltip module")
 
 	; A held Critical from the fire path spans this body — a blocking call here
 	; would freeze the keyboard hook and drop keys typed after an expansion.

@@ -205,6 +205,19 @@ _DriverFuncBody(Name) {
 	return Out
 }
 
+; Reads every .ahk under a windows/-relative directory (recursive), concatenated
+; into one string. Use for source-introspection tests that scan a specific
+; module's files (e.g. "ui/tooltip") regardless of how that module is internally
+; split into sub-files. RelDir uses forward slashes.
+_DriverDirConcat(RelDir) {
+	SplitPath(A_ScriptDir, , &Root)   ; A_ScriptDir = windows/tests  ->  Root = windows
+	Dir := Root . "\" . StrReplace(RelDir, "/", "\")
+	Combined := ""
+	Loop Files, Dir . "\*.ahk", "FR"
+		try Combined .= "`n" . FileRead(A_LoopFileFullPath)
+	return Combined
+}
+
 
 
 

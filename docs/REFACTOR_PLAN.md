@@ -122,9 +122,9 @@ Chemin identique d'un driver à l'autre → l'analogue se trouve au même endroi
 
 ## P5 — Folderisation `modules/` + `ui/` Windows
 
-- [ ] `tray_menu.ahk` (2975 l.) → `ui/menu/{init,menu_layout,menu_hotstrings,menu_metrics,menu_gestures,menu_shortcuts,menu_taphold,menu_about,menu_debug}.ahk`.
+- [x] `tray_menu.ahk` (2975 l.) → **`ui/menu/` (12 fichiers)** : `menu_engine`, `menu_gestures`, `menu_metrics`, `menu_metrics_actions`, `menu_layout`, `menu_hotstrings`, `menu_submenus`, `menu_shortcuts`, `menu_taphold`, `menu_init`, `menu_actions`, `menu_rebuild`. `tray_menu.ahk` = index de 95 l. (header + globals d'état + `#Include` in-place → ordre d'exécution top-level préservé à l'octet). 5 meta-tests file-pinnés migrés vers `_DriverSourceConcat()`/`_DriverFuncBody()`. **Vérif** : dry-run exit 0, suite 2230/0, encoding 589 fichiers.
 - [ ] Fusionner `ui/tray_llm.ahk` (barrel) + `ui/tray_llm/` → un seul `ui/menu_llm/` (`init.ahk`).
-- [ ] `lib/tooltip.ahk` (94 Ko) → `ui/tooltip/{core,helpers,llm}.ahk`.
+- [x] `lib/tooltip.ahk` (2251 l.) → **`ui/tooltip/{init,core,helpers,llm}.ahk`** (move lib→ui + split, miroir macOS). `init.ahk` = index (module doc + 3 `#Include`). Includes mis à jour : `ErgoptiPlus.ahk` + `tests/run_all.ahk`. Nouveau helper `_DriverDirConcat("ui/tooltip")` dans `test_framework.ahk` (scan source par module, indépendant du sous-découpage) ; 7 tests d'introspection migrés. Orphelin non-CI rotté `run_llm_tooltip_grace.ahk` supprimé (déjà rouge sur un contrat de garde périmé ; superseded par `test_llm_tooltip_grace.ahk` dans run_all). **Vérif** : dry-run exit 0, suite 2228/0, encoding 591.
 - [ ] `lib/updater.ahk` (75 Ko) + `modules/gestures.ahk` (79 Ko) + `lib/healthcheck.ahk` → sous-fichiers le long des sections.
 - [ ] Sortir l'UI de `lib/` → `ui/<window>/` (onboarding, changelog, hotstrings_config_window, hotstring_editor, model_browser, wpm, healthcheck, spotlight).
 - [ ] Consolider la couche layout → `modules/keymap/` ; supprimer le stub `lib/app_state.ahk`.
