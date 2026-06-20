@@ -67,7 +67,7 @@ local AWAKE_RETURN_DELAY_SEC = Timings.sec("keep_awake", "return_delay_ms") -- S
 -- Teams went "absent" despite the visible jiggle. A real F18 key event resets
 -- that counter; F18 types nothing, fires no shortcut, and the keymap engine
 -- fast-exits it (FAST_EXIT_KEYCODES). This is the macOS analog of the AHK
--- driver's {VKFF} empty keystroke. Single source of truth: shared/lua/keycodes
+-- driver's {VKFF} empty keystroke. Single source of truth: _shared/lua/keycodes
 -- (F18_WAKE_OS), the same code the keymap reserves.
 local KEEP_AWAKE_WAKE_KEY    = Keycodes.F18_WAKE_OS
 

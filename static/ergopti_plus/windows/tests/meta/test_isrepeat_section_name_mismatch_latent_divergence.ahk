@@ -50,11 +50,11 @@ _ISRMM_ReadWindowsSource(RelPath) {
 	return FileRead(Path)
 }
 
-; Reads a shared/-relative source file (the TOML tree lives beside windows/).
+; Reads a _shared/-relative source file (the TOML tree lives beside windows/).
 _ISRMM_ReadSharedSource(RelPath) {
 	SplitPath(A_ScriptDir, , &WindowsDir)   ; ...\windows
 	SplitPath(WindowsDir, , &DriversDir)    ; ...\ergopti_plus
-	Path := StrReplace(DriversDir, "\", "/") . "/shared/" . RelPath
+	Path := StrReplace(DriversDir, "\", "/") . "/_shared/" . RelPath
 	return FileRead(Path)
 }
 

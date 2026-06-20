@@ -52,7 +52,7 @@
 ; ===================================
 
 ; The six *_MS / *_GAP_MS timing thresholds below are sourced from the shared
-; cross-driver registry (shared/timings/constants.toml [keylogger]) by
+; cross-driver registry (_shared/timings/constants.toml [keylogger]) by
 ; KeyloggerWalkerLoadTimings(), called once at boot. They start at the sentinel
 ; 0 because AHK v2 runs static initializers BEFORE the auto-execute body, so the
 ; registry is not yet loaded here; reading one before the loader runs would be a

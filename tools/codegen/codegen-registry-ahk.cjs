@@ -6,7 +6,7 @@
  * DESCRIPTION:
  * Generates `static/ergopti_plus/windows/_generated/registry.ahk` from the
  * Registry domain contract defined in
- * `static/ergopti_plus/shared/domain/Registry.spec.js`.
+ * `static/ergopti_plus/_shared/domain/Registry.spec.js`.
  *
  * FEATURES & RATIONALE:
  * 1. Single source of truth: the generated file derives its class contract

@@ -37,12 +37,12 @@
 ; ===============================
 ; =====================================
 
-; Point the cache at the real shared hotstrings tree (static/ergopti_plus/shared)
+; Point the cache at the real shared hotstrings tree (static/ergopti_plus/_shared)
 ; resolved relative to the tests directory, so the build reads the genuine TOMLs.
 _HsCacheTestSharedDir() {
 	SplitPath(A_ScriptDir, , &WindowsDir)   ; ...\windows
 	SplitPath(WindowsDir, , &DriversDir)    ; ...\ergopti_plus
-	return DriversDir . "\shared"
+	return DriversDir . "\_shared"
 }
 
 ; Deep-compare two cache rows ([flags, trigger, output, final, repeat, caseSens]).

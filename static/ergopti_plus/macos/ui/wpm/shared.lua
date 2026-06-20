@@ -1,4 +1,4 @@
---- ui/wpm/shared.lua
+--- ui/wpm/_shared.lua
 
 --- ==============================================================================
 --- MODULE: WPM Shared UI Helpers

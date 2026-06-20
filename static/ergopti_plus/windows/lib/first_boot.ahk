@@ -73,7 +73,7 @@ _FirstBoot_CopyIfMissing(SrcPath, DstPath, Label) {
 	}
 	if !FileExist(SrcPath) {
 		; A missing config_template is a build-pipeline failure: ``npm run build:manifest``
-		; must be run after editing ``shared/features/manifest.toml``. The driver
+		; must be run after editing ``_shared/features/manifest.toml``. The driver
 		; cannot synthesize a default v2 config on its own.
 		try LoggerError("FirstBoot",
 			"Template '{1}' not found at '{2}' — cannot bootstrap user config. "

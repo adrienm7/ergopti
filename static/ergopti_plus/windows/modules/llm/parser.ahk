@@ -171,7 +171,7 @@ _LLM_Parser_CharLev(a, b) {
 ; ======= 1.1) Two-tier token diff (port) =======
 ; ===============================================
 ; Faithful AHK port of the shared Lua parser's token-level diff
-; (shared/lua/llm/parser.lua: get_chars / tokenize / token_sub_cost /
+; (_shared/lua/llm/parser.lua: get_chars / tokenize / token_sub_cost /
 ; token_diff_ops). These drive the intra-word physical injection so the AHK
 ; driver deletes only the changed characters instead of retyping whole words.
 ; UTF-8 chars are iterated one codepoint at a time (BMP — French accents — only).

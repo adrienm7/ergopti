@@ -4,7 +4,7 @@
 ; MODULE: TextSender Adapter (AutoHotkey)
 ; DESCRIPTION:
 ; AHK v2 implementation of the TextSender port contract defined in
-; static/ergopti_plus/shared/ports/TextSender.spec.js. Wraps AHK's SendText,
+; static/ergopti_plus/_shared/ports/TextSender.spec.js. Wraps AHK's SendText,
 ; SendInput, and the Clipboard port (adapters/clipboard.ahk) behind the three
 ; canonical functions (TextSend, TextEraseChars, TextPressKey) so domain modules
 ; can inject text and keystrokes without coupling to AHK-specific send APIs.

@@ -321,7 +321,7 @@ OllamaWV_HtmlUrl() {
 }
 
 /**
- * Returns the file:// URL for the static/ergopti_plus/shared/locales/ directory (trailing slash).
+ * Returns the file:// URL for the static/ergopti_plus/_shared/locales/ directory (trailing slash).
  * Injected as window.__i18n_base so i18n.js fetches the correct locale file.
  * @returns {string}
  */

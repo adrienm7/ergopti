@@ -10,7 +10,7 @@
 ; FEATURES & RATIONALE:
 ; 1. No generated CODE in the repo: the bundled-category hotstrings (distances,
 ;    SFBs, rolls, autocorrection, magic-key) are no longer emitted as AHK source.
-;    The TOML files under ``shared/hotstrings/`` stay the single source of truth.
+;    The TOML files under ``_shared/hotstrings/`` stay the single source of truth.
 ; 2. Faster time-to-icon: AHK no longer parses ~1 MB of generated source during
 ;    the load phase that precedes tray-icon creation. The cache is DATA read at
 ;    registration time (after the icon), not code parsed before it.

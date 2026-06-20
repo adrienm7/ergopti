@@ -13,7 +13,7 @@
 ; FEATURES & RATIONALE:
 ; 1. Single mapping table per feature category — easy to extend when a new
 ;    feature is added. Manifest-aligned: every key here matches a manifest
-;    entry under ``static/ergopti_plus/shared/features/manifest.toml``.
+;    entry under ``static/ergopti_plus/_shared/features/manifest.toml``.
 ; 2. ``TranslateLegacyPath(V1Path)`` returns a {section, key, v2_node, ...} struct
 ;    so callers can write to TOML and mutate ``Features`` in lock-step.
 ; 3. Modélisation α support — entries like Shortcuts.GPT decompose into a v2

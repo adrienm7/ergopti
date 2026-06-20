@@ -4,7 +4,7 @@
 --- MODULE: WindowManager Adapter (Hammerspoon)
 --- DESCRIPTION:
 --- Hammerspoon implementation of the WindowManager port contract defined in
---- static/ergopti_plus/shared/ports/WindowManager.spec.js. Wraps hs.window and
+--- static/ergopti_plus/_shared/ports/WindowManager.spec.js. Wraps hs.window and
 --- hs.application to activate, query, and manage windows without coupling
 --- domain modules to hs-specific APIs.
 ---

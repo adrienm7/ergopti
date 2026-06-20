@@ -36,7 +36,7 @@ local LOG = "shortcuts.actions.text"
 -- ====================================
 
 -- Clipboard settle delays come from the shared cross-driver registry
--- (shared/timings/constants.toml [debounce]) so AHK and macOS stay in sync.
+-- (_shared/timings/constants.toml [debounce]) so AHK and macOS stay in sync.
 local COPY_SETTLE_SEC    = Timings.sec("debounce", "clipboard_copy_settle_ms")  -- Wait after Cmd+C for clipboard to fill
 local PASTE_SETTLE_SEC   = Timings.sec("debounce", "clipboard_paste_settle_ms") -- Wait before pasting the transformed text
 local RESELECT_DELAY_SEC = Timings.sec("debounce", "clipboard_reselect_ms")     -- Wait after paste before re-selecting
@@ -45,7 +45,7 @@ local MAX_RESELECT_CHARS = 5000   -- Safety cap: avoid freezing on huge pastes
 
 -- Symbols that should wrap the selection rather than replace it.
 -- The canonical catalogue AND its grouping live in the SHARED single source of
--- truth: ``static/ergopti_plus/shared/wrap_symbols.json`` (the same file the AHK
+-- truth: ``static/ergopti_plus/_shared/wrap_symbols.json`` (the same file the AHK
 -- driver reads). It is loaded once below — NEVER hardcode the list or its order
 -- here. WRAP_GROUPS preserves the ordered groups (each {i18n=<label key>, pairs=…};
 -- the menu renders each as a named nested sub-submenu); WRAP_PAIRS is the

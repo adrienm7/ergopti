@@ -85,7 +85,7 @@ global ScriptInformation := Map(
 ; Features directly.
 ;
 ; The fixture below mirrors the manifest defaults — extend it alongside
-; any new feature added to static/ergopti_plus/shared/features/manifest.toml
+; any new feature added to static/ergopti_plus/_shared/features/manifest.toml
 ; so existing tests don't break when a new HotIf reads Features["…"].
 global Features := Map(
     "layout", Map(
@@ -351,7 +351,7 @@ global SpaceAroundSymbols := ""
 ; Points at the real ``static/`` tree (three levels up from the tests folder)
 ; so:
 ;   - i18n.ahk resolves real locale JSONs and t() returns translated strings
-;   - modules/gestures.ahk parses the bundled ``shared/actions.toml`` and
+;   - modules/gestures.ahk parses the bundled ``_shared/actions.toml`` and
 ;     populates GESTURE_ACTION_NAMES with the production gesture catalog
 ;     (the gesture tests would otherwise see an empty registry).
 ;
@@ -359,7 +359,7 @@ global SpaceAroundSymbols := ""
 ; rolls.toml / autocorrection.toml metadata by pre-caching empty entries in
 ; ``HotstringGroupConfig`` from ``_HCfgTestReset`` — see test_hotstrings_config.ahk.
 global _StaticDir := A_ScriptDir . "\..\..\.."
-global _SharedDir := _StaticDir . "\ergopti_plus\shared"
+global _SharedDir := _StaticDir . "\ergopti_plus\_shared"
 global _DriverDir := _StaticDir . "\ergopti_plus\windows"
 
 ; Strict-canonicalisation guard read by TOML_RunStrictCanonicalization in

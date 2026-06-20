@@ -4,10 +4,10 @@
  * ==============================================================================
  * MODULE: Tooling Shared-Tree Paths
  * DESCRIPTION:
- * The single source of truth for the cross-platform shared/ tree location used
+ * The single source of truth for the cross-platform _shared/ tree location used
  * by every dev tool (codegen, tests, linters, build scripts). Tools used to
- * each hardcode the literal "static/ergopti_plus/shared/..." string; this module
- * centralises it so a repo-layout rename (shared/ -> _shared/) only needs editing
+ * each hardcode the literal "static/ergopti_plus/_shared/..." string; this module
+ * centralises it so a future rename of the _shared/ tree only needs editing
  * SHARED_REL on the one line below.
  *
  * FEATURES & RATIONALE:
@@ -29,15 +29,15 @@ const path = require('path');
 const REPO_ROOT = path.resolve(__dirname, '..', '..');
 
 // THE single source of truth for the shared-tree location. Forward-slash,
-// repo-relative — a shared/ -> _shared/ rename is a one-token edit here.
-const SHARED_REL = 'static/ergopti_plus/shared';
+// repo-relative — a future rename of the _shared/ tree is a one-token edit here.
+const SHARED_REL = 'static/ergopti_plus/_shared';
 
-// Absolute path to the shared/ tree.
+// Absolute path to the _shared/ tree.
 const SHARED_DIR = path.join(REPO_ROOT, SHARED_REL);
 
 /**
- * Resolves an absolute path inside the shared/ tree.
- * @param {...string} segments - Path segments under shared/, e.g. "ports", "contracts.json".
+ * Resolves an absolute path inside the _shared/ tree.
+ * @param {...string} segments - Path segments under _shared/, e.g. "ports", "contracts.json".
  * @returns {string} Absolute filesystem path.
  */
 function shared(...segments) {
@@ -45,10 +45,10 @@ function shared(...segments) {
 }
 
 /**
- * Resolves a repo-relative (forward-slash) path inside the shared/ tree. Useful
+ * Resolves a repo-relative (forward-slash) path inside the _shared/ tree. Useful
  * for tools that join against their own REPO_ROOT or print the path verbatim.
- * @param {...string} segments - Path segments under shared/.
- * @returns {string} Repo-relative path, e.g. "static/ergopti_plus/shared/ports/contracts.json".
+ * @param {...string} segments - Path segments under _shared/.
+ * @returns {string} Repo-relative path, e.g. "static/ergopti_plus/_shared/ports/contracts.json".
  */
 function sharedRel(...segments) {
 	return [SHARED_REL, ...segments].join('/');

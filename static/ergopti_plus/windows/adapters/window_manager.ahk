@@ -4,7 +4,7 @@
 ; MODULE: WindowManager Adapter (AutoHotkey)
 ; DESCRIPTION:
 ; AHK v2 implementation of the WindowManager port contract defined in
-; static/ergopti_plus/shared/ports/WindowManager.spec.js. Wraps AHK v2's
+; static/ergopti_plus/_shared/ports/WindowManager.spec.js. Wraps AHK v2's
 ; WinActivate, WinExist, WinKill, WinGetList, WinGetTitle, and related
 ; built-ins behind the six canonical functions so domain modules can manage
 ; application windows without coupling to AHK-specific windowing APIs.

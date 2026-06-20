@@ -5,7 +5,7 @@
  * MODULE: Hotstring Priority Parity Gate
  * DESCRIPTION:
  * Cross-driver freshness gate locking the hotstring collision-priority SOURCE
- * defaults to a single source of truth: shared/hotstrings/priority.json. The two
+ * defaults to a single source of truth: _shared/hotstrings/priority.json. The two
  * drivers necessarily declare the constants in their own language (AHK
  * HSE_PRIORITY_*, Lua PRIORITY_*) because they are read on the hot registration
  * path, but they must never DIVERGE from the shared JSON or from each other.
@@ -29,7 +29,7 @@ const FAIL = '✗';
 let pass = 0;
 let fail = 0;
 
-const src = JSON.parse(fs.readFileSync(path.join(ROOT, 'shared/hotstrings/priority.json'), 'utf8'));
+const src = JSON.parse(fs.readFileSync(path.join(ROOT, '_shared/hotstrings/priority.json'), 'utf8'));
 const expected = { common: src.common, package: src.package, personal: src.personal };
 
 const AHK = fs.readFileSync(path.join(ROOT, 'windows/lib/hotstrings/hotstring_engine_main.ahk'), 'utf8');
@@ -66,7 +66,7 @@ for (const key of ['common', 'package', 'personal']) {
 		pass++;
 	} else {
 		console.log(`  ${FAIL}  ${key}: shared=${want} | AHK=${ahk} | Lua=${lua}`);
-		console.log('       - all three must equal shared/hotstrings/priority.json');
+		console.log('       - all three must equal _shared/hotstrings/priority.json');
 		fail++;
 	}
 }

@@ -4,7 +4,7 @@
 --- MODULE: Notifier Adapter (Linux)
 --- DESCRIPTION:
 --- Linux implementation of the Notifier port contract defined in
---- static/ergopti_plus/shared/ports/Notifier.spec.js. Wraps the D-Bus
+--- static/ergopti_plus/_shared/ports/Notifier.spec.js. Wraps the D-Bus
 --- org.freedesktop.Notifications interface (notify-send CLI) to deliver
 --- desktop notifications without coupling domain modules to any OS API.
 ---

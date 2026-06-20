@@ -24,7 +24,7 @@ Three implementation paths were evaluated:
    domain modules are Lua. A Python runtime would require rewriting the
    domain layer or bridging two runtimes, both expensive and error-prone.
 3. **LuaJIT + libinput + uinput** — the Hammerspoon driver is already
-   written in Lua; `static/ergopti_plus/shared/lua/` contains portable Lua
+   written in Lua; `static/ergopti_plus/_shared/lua/` contains portable Lua
    modules (TOML codec, LLM bridge utilities) that work under plain Lua 5.4
    or LuaJIT without modification. The Linux kernel exposes keyboard events
    via `libinput` (read path) and `uinput` (write path), both accessible
@@ -43,14 +43,14 @@ this assumption. The core I/O adapters use only the standard Lua I/O and `os`
 libraries; the keyboard and injection adapters use LuaJIT FFI bindings to
 libinput and uinput respectively.
 
-The shared Lua modules in `static/ergopti_plus/shared/lua/` (TOML codec, LLM
+The shared Lua modules in `static/ergopti_plus/_shared/lua/` (TOML codec, LLM
 utilities) are the canonical implementations for the Linux driver — no rewrite.
 
 ## Consequences
 
 ### Positive
 
-- Domain modules in `shared/lua/` are reused directly; zero code duplication.
+- Domain modules in `_shared/lua/` are reused directly; zero code duplication.
 - LuaJIT's FFI removes the need for a C extension module for libinput/uinput.
 - A single Lua version (5.4-compatible subset) spans macOS, Linux, and shared
   modules — contributors need to learn only one language.
@@ -81,6 +81,6 @@ utilities) are the canonical implementations for the Linux driver — no rewrite
 ## Evidence in the codebase
 
 - Linux adapter implementations (9 adapters): `static/ergopti_plus/linux/adapters/`
-- Shared portable Lua modules: `static/ergopti_plus/shared/lua/toml_codec/`, `static/ergopti_plus/shared/lua/llm/`
-- Port contracts: `static/ergopti_plus/shared/ports/KeyboardHook.spec.js`, `TextSender.spec.js`, etc.
+- Shared portable Lua modules: `static/ergopti_plus/_shared/lua/toml_codec/`, `static/ergopti_plus/_shared/lua/llm/`
+- Port contracts: `static/ergopti_plus/_shared/ports/KeyboardHook.spec.js`, `TextSender.spec.js`, etc.
 - Linux tests: `static/ergopti_plus/linux/tests/`

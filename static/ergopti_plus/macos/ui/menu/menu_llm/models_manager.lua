@@ -25,13 +25,13 @@ local Paths     = require("lib.paths")
 
 local LOG = "menu_llm.models"
 
---- Loads shared/llm/models.json via lib.paths (configdir + script-relative walk).
+--- Loads _shared/llm/models.json via lib.paths (configdir + script-relative walk).
 --- Missing or invalid file → error (fail fast).
 --- @return table Provider list parsed from models.json.
 local function load_models_presets()
 	local path = Paths.shared_llm_path("models.json")
 	if not path then
-		error("[menu_llm.models] static/ergopti_plus/shared/llm/models.json not found")
+		error("[menu_llm.models] static/ergopti_plus/_shared/llm/models.json not found")
 	end
 	local fh = io.open(path, "r")
 	if not fh then
@@ -78,7 +78,7 @@ local function extract_mlx_name(url)
 end
 
 --- Resolves the actual backend-specific model name.
---- @param display_name string The display name from shared/llm/models.json.
+--- @param display_name string The display name from _shared/llm/models.json.
 --- @param presets table The global models configuration.
 --- @param is_mlx boolean True for MLX, false for Ollama.
 --- @return string The actual model name for the backend.
@@ -424,7 +424,7 @@ function M.new(deps)
 	function obj.get_model_emojis(name) return get_model_info_logic(name, presets).emojis end
 	
 	--- Gets the actual backend-specific model name.
-	--- @param display_name string The display name from shared/llm/models.json.
+	--- @param display_name string The display name from _shared/llm/models.json.
 	--- @return string The real model name for the active backend.
 	function obj.get_actual_model_name(display_name)
 		local active_backend = llm_mod.get_backend()
@@ -432,7 +432,7 @@ function M.new(deps)
 	end
 	
 	--- Checks if a display model name is installed, by converting to real backend name.
-	--- @param display_name string The display name from shared/llm/models.json.
+	--- @param display_name string The display name from _shared/llm/models.json.
 	--- @return boolean True if installed, false otherwise.
 	function obj.is_model_installed(display_name)
 		local installed = obj.get_installed_models()

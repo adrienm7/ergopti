@@ -4,7 +4,7 @@
 ; MODULE: Changelog Window
 ; DESCRIPTION:
 ; Shared-UI webview changelog for the Windows driver.
-; Renders the same HTML/CSS/JS from shared/ui/changelog/ that macOS uses,
+; Renders the same HTML/CSS/JS from _shared/ui/changelog/ that macOS uses,
 ; via WebView2 — so both platforms have an identical two-column interface:
 ; release list sidebar on the left, markdown content pane on the right.
 ;
@@ -392,7 +392,7 @@ _CLW_WebView2Available() {
 }
 
 /**
- * Returns the file:// URL for shared/ui/changelog/index.html.
+ * Returns the file:// URL for _shared/ui/changelog/index.html.
  * @returns {string}
  */
 _CLW_HtmlUrl() {
@@ -404,7 +404,7 @@ _CLW_HtmlUrl() {
 }
 
 /**
- * Returns the file:// URL for shared/locales/ (trailing slash).
+ * Returns the file:// URL for _shared/locales/ (trailing slash).
  * @returns {string}
  */
 _CLW_LocalesUrl() {

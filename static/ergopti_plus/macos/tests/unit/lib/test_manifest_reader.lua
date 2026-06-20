@@ -4,7 +4,7 @@
 --- MODULE: Features Manifest Reader Tests (Hammerspoon)
 --- DESCRIPTION:
 --- A2 — macOS now reads feature defaults from the shared codegen'd manifest
---- (`_generated/features_manifest.lua`, single source `shared/features/manifest.toml`)
+--- (`_generated/features_manifest.lua`, single source `_shared/features/manifest.toml`)
 --- via `lib.manifest_reader`, the counterpart of the AHK `manifest_reader.ahk`
 --- that the Windows driver already builds its whole `Features` map from.
 ---

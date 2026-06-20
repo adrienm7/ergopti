@@ -4,7 +4,7 @@
 ; MODULE: PromptBuilder Corpus Consumer (AHK)
 ; DESCRIPTION:
 ; Validates the AHK PromptBuilder implementation against the cross-driver
-; contract defined in shared/tests/corpus/prompt_builder/vectors.json.
+; contract defined in _shared/tests/corpus/prompt_builder/vectors.json.
 ; Each vector seeds PromptBuilder.Build() with its buffer and config, then
 ; asserts max_tokens, temperature, context_tail, min_words, and num_predictions.
 ;
@@ -28,7 +28,7 @@
 ; ===================================================
 
 _PromptBuilderCorpus_RegisterAll() {
-	CorpusPath := A_ScriptDir . "\..\..\shared\tests\corpus\prompt_builder\vectors.json"
+	CorpusPath := A_ScriptDir . "\..\..\_shared\tests\corpus\prompt_builder\vectors.json"
 
 	if !FileExist(CorpusPath) {
 		Test("PromptBuilder corpus: file exists", () => AssertTrue(false,

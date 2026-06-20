@@ -87,21 +87,21 @@ static/ergopti_plus/windows/paths.toml
 static/ergopti_plus/macos/nul
 static/ergopti_plus/windows/_generated/personal_shortcuts.ahk
 static/ergopti_plus/windows/_generated/prefetch_*.json
-static/ergopti_plus/shared/ui/metrics_typing/prefetch.json
-static/ergopti_plus/shared/ui/metrics_apps/prefetch.json
+static/ergopti_plus/_shared/ui/metrics_typing/prefetch.json
+static/ergopti_plus/_shared/ui/metrics_apps/prefetch.json
 
 # Self-healing locale fast-parse cache. The .json beside each is the single
 # tracked source of truth; the Windows driver writes/refreshes the .tsv on demand
 # (lib/i18n.ahk _I18nWriteTsvCache) for ~23x faster boot parsing. Never tracked —
 # it is regenerated from the .json whenever missing or older than its source.
-static/ergopti_plus/shared/locales/*.tsv
+static/ergopti_plus/_shared/locales/*.tsv
 
 # Self-healing hotstrings cache. The category .toml files beside it are the single
 # tracked source of truth; the Windows driver builds/refreshes the .tsv on demand
 # (lib/hotstrings/hotstrings_cache.ahk) so the bundled hotstrings no longer ship as
 # committed generated AHK. Never tracked — rebuilt whenever missing or older than
 # any source TOML. The old generated_*.ahk bundle is ignored too, for safety.
-static/ergopti_plus/shared/hotstrings/generated_hotstrings.tsv
+static/ergopti_plus/_shared/hotstrings/generated_hotstrings.tsv
 static/ergopti_plus/windows/lib/hotstrings/generated_*.ahk
 static/ergopti_plus/windows/lib/hotstrings/hotstrings_generated.ahk
 

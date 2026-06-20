@@ -3,7 +3,7 @@
 ; ==============================================================================
 ; MODULE: Menu Manifest Loader
 ; DESCRIPTION:
-; Reads ``static/ergopti_plus/shared/menu_manifest.json`` at boot and exposes
+; Reads ``static/ergopti_plus/_shared/menu_manifest.json`` at boot and exposes
 ; ordered menu structures so the rest of the driver never hard-codes menu layout.
 ;
 ; FEATURES & RATIONALE:
@@ -82,7 +82,7 @@ MenuManifest_InvalidateCache() {
 	_MM_DEBUG_MENU_CACHE       := false
 }
 
-; Loads ``static/ergopti_plus/shared/menu_manifest.json`` and converts the hotstring group id lists
+; Loads ``static/ergopti_plus/_shared/menu_manifest.json`` and converts the hotstring group id lists
 ; into arrays of AHK Features keys using ``hotstring_category_keys``.
 ;
 ; Returns an object with three properties:

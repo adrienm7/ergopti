@@ -53,7 +53,7 @@ local LAYOUT_TIS_SETTLE_SEC = Timings.sec("debounce", "layout_tis_settle_ms")
 local _SELF_DIR = (debug.getinfo(1, "S").source:sub(2):match("^(.*[/\\])") or "./")
 
 -- Data JSONs live alongside this module under data/; Karabiner-Elements is
--- macOS-exclusive so there is no reason to put these files in shared/.
+-- macOS-exclusive so there is no reason to put these files in _shared/.
 local _DATA_DIR = _SELF_DIR .. "data/"
 
 -- Standard Karabiner-Elements config path, expressed as a tilde path so the

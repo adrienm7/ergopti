@@ -41,7 +41,7 @@ from tools.lib.paths import shared  # noqa: E402
 # ====================================
 # ====================================
 
-# Locale directory lives at <repo>/static/ergopti_plus/shared/locales/ and the
+# Locale directory lives at <repo>/static/ergopti_plus/_shared/locales/ and the
 # canonical reference is en.json — every other file must mirror its key set exactly.
 LOCALES_DIR  = shared("locales")
 REFERENCE    = "en"

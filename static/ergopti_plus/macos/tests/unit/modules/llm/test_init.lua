@@ -135,7 +135,7 @@ end)
 --- ============================================================
 -- =========================================================
 
--- Regression: the shared scalar defaults must come from shared/llm/defaults.json
+-- Regression: the shared scalar defaults must come from _shared/llm/defaults.json
 -- (the single source) and never from a hardcoded base table re-declared in
 -- init.lua. If a divergent hardcoded value is reintroduced, these comparisons
 -- against the JSON fail.

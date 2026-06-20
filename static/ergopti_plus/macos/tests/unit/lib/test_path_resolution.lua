@@ -180,7 +180,7 @@ helpers.describe("metrics_typing and metrics_apps asset resolution", function()
 
 	helpers.it("checks for assets directory existence, not just hs.configdir construct", function()
 		-- Before the fix, metrics_typing and metrics_apps used:
-		--   assets_dir = hs.configdir .. "/../shared/ui/metrics_typing/"
+		--   assets_dir = hs.configdir .. "/../_shared/ui/metrics_typing/"
 		-- After the fix, they call resolve_ui_assets_dir() which checks fs.dir().
 		-- This test ensures that the check is in place.
 		log_calls = {}

@@ -143,7 +143,7 @@ local function load_llm_init_with_deferred_probes(ollama_status, ollama_body, ml
 	end
 
 	-- Load the real modules.llm.init — load_shared_defaults() runs now, reading
-	-- shared/llm/defaults.json via lib.paths stub (requires lib.paths to be set
+	-- _shared/llm/defaults.json via lib.paths stub (requires lib.paths to be set
 	-- before this line)
 	local LLM = require("modules.llm.init")
 

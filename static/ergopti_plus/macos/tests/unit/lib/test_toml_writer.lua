@@ -255,13 +255,13 @@ end)
 
 helpers.describe("toml_writer: get_format_script_path uses correct repo-root pattern", function()
 	helpers.it("shared writer source uses 'static[/\\\\]' to strip path, not 'static[/\\\\]drivers[/\\\\]'", function()
-		-- The writer lives under static/ergopti_plus/shared/lua/toml_codec/.
+		-- The writer lives under static/ergopti_plus/_shared/lua/toml_codec/.
 		-- The old gsub pattern `static[/\]drivers[/\].*` never matched that path,
 		-- so get_format_script_path() returned the full source path unchanged
 		-- instead of stripping back to the repo root.
 		local shared_writer_path = helpers.shared("lua/toml_codec/writer.lua")
 		local fh = io.open(shared_writer_path, "r")
-		helpers.assert_true(fh ~= nil, "shared/lua/toml_codec/writer.lua must be readable")
+		helpers.assert_true(fh ~= nil, "_shared/lua/toml_codec/writer.lua must be readable")
 		local src = fh:read("*a"); fh:close()
 
 		-- Must NOT contain the old wrong pattern

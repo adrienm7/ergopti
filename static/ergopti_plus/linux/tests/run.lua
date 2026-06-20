@@ -35,10 +35,10 @@ if driver_root == "." then
 	end
 end
 
--- The shared/ Lua libraries live one level above the linux driver root
--- (i.e. in static/ergopti_plus/shared/lua/).
+-- The _shared/ Lua libraries live one level above the linux driver root
+-- (i.e. in static/ergopti_plus/_shared/lua/).
 local drivers_root = driver_root:match("^(.*)/[^/]+$") or driver_root
-local shared_lua   = drivers_root .. "/shared/lua"
+local shared_lua   = drivers_root .. "/_shared/lua"
 
 -- Build the package search path: driver root first, then shared libs, then tests/.
 package.path = table.concat({

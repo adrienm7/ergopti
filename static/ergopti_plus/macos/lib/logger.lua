@@ -99,7 +99,7 @@ local SUB_LOG_NAMES_FALLBACK = {
 --- ==========================================
 -- ==========================================
 
---- Parses shared/logger/sub_files.toml and populates SUB_LOG_NAMES with the
+--- Parses _shared/logger/sub_files.toml and populates SUB_LOG_NAMES with the
 --- entries whose platforms array includes "hs". Falls back to SUB_LOG_NAMES_FALLBACK
 --- when the file is absent or unreadable so the driver stays functional in stripped builds.
 ---
@@ -108,8 +108,8 @@ local SUB_LOG_NAMES_FALLBACK = {
 --- a full TOML library would be overkill for this single use case.
 --- @param driver_root string Absolute path to the hammerspoon/ driver directory (trailing slash).
 local function _load_sub_files_toml(driver_root)
-	-- Path: hammerspoon/ → ergopti_plus/ → shared/logger/sub_files.toml
-	local toml_path = driver_root .. "../shared/logger/sub_files.toml"
+	-- Path: hammerspoon/ → ergopti_plus/ → _shared/logger/sub_files.toml
+	local toml_path = driver_root .. "../_shared/logger/sub_files.toml"
 	local fh = io.open(toml_path, "r")
 	if not fh then
 		SUB_LOG_NAMES = SUB_LOG_NAMES_FALLBACK
@@ -295,7 +295,7 @@ function M.init_log_path(config_dir, max_age_days)
 	M.UNIFIED_LOG_FILE = log_dir .. "ErgoptiPlus_" .. os.date("%Y-%m-%d") .. ".log"
 	M.ERRORS_LOG_FILE = log_dir .. "ErgoptiPlus_errors_" .. os.date("%Y-%m-%d") .. ".log"
 
-	-- Load sub-file routing rules from shared/logger/sub_files.toml so adding a
+	-- Load sub-file routing rules from _shared/logger/sub_files.toml so adding a
 	-- new topical log requires only a TOML edit, not a code change in both drivers.
 	-- Derive the driver root from this file's own source path (lib/logger.lua → driver root).
 	pcall(function()

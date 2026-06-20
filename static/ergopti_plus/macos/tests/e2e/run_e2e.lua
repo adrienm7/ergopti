@@ -50,8 +50,8 @@ end
 
 local drivers_root = driver_root:match("^(.*)/[^/]+$") or driver_root
 -- Single shared-tree root for this bootstrap harness; everything below derives
--- from it so a shared/ -> _shared/ rename only touches this one literal.
-local shared_root  = drivers_root .. "/shared"
+-- from it so a future rename of the _shared/ tree only touches this one literal.
+local shared_root  = drivers_root .. "/_shared"
 local shared_lua   = shared_root .. "/lua"
 local corpus_path  = shared_root .. "/tests/corpus/hotstrings/vectors.json"
 
@@ -108,7 +108,7 @@ end
 
 
 --- Reads and JSON-decodes the shared corpus file.
---- Requires the shared/lua json module (tiny pure-Lua JSON parser).
+--- Requires the _shared/lua json module (tiny pure-Lua JSON parser).
 --- @return table Array of vector tables.
 local function load_corpus()
 	local f, err = io.open(corpus_path, "r")
@@ -120,7 +120,7 @@ local function load_corpus()
 	-- Use the tiny JSON decoder available in the shared Lua library.
 	local ok, json = pcall(require, "json")
 	if not ok then
-		error("Cannot load shared json module — check shared/lua/json.lua exists.")
+		error("Cannot load shared json module — check _shared/lua/json.lua exists.")
 	end
 	local decoded = json.decode(raw)
 	return decoded.vectors

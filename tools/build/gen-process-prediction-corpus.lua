@@ -5,9 +5,9 @@
 --- DESCRIPTION:
 --- Generates the cross-driver golden corpus for the LLM semantic-diff parser
 --- (process_prediction) by running the SHARED Lua implementation
---- (shared/lua/llm/parser.lua) — the canonical source after the parser lift — as
+--- (_shared/lua/llm/parser.lua) — the canonical source after the parser lift — as
 --- the oracle over a curated set of input vectors. The emitted corpus
---- (shared/tests/corpus/llm/process_prediction_vectors.json) is consumed by both
+--- (_shared/tests/corpus/llm/process_prediction_vectors.json) is consumed by both
 --- the macOS Lua suite and the AHK suite, which assert their parser produces the
 --- same PHYSICAL output (deletes / to_type / nw / has_corrections / disable_bold)
 --- for each vector. The `chunks` field is tooltip-display-only and is computed
@@ -17,8 +17,8 @@
 ---     lua tools/build/gen-process-prediction-corpus.lua
 --- ==============================================================================
 
--- Resolve the repo's shared/lua so the shared modules resolve regardless of cwd.
-local SHARED_LUA = "D:/Documents/GitHub/ergopti/static/ergopti_plus/shared/lua"
+-- Resolve the repo's _shared/lua so the shared modules resolve regardless of cwd.
+local SHARED_LUA = "D:/Documents/GitHub/ergopti/static/ergopti_plus/_shared/lua"
 package.path = SHARED_LUA .. "/?.lua;" .. SHARED_LUA .. "/?/init.lua;" .. package.path
 
 local parser = require("llm.parser")
@@ -213,7 +213,7 @@ end
 table.insert(lines, "\t]")
 table.insert(lines, "}")
 
-local OUT = "D:/Documents/GitHub/ergopti/static/ergopti_plus/shared/tests/corpus/llm/process_prediction_vectors.json"
+local OUT = "D:/Documents/GitHub/ergopti/static/ergopti_plus/_shared/tests/corpus/llm/process_prediction_vectors.json"
 local fh = assert(io.open(OUT, "w"))
 fh:write(table.concat(lines, "\n") .. "\n")
 fh:close()

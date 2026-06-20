@@ -1,6 +1,6 @@
 # Audit Profond et Détection de Bugs - ErgoptiPlus (Hammerspoon/Lua)
 
-Cet audit a été réalisé en analysant minutieusement le code source de l'intégration Hammerspoon (`macos/` et `shared/lua/`). En se concentrant sur les spécificités du moteur Lua de Hammerspoon, de la gestion asynchrone, et des événements système, plusieurs bugs critiques ont été détectés, dont des suppressions silencieuses de tâches, le gel de la boucle d'événements, et des risques majeurs de perte de données.
+Cet audit a été réalisé en analysant minutieusement le code source de l'intégration Hammerspoon (`macos/` et `_shared/lua/`). En se concentrant sur les spécificités du moteur Lua de Hammerspoon, de la gestion asynchrone, et des événements système, plusieurs bugs critiques ont été détectés, dont des suppressions silencieuses de tâches, le gel de la boucle d'événements, et des risques majeurs de perte de données.
 
 Voici les découvertes détaillées, les correctifs recommandés, et les tests de non-régression à implémenter.
 
@@ -72,7 +72,7 @@ end
 ## 3. Module `TOML Codec` et Configuration (Critique - Perte de Données)
 
 ### 3.1 Sauvegarde Destructrice et Non-Atomique
-**Fichier :** `shared/lua/toml_codec/writer.lua` (ainsi que `hotstrings_config.lua` et `menu_paths.lua`)
+**Fichier :** `_shared/lua/toml_codec/writer.lua` (ainsi que `hotstrings_config.lua` et `menu_paths.lua`)
 **Le problème :** Lors de l'enregistrement du dictionnaire TOML de l'utilisateur, le script exécute `local ok, fh = pcall(io.open, path, "w")`. Ce mode `"w"` **vide immédiatement le fichier** (troncature à 0 octet). Si une erreur d'écriture survient dans les microsecondes qui suivent, ou si l'utilisateur recharge Hammerspoon à ce moment exact, la configuration complète de l'utilisateur est effacée et irrémédiablement perdue.
 Le module `log_manager.lua` gère très bien l'écriture des fichiers `.json` de manière atomique, mais cette sécurité a été oubliée pour les configurations clés.
 **Le correctif :** Implémenter le pattern d'écriture atomique via un fichier temporaire :

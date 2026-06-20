@@ -29,7 +29,7 @@
 
 ; ----------------------------- Built-in catalogue ----------------------------
 ; The canonical catalogue + its grouping live in the SHARED single source of
-; truth: ``static/ergopti_plus/shared/wrap_symbols.json`` (the same file the
+; truth: ``static/ergopti_plus/_shared/wrap_symbols.json`` (the same file the
 ; macOS driver reads). It is loaded once by _WS_LoadBuiltinCatalogue() into the
 ; two globals below — NEVER hardcode the list or its order here.
 ;   _WS_BUILTIN_PAIRS  — flat array of Map("left", …, "right", …), used to build
@@ -90,7 +90,7 @@ WrapSymbols_Init(ConfigDir) {
 }
 
 ; Load the built-in catalogue from the shared single source of truth
-; (``shared/wrap_symbols.json``). Populates _WS_BUILTIN_GROUPS (ordered groups)
+; (``_shared/wrap_symbols.json``). Populates _WS_BUILTIN_GROUPS (ordered groups)
 ; and the flattened _WS_BUILTIN_PAIRS. Falls back to _WS_FALLBACK_GROUPS on any
 ; read/parse failure so wrapping degrades gracefully rather than vanishing.
 _WS_LoadBuiltinCatalogue() {

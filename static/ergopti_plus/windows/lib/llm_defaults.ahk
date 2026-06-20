@@ -3,7 +3,7 @@
 ; ==============================================================================
 ; MODULE: LLM Defaults Loader
 ; DESCRIPTION:
-; Reads static/ergopti_plus/shared/llm/defaults.json at boot and exposes a global
+; Reads static/ergopti_plus/_shared/llm/defaults.json at boot and exposes a global
 ; LLM_Defaults Map so every LLM module reads its initial values from a single
 ; cross-platform source of truth instead of duplicating hardcoded constants.
 ;
@@ -169,8 +169,8 @@ LLM_Defaults_Load() {
 	try raw := FileRead(path, "UTF-8")
 
 	if (raw == "") {
-		LoggerError("LLMDefaults", "shared/llm/defaults.json not found or empty at '{1}' — LLM defaults cannot be initialised.", path)
-		throw Error("ergopti_plus: shared/llm/defaults.json is required but was not found")
+		LoggerError("LLMDefaults", "_shared/llm/defaults.json not found or empty at '{1}' — LLM defaults cannot be initialised.", path)
+		throw Error("ergopti_plus: _shared/llm/defaults.json is required but was not found")
 	}
 
 	d       := Map()
@@ -218,8 +218,8 @@ LLM_Defaults_Load() {
 	}
 
 	if (missing.Length > 0) {
-		LoggerError("LLMDefaults", "shared/llm/defaults.json is missing required key(s): {1} — LLM defaults incomplete.", _LLMD_JoinArray(missing, ", "))
-		throw Error("ergopti_plus: shared/llm/defaults.json is missing required key(s): " . _LLMD_JoinArray(missing, ", "))
+		LoggerError("LLMDefaults", "_shared/llm/defaults.json is missing required key(s): {1} — LLM defaults incomplete.", _LLMD_JoinArray(missing, ", "))
+		throw Error("ergopti_plus: _shared/llm/defaults.json is missing required key(s): " . _LLMD_JoinArray(missing, ", "))
 	}
 
 	; AHK-local keys (model, backend) — not part of the cross-platform JSON.

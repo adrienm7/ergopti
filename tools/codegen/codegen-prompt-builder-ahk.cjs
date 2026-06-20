@@ -6,7 +6,7 @@
  * DESCRIPTION:
  * Generates `static/ergopti_plus/windows/_generated/prompt_builder.ahk` from the
  * canonical algorithm defined in
- * `static/ergopti_plus/shared/lua/llm/prompt_builder.lua`.
+ * `static/ergopti_plus/_shared/lua/llm/prompt_builder.lua`.
  *
  * FEATURES & RATIONALE:
  * 1. Single source of truth: all constants are kept in sync with the Lua and JS

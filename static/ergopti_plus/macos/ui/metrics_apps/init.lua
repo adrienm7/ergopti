@@ -45,7 +45,7 @@ M._manifest_rev    = -1
 
 --- Resolves the path to shared UI assets (fail-fast).
 --- Priority: module-relative > upward search > ERROR
---- @param subdir string Subdirectory name under static/ergopti_plus/shared/ui/.
+--- @param subdir string Subdirectory name under static/ergopti_plus/_shared/ui/.
 --- @return string|nil Absolute path if found, nil if missing (ERROR logged).
 local function resolve_ui_assets_dir(subdir)
 	-- Resolved through the single shared-tree resolver (Paths.shared). The

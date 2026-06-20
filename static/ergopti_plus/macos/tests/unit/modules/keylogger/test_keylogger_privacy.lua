@@ -6,7 +6,7 @@
 --- Verifies the security guarantee that passwords, API keys, and 2FA codes
 --- are never persisted by the keylogger when the correct privacy filters are
 --- active. Each test case corresponds to a vector in:
----   static/ergopti_plus/shared/tests/corpus/security/keylogger_no_persist_vectors.json
+---   static/ergopti_plus/_shared/tests/corpus/security/keylogger_no_persist_vectors.json
 ---
 --- FEATURES & RATIONALE:
 --- 1. Secure Field Guard: CoreState.is_secure_field=true must prevent any
@@ -144,8 +144,8 @@ end
 -- ==============================================
 
 -- Load the shared security corpus so vector definitions stay in one place.
--- The corpus path is two levels above the HS driver root: shared/ lives at
--- static/ergopti_plus/shared/ while we are under static/ergopti_plus/macos/.
+-- The corpus path is two levels above the HS driver root: _shared/ lives at
+-- static/ergopti_plus/_shared/ while we are under static/ergopti_plus/macos/.
 local _corpus_path = helpers.shared("tests/corpus/security/keylogger_no_persist_vectors.json")
 
 --- Reads and JSON-decodes the corpus file.

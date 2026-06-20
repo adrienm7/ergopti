@@ -2,7 +2,7 @@
 
 ; ==========================================
 ; AUTO-GENERATED — do not edit manually
-; Source: static/ergopti_plus/shared/lua/llm/prompt_builder.lua
+; Source: static/ergopti_plus/_shared/lua/llm/prompt_builder.lua
 ; Run: npm run codegen:prompt-builder:ahk
 ; ==========================================
 
@@ -14,8 +14,8 @@
 ; from the current typing buffer and a configuration Map.
 ;
 ; This module is the AHK counterpart of:
-;   static/ergopti_plus/shared/lua/llm/prompt_builder.lua
-;   static/ergopti_plus/shared/domain/PromptBuilder.js
+;   static/ergopti_plus/_shared/lua/llm/prompt_builder.lua
+;   static/ergopti_plus/_shared/domain/PromptBuilder.js
 ; All constants and algorithms MUST stay in sync with those references.
 ;
 ; CONSTANTS (canonical — all drivers MUST use these exact values):

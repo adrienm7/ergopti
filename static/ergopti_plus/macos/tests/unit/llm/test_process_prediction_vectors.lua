@@ -4,14 +4,14 @@
 --- MODULE: process_prediction Cross-Driver Corpus (Hammerspoon / shared oracle)
 --- DESCRIPTION:
 --- Runs the cross-driver golden corpus
---- (shared/tests/corpus/llm/process_prediction_vectors.json) through the SHARED
+--- (_shared/tests/corpus/llm/process_prediction_vectors.json) through the SHARED
 --- Lua parser — the canonical oracle the corpus was generated from. The AHK suite
 --- asserts its port matches the same corpus row-by-row (test_llm_parser.ahk §3), so
 --- together they pin macOS ≡ AHK on the physical injection contract (deletes /
 --- to_type / nw / has_corrections / disable_bold).
 ---
 --- This side passes by construction; its purpose is to make the corpus a tripwire:
---- any change to shared/lua/llm/parser.lua that shifts the output fails here until
+--- any change to _shared/lua/llm/parser.lua that shifts the output fails here until
 --- the corpus is regenerated (lua tools/build/gen-process-prediction-corpus.lua),
 --- forcing the AHK port to be re-verified against the new truth.
 --- ==============================================================================
@@ -22,7 +22,7 @@ local helpers = require("tests.helpers")
 package.loaded["lib.logger"] = nil
 helpers.load_with_stubs("lib.logger")
 
--- Put shared/lua on the path so require("llm.parser") resolves to the oracle.
+-- Put _shared/lua on the path so require("llm.parser") resolves to the oracle.
 local shared_lua  = helpers.shared("lua/")
 package.path = shared_lua .. "?.lua;" .. shared_lua .. "?/init.lua;" .. package.path
 

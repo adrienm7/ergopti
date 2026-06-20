@@ -4,7 +4,7 @@
 --- MODULE: Hotstring Corpus Consumer (Hammerspoon)
 --- DESCRIPTION:
 --- Loads the shared cross-driver corpus from
---- shared/tests/corpus/hotstrings/vectors.json and validates each vector
+--- _shared/tests/corpus/hotstrings/vectors.json and validates each vector
 --- against the Hammerspoon registry module.
 ---
 --- COVERAGE:
@@ -34,7 +34,7 @@ local helpers = require("tests.helpers")
 -- ========================================
 
 -- Resolve the corpus path relative to the driver root
--- The corpus lives two levels above the HS driver: static/ergopti_plus/shared/
+-- The corpus lives two levels above the HS driver: static/ergopti_plus/_shared/
 local corpus_path = helpers.shared("tests/corpus/hotstrings/vectors.json")
 
 local function read_corpus()

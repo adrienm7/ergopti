@@ -4,7 +4,7 @@
 --- MODULE: api_mlx — MLX server address single-source-of-truth
 --- DESCRIPTION:
 --- Locks down the contract that the MLX server host/port live in ONE place
---- (shared/llm/mlx_server.json, loaded by api_mlx, overridable per-user) and are
+--- (_shared/llm/mlx_server.json, loaded by api_mlx, overridable per-user) and are
 --- exposed via getters, so the port is never hardcoded across api_mlx, the
 --- models_manager_mlx launcher, and the init.lua boot cleanup. Before this, "8080"
 --- was written by hand in ~20 places; changing the port meant hunting them all down.
@@ -25,7 +25,7 @@ local helpers = require("tests.helpers")
 package.loaded["modules.llm.api_mlx"] = nil
 local ApiMlx = require("modules.llm.api_mlx")
 
--- The dedicated default shipped in shared/llm/mlx_server.json and hardcoded as the
+-- The dedicated default shipped in _shared/llm/mlx_server.json and hardcoded as the
 -- final fallback in api_mlx. Kept in sync with both; a regression that reverts the
 -- default to 8080 fails here.
 local DEDICATED_DEFAULT_PORT = 3460
@@ -61,7 +61,7 @@ helpers.describe("api_mlx — MLX server address getters", function()
 	end)
 
 	helpers.it("falls back to Ergopti's dedicated 127.0.0.1:3460 default (NOT 8080) when no config/override is present", function()
-		-- The test box has no shared/llm/mlx_server.json reachable from hs.configdir
+		-- The test box has no _shared/llm/mlx_server.json reachable from hs.configdir
 		-- and no hs.settings override, so the loader must fall back to the dedicated
 		-- default rather than mlx_lm.server's collision-prone 8080.
 		helpers.assert_eq(ApiMlx.get_host(), "127.0.0.1")

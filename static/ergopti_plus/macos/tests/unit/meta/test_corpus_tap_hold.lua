@@ -4,7 +4,7 @@
 --- MODULE: Tap-Hold Corpus Consumer (Hammerspoon)
 --- DESCRIPTION:
 --- Loads the shared cross-driver corpus from
---- shared/tests/corpus/tap_hold/vectors.json and validates each vector
+--- _shared/tests/corpus/tap_hold/vectors.json and validates each vector
 --- against the Hammerspoon TOML codec — ensuring that a tap-hold configuration
 --- round-trips through the shared Lua codec with the expected structure.
 ---
@@ -109,7 +109,7 @@ end)
 -- ==========================================
 -- ==========================================
 
--- Load the shared TOML codec (lives in shared/lua/toml_codec/).
+-- Load the shared TOML codec (lives in _shared/lua/toml_codec/).
 local codec_ok, codec = pcall(require, "toml_codec.codec")
 
 helpers.describe("tap_hold corpus — TOML codec round-trip", function()

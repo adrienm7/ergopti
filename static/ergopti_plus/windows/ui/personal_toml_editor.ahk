@@ -548,7 +548,7 @@ _SetEditCueBanner(Ctrl, Text) {
 }
 
 ; Personal source-default priority read from the shared single source
-; (shared/hotstrings/priority.json) so the editor never hardcodes it. Falls back
+; (_shared/hotstrings/priority.json) so the editor never hardcodes it. Falls back
 ; to the engine constant — which the parity gate keeps identical to that file —
 ; if the shared file cannot be read.
 _GetSharedPersonalDefault() {

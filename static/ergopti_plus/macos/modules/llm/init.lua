@@ -32,7 +32,7 @@ M.BUILTIN_PROFILES = Profiles.BUILTIN_PROFILES
 --- =======================================
 -- =======================================
 
---- Shared scalar/boolean defaults: keys that live in shared/llm/defaults.json
+--- Shared scalar/boolean defaults: keys that live in _shared/llm/defaults.json
 --- under the same name on every driver. Sourced EXCLUSIVELY from the JSON — the
 --- values are never re-declared here (rule 5.2 single source of truth).
 local _SHARED_SCALAR_KEYS = {
@@ -73,14 +73,14 @@ local function load_shared_defaults()
 	end
 
 	if not raw or raw == "" then
-		Logger.error(LOG, "shared/llm/defaults.json not found on any candidate path — LLM defaults cannot be initialised.")
-		error("ergopti_plus: shared/llm/defaults.json is required but was not found")
+		Logger.error(LOG, "_shared/llm/defaults.json not found on any candidate path — LLM defaults cannot be initialised.")
+		error("ergopti_plus: _shared/llm/defaults.json is required but was not found")
 	end
 
 	local ok, parsed = pcall(hs.json.decode, raw)
 	if not ok or type(parsed) ~= "table" then
-		Logger.error(LOG, "shared/llm/defaults.json (%s) could not be parsed — LLM defaults cannot be initialised.", tostring(used))
-		error("ergopti_plus: shared/llm/defaults.json failed to parse")
+		Logger.error(LOG, "_shared/llm/defaults.json (%s) could not be parsed — LLM defaults cannot be initialised.", tostring(used))
+		error("ergopti_plus: _shared/llm/defaults.json failed to parse")
 	end
 
 	-- Start from the HS-only defaults, then layer every shared value on top.
@@ -113,8 +113,8 @@ local function load_shared_defaults()
 	end
 
 	if #missing > 0 then
-		Logger.error(LOG, "shared/llm/defaults.json is missing required key(s): %s — LLM defaults incomplete.", table.concat(missing, ", "))
-		error("ergopti_plus: shared/llm/defaults.json is missing required key(s): " .. table.concat(missing, ", "))
+		Logger.error(LOG, "_shared/llm/defaults.json is missing required key(s): %s — LLM defaults incomplete.", table.concat(missing, ", "))
+		error("ergopti_plus: _shared/llm/defaults.json is missing required key(s): " .. table.concat(missing, ", "))
 	end
 
 	Logger.done(LOG, "Shared LLM defaults loaded from defaults.json (%s).", tostring(used))
@@ -463,7 +463,7 @@ end
 -- Flat index: { [label] = { ollama = "...", mlx = "..." } } — built once from JSON
 local _model_index = nil
 
---- Builds and caches a flat O(1) lookup index from shared/llm/models.json.
+--- Builds and caches a flat O(1) lookup index from _shared/llm/models.json.
 --- @return table The index keyed by model label.
 local function get_model_index()
 	if _model_index then return _model_index end
@@ -501,7 +501,7 @@ end
 
 --- Translates a JSON model label to the backend-specific identifier in O(1).
 --- e.g., "gemma-4-E2B-it" -> "gemma4:e2b" (Ollama) or "gemma-4-e2b-it-mxfp4" (MLX)
---- @param label string The model label ("name" field from shared/llm/models.json).
+--- @param label string The model label ("name" field from _shared/llm/models.json).
 --- @param backend string The target backend identifier.
 --- @return string The backend-specific identifier, or label unchanged if not found.
 local function resolve_model_for_backend(label, backend)

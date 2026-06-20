@@ -426,7 +426,7 @@ _LLM_ModelBrowser_ShowWeb() {
  * MoE-aware) from the shared model index and injects it via injectModels(). The
  * Windows backend is always Ollama, so the install flag reads the Ollama tag list.
  *
- * The catalogue is STATIC (shared/llm/models.json), so it is ALWAYS injected in
+ * The catalogue is STATIC (_shared/llm/models.json), so it is ALWAYS injected in
  * full — whether or not the AI feature is enabled. Only the green "installed" dot
  * needs Ollama, so its tag scan is skipped unless the daemon is confirmed ready.
  * This is critical here: InjectCatalogue runs inside the WebView2 WebMessageReceived
@@ -558,7 +558,7 @@ _LLM_MBW_WebView2Available() {
 	return IsSet(WebView2) && FileExist(loader)
 }
 
-/** Returns the file:// URL for shared/ui/model_browser/index.html. */
+/** Returns the file:// URL for _shared/ui/model_browser/index.html. */
 _LLM_MBW_HtmlUrl() {
 	global _SharedDir
 	base := _SharedDir . "\ui\model_browser\index.html"
@@ -567,7 +567,7 @@ _LLM_MBW_HtmlUrl() {
 	return "file:///" . StrReplace(base, "\", "/")
 }
 
-/** Returns the file:// URL for shared/locales/ (trailing slash). */
+/** Returns the file:// URL for _shared/locales/ (trailing slash). */
 _LLM_MBW_LocalesUrl() {
 	global _SharedDir
 	base := _SharedDir . "\locales\"

@@ -265,7 +265,7 @@ _Updater_NormalizeTag(Tag) {
 	return (SubStr(Tag, 1, 1) == "v") ? SubStr(Tag, 2) : Tag
 }
 
-; Semver helpers — canonical algorithm in shared/updater/version.js.
+; Semver helpers — canonical algorithm in _shared/updater/version.js.
 ; Parses "2.5.0-dev.3" into { Maj, Min, Pat, PreParts } or 0 on failure.
 _Updater_ParseVersion(Tag) {
 	Norm := _Updater_NormalizeTag(Tag)
@@ -338,7 +338,7 @@ _Updater_CompareVersions(A, B) {
 
 ; Returns true when Latest is strictly newer than Current (semver comparison).
 ; Handles pre-release tags (e.g. 2.5.0-dev.3 → 2.5.0-dev.4). Canonical
-; vectors live in shared/updater/version.js:versionTestVectors().
+; vectors live in _shared/updater/version.js:versionTestVectors().
 _Updater_IsNewerVersion(Latest, Current) {
 	return _Updater_CompareVersions(Latest, Current) > 0
 }

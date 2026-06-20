@@ -16,7 +16,7 @@
 --- DEPENDENCIES:
 --- - lib.logger (project-wide logger).
 --- - hs.json, hs.sqlite3, hs.fs.
---- - Canonical SQLite schema: static/ergopti_plus/shared/data/db/schema.sql.
+--- - Canonical SQLite schema: static/ergopti_plus/_shared/data/db/schema.sql.
 --- ==============================================================================
 
 local M = {}

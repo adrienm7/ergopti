@@ -7,7 +7,7 @@
 ---
 --- FEATURES & RATIONALE:
 --- 1. Manifest-Driven: Structure (slot groups, separators, action buttons) is
----    read from ``shared/menu_manifest.json`` via ``lib/manifest_menu``.
+---    read from ``_shared/menu_manifest.json`` via ``lib/manifest_menu``.
 ---    Dynamic blocks (slot items, disable_all, restore_defaults) are supplied
 ---    as handlers so runtime state stays in Lua.
 --- ==============================================================================

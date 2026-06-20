@@ -8,7 +8,7 @@
 --- package.path (there is no linux/lib/ directory). Every such require would
 --- raise a "module 'lib.logger' not found" error the moment the adapter loaded,
 --- silently crashing whichever feature pulled it in. The canonical Linux logger
---- is the shared print-fallback shim at shared/lua/logger/shim.lua, required as
+--- is the shared print-fallback shim at _shared/lua/logger/shim.lua, required as
 --- `require("logger.shim")` by the other 11 adapters.
 ---
 --- FEATURES & RATIONALE:

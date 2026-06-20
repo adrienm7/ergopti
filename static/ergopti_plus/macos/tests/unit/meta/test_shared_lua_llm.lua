@@ -5,8 +5,8 @@
 --- DESCRIPTION:
 --- Validates the two shared Lua LLM modules against their cross-driver test
 --- vectors, ensuring the Lua implementations stay in sync with the JS reference
---- implementations in shared/domain/PromptBuilder.js and
---- shared/domain/ProfileSelector.js.
+--- implementations in _shared/domain/PromptBuilder.js and
+--- _shared/domain/ProfileSelector.js.
 ---
 --- COVERAGE:
 --- 1. PromptBuilder — every vector from M.test_vectors() is executed against
@@ -28,10 +28,10 @@ local helpers = require("tests.helpers")
 -- ==========================================
 -- ==========================================
 
--- Resolve shared/lua path relative to the driver root
+-- Resolve _shared/lua path relative to the driver root
 local shared_lua  = helpers.shared("lua/")
 
--- Prepend shared/lua/ to the Lua package path so require("llm.xxx") resolves
+-- Prepend _shared/lua/ to the Lua package path so require("llm.xxx") resolves
 local orig_path = package.path
 package.path = shared_lua .. "?.lua;" .. shared_lua .. "?/init.lua;" .. package.path
 
@@ -53,7 +53,7 @@ package.path = orig_path
 helpers.describe("shared_lua_llm — PromptBuilder: module loads", function()
 	helpers.it("prompt_builder module is available on the shared Lua path", function()
 		helpers.assert_true(ok_pb,
-			"shared/lua/llm/prompt_builder.lua not found or has syntax error: "
+			"_shared/lua/llm/prompt_builder.lua not found or has syntax error: "
 			.. tostring(PromptBuilder))
 	end)
 end)
@@ -159,7 +159,7 @@ end)
 helpers.describe("shared_lua_llm — ProfileSelector: module loads", function()
 	helpers.it("profile_selector module is available on the shared Lua path", function()
 		helpers.assert_true(ok_ps,
-			"shared/lua/llm/profile_selector.lua not found or has syntax error: "
+			"_shared/lua/llm/profile_selector.lua not found or has syntax error: "
 			.. tostring(ProfileSelector))
 	end)
 end)

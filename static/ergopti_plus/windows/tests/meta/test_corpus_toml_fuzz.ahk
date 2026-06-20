@@ -6,7 +6,7 @@
 ; Exercises the AHK TOML loader (lib/toml/toml_loader.ahk via ParseTomlFile
 ; and lib/toml/toml_helpers.ahk via ParseTomlFile) against every entry in the
 ; shared cross-driver fuzz corpus:
-;   shared/tests/corpus/toml/fuzz_corpus.json
+;   _shared/tests/corpus/toml/fuzz_corpus.json
 ;
 ; CONTRACT:
 ; For every fuzz vector the loader MUST NOT crash (unhandled exception, infinite
@@ -33,7 +33,7 @@
 ; ======================================
 
 _TomlFuzz_RunAll() {
-	CorpusPath := A_ScriptDir . "\..\..\shared\tests\corpus\toml\fuzz_corpus.json"
+	CorpusPath := A_ScriptDir . "\..\..\_shared\tests\corpus\toml\fuzz_corpus.json"
 
 	_TomlFuzz_FileExists() {
 		AssertTrue(FileExist(CorpusPath) != "", "TOML fuzz corpus must exist at: " . CorpusPath)

@@ -44,7 +44,7 @@ local LOG            = "keylogger"
 -- ================================
 
 -- Timing thresholds come from the shared cross-driver registry
--- (shared/timings/constants.toml [keylogger]) so the AHK and macOS keyloggers
+-- (_shared/timings/constants.toml [keylogger]) so the AHK and macOS keyloggers
 -- stay in sync; the comment after each names the canonical value for reference.
 -- Typing session idle threshold before a "micro-idle" event is logged (30 s)
 local MICRO_IDLE_TIMEOUT_MS      = Timings.ms("keylogger", "micro_idle_timeout_ms")

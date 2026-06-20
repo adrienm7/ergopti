@@ -8,7 +8,7 @@
 ; ``modules/llm/api_common.lua`` — same surface (get_diversity_temperature,
 ; get_retry_policy, get_rate_limit_min_interval_ms, insert_prediction,
 ; new_dedup_stats), same algorithm, and the same numeric tunables (loaded
-; from ``static/ergopti_plus/shared/llm/inference.json``).
+; from ``static/ergopti_plus/_shared/llm/inference.json``).
 ;
 ; FEATURES & RATIONALE:
 ; 1. Single source of truth for inference tunables: change a knob in
@@ -52,18 +52,18 @@ _LLM_Common_GetInference() {
 	; Canonical path next to defaults.json / models.json.
 	path := _SharedDir . "\llm\inference.json"
 	if !FileExist(path) {
-		LoggerError("LLMCommon", "shared/llm/inference.json not found at '{1}' — LLM inference tunables cannot be loaded.", path)
-		throw Error("ergopti_plus: shared/llm/inference.json is required but was not found")
+		LoggerError("LLMCommon", "_shared/llm/inference.json not found at '{1}' — LLM inference tunables cannot be loaded.", path)
+		throw Error("ergopti_plus: _shared/llm/inference.json is required but was not found")
 	}
 	raw := FSRead(path)
 	if (raw == false) {
-		LoggerError("LLMCommon", "shared/llm/inference.json could not be read at '{1}'.", path)
-		throw Error("ergopti_plus: shared/llm/inference.json could not be read")
+		LoggerError("LLMCommon", "_shared/llm/inference.json could not be read at '{1}'.", path)
+		throw Error("ergopti_plus: _shared/llm/inference.json could not be read")
 	}
 	parsed := _LLM_Common_ParseInferenceJson(raw)
 	if (parsed.Count == 0) {
-		LoggerError("LLMCommon", "shared/llm/inference.json parsed to an empty table — malformed JSON.")
-		throw Error("ergopti_plus: shared/llm/inference.json is present but parsed empty")
+		LoggerError("LLMCommon", "_shared/llm/inference.json parsed to an empty table — malformed JSON.")
+		throw Error("ergopti_plus: _shared/llm/inference.json is present but parsed empty")
 	}
 	_LLM_COMMON_INFERENCE := parsed
 	return _LLM_COMMON_INFERENCE
@@ -150,7 +150,7 @@ _LLM_Common_Cfg(section, key) {
 	cfg := _LLM_Common_GetInference()
 	if (cfg.Has(section) and cfg[section].Has(key))
 		return cfg[section][key]
-	LoggerError("LLMCommon", "shared/llm/inference.json is missing tunable '{1}.{2}' — malformed or outdated JSON.", section, key)
+	LoggerError("LLMCommon", "_shared/llm/inference.json is missing tunable '{1}.{2}' — malformed or outdated JSON.", section, key)
 	throw Error("ergopti_plus: inference.json missing tunable " . section . "." . key)
 }
 
@@ -174,7 +174,7 @@ LLM_ApiCommon_DefaultDedupEnabled() {
 LLM_ApiCommon_GetRateLimitMs(backend_id) {
 	cfg := _LLM_Common_GetInference()
 	if !cfg.Has("rate_limit_min_interval_ms") {
-		LoggerError("LLMCommon", "shared/llm/inference.json is missing section 'rate_limit_min_interval_ms'.")
+		LoggerError("LLMCommon", "_shared/llm/inference.json is missing section 'rate_limit_min_interval_ms'.")
 		throw Error("ergopti_plus: inference.json missing section rate_limit_min_interval_ms")
 	}
 	rateMap := cfg["rate_limit_min_interval_ms"]

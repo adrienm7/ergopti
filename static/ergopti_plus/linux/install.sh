@@ -77,11 +77,11 @@ CONFIG_DIR="${HOME}/.config/ergopti/hotstrings"
 SYSTEMD_DIR="${HOME}/.config/systemd/user"
 
 # Single source of truth for the shared-tree location, both the repo source and
-# the install destination. A shared/ -> _shared/ rename only needs editing these
+# the install destination. A future rename of the _shared/ tree only needs editing these
 # two lines (and they must stay in sync with the daemon's runtime resolution in
 # ergopti_hotstrings.lua, which expects the installed dir to be a sibling).
-SRC_SHARED="${DRIVERS_ROOT}/shared"
-DEST_SHARED="${LIB_DIR}/shared"
+SRC_SHARED="${DRIVERS_ROOT}/_shared"
+DEST_SHARED="${LIB_DIR}/_shared"
 
 
 # ====================================

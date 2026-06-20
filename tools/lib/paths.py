@@ -4,10 +4,10 @@
 ==============================================================================
 MODULE: Tooling Shared-Tree Paths (Python)
 DESCRIPTION:
-The single source of truth for the cross-platform shared/ tree location used by
+The single source of truth for the cross-platform _shared/ tree location used by
 Python dev tools (data compaction, TOML formatting, locale checks). Tools used
-to each hardcode the literal "static/ergopti_plus/shared/..." string; this module
-centralises it so a repo-layout rename (shared/ -> _shared/) only needs editing
+to each hardcode the literal "static/ergopti_plus/_shared/..." string; this module
+centralises it so a future rename of the _shared/ tree only needs editing
 SHARED_REL on the one line below.
 
 FEATURES & RATIONALE:
@@ -29,18 +29,18 @@ from pathlib import Path
 REPO_ROOT: Path = Path(__file__).resolve().parents[2]
 
 # THE single source of truth for the shared-tree location. Forward-slash,
-# repo-relative — a shared/ -> _shared/ rename is a one-token edit here.
-SHARED_REL: str = "static/ergopti_plus/shared"
+# repo-relative — a future rename of the _shared/ tree is a one-token edit here.
+SHARED_REL: str = "static/ergopti_plus/_shared"
 
-# Absolute path to the shared/ tree.
+# Absolute path to the _shared/ tree.
 SHARED_DIR: Path = REPO_ROOT / SHARED_REL
 
 
 def shared(*parts: str) -> Path:
-	"""Resolves an absolute path inside the shared/ tree.
+	"""Resolves an absolute path inside the _shared/ tree.
 
 	Args:
-		*parts: Path segments under shared/, e.g. "data", "db", "schema.sql".
+		*parts: Path segments under _shared/, e.g. "data", "db", "schema.sql".
 
 	Returns:
 		Absolute filesystem path.
@@ -49,12 +49,12 @@ def shared(*parts: str) -> Path:
 
 
 def shared_rel(*parts: str) -> str:
-	"""Resolves a repo-relative (forward-slash) path inside the shared/ tree.
+	"""Resolves a repo-relative (forward-slash) path inside the _shared/ tree.
 
 	Args:
-		*parts: Path segments under shared/.
+		*parts: Path segments under _shared/.
 
 	Returns:
-		Repo-relative path string, e.g. "static/ergopti_plus/shared/locales".
+		Repo-relative path string, e.g. "static/ergopti_plus/_shared/locales".
 	"""
 	return "/".join((SHARED_REL, *parts))

@@ -4,7 +4,7 @@
 --- MODULE: ProcessLifecycle Adapter (Linux)
 --- DESCRIPTION:
 --- Linux implementation of the ProcessLifecycle port contract defined in
---- static/ergopti_plus/shared/ports/ProcessLifecycle.spec.js. Wraps a polling
+--- static/ergopti_plus/_shared/ports/ProcessLifecycle.spec.js. Wraps a polling
 --- loop backed by xdotool to detect focused-window changes, and a background
 --- shell process monitoring loop for app launch/quit events.
 ---

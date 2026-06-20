@@ -4,7 +4,7 @@
  * ==============================================================================
  * MODULE: Port Contract Single-Source Compliance Tests
  * DESCRIPTION:
- * Enforces that the generated shared/ports/contracts.json is the one and only
+ * Enforces that the generated _shared/ports/contracts.json is the one and only
  * source of truth for the port method/arity surface, and that the AHK driver's
  * hand-written ADAPTER_* dispatch maps stay in sync with it.
  *
@@ -78,7 +78,7 @@ const regenerated = serialise(buildContracts());
 if (committed === null) {
 	fail('contracts.json exists', ['file not found — run `npm run codegen:contracts`']);
 } else if (normalizeEol(committed) !== normalizeEol(regenerated)) {
-	fail('contracts.json is up to date with shared/ports/*.spec.js', [
+	fail('contracts.json is up to date with _shared/ports/*.spec.js', [
 		'contracts.json is STALE — run `npm run codegen:contracts` and commit the result'
 	]);
 } else {

@@ -4,7 +4,7 @@
 --- MODULE: Storage Adapter (Linux)
 --- DESCRIPTION:
 --- Linux implementation of the Storage port contract defined in
---- static/ergopti_plus/shared/ports/Storage.spec.js. Provides a key-value
+--- static/ergopti_plus/_shared/ports/Storage.spec.js. Provides a key-value
 --- persistent store backed by a JSON file under XDG_CONFIG_HOME
 --- (~/.config/ergopti_plus/storage.json) so settings survive daemon restarts
 --- and reboots without depending on D-Bus or gconf.

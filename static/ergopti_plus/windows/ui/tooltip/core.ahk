@@ -28,7 +28,7 @@ global _TooltipGeneration := 0
 global _TooltipTimerGeneration := 0
 
 ; Dequeue state — items that have per-row expiry deadlines. Canonical algorithm:
-; shared/tooltip/dequeue.js (SPEC.md § 7.1). When rows carry distinct non-zero
+; _shared/tooltip/dequeue.js (SPEC.md § 7.1). When rows carry distinct non-zero
 ; DurationSec values, TooltipShow stores the full item list here with absolute
 ; expiry timestamps (A_TickCount + duration_ms). The dequeue poll timer removes
 ; expired rows and re-renders the surviving stack so a short row disappears first

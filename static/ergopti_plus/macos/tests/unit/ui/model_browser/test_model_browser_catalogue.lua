@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: model_browser — catalogue normalisation
 --- DESCRIPTION:
---- Locks down the data shape the shared web table (shared/ui/model_browser) is fed.
+--- Locks down the data shape the shared web table (_shared/ui/model_browser) is fed.
 --- build_catalogue() flattens the provider → family → model preset tree into the
 --- flat, per-row record the page renders (name, family, params_b, active_b, is_moe,
 --- ram_gb, speed_tok_s, type, installed, url) and filters out models that have no

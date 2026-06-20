@@ -54,7 +54,7 @@ global LLM_OLLAMA_TIMEOUT  := 180000  ; ms (3 min) — cold CPU inference headro
 global LLM_OLLAMA_POLL_MS := 0
 
 ; Reassign the LLM backend timing globals (Ollama + remote poll/timeout and the
-; installed-models cache TTL) from the shared registry shared/timings/constants.toml
+; installed-models cache TTL) from the shared registry _shared/timings/constants.toml
 ; at boot, so they stay in sync with the macOS driver instead of re-typing the
 ; same literals. AHK v2 runs global initializers before the auto-execute body, so
 ; these start at the sentinel 0 and are sourced here; every read happens at
