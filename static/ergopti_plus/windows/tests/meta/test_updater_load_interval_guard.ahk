@@ -44,12 +44,6 @@
 ; ===========================================================
 ; ===========================================================
 
-_ULIG_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &WindowsDir)
-	Path := StrReplace(WindowsDir, "\", "/") . "/" . StrReplace(RelPath, "\", "/")
-	return FileRead(Path)
-}
-
 ; Extracts the body of Updater_LoadCheckInterval from the source.
 _ULIG_ExtractLoaderBody(Src) {
 	FnPos := InStr(Src, "Updater_LoadCheckInterval() {")
@@ -80,11 +74,11 @@ _ULIG_ExtractLoaderBody(Src) {
 ; =========================================================
 
 _ULIG_CheckIsNumberGuard() {
-	Src := _ULIG_ReadSource("lib/updater.ahk")
-	Assert(Src != "", "lib/updater.ahk must be readable")
+	Src := _DriverDirConcat("lib/updater")
+	Assert(Src != "", "the lib/updater module must be readable")
 
 	Body := _ULIG_ExtractLoaderBody(Src)
-	Assert(Body != "", "Updater_LoadCheckInterval must be present in lib/updater.ahk")
+	Assert(Body != "", "Updater_LoadCheckInterval must be present in the lib/updater module")
 
 	; (a) IsNumber(raw) validation must be present before the Integer() call.
 	Assert(InStr(Body, "IsNumber(raw)"),
