@@ -115,14 +115,18 @@ end
 -- (e.g. renaming shared/ to _shared/) only needs to be edited on this line.
 local _shared_root = nil
 
---- Returns the absolute path of ``static/ergopti_plus/shared`` (memoised).
---- Resolution walks up from hs.configdir and from this module's own directory,
---- so it works in dev checkouts, packaged .app builds and ~/.hammerspoon symlink
---- setups alike. Returns nil only when the shared tree is genuinely unreachable.
+--- Returns the absolute path of the shared/ tree (memoised). Resolution walks up
+--- from hs.configdir and from this module's own directory looking for the bare
+--- ``shared`` directory name — deliberately NOT the full ``static/ergopti_plus/shared``
+--- path — because the packaged .app mirrors it at a different prefix
+--- (``Contents/Resources/static/drivers/shared``) than the dev checkout
+--- (``static/ergopti_plus/shared``). Matching the bare dir name resolves both, plus
+--- ~/.hammerspoon symlink setups, with one resolver. Returns nil only when the
+--- shared tree is genuinely unreachable.
 --- @return string|nil
 function M.shared_root()
 	if _shared_root then return _shared_root end
-	_shared_root = M.find_from_configdir("static/ergopti_plus/shared")
+	_shared_root = M.find_from_configdir("shared")
 	return _shared_root
 end
 
