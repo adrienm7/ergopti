@@ -107,16 +107,16 @@ Chemin identique d'un driver à l'autre → l'analogue se trouve au même endroi
 
 **Pipeline d'extraction prouvé et sûr** (chaque incrément) : extraction PowerShell (garantit UTF-8 BOM + CRLF) qui remplace le bloc **en place** par un `#Include` (préserve l'ordre de boot et les statements top-level type `global X := …`) → `test:ahk-encoding` → dry-run AHK (parse, exit 0) → suite complète AHK (2224/0) → repointer les meta-tests qui scannent le source de `ErgoptiPlus.ahk` (≈25 tests pinnent des fonctions à ce fichier — le filet les attrape).
 
-- [x] Hotkeys AltGr → `lib/script_altgr_hotkeys.ahk` (incrément 1 ; 2 meta-tests repointés ; suite 2224/0).
-- [x] Éditeurs (magic key, repeat key, infos perso, lien GPT) → `ui/editors.ahk` (incrément 2 ; 0 couplage ; suite 2224/0).
-- [ ] Pickers (`ShowActionPicker`, `ShowKeyboardSlotPicker`, `ShowKeyboardShortcutPicker`, `FilePathsEditor`) → `ui/action_picker.ahk` (1 meta-test à repointer).
-- [ ] Config IO (`SaveFullConfig`, `_CollectFeatureUpdates`, `ReadScript/KeyboardShortcutsConfig`, toggles) → `lib/config_io.ahk`.
-- [ ] Lifecycle (suspend/shutdown/tray/debug) → `lib/lifecycle.ahk` (fort couplage meta-tests suspend-guard).
-- [ ] Tables d'état globales (`ScriptInformation`, `SCRIPT_SHORTCUT_*`, `KEYBOARD_SHORTCUT_*`, `CategoryEnabled`) → `lib/feature_state.ahk` (top-level dans la section boot — extraction in-place obligatoire).
-- [ ] Sondes `DllCall` (AltGr-Kana, scan magic-key) → `adapters/key_state.ahk`.
-- [ ] Bannières 5-blank-lines / 7-`=` dans chaque nouveau fichier.
+- [x] Hotkeys AltGr → `lib/script_altgr_hotkeys.ahk` (incrément 1 ; 2 meta-tests repointés).
+- [x] Éditeurs (magic key, repeat key, infos perso, lien GPT) → `ui/editors.ahk` (incrément 2).
+- [x] Pickers (`ShowActionPicker`, `ShowKeyboardSlotPicker`, `ShowKeyboardShortcutPicker`, `FilePathsEditor`) → `ui/action_picker.ahk` (incrément 3).
+- [x] Config IO (toggles, `SaveFullConfig`, `_CollectFeatureUpdates`, shortcut config) → `lib/config_io.ahk` (incrément 4). **Bonus** : durcissement des meta-tests d'introspection — `_DriverSourceConcat()` (tout l'arbre `windows/**/*.ahk`) + `_DriverFuncBody()` (ancre sur la *définition*, indentée ou non) dans `test_framework.ahk` ; ~28 tests migrés → **désormais indépendants de l'emplacement des fonctions** (plus de casse à chaque déplacement).
+- [x] Lifecycle (suspend/shutdown/tray/debug) → `lib/lifecycle.ahk` (incrément 5).
+- [x] Tables d'état globales (`ScriptInformation`, `SCRIPT_SHORTCUT_*`, `KEYBOARD_SHORTCUT_*`, `CategoryEnabled` + readers) → `lib/feature_state.ahk` (incrément 6 ; in-place ; 0 fix de test grâce au durcissement).
+- [ ] *(optionnel, plus risqué)* Sondes `DllCall` (AltGr-Kana, scan magic-key) → `adapters/key_state.ahk` ; séquence de boot → `lib/boot.ahk`. **Repoussé** : ce qui reste dans l'entrée (manifeste d'`#Include` + orchestration de boot) est désormais le rôle légitime de l'entrée ; extraire le boot touche l'ordre `#Include`/`#InputLevel`/exécution top-level (risque élevé pour un gain de lisibilité faible).
+- [ ] Bannières 5-blank-lines / 7-`=` dans les nouveaux fichiers (passe `npm run fix:banners` à faire en fin de P4/P5).
 
-**Vérif.** ✅ par incrément : dry-run exit 0 + suite 2224/0 + encoding vert. ⏳ Spot-check runtime par le mainteneur (lancer le driver) recommandé après la phase. Entrée réduite de ~190 lignes jusqu'ici (2397 → ~2207).
+**Vérif. ✅** Driver rechargé par le mainteneur — fonctionne comme avant. Chaque incrément : dry-run exit 0 + suite **2230/0** + encoding vert. **Entrée : 2397 → 1189 lignes (−50 %).** Cœur de P4 atteint ; le reste de l'entrée est manifeste + boot.
 
 ---
 
