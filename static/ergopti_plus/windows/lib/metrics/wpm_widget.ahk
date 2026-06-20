@@ -862,13 +862,30 @@ WPMWidget_DragEnd(*) {
 ; ==============================
 ; ============================================
 
-; Pre-create the graph window + warm GDI+ during a quiet boot slot (armed earlier
-; than WPMWidget_Show), so the one-time DWM window-allocation and GdiplusStartup
-; cost is paid OFF the typing path. Previously that cost was absorbed by the first
-; tooltip render after the widget appeared, surfacing as a ~110 ms Tooltip.Present
-; blip (message-pump reentrancy while DWM composited the brand-new window). One
-; hidden render forces the layered surface allocation; the window stays hidden, so
-; the normal tick still reveals it only once the user actually types.
+; No-op draw callback for GR_DrawBitmap: leaves the freshly created DIB untouched.
+; CreateDIBSection zero-fills its pixels, so the uploaded layered surface is FULLY
+; TRANSPARENT (every ARGB = 0). This is the key to warming the graph window without
+; ever flashing: see WPMWidget_PrewarmGraph.
+_WPMWidget_WarmDrawTransparent(MemDC, W, H) {
+    ; Intentionally draws nothing: the zero-filled DIB uploads as a fully
+    ; transparent layered surface. Adding any paint here would defeat the warm
+    ; (an opaque surface flashes when Show("Hide") re-applies WS_VISIBLE).
+}
+
+; Pre-create the graph window + warm GDI+ and the layered/DWM upload path during a
+; quiet boot slot (armed earlier than WPMWidget_Show), so the one-time DWM
+; window-allocation and GdiplusStartup cost is paid OFF the typing path. Previously
+; that cost was absorbed by the first render after the widget appeared, surfacing as
+; a ~110 ms blip (message-pump reentrancy while DWM composited the brand-new window).
+;
+; The warm MUST upload a TRANSPARENT surface, not a real "0" graph. Gui.Show("Hide")
+; leaves WS_VISIBLE set on the window (verified: IsWindowVisible == 1), and a layered
+; window with a non-transparent surface displays the instant WS_VISIBLE is applied.
+; WPMWidget_Show calls Gui.Show("Hide") AGAIN to reposition the window, re-applying
+; WS_VISIBLE — so any opaque surface left here would flash a "0" graph at the real
+; position then (an earlier off-screen warm did not help: the reposition brought it
+; back on-screen). A transparent surface is invisible regardless of WS_VISIBLE; the
+; tick uploads the real opaque content only once the user types.
 WPMWidget_PrewarmGraph() {
     if (!WPMWidget.visible or !WPMWidget.show_graph or A_IsSuspended)
         return
@@ -884,17 +901,37 @@ WPMWidget_PrewarmGraph() {
     }
     WPMWidget_ShowPos(&show_x, &show_y)
     try {
-        ; Allocate the HWND + size WHILE HIDDEN, start GDI+, then run one hidden
-        ; render so UpdateLayeredWindow creates the layered surface now, not on the
-        ; first reveal. Leave it hidden — the tick reveals it when typing starts.
+        ; Size the layered window, start GDI+, then upload one TRANSPARENT frame to
+        ; warm the CreateDIBSection -> UpdateLayeredWindow -> DWM path. Nothing is ever
+        ; visible (transparent surface), so the WS_VISIBLE that Show("Hide") sets is
+        ; harmless. GR_Hide leaves it in the clean SW_HIDE resting state.
         g.Show("Hide NoActivate x" . show_x . " y" . show_y
             . " w" . WPMWidgetConst.GRAPH_W . " h" . WPMWidgetConst.GRAPH_H)
         WPMWidget_EnsureGdip()
-        WPMWidget_RenderGraph("0 " . t("menu.metrics.wpm_unit"), WPMWidgetConst.COLOR_GRAPH_MANUAL)
-        LoggerDone("WPMWidget", "Graph window pre-warmed off the typing path.")
+        GR_DrawBitmap(g.Hwnd, _WPMWidget_WarmDrawTransparent)
+        GR_Hide(g.Hwnd)
+        LoggerDone("WPMWidget", "Graph window pre-warmed (transparent surface), off the typing path.")
     } catch as e {
         LoggerError("WPMWidget", "Graph pre-warm failed: {1}", e.Message)
     }
+}
+
+
+; Clears the rolling WPM state (keystroke ring, history, input/category
+; timestamps). Called by WPMWidget_Show so keystrokes typed during boot/reload --
+; before the widget surface is armed -- cannot trigger an immediate reveal: the
+; widget must stay hidden until the user actually types after it is shown.
+_WPMWidget_ResetRolling() {
+    Critical("On")
+    WPMWidget._ring := []
+    WPMWidget._ring_head := 0
+    Critical("Off")
+    WPMWidget._graph_hist    := []
+    WPMWidget._last_input_ms := 0
+    WPMWidget._last_hs_tick  := 0
+    WPMWidget._last_ai_tick  := 0
+    WPMWidget._last_ac_tick  := 0
+    WPMWidget._last_wpm      := 0
 }
 
 
@@ -910,6 +947,10 @@ WPMWidget_Show() {
     }
 
     WPMWidget.visible := true
+
+    ; Start from a clean slate -- discard any keystrokes counted during boot or
+    ; reload so the surface stays hidden until the user types AFTER it is shown.
+    _WPMWidget_ResetRolling()
 
     if (WPMWidget.pos_x = -1 || WPMWidget.pos_y = -1) {
         WPMWidget_DefaultPos(&def_x, &def_y)
