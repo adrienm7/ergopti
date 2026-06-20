@@ -32,7 +32,7 @@
 ; ===================================================
 ; ===================================================
 
-; Verbatim copy of the fixed _ScriptAltGrChordDebounce from ErgoptiPlus.ahk.
+; Verbatim copy of the fixed _ScriptAltGrChordDebounce from lib/script_altgr_hotkeys.ahk.
 ; Keeping it inline lets the test run headless without #Including the full
 ; driver (which registers global hotkeys incompatible with the test runner).
 _TestDebounce(Slot) {
@@ -97,12 +97,12 @@ _ACDS_StripLineComments(Src) {
 }
 
 _ACDS_AssertNoSharedLastTick() {
-	Src := _ACDS_StripLineComments(_ACDS_ReadSource("ErgoptiPlus.ahk"))
-	Assert(Src != "", "ErgoptiPlus.ahk must be readable")
+	Src := _ACDS_StripLineComments(_ACDS_ReadSource("lib/script_altgr_hotkeys.ahk"))
+	Assert(Src != "", "lib/script_altgr_hotkeys.ahk must be readable")
 
 	; Extract the _ScriptAltGrChordDebounce function body
 	FuncIdx := InStr(Src, "_ScriptAltGrChordDebounce(")
-	Assert(FuncIdx > 0, "_ScriptAltGrChordDebounce must exist in ErgoptiPlus.ahk")
+	Assert(FuncIdx > 0, "_ScriptAltGrChordDebounce must exist in lib/script_altgr_hotkeys.ahk")
 	Rest := SubStr(Src, FuncIdx)
 	End := InStr(Rest, "`n}")
 	Assert(End > 0, "_ScriptAltGrChordDebounce must have a closing brace")
@@ -116,7 +116,7 @@ _ACDS_AssertNoSharedLastTick() {
 
 	; Call site must pass Slot argument
 	DispIdx := InStr(Src, "_ScriptAltGrDispatch(")
-	Assert(DispIdx > 0, "_ScriptAltGrDispatch must exist in ErgoptiPlus.ahk")
+	Assert(DispIdx > 0, "_ScriptAltGrDispatch must exist in lib/script_altgr_hotkeys.ahk")
 	DispRest := SubStr(Src, DispIdx)
 	DispEnd := InStr(DispRest, "`n}")
 	DispBody := SubStr(DispRest, 1, DispEnd + 2)
