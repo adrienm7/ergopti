@@ -261,7 +261,12 @@ end
 --- Binds all configured hotkeys and starts background tasks.
 function M.start()
 	if started then
-		Logger.warn(LOG, "M.start() called more than once — ignoring duplicate call.")
+		-- A second start() per boot is the intended reconciliation, not a bug:
+		-- init.lua starts the bindings early so hotkeys work during boot, then
+		-- menu_state re-starts them to apply the saved on/off preference. Mirror
+		-- keymap.start's silently-idempotent restart and log at DEBUG so a normal
+		-- boot stays warning-free (a WARNING every boot trains users to ignore them)
+		Logger.debug(LOG, "M.start() already active — ignoring duplicate start (boot reconciliation).")
 		return
 	end
 	Logger.start(LOG, "Starting shortcuts bindings…")

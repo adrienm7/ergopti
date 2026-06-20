@@ -275,6 +275,9 @@ local function ensure_ignored_win_watchers()
 	-- Window-level: fires on intra-app focus changes and title changes (some apps
 	-- reuse one window but change its title between contexts we need to re-evaluate).
 	if not _ignored_win_win_filter then
+		-- hs.window.filter.default enumerates every window on first use; time it so a
+		-- slow first-keystroke is attributable in the logs (keylogger-winfilter-lazy).
+		local t0 = hs.timer.absoluteTime()
 		local ok, filter = pcall(function()
 			local f = hs.window.filter.default
 			f:subscribe(
@@ -285,7 +288,8 @@ local function ensure_ignored_win_watchers()
 		end)
 		if ok and filter then
 			_ignored_win_win_filter = filter
-			Logger.debug(LOG, "Ignored-window cache: window filter subscribed.")
+			Logger.debug(LOG, "Ignored-window cache: window filter subscribed (%.1f ms).",
+				(hs.timer.absoluteTime() - t0) / 1e6)
 		else
 			Logger.warn(LOG, "Ignored-window cache: window filter setup failed — relying on TTL.")
 		end

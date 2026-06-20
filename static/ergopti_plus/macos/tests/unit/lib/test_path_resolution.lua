@@ -36,12 +36,28 @@ end
 -- =====================================
 
 helpers.describe("wpm_widget.resolve_shared_constants_path", function()
-	helpers.it("finds constants.toml via module-relative path", function()
+	helpers.it("resolves both shared constants files at load (no not-found ERROR)", function()
+		-- Loading alone proves nothing: wpm_widget degrades gracefully when a
+		-- constants file is missing (it logs an ERROR and serves a stub config), so
+		-- `WpmWidget ~= nil` holds even when resolution FAILS. We must assert that
+		-- NO "file not found after all attempts" ERROR was logged during load.
+		-- A wrong shared-tree relative path — e.g. the _shared/ reorg leftover
+		-- "wpm_widget/constants.toml" instead of "modules/wpm_widget/constants.toml"
+		-- — makes resolve_shared_constants_path log exactly that and the widget go
+		-- non-functional at boot (project-shared-tree-layout bypass gotcha).
+		log_calls = {}
 		local WpmWidget = helpers.load_with_stubs("ui.wpm.wpm_widget")
-		-- Accessing the private function via debug introspection or module exports
-		-- For this test, we verify the module loads without error, which means
-		-- the module-relative path resolution succeeded during initialization.
-		helpers.assert_true(WpmWidget ~= nil)
+		helpers.assert_true(WpmWidget ~= nil, "wpm_widget module must load")
+
+		local not_found = {}
+		for _, c in ipairs(log_calls) do
+			if type(c.fmt) == "string" and c.fmt:find("file not found after all attempts", 1, true) then
+				not_found[#not_found + 1] = tostring((c.args and c.args[1]) or "?")
+			end
+		end
+		helpers.assert_true(#not_found == 0,
+			"wpm_widget could not resolve its shared constants (wrong _shared-relative path?): "
+				.. table.concat(not_found, ", "))
 	end)
 
 	helpers.it("logs ERROR when shared constants cannot be found", function()

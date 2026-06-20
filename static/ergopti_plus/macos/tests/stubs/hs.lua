@@ -276,12 +276,48 @@ M.logger = {
 --- =============================
 -- ============================
 
+-- Per-path directory listings a test can populate: __entries["/abs/path"] = { "a.toml", "b.toml" }.
+-- Empty by default so an un-populated directory simply iterates to nothing.
+local FS_ENTRIES = {}
+
+--- Builds an hs.fs.dir-faithful (iterator, dirObject) pair.
+--- Real Hammerspoon's hs.fs.dir() returns TWO values — an iterator function AND
+--- a directory userdata object — and the iterator REQUIRES that object as its
+--- first argument (it checks the "directory" metatable and aborts with "directory
+--- metatable expected, got nil" otherwise). Modelling that faithfully here is
+--- what lets the suite catch the dropped-second-return-value bug: code that does
+--- `local ok, it = pcall(hs.fs.dir, d); for x in it do` passes nil as state and
+--- fails EXACTLY as it does against real Hammerspoon (init-fsdir-drops-state).
+--- The old lenient stub (`function(_) return function() return nil end end`)
+--- returned a single, stateless iterator and so masked that whole class of bug.
+--- @param entries table|nil Array of entry names to yield.
+--- @return function, table The iterator and its mandatory directory-object state.
+local function make_fs_dir_iterator(entries)
+	entries = entries or {}
+	local index = 0
+	local dir_object = setmetatable({}, { __name = "hs.fs.dir directory object" })
+	local function iterator(state)
+		if state ~= dir_object then
+			error("bad argument #1 to 'for iterator' (directory metatable expected, got "
+				.. (state == nil and "nil" or type(state)) .. ")", 2)
+		end
+		index = index + 1
+		return entries[index]
+	end
+	return iterator, dir_object
+end
+
 M.fs = {
-	dir = function(_) return function() return nil end end,
+	-- Returns (iterator, dirObject) like real Hammerspoon — see make_fs_dir_iterator.
+	dir = function(path) return make_fs_dir_iterator(FS_ENTRIES[path]) end,
 	attributes = function(_) return nil end,
 	mkdir = function(_) return true end,
 	pathToAbsolute = function(p) return p end,
 	displayName = function(p) return p end,
+	-- Test hook: register the names a given absolute path should list.
+	__set_entries = function(path, names) FS_ENTRIES[path] = names end,
+	__entries = FS_ENTRIES,
+	__reset_entries = function() for k in pairs(FS_ENTRIES) do FS_ENTRIES[k] = nil end end,
 }
 
 
@@ -567,6 +603,7 @@ function M.__reset()
 	for i = #EXEC_CALLS, 1, -1 do EXEC_CALLS[i] = nil end
 	for k in pairs(EXEC_RESPONSES) do EXEC_RESPONSES[k] = nil end
 	M.http.__reset()
+	if M.fs and M.fs.__reset_entries then M.fs.__reset_entries() end
 	-- Rebuild the canonical keycodes.map: tests like test_keycodes deliberately
 	-- assign a stripped-down literal table to hs.keycodes.map, which would
 	-- otherwise leak into later tests that load modules calling Keycodes.to_name

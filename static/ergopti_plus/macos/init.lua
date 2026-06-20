@@ -399,7 +399,6 @@ Boot.mark("LLM backend bootstrap")
 local configured_hotstrings_dir = menu_paths.get("HotstringsDirPath")
 local bundled_hotstrings_dir    = base_dir .. "../_shared/modules/hotstrings/"
 local hotstrings_dir            = configured_hotstrings_dir
-local config_file               = menu_paths.get("ConfigTomlPath")
 
 local HOTSTRINGS_EXCLUDED_STEMS = {
 	hotstrings_config = true,
@@ -409,22 +408,41 @@ local HOTSTRINGS_EXCLUDED_STEMS = {
 	paths = true,
 }
 
+--- Lists the entry names of a directory, surviving an unreadable folder.
+--- hs.fs.dir() has TWO traps: it THROWS on a missing / permission-denied
+--- directory, AND it returns TWO values — the iterator function AND a directory
+--- state object that the iterator REQUIRES as its first argument. Iterating
+--- INSIDE the pcall handles both: the throw is caught, and the generic-for
+--- receives hs.fs.dir's full multi-value return. Capturing only the iterator
+--- (`local ok, it = pcall(hs.fs.dir, dir)`) silently drops the state object, and
+--- real Hammerspoon's iterator then aborts with "directory metatable expected,
+--- got nil" on the first step — a boot-time crash the lenient test stub masked
+--- (init-fsdir-drops-state). All directory listing in this file MUST go through
+--- here so the contract is honoured in exactly one place.
+--- @param dir string Absolute directory path.
+--- @return table Array of entry names; empty when the directory is unreadable.
+local function safe_dir_entries(dir)
+	local names = {}
+	if type(dir) ~= "string" or dir == "" then return names end
+	local ok, err = pcall(function()
+		for name in hs.fs.dir(dir) do
+			names[#names + 1] = name
+		end
+	end)
+	if not ok then
+		Logger.error(LOG, "Cannot iterate directory '%s' — %s.", tostring(dir), tostring(err))
+		return {}
+	end
+	return names
+end
+
 local function has_common_hotstring_groups(dir)
 	if type(dir) ~= "string" or dir == "" then return false end
 	local ok_attr, attr = pcall(hs.fs.attributes, dir)
 	if not ok_attr or type(attr) ~= "table" or attr.mode ~= "directory" then
 		return false
 	end
-	-- hs.fs.dir() throws on inaccessible / deleted directories; wrap in pcall
-	-- so a permission error or race-deleted folder does not abort initialisation
-	-- (init-fsdir-pcall).
-	local ok_iter, dir_iter = pcall(hs.fs.dir, dir)
-	if not ok_iter then
-		Logger.error(LOG, "Cannot iterate hotstrings directory '%s' — %s.",
-			tostring(dir), tostring(dir_iter))
-		return false
-	end
-	for fname in dir_iter do
+	for _, fname in ipairs(safe_dir_entries(dir)) do
 		if fname:match("%.toml$") and not fname:match("^_") then
 			local stem = fname:match("^(.-)%.toml$")
 			if stem and not HOTSTRINGS_EXCLUDED_STEMS[stem] then
@@ -486,45 +504,13 @@ end
 -- ==================================
 -- =================================
 
--- Restore section-enabled states and global trigger char from config.json BEFORE any TOML is parsed
+-- Magic key (the hotstring trigger character) defaults here; a user's custom
+-- value and per-section enabled states are restored from config.toml by
+-- menu_state during menu start (the v2 config is TOML, not the legacy config.json).
 local magic_key = "★"
 
-do
-	local fh = io.open(config_file, "r")
-	if fh then
-		local raw = fh:read("*a")
-		fh:close()
-		local ok, cfg = pcall(hs.json.decode, raw)
-		if ok and type(cfg) == "table" then
-			
-			-- Read the global trigger character
-			if type(cfg.trigger_char) == "string" then
-				magic_key = cfg.trigger_char
-			end
-
-			-- Restore section states
-			-- WHY explicit if/else: in Lua, both `false` and `nil` are falsy, so
-			-- the idiom `cond and X or Y` cannot return `false` reliably and was
-			-- silently writing `false` (disabling every section) at each restart
-			if type(cfg.section_states) == "table" then
-				for grp, secs in pairs(cfg.section_states) do
-					if type(secs) == "table" then
-						for sec_name, enabled in pairs(secs) do
-							local key = "hotstrings_section_" .. grp .. "_" .. sec_name
-							if enabled == false then
-								hs.settings.set(key, false)
-							else
-								hs.settings.set(key, nil)
-							end
-						end
-					end
-				end
-			end
-		end
-	end
-end
-
--- Pass the loaded trigger char to keymap before loading files
+-- Pass the trigger char to keymap before loading files so magic-key hotstrings
+-- register against the right character.
 if keymap.set_trigger_char then
 	keymap.set_trigger_char(magic_key)
 end
@@ -566,16 +552,12 @@ do
 end
 
 local toml_set = {}
--- hs.fs.dir() throws on inaccessible/deleted directories; wrap in pcall
-local ok_toml_iter, toml_dir_iter = pcall(hs.fs.dir, hotstrings_dir)
-if ok_toml_iter and toml_dir_iter then
-	for fname in toml_dir_iter do
-		-- Skip manifest/index files (prefixed with _) — they are metadata, not hotstring groups
-		if fname:match("%.toml$") and not fname:match("^_") then
-			local stem = fname:match("^(.-)%.toml$")
-			if stem and not HOTSTRINGS_EXCLUDED_STEMS[stem] then
-				toml_set[stem] = fname
-			end
+for _, fname in ipairs(safe_dir_entries(hotstrings_dir)) do
+	-- Skip manifest/index files (prefixed with _) — they are metadata, not hotstring groups
+	if fname:match("%.toml$") and not fname:match("^_") then
+		local stem = fname:match("^(.-)%.toml$")
+		if stem and not HOTSTRINGS_EXCLUDED_STEMS[stem] then
+			toml_set[stem] = fname
 		end
 	end
 end
@@ -686,21 +668,17 @@ do
 		if not (ok_attr and type(attr) == "table" and attr.mode == "directory") then return end
 
 		local items = {}
-		-- hs.fs.dir() throws on inaccessible/deleted directories; wrap in pcall
-		local ok_scan_iter, scan_dir_iter = pcall(hs.fs.dir, dir)
-		if ok_scan_iter and scan_dir_iter then
-			for fname in scan_dir_iter do
-				if fname ~= "." and fname ~= ".." and not fname:match("^_") then
-					local fpath = dir .. "/" .. fname
-					local ok_a, a = pcall(hs.fs.attributes, fpath)
-					if ok_a and type(a) == "table" then
-						if a.mode == "directory" then
-							table.insert(items, { type = "dir", name = fname, path = fpath })
-						elseif a.mode == "file" and fname:match("%.toml$") and (prefix ~= "" or fname ~= "personal_hotstrings.toml") then
-							local stem = fname:match("^(.-)%.toml$")
-							if stem and stem ~= "" then
-								table.insert(items, { type = "file", name = fname, stem = stem, path = fpath })
-							end
+		for _, fname in ipairs(safe_dir_entries(dir)) do
+			if fname ~= "." and fname ~= ".." and not fname:match("^_") then
+				local fpath = dir .. "/" .. fname
+				local ok_a, a = pcall(hs.fs.attributes, fpath)
+				if ok_a and type(a) == "table" then
+					if a.mode == "directory" then
+						table.insert(items, { type = "dir", name = fname, path = fpath })
+					elseif a.mode == "file" and fname:match("%.toml$") and (prefix ~= "" or fname ~= "personal_hotstrings.toml") then
+						local stem = fname:match("^(.-)%.toml$")
+						if stem and stem ~= "" then
+							table.insert(items, { type = "file", name = fname, stem = stem, path = fpath })
 						end
 					end
 				end
@@ -864,22 +842,19 @@ do
 		w:start()
 		table.insert(_G.script_watchers, w)
 
-		local ok_watch_iter, watch_dir_iter = pcall(hs.fs.dir, dir)
-		if ok_watch_iter and watch_dir_iter then
-			for fname in watch_dir_iter do
-				if fname ~= "." and fname ~= ".." then
-					local path = dir .. "/" .. fname
-					local ok_a, a = pcall(hs.fs.attributes, path)
-					if ok_a and type(a) == "table" then
-						if a.mode == "directory" then
-							watch_personal_hotstrings_dir(path)
-						elseif a.mode == "file" and fname:match("%.toml$") then
-							local fw = hs.pathwatcher.new(path, function()
-								schedule_reload(i18n.get("init.reload_hotstrings"))
-							end)
-							fw:start()
-							table.insert(_G.script_watchers, fw)
-						end
+		for _, fname in ipairs(safe_dir_entries(dir)) do
+			if fname ~= "." and fname ~= ".." then
+				local path = dir .. "/" .. fname
+				local ok_a, a = pcall(hs.fs.attributes, path)
+				if ok_a and type(a) == "table" then
+					if a.mode == "directory" then
+						watch_personal_hotstrings_dir(path)
+					elseif a.mode == "file" and fname:match("%.toml$") then
+						local fw = hs.pathwatcher.new(path, function()
+							schedule_reload(i18n.get("init.reload_hotstrings"))
+						end)
+						fw:start()
+						table.insert(_G.script_watchers, fw)
 					end
 				end
 			end
@@ -914,16 +889,13 @@ do
 	-- ==================================
 
 	-- Safety net for in-place edits that directory watchers may miss
-	local ok_per_file_iter, per_file_iter = pcall(hs.fs.dir, hotstrings_dir)
-	if ok_per_file_iter and per_file_iter then
-		for fname in per_file_iter do
-			if fname:match("%.toml$") or fname:match("_index%.json$") then
-				local w = hs.pathwatcher.new(hotstrings_dir .. fname, function()
-					schedule_reload(i18n.get("init.reload_hotstrings"))
-				end)
-				w:start()
-				table.insert(_G.script_watchers, w)
-			end
+	for _, fname in ipairs(safe_dir_entries(hotstrings_dir)) do
+		if fname:match("%.toml$") or fname:match("_index%.json$") then
+			local w = hs.pathwatcher.new(hotstrings_dir .. fname, function()
+				schedule_reload(i18n.get("init.reload_hotstrings"))
+			end)
+			w:start()
+			table.insert(_G.script_watchers, w)
 		end
 	end
 end

@@ -98,16 +98,35 @@ local COLOR_PRESETS = {
 --- =========================================
 -- =========================================
 
+--- Lists the entry names of a directory, surviving an unreadable folder.
+--- hs.fs.dir() THROWS on a missing/permission-denied directory AND returns TWO
+--- values — the iterator AND a directory state object the iterator REQUIRES as
+--- its first argument. Iterating INSIDE the pcall keeps both: the throw is caught
+--- and the generic-for receives hs.fs.dir's full return. Capturing only the
+--- iterator (`local ok, it = pcall(function() return hs.fs.dir(dir) end)`) drops
+--- the state, and real Hammerspoon's iterator then aborts with "directory
+--- metatable expected, got nil" on the first step (init-fsdir-drops-state).
+--- @param dir string Absolute directory path.
+--- @return table Array of entry names; empty when the directory is unreadable.
+local function safe_dir_entries(dir)
+	if type(dir) ~= "string" or dir == "" then return {} end
+	local names = {}
+	local ok = pcall(function()
+		for name in hs.fs.dir(dir) do
+			names[#names + 1] = name
+		end
+	end)
+	if not ok then return {} end
+	return names
+end
+
 --- Lists TOML files in a directory, skipping names that start with `_`.
---- Returns an array of absolute paths. Uses hs.fs.dir for directory scanning.
+--- Returns an array of absolute paths.
 --- @param dir string Absolute path to the directory.
 --- @return table Array of absolute TOML paths.
 local function list_toml_files(dir)
-	if type(dir) ~= "string" or dir == "" then return {} end
 	local out = {}
-	local ok, iter = pcall(function() return hs.fs.dir(dir) end)
-	if not ok or not iter then return {} end
-	for name in iter do
+	for _, name in ipairs(safe_dir_entries(dir)) do
 		if name:sub(1, 1) ~= "_" and name:match("%.toml$") then
 			table.insert(out, dir .. "/" .. name)
 		end
@@ -170,10 +189,8 @@ end
 local function discover_extensions(extensions_dir)
 	if type(extensions_dir) ~= "string" or extensions_dir == "" then return {} end
 	local out = {}
-	local ok, iter = pcall(function() return hs.fs.dir(extensions_dir) end)
-	if not ok or not iter then return {} end
 	local ext_dirs = {}
-	for name in iter do
+	for _, name in ipairs(safe_dir_entries(extensions_dir)) do
 		if name:sub(1, 1) ~= "." then
 			local attr_ok, attrs = pcall(function()
 				return hs.fs.attributes(extensions_dir .. "/" .. name)
