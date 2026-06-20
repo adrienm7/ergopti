@@ -72,7 +72,7 @@ _MDDL_FuncBody(Src, FuncDef) {
 
 _MDDL_NoOneLevelCap() {
 	Src := _MDDL_ReadSource("lib/menu_dispatcher.ahk")
-	Body := _MDDL_FuncBody(Src, "_MenuDispatchHandleHasId(")
+	Body := _DriverFuncBody("_MenuDispatchHandleHasId")
 	Assert(Body != "", "_MenuDispatchHandleHasId must be defined in menu_dispatcher.ahk")
 	; The old one-level cap called _MenuDispatchHandleHasId(Sub, ItemId, false).
 	; That literal ', false)' must not appear anywhere in the function body after
@@ -84,7 +84,7 @@ Test("menu_dispatcher: _MenuDispatchHandleHasId has no one-level-cap call (F07 d
 
 _MDDL_CycleGuardPresent() {
 	Src := _MDDL_ReadSource("lib/menu_dispatcher.ahk")
-	Body := _MDDL_FuncBody(Src, "_MenuDispatchHandleHasId(")
+	Body := _DriverFuncBody("_MenuDispatchHandleHasId")
 	Assert(Body != "", "_MenuDispatchHandleHasId must be defined in menu_dispatcher.ahk")
 	Assert(InStr(Body, "Seen.Has(") > 0,
 		"_MenuDispatchHandleHasId must use a Seen Map (Seen.Has()) to guard against HMENU cycles — without it an infinite loop is possible")
@@ -93,7 +93,7 @@ Test("menu_dispatcher: _MenuDispatchHandleHasId has cycle guard via Seen.Has() (
 
 _MDDL_RecursiveCall() {
 	Src := _MDDL_ReadSource("lib/menu_dispatcher.ahk")
-	Body := _MDDL_FuncBody(Src, "_MenuDispatchHandleHasId(")
+	Body := _DriverFuncBody("_MenuDispatchHandleHasId")
 	Assert(Body != "", "_MenuDispatchHandleHasId must be defined in menu_dispatcher.ahk")
 	Assert(InStr(Body, "_MenuDispatchHandleHasId(Sub") > 0,
 		"_MenuDispatchHandleHasId must call itself recursively with the Sub handle to achieve depth-unlimited traversal")
@@ -102,7 +102,7 @@ Test("menu_dispatcher: _MenuDispatchHandleHasId calls itself recursively (F07 de
 
 _MDDL_CallerPassesMap() {
 	Src := _MDDL_ReadSource("lib/menu_dispatcher.ahk")
-	Body := _MDDL_FuncBody(Src, "_MenuDispatchIdIsLiveAnywhere(")
+	Body := _DriverFuncBody("_MenuDispatchIdIsLiveAnywhere")
 	Assert(Body != "", "_MenuDispatchIdIsLiveAnywhere must be defined in menu_dispatcher.ahk")
 	Assert(InStr(Body, "Map()") > 0,
 		"_MenuDispatchIdIsLiveAnywhere must pass Map() as the initial Seen argument to _MenuDispatchHandleHasId — without it the cycle guard is never seeded")

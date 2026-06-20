@@ -66,7 +66,7 @@ _OSSG_FuncBody(Src, FuncDef) {
 
 _OSSG_OneShotShiftHasSuspendGuard() {
 	Src := _OSSG_ReadSource("modules/tap_holds/one_shot_shift.ahk")
-	Body := _OSSG_FuncBody(Src, "OneShotShift() {")
+	Body := _DriverFuncBody("OneShotShift")
 	Assert(Body != "", "OneShotShift must exist in modules/tap_holds/one_shot_shift.ahk")
 	Assert(InStr(Body, "A_IsSuspended") > 0,
 		"OneShotShift must check A_IsSuspended — starting an InputHook while suspended would intercept keystrokes belonging to other applications and apply an erroneous capitalisation")
@@ -84,7 +84,7 @@ Test("one_shot_shift: OneShotShift() has A_IsSuspended guard", _OSSG_OneShotShif
 ; ==================================================
 
 _OSSG_SuspendEnterResetsOneShotShift() {
-	Src := _OSSG_ReadSource("ErgoptiPlus.ahk")
+	Src := _DriverSourceConcat()
 	; Isolate the Ergopti_OnSuspendEnter body by slicing from its declaration to
 	; the start of the next top-level function so inner braces do not confuse the
 	; simple text scan.

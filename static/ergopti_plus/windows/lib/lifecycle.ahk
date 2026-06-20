@@ -1,0 +1,201 @@
+﻿; lib/lifecycle.ahk
+
+; ==============================================================================
+; MODULE: Driver Lifecycle, Tray & Debug Actions
+; DESCRIPTION:
+; Suspend/resume (ToggleSuspend, Ergopti_OnSuspendEnter/Resume, the suspend-state
+; watchdog and prefix drain), shutdown (Ergopti_OnShutdown), the deferred tray
+; menu build + icon update, and the debug/control actions (reload, exit, WindowSpy,
+; ListVars, KeyHistory, healthcheck, edit). Extracted verbatim from ErgoptiPlus.ahk
+; (P4 entrypoint decomposition) and #Include'd in place; functions are hoisted so
+; their OnExit/SetTimer/hotkey call sites in the entry boot section are unaffected.
+; ==============================================================================
+
+ActivateEdit(*) {
+    Edit()
+}
+; Drains the SC138 (AltGr/Kana) custom-combination prefix latch BEFORE a suspend
+; flips. AHK prefix flags latch across Suspend and cannot be cleared by synthetic
+; events — they must be prevented at the source by waiting (briefly) for the
+; physical key to lift before suspending. Factored out of ToggleSuspend so EVERY
+; code path that can trigger a suspend can call the same drain, and so a future
+; native/external suspend hotkey cannot silently reintroduce the « AltGr bloqué »
+; regression by bypassing the wait. Safe no-op when entering from suspended state,
+; when the Kana fixup is off, or when SC138 is not physically held.
+_SuspendDrainPrefix() {
+    global _ALTGR_KANA_FIXUP
+    if !A_IsSuspended and IsSet(_ALTGR_KANA_FIXUP) and _ALTGR_KANA_FIXUP and GetKeyState("SC138", "P")
+        KeyWait("SC138", "T1")
+}
+ToggleSuspend(*) {
+    _SuspendDrainPrefix()
+    Suspend(-1)
+    _SuspendStateWatchdog()
+}
+Ergopti_OnSuspendEnter() {
+    try TooltipHide("Suspend", true)
+    try LLM_Tooltip_Hide(true)
+    try LLM_Engine_CancelTimer()
+    ; Stop in-flight generation AND clear the prediction cache so a suggestion
+    ; produced before the pause cannot re-render after resume on a rebuilt
+    ; context ("pause = tout eteint" invariant). StopGeneration drops last_ctx /
+    ; last_results, bumps request_id, and cancels async streams.
+    try LLM_Engine_StopGeneration()
+    ; Cancel the Ollama warm-up retry timer so it does not make background HTTP
+    ; calls while the driver is paused ("pause = tout éteint" invariant).
+    try LLM_OllamaCancelWarmupRetry()
+    ; Stop the LLM pointer-dismiss poll timer + its pass-through mouse hotkeys.
+    ; SetTimer/Hotkey callbacks bypass native Suspend, so without this the
+    ; 50 ms MouseGetPos poll keeps firing for the whole pause ("pause = tout
+    ; éteint" invariant). Re-armed from Ergopti_OnSuspendResume when the bridge
+    ; is active.
+    try _LLM_PointerWatch_Stop()
+    ; Cancel in-flight background update checks so a stale async callback cannot
+    ; surface a TrayTip or rebuild the menu while paused ("pause = tout éteint").
+    try _Updater_CancelAsyncChecks()
+    try StopActivitySimulation()
+    ; Reset OneShotShift so a shift armed just before suspension is not applied
+    ; to the first keystroke after resume ("pause = tout éteint" invariant)
+    global OneShotShiftEnabled := False
+    global _LLM_Deps_PollTimer
+    if IsSet(_LLM_Deps_PollTimer)
+        try SetTimer(_LLM_Deps_PollTimer, 0)
+}
+Ergopti_OnSuspendResume() {
+    if IsSet(_ResetPrefixBuffer)
+        try _ResetPrefixBuffer()
+    global _LLM_Deps_PollTimer, _LLM_Deps_Checking
+    if IsSet(_LLM_Deps_PollTimer) and IsSet(_LLM_Deps_Checking) and _LLM_Deps_Checking
+        try SetTimer(_LLM_Deps_PollTimer, 3000)
+    ; Re-arm the LLM pointer-dismiss watcher stopped in Ergopti_OnSuspendEnter,
+    ; but only when the bridge is still active — _LLM_PointerWatch_Start is a
+    ; no-op when already armed, so this is safe to call unconditionally on the
+    ; active path.
+    global _LLM_Bridge_Active
+    if IsSet(_LLM_Bridge_Active) and _LLM_Bridge_Active
+        try _LLM_PointerWatch_Start()
+}
+_SuspendStateWatchdog() {
+    global _LastSuspendState
+    if (A_IsSuspended == _LastSuspendState)
+        return
+    _LastSuspendState := A_IsSuspended
+    UpdateTrayIcon()
+    if A_IsSuspended
+        Ergopti_OnSuspendEnter()
+    else
+        Ergopti_OnSuspendResume()
+}
+; Single global shutdown handler wired to OnExit (see the auto-execute section
+; after the keylogger is started). AHK v2 Reload() and ExitApp() tear the process
+; down WITHOUT running per-module destructors — only callbacks registered via
+; OnExit run. The keylogger hot path is intentionally RAM-buffered (KL_AppendLog
+; queues into _pending_entries; KL_Hook_Tick flushes buffer_events every 200 ms
+; and KL_IngestOnce drains _pending_entries to data.sql every 5 s), so WITHOUT this
+; handler a Reload (the driver's standard "apply settings" mechanism, also fired by
+; CheckKeyboardLayoutChange on a layout switch) silently loses the last few seconds
+; of typing metrics on every restart. KL_Stop is idempotent (guards on
+; Keylogger.initialized) and already flushes + ingests + saves, so wiring it here
+; closes the data-loss window. EVERY step is try-wrapped: an OnExit callback that
+; throws is swallowed by AHK and can hang exit, so the handler must never throw.
+; Returning 0 lets the exit proceed.
+Ergopti_OnShutdown(reason, code) {
+    try KL_Stop()
+    try HotstringPrefixWatcherStop()
+    try HookDispatcher.Stop()
+    try KLWV_CloseAll()
+    try OllamaWV_Close()
+    return 0
+}
+; Build the full tray menu off the boot critical path (armed after "ready"). The
+; build runs under Critical so it is ONE uninterrupted pass — a tray click queued
+; during boot cannot pump the message loop mid-build and paint a half-built menu
+; (the documented "menu shows only the first items" bug). No Sleep inside, so it is
+; safe to hold Critical across it. UpdateTrayIcon runs last, once MenuSuspend exists.
+BuildTrayMenuDeferred() {
+    global _DriverReady, _LangMenuBuildPending, LANG_MENU_DEFER_MS
+    ; Same rationale for the bundled-extensions scan: it does DirExist/Loop Files/
+    ; FileRead over the extensions tree. Warm its cache off-Critical too so the
+    ; under-Critical _HS_Extensions call hits only the warm cache.
+    _HS_PreScanExtensions()
+    ; Warm the personal-hotstrings prescan cache BEFORE taking Critical. The scan
+    ; recurses the personal-hotstrings dir and parses every ext TOML — unbounded
+    ; file I/O that, on a cloud-synced config dir (OneDrive Files On-Demand) or a
+    ; spun-down drive, can stall for seconds. Critical("On") starves the LL keyboard
+    ; hook for its whole duration, so doing that I/O under Critical turns a one-time
+    ; menu build into a multi-second keyboard freeze on the first keystrokes after
+    ; launch. _HS_PreScanPersonal is cache-guarded (idempotent once
+    ; _HS_PreScanPersonalCacheLoaded is set), so the InitSubMenus call below hits
+    ; only the warm cache — the Critical span then covers ONLY the pure Win32
+    ; Menu.Add / RegisterMenuItem pass that must be one uninterrupted block.
+    _HS_PreScanPersonal()
+    Critical("On")
+    ; Clear the dispatch bypass Maps BEFORE the InitSubMenus()/initMenu()
+    ; re-registration pass. AHK reuses freed menu-item IDs after Menu.Delete();
+    ; a stale entry left in the Maps could bind a reused ID to a different
+    ; item's callback and fire the WRONG action on a dropped-click retry (see
+    ; menu_dispatcher.ahk).
+    MenuDispatcher_Reset()
+    InitSubMenus()
+    ; Build everything EXCEPT the 21-locale language submenu (~219 ms of Win32 menu
+    ; registration + flag-icon loads). Forcing _DriverReady false makes initMenu
+    ; DEFER that submenu (its boot behaviour) so THIS post-ready build stays ~157 ms
+    ; instead of ~420 ms — small enough not to lag the first keystrokes after launch.
+    ; The language submenu is then armed on its own timer below, exactly as the
+    ; original boot path did, so it never piles onto this Critical section.
+    _SavedReady := _DriverReady
+    _DriverReady := false
+    ; Restore _DriverReady even if initMenu() throws (I/O error, parse failure…);
+    ; leaving it false permanently would silently block all async saves thereafter.
+    try {
+        initMenu()
+    } finally {
+        _DriverReady := _SavedReady
+    }
+    UpdateTrayIcon()
+    Critical("Off")
+    if _LangMenuBuildPending
+        SetTimer(BuildLanguageMenuDeferred, -LANG_MENU_DEFER_MS)
+    BootProfile_Mark("Tray menu built (deferred, off time-to-ready)")
+}
+
+UpdateTrayIcon() {
+    ; The MenuSuspend item exists only after BuildTrayMenuDeferred has run. This is
+    ; called from ToggleSuspend / the suspend watchdog, which can fire in the brief
+    ; pre-build window after launch — guard the check so an early suspend cannot
+    ; throw on a not-yet-built menu item. The icon swap below still happens.
+    if A_IsSuspended {
+        try A_TrayMenu.Check(MenuSuspend)
+        if FileExist(IconPathDisabled)
+            TraySetIcon(IconPathDisabled, , True)
+    }
+    else {
+        try A_TrayMenu.Uncheck(MenuSuspend)
+        if FileExist(IconPath)
+            TraySetIcon(IconPath)
+    }
+}
+ActivateReload(*) {
+    Reload()
+}
+ActivateExitApp(*) {
+    ExitApp()
+}
+WindowSpy(*) {
+    SplitPath(A_AhkPath, , &ahkDir)
+    SplitPath(ahkDir, , &parentDir)
+    spyPath := parentDir "\WindowSpy.ahk"
+    if FileExist(spyPath)
+        Run(spyPath)
+    else
+        MsgBox(Format(t("ergopti.windowspy_not_found"), spyPath))
+}
+ActivateListVars(*) {
+    ListVars()
+}
+ActivateKeyHistory(*) {
+    KeyHistory()
+}
+ShowHealthCheck(*) {
+    HealthCheck_ShowWindow()
+}

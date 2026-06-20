@@ -60,7 +60,7 @@ _LFOB_CheckFanOutNoDirectAppend() {
 	Src := _LFOB_ReadSource("lib/logger.ahk")
 	Assert(Src != "", "lib/logger.ahk must be readable")
 
-	FanOut := _LFOB_FuncBody(Src, "_LoggerFanOut(")
+	FanOut := _DriverFuncBody("_LoggerFanOut")
 	Assert(FanOut != "", "_LoggerFanOut must exist in lib/logger.ahk")
 
 	Assert(!InStr(FanOut, "FileAppend"),
@@ -80,7 +80,7 @@ _LFOB_CheckFlushDrainsSubPending() {
 	Assert(Src != "", "lib/logger.ahk must be readable")
 
 	; Target the function definition, not the earlier call site inside LoggerInit
-	Flush := _LFOB_FuncBody(Src, "_LoggerFlush(ForceFlush")
+	Flush := _DriverFuncBody("_LoggerFlush")
 	Assert(Flush != "", "_LoggerFlush must exist in lib/logger.ahk")
 
 	Assert(InStr(Flush, "_LOGGER_SUB_PENDING"),

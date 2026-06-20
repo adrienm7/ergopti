@@ -67,7 +67,7 @@ _APEL_CheckCatchBlockExists() {
 	Src := _APEL_ReadSource("ui/tray_llm/menu_api_entries.ahk")
 	Assert(Src != "", "ui/tray_llm/menu_api_entries.ahk must be readable")
 
-	Body := _APEL_FuncBody(Src, "_LLM_Tray_PersistApiEntries() {")
+	Body := _DriverFuncBody("_LLM_Tray_PersistApiEntries")
 	Assert(Body != "", "_LLM_Tray_PersistApiEntries must be present in menu_api_entries.ahk")
 
 	; Must have a catch block in the write section
@@ -79,7 +79,7 @@ _APEL_CheckCatchLogsError() {
 	Src := _APEL_ReadSource("ui/tray_llm/menu_api_entries.ahk")
 	Assert(Src != "", "ui/tray_llm/menu_api_entries.ahk must be readable")
 
-	Body := _APEL_FuncBody(Src, "_LLM_Tray_PersistApiEntries() {")
+	Body := _DriverFuncBody("_LLM_Tray_PersistApiEntries")
 	Assert(Body != "", "_LLM_Tray_PersistApiEntries must be present in menu_api_entries.ahk")
 
 	; The catch must log an error so the failure is diagnosable

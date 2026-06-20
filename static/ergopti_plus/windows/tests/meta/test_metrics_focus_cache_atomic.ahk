@@ -56,7 +56,7 @@ _MFCA_FocusCacheIsAtomic() {
 	Assert(InStr(Src, "static process_name :=") == 0, "MetricsFocusCache must NOT have separate process_name property")
 	
 	; 2. Verify MF_RefreshFocus publishes via a single swap.
-	Body := _MFCA_FuncBody(Src, "MF_RefreshFocus() {")
+	Body := _DriverFuncBody("MF_RefreshFocus")
 	Assert(Body != "", "MF_RefreshFocus must exist in metrics_filters.ahk")
 	
 	; Look for the assignment to .state
@@ -64,7 +64,7 @@ _MFCA_FocusCacheIsAtomic() {
 		"MF_RefreshFocus must publish the new context via a single assignment to MetricsFocusCache.state (metrics-focus-cache-atomic)")
 		
 	; 3. Verify MF_ShouldFilter captures the reference once.
-	BodySF := _MFCA_FuncBody(Src, "MF_ShouldFilter() {")
+	BodySF := _DriverFuncBody("MF_ShouldFilter")
 	Assert(InStr(BodySF, "s := MetricsFocusCache.state") > 0,
 		"MF_ShouldFilter must capture the MetricsFocusCache.state reference once into a local variable (metrics-focus-cache-atomic)")
 }

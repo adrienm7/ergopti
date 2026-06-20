@@ -66,7 +66,7 @@ _TACT_FuncBody(Src, FuncDef) {
 
 _TACT_CancelTimerCalledAfterTryAcceptTab() {
 	Src := _TACT_ReadSource("modules/llm/llm_bridge.ahk")
-	Body := _TACT_FuncBody(Src, "LLM_Bridge_FeedKeyDownIfActive(vk) {")
+	Body := _DriverFuncBody("LLM_Bridge_FeedKeyDownIfActive")
 	Assert(Body != "",
 		"LLM_Bridge_FeedKeyDownIfActive must exist in modules/llm/llm_bridge.ahk")
 

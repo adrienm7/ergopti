@@ -81,7 +81,7 @@ _KLWSP_TitleChangeBlock(FuncBody) {
 _KLWSP_FlushBeforeWindowSwitch() {
 	Src := _KLWSP_ReadSource("modules/keylogger/keylogger_hook.ahk")
 
-	FuncBody := _KLWSP_FuncBody(Src, "KL_Hook_RefreshContext(")
+	FuncBody := _DriverFuncBody("KL_Hook_RefreshContext")
 	Assert(FuncBody != "",
 		"KL_Hook_RefreshContext must exist in keylogger_hook.ahk")
 

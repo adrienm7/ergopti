@@ -66,7 +66,7 @@ _ULEM_FuncBody(Src, FuncDef) {
 
 _ULEM_OpenLogsControllerFailure() {
 	Src := _ULEM_ReadSource("modules/keylogger/keylogger_webview.ahk")
-	Body := _ULEM_FuncBody(Src, "KLWV_Open(which, metrics_dir) {")
+	Body := _DriverFuncBody("KLWV_Open")
 	Assert(Body != "", "KLWV_Open(which, metrics_dir) declaration must exist in keylogger_webview.ahk")
 	Assert(InStr(Body, "LoggerError") > 0,
 		"KLWV_Open must route the WebView2 controller-create failure through LoggerError, not only FileAppend to webview.log (ui-launch-error-msgbox-on-timer-thread)")
@@ -75,7 +75,7 @@ Test("keylogger_webview: KLWV_Open logs controller-create failure via LoggerErro
 
 _ULEM_OpenLogsNavigateFailure() {
 	Src := _ULEM_ReadSource("modules/keylogger/keylogger_webview.ahk")
-	Body := _ULEM_FuncBody(Src, "KLWV_Open(which, metrics_dir) {")
+	Body := _DriverFuncBody("KLWV_Open")
 	Assert(Body != "", "KLWV_Open(which, metrics_dir) declaration must exist in keylogger_webview.ahk")
 	Assert(InStr(Body, "LoggerWarn") > 0,
 		"KLWV_Open must route the WebView2 navigate failure through LoggerWarn, not only FileAppend to webview.log (ui-launch-error-msgbox-on-timer-thread)")

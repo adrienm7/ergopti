@@ -68,7 +68,7 @@ _KLRDBG_FuncBody(Src, FuncDef) {
 
 _KLRDBG_BuildHasNoRawFileAppend() {
 	Src := _KLRDBG_ReadSource("modules/keylogger/keylogger_reader.ahk")
-	Seg := _KLRDBG_FuncBody(Src, "KLR_BuildDatabase(metrics_dir) {")
+	Seg := _DriverFuncBody("KLR_BuildDatabase")
 	Assert(Seg != "", "KLR_BuildDatabase(metrics_dir) declaration must exist in keylogger_reader.ahk")
 	Assert(!InStr(Seg, "FileAppend"),
 		"KLR_BuildDatabase must not call FileAppend directly - the build runs every ingest tick and can land on the keystroke thread; route diagnostics through the debug-gated KLR_PrefetchDebug helper")
@@ -77,7 +77,7 @@ Test("keylogger_reader: KLR_BuildDatabase has no ungated FileAppend (klr-buildda
 
 _KLRDBG_IncrementalHasNoRawFileAppend() {
 	Src := _KLRDBG_ReadSource("modules/keylogger/keylogger_reader.ahk")
-	Seg := _KLRDBG_FuncBody(Src, "KLR_ApplyIncremental(db, md, logPath) {")
+	Seg := _DriverFuncBody("KLR_ApplyIncremental")
 	Assert(Seg != "", "KLR_ApplyIncremental(db, md, logPath) declaration must exist in keylogger_reader.ahk")
 	Assert(!InStr(Seg, "FileAppend"),
 		"KLR_ApplyIncremental must not call FileAppend directly - it runs on the same hot ingest path; route diagnostics through KLR_PrefetchDebug")
@@ -86,7 +86,7 @@ Test("keylogger_reader: KLR_ApplyIncremental has no ungated FileAppend (klr-buil
 
 _KLRDBG_PrefetchDebugGatesOnDebugFlag() {
 	Src := _KLRDBG_ReadSource("modules/keylogger/keylogger_reader.ahk")
-	Seg := _KLRDBG_FuncBody(Src, "KLR_PrefetchDebug(logPath, line) {")
+	Seg := _DriverFuncBody("KLR_PrefetchDebug")
 	Assert(Seg != "", "KLR_PrefetchDebug(logPath, line) helper must exist in keylogger_reader.ahk")
 	Assert(InStr(Seg, "LoggerIsDebugEnabled") > 0,
 		"KLR_PrefetchDebug must early-return unless LoggerIsDebugEnabled() so the prefetch.log instrumentation is silent below DEBUG level")

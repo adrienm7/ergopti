@@ -47,7 +47,7 @@ _CRL_FuncBody(SourceCode, FuncDecl) {
 
 _CRL_AssertNoAClipboardRef() {
     Src := _CRL_ReadSource("modules/keylogger/keylogger_clipboard.ahk")
-    Body := _CRL_FuncBody(Src, "KL_Clip_OnChange(data_type) {")
+    Body := _DriverFuncBody("KL_Clip_OnChange")
     Assert(Body != "", "KL_Clip_OnChange must exist in keylogger_clipboard.ahk")
     
     Assert(!InStr(Body, "A_Clipboard"), "KL_Clip_OnChange must NOT reference A_Clipboard to avoid materialising large payloads into RAM (clipboard-reads-entire-clipboard-into-ram)")

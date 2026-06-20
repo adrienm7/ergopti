@@ -59,7 +59,7 @@ _THCA_AbortBeforeZero() {
 	Src := _THCA_StripLineComments(_THCA_ReadSource("adapters/http_client.ahk"))
 	Assert(Src != "", "adapters/http_client.ahk must be readable")
 
-	Body := _THCA_FuncBody(Src, "HTTPCancel() {")
+	Body := _DriverFuncBody("HTTPCancel")
 	Assert(Body != "", "HTTPCancel must be defined in adapters/http_client.ahk")
 
 	; Abort() must be called

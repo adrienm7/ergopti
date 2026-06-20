@@ -46,7 +46,7 @@ _TSO_FuncBody(Src, FuncDecl) {
 _TSO_OneShotReschedules() {
 	Src := _TSO_ReadSource("adapters/timer_scheduler.ahk")
 	; Use the definition pattern (with trailing " {") to avoid matching the call site at TimerAfter.
-	Body := _TSO_FuncBody(Src, "_TimerAdapterMakeOneShot(Handle, Fn) {")
+	Body := _DriverFuncBody("_TimerAdapterMakeOneShot")
 
 	Assert(Body != "", "_TimerAdapterMakeOneShot must exist in timer_scheduler.ahk")
 

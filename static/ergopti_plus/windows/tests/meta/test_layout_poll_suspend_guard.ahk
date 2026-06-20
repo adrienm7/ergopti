@@ -52,8 +52,8 @@ _LPSG_FuncBody(Src, FuncDef) {
 ; ===================================================
 
 _LPSG_LayoutPollHasSuspendGuard() {
-	Src := _LPSG_ReadSource("ErgoptiPlus.ahk")
-	Seg := _LPSG_FuncBody(Src, "CheckKeyboardLayoutChange() {")
+	Src := _DriverSourceConcat()
+	Seg := _DriverFuncBody("CheckKeyboardLayoutChange")
 	Assert(Seg != "", "CheckKeyboardLayoutChange must exist in ErgoptiPlus.ahk")
 	Assert(InStr(Seg, "A_IsSuspended") > 0,
 		"CheckKeyboardLayoutChange must check A_IsSuspended — Reload() clears pause state; a layout switch while paused would silently unpause the driver")

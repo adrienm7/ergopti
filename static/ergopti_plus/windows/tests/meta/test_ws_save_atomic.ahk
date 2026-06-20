@@ -52,7 +52,7 @@ _TWSA_AtomicWrite() {
 	Src := _TWSA_StripLineComments(_TWSA_ReadSource("lib/wrap_symbols_config.ahk"))
 	Assert(Src != "", "lib/wrap_symbols_config.ahk must be readable")
 
-	Body := _TWSA_FuncBody(Src, "_WS_Save() {")
+	Body := _DriverFuncBody("_WS_Save")
 	Assert(Body != "", "_WS_Save must be defined in lib/wrap_symbols_config.ahk")
 
 	; Must use a .tmp staging file

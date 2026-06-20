@@ -66,7 +66,7 @@ _HCSNB_FuncBody(Src, FuncDef) {
 
 _HCSNB_SysInfoIsNonBlocking() {
 	Src := _HCSNB_ReadSource("lib/healthcheck.ahk")
-	Body := _HCSNB_FuncBody(Src, "_HealthCheck_SysInfo(")
+	Body := _DriverFuncBody("_HealthCheck_SysInfo")
 	Assert(Body != "", "_HealthCheck_SysInfo must exist in healthcheck.ahk")
 	Assert(InStr(Body, "RunWait(") == 0,
 		"_HealthCheck_SysInfo must not use blocking RunWait for git — can freeze the crash handler path")

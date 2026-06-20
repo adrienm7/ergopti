@@ -35,7 +35,7 @@ _G5UD_FuncBody(Src, FuncDef) {
 
 _G5UD_CheckDownloadPollGuards() {
 	Src := _G5UD_ReadSource("lib/updater.ahk")
-	Seg := _G5UD_FuncBody(Src, "_Updater_PollDownloadAsync(Req, NewExe, SwapBat, CurrentExe, Tag, Polls := 0) {")
+	Seg := _DriverFuncBody("_Updater_PollDownloadAsync")
 	
 	Assert(Seg != "", "_Updater_PollDownloadAsync must exist in updater.ahk")
 	Assert(InStr(Seg, "A_IsSuspended") > 0,

@@ -58,7 +58,7 @@ _OTR_FuncBody(Src, FuncDecl) {
 _OTR_TrimUsesMinId() {
 	Src := _OTR_StripComments(_OTR_ReadSource("modules/llm/api_ollama.ahk"))
 	; Use the definition pattern (with trailing " {") to avoid matching the call site.
-	Body := _OTR_FuncBody(Src, "_LLM_Ollama_TrimAsyncRegistry() {")
+	Body := _DriverFuncBody("_LLM_Ollama_TrimAsyncRegistry")
 
 	Assert(Body != "", "_LLM_Ollama_TrimAsyncRegistry must exist in api_ollama.ahk")
 
@@ -87,7 +87,7 @@ Test("api_ollama: TrimAsyncRegistry uses explicit min-ID scan (trim-async-regist
 
 _OTR_PollCatchesCom() {
 	Src := _OTR_StripComments(_OTR_ReadSource("modules/llm/api_ollama.ahk"))
-	Body := _OTR_FuncBody(Src, "_LLM_Ollama_PollRequest(req_id")
+	Body := _DriverFuncBody("_LLM_Ollama_PollRequest")
 
 	Assert(Body != "", "_LLM_Ollama_PollRequest must exist in api_ollama.ahk")
 

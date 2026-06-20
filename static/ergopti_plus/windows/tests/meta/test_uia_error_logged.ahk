@@ -54,7 +54,7 @@ _UEL_FuncBody(Src, FuncDef) {
 
 _UEL_AssertPollTickLogsFailure() {
 	Src := _UEL_ReadSource("modules/layout.ahk")
-	Body := _UEL_FuncBody(Src, "_UIA_SelectionPollTick() {")
+	Body := _DriverFuncBody("_UIA_SelectionPollTick")
 	Assert(Body != "", "_UIA_SelectionPollTick() declaration must exist in layout.ahk")
 	Assert(InStr(Body, "catch as e") > 0,
 		"_UIA_SelectionPollTick must bind the exception (catch as e) rather than swallow it with a bare catch (uia-error-swallowed-silently)")

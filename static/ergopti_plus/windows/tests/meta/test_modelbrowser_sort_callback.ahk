@@ -55,7 +55,7 @@ _TMBSC_SortUsesCallback() {
 	Src := _TMBSC_StripLineComments(_TMBSC_ReadSource("ui/llm_model_browser.ahk"))
 	Assert(Src != "", "ui/llm_model_browser.ahk must be readable")
 
-	Body := _TMBSC_FuncBody(Src, "_LLM_ModelBrowser_Sort(names) {")
+	Body := _DriverFuncBody("_LLM_ModelBrowser_Sort")
 	Assert(Body != "", "_LLM_ModelBrowser_Sort must be defined in ui/llm_model_browser.ahk")
 
 	; Must use Array.Sort with a comparison callback (not a nested loop bubble sort)

@@ -51,7 +51,7 @@ _HRA_FuncBody(Src, FuncDef) {
 
 _HRA_RegisterIsAtomic() {
 	Src := _HRA_ReadSource("lib/hotstrings/hotstring_engine_main.ahk")
-	Body := _HRA_FuncBody(Src, "HSE_Register(Flags, Trigger, Callback, Meta := unset) {")
+	Body := _DriverFuncBody("HSE_Register")
 	Assert(Body != "", "HSE_Register must exist in hotstring_engine_main.ahk")
 	
 	; Verify that Critical("On") appears before the index pushes.

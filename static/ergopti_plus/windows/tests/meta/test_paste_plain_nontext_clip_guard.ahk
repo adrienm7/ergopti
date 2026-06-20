@@ -61,7 +61,7 @@ _PPNC_FuncBody(Src, FuncDef) {
 
 _PPNC_PasteWithoutFormattingHasTextGuard() {
 	Src := _PPNC_ReadSource("modules/shortcuts/ctrl.ahk")
-	Seg := _PPNC_FuncBody(Src, "PasteWithoutFormatting(*) {")
+	Seg := _DriverFuncBody("PasteWithoutFormatting")
 	Assert(Seg != "", "PasteWithoutFormatting(*) declaration must exist in modules/shortcuts/ctrl.ahk")
 	StripIdx := InStr(Seg, "A_Clipboard := A_Clipboard")
 	Assert(StripIdx > 0, "PasteWithoutFormatting must still strip rich formatting via A_Clipboard := A_Clipboard")
@@ -73,7 +73,7 @@ Test("ctrl: PasteWithoutFormatting guards strip on non-text clipboard (paste-pla
 
 _PPNC_GesturePastePlainHasTextGuard() {
 	Src := _PPNC_ReadSource("modules/gestures.ahk")
-	Seg := _PPNC_FuncBody(Src, "GesturePastePlain() {")
+	Seg := _DriverFuncBody("GesturePastePlain")
 	Assert(Seg != "", "GesturePastePlain() declaration must exist in modules/gestures.ahk")
 	StripIdx := InStr(Seg, "A_Clipboard := A_Clipboard")
 	Assert(StripIdx > 0, "GesturePastePlain must still strip rich formatting via A_Clipboard := A_Clipboard")

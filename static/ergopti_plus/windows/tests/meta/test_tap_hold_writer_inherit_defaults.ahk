@@ -71,7 +71,7 @@ _TWHID_CheckWriterEmitsInheritDefaults() {
 	Src := _TWHID_ReadSource("lib/tap_hold/tap_hold_writer.ahk")
 	Assert(Src != "", "lib/tap_hold/tap_hold_writer.ahk must be readable")
 
-	Body := _TWHID_FuncBody(Src, "_TH_WriteTapHoldToml() {")
+	Body := _DriverFuncBody("_TH_WriteTapHoldToml")
 	Assert(Body != "", "_TH_WriteTapHoldToml must be present in tap_hold_writer.ahk")
 
 	Assert(InStr(Body, "inherit_defaults"),
@@ -82,7 +82,7 @@ _TWHID_CheckWriterEmitsRootSection() {
 	Src := _TWHID_ReadSource("lib/tap_hold/tap_hold_writer.ahk")
 	Assert(Src != "", "lib/tap_hold/tap_hold_writer.ahk must be readable")
 
-	Body := _TWHID_FuncBody(Src, "_TH_WriteTapHoldToml() {")
+	Body := _DriverFuncBody("_TH_WriteTapHoldToml")
 	Assert(Body != "", "_TH_WriteTapHoldToml must be present in tap_hold_writer.ahk")
 
 	; Must emit a [tap_hold] WindowsDir section (the header for the flag)

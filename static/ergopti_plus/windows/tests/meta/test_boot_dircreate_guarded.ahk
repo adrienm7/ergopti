@@ -48,7 +48,7 @@ _BDG_ReadSource(RelPath) {
 ; ================================================
 
 _BDG_CheckDirCreateGuarded() {
-	Src := _BDG_ReadSource("ErgoptiPlus.ahk")
+	Src := _DriverSourceConcat()
 	Assert(Src != "", "ErgoptiPlus.ahk must be readable")
 
 	; The two boot DirCreate calls must be try-wrapped (MED-03).
@@ -62,7 +62,7 @@ _BDG_CheckDirCreateGuarded() {
 }
 
 _BDG_CheckFileAppendGuarded() {
-	Src := _BDG_ReadSource("ErgoptiPlus.ahk")
+	Src := _DriverSourceConcat()
 	Assert(Src != "", "ErgoptiPlus.ahk must be readable")
 
 	; The bootstrap FileAppend call must be try-wrapped (MED-03).

@@ -68,7 +68,7 @@ Test("keylogger: _shutting_down flag declared and initialised false (kl-stop-flu
 
 _KSFS_KLStopSetsFlag() {
 	Src := _KSFS_ReadSource("modules/keylogger/keylogger.ahk")
-	Body := _KSFS_FuncBody(Src, "KL_Stop() {")
+	Body := _DriverFuncBody("KL_Stop")
 	Assert(Body != "", "KL_Stop() must exist in keylogger.ahk")
 	; Flag must be set BEFORE KL_FlushBuffer so the guard bypass is active during flush.
 	FlagIdx  := InStr(Body, "_shutting_down := true")
@@ -84,7 +84,7 @@ Test("keylogger: KL_Stop() sets _shutting_down before KL_FlushBuffer (kl-stop-fl
 
 _KSFS_AppendLogGuardBypasses() {
 	Src := _KSFS_ReadSource("modules/keylogger/keylogger.ahk")
-	Body := _KSFS_FuncBody(Src, "KL_AppendLog(entry) {")
+	Body := _DriverFuncBody("KL_AppendLog")
 	Assert(Body != "", "KL_AppendLog() must exist in keylogger.ahk")
 	Assert(InStr(Body, "A_IsSuspended") > 0,
 		"KL_AppendLog must still guard on A_IsSuspended (kl-stop-flush-defeated-by-suspend)")
@@ -95,7 +95,7 @@ Test("keylogger: KL_AppendLog suspend guard includes _shutting_down bypass (kl-s
 
 _KSFS_IngestOnceGuardBypasses() {
 	Src := _KSFS_ReadSource("modules/keylogger/keylogger.ahk")
-	Body := _KSFS_FuncBody(Src, "KL_IngestOnce(force := false) {")
+	Body := _DriverFuncBody("KL_IngestOnce")
 	Assert(Body != "", "KL_IngestOnce() must exist in keylogger.ahk")
 	Assert(InStr(Body, "A_IsSuspended") > 0,
 		"KL_IngestOnce must still guard on A_IsSuspended (kl-stop-flush-defeated-by-suspend)")

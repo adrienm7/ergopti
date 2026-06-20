@@ -76,7 +76,7 @@ Test("Shortcuts/altgr: module declares _AltGrShortcutsRegistered latch (altgr-sh
 
 _AGRG_DuplicateCallWarnsAndReturns() {
 	Src := _AGRG_ReadSource("modules/shortcuts/altgr.ahk")
-	Seg := _AGRG_FuncBody(Src, "_RegisterAltGrShortcutsHotkeys() {")
+	Seg := _DriverFuncBody("_RegisterAltGrShortcutsHotkeys")
 	Assert(Seg != "", "_RegisterAltGrShortcutsHotkeys() declaration must exist in altgr.ahk")
 	Assert(InStr(Seg, "if _AltGrShortcutsRegistered") > 0,
 		"_RegisterAltGrShortcutsHotkeys must guard on _AltGrShortcutsRegistered and bail before re-binding the SC138 combos (altgr-shortcut-hotkeys-reregister-unguarded)")
@@ -87,7 +87,7 @@ Test("Shortcuts/altgr: duplicate _RegisterAltGrShortcutsHotkeys warns and return
 
 _AGRG_RegistrationIsLogged() {
 	Src := _AGRG_ReadSource("modules/shortcuts/altgr.ahk")
-	Seg := _AGRG_FuncBody(Src, "_RegisterAltGrShortcutsHotkeys() {")
+	Seg := _DriverFuncBody("_RegisterAltGrShortcutsHotkeys")
 	Assert(Seg != "", "_RegisterAltGrShortcutsHotkeys() declaration must exist in altgr.ahk")
 	Assert(InStr(Seg, "LoggerStart") > 0,
 		"_RegisterAltGrShortcutsHotkeys must LoggerStart so dynamic AltGr registration is traceable")

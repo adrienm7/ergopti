@@ -52,7 +52,7 @@ _TLTBM_TokenBudgetMin5() {
 	Src := _TLTBM_StripLineComments(_TLTBM_ReadSource("modules/llm/prediction_engine.ahk"))
 	Assert(Src != "", "modules/llm/prediction_engine.ahk must be readable")
 
-	Body := _TLTBM_FuncBody(Src, "_LLM_Engine_CallTokenBudget(maxTokens, predsPerCall) {")
+	Body := _DriverFuncBody("_LLM_Engine_CallTokenBudget")
 	Assert(Body != "", "_LLM_Engine_CallTokenBudget must be defined in modules/llm/prediction_engine.ahk")
 
 	; The return must wrap with Max(5, ...)

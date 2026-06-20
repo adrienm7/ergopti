@@ -68,7 +68,7 @@ _KWDW_FuncBody(Src, FuncDef) {
 ; The function must no longer delete the destination before moving onto it.
 _KWDW_NoDeleteThenMove() {
 	Src := _KWDW_ReadSource("modules/keylogger/keylogger_prefetch.ahk")
-	Seg := _KWDW_FuncBody(Src, "KLPF_WriteAtomic(path, content) {")
+	Seg := _DriverFuncBody("KLPF_WriteAtomic")
 	Assert(Seg != "", "KLPF_WriteAtomic(path, content) declaration must exist in keylogger_prefetch.ahk")
 	; The destination publish must be a true atomic swap, never FileDelete(path)
 	; followed by a FileMove onto it — that gap is the absent-file window.
@@ -83,7 +83,7 @@ Test("keylogger: KLPF_WriteAtomic has no delete-then-move window (klpf-writeatom
 ; KL_WriteAtomic uses (REPLACE_EXISTING | WRITE_THROUGH), not a FileMove.
 _KWDW_UsesAtomicSwap() {
 	Src := _KWDW_ReadSource("modules/keylogger/keylogger_prefetch.ahk")
-	Seg := _KWDW_FuncBody(Src, "KLPF_WriteAtomic(path, content) {")
+	Seg := _DriverFuncBody("KLPF_WriteAtomic")
 	Assert(Seg != "", "KLPF_WriteAtomic(path, content) declaration must exist in keylogger_prefetch.ahk")
 	Assert(InStr(Seg, "MoveFileExW") > 0,
 		"KLPF_WriteAtomic must publish the destination with MoveFileExW — the documented atomic directory-entry swap with no absent-file window")

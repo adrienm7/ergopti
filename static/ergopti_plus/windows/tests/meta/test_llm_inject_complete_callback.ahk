@@ -84,7 +84,7 @@ _LICC_CheckCallbackWired() {
 	Src := _LICC_ReadSource("modules/llm/llm_bridge.ahk")
 	Assert(Src != "", "modules/llm/llm_bridge.ahk must be readable")
 
-	Body := _LICC_FuncBody(Src, "LLM_Bridge_OnAccept(text) {")
+	Body := _DriverFuncBody("LLM_Bridge_OnAccept")
 	Assert(Body != "", "LLM_Bridge_OnAccept must be present in llm_bridge.ahk")
 
 	; (a) TextSend must not receive a bare 0 as callback
@@ -100,7 +100,7 @@ _LICC_CheckCompleteFnExists() {
 	Src := _LICC_ReadSource("modules/llm/llm_bridge.ahk")
 	Assert(Src != "", "modules/llm/llm_bridge.ahk must be readable")
 
-	Body := _LICC_FuncBody(Src, "_LLM_Bridge_OnInjectComplete(")
+	Body := _DriverFuncBody("_LLM_Bridge_OnInjectComplete")
 	Assert(Body != "", "_LLM_Bridge_OnInjectComplete must be defined in llm_bridge.ahk")
 
 	; (b) Must clear synthetic flag
@@ -116,7 +116,7 @@ _LICC_CheckNoFixedTimerForClear() {
 	Src := _LICC_ReadSource("modules/llm/llm_bridge.ahk")
 	Assert(Src != "", "modules/llm/llm_bridge.ahk must be readable")
 
-	Body := _LICC_FuncBody(Src, "LLM_Bridge_OnAccept(text) {")
+	Body := _DriverFuncBody("LLM_Bridge_OnAccept")
 	Assert(Body != "", "LLM_Bridge_OnAccept must be present in llm_bridge.ahk")
 
 	; (d) Fixed-delay timer for KL_ClearSynthetic must not be in OnAccept body

@@ -63,7 +63,7 @@ _SsidHash_FuncBody(Src, FuncDef) {
 
 _SsidHash_HashesRawOctetsNotUtf8() {
 	Src := _SsidHash_ReadSource("adapters/network_info.ahk")
-	Seg := _SsidHash_FuncBody(Src, "_NI_QueryWlan() {")
+	Seg := _DriverFuncBody("_NI_QueryWlan")
 	Assert(Seg != "", "_NI_QueryWlan() declaration must exist in network_info.ahk")
 	Assert(InStr(Seg, "_NI_SsidOctetsToHashInput(") > 0,
 		"_NI_QueryWlan must build its hash input from the raw SSID octets via _NI_SsidOctetsToHashInput - UTF-8 decoding mojibakes non-UTF-8 SSIDs and yields an unstable hash")
@@ -74,7 +74,7 @@ Test("NetworkInfo: SSID hashed from raw octets, not UTF-8 decode (ssid-utf8-misd
 
 _SsidHash_HasSignalSizeBoundsGuard() {
 	Src := _SsidHash_ReadSource("adapters/network_info.ahk")
-	Seg := _SsidHash_FuncBody(Src, "_NI_QueryWlan() {")
+	Seg := _DriverFuncBody("_NI_QueryWlan")
 	Assert(InStr(Seg, "NI_WLAN_MIN_CONN_ATTR_SIZE") > 0,
 		"_NI_QueryWlan must bound-check cbData against NI_WLAN_MIN_CONN_ATTR_SIZE before reading the signal-quality field at +576 (a truncated buffer would NumGet past the allocation)")
 }
@@ -82,7 +82,7 @@ Test("NetworkInfo: _NI_QueryWlan bounds-checks cbData before signal read (ssid-u
 
 _SsidHash_OctetHelperSerialisesBytes() {
 	Src := _SsidHash_ReadSource("adapters/network_info.ahk")
-	Seg := _SsidHash_FuncBody(Src, "_NI_SsidOctetsToHashInput(pBytes, len) {")
+	Seg := _DriverFuncBody("_NI_SsidOctetsToHashInput")
 	Assert(Seg != "", "_NI_SsidOctetsToHashInput(pBytes, len) helper must exist in network_info.ahk")
 	Assert(InStr(Seg, "UChar") > 0,
 		"_NI_SsidOctetsToHashInput must read individual octets as UChar so the hash input is a byte-exact, encoding-independent serialisation")

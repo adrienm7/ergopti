@@ -147,7 +147,7 @@ _MIS_CheckLayerDispatchCritical() {
 	try Src := FileRead(WindowsDir . "\lib\layout\layout_shift_caps.ahk")
 	Assert(Src != "", "layout_shift_caps.ahk must be readable")
 
-	Body := _MIS_FuncBody(Src, "LayerDispatch(SC, SymbolMap, *) {")
+	Body := _DriverFuncBody("LayerDispatch")
 	Assert(Body != "", "LayerDispatch(SC, SymbolMap, *) must exist in layout_shift_caps.ahk")
 
 	CritPos := InStr(Body, 'Critical("On")')
@@ -175,7 +175,7 @@ _MIS_CheckAltGrShiftDispatchCritical() {
 	try Src := FileRead(WindowsDir . "\lib\layout\layout_altgr.ahk")
 	Assert(Src != "", "layout_altgr.ahk must be readable")
 
-	Body := _MIS_FuncBody(Src, "AltGrShiftDispatch(SC, Table, *) {")
+	Body := _DriverFuncBody("AltGrShiftDispatch")
 	Assert(Body != "", "AltGrShiftDispatch(SC, Table, *) must exist in layout_altgr.ahk")
 
 	CritPos := InStr(Body, 'Critical("On")')

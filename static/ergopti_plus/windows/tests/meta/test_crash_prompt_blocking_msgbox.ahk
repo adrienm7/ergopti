@@ -58,7 +58,7 @@ _CPMB_FuncBody(Src, FuncDef) {
 
 _CPMB_NoBlockingMsgBox() {
 	Src := _CPMB_ReadSource("lib/crash_reporter.ahk")
-	Body := _CPMB_FuncBody(Src, "CrashReport_PromptUser(Report) {")
+	Body := _DriverFuncBody("CrashReport_PromptUser")
 	Assert(Body != "", "CrashReport_PromptUser(Report) must exist in lib/crash_reporter.ahk")
 	Assert(InStr(Body, "MsgBox(") = 0,
 		"CrashReport_PromptUser must NOT call a modal MsgBox — it runs on the input thread and starves the keyboard hook (HIGH-02)")

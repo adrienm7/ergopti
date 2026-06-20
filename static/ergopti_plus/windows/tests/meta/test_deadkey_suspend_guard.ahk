@@ -55,7 +55,7 @@ _DKSG_FuncBody(Src, FuncDef) {
 
 _DKSG_AssertDeadKeyHasSuspendGuard() {
 	Src := _DKSG_ReadSource("modules/layout.ahk")
-	Body := _DKSG_FuncBody(Src, "DeadKey(Mapping) {")
+	Body := _DriverFuncBody("DeadKey")
 	Assert(Body != "", "DeadKey(Mapping) declaration must exist in layout.ahk")
 	Assert(InStr(Body, "A_IsSuspended") > 0,
 		"DeadKey must check A_IsSuspended and no-op while paused - a live InputHook bypasses native Suspend (deadkey-inputhook-no-timeout-no-suspend-guard)")

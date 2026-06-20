@@ -76,7 +76,7 @@ _SWNPK_CountOccurrences(Hay, Needle) {
 ; and as the Suspend(-1) call; any other occurrence is a path that bypasses the
 ; prefix drain.
 _SWNPK_OnlyCallSiteIsToggleSuspend() {
-	Src := _SWNPK_ReadSource("ErgoptiPlus.ahk")
+	Src := _DriverSourceConcat()
 	TotalSuspendParen := _SWNPK_CountOccurrences(Src, "Suspend(")
 	ToggleDecls       := _SWNPK_CountOccurrences(Src, "ToggleSuspend(")
 	RealCalls         := _SWNPK_CountOccurrences(Src, "Suspend(-1)")
@@ -91,8 +91,8 @@ Test("ErgoptiPlus: Suspend(-1) is the only suspend call site (suspend-watchdog-n
 
 ; Invariant 2: ToggleSuspend drains the prefix before flipping Suspend.
 _SWNPK_ToggleDrainsBeforeSuspend() {
-	Src := _SWNPK_ReadSource("ErgoptiPlus.ahk")
-	Seg := _SWNPK_FuncBody(Src, "ToggleSuspend(*) {")
+	Src := _DriverSourceConcat()
+	Seg := _DriverFuncBody("ToggleSuspend")
 	Assert(Seg != "", "ToggleSuspend(*) must exist in ErgoptiPlus.ahk")
 	DrainPos   := InStr(Seg, "_SuspendDrainPrefix()")
 	SuspendPos := InStr(Seg, "Suspend(-1)")
@@ -106,8 +106,8 @@ Test("ErgoptiPlus: ToggleSuspend drains prefix before Suspend (suspend-watchdog-
 
 ; Invariant 3: the drain helper performs the KeyWait("SC138"...) wait.
 _SWNPK_DrainHelperWaitsSc138() {
-	Src := _SWNPK_ReadSource("ErgoptiPlus.ahk")
-	Seg := _SWNPK_FuncBody(Src, "_SuspendDrainPrefix() {")
+	Src := _DriverSourceConcat()
+	Seg := _DriverFuncBody("_SuspendDrainPrefix")
 	Assert(Seg != "", "_SuspendDrainPrefix() must exist in ErgoptiPlus.ahk")
 	; Q is the ASCII double-quote (the linter bans the backtick-quote escape).
 	Q := Chr(34)

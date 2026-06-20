@@ -53,7 +53,7 @@ _HLTSG_FuncBody(Src, FuncDef) {
 
 _HLTSG_HalflifeTickHasSuspendGuard() {
 	Src := _HLTSG_ReadSource("modules/keylogger/keylogger_trigger_roi.ahk")
-	Seg := _HLTSG_FuncBody(Src, "KL_Roi_HalflifeTick() {")
+	Seg := _DriverFuncBody("KL_Roi_HalflifeTick")
 	Assert(Seg != "", "KL_Roi_HalflifeTick must exist in keylogger_trigger_roi.ahk")
 	Assert(InStr(Seg, "A_IsSuspended") > 0,
 		"KL_Roi_HalflifeTick must check A_IsSuspended — SetTimer bypasses Suspend; without this the iteration runs while paused")

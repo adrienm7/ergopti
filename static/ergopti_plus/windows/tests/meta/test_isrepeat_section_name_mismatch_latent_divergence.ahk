@@ -79,7 +79,7 @@ _ISRMM_FuncBody(Src, FuncDef) {
 
 _ISRMM_CacheDropsBrokenPredicate() {
 	Src := _ISRMM_ReadWindowsSource("lib/hotstrings/hotstrings_cache.ahk")
-	Body := _ISRMM_FuncBody(Src, "_HotstringsCacheBuildRows() {")
+	Body := _DriverFuncBody("_HotstringsCacheBuildRows")
 	Assert(Body != "", "_HotstringsCacheBuildRows must exist in hotstrings_cache.ahk")
 	; The broken no-underscore section literal predicate must be gone (not dead).
 	Assert(InStr(Body, Chr(34) . "repeatcorrections" . Chr(34)) == 0,
@@ -93,7 +93,7 @@ Test("hotstrings cache: build drops the broken IsRepeat predicate (isrepeat-sect
 
 _ISRMM_TomlFallbackOmitsIsRepeat() {
 	Src := _ISRMM_ReadWindowsSource("lib/toml/toml_loader.ahk")
-	Body := _ISRMM_FuncBody(Src, "LoadHotstringsSection(CategoryName, SectionName, FeatureConfig")
+	Body := _DriverFuncBody("LoadHotstringsSection")
 	Assert(Body != "", "LoadHotstringsSection must exist in toml_loader.ahk")
 	; The fallback must NOT set an IsRepeat option - that is the canonical behaviour
 	; the cache now matches. If a future edit adds IsRepeat here it must also add

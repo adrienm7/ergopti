@@ -66,7 +66,7 @@ _NTNC_CheckNgramNotInClear() {
 	Src := _NTNC_ReadSource("modules/keylogger/keylogger_reader.ahk")
 	Assert(Src != "", "modules/keylogger/keylogger_reader.ahk must be readable")
 
-	Body := _NTNC_FuncBody(Src, "KLR_ClearAggregates(db) {")
+	Body := _DriverFuncBody("KLR_ClearAggregates")
 	Assert(Body != "", "KLR_ClearAggregates must be present in keylogger_reader.ahk")
 
 	; None of the ngram tables must appear in the clear list
@@ -82,7 +82,7 @@ _NTNC_CheckAggStillCleared() {
 	Src := _NTNC_ReadSource("modules/keylogger/keylogger_reader.ahk")
 	Assert(Src != "", "modules/keylogger/keylogger_reader.ahk must be readable")
 
-	Body := _NTNC_FuncBody(Src, "KLR_ClearAggregates(db) {")
+	Body := _DriverFuncBody("KLR_ClearAggregates")
 	Assert(Body != "", "KLR_ClearAggregates must be present in keylogger_reader.ahk")
 
 	; The agg_* tables must still be cleared

@@ -66,7 +66,7 @@ _KRCB_FuncBody(Src, FuncDef) {
 ; blocking Win32 probe must never run on the keyboard-hook thread.
 _KRCB_OnCharHasNoInlineRefresh() {
 	Src := _KRCB_ReadSource("modules/keylogger/keylogger_hook.ahk")
-	Body := _KRCB_FuncBody(Src, "KL_Hook_OnChar(ih, c) {")
+	Body := _DriverFuncBody("KL_Hook_OnChar")
 	Assert(Body != "", "KL_Hook_OnChar must exist in keylogger_hook.ahk")
 	Assert(InStr(Body, "KL_Hook_RefreshContext") = 0,
 		"KL_Hook_OnChar must NOT call KL_Hook_RefreshContext on the keystroke thread - WinGetTitle/WinGetProcessName can block on a busy foreground window and drop the in-flight keystroke (kl-refresh-context-blocks-on-keystroke)")
@@ -75,7 +75,7 @@ Test("keylogger_hook: OnChar does not inline the blocking context refresh (kl-re
 
 _KRCB_OnKeyDownHasNoInlineRefresh() {
 	Src := _KRCB_ReadSource("modules/keylogger/keylogger_hook.ahk")
-	Body := _KRCB_FuncBody(Src, "KL_Hook_OnKeyDown(ih, vk, sc) {")
+	Body := _DriverFuncBody("KL_Hook_OnKeyDown")
 	Assert(Body != "", "KL_Hook_OnKeyDown must exist in keylogger_hook.ahk")
 	Assert(InStr(Body, "KL_Hook_RefreshContext") = 0,
 		"KL_Hook_OnKeyDown must NOT call KL_Hook_RefreshContext on the keystroke thread (kl-refresh-context-blocks-on-keystroke)")
@@ -85,7 +85,7 @@ Test("keylogger_hook: OnKeyDown does not inline the blocking context refresh (kl
 ; Context refresh must instead be armed on its own SetTimer in KL_Hook_Start.
 _KRCB_RefreshArmedByTimer() {
 	Src := _KRCB_ReadSource("modules/keylogger/keylogger_hook.ahk")
-	Body := _KRCB_FuncBody(Src, "KL_Hook_Start() {")
+	Body := _DriverFuncBody("KL_Hook_Start")
 	Assert(Body != "", "KL_Hook_Start must exist in keylogger_hook.ahk")
 	Assert(InStr(Body, "CONTEXT_REFRESH_MS") > 0,
 		"KL_Hook_Start must arm context refresh on a dedicated SetTimer using KLHookConst.CONTEXT_REFRESH_MS (kl-refresh-context-blocks-on-keystroke)")

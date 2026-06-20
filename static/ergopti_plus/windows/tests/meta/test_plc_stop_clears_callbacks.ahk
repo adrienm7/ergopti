@@ -55,7 +55,7 @@ _TPSCC_AllCallbacksCleared() {
 	Src := _TPSCC_StripLineComments(_TPSCC_ReadSource("adapters/process_lifecycle.ahk"))
 	Assert(Src != "", "adapters/process_lifecycle.ahk must be readable")
 
-	Body := _TPSCC_FuncBody(Src, "PLC_Stop() {")
+	Body := _DriverFuncBody("PLC_Stop")
 	Assert(Body != "", "PLC_Stop must be defined in adapters/process_lifecycle.ahk")
 
 	; All three arrays must be reset

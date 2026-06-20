@@ -47,7 +47,7 @@ _HCA_FuncBody(Src, FuncDecl) {
 
 _HCA_UsesAtomicWrite() {
 	Src := _HCA_ReadSource("lib/hotstrings/hotstrings_cache.ahk")
-	Body := _HCA_FuncBody(Src, "_HotstringsCacheWriteTsv(")
+	Body := _DriverFuncBody("_HotstringsCacheWriteTsv")
 
 	Assert(Body != "", "_HotstringsCacheWriteTsv must exist in hotstrings_cache.ahk")
 

@@ -66,7 +66,7 @@ _OKDLB_FuncBody(Src, FuncDef) {
 
 _OKDLB_TabEnterBranchFeedsBridge() {
 	Src := _OKDLB_ReadSource("lib/hotstrings/hotstring_prefix_watcher.ahk")
-	Seg := _OKDLB_FuncBody(Src, "_OnPrefixKeyDown(IH, VK")
+	Seg := _DriverFuncBody("_OnPrefixKeyDown")
 	Assert(Seg != "", "_OnPrefixKeyDown must exist in hotstring_prefix_watcher.ahk")
 	; The Tab/Enter clause must now route the VK through the bridge feed so the
 	; Enter flush (and the non-accepted Tab flush) actually fire on this hook.
@@ -82,7 +82,7 @@ Test("PrefixWatcher: Tab/Enter clause feeds the LLM bridge (onkeydown-dead-llm-b
 
 _OKDLB_NoDeadTrailingClause() {
 	Src := _OKDLB_ReadSource("lib/hotstrings/hotstring_prefix_watcher.ahk")
-	Seg := _OKDLB_FuncBody(Src, "_OnPrefixKeyDown(IH, VK")
+	Seg := _DriverFuncBody("_OnPrefixKeyDown")
 	Assert(Seg != "", "_OnPrefixKeyDown must exist in hotstring_prefix_watcher.ahk")
 	; The unreachable trailing clause testing all three nav VKs at once must be
 	; gone  -  it could never execute because Tab/Enter/Escape matched earlier.

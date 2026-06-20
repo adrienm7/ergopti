@@ -66,7 +66,7 @@ _USCI_FuncBody(Src, FuncDef) {
 
 _USCI_CoercesInsteadOfExactTypeReject() {
 	Src := _USCI_ReadSource("lib/updater.ahk")
-	Seg := _USCI_FuncBody(Src, "Updater_SetCheckInterval(Seconds) {")
+	Seg := _DriverFuncBody("Updater_SetCheckInterval")
 	Assert(Seg != "", "Updater_SetCheckInterval(Seconds) declaration must exist in lib/updater.ahk")
 
 	; The exact-type rejection must be gone — it silently dropped valid String
@@ -82,7 +82,7 @@ Test("updater: Updater_SetCheckInterval coerces instead of exact-type reject (up
 
 _USCI_LogsOnRejection() {
 	Src := _USCI_ReadSource("lib/updater.ahk")
-	Seg := _USCI_FuncBody(Src, "Updater_SetCheckInterval(Seconds) {")
+	Seg := _DriverFuncBody("Updater_SetCheckInterval")
 	; A rejected value must be visible in the log rather than silently dropped.
 	Assert(InStr(Seg, "LoggerWarn") > 0,
 		"Updater_SetCheckInterval must LoggerWarn on a rejected value — fail loud, do not silently no-op (updater-setcheckinterval-type-guard-rejects-non-integer)")

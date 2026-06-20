@@ -59,8 +59,8 @@ _DMCFIO_FuncBody(Src, FuncDef) {
 ; ==================================================
 
 _DMCFIO_PrescanWarmedBeforeCritical() {
-	Src := _DMCFIO_ReadSource("ErgoptiPlus.ahk")
-	Seg := _DMCFIO_FuncBody(Src, "BuildTrayMenuDeferred() {")
+	Src := _DriverSourceConcat()
+	Seg := _DriverFuncBody("BuildTrayMenuDeferred")
 	Assert(Seg != "", "BuildTrayMenuDeferred() must exist in ErgoptiPlus.ahk")
 	; Match the EXECUTABLE sequence: the prescan call immediately followed (only
 	; whitespace/newlines between) by Critical(On). Matching the contiguous code

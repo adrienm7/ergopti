@@ -65,7 +65,7 @@ _NPNN_FuncBody(Src, FuncDef) {
 
 _NPNN_PromptNumericGuardsInteger() {
 	Src := _NPNN_ReadSource("ui/tray_llm/menu_settings.ahk")
-	Seg := _NPNN_FuncBody(Src, "LLM_Tray_PromptNumeric(key, title, prompt")
+	Seg := _DriverFuncBody("LLM_Tray_PromptNumeric")
 	Assert(Seg != "", "LLM_Tray_PromptNumeric declaration must exist in menu_settings.ahk")
 	Assert(InStr(Seg, "IsInteger") > 0,
 		"LLM_Tray_PromptNumeric must guard with IsInteger before Integer() — a non-numeric typo would otherwise throw an unhandled error in the menu-callback thread")
@@ -74,7 +74,7 @@ Test("menu_settings: LLM_Tray_PromptNumeric guards Integer() with IsInteger (num
 
 _NPNN_PromptMaxWordsGuardsInteger() {
 	Src := _NPNN_ReadSource("ui/tray_llm/menu_settings.ahk")
-	Seg := _NPNN_FuncBody(Src, "LLM_Tray_PromptMaxWords() {")
+	Seg := _DriverFuncBody("LLM_Tray_PromptMaxWords")
 	Assert(Seg != "", "LLM_Tray_PromptMaxWords declaration must exist in menu_settings.ahk")
 	Assert(InStr(Seg, "IsInteger") > 0,
 		"LLM_Tray_PromptMaxWords must guard with IsInteger before Integer() — a non-numeric typo would otherwise throw an unhandled error")
@@ -83,7 +83,7 @@ Test("menu_settings: LLM_Tray_PromptMaxWords guards Integer() with IsInteger (nu
 
 _NPNN_PromptTemperatureGuardsFloat() {
 	Src := _NPNN_ReadSource("ui/tray_llm/menu_settings.ahk")
-	Seg := _NPNN_FuncBody(Src, "LLM_Tray_PromptTemperature() {")
+	Seg := _DriverFuncBody("LLM_Tray_PromptTemperature")
 	Assert(Seg != "", "LLM_Tray_PromptTemperature declaration must exist in menu_settings.ahk")
 	Assert(InStr(Seg, "IsNumber") > 0,
 		"LLM_Tray_PromptTemperature must guard with IsNumber before Float() — a non-numeric typo would otherwise throw an unhandled error")

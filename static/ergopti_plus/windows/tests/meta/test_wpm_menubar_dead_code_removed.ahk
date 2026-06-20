@@ -52,7 +52,7 @@ _WMDR_ReadSource(RelPath) {
 ; ===========================================
 
 _WMDR_NoWpmMenubarTickInMain() {
-	Src := _WMDR_ReadSource("ErgoptiPlus.ahk")
+	Src := _DriverSourceConcat()
 	Assert(Src != "", "ErgoptiPlus.ahk must be readable")
 	Assert(not InStr(Src, "WpmMenubar_Tick"),
 		"ErgoptiPlus.ahk must not reference WpmMenubar_Tick (dead macOS-only callback)")
@@ -60,7 +60,7 @@ _WMDR_NoWpmMenubarTickInMain() {
 Test("F13 regression: ErgoptiPlus.ahk must not contain WpmMenubar_Tick", _WMDR_NoWpmMenubarTickInMain)
 
 _WMDR_NoShowWpmMenubarPushInMain() {
-	Src := _WMDR_ReadSource("ErgoptiPlus.ahk")
+	Src := _DriverSourceConcat()
 	Assert(Src != "", "ErgoptiPlus.ahk must be readable")
 	Assert(not InStr(Src, "metrics_show_wpm_menubar"),
 		"ErgoptiPlus.ahk must not push metrics_show_wpm_menubar in SaveFullConfig")

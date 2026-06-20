@@ -65,7 +65,7 @@ _DMNCSM_FuncBody(Src, FuncDef) {
 
 _DMNCSM_ResetHelperClearsBothMaps() {
 	Src := _DMNCSM_ReadSource("lib/menu_dispatcher.ahk")
-	Seg := _DMNCSM_FuncBody(Src, "MenuDispatcher_Reset() {")
+	Seg := _DriverFuncBody("MenuDispatcher_Reset")
 	Assert(Seg != "", "MenuDispatcher_Reset() must be defined in menu_dispatcher.ahk")
 	; Whitespace-tolerant: the assignments are alignment-padded in the source
 	; (one vs two spaces before :=), so collapse runs of spaces before matching.
@@ -88,7 +88,7 @@ Test("menu_dispatcher: MenuDispatcher_Reset clears both dispatch Maps (dispatche
 
 _DMNCSM_RebuildTrayMenuCallsReset() {
 	Src := _DMNCSM_ReadSource("ui/tray_menu.ahk")
-	Seg := _DMNCSM_FuncBody(Src, "RebuildTrayMenu() {")
+	Seg := _DriverFuncBody("RebuildTrayMenu")
 	Assert(Seg != "", "RebuildTrayMenu() must exist in ui/tray_menu.ahk")
 	Assert(InStr(Seg, "MenuDispatcher_Reset()") > 0,
 		"RebuildTrayMenu must call MenuDispatcher_Reset() before re-registering items - otherwise stale reused IDs survive the rebuild and can misfire")
@@ -96,8 +96,8 @@ _DMNCSM_RebuildTrayMenuCallsReset() {
 Test("tray_menu: RebuildTrayMenu calls MenuDispatcher_Reset (dispatcher-map-never-cleared-stale-misfire)", _DMNCSM_RebuildTrayMenuCallsReset)
 
 _DMNCSM_DeferredBuildCallsReset() {
-	Src := _DMNCSM_ReadSource("ErgoptiPlus.ahk")
-	Seg := _DMNCSM_FuncBody(Src, "BuildTrayMenuDeferred() {")
+	Src := _DriverSourceConcat()
+	Seg := _DriverFuncBody("BuildTrayMenuDeferred")
 	Assert(Seg != "", "BuildTrayMenuDeferred() must exist in ErgoptiPlus.ahk")
 	Assert(InStr(Seg, "MenuDispatcher_Reset()") > 0,
 		"BuildTrayMenuDeferred must call MenuDispatcher_Reset() before InitSubMenus()/initMenu() repopulate the dispatch Maps")

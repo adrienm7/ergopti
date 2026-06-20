@@ -60,7 +60,7 @@ _PwssFuncBody(Src, FuncDef) {
 
 _PwssSuspendEnterStopsPointerWatch() {
 	Src := _PwssReadSource("ErgoptiPlus.ahk")
-	Seg := _PwssFuncBody(Src, "Ergopti_OnSuspendEnter() {")
+	Seg := _DriverFuncBody("Ergopti_OnSuspendEnter")
 	Assert(Seg != "", "Ergopti_OnSuspendEnter() declaration must exist in ErgoptiPlus.ahk")
 	Assert(InStr(Seg, "_LLM_PointerWatch_Stop()") > 0,
 		"Ergopti_OnSuspendEnter must stop the LLM pointer-dismiss watcher -- its SetTimer poll + mouse hotkeys bypass native Suspend and would keep running for the whole pause")
@@ -69,7 +69,7 @@ Test("ErgoptiPlus: Ergopti_OnSuspendEnter stops the LLM pointer watcher (llm-poi
 
 _PwssSuspendResumeRearmsPointerWatch() {
 	Src := _PwssReadSource("ErgoptiPlus.ahk")
-	Seg := _PwssFuncBody(Src, "Ergopti_OnSuspendResume() {")
+	Seg := _DriverFuncBody("Ergopti_OnSuspendResume")
 	Assert(Seg != "", "Ergopti_OnSuspendResume() declaration must exist in ErgoptiPlus.ahk")
 	Assert(InStr(Seg, "_LLM_PointerWatch_Start()") > 0,
 		"Ergopti_OnSuspendResume must re-arm the LLM pointer-dismiss watcher stopped on suspend so dismiss-on-pointer works again after unpause")

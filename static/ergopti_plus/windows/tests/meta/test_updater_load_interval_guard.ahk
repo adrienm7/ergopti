@@ -103,7 +103,7 @@ _ULIG_CheckIsNumberGuard() {
 }
 
 _ULIG_CheckCallSiteGuarded() {
-	Src := _ULIG_ReadSource("ErgoptiPlus.ahk")
+	Src := _DriverSourceConcat()
 	Assert(Src != "", "ErgoptiPlus.ahk must be readable")
 
 	; (b) The call site must be wrapped in try so a residual exception does not

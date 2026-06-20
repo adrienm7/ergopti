@@ -46,7 +46,7 @@ _CWB_FuncBody(Src, FuncDecl) {
 
 _CWB_ClipWaitAcceptsBinary() {
 	Src := _CWB_ReadSource("lib/hotstrings/hotstring_engine.ahk")
-	Body := _CWB_FuncBody(Src, "GetSelection()")
+	Body := _DriverFuncBody("GetSelection")
 
 	Assert(Body != "", "GetSelection() must exist in hotstring_engine.ahk")
 

@@ -59,7 +59,7 @@ _PWF_FuncBody(Src, FuncDef) {
 
 _PWF_AssertSnapshot() {
 	Src := _PWF_ReadSource("modules/shortcuts/ctrl.ahk")
-	Body := _PWF_FuncBody(Src, "PasteWithoutFormatting(*) {")
+	Body := _DriverFuncBody("PasteWithoutFormatting")
 	Assert(Body != "", "PasteWithoutFormatting(*) declaration must exist in ctrl.ahk")
 	Assert(InStr(Body, "ClipboardAll()") > 0,
 		"PasteWithoutFormatting must snapshot the full clipboard via ClipboardAll() before coercion (paste-without-formatting-no-restore)")
@@ -68,7 +68,7 @@ Test("ctrl: PasteWithoutFormatting snapshots clipboard before coercion (paste-wi
 
 _PWF_AssertDeferredRestore() {
 	Src := _PWF_ReadSource("modules/shortcuts/ctrl.ahk")
-	Body := _PWF_FuncBody(Src, "PasteWithoutFormatting(*) {")
+	Body := _DriverFuncBody("PasteWithoutFormatting")
 	Assert(Body != "", "PasteWithoutFormatting(*) declaration must exist in ctrl.ahk")
 	Assert(InStr(Body, "SetTimer") > 0,
 		"PasteWithoutFormatting must schedule a deferred restore via SetTimer (paste-without-formatting-no-restore)")

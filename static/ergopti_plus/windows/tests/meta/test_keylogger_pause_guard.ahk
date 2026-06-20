@@ -64,7 +64,7 @@ _KLPG_FuncBody(Src, FuncDef) {
 
 _KLPG_AppendLogHasPauseGuard() {
 	Src := _KLPG_ReadSource("modules/keylogger/keylogger.ahk")
-	Seg := _KLPG_FuncBody(Src, "KL_AppendLog(entry) {")
+	Seg := _DriverFuncBody("KL_AppendLog")
 	Assert(Seg != "", "KL_AppendLog(entry) declaration must exist in keylogger.ahk")
 	Assert(InStr(Seg, "A_IsSuspended") > 0,
 		"KL_AppendLog must early-return on A_IsSuspended — it is the telemetry chokepoint; without this the keylogger writes PII while paused")
@@ -73,7 +73,7 @@ Test("keylogger: KL_AppendLog has an A_IsSuspended pause guard (chokepoint)", _K
 
 _KLPG_AppendLogExemptsSystemEvent() {
 	Src := _KLPG_ReadSource("modules/keylogger/keylogger.ahk")
-	Seg := _KLPG_FuncBody(Src, "KL_AppendLog(entry) {")
+	Seg := _DriverFuncBody("KL_AppendLog")
 	Assert(InStr(Seg, "system_event") > 0,
 		"KL_AppendLog pause guard must exempt type system_event so the pause/resume lifecycle markers still log while suspended")
 }

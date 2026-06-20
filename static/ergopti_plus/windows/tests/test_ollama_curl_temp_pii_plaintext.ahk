@@ -73,7 +73,7 @@ _OCTPP_FuncBody(Src, FuncDef) {
 
 _OCTPP_DispatchUsesHardenedDir() {
 	Src := _OCTPP_ReadSource("modules/llm/api_ollama.ahk")
-	Seg := _OCTPP_FuncBody(Src, "_LLM_Ollama_DispatchAsync(job) {")
+	Seg := _DriverFuncBody("_LLM_Ollama_DispatchAsync")
 	Assert(Seg != "", "_LLM_Ollama_DispatchAsync must exist in api_ollama.ahk")
 	Assert(InStr(Seg, "_LLM_Ollama_TempDir(") > 0,
 		"_LLM_Ollama_DispatchAsync must build its payload path from _LLM_Ollama_TempDir(), not a bare A_Temp join (ollama-curl-temp-pii-plaintext)")
@@ -86,7 +86,7 @@ Test("api_ollama: _LLM_Ollama_DispatchAsync routes payload through the hardened 
 
 _OCTPP_StreamingUsesHardenedDir() {
 	Src := _OCTPP_ReadSource("modules/llm/api_ollama.ahk")
-	Seg := _OCTPP_FuncBody(Src, "LLM_OllamaGenerate_Streaming(model,")
+	Seg := _DriverFuncBody("LLM_OllamaGenerate_Streaming")
 	Assert(Seg != "", "LLM_OllamaGenerate_Streaming must exist in api_ollama.ahk")
 	Assert(InStr(Seg, "_LLM_Ollama_TempDir(") > 0,
 		"LLM_OllamaGenerate_Streaming must build its payload path from _LLM_Ollama_TempDir(), not a bare A_Temp join (ollama-curl-temp-pii-plaintext)")

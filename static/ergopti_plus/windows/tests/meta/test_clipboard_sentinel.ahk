@@ -54,7 +54,7 @@ _TCBS_SaveReturnsSentinel() {
 	Src := _TCBS_StripLineComments(_TCBS_ReadSource("adapters/clipboard.ahk"))
 	Assert(Src != "", "adapters/clipboard.ahk must be readable")
 
-	Body := _TCBS_FuncBody(Src, "CB_Save() {")
+	Body := _DriverFuncBody("CB_Save")
 	Assert(Body != "", "CB_Save() must be defined in adapters/clipboard.ahk")
 
 	Assert(InStr(Body, "__CB_SAVE_ERROR__") > 0,
@@ -72,7 +72,7 @@ Test("clipboard: CB_Save returns __CB_SAVE_ERROR__ sentinel on clipboard-lock fa
 _TCBS_RestoreGuardsOnSentinel() {
 	Src := _TCBS_StripLineComments(_TCBS_ReadSource("adapters/clipboard.ahk"))
 
-	Body := _TCBS_FuncBody(Src, "CB_Restore(Saved) {")
+	Body := _DriverFuncBody("CB_Restore")
 	Assert(Body != "", "CB_Restore(Saved) must be defined in adapters/clipboard.ahk")
 
 	Assert(InStr(Body, "__CB_SAVE_ERROR__") > 0,

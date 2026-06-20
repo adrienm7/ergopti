@@ -90,7 +90,7 @@ _LTLG_CheckInitSetsFlag() {
 	Src := _LTLG_ReadSource("ui/tray_llm/init.ahk")
 	Assert(Src != "", "ui/tray_llm/init.ahk must be readable")
 
-	Body := _LTLG_FuncBody(Src, "LLM_Tray_Init(")
+	Body := _DriverFuncBody("LLM_Tray_Init")
 	Assert(Body != "", "LLM_Tray_Init must be present in ui/tray_llm/init.ahk")
 
 	Assert(InStr(Body, "_LLM_Tray_Loaded := true"),

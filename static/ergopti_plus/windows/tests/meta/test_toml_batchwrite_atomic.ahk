@@ -29,7 +29,7 @@ _TBA_FuncBody(Src, FuncDef) {
 
 _TBA_BatchWriteIsAtomic() {
 	Src := _TBA_ReadSource("lib/toml/toml_helpers.ahk")
-	Seg := _TBA_FuncBody(Src, "TOML_BatchWrite(Path, Updates) {")
+	Seg := _DriverFuncBody("TOML_BatchWrite")
 	Assert(Seg != "", "TOML_BatchWrite declaration must exist")
 	
 	Assert(InStr(Seg, "FileDelete(Path)") == 0,

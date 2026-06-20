@@ -72,7 +72,7 @@ Test("tray_menu: personal ext scan has a depth-cap constant (personal-ext-scan-u
 
 _PESUR_ScanHasCycleGuards() {
 	Src := _PESUR_ReadSource("ui/tray_menu.ahk")
-	Seg := _PESUR_FuncBody(Src, "_HS_PreScanPersonal() {")
+	Seg := _DriverFuncBody("_HS_PreScanPersonal")
 	Assert(Seg != "", "_HS_PreScanPersonal() declaration must exist in tray_menu.ahk")
 	Assert(InStr(Seg, "_HS_SCAN_MAX_DEPTH") > 0,
 		"_HS_ScanExt must consult _HS_SCAN_MAX_DEPTH and stop descending past the cap")
@@ -83,7 +83,7 @@ Test("tray_menu: _HS_ScanExt has depth + visited-set cycle guards (personal-ext-
 
 _PESUR_TopLevelScanWrappedInTryCatch() {
 	Src := _PESUR_ReadSource("ui/tray_menu.ahk")
-	Seg := _PESUR_FuncBody(Src, "_HS_PreScanPersonal() {")
+	Seg := _DriverFuncBody("_HS_PreScanPersonal")
 	Assert(Seg != "", "_HS_PreScanPersonal() declaration must exist in tray_menu.ahk")
 	; The top-level walk must be inside a try { ... } catch so a runaway/failed
 	; scan degrades to no extension hotstrings instead of crashing the build.

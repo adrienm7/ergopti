@@ -66,7 +66,7 @@ _GSBlk_FuncBody(Src, FuncDef) {
 ; a timeout. Before the fix it called ClipWait(...) and ignored the result.
 _GSBlk_GetSelectionChecksClipWait() {
 	Src := _GSBlk_ReadSource("lib/hotstrings/hotstring_engine.ahk")
-	Seg := _GSBlk_FuncBody(Src, "GetSelection() {")
+	Seg := _DriverFuncBody("GetSelection")
 	Assert(Seg != "", "GetSelection() declaration must exist in hotstring_engine.ahk")
 	Assert(InStr(Seg, "!ClipWait(") > 0,
 		"GetSelection must check the ClipWait return value -- a timed-out copy must "
@@ -95,19 +95,19 @@ _GSBlk_CaseChordsNoOpOnEmpty() {
 	GestSrc := _GSBlk_ReadSource("modules/gestures.ahk")
 	EmptyGuard := "if (Text = " . Chr(34) . Chr(34) . ")"
 
-	UpperSeg := _GSBlk_FuncBody(WinSrc, "ConvertToUppercase(*) {")
+	UpperSeg := _DriverFuncBody("ConvertToUppercase")
 	Assert(InStr(UpperSeg, EmptyGuard) > 0,
 		"ConvertToUppercase must no-op on an empty selection (no stale SendInstant)")
 
-	TitleSeg := _GSBlk_FuncBody(WinSrc, "ConvertToTitleCase(*) {")
+	TitleSeg := _DriverFuncBody("ConvertToTitleCase")
 	Assert(InStr(TitleSeg, EmptyGuard) > 0,
 		"ConvertToTitleCase must no-op on an empty selection (no stale SendInstant)")
 
-	GUpperSeg := _GSBlk_FuncBody(GestSrc, "GestureToggleUppercase() {")
+	GUpperSeg := _DriverFuncBody("GestureToggleUppercase")
 	Assert(InStr(GUpperSeg, EmptyGuard) > 0,
 		"GestureToggleUppercase must no-op on an empty selection (no stale SendInstant)")
 
-	GTitleSeg := _GSBlk_FuncBody(GestSrc, "GestureToggleTitleCase() {")
+	GTitleSeg := _DriverFuncBody("GestureToggleTitleCase")
 	Assert(InStr(GTitleSeg, EmptyGuard) > 0,
 		"GestureToggleTitleCase must no-op on an empty selection (no stale SendInstant)")
 }

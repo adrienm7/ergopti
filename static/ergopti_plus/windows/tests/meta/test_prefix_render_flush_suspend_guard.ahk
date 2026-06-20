@@ -57,7 +57,7 @@ _PRFSG_FuncBody(Src, FuncDef) {
 
 _PRFSG_FlushGuardsSuspend() {
 	Src := _PRFSG_ReadSource("lib/hotstrings/hotstring_prefix_watcher.ahk")
-	FlushBody := _PRFSG_FuncBody(Src, "_PrefixRenderFlush() {")
+	FlushBody := _DriverFuncBody("_PrefixRenderFlush")
 	Assert(FlushBody != "", "_PrefixRenderFlush() must exist in hotstring_prefix_watcher.ahk")
 
 	SuspendPos := InStr(FlushBody, "A_IsSuspended")

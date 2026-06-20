@@ -84,7 +84,7 @@ _RoiPrune_HasShrinkingTarget() {
 ; that guarantees the map shrinks even when no count == 1 noise exists.
 _RoiPrune_HelperEvictsToTarget() {
 	Src := _RoiPrune_ReadSource("modules/keylogger/keylogger_trigger_roi.ahk")
-	Body := _RoiPrune_FuncBody(Src, "KL_Roi_PruneWordCounts() {")
+	Body := _DriverFuncBody("KL_Roi_PruneWordCounts")
 	Assert(Body != "", "KL_Roi_PruneWordCounts must exist in keylogger_trigger_roi.ahk (roi-full-map-prune-scan-on-hot-path)")
 	Assert(InStr(Body, "PRUNE_TARGET_WORDS") > 0, "KL_Roi_PruneWordCounts must evict down to PRUNE_TARGET_WORDS (roi-full-map-prune-scan-on-hot-path)")
 	Assert(InStr(Body, ".Delete(") > 0, "KL_Roi_PruneWordCounts must Delete entries to actually shrink the map (roi-full-map-prune-scan-on-hot-path)")
@@ -94,7 +94,7 @@ _RoiPrune_HelperEvictsToTarget() {
 ; scan of word_counts on the hot path.
 _RoiPrune_ProcessWordDelegates() {
 	Src := _RoiPrune_ReadSource("modules/keylogger/keylogger_trigger_roi.ahk")
-	Body := _RoiPrune_FuncBody(Src, "KL_Roi_ProcessWord(word) {")
+	Body := _DriverFuncBody("KL_Roi_ProcessWord")
 	Assert(Body != "", "KL_Roi_ProcessWord must exist in keylogger_trigger_roi.ahk (roi-full-map-prune-scan-on-hot-path)")
 	Assert(InStr(Body, "KL_Roi_PruneWordCounts()") > 0, "KL_Roi_ProcessWord must delegate pruning to KL_Roi_PruneWordCounts, not scan the map inline on the hot path (roi-full-map-prune-scan-on-hot-path)")
 	Assert(InStr(Body, "for k, v in KLRoi.word_counts") = 0, "KL_Roi_ProcessWord must not enumerate word_counts inline on the hot path (roi-full-map-prune-scan-on-hot-path)")

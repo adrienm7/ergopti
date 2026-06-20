@@ -30,7 +30,7 @@ _KPG_AssertPauseGates() {
 }
 
 _KPG_AssertOnSuspendEnter() {
-	Src := _KPG_ReadSource("ErgoptiPlus.ahk")
+	Src := _DriverSourceConcat()
 	Body := _KPG_FuncBodyStripped(Src, "Ergopti_OnSuspendEnter() {")
 	Assert(InStr(Body, "StopActivitySimulation()") > 0, "Ergopti_OnSuspendEnter must call StopActivitySimulation (keepawake-bypasses-pause)")
 }

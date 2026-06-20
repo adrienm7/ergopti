@@ -62,7 +62,7 @@ _VpnRet_FuncBody(Src, FuncDef) {
 
 _VpnRet_NoMatchPathReturnsFalse() {
 	Src := _VpnRet_ReadSource("adapters/network_info.ahk")
-	Seg := _VpnRet_FuncBody(Src, "NI_IsVpnActive() {")
+	Seg := _DriverFuncBody("NI_IsVpnActive")
 	Assert(Seg != "", "NI_IsVpnActive() declaration must exist in network_info.ahk")
 	; The function must contain the no-match boolean return that follows the
 	; `while` walk and precedes the `catch`. Locate the loop close, then assert

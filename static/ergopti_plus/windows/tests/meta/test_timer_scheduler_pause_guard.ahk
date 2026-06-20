@@ -29,7 +29,7 @@ _TSPG_FuncBody(Src, FuncDef) {
 
 _TSPG_RepeatingHasPauseGuard() {
 	Src := _TSPG_ReadSource("adapters/timer_scheduler.ahk")
-	Seg := _TSPG_FuncBody(Src, "_Repeating(BoundHandle, BoundFn) {")
+	Seg := _DriverFuncBody("_Repeating")
 	Assert(Seg != "", "_Repeating declaration must exist")
 	Assert(InStr(Seg, "A_IsSuspended") > 0,
 		"_Repeating must early-return on A_IsSuspended (timer-scheduler-no-pause-guard)")
@@ -38,7 +38,7 @@ Test("TimerScheduler: _Repeating has an A_IsSuspended pause guard", _TSPG_Repeat
 
 _TSPG_OneShotHasPauseGuard() {
 	Src := _TSPG_ReadSource("adapters/timer_scheduler.ahk")
-	Seg := _TSPG_FuncBody(Src, "_OneShot(BoundHandle, BoundFn) {")
+	Seg := _DriverFuncBody("_OneShot")
 	Assert(Seg != "", "_OneShot declaration must exist")
 	Assert(InStr(Seg, "A_IsSuspended") > 0,
 		"_OneShot must early-return on A_IsSuspended (timer-scheduler-no-pause-guard)")

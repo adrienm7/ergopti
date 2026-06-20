@@ -76,7 +76,7 @@ Test("topo: KL_Topo_IsLikelyDesktopSwitch pure helper exists (topo-checkvirtuald
 ; pass both the outgoing prev_hwnd and that captured value into the check.
 _TCSP_PreCaptureBeforeWrite() {
 	Src := _TCSP_ReadSource("modules/keylogger/keylogger_window_topology.ahk")
-	Seg := _TCSP_FuncBody(Src, "KL_Topo_Tick() {")
+	Seg := _DriverFuncBody("KL_Topo_Tick")
 	Assert(Seg != "", "KL_Topo_Tick() declaration must exist")
 	CapIdx := InStr(Seg, "incoming_last_seen := KLTopo.seen_hwnds.Has(hwnd)")
 	CallIdx := InStr(Seg, "KL_Topo_CheckVirtualDesktop(KLTopo.prev_hwnd, incoming_last_seen)")
@@ -94,7 +94,7 @@ _TCSP_GapConstantNamed() {
 	Src := _TCSP_ReadSource("modules/keylogger/keylogger_window_topology.ahk")
 	Assert(InStr(Src, "DESKTOP_SWITCH_MIN_GAP_MS") > 0,
 		"The desktop-switch gap threshold must be a named constant (DESKTOP_SWITCH_MIN_GAP_MS), not a magic 3000 literal")
-	Seg := _TCSP_FuncBody(Src, "KL_Topo_IsLikelyDesktopSwitch(prev_alive, incoming_last_seen, now) {")
+	Seg := _DriverFuncBody("KL_Topo_IsLikelyDesktopSwitch")
 	Assert(InStr(Seg, "KLTopoConst.DESKTOP_SWITCH_MIN_GAP_MS") > 0,
 		"KL_Topo_IsLikelyDesktopSwitch must compare the gap against KLTopoConst.DESKTOP_SWITCH_MIN_GAP_MS")
 }

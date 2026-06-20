@@ -58,7 +58,7 @@ _TISLRF_FallbackWarmReset() {
 	Src := _TISLRF_StripLineComments(_TISLRF_ReadSource("lib/i18n.ahk"))
 	Assert(Src != "", "lib/i18n.ahk must be readable")
 
-	Body := _TISLRF_FuncBody(Src, "I18nSetLocale(Code) {")
+	Body := _DriverFuncBody("I18nSetLocale")
 	Assert(Body != "", "I18nSetLocale must be defined in lib/i18n.ahk")
 
 	; _I18nFallbacksWarmed must be reset inside the function

@@ -62,7 +62,7 @@ _DPSG_FuncBody(Src, FuncDef) {
 
 _DPSG_DequeuePollHasSuspendGuard() {
 	Src := _DPSG_ReadSource("lib/tooltip.ahk")
-	Seg := _DPSG_FuncBody(Src, "_TooltipDequeuePollFn() {")
+	Seg := _DriverFuncBody("_TooltipDequeuePollFn")
 	Assert(Seg != "", "_TooltipDequeuePollFn() declaration must exist in tooltip.ahk")
 	Assert(InStr(Seg, "A_IsSuspended") > 0,
 		"_TooltipDequeuePollFn must check A_IsSuspended -- SetTimer bypasses native Suspend; without this the dequeue poll repaints a tooltip while the driver is paused")

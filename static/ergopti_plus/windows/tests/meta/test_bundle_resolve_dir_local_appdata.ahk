@@ -58,7 +58,7 @@ _BRDL_CheckNoDoubleDot() {
 	Src := _BRDL_ReadSource("lib/bundle.ahk")
 	Assert(Src != "", "lib/bundle.ahk must be readable")
 
-	Body := _BRDL_FuncBody(Src, "_Bundle_ResolveDir(")
+	Body := _DriverFuncBody("_Bundle_ResolveDir")
 	Assert(Body != "", "_Bundle_ResolveDir must be present in lib/bundle.ahk")
 
 	Assert(!InStr(Body, '".."') && !InStr(Body, '"\.."'),
@@ -69,7 +69,7 @@ _BRDL_CheckUsesLocalAppData() {
 	Src := _BRDL_ReadSource("lib/bundle.ahk")
 	Assert(Src != "", "lib/bundle.ahk must be readable")
 
-	Body := _BRDL_FuncBody(Src, "_Bundle_ResolveDir(")
+	Body := _DriverFuncBody("_Bundle_ResolveDir")
 	Assert(Body != "", "_Bundle_ResolveDir must be present in lib/bundle.ahk")
 
 	Assert(InStr(Body, "A_LocalAppData"),

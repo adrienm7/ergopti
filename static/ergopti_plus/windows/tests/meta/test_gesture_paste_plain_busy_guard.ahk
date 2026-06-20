@@ -63,7 +63,7 @@ _GPPBG_FuncBody(Src, FuncDef) {
 
 _GPPBG_AssertGesturePastePlainChecksGuard() {
 	Src := _GPPBG_ReadSource("modules/gestures.ahk")
-	Body := _GPPBG_FuncBody(Src, "GesturePastePlain() {")
+	Body := _DriverFuncBody("GesturePastePlain")
 	Assert(Body != "", "GesturePastePlain() declaration must exist in gestures.ahk")
 	Assert(InStr(Body, "_SEND_INSTANT_CLIP_BUSY") > 0,
 		"GesturePastePlain must read/set _SEND_INSTANT_CLIP_BUSY to participate in the clipboard reentrancy guard (gesture-paste-plain-bypass-busy-guard)")
@@ -72,7 +72,7 @@ Test("gestures: GesturePastePlain participates in the clipboard reentrancy guard
 
 _GPPBG_AssertRestoreClearsGuard() {
 	Src := _GPPBG_ReadSource("modules/gestures.ahk")
-	Body := _GPPBG_FuncBody(Src, "_GesturePastePlainRestore(OldClip) {")
+	Body := _DriverFuncBody("_GesturePastePlainRestore")
 	Assert(Body != "", "_GesturePastePlainRestore(OldClip) declaration must exist in gestures.ahk")
 	Assert(InStr(Body, "_SEND_INSTANT_CLIP_BUSY") > 0,
 		"_GesturePastePlainRestore must clear _SEND_INSTANT_CLIP_BUSY so the next operation can take the clipboard route (gesture-paste-plain-bypass-busy-guard)")
@@ -85,7 +85,7 @@ Test("gestures: deferred restore releases the reentrancy guard (gesture-paste-pl
 ; every subsequent plain-paste silently falls through to the bypass branch.
 _GPPBG_AssertCatchReleasesGuard() {
 	Src := _GPPBG_ReadSource("modules/gestures.ahk")
-	Body := _GPPBG_FuncBody(Src, "GesturePastePlain() {")
+	Body := _DriverFuncBody("GesturePastePlain")
 	Assert(Body != "", "GesturePastePlain() declaration must exist in gestures.ahk")
 	Assert(RegExMatch(Body, "catch[\s\S]*?_SEND_INSTANT_CLIP_BUSY := false") > 0,
 		"GesturePastePlain catch block must reset _SEND_INSTANT_CLIP_BUSY := false so a throw mid-paste does not latch the guard forever (HIGH-03)")

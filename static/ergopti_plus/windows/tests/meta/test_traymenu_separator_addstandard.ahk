@@ -57,7 +57,7 @@ _TMSAS_FuncBody(Src, FuncDef) {
 
 _TMSAS_SeparatorUsesBareAdd() {
 	Src := _TMSAS_ReadSource("adapters/tray_menu.ahk")
-	Seg := _TMSAS_FuncBody(Src, "TrayMenuSetMenu(Items) {")
+	Seg := _DriverFuncBody("TrayMenuSetMenu")
 	Assert(Seg != "", "TrayMenuSetMenu(Items) must exist in adapters/tray_menu.ahk")
 	Assert(InStr(Seg, "A_TrayMenu.Add()") > 0,
 		"TrayMenuSetMenu separator branch must call A_TrayMenu.Add() (no args) for a separator")
@@ -66,7 +66,7 @@ Test("tray_menu: separator uses A_TrayMenu.Add() not AddStandard() (traymenu-sep
 
 _TMSAS_NoAddStandard() {
 	Src := _TMSAS_ReadSource("adapters/tray_menu.ahk")
-	Seg := _TMSAS_FuncBody(Src, "TrayMenuSetMenu(Items) {")
+	Seg := _DriverFuncBody("TrayMenuSetMenu")
 	; Match the real call form A_TrayMenu.AddStandard so the explanatory
 	; source comment (which names the bare AddStandard API) is not a false hit.
 	Assert(InStr(Seg, "A_TrayMenu.AddStandard") = 0,

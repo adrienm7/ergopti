@@ -67,7 +67,7 @@ _PCTW_FuncBody(Src, FuncDef) {
 
 _PCTW_CommitHelperWritesHwndLast() {
 	Src := _PCTW_ReadSource("modules/keylogger/keylogger.ahk")
-	Seg := _PCTW_FuncBody(Src, "KL_CommitPwCache(hwnd, at, val) {")
+	Seg := _DriverFuncBody("KL_CommitPwCache")
 	Assert(Seg != "", "KL_CommitPwCache(hwnd, at, val) must exist - the single source of truth for password-cache write ordering")
 	PosVal  := InStr(Seg, "last_val")
 	PosAt   := InStr(Seg, "last_at")
@@ -83,7 +83,7 @@ Test("keylogger: KL_CommitPwCache writes last_hwnd last (password-cache-torn-wri
 
 _PCTW_AsyncWriterRoutesThroughCommit() {
 	Src := _PCTW_ReadSource("modules/keylogger/keylogger.ahk")
-	Seg := _PCTW_FuncBody(Src, "KL_AsyncPasswordDetect(hwnd) {")
+	Seg := _DriverFuncBody("KL_AsyncPasswordDetect")
 	Assert(Seg != "", "KL_AsyncPasswordDetect(hwnd) declaration must exist in keylogger.ahk")
 	Assert(InStr(Seg, "KL_CommitPwCache(") > 0,
 		"KL_AsyncPasswordDetect (off-thread writer) must commit via KL_CommitPwCache - a raw three-step write with last_hwnd first is the torn-write race")

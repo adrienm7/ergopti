@@ -76,7 +76,7 @@ _POETC_FuncBody(Src, FuncDef) {
 
 _POETC_PublicWrapsImplInTryCatch() {
 	Src := _POETC_ReadSource("modules/llm/parser.ahk")
-	Seg := _POETC_FuncBody(Src, "LLM_Parser_ProcessPrediction(full_text")
+	Seg := _DriverFuncBody("LLM_Parser_ProcessPrediction")
 	Assert(Seg != "", "LLM_Parser_ProcessPrediction(full_text...) must exist in parser.ahk")
 	Assert(InStr(Seg, "try {") > 0,
 		"LLM_Parser_ProcessPrediction must wrap its work in try { } - async callbacks swallow thrown errors")
@@ -98,7 +98,7 @@ Test("LLM parser: private ProcessPrediction impl exists for the firewall (parser
 
 _POETC_AnchorLoopsGuardKeyAccess() {
 	Src := _POETC_ReadSource("modules/llm/parser.ahk")
-	Seg := _POETC_FuncBody(Src, "_LLM_Parser_ProcessPredictionImpl(full_text")
+	Seg := _DriverFuncBody("_LLM_Parser_ProcessPredictionImpl")
 	Assert(Seg != "", "_LLM_Parser_ProcessPredictionImpl declaration must exist in parser.ahk")
 	; The anchor loops walk stripped_ops / ops which can hold "ins" ops (t2 only,
 	; no t1). A raw t1 access on such an op throws "Key not found"; the fix reads

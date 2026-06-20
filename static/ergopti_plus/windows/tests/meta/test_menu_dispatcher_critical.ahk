@@ -56,7 +56,7 @@ _MDC_FuncBody(Src, FuncDef) {
 
 _MDC_CriticalReleasedBeforeCallback() {
 	Src := _MDC_ReadSource("lib/menu_dispatcher.ahk")
-	Seg := _MDC_FuncBody(Src, "_DispatchIfMissed(ItemId, ExpectedLastFire) {")
+	Seg := _DriverFuncBody("_DispatchIfMissed")
 	Assert(Seg != "", "_DispatchIfMissed must exist in menu_dispatcher.ahk")
 	; Verify Critical Off appears in the function body (released before Call).
 	; Use single-quoted string so the linter does not flag escaped double quotes.

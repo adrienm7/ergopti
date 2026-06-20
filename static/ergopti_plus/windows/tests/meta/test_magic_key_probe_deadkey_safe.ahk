@@ -54,7 +54,7 @@ _MKPDS_StripLineComments(Src) {
 ; ==============================================================
 
 _MKPDS_AssertWFlags() {
-	Src := _MKPDS_StripLineComments(_MKPDS_ReadSource("ErgoptiPlus.ahk"))
+	Src := _MKPDS_StripLineComments(_DriverSourceConcat())
 	Assert(Src != "", "ErgoptiPlus.ahk must be readable")
 
 	; The DllCall must pass 0x4 as the wFlags argument to ToUnicodeEx so that

@@ -63,8 +63,8 @@ _OEKF_FuncBody(Src, FuncDef) {
 ; ==================================================
 
 _OEKF_ShutdownHandlerExists() {
-	Src := _OEKF_ReadSource("ErgoptiPlus.ahk")
-	Seg := _OEKF_FuncBody(Src, "Ergopti_OnShutdown(reason, code) {")
+	Src := _DriverSourceConcat()
+	Seg := _DriverFuncBody("Ergopti_OnShutdown")
 	Assert(Seg != "", "Ergopti_OnShutdown(reason, code) must exist in ErgoptiPlus.ahk")
 	Assert(InStr(Seg, "KL_Stop()") > 0,
 		"Ergopti_OnShutdown must call KL_Stop() to flush the RAM-buffered keylogger metrics before the process tears down on Reload/exit")
@@ -72,7 +72,7 @@ _OEKF_ShutdownHandlerExists() {
 Test("ErgoptiPlus: Ergopti_OnShutdown flushes keylogger via KL_Stop (no-onexit-keylogger-flush)", _OEKF_ShutdownHandlerExists)
 
 _OEKF_OnExitRegistered() {
-	Src := _OEKF_ReadSource("ErgoptiPlus.ahk")
+	Src := _DriverSourceConcat()
 	Assert(InStr(Src, "OnExit(Ergopti_OnShutdown)") > 0,
 		"ErgoptiPlus.ahk must register OnExit(Ergopti_OnShutdown) — Reload/ExitApp run ONLY OnExit callbacks, so this is the single seam that flushes buffered metrics; removing it silently loses typing data on every restart")
 }

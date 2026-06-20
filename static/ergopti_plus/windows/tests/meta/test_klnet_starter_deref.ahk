@@ -54,7 +54,7 @@ _KSD_FuncBody(Src, FuncDef) {
 
 _KSD_WifiStarterDerefsBeforeCall() {
 	Src  := _KSD_ReadSource("modules/keylogger/keylogger_network.ahk")
-	Body := _KSD_FuncBody(Src, "KL_Net_WifiStarter() {")
+	Body := _DriverFuncBody("KL_Net_WifiStarter")
 	Assert(Body != "", "KL_Net_WifiStarter must exist in keylogger_network.ahk")
 	Assert(InStr(Body, "fn := KLNet.wifi_fn") > 0,
 		"KL_Net_WifiStarter must copy the BoundFunc to a local variable before calling")
@@ -65,7 +65,7 @@ Test("keylogger_network: KL_Net_WifiStarter dereferences BoundFunc before call (
 
 _KSD_ReachStarterDerefsBeforeCall() {
 	Src  := _KSD_ReadSource("modules/keylogger/keylogger_network.ahk")
-	Body := _KSD_FuncBody(Src, "KL_Net_ReachStarter() {")
+	Body := _DriverFuncBody("KL_Net_ReachStarter")
 	Assert(Body != "", "KL_Net_ReachStarter must exist in keylogger_network.ahk")
 	Assert(InStr(Body, "fn := KLNet.reach_fn") > 0,
 		"KL_Net_ReachStarter must copy the BoundFunc to a local variable before calling")
@@ -76,7 +76,7 @@ Test("keylogger_network: KL_Net_ReachStarter dereferences BoundFunc before call 
 
 _KSD_VpnStarterDerefsBeforeCall() {
 	Src  := _KSD_ReadSource("modules/keylogger/keylogger_network.ahk")
-	Body := _KSD_FuncBody(Src, "KL_Net_VpnStarter() {")
+	Body := _DriverFuncBody("KL_Net_VpnStarter")
 	Assert(Body != "", "KL_Net_VpnStarter must exist in keylogger_network.ahk")
 	Assert(InStr(Body, "fn := KLNet.vpn_fn") > 0,
 		"KL_Net_VpnStarter must copy the BoundFunc to a local variable before calling")

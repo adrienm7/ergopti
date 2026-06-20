@@ -69,7 +69,7 @@ _CWDW_Source() {
 ; The Change handler must NOT persist directly -- it arms the debounce instead.
 _CWDW_DelayHandlerDoesNotWriteDirectly() {
 	Src := _CWDW_Source()
-	Seg := _CWDW_FuncBody(Src, "_HCW_OnDelayChanged() {")
+	Seg := _DriverFuncBody("_HCW_OnDelayChanged")
 	Assert(Seg != "", "_HCW_OnDelayChanged must exist in hotstrings_config_window.ahk")
 	Assert(InStr(Seg, "_HCW_ArmNumericWrite") > 0,
 		"_HCW_OnDelayChanged must arm the debounce via _HCW_ArmNumericWrite, not persist per keystroke")
@@ -80,7 +80,7 @@ Test("hs_config: _HCW_OnDelayChanged debounces instead of writing per keystroke 
 
 _CWDW_PriorityHandlerDoesNotWriteDirectly() {
 	Src := _CWDW_Source()
-	Seg := _CWDW_FuncBody(Src, "_HCW_OnPriorityChanged() {")
+	Seg := _DriverFuncBody("_HCW_OnPriorityChanged")
 	Assert(Seg != "", "_HCW_OnPriorityChanged must exist in hotstrings_config_window.ahk")
 	Assert(InStr(Seg, "_HCW_ArmNumericWrite") > 0,
 		"_HCW_OnPriorityChanged must arm the debounce via _HCW_ArmNumericWrite, not persist per keystroke")
@@ -93,7 +93,7 @@ Test("hs_config: _HCW_OnPriorityChanged debounces instead of writing per keystro
 ; the single flush callback -- that is what coalesces the burst into one write.
 _CWDW_ArmUsesOneShotTimer() {
 	Src := _CWDW_Source()
-	Seg := _CWDW_FuncBody(Src, "_HCW_ArmNumericWrite(Field, Entry, Sec, Value) {")
+	Seg := _DriverFuncBody("_HCW_ArmNumericWrite")
 	Assert(Seg != "", "_HCW_ArmNumericWrite must exist in hotstrings_config_window.ahk")
 	Assert(InStr(Seg, "SetTimer(_HCW_FlushNumericWrite, -_HCW_NUMERIC_DEBOUNCE_MS)") > 0,
 		"_HCW_ArmNumericWrite must re-arm a one-shot SetTimer (negative _HCW_NUMERIC_DEBOUNCE_MS) so each keystroke coalesces into a single deferred write")
@@ -103,7 +103,7 @@ Test("hs_config: numeric write is armed as a one-shot debounce timer (config-win
 ; The single deferred write must happen inside the flush callback.
 _CWDW_FlushPerformsSingleWrite() {
 	Src := _CWDW_Source()
-	Seg := _CWDW_FuncBody(Src, "_HCW_FlushNumericWrite() {")
+	Seg := _DriverFuncBody("_HCW_FlushNumericWrite")
 	Assert(Seg != "", "_HCW_FlushNumericWrite must exist in hotstrings_config_window.ahk")
 	Assert(InStr(Seg, "_HCW_SetOverride") > 0,
 		"_HCW_FlushNumericWrite must perform the single _HCW_SetOverride once the edit burst settles")

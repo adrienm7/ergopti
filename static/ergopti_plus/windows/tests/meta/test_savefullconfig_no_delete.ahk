@@ -64,7 +64,7 @@ _SFND_FuncBody(Src, FuncDef) {
 _SFND_SaveFullConfigNoDelete() {
 	Raw := _DriverSourceConcat()
 	Src := _SFND_StripComments(Raw)
-	Body := _SFND_FuncBody(Src, "SaveFullConfig() {")
+	Body := _DriverFuncBody("SaveFullConfig")
 	Assert(Body != "", "SaveFullConfig() must exist in ErgoptiPlus.ahk")
 
 	Assert(InStr(Body, "FileDelete(") = 0,

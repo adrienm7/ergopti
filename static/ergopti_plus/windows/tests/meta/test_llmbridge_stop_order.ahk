@@ -55,7 +55,7 @@ _TLBSO_StopBeforeDisable() {
 	Src := _TLBSO_StripLineComments(_TLBSO_ReadSource("modules/llm/llm_bridge.ahk"))
 	Assert(Src != "", "modules/llm/llm_bridge.ahk must be readable")
 
-	Body := _TLBSO_FuncBody(Src, "LLM_Bridge_Stop() {")
+	Body := _DriverFuncBody("LLM_Bridge_Stop")
 	Assert(Body != "", "LLM_Bridge_Stop must be defined in modules/llm/llm_bridge.ahk")
 
 	; Both calls must be present

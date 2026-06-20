@@ -50,7 +50,7 @@ _PE32_SourceScanCheck() {
 	Src := _PE32_ReadSource("modules/keylogger/keylogger_av_state.ahk")
 	Assert(Src != "", "Source file keylogger_av_state.ahk must exist")
 
-	Body := _PE32_FuncBody(Src, "_KL_AV_FindCaptureExeSnapshot(")
+	Body := _DriverFuncBody("_KL_AV_FindCaptureExeSnapshot")
 	Assert(Body != "", "_KL_AV_FindCaptureExeSnapshot must exist in keylogger_av_state.ahk")
 
 	; Regression guard: the old wrong size must no longer appear anywhere in the function body

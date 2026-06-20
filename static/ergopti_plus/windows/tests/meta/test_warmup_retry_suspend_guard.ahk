@@ -57,7 +57,7 @@ _WRS_FuncBody(Src, FuncDef) {
 
 _WRS_WarmupTickHasSuspendGuard() {
 	Src := _WRS_ReadSource("modules/llm/api_ollama.ahk")
-	Seg := _WRS_FuncBody(Src, "LLM_Ollama_WarmupRetryTick() {")
+	Seg := _DriverFuncBody("LLM_Ollama_WarmupRetryTick")
 	Assert(Seg != "", "LLM_Ollama_WarmupRetryTick must exist in api_ollama.ahk")
 	Assert(InStr(Seg, "A_IsSuspended") > 0,
 		"LLM_Ollama_WarmupRetryTick must check A_IsSuspended — SetTimer bypasses Suspend; without this guard HTTP calls fire while paused")
@@ -65,7 +65,7 @@ _WRS_WarmupTickHasSuspendGuard() {
 Test("api_ollama: LLM_Ollama_WarmupRetryTick has A_IsSuspended guard", _WRS_WarmupTickHasSuspendGuard)
 
 _WRS_SuspendEnterCancelsWarmupRetry() {
-	Src := _WRS_ReadSource("ErgoptiPlus.ahk")
+	Src := _DriverSourceConcat()
 	; Search from the declaration of Ergopti_OnSuspendEnter in the tail.
 	FuncPos := InStr(Src, "Ergopti_OnSuspendEnter() {")
 	Assert(FuncPos > 0, "Ergopti_OnSuspendEnter must exist in ErgoptiPlus.ahk")
@@ -80,18 +80,18 @@ Test("ErgoptiPlus: Ergopti_OnSuspendEnter cancels Ollama warmup retry on pause",
 _WRS_DepsPollHasSuspendGuard() {
 	Src := _WRS_ReadSource("modules/llm/ollama_deps_checker.ahk")
 	
-	Seg1 := _WRS_FuncBody(Src, "LLM_Deps_PollServerReady(on_ready?, on_failed?) {")
+	Seg1 := _DriverFuncBody("LLM_Deps_PollServerReady")
 	Assert(InStr(Seg1, "A_IsSuspended") > 0,
 		"LLM_Deps_PollServerReady must check A_IsSuspended (warmup-retry-ignores-suspend)")
 		
-	Seg2 := _WRS_FuncBody(Src, "LLM_Deps_PollFile(pid, on_ready?, on_failed?) {")
+	Seg2 := _DriverFuncBody("LLM_Deps_PollFile")
 	Assert(InStr(Seg2, "A_IsSuspended") > 0,
 		"LLM_Deps_PollFile must check A_IsSuspended (warmup-retry-ignores-suspend)")
 }
 Test("ollama_deps_checker: deps poll callbacks have A_IsSuspended guard", _WRS_DepsPollHasSuspendGuard)
 
 _WRS_SuspendEnterCancelsDepsPoll() {
-	Src := _WRS_ReadSource("ErgoptiPlus.ahk")
+	Src := _DriverSourceConcat()
 	
 	FuncPos := InStr(Src, "Ergopti_OnSuspendEnter() {")
 	Assert(FuncPos > 0, "Ergopti_OnSuspendEnter must exist")

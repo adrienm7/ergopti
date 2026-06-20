@@ -54,7 +54,7 @@ _TRNTA_NoThirdArg() {
 	Src := _TRNTA_StripLineComments(_TRNTA_ReadSource("lib/registry.ahk"))
 	Assert(Src != "", "lib/registry.ahk must be readable")
 
-	Body := _TRNTA_FuncBody(Src, "Reg_ReadBinary(keyPath, valueName) {")
+	Body := _DriverFuncBody("Reg_ReadBinary")
 	Assert(Body != "", "Reg_ReadBinary must be defined in lib/registry.ahk")
 
 	; The broken AHK v1 form passes "REG_BINARY" as third argument
