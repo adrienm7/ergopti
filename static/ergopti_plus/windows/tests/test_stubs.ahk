@@ -264,7 +264,7 @@ global Features := Map(
         ; personal_hotstrings.toml [_meta.sections] block (via BootstrapPersonalFeatures
         ; + the reverse mirror); tests pre-seed a representative shape so the
         ; v2 read sites in modules/hotstrings.ahk and
-        ; lib/hotstrings/personal_toml_editor.ahk find a configured Map.
+        ; ui/personal_toml_editor.ahk find a configured Map.
         "personal", Map(
             "autocorrection", Map("enabled", true, "time_activation_seconds", 0.75),
             "code",           Map("enabled", true, "time_activation_seconds", 0.75),

@@ -88,7 +88,7 @@ OnError(_FatalErrorHandler)
 #Include ../_generated/features_manifest.ahk
 #Include ../lib/manifest_reader.ahk
 #Include ../lib/hotstrings/hotstrings_config.ahk
-#Include ../lib/hotstrings/personal_toml_editor.ahk
+#Include ../ui/personal_toml_editor.ahk
 #Include ../lib/layout/layout_altgr.ahk
 #Include ../lib/layout/layout_shift_caps.ahk
 ; Pure layout-poll quiescence decision (no OS deps, no top-level hotkeys) —
