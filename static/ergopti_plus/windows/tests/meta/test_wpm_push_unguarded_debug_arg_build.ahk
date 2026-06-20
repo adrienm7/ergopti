@@ -12,7 +12,7 @@
 ; follow this). The fix wraps the per-Push LoggerDebug line in
 ; `if LoggerIsDebugEnabled()` so nothing is interpolated below DEBUG level.
 ;
-; This is a meta-static test: lib/metrics/wpm_widget.ahk registers GUI / timer
+; This is a meta-static test: ui/wpm_widget.ahk registers GUI / timer
 ; state and is NOT in the headless run_all include graph, so a source-text
 ; guard is the only automated net available. ASCII-only per the suite
 ; convention. If the gate is removed this test fails.
@@ -59,7 +59,7 @@ _WpmDbg_FuncBody(Src, FuncDef) {
 ; ==================================================
 
 _WpmDbg_PushDebugIsGated() {
-	Src := _WpmDbg_ReadSource("lib/metrics/wpm_widget.ahk")
+	Src := _WpmDbg_ReadSource("ui/wpm_widget.ahk")
 	Seg := _DriverFuncBody("WPMWidget_Push")
 	Assert(Seg != "", "WPMWidget_Push declaration must exist in wpm_widget.ahk")
 

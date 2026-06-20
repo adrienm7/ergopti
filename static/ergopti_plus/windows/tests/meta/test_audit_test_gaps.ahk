@@ -120,7 +120,7 @@ Test("keylogger_av: master-volume probe uses the winmm path, code matches docs (
 ; =========================================================
 
 _ATG_WpmWidgetHasNoLiveWebView2() {
-	Src := _ATG_StripComments(_ATG_ReadSource("lib/metrics/wpm_widget.ahk"))
+	Src := _ATG_StripComments(_ATG_ReadSource("ui/wpm_widget.ahk"))
 	; The graph renderer was migrated to a GDI+ layered window; with no live
 	; WebView2 controller there is no per-process user-data folder to orphan on
 	; Reload, eliminating the temp-dir leak at the source.

@@ -16,7 +16,7 @@
 ; self-heal by calling WPMWidget_BuildCompact() to rebuild the nulled widget.
 ; This test asserts both halves are present so a regression fails CI.
 ;
-; SCOPE: source introspection of lib/metrics/wpm_widget.ahk.
+; SCOPE: source introspection of ui/wpm_widget.ahk.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -71,17 +71,17 @@ _WCCV_FuncBody(Src, FuncName) {
 ; ==================================================
 
 _WCCV_ColorIsValidated() {
-	Src := _WCCV_ReadSource("lib/metrics/wpm_widget.ahk")
+	Src := _WCCV_ReadSource("ui/wpm_widget.ahk")
 	Body := _DriverFuncBody("WPMWidget_CategoryBgColor")
-	Assert(Body != "", "WPMWidget_CategoryBgColor( must exist in lib/metrics/wpm_widget.ahk")
+	Assert(Body != "", "WPMWidget_CategoryBgColor( must exist in ui/wpm_widget.ahk")
 	Assert(InStr(Body, "[0-9A-Fa-f]{6}") > 0,
 		"WPMWidget_CategoryBgColor must validate the color against a 6-digit hex regex before returning it (MEDIUM-01)")
 }
 
 _WCCV_TickCatchSelfHeals() {
-	Src := _WCCV_ReadSource("lib/metrics/wpm_widget.ahk")
+	Src := _WCCV_ReadSource("ui/wpm_widget.ahk")
 	Body := _DriverFuncBody("WPMWidget_Tick")
-	Assert(Body != "", "WPMWidget_Tick( must exist in lib/metrics/wpm_widget.ahk")
+	Assert(Body != "", "WPMWidget_Tick( must exist in ui/wpm_widget.ahk")
 	Assert(InStr(Body, "WPMWidget_BuildCompact") > 0,
 		"WPMWidget_Tick compact-mode catch must rebuild the widget via WPMWidget_BuildCompact so a bad-color throw does not disable it permanently (MEDIUM-01)")
 }

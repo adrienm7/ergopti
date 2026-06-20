@@ -232,7 +232,7 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 #Include lib/config_shortcuts.ahk
 #Include lib/metrics/metrics_shortcuts.ahk
 #Include lib/metrics/metrics_filters.ahk
-#Include lib/metrics/wpm_widget.ahk
+#Include ui/wpm_widget.ahk
 #Include lib/sqlite3.ahk
 #Include vendor/ComVar.ahk
 #Include vendor/Promise.ahk
