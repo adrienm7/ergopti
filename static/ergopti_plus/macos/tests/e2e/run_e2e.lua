@@ -49,8 +49,11 @@ if driver_root == "." then
 end
 
 local drivers_root = driver_root:match("^(.*)/[^/]+$") or driver_root
-local shared_lua   = drivers_root .. "/shared/lua"
-local corpus_path  = drivers_root .. "/shared/tests/corpus/hotstrings/vectors.json"
+-- Single shared-tree root for this bootstrap harness; everything below derives
+-- from it so a shared/ -> _shared/ rename only touches this one literal.
+local shared_root  = drivers_root .. "/shared"
+local shared_lua   = shared_root .. "/lua"
+local corpus_path  = shared_root .. "/tests/corpus/hotstrings/vectors.json"
 
 package.path = table.concat({
 	driver_root .. "/?.lua",

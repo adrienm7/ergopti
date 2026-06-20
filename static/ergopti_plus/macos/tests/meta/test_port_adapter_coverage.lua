@@ -24,6 +24,9 @@ local helpers = require("tests.helpers")
 local DRIVER_ROOT = helpers.driver_root()
 -- Climb from macos/ root up to repo root (static/ergopti_plus/macos/ -> repo root)
 local REPO_ROOT = DRIVER_ROOT:gsub("[/\\]static[/\\]ergopti_plus[/\\]macos[/\\]?$", "")
+-- Single source of truth for the shared tree in this meta test; the ports/
+-- domain dirs below derive from it so a shared/ -> _shared/ rename is one edit.
+local SHARED_DIR = REPO_ROOT .. "/static/ergopti_plus/shared"
 
 -- Additional suspend/pause coverage note for meta
 -- All adapters must be usable under pause; no OS calls when paused.
@@ -94,7 +97,7 @@ end
 -- =============================================
 
 helpers.describe("meta: port-adapter coverage", function()
-	local shared_ports  = REPO_ROOT .. "/static/ergopti_plus/shared/ports"
+	local shared_ports  = SHARED_DIR .. "/ports"
 	local ahk_adapters  = REPO_ROOT .. "/static/ergopti_plus/windows/adapters"
 	local hs_adapters   = REPO_ROOT .. "/static/ergopti_plus/macos/adapters"
 	local linux_adapters = REPO_ROOT .. "/static/ergopti_plus/linux/adapters"
@@ -171,7 +174,7 @@ end)
 -- =================================================
 
 helpers.describe("meta: domain spec test coverage", function()
-	local domain_dir = REPO_ROOT .. "/static/ergopti_plus/shared/domain"
+	local domain_dir = SHARED_DIR .. "/domain"
 	local ahk_tests  = REPO_ROOT .. "/static/ergopti_plus/windows/tests"
 	local hs_tests   = REPO_ROOT .. "/static/ergopti_plus/macos/tests"
 
@@ -241,7 +244,7 @@ local LUA_HS_BASELINE       = 950  -- hs.* calls in macos/modules/ and macos/lib
 local LUA_IO_OS_BASELINE    = 70   -- io.open / os.execute calls in macos/modules/ and macos/lib/ (bumped after errors-sink + diagnostic + menu + sg feature work)
 
 helpers.describe("meta: shared/ code purity", function()
-	local shared_dir = REPO_ROOT .. "/static/ergopti_plus/shared"
+	local shared_dir = SHARED_DIR
 
 	-- Patterns that indicate direct OS-API usage forbidden in shared code
 	local forbidden_js_patterns = {
