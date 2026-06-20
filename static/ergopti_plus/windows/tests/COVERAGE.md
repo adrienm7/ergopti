@@ -129,7 +129,7 @@ When adding a new IA menu option: extend the JSON contract, wire `ui/tray_llm/pe
 | `modules/dynamic_hotstrings/`                  | Public `start()`/`inject_data()` mainly mutate the registry; full coverage needs a seeded registry fixture.        |
 | `modules/keylogger/kc_bridge.ahk`              | File-tail watcher around an external Karabiner log file; no equivalent on Windows. N/A.                            |
 | `lib/bundle.ahk`                               | Version/update constants stamped at compile time. No runtime logic.                                                |
-| `lib/wpm_widget.ahk`                           | Renders a live GUI overlay. Manual QA only.                                                                        |
+| `ui/wpm_widget.ahk`                            | Renders a live GUI overlay. Manual QA only.                                                                        |
 | Shared corpus: `prompt_builder/`               | AHK-side corpus consumer not yet written — see roadmap item 1.                                                     |
 | Shared corpus: `llm/parser_test_vectors`       | AHK-side corpus consumer not yet written — see roadmap item 1.                                                     |
 | Shared corpus: `toml/fuzz_corpus`              | AHK-side TOML fuzz harness not yet written — see roadmap item 2.                                                   |

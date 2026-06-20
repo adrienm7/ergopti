@@ -17,7 +17,7 @@
 ;   the widget, that whole-keyboard-freeze regression returns — this test makes
 ;   that loud.
 ;
-; SCOPE: source introspection of lib/metrics/wpm_widget.ahk + ui/tray_menu.ahk
+; SCOPE: source introspection of ui/wpm_widget.ahk + ui/tray_menu.ahk
 ;   (neither is loaded by the headless run_all, so a code-level guard is the only
 ;   automated net available for them). ASCII-only per the suite convention.
 ; ==============================================================================
@@ -36,7 +36,7 @@
 
 _MetaCheckWpmWidgetNativeRender() {
 	SplitPath(A_ScriptDir, , &WindowsDir)   ; A_ScriptDir is tests\ -> WindowsDir is windows\
-	WpmFile := WindowsDir . "\lib\metrics\wpm_widget.ahk"
+	WpmFile := WindowsDir . "\ui\wpm_widget.ahk"
 
 	Body := ""
 	try Body := FileRead(WpmFile)

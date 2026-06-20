@@ -9,7 +9,7 @@
 ; GR_DrawBitmap used to guard its paint block with `Type(DrawFn) == "Func"`.
 ; In AHK v2, any nested function that captures an enclosing local variable is
 ; a Closure (Type()=="Closure"), NOT a Func.  Both production callers
-; (lib/spotlight.ahk and lib/metrics/wpm_widget.ahk) pass closures, so the
+; (ui/spotlight.ahk and ui/wpm_widget.ahk) pass closures, so the
 ; old guard silently suppressed every DrawFn call and every UpdateLayeredWindow,
 ; leaving the spotlight overlay and the WPM graph widget fully invisible.
 ;

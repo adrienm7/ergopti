@@ -4,7 +4,7 @@
 ; MODULE: WPM Widget Color Cache Meta-Test
 ; DESCRIPTION:
 ; Structural regression for the per-category color memoization added to
-; _WPMWidget_ReadTomlColor in lib/metrics/wpm_widget.ahk.
+; _WPMWidget_ReadTomlColor in ui/wpm_widget.ahk.
 ;
 ; Before the fix, every call to _WPMWidget_ReadTomlColor() did a full FileRead
 ; of the hotstring category TOML file. The WPM tick fires every ~100 ms and
@@ -35,7 +35,7 @@
 ; ===================================================
 
 _WWCC_ReadSource() {
-	return FileRead(A_ScriptDir . "\..\lib\metrics\wpm_widget.ahk", "UTF-8")
+	return FileRead(A_ScriptDir . "\..\ui\wpm_widget.ahk", "UTF-8")
 }
 
 
