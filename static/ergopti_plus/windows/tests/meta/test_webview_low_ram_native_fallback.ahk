@@ -74,7 +74,21 @@ _TWLR_UpdaterChangelogHasNativeNotes() {
 	Src := _DriverDirConcat("lib/updater")
 	Assert(InStr(Src, "RightPaneEdit") > 0,
 		"updater changelog must build a native RightPaneEdit fallback when WebView2 is off")
-	Assert(InStr(Src, "RightPaneEdit.Value := md") > 0,
-		"ShowBody must write the Markdown into the native Edit (not the old no-op that left the pane blank)")
+	Assert(InStr(Src, "RightPaneEdit.Value := _Updater_MarkdownToPlain(md)") > 0,
+		"ShowBody must render the Markdown into the native Edit via _Updater_MarkdownToPlain (not raw md, not a no-op)")
 }
 Test("webview-lowram: updater changelog renders notes natively when WebView2 is off", _TWLR_UpdaterChangelogHasNativeNotes)
+
+; The native notes must RENDER the Markdown (strip ## / ** etc.), not dump raw
+; markup -- the reported regression. Exercise the converter directly.
+_TWLR_MarkdownToPlainStripsMarkup() {
+	out := _Updater_MarkdownToPlain("## Changes`n" . "**bold** and *italic* and " . '``code``' . "`n- one`n[site](https://x.io)")
+	Assert(InStr(out, "##") = 0, "headings must not keep ## markup")
+	Assert(InStr(out, "**") = 0, "bold must not keep ** markup")
+	Assert(InStr(out, "Changes") > 0, "heading text must survive")
+	Assert(InStr(out, "bold") > 0, "bold text must survive")
+	Assert(InStr(out, "italic") > 0, "italic text must survive")
+	Assert(InStr(out, "code") > 0, "inline code text must survive")
+	Assert(InStr(out, "https://x.io") > 0, "link URL must survive as plain text")
+}
+Test("webview-lowram: _Updater_MarkdownToPlain strips markup for the native notes view", _TWLR_MarkdownToPlainStripsMarkup)
