@@ -36,11 +36,6 @@
 ; =============================================
 ; =============================================
 
-_ONA_ReadSource(RelPath) {
-	Root := A_ScriptDir . "\.."
-	return FileRead(Root . "\" . RelPath)
-}
-
 _ONA_FuncBody(Src, FuncDef) {
 	Idx := InStr(Src, FuncDef)
 	if !Idx
@@ -63,9 +58,8 @@ _ONA_FuncBody(Src, FuncDef) {
 ; =====================================================
 
 _ONA_CommitDoesNotUseAppState() {
-	Src := _ONA_ReadSource("lib\onboarding.ahk")
 	Seg := _DriverFuncBody("_Onboarding_Commit")
-	Assert(Seg != "", "_Onboarding_Commit declaration must exist in lib/onboarding.ahk")
+	Assert(Seg != "", "_Onboarding_Commit declaration must exist in the driver source")
 	; Any AppState[...] index-assign in this function throws UnsetError in production
 	; because the Map was removed from lib/app_state.ahk
 	Assert(InStr(Seg, "AppState[") = 0,
@@ -74,9 +68,8 @@ _ONA_CommitDoesNotUseAppState() {
 Test("onboarding: _Onboarding_Commit does not access AppState (UnsetError crash on first-run wizard)", _ONA_CommitDoesNotUseAppState)
 
 _ONA_CommitUsesStrictCanonGlobal() {
-	Src := _ONA_ReadSource("lib\onboarding.ahk")
 	Seg := _DriverFuncBody("_Onboarding_Commit")
-	Assert(Seg != "", "_Onboarding_Commit declaration must exist in lib/onboarding.ahk")
+	Assert(Seg != "", "_Onboarding_Commit declaration must exist in the driver source")
 	; Must use the correct plain global instead of the removed Map entry
 	Assert(InStr(Seg, "_TOML_STRICT_CANON_IN_PROGRESS") > 0,
 		"_Onboarding_Commit must use _TOML_STRICT_CANON_IN_PROGRESS global to block strict canonicalisation")
@@ -94,7 +87,6 @@ Test("onboarding: _Onboarding_Commit uses _TOML_STRICT_CANON_IN_PROGRESS global 
 ; ============================================================
 
 _ONA_StrictCanonDoesNotUseAppState() {
-	Src := _ONA_ReadSource("lib\toml\toml_helpers.ahk")
 	Seg := _DriverFuncBody("TOML_RunStrictCanonicalization")
 	Assert(Seg != "", "TOML_RunStrictCanonicalization declaration must exist in lib/toml/toml_helpers.ahk")
 	; AppState.Has(...) would throw UnsetError in production
