@@ -379,12 +379,11 @@ _LLM_ModelBrowser_ShowWeb() {
 	_LLM_MBW_Gui := g
 
 	loader := _VendorDir . "\64bit\WebView2Loader.dll"
-	global _LLM_MBW_Udir := A_Temp . "\ergopti_modelbrowser_wv_" . A_TickCount
-	WebView_SweepStaleProfiles("ergopti_modelbrowser_wv_")
-	try DirCreate(_LLM_MBW_Udir)
 
 	try {
-		_LLM_MBW_Controller := WebView2.create(Placeholder.Hwnd, , 0, _LLM_MBW_Udir, "", 0, loader)
+		; Reuse the shared session environment (lib/webview_utils.ahk) so no
+		; second Chromium process boots and reopens are near-instant.
+		_LLM_MBW_Controller := WebView2.create(Placeholder.Hwnd, , WebView_SharedEnvironment(loader))
 	} catch as Err {
 		try LoggerError("LLM.browser", "WebView2 create failed: {1}.", Err.Message)
 		try g.Destroy()
@@ -629,7 +628,7 @@ _LLM_MBW_OnResize(GuiObj, MinMax, Width, Height) {
 }
 
 _LLM_MBW_Reset() {
-	global _LLM_MBW_Gui, _LLM_MBW_WebView, _LLM_MBW_Controller, _LLM_MBW_Ready, _LLM_MBW_Queue, _LLM_MBW_Udir
+	global _LLM_MBW_Gui, _LLM_MBW_WebView, _LLM_MBW_Controller, _LLM_MBW_Ready, _LLM_MBW_Queue
 	if IsSet(_LLM_MBW_Controller)
 		try _LLM_MBW_Controller.Close()
 	_LLM_MBW_Gui        := unset
@@ -637,8 +636,4 @@ _LLM_MBW_Reset() {
 	_LLM_MBW_Controller := unset
 	_LLM_MBW_Ready      := false
 	_LLM_MBW_Queue      := []
-	if IsSet(_LLM_MBW_Udir) {
-		try DirDelete(_LLM_MBW_Udir, true)
-		_LLM_MBW_Udir := unset
-	}
 }

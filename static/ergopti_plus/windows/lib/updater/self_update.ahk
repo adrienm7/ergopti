@@ -261,7 +261,6 @@ Updater_ShowUpdatePrompt(Release) {
 		? Release.HtmlUrl : Updater_ReleasesPageUrl()))
 	BtnLater.OnEvent("Click",   (*) => _Updater_CloseGui(G))
 	G.WVC := 0
-	G.Udir := ""
 	G.OnEvent("Close",  (*) => _Updater_CloseGui(G))
 	G.OnEvent("Escape", (*) => _Updater_CloseGui(G))
 	G.Show("w740 AutoSize")
@@ -270,13 +269,11 @@ Updater_ShowUpdatePrompt(Release) {
 	UseWV := IsSet(WebView2) && FileExist(_VendorDir . "\64bit\WebView2Loader.dll")
 	if UseWV {
 		loader := _VendorDir . "\64bit\WebView2Loader.dll"
-		udir   := A_Temp . "\ergopti_update_wv_" . A_TickCount
-		WebView_SweepStaleProfiles("ergopti_update_wv_")
-		try DirCreate(udir)
-		G.Udir := udir
 		WVC := unset
 		try {
-			WVC := WebView2.create(BodyPane.Hwnd, , 0, udir, "", 0, loader)
+			; Reuse the shared session environment (lib/webview_utils.ahk) so no
+			; second Chromium process boots and reopens are near-instant.
+			WVC := WebView2.create(BodyPane.Hwnd, , WebView_SharedEnvironment(loader))
 			G.WVC := WVC
 		} catch as Err {
 			try LoggerWarn("Updater", "WebView2 create failed in update prompt: {1}.", Err.Message)
@@ -307,8 +304,6 @@ _Updater_CloseGui(G) {
 	if G.HasProp("WVC") && G.WVC
 		try G.WVC.Close()
 	try G.Destroy()
-	if G.HasProp("Udir") && G.Udir != ""
-		try DirDelete(G.Udir, true)
 }
 
 

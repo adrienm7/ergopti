@@ -326,7 +326,6 @@ _Updater_BuildChangelogGui(Json, Channel) {
 	BtnInstall.OnEvent("Click", InstallSelected)
 	BtnOpen.OnEvent("Click", OpenSelected)
 	G.WVC := 0
-	G.Udir := ""
 	G.OnEvent("Close",  (*) => _Updater_CloseGui(G))
 	G.OnEvent("Escape", (*) => _Updater_CloseGui(G))
 
@@ -335,15 +334,13 @@ _Updater_BuildChangelogGui(Json, Channel) {
 	; Spin up the WebView2 controller now that the window Hwnd is valid.
 	if (UseWV) {
 		loader := _VendorDir . "\64bit\WebView2Loader.dll"
-		udir   := A_Temp . "\ergopti_changelog_wv_" . A_TickCount
-		WebView_SweepStaleProfiles("ergopti_changelog_wv_")
-		try DirCreate(udir)
-		G.Udir := udir
 		try {
 			; Parent the WebView2 to the RightPane control directly so Fill()
 			; covers exactly that control's client area — no manual coordinate
 			; arithmetic needed, and resize is handled automatically by the OS.
-			WVC := WebView2.create(RightPane.Hwnd, , 0, udir, "", 0, loader)
+			; Reuse the shared session environment (lib/webview_utils.ahk) so no
+			; second Chromium process boots and reopens are near-instant.
+			WVC := WebView2.create(RightPane.Hwnd, , WebView_SharedEnvironment(loader))
 			G.WVC := WVC
 		} catch as Err {
 			try LoggerWarn("Updater", "WebView2 create failed: {1} — falling back.", Err.Message)
