@@ -6,7 +6,7 @@
 ; Static source guard for the "infinite WinHTTP resolve timeout in the changelog
 ; window" finding (changelog-infinite-resolve-timeout).
 ;
-; lib/changelog_window.ahk previously called:
+; ui/changelog_window.ahk previously called:
 ;   Req.SetTimeouts(0, 10000, 20000, 20000)
 ; where 0 is the DNS resolution timeout. On a captive-portal network this stalls
 ; the timer thread indefinitely, blocking every subsequent SetTimer callback and
@@ -42,14 +42,14 @@ _CLWT_ReadSource(RelPath) {
 ; ===================================================
 
 _CLWT_NoInfiniteResolveTimeout() {
-	Src := _CLWT_ReadSource("lib/changelog_window.ahk")
+	Src := _CLWT_ReadSource("ui/changelog_window.ahk")
 	Assert(InStr(Src, "SetTimeouts(0,") = 0,
 		"changelog_window.ahk must NOT use SetTimeouts(0,...) — zero resolve timeout hangs the timer thread on captive networks")
 }
 Test("changelog_window: no infinite WinHTTP resolve timeout (SetTimeouts(0,...))", _CLWT_NoInfiniteResolveTimeout)
 
 _CLWT_UsesSharedResolveConstant() {
-	Src := _CLWT_ReadSource("lib/changelog_window.ahk")
+	Src := _CLWT_ReadSource("ui/changelog_window.ahk")
 	Assert(InStr(Src, "UPDATER_HTTP_RESOLVE_TIMEOUT_MS") > 0,
 		"changelog_window.ahk must reference UPDATER_HTTP_RESOLVE_TIMEOUT_MS so all WinHTTP calls share the same finite DNS budget")
 }
