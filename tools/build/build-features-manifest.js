@@ -25,11 +25,13 @@ import { parse as parseToml } from 'smol-toml';
 import { mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
+import sharedPaths from '../lib/paths.cjs';
 
+const { shared } = sharedPaths;
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, '..', '..');
 
-const MANIFEST_PATH = resolve(REPO_ROOT, 'static/ergopti_plus/shared/features/manifest.toml');
+const MANIFEST_PATH = shared('features/manifest.toml');
 
 const OUT_AHK_DIR = resolve(REPO_ROOT, 'static/ergopti_plus/windows/_generated');
 const OUT_HS_DIR = resolve(REPO_ROOT, 'static/ergopti_plus/macos/_generated');

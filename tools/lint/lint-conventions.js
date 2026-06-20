@@ -16,6 +16,9 @@
 import { readFileSync, writeFileSync, readdirSync, statSync } from 'fs';
 import { join, relative, extname } from 'path';
 import { execSync } from 'child_process';
+import sharedPaths from '../lib/paths.cjs';
+
+const { shared } = sharedPaths;
 
 // This script lives at <repo>/tools/lint/, so the repo root is two levels up.
 const REPO_ROOT = new URL('../..', import.meta.url).pathname
@@ -448,8 +451,8 @@ function checkLuaAntiPatterns(file) {
 // ──────────────────────────────────────────────────────────────────────────────
 
 function checkWebUiAntiPatterns() {
-	const scriptPath = join(REPO_ROOT, 'static/ergopti_plus/shared/ui/changelog/script.js');
-	const stylePath = join(REPO_ROOT, 'static/ergopti_plus/shared/ui/changelog/style.css');
+	const scriptPath = shared('ui/changelog/script.js');
+	const stylePath = shared('ui/changelog/style.css');
 
 	try {
 		const script = readFileSync(scriptPath, 'utf8');
@@ -471,7 +474,7 @@ function checkWebUiAntiPatterns() {
 // ──────────────────────────────────────────────────────────────────────────────
 
 function checkMacOsGestureDefaults() {
-	const manifestPath = join(REPO_ROOT, 'static/ergopti_plus/shared/features/manifest.toml');
+	const manifestPath = shared('features/manifest.toml');
 	try {
 		const content = readFileSync(manifestPath, 'utf8');
 		// Only look at the hs.gestures section

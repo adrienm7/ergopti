@@ -28,10 +28,12 @@ import { parse as parseToml } from 'smol-toml';
 import { readFileSync, readdirSync, statSync } from 'fs';
 import { dirname, resolve, join, relative } from 'path';
 import { fileURLToPath } from 'url';
+import sharedPaths from '../lib/paths.cjs';
 
+const { shared } = sharedPaths;
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, '..', '..');
-const MANIFEST_PATH = resolve(REPO_ROOT, 'static/ergopti_plus/shared/features/manifest.toml');
+const MANIFEST_PATH = shared('features/manifest.toml');
 const AHK_ROOT = resolve(REPO_ROOT, 'static/ergopti_plus/windows');
 
 // Directories whose .ahk files are NOT hand-written driver code reading the

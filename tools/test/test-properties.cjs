@@ -25,6 +25,7 @@
 const fc = require('fast-check');
 const fs = require('fs');
 const path = require('path');
+const { sharedRel } = require('../lib/paths.cjs');
 
 // =========================================
 // =========================================
@@ -51,7 +52,7 @@ function load_spec(rel_path) {
 	return mod.exports;
 }
 
-const RegistrySpec = load_spec('static/ergopti_plus/shared/domain/Registry.spec.js');
+const RegistrySpec = load_spec(sharedRel('domain/Registry.spec.js'));
 
 // =========================================
 // =========================================

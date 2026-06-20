@@ -28,6 +28,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { shared } = require('../lib/paths.cjs');
 
 const REPO_ROOT = path.resolve(__dirname, '..', '..');
 
@@ -39,10 +40,7 @@ const HS_MANIFEST = path.join(
 	REPO_ROOT,
 	'static/ergopti_plus/macos/_generated/features_manifest.lua'
 );
-const FIXTURE_CONFIG = path.join(
-	REPO_ROOT,
-	'static/ergopti_plus/shared/tests/fixtures/test_config.toml'
-);
+const FIXTURE_CONFIG = shared('tests/fixtures/test_config.toml');
 
 // =====================================================================
 // =====================================================================
@@ -592,7 +590,7 @@ const ahkSrc = fs.readFileSync(AHK_MANIFEST, 'utf8');
 const luaSrc = fs.readFileSync(HS_MANIFEST, 'utf8');
 const fixtureSrc = fs.readFileSync(FIXTURE_CONFIG, 'utf8');
 const manifestSrc = fs.readFileSync(
-	path.join(REPO_ROOT, 'static/ergopti_plus/shared/features/manifest.toml'),
+	shared('features/manifest.toml'),
 	'utf8'
 );
 
