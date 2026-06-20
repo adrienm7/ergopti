@@ -259,9 +259,7 @@ helpers.describe("toml_writer: get_format_script_path uses correct repo-root pat
 		-- The old gsub pattern `static[/\]drivers[/\].*` never matched that path,
 		-- so get_format_script_path() returned the full source path unchanged
 		-- instead of stripping back to the repo root.
-		local shared_writer_path = helpers.driver_root()
-			:gsub("[/\\]macos[/\\]?$", "")
-			.. "/shared/lua/toml_codec/writer.lua"
+		local shared_writer_path = helpers.shared("lua/toml_codec/writer.lua")
 		local fh = io.open(shared_writer_path, "r")
 		helpers.assert_true(fh ~= nil, "shared/lua/toml_codec/writer.lua must be readable")
 		local src = fh:read("*a"); fh:close()
