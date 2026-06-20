@@ -74,8 +74,7 @@ _KSGRD_FuncBody(Src, FuncName) {
 ; ==================================================
 
 _KSGRD_GroupsUseRegisterMenuItem() {
-	Src := _KSGRD_ReadSource("ErgoptiPlus.ahk")
-	Body := _KSGRD_FuncBody(Src, "InsertKeyboardShortcutGroups(")
+	Body := _DriverFuncBody("InsertKeyboardShortcutGroups")
 	Assert(Body != "", "InsertKeyboardShortcutGroups must exist in ErgoptiPlus.ahk")
 
 	Assert(InStr(Body, "RegisterMenuItem(GMenu") > 0,

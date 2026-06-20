@@ -53,7 +53,7 @@ _SSSL_StripLineComments(Src) {
 ; ======================================================================
 
 _SSSL_AssertLabelsAreKeys() {
-	Src := _SSSL_StripLineComments(_SSSL_ReadSource("ErgoptiPlus.ahk"))
+	Src := _SSSL_StripLineComments(_DriverSourceConcat())
 	Assert(Src != "", "ErgoptiPlus.ahk must be readable")
 
 	; Locate the SCRIPT_SHORTCUT_LABELS Map assignment block
@@ -82,16 +82,12 @@ Test("F29: SCRIPT_SHORTCUT_LABELS stores raw i18n keys, not t() calls", _SSSL_As
 ; ======================================================================
 
 _SSSL_AssertMenuResolvesViaT() {
-	Src := _SSSL_StripLineComments(_SSSL_ReadSource("ErgoptiPlus.ahk"))
+	Src := _SSSL_StripLineComments(_DriverSourceConcat())
 	Assert(Src != "", "ErgoptiPlus.ahk must be readable")
 
-	; Locate BuildScriptShortcutsMenu body
-	FuncIdx := InStr(Src, "BuildScriptShortcutsMenu(")
-	Assert(FuncIdx > 0, "BuildScriptShortcutsMenu must exist in ErgoptiPlus.ahk")
-	Rest := SubStr(Src, FuncIdx)
-	End := InStr(Rest, "return ")
-	Assert(End > 0, "BuildScriptShortcutsMenu must contain a return statement")
-	Body := SubStr(Rest, 1, End + 10)
+	; Locate BuildScriptShortcutsMenu body (column-0 definition, not a call site)
+	Body := _DriverFuncBody("BuildScriptShortcutsMenu")
+	Assert(Body != "", "BuildScriptShortcutsMenu must exist in the driver source")
 
 	; The label lookup must go through t(SCRIPT_SHORTCUT_LABELS[...]) so the
 	; translation is resolved at call time, after I18nInit() has run.

@@ -62,7 +62,7 @@ _SFND_FuncBody(Src, FuncDef) {
 }
 
 _SFND_SaveFullConfigNoDelete() {
-	Raw := _SFND_ReadSource("ErgoptiPlus.ahk")
+	Raw := _DriverSourceConcat()
 	Src := _SFND_StripComments(Raw)
 	Body := _SFND_FuncBody(Src, "SaveFullConfig() {")
 	Assert(Body != "", "SaveFullConfig() must exist in ErgoptiPlus.ahk")
@@ -86,7 +86,7 @@ Test("ErgoptiPlus: SaveFullConfig has no FileDelete before TOML_BatchWrite (save
 ; ====================================================
 
 _SFND_BuildTrayMenuDeferredTryFinally() {
-	Raw := _SFND_ReadSource("ErgoptiPlus.ahk")
+	Raw := _DriverSourceConcat()
 	Src := _SFND_StripComments(Raw)
 
 	; _DriverReady must be restored via a finally block, not conditionally
