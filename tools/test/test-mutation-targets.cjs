@@ -28,6 +28,8 @@
 
 'use strict';
 
+const { sharedRel } = require('../lib/paths.cjs');
+
 const assert = require('assert/strict');
 const fs = require('fs');
 const path = require('path');
@@ -58,10 +60,8 @@ function load_spec(rel_path) {
 	return mod.exports;
 }
 
-const RegistrySpec = load_spec('static/ergopti_plus/shared/domain/Registry.spec.js');
-const HotstringMatcherSpec = load_spec(
-	'static/ergopti_plus/shared/domain/HotstringMatcher.spec.js'
-);
+const RegistrySpec = load_spec(sharedRel('domain/Registry.spec.js'));
+const HotstringMatcherSpec = load_spec(sharedRel('domain/HotstringMatcher.spec.js'));
 
 // ============================================
 // ============================================

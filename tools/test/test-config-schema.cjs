@@ -28,12 +28,10 @@
 const fs = require('fs');
 const path = require('path');
 const TOML = require('smol-toml');
+const { shared } = require('../lib/paths.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const SCHEMA_PATH = path.join(
-	ROOT,
-	'static/ergopti_plus/shared/config_schema/config.schema.json'
-);
+const SCHEMA_PATH = shared('config_schema/config.schema.json');
 const TARGETS = [
 	'static/ergopti_plus/windows/_generated/config_template.toml',
 	'static/ergopti_plus/macos/_generated/config_template.toml'

@@ -23,10 +23,11 @@
 
 const fs = require('fs');
 const path = require('path');
+const { sharedRel } = require('../lib/paths.cjs');
 
 const ROOT = path.resolve(__dirname, '../..');
 const OUT_PATH = path.resolve(ROOT, 'static/ergopti_plus/windows/_generated/expander.ahk');
-const SPEC_REL = 'static/ergopti_plus/shared/domain/Expander.spec.js';
+const SPEC_REL = sharedRel('domain/Expander.spec.js');
 
 // ==================================================
 // ==================================================

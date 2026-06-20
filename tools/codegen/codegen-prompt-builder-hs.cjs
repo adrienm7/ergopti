@@ -21,7 +21,9 @@
 
 'use strict';
 
-const SHARED_SRC = 'static/ergopti_plus/shared/lua/llm/prompt_builder.lua';
+const { sharedRel } = require('../lib/paths.cjs');
+
+const SHARED_SRC = sharedRel('lua/llm/prompt_builder.lua');
 const HS_CONSUMER = 'static/ergopti_plus/macos/modules/llm/prompt_builder.lua';
 
 console.log('codegen:prompt-builder:hs — no-op (HS uses shared Lua directly).');

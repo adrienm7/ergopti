@@ -25,6 +25,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { shared, sharedRel } = require('../lib/paths.cjs');
 
 const ROOT = path.resolve(__dirname, '../..');
 
@@ -32,7 +33,7 @@ const ROOT = path.resolve(__dirname, '../..');
 // module.exports but the package is type:module (ESM). We inline the CJS
 // wrapper so require() works without needing a .cjs copy of the spec.
 const specSource = fs.readFileSync(
-	path.join(ROOT, 'static/ergopti_plus/shared/domain/Terminators.spec.js'),
+	shared('domain/Terminators.spec.js'),
 	'utf8'
 );
 const specModule = { exports: {} };
@@ -41,8 +42,8 @@ new Function('require', 'module', 'exports', '__dirname', '__filename', specSour
 	require,
 	specModule,
 	specModule.exports,
-	path.join(ROOT, 'static/ergopti_plus/shared/domain'),
-	path.join(ROOT, 'static/ergopti_plus/shared/domain/Terminators.spec.js')
+	shared('domain'),
+	shared('domain/Terminators.spec.js')
 );
 const { TERMINATOR_DEFS } = specModule.exports;
 
@@ -337,7 +338,7 @@ function generateLua() {
 	}).join(',\n');
 
 	return [
-		`--- static/ergopti_plus/shared/lua/keymap/terminators_catalogue.lua`,
+		`--- ${sharedRel('lua/keymap/terminators_catalogue.lua')}`,
 		`--- AUTO-GENERATED from shared/domain/Terminators.spec.js.`,
 		`--- DO NOT EDIT BY HAND — run \`npm run codegen:terminators\` to refresh.`,
 		``,
@@ -364,7 +365,7 @@ function generateLua() {
 // ==================================================
 
 const AHK_OUT = path.join(ROOT, 'static/ergopti_plus/windows/_generated/terminators.ahk');
-const LUA_OUT = path.join(ROOT, 'static/ergopti_plus/shared/lua/keymap/terminators_catalogue.lua');
+const LUA_OUT = shared('lua/keymap/terminators_catalogue.lua');
 
 console.log('codegen:terminators — generating from terminators.spec.js…');
 writeFile(AHK_OUT, generateAhk());

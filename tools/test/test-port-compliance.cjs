@@ -33,9 +33,10 @@
 const fs = require('fs');
 const path = require('path');
 const { buildContracts, serialise } = require('../codegen/codegen-contracts-json.cjs');
+const { shared } = require('../lib/paths.cjs');
 
 const ROOT = path.join(__dirname, '../..');
-const CONTRACTS_PATH = path.join(ROOT, 'static/ergopti_plus/shared/ports/contracts.json');
+const CONTRACTS_PATH = shared('ports/contracts.json');
 const AHK_ADAPTERS_DIR = path.join(ROOT, 'static/ergopti_plus/windows/adapters');
 
 const PASS = '✓';
