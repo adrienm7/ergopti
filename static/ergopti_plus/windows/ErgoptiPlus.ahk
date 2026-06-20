@@ -216,7 +216,7 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 #Include lib/hotstrings/hotstrings_config_window.ahk
 #Include lib/wrap_symbols_config.ahk
 #Include lib/ui_style.ahk
-#Include lib/tooltip.ahk
+#Include ui/tooltip/init.ahk
 #Include lib/llm_diff.ahk
 #Include lib/hotstrings/hotstring_prefix_watcher.ahk
 ; Self-healing hotstring cache for the bundled TOMLs. Replaces the old ~1 MB of

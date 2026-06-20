@@ -83,7 +83,7 @@ Test("render: empty/none/combined modifiers format correctly",
 ; ==================================================================
 
 _TestRender_BuildGuardPresent() {
-	Body := FileRead(A_ScriptDir . "\..\lib\tooltip.ahk", "UTF-8")
+	Body := _DriverDirConcat("ui/tooltip")
 	; Defence in depth: even if some future formatter throws mid-build, the tooltip
 	; must not be left destroyed with a ghost "visible" flag. LLM_TooltipShow wraps
 	; the build and resets to a clean hidden state on error.

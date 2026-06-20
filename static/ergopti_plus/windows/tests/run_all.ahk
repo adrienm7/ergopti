@@ -94,7 +94,7 @@ OnError(_FatalErrorHandler)
 ; Pure layout-poll quiescence decision (no OS deps, no top-level hotkeys) —
 ; exercised by meta/test_layout_quiescence.ahk and consumed by ErgoptiPlus.ahk.
 #Include ../lib/layout_poll_helper.ahk
-#Include ../lib/tooltip.ahk
+#Include ../ui/tooltip/init.ahk
 #Include ../lib/updater.ahk
 ; json.ahk must precede i18n.ahk — _I18nLoadFile now delegates to JsonParse.
 #Include ../lib/registry.ahk

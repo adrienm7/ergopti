@@ -31,14 +31,6 @@
 ; ==================================================
 ; ==================================================
 
-; Reads a windows/-relative source file. A_ScriptDir is the runner dir (tests/);
-; its parent is the windows/ driver root.
-_BGCN_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
-}
-
 ; Returns the brace block starting at the given header line, from the header up
 ; to and including the first closing brace at the source's 4-space function-body
 ; indentation. Returns "" when the header is absent.
@@ -61,9 +53,9 @@ _BGCN_BlockAt(Src, Header) {
 ; ==================================================
 
 _BGCN_CleanupReleasesBothAndReturns() {
-	Src := _BGCN_ReadSource("lib/tooltip.ahk")
+	Src := _DriverDirConcat("ui/tooltip")
 	Block := _BGCN_BlockAt(Src, "if (!HBmp or !MemDC) {")
-	Assert(Block != "", "tooltip.ahk must contain the !HBmp-or-!MemDC GDI-failure block")
+	Assert(Block != "", "the ui/tooltip module must contain the !HBmp-or-!MemDC GDI-failure block")
 
 	; Both handles must be released through parenthesized single-line guards so
 	; the surviving handle is never leaked on a partial-allocation failure.

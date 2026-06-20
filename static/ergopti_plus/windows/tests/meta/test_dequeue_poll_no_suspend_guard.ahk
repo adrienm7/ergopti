@@ -30,14 +30,6 @@
 ; ==================================================
 ; ==================================================
 
-; Reads a windows/-relative source file. A_ScriptDir is the runner dir (tests/);
-; its parent is the windows/ driver root.
-_DPSG_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
-}
-
 ; Returns the full function body -- from its declaration to the first closing
 ; brace at column 0. Returns "" when the declaration is absent.
 _DPSG_FuncBody(Src, FuncDef) {
@@ -61,9 +53,8 @@ _DPSG_FuncBody(Src, FuncDef) {
 ; ==================================================
 
 _DPSG_DequeuePollHasSuspendGuard() {
-	Src := _DPSG_ReadSource("lib/tooltip.ahk")
 	Seg := _DriverFuncBody("_TooltipDequeuePollFn")
-	Assert(Seg != "", "_TooltipDequeuePollFn() declaration must exist in tooltip.ahk")
+	Assert(Seg != "", "_TooltipDequeuePollFn() declaration must exist in the driver source")
 	Assert(InStr(Seg, "A_IsSuspended") > 0,
 		"_TooltipDequeuePollFn must check A_IsSuspended -- SetTimer bypasses native Suspend; without this the dequeue poll repaints a tooltip while the driver is paused")
 }
