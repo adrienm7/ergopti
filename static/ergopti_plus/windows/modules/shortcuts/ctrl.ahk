@@ -19,13 +19,6 @@
 ; =================================
 ; =================================
 
-if Features["shortcuts"]["save"] {
-    AddShortcut("^", "j", (*) => SendFinalResult("^s"))
-}
-if Features["shortcuts"]["ctrl_j"] {
-    AddShortcut("^", "s", (*) => SendFinalResult("^j"))
-}
-
 if Features["shortcuts"]["microsoft_bold"] {
     ; Makes it possible to use the standard shortcuts instead of their translation in Microsoft apps
     AddShortcut(
