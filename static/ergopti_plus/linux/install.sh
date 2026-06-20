@@ -76,6 +76,13 @@ BIN_DIR="${PREFIX}/bin"
 CONFIG_DIR="${HOME}/.config/ergopti/hotstrings"
 SYSTEMD_DIR="${HOME}/.config/systemd/user"
 
+# Single source of truth for the shared-tree location, both the repo source and
+# the install destination. A shared/ -> _shared/ rename only needs editing these
+# two lines (and they must stay in sync with the daemon's runtime resolution in
+# ergopti_hotstrings.lua, which expects the installed dir to be a sibling).
+SRC_SHARED="${DRIVERS_ROOT}/shared"
+DEST_SHARED="${LIB_DIR}/shared"
+
 
 # ====================================
 # ====================================
@@ -203,17 +210,17 @@ echo "=== Installation des fichiers ==="
 
 # Create destination directories.
 install -d "${LIB_DIR}/linux"
-install -d "${LIB_DIR}/shared"
+install -d "${DEST_SHARED}"
 install -d "${BIN_DIR}"
 install -d "${CONFIG_DIR}"
 
 # Copy driver Lua sources.
 cp -r "${SCRIPT_DIR}/." "${LIB_DIR}/linux/"
-cp -r "${DRIVERS_ROOT}/shared/." "${LIB_DIR}/shared/"
+cp -r "${SRC_SHARED}/." "${DEST_SHARED}/"
 
 # Copy default hotstring TOMLs so the user has something to start with.
 # We do NOT overwrite existing user config to preserve customisations.
-for toml in "${DRIVERS_ROOT}/shared/hotstrings/"*.toml; do
+for toml in "${SRC_SHARED}/hotstrings/"*.toml; do
 	[[ "$(basename "${toml}")" == _* ]] && continue
 	category="$(basename "${toml}" .toml)"
 	dest="${CONFIG_DIR}/${category}.toml"
@@ -231,7 +238,7 @@ cat > "${BIN_DIR}/ergopti-hotstrings" << WRAPPER
 # Auto-généré par install.sh — ne pas éditer manuellement.
 set -euo pipefail
 DRIVER_ROOT="${LIB_DIR}/linux"
-SHARED_LUA="${LIB_DIR}/shared/lua"
+SHARED_LUA="${DEST_SHARED}/lua"
 export LUA_PATH="\${DRIVER_ROOT}/?.lua;\${DRIVER_ROOT}/?/init.lua;\${SHARED_LUA}/?.lua;\${SHARED_LUA}/?/init.lua;;"
 exec luajit "\${DRIVER_ROOT}/ergopti_hotstrings.lua" "\$@"
 WRAPPER
