@@ -4,7 +4,7 @@
 ; MODULE: Keylogger SQLite Reader (AHK)
 ; DESCRIPTION:
 ; Windows port of modules/keylogger/sqlite_reader.lua. Builds an in-memory
-; SQLite database from `_shared/schema/schema.sql` + the device's
+; SQLite database from `_shared/data/db/schema.sql` + the device's
 ; `data.sql`, then projects the result into the JSON shape consumed by the
 ; metrics_typing / metrics_apps webview frontends.
 ;
@@ -58,11 +58,11 @@ class KLReadConst {
 ; ===================================
 
 ; Resolve the canonical schema.sql path. The shared schema lives at
-; `static/ergopti_plus/shared/schema/schema.sql`; _StaticDir already
+; `static/ergopti_plus/shared/data/db/schema.sql`; _StaticDir already
 ; resolves to the right root in both dev and compiled modes.
 KLR_ResolveSchemaPath() {
     global _SharedDir
-    base := _SharedDir . "\schema\schema.sql"
+    base := _SharedDir . "\data\db\schema.sql"
     loop files, base
         return A_LoopFileFullPath
     return base

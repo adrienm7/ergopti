@@ -280,7 +280,7 @@ static/drivers/autohotkey/lib/keylogger/
   context_tracker.ahk; foreground app, window title, password field
   log_writer.ahk     ; append_log → today.log (UTF-8 JSONL)
   ingest.ahk         ; today.log → data.sql (texte) + db.sqlite (mirror)
-  schema.ahk         ; chargement DDL et migrations depuis _shared/schema/
+  schema.ahk         ; chargement DDL et migrations depuis _shared/data/db/
   watchers.ahk       ; WTS / power / wifi / audio / app focus
   sensors.ahk        ; mouse poll, system load, battery
   device_id.ahk      ; UUID + host_signature + fork-on-mismatch (§16)
@@ -296,11 +296,12 @@ Lib SQLite côté AHK : `Class_SQLite.ahk` ou wrapper maison sur
 ## 12. Plan d’architecture UI partagée
 
 ```
-static/drivers/_shared/
-  schema/
-    schema.sql               ; DDL canonique de db.sqlite (§14)
-    migrations/
-      0001_initial.sql       ; schema_version = 1
+static/ergopti_plus/_shared/
+  data/
+    db/
+      schema.sql             ; DDL canonique de db.sqlite (§14)
+      migrations/
+        0001_initial.sql     ; schema_version = 1
   ui/
     metrics_apps/            ; HTML+CSS+JS uniquement
     metrics_typing/          ; idem
@@ -341,7 +342,7 @@ réécriture d’UI, juste un launcher différent par OS.
 
 ## 14. Schéma SQLite — DDL canonique
 
-Fichier de référence : `_shared/schema/schema.sql`. Bit-identique entre
+Fichier de référence : `_shared/data/db/schema.sql`. Bit-identique entre
 les drivers (`schema_version` empêche les divergences).
 
 ```sql
@@ -1064,8 +1065,8 @@ avant le premier démarrage s'il veut une mise au propre absolue.
 
 Séance 2 (extraction UI partagée + branchement HS) :
 
-- `static/drivers/_shared/schema/schema.sql` — DDL canonique.
-- `static/drivers/_shared/schema/migrations/0001_initial.sql`.
+- `static/ergopti_plus/_shared/data/db/schema.sql` — DDL canonique.
+- `static/ergopti_plus/_shared/data/db/migrations/0001_initial.sql`.
 - `static/drivers/_shared/ui/metrics_apps/{index.html,script.js,style.css,README.md}`.
 - `static/drivers/_shared/ui/metrics_typing/{index.html,*.js,style.css,README.md}`.
 - `static/drivers/_shared/scripts/data_sql_parser.lua` — utilitaire
