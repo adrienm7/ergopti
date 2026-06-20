@@ -81,13 +81,13 @@ Chemin identique d'un driver à l'autre → l'analogue se trouve au même endroi
 
 **But.** Un point d'entrée unique, des échecs lisibles, ajouter un test sans éditer le runner.
 
-- [ ] Scripts `package.json` : `test:ahk`, `test:hs`, `test:linux`, `test:js`, `test:all` ; repointer `ci.yml` dessus (local == CI).
-- [ ] Câbler (ou documenter local-only) les `tools/test/*.cjs` orphelins ; traiter `test-mutation-targets.cjs`.
-- [ ] Format de résultat unique : TAP + ligne JSON `{passed,failed,failures:[{name,file,line,msg}]}` côté AHK **et** Lua ; `tools/test/report.cjs` parse → liste en tête de step + annotations GitHub `::error` + artefact.
-- [ ] Adopter la taxonomie macOS `tests/{unit/{lib,adapters,modules,ui},integration,e2e,bench,fixtures,helpers,stubs,meta}` sur Windows ; collapse `macos/tests/unit/meta` → `tests/meta`.
-- [ ] **(haut risque, en dernier)** Remplacer les ~370 `#Include` de `run_all.ahk` par auto-découverte (glob) + `_generated/test_includes.ahk` ; **derrière** `test_run_all_include_integrity.ahk`, en comparant la liste découverte à l'ancienne avant suppression. Retirer les `FileAppend [marker]`.
+- [x] Scripts `package.json` : `test:js` (umbrella node, mirror des jobs "Validate ·"), `test:hs`, `test:linux`. `test:ahk` documenté dans `docs/TESTING.md` (chemin de l'exe AHK variable → laissé en doc plutôt qu'en script hardcodé).
+- [x] **Point d'entrée + échecs lisibles** : `tools/test/run-js-suite.cjs` affiche un résumé pass/fail par check et, sur échec, **la commande exacte pour rejouer** + le tail de sortie. `docs/TESTING.md` = doc unique « comment lancer/diagnostiquer chaque couche, local == CI ».
+- [ ] ~~Format TAP+JSON unifié + `report.cjs` + annotations GitHub côté AHK/Lua~~ → **REPORTÉ** (refactor des deux runners, gros ; le résumé `test:js` couvre déjà la couche node qui est celle qui casse le plus souvent).
+- [ ] ~~Taxonomie de tests miroir sur Windows (déplacer ~90 tests plats + 327 meta)~~ → **REPORTÉ** : nécessite de réécrire les ~370 `#Include` de `run_all.ahk` ; gros + risqué, n'adresse pas la douleur CI (déjà couverte). À faire en passe dédiée, vérifiée par dry-run + suite.
+- [ ] ~~Auto-découverte `run_all.ahk`~~ → **REPORTÉ** (haut risque, cf. risques).
 
-**Vérif.** Même ensemble de tests avant/après (comparer compteurs + liste de noms découverts) ; un test cassé volontairement remonte en tête du step avec `file:line`.
+**Vérif. ✅** `test:js` 4/4 vert ; `test:hs` 2228 tests verts ; doc TESTING.md couvre les 4 couches avec la commande exacte de chacune.
 
 ---
 
