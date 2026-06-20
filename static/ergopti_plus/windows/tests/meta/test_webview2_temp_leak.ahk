@@ -42,7 +42,7 @@ _TWTL_CheckUpdaterModuleHost(CreatePrefix) {
 
 _TWTL_AllHosts() {
 	_TWTL_CheckHost("lib/changelog_window.ahk", "ergopti_changelog_wv_", "DirDelete(_CLW_Udir, true)")
-	_TWTL_CheckHost("lib/healthcheck.ahk", "ergopti_hc_wv_", "DirDelete(G.Udir, true)")
+	_TWTL_CheckHost("ui/healthcheck/core.ahk", "ergopti_hc_wv_", "DirDelete(G.Udir, true)")
 	_TWTL_CheckUpdaterModuleHost("ergopti_changelog_wv_")
 	_TWTL_CheckUpdaterModuleHost("ergopti_update_wv_")
 	_TWTL_CheckHost("modules/keylogger/keylogger_ui.ahk", "ergopti_metrics_edge_", "")
