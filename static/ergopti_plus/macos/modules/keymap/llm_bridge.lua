@@ -37,6 +37,7 @@ local tooltip          = require("ui.tooltip")
 local engine           = require("modules.llm.prediction_engine")
 local Registry         = require("modules.keymap.registry")
 local hotstrings_config = require("modules.hotstrings_config")
+local expander         = require("modules.keymap.expander")
 
 local LOG    = "keymap.llm_bridge"
 local _state = nil  -- Shared CoreState, injected via M.init().
@@ -696,45 +697,36 @@ function M.apply_prediction(idx)
 
 	M.reset_predictions()
 
-	-- Arm the synthetic-event window before mutating counters so the A6 guard in
-	-- onKeyDownRaw sees a fresh timestamp and does not clear the counters mid-expansion.
-	_state.last_synthetic_arm_time = hs.timer.secondsSinceEpoch()
-
-	-- Issue deletions then type the completion into the HID event queue.
-	_state.expected_synthetic_deletes = _state.expected_synthetic_deletes + delete_count
-	for _ = 1, delete_count do keyStroke({}, "delete", 0) end
-
-	local _, emitted_str = km_utils.emit_text(text_to_type)
-	_state.expected_synthetic_chars = _state.expected_synthetic_chars .. emitted_str
-	-- Drain paste-ops: emit_text takes the clipboard-paste path for accented text
-	-- (contains_high_unicode) or text > 50 codepoints. When it does, the Cmd+V echo
-	-- arrives as a keyDown event; without marking it synthetic, onKeyDownRaw treats
-	-- it as a real Cmd+V and wipes the rolling buffer. The counter also leaks to the
-	-- next expansion if not drained here, silently swallowing a genuine Cmd+V.
-	local paste_ops = km_utils.take_paste_ops and km_utils.take_paste_ops() or 0
-	if paste_ops > 0 then
-		_state.expected_synthetic_pastes = (_state.expected_synthetic_pastes or 0) + paste_ops
-	end
-
-	-- Notify even when emitted_str is empty (paste path): the keylogger must
-	-- still see the delete_count backspaces as synthetic, otherwise it counts
-	-- them as human corrections and desynchronises its rolling buffer.
-	if delete_count > 0 or emitted_str ~= "" then
-		keylogger.notify_synthetic(emitted_str, "llm", delete_count)
-	end
+	-- Route through the single injection choke point so every synthetic-event
+	-- tracker (expected_synthetic_deletes/chars/pastes + keylogger synth_queue) is
+	-- updated atomically in one place — same path as hotstring expansion.
+	-- is_final=true: suppress hotstring re-scan after LLM accept.
+	-- is_ignored=true: reset_predictions() already hid the tooltip; the F16 chain
+	--   signal (injected below) handles the next prediction — do not arm the LLM
+	--   inactivity timer or trigger update_preview here.
+	expander.perform_text_replacement(
+		delete_count,
+		function() return km_utils.emit_text(text_to_type) end,
+		function()
+			-- Sync the in-memory buffer to reflect the accepted completion.
+			-- Drain paste-ops inline: take_paste_ops is called inside
+			-- perform_text_replacement before this buffer_action fires, so
+			-- the clipboard-paste counter is already accounted for.
+			if delete_count == 0 then
+				_state.buffer = _state.buffer .. text_to_type
+			else
+				local ok, start_pos = pcall(utf8.offset, _state.buffer, -delete_count)
+				if not ok or not start_pos or delete_count >= #_state.buffer then
+					start_pos = 1
+				end
+				_state.buffer = (_state.buffer:sub(1, start_pos - 1) or "") .. text_to_type
+			end
+		end,
+		true,   -- is_final
+		true,   -- is_ignored
+		"llm"
+	)
 	keylogger.log_llm_accepted(text_to_type, nil, all_preds, idx, delete_count, deleted_text)
-
-	-- Update the in-memory buffer to reflect the accepted completion.
-	if delete_count == 0 then
-		_state.buffer = _state.buffer .. text_to_type
-	else
-		local ok, start_pos = pcall(utf8.offset, _state.buffer, -delete_count)
-		if not ok or not start_pos or delete_count >= #_state.buffer then
-			start_pos = 1
-		end
-		_state.buffer = (_state.buffer:sub(1, start_pos - 1) or "") .. text_to_type
-	end
-	keylogger.set_buffer(_state.buffer)
 
 	Logger.success(LOG, "Prediction #%d applied — buffer updated.", idx)
 

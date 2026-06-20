@@ -200,6 +200,41 @@ package.loaded["lib.text_utils"] = {
 }
 
 
+--- ============================================================
+-- ===== 1.10) expander stub ====================================
+-- llm_bridge now routes apply_prediction through the single
+-- injection choke point expander.perform_text_replacement.
+-- This stub mirrors that contract so the tests stay headless.
+--- ============================================================
+
+-- The state reference is captured by expander_stub.init() and shared
+-- with perform_text_replacement; reset per-test by calling init(state).
+local _exp_state = nil
+package.loaded["modules.keymap.expander"] = {
+	init = function(s, ...) _exp_state = s end,
+	perform_text_replacement = function(deletes, emit_fn, buf_fn, is_final, is_ignored, source_type, source_variant)
+		-- Mirror the real expander contract for the counters under test.
+		if _exp_state and hs and hs.timer then
+			_exp_state.last_synthetic_arm_time = hs.timer.secondsSinceEpoch()
+		end
+		if _exp_state then
+			_exp_state.expected_synthetic_deletes = (_exp_state.expected_synthetic_deletes or 0) + deletes
+		end
+		local _, _, emitted = pcall(emit_fn)
+		emitted = emitted or ""
+		if _exp_state then
+			_exp_state.expected_synthetic_chars = (_exp_state.expected_synthetic_chars or "") .. emitted
+		end
+		local km = package.loaded["modules.keymap.utils"]
+		local paste_ops = km and type(km.take_paste_ops) == "function" and km.take_paste_ops() or 0
+		if paste_ops > 0 and _exp_state then
+			_exp_state.expected_synthetic_pastes = (_exp_state.expected_synthetic_pastes or 0) + paste_ops
+		end
+		if type(buf_fn) == "function" then pcall(buf_fn) end
+	end,
+}
+
+
 
 
 -- ================================================
@@ -263,6 +298,9 @@ helpers.describe("apply_prediction: guard-arm ordering invariant", function()
 		local initial_deletes = state.expected_synthetic_deletes
 
 		fresh_bridge.init(state, { preview_star_enabled = true, preview_autocorrect_enabled = true })
+		-- Sync the expander stub to the same state object so perform_text_replacement
+		-- updates the counters that this test asserts.
+		package.loaded["modules.keymap.expander"].init(state)
 
 		-- Capture the arm time and counter value immediately before the call
 		-- so the assertion window is as tight as possible.

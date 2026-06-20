@@ -24,6 +24,35 @@ local helpers = require("tests.helpers")
 package.loaded["lib.logger"] = nil
 helpers.load_with_stubs("lib.logger")
 
+-- Expander stub: llm_bridge now routes apply_prediction through
+-- expander.perform_text_replacement. The stub mirrors the contract so
+-- the paste-ops drain tests stay headless. The init() call captures the
+-- state reference; perform_text_replacement updates it exactly as the
+-- real expander does.
+local _exp_state = nil
+package.loaded["modules.keymap.expander"] = {
+	init = function(s, ...) _exp_state = s end,
+	perform_text_replacement = function(deletes, emit_fn, buf_fn, is_final, is_ignored, source_type, source_variant)
+		if _exp_state and hs and hs.timer then
+			_exp_state.last_synthetic_arm_time = hs.timer.secondsSinceEpoch()
+		end
+		if _exp_state then
+			_exp_state.expected_synthetic_deletes = (_exp_state.expected_synthetic_deletes or 0) + deletes
+		end
+		local _, _, emitted = pcall(emit_fn)
+		emitted = emitted or ""
+		if _exp_state then
+			_exp_state.expected_synthetic_chars = (_exp_state.expected_synthetic_chars or "") .. emitted
+		end
+		local km = package.loaded["modules.keymap.utils"]
+		local paste_ops = km and type(km.take_paste_ops) == "function" and km.take_paste_ops() or 0
+		if paste_ops > 0 and _exp_state then
+			_exp_state.expected_synthetic_pastes = (_exp_state.expected_synthetic_pastes or 0) + paste_ops
+		end
+		if type(buf_fn) == "function" then pcall(buf_fn) end
+	end,
+}
+
 local helpers2 = helpers  -- alias for clarity inside closures
 
 -- We test the logic in isolation by directly exercising the production code
@@ -145,6 +174,7 @@ helpers.describe("apply_prediction — paste-ops drain (keymap-bridge-001)", fun
 
 		local state = make_state("hello world, this is a test buffer prefix")
 		bridge.init(state, {})
+		package.loaded["modules.keymap.expander"].init(state)
 
 		-- Before fix: expected_synthetic_pastes stayed 0 even after a paste-path acceptance
 		-- After fix:  expected_synthetic_pastes == 1 and take_paste_ops() returns 0
@@ -204,6 +234,7 @@ helpers.describe("apply_prediction — paste-ops drain (keymap-bridge-001)", fun
 
 		local state = make_state("prefix")
 		bridge.init(state, {})
+		package.loaded["modules.keymap.expander"].init(state)
 		bridge.apply_prediction(1)
 
 		helpers.assert_eq(state.expected_synthetic_pastes, 0,

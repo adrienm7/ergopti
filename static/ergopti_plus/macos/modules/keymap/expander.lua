@@ -107,7 +107,10 @@ function M.perform_text_replacement(deletes, emit_action, buffer_action, is_fina
 		_state.expected_synthetic_pastes = (_state.expected_synthetic_pastes or 0) + paste_ops
 	end
 
-	if keylogger and type(keylogger.notify_synthetic) == "function" then
+	-- Guard: skip notify when nothing was actually injected (deletes=0 and emitted_str="")
+	-- to avoid a no-op synth_queue entry that would absorb the first real keystroke typed
+	-- immediately after a cancelled or empty expansion.
+	if (deletes > 0 or emitted_str ~= "") and keylogger and type(keylogger.notify_synthetic) == "function" then
 		keylogger.notify_synthetic(emitted_str, source_type or "hotstring", deletes, source_variant)
 	end
 
