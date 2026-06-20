@@ -292,7 +292,7 @@ _Updater_BuildChangelogGui(Json, Channel) {
 	ShowBody := (md) => (
 		UseWV && IsSet(WVC)
 			? WVC.CoreWebView2.NavigateToString(MakeHtml(md))
-			: (IsSet(RightPaneEdit) ? (RightPaneEdit.Value := md) : 0)
+			: (IsSet(RightPaneEdit) ? (RightPaneEdit.Value := _Updater_MarkdownToPlain(md)) : 0)
 	)
 
 	OpenSelected := (*) => (
@@ -458,6 +458,37 @@ _Updater_MakeMarkdownHtml(md) {
 		. "document.body.innerHTML=mdToHtml(md);"
 		. "</script></body></html>"
 	)
+}
+
+; Converts the GitHub-release Markdown subset to clean, readable plain text for the
+; native (no-WebView2) fallback. Mirrors the subset rendered by
+; _Updater_MakeMarkdownHtml so the low-RAM view stays faithful: headings, bold,
+; italic, inline code, links, lists, blockquotes and horizontal rules. It cannot
+; reproduce fonts or colours, but it strips the raw markup so the notes read as
+; prose instead of "## ... **...**".
+_Updater_MarkdownToPlain(md) {
+	if (md = "")
+		return md
+	s := md
+	; Drop fenced-code fences (keep their contents as plain lines).
+	s := RegExReplace(s, "m)^\s*``````.*$", "")
+	; ATX headings -> bare text.
+	s := RegExReplace(s, "m)^#{1,6}\s+", "")
+	; Horizontal rules -> a thin separator line.
+	s := RegExReplace(s, "m)^\s*(?:---+|\*\*\*+)\s*$", "----------------------------------------")
+	; List markers -> a simple bullet; blockquote markers -> an indent bar.
+	s := RegExReplace(s, "m)^(\s*)[-*+]\s+", "$1- ")
+	s := RegExReplace(s, "m)^>\s?", "  | ")
+	; Inline: images/links first, then code, then bold before italic.
+	s := RegExReplace(s, "!\[([^\]]*)\]\(([^)]+)\)", "$1")
+	s := RegExReplace(s, "\[([^\]]+)\]\(([^)]+)\)", "$1 ($2)")
+	s := RegExReplace(s, '``([^``]+)``', "$1")
+	s := RegExReplace(s, "\*\*(.+?)\*\*", "$1")
+	s := RegExReplace(s, "__(.+?)__", "$1")
+	s := RegExReplace(s, "\*(.+?)\*", "$1")
+	; Underscore italics only when flanked by non-word chars (spare snake_case).
+	s := RegExReplace(s, "(?<!\w)_(.+?)_(?!\w)", "$1")
+	return s
 }
 
 

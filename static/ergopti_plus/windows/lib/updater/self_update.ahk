@@ -294,7 +294,7 @@ Updater_ShowUpdatePrompt(Release) {
 	if (!UseWV or !IsSet(WVC)) {
 		; Fallback: replace the placeholder with a plain read-only Edit.
 		BodyPane.GetPos(&bx, &by, &bw, &bh)
-		BodyText := (Release.Body != "") ? Release.Body : t("updater.changelog_empty")
+		BodyText := (Release.Body != "") ? _Updater_MarkdownToPlain(Release.Body) : t("updater.changelog_empty")
 		G.Add("Edit", "x" . bx . " y" . by . " w" . bw . " h" . bh
 			. " ReadOnly +Multi -Wrap +VScroll", BodyText)
 	}
