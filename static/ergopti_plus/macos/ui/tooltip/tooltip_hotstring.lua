@@ -9,7 +9,7 @@
 --- 1. Lightweight Rendering: Designed for simple text without AI diffs.
 --- 2. Failsafe Watchers: Dismisses on any standard user interaction.
 --- 3. Stacked dequeue: per-row expiry logic mirrors AHK lib/tooltip.ahk and
----    shared/tooltip/dequeue.js (see SPEC.md § 7.1).
+---    _shared/tooltip/dequeue.js (see SPEC.md § 7.1).
 --- ==============================================================================
 
 local M = {}

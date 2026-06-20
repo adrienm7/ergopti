@@ -4,7 +4,7 @@
 --- MODULE: KeyboardHook Adapter (Linux)
 --- DESCRIPTION:
 --- Linux implementation of the KeyboardHook port contract defined in
---- static/ergopti_plus/shared/ports/KeyboardHook.spec.js. Wraps the libinput
+--- static/ergopti_plus/_shared/ports/KeyboardHook.spec.js. Wraps the libinput
 --- event device interface (via a background read loop on /dev/input/eventN)
 --- to intercept or passively observe keyboard events without coupling domain
 --- modules to any X11, Wayland, or kernel API.

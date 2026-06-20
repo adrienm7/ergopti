@@ -5,7 +5,7 @@
 ; DESCRIPTION:
 ; Diagnostic harness that runs the AHK LLM_Parser_ProcessPrediction against the
 ; cross-driver golden corpus generated from the shared Lua parser
-; (shared/tests/corpus/llm/process_prediction_vectors.json) and reports, per
+; (_shared/tests/corpus/llm/process_prediction_vectors.json) and reports, per
 ; vector, whether the AHK physical output matches the oracle. The parity contract
 ; is the physical fields only: deletes / to_type / nw / has_corrections /
 ; disable_bold (chunks are display-only and computed differently per driver).
@@ -43,7 +43,7 @@ _BoolStr(V) => (V ? "true" : "false")
 
 try FileDelete(_OUT)
 
-CorpusPath := A_ScriptDir . "\..\..\shared\tests\corpus\llm\process_prediction_vectors.json"
+CorpusPath := A_ScriptDir . "\..\..\_shared\tests\corpus\llm\process_prediction_vectors.json"
 if !FileExist(CorpusPath) {
 	_Emit("FATAL: corpus not found at " . CorpusPath)
 	ExitApp(2)

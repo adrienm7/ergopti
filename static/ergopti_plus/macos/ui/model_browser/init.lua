@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- Floating webview that renders the curated LLM model catalogue as a sortable,
 --- filterable table and lets the user pick a model. Replaces the old hs.chooser
---- list with the shared/ui/model_browser/ HTML/CSS/JS frontend, so the macOS
+--- list with the _shared/ui/model_browser/ HTML/CSS/JS frontend, so the macOS
 --- (Hammerspoon) and Windows (AHK + WebView2) drivers share one model browser
 --- instead of each maintaining its own (hs.chooser vs AHK ListView).
 ---
@@ -40,7 +40,7 @@ local _queued    = {}
 local _on_select = nil   -- callback(name) invoked when the user picks a model
 local _ctx       = nil   -- last-opened context, kept for catalogue refresh
 
--- The shared UI assets live in …/ergopti_plus/shared/ui/model_browser/. Resolved
+-- The shared UI assets live in …/ergopti_plus/_shared/ui/model_browser/. Resolved
 -- through the single shared-tree resolver (Paths.shared); the trailing slash is
 -- preserved because ui_builder concatenates asset filenames directly onto this
 -- directory.

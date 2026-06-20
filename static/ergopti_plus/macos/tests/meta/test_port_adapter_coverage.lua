@@ -5,16 +5,16 @@
 --- DESCRIPTION:
 --- Verifies three structural invariants of the hexagonal architecture:
 ---
---- 1. ADAPTER PRESENCE — Every port spec in shared/ports/*.spec.js has a
+--- 1. ADAPTER PRESENCE — Every port spec in _shared/ports/*.spec.js has a
 ---    matching adapter file in static/ergopti_plus/windows/adapters/ and in
 ---    static/ergopti_plus/macos/adapters/. A missing adapter means a port
 ---    contract exists on paper but is not honoured by a driver.
 ---
---- 2. DOMAIN TEST COVERAGE — Every domain spec in shared/domain/*.spec.js
+--- 2. DOMAIN TEST COVERAGE — Every domain spec in _shared/domain/*.spec.js
 ---    has at least one corresponding test file in at least one driver's test
 ---    suite. An untested domain spec is a dead letter.
 ---
---- 3. SHARED PURITY — No file under shared/ directly calls OS-level APIs
+--- 3. SHARED PURITY — No file under _shared/ directly calls OS-level APIs
 ---    (io.open, hs., SendInput, SendEvent, TrayTip). Shared code must be
 ---    pure logic; OS access must go through port adapters.
 --- ==============================================================================
@@ -25,8 +25,8 @@ local DRIVER_ROOT = helpers.driver_root()
 -- Climb from macos/ root up to repo root (static/ergopti_plus/macos/ -> repo root)
 local REPO_ROOT = DRIVER_ROOT:gsub("[/\\]static[/\\]ergopti_plus[/\\]macos[/\\]?$", "")
 -- Single source of truth for the shared tree in this meta test; the ports/
--- domain dirs below derive from it so a shared/ -> _shared/ rename is one edit.
-local SHARED_DIR = REPO_ROOT .. "/static/ergopti_plus/shared"
+-- domain dirs below derive from it so a future rename of the _shared/ tree is one edit.
+local SHARED_DIR = REPO_ROOT .. "/static/ergopti_plus/_shared"
 
 -- Additional suspend/pause coverage note for meta
 -- All adapters must be usable under pause; no OS calls when paused.
@@ -148,7 +148,7 @@ helpers.describe("meta: port-adapter coverage", function()
 	end
 
 	helpers.it(string.format("every port spec has an AHK adapter (%d specs)", spec_count), function()
-		helpers.assert_true(spec_count > 0, "no *.spec.js files found in shared/ports — check REPO_ROOT")
+		helpers.assert_true(spec_count > 0, "no *.spec.js files found in _shared/ports — check REPO_ROOT")
 		helpers.assert_true(missing_ahk == 0,
 			string.format("%d AHK adapter(s) missing for port specs", missing_ahk))
 	end)
@@ -221,7 +221,7 @@ helpers.describe("meta: domain spec test coverage", function()
 	end
 
 	helpers.it(string.format("every domain spec has a driver test (%d specs)", spec_count), function()
-		helpers.assert_true(spec_count > 0, "no *.spec.js files found in shared/domain — check REPO_ROOT")
+		helpers.assert_true(spec_count > 0, "no *.spec.js files found in _shared/domain — check REPO_ROOT")
 		helpers.assert_true(uncovered == 0,
 			string.format("%d domain spec(s) have no driver test", uncovered))
 	end)
@@ -243,7 +243,7 @@ end)
 local LUA_HS_BASELINE       = 950  -- hs.* calls in macos/modules/ and macos/lib/ (bumped: hs.timer.secondsSinceEpoch() added to vscode_bridge for AX-call TTL cache +1, and ke_lifecycle.kill_async for microsecond-precision script path +1)
 local LUA_IO_OS_BASELINE    = 70   -- io.open / os.execute calls in macos/modules/ and macos/lib/ (bumped after errors-sink + diagnostic + menu + sg feature work)
 
-helpers.describe("meta: shared/ code purity", function()
+helpers.describe("meta: _shared/ code purity", function()
 	local shared_dir = SHARED_DIR
 
 	-- Patterns that indicate direct OS-API usage forbidden in shared code
@@ -290,7 +290,7 @@ helpers.describe("meta: shared/ code purity", function()
 				for _, entry in ipairs(forbidden_js_patterns) do
 					if line:find(entry.pat) then
 						js_violations = js_violations + 1
-						print(string.format("  WARN: %s in shared/ file: %s:%d",
+						print(string.format("  WARN: %s in _shared/ file: %s:%d",
 							entry.desc, rel, line_num))
 					end
 				end
@@ -304,11 +304,11 @@ helpers.describe("meta: shared/ code purity", function()
 		::continue::
 	end
 
-	helpers.it(string.format("no direct OS API calls in shared/ JS source files (%d scanned)", scanned), function()
+	helpers.it(string.format("no direct OS API calls in _shared/ JS source files (%d scanned)", scanned), function()
 		helpers.assert_true(scanned >= 0,
 			"shared JS purity scanner failed to initialise")
 		helpers.assert_true(js_violations == 0,
-			string.format("%d OS-API call(s) found in shared/ JS — shared code must be pure logic", js_violations))
+			string.format("%d OS-API call(s) found in _shared/ JS — shared code must be pure logic", js_violations))
 	end)
 end)
 

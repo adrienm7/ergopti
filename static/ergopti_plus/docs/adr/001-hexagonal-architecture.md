@@ -33,13 +33,13 @@ surfaces differ between drivers.
 Adopt a **hexagonal (ports-and-adapters) architecture** across all drivers.
 
 - **Ports** are formal JavaScript interface contracts stored in
-  `static/ergopti_plus/shared/ports/`. Each port `.spec.js` file documents
+  `static/ergopti_plus/_shared/ports/`. Each port `.spec.js` file documents
   the exact method signatures, parameter types, and return values that
   every adapter must implement.
 - **Adapters** are driver-specific implementations of those contracts. The
   macOS driver provides Hammerspoon adapters; the Linux driver provides
   LuaJIT/POSIX adapters; the Windows driver provides AHK COM adapters.
-- **Domain modules** in `static/ergopti_plus/shared/domain/` depend only on
+- **Domain modules** in `static/ergopti_plus/_shared/domain/` depend only on
   port interfaces, never on concrete OS APIs.
 
 The twenty port contracts are: `FileSystem`, `HttpClient`, `KeyboardHook`,
@@ -78,8 +78,8 @@ The twenty port contracts are: `FileSystem`, `HttpClient`, `KeyboardHook`,
 
 ## Evidence in the codebase
 
-- Port contracts: `static/ergopti_plus/shared/ports/*.spec.js` (20 files: `FileSystem.spec.js`, `HttpClient.spec.js`, `KeyboardHook.spec.js`, `Notifier.spec.js`, `TextSender.spec.js`, `TimerScheduler.spec.js`, `TooltipRenderer.spec.js`, `TrayMenu.spec.js`, `SecureFieldDetector.spec.js`, `Clipboard.spec.js`, `Storage.spec.js`, `ProcessLifecycle.spec.js`, `KeyState.spec.js`, `MouseControl.spec.js`, `NetworkInfo.spec.js`, `WindowInfo.spec.js`, `WindowManager.spec.js`, `AppLauncher.spec.js`, `Crypto.spec.js`, `GraphicsRenderer.spec.js`)
-- Port spec documentation: `static/ergopti_plus/shared/ports/SPEC.md`
+- Port contracts: `static/ergopti_plus/_shared/ports/*.spec.js` (20 files: `FileSystem.spec.js`, `HttpClient.spec.js`, `KeyboardHook.spec.js`, `Notifier.spec.js`, `TextSender.spec.js`, `TimerScheduler.spec.js`, `TooltipRenderer.spec.js`, `TrayMenu.spec.js`, `SecureFieldDetector.spec.js`, `Clipboard.spec.js`, `Storage.spec.js`, `ProcessLifecycle.spec.js`, `KeyState.spec.js`, `MouseControl.spec.js`, `NetworkInfo.spec.js`, `WindowInfo.spec.js`, `WindowManager.spec.js`, `AppLauncher.spec.js`, `Crypto.spec.js`, `GraphicsRenderer.spec.js`)
+- Port spec documentation: `static/ergopti_plus/_shared/ports/SPEC.md`
 - Linux adapter implementations: `static/ergopti_plus/linux/adapters/`
 - Compliance enforcement script: `tools/test/test-port-compliance.cjs` (`npm run test:port-compliance`)
-- Domain module specs: `static/ergopti_plus/shared/domain/SPEC.md`
+- Domain module specs: `static/ergopti_plus/_shared/domain/SPEC.md`

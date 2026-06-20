@@ -10,7 +10,7 @@
 --- latency must be a named, registry-sourced constant so both drivers and the
 --- test suite share one tunable value (copilot-instructions §5.1 / §5.2).
 ---
---- Fix: add layout_tis_settle_ms to shared/timings/constants.toml [debounce] and
+--- Fix: add layout_tis_settle_ms to _shared/timings/constants.toml [debounce] and
 --- read it via Timings.sec in karabiner/init.lua.
 --- ==============================================================================
 
@@ -35,6 +35,6 @@ helpers.describe("karabiner: layout-settle delay is a registry constant, not a m
 		local fh = io.open(path, "r"); helpers.assert_true(fh ~= nil, "cannot open constants.toml")
 		local toml = fh:read("*a"); fh:close()
 		helpers.assert_true(toml:find("layout_tis_settle_ms", 1, true) ~= nil,
-			"shared/timings/constants.toml must define layout_tis_settle_ms")
+			"_shared/timings/constants.toml must define layout_tis_settle_ms")
 	end)
 end)

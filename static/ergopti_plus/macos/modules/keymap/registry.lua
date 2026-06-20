@@ -51,7 +51,7 @@ end
 -- outrank "ext." packages, which outrank bundled common ones. The cascade above
 -- these defaults (individual > section > file) is resolved by the loader before
 -- M.add; these are the final fallback.
--- SINGLE SOURCE OF TRUTH: shared/hotstrings/priority.json. These literals are
+-- SINGLE SOURCE OF TRUTH: _shared/hotstrings/priority.json. These literals are
 -- held identical to it (and to the AHK HSE_PRIORITY_* in hotstring_engine_main.ahk)
 -- by the gate tools/test/test-priority-parity.cjs — change the JSON and all three.
 local PRIORITY_COMMON   = 10

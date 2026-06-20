@@ -4,7 +4,7 @@
 ; MODULE: MouseControl Adapter (AutoHotkey)
 ; DESCRIPTION:
 ; AHK v2 implementation of the MouseControl port contract defined in
-; static/ergopti_plus/shared/ports/MouseControl.spec.js. Wraps AHK v2's
+; static/ergopti_plus/_shared/ports/MouseControl.spec.js. Wraps AHK v2's
 ; MouseMove, MouseGetPos, MonitorGetCount, and MonitorGet built-ins behind
 ; four canonical functions so domain modules can read and write the cursor
 ; position and query monitor geometry without coupling to AHK-specific APIs.

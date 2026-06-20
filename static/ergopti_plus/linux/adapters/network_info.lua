@@ -4,7 +4,7 @@
 --- MODULE: NetworkInfo Adapter (Linux)
 --- DESCRIPTION:
 --- Linux implementation of the NetworkInfo port contract defined in
---- static/ergopti_plus/shared/ports/NetworkInfo.spec.js. Wraps iwgetid/nmcli,
+--- static/ergopti_plus/_shared/ports/NetworkInfo.spec.js. Wraps iwgetid/nmcli,
 --- ping, and ip/ifconfig to expose Wi-Fi SSID hash, signal strength, internet
 --- reachability, and VPN detection without coupling domain modules to
 --- platform-specific APIs.

@@ -20,8 +20,8 @@ Windows port of the LLM prediction subsystem. `llm_bridge.ahk` maintains a rolli
 - `ProfileSelector.js` — `profiles.ahk` manages profile selection following this contract
 
 LLM output diff-coloring (`process_prediction`) lives in the shared Lua canon
-`shared/lua/llm/parser.lua`; the AHK port is `modules/llm/parser.ahk`, pinned to
-the same `shared/tests/corpus/llm/process_prediction_vectors.json` golden corpus.
+`_shared/lua/llm/parser.lua`; the AHK port is `modules/llm/parser.ahk`, pinned to
+the same `_shared/tests/corpus/llm/process_prediction_vectors.json` golden corpus.
 
 ## Public API
 

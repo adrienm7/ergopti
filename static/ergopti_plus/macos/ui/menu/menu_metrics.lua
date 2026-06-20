@@ -9,7 +9,7 @@
 ---
 --- FEATURES & RATIONALE:
 --- 1. Manifest-Driven: Structure (order, separators, sections) is read from
----    ``shared/menu_manifest.json`` via ``lib/manifest_menu``.  Dynamic blocks
+---    ``_shared/menu_manifest.json`` via ``lib/manifest_menu``.  Dynamic blocks
 ---    (shortcut pickers, app exclusion, WPM controls, encryption) are supplied
 ---    as handlers so state-bearing logic stays in Lua.
 --- 2. Orchestration: Bridges the isolated UI components (menubar, widget) and

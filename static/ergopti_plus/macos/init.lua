@@ -11,7 +11,7 @@
 --- 2. File Discovery: Dynamically loads private and public configuration files.
 --- ==============================================================================
 
--- Inject the shared/lua root into package.path so that lib/ shims for
+-- Inject the _shared/lua root into package.path so that lib/ shims for
 -- toml_codec, toml_reader, and toml_writer can resolve their shared modules.
 -- This must run before any require() that pulls in those libs.
 do
@@ -20,9 +20,9 @@ do
 	local _abs = _src:match("^[/\\]") and _src or (hs.fs and hs.fs.currentDir and hs.fs.currentDir() .. "/" .. _src or _src)
 	-- Strip "init.lua" to get the HS driver root
 	local _hs_root = _abs:match("^(.*)[/\\][^/\\]+$") or _abs
-	-- shared/ lives one level up from the HS driver root (in ergopti_plus/)
+	-- _shared/ lives one level up from the HS driver root (in ergopti_plus/)
 	local _ergopti_plus = _hs_root:match("^(.*)[/\\][^/\\]+$") or _hs_root
-	local _shared       = _ergopti_plus .. "/shared/lua"
+	local _shared       = _ergopti_plus .. "/_shared/lua"
 	if not package.path:find(_shared, 1, true) then
 		package.path = _shared .. "/?.lua;" .. _shared .. "/?/init.lua;" .. package.path
 	end
@@ -198,7 +198,7 @@ Boot.mark("Path: runtime error capture installed")
 -- load ~10x faster. Wired here — before any keymap.load_toml — so the first boot
 -- after a file change re-parses and refreshes the snapshot, every later boot reads
 -- it, and the same-boot delay-reading pass also hits the snapshot. Kept in an
--- adapter so shared/ stays filesystem-free (the reader sees only a load/store hook).
+-- adapter so _shared/ stays filesystem-free (the reader sees only a load/store hook).
 do
 	local ok_cache, toml_cache = pcall(require, "adapters.toml_cache")
 	if ok_cache and type(toml_cache) == "table" and type(toml_cache.init) == "function" then
@@ -288,7 +288,7 @@ local boot_llm_enabled = hs.settings.get("llm.enabled") ~= false
 -- seconds instead of a 45-90 s cold reload. Killing it unconditionally (the old
 -- behaviour) is exactly what made every boot/reload pay a cold start.
 --
--- The MLX port is the single source of truth from api_mlx (shared/llm/mlx_server.json).
+-- The MLX port is the single source of truth from api_mlx (_shared/llm/mlx_server.json).
 -- Decision is spare-all-or-nuke-all: under SO_REUSEPORT the listening PID is
 -- unreliable to single out (bash wrapper vs Python child — see api_mlx.lua), so we
 -- never pick individual PIDs. Synchronous on purpose: the port state must settle
@@ -296,7 +296,7 @@ local boot_llm_enabled = hs.settings.get("llm.enabled") ~= false
 if boot_llm_enabled then
 do
 	local ok_mlx, ApiMlx = pcall(require, "modules.llm.api_mlx")
-	-- The MLX port is owned by api_mlx (shared/llm/mlx_server.json = 3460). Prefer
+	-- The MLX port is owned by api_mlx (_shared/llm/mlx_server.json = 3460). Prefer
 	-- the resolved port, then api_mlx's exposed canonical default; the trailing
 	-- literal is only ever reached if api_mlx itself failed to load, and it is the
 	-- canonical 3460 — NEVER mlx_lm.server's 8080 default, which is explicitly
@@ -397,7 +397,7 @@ end
 Boot.mark("LLM backend bootstrap")
 
 local configured_hotstrings_dir = menu_paths.get("HotstringsDirPath")
-local bundled_hotstrings_dir    = base_dir .. "../shared/hotstrings/"
+local bundled_hotstrings_dir    = base_dir .. "../_shared/hotstrings/"
 local hotstrings_dir            = configured_hotstrings_dir
 local config_file               = menu_paths.get("ConfigTomlPath")
 
@@ -659,7 +659,7 @@ Boot.mark("TOML discovery + ordering")
 do
 	local personal_path = menu_paths.get("PersonalTomlPath")
 	-- Personal source-default priority, read from the shared single source
-	-- (shared/hotstrings/priority.json, copied into the bundle) so the editor
+	-- (_shared/hotstrings/priority.json, copied into the bundle) so the editor
 	-- shows it as the priority field placeholder without hardcoding it. Falls back
 	-- to the engine value (kept identical to that file by the parity gate).
 	local personal_default_priority = keymap.source_priority and keymap.source_priority("personal") or nil

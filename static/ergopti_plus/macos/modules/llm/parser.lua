@@ -4,7 +4,7 @@
 --- MODULE: LLM Output Parser (Hammerspoon shim)
 --- DESCRIPTION:
 --- Hammerspoon-local re-export of the shared, platform-neutral LLM output parser
---- (shared/lua/llm/parser.lua). The shared module is PURE; the only OS-specific
+--- (_shared/lua/llm/parser.lua). The shared module is PURE; the only OS-specific
 --- inputs it needs are the min/max word limits, which this shim resolves from the
 --- Hammerspoon settings store (falling back to the llm DEFAULT_STATE) and threads
 --- into process_prediction's opts. Every other function (strip_thinking,

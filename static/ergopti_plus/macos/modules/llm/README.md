@@ -20,9 +20,9 @@ Coordinates communication with local (Ollama, MLX) and remote LLM backends. Mana
 - `ProfileSelector.js` — `profiles.lua` implements profile management
 
 LLM output diff-coloring (`process_prediction`) lives in the shared Lua canon
-`shared/lua/llm/parser.lua`; `modules/llm/parser.lua` is a thin shim over it
+`_shared/lua/llm/parser.lua`; `modules/llm/parser.lua` is a thin shim over it
 (AHK port: `windows/modules/llm/parser.ahk`), pinned by
-`shared/tests/corpus/llm/process_prediction_vectors.json`.
+`_shared/tests/corpus/llm/process_prediction_vectors.json`.
 
 ## Public API
 

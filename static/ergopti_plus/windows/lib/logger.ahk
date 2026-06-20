@@ -567,11 +567,11 @@ _LoggerFanOut(Tag, Line) {
 _LoggerLoadSubFilesToml(ScriptDir) {
     global LOGGER_SUB_FILES, LOGGER_SUB_FILES_FALLBACK, _SharedDir
     ; Prefer the canonical _SharedDir resolved at boot by ErgoptiPlus.ahk; fall back
-    ; to the corrected one-level relative path (windows/ → ergopti_plus/shared/).
+    ; to the corrected one-level relative path (windows/ → ergopti_plus/_shared/).
     if (IsSet(_SharedDir) and _SharedDir != "")
         TomlPath := _SharedDir . "\logger\sub_files.toml"
     else
-        TomlPath := ScriptDir . "..\shared\logger\sub_files.toml"
+        TomlPath := ScriptDir . "..\_shared\logger\sub_files.toml"
     if !FileExist(TomlPath) {
         LOGGER_SUB_FILES := LOGGER_SUB_FILES_FALLBACK
         return

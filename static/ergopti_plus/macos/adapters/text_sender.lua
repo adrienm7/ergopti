@@ -4,7 +4,7 @@
 --- MODULE: TextSender Adapter (Hammerspoon)
 --- DESCRIPTION:
 --- Hammerspoon implementation of the TextSender port contract defined in
---- static/ergopti_plus/shared/ports/TextSender.spec.js. Bridges domain-level text
+--- static/ergopti_plus/_shared/ports/TextSender.spec.js. Bridges domain-level text
 --- insertion requests to hs.eventtap.keyStroke, the Clipboard port adapter, and
 --- hs.eventtap.keyStrokes without coupling domain modules to any hs API.
 ---

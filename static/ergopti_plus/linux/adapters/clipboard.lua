@@ -4,7 +4,7 @@
 --- MODULE: Clipboard Adapter (Linux)
 --- DESCRIPTION:
 --- Linux implementation of the Clipboard port contract defined in
---- static/ergopti_plus/shared/ports/Clipboard.spec.js. Wraps xclip/xsel/wl-paste
+--- static/ergopti_plus/_shared/ports/Clipboard.spec.js. Wraps xclip/xsel/wl-paste
 --- to provide read/write/save/restore operations without coupling domain
 --- modules to platform-specific clipboard APIs.
 ---

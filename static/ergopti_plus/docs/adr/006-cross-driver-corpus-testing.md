@@ -26,7 +26,7 @@ cross-driver divergence history, making them the natural starting point.
 ## Decision
 
 Maintain **shared test-vector files** under
-`static/ergopti_plus/shared/tests/corpus/` in JSON format. Each subsystem has its
+`static/ergopti_plus/_shared/tests/corpus/` in JSON format. Each subsystem has its
 own subdirectory containing a `vectors.json` file with a list of
 `{ input, expected }` pairs (or the richer format required by the subsystem).
 
@@ -35,9 +35,9 @@ A driver that does not pass every vector in the corpus is considered broken.
 
 Current corpus directories:
 
-- `static/ergopti_plus/shared/tests/corpus/hotstrings/vectors.json` — hotstring
+- `static/ergopti_plus/_shared/tests/corpus/hotstrings/vectors.json` — hotstring
   expansion input/output pairs.
-- `static/ergopti_plus/shared/tests/corpus/tap_hold/vectors.json` — tap-hold
+- `static/ergopti_plus/_shared/tests/corpus/tap_hold/vectors.json` — tap-hold
   timing scenarios and expected key event sequences.
 
 Hammerspoon consumption is implemented in:
@@ -80,6 +80,6 @@ Hammerspoon consumption is implemented in:
 
 ## Evidence in the codebase
 
-- Hotstring vectors: `static/ergopti_plus/shared/tests/corpus/hotstrings/vectors.json`
-- Tap-hold vectors: `static/ergopti_plus/shared/tests/corpus/tap_hold/vectors.json`
+- Hotstring vectors: `static/ergopti_plus/_shared/tests/corpus/hotstrings/vectors.json`
+- Tap-hold vectors: `static/ergopti_plus/_shared/tests/corpus/tap_hold/vectors.json`
 - HS corpus runners: `static/ergopti_plus/macos/tests/unit/meta/test_corpus_hotstrings.lua`, `test_corpus_tap_hold.lua`

@@ -7,7 +7,7 @@
 ;
 ; BUGS ENCODED:
 ; F11 — _LoggerLoadSubFilesToml used a three-level relative path
-;        (..\..\..\shared\logger\sub_files.toml) instead of one level up or
+;        (..\..\..\_shared\logger\sub_files.toml) instead of one level up or
 ;        the canonical _SharedDir global, causing the TOML file to never be
 ;        found and silently falling back to the hardcoded list.
 ; F19a — The platform filter compared P against "autohotkey" but sub_files.toml
@@ -41,7 +41,7 @@ _LSFR_ReadSource(RelPath) {
 _LSFR_F11_NoTripleDotPath() {
 	Src := _LSFR_ReadSource("lib\logger.ahk")
 	; The old broken path contained three consecutive ..\
-	HasTripleDot := InStr(Src, "..\..\..\\shared") or InStr(Src, "..\\..\\..\\ shared") or InStr(Src, "...\\..\\..\\")
+	HasTripleDot := InStr(Src, "..\..\..\\_shared") or InStr(Src, "..\\..\\..\\ shared") or InStr(Src, "...\\..\\..\\")
 	; More reliable: count occurrences of "..\" in the TomlPath assignment line
 	FoundBad := false
 	for _, Line in StrSplit(Src, "`n", "`r") {
@@ -59,9 +59,9 @@ Test("meta logger sub_files: F11 — path does not climb 3 levels", _LSFR_F11_No
 _LSFR_F11_UsesCorrectPath() {
 	Src := _LSFR_ReadSource("lib\logger.ahk")
 	HasSharedDir := InStr(Src, "_SharedDir")
-	HasOneLevelUp := InStr(Src, "..\shared\logger")
+	HasOneLevelUp := InStr(Src, "..\_shared\logger")
 	Assert(HasSharedDir or HasOneLevelUp,
-		"F11: _LoggerLoadSubFilesToml must reference _SharedDir or one-level relative path (..\shared\logger).")
+		"F11: _LoggerLoadSubFilesToml must reference _SharedDir or one-level relative path (..\_shared\logger).")
 }
 Test("meta logger sub_files: F11 — path uses _SharedDir or one-level relative", _LSFR_F11_UsesCorrectPath)
 

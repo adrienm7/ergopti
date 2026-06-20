@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Shared Hotstring Engine — Unit Tests (Linux)
 --- DESCRIPTION:
---- Validates that the shared hotstring engine at shared/lua/hotstring_engine/
+--- Validates that the shared hotstring engine at _shared/lua/hotstring_engine/
 --- is accessible from the Linux driver and that its core matching algorithm
 --- behaves correctly — providing a smoke test that the path resolution in the
 --- engine.lua thin re-export works end-to-end.
@@ -24,17 +24,17 @@ local helpers = require("tests.helpers")
 -- =========================================
 -- =========================================
 
---- Resolves the path to shared/lua/ from this test file's location.
---- @return string|nil Absolute or relative path to shared/lua/, or nil on failure.
+--- Resolves the path to _shared/lua/ from this test file's location.
+--- @return string|nil Absolute or relative path to _shared/lua/, or nil on failure.
 local function shared_lua_path()
 	local this = debug.getinfo(1, "S").source:gsub("^@", "")
-	-- Navigate: tests/unit/meta/ → tests/ → linux/ → shared/lua/
+	-- Navigate: tests/unit/meta/ → tests/ → linux/ → _shared/lua/
 	local linux_root = this:match("^(.*[/\\])tests[/\\]")
 	if not linux_root then return nil end
-	return linux_root .. "../../shared/lua"
+	return linux_root .. "../../_shared/lua"
 end
 
--- Bootstrap: inject shared/lua/ into package.path before requiring the engine.
+-- Bootstrap: inject _shared/lua/ into package.path before requiring the engine.
 local _shared = shared_lua_path()
 if _shared then
 	local entry = _shared .. "/?.lua"

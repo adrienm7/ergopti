@@ -45,11 +45,11 @@ from pathlib import Path
 ASSET_TREES: list[tuple[str, str, tuple[str, ...]]] = [
 	# Shared assets tree: locales, hotstrings TOMLs, WebView UI, LLM defaults,
 	# DB schema, actions.toml, menu_manifest.json. The AHK driver reads all of
-	# these via _SharedDir = _StaticDir + "\ergopti_plus\shared".
+	# these via _SharedDir = _StaticDir + "\ergopti_plus\_shared".
 	# prefetch.json is regenerated at runtime by the dashboards — skip it.
 	(
-		"static/ergopti_plus/shared",
-		"static/ergopti_plus/shared",
+		"static/ergopti_plus/_shared",
+		"static/ergopti_plus/_shared",
 		("prefetch.json",),
 	),
 	# Windows-driver data files (tap_hold defaults, generated config template).

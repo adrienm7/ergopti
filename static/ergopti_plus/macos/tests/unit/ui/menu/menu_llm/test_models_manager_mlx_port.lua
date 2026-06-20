@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- Locks down the bug where the bash launcher started mlx_lm.server WITHOUT a
 --- --port flag. mlx_lm.server then binds its own 8080 default, silently ignoring
---- the centralized port (shared/llm/mlx_server.json + the user override). Every
+--- the centralized port (_shared/llm/mlx_server.json + the user override). Every
 --- client (warmup, discovery, health probe, boot cleanup) reads the configured
 --- port via api_mlx.get_port(), so without --port the server and its clients
 --- disagree the moment the port is anything other than 8080 — the centralized

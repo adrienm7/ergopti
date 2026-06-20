@@ -4,7 +4,7 @@
 --- MODULE: AppLauncher Adapter (Hammerspoon)
 --- DESCRIPTION:
 --- Hammerspoon implementation of the AppLauncher port contract defined in
---- static/ergopti_plus/shared/ports/AppLauncher.spec.js. Wraps hs.application and
+--- static/ergopti_plus/_shared/ports/AppLauncher.spec.js. Wraps hs.application and
 --- hs.execute to launch applications and query process existence without
 --- coupling domain modules to hs-specific APIs.
 ---

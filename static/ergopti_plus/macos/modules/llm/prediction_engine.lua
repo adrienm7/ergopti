@@ -127,7 +127,7 @@ local _chain_trigger_timer = nil
 local chain_pending = false
 
 -- Minimum gap between consecutive backend calls — protects paid APIs from per-keystroke
--- bursts and caps energy on local backends. Sourced from shared/llm/inference.json
+-- bursts and caps energy on local backends. Sourced from _shared/llm/inference.json
 -- so the AHK twin (modules/llm/api_common.ahk) reads the same floor.
 local ApiCommon = require("modules.llm.api_common")
 local _last_request_at_s = 0

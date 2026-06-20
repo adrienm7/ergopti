@@ -89,7 +89,7 @@ function M.find_from_configdir(relative_target, max_steps)
 	-- Script-relative fallback: walk up from lib/paths.lua's directory.
 	-- This handles setups where hs.configdir = ~/.hammerspoon (a symlink to
 	-- the macos/ sub-tree) and therefore does not reach the repo root that
-	-- holds ergopti_plus/shared/.
+	-- holds ergopti_plus/_shared/.
 	if _script_dir ~= "" then
 		Logger.debug(LOG, "find_from_configdir('%s'): retrying from script dir '%s'.", relative_target, _script_dir)
 		result = M.find_upward(_script_dir, relative_target, max_steps)
@@ -110,30 +110,30 @@ end
 --- =======================================
 -- ======================================
 
--- Absolute path of the shared/ tree, resolved once and memoised. This is THE
+-- Absolute path of the _shared/ tree, resolved once and memoised. This is THE
 -- single source of truth for the shared root on macOS: a repo-layout change
--- (e.g. renaming shared/ to _shared/) only needs to be edited on this line.
+-- (e.g. a future rename of the _shared/ tree) only needs to be edited on this line.
 local _shared_root = nil
 
---- Returns the absolute path of the shared/ tree (memoised). Resolution walks up
+--- Returns the absolute path of the _shared/ tree (memoised). Resolution walks up
 --- from hs.configdir and from this module's own directory looking for the bare
---- ``shared`` directory name — deliberately NOT the full ``static/ergopti_plus/shared``
+--- ``shared`` directory name — deliberately NOT the full ``static/ergopti_plus/_shared``
 --- path — because the packaged .app mirrors it at a different prefix
---- (``Contents/Resources/static/drivers/shared``) than the dev checkout
---- (``static/ergopti_plus/shared``). Matching the bare dir name resolves both, plus
+--- (``Contents/Resources/static/drivers/_shared``) than the dev checkout
+--- (``static/ergopti_plus/_shared``). Matching the bare dir name resolves both, plus
 --- ~/.hammerspoon symlink setups, with one resolver. Returns nil only when the
 --- shared tree is genuinely unreachable.
 --- @return string|nil
 function M.shared_root()
 	if _shared_root then return _shared_root end
-	_shared_root = M.find_from_configdir("shared")
+	_shared_root = M.find_from_configdir("_shared")
 	return _shared_root
 end
 
---- Resolves a path inside the shared/ tree. Every shared resource MUST go
---- through this helper rather than hand-rolling a relative ``../shared/...``
+--- Resolves a path inside the _shared/ tree. Every shared resource MUST go
+--- through this helper rather than hand-rolling a relative ``../_shared/...``
 --- path, so the shared root lives in exactly one place (M.shared_root).
---- @param rel string|nil Path relative to shared/, e.g. ``"llm/models.json"``. Nil → the root dir.
+--- @param rel string|nil Path relative to _shared/, e.g. ``"llm/models.json"``. Nil → the root dir.
 --- @return string|nil Absolute path, or nil when the shared tree is unreachable.
 function M.shared(rel)
 	local root = M.shared_root()
@@ -144,7 +144,7 @@ function M.shared(rel)
 	return root
 end
 
---- Resolves a file inside ``shared/llm/``. Thin wrapper over M.shared kept for
+--- Resolves a file inside ``_shared/llm/``. Thin wrapper over M.shared kept for
 --- call-site readability.
 --- @param filename string|nil File name (e.g. ``"models.json"``). Nil → directory path.
 --- @return string|nil Absolute path, or nil when the shared tree is unreachable.

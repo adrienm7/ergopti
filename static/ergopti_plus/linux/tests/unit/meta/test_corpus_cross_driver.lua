@@ -4,7 +4,7 @@
 --- MODULE: Cross-Driver Corpus Consumer (Linux)
 --- DESCRIPTION:
 --- Consumes the shared cross-driver test corpus vectors from
---- shared/tests/corpus/ to verify ADR-006 compliance: every driver MUST
+--- _shared/tests/corpus/ to verify ADR-006 compliance: every driver MUST
 --- consume every cross-driver corpus. Vectors that cannot run on Linux are
 --- explicitly SKIP-marked with a documented reason.
 ---
@@ -31,7 +31,7 @@ local assert_true  = helpers.assert_true
 local assert_eq    = helpers.assert_eq
 
 local driver_root = helpers.driver_root()
-local shared_root = driver_root .. "/../shared"
+local shared_root = driver_root .. "/../_shared"
 local corpus_root = shared_root .. "/tests/corpus"
 
 
@@ -54,7 +54,7 @@ local function load_json_corpus(path)
 	if not f then return nil, "cannot open: " .. path end
 	local raw = f:read("*a")
 	f:close()
-	-- Use shared/lua/json.lua if available (bundled in the repo).
+	-- Use _shared/lua/json.lua if available (bundled in the repo).
 	local ok, json_mod = pcall(require, "json")
 	if ok and json_mod and json_mod.decode then
 		local decoded, err = json_mod.decode(raw)
@@ -211,7 +211,7 @@ describe("Corpus: prompt_builder/vectors.json", function()
 	end)
 
 	it("SKIP — PromptBuilder not wired on Linux (depends on LLM engine)", function()
-		-- shared/lua/llm/prompt_builder.lua exists but is not loaded by the Linux
+		-- _shared/lua/llm/prompt_builder.lua exists but is not loaded by the Linux
 		-- daemon (no LLM engine to call it). When the LLM port lands, update this
 		-- to call the real PromptBuilder and assert output against the vectors.
 		assert_true(true, "skip acknowledged — PromptBuilder port is a roadmap item")
@@ -287,7 +287,7 @@ describe("Corpus: toml/fuzz_corpus.json", function()
 	-- corpus. The codec should not crash on any of the fuzz inputs.
 	local toml_ok, toml_mod = pcall(require, "toml_codec.codec")
 
-	it("shared TOML codec loads (shared/lua/toml_codec/codec.lua)", function()
+	it("shared TOML codec loads (_shared/lua/toml_codec/codec.lua)", function()
 		assert_true(toml_ok, "toml_codec.codec must be requireable: " .. tostring(toml_mod))
 	end)
 

@@ -73,7 +73,7 @@ _MetaRunAdapterPresenceTests() {
 	; #Include'd file is executing — strip everything from /static/... onward.
 	RepoRoot := RegExReplace(RepoRoot, "/static/ergopti_plus/windows/tests(/meta)?$", "")
 
-	SharedPorts := RepoRoot . "/static/ergopti_plus/shared/ports"
+	SharedPorts := RepoRoot . "/static/ergopti_plus/_shared/ports"
 	AhkAdapters   := RepoRoot . "/static/ergopti_plus/windows/adapters"
 	HsAdapters    := RepoRoot . "/static/ergopti_plus/macos/adapters"
 	LinuxAdapters := RepoRoot . "/static/ergopti_plus/linux/adapters"
@@ -144,7 +144,7 @@ _MetaRunDomainCoverageTests() {
 	; #Include'd file is executing — strip everything from /static/... onward.
 	RepoRoot := RegExReplace(RepoRoot, "/static/ergopti_plus/windows/tests(/meta)?$", "")
 
-	DomainDir  := RepoRoot . "/static/ergopti_plus/shared/domain"
+	DomainDir  := RepoRoot . "/static/ergopti_plus/_shared/domain"
 	AhkTests   := RepoRoot . "/static/ergopti_plus/windows/tests"
 	HsTests    := RepoRoot . "/static/ergopti_plus/macos/tests"
 
@@ -213,7 +213,7 @@ _MetaRunSharedPurityTests() {
 	; #Include'd file is executing — strip everything from /static/... onward.
 	RepoRoot := RegExReplace(RepoRoot, "/static/ergopti_plus/windows/tests(/meta)?$", "")
 
-	SharedDir := RepoRoot . "/static/ergopti_plus/shared"
+	SharedDir := RepoRoot . "/static/ergopti_plus/_shared"
 	; ``\bhs\.`` (word boundary) so the Hammerspoon global is matched but not the
 	; "hs." inside ordinary words like "months." — the looser ``hs\.`` produced
 	; false positives that forced this gate to stay warn-only.
@@ -234,7 +234,7 @@ _MetaRunSharedPurityTests() {
 		} catch {
 			continue
 		}
-		Rel := SubStr(FilePath, InStr(FilePath, "/shared/") + 1)
+		Rel := SubStr(FilePath, InStr(FilePath, "/_shared/") + 1)
 		InBlockComment := false
 		LineNum := 0
 		for Line in StrSplit(Body, "`n", "`r") {

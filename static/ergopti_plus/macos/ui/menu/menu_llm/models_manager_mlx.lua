@@ -41,7 +41,7 @@ if not ok_dw then download_window = nil end
 local ApiMlx = require("modules.llm.api_mlx")
 
 -- Single source of truth for the MLX server port: api_mlx, backed by the per-user
--- override and shared/llm/mlx_server.json. Resolved from the getter — the port
+-- override and _shared/llm/mlx_server.json. Resolved from the getter — the port
 -- literal lives ONLY in api_mlx (MLX_DEFAULT_PORT) / mlx_server.json, never here.
 -- Re-resolved at launch time in start_server in case the user changed it via the menu.
 local MLX_PORT = ApiMlx.get_port()

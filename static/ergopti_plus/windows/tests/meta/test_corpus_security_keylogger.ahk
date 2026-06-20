@@ -4,7 +4,7 @@
 ; MODULE: Security / Keylogger Privacy Corpus Consumer (AHK)
 ; DESCRIPTION:
 ; Validates AHK keylogger privacy invariants against the cross-driver contract
-; defined in shared/tests/corpus/security/keylogger_no_persist_vectors.json.
+; defined in _shared/tests/corpus/security/keylogger_no_persist_vectors.json.
 ;
 ; APPROACH: Each corpus vector is loaded from the JSON file and either tested
 ; or explicitly skipped with a documented reason. This ensures the corpus is
@@ -70,7 +70,7 @@ _KL_ClassAndStyleIsPassword(Win32Class, Win32StyleHex) {
 ; ==================================================
 
 _SecurityCorpus_RunAll() {
-	CorpusPath := A_ScriptDir . "\..\..\shared\tests\corpus\security\keylogger_no_persist_vectors.json"
+	CorpusPath := A_ScriptDir . "\..\..\_shared\tests\corpus\security\keylogger_no_persist_vectors.json"
 	_SecurityCorpus_Load() {
 		AssertTrue(FileExist(CorpusPath) != "", "Security corpus file must exist at: " . CorpusPath)
 	}

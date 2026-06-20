@@ -1,7 +1,7 @@
 --- tests/unit/ui/test_tooltip_dequeue_contract.lua
 ---
 --- Validates the Hammerspoon stacked-tooltip dequeue logic against the canonical
---- test vectors defined in shared/tooltip/dequeue.js.
+--- test vectors defined in _shared/tooltip/dequeue.js.
 
 local helpers = require("tests.helpers")
 
@@ -16,7 +16,7 @@ local MS_OPTS = {
 	timeout_floor_sec = FLOOR,
 }
 
---- Hard-coded vectors mirroring dequeueTestVectors() from shared/tooltip/dequeue.js.
+--- Hard-coded vectors mirroring dequeueTestVectors() from _shared/tooltip/dequeue.js.
 local VECTORS = {
 	{
 		id = "mixed_1s_2s_stacked_destuck",

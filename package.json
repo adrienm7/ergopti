@@ -14,7 +14,7 @@
 		"build:manifest": "node ./tools/build/build-features-manifest.js",
 		"build:domain": "node ./tools/build/build-domain.cjs",
 		"codegen": "npm run build:domain",
-		"lint:banners": "node ./tools/lint/audit-banner-alignment.js static/ergopti_plus/shared",
+		"lint:banners": "node ./tools/lint/audit-banner-alignment.js static/ergopti_plus/_shared",
 		"lint:conventions": "node ./tools/lint/lint-conventions.js --warn-only",
 		"lint:conventions:strict": "node ./tools/lint/lint-conventions.js --fail-on-violations",
 		"test:port-compliance": "node ./tools/test/test-port-compliance.cjs",

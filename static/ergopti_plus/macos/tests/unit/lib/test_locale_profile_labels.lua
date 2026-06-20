@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Locale Profile-Label Integrity Tests
 --- DESCRIPTION:
---- Cross-language guard for the profile labels stored in shared/locales/*.json.
+--- Cross-language guard for the profile labels stored in _shared/locales/*.json.
 ---
 --- THE CONTRACT (encodes the root cause of the "%d prédiction%s" bug):
 --- Profile labels ("llm.profile.<id>.label") are rendered through a brace-style

@@ -3,14 +3,14 @@
 --- ==============================================================================
 --- MODULE: Keycode Registry (Hammerspoon Shim)
 --- DESCRIPTION:
---- Thin shim over shared/lua/keycodes/init.lua that re-exports every
+--- Thin shim over _shared/lua/keycodes/init.lua that re-exports every
 --- platform-neutral keycode constant and adds the single Hammerspoon-specific
 --- helper that depends on hs.keycodes.map. All numeric constants live in the
 --- shared module — this file must never redeclare them.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Single source of truth: numeric keycodes are defined once in
----    shared/lua/keycodes/init.lua and surfaced here via metatable delegation.
+---    _shared/lua/keycodes/init.lua and surfaced here via metatable delegation.
 --- 2. HS-specific surface: M.to_name() requires hs.keycodes.map and therefore
 ---    cannot live in the platform-neutral shared module.
 --- 3. Transparent delegation: callers that already require("lib.keycodes") see
@@ -37,7 +37,7 @@ local M = setmetatable({}, { __index = shared_keycodes })
 --- Returns the lowercase macOS key name (e.g. "f13", "f20", "spacebar") for a
 --- numeric keycode, by reverse-mapping hs.keycodes.map. Used by callers that
 --- emit JSON destined for Karabiner Elements (which expects textual key names),
---- so the source of truth stays the numeric registry in shared/lua/keycodes and
+--- so the source of truth stays the numeric registry in _shared/lua/keycodes and
 --- no magic "f13"/"f20" string ever appears in Lua code.
 --- @param numeric_code integer The macOS HID keycode to translate.
 --- @return string The lowercase key name. Errors if the code is unknown.

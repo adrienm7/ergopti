@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- Centralizes shared helpers used by every LLM backend (MLX, Ollama, remote API)
 --- — diversity temperature stepping, exact-text deduplication, retry policy.
---- The tunable numbers live in ``static/ergopti_plus/shared/llm/inference.json``
+--- The tunable numbers live in ``static/ergopti_plus/_shared/llm/inference.json``
 --- next to defaults.json so the AHK twin (modules/llm/api_common.ahk) reads
 --- the SAME values: change a knob there and both drivers track it in lockstep.
 ---

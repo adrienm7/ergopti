@@ -4,7 +4,7 @@
 ; MODULE: LLM Parser Corpus Consumer (AHK)
 ; DESCRIPTION:
 ; Validates the AHK LLM response parsers against the cross-driver contract
-; defined in shared/tests/corpus/llm/parser_test_vectors.json.
+; defined in _shared/tests/corpus/llm/parser_test_vectors.json.
 ; Each vector calls the parser function matching its "parser" field and
 ; asserts the extracted text equals expected.text (and ok = text != "").
 ;
@@ -69,7 +69,7 @@ _LLMCorpusDispatch(Vec) {
 ; ===================================================
 
 _LLMParserCorpus_RegisterAll() {
-	CorpusPath := A_ScriptDir . "\..\..\shared\tests\corpus\llm\parser_test_vectors.json"
+	CorpusPath := A_ScriptDir . "\..\..\_shared\tests\corpus\llm\parser_test_vectors.json"
 
 	if !FileExist(CorpusPath) {
 		; Register a single failing test so the missing corpus is visible in CI.

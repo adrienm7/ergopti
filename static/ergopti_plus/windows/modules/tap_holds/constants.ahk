@@ -20,7 +20,7 @@
 ; ============================
 
 ; The tap-hold timing constants below are sourced from the shared cross-driver
-; registry (shared/timings/constants.toml [tap_hold]) by TapHoldsLoadTimings(),
+; registry (_shared/timings/constants.toml [tap_hold]) by TapHoldsLoadTimings(),
 ; called once at boot from the auto-execute body. They start at the sentinel 0
 ; because AHK v2 runs global initializers BEFORE the auto-execute body, so the
 ; registry is not yet loaded here; the reassign runs well before any tap-hold

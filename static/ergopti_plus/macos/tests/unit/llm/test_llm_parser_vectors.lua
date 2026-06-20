@@ -4,7 +4,7 @@
 --- MODULE: LLM Parser Corpus Consumer (Hammerspoon)
 --- DESCRIPTION:
 --- Loads the shared cross-driver LLM parser corpus from
---- shared/tests/corpus/llm/parser_test_vectors.json and validates each vector
+--- _shared/tests/corpus/llm/parser_test_vectors.json and validates each vector
 --- against pure-Lua re-implementations of the HS parser logic.
 ---
 --- WHY A RE-IMPLEMENTATION RATHER THAN CALLING THE MODULE DIRECTLY:

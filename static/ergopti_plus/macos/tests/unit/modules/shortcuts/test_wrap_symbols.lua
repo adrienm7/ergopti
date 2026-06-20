@@ -101,7 +101,7 @@ end)
 -- =====================================
 -- =====================================
 
--- These pin the shared single source of truth (shared/wrap_symbols.json) so that
+-- These pin the shared single source of truth (_shared/wrap_symbols.json) so that
 -- the catalogue is loaded from there (not hardcoded) and the newly-added Unicode
 -- bracket families are present. Glyphs are built via utf8.char(codepoint) so this
 -- source file stays ASCII-only and immune to encoding regressions.

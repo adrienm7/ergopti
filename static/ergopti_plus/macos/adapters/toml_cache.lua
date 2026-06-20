@@ -4,7 +4,7 @@
 --- MODULE: TOML Hotstring Cache Adapter (Hammerspoon)
 --- DESCRIPTION:
 --- Disk-backed snapshot cache for the shared TOML hotstring parser. The parser
---- (shared/lua/toml_codec/reader.lua) walks every source byte by hand, which is
+--- (_shared/lua/toml_codec/reader.lua) walks every source byte by hand, which is
 --- the single biggest contributor to the "Hotstring groups registered" boot
 --- phase (~200 ms for the bundled files). This adapter serialises each parsed
 --- result into a precompiled Lua chunk so that, on every boot where the source

@@ -4,7 +4,7 @@
 --- MODULE: TrayMenu Adapter (Linux)
 --- DESCRIPTION:
 --- Linux implementation of the TrayMenu port contract defined in
---- static/ergopti_plus/shared/ports/TrayMenu.spec.js. Wraps the D-Bus
+--- static/ergopti_plus/_shared/ports/TrayMenu.spec.js. Wraps the D-Bus
 --- StatusNotifierItem / AppIndicator interface (via a helper process or the
 --- libappindicator C binding) to expose a platform-agnostic interface
 --- (setIcon, setMenu, setTooltip, destroy) for desktop-environment tray icons.

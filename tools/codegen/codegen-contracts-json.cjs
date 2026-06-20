@@ -4,8 +4,8 @@
  * ==============================================================================
  * MODULE: Port Contracts JSON Generator
  * DESCRIPTION:
- * Emits static/ergopti_plus/shared/ports/contracts.json from the authoritative
- * portContract definitions in shared/ports/*.spec.js. This collapses the four
+ * Emits static/ergopti_plus/_shared/ports/contracts.json from the authoritative
+ * portContract definitions in _shared/ports/*.spec.js. This collapses the four
  * hand-maintained method/arity mirrors (the macOS PORT_CONTRACTS Lua table, the
  * AHK ADAPTER_* maps, and the JS HS_ADAPTERS stubs) into a single machine
  * readable source that every driver's compliance test can read at runtime.

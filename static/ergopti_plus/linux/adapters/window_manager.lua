@@ -4,7 +4,7 @@
 --- MODULE: WindowManager Adapter (Linux)
 --- DESCRIPTION:
 --- Linux implementation of the WindowManager port contract defined in
---- static/ergopti_plus/shared/ports/WindowManager.spec.js. Wraps xdotool and
+--- static/ergopti_plus/_shared/ports/WindowManager.spec.js. Wraps xdotool and
 --- wmctrl to activate, query, and manage windows without coupling domain
 --- modules to compositor-specific APIs.
 ---

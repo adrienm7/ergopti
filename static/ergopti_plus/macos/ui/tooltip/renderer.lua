@@ -17,7 +17,7 @@ local LOG = "tooltip_renderer"
 local Config = require("ui.tooltip.config")
 
 -- Corner arc radius for ALL tooltip rounding (single + stacked canvases). Read
--- from the shared cross-driver source (shared/tooltip/constants.toml → Config)
+-- from the shared cross-driver source (_shared/tooltip/constants.toml → Config)
 -- so macOS and Windows round identically — never hardcode it here.
 local CORNER_RADIUS = Config.layout.corner_radius
 

@@ -4,7 +4,7 @@
 --- computed ASSETS_DIR via a brittle gsub that searched for a hardcoded driver
 --- path segment, silently returning the unchanged source dir when the segment
 --- did not match — so the webview tried to load assets from the macOS driver
---- folder rather than the cross-platform shared/ folder.
+--- folder rather than the cross-platform _shared/ folder.
 ---
 --- The path resolution is now centralised through Paths.shared, the single
 --- source of truth for the shared root. This test pins that contract: ASSETS_DIR

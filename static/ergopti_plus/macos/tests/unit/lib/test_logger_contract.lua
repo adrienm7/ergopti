@@ -4,12 +4,12 @@
 --- MODULE: Logger Contract Tests
 --- DESCRIPTION:
 --- Validates the Hammerspoon Logger against the cross-driver test vectors defined
---- in static/ergopti_plus/shared/logger/test_vectors.json. Every vector describes an
+--- in static/ergopti_plus/_shared/logger/test_vectors.json. Every vector describes an
 --- expected formatted log line; these tests assert that the HS Logger produces
 --- exactly that output for each variant/module/message combination.
 ---
 --- RATIONALE:
---- The shared/logger/SPEC.md defines a single line format used by both AHK and HS:
+--- The _shared/logger/SPEC.md defines a single line format used by both AHK and HS:
 ---     YYYY-MM-DD HH:MM:SS:mmm [LEVEL] [Module] message
 --- The test_vectors.json replaces the timestamp with the "TIMESTAMP" sentinel so
 --- vectors are time-independent. This test loads those vectors and verifies HS
@@ -19,8 +19,8 @@
 local helpers = require("tests.helpers")
 
 -- Path to the shared test vectors file, resolved relative to the driver root.
--- static/ergopti_plus/macos/ and static/ergopti_plus/shared/ are siblings, so
--- shared/ is one level up from the driver root.
+-- static/ergopti_plus/macos/ and static/ergopti_plus/_shared/ are siblings, so
+-- _shared/ is one level up from the driver root.
 local SHARED_VECTORS_PATH = helpers.shared("logger/test_vectors.json")
 
 

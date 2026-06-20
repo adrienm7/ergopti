@@ -223,7 +223,7 @@ end
 
 --- Source-default collision priority (personal 50 / package 30 / common 10) for a
 --- UI group, read from the keymap engine so the window never hardcodes a fourth
---- copy of the tiers (the single source is shared/hotstrings/priority.json, held
+--- copy of the tiers (the single source is _shared/hotstrings/priority.json, held
 --- equal across drivers by tools/test/test-priority-parity.cjs). The keymap module
 --- is required lazily — it is loaded long before this window opens, but a headless
 --- harness may lack it, in which case the source default is simply omitted.

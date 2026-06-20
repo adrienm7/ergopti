@@ -32,7 +32,7 @@
 
 ; Ultimate fallback when neither a user override nor a TOML default is set.
 ; LOADED AT BOOT from the shared cross-driver canon
-; (shared/hotstrings/defaults.toml) by HotstringsConfigLoadSharedDefaults() —
+; (_shared/hotstrings/defaults.toml) by HotstringsConfigLoadSharedDefaults() —
 ; the SINGLE source shared verbatim with the Hammerspoon driver. They start
 ; empty so a missing file/key fails fast (rule 5.3) rather than masking driver
 ; drift behind a hardcoded literal (rules 5.2 / 5.4). ``GLOBAL_DEFAULT_COLOR``
@@ -52,10 +52,10 @@ global DYN_HOTSTRINGS_DEFAULT_DELAY := 2.0
 
 ; Per-category baseline that overrides ``GLOBAL_DEFAULT_COLOR`` only when no
 ; TOML _meta or user override sets a color. Both baselines load at boot from the
-; shared canon — "personal" from shared/hotstrings/defaults.toml via
+; shared canon — "personal" from _shared/hotstrings/defaults.toml via
 ; HotstringsConfigLoadSharedDefaults() (kept in lock-step with macOS), and
 ; "llm_prediction" from the canonical AI loading hex
-; (shared/tooltip/constants.toml [accent_colors] ai_loading_hex, exposed as
+; (_shared/tooltip/constants.toml [accent_colors] ai_loading_hex, exposed as
 ; UI_AI_LOADING_HEX) via HotstringsConfigLoadLlmPredictionColor(). They start
 ; empty so a missing load fails fast (rule 5.3) rather than masking drift behind
 ; a re-typed literal (rules 5.2 / 5.4).
@@ -65,7 +65,7 @@ global HOTSTRINGS_CATEGORY_DEFAULT_COLORS := Map(
 
 ; Shared terminator catalogue instance — the single source of truth for the
 ; word-expander LIST (labels, order, separators) AND the default-enabled set,
-; generated from shared/domain/Terminators.spec.js and shared verbatim with
+; generated from _shared/domain/Terminators.spec.js and shared verbatim with
 ; macOS. Both the tray submenu and the config-window checkboxes render
 ; HSE_Terminators.all() so the catalogue can never drift between the two UIs or
 ; between drivers. Created once at load — before initMenu and before the default
@@ -122,7 +122,7 @@ global _HSResolveGen := 0
 ; Load the cross-driver hotstring resolution defaults — the global default
 ; expansion delay, the global default tooltip color, and the per-category
 ; "personal" baseline color — from the shared canon
-; (shared/hotstrings/defaults.toml), the SINGLE source shared verbatim with the
+; (_shared/hotstrings/defaults.toml), the SINGLE source shared verbatim with the
 ; Hammerspoon driver. Must run once at boot BEFORE the tray menu is built (it
 ; reads GLOBAL_DEFAULT_DELAY) and before any HotstringsResolve.
 ;
@@ -130,7 +130,7 @@ global _HSResolveGen := 0
 ; fatal dialog and the script exits (fail fast, rule 5.3); in the headless test
 ; runner run_all.ahk's OnError handler turns it into a "not ok 0" line instead
 ; of hanging on a modal. There is no compile-time fallback (rules 5.2 / 5.4).
-; @param SharedDir Optional shared/ root; defaults to the global ``_SharedDir``.
+; @param SharedDir Optional _shared/ root; defaults to the global ``_SharedDir``.
 HotstringsConfigLoadSharedDefaults(SharedDir := "") {
     global _SharedDir, GLOBAL_DEFAULT_DELAY, GLOBAL_DEFAULT_COLOR
     global HOTSTRINGS_CATEGORY_DEFAULT_COLORS
@@ -138,7 +138,7 @@ HotstringsConfigLoadSharedDefaults(SharedDir := "") {
     Path := Dir . "\hotstrings\defaults.toml"
     c    := ParseTomlFile(Path)
     if !c.Count {
-        throw Error("shared/hotstrings/defaults.toml introuvable ou vide : " . Path)
+        throw Error("_shared/hotstrings/defaults.toml introuvable ou vide : " . Path)
     }
 
     GLOBAL_DEFAULT_DELAY := Float(_HSDefaultsRequire(c, "delays", "default_sec", Path))
@@ -151,7 +151,7 @@ HotstringsConfigLoadSharedDefaults(SharedDir := "") {
 
 ; Source the llm_prediction baseline tint from the canonical AI loading hex
 ; (UI_AI_LOADING_HEX, loaded by UiStyle_LoadSharedConst() from
-; shared/tooltip/constants.toml [accent_colors] ai_loading_hex) so the AI tint
+; _shared/tooltip/constants.toml [accent_colors] ai_loading_hex) so the AI tint
 ; lives in ONE place instead of a re-typed literal. Must run AFTER
 ; UiStyle_LoadSharedConst() — UI_AI_LOADING_HEX is "" until then — and before the
 ; tray menu build / any resolve. A missing value THROWS (fail fast, no fallback).
@@ -169,7 +169,7 @@ HotstringsConfigLoadLlmPredictionColor() {
 _HSDefaultsRequire(c, Section, Key, Path) {
     Val := IniCacheGet(c, Section, Key)
     if (Val == "_") {
-        throw Error(Format("shared/hotstrings/defaults.toml — clé manquante : [{1}] {2} ({3})", Section, Key, Path))
+        throw Error(Format("_shared/hotstrings/defaults.toml — clé manquante : [{1}] {2} ({3})", Section, Key, Path))
     }
     return Val
 }
@@ -180,7 +180,7 @@ _HSDefaultsRequireHex(c, Section, Key, Path) {
     Val := _HSDefaultsRequire(c, Section, Key, Path)
     Hex := (SubStr(Val, 1, 1) == "#") ? SubStr(Val, 2) : Val
     if (StrLen(Hex) != 6) {
-        throw Error(Format("shared/hotstrings/defaults.toml — couleur hex invalide : [{1}] {2} = {3}", Section, Key, Val))
+        throw Error(Format("_shared/hotstrings/defaults.toml — couleur hex invalide : [{1}] {2} = {3}", Section, Key, Val))
     }
     return "#" . Hex
 }

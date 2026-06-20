@@ -4,13 +4,13 @@
 --- MODULE: LLM Profiles
 --- DESCRIPTION:
 --- Loads built-in prompt profiles from the shared JSON registry
---- (``static/ergopti_plus/shared/llm/profiles.json``) and merges them with the
+--- (``static/ergopti_plus/_shared/llm/profiles.json``) and merges them with the
 --- user-defined profiles. The JSON file is the single source of truth so a
 --- prompt tweak applies to both the Hammerspoon and AutoHotkey drivers
 --- with no risk of drift.
 ---
 --- ARCHITECTURE:
---- Profile loading and merging are delegated to shared/lua/llm/profile_selector.lua
+--- Profile loading and merging are delegated to _shared/lua/llm/profile_selector.lua
 --- (platform-neutral, no hs.* calls). This module adds only the two
 --- Hammerspoon-specific layers that profile_selector cannot provide:
 ---   1. i18n label decoration — hs locale-aware via lib.i18n.
@@ -122,7 +122,7 @@ end
 -- ============================================
 
 --- Resolves the live (min, max) word bounds for prompt interpolation from the
---- single source of truth. The canonical defaults live in shared/llm/defaults.json
+--- single source of truth. The canonical defaults live in _shared/llm/defaults.json
 --- (surfaced as DEFAULT_STATE.llm_min_words / llm_max_words); a live user override
 --- in the user settings takes precedence. We never substitute a divergent literal:
 --- a nil in DEFAULT_STATE means the LLM module failed to initialise its defaults,
@@ -136,7 +136,7 @@ function M._resolve_word_bounds(ds, get_setting)
 	local def_min = ds.llm_min_words
 	local def_max = ds.llm_max_words
 	if def_min == nil or def_max == nil then
-		Logger.error(LOG, "resolve_word_bounds: DEFAULT_STATE is missing llm_min_words/llm_max_words — LLM defaults were not initialised from shared/llm/defaults.json.")
+		Logger.error(LOG, "resolve_word_bounds: DEFAULT_STATE is missing llm_min_words/llm_max_words — LLM defaults were not initialised from _shared/llm/defaults.json.")
 	end
 
 	local min_w = tonumber(get_setting("llm_min_words")) or def_min

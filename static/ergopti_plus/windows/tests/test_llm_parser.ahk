@@ -129,7 +129,7 @@ _LLMPP_RunVector(Vec) {
 }
 
 _LLMPP_RegisterCorpus() {
-	CorpusPath := A_ScriptDir . "\..\..\shared\tests\corpus\llm\process_prediction_vectors.json"
+	CorpusPath := A_ScriptDir . "\..\..\_shared\tests\corpus\llm\process_prediction_vectors.json"
 	if !FileExist(CorpusPath) {
 		Test("LLM process_prediction corpus: file exists",
 			() => AssertTrue(false, "corpus not found: " . CorpusPath))

@@ -45,7 +45,7 @@ def find_schema(metrics_dir: Path) -> Path | None:
 	"""Locate schema.sql relative to the metrics directory."""
 	candidates = [
 		shared("data", "db", "schema.sql"),
-		metrics_dir.parent.parent.parent / "static" / "ergopti_plus" / "shared" / "data" / "db" / "schema.sql",
+		metrics_dir.parent.parent.parent / "static" / "ergopti_plus" / "_shared" / "data" / "db" / "schema.sql",
 	]
 	for p in candidates:
 		if p.exists():

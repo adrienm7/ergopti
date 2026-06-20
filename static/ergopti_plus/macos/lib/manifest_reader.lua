@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- Thin runtime API over the codegen'd `_generated/features_manifest.lua`, which
 --- is produced by `npm run build:manifest` from the single source of truth at
---- `shared/features/manifest.toml`. This is the macOS counterpart of the AHK
+--- `_shared/features/manifest.toml`. This is the macOS counterpart of the AHK
 --- `lib/manifest_reader.ahk` — the AHK driver already builds its entire
 --- `Features` map from the manifest, so reading the same manifest here makes the
 --- cross-driver feature defaults a genuine single source instead of hand-copied

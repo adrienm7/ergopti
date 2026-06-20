@@ -4,7 +4,7 @@
 ; MODULE: FileSystem Adapter (AutoHotkey)
 ; DESCRIPTION:
 ; AHK v2 implementation of the FileSystem port contract defined in
-; static/ergopti_plus/shared/ports/FileSystem.spec.js. Wraps AHK v2's
+; static/ergopti_plus/_shared/ports/FileSystem.spec.js. Wraps AHK v2's
 ; FileRead, FileOpen, FileExist, and FileDelete built-ins behind the five
 ; canonical functions (FSRead, FSWrite, FSAppend, FSExists, FSDelete) so
 ; domain modules perform file I/O without coupling to AHK-specific APIs.

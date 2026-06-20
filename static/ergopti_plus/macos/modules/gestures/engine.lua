@@ -37,7 +37,7 @@ local _any_touch_hook = nil
 -- =========================================
 
 -- Timing constants come from the shared cross-driver registry
--- (shared/timings/constants.toml [gestures]) so AHK and macOS stay in sync;
+-- (_shared/timings/constants.toml [gestures]) so AHK and macOS stay in sync;
 -- the spatial thresholds below it are driver-specific and stay local.
 local TAP_MAX_SEC    = Timings.sec("gestures", "tap_max_ms")   -- Capture slightly slow multi-finger taps
 -- Minimum centroid displacement (Manhattan distance) to confirm a swipe on commit.

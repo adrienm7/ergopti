@@ -4,7 +4,7 @@
 --- MODULE: TOML Writer Atomic Write Meta Test
 --- DESCRIPTION:
 --- Static source guard for the "toml-non-atomic-write" audit finding in
---- shared/lua/toml_codec/writer.lua.
+--- _shared/lua/toml_codec/writer.lua.
 ---
 --- ROOT CAUSE ENCODED:
 --- M.write() opened the target config file with io.open(path, "w"), which
@@ -45,7 +45,7 @@ end
 -- ===========================================================================
 -- ===========================================================================
 
-helpers.describe("shared/lua/toml_codec/writer.lua: atomic write (toml-non-atomic-write)", function()
+helpers.describe("_shared/lua/toml_codec/writer.lua: atomic write (toml-non-atomic-write)", function()
 
 	helpers.it("M.write writes to a .tmp file before renaming", function()
 		local src = strip_comments(read_source(helpers.shared("lua/toml_codec/writer.lua")))

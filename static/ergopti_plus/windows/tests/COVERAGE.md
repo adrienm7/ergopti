@@ -47,14 +47,14 @@ it intentionally skips, and the rationale for each deferral.
 
 ### LLM menu persistence (regression guard)
 
-Contract: `shared/llm/menu_persistence_contract.json` — one row per tray/menu knob that must round-trip to disk.
+Contract: `_shared/llm/menu_persistence_contract.json` — one row per tray/menu knob that must round-trip to disk.
 
 | Runner               | Command                                                                                               |
 | -------------------- | ----------------------------------------------------------------------------------------------------- |
 | AHK (focused)        | `AutoHotkey64.exe /ErrorStdOut windows/tests/run_llm_menu_persistence.ahk`                            |
 | AHK (full suite)     | `AutoHotkey64.exe /ErrorStdOut windows/tests/run_all.ahk`                                             |
 | Hammerspoon          | `lua macos/tests/run.lua` (includes `test_llm_menu_persistence.lua`, `test_llm_menu_regressions.lua`) |
-| Contract schema (CI) | `python shared/llm/validate_menu_persistence_contract.py`                                             |
+| Contract schema (CI) | `python _shared/llm/validate_menu_persistence_contract.py`                                             |
 
 When adding a new IA menu option: extend the JSON contract, wire `ui/tray_llm/persist.ahk` (sync + append + `BuildSavedOpts`), map `preferences.lua` on macOS, then run the three runners above.
 
@@ -150,6 +150,6 @@ requires a live AHK message pump or Windows OS interaction):
 
 ## Roadmap for follow-up sprints
 
-1. Add AHK corpus consumers for `shared/tests/corpus/prompt_builder/`, `llm/parser_test_vectors.json`, and `security/keylogger_no_persist_vectors.json` — mirrors the macOS `test_keylogger_privacy.lua` approach.
-2. Build a TOML fuzz harness that iterates `shared/tests/corpus/toml/fuzz_corpus.json` and verifies the AHK TOML loader does not crash on adversarial inputs.
+1. Add AHK corpus consumers for `_shared/tests/corpus/prompt_builder/`, `llm/parser_test_vectors.json`, and `security/keylogger_no_persist_vectors.json` — mirrors the macOS `test_keylogger_privacy.lua` approach.
+2. Build a TOML fuzz harness that iterates `_shared/tests/corpus/toml/fuzz_corpus.json` and verifies the AHK TOML loader does not crash on adversarial inputs.
 3. Add `test_tooltip_tint_contract.ahk` assertions: the tint mixing math (`_TooltipMixTintHex`) should be verified against the shared `[tint]` constants in `tooltip/constants.toml`.

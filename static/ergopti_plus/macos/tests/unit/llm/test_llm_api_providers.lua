@@ -6,7 +6,7 @@ package.loaded["lib.logger"] = nil
 helpers.load_with_stubs("lib.logger")
 
 -- Load the module. This will trigger load_api_providers() internally
--- which reads static/ergopti_plus/shared/llm/api_providers.json
+-- which reads static/ergopti_plus/_shared/llm/api_providers.json
 local ApiRemote = helpers.load_with_stubs("modules.llm.api_remote")
 
 helpers.describe("LLM API Providers Catalogue", function()

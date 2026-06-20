@@ -47,17 +47,17 @@ function M.fixtures_dir()
 end
 
 -- THE single source of truth for the shared-tree location in tests: a path
--- relative to the macOS driver root. shared/ is a sibling of macos/ (both live
--- under ergopti_plus/), so it sits one level up. A repo-layout rename
--- (shared/ -> _shared/) only needs editing this one constant.
-local SHARED_REL = "../shared"
+-- relative to the macOS driver root. _shared/ is a sibling of macos/ (both live
+-- under ergopti_plus/), so it sits one level up. A future rename of the
+-- _shared/ tree only needs editing this one constant.
+local SHARED_REL = "../_shared"
 
---- Resolves a path inside the shared/ tree, relative to the driver root.
+--- Resolves a path inside the _shared/ tree, relative to the driver root.
 --- Mirrors the production Paths.shared contract (nil/"" -> the shared root dir).
 --- Every test that needs a shared resource MUST go through this helper rather
---- than hand-rolling ``driver_root() .. "../shared/..."`` so the folder name
+--- than hand-rolling ``driver_root() .. "../_shared/..."`` so the folder name
 --- lives in exactly one place.
---- @param rel string|nil Path relative to shared/, e.g. ``"llm/models.json"``.
+--- @param rel string|nil Path relative to _shared/, e.g. ``"llm/models.json"``.
 --- @return string Absolute path.
 function M.shared(rel)
 	local root = M.driver_root() .. SHARED_REL
@@ -137,7 +137,7 @@ function M.load_with_stubs(module_name, hs_overrides)
 	}
 
 	-- Stub lib.paths so that any module (e.g. llm/api_remote, profiles resolution)
-	-- can find shared/llm/api_providers.json and profiles.json during headless
+	-- can find _shared/llm/api_providers.json and profiles.json during headless
 	-- tests. Without this, io.open fails or returns nil path, causing "not found"
 	-- errors in tests that load api_remote or exercise catalogue-dependent code.
 	package.loaded["lib.paths"] = {
@@ -148,7 +148,7 @@ function M.load_with_stubs(module_name, hs_overrides)
 		shared_root     = function() return M.shared() end,
 		shared_llm_path = function(name) return M.shared("llm/" .. name) end,
 		find_from_configdir = function(relative_target)
-			-- relative_target is usually "static/ergopti_plus/shared/locales"
+			-- relative_target is usually "static/ergopti_plus/_shared/locales"
 			-- M.driver_root() is .../static/ergopti_plus/macos/
 			-- We want to return .../relative_target
 			return M.driver_root() .. "../../" .. relative_target

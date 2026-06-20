@@ -1,7 +1,7 @@
 # Audit Hammerspoon (macOS) — bugs, races & corrections
 
 > Audit exhaustif du driver **Hammerspoon / macOS** d'Ergopti+
-> (`static/ergopti_plus/macos/` + shared Lua `static/ergopti_plus/shared/lua/`).
+> (`static/ergopti_plus/macos/` + shared Lua `static/ergopti_plus/_shared/lua/`).
 > Périmètre : moteur de remap/hotstrings (`modules/keymap`), keylogger
 > (`modules/keylogger`), hotstrings dynamiques (`modules/dynamic_hotstrings`),
 > LLM, tooltip, gestes/raccourcis, adaptateurs.

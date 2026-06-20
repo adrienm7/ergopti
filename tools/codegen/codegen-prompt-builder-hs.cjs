@@ -6,7 +6,7 @@
  * DESCRIPTION:
  * The Hammerspoon driver consumes the shared Lua implementation of
  * PromptBuilder directly via:
- *   require("llm.prompt_builder")        -- shared/lua/llm/prompt_builder.lua
+ *   require("llm.prompt_builder")        -- _shared/lua/llm/prompt_builder.lua
  * No code generation is needed because Lua modules are cross-runtime portable.
  *
  * CONTRAST WITH AHK:

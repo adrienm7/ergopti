@@ -7,7 +7,7 @@
 ---
 --- FEATURES & RATIONALE:
 --- 1. Manifest-Driven: Structure (order, separators, groups) is read from
----    ``shared/menu_manifest.json`` via ``lib/manifest_menu``.  Dynamic
+---    ``_shared/menu_manifest.json`` via ``lib/manifest_menu``.  Dynamic
 ---    blocks (ctrl group, cmd group, script control, extensions, edit action)
 ---    are supplied as handlers so platform-specific logic stays in Lua.
 --- ==============================================================================

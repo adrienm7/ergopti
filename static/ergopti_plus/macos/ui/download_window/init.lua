@@ -46,7 +46,7 @@ local _is_hiding = false
 local _kind      = nil      -- Active kind, if any (mlx_install, ollama_install, mlx_model, ollama_model)
 local _mode      = "download" -- "download" (model download) or "bootstrap" (engine install)
 
--- HTML/CSS/JS assets live in the cross-platform shared/ folder so all drivers
+-- HTML/CSS/JS assets live in the cross-platform _shared/ folder so all drivers
 -- benefit from the same UI without duplication. Resolved through the single
 -- shared-tree resolver (Paths.shared); the trailing slash is preserved because
 -- ui_builder concatenates asset filenames directly onto this directory.

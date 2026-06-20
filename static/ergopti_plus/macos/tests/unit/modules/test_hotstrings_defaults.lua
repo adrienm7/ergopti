@@ -6,7 +6,7 @@
 --- A4 — the hotstring resolution fallbacks (global default delay, global default
 --- color, and the per-category "personal" baseline) are mutualised across the
 --- AHK and Hammerspoon drivers: both read them from the shared cross-driver canon
---- shared/hotstrings/defaults.toml instead of a per-driver literal.
+--- _shared/hotstrings/defaults.toml instead of a per-driver literal.
 ---
 --- These tests pin two things:
 ---   1. The module loaded the values FROM the shared file — resolve()'s fallbacks

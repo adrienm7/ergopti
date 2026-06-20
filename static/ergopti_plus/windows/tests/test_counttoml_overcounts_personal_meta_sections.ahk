@@ -57,7 +57,7 @@ _CTOPMS_DottedMetaNotCounted() {
 		. _CTOPMS_BuildEntry("ccc", "gamma")
 	FileAppend(Content, TmpPath, "UTF-8")
 
-	; Explicit path bypasses the personal/shared resolution; clear any stale
+	; Explicit path bypasses the personal/_shared resolution; clear any stale
 	; per-file count cache by using a fresh path name each run + final delete.
 	AssertEqual(3, CountTomlHotstrings("x", TmpPath),
 		"the four [_meta.sections.accents] metadata lines must NOT be counted as hotstrings; only the 3 real [[accents]] entries count")

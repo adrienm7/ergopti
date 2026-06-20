@@ -4,7 +4,7 @@
 ; MODULE: Crypto Adapter (AutoHotkey)
 ; DESCRIPTION:
 ; AHK v2 implementation of the Crypto port contract defined in
-; static/ergopti_plus/shared/ports/Crypto.spec.js. Provides a single canonical
+; static/ergopti_plus/_shared/ports/Crypto.spec.js. Provides a single canonical
 ; SHA-256 function backed by the .NET System.Security.Cryptography.SHA256Managed
 ; COM class so domain modules can produce privacy hashes without coupling to
 ; AHK-specific COM plumbing.

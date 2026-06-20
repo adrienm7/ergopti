@@ -4,7 +4,7 @@
 ; MODULE: KeyboardHook Adapter (AutoHotkey)
 ; DESCRIPTION:
 ; AHK v2 implementation of the KeyboardHook port contract defined in
-; static/ergopti_plus/shared/ports/KeyboardHook.spec.js. Wraps the unified
+; static/ergopti_plus/_shared/ports/KeyboardHook.spec.js. Wraps the unified
 ; HookDispatcher (lib/hook_dispatcher.ahk) behind the five canonical
 ; functions (KHStart, KHStop, KHIsRunning, KHRefreshContext, KHGetContext).
 ;
@@ -29,7 +29,7 @@
 ; events selectively per subscriber. Rather than silently swallow an inert
 ; option, KHStart emits a WARNING so the unsupported capability is loud (see the
 ; "no silent behavioral fallback" rule, CLAUDE.md 5.4) while keeping the option
-; in the port contract (shared/ports/KeyboardHook.spec.js).
+; in the port contract (_shared/ports/KeyboardHook.spec.js).
 ; ==============================================================================
 
 ; Cached context (appId = process name, windowTitle = window caption).

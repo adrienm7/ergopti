@@ -4,7 +4,7 @@
 --- MODULE: SecureFieldDetector Adapter (Linux)
 --- DESCRIPTION:
 --- Linux implementation of the SecureFieldDetector port contract defined in
---- static/ergopti_plus/shared/ports/SecureFieldDetector.spec.js. Uses AT-SPI2
+--- static/ergopti_plus/_shared/ports/SecureFieldDetector.spec.js. Uses AT-SPI2
 --- via the at-spi2-core CLI tools (or xprop as fallback) to detect whether the
 --- currently focused element is a password field, and a hardcoded known-app list
 --- for apps that render secure views in WebKit or Electron without exposing the

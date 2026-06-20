@@ -4,7 +4,7 @@
 
 Implements tap-vs-hold disambiguation for keys that have dual roles: a short press (tap) fires one action while a held press activates a layer or modifier. Covers the full navigation layer (arrows, word/line/document navigation, window management, volume), CapsWord, and per-key timing constants shared across all sub-modules.
 
-## Ports used (`shared/ports/`)
+## Ports used (`_shared/ports/`)
 
 | Port             | Usage                                                                           |
 | ---------------- | ------------------------------------------------------------------------------- |

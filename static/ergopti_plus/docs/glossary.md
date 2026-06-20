@@ -241,7 +241,7 @@ below the activation threshold. Declared as `tap_action` in
 A key-behaviour mode where a short press (tap) and a long press (hold) on the
 same physical key emit different actions. The threshold is configurable via
 `time_activation_seconds` in `windows/data/tap_hold/defaults.toml`. Test vectors
-for the timing logic: `shared/tests/corpus/tap_hold/vectors.json`.
+for the timing logic: `_shared/tests/corpus/tap_hold/vectors.json`.
 
 ---
 
@@ -316,9 +316,9 @@ Managed by `modules/llm/streaming_handler.lua`. Controlled by the
 The pass that colours the LLM prediction for display in the tooltip: green for
 corrected tail words, orange for new continuation words, and no colour (gray)
 for unchanged text. Implemented by `process_prediction` in the shared Lua canon
-`shared/lua/llm/parser.lua` (Hammerspoon shim `modules/llm/parser.lua`, AHK port
+`_shared/lua/llm/parser.lua` (Hammerspoon shim `modules/llm/parser.lua`, AHK port
 `windows/modules/llm/parser.ahk`), pinned cross-driver by
-`shared/tests/corpus/llm/process_prediction_vectors.json`. (Superseded the
+`_shared/tests/corpus/llm/process_prediction_vectors.json`. (Superseded the
 removed `TokenParser.js` word-level reference, 2026-06-13.)
 
 ---

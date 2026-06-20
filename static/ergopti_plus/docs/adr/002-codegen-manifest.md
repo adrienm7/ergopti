@@ -27,7 +27,7 @@ the driver's internal registry exactly, creating a fourth source of truth.
 ## Decision
 
 Maintain a **single authoritative TOML manifest** at
-`static/ergopti_plus/shared/features/manifest.toml` and generate all
+`static/ergopti_plus/_shared/features/manifest.toml` and generate all
 driver-specific feature registries from it at build time.
 
 The build script (`tools/build/build-features-manifest.js`, exposed as
@@ -75,8 +75,8 @@ repository so drivers can boot without running the build step.
 
 ## Evidence in the codebase
 
-- Source manifest: `static/ergopti_plus/shared/features/manifest.toml`
-- Schema: `static/ergopti_plus/shared/features/manifest.schema.json`
+- Source manifest: `static/ergopti_plus/_shared/features/manifest.toml`
+- Schema: `static/ergopti_plus/_shared/features/manifest.schema.json`
 - Build script: `tools/build/build-features-manifest.js`
 - npm script: `package.json` → `"build:manifest"`
 - Generated AHK output: `static/ergopti_plus/windows/_generated/features_manifest.ahk`

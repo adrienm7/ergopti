@@ -40,7 +40,7 @@ end
 --- Resolves the absolute path to a shared resource file (fail-fast).
 --- Priority: module-relative > upward search > ERROR
 --- Passes the first path that exists; logs ERROR and returns nil if none found.
---- @param rel string Relative path under static/ergopti_plus/shared/.
+--- @param rel string Relative path under static/ergopti_plus/_shared/.
 --- @return string|nil Absolute path if found, nil if missing (ERROR logged).
 local function resolve_shared_constants_path(rel)
 	-- Resolved through the single shared-tree resolver (Paths.shared), which
@@ -73,7 +73,7 @@ local function _toml_num(line, key)
 	return v and tonumber(v) or nil
 end
 
--- Loads shared/wpm_widget/constants.toml and shared/timings/constants.toml at runtime.
+-- Loads _shared/wpm_widget/constants.toml and _shared/timings/constants.toml at runtime.
 -- Returns a config table; logs an error and returns a safe-default stub on failure.
 local function _load_shared_const()
 	local wpm_path     = resolve_shared_constants_path("wpm_widget/constants.toml")
@@ -102,7 +102,7 @@ local function _load_shared_const()
 	local tc = read_toml(timings_path)
 
 	if not wpm_path then
-		Logger.error(LOG, "_load_shared_const: shared/wpm_widget/constants.toml not found — widget non-functional.")
+		Logger.error(LOG, "_load_shared_const: _shared/wpm_widget/constants.toml not found — widget non-functional.")
 	end
 
 	local compact    = wc.compact    or {}
@@ -113,7 +113,7 @@ local function _load_shared_const()
 	local function hex(s) return (s or ""):gsub("^#", "") end
 
 	return {
-		-- Compact layout (shared/wpm_widget/constants.toml [compact])
+		-- Compact layout (_shared/wpm_widget/constants.toml [compact])
 		compact_width         = compact.width                    or 80,
 		compact_height_number = compact.height_number            or 44,
 		compact_height_gap    = compact.height_gap               or 4,
@@ -131,7 +131,7 @@ local function _load_shared_const()
 		widget_hsl_l          = tonumber(colors.widget_hsl_l) or 0.40,
 		widget_hsl_s          = tonumber(colors.widget_hsl_s) or 1.00,
 
-		-- Idle hide and color-hold durations (shared/timings/constants.toml [ui])
+		-- Idle hide and color-hold durations (_shared/timings/constants.toml [ui])
 		idle_hide_s           = ((tc.ui and tc.ui.wpm_widget_idle_hide_ms) or 3000) / 1000,
 		source_color_duration = ((tc.ui and tc.ui.wpm_color_hold_ms)       or 1000) / 1000,
 
@@ -412,7 +412,7 @@ local function update_widget()
 			table.insert(elements, { type = "text", text = wpm_full_str, textColor = CONFIG.text_color, textSize = text_size, textAlignment = "center", frame = { x = 0, y = 5, w = canvas_width, h = text_size + 6 } })
 		else
 			-- ── Compact mode: two-zone pill — upper number + lower darker unit strip ──
-			-- Layout mirrors shared/wpm_widget/constants.toml [compact] and AHK WPMWidget_BuildCompact.
+			-- Layout mirrors _shared/wpm_widget/constants.toml [compact] and AHK WPMWidget_BuildCompact.
 			local source = (_use_source_colors and active_source ~= "none") and active_source or "manual"
 			local source_color = WPMShared.get_source_color(source, 1.0)
 			local bg_hex     = source_color.hex

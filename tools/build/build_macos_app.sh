@@ -343,13 +343,13 @@ assemble_app() {
 		"$static_root/drivers/hammerspoon/"
 
 	# Shared tree (WebView HTML/CSS/JS, LLM defaults, DB schema, locales, hotstrings).
-	cp -R "$REPO_ROOT/static/ergopti_plus/shared"      "$static_root/drivers/shared"
+	cp -R "$REPO_ROOT/static/ergopti_plus/_shared"      "$static_root/drivers/_shared"
 
 	# Static assets.
-	cp -R "$REPO_ROOT/static/ergopti_plus/shared/menu_manifest.json" "$static_root/"
+	cp -R "$REPO_ROOT/static/ergopti_plus/_shared/menu_manifest.json" "$static_root/"
 	cp -R "$REPO_ROOT/static/version.json"        "$static_root/" 2>/dev/null || true
-	cp -R "$REPO_ROOT/static/ergopti_plus/shared/locales"            "$static_root/"
-	cp -R "$REPO_ROOT/static/ergopti_plus/shared/hotstrings"         "$static_root/"
+	cp -R "$REPO_ROOT/static/ergopti_plus/_shared/locales"            "$static_root/"
+	cp -R "$REPO_ROOT/static/ergopti_plus/_shared/hotstrings"         "$static_root/"
 	cp -R "$REPO_ROOT/static/img"                 "$static_root/"
 
 	# Bundle third-party tools so they are available on first launch with no

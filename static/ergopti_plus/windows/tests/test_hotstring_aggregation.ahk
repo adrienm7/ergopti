@@ -11,7 +11,7 @@
 
 ; Stub global dependencies
 global _StaticDir := A_ScriptDir . "/../../../../static"
-global _SharedDir := _StaticDir . "/ergopti_plus/shared"
+global _SharedDir := _StaticDir . "/ergopti_plus/_shared"
 global Features := Map()
 global ScriptInformation := Map(
     "MagicKey", "★",

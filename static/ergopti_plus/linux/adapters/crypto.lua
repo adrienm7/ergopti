@@ -4,7 +4,7 @@
 --- MODULE: Crypto Adapter (Linux)
 --- DESCRIPTION:
 --- Linux implementation of the Crypto port contract defined in
---- static/ergopti_plus/shared/ports/Crypto.spec.js. Provides a SHA-256 digest
+--- static/ergopti_plus/_shared/ports/Crypto.spec.js. Provides a SHA-256 digest
 --- function backed by the openssl CLI (available on all mainstream Linux
 --- distributions) without coupling domain modules to any specific crypto library.
 ---

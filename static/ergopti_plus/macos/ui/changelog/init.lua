@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- Floating webview that fetches GitHub release notes and renders them as a
 --- two-column UI: a sidebar listing available releases and a markdown content
---- pane. Uses the shared/ui/changelog/ HTML/CSS/JS assets so Windows (AHK +
+--- pane. Uses the _shared/ui/changelog/ HTML/CSS/JS assets so Windows (AHK +
 --- WebView2) and a future Linux driver can reuse the same frontend without
 --- duplication.
 ---
@@ -44,7 +44,7 @@ local _ucc      = nil
 local _ready    = false
 local _queued   = {}
 
--- The shared UI assets live in …/ergopti_plus/shared/ui/changelog/. Resolved
+-- The shared UI assets live in …/ergopti_plus/_shared/ui/changelog/. Resolved
 -- through the single shared-tree resolver (Paths.shared); the trailing slash is
 -- preserved because the consumer concatenates "index.html" onto this directory.
 local ASSETS_DIR = (Paths.shared("ui/changelog") or "") .. "/"
