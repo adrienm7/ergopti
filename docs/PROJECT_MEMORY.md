@@ -198,6 +198,8 @@ The OS-purity ratchet (`tests/meta/test_port_adapter_coverage.lua`) counts occur
 - If a comment genuinely needs to reference the `hs.` API name (e.g., documenting a foot-gun), accept the ratchet increment and update the baseline in the test with a brief note.
 - Current baseline: `hs.*` count = 950, `io.open`/`os.execute` count = 70.
 
+**Corollary — `adapters/` is the OS-isolation layer, not "exactly the 20 ports".** A refactor that tries to make `macos/adapters/` mirror `windows/adapters/` at exactly the 20 contract ports by moving the non-port helpers (`shell_runner`, `toml_cache`, `json_codec`) into `lib/` is rejected by this ratchet: those helpers do shell-exec / file-I/O, so relocating them spikes the `io.open`/`os.execute` and `hs.*` counts outside `adapters/` (verified: 74 > 70 and 976 > 950). Do **not** weaken the baseline to permit it (§5.9). The correct mental model: `adapters/` holds the 20 ports **plus** any OS-touching infrastructure helper; cross-driver "adapter parity" means the 20 ports line up, not that the folder file counts match.
+
 Related: [[project_lua_closure_before_local_nil_global]] (the audit where this was discovered).
 
 ---

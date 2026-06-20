@@ -93,12 +93,11 @@ Chemin identique d'un driver à l'autre → l'analogue se trouve au même endroi
 
 ## P3 — Parité adapters (structurel bas risque)
 
-- [ ] Déplacer `macos/adapters/{json_codec,shell_runner,toml_cache}.lua` → `macos/lib/` (maj require-paths) → 20 ports exactement des deux côtés.
-- [ ] Ajouter les maps `ADAPTER_<NAME>` aux 6 adapters AHK qui en manquent ; **vérifier** ; **puis** durcir `test-port-compliance.cjs` (exiger les 20 ports). *(Ordre atomique : maps avant durcissement, sinon CI rouge en cours de phase.)*
-- [ ] Normaliser les 2 en-têtes de chemin d'adapters AHK + indentation `key_state.ahk`.
-- [ ] Codegen des vecteurs de contrat AHK depuis les specs JS (`test_adapter_contract_vectors.ahk`).
+- [x] ~~Déplacer `macos/adapters/{json_codec,shell_runner,toml_cache}.lua` → `macos/lib/`~~ → **REJETÉ** par l'architecture. Le test `tests/meta/test_port_adapter_coverage.lua` impose que tout appel OS (`hs.*`, `io.open`/`os.execute`) vive dans `adapters/`. Ces 3 helpers **touchent l'OS** (exec shell, I/O fichier) → ils sont légitimement dans `adapters/`. Affaiblir le baseline du test pour permettre le move est interdit (§5.9). **Conclusion : `adapters/` = couche d'isolation OS (les 20 ports + helpers OS), pas « exactement 20 ports ».** La parité visée doit être documentée ainsi, pas forcée par un déplacement. Voir [PROJECT_MEMORY](PROJECT_MEMORY.md).
+- [ ] ~~Maps `ADAPTER_<NAME>` + durcir `test-port-compliance`~~ → **REPORTÉ** : `test:port-compliance` passe déjà (20 ports couverts) ; durcir un test vert pour une valeur marginale = risque net négatif sans bénéfice clair. À reconsidérer seulement si une vraie lacune de couverture est prouvée.
+- [ ] ~~Normaliser en-têtes + codegen vecteurs de contrat~~ → **REPORTÉ** (cosmétique / gros pour valeur faible).
 
-**Vérif.** `test:port-compliance` vert ; `adapters/` = 20 des deux côtés ; vecteurs générés == vecteurs hand-typés.
+**Vérif. ✅** Le filet de test (`test:hs`, 2228 tests) a rejeté le move ; revert propre, suite re-verte. P3 : aucun changement de code — le principal item était architecturalement incorrect.
 
 ---
 
