@@ -27,6 +27,7 @@ local fs         = require("hs.fs")
 local json       = require("hs.json")
 local ui_builder = require("ui.ui_builder")
 local Logger     = require("lib.logger")
+local Paths      = require("lib.paths")
 local i18n       = require("lib.i18n")
 
 local LOG = "metrics_typing"
@@ -58,21 +59,12 @@ M._ingest_listener_registered = false
 --- @param subdir string Subdirectory name under static/ergopti_plus/shared/ui/.
 --- @return string|nil Absolute path if found, nil if missing (ERROR logged).
 local function resolve_ui_assets_dir(subdir)
-	local source = debug.getinfo(1, "S").source or ""
-	source = source:sub(1, 1) == "@" and source:sub(2) or source
-	local this_dir = source:match("^(.*)/[^/]+$") or ""
-	if this_dir ~= "" then
-		local by_module = this_dir .. "/../../../shared/ui/" .. subdir
-		if fs.dir(by_module) then
-			Logger.debug(LOG, "resolve_ui_assets_dir('%s'): module path OK.", subdir)
-			return by_module .. "/"
-		end
-	end
-
-	local Paths = require("lib.paths")
-	local base = Paths.find_from_configdir("static/ergopti_plus/shared/ui/" .. subdir)
+	-- Resolved through the single shared-tree resolver (Paths.shared). The
+	-- trailing slash is preserved because callers concatenate asset filenames
+	-- directly onto the returned directory path.
+	local base = Paths.shared("ui/" .. subdir)
 	if base and fs.dir(base) then
-		Logger.debug(LOG, "resolve_ui_assets_dir('%s'): upward search OK.", subdir)
+		Logger.debug(LOG, "resolve_ui_assets_dir('%s'): resolved via Paths.shared.", subdir)
 		return base .. "/"
 	end
 

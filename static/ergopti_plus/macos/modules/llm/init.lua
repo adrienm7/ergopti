@@ -15,6 +15,7 @@ local ApiOllama = require("modules.llm.api_ollama")
 local ApiMlx    = require("modules.llm.api_mlx")
 local ApiRemote = require("modules.llm.api_remote")
 local Logger    = require("lib.logger")
+local Paths     = require("lib.paths")
 local TimerScheduler = require("adapters.timer_scheduler")
 
 local LOG = "llm.core"
@@ -30,11 +31,6 @@ M.BUILTIN_PROFILES = Profiles.BUILTIN_PROFILES
 -- ======= 1/ Constants & Defaults =======
 --- =======================================
 -- =======================================
-
---- Resolves shared/llm/ relative to THIS source file so the path is
---- deterministic in production and in headless tests alike — independent of
---- hs.configdir or the load order of lib.paths (required later in this file).
-local _SELF_DIR = (debug.getinfo(1, "S").source:gsub("^@", "")):gsub("\\", "/"):match("^(.*)/[^/]+$") or "."
 
 --- Shared scalar/boolean defaults: keys that live in shared/llm/defaults.json
 --- under the same name on every driver. Sourced EXCLUSIVELY from the JSON — the
@@ -66,20 +62,14 @@ local _HS_ONLY_DEFAULTS = {
 --- hardcoded fallback for the shared values).
 --- @return table The fully-populated DEFAULT_STATE table.
 local function load_shared_defaults()
-	-- Candidate paths: source-relative first (deterministic, resolves in tests),
-	-- then the installed Hammerspoon layouts. These are PATH candidates only —
-	-- not one of them is a value fallback.
-	local candidates = {
-		_SELF_DIR .. "/../../../shared/llm/defaults.json",
-		(os.getenv("HOME") or "") .. "/Library/Application Support/Hammerspoon/../../../static/ergopti_plus/shared/llm/defaults.json",
-		(hs.configdir or "") .. "/../../static/ergopti_plus/shared/llm/defaults.json",
-		(hs.configdir or "") .. "/../shared/llm/defaults.json",
-	}
-
+	-- Resolved through the single shared-tree resolver (Paths.shared), which
+	-- performs the dual-root upward walk so it is deterministic in production
+	-- and in headless tests alike — independent of hs.configdir layout.
 	local raw, used = nil, nil
-	for _, p in ipairs(candidates) do
+	local p = Paths.shared("llm/defaults.json")
+	if type(p) == "string" and p ~= "" then
 		local fh = io.open(p, "r")
-		if fh then raw = fh:read("*a"); fh:close(); used = p; break end
+		if fh then raw = fh:read("*a"); fh:close(); used = p end
 	end
 
 	if not raw or raw == "" then

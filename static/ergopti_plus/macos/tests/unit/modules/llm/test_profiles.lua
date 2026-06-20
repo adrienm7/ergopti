@@ -24,6 +24,12 @@ package.loaded["lib.i18n"] = {
 --- Stub Paths so that any load of api_remote (or catalogue users) can resolve
 --- shared/llm/*.json from the real source tree during headless test runs.
 package.loaded["lib.paths"] = {
+	shared = function(rel)
+		local root = helpers.driver_root() .. "../shared"
+		if rel and rel ~= "" then return root .. "/" .. rel end
+		return root
+	end,
+	shared_root = function() return helpers.driver_root() .. "../shared" end,
 	shared_llm_path = function(name)
 		return helpers.driver_root() .. "../shared/llm/" .. name
 	end,

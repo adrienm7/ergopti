@@ -22,6 +22,7 @@ local JsonCodec      = require("adapters.json_codec")
 local TimerScheduler = require("adapters.timer_scheduler")
 local ShellRunner    = require("adapters.shell_runner")
 local Timings        = require("lib.timings")
+local Paths          = require("lib.paths")
 local LOG            = "llm.api_mlx"
 
 local ok_kl, keylogger = pcall(require, "modules.keylogger")
@@ -83,24 +84,19 @@ end
 
 local function load_mlx_server_config()
 	local host, port = MLX_DEFAULT_HOST, MLX_DEFAULT_PORT
-	-- 1) Shared JSON default (the value shipped with the repo).
-	local cfgdir = (type(hs) == "table" and hs.configdir) or nil
-	if cfgdir then
-		local candidates = {
-			cfgdir .. "/../shared/llm/mlx_server.json",
-			cfgdir .. "/../../static/ergopti_plus/shared/llm/mlx_server.json",
-		}
-		for _, p in ipairs(candidates) do
-			local fh = io.open(p, "r")
-			if fh then
-				local raw = fh:read("*a")
-				fh:close()
-				local ok, parsed = pcall(hs.json.decode, raw)
-				if ok and type(parsed) == "table" then
-					if type(parsed.host) == "string" and parsed.host ~= "" then host = parsed.host end
-					if type(parsed.port) == "number" and parsed.port > 0 then port = math.floor(parsed.port) end
-					break
-				end
+	-- 1) Shared JSON default (the value shipped with the repo). Resolved through
+	-- the single shared-tree resolver (Paths.shared), which performs the dual-root
+	-- upward walk — robust to packaged .app builds and symlinked setups alike.
+	local p = Paths.shared("llm/mlx_server.json")
+	if type(p) == "string" and p ~= "" then
+		local fh = io.open(p, "r")
+		if fh then
+			local raw = fh:read("*a")
+			fh:close()
+			local ok, parsed = pcall(hs.json.decode, raw)
+			if ok and type(parsed) == "table" then
+				if type(parsed.host) == "string" and parsed.host ~= "" then host = parsed.host end
+				if type(parsed.port) == "number" and parsed.port > 0 then port = math.floor(parsed.port) end
 			end
 		end
 	end

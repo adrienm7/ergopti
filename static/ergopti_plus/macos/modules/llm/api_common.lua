@@ -21,6 +21,7 @@
 local M = {}
 local hs     = hs
 local Logger = require("lib.logger")
+local Paths  = require("lib.paths")
 local LOG    = "llm.api_common"
 
 
@@ -58,17 +59,14 @@ local FALLBACK = {
 	},
 }
 
---- Loads the inference.json sitting next to defaults.json. Same probe order
---- as load_shared_defaults in init.lua so we benefit from the same path
---- discovery and the same fallback story.
+--- Loads the inference.json sitting next to defaults.json. The path is resolved
+--- through the single shared-tree resolver (Paths.shared), which performs the
+--- dual-root upward walk — robust to packaged .app builds and symlinked
+--- ~/.hammerspoon setups alike. Falls back to FALLBACK on any read/parse failure.
 --- @return table The constants table (always non-nil — falls back to FALLBACK).
 local function load_inference_constants()
-	local candidates = {
-		hs.configdir .. "/../shared/llm/inference.json",
-		hs.configdir .. "/../../static/ergopti_plus/shared/llm/inference.json",
-		(os.getenv("HOME") or "") .. "/Library/Application Support/Hammerspoon/../../../static/ergopti_plus/shared/llm/inference.json",
-	}
-	for _, p in ipairs(candidates) do
+	local p = Paths.shared("llm/inference.json")
+	if type(p) == "string" and p ~= "" then
 		local fh = io.open(p, "r")
 		if fh then
 			local raw = fh:read("*a")

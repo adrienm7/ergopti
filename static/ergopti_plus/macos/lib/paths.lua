@@ -100,16 +100,55 @@ function M.find_from_configdir(relative_target, max_steps)
 	return nil
 end
 
---- Resolves a file inside ``static/ergopti_plus/shared/llm/``.
+
+
+
+
+-- ======================================
+--- =======================================
+-- ======= 2/ Shared-tree resolver =======
+--- =======================================
+-- ======================================
+
+-- Absolute path of the shared/ tree, resolved once and memoised. This is THE
+-- single source of truth for the shared root on macOS: a repo-layout change
+-- (e.g. renaming shared/ to _shared/) only needs to be edited on this line.
+local _shared_root = nil
+
+--- Returns the absolute path of ``static/ergopti_plus/shared`` (memoised).
+--- Resolution walks up from hs.configdir and from this module's own directory,
+--- so it works in dev checkouts, packaged .app builds and ~/.hammerspoon symlink
+--- setups alike. Returns nil only when the shared tree is genuinely unreachable.
+--- @return string|nil
+function M.shared_root()
+	if _shared_root then return _shared_root end
+	_shared_root = M.find_from_configdir("static/ergopti_plus/shared")
+	return _shared_root
+end
+
+--- Resolves a path inside the shared/ tree. Every shared resource MUST go
+--- through this helper rather than hand-rolling a relative ``../shared/...``
+--- path, so the shared root lives in exactly one place (M.shared_root).
+--- @param rel string|nil Path relative to shared/, e.g. ``"llm/models.json"``. Nil → the root dir.
+--- @return string|nil Absolute path, or nil when the shared tree is unreachable.
+function M.shared(rel)
+	local root = M.shared_root()
+	if not root then return nil end
+	if rel and rel ~= "" then
+		return root .. "/" .. rel
+	end
+	return root
+end
+
+--- Resolves a file inside ``shared/llm/``. Thin wrapper over M.shared kept for
+--- call-site readability.
 --- @param filename string|nil File name (e.g. ``"models.json"``). Nil → directory path.
 --- @return string|nil Absolute path, or nil when the shared tree is unreachable.
 function M.shared_llm_path(filename)
-	local dir = M.find_from_configdir("static/ergopti_plus/shared/llm")
-	if not dir then return nil end
 	if filename and filename ~= "" then
-		return dir .. "/" .. filename
+		return M.shared("llm/" .. filename)
 	end
-	return dir
+	return M.shared("llm")
 end
 
 return M

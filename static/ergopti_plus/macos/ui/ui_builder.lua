@@ -17,6 +17,7 @@
 local M = {}
 local hs = hs
 local Logger = require("lib.logger")
+local Paths = require("lib.paths")
 local LOG = "ui_builder"
 
 -- Per-process cache of assembled HTML strings.  Avoids re-reading the local
@@ -31,12 +32,10 @@ local _html_cache = {}
 -- i18n.js fetch() resolves locale JSON files correctly even when the HTML is
 -- loaded inline (via wv:html()) with no base URL.
 local _locales_base_url = (function()
-	local src = debug.getinfo(1, "S").source:sub(2)  -- strip leading '@'
-	-- ui_builder.lua lives at  .../hammerspoon/ui/ui_builder.lua
-	-- shared/locales/          ../../../shared/locales/
-	local dir = src:match("^(.*[/\\])") or "./"
-	-- Walk up: ui/ → hammerspoon/ → ergopti_plus/ then into shared/locales/
-	local locales = dir .. "../../shared/locales/"
+	-- Resolved through the single shared-tree resolver (Paths.shared); the
+	-- trailing slash is preserved because the browser-side fetch() concatenates
+	-- the locale filename directly onto this base.
+	local locales = (Paths.shared("locales") or "") .. "/"
 	-- Normalise to forward slashes and prepend file:// so fetch() accepts it
 	locales = locales:gsub("\\", "/")
 	if not locales:match("^/") then locales = "/" .. locales end
