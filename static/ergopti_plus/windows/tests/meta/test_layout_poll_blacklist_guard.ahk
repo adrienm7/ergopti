@@ -49,8 +49,8 @@ _LPBG_FuncBody(Src, FuncDef) {
 ; ===================================================
 
 _LPBG_LayoutPollHasBlacklistGuard() {
-	Src := _LPBG_ReadSource("ErgoptiPlus.ahk")
-	Seg := _LPBG_FuncBody(Src, "CheckKeyboardLayoutChange() {")
+	Src := _DriverSourceConcat()
+	Seg := _DriverFuncBody("CheckKeyboardLayoutChange")
 	Assert(Seg != "", "CheckKeyboardLayoutChange must exist in ErgoptiPlus.ahk")
 	Assert(InStr(Seg, "MF_ShouldFilter") > 0,
 		"CheckKeyboardLayoutChange must check MF_ShouldFilter() — Reload() is disruptive; it must be skipped while a blacklisted app is focused (layout-poll-blind-reload)")

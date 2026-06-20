@@ -54,7 +54,7 @@ _TLPPH_ZeroHklPreservesPending() {
 	Src := _TLPPH_StripLineComments(_TLPPH_ReadSource("lib/layout_poll_helper.ahk"))
 	Assert(Src != "", "lib/layout_poll_helper.ahk must be readable")
 
-	Body := _TLPPH_FuncBody(Src, "_ShouldReloadForHkl(curHkl, &lastHkl, &pendingHkl, suspended, isBlacklisted, hseSuppressed, pwSuppressed, idleMs) {")
+	Body := _DriverFuncBody("_ShouldReloadForHkl")
 	Assert(Body != "", "_ShouldReloadForHkl must be defined in lib/layout_poll_helper.ahk")
 
 	; The curHkl == 0 early return must be present

@@ -72,7 +72,7 @@ _CLSO_FuncBody(Src, FuncDef) {
 ; the union of all three logical states, not just CapsWord + layer.
 _CLSO_LedConsultsHardwareToggle() {
 	Src := _CLSO_ReadSource("modules/shortcuts/capsword.ahk")
-	Seg := _CLSO_FuncBody(Src, "UpdateCapsLockLED() {")
+	Seg := _DriverFuncBody("UpdateCapsLockLED")
 	Assert(Seg != "", "UpdateCapsLockLED() declaration must exist in capsword.ahk")
 	Assert(InStr(Seg, "CapsWordEnabled") > 0,
 		"UpdateCapsLockLED must still consider CapsWordEnabled")
@@ -90,7 +90,7 @@ Test("capsword: UpdateCapsLockLED ORs the hardware CapsLock toggle (capslock-led
 ; directly, so it can never leave the LED disagreeing with CapsWord/layer state.
 _CLSO_ToggleRoutesThroughLed() {
 	Src := _CLSO_ReadSource("modules/tap_holds/one_shot_shift.ahk")
-	Seg := _CLSO_FuncBody(Src, "ToggleCapsLock() {")
+	Seg := _DriverFuncBody("ToggleCapsLock")
 	Assert(Seg != "", "ToggleCapsLock() declaration must exist in one_shot_shift.ahk")
 	Assert(InStr(Seg, "UpdateCapsLockLED()") > 0,
 		"ToggleCapsLock must route the LED through UpdateCapsLockLED() (the single LED owner) instead of setting SetCapsLockState(Off) on its own, which would desync the LED while the nav layer is active")

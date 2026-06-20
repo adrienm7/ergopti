@@ -58,7 +58,7 @@ _CPTL_FuncBody(Src, FuncDef) {
 
 _CPTL_DispatchSweepsOrphans() {
 	Src := _CPTL_ReadSource("modules/llm/api_ollama.ahk")
-	Seg := _CPTL_FuncBody(Src, "_LLM_Ollama_DispatchAsync(job) {")
+	Seg := _DriverFuncBody("_LLM_Ollama_DispatchAsync")
 	Assert(Seg != "", "_LLM_Ollama_DispatchAsync must exist in api_ollama.ahk")
 	Assert(InStr(Seg, "_LLM_Ollama_StreamCleanupOrphans(") > 0,
 		"_LLM_Ollama_DispatchAsync must call _LLM_Ollama_StreamCleanupOrphans() -- the non-streaming hot path writes PII payload files and must reap crash orphans (curl-payload-pii-temp-leak)")

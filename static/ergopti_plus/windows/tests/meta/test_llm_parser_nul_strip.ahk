@@ -57,7 +57,7 @@ _TLPNS_ControlCharStrip() {
 	Src := _TLPNS_StripLineComments(_TLPNS_ReadSource("modules/llm/parser.ahk"))
 	Assert(Src != "", "modules/llm/parser.ahk must be readable")
 
-	Body := _TLPNS_FuncBody(Src, "_LLM_Parser_CleanModelOutput(text) {")
+	Body := _DriverFuncBody("_LLM_Parser_CleanModelOutput")
 	Assert(Body != "", "_LLM_Parser_CleanModelOutput must be defined in modules/llm/parser.ahk")
 
 	; The NUL-and-control-char strip regex must be present

@@ -54,7 +54,7 @@ _TPOSS_SeenSectionsTracker() {
 	Src := _TPOSS_StripLineComments(_TPOSS_ReadSource("lib/hotstrings/hotstrings_config.ahk"))
 	Assert(Src != "", "lib/hotstrings/hotstrings_config.ahk must be readable")
 
-	Body := _TPOSS_FuncBody(Src, "_ParseOverrides(Path) {")
+	Body := _DriverFuncBody("_ParseOverrides")
 	Assert(Body != "", "_ParseOverrides must be defined in lib/hotstrings/hotstrings_config.ahk")
 
 	; SeenSections Map must be declared

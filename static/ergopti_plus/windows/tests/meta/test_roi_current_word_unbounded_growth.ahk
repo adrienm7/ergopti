@@ -71,7 +71,7 @@ _RoiWord_HasCapConstant() {
 ; keystroke thread.
 _RoiWord_OnCharCapsBuffer() {
 	Src := _RoiWord_ReadSource("modules/keylogger/keylogger_trigger_roi.ahk")
-	Body := _RoiWord_FuncBody(Src, "KL_Roi_OnChar(c) {")
+	Body := _DriverFuncBody("KL_Roi_OnChar")
 	Assert(Body != "", "KL_Roi_OnChar must exist in keylogger_trigger_roi.ahk (roi-current-word-unbounded-growth)")
 	Assert(InStr(Body, "MAX_INPROGRESS_WORD_LEN") > 0, "KL_Roi_OnChar must bound current_word against MAX_INPROGRESS_WORD_LEN before appending (roi-current-word-unbounded-growth)")
 	Assert(InStr(Body, "StrLen(KLRoi.current_word)") > 0, "KL_Roi_OnChar must measure StrLen(current_word) to enforce the cap (roi-current-word-unbounded-growth)")
@@ -82,7 +82,7 @@ _RoiWord_OnCharCapsBuffer() {
 ; over-long run never reaches KL_Roi_ProcessWord and becomes a candidate.
 _RoiWord_OverflowDiscardsRun() {
 	Src := _RoiWord_ReadSource("modules/keylogger/keylogger_trigger_roi.ahk")
-	Body := _RoiWord_FuncBody(Src, "KL_Roi_OnChar(c) {")
+	Body := _DriverFuncBody("KL_Roi_OnChar")
 	Assert(InStr(Body, "word_overflowed") > 0, "KL_Roi_OnChar must track an overflow flag so the over-long run is discarded (roi-current-word-unbounded-growth)")
 	; The boundary path must early-return on overflow before calling ProcessWord.
 	OverflowIdx := InStr(Body, "if (overflowed)")

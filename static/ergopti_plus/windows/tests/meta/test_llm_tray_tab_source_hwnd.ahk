@@ -59,7 +59,7 @@ _TLTSH_SourceHwndCheck() {
 	Assert(InStr(Src, "LLM_Tray_TryAcceptTabGuarded()") > 0,
 		"ui/tray_llm/tab_accept.ahk must define LLM_Tray_TryAcceptTabGuarded() (source_hwnd guard)")
 
-	Body := _TLTSH_FuncBody(Src, "LLM_Tray_TryAcceptTabGuarded() {")
+	Body := _DriverFuncBody("LLM_Tray_TryAcceptTabGuarded")
 	Assert(Body != "", "LLM_Tray_TryAcceptTabGuarded must have a function body in tab_accept.ahk")
 
 	; Must read source_hwnd from the engine state

@@ -70,7 +70,7 @@ _CSAE_FuncBody(Src, FuncDef) {
 
 _CSAE_TokenizerTracksRawEscape() {
 	Src := _CSAE_ReadSource("lib/config_shortcuts.ahk")
-	Seg := _CSAE_FuncBody(Src, "CS_CoerceValue(raw) {")
+	Seg := _DriverFuncBody("CS_CoerceValue")
 	Assert(Seg != "", "CS_CoerceValue(raw) declaration must exist in config_shortcuts.ahk")
 	; The fixed tokenizer carries a dedicated raw-stream escape flag.
 	Assert(InStr(Seg, "escaped := false") > 0,
@@ -87,7 +87,7 @@ _CSAE_ElementsUnescapedExactlyOnce() {
 	; exactly once instead of recursing through CS_CoerceValue again.
 	Assert(InStr(Src, "CS_CoerceElement(token) {") > 0,
 		"config_shortcuts.ahk must define CS_CoerceElement to unescape each array element exactly once")
-	Seg := _CSAE_FuncBody(Src, "CS_CoerceValue(raw) {")
+	Seg := _DriverFuncBody("CS_CoerceValue")
 	Assert(InStr(Seg, "CS_CoerceElement(") > 0,
 		"CS_CoerceValue array tokenizer must push elements through CS_CoerceElement, not re-coerce them via CS_CoerceValue")
 }

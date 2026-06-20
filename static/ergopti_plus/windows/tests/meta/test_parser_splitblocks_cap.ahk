@@ -59,7 +59,7 @@ _PSC_SplitBlocksHasMaxCount() {
 	Assert(InStr(Src, "LLM_Parser_SplitBlocks(raw, max_count") > 0,
 		"LLM_Parser_SplitBlocks must accept a max_count parameter (llm-split-batch-no-cap)")
 
-	Body := _PSC_FuncBody(Src, "LLM_Parser_SplitBlocks(raw")
+	Body := _DriverFuncBody("LLM_Parser_SplitBlocks")
 	Assert(InStr(Body, "max_count") > 0 and InStr(Body, "blocks.Length >= max_count") > 0,
 		"LLM_Parser_SplitBlocks must break when blocks.Length >= max_count (llm-split-batch-no-cap)")
 }
@@ -77,7 +77,7 @@ Test("parser: LLM_Parser_SplitBlocks accepts and enforces max_count (llm-split-b
 
 _PSC_ParseResponsePassesCap() {
 	Src := _PSC_StripComments(_PSC_ReadSource("modules/llm/parser.ahk"))
-	Body := _PSC_FuncBody(Src, "LLM_Parser_ParseResponse(")
+	Body := _DriverFuncBody("LLM_Parser_ParseResponse")
 
 	Assert(Body != "", "LLM_Parser_ParseResponse must exist in parser.ahk")
 

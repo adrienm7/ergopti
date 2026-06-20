@@ -74,7 +74,7 @@ _LACF_AfterFinally(Body) {
 ; timers fire even when TextSend raises an error.
 _LACF_BridgeHasFinally() {
 	Src := _LACF_ReadSource("modules/llm/llm_bridge.ahk")
-	Body := _LACF_FuncBody(Src, "LLM_Bridge_OnAccept(text) {")
+	Body := _DriverFuncBody("LLM_Bridge_OnAccept")
 	Assert(Body != "", "LLM_Bridge_OnAccept must exist in modules/llm/llm_bridge.ahk")
 	Assert(InStr(Body, "} finally {") > 0,
 		"LLM_Bridge_OnAccept must use try { ... } finally { ... } so cleanup timers fire even when TextSend fails (llm-accept-cleanup-in-finally)")
@@ -85,7 +85,7 @@ Test("llm_bridge: LLM_Bridge_OnAccept wraps TextSend in try/finally (llm-accept-
 ; unconditionally -- not only on the success path after TextSend.
 _LACF_BridgeKLClearInFinally() {
 	Src := _LACF_ReadSource("modules/llm/llm_bridge.ahk")
-	Body := _LACF_FuncBody(Src, "LLM_Bridge_OnAccept(text) {")
+	Body := _DriverFuncBody("LLM_Bridge_OnAccept")
 	Assert(Body != "", "LLM_Bridge_OnAccept must exist in modules/llm/llm_bridge.ahk")
 	FinallyBlock := _LACF_AfterFinally(Body)
 	Assert(FinallyBlock != "", "LLM_Bridge_OnAccept must have a } finally { block (llm-accept-cleanup-in-finally)")
@@ -98,7 +98,7 @@ Test("llm_bridge: KL_ClearSynthetic timer is scheduled from the finally block (l
 ; block -- a stuck suppression silences the hotstring engine permanently.
 _LACF_BridgePrefixSupInFinally() {
 	Src := _LACF_ReadSource("modules/llm/llm_bridge.ahk")
-	Body := _LACF_FuncBody(Src, "LLM_Bridge_OnAccept(text) {")
+	Body := _DriverFuncBody("LLM_Bridge_OnAccept")
 	FinallyBlock := _LACF_AfterFinally(Body)
 	Assert(FinallyBlock != "", "LLM_Bridge_OnAccept must have a } finally { block (llm-accept-cleanup-in-finally)")
 	Assert(InStr(FinallyBlock, "PrefixWatcherSuppress(false)") > 0,
@@ -117,7 +117,7 @@ Test("llm_bridge: PrefixWatcherSuppress release timer is scheduled from the fina
 ; the cleanup timers must be in a finally block, not inline after TextSend.
 _LACF_EngineHasFinally() {
 	Src := _LACF_ReadSource("modules/llm/prediction_engine.ahk")
-	Body := _LACF_FuncBody(Src, "LLM_Engine_OnResults(slots, ctx, active := 1, is_final := false) {")
+	Body := _DriverFuncBody("LLM_Engine_OnResults")
 	Assert(Body != "", "LLM_Engine_OnResults must exist in modules/llm/prediction_engine.ahk")
 	Assert(InStr(Body, "} finally {") > 0,
 		"The inline auto-type path of LLM_Engine_OnResults must use try/finally so cleanup timers fire even when TextSend fails (llm-accept-cleanup-in-finally)")
@@ -126,7 +126,7 @@ Test("prediction_engine: LLM_Engine_OnResults inline accept wraps TextSend in tr
 
 _LACF_EngineKLClearInFinally() {
 	Src := _LACF_ReadSource("modules/llm/prediction_engine.ahk")
-	Body := _LACF_FuncBody(Src, "LLM_Engine_OnResults(slots, ctx, active := 1, is_final := false) {")
+	Body := _DriverFuncBody("LLM_Engine_OnResults")
 	Assert(Body != "", "LLM_Engine_OnResults must exist in modules/llm/prediction_engine.ahk")
 	FinallyBlock := _LACF_AfterFinally(Body)
 	Assert(FinallyBlock != "", "LLM_Engine_OnResults must have a } finally { block in its auto-type path (llm-accept-cleanup-in-finally)")

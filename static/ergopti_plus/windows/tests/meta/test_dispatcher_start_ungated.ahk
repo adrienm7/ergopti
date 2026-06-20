@@ -81,7 +81,7 @@ _DSU_FindMatchingClose(Lines, OpenLine) {
 ; ========================================================
 
 _DSU_CheckStartUngated() {
-	Body := _DSU_ReadSource("ErgoptiPlus.ahk")
+	Body := _DriverSourceConcat()
 	Assert(Body != "", "ErgoptiPlus.ahk must be readable")
 
 	; (a) HookDispatcher.Start() must exist somewhere in the file.

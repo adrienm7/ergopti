@@ -142,25 +142,23 @@ _DescribeValue(V) {
 	}
 }
 
-; Reads ErgoptiPlus.ahk concatenated with every .ahk file it directly #Includes,
-; so source-introspection tests find a function regardless of which lib/ or ui/
-; file the entrypoint decomposition (P4/P5) moved it into. Cached after first use.
+; Reads the ENTIRE driver source — every .ahk under the windows/ root except the
+; tests/, vendor/ and _generated/ trees — concatenated into one string, so
+; source-introspection tests find a function regardless of which lib/ or ui/ file
+; the entrypoint decomposition (P4/P5) moved it into. Function names are unique in
+; the driver's global namespace, so the column-0 anchor in _DriverFuncBody still
+; resolves to the single definition. Cached after first use.
 _DriverSourceConcat() {
 	static cache := ""
 	if (cache != "")
 		return cache
-	SplitPath(A_ScriptDir, , &Root)
-	Root := StrReplace(Root, "\", "/")
-	Entry := FileRead(Root . "/ErgoptiPlus.ahk")
-	Combined := Entry
-	for Line in StrSplit(Entry, "`n", "`r") {
-		if RegExMatch(Line, "^\s*#Include\s+(?:\*i\s+)?(.+?)\s*$", &m) {
-			Inc := StrReplace(Trim(m[1]), "\", "/")
-			if !RegExMatch(Inc, "i)\.ahk$")
-				continue
-			Path := RegExMatch(Inc, "^([A-Za-z]:/|/)") ? Inc : Root . "/" . Inc
-			try Combined .= "`n" . FileRead(Path)
-		}
+	SplitPath(A_ScriptDir, , &Root)   ; A_ScriptDir = windows/tests  ->  Root = windows
+	Combined := ""
+	Loop Files, Root . "\*.ahk", "FR" {
+		p := StrReplace(A_LoopFileFullPath, "\", "/")
+		if (InStr(p, "/tests/") or InStr(p, "/vendor/") or InStr(p, "/_generated/"))
+			continue
+		try Combined .= "`n" . FileRead(A_LoopFileFullPath)
 	}
 	cache := Combined
 	return cache
@@ -172,7 +170,11 @@ _DriverSourceConcat() {
 ; indented) in an earlier-concatenated file is never mistaken for the body.
 _DriverFuncBody(Name) {
 	Src := _DriverSourceConcat()
-	if !RegExMatch(Src, "m)^" . Name . "\(", &m)
+	; Match a function DEFINITION line — the name, its (...) params and the opening
+	; brace — optionally indented (nested functions), never a bare call site (a
+	; call has no trailing ") {"). This distinguishes def from call without relying
+	; on column 0, so nested helpers like _OneShot/_Repeating resolve too.
+	if !RegExMatch(Src, "m)^[ \t]*" . Name . "\([^\r\n]*\)\s*\{", &m)
 		return ""
 	Idx := m.Pos
 	OpenPos := InStr(Src, "{", , Idx)

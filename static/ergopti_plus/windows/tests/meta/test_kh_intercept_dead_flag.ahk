@@ -64,7 +64,7 @@ _KHIDF_FuncBody(Src, FuncDef) {
 
 _KHIDF_KHStartWarnsOnIntercept() {
 	Src := _KHIDF_ReadSource("adapters/keyboard_hook.ahk")
-	Seg := _KHIDF_FuncBody(Src, "KHStart(Opts) {")
+	Seg := _DriverFuncBody("KHStart")
 	Assert(Seg != "", "KHStart(Opts) declaration must exist in keyboard_hook.ahk")
 	Assert(InStr(Seg, "intercept") > 0,
 		"KHStart must still read the intercept option — it remains part of the port contract")

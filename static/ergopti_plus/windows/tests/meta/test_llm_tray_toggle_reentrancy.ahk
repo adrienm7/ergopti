@@ -56,7 +56,7 @@ _TLTTR_ReentrancyGuard() {
 	Src := _TLTTR_StripLineComments(_TLTTR_ReadSource("ui/tray_llm/actions.ahk"))
 	Assert(Src != "", "ui/tray_llm/actions.ahk must be readable")
 
-	Body := _TLTTR_FuncBody(Src, "LLM_Tray_OnToggle(*) {")
+	Body := _DriverFuncBody("LLM_Tray_OnToggle")
 	Assert(Body != "", "LLM_Tray_OnToggle must be defined in ui/tray_llm/actions.ahk")
 
 	; The re-entrancy static must be declared

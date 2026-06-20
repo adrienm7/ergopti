@@ -72,7 +72,7 @@ _GDLF_FuncBody(Src, FuncName) {
 
 _GDLF_DispatchCatchesAndLogs() {
 	Src := _GDLF_ReadSource("modules/gestures.ahk")
-	Body := _GDLF_FuncBody(Src, "GestureDispatch(slot)")
+	Body := _DriverFuncBody("GestureDispatch")
 	Assert(Body != "", "GestureDispatch(slot) must exist in modules/gestures.ahk")
 
 	Assert(InStr(Body, "catch") > 0,

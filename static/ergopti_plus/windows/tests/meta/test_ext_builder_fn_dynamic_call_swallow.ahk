@@ -65,7 +65,7 @@ _EBFD_FuncBody(Src, FuncDef) {
 
 _EBFD_CatchFailsLoud() {
 	Src := _EBFD_ReadSource("ui/tray_menu.ahk")
-	Seg := _EBFD_FuncBody(Src, "_SC_Extensions(SubMenu, _Cat) {")
+	Seg := _DriverFuncBody("_SC_Extensions")
 	Assert(Seg != "", "_SC_Extensions(SubMenu, _Cat) declaration must exist in tray_menu.ahk")
 	; The thrown-builder branch must log an ERROR, not merely a Warn the user
 	; never reads.
@@ -76,7 +76,7 @@ Test("tray_menu: extension builder failure logs an ERROR (ext-builder-fn-dynamic
 
 _EBFD_RendersVisibleErrorRow() {
 	Src := _EBFD_ReadSource("ui/tray_menu.ahk")
-	Seg := _EBFD_FuncBody(Src, "_SC_Extensions(SubMenu, _Cat) {")
+	Seg := _DriverFuncBody("_SC_Extensions")
 	Assert(Seg != "", "_SC_Extensions(SubMenu, _Cat) declaration must exist in tray_menu.ahk")
 	; A failed/empty builder must produce a visible disabled marker built from a
 	; localised error prefix plus the ExtId, so it is not mistaken for an absent
@@ -88,7 +88,7 @@ Test("tray_menu: extension builder failure shows a visible disabled row (ext-bui
 
 _EBFD_ValidatesItemsPopulated() {
 	Src := _EBFD_ReadSource("ui/tray_menu.ahk")
-	Seg := _EBFD_FuncBody(Src, "_SC_Extensions(SubMenu, _Cat) {")
+	Seg := _DriverFuncBody("_SC_Extensions")
 	Assert(Seg != "", "_SC_Extensions(SubMenu, _Cat) declaration must exist in tray_menu.ahk")
 	; A builder may return without throwing yet populate nothing; the fix counts
 	; the items added and treats zero as a failure.

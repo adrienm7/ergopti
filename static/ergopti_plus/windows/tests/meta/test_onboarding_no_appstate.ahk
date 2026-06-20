@@ -64,7 +64,7 @@ _ONA_FuncBody(Src, FuncDef) {
 
 _ONA_CommitDoesNotUseAppState() {
 	Src := _ONA_ReadSource("lib\onboarding.ahk")
-	Seg := _ONA_FuncBody(Src, "_Onboarding_Commit()")
+	Seg := _DriverFuncBody("_Onboarding_Commit")
 	Assert(Seg != "", "_Onboarding_Commit declaration must exist in lib/onboarding.ahk")
 	; Any AppState[...] index-assign in this function throws UnsetError in production
 	; because the Map was removed from lib/app_state.ahk
@@ -75,7 +75,7 @@ Test("onboarding: _Onboarding_Commit does not access AppState (UnsetError crash 
 
 _ONA_CommitUsesStrictCanonGlobal() {
 	Src := _ONA_ReadSource("lib\onboarding.ahk")
-	Seg := _ONA_FuncBody(Src, "_Onboarding_Commit() {")
+	Seg := _DriverFuncBody("_Onboarding_Commit")
 	Assert(Seg != "", "_Onboarding_Commit declaration must exist in lib/onboarding.ahk")
 	; Must use the correct plain global instead of the removed Map entry
 	Assert(InStr(Seg, "_TOML_STRICT_CANON_IN_PROGRESS") > 0,
@@ -95,7 +95,7 @@ Test("onboarding: _Onboarding_Commit uses _TOML_STRICT_CANON_IN_PROGRESS global 
 
 _ONA_StrictCanonDoesNotUseAppState() {
 	Src := _ONA_ReadSource("lib\toml\toml_helpers.ahk")
-	Seg := _ONA_FuncBody(Src, "TOML_RunStrictCanonicalization(Path)")
+	Seg := _DriverFuncBody("TOML_RunStrictCanonicalization")
 	Assert(Seg != "", "TOML_RunStrictCanonicalization declaration must exist in lib/toml/toml_helpers.ahk")
 	; AppState.Has(...) would throw UnsetError in production
 	Assert(InStr(Seg, "AppState.Has") = 0,

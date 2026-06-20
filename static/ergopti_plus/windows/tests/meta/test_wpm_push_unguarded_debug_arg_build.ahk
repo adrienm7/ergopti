@@ -60,7 +60,7 @@ _WpmDbg_FuncBody(Src, FuncDef) {
 
 _WpmDbg_PushDebugIsGated() {
 	Src := _WpmDbg_ReadSource("lib/metrics/wpm_widget.ahk")
-	Seg := _WpmDbg_FuncBody(Src, "WPMWidget_Push(")
+	Seg := _DriverFuncBody("WPMWidget_Push")
 	Assert(Seg != "", "WPMWidget_Push declaration must exist in wpm_widget.ahk")
 
 	DbgIdx := InStr(Seg, "LoggerDebug(")

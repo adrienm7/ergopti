@@ -59,7 +59,7 @@ _LDEK_FuncBody(Src, FuncDef) {
 _LDEK_DeadKeyResendEndKey() {
 	Raw := _LDEK_ReadSource("modules/layout.ahk")
 	Src := _LDEK_StripComments(Raw)
-	Body := _LDEK_FuncBody(Src, "DeadKey(Mapping) {")
+	Body := _DriverFuncBody("DeadKey")
 	Assert(Body != "", "DeadKey(Mapping) must exist in modules/layout.ahk")
 
 	; Must check EndReason so the re-send only fires when an EndKey terminated the hook

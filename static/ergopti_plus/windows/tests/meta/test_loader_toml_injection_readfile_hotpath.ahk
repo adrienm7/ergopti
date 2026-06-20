@@ -69,7 +69,7 @@ _LTI_FuncBody(Src, FuncDef) {
 
 _LTI_WriteTapHoldTomlIsAtomic() {
 	Src := _LTI_ReadSource("lib/tap_hold/tap_hold_writer.ahk")
-	Seg := _LTI_FuncBody(Src, "_TH_WriteTapHoldToml() {")
+	Seg := _DriverFuncBody("_TH_WriteTapHoldToml")
 	Assert(Seg != "", "_TH_WriteTapHoldToml declaration must exist in tap_hold_writer.ahk")
 	Assert(InStr(Seg, "FileDelete(Path)") == 0,
 		"_TH_WriteTapHoldToml must NOT delete the live tap_hold.toml first — a crash before FileAppend truncates it (loader-toml-injection-readfile-hotpath)")
@@ -80,7 +80,7 @@ Test("tap_hold_writer: _TH_WriteTapHoldToml uses atomic FileMove (loader-toml-in
 
 _LTI_WriteTapHoldDisabledIsAtomic() {
 	Src := _LTI_ReadSource("lib/tap_hold/tap_hold_writer.ahk")
-	Seg := _LTI_FuncBody(Src, "_TH_WriteTapHoldDisabled() {")
+	Seg := _DriverFuncBody("_TH_WriteTapHoldDisabled")
 	Assert(Seg != "", "_TH_WriteTapHoldDisabled declaration must exist in tap_hold_writer.ahk")
 	Assert(InStr(Seg, "FileDelete(Path)") == 0,
 		"_TH_WriteTapHoldDisabled must NOT delete the live tap_hold.toml first (loader-toml-injection-readfile-hotpath)")

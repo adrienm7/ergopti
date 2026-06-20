@@ -65,7 +65,7 @@ _HDGA_FuncBody(Src, FuncDef) {
 
 _HDGA_DisableGroupRebuildIsAtomic() {
 	Src := _HDGA_ReadSource("lib/hotstrings/hotstring_engine_main.ahk")
-	Body := _HDGA_FuncBody(Src, "HSE_DisableGroup(Group) {")
+	Body := _DriverFuncBody("HSE_DisableGroup")
 	Assert(Body != "", "HSE_DisableGroup(Group) declaration must exist in hotstring_engine_main.ahk")
 
 	; The wide index rebuild must be Critical-wrapped so a reader thread never

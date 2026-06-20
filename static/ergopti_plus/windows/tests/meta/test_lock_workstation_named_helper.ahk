@@ -56,7 +56,7 @@ _LWNH_FuncBody(Src, FuncDef) {
 
 _LWNH_AssertNamedHelperExists() {
 	Src := _LWNH_ReadSource("modules/layout.ahk")
-	Body := _LWNH_FuncBody(Src, "_LockWorkstationEmit(*) {")
+	Body := _DriverFuncBody("_LockWorkstationEmit")
 	Assert(Body != "", "layout.ahk must define a named _LockWorkstationEmit helper instead of an inline arrow (lock-workstation-lambda-implicit-concat)")
 	Assert(InStr(Body, "LockWorkStation") > 0,
 		"_LockWorkstationEmit must call DllCall(LockWorkStation) on an explicit line (lock-workstation-lambda-implicit-concat)")

@@ -61,7 +61,7 @@ _HCWRA_FuncBody(Src, FuncDef) {
 
 _HCWRA_WidgetsInGlobalDecl() {
 	Src := _HCWRA_ReadSource("lib\hotstrings\hotstrings_config_window.ahk")
-	Body := _HCWRA_FuncBody(Src, "_HCW_ResetAll() {")
+	Body := _DriverFuncBody("_HCW_ResetAll")
 	Assert(Body != "", "_HCW_ResetAll must exist in hotstrings_config_window.ahk")
 	; The global declaration must include _HCWWidgets so AHK treats the assignment
 	; below as the module-level variable, not a new local
@@ -72,7 +72,7 @@ Test("hcw_reset_all: _HCWWidgets present in function body (global declaration)",
 
 _HCWRA_GuiNulledAfterDestroy() {
 	Src := _HCWRA_ReadSource("lib\hotstrings\hotstrings_config_window.ahk")
-	Body := _HCWRA_FuncBody(Src, "_HCW_ResetAll() {")
+	Body := _DriverFuncBody("_HCW_ResetAll")
 	Assert(InStr(Body, "_HCWGui := 0") > 0,
 		"_HCW_ResetAll must set _HCWGui := 0 after Destroy() — Gui.Destroy() does not fire OnEvent('Close') (hcw-reset-all-teardown)")
 }
@@ -80,7 +80,7 @@ Test("hcw_reset_all: _HCWGui is zeroed after Destroy()", _HCWRA_GuiNulledAfterDe
 
 _HCWRA_WidgetsNulledAfterDestroy() {
 	Src := _HCWRA_ReadSource("lib\hotstrings\hotstrings_config_window.ahk")
-	Body := _HCWRA_FuncBody(Src, "_HCW_ResetAll() {")
+	Body := _DriverFuncBody("_HCW_ResetAll")
 	Assert(InStr(Body, "_HCWWidgets := 0") > 0,
 		"_HCW_ResetAll must set _HCWWidgets := 0 after Destroy() to prevent debounce timer from accessing destroyed controls (hcw-reset-all-teardown)")
 }
@@ -88,7 +88,7 @@ Test("hcw_reset_all: _HCWWidgets is zeroed after Destroy()", _HCWRA_WidgetsNulle
 
 _HCWRA_FlushCalledBeforeDestroy() {
 	Src := _HCWRA_ReadSource("lib\hotstrings\hotstrings_config_window.ahk")
-	Body := _HCWRA_FuncBody(Src, "_HCW_ResetAll() {")
+	Body := _DriverFuncBody("_HCW_ResetAll")
 	Assert(InStr(Body, "_HCW_FlushNumericWrite()") > 0,
 		"_HCW_ResetAll must call _HCW_FlushNumericWrite() to drain the debounce timer before controls are destroyed (hcw-reset-all-teardown)")
 }
@@ -96,7 +96,7 @@ Test("hcw_reset_all: _HCW_FlushNumericWrite() is called", _HCWRA_FlushCalledBefo
 
 _HCWRA_FlushBeforeDestroy() {
 	Src := _HCWRA_ReadSource("lib\hotstrings\hotstrings_config_window.ahk")
-	Body := _HCWRA_FuncBody(Src, "_HCW_ResetAll() {")
+	Body := _DriverFuncBody("_HCW_ResetAll")
 	IdxFlush := InStr(Body, "_HCW_FlushNumericWrite()")
 	IdxDestroy := InStr(Body, ".Destroy()")
 	Assert(IdxFlush > 0 and IdxDestroy > 0 and IdxFlush < IdxDestroy,

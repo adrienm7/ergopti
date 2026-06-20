@@ -64,7 +64,7 @@ _SCSR_FuncBody(Src, FuncDef) {
 
 _SCSR_StopResetsCpuBaseline() {
 	Src := _SCSR_ReadSource("modules/keylogger/keylogger_sensors.ahk")
-	Seg := _SCSR_FuncBody(Src, "KL_Sensors_Stop() {")
+	Seg := _DriverFuncBody("KL_Sensors_Stop")
 	Assert(Seg != "", "KL_Sensors_Stop() declaration must exist in keylogger_sensors.ahk")
 	AssertContains(Seg, "KLSensors.prev_idle   := -1",
 		"KL_Sensors_Stop must reset KLSensors.prev_idle to -1 — statics survive Stop/Start, so a stale CPU baseline would emit a bogus first sample after re-enabling")

@@ -62,7 +62,7 @@ _DSW_FuncBody(Src, FuncDef) {
 ; ==================================================
 
 _DSW_OnExitWiresStop() {
-	Src := _DSW_ReadSource("ErgoptiPlus.ahk")
+	Src := _DriverSourceConcat()
 	; The startup section must register Stop() as the process OnExit handler so a
 	; plain ExitApp releases the InputHook explicitly, not just via OS teardown.
 	Assert(InStr(Src, "OnExit") > 0 && InStr(Src, "HookDispatcher.Stop") > 0,

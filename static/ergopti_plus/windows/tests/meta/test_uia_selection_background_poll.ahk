@@ -52,7 +52,7 @@ _USBP_SelectionIsPolledInBackground() {
 	Src := _USBP_ReadSource("modules/layout.ahk")
 	
 	; 1. Verify background tick exists and does the heavy lifting.
-	TickBody := _USBP_FuncBody(Src, "_UIA_SelectionPollTick() {")
+	TickBody := _DriverFuncBody("_UIA_SelectionPollTick")
 	Assert(TickBody != "", "_UIA_SelectionPollTick must exist in modules/layout.ahk")
 	Assert(InStr(TickBody, "UIA.GetFocusedElement()") > 0,
 		"_UIA_SelectionPollTick must perform the UIA query (uia-selection-blocks-keyboard-thread)")
@@ -60,7 +60,7 @@ _USBP_SelectionIsPolledInBackground() {
 		"_UIA_SelectionPollTick must update the _UIA_SelectionCache")
 	
 	; 2. Verify GetUIASelection is now just a cache reader.
-	GetterBody := _USBP_FuncBody(Src, "GetUIASelection() {")
+	GetterBody := _DriverFuncBody("GetUIASelection")
 	Assert(GetterBody != "", "GetUIASelection must exist in modules/layout.ahk")
 	Assert(InStr(GetterBody, "return _UIA_SelectionCache") > 0,
 		"GetUIASelection must return the cached value immediately (uia-selection-blocks-keyboard-thread)")
@@ -79,7 +79,7 @@ Test("layout: UIA selection is polled in background (uia-selection-blocks-keyboa
 ; (WrapTextIfSelected, gated on wrap_text_if_selected) is disabled.
 _USBP_PollTickSuspendAndFeatureGated() {
 	Src := _USBP_ReadSource("modules/layout.ahk")
-	TickBody := _USBP_FuncBody(Src, "_UIA_SelectionPollTick() {")
+	TickBody := _DriverFuncBody("_UIA_SelectionPollTick")
 	Assert(TickBody != "", "_UIA_SelectionPollTick must exist in modules/layout.ahk")
 	Assert(InStr(TickBody, "A_IsSuspended") > 0,
 		"_UIA_SelectionPollTick must early-return on A_IsSuspended — SetTimer bypasses native Suspend, so the synchronous UIA COM poll would keep firing on the keyboard thread while paused (uia-poll-bypasses-suspend)")

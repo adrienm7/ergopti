@@ -52,7 +52,7 @@ _TTSMG_MsZeroGuard() {
 	Src := _TTSMG_StripLineComments(_TTSMG_ReadSource("adapters/timer_scheduler.ahk"))
 	Assert(Src != "", "adapters/timer_scheduler.ahk must be readable")
 
-	Body := _TTSMG_FuncBody(Src, "TimerEvery(IntervalSec, Fn) {")
+	Body := _DriverFuncBody("TimerEvery")
 	Assert(Body != "", "TimerEvery must be defined in adapters/timer_scheduler.ahk")
 
 	; The guard must be present

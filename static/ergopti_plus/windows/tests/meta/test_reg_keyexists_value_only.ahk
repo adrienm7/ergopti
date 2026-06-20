@@ -69,7 +69,7 @@ _RKVO_FuncBody(Src, FuncDef) {
 
 _RKVO_KeyExistsEnumeratesValues() {
 	Src := _RKVO_ReadSource("lib/registry.ahk")
-	Seg := _RKVO_FuncBody(Src, "Reg_KeyExists(keyPath) {")
+	Seg := _DriverFuncBody("Reg_KeyExists")
 	Assert(Seg != "", "Reg_KeyExists(keyPath) declaration must exist in lib/registry.ahk")
 	; The fix iterates named values so a value-only key (no sub-keys, no
 	; (Default) value) is reported as existing. Both forms of the directive are

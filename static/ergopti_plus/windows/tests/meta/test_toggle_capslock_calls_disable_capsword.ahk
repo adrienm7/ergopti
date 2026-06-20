@@ -70,7 +70,7 @@ _TCDCW_CheckCallsDisableCapsWord() {
 	Src := _TCDCW_ReadSource("modules/tap_holds/one_shot_shift.ahk")
 	Assert(Src != "", "modules/tap_holds/one_shot_shift.ahk must be readable")
 
-	Body := _TCDCW_FuncBody(Src, "ToggleCapsLock() {")
+	Body := _DriverFuncBody("ToggleCapsLock")
 	Assert(Body != "", "ToggleCapsLock must be present in one_shot_shift.ahk")
 
 	Assert(InStr(Body, "DisableCapsWord()"),
@@ -81,7 +81,7 @@ _TCDCW_CheckNoDirectFalseAssign() {
 	Src := _TCDCW_ReadSource("modules/tap_holds/one_shot_shift.ahk")
 	Assert(Src != "", "modules/tap_holds/one_shot_shift.ahk must be readable")
 
-	Body := _TCDCW_FuncBody(Src, "ToggleCapsLock() {")
+	Body := _DriverFuncBody("ToggleCapsLock")
 	Assert(Body != "", "ToggleCapsLock must be present in one_shot_shift.ahk")
 
 	; The bare assignment (without the else/fallback path) must not appear as

@@ -67,11 +67,11 @@ _WVRL_FuncBody(Src, FuncDef) {
 ; ==================================================
 
 _WVRL_CloseAllWiredToOnExit() {
-	Src := _WVRL_ReadSource("ErgoptiPlus.ahk")
+	Src := _DriverSourceConcat()
 	; The single global shutdown handler must call KLWV_CloseAll, and it must be
 	; registered via OnExit - Reload/ExitApp run ONLY OnExit callbacks, so this
 	; is the seam that releases the WebView2 controllers and unlocks the udirs.
-	Seg := _WVRL_FuncBody(Src, "Ergopti_OnShutdown(reason, code) {")
+	Seg := _DriverFuncBody("Ergopti_OnShutdown")
 	Assert(Seg != "", "Ergopti_OnShutdown(reason, code) must exist in ErgoptiPlus.ahk")
 	Assert(InStr(Seg, "KLWV_CloseAll()") > 0,
 		"Ergopti_OnShutdown must call KLWV_CloseAll() - without it a Reload orphans the WebView2 host process and leaks its locked ergopti_webview2_* temp profile dir")
@@ -91,7 +91,7 @@ Test("keylogger: KLWV_CloseAll runs on shutdown via OnExit (webview-temp-dir-and
 
 _WVRL_CloseReleasesEverything() {
 	Src := _WVRL_ReadSource("modules/keylogger/keylogger_webview.ahk")
-	Seg := _WVRL_FuncBody(Src, "KLWV_Close(which) {")
+	Seg := _DriverFuncBody("KLWV_Close")
 	Assert(Seg != "", "KLWV_Close(which) must exist in keylogger_webview.ahk")
 	; Releasing the COM controller is what stops the msedgewebview2.exe host and
 	; releases the lock on the per-launch profile dir.
@@ -108,7 +108,7 @@ Test("keylogger: KLWV_Close releases controller, gui and udir (webview-temp-dir-
 
 _WVRL_CloseAllIteratesClone() {
 	Src := _WVRL_ReadSource("modules/keylogger/keylogger_webview.ahk")
-	Seg := _WVRL_FuncBody(Src, "KLWV_CloseAll() {")
+	Seg := _DriverFuncBody("KLWV_CloseAll")
 	Assert(Seg != "", "KLWV_CloseAll() must exist in keylogger_webview.ahk")
 	; KLWV_Close mutates KLWV.windows (Delete) mid-iteration; iterating a Clone()
 	; avoids skipping entries / corrupting the enumerator.

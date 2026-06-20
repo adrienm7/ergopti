@@ -59,7 +59,7 @@ _TDUDMK_DynamicMagicKeyUsed() {
 	Src := _TDUDMK_StripLineComments(_TDUDMK_ReadSource("modules/hotstrings.ahk"))
 	Assert(Src != "", "modules/hotstrings.ahk must be readable")
 
-	Body := _TDUDMK_FuncBody(Src, "ShouldActivateDeadkey(Combination, MappedValue, Delay) {")
+	Body := _DriverFuncBody("ShouldActivateDeadkey")
 	Assert(Body != "", "ShouldActivateDeadkey must be defined in modules/hotstrings.ahk")
 
 	; Must read the magic key from ScriptInformation at runtime

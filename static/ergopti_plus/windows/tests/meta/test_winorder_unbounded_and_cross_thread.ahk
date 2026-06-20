@@ -69,7 +69,7 @@ Test("gestures: GESTURE_WIN_ORDER_MAX cap constant exists (winorder-unbounded-an
 
 _WUCT_OnForegroundCapsLength() {
 	Src := _WUCT_ReadSource("modules/gestures.ahk")
-	Seg := _WUCT_FuncBody(Src, "_GestureOnForeground(")
+	Seg := _DriverFuncBody("_GestureOnForeground")
 	Assert(Seg != "", "_GestureOnForeground declaration must exist in gestures.ahk")
 	Assert(InStr(Seg, "GESTURE_WIN_ORDER_MAX") > 0,
 		"_GestureOnForeground must bound its rebuild by GESTURE_WIN_ORDER_MAX — without the cap the recency list grows without limit and each gesture pays an O(n) prune")
@@ -78,7 +78,7 @@ Test("gestures: _GestureOnForeground caps _GestureWinOrder length (winorder-unbo
 
 _WUCT_OnForegroundHasSuspendGuard() {
 	Src := _WUCT_ReadSource("modules/gestures.ahk")
-	Seg := _WUCT_FuncBody(Src, "_GestureOnForeground(")
+	Seg := _DriverFuncBody("_GestureOnForeground")
 	Assert(Seg != "", "_GestureOnForeground declaration must exist in gestures.ahk")
 	Assert(InStr(Seg, "A_IsSuspended") > 0,
 		"_GestureOnForeground must early-return on A_IsSuspended so the recency tracker does not churn while the driver is paused")

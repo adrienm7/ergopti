@@ -55,7 +55,7 @@ _KHT_FuncBody(Src, FuncDecl) {
 
 _KHT_OnCharWrapped() {
 	Src := _KHT_StripComments(_KHT_ReadSource("modules/keylogger/keylogger_hook.ahk"))
-	Body := _KHT_FuncBody(Src, "KL_Hook_OnChar(")
+	Body := _DriverFuncBody("KL_Hook_OnChar")
 
 	Assert(Body != "", "KL_Hook_OnChar must exist in keylogger_hook.ahk")
 
@@ -83,7 +83,7 @@ Test("keylogger_hook: KL_Hook_OnChar body wrapped in global try/catch (keylogger
 
 _KHT_OnKeyDownWrapped() {
 	Src := _KHT_StripComments(_KHT_ReadSource("modules/keylogger/keylogger_hook.ahk"))
-	Body := _KHT_FuncBody(Src, "KL_Hook_OnKeyDown(")
+	Body := _DriverFuncBody("KL_Hook_OnKeyDown")
 
 	Assert(Body != "", "KL_Hook_OnKeyDown must exist in keylogger_hook.ahk")
 

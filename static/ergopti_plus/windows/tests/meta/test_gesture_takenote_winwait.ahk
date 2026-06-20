@@ -60,7 +60,7 @@ _GTN_FuncBody(Src, FuncDef) {
 _GTN_WinWaitIsQualified() {
 	Raw := _GTN_ReadSource("modules/gestures.ahk")
 	Src := _GTN_StripComments(Raw)
-	Body := _GTN_FuncBody(Src, "GestureTakeNote() {")
+	Body := _DriverFuncBody("GestureTakeNote")
 	Assert(Body != "", "GestureTakeNote() must exist in modules/gestures.ahk")
 
 	; Negative: bare WinWait on filename alone must not appear after Run()

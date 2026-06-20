@@ -60,7 +60,7 @@ _TMRA_FuncBody(Src, FuncDef) {
 
 _TMRA_ActionableRoutesThroughRegister() {
 	Src := _TMRA_ReadSource("adapters/tray_menu.ahk")
-	Seg := _TMRA_FuncBody(Src, "TrayMenuSetMenu(Items) {")
+	Seg := _DriverFuncBody("TrayMenuSetMenu")
 	Assert(Seg != "", "TrayMenuSetMenu(Items) must exist in adapters/tray_menu.ahk")
 	Assert(InStr(Seg, "RegisterMenuItem(A_TrayMenu") > 0,
 		"TrayMenuSetMenu must route actionable items through RegisterMenuItem(A_TrayMenu, ...) so they join the WM_COMMAND retry path")
@@ -69,7 +69,7 @@ Test("tray_menu: actionable items routed through RegisterMenuItem (traymenu-setm
 
 _TMRA_NoRawActionableAdd() {
 	Src := _TMRA_ReadSource("adapters/tray_menu.ahk")
-	Seg := _TMRA_FuncBody(Src, "TrayMenuSetMenu(Items) {")
+	Seg := _DriverFuncBody("TrayMenuSetMenu")
 	; The two-argument raw Add bypasses the dispatch retry and is the bug.
 	; Separators keep the zero-argument A_TrayMenu.Add(), which is fine.
 	Assert(InStr(Seg, "A_TrayMenu.Add(ItemTitle") = 0,

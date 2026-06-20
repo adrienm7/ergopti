@@ -67,7 +67,7 @@ _AHSG_FuncBody(Src, FuncDef) {
 
 _AHSG_GateBeforePoke() {
 	Src := _AHSG_ReadSource("lib/hotstrings/hotstring_engine.ahk")
-	Seg := _AHSG_FuncBody(Src, "ActivateHotstrings() {")
+	Seg := _DriverFuncBody("ActivateHotstrings")
 	Assert(Seg != "", "ActivateHotstrings() declaration must exist in hotstring_engine.ahk")
 
 	; The empty-buffer gate must reference HSE_Buffer.
@@ -86,7 +86,7 @@ Test("hotstring_engine: ActivateHotstrings gates the Sleep poke on a pending HSE
 
 _AHSG_GuardReturnsEarly() {
 	Src := _AHSG_ReadSource("lib/hotstrings/hotstring_engine.ahk")
-	Seg := _AHSG_FuncBody(Src, "ActivateHotstrings() {")
+	Seg := _DriverFuncBody("ActivateHotstrings")
 	; Slice from the function head to the first space poke: the early-return that
 	; skips the dance on an empty buffer must live in that prologue.
 	PokeIdx := InStr(Seg, "SendNewResult(" . Chr(0x22) . " " . Chr(0x22) . ")")

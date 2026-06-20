@@ -78,7 +78,7 @@ Test("menu_dispatcher: MenuDispatcher_PruneMenu prune helper exists (menu-dispat
 
 _MDCUG_PruneDeletesMapEntries() {
 	Src := _MDCUG_ReadSource("lib/menu_dispatcher.ahk")
-	Seg := _MDCUG_FuncBody(Src, "MenuDispatcher_PruneMenu(MenuObj) {")
+	Seg := _DriverFuncBody("MenuDispatcher_PruneMenu")
 	Assert(Seg != "", "MenuDispatcher_PruneMenu(MenuObj) declaration must exist in menu_dispatcher.ahk")
 	Assert(InStr(Seg, "_MenuDispatchCallbacks.Delete(") > 0,
 		"MenuDispatcher_PruneMenu must Delete() dead entries from _MenuDispatchCallbacks - otherwise the Map still grows without bound")
@@ -101,7 +101,7 @@ Test("menu_dispatcher: PruneMenu deletes dead entries from both dispatch Maps (m
 
 _MDCUG_BuildCallsPrune() {
 	Src := _MDCUG_ReadSource("ui/tray_llm/menu_main.ahk")
-	Seg := _MDCUG_FuncBody(Src, "LLM_Tray_Build() {")
+	Seg := _DriverFuncBody("LLM_Tray_Build")
 	Assert(Seg != "", "LLM_Tray_Build() declaration must exist in menu_main.ahk")
 	Assert(InStr(Seg, "MenuDispatcher_PruneMenu(_LLM_Tray_Menu)") > 0,
 		"LLM_Tray_Build must call MenuDispatcher_PruneMenu(_LLM_Tray_Menu) after deleting its items - without it the dispatch Maps leak dead IDs across every rebuild")

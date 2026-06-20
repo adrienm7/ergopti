@@ -68,7 +68,7 @@ _UFPS_FuncBody(Src, FuncDef) {
 
 _UFPS_FocusPollHasSuspendGuard() {
 	Src := _UFPS_ReadSource("adapters/process_lifecycle.ahk")
-	Seg := _UFPS_FuncBody(Src, "PLC_Poll() {")
+	Seg := _DriverFuncBody("PLC_Poll")
 	Assert(Seg != "", "PLC_Poll() declaration must exist in process_lifecycle.ahk")
 	Assert(InStr(Seg, "A_IsSuspended") > 0,
 		"PLC_Poll must early-return on A_IsSuspended — otherwise focus changes keep being observed and fanned out to callbacks while the driver is paused (no-suspend-guard-on-background-tick-and-focus-poll)")
@@ -77,7 +77,7 @@ Test("process_lifecycle: PLC_Poll has an A_IsSuspended guard (no-suspend-guard-o
 
 _UFPS_BackgroundTickHasSuspendGuard() {
 	Src := _UFPS_ReadSource("lib/updater.ahk")
-	Seg := _UFPS_FuncBody(Src, "Updater_BackgroundTick(*) {")
+	Seg := _DriverFuncBody("Updater_BackgroundTick")
 	Assert(Seg != "", "Updater_BackgroundTick(*) declaration must exist in lib/updater.ahk")
 	Assert(InStr(Seg, "A_IsSuspended") > 0,
 		"Updater_BackgroundTick must skip its network dispatch / TrayTip / menu rebuild on A_IsSuspended — otherwise update notifications keep popping while the driver is paused (no-suspend-guard-on-background-tick-and-focus-poll)")

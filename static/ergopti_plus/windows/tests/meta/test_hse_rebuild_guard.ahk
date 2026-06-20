@@ -56,13 +56,13 @@ _HRG_RebuildIsGuarded() {
 		"HSE_RebuildInProgress global flag must be defined in hotstring_engine_main.ahk")
 	
 	; 2. Verify HSE_FindMatchAtEnd respects the flag.
-	MatchBody := _HRG_FuncBody(EngineSrc, "HSE_FindMatchAtEnd(JustTypedChar) {")
+	MatchBody := _DriverFuncBody("HSE_FindMatchAtEnd")
 	Assert(InStr(MatchBody, "if HSE_RebuildInProgress") > 0,
 		"HSE_FindMatchAtEnd must return early if HSE_RebuildInProgress is true (hse-registry-torn-read-vs-onmessage)")
 	
 	; 3. Verify RebuildHotstringsLive sets/clears the flag.
 	MenuSrc := _HRG_ReadSource("ui/tray_menu.ahk")
-	RebuildBody := _HRG_FuncBody(MenuSrc, "RebuildHotstringsLive() {")
+	RebuildBody := _DriverFuncBody("RebuildHotstringsLive")
 	Assert(RebuildBody != "", "RebuildHotstringsLive must exist in tray_menu.ahk")
 	
 	Assert(InStr(RebuildBody, "HSE_RebuildInProgress := true") > 0,

@@ -72,7 +72,7 @@ _LPBN_CheckGuardRejectsObjects() {
 	Src := _LPBN_ReadSource("modules/llm/models.ahk")
 	Assert(Src != "", "modules/llm/models.ahk must be readable")
 
-	Body := _LPBN_FuncBody(Src, "_LLM_ParseBillions(s) {")
+	Body := _DriverFuncBody("_LLM_ParseBillions")
 	Assert(Body != "", "_LLM_ParseBillions must be present in models.ahk")
 
 	; Old broken guard — must not exist
@@ -88,7 +88,7 @@ _LPBN_CheckGuardComesBeforeRegExMatch() {
 	Src := _LPBN_ReadSource("modules/llm/models.ahk")
 	Assert(Src != "", "modules/llm/models.ahk must be readable")
 
-	Body := _LPBN_FuncBody(Src, "_LLM_ParseBillions(s) {")
+	Body := _DriverFuncBody("_LLM_ParseBillions")
 	Assert(Body != "", "_LLM_ParseBillions must be present in models.ahk")
 
 	GuardPos    := InStr(Body, "IsObject(s)")

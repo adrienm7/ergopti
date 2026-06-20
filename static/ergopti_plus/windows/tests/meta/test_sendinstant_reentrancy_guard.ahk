@@ -64,7 +64,7 @@ Test("hotstring_engine: SendInstant declares a clipboard reentrancy guard (send-
 
 _SIRG_AssertSendInstantChecksGuard() {
 	Src := _SIRG_ReadSource("lib/hotstrings/hotstring_engine.ahk")
-	Body := _SIRG_FuncBody(Src, "SendInstant(Text) {")
+	Body := _DriverFuncBody("SendInstant")
 	Assert(Body != "", "SendInstant(Text) declaration must exist in hotstring_engine.ahk")
 	Assert(InStr(Body, "_SEND_INSTANT_CLIP_BUSY") > 0,
 		"SendInstant must read/set _SEND_INSTANT_CLIP_BUSY so a second overlapping call skips the clipboard dance (send-instant-sleep-clipboard-on-keyboard-thread)")
@@ -73,7 +73,7 @@ Test("hotstring_engine: SendInstant body consults the reentrancy guard (send-ins
 
 _SIRG_AssertRestoreClearsGuard() {
 	Src := _SIRG_ReadSource("lib/hotstrings/hotstring_engine.ahk")
-	Body := _SIRG_FuncBody(Src, "_SendInstant_RestoreClipboard(OldClip) {")
+	Body := _DriverFuncBody("_SendInstant_RestoreClipboard")
 	Assert(Body != "", "_SendInstant_RestoreClipboard(OldClip) declaration must exist in hotstring_engine.ahk")
 	Assert(InStr(Body, "_SEND_INSTANT_CLIP_BUSY") > 0,
 		"the deferred restore must clear _SEND_INSTANT_CLIP_BUSY so the next SendInstant can dance again (send-instant-sleep-clipboard-on-keyboard-thread)")

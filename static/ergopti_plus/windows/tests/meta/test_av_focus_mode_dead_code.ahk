@@ -70,7 +70,7 @@ _AVFM_FuncBody(Src, FuncDef) {
 
 _AVFM_SlowTickDoesNotPollFocus() {
 	Src := _AVFM_ReadSource("modules/keylogger/keylogger_av_state.ahk")
-	Seg := _AVFM_FuncBody(Src, "KL_AV_SlowTick() {")
+	Seg := _DriverFuncBody("KL_AV_SlowTick")
 	Assert(Seg != "", "KL_AV_SlowTick() declaration must exist in keylogger_av_state.ahk")
 	Assert(InStr(Seg, "KL_AV_PollFocusMode") = 0,
 		"KL_AV_SlowTick must NOT call KL_AV_PollFocusMode - its recursive registry walk blocks the AHK main thread for ~30 s, locking the keyboard")

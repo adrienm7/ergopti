@@ -96,7 +96,7 @@ _DENI_FuncBody(Src, FuncDef) {
 ; otherwise the two paths could silently re-diverge.
 _DENI_WindowDelegatesToHelper() {
 	Src := _DENI_ReadSource("lib/hotstrings/hotstrings_config_window.ahk")
-	Seg := _DENI_FuncBody(Src, "_HCW_TomlValue(Field, Value) {")
+	Seg := _DriverFuncBody("_HCW_TomlValue")
 	Assert(Seg != "", "_HCW_TomlValue must exist in hotstrings_config_window.ahk")
 	Assert(InStr(Seg, "HotstringsSerialiseDelay") > 0,
 		"_HCW_TomlValue must serialise the delay field via HotstringsSerialiseDelay -- single source of truth shared with the override store")

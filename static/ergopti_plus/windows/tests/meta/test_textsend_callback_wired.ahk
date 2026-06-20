@@ -80,7 +80,7 @@ Test("text_sender: Callback is forwarded into _TextSendClipboard (fires after pa
 _TTCW_CallbackAfterPaste() {
 	Src := _TTCW_StripLineComments(_TTCW_ReadSource("adapters/text_sender.ahk"))
 
-	Body := _TTCW_FuncBody(Src, "_TextSendClipboard(Text, Saved, Callback)")
+	Body := _DriverFuncBody("_TextSendClipboard")
 	Assert(Body != "", "_TextSendClipboard must accept a Callback parameter")
 
 	; The Callback must be invoked inside _TextSendClipboard (after Ctrl+V)

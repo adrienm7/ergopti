@@ -40,7 +40,7 @@ _AGHF_ReadSource(RelPath) {
 ; ===================================================
 
 _AGHF_CheckNoDirectHKLArg() {
-	Src := _AGHF_ReadSource("ErgoptiPlus.ahk")
+	Src := _DriverSourceConcat()
 	Assert(Src != "", "ErgoptiPlus.ahk must be readable")
 
 	; Detect the AltGrDetect log block by looking for its unique signature.
@@ -54,7 +54,7 @@ _AGHF_CheckNoDirectHKLArg() {
 }
 
 _AGHF_CheckHKLFallbackPresent() {
-	Src := _AGHF_ReadSource("ErgoptiPlus.ahk")
+	Src := _DriverSourceConcat()
 	Assert(Src != "", "ErgoptiPlus.ahk must be readable")
 
 	; The block must resolve HKL into a variable and apply thread-layout fallback

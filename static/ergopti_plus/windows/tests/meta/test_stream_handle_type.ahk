@@ -64,7 +64,7 @@ _SHT_FuncBody(Src, FuncDef) {
 
 _SHT_AssertHandleTypeCheck() {
 	Src := _SHT_ReadSource("modules/llm/api_ollama.ahk")
-	Body := _SHT_FuncBody(Src, "_LLM_Ollama_RemoveStreamHandle(handle) {")
+	Body := _DriverFuncBody("_LLM_Ollama_RemoveStreamHandle")
 	Assert(Body != "", "_LLM_Ollama_RemoveStreamHandle declaration must exist in api_ollama.ahk")
 
 	; Regression guard: the old broken check used ``is Map`` on an object literal,
@@ -94,7 +94,7 @@ Test("api_ollama: _LLM_Ollama_RemoveStreamHandle uses IsObject/HasOwnProp, not '
 
 _SHT_AssertObjectReferenceComparison() {
 	Src := _SHT_ReadSource("modules/llm/api_ollama.ahk")
-	Body := _SHT_FuncBody(Src, "_LLM_Ollama_RemoveStreamHandle(handle) {")
+	Body := _DriverFuncBody("_LLM_Ollama_RemoveStreamHandle")
 	Assert(Body != "", "_LLM_Ollama_RemoveStreamHandle declaration must exist in api_ollama.ahk")
 
 	; The correct fix compares by OBJECT REFERENCE (h != handle), not by Pid.

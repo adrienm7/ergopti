@@ -66,7 +66,7 @@ _SFFC_FuncBody(Src, FuncDef) {
 
 _SFFC_StopClearsScrollFlushFn() {
 	Src  := _SFFC_ReadSource("modules/keylogger/keylogger_mouse.ahk")
-	Body := _SFFC_FuncBody(Src, "KL_Mouse_Stop() {")
+	Body := _DriverFuncBody("KL_Mouse_Stop")
 	Assert(Body != "", "KL_Mouse_Stop must exist in keylogger_mouse.ahk")
 	Assert(InStr(Body, "scroll_flush_fn := unset") > 0,
 		"KL_Mouse_Stop must assign scroll_flush_fn := unset after cancelling the timer — without this a late wheel tick arriving during teardown can re-arm a stale reference and keep the flush timer alive past Stop()")

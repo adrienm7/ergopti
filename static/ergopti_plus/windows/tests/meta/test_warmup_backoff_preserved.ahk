@@ -79,7 +79,7 @@ Test("api_ollama: LLM_OllamaCancelWarmupRetry has reset_backoff parameter",
 
 _WBPG_BackoffResetIsConditional() {
 	Src := _WBPG_ReadSource("modules/llm/api_ollama.ahk")
-	Body := _WBPG_FuncBody(Src, "LLM_OllamaCancelWarmupRetry(")
+	Body := _DriverFuncBody("LLM_OllamaCancelWarmupRetry")
 	Assert(Body != "",
 		"LLM_OllamaCancelWarmupRetry body must be extractable from api_ollama.ahk")
 

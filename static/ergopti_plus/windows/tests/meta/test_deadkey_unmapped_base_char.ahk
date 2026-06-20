@@ -57,7 +57,7 @@ _DKUBC_FuncBody(Src, FuncDef) {
 _DKUBC_UnmappedKeyEmitsBaseChar() {
 	Raw := _DKUBC_ReadSource("modules/layout.ahk")
 	Src := _DKUBC_StripComments(Raw)
-	Body := _DKUBC_FuncBody(Src, "DeadKey(Mapping) {")
+	Body := _DriverFuncBody("DeadKey")
 	Assert(Body != "", "DeadKey(Mapping) must exist in modules/layout.ahk")
 
 	; Negative: bare else that only sends PressedKey (drops the dead-key base char)

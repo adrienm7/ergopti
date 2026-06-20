@@ -57,7 +57,7 @@ _TTCQC_QuoteAwareScanner() {
 	Src := _TTCQC_StripLineComments(_TTCQC_ReadSource("lib/toml/toml_config_loader.ahk"))
 	Assert(Src != "", "lib/toml/toml_config_loader.ahk must be readable")
 
-	Body := _TTCQC_FuncBody(Src, "TomlCoerceValueExt(Raw) {")
+	Body := _DriverFuncBody("TomlCoerceValueExt")
 	Assert(Body != "", "TomlCoerceValueExt must be defined in lib/toml/toml_config_loader.ahk")
 
 	; Quote-state tracking variable must be present

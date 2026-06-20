@@ -70,7 +70,7 @@ _LTAFK_FuncBody(Src, FuncDef) {
 ; watcher for every physical keypress, filtered or not.
 _LTAFK_HelperExists() {
 	Src := _LTAFK_ReadSource("modules/keylogger/keylogger_hook.ahk")
-	Body := _LTAFK_FuncBody(Src, "KL_Hook_NoteActivity(")
+	Body := _DriverFuncBody("KL_Hook_NoteActivity")
 	Assert(Body != "",
 		"KL_Hook_NoteActivity must exist in keylogger_hook.ahk - it is the single place that advances KLHook.last_tick for every physical keypress (lost-tick-after-filtered-keystroke)")
 	Assert(InStr(Body, "KLHook.last_tick := now") > 0,
@@ -84,7 +84,7 @@ Test("keylogger_hook: KL_Hook_NoteActivity helper advances watermark + drives wa
 ; filtered key still advances last_tick.
 _LTAFK_OnCharNotesBeforeFilter() {
 	Src := _LTAFK_ReadSource("modules/keylogger/keylogger_hook.ahk")
-	Body := _LTAFK_FuncBody(Src, "KL_Hook_OnChar(ih, c) {")
+	Body := _DriverFuncBody("KL_Hook_OnChar")
 	Assert(Body != "", "KL_Hook_OnChar must exist in keylogger_hook.ahk")
 	NotePos := InStr(Body, "KL_Hook_NoteActivity(")
 	FilterPos := InStr(Body, "MF_ShouldFilter()")
@@ -100,7 +100,7 @@ Test("keylogger_hook: OnChar advances watermark before MF_ShouldFilter (lost-tic
 ; Same ordering invariant for the special-key (bracket marker) path of OnKeyDown.
 _LTAFK_OnKeyDownNotesBeforeFilter() {
 	Src := _LTAFK_ReadSource("modules/keylogger/keylogger_hook.ahk")
-	Body := _LTAFK_FuncBody(Src, "KL_Hook_OnKeyDown(ih, vk, sc) {")
+	Body := _DriverFuncBody("KL_Hook_OnKeyDown")
 	Assert(Body != "", "KL_Hook_OnKeyDown must exist in keylogger_hook.ahk")
 	; The shortcut path holds the first MF_ShouldFilter-free activity bump; the
 	; bracket-marker path adds the NoteActivity-before-filter ordering we assert.

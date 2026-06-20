@@ -84,7 +84,7 @@ _SDPS_CheckRegisterShiftHasSkipGuard() {
 	Src := _SDPS_ReadSource("lib/layout/layout_shift_caps.ahk")
 	Assert(Src != "", "lib/layout/layout_shift_caps.ahk must be readable")
 
-	Body := _SDPS_FuncBody(Src, "RegisterShiftLayer() {")
+	Body := _DriverFuncBody("RegisterShiftLayer")
 	Assert(Body != "", "RegisterShiftLayer must be present in layout_shift_caps.ahk")
 
 	Assert(InStr(Body, "SkipDigitRow") || InStr(Body, "_SHIFT_DIGIT_SCS"),
@@ -98,7 +98,7 @@ _SDPS_CheckSkipUsedInsideLoop() {
 	Src := _SDPS_ReadSource("lib/layout/layout_shift_caps.ahk")
 	Assert(Src != "", "lib/layout/layout_shift_caps.ahk must be readable")
 
-	Body := _SDPS_FuncBody(Src, "RegisterShiftLayer() {")
+	Body := _DriverFuncBody("RegisterShiftLayer")
 	Assert(Body != "", "RegisterShiftLayer must be present in layout_shift_caps.ahk")
 
 	; The skip/continue must appear inside the SHIFTED_LETTERS loop

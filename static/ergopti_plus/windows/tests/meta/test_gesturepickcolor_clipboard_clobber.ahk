@@ -61,7 +61,7 @@ _GPCC_FuncBody(Src, FuncDef) {
 
 _GPCC_PastePlainSnapshotsFullClipboard() {
 	Src := _GPCC_ReadSource("modules/gestures.ahk")
-	Seg := _GPCC_FuncBody(Src, "GesturePastePlain() {")
+	Seg := _DriverFuncBody("GesturePastePlain")
 	Assert(Seg != "", "GesturePastePlain() declaration must exist in gestures.ahk")
 	Assert(InStr(Seg, "ClipboardAll()") > 0,
 		"GesturePastePlain must snapshot the full clipboard with ClipboardAll() before coercing to plain text — the self-assign drops non-text formats the user may still want")
@@ -70,7 +70,7 @@ Test("gestures: GesturePastePlain snapshots full clipboard before coercion (gest
 
 _GPCC_PastePlainDefersRestore() {
 	Src := _GPCC_ReadSource("modules/gestures.ahk")
-	Seg := _GPCC_FuncBody(Src, "GesturePastePlain() {")
+	Seg := _DriverFuncBody("GesturePastePlain")
 	Assert(Seg != "", "GesturePastePlain() declaration must exist in gestures.ahk")
 	Assert(InStr(Seg, "_GesturePastePlainRestore") > 0,
 		"GesturePastePlain must restore the original clipboard via the deferred _GesturePastePlainRestore helper so the user's non-text payload survives the paste")

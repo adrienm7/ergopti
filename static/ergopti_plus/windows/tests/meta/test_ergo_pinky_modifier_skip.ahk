@@ -56,7 +56,7 @@ _TEPMS_ModifierVkEarlyReturn() {
 	Src := _TEPMS_StripLineComments(_TEPMS_ReadSource("modules/keylogger/keylogger_ergonomics.ahk"))
 	Assert(Src != "", "modules/keylogger/keylogger_ergonomics.ahk must be readable")
 
-	Body := _TEPMS_FuncBody(Src, "KL_Ergo_UpdatePinky(vk, now, app) {")
+	Body := _DriverFuncBody("KL_Ergo_UpdatePinky")
 	Assert(Body != "", "KL_Ergo_UpdatePinky must be defined in modules/keylogger/keylogger_ergonomics.ahk")
 
 	; Generic Shift/Ctrl/Alt (0x10, 0x11, 0x12) must be in the guard

@@ -60,7 +60,7 @@ _TAHD_DelegatesAtRuntime() {
 	Assert(InStr(Src, "_AnyShortcutEnabled(") > 0,
 		"modules/shortcuts/altgr.ahk must define or call _AnyShortcutEnabled() for runtime config evaluation")
 
-	Body := _TAHD_FuncBody(Src, "IsAltGrLAltEnabled() {")
+	Body := _DriverFuncBody("IsAltGrLAltEnabled")
 	Assert(Body != "", "IsAltGrLAltEnabled must be defined in modules/shortcuts/altgr.ahk")
 
 	; Must delegate to _AnyShortcutEnabled with the correct group key

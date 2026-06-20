@@ -72,7 +72,7 @@ _WCCV_FuncBody(Src, FuncName) {
 
 _WCCV_ColorIsValidated() {
 	Src := _WCCV_ReadSource("lib/metrics/wpm_widget.ahk")
-	Body := _WCCV_FuncBody(Src, "WPMWidget_CategoryBgColor(")
+	Body := _DriverFuncBody("WPMWidget_CategoryBgColor")
 	Assert(Body != "", "WPMWidget_CategoryBgColor( must exist in lib/metrics/wpm_widget.ahk")
 	Assert(InStr(Body, "[0-9A-Fa-f]{6}") > 0,
 		"WPMWidget_CategoryBgColor must validate the color against a 6-digit hex regex before returning it (MEDIUM-01)")
@@ -80,7 +80,7 @@ _WCCV_ColorIsValidated() {
 
 _WCCV_TickCatchSelfHeals() {
 	Src := _WCCV_ReadSource("lib/metrics/wpm_widget.ahk")
-	Body := _WCCV_FuncBody(Src, "WPMWidget_Tick(")
+	Body := _DriverFuncBody("WPMWidget_Tick")
 	Assert(Body != "", "WPMWidget_Tick( must exist in lib/metrics/wpm_widget.ahk")
 	Assert(InStr(Body, "WPMWidget_BuildCompact") > 0,
 		"WPMWidget_Tick compact-mode catch must rebuild the widget via WPMWidget_BuildCompact so a bad-color throw does not disable it permanently (MEDIUM-01)")

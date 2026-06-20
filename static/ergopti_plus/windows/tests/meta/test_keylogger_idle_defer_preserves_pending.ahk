@@ -66,7 +66,7 @@ _MetaCheckIdleDeferBeforePendingDrain() {
 	; Strip block comments so /*…*/ regions cannot fool the offset comparison
 	Src := RegExReplace(Src, "(?s)/\*.*?\*/", "")
 
-	Body := _KLID_FuncBody(Src, "KL_IngestOnce(")
+	Body := _DriverFuncBody("KL_IngestOnce")
 	Assert(StrLen(Body) > 0,
 		"KL_IngestOnce must be present in keylogger.ahk")
 

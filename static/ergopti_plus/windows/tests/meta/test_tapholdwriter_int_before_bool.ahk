@@ -55,7 +55,7 @@ _TTIB_IntBeforeBool() {
 	Src := _TTIB_StripLineComments(_TTIB_ReadSource("lib/tap_hold/tap_hold_writer.ahk"))
 	Assert(Src != "", "lib/tap_hold/tap_hold_writer.ahk must be readable")
 
-	Body := _TTIB_FuncBody(Src, "_TH_TomlFormatLine(Key, Value) {")
+	Body := _DriverFuncBody("_TH_TomlFormatLine")
 	Assert(Body != "", "_TH_TomlFormatLine must be defined in lib/tap_hold/tap_hold_writer.ahk")
 
 	; Both checks must be present

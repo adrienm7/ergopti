@@ -65,7 +65,7 @@ _HPTS_FuncBody(Src, FuncDef) {
 
 _HPTS_FireHealthProbeHasSuspendGuard() {
 	Src := _HPTS_ReadSource("ui/tray_llm/actions.ahk")
-	Seg := _HPTS_FuncBody(Src, "_LLM_Tray_FireHealthProbe() {")
+	Seg := _DriverFuncBody("_LLM_Tray_FireHealthProbe")
 	Assert(Seg != "", "_LLM_Tray_FireHealthProbe() declaration must exist in actions.ahk")
 	Assert(InStr(Seg, "A_IsSuspended") > 0,
 		"_LLM_Tray_FireHealthProbe must early-return on A_IsSuspended - its 10 s SetTimer bypasses Suspend and would keep pinging Ollama + rebuilding the tray while paused")
@@ -74,7 +74,7 @@ Test("LLM tray: _LLM_Tray_FireHealthProbe has an A_IsSuspended guard (health-pro
 
 _HPTS_ProbeDoneSkipsRebuildWhileSuspended() {
 	Src := _HPTS_ReadSource("ui/tray_llm/actions.ahk")
-	Seg := _HPTS_FuncBody(Src, "_LLM_Tray_OnHealthProbeDone(reachable) {")
+	Seg := _DriverFuncBody("_LLM_Tray_OnHealthProbeDone")
 	Assert(Seg != "", "_LLM_Tray_OnHealthProbeDone(reachable) declaration must exist in actions.ahk")
 	Assert(InStr(Seg, "A_IsSuspended") > 0,
 		"_LLM_Tray_OnHealthProbeDone must skip LLM_Tray_Build() while A_IsSuspended - an async probe landing just after Pause would otherwise churn the tray menu")

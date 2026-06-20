@@ -101,7 +101,7 @@ _DESC_StripComments(Body) {
 }
 
 _DESC_PrescanWarmedBeforeCritical() {
-	Src := _DESC_ReadSource("ErgoptiPlus.ahk")
+	Src := _DriverSourceConcat()
 	Seg := _DESC_FuncBodyFlat(Src, "BuildTrayMenuDeferred() {")
 	Assert(Seg != "", "BuildTrayMenuDeferred() must exist in ErgoptiPlus.ahk")
 

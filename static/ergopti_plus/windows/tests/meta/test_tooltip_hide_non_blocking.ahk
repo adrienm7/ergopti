@@ -60,7 +60,7 @@ _TTHNB_FuncBody(Src, FuncDef) {
 
 _TTHNB_TooltipHideIsNonBlocking() {
 	Src := _TTHNB_ReadSource("lib/tooltip.ahk")
-	Body := _TTHNB_FuncBody(Src, "TooltipHide(DbgTag := ")
+	Body := _DriverFuncBody("TooltipHide")
 	Assert(Body != "", "TooltipHide(DbgTag := ...) declaration must exist in lib/tooltip.ahk")
 
 	; A held Critical from the fire path spans this body — a blocking call here

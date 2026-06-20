@@ -58,8 +58,8 @@ _GEHSS_FuncBody(Src, FuncDef) {
 ; ==================================================
 
 _GEHSS_HandlerUsesReleaseGuard() {
-	Src := _GEHSS_ReadSource("ErgoptiPlus.ahk")
-	Seg := _GEHSS_FuncBody(Src, "ErgoptiGlobalErrorHandler(Exc, Mode) {")
+	Src := _DriverSourceConcat()
+	Seg := _DriverFuncBody("ErgoptiGlobalErrorHandler")
 	Assert(Seg != "", "ErgoptiGlobalErrorHandler(Exc, Mode) must exist in ErgoptiPlus.ahk")
 	Assert(InStr(Seg, "_ShouldReleaseModifier(") > 0,
 		"ErgoptiGlobalErrorHandler must route the modifier-release decision through _ShouldReleaseModifier — releasing a modifier the user is physically holding desyncs the modifier state and breaks capitalisation")
@@ -67,8 +67,8 @@ _GEHSS_HandlerUsesReleaseGuard() {
 Test("ErgoptiPlus: error handler gates modifier release via _ShouldReleaseModifier (global-error-handler-sendevent-storm)", _GEHSS_HandlerUsesReleaseGuard)
 
 _GEHSS_ReleaseGuardChecksPhysicalState() {
-	Src := _GEHSS_ReadSource("ErgoptiPlus.ahk")
-	Seg := _GEHSS_FuncBody(Src, "_ShouldReleaseModifier(ModKey) {")
+	Src := _DriverSourceConcat()
+	Seg := _DriverFuncBody("_ShouldReleaseModifier")
 	Assert(Seg != "", "_ShouldReleaseModifier(ModKey) must exist in ErgoptiPlus.ahk")
 	; Q is the ASCII double-quote (the linter bans the backtick-quote escape).
 	Q := Chr(34)
@@ -78,8 +78,8 @@ _GEHSS_ReleaseGuardChecksPhysicalState() {
 Test("ErgoptiPlus: _ShouldReleaseModifier spares physically-held keys (global-error-handler-sendevent-storm)", _GEHSS_ReleaseGuardChecksPhysicalState)
 
 _GEHSS_HandlerSurfaceIsNonBlocking() {
-	Src := _GEHSS_ReadSource("ErgoptiPlus.ahk")
-	Seg := _GEHSS_FuncBody(Src, "ErgoptiGlobalErrorHandler(Exc, Mode) {")
+	Src := _DriverSourceConcat()
+	Seg := _DriverFuncBody("ErgoptiGlobalErrorHandler")
 	Assert(InStr(Seg, "NotifierSend(") > 0,
 		"ErgoptiGlobalErrorHandler must surface the error via the non-blocking NotifierSend tray notification")
 	Assert(InStr(Seg, "MsgBox(") = 0,

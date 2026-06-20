@@ -77,7 +77,7 @@ Test("keylogger: id-collision hardening helpers exist (kl-stop-dead-no-exit-flus
 
 _KLSD_InitWiresHardening() {
 	Src := _KLSD_ReadSource("modules/keylogger/keylogger.ahk")
-	Seg := _KLSD_FuncBody(Src, "KL_Init(metrics_dir) {")
+	Seg := _DriverFuncBody("KL_Init")
 	Assert(Seg != "", "KL_Init(metrics_dir) declaration must exist in keylogger.ahk")
 	Assert(InStr(Seg, "KL_ResolveStartId(") > 0,
 		"KL_Init must call KL_ResolveStartId to correct next_event_id after KL_LoadState - trusting state.json alone re-mints ids that INSERT OR IGNORE silently drops")

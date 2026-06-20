@@ -62,7 +62,7 @@ _PTLFG_FuncBody(Src, FuncDef) {
 
 _PTLFG_EnterFlushReachesBridgeFromWatcher() {
 	Src := _PTLFG_ReadSource("lib/hotstrings/hotstring_prefix_watcher.ahk")
-	Seg := _PTLFG_FuncBody(Src, "_OnPrefixKeyDown(IH, VK")
+	Seg := _DriverFuncBody("_OnPrefixKeyDown")
 	Assert(Seg != "", "_OnPrefixKeyDown must exist in hotstring_prefix_watcher.ahk")
 	; Locate the live Tab/Enter clause and confirm it feeds the bridge  -  the
 	; only place Enter (0x0D) can reach the LLM flush on this hook path.
@@ -78,7 +78,7 @@ Test("PrefixWatcher: Enter flush reaches the LLM bridge via the watcher (prefix-
 
 _PTLFG_BridgeMapsEnterToFlush() {
 	Src := _PTLFG_ReadSource("modules/llm/llm_bridge.ahk")
-	Seg := _PTLFG_FuncBody(Src, "LLM_Bridge_FeedKeyDownIfActive(vk) {")
+	Seg := _DriverFuncBody("LLM_Bridge_FeedKeyDownIfActive")
 	Assert(Seg != "", "LLM_Bridge_FeedKeyDownIfActive must exist in llm_bridge.ahk")
 	; The bridge entry point must still route Enter (0x0D) to a flush, otherwise
 	; the watcher feeding it the VK would be a no-op.

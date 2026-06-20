@@ -39,7 +39,7 @@ _TBCC_FuncBody(Src, FuncDef) {
 
 _TBCC_DeepCopyPresent() {
 	Src := _TBCC_ReadSource("lib/toml/toml_helpers.ahk")
-	Seg := _TBCC_FuncBody(Src, "TOML_BatchWrite(Path, Updates) {")
+	Seg := _DriverFuncBody("TOML_BatchWrite")
 	Assert(Seg != "", "TOML_BatchWrite declaration must exist")
 
 	; The cached Map must be cloned before any mutation so that a write failure
@@ -54,7 +54,7 @@ Test("toml_helpers: TOML_BatchWrite deep-copies cached Map before mutation", _TB
 
 _TBCC_FailurePathsInvalidateCache() {
 	Src := _TBCC_ReadSource("lib/toml/toml_helpers.ahk")
-	Seg := _TBCC_FuncBody(Src, "TOML_BatchWrite(Path, Updates) {")
+	Seg := _DriverFuncBody("TOML_BatchWrite")
 	Assert(Seg != "", "TOML_BatchWrite declaration must exist")
 
 	; Count distinct cache-invalidation blocks inside the function body.

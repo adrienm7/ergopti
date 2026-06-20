@@ -68,7 +68,7 @@ _MDEP_FuncBody(Src, FuncName) {
 
 _MDEP_CheckErrorPropagation() {
 	Src := _MDEP_ReadSource("lib/menu_dispatcher.ahk")
-	Body := _MDEP_FuncBody(Src, "_DispatchIfMissed(ItemId, ExpectedLastFire)")
+	Body := _DriverFuncBody("_DispatchIfMissed")
 	Assert(Body != "", "_DispatchIfMissed must exist in menu_dispatcher.ahk")
 
 	HasThrow := InStr(Body, "throw Err") > 0

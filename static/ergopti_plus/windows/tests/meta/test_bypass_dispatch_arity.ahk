@@ -59,7 +59,7 @@ _BDA_FuncBody(Src, FuncDef) {
 
 _BDA_OldOneArgCallAbsent() {
 	Src := _BDA_ReadSource("lib/menu_dispatcher.ahk")
-	Seg := _BDA_FuncBody(Src, "_DispatchIfMissed(ItemId, ExpectedLastFire) {")
+	Seg := _DriverFuncBody("_DispatchIfMissed")
 	Assert(Seg != "", "_DispatchIfMissed must exist in menu_dispatcher.ahk")
 	; The old broken form passed a single string — any match here means the
 	; regression has been reintroduced and the callback will always throw.
@@ -70,7 +70,7 @@ Test("menu_dispatcher: _DispatchIfMissed does not use old single-arg Callback.Ca
 
 _BDA_ThreeArgCallPresent() {
 	Src := _BDA_ReadSource("lib/menu_dispatcher.ahk")
-	Seg := _BDA_FuncBody(Src, "_DispatchIfMissed(ItemId, ExpectedLastFire) {")
+	Seg := _DriverFuncBody("_DispatchIfMissed")
 	Assert(Seg != "", "_DispatchIfMissed must exist in menu_dispatcher.ahk")
 	; The correct form satisfies the (ItemName, ItemPos, MenuObj) arity that
 	; every AHK menu callback expects, preventing a "too few arguments" throw.

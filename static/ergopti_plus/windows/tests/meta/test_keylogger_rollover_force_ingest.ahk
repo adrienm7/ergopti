@@ -72,7 +72,7 @@ _MetaCheckRolloverForceIngest() {
 	; --- Assert 1: KL_IngestOnce signature declares the `force` parameter ---
 	; The signature must be KL_IngestOnce(force ...) so the caller can bypass
 	; the idle-defer guard at day rollover.
-	SigLine := _KLRD_FuncBody(Src, "KL_IngestOnce(")
+	SigLine := _DriverFuncBody("KL_IngestOnce")
 	Assert(StrLen(SigLine) > 0,
 		"KL_IngestOnce must be present in keylogger.ahk")
 
@@ -89,7 +89,7 @@ _MetaCheckRolloverForceIngest() {
 
 
 	; --- Assert 2: KL_DayRollover calls KL_IngestOnce(true) ---
-	RolloverBody := _KLRD_FuncBody(Src, "KL_DayRollover(")
+	RolloverBody := _DriverFuncBody("KL_DayRollover")
 	Assert(StrLen(RolloverBody) > 0,
 		"KL_DayRollover must be present in keylogger.ahk")
 
@@ -110,7 +110,7 @@ _MetaCheckRolloverNoBareCall() {
 	}
 
 	Src := RegExReplace(Src, "(?s)/\*.*?\*/", "")
-	RolloverBody := _KLRD_FuncBody(Src, "KL_DayRollover(")
+	RolloverBody := _DriverFuncBody("KL_DayRollover")
 	Assert(StrLen(RolloverBody) > 0,
 		"KL_DayRollover must be present in keylogger.ahk")
 

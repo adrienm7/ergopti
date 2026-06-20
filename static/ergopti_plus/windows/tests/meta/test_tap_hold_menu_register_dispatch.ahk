@@ -86,7 +86,7 @@ _THRD_CheckResetDefaultsRegistered() {
 	Src := _THRD_ReadSource("ui/tray_menu.ahk")
 	Assert(Src != "", "ui/tray_menu.ahk must be readable")
 
-	Body := _THRD_FuncBody(Src, "_TH_DynResetDefaults(")
+	Body := _DriverFuncBody("_TH_DynResetDefaults")
 	Assert(Body != "", "_TH_DynResetDefaults must be present in ui/tray_menu.ahk")
 
 	Assert(InStr(Body, "RegisterMenuItem("),
@@ -99,7 +99,7 @@ _THRD_CheckDisableAllRegistered() {
 	Src := _THRD_ReadSource("ui/tray_menu.ahk")
 	Assert(Src != "", "ui/tray_menu.ahk must be readable")
 
-	Body := _THRD_FuncBody(Src, "_TH_DynDisableAll(")
+	Body := _DriverFuncBody("_TH_DynDisableAll")
 	Assert(Body != "", "_TH_DynDisableAll must be present in ui/tray_menu.ahk")
 
 	Assert(InStr(Body, "RegisterMenuItem("),
@@ -112,7 +112,7 @@ _THRD_CheckDynKeysRegistered() {
 	Src := _THRD_ReadSource("ui/tray_menu.ahk")
 	Assert(Src != "", "ui/tray_menu.ahk must be readable")
 
-	Body := _THRD_FuncBody(Src, "_TH_DynKeys(")
+	Body := _DriverFuncBody("_TH_DynKeys")
 	Assert(Body != "", "_TH_DynKeys must be present in ui/tray_menu.ahk")
 
 	; Disable label and tap-picker must use RegisterMenuItem.
@@ -132,7 +132,7 @@ _THRD_CheckHoldPickerRegistered() {
 	Src := _THRD_ReadSource("ui/tray_menu.ahk")
 	Assert(Src != "", "ui/tray_menu.ahk must be readable")
 
-	Body := _THRD_FuncBody(Src, "_BuildHoldPickerSubmenu(")
+	Body := _DriverFuncBody("_BuildHoldPickerSubmenu")
 	Assert(Body != "", "_BuildHoldPickerSubmenu must be present in ui/tray_menu.ahk")
 
 	Assert(InStr(Body, "RegisterMenuItem(PickerMenu, Label"),

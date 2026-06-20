@@ -80,7 +80,7 @@ _SADRD_Count(Haystack, Needle) {
 
 _SADRD_AltGrModifierBalanced() {
 	Src := _SADRD_ReadSource("modules/tap_holds/space.ahk")
-	Body := _SADRD_FuncBody(Src, "_SpaceHoldAltGr(captured) {")
+	Body := _DriverFuncBody("_SpaceHoldAltGr")
 	Assert(Body != "", "_SpaceHoldAltGr(captured) must exist in modules/tap_holds/space.ahk")
 
 	Downs := _SADRD_Count(Body, "{RAlt Down}")

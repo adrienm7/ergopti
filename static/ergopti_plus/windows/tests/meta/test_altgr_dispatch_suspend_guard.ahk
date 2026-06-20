@@ -67,7 +67,7 @@ _ADSG_CheckSuspendGuard() {
 	Src := _ADSG_ReadSource("lib/script_altgr_hotkeys.ahk")
 	Assert(Src != "", "lib/script_altgr_hotkeys.ahk must be readable")
 
-	Body := _ADSG_FuncBody(Src, "_ScriptAltGrDispatch(SuffixSC, Slot, NativeSend, CtrlAltSuffixKey) {")
+	Body := _DriverFuncBody("_ScriptAltGrDispatch")
 	Assert(Body != "", "_ScriptAltGrDispatch must be present in lib/script_altgr_hotkeys.ahk")
 
 	GuardPos  := InStr(Body, "A_IsSuspended")

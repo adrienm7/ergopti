@@ -80,7 +80,7 @@ _AOPS_ThresholdsSingleSource() {
 	Assert(InStr(StateSrc, "global LAST_SENT_KEY_TIME_MAX_AGE_MS :=") == 0,
 		"LAST_SENT_KEY_TIME_MAX_AGE_MS must be declared once in ErgoptiPlus.ahk, not duplicated in app_state.ahk (appstate-orphaned-parallel-state)")
 
-	EntrySrc := _AOPS_ReadSource("ErgoptiPlus.ahk")
+	EntrySrc := _DriverSourceConcat()
 	Assert(InStr(EntrySrc, "global LAST_SENT_KEY_TIME_PRUNE_AT :=") > 0,
 		"ErgoptiPlus.ahk must remain the single source for LAST_SENT_KEY_TIME_PRUNE_AT (appstate-orphaned-parallel-state)")
 }

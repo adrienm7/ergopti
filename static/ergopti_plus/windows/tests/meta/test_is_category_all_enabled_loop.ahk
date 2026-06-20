@@ -53,7 +53,7 @@ _TICALE_LoopsAllCategories() {
 	Src := _TICALE_StripLineComments(_DriverSourceConcat())
 	Assert(Src != "", "ErgoptiPlus.ahk must be readable")
 
-	Body := _TICALE_FuncBody(Src, "IsCategoryAllEnabled(Categories) {")
+	Body := _DriverFuncBody("IsCategoryAllEnabled")
 	Assert(Body != "", "IsCategoryAllEnabled must be defined in ErgoptiPlus.ahk")
 
 	; Must iterate ALL categories, not just index [1]
