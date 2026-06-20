@@ -52,7 +52,7 @@ Test("webview-lowram: updater module gates WebView2 on free RAM", _TWLR_UpdaterM
 
 ; changelog_window must redirect to the native changelog window when RAM is low.
 _TWLR_ChangelogWindowGated() {
-	Src := _TWLR_ReadSource("lib/changelog_window.ahk")
+	Src := _TWLR_ReadSource("ui/changelog_window.ahk")
 	Assert(InStr(Src, "WebView_ShouldUseNativeFallback") > 0,
 		"changelog_window must redirect to the native changelog window when free RAM is low")
 }

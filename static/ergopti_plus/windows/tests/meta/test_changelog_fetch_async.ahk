@@ -16,7 +16,7 @@
 ; the synchronous open is gone and the async poll pattern is present, so a
 ; regression back to a blocking fetch fails CI.
 ;
-; SCOPE: source introspection of lib/changelog_window.ahk.
+; SCOPE: source introspection of ui/changelog_window.ahk.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -71,9 +71,9 @@ _CLFA_FuncBody(Src, FuncName) {
 ; ==================================================
 
 _CLFA_FetchIsAsync() {
-	Src := _CLFA_ReadSource("lib/changelog_window.ahk")
+	Src := _CLFA_ReadSource("ui/changelog_window.ahk")
 	Body := _DriverFuncBody("_CLW_DoFetch")
-	Assert(Body != "", "_CLW_DoFetch(Channel) must exist in lib/changelog_window.ahk")
+	Assert(Body != "", "_CLW_DoFetch(Channel) must exist in ui/changelog_window.ahk")
 
 	Q := Chr(34)
 	SyncOpen := "Req.Open(" . Q . "GET" . Q . ", Url, false)"
