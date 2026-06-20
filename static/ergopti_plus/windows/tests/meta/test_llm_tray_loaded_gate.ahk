@@ -98,11 +98,11 @@ _LTLG_CheckInitSetsFlag() {
 }
 
 _LTLG_CheckSaveConfigGated() {
-	Src := _LTLG_ReadSource("ErgoptiPlus.ahk")
+	Src := _DriverSourceConcat()
 	Assert(Src != "", "ErgoptiPlus.ahk must be readable")
 
-	Body := _LTLG_FuncBody(Src, "SaveFullConfig()")
-	Assert(Body != "", "SaveFullConfig must be present in ErgoptiPlus.ahk")
+	Body := _DriverFuncBody("SaveFullConfig")
+	Assert(Body != "", "SaveFullConfig must be present in the driver source")
 
 	; _LLM_Tray_SyncToFeatures call must be guarded by _LLM_Tray_Loaded
 	SyncPos   := InStr(Body, "_LLM_Tray_SyncToFeatures()")

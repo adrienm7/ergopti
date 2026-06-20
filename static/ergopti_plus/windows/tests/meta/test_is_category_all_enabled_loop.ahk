@@ -50,7 +50,7 @@ _TICALE_FuncBody(Src, Decl) {
 ; =================================================================
 
 _TICALE_LoopsAllCategories() {
-	Src := _TICALE_StripLineComments(_TICALE_ReadSource("ErgoptiPlus.ahk"))
+	Src := _TICALE_StripLineComments(_DriverSourceConcat())
 	Assert(Src != "", "ErgoptiPlus.ahk must be readable")
 
 	Body := _TICALE_FuncBody(Src, "IsCategoryAllEnabled(Categories) {")

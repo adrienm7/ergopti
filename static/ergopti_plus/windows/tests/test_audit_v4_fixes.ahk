@@ -124,7 +124,7 @@ Test("Audit-v4: GR_DrawBitmap GDI cleanup guaranteed by try/finally", TestAuditV
 ; =============================================================
 
 TestAuditV4_SaveFullConfigReschedule() {
-	Src := _AuditV4_ReadSrc("ErgoptiPlus.ahk")
+	Src := _DriverSourceConcat()
 
 	; The bug: boot timer is one-shot (-500 ms); if SaveFullConfig runs before
 	; _DriverReady is set, it returns immediately, silently dropping the save.

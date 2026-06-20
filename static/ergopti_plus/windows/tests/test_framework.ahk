@@ -142,6 +142,67 @@ _DescribeValue(V) {
 	}
 }
 
+; Reads ErgoptiPlus.ahk concatenated with every .ahk file it directly #Includes,
+; so source-introspection tests find a function regardless of which lib/ or ui/
+; file the entrypoint decomposition (P4/P5) moved it into. Cached after first use.
+_DriverSourceConcat() {
+	static cache := ""
+	if (cache != "")
+		return cache
+	SplitPath(A_ScriptDir, , &Root)
+	Root := StrReplace(Root, "\", "/")
+	Entry := FileRead(Root . "/ErgoptiPlus.ahk")
+	Combined := Entry
+	for Line in StrSplit(Entry, "`n", "`r") {
+		if RegExMatch(Line, "^\s*#Include\s+(?:\*i\s+)?(.+?)\s*$", &m) {
+			Inc := StrReplace(Trim(m[1]), "\", "/")
+			if !RegExMatch(Inc, "i)\.ahk$")
+				continue
+			Path := RegExMatch(Inc, "^([A-Za-z]:/|/)") ? Inc : Root . "/" . Inc
+			try Combined .= "`n" . FileRead(Path)
+		}
+	}
+	cache := Combined
+	return cache
+}
+
+; Returns the body (signature through the matching closing brace, full-line
+; comments stripped) of a top-level driver function, found across the whole
+; driver source. Anchors on the column-0 DEFINITION, so a call site (always
+; indented) in an earlier-concatenated file is never mistaken for the body.
+_DriverFuncBody(Name) {
+	Src := _DriverSourceConcat()
+	if !RegExMatch(Src, "m)^" . Name . "\(", &m)
+		return ""
+	Idx := m.Pos
+	OpenPos := InStr(Src, "{", , Idx)
+	if (!OpenPos)
+		return ""
+	depth := 0
+	i := OpenPos
+	Len := StrLen(Src)
+	BodyEnd := Len
+	while (i <= Len) {
+		ch := SubStr(Src, i, 1)
+		if (ch == "{")
+			depth++
+		else if (ch == "}") {
+			depth--
+			if (depth <= 0) {
+				BodyEnd := i
+				break
+			}
+		}
+		i++
+	}
+	Body := SubStr(Src, Idx, BodyEnd - Idx + 1)
+	Out := ""
+	for Line in StrSplit(Body, "`n", "`r")
+		if !RegExMatch(Line, "^\s*;")
+			Out .= Line . "`n"
+	return Out
+}
+
 
 
 
