@@ -21,7 +21,7 @@ local helpers = require("tests.helpers")
 -- sections under `.sections`, mirroring how config.lua's require_key indexes them.
 local function shared_constants()
 	local toml_reader = require("lib.toml_reader")
-	local path = helpers.driver_root() .. "../shared/tooltip/constants.toml"
+	local path = helpers.shared("tooltip/constants.toml")
 	local ok, data = pcall(toml_reader.parse, path)
 	helpers.assert_true(ok and type(data) == "table" and type(data.sections) == "table",
 		"shared/tooltip/constants.toml must parse with sections")

@@ -41,8 +41,7 @@ helpers.load_with_stubs("lib.logger")
 -- ============================================
 -- ============================================
 
-local _driver_root = helpers.driver_root()
-local corpus_path  = _driver_root .. "../shared/tests/corpus/llm/parser_test_vectors.json"
+local corpus_path  = helpers.shared("tests/corpus/llm/parser_test_vectors.json")
 
 --- Reads and parses the shared corpus JSON file.
 --- @return table|nil corpus, string|nil err

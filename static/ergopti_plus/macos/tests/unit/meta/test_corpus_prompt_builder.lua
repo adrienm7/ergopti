@@ -33,14 +33,13 @@ local helpers = require("tests.helpers")
 -- ============================================
 
 -- Inject the shared/lua/ path so prompt_builder can be required directly.
-local _driver_root = helpers.driver_root()
-local _shared_lua  = _driver_root .. "../shared/lua"
+local _shared_lua  = helpers.shared("lua")
 local _entry       = _shared_lua .. "/?.lua"
 if not package.path:find(_entry, 1, true) then
 	package.path = _entry .. ";" .. package.path
 end
 
-local corpus_path = _driver_root .. "../shared/tests/corpus/prompt_builder/vectors.json"
+local corpus_path = helpers.shared("tests/corpus/prompt_builder/vectors.json")
 
 --- Reads and parses the corpus JSON file.
 --- @return table|nil corpus, string|nil err

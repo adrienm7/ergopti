@@ -46,6 +46,27 @@ function M.fixtures_dir()
 	return M.driver_root() .. "tests/fixtures/"
 end
 
+-- THE single source of truth for the shared-tree location in tests: a path
+-- relative to the macOS driver root. shared/ is a sibling of macos/ (both live
+-- under ergopti_plus/), so it sits one level up. A repo-layout rename
+-- (shared/ -> _shared/) only needs editing this one constant.
+local SHARED_REL = "../shared"
+
+--- Resolves a path inside the shared/ tree, relative to the driver root.
+--- Mirrors the production Paths.shared contract (nil/"" -> the shared root dir).
+--- Every test that needs a shared resource MUST go through this helper rather
+--- than hand-rolling ``driver_root() .. "../shared/..."`` so the folder name
+--- lives in exactly one place.
+--- @param rel string|nil Path relative to shared/, e.g. ``"llm/models.json"``.
+--- @return string Absolute path.
+function M.shared(rel)
+	local root = M.driver_root() .. SHARED_REL
+	if rel and rel ~= "" then
+		return root .. "/" .. rel
+	end
+	return root
+end
+
 
 
 
@@ -120,22 +141,12 @@ function M.load_with_stubs(module_name, hs_overrides)
 	-- tests. Without this, io.open fails or returns nil path, causing "not found"
 	-- errors in tests that load api_remote or exercise catalogue-dependent code.
 	package.loaded["lib.paths"] = {
-		-- Single shared-tree resolver: maps a path relative to shared/ onto the
-		-- repo's shared/ directory next to the driver. Mirrors the production
-		-- Paths.shared contract (nil/"" → the shared root dir).
-		shared = function(rel)
-			local root = M.driver_root() .. "../shared"
-			if rel and rel ~= "" then
-				return root .. "/" .. rel
-			end
-			return root
-		end,
-		shared_root = function()
-			return M.driver_root() .. "../shared"
-		end,
-		shared_llm_path = function(name)
-			return M.driver_root() .. "../shared/llm/" .. name
-		end,
+		-- Single shared-tree resolver: all three helpers delegate to M.shared so
+		-- the folder name lives in exactly one place (SHARED_REL). Mirrors the
+		-- production Paths.shared contract (nil/"" → the shared root dir).
+		shared          = function(rel) return M.shared(rel) end,
+		shared_root     = function() return M.shared() end,
+		shared_llm_path = function(name) return M.shared("llm/" .. name) end,
 		find_from_configdir = function(relative_target)
 			-- relative_target is usually "static/ergopti_plus/shared/locales"
 			-- M.driver_root() is .../static/ergopti_plus/macos/

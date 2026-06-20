@@ -19,11 +19,10 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local DRIVER_ROOT = helpers.driver_root()
 
-local function read_source(rel)
-	local fh = io.open(DRIVER_ROOT .. rel, "r")
-	assert(fh, "cannot open " .. rel)
+local function read_source(path)
+	local fh = io.open(path, "r")
+	assert(fh, "cannot open " .. path)
 	local src = fh:read("*a")
 	fh:close()
 	return src
@@ -49,7 +48,7 @@ end
 helpers.describe("shared/lua/toml_codec/writer.lua: atomic write (toml-non-atomic-write)", function()
 
 	helpers.it("M.write writes to a .tmp file before renaming", function()
-		local src = strip_comments(read_source("../shared/lua/toml_codec/writer.lua"))
+		local src = strip_comments(read_source(helpers.shared("lua/toml_codec/writer.lua")))
 		helpers.assert_true(
 			src:find('path%s*%.%.%s*"%.tmp"') ~= nil
 			or src:find("path%.%.\"%.tmp\"") ~= nil,
@@ -57,14 +56,14 @@ helpers.describe("shared/lua/toml_codec/writer.lua: atomic write (toml-non-atomi
 	end)
 
 	helpers.it("M.write calls os.rename to atomically replace the target", function()
-		local src = strip_comments(read_source("../shared/lua/toml_codec/writer.lua"))
+		local src = strip_comments(read_source(helpers.shared("lua/toml_codec/writer.lua")))
 		helpers.assert_true(
 			src:find("os%.rename%s*%(") ~= nil,
 			"writer.lua must call os.rename(tmp_path, path) for atomic replacement (toml-non-atomic-write)")
 	end)
 
 	helpers.it("M.write does NOT open the target path directly with 'w' mode", function()
-		local src = strip_comments(read_source("../shared/lua/toml_codec/writer.lua"))
+		local src = strip_comments(read_source(helpers.shared("lua/toml_codec/writer.lua")))
 		-- The direct truncating open on the live path must be gone; only the
 		-- .tmp open should remain.  We verify the pattern io.open(path, "w")
 		-- is absent (the tmp open uses tmp_path or tmp_w, not bare path).
@@ -74,7 +73,7 @@ helpers.describe("shared/lua/toml_codec/writer.lua: atomic write (toml-non-atomi
 	end)
 
 	helpers.it("M.batch_write also uses .tmp + os.rename", function()
-		local src = strip_comments(read_source("../shared/lua/toml_codec/writer.lua"))
+		local src = strip_comments(read_source(helpers.shared("lua/toml_codec/writer.lua")))
 		-- batch_write has its own write path — both must be atomic
 		helpers.assert_true(
 			src:find("os%.rename") ~= nil,

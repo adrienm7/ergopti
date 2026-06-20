@@ -30,7 +30,7 @@ local json    = require("json")
 -- ====================================================
 -- ====================================================
 
-local CONTRACTS_PATH = helpers.driver_root() .. "../shared/ports/contracts.json"
+local CONTRACTS_PATH = helpers.shared("ports/contracts.json")
 
 --- Reads and decodes the shared port-contract registry. Fails loudly (rather
 --- than silently skipping) when the file is absent or malformed — a missing
