@@ -211,7 +211,7 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 #Include lib/json.ahk
 ; i18n module — must come after toml_loader.ahk (TOML_BatchWrite), logger.ahk, and json.ahk
 #Include lib/i18n.ahk
-#Include lib/onboarding.ahk
+#Include ui/onboarding/init.ahk
 #Include lib/hotstrings/hotstrings_config.ahk
 #Include lib/hotstrings/hotstrings_config_window.ahk
 #Include lib/wrap_symbols_config.ahk
