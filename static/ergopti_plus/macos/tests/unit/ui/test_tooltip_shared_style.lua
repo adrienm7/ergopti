@@ -4,7 +4,7 @@
 --- MODULE: Tooltip Shared-Style Contract Tests
 --- DESCRIPTION:
 --- Guards that the macOS tooltip reads its visual style (corner radius, border
---- ring, separator) from the SINGLE shared source — _shared/tooltip/constants.toml
+--- ring, separator) from the SINGLE shared source — _shared/modules/tooltip/constants.toml
 --- — rather than hardcoded literals. Both drivers consume that file (HS here, AHK
 --- via lib/ui_style.ahk) so the tooltips look identical across platforms.
 ---
@@ -21,10 +21,10 @@ local helpers = require("tests.helpers")
 -- sections under `.sections`, mirroring how config.lua's require_key indexes them.
 local function shared_constants()
 	local toml_reader = require("lib.toml_reader")
-	local path = helpers.shared("tooltip/constants.toml")
+	local path = helpers.shared("modules/tooltip/constants.toml")
 	local ok, data = pcall(toml_reader.parse, path)
 	helpers.assert_true(ok and type(data) == "table" and type(data.sections) == "table",
-		"_shared/tooltip/constants.toml must parse with sections")
+		"_shared/modules/tooltip/constants.toml must parse with sections")
 	return data.sections
 end
 

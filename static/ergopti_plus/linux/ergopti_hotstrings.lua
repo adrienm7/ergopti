@@ -14,7 +14,7 @@
 ---   --config  <path>   Path to a TOML config file or directory containing
 ---                       TOML hotstring files. Defaults to
 ---                       ~/.config/ergopti/hotstrings/ if that directory exists,
----                       then falls back to the _shared/hotstrings/ tree shipped
+---                       then falls back to the _shared/modules/hotstrings/ tree shipped
 ---                       alongside the script.
 ---   --device  <path>   Evdev device to listen on (e.g. /dev/input/event3).
 ---                       When omitted, device_finder auto-selects the keyboard.
@@ -188,9 +188,9 @@ local function resolve_toml_paths(config_path)
 		end
 	end
 
-	-- Last resort: the _shared/hotstrings/ tree co-located with the script.
+	-- Last resort: the _shared/modules/hotstrings/ tree co-located with the script.
 	if not root then
-		local shared = SCRIPT_DIR .. "/../../_shared/hotstrings"
+		local shared = SCRIPT_DIR .. "/../../_shared/modules/hotstrings"
 		local fh = io.open(shared, "r")
 		if fh then
 			fh:close()

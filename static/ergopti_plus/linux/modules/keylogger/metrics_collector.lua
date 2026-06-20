@@ -43,7 +43,7 @@ local LOG = "modules.keylogger.metrics_collector"
 -- Default inactivity gap after which the rolling WPM window is considered stale.
 -- If no key is pressed for this long the WPM calculation resets to 0. Mirrors the
 -- canonical macOS value (keylogger/init.lua SESSION_TIMEOUT_MS = 5*60*1000) and
--- _shared/timings/constants.toml [keylogger] session_timeout_ms so the WPM/session
+-- _shared/modules/timings/constants.toml [keylogger] session_timeout_ms so the WPM/session
 -- math is identical across drivers (was a divergent 30 s).
 local DEFAULT_SESSION_TIMEOUT_MS = 300000   -- 5 min — canonical, matches macOS
 

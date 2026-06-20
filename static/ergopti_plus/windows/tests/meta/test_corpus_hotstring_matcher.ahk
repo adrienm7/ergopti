@@ -4,7 +4,7 @@
 ; MODULE: HotstringMatcher Corpus Consumer (AHK)
 ; DESCRIPTION:
 ; Validates the AHK hotstring engine against the cross-driver contract defined
-; in _shared/domain/HotstringMatcher.spec.js. Each test vector seeds a minimal
+; in _shared/core/domain/HotstringMatcher.spec.js. Each test vector seeds a minimal
 ; in-memory registry, runs a buffer matching decision, and asserts the outcome
 ; matches the expected MatchResult or null.
 ;

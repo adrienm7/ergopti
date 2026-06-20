@@ -104,10 +104,10 @@ global _I18nFlagExistsCache := Map()
 ; =============================================
 
 ; Resolve the absolute path to a locale JSON file given a locale code.
-; Uses _StaticDir (computed in ErgoptiPlus.ahk) to reach static/ergopti_plus/_shared/locales/.
+; Uses _StaticDir (computed in ErgoptiPlus.ahk) to reach static/ergopti_plus/_shared/data/locales/.
 _I18nLocalePath(Code) {
 	global _SharedDir
-	return _SharedDir . "\locales\" . Code . ".json"
+	return _SharedDir . "\data\locales\" . Code . ".json"
 }
 
 ; Invert _I18nWriteTsvCache's value escaping in a single left-to-right scan so

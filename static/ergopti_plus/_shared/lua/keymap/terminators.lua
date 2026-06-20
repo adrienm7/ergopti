@@ -44,7 +44,7 @@ local Logger = require("logger.shim")
 --- Labels are static French strings; host drivers may resolve them further via i18n.
 ---
 --- The catalogue DATA is generated from the single source of truth
---- (_shared/domain/Terminators.spec.js → `npm run codegen:terminators`) so this
+--- (_shared/core/domain/Terminators.spec.js → `npm run codegen:terminators`) so this
 --- module and the AHK driver can never drift. Only the data lives in the
 --- generated file; all logic below (O(1) caches, multi-codepoint safety, custom
 --- and magic-key lifecycle) stays hand-written here.

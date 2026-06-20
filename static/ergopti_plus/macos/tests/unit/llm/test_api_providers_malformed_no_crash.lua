@@ -102,7 +102,7 @@ helpers.describe("api_remote — malformed api_providers.json does not crash req
 			shared = function(rel) return helpers.shared(rel) end,
 			shared_root = function() return helpers.shared() end,
 			shared_llm_path = function(name)
-				return helpers.shared("llm/" .. name)
+				return helpers.shared("modules/llm/" .. name)
 			end,
 			find_from_configdir = function() return nil end,
 		}

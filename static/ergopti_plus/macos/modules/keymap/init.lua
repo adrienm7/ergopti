@@ -73,7 +73,7 @@ M.DELAY_KEY_TO_CATEGORY = {
 --- Canonical defaults exposed to menu modules (single source of truth).
 --- Menu modules MUST read from here instead of re-declaring their own values.
 --- The hotstring/preview values are sourced from the shared features manifest
---- (`_shared/features/manifest.toml` -> `_generated/features_manifest.lua`) via
+--- (`_shared/modules/features/manifest.toml` -> `_generated/features_manifest.lua`) via
 --- `lib.manifest_reader`, so they stay in lock-step with the AHK driver (which
 --- builds its whole `Features` map from the same manifest). `default_for` fails
 --- fast if a path is missing, so a renamed feature never silently becomes nil.
@@ -270,7 +270,7 @@ M.add                   = Registry.add
 M.load_file             = Registry.load_file
 M.load_toml             = Registry.load_toml
 -- Exposed so the hotstring editor can show the personal source default (the
--- single source kept in sync with _shared/hotstrings/priority.json) instead of
+-- single source kept in sync with _shared/modules/hotstrings/priority.json) instead of
 -- hardcoding it in the UI.
 M.source_priority       = Registry.source_priority
 M.is_section_enabled    = Registry.is_section_enabled

@@ -39,7 +39,7 @@ _MR_GetManifestRoot() {
 	if (_MR_MANIFEST_CACHE != false) {
 		return _MR_MANIFEST_CACHE
 	}
-	FilePath := _SharedDir . "\menu_manifest.json"
+	FilePath := _SharedDir . "\modules\menu\menu_manifest.json"
 	if !FileExist(FilePath) {
 		try LoggerWarn("MenuRenderer", "manifest not found at '{1}'.", FilePath)
 		return false

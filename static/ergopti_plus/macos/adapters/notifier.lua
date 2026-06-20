@@ -4,7 +4,7 @@
 --- MODULE: Notifier Adapter (Hammerspoon)
 --- DESCRIPTION:
 --- Hammerspoon implementation of the Notifier port contract defined in
---- static/ergopti_plus/_shared/ports/Notifier.spec.js. Wraps hs.notify to deliver
+--- static/ergopti_plus/_shared/core/ports/Notifier.spec.js. Wraps hs.notify to deliver
 --- system-level notifications without coupling domain modules to the hs API.
 ---
 --- FEATURES & RATIONALE:

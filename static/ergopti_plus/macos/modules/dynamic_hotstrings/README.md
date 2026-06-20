@@ -4,7 +4,7 @@
 
 Orchestrates dynamic text expansions that cannot be stored as static hotstring triggers. Couples two engines: `personal_info.lua` handles `@`-tag substitutions (name, phone, IBAN, SSN) loaded from the user's personal info file, and `rules_engine.lua` generates real-time prefixes and handles date/suffix-based expansions (e.g. `td` → today's date in multiple formats).
 
-## Ports used (`_shared/ports/`)
+## Ports used (`_shared/core/ports/`)
 
 | Port             | Usage                                                   |
 | ---------------- | ------------------------------------------------------- |
@@ -12,7 +12,7 @@ Orchestrates dynamic text expansions that cannot be stored as static hotstring t
 | `TextSender`     | Injecting expanded text via the keymap expander         |
 | `TimerScheduler` | Debounce between trigger detection and expansion firing |
 
-## Domain module (`_shared/domain/`)
+## Domain module (`_shared/core/domain/`)
 
 - `HotstringMatcher.spec.js` — the rules engine exposes match callbacks consumed by the keymap's Registry under this contract
 

@@ -4,7 +4,7 @@
 
 Captures raw multi-touch trackpad input via the undocumented macOS `touchdevice` API. Maps multi-finger taps and directional swipes to configurable system actions (app switching, scroll toggling, workspace navigation, etc.). Handles cold-start dormancy (the kernel gates the device until the first physical touch) through an adaptive probe loop.
 
-## Ports used (`_shared/ports/`)
+## Ports used (`_shared/core/ports/`)
 
 | Port             | Usage                                                  |
 | ---------------- | ------------------------------------------------------ |
@@ -13,7 +13,7 @@ Captures raw multi-touch trackpad input via the undocumented macOS `touchdevice`
 
 The raw touch frame callback arrives via `vendor.hs_asm.undocumented.touchdevice` (loaded with `pcall`; gracefully absent when unavailable).
 
-## Domain module (`_shared/domain/`)
+## Domain module (`_shared/core/domain/`)
 
 - `GestureRecognizer.spec.js` — `engine.lua` implements the finger-count + direction classification contract
 

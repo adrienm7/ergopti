@@ -4,7 +4,7 @@
 --- MODULE: TrayMenu Adapter (Hammerspoon)
 --- DESCRIPTION:
 --- Hammerspoon implementation of the TrayMenu port contract defined in
---- static/ergopti_plus/_shared/ports/TrayMenu.spec.js. Wraps hs.menubar to expose
+--- static/ergopti_plus/_shared/core/ports/TrayMenu.spec.js. Wraps hs.menubar to expose
 --- a platform-agnostic interface (setIcon, setMenu, setTooltip, destroy) that
 --- domain modules can call without a direct dependency on the hs.menubar API.
 ---

@@ -55,7 +55,7 @@ LuaJIT instead of Rust.
 
 ```
 linux/
-  adapters/              9 port adapters (one per _shared/ports/*.spec.js)
+  adapters/              9 port adapters (one per _shared/core/ports/*.spec.js)
   modules/
     hotstrings/
       engine.lua         Pure-Lua trigger matching (HotstringMatcher spec)

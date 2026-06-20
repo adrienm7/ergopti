@@ -4,7 +4,7 @@
 ; MODULE: HttpClient Adapter (AutoHotkey)
 ; DESCRIPTION:
 ; AHK v2 implementation of the HttpClient port contract defined in
-; static/ergopti_plus/_shared/ports/HttpClient.spec.js. Wraps WinHttp COM object
+; static/ergopti_plus/_shared/core/ports/HttpClient.spec.js. Wraps WinHttp COM object
 ; (synchronous) behind the three canonical functions (HTTPPost, HTTPCancel,
 ; HTTPIsActive) so domain modules can make HTTP requests without coupling to
 ; the WinHttp COM API.

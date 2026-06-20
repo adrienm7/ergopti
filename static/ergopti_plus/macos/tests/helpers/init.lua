@@ -137,7 +137,7 @@ function M.load_with_stubs(module_name, hs_overrides)
 	}
 
 	-- Stub lib.paths so that any module (e.g. llm/api_remote, profiles resolution)
-	-- can find _shared/llm/api_providers.json and profiles.json during headless
+	-- can find _shared/modules/llm/api_providers.json and profiles.json during headless
 	-- tests. Without this, io.open fails or returns nil path, causing "not found"
 	-- errors in tests that load api_remote or exercise catalogue-dependent code.
 	package.loaded["lib.paths"] = {
@@ -146,9 +146,9 @@ function M.load_with_stubs(module_name, hs_overrides)
 		-- production Paths.shared contract (nil/"" → the shared root dir).
 		shared          = function(rel) return M.shared(rel) end,
 		shared_root     = function() return M.shared() end,
-		shared_llm_path = function(name) return M.shared("llm/" .. name) end,
+		shared_llm_path = function(name) return M.shared("modules/llm/" .. name) end,
 		find_from_configdir = function(relative_target)
-			-- relative_target is usually "static/ergopti_plus/_shared/locales"
+			-- relative_target is usually "static/ergopti_plus/_shared/data/locales"
 			-- M.driver_root() is .../static/ergopti_plus/macos/
 			-- We want to return .../relative_target
 			return M.driver_root() .. "../../" .. relative_target

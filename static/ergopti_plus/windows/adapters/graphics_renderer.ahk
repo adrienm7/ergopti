@@ -4,7 +4,7 @@
 ; MODULE: GraphicsRenderer Adapter (AutoHotkey)
 ; DESCRIPTION:
 ; AHK v2 implementation of the GraphicsRenderer port contract defined in
-; static/ergopti_plus/_shared/ports/GraphicsRenderer.spec.js. Wraps the Win32
+; static/ergopti_plus/_shared/core/ports/GraphicsRenderer.spec.js. Wraps the Win32
 ; CreateWindowEx / GDI+ / UpdateLayeredWindow pipeline behind five canonical
 ; functions so callers manage layered windows without touching raw DllCalls.
 ;

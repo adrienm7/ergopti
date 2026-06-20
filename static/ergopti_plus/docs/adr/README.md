@@ -36,6 +36,6 @@ Files are named `NNN-short-slug.md` where `NNN` is a zero-padded three-digit seq
 | [002](002-codegen-manifest.md)            | Features manifest generated from TOML                      | Accepted           |
 | [003](003-single-toml-schema.md)          | Single TOML schema with snake_case keys for all config     | Accepted           |
 | [004](004-linux-backend-luajit.md)        | Linux driver uses LuaJIT + libinput + uinput               | Proposed           |
-| [005](005-hotstring-engine-ownership.md)  | Hotstring engine canonical spec lives in `_shared/domain/` | Accepted           |
+| [005](005-hotstring-engine-ownership.md)  | Hotstring engine canonical spec lives in `_shared/core/domain/` | Accepted           |
 | [006](006-cross-driver-corpus-testing.md) | Shared test-vector corpus consumed by all drivers          | Accepted           |
 | [007](007-i18n-audit-findings.md)         | i18n audit findings (1.3.6)                                | Partially resolved |

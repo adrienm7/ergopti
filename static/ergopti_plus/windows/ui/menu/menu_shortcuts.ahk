@@ -162,7 +162,7 @@ _WS_BuildSymbolsMenu() {
 	; Each group from the shared catalogue becomes its own sub-submenu (titled by
 	; its i18n label) so the top-level list stays short. Every group sub-submenu
 	; carries its own « check all / uncheck all » so the user can flip a whole
-	; family at once. Order and grouping come from _shared/wrap_symbols.json.
+	; family at once. Order and grouping come from _shared/modules/wrap_symbols/wrap_symbols.json.
 	for _, Group in _WS_BUILTIN_GROUPS {
 		GroupMenu := Menu()
 		; Collect this group's opening chars for the per-group bulk actions.

@@ -107,7 +107,7 @@ helpers.describe("Registry -- shifted-comma case variants (':D' emoji safety)", 
 		local R = require("modules.keymap.registry")
 		local state = State.new({ trigger_char = "★", expansion_delay = 0.4 }, { sfbsreduction = 0.3 })
 		R.init(state)
-		-- Same flags as static/ergopti_plus/_shared/hotstrings/sfbsreduction.toml:
+		-- Same flags as static/ergopti_plus/_shared/modules/hotstrings/sfbsreduction.toml:
 		-- auto_expand=true (star), is_word=false (in-word), is_case_sensitive=false.
 		R.add(",d", "ds", { auto_expand = true, is_word = false, is_case_sensitive = false })
 		return state

@@ -58,7 +58,7 @@ local function locale_path(code)
 	-- Resolve through the single shared-tree resolver. Paths.shared already
 	-- performs the dual-root upward walk (hs.configdir + module dir), so it
 	-- works in dev checkouts, packaged .app builds and ~/.hammerspoon symlinks.
-	local path = Paths.shared("locales/" .. code .. ".json")
+	local path = Paths.shared("data/locales/" .. code .. ".json")
 	if path and file_exists(path) then
 		Logger.debug(LOG, "locale_path('%s'): resolved via Paths.shared.", code)
 		return path

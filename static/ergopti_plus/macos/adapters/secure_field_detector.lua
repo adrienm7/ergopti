@@ -4,7 +4,7 @@
 --- MODULE: SecureFieldDetector Adapter (Hammerspoon)
 --- DESCRIPTION:
 --- Hammerspoon implementation of the SecureFieldDetector port contract defined in
---- static/ergopti_plus/_shared/ports/SecureFieldDetector.spec.js. Wraps hs.axuielement
+--- static/ergopti_plus/_shared/core/ports/SecureFieldDetector.spec.js. Wraps hs.axuielement
 --- and a hardcoded list of known password-manager app names to detect whether the
 --- user is currently focused on a secure text field or a security-sensitive app.
 ---

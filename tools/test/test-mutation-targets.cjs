@@ -60,8 +60,8 @@ function load_spec(rel_path) {
 	return mod.exports;
 }
 
-const RegistrySpec = load_spec(sharedRel('domain/Registry.spec.js'));
-const HotstringMatcherSpec = load_spec(sharedRel('domain/HotstringMatcher.spec.js'));
+const RegistrySpec = load_spec(sharedRel('core/domain/Registry.spec.js'));
+const HotstringMatcherSpec = load_spec(sharedRel('core/domain/HotstringMatcher.spec.js'));
 
 // ============================================
 // ============================================

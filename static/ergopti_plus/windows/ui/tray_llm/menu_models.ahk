@@ -4,7 +4,7 @@
 ; MODULE: LLM Tray — Backend + Model submenus
 ; DESCRIPTION:
 ; Builds the Backend selector ("Ollama" / "API"), the Model picker (curated
-; catalogue parsed from _shared/llm/models.json), the per-model sub-submenu
+; catalogue parsed from _shared/modules/llm/models.json), the per-model sub-submenu
 ; (specs / capabilities / hardware requirements / source URL), and the
 ; auxiliary "+ Add an API…" entry that delegates to menu_api_entries.ahk.
 ;
@@ -88,7 +88,7 @@ LLM_Tray_BuildBackendMenu() {
  * divider, each model row carrying a rich title (install dot, type badge,
  * params + RAM) and a per-model sub-submenu with specs and source URL.
  *
- * The catalogue is parsed from the shared ``_shared/llm/models.json``
+ * The catalogue is parsed from the shared ``_shared/modules/llm/models.json``
  * (loaded by ``LLM_GetModelPresets``). When the catalogue is empty or
  * unreadable, the function falls back to the legacy "installed Ollama
  * tags only" list so the user always has a picker.

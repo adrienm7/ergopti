@@ -21,7 +21,7 @@
 ; ============================================================
 ; ============================================================
 
-; Surface lifecycle — canonical phases in _shared/tooltip/lifecycle.js.
+; Surface lifecycle — canonical phases in _shared/modules/tooltip/lifecycle.js.
 ; AHK uses two HWNDs (content + border); PREPARE keeps both hidden until the
 ; border DIB and content controls are ready, then REVEAL shows them together.
 

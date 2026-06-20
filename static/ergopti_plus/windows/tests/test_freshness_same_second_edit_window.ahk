@@ -37,7 +37,7 @@ _FreshSameSec_TieIsStale() {
 	; Only distancesreduction.toml exists here; _HotstringsCacheIsFresh skips the
 	; other bundled categories via FileExist, so one TOML controls the verdict.
 	Base := A_Temp . "\ergopti_freshness_samesecond_test"
-	HsDir := Base . "\hotstrings"
+	HsDir := Base . "\modules\hotstrings"
 	try DirCreate(HsDir)
 
 	global _SharedDir := Base
@@ -79,7 +79,7 @@ _FreshSameSec_NewerTsvStillFresh() {
 	; The fix must only catch the equal-second tie, not regress the normal case:
 	; a .tsv strictly newer than every TOML is still fresh (no needless rebuild).
 	Base := A_Temp . "\ergopti_freshness_newer_test"
-	HsDir := Base . "\hotstrings"
+	HsDir := Base . "\modules\hotstrings"
 	try DirCreate(HsDir)
 
 	global _SharedDir := Base

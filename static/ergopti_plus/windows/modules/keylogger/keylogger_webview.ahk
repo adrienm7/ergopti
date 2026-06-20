@@ -102,7 +102,7 @@ KLWV_AssetUrl(which) {
 ; Matches the convention used by OllamaWV_LocalesUrl in ollama_webview.ahk.
 KLWV_LocalesUrl() {
     global _SharedDir
-    base := _SharedDir . "\locales\"
+    base := _SharedDir . "\data\locales\"
     return "file:///" . StrReplace(base, "\", "/")
 }
 
@@ -438,7 +438,7 @@ KLWV_InjectI18n(which) {
     if !KLWV.windows.Has(which)
         return
     locale_code := I18nGetLocale()
-    json_path := _SharedDir . "\locales\" . locale_code . ".json"
+    json_path := _SharedDir . "\data\locales\" . locale_code . ".json"
     json_str := "{}"
     if FileExist(json_path)
         try json_str := FileRead(json_path, "UTF-8")

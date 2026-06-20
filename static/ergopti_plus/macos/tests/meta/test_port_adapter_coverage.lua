@@ -5,12 +5,12 @@
 --- DESCRIPTION:
 --- Verifies three structural invariants of the hexagonal architecture:
 ---
---- 1. ADAPTER PRESENCE — Every port spec in _shared/ports/*.spec.js has a
+--- 1. ADAPTER PRESENCE — Every port spec in _shared/core/ports/*.spec.js has a
 ---    matching adapter file in static/ergopti_plus/windows/adapters/ and in
 ---    static/ergopti_plus/macos/adapters/. A missing adapter means a port
 ---    contract exists on paper but is not honoured by a driver.
 ---
---- 2. DOMAIN TEST COVERAGE — Every domain spec in _shared/domain/*.spec.js
+--- 2. DOMAIN TEST COVERAGE — Every domain spec in _shared/core/domain/*.spec.js
 ---    has at least one corresponding test file in at least one driver's test
 ---    suite. An untested domain spec is a dead letter.
 ---
@@ -97,7 +97,7 @@ end
 -- =============================================
 
 helpers.describe("meta: port-adapter coverage", function()
-	local shared_ports  = SHARED_DIR .. "/ports"
+	local shared_ports  = SHARED_DIR .. "/core/ports"
 	local ahk_adapters  = REPO_ROOT .. "/static/ergopti_plus/windows/adapters"
 	local hs_adapters   = REPO_ROOT .. "/static/ergopti_plus/macos/adapters"
 	local linux_adapters = REPO_ROOT .. "/static/ergopti_plus/linux/adapters"
@@ -148,7 +148,7 @@ helpers.describe("meta: port-adapter coverage", function()
 	end
 
 	helpers.it(string.format("every port spec has an AHK adapter (%d specs)", spec_count), function()
-		helpers.assert_true(spec_count > 0, "no *.spec.js files found in _shared/ports — check REPO_ROOT")
+		helpers.assert_true(spec_count > 0, "no *.spec.js files found in _shared/core/ports — check REPO_ROOT")
 		helpers.assert_true(missing_ahk == 0,
 			string.format("%d AHK adapter(s) missing for port specs", missing_ahk))
 	end)
@@ -174,7 +174,7 @@ end)
 -- =================================================
 
 helpers.describe("meta: domain spec test coverage", function()
-	local domain_dir = SHARED_DIR .. "/domain"
+	local domain_dir = SHARED_DIR .. "/core/domain"
 	local ahk_tests  = REPO_ROOT .. "/static/ergopti_plus/windows/tests"
 	local hs_tests   = REPO_ROOT .. "/static/ergopti_plus/macos/tests"
 
@@ -221,7 +221,7 @@ helpers.describe("meta: domain spec test coverage", function()
 	end
 
 	helpers.it(string.format("every domain spec has a driver test (%d specs)", spec_count), function()
-		helpers.assert_true(spec_count > 0, "no *.spec.js files found in _shared/domain — check REPO_ROOT")
+		helpers.assert_true(spec_count > 0, "no *.spec.js files found in _shared/core/domain — check REPO_ROOT")
 		helpers.assert_true(uncovered == 0,
 			string.format("%d domain spec(s) have no driver test", uncovered))
 	end)

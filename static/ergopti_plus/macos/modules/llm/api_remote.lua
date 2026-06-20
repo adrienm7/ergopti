@@ -57,7 +57,7 @@ if not ok_kl then keylogger = nil end
 -- =======================================
 -- =======================================
 
---- Loaded from _shared/llm/api_providers.json at require time (AHK twin loads the
+--- Loaded from _shared/modules/llm/api_providers.json at require time (AHK twin loads the
 --- same file). Adding a provider = one entry in the JSON plus (optionally) a
 --- new format branch in build_payload / parse_response below.
 --- Returns (providers_table, order_array, prices_table) on success, or three
@@ -156,7 +156,7 @@ M.PROVIDERS, M.PROVIDER_ORDER, MODEL_PRICES = load_api_providers()
 local REQUEST_TIMEOUT_S = Timings.sec("llm", "request_timeout_ms")
 
 local DEDUPLICATION_ENABLED      = ApiCommon.DEFAULT_DEDUPLICATION_ENABLED
--- Retry policy from _shared/llm/inference.json (api_common.lua) so the
+-- Retry policy from _shared/modules/llm/inference.json (api_common.lua) so the
 -- remote backend tracks the same retry budget as Ollama / MLX.
 local _R_MAX_MULT, _R_TEMP_STEP, _R_EXTRA_TOKENS = ApiCommon.get_retry_policy()
 local RETRY_FAILED_PREDICTION    = (_R_MAX_MULT or 0) > 1

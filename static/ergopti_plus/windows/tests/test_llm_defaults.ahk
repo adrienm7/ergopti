@@ -6,7 +6,7 @@
 ; Regression coverage for lib/llm_defaults.ahk after the hardcoded-fallback
 ; removal. The 20-key _LLM_DEFAULTS_FALLBACK mirror is gone; only the genuinely
 ; AHK-local _LLM_LOCAL_DEFAULTS (model, backend) remains, and the loader sources
-; every shared value from _shared/llm/defaults.json, failing fast on a missing
+; every shared value from _shared/modules/llm/defaults.json, failing fast on a missing
 ; file or key instead of substituting a divergent in-code mirror.
 ; ==============================================================================
 

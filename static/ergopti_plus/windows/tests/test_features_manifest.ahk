@@ -13,7 +13,7 @@
 ;   1. Builds a fresh ``Features`` Map from the manifest.
 ;   2. Optionally writes a temporary v2 ``config.toml`` and applies it.
 ;   3. Asserts the resulting path/value matches what the migration document
-;      promises at ``_shared/features/_migration_v1_to_v2.md``.
+;      promises at ``_shared/modules/features/_migration_v1_to_v2.md``.
 ;
 ; FEATURES & RATIONALE:
 ; 1. Codegen guard: if the manifest hasn't been built, ``ManifestEnsureLoaded``

@@ -4,7 +4,7 @@
 ; MODULE: TimerScheduler Adapter (AutoHotkey)
 ; DESCRIPTION:
 ; AHK v2 implementation of the TimerScheduler port contract defined in
-; static/ergopti_plus/_shared/ports/TimerScheduler.spec.js. Wraps AHK's SetTimer
+; static/ergopti_plus/_shared/core/ports/TimerScheduler.spec.js. Wraps AHK's SetTimer
 ; behind four canonical methods (TimerAfter, TimerEvery, TimerCancel,
 ; TimerCancelAll) so domain modules can schedule deferred work without
 ; calling SetTimer directly.

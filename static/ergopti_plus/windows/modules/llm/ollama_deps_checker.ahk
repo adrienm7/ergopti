@@ -6,7 +6,7 @@
 ; Windows equivalent of the Hammerspoon ollama_deps_checker.lua.
 ; Ensures the Ollama binary is installed and the local inference server is
 ; reachable on http://localhost:11434. The heavy lifting is done by the shared
-; PowerShell installer (_shared/llm/install/ollama_install.ps1); this module
+; PowerShell installer (_shared/modules/llm/install/ollama_install.ps1); this module
 ; handles async invocation, output parsing, and drives the shared WebView2
 ; download_window UI (ollama_webview.ahk) — the same HTML/CSS/JS used on macOS.
 ;

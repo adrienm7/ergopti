@@ -4,7 +4,7 @@
 --- MODULE: KeyState Adapter (Hammerspoon)
 --- DESCRIPTION:
 --- Hammerspoon implementation of the KeyState port contract defined in
---- static/ergopti_plus/_shared/ports/KeyState.spec.js. Wraps hs.eventtap to query
+--- static/ergopti_plus/_shared/core/ports/KeyState.spec.js. Wraps hs.eventtap to query
 --- the physical state of keyboard keys without coupling domain modules to hs APIs.
 ---
 --- FEATURES & RATIONALE:

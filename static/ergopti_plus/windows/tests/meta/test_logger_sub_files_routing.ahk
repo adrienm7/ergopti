@@ -7,7 +7,7 @@
 ;
 ; BUGS ENCODED:
 ; F11 — _LoggerLoadSubFilesToml used a three-level relative path
-;        (..\..\..\_shared\logger\sub_files.toml) instead of one level up or
+;        (..\..\..\_shared\modules\logger\sub_files.toml) instead of one level up or
 ;        the canonical _SharedDir global, causing the TOML file to never be
 ;        found and silently falling back to the hardcoded list.
 ; F19a — The platform filter compared P against "autohotkey" but sub_files.toml
@@ -59,7 +59,7 @@ Test("meta logger sub_files: F11 — path does not climb 3 levels", _LSFR_F11_No
 _LSFR_F11_UsesCorrectPath() {
 	Src := _LSFR_ReadSource("lib\logger.ahk")
 	HasSharedDir := InStr(Src, "_SharedDir")
-	HasOneLevelUp := InStr(Src, "..\_shared\logger")
+	HasOneLevelUp := InStr(Src, "..\_shared\modules\logger")
 	Assert(HasSharedDir or HasOneLevelUp,
 		"F11: _LoggerLoadSubFilesToml must reference _SharedDir or one-level relative path (..\_shared\logger).")
 }

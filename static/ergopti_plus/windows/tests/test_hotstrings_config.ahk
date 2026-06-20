@@ -16,7 +16,7 @@
 
 ; The resolution fallbacks (GLOBAL_DEFAULT_DELAY / GLOBAL_DEFAULT_COLOR /
 ; HOTSTRINGS_CATEGORY_DEFAULT_COLORS["personal"]) are no longer hardcoded — they
-; load from _shared/hotstrings/defaults.toml. Populate them once here (using the
+; load from _shared/modules/hotstrings/defaults.toml. Populate them once here (using the
 ; real _shared/ dir that test_stubs.ahk points _SharedDir at) so the fallback
 ; assertions below see the canonical values, exactly as production does at boot.
 HotstringsConfigLoadSharedDefaults()
@@ -24,7 +24,7 @@ HotstringsConfigLoadSharedDefaults()
 ; UI_AI_LOADING_HEX (set by UiStyle_LoadSharedConst), which this headless harness
 ; does not run — so load that hex from the same shared file and run the loader,
 ; exactly as production does, so the resolve-cascade tests below see the AI tint.
-UI_AI_LOADING_HEX := IniCacheGet(ParseTomlFile(_SharedDir . "\tooltip\constants.toml"), "accent_colors", "ai_loading_hex")
+UI_AI_LOADING_HEX := IniCacheGet(ParseTomlFile(_SharedDir . "\modules\tooltip\constants.toml"), "accent_colors", "ai_loading_hex")
 HotstringsConfigLoadLlmPredictionColor()
 
 ; Helper — wipe / seed the in-memory state for a single test case.
@@ -203,7 +203,7 @@ Test("HotstringsConfig: llm_prediction category defaults to violet AI tint",
     TestHotstringsConfig_LlmPredictionVioletDefault)
 
 ; Single-source tripwire (A4 — mutualised AHK <-> macOS resolution defaults).
-; The three fallbacks now load from _shared/hotstrings/defaults.toml instead of a
+; The three fallbacks now load from _shared/modules/hotstrings/defaults.toml instead of a
 ; per-driver literal. This pins two things at once:
 ;   1. The loader actually read the shared file — the live globals equal the
 ;      values parsed straight out of defaults.toml (not a stale hardcoded value).
@@ -214,7 +214,7 @@ Test("HotstringsConfig: llm_prediction category defaults to violet AI tint",
 TestHotstringsConfig_SharedDefaultsAreSingleSource() {
     global _SharedDir, GLOBAL_DEFAULT_DELAY, GLOBAL_DEFAULT_COLOR
     global HOTSTRINGS_CATEGORY_DEFAULT_COLORS
-    Path := _SharedDir . "\hotstrings\defaults.toml"
+    Path := _SharedDir . "\modules\hotstrings\defaults.toml"
     c    := ParseTomlFile(Path)
     AssertTrue(c.Count > 0, "defaults.toml is present and parses (" . Path . ")")
 
@@ -239,15 +239,15 @@ Test("HotstringsConfig: resolution defaults come from the shared defaults.toml (
     TestHotstringsConfig_SharedDefaultsAreSingleSource)
 
 ; The llm_prediction baseline tint is the canonical AI loading hex from
-; _shared/tooltip/constants.toml [accent_colors] ai_loading_hex (exposed as
+; _shared/modules/tooltip/constants.toml [accent_colors] ai_loading_hex (exposed as
 ; UI_AI_LOADING_HEX), NOT a re-typed literal. Proves the loader copies it and
 ; fails fast when the shared hex is unloaded.
 TestHotstringsConfig_LlmPredictionColorFromSharedAiHex() {
     global _SharedDir, UI_AI_LOADING_HEX, HOTSTRINGS_CATEGORY_DEFAULT_COLORS
     ; Pin the canonical value at its single source.
-    c := ParseTomlFile(_SharedDir . "\tooltip\constants.toml")
+    c := ParseTomlFile(_SharedDir . "\modules\tooltip\constants.toml")
     AssertEqual("#AD61FF", IniCacheGet(c, "accent_colors", "ai_loading_hex"),
-        "canonical AI loading hex in _shared/tooltip/constants.toml")
+        "canonical AI loading hex in _shared/modules/tooltip/constants.toml")
 
     savedHex   := IsSet(UI_AI_LOADING_HEX) ? UI_AI_LOADING_HEX : ""
     savedColor := HOTSTRINGS_CATEGORY_DEFAULT_COLORS.Has("llm_prediction") ? HOTSTRINGS_CATEGORY_DEFAULT_COLORS["llm_prediction"] : ""

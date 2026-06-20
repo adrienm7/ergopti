@@ -22,12 +22,12 @@ package.loaded["lib.i18n"] = {
 }
 
 --- Stub Paths so that any load of api_remote (or catalogue users) can resolve
---- _shared/llm/*.json from the real source tree during headless test runs.
+--- _shared/modules/llm/*.json from the real source tree during headless test runs.
 package.loaded["lib.paths"] = {
 	shared = function(rel) return helpers.shared(rel) end,
 	shared_root = function() return helpers.shared() end,
 	shared_llm_path = function(name)
-		return helpers.shared("llm/" .. name)
+		return helpers.shared("modules/llm/" .. name)
 	end,
 }
 
@@ -73,7 +73,7 @@ helpers.describe("Profiles.BUILTIN_PROFILES", function()
 		-- The legacy ``system_multi`` function field was replaced by the
 		-- JSON-shaped ``system_multi_template`` string (with a ``{n}``
 		-- placeholder) when profiles.lua started loading the shared
-		-- ``_shared/llm/profiles.json``. Only the batch profile defines it.
+		-- ``_shared/modules/llm/profiles.json``. Only the batch profile defines it.
 		for _, p in ipairs(Profiles.BUILTIN_PROFILES) do
 			if p.id == "batch_advanced" then
 				helpers.assert_eq(type(p.system_multi_template), "string")

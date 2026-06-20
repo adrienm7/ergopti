@@ -38,7 +38,7 @@ Not in `test:js` (run on demand): `python tools/dev/format_toml.py --hotstrings
 --all --check` (hotstring TOML formatting), `npm run test:properties`,
 `npm run test:mutation`.
 
-**Adding a feature flag?** Edit only `static/ergopti_plus/_shared/features/manifest.toml`,
+**Adding a feature flag?** Edit only `static/ergopti_plus/_shared/modules/features/manifest.toml`,
 then `npm run codegen`, then commit the regenerated `_generated/` files. If you
 read it in AHK as `Features["<section>"]["<id>"]`,
 `test:feature-read-sites` proves the path is backed by the manifest — a mismatch

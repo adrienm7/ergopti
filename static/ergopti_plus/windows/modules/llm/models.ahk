@@ -3,7 +3,7 @@
 ; ==============================================================================
 ; MODULE: LLM Models Registry
 ; DESCRIPTION:
-; Loads the shared model catalogue from _shared/llm/models.json and exposes the
+; Loads the shared model catalogue from _shared/modules/llm/models.json and exposes the
 ; hierarchical (provider → family → model) and flat (display name → metadata)
 ; views the rest of the AHK stack needs.
 ;
@@ -34,16 +34,16 @@
 ; ==================================
 
 /**
- * Returns the absolute path to a file inside _shared/llm/.
+ * Returns the absolute path to a file inside _shared/modules/llm/.
  * Walks up from the current script location to find the _shared sibling.
- * @param {string} filename - Filename within _shared/llm/ (e.g. "models.json").
+ * @param {string} filename - Filename within _shared/modules/llm/ (e.g. "models.json").
  * @returns {string} Absolute path, or "" if not found.
  */
 LLM_GetSharedPath(filename) {
 	global _SharedDir
 	; so a single canonical path is enough; the legacy multi-candidate fallback
 	; was only useful when the script could be invoked from arbitrary cwds.
-	canonical := _SharedDir . "\llm\" . filename
+	canonical := _SharedDir . "\modules\llm\" . filename
 	if FileExist(canonical)
 		return canonical
 	return ""

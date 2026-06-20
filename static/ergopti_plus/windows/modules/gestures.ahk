@@ -969,7 +969,7 @@ global GESTURE_AX_NAMES := []
 _GestureLoadActionCatalog(*) {
     global GESTURE_ACTION_NAMES, GESTURE_AX_NAMES, GESTURE_ACTIONS, _SharedDir, _GestureSpecialKeys
 
-    _SharedToml := _SharedDir . "\actions.toml"
+    _SharedToml := _SharedDir . "\modules\gestures\actions.toml"
     _Toml       := ParseTomlFile(_SharedToml)
 
     ; Build GESTURE_ACTION_NAMES from [sg_order].items, keeping only entries

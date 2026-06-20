@@ -4,7 +4,7 @@
 ; MODULE: TOML Config Loader
 ; DESCRIPTION:
 ; Reads the user ``config.toml`` produced by the first-boot generator from
-; ``_shared/features/manifest.toml``. Distinct from the legacy ``toml_loader.ahk``
+; ``_shared/modules/features/manifest.toml``. Distinct from the legacy ``toml_loader.ahk``
 ; which only handles flat ``[script]``/``[features]`` overrides — this loader
 ; supports arbitrarily nested sections (``[hotstrings.autocorrection.accents]``)
 ; and simple array values (``val_modifiers = ["alt"]``).

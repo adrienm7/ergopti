@@ -12,10 +12,10 @@ const path = require('path');
 const { shared, sharedRel } = require('../lib/paths.cjs');
 
 const REPO_ROOT = path.resolve(__dirname, '../../');
-const LOCALES_DIR = shared('locales');
+const LOCALES_DIR = shared('data/locales');
 const WINDOWS_DIR = path.join(REPO_ROOT, 'static/ergopti_plus/windows');
 const MACOS_DIR = path.join(REPO_ROOT, 'static/ergopti_plus/macos');
-const MANIFEST_PATH = shared('menu_manifest.json');
+const MANIFEST_PATH = shared('modules/menu/menu_manifest.json');
 
 // 1. Load the reference locale (English)
 const enLocalePath = path.join(LOCALES_DIR, 'en.json');
@@ -86,7 +86,7 @@ function auditManifest(obj) {
 	} else if (typeof obj === 'object' && obj !== null) {
 		if (obj.i18n && !availableKeys.has(obj.i18n)) {
 			if (!missingKeys.has(obj.i18n)) missingKeys.set(obj.i18n, []);
-			missingKeys.get(obj.i18n).push(sharedRel('menu_manifest.json'));
+			missingKeys.get(obj.i18n).push(sharedRel('modules/menu/menu_manifest.json'));
 		}
 		Object.values(obj).forEach(auditManifest);
 	}

@@ -104,7 +104,7 @@ global _LOGGER_FLUSH_TIMER_STARTED := False
 ; previous days are deleted at init time. Paths are resolved relative to LogDir.
 ;
 ; Populated by _LoggerLoadSubFilesToml() at LoggerInit time from the canonical
-; _shared/logger/sub_files.toml; falls back to the hardcoded list when the
+; _shared/modules/logger/sub_files.toml; falls back to the hardcoded list when the
 ; shared file is unavailable (e.g. stripped builds, running from a temp copy).
 global LOGGER_SUB_FILES := []
 
@@ -158,7 +158,7 @@ LoggerInit() {
     LOGGER_LOG_PATH := LogDir . "ErgoptiPlus_" . FormatTime(, "yyyy-MM-dd") . ".log"
     LOGGER_ERRORS_LOG_PATH := LogDir . "ErgoptiPlus_errors_" . FormatTime(, "yyyy-MM-dd") . ".log"
     _LoggerPurgeOldLogs(LogDir, 14)
-    ; Load sub-file routing rules from _shared/logger/sub_files.toml so adding a
+    ; Load sub-file routing rules from _shared/modules/logger/sub_files.toml so adding a
     ; new topical log requires only a TOML edit, not a code change in both drivers.
     _LoggerLoadSubFilesToml(A_ScriptDir . "\")
     _LoggerInitSubFiles(LogDir)
@@ -551,7 +551,7 @@ _LoggerFanOut(Tag, Line) {
     }
 }
 
-; Parses _shared/logger/sub_files.toml and populates LOGGER_SUB_FILES with the
+; Parses _shared/modules/logger/sub_files.toml and populates LOGGER_SUB_FILES with the
 ; entries whose platforms array includes "ahk". Falls back to LOGGER_SUB_FILES_FALLBACK
 ; when the file is absent or unreadable so the driver stays functional in stripped builds.
 ;
@@ -569,9 +569,9 @@ _LoggerLoadSubFilesToml(ScriptDir) {
     ; Prefer the canonical _SharedDir resolved at boot by ErgoptiPlus.ahk; fall back
     ; to the corrected one-level relative path (windows/ → ergopti_plus/_shared/).
     if (IsSet(_SharedDir) and _SharedDir != "")
-        TomlPath := _SharedDir . "\logger\sub_files.toml"
+        TomlPath := _SharedDir . "\modules\logger\sub_files.toml"
     else
-        TomlPath := ScriptDir . "..\_shared\logger\sub_files.toml"
+        TomlPath := ScriptDir . "..\_shared\modules\logger\sub_files.toml"
     if !FileExist(TomlPath) {
         LOGGER_SUB_FILES := LOGGER_SUB_FILES_FALLBACK
         return

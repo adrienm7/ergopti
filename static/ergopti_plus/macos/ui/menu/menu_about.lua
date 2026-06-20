@@ -14,7 +14,7 @@
 --- 2. State machine: the item label reflects the current state (idle /
 ---    checking / update available / installing) so the user always knows
 ---    what is happening.
---- 3. Background polling: optional periodic silent check (_shared/updater/
+--- 3. Background polling: optional periodic silent check (_shared/modules/updater/
 ---    constants.toml interval presets), surfaces a notification on new releases.
 --- 4. Channel-aware: the user can switch between "main" (stable releases) and
 ---    "dev" (pre-releases) and the choice is persisted in config.toml.

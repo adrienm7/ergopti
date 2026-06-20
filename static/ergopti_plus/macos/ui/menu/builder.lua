@@ -49,7 +49,7 @@ local _debug_menu_cache     = nil
 --- @return table|nil Parsed manifest data, or nil on failure.
 local function load_manifest()
 	if _manifest_cache then return _manifest_cache end
-	local manifest_path = Paths.shared("menu_manifest.json") or ""
+	local manifest_path = Paths.shared("modules/menu/menu_manifest.json") or ""
 	local ok_r, fh = pcall(io.open, manifest_path, "r")
 	if not ok_r or not fh then
 		Logger.error(LOG, "Cannot open menu_manifest.json at '%s'.", manifest_path)

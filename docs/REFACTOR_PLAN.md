@@ -35,7 +35,7 @@ Chemin identique d'un driver à l'autre → l'analogue se trouve au même endroi
 | Concept | `windows/` | `macos/` | Rôle |
 |---|---|---|---|
 | Entrée | `ErgoptiPlus.ahk` (mince) | `init.lua` (mince) | directives + manifeste d'include + filet d'erreur + `Boot_Run()` |
-| Adapters | `adapters/` (20 exactement) | `adapters/` (20 exactement) | 1 fichier / port de `_shared/ports/contracts.json` |
+| Adapters | `adapters/` (20 exactement) | `adapters/` (20 exactement) | 1 fichier / port de `_shared/core/ports/contracts.json` |
 | Infra/domaine | `lib/` (aucun UI) | `lib/` (aucun UI) | |
 | Features | `modules/<feature>/` | `modules/<feature>/` | 1 dossier / feature |
 | Fenêtres UI | `ui/<window>/` | `ui/<window>/` | 1 dossier / fenêtre |
@@ -152,7 +152,7 @@ Chemin identique d'un driver à l'autre → l'analogue se trouve au même endroi
 ## P7 — Mise en commun profonde (gros blast radius — en dernier, livré sous-étape par sous-étape)
 
 - [ ] Logger → cœur partagé `_shared/lua/logger` via `set_sink()` (les deux drivers).
-- [ ] Tooltip AHK lit `_shared/tooltip/constants.toml` ; ⚠️ divergences d'alpha → clés per-platform reproduisant l'existant (gate : snapshot avant/après).
+- [ ] Tooltip AHK lit `_shared/modules/tooltip/constants.toml` ; ⚠️ divergences d'alpha → clés per-platform reproduisant l'existant (gate : snapshot avant/après).
 - [ ] **tap_hold** → `_shared/tap_hold/defaults.toml`. ⚠️ **TOML Windows vs JSON macOS diffèrent probablement déjà** → prouver l'équivalence byte d'abord, sinon c'est un `feat`, pas un refactor.
 - [ ] Codegen du codec TOML + parser LLM AHK depuis `_shared/lua` ; éliminer `path_translator.ahk` (map d'ids générée ou migration snake_case).
 - [ ] Promouvoir les frontends web restants → `_shared/ui/` ; plier le placement du menu dans `manifest.toml` + émettre l'arbre par codegen.

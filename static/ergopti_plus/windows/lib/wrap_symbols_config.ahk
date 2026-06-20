@@ -98,7 +98,7 @@ _WS_LoadBuiltinCatalogue() {
     _WS_BUILTIN_PAIRS  := []
     _WS_BUILTIN_GROUPS := []
 
-    FilePath := _SharedDir . "\wrap_symbols.json"
+    FilePath := _SharedDir . "\modules\wrap_symbols\wrap_symbols.json"
     Groups := ""
     if FileExist(FilePath) {
         Content := ""

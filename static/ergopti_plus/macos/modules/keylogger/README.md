@@ -4,7 +4,7 @@
 
 Low-level event tap daemon that intercepts, timestamps, and stores every human keystroke globally across the operating system. Drives context tracking (app focus, secure-field guard), hardware telemetry (battery, WiFi, mouse distance, system load), and persists everything to an SQLite database and a hot-path JSONL log.
 
-## Ports used (`_shared/ports/`)
+## Ports used (`_shared/core/ports/`)
 
 | Port                  | Usage                                                 |
 | --------------------- | ----------------------------------------------------- |
@@ -15,7 +15,7 @@ Low-level event tap daemon that intercepts, timestamps, and stores every human k
 | `Storage`             | SQLite writes via `sqlite_writer` and `sqlite_reader` |
 | `TimerScheduler`      | Idle check, maintenance, and flush timers             |
 
-## Domain module (`_shared/domain/`)
+## Domain module (`_shared/core/domain/`)
 
 No domain spec directly — the keylogger implements the on-disk schema described in `_shared/data/KEYLOGGER_SPEC.md`. The `kc_bridge` sub-module exposes keycode translation consumed by `karabiner`.
 

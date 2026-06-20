@@ -184,7 +184,7 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 #Include lib/hotstrings/hotstring_engine_main.ahk
 #Include lib/hotstrings/hotstring_live_toggle.ahk
 ; Generated terminator catalogue (single source of truth — shared with macOS via
-; _shared/domain/Terminators.spec.js). Both the tray and config-window delimiter
+; _shared/core/domain/Terminators.spec.js). Both the tray and config-window delimiter
 ; menus render this catalogue so the word-terminator list never drifts between
 ; drivers. Included before the menus and before HSE_Terminators is instantiated.
 #Include _generated/terminators.ahk
@@ -350,12 +350,12 @@ global _AhkSubDir := "autohotkey\"
 global ConfigurationFile := _ConfigDir . _AhkSubDir . "config.toml"
 
 ; Load the cross-driver hotstring resolution defaults (global default delay /
-; color / "personal" baseline) from _shared/hotstrings/defaults.toml — the single
+; color / "personal" baseline) from _shared/modules/hotstrings/defaults.toml — the single
 ; source shared with Hammerspoon. Must precede HotstringsConfigInit and the tray
 ; menu build (initMenu reads GLOBAL_DEFAULT_DELAY). Fail-fast on a missing key.
 HotstringsConfigLoadSharedDefaults()
 ; Load the shared timing registry, then reassign the keylogger-walker and
-; tap-hold timing constants from it (_shared/timings/constants.toml). AHK v2 runs
+; tap-hold timing constants from it (_shared/modules/timings/constants.toml). AHK v2 runs
 ; static/global initializers before this auto-execute body, so these constants
 ; start at a sentinel and are sourced here — well before the keylogger hook or
 ; any tap-hold hotkey arms. Fail-fast on a missing key.
@@ -453,7 +453,7 @@ BootProfile_Begin()
 I18nPreload()
 BootProfile_Mark("i18n locale preloaded")
 
-; Load tooltip visual constants from _shared/tooltip/constants.toml so the
+; Load tooltip visual constants from _shared/modules/tooltip/constants.toml so the
 ; runtime values stay in sync with the TOML single source of truth.
 ; Must run after _SharedDir is set (line ~51) and ParseTomlFile is available.
 UiStyle_LoadSharedConst()

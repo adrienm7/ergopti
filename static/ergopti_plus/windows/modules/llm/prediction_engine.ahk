@@ -31,7 +31,7 @@
 ; defaults.json rather than being hardcoded here.
 ; Timer/cache keys are always initialised to their zero values regardless.
 ; String/numeric placeholder values — always overwritten by LLM_Engine_ApplySharedDefaults()
-; which reads from LLM_Defaults (lib/llm_defaults.ahk → _shared/llm/defaults.json).
+; which reads from LLM_Defaults (lib/llm_defaults.ahk → _shared/modules/llm/defaults.json).
 global _LLM_Engine := Map(
 	"enabled",                    false,
 	"model",                      "",
@@ -78,7 +78,7 @@ global _LLM_Engine := Map(
 )
 
 ; Per-backend minimum interval (ms) between two prediction requests is now
-; defined in ``static/ergopti_plus/_shared/llm/inference.json`` and read via
+; defined in ``static/ergopti_plus/_shared/modules/llm/inference.json`` and read via
 ; ``LLM_ApiCommon_GetRateLimitMs(backend)``. The shared JSON keeps the AHK
 ; and HS drivers in lockstep — changing a floor in one place applies to
 ; both backends with no risk of drift.

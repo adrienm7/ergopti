@@ -4,7 +4,7 @@
 --- MODULE: NetworkInfo Adapter (Hammerspoon)
 --- DESCRIPTION:
 --- Hammerspoon implementation of the NetworkInfo port contract defined in
---- static/ergopti_plus/_shared/ports/NetworkInfo.spec.js. Wraps hs.wifi and shell
+--- static/ergopti_plus/_shared/core/ports/NetworkInfo.spec.js. Wraps hs.wifi and shell
 --- commands to expose Wi-Fi SSID, signal strength, internet reachability, and
 --- VPN detection without coupling domain modules to hs APIs.
 ---

@@ -590,7 +590,7 @@ const ahkSrc = fs.readFileSync(AHK_MANIFEST, 'utf8');
 const luaSrc = fs.readFileSync(HS_MANIFEST, 'utf8');
 const fixtureSrc = fs.readFileSync(FIXTURE_CONFIG, 'utf8');
 const manifestSrc = fs.readFileSync(
-	shared('features/manifest.toml'),
+	shared('modules/features/manifest.toml'),
 	'utf8'
 );
 

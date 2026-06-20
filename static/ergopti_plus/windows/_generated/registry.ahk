@@ -2,7 +2,7 @@
 
 ; ==========================================
 ; AUTO-GENERATED — do not edit manually
-; Source: static/ergopti_plus/_shared/domain/Registry.spec.js
+; Source: static/ergopti_plus/_shared/core/domain/Registry.spec.js
 ; Run: npm run codegen:registry
 ; ==========================================
 

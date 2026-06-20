@@ -34,7 +34,7 @@ InitSubMenus() {
 	; the TOML has no sections_order.
 	for _, V1Cat in _FLAT_HOTSTRING_V1_CATS {
 		SubMenu := Menu()
-		TomlPath := _SharedDir . "\hotstrings\" . StrLower(V1Cat) . ".toml"
+		TomlPath := _SharedDir . "\modules\hotstrings\" . StrLower(V1Cat) . ".toml"
 		if FileExist(TomlPath) {
 			RegisterMenuItem(SubMenu, t("menu.hotstrings.open_file"), _MakeOpenFileFn(TomlPath))
 			SubMenu.Add()

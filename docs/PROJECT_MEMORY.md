@@ -27,7 +27,7 @@ Accumulated engineering knowledge for this repository — gotchas, architecture 
   - [project-ahk-test-suite-critical-leak](#project-ahk-test-suite-critical-leak) — Critical("On") in layout/hotkey callbacks is safe in production but leaks into the main thread when invoked directly by tests, silently hanging background timers
   - [project-updater-nonblocking-http](#project-updater-nonblocking-http) — The updater background poll must never do synchronous WinHttp on the main thread (it freezes all remapping); WinHttp SetTimeouts 0 = infinite. Use the async WinHTTP + WaitForResponse(0) + SetTimer-poll pattern.
   - [project-config-v2-refactor](#project-config-v2-refactor) — State of the v2 config schema refactor (Scope C) — branch refactor/config-schema-v2 with 5 dormant commits. Cut-over to actually migrate the AHK driver runtime is the open piece.
-  - [project_debug_menu_sync](#project-debug-menu-sync) — Debug menu order is defined in _shared/menu_manifest.json debug_menu — both AHK and Lua drivers consume it
+  - [project_debug_menu_sync](#project-debug-menu-sync) — Debug menu order is defined in _shared/modules/menu/menu_manifest.json debug_menu — both AHK and Lua drivers consume it
   - [project-gestures-reversal-detection](#project-gestures-reversal-detection) — How direction reversals are detected in the gestures engine (x1 vs incremental)
   - [project-gestures-startup-design](#project-gestures-startup-design) — Design choices for the macOS gestures startup path — primer-as-wakeup-signal vs burst probes
   - [project-hotstring-delay-architecture](#project-hotstring-delay-architecture) — Where hotstring expansion delays are configured, the cross-platform precedence, and the key gotchas
@@ -35,7 +35,7 @@ Accumulated engineering knowledge for this repository — gotchas, architecture 
   - [project-hotstring-live-rebuild](#project-hotstring-live-rebuild) — Hotstring section/category toggles apply in-process via a re-runnable RegisterAllHotstrings(); native-engine + layout-backed features under hotstrings.\* are the reload-only exceptions
   - [project-typing-latency-tooltip-coldstart](#project-typing-latency-tooltip-coldstart) — Tooltip render + post-boot warm-up latency: the border alpha scan optimization, why tooltip window-reuse is rejected (AHK v2 can't remove Gui controls), and why deferred-registration chunking was reverted
   - [project-hs-perf-profilers-and-case-conform](#project-hs-perf-profilers-and-case-conform) — macOS boot/hot-path profilers (via timer_scheduler adapter), the case-conform registration fast path (lowercase-only + fire-time conform, Unicode tail buckets), the menubar dirty-cache, the two dominant boot costs found + fixed (group disable/enable round-trip ~2 s; synchronous log-purge shell pipeline ~0.6 s deferred), and the escape-trap-on-first-show gotcha (Escape priority over Raycast — do not move to init)
-  - [project-tooltip-shared-style](#project-tooltip-shared-style) — Tooltip style is shared via _shared/tooltip/constants.toml (per-driver alphas border_alpha_hs vs _ahk are intentionally different); the macOS stacked canvas rounds its colored rectangle with a SINGLE rounded panel background — NOT an hs.canvas clip element (clip rendered solid red on the user's build)
+  - [project-tooltip-shared-style](#project-tooltip-shared-style) — Tooltip style is shared via _shared/modules/tooltip/constants.toml (per-driver alphas border_alpha_hs vs _ahk are intentionally different); the macOS stacked canvas rounds its colored rectangle with a SINGLE rounded panel background — NOT an hs.canvas clip element (clip rendered solid red on the user's build)
   - [project-hs-script-quit-kills-karabiner](#project-hs-script-quit-kills-karabiner) — the script_quit action (rcmd+Escape) calls os.exit(), which BYPASSES the Hammerspoon shutdown callback, so it must call karabiner.kill() itself or KE keeps remapping the keyboard after HS is gone; conversely the shutdown callback must NOT kill KE on a reload (lib/reload_guard distinguishes reload from quit) or the grabber cascades down and the native "install Karabiner" prompt appears
   - [project-hs-onboarding-config-schema](#project-hs-onboarding-config-schema) — the first-run wizard MUST write config.toml using the canonical HS schema (ui/menu/preferences.lua KEY_MAP: lowercase sections, clean `enabled` flags) — NOT AHK-style keys — or every wizard choice is silently dropped on the post-wizard reload; locale persists via hs.settings, not config.toml
   - [Keymap module architecture and refactor decisions](#keymap-module-architecture-and-refactor-decisions) — Structure of the keymap module, where defaults live, which files do what
@@ -471,12 +471,12 @@ _State of the v2 config schema refactor (Scope C) — branch refactor/config-sch
 
 The user is mid-flight on the Scope C refactor — a clean-state rewrite of the Ergopti+ user configuration system, unifying it under a snake_case schema, a single shared features manifest, and a codegen pipeline.
 
-**Why:** the v1 config had drifted into a messy state (AHK using PascalCase mixed with snake_case in the same `config.toml`, HS using snake_case-only, separate `features_config.ahk` hardcoded Map, hand-written TOML loaders that don't support nested sections). The refactor centralises every default in `_shared/features/manifest.toml` and codegen-emits per-driver artifacts.
+**Why:** the v1 config had drifted into a messy state (AHK using PascalCase mixed with snake_case in the same `config.toml`, HS using snake_case-only, separate `features_config.ahk` hardcoded Map, hand-written TOML loaders that don't support nested sections). The refactor centralises every default in `_shared/modules/features/manifest.toml` and codegen-emits per-driver artifacts.
 
 **How to apply:** when resuming work on this refactor, read in this order:
 
-1. `static/drivers/_shared/config_schema/SCHEMA.md` — design conventions (snake_case, modélisation α for hotstrings, `ahk.`/`hs.` prefixes).
-2. `static/drivers/_shared/features/manifest.toml` — single source of truth, 302 features.
+1. `static/drivers/_shared/core/config_schema/SCHEMA.md` — design conventions (snake_case, modélisation α for hotstrings, `ahk.`/`hs.` prefixes).
+2. `static/drivers/_shared/modules/features/manifest.toml` — single source of truth, 302 features.
 3. `scripts/build-features-manifest.js` — codegen pipeline; run with `npm run build:manifest`.
 4. The three dormant AHK modules: `lib/first_boot.ahk`, `lib/manifest_reader.ahk`, `lib/toml/toml_loader_v2.ahk`.
 
@@ -537,7 +537,7 @@ Fixed by making the target Map explicit: `ApplyConfigTomlV2(FeaturesMap, FilePat
 
 **Open piece — the cut-over (C4.5 + C4.6 + C5 + C7 + C8)**: replace the hardcoded `Features := Map(...)` in `lib/features_config.ahk` with a call to `ManifestBuildFeaturesMap()`, wire `EnsureUserConfigsExist()` + `ApplyConfigTomlV2()` into `ErgoptiPlus.ahk` boot, and migrate ~500-800 sites across 22 files from PascalCase to snake_case keys plus `.Property → ["key"]` access. Also: `TapHolds` is removed from Features in v2 (moved to a separate `tap_hold` table populated from `tap_hold.toml`), so sites reading `Features["TapHolds"][...]` need a different access pattern.
 
-**Mapping reference** is now committed at `static/drivers/_shared/features/_migration_v1_to_v2.md` (commit 98c34833, 567 lines) — exhaustive v1 → v2 table covering every TOML section, Features path, access pattern, IniCacheGet call site, and a stepped cut-over checklist. Read this top-down before launching the cut-over agent.
+**Mapping reference** is now committed at `static/drivers/_shared/modules/features/_migration_v1_to_v2.md` (commit 98c34833, 567 lines) — exhaustive v1 → v2 table covering every TOML section, Features path, access pattern, IniCacheGet call site, and a stepped cut-over checklist. Read this top-down before launching the cut-over agent.
 
 **Next decision** — approach for the cut-over: (a) 3 mini-cut-over commits with a temporary compat shim (driver bootable at each step, adds throwaway code), or (b) Big Bang Agent run with the migration document as reference (single sweep across all files, no intermediate boot, cleaner diff but riskier). User has not yet chosen.
 
@@ -564,7 +564,7 @@ consumers). A2 resolved them:
   (counterpart of `manifest_reader.ahk`). `modules/keymap/init.lua` `DEFAULT_STATE`
   now sources its hotstring/preview defaults via `Manifest.default_for("hs.hotstrings.<id>")`
   / `"hotstrings.trigger_char"` (fail-fast on a missing path), so macOS keymap
-  defaults come from the same `_shared/features/manifest.toml` single source as AHK.
+  defaults come from the same `_shared/modules/features/manifest.toml` single source as AHK.
   The reader loads the manifest cwd-independently (`debug.getinfo` + `loadfile`),
   not via `require`. Other macOS modules (gestures/llm/dynamic_hotstrings/keylogger)
   still hold hand-written `DEFAULT_STATE` — wiring them is the follow-up (LLM layers
@@ -579,7 +579,7 @@ was re-anchored 900→905 with a comment. If you wire more modules to the manife
 expect to re-anchor again (the real drive-to-zero target is OS calls, not paths).
 
 **Update (2026-06-13, A3): shared timings registry now has dedicated readers on
-both drivers.** `_shared/timings/constants.toml` (~80 ms constants, each naming the
+both drivers.** `_shared/modules/timings/constants.toml` (~80 ms constants, each naming the
 AHK + HS local it duplicated) is now read through a fail-fast reader on each side
 instead of ad-hoc per-consumer parsing:
 
@@ -653,7 +653,7 @@ before re-enabling codegen for it. The cross-driver `prompt_builder/vectors.json
 - **Config schema** is now enforced: `tools/test/test-config-schema.cjs`
   (`test:config-schema`, also a `build:domain` step) is a dependency-free minimal
   JSON-Schema validator (there is no ajv) that checks the generated
-  `config_template.toml` against `_shared/config_schema/config.schema.json`. That
+  `config_template.toml` against `_shared/core/config_schema/config.schema.json`. That
   schema had drifted (it was consumed by zero tests) and was reconciled to the
   manifest. When the manifest gains a config key, add it to the schema or this
   fails. Watch the `allOf` + `additionalProperties:false` trap (a strict
@@ -701,7 +701,7 @@ _trigger_roi/_clipboard/_window_topology/_ergonomics` + `keylogger.ahk`
 
 ### project_debug_menu_sync
 
-_Debug menu order is defined in _shared/menu_manifest.json debug_menu — both AHK and Lua drivers consume it_
+_Debug menu order is defined in _shared/modules/menu/menu_manifest.json debug_menu — both AHK and Lua drivers consume it_
 
 <sub>slug: `project_debug_menu_sync`</sub>
 
@@ -777,7 +777,7 @@ _Where hotstring expansion delays are configured, the cross-platform precedence,
 
 How the hotstring expansion-delay (TimeActivationSeconds / typing-speed gate) is configured across both drivers. Mapped 2026-06-04 building the per-section delay feature (comma_j → 5s). See [[project_hotstring_engine_internals]].
 
-**Source of truth = the shared per-category TOML**, `static/ergopti_plus/_shared/hotstrings/<category>.toml`:
+**Source of truth = the shared per-category TOML**, `static/ergopti_plus/_shared/modules/hotstrings/<category>.toml`:
 
 - `[_meta] delay = <s>` — the group/category delay.
 - `[_meta.section_delays]` block (`<section> = <s>` lines) — per-section overrides, e.g. `comma_j = 5`.
@@ -792,7 +792,7 @@ How the hotstring expansion-delay (TimeActivationSeconds / typing-speed gate) is
 **Cross-platform Delays-submenu parity (added 2026-06-04, branch `feat/comma-j-expansion`).** Both drivers' hotstrings "Delays" submenu now surfaces the same set of quick delay items: default expansion delay, ★ magic-key, autocorrection, AI-prediction timeout, and dynamic-hotstrings (HS also keeps it; AHK gained all of them). Key implementation facts:
 
 - **★ + autocorrection** are real TOML-backed categories (`magickey.toml` `[_meta] delay = 2.0`, `autocorrection.toml` = 1.0). On macOS the quick item must read via `hotstrings_config.resolve(cat,nil).delay` and write via `set_override` + `set_delay` (NOT the `make_delay_item`/`state.delays` path, which is in-memory-only and would desync from the config window). AHK uses `HotstringsResolve`/`HotstringsSetOverride` — `_HS_CategoryDelayLabel`/`_HS_PromptCategoryDelay(cat, i18nKey, DefaultSec:="")` in `tray_menu.ahk`.
-- **AHK llm_prediction + dynamichotstrings have NO category TOML** — `ParseTomlGroupConfig` silently returns an empty cached config for a missing file (no log noise), so they're used as **pseudo-category override keys**: default is a code constant (`UI_LLM_TIMEOUT_SEC`=20s in `_shared/tooltip/constants.toml`; `DYN_HOTSTRINGS_DEFAULT_DELAY`=2.0 in `modules/hotstrings.ahk`), override persisted via `HotstringsSetOverride("llm_prediction"/"dynamichotstrings",...)`. This avoided a 6-file `_LLM_Tray` plumbing route and the `build-hotstrings.cjs` enumeration risk of adding fake category TOMLs. The LLM tooltip timer (`lib/tooltip.ahk` ~1209) resolves the override live (applies without restart); AHK category-delay changes otherwise apply on restart (registered `TimeActivationSeconds` is read at startup).
+- **AHK llm_prediction + dynamichotstrings have NO category TOML** — `ParseTomlGroupConfig` silently returns an empty cached config for a missing file (no log noise), so they're used as **pseudo-category override keys**: default is a code constant (`UI_LLM_TIMEOUT_SEC`=20s in `_shared/modules/tooltip/constants.toml`; `DYN_HOTSTRINGS_DEFAULT_DELAY`=2.0 in `modules/hotstrings.ahk`), override persisted via `HotstringsSetOverride("llm_prediction"/"dynamichotstrings",...)`. This avoided a 6-file `_LLM_Tray` plumbing route and the `build-hotstrings.cjs` enumeration risk of adding fake category TOMLs. The LLM tooltip timer (`lib/tooltip.ahk` ~1209) resolves the override live (applies without restart); AHK category-delay changes otherwise apply on restart (registered `TimeActivationSeconds` is read at startup).
 - **AHK dynamic phone/SSN/IBAN prefix hotstrings were rewritten from native `Hotstring()` to HSE `CreateHotstring`** so they honour `TimeActivationSeconds` (they had none). `_HotstringDispatch` calls a callable `Replacement`, so `(*) => SendFinalResult(V)` became `(*) => V` + `FinalResult:True`; `OnlyText:True` also fixed a latent `+33…` SendInput modifier-interpretation bug. The `@np` personal-info expansions were already HSE and left firing instantly (out of scope). `IsTimeActivationExpired` treats `<=0` as "no gate".
 - **i18n**: two NEW keys `menu.hotstrings.delay_magic_key` / `delay_autocorrection` added to all 21 locales (the existing `tooltip_magic`/`tooltip_autocorrect` are PREVIEW labels, not delay labels). Reused `tooltip_ai_acceptance` / `tooltip_autocompletion` for the AI/dynamic items. Locale files are UTF-8 **BOM + CRLF + tab + NOT globally sorted** — insert keys via targeted text insertion at the alphabetical position, never full reserialize (would rewrite all 2144 keys). `tools/locale/check_locales.py` points at a stale `tools/static/locales` path but the parity rule (every locale mirrors `en.json`) still holds.
 - **Test fixes (committed)**: `lib/locale.lua` Windows path-separator bug (forward-slash-only dirname regex dropped the `lib` segment when `package.searchpath` injected a backslash); two stale purity baselines re-anchored (852→862, 61→63) in `tests/meta/test_port_adapter_coverage.lua`.
@@ -801,7 +801,7 @@ All AI-timeout + dynamic-delay behaviour is AHK-side and **UI/runtime — NOT co
 
 All of the above lives on branch `feat/comma-j-expansion` (not yet merged to dev as of 2026-06-04).
 
-**The three hard fallbacks are now a shared cross-driver file (A4, 2026-06-13).** `GLOBAL_DEFAULT_DELAY` (0.75 s), `GLOBAL_DEFAULT_COLOR` (#1e88e5) and the `personal` baseline (#6e6e73) used to be duplicated literals in BOTH `windows/lib/hotstrings/hotstrings_config.ahk` and `macos/modules/hotstrings_config.lua` (each claiming "single source"). They now live ONCE in `static/ergopti_plus/_shared/hotstrings/defaults.toml` (`[colors] global_default / personal`, `[delays] default_sec`) and are read at boot by both drivers with a fail-fast `require_key`, exactly like `_shared/tooltip/constants.toml`. Key implementation gotchas:
+**The three hard fallbacks are now a shared cross-driver file (A4, 2026-06-13).** `GLOBAL_DEFAULT_DELAY` (0.75 s), `GLOBAL_DEFAULT_COLOR` (#1e88e5) and the `personal` baseline (#6e6e73) used to be duplicated literals in BOTH `windows/lib/hotstrings/hotstrings_config.ahk` and `macos/modules/hotstrings_config.lua` (each claiming "single source"). They now live ONCE in `static/ergopti_plus/_shared/modules/hotstrings/defaults.toml` (`[colors] global_default / personal`, `[delays] default_sec`) and are read at boot by both drivers with a fail-fast `require_key`, exactly like `_shared/modules/tooltip/constants.toml`. Key implementation gotchas:
 
 - **AHK uses an EXPLICIT loader, never a top-level auto-read.** `HotstringsConfigLoadSharedDefaults()` is called from `ErgoptiPlus.ahk` (before `HotstringsConfigInit` and the tray menu build — `initMenu` reads `GLOBAL_DEFAULT_DELAY`). It is NOT run at the `hotstrings_config.ahk` top level because `tests/test_hotstring_aggregation.ahk` sets `_SharedDir` _after_ its `#Include` of the file — a top-level read would throw at include time. This mirrors `ui_style.ahk`'s sentinel-then-loader pattern. The three globals start `""` / `Map()` sentinels.
 - **Fail-fast = THROW, not `MsgBox`+`ExitApp`.** A missing key throws an `Error`: in production the unhandled boot error surfaces the fatal dialog and exits (desired); in CI `run_all.ahk`'s `OnError` handler turns it into a `not ok 0` line (no hung modal). `MsgBox`+`ExitApp` would hang the headless runner. The macOS side `error()`s at require-time (re-required per test).
@@ -851,11 +851,11 @@ Performance work on the Hammerspoon driver, 2026-06-16 (ports of AHK optimisatio
 
 ### project-tooltip-shared-style
 
-_Tooltip visual style is shared across drivers via _shared/tooltip/constants.toml; the macOS stacked canvas rounds its colored rows via an hs.canvas clip; per-driver alphas are intentionally different_
+_Tooltip visual style is shared across drivers via _shared/modules/tooltip/constants.toml; the macOS stacked canvas rounds its colored rows via an hs.canvas clip; per-driver alphas are intentionally different_
 
 <sub>slug: `project_tooltip_shared_style`</sub>
 
-The cross-driver tooltip look is defined ONCE in `_shared/tooltip/constants.toml` and read by both drivers — macOS via `ui/tooltip/config.lua` (into `Config.layout.*` / `Config.colors.*`), Windows via `lib/ui_style.ahk`. Never hardcode tooltip style (radius, border, separator, padding, colors) in a renderer; add/read the key in the shared TOML.
+The cross-driver tooltip look is defined ONCE in `_shared/modules/tooltip/constants.toml` and read by both drivers — macOS via `ui/tooltip/config.lua` (into `Config.layout.*` / `Config.colors.*`), Windows via `lib/ui_style.ahk`. Never hardcode tooltip style (radius, border, separator, padding, colors) in a renderer; add/read the key in the shared TOML.
 
 **Per-driver alphas are deliberately different, by design.** The file carries BOTH `border_alpha_hs` (0.13) and `border_alpha_ahk` (0.25), and `sep_alpha_hs` (0.09) vs the AHK separator value, because hs.canvas and GDI render the same nominal alpha differently — the split values make the two LOOK identical. macOS code MUST read the `_hs` variants. A 2026-06-16 bug had the macOS *stacked* (multi-row LLM) canvas hardcode the AHK `0.25` for both its border and separators, so the multi-row tooltip looked heavier than the single tooltip and than Windows. Fixed by routing both through `Config.colors.border` / `Config.colors.sep`. Regression: `tests/unit/ui/test_tooltip_shared_style.lua`.
 
@@ -988,7 +988,7 @@ _The Windows driver's locale .tsv is a gitignored self-healing cache regenerated
 `JsonParse` of a 2196-key locale costs ~180 ms on the boot critical path (the tray
 menu needs `t()`); parsing the flat `key<TAB>value` `.tsv` instead is ~16 ms
 (~×11). To keep that speed WITHOUT committing the same data twice, the `.tsv`
-files under `static/ergopti_plus/_shared/locales/` are a **gitignored, self-healing
+files under `static/ergopti_plus/_shared/data/locales/` are a **gitignored, self-healing
 cache** owned end-to-end by `lib/i18n.ahk` (`_I18nLoadLocaleMap` /
 `_I18nWriteTsvCache`): on load it uses the `.tsv` when present AND at least as new
 as the `.json` (`FileGetTime "M"` compare in `_I18nTsvIsFresh`), otherwise it
@@ -1088,7 +1088,7 @@ _The bundled hotstrings are NOT committed generated AHK any more — they are a 
 
 The single biggest boot cost was invisible: AHK tokenises every `#Include`d source **before** it creates the tray icon, and the committed `generated_*.ahk` bundle was **~1 MB / ~2992 rows** of that — measured at **~470 ms of the ~470-660 ms "time-to-icon"** (the parse phase; pure file I/O for all 259 driver files is only ~35 ms, so compiling to `.exe` would NOT help — the cost is CPU tokenisation, not disk). `BootProfile_ProcessUptimeMs()` (GetProcessTimes creation FILETIME vs now) surfaces this pre-first-log phase as the first BootProfile line.
 
-Fix (mirrors the i18n locale `.tsv` pattern exactly): deleted the 6 `generated_*.ahk`, the node `build-hotstrings.cjs` AND the python `compile_hotstrings.py` codegens (+ the `build:hotstrings` npm script + the CI "Regenerate hotstrings_generated.ahk" step). `lib/hotstrings/hotstrings_cache.ahk` now owns it: `HotstringsCacheEnsure()` reads `_shared/hotstrings/generated_hotstrings.tsv` (gitignored) when it is at least as new as every bundled TOML; otherwise it **rebuilds from the TOML once** (first launch or after a TOML edit) and rewrites it. It plugs into the SAME `_GENERATED_HOTSTRINGS` fast-path `LoadHotstringsSection` already consults (each cached `cat.sec` → a bound `_HsCacheRegisterSection`), so callers are unchanged. Rows are `[flags, trigger, output, finalResult, isRepeat, isCaseSens]`; the builder uses the **identical** line scan + `_HOTSTRING_ENTRY_PATTERN` + `UnescapeTomlString` + flag logic as the runtime TOML fallback, so it reproduces the old generated behaviour 1:1.
+Fix (mirrors the i18n locale `.tsv` pattern exactly): deleted the 6 `generated_*.ahk`, the node `build-hotstrings.cjs` AND the python `compile_hotstrings.py` codegens (+ the `build:hotstrings` npm script + the CI "Regenerate hotstrings_generated.ahk" step). `lib/hotstrings/hotstrings_cache.ahk` now owns it: `HotstringsCacheEnsure()` reads `_shared/modules/hotstrings/generated_hotstrings.tsv` (gitignored) when it is at least as new as every bundled TOML; otherwise it **rebuilds from the TOML once** (first launch or after a TOML edit) and rewrites it. It plugs into the SAME `_GENERATED_HOTSTRINGS` fast-path `LoadHotstringsSection` already consults (each cached `cat.sec` → a bound `_HsCacheRegisterSection`), so callers are unchanged. Rows are `[flags, trigger, output, finalResult, isRepeat, isCaseSens]`; the builder uses the **identical** line scan + `_HOTSTRING_ENTRY_PATTERN` + `UnescapeTomlString` + flag logic as the runtime TOML fallback, so it reproduces the old generated behaviour 1:1.
 
 Gotchas: (1) `isRepeat` was ALREADY always false in the old generated output — the generator compared the section to the literal `"repeatcorrections"` while the real section is `repeat_corrections` (underscore). Preserved verbatim (behaviour-preserving, NOT corrected). (2) The generated fast-path never set `Priority` in opts (the TOML fallback does) — the cache matches the generated path (no Priority). (3) New `.ahk` files MUST be UTF-8 **BOM** + CRLF or AHK silently aborts mid-file → the file's later functions go undefined → load error with no message in the headless harness (run `node tools/deploy/fix-ahk-encoding.cjs`). (4) The bundled-hotstring registration path had NO end-to-end suite coverage; `tests/test_hotstrings_cache.ahk` is now that net (build parity, lossless `.tsv` round-trip, escape/unescape of tab/CR/LF/backslash). First-launch (or post-edit) pays a one-time TOML parse; every later boot is the fast `.tsv` read.
 
@@ -1326,7 +1326,7 @@ green while production crashed on every keystroke-driven request. Fixed in commi
 
 ### project-profile-label-placeholder-convention
 
-_LLM profile labels in `_shared/locales/*.json` use **brace** placeholders `{n}`/`{s}` (count + plural-s), NOT printf `%d`/`%s` — the menu substitutes braces, so a printf token leaks verbatim into the UI._
+_LLM profile labels in `_shared/data/locales/*.json` use **brace** placeholders `{n}`/`{s}` (count + plural-s), NOT printf `%d`/`%s` — the menu substitutes braces, so a printf token leaks verbatim into the UI._
 
 <sub>slug: `project_profile_label_placeholder_convention`</sub>
 

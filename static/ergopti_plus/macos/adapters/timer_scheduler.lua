@@ -4,7 +4,7 @@
 --- MODULE: TimerScheduler Adapter (Hammerspoon)
 --- DESCRIPTION:
 --- Hammerspoon implementation of the TimerScheduler port contract defined in
---- static/ergopti_plus/_shared/ports/TimerScheduler.spec.js. Wraps hs.timer.doAfter
+--- static/ergopti_plus/_shared/core/ports/TimerScheduler.spec.js. Wraps hs.timer.doAfter
 --- and hs.timer.doEvery behind the four canonical port methods (after, every,
 --- cancel, cancelAll) so domain modules can schedule deferred work without a
 --- direct dependency on hs.timer.

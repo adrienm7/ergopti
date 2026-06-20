@@ -203,12 +203,12 @@ Test("LLM regression: MakeSetNHandler captures 1/3/10 not last N only",
 ; guards in macos/tests/unit/lib/test_locale_profile_labels.lua and
 ; macos/tests/unit/menu/test_profile_label.lua.
 
-; Resolves ergopti_plus/_shared/locales from A_ScriptDir (= windows/tests when the
+; Resolves ergopti_plus/_shared/data/locales from A_ScriptDir (= windows/tests when the
 ; suite is #Include-d by run_all.ahk). Same derivation as test_locale_json_valid.
 _LLMPL_LocaleDir() {
 	SplitPath(A_ScriptDir, , &DriverDir)   ; -> windows
 	SplitPath(DriverDir, , &EpDir)         ; -> ergopti_plus
-	return EpDir . "\_shared\locales"
+	return EpDir . "\_shared\data\locales"
 }
 
 ; Key matches the dot-notation profile label keys (llm.profile.<id>.label).
@@ -342,7 +342,7 @@ Test("LLM regression: brace substitution on real label leaves no placeholder",
 ; gates its model submenu on the enabled flag (only on "paused"), so the two
 ; drivers diverged: macOS listed everything, Windows showed one row.
 ;
-; THE FIX: the curated catalogue is STATIC (_shared/llm/models.json), so it is
+; THE FIX: the curated catalogue is STATIC (_shared/modules/llm/models.json), so it is
 ; always built in full regardless of enabled/ready state. Only the green
 ; "installed" dot needs Ollama, so that probe is skipped (rows render dot-less)
 ; until the daemon is confirmed ready - keeping the menu non-blocking while off.

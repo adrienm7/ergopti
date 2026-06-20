@@ -4,7 +4,7 @@
 --- MODULE: KeyState Adapter (Linux)
 --- DESCRIPTION:
 --- Linux implementation of the KeyState port contract defined in
---- static/ergopti_plus/_shared/ports/KeyState.spec.js. Queries the physical
+--- static/ergopti_plus/_shared/core/ports/KeyState.spec.js. Queries the physical
 --- state of keyboard modifier keys via xdotool/xinput without coupling domain
 --- modules to platform-specific APIs.
 ---

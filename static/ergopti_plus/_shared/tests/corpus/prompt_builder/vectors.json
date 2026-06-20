@@ -1,6 +1,6 @@
 {
 	"$schema": "https://ergopti.com/schema/corpus/prompt_builder.v1.json",
-	"description": "Cross-driver regression corpus for the LLM PromptBuilder algorithm. Vectors are derived from the canonical reference in _shared/domain/PromptBuilder.js. Every Lua and AHK driver implementation MUST produce matching output for these inputs.",
+	"description": "Cross-driver regression corpus for the LLM PromptBuilder algorithm. Vectors are derived from the canonical reference in _shared/core/domain/PromptBuilder.js. Every Lua and AHK driver implementation MUST produce matching output for these inputs.",
 	"version": "1.0.0",
 	"constants": {
 		"CONTEXT_TAIL_WORDS": 5,

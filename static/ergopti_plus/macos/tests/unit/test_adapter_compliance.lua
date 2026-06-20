@@ -5,8 +5,8 @@
 --- DESCRIPTION:
 --- Validates that every Hammerspoon adapter in adapters/ exposes the correct
 --- method surface required by the corresponding port contract. The contract is
---- read at runtime from the generated single source _shared/ports/contracts.json
---- (projected from _shared/ports/*.spec.js by codegen-contracts-json.cjs), so the
+--- read at runtime from the generated single source _shared/core/ports/contracts.json
+--- (projected from _shared/core/ports/*.spec.js by codegen-contracts-json.cjs), so the
 --- method names and arities are no longer mirrored by hand in this file — a
 --- spec change flows here automatically.
 ---
@@ -30,7 +30,7 @@ local json    = require("json")
 -- ====================================================
 -- ====================================================
 
-local CONTRACTS_PATH = helpers.shared("ports/contracts.json")
+local CONTRACTS_PATH = helpers.shared("core/ports/contracts.json")
 
 --- Reads and decodes the shared port-contract registry. Fails loudly (rather
 --- than silently skipping) when the file is absent or malformed — a missing

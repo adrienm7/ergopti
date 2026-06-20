@@ -6,7 +6,7 @@
 --- Validates that the shared logger core in _shared/lua/logger/init.lua
 --- produces lines that conform to the format contract in SPEC.md § 3.
 --- Exercises all 8 variants, the ring buffer, severity filtering, and the
---- test vectors from static/ergopti_plus/_shared/logger/test_vectors.json.
+--- test vectors from static/ergopti_plus/_shared/modules/logger/test_vectors.json.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Time-independent: M.timestamp_fn is replaced with a sentinel function

@@ -42,7 +42,7 @@ local LOG        = "hotstrings_config"
 
 -- Ultimate fallbacks when neither a user override nor a TOML default is set.
 -- LOADED AT REQUIRE-TIME from the shared cross-driver canon
--- (_shared/hotstrings/defaults.toml) by load_shared_defaults() below — the
+-- (_shared/modules/hotstrings/defaults.toml) by load_shared_defaults() below — the
 -- SINGLE source shared verbatim with the AutoHotkey driver. They start nil so
 -- a missing file/key fails fast (rule 5.3) instead of masking driver drift
 -- behind a hardcoded literal (rules 5.2 / 5.4). ``GLOBAL_DEFAULT_COLOR`` remains
@@ -782,7 +782,7 @@ end
 --- ==========================================================
 -- ==========================================================
 
---- Reads _shared/hotstrings/defaults.toml at require-time and populates the
+--- Reads _shared/modules/hotstrings/defaults.toml at require-time and populates the
 --- three hard-fallback constants from the single cross-driver source. A missing
 --- file, section, or key raises an error (fail fast — no driver-side literal).
 --- The path is resolved relative to THIS file (cwd-independent), mirroring
@@ -792,12 +792,12 @@ local function load_shared_defaults()
 	-- Resolved through the single shared-tree resolver (Paths.shared) so the
 	-- shared root lives in exactly one place, cwd-independent in production and
 	-- in the headless unit harness.
-	local toml_path = Paths.shared("hotstrings/defaults.toml")
+	local toml_path = Paths.shared("modules/hotstrings/defaults.toml")
 
 	local parsed   = TomlReader.parse(toml_path)
 	local sections = (type(parsed) == "table") and parsed.sections or nil
 	if type(sections) ~= "table" then
-		error("[hotstrings_config] _shared/hotstrings/defaults.toml not readable: " .. toml_path)
+		error("[hotstrings_config] _shared/modules/hotstrings/defaults.toml not readable: " .. toml_path)
 	end
 
 	local function require_key(section, key)

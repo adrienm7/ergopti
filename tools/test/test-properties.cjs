@@ -16,7 +16,7 @@
  * 4. Coverage: 20+ properties spanning HotstringMatcher, Registry, and Expander
  *    run at 1000 iterations each by default.
  * 5. Imports real domain spec files: properties execute against the canonical
- *    implementations in _shared/domain/ so mutations there are actually caught.
+ *    implementations in _shared/core/domain/ so mutations there are actually caught.
  * ==============================================================================
  */
 
@@ -52,7 +52,7 @@ function load_spec(rel_path) {
 	return mod.exports;
 }
 
-const RegistrySpec = load_spec(sharedRel('domain/Registry.spec.js'));
+const RegistrySpec = load_spec(sharedRel('core/domain/Registry.spec.js'));
 
 // =========================================
 // =========================================
@@ -104,7 +104,7 @@ function suite(name, fn) {
 
 /**
  * Builds a minimal in-memory Registry adapter that satisfies the domain
- * contract described in _shared/domain/Registry.spec.js. Used by matcher and
+ * contract described in _shared/core/domain/Registry.spec.js. Used by matcher and
  * expander properties that require a live registry. The implementation mirrors
  * the spec pseudocode so that Stryker mutations in the spec are exercised.
  * @returns {object} Registry adapter.
@@ -176,7 +176,7 @@ function makeRegistry() {
 // ==================================================
 
 // Canonical reference implementation matching the pseudocode in
-// _shared/domain/HotstringMatcher.spec.js. Properties run against this so that
+// _shared/core/domain/HotstringMatcher.spec.js. Properties run against this so that
 // Stryker mutations in the spec's algorithm are caught by failing properties.
 
 /**

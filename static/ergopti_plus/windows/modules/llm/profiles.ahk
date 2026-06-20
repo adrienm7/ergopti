@@ -4,7 +4,7 @@
 ; MODULE: LLM Profiles
 ; DESCRIPTION:
 ; Loads built-in and user-defined prompt profiles from the shared JSON registry
-; at _shared/llm/profiles.json. Resolves the active profile and injects
+; at _shared/modules/llm/profiles.json. Resolves the active profile and injects
 ; runtime variables ({min_words}, {max_words}, {language}) into the prompt.
 ;
 ; FEATURES & RATIONALE:
@@ -137,7 +137,7 @@ LLM_ResolveSystemPrompt(profile, n, min_words, max_words, language := "en") {
 ; ======================================
 
 /**
- * Parses profiles.json from _shared/llm/ and returns an array of Map objects.
+ * Parses profiles.json from _shared/modules/llm/ and returns an array of Map objects.
  * Uses JsonParse for robustness — the hand-rolled brace-depth parser broke on
  * system prompts that contained literal { or } characters.
  * @returns {Array} Array of profile Map objects.

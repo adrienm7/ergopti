@@ -36,7 +36,7 @@ local LOG = "shortcuts.actions.text"
 -- ====================================
 
 -- Clipboard settle delays come from the shared cross-driver registry
--- (_shared/timings/constants.toml [debounce]) so AHK and macOS stay in sync.
+-- (_shared/modules/timings/constants.toml [debounce]) so AHK and macOS stay in sync.
 local COPY_SETTLE_SEC    = Timings.sec("debounce", "clipboard_copy_settle_ms")  -- Wait after Cmd+C for clipboard to fill
 local PASTE_SETTLE_SEC   = Timings.sec("debounce", "clipboard_paste_settle_ms") -- Wait before pasting the transformed text
 local RESELECT_DELAY_SEC = Timings.sec("debounce", "clipboard_reselect_ms")     -- Wait after paste before re-selecting
@@ -69,7 +69,7 @@ local FALLBACK_GROUPS = {
 --- symlinked ~/.hammerspoon setups alike.
 --- @return table|nil Array of groups (each {i18n=<label key>, pairs={{left,right},…}}).
 local function load_shared_groups()
-	local path = Paths.shared("wrap_symbols.json")
+	local path = Paths.shared("modules/wrap_symbols/wrap_symbols.json")
 	if type(path) ~= "string" or path == "" then return nil end
 	local fh = io.open(path, "r")
 	if not fh then return nil end

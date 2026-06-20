@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- Centralizes shared helpers used by every LLM backend (MLX, Ollama, remote API)
 --- — diversity temperature stepping, exact-text deduplication, retry policy.
---- The tunable numbers live in ``static/ergopti_plus/_shared/llm/inference.json``
+--- The tunable numbers live in ``static/ergopti_plus/_shared/modules/llm/inference.json``
 --- next to defaults.json so the AHK twin (modules/llm/api_common.ahk) reads
 --- the SAME values: change a knob there and both drivers track it in lockstep.
 ---
@@ -65,7 +65,7 @@ local FALLBACK = {
 --- ~/.hammerspoon setups alike. Falls back to FALLBACK on any read/parse failure.
 --- @return table The constants table (always non-nil — falls back to FALLBACK).
 local function load_inference_constants()
-	local p = Paths.shared("llm/inference.json")
+	local p = Paths.shared("modules/llm/inference.json")
 	if type(p) == "string" and p ~= "" then
 		local fh = io.open(p, "r")
 		if fh then

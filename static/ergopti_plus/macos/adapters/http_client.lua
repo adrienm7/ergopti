@@ -4,7 +4,7 @@
 --- MODULE: HttpClient Adapter (Hammerspoon)
 --- DESCRIPTION:
 --- Hammerspoon implementation of the HttpClient port contract defined in
---- static/ergopti_plus/_shared/ports/HttpClient.spec.js. Wraps hs.http.asyncPost,
+--- static/ergopti_plus/_shared/core/ports/HttpClient.spec.js. Wraps hs.http.asyncPost,
 --- hs.http.asyncGet, and hs.http.encodeForQuery behind a stable adapter surface
 --- so domain modules can make HTTP requests without a direct dependency on hs.http.
 ---

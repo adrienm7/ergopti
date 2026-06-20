@@ -6,7 +6,7 @@
  * DESCRIPTION:
  * Generates both the AHK v2 and Hammerspoon Lua implementations of the
  * Terminators port contract from the single source of truth defined in
- * static/ergopti_plus/_shared/domain/Terminators.spec.js. Running this script
+ * static/ergopti_plus/_shared/core/domain/Terminators.spec.js. Running this script
  * ensures both drivers start from identical catalogue data and expose the
  * same isTerminator / isConsumed / setEnabled / isEnabled / updateMagicKey /
  * addCustom / all() API surface.
@@ -33,7 +33,7 @@ const ROOT = path.resolve(__dirname, '../..');
 // module.exports but the package is type:module (ESM). We inline the CJS
 // wrapper so require() works without needing a .cjs copy of the spec.
 const specSource = fs.readFileSync(
-	shared('domain/Terminators.spec.js'),
+	shared('core/domain/Terminators.spec.js'),
 	'utf8'
 );
 const specModule = { exports: {} };
@@ -42,8 +42,8 @@ new Function('require', 'module', 'exports', '__dirname', '__filename', specSour
 	require,
 	specModule,
 	specModule.exports,
-	shared('domain'),
-	shared('domain/Terminators.spec.js')
+	shared('core/domain'),
+	shared('core/domain/Terminators.spec.js')
 );
 const { TERMINATOR_DEFS } = specModule.exports;
 
@@ -135,7 +135,7 @@ function generateAhk() {
 
 	return [
 		`; static/ergopti_plus/windows/_generated/terminators.ahk`,
-		`; AUTO-GENERATED from _shared/domain/Terminators.spec.js.`,
+		`; AUTO-GENERATED from _shared/core/domain/Terminators.spec.js.`,
 		`; DO NOT EDIT BY HAND — run \`npm run codegen:terminators\` to refresh.`,
 		`#Requires AutoHotkey v2.0`,
 		``,
@@ -339,7 +339,7 @@ function generateLua() {
 
 	return [
 		`--- ${sharedRel('lua/keymap/terminators_catalogue.lua')}`,
-		`--- AUTO-GENERATED from _shared/domain/Terminators.spec.js.`,
+		`--- AUTO-GENERATED from _shared/core/domain/Terminators.spec.js.`,
 		`--- DO NOT EDIT BY HAND — run \`npm run codegen:terminators\` to refresh.`,
 		``,
 		`--- ==============================================================================`,

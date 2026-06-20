@@ -10,7 +10,7 @@
 ---
 --- FEATURES & RATIONALE:
 --- 1. Exhaustive list: the EXPECTED_ADAPTERS table enumerates all 9 canonical
----    adapter file names derived from the _shared/ports/*.spec.js contracts.
+---    adapter file names derived from the _shared/core/ports/*.spec.js contracts.
 --- 2. File-based check: we open each file with io.open to avoid depending on
 ---    lfs or any external library — the test runs under plain LuaJIT.
 --- 3. Fail-fast reporting: each missing file is printed individually so the
@@ -30,7 +30,7 @@ local ADAPTERS_DIR = DRIVER_ROOT .. "/adapters"
 -- =====================================================
 
 -- Canonical list of the 9 port adapters the Linux driver must implement.
--- Derived from static/ergopti_plus/_shared/ports/*.spec.js via snake_case mapping.
+-- Derived from static/ergopti_plus/_shared/core/ports/*.spec.js via snake_case mapping.
 local EXPECTED_ADAPTERS = {
 	"notifier.lua",
 	"timer_scheduler.lua",

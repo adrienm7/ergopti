@@ -6,7 +6,7 @@
 --- A4 — the hotstring resolution fallbacks (global default delay, global default
 --- color, and the per-category "personal" baseline) are mutualised across the
 --- AHK and Hammerspoon drivers: both read them from the shared cross-driver canon
---- _shared/hotstrings/defaults.toml instead of a per-driver literal.
+--- _shared/modules/hotstrings/defaults.toml instead of a per-driver literal.
 ---
 --- These tests pin two things:
 ---   1. The module loaded the values FROM the shared file — resolve()'s fallbacks
@@ -23,7 +23,7 @@ local helpers = require("tests.helpers")
 package.loaded["lib.logger"] = nil
 local _ = helpers.load_with_stubs("lib.logger")
 
-local defaults_path = helpers.shared("hotstrings/defaults.toml")
+local defaults_path = helpers.shared("modules/hotstrings/defaults.toml")
 
 --- Build a unique writable temp path (the module itself creates the file).
 local function temp_path(name)

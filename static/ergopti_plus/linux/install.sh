@@ -220,7 +220,7 @@ cp -r "${SRC_SHARED}/." "${DEST_SHARED}/"
 
 # Copy default hotstring TOMLs so the user has something to start with.
 # We do NOT overwrite existing user config to preserve customisations.
-for toml in "${SRC_SHARED}/hotstrings/"*.toml; do
+for toml in "${SRC_SHARED}/modules/hotstrings/"*.toml; do
 	[[ "$(basename "${toml}")" == _* ]] && continue
 	category="$(basename "${toml}" .toml)"
 	dest="${CONFIG_DIR}/${category}.toml"
