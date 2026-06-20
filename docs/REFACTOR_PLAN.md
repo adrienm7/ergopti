@@ -105,12 +105,18 @@ Chemin identique d'un driver à l'autre → l'analogue se trouve au même endroi
 
 **But.** `ErgoptiPlus.ahk` 2397 → ~150 lignes, miroir de `init.lua`.
 
-- [ ] Extraire : boot → `lib/boot.ahk` ; config IO → `lib/config_io.ahk` ; lifecycle → `lib/lifecycle.ahk` ; hotkeys AltGr → `lib/script_altgr_hotkeys.ahk` ; tables d'état → `lib/feature_state.ahk`.
-- [ ] Pickers/éditeurs → `ui/action_picker.ahk` + `ui/editors.ahk` ; sondes `DllCall` → `adapters/key_state.ahk`.
-- [ ] Bannières 5-blank-lines / 7-`=` dans chaque nouveau fichier.
-- [ ] **Préserver exactement** l'ordre d'`#Include` et les directives `#InputLevel` (assertion : `ApplyMasterGatesToFeatures` tourne avant la 1re lecture via accesseur dans `boot.ahk`).
+**Pipeline d'extraction prouvé et sûr** (chaque incrément) : extraction PowerShell (garantit UTF-8 BOM + CRLF) qui remplace le bloc **en place** par un `#Include` (préserve l'ordre de boot et les statements top-level type `global X := …`) → `test:ahk-encoding` → dry-run AHK (parse, exit 0) → suite complète AHK (2224/0) → repointer les meta-tests qui scannent le source de `ErgoptiPlus.ahk` (≈25 tests pinnent des fonctions à ce fichier — le filet les attrape).
 
-**Vérif.** Dry-run AHK exit 0 ; suite AHK verte ; séquence des phases de boot (log) inchangée ; e2e vert.
+- [x] Hotkeys AltGr → `lib/script_altgr_hotkeys.ahk` (incrément 1 ; 2 meta-tests repointés ; suite 2224/0).
+- [x] Éditeurs (magic key, repeat key, infos perso, lien GPT) → `ui/editors.ahk` (incrément 2 ; 0 couplage ; suite 2224/0).
+- [ ] Pickers (`ShowActionPicker`, `ShowKeyboardSlotPicker`, `ShowKeyboardShortcutPicker`, `FilePathsEditor`) → `ui/action_picker.ahk` (1 meta-test à repointer).
+- [ ] Config IO (`SaveFullConfig`, `_CollectFeatureUpdates`, `ReadScript/KeyboardShortcutsConfig`, toggles) → `lib/config_io.ahk`.
+- [ ] Lifecycle (suspend/shutdown/tray/debug) → `lib/lifecycle.ahk` (fort couplage meta-tests suspend-guard).
+- [ ] Tables d'état globales (`ScriptInformation`, `SCRIPT_SHORTCUT_*`, `KEYBOARD_SHORTCUT_*`, `CategoryEnabled`) → `lib/feature_state.ahk` (top-level dans la section boot — extraction in-place obligatoire).
+- [ ] Sondes `DllCall` (AltGr-Kana, scan magic-key) → `adapters/key_state.ahk`.
+- [ ] Bannières 5-blank-lines / 7-`=` dans chaque nouveau fichier.
+
+**Vérif.** ✅ par incrément : dry-run exit 0 + suite 2224/0 + encoding vert. ⏳ Spot-check runtime par le mainteneur (lancer le driver) recommandé après la phase. Entrée réduite de ~190 lignes jusqu'ici (2397 → ~2207).
 
 ---
 
