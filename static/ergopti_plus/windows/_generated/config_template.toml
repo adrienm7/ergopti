@@ -306,7 +306,6 @@ microsoft_bold = true
 title_case = true
 uppercase = true
 paste_without_formatting = false
-save = false
 select_line = true
 spotlight_mouse = true
 surround_with_parentheses = true
@@ -348,9 +347,9 @@ ergopti_base = true
 direct_access_digits = true
 ergopti_alt_gr = true
 ergopti_plus = true
+ctrl_magic_save = false
 
 [ahk.shortcuts]
-ctrl_j = false
 open_downloads = true
 move = true
 screen = true
