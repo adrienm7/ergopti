@@ -29,16 +29,6 @@
 ; =================================================
 ; =================================================
 
-_UCSG_ReadSource(RelPath) {
-	; A_ScriptDir is the runner dir (tests/); its parent is the windows/ driver
-	; root. A single split is correct — the runner is tests/run_all.ahk, not a
-	; per-file script under tests/meta/, so do NOT split twice (that overshoots to
-	; ergopti_plus/ and makes every FileRead miss).
-	SplitPath(A_ScriptDir, , &Root)
-	Path := Root . "\" . StrReplace(RelPath, "/", "\")
-	return FileRead(Path)
-}
-
 _UCSG_FuncBody(Src, FnDecl) {
 	FnPos := InStr(Src, FnDecl)
 	if (!FnPos)
@@ -61,11 +51,11 @@ _UCSG_FuncBody(Src, FnDecl) {
 }
 
 _UCSG_CheckFnHasSuspendGuard(FnDecl) {
-	Src := _UCSG_ReadSource("lib/updater.ahk")
-	Assert(Src != "", "lib/updater.ahk must be readable")
+	Src := _DriverDirConcat("lib/updater")
+	Assert(Src != "", "the lib/updater module must be readable")
 
 	Body := _UCSG_FuncBody(Src, FnDecl)
-	Assert(Body != "", FnDecl . " must be present in updater.ahk")
+	Assert(Body != "", FnDecl . " must be present in the lib/updater module")
 
 	; The guard must appear before any UI/install operation
 	SuspendPos := InStr(Body, "A_IsSuspended")

@@ -29,11 +29,22 @@ _TWTL_CheckHost(Path, CreatePrefix, CloseSig, RequiresUdirDelete := true) {
 	}
 }
 
+; The updater module's WebView hosts (changelog window, update prompt) share the
+; generic _Updater_CloseGui udir cleanup, which lives in a sibling file after the
+; lib/updater split — so verify the create + cleanup invariant at MODULE scope.
+_TWTL_CheckUpdaterModuleHost(CreatePrefix) {
+	Src := _DriverDirConcat("lib/updater")
+	Assert(InStr(Src, 'WebView_SweepStaleProfiles("' . CreatePrefix . '")') > 0,
+		"lib/updater module must call WebView_SweepStaleProfiles(" . CreatePrefix . ") before DirCreate")
+	Assert(InStr(Src, "DirDelete") > 0,
+		"lib/updater module must delete WebView udirs in the Close path")
+}
+
 _TWTL_AllHosts() {
 	_TWTL_CheckHost("lib/changelog_window.ahk", "ergopti_changelog_wv_", "DirDelete(_CLW_Udir, true)")
 	_TWTL_CheckHost("lib/healthcheck.ahk", "ergopti_hc_wv_", "DirDelete(G.Udir, true)")
-	_TWTL_CheckHost("lib/updater.ahk", "ergopti_changelog_wv_", "DirDelete(G.Udir, true)")
-	_TWTL_CheckHost("lib/updater.ahk", "ergopti_update_wv_", "DirDelete(G.Udir, true)")
+	_TWTL_CheckUpdaterModuleHost("ergopti_changelog_wv_")
+	_TWTL_CheckUpdaterModuleHost("ergopti_update_wv_")
 	_TWTL_CheckHost("modules/keylogger/keylogger_ui.ahk", "ergopti_metrics_edge_", "")
 	_TWTL_CheckHost("modules/keylogger/keylogger_webview.ahk", "ergopti_webview2_", 'DirDelete(entry["udir"], true)')
 	_TWTL_CheckHost("modules/llm/ollama_webview.ahk", "ergopti_ollama_wv_", "DirDelete(_OllamaWV_Udir, true)")

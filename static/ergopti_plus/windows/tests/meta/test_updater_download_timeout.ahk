@@ -32,16 +32,11 @@
 ; ===========================================================
 ; ===========================================================
 
-_UDTO_ReadSource() {
-	return FileRead(A_ScriptDir . "\..\lib\updater.ahk", "UTF-8")
-}
-
-
-_UDTO_FindPollBlock(src) {
-	pos := InStr(src, "_Updater_PollDownloadAsync(")
-	if (!pos)
-		return ""
-	return SubStr(src, pos, 800)
+; Returns the body of _Updater_PollDownloadAsync from the (now split) updater
+; module via the location-independent driver-source helper, anchored on the
+; column-0 definition so a call site cannot be mistaken for the body.
+_UDTO_FindPollBlock() {
+	return _DriverFuncBody("_Updater_PollDownloadAsync")
 }
 
 
@@ -54,7 +49,7 @@ _UDTO_FindPollBlock(src) {
 ; ===========================================================
 
 _UDTO_600SecCeiling() {
-	block := _UDTO_FindPollBlock(_UDTO_ReadSource())
+	block := _UDTO_FindPollBlock()
 	Assert(InStr(block, "600000") > 0,
 		"updater.ahk: _Updater_PollDownloadAsync must use 600000 ms as the download timeout ceiling")
 }
@@ -62,7 +57,7 @@ Test("Updater: download poll ceiling raised to 600000 ms (updater-download-timeo
 
 
 _UDTO_No120SecCeiling() {
-	block := _UDTO_FindPollBlock(_UDTO_ReadSource())
+	block := _UDTO_FindPollBlock()
 	; The MaxPolls expression must not still divide 120000.
 	posMax := InStr(block, "MaxPolls := 120000")
 	Assert(posMax = 0,

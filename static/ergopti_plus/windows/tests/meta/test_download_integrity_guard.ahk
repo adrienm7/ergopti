@@ -31,12 +31,6 @@
 ; ===================================================
 ; ===================================================
 
-_DIG_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
-}
-
 ; Extracts the body of a named function up to the first unindented closing
 ; brace, stripping comment lines to avoid false positives.
 _DIG_FuncBodyStripped(Src, FuncDef) {
@@ -65,7 +59,7 @@ _DIG_FuncBodyStripped(Src, FuncDef) {
 ; ===================================================
 
 _DIG_MinSizeConstantDeclared() {
-	Src := _DIG_ReadSource("lib/updater.ahk")
+	Src := _DriverDirConcat("lib/updater")
 	Assert(InStr(Src, "UPDATER_MIN_EXE_SIZE_BYTES") > 0,
 		"lib/updater.ahk must declare UPDATER_MIN_EXE_SIZE_BYTES — the named constant for the minimum valid exe size (rule 5.1: no magic numbers; download-no-integrity-partial-safety)")
 }
@@ -84,7 +78,7 @@ Test("updater: UPDATER_MIN_EXE_SIZE_BYTES constant declared (download-no-integri
 ; ===================================================
 
 _DIG_ContentLengthCheckPresent() {
-	Src := _DIG_ReadSource("lib/updater.ahk")
+	Src := _DriverDirConcat("lib/updater")
 	; The install function is large; anchor on a unique string near the download path
 	Idx := InStr(Src, "ADODB.Stream")
 	Assert(Idx > 0, "Download via ADODB.Stream must exist in lib/updater.ahk")
@@ -96,7 +90,7 @@ _DIG_ContentLengthCheckPresent() {
 Test("updater: install path reads Content-Length header to detect truncated downloads (download-no-integrity-partial-safety)", _DIG_ContentLengthCheckPresent)
 
 _DIG_MinSizeCheckPresent() {
-	Src := _DIG_ReadSource("lib/updater.ahk")
+	Src := _DriverDirConcat("lib/updater")
 	Idx := InStr(Src, "ADODB.Stream")
 	Assert(Idx > 0, "Download via ADODB.Stream must exist in lib/updater.ahk")
 	Window := SubStr(Src, Idx, 3000)
@@ -106,7 +100,7 @@ _DIG_MinSizeCheckPresent() {
 Test("updater: install path rejects downloads smaller than UPDATER_MIN_EXE_SIZE_BYTES (download-no-integrity-partial-safety)", _DIG_MinSizeCheckPresent)
 
 _DIG_PartialFileDeleted() {
-	Src := _DIG_ReadSource("lib/updater.ahk")
+	Src := _DriverDirConcat("lib/updater")
 	Idx := InStr(Src, "Content-Length")
 	Assert(Idx > 0, "Content-Length guard must exist in lib/updater.ahk")
 	; After the Content-Length check, a FileDelete must appear before a MsgBox abort

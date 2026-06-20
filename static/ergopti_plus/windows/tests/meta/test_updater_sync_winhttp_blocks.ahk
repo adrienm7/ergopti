@@ -2,12 +2,6 @@
 
 #Requires AutoHotkey v2.0
 
-_USWB_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
-}
-
 _USWB_FuncBodyStripped(Src, FuncDef) {
 	Idx := InStr(Src, FuncDef)
 	if !Idx
@@ -19,7 +13,7 @@ _USWB_FuncBodyStripped(Src, FuncDef) {
 }
 
 _USWB_AssertOneClickUpdateAsync() {
-	Src := _USWB_ReadSource("lib/updater.ahk")
+	Src := _DriverDirConcat("lib/updater")
 	Body := _USWB_FuncBodyStripped(Src, "Updater_OneClickUpdate(*) {")
 	Assert(Body != "", "Updater_OneClickUpdate must exist in lib/updater.ahk")
 	
@@ -31,7 +25,7 @@ _USWB_AssertOneClickUpdateAsync() {
 }
 
 _USWB_AssertDownloadAndInstallAsync() {
-	Src := _USWB_ReadSource("lib/updater.ahk")
+	Src := _DriverDirConcat("lib/updater")
 	Body := _USWB_FuncBodyStripped(Src, "Updater_DownloadAndInstall(Release) {")
 	Assert(Body != "", "Updater_DownloadAndInstall must exist in lib/updater.ahk")
 	
@@ -43,7 +37,7 @@ _USWB_AssertDownloadAndInstallAsync() {
 }
 
 _USWB_AssertShowAvailableUpdateAsync() {
-	Src := _USWB_ReadSource("lib/updater.ahk")
+	Src := _DriverDirConcat("lib/updater")
 	Body := _USWB_FuncBodyStripped(Src, "Updater_ShowAvailableUpdate(*) {")
 	Assert(Body != "", "Updater_ShowAvailableUpdate must exist in lib/updater.ahk")
 
