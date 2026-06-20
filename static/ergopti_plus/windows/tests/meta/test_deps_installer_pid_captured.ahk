@@ -68,7 +68,7 @@ _DIPC_CheckPidAssignedInRunInstaller() {
 	Src := _DIPC_ReadSource("modules/llm/ollama_deps_checker.ahk")
 	Assert(Src != "", "modules/llm/ollama_deps_checker.ahk must be readable")
 
-	Body := _DIPC_FuncBody(Src, "LLM_Deps_RunInstaller(model, on_ready, on_failed) {")
+	Body := _DIPC_FuncBody(Src, "LLM_Deps_RunInstaller(model, on_ready?, on_failed?) {")
 	Assert(Body != "", "LLM_Deps_RunInstaller must be present in ollama_deps_checker.ahk")
 
 	; The PID must be assigned inside RunInstaller, not only inside Cancel
@@ -80,7 +80,7 @@ _DIPC_CheckRunUsesAmpersandPid() {
 	Src := _DIPC_ReadSource("modules/llm/ollama_deps_checker.ahk")
 	Assert(Src != "", "modules/llm/ollama_deps_checker.ahk must be readable")
 
-	Body := _DIPC_FuncBody(Src, "LLM_Deps_RunInstaller(model, on_ready, on_failed) {")
+	Body := _DIPC_FuncBody(Src, "LLM_Deps_RunInstaller(model, on_ready?, on_failed?) {")
 	Assert(Body != "", "LLM_Deps_RunInstaller must be present in ollama_deps_checker.ahk")
 
 	; The Run call must pass &_LLM_Deps_InstallerPid as the 4th argument

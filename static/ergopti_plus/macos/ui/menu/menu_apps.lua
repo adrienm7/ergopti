@@ -247,10 +247,11 @@ function M.build(ctx)
 				-- are injected directly into the launched app's environment.
 				-- `setEnvironment` on the `open` process itself does not propagate
 				-- to the app it spawns; `--env KEY=VALUE` does.
-				local task = hs.task.new(
+				local task
+				task = hs.task.new(
 					"/usr/bin/open",
 					function(code, _, stderr)
-						M._active_tasks[task] = nil  -- task captured by closure; clears the GC-root pin
+						if task then M._active_tasks[task] = nil end  -- task captured by closure; clears the GC-root pin
 						if code ~= 0 then
 							Logger.error(LOG, "open '%s' exited %d: %s.", app_name, code, stderr)
 						end

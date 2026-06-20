@@ -578,8 +578,9 @@ PY
 				"[ -n \"$(echo $ALL | tr -d ' ')\" ] && echo \"$ALL\" | tr ' ' '\\n' | sort -u | xargs kill -9 2>/dev/null; " ..
 				"rm -f /tmp/mlx_server.pid /tmp/mlx_server.pgid; " ..
 				"echo done"
-			local sweep = hs.task.new("/bin/bash", function(_, stdout)
-				M._active_tasks[sweep] = nil  -- sweep captured by closure
+			local sweep
+			sweep = hs.task.new("/bin/bash", function(_, stdout)
+				if sweep then M._active_tasks[sweep] = nil end  -- sweep captured by closure
 				Logger.debug(LOG, "Pre-launch port-%d sweep done: %s", MLX_PORT, tostring(stdout):gsub("\n", " "))
 			end, {"-c", sweep_cmd})
 			if sweep then
@@ -639,8 +640,9 @@ PY
 				-- Use curl --no-keepalive so each probe opens a fresh TCP connection.
 				-- hs.http pools connections and reuses a keep-alive socket to a zombie
 				-- server, making this probe see the zombie's stale model ID indefinitely.
-				local probe_task = hs.task.new("/usr/bin/curl", function(exit_code, stdout)
-					M._active_tasks[probe_task] = nil  -- probe_task captured by closure
+				local probe_task
+				probe_task = hs.task.new("/usr/bin/curl", function(exit_code, stdout)
+					if probe_task then M._active_tasks[probe_task] = nil end  -- probe_task captured by closure
 					if startup_closed or startup_confirmed then return end
 					if exit_code == 0 and probe_matches_target(stdout or "") then
 						mark_server_ready()
@@ -946,7 +948,8 @@ PY
 				if on_cancel then pcall(on_cancel) end
 			end
 
-			local task = hs.task.new("/bin/bash", function(code)
+			local task
+			task = hs.task.new("/bin/bash", function(code)
 				startup_closed = true
 				if deps.active_tasks and deps.active_tasks["mlx_server"] == task then
 					deps.active_tasks["mlx_server"] = nil

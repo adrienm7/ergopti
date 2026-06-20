@@ -80,11 +80,11 @@ Test("ErgoptiPlus: Ergopti_OnSuspendEnter cancels Ollama warmup retry on pause",
 _WRS_DepsPollHasSuspendGuard() {
 	Src := _WRS_ReadSource("modules/llm/ollama_deps_checker.ahk")
 	
-	Seg1 := _WRS_FuncBody(Src, "LLM_Deps_PollServerReady(on_ready, on_failed) {")
+	Seg1 := _WRS_FuncBody(Src, "LLM_Deps_PollServerReady(on_ready?, on_failed?) {")
 	Assert(InStr(Seg1, "A_IsSuspended") > 0,
 		"LLM_Deps_PollServerReady must check A_IsSuspended (warmup-retry-ignores-suspend)")
 		
-	Seg2 := _WRS_FuncBody(Src, "LLM_Deps_PollFile(pid, on_ready, on_failed) {")
+	Seg2 := _WRS_FuncBody(Src, "LLM_Deps_PollFile(pid, on_ready?, on_failed?) {")
 	Assert(InStr(Seg2, "A_IsSuspended") > 0,
 		"LLM_Deps_PollFile must check A_IsSuspended (warmup-retry-ignores-suspend)")
 }

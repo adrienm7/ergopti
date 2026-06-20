@@ -240,8 +240,9 @@ end
 --- @param expected_sha string Expected SHA-256, lowercase hex.
 --- @param callback function fun(ok: boolean, err: string|nil)
 local function verify_sha256_async(path, expected_sha, callback)
-	local task = hs.task.new("/usr/bin/shasum", function(rc, stdout)
-		M._active_tasks[task] = nil  -- task captured by closure; clears the GC-root pin
+	local task
+	task = hs.task.new("/usr/bin/shasum", function(rc, stdout)
+		if task then M._active_tasks[task] = nil end  -- task captured by closure; clears the GC-root pin
 		if rc ~= 0 or type(stdout) ~= "string" then
 			callback(false, "shasum exit code " .. tostring(rc))
 			return
@@ -275,8 +276,9 @@ local function download_async(url, dest, callback)
 	if parent ~= "" then
 		hs.execute(string.format("/bin/mkdir -p %q", parent))
 	end
-	local task = hs.task.new("/usr/bin/curl", function(rc, _, stderr)
-		M._active_tasks[task] = nil  -- task captured by closure; clears the GC-root pin
+	local task
+	task = hs.task.new("/usr/bin/curl", function(rc, _, stderr)
+		if task then M._active_tasks[task] = nil end  -- task captured by closure; clears the GC-root pin
 		if rc ~= 0 then
 			callback(false, "curl rc=" .. tostring(rc) .. " stderr=" .. tostring(stderr))
 			return
@@ -294,8 +296,9 @@ end
 --- @param dmg_path string Absolute path to the .dmg.
 --- @param callback function fun(ok: boolean, mount_point_or_err: string)
 local function mount_dmg_async(dmg_path, callback)
-	local task = hs.task.new("/usr/bin/hdiutil", function(rc, stdout, stderr)
-		M._active_tasks[task] = nil  -- task captured by closure; clears the GC-root pin
+	local task
+	task = hs.task.new("/usr/bin/hdiutil", function(rc, stdout, stderr)
+		if task then M._active_tasks[task] = nil end  -- task captured by closure; clears the GC-root pin
 		if rc ~= 0 or type(stdout) ~= "string" then
 			callback(false, "hdiutil rc=" .. tostring(rc) .. " stderr=" .. tostring(stderr))
 			return
@@ -354,8 +357,9 @@ local function run_pkg_with_sudo_async(pkg_path, callback)
 		[[do shell script "/usr/sbin/installer -pkg " & quoted form of "%s" & " -target /" with administrator privileges]],
 		escaped
 	)
-	local task = hs.task.new("/usr/bin/osascript", function(rc, _, stderr)
-		M._active_tasks[task] = nil  -- task captured by closure; clears the GC-root pin
+	local task
+	task = hs.task.new("/usr/bin/osascript", function(rc, _, stderr)
+		if task then M._active_tasks[task] = nil end  -- task captured by closure; clears the GC-root pin
 		if rc ~= 0 then
 			callback(false, "osascript rc=" .. tostring(rc) .. " stderr=" .. tostring(stderr))
 			return

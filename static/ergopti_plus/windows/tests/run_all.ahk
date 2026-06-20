@@ -467,6 +467,7 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 #Include meta/test_traymenu_separator_addstandard.ahk
 #Include meta/test_traymenu_setmenu_raw_add.ahk
 #Include meta/test_tap_hold_menu_register_dispatch.ahk
+#Include meta/test_menu_dispatch_error_propagation.ahk
 #Include meta/test_ui_launch_error_msgbox_on_timer_thread.ahk
 #Include meta/test_uia_error_logged.ahk
 #Include meta/test_updater_focus_poll_suspend_guard.ahk
@@ -625,6 +626,7 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 #Include meta/test_prefix_render_flush_suspend_guard.ahk
 #Include meta/test_gesture_dispatch_logs_failure.ahk
 #Include meta/test_ollama_installer_sync_winhttp_blocks.ahk
+#Include meta/test_g5_updater_download.ahk
 
 ; Watchdog: kill the process if RunTests() never returns (e.g. a corpus
 ; consumer blocks on a synchronous HTTP call, an InputHook with no timeout,

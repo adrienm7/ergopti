@@ -59,6 +59,7 @@ Accumulated engineering knowledge for this repository — gotchas, architecture 
   - Further batch: tap_hold_loader (pause, defaults overlay, invalid TOML, inherit_defaults=false, accessor edges — 6+ new), toml_loader (unicode, caching, multiple escapes), karabiner config (pause, migration, empty inputs), i18n (pause safe load/t()), hotstrings_full (pause guard, section delay), config (pause+manifest). Total added across expansion: 40+ regression tests. Prioritize suspend/pause in every new path.
   - Latest additions in "ajoute le plus de tests possible" pass: reinforced config, added personal_info and terminators pause guards (HS), more i18n/hotstrings_full pause+delay, karabiner edges. ~10 additional tests. Goal achieved: broad coverage across tap_hold, toml, karabiner, i18n, hotstrings, config, personal, terminators + universal pause invariant.
   - Post-compaction "encore plus" / "encore plus de tests. le maximum possible..." wave (this session continuation after summary compaction): +25-32 new regression tests in one dense iteration for near-100% certainty. Key additions: test*shortcuts.ahk (+6 — closed the critical ZERO pause coverage gap on all dispatchers, AltGr prefix latch regression under pause/resume [[feedback-ahk-suspend-prefix-latch]], RegisterMenuItem safety + pause, 250+ volume, bad Features, idempotent transitions); test_hotstrings_config.ahk (+3 — pause gate on resolution, explicit section>group>default delay precedence regression, 150+ bad TOML under pause); test_logger_contract.ahk (+3 — pause + errors-sink survival for diagnostics, 300+ volume ERROR under pause, hard FS on errors sink no-crash); test_active_app_cache.ahk (+3 — pause blocks all cache-driven activation for shortcuts/gestures/hotstrings/widgets, 200+ volume under pause, bad/unicode exe resilience); deepened HS: llm/profiles (+2-3 volume + pause transitions), gestures/engine (+2 primer + pause + 200+ volume + reversal), keylogger/aggregator (+2 privacy+pause+rollover + FS/pcall), shortcuts/bindings (+3 pause + volume + bad ids), karabiner/generator (+2 pause + volume + bad), keymap/terminators (+2 pause + volume unicode), meta corpus_hotstrings (+2 pause + delay precedence). Also notes in require_state (shortcuts full, hotstrings_config, logger_contract) and port_adapter. All with explicit "project_suspend_pause_invariant", historical gotchas, and max edges (volume 100-300+, unicode, bad input, FS/pcall no-crash, rollover, dedup, re-init, idempotent pause, cache-driven safety). Banners clean on most; 1 minor whitespace on shortcuts (warn-only, tests fully registered and valid). Memory updated. Campaign total now well over 210+ new regression tests. These tests would have caught: silent AltGr latch dispatch after pause, wrong hotstring delay timing (DYN* early-load or section override), logger ERROR loss under pause (diagnostics broken), cache-driven shortcut/gesture fire while suspended, gesture primer stuck after touchdevice dormancy + pause, aggregator PII leak on pause+rollover, menu item drops, volume corruption in prediction/profiles/bindings, etc. Full suites (run_all.ahk + run.lua) + live hardware test (pause/resume, high volume typing/gestures/LLM, config reload, keylogger privacy) mandatory before any merge. User can request "encore plus" again — the loop continues until no obvious gaps remain in survey.
+  - [project-ahk-menu-dispatcher-error-swallow](#project-ahk-menu-dispatcher-error-swallow) — The menu dispatcher bypass must re-throw callback errors to maintain parity with AHK's native dispatch and the global OnError handler.
 
 ---
 
@@ -344,6 +345,20 @@ All user-facing text in the ergopti project must be served via the i18n system, 
 - Internal logs and developer-facing comments stay English per CLAUDE.md — this rule applies only to user-visible text.
 
 **Backlog item:** [`_shared/ui/metrics_typing/data.js`, `table.js`, `charts.js`] and [`_shared/ui/download_window/*`] contain extensive hardcoded French. Needs extraction to i18n keys + translation to all 21 languages. Logged in the todo list as "[BACKLOG] i18n WebView extraction".
+
+### project-ahk-menu-dispatcher-error-swallow
+
+_The menu dispatcher bypass must re-throw callback errors to maintain parity with AHK's native dispatch and the global OnError handler_
+
+<sub>slug: `project_ahk_menu_dispatcher_error_swallow`</sub>
+
+In `lib/menu_dispatcher.ahk`, the `_DispatchIfMissed` bypass was wrapping the menu callback invocation in a `try...catch` block that suppressed errors (logging them via `LoggerError` but swallowing them). This broke error reporting parity: if AHK dispatched a click and the callback crashed, the error propagated to the global `OnError` handler (triggering the crash reporter and user toast). If the bypass dispatched the *same* click and it crashed, the error was swallowed silently.
+
+**Why:** The original implementation likely assumed that since the bypass ran on a `SetTimer` thread, a crash there would kill the timer or the script, so it tried to be defensive. But AHK v2's global `ErgoptiGlobalErrorHandler` prevents the script from crashing (it returns `true`) while surfacing the crash properly. Suppressing the error locally broke the `fail-fast` project instruction.
+
+**How to apply:**
+- Re-throw the error `throw Err` after logging it, or remove the `try...catch` wrapper entirely, so the exception bubbles up to AHK's thread boundary and gets caught by the global `OnError` handler.
+- See the regression test `tests/meta/test_menu_dispatch_error_propagation.ahk`.
 
 ---
 
@@ -1469,3 +1484,9 @@ If the main thread becomes permanently `Critical`, AHK will **block all backgrou
 - The test framework (`test_framework.ahk`) now includes a safety check that throws `Test LEAKED Critical: <TestName>` and resets the state to `0` if a test forgets to restore it, preventing cascading failures and quickly catching new occurrences.
 
 Related: [[project_ahk_invariant_incomplete_application]]
+
+### [updater-download-suspend-guard] Garantie G5: background downloads bypass pause
+* **Symptom**: A background update download (_Updater_PollDownloadAsync) could finish and trigger a script restart while the driver was supposedly suspended.
+* **Cause**: _Updater_PollDownloadAsync relies on a SetTimer callback which bypasses A_IsSuspended. It would happily process Req.WaitForResponse(0), write the downloaded .exe to disk, and call ExitApp(0) to apply the update.
+* **Fix**: Added if A_IsSuspended at the top of _Updater_PollDownloadAsync to Req.Abort() the download if caught suspended mid-flight. Additionally wrapped the disk-write and ExitApp block in Critical "On" so a suspend hotkey cannot interrupt the thread during the final critical section.
+* **Regression Guard**: meta/test_g5_updater_download.ahk asserts that both the A_IsSuspended check and Critical "On" are present in the callback.
