@@ -1,0 +1,71 @@
+﻿; tests/meta/test_webview_low_ram_native_fallback.ahk
+
+; ==============================================================================
+; MODULE: WebView Low-RAM Native Fallback Meta Test
+; DESCRIPTION:
+; Static source guard for the low-RAM WebView fallback feature.
+;
+; On a RAM-starved machine the Edge/Chromium cold start costs many seconds, so
+; WebView windows that have a native equivalent skip WebView2 and use that native
+; view when free RAM is below WEBVIEW_MIN_AVAIL_RAM_MB. This test pins:
+;   1. the shared gate helper exists in lib/webview_utils.ahk,
+;   2. each gated host actually consults WebView_ShouldUseNativeFallback,
+;   3. updater/changelog has a real native notes fallback (an Edit), so gating
+;      it cannot leave the notes pane blank.
+; ==============================================================================
+
+#Requires AutoHotkey v2.0
+
+_TWLR_ReadSource(RelPath) {
+	SplitPath(A_ScriptDir, , &Root)
+	Path := StrReplace(Root, "\", "/") . "/" . RelPath
+	return FileRead(Path)
+}
+
+; The shared gate helper + tunable threshold must live in webview_utils.ahk.
+_TWLR_GateHelperExists() {
+	Src := _TWLR_ReadSource("lib/webview_utils.ahk")
+	Assert(InStr(Src, "WebView_ShouldUseNativeFallback") > 0,
+		"lib/webview_utils.ahk must define WebView_ShouldUseNativeFallback")
+	Assert(InStr(Src, "WEBVIEW_MIN_AVAIL_RAM_MB") > 0,
+		"lib/webview_utils.ahk must define the tunable WEBVIEW_MIN_AVAIL_RAM_MB threshold")
+	Assert(InStr(Src, "GlobalMemoryStatusEx") > 0,
+		"WebView_AvailRamMb must read free RAM via GlobalMemoryStatusEx")
+}
+Test("webview-lowram: gate helper + threshold defined in webview_utils", _TWLR_GateHelperExists)
+
+; Healthcheck must gate its WebView2 use so low RAM falls back to the native Edit.
+_TWLR_HealthcheckGated() {
+	Src := _DriverDirConcat("ui/healthcheck")
+	Assert(InStr(Src, "WebView_ShouldUseNativeFallback") > 0,
+		"healthcheck must gate WebView2 on WebView_ShouldUseNativeFallback (low RAM -> native Edit)")
+}
+Test("webview-lowram: healthcheck gates WebView2 on free RAM", _TWLR_HealthcheckGated)
+
+; The updater module (changelog pane + update prompt) must gate the same way.
+_TWLR_UpdaterModuleGated() {
+	Src := _DriverDirConcat("lib/updater")
+	Assert(InStr(Src, "WebView_ShouldUseNativeFallback") > 0,
+		"lib/updater must gate WebView2 on WebView_ShouldUseNativeFallback")
+}
+Test("webview-lowram: updater module gates WebView2 on free RAM", _TWLR_UpdaterModuleGated)
+
+; changelog_window must redirect to the native changelog window when RAM is low.
+_TWLR_ChangelogWindowGated() {
+	Src := _TWLR_ReadSource("lib/changelog_window.ahk")
+	Assert(InStr(Src, "WebView_ShouldUseNativeFallback") > 0,
+		"changelog_window must redirect to the native changelog window when free RAM is low")
+}
+Test("webview-lowram: changelog_window redirects to native window on low RAM", _TWLR_ChangelogWindowGated)
+
+; Gating updater/changelog only helps if its non-WebView path actually renders the
+; notes. Before this feature ShowBody returned 0 with WebView2 off, leaving the
+; pane blank. Pin the native Edit fallback so that regression cannot return.
+_TWLR_UpdaterChangelogHasNativeNotes() {
+	Src := _DriverDirConcat("lib/updater")
+	Assert(InStr(Src, "RightPaneEdit") > 0,
+		"updater changelog must build a native RightPaneEdit fallback when WebView2 is off")
+	Assert(InStr(Src, "RightPaneEdit.Value := md") > 0,
+		"ShowBody must write the Markdown into the native Edit (not the old no-op that left the pane blank)")
+}
+Test("webview-lowram: updater changelog renders notes natively when WebView2 is off", _TWLR_UpdaterChangelogHasNativeNotes)

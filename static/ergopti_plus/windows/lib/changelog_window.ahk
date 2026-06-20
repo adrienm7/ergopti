@@ -66,8 +66,9 @@ Changelog_Open(Channel := "dev") {
 	_CLW_Ready   := false
 	_CLW_Queue   := []
 
-	; Bail early if WebView2 is not available — fall back to the old window.
-	if (!_CLW_WebView2Available()) {
+	; Bail early if WebView2 is unavailable, or if free RAM is too low to absorb
+	; the Chromium cold start — fall back to the lighter native changelog window.
+	if (!_CLW_WebView2Available() || WebView_ShouldUseNativeFallback()) {
 		_Updater_OpenChangelogWindow(Channel)
 		return
 	}

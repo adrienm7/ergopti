@@ -266,7 +266,7 @@ Updater_ShowUpdatePrompt(Release) {
 	G.Show("w740 AutoSize")
 
 	; Spin up WebView2 for Markdown rendering after Show() (Hwnd is valid then).
-	UseWV := IsSet(WebView2) && FileExist(_VendorDir . "\64bit\WebView2Loader.dll")
+	UseWV := IsSet(WebView2) && FileExist(_VendorDir . "\64bit\WebView2Loader.dll") && !WebView_ShouldUseNativeFallback()
 	if UseWV {
 		loader := _VendorDir . "\64bit\WebView2Loader.dll"
 		WVC := unset

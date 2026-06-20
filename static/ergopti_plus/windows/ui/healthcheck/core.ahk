@@ -292,7 +292,7 @@ HealthCheck_ShowWindow() {
 
 	G.Show("w" . _HC_WIN_W . " AutoSize")
 
-	UseWV := IsSet(WebView2) && IsSet(_VendorDir) && FileExist(_VendorDir . "\64bit\WebView2Loader.dll")
+	UseWV := IsSet(WebView2) && IsSet(_VendorDir) && FileExist(_VendorDir . "\64bit\WebView2Loader.dll") && !WebView_ShouldUseNativeFallback()
 	if UseWV {
 		loader := _VendorDir . "\64bit\WebView2Loader.dll"
 
