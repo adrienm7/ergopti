@@ -40,8 +40,8 @@ from pathlib import Path
 def find_schema(metrics_dir: Path) -> Path | None:
 	"""Locate schema.sql relative to the metrics directory."""
 	candidates = [
-		Path(__file__).parent.parent / "static" / "ergopti_plus" / "shared" / "schema" / "schema.sql",
-		metrics_dir.parent.parent.parent / "static" / "ergopti_plus" / "shared" / "schema" / "schema.sql",
+		Path(__file__).parent.parent / "static" / "ergopti_plus" / "shared" / "data" / "db" / "schema.sql",
+		metrics_dir.parent.parent.parent / "static" / "ergopti_plus" / "shared" / "data" / "db" / "schema.sql",
 	]
 	for p in candidates:
 		if p.exists():
