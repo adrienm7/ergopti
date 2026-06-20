@@ -285,7 +285,6 @@ HealthCheck_ShowWindow() {
 		BtnLabel)
 
 	G.WVC := 0
-	G.Udir := ""
 	CloseAndCopy := (*) => (A_Clipboard := PlainText, _HealthCheck_CloseGui(G))
 	G.OnEvent("Close",  (*) => _HealthCheck_CloseGui(G))
 	G.OnEvent("Escape", (*) => _HealthCheck_CloseGui(G))
@@ -296,15 +295,13 @@ HealthCheck_ShowWindow() {
 	UseWV := IsSet(WebView2) && IsSet(_VendorDir) && FileExist(_VendorDir . "\64bit\WebView2Loader.dll")
 	if UseWV {
 		loader := _VendorDir . "\64bit\WebView2Loader.dll"
-		udir   := A_Temp . "\ergopti_hc_wv_" . A_TickCount
-		WebView_SweepStaleProfiles("ergopti_hc_wv_")
-		try DirCreate(udir)
-		G.Udir := udir
 
 		WVC := 0
 		try {
 			; Parent to ContentCtl.Hwnd — identical to updater's RightPane.Hwnd pattern.
-			WVC := WebView2.create(ContentCtl.Hwnd, , 0, udir, "", 0, loader)
+			; Reuse the shared session environment (lib/webview_utils.ahk) so no
+			; second Chromium process boots and reopens are near-instant.
+			WVC := WebView2.create(ContentCtl.Hwnd, , WebView_SharedEnvironment(loader))
 			G.WVC := WVC
 		} catch as Err {
 			try LoggerWarn("Healthcheck", "WebView2 create failed: {1} — falling back.", Err.Message)
@@ -358,8 +355,6 @@ _HealthCheck_CloseGui(G) {
 	if G.HasProp("WVC") && G.WVC
 		try G.WVC.Close()
 	try G.Destroy()
-	if G.HasProp("Udir") && G.Udir != ""
-		try DirDelete(G.Udir, true)
 }
 
 ; Formats the snapshot as a plain-text string (fallback when WebView2 is absent).
