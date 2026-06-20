@@ -75,7 +75,7 @@ _LTLG_FuncBody(Src, FnDecl) {
 ; ================================================
 
 _LTLG_CheckModuleLevelFlag() {
-	Src := _LTLG_ReadSource("ui/tray_llm.ahk")
+	Src := _LTLG_ReadSource("ui/tray_llm/_index.ahk")
 	Assert(Src != "", "ui/tray_llm.ahk must be readable")
 
 	Assert(InStr(Src, "_LLM_Tray_Loaded  := false") || InStr(Src, "_LLM_Tray_Loaded := false"),

@@ -1,4 +1,4 @@
-﻿; ui/tray_llm.ahk
+﻿; ui/tray_llm/_index.ahk
 
 ; ==============================================================================
 ; MODULE: LLM Tray Menu UI — Entry Point
@@ -258,12 +258,12 @@ global _LLM_Tray_TriggerHk := unset
 ; can reference any other. The grouping below mirrors the call graph
 ; (init → build → action handlers) purely for human readability.
 
-#Include tray_llm/persist.ahk
-#Include tray_llm/init.ahk
-#Include tray_llm/menu_main.ahk
-#Include tray_llm/menu_models.ahk
-#Include tray_llm/menu_api_entries.ahk
-#Include tray_llm/menu_profiles.ahk
-#Include tray_llm/menu_settings.ahk
-#Include tray_llm/actions.ahk
-#Include tray_llm/tab_accept.ahk
+#Include persist.ahk
+#Include init.ahk
+#Include menu_main.ahk
+#Include menu_models.ahk
+#Include menu_api_entries.ahk
+#Include menu_profiles.ahk
+#Include menu_settings.ahk
+#Include actions.ahk
+#Include tab_accept.ahk
