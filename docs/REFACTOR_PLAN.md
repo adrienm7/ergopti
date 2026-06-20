@@ -49,15 +49,15 @@ Chemin identique d'un driver à l'autre → l'analogue se trouve au même endroi
 
 **But.** Nettoyer le tracking git et la racine pour que la structure soit lisible avant tout déplacement de code.
 
-- [ ] Archiver les 8 audits markdown uniques (`AUDIT_*.md`, `RAPPORT_AUDIT*.md`, `audit_ergoptiplus.md` = doublon de `RAPPORT_AUDIT_FINAL.md`) sous `docs/archive/audits/` (préserve l'historique, nettoie la racine).
-- [ ] `git rm` les dumps git-log jetables `all_fix_commits.txt`, `fix_commits.txt`.
-- [ ] `git rm --cached static/ergopti_plus/windows/build/static_bundle.zip` (déjà gitignore, CI le reconstruit).
-- [ ] `git rm --cached reports/mutation/mutation.html` + ajouter `/reports/` à `.gitignore`.
-- [ ] `git rm static/ergopti_plus/kanata/{kanata,kanata_winIOv2.exe}` (binaires non référencés ; `install.sh` n'utilise que `kanata.kbd` — vérifié). Garder `kanata.kbd`.
-- [ ] Supprimer du working tree les logs scratch non trackés (`ci.log`, `failed_run.log`, `windows/out.log`, `tests/test_run.log`, `macos/tests/scratch_*.log`, `luac.out`).
-- [ ] Ajouter `luac.out`/`*.luac` déjà couverts ; vérifier la couverture `.gitignore`.
+- [x] Archiver les 8 audits markdown uniques (`AUDIT_*.md`, `RAPPORT_AUDIT*.md`) sous `docs/archive/audits/` ; supprimer `audit_ergoptiplus.md` (doublon byte-identique de `RAPPORT_AUDIT_FINAL.md`, md5 vérifié).
+- [x] `git rm` les dumps git-log jetables `all_fix_commits.txt`, `fix_commits.txt`.
+- [x] `git rm --cached static/ergopti_plus/windows/build/static_bundle.zip` (déjà gitignore l.153, reste sur disque, CI le reconstruit).
+- [x] `git rm --cached reports/mutation/mutation.html` + ajouter `/reports/` à `.gitignore` (l.132).
+- [x] `git rm static/ergopti_plus/kanata/{kanata,kanata_winIOv2.exe}` (binaires non référencés ; `linux/install.sh` n'utilise que `kanata.kbd` — vérifié). Garder `kanata.kbd`.
+- [x] Supprimer du working tree les logs scratch non trackés (`ci.log`, `failed_run.log`, `windows/out.log`, `tests/test_run.log`, `macos/tests/scratch_*.log`, `luac.out`).
+- [x] `luac.out`/`*.luac` déjà couverts par `.gitignore` (l.65-66) — vérifié.
 
-**Vérif.** `git status` propre ; suite node + AHK dry-run inchangées (vert) ; `grep` confirme aucune référence cassée.
+**Vérif. ✅** `git check-ignore` confirme zip + `reports/` ignorés ; `test:ahk-encoding` (571 fichiers) + `test:config-schema` verts ; aucun fichier tracké cassé.
 
 ---
 
