@@ -76,8 +76,8 @@ end
 -- Loads _shared/modules/wpm_widget/constants.toml and _shared/modules/timings/constants.toml at runtime.
 -- Returns a config table; logs an error and returns a safe-default stub on failure.
 local function _load_shared_const()
-	local wpm_path     = resolve_shared_constants_path("wpm_widget/constants.toml")
-	local timings_path = resolve_shared_constants_path("timings/constants.toml")
+	local wpm_path     = resolve_shared_constants_path("modules/wpm_widget/constants.toml")
+	local timings_path = resolve_shared_constants_path("modules/timings/constants.toml")
 
 	local function read_toml(path)
 		if not path then return {} end

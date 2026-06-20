@@ -295,6 +295,37 @@ local _maintenance_timer    = nil
 local _tap_watchdog_timer   = nil
 local _app_watcher          = nil
 local _win_filter           = nil
+
+-- Browser apps whose intra-window focus/title changes warrant a private-mode
+-- re-check. The array feeds hs.window.filter.new(); the set gives O(1) lookup in
+-- the app-activation hook that lazily creates the filter.
+local BROWSER_APPS = {
+	"Safari", "Google Chrome", "Firefox", "Microsoft Edge",
+	"Brave Browser", "Arc", "Opera", "Vivaldi",
+}
+local BROWSER_APP_SET = {}
+for _, _name in ipairs(BROWSER_APPS) do BROWSER_APP_SET[_name] = true end
+
+--- Lazily creates the browser window-filter on the FIRST browser activation.
+--- hs.window.filter's first instantiation makes Hammerspoon enumerate every window
+--- of every app — multi-second on machines with many apps or a VPN — so creating
+--- it eagerly at keylogger start delayed the whole engine becoming ready. Per
+--- app-switch private/incognito detection runs immediately via
+--- ContextTracker.update_private_status (called from app_watcher_cb) and does NOT
+--- need this filter; the filter only adds intra-app (tab/title-change) re-checks,
+--- which only matter once the user is actually inside a browser
+--- (keylogger-winfilter-lazy).
+local function ensure_browser_window_filter()
+	if _win_filter then return end
+	local t0 = hs.timer.absoluteTime()
+	_win_filter = hs.window.filter.new(BROWSER_APPS)
+	_win_filter:subscribe(
+		{ hs.window.filter.windowFocused, hs.window.filter.windowTitleChanged },
+		ContextTracker.update_private_status
+	)
+	Logger.debug(LOG, "Browser window filter created lazily on first browser activation (%.1f ms).",
+		(hs.timer.absoluteTime() - t0) / 1e6)
+end
 local _caffeinate_watcher   = nil
 local _wifi_watcher         = nil
 local _battery_watcher      = nil
@@ -1457,27 +1488,22 @@ function M.start(script_control)
 	CoreState.recent_typing_eff  = {}
 	CoreState.recent_typing_phys = {}
 
-	-- Application watcher
+	-- Application watcher. The browser window-filter is created LAZILY on the first
+	-- browser activation (see ensure_browser_window_filter) so the keylogger never
+	-- pays hs.window.filter's whole-window-tree enumeration at start.
 	if not _app_watcher then
-		_app_watcher = hs.application.watcher.new(ContextTracker.app_watcher_cb)
+		_app_watcher = hs.application.watcher.new(function(app_name, event_type, app_object)
+			if event_type == hs.application.watcher.activated and BROWSER_APP_SET[app_name] then
+				ensure_browser_window_filter()
+			end
+			ContextTracker.app_watcher_cb(app_name, event_type, app_object)
+		end)
 	end
 	_app_watcher:start()
 
-	-- Browser window filter for private-mode detection
-	hs.timer.doAfter(0, function()
-		if not _win_filter then
-			local browsers = {
-				"Safari", "Google Chrome", "Firefox", "Microsoft Edge",
-				"Brave Browser", "Arc", "Opera", "Vivaldi",
-			}
-			_win_filter = hs.window.filter.new(browsers)
-			_win_filter:subscribe(
-				{ hs.window.filter.windowFocused, hs.window.filter.windowTitleChanged },
-				ContextTracker.update_private_status
-			)
-		end
-		ContextTracker.update_private_status()
-	end)
+	-- Evaluate the current window's private status on the next tick (independent of
+	-- the lazy browser filter), keeping it off the synchronous start path.
+	hs.timer.doAfter(0, ContextTracker.update_private_status)
 
 	-- System sleep/wake/lock watcher
 	if not _caffeinate_watcher then

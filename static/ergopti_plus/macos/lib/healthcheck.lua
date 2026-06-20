@@ -749,45 +749,29 @@ _collect_pause_state = function()
 end
 
 _collect_keylogger_summary = function()
+	-- events_session / privacy_hits have no public accessor today, so they are
+	-- reported as "n/a" rather than probed against a nonexistent function. WPM is
+	-- live from the keylogger; the log paths are the logger's canonical constants.
 	local sum = {
 		enabled = "unknown",
 		wpm = "n/a",
-		events_session = 0,
-		privacy_hits = 0,
-		today_log = "",
-		errors_log = "",
+		events_session = "n/a",
+		privacy_hits = "n/a",
+		today_log = Logger.UNIFIED_LOG_FILE or "",
+		errors_log = Logger.ERRORS_LOG_FILE or "",
 		notes = "High-severity (WARNING/ERROR) also written to dedicated ErgoptiPlus_errors_*.log (see Debug > Open Error Log)",
 	}
-	local ok_l, logm = pcall(require, "modules.keylogger.log_manager")
-	if not ok_l then
-		Logger.warn(LOG, "log_manager unavailable: %s.", tostring(logm))
-	elseif type(logm.get_paths) ~= "function" then
-		Logger.warn(LOG, "log_manager.get_paths is not a function.")
+	local ok_k, kl = pcall(require, "modules.keylogger")
+	if not ok_k then
+		Logger.warn(LOG, "modules.keylogger unavailable: %s.", tostring(kl))
+	elseif type(kl.get_live_stats) ~= "function" then
+		Logger.warn(LOG, "keylogger.get_live_stats is not a function.")
 	else
-		local p = logm.get_paths() or {}
-		sum.today_log  = p.unified or ""
-		sum.errors_log = p.errors  or ""
+		local st = kl.get_live_stats() or {}
+		if st.wpm ~= nil then sum.wpm = st.wpm end
 	end
-	local ok_a, agg = pcall(require, "modules.keylogger.aggregator")
-	if not ok_a then
-		Logger.warn(LOG, "keylogger.aggregator unavailable: %s.", tostring(agg))
-	elseif type(agg.get_stats) ~= "function" then
-		Logger.warn(LOG, "aggregator.get_stats is not a function.")
-	else
-		local s = agg.get_stats() or {}
-		sum.events_session = s.events or sum.events_session
-		sum.wpm            = s.wpm    or sum.wpm
-	end
-	local ok_p, priv = pcall(require, "modules.keylogger.privacy")
-	if not ok_p then
-		Logger.warn(LOG, "keylogger.privacy unavailable: %s.", tostring(priv))
-	elseif type(priv.get_hit_count) ~= "function" then
-		Logger.warn(LOG, "privacy.get_hit_count is not a function.")
-	else
-		sum.privacy_hits = priv.get_hit_count() or 0
-	end
-	Logger.debug(LOG, "Keylogger: events=%s wpm=%s privacy_hits=%s.",
-		tostring(sum.events_session), tostring(sum.wpm), tostring(sum.privacy_hits))
+	Logger.debug(LOG, "Keylogger: wpm=%s unified='%s' errors='%s'.",
+		tostring(sum.wpm), tostring(sum.today_log), tostring(sum.errors_log))
 	return sum
 end
 
@@ -796,13 +780,22 @@ _collect_llm_state = function()
 	local ok, llm = pcall(require, "modules.llm.init")
 	if not ok then
 		Logger.warn(LOG, "modules.llm.init unavailable: %s.", tostring(llm))
-	elseif type(llm.get_state) ~= "function" then
-		Logger.warn(LOG, "llm.get_state is not a function.")
 	else
-		local s = llm.get_state() or {}
-		st.enabled        = tostring(s.llm_enabled       or "unknown")
-		st.backend        = s.llm_backend                or st.backend
-		st.active_profile = s.llm_active_profile         or st.active_profile
+		if type(llm.get_runtime_llm_enabled) == "function" then
+			st.enabled = tostring(llm.get_runtime_llm_enabled())
+		else
+			Logger.warn(LOG, "llm.get_runtime_llm_enabled is not a function.")
+		end
+		if type(llm.get_backend) == "function" then
+			st.backend = llm.get_backend() or st.backend
+		else
+			Logger.warn(LOG, "llm.get_backend is not a function.")
+		end
+		if type(llm.get_active_profile) == "function" then
+			st.active_profile = llm.get_active_profile() or st.active_profile
+		else
+			Logger.warn(LOG, "llm.get_active_profile is not a function.")
+		end
 	end
 	Logger.debug(LOG, "LLM: enabled=%s backend=%s profile=%s.",
 		tostring(st.enabled), tostring(st.backend), tostring(st.active_profile))
@@ -810,28 +803,21 @@ _collect_llm_state = function()
 end
 
 _collect_layout_state = function()
-	local st = { ergopti_base = "unknown", altgr = "unknown", shift = "unknown", caps = "unknown", prefix_latch = "clean" }
-	local ok, lay = pcall(require, "lib.layout")
-	if not ok then
-		Logger.warn(LOG, "lib.layout unavailable: %s.", tostring(lay))
-	elseif type(lay.is_ergopti_base) ~= "function" then
-		Logger.warn(LOG, "layout.is_ergopti_base is not a function.")
-	else
-		st.ergopti_base = lay.is_ergopti_base() and "on" or "off"
-	end
+	-- ergopti_base (active-layout detection) and caps (capslock) have no runtime
+	-- accessor — checkKeyboardModifiers only exposes shift/ctrl/alt/cmd/fn — so
+	-- they stay "n/a" instead of probing a function that does not exist. altgr and
+	-- shift are read live through the key_state adapter's real API.
+	local st = { ergopti_base = "n/a", altgr = "unknown", shift = "unknown", caps = "n/a", prefix_latch = "clean" }
 	local ok_ks, ks = pcall(require, "adapters.key_state")
 	if not ok_ks then
 		Logger.warn(LOG, "adapters.key_state unavailable: %s.", tostring(ks))
 	else
-		if type(ks.get_altgr) == "function" then st.altgr = ks.get_altgr() and "active" or "off"
-		else Logger.warn(LOG, "key_state.get_altgr is not a function.") end
-		if type(ks.get_shift) == "function" then st.shift = ks.get_shift() and "active" or "off"
-		else Logger.warn(LOG, "key_state.get_shift is not a function.") end
-		if type(ks.get_caps) == "function" then st.caps = ks.get_caps() and "active" or "off"
-		else Logger.warn(LOG, "key_state.get_caps is not a function.") end
+		if type(ks.is_right_altgr_held) == "function" then st.altgr = ks.is_right_altgr_held() and "active" or "off"
+		else Logger.warn(LOG, "key_state.is_right_altgr_held is not a function.") end
+		if type(ks.isDown) == "function" then st.shift = ks.isDown("shift") and "active" or "off"
+		else Logger.warn(LOG, "key_state.isDown is not a function.") end
 	end
-	Logger.debug(LOG, "Layout: base=%s altgr=%s shift=%s caps=%s.",
-		tostring(st.ergopti_base), tostring(st.altgr), tostring(st.shift), tostring(st.caps))
+	Logger.debug(LOG, "Layout: altgr=%s shift=%s.", tostring(st.altgr), tostring(st.shift))
 	return st
 end
 
@@ -840,17 +826,22 @@ _collect_hotstrings_state = function()
 	local ok_t, term = pcall(require, "modules.keymap.terminators")
 	if not ok_t then
 		Logger.warn(LOG, "modules.keymap.terminators unavailable: %s.", tostring(term))
+	elseif type(term.get_terminator_defs) ~= "function" then
+		Logger.warn(LOG, "terminators.get_terminator_defs is not a function.")
 	else
-		if type(term.count) == "function" then
-			st.terminators = term.count()
-		else
-			Logger.warn(LOG, "terminators.count is not a function.")
-		end
-		if type(term.get_magic_key) == "function" then
-			st.magic_key = term.get_magic_key() or ""
-		else
-			Logger.warn(LOG, "terminators.get_magic_key is not a function.")
-		end
+		local defs = term.get_terminator_defs() or {}
+		local n = 0
+		for _ in pairs(defs) do n = n + 1 end
+		st.terminators = n
+	end
+	-- The magic key is the keymap's trigger char (owned by the registry).
+	local ok_km, km = pcall(require, "modules.keymap")
+	if not ok_km then
+		Logger.warn(LOG, "modules.keymap unavailable: %s.", tostring(km))
+	elseif type(km.get_trigger_char) ~= "function" then
+		Logger.warn(LOG, "keymap.get_trigger_char is not a function.")
+	else
+		st.magic_key = km.get_trigger_char() or ""
 	end
 	Logger.debug(LOG, "Hotstrings: terminators=%d magic_key='%s'.", st.terminators, tostring(st.magic_key))
 	return st
@@ -864,17 +855,11 @@ _collect_logs_info = function()
 		ring_lines = 0,
 		note = "Dedicated errors sink (WARNING/ERROR only) keeps the main daily log smaller and easier to read.",
 	}
-	local ok, logm = pcall(require, "modules.keylogger.log_manager")
-	if not ok then
-		Logger.warn(LOG, "log_manager unavailable for logs_info: %s.", tostring(logm))
-	elseif type(logm.get_paths) ~= "function" then
-		Logger.warn(LOG, "log_manager.get_paths is not a function.")
-	else
-		local p = logm.get_paths() or {}
-		info.unified_today     = p.unified or ""
-		info.errors_today      = p.errors  or ""
-		info.errors_sink_active = (p.errors and p.errors ~= "") or false
-	end
+	-- Canonical log file paths live on the logger module as public constants,
+	-- re-pointed at the dated files by Logger.init_log_path() during boot.
+	info.unified_today      = Logger.UNIFIED_LOG_FILE or ""
+	info.errors_today       = Logger.ERRORS_LOG_FILE or ""
+	info.errors_sink_active = (info.errors_today ~= "")
 	-- Logger is already required at module level; re-require only to check ring_buffer_snapshot
 	if type(Logger.ring_buffer_snapshot) == "function" then
 		local rb = Logger.ring_buffer_snapshot() or {}

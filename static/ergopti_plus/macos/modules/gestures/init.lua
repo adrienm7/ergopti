@@ -213,8 +213,9 @@ local function prewarm_dependencies()
 		"hs.asapplescript", "hs.layout", "hs.timer", "hs.canvas"
 	}
 	for _, mod in ipairs(modules) do pcall(require, mod) end
-	pcall(function() Actions.init(CoreState) end)
-	pcall(function() Engine.init(CoreState, Actions) end)
+	-- Actions/Engine are already initialised at module load (see top of file); the
+	-- pre-warm only force-loads the hs.* extensions above. Re-initialising here was
+	-- a no-op that logged a spurious "M.init() called more than once" every boot.
 end
 
 --- Aggressive kickstart of the system HID subsystem.
