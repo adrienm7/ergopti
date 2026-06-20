@@ -191,7 +191,13 @@ local function pause_all()
 	elseif _shortcuts and type(_shortcuts.stop) == "function" then
 		pcall(function() _shortcuts.stop() end)
 	end
-	if _gestures and type(_gestures.disable_all) == "function" then
+	-- suspend() sets CoreState.suspended=true while leaving CoreState.enabled
+	-- untouched. This means a menu toggle of gestures ON/OFF during pause
+	-- changes the right axis and is honoured correctly at resume, instead of
+	-- being overwritten by a stale snapshot-based enable_all() call.
+	if _gestures and type(_gestures.suspend) == "function" then
+		pcall(function() _gestures.suspend() end)
+	elseif _gestures and type(_gestures.disable_all) == "function" then
 		pcall(function() _gestures.disable_all() end)
 	end
 	if _karabiner and type(_karabiner.pause) == "function" then
@@ -212,7 +218,13 @@ local function resume_all()
 			pcall(function() _shortcuts.start() end)
 		end
 	end
-	if _gestures_were_enabled then
+	-- resume() clears CoreState.suspended so the engine gate re-uses
+	-- CoreState.enabled (the user feature flag). No snapshot needed: whatever
+	-- the user toggled during pause is already in enabled, and resume never
+	-- overrides it.
+	if _gestures and type(_gestures.resume) == "function" then
+		pcall(function() _gestures.resume() end)
+	elseif _gestures_were_enabled then
 		if _gestures and type(_gestures.enable_all) == "function" then
 			pcall(function() _gestures.enable_all() end)
 		end
