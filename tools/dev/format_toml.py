@@ -30,12 +30,16 @@ import unicodedata
 from collections import OrderedDict
 from pathlib import Path
 
+# Make tools/lib importable (repo root on sys.path) for the shared-tree SSOT.
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from tools.lib.paths import shared  # noqa: E402
+
 HOTSTRING_FILES = [
-    "static/ergopti_plus/shared/hotstrings/distancesreduction.toml",
-    "static/ergopti_plus/shared/hotstrings/sfbsreduction.toml",
-    "static/ergopti_plus/shared/hotstrings/rolls.toml",
-    "static/ergopti_plus/shared/hotstrings/autocorrection.toml",
-    "static/ergopti_plus/shared/hotstrings/magickey.toml",
+    shared("hotstrings", "distancesreduction.toml"),
+    shared("hotstrings", "sfbsreduction.toml"),
+    shared("hotstrings", "rolls.toml"),
+    shared("hotstrings", "autocorrection.toml"),
+    shared("hotstrings", "magickey.toml"),
 ]
 
 _REPO_ROOT = Path(__file__).parent.parent.parent
@@ -453,7 +457,7 @@ def hotstrings_mode() -> None:
     args = [a for a in args if a not in ("--check", "--all")]
 
     if all_mode:
-        targets = [(_REPO_ROOT / p).resolve() for p in HOTSTRING_FILES]
+        targets = [p.resolve() for p in HOTSTRING_FILES]
     else:
         targets = [Path(a).resolve() for a in args]
 
