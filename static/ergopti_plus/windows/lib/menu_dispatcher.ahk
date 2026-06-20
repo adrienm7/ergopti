@@ -506,6 +506,7 @@ _DispatchIfMissed(ItemId, ExpectedLastFire) {
     } catch as Err {
         try LoggerError("MenuDispatcher",
             "Bypass dispatch for ItemId={1} threw: {2}.", ItemId, Err.Message)
+        throw Err
     }
 }
 

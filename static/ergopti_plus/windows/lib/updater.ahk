@@ -1698,6 +1698,13 @@ Updater_DownloadAndInstall(Release) {
 
 _Updater_PollDownloadAsync(Req, NewExe, SwapBat, CurrentExe, Tag, Polls := 0) {
 	global _UpdaterDownloadInProgress, UPDATER_ASYNC_POLL_MS
+	if A_IsSuspended {
+		try LoggerWarn("Updater", "Async download aborted: driver suspended mid-flight (G5 Guarantee).")
+		try Req.Abort()
+		_UpdaterDownloadInProgress := false
+		try SetTimer((*) => initMenu(), -50)
+		return
+	}
 	; Give the download up to 600 seconds to complete — slow connections on
 	; large releases need more headroom than the old 120-second ceiling allowed.
 	MaxPolls := 600000 / UPDATER_ASYNC_POLL_MS
@@ -1728,6 +1735,8 @@ _Updater_PollDownloadAsync(Req, NewExe, SwapBat, CurrentExe, Tag, Polls := 0) {
 		MsgBox(t("updater.install_error_download"), t("updater.title_update"), "Icon!")
 		return
 	}
+	
+	Critical "On"
 	
 	try {
 		Stream := ComObject("ADODB.Stream")

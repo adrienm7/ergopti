@@ -41,7 +41,7 @@ _UDTO_FindPollBlock(src) {
 	pos := InStr(src, "_Updater_PollDownloadAsync(")
 	if (!pos)
 		return ""
-	return SubStr(src, pos, 400)
+	return SubStr(src, pos, 800)
 }
 
 

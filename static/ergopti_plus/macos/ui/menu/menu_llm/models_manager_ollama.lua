@@ -229,8 +229,9 @@ function M.new(deps, presets, ram_getter)
 		-- hs.task is non-blocking unlike hs.execute.
 		-- Pinned to _active_tasks so the GC cannot SIGTERM it before the callback
 		-- fires and resets _installed_loading — a GC kill would deadlock the lock.
-		local task = hs.task.new(bin, function(code, stdout)
-			_active_tasks[task] = nil  -- task captured by closure; clears the GC-root pin
+		local task
+		task = hs.task.new(bin, function(code, stdout)
+			if task then _active_tasks[task] = nil end  -- task captured by closure; clears the GC-root pin
 			_installed_loading = false
 			local installed = {}
 			if code == 0 and type(stdout) == "string" then
