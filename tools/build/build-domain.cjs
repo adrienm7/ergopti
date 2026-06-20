@@ -231,6 +231,23 @@ const PIPELINE = [
 				.join('\n');
 			return { ok, detail: ok ? undefined : detail || lines[lines.length - 1] || '' };
 		}
+	},
+
+	// -------------------------------------------------------
+	// Step 6: Every AHK feature read site is backed by the manifest. Guards the
+	// layout.ahk ctrl_magic_save UnsetItemError class — a feature read at a path
+	// the manifest does not define (section-prefix drift, removed feature, etc.).
+	// -------------------------------------------------------
+	{
+		name: 'test:feature-read-sites — AHK Features[...] reads ⊆ manifest',
+		run() {
+			const { ok, stdout, stderr } = runNpmScript('test:feature-read-sites');
+			const lines = (stdout + stderr).trim().split('\n').filter(Boolean);
+			const detail = lines
+				.filter((l) => l.includes('✗') || l.trim().startsWith('Features['))
+				.join('\n');
+			return { ok, detail: ok ? undefined : detail || lines[lines.length - 1] || '' };
+		}
 	}
 ];
 
