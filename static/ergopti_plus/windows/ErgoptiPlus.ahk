@@ -225,7 +225,7 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 ; locale cache. LoadHotstringsSection ensures + consults it, falling back to the
 ; runtime TOML parser on a cache miss. No generated CODE is kept in the repo.
 #Include lib/hotstrings/hotstrings_cache.ahk
-#Include lib/hotstrings/personal_toml_editor.ahk
+#Include ui/personal_toml_editor.ahk
 #Include lib/layout/layout_altgr.ahk
 #Include lib/layout/layout_shift_caps.ahk
 #Include lib/app_picker.ahk

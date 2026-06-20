@@ -52,7 +52,7 @@ _FTSP_NoStalePathTokens() {
 	StaleLayout := "static" . "\drivers\autohotkey"
 	StaleScript := "tools" . "\format_toml.py"
 
-	Files := ["lib/toml/toml_helpers.ahk", "lib/hotstrings/personal_toml_editor.ahk"]
+	Files := ["lib/toml/toml_helpers.ahk", "ui/personal_toml_editor.ahk"]
 	for _, Rel in Files {
 		Src := _FTSP_ReadSource(Rel)
 		Assert(InStr(Src, StaleLayout) = 0,
