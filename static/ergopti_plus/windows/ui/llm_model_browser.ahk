@@ -61,9 +61,10 @@ global LLM_MB_COL_STATUS    := 7
 LLM_ModelBrowser_Show() {
 	global _LLM_ModelBrowser_Gui, _LLM_Tray
 	; Prefer the shared web table (sortable/filterable, identical to the macOS
-	; browser) when WebView2 is available; fall back to the native ListView below
-	; when it is not, or if the webview fails to spin up.
-	if (_LLM_MBW_WebView2Available()) {
+	; browser) when WebView2 is available and there is enough free RAM to boot it;
+	; fall back to the native ListView below when WebView2 is unavailable, the
+	; webview fails to spin up, or free RAM is too low for the Chromium cold start.
+	if (_LLM_MBW_WebView2Available() && !WebView_ShouldUseNativeFallback()) {
 		web := ""
 		try web := _LLM_ModelBrowser_ShowWeb()
 		catch as Err
