@@ -33,12 +33,6 @@
 ; ==================================================
 ; ==================================================
 
-_DESC_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
-}
-
 ; Body delimited by the first closing brace flush-left (`\n}`).
 _DESC_FuncBodyFlat(Src, FuncDef) {
 	Idx := InStr(Src, FuncDef)
@@ -50,34 +44,6 @@ _DESC_FuncBodyFlat(Src, FuncDef) {
 		return SubStr(Rest, 1, End + 1)
 	return Rest
 }
-
-; Body via balanced brace-walking (handles nested blocks).
-_DESC_FuncBodyWalk(Src, FuncName) {
-	Idx := InStr(Src, FuncName)
-	if (!Idx)
-		return ""
-	OpenPos := InStr(Src, "{", , Idx)
-	if (!OpenPos)
-		return ""
-	depth := 0
-	i := OpenPos
-	Len := StrLen(Src)
-	while (i <= Len) {
-		ch := SubStr(Src, i, 1)
-		if (ch == "{")
-			depth++
-		else if (ch == "}") {
-			depth--
-			if (depth <= 0)
-				return SubStr(Src, Idx, i - Idx + 1)
-		}
-		i++
-	}
-	return SubStr(Src, Idx)
-}
-
-
-
 
 ; ==================================================
 ; ==================================================
@@ -120,9 +86,8 @@ _DESC_PrescanWarmedBeforeCritical() {
 }
 
 _DESC_ExtMenuDoesNoFileIO() {
-	Src := _DESC_ReadSource("ui/tray_menu.ahk")
-	Body := _DESC_FuncBodyWalk(Src, "_HS_Extensions(")
-	Assert(Body != "", "_HS_Extensions( must exist in ui/tray_menu.ahk")
+	Body := _DriverFuncBody("_HS_Extensions")
+	Assert(Body != "", "_HS_Extensions must exist in the driver source")
 
 	; Strip comments so a comment that names "Loop Files" / "FileRead" (explaining
 	; where the I/O moved to) cannot trip these assertions — only real code counts.
