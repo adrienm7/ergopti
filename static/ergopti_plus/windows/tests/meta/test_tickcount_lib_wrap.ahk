@@ -79,8 +79,8 @@ Test("tickcount-wrap: metrics_filters.ahk focus TTL comparison uses & 0xFFFFFFFF
 ; ================================================================
 
 _TCLW_HealthCheckWrapSafe() {
-	Src := _TCLW_ReadSource("lib/healthcheck.ahk")
-	Assert(Src != "", "lib/healthcheck.ahk must be readable")
+	Src := _DriverDirConcat("ui/healthcheck")
+	Assert(Src != "", "the ui/healthcheck module must be readable")
 
 	Assert(!InStr(Src, "UptimeSec := (A_TickCount - _HealthCheckStartMs) // 1000"),
 		"healthcheck.ahk must not use bare subtraction without & 0xFFFFFFFF mask (tickcount-wrap)")

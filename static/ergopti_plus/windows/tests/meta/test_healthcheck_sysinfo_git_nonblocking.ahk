@@ -32,14 +32,6 @@
 ; ====================================================
 ; ====================================================
 
-; Reads a windows/-relative source file. A_ScriptDir is the runner dir
-; (tests/); its parent is the windows/ driver root.
-_HCSNB_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
-}
-
 ; Returns the full function body — from its declaration to the first closing
 ; brace at column 0 (AHK functions close with `}` flush-left). Returns "" when
 ; the declaration is absent.
@@ -65,9 +57,8 @@ _HCSNB_FuncBody(Src, FuncDef) {
 ; ====================================================
 
 _HCSNB_SysInfoIsNonBlocking() {
-	Src := _HCSNB_ReadSource("lib/healthcheck.ahk")
 	Body := _DriverFuncBody("_HealthCheck_SysInfo")
-	Assert(Body != "", "_HealthCheck_SysInfo must exist in healthcheck.ahk")
+	Assert(Body != "", "_HealthCheck_SysInfo must exist in the ui/healthcheck module")
 	Assert(InStr(Body, "RunWait(") == 0,
 		"_HealthCheck_SysInfo must not use blocking RunWait for git — can freeze the crash handler path")
 	Assert(InStr(Body, "Run(") > 0,

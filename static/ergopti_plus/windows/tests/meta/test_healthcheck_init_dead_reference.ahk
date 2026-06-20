@@ -32,14 +32,6 @@
 ; ===================================================
 ; ===================================================
 
-; Reads a windows/-relative source file. A_ScriptDir is the runner dir (tests/);
-; its parent is the windows/ driver root.
-_HCIDR_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
-}
-
 ; True when the source contains a real function definition for the given name,
 ; i.e. the name immediately followed (after optional spaces) by an opening paren.
 _HCIDR_HasFuncDef(Src, Name) {
@@ -56,8 +48,8 @@ _HCIDR_HasFuncDef(Src, Name) {
 ; ===================================================
 
 _HCIDR_NoDanglingInit() {
-	Src := _HCIDR_ReadSource("lib/healthcheck.ahk")
-	Assert(Src != "", "Source file healthcheck.ahk must exist")
+	Src := _DriverDirConcat("ui/healthcheck")
+	Assert(Src != "", "the ui/healthcheck module must exist")
 	; The contract must either not mention HealthCheck_Init at all, or back it
 	; with a real function definition. A bare mention (comment/docstring) with no
 	; definition is the regression we are guarding against.
@@ -69,7 +61,7 @@ _HCIDR_NoDanglingInit() {
 Test("HealthCheck: no dangling HealthCheck_Init reference (healthcheck-init-dead-reference)", _HCIDR_NoDanglingInit)
 
 _HCIDR_StartMsAnchored() {
-	Src := _HCIDR_ReadSource("lib/healthcheck.ahk")
+	Src := _DriverDirConcat("ui/healthcheck")
 	; The uptime origin must still be the module-load tick capture — the single
 	; source of truth crash_reporter.ahk also reads.
 	Assert(InStr(Src, "_HealthCheckStartMs   := A_TickCount") > 0,
