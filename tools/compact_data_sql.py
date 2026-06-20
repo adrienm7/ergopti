@@ -30,6 +30,10 @@ import shutil
 import time
 from pathlib import Path
 
+# Make tools/lib importable (repo root on sys.path) for the shared-tree SSOT.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from tools.lib.paths import shared  # noqa: E402
+
 
 # ============================================================
 # ============================================================
@@ -40,7 +44,7 @@ from pathlib import Path
 def find_schema(metrics_dir: Path) -> Path | None:
 	"""Locate schema.sql relative to the metrics directory."""
 	candidates = [
-		Path(__file__).parent.parent / "static" / "ergopti_plus" / "shared" / "data" / "db" / "schema.sql",
+		shared("data", "db", "schema.sql"),
 		metrics_dir.parent.parent.parent / "static" / "ergopti_plus" / "shared" / "data" / "db" / "schema.sql",
 	]
 	for p in candidates:
