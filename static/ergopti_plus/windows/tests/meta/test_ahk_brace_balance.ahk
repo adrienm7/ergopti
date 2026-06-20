@@ -130,7 +130,7 @@ _MetaRunBraceBalanceTests() {
 	DriverRoot := StrReplace(_DriverRootRaw, "\", "/") . "/"
 	Checked := 0
 
-	for Sub in ["lib", "modules"] {
+	for Sub in ["lib", "modules", "ui"] {
 		for AbsPath in _MetaBrace_ListFiles(StrReplace(DriverRoot . Sub, "/", "\")) {
 			AbsCopy := AbsPath
 			_MetaBraceCheckOne() {
