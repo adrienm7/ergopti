@@ -19,9 +19,9 @@ _SNB_FuncBodyStripped(Src, FuncDef) {
 }
 
 _SNB_AssertNonBlocking() {
-	Src := _SNB_ReadSource("lib/spotlight.ahk")
+	Src := _SNB_ReadSource("ui/spotlight.ahk")
 	Body := _SNB_FuncBodyStripped(Src, "SpotlightMouseAt(X, Y, DurationMs) {")
-	Assert(Body != "", "SpotlightMouseAt must exist in lib/spotlight.ahk")
+	Assert(Body != "", "SpotlightMouseAt must exist in ui/spotlight.ahk")
 	
 	SleepIdx := InStr(Body, "Sleep(")
 	Assert(!SleepIdx, "SpotlightMouseAt must not use a blocking Sleep loop (spotlight-blocks-keyboard-thread)")
@@ -31,9 +31,9 @@ _SNB_AssertNonBlocking() {
 }
 
 _SNB_AssertSuspendGuard() {
-	Src := _SNB_ReadSource("lib/spotlight.ahk")
+	Src := _SNB_ReadSource("ui/spotlight.ahk")
 	Body := _SNB_FuncBodyStripped(Src, "_SpotlightTick() {")
-	Assert(Body != "", "_SpotlightTick must exist in lib/spotlight.ahk")
+	Assert(Body != "", "_SpotlightTick must exist in ui/spotlight.ahk")
 	
 	SuspendIdx := InStr(Body, "A_IsSuspended")
 	Assert(SuspendIdx > 0, "_SpotlightTick must guard against A_IsSuspended to hide overlay on pause (spotlight-blocks-keyboard-thread)")

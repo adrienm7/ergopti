@@ -27,7 +27,7 @@ _SGL_FuncBody(Src, FuncDef) {
 }
 
 _SGL_SpotlightHasTryCatch() {
-	Src := _SGL_ReadSource("lib/spotlight.ahk")
+	Src := _SGL_ReadSource("ui/spotlight.ahk")
 	Seg := _DriverFuncBody("SpotlightMouseAt")
 	Assert(Seg != "", "SpotlightMouseAt declaration must exist")
 	
