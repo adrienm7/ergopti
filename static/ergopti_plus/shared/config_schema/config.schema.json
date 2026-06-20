@@ -240,7 +240,8 @@
 						"ergopti_base": { "type": "boolean" },
 						"direct_access_digits": { "type": "boolean" },
 						"ergopti_alt_gr": { "type": "boolean" },
-						"ergopti_plus": { "type": "boolean" }
+						"ergopti_plus": { "type": "boolean" },
+						"ctrl_magic_save": { "type": "boolean" }
 					}
 				},
 				"shortcuts": { "type": "object", "additionalProperties": true },
