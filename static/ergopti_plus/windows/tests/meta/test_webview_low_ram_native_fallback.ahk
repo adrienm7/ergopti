@@ -58,6 +58,15 @@ _TWLR_ChangelogWindowGated() {
 }
 Test("webview-lowram: changelog_window redirects to native window on low RAM", _TWLR_ChangelogWindowGated)
 
+; The model browser already ships a native ListView; it must prefer that over
+; WebView2 when free RAM is low (the web path is gated, native Build is the fallback).
+_TWLR_ModelBrowserGated() {
+	Src := _TWLR_ReadSource("ui/llm_model_browser.ahk")
+	Assert(InStr(Src, "WebView_ShouldUseNativeFallback") > 0,
+		"model_browser must gate its WebView2 path on WebView_ShouldUseNativeFallback (low RAM -> native ListView)")
+}
+Test("webview-lowram: model_browser prefers native ListView on low RAM", _TWLR_ModelBrowserGated)
+
 ; Gating updater/changelog only helps if its non-WebView path actually renders the
 ; notes. Before this feature ShowBody returned 0 with WebView2 off, leaving the
 ; pane blank. Pin the native Edit fallback so that regression cannot return.
