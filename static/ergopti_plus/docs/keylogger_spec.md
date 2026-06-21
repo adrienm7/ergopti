@@ -7,7 +7,7 @@ synchronisation entre plusieurs machines (mac + pc + autre mac…) avec
 via du caching en base.
 
 Toutes les références à des numéros de ligne renvoient à
-`static/drivers/hammerspoon/modules/keylogger/{init,log_manager,context_tracker,kc_bridge}.lua`.
+`static/ergopti_plus/macos/modules/keylogger/{init,log_manager,context_tracker,kc_bridge}.lua`.
 
 ---
 
@@ -273,7 +273,7 @@ joint sur device_id pour router vers le mapping macOS ou Windows.
 ## 11. Plan d’architecture AHK
 
 ```
-static/drivers/autohotkey/lib/keylogger/
+static/ergopti_plus/windows/modules/keylogger/
   init.ahk           ; api publique
   event_loop.ahk     ; hook clavier/souris bas-niveau, pipeline filtres
   buffer.ahk         ; buffer_events / rich_chunks / synth_queue
@@ -1067,20 +1067,20 @@ Séance 2 (extraction UI partagée + branchement HS) :
 
 - `static/ergopti_plus/_shared/data/db/schema.sql` — DDL canonique.
 - `static/ergopti_plus/_shared/data/db/migrations/0001_initial.sql`.
-- `static/drivers/_shared/ui/metrics_apps/{index.html,script.js,style.css,README.md}`.
-- `static/drivers/_shared/ui/metrics_typing/{index.html,*.js,style.css,README.md}`.
-- `static/drivers/_shared/scripts/data_sql_parser.lua` — utilitaire
+- `static/ergopti_plus/_shared/ui/metrics_apps/{index.html,script.js,style.css,README.md}`.
+- `static/ergopti_plus/_shared/ui/metrics_typing/{index.html,*.js,style.css,README.md}`.
+- `static/ergopti_plus/_shared/scripts/data_sql_parser.lua` — utilitaire
   partagé pour parser les batches data.sql (utilisé par le replay HS,
   servira aussi côté AHK).
-- Mise à jour de `static/drivers/hammerspoon/modules/keylogger/log_manager.lua`
+- Mise à jour de `static/ergopti_plus/macos/modules/keylogger/log_manager.lua`
   pour écrire `today.log` (JSONL) + `data.sql` (texte append-only) +
   `db.sqlite` dans tmpdir, au lieu de .log + .idx + manifest.json.
-- Mise à jour de `static/drivers/hammerspoon/ui/metrics_*/init.lua`
+- Mise à jour de `static/ergopti_plus/macos/ui/metrics_*/init.lua`
   pour pointer vers `_shared/ui/`.
 
 Séance 3 (port AHK keylogger) :
 
-- Tout sous `static/drivers/autohotkey/lib/keylogger/` (cf. §11).
+- Tout sous `static/ergopti_plus/windows/modules/keylogger/` (cf. §11).
 - Tests unitaires AHK qui valident la parité byte-pour-byte de `data.sql`
   généré par AHK vs HS pour des inputs identiques (modulo timestamps et
   device_id).
@@ -1093,5 +1093,5 @@ Séance dédiée (priorité haute, après séance 4) :
 
 Séance 4 (UI launcher AHK) :
 
-- `static/drivers/autohotkey/lib/metrics_ui/webview2_launcher.ahk`.
+- `static/ergopti_plus/windows/lib/metrics_ui/webview2_launcher.ahk`.
 - Branchement menu tray.

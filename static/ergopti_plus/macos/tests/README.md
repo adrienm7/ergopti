@@ -1,7 +1,7 @@
 # Hammerspoon Driver — Test Suite
 
 Comprehensive Lua unit, meta, and integration tests for the code under
-`static/drivers/hammerspoon/`. The suite is **runnable on Linux, macOS and
+`static/ergopti_plus/macos/`. The suite is **runnable on Linux, macOS and
 Windows** under plain Lua 5.4 — no external dependencies required.
 
 ## Layout
@@ -27,7 +27,7 @@ tests/
 brew install lua             # macOS
 sudo apt install lua5.4      # Debian/Ubuntu
 
-cd static/drivers/hammerspoon
+cd static/ergopti_plus/macos
 lua tests/run.lua
 ```
 

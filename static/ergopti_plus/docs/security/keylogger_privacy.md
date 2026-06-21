@@ -1,7 +1,7 @@
 # Keylogger Privacy — Audit Report (item 6.3.2)
 
 **Date:** 2026-05-26
-**Scope:** Both keylogger drivers — AHK (`static/drivers/autohotkey/`) and HS (`static/drivers/hammerspoon/`)
+**Scope:** Both keylogger drivers — AHK (`static/ergopti_plus/windows/`) and HS (`static/ergopti_plus/macos/`)
 **Invariant audited:** Passwords, API keys, and 2FA codes must never be persisted.
 
 ---
@@ -115,8 +115,8 @@ The header comment in `keylogger.ahk` section 13 referenced a `TODO_UIA` note th
 
 ## 6. Test Coverage
 
-- **Corpus:** `static/drivers/_shared/tests/corpus/security/keylogger_no_persist_vectors.json` — 10 vectors covering SEC-001 to SEC-010.
-- **HS unit tests:** `static/drivers/hammerspoon/tests/unit/modules/keylogger/test_keylogger_privacy.lua` — 12 test cases directly derived from the corpus vectors, covering: secure field guard (3 cases), system auth guard (2 cases), private browsing guard (1 case), normal-field baseline (1 case), buffer flush on field transition (1 case), and filter toggle integrity (3 cases).
+- **Corpus:** `static/ergopti_plus/_shared/tests/corpus/security/keylogger_no_persist_vectors.json` — 10 vectors covering SEC-001 to SEC-010.
+- **HS unit tests:** `static/ergopti_plus/macos/tests/unit/modules/keylogger/test_keylogger_privacy.lua` — 12 test cases directly derived from the corpus vectors, covering: secure field guard (3 cases), system auth guard (2 cases), private browsing guard (1 case), normal-field baseline (1 case), buffer flush on field transition (1 case), and filter toggle integrity (3 cases).
 
 ---
 

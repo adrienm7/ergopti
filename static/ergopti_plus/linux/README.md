@@ -96,7 +96,7 @@ luajit ergopti_hotstrings.lua --dry-run --verbose
 ## Running the tests
 
 ```bash
-cd static/drivers/linux
+cd static/ergopti_plus/linux
 luajit tests/run.lua
 ```
 
@@ -105,7 +105,7 @@ Requires LuaJIT 2.x. Plain Lua 5.4 works for the meta tests (no luv dependency).
 ## Installation
 
 ```bash
-bash static/drivers/linux/install.sh
+bash static/ergopti_plus/linux/install.sh
 ```
 
 The installer detects apt/dnf/pacman, installs dependencies (luajit, ydotool,
