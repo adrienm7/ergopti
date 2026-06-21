@@ -1,4 +1,4 @@
---- static/ergopti_plus/linux/modules/hotstrings/engine.lua
+--- modules/hotstrings/engine.lua
 
 --- ==============================================================================
 --- MODULE: Hotstring Engine (Linux — thin re-export)

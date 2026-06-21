@@ -1,4 +1,5 @@
 /**
+ * _shared/ui/metrics_apps/script.js
  * ==============================================================================
  * MODULE: Apps Time UI Logic
  * DESCRIPTION:

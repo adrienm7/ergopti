@@ -25,7 +25,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { shared, sharedRel } = require('../lib/paths.cjs');
+const { shared } = require('../lib/paths.cjs');
 
 const ROOT = path.resolve(__dirname, '../..');
 
@@ -338,7 +338,7 @@ function generateLua() {
 	}).join(',\n');
 
 	return [
-		`--- ${sharedRel('lua/keymap/terminators_catalogue.lua')}`,
+		`--- _shared/lua/keymap/terminators_catalogue.lua`,
 		`--- AUTO-GENERATED from _shared/core/domain/Terminators.spec.js.`,
 		`--- DO NOT EDIT BY HAND — run \`npm run codegen:terminators\` to refresh.`,
 		``,

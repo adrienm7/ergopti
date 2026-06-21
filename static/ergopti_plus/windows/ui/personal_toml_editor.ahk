@@ -1,4 +1,4 @@
-﻿; drivers/autohotkey/ui/personal_toml_editor.ahk
+﻿; ui/personal_toml_editor.ahk
 
 ; ==============================================================================
 ; MODULE: Personal TOML Editor

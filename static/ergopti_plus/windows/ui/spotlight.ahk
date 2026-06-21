@@ -1,4 +1,4 @@
-﻿; drivers/autohotkey/ui/spotlight.ahk
+﻿; ui/spotlight.ahk
 ; Requires: GraphicsRenderer
 
 ; ==============================================================================

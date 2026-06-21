@@ -1,4 +1,4 @@
-﻿; lib/metrics_filters.ahk
+﻿; lib/metrics/metrics_filters.ahk
 
 ; ==============================================================================
 ; MODULE: Metrics Privacy Filters

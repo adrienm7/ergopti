@@ -1,4 +1,4 @@
---- static/ergopti_plus/linux/adapters/tray_menu.lua
+--- adapters/tray_menu.lua
 
 --- ==============================================================================
 --- MODULE: TrayMenu Adapter (Linux)

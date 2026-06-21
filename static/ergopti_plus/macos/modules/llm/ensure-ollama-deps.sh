@@ -1,4 +1,5 @@
 #!/bin/bash
+# modules/llm/ensure-ollama-deps.sh
 
 # ==============================================================================
 # SCRIPT: Ensure Ollama Engine Available

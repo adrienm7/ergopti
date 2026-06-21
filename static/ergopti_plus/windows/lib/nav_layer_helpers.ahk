@@ -1,4 +1,4 @@
-﻿; drivers/autohotkey/lib/nav_layer_helpers.ahk
+﻿; lib/nav_layer_helpers.ahk
 
 ; ==============================================================================
 ; MODULE: Navigation Layer Helpers

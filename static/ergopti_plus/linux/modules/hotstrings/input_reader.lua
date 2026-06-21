@@ -1,4 +1,4 @@
---- static/ergopti_plus/linux/modules/hotstrings/input_reader.lua
+--- modules/hotstrings/input_reader.lua
 
 --- ==============================================================================
 --- MODULE: Input Reader (Linux)

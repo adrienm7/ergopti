@@ -1,4 +1,4 @@
---- drivers/_shared/lua/color_utils/init.lua
+--- _shared/lua/color_utils/init.lua
 
 --- ==============================================================================
 --- MODULE: Color Utilities (Shared)

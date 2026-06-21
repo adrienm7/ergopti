@@ -1,4 +1,4 @@
-// ui/metrics_typing/heatmap_win.js
+// _shared/ui/metrics_typing/heatmap_win.js
 
 /**
  * ==============================================================================

@@ -1,4 +1,4 @@
-﻿; drivers/autohotkey/lib/ui_style.ahk
+﻿; lib/ui_style.ahk
 
 ; ==============================================================================
 ; MODULE: UI Style Constants

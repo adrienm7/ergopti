@@ -1,4 +1,4 @@
-﻿; windows/ui/changelog_window.ahk
+﻿; ui/changelog_window.ahk
 
 ; ==============================================================================
 ; MODULE: Changelog Window

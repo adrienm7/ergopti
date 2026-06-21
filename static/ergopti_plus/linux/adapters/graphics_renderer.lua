@@ -1,4 +1,4 @@
---- linux/adapters/graphics_renderer.lua
+--- adapters/graphics_renderer.lua
 
 --- ==============================================================================
 --- MODULE: GraphicsRenderer Adapter (Linux)

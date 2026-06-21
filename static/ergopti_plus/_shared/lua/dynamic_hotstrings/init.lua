@@ -1,4 +1,4 @@
---- drivers/_shared/lua/dynamic_hotstrings/init.lua
+--- _shared/lua/dynamic_hotstrings/init.lua
 
 --- ==============================================================================
 --- MODULE: Dynamic Hotstrings Rules Engine (shared)

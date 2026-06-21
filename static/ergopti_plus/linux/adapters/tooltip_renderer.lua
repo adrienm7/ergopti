@@ -1,4 +1,4 @@
---- static/ergopti_plus/linux/adapters/tooltip_renderer.lua
+--- adapters/tooltip_renderer.lua
 
 --- ==============================================================================
 --- MODULE: TooltipRenderer Adapter (Linux)

@@ -1,4 +1,4 @@
-﻿; drivers/autohotkey/lib/window_utils.ahk
+﻿; lib/window_utils.ahk
 
 ; ==============================================================================
 ; MODULE: Window Utilities

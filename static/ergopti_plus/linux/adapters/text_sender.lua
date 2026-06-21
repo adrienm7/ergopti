@@ -1,4 +1,4 @@
---- static/ergopti_plus/linux/adapters/text_sender.lua
+--- adapters/text_sender.lua
 
 --- ==============================================================================
 --- MODULE: TextSender Adapter (Linux)

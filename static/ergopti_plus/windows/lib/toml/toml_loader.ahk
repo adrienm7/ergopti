@@ -1,4 +1,4 @@
-﻿; drivers/autohotkey/lib/toml_loader.ahk
+﻿; lib/toml/toml_loader.ahk
 
 ; ==============================================================================
 ; MODULE: TOML Loader

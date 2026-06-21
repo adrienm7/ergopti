@@ -1,4 +1,4 @@
---- linux/adapters/key_state.lua
+--- adapters/key_state.lua
 
 --- ==============================================================================
 --- MODULE: KeyState Adapter (Linux)

@@ -1,4 +1,4 @@
-﻿; modules/keylogger_clipboard.ahk
+﻿; modules/keylogger/keylogger_clipboard.ahk
 
 _KL_Clip_CharCountFromByteSize(bytes) {
     if (bytes <= 2)

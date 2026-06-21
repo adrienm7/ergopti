@@ -1,4 +1,4 @@
-﻿; static/ergopti_plus/windows/lib/wrap_symbols_config.ahk
+﻿; lib/wrap_symbols_config.ahk
 
 ; ==============================================================================
 ; MODULE: Wrap Symbols Config

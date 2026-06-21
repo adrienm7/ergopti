@@ -1,4 +1,4 @@
---- linux/adapters/secure_field_detector.lua
+--- adapters/secure_field_detector.lua
 
 --- ==============================================================================
 --- MODULE: SecureFieldDetector Adapter (Linux)

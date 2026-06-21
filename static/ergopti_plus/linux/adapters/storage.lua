@@ -1,4 +1,4 @@
---- linux/adapters/storage.lua
+--- adapters/storage.lua
 
 --- ==============================================================================
 --- MODULE: Storage Adapter (Linux)

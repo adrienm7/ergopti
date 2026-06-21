@@ -1,4 +1,4 @@
-﻿; static/ergopti_plus/windows/lib/registry.ahk
+﻿; lib/registry.ahk
 
 ; ==============================================================================
 ; MODULE: Windows Registry Abstraction

@@ -1,4 +1,4 @@
-﻿; static/ergopti_plus/windows/lib/layout_altgr.ahk
+﻿; lib/layout/layout_altgr.ahk
 
 ; ==============================================================================
 ; MODULE: AltGr Layer Tables

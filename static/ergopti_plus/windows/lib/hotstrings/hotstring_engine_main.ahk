@@ -1,4 +1,4 @@
-﻿; static/ergopti_plus/windows/lib/hotstrings/hotstring_engine_main.ahk
+﻿; lib/hotstrings/hotstring_engine_main.ahk
 
 ; ==============================================================================
 ; MODULE: Hotstring Engine

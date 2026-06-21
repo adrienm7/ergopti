@@ -1,4 +1,4 @@
---- static/ergopti_plus/linux/adapters/http_client.lua
+--- adapters/http_client.lua
 
 --- ==============================================================================
 --- MODULE: HttpClient Adapter (Linux)

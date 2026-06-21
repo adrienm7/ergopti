@@ -1,4 +1,4 @@
-﻿; static/ergopti_plus/windows/lib/hotstrings/hotstring_live_toggle.ahk
+﻿; lib/hotstrings/hotstring_live_toggle.ahk
 
 ; ==============================================================================
 ; MODULE: Hotstring Live-Toggle Classification

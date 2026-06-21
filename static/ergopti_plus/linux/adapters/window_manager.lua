@@ -1,4 +1,4 @@
---- linux/adapters/window_manager.lua
+--- adapters/window_manager.lua
 
 --- ==============================================================================
 --- MODULE: WindowManager Adapter (Linux)

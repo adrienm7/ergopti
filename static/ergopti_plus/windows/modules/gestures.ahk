@@ -1,4 +1,4 @@
-﻿; drivers/autohotkey/modules/gestures.ahk
+﻿; modules/gestures.ahk
 ; Requires: TextSender, WindowManager, MouseControl
 
 ; ==============================================================================

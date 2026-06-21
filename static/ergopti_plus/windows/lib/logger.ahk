@@ -1,4 +1,4 @@
-﻿; static/ergopti_plus/windows/lib/logger.ahk
+﻿; lib/logger.ahk
 
 ; ==============================================================================
 ; MODULE: Logger

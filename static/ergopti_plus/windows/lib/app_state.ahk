@@ -1,4 +1,4 @@
-﻿; static/ergopti_plus/windows/lib/app_state.ahk
+﻿; lib/app_state.ahk
 
 ; ==============================================================================
 ; MODULE: Application State

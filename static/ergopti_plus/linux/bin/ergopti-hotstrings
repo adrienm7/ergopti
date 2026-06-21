@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# static/ergopti_plus/linux/bin/ergopti-hotstrings
+# bin/ergopti-hotstrings
 #
 # Wrapper shell script for the Ergopti hotstring expansion daemon.
 #

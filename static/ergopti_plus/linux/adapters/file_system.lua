@@ -1,4 +1,4 @@
---- static/ergopti_plus/linux/adapters/file_system.lua
+--- adapters/file_system.lua
 
 --- ==============================================================================
 --- MODULE: FileSystem Adapter (Linux)

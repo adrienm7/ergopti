@@ -1,4 +1,4 @@
---- linux/adapters/network_info.lua
+--- adapters/network_info.lua
 
 --- ==============================================================================
 --- MODULE: NetworkInfo Adapter (Linux)
