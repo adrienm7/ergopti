@@ -23,6 +23,7 @@ local M = {}
 
 local Logger   = require("lib.logger")
 local i18n     = require("lib.i18n")
+local Manifest = require("lib.manifest_reader")
 local Selector = require("llm.profile_selector")
 local hs       = hs
 local LOG      = "llm.profiles"
@@ -196,8 +197,10 @@ function M.resolve_system_prompt(profile, n)
 	prompt = prompt:gsub("{min_words}", tostring(min_w or ""))
 
 	-- Inject the active UI locale so the model replies in the user's language.
-	local get_locale = (i18n and i18n.get_locale) or function() return "fr" end
-	local locale = get_locale() or "fr"
+	-- i18n is always loaded; its get_locale() returns the configured locale,
+	-- falling back to the manifest's script.locale default — the single source —
+	-- rather than a re-typed "fr" literal (rule 5.2).
+	local locale = i18n.get_locale() or Manifest.default_for("script.locale")
 	prompt = prompt:gsub("{language}", locale)
 
 	return prompt
