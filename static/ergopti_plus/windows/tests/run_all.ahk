@@ -269,6 +269,7 @@ try FileAppend("# [marker] about to include gestures.ahk (top-level t() for SLOT
 #Include ../modules/gestures_click.ahk
 #Include ../modules/gestures_screenshots.ahk
 #Include ../modules/gestures_window_cycle.ahk
+#Include ../modules/gestures_config.ahk
 #Include test_gestures.ahk
 try FileAppend("# [marker] gestures + test included`r`n", A_Temp . "\ergopti_test_results.txt", "UTF-8")
 try FileAppend("# [marker] gestures + test included`r`n", "*")
