@@ -6,16 +6,9 @@
   - [Table of contents](#table-of-contents)
   - [🏗️ Project overview](#️-project-overview)
   - [💻 Local development setup](#-local-development-setup)
+  - [🧪 Running the tests](#-running-the-tests)
+  - [🧱 Hotstrings & the shared source of truth](#-hotstrings--the-shared-source-of-truth)
   - [🔒 Private AHK file workflow](#-private-ahk-file-workflow)
-    - [The problem](#the-problem)
-    - [The solution](#the-solution)
-    - [Setting it up on a new machine](#setting-it-up-on-a-new-machine)
-      - [1. Create the override file](#1-create-the-override-file)
-      - [2. Start the watcher](#2-start-the-watcher)
-      - [3. Make it survive reboots (OS-Specific)](#3-make-it-survive-reboots-os-specific)
-      - [🛑 Stopping the watcher](#-stopping-the-watcher)
-    - [What happens automatically at commit time](#what-happens-automatically-at-commit-time)
-  - [⚙️ Hotstrings generator](#️-hotstrings-generator)
   - [🪝 Pre-commit hooks](#-pre-commit-hooks)
 
 ---
@@ -25,8 +18,23 @@
 This repo contains:
 
 - The **Ergopti website** (SvelteKit, `src/`)
-- The **driver files** distributed to users (AutoHotkey, Hammerspoon, Karabiner…), under `static/drivers/`
-- A Python **hotstrings generator** (`static/hotstrings/0_generate_hotstrings.py`) that reads `ErgoptiPlus.ahk` and outputs TOML files consumed by Hammerspoon
+- The **driver files** distributed to users, under `static/ergopti_plus/`, one
+  directory per platform:
+  - `static/ergopti_plus/windows/` — AutoHotkey v2 driver (entrypoint
+    `ErgoptiPlus.ahk`)
+  - `static/ergopti_plus/macos/` — Hammerspoon / Lua driver (entrypoint
+    `init.lua`)
+  - `static/ergopti_plus/linux/` — Lua hotstrings daemon (entrypoint
+    `ergopti_hotstrings.lua`)
+- The **cross-driver shared layer** under `static/ergopti_plus/_shared/`: the
+  hotstring TOML catalogues, locales, the domain spec, and the feature
+  manifest that the code generators read.
+
+The drivers are built from a single source of truth: data lives once in
+`_shared/` (TOML / JSON), and `npm run build:domain` / `npm run build:manifest`
+regenerate the per-driver `_generated/` artifacts. There is **no Python
+hotstrings generator** anymore — see
+[Hotstrings & the shared source of truth](#-hotstrings--the-shared-source-of-truth).
 
 ---
 
@@ -35,141 +43,96 @@ This repo contains:
 > **Note for Windows users:** Do not add inline comments (`#`) when copy-pasting commands in `cmd.exe` as it can cause `npm` to crash.
 
 ```bash
-# 1. Install JS dependencies (also sets up Husky hooks and pm2)
+# 1. Install JS dependencies (also sets up Husky hooks)
 npm install
 
-# 2. Install Python dependencies
+# 2. Install Python dependencies (used by the TOML formatter and a few dev tools)
 uv sync
 
-# 3. Start the dev server
+# 3. Start the dev server (the website)
 npm run dev
 ```
 
 ---
 
-## 🔒 Private AHK file workflow
+## 🧪 Running the tests
 
-### The problem
+Each driver and the shared layer have their own headless suite. The same suites
+run in CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)); run them
+locally before opening a PR.
 
-`static/drivers/autohotkey/ErgoptiPlus.ahk` is the **public** version of the AutoHotkey script — it is stripped of any personal shortcuts (section 2) before every commit.
+| Command                            | What it covers                                                        |
+| ---------------------------------- | --------------------------------------------------------------------- |
+| `npm run test:js`                  | Shared domain pipeline: port compliance, manifest/priority parity, translation audit, strict conventions, architecture diagram |
+| `npm run test:hs`                  | macOS (Hammerspoon / Lua) unit + meta suite — `static/ergopti_plus/macos/tests/run.lua` |
+| `npm run test:linux`              | Linux (LuaJIT) suite — `static/ergopti_plus/linux/tests/run.lua`      |
+| `npm run test:ahk-encoding`        | Verifies every `.ahk` file is UTF-8 **BOM + CRLF** (AHK v2 aborts silently on encoding drift) |
+| `npm run lint:conventions:strict`  | Banner alignment, spacing and section-header rules (the commit gate)  |
 
-On the author's machine, the real file lives in a **private repo** at a different path and contains a personal section 2 that must never be pushed here.
-
-### The solution
-
-A **gitignored override file** tells the tooling where your private AHK file is:
-
-```text
-static/hotstrings/.local_ahk_path   ← gitignored, never committed
-```
-
-This plain-text file contains a single line: the absolute path to your private `ErgoptiPlus.ahk`, for example:
-
-- **macOS/Linux:** `/Users/you/private-config/ErgoptiPlus.ahk`
-- **Windows:** `C:\Users\you\private-config\ErgoptiPlus.ahk`
-
-### Setting it up on a new machine
-
-#### 1. Create the override file
-
-Create the `.local_ahk_path` file and paste the absolute path to your private `ErgoptiPlus.ahk` inside it.
-
-```bash
-echo "/absolute/path/to/your/private/ErgoptiPlus.ahk" > static/hotstrings/.local_ahk_path
-```
-
-#### 2. Start the watcher
-
-Install the pm2 watcher — it triggers the full pipeline automatically on every save of your private file, no terminal needed:
-
-```bash
-npm run install-watcher
-```
-
-_(Logs are available at `logs/ahk-watcher.log` inside the project)._
-
-#### 3. Make it survive reboots (OS-Specific)
-
-**🍎 macOS & 🐧 Linux**
-Run the following command once, and execute the command it prints in your terminal (requires `sudo` on Linux):
-
-```bash
-npx pm2 startup
-```
-
-**🪟 Windows**
-Windows requires a specific package to handle pm2 on startup. Open a terminal **as Administrator** and run:
-
-```bash
-npm install -g pm2-windows-startup
-pm2-startup install
-npx pm2 save
-```
-
-#### 🛑 Stopping the watcher
-
-To stop the watcher permanently on any OS:
-
-```bash
-npm run uninstall-watcher
-```
-
-> **Manual update:** Alternatively, you can run the pipeline manually at any time using `npm run update`.
-
-### What happens automatically at commit time
-
-```text
-private ErgoptiPlus.ahk
-        │
-        │  sync-private-ahk.js  (copies private → public)
-        ▼
-static/drivers/autohotkey/ErgoptiPlus.ahk  (full file, with section 2)
-        │
-        │  remove_ahk_personal_configuration.js  (strips section 2)
-        ▼
-static/drivers/autohotkey/ErgoptiPlus.ahk  (public version, no section 2)
-        │
-        │  0_generate_hotstrings.py  (regenerate TOML files)
-        ▼
-static/hotstrings/*.toml
-        │
-        │  git add + commit
-        ▼
-GitHub
-```
-
-> **Note:** If `.local_ahk_path` is absent (e.g., on a contributor's machine or CI), the sync step is silently skipped and the existing public file is used as-is.
+The Windows AHK unit suite runs from
+`static/ergopti_plus/windows/tests/run_all.ahk` (driven on a Windows runner in
+CI). Locally, run it with AutoHotkey v2; pass `--only <substring>` to run a
+single test by a distinctive slug.
 
 ---
 
-## ⚙️ Hotstrings generator
+## 🧱 Hotstrings & the shared source of truth
 
-`static/hotstrings/0_generate_hotstrings.py` parses `ErgoptiPlus.ahk` and writes TOML files consumed by the Hammerspoon driver.
+Hotstrings are authored as **TOML** under
+`static/ergopti_plus/_shared/modules/hotstrings/` — this is the cross-driver
+single source of truth, read directly by both the AutoHotkey and Hammerspoon
+drivers so a tweak applies to both with no risk of drift:
 
-Run it manually:
+- `_index.toml` — category order and dynamic-hotstring metadata
+- `defaults.toml` — the shared default delays / colours
+- `autocorrection.toml`, `magickey.toml`, `rolls.toml`, `sfbsreduction.toml`,
+  `distancesreduction.toml` — the catalogues themselves
+- `generated_hotstrings.tsv` — a **gitignored**, self-healing runtime cache the
+  drivers regenerate from the TOML; never edit or commit it
 
-```bash
-python static/hotstrings/0_generate_hotstrings.py
-```
+Edit the `.toml` files directly. The pre-commit hook sorts and formats any
+staged hotstring TOML via `tools/dev/format_toml.py` so the on-disk order stays
+canonical. Codegen artifacts under each driver's `_generated/` directory are
+rebuilt by `npm run build:domain` (and `npm run build:manifest` for the feature
+manifest); CI fails the build if a generated file drifts from its source.
 
-When `.local_ahk_path` is present, the script reads from your private file directly. Otherwise, it falls back to the public `ErgoptiPlus.ahk`.
+---
+
+## 🔒 Private AHK file workflow
+
+The public `static/ergopti_plus/windows/ErgoptiPlus.ahk` is stripped of the
+maintainer's personal shortcuts (the `2/ PERSONAL SHORTCUTS` section) — that
+section lives only in a **private** copy of the file and must never be pushed
+here. The strip keeps the surrounding `3/ LAYOUT MODIFICATION` section intact.
+
+The tooling for this lives under `tools/dev/`:
+
+- `remove_ahk_personal_configuration.js` — strips the `2/ PERSONAL SHORTCUTS`
+  block from the public file (already points at
+  `static/ergopti_plus/windows`).
+- `sync-private-ahk.js` — copies the maintainer's private file to the public
+  location and refreshes the "Last modified" date line.
+- `watch-ahk.js` — watches the private file and re-runs the pipeline on save.
+
+> ⚠️ **Needs a refresh after the `static/drivers/` → `static/ergopti_plus/`
+> reorg.** `sync-private-ahk.js` still reads its override from
+> `static/hotstrings/.local_ahk_path` and writes to
+> `static/drivers/autohotkey/ErgoptiPlus.ahk` — both pre-reorg paths that no
+> longer exist. It is also no longer wired into an npm script or the pre-commit
+> hook (the old `sync-ahk` / `clean-ahk` / `install-watcher` / `update`
+> commands were removed). Update the two paths (and decide where
+> `.local_ahk_path` should live now) before relying on this workflow. Until
+> then the public file is committed as-is, with no automatic private sync.
 
 ---
 
 ## 🪝 Pre-commit hooks
 
-Managed by [Husky](https://typicode.github.io/husky/). The hook runs in order:
+Managed by [Husky](https://typicode.github.io/husky/)
+([`.husky/pre-commit`](.husky/pre-commit)). The hook runs, in order:
 
-| Step | Script                                     | Description                                           |
-| ---- | ------------------------------------------ | ----------------------------------------------------- |
-| 1    | `npm run sync-ahk`                         | Copy private AHK → public (no-op if no override)      |
-| 2    | `npm run clean-ahk`                        | Strip section 2 from public AHK                       |
-| 3    | `node scripts/update-ahk-date.js`          | Update the "Last modified" date                       |
-| 4    | `git add static/drivers/autohotkey/*.ahk`  | Stage the cleaned file                                |
-| 5    | Windows only: local Ahk2Exe compile        | If AHK is staged, compile and stage `ErgoptiPlus.exe` |
-| 6    | `uv run python … 0_generate_hotstrings.py` | Regenerate TOML hotstrings from the cleaned AHK       |
-| 7    | `git add static/hotstrings/*.toml`         | Stage the regenerated TOML files                      |
-
-```
-
-```
+| Step | Action                                                            | Why                                                                 |
+| ---- | ---------------------------------------------------------------- | ------------------------------------------------------------------- |
+| 1    | Format staged hotstring TOML via `tools/dev/format_toml.py` and re-stage | Keeps the catalogue order canonical and diffs minimal               |
+| 2    | Fix AHK encoding (UTF-8 BOM + CRLF) on staged `.ahk` via `tools/deploy/fix-ahk-encoding.cjs` and re-stage | AHK v2 silently aborts mid-file on encoding drift → silent CI failures |
+| 3    | `node tools/lint/lint-conventions.js --fail-on-violations`       | Blocks the commit on any banner / spacing / section-header violation |
