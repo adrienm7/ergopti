@@ -192,7 +192,9 @@ LLM_OllamaAllowInference() {
 }
 
 LLM_OllamaGenerate(model, system_prompt, full_text, temperature := 0.1, tail_text := "") {
-	payload := LLM_BuildOllamaPayload(model, system_prompt, full_text, temperature, false, "", 150, false, tail_text)
+	; Sync path has no max_words context, so it asks for the shared default budget
+	; explicitly via PB_DEFAULT_MAX_TOKENS (no literal — single cross-driver source)
+	payload := LLM_BuildOllamaPayload(model, system_prompt, full_text, temperature, false, "", PB_DEFAULT_MAX_TOKENS, false, tail_text)
 
 	try {
 		http := ComObject("WinHttp.WinHttpRequest.5.1")
@@ -342,7 +344,7 @@ LLM_OllamaDeleteModel(tag) {
  * @param {function} on_fail       - Callback fired on any failure.
  * @returns {Integer} The request id (use with LLM_OllamaCancelAsync to abort).
  */
-LLM_OllamaGenerate_Async(model, system_prompt, full_text, temperature, on_success, on_fail, stop_sequences := "", max_tokens := 150, is_batch := false, tail_text := "") {
+LLM_OllamaGenerate_Async(model, system_prompt, full_text, temperature, on_success, on_fail, stop_sequences := "", max_tokens := "", is_batch := false, tail_text := "") {
 	global _LLM_Ollama_AsyncCounter, _LLM_Ollama_Pending
 	_LLM_Ollama_AsyncCounter += 1
 	req_id := _LLM_Ollama_AsyncCounter
@@ -940,7 +942,7 @@ LLM_OllamaCancelWarmupRetry(reset_backoff := false) {
  * @returns {Object} A handle ``{ Pid, Cancelled }`` callers can pass to
  *                   LLM_OllamaCancelStream to terminate the curl process.
  */
-LLM_OllamaGenerate_Streaming(model, system_prompt, full_text, temperature, on_partial, on_success, on_fail, stop_sequences := "", max_tokens := 150, is_batch := false, tail_text := "") {
+LLM_OllamaGenerate_Streaming(model, system_prompt, full_text, temperature, on_partial, on_success, on_fail, stop_sequences := "", max_tokens := "", is_batch := false, tail_text := "") {
 	; Build the streaming payload — ``stream:true`` flips Ollama to JSONL (/api/chat).
 	payload := LLM_BuildOllamaPayload(model, system_prompt, full_text, temperature, true, stop_sequences, max_tokens, is_batch, tail_text)
 
@@ -1344,12 +1346,13 @@ _LLM_Ollama_BuildMessages(system_prompt, full_text, tail_text, model) {
 /**
  * Serialises parameters into an Ollama /api/chat JSON payload (macOS parity).
  */
-LLM_BuildOllamaPayload(model, system_prompt, full_text, temperature, streaming := false, stop_sequences := "", max_tokens := 150, is_batch := false, tail_text := "") {
+LLM_BuildOllamaPayload(model, system_prompt, full_text, temperature, streaming := false, stop_sequences := "", max_tokens := "", is_batch := false, tail_text := "") {
 	line_mode := _LLM_Ollama_IsLineMode(system_prompt, is_batch)
 	; Output-token cap = the shared PromptBuilder budget threaded from the engine
-	; (single cross-driver source). No local re-derivation; falls back to the
-	; PromptBuilder default only when an out-of-range value is passed.
-	num_predict := (max_tokens is Number and max_tokens > 0) ? Integer(max_tokens) : 150
+	; (single cross-driver source). No local re-derivation and no literal: an unset
+	; ("") or out-of-range value resolves to PB_DEFAULT_MAX_TOKENS, the one shared
+	; constant codegen'd from the domain DEFAULT_MAX_TOKENS.
+	num_predict := (max_tokens is Number and max_tokens > 0) ? Integer(max_tokens) : PB_DEFAULT_MAX_TOKENS
 	msgs := _LLM_Ollama_BuildMessages(system_prompt, full_text, tail_text, model)
 	msgs_json := ""
 	for _, m in msgs {

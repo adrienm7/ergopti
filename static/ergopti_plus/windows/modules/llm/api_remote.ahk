@@ -62,7 +62,7 @@ global LLM_REMOTE_TIMEOUT_MS := 0   ; sentinel — sourced at boot by LLMApiLoad
 ; Returns the generated text, or "" on any error (network, HTTP non-2xx, parse
 ; failure). Failure is silent by design so the prediction loop never crashes —
 ; the user gets no tooltip instead of an error dialog mid-typing.
-LLM_RemoteGenerate(Entry, SystemPrompt, FullText, Temperature := 0.1, TailText := "", max_tokens := 256) {
+LLM_RemoteGenerate(Entry, SystemPrompt, FullText, Temperature := 0.1, TailText := "", max_tokens := "") {
     global LLM_API_PROVIDERS, LLM_REMOTE_TIMEOUT_MS
 
     resolved := _LLMRemoteResolveEntry(Entry)
@@ -116,7 +116,7 @@ global LLM_REMOTE_MAX_INFLIGHT := 16
  * @param {function}   on_fail      - Called on HTTP / parse failure.
  * @returns {Integer}  Request id, usable with LLM_RemoteCancelAsync.
  */
-LLM_RemoteGenerate_Async(Entry, SystemPrompt, FullText, Temperature, on_success, on_fail, TailText := "", max_tokens := 256) {
+LLM_RemoteGenerate_Async(Entry, SystemPrompt, FullText, Temperature, on_success, on_fail, TailText := "", max_tokens := "") {
     global _LLM_Remote_Async, _LLM_Remote_AsyncCounter, LLM_REMOTE_TIMEOUT_MS
 
     _LLM_Remote_AsyncCounter += 1
@@ -573,15 +573,16 @@ _LLMRemoteSetAuthHeaders(Http, Format, Token) {
 ; ``Format`` as a parameter would silently break every API request — the
 ; call ``Format("{:.2f}", ...)`` would try to invoke the parameter (a
 ; string, e.g. "openai") as a function and throw at runtime.
-_LLMRemoteBuildPayload(Fmt, Model, SystemPrompt, UserText, Temperature, max_tokens := 256) {
+_LLMRemoteBuildPayload(Fmt, Model, SystemPrompt, UserText, Temperature, max_tokens := "") {
     SysEsc  := _LLMRemoteJsonEscape(SystemPrompt)
     UserEsc := _LLMRemoteJsonEscape(UserText)
     ModelEsc := _LLMRemoteJsonEscape(Model)
     Temp := Format("{:.2f}", Temperature)
-    ; Output-token cap threaded from the shared PromptBuilder budget (single
-    ; cross-driver source); replaces the former hardcoded 256 in each provider
-    ; branch. Falls back to 256 only for an out-of-range value.
-    MaxTok := (max_tokens is Number and max_tokens > 0) ? Integer(max_tokens) : 256
+    ; Output-token cap threaded from the shared PromptBuilder budget. The number
+    ; is never re-declared here: an unset ("") or out-of-range value resolves to
+    ; PB_DEFAULT_MAX_TOKENS — the single shared constant (codegen'd from the
+    ; domain DEFAULT_MAX_TOKENS) the engine also threads. One source, no literal.
+    MaxTok := (max_tokens is Number and max_tokens > 0) ? Integer(max_tokens) : PB_DEFAULT_MAX_TOKENS
 
     if (Fmt == "anthropic") {
         ; Anthropic Messages API: top-level ``system`` field, ``messages`` is

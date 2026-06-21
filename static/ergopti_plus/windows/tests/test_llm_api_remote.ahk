@@ -105,8 +105,10 @@ Test("_LLMRemoteBuildPayload: anthropic payload includes max_tokens", _RemotePay
 
 
 ; A5 — the output-token cap is the shared PromptBuilder budget threaded from the
-; engine (single cross-driver source), replacing the former hardcoded 256 in
-; every provider branch. Default stays 256 for callers that don't thread it.
+; engine (single cross-driver source), replacing the former hardcoded per-provider
+; literals. The un-threaded fallback default is now unified to 150 across all
+; backends (= PromptBuilder DEFAULT_MAX_TOKENS), so a caller that omits max_tokens
+; gets the same documented default the live engine threads.
 _RemotePayload_OpenAI_MaxTokensThreaded() {
 	p := _LLMRemoteBuildPayload("openai", "m", "s", "u", 0.1, 42)
 	AssertContains(p, '"max_tokens":42', "openai max_tokens must equal the threaded value")
@@ -127,9 +129,11 @@ Test("_LLMRemoteBuildPayload: anthropic max_tokens is threaded (A5)", _RemotePay
 
 _RemotePayload_MaxTokensDefault() {
 	p := _LLMRemoteBuildPayload("openai", "m", "s", "u", 0.1)
-	AssertContains(p, '"max_tokens":256', "max_tokens defaults to 256 when not threaded")
+	; Unified cross-driver default — must equal PromptBuilder DEFAULT_MAX_TOKENS (150),
+	; the same value the live engine threads, not the legacy per-provider 256
+	AssertContains(p, '"max_tokens":150', "max_tokens defaults to 150 (unified PromptBuilder default) when not threaded")
 }
-Test("_LLMRemoteBuildPayload: max_tokens defaults to 256 when not threaded (A5)", _RemotePayload_MaxTokensDefault)
+Test("_LLMRemoteBuildPayload: max_tokens defaults to 150 (unified) when not threaded (A5)", _RemotePayload_MaxTokensDefault)
 
 
 _RemotePayload_Gemini_SystemInstruction() {
