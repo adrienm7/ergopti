@@ -112,28 +112,33 @@ local function _load_shared_const()
 	-- Strip leading '#' from hex strings for hs.canvas compatibility.
 	local function hex(s) return (s or ""):gsub("^#", "") end
 
+	-- No literal fallbacks below: the shared TOML is the single source of truth
+	-- (rules 5.2 / 5.4), mirroring the AHK WPMWidgetConst sentinel/fail-fast class.
+	-- A missing TOML is already logged as an ERROR above; a missing key then
+	-- surfaces loud (nil) rather than silently masking drift behind a re-typed
+	-- default. Covered by test_wpm_shared_constants.
 	return {
-		-- Compact layout (_shared/modules/wpm_widget/constants.toml [compact])
-		compact_width         = compact.width                    or 80,
-		compact_height_number = compact.height_number            or 44,
-		compact_height_gap    = compact.height_gap               or 4,
-		compact_height_unit   = compact.height_unit              or 20,
-		compact_number_size   = compact.number_font_size         or 20,
-		compact_unit_size     = compact.unit_font_size           or 8,
-		compact_padding_x     = compact.padding_x                or 14,
-		compact_unit_darken   = compact.unit_strip_darken_factor or 0.40,
+		-- Compact layout — _shared/modules/wpm_widget/constants.toml [compact]
+		compact_width         = compact.width,
+		compact_height_number = compact.height_number,
+		compact_height_gap    = compact.height_gap,
+		compact_height_unit   = compact.height_unit,
+		compact_number_size   = compact.number_font_size,
+		compact_unit_size     = compact.unit_font_size,
+		compact_padding_x     = compact.padding_x,
+		compact_unit_darken   = compact.unit_strip_darken_factor,
 
-		-- Colors
-		color_bg_manual       = "#" .. hex(colors.bg_manual  or "#0055cc"),
-		color_bg_idle         = "#" .. hex(colors.bg_idle    or "#1a1a2e"),
-		color_txt_active_alpha = (transp.alpha_active or 220) / 255,
+		-- Colors — _shared/modules/wpm_widget/constants.toml [colors]
+		color_bg_manual       = "#" .. hex(colors.bg_manual),
+		color_bg_idle         = "#" .. hex(colors.bg_idle),
+		color_txt_active_alpha = transp.alpha_active / 255,
 		-- HSL target to normalise hotstring accent hues to the same brightness as bg_manual.
-		widget_hsl_l          = tonumber(colors.widget_hsl_l) or 0.40,
-		widget_hsl_s          = tonumber(colors.widget_hsl_s) or 1.00,
+		widget_hsl_l          = tonumber(colors.widget_hsl_l),
+		widget_hsl_s          = tonumber(colors.widget_hsl_s),
 
-		-- Idle hide and color-hold durations (_shared/modules/timings/constants.toml [ui])
-		idle_hide_s           = ((tc.ui and tc.ui.wpm_widget_idle_hide_ms) or 3000) / 1000,
-		source_color_duration = ((tc.ui and tc.ui.wpm_color_hold_ms)       or 1000) / 1000,
+		-- Idle hide and color-hold durations — _shared/modules/timings/constants.toml [ui]
+		idle_hide_s           = (tc.ui and tc.ui.wpm_widget_idle_hide_ms) / 1000,
+		source_color_duration = (tc.ui and tc.ui.wpm_color_hold_ms)       / 1000,
 
 		-- Graph mode (HS-only, not in shared TOML)
 		use_fixed_scale       = true,
@@ -147,6 +152,11 @@ local function _load_shared_const()
 		graph_line_width      = 2,
 	}
 end
+
+-- Exposed for the shared-constants regression test (test_wpm_shared_constants):
+-- it asserts every value is sourced from the shared TOML, with no re-typed
+-- literal default in this loader (rules 5.2 / 5.4).
+M._load_shared_const = _load_shared_const
 
 local CONFIG     = _load_shared_const()
 local IDLE_HIDE_S = CONFIG.idle_hide_s
