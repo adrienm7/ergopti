@@ -38,6 +38,7 @@ local Paths          = require("lib.paths")
 local Profiles       = require("modules.llm.profiles")
 local Parser         = require("modules.llm.parser")
 local ApiCommon      = require("modules.llm.api_common")
+local SharedPromptBuilder = require("llm.prompt_builder")   -- single source for DEFAULT_MAX_TOKENS
 local _http_adapter  = require("adapters.http_client")
 local _infer_client  = _http_adapter.new()   -- used for inference POST requests
 local _check_client  = _http_adapter.new()   -- used for health-check GET requests
@@ -281,7 +282,9 @@ end
 --- and the single-shot path keeps error handling trivial.
 local function build_payload(format, model, system_prompt, user_prompt, temperature, max_tokens)
 	temperature = tonumber(temperature) or 0.1
-	max_tokens  = tonumber(max_tokens) or 256
+	-- No literal: an unset cap resolves to the one shared default
+	-- (DEFAULT_MAX_TOKENS), the same constant the engine threads from the budget.
+	max_tokens  = tonumber(max_tokens) or SharedPromptBuilder.DEFAULT_MAX_TOKENS
 
 	if format == "anthropic" then
 		return {

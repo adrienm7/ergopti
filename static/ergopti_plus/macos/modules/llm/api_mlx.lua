@@ -14,6 +14,7 @@ local i18n           = require("lib.i18n")
 local Parser         = require("modules.llm.parser")
 local Profiles       = require("modules.llm.profiles")
 local ApiCommon      = require("modules.llm.api_common")
+local SharedPromptBuilder = require("llm.prompt_builder")   -- single source for DEFAULT_MAX_TOKENS
 local _warmup_client = require("adapters.http_client").new()  -- Dedicated client for warmup POSTs; isolated so discovery probes cannot cancel an in-flight warmup
 local _probe_client  = require("adapters.http_client").new()  -- Dedicated client for discover_endpoints() POST probes; never shares state with warmup
 local _check_client  = require("adapters.http_client").new()  -- Dedicated client for check_availability() GETs
@@ -1095,7 +1096,8 @@ local function post_and_parse(model_name, system_prompt, full_text, tail_text,
             prompt      = prompt,
             stream      = false,
             temperature = opts.temperature,
-            max_tokens  = tonumber(opts.max_tokens) or 50,
+            -- No literal: unset cap resolves to the one shared DEFAULT_MAX_TOKENS
+            max_tokens  = tonumber(opts.max_tokens) or SharedPromptBuilder.DEFAULT_MAX_TOKENS,
             stop        = { "\n\n", "</", "\"", "- " }
         }
     else
@@ -1298,7 +1300,8 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 			prompt      = prompt,
 			stream      = true,
 			temperature = opts.temperature,
-			max_tokens  = tonumber(opts.max_tokens) or 50,
+			-- No literal: unset cap resolves to the one shared DEFAULT_MAX_TOKENS
+			max_tokens  = tonumber(opts.max_tokens) or SharedPromptBuilder.DEFAULT_MAX_TOKENS,
 			stop        = { "\n\n", "</", "\"", "- " },
 		}
 	else

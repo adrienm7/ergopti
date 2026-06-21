@@ -34,6 +34,7 @@
 		"test:dev-tool-paths": "node ./tools/test/test-dev-tool-paths.cjs",
 		"test:doc-paths": "node ./tools/test/test-doc-paths.cjs",
 		"test:no-pinned-source-reads": "node ./tools/test/test-no-pinned-source-reads.cjs",
+		"test:max-tokens-single-source": "node ./tools/test/test-max-tokens-single-source.cjs",
 		"test:macos-bundle-layout": "node ./tools/test/test-macos-bundle-layout.cjs",
 		"test:js": "node ./tools/test/run-js-suite.cjs",
 		"test:hs": "cd static/ergopti_plus/macos && lua tests/run.lua",
