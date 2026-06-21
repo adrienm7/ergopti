@@ -32,16 +32,6 @@ _KSD_ReadSource(RelPath) {
 	return FileRead(StrReplace(Root, "\", "/") . "/" . RelPath)
 }
 
-_KSD_FuncBody(Src, FuncDef) {
-	Idx := InStr(Src, FuncDef)
-	if !Idx
-		return ""
-	Rest := SubStr(Src, Idx)
-	if RegExMatch(Rest, "m)^\}", &Match)
-		return SubStr(Rest, 1, Match.Pos)
-	return Rest
-}
-
 
 
 

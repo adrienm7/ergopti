@@ -16,16 +16,6 @@ _SGL_ReadSource(RelPath) {
 	return FileRead(Path)
 }
 
-_SGL_FuncBody(Src, FuncDef) {
-	Idx := InStr(Src, FuncDef)
-	if !Idx
-		return ""
-	Rest := SubStr(Src, Idx)
-	if RegExMatch(Rest, "m)^\}", &Match)
-		Rest := SubStr(Rest, 1, Match.Pos)
-	return Rest
-}
-
 _SGL_SpotlightHasTryCatch() {
 	Src := _SGL_ReadSource("ui/spotlight.ahk")
 	Seg := _DriverFuncBody("SpotlightMouseAt")

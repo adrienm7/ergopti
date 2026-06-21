@@ -22,17 +22,6 @@ _G5UD_ReadSource(RelPath) {
 	return FileRead(Path)
 }
 
-_G5UD_FuncBody(Src, FuncDef) {
-	Idx := InStr(Src, FuncDef)
-	if !Idx
-		return ""
-	Rest := SubStr(Src, Idx)
-	End := InStr(Rest, "`n}")
-	if End
-		return SubStr(Rest, 1, End + 1)
-	return Rest
-}
-
 _G5UD_CheckDownloadPollGuards() {
 	Src := _G5UD_ReadSource("lib/updater.ahk")
 	Seg := _DriverFuncBody("_Updater_PollDownloadAsync")

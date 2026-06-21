@@ -36,17 +36,6 @@ _CPTL_ReadSource(RelPath) {
 	return FileRead(Path)
 }
 
-_CPTL_FuncBody(Src, FuncDef) {
-	Idx := InStr(Src, FuncDef)
-	if !Idx
-		return ""
-	Rest := SubStr(Src, Idx)
-	End := InStr(Rest, "`n}")
-	if End
-		return SubStr(Rest, 1, End + 1)
-	return Rest
-}
-
 
 
 

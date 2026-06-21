@@ -45,17 +45,6 @@ _LDEK_StripComments(Src) {
 	return Out
 }
 
-_LDEK_FuncBody(Src, FuncDef) {
-	Idx := InStr(Src, FuncDef)
-	if !Idx
-		return ""
-	Rest := SubStr(Src, Idx)
-	End := InStr(Rest, "`n}")
-	if End
-		return SubStr(Rest, 1, End + 1)
-	return Rest
-}
-
 _LDEK_DeadKeyResendEndKey() {
 	Raw := _LDEK_ReadSource("modules/layout.ahk")
 	Src := _LDEK_StripComments(Raw)

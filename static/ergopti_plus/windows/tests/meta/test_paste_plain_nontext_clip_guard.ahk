@@ -37,19 +37,6 @@ _PPNC_ReadSource(RelPath) {
 	return FileRead(Path)
 }
 
-; Returns the function body from its declaration to the first flush-left closing
-; brace. Returns "" when the declaration is absent.
-_PPNC_FuncBody(Src, FuncDef) {
-	Idx := InStr(Src, FuncDef)
-	if !Idx
-		return ""
-	Rest := SubStr(Src, Idx)
-	End := InStr(Rest, "`n}")
-	if End
-		return SubStr(Rest, 1, End + 1)
-	return Rest
-}
-
 
 
 

@@ -111,31 +111,6 @@ Test("meta input: keystroke path is Critical-serialized (no fast-typing reorder 
 ; =====================================
 ; =====================================
 
-; Extracts the body of a named function via balanced brace-walking.
-_MIS_FuncBody(Src, FuncName) {
-	Idx := InStr(Src, FuncName)
-	if (!Idx)
-		return ""
-	OpenPos := InStr(Src, "{", , Idx)
-	if (!OpenPos)
-		return ""
-	depth := 0
-	i := OpenPos
-	Len := StrLen(Src)
-	while (i <= Len) {
-		ch := SubStr(Src, i, 1)
-		if (ch == "{")
-			depth++
-		else if (ch == "}") {
-			depth--
-			if (depth <= 0)
-				return SubStr(Src, Idx, i - Idx + 1)
-		}
-		i++
-	}
-	return SubStr(Src, Idx)
-}
-
 ; HIGH-01: LayerDispatch (Shift/CapsLock layer) re-emitted SHIFTED_LETTERS via
 ; SendNewResult with no Critical, so a second fast key could start its remap
 ; thread mid-send and reorder the output. The pure-letter emit path must now be

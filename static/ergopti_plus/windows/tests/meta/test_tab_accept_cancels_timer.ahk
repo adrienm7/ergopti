@@ -41,20 +41,6 @@ _TACT_ReadSource(RelPath) {
 	return FileRead(Path)
 }
 
-; Returns the body of a function from its declaration line to the first
-; closing brace at column 0 (i.e. the first "`n}" after the declaration).
-; Returns "" when the declaration is absent.
-_TACT_FuncBody(Src, FuncDef) {
-	Idx := InStr(Src, FuncDef)
-	if !Idx
-		return ""
-	Rest := SubStr(Src, Idx)
-	End := InStr(Rest, "`n}")
-	if End
-		return SubStr(Rest, 1, End + 1)
-	return Rest
-}
-
 
 
 

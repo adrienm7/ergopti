@@ -16,17 +16,6 @@ _KLLG_ReadSource(RelPath) {
 	return FileRead(Path)
 }
 
-_KLLG_FuncBody(Src, FuncDef) {
-	Idx := InStr(Src, FuncDef)
-	if !Idx
-		return ""
-	Rest := SubStr(Src, Idx)
-	End := InStr(Rest, "`n}")
-	if End
-		return SubStr(Rest, 1, End + 1)
-	return Rest
-}
-
 _KLLG_IdleTickHasPauseGuard() {
 	Src := _KLLG_ReadSource("modules/keylogger/keylogger_watchers.ahk")
 	Seg := _DriverFuncBody("KL_Watchers_IdleTick")

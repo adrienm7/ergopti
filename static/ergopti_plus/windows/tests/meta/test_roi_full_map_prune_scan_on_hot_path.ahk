@@ -39,17 +39,6 @@ _RoiPrune_ReadSource(RelPath) {
 	return FileRead(Path)
 }
 
-_RoiPrune_FuncBody(Src, FuncDef) {
-	Idx := InStr(Src, FuncDef)
-	if !Idx
-		return ""
-	Rest := SubStr(Src, Idx)
-	End := InStr(Rest, "`n}")
-	if End
-		return SubStr(Rest, 1, End + 1)
-	return Rest
-}
-
 ; Reads the integer value assigned to a `static NAME := <int>` constant in the
 ; KLRoiConst block. Returns -1 when the constant is absent.
 _RoiPrune_ConstValue(Src, Name) {

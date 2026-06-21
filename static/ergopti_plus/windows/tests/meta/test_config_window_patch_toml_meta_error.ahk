@@ -16,17 +16,6 @@ _PTME_ReadSource(RelPath) {
 	return FileRead(Path)
 }
 
-_PTME_FuncBody(Src, FuncDef) {
-	Idx := InStr(Src, FuncDef)
-	if !Idx
-		return ""
-	Rest := SubStr(Src, Idx)
-	End := InStr(Rest, "`n}")
-	if End
-		return SubStr(Rest, 1, End + 1)
-	return Rest
-}
-
 _PTME_PatchTomlMetaHasCatch() {
 	Src := _PTME_ReadSource("lib/hotstrings/hotstrings_config_window.ahk")
 	Assert(Src != "", "Source file hotstrings_config_window.ahk must exist")

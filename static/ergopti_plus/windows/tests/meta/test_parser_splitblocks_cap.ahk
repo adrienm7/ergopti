@@ -44,15 +44,6 @@ _PSC_StripComments(Src) {
 	return Out
 }
 
-_PSC_FuncBody(Src, FuncDecl) {
-	Idx := InStr(Src, FuncDecl)
-	if !Idx
-		return ""
-	Rest := SubStr(Src, Idx)
-	End := InStr(Rest, "`n}")
-	return End ? SubStr(Rest, 1, End + 1) : Rest
-}
-
 _PSC_SplitBlocksHasMaxCount() {
 	Src := _PSC_ReadSource("modules/llm/parser.ahk")
 

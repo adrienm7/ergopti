@@ -38,15 +38,6 @@ _TTCW_StripLineComments(Src) {
 	return Out
 }
 
-_TTCW_FuncBody(Src, Decl) {
-	Idx := InStr(Src, Decl)
-	if !Idx
-		return ""
-	Rest := SubStr(Src, Idx)
-	End := InStr(Rest, "`n}")
-	return End ? SubStr(Rest, 1, End + 1) : Rest
-}
-
 
 
 

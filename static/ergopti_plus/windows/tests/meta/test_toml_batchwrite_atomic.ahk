@@ -16,17 +16,6 @@ _TBA_ReadSource(RelPath) {
 	return FileRead(Path)
 }
 
-_TBA_FuncBody(Src, FuncDef) {
-	Idx := InStr(Src, FuncDef)
-	if !Idx
-		return ""
-	Rest := SubStr(Src, Idx)
-	End := InStr(Rest, "`n}")
-	if End
-		return SubStr(Rest, 1, End + 1)
-	return Rest
-}
-
 _TBA_BatchWriteIsAtomic() {
 	Src := _TBA_ReadSource("lib/toml/toml_helpers.ahk")
 	Seg := _DriverFuncBody("TOML_BatchWrite")

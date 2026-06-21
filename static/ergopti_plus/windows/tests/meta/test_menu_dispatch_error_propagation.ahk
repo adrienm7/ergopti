@@ -33,30 +33,6 @@ _MDEP_ReadSource(RelPath) {
 	return FileRead(Path)
 }
 
-_MDEP_FuncBody(Src, FuncName) {
-	Idx := InStr(Src, FuncName)
-	if (!Idx)
-		return ""
-	OpenPos := InStr(Src, "{", , Idx)
-	if (!OpenPos)
-		return ""
-	depth := 0
-	i := OpenPos
-	Len := StrLen(Src)
-	while (i <= Len) {
-		ch := SubStr(Src, i, 1)
-		if (ch == "{")
-			depth++
-		else if (ch == "}") {
-			depth--
-			if (depth <= 0)
-				return SubStr(Src, Idx, i - Idx + 1)
-		}
-		i++
-	}
-	return SubStr(Src, Idx)
-}
-
 
 
 

@@ -16,17 +16,6 @@ _TSPG_ReadSource(RelPath) {
 	return FileRead(Path)
 }
 
-_TSPG_FuncBody(Src, FuncDef) {
-	Idx := InStr(Src, FuncDef)
-	if !Idx
-		return ""
-	Rest := SubStr(Src, Idx)
-	End := InStr(Rest, "`n	}")
-	if End
-		return SubStr(Rest, 1, End + 1)
-	return Rest
-}
-
 _TSPG_RepeatingHasPauseGuard() {
 	Src := _TSPG_ReadSource("adapters/timer_scheduler.ahk")
 	Seg := _DriverFuncBody("_Repeating")

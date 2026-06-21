@@ -41,20 +41,6 @@ _SFFC_ReadSource(RelPath) {
 	return FileRead(Path)
 }
 
-; Extracts the body of a top-level function from its declaration line up to
-; and including the first closing brace at column 0. Returns "" when the
-; declaration is absent.
-_SFFC_FuncBody(Src, FuncDef) {
-	Idx := InStr(Src, FuncDef)
-	if !Idx
-		return ""
-	Rest := SubStr(Src, Idx)
-	End := InStr(Rest, "`n}")
-	if End
-		return SubStr(Rest, 1, End + 1)
-	return Rest
-}
-
 
 
 

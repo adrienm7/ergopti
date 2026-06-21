@@ -40,21 +40,6 @@ _KLWSP_ReadSource(RelPath) {
 	return FileRead(Path)
 }
 
-; Extracts the body of a named function from Src, starting at FuncDecl and
-; ending at the first closing brace that sits at column 0 on its own line.
-; Returns "" when the declaration cannot be found.
-_KLWSP_FuncBody(Src, FuncDecl) {
-	Idx := InStr(Src, FuncDecl)
-	if !Idx
-		return ""
-	Rest := SubStr(Src, Idx)
-	; Match a closing brace at column 0 (start of line) — this is the
-	; function-level brace, not a nested one.
-	if RegExMatch(Rest, "m)^\}", &Match)
-		return SubStr(Rest, 1, Match.Pos)
-	return Rest
-}
-
 ; Extracts the title-change block — the if-block that starts with
 ; `if (NewTitle != KLHook.prev_title)` — from an already-extracted
 ; function body. Returns "" when the sentinel line is absent.

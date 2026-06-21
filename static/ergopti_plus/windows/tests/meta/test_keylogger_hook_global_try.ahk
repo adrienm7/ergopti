@@ -44,15 +44,6 @@ _KHT_StripComments(Src) {
 	return Out
 }
 
-_KHT_FuncBody(Src, FuncDecl) {
-	Idx := InStr(Src, FuncDecl)
-	if !Idx
-		return ""
-	Rest := SubStr(Src, Idx)
-	End := InStr(Rest, "`n}")
-	return End ? SubStr(Rest, 1, End + 1) : Rest
-}
-
 _KHT_OnCharWrapped() {
 	Src := _KHT_StripComments(_KHT_ReadSource("modules/keylogger/keylogger_hook.ahk"))
 	Body := _DriverFuncBody("KL_Hook_OnChar")
