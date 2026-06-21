@@ -2,11 +2,12 @@ import fs from 'fs';
 import path from 'path';
 
 // Sync the private AHK file to the public repo location.
-// Reads the path from "static/hotstrings/.local_ahk_path" (gitignored).
+// Reads the path from "static/ergopti_plus/windows/.local_ahk_path" (gitignored).
 // If the file does not exist, this script is a no-op.
-// The subsequent clean-ahk step will strip the personal section before commit.
+// The subsequent remove_ahk_personal_configuration.js step strips the personal
+// section (2/ PERSONAL SHORTCUTS) before the file is committed.
 
-const overrideFile = path.join('static', 'hotstrings', '.local_ahk_path');
+const overrideFile = path.join('static', 'ergopti_plus', 'windows', '.local_ahk_path');
 
 if (!fs.existsSync(overrideFile)) {
 	console.log('ℹ️  No .local_ahk_path found — skipping private AHK sync.');
@@ -25,7 +26,7 @@ if (!fs.existsSync(privatePath)) {
 	process.exit(1);
 }
 
-const publicPath = path.join('static', 'drivers', 'autohotkey', 'ErgoptiPlus.ahk');
+const publicPath = path.join('static', 'ergopti_plus', 'windows', 'ErgoptiPlus.ahk');
 
 // Helper to strip date line and section 2/ perso (découpage étape-par-étape comme remove_ahk_personal_configuration.js)
 function stripForComparison(content) {

@@ -105,6 +105,11 @@ static/ergopti_plus/_shared/modules/hotstrings/generated_hotstrings.tsv
 static/ergopti_plus/windows/lib/hotstrings/generated_*.ahk
 static/ergopti_plus/windows/lib/hotstrings/hotstrings_generated.ahk
 
+# Private-AHK override pointer. A single-line file holding the absolute path to
+# the maintainer's private ErgoptiPlus.ahk (with the personal 2/ section). Read
+# by tools/dev/{sync-private-ahk,watch-ahk}.js; never tracked.
+static/ergopti_plus/windows/.local_ahk_path
+
 # Corpus working copy produced by build scripts
 static/corpus/modifie/
 
