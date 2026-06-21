@@ -785,3 +785,41 @@ helpers.describe("Adapter contract vectors: AppLauncher", function()
 		helpers.assert_true(ok, "launchWithArgs() must not throw")
 	end)
 end)
+
+
+-- WindowManager vectors (WindowManager.spec.js). All mutating calls target a
+-- nonexistent window handle (no-op -> false), so no real window is activated or
+-- killed; the rest are read-only queries.
+helpers.describe("Adapter contract vectors: WindowManager", function()
+	local adapter = helpers.load_with_stubs("adapters.window_manager")
+	local NONE = 999999999 -- a window handle that cannot exist
+
+	helpers.it("activate returns false for a missing window (activate_missing_returns_false)", function()
+		helpers.assert_eq(false, adapter.activate(NONE), "activate(missing) must be false")
+	end)
+
+	helpers.it("exists returns false for a missing window (exists_missing_returns_false)", function()
+		helpers.assert_eq(false, adapter.exists(NONE), "exists(missing) must be false")
+	end)
+
+	helpers.it("kill returns false for a missing window (kill_missing_returns_false)", function()
+		helpers.assert_eq(false, adapter.kill(NONE), "kill(missing) must be false")
+	end)
+
+	helpers.it("getList returns a table (get_list_returns_array)", function()
+		local ok, out = pcall(function() return adapter.getList() end)
+		helpers.assert_true(ok, "getList() must not throw")
+		helpers.assert_true(type(out) == "table", "getList() must return a table")
+	end)
+
+	helpers.it("getTitle returns '' for a missing window (get_title_missing_returns_empty_string)", function()
+		helpers.assert_eq("", adapter.getTitle(NONE), "getTitle(missing) must be the empty string")
+	end)
+
+	helpers.it("getFocused returns an object with a numeric hwnd (get_focused_returns_object)", function()
+		local ok, f = pcall(function() return adapter.getFocused() end)
+		helpers.assert_true(ok, "getFocused() must not throw")
+		helpers.assert_true(type(f) == "table", "getFocused() must return a table")
+		helpers.assert_true(type(f.hwnd) == "number", "getFocused().hwnd must be a number")
+	end)
+end)
