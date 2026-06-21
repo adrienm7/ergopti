@@ -26,7 +26,25 @@
 SetWorkingDir(A_ScriptDir)
 #Warn All, StdOut
 #Warn VarUnset, Off
-global _AHK_DRY_RUN := (A_Args.Length > 0 && A_Args[1] == "--dry-run")
+; Parse runner flags:
+;   --dry-run        parse/load gate only — register every test, skip execution.
+;   --only <substr>  run only tests whose name contains <substr> (case-insensitive),
+;                    e.g. AutoHotkey64.exe run_all.ahk --only "(my-slug)" to replay
+;                    a single failing test without the whole suite.
+global _AHK_DRY_RUN := false
+global _AHK_ONLY_FILTER := ""
+_riArgIndex := 1
+while (_riArgIndex <= A_Args.Length) {
+	_riArg := A_Args[_riArgIndex]
+	if (_riArg == "--dry-run")
+		_AHK_DRY_RUN := true
+	else if (_riArg == "--only" && _riArgIndex < A_Args.Length) {
+		_riArgIndex += 1
+		_AHK_ONLY_FILTER := A_Args[_riArgIndex]
+	} else if (SubStr(_riArg, 1, 7) == "--only=")
+		_AHK_ONLY_FILTER := SubStr(_riArg, 8)
+	_riArgIndex += 1
+}
 
 ; Test framework first — Assert / Test / RunTests must exist before any
 ; subsequent file registers its cases or invokes assertions inside lambdas.
@@ -282,6 +300,7 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 #Include meta/test_file_headers.ahk
 #Include meta/test_section_headers.ahk
 #Include meta/test_run_all_include_integrity.ahk
+#Include meta/test_runner_only_filter.ahk
 #Include meta/test_logger_pairing.ahk
 #Include meta/test_no_duplicate_defaults.ahk
 #Include meta/test_require_state_pattern.ahk
