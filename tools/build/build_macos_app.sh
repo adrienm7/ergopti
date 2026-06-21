@@ -323,14 +323,16 @@ assemble_app() {
 	log "Bundling Sparkle.framework (source: $sparkle_fw)"
 	cp -R "$sparkle_fw" "$APP_PATH/Contents/Frameworks/Sparkle.framework"
 
-	# Mirror the dev tree under Contents/Resources/ so every Lua path that
-	# walks up from hs.configdir (e.g. ``hs.configdir .. "/../_shared/..."``,
-	# ``locale.lua``'s gsub("/static/ergopti_plus/macos$"), etc.) resolves
-	# correctly without any code change. The MJConfigDir we point Hammerspoon
-	# at is the embedded ``static/ergopti_plus/macos`` subtree.
+	# Mirror the dev tree under Contents/Resources/ at the SAME repo-relative
+	# layout (static/ergopti_plus/...) so every Lua path resolves identically in
+	# the bundle and in a dev checkout — hs.configdir-relative walks,
+	# ``locale.lua``'s gsub("/static/ergopti_plus/macos$"), models_manager_mlx's
+	# project_root + "/static/ergopti_plus/macos", etc. — with no code change.
+	# The MJConfigDir we point Hammerspoon at is the embedded
+	# ``static/ergopti_plus/macos`` subtree.
 	local res="$APP_PATH/Contents/Resources"
 	local static_root="$res/static"
-	mkdir -p "$static_root/drivers"
+	mkdir -p "$static_root/ergopti_plus"
 
 	# Lua config tree — what Hammerspoon will load. Exclude dev-only paths.
 	rsync -a \
@@ -340,10 +342,10 @@ assemble_app() {
 		--exclude='paths.toml' \
 		--exclude='launcher' \
 		"$REPO_ROOT/static/ergopti_plus/macos/" \
-		"$static_root/drivers/hammerspoon/"
+		"$static_root/ergopti_plus/macos/"
 
 	# Shared tree (WebView HTML/CSS/JS, LLM defaults, DB schema, locales, hotstrings).
-	cp -R "$REPO_ROOT/static/ergopti_plus/_shared"      "$static_root/drivers/_shared"
+	cp -R "$REPO_ROOT/static/ergopti_plus/_shared"      "$static_root/ergopti_plus/_shared"
 
 	# Static assets.
 	cp -R "$REPO_ROOT/static/ergopti_plus/_shared/modules/menu/menu_manifest.json" "$static_root/"

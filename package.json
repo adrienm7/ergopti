@@ -31,6 +31,7 @@
 		"test:feature-read-sites": "node ./tools/test/test-feature-read-sites.js",
 		"test:architecture": "node ./tools/test/test-architecture-diagram.cjs",
 		"test:dev-tool-paths": "node ./tools/test/test-dev-tool-paths.cjs",
+		"test:macos-bundle-layout": "node ./tools/test/test-macos-bundle-layout.cjs",
 		"test:js": "node ./tools/test/run-js-suite.cjs",
 		"test:hs": "cd static/ergopti_plus/macos && lua tests/run.lua",
 		"test:linux": "cd static/ergopti_plus/linux && luajit tests/run.lua",

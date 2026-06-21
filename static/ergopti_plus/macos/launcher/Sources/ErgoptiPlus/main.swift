@@ -123,7 +123,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 	// directory is derived from the file path by HS internally, so every Lua
 	// require() and hs.configdir resolve correctly from this single override.
 	private func bundledConfigDir() -> String {
-		return "\(Bundle.main.bundlePath)/Contents/Resources/static/drivers/hammerspoon"
+		return "\(Bundle.main.bundlePath)/Contents/Resources/static/ergopti_plus/macos"
 	}
 
 	private func bundledInitLuaPath() -> String {
@@ -259,7 +259,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 // always sees the correct config path, even if applicationDidFinishLaunching is
 // never reached (Gatekeeper first-run kill, Sparkle init exception, etc.).
 // CFPreferencesSynchronize flushes synchronously to disk before app.run().
-let _earlyInitLua = Bundle.main.bundlePath + "/Contents/Resources/static/drivers/hammerspoon/init.lua"
+let _earlyInitLua = Bundle.main.bundlePath + "/Contents/Resources/static/ergopti_plus/macos/init.lua"
 CFPreferencesSetValue(
     kHammerspoonConfigKey as CFString,
     _earlyInitLua as CFString,
