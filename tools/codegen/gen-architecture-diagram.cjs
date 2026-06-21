@@ -22,6 +22,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { REPO_ROOT, shared } = require('../lib/paths.cjs');
 
 // ==============================================
 // ==============================================
@@ -29,12 +30,17 @@ const path = require('path');
 // ==============================================
 // ==============================================
 
-const ROOT = path.resolve(__dirname, '..');
-const PORTS_DIR = path.join(ROOT, 'static', 'drivers', '_shared', 'ports');
-const DOMAIN_DIR = path.join(ROOT, 'static', 'drivers', '_shared', 'domain');
-const AHK_DIR = path.join(ROOT, 'static', 'drivers', 'autohotkey', 'adapters');
-const HS_DIR = path.join(ROOT, 'static', 'drivers', 'hammerspoon', 'adapters');
-const OUT_FILE = path.join(ROOT, 'docs', 'architecture.md');
+// Paths derive from the canonical shared-tree resolver (tools/lib/paths.cjs) so a
+// future tree rename is a one-token edit there. The reorg moved
+// static/drivers/{autohotkey,hammerspoon,_shared/{ports,domain}} to
+// static/ergopti_plus/{windows,macos,_shared/core/{ports,domain}}; the old
+// hardcoded constants here (plus a ROOT that resolved to tools/ rather than the
+// repo root) pointed at nothing, so the diagram silently regenerated empty.
+const PORTS_DIR = shared('core', 'ports');
+const DOMAIN_DIR = shared('core', 'domain');
+const AHK_DIR = path.join(REPO_ROOT, 'static', 'ergopti_plus', 'windows', 'adapters');
+const HS_DIR = path.join(REPO_ROOT, 'static', 'ergopti_plus', 'macos', 'adapters');
+const OUT_FILE = path.join(REPO_ROOT, 'static', 'ergopti_plus', 'docs', 'architecture.md');
 
 // Prefix used in Mermaid node IDs to avoid reserved-keyword collisions
 const PREFIX_PORT = 'P_';
@@ -145,7 +151,7 @@ function buildDiagram(ports, domain, ahkAdapters, hsAdapters) {
 
 	// --- AHK adapters subgraph with edges from ports ---
 	lines.push('');
-	lines.push('    subgraph AHK_Adapters["AHK Adapters — autohotkey/adapters/"]');
+	lines.push('    subgraph AHK_Adapters["AHK Adapters — windows/adapters/"]');
 	for (const a of ahkAdapters) {
 		const lbl = label(a) + '.ahk';
 		lines.push(`        ${nodeId(PREFIX_AHK, a)}["${lbl}"]`);
@@ -154,7 +160,7 @@ function buildDiagram(ports, domain, ahkAdapters, hsAdapters) {
 
 	// --- HS adapters subgraph with edges from ports ---
 	lines.push('');
-	lines.push('    subgraph HS_Adapters["HS Adapters — hammerspoon/adapters/"]');
+	lines.push('    subgraph HS_Adapters["HS Adapters — macos/adapters/"]');
 	for (const a of hsAdapters) {
 		const lbl = label(a) + '.lua';
 		lines.push(`        ${nodeId(PREFIX_HS, a)}["${lbl}"]`);
@@ -215,7 +221,7 @@ function buildDiagram(ports, domain, ahkAdapters, hsAdapters) {
 function wrapMarkdown(mermaid) {
 	const ts = new Date().toISOString().slice(0, 10);
 	return [
-		'<!-- docs/architecture.md -->',
+		'<!-- static/ergopti_plus/docs/architecture.md -->',
 		'<!-- AUTO-GENERATED — do not edit by hand. Run: npm run gen:diagram -->',
 		'',
 		'# Architecture Overview',
@@ -238,7 +244,7 @@ function wrapMarkdown(mermaid) {
 // ==============================
 // ==============================
 
-(function main() {
+function main() {
 	console.log('[gen:diagram] Reading specs and adapter listings…');
 
 	const ports = readSpecNames(PORTS_DIR);
@@ -258,4 +264,24 @@ function wrapMarkdown(mermaid) {
 	fs.writeFileSync(OUT_FILE, markdown, 'utf8');
 
 	console.log(`[gen:diagram] Written → ${OUT_FILE}`);
-})();
+}
+
+// Only run when invoked directly (``node …/gen-architecture-diagram.cjs``); when
+// required by the regression test the read helpers and path constants are used
+// without the file-writing side effect.
+if (require.main === module) {
+	main();
+}
+
+module.exports = {
+	PORTS_DIR,
+	DOMAIN_DIR,
+	AHK_DIR,
+	HS_DIR,
+	OUT_FILE,
+	readSpecNames,
+	readAdapterNames,
+	buildDiagram,
+	wrapMarkdown,
+	main
+};
