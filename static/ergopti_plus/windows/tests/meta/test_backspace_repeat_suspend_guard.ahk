@@ -30,12 +30,6 @@
 ; ==================================================
 ; ==================================================
 
-_BRSG_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
-}
-
 ; Extracts a brace-delimited block whose header contains Marker, via balanced
 ; brace-walking from the first "{" after the marker.
 _BRSG_BlockBody(Src, Marker) {
@@ -72,7 +66,7 @@ _BRSG_BlockBody(Src, Marker) {
 ; ==================================================
 
 _BRSG_LAltLoopGuarded() {
-	Src := _BRSG_ReadSource("modules/tap_holds/lalt.ahk")
+	Src := _DriverSourceConcat()
 	LoopBody := _BRSG_BlockBody(Src, "while KS_IsDown(" . Chr(34) . "SC038" . Chr(34) . ")")
 	Assert(LoopBody != "", "LAlt backspace-repeat loop (while KS_IsDown(SC038)) must exist in lalt.ahk")
 	Assert(InStr(LoopBody, "A_IsSuspended") > 0,
@@ -80,7 +74,7 @@ _BRSG_LAltLoopGuarded() {
 }
 
 _BRSG_RCtrlLoopGuarded() {
-	Src := _BRSG_ReadSource("modules/tap_holds/rctrl.ahk")
+	Src := _DriverSourceConcat()
 	LoopBody := _BRSG_BlockBody(Src, "while KS_IsDown(" . Chr(34) . "SC11D" . Chr(34) . ")")
 	Assert(LoopBody != "", "RCtrl backspace-repeat loop (while KS_IsDown(SC11D)) must exist in rctrl.ahk")
 	Assert(InStr(LoopBody, "A_IsSuspended") > 0,
