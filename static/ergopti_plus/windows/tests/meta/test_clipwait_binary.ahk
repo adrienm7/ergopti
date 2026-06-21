@@ -35,15 +35,6 @@ _CWB_ReadSource(RelPath) {
 	return FileRead(StrReplace(Root, "/", "\") . "\" . StrReplace(RelPath, "/", "\"), "UTF-8")
 }
 
-_CWB_FuncBody(Src, FuncDecl) {
-	Idx := InStr(Src, FuncDecl)
-	if !Idx
-		return ""
-	Rest := SubStr(Src, Idx)
-	End := InStr(Rest, "`n}")
-	return End ? SubStr(Rest, 1, End + 1) : Rest
-}
-
 _CWB_ClipWaitAcceptsBinary() {
 	Src := _CWB_ReadSource("lib/hotstrings/hotstring_engine.ahk")
 	Body := _DriverFuncBody("GetSelection")
