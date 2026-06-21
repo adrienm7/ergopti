@@ -928,3 +928,34 @@ _RunMouseControlContractVectors() {
 	Test("MouseControl: getMonitorBounds returns zeros for an invalid index", _Result_mc_bounds_invalid)
 }
 _RunMouseControlContractVectors()
+
+
+; Clipboard contract vectors (Clipboard.spec.js). Operates on the REAL clipboard,
+; so the whole scenario is wrapped in CB_SaveAll/CB_RestoreAll to preserve the
+; user's clipboard (text AND binary) regardless of outcome.
+_RunClipboardContractVectors() {
+	_Result_clipboard_roundtrip() {
+		SavedAll := CB_SaveAll()
+		Err := ""
+		try {
+			; write_returns_true
+			Assert(CB_Write("test") = true || CB_Write("test") = 1, "CB_Write must return true")
+			; read_after_write
+			CB_Write("ergopti_clipboard_test_42")
+			Assert(CB_Read() = "ergopti_clipboard_test_42", "CB_Read must return what CB_Write wrote")
+			; save_returns_string_or_null
+			Saved := CB_Save()
+			Assert(Type(Saved) = "String", "CB_Save must return a string")
+			; restore_null_clears
+			Assert(CB_Restore("") = true || CB_Restore("") = 1, "CB_Restore(null) must return true")
+			; read_empty_returns_null
+			Assert(CB_Read() = "", "CB_Read after restore(null) must be empty")
+		} catch as E {
+			Err := E.Message
+		}
+		CB_RestoreAll(SavedAll)
+		Assert(Err = "", "Clipboard round-trip must not throw: " . Err)
+	}
+	Test("Clipboard: write/read/save/restore round-trip (user clipboard preserved)", _Result_clipboard_roundtrip)
+}
+_RunClipboardContractVectors()

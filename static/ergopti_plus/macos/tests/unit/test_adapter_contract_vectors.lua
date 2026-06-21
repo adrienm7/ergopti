@@ -867,3 +867,42 @@ helpers.describe("Adapter contract vectors: MouseControl", function()
 		helpers.assert_eq(0, b.bottom, "invalid-index bottom must be 0")
 	end)
 end)
+
+
+-- Clipboard vectors (Clipboard.spec.js). Backed by an in-memory hs.pasteboard
+-- stub so the round-trip never touches the real macOS pasteboard.
+helpers.describe("Adapter contract vectors: Clipboard", function()
+	local pb = { text = nil, data = nil }
+	local adapter = helpers.load_with_stubs("adapters.clipboard", {
+		pasteboard = {
+			getContents = function() return pb.text end,
+			setContents = function(t) pb.text = t ; pb.data = { text = t } ; return true end,
+			readAllData = function() return pb.data end,
+			clearContents = function() pb.text = nil ; pb.data = nil end,
+			writeAllData = function(d) pb.data = d ; pb.text = d and d.text or nil ; return true end,
+		},
+	})
+
+	helpers.it("write returns true (write_returns_true)", function()
+		helpers.assert_eq(true, adapter.write("test"), "write() must return true")
+	end)
+
+	helpers.it("read returns what write wrote (read_after_write)", function()
+		adapter.write("ergopti_clipboard_test_42")
+		helpers.assert_eq("ergopti_clipboard_test_42", adapter.read(), "read() must return the written content")
+	end)
+
+	helpers.it("save returns without throwing (save_returns_string_or_null)", function()
+		local ok = pcall(function() return adapter.save() end)
+		helpers.assert_true(ok, "save() must not throw")
+	end)
+
+	helpers.it("restore(nil) returns true (restore_null_clears)", function()
+		helpers.assert_eq(true, adapter.restore(nil), "restore(nil) must return true")
+	end)
+
+	helpers.it("read returns nil when the clipboard is empty (read_empty_returns_null)", function()
+		adapter.restore(nil)
+		helpers.assert_eq(nil, adapter.read(), "read() must return nil when empty")
+	end)
+end)
