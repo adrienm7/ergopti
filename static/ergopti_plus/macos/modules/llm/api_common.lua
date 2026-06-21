@@ -22,6 +22,8 @@ local M = {}
 local hs     = hs
 local Logger = require("lib.logger")
 local Paths  = require("lib.paths")
+local FileSystem = require("adapters.file_system")   -- OS-pure file read (port FileSystem)
+local JsonCodec  = require("adapters.json_codec")    -- OS-pure JSON decode (port JsonCodec)
 local LOG    = "llm.api_common"
 
 
@@ -84,6 +86,34 @@ end
 
 local INFERENCE = load_inference_constants()
 
+--- Loads the default generation temperature from the shared defaults.json — the
+--- same single source DEFAULT_STATE is built from — so every backend's defensive
+--- temperature fallback resolves to one value instead of a literal duplicated
+--- across the backend adapters. Mirrors 0.1 only when the JSON is unreadable,
+--- matching the FALLBACK convention above (a corrupt JSON never leaves the
+--- temperature nil).
+--- @return number The default generation temperature.
+local function load_default_temperature()
+	local p = Paths.shared("modules/llm/defaults.json")
+	if type(p) == "string" and p ~= "" then
+		local raw = FileSystem.read(p)
+		if raw then
+			local ok, parsed = pcall(JsonCodec.decode, raw)
+			if ok and type(parsed) == "table" and tonumber(parsed.llm_temperature) then
+				return tonumber(parsed.llm_temperature)
+			end
+		end
+	end
+	Logger.warn(LOG, "defaults.json llm_temperature unreadable — using mirrored fallback.")
+	return 0.1
+end
+
+--- Default generation temperature, single-sourced from defaults.json. Backends
+--- read it as ``ApiCommon.DEFAULT_TEMPERATURE`` for their defensive fallback so
+--- the value is never hardcoded at the call site.
+local DEFAULT_TEMPERATURE = load_default_temperature()
+M.DEFAULT_TEMPERATURE = DEFAULT_TEMPERATURE
+
 --- Picks a field from the JSON config, falling back to FALLBACK on miss.
 --- Keeps the call sites readable: ``cfg("diversity_temperature", "step_default")``.
 local function cfg(section, key)
@@ -139,7 +169,7 @@ end
 --- @return number The computed temperature.
 function M.get_diversity_temperature(base_temp, variant_index, step)
 	local idx = math.max(1, tonumber(variant_index) or 1)
-	local base = tonumber(base_temp) or 0.1
+	local base = tonumber(base_temp) or DEFAULT_TEMPERATURE
 	local delta = tonumber(step)
 	if delta == nil then
 		if base <= 0.15 then
