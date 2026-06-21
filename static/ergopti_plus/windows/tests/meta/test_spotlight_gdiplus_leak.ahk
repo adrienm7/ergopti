@@ -10,14 +10,8 @@
 
 #Requires AutoHotkey v2.0
 
-_SGL_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
-}
-
 _SGL_SpotlightHasTryCatch() {
-	Src := _SGL_ReadSource("ui/spotlight.ahk")
+	; Move-resilient: scan by function name, not a pinned ui/spotlight path.
 	Seg := _DriverFuncBody("SpotlightMouseAt")
 	Assert(Seg != "", "SpotlightMouseAt declaration must exist")
 	

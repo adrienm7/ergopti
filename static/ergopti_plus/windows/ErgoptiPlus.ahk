@@ -173,7 +173,7 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 ; ``HotstringHandler`` and ``MicrosoftApps``.
 #Include lib/window_utils.ahk
 #Include lib/string_utils.ahk
-#Include ui/spotlight.ahk
+#Include ui/spotlight/init.ahk
 #Include lib/nav_layer_helpers.ahk
 
 ; Core hotstring engine (send primitives, hotstring builders, text helpers)
