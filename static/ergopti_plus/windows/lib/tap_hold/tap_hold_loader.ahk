@@ -28,6 +28,12 @@
 ;    as before — only the user file is parsed.
 ; ==============================================================================
 
+; Default per-key tap-hold activation threshold in seconds, used when a key has
+; no time_activation_seconds (e.g. a tap-only override under inherit_defaults =
+; false). Single source for the former 0.2 literal that TapHoldDuration used to
+; duplicate across its two return branches
+global TAPHOLD_DEFAULT_ACTIVATION_SECONDS := 0.2
+
 
 
 
@@ -251,14 +257,15 @@ TapHoldTapAction(TapHold, KeyId) {
 	return Entry.Has("tap_action") ? Entry["tap_action"] : ""
 }
 
-; Return the hold-time threshold for ``KeyId`` in seconds, with a sensible
-; default of 0.2s when unset.
+; Return the hold-time threshold for ``KeyId`` in seconds, falling back to the
+; single-sourced TAPHOLD_DEFAULT_ACTIVATION_SECONDS when the key is unconfigured
+; or declares no ``time_activation_seconds``.
 TapHoldDuration(TapHold, KeyId) {
 	if !(TapHold.Has("keys") and TapHold["keys"].Has(KeyId)) {
-		return 0.2
+		return TAPHOLD_DEFAULT_ACTIVATION_SECONDS
 	}
 	Entry := TapHold["keys"][KeyId]
-	return Entry.Has("time_activation_seconds") ? Entry["time_activation_seconds"] : 0.2
+	return Entry.Has("time_activation_seconds") ? Entry["time_activation_seconds"] : TAPHOLD_DEFAULT_ACTIVATION_SECONDS
 }
 
 ; Return the configured hold modifier for ``KeyId`` (e.g. "ctrl", "shift",
