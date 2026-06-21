@@ -14,7 +14,10 @@
 > > • vecteurs de contrat **20/20 macOS + 18/20 AHK** (étaient 9/20 ; T1.4 quasi close),
 > > • runner AHK : `--only` + ligne `replay:` + `[file:line]` pointant le **test** (pas le helper) **déjà livrés** (le cœur de T1.3 est fait),
 > > • defaults WPM-HS / `DYN_HOTSTRINGS_DEFAULT_DELAY` / `profiles.lua 'fr'` **déjà rapatriés dans `_shared/`** fail-fast,
-> > • `architecture.md` **déjà régénéré** (dessine bien 20 ports HS).
+> > • `architecture.md` **déjà régénéré** (dessine bien 20 ports HS),
+> > • **ratchet de pureté OS AHK déjà ajouté** ([`meta/test_ahk_os_purity_ratchet.ahk`](../static/ergopti_plus/windows/tests/meta/test_ahk_os_purity_ratchet.ahk), commit `af2a73eee`, baseline 256 = DllCall 110 + COM 19 + FileIO 127, câblé `run_all.ahk:310`) — T1.1 **FAIT**.
+> >
+> > ⚠️ **Même cette 2ᵉ passe de vérif a raté T1.1** (le ratchet est un fichier séparé que le cluster n'a pas grepé) : le plan est **plus avancé que ce que le code documenté laisse croire**. Re-vérifier l'état réel **avant** d'implémenter chaque étape restante.
 > >
 > ~20 chiffres/citations dérivés ont été corrigés (détaillés en ligne). **Aucune étape
 > ne change le comportement** sauf celles explicitement marquées `feat`/`fix`.
@@ -44,10 +47,11 @@ Par impact décroissant (gain entre parenthèses) :
    accepte `--only <substr>` ([run_all.ahk:37-47](../static/ergopti_plus/windows/tests/run_all.ahk#L37)) et imprime une ligne `replay:`
    par `not ok` ([test_framework.ahk:358-360](../static/ergopti_plus/windows/tests/test_framework.ahk#L358)). **Reste** : bannir
    `Assert()`/`AssertThrows()` **nus** (sans valeur attendu/obtenu). (→ *diagnostic*).
-4. **DIP asymétrique = le gain max / risque min.** macOS a un *ratchet de pureté OS*
-   (**918/950** `hs.*`, **70/70 `io.open` — ZÉRO marge**) ; **AHK n'en a aucun** →
-   117 `DllCall` + 21 COM + 36 `FileRead` hors `adapters/` non gardés. Ajouter le ratchet
-   AHK (baseline = comptes actuels) est *test-only, blast faible*. (→ *zéro dérive*).
+4. ✅ **DIP : le ratchet AHK existe maintenant aussi (T1.1 FAIT).** macOS a son
+   *ratchet de pureté OS* (**918/950** `hs.*`, **70/70 `io.open` — ZÉRO marge**) ; le côté
+   AHK, longtemps non gardé (117 `DllCall` + 21 COM + 36 `FileRead`), est désormais
+   ratché par [`test_ahk_os_purity_ratchet.ahk`](../static/ergopti_plus/windows/tests/meta/test_ahk_os_purity_ratchet.ahk) (baseline 256, `run_all.ahk:310`). **Reste** : faire
+   *descendre* le baseline en migrant les appels vers `adapters/`. (→ *zéro dérive*).
 5. ✅ **Defaults : l'infra `_shared/` existe et la dette a été largement payée.** WPM-HS,
    `DYN_HOTSTRINGS_DEFAULT_DELAY` et `profiles.lua 'fr'` sont **déjà** rapatriés fail-fast.
    **Restent** : `language 'fr'` Windows (≥4 sites), 41 `tonumber(x) or <litt>` LLM macOS
@@ -195,7 +199,7 @@ Invariants porteurs (ne pas casser, [§8](#8-risques--foot-guns)) :
 | Ports avec test de contrat **comportemental** | ✅ **20 / 20 macOS** (20 `describe` blocks, [`test_adapter_contract_vectors.lua:34-915`](../static/ergopti_plus/macos/tests/unit/test_adapter_contract_vectors.lua#L34)) ; **18 / 20 AHK** (manquent KeyboardHook, TooltipRenderer) ; vecteurs encore *hand-mirrored* du JS (`:17`) | étendu par 5 commits (`4db56c273`…`57fa6a85b`) |
 | Ratchet OS macOS `hs.*` (hors `adapters/`) | **918 / 950** (32 de marge) | [`test_port_adapter_coverage.lua:243`](../static/ergopti_plus/macos/tests/meta/test_port_adapter_coverage.lua#L243) (comptage `:365`, motif `%f[%w]hs%.`) |
 | Ratchet OS macOS `io.open`/`os.execute` | **70 / 70 — ZÉRO marge** | idem `:244` |
-| OS direct AHK **hors `adapters/`, NON gardé** | **117 `DllCall` + 21 COM + 36 `FileRead`** | `windows/{modules,lib}` ; le garde AHK ne scanne que `_shared/` JS ([`test_port_adapter_coverage.ahk:216,222`](../static/ergopti_plus/windows/tests/meta/test_port_adapter_coverage.ahk#L216)) |
+| OS direct AHK hors `adapters/` | **117 `DllCall` + 21 COM + 36 `FileRead`**, désormais **ratché** (baseline 256) | ✅ gardé par [`test_ahk_os_purity_ratchet.ahk`](../static/ergopti_plus/windows/tests/meta/test_ahk_os_purity_ratchet.ahk) (`run_all.ahk:310`) — `test_port_adapter_coverage.ahk:216,222` ne couvre que `_shared/` JS |
 | Fonctions-dieu (SRP) | `handle_key()` 384 l. ([`keylogger/init.lua:448`](../static/ergopti_plus/macos/modules/keylogger/init.lua#L448)), `onKeyDownRaw()` 284 l. ([`keymap/init.lua:592`](../static/ergopti_plus/macos/modules/keymap/init.lua#L592)) | |
 | Fallback `if x == nil then x =` (macOS modules) | 2 ([`api_common.lua:104`](../static/ergopti_plus/macos/modules/llm/api_common.lua#L104) `=300`, `gestures/init.lua:375` `=true`) | violation §5.4 |
 
@@ -292,18 +296,14 @@ Preuve · Action · Test · Vérif · Diagnostic d'échec · Rollback · Blast.*
 
 ### Tier 1 — Low risk (test-only, fail-fast, renommages frontend-déjà-partagé)
 
-**T1.1 — Ratchet de pureté OS côté AHK** *(NOUVEAU ; symétrise le garde macOS)* ⭐ *gain max / risque min*
-- **Obj** : garder les appels OS hors `adapters/` côté AHK comme macOS le fait. **SOLID-D.**
-- **Preuve** : 117 `DllCall` + 21 COM + 36 `FileRead` non gardés ; `test_port_adapter_coverage.ahk:222`
-  ne scanne que `_shared/` JS.
-- **Action** : étendre le test pour compter `DllCall|ComObject|FileRead` dans
-  `windows/{modules,lib}` (hors `adapters/`), **baseline = comptes actuels** (117/21/36) avec
-  TODO-vers-le-bas (un baseline figé est légitime ; §5.6 interdit le code mort, pas un seuil).
-- **Test** : `test_ahk_os_purity_ratchet.ahk` — rouge si on ajoute un `DllCall` hors adapter,
-  vert au baseline (encode la cause : « nouvel appel OS non isolé »).
-- **Vérif** : dry-run exit 0 + suite + `test:ahk-encoding`. **Diagnostic d'échec** : le message
-  nomme fichier+compte (« +1 DllCall hors adapters/ dans modules/X.ahk ») → router via le port.
-  **Rollback** : retirer le test. **Blast** : faible (test-only).
+**T1.1 — Ratchet de pureté OS côté AHK** ✅ **FAIT** (commit `af2a73eee`) *(symétrise le garde macOS)*
+- **Livré** : [`meta/test_ahk_os_purity_ratchet.ahk`](../static/ergopti_plus/windows/tests/meta/test_ahk_os_purity_ratchet.ahk) compte `DllCall`/COM/file-built-ins (lignes
+  non-commentaires) dans `windows/{modules,lib}` hors `adapters/` et échoue si le total dépasse
+  **256** (DllCall 110 + COM 19 + FileIO 127). Câblé `run_all.ahk:310`, vert dans la suite (2358/0).
+- **Reste (suivi, pas bloquant)** : *descendre* le baseline en migrant les appels OS vers
+  `adapters/` (le ratchet interdit la croissance ; la migration est un refactor SOLID-D séparé).
+- **Diagnostic d'échec** : message « Direct OS calls … rose to N (baseline 256): DllCall=… COM=…
+  FileIO=… » → router le nouvel appel via un port adapter, **ne pas** lever le baseline.
 
 **T1.2 — Migrer les ~144 tests *location-pinned* vers les helpers move-resilient** *(prolonge le durcissement P4/P5)* ⭐
 - **Obj** : qu'un déplacement de fichier **ne casse plus aucun test**. **Douleur n°2.**
