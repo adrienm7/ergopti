@@ -746,7 +746,7 @@ function M.fetch_sequential(full_text, tail_text, model_name, temperature,
 	local requested_predictions  = math.max(1, math.floor(tonumber(num_predictions) or 1))
 	local max_attempts           = requested_predictions
 	if RETRY_FAILED_PREDICTION then
-		max_attempts = math.max(requested_predictions, requested_predictions * math.max(1, math.floor(tonumber(RETRY_FAILED_MAX_MULT) or 2)))
+		max_attempts = math.max(requested_predictions, requested_predictions * math.max(1, math.floor(tonumber(RETRY_FAILED_MAX_MULT))))
 	end
 	local attempt_index          = 1
 	local dedup_stats            = ApiCommon.new_dedup_stats()
@@ -790,8 +790,8 @@ function M.fetch_sequential(full_text, tail_text, model_name, temperature,
 				end,
 				function()
 					if attempt < 2 then
-						local retry_tokens = tokens + (_R_EXTRA_TOKENS or 5)
-						local retry_temp   = math.min(1.30, (tonumber(temp) or ApiCommon.DEFAULT_TEMPERATURE) + (_R_TEMP_STEP or 0.18))
+						local retry_tokens = tokens + _R_EXTRA_TOKENS
+						local retry_temp   = math.min(1.30, (tonumber(temp) or ApiCommon.DEFAULT_TEMPERATURE) + _R_TEMP_STEP)
 						request_variant(attempt + 1, retry_tokens, retry_temp)
 						return
 					end
