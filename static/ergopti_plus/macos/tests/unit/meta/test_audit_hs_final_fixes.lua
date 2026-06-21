@@ -102,8 +102,11 @@ helpers.describe("Audit-hs-final fixes", function()
 	-- ========================================================
 
 	helpers.it("actions.lua leftMouseTap must guard on leftClickHeld before re-toggling", function()
-		local src = read_src("modules/gestures/actions.lua")
-		assert(src, "modules/gestures/actions.lua must be readable")
+		-- The synthetic click-hold subsystem was extracted into actions_click.lua;
+		-- read both so the guard assertion survives that move (move-resilient).
+		local src = (read_src("modules/gestures/actions.lua") or "") ..
+			"\n" .. (read_src("modules/gestures/actions_click.lua") or "")
+		assert(src ~= "", "gestures actions/actions_click source must be readable")
 		-- The bug: doAfter(0, M.toggle_left_click) fired unconditionally. If
 		-- click_key_watcher had already set leftClickHeld=false, the deferred
 		-- call re-engaged an infinite hold.
