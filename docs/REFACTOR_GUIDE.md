@@ -27,6 +27,27 @@
 > (l'outil `Grep`) sinon on conclut à tort « 0 occurrence ». Voir
 > [§8 Risques](#8-risques--foot-guns).
 
+> **Journal d'exécution — session autonome 2026-06-21.** Commits livrés (suite verte à
+> chaque étape : AHK 2365/2365, macOS 2305/0, JS 10/10, encoding 605) :
+> - ✅ **Tier 0** : chemin mort `static\drivers\hammerspoon` corrigé + garde
+>   [`test-doc-paths.cjs`](../tools/test/test-doc-paths.cjs) (rouge-avant/vert-après, dans `test:js`).
+> - ✅ **T1.4 (partiel)** : vecteurs de contrat **KeyboardHook** ajoutés côté AHK → **19/20**.
+>   **TooltipRenderer** reste non couvert (son adapter délègue au sous-système GUI tooltip
+>   non initialisé en headless ; il faudrait un harnais de stub — vraie exception « headless-hard »).
+> - ✅ **T1.6 (recadré + fix locale)** : la temperature AHK est **déjà** SSoT (`ApplySharedDefaults`
+>   mappe `llm_temperature`) ; le `language "fr"` codé en dur est **corrigé** — il suit maintenant la
+>   locale active `_I18nLocale` (règle [[feedback-ui-must-be-i18n]] : aucun français codé en dur).
+>   Reste : 41 `tonumber(x) or 0.1` LLM **macOS** (tidy modeste).
+> - ✅ **T1.2 (garde)** : ratchet [`test-no-pinned-source-reads.cjs`](../tools/test/test-no-pinned-source-reads.cjs)
+>   gèle à **118** les tests AHK qui `FileRead` un chemin source codé en dur ; interdit la croissance.
+>   La **migration** des 118 vers les helpers move-resilient reste à faire (par lots).
+> - Découverte : **T1.1 (ratchet OS AHK) était déjà fait** (`af2a73eee`) — le plan est plus avancé
+>   que la prose ; **sonder l'état réel avant d'implémenter** chaque étape restante.
+>
+> Restant = surtout du **structurel non vérifiable headless** (splits Tier 2 : régressions visibles
+> seulement au reload GUI) ou du **`feat`/produit** (`tap_hold`, `max_tokens`, locale LLM par défaut) :
+> à faire avec vérif live ou arbitrage maintainer (cf. [§7](#7-décisions-maintainer-requises)).
+
 ---
 
 ## 1. TL;DR
@@ -65,9 +86,9 @@ Par impact décroissant (gain entre parenthèses) :
 8. **Open/Closed : `hotstrings.ahk` = 96 sites `Features[` + 34 `if`-blocks
    hand-maintained.** Ajouter un groupe = éditer ce fichier au lieu du seul manifeste.
    → boucle data-driven (le macOS le fait déjà). (→ *SOLID-O*).
-9. ✅ **Liskov : la couverture de contrat est quasi complète (20/20 macOS, 18/20 AHK).**
-   Étaient 9/20 ; 5 commits l'ont étendue. **Reste** : 2 ports AHK (KeyboardHook,
-   TooltipRenderer) + dériver les vecteurs des `*.spec.js` plutôt que les hand-mirrorer. (→ *correction cross-driver*).
+9. ✅ **Liskov : la couverture de contrat est quasi complète (20/20 macOS, 19/20 AHK).**
+   Étaient 9/20 ; 5 commits + KeyboardHook (cette session) l'ont étendue. **Reste** : 1 port AHK
+   (TooltipRenderer — headless-hard) + dériver les vecteurs des `*.spec.js` plutôt que les hand-mirrorer. (→ *correction cross-driver*).
 10. **Symétrie structurelle à fort blast radius = décisions maintainer**, pas
     décidées seul : `keymap` location, `lib/` foldé (Win) vs plat (macOS), placement
     menu LLM, **accessor fail-fast des 294 sites `Features[`** (reporté en P4),
@@ -196,7 +217,7 @@ Invariants porteurs (ne pas casser, [§8](#8-risques--foot-guns)) :
 |---|---|---|
 | Sites `Features[` **production** AHK (ripgrep) | **294 / 29 fichiers** (modules 187/9, lib 58/10, ui 37/9, entrée 12/1 ; pire : `hotstrings.ahk`=96, `altgr.ahk`=23, `path_translator.ahk`=23, `win.ahk`=20) | Grep `Features\[` (exclut tests) — confirme [REFACTOR_PLAN.md:74](REFACTOR_PLAN.md#L74) |
 | `if`-blocks `Features[…]{LoadHotstringsSection}` hand-maintained | 34 dans [`hotstrings.ahk:66-1002`](../static/ergopti_plus/windows/modules/hotstrings.ahk#L66) | violation **O** |
-| Ports avec test de contrat **comportemental** | ✅ **20 / 20 macOS** (20 `describe` blocks, [`test_adapter_contract_vectors.lua:34-915`](../static/ergopti_plus/macos/tests/unit/test_adapter_contract_vectors.lua#L34)) ; **18 / 20 AHK** (manquent KeyboardHook, TooltipRenderer) ; vecteurs encore *hand-mirrored* du JS (`:17`) | étendu par 5 commits (`4db56c273`…`57fa6a85b`) |
+| Ports avec test de contrat **comportemental** | ✅ **20 / 20 macOS** (20 `describe` blocks, [`test_adapter_contract_vectors.lua:34-915`](../static/ergopti_plus/macos/tests/unit/test_adapter_contract_vectors.lua#L34)) ; **19 / 20 AHK** (manque TooltipRenderer — headless-hard) ; vecteurs encore *hand-mirrored* du JS (`:17`) | étendu par 5 commits + KeyboardHook |
 | Ratchet OS macOS `hs.*` (hors `adapters/`) | **918 / 950** (32 de marge) | [`test_port_adapter_coverage.lua:243`](../static/ergopti_plus/macos/tests/meta/test_port_adapter_coverage.lua#L243) (comptage `:365`, motif `%f[%w]hs%.`) |
 | Ratchet OS macOS `io.open`/`os.execute` | **70 / 70 — ZÉRO marge** | idem `:244` |
 | OS direct AHK hors `adapters/` | **117 `DllCall` + 21 COM + 36 `FileRead`**, désormais **ratché** (baseline 256) | ✅ gardé par [`test_ahk_os_purity_ratchet.ahk`](../static/ergopti_plus/windows/tests/meta/test_ahk_os_purity_ratchet.ahk) (`run_all.ahk:310`) — `test_port_adapter_coverage.ahk:216,222` ne couvre que `_shared/` JS |
@@ -339,14 +360,17 @@ Preuve · Action · Test · Vérif · Diagnostic d'échec · Rollback · Blast.*
 - **Vérif** : suites vertes, exit-code CI préservé. **Diagnostic d'échec** : méta. **Rollback** :
   additif. **Blast** : faible-moyen (runners partagés, couverts par leurs propres tests).
 
-**T1.4 — Combler les 2 ports AHK + dériver les vecteurs de la SSoT** *(prolonge ADR-006 ; périmètre réduit)*
-- **Obj** : un port mal implémenté **échoue en CI, pas au clavier**. **SOLID-L.** ✅ 20/20 macOS +
-  18/20 AHK déjà couverts.
-- **Preuve** : manquent KeyboardHook + TooltipRenderer côté AHK ; vecteurs encore « hard-coded
-  mirroring the JS source » ([`test_adapter_contract_vectors.lua:17`](../static/ergopti_plus/macos/tests/unit/test_adapter_contract_vectors.lua#L17)).
-- **Action** : ajouter les 2 sections AHK manquantes ; **puis** exposer `contractTestVectors()`
-  dans chaque `_shared/core/ports/*.spec.js` comme source exécutée, chargée par un loader mince
-  des deux côtés (élimine la dérive hand-mirror).
+**T1.4 — Combler les ports AHK + dériver les vecteurs de la SSoT** *(prolonge ADR-006 ; en cours)*
+- **Obj** : un port mal implémenté **échoue en CI, pas au clavier**. **SOLID-L.** ✅ 20/20 macOS,
+  **19/20 AHK** (KeyboardHook ajouté cette session).
+- **Reste** : (a) **TooltipRenderer** AHK — son adapter délègue au sous-système GUI `lib/tooltip`
+  (`LLM_TooltipOwnsSurface`, `_TooltipGeneration`…) non initialisé en headless → nécessite un
+  **harnais de stub** (le fichier de contrat AHK n'en a pas, contrairement au macOS `load_with_stubs`) ;
+  (b) vecteurs encore « hard-coded mirroring the JS source »
+  ([`test_adapter_contract_vectors.lua:17`](../static/ergopti_plus/macos/tests/unit/test_adapter_contract_vectors.lua#L17)).
+- **Action** : (a) ajouter un stub tooltip minimal + la section TooltipRenderer ; (b) exposer
+  `contractTestVectors()` dans chaque `_shared/core/ports/*.spec.js` comme source exécutée, chargée
+  par un loader mince des deux côtés (élimine la dérive hand-mirror).
 - **Test** : les vecteurs partagés tournent sur **chaque** adapter (même corpus).
 - **Vérif** : `test:hs` + suite AHK + `test:port-compliance`. **Diagnostic d'échec** : « adapter
   crypto.lua sha256 ≠ vecteur attendu » → comportement, pas structure. **Rollback** : test-only.
