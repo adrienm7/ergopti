@@ -32,6 +32,7 @@ local dialog   = require("lib.dialog_util")
 local LogManager     = require("modules.keylogger.log_manager")
 local ContextTracker = require("modules.keylogger.context_tracker")
 local KcBridge       = require("modules.keylogger.kc_bridge")
+local Watchers       = require("modules.keylogger.watchers")
 local LOG            = "keylogger"
 
 
@@ -58,8 +59,6 @@ local WPM_MIN_DURATION_MS        = Timings.ms("keylogger", "wpm_min_duration_ms"
 local IDLE_CHECK_INTERVAL_SEC    = Timings.sec("keylogger", "idle_check_interval_ms")
 -- How often the maintenance timer fires for day-rotation and mouse polling (seconds)
 local MAINTENANCE_INTERVAL_SEC   = Timings.sec("keylogger", "maintenance_interval_ms")
--- Minimum gap between system-load polls to avoid spawning top too often (5 min)
-local SYSTEM_LOAD_POLL_INTERVAL_MS = Timings.ms("keylogger", "system_load_poll_ms")
 -- Delay before synthetic input is considered a match (very fast = synthetic)
 local SYNTH_MATCH_DELAY_MS       = Timings.ms("keylogger", "synth_match_delay_ms")
 -- Flush the buffer after this many milliseconds of inactivity (2 min)
@@ -326,18 +325,11 @@ local function ensure_browser_window_filter()
 	Logger.debug(LOG, "Browser window filter created lazily on first browser activation (%.1f ms).",
 		(hs.timer.absoluteTime() - t0) / 1e6)
 end
+-- Sleep/wake/lock watcher handle; its callback lives in the watchers module
 local _caffeinate_watcher   = nil
-local _wifi_watcher         = nil
-local _battery_watcher      = nil
-local _spaces_watcher       = nil
-local _audio_watcher_active = false
-local _current_day          = os.date("%Y-%m-%d")
 
 -- Cached module references to avoid pcall(require, ...) on every keystroke
 local _keymap_mod = nil
-
--- Throttle for the expensive system-load poll
-local _last_system_load_poll_ms = 0
 
 -- Lazily built keycode → name mapping
 local _keycode_to_name = nil
@@ -839,249 +831,11 @@ end
 --- ================================================
 -- =============================================
 
---- Polls mouse position and accumulates the physical travel distance.
---- Called every second via the maintenance timer.
-local function poll_mouse_distance()
-	local current_pos = hs.mouse.absolutePosition()
-	if CoreState.last_mouse_pos then
-		local dx   = current_pos.x - CoreState.last_mouse_pos.x
-		local dy   = current_pos.y - CoreState.last_mouse_pos.y
-		local dist = math.sqrt(dx * dx + dy * dy)
-		if dist > 0 then CoreState.mouse_distance_px = CoreState.mouse_distance_px + dist end
-	end
-	CoreState.last_mouse_pos = current_pos
-end
-
---- Polls CPU usage via `top` and logs it as a system event.
---- Throttled to at most once per SYSTEM_LOAD_POLL_INTERVAL_MS to avoid spawning
---- a subprocess every 10 seconds.
-local function poll_system_load()
-	local now_ms = hs.timer.absoluteTime() / 1000000
-	if (now_ms - _last_system_load_poll_ms) < SYSTEM_LOAD_POLL_INTERVAL_MS then return end
-	_last_system_load_poll_ms = now_ms
-
-	pcall(function()
-		hs.task.new("/usr/bin/top", function(_, stdout, _)
-			local cpu_user = stdout:match("CPU usage:%s*([%d%.]+)%%%s*user")
-			local mem_used = stdout:match("PhysMem:%s*([%d%.A-Z]+)%s+used")
-			LogManager.log_system_event("system_load", {
-				cpu_user_percent = tonumber(cpu_user),
-				mem_used         = mem_used,
-			})
-		end, { "-l", "1", "-n", "0" }):start()
-	end)
-end
-
---- Idle check: runs every IDLE_CHECK_INTERVAL_SEC seconds.
---- Logs micro-idle events and clears abandoned sessions.
-local function check_idle()
-	if _is_paused() then return end
-	local now = hs.timer.absoluteTime() / 1000000
-
-	if CoreState.session_last_active > 0 then
-		local idle_ms = now - CoreState.session_last_active
-
-		if not CoreState.is_micro_idle
-		and idle_ms > MICRO_IDLE_TIMEOUT_MS
-		and idle_ms <= SESSION_TIMEOUT_MS
-		then
-			CoreState.is_micro_idle = true
-			LogManager.append_log({ type = "idle_start" })
-			Logger.debug(LOG, "Micro-idle started (%.0f ms since last keystroke).", idle_ms)
-		end
-
-		if idle_ms > SESSION_TIMEOUT_MS then
-			if #CoreState.buffer_events > 0 then LogManager.flush_buffer() end
-			LogManager.append_log({
-				type        = "session_end",
-				duration_ms = CoreState.session_last_active - CoreState.session_start_time,
-			})
-			Logger.debug(LOG, "Typing session ended after %.0f ms of inactivity.", idle_ms)
-			CoreState.session_last_active = 0
-			CoreState.session_start_time  = 0
-			CoreState.is_micro_idle       = false
-		end
-	end
-
-	poll_system_load()
-end
-
---- Day-rotation check: runs every second via the maintenance timer.
---- When midnight passes, flushes and archives the previous day's data.
-local function perform_maintenance()
-	if _is_paused() then return end
-	local today = os.date("%Y-%m-%d")
-	if _current_day ~= today then
-		Logger.start(LOG, "Midnight rotation: archiving %s…", _current_day)
-		LogManager.flush_buffer()
-		-- New model: day_rollover drains today.log into data.sql + sqlite,
-		-- then deletes today.log. The in-memory today_idx / ngram context
-		-- are reset because the next day starts fresh.
-		LogManager.day_rollover()
-		CoreState.today_idx     = {}
-		CoreState.ngram_context = nil
-		_current_day = today
-		Logger.success(LOG, "Midnight rotation complete — now tracking %s.", today)
-	end
-	poll_mouse_distance()
-end
-
---- Handles system sleep, wake, lock, and unlock events.
---- @param event number The caffeinate watcher event constant.
-local function caffeinate_cb(event)
-	if _is_paused() then return end
-	local now = hs.timer.absoluteTime() / 1000000
-	if event == hs.caffeinate.watcher.systemWillSleep
-	or event == hs.caffeinate.watcher.screensDidSleep
-	then
-		LogManager.log_system_event("sleep", { battery_level = CoreState.current_battery_level })
-		-- Arm passive-time accounting: any wake/unlock will close this window
-		CoreState.passive_started_at  = now
-		CoreState.passive_kind        = "sleep"
-		if CoreState.active_app_name then
-			LogManager.log_app_switch(
-				CoreState.active_app_name, "SYSTEM_SLEEP",
-				now - (CoreState.active_app_start or now)
-			)
-			CoreState.active_app_name = nil
-		end
-
-	elseif event == hs.caffeinate.watcher.systemDidWake
-	or     event == hs.caffeinate.watcher.screensDidWake
-	then
-		LogManager.log_system_event("wake")
-		if CoreState.passive_started_at then
-			LogManager.log_passive_period(
-				CoreState.passive_kind or "sleep",
-				math.floor(now - CoreState.passive_started_at)
-			)
-			CoreState.passive_started_at = nil
-			CoreState.passive_kind       = nil
-		end
-		CoreState.active_app_start = now
-
-	elseif event == hs.caffeinate.watcher.screensDidLock then
-		LogManager.log_system_event("lock")
-		CoreState.passive_started_at = now
-		CoreState.passive_kind       = "lock"
-		if CoreState.active_app_name then
-			LogManager.log_app_switch(
-				CoreState.active_app_name, "SYSTEM_LOCK",
-				now - (CoreState.active_app_start or now)
-			)
-			CoreState.active_app_name = nil
-		end
-
-	elseif event == hs.caffeinate.watcher.screensDidUnlock then
-		LogManager.log_system_event("unlock")
-		if CoreState.passive_started_at then
-			LogManager.log_passive_period(
-				CoreState.passive_kind or "lock",
-				math.floor(now - CoreState.passive_started_at)
-			)
-			CoreState.passive_started_at = nil
-			CoreState.passive_kind       = nil
-		end
-		CoreState.active_app_start = now
-	end
-end
-
---- Starts WiFi, battery, spaces, and audio device watchers.
-local function init_hardware_watchers()
-	Logger.trace(LOG, "Starting hardware watchers…")
-
-	if hs.wifi and hs.wifi.watcher then
-		local ok, w = pcall(function()
-			return hs.wifi.watcher.new(function()
-				if _is_paused() then return end
-				local ssid = hs.wifi.currentNetwork()
-				LogManager.log_system_event("wifi_change", { ssid = ssid or "Disconnected" })
-				Logger.debug(LOG, "Wi-Fi changed: %s.", ssid or "Disconnected")
-			end)
-		end)
-		if ok and w then _wifi_watcher = w; _wifi_watcher:start() end
-	end
-
-	if hs.battery and hs.battery.watcher then
-		local ok, w = pcall(function()
-			return hs.battery.watcher.new(function()
-				if _is_paused() then return end
-				local level      = hs.battery.percentage()
-				local is_charging = hs.battery.isCharging()
-				local source     = hs.battery.powerSource()
-				CoreState.current_battery_level = level
-				LogManager.log_system_event("power_change", {
-					source      = source,
-					level       = level,
-					is_charging = is_charging,
-				})
-				Logger.debug(LOG, "Battery: %s%% (%s, charging=%s).",
-					tostring(level), tostring(source), tostring(is_charging))
-			end)
-		end)
-		if ok and w then
-			_battery_watcher = w
-			_battery_watcher:start()
-			-- Snapshot current battery level immediately on start
-			CoreState.current_battery_level = hs.battery.percentage()
-		end
-	end
-
-	if hs.spaces and hs.spaces.watcher then
-		pcall(function()
-			_spaces_watcher = hs.spaces.watcher.new(function(space_id)
-				if _is_paused() then return end
-				LogManager.log_system_event("space_change", { space_id = space_id })
-			end)
-			_spaces_watcher:start()
-		end)
-	end
-
-	-- Audio device watcher: logs volume and mute changes
-	if hs.audiodevice and hs.audiodevice.watcher then
-		local ok = pcall(function()
-			hs.audiodevice.watcher.setCallback(function(event_code)
-				if _is_paused() then return end
-				-- "vOut " = output volume changed, "mOut " = output mute toggled
-				if event_code == "vOut " or event_code == "mOut " then
-					local device = hs.audiodevice.defaultOutputDevice()
-					if device then
-						local vol   = device:volume()
-						local muted = device:muted()
-						CoreState.current_audio_volume = vol
-						LogManager.log_system_event("audio_change", {
-							volume     = vol,
-							muted      = muted,
-							event_code = event_code,
-						})
-						Logger.debug(LOG, "Audio: volume=%.0f%%, muted=%s.", vol or 0, tostring(muted))
-					end
-				end
-			end)
-			hs.audiodevice.watcher.start()
-			_audio_watcher_active = true
-			-- Snapshot current volume immediately
-			local device = hs.audiodevice.defaultOutputDevice()
-			if device then CoreState.current_audio_volume = device:volume() end
-		end)
-		if not ok then Logger.warn(LOG, "Failed to start audio device watcher.") end
-	end
-
-	Logger.done(LOG, "Hardware watchers started.")
-end
-
---- Stops all hardware watchers cleanly.
-local function stop_hardware_watchers()
-	Logger.trace(LOG, "Stopping hardware watchers…")
-	if _wifi_watcher    then _wifi_watcher:stop();    _wifi_watcher    = nil end
-	if _battery_watcher then _battery_watcher:stop(); _battery_watcher = nil end
-	if _spaces_watcher  then pcall(function() _spaces_watcher:stop() end); _spaces_watcher = nil end
-	if _audio_watcher_active then
-		pcall(function() hs.audiodevice.watcher.stop() end)
-		_audio_watcher_active = false
-	end
-	Logger.done(LOG, "Hardware watchers stopped.")
-end
+-- The background sensor layer (idle/maintenance timers, sleep/wake caffeinate
+-- callback, and the Wi-Fi/battery/spaces/audio hardware watchers) lives in the
+-- self-contained keylogger/watchers.lua module so this file stays focused on the
+-- event-tap engine. It is wired with the shared CoreState and the _is_paused
+-- predicate in M.start(); the lifecycle below references Watchers.* directly.
 
 
 
@@ -1470,6 +1224,9 @@ function M.start(script_control)
 		_state = true
 		LogManager.init(CoreState)
 		ContextTracker.init(CoreState, LogManager)
+		-- The watcher layer needs the shared state and the pause predicate; both
+		-- are stable for the process lifetime, so a one-shot init is sufficient.
+		Watchers.init(CoreState, _is_paused)
 	end
 	-- Re-wire and re-arm on every start so stop/start cycles keep the bridge
 	-- and ingest loop alive. Both calls are idempotent when already running.
@@ -1507,11 +1264,11 @@ function M.start(script_control)
 
 	-- System sleep/wake/lock watcher
 	if not _caffeinate_watcher then
-		_caffeinate_watcher = hs.caffeinate.watcher.new(caffeinate_cb)
+		_caffeinate_watcher = hs.caffeinate.watcher.new(Watchers.caffeinate_cb)
 	end
 	_caffeinate_watcher:start()
 
-	init_hardware_watchers()
+	Watchers.init_hardware_watchers()
 
 	-- Main event tap
 	if not _event_tap then
@@ -1540,12 +1297,12 @@ function M.start(script_control)
 	_tap_watchdog_timer:start()
 
 	-- Idle detection timer
-	if not _idle_timer then _idle_timer = hs.timer.new(IDLE_CHECK_INTERVAL_SEC, check_idle) end
+	if not _idle_timer then _idle_timer = hs.timer.new(IDLE_CHECK_INTERVAL_SEC, Watchers.check_idle) end
 	_idle_timer:start()
 
 	-- Maintenance timer (day rotation + mouse distance)
 	if not _maintenance_timer then
-		_maintenance_timer = hs.timer.new(MAINTENANCE_INTERVAL_SEC, perform_maintenance)
+		_maintenance_timer = hs.timer.new(MAINTENANCE_INTERVAL_SEC, Watchers.perform_maintenance)
 	end
 	_maintenance_timer:start()
 
@@ -1592,7 +1349,7 @@ function M.stop()
 		CoreState.ax_observer = nil
 	end
 
-	stop_hardware_watchers()
+	Watchers.stop_hardware_watchers()
 	KcBridge.stop()
 
 	-- Close the SQLite cache cleanly (drains any pending today.log entries

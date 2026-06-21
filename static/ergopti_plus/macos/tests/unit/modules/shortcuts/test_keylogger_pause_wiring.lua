@@ -65,19 +65,28 @@ end)
 helpers.describe("keylogger pause wiring — timer/watcher callbacks guarded (e2e-pause-suspend-1 regression)", function()
 
 	helpers.it("keylogger/init.lua timer/watcher callbacks all call _is_paused()", function()
-		local src_path = helpers.driver_root() .. "modules/keylogger/init.lua"
-		local fh = io.open(src_path, "r")
-		helpers.assert_true(fh ~= nil, "keylogger/init.lua must be readable")
-		local src = fh:read("*a"); fh:close()
-		-- Every top-level callback (check_idle, perform_maintenance, caffeinate_cb,
-		-- wifi/battery/spaces/audio watcher lambdas) must start with _is_paused().
-		-- We assert the helper exists and is used more than once (once per callback).
+		-- The sensor callbacks (check_idle, perform_maintenance, caffeinate_cb,
+		-- wifi/battery/spaces/audio watcher lambdas) were extracted into the
+		-- self-contained watchers.lua, which receives _is_paused as an injected
+		-- predicate and keeps the exact _is_paused() guard at every call site.
+		-- Read both files so the guard count survives that move (move-resilient).
+		local function read_src(rel)
+			local fh = io.open(helpers.driver_root() .. rel, "r")
+			if not fh then return nil end
+			local s = fh:read("*a"); fh:close()
+			return s
+		end
+		local init_src = read_src("modules/keylogger/init.lua")
+		helpers.assert_true(init_src ~= nil, "keylogger/init.lua must be readable")
+		local src = init_src .. "\n" .. (read_src("modules/keylogger/watchers.lua") or "")
+		-- Every top-level callback must start with _is_paused(). We assert the
+		-- helper exists and is used more than once (once per callback).
 		local count = 0
 		for _ in src:gmatch("_is_paused%(%)") do count = count + 1 end
 		-- 1 definition + at least 7 usage sites = at minimum 8 occurrences
 		helpers.assert_true(count >= 8,
 			string.format(
-				"_is_paused() must appear at least 8 times in keylogger/init.lua (definition + 7 callbacks) — got %d",
+				"_is_paused() must appear at least 8 times across keylogger init/watchers (definition + 7 callbacks) — got %d",
 				count
 			)
 		)
