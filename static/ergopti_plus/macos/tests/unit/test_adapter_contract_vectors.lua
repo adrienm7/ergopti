@@ -543,3 +543,51 @@ helpers.describe("Adapter contract vectors: TrayMenu", function()
 		helpers.assert_true(ok, "destroy() called twice must not throw")
 	end)
 end)
+
+
+
+
+-- =========================================
+--- =========================================
+-- ======= 10/ Crypto Vectors ==============
+--- =========================================
+-- =========================================
+
+helpers.describe("Adapter contract vectors: Crypto", function()
+	-- sha256() shells out to openssl via hs.execute; stub it with a fixed digest
+	-- in the real output format so the adapter's parse/clean path is exercised.
+	local CANONICAL = "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
+	local adapter = helpers.load_with_stubs("adapters.crypto", {
+		execute = function(_cmd) return "SHA2-256(stdin)= " .. CANONICAL .. "\n" end,
+	})
+
+	helpers.it("sha256 returns a string and never throws (sha256_returns_string)", function()
+		local ok, out = pcall(function() return adapter.sha256("hello") end)
+		helpers.assert_true(ok, "sha256() must not throw")
+		helpers.assert_true(type(out) == "string", "sha256() must return a string")
+	end)
+
+	helpers.it("sha256 returns 64 lowercase hex chars (sha256_returns_64_hex_chars)", function()
+		local out = adapter.sha256("hello")
+		helpers.assert_eq(64, #out, "sha256() must return exactly 64 chars")
+		helpers.assert_true(out:match("^[0-9a-f]+$") ~= nil, "sha256() must be lowercase hex")
+	end)
+
+	helpers.it("sha256 is deterministic for the same input (sha256_is_deterministic)", function()
+		helpers.assert_eq(adapter.sha256("ergopti"), adapter.sha256("ergopti"),
+			"sha256() must return the same digest for the same input")
+	end)
+
+	helpers.it("sha256 handles the empty string without throwing (sha256_empty_string)", function()
+		local ok = pcall(function() return adapter.sha256("") end)
+		helpers.assert_true(ok, "sha256('') must not throw")
+	end)
+
+	helpers.it("sha256 returns '' when the digest cannot be parsed (error_behavior)", function()
+		local bad = helpers.load_with_stubs("adapters.crypto", {
+			execute = function(_cmd) return "garbage with no digest line" end,
+		})
+		helpers.assert_eq("", bad.sha256("hello"),
+			"sha256() must return '' on unparseable crypto output")
+	end)
+end)

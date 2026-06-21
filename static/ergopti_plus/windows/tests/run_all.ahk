@@ -144,6 +144,7 @@ InstallHotstringHooks()
 #Include ../adapters/process_lifecycle.ahk
 #Include ../adapters/key_state.ahk
 #Include ../adapters/app_launcher.ahk
+#Include ../adapters/crypto.ahk
 ; Unified input-hook dispatcher + keyboard_hook adapter. hook_dispatcher.ahk
 ; defines only classes at top level (no hotkeys), so it is safe in the headless
 ; runner; keyboard_hook.ahk registers/unregisters its subscribers through it.
