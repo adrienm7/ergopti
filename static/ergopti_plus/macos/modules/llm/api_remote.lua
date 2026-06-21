@@ -281,7 +281,7 @@ end
 --- Streaming is OFF — the engine-level pacing already protects paid quotas,
 --- and the single-shot path keeps error handling trivial.
 local function build_payload(format, model, system_prompt, user_prompt, temperature, max_tokens)
-	temperature = tonumber(temperature) or 0.1
+	temperature = tonumber(temperature) or ApiCommon.DEFAULT_TEMPERATURE
 	-- No literal: an unset cap resolves to the one shared default
 	-- (DEFAULT_MAX_TOKENS), the same constant the engine threads from the budget.
 	max_tokens  = tonumber(max_tokens) or SharedPromptBuilder.DEFAULT_MAX_TOKENS
@@ -695,7 +695,7 @@ end
 function M.fetch_batch(full_text, tail_text, model_name, temperature,
                        max_predict, num_predictions, profile,
                        on_success, on_fail, request_id_provider, _streaming, _on_partial)
-	local effective_temp     = tonumber(temperature) or 0.1
+	local effective_temp     = tonumber(temperature) or ApiCommon.DEFAULT_TEMPERATURE
 	local system_prompt      = Profiles.resolve_system_prompt(profile, num_predictions)
 	local tokens             = (tonumber(max_predict) or 32) * num_predictions + (num_predictions * 5)
 	local is_batch           = profile.batch
@@ -742,7 +742,7 @@ function M.fetch_sequential(full_text, tail_text, model_name, temperature,
 	local system_prompt          = Profiles.resolve_system_prompt(profile, 1)
 	local t0                     = TimerScheduler.now()
 	local results                = {}
-	local base_temp              = tonumber(temperature) or 0.1
+	local base_temp              = tonumber(temperature) or ApiCommon.DEFAULT_TEMPERATURE
 	local requested_predictions  = math.max(1, math.floor(tonumber(num_predictions) or 1))
 	local max_attempts           = requested_predictions
 	if RETRY_FAILED_PREDICTION then
@@ -791,7 +791,7 @@ function M.fetch_sequential(full_text, tail_text, model_name, temperature,
 				function()
 					if attempt < 2 then
 						local retry_tokens = tokens + (_R_EXTRA_TOKENS or 5)
-						local retry_temp   = math.min(1.30, (tonumber(temp) or 0.1) + (_R_TEMP_STEP or 0.18))
+						local retry_temp   = math.min(1.30, (tonumber(temp) or ApiCommon.DEFAULT_TEMPERATURE) + (_R_TEMP_STEP or 0.18))
 						request_variant(attempt + 1, retry_tokens, retry_temp)
 						return
 					end

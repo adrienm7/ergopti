@@ -289,7 +289,7 @@ local STOP_LINE     = { "<|eot_id|>", "<|im_end|>", "[/INST]", "PREFIX:", "TAIL:
 --- @return table The options configuration table.
 local function build_options(temperature, num_predict_tokens, model_name, is_batch, line_mode)
     local opts = {
-        temperature = tonumber(temperature) or 0.1,
+        temperature = tonumber(temperature) or ApiCommon.DEFAULT_TEMPERATURE,
         num_predict = tonumber(num_predict_tokens),
         stop        = (line_mode and not is_batch) and STOP_LINE or STOP_BATCH,
     }
@@ -677,7 +677,7 @@ function M.fetch_batch(full_text, tail_text, model_name, temperature,
                        max_predict, num_predictions, profile,
                        on_success, on_fail, request_id_provider, streaming, on_partial)
 
-	local effective_temp = tonumber(temperature) or 0.1
+	local effective_temp = tonumber(temperature) or ApiCommon.DEFAULT_TEMPERATURE
 	local system_prompt  = Profiles.resolve_system_prompt(profile, num_predictions)
 	local tokens         = tonumber(max_predict) * num_predictions + (num_predictions * 5)
 	local is_batch       = profile.batch
@@ -747,7 +747,7 @@ function M.fetch_sequential(full_text, tail_text, model_name, temperature,
 	local system_prompt = Profiles.resolve_system_prompt(profile, 1)
 	local t0            = TimerScheduler.now()
 	local results       = {}
-	local base_temp     = tonumber(temperature) or 0.1
+	local base_temp     = tonumber(temperature) or ApiCommon.DEFAULT_TEMPERATURE
 	local requested_predictions = math.max(1, math.floor(tonumber(num_predictions) or 1))
 	local max_attempts = requested_predictions
 	if RETRY_FAILED_PREDICTION_ENABLED == true then
@@ -802,7 +802,7 @@ function M.fetch_sequential(full_text, tail_text, model_name, temperature,
 				function()
 					if attempt < 2 then
 						local retry_tokens = tokens + (_RETRY_EXTRA_TOKENS or 5)
-						local retry_temp   = math.min(1.30, (tonumber(temp) or 0.1) + (_RETRY_TEMP_STEP or 0.18))
+						local retry_temp   = math.min(1.30, (tonumber(temp) or ApiCommon.DEFAULT_TEMPERATURE) + (_RETRY_TEMP_STEP or 0.18))
 						Logger.debug(LOG, "[%s] Variant %d/%d quick retry: tokens=%d temp=%.2f",
 							model_name, variant_index, max_attempts, retry_tokens, retry_temp)
 						-- Retry does not stream partial updates (would overwrite the growing preview)
