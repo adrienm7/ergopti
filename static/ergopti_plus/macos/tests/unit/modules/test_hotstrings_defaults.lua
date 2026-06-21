@@ -90,4 +90,21 @@ helpers.describe("hotstrings_config: shared defaults are the single source", fun
 
 		os.remove(path)
 	end)
+
+	-- Cross-driver SSoT for the dynamic-hotstrings default delay. The AHK driver
+	-- now LOADS DYN_HOTSTRINGS_DEFAULT_DELAY from [delays] dynamichotstrings_sec
+	-- (test_hotstrings_config.ahk §SharedDefaultsAreSingleSource); macOS keeps the
+	-- value in the keymap DELAYS_DEFAULT table (a static table built at module
+	-- load), so this pins that literal to the same shared key — a change to the
+	-- TOML that is not mirrored here turns this red.
+	helpers.it("keymap DELAYS_DEFAULT.dynamichotstrings equals the shared [delays] dynamichotstrings_sec", function()
+		local sections = read_defaults()
+		helpers.assert_true(sections.delays.dynamichotstrings_sec ~= nil,
+			"defaults.toml [delays] must declare dynamichotstrings_sec")
+		local keymap = helpers.load_with_stubs("modules.keymap")
+		helpers.assert_eq(keymap.DELAYS_DEFAULT.dynamichotstrings, tonumber(sections.delays.dynamichotstrings_sec),
+			"macOS keymap DELAYS_DEFAULT.dynamichotstrings must equal the shared TOML dynamichotstrings_sec (cross-driver SSoT)")
+		helpers.assert_eq(2.0, keymap.DELAYS_DEFAULT.dynamichotstrings,
+			"canonical dynamic-hotstrings default delay (seconds)")
+	end)
 end)

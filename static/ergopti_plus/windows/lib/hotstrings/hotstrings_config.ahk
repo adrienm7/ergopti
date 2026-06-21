@@ -42,13 +42,16 @@ global GLOBAL_DEFAULT_DELAY := ""
 global GLOBAL_DEFAULT_COLOR := ""
 
 ; Default activation delay (seconds) for the dynamic hotstrings (dates, phone /
-; SSN / IBAN prefixes). Mirrors the macOS DELAYS_DEFAULT.dynamichotstrings value.
-; Defined HERE — in the early-loaded config layer — rather than in
-; modules/hotstrings.ahk, because the tray "Delays" submenu reads it while
-; building the menu at startup (initMenu), before the feature module's top-level
-; code has run; a definition in the late module leaves it unassigned and crashes
-; menu construction. The user's "dynamichotstrings" delay override takes priority.
-global DYN_HOTSTRINGS_DEFAULT_DELAY := 2.0
+; SSN / IBAN prefixes). Loaded from _shared/modules/hotstrings/defaults.toml
+; [delays] dynamichotstrings_sec by HotstringsConfigLoadSharedDefaults() — the
+; SINGLE source shared verbatim with the macOS DELAYS_DEFAULT.dynamichotstrings —
+; so it can never drift behind a re-typed literal (rules 5.2 / 5.4). Starts empty
+; and fails fast on a missing key. It is declared HERE, in the early-loaded config
+; layer, because the tray "Delays" submenu reads it while building the menu at
+; startup (initMenu); the loader runs before that (ErgoptiPlus.ahk: the
+; HotstringsConfigLoadSharedDefaults call precedes the menu build), so the value
+; is populated in time. The user's "dynamichotstrings" delay override takes priority.
+global DYN_HOTSTRINGS_DEFAULT_DELAY := ""
 
 ; Per-category baseline that overrides ``GLOBAL_DEFAULT_COLOR`` only when no
 ; TOML _meta or user override sets a color. Both baselines load at boot from the
@@ -132,7 +135,7 @@ global _HSResolveGen := 0
 ; of hanging on a modal. There is no compile-time fallback (rules 5.2 / 5.4).
 ; @param SharedDir Optional _shared/ root; defaults to the global ``_SharedDir``.
 HotstringsConfigLoadSharedDefaults(SharedDir := "") {
-    global _SharedDir, GLOBAL_DEFAULT_DELAY, GLOBAL_DEFAULT_COLOR
+    global _SharedDir, GLOBAL_DEFAULT_DELAY, GLOBAL_DEFAULT_COLOR, DYN_HOTSTRINGS_DEFAULT_DELAY
     global HOTSTRINGS_CATEGORY_DEFAULT_COLORS
     Dir  := (SharedDir != "") ? SharedDir : (IsSet(_SharedDir) ? _SharedDir : "")
     Path := Dir . "\modules\hotstrings\defaults.toml"
@@ -142,11 +145,12 @@ HotstringsConfigLoadSharedDefaults(SharedDir := "") {
     }
 
     GLOBAL_DEFAULT_DELAY := Float(_HSDefaultsRequire(c, "delays", "default_sec", Path))
+    DYN_HOTSTRINGS_DEFAULT_DELAY := Float(_HSDefaultsRequire(c, "delays", "dynamichotstrings_sec", Path))
     GLOBAL_DEFAULT_COLOR := _HSDefaultsRequireHex(c, "colors", "global_default", Path)
     HOTSTRINGS_CATEGORY_DEFAULT_COLORS["personal"] := _HSDefaultsRequireHex(c, "colors", "personal", Path)
 
-    try LoggerInfo("HotstringsConfig", "Shared defaults loaded (delay={1}s color={2} personal={3}).",
-        GLOBAL_DEFAULT_DELAY, GLOBAL_DEFAULT_COLOR, HOTSTRINGS_CATEGORY_DEFAULT_COLORS["personal"])
+    try LoggerInfo("HotstringsConfig", "Shared defaults loaded (delay={1}s dyn={2}s color={3} personal={4}).",
+        GLOBAL_DEFAULT_DELAY, DYN_HOTSTRINGS_DEFAULT_DELAY, GLOBAL_DEFAULT_COLOR, HOTSTRINGS_CATEGORY_DEFAULT_COLORS["personal"])
 }
 
 ; Source the llm_prediction baseline tint from the canonical AI loading hex

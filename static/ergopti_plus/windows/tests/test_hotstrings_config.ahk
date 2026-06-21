@@ -212,7 +212,7 @@ Test("HotstringsConfig: llm_prediction category defaults to violet AI tint",
 ;      .lua), so a drift on either driver — or an accidental edit to the shared
 ;      file — turns one of these red.
 TestHotstringsConfig_SharedDefaultsAreSingleSource() {
-    global _SharedDir, GLOBAL_DEFAULT_DELAY, GLOBAL_DEFAULT_COLOR
+    global _SharedDir, GLOBAL_DEFAULT_DELAY, GLOBAL_DEFAULT_COLOR, DYN_HOTSTRINGS_DEFAULT_DELAY
     global HOTSTRINGS_CATEGORY_DEFAULT_COLORS
     Path := _SharedDir . "\modules\hotstrings\defaults.toml"
     c    := ParseTomlFile(Path)
@@ -229,11 +229,14 @@ TestHotstringsConfig_SharedDefaultsAreSingleSource() {
         "personal baseline is loaded from defaults.toml [colors] personal")
     AssertEqual(Float(IniCacheGet(c, "delays", "default_sec")), GLOBAL_DEFAULT_DELAY,
         "GLOBAL_DEFAULT_DELAY is loaded from defaults.toml [delays] default_sec")
+    AssertEqual(Float(IniCacheGet(c, "delays", "dynamichotstrings_sec")), DYN_HOTSTRINGS_DEFAULT_DELAY,
+        "DYN_HOTSTRINGS_DEFAULT_DELAY is loaded from defaults.toml [delays] dynamichotstrings_sec")
 
     ; (2) Pin the canonical cross-driver values so an accidental edit is caught.
     AssertEqual("#1e88e5", GLOBAL_DEFAULT_COLOR, "canonical global default color")
     AssertEqual("#6e6e73", HOTSTRINGS_CATEGORY_DEFAULT_COLORS["personal"], "canonical personal baseline color")
     AssertEqual(0.75, GLOBAL_DEFAULT_DELAY, "canonical global default delay (seconds)")
+    AssertEqual(2.0, DYN_HOTSTRINGS_DEFAULT_DELAY, "canonical dynamic-hotstrings default delay (seconds)")
 }
 Test("HotstringsConfig: resolution defaults come from the shared defaults.toml (single source)",
     TestHotstringsConfig_SharedDefaultsAreSingleSource)
