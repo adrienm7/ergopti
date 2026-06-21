@@ -32,18 +32,29 @@ local helpers = require("tests.helpers")
 
 helpers.describe("keylogger: midnight rotation invariants (C3)", function()
 	local function read_src()
-		local path = helpers.driver_root() .. "modules/keylogger/init.lua"
-		local fh = io.open(path, "r")
-		helpers.assert_true(fh ~= nil, "cannot open keylogger/init.lua at " .. tostring(path))
-		local src = fh:read("*a"); fh:close()
-		return src
+		-- perform_maintenance() was extracted from keylogger/init.lua into the
+		-- self-contained keylogger/watchers.lua. Concatenate both so the body
+		-- introspection survives that move (move-resilient). The shared state is
+		-- the injected CoreState, named _state inside watchers.lua.
+		local function read_one(rel)
+			local path = helpers.driver_root() .. rel
+			local fh = io.open(path, "r")
+			helpers.assert_true(fh ~= nil, "cannot open " .. rel .. " at " .. tostring(path))
+			local s = fh:read("*a"); fh:close()
+			return s
+		end
+		return read_one("modules/keylogger/init.lua")
+			.. "\n" .. read_one("modules/keylogger/watchers.lua")
 	end
 
 	local function extract_maintenance(src)
 		-- Extract the body of perform_maintenance() by finding its definition
 		-- and taking the next ~600 chars (the function is short — ~15 lines).
+		-- After the watchers extraction it is exposed as M.perform_maintenance;
+		-- accept both the old local form and the public form (move-resilient).
 		local fn_start = src:find("local function perform_maintenance()", 1, true)
-		helpers.assert_true(fn_start ~= nil, "perform_maintenance() must exist in keylogger/init.lua")
+			or src:find("function M.perform_maintenance()", 1, true)
+		helpers.assert_true(fn_start ~= nil, "perform_maintenance() must exist in keylogger init/watchers")
 		return src:sub(fn_start, fn_start + 600)
 	end
 
@@ -67,22 +78,24 @@ helpers.describe("keylogger: midnight rotation invariants (C3)", function()
 
 	-- ===== Invariant 2: only today_idx + ngram_context are reset =====
 
-	helpers.it("rotation resets CoreState.today_idx to {}", function()
+	helpers.it("rotation resets the shared today_idx to {}", function()
 		local src = read_src()
 		local body = extract_maintenance(src)
+		-- The shared state is CoreState in init.lua; it is the injected _state
+		-- inside watchers.lua. Accept either name (same table, move-resilient).
 		helpers.assert_true(
-			body:find("CoreState.today_idx%s*=%s*{}", 1, false) ~= nil
-			or body:find("CoreState.today_idx = {}", 1, true) ~= nil,
-			"perform_maintenance() must reset CoreState.today_idx = {} on date change")
+			body:find("CoreState%.today_idx%s*=%s*{}", 1, false) ~= nil
+			or body:find("_state%.today_idx%s*=%s*{}", 1, false) ~= nil,
+			"perform_maintenance() must reset <state>.today_idx = {} on date change")
 	end)
 
-	helpers.it("rotation resets CoreState.ngram_context to nil", function()
+	helpers.it("rotation resets the shared ngram_context to nil", function()
 		local src = read_src()
 		local body = extract_maintenance(src)
 		helpers.assert_true(
-			body:find("CoreState.ngram_context%s*=%s*nil", 1, false) ~= nil
-			or body:find("CoreState.ngram_context = nil", 1, true) ~= nil,
-			"perform_maintenance() must reset CoreState.ngram_context = nil on date change")
+			body:find("CoreState%.ngram_context%s*=%s*nil", 1, false) ~= nil
+			or body:find("_state%.ngram_context%s*=%s*nil", 1, false) ~= nil,
+			"perform_maintenance() must reset <state>.ngram_context = nil on date change")
 	end)
 
 	helpers.it("rotation does NOT wipe CoreState.synth_queue", function()
