@@ -377,20 +377,7 @@ OpenHotstringsConfigWindow() {
 	TooltipChk := G.Add("Checkbox", "xm y+10", t("hs_config.label_tooltip"))
 	TooltipReset := G.Add("Button", "x512 yp-2 w28 h24", "↺")
 
-	G.Add("Text", "xm y+14 w526 h1 0x10")   ; section separator
-
-	; ----- Word delimiters section -----------------------------------------
-	G.Add("Text", "xm y+12 w526 h18", t("hs_config.label_delimiters"))
-	G.Add("Text", "xm y+4 w526 h16 cGray", t("hs_config.delimiters_hint"))
-
-	; Two rows of checkboxes, 8 per row, evenly spaced across the 526 px column.
-	; Each checkbox captures its char via a closure over (Char).
-	DelimChks := _HCW_BuildDelimiterCheckboxes(G)
-	BtnDelimReset := G.Add("Button", "xm y+10 h24", t("hs_config.delimiters_reset"))
-	Gui_HarmoniseButtonWidths([BtnDelimReset])
-	BtnDelimReset.OnEvent("Click", (*) => _HCW_ResetDelimiters(DelimChks))
-
-	G.Add("Text", "xm y+14 w526 h1 0x10")   ; horizontal rule aligned to x=540
+	G.Add("Text", "xm y+14 w526 h1 0x10")   ; horizontal rule before the close button
 
 	; ----- Close button (bottom, after HR) --------------------------------
 	; Auto-sized to the localised label (with the 90 px floor) then centred
@@ -420,7 +407,6 @@ OpenHotstringsConfigWindow() {
 		TooltipChk:   TooltipChk,
 		TooltipReset: TooltipReset,
 		Status:       Status,
-		DelimChks:    DelimChks,
 	}
 
 	GroupDD.Choose(1)
@@ -439,7 +425,6 @@ OpenHotstringsConfigWindow() {
 	G.OnEvent("Close",             (*) => _HCW_OnClose())
 
 	_HCW_OnGroupChanged()    ; populate file + section dropdowns and first load
-	_HCW_LoadDelimiterCheckboxes(DelimChks)   ; tick boxes for current delimiters
 
 	G.Show()
 	_HCWGui := G
@@ -758,92 +743,6 @@ _HCW_OnClose() {
 	_HCW_FlushNumericWrite()
 	_HCWGui := 0
 	_HCWWidgets := 0
-}
-
-
-; Configurable delimiter entries, sourced from the shared terminator catalogue
-; (HSE_Terminators) so the config window and the tray submenu never drift from
-; each other or from macOS. Separator markers are skipped — the checkbox grid
-; has no dividers. Each entry carries its full chars array (e.g. Entrée = CR+LF)
-; so a multi-char slot toggles as a single unit.
-_HCW_DELIMITER_DEFS() {
-	global HSE_Terminators
-	Defs := []
-	for D in HSE_Terminators.all() {
-		if (D.Has("type") and D["type"] == "separator")
-			continue
-		Defs.Push({ Chars: D["chars"], Label: D["label"] })
-	}
-	return Defs
-}
-
-; Build a grid of checkboxes (4 per row) for each configurable delimiter.
-; Returns an Array of { Chars, Chk } so callers can read/set .Value.
-_HCW_BuildDelimiterCheckboxes(G) {
-	Defs := _HCW_DELIMITER_DEFS()
-	Chks := []
-	ColW := 120    ; px per column (526 / 4 ≈ 131, leaving a small margin)
-	Cols := 4
-	for Idx, D in Defs {
-		Col := Mod(Idx - 1, Cols)
-		if (Col == 0) {
-			Opt := (Idx == 1) ? ("xm y+8 w" . ColW) : ("xm y+6 w" . ColW)
-		} else {
-			Opt := "x+4 yp w" . ColW
-		}
-		Chk := G.Add("Checkbox", Opt, D.Label)
-		Chk.OnEvent("Click", (*) => _HCW_OnDelimiterChanged())
-		Chks.Push({ Chars: D.Chars, Chk: Chk })
-	}
-	return Chks
-}
-
-; Tick/untick the delimiter checkboxes to match the current effective string —
-; a box is ticked when every char of its catalogue entry is active.
-_HCW_LoadDelimiterCheckboxes(DelimChks) {
-	Current := HotstringsGetWordDelimiters()
-	for _, Entry in DelimChks {
-		Entry.Chk.Value := HSE_TerminatorEntryEnabled(Entry.Chars, Current) ? 1 : 0
-	}
-}
-
-; Called when any delimiter checkbox is clicked — rebuild the string from all
-; checkbox states (preserving any custom chars added via the tray menu) and
-; persist it.
-_HCW_OnDelimiterChanged() {
-	global _HCWWidgets
-	if !IsObject(_HCWWidgets) or !_HCWWidgets.HasOwnProp("DelimChks") {
-		return
-	}
-	; Chars owned by the catalogue — used to tell custom chars apart.
-	BuiltinChars := HSE_TerminatorBuiltinChars()
-	New := ""
-	for _, Entry in _HCWWidgets.DelimChks {
-		if (Entry.Chk.Value == 1) {
-			for Ch in Entry.Chars {
-				if !InStr(New, Ch)
-					New .= Ch
-			}
-		}
-	}
-	; Preserve custom chars: present in the active string, owned by no catalogue
-	; entry, and not the structural CR/LF that belong to the Entrée entry.
-	Current := HotstringsGetWordDelimiters()
-	Loop Parse, Current {
-		Ch := A_LoopField
-		if (Ch != "`r" and Ch != "`n" and !InStr(BuiltinChars, Ch) and !InStr(New, Ch))
-			New .= Ch
-	}
-	HotstringsSetWordDelimiters(New)
-	TrayTip(t("hs_config.notify_delimiters_saved"), "", "Iconi Mute")
-}
-
-; Reset all delimiter checkboxes to the built-in defaults.
-_HCW_ResetDelimiters(DelimChks) {
-	global HOTSTRINGS_DEFAULT_WORD_DELIMITERS
-	HotstringsSetWordDelimiters(HOTSTRINGS_DEFAULT_WORD_DELIMITERS)
-	_HCW_LoadDelimiterCheckboxes(DelimChks)
-	TrayTip(t("hs_config.notify_delimiters_saved"), "", "Iconi Mute")
 }
 
 
