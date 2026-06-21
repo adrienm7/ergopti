@@ -1,4 +1,4 @@
-﻿; drivers/autohotkey/lib/hotstring_prefix_watcher.ahk
+﻿; lib/hotstrings/hotstring_prefix_watcher.ahk
 
 ; ==============================================================================
 ; MODULE: Hotstring Prefix Watcher

@@ -1,4 +1,4 @@
-﻿; modules/keylogger.ahk
+﻿; modules/keylogger/keylogger.ahk
 
 ; ==============================================================================
 ; MODULE: Keylogger (AHK)

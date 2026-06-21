@@ -1,4 +1,4 @@
---- drivers/_shared/lua/toml_codec/init.lua
+--- _shared/lua/toml_codec/init.lua
 
 --- ==============================================================================
 --- MODULE: TOML Codec — Shared Entry Point

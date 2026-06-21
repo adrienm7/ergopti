@@ -1,4 +1,4 @@
-﻿; modules/keylogger_ui.ahk
+﻿; modules/keylogger/keylogger_ui.ahk
 
 ; ==============================================================================
 ; MODULE: Keylogger UI Launcher

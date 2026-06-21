@@ -1,4 +1,4 @@
-// ui/metrics_typing/main.js
+// _shared/ui/metrics_typing/main.js
 
 /**
  * ==============================================================================

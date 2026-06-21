@@ -1,4 +1,4 @@
---- linux/adapters/app_launcher.lua
+--- adapters/app_launcher.lua
 
 --- ==============================================================================
 --- MODULE: AppLauncher Adapter (Linux)

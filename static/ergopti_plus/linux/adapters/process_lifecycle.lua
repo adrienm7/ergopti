@@ -1,4 +1,4 @@
---- linux/adapters/process_lifecycle.lua
+--- adapters/process_lifecycle.lua
 
 --- ==============================================================================
 --- MODULE: ProcessLifecycle Adapter (Linux)

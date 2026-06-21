@@ -1,4 +1,5 @@
 #!/bin/bash
+# modules/llm/ensure-mlx-deps.sh
 
 # ==============================================================================
 # SCRIPT: Ensure Hammerspoon Python Dependencies

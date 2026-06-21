@@ -1,4 +1,4 @@
-﻿; modules/keylogger_network.ahk
+﻿; modules/keylogger/keylogger_network.ahk
 ; Requires: NetworkInfo, Crypto
 
 ; ==============================================================================

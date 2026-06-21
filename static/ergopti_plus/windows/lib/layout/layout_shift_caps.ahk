@@ -1,4 +1,4 @@
-﻿; static/ergopti_plus/windows/lib/layout_shift_caps.ahk
+﻿; lib/layout/layout_shift_caps.ahk
 
 ; ==============================================================================
 ; MODULE: Shift and CapsLock Layer Tables

@@ -1,4 +1,4 @@
-﻿; static/ergopti_plus/windows/modules/layout.ahk
+﻿; modules/layout.ahk
 
 ; ==============================================================================
 ; MODULE: Layout

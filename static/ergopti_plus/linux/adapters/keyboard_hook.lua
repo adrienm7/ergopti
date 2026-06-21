@@ -1,4 +1,4 @@
---- static/ergopti_plus/linux/adapters/keyboard_hook.lua
+--- adapters/keyboard_hook.lua
 
 --- ==============================================================================
 --- MODULE: KeyboardHook Adapter (Linux)

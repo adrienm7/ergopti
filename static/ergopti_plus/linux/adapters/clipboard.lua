@@ -1,4 +1,4 @@
---- linux/adapters/clipboard.lua
+--- adapters/clipboard.lua
 
 --- ==============================================================================
 --- MODULE: Clipboard Adapter (Linux)

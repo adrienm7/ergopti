@@ -1,4 +1,4 @@
-﻿; drivers/autohotkey/lib/webview_utils.ahk
+﻿; lib/webview_utils.ahk
 
 #Requires AutoHotkey v2.0
 

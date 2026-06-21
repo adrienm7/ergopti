@@ -1,4 +1,4 @@
---- static/ergopti_plus/linux/modules/hotstrings/loader.lua
+--- modules/hotstrings/loader.lua
 
 --- ==============================================================================
 --- MODULE: Hotstring TOML Loader (Linux)

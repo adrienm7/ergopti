@@ -6,7 +6,7 @@
 --- Hammerspoon-specific shim that wires the shared pure-Lua dynamic hotstrings
 --- rules engine into the HS keymap module. Handles hs.eventtap injection and
 --- hs.timer scheduling — the matching logic itself lives in the shared module at
---- drivers/_shared/lua/dynamic_hotstrings/init.lua.
+--- _shared/lua/dynamic_hotstrings/init.lua.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Thin shim: all suffix-matching and rule-registration logic is delegated to

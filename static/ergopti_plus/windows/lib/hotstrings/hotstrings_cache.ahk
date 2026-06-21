@@ -1,4 +1,4 @@
-﻿; static/ergopti_plus/windows/lib/hotstrings/hotstrings_cache.ahk
+﻿; lib/hotstrings/hotstrings_cache.ahk
 
 ; ==============================================================================
 ; MODULE: Hotstrings Self-Healing Cache

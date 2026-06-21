@@ -1,4 +1,4 @@
-﻿; modules/keylogger_webview.ahk
+﻿; modules/keylogger/keylogger_webview.ahk
 
 ; ==============================================================================
 ; MODULE: Keylogger WebView2 Host (B niveau 2)

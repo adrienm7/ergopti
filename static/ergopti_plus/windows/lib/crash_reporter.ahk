@@ -1,4 +1,4 @@
-﻿; static/ergopti_plus/windows/lib/crash_reporter.ahk
+﻿; lib/crash_reporter.ahk
 
 ; ==============================================================================
 ; MODULE: Crash Reporter

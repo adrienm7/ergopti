@@ -4,7 +4,7 @@
 --- MODULE: Keymap Terminators (Hammerspoon shim)
 --- DESCRIPTION:
 --- Hammerspoon-local re-export of the shared terminator catalogue. Delegates
---- all logic to drivers/_shared/lua/keymap/terminators.lua and post-processes
+--- all logic to _shared/lua/keymap/terminators.lua and post-processes
 --- the TERMINATOR_DEFS labels via lib.i18n so the menu shows localised strings
 --- in the user's active language.
 --- ==============================================================================

@@ -1,4 +1,4 @@
---- static/ergopti_plus/linux/modules/keylogger/metrics_collector.lua
+--- modules/keylogger/metrics_collector.lua
 
 --- ==============================================================================
 --- MODULE: Metrics Collector (Linux)

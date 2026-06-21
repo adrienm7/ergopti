@@ -1,4 +1,4 @@
---- linux/adapters/crypto.lua
+--- adapters/crypto.lua
 
 --- ==============================================================================
 --- MODULE: Crypto Adapter (Linux)

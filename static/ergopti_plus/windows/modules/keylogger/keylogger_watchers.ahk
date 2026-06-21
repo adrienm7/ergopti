@@ -1,4 +1,4 @@
-﻿; modules/keylogger_watchers.ahk
+﻿; modules/keylogger/keylogger_watchers.ahk
 
 ; ==============================================================================
 ; MODULE: Keylogger Watchers (session, idle, system events)

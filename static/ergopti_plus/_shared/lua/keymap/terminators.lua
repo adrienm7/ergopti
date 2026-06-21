@@ -1,4 +1,4 @@
---- drivers/_shared/lua/keymap/terminators.lua
+--- _shared/lua/keymap/terminators.lua
 
 --- ==============================================================================
 --- MODULE: Keymap Terminators (Shared)

@@ -1,4 +1,4 @@
---- drivers/_shared/lua/logger/init.lua
+--- _shared/lua/logger/init.lua
 
 --- ==============================================================================
 --- MODULE: Logger Core (Shared)

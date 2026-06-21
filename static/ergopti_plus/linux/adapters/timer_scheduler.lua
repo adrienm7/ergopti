@@ -1,4 +1,4 @@
---- static/ergopti_plus/linux/adapters/timer_scheduler.lua
+--- adapters/timer_scheduler.lua
 
 --- ==============================================================================
 --- MODULE: TimerScheduler Adapter (Linux)

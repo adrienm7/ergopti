@@ -1,4 +1,4 @@
-﻿; static/ergopti_plus/windows/modules/shortcuts.ahk
+﻿; modules/shortcuts.ahk
 
 ; ==============================================================================
 ; MODULE: Shortcuts

@@ -1,4 +1,4 @@
---- drivers/_shared/lua/text_utils/init.lua
+--- _shared/lua/text_utils/init.lua
 
 --- ==============================================================================
 --- MODULE: Text Utilities (Shared)

@@ -1,4 +1,4 @@
---- linux/adapters/mouse_control.lua
+--- adapters/mouse_control.lua
 
 --- ==============================================================================
 --- MODULE: MouseControl Adapter (Linux)

@@ -1,4 +1,4 @@
---- drivers/_shared/lua/keycodes/qwerty_names.lua
+--- _shared/lua/keycodes/qwerty_names.lua
 
 --- ==============================================================================
 --- MODULE: QWERTY Key Names (Shared)

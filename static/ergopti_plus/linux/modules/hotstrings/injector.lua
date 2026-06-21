@@ -1,4 +1,4 @@
---- static/ergopti_plus/linux/modules/hotstrings/injector.lua
+--- modules/hotstrings/injector.lua
 
 --- ==============================================================================
 --- MODULE: Hotstring Injector (Linux)

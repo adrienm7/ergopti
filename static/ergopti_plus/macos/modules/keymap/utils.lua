@@ -4,7 +4,7 @@
 --- MODULE: Keymap Utilities (Hammerspoon adapter)
 --- DESCRIPTION:
 --- Hammerspoon-specific keymap helpers layered on top of the shared pure-Lua
---- core from drivers/_shared/lua/keymap/utils.lua. Adds OS-level text emission
+--- core from _shared/lua/keymap/utils.lua. Adds OS-level text emission
 --- (simulated keystrokes and clipboard paste) and ignored-window detection,
 --- which depend on hs.eventtap, hs.pasteboard, hs.timer, and hs.window.
 ---

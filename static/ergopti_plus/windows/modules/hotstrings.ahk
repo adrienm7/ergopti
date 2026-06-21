@@ -1,4 +1,4 @@
-﻿; static/ergopti_plus/windows/modules/hotstrings.ahk
+﻿; modules/hotstrings.ahk
 
 ; ==============================================================================
 ; MODULE: Hotstrings

@@ -1,4 +1,4 @@
-﻿; modules/keylogger_mouse.ahk
+﻿; modules/keylogger/keylogger_mouse.ahk
 
 ; ==============================================================================
 ; MODULE: Keylogger Mouse Events

@@ -1,4 +1,4 @@
-﻿; lib/layout_ergopti.ahk
+﻿; lib/layout/layout_ergopti.ahk
 
 ; ==============================================================================
 ; MODULE: Ergopti Base-Layer Mapping (single source of truth)

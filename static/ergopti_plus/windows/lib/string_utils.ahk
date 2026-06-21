@@ -1,4 +1,4 @@
-﻿; drivers/autohotkey/lib/string_utils.ahk
+﻿; lib/string_utils.ahk
 
 ; ==============================================================================
 ; MODULE: String Utilities

@@ -1,4 +1,4 @@
---- drivers/_shared/lua/keycodes/init.lua
+--- _shared/lua/keycodes/init.lua
 
 --- ==============================================================================
 --- MODULE: Keycode Registry (Shared)

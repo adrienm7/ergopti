@@ -1,4 +1,4 @@
-// ui/download_window/script.js
+// _shared/ui/download_window/script.js
 
 /**
  * ==============================================================================

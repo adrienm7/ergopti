@@ -1,4 +1,4 @@
-﻿; drivers/autohotkey/lib/i18n.ahk
+﻿; lib/i18n.ahk
 
 ; ==============================================================================
 ; MODULE: i18n (Internationalisation)

@@ -1,4 +1,4 @@
---- static/ergopti_plus/linux/adapters/notifier.lua
+--- adapters/notifier.lua
 
 --- ==============================================================================
 --- MODULE: Notifier Adapter (Linux)

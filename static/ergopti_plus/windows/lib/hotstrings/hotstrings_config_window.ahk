@@ -1,4 +1,4 @@
-﻿; drivers/autohotkey/lib/hotstrings/hotstrings_config_window.ahk
+﻿; lib/hotstrings/hotstrings_config_window.ahk
 
 ; ==============================================================================
 ; MODULE: Hotstrings Config Window

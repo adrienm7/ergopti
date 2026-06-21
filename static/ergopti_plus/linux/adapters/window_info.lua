@@ -1,4 +1,4 @@
---- static/ergopti_plus/linux/adapters/window_info.lua
+--- adapters/window_info.lua
 
 --- ==============================================================================
 --- MODULE: WindowInfo Adapter (Linux)

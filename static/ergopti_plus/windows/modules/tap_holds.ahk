@@ -1,4 +1,4 @@
-﻿; static/ergopti_plus/windows/modules/tap_holds.ahk
+﻿; modules/tap_holds.ahk
 
 ; ==============================================================================
 ; MODULE: Tap-Holds, One-Shot Shift and Navigation Layer

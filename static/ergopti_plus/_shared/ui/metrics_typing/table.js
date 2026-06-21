@@ -1,4 +1,4 @@
-// ui/metrics_typing/table.js
+// _shared/ui/metrics_typing/table.js
 
 /**
  * ==============================================================================

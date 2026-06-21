@@ -1,4 +1,4 @@
---- static/ergopti_plus/linux/modules/hotstrings/device_finder.lua
+--- modules/hotstrings/device_finder.lua
 
 --- ==============================================================================
 --- MODULE: Device Finder (Linux)
