@@ -274,6 +274,82 @@ end)
 
 
 
+-- =====================================================================
+-- =====================================================================
+-- ======= 2b/ per-key tap/hold timeout override (feat) ================
+-- =====================================================================
+-- =====================================================================
+
+-- Karabiner honours basic.to_if_alone_timeout_milliseconds at the manipulator
+-- level, overriding the complex_modifications global. The per-key feature stores
+-- an optional timeout_ms on the tap_hold_config entry; when set, the generator
+-- must emit it as a manipulator-level parameter, and when unset/non-positive it
+-- must emit nothing so the key inherits the single global value (no duplication).
+helpers.describe("Generator.build_karabiner_json: per-key tap/hold timeout override", function()
+	local function rcmd_manipulator(result)
+		for _, rule in ipairs(result.profiles[1].complex_modifications.rules) do
+			if type(rule.description) == "string" and rule.description:find("Right Command") then
+				return rule.manipulators[1]
+			end
+		end
+		return nil
+	end
+
+	helpers.it("emits per-manipulator basic.to_if_alone_timeout_milliseconds when timeout_ms is set", function()
+		local state = make_state({
+			tap_hold_config = { right_command = { tap = "cmd", hold = "none", timeout_ms = 333 } },
+		})
+		local result = Generator.build_karabiner_json(
+			state, {NONE_ACTION, CMD_ACTION}, {RCMD_KEY_DEF}, {}, nil, "/fake/data_dir/"
+		)
+		local m = rcmd_manipulator(result)
+		helpers.assert_true(m ~= nil, "expected a Right Command manipulator")
+		helpers.assert_true(type(m.parameters) == "table", "manipulator must carry per-key parameters")
+		helpers.assert_eq(m.parameters["basic.to_if_alone_timeout_milliseconds"], 333,
+			"per-key timeout must override the global at the manipulator level")
+	end)
+
+	helpers.it("omits per-manipulator parameters when no per-key timeout is set (inherits global)", function()
+		local state = make_state({
+			tap_hold_config = { right_command = { tap = "cmd", hold = "none" } },
+		})
+		local result = Generator.build_karabiner_json(
+			state, {NONE_ACTION, CMD_ACTION}, {RCMD_KEY_DEF}, {}, nil, "/fake/data_dir/"
+		)
+		local m = rcmd_manipulator(result)
+		helpers.assert_true(m ~= nil, "expected a Right Command manipulator")
+		helpers.assert_nil(m.parameters, "no per-key parameters when the key inherits the global timeout")
+	end)
+
+	helpers.it("treats a non-positive per-key timeout as 'inherit global' (no override emitted)", function()
+		local state = make_state({
+			tap_hold_config = { right_command = { tap = "cmd", hold = "none", timeout_ms = 0 } },
+		})
+		local result = Generator.build_karabiner_json(
+			state, {NONE_ACTION, CMD_ACTION}, {RCMD_KEY_DEF}, {}, nil, "/fake/data_dir/"
+		)
+		local m = rcmd_manipulator(result)
+		helpers.assert_nil(m.parameters, "timeout_ms <= 0 must clear to the global, emitting no override")
+	end)
+
+	helpers.it("keeps the global complex_modifications timeout as the default for other keys", function()
+		local state = make_state({
+			tap_hold_timeout_ms = 250,
+			tap_hold_config     = { right_command = { tap = "cmd", hold = "none", timeout_ms = 333 } },
+		})
+		local result = Generator.build_karabiner_json(
+			state, {NONE_ACTION, CMD_ACTION}, {RCMD_KEY_DEF}, {}, nil, "/fake/data_dir/"
+		)
+		-- The per-key override does not disturb the global parameter block.
+		helpers.assert_eq(
+			result.profiles[1].complex_modifications.parameters["basic.to_if_alone_timeout_milliseconds"],
+			250, "global timeout stays the inherited default")
+	end)
+end)
+
+
+
+
 -- ==============================================================
 -- ==============================================================
 -- ======= 3/ merge_into_existing_config: snapshot tests ========
