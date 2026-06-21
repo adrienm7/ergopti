@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# static/drivers/linux/bin/ergopti-hotstrings
+# static/ergopti_plus/linux/bin/ergopti-hotstrings
 #
 # Wrapper shell script for the Ergopti hotstring expansion daemon.
 #
@@ -96,11 +96,11 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 # Determine the ergopti installation root.
 # When installed via .deb / AppImage: script lives at /usr/bin/ and libs at
 # /usr/lib/ergopti/.  When run from a repo checkout: script lives in
-# static/drivers/linux/bin/ and we go two levels up to reach the drivers root.
+# static/ergopti_plus/linux/bin/ and we go two levels up to reach the ergopti_plus root.
 if [ -d "/usr/lib/ergopti" ]; then
 	ERGOPTI_ROOT="/usr/lib/ergopti"
 else
-	# Repo checkout: bin/ → linux/ → drivers/ → …
+	# Repo checkout: bin/ → linux/ → ergopti_plus/ → …
 	DRIVERS_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd -P)"
 	ERGOPTI_ROOT="${DRIVERS_ROOT}"
 fi
