@@ -42,7 +42,7 @@ global _LLM_Engine := Map(
 	"max_words",                  15,
 	"debounce_ms",                500,
 	"ctx_chars",                  500,
-	"language",                   "fr",
+	"language",                   "",
 	"temperature",                "0.10",
 	"instant_on_word_end",        true,
 	"after_hotstring",            true,
@@ -143,7 +143,7 @@ LLM_Engine_ApplySharedDefaults()
  *   n_predictions, min_words, max_words, debounce_ms, ctx_chars, language.
  */
 LLM_Engine_Init(opts) {
-	global _LLM_Engine
+	global _LLM_Engine, _I18nLocale
 	; Stop any in-flight generation when the backend changes so a WinHTTP
 	; response from the old provider cannot land into the new backend's context.
 	if (IsSet(_LLM_Engine) and _LLM_Engine.Has("backend") and opts.Has("backend") and _LLM_Engine["backend"] != opts["backend"]) {
@@ -164,6 +164,12 @@ LLM_Engine_Init(opts) {
 	for _, k in _keys
 		if opts.Has(k)
 			_LLM_Engine[k] := opts[k]
+
+	; The prediction language follows the active UI locale (the i18n single source
+	; of truth, lib/i18n.ahk) instead of a hardcoded "fr", so a user typing in their
+	; own language gets predictions in it. An explicit opts["language"] still wins.
+	if (!opts.Has("language") and IsSet(_I18nLocale) and _I18nLocale != "")
+		_LLM_Engine["language"] := _I18nLocale
 
 	; Arrays require explicit copy to avoid shared references
 	if opts.Has("user_profiles") && (opts["user_profiles"] is Array)

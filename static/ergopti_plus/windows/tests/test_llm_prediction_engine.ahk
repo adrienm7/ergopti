@@ -54,6 +54,30 @@ _EngineInit_OverridesNPredictions() {
 Test("LLM_Engine_Init: overrides n_predictions from opts", _EngineInit_OverridesNPredictions)
 
 
+_EngineInit_LanguageFollowsLocale() {
+	global _LLM_Engine, _I18nLocale
+	Saved := _I18nLocale
+	_I18nLocale := "en"
+	LLM_Engine_Init(Map())
+	Lang := _LLM_Engine["language"]
+	_I18nLocale := Saved
+	AssertEqual("en", Lang)
+}
+Test("LLM_Engine_Init: language follows the active UI locale, not a hardcoded fr", _EngineInit_LanguageFollowsLocale)
+
+
+_EngineInit_LanguageOptsOverride() {
+	global _LLM_Engine, _I18nLocale
+	Saved := _I18nLocale
+	_I18nLocale := "en"
+	LLM_Engine_Init(Map("language", "de"))
+	Lang := _LLM_Engine["language"]
+	_I18nLocale := Saved
+	AssertEqual("de", Lang)
+}
+Test("LLM_Engine_Init: explicit opts language overrides the locale default", _EngineInit_LanguageOptsOverride)
+
+
 _LLM_TooltipVanishOnAccept() {
     global _TooltipDequeueActive
     _TooltipDequeueActive := true
