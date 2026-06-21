@@ -751,7 +751,7 @@ function M.fetch_sequential(full_text, tail_text, model_name, temperature,
 	local requested_predictions = math.max(1, math.floor(tonumber(num_predictions) or 1))
 	local max_attempts = requested_predictions
 	if RETRY_FAILED_PREDICTION_ENABLED == true then
-		max_attempts = math.max(requested_predictions, requested_predictions * math.max(1, math.floor(tonumber(RETRY_FAILED_PREDICTION_MAX_MULTIPLIER) or 2)))
+		max_attempts = math.max(requested_predictions, requested_predictions * math.max(1, math.floor(tonumber(RETRY_FAILED_PREDICTION_MAX_MULTIPLIER))))
 	end
 	local attempt_index = 1
 	local dedup_stats   = ApiCommon.new_dedup_stats()
@@ -801,8 +801,8 @@ function M.fetch_sequential(full_text, tail_text, model_name, temperature,
 				end,
 				function()
 					if attempt < 2 then
-						local retry_tokens = tokens + (_RETRY_EXTRA_TOKENS or 5)
-						local retry_temp   = math.min(1.30, (tonumber(temp) or ApiCommon.DEFAULT_TEMPERATURE) + (_RETRY_TEMP_STEP or 0.18))
+						local retry_tokens = tokens + _RETRY_EXTRA_TOKENS
+						local retry_temp   = math.min(1.30, (tonumber(temp) or ApiCommon.DEFAULT_TEMPERATURE) + _RETRY_TEMP_STEP)
 						Logger.debug(LOG, "[%s] Variant %d/%d quick retry: tokens=%d temp=%.2f",
 							model_name, variant_index, max_attempts, retry_tokens, retry_temp)
 						-- Retry does not stream partial updates (would overwrite the growing preview)
