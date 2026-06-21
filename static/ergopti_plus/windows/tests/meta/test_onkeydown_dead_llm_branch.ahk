@@ -20,52 +20,14 @@
 ;
 ; Meta-static because _OnPrefixKeyDown depends on LLM_Bridge_FeedKeyDownIfActive
 ; (defined in modules/llm/llm_bridge.ahk, NOT in the run_all include graph) and
-; on tooltip / HSE side effects; calling it headless is unsafe.
+; on tooltip / HSE side effects; calling it headless is unsafe. The assertions
+; read the function body via the move-resilient _DriverFuncBody helper, so they
+; survive a move of hotstring_prefix_watcher.ahk.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
 
-
-
-
-; ==================================================
-; ==================================================
-; ======= 1/ Source scan helpers ===================
-; ==================================================
-; ==================================================
-
-; Reads a windows/-relative source file. A_ScriptDir is the runner dir (tests/);
-; its parent is the windows/ driver root.
-_OKDLB_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
-}
-
-; Returns the full function body  -  from its declaration to the first closing
-; brace at column 0. Returns "" when the declaration is absent.
-_OKDLB_FuncBody(Src, FuncDef) {
-	Idx := InStr(Src, FuncDef)
-	if !Idx
-		return ""
-	Rest := SubStr(Src, Idx)
-	End := InStr(Rest, "`n}")
-	if End
-		return SubStr(Rest, 1, End + 1)
-	return Rest
-}
-
-
-
-
-; ==================================================
-; ==================================================
-; ======= 2/ Dead-branch removal assertions ========
-; ==================================================
-; ==================================================
-
 _OKDLB_TabEnterBranchFeedsBridge() {
-	Src := _OKDLB_ReadSource("lib/hotstrings/hotstring_prefix_watcher.ahk")
 	Seg := _DriverFuncBody("_OnPrefixKeyDown")
 	Assert(Seg != "", "_OnPrefixKeyDown must exist in hotstring_prefix_watcher.ahk")
 	; The Tab/Enter clause must now route the VK through the bridge feed so the
@@ -81,7 +43,6 @@ _OKDLB_TabEnterBranchFeedsBridge() {
 Test("PrefixWatcher: Tab/Enter clause feeds the LLM bridge (onkeydown-dead-llm-branch)", _OKDLB_TabEnterBranchFeedsBridge)
 
 _OKDLB_NoDeadTrailingClause() {
-	Src := _OKDLB_ReadSource("lib/hotstrings/hotstring_prefix_watcher.ahk")
 	Seg := _DriverFuncBody("_OnPrefixKeyDown")
 	Assert(Seg != "", "_OnPrefixKeyDown must exist in hotstring_prefix_watcher.ahk")
 	; The unreachable trailing clause testing all three nav VKs at once must be

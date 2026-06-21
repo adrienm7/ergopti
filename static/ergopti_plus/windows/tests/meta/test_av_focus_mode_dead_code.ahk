@@ -45,20 +45,6 @@ _AVFM_ReadSource(RelPath) {
 	return FileRead(Path)
 }
 
-; Returns the full function body - from its declaration to the first closing
-; brace at column 0 (AHK functions close with a flush-left brace). Returns ""
-; when the declaration is absent.
-_AVFM_FuncBody(Src, FuncDef) {
-	Idx := InStr(Src, FuncDef)
-	if !Idx
-		return ""
-	Rest := SubStr(Src, Idx)
-	End := InStr(Rest, "`n}")
-	if End
-		return SubStr(Rest, 1, End + 1)
-	return Rest
-}
-
 
 
 
@@ -69,7 +55,6 @@ _AVFM_FuncBody(Src, FuncDef) {
 ; ==================================================
 
 _AVFM_SlowTickDoesNotPollFocus() {
-	Src := _AVFM_ReadSource("modules/keylogger/keylogger_av_state.ahk")
 	Seg := _DriverFuncBody("KL_AV_SlowTick")
 	Assert(Seg != "", "KL_AV_SlowTick() declaration must exist in keylogger_av_state.ahk")
 	Assert(InStr(Seg, "KL_AV_PollFocusMode") = 0,
