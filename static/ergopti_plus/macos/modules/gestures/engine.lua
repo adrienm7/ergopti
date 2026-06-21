@@ -13,10 +13,11 @@
 
 local M = {}
 
-local hs      = hs
-local Logger  = require("lib.logger")
-local Timings = require("lib.timings")
-local LOG     = "gestures.engine"
+local hs       = hs
+local Logger   = require("lib.logger")
+local Timings  = require("lib.timings")
+local Geometry = require("modules.gestures.geometry")
+local LOG      = "gestures.engine"
 
 local _state      = nil
 local _actions    = nil
@@ -45,9 +46,10 @@ local TAP_MAX_SEC    = Timings.sec("gestures", "tap_max_ms")   -- Capture slight
 -- were enough to lock a direction during live tracking are not misclassified as
 -- swipes when fingers lift.
 local TAP_MAX_DELTA  = 8.0    -- Units below which a gesture is always treated as a tap on commit
-local SWIPE_MIN      = 1.5    -- 3/4/5 fingers: minimum distance to validate a swipe
-local SWIPE_MIN_2    = 3.0    -- 2 fingers horiz/vert (left to macOS, diagonal only)
-local DIAG_MIN_2     = 5.0    -- 2 fingers: minimum total distance to validate a diagonal
+-- Swipe-distance thresholds live in gestures/geometry.lua (single source of
+-- truth); the commit path reads SWIPE_MIN back from there so the direction
+-- classifier and the commit threshold check can never drift apart.
+local SWIPE_MIN      = Geometry.SWIPE_MIN
 local SCALE_DIV      = 3.5
 local LIVE_AXIS_MIN               = 1.0   -- Minimum signed distance to trigger non-scalable horizontal actions live
 local LIVE_REARM_SEC              = Timings.sec("gestures", "live_rearm_ms")          -- Minimum delay between consecutive live axis triggers
@@ -202,81 +204,6 @@ local function resetGS()
 	}
 end
 resetGS()
-
---- Calculates the central point among all current fingers.
---- @param touches table Trackpad touch arrays.
---- @return table X and Y coordinate map.
-local function avgPos(touches)
-	local x, y = 0, 0
-	if type(touches) ~= "table" or #touches == 0 then return {x=0, y=0} end
-	
-	for _, t in ipairs(touches) do
-		if type(t) == "table" and type(t.absoluteVector) == "table" and type(t.absoluteVector.position) == "table" then
-			x = x + (tonumber(t.absoluteVector.position.x) or 0)
-			y = y + (tonumber(t.absoluteVector.position.y) or 0)
-		end
-	end
-	return { x = x / #touches, y = y / #touches }
-end
-
---- Infers the action configuration slot ID given fingers count and direction.
---- @param mf number Number of fingers.
---- @param dir string Direction name (e.g., "horiz", "diag").
---- @param dx number X delta.
---- @param dy number Y delta.
---- @return string|nil The slot string ID.
-local function slotForDir(mf, dir, dx, dy)
-	local prefix = "swipe_" .. tostring(mf) .. "_"
-	if dir == "horiz" then
-		return prefix .. (dx > 0 and "right" or "left")
-	elseif dir == "vert" then
-		return prefix .. (dy > 0 and "down" or "up")
-	elseif dir == "diag" then
-		if dx > 0 then
-			return prefix .. (dy > 0 and "right_down" or "right_up")
-		else
-			return prefix .. (dy > 0 and "left_down" or "left_up")
-		end
-	end
-	return nil
-end
-
---- Derives a general direction from geometric distances.
---- @param dx number X delta.
---- @param dy number Y delta.
---- @param mf number Amount of fingers.
---- @return string|nil Direction string.
-local function computeDir(dx, dy, mf)
-	local adx  = math.abs(dx)
-	local ady  = math.abs(dy)
-	local dist = adx + ady
-	local min  = (mf == 2) and SWIPE_MIN_2 or SWIPE_MIN
-	
-	if dist < min then return nil end
-
-	-- Stricter angles for primary axes to avoid accidental diagonal lock
-	-- Horizontal: 0-25 degrees (atan dy/dx)
-	-- Vertical: 65-90 degrees
-	-- Diagonal: 25-65 degrees
-	local angle = math.deg(math.atan(ady, adx))
-
-	if angle >= 65 then 
-		return "vert"
-	elseif angle <= 25 then 
-		return "horiz"
-	else
-		-- Lock diagonal only when total Manhattan distance (adx+ady) meets the threshold.
-		-- The previous guard required each axis to independently exceed diagMin, which
-		-- doubled the required travel (e.g. 10 units for diagMin=5, not 5). Using the
-		-- already-computed `dist` matches the "minimum total distance" intent and makes
-		-- 45° diagonals detectable at the same distance as straight swipes.
-		local diagMin = (mf == 2) and DIAG_MIN_2 or (min * 1.5)
-		if dist >= diagMin then return "diag" end
-
-		-- Fallback to dominant axis if not enough "diagonal-ness"
-		return (adx >= ady) and "horiz" or "vert"
-	end
-end
 
 --- Computes continuous signed distance (absolute trackpad coordinates).
 --- @param pos table Current position coordinates.
@@ -533,7 +460,7 @@ local function commitGesture(now)
 		return
 	end
 
-	local dir = computeDir(dx, dy, mf)
+	local dir = Geometry.computeDir(dx, dy, mf)
 	Logger.debug(LOG, "commitGesture: computeDir → %s (lockedDir=%s)", tostring(dir), tostring(gs.lockedDir))
 	if not dir then
 		Logger.debug(LOG, "commitGesture: no direction computed — return")
@@ -551,7 +478,7 @@ local function commitGesture(now)
 		return
 	end
 
-	local slot = slotForDir(mf, dir, dx, dy)
+	local slot = Geometry.slotForDir(mf, dir, dx, dy)
 	Logger.debug(LOG, "commitGesture: slotForDir(%d, %s, %.2f, %.2f) → %s", mf, dir, dx, dy, tostring(slot))
 	if not slot or _state.ga[slot] == "none" then
 		Logger.debug(LOG, "commitGesture: slot=%s action=%s — skip",
@@ -661,7 +588,7 @@ function M.process_frame(touches)
 	if n >= 3 and _state and _state.enabled and not _state.suspended then startScrollBlock() end
 
 	if n >= 2 then
-		local pos = avgPos(touches)
+		local pos = Geometry.avgPos(touches)
 		if not gs.active then
 			Logger.info(LOG, "GESTURE START: fingers=%d pos=(%.1f,%.1f) ts=%.3f", n, pos.x, pos.y, now)
 			-- Signal the actions module that a new gesture has begun, so any
@@ -844,7 +771,7 @@ function M.process_frame(touches)
 				if gs.lockedDir == nil then
 					local dx = pos.x - gs.startPos.x
 					local dy = pos.y - gs.startPos.y
-					local tentative = computeDir(dx, dy, gs.maxFingers)
+					local tentative = Geometry.computeDir(dx, dy, gs.maxFingers)
 					if tentative ~= nil then
 						Logger.info(LOG, "LOCKED DIR=%s (dx=%.2f dy=%.2f maxFingers=%d)",
 							tentative, dx, dy, gs.maxFingers)
@@ -856,7 +783,7 @@ function M.process_frame(touches)
 					local axis = gs.lockedDir
 					local dx = pos.x - gs.startPos.x
 					local dy = pos.y - gs.startPos.y
-					local slot = slotForDir(gs.maxFingers, axis, dx, dy)
+					local slot = Geometry.slotForDir(gs.maxFingers, axis, dx, dy)
 
 					if slot and _state.ga[slot] and _state.ga[slot] ~= "none" then
 						triggerLiveAxisIfNeeded(slot, pos, now, axis)

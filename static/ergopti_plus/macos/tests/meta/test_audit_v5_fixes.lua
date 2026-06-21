@@ -38,18 +38,26 @@ end
 
 helpers.describe("gestures/engine.lua: diagonal detection uses total distance (audit-v5)", function()
 
+	-- computeDir() (which owns the diagonal-distance guard) was extracted from
+	-- gestures/engine.lua into the self-contained gestures/geometry.lua. Read
+	-- both so the guard assertions survive that move (move-resilient).
+	local function read_geometry_src()
+		return (read_source("modules/gestures/engine.lua") or "") ..
+			"\n" .. (read_source("modules/gestures/geometry.lua") or "")
+	end
+
 	helpers.it("old `adx >= diagMin and ady >= diagMin` pattern is gone", function()
-		local src = read_source("modules/gestures/engine.lua")
+		local src = read_geometry_src()
 		helpers.assert_true(
 			not src:find("adx >= diagMin and ady >= diagMin", 1, true),
-			"engine.lua must not use `adx >= diagMin and ady >= diagMin` (requires 2x distance)")
+			"engine/geometry must not use `adx >= diagMin and ady >= diagMin` (requires 2x distance)")
 	end)
 
 	helpers.it("diagonal check uses `dist >= diagMin`", function()
-		local src = read_source("modules/gestures/engine.lua")
+		local src = read_geometry_src()
 		helpers.assert_true(
 			src:find("dist >= diagMin", 1, true) ~= nil,
-			"engine.lua diagonal check must use `dist >= diagMin` (Manhattan total distance)")
+			"engine/geometry diagonal check must use `dist >= diagMin` (Manhattan total distance)")
 	end)
 
 end)
