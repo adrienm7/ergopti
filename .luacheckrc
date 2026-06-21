@@ -31,10 +31,10 @@ ignore = {
 }
 
 exclude_files = {
-	"static/drivers/hammerspoon/hs/_asm/**",
+	"static/ergopti_plus/macos/vendor/hs_asm/**",
 }
 
-files["static/drivers/hammerspoon/tests/"] = {
+files["static/ergopti_plus/macos/tests/"] = {
 	-- Tests legitimately do dynamic requires and global stub injection
 	ignore = { "111", "112", "113", "121", "122", "143" },
 }
