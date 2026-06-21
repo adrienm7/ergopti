@@ -52,9 +52,13 @@ GestureToggleLeftClick() {
 
     ; Install a keyboard hook that releases the button on any key press
     GestureStartKeyboardWatcher()
-    ; Subscribe via HookDispatcher so the shared ~RButton handler is preserved;
-    ; a bare Hotkey("~RButton", …) call would replace the dispatcher's handler.
+    ; Subscribe via HookDispatcher so the shared ~LButton/~RButton handlers are
+    ; preserved; a bare Hotkey(…) call would replace the dispatcher's handlers.
+    ; A right-click stops the hold, and a one-finger tap (a physical left-click)
+    ; releases it too, so the next triple-tap re-engages a fresh left-click-down
+    ; instead of toggling the stale hold off.
     HookDispatcher.Register("mouse_rdown", GestureReleaseLeftClick)
+    HookDispatcher.Register("mouse_ldown", GestureReleaseLeftClick)
     LoggerInfo("gestures", "Left-click hold mode enabled.")
 }
 
@@ -66,9 +70,10 @@ GestureReleaseLeftClick(*) {
         return
     }
 
-    ; Unsubscribe via HookDispatcher — Hotkey("~RButton", …, "Off") would
-    ; disable the shared ~RButton handler that the dispatcher registered.
+    ; Unsubscribe via HookDispatcher — Hotkey(…, "Off") would disable the shared
+    ; ~LButton/~RButton handlers that the dispatcher registered.
     HookDispatcher.Unregister("mouse_rdown", GestureReleaseLeftClick)
+    HookDispatcher.Unregister("mouse_ldown", GestureReleaseLeftClick)
     LoggerDebug("gestures", "Disabling left-click hold mode…")
     Click("Left", "Up")
     GestureLeftClickHeld := False
