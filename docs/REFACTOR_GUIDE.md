@@ -7,8 +7,10 @@
 > rouge diagnosticable en < 5 min** — qui n'était pas encore traitée.
 >
 > **Toutes les affirmations sont adossées à un `path:line` ou une commande
-> reproductible.** Les chiffres ont été mesurés le 2026-06-21 et re-vérifiés par une
-> passe de cross-check adverse. **Aucune étape ne change le comportement** sauf celles
+> reproductible.** Les chiffres ont été mesurés le 2026-06-21 puis re-vérifiés par une passe
+> de cross-check adverse multi-agents (8 vérificateurs indépendants) ; les écarts trouvés
+> (FileRead AHK 152→36, adapters macOS 20→23, citation `run.lua:186`→`helpers/init.lua:237`,
+> plage `hotstrings.ahk`, comptes d'assertions) ont été corrigés. **Aucune étape ne change le comportement** sauf celles
 > explicitement marquées `feat`/`fix`.
 >
 > ⚠️ **Foot-gun de mesure** : `git grep` / `grep` POSIX renvoie **0** sur les fichiers
@@ -34,7 +36,7 @@ Par impact décroissant (gain entre parenthèses) :
    test ; 0 replay par test), **macOS/Linux B-**. Hisser AHK/Lua au niveau JS. (→ *diagnostic*).
 4. **DIP asymétrique = le gain max / risque min.** macOS a un *ratchet de pureté OS*
    (917/950 `hs.*`, **70/70 `io.open` — ZÉRO marge**) ; **AHK n'en a aucun** →
-   117 `DllCall` + 152 `FileRead` hors `adapters/` non gardés. Ajouter le ratchet AHK
+   117 `DllCall` + 36 `FileRead` hors `adapters/` non gardés. Ajouter le ratchet AHK
    (baseline = comptes actuels) est *test-only, blast faible*. (→ *zéro dérive*).
 5. **Defaults : l'infra `_shared/` existe déjà et marche** (timings, hotstrings, llm,
    wpm, tooltip). Restent **~5 poches** de duplication / fallback §5.4 : WPM HS
@@ -97,9 +99,9 @@ Bucketisation des **411** `windows/tests/test_*.ahk` (commandes reproductibles) 
 | Couche | Attendu vs obtenu ? | Indice `path:line` ? | Replay d'un seul test ? | Note |
 |---|---|---|---|---|
 | **JS** (`tools/test`) | ✅ par check, + tail ([`run-js-suite.cjs:71`](../tools/test/run-js-suite.cjs#L71)) | implicite (stack si throw) | ✅ `reproduce:` ([`run-js-suite.cjs:70`](../tools/test/run-js-suite.cjs#L70)) | **A-** (la barre) |
-| **macOS** (`macos/tests`) | partiel — `assert_eq` oui, `assert_true` nu → « expected truthy » ([`helpers/init.lua:236`](../static/ergopti_plus/macos/tests/helpers/init.lua#L236)) ; **532** sites nus | ✅ `error(msg,2)` → site du test ([`run.lua:186`](../static/ergopti_plus/macos/tests/run.lua#L186)) | ❌ aucun filtre CLI | **B-** |
+| **macOS** (`macos/tests`) | partiel — `assert_eq` oui, `assert_true` nu → « expected truthy » ([`helpers/init.lua:236`](../static/ergopti_plus/macos/tests/helpers/init.lua#L236)) ; **~530** sites nus (estim.) | ✅ `error(msg,2)` → site du test ([`helpers/init.lua:237`](../static/ergopti_plus/macos/tests/helpers/init.lua#L237)) | ❌ aucun filtre CLI | **B-** |
 | **Linux** (`linux/tests`) | partiel (`assert_true` nu [`helpers.lua:87`](../static/ergopti_plus/linux/tests/helpers.lua#L87)) | ✅ `error(msg,2)` | ❌ aucun filtre | **B-** |
-| **AHK** (`windows/tests`) | partiel — `AssertEqual/True/False/Contains` rendent les valeurs ([`test_framework.ahk:88`](../static/ergopti_plus/windows/tests/test_framework.ahk#L88)) ; `Assert()`/`AssertThrows()` **nus** ; **256** `Assert` + **162** `AssertTrue` nus | ⚠️ mal placé — `[e.File:e.Line]` pointe la **ligne du helper** dans `test_framework.ahk:290`, pas le test | ❌ `run_all.ahk` ne lit que `--dry-run` ([`:29`](../static/ergopti_plus/windows/tests/run_all.ahk#L29)) | **C** |
+| **AHK** (`windows/tests`) | partiel — `AssertEqual/True/False/Contains` rendent les valeurs ([`test_framework.ahk:88`](../static/ergopti_plus/windows/tests/test_framework.ahk#L88)) ; `Assert()`/`AssertThrows()` **sans valeur** ; **2008** sites `Assert(` (mesuré) + **598** `AssertTrue(` | ⚠️ mal placé — `[e.File:e.Line]` pointe la **ligne du helper** dans `test_framework.ahk:290`, pas le test | ❌ `run_all.ahk` ne lit que `--dry-run` ([`:29`](../static/ergopti_plus/windows/tests/run_all.ahk#L29)) | **C** |
 
 **La barre existe déjà** : [`run-js-suite.cjs:67-74`](../tools/test/run-js-suite.cjs#L67) imprime, par
 check rouge, (a) le nom, (b) `reproduce: <cmd exact>`, (c) les 12 dernières lignes de
@@ -155,17 +157,18 @@ top-level `^#+F1::..^#+F10::` ([`:1805`](../static/ergopti_plus/windows/modules/
 | Mesure | Valeur | Source |
 |---|---|---|
 | Sites `Features[` **production** AHK (ripgrep) | **294 / 29 fichiers** (pire : `hotstrings.ahk`=96, `altgr.ahk`=23, `path_translator.ahk`=23, `win.ahk`=20) | `Grep 'Features\['` (exclut tests) — confirme [REFACTOR_PLAN.md:74](REFACTOR_PLAN.md#L74) |
-| `if`-blocks `Features[…]{LoadHotstringsSection}` hand-maintained | 34 dans [`hotstrings.ahk:65-260`](../static/ergopti_plus/windows/modules/hotstrings.ahk#L65) | violation **O** |
+| `if`-blocks `Features[…]{LoadHotstringsSection}` hand-maintained | 34 dans [`hotstrings.ahk:66-1002`](../static/ergopti_plus/windows/modules/hotstrings.ahk#L66) | violation **O** |
 | Ports avec test de contrat **comportemental** | **9 / 20** (macOS), ~8/20 (AHK) ; **11 ports = 0** (Crypto, KeyState, MouseControl, GraphicsRenderer, WindowManager, NetworkInfo, Clipboard, Storage, ProcessLifecycle, AppLauncher, SecureFieldDetector) | [`test_adapter_contract_vectors.lua:34`](../static/ergopti_plus/macos/tests/unit/test_adapter_contract_vectors.lua#L34) |
 | Ratchet OS macOS `hs.*` (hors `adapters/`) | **917 / 950** (33 de marge) | [`test_port_adapter_coverage.lua:243`](../static/ergopti_plus/macos/tests/meta/test_port_adapter_coverage.lua#L243) |
 | Ratchet OS macOS `io.open`/`os.execute` | **70 / 70 — ZÉRO marge** | idem `:244` |
-| OS direct AHK **hors `adapters/`, NON gardé** | **117 `DllCall` + 21 COM + 152 `FileRead`** | `windows/{modules,lib}` ; le garde AHK ne scanne que `_shared/` JS ([`test_port_adapter_coverage.ahk:222`](../static/ergopti_plus/windows/tests/meta/test_port_adapter_coverage.ahk#L222)) |
+| OS direct AHK **hors `adapters/`, NON gardé** | **117 `DllCall` + 21 COM + 36 `FileRead`** | `windows/{modules,lib}` ; le garde AHK ne scanne que `_shared/` JS ([`test_port_adapter_coverage.ahk:222`](../static/ergopti_plus/windows/tests/meta/test_port_adapter_coverage.ahk#L222)) |
 | Fonctions-dieu (SRP) | `handle_key()` ~390 l. ([`keylogger/init.lua:448`](../static/ergopti_plus/macos/modules/keylogger/init.lua#L448)), `onKeyDownRaw()` ~290 l. ([`keymap/init.lua:592`](../static/ergopti_plus/macos/modules/keymap/init.lua#L592)) | |
 | Fallback `if x == nil then x =` (macOS modules+lib) | 2 ([`api_common.lua:104`](../static/ergopti_plus/macos/modules/llm/api_common.lua#L104) `=300`, `gestures/init.lua:375`) | violation §5.4 |
 
-**Contredit une hypothèse du prompt** : les 3 drivers ont **les 20 adapters** (macOS
-`mouse_control/graphics_renderer/window_manager/crypto/network_info/key_state` sont de
-**vraies** implémentations). Le trou Liskov n'est pas « adapters manquants » mais
+**Contredit une hypothèse du prompt** : les 3 drivers implémentent **les 20 ports** (Win 20,
+Linux 20, **macOS 23 fichiers = 20 ports + 3 adapters helpers OS** `json_codec/shell_runner/toml_cache`) ;
+macOS `mouse_control/graphics_renderer/window_manager/crypto/network_info/key_state` sont de
+**vraies** implémentations. Le trou Liskov n'est pas « adapters manquants » mais
 « 11 ports sans vecteurs ». La doc [`architecture.md:100`](../static/ergopti_plus/docs/architecture.md#L100) est **périmée** (n'y dessine que 13 ports HS) → à régénérer.
 
 ### 2.6 Linux — driver partiel (état)
@@ -253,7 +256,7 @@ Preuve · Action · Test · Vérif · Diagnostic d'échec · Rollback · Blast.*
 
 **T1.1 — Ratchet de pureté OS côté AHK** *(NOUVEAU ; symétrise le garde macOS)* ⭐ *gain max / risque min*
 - **Obj** : garder les appels OS hors `adapters/` côté AHK comme macOS le fait. **SOLID-D.**
-- **Preuve** : 117 `DllCall` + 152 `FileRead` non gardés ; `test_port_adapter_coverage.ahk:222`
+- **Preuve** : 117 `DllCall` + 36 `FileRead` non gardés ; `test_port_adapter_coverage.ahk:222`
   ne scanne que `_shared/` JS.
 - **Action** : étendre le test pour compter `DllCall|ComObject|FileRead` dans
   `windows/{modules,lib}` (hors `adapters/`), **baseline = comptes actuels** (pas 0 : §5.6
@@ -311,8 +314,8 @@ Preuve · Action · Test · Vérif · Diagnostic d'échec · Rollback · Blast.*
 
 **T1.5 — Renommer les contrôleurs webview `flat → ui/<window>/init`** *(prolonge P5 §131,133)* ⭐ *win le moins cher*
 - **Obj** : symétrie de chemin pour 5 fenêtres. **Preuve** : `_shared/ui/` héberge déjà
-  `index.html/script.js/style.css` 1:1 (`changelog, download_window, metrics_apps,
-  metrics_typing, model_browser`), résolus par les deux drivers
+  leurs assets web 1:1 (`index.html`+JS+`style.css` ; metrics_typing = JS modularisé en 10 fichiers)
+  pour `changelog, download_window, metrics_apps, metrics_typing, model_browser`, résolus par les deux drivers
   ([`macos/ui/model_browser/init.lua:47`](../static/ergopti_plus/macos/ui/model_browser/init.lua#L47), [`windows/ui/changelog_window.ahk:399`](../static/ergopti_plus/windows/ui/changelog_window.ahk#L399)).
 - **Action** : `windows/ui/changelog_window.ahk → ui/changelog/init.ahk`,
   `llm_model_browser.ahk → ui/model_browser/init.ahk` (le frontend ne bouge pas ; le path
@@ -417,7 +420,7 @@ Preuve · Action · Test · Vérif · Diagnostic d'échec · Rollback · Blast.*
 
 **T3.4 — `hotstrings.ahk` : 34 `if`-blocks → boucle data-driven** *(SOLID-O)*
 - **Preuve** : 96 sites `Features[` + 34 `LoadHotstringsSection` hand-maintained
-  ([`:65-260`](../static/ergopti_plus/windows/modules/hotstrings.ahk#L65)) ; macOS data-driven via `_index.toml`. **Action** : itérer les groupes
+  ([`:66-1002`](../static/ergopti_plus/windows/modules/hotstrings.ahk#L66)) ; macOS data-driven via `_index.toml`. **Action** : itérer les groupes
   déclarés au manifeste. **Test** : « un nouveau groupe manifeste-only se charge **sans** édition de
   code ». **Blast** : **HAUT** (load path hot).
 
@@ -472,7 +475,7 @@ port non conforme **échoue au CI, pas au clavier**.
 - **Nom = comportement** : `expands "tdej" -> "déjeuner" after a word boundary`, pas
   `test_expander_file_has_function`.
 - **Gabarit de message** mandaté (T1.3) : `expected / actual / at:<test:line> / replay:<cmd>`.
-- **Bannir** `Assert()`/`AssertThrows()` nus (256+162 AHK) et `assert_true(x)` nu (532 macOS).
+- **Bannir** `Assert()`/`AssertThrows()` sans valeur (**~2008** `Assert(` AHK) et `assert_true(x)` nu (~530 macOS).
 
 ### 6.6 Métrique de réussite
 - Ratio behavior:scan-source **inversé** sur la part convertible (cible : behavior ≥ scan-source).
