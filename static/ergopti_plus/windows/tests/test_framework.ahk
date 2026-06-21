@@ -248,6 +248,25 @@ _FilterMatches(Name, Filter) {
 	return (Filter == "" || InStr(Name, Filter) > 0)
 }
 
+; Returns "file:line" for the first stack frame OUTSIDE test_framework.ahk — the
+; failing test's own call site, rather than the assert helper that threw. AHK
+; stack lines look like ``C:\...\test_foo.ahk (123) : [Func] <source>``. Returns
+; "" when no such frame is found (the stack format varies by AHK build) so the
+; caller can fall back to the raw throw location.
+_TestCallSite(StackText) {
+	if (StackText == "")
+		return ""
+	for Line in StrSplit(StackText, "`n", "`r") {
+		if !RegExMatch(Line, "^\s*(.+?)\s+\((\d+)\)", &m)
+			continue
+		if (InStr(m[1], "test_framework.ahk") || m[1] == "")
+			continue
+		SplitPath(m[1], &FileName)
+		return FileName . ":" . m[2]
+	}
+	return ""
+}
+
 ; Path of the TAP results file. Overridden by e2e; otherwise set per-run in
 ; RunTests() (PID suffix) so parallel AHK runners do not deadlock on one handle.
 global TEST_RESULTS_FILE := A_Temp . "\ergopti_test_results.txt"
@@ -318,7 +337,15 @@ RunTests() {
             }
 		} catch as e {
 			Status := "not ok"
-			Detail := " — " . e.Message . " [" . e.File . ":" . e.Line . "]"
+			; Point [file:line] at the test's own call site, not the assert helper
+			; in test_framework.ahk where the throw physically happened.
+			Site := ""
+			try Site := _TestCallSite(e.Stack)
+			if (Site == "") {
+				SplitPath(e.File, &EFileName)
+				Site := EFileName . ":" . e.Line
+			}
+			Detail := " — " . e.Message . " [" . Site . "]"
 		}
 		if (Status == "ok") {
 			TEST_PASS_COUNT += 1
@@ -326,6 +353,11 @@ RunTests() {
 			TEST_FAIL_COUNT += 1
 		}
 		_TestPrint(Status . " " . Index . " - " . TestEntry.name . Detail)
+		; Print the exact one-test replay command so a red test is reproducible
+		; without re-running the whole suite (the JS runner sets this bar).
+		if (Status == "not ok")
+			_TestPrint("#   replay: AutoHotkey64.exe tests\run_all.ahk --only "
+				. Chr(34) . TestEntry.name . Chr(34))
 	}
 	_TestPrint("# " . TEST_PASS_COUNT . " passed, " . TEST_FAIL_COUNT . " failed.")
 	_CopyTestResultsForCi()
