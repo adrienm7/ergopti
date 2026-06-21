@@ -467,3 +467,62 @@ _RunHttpClientContractVectors() {
 	Test("HttpClient: cancel when idle does not throw", _Result_cancel_idle)
 }
 _RunHttpClientContractVectors()
+
+
+
+
+; ===============================================
+; ===============================================
+; ======= 9/ Crypto contract vectors ============
+; ===============================================
+; ===============================================
+
+_RunCryptoContractVectors() {
+	; sha256 returns a string and never throws (sha256_returns_string)
+	_Result_crypto_string() {
+		Err := "", Out := ""
+		try {
+			Out := CryptoSha256("hello")
+		} catch as E {
+			Err := E.Message
+		}
+		Assert(Err = "", "CryptoSha256 must not throw: " . Err)
+		Assert(Type(Out) = "String", "CryptoSha256 must return a String")
+	}
+	Test("Crypto: sha256 returns a string and never throws", _Result_crypto_string)
+
+	; Lowercase hex; 64 chars via the COM SHA256Managed class, 8 via the DJB2
+	; fallback. When COM is present it must equal the canonical SHA-256 of "hello"
+	; (sha256_returns_64_hex_chars).
+	_Result_crypto_hex() {
+		Out := CryptoSha256("hello")
+		Assert(RegExMatch(Out, "^[0-9a-f]+$") > 0, "CryptoSha256 must be lowercase hex: " . Out)
+		Assert(StrLen(Out) = 64 || StrLen(Out) = 8,
+			"CryptoSha256 must be 64 (COM) or 8 (DJB2 fallback) hex chars, got " . StrLen(Out))
+		if (StrLen(Out) = 64) {
+			Assert(Out = "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824",
+				"CryptoSha256('hello') must equal the canonical SHA-256 digest, got: " . Out)
+		}
+	}
+	Test("Crypto: sha256 returns the canonical lowercase hex digest", _Result_crypto_hex)
+
+	; sha256 is deterministic (sha256_is_deterministic)
+	_Result_crypto_det() {
+		Assert(CryptoSha256("ergopti") = CryptoSha256("ergopti"),
+			"CryptoSha256 must return the same digest for the same input")
+	}
+	Test("Crypto: sha256 is deterministic", _Result_crypto_det)
+
+	; sha256 handles the empty string without throwing (sha256_empty_string)
+	_Result_crypto_empty() {
+		Err := ""
+		try {
+			CryptoSha256("")
+		} catch as E {
+			Err := E.Message
+		}
+		Assert(Err = "", "CryptoSha256('') must not throw: " . Err)
+	}
+	Test("Crypto: sha256 handles the empty string", _Result_crypto_empty)
+}
+_RunCryptoContractVectors()
