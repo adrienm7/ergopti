@@ -991,3 +991,59 @@ _RunGraphicsRendererContractVectors() {
 	Test("GraphicsRenderer: destroy/show/hide/drawBitmap on a zero handle are no-ops", _Result_gr_zero_noops)
 }
 _RunGraphicsRendererContractVectors()
+
+
+
+; KeyboardHook contract vectors (KeyboardHook.spec.js). The adapter registers with
+; the shared HookDispatcher rather than creating its own InputHook, and KHStart
+; does NOT start the underlying hook (HookDispatcher.Start owns that lifecycle), so
+; these run headless without intercepting real keystrokes. Mirrors the macOS
+; KeyboardHook vectors: start/stop toggle isRunning, stop is idempotent, getContext
+; returns a Map, refreshContext does not throw.
+_RunKeyboardHookContractVectors() {
+	_Result_kh_start_running() {
+		KHStart(Map("onChar", (*) => 0, "onKey", (*) => 0))
+		Running := KHIsRunning()
+		KHStop()
+		Assert(Running, "KHIsRunning() must be truthy after KHStart(); got " . Running)
+	}
+	Test("KeyboardHook: isRunning() is true after start()", _Result_kh_start_running)
+
+	_Result_kh_stop_running() {
+		KHStart(Map("onChar", (*) => 0, "onKey", (*) => 0))
+		KHStop()
+		Running := KHIsRunning()
+		Assert(!Running, "KHIsRunning() must be falsy after KHStop(); got " . Running)
+	}
+	Test("KeyboardHook: isRunning() is false after stop()", _Result_kh_stop_running)
+
+	_Result_kh_stop_idempotent() {
+		Err := ""
+		try {
+			KHStop()
+			KHStop()
+		} catch as E {
+			Err := E.Message
+		}
+		Assert(Err = "", "KHStop() when not running must not throw: " . Err)
+	}
+	Test("KeyboardHook: stop() when not running is safe (idempotent)", _Result_kh_stop_idempotent)
+
+	_Result_kh_getcontext_map() {
+		Ctx := KHGetContext()
+		Assert(Ctx is Map, "KHGetContext() must return a Map; got type " . Type(Ctx))
+	}
+	Test("KeyboardHook: getContext() returns a Map", _Result_kh_getcontext_map)
+
+	_Result_kh_refresh_no_throw() {
+		Err := ""
+		try {
+			KHRefreshContext()
+		} catch as E {
+			Err := E.Message
+		}
+		Assert(Err = "", "KHRefreshContext() must not throw: " . Err)
+	}
+	Test("KeyboardHook: refreshContext() does not throw", _Result_kh_refresh_no_throw)
+}
+_RunKeyboardHookContractVectors()
