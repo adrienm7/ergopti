@@ -2,26 +2,10 @@
 
 #Requires AutoHotkey v2.0
 
-_TDT_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
-}
-
-_TDT_FuncBodyStripped(Src, FuncDef) {
-	Idx := InStr(Src, FuncDef)
-	if !Idx
-		return ""
-	Rest := SubStr(Src, Idx)
-	if RegExMatch(Rest, "m)^\}", &Match)
-		Rest := SubStr(Rest, 1, Match.Pos)
-	return Rest
-}
-
 _TDT_AssertDeadKeyTimeout() {
-	Src := _TDT_ReadSource("modules/layout.ahk")
-	
-	DeadKeyBody := _TDT_FuncBodyStripped(Src, "DeadKey(Mapping) {")
+	; Move-resilient: locate DeadKey() across the whole driver source via the
+	; framework helper instead of a pinned modules path
+	DeadKeyBody := _DriverFuncBody("DeadKey")
 	
 	TimeoutIdx := InStr(DeadKeyBody, '"L1 T2"')
 	if !TimeoutIdx

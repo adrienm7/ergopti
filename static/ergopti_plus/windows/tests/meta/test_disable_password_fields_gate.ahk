@@ -39,34 +39,6 @@
 ; =================================================
 ; =================================================
 
-_DPFG_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &WindowsDir)
-	Path := WindowsDir . "\" . StrReplace(RelPath, "/", "\")
-	return FileRead(Path)
-}
-
-_DPFG_ExtractFnBody(Src, FnName) {
-	FnPos := InStr(Src, FnName)
-	if (!FnPos)
-		return ""
-	depth := 0
-	i := FnPos
-	Len := StrLen(Src)
-	while (i <= Len) {
-		ch := SubStr(Src, i, 1)
-		if (ch == "{")
-			depth++
-		else if (ch == "}") {
-			depth--
-			if (depth <= 0)
-				return SubStr(Src, FnPos, i - FnPos + 1)
-		}
-		i++
-	}
-	return SubStr(Src, FnPos)
-}
-
-
 ; ===================================================
 ; ===================================================
 ; ======= 2/ Test implementations ===================
@@ -74,10 +46,8 @@ _DPFG_ExtractFnBody(Src, FnName) {
 ; ===================================================
 
 _DPFG_CheckFirePredictionGate() {
-	Src := _DPFG_ReadSource("modules/llm/prediction_engine.ahk")
-	Assert(Src != "", "modules/llm/prediction_engine.ahk must be readable")
-
-	Body := _DPFG_ExtractFnBody(Src, "LLM_Engine_FirePrediction(")
+	; Move-resilient: find the function body across the whole driver source
+	Body := _DriverFuncBody("LLM_Engine_FirePrediction")
 	Assert(Body != "", "LLM_Engine_FirePrediction must be present in prediction_engine.ahk")
 
 	; (a) Gate must check disable_password_fields flag
@@ -98,10 +68,8 @@ _DPFG_CheckFirePredictionGate() {
 }
 
 _DPFG_CheckSFDClassGuard() {
-	Src := _DPFG_ReadSource("adapters/secure_field_detector.ahk")
-	Assert(Src != "", "adapters/secure_field_detector.ahk must be readable")
-
-	Body := _DPFG_ExtractFnBody(Src, "SFD_IsSecureField(")
+	; Move-resilient: find the function body across the whole driver source
+	Body := _DriverFuncBody("SFD_IsSecureField")
 	Assert(Body != "", "SFD_IsSecureField must be present in adapters/secure_field_detector.ahk")
 
 	; ES_PASSWORD bit test position
