@@ -591,3 +591,31 @@ helpers.describe("Adapter contract vectors: Crypto", function()
 			"sha256() must return '' on unparseable crypto output")
 	end)
 end)
+
+
+-- SecureFieldDetector vectors (SecureFieldDetector.spec.js). Read-only — the
+-- detector inspects the focused field/app and never mutates OS state.
+helpers.describe("Adapter contract vectors: SecureFieldDetector", function()
+	local adapter = helpers.load_with_stubs("adapters.secure_field_detector")
+
+	helpers.it("isSecureField returns a boolean and never throws (isSecureField_returns_boolean)", function()
+		local ok, out = pcall(function() return adapter.isSecureField() end)
+		helpers.assert_true(ok, "isSecureField() must not throw")
+		helpers.assert_true(type(out) == "boolean", "isSecureField() must return a boolean")
+	end)
+
+	helpers.it("isSecureApp returns false for an unknown process (isSecureApp_unknown_returns_false)", function()
+		helpers.assert_eq(false, adapter.isSecureApp("notanapp.exe"), "isSecureApp(unknown) must be false")
+	end)
+
+	helpers.it("isSecureApp returns false for the empty string (isSecureApp_empty_returns_false)", function()
+		local ok, out = pcall(function() return adapter.isSecureApp("") end)
+		helpers.assert_true(ok, "isSecureApp('') must not throw")
+		helpers.assert_eq(false, out, "isSecureApp('') must be false")
+	end)
+
+	helpers.it("refresh completes without throwing (refresh_does_not_throw)", function()
+		local ok = pcall(function() adapter.refresh() end)
+		helpers.assert_true(ok, "refresh() must not throw")
+	end)
+end)

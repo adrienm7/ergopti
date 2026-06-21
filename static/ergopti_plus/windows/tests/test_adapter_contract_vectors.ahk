@@ -526,3 +526,55 @@ _RunCryptoContractVectors() {
 	Test("Crypto: sha256 handles the empty string", _Result_crypto_empty)
 }
 _RunCryptoContractVectors()
+
+
+; SecureFieldDetector contract vectors (SecureFieldDetector.spec.js). Read-only —
+; the detector inspects the focused field/app and never mutates OS state.
+_RunSecureFieldDetectorContractVectors() {
+	; isSecureField returns a boolean and never throws (isSecureField_returns_boolean)
+	_Result_sfd_field_bool() {
+		Err := "", Out := ""
+		try {
+			Out := SFD_IsSecureField()
+		} catch as E {
+			Err := E.Message
+		}
+		Assert(Err = "", "SFD_IsSecureField must not throw: " . Err)
+		Assert(Out = true || Out = false || Out = 1 || Out = 0,
+			"SFD_IsSecureField must return a boolean, got: " . Type(Out))
+	}
+	Test("SecureFieldDetector: isSecureField returns a boolean and never throws", _Result_sfd_field_bool)
+
+	; isSecureApp returns false for an unknown process (isSecureApp_unknown_returns_false)
+	_Result_sfd_unknown_false() {
+		Out := SFD_IsSecureApp("notanapp.exe")
+		Assert(Out = false || Out = 0, "SFD_IsSecureApp(unknown) must be false")
+	}
+	Test("SecureFieldDetector: isSecureApp returns false for an unknown process", _Result_sfd_unknown_false)
+
+	; isSecureApp returns false for the empty string (isSecureApp_empty_returns_false)
+	_Result_sfd_empty_false() {
+		Err := "", Out := ""
+		try {
+			Out := SFD_IsSecureApp("")
+		} catch as E {
+			Err := E.Message
+		}
+		Assert(Err = "", "SFD_IsSecureApp('') must not throw: " . Err)
+		Assert(Out = false || Out = 0, "SFD_IsSecureApp('') must be false")
+	}
+	Test("SecureFieldDetector: isSecureApp returns false for the empty string", _Result_sfd_empty_false)
+
+	; refresh completes without throwing (refresh_does_not_throw)
+	_Result_sfd_refresh() {
+		Err := ""
+		try {
+			SFD_Refresh()
+		} catch as E {
+			Err := E.Message
+		}
+		Assert(Err = "", "SFD_Refresh must not throw: " . Err)
+	}
+	Test("SecureFieldDetector: refresh completes without throwing", _Result_sfd_refresh)
+}
+_RunSecureFieldDetectorContractVectors()
