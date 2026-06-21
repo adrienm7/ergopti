@@ -823,3 +823,47 @@ helpers.describe("Adapter contract vectors: WindowManager", function()
 		helpers.assert_true(type(f.hwnd) == "number", "getFocused().hwnd must be a number")
 	end)
 end)
+
+
+-- MouseControl vectors (MouseControl.spec.js). setPos moves the cursor, so the
+-- test saves getPos() first and restores it after (hs.mouse is stubbed on macOS,
+-- but the save/restore keeps the AHK twin honest).
+helpers.describe("Adapter contract vectors: MouseControl", function()
+	local adapter = helpers.load_with_stubs("adapters.mouse_control")
+
+	helpers.it("getPos returns {x, y} numbers, never throws (get_pos_returns_object / fields_are_numbers)", function()
+		local ok, p = pcall(function() return adapter.getPos() end)
+		helpers.assert_true(ok, "getPos() must not throw")
+		helpers.assert_true(type(p) == "table", "getPos() must return a table")
+		helpers.assert_true(type(p.x) == "number" and type(p.y) == "number", "getPos().x/.y must be numbers")
+	end)
+
+	helpers.it("setPos does not throw (set_pos_does_not_throw)", function()
+		local saved = adapter.getPos()
+		local ok = pcall(function() adapter.setPos(0, 0) end)
+		pcall(function() adapter.setPos(saved.x, saved.y) end)
+		helpers.assert_true(ok, "setPos() must not throw")
+	end)
+
+	helpers.it("getMonitorCount is a number >= 0, never throws (get_monitor_count_is_number)", function()
+		local ok, n = pcall(function() return adapter.getMonitorCount() end)
+		helpers.assert_true(ok, "getMonitorCount() must not throw")
+		helpers.assert_true(type(n) == "number" and n >= 0, "getMonitorCount() must be a number >= 0")
+	end)
+
+	helpers.it("getMonitorBounds returns {left, top, right, bottom} numbers (get_monitor_bounds_fields_are_numbers)", function()
+		local b = adapter.getMonitorBounds(1)
+		helpers.assert_true(type(b) == "table", "getMonitorBounds() must return a table")
+		helpers.assert_true(type(b.left) == "number" and type(b.top) == "number"
+			and type(b.right) == "number" and type(b.bottom) == "number",
+			"getMonitorBounds() fields must be numbers")
+	end)
+
+	helpers.it("getMonitorBounds returns zeros for an invalid index (get_monitor_bounds_invalid_index_returns_zeros)", function()
+		local b = adapter.getMonitorBounds(9999)
+		helpers.assert_eq(0, b.left, "invalid-index left must be 0")
+		helpers.assert_eq(0, b.top, "invalid-index top must be 0")
+		helpers.assert_eq(0, b.right, "invalid-index right must be 0")
+		helpers.assert_eq(0, b.bottom, "invalid-index bottom must be 0")
+	end)
+end)

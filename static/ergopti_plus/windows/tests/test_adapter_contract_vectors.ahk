@@ -866,3 +866,65 @@ _RunWindowManagerContractVectors() {
 	Test("WindowManager: getFocused returns an object with a numeric hwnd", _Result_wm_getfocused)
 }
 _RunWindowManagerContractVectors()
+
+
+; MouseControl contract vectors (MouseControl.spec.js). setPos moves the REAL
+; cursor via SetCursorPos, so the test saves the position first and restores it
+; immediately after.
+_RunMouseControlContractVectors() {
+	_Result_mc_getpos() {
+		Err := "", P := ""
+		try {
+			P := MCGetPos()
+		} catch as E {
+			Err := E.Message
+		}
+		Assert(Err = "", "MCGetPos must not throw: " . Err)
+		Assert(IsObject(P), "MCGetPos must return an object")
+		Assert((Type(P["x"]) = "Integer" || Type(P["x"]) = "Float")
+			&& (Type(P["y"]) = "Integer" || Type(P["y"]) = "Float"),
+			"MCGetPos().x/.y must be numbers")
+	}
+	Test("MouseControl: getPos returns {x, y} numbers and never throws", _Result_mc_getpos)
+
+	_Result_mc_setpos() {
+		Saved := MCGetPos()
+		Err := ""
+		try {
+			MCSetPos(0, 0)
+		} catch as E {
+			Err := E.Message
+		}
+		MCSetPos(Saved["x"], Saved["y"])
+		Assert(Err = "", "MCSetPos must not throw: " . Err)
+	}
+	Test("MouseControl: setPos does not throw (cursor restored)", _Result_mc_setpos)
+
+	_Result_mc_monitor_count() {
+		Err := "", N := ""
+		try {
+			N := MCGetMonitorCount()
+		} catch as E {
+			Err := E.Message
+		}
+		Assert(Err = "", "MCGetMonitorCount must not throw: " . Err)
+		Assert((Type(N) = "Integer" || Type(N) = "Float") && N >= 0, "MCGetMonitorCount must be a number >= 0")
+	}
+	Test("MouseControl: getMonitorCount is a number >= 0", _Result_mc_monitor_count)
+
+	_Result_mc_bounds() {
+		B := MCGetMonitorBounds(1)
+		Assert(IsObject(B), "MCGetMonitorBounds must return an object")
+		Assert((Type(B["left"]) = "Integer" || Type(B["left"]) = "Float"), "bounds.left must be a number")
+		Assert((Type(B["bottom"]) = "Integer" || Type(B["bottom"]) = "Float"), "bounds.bottom must be a number")
+	}
+	Test("MouseControl: getMonitorBounds returns numeric fields", _Result_mc_bounds)
+
+	_Result_mc_bounds_invalid() {
+		B := MCGetMonitorBounds(9999)
+		Assert(B["left"] = 0 && B["top"] = 0 && B["right"] = 0 && B["bottom"] = 0,
+			"getMonitorBounds(invalid) must return zeros")
+	}
+	Test("MouseControl: getMonitorBounds returns zeros for an invalid index", _Result_mc_bounds_invalid)
+}
+_RunMouseControlContractVectors()
