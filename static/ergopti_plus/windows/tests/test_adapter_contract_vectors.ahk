@@ -810,3 +810,59 @@ _RunAppLauncherContractVectors() {
 	Test("AppLauncher: launch handles an empty path without throwing", _Result_al_launch_empty_safe)
 }
 _RunAppLauncherContractVectors()
+
+
+; WindowManager contract vectors (WindowManager.spec.js). All mutating calls use
+; a nonexistent window handle (no-op -> false), so nothing real is activated or
+; killed; the rest are read-only queries.
+_RunWindowManagerContractVectors() {
+	_Result_wm_activate_false() {
+		Out := WMActivate(999999999)
+		Assert(Out = false || Out = 0, "WMActivate(missing) must be false")
+	}
+	Test("WindowManager: activate returns false for a missing window", _Result_wm_activate_false)
+
+	_Result_wm_exists_false() {
+		Out := WMExists(999999999)
+		Assert(Out = false || Out = 0, "WMExists(missing) must be false")
+	}
+	Test("WindowManager: exists returns false for a missing window", _Result_wm_exists_false)
+
+	_Result_wm_kill_false() {
+		Out := WMKill(999999999)
+		Assert(Out = false || Out = 0, "WMKill(missing) must be false")
+	}
+	Test("WindowManager: kill returns false for a missing window", _Result_wm_kill_false)
+
+	_Result_wm_getlist() {
+		Err := "", Out := ""
+		try {
+			Out := WMGetList()
+		} catch as E {
+			Err := E.Message
+		}
+		Assert(Err = "", "WMGetList must not throw: " . Err)
+		Assert(IsObject(Out), "WMGetList must return an array")
+	}
+	Test("WindowManager: getList returns an array", _Result_wm_getlist)
+
+	_Result_wm_gettitle_empty() {
+		Assert(WMGetTitle(999999999) = "", "WMGetTitle(missing) must be the empty string")
+	}
+	Test("WindowManager: getTitle returns empty string for a missing window", _Result_wm_gettitle_empty)
+
+	_Result_wm_getfocused() {
+		Err := "", App := ""
+		try {
+			App := WMGetFocused()
+		} catch as E {
+			Err := E.Message
+		}
+		Assert(Err = "", "WMGetFocused must not throw: " . Err)
+		Assert(IsObject(App), "WMGetFocused must return an object")
+		Assert(Type(App["hwnd"]) = "Integer" || Type(App["hwnd"]) = "Float",
+			"WMGetFocused().hwnd must be a number")
+	}
+	Test("WindowManager: getFocused returns an object with a numeric hwnd", _Result_wm_getfocused)
+}
+_RunWindowManagerContractVectors()
