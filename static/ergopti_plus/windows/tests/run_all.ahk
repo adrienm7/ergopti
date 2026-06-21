@@ -301,6 +301,7 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 #Include meta/test_section_headers.ahk
 #Include meta/test_run_all_include_integrity.ahk
 #Include meta/test_runner_only_filter.ahk
+#Include meta/test_ahk_os_purity_ratchet.ahk
 #Include meta/test_logger_pairing.ahk
 #Include meta/test_no_duplicate_defaults.ahk
 #Include meta/test_require_state_pattern.ahk
