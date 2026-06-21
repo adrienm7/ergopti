@@ -17,10 +17,12 @@ local helpers = require("tests.helpers")
 -- Minimal karabiner surface needed by the picker builders. Mutable _taps / _combos
 -- let a test flip a binding and observe cache invalidation.
 local function make_karabiner()
-	local taps   = { left_shift = "none" }
-	local combos = { esc_tab = { combo = "none", tap = "none", hold = "none" } }
+	local taps     = { left_shift = "none" }
+	local combos   = { esc_tab = { combo = "none", tap = "none", hold = "none" } }
+	local timeouts = {}  -- per-key tap/hold overrides; nil entry = inherit global
 	return {
-		_taps = taps, _combos = combos,
+		_taps = taps, _combos = combos, _timeouts = timeouts,
+		DEFAULT_TAP_HOLD_TIMEOUT_MS = 200,
 		AVAILABLE_ACTIONS = {
 			{ id = "none",  label = "Aucune", category = "Special", holdable = true,  tappable = true  },
 			{ id = "copy",  label = "Copier", short_label = "Copier", category = "Edition", holdable = false, tappable = true },
@@ -32,6 +34,9 @@ local function make_karabiner()
 		get_combo_symmetric    = function() return false end,
 		get_tap_action         = function(id) return taps[id] or "none" end,
 		get_hold_action        = function(_)  return "none" end,
+		get_tap_hold_timeout   = function() return 200 end,
+		get_tap_timeout        = function(id) return timeouts[id] end,
+		set_tap_timeout        = function(id, ms) timeouts[id] = ms end,
 		get_combo_combo_action = function(id) return combos[id].combo end,
 		get_combo_tap_action   = function(id) return combos[id].tap end,
 		get_combo_hold_action  = function(id) return combos[id].hold end,
@@ -74,5 +79,16 @@ helpers.describe("menu_karabiner picker-tree memoisation", function()
 		helpers.assert_true(fp_a ~= fp_b, "fingerprint must change when a combo binding changes")
 		helpers.assert_true(kar._picker_fingerprint(k, true) ~= kar._picker_fingerprint(k, false),
 			"fingerprint must include the enabled flag")
+	end)
+
+	-- The per-key delay is rendered inside the cached tap/hold submenu, so a change
+	-- to a per-key timeout MUST invalidate the picker cache or the menu would show a
+	-- stale delay label. Guards the fingerprint inclusion of get_tap_timeout.
+	helpers.it("fingerprint reflects a per-key tap/hold timeout change", function()
+		local k = make_karabiner()
+		local fp_a = kar._picker_fingerprint(k, true)
+		k._timeouts.left_shift = 333  -- set a per-key delay override
+		local fp_b = kar._picker_fingerprint(k, true)
+		helpers.assert_true(fp_a ~= fp_b, "fingerprint must change when a per-key delay override changes")
 	end)
 end)

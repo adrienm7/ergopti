@@ -206,6 +206,13 @@ local function build_one_tap_hold_item(karabiner, action_index, update_menu, ena
 	local hold_slbl = short_action_label(action_index, current_hold)
 	local is_active = (current_tap ~= "none" or current_hold ~= "none")
 
+	-- Per-key tap/hold threshold: the effective value is the per-key override when
+	-- set, otherwise the single global timeout (no duplicated literal when unset).
+	local global_ms = karabiner.get_tap_hold_timeout() or karabiner.DEFAULT_TAP_HOLD_TIMEOUT_MS
+	local ok_to, per_key_ms = pcall(karabiner.get_tap_timeout, kid)
+	if not ok_to then per_key_ms = nil end
+	local effective_ms = per_key_ms or global_ms
+
 	-- Show "—" when nothing is configured on this key
 	local combo_label = (current_tap == "none" and current_hold == "none")
 		and NONE_DISPLAY
@@ -242,6 +249,49 @@ local function build_one_tap_hold_item(karabiner, action_index, update_menu, ena
 				update_menu,
 				"hold"
 			),
+		},
+		{ title = "-" },
+		-- Per-key tap/hold delay: open a free-text dialog to set a custom value, or
+		-- revert to the single global delay. The title shows the effective value.
+		{
+			title = string.format(i18n.get("menu.karabiner.key_tap_delay"), fmt_delay(effective_ms)),
+			menu  = {
+				{
+					title = i18n.get("menu.karabiner.key_tap_delay_set"),
+					fn    = function()
+						hs.focus()
+						local prompt = string.format(
+							i18n.get("menu.karabiner.key_tap_delay_dialog_prompt"), global_ms)
+						local title_d    = i18n.get("menu.karabiner.key_tap_delay_dialog_title")
+						local btn_ok     = i18n.get("button.ok")
+						local btn_cancel = i18n.get("button.cancel")
+						local script = string.format(
+							"display dialog %q default answer \"%d\" with title %q buttons {%q, %q} default button %q",
+							prompt, effective_ms, title_d, btn_cancel, btn_ok, btn_ok
+						)
+						local ok, result = hs.osascript.applescript(script)
+						if not ok or type(result) ~= "table" then return end
+						local ms = tonumber(result["text returned"])
+						if not ms or ms <= 0 then
+							Logger.warn(LOG, "Invalid per-key delay '%s' — ignored.", tostring(result["text returned"]))
+							return
+						end
+						karabiner.set_tap_timeout(kid, math.floor(ms))
+						pcall(karabiner.regenerate)
+						if update_menu then update_menu() end
+					end,
+				},
+				{
+					title   = string.format(i18n.get("menu.karabiner.key_tap_delay_use_global"), fmt_delay(global_ms)),
+					checked = (per_key_ms == nil),
+					disabled = (per_key_ms == nil),
+					fn      = function()
+						karabiner.set_tap_timeout(kid, nil)
+						pcall(karabiner.regenerate)
+						if update_menu then update_menu() end
+					end,
+				},
+			},
 		},
 	}
 
@@ -581,6 +631,11 @@ local function picker_fingerprint(karabiner, enabled)
 	local parts = { enabled and "1" or "0" }
 	local ok_sym, sym = pcall(karabiner.get_combo_symmetric)
 	parts[#parts + 1] = (ok_sym and sym) and "1" or "0"
+	-- The global tap/hold timeout is rendered in every per-key delay submenu
+	-- (the "use global (%s)" label and the effective value when no override), so a
+	-- global change must invalidate the cached picker trees as well.
+	local ok_g, g = pcall(karabiner.get_tap_hold_timeout)
+	parts[#parts + 1] = (ok_g and g ~= nil) and tostring(g) or "none"
 	local function add(getter, id)
 		local ok, v = pcall(getter, id)
 		parts[#parts + 1] = (ok and v ~= nil) and tostring(v) or "none"
@@ -588,6 +643,7 @@ local function picker_fingerprint(karabiner, enabled)
 	for _, kd in ipairs(karabiner.TAP_HOLD_KEYS or {}) do
 		add(karabiner.get_tap_action,  kd.id)
 		add(karabiner.get_hold_action, kd.id)
+		add(karabiner.get_tap_timeout, kd.id)  -- per-key delay shows in the submenu label
 	end
 	for _, cd in ipairs(karabiner.MOD_COMBOS or {}) do
 		add(karabiner.get_combo_combo_action, cd.id)

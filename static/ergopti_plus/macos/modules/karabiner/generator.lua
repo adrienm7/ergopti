@@ -335,8 +335,9 @@ end
 --- @param tap_action table Resolved action definition for the tap slot.
 --- @param hold_action table Resolved action definition for the hold slot.
 --- @param action_index table id → action map (required for sticky-equivalent companion rules).
+--- @param tap_timeout_ms number|nil Per-key tap/hold threshold override in ms; nil inherits the global.
 --- @return table Karabiner rule object.
-local function build_tap_hold_rule(key_def, tap_action, hold_action, action_index)
+local function build_tap_hold_rule(key_def, tap_action, hold_action, action_index, tap_timeout_ms)
 	local tap_to   = tap_action.karabiner_to  or {}
 	local hold_to  = hold_action.karabiner_to or {}
 	local key_code = key_def.from.key_code
@@ -401,6 +402,14 @@ local function build_tap_hold_rule(key_def, tap_action, hold_action, action_inde
 	-- to_if_alone only when tap output differs from hold output
 	if not same_output(effective_tap_to, effective_hold_to) then
 		manipulator.to_if_alone = effective_tap_to
+	end
+
+	-- Per-key tap/hold threshold override. Karabiner honours
+	-- basic.to_if_alone_timeout_milliseconds at the manipulator level, overriding
+	-- the complex_modifications global. nil/0 inherits the single global value, so
+	-- there is no duplicated per-key literal when the user has not customised it.
+	if tap_timeout_ms and tap_timeout_ms > 0 then
+		manipulator.parameters = { ["basic.to_if_alone_timeout_milliseconds"] = tap_timeout_ms }
 	end
 
 	-- Merge hold action's own to_after_key_up (e.g. layer release) with set_variable=0
@@ -845,7 +854,10 @@ function M.build_karabiner_json(state, available_actions, tap_hold_keys, mod_com
 			hold_action = none_action
 		end
 
-		local rule = build_tap_hold_rule(key_def, tap_action, hold_action, action_index)
+		-- Per-key tap/hold threshold override (nil = inherit the global parameter).
+		local per_key_ms = tonumber(cfg.timeout_ms)
+		if per_key_ms and per_key_ms <= 0 then per_key_ms = nil end
+		local rule = build_tap_hold_rule(key_def, tap_action, hold_action, action_index, per_key_ms)
 		if rule then all_rules[#all_rules + 1] = rule end
 	end
 

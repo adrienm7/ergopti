@@ -157,6 +157,36 @@ helpers.describe("Config.load_user_config — new tap/hold key seeding (karabine
 			"Seeded tap/hold 'caps_lock' must have a string .hold field (karabiner-gen-2)"
 		)
 	end)
+
+	-- Per-key tap/hold timeout override (feat): a saved timeout_ms must survive the
+	-- load so a customised per-key delay is not silently dropped on reload.
+	helpers.it("preserves a persisted per-key timeout_ms override on load", function()
+		local original_load = Config._load_toml_file
+		Config._load_toml_file = function(_path)
+			return {
+				tap_holds = {
+					timeout_ms        = 200,
+					sticky_timeout_ms = 500,
+					config            = { escape = { tap = "escape", hold = "escape", timeout_ms = 333 } },
+				},
+				mod_combos = { simultaneous_threshold_ms = 50, config = {} },
+			}
+		end
+
+		local state = Config.load_user_config({ { id = "escape", label = "Esc" } }, {}, "/fake/path.toml")
+		Config._load_toml_file = original_load
+
+		helpers.assert_eq(state.tap_hold_config.escape.timeout_ms, 333,
+			"a persisted per-key timeout_ms must be preserved on load (not dropped)")
+	end)
+
+	-- The global timeout stays the single default: build_default_state must NOT bake
+	-- a per-key timeout into entries, so an unset key inherits the one global value.
+	helpers.it("build_default_state leaves per-key timeout unset (inherits the global)", function()
+		local state = Config.build_default_state({ { id = "escape", label = "Esc" } }, {})
+		helpers.assert_nil(state.tap_hold_config.escape.timeout_ms,
+			"default per-key entries must not carry a timeout_ms — they inherit the global")
+	end)
 end)
 
 
@@ -187,5 +217,52 @@ helpers.describe("Config.compute_non_canonical_combos", function()
 		}
 		local nc = Config.compute_non_canonical_combos(mod_combos)
 		helpers.assert_eq(next(nc), nil)
+	end)
+end)
+
+
+
+
+-- =====================================================================
+-- =====================================================================
+-- ======= init.lua tap/hold setters preserve per-key timeout ==========
+-- =====================================================================
+-- =====================================================================
+
+-- ROOT CAUSE: set_tap_action / set_hold_action rebuild the entry as
+-- { tap = ..., hold = ... }. Without explicitly carrying timeout_ms across, a
+-- tap/hold action change would silently wipe a per-key delay override. Source
+-- introspection (init.lua is the stateful orchestrator with no unit harness)
+-- pins that both setters thread timeout_ms through the rebuilt entry.
+helpers.describe("Karabiner init.lua — tap/hold setters preserve per-key timeout override", function()
+	local function init_source()
+		local fh = io.open(helpers.driver_root() .. "modules/karabiner/init.lua", "r")
+		if not fh then return nil end
+		local src = fh:read("*a"); fh:close()
+		return src
+	end
+
+	--- Returns the body of a named function in the source (signature → matching end
+	--- via brace-less Lua scanning: from "function M.<name>" to the next "\nend").
+	local function fn_body(src, name)
+		local s = src:find("function M%." .. name .. "%(")
+		if not s then return "" end
+		local e = src:find("\nend", s)
+		return src:sub(s, e or #src)
+	end
+
+	helpers.it("set_tap_action carries timeout_ms across the entry rebuild", function()
+		local src = init_source()
+		helpers.assert_true(src ~= nil, "init.lua must be readable")
+		local body = fn_body(src, "set_tap_action")
+		helpers.assert_true(body:find("timeout_ms", 1, true) ~= nil,
+			"set_tap_action must preserve timeout_ms when rebuilding the entry")
+	end)
+
+	helpers.it("set_hold_action carries timeout_ms across the entry rebuild", function()
+		local src = init_source()
+		local body = fn_body(src, "set_hold_action")
+		helpers.assert_true(body:find("timeout_ms", 1, true) ~= nil,
+			"set_hold_action must preserve timeout_ms when rebuilding the entry")
 	end)
 end)

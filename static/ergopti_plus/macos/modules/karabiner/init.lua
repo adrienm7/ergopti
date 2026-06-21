@@ -228,7 +228,8 @@ end
 function M.set_tap_action(key_id, action_id)
 	if not require_state("set_tap_action") then return end
 	local cfg = _state.tap_hold_config[key_id] or {}
-	_state.tap_hold_config[key_id] = { tap = action_id, hold = cfg.hold or "none" }
+	-- Preserve any per-key timeout override — rebuilding the entry must not drop it.
+	_state.tap_hold_config[key_id] = { tap = action_id, hold = cfg.hold or "none", timeout_ms = cfg.timeout_ms }
 	Logger.debug(LOG, "Key '%s' tap → '%s'.", key_id, action_id)
 	Config.save_user_config(_state, resolve_user_config())
 end
@@ -240,8 +241,39 @@ end
 function M.set_hold_action(key_id, action_id)
 	if not require_state("set_hold_action") then return end
 	local cfg = _state.tap_hold_config[key_id] or {}
-	_state.tap_hold_config[key_id] = { tap = cfg.tap or "none", hold = action_id }
+	-- Preserve any per-key timeout override — rebuilding the entry must not drop it.
+	_state.tap_hold_config[key_id] = { tap = cfg.tap or "none", hold = action_id, timeout_ms = cfg.timeout_ms }
 	Logger.debug(LOG, "Key '%s' hold → '%s'.", key_id, action_id)
+	Config.save_user_config(_state, resolve_user_config())
+end
+
+--- Returns the per-key tap/hold threshold override in milliseconds, or nil when
+--- the key inherits the global tap/hold timeout (no per-key customisation).
+--- @param key_id string Key id.
+--- @return number|nil Per-key override in milliseconds, or nil.
+function M.get_tap_timeout(key_id)
+	if not require_state("get_tap_timeout") then return nil end
+	local cfg = _state.tap_hold_config[key_id]
+	return cfg and tonumber(cfg.timeout_ms) or nil
+end
+
+--- Sets or clears the per-key tap/hold threshold override and persists it.
+--- A positive value overrides the global timeout for this key only; nil or a
+--- non-positive value clears the override so the key inherits the single global
+--- value again — no stale per-key literal is left behind. Does NOT regenerate.
+--- @param key_id string Key id.
+--- @param ms number|nil Per-key override in milliseconds, or nil to clear.
+function M.set_tap_timeout(key_id, ms)
+	if not require_state("set_tap_timeout") then return end
+	local cfg   = _state.tap_hold_config[key_id] or {}
+	local value = tonumber(ms)
+	if value and value > 0 then
+		value = math.floor(value)
+	else
+		value = nil  -- clear override → inherit the global timeout
+	end
+	_state.tap_hold_config[key_id] = { tap = cfg.tap or "none", hold = cfg.hold or "none", timeout_ms = value }
+	Logger.debug(LOG, "Key '%s' tap/hold timeout override → %s.", key_id, value and (value .. " ms") or "global")
 	Config.save_user_config(_state, resolve_user_config())
 end
 
