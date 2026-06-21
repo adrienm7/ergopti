@@ -44,7 +44,7 @@ choco install lua
 Then:
 
 ```powershell
-cd static\drivers\hammerspoon
+cd static\ergopti_plus\macos
 lua tests\run.lua
 ```
 
