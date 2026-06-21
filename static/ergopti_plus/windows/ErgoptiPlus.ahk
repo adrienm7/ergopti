@@ -821,6 +821,7 @@ try _HSSnapshotAllCategories()
 ApplyMasterGatesToFeatures()
 
 #Include modules/gestures.ahk
+#Include modules/gestures_click.ahk
 ReadScriptShortcutsConfig()
 ReadKeyboardShortcutsConfig()
 
