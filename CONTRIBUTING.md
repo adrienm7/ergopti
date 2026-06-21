@@ -105,24 +105,37 @@ maintainer's personal shortcuts (the `2/ PERSONAL SHORTCUTS` section) — that
 section lives only in a **private** copy of the file and must never be pushed
 here. The strip keeps the surrounding `3/ LAYOUT MODIFICATION` section intact.
 
-The tooling for this lives under `tools/dev/`:
+A **gitignored** one-line pointer tells the tooling where your private file is:
 
+```text
+static/ergopti_plus/windows/.local_ahk_path   ← absolute path to your private
+                                                ErgoptiPlus.ahk (never committed)
+```
+
+The tools live under `tools/dev/`:
+
+- `sync-private-ahk.js` — copies the private file to the public location and
+  refreshes the "Last modified" date line. No-op when `.local_ahk_path` is
+  absent (e.g. on a contributor's machine or CI).
 - `remove_ahk_personal_configuration.js` — strips the `2/ PERSONAL SHORTCUTS`
-  block from the public file (already points at
-  `static/ergopti_plus/windows`).
-- `sync-private-ahk.js` — copies the maintainer's private file to the public
-  location and refreshes the "Last modified" date line.
-- `watch-ahk.js` — watches the private file and re-runs the pipeline on save.
+  block from the public file.
+- `watch-ahk.js` — watches the private file and re-runs the two steps above on
+  every save.
 
-> ⚠️ **Needs a refresh after the `static/drivers/` → `static/ergopti_plus/`
-> reorg.** `sync-private-ahk.js` still reads its override from
-> `static/hotstrings/.local_ahk_path` and writes to
-> `static/drivers/autohotkey/ErgoptiPlus.ahk` — both pre-reorg paths that no
-> longer exist. It is also no longer wired into an npm script or the pre-commit
-> hook (the old `sync-ahk` / `clean-ahk` / `install-watcher` / `update`
-> commands were removed). Update the two paths (and decide where
-> `.local_ahk_path` should live now) before relying on this workflow. Until
-> then the public file is committed as-is, with no automatic private sync.
+Run the pipeline once, or start the watcher to run it automatically:
+
+```bash
+# one-shot: sync private → public, then strip the personal section
+npm run sync:ahk
+
+# or watch the private file and run the pipeline on every save
+npm run watch:ahk
+```
+
+> **Note:** the sync is **not** run by the pre-commit hook — the public file is
+> committed as-is unless you run `npm run sync:ahk` (or the watcher) first.
+> Hotstrings are no longer generated from the AHK; the TOML catalogues under
+> `_shared/modules/hotstrings/` are the source of truth.
 
 ---
 

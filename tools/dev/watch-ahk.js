@@ -1,6 +1,5 @@
-import { execFileSync, execSync } from 'child_process';
+import { execFileSync } from 'child_process';
 import { existsSync, readFileSync, watchFile } from 'fs';
-import os from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -8,10 +7,11 @@ import { fileURLToPath } from 'url';
 // Self-contained: does not rely on npm or PATH — safe to run from pm2 or any
 // process manager on macOS, Windows, and Linux.
 
-const PROJECT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+// This file lives in tools/dev/, so the repo root is two directories up.
+const PROJECT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const NODE = process.execPath;
 
-const overrideFile = path.join(PROJECT_DIR, 'static', 'drivers', 'hotstrings', '.local_ahk_path');
+const overrideFile = path.join(PROJECT_DIR, 'static', 'ergopti_plus', 'windows', '.local_ahk_path');
 
 if (!existsSync(overrideFile)) {
 	console.error('❌ No .local_ahk_path found — nothing to watch.');
@@ -25,33 +25,13 @@ if (!privatePath || !existsSync(privatePath)) {
 	process.exit(1);
 }
 
-// Locate uv: try PATH first, then common install locations.
-function findUv() {
-	try {
-		const cmd = os.platform() === 'win32' ? 'where uv' : 'which uv';
-		return execSync(cmd, { encoding: 'utf8' }).trim().split('\n')[0].trim();
-	} catch {
-		const candidates = [
-			path.join(os.homedir(), '.local', 'bin', 'uv'), // Linux
-			path.join(os.homedir(), 'Library', 'Python', '3.13', 'bin', 'uv'), // macOS pip-installed
-			path.join(os.homedir(), 'Library', 'Python', '3.12', 'bin', 'uv'),
-			path.join(os.homedir(), '.cargo', 'bin', 'uv'), // cargo install
-			'C:\\Users\\' + os.userInfo().username + '\\AppData\\Local\\Programs\\uv\\uv.exe' // Windows
-		];
-		return candidates.find(existsSync) ?? null;
-	}
-}
-
-const uvPath = findUv();
-if (!uvPath) {
-	console.error('❌ uv not found. Install it or ensure it is in PATH.');
-	process.exit(1);
-}
-
+// The pipeline: sync the private file to the public location (with a refreshed
+// date line), then strip the personal "2/ PERSONAL SHORTCUTS" section.
+// Hotstrings are no longer generated from the AHK — the TOML catalogues under
+// _shared/modules/hotstrings/ are the single source of truth.
 const scripts = [
-	path.join(PROJECT_DIR, 'scripts', 'sync-private-ahk.js'),
-	path.join(PROJECT_DIR, 'scripts', 'remove_ahk_personal_configuration.js'),
-	path.join(PROJECT_DIR, 'scripts', 'update-ahk-date.js')
+	path.join(PROJECT_DIR, 'tools', 'dev', 'sync-private-ahk.js'),
+	path.join(PROJECT_DIR, 'tools', 'dev', 'remove_ahk_personal_configuration.js')
 ];
 
 function runPipeline() {
@@ -59,11 +39,6 @@ function runPipeline() {
 	for (const script of scripts) {
 		execFileSync(NODE, [script], { cwd: PROJECT_DIR, stdio: 'inherit' });
 	}
-	// Generate TOML hotstrings via uv.
-	execFileSync(uvPath, ['run', 'python', 'static/hotstrings/0_generate_hotstrings.py'], {
-		cwd: PROJECT_DIR,
-		stdio: 'inherit'
-	});
 }
 
 console.log(`👁  Watching: ${privatePath}`);
