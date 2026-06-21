@@ -1,5 +1,5 @@
 // swift-tools-version:5.9
-// static/drivers/hammerspoon/launcher/Package.swift
+// static/ergopti_plus/macos/launcher/Package.swift
 //
 // MODULE: ErgoptiPlus launcher Swift package
 // DESCRIPTION:
