@@ -823,6 +823,7 @@ ApplyMasterGatesToFeatures()
 #Include modules/gestures.ahk
 #Include modules/gestures_click.ahk
 #Include modules/gestures_screenshots.ahk
+#Include modules/gestures_window_cycle.ahk
 ReadScriptShortcutsConfig()
 ReadKeyboardShortcutsConfig()
 
