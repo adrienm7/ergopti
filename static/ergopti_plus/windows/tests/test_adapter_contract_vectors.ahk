@@ -578,3 +578,235 @@ _RunSecureFieldDetectorContractVectors() {
 	Test("SecureFieldDetector: refresh completes without throwing", _Result_sfd_refresh)
 }
 _RunSecureFieldDetectorContractVectors()
+
+
+; NetworkInfo contract vectors (NetworkInfo.spec.js). All queries are fast,
+; in-process DllCalls (WLAN / iphlpapi / wininet) — no subprocess, no blocking
+; network round-trip.
+_RunNetworkInfoContractVectors() {
+	_Result_ni_ssid() {
+		Err := "", Out := ""
+		try {
+			Out := NI_GetSsidHash()
+		} catch as E {
+			Err := E.Message
+		}
+		Assert(Err = "", "NI_GetSsidHash must not throw: " . Err)
+		Assert(Type(Out) = "String", "NI_GetSsidHash must return a string")
+	}
+	Test("NetworkInfo: getSsidHash returns a string and never throws", _Result_ni_ssid)
+
+	_Result_ni_signal() {
+		Err := "", Out := ""
+		try {
+			Out := NI_GetSignalStrength()
+		} catch as E {
+			Err := E.Message
+		}
+		Assert(Err = "", "NI_GetSignalStrength must not throw: " . Err)
+		Assert(Out = "" || Type(Out) = "Integer" || Type(Out) = "Float",
+			"NI_GetSignalStrength must be a number or empty")
+	}
+	Test("NetworkInfo: getSignalStrength returns a number and never throws", _Result_ni_signal)
+
+	_Result_ni_reach() {
+		Err := "", Out := ""
+		try {
+			Out := NI_IsInternetReachable()
+		} catch as E {
+			Err := E.Message
+		}
+		Assert(Err = "", "NI_IsInternetReachable must not throw: " . Err)
+		Assert(Out = true || Out = false || Out = 1 || Out = 0, "NI_IsInternetReachable must return a boolean")
+	}
+	Test("NetworkInfo: isInternetReachable returns a boolean", _Result_ni_reach)
+
+	_Result_ni_vpn() {
+		Err := "", Out := ""
+		try {
+			Out := NI_IsVpnActive()
+		} catch as E {
+			Err := E.Message
+		}
+		Assert(Err = "", "NI_IsVpnActive must not throw: " . Err)
+		Assert(Out = true || Out = false || Out = 1 || Out = 0, "NI_IsVpnActive must return a boolean")
+	}
+	Test("NetworkInfo: isVpnActive returns a boolean", _Result_ni_vpn)
+}
+_RunNetworkInfoContractVectors()
+
+
+; KeyState contract vectors (KeyState.spec.js). Read-only GetKeyState queries.
+_RunKeyStateContractVectors() {
+	_Result_ks_unknown_down() {
+		Out := KS_IsDown("ERGOPTI_NONEXISTENT_KEY_XYZ")
+		Assert(Out = false || Out = 0, "KS_IsDown(unknown) must be false")
+	}
+	Test("KeyState: isDown returns false for an unknown key", _Result_ks_unknown_down)
+
+	_Result_ks_unknown_up() {
+		Out := KS_IsUp("ERGOPTI_NONEXISTENT_KEY_XYZ")
+		Assert(Out = true || Out = 1, "KS_IsUp(unknown) must be true")
+	}
+	Test("KeyState: isUp returns true for an unknown key", _Result_ks_unknown_up)
+
+	_Result_ks_inverse() {
+		Down := KS_IsDown("LShift")
+		Up   := KS_IsUp("LShift")
+		Assert(!!Down != !!Up, "KS_IsUp must be the inverse of KS_IsDown")
+	}
+	Test("KeyState: isDown and isUp are inverse for the same key", _Result_ks_inverse)
+
+	_Result_ks_down_bool() {
+		Out := KS_IsDown("SC038")
+		Assert(Out = true || Out = false || Out = 1 || Out = 0, "KS_IsDown must return a boolean")
+	}
+	Test("KeyState: isDown returns a boolean", _Result_ks_down_bool)
+
+	_Result_ks_up_bool() {
+		Out := KS_IsUp("SC038")
+		Assert(Out = true || Out = false || Out = 1 || Out = 0, "KS_IsUp must return a boolean")
+	}
+	Test("KeyState: isUp returns a boolean", _Result_ks_up_bool)
+}
+_RunKeyStateContractVectors()
+
+
+; Storage contract vectors (Storage.spec.js). Persists to the registry; each
+; test uses a unique key and deletes it afterward, so no real settings leak.
+_RunStorageContractVectors() {
+	_Result_st_set_true() {
+		Out := ST_Set("__ACV_ST_TEST__", "v")
+		ST_Delete("__ACV_ST_TEST__")
+		Assert(Out = true || Out = 1, "ST_Set must return true")
+	}
+	Test("Storage: set returns true", _Result_st_set_true)
+
+	_Result_st_get_after_set() {
+		ST_Set("__ACV_ST_TEST__", "v")
+		Got := ST_Get("__ACV_ST_TEST__", "")
+		ST_Delete("__ACV_ST_TEST__")
+		Assert(Got = "v", "ST_Get must return the stored value, got: " . Got)
+	}
+	Test("Storage: get returns the value previously set", _Result_st_get_after_set)
+
+	_Result_st_get_missing() {
+		Assert(ST_Get("__ACV_never_set__", "fallback") = "fallback", "ST_Get(missing) must return the default")
+	}
+	Test("Storage: get returns the default for a missing key", _Result_st_get_missing)
+
+	_Result_st_has() {
+		ST_Set("__ACV_ST_TEST__", "x")
+		HasAfter := ST_Has("__ACV_ST_TEST__")
+		ST_Delete("__ACV_ST_TEST__")
+		HasGone := ST_Has("__ACV_ST_TEST__")
+		Assert(HasAfter = true || HasAfter = 1, "ST_Has must be true after set")
+		Assert(HasGone = false || HasGone = 0, "ST_Has must be false after delete")
+	}
+	Test("Storage: has is true after set, false after delete", _Result_st_has)
+
+	_Result_st_has_missing() {
+		Out := ST_Has("__ACV_never_set__")
+		Assert(Out = false || Out = 0, "ST_Has(missing) must be false")
+	}
+	Test("Storage: has is false for a never-stored key", _Result_st_has_missing)
+
+	_Result_st_keys_type() {
+		Assert(IsObject(ST_Keys()), "ST_Keys must return an array")
+	}
+	Test("Storage: keys returns an array", _Result_st_keys_type)
+}
+_RunStorageContractVectors()
+
+
+; ProcessLifecycle contract vectors (ProcessLifecycle.spec.js). Each test that
+; calls PLC_Start also calls PLC_Stop so no foreground watcher leaks.
+_RunProcessLifecycleContractVectors() {
+	_Result_plc_foreground() {
+		App := PLC_GetForegroundApp()
+		Assert(IsObject(App), "PLC_GetForegroundApp must return an object")
+		Assert(Type(App["appId"]) = "String", "getForegroundApp().appId must be a string")
+		Assert(Type(App["windowTitle"]) = "String", "getForegroundApp().windowTitle must be a string")
+	}
+	Test("ProcessLifecycle: getForegroundApp returns {appId, windowTitle} strings", _Result_plc_foreground)
+
+	_Result_plc_start_idempotent() {
+		Err := ""
+		try {
+			PLC_Start()
+			PLC_Start()
+		} catch as E {
+			Err := E.Message
+		}
+		PLC_Stop()
+		Assert(Err = "", "PLC_Start() twice must not throw: " . Err)
+	}
+	Test("ProcessLifecycle: start is idempotent", _Result_plc_start_idempotent)
+
+	_Result_plc_stop_idempotent() {
+		Err := ""
+		try {
+			PLC_Start()
+			PLC_Stop()
+			PLC_Stop()
+		} catch as E {
+			Err := E.Message
+		}
+		Assert(Err = "", "PLC_Stop() twice must not throw: " . Err)
+	}
+	Test("ProcessLifecycle: stop is idempotent", _Result_plc_stop_idempotent)
+
+	_Result_plc_stop_before_start() {
+		Err := ""
+		try {
+			PLC_Stop()
+		} catch as E {
+			Err := E.Message
+		}
+		Assert(Err = "", "PLC_Stop() before start must not throw: " . Err)
+	}
+	Test("ProcessLifecycle: stop before start is safe", _Result_plc_stop_before_start)
+
+	_Result_plc_on_focus() {
+		Err := ""
+		try {
+			PLC_OnFocusChange((*) => 0)
+		} catch as E {
+			Err := E.Message
+		}
+		Assert(Err = "", "PLC_OnFocusChange(fn) must not throw: " . Err)
+	}
+	Test("ProcessLifecycle: onFocusChange accepts a function", _Result_plc_on_focus)
+}
+_RunProcessLifecycleContractVectors()
+
+
+; AppLauncher contract vectors (AppLauncher.spec.js). launch() spawns a real
+; process, so the headless AHK test covers only isRunning plus the graceful
+; empty-path error path; the real-launch contract is exercised on macOS where
+; hs.application is stubbed.
+_RunAppLauncherContractVectors() {
+	_Result_al_unknown_false() {
+		Out := AL_IsRunning("ergopti_nonexistent_proc_xyz.exe")
+		Assert(Out = false || Out = 0, "AL_IsRunning(unknown) must be false")
+	}
+	Test("AppLauncher: isRunning returns false for an unknown process", _Result_al_unknown_false)
+
+	_Result_al_running_bool() {
+		Out := AL_IsRunning("explorer.exe")
+		Assert(Out = true || Out = false || Out = 1 || Out = 0, "AL_IsRunning must return a boolean")
+	}
+	Test("AppLauncher: isRunning returns a boolean", _Result_al_running_bool)
+
+	_Result_al_launch_empty_safe() {
+		Err := ""
+		try {
+			AL_Launch("")
+		} catch as E {
+			Err := E.Message
+		}
+		Assert(Err = "", "AL_Launch('') must not throw: " . Err)
+	}
+	Test("AppLauncher: launch handles an empty path without throwing", _Result_al_launch_empty_safe)
+}
+_RunAppLauncherContractVectors()
