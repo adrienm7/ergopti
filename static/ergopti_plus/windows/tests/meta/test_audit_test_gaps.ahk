@@ -18,6 +18,9 @@
 ; ==============================================================================
 
 ; Reads a windows/-relative source file (A_ScriptDir is the runner dir tests/).
+; Retained only for the wpm_widget WebView2-absence check, which is genuinely
+; file-scoped: other ui/ files use WebView2 in live code, so the framework's
+; dir/tree concat helpers would false-trip the absence assertion.
 _ATG_ReadSource(RelPath) {
 	SplitPath(A_ScriptDir, , &Root)
 	return FileRead(StrReplace(Root, "/", "\") . "\" . StrReplace(RelPath, "/", "\"), "UTF-8")
@@ -33,18 +36,6 @@ _ATG_StripComments(Src) {
 	return Out
 }
 
-; Column-0 function body (definition, not a call site) to the first flush-left
-; closing brace, with full-line comments stripped.
-_ATG_FuncBodyStripped(Src, Decl) {
-	Idx := InStr(Src, "`n" . Decl)
-	if !Idx
-		return ""
-	Rest := SubStr(Src, Idx + 1)
-	End := InStr(Rest, "`n}")
-	Body := End ? SubStr(Rest, 1, End + 1) : Rest
-	return _ATG_StripComments(Body)
-}
-
 
 
 
@@ -55,19 +46,22 @@ _ATG_FuncBodyStripped(Src, Decl) {
 ; =========================================================
 
 _ATG_MetricsTicksGatedOnSuspend() {
+	; Move-resilient: locate each tick function across the whole driver source
+	; via the framework helper rather than a pinned per-module path. Maps the
+	; bare function name to the original declaration used in assertion messages.
 	Checks := Map(
-		"modules/keylogger/keylogger_sensors.ahk", "KL_Sensors_Tick()",
-		"modules/keylogger/keylogger.ahk",         "KL_IngestOnce(",
-		"modules/keylogger/keylogger_hook.ahk",    "KL_Hook_Tick()")
-	for RelPath, Decl in Checks {
-		Body := _ATG_FuncBodyStripped(_ATG_ReadSource(RelPath), Decl)
-		Assert(Body != "", Decl . " must exist in " . RelPath)
+		"KL_Sensors_Tick", "KL_Sensors_Tick()",
+		"KL_IngestOnce",   "KL_IngestOnce(",
+		"KL_Hook_Tick",    "KL_Hook_Tick()")
+	for Name, Decl in Checks {
+		Body := _DriverFuncBody(Name)
+		Assert(Body != "", Decl . " must exist")
 		Assert(InStr(Body, "A_IsSuspended") > 0,
 			Decl . " must early-return on A_IsSuspended so metrics timers go quiet while paused (metrics-timers-bypass-pause)")
 	}
-	; KL_Hook_LivePush lives in the same hook file.
-	Body := _ATG_FuncBodyStripped(_ATG_ReadSource("modules/keylogger/keylogger_hook.ahk"), "KL_Hook_LivePush()")
-	Assert(Body != "", "KL_Hook_LivePush() must exist in keylogger_hook.ahk")
+	; KL_Hook_LivePush is the live-push companion tick.
+	Body := _DriverFuncBody("KL_Hook_LivePush")
+	Assert(Body != "", "KL_Hook_LivePush() must exist")
 	Assert(InStr(Body, "A_IsSuspended") > 0,
 		"KL_Hook_LivePush must gate on A_IsSuspended (metrics-timers-bypass-pause)")
 }
@@ -83,7 +77,7 @@ Test("metrics: the recurring keylogger/metrics ticks gate on A_IsSuspended (metr
 ; =========================================================
 
 _ATG_IngestDrainIsAtomic() {
-	Body := _ATG_FuncBodyStripped(_ATG_ReadSource("modules/keylogger/keylogger.ahk"), "KL_IngestOnce(")
+	Body := _DriverFuncBody("KL_IngestOnce")
 	Assert(Body != "", "KL_IngestOnce() must exist in keylogger.ahk")
 	Assert(InStr(Body, "Critical(") > 0,
 		"KL_IngestOnce must wrap the pending-entries drain in Critical() so the keystroke hook cannot append between snapshot and clear (pending-entries-cross-thread-race)")
@@ -102,7 +96,10 @@ Test("keylogger: KL_IngestOnce drains _pending_entries atomically under Critical
 ; =========================================================
 
 _ATG_AvVolumeUsesWinmm() {
-	Src := _ATG_StripComments(_ATG_ReadSource("modules/keylogger/keylogger_av_state.ahk"))
+	; Scoped to the keylogger module tree: the winmm-vs-COM invariant is specific
+	; to keylogger_av_state, and other modules may legitimately use COM, so a
+	; whole-tree scan would false-trip the CoCreateInstance absence check.
+	Src := _ATG_StripComments(_DriverDirConcat("modules/keylogger"))
 	Assert(InStr(Src, "waveOutGetVolume") > 0,
 		"the volume probe must read winmm waveOutGetVolume — the documented MMDevice/IAudioEndpointVolume COM path was never the implementation (av-mute-heuristic-and-doc-mismatch)")
 	Assert(InStr(Src, "CoCreateInstance") = 0,
@@ -120,6 +117,9 @@ Test("keylogger_av: master-volume probe uses the winmm path, code matches docs (
 ; =========================================================
 
 _ATG_WpmWidgetHasNoLiveWebView2() {
+	; Cannot broaden to _DriverDirConcat("ui"): other ui/ files (changelog,
+	; model browser, healthcheck) reference WebView2 in live code, so a dir/tree
+	; scan would false-trip this file-scoped "wpm_widget has none" invariant.
 	Src := _ATG_StripComments(_ATG_ReadSource("ui/wpm_widget.ahk"))
 	; The graph renderer was migrated to a GDI+ layered window; with no live
 	; WebView2 controller there is no per-process user-data folder to orphan on

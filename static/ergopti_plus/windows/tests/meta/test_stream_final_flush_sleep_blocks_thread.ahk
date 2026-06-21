@@ -26,44 +26,14 @@
 
 ; ===================================================
 ; ===================================================
-; ======= 1/ Source scan helpers ====================
-; ===================================================
-; ===================================================
-
-_SFFSBT_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
-}
-
-_SFFSBT_FuncBodyStripped(Src, FuncDef) {
-	Idx := InStr(Src, FuncDef)
-	if !Idx
-		return ""
-	Rest := SubStr(Src, Idx)
-	if RegExMatch(Rest, "m)^\}", &Match)
-		Rest := SubStr(Rest, 1, Match.Pos)
-	Out := ""
-	loop parse, Rest, "`n", "`r" {
-		Line := A_LoopField
-		if !RegExMatch(Line, "^\s*;")
-			Out .= Line . "`n"
-	}
-	return Out
-}
-
-
-
-
-; ===================================================
-; ===================================================
-; ======= 2/ No-blocking-Sleep assertions ===========
+; ======= 1/ No-blocking-Sleep assertions ===========
 ; ===================================================
 ; ===================================================
 
 _SFFSBT_StreamPollHasNoSleep() {
-	Src := _SFFSBT_ReadSource("modules/llm/api_ollama.ahk")
-	Body := _SFFSBT_FuncBodyStripped(Src, "_LLM_Ollama_StreamPoll(handle, state, on_partial, on_success, on_fail) {")
+	; Move-resilient: locate _LLM_Ollama_StreamPoll() by name via the framework
+	; helper instead of a pinned modules/llm/api_ollama.ahk read.
+	Body := _DriverFuncBody("_LLM_Ollama_StreamPoll")
 	Assert(Body != "", "_LLM_Ollama_StreamPoll must exist in api_ollama.ahk")
 	Assert(InStr(Body, "Sleep(") == 0,
 		"_LLM_Ollama_StreamPoll must not block the message pump with Sleep( -- the end-of-stream flush must re-arm a timer instead (stream-final-flush-sleep-blocks-thread)")
@@ -71,8 +41,7 @@ _SFFSBT_StreamPollHasNoSleep() {
 Test("api_ollama: _LLM_Ollama_StreamPoll has no blocking Sleep (stream-final-flush-sleep-blocks-thread)", _SFFSBT_StreamPollHasNoSleep)
 
 _SFFSBT_FinalFlushIsNonBlocking() {
-	Src := _SFFSBT_ReadSource("modules/llm/api_ollama.ahk")
-	Body := _SFFSBT_FuncBodyStripped(Src, "_LLM_Ollama_StreamFinalFlush(handle, state, on_partial, on_success, on_fail) {")
+	Body := _DriverFuncBody("_LLM_Ollama_StreamFinalFlush")
 	Assert(Body != "", "_LLM_Ollama_StreamFinalFlush must exist -- the end-of-stream flush must live in a re-armed function, not a Sleep loop")
 	Assert(InStr(Body, "Sleep(") == 0,
 		"_LLM_Ollama_StreamFinalFlush must not block with Sleep( (stream-final-flush-sleep-blocks-thread)")

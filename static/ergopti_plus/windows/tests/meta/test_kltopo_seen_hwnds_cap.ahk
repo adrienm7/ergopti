@@ -28,41 +28,12 @@
 
 ; ============================================================
 ; ============================================================
-; ======= 1/ Source-inspection helpers =======================
-; ============================================================
-; ============================================================
-
-_KTSHC_ReadSource() {
-	return FileRead(A_ScriptDir . "\..\modules\keylogger\keylogger_window_topology.ahk", "UTF-8")
-}
-
-
-_KTSHC_FindTickBlock(src) {
-	pos := InStr(src, "KL_Topo_Tick()")
-	if (!pos)
-		return ""
-	return SubStr(src, pos, 800)
-}
-
-
-_KTSHC_FindStopBlock(src) {
-	pos := InStr(src, "KL_Topo_Stop()")
-	if (!pos)
-		return ""
-	return SubStr(src, pos, 400)
-}
-
-
-
-
-; ============================================================
-; ============================================================
-; ======= 2/ Assertions ======================================
+; ======= 1/ Assertions ======================================
 ; ============================================================
 ; ============================================================
 
 _KTSHC_CapConstantDeclared() {
-	src := _KTSHC_ReadSource()
+	src := _DriverDirConcat("modules/keylogger")
 	Assert(InStr(src, "SEEN_HWNDS_CAP") > 0,
 		"keylogger_window_topology.ahk: KLTopoConst must declare SEEN_HWNDS_CAP to bound seen_hwnds growth")
 }
@@ -70,7 +41,7 @@ Test("KLTopo: SEEN_HWNDS_CAP constant declared (seen-hwnds-cap)", _KTSHC_CapCons
 
 
 _KTSHC_CapEnforcedInTick() {
-	block := _KTSHC_FindTickBlock(_KTSHC_ReadSource())
+	block := _DriverFuncBody("KL_Topo_Tick")
 	Assert(InStr(block, "SEEN_HWNDS_CAP") > 0,
 		"keylogger_window_topology.ahk: KL_Topo_Tick() must reference SEEN_HWNDS_CAP to enforce the cap")
 	Assert(InStr(block, ".Clear()") > 0,
@@ -80,7 +51,7 @@ Test("KLTopo: KL_Topo_Tick() enforces SEEN_HWNDS_CAP with .Clear() (seen-hwnds-c
 
 
 _KTSHC_StopClearsSeenHwnds() {
-	block := _KTSHC_FindStopBlock(_KTSHC_ReadSource())
+	block := _DriverFuncBody("KL_Topo_Stop")
 	Assert(InStr(block, "seen_hwnds") > 0 and InStr(block, ".Clear()") > 0,
 		"keylogger_window_topology.ahk: KL_Topo_Stop() must call seen_hwnds.Clear() to free history on stop")
 }
@@ -88,7 +59,7 @@ Test("KLTopo: KL_Topo_Stop() clears seen_hwnds (seen-hwnds-cap)", _KTSHC_StopCle
 
 
 _KTSHC_StopResetsPrevHwnd() {
-	block := _KTSHC_FindStopBlock(_KTSHC_ReadSource())
+	block := _DriverFuncBody("KL_Topo_Stop")
 	Assert(InStr(block, "prev_hwnd") > 0,
 		"keylogger_window_topology.ahk: KL_Topo_Stop() must reset prev_hwnd so it does not carry stale state into the next Start()")
 }

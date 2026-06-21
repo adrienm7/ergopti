@@ -34,8 +34,11 @@
 ; ===========================================================
 ; ===========================================================
 
+; Move-resilient: scan the keylogger module dir via the framework helper instead
+; of a pinned keylogger.ahk read. The "statements := []" marker is unique to
+; keylogger.ahk, so the block extractor below stays scoped to the ingest path.
 _WBCR_ReadSource() {
-	return FileRead(A_ScriptDir . "\..\modules\keylogger\keylogger.ahk", "UTF-8")
+	return _DriverDirConcat("modules/keylogger")
 }
 
 

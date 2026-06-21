@@ -27,44 +27,12 @@
 
 ; ===================================================
 ; ===================================================
-; ======= 1/ Source scan helpers ====================
-; ===================================================
-; ===================================================
-
-_GKWS_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
-}
-
-_GKWS_FuncBodyStripped(Src, FuncDef) {
-	Idx := InStr(Src, FuncDef)
-	if !Idx
-		return ""
-	Rest := SubStr(Src, Idx)
-	if RegExMatch(Rest, "m)^\}", &Match)
-		Rest := SubStr(Rest, 1, Match.Pos)
-	Out := ""
-	loop parse, Rest, "`n", "`r" {
-		Line := A_LoopField
-		if !RegExMatch(Line, "^\s*;")
-			Out .= Line . "`n"
-	}
-	return Out
-}
-
-
-
-
-; ===================================================
-; ===================================================
-; ======= 2/ GestureOnKeyDown suspend guard =========
+; ======= 1/ GestureOnKeyDown suspend guard =========
 ; ===================================================
 ; ===================================================
 
 _GKWS_SuspendGuardInOnKeyDown() {
-	Src := _GKWS_ReadSource("modules/gestures.ahk")
-	Body := _GKWS_FuncBodyStripped(Src, "GestureOnKeyDown(ih, vk, sc) {")
+	Body := _DriverFuncBody("GestureOnKeyDown")
 	Assert(Body != "", "GestureOnKeyDown must exist in modules/gestures.ahk")
 	Assert(InStr(Body, "A_IsSuspended") > 0,
 		"GestureOnKeyDown must check A_IsSuspended — InputHooks bypass Suspend and would otherwise suppress/re-inject keystrokes at Level 3 while the driver is paused (clickhold-inputhook-drops-keys)")
@@ -72,12 +40,11 @@ _GKWS_SuspendGuardInOnKeyDown() {
 Test("gestures: GestureOnKeyDown has A_IsSuspended guard (clickhold-inputhook-drops-keys)", _GKWS_SuspendGuardInOnKeyDown)
 
 _GKWS_InputHookIsNonConsuming() {
-	Src := _GKWS_ReadSource("modules/gestures.ahk")
-	Body := _GKWS_FuncBodyStripped(Src, "GestureStartKeyboardWatcher() {")
+	Body := _DriverFuncBody("GestureStartKeyboardWatcher")
 	Assert(Body != "", "GestureStartKeyboardWatcher must exist in modules/gestures.ahk")
 	Assert(InStr(Body, 'InputHook("V L3")') > 0 || InStr(Body, "InputHook('V L3')") > 0, "GestureStartKeyboardWatcher must use 'V' option to make the hook non-consuming (clickhold-inputhook-drops-keys)")
-	
-	BodyOnKeyDown := _GKWS_FuncBodyStripped(Src, "GestureOnKeyDown(ih, vk, sc) {")
+
+	BodyOnKeyDown := _DriverFuncBody("GestureOnKeyDown")
 	Assert(InStr(BodyOnKeyDown, "SendLevel") == 0, "GestureOnKeyDown must not re-send keys using SendLevel, as the hook is now non-consuming")
 }
 Test("gestures: GestureStartKeyboardWatcher uses non-consuming 'V' hook (clickhold-inputhook-drops-keys)", _GKWS_InputHookIsNonConsuming)

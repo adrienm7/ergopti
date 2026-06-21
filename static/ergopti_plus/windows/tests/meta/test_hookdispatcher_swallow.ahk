@@ -8,14 +8,8 @@
 
 #Requires AutoHotkey v2.0
 
-_THS_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
-}
-
 _THS_Check() {
-	Src := _THS_ReadSource("lib/hook_dispatcher.ahk")
+	Src := _DriverDirConcat("lib")
 	Assert(Src != "", "Source file must exist")
 	Assert(InStr(Src, "catch as e") > 0, "HookDispatcher must catch subscriber exceptions")
 	Assert(InStr(Src, 'LoggerWarn("HookDispatcher"') > 0, "HookDispatcher must log subscriber exceptions")
@@ -26,13 +20,13 @@ _THS_Check() {
 ; during a Ctrl/Shift/Alt keydown. Before this fix the modifier stayed logically
 ; stuck after any subscriber exception, requiring a script restart.
 _THS_CheckModifierRelease() {
-	Src := _THS_ReadSource("lib/hook_dispatcher.ahk")
+	Src := _DriverDirConcat("lib")
 	Assert(InStr(Src, "ErgoptiGlobalErrorHandler(e") > 0,
 		"HookDispatcher catch must call ErgoptiGlobalErrorHandler(e, ...) to release stuck modifiers")
 }
 
 _THS_EscalationIsThrottled() {
-	Src := _THS_ReadSource("lib/hook_dispatcher.ahk")
+	Src := _DriverDirConcat("lib")
 	; Find the catch region. The escalation must appear inside the throttle if-block,
 	; not after it — otherwise every exception fires the heavyweight crash handler per keystroke.
 	; Verify: the ErgoptiGlobalErrorHandler call must not appear AFTER the closing brace of
@@ -49,7 +43,7 @@ _THS_EscalationIsThrottled() {
 }
 
 _THS_DeltaIsWrapSafe() {
-	Src := _THS_ReadSource("lib/hook_dispatcher.ahk")
+	Src := _DriverDirConcat("lib")
 	Assert(InStr(Src, "& 0xFFFFFFFF") > 0,
 		"error cache delta must use 32-bit wrap mask to avoid 49-day suppression")
 }

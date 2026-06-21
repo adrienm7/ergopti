@@ -34,25 +34,27 @@
 
 _MetaCheckPrefixWatcherDeferred() {
 	SplitPath(A_ScriptDir, , &WindowsDir)
-	WatcherFile := WindowsDir . "\lib\hotstrings\hotstring_prefix_watcher.ahk"
-	HsFile := WindowsDir . "\modules\hotstrings.ahk"
 
-	WBody := ""
-	try WBody := FileRead(WatcherFile)
-	Assert(WBody != "", "hotstring_prefix_watcher.ahk must be readable")
+	; Move-resilient: scan the hotstrings lib dir for the watcher's deferred-build
+	; log line. That message is unique to hotstring_prefix_watcher.ahk, so the
+	; present-string check is unambiguous within the scope.
+	WBody := _DriverDirConcat("lib/hotstrings")
 
 	; The InputHook init must NOT build the index inline anymore — its success log
 	; line proves the build was deferred off the boot path.
 	Assert(InStr(WBody, "index build deferred off the boot path"),
 		"HotstringPrefixWatcherInit must defer the trigger-index build off the boot critical path")
 
-	HsBody := ""
-	try HsBody := FileRead(HsFile)
-	Assert(HsBody != "", "modules\hotstrings.ahk must be readable")
+	; Move-resilient: scan the modules dir for the deferred emoji/symbol pass.
+	; RegisterEmojisSymbolsDeferred and HotstringPrefixWatcherRebuildIndex both
+	; live only in modules/hotstrings.ahk, so the positional check below is
+	; unambiguous within the modules scope.
+	HsBody := _DriverDirConcat("modules")
 
 	; The boot tail must warm the empty-at-boot index off the critical path with a
 	; short-delay SetTimer(HotstringPrefixWatcherRebuildIndex). (That it is armed
-	; AFTER "ready" is enforced by test_boot_deferred_tasks.)
+	; AFTER "ready" is enforced by test_boot_deferred_tasks.) ErgoptiPlus.ahk is the
+	; windows-root entry point (no modules/lib/ui segment), so it stays a pinned read.
 	BootBody := ""
 	try BootBody := FileRead(WindowsDir . "\ErgoptiPlus.ahk")
 	Assert(BootBody != "", "ErgoptiPlus.ahk must be readable")

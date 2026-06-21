@@ -37,16 +37,11 @@
 ; =====================================
 
 _MetaCheckErgoFlowGapEnd() {
-	; Locate the source file relative to the tests/ directory
-	SplitPath(A_ScriptDir, , &WindowsDir)
-	SrcFile := WindowsDir . "\modules\keylogger\keylogger_ergonomics.ahk"
-
-	try {
-		Body := FileRead(SrcFile)
-	} catch {
-		Assert(false, "modules/keylogger/keylogger_ergonomics.ahk must be readable")
-		return
-	}
+	; Move-resilient: scan the keylogger module tree (comments PRESERVED) instead
+	; of a pinned keylogger path. Comments must be kept because flow_window_start
+	; appears inside KL_Ergo_UpdateBlock only as a comment (the actual emit is
+	; delegated to KL_Ergo_CheckFlow), and the ordering assertions depend on it.
+	Body := _DriverDirConcat("modules/keylogger")
 
 	; Locate the KL_Ergo_UpdateBlock function definition
 	FnPos := InStr(Body, "KL_Ergo_UpdateBlock(delay_ms, now, app, is_bs) {")

@@ -36,12 +36,6 @@
 ; =========================================================
 ; =========================================================
 
-_TSA_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &WindowsDir)
-	Path := StrReplace(WindowsDir, "\", "/") . "/" . StrReplace(RelPath, "\", "/")
-	return FileRead(Path)
-}
-
 ; Returns the substring inside the debounce block:
 ;   if (KLTopo.pending_ticks >= KLTopoConst.DEBOUNCE_TICKS) { ... }
 ; Starts AFTER the opening brace of that if-block.
@@ -77,7 +71,10 @@ _TSA_ExtractDebounceBody(Src) {
 ; =======================================================
 
 _TSA_CheckSingleAppend() {
-	Src := _TSA_ReadSource("modules/keylogger/keylogger_window_topology.ahk")
+	; Move-resilient: scan the keylogger module dir via the framework helper instead
+	; of a pinned keylogger_window_topology.ahk read. The debounce block's opening
+	; marker is unique to that file, so the block extractor stays scoped correctly.
+	Src := _DriverDirConcat("modules/keylogger")
 	Assert(Src != "", "modules/keylogger/keylogger_window_topology.ahk must be readable")
 
 	DebounceBody := _TSA_ExtractDebounceBody(Src)

@@ -19,26 +19,16 @@
 
 ; ===================================================
 ; ===================================================
-; ======= 1/ Source scan helpers ====================
-; ===================================================
-; ===================================================
-
-_CDRI_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &WindowsDir)
-	Path := WindowsDir . "\" . StrReplace(RelPath, "/", "\")
-	return FileRead(Path)
-}
-
-
-; ===================================================
-; ===================================================
-; ======= 2/ Test implementations ===================
+; ======= 1/ Test implementations ===================
 ; ===================================================
 ; ===================================================
 
 _CDRI_CheckIndexAfterRebuild() {
-	Src := _CDRI_ReadSource("lib/hotstrings/hotstrings_config_window.ahk")
-	Assert(Src != "", "lib/hotstrings/hotstrings_config_window.ahk must be readable")
+	; Move-resilient: scan the hotstrings module tree via the framework helper
+	; instead of a pinned config-window path. Both call names are unique to this
+	; module, so first-occurrence ordering still encodes the rebuild-then-index
+	; invariant regardless of which file in lib/hotstrings holds the block.
+	Src := _DriverDirConcat("lib/hotstrings")
 
 	; Locate the color block — find the rebuild call then check that ColorIndexFor
 	; is called after (higher byte offset) not before.

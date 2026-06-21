@@ -8,15 +8,11 @@
 
 #Requires AutoHotkey v2.0
 
-_TAV_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
-}
-
 _TAV_Check() {
-	Src := _TAV_ReadSource("modules/keylogger/keylogger_av_state.ahk")
-	Assert(Src != "", "Source file keylogger_av_state.ahk must exist")
+	; Move-resilient: scan the keylogger module tree (comments preserved — one
+	; assertion targets the "heuristic" doc string) instead of a pinned path.
+	; The unique KL_AV_GetMasterMuted(vol) signature keeps the scope meaningful.
+	Src := _DriverDirConcat("modules/keylogger")
 	Assert(InStr(Src, "KL_AV_GetMasterMuted(vol)") > 0, "keylogger_av_state.ahk must take vol parameter")
 	Assert(InStr(Src, "heuristic") > 0, "keylogger_av_state.ahk must document the heuristic")
 }

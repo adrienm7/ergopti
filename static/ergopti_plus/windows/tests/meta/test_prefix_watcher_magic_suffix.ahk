@@ -18,12 +18,6 @@
 
 #Requires AutoHotkey v2.0
 
-_TPWMS_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path, "UTF-8")
-}
-
 _TPWMS_StripLineComments(Src) {
 	Out := ""
 	for Line in StrSplit(Src, "`n", "`r") {
@@ -44,7 +38,10 @@ _TPWMS_StripLineComments(Src) {
 ; ===============================================================
 
 _TPWMS_TrailingSuffixCheck() {
-	Src := _TPWMS_StripLineComments(_TPWMS_ReadSource("lib/hotstrings/hotstring_prefix_watcher.ahk"))
+	; Move-resilient: scan the hotstrings lib dir via the framework helper instead
+	; of a pinned hotstring_prefix_watcher.ahk path. The trailing-suffix form
+	; SubStr(Trigger, -MkLen) == MagicKey is unique to the watcher within the dir.
+	Src := _TPWMS_StripLineComments(_DriverDirConcat("lib/hotstrings"))
 	Assert(Src != "", "lib/hotstrings/hotstring_prefix_watcher.ahk must be readable")
 
 	; MkLen must be computed from StrLen(MagicKey) — needed by the suffix test

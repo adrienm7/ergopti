@@ -38,27 +38,11 @@
 ; =====================================
 
 _MetaCheckEnsureModelReadyGuard() {
-	; Locate ui/tray_llm/actions.ahk relative to the tests/ directory.
-	SplitPath(A_ScriptDir, , &WindowsDir)
-	ActionsFile := WindowsDir . "\ui\tray_llm\actions.ahk"
-
-	try {
-		Body := FileRead(ActionsFile)
-	} catch {
-		return
-	}
-
-	FnPos := InStr(Body, "LLM_Tray_EnsureModelReady() {")
-	Assert(FnPos > 0,
+	; Move-resilient: locate LLM_Tray_EnsureModelReady() across the whole driver
+	; source via the framework helper instead of a pinned ui/tray_llm path.
+	FnBody := _DriverFuncBody("LLM_Tray_EnsureModelReady")
+	Assert(FnBody != "",
 		"actions.ahk must define LLM_Tray_EnsureModelReady() — entry point not found")
-
-	; Scope the search to the function body: in this tab-indented codebase the
-	; only column-0 closing brace after the declaration is the function's own,
-	; so the first "`n}" after FnPos bounds the body precisely.
-	BodyEnd := InStr(Body, "`n}", false, FnPos)
-	if (BodyEnd == 0)
-		BodyEnd := StrLen(Body) + 1
-	FnBody := SubStr(Body, FnPos, BodyEnd - FnPos)
 
 	GuardPos := InStr(FnBody, "!LLM_Deps_IsReady()")
 	ProbePos := InStr(FnBody, "LLM_IsModelInstalled(")

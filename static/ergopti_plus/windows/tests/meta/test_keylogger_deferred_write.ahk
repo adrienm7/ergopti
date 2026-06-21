@@ -2,38 +2,14 @@
 
 #Requires AutoHotkey v2.0
 
-_KDW_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
-}
-
-_KDW_FuncBodyStripped(Src, FuncDef) {
-	Idx := InStr(Src, FuncDef)
-	if !Idx
-		return ""
-	Rest := SubStr(Src, Idx)
-	if RegExMatch(Rest, "m)^\}", &Match)
-		Rest := SubStr(Rest, 1, Match.Pos)
-	Out := ""
-	loop parse, Rest, "`n", "`r" {
-		Line := A_LoopField
-		if !RegExMatch(Line, "^\s*;")
-			Out .= Line . "`n"
-	}
-	return Out
-}
-
 _KDW_AssertDeferredWrite() {
-	Src := _KDW_ReadSource("modules/keylogger/keylogger.ahk")
-	
-	AppendBody := _KDW_FuncBodyStripped(Src, "KL_AppendLog(entry) {")
-	
+	AppendBody := _DriverFuncBody("KL_AppendLog")
+
 	InlineWriteIdx := InStr(AppendBody, "fh.Write(")
 	Assert(!InlineWriteIdx, "KL_AppendLog must NOT call fh.Write() inline (kl-synchronous-disk-write-on-keystroke)")
-	
-	IngestBody := _KDW_FuncBodyStripped(Src, "KL_IngestOnce(force := false) {")
-	
+
+	IngestBody := _DriverFuncBody("KL_IngestOnce")
+
 	DeferredWriteIdx := InStr(IngestBody, "fh.Write(")
 	Assert(DeferredWriteIdx > 0, "KL_IngestOnce must write pending_snapshot to disk (kl-synchronous-disk-write-on-keystroke)")
 }

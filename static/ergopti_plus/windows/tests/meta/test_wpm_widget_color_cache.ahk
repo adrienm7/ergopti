@@ -34,16 +34,19 @@
 ; ===================================================
 ; ===================================================
 
+; Move-resilient: the whole driver source via the framework helper. Only used for
+; the unique WPMWidget_InvalidateColorCache token check; the per-function checks
+; go through _WWCC_FindReadTomlBlock below.
 _WWCC_ReadSource() {
-	return FileRead(A_ScriptDir . "\..\ui\wpm_widget.ahk", "UTF-8")
+	return _DriverSourceConcat()
 }
 
 
+; Move-resilient: extract _WPMWidget_ReadTomlColor()'s body by name (the helper
+; anchors on the DEFINITION, so the earlier call sites do not confuse it). The
+; src argument is ignored; kept so the call sites stay unchanged.
 _WWCC_FindReadTomlBlock(src) {
-	pos := InStr(src, "_WPMWidget_ReadTomlColor(CategoryName")
-	if (!pos)
-		return ""
-	return SubStr(src, pos, 600)
+	return _DriverFuncBody("_WPMWidget_ReadTomlColor")
 }
 
 

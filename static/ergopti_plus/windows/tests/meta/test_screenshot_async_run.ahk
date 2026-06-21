@@ -31,11 +31,12 @@
 ; ==========================================================
 ; ==========================================================
 
-_SAR_ReadSource() {
-	return FileRead(A_ScriptDir . "\..\modules\shortcuts\win.ahk", "UTF-8")
-}
-
-
+; Move-resilient: scan the shortcuts module dir via the framework helper instead
+; of a pinned win.ahk path. SC029:: is unique within modules/shortcuts (only the
+; screenshot hotkey lives here; layout.ahk's SC029:: is in modules/, out of scope),
+; so the first-match extraction below still targets the screenshot block. The
+; ~600-char window stays inside win.ahk (the block sits well before EOF), so it
+; never spills into a neighbouring file's content.
 _SAR_FindScreenshotBlock(src) {
 	pos := InStr(src, "SC029::")
 	if (!pos)
@@ -54,7 +55,7 @@ _SAR_FindScreenshotBlock(src) {
 ; ==========================================================
 
 _SAR_NoRunWait() {
-	block := _SAR_FindScreenshotBlock(_SAR_ReadSource())
+	block := _SAR_FindScreenshotBlock(_DriverDirConcat("modules/shortcuts"))
 	Assert(block != "",
 		"shortcuts/win.ahk: SC029 screenshot hotkey block must be present")
 	Assert(InStr(block, "RunWait") = 0,
@@ -64,7 +65,7 @@ Test("Screenshot hotkey: RunWait not used in SC029 block (screenshot-async-run)"
 
 
 _SAR_AsyncRunPresent() {
-	block := _SAR_FindScreenshotBlock(_SAR_ReadSource())
+	block := _SAR_FindScreenshotBlock(_DriverDirConcat("modules/shortcuts"))
 	; Run( with an opening paren distinguishes the Run function from RunWait.
 	Assert(InStr(block, "Run(") > 0,
 		"shortcuts/win.ahk: SC029 must call Run() (async) instead of RunWait for the PowerShell capture process")

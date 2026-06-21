@@ -2,25 +2,12 @@
 
 #Requires AutoHotkey v2.0
 
-_SSPY_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
-}
-
-_SSPY_FuncBodyStripped(Src, FuncDef) {
-	Idx := InStr(Src, FuncDef)
-	if !Idx
-		return ""
-	Rest := SubStr(Src, Idx)
-	if RegExMatch(Rest, "m)^\}", &Match)
-		Rest := SubStr(Rest, 1, Match.Pos)
-	return Rest
-}
-
 _SSPY_AssertYieldOpsParams() {
-	Src := _SSPY_ReadSource("lib/sqlite3.ahk")
-	
+	; Move-resilient: scan the whole driver source via the framework helper instead
+	; of a pinned lib/sqlite3.ahk read. The exact signature strings below are unique
+	; to sqlite3.ahk, so the whole-tree scope cannot trivially satisfy them.
+	Src := _DriverSourceConcat()
+
 	ExecDefIdx := InStr(Src, "SQLite_Exec(db, sql, YieldOps := 0) {")
 	Assert(ExecDefIdx > 0, "SQLite_Exec must expose a YieldOps parameter (sqlite-wrapper-no-bounded-blocking-on-main-thread)")
 
@@ -29,27 +16,27 @@ _SSPY_AssertYieldOpsParams() {
 }
 
 _SSPY_AssertProgressHandler() {
-	Src := _SSPY_ReadSource("lib/sqlite3.ahk")
+	; The global _SQLite_ProgressCb token is unique to sqlite3.ahk, so a whole-tree
+	; scan stays unambiguous; the per-function checks use _DriverFuncBody.
+	Src := _DriverSourceConcat()
 
 	YieldCbIdx := InStr(Src, "_SQLite_ProgressCb := CallbackCreate(")
 	Assert(YieldCbIdx > 0, "A global CallbackCreate must be defined for progress yielding (sqlite-wrapper-no-bounded-blocking-on-main-thread)")
 
-	ExecBody := _SSPY_FuncBodyStripped(Src, "SQLite_Exec(db, sql, YieldOps := 0) {")
+	ExecBody := _DriverFuncBody("SQLite_Exec")
 	ExecHandlerIdx := InStr(ExecBody, "sqlite3_progress_handler")
 	Assert(ExecHandlerIdx > 0, "SQLite_Exec must register the sqlite3_progress_handler when YieldOps > 0 (sqlite-wrapper-no-bounded-blocking-on-main-thread)")
 
-	QueryBody := _SSPY_FuncBodyStripped(Src, "SQLite_Query(db, sql, YieldOps := 0) {")
+	QueryBody := _DriverFuncBody("SQLite_Query")
 	QueryHandlerIdx := InStr(QueryBody, "sqlite3_progress_handler")
 	Assert(QueryHandlerIdx > 0, "SQLite_Query must register the sqlite3_progress_handler when YieldOps > 0 (sqlite-wrapper-no-bounded-blocking-on-main-thread)")
 }
 
 _SSPY_AssertProgressHandlerDeregisteredOnError() {
-	Src := _SSPY_ReadSource("lib/sqlite3.ahk")
-
 	; Locate the prepare-failure block inside SQLite_Exec and verify it
 	; deregisters the progress handler (Int 0 disables it) before returning.
 	; Without this the handler stays installed permanently after a bad SQL string.
-	ExecBody := _SSPY_FuncBodyStripped(Src, "SQLite_Exec(db, sql, YieldOps := 0) {")
+	ExecBody := _DriverFuncBody("SQLite_Exec")
 	ExecPrepErrIdx := InStr(ExecBody, "sqlite3_prepare_v2 failed")
 	Assert(ExecPrepErrIdx > 0, "SQLite_Exec must have a prepare-failure error path (sqlite-progress-handler-leaked-on-prepare-error)")
 	ExecErrBlock := SubStr(ExecBody, ExecPrepErrIdx)
@@ -59,7 +46,7 @@ _SSPY_AssertProgressHandlerDeregisteredOnError() {
 
 	; Locate the early-return block inside SQLite_Query (prepare failure /
 	; null statement) and verify the same deregistration is present there.
-	QueryBody := _SSPY_FuncBodyStripped(Src, "SQLite_Query(db, sql, YieldOps := 0) {")
+	QueryBody := _DriverFuncBody("SQLite_Query")
 	QueryPrepErrIdx := InStr(QueryBody, "rc != SQLiteConst.OK || !pstmt")
 	Assert(QueryPrepErrIdx > 0, "SQLite_Query must have a prepare-failure early-return path (sqlite-progress-handler-leaked-on-prepare-error)")
 	QueryErrBlock := SubStr(QueryBody, QueryPrepErrIdx)

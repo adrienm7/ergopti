@@ -27,44 +27,14 @@
 
 ; ===================================================
 ; ===================================================
-; ======= 1/ Source scan helpers ====================
-; ===================================================
-; ===================================================
-
-_RPD_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
-}
-
-_RPD_FuncBodyStripped(Src, FuncDef) {
-	Idx := InStr(Src, FuncDef)
-	if !Idx
-		return ""
-	Rest := SubStr(Src, Idx)
-	if RegExMatch(Rest, "m)^\}", &Match)
-		Rest := SubStr(Rest, 1, Match.Pos)
-	Out := ""
-	loop parse, Rest, "`n", "`r" {
-		Line := A_LoopField
-		if !RegExMatch(Line, "^\s*;")
-			Out .= Line . "`n"
-	}
-	return Out
-}
-
-
-
-
-; ===================================================
-; ===================================================
-; ======= 2/ Deadline cap assertions ================
+; ======= 1/ Deadline cap assertions ================
 ; ===================================================
 ; ===================================================
 
 _RPD_PollHasDeadlineCheck() {
-	Src := _RPD_ReadSource("modules/llm/api_remote.ahk")
-	Body := _RPD_FuncBodyStripped(Src, "_LLMRemote_PollRequest(req_id) {")
+	; Move-resilient: locate the function across the driver source via the framework
+	; helper (also strips full-line comments) instead of a pinned api_remote.ahk path.
+	Body := _DriverFuncBody("_LLMRemote_PollRequest")
 	Assert(Body != "", "_LLMRemote_PollRequest must exist in modules/llm/api_remote.ahk")
 	Assert(InStr(Body, "deadline_tick") > 0,
 		"_LLMRemote_PollRequest must check deadline_tick — without a cap the poll timer fires forever on a stalled WinHTTP request (remote-poll-no-deadline-cap)")
@@ -72,8 +42,7 @@ _RPD_PollHasDeadlineCheck() {
 Test("api_remote: _LLMRemote_PollRequest checks deadline_tick to cap infinite poll loop (remote-poll-no-deadline-cap)", _RPD_PollHasDeadlineCheck)
 
 _RPD_DeadlineTickStoredAtDispatch() {
-	Src := _RPD_ReadSource("modules/llm/api_remote.ahk")
-	Body := _RPD_FuncBodyStripped(Src, "LLM_RemoteGenerate_Async(Entry,")
+	Body := _DriverFuncBody("LLM_RemoteGenerate_Async")
 	Assert(Body != "", "LLM_RemoteGenerate_Async must exist in modules/llm/api_remote.ahk")
 	Assert(InStr(Body, "deadline_tick") > 0,
 		"LLM_RemoteGenerate_Async must store deadline_tick in the registry entry so _LLMRemote_PollRequest can enforce it")
@@ -85,13 +54,12 @@ Test("api_remote: LLM_RemoteGenerate_Async stores deadline_tick in the registry 
 
 ; ===================================================
 ; ===================================================
-; ======= 3/ Abort on cancel assertions =============
+; ======= 2/ Abort on cancel assertions =============
 ; ===================================================
 ; ===================================================
 
 _RPD_CancelAsyncAbortsHttp() {
-	Src := _RPD_ReadSource("modules/llm/api_remote.ahk")
-	Body := _RPD_FuncBodyStripped(Src, "LLM_RemoteCancelAsync(req_id) {")
+	Body := _DriverFuncBody("LLM_RemoteCancelAsync")
 	Assert(Body != "", "LLM_RemoteCancelAsync must exist in modules/llm/api_remote.ahk")
 	Assert(InStr(Body, ".Abort()") > 0,
 		"LLM_RemoteCancelAsync must call .Abort() on the WinHTTP object — setting cancelled:=true alone leaves the live HTTP request consuming bandwidth (remote-poll-no-deadline-cap)")
@@ -99,8 +67,7 @@ _RPD_CancelAsyncAbortsHttp() {
 Test("api_remote: LLM_RemoteCancelAsync calls .Abort() to kill the live WinHTTP request (remote-poll-no-deadline-cap)", _RPD_CancelAsyncAbortsHttp)
 
 _RPD_CancelAllAbortsHttp() {
-	Src := _RPD_ReadSource("modules/llm/api_remote.ahk")
-	Body := _RPD_FuncBodyStripped(Src, "LLM_RemoteCancelAllAsync() {")
+	Body := _DriverFuncBody("LLM_RemoteCancelAllAsync")
 	Assert(Body != "", "LLM_RemoteCancelAllAsync must exist in modules/llm/api_remote.ahk")
 	Assert(InStr(Body, ".Abort()") > 0,
 		"LLM_RemoteCancelAllAsync must call .Abort() on each WinHTTP object — setting cancelled:=true alone leaves all live requests consuming bandwidth (remote-poll-no-deadline-cap)")

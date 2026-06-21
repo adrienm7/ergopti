@@ -34,12 +34,11 @@
 ; ==================================================
 ; ==================================================
 
-; Reads a windows/-relative source file. A_ScriptDir is the runner dir (tests/);
-; its parent is the windows/ driver root.
+; Returns the concatenated tap_holds module source. The per-key #HotIf anchors are
+; unique across these files, so a whole-dir scan resolves each block regardless of
+; how the module is split — move-resilient. RelPath is kept for call-site clarity.
 _HLRB_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
+	return _DriverDirConcat("modules/tap_holds")
 }
 
 ; Extracts the body of a single hotkey block: from the Anchor (a substring on

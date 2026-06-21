@@ -27,22 +27,7 @@
 
 ; ==================================================
 ; ==================================================
-; ======= 1/ Source scan helper ====================
-; ==================================================
-; ==================================================
-
-_FTSP_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
-}
-
-
-
-
-; ==================================================
-; ==================================================
-; ======= 2/ Stale-token absence assertions ========
+; ======= 1/ Stale-token absence assertions ========
 ; ==================================================
 ; ==================================================
 
@@ -52,9 +37,13 @@ _FTSP_NoStalePathTokens() {
 	StaleLayout := "static" . "\drivers\autohotkey"
 	StaleScript := "tools" . "\format_toml.py"
 
+	; Move-resilient AND strengthened: scan the WHOLE driver source (tests/ tree
+	; excluded by the helper) instead of two pinned paths. These stale tokens
+	; must be absent everywhere, so a whole-tree scan catches a reappearance in
+	; any file, not just the two the fix originally touched.
+	Src := _DriverSourceConcat()
 	Files := ["lib/toml/toml_helpers.ahk", "ui/personal_toml_editor.ahk"]
 	for _, Rel in Files {
-		Src := _FTSP_ReadSource(Rel)
 		Assert(InStr(Src, StaleLayout) = 0,
 			Rel . " must not reference the stale '" . StaleLayout . "' layout - the driver lives under static/ergopti_plus/windows")
 		Assert(InStr(Src, StaleScript) = 0,
@@ -65,8 +54,9 @@ Test("toml_helpers: no stale drivers/autohotkey + tools/format_toml.py tokens (f
 
 _FTSP_DeadFormatterRemoved() {
 	; The dead synchronous formatter helper must be gone so it cannot be
-	; revived into a blocking RunWait on the SaveFullConfig save path.
-	Src := _FTSP_ReadSource("lib/toml/toml_helpers.ahk")
+	; revived into a blocking RunWait on the SaveFullConfig save path. Whole-tree
+	; scan strengthens this: the removed helper must not resurface anywhere.
+	Src := _DriverSourceConcat()
 	Assert(InStr(Src, "TOML_FormatViaScript") = 0,
 		"TOML_FormatViaScript must be removed - it never ran (stale path) and reviving it would block SaveFullConfig with a synchronous python RunWait")
 }

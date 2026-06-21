@@ -25,21 +25,6 @@
 
 #Requires AutoHotkey v2.0
 
-_TLDHCL_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path, "UTF-8")
-}
-
-_TLDHCL_StripLineComments(Src) {
-	Out := ""
-	for Line in StrSplit(Src, "`n", "`r") {
-		if !RegExMatch(Line, "^\s*;")
-			Out .= Line . "`n"
-	}
-	return Out
-}
-
 
 
 
@@ -51,8 +36,7 @@ _TLDHCL_StripLineComments(Src) {
 ; ======================================================================
 
 _TLDHCL_HasCorrectionsAfterLTrim() {
-	Src := _TLDHCL_StripLineComments(_TLDHCL_ReadSource("lib/llm_diff.ahk"))
-	Assert(Src != "", "lib/llm_diff.ahk must be readable")
+	Src := _DriverDirConcat("lib")
 
 	; LTrim on the first chunk must be present
 	Assert(InStr(Src, "LTrim(chunks[1].text)") > 0,

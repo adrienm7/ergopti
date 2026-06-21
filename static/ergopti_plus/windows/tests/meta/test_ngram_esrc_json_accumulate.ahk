@@ -26,28 +26,16 @@
 
 
 
-; =================================================
-; =================================================
-; ======= 1/ Source scan helpers ==================
-; =================================================
-; =================================================
-
-_NEA_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &WindowsDir)
-	Path := WindowsDir . "\" . StrReplace(RelPath, "/", "\")
-	return FileRead(Path)
-}
-
-
 ; ===================================================
 ; ===================================================
-; ======= 2/ Test implementations ===================
+; ======= 1/ Test implementations ===================
 ; ===================================================
 ; ===================================================
 
 _NEA_CheckNoOverwrite() {
-	Src := _NEA_ReadSource("modules/keylogger/keylogger_walker.ahk")
-	Assert(Src != "", "modules/keylogger/keylogger_walker.ahk must be readable")
+	; Move-resilient: scan the modules/keylogger dir via the framework helper.
+	; All esrc_json anchors here are unique to keylogger_walker.ahk within that dir.
+	Src := _DriverDirConcat("modules/keylogger")
 
 	; The old bare-overwrite form must not appear in the UPSERT for ngram tables
 	Assert(!InStr(Src, "esrc_json=excluded.esrc_json"),
@@ -55,24 +43,21 @@ _NEA_CheckNoOverwrite() {
 }
 
 _NEA_CheckMergeExprExists() {
-	Src := _NEA_ReadSource("modules/keylogger/keylogger_walker.ahk")
-	Assert(Src != "", "modules/keylogger/keylogger_walker.ahk must be readable")
+	Src := _DriverDirConcat("modules/keylogger")
 
 	Assert(InStr(Src, "KLW_EsrcMergeExpr"),
 		"KLW_EsrcMergeExpr must be defined and used in keylogger_walker.ahk")
 }
 
 _NEA_CheckMergeExprUsesJsonSet() {
-	Src := _NEA_ReadSource("modules/keylogger/keylogger_walker.ahk")
-	Assert(Src != "", "modules/keylogger/keylogger_walker.ahk must be readable")
+	Src := _DriverDirConcat("modules/keylogger")
 
 	Assert(InStr(Src, "json_set(COALESCE(esrc_json"),
 		"KLW_EsrcMergeExpr must build a json_set() expression starting from COALESCE(esrc_json,'{}') to handle NULL rows")
 }
 
 _NEA_CheckMergeExprSumsKeys() {
-	Src := _NEA_ReadSource("modules/keylogger/keylogger_walker.ahk")
-	Assert(Src != "", "modules/keylogger/keylogger_walker.ahk must be readable")
+	Src := _DriverDirConcat("modules/keylogger")
 
 	; The expression must sum existing + excluded values for each key
 	Assert(InStr(Src, "json_extract(esrc_json,") && InStr(Src, "json_extract(excluded.esrc_json,"),

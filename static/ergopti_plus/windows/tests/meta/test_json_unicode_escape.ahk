@@ -8,15 +8,8 @@
 
 #Requires AutoHotkey v2.0
 
-_TJU_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
-}
-
 _TJU_Check() {
-	Src := _TJU_ReadSource("lib/json.ahk")
-	Assert(Src != "", "Source file json.ahk must exist")
+	Src := _DriverDirConcat("lib")
 	Assert(InStr(Src, "^[0-9A-Fa-f]{4}$") > 0, "json.ahk must validate \\u hex escapes")
 	Assert(InStr(Src, "JSON: invalid \u escape") > 0, "json.ahk must throw descriptive error on invalid \\u escape")
 }

@@ -8,14 +8,8 @@
 
 #Requires AutoHotkey v2.0
 
-_THR_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
-}
-
 _THR_Check() {
-	Src := _THR_ReadSource("lib/logger.ahk")
+	Src := _DriverDirConcat("lib")
 	Assert(Src != "", "Source file logger.ahk must exist")
 	Assert(InStr(Src, "HealthCheck_RecordWarn()") > 0, "logger.ahk must call HealthCheck_RecordWarn")
 	Assert(InStr(Src, "HealthCheck_RecordError(Body)") > 0, "logger.ahk must call HealthCheck_RecordError")

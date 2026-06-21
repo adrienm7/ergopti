@@ -34,33 +34,15 @@
 
 ; ================================================================
 ; ================================================================
-; ======= 1/ Source-inspection helpers ===========================
-; ================================================================
-; ================================================================
-
-_PHSP_ReadSource() {
-	return FileRead(A_ScriptDir . "\..\ui\tray_llm\menu_profiles.ahk", "UTF-8")
-}
-
-
-_PHSP_FindBindBlock(src) {
-	pos := InStr(src, "LLM_Tray_BindProfileHotkeys()")
-	if (!pos)
-		return ""
-	return SubStr(src, pos, 400)
-}
-
-
-
-
-; ================================================================
-; ================================================================
-; ======= 2/ Assertions ==========================================
+; ======= 1/ Assertions ==========================================
 ; ================================================================
 ; ================================================================
 
 _PHSP_StablePredDeclared() {
-	src := _PHSP_ReadSource()
+	; Move-resilient: scan the tray_llm UI dir via the framework helper. The
+	; module-level _LLM_PROFILE_HOTKEY_PRED global lives outside any function, so
+	; it cannot be reached via _DriverFuncBody — a dir concat is the right scope.
+	src := _DriverDirConcat("ui/tray_llm")
 	Assert(InStr(src, "_LLM_PROFILE_HOTKEY_PRED") > 0,
 		"menu_profiles.ahk: _LLM_PROFILE_HOTKEY_PRED must be declared as a module-level stable BoundFunc for HotIf")
 }
@@ -68,7 +50,10 @@ Test("Profile hotkeys: _LLM_PROFILE_HOTKEY_PRED stable BoundFunc declared (profi
 
 
 _PHSP_HotIfUsesStablePred() {
-	block := _PHSP_FindBindBlock(_PHSP_ReadSource())
+	; Move-resilient: extract the LLM_Tray_BindProfileHotkeys body via the bare-name
+	; helper instead of a pinned read + 400-char window (which would false-match the
+	; call site in init.ahk under any concat).
+	block := _DriverFuncBody("LLM_Tray_BindProfileHotkeys")
 	Assert(InStr(block, "HotIf(_LLM_PROFILE_HOTKEY_PRED)") > 0,
 		"menu_profiles.ahk: LLM_Tray_BindProfileHotkeys() must pass _LLM_PROFILE_HOTKEY_PRED (not a fresh lambda) to HotIf")
 }
@@ -76,7 +61,7 @@ Test("Profile hotkeys: HotIf uses stable _LLM_PROFILE_HOTKEY_PRED in LLM_Tray_Bi
 
 
 _PHSP_NoFreshLambdaInHotIf() {
-	block := _PHSP_FindBindBlock(_PHSP_ReadSource())
+	block := _DriverFuncBody("LLM_Tray_BindProfileHotkeys")
 	; An anonymous (*) => lambda inside HotIf(...) would look like HotIf((*) =>
 	Assert(InStr(block, 'HotIf((*) =>') = 0,
 		"menu_profiles.ahk: LLM_Tray_BindProfileHotkeys() must not pass a fresh lambda to HotIf — use the hoisted _LLM_PROFILE_HOTKEY_PRED")

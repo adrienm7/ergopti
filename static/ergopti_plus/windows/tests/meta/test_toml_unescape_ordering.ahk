@@ -18,13 +18,6 @@
 
 #Requires AutoHotkey v2.0
 
-_TTUO_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path, "UTF-8")
-}
-
-
 ; ======================================================
 ; ======================================================
 ; ======= 1/ _WS_UnescapeToml ordering check ===========
@@ -32,16 +25,11 @@ _TTUO_ReadSource(RelPath) {
 ; ======================================================
 
 _TTUO_UnescapeOrderingCheck() {
-	Src := _TTUO_ReadSource("lib/wrap_symbols_config.ahk")
-	Assert(Src != "", "lib/wrap_symbols_config.ahk must be readable")
-
-	; Locate the function DEFINITION (not call sites — the function is called earlier
-	; in the file, so searching only the opening token lands on a call site)
-	FuncStart := InStr(Src, "_WS_UnescapeToml(S) {")
-	Assert(FuncStart > 0, "_WS_UnescapeToml must be defined in lib/wrap_symbols_config.ahk")
-
-	; Extract a window large enough to cover the two-line body (500 chars is ample)
-	Snippet := SubStr(Src, FuncStart, 500)
+	; Move-resilient: extract _WS_UnescapeToml()'s body by name via the framework
+	; helper instead of a pinned lib/wrap_symbols_config.ahk read. The helper anchors
+	; on the DEFINITION, so the earlier call site no longer confuses the extraction.
+	Snippet := _DriverFuncBody("_WS_UnescapeToml")
+	Assert(Snippet != "", "_WS_UnescapeToml must be defined in lib/wrap_symbols_config.ahk")
 
 	; Both replacements must be present in the function
 	BackslashPos := InStr(Snippet, "StrReplace(S, " . Chr(0x22) . "\\" . Chr(0x22))

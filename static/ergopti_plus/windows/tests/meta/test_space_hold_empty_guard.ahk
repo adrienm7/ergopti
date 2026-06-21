@@ -32,33 +32,14 @@
 
 ; ============================================================
 ; ============================================================
-; ======= 1/ Source-inspection helpers =======================
-; ============================================================
-; ============================================================
-
-_SHEG_ReadSource() {
-	return FileRead(A_ScriptDir . "\..\modules\tap_holds\space.ahk", "UTF-8")
-}
-
-
-_SHEG_FindSpaceTapHoldBlock(src) {
-	pos := InStr(src, "SpaceTapHold(HoldFn)")
-	if (!pos)
-		return ""
-	return SubStr(src, pos, 500)
-}
-
-
-
-
-; ============================================================
-; ============================================================
-; ======= 2/ Assertions ======================================
+; ======= 1/ Assertions ======================================
 ; ============================================================
 ; ============================================================
 
 _SHEG_GuardPresent() {
-	block := _SHEG_FindSpaceTapHoldBlock(_SHEG_ReadSource())
+	; Move-resilient: locate SpaceTapHold() across the whole driver source via the
+	; framework helper instead of a pinned modules path
+	block := _DriverFuncBody("SpaceTapHold")
 	Assert(InStr(block, "ih.Input") > 0,
 		"space.ahk: SpaceTapHold() must check ih.Input before calling HoldFn to prevent phantom modifier on empty capture")
 }
@@ -66,7 +47,7 @@ Test("SpaceTapHold: ih.Input guard present before HoldFn.Call (space-hold-empty-
 
 
 _SHEG_HoldFnInsideGuard() {
-	block := _SHEG_FindSpaceTapHoldBlock(_SHEG_ReadSource())
+	block := _DriverFuncBody("SpaceTapHold")
 	posGuard   := InStr(block, "ih.Input")
 	posHoldFn  := InStr(block, "HoldFn.Call")
 	Assert(posGuard > 0 and posHoldFn > 0,

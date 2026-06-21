@@ -36,7 +36,7 @@ const TESTS_DIR = path.join(ROOT, 'static', 'ergopti_plus', 'windows', 'tests');
 // Frozen baseline — the current count of location-pinned source-reading test
 // files. Drive toward zero by migrating each to a _Driver* helper; NEVER raise
 // it to make a new test pass.
-const BASELINE = 115;
+const BASELINE = 19;
 
 const HELPER_RE = /_DriverSourceConcat|_DriverFuncBody|_DriverDirConcat/;
 // A quoted relative path into a driver SOURCE tree ending in .ahk, e.g.

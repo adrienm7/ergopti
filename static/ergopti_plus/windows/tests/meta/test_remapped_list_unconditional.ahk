@@ -29,33 +29,15 @@
 
 ; =============================================================
 ; =============================================================
-; ======= 1/ Source-inspection helpers ========================
-; =============================================================
-; =============================================================
-
-_RLUA_ReadSource() {
-	return FileRead(A_ScriptDir . "\..\modules\layout.ahk", "UTF-8")
-}
-
-
-_RLUA_FindRemapKeyBlock(src) {
-	pos := InStr(src, "RemapKey(ScanCode, Character")
-	if (!pos)
-		return ""
-	return SubStr(src, pos, 800)
-}
-
-
-
-
-; =============================================================
-; =============================================================
-; ======= 2/ Assertions =======================================
+; ======= 1/ Assertions =======================================
 ; =============================================================
 ; =============================================================
 
 _RLUA_AssignmentPresent() {
-	block := _RLUA_FindRemapKeyBlock(_RLUA_ReadSource())
+	; Move-resilient: extract the RemapKey body via the bare-name helper instead of
+	; a pinned layout.ahk read + 800-char window. The exact body is strictly better
+	; for the positional checks below.
+	block := _DriverFuncBody("RemapKey")
 	Assert(InStr(block, "RemappedList[Character] := ScanCode") > 0,
 		"layout.ahk: RemapKey() must assign RemappedList[Character] := ScanCode for all remapped keys")
 }
@@ -63,7 +45,7 @@ Test("RemapKey: RemappedList[Character] := ScanCode assignment present (remapped
 
 
 _RLUA_AssignmentBeforeAlternativeCheck() {
-	block := _RLUA_FindRemapKeyBlock(_RLUA_ReadSource())
+	block := _DriverFuncBody("RemapKey")
 	posAssign := InStr(block, "RemappedList[Character] := ScanCode")
 	; The guarded hotkey for AlternativeCharacter must come AFTER the assignment.
 	posAlt    := InStr(block, 'AlternativeCharacter != ""')
@@ -81,7 +63,7 @@ Test("RemapKey: RemappedList assignment precedes AlternativeCharacter branch (re
 
 
 _RLUA_AssignmentNotInsideEmptyStringBranch() {
-	block := _RLUA_FindRemapKeyBlock(_RLUA_ReadSource())
+	block := _DriverFuncBody("RemapKey")
 	; The old conditional was: if AlternativeCharacter == "" { RemappedList[...] }
 	; After the fix, the == "" check must no longer gate the assignment.
 	posAssign := InStr(block, "RemappedList[Character] := ScanCode")

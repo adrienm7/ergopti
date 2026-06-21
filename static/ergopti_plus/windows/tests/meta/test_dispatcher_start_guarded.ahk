@@ -32,17 +32,11 @@
 ; ==================================================
 ; ==================================================
 
-; Reads a windows/-relative source file. A_ScriptDir is the runner dir (tests/);
-; its parent is the windows/ driver root.
-_DSG_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
-}
-
 ; Returns the function body from its declaration to the first flush-left closing
 ; brace at one-tab indentation (class methods close with a tab + "}"). Returns ""
-; when the declaration is absent.
+; when the declaration is absent. Kept (rather than _DriverFuncBody) because the
+; targets are ``static`` class methods, which the framework helper's column-0
+; name anchor does not match — the source comes from _DriverDirConcat("lib").
 _DSG_MethodBody(Src, MethodDef) {
 	Idx := InStr(Src, MethodDef)
 	if !Idx
@@ -65,7 +59,7 @@ _DSG_MethodBody(Src, MethodDef) {
 ; ==================================================
 
 _DSG_StartReusesLiveInputHook() {
-	Src := _DSG_ReadSource("lib/hook_dispatcher.ahk")
+	Src := _DriverDirConcat("lib")
 	Seg := _DSG_MethodBody(Src, "static Start() {")
 	Assert(Seg != "", "HookDispatcher.Start() must exist in hook_dispatcher.ahk")
 	Assert(InStr(Seg, "_ih is InputHook") > 0,
@@ -74,7 +68,7 @@ _DSG_StartReusesLiveInputHook() {
 Test("HookDispatcher: Start() reuses a live InputHook (dispatcher-start-unguarded-hotkeys-leak-ih)", _DSG_StartReusesLiveInputHook)
 
 _DSG_StartSetsStartedBeforeMouseHotkeys() {
-	Src := _DSG_ReadSource("lib/hook_dispatcher.ahk")
+	Src := _DriverDirConcat("lib")
 	Seg := _DSG_MethodBody(Src, "static Start() {")
 	StartedIdx := InStr(Seg, "_started := true")
 	HotkeyIdx := InStr(Seg, "_SafeHotkey(")
@@ -86,7 +80,7 @@ _DSG_StartSetsStartedBeforeMouseHotkeys() {
 Test("HookDispatcher: Start() sets _started before mouse hotkeys (dispatcher-start-unguarded-hotkeys-leak-ih)", _DSG_StartSetsStartedBeforeMouseHotkeys)
 
 _DSG_SafeHotkeyGuardsRegistration() {
-	Src := _DSG_ReadSource("lib/hook_dispatcher.ahk")
+	Src := _DriverDirConcat("lib")
 	Seg := _DSG_MethodBody(Src, "static _SafeHotkey(key_name, callback_fn) {")
 	Assert(Seg != "", "HookDispatcher._SafeHotkey() helper must exist")
 	Assert(InStr(Seg, "try") > 0 && InStr(Seg, "catch") > 0,
@@ -97,7 +91,7 @@ _DSG_SafeHotkeyGuardsRegistration() {
 Test("HookDispatcher: _SafeHotkey guards each Hotkey registration (dispatcher-start-unguarded-hotkeys-leak-ih)", _DSG_SafeHotkeyGuardsRegistration)
 
 _DSG_IhInitializedToFalse() {
-	Src := _DSG_ReadSource("lib/hook_dispatcher.ahk")
+	Src := _DriverDirConcat("lib")
 	; `unset` static properties raise PropertyError when read via `is` —
 	; `false` lets the reuse guard evaluate without throwing on first boot
 	Assert(InStr(Src, "static _ih := false") > 0,

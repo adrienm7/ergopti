@@ -38,11 +38,6 @@
 ; =============================================================
 ; =============================================================
 
-_HSDU_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	return FileRead(StrReplace(Root, "/", "\") . "\" . StrReplace(RelPath, "/", "\"), "UTF-8")
-}
-
 _HSDU_StripComments(Src) {
 	Out := ""
 	for Line in StrSplit(Src, "`n", "`r") {
@@ -53,7 +48,7 @@ _HSDU_StripComments(Src) {
 }
 
 _HSDU_UppercaseDeletedInLoop() {
-	Raw := _HSDU_ReadSource("modules/hotstrings.ahk")
+	Raw := _DriverDirConcat("modules")
 	Src := _HSDU_StripComments(Raw)
 	Assert(Src != "", "modules/hotstrings.ahk must be readable")
 
@@ -77,7 +72,7 @@ Test("hotstrings: dead-key loop deletes uppercase vowel variants via StrUpper(Vo
 ; ====================================================
 
 _HSDU_ETExplicitlyDeleted() {
-	Raw := _HSDU_ReadSource("modules/hotstrings.ahk")
+	Raw := _DriverDirConcat("modules")
 	Src := _HSDU_StripComments(Raw)
 
 	; "E" must be explicitly deleted (uppercase counterpart of "e" which closes "êe" → "œ")

@@ -2,28 +2,12 @@
 
 #Requires AutoHotkey v2.0
 
-_SHEG_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
-}
-
-_SHEG_FuncBodyStripped(Src, FuncDef) {
-	Idx := InStr(Src, FuncDef)
-	if !Idx
-		return ""
-	Rest := SubStr(Src, Idx)
-	if RegExMatch(Rest, "m)^\}", &Match)
-		Rest := SubStr(Rest, 1, Match.Pos)
-	return Rest
-}
-
 _SHEG_AssertSpaceHoldTryGuard() {
-	Src := _SHEG_ReadSource("modules/tap_holds/space.ahk")
-	
 	Funcs := ["_SpaceHoldCtrl", "_SpaceHoldShift", "_SpaceHoldAlt", "_SpaceHoldAltGr", "_SpaceHoldWin"]
 	for _, fn in Funcs {
-		Body := _SHEG_FuncBodyStripped(Src, fn . "(captured) {")
+		; Move-resilient: locate each hold function across the whole driver source
+		; via the framework helper instead of a pinned modules path
+		Body := _DriverFuncBody(fn)
 		Assert(Body != "", fn . " must exist in space.ahk")
 		
 		; We assert that there's a try block protecting the SendInput of the captured char

@@ -24,41 +24,29 @@
 
 ; ================================================
 ; ================================================
-; ======= 1/ Source scan helper ==================
-; ================================================
-; ================================================
-
-_CRUN_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
-}
-
-
-
-
-; ================================================
-; ================================================
-; ======= 2/ Uniqueness loop assertions ==========
+; ======= 1/ Uniqueness loop assertions ==========
 ; ================================================
 ; ================================================
 
 _CRUN_HasFileExistLoop() {
-	Src := _CRUN_ReadSource("lib/crash_reporter.ahk")
+	; Move-resilient: scan the lib module tree via the framework helper instead of
+	; a pinned crash_reporter path. The FName/JsonStr tokens are unique to
+	; crash_reporter within lib/, so the scope stays meaningful.
+	Src := _DriverDirConcat("lib")
 	Assert(InStr(Src, "FileExist(FName)") > 0,
 		"crash_reporter.ahk must contain a FileExist(FName) uniqueness loop to handle same-second collisions")
 }
 Test("crash_reporter: CrashReport_Save contains FileExist uniqueness loop (crash-report-same-second-collision)", _CRUN_HasFileExistLoop)
 
 _CRUN_HasTruncatingWrite() {
-	Src := _CRUN_ReadSource("lib/crash_reporter.ahk")
+	Src := _DriverDirConcat("lib")
 	Assert(InStr(Src, "FileOpen(FName, " . Chr(0x22) . "w" . Chr(0x22)) > 0,
 		'crash_reporter.ahk must use FileOpen(FName, "w") truncating write instead of FileAppend')
 }
 Test("crash_reporter: CrashReport_Save uses FileOpen truncating write (crash-report-same-second-collision)", _CRUN_HasTruncatingWrite)
 
 _CRUN_NoFileAppend() {
-	Src := _CRUN_ReadSource("lib/crash_reporter.ahk")
+	Src := _DriverDirConcat("lib")
 	Assert(InStr(Src, "FileAppend(JsonStr") = 0,
 		"crash_reporter.ahk must NOT use FileAppend for crash reports — same-second writes corrupt the JSON file")
 }

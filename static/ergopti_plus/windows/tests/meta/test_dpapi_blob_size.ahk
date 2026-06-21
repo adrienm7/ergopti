@@ -21,22 +21,6 @@
 
 
 
-
-; ===========================================================
-; ===========================================================
-; ======= 1/ Source scan helpers ============================
-; ===========================================================
-; ===========================================================
-
-_DPBZ_ReadSource(RelPath) {
-	Root := A_ScriptDir . "\..\..\"
-	return FileRead(Root . RelPath)
-}
-
-
-
-
-
 ; ===========================================================
 ; ===========================================================
 ; ======= 2/ Static source assertions =======================
@@ -44,14 +28,17 @@ _DPBZ_ReadSource(RelPath) {
 ; ===========================================================
 
 _DPBZ_OldFormAbsent() {
-	Src := _DPBZ_ReadSource("modules\llm\api_token_crypto.ahk")
+	; Move-resilient: scan the llm module tree via the framework helper instead of
+	; a pinned api_token_crypto path. Both Buffer forms are unique to that file
+	; within modules/llm, so the scope stays meaningful.
+	Src := _DriverDirConcat("modules/llm")
 	Assert(InStr(Src, "Buffer(4 + A_PtrSize") = 0,
 		"api_token_crypto.ahk must not contain Buffer(4 + A_PtrSize — use Buffer(A_PtrSize * 2) to cover 16 bytes on x64")
 }
 Test("api_token_crypto: old Buffer(4 + A_PtrSize) form is absent", _DPBZ_OldFormAbsent)
 
 _DPBZ_NewFormPresent() {
-	Src := _DPBZ_ReadSource("modules\llm\api_token_crypto.ahk")
+	Src := _DriverDirConcat("modules/llm")
 	Assert(InStr(Src, "Buffer(A_PtrSize * 2") > 0,
 		"api_token_crypto.ahk must use Buffer(A_PtrSize * 2) for DATA_BLOB allocations")
 }

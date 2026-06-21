@@ -8,15 +8,11 @@
 
 #Requires AutoHotkey v2.0
 
-_TPD_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
-}
-
 _TPD_Check() {
-	Src := _TPD_ReadSource("ui/tray_llm/menu_profiles.ahk")
-	Assert(Src != "", "Source file menu_profiles.ahk must exist")
+	; Move-resilient: scan the tray_llm UI dir via the framework helper instead of
+	; a pinned menu_profiles.ahk path. The Cancel/RemoveAt tokens are unique to
+	; menu_profiles within the dir, so the present-string checks are unambiguous.
+	Src := _DriverDirConcat("ui/tray_llm")
 	Assert(InStr(Src, 'choice == "Cancel"') > 0, "menu_profiles.ahk must handle Cancel choice")
 	Assert(InStr(Src, "RemoveAt(i)") > 0, "menu_profiles.ahk must delete profile from user_profiles")
 	Assert(InStr(Src, "LLM_Tray_BindProfileHotkeys") > 0, "menu_profiles.ahk must re-bind hotkeys")

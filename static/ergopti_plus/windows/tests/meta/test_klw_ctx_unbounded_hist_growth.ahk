@@ -36,14 +36,6 @@
 ; ===================================================
 ; ===================================================
 
-; Reads a windows/-relative source file. A_ScriptDir is the runner dir (tests/);
-; its parent is the windows/ driver root.
-_KLWHIST_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
-}
-
 ; Counts non-overlapping occurrences of Needle in Hay.
 _KLWHIST_Count(Hay, Needle) {
 	n := 0
@@ -63,14 +55,14 @@ _KLWHIST_Count(Hay, Needle) {
 ; ===================================================
 
 _KLWHIST_HasCapConstant() {
-	Src := _KLWHIST_ReadSource("modules/keylogger/keylogger_walker.ahk")
+	Src := _DriverDirConcat("modules/keylogger")
 	Assert(InStr(Src, "static HIST_CAP") > 0,
 		"KLWConst must declare a HIST_CAP constant bounding the backspace-attribution ring ctx[hist]")
 }
 Test("keylogger_walker: KLWConst declares HIST_CAP (klw-ctx-unbounded-hist-growth)", _KLWHIST_HasCapConstant)
 
 _KLWHIST_TrimsBothPushSites() {
-	Src := _KLWHIST_ReadSource("modules/keylogger/keylogger_walker.ahk")
+	Src := _DriverDirConcat("modules/keylogger")
 	; The distinctive fix: trim the oldest entry once the ring exceeds the cap.
 	Assert(InStr(Src, "backtrack.Length > KLWConst.HIST_CAP") > 0,
 		"hist must be capped at KLWConst.HIST_CAP - without the trim it grows linearly with chars typed and is re-serialised every tick")

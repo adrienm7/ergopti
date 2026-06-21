@@ -18,26 +18,17 @@
 
 ; ===================================================
 ; ===================================================
-; ======= 1/ Source scan helpers ====================
-; ===================================================
-; ===================================================
-
-_CTSM_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &WindowsDir)
-	Path := WindowsDir . "\" . StrReplace(RelPath, "/", "\")
-	return FileRead(Path)
-}
-
-
-; ===================================================
-; ===================================================
-; ======= 2/ Test implementations ===================
+; ======= 1/ Test implementations ===================
 ; ===================================================
 ; ===================================================
 
 _CTSM_CheckGestures() {
-	Src := _CTSM_ReadSource("modules/gestures.ahk")
-	Assert(Src != "", "modules/gestures.ahk must be readable")
+	; Move-resilient: pin the assertions to the GestureToggleUppercase body via
+	; the framework helper. KL_ClearSynthetic appears across several modules, so
+	; scanning a whole dir/tree would weaken this gestures-specific invariant;
+	; the function body keeps it tight (and is stronger than the old file scan).
+	Src := _DriverFuncBody("GestureToggleUppercase")
+	Assert(Src != "", "GestureToggleUppercase must exist")
 
 	Assert(InStr(Src, 'KL_MarkSynthetic("case-transform")'),
 		"GestureToggleUppercase/TitleCase must call KL_MarkSynthetic before SendInstant")
@@ -46,8 +37,8 @@ _CTSM_CheckGestures() {
 }
 
 _CTSM_CheckWinShortcuts() {
-	Src := _CTSM_ReadSource("modules/shortcuts/win.ahk")
-	Assert(Src != "", "modules/shortcuts/win.ahk must be readable")
+	Src := _DriverFuncBody("ConvertToTitleCase")
+	Assert(Src != "", "ConvertToTitleCase must exist")
 
 	Assert(InStr(Src, 'KL_MarkSynthetic("case-transform")'),
 		"ConvertToTitleCase/ConvertToUppercase must call KL_MarkSynthetic before SendInstant")

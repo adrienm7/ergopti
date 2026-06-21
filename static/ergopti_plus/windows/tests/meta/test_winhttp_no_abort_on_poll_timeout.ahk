@@ -28,47 +28,16 @@
 
 ; ===================================================
 ; ===================================================
-; ======= 1/ Source scan helpers ====================
-; ===================================================
-; ===================================================
-
-_WNAPT_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
-}
-
-; Returns the text between FuncDef and the first flush-left closing brace,
-; with full-line comments stripped so an assertion can never match a phrase
-; that only appears in a comment.
-_WNAPT_FuncBodyStripped(Src, FuncDef) {
-	Idx := InStr(Src, FuncDef)
-	if !Idx
-		return ""
-	Rest := SubStr(Src, Idx)
-	if RegExMatch(Rest, "m)^\}", &Match)
-		Rest := SubStr(Rest, 1, Match.Pos)
-	Out := ""
-	loop parse, Rest, "`n", "`r" {
-		Line := A_LoopField
-		if !RegExMatch(Line, "^\s*;")
-			Out .= Line . "`n"
-	}
-	return Out
-}
-
-
-
-
-; ===================================================
-; ===================================================
-; ======= 2/ Abort-on-give-up assertions ============
+; ======= 1/ Abort-on-give-up assertions ============
 ; ===================================================
 ; ===================================================
 
 _WNAPT_RemotePollAbortsOnGiveUp() {
-	Src := _WNAPT_ReadSource("modules/llm/api_remote.ahk")
-	Body := _WNAPT_FuncBodyStripped(Src, "_LLMRemote_PollRequest(req_id) {")
+	; Move-resilient: extract _LLMRemote_PollRequest()'s body by name via the
+	; framework helper instead of a pinned modules/llm/api_remote.ahk read. The
+	; helper strips full-line comments, so an assertion can never match a phrase
+	; that only appears in a comment.
+	Body := _DriverFuncBody("_LLMRemote_PollRequest")
 	Assert(Body != "", "_LLMRemote_PollRequest must exist in api_remote.ahk")
 	; Both the cancelled and the deadline branch must Abort the live request
 	; before dropping the registry reference. Two .Abort() call sites in the
@@ -85,8 +54,7 @@ _WNAPT_RemotePollAbortsOnGiveUp() {
 Test("api_remote: _LLMRemote_PollRequest aborts WinHTTP on cancel and deadline give-up (winhttp-no-abort-on-poll-timeout)", _WNAPT_RemotePollAbortsOnGiveUp)
 
 _WNAPT_OllamaGenericPollAbortsOnTimeout() {
-	Src := _WNAPT_ReadSource("modules/llm/api_ollama.ahk")
-	Body := _WNAPT_FuncBodyStripped(Src, "_LLM_Ollama_PollGeneric(http, on_ok, on_err")
+	Body := _DriverFuncBody("_LLM_Ollama_PollGeneric")
 	Assert(Body != "", "_LLM_Ollama_PollGeneric must exist in api_ollama.ahk")
 	Assert(InStr(Body, "http.Abort()") > 0,
 		"_LLM_Ollama_PollGeneric must call http.Abort() on its deadline timeout path so a never-responding endpoint does not leak the COM request until WinHTTP's own timeout fires (winhttp-no-abort-on-poll-timeout)")

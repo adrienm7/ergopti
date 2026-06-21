@@ -39,12 +39,6 @@
 ; =======================================================
 ; =======================================================
 
-_LBDS_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &WindowsDir)
-	Path := StrReplace(WindowsDir, "\", "/") . "/" . StrReplace(RelPath, "\", "/")
-	return FileRead(Path)
-}
-
 ; Extracts the batch state Map literal from the source — the block between
 ; "if (n_predictions > 1 and is_batch_profile) {" and the first "state := Map("
 ; after it, up to the matching closing parenthesis.
@@ -95,8 +89,7 @@ _LBDS_ExtractParseSlotsDedup(Src) {
 ; =====================================================
 
 _LBDS_CheckBatchMapHasDedupStats() {
-	Src := _LBDS_ReadSource("modules/llm/prediction_engine.ahk")
-	Assert(Src != "", "modules/llm/prediction_engine.ahk must be readable")
+	Src := _DriverDirConcat("modules/llm")
 
 	BatchMap := _LBDS_ExtractBatchStateMap(Src)
 	Assert(BatchMap != "",
@@ -112,8 +105,7 @@ _LBDS_CheckBatchMapHasDedupStats() {
 }
 
 _LBDS_CheckParseSlotsDefensiveGuard() {
-	Src := _LBDS_ReadSource("modules/llm/prediction_engine.ahk")
-	Assert(Src != "", "modules/llm/prediction_engine.ahk must be readable")
+	Src := _DriverDirConcat("modules/llm")
 
 	DeducSegment := _LBDS_ExtractParseSlotsDedup(Src)
 	Assert(DeducSegment != "",

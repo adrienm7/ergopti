@@ -32,30 +32,24 @@
 ; ======================================
 ; ======================================
 
+; Reads a windows/-relative source file. Still used by the SC029/SC00C/SC00D
+; hotkey scan below: SC029:: is NOT unique across the modules tree (it also tags
+; the screenshot hotkey in modules/shortcuts/win.ahk), so no concat helper can
+; safely scope that positional/first-match scan — it stays a pinned read.
 _RECU_ReadSource(RelPath) {
 	SplitPath(A_ScriptDir, , &Root)
 	Path := StrReplace(Root, "\", "/") . "/" . RelPath
 	return FileRead(Path)
 }
 
-_RECU_FuncBody(Src, FuncDef) {
-	Idx := InStr(Src, FuncDef)
-	if !Idx
-		return ""
-	Rest := SubStr(Src, Idx)
-	End := InStr(Rest, "`n}")
-	if End
-		return SubStr(Rest, 1, End + 1)
-	return Rest
-}
-
-; Asserts the function FuncDef exists in Src and its body wraps the emit in
-; Critical("On") - the shared atomicity contract.
-_RECU_AssertEmitterIsCritical(Src, FuncDef) {
-	Body := _RECU_FuncBody(Src, FuncDef)
-	Assert(Body != "", FuncDef . " must exist in layout.ahk (remap-emit-critical-uneven)")
+; Asserts the function FnName exists in the driver source and its body wraps the
+; emit in Critical("On") - the shared atomicity contract. Move-resilient: locates
+; the function via the framework helper (bare name) instead of a pinned read.
+_RECU_AssertEmitterIsCritical(FnName) {
+	Body := _DriverFuncBody(FnName)
+	Assert(Body != "", FnName . " must exist in layout.ahk (remap-emit-critical-uneven)")
 	Assert(InStr(Body, "Critical(") > 0,
-		FuncDef . " must serialise its SendEvent with Critical so it cannot interleave with a remapped letter's emit (remap-emit-critical-uneven)")
+		FnName . " must serialise its SendEvent with Critical so it cannot interleave with a remapped letter's emit (remap-emit-critical-uneven)")
 }
 
 
@@ -69,20 +63,21 @@ _RECU_AssertEmitterIsCritical(Src, FuncDef) {
 ; ====================================================
 
 _RECU_AssertDigitRowEmittersCritical() {
-	Src := _RECU_ReadSource("modules/layout.ahk")
-	_RECU_AssertEmitterIsCritical(Src, "_DigitRowDown(Digit, *) {")
-	_RECU_AssertEmitterIsCritical(Src, "_DigitRowUp(Digit, *) {")
+	_RECU_AssertEmitterIsCritical("_DigitRowDown")
+	_RECU_AssertEmitterIsCritical("_DigitRowUp")
 }
 Test("layout: digit-row emitters are Critical-serialised (remap-emit-critical-uneven)", _RECU_AssertDigitRowEmittersCritical)
 
 _RECU_AssertShiftSymbolEmitterCritical() {
-	Src := _RECU_ReadSource("modules/layout.ahk")
-	_RECU_AssertEmitterIsCritical(Src, "_DigitShiftSend(Symbol, *) {")
+	_RECU_AssertEmitterIsCritical("_DigitShiftSend")
 }
 Test("layout: shifted-symbol emitter is Critical-serialised (remap-emit-critical-uneven)", _RECU_AssertShiftSymbolEmitterCritical)
 
 _RECU_AssertNumberRowRoutesThroughHelpers() {
-	Src := _RECU_ReadSource("modules/layout.ahk")
+	; Move-resilient: scan the modules dir via the framework helper. _DigitRowDown(
+	; and _DigitRowUp( are unique to layout.ahk within modules, so these present
+	; checks are unambiguous.
+	Src := _DriverDirConcat("modules")
 	; The inline number-row hotkeys must delegate to the serialised helpers
 	; rather than calling SendEvent("{1 Down}") directly (the old non-Critical
 	; path). A regression that inlines a bare SendEvent again drops this token.

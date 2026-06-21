@@ -30,54 +30,14 @@
 
 
 
-; =====================================================
-; =====================================================
-; ======= 1/ Source scan helper =======================
-; =====================================================
-; =====================================================
-
-_GEBR_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
-}
-
-; Extracts the body of _GestureUnhook from the source.
-; Returns the substring from the function header to its closing brace.
-_GEBR_ExtractUnhookBody(Src) {
-	StartPos := InStr(Src, "_GestureUnhook(*) {")
-	if (!StartPos)
-		return ""
-	; Walk forward to find the matching closing brace.
-	depth := 0
-	i := StartPos
-	Len := StrLen(Src)
-	while (i <= Len) {
-		ch := SubStr(Src, i, 1)
-		if (ch == "{")
-			depth++
-		else if (ch == "}") {
-			depth--
-			if (depth <= 0)
-				return SubStr(Src, StartPos, i - StartPos + 1)
-		}
-		i++
-	}
-	return SubStr(Src, StartPos)
-}
-
-
 ; ==================================================
 ; ==================================================
-; ======= 2/ Test implementations ==================
+; ======= 1/ Test implementations ==================
 ; ==================================================
 ; ==================================================
 
 _GEBR_CheckExitButtonRelease() {
-	Src := _GEBR_ReadSource("modules/gestures.ahk")
-	Assert(Src != "", "modules/gestures.ahk must be readable")
-
-	UnhookBody := _GEBR_ExtractUnhookBody(Src)
+	UnhookBody := _DriverFuncBody("_GestureUnhook")
 	Assert(UnhookBody != "",
 		"_GestureUnhook function must be present in modules/gestures.ahk")
 

@@ -40,11 +40,6 @@
 ; ==================================================
 ; ==================================================
 
-_LLMSF_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	return FileRead(StrReplace(Root, "/", "\") . "\" . StrReplace(RelPath, "/", "\"), "UTF-8")
-}
-
 _LLMSF_StripComments(Src) {
 	Out := ""
 	for Line in StrSplit(Src, "`n", "`r") {
@@ -55,9 +50,11 @@ _LLMSF_StripComments(Src) {
 }
 
 _LLMSF_MoreToReadNotInverted() {
-	Raw := _LLMSF_ReadSource("modules/llm/api_ollama.ahk")
+	; Move-resilient: scan the modules/llm dir via the framework helper. The
+	; present-anchors here are unique to api_ollama.ahk within that dir, and the
+	; comments are stripped so absent-checks cannot false-fail on a comment.
+	Raw := _DriverDirConcat("modules/llm")
 	Src := _LLMSF_StripComments(Raw)
-	Assert(Src != "", "modules/llm/api_ollama.ahk must be readable")
 
 	; The correct form: true when file is absent or empty (retry needed)
 	Assert(InStr(Src, "more_to_read := (!FileExist(") > 0,
@@ -79,7 +76,7 @@ Test("api_ollama: more_to_read is true when file empty (retry needed), not inver
 ; ======================================================
 
 _LLMSF_LeftoverFlushedBeforeFinalCheck() {
-	Raw := _LLMSF_ReadSource("modules/llm/api_ollama.ahk")
+	Raw := _DriverDirConcat("modules/llm")
 	Src := _LLMSF_StripComments(Raw)
 
 	; The leftover flush must call ConsumeStreamChunk with a synthetic newline
@@ -113,7 +110,7 @@ Test("api_ollama: StreamFinalFlush flushes state[leftover] with synthetic newlin
 ; =====================================================
 
 _LLMSF_HandleRemovedByReference() {
-	Raw := _LLMSF_ReadSource("modules/llm/api_ollama.ahk")
+	Raw := _DriverDirConcat("modules/llm")
 	Src := _LLMSF_StripComments(Raw)
 
 	; Object reference comparison must be present

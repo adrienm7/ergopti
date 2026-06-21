@@ -81,32 +81,10 @@ Test("F45: AltGr chord debounce is per-slot (distinct chords within 80ms are not
 ; ==========================================================
 ; ==========================================================
 
-_ACDS_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
-}
-
-_ACDS_StripLineComments(Src) {
-	Out := ""
-	for Line in StrSplit(Src, "`n", "`r") {
-		if !RegExMatch(Line, "^\s*;")
-			Out .= Line . "`n"
-	}
-	return Out
-}
-
 _ACDS_AssertNoSharedLastTick() {
-	Src := _ACDS_StripLineComments(_ACDS_ReadSource("lib/script_altgr_hotkeys.ahk"))
-	Assert(Src != "", "lib/script_altgr_hotkeys.ahk must be readable")
-
-	; Extract the _ScriptAltGrChordDebounce function body
-	FuncIdx := InStr(Src, "_ScriptAltGrChordDebounce(")
-	Assert(FuncIdx > 0, "_ScriptAltGrChordDebounce must exist in lib/script_altgr_hotkeys.ahk")
-	Rest := SubStr(Src, FuncIdx)
-	End := InStr(Rest, "`n}")
-	Assert(End > 0, "_ScriptAltGrChordDebounce must have a closing brace")
-	Body := SubStr(Rest, 1, End + 2)
+	; Move-resilient: locate the function bodies across the whole driver source
+	Body := _DriverFuncBody("_ScriptAltGrChordDebounce")
+	Assert(Body != "", "_ScriptAltGrChordDebounce must exist in lib/script_altgr_hotkeys.ahk")
 
 	; Must use a Map, not a plain scalar last_tick
 	Assert(!InStr(Body, "last_tick"),
@@ -115,11 +93,8 @@ _ACDS_AssertNoSharedLastTick() {
 		"_ScriptAltGrChordDebounce must use a static Map() for per-slot debounce tracking (F45)")
 
 	; Call site must pass Slot argument
-	DispIdx := InStr(Src, "_ScriptAltGrDispatch(")
-	Assert(DispIdx > 0, "_ScriptAltGrDispatch must exist in lib/script_altgr_hotkeys.ahk")
-	DispRest := SubStr(Src, DispIdx)
-	DispEnd := InStr(DispRest, "`n}")
-	DispBody := SubStr(DispRest, 1, DispEnd + 2)
+	DispBody := _DriverFuncBody("_ScriptAltGrDispatch")
+	Assert(DispBody != "", "_ScriptAltGrDispatch must exist in lib/script_altgr_hotkeys.ahk")
 	Assert(RegExMatch(DispBody, "_ScriptAltGrChordDebounce\s*\(Slot\)") > 0,
 		"_ScriptAltGrDispatch must call _ScriptAltGrChordDebounce(Slot) with the Slot argument (F45)")
 }

@@ -17,12 +17,6 @@
 
 #Requires AutoHotkey v2.0
 
-_TLDT_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path, "UTF-8")
-}
-
 _TLDT_StripLineComments(Src) {
 	Out := ""
 	for Line in StrSplit(Src, "`n", "`r") {
@@ -43,8 +37,9 @@ _TLDT_StripLineComments(Src) {
 ; ==============================================================
 
 _TLDT_DedupTickTime() {
-	Src := _TLDT_StripLineComments(_TLDT_ReadSource("lib/logger.ahk"))
-	Assert(Src != "", "lib/logger.ahk must be readable")
+	; Move-resilient: scan the lib dir via the framework helper. "_LastErrTime"
+	; and "A_TickCount - _LastErrTime" are unique to logger.ahk within lib.
+	Src := _TLDT_StripLineComments(_DriverDirConcat("lib"))
 
 	; The static must be declared
 	Assert(InStr(Src, "_LastErrTime") > 0,

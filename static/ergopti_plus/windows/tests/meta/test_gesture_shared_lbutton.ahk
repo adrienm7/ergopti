@@ -24,49 +24,12 @@
 
 ; =====================================================
 ; =====================================================
-; ======= 1/ Source scan helper ======================
-; =====================================================
-; =====================================================
-
-_GSLB_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
-}
-
-; Extracts everything from FuncDef to the next non-indented closing brace.
-; Strips all comment lines first so comment text does not pollute the search.
-_GSLB_FuncBodyStripped(Src, FuncDef) {
-	Idx := InStr(Src, FuncDef)
-	if !Idx
-		return ""
-	Rest := SubStr(Src, Idx)
-	; Find the first closing brace at the start of a line (no indentation).
-	; This correctly skips nested braces inside if/loop blocks.
-	if RegExMatch(Rest, "m)^\}", &Match)
-		Rest := SubStr(Rest, 1, Match.Pos)
-	; Remove lines that start with optional whitespace then a semicolon
-	Out := ""
-	loop parse, Rest, "`n", "`r" {
-		Line := A_LoopField
-		if !RegExMatch(Line, "^\s*;")
-			Out .= Line . "`n"
-	}
-	return Out
-}
-
-
-
-
-; =====================================================
-; =====================================================
-; ======= 2/ Right-click assertions ==================
+; ======= 1/ Right-click assertions ==================
 ; =====================================================
 ; =====================================================
 
 _GSLB_ToggleRightUsesRegister() {
-	Src := _GSLB_ReadSource("modules/gestures.ahk")
-	Body := _GSLB_FuncBodyStripped(Src, "GestureToggleRightClick() {")
+	Body := _DriverFuncBody("GestureToggleRightClick")
 	Assert(Body != "", "GestureToggleRightClick must exist in gestures.ahk")
 	Assert(!InStr(Body, "Hotkey("),
 		"GestureToggleRightClick must NOT call Hotkey() directly — use HookDispatcher.Register instead")
@@ -76,8 +39,7 @@ _GSLB_ToggleRightUsesRegister() {
 Test("gestures: GestureToggleRightClick uses HookDispatcher.Register instead of bare Hotkey(~LButton) (gesture-release-disables-shared-lbutton)", _GSLB_ToggleRightUsesRegister)
 
 _GSLB_ReleaseRightUsesUnregister() {
-	Src := _GSLB_ReadSource("modules/gestures.ahk")
-	Body := _GSLB_FuncBodyStripped(Src, "GestureReleaseRightClick(*) {")
+	Body := _DriverFuncBody("GestureReleaseRightClick")
 	Assert(Body != "", "GestureReleaseRightClick must exist in gestures.ahk")
 	Assert(!InStr(Body, "Hotkey("),
 		"GestureReleaseRightClick must NOT call Hotkey() directly — use HookDispatcher.Unregister instead")
@@ -91,13 +53,12 @@ Test("gestures: GestureReleaseRightClick uses HookDispatcher.Unregister instead 
 
 ; =====================================================
 ; =====================================================
-; ======= 3/ Left-click assertions ===================
+; ======= 2/ Left-click assertions ===================
 ; =====================================================
 ; =====================================================
 
 _GSLB_ToggleLeftUsesRegister() {
-	Src := _GSLB_ReadSource("modules/gestures.ahk")
-	Body := _GSLB_FuncBodyStripped(Src, "GestureToggleLeftClick() {")
+	Body := _DriverFuncBody("GestureToggleLeftClick")
 	Assert(Body != "", "GestureToggleLeftClick must exist in gestures.ahk")
 	Assert(!InStr(Body, "Hotkey("),
 		"GestureToggleLeftClick must NOT call Hotkey() directly — use HookDispatcher.Register instead")
@@ -107,8 +68,7 @@ _GSLB_ToggleLeftUsesRegister() {
 Test("gestures: GestureToggleLeftClick uses HookDispatcher.Register instead of bare Hotkey(~RButton) (gesture-release-disables-shared-lbutton)", _GSLB_ToggleLeftUsesRegister)
 
 _GSLB_ReleaseLeftUsesUnregister() {
-	Src := _GSLB_ReadSource("modules/gestures.ahk")
-	Body := _GSLB_FuncBodyStripped(Src, "GestureReleaseLeftClick(*) {")
+	Body := _DriverFuncBody("GestureReleaseLeftClick")
 	Assert(Body != "", "GestureReleaseLeftClick must exist in gestures.ahk")
 	Assert(!InStr(Body, "Hotkey("),
 		"GestureReleaseLeftClick must NOT call Hotkey() directly — use HookDispatcher.Unregister instead")

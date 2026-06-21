@@ -2,27 +2,11 @@
 
 #Requires AutoHotkey v2.0
 
-_MPG_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
-}
-
-_MPG_FuncBodyStripped(Src, FuncDef) {
-	Idx := InStr(Src, FuncDef)
-	if !Idx
-		return ""
-	Rest := SubStr(Src, Idx)
-	if RegExMatch(Rest, "m)^\}", &Match)
-		Rest := SubStr(Rest, 1, Match.Pos)
-	return Rest
-}
-
 _MPG_AssertMouseParkGate() {
-	Src := _MPG_ReadSource("modules/keylogger/keylogger_mouse.ahk")
-	
-	Body := _MPG_FuncBodyStripped(Src, "KL_Mouse_ParkTick() {")
-	
+	; Move-resilient: locate KL_Mouse_ParkTick() across the whole driver source
+	; via the framework helper instead of a pinned modules path
+	Body := _DriverFuncBody("KL_Mouse_ParkTick")
+
 	SuspendedIdx := InStr(Body, "if (!A_IsSuspended")
 	Assert(SuspendedIdx > 0, "KL_Mouse_ParkTick must evaluate MF_ShouldFilter only when not suspended (mouse-park-distance-no-gate)")
 	

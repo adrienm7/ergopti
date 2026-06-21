@@ -34,12 +34,13 @@
 ; =====================================
 
 _MetaCheckHseAltGrKanaSendInput() {
-	SplitPath(A_ScriptDir, , &WindowsDir)
-	HseFile := WindowsDir . "\lib\hotstrings\hotstring_engine_main.ahk"
-
-	Body := ""
-	try Body := FileRead(HseFile)
-	Assert(Body != "", "lib\hotstrings\hotstring_engine_main.ahk must be readable for the AltGr SendInput meta-test")
+	; Move-resilient: isolate HSE_DispatchMatch's body across the whole driver
+	; source. Scoping to the function body (not the lib/hotstrings dir) is
+	; required because a SIBLING function in hotstring_engine.ahk legitimately
+	; uses SendEvent("{SC138 Up}"); the absent check must stay scoped to
+	; HSE_DispatchMatch alone.
+	Body := _DriverFuncBody("HSE_DispatchMatch")
+	Assert(Body != "", "HSE_DispatchMatch must be present for the AltGr SendInput meta-test")
 
 	; The fixup must use SendInput for the SC138 Up.
 	Assert(InStr(Body, 'SendInput("{SC138 Up}")'),

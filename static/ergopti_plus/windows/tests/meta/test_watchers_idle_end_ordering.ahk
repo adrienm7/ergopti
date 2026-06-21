@@ -22,33 +22,6 @@
 
 #Requires AutoHotkey v2.0
 
-_TWIED_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path, "UTF-8")
-}
-
-_TWIED_StripLineComments(Src) {
-	Out := ""
-	for Line in StrSplit(Src, "`n", "`r") {
-		if !RegExMatch(Line, "^\s*;")
-			Out .= Line . "`n"
-	}
-	return Out
-}
-
-; Locate the KL_Watchers_IdleTick function body (ends at the next flush-left }).
-_TWIED_IdleTickBody(Src) {
-	Decl := "KL_Watchers_IdleTick() {"
-	Idx := InStr(Src, Decl)
-	if !Idx
-		return ""
-	Rest := SubStr(Src, Idx)
-	End := InStr(Rest, "`n}")
-	return End ? SubStr(Rest, 1, End + 1) : Rest
-}
-
-
 ; ====================================================================
 ; ====================================================================
 ; ======= 1/ idle_end emitted before session_end in IdleTick =========
@@ -56,10 +29,11 @@ _TWIED_IdleTickBody(Src) {
 ; ====================================================================
 
 _TWIED_IdleEndBeforeSessionEnd() {
-	Src := _TWIED_StripLineComments(_TWIED_ReadSource("modules/keylogger/keylogger_watchers.ahk"))
-	Assert(Src != "", "modules/keylogger/keylogger_watchers.ahk must be readable")
-
-	Body := _TWIED_IdleTickBody(Src)
+	; Move-resilient: extract KL_Watchers_IdleTick()'s body by name via the
+	; framework helper instead of a pinned modules/keylogger/keylogger_watchers.ahk
+	; read. Full-line comments are stripped by the helper, so the ordering check
+	; can never match a phrase that only appears in a comment.
+	Body := _DriverFuncBody("KL_Watchers_IdleTick")
 	Assert(Body != "", "KL_Watchers_IdleTick must be defined in modules/keylogger/keylogger_watchers.ahk")
 
 	; Both events must appear

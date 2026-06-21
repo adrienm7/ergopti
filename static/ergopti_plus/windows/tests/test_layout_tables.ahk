@@ -494,8 +494,10 @@ Test("CAPSLOCK_SYMBOLS: every entry runs without crashing", TestLT_CapsLockSymbo
 ; requirement existed, AltGr+digit (superscripts, subscripts, euro) were silently
 ; disabled for users who had Ergopti AltGr on but Ergopti base emulation off.
 TestLT_AltGrNumberRowRegistrationNoErgoptiBase() {
-	FilePath := A_ScriptDir . "\..\lib\layout\layout_altgr.ahk"
-	Content := FileRead(FilePath, "UTF-8-RAW")
+	; Move-resilient: scan the layout module dir via the framework helper instead of
+	; a pinned lib/layout/layout_altgr.ahk read. The ergopti_alt_gr HotIf token is
+	; unique to layout_altgr.ahk within lib/layout, so the scan stays scoped to it.
+	Content := _DriverDirConcat("lib/layout")
 	; Locate the HotIf line that gates ALTGR_NUMBER_ROW registration.
 	; That line should contain "ergopti_alt_gr" but must NOT contain "ergopti_base".
 	Pattern := "HotIf\([^)]*ergopti_alt_gr[^)]*\)"

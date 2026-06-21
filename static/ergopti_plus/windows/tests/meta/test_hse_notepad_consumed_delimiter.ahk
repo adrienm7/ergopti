@@ -30,12 +30,6 @@
 ; ===========================================================
 ; ===========================================================
 
-_THNCD_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path, "UTF-8")
-}
-
 ; Extracts the Notepad branch body from HSE_DispatchMatch: the block that starts
 ; with `if IsNotepadApp {` and ends at the matching closing brace before `} else {`.
 _THNCD_ExtractNotepadBranch(Src) {
@@ -60,7 +54,7 @@ _THNCD_ExtractNotepadBranch(Src) {
 ; =========================================================
 
 _THNCD_NotepadBranchHasConsumedDelimiterGuard() {
-	Src := _THNCD_ReadSource("lib/hotstrings/hotstring_engine_main.ahk")
+	Src := _DriverDirConcat("lib/hotstrings")
 	Assert(Src != "", "lib/hotstrings/hotstring_engine_main.ahk must be readable")
 
 	Branch := _THNCD_ExtractNotepadBranch(Src)
