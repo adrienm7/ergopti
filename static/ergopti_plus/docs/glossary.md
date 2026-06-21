@@ -24,8 +24,8 @@ within each group. Cross-references appear as **→ Term**.
 A **→ Hotstring** expansion mode where the expansion fires the instant the
 full trigger is typed, without waiting for a **→ Terminator** keystroke. Enabled
 by the `auto` flag on a hotstring entry. Implemented in
-`static/drivers/hammerspoon/modules/keymap/expander.lua` and
-`static/drivers/autohotkey/lib/hotstrings/hotstring_engine.ahk`.
+`static/ergopti_plus/macos/modules/keymap/expander.lua` and
+`static/ergopti_plus/windows/lib/hotstrings/hotstring_engine.ahk`.
 
 **Buffer (Typing Buffer)**
 The rolling in-memory string that records the characters the user has typed
@@ -157,7 +157,7 @@ key, or combining vowel + modifier into a single typed sequence. Stored in
 **Dynamic Hotstrings**
 Hotstrings whose replacement is computed at expansion time rather than being
 a static string. Implemented in
-`static/drivers/hammerspoon/modules/dynamic_hotstrings/`. Examples include
+`static/ergopti_plus/macos/modules/dynamic_hotstrings/`. Examples include
 the `{date}` and `{time}` template tokens.
 
 **`final` Flag**
@@ -410,7 +410,7 @@ synced (listed in the auto-generated `.gitignore`). See `KEYLOGGER_SPEC.md`
 **Adapter**
 A driver-specific implementation of a **→ Port** contract. Each driver (macOS,
 Windows, Linux) provides its own set of adapters for the nine OS-facing
-interfaces. Adapters live under `static/drivers/<driver>/adapters/`. See
+interfaces. Adapters live under `static/ergopti_plus/<driver>/adapters/`. See
 ADR-001.
 
 **Codegen (Code Generation)**
@@ -430,7 +430,7 @@ corpus automatically exercises every driver. See ADR-006.
 A self-contained integration of Ergopti+ for a specific OS runtime:
 `hammerspoon` (macOS), `autohotkey` (Windows), `linux` (LuaJIT+libinput).
 Each driver implements the nine **→ Port** adapters and consumes the
-shared domain modules. All live under `static/drivers/<driver>/`.
+shared domain modules. All live under `static/ergopti_plus/<driver>/`.
 
 **Domain Module**
 A pure, platform-agnostic module in `_shared/core/domain/` that contains only

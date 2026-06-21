@@ -517,7 +517,7 @@ v1 has per-group `[_meta] delay` fields. v2 keeps this structure but applies sna
 
 When you start the cut-over, do these in order:
 
-1. **Run `npm run build:manifest`** to ensure `static/drivers/autohotkey/_generated/features_manifest.ahk` exists. Without it, `manifest_reader.ahk` will refuse to load and the driver will not boot.
+1. **Run `npm run build:manifest`** to ensure `static/ergopti_plus/windows/_generated/features_manifest.ahk` exists. Without it, `manifest_reader.ahk` will refuse to load and the driver will not boot.
 2. **Delete the user's existing config**: `config/ergopti_plus/ahk/config.toml` — the first-boot module will regenerate it from the v2 template. (This is the "clean state, no backward compat" decision.)
 3. **Wire boot order in `ErgoptiPlus.ahk`**:
    - Replace `#Include lib/features_config.ahk` with `#Include lib/manifest_reader.ahk` (already present as dormant `#Include`).

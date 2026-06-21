@@ -19,7 +19,7 @@ The launcher is compiled by `tools/build_macos_app.sh` as part of the macOS
 app assembly. To iterate on the Swift code alone:
 
 ```sh
-cd static/drivers/hammerspoon/launcher
+cd static/ergopti_plus/macos/launcher
 swift build -c release --product Ergopti
 swift run Ergopti          # for local testing (HS not bundled, expect a fail dialog)
 ```

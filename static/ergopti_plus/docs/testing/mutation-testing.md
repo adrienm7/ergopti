@@ -19,7 +19,7 @@ without any assertion checking its output.
 
 ## Why We Use It
 
-The JS domain layer (`static/drivers/_shared/core/domain/`) contains the authoritative
+The JS domain layer (`static/ergopti_plus/_shared/core/domain/`) contains the authoritative
 reference algorithms for Registry tail-char bucketing, HotstringMatcher, and
 Expander logic. These specs are shared across the AHK and Hammerspoon drivers; a
 silent regression in the reference algorithm propagates to all drivers.
@@ -53,7 +53,7 @@ The configuration lives in `stryker.config.mjs` at the project root.
 | Setting          | Value                                                                                  |
 | ---------------- | -------------------------------------------------------------------------------------- |
 | Test runner      | `command` (runs `node scripts/test-mutation-targets.cjs`)                              |
-| Mutated files    | `static/drivers/_shared/core/domain/**/*.js`<br>`static/drivers/_shared/core/ports/**/*.spec.js` |
+| Mutated files    | `static/ergopti_plus/_shared/core/domain/**/*.js`<br>`static/ergopti_plus/_shared/core/ports/**/*.spec.js` |
 | Excluded         | `_generated/`, `node_modules/`                                                         |
 | Report output    | `reports/mutation/mutation.html`                                                       |
 | Threshold: break | 50% — run fails below this score                                                       |
