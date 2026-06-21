@@ -619,3 +619,169 @@ helpers.describe("Adapter contract vectors: SecureFieldDetector", function()
 		helpers.assert_true(ok, "refresh() must not throw")
 	end)
 end)
+
+
+-- NetworkInfo vectors (NetworkInfo.spec.js). Read-only network queries.
+helpers.describe("Adapter contract vectors: NetworkInfo", function()
+	local adapter = helpers.load_with_stubs("adapters.network_info")
+
+	helpers.it("getSsidHash returns a string or nil, never throws (get_ssid_hash_returns_string_or_null)", function()
+		local ok, out = pcall(function() return adapter.getSsidHash() end)
+		helpers.assert_true(ok, "getSsidHash() must not throw")
+		helpers.assert_true(out == nil or type(out) == "string", "getSsidHash() must return a string or nil")
+	end)
+
+	helpers.it("getSignalStrength returns a number or nil, never throws (get_signal_strength_returns_number_or_null)", function()
+		local ok, out = pcall(function() return adapter.getSignalStrength() end)
+		helpers.assert_true(ok, "getSignalStrength() must not throw")
+		helpers.assert_true(out == nil or type(out) == "number", "getSignalStrength() must return a number or nil")
+	end)
+
+	helpers.it("isInternetReachable returns a boolean (is_internet_reachable_returns_bool)", function()
+		local ok, out = pcall(function() return adapter.isInternetReachable() end)
+		helpers.assert_true(ok, "isInternetReachable() must not throw")
+		helpers.assert_true(type(out) == "boolean", "isInternetReachable() must return a boolean")
+	end)
+
+	helpers.it("isVpnActive returns a boolean (is_vpn_active_returns_bool)", function()
+		local ok, out = pcall(function() return adapter.isVpnActive() end)
+		helpers.assert_true(ok, "isVpnActive() must not throw")
+		helpers.assert_true(type(out) == "boolean", "isVpnActive() must return a boolean")
+	end)
+end)
+
+
+-- KeyState vectors (KeyState.spec.js). Read-only modifier/key state queries.
+helpers.describe("Adapter contract vectors: KeyState", function()
+	local adapter = helpers.load_with_stubs("adapters.key_state")
+
+	helpers.it("isDown returns false for an unknown key (is_down_unknown_key_returns_false)", function()
+		helpers.assert_eq(false, adapter.isDown("ERGOPTI_NONEXISTENT_KEY_XYZ"), "isDown(unknown) must be false")
+	end)
+
+	helpers.it("isUp returns true for an unknown key (is_up_unknown_key_returns_true)", function()
+		helpers.assert_eq(true, adapter.isUp("ERGOPTI_NONEXISTENT_KEY_XYZ"), "isUp(unknown) must be true")
+	end)
+
+	helpers.it("isDown and isUp are inverse for the same key (is_down_is_up_are_inverse)", function()
+		local down = adapter.isDown("LShift")
+		helpers.assert_eq(not down, adapter.isUp("LShift"), "isUp must be the inverse of isDown")
+	end)
+
+	helpers.it("isDown returns a boolean (is_down_returns_boolean)", function()
+		helpers.assert_true(type(adapter.isDown("SC038")) == "boolean", "isDown() must return a boolean")
+	end)
+
+	helpers.it("isUp returns a boolean (is_up_returns_boolean)", function()
+		helpers.assert_true(type(adapter.isUp("SC038")) == "boolean", "isUp() must return a boolean")
+	end)
+end)
+
+
+-- Storage vectors (Storage.spec.js). Round-trips a unique test key against the
+-- (stubbed, in-memory) settings store and deletes it afterward — no real persist.
+helpers.describe("Adapter contract vectors: Storage", function()
+	-- Back the adapter with an isolated in-memory hs.settings so the round-trip
+	-- touches no real persisted settings and keys()/getKeys is fully supported.
+	local store = {}
+	local adapter = helpers.load_with_stubs("adapters.storage", {
+		settings = {
+			set = function(k, v) store[k] = v end,
+			get = function(k) return store[k] end,
+			clear = function(k) store[k] = nil end,
+			getKeys = function() local ks = {} ; for k in pairs(store) do ks[#ks + 1] = k end ; return ks end,
+		},
+	})
+	local TEST_KEY = "__ST_TEST_KEY__"
+	local MISSING_KEY = "never_set_9z3k"
+
+	helpers.it("set returns true (set_returns_true)", function()
+		helpers.assert_eq(true, adapter.set(TEST_KEY, "v"), "set() must return true")
+		adapter.delete(TEST_KEY)
+	end)
+
+	helpers.it("get returns the value previously set (get_after_set)", function()
+		adapter.set(TEST_KEY, "v")
+		helpers.assert_eq("v", adapter.get(TEST_KEY, nil), "get() must return the stored value")
+		adapter.delete(TEST_KEY)
+	end)
+
+	helpers.it("get returns the default for a missing key (get_missing_returns_default)", function()
+		helpers.assert_eq("fallback", adapter.get(MISSING_KEY, "fallback"), "get(missing) must return the default")
+	end)
+
+	helpers.it("has is true after set, false after delete (has_true_after_set / delete_removes_key)", function()
+		adapter.set(TEST_KEY, "x")
+		helpers.assert_eq(true, adapter.has(TEST_KEY), "has() must be true after set")
+		adapter.delete(TEST_KEY)
+		helpers.assert_eq(false, adapter.has(TEST_KEY), "has() must be false after delete")
+	end)
+
+	helpers.it("has is false for a never-stored key (has_false_for_missing)", function()
+		helpers.assert_eq(false, adapter.has(MISSING_KEY), "has(missing) must be false")
+	end)
+
+	helpers.it("keys returns a table (keys_returns_array)", function()
+		helpers.assert_true(type(adapter.keys()) == "table", "keys() must return a table")
+	end)
+end)
+
+
+-- ProcessLifecycle vectors (ProcessLifecycle.spec.js). start/stop drive a focus
+-- watcher; each test that starts also stops so no watcher leaks past the suite.
+helpers.describe("Adapter contract vectors: ProcessLifecycle", function()
+	local adapter = helpers.load_with_stubs("adapters.process_lifecycle")
+
+	helpers.it("getForegroundApp returns {appId, windowTitle} strings (getForegroundApp_returns_shape)", function()
+		local app = adapter.getForegroundApp()
+		helpers.assert_true(type(app) == "table", "getForegroundApp() must return a table")
+		helpers.assert_true(type(app.appId) == "string", "getForegroundApp().appId must be a string")
+		helpers.assert_true(type(app.windowTitle) == "string", "getForegroundApp().windowTitle must be a string")
+	end)
+
+	helpers.it("start is idempotent (start_is_idempotent)", function()
+		local ok = pcall(function() adapter.start(); adapter.start() end)
+		adapter.stop()
+		helpers.assert_true(ok, "start() twice must not throw")
+	end)
+
+	helpers.it("stop is idempotent (stop_is_idempotent)", function()
+		local ok = pcall(function() adapter.start(); adapter.stop(); adapter.stop() end)
+		helpers.assert_true(ok, "stop() twice must not throw")
+	end)
+
+	helpers.it("stop before start is safe (stop_before_start_is_safe)", function()
+		local ok = pcall(function() adapter.stop() end)
+		helpers.assert_true(ok, "stop() before start() must not throw")
+	end)
+
+	helpers.it("onFocusChange accepts a function (onFocusChange_accepts_function)", function()
+		local ok = pcall(function() adapter.onFocusChange(function() end) end)
+		helpers.assert_true(ok, "onFocusChange(fn) must not throw")
+	end)
+end)
+
+
+-- AppLauncher vectors (AppLauncher.spec.js). launch() is stubbed here (hs is
+-- mocked) so no real process is spawned; the AHK twin only tests isRunning.
+helpers.describe("Adapter contract vectors: AppLauncher", function()
+	local adapter = helpers.load_with_stubs("adapters.app_launcher")
+
+	helpers.it("isRunning returns false for an unknown process (is_running_unknown_process_returns_false)", function()
+		helpers.assert_eq(false, adapter.isRunning("ergopti_nonexistent_proc_xyz"), "isRunning(unknown) must be false")
+	end)
+
+	helpers.it("isRunning returns a boolean (is_running_returns_boolean)", function()
+		helpers.assert_true(type(adapter.isRunning("Finder")) == "boolean", "isRunning() must return a boolean")
+	end)
+
+	helpers.it("launch does not throw (launch_does_not_throw)", function()
+		local ok = pcall(function() adapter.launch("/System/Applications/Calculator.app") end)
+		helpers.assert_true(ok, "launch() must not throw")
+	end)
+
+	helpers.it("launchWithArgs does not throw (launch_with_args_does_not_throw)", function()
+		local ok = pcall(function() adapter.launchWithArgs("/System/Applications/Calculator.app", { "--flag" }) end)
+		helpers.assert_true(ok, "launchWithArgs() must not throw")
+	end)
+end)
