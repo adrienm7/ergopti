@@ -53,3 +53,11 @@ personal = "#6e6e73"
 # This file (hotstrings/defaults.toml) is the authoritative source; the timings
 # entry mirrors it for cross-module discovery.
 default_sec = 0.75
+
+# Default activation delay (seconds) for the dynamic-hotstrings category (dates,
+# phone / SSN / IBAN prefixes). This category has no per-file [_meta] delay, so
+# this is the canonical default for both drivers — read by AHK
+# (DYN_HOTSTRINGS_DEFAULT_DELAY via HotstringsConfigLoadSharedDefaults) and macOS
+# (keymap DELAYS_DEFAULT.dynamichotstrings). Previously a re-typed literal in each
+# driver, kept in sync only by a comment (rules 5.2 / 5.4).
+dynamichotstrings_sec = 2.0
