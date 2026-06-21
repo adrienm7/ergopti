@@ -249,7 +249,8 @@ Test("TapHoldTapAction: unknown key returns empty string", TestTapHold_TapAction
 
 TestTapHold_DurationDefault() {
 	TH := Map("keys", Map("x", Map("tap_action", "y")), "layers", Map())
-	AssertEqual(0.2, TapHoldDuration(TH, "x"))  ; from source default? verify accessor handles missing
+	; Accessor must source its fallback from the single constant, not a literal
+	AssertEqual(TAPHOLD_DEFAULT_ACTIVATION_SECONDS, TapHoldDuration(TH, "x"))
 }
 Test("TapHoldDuration: falls back when time_activation_seconds absent", TestTapHold_DurationDefault)
 
@@ -301,15 +302,23 @@ Test("TapHoldTapAction: returns empty string when tap_action key absent", _TH_Ta
 
 _TH_DurationDefaultForUnknownKey() {
 	TH := Map("keys", Map(), "layers", Map())
-	AssertEqual(0.2, TapHoldDuration(TH, "caps_lock"))
+	AssertEqual(TAPHOLD_DEFAULT_ACTIVATION_SECONDS, TapHoldDuration(TH, "caps_lock"))
 }
-Test("TapHoldDuration: returns 0.2 default for unknown key", _TH_DurationDefaultForUnknownKey)
+Test("TapHoldDuration: returns the single-sourced default for unknown key", _TH_DurationDefaultForUnknownKey)
 
 _TH_DurationDefaultWhenAbsent() {
 	TH := Map("keys", Map("lalt", Map("tap_action", "backspace")), "layers", Map())
-	AssertEqual(0.2, TapHoldDuration(TH, "lalt"))
+	AssertEqual(TAPHOLD_DEFAULT_ACTIVATION_SECONDS, TapHoldDuration(TH, "lalt"))
 }
-Test("TapHoldDuration: returns 0.2 default when time_activation_seconds absent", _TH_DurationDefaultWhenAbsent)
+Test("TapHoldDuration: returns the single-sourced default when time_activation_seconds absent", _TH_DurationDefaultWhenAbsent)
+
+; Pin the canonical default value in exactly one place. This is the regression
+; for sourcing TapHoldDuration's fallback from a single named constant instead of
+; the 0.2 literal it used to duplicate across both return branches.
+_TH_DefaultActivationConstantValue() {
+	AssertEqual(0.2, TAPHOLD_DEFAULT_ACTIVATION_SECONDS)
+}
+Test("tap_hold: TAPHOLD_DEFAULT_ACTIVATION_SECONDS is the single 0.2 source", _TH_DefaultActivationConstantValue)
 
 _TH_DurationReturnsConfiguredValue() {
 	TH := Map("keys", Map("caps_lock", Map("time_activation_seconds", 0.35)), "layers", Map())
