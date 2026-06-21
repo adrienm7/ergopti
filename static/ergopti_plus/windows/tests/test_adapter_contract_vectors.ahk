@@ -959,3 +959,35 @@ _RunClipboardContractVectors() {
 	Test("Clipboard: write/read/save/restore round-trip (user clipboard preserved)", _Result_clipboard_roundtrip)
 }
 _RunClipboardContractVectors()
+
+
+; GraphicsRenderer contract vectors (GraphicsRenderer.spec.js). The window is
+; created HIDDEN (WS_POPUP without WS_VISIBLE), so create/destroy never put
+; anything on screen. Two vectors are intentionally exercised only on macOS
+; (stubbed hs.canvas): show()-visibility (GR_Show on a real handle would flash
+; the real desktop) and draw_bitmap_calls_draw_fn (GR_DrawBitmap renders through
+; a GDI DIB/UpdateLayeredWindow chain that does not complete on a hidden window
+; in the headless runner, so the callback is not invoked here).
+_RunGraphicsRendererContractVectors() {
+	_Result_gr_create_nonzero() {
+		H := GR_CreateWindow(Map("x", 100, "y", 100, "w", 200, "h", 200))
+		GR_DestroyWindow(H)
+		Assert(H != 0 && H != "", "GR_CreateWindow must return a non-zero handle")
+	}
+	Test("GraphicsRenderer: createWindow returns a non-zero handle", _Result_gr_create_nonzero)
+
+	_Result_gr_zero_noops() {
+		Err := ""
+		try {
+			GR_DestroyWindow(0)
+			GR_Show(0)
+			GR_Hide(0)
+			GR_DrawBitmap(0, (*) => 0)
+		} catch as E {
+			Err := E.Message
+		}
+		Assert(Err = "", "zero-handle calls must be no-ops without throwing: " . Err)
+	}
+	Test("GraphicsRenderer: destroy/show/hide/drawBitmap on a zero handle are no-ops", _Result_gr_zero_noops)
+}
+_RunGraphicsRendererContractVectors()

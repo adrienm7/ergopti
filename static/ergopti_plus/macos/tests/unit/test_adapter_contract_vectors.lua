@@ -906,3 +906,46 @@ helpers.describe("Adapter contract vectors: Clipboard", function()
 		helpers.assert_eq(nil, adapter.read(), "read() must return nil when empty")
 	end)
 end)
+
+
+-- GraphicsRenderer vectors (GraphicsRenderer.spec.js). hs.canvas is stubbed, so
+-- create/show/hide/destroy never put a real surface on screen — this is the one
+-- port whose show() vector is exercised here only (the AHK twin keeps the window
+-- hidden to avoid flashing the real desktop).
+helpers.describe("Adapter contract vectors: GraphicsRenderer", function()
+	local adapter = helpers.load_with_stubs("adapters.graphics_renderer")
+
+	helpers.it("createWindow returns a non-zero handle (create_returns_nonzero_handle)", function()
+		local h = adapter.createWindow({ x = 100, y = 100, w = 200, h = 200 })
+		helpers.assert_true(h ~= nil and h ~= 0, "createWindow() must return a non-zero handle")
+		adapter.destroyWindow(h)
+	end)
+
+	helpers.it("destroy/show/hide/drawBitmap on a zero handle are no-ops (zero_is_noop)", function()
+		local ok = pcall(function()
+			adapter.destroyWindow(0)
+			adapter.show(0)
+			adapter.hide(0)
+			adapter.drawBitmap(0, function() end)
+		end)
+		helpers.assert_true(ok, "zero-handle calls must be no-ops without throwing")
+	end)
+
+	helpers.it("drawBitmap calls the draw function (draw_bitmap_calls_draw_fn)", function()
+		local h = adapter.createWindow({ x = 0, y = 0, w = 64, h = 64 })
+		local called = false
+		adapter.drawBitmap(h, function() called = true end)
+		adapter.destroyWindow(h)
+		helpers.assert_true(called, "drawBitmap() must invoke the draw function")
+	end)
+
+	helpers.it("show then hide then destroy do not throw (show/hide/destroy lifecycle)", function()
+		local h = adapter.createWindow({ x = 0, y = 0, w = 64, h = 64 })
+		local ok = pcall(function()
+			adapter.show(h)
+			adapter.hide(h)
+			adapter.destroyWindow(h)
+		end)
+		helpers.assert_true(ok, "show/hide/destroy lifecycle must not throw")
+	end)
+end)
