@@ -58,18 +58,6 @@ _ISRMM_ReadSharedSource(RelPath) {
 	return FileRead(Path)
 }
 
-; Returns the full function body - declaration to the first column-0 closing brace.
-_ISRMM_FuncBody(Src, FuncDef) {
-	Idx := InStr(Src, FuncDef)
-	if !Idx
-		return ""
-	Rest := SubStr(Src, Idx)
-	End := InStr(Rest, "`n}")
-	if End
-		return SubStr(Rest, 1, End + 1)
-	return Rest
-}
-
 
 ; ==================================================
 ; ==================================================

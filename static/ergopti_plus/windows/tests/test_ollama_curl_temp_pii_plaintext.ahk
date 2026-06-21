@@ -60,17 +60,6 @@ _OCTPP_ReadSource(RelPath) {
 	return FileRead(Path)
 }
 
-_OCTPP_FuncBody(Src, FuncDef) {
-	Idx := InStr(Src, FuncDef)
-	if !Idx
-		return ""
-	Rest := SubStr(Src, Idx)
-	End := InStr(Rest, "`n}")
-	if End
-		return SubStr(Rest, 1, End + 1)
-	return Rest
-}
-
 _OCTPP_DispatchUsesHardenedDir() {
 	Src := _OCTPP_ReadSource("modules/llm/api_ollama.ahk")
 	Seg := _DriverFuncBody("_LLM_Ollama_DispatchAsync")

@@ -17,34 +17,6 @@ _CRL_ReadSource(RelPath) {
 	return FileRead(Path, "UTF-8")
 }
 
-_CRL_FuncBody(SourceCode, FuncDecl) {
-	Lines := StrSplit(SourceCode, "`n", "`r")
-	InFunc := false
-	Body := ""
-	BraceDepth := 0
-	
-	for Line in Lines {
-		Trimmed := Trim(Line)
-		if (!InFunc) {
-			if (InStr(Trimmed, FuncDecl) == 1) {
-				InFunc := true
-				Body .= Trimmed . "`n"
-				BraceDepth := 1
-			}
-		} else {
-			Body .= Trimmed . "`n"
-			if (InStr(Trimmed, "{"))
-				BraceDepth++
-			if (InStr(Trimmed, "}")) {
-				BraceDepth--
-				if (BraceDepth <= 0)
-					return Body
-			}
-		}
-	}
-	return Body
-}
-
 _CRL_AssertNoAClipboardRef() {
     Src := _CRL_ReadSource("modules/keylogger/keylogger_clipboard.ahk")
     Body := _DriverFuncBody("KL_Clip_OnChange")

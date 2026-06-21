@@ -44,18 +44,6 @@ _HDGA_ReadSource(RelPath) {
 	return FileRead(Path)
 }
 
-; Returns the function body from its declaration to the first closing brace at
-; column 0 (AHK functions close flush-left; inner blocks close indented).
-_HDGA_FuncBody(Src, FuncDef) {
-	Idx := InStr(Src, FuncDef)
-	if !Idx
-		return ""
-	Rest := SubStr(Src, Idx)
-	if RegExMatch(Rest, "m)^\}", &Match)
-		return SubStr(Rest, 1, Match.Pos)
-	return Rest
-}
-
 
 ; ===================================================
 ; ===================================================

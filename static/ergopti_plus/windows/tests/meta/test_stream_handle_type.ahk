@@ -35,23 +35,6 @@ _SHT_ReadSource(RelPath) {
 	return FileRead(Path)
 }
 
-; Extracts the body of a function identified by its declaration line.
-; Scans forward from the declaration to the first closing brace at
-; column 0 (the pattern AHK v2 uses for top-level function ends).
-_SHT_FuncBody(Src, FuncDef) {
-	Idx := InStr(Src, FuncDef)
-	if !Idx
-		return ""
-	Rest := SubStr(Src, Idx)
-	; Walk forward to find the closing "}" that ends the function at the
-	; top indentation level — the reference test uses "`n}" which is
-	; sufficient for single-level functions.
-	End := InStr(Rest, "`n}")
-	if End
-		return SubStr(Rest, 1, End + 1)
-	return Rest
-}
-
 
 
 

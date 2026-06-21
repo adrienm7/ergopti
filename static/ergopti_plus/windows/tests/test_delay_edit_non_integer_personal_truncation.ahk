@@ -80,17 +80,6 @@ _DENI_ReadSource(RelPath) {
 	return FileRead(Path)
 }
 
-_DENI_FuncBody(Src, FuncDef) {
-	Idx := InStr(Src, FuncDef)
-	if !Idx
-		return ""
-	Rest := SubStr(Src, Idx)
-	End := InStr(Rest, "`n}")
-	if End
-		return SubStr(Rest, 1, End + 1)
-	return Rest
-}
-
 ; _HCW_TomlValue (config window, not in the run_all graph) must delegate the
 ; "delay" field to the shared helper rather than re-implement its own Format,
 ; otherwise the two paths could silently re-diverge.

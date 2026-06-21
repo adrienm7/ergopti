@@ -46,15 +46,6 @@ _OTR_StripComments(Src) {
 	return Out
 }
 
-_OTR_FuncBody(Src, FuncDecl) {
-	Idx := InStr(Src, FuncDecl)
-	if !Idx
-		return ""
-	Rest := SubStr(Src, Idx)
-	End := InStr(Rest, "`n}")
-	return End ? SubStr(Rest, 1, End + 1) : Rest
-}
-
 _OTR_TrimUsesMinId() {
 	Src := _OTR_StripComments(_OTR_ReadSource("modules/llm/api_ollama.ahk"))
 	; Use the definition pattern (with trailing " {") to avoid matching the call site.

@@ -36,15 +36,6 @@ _HCA_ReadSource(RelPath) {
 	return FileRead(StrReplace(Root, "/", "\") . "\" . StrReplace(RelPath, "/", "\"), "UTF-8")
 }
 
-_HCA_FuncBody(Src, FuncDecl) {
-	Idx := InStr(Src, FuncDecl)
-	if !Idx
-		return ""
-	Rest := SubStr(Src, Idx)
-	End := InStr(Rest, "`n}")
-	return End ? SubStr(Rest, 1, End + 1) : Rest
-}
-
 _HCA_UsesAtomicWrite() {
 	Src := _HCA_ReadSource("lib/hotstrings/hotstrings_cache.ahk")
 	Body := _DriverFuncBody("_HotstringsCacheWriteTsv")

@@ -36,27 +36,6 @@ _DIPC_ReadSource(RelPath) {
 	return FileRead(Path)
 }
 
-_DIPC_FuncBody(Src, FnDecl) {
-	FnPos := InStr(Src, FnDecl)
-	if (!FnPos)
-		return ""
-	depth := 0
-	i := FnPos
-	Len := StrLen(Src)
-	while (i <= Len) {
-		ch := SubStr(Src, i, 1)
-		if (ch == "{")
-			depth++
-		else if (ch == "}") {
-			depth--
-			if (depth <= 0)
-				return SubStr(Src, FnPos, i - FnPos + 1)
-		}
-		i++
-	}
-	return SubStr(Src, FnPos)
-}
-
 
 ; ===================================================
 ; ===================================================

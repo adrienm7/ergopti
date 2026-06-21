@@ -40,20 +40,6 @@ _HPTS_ReadSource(RelPath) {
 	return FileRead(Path)
 }
 
-; Returns the full function body - from its declaration to the first closing
-; brace at column 0 (AHK functions close with `}` flush-left, while inner blocks
-; close indented). Returns "" when the declaration is absent.
-_HPTS_FuncBody(Src, FuncDef) {
-	Idx := InStr(Src, FuncDef)
-	if !Idx
-		return ""
-	Rest := SubStr(Src, Idx)
-	End := InStr(Rest, "`n}")
-	if End
-		return SubStr(Rest, 1, End + 1)
-	return Rest
-}
-
 
 
 

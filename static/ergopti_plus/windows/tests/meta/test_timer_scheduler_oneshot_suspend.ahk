@@ -34,15 +34,6 @@ _TSO_ReadSource(RelPath) {
 	return FileRead(StrReplace(Root, "/", "\") . "\" . StrReplace(RelPath, "/", "\"), "UTF-8")
 }
 
-_TSO_FuncBody(Src, FuncDecl) {
-	Idx := InStr(Src, FuncDecl)
-	if !Idx
-		return ""
-	Rest := SubStr(Src, Idx)
-	End := InStr(Rest, "`n}")
-	return End ? SubStr(Rest, 1, End + 1) : Rest
-}
-
 _TSO_OneShotReschedules() {
 	Src := _TSO_ReadSource("adapters/timer_scheduler.ahk")
 	; Use the definition pattern (with trailing " {") to avoid matching the call site at TimerAfter.

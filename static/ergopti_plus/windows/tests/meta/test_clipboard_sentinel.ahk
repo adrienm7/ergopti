@@ -32,17 +32,6 @@ _TCBS_StripLineComments(Src) {
 	return Out
 }
 
-; Extract a function body by locating the declaration line and reading until the
-; first flush-left closing brace.
-_TCBS_FuncBody(Src, Decl) {
-	Idx := InStr(Src, "`n" . Decl)
-	if !Idx
-		return ""
-	Rest := SubStr(Src, Idx + 1)
-	End := InStr(Rest, "`n}")
-	return End ? SubStr(Rest, 1, End + 1) : Rest
-}
-
 
 ; ===========================================================
 ; ===========================================================

@@ -50,17 +50,6 @@ _SFND_StripComments(Src) {
 	return Out
 }
 
-_SFND_FuncBody(Src, FuncDef) {
-	Idx := InStr(Src, FuncDef)
-	if !Idx
-		return ""
-	Rest := SubStr(Src, Idx)
-	End := InStr(Rest, "`n}")
-	if End
-		return SubStr(Rest, 1, End + 1)
-	return Rest
-}
-
 _SFND_SaveFullConfigNoDelete() {
 	Raw := _DriverSourceConcat()
 	Src := _SFND_StripComments(Raw)

@@ -43,19 +43,6 @@ _LTAFK_ReadSource(RelPath) {
 	return FileRead(Path)
 }
 
-; Returns the full function body, from its declaration to the first closing
-; brace at column 0. Robust to nested `}` inside try / switch blocks (those
-; close indented), unlike a fixed-size window. Returns "" when absent.
-_LTAFK_FuncBody(Src, FuncDef) {
-	Idx := InStr(Src, FuncDef)
-	if !Idx
-		return ""
-	Rest := SubStr(Src, Idx)
-	if RegExMatch(Rest, "m)^\}", &Match)
-		return SubStr(Rest, 1, Match.Pos)
-	return Rest
-}
-
 
 
 

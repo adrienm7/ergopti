@@ -29,24 +29,6 @@ _KLRD_ReadSource(RelPath) {
 	return FileRead(Root . RelPath)
 }
 
-; Extract a function body by searching for the flush-left closing brace that
-; terminates the first function definition matching FuncDef.
-_KLRD_FuncBody(Src, FuncDef) {
-	Idx := InStr(Src, FuncDef)
-	if !Idx
-		return ""
-	Rest := SubStr(Src, Idx)
-	; Find flush-left closing brace — the column-0 `}` that closes the function
-	i := 1
-	while (i <= StrLen(Rest)) {
-		if (SubStr(Rest, i, 2) == "`n}") {
-			return SubStr(Rest, 1, i + 1)
-		}
-		i++
-	}
-	return Rest
-}
-
 
 
 

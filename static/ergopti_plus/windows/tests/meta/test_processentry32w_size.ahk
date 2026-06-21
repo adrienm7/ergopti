@@ -18,34 +18,6 @@ _PE32_ReadSource(RelPath) {
 	return FileRead(Path, "UTF-8")
 }
 
-_PE32_FuncBody(SourceCode, FuncDecl) {
-	Lines := StrSplit(SourceCode, "`n", "`r")
-	InFunc := false
-	Body := ""
-	BraceDepth := 0
-
-	for Line in Lines {
-		Trimmed := Trim(Line)
-		if (!InFunc) {
-			if (InStr(Trimmed, FuncDecl) == 1) {
-				InFunc := true
-				Body .= Trimmed . "`n"
-				BraceDepth := 1
-			}
-		} else {
-			Body .= Trimmed . "`n"
-			if (InStr(Trimmed, "{"))
-				BraceDepth++
-			if (InStr(Trimmed, "}")) {
-				BraceDepth--
-				if (BraceDepth <= 0)
-					return Body
-			}
-		}
-	}
-	return Body
-}
-
 _PE32_SourceScanCheck() {
 	Src := _PE32_ReadSource("modules/keylogger/keylogger_av_state.ahk")
 	Assert(Src != "", "Source file keylogger_av_state.ahk must exist")

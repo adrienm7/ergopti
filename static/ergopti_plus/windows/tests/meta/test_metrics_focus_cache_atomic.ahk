@@ -30,17 +30,6 @@ _MFCA_ReadSource(RelPath) {
 	return FileRead(Path)
 }
 
-_MFCA_FuncBody(Src, FuncDef) {
-	Idx := InStr(Src, FuncDef)
-	if !Idx
-		return ""
-	Rest := SubStr(Src, Idx)
-	; Find the first closing brace at the start of a line (no indentation).
-	if RegExMatch(Rest, "m)^\}", &Match)
-		return SubStr(Rest, 1, Match.Pos)
-	return Rest
-}
-
 
 ; ===================================================
 ; ===================================================

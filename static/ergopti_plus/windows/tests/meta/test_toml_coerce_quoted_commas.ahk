@@ -37,15 +37,6 @@ _TTCQC_StripLineComments(Src) {
 	return Out
 }
 
-_TTCQC_FuncBody(Src, Decl) {
-	Idx := InStr(Src, Decl)
-	if !Idx
-		return ""
-	Rest := SubStr(Src, Idx)
-	; The function is longer than a simple one-liner — extract 1500 chars
-	return SubStr(Rest, 1, 1500)
-}
-
 
 ; =========================================================================
 ; =========================================================================

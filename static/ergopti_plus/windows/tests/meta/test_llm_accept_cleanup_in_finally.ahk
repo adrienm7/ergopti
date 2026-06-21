@@ -40,19 +40,6 @@ _LACF_ReadSource(RelPath) {
 	return FileRead(Path)
 }
 
-; Returns the full function body from its declaration line to the first
-; closing brace at column 0. Robust to nested braces in try/switch blocks
-; because inner braces are always indented.
-_LACF_FuncBody(Src, FuncDef) {
-	Idx := InStr(Src, FuncDef)
-	if !Idx
-		return ""
-	Rest := SubStr(Src, Idx)
-	if RegExMatch(Rest, "m)^\}", &Match)
-		return SubStr(Rest, 1, Match.Pos)
-	return Rest
-}
-
 ; Returns the substring of Body starting at the first "} finally {" token.
 ; The caller uses InStr on this result to assert that cleanup code appears
 ; inside (or after) the finally block, never only in the try block.

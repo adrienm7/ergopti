@@ -40,20 +40,6 @@ _OSSG_ReadSource(RelPath) {
 	return FileRead(Path)
 }
 
-; Extracts the body of a named function from Src: from the declaration line to
-; the first top-level closing brace (`n}). Returns "" when the declaration is
-; absent so callers can assert its presence explicitly.
-_OSSG_FuncBody(Src, FuncDef) {
-	Idx := InStr(Src, FuncDef)
-	if !Idx
-		return ""
-	Rest := SubStr(Src, Idx)
-	End := InStr(Rest, "`n}")
-	if End
-		return SubStr(Rest, 1, End + 1)
-	return Rest
-}
-
 
 
 

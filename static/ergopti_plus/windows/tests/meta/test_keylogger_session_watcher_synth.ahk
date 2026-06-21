@@ -39,19 +39,6 @@ _KSW_ReadSource(RelPath) {
 	return FileRead(Path)
 }
 
-; Extracts a top-level function body: from the declaration to the first
-; flush-left closing brace.
-_KSW_FuncBody(Src, Decl) {
-	Idx := InStr(Src, Decl)
-	if !Idx
-		return ""
-	Rest := SubStr(Src, Idx)
-	End := InStr(Rest, "`n}")
-	if End
-		return SubStr(Rest, 1, End + 1)
-	return Rest
-}
-
 
 
 
