@@ -21,12 +21,6 @@
 
 #Requires AutoHotkey v2.0
 
-_TSTC_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path, "UTF-8")
-}
-
 _TSTC_StripLineComments(Src) {
 	Out := ""
 	for Line in StrSplit(Src, "`n", "`r") {
@@ -44,7 +38,10 @@ _TSTC_StripLineComments(Src) {
 ; ==================================================================
 
 _TSTC_ConfigurableTimeout() {
-	Src := _TSTC_StripLineComments(_TSTC_ReadSource("modules/tap_holds/space.ahk"))
+	; Move-resilient: scan the tap-holds module dir via the framework helper instead
+	; of a pinned modules path; the constant declaration lives at module scope (not
+	; inside a function), so keep the comment-stripping extractor
+	Src := _TSTC_StripLineComments(_DriverDirConcat("modules/tap_holds"))
 	Assert(Src != "", "modules/tap_holds/space.ahk must be readable")
 
 	; The constant must be declared

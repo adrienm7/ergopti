@@ -35,41 +35,15 @@
 
 ; ================================================================
 ; ================================================================
-; ======= 1/ Source-inspection helpers ===========================
-; ================================================================
-; ================================================================
-
-_SWDC_ReadSource() {
-	return FileRead(A_ScriptDir . "\..\modules\keylogger\keylogger_sensors.ahk", "UTF-8")
-}
-
-
-_SWDC_FindStartBlock(src) {
-	pos := InStr(src, "KL_Sensors_Start()")
-	if (!pos)
-		return ""
-	return SubStr(src, pos, 600)
-}
-
-
-_SWDC_FindStopBlock(src) {
-	pos := InStr(src, "KL_Sensors_Stop()")
-	if (!pos)
-		return ""
-	return SubStr(src, pos, 400)
-}
-
-
-
-
-; ================================================================
-; ================================================================
-; ======= 2/ Assertions ==========================================
+; ======= 1/ Assertions ==========================================
 ; ================================================================
 ; ================================================================
 
 _SWDC_WarmupFnDeclared() {
-	src := _SWDC_ReadSource()
+	; Move-resilient: the warmup_fn property lives on the KLSensors class (not in a
+	; function body), so scan the keylogger module dir via the framework helper. The
+	; warmup_fn token is unique to keylogger_sensors.ahk, so the scope stays tight.
+	src := _DriverDirConcat("modules/keylogger")
 	Assert(InStr(src, "warmup_fn") > 0,
 		"keylogger_sensors.ahk: KLSensors must declare a warmup_fn property for the distinct warm-up BoundFunc")
 }
@@ -77,7 +51,9 @@ Test("KLSensors: warmup_fn property declared (sensors-warmup-distinct)", _SWDC_W
 
 
 _SWDC_WarmupTimerUsesWarmupFn() {
-	block := _SWDC_FindStartBlock(_SWDC_ReadSource())
+	; Move-resilient: extract KL_Sensors_Start()'s body by name via the framework
+	; helper instead of a fixed-size window off a pinned source path.
+	block := _DriverFuncBody("KL_Sensors_Start")
 	; The one-shot (-2000) must reference warmup_fn, not tick_fn.
 	posWarmup := InStr(block, "warmup_fn")
 	pos2000   := InStr(block, "-2000")
@@ -91,7 +67,7 @@ Test("KLSensors: SetTimer one-shot (-2000) uses warmup_fn (sensors-warmup-distin
 
 
 _SWDC_PeriodicTimerUsesTickFn() {
-	block := _SWDC_FindStartBlock(_SWDC_ReadSource())
+	block := _DriverFuncBody("KL_Sensors_Start")
 	; The periodic arm must reference tick_fn.
 	Assert(InStr(block, "tick_fn") > 0,
 		"keylogger_sensors.ahk: KL_Sensors_Start() must still register KLSensors.tick_fn for the periodic timer")
@@ -100,7 +76,7 @@ Test("KLSensors: SetTimer periodic arm uses tick_fn (sensors-warmup-distinct)", 
 
 
 _SWDC_StopCancelsWarmup() {
-	block := _SWDC_FindStopBlock(_SWDC_ReadSource())
+	block := _DriverFuncBody("KL_Sensors_Stop")
 	Assert(InStr(block, "warmup_fn") > 0,
 		"keylogger_sensors.ahk: KL_Sensors_Stop() must cancel the warmup_fn timer so it does not fire after stop")
 }

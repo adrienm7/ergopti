@@ -12,17 +12,10 @@
 
 #Requires AutoHotkey v2.0
 
-_TKPM_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
-}
-
 ; The dead Keylogger.current_pause_ms field must no longer appear in the source.
 ; If it reappears, pause_before_ms will be hardcoded 0 again.
 _TKPM_DeadFieldRemoved() {
-	Src := _TKPM_ReadSource("modules/keylogger/keylogger.ahk")
-	Assert(Src != "", "Keylogger source must exist")
+	Src := _DriverSourceConcat()
 	Assert(!InStr(Src, "current_pause_ms"),
 		"Keylogger must not declare or use current_pause_ms — it was never updated and hardcoded pause_before_ms to 0")
 }
@@ -30,7 +23,7 @@ _TKPM_DeadFieldRemoved() {
 ; snap_pause must be derived from snap_events[1][2] (first event delay = inter-burst gap).
 ; Any literal use of a hard-zero fallback without this expression indicates a regression.
 _TKPM_SnapPauseUsesFirstEventDelay() {
-	Src := _TKPM_ReadSource("modules/keylogger/keylogger.ahk")
+	Src := _DriverDirConcat("modules/keylogger")
 	Assert(InStr(Src, "snap_events[1][2]") > 0,
 		"KL_FlushBuffer must use snap_events[1][2] as snap_pause (first event delay = inter-burst gap)")
 }

@@ -34,33 +34,8 @@
 ; =============================================================
 ; =============================================================
 
-_GSNF_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	return FileRead(StrReplace(Root, "/", "\") . "\" . StrReplace(RelPath, "/", "\"), "UTF-8")
-}
-
-_GSNF_StripComments(Src) {
-	Out := ""
-	for Line in StrSplit(Src, "`n", "`r") {
-		if !RegExMatch(Line, "^\s*;")
-			Out .= Line . "`n"
-	}
-	return Out
-}
-
-_GSNF_ExtractFunc(Src, FuncName) {
-	; Search for the definition (with trailing " {") to avoid matching call sites.
-	Idx := InStr(Src, FuncName . "() {")
-	if !Idx
-		return ""
-	; Grab up to 1500 chars to cover the function body
-	return SubStr(Src, Idx, 1500)
-}
-
 _GSNF_NoTempFile() {
-	Raw := _GSNF_ReadSource("modules/gestures.ahk")
-	Src := _GSNF_StripComments(Raw)
-	Body := _GSNF_ExtractFunc(Src, "GestureScreenshotInstant")
+	Body := _DriverFuncBody("GestureScreenshotInstant")
 	Assert(Body != "", "GestureScreenshotInstant must exist in modules/gestures.ahk")
 
 	Assert(!InStr(Body, "hs_screenshot.ps1"),
@@ -84,9 +59,7 @@ Test("gestures: GestureScreenshotInstant does not write a shared temp .ps1 file 
 ; ======================================================
 
 _GSNF_InlineCommand() {
-	Raw := _GSNF_ReadSource("modules/gestures.ahk")
-	Src := _GSNF_StripComments(Raw)
-	Body := _GSNF_ExtractFunc(Src, "GestureScreenshotInstant")
+	Body := _DriverFuncBody("GestureScreenshotInstant")
 	Assert(Body != "", "GestureScreenshotInstant must exist in modules/gestures.ahk")
 
 	Assert(InStr(Body, "-Command") > 0,

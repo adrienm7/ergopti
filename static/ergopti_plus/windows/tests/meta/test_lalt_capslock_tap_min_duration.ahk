@@ -70,7 +70,9 @@ _TMDF_BlockBody(Src, HotkeyDef) {
 
 ; CapsLock hold-layer (2.4): must gate on TapMinDurationMs() AND A_PriorKey.
 _TMDF_CapsLockLayerHasFloorAndPriorKey() {
-	Src := _TMDF_ReadSource("modules/tap_holds/capslock.ahk")
+	; Move-resilient: scan the whole tap_holds module instead of a pinned path.
+	; The "`n$SC03A:: {" anchor is unique to capslock.ahk in this dir.
+	Src := _DriverDirConcat("modules/tap_holds")
 	; Newline-anchor the declaration so it matches the flush-left 2.4 hold-layer
 	; block ($SC03A) and NOT the 2.3 hold-modifier block (*$SC03A) which shares
 	; the trailing "$SC03A:: {" substring.
@@ -100,7 +102,10 @@ Test("tap_holds: lalt 4.2 tab+layer has TapMinDurationMs floor (lalt-altgr-capsl
 
 ; LAlt generic hold-layer (4.8): must gate on TapMinDurationMs() AND A_PriorKey.
 _TMDF_LAltGenericLayerHasFloor() {
-	Src := _TMDF_ReadSource("modules/tap_holds/lalt.ahk")
+	; Move-resilient: scan the whole tap_holds module instead of a pinned path.
+	; The A_PriorKey == "LAlt") { anchor is unique to lalt.ahk in this dir, and the
+	; TapMinDurationMs() floor sits on the same line just before it.
+	Src := _DriverDirConcat("modules/tap_holds")
 	; The generic hold-layer dispatch is the only call to _LAltDispatch() guarded
 	; by A_PriorKey == "LAlt"; isolate that statement and assert the floor is present.
 	Idx := InStr(Src, "A_PriorKey == " . Chr(34) . "LAlt" . Chr(34) . ") {")

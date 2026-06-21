@@ -28,30 +28,6 @@
 ; ===================================================
 ; ===================================================
 
-_LAHS_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
-}
-
-; Extracts the function body up to the first unindented closing brace,
-; stripping comment lines so comment text does not pollute code searches.
-_LAHS_FuncBodyStripped(Src, FuncDef) {
-	Idx := InStr(Src, FuncDef)
-	if !Idx
-		return ""
-	Rest := SubStr(Src, Idx)
-	if RegExMatch(Rest, "m)^\}", &Match)
-		Rest := SubStr(Rest, 1, Match.Pos)
-	Out := ""
-	loop parse, Rest, "`n", "`r" {
-		Line := A_LoopField
-		if !RegExMatch(Line, "^\s*;")
-			Out .= Line . "`n"
-	}
-	return Out
-}
-
 ; Extracts a window of source around Anchor and strips comments. The window
 ; reaches well past the anchor (the inline auto-type block carries verbose
 ; rationale comments between the anchor assignment and the HSE_HardReset call).
@@ -80,8 +56,7 @@ _LAHS_WindowStripped(Src, Anchor) {
 ; ===================================================
 
 _LAHS_AcceptSuppressesBefore() {
-	Src := _LAHS_ReadSource("modules/llm/llm_bridge.ahk")
-	Body := _LAHS_FuncBodyStripped(Src, "LLM_Bridge_OnAccept(text) {")
+	Body := _DriverFuncBody("LLM_Bridge_OnAccept")
 	Assert(Body != "", "LLM_Bridge_OnAccept must exist in modules/llm/llm_bridge.ahk")
 	Assert(InStr(Body, "PrefixWatcherSuppress") > 0,
 		"LLM_Bridge_OnAccept must call PrefixWatcherSuppress to mute the hotstring InputHook before injecting the prediction")
@@ -89,8 +64,7 @@ _LAHS_AcceptSuppressesBefore() {
 Test("llm_bridge: LLM_Bridge_OnAccept calls PrefixWatcherSuppress to suppress hotstring observation during inject (llm-autotype-no-hse-suppress)", _LAHS_AcceptSuppressesBefore)
 
 _LAHS_AcceptResetsHSE() {
-	Src := _LAHS_ReadSource("modules/llm/llm_bridge.ahk")
-	Body := _LAHS_FuncBodyStripped(Src, "LLM_Bridge_OnAccept(text) {")
+	Body := _DriverFuncBody("LLM_Bridge_OnAccept")
 	Assert(Body != "", "LLM_Bridge_OnAccept must exist in modules/llm/llm_bridge.ahk")
 	Assert(InStr(Body, "HSE_HardReset") > 0,
 		"LLM_Bridge_OnAccept must call HSE_HardReset() after TextSend to clear the stale pre-prediction buffer")
@@ -107,7 +81,7 @@ Test("llm_bridge: LLM_Bridge_OnAccept calls HSE_HardReset after TextSend to clea
 ; ===================================================
 
 _LAHS_InlineAutoTypeSuppresses() {
-	Src := _LAHS_ReadSource("modules/llm/prediction_engine.ahk")
+	Src := _DriverDirConcat("modules/llm")
 	; Use the unique "inline_last_typed" assignment as anchor — it is the line
 	; immediately before the TextSend in the inline auto-type block.
 	Win := _LAHS_WindowStripped(Src, "inline_last_typed")
@@ -118,7 +92,7 @@ _LAHS_InlineAutoTypeSuppresses() {
 Test("prediction_engine: inline auto-type calls PrefixWatcherSuppress before TextSend (llm-autotype-no-hse-suppress)", _LAHS_InlineAutoTypeSuppresses)
 
 _LAHS_InlineAutoTypeResetsHSE() {
-	Src := _LAHS_ReadSource("modules/llm/prediction_engine.ahk")
+	Src := _DriverDirConcat("modules/llm")
 	Win := _LAHS_WindowStripped(Src, "inline_last_typed")
 	Assert(Win != "", "inline_last_typed must exist in modules/llm/prediction_engine.ahk")
 	Assert(InStr(Win, "HSE_HardReset") > 0,

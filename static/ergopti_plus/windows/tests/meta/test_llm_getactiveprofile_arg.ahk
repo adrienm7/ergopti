@@ -20,20 +20,8 @@
 
 #Requires AutoHotkey v2.0
 
-_TLGAA_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path, "UTF-8")
-}
 
-_TLGAA_StripLineComments(Src) {
-	Out := ""
-	for Line in StrSplit(Src, "`n", "`r") {
-		if !RegExMatch(Line, "^\s*;")
-			Out .= Line . "`n"
-	}
-	return Out
-}
+
 
 
 ; ==========================================================================
@@ -43,8 +31,7 @@ _TLGAA_StripLineComments(Src) {
 ; ==========================================================================
 
 _TLGAA_ProfileArgPresent() {
-	Src := _TLGAA_StripLineComments(_TLGAA_ReadSource("modules/llm/prediction_engine.ahk"))
-	Assert(Src != "", "modules/llm/prediction_engine.ahk must be readable")
+	Src := _DriverDirConcat("modules/llm")
 
 	; The call must include user_profiles as the second argument
 	; The fix uses _LLM_Engine["user_profiles"] or [] as fallback

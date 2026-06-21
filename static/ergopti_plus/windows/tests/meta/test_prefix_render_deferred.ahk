@@ -32,36 +32,25 @@
 ; =====================================
 
 _MetaCheckPrefixRenderDeferred() {
-	; Locate lib/hotstrings/hotstring_prefix_watcher.ahk relative to tests/.
-	SplitPath(A_ScriptDir, , &WindowsDir)
-	PWFile := WindowsDir . "\lib\hotstrings\hotstring_prefix_watcher.ahk"
+	; Move-resilient: scan the hotstrings lib dir and the _OnPrefixChar body via
+	; the framework helpers instead of a pinned hotstring_prefix_watcher.ahk path.
+	; The _Prefix* render tokens are unique to lib/hotstrings, so the present-string
+	; checks are unambiguous within that scope.
+	DirSrc := _DriverDirConcat("lib/hotstrings")
 
-	try {
-		Body := FileRead(PWFile)
-	} catch {
-		return
-	}
-
-	Assert(InStr(Body, "_PrefixScheduleRender(") > 0,
+	Assert(InStr(DirSrc, "_PrefixScheduleRender(") > 0,
 		"hotstring_prefix_watcher.ahk must define the debounced render scheduler "
 		. "_PrefixScheduleRender — without it the ~60 ms tooltip rebuild runs on "
 		. "the synchronous keystroke path and every trigger-prefix keystroke lags")
 
-	Assert(InStr(Body, "_PrefixRenderFlush(") > 0,
+	Assert(InStr(DirSrc, "_PrefixRenderFlush(") > 0,
 		"hotstring_prefix_watcher.ahk must define the debounce flush _PrefixRenderFlush")
 
-	; Scope to the hot _OnPrefixChar body. In this codebase the only column-0
-	; closing brace after the declaration is the function's own, so the first
-	; "`n}" after FnPos bounds the body. NOTE: the profiling shim is named
-	; _OnPrefixCharProfiled, so match the exact "_OnPrefixChar(IH, Char) {" head.
-	FnPos := InStr(Body, "_OnPrefixChar(IH, Char) {")
-	Assert(FnPos > 0,
+	; Scope to the hot _OnPrefixChar body. The bare-name helper anchors on the
+	; column-0 definition, so it never matches the _OnPrefixCharProfiled shim.
+	FnBody := _DriverFuncBody("_OnPrefixChar")
+	Assert(FnBody != "",
 		"hotstring_prefix_watcher.ahk must define _OnPrefixChar(IH, Char) — entry point not found")
-
-	BodyEnd := InStr(Body, "`n}", false, FnPos)
-	if (BodyEnd == 0)
-		BodyEnd := StrLen(Body) + 1
-	FnBody := SubStr(Body, FnPos, BodyEnd - FnPos)
 
 	Assert(InStr(FnBody, "_PrefixScheduleRender(") > 0,
 		"_OnPrefixChar must defer the preview render via _PrefixScheduleRender")
@@ -82,27 +71,19 @@ Test("meta prefix: _OnPrefixChar defers the tooltip render off the keystroke pat
 ; (_PrefixCancelRender) BEFORE HSE_DispatchMatch, so the obsolete preview can
 ; never paint during the send. This asserts the ordering at the source level.
 _MetaCheckPrefixRenderCancelledOnFire() {
-	SplitPath(A_ScriptDir, , &WindowsDir)
-	PWFile := WindowsDir . "\lib\hotstrings\hotstring_prefix_watcher.ahk"
+	; Move-resilient: scan the hotstrings lib dir for the cancel helper definition
+	; and the _OnPrefixChar body for the cancel-before-dispatch ordering. Both
+	; _PrefixCancelRender and HSE_DispatchMatch appear once each (as code) inside
+	; the body, so the positional assertion is preserved.
+	DirSrc := _DriverDirConcat("lib/hotstrings")
 
-	try {
-		Body := FileRead(PWFile)
-	} catch {
-		return
-	}
-
-	Assert(InStr(Body, "_PrefixCancelRender(") > 0,
+	Assert(InStr(DirSrc, "_PrefixCancelRender(") > 0,
 		"hotstring_prefix_watcher.ahk must define _PrefixCancelRender — without it the "
 		. "obsolete pre-expansion preview fires reentrantly during the magic-key send")
 
-	FnPos := InStr(Body, "_OnPrefixChar(IH, Char) {")
-	Assert(FnPos > 0,
+	FnBody := _DriverFuncBody("_OnPrefixChar")
+	Assert(FnBody != "",
 		"hotstring_prefix_watcher.ahk must define _OnPrefixChar(IH, Char) — entry point not found")
-
-	BodyEnd := InStr(Body, "`n}", false, FnPos)
-	if (BodyEnd == 0)
-		BodyEnd := StrLen(Body) + 1
-	FnBody := SubStr(Body, FnPos, BodyEnd - FnPos)
 
 	CancelPos   := InStr(FnBody, "_PrefixCancelRender(")
 	DispatchPos := InStr(FnBody, "HSE_DispatchMatch(")

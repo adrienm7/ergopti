@@ -31,11 +31,10 @@
 ; =====================================
 
 _MetaCheckGesturesActionCatalogDeferred() {
-	SplitPath(A_ScriptDir, , &WindowsDir)
-	GesturesFile := WindowsDir . "\modules\gestures.ahk"
-
-	Body := ""
-	try Body := FileRead(GesturesFile)
+	; Move-resilient: scan the modules tree via the framework helper instead of a
+	; pinned gestures path. Every token below is _Gesture*-prefixed and unique to
+	; gestures.ahk within modules/, so the scope stays meaningful.
+	Body := _DriverDirConcat("modules")
 	Assert(Body != "", "modules\gestures.ahk must be readable for the gestures-deferred meta-test")
 
 	; The deferred loader function must exist.

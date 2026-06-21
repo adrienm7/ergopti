@@ -35,8 +35,7 @@
 _MetaCheckI18nFallbackDeferred() {
 	SplitPath(A_ScriptDir, , &WindowsDir)
 
-	I18n := ""
-	try I18n := FileRead(WindowsDir . "\lib\i18n.ahk")
+	I18n := _DriverDirConcat("lib")
 	Assert(I18n != "", "lib\i18n.ahk must be readable")
 
 	; The boot preload must load the active locale only, with a separate warmer and

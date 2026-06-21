@@ -17,26 +17,14 @@
 
 ; ===================================================
 ; ===================================================
-; ======= 1/ Source scan helpers ====================
-; ===================================================
-; ===================================================
-
-_LFOW_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &WindowsDir)
-	Path := WindowsDir . "\" . StrReplace(RelPath, "/", "\")
-	return FileRead(Path)
-}
-
-
-; ===================================================
-; ===================================================
-; ======= 2/ Test implementations ===================
+; ======= 1/ Test implementations ===================
 ; ===================================================
 ; ===================================================
 
 _LFOW_CheckWarnThreshold() {
-	Src := _LFOW_ReadSource("lib/logger.ahk")
-	Assert(Src != "", "lib/logger.ahk must be readable")
+	; Move-resilient: scan the lib dir via the framework helper. The
+	; LOGGER_SEVERITY["WARNING"] anchors are unique to logger.ahk within lib.
+	Src := _DriverDirConcat("lib")
 
 	; The force-flush guard must use "WARNING" as the threshold, not "ERROR"
 	Assert(!InStr(Src, 'LOGGER_SEVERITY["ERROR"]') || InStr(Src, 'LOGGER_SEVERITY["WARNING"]'),

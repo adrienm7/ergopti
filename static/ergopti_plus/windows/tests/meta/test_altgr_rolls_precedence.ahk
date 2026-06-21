@@ -35,15 +35,6 @@
 ; ==================================================
 ; ==================================================
 
-_ARP_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
-}
-
-
-
-
 ; ==================================================
 ; ==================================================
 ; ======= 2/ Registration-order assertion ==========
@@ -60,7 +51,9 @@ _ARP_CallLinePos(Src, Name) {
 }
 
 _ARP_RollsRegisteredLast() {
-	Src := _ARP_ReadSource("modules/layout.ahk")
+	; Move-resilient: both call sites live in modules/layout.ahk; scope to the
+	; modules tree so their relative registration order is preserved in the concat
+	Src := _DriverDirConcat("modules")
 	PosLayer := _ARP_CallLinePos(Src, "RegisterAltGrLayer")
 	PosRolls := _ARP_CallLinePos(Src, "_RegisterRollsAltGrHotkeys")
 	Assert(PosLayer > 0, "RegisterAltGrLayer() call site must exist in modules/layout.ahk")

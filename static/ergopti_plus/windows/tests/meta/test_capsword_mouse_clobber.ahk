@@ -31,24 +31,6 @@
 
 
 
-; ======================================
-; ======================================
-; ======= 1/ Source scan helpers =======
-; ======================================
-; ======================================
-
-; Reads a windows/-relative source file. A_ScriptDir is the runner dir (tests/);
-; its parent is the windows/ driver root.
-_CWMC_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := Root . "\" . RelPath
-	return FileRead(Path)
-}
-
-
-
-
-
 ; ==============================================
 ; ==============================================
 ; ======= 2/ Static hotkey absent checks =======
@@ -58,7 +40,7 @@ _CWMC_ReadSource(RelPath) {
 ; No bare ~LButton:: label should exist in the file -- that would be a static
 ; hotkey registration that bypasses HookDispatcher.
 _CWMC_NoStaticLButton() {
-	Src := _CWMC_ReadSource("modules\shortcuts\capsword.ahk")
+	Src := _DriverDirConcat("modules/shortcuts")
 	Assert(!InStr(Src, "~LButton::"),
 		"capsword.ahk must NOT contain a static ~LButton:: hotkey label -- use HookDispatcher.Register() instead")
 }
@@ -66,7 +48,7 @@ Test("capsword: no static ~LButton:: hotkey label (F24 capsword-mouse-clobber)",
 
 ; No bare ~RButton:: label should exist in the file.
 _CWMC_NoStaticRButton() {
-	Src := _CWMC_ReadSource("modules\shortcuts\capsword.ahk")
+	Src := _DriverDirConcat("modules/shortcuts")
 	Assert(!InStr(Src, "~RButton::"),
 		"capsword.ahk must NOT contain a static ~RButton:: hotkey label -- use HookDispatcher.Register() instead")
 }
@@ -85,7 +67,7 @@ Test("capsword: no static ~RButton:: hotkey label (F24 capsword-mouse-clobber)",
 ; HookDispatcher.Register must be called with an LButton event type constant so
 ; the module subscribes to left-click down through the unified fan-out.
 _CWMC_DynamicLButtonPresent() {
-	Src := _CWMC_ReadSource("modules\shortcuts\capsword.ahk")
+	Src := _DriverDirConcat("modules/shortcuts")
 	; The registration must reference the EVT_MS_LDOWN constant
 	Assert(InStr(Src, "EVT_MS_LDOWN"),
 		"capsword.ahk must call HookDispatcher.Register with EVT_MS_LDOWN to cancel CapsWord on left click")
@@ -94,7 +76,7 @@ Test("capsword: dynamic HookDispatcher.Register for EVT_MS_LDOWN present (F24 ca
 
 ; Same check for right-click.
 _CWMC_DynamicRButtonPresent() {
-	Src := _CWMC_ReadSource("modules\shortcuts\capsword.ahk")
+	Src := _DriverDirConcat("modules/shortcuts")
 	Assert(InStr(Src, "EVT_MS_RDOWN"),
 		"capsword.ahk must call HookDispatcher.Register with EVT_MS_RDOWN to cancel CapsWord on right click")
 }
@@ -103,7 +85,7 @@ Test("capsword: dynamic HookDispatcher.Register for EVT_MS_RDOWN present (F24 ca
 ; The matching Unregister calls must also be present so the listener is torn
 ; down when CapsWord deactivates and does not linger as a stale subscriber.
 _CWMC_UnregisterPresent() {
-	Src := _CWMC_ReadSource("modules\shortcuts\capsword.ahk")
+	Src := _DriverDirConcat("modules/shortcuts")
 	Assert(InStr(Src, "HookDispatcher.Unregister"),
 		"capsword.ahk must call HookDispatcher.Unregister to remove the mouse listener when CapsWord deactivates")
 }

@@ -39,11 +39,6 @@
 ; =====================================================
 ; =====================================================
 
-_IFR_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &WindowsDir)
-	return FileRead(WindowsDir . "\" . StrReplace(RelPath, "/", "\"))
-}
-
 ; Extracts the body of the FileAppend catch block inside KL_IngestOnce.
 ; Returns the substring from the catch opening brace to the matching close.
 _IFR_ExtractCatchBody(Src) {
@@ -81,8 +76,7 @@ _IFR_ExtractCatchBody(Src) {
 ; ===================================================
 
 _IFR_CheckRequeueOnFailure() {
-	Src := _IFR_ReadSource("modules/keylogger/keylogger.ahk")
-	Assert(Src != "", "modules/keylogger/keylogger.ahk must be readable")
+	Src := _DriverDirConcat("modules/keylogger")
 
 	CatchBody := _IFR_ExtractCatchBody(Src)
 	Assert(CatchBody != "",

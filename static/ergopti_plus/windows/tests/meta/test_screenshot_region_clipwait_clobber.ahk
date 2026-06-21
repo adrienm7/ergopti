@@ -8,15 +8,13 @@
 
 #Requires AutoHotkey v2.0
 
-_TSC_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
-}
-
 _TSC_Check() {
-	Src := _TSC_ReadSource("modules/gestures.ahk")
-	Assert(Src != "", "Source file gestures.ahk must exist")
+	; Move-resilient: extract GestureScreenshotRegion()'s body by name via the
+	; framework helper instead of a pinned modules/gestures.ahk read. Scoping to the
+	; function (rather than the whole file) keeps the clipboard backup/restore
+	; assertions tied to the region-screenshot path they actually guard.
+	Src := _DriverFuncBody("GestureScreenshotRegion")
+	Assert(Src != "", "GestureScreenshotRegion must exist in modules/gestures.ahk")
 	Assert(InStr(Src, "OldClip := ClipboardAll()") > 0, "gestures.ahk must backup clipboard")
 	Assert(InStr(Src, "finally {") > 0, "gestures.ahk must use finally block to restore clipboard")
 	Assert(InStr(Src, "A_Clipboard := OldClip") > 0, "gestures.ahk must restore clipboard")

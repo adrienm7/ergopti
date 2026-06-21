@@ -26,39 +26,14 @@
 
 ; ==================================================
 ; ==================================================
-; ======= 1/ Source scan helpers ===================
-; ==================================================
-; ==================================================
-
-_PwtsReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
-}
-
-_PwtsFuncBody(Src, FuncDef) {
-	Idx := InStr(Src, FuncDef)
-	if !Idx
-		return ""
-	Rest := SubStr(Src, Idx)
-	End := InStr(Rest, "`n}")
-	if End
-		return SubStr(Rest, 1, End + 1)
-	return Rest
-}
-
-
-
-
-; ==================================================
-; ==================================================
-; ======= 2/ Suspend-guard assertion ===============
+; ======= 1/ Suspend-guard assertion ===============
 ; ==================================================
 ; ==================================================
 
 _PwtsMoveTickHasSuspendGuard() {
-	Src := _PwtsReadSource("modules/llm/llm_bridge.ahk")
-	Seg := _PwtsFuncBody(Src, "_LLM_PointerWatch_OnMoveTick(*) {")
+	; Move-resilient: locate _LLM_PointerWatch_OnMoveTick across the whole driver
+	; source via the framework helper instead of a pinned llm_bridge.ahk path.
+	Seg := _DriverFuncBody("_LLM_PointerWatch_OnMoveTick")
 	Assert(Seg != "", "_LLM_PointerWatch_OnMoveTick(*) declaration must exist in llm_bridge.ahk")
 	Assert(InStr(Seg, "A_IsSuspended") > 0,
 		"_LLM_PointerWatch_OnMoveTick must early-return on A_IsSuspended -- SetTimer threads bypass native Suspend, so the 50 ms MouseGetPos poll would keep firing while paused")

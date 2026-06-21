@@ -23,28 +23,17 @@
 
 
 
-; =================================================
-; =================================================
-; ======= 1/ Source scan helpers ==================
-; =================================================
-; =================================================
-
-_LNLT_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &WindowsDir)
-	Path := WindowsDir . "\" . StrReplace(RelPath, "/", "\")
-	return FileRead(Path)
-}
-
-
 ; ===================================================
 ; ===================================================
-; ======= 2/ Test implementations ===================
+; ======= 1/ Test implementations ===================
 ; ===================================================
 ; ===================================================
 
 _LNLT_CheckLoopIsTen() {
-	Src := _LNLT_ReadSource("ui/tray_llm/tab_accept.ahk")
-	Assert(Src != "", "ui/tray_llm/tab_accept.ahk must be readable")
+	; Move-resilient: scan the whole driver source via the framework helper.
+	; "Loop 10" and "Loop 9" are unique enough that whole-tree scope preserves
+	; the present/absent semantics and strengthens the absent guard.
+	Src := _DriverSourceConcat()
 
 	Assert(!InStr(Src, "Loop 9"),
 		"nav-jump binding loop must not be Loop 9 — that misses slot 10 (digit 0)")
@@ -54,8 +43,9 @@ _LNLT_CheckLoopIsTen() {
 }
 
 _LNLT_CheckSlot10MapsToZero() {
-	Src := _LNLT_ReadSource("ui/tray_llm/tab_accept.ahk")
-	Assert(Src != "", "ui/tray_llm/tab_accept.ahk must be readable")
+	; Move-resilient: "A_Index == 10" is unique to tab_accept.ahk in the driver
+	; source, so whole-tree scope cannot false-pass.
+	Src := _DriverSourceConcat()
 
 	; The mapping of index 10 to digit "0" must be present
 	Assert(InStr(Src, "A_Index == 10") && InStr(Src, '"0"'),

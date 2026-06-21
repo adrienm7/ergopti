@@ -28,39 +28,14 @@
 
 ; ==================================================
 ; ==================================================
-; ======= 1/ Source scan helpers ===================
-; ==================================================
-; ==================================================
-
-_TtkbReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
-}
-
-_TtkbFuncBody(Src, FuncDef) {
-	Idx := InStr(Src, FuncDef)
-	if !Idx
-		return ""
-	Rest := SubStr(Src, Idx)
-	End := InStr(Rest, "`n}")
-	if End
-		return SubStr(Rest, 1, End + 1)
-	return Rest
-}
-
-
-
-
-; ==================================================
-; ==================================================
-; ======= 2/ Deferred-teardown assertion ===========
+; ======= 1/ Deferred-teardown assertion ===========
 ; ==================================================
 ; ==================================================
 
 _TtkbOnCharDefersHide() {
-	Src := _TtkbReadSource("modules/llm/llm_bridge.ahk")
-	Seg := _TtkbFuncBody(Src, "LLM_Bridge_OnChar(ch) {")
+	; Move-resilient: extract LLM_Bridge_OnChar()'s body by name via the framework
+	; helper instead of a pinned modules/llm/llm_bridge.ahk read.
+	Seg := _DriverFuncBody("LLM_Bridge_OnChar")
 	Assert(Seg != "", "LLM_Bridge_OnChar(ch) declaration must exist in llm_bridge.ahk")
 	; The dismiss branch must hand the teardown to a fresh timer thread, not run
 	; it inline on the InputHook thread.

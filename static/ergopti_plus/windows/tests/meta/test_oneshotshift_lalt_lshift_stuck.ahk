@@ -33,14 +33,6 @@
 ; ==================================================
 ; ==================================================
 
-; Reads a windows/-relative source file. A_ScriptDir is the runner dir (tests/);
-; its parent is the windows/ driver root.
-_OSLLS_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
-}
-
 ; Extracts the body of a single hotkey/function block: from the declaration to
 ; the first closing brace at column 0 (AHK top-level blocks close with `}`
 ; flush-left while inner blocks close indented). Returns "" when absent.
@@ -78,7 +70,10 @@ _OSLLS_AssertReleaseInFinally(Body, Where) {
 ; ==================================================
 
 _OSLLS_LAltOneShotShiftGuarded() {
-	Src := _OSLLS_ReadSource("modules/tap_holds/lalt.ahk")
+	; Move-resilient: scan the tap_holds module dir via the framework helper
+	; instead of a pinned lalt.ahk path. The left_alt one_shot_shift #HotIf
+	; declaration is unique to lalt.ahk, so the extracted block is unambiguous.
+	Src := _DriverDirConcat("modules/tap_holds")
 	Body := _OSLLS_Block(Src, "#HotIf TapHoldTapAction(TapHold, " . Chr(34) . "left_alt" . Chr(34) . ") == " . Chr(34) . "one_shot_shift" . Chr(34))
 	Assert(Body != "", "lalt.ahk one_shot_shift #HotIf block must exist")
 	_OSLLS_AssertReleaseInFinally(Body, "lalt.ahk one_shot_shift tap")
@@ -95,7 +90,10 @@ Test("tap-holds: LAlt one_shot_shift releases LShift in a bounded finally (onesh
 ; ==================================================
 
 _OSLLS_RCtrlOneShotShiftGuarded() {
-	Src := _OSLLS_ReadSource("modules/tap_holds/rctrl.ahk")
+	; Move-resilient: scan the tap_holds module dir via the framework helper
+	; instead of a pinned rctrl.ahk path. The right_ctrl one_shot_shift #HotIf
+	; declaration is unique to rctrl.ahk, so the extracted block is unambiguous.
+	Src := _DriverDirConcat("modules/tap_holds")
 	Body := _OSLLS_Block(Src, "#HotIf TapHoldTapAction(TapHold, " . Chr(34) . "right_ctrl" . Chr(34) . ") == " . Chr(34) . "one_shot_shift" . Chr(34))
 	Assert(Body != "", "rctrl.ahk one_shot_shift #HotIf block must exist")
 	_OSLLS_AssertReleaseInFinally(Body, "rctrl.ahk one_shot_shift tap")
@@ -112,7 +110,10 @@ Test("tap-holds: RCtrl one_shot_shift releases LShift in a bounded finally (ones
 ; ==================================================
 
 _OSLLS_TimeoutConstantDefined() {
-	Src := _OSLLS_ReadSource("modules/tap_holds/constants.ahk")
+	; Move-resilient: scan the tap_holds module dir via the framework helper.
+	; The global STUCK_MODIFIER_RELEASE_TIMEOUT_SEC := definition is unique to
+	; constants.ahk within tap_holds, so the present-string check is unambiguous.
+	Src := _DriverDirConcat("modules/tap_holds")
 	Assert(InStr(Src, "global STUCK_MODIFIER_RELEASE_TIMEOUT_SEC :=") > 0,
 		"STUCK_MODIFIER_RELEASE_TIMEOUT_SEC must be defined in tap_holds/constants.ahk (the early-loaded constants layer) so both lalt.ahk and rctrl.ahk can reference it when their hotkeys fire")
 }

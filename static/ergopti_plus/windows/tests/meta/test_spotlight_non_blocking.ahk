@@ -2,25 +2,10 @@
 
 #Requires AutoHotkey v2.0
 
-_SNB_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
-}
-
-_SNB_FuncBodyStripped(Src, FuncDef) {
-	Idx := InStr(Src, FuncDef)
-	if !Idx
-		return ""
-	Rest := SubStr(Src, Idx)
-	if RegExMatch(Rest, "m)^\}", &Match)
-		Rest := SubStr(Rest, 1, Match.Pos)
-	return Rest
-}
-
 _SNB_AssertNonBlocking() {
-	Src := _SNB_ReadSource("ui/spotlight.ahk")
-	Body := _SNB_FuncBodyStripped(Src, "SpotlightMouseAt(X, Y, DurationMs) {")
+	; Move-resilient: locate SpotlightMouseAt() by name via the framework helper
+	; instead of a pinned ui/spotlight.ahk read.
+	Body := _DriverFuncBody("SpotlightMouseAt")
 	Assert(Body != "", "SpotlightMouseAt must exist in ui/spotlight.ahk")
 	
 	SleepIdx := InStr(Body, "Sleep(")
@@ -31,8 +16,7 @@ _SNB_AssertNonBlocking() {
 }
 
 _SNB_AssertSuspendGuard() {
-	Src := _SNB_ReadSource("ui/spotlight.ahk")
-	Body := _SNB_FuncBodyStripped(Src, "_SpotlightTick() {")
+	Body := _DriverFuncBody("_SpotlightTick")
 	Assert(Body != "", "_SpotlightTick must exist in ui/spotlight.ahk")
 	
 	SuspendIdx := InStr(Body, "A_IsSuspended")

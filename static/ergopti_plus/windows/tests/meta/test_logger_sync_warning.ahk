@@ -2,27 +2,11 @@
 
 #Requires AutoHotkey v2.0
 
-_LSW_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
-}
-
-_LSW_FuncBodyStripped(Src, FuncDef) {
-	Idx := InStr(Src, FuncDef)
-	if !Idx
-		return ""
-	Rest := SubStr(Src, Idx)
-	if RegExMatch(Rest, "m)^\}", &Match)
-		Rest := SubStr(Rest, 1, Match.Pos)
-	return Rest
-}
-
 _LSW_AssertWarningFlushBehavior() {
-	Src := _LSW_ReadSource("lib/logger.ahk")
-	
-	EmitBody := _LSW_FuncBodyStripped(Src, "_LoggerEmit(Level, Tag, Msg, Args*) {")
-	
+	; Move-resilient: locate _LoggerEmit() across the whole driver source via the
+	; framework helper instead of a pinned lib path
+	EmitBody := _DriverFuncBody("_LoggerEmit")
+
 	; The force flush condition should check for ERROR, not WARNING
 	WarnFlushIdx := InStr(EmitBody, 'LOGGER_SEVERITY[Level] >= LOGGER_SEVERITY["WARNING"] {`n			_LoggerFlush(true)')
 	Assert(!WarnFlushIdx, "_LoggerEmit must NOT force flush for WARNING (logger-sync-double-write-on-warning)")

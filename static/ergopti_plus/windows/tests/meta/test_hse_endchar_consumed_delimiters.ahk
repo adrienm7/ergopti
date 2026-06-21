@@ -19,12 +19,6 @@
 
 #Requires AutoHotkey v2.0
 
-_THECE_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path, "UTF-8")
-}
-
 _THECE_StripLineComments(Src) {
 	Out := ""
 	for Line in StrSplit(Src, "`n", "`r") {
@@ -42,7 +36,7 @@ _THECE_StripLineComments(Src) {
 ; ==========================================================================
 
 _THECE_ConsumedDelimitersGuard() {
-	Src := _THECE_StripLineComments(_THECE_ReadSource("lib/hotstrings/hotstring_engine_main.ahk"))
+	Src := _THECE_StripLineComments(_DriverDirConcat("lib/hotstrings"))
 	Assert(Src != "", "lib/hotstrings/hotstring_engine_main.ahk must be readable")
 
 	; The constant must be declared

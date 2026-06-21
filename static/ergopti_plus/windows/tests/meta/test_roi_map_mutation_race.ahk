@@ -2,25 +2,12 @@
 
 #Requires AutoHotkey v2.0
 
-_RMMR_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
-}
-
-_RMMR_FuncBodyStripped(Src, FuncDef) {
-	Idx := InStr(Src, FuncDef)
-	if !Idx
-		return ""
-	Rest := SubStr(Src, Idx)
-	if RegExMatch(Rest, "m)^\}", &Match)
-		Rest := SubStr(Rest, 1, Match.Pos)
-	return Rest
-}
-
 _RMMR_AssertHalflifeTickAtomic() {
-	Src := _RMMR_ReadSource("modules/keylogger/keylogger_trigger_roi.ahk")
-	Body := _RMMR_FuncBodyStripped(Src, "KL_Roi_HalflifeTick() {")
+	; Move-resilient: locate KL_Roi_HalflifeTick across the driver source via the
+	; framework helper instead of a pinned keylogger_trigger_roi.ahk path. Both
+	; Critical("On") and snapshot[trig] := last_tick are code (not comments), so the
+	; positional check below is preserved by the comment-stripping helper.
+	Body := _DriverFuncBody("KL_Roi_HalflifeTick")
 	Assert(Body != "", "KL_Roi_HalflifeTick must exist in keylogger_trigger_roi.ahk")
 	
 	CritOnIdx := InStr(Body, 'Critical("On")')
@@ -35,8 +22,7 @@ _RMMR_AssertProcessWordAtomic() {
 	; for the bounded/guaranteed-shrinking fix), which KL_Roi_ProcessWord invokes
 	; once the cap is exceeded. The atomicity guarantee moved with it, so assert
 	; the helper holds the Critical section.
-	Src := _RMMR_ReadSource("modules/keylogger/keylogger_trigger_roi.ahk")
-	Body := _RMMR_FuncBodyStripped(Src, "KL_Roi_PruneWordCounts() {")
+	Body := _DriverFuncBody("KL_Roi_PruneWordCounts")
 	Assert(Body != "", "KL_Roi_PruneWordCounts must exist in keylogger_trigger_roi.ahk")
 
 	CritOnIdx := InStr(Body, 'Critical("On")')

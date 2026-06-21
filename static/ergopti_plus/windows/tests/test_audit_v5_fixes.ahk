@@ -79,7 +79,10 @@ Test("Audit-v5: NI_ADAPTER_OFFSET_OPER_STATUS and FRIENDLY_NAME are dynamic (A_P
 ; =============================================================================
 
 TestAuditV5_DpapiPtrSizeOffset() {
-	Src := _AuditV5_ReadSrc("modules\llm\api_token_crypto.ahk")
+	; Move-resilient: scan the whole driver source via the framework helper instead
+	; of a pinned modules/llm/api_token_crypto.ahk read. The in_blob/A_PtrSize DPAPI
+	; tokens below are unique to api_token_crypto.ahk, so the scope stays unambiguous.
+	Src := _DriverSourceConcat()
 
 	; The bug: NumPut("Ptr", ..., blob, 8) hardcoded offset 8 for pbData in DATA_BLOB.
 	; On x86 A_PtrSize=4 and pbData sits at offset 4 -- hardcoded 8 writes to wrong memory.
@@ -112,7 +115,11 @@ Test("Audit-v5: DPAPI DATA_BLOB pointer offset uses A_PtrSize (not hardcoded 8)"
 ; ================================================================================
 
 TestAuditV5_UnregisterFinally() {
-	Src := _AuditV5_ReadSrc("lib\hook_dispatcher.ahk")
+	; Move-resilient: scan the whole driver source via the framework helper instead
+	; of a pinned lib/hook_dispatcher.ahk read. The "static Unregister(...)" /
+	; "static Dispatch(" anchors below are unique to hook_dispatcher.ahk, so the
+	; block extractor stays scoped to the Unregister method.
+	Src := _DriverSourceConcat()
 
 	; The bug: Unregister() used bare try { } Critical("Off") -- fragile if a future
 	; rethrow short-circuits the critical-off. Register() already used finally correctly.

@@ -8,15 +8,11 @@
 
 #Requires AutoHotkey v2.0
 
-_TES_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
-}
-
 _TES_Check() {
-	Src := _TES_ReadSource("modules/keylogger/keylogger_hook.ahk")
-	Assert(Src != "", "Source file keylogger_hook.ahk must exist")
+	; Move-resilient: scan the keylogger module tree via the framework helper
+	; instead of a pinned keylogger_hook path. Both tokens live in that tree, so
+	; the scope stays meaningful.
+	Src := _DriverDirConcat("modules/keylogger")
 	Assert(InStr(Src, "!Keylogger.synth_active") > 0, "keylogger_hook.ahk must check synth_active before Ergo/ROI")
 	Assert(InStr(Src, "KLHook.last_tick := 0") > 0, "keylogger_hook.ahk must reset last_tick on synth strokes")
 }

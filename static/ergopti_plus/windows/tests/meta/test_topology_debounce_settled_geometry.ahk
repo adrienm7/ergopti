@@ -31,14 +31,6 @@
 ; ==================================================
 ; ==================================================
 
-; Reads a windows/-relative source file. A_ScriptDir is the runner dir (tests/);
-; its parent is the windows/ driver root.
-_TDSG_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
-}
-
 ; Returns the text of the matching-type branch of the debounce block, from the
 ; opening `if (change_type = KLTopo.pending_type)` up to (but not including)
 ; the closing `} else {`. Returns "" when the declaration is absent.
@@ -68,7 +60,10 @@ _TDSG_MatchingBranch(Src) {
 ; sample is used when the debounce threshold is finally reached, not the first
 ; (potentially mid-drag overshoot) sample.
 _TDSG_MatchingBranchUpdatesPendingData() {
-	Src := _TDSG_ReadSource("modules/keylogger/keylogger_window_topology.ahk")
+	; Move-resilient: scan the keylogger module dir via the framework helper instead
+	; of a pinned keylogger_window_topology.ahk read. The branch's opening marker is
+	; unique to that file, so the block extractor still scopes to the right branch.
+	Src := _DriverDirConcat("modules/keylogger")
 	Branch := _TDSG_MatchingBranch(Src)
 	Assert(Branch != "",
 		"Debounce matching-type branch (if change_type = KLTopo.pending_type) must exist in keylogger_window_topology.ahk")
@@ -80,7 +75,10 @@ Test("topo: debounce matching-type branch updates pending_data with latest geome
 ; Guard that the fix assignment targets pending_data, not pending_ticks, to
 ; ensure it cannot be confused with the increment line already present.
 _TDSG_PendingDataAssignmentIsPresent() {
-	Src := _TDSG_ReadSource("modules/keylogger/keylogger_window_topology.ahk")
+	; Move-resilient: scan the keylogger module dir via the framework helper instead
+	; of a pinned keylogger_window_topology.ahk read. The branch's opening marker is
+	; unique to that file, so the block extractor still scopes to the right branch.
+	Src := _DriverDirConcat("modules/keylogger")
 	Branch := _TDSG_MatchingBranch(Src)
 	Assert(Branch != "",
 		"Debounce matching-type branch must exist")
@@ -93,7 +91,10 @@ Test("topo: pending_data := change_data present in matching-type branch (topolog
 ; Ensure pending_ticks increment is still present in the same branch — the fix
 ; must ADD the assignment without removing the counter update.
 _TDSG_PendingTicksIncrementRetained() {
-	Src := _TDSG_ReadSource("modules/keylogger/keylogger_window_topology.ahk")
+	; Move-resilient: scan the keylogger module dir via the framework helper instead
+	; of a pinned keylogger_window_topology.ahk read. The branch's opening marker is
+	; unique to that file, so the block extractor still scopes to the right branch.
+	Src := _DriverDirConcat("modules/keylogger")
 	Branch := _TDSG_MatchingBranch(Src)
 	Assert(Branch != "",
 		"Debounce matching-type branch must exist")

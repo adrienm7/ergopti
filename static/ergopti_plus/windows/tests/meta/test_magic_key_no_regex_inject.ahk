@@ -18,40 +18,29 @@
 
 ; ===================================================
 ; ===================================================
-; ======= 1/ Source scan helpers ====================
-; ===================================================
-; ===================================================
-
-_MKRI_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &WindowsDir)
-	Path := WindowsDir . "\" . StrReplace(RelPath, "/", "\")
-	return FileRead(Path)
-}
-
-
-; ===================================================
-; ===================================================
-; ======= 2/ Test implementations ===================
+; ======= 1/ Test implementations ===================
 ; ===================================================
 ; ===================================================
 
 _MKRI_CheckNoRawInject() {
-	Src := _MKRI_ReadSource("modules/hotstrings.ahk")
-	Assert(Src != "", "modules/hotstrings.ahk must be readable")
+	; Move-resilient: locate ShouldActivateDeadkey() across the whole driver
+	; source via the framework helper instead of a pinned modules path
+	Body := _DriverFuncBody("ShouldActivateDeadkey")
+	Assert(Body != "", "ShouldActivateDeadkey must exist in the driver source")
 
 	; The old buggy pattern injected MK directly into a regex character class:
 	;   ~= "^[^A-Za-z" . MK . "]$"
 	; This is unsafe when MK contains ], \, ^, or -.
-	Assert(!InStr(Src, '"^[^A-Za-z" . MK . "]$"'),
+	Assert(!InStr(Body, '"^[^A-Za-z" . MK . "]$"'),
 		'ShouldActivateDeadkey must not inject MK directly into a regex character class')
 }
 
 _MKRI_CheckPlainComparison() {
-	Src := _MKRI_ReadSource("modules/hotstrings.ahk")
-	Assert(Src != "", "modules/hotstrings.ahk must be readable")
+	Body := _DriverFuncBody("ShouldActivateDeadkey")
+	Assert(Body != "", "ShouldActivateDeadkey must exist in the driver source")
 
 	; The fix uses a plain string comparison (Ch3 != MK) instead of a character class
-	Assert(InStr(Src, "Ch3 != MK") || InStr(Src, "MK != Ch3"),
+	Assert(InStr(Body, "Ch3 != MK") || InStr(Body, "MK != Ch3"),
 		"ShouldActivateDeadkey must compare magic key with plain != instead of a regex character class")
 }
 

@@ -20,31 +20,18 @@
 
 
 
-; ===========================================================
-; ===========================================================
-; ======= 1/ Source scan helper ============================
-; ===========================================================
-; ===========================================================
-
-; Reads a windows/-relative source file via the tests/ parent dir.
-_RHTR_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
-}
-
-
-
-
-
 ; ===================================================
 ; ===================================================
-; ======= 2/ Threshold reachability assertion =======
+; ======= 1/ Threshold reachability assertion =======
 ; ===================================================
 ; ===================================================
 
 _RHTR_HalflifeAlertIsReachable() {
-	Src := _RHTR_ReadSource("modules/keylogger/keylogger_trigger_roi.ahk")
+	; Move-resilient: scan the keylogger module dir via the framework helper instead
+	; of a pinned keylogger_trigger_roi.ahk path. Both MAX_SANE_AGE_MS and
+	; HALFLIFE_WARN_DAYS are static class constants (not function bodies), each
+	; defined exactly once in the dir, so the value parse below stays unambiguous.
+	Src := _DriverDirConcat("modules/keylogger")
 
 	; --- parse MAX_SANE_AGE_MS ---------------------------------
 	; Matches:  static MAX_SANE_AGE_MS := 3888000000

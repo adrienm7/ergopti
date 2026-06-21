@@ -26,15 +26,8 @@
 
 #Requires AutoHotkey v2.0
 
-_TLDA_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
-}
-
 _TLDA_Check() {
-	Src := _TLDA_ReadSource("lib/llm_diff.ahk")
-	Assert(Src != "", "Source file lib/llm_diff.ahk must exist")
+	Src := _DriverDirConcat("lib")
 
 	; The tokenizer must extend word-character detection to non-ASCII codepoints.
 	; This single condition is what makes "café" tokenize as one word token

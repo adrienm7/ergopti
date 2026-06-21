@@ -2,25 +2,10 @@
 
 #Requires AutoHotkey v2.0
 
-_ST_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
-}
-
-_ST_FuncBodyStripped(Src, FuncDef) {
-	Idx := InStr(Src, FuncDef)
-	if !Idx
-		return ""
-	Rest := SubStr(Src, Idx)
-	if RegExMatch(Rest, "m)^\}", &Match)
-		Rest := SubStr(Rest, 1, Match.Pos)
-	return Rest
-}
-
 _ST_AssertSpaceTapAtomic() {
-	Src := _ST_ReadSource("modules/tap_holds/space.ahk")
-	Body := _ST_FuncBodyStripped(Src, "_SpaceTap() {")
+	; Move-resilient: locate _SpaceTap() across the whole driver source via the
+	; framework helper instead of a pinned modules path
+	Body := _DriverFuncBody("_SpaceTap")
 	Assert(Body != "", "_SpaceTap must exist in modules/tap_holds/space.ahk")
 	
 	CritOnIdx := InStr(Body, 'Critical("On")')

@@ -22,12 +22,6 @@
 ; ===================================================
 ; ===================================================
 
-_HDCS_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &WindowsDir)
-	Path := WindowsDir . "\" . StrReplace(RelPath, "/", "\")
-	return FileRead(Path)
-}
-
 _HDCS_FuncBody(Src, FnDecl) {
 	FnPos := InStr(Src, FnDecl)
 	if (!FnPos)
@@ -57,8 +51,7 @@ _HDCS_FuncBody(Src, FnDecl) {
 ; ===================================================
 
 _HDCS_CheckRegisterSaveRestore() {
-	Src := _HDCS_ReadSource("lib/hook_dispatcher.ahk")
-	Assert(Src != "", "lib/hook_dispatcher.ahk must be readable")
+	Src := _DriverDirConcat("lib")
 
 	RegBody := _HDCS_FuncBody(Src, "static Register(")
 	Assert(RegBody != "", "HookDispatcher.Register must be present")
@@ -70,8 +63,7 @@ _HDCS_CheckRegisterSaveRestore() {
 }
 
 _HDCS_CheckUnregisterSaveRestore() {
-	Src := _HDCS_ReadSource("lib/hook_dispatcher.ahk")
-	Assert(Src != "", "lib/hook_dispatcher.ahk must be readable")
+	Src := _DriverDirConcat("lib")
 
 	UnregBody := _HDCS_FuncBody(Src, "static Unregister(")
 	Assert(UnregBody != "", "HookDispatcher.Unregister must be present")

@@ -36,8 +36,7 @@
 ; ======================================================
 
 _HDEC_ReadSource() {
-	src := FileRead(A_ScriptDir . "\..\lib\hook_dispatcher.ahk", "UTF-8")
-	return src
+	return _DriverDirConcat("lib")
 }
 
 

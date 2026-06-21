@@ -22,21 +22,6 @@
 
 #Requires AutoHotkey v2.0
 
-_TTMAD_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path, "UTF-8")
-}
-
-_TTMAD_StripLineComments(Src) {
-	Out := ""
-	for Line in StrSplit(Src, "`n", "`r") {
-		if !RegExMatch(Line, "^\s*;")
-			Out .= Line . "`n"
-	}
-	return Out
-}
-
 
 
 
@@ -48,7 +33,10 @@ _TTMAD_StripLineComments(Src) {
 ; ===================================================================
 
 _TTMAD_BracketDepthCounter() {
-	Src := _TTMAD_StripLineComments(_TTMAD_ReadSource("lib/toml/toml_helpers.ahk"))
+	; Move-resilient: scan the toml module dir via the framework helper instead of a
+	; pinned lib/toml/toml_helpers.ahk read. The Depth++/Depth--/Depth <= 0/InStr2
+	; tokens are unique to toml_helpers.ahk within lib/toml, so the scope stays tight.
+	Src := _DriverDirConcat("lib/toml")
 	Assert(Src != "", "lib/toml/toml_helpers.ahk must be readable")
 
 	; The Depth variable must exist — it is the bracket-depth counter

@@ -35,24 +35,8 @@
 ; ====================================================
 ; ====================================================
 
-_KLSM_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	return FileRead(StrReplace(Root, "/", "\") . "\" . StrReplace(RelPath, "/", "\"), "UTF-8")
-}
-
-_KLSM_StripComments(Src) {
-	Out := ""
-	for Line in StrSplit(Src, "`n", "`r") {
-		if !RegExMatch(Line, "^\s*;")
-			Out .= Line . "`n"
-	}
-	return Out
-}
-
 _KLSM_ConstantDeclared() {
-	Raw := _KLSM_ReadSource("modules/keylogger/keylogger.ahk")
-	Src := _KLSM_StripComments(Raw)
-	Assert(Src != "", "modules/keylogger/keylogger.ahk must be readable")
+	Src := _DriverDirConcat("modules/keylogger")
 
 	Assert(InStr(Src, "DATA_SQL_SCAN_TAIL_BYTES") > 0,
 		"KeylogConst must declare DATA_SQL_SCAN_TAIL_BYTES (keylogger-scan-max-id-performance)")
@@ -74,13 +58,10 @@ Test("keylogger: KeylogConst.DATA_SQL_SCAN_TAIL_BYTES is declared and >= 32 KB (
 ; ============================================================
 
 _KLSM_InitUsesTailRead() {
-	Raw := _KLSM_ReadSource("modules/keylogger/keylogger.ahk")
-	Src := _KLSM_StripComments(Raw)
-
-	; Extract KL_Init body
-	Idx := InStr(Src, "KL_Init(metrics_dir) {")
-	Assert(Idx > 0, "KL_Init must exist in modules/keylogger/keylogger.ahk")
-	Body := SubStr(Src, Idx, 4000)
+	; Move-resilient: locate KL_Init() across the whole driver source via the
+	; framework helper instead of a pinned modules path
+	Body := _DriverFuncBody("KL_Init")
+	Assert(Body != "", "KL_Init must exist in the driver source")
 
 	; The old O(N) pattern must be gone: FileRead on the full data_sql_path
 	Assert(!RegExMatch(Body, "FileRead\([^)]*data_sql_path[^)]*\)"),
@@ -111,16 +92,14 @@ Test("keylogger: KL_Init uses FileOpen+Seek tail-read, not full FileRead (keylog
 ; =======================================================
 
 _KLSM_ScanFunctionPure() {
-	Raw := _KLSM_ReadSource("modules/keylogger/keylogger.ahk")
-	Src := _KLSM_StripComments(Raw)
+	; Move-resilient: locate KL_ScanMaxEventId() across the whole driver source.
+	Body := _DriverFuncBody("KL_ScanMaxEventId")
 
 	; KL_ScanMaxEventId must still exist and accept text + device params
-	Assert(InStr(Src, "KL_ScanMaxEventId(sql_text, device_id_lit)") > 0,
+	Assert(InStr(Body, "KL_ScanMaxEventId(sql_text, device_id_lit)") > 0,
 		"KL_ScanMaxEventId(sql_text, device_id_lit) must remain a pure function (keylogger-scan-max-id-performance)")
 
 	; Must NOT call FileRead / FileOpen internally (pure = no disk I/O)
-	Idx := InStr(Src, "KL_ScanMaxEventId(sql_text, device_id_lit)")
-	Body := SubStr(Src, Idx, 800)
 	Assert(!InStr(Body, "FileRead") && !InStr(Body, "FileOpen"),
 		"KL_ScanMaxEventId must remain pure (no disk I/O) — I/O is the caller's responsibility (keylogger-scan-max-id-performance)")
 }

@@ -26,14 +26,13 @@
 ; elsewhere in the file must not satisfy the check, so the assertion runs against
 ; a window scoped to the function body only.
 _MetaWrapSymbolsGateBody() {
-	SplitPath(A_ScriptDir, , &DriverRootRaw)
-	LayoutPath := DriverRootRaw . "\modules\layout.ahk"
-	Body := FileRead(LayoutPath)
-	StartPos := InStr(Body, "WrapTextIfSelected(Symbol")
-	AssertTrue(StartPos > 0,
+	; Move-resilient: extract WrapTextIfSelected()'s body by name via the framework
+	; helper instead of a pinned modules/layout.ahk read. The helper anchors on the
+	; DEFINITION and scopes to the function body, so a bare mention elsewhere in the
+	; file cannot satisfy the gate check.
+	Snippet := _DriverFuncBody("WrapTextIfSelected")
+	AssertTrue(Snippet != "",
 		"WrapTextIfSelected(Symbol, ...) definition not found in modules/layout.ahk")
-	; A 1200-char window comfortably covers the short function body.
-	Snippet := SubStr(Body, StartPos, 1200)
 	AssertContains(Snippet, "WrapSymbols_IsEnabled",
 		"WrapTextIfSelected must gate on WrapSymbols_IsEnabled so menu-disabled "
 		. "symbols (e.g. '@') do not wrap the selection")

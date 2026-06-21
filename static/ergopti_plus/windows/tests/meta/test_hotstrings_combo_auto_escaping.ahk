@@ -31,23 +31,11 @@
 ; =======================================================================
 ; =======================================================================
 
-_HSCA_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	return FileRead(StrReplace(Root, "/", "\") . "\" . StrReplace(RelPath, "/", "\"), "UTF-8")
-}
-
 _HSCAEscapingApplied() {
-	Raw := _HSCA_ReadSource("modules/hotstrings.ahk")
-	Assert(Raw != "", "modules/hotstrings.ahk must be readable")
-
-	; Locate the CreateHotstringComboAuto function body by finding the function
-	; header and then verifying EscapeSpecialChars( appears before the next
-	; CreateHotstring call that closes the function.
-	FnStart := InStr(Raw, "CreateHotstringComboAuto(Combo)")
-	Assert(FnStart > 0, "modules/hotstrings.ahk must define CreateHotstringComboAuto(Combo)")
-
-	; Extract a generous window from the function start to capture the entire body
-	FnBody := SubStr(Raw, FnStart, 600)
+	; Locate the CreateHotstringComboAuto function body and verify EscapeSpecialChars(
+	; is applied to each field value inside it.
+	FnBody := _DriverFuncBody("CreateHotstringComboAuto")
+	Assert(FnBody != "", "modules/hotstrings.ahk must define CreateHotstringComboAuto(Combo)")
 
 	Assert(InStr(FnBody, "EscapeSpecialChars(") > 0,
 		"CreateHotstringComboAuto must call EscapeSpecialChars() on each field value (F17 regression guard)")

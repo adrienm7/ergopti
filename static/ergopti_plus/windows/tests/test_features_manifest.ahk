@@ -596,20 +596,12 @@ Test("ManifestBuildFeaturesMap: all keys are snake_case (no v1 PascalCase residu
 ; This test reads the source files directly so the guard can never silently
 ; revert without the test catching it.
 
-_FMv2_SourceFiles() {
-	Base := A_ScriptDir . "\.."
-	return [
-		Base . "\modules\layout.ahk",
-		Base . "\modules\shortcuts\win.ahk",
-	]
-}
-
-_FMv2_HotIfFeaturesLines(FilePath) {
+; Returns every "#HotIf ...Features[..." line across the whole driver source that
+; dereferences Features[] (move-resilient: scans the concatenated source instead
+; of a hardcoded file list, so the guard holds no matter where a #HotIf moves).
+_FMv2_HotIfFeaturesLines() {
 	Result := []
-	if !FileExist(FilePath) {
-		return Result
-	}
-	Content := FileRead(FilePath)
+	Content := _DriverSourceConcat()
 	Lines := StrSplit(Content, "`n")
 	for LineNum, Line in Lines {
 		TrimmedLine := Trim(Line, " `t`r")
@@ -622,11 +614,9 @@ _FMv2_HotIfFeaturesLines(FilePath) {
 
 TestFMv2_HotIfFeaturesHasIsSetGuard() {
 	Violations := []
-	for FilePath in _FMv2_SourceFiles() {
-		for Entry in _FMv2_HotIfFeaturesLines(FilePath) {
-			if !InStr(Entry.Text, "IsSet(Features)") {
-				Violations.Push(FilePath . ":" . Entry.Line . " -> " . Entry.Text)
-			}
+	for Entry in _FMv2_HotIfFeaturesLines() {
+		if !InStr(Entry.Text, "IsSet(Features)") {
+			Violations.Push(Entry.Text)
 		}
 	}
 	AssertEqual(0, Violations.Length,

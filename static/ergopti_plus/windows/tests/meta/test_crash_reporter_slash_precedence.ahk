@@ -23,26 +23,15 @@
 
 ; ===================================================
 ; ===================================================
-; ======= 1/ Source scan helpers ====================
-; ===================================================
-; ===================================================
-
-_CRSP_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &WindowsDir)
-	Path := WindowsDir . "\" . StrReplace(RelPath, "/", "\")
-	return FileRead(Path)
-}
-
-
-; ===================================================
-; ===================================================
-; ======= 2/ Test implementations ===================
+; ======= 1/ Test implementations ===================
 ; ===================================================
 ; ===================================================
 
 _CRSP_CheckNoBadPrecedence() {
-	Src := _CRSP_ReadSource("lib/crash_reporter.ahk")
-	Assert(Src != "", "lib/crash_reporter.ahk must be readable")
+	; Move-resilient: scan the lib module tree via the framework helper instead of
+	; a pinned crash_reporter path. The BaseDir precedence forms are unique to
+	; crash_reporter within lib/, so the scope stays meaningful.
+	Src := _DriverDirConcat("lib")
 
 	; The wrong form: (!BaseDir ~= "[/\\]$") — NOT binds to BaseDir, not the regex result
 	Assert(!InStr(Src, "if (!BaseDir ~="),
@@ -50,8 +39,7 @@ _CRSP_CheckNoBadPrecedence() {
 }
 
 _CRSP_CheckCorrectPrecedence() {
-	Src := _CRSP_ReadSource("lib/crash_reporter.ahk")
-	Assert(Src != "", "lib/crash_reporter.ahk must be readable")
+	Src := _DriverDirConcat("lib")
 
 	; The correct form: !(BaseDir ~= "[/\\]$")
 	Assert(InStr(Src, "if !(BaseDir ~="),

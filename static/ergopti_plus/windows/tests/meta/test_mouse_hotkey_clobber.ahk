@@ -30,46 +30,14 @@
 
 ; ===================================================
 ; ===================================================
-; ======= 1/ Source scan helpers ====================
-; ===================================================
-; ===================================================
-
-_MHCB_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
-}
-
-_MHCB_FuncBodyStripped(Src, FuncDef) {
-	Idx := InStr(Src, FuncDef)
-	if !Idx
-		return ""
-	Rest := SubStr(Src, Idx)
-	; Find the first closing brace at the start of a line (no indentation).
-	; This correctly skips nested braces inside if/loop blocks.
-	if RegExMatch(Rest, "m)^\}", &Match)
-		Rest := SubStr(Rest, 1, Match.Pos)
-	Out := ""
-	loop parse, Rest, "`n", "`r" {
-		Line := A_LoopField
-		if !RegExMatch(Line, "^\s*;")
-			Out .= Line . "`n"
-	}
-	return Out
-}
-
-
-
-
-; ===================================================
-; ===================================================
-; ======= 2/ PrefixWatcher mouse hooks ==============
+; ======= 1/ PrefixWatcher mouse hooks ==============
 ; ===================================================
 ; ===================================================
 
 _MHCB_PrefixWatcherUsesDispatcher() {
-	Src := _MHCB_ReadSource("lib/hotstrings/hotstring_prefix_watcher.ahk")
-	Body := _MHCB_FuncBodyStripped(Src, "_InstallMouseClickResetHooks() {")
+	; Move-resilient: locate the function across the whole driver source via the
+	; framework helper instead of a pinned lib path
+	Body := _DriverFuncBody("_InstallMouseClickResetHooks")
 	Assert(Body != "", "_InstallMouseClickResetHooks must exist in hotstring_prefix_watcher.ahk")
 	Assert(InStr(Body, "HookDispatcher.Register") > 0,
 		"_InstallMouseClickResetHooks must call HookDispatcher.Register — a bare Hotkey() would clobber the dispatcher's ~LButton/~RButton/~MButton handlers (mouse-hotkey-clobber)")
@@ -77,8 +45,7 @@ _MHCB_PrefixWatcherUsesDispatcher() {
 Test("prefix_watcher: _InstallMouseClickResetHooks uses HookDispatcher.Register (mouse-hotkey-clobber)", _MHCB_PrefixWatcherUsesDispatcher)
 
 _MHCB_PrefixWatcherNoDirectLButton() {
-	Src := _MHCB_ReadSource("lib/hotstrings/hotstring_prefix_watcher.ahk")
-	Body := _MHCB_FuncBodyStripped(Src, "_InstallMouseClickResetHooks() {")
+	Body := _DriverFuncBody("_InstallMouseClickResetHooks")
 	Assert(Body != "", "_InstallMouseClickResetHooks must exist in hotstring_prefix_watcher.ahk")
 	DQ := Chr(34)
 	HotkeyLButton := "Hotkey(" . DQ . "~LButton" . DQ
@@ -92,13 +59,12 @@ Test("prefix_watcher: _InstallMouseClickResetHooks does not call Hotkey(~LButton
 
 ; ===================================================
 ; ===================================================
-; ======= 3/ LLM bridge pointer watcher ============
+; ======= 2/ LLM bridge pointer watcher ============
 ; ===================================================
 ; ===================================================
 
 _MHCB_LLMStartUsesDispatcher() {
-	Src := _MHCB_ReadSource("modules/llm/llm_bridge.ahk")
-	Body := _MHCB_FuncBodyStripped(Src, "_LLM_PointerWatch_Start() {")
+	Body := _DriverFuncBody("_LLM_PointerWatch_Start")
 	Assert(Body != "", "_LLM_PointerWatch_Start must exist in modules/llm/llm_bridge.ahk")
 	Assert(InStr(Body, "HookDispatcher.Register") > 0,
 		"_LLM_PointerWatch_Start must call HookDispatcher.Register for dispatcher-owned mouse keys (mouse-hotkey-clobber)")
@@ -106,8 +72,7 @@ _MHCB_LLMStartUsesDispatcher() {
 Test("llm_bridge: _LLM_PointerWatch_Start uses HookDispatcher.Register (mouse-hotkey-clobber)", _MHCB_LLMStartUsesDispatcher)
 
 _MHCB_LLMStartNoDirectLButton() {
-	Src := _MHCB_ReadSource("modules/llm/llm_bridge.ahk")
-	Body := _MHCB_FuncBodyStripped(Src, "_LLM_PointerWatch_Start() {")
+	Body := _DriverFuncBody("_LLM_PointerWatch_Start")
 	Assert(Body != "", "_LLM_PointerWatch_Start must exist in modules/llm/llm_bridge.ahk")
 	DQ := Chr(34)
 	HotkeyLButton := "Hotkey(" . DQ . "~LButton" . DQ
@@ -117,8 +82,7 @@ _MHCB_LLMStartNoDirectLButton() {
 Test("llm_bridge: _LLM_PointerWatch_Start does not call Hotkey(~LButton) directly (mouse-hotkey-clobber)", _MHCB_LLMStartNoDirectLButton)
 
 _MHCB_LLMStopUsesUnregister() {
-	Src := _MHCB_ReadSource("modules/llm/llm_bridge.ahk")
-	Body := _MHCB_FuncBodyStripped(Src, "_LLM_PointerWatch_Stop() {")
+	Body := _DriverFuncBody("_LLM_PointerWatch_Stop")
 	Assert(Body != "", "_LLM_PointerWatch_Stop must exist in modules/llm/llm_bridge.ahk")
 	Assert(InStr(Body, "HookDispatcher.Unregister") > 0,
 		"_LLM_PointerWatch_Stop must call HookDispatcher.Unregister to undo the dispatcher-registered subscriptions (mouse-hotkey-clobber)")

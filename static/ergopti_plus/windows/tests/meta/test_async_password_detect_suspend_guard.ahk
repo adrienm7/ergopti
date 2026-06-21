@@ -27,35 +27,14 @@
 
 ; ==============================================================
 ; ==============================================================
-; ======= 1/ Source-inspection helpers =========================
-; ==============================================================
-; ==============================================================
-
-_APDSG_ReadSource() {
-	return FileRead(A_ScriptDir . "\..\modules\keylogger\keylogger.ahk", "UTF-8")
-}
-
-
-_APDSG_FindFunctionBlock(src) {
-	mark := "KL_AsyncPasswordDetect(hwnd) {"
-	pos := InStr(src, mark)
-	if (!pos)
-		return ""
-	; Return the next 500 chars — covers the guard and first real call.
-	return SubStr(src, pos, 500)
-}
-
-
-
-
-; ==============================================================
-; ==============================================================
-; ======= 2/ Assertions ========================================
+; ======= 1/ Assertions ========================================
 ; ==============================================================
 ; ==============================================================
 
 _APDSG_SuspendCheckPresent() {
-	block := _APDSG_FindFunctionBlock(_APDSG_ReadSource())
+	; Move-resilient: locate KL_AsyncPasswordDetect across the whole driver
+	; source via the framework helper instead of a pinned keylogger path.
+	block := _DriverFuncBody("KL_AsyncPasswordDetect")
 	Assert(InStr(block, "A_IsSuspended") > 0,
 		"keylogger.ahk: KL_AsyncPasswordDetect must check A_IsSuspended before running UIA/Win32 detection")
 }
@@ -63,7 +42,7 @@ Test("KL_AsyncPasswordDetect: A_IsSuspended guard present (async-password-detect
 
 
 _APDSG_SuspendCheckBeforeDetect() {
-	block := _APDSG_FindFunctionBlock(_APDSG_ReadSource())
+	block := _DriverFuncBody("KL_AsyncPasswordDetect")
 	posGuard  := InStr(block, "A_IsSuspended")
 	posDetect := InStr(block, "KL_DetectPasswordFor")
 	Assert(posGuard > 0 and posDetect > 0,
