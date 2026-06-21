@@ -3,10 +3,10 @@
 ; ==============================================================================
 ; MODULE: Spotlight GDI+ FreeLibrary Meta Test
 ; DESCRIPTION:
-; Regression guard ensuring ui/spotlight.ahk balances every LoadLibrary("gdiplus")
+; Regression guard ensuring ui/spotlight/init.ahk balances every LoadLibrary("gdiplus")
 ; call with a FreeLibrary call so the DLL ref-count stays clean across invocations.
 ;
-; SCOPE: source introspection of ui/spotlight.ahk.
+; SCOPE: source introspection of ui/spotlight/init.ahk.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -20,10 +20,9 @@
 ; ===================================================
 ; ===================================================
 
-_SGFL_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &WindowsDir)
-	Path := WindowsDir . "\" . StrReplace(RelPath, "/", "\")
-	return FileRead(Path)
+_SGFL_ReadSource(RelDir) {
+	; Move-resilient: concat the whole window folder, not a pinned single-file path.
+	return _DriverDirConcat(RelDir)
 }
 
 
@@ -34,22 +33,22 @@ _SGFL_ReadSource(RelPath) {
 ; ===================================================
 
 _SGFL_CheckFreeLibraryPresent() {
-	Src := _SGFL_ReadSource("ui/spotlight.ahk")
-	Assert(Src != "", "ui/spotlight.ahk must be readable")
+	Src := _SGFL_ReadSource("ui/spotlight")
+	Assert(Src != "", "ui/spotlight/init.ahk must be readable")
 
 	Assert(InStr(Src, "LoadLibrary"),
-		"ui/spotlight.ahk must call LoadLibrary to acquire gdiplus")
+		"ui/spotlight/init.ahk must call LoadLibrary to acquire gdiplus")
 	Assert(InStr(Src, "FreeLibrary"),
-		"ui/spotlight.ahk must call FreeLibrary to release gdiplus — LoadLibrary without FreeLibrary leaks the DLL ref-count")
+		"ui/spotlight/init.ahk must call FreeLibrary to release gdiplus — LoadLibrary without FreeLibrary leaks the DLL ref-count")
 }
 
 _SGFL_CheckHandleStored() {
-	Src := _SGFL_ReadSource("ui/spotlight.ahk")
-	Assert(Src != "", "ui/spotlight.ahk must be readable")
+	Src := _SGFL_ReadSource("ui/spotlight")
+	Assert(Src != "", "ui/spotlight/init.ahk must be readable")
 
 	; The module handle must be stored so _SpotlightDismiss can reach it
 	Assert(InStr(Src, "hGdiplus"),
-		'ui/spotlight.ahk must store the LoadLibrary handle in _Spotlight_State["hGdiplus"] for balanced FreeLibrary on dismiss')
+		'ui/spotlight/init.ahk must store the LoadLibrary handle in _Spotlight_State["hGdiplus"] for balanced FreeLibrary on dismiss')
 }
 
 

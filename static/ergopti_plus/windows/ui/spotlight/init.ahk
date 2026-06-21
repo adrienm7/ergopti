@@ -1,4 +1,4 @@
-﻿; ui/spotlight.ahk
+﻿; ui/spotlight/init.ahk
 ; Requires: GraphicsRenderer
 
 ; ==============================================================================
