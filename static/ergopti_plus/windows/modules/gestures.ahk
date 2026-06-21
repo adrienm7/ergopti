@@ -964,7 +964,7 @@ global GESTURE_AX_NAMES := []
 ; when the gesture-picker menu is built — which happens in the deferred
 ; initMenu phase (~250 ms after boot). Deferring the TOML parse off the
 ; critical boot path removes ~100 ms from the gestures module init time.
-; SetTimer(-0) fires immediately after the auto-execute section finishes,
+; A run-once SetTimer(-1) fires ~1 ms after the auto-execute section finishes,
 ; well before initMenu runs, so the lists are always ready for the menu.
 _GestureLoadActionCatalog(*) {
     global GESTURE_ACTION_NAMES, GESTURE_AX_NAMES, GESTURE_ACTIONS, _SharedDir, _GestureSpecialKeys
@@ -1040,7 +1040,11 @@ _GestureLoadActionCatalog(*) {
         }
     }
 }
-SetTimer(_GestureLoadActionCatalog, -0)
+; Run-once, deferred off the boot path. MUST be a negative NON-ZERO period:
+; AHK v2 treats -0 as 0, and SetTimer(fn, 0) DISABLES the timer (the callback
+; never fires), which left GESTURE_ACTION_NAMES empty and the action picker
+; blank. -1 fires once ~1 ms after the auto-execute section finishes.
+SetTimer(_GestureLoadActionCatalog, -1)
 
 ; Factory gesture slot actions — mirrors features_manifest.ahk defaults.
 global GESTURE_FACTORY_DEFAULTS := Map(

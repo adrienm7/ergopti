@@ -41,9 +41,19 @@ _MetaCheckGesturesActionCatalogDeferred() {
 	Assert(InStr(Body, "_GestureLoadActionCatalog("),
 		"gestures.ahk must define _GestureLoadActionCatalog() to build the action catalog off the boot path")
 
-	; It must be armed as a zero-delay SetTimer (fires after auto-execute finishes).
-	Assert(InStr(Body, "SetTimer(_GestureLoadActionCatalog, -0)"),
-		"gestures.ahk must call SetTimer(_GestureLoadActionCatalog, -0) to defer catalog init (perf-gestures-deferred)")
+	; It must be armed as a run-once SetTimer with a negative NON-ZERO period
+	; (fires once after auto-execute finishes).
+	Assert(InStr(Body, "SetTimer(_GestureLoadActionCatalog, -1)"),
+		"gestures.ahk must call SetTimer(_GestureLoadActionCatalog, -1) to defer catalog init (perf-gestures-deferred)")
+
+	; Regression for gesture-action-catalog-never-loads: AHK v2 treats -0 as 0,
+	; and SetTimer(fn, 0) DISABLES the timer — the callback never fires, so
+	; GESTURE_ACTION_NAMES stayed empty and the action picker was blank. The
+	; defer period must never be -0 (or 0).
+	Assert(!InStr(Body, "SetTimer(_GestureLoadActionCatalog, -0)")
+		and !InStr(Body, "SetTimer(_GestureLoadActionCatalog, 0)"),
+		"gestures.ahk must NOT defer the catalog with a zero period — SetTimer(fn, -0)/(fn, 0) "
+		. "disables the timer so the catalog never loads (gesture-action-catalog-never-loads)")
 
 	; The inline ParseTomlFile call for the shared TOML must be gone from the
 	; auto-execute body — it must live inside _GestureLoadActionCatalog, not at
