@@ -61,6 +61,12 @@ try FileDelete(_TEST_RESULTS_FILE)
 if !IsSet(_AHK_DRY_RUN)
 	global _AHK_DRY_RUN := false
 
+; Optional case-insensitive substring filter on test names (run_all sets it from
+; ``--only <substr>``). Empty means "run every registered test". Lets a developer
+; replay one failing test by its distinctive slug instead of the whole suite.
+if !IsSet(_AHK_ONLY_FILTER)
+	global _AHK_ONLY_FILTER := ""
+
 
 
 
@@ -235,6 +241,13 @@ Test(Name, Callback) {
 	TEST_REGISTRY.Push({ name: Name, callback: Callback })
 }
 
+; True when ``Name`` should run under the active ``--only`` filter. An empty
+; filter matches every test; otherwise the match is a case-insensitive substring,
+; so a distinctive slug (e.g. a trailing "(my-slug)") selects a single test.
+_FilterMatches(Name, Filter) {
+	return (Filter == "" || InStr(Name, Filter) > 0)
+}
+
 ; Path of the TAP results file. Overridden by e2e; otherwise set per-run in
 ; RunTests() (PID suffix) so parallel AHK runners do not deadlock on one handle.
 global TEST_RESULTS_FILE := A_Temp . "\ergopti_test_results.txt"
@@ -254,29 +267,47 @@ _TestPrint(Line) {
 ; When --dry-run is passed on the command line, exits immediately after
 ; printing the plan line so the CI warning-check step stays fast.
 RunTests() {
-	global TEST_REGISTRY, TEST_PASS_COUNT, TEST_FAIL_COUNT, _AHK_DRY_RUN
+	global TEST_REGISTRY, TEST_PASS_COUNT, TEST_FAIL_COUNT, _AHK_DRY_RUN, _AHK_ONLY_FILTER
 	global TEST_RESULTS_FILE, TEST_RESULTS_CANONICAL
     if (A_IsCritical != 0) {
         throw Error("RunTests started with A_IsCritical=" . A_IsCritical)
     }
 	if !IsSet(_AHK_DRY_RUN)
 		_AHK_DRY_RUN := false
+	if !IsSet(_AHK_ONLY_FILTER)
+		_AHK_ONLY_FILTER := ""
 	; Per-process results path unless a runner already chose a custom file (e2e).
 	if (TEST_RESULTS_FILE = TEST_RESULTS_CANONICAL) {
 		TEST_RESULTS_FILE := A_Temp . "\ergopti_test_results_"
 			. DllCall("GetCurrentProcessId") . ".txt"
 	}
 	try FileDelete(TEST_RESULTS_FILE)
-	_TestPrint("1.." . TEST_REGISTRY.Length)
+	; Apply the optional --only <substr> filter. The plan line (1..N) and the run
+	; loop both operate on the selected subset so a filtered run is a valid, fast
+	; replay of a single failing test.
+	ActiveTests := []
+	for TestEntry in TEST_REGISTRY {
+		if _FilterMatches(TestEntry.name, _AHK_ONLY_FILTER)
+			ActiveTests.Push(TestEntry)
+	}
+	_TestPrint("1.." . ActiveTests.Length)
+	if (_AHK_ONLY_FILTER != "")
+		_TestPrint("# --only " . _AHK_ONLY_FILTER . " - " . ActiveTests.Length
+			. " of " . TEST_REGISTRY.Length . " test(s) selected.")
 	if (_AHK_DRY_RUN) {
 		_TestPrint("# dry-run - skipping execution.")
 		_CopyTestResultsForCi()
 		ExitApp(0)
 	}
+	if (ActiveTests.Length == 0) {
+		_TestPrint("# no test matched --only " . _AHK_ONLY_FILTER . ".")
+		_CopyTestResultsForCi()
+		ExitApp(1)
+	}
 	Index := 0
-	for TestEntry in TEST_REGISTRY {
+	for TestEntry in ActiveTests {
 		Index += 1
-		_TestPrint("RUNNING " . Index . "/" . TEST_REGISTRY.Length . " - " . TestEntry.name)
+		_TestPrint("RUNNING " . Index . "/" . ActiveTests.Length . " - " . TestEntry.name)
 		Status := "ok"
 		Detail := ""
 		try {
