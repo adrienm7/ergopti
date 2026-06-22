@@ -357,11 +357,17 @@ HotstringPrefixWatcherRebuildIndex() {
     ; one, never the transient empty Map() that an in-place clear would expose.
     NewIndex := Map()
     NewSet := Map()
+    _rebuildStart := A_TickCount
     for _, Category in _PREFIX_WATCHER_CATEGORIES {
         _RegisterCategoryTriggers(Category, NewIndex, NewSet)
     }
     _PrefixIndex := NewIndex
     _TriggerSet := NewSet
+    ; Diagnostic: this rebuild re-reads + regex-parses every category TOML from disk
+    ; (no precompiled-cache fast path, unlike the HSE registration via _GENERATED_HOTSTRINGS),
+    ; so it is the suspected cost of the multi-second deferred emoji/symbol pass. Log the
+    ; trigger count + wall time so a slow rebuild is attributed to this step, not guessed at.
+    try LoggerInfo("PrefixWatcher", "Index rebuilt: {1} trigger(s) in {2} ms.", NewSet.Count, A_TickCount - _rebuildStart)
     ; A just-disabled section may still have a tooltip on screen — hide it so the
     ; preview cannot outlive the expansion it was advertising.
     TooltipHide("LiveToggleRebuild", true)
