@@ -68,6 +68,7 @@ _MetaBrace_Count(Source) {
 	I := 1
 	Len := StrLen(Source)
 	DQ := Chr(34)  ; double-quote character
+	SQ := Chr(39)  ; single-quote character (AHK v2 also delimits strings with ')
 	BT := Chr(96)  ; backtick (AHK v2 string-escape prefix)
 
 	while I <= Len {
@@ -87,8 +88,11 @@ _MetaBrace_Count(Source) {
 			continue
 		}
 
-		; String literal: "..." (BT is the AHK v2 escape prefix inside strings)
-		if Ch = DQ {
+		; String literal: "..." or '...' — AHK v2 delimits with either quote, and
+		; BT is the escape prefix inside both. A brace inside a string is not code,
+		; so an unmatched ``{`` in e.g. a single-quoted regex must not be counted.
+		if Ch = DQ || Ch = SQ {
+			Quote := Ch
 			I++
 			while I <= Len {
 				SC := SubStr(Source, I, 1)
@@ -96,7 +100,7 @@ _MetaBrace_Count(Source) {
 					I += 2   ; skip backtick-escaped character
 					continue
 				}
-				if SC = DQ {
+				if SC = Quote {
 					I++
 					break
 				}
@@ -125,33 +129,45 @@ _MetaBrace_Count(Source) {
 ; =====================================
 ; =====================================
 
+; Per-file checker. Kept at module scope (NOT nested in the loop) so each
+; registered test binds its OWN path through the factory below. A function
+; nested in the loop would close over the shared loop variable by reference, so
+; every test would re-check only the LAST enumerated file — the guard then
+; silently validated a single file instead of all of them.
+_MetaBrace_CheckFile(AbsPath, NormRoot) {
+	try {
+		Source := FileRead(StrReplace(AbsPath, "/", "\"))
+	} catch {
+		Assert(false, "cannot read " . AbsPath)
+		return
+	}
+	Counts := _MetaBrace_Count(Source)
+	Rel := SubStr(StrReplace(AbsPath, "\", "/"), StrLen(NormRoot) + 1)
+	Assert(
+		Counts["open"] = Counts["close"],
+		"unbalanced braces in " . Rel
+		. " — open: " . Counts["open"]
+		. "  close: " . Counts["close"]
+	)
+}
+
+; Factory: binds AbsPath + NormRoot into a fresh closure per file (parameters are
+; per-call, so each returned closure captures its own values).
+_MetaBrace_MakeCheck(AbsPath, NormRoot) {
+	return () => _MetaBrace_CheckFile(AbsPath, NormRoot)
+}
+
 _MetaRunBraceBalanceTests() {
 	SplitPath(A_ScriptDir, , &_DriverRootRaw)
 	DriverRoot := StrReplace(_DriverRootRaw, "\", "/") . "/"
+	NormRoot := StrReplace(DriverRoot, "\", "/")
 	Checked := 0
 
 	for Sub in ["lib", "modules", "ui"] {
 		for AbsPath in _MetaBrace_ListFiles(StrReplace(DriverRoot . Sub, "/", "\")) {
-			AbsCopy := AbsPath
-			_MetaBraceCheckOne() {
-				Checked++
-				try {
-					Source := FileRead(StrReplace(AbsCopy, "/", "\"))
-				} catch {
-					Assert(false, "cannot read " . AbsCopy)
-					return
-				}
-				Counts := _MetaBrace_Count(Source)
-				NormRoot := StrReplace(DriverRoot, "\", "/")
-				Rel := SubStr(StrReplace(AbsCopy, "\", "/"), StrLen(NormRoot) + 1)
-				Assert(
-					Counts["open"] = Counts["close"],
-					"unbalanced braces in " . Rel
-					. " — open: " . Counts["open"]
-					. "  close: " . Counts["close"]
-				)
-			}
-			Test("brace balance: " . RegExReplace(AbsPath, ".*[/\\]"), _MetaBraceCheckOne)
+			Checked++
+			Test("brace balance: " . RegExReplace(AbsPath, ".*[/\\]"),
+				_MetaBrace_MakeCheck(AbsPath, NormRoot))
 		}
 	}
 
