@@ -1,4 +1,4 @@
---- tests/unit/lib/test_mlx_deps_reentrancy_nil_cb.lua
+--- tests/unit/modules/llm/test_mlx_deps_reentrancy_nil_cb.lua
 
 --- ==============================================================================
 --- MODULE: Regression — mlx_deps_checker reentrancy guard with nil callback
@@ -29,7 +29,7 @@ helpers.describe("mlx_deps_checker: reentrancy guard with nil callback", functio
 	helpers.it("source uses _task_running boolean guard, not #_pending_callbacks", function()
 		local src_path = debug.getinfo(1, "S").source:match("^@(.+)$")
 		local base = src_path:match("^(.+)[/\\]tests[/\\]") or ""
-		local src_file = base .. "/lib/mlx_deps_checker.lua"
+		local src_file = base .. "/modules/llm/mlx_deps_checker.lua"
 
 		local fh = io.open(src_file, "r")
 		helpers.assert_true(fh ~= nil, "Cannot open mlx_deps_checker.lua at: " .. src_file)
@@ -60,7 +60,7 @@ helpers.describe("mlx_deps_checker: reentrancy guard with nil callback", functio
 	helpers.it("_task_running is set before task:start() and cleared in fire_pending_callbacks", function()
 		local src_path = debug.getinfo(1, "S").source:match("^@(.+)$")
 		local base = src_path:match("^(.+)[/\\]tests[/\\]") or ""
-		local src_file = base .. "/lib/mlx_deps_checker.lua"
+		local src_file = base .. "/modules/llm/mlx_deps_checker.lua"
 
 		local fh = io.open(src_file, "r")
 		helpers.assert_true(fh ~= nil, "Cannot open mlx_deps_checker.lua")

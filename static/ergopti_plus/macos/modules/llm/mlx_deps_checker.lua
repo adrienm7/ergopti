@@ -1,4 +1,4 @@
---- lib/mlx_deps_checker.lua
+--- modules/llm/mlx_deps_checker.lua
 
 --- ==============================================================================
 --- MODULE: MLX Dependencies Checker
@@ -115,7 +115,7 @@ local _task_running = false
 local function resolve_hs_root()
 	local source = debug.getinfo(1, "S").source or ""
 	source = source:sub(1, 1) == "@" and source:sub(2) or source
-	local root = source:match("^(.*)/lib/mlx_deps_checker%.lua$")
+	local root = source:match("^(.*)/modules/llm/mlx_deps_checker%.lua$")
 	if root and root ~= "" and hs.fs.attributes(root, "mode") then
 		return root
 	end

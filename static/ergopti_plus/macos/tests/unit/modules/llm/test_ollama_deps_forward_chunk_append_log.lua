@@ -1,4 +1,4 @@
---- tests/unit/lib/test_ollama_deps_forward_chunk_append_log.lua
+--- tests/unit/modules/llm/test_ollama_deps_forward_chunk_append_log.lua
 
 --- Regression test for lib-deps-3: ollama_deps_checker.lua forward_chunk()
 --- called llm_progress.set_detail but omitted llm_progress.append_log, so
@@ -9,7 +9,7 @@
 
 local helpers = require("tests.helpers")
 
-local src_path = helpers.driver_root() .. "lib/ollama_deps_checker.lua"
+local src_path = helpers.driver_root() .. "modules/llm/ollama_deps_checker.lua"
 local fh = io.open(src_path, "r")
 if not fh then error("ollama_deps_checker.lua not readable at: " .. src_path) end
 local src = fh:read("*a") ; fh:close()

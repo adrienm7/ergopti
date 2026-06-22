@@ -20,8 +20,8 @@ local Logger   = require("lib.logger")
 
 local LOG = "backend_panel"
 
-local mlx_deps_checker    = require("lib.mlx_deps_checker")
-local ollama_deps_checker = require("lib.ollama_deps_checker")
+local mlx_deps_checker    = require("modules.llm.mlx_deps_checker")
+local ollama_deps_checker = require("modules.llm.ollama_deps_checker")
 -- Single source of truth for the MLX server port — used to free the right socket
 -- when switching away from MLX. Never hardcode the port here.
 local ApiMlx              = require("modules.llm.api_mlx")

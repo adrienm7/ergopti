@@ -1,4 +1,4 @@
---- tests/unit/lib/test_ollama_deps_reentrancy.lua
+--- tests/unit/modules/llm/test_ollama_deps_reentrancy.lua
 
 --- Regression test for lib-deps-1: check_and_install_deps() had no reentrancy
 --- guard. Calling it while a task was already running created a second
@@ -10,9 +10,9 @@
 
 local helpers = require("tests.helpers")
 
-local src_path = helpers.driver_root() .. "lib/ollama_deps_checker.lua"
+local src_path = helpers.driver_root() .. "modules/llm/ollama_deps_checker.lua"
 local fh = io.open(src_path, "r")
-if not fh then error("lib/ollama_deps_checker.lua not readable at: " .. src_path) end
+if not fh then error("modules/llm/ollama_deps_checker.lua not readable at: " .. src_path) end
 local src = fh:read("*a") ; fh:close()
 
 -- Test 1: reentrancy flag declared at module level.

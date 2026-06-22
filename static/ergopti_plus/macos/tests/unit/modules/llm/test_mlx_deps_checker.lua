@@ -1,9 +1,9 @@
---- tests/unit/lib/test_mlx_deps_checker.lua
+--- tests/unit/modules/llm/test_mlx_deps_checker.lua
 
 --- ==============================================================================
 --- MODULE: mlx_deps_checker Regression Tests
 --- DESCRIPTION:
---- Locks packaging-sensitive behavior for lib.mlx_deps_checker: script path
+--- Locks packaging-sensitive behavior for modules.llm.mlx_deps_checker: script path
 --- discovery in bundled layouts, shell quoting for PROJECT_ROOT/script path,
 --- and failure callback fan-out on early task setup failures.
 --- ============================================================================== 
@@ -21,7 +21,7 @@ local helpers = require("tests.helpers")
 -- =========================================
 
 local function read_source()
-	local path = helpers.driver_root() .. "lib/mlx_deps_checker.lua"
+	local path = helpers.driver_root() .. "modules/llm/mlx_deps_checker.lua"
 	local fh = io.open(path, "r")
 	if not fh then return "" end
 	local body = fh:read("*a") or ""
@@ -38,7 +38,7 @@ helpers.describe("mlx_deps_checker source invariants", function()
 
 	helpers.it("defines resolve_hs_root from current file location", function()
 		helpers.assert_true(SOURCE:find("local function resolve_hs_root()", 1, true) ~= nil)
-		helpers.assert_true(SOURCE:find("/lib/mlx_deps_checker%.lua$", 1, true) ~= nil)
+		helpers.assert_true(SOURCE:find("/modules/llm/mlx_deps_checker%.lua$", 1, true) ~= nil)
 	end)
 
 	helpers.it("defines bootstrap-script resolver with upward fallback", function()
@@ -107,7 +107,7 @@ helpers.describe("mlx_deps_checker public API", function()
 	local original_logger = package.loaded["lib.logger"]
 	local original_window = package.loaded["ui.download_window"]
 	local original_paths = package.loaded["lib.paths"]
-	local original_checker = package.loaded["lib.mlx_deps_checker"]
+	local original_checker = package.loaded["modules.llm.mlx_deps_checker"]
 
 	local calls = {
 		start = 0,
@@ -143,8 +143,8 @@ helpers.describe("mlx_deps_checker public API", function()
 		find_from_configdir = function() return nil end,
 	}
 
-	package.loaded["lib.mlx_deps_checker"] = nil
-	local checker = helpers.load_with_stubs("lib.mlx_deps_checker")
+	package.loaded["modules.llm.mlx_deps_checker"] = nil
+	local checker = helpers.load_with_stubs("modules.llm.mlx_deps_checker")
 
 	helpers.it("exposes the expected state accessors", function()
 		helpers.assert_eq(type(checker.get_state), "function")
@@ -166,5 +166,5 @@ helpers.describe("mlx_deps_checker public API", function()
 	package.loaded["lib.logger"] = original_logger
 	package.loaded["ui.download_window"] = original_window
 	package.loaded["lib.paths"] = original_paths
-	package.loaded["lib.mlx_deps_checker"] = original_checker
+	package.loaded["modules.llm.mlx_deps_checker"] = original_checker
 end)

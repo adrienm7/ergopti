@@ -23,7 +23,7 @@ feature logic lives in the modules it loads.
 | `tests/` | `meta/` (source-introspection + port-coverage guards), `unit/`, `helpers/`, `stubs/`. |
 
 > MLX provisioning: `modules/llm/ensure-mlx-deps.sh` builds a `.venv` from the
-> pinned `pyproject.toml` on startup (hash-gated). `lib/mlx_deps_checker.lua`
+> pinned `pyproject.toml` on startup (hash-gated). `modules/llm/mlx_deps_checker.lua`
 > resolves that script relative to the Hammerspoon root, so moving these files
 > requires updating their path resolution — the Lua unit suite does not exercise
 > the bash/venv runtime.
