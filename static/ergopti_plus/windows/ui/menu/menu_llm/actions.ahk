@@ -258,6 +258,46 @@ _LLM_Menu_OnHealthProbeDone(reachable) {
 		LLM_Menu_Build()
 }
 
+/**
+ * Fires an async installed-models probe and stashes the result in the shared
+ * models cache so the next rebuild paints the green install dots. The exact mirror
+ * of _LLM_Menu_FireHealthProbe, but for GET /api/tags instead of the reachability
+ * ping: fire-and-forget, paint on the next pass. The blocking list probe used to
+ * run inline per catalogue row at build time and froze the keyboard thread for up
+ * to ~20 s on a cold daemon — this moves it off the hot path entirely.
+ */
+LLM_Menu_FireInstalledTagsProbe() {
+	global _LLM_Menu, _LLM_InstalledTagsCacheAt, LLM_INSTALLED_CACHE_TTL_MS
+	; Same Pause invariant as the health probe: SetTimer-driven rebuilds bypass
+	; native Suspend, so a probe firing while paused could repaint the tray.
+	if A_IsSuspended
+		return
+	if (_LLM_Menu["backend"] != "ollama")
+		return
+	; The install dots only mean something once Ollama is confirmed reachable —
+	; mirrors the menu's own deps_ready gate on the per-row probe. When the daemon
+	; is down the async request would just time out with nothing to paint.
+	if !(IsSet(LLM_Deps_IsReady) and LLM_Deps_IsReady())
+		return
+	; Throttle on the cache age (the same TTL the blocking path used) so repeated
+	; menu opens / rebuilds don't re-query the daemon every time.
+	now := A_TickCount
+	if (_LLM_InstalledTagsCacheAt > 0 and (now - _LLM_InstalledTagsCacheAt) < LLM_INSTALLED_CACHE_TTL_MS)
+		return
+	try LLM_OllamaListModels_Async((tags) => _LLM_Menu_OnInstalledTagsProbeDone(tags))
+}
+
+_LLM_Menu_OnInstalledTagsProbeDone(tags) {
+	prev := _LLM_GetInstalledTagsCached()
+	LLM_SetInstalledTagsCache(tags)
+	; Repaint only when the installed SET actually changed (mirrors the health dot's
+	; flip-guard) and never while suspended — so a probe landing mid-build doesn't
+	; churn the tray, and the green dots appear a moment after the daemon answers.
+	; The next rebuild's probe sees a fresh cache and skips, so there is no loop.
+	if (_LLM_InstalledTagsListChanged(prev, IsSet(tags) ? tags : []) and !A_IsSuspended)
+		LLM_Menu_Build()
+}
+
 LLM_Menu_SetProfile(id) {
 	global _LLM_Menu
 	; If the user picks a profile manually while auto-detection is on, they
@@ -386,6 +426,11 @@ LLM_Menu_EnsureModelReady() {
 	; LLM_Deps_IsReady() == true, where the same probe returns in milliseconds.
 	if !LLM_Deps_IsReady()
 		return
+	; Deps are confirmed up — refresh the installed-tags cache with ONE synchronous
+	; probe so the model auto-correct below reads a trustworthy snapshot. This is the
+	; only sanctioned blocking /api/tags call (off the keyboard hot path, gated on
+	; deps-ready above); the tray build itself stays non-blocking via the async probe.
+	_LLM_WarmInstalledTagsSync()
 	model := _LLM_Menu["model"]
 	if (model == "")
 		model := _LLM_DefaultFor("llm_model", "Qwen3.5-0.8B")

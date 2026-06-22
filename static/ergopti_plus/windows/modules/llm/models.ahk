@@ -212,7 +212,7 @@ LLM_ResolveOllamaTag(display_name) {
 /**
  * Picks the best catalogue display name that is installed locally.
  * Prefers the shared AHK default, then any catalogue entry, then the first
- * raw tag from ``ollama list``.
+ * raw tag from the cached installed list.
  *
  * @returns {string} Display name or raw tag, or "" when Ollama has no models.
  */
@@ -225,7 +225,10 @@ LLM_PickBestInstalledDisplayName() {
 		if LLM_IsModelInstalled(name)
 			return name
 	}
-	installed := LLM_OllamaListModels()
+	; Non-blocking: read the background-refreshed cache, never the synchronous
+	; GET /api/tags (which froze the keyboard thread). The only caller
+	; (LLM_Menu_EnsureModelReady) warms it first via _LLM_WarmInstalledTagsSync.
+	installed := _LLM_GetInstalledTagsCached()
 	return (installed.Length > 0) ? installed[1] : ""
 }
 
@@ -455,33 +458,95 @@ _LLM_IsNumber(v) {
 ; ====================================
 ; ====================================
 
-; Short TTL cache for the locally installed Ollama tag list. Without it the
-; tray menu would call ``ollama list`` once per model row at build time, which
-; is fine for a handful of entries but becomes a perceptible stutter on a
-; catalogue of ~50 models. The 2-second TTL keeps the menu responsive while
-; still picking up newly-installed models within a couple of menu opens.
+; In-memory snapshot of the locally-installed Ollama tag list, read by the tray
+; menu (green install dots) and the tag resolver. It is refreshed ONLY in the
+; background: the synchronous ``GET /api/tags`` that used to populate it ran once
+; per model row at build time and froze the keyboard thread for up to ~20 s on a
+; cold/slow daemon (AUDIT_AHK_2026-06-19 / TODO.md). The single writer is
+; ``LLM_SetInstalledTagsCache``, fed by the async tray probe
+; (LLM_Menu_FireInstalledTagsProbe) and the deps-ready one-shot warm
+; (_LLM_WarmInstalledTagsSync). The TTL only throttles how often the async probe
+; re-queries the daemon; the read path never consults it.
 global LLM_INSTALLED_CACHE_TTL_MS := 0   ; sentinel — sourced at boot by LLMApiLoadTimings ([llm] installed_cache_ttl_ms)
 global _LLM_InstalledTagsCache := unset
 global _LLM_InstalledTagsCacheAt := 0
 
+/**
+ * Returns the most recent in-memory snapshot of the locally-installed Ollama tags.
+ * NON-BLOCKING by contract: it NEVER performs the synchronous GET /api/tags — that
+ * call, run per catalogue row at every tray rebuild, froze the keyboard thread for
+ * up to ~20 s on a cold daemon. The cache is refreshed in the background through
+ * LLM_OllamaListModels_Async (see LLM_SetInstalledTagsCache); until the first
+ * refresh lands this returns an empty list (no dots yet), exactly like the health
+ * dot which paints only after its async probe answers.
+ * @returns {Array} Cached tag list (empty until the first refresh lands).
+ */
 _LLM_GetInstalledTagsCached() {
-	global _LLM_InstalledTagsCache, _LLM_InstalledTagsCacheAt, LLM_INSTALLED_CACHE_TTL_MS
-	now := A_TickCount
-	if IsSet(_LLM_InstalledTagsCache) and (now - _LLM_InstalledTagsCacheAt) < LLM_INSTALLED_CACHE_TTL_MS
-		return _LLM_InstalledTagsCache
+	global _LLM_InstalledTagsCache
+	return IsSet(_LLM_InstalledTagsCache) ? _LLM_InstalledTagsCache : []
+}
+
+/**
+ * Replaces the in-memory installed-tags snapshot and stamps the refresh time. The
+ * SINGLE writer for the cache that _LLM_GetInstalledTagsCached reads — fed by the
+ * tray's async probe callback and the deps-ready sync warm. Logs at DEBUG so a
+ * startup trace shows exactly when (and to how many tags) the list last refreshed.
+ * @param {Array} tags - Tag names from Ollama (or [] when the daemon is unreachable).
+ */
+LLM_SetInstalledTagsCache(tags) {
+	global _LLM_InstalledTagsCache, _LLM_InstalledTagsCacheAt
+	_LLM_InstalledTagsCache   := (tags is Array) ? tags : []
+	_LLM_InstalledTagsCacheAt := A_TickCount
+	try LoggerDebug("LLM.models", "Installed-tags cache updated ({1} tag(s)).", _LLM_InstalledTagsCache.Length)
+}
+
+/**
+ * Blocking one-shot that refreshes the installed-tags cache via the synchronous
+ * GET /api/tags. Used ONLY off the keyboard hot path — LLM_Menu_EnsureModelReady at
+ * enable/bridge-start, already guarded by LLM_Deps_IsReady() — so the model
+ * auto-correct reads a trustworthy snapshot before the engine fires. The tray build
+ * NEVER calls this; it relies on the async LLM_Menu_FireInstalledTagsProbe.
+ * @returns {Array} The freshly-fetched tag list (or [] on failure).
+ */
+_LLM_WarmInstalledTagsSync() {
 	tags := []
 	try {
-		; LLM_OllamaListModels lives in api_ollama.ahk; treat it as optional
-		; so this module remains loadable in tests that stub the Ollama
-		; layer out.
+		; LLM_OllamaListModels lives in api_ollama.ahk; treat it as optional so this
+		; module stays loadable in tests that stub the Ollama layer out.
 		if IsSet(LLM_OllamaListModels)
 			tags := LLM_OllamaListModels()
 	} catch {
 		tags := []
 	}
-	_LLM_InstalledTagsCache := tags
-	_LLM_InstalledTagsCacheAt := now
+	LLM_SetInstalledTagsCache(tags)
 	return tags
+}
+
+/**
+ * True when two installed-tag lists differ as SETS (membership, order-insensitive —
+ * Ollama's /api/tags ordering is not guaranteed stable across calls). Lets the tray
+ * probe repaint only on a real change, mirroring the health dot's flip-guard.
+ * @param {Array} old - Previous tag list.
+ * @param {Array} new - Freshly-fetched tag list.
+ * @returns {Boolean} True when the membership changed.
+ */
+_LLM_InstalledTagsListChanged(old, new) {
+	if !(old is Array) or !(new is Array)
+		return true
+	if (old.Length != new.Length)
+		return true
+	for _, tag in new {
+		found := false
+		for _, o in old {
+			if (o == tag) {
+				found := true
+				break
+			}
+		}
+		if !found
+			return true
+	}
+	return false
 }
 
 /**
