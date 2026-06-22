@@ -979,10 +979,18 @@ RegisterEmojisSymbolsDeferred() {
 	if (IsSet(HSE_RegistryByGroup) and (HSE_RegistryByGroup.Has("emojis.emojis") or HSE_RegistryByGroup.Has("magickey.text_expansion_emojis")))
 		return
 	try {
+		; Isolated wall-clock for the HSE registration alone. The BootProfile delta
+		; below folds in the 1.5 s SetTimer delay AND interleaving with the other
+		; deferred boot tasks (warm-up rebuild, Ollama probe, LLM bridge), so it
+		; massively overstates the true cost — this line shows the real registration time.
+		_emojiStart := A_TickCount
 		_RegisterEmojisSymbolsSections()
-		; The prefix-watcher index was armed at boot WITHOUT these categories —
-		; rebuild it so the tooltip preview ranks them like every other category.
-		try HotstringPrefixWatcherRebuildIndex()
+		try LoggerInfo("Hotstrings", "Emoji/symbol HSE sections registered in {1} ms.", A_TickCount - _emojiStart)
+		; No prefix-index rebuild here: the warm-up SetTimer (HS_PREFIX_INDEX_WARM_DELAY_MS)
+		; already built a COMPLETE index from the in-memory cache + Features, which include
+		; the emoji/symbol sections independent of HSE registration timing. A second rebuild
+		; produced the identical 3180-trigger index — pure redundant boot work, removed
+		; (pinned by test_prefix_watcher_deferred + test_prefix_index_cache_equiv).
 		try BootProfile_Mark("Emoji/symbol hotstrings registered (deferred)")
 		try LoggerInfo("Hotstrings", "Deferred emoji/symbol registration complete.")
 	} catch as e {
