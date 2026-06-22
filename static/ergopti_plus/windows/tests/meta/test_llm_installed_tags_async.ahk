@@ -76,20 +76,30 @@ _MetaCheckInstalledTagsNonBlocking() {
 		. "the synchronous LLM_OllamaListModels()")
 
 	; (5) The tray build must FIRE the async probe in the model row (mirrors the
-	; health probe) so the cache refreshes without the build ever blocking.
+	; health probe) so the cache refreshes without the build ever blocking. The call
+	; must use the EXACT _-prefixed name (see the def cross-check in (6)).
 	EmitBody := _DriverFuncBody("_LLM_Menu_EmitRow")
 	Assert(EmitBody != "", "menu_main.ahk must define _LLM_Menu_EmitRow()")
-	Assert(InStr(EmitBody, "LLM_Menu_FireInstalledTagsProbe("),
-		"the model row must fire LLM_Menu_FireInstalledTagsProbe() (async, non-blocking)")
+	Assert(InStr(EmitBody, "_LLM_Menu_FireInstalledTagsProbe("),
+		"the model row must fire _LLM_Menu_FireInstalledTagsProbe() (async, non-blocking)")
 
 	; (6) The probe + its result handler mirror the health-dot pattern: async fetch,
 	; suspend-guarded, repaint only via LLM_SetInstalledTagsCache + change-flip guard.
-	FireBody := _DriverFuncBody("LLM_Menu_FireInstalledTagsProbe")
-	Assert(FireBody != "", "actions.ahk must define LLM_Menu_FireInstalledTagsProbe()")
+	; CRITICAL: the name CALLED in the model row must have a matching top-level
+	; DEFINITION under the EXACT same name. AHK v2 turns a call to an unknown name
+	; into a dynamic call through an unset variable — NO load error — which then
+	; throws "this local variable has not been assigned a value" only at runtime,
+	; aborting the whole build. A def/call _-prefix mismatch shipped exactly that and
+	; emptied the menu; asserting the def exists under the called name catches it.
+	FireBody := _DriverFuncBody("_LLM_Menu_FireInstalledTagsProbe")
+	Assert(FireBody != "",
+		"actions.ahk must define _LLM_Menu_FireInstalledTagsProbe() under the SAME name "
+		. "the model row calls — a mismatch becomes a runtime unset-variable throw that "
+		. "aborts the build and empties the IA menu")
 	Assert(InStr(FireBody, "LLM_OllamaListModels_Async("),
-		"LLM_Menu_FireInstalledTagsProbe must dispatch the async probe")
+		"_LLM_Menu_FireInstalledTagsProbe must dispatch the async probe")
 	Assert(InStr(FireBody, "A_IsSuspended"),
-		"LLM_Menu_FireInstalledTagsProbe must early-return on A_IsSuspended — its rebuild "
+		"_LLM_Menu_FireInstalledTagsProbe must early-return on A_IsSuspended — its rebuild "
 		. "path bypasses native Suspend like the health probe")
 
 	DoneBody := _DriverFuncBody("_LLM_Menu_OnInstalledTagsProbeDone")
