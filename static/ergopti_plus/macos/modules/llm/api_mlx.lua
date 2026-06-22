@@ -14,6 +14,7 @@ local i18n           = require("lib.i18n")
 local Parser         = require("modules.llm.parser")
 local Profiles       = require("modules.llm.profiles")
 local ApiCommon      = require("modules.llm.api_common")
+local ApiMlxFetch    = require("modules.llm.api_mlx_fetch")   -- dispatch strategies (batch/parallel/sequential)
 local SharedPromptBuilder = require("llm.prompt_builder")   -- single source for DEFAULT_MAX_TOKENS
 local _warmup_client = require("adapters.http_client").new()  -- Dedicated client for warmup POSTs; isolated so discovery probes cannot cancel an in-flight warmup
 local _probe_client  = require("adapters.http_client").new()  -- Dedicated client for discover_endpoints() POST probes; never shares state with warmup
@@ -31,10 +32,6 @@ if not ok_kl then keylogger = nil end
 
 local _req_counter = 0
 local DEDUPLICATION_ENABLED = false
--- Retry policy comes from _shared/modules/llm/inference.json (see api_common.lua).
-local _RETRY_MAX_MULT, _RETRY_TEMP_STEP, _RETRY_EXTRA_TOKENS = ApiCommon.get_retry_policy()
-local RETRY_FAILED_PREDICTION_ENABLED        = (_RETRY_MAX_MULT or 0) > 1
-local RETRY_FAILED_PREDICTION_MAX_MULTIPLIER = _RETRY_MAX_MULT
 -- MLX stream/warmup timeouts come from the shared cross-driver registry ([llm]).
 local STREAM_CONNECT_TIMEOUT_SEC = Timings.sec("llm", "stream_connect_timeout_ms") -- Fail fast if the MLX server does not accept the TCP connection
 local STREAM_HARD_TIMEOUT_SEC    = Timings.sec("llm", "stream_hard_timeout_ms")    -- Kill the task if the server accepts but never sends a token
@@ -1626,177 +1623,33 @@ end
 --- ===================================
 -- ===================================
 
---- Dispatches a single API request asking for N clustered predictions.
---- @param full_text string The complete tracked context string.
---- @param tail_text string The most recent segment of the context.
---- @param model_name string Name of the targeted local model.
---- @param temperature number Base sampling temperature.
---- @param max_predict number Maximum allowed output tokens.
---- @param num_predictions number Request quantity for prediction arrays.
---- @param profile table Active profile mapping.
---- @param on_success function Function to execute on success.
---- @param on_fail function Function to execute on failure.
---- @param request_id_provider function Callback returning the current request identifier.
---- @param streaming boolean Whether to use token-by-token streaming (controlled by init.lua).
---- @param on_partial function|nil Optional token-by-token streaming callback.
-function M.fetch_batch(full_text, tail_text, model_name, temperature,
-                       max_predict, num_predictions, profile,
-                       on_success, on_fail, request_id_provider, streaming, on_partial)
+-- The dispatch strategies live in api_mlx_fetch.lua — a state-free module that
+-- receives the request mechanics (post_and_parse / post_and_parse_streaming) and
+-- the dedup flag by injection. Wire it up now that the post functions are defined,
+-- then re-expose the same public surface through thin delegations so every caller
+-- (prediction_engine, init.lua) keeps using ApiMlx.fetch_* unchanged.
+ApiMlxFetch.init({
+	post_and_parse           = post_and_parse,
+	post_and_parse_streaming = post_and_parse_streaming,
+	dedup_enabled            = DEDUPLICATION_ENABLED,
+})
 
-	local effective_temp = tonumber(temperature) or ApiCommon.DEFAULT_TEMPERATURE
-	local system_prompt  = Profiles.resolve_system_prompt(profile, num_predictions)
-	local tokens         = tonumber(max_predict) * num_predictions + (num_predictions * 5)
-	local is_batch       = profile.batch
-	local dedup_stats    = ApiCommon.new_dedup_stats()
-	local post_fn        = streaming and post_and_parse_streaming or post_and_parse
-
-	local t0 = TimerScheduler.now()
-	post_fn(model_name, system_prompt, full_text, tail_text,
-		effective_temp, tokens, num_predictions, is_batch,
-		function(results)
-			local ms = math.floor((TimerScheduler.now() - t0) * 1000)
-			ApiCommon.log_prediction_summary(Logger, LOG, "batch", num_predictions, dedup_stats, #results)
-			-- With streaming OFF: reveal each prediction one by one (complete, no animation) so
-			-- the user sees slot 1 fill, then slot 2, etc. rather than all appearing at once.
-			-- Each doAfter(0) yields to the event loop so the tooltip renders between reveals.
-			-- With streaming ON: on_partial_cb already showed each pred token by token;
-			-- emit the final call directly to replace stream placeholders with diff colors.
-			if not streaming and #results > 1 then
-				local function reveal_next(idx)
-					if idx > #results then return end
-					local subset = {}
-					for j = 1, idx do subset[j] = results[j] end
-					local is_final = (idx == #results)
-					-- Pass is_batch_progressive=true so prediction_engine bypasses the
-					-- streaming_multi early-return for these intermediate calls
-					if type(on_success) == "function" then pcall(on_success, subset, ms, is_final, not is_final) end
-					if not is_final then TimerScheduler.after(0, function() reveal_next(idx + 1) end) end
-				end
-				reveal_next(1)
-			else
-				if type(on_success) == "function" then pcall(on_success, results, ms, true) end
-			end
-		end,
-		on_fail,
-		dedup_stats,
-		streaming and on_partial or nil)
+--- Dispatches a single request asking for N clustered predictions.
+--- @see modules.llm.api_mlx_fetch M.fetch_batch for the full contract.
+function M.fetch_batch(...)
+	return ApiMlxFetch.fetch_batch(...)
 end
 
---- Dispatches multiple parallel API requests incrementing the temperature to aggregate predictions.
---- @param full_text string The complete tracked context string.
---- @param tail_text string The most recent segment of the context.
---- @param model_name string Name of the targeted local model.
---- @param temperature number Base sampling temperature.
---- @param max_predict number Maximum allowed output tokens.
---- @param num_predictions number Request quantity for prediction arrays.
---- @param profile table Active profile mapping.
---- @param on_success function Function to execute on success.
---- @param on_fail function Function to execute on failure.
---- @param request_id_provider function Callback returning the current request identifier.
---- @param streaming boolean Whether to use token-by-token streaming.
---- @param on_partial function|nil Optional token-by-token streaming callback.
-function M.fetch_parallel(full_text, tail_text, model_name, temperature,
-                          max_predict, num_predictions, profile,
-                          on_success, on_fail, request_id_provider, streaming, on_partial)
-	-- MLX can produce unstable outputs under parallel fan-out with some models
-	-- Force sequential dispatch for reliability while keeping the same public API
-	return M.fetch_sequential(full_text, tail_text, model_name, temperature,
-		max_predict, num_predictions, profile,
-		on_success, on_fail, request_id_provider, streaming, on_partial)
+--- Dispatches predictions with per-variant temperature spread (sequential under the hood).
+--- @see modules.llm.api_mlx_fetch M.fetch_parallel for the full contract.
+function M.fetch_parallel(...)
+	return ApiMlxFetch.fetch_parallel(...)
 end
 
---- Dispatches multiple sequential API requests to avoid parallel connection dropping.
---- @param full_text string The complete tracked context string.
---- @param tail_text string The most recent segment of the context.
---- @param model_name string Name of the targeted local model.
---- @param temperature number Base sampling temperature.
---- @param max_predict number Maximum allowed output tokens.
---- @param num_predictions number Request quantity for prediction arrays.
---- @param profile table Active profile mapping.
---- @param on_success function Function to execute on success.
---- @param on_fail function Function to execute on failure.
---- @param request_id_provider function Callback returning the current request identifier.
---- @param streaming boolean Whether to use token-by-token streaming.
---- @param on_partial function|nil Optional token-by-token streaming callback.
-function M.fetch_sequential(full_text, tail_text, model_name, temperature,
-                             max_predict, num_predictions, profile,
-                             on_success, on_fail, request_id_provider, streaming, on_partial)
-
-	local system_prompt = Profiles.resolve_system_prompt(profile, 1)
-	local t0            = TimerScheduler.now()
-	local results       = {}
-	local base_temp     = tonumber(temperature) or ApiCommon.DEFAULT_TEMPERATURE
-	local requested_predictions = math.max(1, math.floor(tonumber(num_predictions) or 1))
-	local max_attempts = requested_predictions
-	if RETRY_FAILED_PREDICTION_ENABLED == true then
-		max_attempts = math.max(requested_predictions, requested_predictions * math.max(1, math.floor(tonumber(RETRY_FAILED_PREDICTION_MAX_MULTIPLIER))))
-	end
-	local attempt_index = 1
-	local dedup_stats   = ApiCommon.new_dedup_stats()
-	local initial_request_id = type(request_id_provider) == "function" and request_id_provider() or nil
-
-	local function do_next()
-		-- Check if this request batch was cancelled dynamically
-		if type(request_id_provider) == "function" then
-			local current_request_id = request_id_provider()
-			if initial_request_id ~= nil and current_request_id ~= initial_request_id then
-				Logger.debug(LOG, "Request batch cancelled: ID changed from %s to %s at step %d/%d",
-					tostring(initial_request_id), tostring(current_request_id), attempt_index, max_attempts)
-				return
-			end
-		end
-
-		if #results >= requested_predictions or attempt_index > max_attempts then
-			if #results == 0 then if type(on_fail) == "function" then pcall(on_fail) end return end
-			ApiCommon.log_prediction_summary(Logger, LOG, "sequential", requested_predictions, dedup_stats, #results)
-			local ms = math.floor((TimerScheduler.now() - t0) * 1000)
-			if type(on_success) == "function" then pcall(on_success, results, ms, true) end
-			return
-		end
-
-		local variant_index  = attempt_index
-		attempt_index        = attempt_index + 1
-		local variant_temp   = ApiCommon.get_diversity_temperature(base_temp, variant_index, 0.30)
-		local primary_tokens = tonumber(max_predict)
-		-- Each variant streams its tokens via on_partial so the tooltip shows each
-		-- prediction building in its own slot; prediction_engine.lua keeps the cursor
-		-- at slot 1 (or wherever the user navigated) regardless of which slot streams
-		local variant_partial = on_partial
-
-		local function request_variant(attempt, tokens, temp)
-			local post_fn = streaming and post_and_parse_streaming or post_and_parse
-			post_fn(model_name, system_prompt, full_text, tail_text,
-				temp, tokens, 1, false,
-				function(preds)
-					if type(preds) == "table" and type(preds[1]) == "table" then
-						if #results < requested_predictions then
-							ApiCommon.insert_prediction(results, preds[1], dedup_stats, DEDUPLICATION_ENABLED, Logger, LOG)
-							local ms = math.floor((TimerScheduler.now() - t0) * 1000)
-							if type(on_success) == "function" then pcall(on_success, results, ms, false) end
-						end
-					end
-					do_next()
-				end,
-				function()
-					if attempt < 2 then
-						local retry_tokens = tokens + 5
-						local retry_temp   = math.min(0.60, (tonumber(temp) or ApiCommon.DEFAULT_TEMPERATURE) + 0.10)
-						Logger.debug(LOG, "[%s] Variant %d/%d quick chat retry: tokens=%d temp=%.2f",
-							model_name, variant_index, max_attempts, retry_tokens, retry_temp)
-						-- Retry does not stream partial updates (would overwrite the growing preview)
-						request_variant(attempt + 1, retry_tokens, retry_temp)
-						return
-					end
-					do_next()
-				end,
-				dedup_stats,
-				streaming and variant_partial or nil)
-		end
-
-		request_variant(1, primary_tokens, variant_temp)
-	end
-
-	do_next()
+--- Dispatches sequential requests to avoid parallel connection dropping.
+--- @see modules.llm.api_mlx_fetch M.fetch_sequential for the full contract.
+function M.fetch_sequential(...)
+	return ApiMlxFetch.fetch_sequential(...)
 end
 
 return M
