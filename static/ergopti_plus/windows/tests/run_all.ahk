@@ -242,6 +242,8 @@ try FileAppend("# [marker] starting direct include of LLM production modules`r`n
 #Include meta/test_llm_installed_tags_async.ahk
 ; Any input (type/click/move) cancels in-progress generation (llm-spinner-lingers-through-input).
 #Include meta/test_llm_input_cancels_generation.ahk
+; Ollama reachability probe is non-blocking curl, not WinHTTP (ollama-reachability-winhttp-connect-blocks).
+#Include meta/test_ollama_reachability_async_nonblocking.ahk
 try FileAppend("# [marker] LLM production modules + tests included`r`n", A_Temp . "\ergopti_test_results.txt", "UTF-8")
 try FileAppend("# [marker] LLM production modules + tests included`r`n", "*")
 

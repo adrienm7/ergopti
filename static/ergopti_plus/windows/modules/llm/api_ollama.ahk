@@ -238,23 +238,57 @@ LLM_OllamaIsRunning() {
  * @param {function} on_result - Callback receiving the boolean reachability.
  */
 LLM_OllamaIsRunning_Async(on_result) {
+	; curl CHILD PROCESS, not WinHTTP. The WinHttpRequest.5.1 COM object's "async"
+	; mode (Open(...,true) + Send()) still performs the TCP connect synchronously on
+	; the CALLING (message-loop) thread: against a cold/busy local daemon that connect
+	; blocked for up to ~9 s at boot — freezing the tray build AND keystroke/cancel
+	; handling (the menu build that ran during the boot bootstrap was measured stuck
+	; for ~14 s entirely on this). It is the same reason the generation path already
+	; uses curl. A curl child does the connect in its OWN process; we only poll
+	; ProcessExist (instant), so the AHK message loop is NEVER blocked.
 	try {
-		http := ComObject("WinHttp.WinHttpRequest.5.1")
-		http.Open("GET", LLM_OLLAMA_BASE_URL "/api/version", true)
-		; 1 s timeouts (was 2 s × 4 phases = 8 s worst case). A local
-		; Ollama answers in < 50 ms; if it doesn't reply within a single
-		; second the daemon is unreachable and there's nothing to gain
-		; from waiting longer.
-		http.SetTimeouts(1000, 1000, 1000, 1000)
-		http.Send()
-		; Use ``poll_ms = 500`` for the health probe — we don't need 50 ms
-		; reactivity for a check that fires every 10 s, and the tighter
-		; loop was firing ~60 timer callbacks per probe, contesting the
-		; message loop with the InputHook and dropping user keystrokes.
-		_LLM_Ollama_PollGeneric(http, (status, _body) => on_result(status == 200), () => on_result(false), 0, 0, 500)
+		uid := _LLM_Ollama_NextStreamUid()
+		tmp_out := _LLM_Ollama_TempDir() . "\ergopti_ollama_ping_" . uid . ".out"
+		curl_exe := A_WinDir . "\System32\curl.exe"
+		; -m 2: hard 2 s ceiling. A local daemon answers GET /api/version in < 50 ms;
+		; one that needs longer is "not ready yet" for our purposes — the deps poll
+		; retries, and the health tick re-probes, so a slow first answer self-heals.
+		cmd := '"' . curl_exe . '" -s -m 2 -o ' . _Q(tmp_out) . ' ' . _Q(LLM_OLLAMA_BASE_URL . "/api/version")
+		pid := 0
+		Run(cmd, , "Hide", &pid)
+		_LLM_Ollama_PingPoll(pid, tmp_out, on_result, A_TickCount)
 	} catch {
 		try on_result(false)
 	}
+}
+
+/**
+ * Polls a reachability-ping curl child WITHOUT blocking the message loop. Reachable
+ * iff curl exited having written a non-empty body (GET /api/version → 200 + JSON);
+ * a connection refusal / timeout exits non-zero with an empty file. Mirrors the
+ * non-streaming generation poll (_LLM_Ollama_PollCurl), scaled down for a tiny ping.
+ * @param {integer}  pid        - curl child PID (0 if Run failed).
+ * @param {string}   tmp_out    - Temp file curl writes the response body to.
+ * @param {function} on_result  - Callback receiving the boolean reachability.
+ * @param {integer}  start_tick - A_TickCount at dispatch, for the deadline backstop.
+ */
+_LLM_Ollama_PingPoll(pid, tmp_out, on_result, start_tick) {
+	; 4 s backstop: curl -m 2 should exit by ~2 s, but ProcessClose if it overruns so
+	; a wedged child can never keep the poll chain (or its temp handle) alive.
+	if (pid > 0 and ProcessExist(pid)) {
+		if (_LLM_DeadlineExpired(start_tick, 4000)) {
+			try ProcessClose(pid)
+			try FSDelete(tmp_out)
+			try on_result(false)
+			return
+		}
+		SetTimer(() => _LLM_Ollama_PingPoll(pid, tmp_out, on_result, start_tick), -150)
+		return
+	}
+	reachable := false
+	try reachable := (FileExist(tmp_out) and FileGetSize(tmp_out) > 0)
+	try FSDelete(tmp_out)
+	try on_result(reachable)
 }
 
 /**
