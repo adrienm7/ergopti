@@ -163,18 +163,34 @@ MenuDispatcher_PruneMenu(MenuObj) {
         return
     }
 
-    ; Drop every tracked ID that no longer corresponds to a live item in THIS
-    ; menu. An ID owned by ANOTHER menu also has no entry in LiveIds, so we must
-    ; only prune IDs that were registered for the menu being rebuilt. We cannot
-    ; know an ID's owning menu from the Maps alone, so we restrict the prune to
-    ; IDs absent from LiveIds AND whose item is gone from EVERY tracked menu —
-    ; in practice the rebuilder calls this immediately after deleting its own
-    ; items, and a freed Win32 ID is no longer reported by GetMenuItemID for any
-    ; menu until re-added. Collect dead IDs first to avoid mutating during
-    ; enumeration.
+    ; Fold in EVERY ID live anywhere in the tray, collected in a SINGLE recursive
+    ; walk. An ID owned by ANOTHER menu has no entry in this menu's LiveIds, so
+    ; without this it would look dead and be wrongly pruned. The previous code
+    ; asked _MenuDispatchIdIsLiveAnywhere(Id) PER tracked ID — each a full
+    ; recursive descent of the whole tray — making the prune O(tracked x tray):
+    ; with hundreds of tracked items it cost ~0.6 s warm and up to ~6 s at boot
+    ; (the dominant term in LLM_Menu_Build latency). One walk + O(1) lookups is
+    ; O(tray + tracked) (menu-prune-quadratic-tray-walk).
+    TrayWalked := false
+    try {
+        TrayHandle := A_TrayMenu.Handle
+        if (TrayHandle) {
+            _MenuDispatchCollectLiveIds(TrayHandle, LiveIds, Map())
+            TrayWalked := true
+        }
+    } catch {
+        ; Tray handle unavailable — fall through to the guard below.
+    }
+    ; Without a reliable whole-tray live set we cannot tell an ID owned by another
+    ; live menu from a freed one, so skip the prune rather than drop a live entry.
+    if (!TrayWalked)
+        return
+
+    ; Drop every tracked ID no longer live in this menu OR anywhere in the tray.
+    ; Collect dead IDs first to avoid mutating the Map during enumeration.
     DeadIds := []
     for Id in _MenuDispatchCallbacks {
-        if !LiveIds.Has(Id) and !_MenuDispatchIdIsLiveAnywhere(Id) {
+        if !LiveIds.Has(Id) {
             DeadIds.Push(Id)
         }
     }
@@ -190,48 +206,31 @@ MenuDispatcher_PruneMenu(MenuObj) {
     }
 }
 
-; Reports whether a Win32 menu-item ID is still present in ANY currently
-; registered tray menu. Used by MenuDispatcher_PruneMenu to avoid dropping an
-; entry that belongs to a DIFFERENT live menu than the one being rebuilt: a
-; freed ID is reported by GetMenuItemID for no menu, while a live ID owned by
-; another submenu still shows up there. We probe the tray root and descend
-; recursively with cycle protection to reach items at any depth (depth 2-3 is
-; reachable through Shortcuts → modifier_combos → items). Returns true on any
-; match.
-_MenuDispatchIdIsLiveAnywhere(ItemId) {
-    try {
-        TrayHandle := A_TrayMenu.Handle
-        if (TrayHandle and _MenuDispatchHandleHasId(TrayHandle, ItemId, Map()))
-            return true
-    } catch {
-        ; Tray menu may not exist yet (very early boot) — treat as not live.
-    }
-    return false
-}
-
-; Walks HMENU for ItemId, descending into every popup submenu recursively.
-; Seen guards against cycles (circular HMENU references) by tracking every
-; handle already visited. Returns true on first match.
-_MenuDispatchHandleHasId(HMENU, ItemId, Seen) {
+; Collects every live menu-item ID reachable from HMENU into LiveSet, descending
+; into every popup submenu recursively (depth-unlimited — items live at depth 2-3,
+; e.g. Shortcuts → modifier_combos → items, must be collected or PruneMenu would
+; wrongly drop their tracking; F07 deep-liveness). Seen guards against cyclic
+; HMENU references. One pass replaces the old per-ID _MenuDispatchIdIsLiveAnywhere
+; search that made the prune O(tracked x tray) (menu-prune-quadratic-tray-walk).
+_MenuDispatchCollectLiveIds(HMENU, LiveSet, Seen) {
     if (Seen.Has(HMENU))
-        return false
+        return
     Seen[HMENU] := true
     try {
         Count := DllCall("GetMenuItemCount", "ptr", HMENU, "int")
         Loop Count {
             Pos := A_Index - 1
             Id := DllCall("GetMenuItemID", "ptr", HMENU, "int", Pos, "uint")
-            if (Id == ItemId and Id != 0xFFFFFFFF)
-                return true
+            if (Id and Id != 0xFFFFFFFF)
+                LiveSet[Id] := true
             Sub := DllCall("GetSubMenu", "ptr", HMENU, "int", Pos, "ptr")
-            if (Sub and _MenuDispatchHandleHasId(Sub, ItemId, Seen))
-                return true
+            if (Sub)
+                _MenuDispatchCollectLiveIds(Sub, LiveSet, Seen)
         }
     } catch {
-        ; Probe failure — report not found so the conservative path keeps the
-        ; entry only if PruneMenu's own LiveIds set claims it.
+        ; Probe failure mid-walk — stop descending this branch. Same exposure as the
+        ; prior per-ID probe: an unreachable live ID may then be treated as dead.
     }
-    return false
 }
 
 ; Add a menu item that participates in the dispatch bypass. Behaves like

@@ -7,20 +7,20 @@
 ; lib/menu_dispatcher.ahk.
 ;
 ; BACKGROUND:
-; MenuDispatcher_PruneMenu calls _MenuDispatchIdIsLiveAnywhere(Id) to decide
-; whether a tracked item is still present somewhere in the tray hierarchy.
-; Before the fix, _MenuDispatchHandleHasId(HMENU, ItemId, Recurse) descended
-; only ONE level of submenus (called with Recurse=true at depth 0, then
-; Recurse=false at depth 1). Items registered at depth 2-3 (e.g. Shortcuts →
-; modifier_combos → items) were always reported as "not found", so PruneMenu
-; incorrectly deleted them from _MenuDispatchCallbacks and click recovery was
-; permanently disabled for those items.
+; MenuDispatcher_PruneMenu must decide whether each tracked item is still present
+; somewhere in the tray hierarchy. Before the F07 fix the walker descended only
+; ONE level of submenus, so items registered at depth 2-3 (e.g. Shortcuts →
+; modifier_combos → items) were always reported "not found" and PruneMenu wrongly
+; deleted them from _MenuDispatchCallbacks, permanently disabling click recovery.
 ;
 ; THE FIX:
-; Replaced the bounded-recursion helper (Recurse bool) with fully recursive,
-; depth-unlimited traversal using a Seen Map to guard against HMENU cycles.
-; The new signature is _MenuDispatchHandleHasId(HMENU, ItemId, Seen), and
-; _MenuDispatchIdIsLiveAnywhere passes Map() as the initial Seen argument.
+; Fully recursive, depth-unlimited traversal with a Seen Map guarding HMENU cycles.
+; The traversal now lives in _MenuDispatchCollectLiveIds(HMENU, LiveSet, Seen),
+; which PruneMenu seeds once with Map(). It replaced the old per-ID
+; _MenuDispatchIdIsLiveAnywhere / _MenuDispatchHandleHasId search (a full tray
+; descent PER tracked ID — see menu-prune-quadratic-tray-walk). The depth-unlimited
+; + cycle-guard guarantee is unchanged; only the shape (collect-all in one pass vs
+; find-one) changed.
 ;
 ; This meta-static test asserts the fix is structurally present and cannot
 ; silently regress.
@@ -58,39 +58,38 @@ _MDDL_ReadSource(RelPath) {
 
 _MDDL_NoOneLevelCap() {
 	Src := _MDDL_ReadSource("lib/menu_dispatcher.ahk")
-	Body := _DriverFuncBody("_MenuDispatchHandleHasId")
-	Assert(Body != "", "_MenuDispatchHandleHasId must be defined in menu_dispatcher.ahk")
-	; The old one-level cap called _MenuDispatchHandleHasId(Sub, ItemId, false).
-	; That literal ', false)' must not appear anywhere in the function body after
-	; the fix — it is the signature of the bounded descent that caused F07.
+	Body := _DriverFuncBody("_MenuDispatchCollectLiveIds")
+	Assert(Body != "", "_MenuDispatchCollectLiveIds must be defined in menu_dispatcher.ahk")
+	; The old one-level cap called the walker with a trailing ', false)'. That literal
+	; must not reappear anywhere in the traversal — it was the bounded descent (F07).
 	Assert(InStr(Body, ", false)") == 0,
-		"_MenuDispatchHandleHasId body must NOT contain ', false)' — that was the one-level cap that prevented deep-menu items from being found")
+		"_MenuDispatchCollectLiveIds body must NOT contain ', false)' — that was the one-level cap that prevented deep-menu items from being found")
 }
-Test("menu_dispatcher: _MenuDispatchHandleHasId has no one-level-cap call (F07 deep-liveness)", _MDDL_NoOneLevelCap)
+Test("menu_dispatcher: _MenuDispatchCollectLiveIds has no one-level-cap call (F07 deep-liveness)", _MDDL_NoOneLevelCap)
 
 _MDDL_CycleGuardPresent() {
 	Src := _MDDL_ReadSource("lib/menu_dispatcher.ahk")
-	Body := _DriverFuncBody("_MenuDispatchHandleHasId")
-	Assert(Body != "", "_MenuDispatchHandleHasId must be defined in menu_dispatcher.ahk")
+	Body := _DriverFuncBody("_MenuDispatchCollectLiveIds")
+	Assert(Body != "", "_MenuDispatchCollectLiveIds must be defined in menu_dispatcher.ahk")
 	Assert(InStr(Body, "Seen.Has(") > 0,
-		"_MenuDispatchHandleHasId must use a Seen Map (Seen.Has()) to guard against HMENU cycles — without it an infinite loop is possible")
+		"_MenuDispatchCollectLiveIds must use a Seen Map (Seen.Has()) to guard against HMENU cycles — without it an infinite loop is possible")
 }
-Test("menu_dispatcher: _MenuDispatchHandleHasId has cycle guard via Seen.Has() (F07 deep-liveness)", _MDDL_CycleGuardPresent)
+Test("menu_dispatcher: _MenuDispatchCollectLiveIds has cycle guard via Seen.Has() (F07 deep-liveness)", _MDDL_CycleGuardPresent)
 
 _MDDL_RecursiveCall() {
 	Src := _MDDL_ReadSource("lib/menu_dispatcher.ahk")
-	Body := _DriverFuncBody("_MenuDispatchHandleHasId")
-	Assert(Body != "", "_MenuDispatchHandleHasId must be defined in menu_dispatcher.ahk")
-	Assert(InStr(Body, "_MenuDispatchHandleHasId(Sub") > 0,
-		"_MenuDispatchHandleHasId must call itself recursively with the Sub handle to achieve depth-unlimited traversal")
+	Body := _DriverFuncBody("_MenuDispatchCollectLiveIds")
+	Assert(Body != "", "_MenuDispatchCollectLiveIds must be defined in menu_dispatcher.ahk")
+	Assert(InStr(Body, "_MenuDispatchCollectLiveIds(Sub") > 0,
+		"_MenuDispatchCollectLiveIds must call itself recursively with the Sub handle to achieve depth-unlimited traversal")
 }
-Test("menu_dispatcher: _MenuDispatchHandleHasId calls itself recursively (F07 deep-liveness)", _MDDL_RecursiveCall)
+Test("menu_dispatcher: _MenuDispatchCollectLiveIds calls itself recursively (F07 deep-liveness)", _MDDL_RecursiveCall)
 
 _MDDL_CallerPassesMap() {
 	Src := _MDDL_ReadSource("lib/menu_dispatcher.ahk")
-	Body := _DriverFuncBody("_MenuDispatchIdIsLiveAnywhere")
-	Assert(Body != "", "_MenuDispatchIdIsLiveAnywhere must be defined in menu_dispatcher.ahk")
-	Assert(InStr(Body, "Map()") > 0,
-		"_MenuDispatchIdIsLiveAnywhere must pass Map() as the initial Seen argument to _MenuDispatchHandleHasId — without it the cycle guard is never seeded")
+	Body := _DriverFuncBody("MenuDispatcher_PruneMenu")
+	Assert(Body != "", "MenuDispatcher_PruneMenu must be defined in menu_dispatcher.ahk")
+	Assert(InStr(Body, "_MenuDispatchCollectLiveIds(TrayHandle, LiveIds, Map())") > 0,
+		"MenuDispatcher_PruneMenu must seed _MenuDispatchCollectLiveIds with Map() as the initial Seen argument — without it the cycle guard is never seeded")
 }
-Test("menu_dispatcher: _MenuDispatchIdIsLiveAnywhere passes Map() as Seen argument (F07 deep-liveness)", _MDDL_CallerPassesMap)
+Test("menu_dispatcher: MenuDispatcher_PruneMenu seeds the walk with Map() as Seen (F07 deep-liveness)", _MDDL_CallerPassesMap)

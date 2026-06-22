@@ -472,6 +472,10 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 #Include meta/test_lock_workstation_named_helper.ahk
 #Include meta/test_lost_tick_after_filtered_keystroke.ahk
 #Include meta/test_menu_dispatch_callbacks_unbounded_growth.ahk
+; Deep-liveness: the prune's tray walk reaches items at any depth (F07 deep-liveness).
+#Include meta/test_menu_dispatch_deep_liveness.ahk
+; Prune collects live IDs once, not per tracked ID — O(tray+tracked) (menu-prune-quadratic-tray-walk).
+#Include meta/test_menu_prune_quadratic_tray_walk.ahk
 #Include meta/test_ni_isvpnactive_missing_return.ahk
 #Include meta/test_no_onexit_keylogger_flush.ahk
 #Include meta/test_onboarding_no_appstate.ahk
