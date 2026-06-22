@@ -17,7 +17,7 @@ SetWorkingDir(A_ScriptDir)
 #Include test_framework.ahk
 
 ; --- Globals the browser module reads ---
-global _LLM_Tray   := Map("model", "Qwen3.5-2B")
+global _LLM_Menu   := Map("model", "Qwen3.5-2B")
 global _VendorDir  := A_ScriptDir
 global _SharedDir  := A_ScriptDir
 global _I18nLocale := "fr"
@@ -32,7 +32,7 @@ t(key)                 => key
 LoggerError(args*)     => ""
 LoggerStart(args*)     => ""
 JsonParse(s)           => Map()
-LLM_Tray_SetModel(n)   => ""
+LLM_Menu_SetModel(n)   => ""
 LLM_Deps_IsReady()     => _MBW_DepsReady
 LLM_OllamaListModels() {
 	global _MBW_OllamaListHits

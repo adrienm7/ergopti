@@ -237,13 +237,13 @@ SaveFullConfig() {
         return
     }
     Updates := []
-    ; Only sync LLM state into Features if LLM_Tray_Init() has already run and
-    ; populated _LLM_Tray with the user's persisted values. Calling it before
+    ; Only sync LLM state into Features if LLM_Menu_Init() has already run and
+    ; populated _LLM_Menu with the user's persisted values. Calling it before
     ; init would push module-level defaults (e.g. enabled=false) over the user's
     ; saved settings, corrupting the config file.
-    global _LLM_Tray_Loaded
-    if IsSet(_LLM_Tray_SyncToFeatures) && (IsSet(_LLM_Tray_Loaded) && _LLM_Tray_Loaded)
-        _LLM_Tray_SyncToFeatures()
+    global _LLM_Menu_Loaded
+    if IsSet(_LLM_Menu_SyncToFeatures) && (IsSet(_LLM_Menu_Loaded) && _LLM_Menu_Loaded)
+        _LLM_Menu_SyncToFeatures()
     if IsSet(Features) {
         _CollectFeatureUpdates(Updates, "", Features)
         Updates.Push({ Section: "_meta", Key: "schema_version", Value: 2 })
@@ -280,16 +280,16 @@ SaveFullConfig() {
     Updates.Push({ Section: "ahk.metrics", Key: WPMWidgetConst.CFG_Y,       Value: String(WPMWidget.pos_y) })
     Updates.Push({ Section: "ahk.metrics", Key: WPMWidgetConst.CFG_COLORS,  Value: WPMWidget.use_colors ? "1" : "0" })
     Updates.Push({ Section: "ahk.metrics", Key: WPMWidgetConst.CFG_GRAPH,   Value: WPMWidget.show_graph  ? "1" : "0" })
-    Updates.Push({ Section: "llm", Key: "onboarding_seen", Value: _LLM_Tray["onboarding_seen"] ? "1" : "0" })
+    Updates.Push({ Section: "llm", Key: "onboarding_seen", Value: _LLM_Menu["onboarding_seen"] ? "1" : "0" })
     _AppOverridesStr := ""
-    for _AppName, _AppProfileId in _LLM_Tray["app_profile_overrides"] {
+    for _AppName, _AppProfileId in _LLM_Menu["app_profile_overrides"] {
         if (_AppOverridesStr != "")
             _AppOverridesStr .= ";"
         _AppOverridesStr .= _AppName . "=" . _AppProfileId
     }
     Updates.Push({ Section: "llm", Key: "app_profile_overrides", Value: _AppOverridesStr })
-    if IsSet(_LLM_Tray_AppendPersistedUpdates)
-        _LLM_Tray_AppendPersistedUpdates(Updates)
+    if IsSet(_LLM_Menu_AppendPersistedUpdates)
+        _LLM_Menu_AppendPersistedUpdates(Updates)
     global CategoryEnabled
     if IsSet(CategoryEnabled) {
         for _CatName, _CatBool in CategoryEnabled

@@ -180,8 +180,8 @@ HotstringPrefixWatcherInit() {
     LoggerSuccess("PrefixWatcher", "Watcher started (index build deferred off the boot path).")
     ; LLM bridge must attach to this InputHook — Ollama bootstrap often
     ; completes before we exist; honour a deferred start request here.
-    if (IsSet(LLM_Tray_TryStartBridge))
-        LLM_Tray_TryStartBridge()
+    if (IsSet(LLM_Menu_TryStartBridge))
+        LLM_Menu_TryStartBridge()
     else if (IsSet(LLM_Bridge_OnPrefixWatcherReady))
         LLM_Bridge_OnPrefixWatcherReady()
 }

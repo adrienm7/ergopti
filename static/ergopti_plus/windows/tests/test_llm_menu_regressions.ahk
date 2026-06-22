@@ -13,19 +13,19 @@ _LLM_Regress_FrameworkPath() {
 }
 
 _LLM_Regress_MenuModelsPath() {
-	return A_ScriptDir . "\..\ui\tray_llm\menu_models.ahk"
+	return A_ScriptDir . "\..\ui\menu\menu_llm\menu_models.ahk"
 }
 
 _LLM_Regress_MenuSettingsPath() {
-	return A_ScriptDir . "\..\ui\tray_llm\menu_settings.ahk"
+	return A_ScriptDir . "\..\ui\menu\menu_llm\menu_settings.ahk"
 }
 
 _LLM_Regress_ActionsPath() {
-	return A_ScriptDir . "\..\ui\tray_llm\actions.ahk"
+	return A_ScriptDir . "\..\ui\menu\menu_llm\actions.ahk"
 }
 
 _LLM_Regress_PersistPath() {
-	return A_ScriptDir . "\..\ui\tray_llm\persist.ahk"
+	return A_ScriptDir . "\..\ui\menu\menu_llm\persist.ahk"
 }
 
 _LLM_Regress_RecordN(n) {
@@ -33,7 +33,7 @@ _LLM_Regress_RecordN(n) {
 	_LLM_Regress_LastN := n
 }
 
-; Production-equivalent factory (must match menu_models.ahk _LLM_Tray_MakeSetNHandler).
+; Production-equivalent factory (must match menu_models.ahk _LLM_Menu_MakeSetNHandler).
 _LLM_Regress_MakeSetNHandler(n) {
 	return (name, pos, menu) => _LLM_Regress_RecordN(n)
 }
@@ -102,12 +102,12 @@ Test("LLM regression: isolated LLM runner predeclares _AHK_DRY_RUN",
 ; ============================================
 
 Test_LLM_Regression_ValModifiersAltCtrlRoundTrip() {
-	global _LLM_Tray, Features
+	global _LLM_Menu, Features
 	Features := _LLM_Persist_CloneFeatures(Features)
-	_LLM_Tray := _LLM_Persist_MakeDefaultTray()
-	_LLM_Tray["val_modifiers"] := "alt,ctrl"
+	_LLM_Menu := _LLM_Persist_MakeDefaultTray()
+	_LLM_Menu["val_modifiers"] := "alt,ctrl"
 
-	_LLM_Tray_SyncToFeatures()
+	_LLM_Menu_SyncToFeatures()
 	got := Features["llm"]["navigation"]["val_modifiers"]
 	Assert(_LLM_Persist_ValuesEqual(["alt", "ctrl"], got, Map("toml_array", true)),
 		"Sync must split alt,ctrl into a two-element array")
@@ -116,7 +116,7 @@ Test_LLM_Regression_ValModifiersAltCtrlRoundTrip() {
 	path := A_Temp . "\ergopti_llm_regress_val_mods.toml"
 	TOML_BatchWrite(path, updates)
 	cache := ParseTomlFile(path)
-	opts := LLM_Tray_BuildSavedOpts(cache)
+	opts := LLM_Menu_BuildSavedOpts(cache)
 	Assert(_LLM_Persist_ValuesEqual("alt,ctrl", opts["val_modifiers"], Map("toml_array", true)),
 		"BuildSavedOpts must reload alt,ctrl from TOML cache, not a single token")
 }
@@ -132,10 +132,10 @@ Test("LLM regression: val_modifiers alt,ctrl round-trips via cache",
 
 Test_LLM_Regression_PersistWiringUsesPersistAhk() {
 	AssertEqual(_LLM_Persist_PersistSource(), _LLM_Regress_PersistPath(),
-		"persistence tests must read ui/tray_llm/persist.ahk, not actions.ahk")
+		"persistence tests must read ui/menu/menu_llm/persist.ahk, not actions.ahk")
 	body := FileRead(_LLM_Regress_ActionsPath(), "UTF-8")
-	Assert(!InStr(body, "#Include tray_llm/persist.ahk", false),
-		"actions.ahk must not #Include tray_llm/persist.ahk")
+	Assert(!InStr(body, "#Include menu_llm/persist.ahk", false),
+		"actions.ahk must not #Include menu_llm/persist.ahk")
 }
 Test("LLM regression: persist wiring lives in persist.ahk only",
 	Test_LLM_Regression_PersistWiringUsesPersistAhk)
@@ -149,7 +149,7 @@ Test("LLM regression: persist wiring lives in persist.ahk only",
 
 Test_LLM_Regression_MenuModelsDocumentsClosureFix() {
 	body := FileRead(_LLM_Regress_MenuModelsPath(), "UTF-8")
-	AssertContains(body, "_LLM_Tray_MakeSetNHandler(n)",
+	AssertContains(body, "_LLM_Menu_MakeSetNHandler(n)",
 		"menu_models must expose per-N factory")
 	AssertContains(body, "AHK v2 closes over outer-scope variables by reference",
 		"menu_models must document the closure pitfall")
@@ -159,12 +159,12 @@ Test("LLM regression: menu_models documents and exposes MakeSetNHandler",
 
 Test_LLM_Regression_MenuSettingsUsesNHandlerFactory() {
 	body := FileRead(_LLM_Regress_MenuSettingsPath(), "UTF-8")
-	AssertContains(body, "_LLM_Tray_MakeSetNHandler(n)",
+	AssertContains(body, "_LLM_Menu_MakeSetNHandler(n)",
 		"menu_settings must register N handlers via factory, not bare loop closure")
-	Assert(!RegExMatch(body, "i)for\s+n\s+in\s+LLM_TRAY_N_OPTIONS[^\n]*\n[^\n]*\(\*\)\s*=>\s*LLM_Tray_SetN\(n\)"),
-		"menu_settings must not bind LLM_Tray_SetN(n) inline inside the N loop")
+	Assert(!RegExMatch(body, "i)for\s+n\s+in\s+LLM_MENU_N_OPTIONS[^\n]*\n[^\n]*\(\*\)\s*=>\s*LLM_Menu_SetN\(n\)"),
+		"menu_settings must not bind LLM_Menu_SetN(n) inline inside the N loop")
 }
-Test("LLM regression: menu_settings wires N via _LLM_Tray_MakeSetNHandler",
+Test("LLM regression: menu_settings wires N via _LLM_Menu_MakeSetNHandler",
 	Test_LLM_Regression_MenuSettingsUsesNHandlerFactory)
 
 Test_LLM_Regression_MakeSetNHandlerCapturesEachN() {
@@ -198,7 +198,7 @@ Test("LLM regression: MakeSetNHandler captures 1/3/10 not last N only",
 ;
 ; THE BUG: the "Batch Advanced" profile label leaked a literal "%d prediction%s"
 ; into the menu. The locale string carried printf "%d"/"%s" tokens, but the menu
-; substitutes brace "{n}"/"{s}" placeholders (LLM_Tray_GetProfileLabel) - so the
+; substitutes brace "{n}"/"{s}" placeholders (LLM_Menu_GetProfileLabel) - so the
 ; printf tokens were never replaced and showed verbatim. Mirrors the Hammerspoon
 ; guards in macos/tests/unit/lib/test_locale_profile_labels.lua and
 ; macos/tests/unit/menu/test_profile_label.lua.
@@ -273,15 +273,15 @@ Test_LLM_Regression_BatchLabelKeepsBracePlaceholders() {
 Test("LLM regression: batch_advanced label keeps {n}/{s} in all locales",
 	Test_LLM_Regression_BatchLabelKeepsBracePlaceholders)
 
-; Source guard: LLM_Tray_GetProfileLabel must substitute the brace placeholders.
+; Source guard: LLM_Menu_GetProfileLabel must substitute the brace placeholders.
 ; If a refactor swaps back to Format()/%d the locale strings stop matching and the
 ; "%d prediction%s" leak returns - this pins the substitution convention at source.
 Test_LLM_Regression_GetProfileLabelUsesBraceSubstitution() {
-	body := FileRead(A_ScriptDir . "\..\ui\tray_llm\menu_profiles.ahk", "UTF-8")
+	body := FileRead(A_ScriptDir . "\..\ui\menu\menu_llm\menu_profiles.ahk", "UTF-8")
 	AssertContains(body, '"{n}"',
-		"LLM_Tray_GetProfileLabel must StrReplace the {n} placeholder")
+		"LLM_Menu_GetProfileLabel must StrReplace the {n} placeholder")
 	AssertContains(body, '"{s}"',
-		"LLM_Tray_GetProfileLabel must StrReplace the {s} placeholder")
+		"LLM_Menu_GetProfileLabel must StrReplace the {s} placeholder")
 	Assert(!InStr(body, 'Format(t("llm.profile.batch_advanced.label")'),
 		"profile label must not be routed through Format()/%d - use {n}/{s} StrReplace")
 }
@@ -289,7 +289,7 @@ Test("LLM regression: GetProfileLabel substitutes {n}/{s}, not printf tokens",
 	Test_LLM_Regression_GetProfileLabelUsesBraceSubstitution)
 
 ; Behavioural contract: the production substitution (the exact StrReplace pair from
-; LLM_Tray_GetProfileLabel) applied to the REAL locale label must leave no leftover
+; LLM_Menu_GetProfileLabel) applied to the REAL locale label must leave no leftover
 ; placeholder of EITHER convention. Synthetic ASCII label covers the plural logic;
 ; the real fr label covers the end-to-end reproduction (kept ASCII-safe: we only
 ; assert the count appears and that no token survives, never the translated word).
@@ -334,9 +334,9 @@ Test("LLM regression: brace substitution on real label leaves no placeholder",
 ;
 ; THE BUG: with the LLM feature toggled OFF, the model submenu collapsed to a
 ; single non-clickable row (the currently selected model) instead of listing the
-; full curated catalogue. Root cause: LLM_Tray_BuildModelMenu early-returned a
-; placeholder whenever ``!_LLM_Tray["enabled"] || !LLM_Deps_IsReady()``. Because
-; the Ollama bootstrap only runs when the feature is enabled (ui/tray_llm/init.ahk),
+; full curated catalogue. Root cause: LLM_Menu_BuildModelMenu early-returned a
+; placeholder whenever ``!_LLM_Menu["enabled"] || !LLM_Deps_IsReady()``. Because
+; the Ollama bootstrap only runs when the feature is enabled (ui/menu/menu_llm/init.ahk),
 ; a disabled feature leaves _LLM_Deps_State = "pending" -> LLM_Deps_IsReady() is
 ; false, so BOTH clauses fire and the catalogue was hidden. Hammerspoon never
 ; gates its model submenu on the enabled flag (only on "paused"), so the two
@@ -352,9 +352,9 @@ Test_LLM_Regression_ModelMenuNoEnabledEarlyExit() {
 	; Root cause: the model menu must never branch on the enabled flag. The
 	; bootstrap-gated Ollama-ready check made that branch collapse the whole
 	; catalogue, so the token must not appear anywhere in this file.
-	Assert(!InStr(body, '_LLM_Tray["enabled"]'),
+	Assert(!InStr(body, '_LLM_Menu["enabled"]'),
 		"menu_models must not gate the catalogue on the enabled flag (regression: disabled hid all models)")
-	Assert(!InStr(body, 'if !_LLM_Tray["enabled"] || !LLM_Deps_IsReady()'),
+	Assert(!InStr(body, 'if !_LLM_Menu["enabled"] || !LLM_Deps_IsReady()'),
 		"menu_models must not early-exit the model menu on enabled/ready (the collapsed-placeholder bug)")
 }
 Test("LLM regression: model menu never collapses on the disabled feature flag",
@@ -367,7 +367,7 @@ Test_LLM_Regression_ModelMenuAlwaysBuildsCatalogue() {
 	; while Ollama is not confirmed up.
 	AssertContains(body, "deps_ready := LLM_Deps_IsReady()",
 		"menu_models must resolve deps_ready once for the catalogue build")
-	AssertContains(body, "_LLM_Tray_AppendCatalogue(m, presets, active, deps_ready)",
+	AssertContains(body, "_LLM_Menu_AppendCatalogue(m, presets, active, deps_ready)",
 		"menu_models must always append the full catalogue, threaded with deps_ready")
 }
 Test("LLM regression: model menu always appends the full catalogue (deps_ready-threaded)",

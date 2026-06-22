@@ -1,4 +1,4 @@
-﻿; ui/tray_llm/menu_models.ahk
+﻿; ui/menu/menu_llm/menu_models.ahk
 
 ; ==============================================================================
 ; MODULE: LLM Tray — Backend + Model submenus
@@ -16,7 +16,7 @@
 ;    mirroring Hammerspoon — selecting a model while off just records the choice.
 ;    Only the green "installed" dot needs Ollama, so its probe is skipped (rows
 ;    render dot-less) until the daemon is ready, keeping the menu non-blocking.
-; 3. Per-iteration closure factories: the for-loop captures via ``_LLM_Tray_Make*``
+; 3. Per-iteration closure factories: the for-loop captures via ``_LLM_Menu_Make*``
 ;    factories rather than ``captured := value`` because AHK v2 closure scopes
 ;    are per-call, not per-iteration.
 ; ==============================================================================
@@ -39,8 +39,8 @@
  * future backends (e.g., LM Studio, llama.cpp) can be added without refactoring.
  * @returns {Menu} Populated backend submenu.
  */
-LLM_Tray_BuildBackendMenu() {
-	global _LLM_Tray
+LLM_Menu_BuildBackendMenu() {
+	global _LLM_Menu
 	m := Menu()
 	; Hardcoded brand prefix per backend — name + emoji + em-dash. Only
 	; the localised descriptive suffix (e.g. "Standard" / "fournisseur
@@ -50,11 +50,11 @@ LLM_Tray_BuildBackendMenu() {
 		"ollama", "Ollama 🦙 — ",
 		"api",    "API 🌐 — "
 	)
-	for backend_id in LLM_TRAY_BACKEND_OPTIONS {
+	for backend_id in LLM_MENU_BACKEND_OPTIONS {
 		prefix := _backend_prefix.Has(backend_id) ? _backend_prefix[backend_id] : ""
 		label := prefix . t("menu.llm.backend_" backend_id "_suffix")
-		RegisterMenuItem(m, label, _LLM_Tray_MakeSetBackendHandler(backend_id))
-		if (backend_id == _LLM_Tray["backend"])
+		RegisterMenuItem(m, label, _LLM_Menu_MakeSetBackendHandler(backend_id))
+		if (backend_id == _LLM_Menu["backend"])
 			m.Check(label)
 	}
 
@@ -62,13 +62,13 @@ LLM_Tray_BuildBackendMenu() {
 	; so a user running Ollama on a non-standard port (or behind a proxy) can still
 	; reach it. Shown unconditionally: the user may set it before switching backend.
 	m.Add()
-	port_display := _LLM_Tray.Has("ollama_port") ? _LLM_Tray["ollama_port"] : 11434
+	port_display := _LLM_Menu.Has("ollama_port") ? _LLM_Menu["ollama_port"] : 11434
 	RegisterMenuItem(m, StrReplace(t("menu.llm.ollama_port_label"), "%s", port_display),
-		(*) => LLM_Tray_PromptOllamaPort())
+		(*) => LLM_Menu_PromptOllamaPort())
 	_LLM_MaybeAddReset(m,
 		port_display,
 		_LLM_DefaultFor("llm_ollama_port", 11434),
-		(*) => LLM_Tray_ResetOllamaPort(_LLM_DefaultFor("llm_ollama_port", 11434)))
+		(*) => LLM_Menu_ResetOllamaPort(_LLM_DefaultFor("llm_ollama_port", 11434)))
 	return m
 }
 
@@ -95,18 +95,18 @@ LLM_Tray_BuildBackendMenu() {
  *
  * @returns {Menu} Populated model submenu.
  */
-LLM_Tray_BuildModelMenu() {
-	global _LLM_Tray
+LLM_Menu_BuildModelMenu() {
+	global _LLM_Menu
 	; Backend == "api": the model picker becomes an "API endpoints" picker —
 	; one entry per user-added provider record, plus "+ Add an API…" at the
 	; bottom. The remote adapter (LLM_RemoteGenerate) reads the active entry
 	; by id at request time.
-	if (_LLM_Tray["backend"] == "api") {
-		return _LLM_Tray_BuildApiEntriesMenu()
+	if (_LLM_Menu["backend"] == "api") {
+		return _LLM_Menu_BuildApiEntriesMenu()
 	}
 
 	m := Menu()
-	active := _LLM_Tray["model"]
+	active := _LLM_Menu["model"]
 
 	; The curated catalogue is STATIC (parsed from the shared models.json), so it
 	; is listed in FULL regardless of whether the LLM feature is enabled or the
@@ -121,7 +121,7 @@ LLM_Tray_BuildModelMenu() {
 
 	; "Aucun modèle (Désactivé)" — first row of the HS menu.
 	no_label := t("menu.llm.no_model")
-	RegisterMenuItem(m, no_label, _LLM_Tray_MakeSetModelHandler(""))
+	RegisterMenuItem(m, no_label, _LLM_Menu_MakeSetModelHandler(""))
 	if (active == "")
 		m.Check(no_label)
 
@@ -131,7 +131,7 @@ LLM_Tray_BuildModelMenu() {
 	default_name := _LLM_DefaultFor("llm_model", "")
 	if (default_name != "") {
 		def_label := StrReplace(t("menu.llm.backend_default_model"), "%s", default_name)
-		RegisterMenuItem(m, def_label, _LLM_Tray_MakeSetModelHandler(default_name))
+		RegisterMenuItem(m, def_label, _LLM_Menu_MakeSetModelHandler(default_name))
 		if (active == default_name)
 			m.Check(def_label)
 	}
@@ -142,7 +142,7 @@ LLM_Tray_BuildModelMenu() {
 	; rendered as separators inside the provider submenu (matches HS's
 	; ``models_manager`` behaviour: no per-family sub-sub-menu).
 	presets := LLM_GetModelPresets()
-	presets_used := _LLM_Tray_AppendCatalogue(m, presets, active, deps_ready)
+	presets_used := _LLM_Menu_AppendCatalogue(m, presets, active, deps_ready)
 
 	; Catalogue fallback: when models.json fails to load OR no entry in the
 	; catalogue advertises an Ollama URL (e.g. an MLX-only catalogue), fall
@@ -158,7 +158,7 @@ LLM_Tray_BuildModelMenu() {
 			m.Disable(no_models_label)
 		} else {
 			for tag in installed {
-				RegisterMenuItem(m, tag, _LLM_Tray_MakeSetModelHandler(tag))
+				RegisterMenuItem(m, tag, _LLM_Menu_MakeSetModelHandler(tag))
 				if (tag == active)
 					m.Check(tag)
 			}
@@ -166,7 +166,7 @@ LLM_Tray_BuildModelMenu() {
 	}
 
 	m.Add()
-	RegisterMenuItem(m, t("menu.llm.add_model_entry"),     (*) => LLM_Tray_PromptAddModel())
+	RegisterMenuItem(m, t("menu.llm.add_model_entry"),     (*) => LLM_Menu_PromptAddModel())
 	; Visual model browser — exposes the shared models.json catalogue with
 	; params / RAM / speed columns so the user can compare specs before
 	; picking. Mirrors the HS visual chooser in ui/menu/menu_llm/models_manager.
@@ -190,7 +190,7 @@ LLM_Tray_BuildModelMenu() {
  *                               the menu never blocks while the feature is off.
  * @returns {Boolean} True when the catalogue produced at least one entry.
  */
-_LLM_Tray_AppendCatalogue(m, presets, active, deps_ready := true) {
+_LLM_Menu_AppendCatalogue(m, presets, active, deps_ready := true) {
 	global JSON_NULL
 	if (Type(presets) != "Array" or presets.Length == 0)
 		return false
@@ -241,8 +241,8 @@ _LLM_Tray_AppendCatalogue(m, presets, active, deps_ready := true) {
 					provider_menu.Add()
 				}
 
-				rich_title := _LLM_Tray_BuildModelRowTitle(name, active, deps_ready)
-				model_menu := _LLM_Tray_BuildPerModelSubmenu(name, model, ollama_url, active, deps_ready)
+				rich_title := _LLM_Menu_BuildModelRowTitle(name, active, deps_ready)
+				model_menu := _LLM_Menu_BuildPerModelSubmenu(name, model, ollama_url, active, deps_ready)
 				provider_menu.Add(rich_title, model_menu)
 				if (name == active)
 					provider_menu.Check(rich_title)
@@ -274,7 +274,7 @@ _LLM_Tray_AppendCatalogue(m, presets, active, deps_ready := true) {
  * @param {Boolean} deps_ready - When false the install probe is skipped (no dot).
  * @returns {string} Formatted row label.
  */
-_LLM_Tray_BuildModelRowTitle(name, active, deps_ready := true) {
+_LLM_Menu_BuildModelRowTitle(name, active, deps_ready := true) {
 	info := LLM_GetModelInfo(name)
 	installed := deps_ready ? LLM_IsModelInstalled(name) : false
 	status := installed ? "🟢 " : ""
@@ -284,7 +284,7 @@ _LLM_Tray_BuildModelRowTitle(name, active, deps_ready := true) {
 	params_b := info.Has("params_b") ? info["params_b"] : 0
 	ram_gb   := info.Has("ram_gb")   ? info["ram_gb"]   : 0
 	if (params_b > 0)
-		params_lbl := " (" . _LLM_Tray_FormatBillions(params_b) . "B params, ~" . Ceil(ram_gb) . " Go RAM)"
+		params_lbl := " (" . _LLM_Menu_FormatBillions(params_b) . "B params, ~" . Ceil(ram_gb) . " Go RAM)"
 	else
 		params_lbl := " (~" . Ceil(ram_gb) . " Go RAM)"
 	return status . name . type_str . params_lbl
@@ -307,21 +307,21 @@ _LLM_Tray_BuildModelRowTitle(name, active, deps_ready := true) {
  *                               model offers "Download" since nothing is confirmed.
  * @returns {Menu} The per-model submenu.
  */
-_LLM_Tray_BuildPerModelSubmenu(name, model, ollama_url, active, deps_ready := true) {
+_LLM_Menu_BuildPerModelSubmenu(name, model, ollama_url, active, deps_ready := true) {
 	global JSON_NULL
 	sub := Menu()
 
 	select_label := t("menu.llm.select_model")
-	RegisterMenuItem(sub, select_label, _LLM_Tray_MakeSetModelHandler(name))
+	RegisterMenuItem(sub, select_label, _LLM_Menu_MakeSetModelHandler(name))
 	if (name == active)
 		sub.Check(select_label)
 
 	if (deps_ready and LLM_IsModelInstalled(name)) {
 		del_label := t("menu.llm.delete_model_cache")
-		RegisterMenuItem(sub, del_label, _LLM_Tray_MakeDeleteCacheHandler(name))
+		RegisterMenuItem(sub, del_label, _LLM_Menu_MakeDeleteCacheHandler(name))
 	} else {
 		dl_label := t("menu.llm.download_model")
-		RegisterMenuItem(sub, dl_label, _LLM_Tray_MakeDownloadModelHandler(name))
+		RegisterMenuItem(sub, dl_label, _LLM_Menu_MakeDownloadModelHandler(name))
 	}
 
 	sub.Add()  ; separator
@@ -331,7 +331,7 @@ _LLM_Tray_BuildPerModelSubmenu(name, model, ollama_url, active, deps_ready := tr
 	sub.Disable(backend_label)
 
 	source_label := StrReplace(t("menu.llm.model_source"), "%s", ollama_url)
-	RegisterMenuItem(sub, source_label, _LLM_Tray_MakeOpenUrlHandler(ollama_url))
+	RegisterMenuItem(sub, source_label, _LLM_Menu_MakeOpenUrlHandler(ollama_url))
 
 	sub.Add()
 	specs_header := t("menu.llm.specs_header")
@@ -373,7 +373,7 @@ _LLM_Tray_BuildPerModelSubmenu(name, model, ollama_url, active, deps_ready := tr
 		caps_header := t("menu.llm.caps_header")
 		sub.Add(caps_header, (*) => 0)
 		sub.Disable(caps_header)
-		if (caps.Has("speed_tok_s") and _LLM_Tray_IsNumber(caps["speed_tok_s"])) {
+		if (caps.Has("speed_tok_s") and _LLM_Menu_IsNumber(caps["speed_tok_s"])) {
 			lbl := StrReplace(t("menu.llm.model_speed"), "%s", caps["speed_tok_s"])
 			sub.Add(lbl, (*) => 0)
 			sub.Disable(lbl)
@@ -397,17 +397,17 @@ _LLM_Tray_BuildPerModelSubmenu(name, model, ollama_url, active, deps_ready := tr
 			hw_header := StrReplace(t("menu.llm.hw_header"), "%s", "Ollama")
 			sub.Add(hw_header, (*) => 0)
 			sub.Disable(hw_header)
-			if (hw.Has("download_gb") and _LLM_Tray_IsNumber(hw["download_gb"])) {
+			if (hw.Has("download_gb") and _LLM_Menu_IsNumber(hw["download_gb"])) {
 				lbl := StrReplace(t("menu.llm.hw_download"), "%s", hw["download_gb"])
 				sub.Add(lbl, (*) => 0)
 				sub.Disable(lbl)
 			}
-			if (hw.Has("disk_gb") and _LLM_Tray_IsNumber(hw["disk_gb"])) {
+			if (hw.Has("disk_gb") and _LLM_Menu_IsNumber(hw["disk_gb"])) {
 				lbl := StrReplace(t("menu.llm.hw_disk"), "%s", hw["disk_gb"])
 				sub.Add(lbl, (*) => 0)
 				sub.Disable(lbl)
 			}
-			if (hw.Has("ram_gb") and _LLM_Tray_IsNumber(hw["ram_gb"])) {
+			if (hw.Has("ram_gb") and _LLM_Menu_IsNumber(hw["ram_gb"])) {
 				lbl := StrReplace(t("menu.llm.hw_ram"), "%s", hw["ram_gb"])
 				sub.Add(lbl, (*) => 0)
 				sub.Disable(lbl)
@@ -434,47 +434,47 @@ _LLM_Tray_BuildPerModelSubmenu(name, model, ollama_url, active, deps_ready := tr
 ; value. The IIFE-style factory below wraps the captured value in a fresh
 ; function parameter, which IS scoped per call and therefore safe.
 
-_LLM_Tray_MakeSetModelHandler(name) {
+_LLM_Menu_MakeSetModelHandler(name) {
 	captured := name
-	return (*) => LLM_Tray_SetModel(captured)
+	return (*) => LLM_Menu_SetModel(captured)
 }
 
-_LLM_Tray_MakeSetNHandler(n) {
-	return (name, pos, menu) => LLM_Tray_SetN(n)
+_LLM_Menu_MakeSetNHandler(n) {
+	return (name, pos, menu) => LLM_Menu_SetN(n)
 }
 
-_LLM_Tray_MakeSetIndentHandler(lvl) {
-	return (name, pos, menu) => LLM_Tray_SetIndent(lvl)
+_LLM_Menu_MakeSetIndentHandler(lvl) {
+	return (name, pos, menu) => LLM_Menu_SetIndent(lvl)
 }
 
-_LLM_Tray_MakeSetBackendHandler(backend_id) {
-	return (name, pos, menu) => LLM_Tray_SetBackend(backend_id)
+_LLM_Menu_MakeSetBackendHandler(backend_id) {
+	return (name, pos, menu) => LLM_Menu_SetBackend(backend_id)
 }
 
-_LLM_Tray_MakeSetProfileHandler(id) {
-	return (name, pos, menu) => LLM_Tray_SetProfile(id)
+_LLM_Menu_MakeSetProfileHandler(id) {
+	return (name, pos, menu) => LLM_Menu_SetProfile(id)
 }
 
-_LLM_Tray_MakeUserProfileClickHandler(p) {
-	return (name, pos, menu) => LLM_Tray_OnUserProfileClick(p)
+_LLM_Menu_MakeUserProfileClickHandler(p) {
+	return (name, pos, menu) => LLM_Menu_OnUserProfileClick(p)
 }
 
-_LLM_Tray_MakeSelectApiEntryHandler(entry) {
-	return (name, pos, menu) => _LLM_Tray_SelectApiEntry(entry)
+_LLM_Menu_MakeSelectApiEntryHandler(entry) {
+	return (name, pos, menu) => _LLM_Menu_SelectApiEntry(entry)
 }
 
-_LLM_Tray_MakeClearOverrideHandler(app_name) {
-	return (*) => _LLM_Tray_ClearOverrideFor(app_name)
+_LLM_Menu_MakeClearOverrideHandler(app_name) {
+	return (*) => _LLM_Menu_ClearOverrideFor(app_name)
 }
 
-_LLM_Tray_MakeDeleteCacheHandler(name) {
+_LLM_Menu_MakeDeleteCacheHandler(name) {
 	captured := name
-	return (*) => _LLM_Tray_PromptDeleteCachedModel(captured)
+	return (*) => _LLM_Menu_PromptDeleteCachedModel(captured)
 }
 
-_LLM_Tray_MakeDownloadModelHandler(name) {
+_LLM_Menu_MakeDownloadModelHandler(name) {
 	captured := name
-	return (*) => _LLM_Tray_PullModel(captured)
+	return (*) => _LLM_Menu_PullModel(captured)
 }
 
 /**
@@ -485,7 +485,7 @@ _LLM_Tray_MakeDownloadModelHandler(name) {
  *
  * @param {string} name - Catalogue display name (e.g. "Qwen 2.5 3B").
  */
-_LLM_Tray_PullModel(name) {
+_LLM_Menu_PullModel(name) {
 	tag := LLM_ResolveOllamaTag(name)
 	if (tag == "") {
 		MsgBox(StrReplace(t("menu.llm.ollama_model_hint"), "%s", name), t("menu.llm.download_model"), "16")
@@ -498,15 +498,15 @@ _LLM_Tray_PullModel(name) {
 	; Rebuild after a short delay so the green dot appears once Ollama finishes
 	; (the user will close the window manually; this just keeps the menu fresh
 	; if they glance at it again while the terminal is still open).
-	SetTimer(() => LLM_Tray_Build(), -3000)
+	SetTimer(() => LLM_Menu_Build(), -3000)
 }
 
-_LLM_Tray_MakeOpenUrlHandler(url) {
+_LLM_Menu_MakeOpenUrlHandler(url) {
 	captured := url
-	return (*) => _LLM_Tray_OpenUrl(captured)
+	return (*) => _LLM_Menu_OpenUrl(captured)
 }
 
-_LLM_Tray_OpenUrl(url) {
+_LLM_Menu_OpenUrl(url) {
 	try Run(url)
 }
 
@@ -525,7 +525,7 @@ _LLM_Tray_OpenUrl(url) {
  * models.json for "field absent") and non-numeric strings so the spec rows
  * never read "null" or "" verbatim.
  */
-_LLM_Tray_IsNumber(v) {
+_LLM_Menu_IsNumber(v) {
 	global JSON_NULL
 	if (v == JSON_NULL)
 		return false
@@ -541,7 +541,7 @@ _LLM_Tray_IsNumber(v) {
  * Formats a parameter count in billions for display, trimming trailing
  * zeros so 3.00 → 3 and 30.53 → 30.53. Mirrors HS's ``%g`` formatter.
  */
-_LLM_Tray_FormatBillions(n) {
+_LLM_Menu_FormatBillions(n) {
 	s := Format("{:.2f}", n)
 	s := RTrim(s, "0")
 	s := RTrim(s, ".")
@@ -553,7 +553,7 @@ _LLM_Tray_FormatBillions(n) {
  * through the HTTP DELETE /api/delete endpoint. The tray rebuild at the end
  * refreshes the installed dot so the row stops showing the green badge.
  */
-_LLM_Tray_PromptDeleteCachedModel(name) {
+_LLM_Menu_PromptDeleteCachedModel(name) {
 	tag := LLM_ResolveOllamaTag(name)
 	if (tag == "")
 		return
@@ -567,5 +567,5 @@ _LLM_Tray_PromptDeleteCachedModel(name) {
 	; new state immediately instead of waiting for the 2 s TTL.
 	global _LLM_InstalledTagsCacheAt
 	_LLM_InstalledTagsCacheAt := 0
-	LLM_Tray_Build()
+	LLM_Menu_Build()
 }

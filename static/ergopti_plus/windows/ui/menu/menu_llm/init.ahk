@@ -1,4 +1,4 @@
-﻿; ui/tray_llm/init.ahk
+﻿; ui/menu/menu_llm/init.ahk
 
 ; ==============================================================================
 ; MODULE: LLM Tray — Initialisation
@@ -35,8 +35,8 @@
  * Bootstraps the tray menu and starts the LLM bridge if auto-start is enabled.
  * @param {Map} saved_opts - Persisted settings loaded from INI/registry.
  */
-LLM_Tray_Init(saved_opts := Map()) {
-	global _LLM_Tray, _LLM_Tray_Menu, _LLM_Tray_InTray, _LLM_Tray_BuildPending
+LLM_Menu_Init(saved_opts := Map()) {
+	global _LLM_Menu, _LLM_Menu_Handle, _LLM_Menu_InTray, _LLM_Menu_BuildPending
 
 	; Defensive: a previous session that crashed mid-install would have
 	; left the AHK process at PriorityClass = High (we boost it in
@@ -56,53 +56,53 @@ LLM_Tray_Init(saved_opts := Map()) {
 
 	for key in _str_keys
 		if saved_opts.Has(key)
-			_LLM_Tray[key] := saved_opts[key]
+			_LLM_Menu[key] := saved_opts[key]
 	for key in _num_keys
 		if saved_opts.Has(key)
-			_LLM_Tray[key] := saved_opts[key]
+			_LLM_Menu[key] := saved_opts[key]
 	for key in _bool_keys
 		if saved_opts.Has(key)
-			_LLM_Tray[key] := saved_opts[key]
+			_LLM_Menu[key] := saved_opts[key]
 	for key in _arr_keys
 		if saved_opts.Has(key) && (saved_opts[key] is Array)
-			_LLM_Tray[key] := saved_opts[key]
+			_LLM_Menu[key] := saved_opts[key]
 
 	; Keep Features["llm"] aligned with tray state so the deferred startup
 	; SaveFullConfig() (~500 ms) does not rewrite num_predictions (etc.) back
 	; to manifest defaults and clobber a change the user just saved.
-	if IsSet(_LLM_Tray_SyncToFeatures)
-		_LLM_Tray_SyncToFeatures()
+	if IsSet(_LLM_Menu_SyncToFeatures)
+		_LLM_Menu_SyncToFeatures()
 
 	; Apply the persisted Ollama port to the HTTP client BEFORE any request fires
 	; (bootstrap probe, warmup) so every call targets the user's configured port.
-	if IsSet(LLM_Ollama_SetPort) and _LLM_Tray.Has("ollama_port")
-		LLM_Ollama_SetPort(_LLM_Tray["ollama_port"])
+	if IsSet(LLM_Ollama_SetPort) and _LLM_Menu.Has("ollama_port")
+		LLM_Ollama_SetPort(_LLM_Menu["ollama_port"])
 
 	; Auto-correct legacy raw-tag configs (e.g. qwen2.5:3b) before the first
 	; bootstrap / bridge start so predictions do not silently fail.
-	if (_LLM_Tray["backend"] == "ollama")
-		LLM_Tray_EnsureModelReady()
+	if (_LLM_Menu["backend"] == "ollama")
+		LLM_Menu_EnsureModelReady()
 
 	; Restore trigger shortcut hotkey
-	if (_LLM_Tray["trigger_shortcut"] != "")
-		LLM_Tray_ApplyTriggerShortcut(_LLM_Tray["trigger_shortcut"])
+	if (_LLM_Menu["trigger_shortcut"] != "")
+		LLM_Menu_ApplyTriggerShortcut(_LLM_Menu["trigger_shortcut"])
 
 	; Restore per-app profile overrides Map (defaults to empty when the
 	; config never carried the field).
 	if saved_opts.Has("app_profile_overrides") and (saved_opts["app_profile_overrides"] is Map)
-		_LLM_Tray["app_profile_overrides"] := saved_opts["app_profile_overrides"]
+		_LLM_Menu["app_profile_overrides"] := saved_opts["app_profile_overrides"]
 
 	; Restore persisted remote API entries (lives in api_entries.json next to
 	; the main config.toml — kept separate because the array-of-maps shape
 	; would not survive the project's flat-TOML writer).
-	_LLM_Tray_LoadApiEntries()
+	_LLM_Menu_LoadApiEntries()
 
 	; Register Ctrl+1 … Ctrl+9 once. Re-registering on every build_menu pass
 	; would be wasteful and noisy in the AHK Hotkey log; doing it here
-	; covers both fresh boots and post-Reload paths since LLM_Tray_Init is
+	; covers both fresh boots and post-Reload paths since LLM_Menu_Init is
 	; the only entry into the tray module.
-	LLM_Tray_BindProfileHotkeys()
-	LLM_Tray_BindNavHotkeys()
+	LLM_Menu_BindProfileHotkeys()
+	LLM_Menu_BindNavHotkeys()
 
 	; (Removed) First-run LLM onboarding TrayTip — the unsolicited
 	; "Text predictions available" balloon was perceived as noise by users
@@ -115,13 +115,13 @@ LLM_Tray_Init(saved_opts := Map()) {
 	; A synchronous build here blocks initMenu mid-way — measured at ~1.6 s under
 	; load — and a tray opened during that window shows only the items registered
 	; before this point (the "menu shows only the first items" bug). Re-populating
-	; _LLM_Tray_Menu in place later keeps the entry's position (see the persistent-
+	; _LLM_Menu_Handle in place later keeps the entry's position (see the persistent-
 	; Menu note at its declaration), so menu order is preserved.
-	if !_LLM_Tray_InTray {
-		A_TrayMenu.Add(t("menu.llm.title"), _LLM_Tray_Menu)
-		_LLM_Tray_InTray := true
+	if !_LLM_Menu_InTray {
+		A_TrayMenu.Add(t("menu.llm.title"), _LLM_Menu_Handle)
+		_LLM_Menu_InTray := true
 	}
-	_LLM_Tray_BuildPending := true
+	_LLM_Menu_BuildPending := true
 
 	; Bootstrap Ollama silently on reload when the feature was already enabled.
 	; show_ui=false so the install window NEVER opens automatically — the user
@@ -136,8 +136,8 @@ LLM_Tray_Init(saved_opts := Map()) {
 	; CPU with the input pipeline. The build_warning_row below now surfaces
 	; the missing-install state in the menu so the user can re-trigger the
 	; install themselves when they're ready.
-	if _LLM_Tray["enabled"]
-		SetTimer(() => LLM_Tray_BootstrapOllama(false), -1)
+	if _LLM_Menu["enabled"]
+		SetTimer(() => LLM_Menu_BootstrapOllama(false), -1)
 
 	; Background health-tick: refreshes the dot every 10 s without waiting
 	; for the user to open the menu. The previous "probe on menu open"
@@ -145,8 +145,8 @@ LLM_Tray_Init(saved_opts := Map()) {
 	; (probe result only landed the second time around). The tick uses
 	; the same flip-guard as the on-open probe, so a stable backend
 	; doesn't trigger spurious rebuilds.
-	SetTimer(_LLM_Tray_FireHealthProbe, 10000)
+	SetTimer(_LLM_Menu_FireHealthProbe, 10000)
 
-	global _LLM_Tray_Loaded
-	_LLM_Tray_Loaded := true
+	global _LLM_Menu_Loaded
+	_LLM_Menu_Loaded := true
 }

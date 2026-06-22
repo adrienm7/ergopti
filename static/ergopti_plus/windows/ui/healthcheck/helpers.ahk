@@ -165,21 +165,21 @@ _HealthCheck_KeyloggerSummary() {
 _HealthCheck_LLMState() {
 	St := Map("enabled", "unknown", "backend", "unknown", "active_profile", "unknown", "model", "n/a", "n_predictions", "n/a", "streaming", "n/a")
 	try {
-		; LLM tray / core state is often in _LLM_Tray or llm/init globals.
-		global _LLM_Tray, llm_enabled, llm_backend, llm_active_profile
+		; LLM tray / core state is often in _LLM_Menu or llm/init globals.
+		global _LLM_Menu, llm_enabled, llm_backend, llm_active_profile
 		if IsSet(llm_enabled)
 			St["enabled"] := llm_enabled ? "true" : "false"
 		if IsSet(llm_backend)
 			St["backend"] := llm_backend
 		if IsSet(llm_active_profile)
 			St["active_profile"] := llm_active_profile
-		if IsSet(_LLM_Tray) && _LLM_Tray is Map {
-			if _LLM_Tray.Has("model")
-				St["model"] := _LLM_Tray["model"]
-			if _LLM_Tray.Has("n_predictions")
-				St["n_predictions"] := _LLM_Tray["n_predictions"]
-			if _LLM_Tray.Has("streaming")
-				St["streaming"] := _LLM_Tray["streaming"]
+		if IsSet(_LLM_Menu) && _LLM_Menu is Map {
+			if _LLM_Menu.Has("model")
+				St["model"] := _LLM_Menu["model"]
+			if _LLM_Menu.Has("n_predictions")
+				St["n_predictions"] := _LLM_Menu["n_predictions"]
+			if _LLM_Menu.Has("streaming")
+				St["streaming"] := _LLM_Menu["streaming"]
 		}
 	} catch {
 	}

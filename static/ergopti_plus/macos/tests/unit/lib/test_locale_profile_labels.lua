@@ -7,7 +7,7 @@
 ---
 --- THE CONTRACT (encodes the root cause of the "%d prédiction%s" bug):
 --- Profile labels ("llm.profile.<id>.label") are rendered through a brace-style
---- formatter (ui/menu/menu_llm/profile_label.lua on macOS, LLM_Tray_GetProfileLabel
+--- formatter (ui/menu/menu_llm/profile_label.lua on macOS, LLM_Menu_GetProfileLabel
 --- on Windows) that only understands "{n}"/"{s}". A printf "%d"/"%s" token therefore
 --- can NEVER be substituted and leaks verbatim into the menu. This test fails the
 --- instant any translator or edit reintroduces a printf token into a profile label,

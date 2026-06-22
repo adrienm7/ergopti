@@ -233,7 +233,7 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 #Include modules/llm/api_remote.ahk
 #Include modules/llm/models.ahk
 ; LLM_GetSharedPath is now available — load the cross-platform defaults before
-; prediction_engine.ahk and tray_llm.ahk initialise their state maps.
+; prediction_engine.ahk and menu_llm.ahk initialise their state maps.
 LLM_Defaults_Load()
 #Include modules/llm/profiles.ahk
 #Include modules/llm/prediction_engine.ahk
@@ -241,7 +241,7 @@ LLM_Defaults_Load()
 #Include modules/llm/ollama_webview.ahk
 #Include modules/llm/ollama_deps_checker.ahk
 #Include ui/tooltip/tooltip_llm.ahk
-#Include ui/tray_llm/_index.ahk
+#Include ui/menu/menu_llm/_index.ahk
 #Include ui/model_browser/init.ahk
 
 ; ======================================================
@@ -877,8 +877,8 @@ _DriverReady := true
 SetTimer(BuildTrayMenuDeferred, -MENU_BUILD_DEFER_MS)
 if _LangMenuBuildPending
 	SetTimer(BuildLanguageMenuDeferred, -LANG_MENU_DEFER_MS)
-if _LLM_Tray_BuildPending
-	SetTimer(LLM_Tray_Build, -LLM_TRAY_BUILD_DEFER_MS)
+if _LLM_Menu_BuildPending
+	SetTimer(LLM_Menu_Build, -LLM_MENU_BUILD_DEFER_MS)
 ; Warm the i18n EN/FR fallback caches off the critical path (the active locale is
 ; already parsed at boot). One JSON parse, only consulted on a missing key; a miss
 ; before this fires triggers a one-time lazy load inside t().

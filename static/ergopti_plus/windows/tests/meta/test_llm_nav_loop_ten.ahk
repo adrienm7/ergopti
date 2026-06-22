@@ -3,7 +3,7 @@
 ; ==============================================================================
 ; MODULE: LLM Nav Jump Loop-10 Meta Test
 ; DESCRIPTION:
-; Regression guard ensuring the digit-hotkey binding loop in LLM_Tray_RebindNav
+; Regression guard ensuring the digit-hotkey binding loop in LLM_Menu_RebindNav
 ; covers all 10 prediction slots (1-9 and 0 for slot 10).
 ;
 ; The bug: the loop ran Loop 9, registering Alt+1 through Alt+9 as prediction-
@@ -15,7 +15,7 @@
 ; The fix: change the loop to Loop 10 and map A_Index == 10 to digit "0" so
 ; all ten slots get a corresponding hotkey.
 ;
-; SCOPE: source introspection of ui/tray_llm/tab_accept.ahk.
+; SCOPE: source introspection of ui/menu/menu_llm/tab_accept.ahk.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0

@@ -18,7 +18,7 @@
 ;    descending, exactly like a file manager. Useful to find the smallest
 ;    model that still fits in RAM, or the fastest among the chat-type ones.
 ; 3. Double-click = select — the row's display name flows through the same
-;    ``LLM_Tray_SetModel`` path as the menu picker, so the deps checker is
+;    ``LLM_Menu_SetModel`` path as the menu picker, so the deps checker is
 ;    triggered when the user picks something not yet installed. No special-
 ;    case install flow lives in this file.
 ; ==============================================================================
@@ -59,7 +59,7 @@ global LLM_MB_COL_STATUS    := 7
  * @returns {Gui} The browser window handle.
  */
 LLM_ModelBrowser_Show() {
-	global _LLM_ModelBrowser_Gui, _LLM_Tray
+	global _LLM_ModelBrowser_Gui, _LLM_Menu
 	; Prefer the shared web table (sortable/filterable, identical to the macOS
 	; browser) when WebView2 is available and there is enough free RAM to boot it;
 	; fall back to the native ListView below when WebView2 is unavailable, the
@@ -176,7 +176,7 @@ _LLM_ModelBrowser_Build() {
  * @param {string}   filter - Substring filter (case-insensitive). Empty = no filter.
  */
 _LLM_ModelBrowser_RefreshRows(lv, filter := "") {
-	global _LLM_Tray
+	global _LLM_Menu
 	lv.Delete()
 	index := LLM_GetModelIndex()
 	; The catalogue is static, so every model is listed regardless of state; the
@@ -197,7 +197,7 @@ _LLM_ModelBrowser_RefreshRows(lv, filter := "") {
 		names.Push(name)
 	names := _LLM_ModelBrowser_Sort(names)
 	row_for_active := 0
-	active := _LLM_Tray["model"]
+	active := _LLM_Menu["model"]
 	for name in names {
 		info := index[name]
 		family := _LLM_ModelBrowser_GuessFamily(name)
@@ -281,7 +281,7 @@ _LLM_ModelBrowser_GuessFamily(name) {
 
 /**
  * Returns the list of locally installed Ollama tags. Mirrors the helper
- * that ``LLM_Tray_BuildModelMenu`` already uses for the flat picker, but
+ * that ``LLM_Menu_BuildModelMenu`` already uses for the flat picker, but
  * tolerated to silent failure: when the daemon is not running we simply
  * mark every entry as "available" — refreshing later (or after a manual
  * install) will pick the change up.
@@ -311,7 +311,7 @@ _LLM_ModelBrowser_GetInstalledTags() {
 
 /**
  * Activates the highlighted model. Routes through the standard
- * LLM_Tray_SetModel path so the deps checker and engine re-init fire
+ * LLM_Menu_SetModel path so the deps checker and engine re-init fire
  * exactly like a click in the flat menu. Closes the browser on success.
  */
 _LLM_ModelBrowser_PickRow(LV, RowNumber) {
@@ -320,7 +320,7 @@ _LLM_ModelBrowser_PickRow(LV, RowNumber) {
 	name := LV.GetText(RowNumber, 1)
 	if (name == "")
 		return
-	LLM_Tray_SetModel(name)
+	LLM_Menu_SetModel(name)
 	_LLM_ModelBrowser_OnClose()
 }
 
@@ -435,14 +435,14 @@ _LLM_ModelBrowser_ShowWeb() {
  * injectModels() ExecuteScript never fires — leaving the user with an empty table.
  */
 _LLM_MBW_InjectCatalogue() {
-	global _LLM_Tray
+	global _LLM_Menu
 	index := LLM_GetModelIndex()
 	installed := Map()
 	if (IsSet(LLM_Deps_IsReady) and LLM_Deps_IsReady()) {
 		for tag in _LLM_ModelBrowser_GetInstalledTags()
 			installed[StrLower(tag)] := true
 	}
-	active := _LLM_Tray.Has("model") ? _LLM_Tray["model"] : ""
+	active := _LLM_Menu.Has("model") ? _LLM_Menu["model"] : ""
 
 	models := "", count := 0
 	for name, info in index {
@@ -539,7 +539,7 @@ _LLM_MBW_OnWebMessage(Handler, Args) {
 		Name := Payload.Has("name") ? Payload["name"] : ""
 		if (Name != "") {
 			_LLM_MBW_OnClose()
-			try LLM_Tray_SetModel(Name)
+			try LLM_Menu_SetModel(Name)
 		}
 	} else if (Action == "open_url") {
 		Url := Payload.Has("url") ? Payload["url"] : ""

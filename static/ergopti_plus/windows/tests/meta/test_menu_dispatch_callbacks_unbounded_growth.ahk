@@ -8,20 +8,20 @@
 ; The dispatch-bypass layer (lib/menu_dispatcher.ahk) records one entry per
 ; tracked menu item in _MenuDispatchCallbacks / _MenuDispatchLastFire. A full
 ; tray rebuild calls MenuDispatcher_Reset() to clear both Maps, but
-; LLM_Tray_Build() rebuilds ONLY the LLM submenu and is invoked very frequently
+; LLM_Menu_Build() rebuilds ONLY the LLM submenu and is invoked very frequently
 ; (every settings tweak, model pull, profile change). Before the fix it deleted
 ; and repopulated its items without ever pruning the freed IDs, so the two Maps
 ; grew without bound for the process lifetime.
 ;
-; A global reset cannot be used inside LLM_Tray_Build() - it would wipe the
+; A global reset cannot be used inside LLM_Menu_Build() - it would wipe the
 ; dispatch tracking of every OTHER live tray menu. The fix adds a per-menu
 ; prune, MenuDispatcher_PruneMenu(MenuObj), keyed off the live HMENU, and calls
-; it from LLM_Tray_Build() right after _LLM_Tray_Menu.Delete().
+; it from LLM_Menu_Build() right after _LLM_Menu_Handle.Delete().
 ;
 ; This is a meta-static test because lib/menu_dispatcher.ahk installs an
 ; OnMessage(0x0111) hook at include time and the LLM tray menu modules register
 ; top-level state, so neither can be #Included by the headless runner without
-; blocking a clean exit. If the prune helper is removed, or LLM_Tray_Build stops
+; blocking a clean exit. If the prune helper is removed, or LLM_Menu_Build stops
 ; calling it, this test fails.
 ; ==============================================================================
 
@@ -86,14 +86,14 @@ Test("menu_dispatcher: PruneMenu deletes dead entries from both dispatch Maps (m
 ; ==========================================
 
 _MDCUG_BuildCallsPrune() {
-	Src := _MDCUG_ReadSource("ui/tray_llm/menu_main.ahk")
-	Seg := _DriverFuncBody("LLM_Tray_Build")
-	Assert(Seg != "", "LLM_Tray_Build() declaration must exist in menu_main.ahk")
-	Assert(InStr(Seg, "MenuDispatcher_PruneMenu(_LLM_Tray_Menu)") > 0,
-		"LLM_Tray_Build must call MenuDispatcher_PruneMenu(_LLM_Tray_Menu) after deleting its items - without it the dispatch Maps leak dead IDs across every rebuild")
+	Src := _MDCUG_ReadSource("ui/menu/menu_llm/menu_main.ahk")
+	Seg := _DriverFuncBody("LLM_Menu_Build")
+	Assert(Seg != "", "LLM_Menu_Build() declaration must exist in menu_main.ahk")
+	Assert(InStr(Seg, "MenuDispatcher_PruneMenu(_LLM_Menu_Handle)") > 0,
+		"LLM_Menu_Build must call MenuDispatcher_PruneMenu(_LLM_Menu_Handle) after deleting its items - without it the dispatch Maps leak dead IDs across every rebuild")
 	; The global reset must NOT appear here: this is a single-menu rebuild, and a
 	; global reset would wipe the dispatch tracking of every other live tray menu.
 	Assert(InStr(Seg, "MenuDispatcher_Reset(") == 0,
-		"LLM_Tray_Build must NOT call MenuDispatcher_Reset() - that global wipe would drop other live menus' dispatch entries; use the per-menu prune instead")
+		"LLM_Menu_Build must NOT call MenuDispatcher_Reset() - that global wipe would drop other live menus' dispatch entries; use the per-menu prune instead")
 }
-Test("menu_main: LLM_Tray_Build prunes its own menu (not a global reset) (menu-dispatch-callbacks-unbounded-growth)", _MDCUG_BuildCallsPrune)
+Test("menu_main: LLM_Menu_Build prunes its own menu (not a global reset) (menu-dispatch-callbacks-unbounded-growth)", _MDCUG_BuildCallsPrune)

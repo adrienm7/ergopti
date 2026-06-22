@@ -61,7 +61,7 @@ while (_riArgIndex <= A_Args.Length) {
 
 ; Install a very early error handler for top-level / #Include phase errors.
 ; When a newly added production module (LLM, gestures, keylogger, prompt builder,
-; tray_llm persist, etc.) or test_*.ahk has a top-level statement that throws
+; menu_llm persist, etc.) or test_*.ahk has a top-level statement that throws
 ; (unset global, t() before i18n is ready, missing stub for a static initializer,
 ; bad include order, etc.) the default AHK behaviour is to show a modal error
 ; MsgBox. In the headless CI runner that dialog is never dismissed → the exe
@@ -241,7 +241,7 @@ try FileAppend("# [marker] LLM production modules + tests included`r`n", A_Temp 
 try FileAppend("# [marker] LLM production modules + tests included`r`n", "*")
 
 ; LLM tray menu -> config.toml persistence (contract-driven round-trips).
-global _LLM_Tray := Map(
+global _LLM_Menu := Map(
 	"enabled", true, "backend", "ollama", "model", "Qwen3.5-0.8B",
 	"profile_id", "basic", "n_predictions", 3, "auto_profile_for_model", true,
 	"min_words", 3, "max_words", 15, "language", "fr", "debounce_ms", 500,
@@ -252,13 +252,13 @@ global _LLM_Tray := Map(
 	"auto_raise_temp", true, "nav_modifiers", "", "val_modifiers", "alt",
 	"trigger_shortcut", "Ctrl+Space", "inline_autotype", false
 )
-try FileAppend("# [marker] about to include tray_llm/persist.ahk (with _LLM_Tray hack)`r`n", A_Temp . "\ergopti_test_results.txt", "UTF-8")
-try FileAppend("# [marker] about to include tray_llm/persist.ahk (with _LLM_Tray hack)`r`n", "*")
-#Include ../ui/tray_llm/persist.ahk
+try FileAppend("# [marker] about to include menu_llm/persist.ahk (with _LLM_Menu hack)`r`n", A_Temp . "\ergopti_test_results.txt", "UTF-8")
+try FileAppend("# [marker] about to include menu_llm/persist.ahk (with _LLM_Menu hack)`r`n", "*")
+#Include ../ui/menu/menu_llm/persist.ahk
 #Include test_llm_menu_persistence.ahk
 #Include test_llm_menu_regressions.ahk
-try FileAppend("# [marker] tray_llm persist + tests included`r`n", A_Temp . "\ergopti_test_results.txt", "UTF-8")
-try FileAppend("# [marker] tray_llm persist + tests included`r`n", "*")
+try FileAppend("# [marker] menu_llm persist + tests included`r`n", A_Temp . "\ergopti_test_results.txt", "UTF-8")
+try FileAppend("# [marker] menu_llm persist + tests included`r`n", "*")
 
 ; Gestures module — included here because its pure logic (assignments, action
 ; registry, dispatch) is testable. The hotkeys it registers are harmless since
@@ -377,7 +377,7 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 #Include meta/test_no_coauthor_in_commits.ahk
 #Include meta/test_no_pascal_case_in_toml.ahk
 #Include meta/test_bundle_exclusions.ahk
-#Include meta/test_llm_tray_init_order.ahk
+#Include meta/test_llm_menu_init_order.ahk
 #Include meta/test_llm_ensure_model_ready_guard.ahk
 #Include meta/test_boot_deferred_tasks.ahk
 #Include meta/test_wpm_widget_native_render.ahk
@@ -387,13 +387,13 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 #Include meta/test_native_hotstrings_migrated.ahk
 #Include meta/test_i18n_fallback_deferred.ahk
 #Include test_hse_conform_double_fire.ahk
-#Include meta/test_llm_tray_deferred_build.ahk
+#Include meta/test_llm_menu_deferred_build.ahk
 #Include meta/test_logger_format_placeholders.ahk
 #Include meta/test_logger_sub_files_routing.ahk
 #Include meta/test_prefix_render_deferred.ahk
 #Include meta/test_input_serialization.ahk
 #Include meta/test_personal_load_once.ahk
-#Include meta/test_tray_llm_actions_include.ahk
+#Include meta/test_menu_llm_actions_include.ahk
 #Include meta/test_port_adapter_coverage.ahk
 #Include meta/test_no_class_global_conflict.ahk
 #Include meta/test_locale_json_valid.ahk
@@ -559,8 +559,8 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 #Include meta/test_i18n_setlocale_resets_fallback.ahk
 #Include meta/test_ws_save_atomic.ahk
 #Include meta/test_tapholdwriter_int_before_bool.ahk
-#Include meta/test_llm_tray_toggle_reentrancy.ahk
-#Include meta/test_llm_tray_tab_source_hwnd.ahk
+#Include meta/test_llm_menu_toggle_reentrancy.ahk
+#Include meta/test_llm_menu_tab_source_hwnd.ahk
 #Include meta/test_modelbrowser_sort_callback.ahk
 #Include meta/test_space_taphold_configurable.ahk
 #Include meta/test_terminators_requires_directive.ahk
@@ -615,7 +615,7 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 #Include meta/test_disable_password_fields_gate.ahk
 #Include meta/test_boot_dircreate_guarded.ahk
 #Include meta/test_toml_render_bool_sentinel.ahk
-#Include meta/test_llm_tray_loaded_gate.ahk
+#Include meta/test_llm_menu_loaded_gate.ahk
 #Include meta/test_altgr_dispatch_suspend_guard.ahk
 #Include meta/test_llm_inject_complete_callback.ahk
 #Include meta/test_ngram_esrc_json_accumulate.ahk

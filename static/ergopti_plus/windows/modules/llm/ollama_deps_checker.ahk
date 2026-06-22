@@ -370,19 +370,19 @@ _LLM_Deps_OnPollProbeResult(reachable, on_ready?, on_failed?) {
 /**
  * User-driven cancel handler — bridges the WebView Cancel button to a
  * full feature deactivation. Cancels the install (LLM_Deps_Cancel) AND
- * flips ``_LLM_Tray["enabled"]`` to false so the tray toggle reflects
+ * flips ``_LLM_Menu["enabled"]`` to false so the tray toggle reflects
  * the user's intent and LLM_Bridge_Stop releases its resources. Saves
  * the new state so the toggle stays OFF across reloads.
  */
 LLM_Deps_OnUserCancel() {
-	global _LLM_Tray
+	global _LLM_Menu
 	LoggerInfo("LLM", "User clicked Cancel — aborting install and disabling feature.")
 	LLM_Deps_Cancel()
-	if IsSet(_LLM_Tray) and _LLM_Tray["enabled"] {
-		_LLM_Tray["enabled"] := false
+	if IsSet(_LLM_Menu) and _LLM_Menu["enabled"] {
+		_LLM_Menu["enabled"] := false
 		try LLM_Bridge_Stop()
-		try LLM_Tray_SaveConfig()
-		try LLM_Tray_Build()
+		try LLM_Menu_SaveConfig()
+		try LLM_Menu_Build()
 	}
 }
 
@@ -392,7 +392,7 @@ LLM_Deps_OnUserCancel() {
  * just resets the state flags.
  *
  * Called from LLM_Deps_OnUserCancel (Cancel button) and from
- * LLM_Tray_OnToggle when the user disables the feature mid-install.
+ * LLM_Menu_OnToggle when the user disables the feature mid-install.
  * Without this, the install kept running in the background even after
  * the user closed every visible cue.
  */

@@ -8,7 +8,7 @@ global _AHK_DRY_RUN := false
 #Include ../lib/json.ahk
 #Include ../lib/toml/toml_helpers.ahk
 #Include ../lib/toml/toml_config_loader.ahk
-global _LLM_Tray := Map(
+global _LLM_Menu := Map(
 	"enabled", true, "backend", "ollama", "model", "Qwen3.5-0.8B",
 	"profile_id", "basic", "n_predictions", 3, "auto_profile_for_model", true,
 	"min_words", 3, "max_words", 15, "language", "fr", "debounce_ms", 500,
@@ -19,7 +19,7 @@ global _LLM_Tray := Map(
 	"auto_raise_temp", true, "nav_modifiers", "", "val_modifiers", "alt",
 	"trigger_shortcut", "Ctrl+Space", "inline_autotype", false
 )
-#Include ../ui/tray_llm/persist.ahk
+#Include ../ui/menu/menu_llm/persist.ahk
 #Include test_llm_menu_persistence.ahk
 #Include test_llm_menu_regressions.ahk
 

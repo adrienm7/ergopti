@@ -1,4 +1,4 @@
-﻿; ui/tray_llm/actions.ahk
+﻿; ui/menu/menu_llm/actions.ahk
 
 ; ==============================================================================
 ; MODULE: LLM Tray — Action Handlers
@@ -13,14 +13,14 @@
 ; an install directly.
 ;
 ; FEATURES & RATIONALE:
-; 1. SaveConfig guard: ``LLM_Tray_SaveConfig`` is no-op until
+; 1. SaveConfig guard: ``LLM_Menu_SaveConfig`` is no-op until
 ;    ``_SaveFullConfigReady`` flips true — prevents the boot pipeline from
 ;    writing back an incomplete tray state before every module has reported
 ;    in.
-; 2. Async health probe: ``_LLM_Tray_FireHealthProbe`` is throttled (one
+; 2. Async health probe: ``_LLM_Menu_FireHealthProbe`` is throttled (one
 ;    probe per 3 s) so opening the menu twice in quick succession doesn't
 ;    fire two redundant pings.
-; 3. Flip-guard rebuild: ``_LLM_Tray_OnHealthProbeDone`` only rebuilds when
+; 3. Flip-guard rebuild: ``_LLM_Menu_OnHealthProbeDone`` only rebuilds when
 ;    the status actually flipped — avoids an infinite rebuild loop when the
 ;    backend stays stable.
 ; 4. SetModel warmup: switching model pre-loads the new tag into Ollama's
@@ -47,7 +47,7 @@
  * reached the handler at all (menu binding issue); if it's present but
  * BootstrapOllama isn't, the handoff dropped somewhere downstream.
  */
-_LLM_Tray_OnWarningInstallClick(ItemName := "", ItemPos := 0, MenuObj := 0) {
+_LLM_Menu_OnWarningInstallClick(ItemName := "", ItemPos := 0, MenuObj := 0) {
 	; Variadic-friendly signature so AHK's menu callback contract works
 	; whether we're bound directly or via a fat-arrow wrapper. AHK calls
 	; menu callbacks as ``fn(name, pos, menu)`` — if those args weren't
@@ -61,7 +61,7 @@ _LLM_Tray_OnWarningInstallClick(ItemName := "", ItemPos := 0, MenuObj := 0) {
 	; TrayTip's presence, not in a buried log line.
 	try TrayTip("Ergopti — IA", "Lancement de l'installation Ollama…", 0x1)
 	try {
-		LLM_Tray_BootstrapOllama(true)
+		LLM_Menu_BootstrapOllama(true)
 	} catch as err {
 		LoggerError("LLM", "Bootstrap raised: " err.Message ".")
 		try TrayTip("Ergopti — IA", "Erreur : " err.Message, 0x3)
@@ -75,29 +75,29 @@ _LLM_Tray_OnWarningInstallClick(ItemName := "", ItemPos := 0, MenuObj := 0) {
 ^!+i:: {
 	LoggerInfo("LLM", "Debug hotkey Ctrl+Alt+Shift+I — direct install trigger.")
 	try TrayTip("Ergopti — IA", "Installation Ollama (déclenchée par raccourci)…", 0x1)
-	try LLM_Tray_BootstrapOllama(true)
+	try LLM_Menu_BootstrapOllama(true)
 }
 
-LLM_Tray_OnToggle(*) {
+LLM_Menu_OnToggle(*) {
 	static _Toggling := false
 	if _Toggling
 		return
 	_Toggling := true
 	try {
-		global _LLM_Tray
-		_LLM_Tray["enabled"] := !_LLM_Tray["enabled"]
-		LoggerInfo("LLM", "Toggle clicked — enabled: " (_LLM_Tray["enabled"] ? "true" : "false") ".")
-		LLM_Tray_SaveConfig()
-		LLM_Tray_Build()
-		if _LLM_Tray["enabled"] {
+		global _LLM_Menu
+		_LLM_Menu["enabled"] := !_LLM_Menu["enabled"]
+		LoggerInfo("LLM", "Toggle clicked — enabled: " (_LLM_Menu["enabled"] ? "true" : "false") ".")
+		LLM_Menu_SaveConfig()
+		LLM_Menu_Build()
+		if _LLM_Menu["enabled"] {
 			; Re-arm the health probe timer so the dot updates promptly
 			; after re-enabling without waiting for the next 10 s tick
-			SetTimer(_LLM_Tray_FireHealthProbe, 10000)
-			LLM_Tray_EnsureModelReady()
-			SetTimer(() => LLM_Tray_BootstrapOllama(true), -1)
+			SetTimer(_LLM_Menu_FireHealthProbe, 10000)
+			LLM_Menu_EnsureModelReady()
+			SetTimer(() => LLM_Menu_BootstrapOllama(true), -1)
 		} else {
 			; Cancel the health probe timer — no point pinging a disabled feature
-			SetTimer(_LLM_Tray_FireHealthProbe, 0)
+			SetTimer(_LLM_Menu_FireHealthProbe, 0)
 			; OFF flow — kill any in-flight Ollama install AND close the
 			; WebView so the user's Cancel intent reaches every layer.
 			; Without these, toggling OFF mid-install would leave the
@@ -114,52 +114,52 @@ LLM_Tray_OnToggle(*) {
 
 /**
  * Persists the current LLM tray state to the shared config TOML.
- * (_LLM_Tray_SyncToFeatures lives in persist.ahk, included by ui/tray_llm.ahk before this file.)
+ * (_LLM_Menu_SyncToFeatures lives in persist.ahk, included by ui/menu/menu_llm.ahk before this file.)
  */
-LLM_Tray_SaveConfig() {
+LLM_Menu_SaveConfig() {
 	global _SaveFullConfigReady
 	if IsSet(_SaveFullConfigReady) && _SaveFullConfigReady {
-		_LLM_Tray_SyncToFeatures()
+		_LLM_Menu_SyncToFeatures()
 		SaveFullConfig()
 	}
 }
 
-LLM_Tray_OnInstantToggle(*) {
-	global _LLM_Tray
-	_LLM_Tray["instant_on_word_end"] := !_LLM_Tray["instant_on_word_end"]
-	LLM_Tray_SaveConfig()
-	LLM_Engine_Init(LLM_Tray_BuildOpts())
-	LLM_Tray_Build()
+LLM_Menu_OnInstantToggle(*) {
+	global _LLM_Menu
+	_LLM_Menu["instant_on_word_end"] := !_LLM_Menu["instant_on_word_end"]
+	LLM_Menu_SaveConfig()
+	LLM_Engine_Init(LLM_Menu_BuildOpts())
+	LLM_Menu_Build()
 }
 
 /**
  * Generic boolean toggle for all simple on/off settings.
- * @param {string} key - The _LLM_Tray key to flip.
+ * @param {string} key - The _LLM_Menu key to flip.
  */
-LLM_Tray_ToggleBool(key) {
-	global _LLM_Tray
-	_LLM_Tray[key] := !_LLM_Tray[key]
-	LLM_Tray_SaveConfig()
-	LLM_Engine_Init(LLM_Tray_BuildOpts())
-	LLM_Tray_Build()
+LLM_Menu_ToggleBool(key) {
+	global _LLM_Menu
+	_LLM_Menu[key] := !_LLM_Menu[key]
+	LLM_Menu_SaveConfig()
+	LLM_Engine_Init(LLM_Menu_BuildOpts())
+	LLM_Menu_Build()
 }
 
 /**
  * Triggers the Ollama deps checker.
  * @param {boolean} show_ui - True when the user explicitly clicked the toggle.
  */
-LLM_Tray_BootstrapOllama(show_ui := true) {
+LLM_Menu_BootstrapOllama(show_ui := true) {
 	LoggerInfo("LLM", "BootstrapOllama fired — deps state: " LLM_Deps_GetState() " show_ui=" (show_ui ? "true" : "false") ".")
 	if LLM_Deps_IsReady() {
 		LoggerInfo("LLM", "Ollama already ready — starting bridge directly.")
-		LLM_Tray_OnDepsReady()
+		LLM_Menu_OnDepsReady()
 		return
 	}
 	LoggerInfo("LLM", "Ollama not ready — launching CheckAndInstall…")
 	LLM_Deps_CheckAndInstall(
-		_LLM_Tray["model"],
-		(*) => LLM_Tray_OnDepsReady(),
-		(msg) => LLM_Tray_OnDepsFailed(msg),
+		_LLM_Menu["model"],
+		(*) => LLM_Menu_OnDepsReady(),
+		(msg) => LLM_Menu_OnDepsFailed(msg),
 		show_ui
 	)
 }
@@ -174,31 +174,31 @@ LLM_Tray_BootstrapOllama(show_ui := true) {
 ; ==================================
 ; =====================================
 
-LLM_Tray_SetBackend(id) {
-	global _LLM_Tray
-	_LLM_Tray["backend"] := id
-	LLM_Tray_SaveConfig()
-	LLM_Tray_Build()
+LLM_Menu_SetBackend(id) {
+	global _LLM_Menu
+	_LLM_Menu["backend"] := id
+	LLM_Menu_SaveConfig()
+	LLM_Menu_Build()
 }
 
-LLM_Tray_SetModel(tag) {
-	global _LLM_Tray
-	_LLM_Tray["model"] := tag
+LLM_Menu_SetModel(tag) {
+	global _LLM_Menu
+	_LLM_Menu["model"] := tag
 	; Honour the auto-detect toggle BEFORE saving so the new profile id
 	; lands in the same config write — keeps the on-disk state consistent
 	; whatever path the user took to switch model.
-	LLM_Tray_AutoApplyProfileForModel()
-	LLM_Tray_SaveConfig()
-	LLM_Engine_Init(LLM_Tray_BuildOpts())
+	LLM_Menu_AutoApplyProfileForModel()
+	LLM_Menu_SaveConfig()
+	LLM_Engine_Init(LLM_Menu_BuildOpts())
 	; Pre-load the new model into Ollama's GPU cache asynchronously so the
 	; first real prediction skips the cold-start penalty. No-op for the
 	; remote API backend — there's no local server to warm.
-	if (_LLM_Tray["backend"] == "ollama") {
+	if (_LLM_Menu["backend"] == "ollama") {
 		global _LLM_Ollama_IsReady
 		_LLM_Ollama_IsReady := false
 		try LLM_OllamaScheduleWarmupRetry(tag)
 	}
-	LLM_Tray_Build()
+	LLM_Menu_Build()
 }
 
 /**
@@ -206,15 +206,15 @@ LLM_Tray_SetModel(tag) {
  * menu rebuild paints the dot accordingly. Mirrors the HS
  * ``probe_llm_health`` helper — fire-and-forget, paint on the next pass.
  */
-; (Removed) ``_LLM_Tray_MaybeShowOnboarding`` — used to fire a tray balloon
+; (Removed) ``_LLM_Menu_MaybeShowOnboarding`` — used to fire a tray balloon
 ; on first launch telling the user "Text predictions available". The
 ; notification was perceived as noise; users prefer to discover the LLM
 ; menu themselves rather than be solicited at startup. The
 ; ``menu.llm.onboarding_*`` locale keys it consumed have been deleted from
 ; every locale.
 
-_LLM_Tray_FireHealthProbe() {
-	global _LLM_Tray
+_LLM_Menu_FireHealthProbe() {
+	global _LLM_Menu
 	; Pause invariant: SetTimer callbacks bypass native Suspend, so this 10 s
 	; health tick keeps pinging Ollama (and can trigger a full tray rebuild)
 	; while the user believes the driver is fully paused. Mirror the guard used
@@ -226,28 +226,28 @@ _LLM_Tray_FireHealthProbe() {
 	; (the per-entry ping in api_remote.ahk) and the user-facing health dot
 	; for a remote provider depends on the same probe, which we can layer
 	; on in a follow-up without touching this scaffolding.
-	if (_LLM_Tray["backend"] != "ollama")
+	if (_LLM_Menu["backend"] != "ollama")
 		return
-	if !_LLM_Tray["enabled"]
+	if !_LLM_Menu["enabled"]
 		return
 	; Throttle to one probe every 3 seconds. Opening the tray menu fires a
 	; rebuild which calls this helper; without the throttle the user
 	; opening the menu twice in 100 ms would fire two redundant pings.
 	now := A_TickCount
-	last := _LLM_Tray.Has("last_health_probe_tick") ? _LLM_Tray["last_health_probe_tick"] : 0
+	last := _LLM_Menu.Has("last_health_probe_tick") ? _LLM_Menu["last_health_probe_tick"] : 0
 	if (last > 0 and (now - last) < 3000)
 		return
-	_LLM_Tray["last_health_probe_tick"] := now
+	_LLM_Menu["last_health_probe_tick"] := now
 	try {
-		LLM_OllamaIsRunning_Async((reachable) => _LLM_Tray_OnHealthProbeDone(reachable))
+		LLM_OllamaIsRunning_Async((reachable) => _LLM_Menu_OnHealthProbeDone(reachable))
 	}
 }
 
-_LLM_Tray_OnHealthProbeDone(reachable) {
-	global _LLM_Tray
-	prev := _LLM_Tray.Has("last_health_status") ? _LLM_Tray["last_health_status"] : ""
+_LLM_Menu_OnHealthProbeDone(reachable) {
+	global _LLM_Menu
+	prev := _LLM_Menu.Has("last_health_status") ? _LLM_Menu["last_health_status"] : ""
 	new_status := reachable ? "ok" : "ko"
-	_LLM_Tray["last_health_status"] := new_status
+	_LLM_Menu["last_health_status"] := new_status
 	; Only repaint when the status actually flipped — avoids an infinite
 	; rebuild loop and keeps the menu stable when the user is not staring
 	; at it. Also skip the rebuild while suspended: a probe fired just before
@@ -255,40 +255,40 @@ _LLM_Tray_OnHealthProbeDone(reachable) {
 	; "pause silences everything" invariant. The stashed status above still
 	; updates so the next unpaused build paints the correct dot.
 	if (prev != new_status and !A_IsSuspended)
-		LLM_Tray_Build()
+		LLM_Menu_Build()
 }
 
-LLM_Tray_SetProfile(id) {
-	global _LLM_Tray
+LLM_Menu_SetProfile(id) {
+	global _LLM_Menu
 	; If the user picks a profile manually while auto-detection is on, they
 	; clearly want a non-default choice — turn auto off so the next model
 	; switch doesn't silently overwrite their pick. The recommended profile
 	; for the current model is still computed live by the auto-detect
 	; helper, so flipping the toggle back on later re-applies it.
-	recommended := LLM_RecommendProfileForModel(_LLM_Tray["model"])
-	if (_LLM_Tray["auto_profile_for_model"] and recommended != "" and id != recommended) {
-		_LLM_Tray["auto_profile_for_model"] := false
+	recommended := LLM_RecommendProfileForModel(_LLM_Menu["model"])
+	if (_LLM_Menu["auto_profile_for_model"] and recommended != "" and id != recommended) {
+		_LLM_Menu["auto_profile_for_model"] := false
 	}
-	_LLM_Tray["profile_id"] := id
-	LLM_Tray_SaveConfig()
-	LLM_Engine_Init(LLM_Tray_BuildOpts())
-	LLM_Tray_Build()
+	_LLM_Menu["profile_id"] := id
+	LLM_Menu_SaveConfig()
+	LLM_Engine_Init(LLM_Menu_BuildOpts())
+	LLM_Menu_Build()
 }
 
-LLM_Tray_SetN(n) {
-	global _LLM_Tray
-	_LLM_Tray["n_predictions"] := n
-	LLM_Tray_SaveConfig()
-	LLM_Engine_Init(LLM_Tray_BuildOpts())
-	LLM_Tray_Build()
+LLM_Menu_SetN(n) {
+	global _LLM_Menu
+	_LLM_Menu["n_predictions"] := n
+	LLM_Menu_SaveConfig()
+	LLM_Engine_Init(LLM_Menu_BuildOpts())
+	LLM_Menu_Build()
 }
 
-LLM_Tray_SetIndent(lvl) {
-	global _LLM_Tray
-	_LLM_Tray["pred_indent"] := lvl
-	LLM_Tray_SaveConfig()
-	LLM_Engine_Init(LLM_Tray_BuildOpts())
-	LLM_Tray_Build()
+LLM_Menu_SetIndent(lvl) {
+	global _LLM_Menu
+	_LLM_Menu["pred_indent"] := lvl
+	LLM_Menu_SaveConfig()
+	LLM_Engine_Init(LLM_Menu_BuildOpts())
+	LLM_Menu_Build()
 }
 
 
@@ -305,23 +305,23 @@ LLM_Tray_SetIndent(lvl) {
  * Opens the shared AppPicker_Show() GUI so the user can select processes
  * to exclude from LLM predictions. Reuses the same picker used by Metrics.
  */
-LLM_Tray_OpenAppPicker() {
-	global _LLM_Tray
+LLM_Menu_OpenAppPicker() {
+	global _LLM_Menu
 	AppPicker_Show(Map(
 		"title",    t("menu.llm.exclude_from_ai"),
 		"prompt",   t("dialog.llm.exclude_prompt"),
 		"ok_label", t("dialog.llm.exclude_ok"),
-		"initial",  _LLM_Tray["disabled_apps"],
-		"on_save",  LLM_Tray_OnAppPickerSave
+		"initial",  _LLM_Menu["disabled_apps"],
+		"on_save",  LLM_Menu_OnAppPickerSave
 	))
 }
 
-LLM_Tray_OnAppPickerSave(selected) {
-	global _LLM_Tray
-	_LLM_Tray["disabled_apps"] := selected
-	LLM_Tray_SaveConfig()
-	LLM_Engine_Init(LLM_Tray_BuildOpts())
-	LLM_Tray_Build()
+LLM_Menu_OnAppPickerSave(selected) {
+	global _LLM_Menu
+	_LLM_Menu["disabled_apps"] := selected
+	LLM_Menu_SaveConfig()
+	LLM_Engine_Init(LLM_Menu_BuildOpts())
+	LLM_Menu_Build()
 }
 
 
@@ -334,7 +334,7 @@ LLM_Tray_OnAppPickerSave(selected) {
 ; =======================
 ; ============================
 
-LLM_Tray_OnAbout(*) {
+LLM_Menu_OnAbout(*) {
 	MsgBox(t("menu.llm.about_body"), t("menu.llm.title"))
 }
 
@@ -346,35 +346,35 @@ LLM_Tray_OnAbout(*) {
  * can finish before HotstringPrefixWatcherInit — starting early left the bridge
  * subscribed to HookDispatcher while keystrokes only reached PrefixWatcher.
  */
-LLM_Tray_TryStartBridge() {
-	global _LLM_Tray
-	if !_LLM_Tray["enabled"] or !LLM_Deps_IsReady()
+LLM_Menu_TryStartBridge() {
+	global _LLM_Menu
+	if !_LLM_Menu["enabled"] or !LLM_Deps_IsReady()
 		return
-	_LLM_Tray["bridge_pending"] := false
-	LLM_Tray_StartBridge()
+	_LLM_Menu["bridge_pending"] := false
+	LLM_Menu_StartBridge()
 	if (IsSet(_PrefixInputHook) && _PrefixInputHook && IsSet(LLM_Bridge_OnPrefixWatcherReady))
 		LLM_Bridge_OnPrefixWatcherReady()
 }
 
-LLM_Tray_StartBridge() {
-	global _LLM_Tray
-	LLM_Tray_EnsureModelReady()
-	LLM_Bridge_Start(LLM_Tray_BuildOpts())
-	tag := LLM_ResolveOllamaTag(_LLM_Tray["model"])
+LLM_Menu_StartBridge() {
+	global _LLM_Menu
+	LLM_Menu_EnsureModelReady()
+	LLM_Bridge_Start(LLM_Menu_BuildOpts())
+	tag := LLM_ResolveOllamaTag(_LLM_Menu["model"])
 	if (IsSet(_PrefixInputHook) && _PrefixInputHook)
-		LoggerInfo("LLM", "Bridge started — model: {1}, tag: {2} (PrefixWatcher hook).", _LLM_Tray["model"], tag)
+		LoggerInfo("LLM", "Bridge started — model: {1}, tag: {2} (PrefixWatcher hook).", _LLM_Menu["model"], tag)
 	else
-		LoggerInfo("LLM", "Bridge started — model: {1}, tag: {2} (HookDispatcher until PrefixWatcher).", _LLM_Tray["model"], tag)
+		LoggerInfo("LLM", "Bridge started — model: {1}, tag: {2} (HookDispatcher until PrefixWatcher).", _LLM_Menu["model"], tag)
 }
 
 /**
- * Ensures _LLM_Tray["model"] points at a locally installed model before the
+ * Ensures _LLM_Menu["model"] points at a locally installed model before the
  * engine fires requests. Legacy configs stored raw Ollama tags (e.g.
  * ``qwen2.5:3b``) that are not installed — auto-switch to the best match.
  */
-LLM_Tray_EnsureModelReady() {
-	global _LLM_Tray
-	if (_LLM_Tray["backend"] != "ollama")
+LLM_Menu_EnsureModelReady() {
+	global _LLM_Menu
+	if (_LLM_Menu["backend"] != "ollama")
 		return
 	; Never run the blocking installed-models probe (GET /api/tags, up to a 5 s
 	; WinHTTP timeout) unless the Ollama daemon is confirmed reachable. At boot
@@ -382,16 +382,16 @@ LLM_Tray_EnsureModelReady() {
 	; froze the synchronous menu build for ~2 s — the single largest chunk of
 	; startup time — even with the LLM feature switched off. The model
 	; auto-correct still runs once the daemon comes up: the deps-ready
-	; bridge-start path (LLM_Tray_StartBridge) calls us again with
+	; bridge-start path (LLM_Menu_StartBridge) calls us again with
 	; LLM_Deps_IsReady() == true, where the same probe returns in milliseconds.
 	if !LLM_Deps_IsReady()
 		return
-	model := _LLM_Tray["model"]
+	model := _LLM_Menu["model"]
 	if (model == "")
 		model := _LLM_DefaultFor("llm_model", "Qwen3.5-0.8B")
 	if LLM_IsModelInstalled(model) {
-		if (_LLM_Tray["model"] == "")
-			_LLM_Tray["model"] := model
+		if (_LLM_Menu["model"] == "")
+			_LLM_Menu["model"] := model
 		return
 	}
 	replacement := LLM_PickBestInstalledDisplayName()
@@ -402,45 +402,45 @@ LLM_Tray_EnsureModelReady() {
 	try LoggerWarn("LLM",
 		"Model '{1}' (tag '{2}') is not installed — switching to '{3}' (tag '{4}').",
 		model, old_tag, replacement, new_tag)
-	_LLM_Tray["model"] := replacement
-	LLM_Tray_SaveConfig()
+	_LLM_Menu["model"] := replacement
+	LLM_Menu_SaveConfig()
 }
 
 /**
  * Converts the current tray state into a Map suitable for LLM_Engine_Init().
  * @returns {Map} Options map.
  */
-LLM_Tray_BuildOpts() {
-	global _LLM_Tray
+LLM_Menu_BuildOpts() {
+	global _LLM_Menu
 	return Map(
-		"model",                   _LLM_Tray["model"],
-		"profile_id",              _LLM_Tray["profile_id"],
-		"user_profiles",           _LLM_Tray["user_profiles"],
-		"n_predictions",           _LLM_Tray["n_predictions"],
-		"min_words",               _LLM_Tray["min_words"],
-		"max_words",               _LLM_Tray["max_words"],
-		"language",                _LLM_Tray["language"],
-		"debounce_ms",             _LLM_Tray["debounce_ms"],
-		"ctx_chars",               _LLM_Tray["ctx_chars"],
-		"temperature",             _LLM_Tray["temperature"],
-		"instant_on_word_end",     _LLM_Tray["instant_on_word_end"],
-		"after_hotstring",         _LLM_Tray["after_hotstring"],
-		"reset_on_nav",            _LLM_Tray["reset_on_nav"],
-		"disable_url_bars",        _LLM_Tray["disable_url_bars"],
-		"disable_password_fields", _LLM_Tray["disable_password_fields"],
-		"disabled_apps",           _LLM_Tray["disabled_apps"],
-		"show_info_bar",           _LLM_Tray["show_info_bar"],
-		"streaming",               _LLM_Tray["streaming"],
-		"show_all_at_once",        _LLM_Tray["show_all_at_once"],
-		"pred_indent",             _LLM_Tray["pred_indent"],
-		"auto_raise_temp",         _LLM_Tray["auto_raise_temp"],
-		"nav_modifiers",           _LLM_Tray["nav_modifiers"],
-		"val_modifiers",           _LLM_Tray["val_modifiers"],
-		"backend",                 _LLM_Tray["backend"],
-		"api_entries",             _LLM_Tray["api_entries"],
-		"api_entry_id",            _LLM_Tray["api_entry_id"],
-		"inline_autotype",         _LLM_Tray["inline_autotype"],
-		"app_profile_overrides",   _LLM_Tray["app_profile_overrides"]
+		"model",                   _LLM_Menu["model"],
+		"profile_id",              _LLM_Menu["profile_id"],
+		"user_profiles",           _LLM_Menu["user_profiles"],
+		"n_predictions",           _LLM_Menu["n_predictions"],
+		"min_words",               _LLM_Menu["min_words"],
+		"max_words",               _LLM_Menu["max_words"],
+		"language",                _LLM_Menu["language"],
+		"debounce_ms",             _LLM_Menu["debounce_ms"],
+		"ctx_chars",               _LLM_Menu["ctx_chars"],
+		"temperature",             _LLM_Menu["temperature"],
+		"instant_on_word_end",     _LLM_Menu["instant_on_word_end"],
+		"after_hotstring",         _LLM_Menu["after_hotstring"],
+		"reset_on_nav",            _LLM_Menu["reset_on_nav"],
+		"disable_url_bars",        _LLM_Menu["disable_url_bars"],
+		"disable_password_fields", _LLM_Menu["disable_password_fields"],
+		"disabled_apps",           _LLM_Menu["disabled_apps"],
+		"show_info_bar",           _LLM_Menu["show_info_bar"],
+		"streaming",               _LLM_Menu["streaming"],
+		"show_all_at_once",        _LLM_Menu["show_all_at_once"],
+		"pred_indent",             _LLM_Menu["pred_indent"],
+		"auto_raise_temp",         _LLM_Menu["auto_raise_temp"],
+		"nav_modifiers",           _LLM_Menu["nav_modifiers"],
+		"val_modifiers",           _LLM_Menu["val_modifiers"],
+		"backend",                 _LLM_Menu["backend"],
+		"api_entries",             _LLM_Menu["api_entries"],
+		"api_entry_id",            _LLM_Menu["api_entry_id"],
+		"inline_autotype",         _LLM_Menu["inline_autotype"],
+		"app_profile_overrides",   _LLM_Menu["app_profile_overrides"]
 	)
 }
 
@@ -457,19 +457,19 @@ LLM_Tray_BuildOpts() {
 /**
  * Called by the deps checker when Ollama is confirmed ready.
  */
-LLM_Tray_OnDepsReady() {
-	global _LLM_Tray
+LLM_Menu_OnDepsReady() {
+	global _LLM_Menu
 	LoggerInfo("LLM", "Ollama ready — LLM enabled: {1}.",
-		_LLM_Tray["enabled"] ? "true" : "false")
-	LLM_Tray_Build()
-	if _LLM_Tray["enabled"] {
-		LLM_Tray_TryStartBridge()
+		_LLM_Menu["enabled"] ? "true" : "false")
+	LLM_Menu_Build()
+	if _LLM_Menu["enabled"] {
+		LLM_Menu_TryStartBridge()
 		; Prime the current model so the first user keystroke does not
 		; pay the cold-start penalty. Async — no blocking on Build.
-		if (_LLM_Tray["backend"] == "ollama" and _LLM_Tray["model"] != "") {
+		if (_LLM_Menu["backend"] == "ollama" and _LLM_Menu["model"] != "") {
 			global _LLM_Ollama_IsReady
 			_LLM_Ollama_IsReady := false
-			try LLM_OllamaScheduleWarmupRetry(_LLM_Tray["model"])
+			try LLM_OllamaScheduleWarmupRetry(_LLM_Menu["model"])
 		} else {
 			global _LLM_Ollama_IsReady
 			_LLM_Ollama_IsReady := true
@@ -481,8 +481,8 @@ LLM_Tray_OnDepsReady() {
  * Called by the deps checker on permanent failure.
  * @param {string} msg - Failure reason.
  */
-LLM_Tray_OnDepsFailed(msg) {
-	global _LLM_Tray
-	_LLM_Tray["enabled"] := false
-	LLM_Tray_Build()
+LLM_Menu_OnDepsFailed(msg) {
+	global _LLM_Menu
+	_LLM_Menu["enabled"] := false
+	LLM_Menu_Build()
 }

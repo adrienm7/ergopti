@@ -138,7 +138,7 @@ helpers.describe("LLM menu regressions — Hammerspoon", function()
 		fh:close()
 		helpers.assert_true(body:find("llm_val_modifiers", 1, true) ~= nil,
 			"preferences.lua must wire llm_val_modifiers")
-		-- macOS has no tray_llm/actions.ahk; guard against duplicating persist in wrong layer.
+		-- macOS has no menu_llm/actions.ahk; guard against duplicating persist in wrong layer.
 		helpers.assert_true(body:find("KEY_MAP", 1, true) ~= nil,
 			"preferences.lua must use KEY_MAP for flat persistence")
 	end)

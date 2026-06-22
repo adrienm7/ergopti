@@ -69,7 +69,7 @@ end
 --- The built-in profiles in profiles.json ship with the driver and are read-only
 --- by design (any local edit would be overwritten on the next update), so cloning
 --- into a user profile is the supported way to customise their prompt. Mirrors the
---- AHK twin's LLM_Tray_CloneActiveBuiltinProfile helper.
+--- AHK twin's LLM_Menu_CloneActiveBuiltinProfile helper.
 --- @param deps table Global dependencies.
 --- @param state table Shared menu state.
 --- @param src table The built-in profile to clone.
@@ -192,7 +192,7 @@ local function build_profile_menu(deps, models_mgr)
 
 		-- A single click selects the profile directly — no nested "use this
 		-- profile" sub-item. Mirrors the AHK tray where clicking a built-in row
-		-- activates it (ui/tray_llm/menu_profiles.ahk). Customising a built-in is
+		-- activates it (ui/menu/menu_llm/menu_profiles.ahk). Customising a built-in is
 		-- still reachable via the "Clone active profile…" entry further down.
 		table.insert(menu, {
 			title    = display_label .. (profile.description and ("  —  " .. profile.description) or "") .. extra,
@@ -303,7 +303,7 @@ local function build_profile_menu(deps, models_mgr)
 	-- to customise its prompt. Only shown when the active profile is a built-in
 	-- (user profiles already expose Edit in their own submenu). Replaces the former
 	-- per-row "Clone & edit" sub-item that the single-click selection removed, and
-	-- mirrors the AHK tray's single clone entry (LLM_Tray_CloneActiveBuiltinProfile).
+	-- mirrors the AHK tray's single clone entry (LLM_Menu_CloneActiveBuiltinProfile).
 	local active_builtin = nil
 	for _, p in ipairs(llm_mod.BUILTIN_PROFILES or {}) do
 		if type(p) == "table" and p.id == state.llm_active_profile then

@@ -17,7 +17,7 @@
 ;    llm_bridge, tab_accept) use the same LLM_Tooltip_* names as before — only
 ;    the implementation changes, not the API.
 ; 3. Tab-to-accept + slot navigation: unchanged from the previous implementation;
-;    wired by tray_llm/tab_accept.ahk which calls LLM_Tooltip_GetText() /
+;    wired by menu_llm/tab_accept.ahk which calls LLM_Tooltip_GetText() /
 ;    LLM_Tooltip_SetActiveIdx().
 ; ==============================================================================
 

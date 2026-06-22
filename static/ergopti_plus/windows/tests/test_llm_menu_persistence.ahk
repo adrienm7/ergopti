@@ -7,8 +7,8 @@
 ; to config.toml on reload). Driven by _shared/modules/llm/menu_persistence_contract.json.
 ;
 ; Three layers per AHK contract entry:
-;   1. Wiring: tray_key appears in ui/tray_llm/persist.ahk (sync or append).
-;   2. Sync: Features["llm"] path matches the sample after _LLM_Tray_SyncToFeatures.
+;   1. Wiring: tray_key appears in ui/menu/menu_llm/persist.ahk (sync or append).
+;   2. Sync: Features["llm"] path matches the sample after _LLM_Menu_SyncToFeatures.
 ;   3. Disk: TOML round-trip via the same collect path SaveFullConfig uses.
 ;
 ; Run (from windows/tests): AutoHotkey64.exe /ErrorStdOut run_llm_menu_persistence.ahk
@@ -103,14 +103,14 @@ _LLM_Persist_CollectFeatureUpdates(Updates, SectionPath, Node) {
 }
 
 _LLM_Persist_CollectUpdates() {
-	global Features, _LLM_Tray
+	global Features, _LLM_Menu
 	Updates := []
-	_LLM_Tray_SyncToFeatures()
+	_LLM_Menu_SyncToFeatures()
 	; Scope to [llm] only - same keys the tray persists; avoids walking the full
 	; Features stub (hotstrings, layout, ...) on every contract round-trip.
 	if Features.Has("llm")
 		_LLM_Persist_CollectFeatureUpdates(Updates, "llm", Features["llm"])
-	_LLM_Tray_AppendPersistedUpdates(Updates)
+	_LLM_Menu_AppendPersistedUpdates(Updates)
 	return Updates
 }
 
@@ -126,7 +126,7 @@ _LLM_Persist_NormalizeTomlValue(raw, entry) {
 	if entry.Has("toml_array") && entry["toml_array"] {
 		if (raw is Array)
 			return raw
-		return _LLM_Tray_CoerceIniArray(raw)
+		return _LLM_Menu_CoerceIniArray(raw)
 	}
 	if entry.Has("toml_number") && entry["toml_number"]
 		return Float(raw) + 0
@@ -144,13 +144,13 @@ _LLM_Persist_NormalizeTomlValue(raw, entry) {
 _LLM_Persist_ValuesEqual(expected, actual, entry) {
 	if entry.Has("toml_array") && entry["toml_array"] {
 		if (Type(expected) = "String")
-			expected := _LLM_Tray_ModifiersStringToArray(expected)
+			expected := _LLM_Menu_ModifiersStringToArray(expected)
 		if (Type(actual) = "String")
-			actual := _LLM_Tray_ModifiersStringToArray(actual)
+			actual := _LLM_Menu_ModifiersStringToArray(actual)
 		if !(expected is Array)
-			expected := _LLM_Tray_CoerceIniArray(expected)
+			expected := _LLM_Menu_CoerceIniArray(expected)
 		if !(actual is Array)
-			actual := _LLM_Tray_CoerceIniArray(actual)
+			actual := _LLM_Menu_CoerceIniArray(actual)
 		if (expected.Length != actual.Length)
 			return false
 		loop expected.Length {
@@ -171,7 +171,7 @@ _LLM_Persist_ReadTomlEntry(cache, section, key) {
 }
 
 _LLM_Persist_PersistSource() {
-	return A_ScriptDir . "\..\ui\tray_llm\persist.ahk"
+	return A_ScriptDir . "\..\ui\menu\menu_llm\persist.ahk"
 }
 
 
@@ -187,12 +187,12 @@ _LLM_Persist_PersistSource() {
 
 Test_LLM_Persist_AllTrayKeysAreSynced() {
 	body := FileRead(_LLM_Persist_PersistSource(), "UTF-8")
-	syncStart := InStr(body, "_LLM_Tray_SyncToFeatures()")
-	appendStart := InStr(body, "_LLM_Tray_AppendPersistedUpdates(Updates)")
+	syncStart := InStr(body, "_LLM_Menu_SyncToFeatures()")
+	appendStart := InStr(body, "_LLM_Menu_AppendPersistedUpdates(Updates)")
 	if (syncStart = 0 or appendStart = 0)
 		throw Error("persist.ahk missing sync helpers")
 	syncBlock := SubStr(body, syncStart, appendStart - syncStart)
-	appendEnd := InStr(body, "LLM_Tray_BuildSavedOpts")
+	appendEnd := InStr(body, "LLM_Menu_BuildSavedOpts")
 	appendBlock := appendEnd > 0
 		? SubStr(body, appendStart, appendEnd - appendStart)
 		: SubStr(body, appendStart)
@@ -210,7 +210,7 @@ Test_LLM_Persist_AllTrayKeysAreSynced() {
 		inAppend := (InStr(appendBlock, needle1) > 0 or InStr(appendBlock, needle2) > 0)
 		Assert(inSync or inAppend,
 			"tray key '" . trayKey . "' (" . entry["id"] . ") must appear in "
-			. "_LLM_Tray_SyncToFeatures or _LLM_Tray_AppendPersistedUpdates")
+			. "_LLM_Menu_SyncToFeatures or _LLM_Menu_AppendPersistedUpdates")
 	}
 }
 Test("LLM persist: every contract tray_key is synced before save",
@@ -228,7 +228,7 @@ Test_LLM_Persist_BuildSavedOptsCoversFeatures() {
 			continue
 		needle := 'opts["' . ahk["tray_key"] . '"]'
 		Assert(InStr(body, needle) > 0,
-			"LLM_Tray_BuildSavedOpts must load " . needle . " (" . entry["id"] . ")")
+			"LLM_Menu_BuildSavedOpts must load " . needle . " (" . entry["id"] . ")")
 	}
 }
 Test("LLM persist: BuildSavedOpts loads every Features-backed tray key",
@@ -246,24 +246,24 @@ Test("LLM persist: BuildSavedOpts loads every Features-backed tray key",
 ; =============================================
 
 _LLM_Persist_RunOneEntry(entry, FeaturesBase) {
-	global _LLM_Tray, Features
+	global _LLM_Menu, Features
 	ahk := entry["ahk"]
 	trayKey := ahk["tray_key"]
 	sample := ahk["sample"]
 
 	Features := _LLM_Persist_CloneFeatures(FeaturesBase)
-	_LLM_Tray := _LLM_Persist_MakeDefaultTray()
-	_LLM_Tray[trayKey] := sample
+	_LLM_Menu := _LLM_Persist_MakeDefaultTray()
+	_LLM_Menu[trayKey] := sample
 
 	if ahk.Has("features") {
-		_LLM_Tray_SyncToFeatures()
+		_LLM_Menu_SyncToFeatures()
 		path := ahk["features"]
 		got := _LLM_Persist_FeaturesGet(path)
 		if (trayKey = "temperature")
 			AssertEqual(Float(sample), Float(got),
 				entry["id"] . " Features sync temperature")
 		else if (trayKey = "val_modifiers") {
-			Assert(_LLM_Persist_ValuesEqual(_LLM_Tray_ModifiersStringToArray(sample), got, ahk),
+			Assert(_LLM_Persist_ValuesEqual(_LLM_Menu_ModifiersStringToArray(sample), got, ahk),
 				entry["id"] . " Features val_modifiers array")
 		} else
 			AssertEqual(sample, got, entry["id"] . " Features sync")
@@ -291,7 +291,7 @@ _LLM_Persist_RunOneEntry(entry, FeaturesBase) {
 	Assert(_LLM_Persist_ValuesEqual(sample, _LLM_Persist_NormalizeTomlValue(raw, ahk), ahk),
 		entry["id"] . " TOML round-trip")
 
-	opts := LLM_Tray_BuildSavedOpts(cache)
+	opts := LLM_Menu_BuildSavedOpts(cache)
 	if (trayKey = "temperature")
 		AssertEqual(sample, opts[trayKey], entry["id"] . " BuildSavedOpts temperature")
 	else if (trayKey = "val_modifiers")
@@ -319,10 +319,10 @@ Test_LLM_Persist_AllAhkContractEntries() {
 Test("LLM persist AHK: all contract entries round-trip", Test_LLM_Persist_AllAhkContractEntries)
 
 Test_LLM_Persist_PredIndentZeroIsNumeric() {
-	global _LLM_Tray, Features
+	global _LLM_Menu, Features
 	Features := _LLM_Persist_CloneFeatures(Features)
-	_LLM_Tray := _LLM_Persist_MakeDefaultTray()
-	_LLM_Tray["pred_indent"] := 0
+	_LLM_Menu := _LLM_Persist_MakeDefaultTray()
+	_LLM_Menu["pred_indent"] := 0
 	updates := _LLM_Persist_CollectUpdates()
 	body := ""
 	for u in updates {

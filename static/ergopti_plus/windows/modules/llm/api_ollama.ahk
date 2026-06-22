@@ -124,7 +124,7 @@ global _LLM_OLLAMA_STREAM_FLUSH_RETRY_MS := 40
  * Updates the Ollama server port and rebuilds LLM_OLLAMA_BASE_URL so every
  * subsequent request targets it. Rejects non-integers and out-of-range ports
  * (privileged < 1024, or > 65535). Called from the tray menu and at boot from
- * LLM_Tray_Init with the persisted value.
+ * LLM_Menu_Init with the persisted value.
  * @param {Integer} port - The new Ollama port (1024-65535).
  * @returns {Boolean} true when applied, false when rejected.
  */
@@ -857,7 +857,7 @@ LLM_OllamaScheduleWarmupRetry(model := "") {
 		return
 	if LLM_OllamaIsReady()
 		return
-	if (IsSet(_LLM_Tray) && _LLM_Tray.Has("enabled") && !_LLM_Tray["enabled"])
+	if (IsSet(_LLM_Menu) && _LLM_Menu.Has("enabled") && !_LLM_Menu["enabled"])
 		return
 	LLM_OllamaWarmup(_LLM_Ollama_WarmupRetryModel)
 	if (IsSet(_LLM_Ollama_WarmupRetryFn) && _LLM_Ollama_WarmupRetryFn)
@@ -876,7 +876,7 @@ LLM_Ollama_WarmupRetryTick() {
 	; Do not stack warmups behind an in-flight prediction — Ollama is single-queue.
 	if (IsSet(_LLM_Ollama_Async) and _LLM_Ollama_Async.Count > 0)
 		return
-	if (IsSet(_LLM_Tray) && _LLM_Tray.Has("enabled") && !_LLM_Tray["enabled"]) {
+	if (IsSet(_LLM_Menu) && _LLM_Menu.Has("enabled") && !_LLM_Menu["enabled"]) {
 		LLM_OllamaCancelWarmupRetry()
 		return
 	}

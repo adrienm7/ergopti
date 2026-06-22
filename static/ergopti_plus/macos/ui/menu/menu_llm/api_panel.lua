@@ -286,7 +286,7 @@ function M.build(ctx)
 end
 
 --- Builds the "active model" submenu when the remote API backend is selected.
---- Mirrors Windows ``_LLM_Tray_BuildApiEntriesMenu()`` — local catalogue rows
+--- Mirrors Windows ``_LLM_Menu_BuildApiEntriesMenu()`` — local catalogue rows
 --- are hidden because they have no ``urls.api`` entry in models.json.
 --- @param ctx table Context with fields: state, paused, update_menu, WarmupCtrl.
 --- @return table menu Populated API entry picker.
