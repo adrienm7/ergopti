@@ -134,9 +134,9 @@ initMenu() {
 	}
 	BootProfile_Mark("MENU/initMenu: hotstrings grandtotal+added")
 
-	global _LLM_Tray_InTray
-	_LLM_Tray_InTray := false
-	_LlmSavedOpts := LLM_Tray_BuildSavedOpts(_IniCache)
+	global _LLM_Menu_InTray
+	_LLM_Menu_InTray := false
+	_LlmSavedOpts := LLM_Menu_BuildSavedOpts(_IniCache)
 
 	_LlmRawOnboarded := IniCacheGet(_IniCache, "llm", "onboarding_seen")
 	if (_LlmRawOnboarded != "_")
@@ -155,7 +155,7 @@ initMenu() {
 		}
 		_LlmSavedOpts["app_profile_overrides"] := _LlmAppOverridesMap
 	}
-	LLM_Tray_Init(_LlmSavedOpts)
+	LLM_Menu_Init(_LlmSavedOpts)
 	BootProfile_Mark("MENU/initMenu: LLM tray init")
 
 	BuildMetricsMenu()

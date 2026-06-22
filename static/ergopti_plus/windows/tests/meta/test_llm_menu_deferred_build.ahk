@@ -1,4 +1,4 @@
-﻿; tests/meta/test_llm_tray_deferred_build.ahk
+﻿; tests/meta/test_llm_menu_deferred_build.ahk
 
 ; ==============================================================================
 ; MODULE: LLM Tray Deferred-Build Test
@@ -6,8 +6,8 @@
 ; Guards the order-preserving deferral of the IA submenu build.
 ;
 ; WHY THIS MATTERS (the regression this encodes):
-;   LLM_Tray_Build() populates ~8 submenus and was called synchronously from
-;   LLM_Tray_Init() inside initMenu(). Under load that build was measured at
+;   LLM_Menu_Build() populates ~8 submenus and was called synchronously from
+;   LLM_Menu_Init() inside initMenu(). Under load that build was measured at
 ;   ~1.6 s, blocking initMenu() mid-way. A tray opened during that window showed
 ;   only the top-level items registered before the IA entry (the user-reported
 ;   "menu shows only the first 2 items" bug). The fix places the IA entry in its
@@ -31,29 +31,29 @@
 
 _MetaCheckLlmTrayDeferredBuild() {
 	SplitPath(A_ScriptDir, , &WindowsDir)
-	InitFile := WindowsDir . "\ui\tray_llm\init.ahk"
+	InitFile := WindowsDir . "\ui\menu\menu_llm\init.ahk"
 	BootFile := WindowsDir . "\ErgoptiPlus.ahk"
 
 	InitBody := ""
 	try InitBody := FileRead(InitFile)
-	Assert(InitBody != "", "ui/tray_llm/init.ahk must be readable")
+	Assert(InitBody != "", "ui/menu/menu_llm/init.ahk must be readable")
 
-	; LLM_Tray_Init must flag the build as deferred, and place the entry itself.
-	Assert(InStr(InitBody, "_LLM_Tray_BuildPending := true") > 0,
-		"LLM_Tray_Init must set _LLM_Tray_BuildPending := true to defer the IA submenu build")
-	Assert(InStr(InitBody, 'A_TrayMenu.Add(t("menu.llm.title"), _LLM_Tray_Menu)') > 0,
-		"LLM_Tray_Init must place the (empty) IA submenu in its canonical tray position")
+	; LLM_Menu_Init must flag the build as deferred, and place the entry itself.
+	Assert(InStr(InitBody, "_LLM_Menu_BuildPending := true") > 0,
+		"LLM_Menu_Init must set _LLM_Menu_BuildPending := true to defer the IA submenu build")
+	Assert(InStr(InitBody, 'A_TrayMenu.Add(t("menu.llm.title"), _LLM_Menu_Handle)') > 0,
+		"LLM_Menu_Init must place the (empty) IA submenu in its canonical tray position")
 
 	; And it must NOT build the menu synchronously — that is what blocked initMenu.
-	Assert(!InStr(InitBody, "LLM_Tray_Build("),
-		"LLM_Tray_Init must NOT call LLM_Tray_Build() synchronously — the boot tail arms it")
+	Assert(!InStr(InitBody, "LLM_Menu_Build("),
+		"LLM_Menu_Init must NOT call LLM_Menu_Build() synchronously — the boot tail arms it")
 
 	; The boot tail must arm the deferred build.
 	BootBody := ""
 	try BootBody := FileRead(BootFile)
 	Assert(BootBody != "", "ErgoptiPlus.ahk must be readable")
-	Assert(InStr(BootBody, "SetTimer(LLM_Tray_Build, -LLM_TRAY_BUILD_DEFER_MS)") > 0,
-		"ErgoptiPlus.ahk boot tail must arm the deferred LLM_Tray_Build")
+	Assert(InStr(BootBody, "SetTimer(LLM_Menu_Build, -LLM_MENU_BUILD_DEFER_MS)") > 0,
+		"ErgoptiPlus.ahk boot tail must arm the deferred LLM_Menu_Build")
 }
 
-Test("meta llm: LLM_Tray_Init defers the IA submenu build", _MetaCheckLlmTrayDeferredBuild)
+Test("meta llm: LLM_Menu_Init defers the IA submenu build", _MetaCheckLlmTrayDeferredBuild)

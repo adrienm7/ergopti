@@ -1,4 +1,4 @@
-﻿; ui/tray_llm/menu_api_entries.ahk
+﻿; ui/menu/menu_llm/menu_api_entries.ahk
 
 ; ==============================================================================
 ; MODULE: LLM Tray — Remote API entries
@@ -40,41 +40,41 @@
 ; Build the "API endpoints" submenu shown when backend == "api". When the user
 ; has no entries yet, the menu carries a single greyed-out hint plus the
 ; "+ Add" action so the next click takes them straight to the entry dialog.
-_LLM_Tray_BuildApiEntriesMenu() {
-	global _LLM_Tray
+_LLM_Menu_BuildApiEntriesMenu() {
+	global _LLM_Menu
 	m := Menu()
-	entries := _LLM_Tray["api_entries"]
+	entries := _LLM_Menu["api_entries"]
 	if (Type(entries) != "Array" or entries.Length == 0) {
 		label := t("menu.llm.api_no_entry")
 		m.Add(label, (*) => 0)
 		m.Disable(label)
 	} else {
-		active_id := _LLM_Tray.Has("api_entry_id") ? _LLM_Tray["api_entry_id"] : ""
+		active_id := _LLM_Menu.Has("api_entry_id") ? _LLM_Menu["api_entry_id"] : ""
 		for entry in entries {
-			id    := _LLM_TrayApiEntryGet(entry, "Id",       "")
-			name  := _LLM_TrayApiEntryGet(entry, "Name",     "(unnamed)")
-			prov  := _LLM_TrayApiEntryGet(entry, "Provider", "")
-			model := _LLM_TrayApiEntryGet(entry, "Model",    "")
+			id    := _LLM_MenuApiEntryGet(entry, "Id",       "")
+			name  := _LLM_MenuApiEntryGet(entry, "Name",     "(unnamed)")
+			prov  := _LLM_MenuApiEntryGet(entry, "Provider", "")
+			model := _LLM_MenuApiEntryGet(entry, "Model",    "")
 			suffix := (model != "" and prov != "") ? "  —  " . prov . " / " . model
 				: (model != "") ? "  —  " . model
 				: (prov  != "") ? "  —  " . prov
 				: ""
 			label := name . suffix
-			RegisterMenuItem(m, label, _LLM_Tray_MakeSelectApiEntryHandler(entry))
+			RegisterMenuItem(m, label, _LLM_Menu_MakeSelectApiEntryHandler(entry))
 			if (id == active_id)
 				m.Check(label)
 		}
 	}
 	m.Add()
-	RegisterMenuItem(m, t("menu.llm.api_add_entry"),  (*) => _LLM_Tray_PromptApiEntry(""))
+	RegisterMenuItem(m, t("menu.llm.api_add_entry"),  (*) => _LLM_Menu_PromptApiEntry(""))
 	if (Type(entries) == "Array" and entries.Length > 0) {
-		RegisterMenuItem(m, t("menu.llm.api_edit_entry"), (*) => _LLM_Tray_PromptApiEntry(_LLM_Tray["api_entry_id"]))
-		RegisterMenuItem(m, t("menu.llm.api_remove_entry"), (*) => _LLM_Tray_RemoveActiveApiEntry())
+		RegisterMenuItem(m, t("menu.llm.api_edit_entry"), (*) => _LLM_Menu_PromptApiEntry(_LLM_Menu["api_entry_id"]))
+		RegisterMenuItem(m, t("menu.llm.api_remove_entry"), (*) => _LLM_Menu_RemoveActiveApiEntry())
 	}
 	return m
 }
 
-_LLM_TrayApiEntryGet(Entry, Key, Default := "") {
+_LLM_MenuApiEntryGet(Entry, Key, Default := "") {
 	if (Entry is Map) {
 		return Entry.Has(Key) ? Entry[Key] : Default
 	}
@@ -85,12 +85,12 @@ _LLM_TrayApiEntryGet(Entry, Key, Default := "") {
 	}
 }
 
-_LLM_Tray_SelectApiEntry(Entry) {
-	global _LLM_Tray
-	_LLM_Tray["api_entry_id"] := _LLM_TrayApiEntryGet(Entry, "Id", "")
-	LLM_Tray_SaveConfig()
-	LLM_Engine_Init(LLM_Tray_BuildOpts())
-	LLM_Tray_Build()
+_LLM_Menu_SelectApiEntry(Entry) {
+	global _LLM_Menu
+	_LLM_Menu["api_entry_id"] := _LLM_MenuApiEntryGet(Entry, "Id", "")
+	LLM_Menu_SaveConfig()
+	LLM_Engine_Init(LLM_Menu_BuildOpts())
+	LLM_Menu_Build()
 }
 
 
@@ -108,12 +108,12 @@ _LLM_Tray_SelectApiEntry(Entry) {
 ; updates it in place. The dialog stays InputBox-driven (one field per call)
 ; so it works on the AHK v2 baseline with no custom Gui — same UX as the
 ; existing single-field prompts the menu already uses.
-_LLM_Tray_PromptApiEntry(EditId) {
-	global _LLM_Tray, LLM_API_PROVIDERS
+_LLM_Menu_PromptApiEntry(EditId) {
+	global _LLM_Menu, LLM_API_PROVIDERS
 	existing := ""
 	if (EditId != "") {
-		for e in _LLM_Tray["api_entries"] {
-			if (_LLM_TrayApiEntryGet(e, "Id", "") == EditId) {
+		for e in _LLM_Menu["api_entries"] {
+			if (_LLM_MenuApiEntryGet(e, "Id", "") == EditId) {
 				existing := e
 				break
 			}
@@ -121,7 +121,7 @@ _LLM_Tray_PromptApiEntry(EditId) {
 	}
 
 	; Step 1 — friendly name.
-	def_name := existing != "" ? _LLM_TrayApiEntryGet(existing, "Name", "") : ""
+	def_name := existing != "" ? _LLM_MenuApiEntryGet(existing, "Name", "") : ""
 	ib := InputBox(t("menu.llm.api_prompt_name"), t("menu.llm.api_dialog_title"),
 		"w420 h130", def_name)
 	if (ib.Result != "OK" or Trim(ib.Value) == "")
@@ -134,7 +134,7 @@ _LLM_Tray_PromptApiEntry(EditId) {
 		provider_choices .= k . " (" . v["Label"] . "), "
 	}
 	provider_choices := RTrim(provider_choices, ", ")
-	def_provider := existing != "" ? _LLM_TrayApiEntryGet(existing, "Provider", "openai") : "openai"
+	def_provider := existing != "" ? _LLM_MenuApiEntryGet(existing, "Provider", "openai") : "openai"
 	ib := InputBox(
 		Format(t("menu.llm.api_prompt_provider"), provider_choices),
 		t("menu.llm.api_dialog_title"), "w520 h150", def_provider)
@@ -146,7 +146,7 @@ _LLM_Tray_PromptApiEntry(EditId) {
 	provider := LLM_API_PROVIDERS[provider_id]
 
 	; Step 3 — base URL (prefilled with the provider default).
-	def_url := existing != "" ? _LLM_TrayApiEntryGet(existing, "BaseUrl", "") : provider["BaseUrl"]
+	def_url := existing != "" ? _LLM_MenuApiEntryGet(existing, "BaseUrl", "") : provider["BaseUrl"]
 	ib := InputBox(t("menu.llm.api_prompt_url"), t("menu.llm.api_dialog_title"),
 		"w520 h130", def_url)
 	if (ib.Result != "OK")
@@ -155,7 +155,7 @@ _LLM_Tray_PromptApiEntry(EditId) {
 
 	; Step 4 — token. InputBox does not natively mask, so we use the Hide
 	; flag (HIDE) so the cleartext doesn't sit on screen / clipboard.
-	def_token := existing != "" ? _LLM_TrayApiEntryGet(existing, "Token", "") : ""
+	def_token := existing != "" ? _LLM_MenuApiEntryGet(existing, "Token", "") : ""
 	ib := InputBox(t("menu.llm.api_prompt_token"), t("menu.llm.api_dialog_title"),
 		"w520 h130 Password", def_token)
 	if (ib.Result != "OK")
@@ -163,7 +163,7 @@ _LLM_Tray_PromptApiEntry(EditId) {
 	new_token := ib.Value   ; do NOT Trim — leading/trailing chars are part of the secret
 
 	; Step 5 — model.
-	def_model := existing != "" ? _LLM_TrayApiEntryGet(existing, "Model", "") : provider["DefaultModel"]
+	def_model := existing != "" ? _LLM_MenuApiEntryGet(existing, "Model", "") : provider["DefaultModel"]
 	ib := InputBox(t("menu.llm.api_prompt_model"), t("menu.llm.api_dialog_title"),
 		"w420 h130", def_model)
 	if (ib.Result != "OK" or Trim(ib.Value) == "")
@@ -172,7 +172,7 @@ _LLM_Tray_PromptApiEntry(EditId) {
 
 	; Persist.
 	new_entry := Map(
-		"Id",       existing != "" ? _LLM_TrayApiEntryGet(existing, "Id", _LLM_Tray_NewApiId()) : _LLM_Tray_NewApiId(),
+		"Id",       existing != "" ? _LLM_MenuApiEntryGet(existing, "Id", _LLM_Menu_NewApiId()) : _LLM_Menu_NewApiId(),
 		"Name",     new_name,
 		"Provider", provider_id,
 		"BaseUrl",  new_url,
@@ -181,20 +181,20 @@ _LLM_Tray_PromptApiEntry(EditId) {
 	)
 	if (existing != "") {
 		idx := 0
-		for i, e in _LLM_Tray["api_entries"] {
-			if (_LLM_TrayApiEntryGet(e, "Id", "") == _LLM_TrayApiEntryGet(existing, "Id", "")) {
+		for i, e in _LLM_Menu["api_entries"] {
+			if (_LLM_MenuApiEntryGet(e, "Id", "") == _LLM_MenuApiEntryGet(existing, "Id", "")) {
 				idx := i
 				break
 			}
 		}
 		if (idx > 0)
-			_LLM_Tray["api_entries"][idx] := new_entry
+			_LLM_Menu["api_entries"][idx] := new_entry
 	} else {
-		_LLM_Tray["api_entries"].Push(new_entry)
-		_LLM_Tray["api_entry_id"] := new_entry["Id"]
+		_LLM_Menu["api_entries"].Push(new_entry)
+		_LLM_Menu["api_entry_id"] := new_entry["Id"]
 	}
-	_LLM_Tray_PersistApiEntries()
-	LLM_Tray_SaveConfig()
+	_LLM_Menu_PersistApiEntries()
+	LLM_Menu_SaveConfig()
 
 	; Token validation: hit the provider's /models endpoint once with the
 	; freshly-saved credentials so the user finds out NOW (with an explicit
@@ -205,21 +205,21 @@ _LLM_Tray_PromptApiEntry(EditId) {
 	; the BaseUrl was unreachable. LLM_RemoteIsReady_Async polls instead, so
 	; the save path returns immediately and the result is surfaced from the
 	; poll callback once it resolves.
-	try LLM_RemoteIsReady_Async(new_entry, _LLM_Tray_MakeApiValidationHandler(new_name))
+	try LLM_RemoteIsReady_Async(new_entry, _LLM_Menu_MakeApiValidationHandler(new_name))
 
-	LLM_Engine_Init(LLM_Tray_BuildOpts())
-	LLM_Tray_Build()
+	LLM_Engine_Init(LLM_Menu_BuildOpts())
+	LLM_Menu_Build()
 }
 
 ; Builds the async validation callback for an API save. Captured ``Name`` is
 ; bound at save time so a later edit/save does not relabel an in-flight TrayTip.
 ; Kept as a factory (not an inline closure) so the captured value is explicit
 ; and the save path reads as a single non-blocking dispatch.
-_LLM_Tray_MakeApiValidationHandler(Name) {
-	return (reachable) => _LLM_Tray_OnApiValidationDone(reachable, Name)
+_LLM_Menu_MakeApiValidationHandler(Name) {
+	return (reachable) => _LLM_Menu_OnApiValidationDone(reachable, Name)
 }
 
-_LLM_Tray_OnApiValidationDone(reachable, Name) {
+_LLM_Menu_OnApiValidationDone(reachable, Name) {
 	if (reachable) {
 		TrayTip(StrReplace(t("menu.llm.api_validated_body"), "%s", Name),
 			t("menu.llm.api_validated_title"), "Iconi")
@@ -229,22 +229,22 @@ _LLM_Tray_OnApiValidationDone(reachable, Name) {
 	}
 }
 
-_LLM_Tray_RemoveActiveApiEntry() {
-	global _LLM_Tray
-	active_id := _LLM_Tray["api_entry_id"]
+_LLM_Menu_RemoveActiveApiEntry() {
+	global _LLM_Menu
+	active_id := _LLM_Menu["api_entry_id"]
 	if (active_id == "")
 		return
 	; Confirm before destroying the entry — the saved token is gone for
 	; good once we delete it. Worth one extra click, especially because
 	; the user is one stray click away in a small menu.
 	active_entry := ""
-	for e in _LLM_Tray["api_entries"] {
-		if (_LLM_TrayApiEntryGet(e, "Id", "") == active_id) {
+	for e in _LLM_Menu["api_entries"] {
+		if (_LLM_MenuApiEntryGet(e, "Id", "") == active_id) {
 			active_entry := e
 			break
 		}
 	}
-	entry_name := _LLM_TrayApiEntryGet(active_entry, "Name", active_id)
+	entry_name := _LLM_MenuApiEntryGet(active_entry, "Name", active_id)
 	confirm := MsgBox(
 		StrReplace(t("menu.llm.api_remove_confirm_body"), "%s", entry_name),
 		t("menu.llm.api_remove_confirm_title"),
@@ -253,25 +253,25 @@ _LLM_Tray_RemoveActiveApiEntry() {
 	if (confirm != "Yes")
 		return
 	kept := []
-	for e in _LLM_Tray["api_entries"] {
-		if (_LLM_TrayApiEntryGet(e, "Id", "") != active_id)
+	for e in _LLM_Menu["api_entries"] {
+		if (_LLM_MenuApiEntryGet(e, "Id", "") != active_id)
 			kept.Push(e)
 	}
-	_LLM_Tray["api_entries"] := kept
-	_LLM_Tray["api_entry_id"] := (kept.Length > 0)
-		? _LLM_TrayApiEntryGet(kept[1], "Id", "")
+	_LLM_Menu["api_entries"] := kept
+	_LLM_Menu["api_entry_id"] := (kept.Length > 0)
+		? _LLM_MenuApiEntryGet(kept[1], "Id", "")
 		: ""
-	_LLM_Tray_PersistApiEntries()
-	LLM_Tray_SaveConfig()
-	LLM_Engine_Init(LLM_Tray_BuildOpts())
-	LLM_Tray_Build()
+	_LLM_Menu_PersistApiEntries()
+	LLM_Menu_SaveConfig()
+	LLM_Engine_Init(LLM_Menu_BuildOpts())
+	LLM_Menu_Build()
 }
 
 ; Heuristic: does the active model name suggest a built-in chain-of-thought
 ; ("thinking" / "reasoning" / DeepSeek's -r1 suffix)? Mirrors HS's
 ; ui/menu/menu_llm/models_manager.lua is_thinking check so both drivers
 ; flag the same model set without a shared metadata table.
-_LLM_Tray_IsThinkingModel(model) {
+_LLM_Menu_IsThinkingModel(model) {
 	if (model == "")
 		return false
 	lower := StrLower(model)
@@ -280,7 +280,7 @@ _LLM_Tray_IsThinkingModel(model) {
 		or InStr(lower, "reasoning") > 0
 }
 
-_LLM_Tray_NewApiId() {
+_LLM_Menu_NewApiId() {
 	; Tick-based id keeps it monotonic without pulling a UUID lib. Collisions
 	; would only happen on two adds within the same millisecond — vanishingly
 	; unlikely from a user-driven dialog flow.
@@ -302,7 +302,7 @@ _LLM_Tray_NewApiId() {
 ; with everything else. Kept separate from config.toml because the schema
 ; is a nested array-of-maps that the project's flat-TOML writer would
 ; mangle.
-_LLM_Tray_ApiEntriesPath() {
+_LLM_Menu_ApiEntriesPath() {
 	global ConfigurationFile
 	if !IsSet(ConfigurationFile) or ConfigurationFile == ""
 		return ""
@@ -314,9 +314,9 @@ _LLM_Tray_ApiEntriesPath() {
 ; missing file (first-run user) and on parse failure (corrupt file) — both
 ; cases just leave the user with an empty entries list, which the UI handles
 ; gracefully via the "+ Add an API…" affordance.
-_LLM_Tray_LoadApiEntries() {
-	global _LLM_Tray
-	path := _LLM_Tray_ApiEntriesPath()
+_LLM_Menu_LoadApiEntries() {
+	global _LLM_Menu
+	path := _LLM_Menu_ApiEntriesPath()
 	if (path == "" or !FileExist(path))
 		return
 	try {
@@ -330,11 +330,11 @@ _LLM_Tray_LoadApiEntries() {
 	; literal ``{`` or ``}`` would silently truncate one entry and shift the
 	; rest by one — a regression that's invisible until a user pastes an
 	; OAuth bearer token containing those characters.
-	for obj_str in _LLM_Tray_SplitJsonObjects(raw) {
+	for obj_str in _LLM_Menu_SplitJsonObjects(raw) {
 		obj := Map()
 		for field in ["Id", "Name", "Provider", "BaseUrl", "Token", "Model"] {
 			if RegExMatch(obj_str, '"' . field . '"\s*:\s*"((?:[^"\\]|\\.)*)"', &fm) {
-				obj[field] := _LLM_TrayApiJsonUnescape(fm[1])
+				obj[field] := _LLM_MenuApiJsonUnescape(fm[1])
 			} else {
 				obj[field] := ""
 			}
@@ -348,11 +348,11 @@ _LLM_Tray_LoadApiEntries() {
 		if (obj["Id"] != "")
 			entries.Push(obj)
 	}
-	_LLM_Tray["api_entries"] := entries
+	_LLM_Menu["api_entries"] := entries
 	; Re-anchor the active id only if it still exists; otherwise pick the
 	; first entry so a corrupted ``api_entry_id`` does not leave the user
 	; with "no active entry" while entries exist on disk.
-	active := _LLM_Tray.Has("api_entry_id") ? _LLM_Tray["api_entry_id"] : ""
+	active := _LLM_Menu.Has("api_entry_id") ? _LLM_Menu["api_entry_id"] : ""
 	if (active != "") {
 		found := false
 		for e in entries {
@@ -366,36 +366,36 @@ _LLM_Tray_LoadApiEntries() {
 	}
 	if (active == "" and entries.Length > 0)
 		active := entries[1]["Id"]
-	_LLM_Tray["api_entry_id"] := active
+	_LLM_Menu["api_entry_id"] := active
 }
 
 ; Write api_entries.json. Called from every CRUD action so the file always
 ; reflects the in-memory state. The serialiser only handles the six string
 ; fields the dialog writes, which is the entire schema by construction.
-_LLM_Tray_PersistApiEntries() {
-	global _LLM_Tray
-	path := _LLM_Tray_ApiEntriesPath()
+_LLM_Menu_PersistApiEntries() {
+	global _LLM_Menu
+	path := _LLM_Menu_ApiEntriesPath()
 	if (path == "")
 		return
-	entries := _LLM_Tray["api_entries"]
+	entries := _LLM_Menu["api_entries"]
 	if (Type(entries) != "Array")
 		entries := []
 	lines := []
 	for e in entries {
 		fields := []
 		for field in ["Id", "Name", "Provider", "BaseUrl", "Token", "Model"] {
-			val := _LLM_TrayApiEntryGet(e, field, "")
+			val := _LLM_MenuApiEntryGet(e, field, "")
 			; Encrypt the token via DPAPI before writing. The encrypted
 			; blob is base64-prefixed with ``dpapi:`` so the loader can
 			; detect it; legacy plaintext entries get encrypted on the
 			; first save after this build lands.
 			if (field == "Token" and val != "")
 				val := LLM_ApiToken_Encrypt(val)
-			fields.Push('"' . field . '":"' . _LLM_TrayApiJsonEscape(val) . '"')
+			fields.Push('"' . field . '":"' . _LLM_MenuApiJsonEscape(val) . '"')
 		}
-		lines.Push("{" . _LLM_TrayJoin(fields, ",") . "}")
+		lines.Push("{" . _LLM_MenuJoin(fields, ",") . "}")
 	}
-	body := "[" . _LLM_TrayJoin(lines, ",`n  ") . "]"
+	body := "[" . _LLM_MenuJoin(lines, ",`n  ") . "]"
 	; Ensure the parent directory exists before writing — first run on a
 	; freshly-checked-out repo would otherwise hit ENOENT.
 	SplitPath(path, , &parent)
@@ -423,14 +423,14 @@ _LLM_Tray_PersistApiEntries() {
 ; ===============================
 ; =====================================
 
-_LLM_TrayJoin(arr, sep) {
+_LLM_MenuJoin(arr, sep) {
 	out := ""
 	for i, v in arr
 		out .= (i > 1 ? sep : "") . v
 	return out
 }
 
-_LLM_TrayApiJsonEscape(s) {
+_LLM_MenuApiJsonEscape(s) {
 	s := StrReplace(s, "\",  "\\")
 	s := StrReplace(s, '"',  '\"')
 	s := StrReplace(s, "`n", "\n")
@@ -443,12 +443,12 @@ _LLM_TrayApiJsonEscape(s) {
  * Splits a JSON array text into its top-level ``{...}`` object substrings,
  * tracking string boundaries and backslash escapes so a literal ``{`` or
  * ``}`` inside a token / URL never trips the split. Used by
- * _LLM_Tray_LoadApiEntries.
+ * _LLM_Menu_LoadApiEntries.
  *
  * @param {string} raw - Raw file contents (typically the contents of api_entries.json).
  * @returns {Array} Array of substrings, each one a complete ``{...}`` block.
  */
-_LLM_Tray_SplitJsonObjects(raw) {
+_LLM_Menu_SplitJsonObjects(raw) {
 	objects := []
 	n := StrLen(raw)
 	i := 1
@@ -510,7 +510,7 @@ _LLM_Tray_SplitJsonObjects(raw) {
 	return objects
 }
 
-_LLM_TrayApiJsonUnescape(s) {
+_LLM_MenuApiJsonUnescape(s) {
 	; Two-pass with a placeholder so an escaped backslash (``\\``) doesn't
 	; trick the subsequent passes. The naive ordering ``\n → newline ;
 	; \\ → \`` mis-handled input like ``\\n`` (escaped backslash + literal

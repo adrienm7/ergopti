@@ -7,7 +7,7 @@ SetWorkingDir(A_ScriptDir)
 ; MODULE: LLM Model Menu - Disabled-Feature Catalogue Tests
 ; DESCRIPTION:
 ; Behavioural guard for the "disabled feature hid every model" regression. Loads
-; ui/tray_llm/menu_models.ahk with stubbed dependencies (so this doubles as a
+; ui/menu/menu_llm/menu_models.ahk with stubbed dependencies (so this doubles as a
 ; parse/load check of the catalogue builder) and proves that the model submenu
 ; lists the FULL curated catalogue regardless of the enabled / Ollama-ready
 ; state, mirroring Hammerspoon. It also pins the non-blocking contract: the green
@@ -25,7 +25,7 @@ global _MMD_ListCalls   := 0       ; LLM_OllamaListModels call count
 global _MMD_InfoCalls   := 0       ; LLM_GetModelInfo call count (catalogue-build signal)
 
 ; --- Globals the module reads ---
-global _LLM_Tray  := Map("backend", "ollama", "model", "Qwen3.5-2B", "enabled", false)
+global _LLM_Menu  := Map("backend", "ollama", "model", "Qwen3.5-2B", "enabled", false)
 global JSON_NULL  := { __null: true }   ; sentinel object: only an exact == match counts as null
 
 ; --- Dependency stubs (must exist at load: AHK resolves calls then) ---
@@ -34,9 +34,9 @@ RegisterMenuItem(m, l, cb*)  => m.Add(l, cb.Length ? cb[1] : (*) => 0)
 LLM_Deps_IsReady()           => _MMD_DepsReady
 _LLM_DefaultFor(k, d := "")  => d
 LLM_ModelBrowser_Show()      => ""
-LLM_Tray_PromptAddModel()    => ""
-_LLM_Tray_BuildApiEntriesMenu() => Menu()
-LLM_Tray_SetModel(n*)        => ""
+LLM_Menu_PromptAddModel()    => ""
+_LLM_Menu_BuildApiEntriesMenu() => Menu()
+LLM_Menu_SetModel(n*)        => ""
 
 LLM_IsModelInstalled(name) {
 	global _MMD_ProbeCalls
@@ -72,7 +72,7 @@ LLM_GetModelPresets() {
 	]
 }
 
-#Include ../ui/tray_llm/menu_models.ahk
+#Include ../ui/menu/menu_llm/menu_models.ahk
 
 ; Isolated suite: bail if a stale lock ever hangs RunTests.
 _MmdWatchdog(*) {
@@ -100,7 +100,7 @@ _MMD_AppendBuildsFullCatalogueWhenNotReady() {
 	global _MMD_DepsReady
 	_MMD_DepsReady := false
 	_MMD_ResetCounters()
-	any := _LLM_Tray_AppendCatalogue(Menu(), LLM_GetModelPresets(), "", false)
+	any := _LLM_Menu_AppendCatalogue(Menu(), LLM_GetModelPresets(), "", false)
 	AssertTrue(any, "the full catalogue must still be built when the feature/daemon is not ready")
 	AssertEqual(0, _MMD_ProbeCalls, "install probe must be skipped when deps are not ready (non-blocking)")
 }
@@ -110,7 +110,7 @@ _MMD_AppendProbesWhenReady() {
 	global _MMD_DepsReady
 	_MMD_DepsReady := true
 	_MMD_ResetCounters()
-	any := _LLM_Tray_AppendCatalogue(Menu(), LLM_GetModelPresets(), "", true)
+	any := _LLM_Menu_AppendCatalogue(Menu(), LLM_GetModelPresets(), "", true)
 	AssertTrue(any, "the catalogue must be built when ready too")
 	AssertTrue(_MMD_ProbeCalls > 0, "install probe must run to paint the green dot when the daemon is ready")
 }
@@ -127,9 +127,9 @@ Test("model menu: install probe runs when the daemon is ready", _MMD_AppendProbe
 _MMD_RowTitleNoDotWhenNotReady() {
 	; U+1F7E2 GREEN CIRCLE - referenced via Chr() so the test stays ASCII-only.
 	dot := Chr(0x1F7E2)
-	title_off := _LLM_Tray_BuildModelRowTitle("Llama-3.1-8B", "", false)
+	title_off := _LLM_Menu_BuildModelRowTitle("Llama-3.1-8B", "", false)
 	Assert(!InStr(title_off, dot), "row title must NOT show the installed dot while deps are not ready")
-	title_on := _LLM_Tray_BuildModelRowTitle("Llama-3.1-8B", "", true)
+	title_on := _LLM_Menu_BuildModelRowTitle("Llama-3.1-8B", "", true)
 	AssertContains(title_on, dot, "row title MUST show the installed dot once deps are ready (model is installed)")
 }
 Test("model menu: row green dot only when deps ready", _MMD_RowTitleNoDotWhenNotReady)
@@ -143,12 +143,12 @@ Test("model menu: row green dot only when deps ready", _MMD_RowTitleNoDotWhenNot
 ; =========================================================
 
 _MMD_BuildModelMenuListsAllWhenDisabled() {
-	global _LLM_Tray, _MMD_DepsReady, _MMD_InfoCalls
+	global _LLM_Menu, _MMD_DepsReady, _MMD_InfoCalls
 	; Reproduce the user's exact state: feature OFF, Ollama never bootstrapped.
-	_LLM_Tray := Map("backend", "ollama", "model", "Qwen3.5-2B", "enabled", false)
+	_LLM_Menu := Map("backend", "ollama", "model", "Qwen3.5-2B", "enabled", false)
 	_MMD_DepsReady := false
 	_MMD_ResetCounters()
-	menu := LLM_Tray_BuildModelMenu()
+	menu := LLM_Menu_BuildModelMenu()
 	AssertTrue(IsObject(menu), "BuildModelMenu must return a Menu, not crash, when the feature is off")
 	; The OLD bug short-circuited to a placeholder before any catalogue work, so
 	; GetModelInfo was never reached. Reaching it proves the full catalogue built.

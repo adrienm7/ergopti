@@ -16,7 +16,7 @@
 --- "%d prédiction%s" (or "{n} prédiction{s}") straight into the menu. Routing every
 --- consumer through this one helper makes that whole class of bug impossible: there
 --- is exactly one placeholder convention and one substitution. It mirrors the AHK
---- twin LLM_Tray_GetProfileLabel, which performs the same "{n}"/"{s}" replacement.
+--- twin LLM_Menu_GetProfileLabel, which performs the same "{n}"/"{s}" replacement.
 --- ==============================================================================
 
 local M = {}

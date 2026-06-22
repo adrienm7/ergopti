@@ -56,7 +56,7 @@ Contract: `_shared/modules/llm/menu_persistence_contract.json` — one row per t
 | Hammerspoon          | `lua macos/tests/run.lua` (includes `test_llm_menu_persistence.lua`, `test_llm_menu_regressions.lua`) |
 | Contract schema (CI) | `python _shared/modules/llm/validate_menu_persistence_contract.py`                                             |
 
-When adding a new IA menu option: extend the JSON contract, wire `ui/tray_llm/persist.ahk` (sync + append + `BuildSavedOpts`), map `preferences.lua` on macOS, then run the three runners above.
+When adding a new IA menu option: extend the JSON contract, wire `ui/menu/menu_llm/persist.ahk` (sync + append + `BuildSavedOpts`), map `preferences.lua` on macOS, then run the three runners above.
 
 **Regression suite** (`test_llm_menu_regressions.*`): one test per fixed incident — `_AHK_DRY_RUN` / `.Call()`, `val_modifiers` comma split, no `actions.ahk` `#Include persist`, AHK v2 menu closure (`MakeSetNHandler`), macOS `build_num_pred_menu` index capture. Add a matching AHK + HS test when fixing the next menu bug.
 
@@ -108,8 +108,8 @@ When adding a new IA menu option: extend the JSON contract, wire `ui/tray_llm/pe
 | `meta/test_i18n_setlocale_resets_fallback.ahk`      | `I18nSetLocale` resets `_I18nFallbacksWarmed := false` so next `t()` rebuilds    |
 | `meta/test_ws_save_atomic.ahk`                      | `_WS_Save` stages write to `.tmp` then renames via `FileMove` (atomic write)     |
 | `meta/test_tapholdwriter_int_before_bool.ahk`       | `_TH_TomlFormatLine` checks `Integer/Float` before `== true` (AHK 0 falsiness)  |
-| `meta/test_llm_tray_toggle_reentrancy.ahk`          | `LLM_Tray_OnToggle` guards with `static _Toggling := false` for re-entrancy     |
-| `meta/test_llm_tray_tab_source_hwnd.ahk`            | `LLM_Tray_TryAcceptTabGuarded` checks `source_hwnd` + `WinExist` before accepting |
+| `meta/test_llm_menu_toggle_reentrancy.ahk`          | `LLM_Menu_OnToggle` guards with `static _Toggling := false` for re-entrancy     |
+| `meta/test_llm_menu_tab_source_hwnd.ahk`            | `LLM_Menu_TryAcceptTabGuarded` checks `source_hwnd` + `WinExist` before accepting |
 | `meta/test_modelbrowser_sort_callback.ahk`          | `_LLM_ModelBrowser_Sort` uses `Array.Sort(comparator)` O(n log n), not bubble sort |
 | `meta/test_space_taphold_configurable.ahk`          | `SPACE_HOLD_INPUT_TIMEOUT_FACTOR` constant replaces hardcoded `T3` in space tap-hold |
 | `meta/test_terminators_requires_directive.ahk`      | `_generated/terminators.ahk` has `#Requires AutoHotkey v2.0` near top of file    |

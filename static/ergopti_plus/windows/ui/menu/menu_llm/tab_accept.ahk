@@ -1,4 +1,4 @@
-﻿; ui/tray_llm/tab_accept.ahk
+﻿; ui/menu/menu_llm/tab_accept.ahk
 
 ; ==============================================================================
 ; MODULE: LLM Tray — Tab Accept + Nav hotkeys
@@ -39,7 +39,7 @@
 ; The hotkey is context-sensitive: active only when the tooltip is shown.
 #HotIf LLM_Tooltip_GetText() != ""
 Tab:: {
-	LLM_Tray_TryAcceptTabGuarded()
+	LLM_Menu_TryAcceptTabGuarded()
 }
 
 ; ── Slot navigation ──
@@ -49,31 +49,31 @@ Tab:: {
 ; default where llm_nav_modifiers = {}. Alt+1..9 jumps directly to a
 ; slot, mirroring HS's val_modifiers = {"alt"}. Both bindings re-render
 ; the tooltip in place so the ▶ marker moves without any flicker.
-global _LLM_Tray_NavHotkeysBound := []
+global _LLM_Menu_NavHotkeysBound := []
 ; Stable function reference used as the HotIf predicate for nav/val hotkeys.
 ; A new lambda on each BindNavHotkeys() call would create a different function
 ; object, causing Hotkey(..., "Off") to target a different HotIf variant and
 ; never actually remove the old binding — duplicates would accumulate.
 global _LLM_Nav_HotIfPred := (*) => LLM_Tooltip_GetText() != ""
 
-LLM_Tray_BindNavHotkeys() {
-	global _LLM_Tray, _LLM_Tray_NavHotkeysBound, _LLM_Nav_HotIfPred
+LLM_Menu_BindNavHotkeys() {
+	global _LLM_Menu, _LLM_Menu_NavHotkeysBound, _LLM_Nav_HotIfPred
 
 	HotIf _LLM_Nav_HotIfPred
 	try {
-		for hk in _LLM_Tray_NavHotkeysBound {
+		for hk in _LLM_Menu_NavHotkeysBound {
 			try Hotkey(hk, "Off")
 		}
-		_LLM_Tray_NavHotkeysBound := []
+		_LLM_Menu_NavHotkeysBound := []
 
-		nav_mod := _LLM_Tray.Has("nav_modifiers") ? _LLM_Tray["nav_modifiers"] : ""
-		val_mod := _LLM_Tray.Has("val_modifiers") ? _LLM_Tray["val_modifiers"] : "alt"
+		nav_mod := _LLM_Menu.Has("nav_modifiers") ? _LLM_Menu["nav_modifiers"] : ""
+		val_mod := _LLM_Menu.Has("val_modifiers") ? _LLM_Menu["val_modifiers"] : "alt"
 
-		nav_prefix := LLM_Tray_ShortcutToAhk(nav_mod == "" ? "dummy" : nav_mod . "+dummy")
+		nav_prefix := LLM_Menu_ShortcutToAhk(nav_mod == "" ? "dummy" : nav_mod . "+dummy")
 		if (nav_prefix != "")
 			nav_prefix := SubStr(nav_prefix, 1, -5)
 
-		val_prefix := LLM_Tray_ShortcutToAhk(val_mod == "" ? "dummy" : val_mod . "+dummy")
+		val_prefix := LLM_Menu_ShortcutToAhk(val_mod == "" ? "dummy" : val_mod . "+dummy")
 		if (val_prefix != "")
 			val_prefix := SubStr(val_prefix, 1, -5)
 
@@ -82,13 +82,13 @@ LLM_Tray_BindNavHotkeys() {
 
 		try {
 			Hotkey(nav_up, (*) => _LLM_Nav_Cycle(-1), "On")
-			_LLM_Tray_NavHotkeysBound.Push(nav_up)
+			_LLM_Menu_NavHotkeysBound.Push(nav_up)
 		} catch as e {
 			LoggerWarn("LLM", "Failed to bind nav_up " nav_up ": " e.Message)
 		}
 		try {
 			Hotkey(nav_dn, (*) => _LLM_Nav_Cycle(1), "On")
-			_LLM_Tray_NavHotkeysBound.Push(nav_dn)
+			_LLM_Menu_NavHotkeysBound.Push(nav_dn)
 		} catch as e {
 			LoggerWarn("LLM", "Failed to bind nav_dn " nav_dn ": " e.Message)
 		}
@@ -104,8 +104,8 @@ LLM_Tray_BindNavHotkeys() {
 			hk := val_prefix . Digit
 			idx := A_Index
 			try {
-				Hotkey(hk, _LLM_Tray_MakeNavJump(idx), "On")
-				_LLM_Tray_NavHotkeysBound.Push(hk)
+				Hotkey(hk, _LLM_Menu_MakeNavJump(idx), "On")
+				_LLM_Menu_NavHotkeysBound.Push(hk)
 			} catch as e {
 				LoggerWarn("LLM", "Failed to bind val " hk ": " e.Message)
 			}
@@ -118,7 +118,7 @@ LLM_Tray_BindNavHotkeys() {
 	}
 }
 
-_LLM_Tray_MakeNavJump(idx) {
+_LLM_Menu_MakeNavJump(idx) {
 	return (*) => _LLM_Nav_Jump(idx)
 }
 
@@ -170,7 +170,7 @@ _LLM_Nav_Jump(idx) {
  * an unrelated application that gained focus while the tooltip was still shown).
  * @returns {boolean} True when a prediction was accepted, false when skipped.
  */
-LLM_Tray_TryAcceptTabGuarded() {
+LLM_Menu_TryAcceptTabGuarded() {
 	global _LLM_Engine
 	; If we captured a source window at trigger time, verify it is still the
 	; active window before injecting — a stale prediction must not paste text

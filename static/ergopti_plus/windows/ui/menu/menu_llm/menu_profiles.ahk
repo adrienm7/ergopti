@@ -1,4 +1,4 @@
-﻿; ui/tray_llm/menu_profiles.ahk
+﻿; ui/menu/menu_llm/menu_profiles.ahk
 
 ; ==============================================================================
 ; MODULE: LLM Tray — Profile management
@@ -42,13 +42,13 @@
  * @param {string} id - Profile ID.
  * @returns {string} Display label.
  */
-LLM_Tray_GetProfileLabel(id) {
-	global _LLM_Tray
-	n := _LLM_Tray["n_predictions"]
+LLM_Menu_GetProfileLabel(id) {
+	global _LLM_Menu
+	n := _LLM_Menu["n_predictions"]
 	s := (n > 1) ? "s" : ""
 
 	; Check user profiles
-	for p in _LLM_Tray["user_profiles"] {
+	for p in _LLM_Menu["user_profiles"] {
 		if (p.Has("id") && p["id"] == id)
 			return p.Has("label") ? p["label"] : id
 	}
@@ -69,8 +69,8 @@ LLM_Tray_GetProfileLabel(id) {
  * Builds the profile selection submenu with built-in and user profiles.
  * @returns {Menu} Populated profile submenu.
  */
-LLM_Tray_BuildProfileMenu() {
-	global _LLM_Tray
+LLM_Menu_BuildProfileMenu() {
+	global _LLM_Menu
 	m := Menu()
 
 	; Section header: built-in profiles
@@ -79,16 +79,16 @@ LLM_Tray_BuildProfileMenu() {
 	m.Disable(header_builtin)
 
 	for id in ["raw", "basic", "advanced", "batch_advanced"] {
-		base_label := LLM_Tray_GetProfileLabel(id)
-		hint := LLM_Tray_GetProfileHotkeyHint(id)
+		base_label := LLM_Menu_GetProfileLabel(id)
+		hint := LLM_Menu_GetProfileHotkeyHint(id)
 		label := (hint != "") ? base_label . "  (" . hint . ")" : base_label
-		RegisterMenuItem(m, label, _LLM_Tray_MakeSetProfileHandler(id))
-		if (id == _LLM_Tray["profile_id"])
+		RegisterMenuItem(m, label, _LLM_Menu_MakeSetProfileHandler(id))
+		if (id == _LLM_Menu["profile_id"])
 			m.Check(label)
 	}
 
 	; Section: user profiles
-	user_profiles := _LLM_Tray["user_profiles"]
+	user_profiles := _LLM_Menu["user_profiles"]
 	if (user_profiles.Length > 0) {
 		m.Add()
 		header_custom := t("menu.profiles.header_custom_profiles")
@@ -98,16 +98,16 @@ LLM_Tray_BuildProfileMenu() {
 		for p in user_profiles {
 			pid        := p.Has("id") ? p["id"] : ""
 			base_plabel := p.Has("label") ? p["label"] : pid
-			hint := LLM_Tray_GetProfileHotkeyHint(pid)
+			hint := LLM_Menu_GetProfileHotkeyHint(pid)
 			plabel := (hint != "") ? base_plabel . "  (" . hint . ")" : base_plabel
-			RegisterMenuItem(m, plabel, _LLM_Tray_MakeUserProfileClickHandler(p))
-			if (pid == _LLM_Tray["profile_id"])
+			RegisterMenuItem(m, plabel, _LLM_Menu_MakeUserProfileClickHandler(p))
+			if (pid == _LLM_Menu["profile_id"])
 				m.Check(plabel)
 		}
 	}
 
 	m.Add()
-	RegisterMenuItem(m, t("menu.profiles.create_profile"), (*) => LLM_Tray_PromptCreateProfile())
+	RegisterMenuItem(m, t("menu.profiles.create_profile"), (*) => LLM_Menu_PromptCreateProfile())
 
 	; "Clone active built-in" — exposes the built-in system prompt for
 	; editing without requiring the user to type it from scratch. The
@@ -115,11 +115,11 @@ LLM_Tray_BuildProfileMenu() {
 	; shared across drivers and any local edit would be overwritten on
 	; the next driver update); cloning them into a user profile is the
 	; supported way to customise their prompts.
-	active_id := _LLM_Tray["profile_id"]
+	active_id := _LLM_Menu["profile_id"]
 	is_builtin := (active_id == "raw" or active_id == "basic" or active_id == "advanced" or active_id == "batch_advanced")
 	if is_builtin {
 		clone_label := t("menu.profiles.clone_builtin")
-		RegisterMenuItem(m, clone_label, (*) => LLM_Tray_CloneActiveBuiltinProfile())
+		RegisterMenuItem(m, clone_label, (*) => LLM_Menu_CloneActiveBuiltinProfile())
 	}
 
 	; Auto-detect toggle: when ON, switching model in the model submenu also
@@ -128,15 +128,15 @@ LLM_Tray_BuildProfileMenu() {
 	; profile each model should run with by default.
 	m.Add()
 	auto_label := t("menu.profiles.auto_detect")
-	RegisterMenuItem(m, auto_label, (*) => _LLM_Tray_ToggleAutoProfile())
-	if _LLM_Tray["auto_profile_for_model"]
+	RegisterMenuItem(m, auto_label, (*) => _LLM_Menu_ToggleAutoProfile())
+	if _LLM_Menu["auto_profile_for_model"]
 		m.Check(auto_label)
 
 	; Per-app profile overrides submenu — list current ones + "Override
 	; active app with active profile" / "Clear override for active app".
 	; The submenu opens lazily so we re-read the focused app each time.
 	m.Add()
-	per_app_menu := _LLM_Tray_BuildPerAppProfileMenu()
+	per_app_menu := _LLM_Menu_BuildPerAppProfileMenu()
 	m.Add(t("menu.profiles.per_app_overrides"), per_app_menu)
 	return m
 }
@@ -151,59 +151,59 @@ LLM_Tray_BuildProfileMenu() {
 ; ============================================
 ; ============================================
 
-_LLM_Tray_BuildPerAppProfileMenu() {
-	global _LLM_Tray
+_LLM_Menu_BuildPerAppProfileMenu() {
+	global _LLM_Menu
 	sm := Menu()
-	overrides := _LLM_Tray["app_profile_overrides"]
+	overrides := _LLM_Menu["app_profile_overrides"]
 	; "Override active app with the currently-selected profile". Lazy
 	; closure so WinGetProcessName fires when the user clicks, not when
 	; the menu is built.
 	RegisterMenuItem(sm, t("menu.profiles.override_active_app_with_current"),
-		(*) => _LLM_Tray_AddOverrideForActiveApp())
+		(*) => _LLM_Menu_AddOverrideForActiveApp())
 	if (overrides is Map and overrides.Count > 0) {
 		sm.Add()
 		; List each override: "slack → informel"  + click clears it.
 		for app_name, profile_id in overrides {
-			label := app_name . "  →  " . LLM_Tray_GetProfileLabel(profile_id)
-			RegisterMenuItem(sm, label, _LLM_Tray_MakeClearOverrideHandler(app_name))
+			label := app_name . "  →  " . LLM_Menu_GetProfileLabel(profile_id)
+			RegisterMenuItem(sm, label, _LLM_Menu_MakeClearOverrideHandler(app_name))
 		}
 	}
 	return sm
 }
 
-_LLM_Tray_AddOverrideForActiveApp() {
-	global _LLM_Tray
+_LLM_Menu_AddOverrideForActiveApp() {
+	global _LLM_Menu
 	app := ""
 	try app := StrLower(WinGetProcessName("A"))
 	app := RegExReplace(app, "\.exe$", "")
 	if (app == "")
 		return
-	_LLM_Tray["app_profile_overrides"][app] := _LLM_Tray["profile_id"]
-	LLM_Tray_SaveConfig()
-	LLM_Engine_Init(LLM_Tray_BuildOpts())
-	LLM_Tray_Build()
+	_LLM_Menu["app_profile_overrides"][app] := _LLM_Menu["profile_id"]
+	LLM_Menu_SaveConfig()
+	LLM_Engine_Init(LLM_Menu_BuildOpts())
+	LLM_Menu_Build()
 }
 
-_LLM_Tray_ClearOverrideFor(app_name) {
-	global _LLM_Tray
-	overrides := _LLM_Tray["app_profile_overrides"]
+_LLM_Menu_ClearOverrideFor(app_name) {
+	global _LLM_Menu
+	overrides := _LLM_Menu["app_profile_overrides"]
 	if !(overrides is Map) or !overrides.Has(app_name)
 		return
 	overrides.Delete(app_name)
-	LLM_Tray_SaveConfig()
-	LLM_Engine_Init(LLM_Tray_BuildOpts())
-	LLM_Tray_Build()
+	LLM_Menu_SaveConfig()
+	LLM_Engine_Init(LLM_Menu_BuildOpts())
+	LLM_Menu_Build()
 }
 
-_LLM_Tray_ToggleAutoProfile() {
-	global _LLM_Tray
-	_LLM_Tray["auto_profile_for_model"] := !_LLM_Tray["auto_profile_for_model"]
+_LLM_Menu_ToggleAutoProfile() {
+	global _LLM_Menu
+	_LLM_Menu["auto_profile_for_model"] := !_LLM_Menu["auto_profile_for_model"]
 	; Re-evaluate immediately on enable so the next prediction uses the
 	; recommended profile without waiting for the user to switch model.
-	if _LLM_Tray["auto_profile_for_model"]
-		LLM_Tray_AutoApplyProfileForModel()
-	LLM_Tray_SaveConfig()
-	LLM_Tray_Build()
+	if _LLM_Menu["auto_profile_for_model"]
+		LLM_Menu_AutoApplyProfileForModel()
+	LLM_Menu_SaveConfig()
+	LLM_Menu_Build()
 }
 
 
@@ -221,8 +221,8 @@ _LLM_Tray_ToggleAutoProfile() {
  * AHK has no native submenu on the fly; we show a MsgBox with button choices.
  * @param {Map} profile - The user profile Map object.
  */
-LLM_Tray_OnUserProfileClick(profile) {
-	global _LLM_Tray
+LLM_Menu_OnUserProfileClick(profile) {
+	global _LLM_Menu
 	pid    := profile.Has("id")    ? profile["id"]    : ""
 	plabel := profile.Has("label") ? profile["label"] : pid
 
@@ -236,26 +236,26 @@ LLM_Tray_OnUserProfileClick(profile) {
 
 	if (choice == "Yes") {
 		; Use this profile
-		LLM_Tray_SetProfile(pid)
+		LLM_Menu_SetProfile(pid)
 	} else if (choice == "No") {
 		; Edit this profile
-		LLM_Tray_PromptEditProfile(profile)
+		LLM_Menu_PromptEditProfile(profile)
 	} else if (choice == "Cancel") {
 		confirm := MsgBox(t("menu.profiles.delete_profile") . " ?", plabel, "4 48")
 		if (confirm == "Yes") {
-			for i, p in _LLM_Tray["user_profiles"] {
+			for i, p in _LLM_Menu["user_profiles"] {
 				if (p.Has("id") && p["id"] == pid) {
-					_LLM_Tray["user_profiles"].RemoveAt(i)
+					_LLM_Menu["user_profiles"].RemoveAt(i)
 					break
 				}
 			}
-			if (_LLM_Tray["profile_id"] == pid)
-				_LLM_Tray["profile_id"] := "basic"
-			LLM_Tray_SaveConfig()
-			LLM_Engine_Init(LLM_Tray_BuildOpts())
-			LLM_Tray_Build()
-			if IsSet(LLM_Tray_BindProfileHotkeys)
-				(LLM_Tray_BindProfileHotkeys)()
+			if (_LLM_Menu["profile_id"] == pid)
+				_LLM_Menu["profile_id"] := "basic"
+			LLM_Menu_SaveConfig()
+			LLM_Engine_Init(LLM_Menu_BuildOpts())
+			LLM_Menu_Build()
+			if IsSet(LLM_Menu_BindProfileHotkeys)
+				(LLM_Menu_BindProfileHotkeys)()
 		}
 	}
 }
@@ -263,8 +263,8 @@ LLM_Tray_OnUserProfileClick(profile) {
 /**
  * Opens InputBox dialogs to create a new user profile (label + prompt).
  */
-LLM_Tray_PromptCreateProfile() {
-	global _LLM_Tray
+LLM_Menu_PromptCreateProfile() {
+	global _LLM_Menu
 
 	; Step 1: label
 	ib_label := InputBox(t("menu.profiles.prompt_label"), t("menu.profiles.create_profile"), "w450 h120")
@@ -279,7 +279,7 @@ LLM_Tray_PromptCreateProfile() {
 	system_single := ib_prompt.Value
 
 	; Generate a unique ID from the label
-	pid := "user_" . LLM_Tray_Slugify(plabel) . "_" . A_TickCount
+	pid := "user_" . LLM_Menu_Slugify(plabel) . "_" . A_TickCount
 
 	new_profile := Map(
 		"id",            pid,
@@ -289,19 +289,19 @@ LLM_Tray_PromptCreateProfile() {
 		"batch",         false
 	)
 
-	_LLM_Tray["user_profiles"].Push(new_profile)
-	_LLM_Tray["profile_id"] := pid
-	LLM_Tray_SaveConfig()
-	LLM_Engine_Init(LLM_Tray_BuildOpts())
-	LLM_Tray_Build()
+	_LLM_Menu["user_profiles"].Push(new_profile)
+	_LLM_Menu["profile_id"] := pid
+	LLM_Menu_SaveConfig()
+	LLM_Engine_Init(LLM_Menu_BuildOpts())
+	LLM_Menu_Build()
 }
 
 /**
  * Opens InputBox dialogs to edit an existing user profile in place.
  * @param {Map} profile - The user profile to edit.
  */
-LLM_Tray_PromptEditProfile(profile) {
-	global _LLM_Tray
+LLM_Menu_PromptEditProfile(profile) {
+	global _LLM_Menu
 	pid := profile.Has("id") ? profile["id"] : ""
 
 	ib_label := InputBox(t("menu.profiles.prompt_label"), t("menu.profiles.edit_profile"), "w450 h120",
@@ -318,16 +318,16 @@ LLM_Tray_PromptEditProfile(profile) {
 		return
 
 	; Update in the array in place
-	for i, p in _LLM_Tray["user_profiles"] {
+	for i, p in _LLM_Menu["user_profiles"] {
 		if (p.Has("id") && p["id"] == pid) {
-			_LLM_Tray["user_profiles"][i]["label"]         := new_label
-			_LLM_Tray["user_profiles"][i]["system_single"] := ib_prompt.Value
+			_LLM_Menu["user_profiles"][i]["label"]         := new_label
+			_LLM_Menu["user_profiles"][i]["system_single"] := ib_prompt.Value
 			break
 		}
 	}
-	LLM_Tray_SaveConfig()
-	LLM_Engine_Init(LLM_Tray_BuildOpts())
-	LLM_Tray_Build()
+	LLM_Menu_SaveConfig()
+	LLM_Engine_Init(LLM_Menu_BuildOpts())
+	LLM_Menu_Build()
 }
 
 /**
@@ -338,16 +338,16 @@ LLM_Tray_PromptEditProfile(profile) {
  * source. Used by the "Cloner ce profil par défaut…" menu entry which
  * is the supported way to customise a built-in's system prompt.
  */
-LLM_Tray_CloneActiveBuiltinProfile() {
-	global _LLM_Tray
-	src_id := _LLM_Tray["profile_id"]
+LLM_Menu_CloneActiveBuiltinProfile() {
+	global _LLM_Menu
+	src_id := _LLM_Menu["profile_id"]
 	; Pull the source profile from the live registry — covers the case
 	; where the user re-loaded profiles.json without restarting.
-	src_profile := LLM_GetActiveProfile(src_id, _LLM_Tray["user_profiles"])
+	src_profile := LLM_GetActiveProfile(src_id, _LLM_Menu["user_profiles"])
 	if !IsObject(src_profile)
 		return
-	src_label := LLM_Tray_GetProfileLabel(src_id)
-	new_id    := "user_" . LLM_Tray_Slugify(src_label) . "_" . A_TickCount
+	src_label := LLM_Menu_GetProfileLabel(src_id)
+	new_id    := "user_" . LLM_Menu_Slugify(src_label) . "_" . A_TickCount
 	new_label := src_label . " " . t("menu.profiles.copy_suffix")
 	new_profile := Map(
 		"id",                    new_id,
@@ -357,14 +357,14 @@ LLM_Tray_CloneActiveBuiltinProfile() {
 		"system_multi_template", src_profile.Has("system_multi_template") ? src_profile["system_multi_template"] : "",
 		"batch",                 src_profile.Has("batch") and src_profile["batch"] == true
 	)
-	_LLM_Tray["user_profiles"].Push(new_profile)
-	_LLM_Tray["profile_id"] := new_id
-	LLM_Tray_SaveConfig()
-	LLM_Engine_Init(LLM_Tray_BuildOpts())
-	LLM_Tray_Build()
+	_LLM_Menu["user_profiles"].Push(new_profile)
+	_LLM_Menu["profile_id"] := new_id
+	LLM_Menu_SaveConfig()
+	LLM_Engine_Init(LLM_Menu_BuildOpts())
+	LLM_Menu_Build()
 	; Immediately open the edit dialog so the user lands directly into
 	; what they wanted: a customisable copy of the built-in prompt.
-	LLM_Tray_PromptEditProfile(new_profile)
+	LLM_Menu_PromptEditProfile(new_profile)
 }
 
 /**
@@ -372,7 +372,7 @@ LLM_Tray_CloneActiveBuiltinProfile() {
  * @param {string} label - Source label.
  * @returns {string} Slugified string (lowercase alphanumeric + underscores).
  */
-LLM_Tray_Slugify(label) {
+LLM_Menu_Slugify(label) {
 	slug := RegExReplace(StrLower(label), "[^a-z0-9]+", "_")
 	slug := Trim(slug, "_")
 	return (slug == "") ? "profile" : slug
@@ -428,16 +428,16 @@ LLM_RecommendProfileForModel(model) {
  *
  * @returns {string} Profile id in effect after the call.
  */
-LLM_Tray_AutoApplyProfileForModel() {
-	global _LLM_Tray
-	if !_LLM_Tray["auto_profile_for_model"]
-		return _LLM_Tray["profile_id"]
-	recommended := LLM_RecommendProfileForModel(_LLM_Tray["model"])
-	if (recommended == "" or recommended == _LLM_Tray["profile_id"])
-		return _LLM_Tray["profile_id"]
-	_LLM_Tray["profile_id"] := recommended
-	LLM_Tray_SaveConfig()
-	LLM_Engine_Init(LLM_Tray_BuildOpts())
+LLM_Menu_AutoApplyProfileForModel() {
+	global _LLM_Menu
+	if !_LLM_Menu["auto_profile_for_model"]
+		return _LLM_Menu["profile_id"]
+	recommended := LLM_RecommendProfileForModel(_LLM_Menu["model"])
+	if (recommended == "" or recommended == _LLM_Menu["profile_id"])
+		return _LLM_Menu["profile_id"]
+	_LLM_Menu["profile_id"] := recommended
+	LLM_Menu_SaveConfig()
+	LLM_Engine_Init(LLM_Menu_BuildOpts())
 	return recommended
 }
 
@@ -460,15 +460,15 @@ LLM_Tray_AutoApplyProfileForModel() {
  *
  * @returns {Array} Ordered profile id strings.
  */
-LLM_Tray_GetHotkeyProfileOrder() {
-	global _LLM_Tray, LLM_PROFILE_BUILTIN_ORDER, LLM_PROFILE_HOTKEY_LIMIT
+LLM_Menu_GetHotkeyProfileOrder() {
+	global _LLM_Menu, LLM_PROFILE_BUILTIN_ORDER, LLM_PROFILE_HOTKEY_LIMIT
 	out := []
 	for _, id in LLM_PROFILE_BUILTIN_ORDER {
 		out.Push(id)
 		if (out.Length >= LLM_PROFILE_HOTKEY_LIMIT)
 			return out
 	}
-	for p in _LLM_Tray["user_profiles"] {
+	for p in _LLM_Menu["user_profiles"] {
 		if !(p is Map) or !p.Has("id")
 			continue
 		out.Push(p["id"])
@@ -480,15 +480,15 @@ LLM_Tray_GetHotkeyProfileOrder() {
 
 /**
  * Looks up the Ctrl+<n> label for a given profile id, or "" when the
- * profile is not in the hotkey range. Used by LLM_Tray_BuildProfileMenu
+ * profile is not in the hotkey range. Used by LLM_Menu_BuildProfileMenu
  * to append "(Ctrl+1)" / "(Ctrl+2)" hints next to each row so the user
  * sees the binding without having to read the docs.
  *
  * @param {string} id - Profile id (built-in or user-defined).
  * @returns {string} "Ctrl+<n>" or "" when the profile is unbound.
  */
-LLM_Tray_GetProfileHotkeyHint(id) {
-	for i, pid in LLM_Tray_GetHotkeyProfileOrder() {
+LLM_Menu_GetProfileHotkeyHint(id) {
+	for i, pid in LLM_Menu_GetHotkeyProfileOrder() {
 		if (pid == id)
 			return "Ctrl+" . i
 	}
@@ -497,10 +497,10 @@ LLM_Tray_GetProfileHotkeyHint(id) {
 
 ; Stable BoundFunc used as the HotIf predicate for all Ctrl+<n> profile
 ; bindings. Allocating it once at module load means every call to
-; LLM_Tray_BindProfileHotkeys reuses the SAME function reference. AHK v2
+; LLM_Menu_BindProfileHotkeys reuses the SAME function reference. AHK v2
 ; keyed HotIf contexts on the function reference: a fresh lambda on each call
 ; would create a new context, orphaning the previous bindings and leaking them.
-global _LLM_PROFILE_HOTKEY_PRED := _LLM_Tray_IsProfileHotkeyActive.Bind()
+global _LLM_PROFILE_HOTKEY_PRED := _LLM_Menu_IsProfileHotkeyActive.Bind()
 
 /**
  * Registers Ctrl+1 … Ctrl+9 globally so the user can switch profiles from
@@ -510,14 +510,14 @@ global _LLM_PROFILE_HOTKEY_PRED := _LLM_Tray_IsProfileHotkeyActive.Bind()
  * is enabled (paused / disabled scripts still get the bare Ctrl+<n> their
  * apps expect).
  */
-LLM_Tray_BindProfileHotkeys() {
+LLM_Menu_BindProfileHotkeys() {
 	global LLM_PROFILE_HOTKEY_LIMIT, _LLM_PROFILE_HOTKEY_PRED
 	; Stable predicate — same BoundFunc every call so AHK reuses the context
 	HotIf(_LLM_PROFILE_HOTKEY_PRED)
 	loop LLM_PROFILE_HOTKEY_LIMIT {
 		idx := A_Index
 		key := "^" . idx
-		try Hotkey(key, _LLM_Tray_MakeProfileHotkey(idx), "On")
+		try Hotkey(key, _LLM_Menu_MakeProfileHotkey(idx), "On")
 	}
 	HotIf  ; reset
 }
@@ -528,11 +528,11 @@ LLM_Tray_BindProfileHotkeys() {
  * least one configured profile to map onto — otherwise the keystroke
  * falls through to the active app unchanged.
  */
-_LLM_Tray_IsProfileHotkeyActive() {
-	global _LLM_Tray
-	if !IsSet(_LLM_Tray) or !_LLM_Tray["enabled"]
+_LLM_Menu_IsProfileHotkeyActive() {
+	global _LLM_Menu
+	if !IsSet(_LLM_Menu) or !_LLM_Menu["enabled"]
 		return false
-	order := LLM_Tray_GetHotkeyProfileOrder()
+	order := LLM_Menu_GetHotkeyProfileOrder()
 	return order.Length > 0
 }
 
@@ -541,19 +541,19 @@ _LLM_Tray_IsProfileHotkeyActive() {
  * the active profile order each time it fires (not at registration time)
  * so new user profiles created after boot are reachable without a reload.
  */
-_LLM_Tray_MakeProfileHotkey(idx) {
-	return (*) => _LLM_Tray_OnProfileHotkey(idx)
+_LLM_Menu_MakeProfileHotkey(idx) {
+	return (*) => _LLM_Menu_OnProfileHotkey(idx)
 }
 
-_LLM_Tray_OnProfileHotkey(idx) {
+_LLM_Menu_OnProfileHotkey(idx) {
 	; The HotIf predicate already guarantees the LLM is enabled and at
 	; least one profile is configured. We still guard against an out-of-
 	; range idx (user has fewer profiles than the bound 1..9) by sending
 	; the bare keystroke through so the app's own Ctrl+<n> handler runs.
-	order := LLM_Tray_GetHotkeyProfileOrder()
+	order := LLM_Menu_GetHotkeyProfileOrder()
 	if (idx < 1 or idx > order.Length) {
 		Send "^" . idx
 		return
 	}
-	LLM_Tray_SetProfile(order[idx])
+	LLM_Menu_SetProfile(order[idx])
 }

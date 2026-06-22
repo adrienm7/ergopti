@@ -1,4 +1,4 @@
-﻿; ui/tray_llm/_index.ahk
+﻿; ui/menu/menu_llm/_index.ahk
 
 ; ==============================================================================
 ; MODULE: LLM Tray Menu UI — Entry Point
@@ -11,7 +11,7 @@
 ;
 ; This file is the entry point: it declares every module-wide global (state
 ; Map, profile thresholds, menu handle, hotkey handle), seeds them from the
-; shared ``defaults.json`` via ``LLM_Tray_ApplySharedDefaults``, then
+; shared ``defaults.json`` via ``LLM_Menu_ApplySharedDefaults``, then
 ; ``#Include``-s every sub-module that defines the actual menu builders,
 ; setters, hotkeys, and lifecycle callbacks.
 ;
@@ -25,16 +25,16 @@
 ; 7. Trigger shortcut: optional hotkey that fires a prediction on demand.
 ;
 ; SUB-MODULE LAYOUT:
-;   tray_llm/init.ahk            — Bootstrap (LLM_Tray_Init).
-;   tray_llm/menu_main.ahk       — Top-level menu orchestrator (LLM_Tray_Build).
-;   tray_llm/menu_models.ahk     — Backend + Model submenus + model handlers.
-;   tray_llm/menu_api_entries.ahk — Remote API entries + JSON storage.
-;   tray_llm/menu_profiles.ahk   — Profile menu + per-app + user CRUD + hotkeys.
-;   tray_llm/menu_settings.ahk   — N / Trigger / Gen / Display / Nav menus +
+;   menu_llm/init.ahk            — Bootstrap (LLM_Menu_Init).
+;   menu_llm/menu_main.ahk       — Top-level menu orchestrator (LLM_Menu_Build).
+;   menu_llm/menu_models.ahk     — Backend + Model submenus + model handlers.
+;   menu_llm/menu_api_entries.ahk — Remote API entries + JSON storage.
+;   menu_llm/menu_profiles.ahk   — Profile menu + per-app + user CRUD + hotkeys.
+;   menu_llm/menu_settings.ahk   — N / Trigger / Gen / Display / Nav menus +
 ;                                  numeric / modifier / shortcut prompts.
-;   tray_llm/actions.ahk         — Toggles, setters, health probe, Ollama
+;   menu_llm/actions.ahk         — Toggles, setters, health probe, Ollama
 ;                                  bootstrap, app picker, lifecycle callbacks.
-;   tray_llm/tab_accept.ahk      — Tab-accept hotkey + slot navigation.
+;   menu_llm/tab_accept.ahk      — Tab-accept hotkey + slot navigation.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -53,7 +53,7 @@
 ; so the active language is already set when the menu is built or rebuilt.
 
 ; Available prediction count choices (mirrors HS: for i = 1, 10 do)
-global LLM_TRAY_N_OPTIONS := [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+global LLM_MENU_N_OPTIONS := [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 
 ; Available backend IDs — Ollama is the only Windows backend today; the list
 ; is kept as an array so adding a future backend only requires appending here.
@@ -61,7 +61,7 @@ global LLM_TRAY_N_OPTIONS := [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 ; lets the user plug into OpenAI / Anthropic / Google Gemini / any
 ; OpenAI-compatible endpoint via the "+ Add an API…" item in the model
 ; submenu. "mlx" is macOS-only — kept out of the AHK list deliberately.
-global LLM_TRAY_BACKEND_OPTIONS := ["ollama", "api"]
+global LLM_MENU_BACKEND_OPTIONS := ["ollama", "api"]
 
 ; Indent level options for multi-prediction display. Range mirrors the HS
 ; menu (modules/llm/init.lua DEFAULT_STATE + ui/menu/menu_llm/settings_manager.lua
@@ -69,8 +69,8 @@ global LLM_TRAY_BACKEND_OPTIONS := ["ollama", "api"]
 ; the prediction lines up at column-N relative to the original cursor, while
 ; positive values insert N spaces before each line. Built lazily at startup
 ; so the integer array stays a single source of truth.
-global LLM_TRAY_INDENT_OPTIONS := _LLMTrayBuildIndentRange()
-_LLMTrayBuildIndentRange() {
+global LLM_MENU_INDENT_OPTIONS := _LLMMenuBuildIndentRange()
+_LLMMenuBuildIndentRange() {
     out := []
     Loop 15 {
         out.Push(A_Index - 8)   ; -7, -6, …, 0, …, 6, 7
@@ -88,10 +88,10 @@ _LLMTrayBuildIndentRange() {
 ; =============================
 ; ============================
 
-; Initial values are replaced at startup by LLM_Tray_ApplySharedDefaults()
+; Initial values are replaced at startup by LLM_Menu_ApplySharedDefaults()
 ; which reads from the shared defaults.json via LLM_Defaults (lib/llm_defaults.ahk).
 ; String fields use "" as placeholder — ApplySharedDefaults() overwrites them.
-global _LLM_Tray := Map(
+global _LLM_Menu := Map(
 	"enabled",                    false,
 	"backend",                    "ollama",
 	; Local Ollama daemon port. 11434 is Ollama's standard; user-overridable from
@@ -180,11 +180,11 @@ global LLM_PROFILE_BUILTIN_ORDER := ["raw", "basic", "advanced", "batch_advanced
 global LLM_PROFILE_HOTKEY_LIMIT := 9
 
 /**
- * Overwrites _LLM_Tray defaults with values from the shared defaults.json.
- * Called once at module load time, before LLM_Tray_Init() applies saved prefs.
+ * Overwrites _LLM_Menu defaults with values from the shared defaults.json.
+ * Called once at module load time, before LLM_Menu_Init() applies saved prefs.
  */
-LLM_Tray_ApplySharedDefaults() {
-	global _LLM_Tray, LLM_Defaults
+LLM_Menu_ApplySharedDefaults() {
+	global _LLM_Menu, LLM_Defaults
 	if !IsSet(LLM_Defaults)
 		return
 
@@ -214,34 +214,34 @@ LLM_Tray_ApplySharedDefaults() {
 
 	for shared_key, tray_key in _key_map {
 		if LLM_Defaults.Has(shared_key)
-			_LLM_Tray[tray_key] := LLM_Defaults[shared_key]
+			_LLM_Menu[tray_key] := LLM_Defaults[shared_key]
 	}
 }
-LLM_Tray_ApplySharedDefaults()
+LLM_Menu_ApplySharedDefaults()
 
 ; Persistent Menu object — reused across rebuilds so the tray entry never
 ; moves. AHK v2 Menu.Delete+Add always appends; updating the same object
 ; in place is the only way to keep the canonical menu position.
-global _LLM_Tray_Menu    := Menu()
-global _LLM_Tray_InTray  := false
-; Becomes true once LLM_Tray_Init() has run and _LLM_Tray holds the user's
-; persisted values. SaveFullConfig() gates _LLM_Tray_SyncToFeatures on this
-; flag so a boot-timer flush fired before LLM_Tray_Init can never clobber the
+global _LLM_Menu_Handle    := Menu()
+global _LLM_Menu_InTray  := false
+; Becomes true once LLM_Menu_Init() has run and _LLM_Menu holds the user's
+; persisted values. SaveFullConfig() gates _LLM_Menu_SyncToFeatures on this
+; flag so a boot-timer flush fired before LLM_Menu_Init can never clobber the
 ; user's saved LLM settings with module-level defaults.
-global _LLM_Tray_Loaded  := false
+global _LLM_Menu_Loaded  := false
 
-; Set by LLM_Tray_Init when the IA submenu has been placed in the tray but its
+; Set by LLM_Menu_Init when the IA submenu has been placed in the tray but its
 ; (expensive) population was deferred to the post-"ready" boot tail. Read once
-; there to arm the deferred LLM_Tray_Build. See LLM_TRAY_BUILD_DEFER_MS.
-global _LLM_Tray_BuildPending := false
+; there to arm the deferred LLM_Menu_Build. See LLM_MENU_BUILD_DEFER_MS.
+global _LLM_Menu_BuildPending := false
 
 ; Delay (ms) after boot before the deferred IA submenu is populated. Armed from
 ; the boot tail (post-"ready") so it never interrupts the hotstring registration;
 ; short so the dropdown is ready almost immediately for a user who opens it.
-global LLM_TRAY_BUILD_DEFER_MS := 200
+global LLM_MENU_BUILD_DEFER_MS := 200
 
 ; Active trigger hotkey object — deleted and recreated on every shortcut change
-global _LLM_Tray_TriggerHk := unset
+global _LLM_Menu_TriggerHk := unset
 
 
 

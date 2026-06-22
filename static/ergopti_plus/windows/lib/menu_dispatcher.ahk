@@ -129,7 +129,7 @@ MenuDispatcher_Reset() {
 }
 
 ; Per-menu prune for rebuilders that delete + repopulate a SINGLE menu in place
-; (e.g. LLM_Tray_Build), as opposed to a full tray rebuild that can call
+; (e.g. LLM_Menu_Build), as opposed to a full tray rebuild that can call
 ; MenuDispatcher_Reset(). Call this right AFTER MenuObj.Delete(): the deleted
 ; items' IDs are gone from the live HMENU, so any _MenuDispatchCallbacks /
 ; _MenuDispatchLastFire entry NOT in the current GetMenuItemID set for THIS

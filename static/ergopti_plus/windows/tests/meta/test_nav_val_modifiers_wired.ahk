@@ -15,9 +15,9 @@ _TNV_ReadSource(RelPath) {
 }
 
 _TNV_Check() {
-	Src := _TNV_ReadSource("ui/tray_llm/tab_accept.ahk")
+	Src := _TNV_ReadSource("ui/menu/menu_llm/tab_accept.ahk")
 	Assert(Src != "", "Source file tab_accept.ahk must exist")
-	Assert(InStr(Src, "LLM_Tray_BindNavHotkeys") > 0, "tab_accept.ahk must bind nav hotkeys dynamically")
+	Assert(InStr(Src, "LLM_Menu_BindNavHotkeys") > 0, "tab_accept.ahk must bind nav hotkeys dynamically")
 	Assert(InStr(Src, "nav_modifiers") > 0, "tab_accept.ahk must read nav_modifiers")
 	Assert(InStr(Src, "val_modifiers") > 0, "tab_accept.ahk must read val_modifiers")
 }

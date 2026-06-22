@@ -1,10 +1,10 @@
-﻿; tests/meta/test_llm_tray_tab_source_hwnd.ahk
+﻿; tests/meta/test_llm_menu_tab_source_hwnd.ahk
 
 ; ==============================================================================
-; MODULE: LLM_Tray_TryAcceptTabGuarded source_hwnd Check Guard
+; MODULE: LLM_Menu_TryAcceptTabGuarded source_hwnd Check Guard
 ; DESCRIPTION:
-; Static source guard for the LLM_Tray_TryAcceptTabGuarded source_hwnd fix in
-; ui/tray_llm/tab_accept.ahk.
+; Static source guard for the LLM_Menu_TryAcceptTabGuarded source_hwnd fix in
+; ui/menu/menu_llm/tab_accept.ahk.
 ;
 ; ROOT CAUSE ENCODED:
 ; The original tab-accept path called the accept function unconditionally when a
@@ -12,7 +12,7 @@
 ; that triggered the LLM prediction. This caused the prediction to be injected
 ; into the wrong application when the user had switched focus before pressing Tab.
 ;
-; The fix introduces LLM_Tray_TryAcceptTabGuarded(), which checks that the
+; The fix introduces LLM_Menu_TryAcceptTabGuarded(), which checks that the
 ; source_hwnd stored in the engine state matches the currently active window
 ; before calling the accept function. If the window no longer exists or is no
 ; longer active, the tab accept is silently skipped.
@@ -38,27 +38,27 @@ _TLTSH_StripLineComments(Src) {
 
 ; ==========================================================================
 ; ==========================================================================
-; ======= 1/ LLM_Tray_TryAcceptTabGuarded checks source_hwnd ===============
+; ======= 1/ LLM_Menu_TryAcceptTabGuarded checks source_hwnd ===============
 ; ==========================================================================
 ; ==========================================================================
 
 _TLTSH_SourceHwndCheck() {
-	Src := _TLTSH_StripLineComments(_TLTSH_ReadSource("ui/tray_llm/tab_accept.ahk"))
-	Assert(Src != "", "ui/tray_llm/tab_accept.ahk must be readable")
+	Src := _TLTSH_StripLineComments(_TLTSH_ReadSource("ui/menu/menu_llm/tab_accept.ahk"))
+	Assert(Src != "", "ui/menu/menu_llm/tab_accept.ahk must be readable")
 
 	; The guarded function must exist
-	Assert(InStr(Src, "LLM_Tray_TryAcceptTabGuarded()") > 0,
-		"ui/tray_llm/tab_accept.ahk must define LLM_Tray_TryAcceptTabGuarded() (source_hwnd guard)")
+	Assert(InStr(Src, "LLM_Menu_TryAcceptTabGuarded()") > 0,
+		"ui/menu/menu_llm/tab_accept.ahk must define LLM_Menu_TryAcceptTabGuarded() (source_hwnd guard)")
 
-	Body := _DriverFuncBody("LLM_Tray_TryAcceptTabGuarded")
-	Assert(Body != "", "LLM_Tray_TryAcceptTabGuarded must have a function body in tab_accept.ahk")
+	Body := _DriverFuncBody("LLM_Menu_TryAcceptTabGuarded")
+	Assert(Body != "", "LLM_Menu_TryAcceptTabGuarded must have a function body in tab_accept.ahk")
 
 	; Must read source_hwnd from the engine state
 	Assert(InStr(Body, "source_hwnd") > 0,
-		"LLM_Tray_TryAcceptTabGuarded must check source_hwnd before accepting the tab prediction")
+		"LLM_Menu_TryAcceptTabGuarded must check source_hwnd before accepting the tab prediction")
 
 	; Must verify the window still exists
 	Assert(InStr(Body, "WinExist") > 0,
-		"LLM_Tray_TryAcceptTabGuarded must verify the source_hwnd window still exists before accepting")
+		"LLM_Menu_TryAcceptTabGuarded must verify the source_hwnd window still exists before accepting")
 }
-Test("tray_llm/tab_accept: LLM_Tray_TryAcceptTabGuarded verifies source_hwnd before accepting", _TLTSH_SourceHwndCheck)
+Test("menu_llm/tab_accept: LLM_Menu_TryAcceptTabGuarded verifies source_hwnd before accepting", _TLTSH_SourceHwndCheck)

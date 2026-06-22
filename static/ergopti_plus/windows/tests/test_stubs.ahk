@@ -272,7 +272,7 @@ global Features := Map(
     ),
     ; Phase 6 — ui/tray_menu.ahk's LLM tray populator now reads from this
     ; nested map (instead of IniCacheGet) and flattens it back into the
-    ; legacy _LlmSavedOpts shape that LLM_Tray_Init expects. Manifest
+    ; legacy _LlmSavedOpts shape that LLM_Menu_Init expects. Manifest
     ; defaults match production; tests don't fire the LLM menu but the
     ; symbols still need to exist as globals.
     "llm", Map(
