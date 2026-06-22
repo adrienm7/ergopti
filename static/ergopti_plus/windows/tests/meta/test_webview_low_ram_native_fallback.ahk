@@ -61,7 +61,7 @@ Test("webview-lowram: changelog_window redirects to native window on low RAM", _
 ; The model browser already ships a native ListView; it must prefer that over
 ; WebView2 when free RAM is low (the web path is gated, native Build is the fallback).
 _TWLR_ModelBrowserGated() {
-	Src := _TWLR_ReadSource("ui/llm_model_browser.ahk")
+	Src := _TWLR_ReadSource("ui/model_browser/init.ahk")
 	Assert(InStr(Src, "WebView_ShouldUseNativeFallback") > 0,
 		"model_browser must gate its WebView2 path on WebView_ShouldUseNativeFallback (low RAM -> native ListView)")
 }

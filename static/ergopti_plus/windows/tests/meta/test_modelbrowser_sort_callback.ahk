@@ -43,7 +43,7 @@ _TMBSC_StripLineComments(Src) {
 ; =========================================================================
 
 _TMBSC_SortUsesCallback() {
-	Src := _TMBSC_StripLineComments(_TMBSC_ReadSource("ui/llm_model_browser.ahk"))
+	Src := _TMBSC_StripLineComments(_TMBSC_ReadSource("ui/model_browser/init.ahk"))
 	Assert(Src != "", "ui/llm_model_browser.ahk must be readable")
 
 	Body := _DriverFuncBody("_LLM_ModelBrowser_Sort")

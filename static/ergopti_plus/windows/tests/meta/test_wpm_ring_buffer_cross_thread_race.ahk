@@ -49,7 +49,7 @@ _WpmRace_ReadSource(RelPath) {
 ; ==================================================
 
 _WpmRace_PushGuardsRingMutation() {
-	Src := _WpmRace_ReadSource("ui/wpm_widget.ahk")
+	Src := _WpmRace_ReadSource("ui/wpm/init.ahk")
 	Seg := _DriverFuncBody("WPMWidget_Push")
 	Assert(Seg != "", "WPMWidget_Push declaration must exist in wpm_widget.ahk")
 	Assert(InStr(Seg, "_ring.Push") > 0,
@@ -62,7 +62,7 @@ _WpmRace_PushGuardsRingMutation() {
 Test("wpm_widget: WPMWidget_Push brackets the ring mutation with Critical (wpm-ring-buffer-cross-thread-race)", _WpmRace_PushGuardsRingMutation)
 
 _WpmRace_CalcGuardsEnumeration() {
-	Src := _WpmRace_ReadSource("ui/wpm_widget.ahk")
+	Src := _WpmRace_ReadSource("ui/wpm/init.ahk")
 	Seg := _DriverFuncBody("WPMWidget_Calc")
 	Assert(Seg != "", "WPMWidget_Calc declaration must exist in wpm_widget.ahk")
 	Assert(InStr(Seg, "for _, ev in WPMWidget._ring") > 0,

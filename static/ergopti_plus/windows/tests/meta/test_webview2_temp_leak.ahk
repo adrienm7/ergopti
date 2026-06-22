@@ -70,7 +70,7 @@ _TWTL_AllHosts() {
 	; Shared-env hosts (leak-free by construction).
 	_TWTL_CheckSharedHost("ui/changelog/init.ahk", "ergopti_changelog_wv_")
 	_TWTL_CheckSharedHost("ui/healthcheck/core.ahk", "ergopti_hc_wv_")
-	_TWTL_CheckSharedHost("ui/llm_model_browser.ahk", "ergopti_modelbrowser_wv_")
+	_TWTL_CheckSharedHost("ui/model_browser/init.ahk", "ergopti_modelbrowser_wv_")
 	_TWTL_CheckSharedUpdaterModule()
 	_TWTL_SharedFolderIsFixed()
 	; Legacy per-launch hosts (interactive/long-lived) -- still sweep + delete.

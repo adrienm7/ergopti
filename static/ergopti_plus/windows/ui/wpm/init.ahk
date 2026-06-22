@@ -1,4 +1,4 @@
-﻿; ui/wpm_widget.ahk
+﻿; ui/wpm/init.ahk
 
 ; ==============================================================================
 ; MODULE: Real-Time WPM Widget

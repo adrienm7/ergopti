@@ -50,7 +50,7 @@ class WebView2 {
 	}
 }
 
-#Include ../ui/llm_model_browser.ahk
+#Include ../ui/model_browser/init.ahk
 
 ; Isolated suite: bail if a stale lock ever hangs RunTests.
 _LlmMbWatchdog(*) {

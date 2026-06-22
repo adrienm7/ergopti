@@ -120,7 +120,7 @@ _ATG_WpmWidgetHasNoLiveWebView2() {
 	; Cannot broaden to _DriverDirConcat("ui"): other ui/ files (changelog,
 	; model browser, healthcheck) reference WebView2 in live code, so a dir/tree
 	; scan would false-trip this file-scoped "wpm_widget has none" invariant.
-	Src := _ATG_StripComments(_ATG_ReadSource("ui/wpm_widget.ahk"))
+	Src := _ATG_StripComments(_ATG_ReadSource("ui/wpm/init.ahk"))
 	; The graph renderer was migrated to a GDI+ layered window; with no live
 	; WebView2 controller there is no per-process user-data folder to orphan on
 	; Reload, eliminating the temp-dir leak at the source.
