@@ -344,7 +344,7 @@ LLM_OllamaListModels() {
 
 /**
  * Non-blocking variant of ``LLM_OllamaListModels`` — fetches the locally-installed
- * model tags from ``GET /api/tags`` through WinHTTP's async mode + a polling tick
+ * model tags from ``GET /api/tags`` through a curl child + a polling tick
  * (mirrors ``LLM_OllamaIsRunning_Async``), so the keyboard/menu thread is NEVER
  * frozen on a cold or slow daemon. The blocking version, called per catalogue row
  * at every tray rebuild past the installed-cache TTL, stalled the menu (and dropped
@@ -353,23 +353,56 @@ LLM_OllamaListModels() {
  * @param {function} on_result - Callback receiving an Array of tag names ([] on failure).
  */
 LLM_OllamaListModels_Async(on_result) {
+	; curl CHILD PROCESS, not WinHTTP — identical reasoning to LLM_OllamaIsRunning_Async:
+	; WinHttpRequest async mode (Open(...,true) + Send()) still performs the TCP connect
+	; SYNCHRONOUSLY on the calling thread, so against a busy daemon it could block the
+	; tray build (which runs under Critical) for up to its timeout. curl does the connect
+	; in its own process; we only poll ProcessExist (instant), so the loop never blocks.
 	try {
-		http := ComObject("WinHttp.WinHttpRequest.5.1")
-		http.Open("GET", LLM_OLLAMA_BASE_URL "/api/tags", true)
-		; Same 1 s per-phase budget as the health probe — a local daemon answers in
-		; well under a second; if it doesn't, the menu must not wait on it.
-		http.SetTimeouts(1000, 1000, 1000, 1000)
-		http.Send()
-		; 500 ms poll cadence (not the 50 ms prediction cadence): this fires from a
-		; menu rebuild, not a per-keystroke path, so reactivity is irrelevant and the
-		; looser loop spares the message pump.
-		_LLM_Ollama_PollGeneric(http,
-			(status, body) => on_result(status == 200 ? _LLM_Ollama_ParseTagNames(body) : []),
-			() => on_result([]),
-			0, 0, 500)
+		uid := _LLM_Ollama_NextStreamUid()
+		tmp_out := _LLM_Ollama_TempDir() . "\ergopti_ollama_tags_" . uid . ".out"
+		curl_exe := A_WinDir . "\System32\curl.exe"
+		; -m 2: a local daemon lists installed tags in well under a second; a slower
+		; answer is "not ready" — the installed-cache TTL re-probes on the next rebuild.
+		cmd := '"' . curl_exe . '" -s -m 2 -o ' . _Q(tmp_out) . ' ' . _Q(LLM_OLLAMA_BASE_URL . "/api/tags")
+		pid := 0
+		Run(cmd, , "Hide", &pid)
+		_LLM_Ollama_TagsPoll(pid, tmp_out, on_result, A_TickCount)
 	} catch {
 		try on_result([])
 	}
+}
+
+/**
+ * Polls an installed-tags curl child WITHOUT blocking the message loop, then parses
+ * the ``GET /api/tags`` body into a tag-name Array (mirrors _LLM_Ollama_PingPoll, but
+ * returns the parsed list rather than a boolean). Delivers [] on timeout / empty body.
+ * @param {integer}  pid        - curl child PID (0 if Run failed).
+ * @param {string}   tmp_out    - Temp file curl writes the response body to.
+ * @param {function} on_result  - Callback receiving an Array of tag names ([] on failure).
+ * @param {integer}  start_tick - A_TickCount at dispatch, for the deadline backstop.
+ */
+_LLM_Ollama_TagsPoll(pid, tmp_out, on_result, start_tick) {
+	if (pid > 0 and ProcessExist(pid)) {
+		; 4 s backstop: curl -m 2 should exit by ~2 s; ProcessClose a wedged child so it
+		; can never keep the poll chain (or its temp handle) alive.
+		if (_LLM_DeadlineExpired(start_tick, 4000)) {
+			try ProcessClose(pid)
+			try FSDelete(tmp_out)
+			try on_result([])
+			return
+		}
+		SetTimer(() => _LLM_Ollama_TagsPoll(pid, tmp_out, on_result, start_tick), -150)
+		return
+	}
+	tags := []
+	try {
+		body := FileExist(tmp_out) ? FileRead(tmp_out, "UTF-8-RAW") : ""
+		if (body != "")
+			tags := _LLM_Ollama_ParseTagNames(body)
+	}
+	try FSDelete(tmp_out)
+	try on_result(tags)
 }
 
 /**

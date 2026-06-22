@@ -51,15 +51,23 @@ _MetaCheckInstalledTagsNonBlocking() {
 		"_LLM_GetInstalledTagsCached must be a pure non-blocking cache read — it must "
 		. "NOT call the synchronous LLM_OllamaListModels() (the GET /api/tags freeze)")
 
-	; (2) The async probe must exist and genuinely run async: WinHTTP Open(..., true)
-	; on /api/tags, driven by the non-blocking _LLM_Ollama_PollGeneric tick.
+	; (2) The async probe must exist and genuinely run non-blocking: a curl CHILD on
+	; /api/tags (NOT WinHTTP — its async Send() still connects synchronously and could
+	; block the now-Critical tray build), polled via ProcessExist. Same contract as
+	; LLM_OllamaIsRunning_Async (ollama-reachability-winhttp-connect-blocks).
 	AsyncBody := _DriverFuncBody("LLM_OllamaListModels_Async")
 	Assert(AsyncBody != "", "api_ollama.ahk must define LLM_OllamaListModels_Async()")
-	Assert(InStr(AsyncBody, "/api/tags") and InStr(AsyncBody, ", true)"),
-		"LLM_OllamaListModels_Async must open GET /api/tags in async mode (Open(..., true))")
-	Assert(InStr(AsyncBody, "_LLM_Ollama_PollGeneric("),
-		"LLM_OllamaListModels_Async must poll via _LLM_Ollama_PollGeneric (non-blocking), "
-		. "never a blocking Send/WaitForResponse on the calling thread")
+	Assert(!InStr(AsyncBody, ".Send(") and !InStr(AsyncBody, 'ComObject("WinHttp'),
+		"LLM_OllamaListModels_Async must NOT use the WinHTTP COM Send() — its synchronous "
+		. "connect can block the (now Critical) tray build; use a curl child instead")
+	Assert(InStr(AsyncBody, "/api/tags") and InStr(AsyncBody, "curl") and InStr(AsyncBody, "Run("),
+		"LLM_OllamaListModels_Async must fetch GET /api/tags via a curl child process")
+	Assert(InStr(AsyncBody, "_LLM_Ollama_TagsPoll("),
+		"LLM_OllamaListModels_Async must hand off to _LLM_Ollama_TagsPoll (poll the child, don't block)")
+	PollBody := _DriverFuncBody("_LLM_Ollama_TagsPoll")
+	Assert(PollBody != "", "api_ollama.ahk must define _LLM_Ollama_TagsPoll()")
+	Assert(InStr(PollBody, "ProcessExist("),
+		"_LLM_Ollama_TagsPoll must poll the curl child via ProcessExist (non-blocking)")
 
 	; (3) The blocking list call survives ONLY in the sanctioned off-hot-path warm.
 	WarmBody := _DriverFuncBody("_LLM_WarmInstalledTagsSync")
