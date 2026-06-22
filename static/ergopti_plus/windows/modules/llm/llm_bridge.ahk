@@ -349,23 +349,6 @@ LLM_Bridge_HasActivePredictionWork() {
 }
 
 /**
- * True ONLY while a real prediction is on screen — never during the violet
- * "génération en cours" loading tooltip, and never while the model is still
- * generating. Pointer-dismiss gates on this (not HasActivePredictionWork) so
- * idle mouse drift while waiting for a slow model can never cancel the
- * suggestion before it appears. Mirrors macOS, which arms its dismiss watchers
- * inside show_predictions and never during show_loading.
- * @returns {boolean}
- */
-_LLM_Bridge_PredictionShown() {
-	if !(IsSet(LLM_Tooltip_IsVisible) && LLM_Tooltip_IsVisible())
-		return false
-	if (IsSet(LLM_Tooltip_IsLoading) && LLM_Tooltip_IsLoading())
-		return false
-	return true
-}
-
-/**
  * Clears predictions, cancels generation, and hides the tooltip.
  * Parity with macOS LLMBridge.reset_predictions() + engine.reset().
  */
@@ -386,22 +369,27 @@ LLM_Bridge_ResetPredictions() {
 }
 
 /**
- * Entry point for mouse / touchpad / wheel activity. Dismisses ONLY a displayed
- * prediction — never during loading / generation, so the user can move the mouse
- * freely while waiting for a slow model without losing the suggestion.
+ * Entry point for mouse / touchpad / wheel activity. Cancels ANY in-progress LLM
+ * work — the loading spinner, an in-flight generation, or a shown prediction — so
+ * any user input dismisses the prediction (macOS parity: its mouse_tap calls
+ * reset_predictions on a click in every phase, and a keystroke cancels generation
+ * via stop_timer). A real prediction is still shielded during its minimum-display
+ * grace window so an incidental click / drift the instant it renders cannot kill it
+ * before it is seen — the loading spinner has no grace, so it cancels immediately.
  */
 LLM_Bridge_OnPointerActivity(reason := "?") {
-	if !_LLM_Bridge_PredictionShown()
+	if !LLM_Bridge_HasActivePredictionWork()
 		return
-	; Minimum-display window: ignore stray pointer drift in the first moments after
-	; the prediction renders so it cannot vanish before the user perceives it.
+	; Minimum-display window: ignore stray pointer drift in the first moments after a
+	; real prediction renders so it cannot vanish before the user perceives it.
+	; InGracePeriod is false during loading, so the spinner stays fully cancellable.
 	if (IsSet(LLM_Tooltip_InGracePeriod) && LLM_Tooltip_InGracePeriod())
 		return
 	; ``reason`` names the exact trigger: a mouse-button / wheel hotkey passes its
 	; own name (e.g. "~LButton"), the move-tick passes "move dx=.. dy=..". This is
 	; the lens for "it vanished while I sat still" — the log says whether it was a
 	; real click, a wheel event, or pointer travel, and by how much.
-	try LoggerDebug("LLM.tt", "DISMISS: pointer activity ({1}) over a shown prediction.", reason)
+	try LoggerDebug("LLM.tt", "DISMISS: pointer activity ({1}) — cancelling in-progress generation + tooltip.", reason)
 	LLM_Bridge_ResetPredictions()
 }
 
@@ -476,12 +464,11 @@ _LLM_PointerWatch_OnMoveTick(*) {
 	; guard is the cheap, local safety net.
 	if A_IsSuspended
 		return
-	; Dismiss-on-move applies ONLY once a real prediction is on screen, never during
-	; the loading / generation phase. While no prediction is shown we drop the
-	; origin so the NEXT prediction captures a fresh one — otherwise mouse travel
-	; that happened while a slow model was generating would be measured against a
-	; stale origin and dismiss the suggestion the instant it appears.
-	if !_LLM_Bridge_PredictionShown() {
+	; Dismiss-on-move applies whenever LLM work is active — the loading spinner, an
+	; in-flight generation, or a shown prediction (any input cancels). While NO work
+	; is active we drop the origin so the next cycle captures a fresh one; the grace
+	; branch below still shields a just-rendered prediction during its window.
+	if !LLM_Bridge_HasActivePredictionWork() {
 		_LLM_PointerWatch_LastX := unset
 		_LLM_PointerWatch_LastY := unset
 		return

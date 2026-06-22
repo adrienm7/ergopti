@@ -6,13 +6,17 @@ SetWorkingDir(A_ScriptDir)
 ; ==============================================================================
 ; MODULE: LLM Pointer-Dismiss Tests
 ; DESCRIPTION:
-; Behavioural guard for the "prediction disappears the instant it appears" bug.
-; The pointer-dismiss watcher used to act whenever HasActivePredictionWork() was
-; true — which INCLUDES the loading / generation phase. So mouse drift while a
-; slow model was still generating dismissed (or cancelled) the suggestion the
-; moment it rendered. The fix gates dismissal on _LLM_Bridge_PredictionShown()
-; (a real prediction on screen, NOT the violet loading tooltip), mirroring macOS
-; which arms its dismiss watchers only inside show_predictions.
+; Behavioural guard for the "génération en cours" spinner that lingered through
+; user input. Per macOS parity (mouse_tap -> reset_predictions on any click in
+; any phase; a keystroke cancels generation via stop_timer) ANY input — keystroke,
+; click, or pointer move — must cancel an in-progress generation and hide the
+; tooltip. So pointer dismissal gates on LLM_Bridge_HasActivePredictionWork()
+; (loading spinner, in-flight generation, OR a shown prediction), NOT only a shown
+; prediction. The only protection retained is the minimum-display grace window: a
+; REAL prediction in its first 600 ms is shielded so an incidental click / drift
+; the instant it renders cannot kill it before the user perceives it (the loading
+; spinner has no grace, so it is cancellable immediately). The move watcher still
+; dismisses only past the deliberate-move threshold, never on sensor jitter.
 ; ==============================================================================
 
 #Include test_framework.ahk
@@ -20,6 +24,7 @@ SetWorkingDir(A_ScriptDir)
 ; --- Mutable tooltip state the stubs report ---
 global _MMP_Visible  := false
 global _MMP_Loading  := false
+global _MMP_InGrace  := false   ; LLM_Tooltip_InGracePeriod() result (shielded shown prediction)
 global _MMP_HideHits := 0   ; counts LLM_Tooltip_Hide() calls (the dismiss signal)
 
 ; --- Globals the bridge reads ---
@@ -29,6 +34,7 @@ global _LLM_Engine := Map("reset_on_nav", false)
 ; --- Dependency stubs (resolved at call time once the bridge is included) ---
 LLM_Tooltip_IsVisible()        => _MMP_Visible
 LLM_Tooltip_IsLoading()        => _MMP_Loading
+LLM_Tooltip_InGracePeriod()    => _MMP_InGrace
 LLM_Engine_IsBusy()            => false
 LLM_Engine_StopGeneration()    => ""
 LLM_Tooltip_MarkChainComplete() => ""
@@ -54,89 +60,92 @@ SetTimer(_MmpWatchdog, -60000)
 
 
 ; =========================================================
-; ======= 1/ _LLM_Bridge_PredictionShown predicate ========
+; ======= 1/ OnPointerActivity cancels active work ========
 ; =========================================================
 
-_MMP_ShownDuringLoading() {
-	global _MMP_Visible, _MMP_Loading
+_MMP_DismissDuringLoading() {
+	global _MMP_Visible, _MMP_Loading, _MMP_InGrace, _MMP_HideHits
+	; The user is waiting for a slow model: loading spinner up, no prediction yet.
+	; Per the user's choice + macOS parity, ANY input now cancels it immediately.
 	_MMP_Visible := true
 	_MMP_Loading := true
-	AssertFalse(_LLM_Bridge_PredictionShown(), "loading tooltip must NOT count as a shown prediction")
-}
-Test("pointer-dismiss: loading tooltip is not a shown prediction", _MMP_ShownDuringLoading)
-
-_MMP_ShownDuringPrediction() {
-	global _MMP_Visible, _MMP_Loading
-	_MMP_Visible := true
-	_MMP_Loading := false
-	AssertTrue(_LLM_Bridge_PredictionShown(), "a visible, non-loading tooltip is a shown prediction")
-}
-Test("pointer-dismiss: visible non-loading tooltip is a shown prediction", _MMP_ShownDuringPrediction)
-
-_MMP_ShownWhenHidden() {
-	global _MMP_Visible, _MMP_Loading
-	_MMP_Visible := false
-	_MMP_Loading := false
-	AssertFalse(_LLM_Bridge_PredictionShown(), "no tooltip means no shown prediction")
-}
-Test("pointer-dismiss: hidden tooltip is not a shown prediction", _MMP_ShownWhenHidden)
-
-
-
-
-; =========================================================
-; ======= 2/ OnPointerActivity gates on the phase =========
-; =========================================================
-
-_MMP_NoDismissDuringLoading() {
-	global _MMP_Visible, _MMP_Loading, _MMP_HideHits
-	; The user is waiting for a slow model: loading tooltip up, no prediction yet.
-	_MMP_Visible := true
-	_MMP_Loading := true
+	_MMP_InGrace := false
 	_MMP_HideHits := 0
 	LLM_Bridge_OnPointerActivity()
-	AssertEqual(0, _MMP_HideHits, "pointer activity during generation must NOT dismiss (regression: prediction vanished on appear)")
+	AssertEqual(1, _MMP_HideHits, "pointer activity during generation MUST cancel the spinner (input cancels in-progress work)")
 }
-Test("pointer-dismiss: pointer activity is ignored during loading/generation", _MMP_NoDismissDuringLoading)
+Test("pointer-dismiss: pointer activity cancels the loading spinner", _MMP_DismissDuringLoading)
 
 _MMP_DismissWhenPredictionShown() {
-	global _MMP_Visible, _MMP_Loading, _MMP_HideHits
-	; A real prediction is on screen — now pointer activity dismisses it.
+	global _MMP_Visible, _MMP_Loading, _MMP_InGrace, _MMP_HideHits
+	; A real prediction is on screen, past its grace window — pointer dismisses it.
 	_MMP_Visible := true
 	_MMP_Loading := false
+	_MMP_InGrace := false
 	_MMP_HideHits := 0
 	LLM_Bridge_OnPointerActivity()
 	AssertEqual(1, _MMP_HideHits, "pointer activity over a shown prediction must dismiss it")
 }
 Test("pointer-dismiss: pointer activity dismisses a shown prediction", _MMP_DismissWhenPredictionShown)
 
+_MMP_GraceShieldsShownPrediction() {
+	global _MMP_Visible, _MMP_Loading, _MMP_InGrace, _MMP_HideHits
+	; A real prediction inside its minimum-display window is shielded: an incidental
+	; click / drift the instant it renders must not kill it before the user sees it.
+	; (The loading spinner has no grace — see _MMP_DismissDuringLoading.)
+	_MMP_Visible := true
+	_MMP_Loading := false
+	_MMP_InGrace := true
+	_MMP_HideHits := 0
+	LLM_Bridge_OnPointerActivity()
+	AssertEqual(0, _MMP_HideHits, "a shown prediction in its grace window must NOT be dismissed by pointer activity")
+}
+Test("pointer-dismiss: grace window shields a freshly-shown prediction", _MMP_GraceShieldsShownPrediction)
+
+_MMP_NoWorkNoDismiss() {
+	global _MMP_Visible, _MMP_Loading, _MMP_InGrace, _MMP_HideHits
+	; Nothing active — pointer activity is a no-op (no wasteful reset / hide).
+	_MMP_Visible := false
+	_MMP_Loading := false
+	_MMP_InGrace := false
+	_MMP_HideHits := 0
+	LLM_Bridge_OnPointerActivity()
+	AssertEqual(0, _MMP_HideHits, "pointer activity with no active prediction work must do nothing")
+}
+Test("pointer-dismiss: no active work means no dismiss", _MMP_NoWorkNoDismiss)
+
 
 
 
 ; =========================================================
-; ======= 3/ Move-tick source contract ====================
+; ======= 2/ Move-tick source contract ====================
 ; =========================================================
 
-_MMP_MoveTickGatesOnShown() {
+_MMP_MoveTickGatesOnActiveWork() {
 	body := FileRead(A_ScriptDir . "\..\modules\llm\llm_bridge.ahk", "UTF-8")
-	; The move watcher must gate on the shown-prediction predicate, not on the
-	; broader HasActivePredictionWork (which includes loading), and must drop the
-	; baseline while no prediction is shown so the next one starts from a fresh origin.
-	AssertContains(body, "if !_LLM_Bridge_PredictionShown() {",
-		"move-tick must gate dismissal on a shown prediction, not on loading/generation")
+	; The move watcher gates on HasActivePredictionWork (loading spinner, in-flight
+	; generation, OR a shown prediction) so a deliberate move cancels during loading
+	; too, and drops the baseline while NO work is active so the next cycle starts
+	; from a fresh origin.
+	AssertContains(body, "if !LLM_Bridge_HasActivePredictionWork() {",
+		"move-tick must gate on active prediction work (incl. loading), not only a shown prediction")
 	AssertContains(body, "_LLM_PointerWatch_LastX := unset",
-		"move-tick must reset the baseline while no prediction is shown")
+		"move-tick must reset the baseline while no prediction work is active")
 	; And it must dismiss only past the deliberate-move threshold, never on raw jitter.
 	AssertContains(body, "_LLM_PointerMovedEnough(x, y, _LLM_PointerWatch_LastX, _LLM_PointerWatch_LastY)",
 		"move-tick must dismiss only when the cursor moved past the jitter threshold")
+	; The retired _LLM_Bridge_PredictionShown predicate must be fully gone — both the
+	; click handler and the move-tick now gate on HasActivePredictionWork (no dead code).
+	AssertFalse(InStr(body, "_LLM_Bridge_PredictionShown"),
+		"_LLM_Bridge_PredictionShown must be removed; both gates now use HasActivePredictionWork")
 }
-Test("pointer-dismiss: move-tick gates on shown prediction + resets baseline", _MMP_MoveTickGatesOnShown)
+Test("pointer-dismiss: move-tick gates on active work + resets baseline", _MMP_MoveTickGatesOnActiveWork)
 
 
 
 
 ; =========================================================
-; ======= 4/ Movement threshold (no dismiss on jitter) ====
+; ======= 3/ Movement threshold (no dismiss on jitter) ====
 ; =========================================================
 
 _MMP_JitterDoesNotDismiss() {
