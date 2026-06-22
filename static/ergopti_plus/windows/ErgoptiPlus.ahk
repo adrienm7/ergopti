@@ -906,10 +906,16 @@ if !_LLM_Menu["enabled"]
 ; already parsed at boot). One JSON parse, only consulted on a missing key; a miss
 ; before this fires triggers a one-time lazy load inside t().
 SetTimer(I18nWarmFallbacks, -I18N_FALLBACK_WARM_DELAY_MS)
-; text_expansion now registers on the critical path (the most-used feature); only
-; the prefix-watcher PREVIEW index is warmed off-path here so tooltips appear
-; shortly after "ready" without paying the index build on time-to-ready.
-SetTimer(HotstringPrefixWatcherRebuildIndex, -HS_PREFIX_INDEX_WARM_DELAY_MS)
+; text_expansion now registers on the critical path (the most-used feature); the
+; prefix-watcher PREVIEW index is built ONCE, off-path, at the END of the deferred
+; emoji/symbol pass below (RegisterEmojisSymbolsDeferred → HotstringPrefixWatcherRebuildIndex).
+; A separate earlier "warm-up" SetTimer used to build it too, but it fired during peak
+; boot contention and before HotstringsResolve was warm for the emoji/symbol sections,
+; so its wall-clock was erratic (250 ms–6 s). Building only after the deferred pass —
+; once HotstringsResolve is memoised and the boot has settled — makes the single rebuild
+; reliably ~220 ms, at the cost of the preview tooltip appearing a few seconds into the
+; session instead of right after "ready" (hotstrings still FIRE immediately — the boot
+; HSE registration is unaffected; only the visual preview is deferred).
 SetTimer(RegisterEmojisSymbolsDeferred, -HS_DEFERRED_REGISTRATION_DELAY_MS)
 if (MetricsShortcuts.enabled and WPMWidget.visible) {
 	; Graph mode: pre-create the GDI+ layered window + warm GDI+ in the quiet slot

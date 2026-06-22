@@ -165,16 +165,15 @@ HotstringPrefixWatcherInit() {
     }
     LoggerStart("PrefixWatcher", "Initializing prefix watcher…")
 
-    ; The trigger index (~3251 entries rescanned from the category TOMLs) costs
-    ; ~157-234 ms — too heavy for the boot critical path. Start the InputHook with
-    ; an EMPTY index here (cheap); the off-critical-path deferred passes build it.
-    ; A short-delay SetTimer(HotstringPrefixWatcherRebuildIndex) at the boot tail
-    ; warms it first; RegisterEmojisSymbolsDeferred rebuilds it again later. Both call
-    ; HotstringPrefixWatcherRebuildIndex (a full TOML rescan) after "ready", and
-    ; that function requires the InputHook to already exist — it does, created just
-    ; below. _LookupAndRender hides the tooltip gracefully while the index is empty,
-    ; so the only visible effect is no live preview for the brief window between
-    ; "ready" and the first deferred rebuild.
+    ; The trigger index (~3180 entries) is too heavy for the boot critical path, so
+    ; start the InputHook with an EMPTY index here (cheap). It is built ONCE, off the
+    ; critical path, at the end of RegisterEmojisSymbolsDeferred — by then the boot has
+    ; settled and HotstringsResolve is memoised for every section, so the single
+    ; HotstringPrefixWatcherRebuildIndex (now a fast in-memory cache build, not a TOML
+    ; rescan) runs reliably in ~220 ms. That function requires the InputHook to already
+    ; exist — it does, created just below. _LookupAndRender hides the tooltip gracefully
+    ; while the index is empty, so the only visible effect is no live preview for the
+    ; brief window between "ready" and that deferred build.
     _StartInputHook()
     _InstallMouseClickResetHooks()
     LoggerSuccess("PrefixWatcher", "Watcher started (index build deferred off the boot path).")

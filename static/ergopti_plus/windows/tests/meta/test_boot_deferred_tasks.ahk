@@ -50,9 +50,10 @@ _MetaCheckBootDeferredTasks() {
 	; Every heavy deferred task must be armed strictly AFTER the ready marker.
 	; InStr returns the FIRST occurrence, so Pos > ReadyPos proves NO occurrence
 	; sits before "ready" — exactly the regression we must prevent.
+	; NB: the prefix-watcher index build is no longer its own SetTimer — it runs at
+	; the end of RegisterEmojisSymbolsDeferred, so it is covered by that probe below.
 	for _, Probe in [
 		"SetTimer(WPMWidget_Show",
-		"SetTimer(HotstringPrefixWatcherRebuildIndex",
 		"SetTimer(RegisterEmojisSymbolsDeferred",
 		"SetTimer(BuildLanguageMenuDeferred",
 		"SetTimer(I18nWarmFallbacks",
