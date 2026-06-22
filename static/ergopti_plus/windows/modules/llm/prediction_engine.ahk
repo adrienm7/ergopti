@@ -219,6 +219,13 @@ LLM_Engine_OnKeystroke(buffer) {
 			return
 
 		LLM_Engine_CancelTimer()
+		; Mirror macOS update_preview -> engine.stop_timer(): every keystroke cancels
+		; any in-flight generation before re-arming. Without it a superseded request
+		; (the user typed past it) kept the "génération en cours" spinner alive and
+		; blocked Ollama's single queue behind stale work, draining for many seconds
+		; after the user stopped typing — the lingering-spinner parity bug. Windows
+		; previously cancelled only the debounce timer here.
+		LLM_Engine_CancelInflight()
 
 		; Arm debounce timer — closure captures the full buffer. PromptBuilder
 		; (macOS parity) derives capped context + tail inside FirePrediction.
@@ -331,6 +338,28 @@ LLM_Engine_StopGeneration() {
 			_LLM_Engine["last_results"] := []
 			_LLM_Engine["last_result"]  := ""
 		}
+		try LLM_OllamaCancelStreams()
+		try LLM_OllamaCancelAllAsync()
+		try LLM_RemoteCancelAllAsync()
+	} finally {
+		Critical(_c)
+	}
+}
+
+/**
+ * Cancels in-flight generation (streaming + async + remote) and invalidates any
+ * stale callbacks by bumping request_id — WITHOUT cancelling the debounce timer or
+ * dropping the prediction cache. Mirrors macOS prediction_engine cancel_streaming(),
+ * which update_preview() calls on every keystroke so typing always kills a
+ * superseded request before re-arming. StopGeneration (which also cancels the timer
+ * and drops the cache) stays for the heavier nav-reset / pause path.
+ */
+LLM_Engine_CancelInflight() {
+	global _LLM_Engine
+	local _c := Critical("On")
+	try {
+		if IsSet(_LLM_Engine)
+			_LLM_Engine["request_id"] := (_LLM_Engine.Has("request_id") ? _LLM_Engine["request_id"] : 0) + 1
 		try LLM_OllamaCancelStreams()
 		try LLM_OllamaCancelAllAsync()
 		try LLM_RemoteCancelAllAsync()
