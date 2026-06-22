@@ -42,6 +42,12 @@ LLM_Menu_Build() {
 	if _Building
 		return
 	_Building := true
+	; Run the whole build under Critical so deferred boot tasks (notably the multi-second
+	; emoji/symbol hotstring registration) cannot preempt the emit loop mid-flight and
+	; stretch a ~50 ms build into several seconds of wall-clock (menu-build-boot-preempt).
+	; Safe only because the build now holds NO blocking call: the prune is O(tray+tracked)
+	; and both the health and installed-tags probes are fire-and-forget curl children.
+	_crit := Critical("On")
 	try {
 	_t0 := A_TickCount
 	try LoggerInfo("LLM", "LLM_Menu_Build: building IA submenu (enabled={1}, inTray={2}).", _LLM_Menu["enabled"] ? "true" : "false", _LLM_Menu_InTray ? "true" : "false")
@@ -151,6 +157,7 @@ LLM_Menu_Build() {
 		try LoggerError("LLM", "LLM_Menu_Build FAILED: {1} ({2}:{3}).", e.Message, e.File, e.Line)
 	} finally {
 		_Building := false
+		Critical(_crit)
 	}
 }
 

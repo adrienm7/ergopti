@@ -246,6 +246,8 @@ try FileAppend("# [marker] starting direct include of LLM production modules`r`n
 #Include meta/test_ollama_reachability_async_nonblocking.ahk
 ; Orphan temp-file sweep is bounded + off the Critical dispatch path (llm-orphan-sweep-temp-recursion).
 #Include meta/test_llm_orphan_sweep_nonblocking.ahk
+; LLM_Menu_Build runs under Critical so deferred boot tasks cannot preempt it (menu-build-boot-preempt).
+#Include meta/test_llm_menu_build_critical.ahk
 try FileAppend("# [marker] LLM production modules + tests included`r`n", A_Temp . "\ergopti_test_results.txt", "UTF-8")
 try FileAppend("# [marker] LLM production modules + tests included`r`n", "*")
 
