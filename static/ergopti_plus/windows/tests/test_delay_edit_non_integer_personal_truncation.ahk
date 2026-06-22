@@ -74,17 +74,12 @@ Test("hs_config: both delay backends serialise the same value identically (delay
 ; ==================================================
 
 ; A_ScriptDir is the runner dir (tests/); its parent is the windows/ driver root.
-_DENI_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
-}
 
 ; _HCW_TomlValue (config window, not in the run_all graph) must delegate the
 ; "delay" field to the shared helper rather than re-implement its own Format,
 ; otherwise the two paths could silently re-diverge.
 _DENI_WindowDelegatesToHelper() {
-	Src := _DENI_ReadSource("lib/hotstrings/hotstrings_config_window.ahk")
+	Src := _DriverDirConcat("ui/hotstrings_config_window")
 	Seg := _DriverFuncBody("_HCW_TomlValue")
 	Assert(Seg != "", "_HCW_TomlValue must exist in hotstrings_config_window.ahk")
 	Assert(InStr(Seg, "HotstringsSerialiseDelay") > 0,

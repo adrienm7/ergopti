@@ -1,4 +1,4 @@
-﻿; lib/hotstrings/hotstrings_config_window.ahk
+﻿; ui/hotstrings_config_window/init.ahk
 
 ; ==============================================================================
 ; MODULE: Hotstrings Config Window
