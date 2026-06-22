@@ -1,4 +1,4 @@
---- tests/unit/lib/test_mlx_deps_progress_no_regression.lua
+--- tests/unit/modules/llm/test_mlx_deps_progress_no_regression.lua
 
 --- Regression test for lib-deps-2: mlx_deps_checker.lua iterated
 --- MARKER_PROGRESS with pairs() and called llm_progress.set_progress(pct)
@@ -12,7 +12,7 @@
 
 local helpers = require("tests.helpers")
 
-local src_path = helpers.driver_root() .. "lib/mlx_deps_checker.lua"
+local src_path = helpers.driver_root() .. "modules/llm/mlx_deps_checker.lua"
 local fh = io.open(src_path, "r")
 if not fh then error("mlx_deps_checker.lua not readable at: " .. src_path) end
 local src = fh:read("*a") ; fh:close()

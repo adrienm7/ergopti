@@ -39,8 +39,8 @@ local TriggerOrch      = require("ui.menu.menu_llm.trigger_orchestrator")
 -- so a fresh-out-of-the-box Mac auto-bootstraps the engine without any
 -- manual user action. Both checkers are idempotent and exit silently when
 -- nothing needs doing, so the menu opens instantly in the nominal case.
-local mlx_deps_checker    = require("lib.mlx_deps_checker")
-local ollama_deps_checker = require("lib.ollama_deps_checker")
+local mlx_deps_checker    = require("modules.llm.mlx_deps_checker")
+local ollama_deps_checker = require("modules.llm.ollama_deps_checker")
 
 --- Triggers the deps checker matching the given backend name. Designed to
 --- be safe to call repeatedly: each underlying script is hash-gated /

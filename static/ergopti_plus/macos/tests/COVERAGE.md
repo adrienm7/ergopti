@@ -72,7 +72,7 @@ intentionally skips, and the rationale for each deferral.
 | `lib.dialog_util`                                   | Pure forwarding wrapper around `hs.dialog.*` — no logic.                                                                                                                                                        |
 | `lib.app_picker`, `lib.ui_restore`                  | UI glue — exercised manually.                                                                                                                                                                                   |
 | `lib.vscode_bridge`                                 | Spawns `code` CLI; manual smoke only.                                                                                                                                                                           |
-| `lib.mlx_deps_checker`, `lib.ollama_deps_checker`   | Run `pip` / `brew` checks on the host; not unit-testable.                                                                                                                                                       |
+| `modules.llm.mlx_deps_checker`, `modules.llm.ollama_deps_checker`   | Run `pip` / `brew` checks on the host; not unit-testable.                                                                                                                                                       |
 | `ui.*`                                              | Pure WebKit rendering. The menu builder data structure remains a candidate for snapshot tests, deferred for now.                                                                                                |
 
 ## Estimated coverage

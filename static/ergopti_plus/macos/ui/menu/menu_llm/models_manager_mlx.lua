@@ -25,7 +25,7 @@ M._active_tasks = {}
 -- can differentiate "still installing" from "definitively failed" when the
 -- MLX import probe below fails. If the module is absent (unusual layout),
 -- we fall back to the previous generic behaviour.
-local ok_mlx_deps, mlx_deps_checker = pcall(require, "lib.mlx_deps_checker")
+local ok_mlx_deps, mlx_deps_checker = pcall(require, "modules.llm.mlx_deps_checker")
 if not ok_mlx_deps then mlx_deps_checker = nil end
 
 local LOG = "menu_llm.mlx"
@@ -144,7 +144,7 @@ function M.new(deps, presets)
 	end
 
 	if project_venv_python == "" or not hs.fs.attributes(project_venv_python, "mode") then
-		-- The auto-bootstrap (lib/mlx_deps_checker) provisions this interpreter
+		-- The auto-bootstrap (modules/llm/mlx_deps_checker) provisions this interpreter
 		-- on every reload; if it is still missing here the bootstrap failed and
 		-- the user has already been notified.
 		Logger.warn(LOG, "Project venv python introuvable à %s — bootstrap auto en échec.",
