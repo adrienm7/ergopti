@@ -244,6 +244,8 @@ try FileAppend("# [marker] starting direct include of LLM production modules`r`n
 #Include meta/test_llm_input_cancels_generation.ahk
 ; Ollama reachability probe is non-blocking curl, not WinHTTP (ollama-reachability-winhttp-connect-blocks).
 #Include meta/test_ollama_reachability_async_nonblocking.ahk
+; Orphan temp-file sweep is bounded + off the Critical dispatch path (llm-orphan-sweep-temp-recursion).
+#Include meta/test_llm_orphan_sweep_nonblocking.ahk
 try FileAppend("# [marker] LLM production modules + tests included`r`n", A_Temp . "\ergopti_test_results.txt", "UTF-8")
 try FileAppend("# [marker] LLM production modules + tests included`r`n", "*")
 
