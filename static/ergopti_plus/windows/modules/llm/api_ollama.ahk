@@ -86,6 +86,15 @@ global _LLM_Ollama_Pending := ""
 ; In-flight curl streaming handles — cancelled by LLM_OllamaCancelAllAsync.
 global _LLM_Ollama_ActiveStreams := []
 
+; Orphan-sweep throttle. The sweep reaps temp files + empty dirs left by PRIOR
+; (crashed) instances; it is never time-critical, so it runs at most once per
+; _LLM_OLLAMA_ORPHAN_SWEEP_MS and ALWAYS off the synchronous dispatch path (see
+; _LLM_Ollama_ScheduleOrphanSweep). Running it inline inside FirePrediction's
+; Critical section, with an unbounded recursive %TEMP% walk, froze the keyboard
+; for tens of seconds mid-prediction (llm-orphan-sweep-temp-recursion).
+global _LLM_Ollama_LastSweepTick := 0
+global _LLM_OLLAMA_ORPHAN_SWEEP_MS := 60000
+
 ; Stop tokens — same lists as macOS api_ollama.lua (STOP_BATCH / STOP_LINE).
 global _LLM_OLLAMA_STOP_BATCH := ["<|eot_id|>", "<|im_end|>", "[/INST]", "PREFIX:", "TAIL:"]
 global _LLM_OLLAMA_STOP_LINE := ["<|eot_id|>", "<|im_end|>", "[/INST]", "PREFIX:", "TAIL:", "`n`n", "===", "`n", "`r", "</", "Suite finale", "SUITE", "NEXT_WORDS:"]
@@ -472,7 +481,7 @@ _LLM_Ollama_DispatchAsync(job) {
 	; non-streaming path is the hot path that actually creates these PII files,
 	; so the sweeper must run here too — coupling it only to the (currently
 	; dead) streaming path left orphans accumulating forever after a hard kill.
-	_LLM_Ollama_StreamCleanupOrphans()
+	_LLM_Ollama_ScheduleOrphanSweep()
 	uid := _LLM_Ollama_NextStreamUid()
 	tmp_dir := _LLM_Ollama_TempDir()
 	tmp_payload := tmp_dir . "\ergopti_ollama_" . uid . ".json"
@@ -1031,7 +1040,7 @@ LLM_OllamaGenerate_Streaming(model, system_prompt, full_text, temperature, on_pa
 	; command-line length limits and shell escaping headaches with the JSON
 	; quotes. The filename mixes the tick count with a per-call counter so
 	; two streams fired in the same millisecond can't share a file.
-	_LLM_Ollama_StreamCleanupOrphans()
+	_LLM_Ollama_ScheduleOrphanSweep()
 	uid := _LLM_Ollama_NextStreamUid()
 	tmp_dir := _LLM_Ollama_TempDir()
 	tmp_payload := tmp_dir . "\ergopti_ollama_" . uid . ".json"
@@ -1302,21 +1311,54 @@ _LLM_Ollama_TempDir() {
 	return FileExist(dir) ? dir : A_Temp
 }
 
-; Wipes any leftover ``ergopti_ollama_*`` temp files older than 60 s. Runs
-; before each new stream so a previous AHK instance that crashed mid-stream
+; Wipes any leftover ``ergopti_ollama_*`` temp files older than 60 s. Runs on
+; a throttled background timer (see _LLM_Ollama_ScheduleOrphanSweep), never on
+; the synchronous dispatch path, so a previous AHK instance that crashed mid-stream
 ; (Power loss, hard kill, …) never leaks files indefinitely. The 60 s
 ; window is generous — typical predictions complete in 1-3 s and any
 ; legitimate in-flight stream on a fresh AHK instance is younger than that.
 _LLM_Ollama_StreamCleanupOrphans() {
 	now := A_Now
-	; Sweep both the per-instance hardened dir (where payloads now live) and the
-	; legacy A_Temp root (older builds wrote directly there; a crash from one of
-	; those leaves orphans we must still reap). Recursive ``FR`` reaches the
-	; PID-keyed subdirectories created by _LLM_Ollama_TempDir().
-	loop files, A_Temp . "\ergopti_ollama_*.json", "FR"
+	my_dir := _LLM_Ollama_TempDir()
+	; Legacy A_Temp-root files (older builds wrote ergopti_ollama_* straight into
+	; %TEMP%). NON-recursive ("F") — never walk the whole %TEMP% subtree: it holds
+	; 100k+ entries on a busy box and a recursive sweep took ~19 s per pass.
+	loop files, A_Temp . "\ergopti_ollama_*.json", "F"
 		_LLM_Ollama_TryDeleteIfOld(A_LoopFilePath, A_LoopFileTimeModified, now)
-	loop files, A_Temp . "\ergopti_ollama_*.out", "FR"
+	loop files, A_Temp . "\ergopti_ollama_*.out", "F"
 		_LLM_Ollama_TryDeleteIfOld(A_LoopFilePath, A_LoopFileTimeModified, now)
+	; Per-instance hardened dirs of prior instances. Scope the walk to our own
+	; ergopti_llm_* dirs, one level deep ("D") — a bounded handful, not all of %TEMP%.
+	; The current instance's own files are reaped by _LLM_Ollama_CleanupCurlFiles.
+	loop files, A_Temp . "\ergopti_llm_*", "D" {
+		inst_dir := A_LoopFilePath
+		if (inst_dir == my_dir)
+			continue
+		loop files, inst_dir . "\ergopti_ollama_*.json", "F"
+			_LLM_Ollama_TryDeleteIfOld(A_LoopFilePath, A_LoopFileTimeModified, now)
+		loop files, inst_dir . "\ergopti_ollama_*.out", "F"
+			_LLM_Ollama_TryDeleteIfOld(A_LoopFilePath, A_LoopFileTimeModified, now)
+		; Reap the now-empty dir of a dead instance so PID dirs (160+ leaked) do not
+		; pile up and slow every future sweep. DirDelete(recurse=false) only deletes
+		; when empty, so a live sibling (it recreates the dir lazily) is never harmed.
+		try DirDelete(inst_dir, false)
+	}
+}
+
+; Schedules the orphan sweep OFF the synchronous dispatch path. A SetTimer callback
+; runs only after the caller's (Critical) dispatch returns, so a slow filesystem can
+; never freeze the keyboard mid-prediction. Throttled because orphans (from crashed
+; PRIOR instances) are never urgent — the live instance reaps its own files inline.
+_LLM_Ollama_ScheduleOrphanSweep() {
+	global _LLM_Ollama_LastSweepTick, _LLM_OLLAMA_ORPHAN_SWEEP_MS
+	now := A_TickCount
+	; Wrap-safe delta: A_TickCount overflows at ~49.7 days.
+	if (_LLM_Ollama_LastSweepTick != 0
+			and ((now - _LLM_Ollama_LastSweepTick + 0x100000000) & 0xFFFFFFFF) < _LLM_OLLAMA_ORPHAN_SWEEP_MS)
+		return
+	_LLM_Ollama_LastSweepTick := now
+	; -1 = fire once, as soon as the message pump is free (outside any Critical).
+	SetTimer(_LLM_Ollama_StreamCleanupOrphans, -1)
 }
 
 _LLM_Ollama_TryDeleteIfOld(path, file_time, now) {
