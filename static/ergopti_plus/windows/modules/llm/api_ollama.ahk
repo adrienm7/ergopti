@@ -258,7 +258,29 @@ LLM_OllamaIsRunning_Async(on_result) {
 }
 
 /**
+ * Extracts the model tag names from an Ollama ``GET /api/tags`` JSON body. Shared
+ * by the blocking ``LLM_OllamaListModels`` and the non-blocking
+ * ``LLM_OllamaListModels_Async`` so the two cannot drift in how they read the
+ * daemon's reply (single source of truth for the parse).
+ * @param {string} raw - Raw JSON response text from /api/tags.
+ * @returns {Array} Array of tag-name strings (empty when none / on no match).
+ */
+_LLM_Ollama_ParseTagNames(raw) {
+	models := []
+	pos := 1
+	while (RegExMatch(raw, '"name"\s*:\s*"([^"]+)"', &m, pos)) {
+		models.Push(m[1])
+		pos := m.Pos + m.Len
+	}
+	return models
+}
+
+/**
  * Returns the list of locally available model tags from Ollama (blocking).
+ * Kept ONLY for off-the-hot-path callers that can tolerate a synchronous round
+ * trip (the model browser window, the deps-ready one-shot cache warm). The tray
+ * menu build MUST NOT call this — use ``LLM_OllamaListModels_Async`` instead, or it
+ * freezes the keyboard thread for up to ~20 s on a cold daemon.
  * @returns {Array} Array of model name strings, or empty array on error.
  */
 LLM_OllamaListModels() {
@@ -271,15 +293,40 @@ LLM_OllamaListModels() {
 		if (http.Status != 200)
 			return models
 
-		raw := http.ResponseText
-		pos := 1
-		while (RegExMatch(raw, '"name"\s*:\s*"([^"]+)"', &m, pos)) {
-			models.Push(m[1])
-			pos := m.Pos + m.Len
-		}
+		models := _LLM_Ollama_ParseTagNames(http.ResponseText)
 	} catch {
 	}
 	return models
+}
+
+/**
+ * Non-blocking variant of ``LLM_OllamaListModels`` — fetches the locally-installed
+ * model tags from ``GET /api/tags`` through WinHTTP's async mode + a polling tick
+ * (mirrors ``LLM_OllamaIsRunning_Async``), so the keyboard/menu thread is NEVER
+ * frozen on a cold or slow daemon. The blocking version, called per catalogue row
+ * at every tray rebuild past the installed-cache TTL, stalled the menu (and dropped
+ * keystrokes) for up to ~20 s — the UI must read only the in-memory cache and let
+ * THIS function refresh it in the background (AUDIT_AHK_2026-06-19 / TODO.md).
+ * @param {function} on_result - Callback receiving an Array of tag names ([] on failure).
+ */
+LLM_OllamaListModels_Async(on_result) {
+	try {
+		http := ComObject("WinHttp.WinHttpRequest.5.1")
+		http.Open("GET", LLM_OLLAMA_BASE_URL "/api/tags", true)
+		; Same 1 s per-phase budget as the health probe — a local daemon answers in
+		; well under a second; if it doesn't, the menu must not wait on it.
+		http.SetTimeouts(1000, 1000, 1000, 1000)
+		http.Send()
+		; 500 ms poll cadence (not the 50 ms prediction cadence): this fires from a
+		; menu rebuild, not a per-keystroke path, so reactivity is irrelevant and the
+		; looser loop spares the message pump.
+		_LLM_Ollama_PollGeneric(http,
+			(status, body) => on_result(status == 200 ? _LLM_Ollama_ParseTagNames(body) : []),
+			() => on_result([]),
+			0, 0, 500)
+	} catch {
+		try on_result([])
+	}
 }
 
 /**

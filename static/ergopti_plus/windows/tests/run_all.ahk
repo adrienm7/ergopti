@@ -237,6 +237,9 @@ try FileAppend("# [marker] starting direct include of LLM production modules`r`n
 #Include ../modules/llm/parser.ahk
 #Include test_llm_parser.ahk
 #Include meta/test_llm_batch_dedup_stats.ahk
+; Non-blocking installed-tags cache contract + behaviour (menu-build-sync-api-tags-freeze).
+; Behavioural cases call the real models.ahk cache funcs included just above.
+#Include meta/test_llm_installed_tags_async.ahk
 try FileAppend("# [marker] LLM production modules + tests included`r`n", A_Temp . "\ergopti_test_results.txt", "UTF-8")
 try FileAppend("# [marker] LLM production modules + tests included`r`n", "*")
 

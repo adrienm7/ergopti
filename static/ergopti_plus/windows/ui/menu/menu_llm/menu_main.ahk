@@ -241,11 +241,15 @@ _LLM_Menu_EmitRow(id, disabled, llm_is_operational) {
 	case "backend":
 		_LLM_Menu_AddRow(StrReplace(t("menu.llm.model_backend"), "%s", _LLM_Menu["backend"]), LLM_Menu_BuildBackendMenu(), disabled)
 	case "model":
-		; Build the submenu, fire the async health probe, then prefix the label with
-		; the cached backend-health dot (🟢 reachable / 🔴 down / "" when off) —
-		; mirrors HS's build_model_item health_dot block.
+		; Build the submenu, fire the async probes (backend health + installed-tags
+		; list), then prefix the label with the cached backend-health dot (🟢
+		; reachable / 🔴 down / "" when off) — mirrors HS's build_model_item
+		; health_dot block. BOTH probes are non-blocking and paint on the next pass:
+		; the submenu reads only the in-memory caches, never a synchronous /api/tags
+		; or reachability round-trip, so opening the tray can never freeze the thread.
 		model_menu := LLM_Menu_BuildModelMenu()
 		_LLM_Menu_FireHealthProbe()
+		_LLM_Menu_FireInstalledTagsProbe()
 		last_status := _LLM_Menu.Has("last_health_status") ? _LLM_Menu["last_health_status"] : ""
 		health_dot := llm_is_operational
 			? ((last_status == "ok") ? "🟢 " : (last_status == "ko") ? "🔴 " : "")
