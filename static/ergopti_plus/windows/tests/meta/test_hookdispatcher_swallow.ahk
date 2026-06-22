@@ -21,7 +21,9 @@ _THS_Check() {
 ; stuck after any subscriber exception, requiring a script restart.
 _THS_CheckModifierRelease() {
 	Src := _DriverDirConcat("lib")
-	Assert(InStr(Src, "ErgoptiGlobalErrorHandler(e") > 0,
+	; Case-sensitive: assert the CALL ``ErgoptiGlobalErrorHandler(e, ...)`` exists,
+	; not merely the definition ``(Exc, Mode)`` now living in lib/error_net.ahk.
+	Assert(InStr(Src, "ErgoptiGlobalErrorHandler(e", true) > 0,
 		"HookDispatcher catch must call ErgoptiGlobalErrorHandler(e, ...) to release stuck modifiers")
 }
 
@@ -33,8 +35,12 @@ _THS_EscalationIsThrottled() {
 	; the throttle block within the catch.
 	; Simple check: the token after the throttle block's _err_cache[sig] := now assignment
 	; must contain ErgoptiGlobalErrorHandler before the next unindented block closes.
+	; Case-sensitive on the call signature so we match HookDispatcher's CALL
+	; ``ErgoptiGlobalErrorHandler(e, ...)`` (lowercase e) and NOT the function
+	; DEFINITION ``ErgoptiGlobalErrorHandler(Exc, Mode)`` in lib/error_net.ahk,
+	; which would otherwise sort earlier in the lib/ concat and break the ordering.
 	CacheAssignIdx := InStr(Src, "_err_cache[sig] := now")
-	EscalateIdx    := InStr(Src, "ErgoptiGlobalErrorHandler(e")
+	EscalateIdx    := InStr(Src, "ErgoptiGlobalErrorHandler(e", true)
 	; Also check that ErgoptiGlobalErrorHandler appears WITHIN 300 chars of the cache assignment
 	; (inside the if block, not floating after it).
 	Assert(EscalateIdx > CacheAssignIdx, "ErgoptiGlobalErrorHandler must appear after throttle cache assignment")
