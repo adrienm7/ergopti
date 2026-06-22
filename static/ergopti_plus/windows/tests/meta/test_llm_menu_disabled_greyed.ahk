@@ -44,19 +44,39 @@ _LMDG_BuildGuardsDepsProbe() {
 }
 Test("menu_main: LLM_Menu_Build guards the deps probe so the toggle always renders (llm-menu-disabled-greyed)", _LMDG_BuildGuardsDepsProbe)
 
-; Guard 2 — the full menu is rendered with greyed rows when off, and the enable
-; toggle is added unconditionally so the feature can always be switched back on.
+; Guard 2 — the full menu is rendered with the SETTINGS rows greyed when off, the
+; enable toggle added unconditionally, and the backend + model rows left ENABLED so
+; the user can configure them before turning the feature on (macOS parity below).
 _LMDG_BuildGreysRowsWhenOff() {
 	Seg := _DriverFuncBody("LLM_Menu_Build")
 	Assert(Seg != "", "LLM_Menu_Build() declaration must exist in menu_main.ahk")
 	Assert(InStr(Seg, '_disabled := !_LLM_Menu["enabled"]') > 0,
 		"LLM_Menu_Build must compute _disabled from the enabled flag to grey settings rows when off")
 	Assert(InStr(Seg, ", _disabled)") > 0,
-		"LLM_Menu_Build must add settings rows via _LLM_Menu_AddRow(..., _disabled) so they grey out when the feature is off")
+		"LLM_Menu_Build must add the SETTINGS rows via _LLM_Menu_AddRow(..., _disabled) so they grey out when the feature is off")
 	Assert(InStr(Seg, "AddCategoryToggleItem(_LLM_Menu_Handle,") > 0,
 		"LLM_Menu_Build must always add the enable toggle (AddCategoryToggleItem)")
 }
-Test("menu_main: LLM_Menu_Build renders a full greyed menu when the feature is off (llm-menu-disabled-greyed)", _LMDG_BuildGreysRowsWhenOff)
+Test("menu_main: LLM_Menu_Build greys the settings rows when the feature is off (llm-menu-disabled-greyed)", _LMDG_BuildGreysRowsWhenOff)
+
+; Guard 2b — macOS parity: the BACKEND and MODEL rows must NOT be greyed by the
+; off-state (the macOS menu uses `disabled = paused or nil`, NOT is_disabled, for
+; both — ui/menu/menu_llm/init.lua). Picking a backend/model while the feature is
+; off must stay possible so it is configured before the user enables predictions.
+; The original greying commit over-greyed these two rows; this guards the fix.
+_LMDG_BackendAndModelStayEnabledWhenOff() {
+	Seg := _DriverFuncBody("LLM_Menu_Build")
+	Assert(Seg != "", "LLM_Menu_Build() declaration must exist in menu_main.ahk")
+	Assert(InStr(Seg, "backend_menu, false)") > 0,
+		"LLM_Menu_Build must add the backend row with disabled=false — the backend picker stays usable while the feature is off (macOS parity)")
+	Assert(InStr(Seg, "model_menu, false)") > 0,
+		"LLM_Menu_Build must add the model row with disabled=false — the model picker stays usable while the feature is off (macOS parity)")
+	Assert(InStr(Seg, "backend_menu, _disabled)") == 0,
+		"LLM_Menu_Build must NOT grey the backend row with _disabled — that over-greyed it when off, diverging from macOS")
+	Assert(InStr(Seg, "model_menu, _disabled)") == 0,
+		"LLM_Menu_Build must NOT grey the model row with _disabled — that over-greyed it when off, diverging from macOS")
+}
+Test("menu_main: backend + model rows stay enabled when the feature is off (llm-menu-disabled-greyed)", _LMDG_BackendAndModelStayEnabledWhenOff)
 
 ; Guard 3 — the row helper greys a row when its disabled flag is set.
 _LMDG_AddRowHelperDisables() {
