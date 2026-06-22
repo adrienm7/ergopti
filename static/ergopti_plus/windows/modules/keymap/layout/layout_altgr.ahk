@@ -1,4 +1,4 @@
-﻿; lib/layout/layout_altgr.ahk
+﻿; modules/keymap/layout/layout_altgr.ahk
 
 ; ==============================================================================
 ; MODULE: AltGr Layer Tables
@@ -15,7 +15,7 @@
 ; 2. The three logical sub-layers are kept as separate tables so the original
 ;    registration order is preserved bit-for-bit (ErgoptiPlus overrides →
 ;    ErgoptiAltGr Number row → ErgoptiAltGr base rows, then the two rolls
-;    LAST in modules/layout.ahk so the roll variant wins its shared chord —
+;    LAST in modules/keymap/layout.ahk so the roll variant wins its shared chord —
 ;    altgr-rolls-dead-precedence). AHK’s most-recently-registered-variant-wins
 ;    rule depends on this ordering, so flattening the tables would silently
 ;    change which binding fires when multiple Layout sub-features are enabled.
@@ -28,7 +28,7 @@
 ; DEPENDENCIES:
 ; This module references ``SendNewResult``, ``WrapTextIfSelected``, ``DeadKey``,
 ; the ``DeadkeyMappingX`` Maps and ``SpaceAroundSymbols``, all defined in
-; modules/layout.ahk. AHK v2 resolves these lazily so the ``#Include`` order
+; modules/keymap/layout.ahk. AHK v2 resolves these lazily so the ``#Include`` order
 ; only needs to guarantee that everything is part of the same compilation unit
 ; before ``RegisterAltGrLayer`` is called.
 ; ==============================================================================

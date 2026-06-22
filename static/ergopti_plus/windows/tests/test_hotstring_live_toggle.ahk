@@ -62,7 +62,7 @@ TestHSLT_BlocklistPinsTheReloadOnlySections() {
 	AssertTrue(_HS_IsReloadOnlyGroup("autocorrection.multiple_punctuation_marks"),
 		"the multiple-punctuation rule is native-engine and must reload")
 	; magic_key.replace lives under "hotstrings.*" but is a LAYOUT remap (J -> star)
-	; applied by modules/layout.ahk, so RegisterAllHotstrings never touches it.
+	; applied by modules/keymap/layout.ahk, so RegisterAllHotstrings never touches it.
 	AssertTrue(_HS_IsReloadOnlyGroup("magickey.replace"),
 		"the magic-key remap is a layout feature and must reload")
 }

@@ -320,7 +320,7 @@ KLPF_BuildApps(db) {
 ; Build the « scancode → printable label » map for the heatmap. When
 ; the Ergopti base-layer emulation is enabled (Features["layout"]
 ; ["ergopti_base"]), we read the canonical mapping from
-; lib/layout_ergopti.ahk — the SAME data layout.ahk uses to install
+; modules/keymap/layout/layout_ergopti.ahk — the SAME data layout.ahk uses to install
 ; the actual remaps. Otherwise we resolve each scancode through the
 ; active Windows keyboard layout using MapVirtualKeyEx(MAPVK_VK_TO_CHAR).
 ; The latter sidesteps the dead-key state ToUnicodeEx leaves behind —

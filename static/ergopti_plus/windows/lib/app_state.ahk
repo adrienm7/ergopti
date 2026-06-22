@@ -24,7 +24,7 @@
 ; 2. The repetition counter is mutated only through SetNumberOfRepetitions /
 ;    ResetNumberOfRepetitions in lib/nav_layer_helpers.ahk.
 ; 3. last_sent_key_time tracking (write + size-bounded pruning) lives only in
-;    UpdateLastSentCharacter / _PruneLastSentKeyTime in modules/layout.ahk.
+;    UpdateLastSentCharacter / _PruneLastSentKeyTime in modules/keymap/layout.ahk.
 ;
 ; RULE: do not reintroduce a parallel state container here. If a future refactor
 ; genuinely consolidates these globals, move the declarations into a single

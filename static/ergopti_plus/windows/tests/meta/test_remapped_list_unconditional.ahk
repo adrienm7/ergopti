@@ -3,7 +3,7 @@
 ; ==============================================================================
 ; MODULE: RemappedList Unconditional Assignment Meta-Test
 ; DESCRIPTION:
-; Structural regression for the RemappedList population fix in modules/layout.ahk.
+; Structural regression for the RemappedList population fix in modules/keymap/layout.ahk.
 ;
 ; Before the fix, RemapKey() only inserted the Character → ScanCode entry into
 ; RemappedList when AlternativeCharacter was empty (i.e. when no alternative

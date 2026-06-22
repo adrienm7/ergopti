@@ -1,10 +1,10 @@
-﻿; lib/layout/layout_ergopti.ahk
+﻿; modules/keymap/layout/layout_ergopti.ahk
 
 ; ==============================================================================
 ; MODULE: Ergopti Base-Layer Mapping (single source of truth)
 ; DESCRIPTION:
 ; Holds the canonical scancode → character mapping for the Ergopti base
-; layer. modules/layout.ahk iterates this table to install the actual
+; layer. modules/keymap/layout.ahk iterates this table to install the actual
 ; AutoHotkey remaps; modules/keylogger_prefetch.ahk reads it to label
 ; the heatmap. Editing the layout in one place propagates to both.
 ;

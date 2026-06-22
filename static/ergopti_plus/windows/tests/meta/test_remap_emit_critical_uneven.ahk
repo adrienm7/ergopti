@@ -90,7 +90,7 @@ Test("layout: number-row hotkeys delegate to the serialised emit helpers (remap-
 
 
 _RECU_AssertOuterSymbolsRouteViaShiftSend() {
-	Src := _RECU_ReadSource("modules/layout.ahk")
+	Src := _RECU_ReadSource("modules/keymap/layout.ahk")
 	; SC029 ($), SC00C (%), SC00D (=) sit outside the SC002-SC00B digit run but
 	; are still part of the same number-row block. They must delegate to
 	; _DigitShiftSend (which wraps Critical("On")) instead of calling
@@ -99,7 +99,7 @@ _RECU_AssertOuterSymbolsRouteViaShiftSend() {
 	for SC in ["SC029", "SC00C", "SC00D"] {
 		; Find the hotkey line for this scancode.
 		Idx := InStr(Src, SC . "::")
-		Assert(Idx > 0, SC . ":: hotkey must exist in modules/layout.ahk")
+		Assert(Idx > 0, SC . ":: hotkey must exist in modules/keymap/layout.ahk")
 		; Extract the rest of that line and assert it routes via _DigitShiftSend.
 		LineEnd := InStr(Src, "`n", , Idx)
 		HotkeyLine := LineEnd ? SubStr(Src, Idx, LineEnd - Idx) : SubStr(Src, Idx, 120)

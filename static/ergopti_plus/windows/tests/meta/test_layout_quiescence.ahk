@@ -6,14 +6,14 @@
 ; Regression test for the layout-poll-blind-reload finding. The 1 s layout-poll
 ; timer used to call Reload() the instant the foreground HKL differed, which
 ; dropped in-flight typing on any transient HKL flicker. The decision now lives
-; in the pure helper _ShouldReloadForHkl (lib/layout_poll_helper.ahk), which only
+; in the pure helper _ShouldReloadForHkl (modules/keymap/layout_poll_helper.ahk), which only
 ; returns true when the new layout has been stable across two consecutive polls,
 ; the user is physically idle, no expansion is in flight, and the driver is
 ; neither suspended nor on a blacklisted app.
 ;
 ; This test drives that helper directly (no OS, no Reload) and asserts every gate
 ; so a regression to the old blind-reload behaviour fails loudly. _ShouldReloadForHkl
-; is supplied by run_all.ahk including lib/layout_poll_helper.ahk; Assert/AssertEqual
+; is supplied by run_all.ahk including modules/keymap/layout_poll_helper.ahk; Assert/AssertEqual
 ; come from the already-included test_framework.ahk.
 ; ==============================================================================
 

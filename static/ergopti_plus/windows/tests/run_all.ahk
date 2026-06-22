@@ -107,11 +107,11 @@ OnError(_FatalErrorHandler)
 #Include ../lib/manifest_reader.ahk
 #Include ../lib/hotstrings/hotstrings_config.ahk
 #Include ../ui/personal_toml_editor.ahk
-#Include ../lib/layout/layout_altgr.ahk
-#Include ../lib/layout/layout_shift_caps.ahk
+#Include ../modules/keymap/layout/layout_altgr.ahk
+#Include ../modules/keymap/layout/layout_shift_caps.ahk
 ; Pure layout-poll quiescence decision (no OS deps, no top-level hotkeys) —
 ; exercised by meta/test_layout_quiescence.ahk and consumed by ErgoptiPlus.ahk.
-#Include ../lib/layout_poll_helper.ahk
+#Include ../modules/keymap/layout_poll_helper.ahk
 #Include ../ui/tooltip/init.ahk
 #Include ../lib/updater.ahk
 ; json.ahk must precede i18n.ahk — _I18nLoadFile now delegates to JsonParse.

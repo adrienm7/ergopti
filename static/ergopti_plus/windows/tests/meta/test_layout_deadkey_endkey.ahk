@@ -4,7 +4,7 @@
 ; MODULE: DeadKey EndKey Re-Send Guard Meta Test
 ; DESCRIPTION:
 ; Static source guard for the "deadkey-endkey-consumed" audit finding in
-; modules/layout.ahk.
+; modules/keymap/layout.ahk.
 ;
 ; ROOT CAUSE ENCODED:
 ; AHK InputHook with EndKeys (Enter, BackSpace, Delete) but without the "V"
@@ -46,10 +46,10 @@ _LDEK_StripComments(Src) {
 }
 
 _LDEK_DeadKeyResendEndKey() {
-	Raw := _LDEK_ReadSource("modules/layout.ahk")
+	Raw := _LDEK_ReadSource("modules/keymap/layout.ahk")
 	Src := _LDEK_StripComments(Raw)
 	Body := _DriverFuncBody("DeadKey")
-	Assert(Body != "", "DeadKey(Mapping) must exist in modules/layout.ahk")
+	Assert(Body != "", "DeadKey(Mapping) must exist in modules/keymap/layout.ahk")
 
 	; Must check EndReason so the re-send only fires when an EndKey terminated the hook
 	Assert(InStr(Body, "ih.EndReason") > 0 and InStr(Body, Chr(34) . "EndKey" . Chr(34)) > 0,

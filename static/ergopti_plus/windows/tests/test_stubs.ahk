@@ -178,7 +178,7 @@ global Features := Map(
             "tab",            false,
         ),
     ),
-    ; Phase 5 — modules/hotstrings.ahk + modules/layout.ahk read these gates
+    ; Phase 5 — modules/hotstrings.ahk + modules/keymap/layout.ahk read these gates
     ; for hotstring registration and AltGr rolls. Each entry is a Map with
     ; at least an "enabled" key; the production loader pulls extra props
     ; (time_activation_seconds, pattern_max_length) from the manifest, but
@@ -370,7 +370,7 @@ global _DriverDir := _StaticDir . "\ergopti_plus\windows"
 ; writes through TOML_BatchWrite / TOML_Write.
 global _TOML_STRICT_CANON_IN_PROGRESS := false
 
-; Hotstring engine globals normally maintained by modules/layout.ahk.
+; Hotstring engine globals normally maintained by modules/keymap/layout.ahk.
 ; The LastSentCharacters ring buffer is defined in lib/hotstring_engine.ahk;
 ; tests seed it via _LSCResetFrom([...]) instead of touching it directly.
 global LastSentCharacterKeyTime := Map()

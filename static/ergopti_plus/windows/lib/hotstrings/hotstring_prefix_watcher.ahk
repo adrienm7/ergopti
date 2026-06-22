@@ -111,7 +111,7 @@ global _PREFIX_WATCHER_CATEGORIES := [
 ; The PrefixWatcher now delegates to WrapSymbols_GetActivePairs() (wrap_symbols_config.ahk)
 ; so the user can enable/disable individual symbols from the menu without a Reload.
 ; This global is kept as a compile-time constant for the legacy WrapTextIfSelected()
-; call in modules/layout.ahk (Win+O gesture) which does not use the active-pairs path.
+; call in modules/keymap/layout.ahk (Win+O gesture) which does not use the active-pairs path.
 global _UIA_WRAP_PAIRS := Map(
     "(", Map("left", "(", "right", ")"),
     ")", Map("left", "(", "right", ")"),

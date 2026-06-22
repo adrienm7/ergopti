@@ -17,7 +17,7 @@ it intentionally skips, and the rationale for each deferral.
 | `lib/config.ahk`                          | `test_config.ahk`                   | 31                            |
 | `lib/toml_loader.ahk`                     | `test_toml_loader.ahk`              | 61                            |
 | `lib/tap_hold_loader.ahk`                 | `test_tap_hold_loader.ahk`          | 45                            |
-| `lib/layout_tables.ahk`                   | `test_layout_tables.ahk`            | 59                            |
+| `modules/keymap/layout/`                   | `test_layout_tables.ahk`            | 59                            |
 | `lib/personal_toml_editor.ahk`            | `test_personal_toml_editor.ahk`     | 59                            |
 | `lib/i18n.ahk`                            | `test_i18n.ahk`                     | 21                            |
 | Test framework itself                     | `test_framework.ahk`                | 5                             |

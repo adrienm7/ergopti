@@ -63,7 +63,7 @@ global _DriverDir := _StaticDir . "\ergopti_plus\windows"
 ; (a Shift/AltGr shortcut that wraps the selection with the typed symbol). If
 ; that feature is disabled in your INI and you want to trim boot time / memory,
 ; you can safely delete ``vendor\UIA.ahk``: WrapTextIfSelected falls back to
-; a plain SendNewResult via ``isSet(UIA)`` at the call site (see modules/layout.ahk).
+; a plain SendNewResult via ``isSet(UIA)`` at the call site (see modules/keymap/layout.ahk).
 ; AHK v2 resolves #Include at parse time, so there is no true runtime lazy-load.
 
 ; ===== Global error net =====
@@ -132,7 +132,7 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 ; Shared timing registry reader (TimingsLoadShared / TimingsGet). Needs
 ; ParseTomlFile (above); consumed by the reassign-at-boot loaders below.
 #Include lib/timings/timings_config.ahk
-#Include lib/layout/layout_ergopti.ahk
+#Include modules/keymap/layout/layout_ergopti.ahk
 
 ; Active-app cache must come before hotstring_engine.ahk because both
 ; ``HotstringHandler`` and ``MicrosoftApps``.
@@ -191,8 +191,8 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 ; runtime TOML parser on a cache miss. No generated CODE is kept in the repo.
 #Include lib/hotstrings/hotstrings_cache.ahk
 #Include ui/personal_toml_editor.ahk
-#Include lib/layout/layout_altgr.ahk
-#Include lib/layout/layout_shift_caps.ahk
+#Include modules/keymap/layout/layout_altgr.ahk
+#Include modules/keymap/layout/layout_shift_caps.ahk
 #Include lib/app_picker.ahk
 #Include lib/config_shortcuts.ahk
 #Include lib/metrics/metrics_shortcuts.ahk
@@ -827,7 +827,7 @@ _RegisterScriptAltGrHotkeys()
 ; them in forward order so first-declared (prominent) sections win HSE's
 ; first-registered-wins collision tiebreak, matching the old effective order.
 #InputLevel 2
-#Include modules/layout.ahk
+#Include modules/keymap/layout.ahk
 #Include modules/shortcuts.ahk
 #Include modules/tap_holds.ahk
 #Include modules/hotstrings.ahk
@@ -905,7 +905,7 @@ global _PENDING_KEYBOARD_HKL := 0
 ; test suite can exercise it without #including this whole entry point (which
 ; registers every hotkey at load). Single source of truth — defined once there,
 ; consumed here and by tests/meta/test_layout_quiescence.ahk.
-#Include lib/layout_poll_helper.ahk
+#Include modules/keymap/layout_poll_helper.ahk
 
 CheckKeyboardLayoutChange() {
     global _LAST_KEYBOARD_HKL, _PENDING_KEYBOARD_HKL, HSE_Suppressed, _PrefixWatcherSuppressed

@@ -22,7 +22,7 @@
 ;      conservative default: their context-conditional dispatch is new on the HSE
 ;      path, so toggling them takes the proven Reload route until verified live.
 ;   2. magic_key.replace — the magic-key remap (J → ★). It lives under
-;      "hotstrings.*" but is a LAYOUT feature (modules/layout.ahk RemapKey at
+;      "hotstrings.*" but is a LAYOUT feature (modules/keymap/layout.ahk RemapKey at
 ;      boot), so a hotstring rebuild does nothing for it.
 ;
 ; FEATURES & RATIONALE:

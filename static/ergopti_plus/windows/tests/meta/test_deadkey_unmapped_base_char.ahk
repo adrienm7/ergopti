@@ -4,7 +4,7 @@
 ; MODULE: DeadKey Unmapped Key Base Char Guard Meta Test
 ; DESCRIPTION:
 ; Static source guard for the "deadkey-unmapped-absorbs-base-char" bug in
-; modules/layout.ahk.
+; modules/keymap/layout.ahk.
 ;
 ; ROOT CAUSE ENCODED:
 ; When a dead-key sequence receives a follow key that is NOT in the mapping
@@ -44,10 +44,10 @@ _DKUBC_StripComments(Src) {
 ; ============================================================================
 
 _DKUBC_UnmappedKeyEmitsBaseChar() {
-	Raw := _DKUBC_ReadSource("modules/layout.ahk")
+	Raw := _DKUBC_ReadSource("modules/keymap/layout.ahk")
 	Src := _DKUBC_StripComments(Raw)
 	Body := _DriverFuncBody("DeadKey")
-	Assert(Body != "", "DeadKey(Mapping) must exist in modules/layout.ahk")
+	Assert(Body != "", "DeadKey(Mapping) must exist in modules/keymap/layout.ahk")
 
 	; Negative: bare else that only sends PressedKey (drops the dead-key base char)
 	Assert(!RegExMatch(Body, "i)\} else \{\s*\n\s*SendNewResult\(PressedKey\)"),

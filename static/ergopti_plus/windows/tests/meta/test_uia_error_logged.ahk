@@ -42,7 +42,7 @@ _UEL_ReadSource(RelPath) {
 ; ==================================================
 
 _UEL_AssertPollTickLogsFailure() {
-	Src := _UEL_ReadSource("modules/layout.ahk")
+	Src := _UEL_ReadSource("modules/keymap/layout.ahk")
 	Body := _DriverFuncBody("_UIA_SelectionPollTick")
 	Assert(Body != "", "_UIA_SelectionPollTick() declaration must exist in layout.ahk")
 	Assert(InStr(Body, "catch as e") > 0,

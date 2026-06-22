@@ -1,4 +1,4 @@
-﻿; lib/layout_poll_helper.ahk
+﻿; modules/keymap/layout_poll_helper.ahk
 
 ; ==============================================================================
 ; MODULE: Layout Poll Helper
