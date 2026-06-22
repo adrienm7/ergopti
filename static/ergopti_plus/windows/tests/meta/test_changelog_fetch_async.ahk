@@ -46,9 +46,10 @@ _CLFA_ReadSource(RelPath) {
 ; ==================================================
 
 _CLFA_FetchIsAsync() {
-	Src := _CLFA_ReadSource("ui/changelog_window.ahk")
+	; Move-resilient: concat the whole window folder, not a pinned single-file path.
+	Src := _DriverDirConcat("ui/changelog")
 	Body := _DriverFuncBody("_CLW_DoFetch")
-	Assert(Body != "", "_CLW_DoFetch(Channel) must exist in ui/changelog_window.ahk")
+	Assert(Body != "", "_CLW_DoFetch(Channel) must exist in ui/changelog/init.ahk")
 
 	Q := Chr(34)
 	SyncOpen := "Req.Open(" . Q . "GET" . Q . ", Url, false)"
