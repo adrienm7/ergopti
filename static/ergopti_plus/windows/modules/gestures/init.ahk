@@ -1,4 +1,4 @@
-﻿; modules/gestures.ahk
+﻿; modules/gestures/init.ahk
 ; Requires: TextSender, WindowManager, MouseControl
 
 ; ==============================================================================

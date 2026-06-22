@@ -1,4 +1,4 @@
-﻿; modules/gestures_click.ahk
+﻿; modules/gestures/click.ahk
 
 ; ==============================================================================
 ; MODULE: Gesture Synthetic Click-Hold (AHK)

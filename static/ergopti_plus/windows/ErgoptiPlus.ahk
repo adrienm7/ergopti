@@ -820,11 +820,11 @@ global _HSCategorySnapshot := Map()
 try _HSSnapshotAllCategories()
 ApplyMasterGatesToFeatures()
 
-#Include modules/gestures.ahk
-#Include modules/gestures_click.ahk
-#Include modules/gestures_screenshots.ahk
-#Include modules/gestures_window_cycle.ahk
-#Include modules/gestures_config.ahk
+#Include modules/gestures/init.ahk
+#Include modules/gestures/click.ahk
+#Include modules/gestures/screenshots.ahk
+#Include modules/gestures/window_cycle.ahk
+#Include modules/gestures/config.ahk
 ReadScriptShortcutsConfig()
 ReadKeyboardShortcutsConfig()
 

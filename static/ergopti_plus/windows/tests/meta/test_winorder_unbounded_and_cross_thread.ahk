@@ -32,11 +32,6 @@
 
 ; Reads a windows/-relative source file. A_ScriptDir is the runner dir (tests/);
 ; its parent is the windows/ driver root.
-_WUCT_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
-}
 
 
 
@@ -48,14 +43,14 @@ _WUCT_ReadSource(RelPath) {
 ; ==================================================
 
 _WUCT_CapConstantExists() {
-	Src := _WUCT_ReadSource("modules/gestures.ahk")
+	Src := _DriverDirConcat("modules/gestures")
 	Assert(InStr(Src, "GESTURE_WIN_ORDER_MAX") > 0,
 		"gestures.ahk must define a GESTURE_WIN_ORDER_MAX cap so _GestureWinOrder cannot grow unbounded on long-running sessions")
 }
 Test("gestures: GESTURE_WIN_ORDER_MAX cap constant exists (winorder-unbounded-and-cross-thread)", _WUCT_CapConstantExists)
 
 _WUCT_OnForegroundCapsLength() {
-	Src := _WUCT_ReadSource("modules/gestures.ahk")
+	Src := _DriverDirConcat("modules/gestures")
 	Seg := _DriverFuncBody("_GestureOnForeground")
 	Assert(Seg != "", "_GestureOnForeground declaration must exist in gestures.ahk")
 	Assert(InStr(Seg, "GESTURE_WIN_ORDER_MAX") > 0,
@@ -64,7 +59,7 @@ _WUCT_OnForegroundCapsLength() {
 Test("gestures: _GestureOnForeground caps _GestureWinOrder length (winorder-unbounded-and-cross-thread)", _WUCT_OnForegroundCapsLength)
 
 _WUCT_OnForegroundHasSuspendGuard() {
-	Src := _WUCT_ReadSource("modules/gestures.ahk")
+	Src := _DriverDirConcat("modules/gestures")
 	Seg := _DriverFuncBody("_GestureOnForeground")
 	Assert(Seg != "", "_GestureOnForeground declaration must exist in gestures.ahk")
 	Assert(InStr(Seg, "A_IsSuspended") > 0,

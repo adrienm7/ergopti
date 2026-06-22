@@ -1,4 +1,4 @@
-﻿; modules/gestures_screenshots.ahk
+﻿; modules/gestures/screenshots.ahk
 
 ; ==============================================================================
 ; MODULE: Gesture Screenshot Capture (AHK)

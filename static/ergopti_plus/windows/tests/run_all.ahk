@@ -265,11 +265,11 @@ try FileAppend("# [marker] tray_llm persist + tests included`r`n", "*")
 ; RunTests() calls ExitApp immediately after completion.
 try FileAppend("# [marker] about to include gestures.ahk (top-level t() for SLOT_LABELS)`r`n", A_Temp . "\ergopti_test_results.txt", "UTF-8")
 try FileAppend("# [marker] about to include gestures.ahk (top-level t() for SLOT_LABELS)`r`n", "*")
-#Include ../modules/gestures.ahk
-#Include ../modules/gestures_click.ahk
-#Include ../modules/gestures_screenshots.ahk
-#Include ../modules/gestures_window_cycle.ahk
-#Include ../modules/gestures_config.ahk
+#Include ../modules/gestures/init.ahk
+#Include ../modules/gestures/click.ahk
+#Include ../modules/gestures/screenshots.ahk
+#Include ../modules/gestures/window_cycle.ahk
+#Include ../modules/gestures/config.ahk
 #Include test_gestures.ahk
 try FileAppend("# [marker] gestures + test included`r`n", A_Temp . "\ergopti_test_results.txt", "UTF-8")
 try FileAppend("# [marker] gestures + test included`r`n", "*")
