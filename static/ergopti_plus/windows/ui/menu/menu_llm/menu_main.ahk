@@ -47,6 +47,7 @@ LLM_Menu_Build() {
 	try LoggerInfo("LLM", "LLM_Menu_Build: building IA submenu (enabled={1}, inTray={2}).", _LLM_Menu["enabled"] ? "true" : "false", _LLM_Menu_InTray ? "true" : "false")
 	; Clear all existing items so we can repopulate in place.
 	try _LLM_Menu_Handle.Delete()
+	_tDelete := A_TickCount
 
 	; Prune the dispatch-bypass Maps for THIS menu's now-deleted items. This is a
 	; single-menu rebuild (not a full tray rebuild), so the global dispatch reset
@@ -56,6 +57,7 @@ LLM_Menu_Build() {
 	; _MenuDispatchCallbacks / _MenuDispatchLastFire without bound across the
 	; very frequent LLM_Menu_Build() passes (settings tweaks, model pulls).
 	try MenuDispatcher_PruneMenu(_LLM_Menu_Handle)
+	_tPrune := A_TickCount
 
 	; Enable / Disable toggle. The checked state MUST reflect
 	; ``_LLM_Menu["enabled"]`` alone — that's the user's intent. We keep a
@@ -115,6 +117,10 @@ LLM_Menu_Build() {
 	; (thinking-model info, the num-predictions reset, the inner separator) are
 	; emitted from inside _LLM_Menu_EmitRow at their anchor row.
 	_rows := _LLM_MenuLayout_Rows()
+	; Diagnostic breakdown of the pre-emit span — isolates the Win32 Delete, the
+	; dispatch-map prune (recursive tray walk), and the remaining setup/layout so a
+	; slow build is attributed to a specific step instead of guessed at.
+	try LoggerInfo("LLM", "LLM_Menu_Build: pre-emit timing — delete {1} ms, prune {2} ms, rest {3} ms.", _tDelete - _t0, _tPrune - _tDelete, A_TickCount - _tPrune)
 	try LoggerInfo("LLM", "LLM_Menu_Build: emitting {1} settings row(s) from shared spec…", _rows.Length)
 	for _i, _row in _rows
 		_LLM_Menu_EmitRow(_row["id"], (_row["disabled_when_off"] ? _disabled : false), _llm_is_operational)
