@@ -266,7 +266,7 @@ _LLM_Menu_OnHealthProbeDone(reachable) {
  * run inline per catalogue row at build time and froze the keyboard thread for up
  * to ~20 s on a cold daemon — this moves it off the hot path entirely.
  */
-LLM_Menu_FireInstalledTagsProbe() {
+_LLM_Menu_FireInstalledTagsProbe() {
 	global _LLM_Menu, _LLM_InstalledTagsCacheAt, LLM_INSTALLED_CACHE_TTL_MS
 	; Same Pause invariant as the health probe: SetTimer-driven rebuilds bypass
 	; native Suspend, so a probe firing while paused could repaint the tray.
