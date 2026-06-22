@@ -43,6 +43,7 @@ LLM_Menu_Build() {
 		return
 	_Building := true
 	try {
+	_t0 := A_TickCount
 	try LoggerInfo("LLM", "LLM_Menu_Build: building IA submenu (enabled={1}, inTray={2}).", _LLM_Menu["enabled"] ? "true" : "false", _LLM_Menu_InTray ? "true" : "false")
 	; Clear all existing items so we can repopulate in place.
 	try _LLM_Menu_Handle.Delete()
@@ -102,9 +103,12 @@ LLM_Menu_Build() {
 		RegisterMenuItem(_LLM_Menu_Handle, t("menu.llm.warning_install_ollama"), _LLM_Menu_OnWarningInstallClick)
 	}
 
-	; Backend submenu
+	; Backend submenu — NEVER greyed by the off-state. Mirrors the macOS menu
+	; (ui/menu/menu_llm/init.lua: the backend row uses `disabled = paused or nil`,
+	; NOT is_disabled): the user must be able to pick the backend/model while the
+	; feature is off so it is configured before they enable it.
 	backend_menu := LLM_Menu_BuildBackendMenu()
-	_LLM_Menu_AddRow(StrReplace(t("menu.llm.model_backend"), "%s", _LLM_Menu["backend"]), backend_menu, _disabled)
+	_LLM_Menu_AddRow(StrReplace(t("menu.llm.model_backend"), "%s", _LLM_Menu["backend"]), backend_menu, false)
 
 	; Model submenu — prefix the label with a backend-health dot so the user
 	; can tell at a glance whether the active backend is reachable, mirroring
@@ -122,9 +126,12 @@ LLM_Menu_Build() {
 	health_dot := _llm_is_operational
 		? ((last_status == "ok") ? "🟢 " : (last_status == "ko") ? "🔴 " : "")
 		: ""
+	; Model submenu — NEVER greyed by the off-state either (macOS parity: the model
+	; row uses `disabled = paused or nil`). The curated catalogue is selectable while
+	; the feature is off; the choice is simply recorded until predictions resume.
 	_LLM_Menu_AddRow(
 		health_dot . StrReplace(t("menu.llm.model_label"), "%s", _LLM_Menu["model"]),
-		model_menu, _disabled)
+		model_menu, false)
 
 	; Thinking-model warning row — surfaces when the active model has built-in
 	; reasoning ("-r1" suffix, "thinking" / "reasoning" in the name). The
@@ -188,7 +195,7 @@ LLM_Menu_Build() {
 	} else {
 		try A_TrayMenu.Uncheck(t("menu.llm.title"))
 	}
-	try LoggerInfo("LLM", "LLM_Menu_Build: IA submenu built with {1} item(s).", DllCall("GetMenuItemCount", "ptr", _LLM_Menu_Handle.Handle, "int"))
+	try LoggerInfo("LLM", "LLM_Menu_Build: IA submenu built with {1} item(s) in {2}ms.", DllCall("GetMenuItemCount", "ptr", _LLM_Menu_Handle.Handle, "int"), A_TickCount - _t0)
 	} finally {
 		_Building := false
 	}
