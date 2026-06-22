@@ -36,7 +36,7 @@
 
 _MetaCheckWpmWidgetNativeRender() {
 	SplitPath(A_ScriptDir, , &WindowsDir)   ; A_ScriptDir is tests\ -> WindowsDir is windows\
-	WpmFile := WindowsDir . "\ui\wpm_widget.ahk"
+	WpmFile := WindowsDir . "\ui\wpm\init.ahk"
 
 	Body := ""
 	try Body := FileRead(WpmFile)

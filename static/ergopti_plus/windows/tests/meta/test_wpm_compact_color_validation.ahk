@@ -46,7 +46,7 @@ _WCCV_ReadSource(RelPath) {
 ; ==================================================
 
 _WCCV_ColorIsValidated() {
-	Src := _WCCV_ReadSource("ui/wpm_widget.ahk")
+	Src := _WCCV_ReadSource("ui/wpm/init.ahk")
 	Body := _DriverFuncBody("WPMWidget_CategoryBgColor")
 	Assert(Body != "", "WPMWidget_CategoryBgColor( must exist in ui/wpm_widget.ahk")
 	Assert(InStr(Body, "[0-9A-Fa-f]{6}") > 0,
@@ -54,7 +54,7 @@ _WCCV_ColorIsValidated() {
 }
 
 _WCCV_TickCatchSelfHeals() {
-	Src := _WCCV_ReadSource("ui/wpm_widget.ahk")
+	Src := _WCCV_ReadSource("ui/wpm/init.ahk")
 	Body := _DriverFuncBody("WPMWidget_Tick")
 	Assert(Body != "", "WPMWidget_Tick( must exist in ui/wpm_widget.ahk")
 	Assert(InStr(Body, "WPMWidget_BuildCompact") > 0,

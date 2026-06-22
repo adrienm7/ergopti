@@ -46,7 +46,7 @@ _WpmDbg_ReadSource(RelPath) {
 ; ==================================================
 
 _WpmDbg_PushDebugIsGated() {
-	Src := _WpmDbg_ReadSource("ui/wpm_widget.ahk")
+	Src := _WpmDbg_ReadSource("ui/wpm/init.ahk")
 	Seg := _DriverFuncBody("WPMWidget_Push")
 	Assert(Seg != "", "WPMWidget_Push declaration must exist in wpm_widget.ahk")
 

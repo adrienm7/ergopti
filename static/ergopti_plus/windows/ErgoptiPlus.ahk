@@ -197,7 +197,7 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 #Include lib/config_shortcuts.ahk
 #Include lib/metrics/metrics_shortcuts.ahk
 #Include lib/metrics/metrics_filters.ahk
-#Include ui/wpm_widget.ahk
+#Include ui/wpm/init.ahk
 #Include lib/sqlite3.ahk
 #Include vendor/ComVar.ahk
 #Include vendor/Promise.ahk
@@ -242,7 +242,7 @@ LLM_Defaults_Load()
 #Include modules/llm/ollama_deps_checker.ahk
 #Include ui/tooltip_llm.ahk
 #Include ui/tray_llm/_index.ahk
-#Include ui/llm_model_browser.ahk
+#Include ui/model_browser/init.ahk
 
 ; ======================================================
 ; ======================================================
