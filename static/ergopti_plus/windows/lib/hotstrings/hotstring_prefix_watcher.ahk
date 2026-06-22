@@ -358,6 +358,16 @@ HotstringPrefixWatcherRebuildIndex() {
     NewIndex := Map()
     NewSet := Map()
     _rebuildStart := A_TickCount
+    ; Make sure the precompiled cache is loaded BEFORE we decide per category which
+    ; path to take. HotstringsCacheEnsure is idempotent (a no-op after the first
+    ; call, which normally happens during boot HSE registration), but the boot-tail
+    ; warm-up rebuild is armed by its own SetTimer and could, on an unlucky ordering,
+    ; fire before any LoadHotstringsSection has loaded the cache — in which case
+    ; _PrefixWatcherCategoryIsCached would wrongly fall back to the cold-disk TOML
+    ; scan (the 6422 ms boot-tail rebuild seen in the logs). Ensuring it here makes
+    ; the in-memory path the guaranteed choice for every bundled category.
+    if IsSet(HotstringsCacheEnsure)
+        try HotstringsCacheEnsure()
     ; Build each category from the in-memory precompiled cache when available
     ; (_HS_CACHE_ROWS, populated once at boot for the HSE fast path) instead of
     ; re-reading + regex-parsing its TOML from disk. The disk rescan was the cost

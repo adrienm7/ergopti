@@ -124,3 +124,34 @@ _PrefixIndexCacheEquiv_MatchesTomlPath() {
 }
 Test("prefix watcher: cache-built index is byte-identical to the TOML-built index (prefix-index-cache-rebuild)",
 	_PrefixIndexCacheEquiv_MatchesTomlPath)
+
+
+
+
+
+; ===================================================
+; ===================================================
+; ======= 2/ Rebuild uses the in-memory cache =======
+; ===================================================
+; ===================================================
+
+; Source-level guard so the dispatch can never silently revert to the cold-disk
+; TOML scan that froze the thread at boot. Pairs with the behavioural equivalence
+; test above (which proves the two paths agree); this one proves the rebuild
+; actually TAKES the cache path and ensures the cache is loaded first.
+_PrefixIndexCacheEquiv_RebuildUsesCache() {
+	Body := _DriverFuncBody("HotstringPrefixWatcherRebuildIndex")
+	Assert(Body != "", "hotstring_prefix_watcher.ahk must define HotstringPrefixWatcherRebuildIndex()")
+	; Bundled categories must build from the in-memory cache path, not re-parse TOML.
+	Assert(InStr(Body, "_RegisterCategoryTriggersFromCache(") > 0,
+		"the rebuild must build bundled categories via _RegisterCategoryTriggersFromCache (in-memory), not re-parse TOML")
+	Assert(InStr(Body, "_PrefixWatcherCategoryIsCached(") > 0,
+		"the rebuild must gate the cache path on _PrefixWatcherCategoryIsCached so personal / cache-miss still parse TOML")
+	; And it must ensure the cache is loaded BEFORE dispatching, so the boot-tail
+	; warm-up rebuild (its own SetTimer) can never race ahead of the cache load and
+	; fall back to the cold-disk TOML scan (the 6422 ms boot-tail rebuild in the logs).
+	Assert(InStr(Body, "HotstringsCacheEnsure(") > 0,
+		"the rebuild must call HotstringsCacheEnsure() before dispatching so a warm-up rebuild cannot fall back to the cold-disk TOML path")
+}
+Test("prefix watcher: index rebuild takes the in-memory cache path, not a cold-disk TOML rescan (prefix-index-cache-rebuild)",
+	_PrefixIndexCacheEquiv_RebuildUsesCache)
