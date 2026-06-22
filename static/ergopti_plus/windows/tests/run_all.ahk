@@ -114,12 +114,14 @@ OnError(_FatalErrorHandler)
 #Include ../modules/keymap/layout_poll_helper.ahk
 #Include ../ui/tooltip/init.ahk
 #Include ../lib/updater.ahk
-; json.ahk must precede i18n.ahk — _I18nLoadFile now delegates to JsonParse.
+; json.ahk must precede locale.ahk — _I18nLoadLocaleMap delegates to JsonParse.
 #Include ../lib/registry.ahk
 #Include ../lib/json.ahk
-; i18n is included here because gestures.ahk calls t() at the top level
-; when building GESTURE_SLOT_LABELS; without this the process blocks on
-; an AHK runtime-error MsgBox and the CI job times out.
+; locale.ahk (string loading + t()) is included here because gestures.ahk calls
+; t() at the top level when building GESTURE_SLOT_LABELS; without it the process
+; blocks on an AHK runtime-error MsgBox and the CI job times out. i18n.ahk (locale
+; management) follows it and calls into the loaders/state it declares.
+#Include ../lib/locale.ahk
 #Include ../lib/i18n.ahk
 try FileAppend("# [marker] i18n included (t() should now be available)`r`n", A_Temp . "\ergopti_test_results.txt", "UTF-8")
 try FileAppend("# [marker] i18n included (t() should now be available)`r`n", "*")
