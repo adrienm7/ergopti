@@ -340,7 +340,7 @@ _HSE_DrainFireLog() {
 ; No-op when the watcher is not running (the index is intentionally empty then).
 HotstringPrefixWatcherRebuildIndex() {
     global _PrefixInputHook, _PrefixIndex, _TriggerSet, _PREFIX_WATCHER_CATEGORIES
-    global _HS_CACHE_LOADED, HS_BUNDLED_CATEGORIES, _HS_CACHE_ROWS
+    global _HS_CACHE_ROWS
     if !_PrefixInputHook {
         return
     }
@@ -397,10 +397,11 @@ HotstringPrefixWatcherRebuildIndex() {
     _PrefixIndex := NewIndex
     _TriggerSet := NewSet
     ; Bundled categories now rebuild from memory (no FileRead, no regex); only
-    ; personal still parses TOML. Keep logging the trigger count + wall time so a
-    ; regression that reintroduces the cold-disk cost is visible at a glance. The
-    ; ensure/build split + cache/toml tally are temporary diagnostics to localise
-    ; where any residual wall-clock goes (cache-load vs the in-memory build loop).
+    ; personal still parses TOML. Permanent instrumentation: the trigger count +
+    ; wall time catch a regression that reintroduces the cold-disk cost, while the
+    ; ensure/build split + cache/toml tally localise any residual wall-clock
+    ; (cache-load vs the in-memory build loop) and confirm the fast path stays live
+    ; (cache=0 toml=6 would mean the cache path silently broke).
     try LoggerInfo("PrefixWatcher",
         "Index rebuilt: {1} trigger(s) in {2} ms (ensure={3}ms build={4}ms cache={5} toml={6} rows={7}).",
         NewSet.Count, A_TickCount - _rebuildStart, _ensureMs, _buildMs, _cachedCats, _tomlCats,
