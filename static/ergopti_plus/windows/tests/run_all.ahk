@@ -179,6 +179,7 @@ InstallSendNoOps()
 #Include test_suppress_refcount.ahk
 #Include test_hotstring_live_toggle.ahk
 #Include test_prefix_watcher_index.ahk
+#Include test_prefix_index_cache_equiv.ahk
 #Include test_master_gates.ahk
 #Include test_domain_registry.ahk
 #Include test_domain_expander.ahk
