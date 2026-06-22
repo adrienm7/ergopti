@@ -155,3 +155,42 @@ _PrefixIndexCacheEquiv_RebuildUsesCache() {
 }
 Test("prefix watcher: index rebuild takes the in-memory cache path, not a cold-disk TOML rescan (prefix-index-cache-rebuild)",
 	_PrefixIndexCacheEquiv_RebuildUsesCache)
+
+
+
+
+
+; ============================================
+; ============================================
+; ======= 3/ Cached-category predicate =======
+; ============================================
+; ============================================
+
+; The dispatcher only takes the fast in-memory path when this predicate returns
+; true. A wrong answer here silently reverts the WHOLE rebuild to the cold-disk
+; TOML scan even though _RegisterCategoryTriggersFromCache is correct — exactly the
+; failure seen live (the boot-tail rebuild stayed at multi-second TOML timings).
+_PrefixIndexCacheEquiv_PredicateSelectsBundled() {
+	global _HS_CACHE_LOADED, HS_BUNDLED_CATEGORIES
+	Assert(IsSet(HS_BUNDLED_CATEGORIES), "HS_BUNDLED_CATEGORIES must be a visible global")
+	SavedLoaded := _HS_CACHE_LOADED
+	_HS_CACHE_LOADED := true
+	try {
+		for Cat in HS_BUNDLED_CATEGORIES
+			AssertTrue(_PrefixWatcherCategoryIsCached(Cat),
+				"bundled category '" . Cat . "' must be reported cached once the cache is loaded")
+		AssertTrue(!_PrefixWatcherCategoryIsCached("personal"),
+			"personal is never bundled — it must take the TOML path")
+		; Casing drift must not silently disable the fast path.
+		AssertTrue(_PrefixWatcherCategoryIsCached("MagicKey"),
+			"the bundled check must be case-insensitive")
+		; With the cache not loaded the predicate must say NO (safe TOML fallback).
+		_HS_CACHE_LOADED := false
+		AssertTrue(!_PrefixWatcherCategoryIsCached("magickey"),
+			"with the cache not loaded the predicate must report NOT cached")
+	} finally {
+		_HS_CACHE_LOADED := SavedLoaded
+	}
+}
+Test("prefix watcher: cached-category predicate selects bundled categories (prefix-index-cache-rebuild)",
+	_PrefixIndexCacheEquiv_PredicateSelectsBundled)
