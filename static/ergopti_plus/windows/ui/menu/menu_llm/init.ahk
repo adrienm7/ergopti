@@ -36,7 +36,7 @@
  * @param {Map} saved_opts - Persisted settings loaded from INI/registry.
  */
 LLM_Menu_Init(saved_opts := Map()) {
-	global _LLM_Menu, _LLM_Menu_Handle, _LLM_Menu_InTray, _LLM_Menu_BuildPending
+	global _LLM_Menu, _LLM_Menu_Handle, _LLM_Menu_InTray
 
 	; Defensive: a previous session that crashed mid-install would have
 	; left the AHK process at PriorityClass = High (we boost it in
@@ -116,12 +116,14 @@ LLM_Menu_Init(saved_opts := Map()) {
 	; load — and a tray opened during that window shows only the items registered
 	; before this point (the "menu shows only the first items" bug). Re-populating
 	; _LLM_Menu_Handle in place later keeps the entry's position (see the persistent-
-	; Menu note at its declaration), so menu order is preserved.
+	; Menu note at its declaration), so menu order is preserved. The population is
+	; armed UNCONDITIONALLY at the boot tail (SetTimer LLM_Menu_Build) — NOT signalled
+	; from here via a flag: initMenu() itself runs inside the deferred tray-build pass,
+	; so any flag set here would be read by the boot tail long before this line runs.
 	if !_LLM_Menu_InTray {
 		A_TrayMenu.Add(t("menu.llm.title"), _LLM_Menu_Handle)
 		_LLM_Menu_InTray := true
 	}
-	_LLM_Menu_BuildPending := true
 
 	; Bootstrap Ollama silently on reload when the feature was already enabled.
 	; show_ui=false so the install window NEVER opens automatically — the user
