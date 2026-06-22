@@ -367,8 +367,10 @@ HotstringPrefixWatcherRebuildIndex() {
     ; _PrefixWatcherCategoryIsCached would wrongly fall back to the cold-disk TOML
     ; scan (the 6422 ms boot-tail rebuild seen in the logs). Ensuring it here makes
     ; the in-memory path the guaranteed choice for every bundled category.
+    _ensureStart := A_TickCount
     if IsSet(HotstringsCacheEnsure)
         try HotstringsCacheEnsure()
+    _ensureMs := A_TickCount - _ensureStart
     ; Build each category from the in-memory precompiled cache when available
     ; (_HS_CACHE_ROWS, populated once at boot for the HSE fast path) instead of
     ; re-reading + regex-parsing its TOML from disk. The disk rescan was the cost
@@ -381,6 +383,7 @@ HotstringPrefixWatcherRebuildIndex() {
     ; old behaviour (pinned by test_prefix_index_cache_equiv).
     _cachedCats := 0
     _tomlCats := 0
+    _buildStart := A_TickCount
     for _, Category in _PREFIX_WATCHER_CATEGORIES {
         if _PrefixWatcherCategoryIsCached(Category) {
             _RegisterCategoryTriggersFromCache(Category, NewIndex, NewSet)
@@ -390,17 +393,17 @@ HotstringPrefixWatcherRebuildIndex() {
             _tomlCats += 1
         }
     }
+    _buildMs := A_TickCount - _buildStart
     _PrefixIndex := NewIndex
     _TriggerSet := NewSet
     ; Bundled categories now rebuild from memory (no FileRead, no regex); only
     ; personal still parses TOML. Keep logging the trigger count + wall time so a
     ; regression that reintroduces the cold-disk cost is visible at a glance. The
-    ; cache/toml tally + cache state are temporary diagnostics to confirm the path.
+    ; ensure/build split + cache/toml tally are temporary diagnostics to localise
+    ; where any residual wall-clock goes (cache-load vs the in-memory build loop).
     try LoggerInfo("PrefixWatcher",
-        "Index rebuilt: {1} trigger(s) in {2} ms (cache={3} toml={4} loaded={5} bundledSet={6} rows={7}).",
-        NewSet.Count, A_TickCount - _rebuildStart, _cachedCats, _tomlCats,
-        (IsSet(_HS_CACHE_LOADED) ? _HS_CACHE_LOADED : "unset"),
-        (IsSet(HS_BUNDLED_CATEGORIES) ? "yes" : "no"),
+        "Index rebuilt: {1} trigger(s) in {2} ms (ensure={3}ms build={4}ms cache={5} toml={6} rows={7}).",
+        NewSet.Count, A_TickCount - _rebuildStart, _ensureMs, _buildMs, _cachedCats, _tomlCats,
         (IsSet(_HS_CACHE_ROWS) ? _HS_CACHE_ROWS.Count : "unset"))
     ; A just-disabled section may still have a tooltip on screen — hide it so the
     ; preview cannot outlive the expansion it was advertising.
