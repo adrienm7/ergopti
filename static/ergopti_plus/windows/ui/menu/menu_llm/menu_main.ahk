@@ -114,8 +114,11 @@ LLM_Menu_Build() {
 	; enabling); the rest carry true (greyed while off). Conditional/native-only rows
 	; (thinking-model info, the num-predictions reset, the inner separator) are
 	; emitted from inside _LLM_Menu_EmitRow at their anchor row.
-	for _i, _row in _LLM_MenuLayout_Rows()
+	_rows := _LLM_MenuLayout_Rows()
+	try LoggerInfo("LLM", "LLM_Menu_Build: emitting {1} settings row(s) from shared spec…", _rows.Length)
+	for _i, _row in _rows
 		_LLM_Menu_EmitRow(_row["id"], (_row["disabled_when_off"] ? _disabled : false), _llm_is_operational)
+	try LoggerInfo("LLM", "LLM_Menu_Build: settings rows emitted ({1} item(s) so far).", DllCall("GetMenuItemCount", "ptr", _LLM_Menu_Handle.Handle, "int"))
 
 	_LLM_Menu_Handle.Add()  ; separator
 	RegisterMenuItem(_LLM_Menu_Handle, t("menu.llm.about"), LLM_Menu_OnAbout)
@@ -135,6 +138,11 @@ LLM_Menu_Build() {
 		try A_TrayMenu.Uncheck(t("menu.llm.title"))
 	}
 	try LoggerInfo("LLM", "LLM_Menu_Build: IA submenu built with {1} item(s) in {2}ms.", DllCall("GetMenuItemCount", "ptr", _LLM_Menu_Handle.Handle, "int"), A_TickCount - _t0)
+	} catch as e {
+		; Capture (and swallow) any build failure so it is visible in the log AND so a
+		; throw can no longer abort the build silently mid-way — at minimum the toggle
+		; and whatever rows were added before the throw stay in the menu.
+		try LoggerError("LLM", "LLM_Menu_Build FAILED: {1} ({2}:{3}).", e.Message, e.File, e.Line)
 	} finally {
 		_Building := false
 	}
