@@ -141,14 +141,19 @@ Chemin identique d'un driver à l'autre → l'analogue se trouve au même endroi
 
 ## P6 — Symétrie macOS
 
-- [ ] Extraire les algos inline d'`init.lua` (découverte hotstrings, cleanup MLX, scan personal-hotstrings, file-watcher) → modules/lib.
-- [ ] Renuméroter/réaligner les bannières d'`init.lua` ; renommer le `boot_llm_enabled` dupliqué.
-- [ ] `lib/{mlx,ollama}_deps_checker.lua` → `modules/llm/` ; `modules/hotstrings_config.lua` → `modules/hotstrings/` ; splitter `healthcheck.lua` + les 2 fichiers MLX ~1800 l.
-- [ ] Supprimer les assets morts `ui/download_window/*` (après diff vs `_shared/`) ; ajouter `init.lua` à `paths_editor/` & `token_prompt/`.
-- [ ] Déplacer `data/generate_models.py` + `pyproject.toml` + `uv.lock` → `tools/`.
-- [ ] Ajouter `windows/README.md` + `macos/README.md` + `docs/TESTING.md` ; maj `new-driver.js` (`DRIVER_SUBDIRS` canonique).
+> **Réconcilié avec le réel le 2026-06-22** : plusieurs items étaient déjà faits, et un reposait sur une hypothèse fausse (`download_window` est vivant). Baseline Lua verte (`lua tests/run.lua` → all passed).
 
-**Vérif.** Suite macOS verte ; ordre des phases de boot (log) inchangé.
+- [x] `lib/{mlx,ollama}_deps_checker.lua` → `modules/llm/` ✅ (déjà fait — `modules/llm/{mlx,ollama}_deps_checker.lua`).
+- [x] `modules/hotstrings_config.lua` → `modules/hotstrings/` ✅ (déjà fait — requis partout comme `modules.hotstrings.hotstrings_config`).
+- [x] `windows/README.md` + `macos/README.md` + `docs/TESTING.md` ✅ (déjà présents).
+- [x] ~~Supprimer les assets morts `ui/download_window/*`~~ → **REJETÉ** : `ui/download_window` n'est PAS mort — il est `require`é activement par `mlx_deps_checker.lua` et `ollama_deps_checker.lua` (UI unifiée de progression de téléchargement LLM) et n'a pas de copie dans `_shared/`. C'est la seule copie, vivante. À garder.
+- [ ] **Splitter les 2 god-files MLX** : `modules/llm/api_mlx.lua` (1802 l.) + `ui/menu/menu_llm/models_manager_mlx.lua` (1790 l.). *(Vérifiable par la suite unitaire Lua ; reload Hammerspoon par le mainteneur pour confirmer, comme les splits AHK P4/P5.)*
+- [ ] **Extraire les algos inline d'`init.lua`** (découverte hotstrings, cleanup MLX, scan personal-hotstrings, file-watcher) → modules/lib ; renuméroter les bannières ; renommer le `boot_llm_enabled` dupliqué. ⚠️ Sensible à l'ordre de boot (comme l'entrée Windows P4) — incréments vérifiés.
+- [ ] `new-driver.js` : `DRIVER_SUBDIRS` = `['adapters','modules','tests','lib']` → ajouter `'ui','data','_generated'` (canonique). *(Petit, bas risque.)*
+- [ ] *(décision requise)* Déplacer `data/generate_models.py` + `pyproject.toml` + `uv.lock` → `tools/` : `pyproject`/`uv.lock` sont la racine de l'env `uv` du driver macOS (CONTRIBUTING `uv sync`) → le move impose de mettre à jour CONTRIBUTING + de fixer la cible (`tools/` racine vs `macos/tools/`). Pas un move sec.
+- [ ] Vérifier/ajouter `init.lua` à `ui/paths_editor/` & `ui/token_prompt/` (à confirmer).
+
+**Vérif.** Suite macOS verte (`lua tests/run.lua`) ; ordre des phases de boot (log) inchangé — reload Hammerspoon par le mainteneur.
 
 ---
 
