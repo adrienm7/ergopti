@@ -41,8 +41,8 @@ end
 --- @param path string Override file path.
 --- @return table Freshly-initialised module.
 local function fresh_module(path)
-	package.loaded["modules.hotstrings_config"] = nil
-	local mod = helpers.load_with_stubs("modules.hotstrings_config")
+	package.loaded["modules.hotstrings.hotstrings_config"] = nil
+	local mod = helpers.load_with_stubs("modules.hotstrings.hotstrings_config")
 	mod.init({ override_path = path, toml_resolver = function() return nil end })
 	return mod
 end

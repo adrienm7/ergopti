@@ -158,7 +158,7 @@ package.loaded["modules.keymap.registry"] = {
 -- ===== 1.6) hotstrings_config stub ========
 --- =========================================
 
-package.loaded["modules.hotstrings_config"] = {
+package.loaded["modules.hotstrings.hotstrings_config"] = {
 	resolve = nil,  -- Intentionally absent to exercise the nil-check branch
 }
 

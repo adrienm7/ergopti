@@ -380,7 +380,7 @@ helpers.describe("llm_bridge.update_preview: bad UTF-8 in buffer does not propag
 			"modules.llm",
 			"modules.llm.prediction_engine",
 			"modules.keylogger",
-			"modules.hotstrings_config",
+			"modules.hotstrings.hotstrings_config",
 			"lib.text_utils",
 			"lib.keycodes",
 			"lib.perf",
@@ -423,7 +423,7 @@ helpers.describe("llm_bridge.update_preview: bad UTF-8 in buffer does not propag
 			notify_synthetic        = function() end,
 			set_buffer              = function() end,
 		}
-		package.loaded["modules.hotstrings_config"] = {
+		package.loaded["modules.hotstrings.hotstrings_config"] = {
 			resolve = nil,  -- Not called in the paths we exercise
 		}
 		package.loaded["ui.tooltip"] = {

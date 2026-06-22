@@ -27,7 +27,7 @@ local helpers = require("tests.helpers")
 helpers.describe("hotstrings_config.resolve early-return — show_tooltip default (dynhotstrings-3 regression)", function()
 
 	local function load_fresh()
-		package.loaded["modules.hotstrings_config"] = nil
+		package.loaded["modules.hotstrings.hotstrings_config"] = nil
 		-- lib.toml_reader requires toml_codec (a Hammerspoon C extension). Stub it so
 		-- the module loads cleanly in headless tests. load_shared_defaults() at module
 		-- level calls parse() and requires a valid sections structure or it errors out.
@@ -41,7 +41,7 @@ helpers.describe("hotstrings_config.resolve early-return — show_tooltip defaul
 				}
 			end,
 		}
-		local mod = helpers.load_with_stubs("modules.hotstrings_config")
+		local mod = helpers.load_with_stubs("modules.hotstrings.hotstrings_config")
 		-- Clear the stub so it doesn't leak into subsequent test files that require
 		-- the real lib.toml_reader (e.g. ui.tooltip.config reads constants.toml).
 		package.loaded["lib.toml_reader"] = nil

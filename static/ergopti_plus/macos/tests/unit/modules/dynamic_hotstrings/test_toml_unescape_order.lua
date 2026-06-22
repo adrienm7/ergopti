@@ -76,7 +76,7 @@ end)
 helpers.describe("hotstrings_config.lua word_delimiters unescape — single-pass (dynhotstrings-2 regression)", function()
 
 	helpers.it("does NOT use the chained gsub that corrupts \\\\n in word_delimiters", function()
-		local src_path = helpers.driver_root() .. "modules/hotstrings_config.lua"
+		local src_path = helpers.driver_root() .. "modules/hotstrings/hotstrings_config.lua"
 		local fh = io.open(src_path, "r")
 		helpers.assert_true(fh ~= nil, "hotstrings_config.lua must be readable")
 		local src = fh:read("*a"); fh:close()
@@ -92,7 +92,7 @@ helpers.describe("hotstrings_config.lua word_delimiters unescape — single-pass
 	end)
 
 	helpers.it("uses the single-pass \\\\(.) replacement-function for word_delimiters", function()
-		local src_path = helpers.driver_root() .. "modules/hotstrings_config.lua"
+		local src_path = helpers.driver_root() .. "modules/hotstrings/hotstrings_config.lua"
 		local fh = io.open(src_path, "r")
 		helpers.assert_true(fh ~= nil)
 		local src = fh:read("*a"); fh:close()

@@ -761,7 +761,7 @@ function M.load_toml(name, path)
 	-- user-section > user-file > meta-section > meta-file > source default. The
 	-- override module is required lazily (it does not require us, but stay defensive
 	-- against load order / headless tests where it may be absent — gotcha G6).
-	local ok_hcfg, hcfg = pcall(require, "modules.hotstrings_config")
+	local ok_hcfg, hcfg = pcall(require, "modules.hotstrings.hotstrings_config")
 	local hotstrings_config = ok_hcfg and hcfg or nil
 	local function user_priority(section_name)
 		if not hotstrings_config or type(hotstrings_config.get_user_override) ~= "function" then

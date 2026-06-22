@@ -28,7 +28,7 @@ local M = {}
 local hs                = hs
 local ui_builder        = require("ui.ui_builder")
 local Logger            = require("lib.logger")
-local hotstrings_config = require("modules.hotstrings_config")
+local hotstrings_config = require("modules.hotstrings.hotstrings_config")
 local TomlReader        = require("lib.toml_reader")
 local i18n              = require("lib.i18n")
 

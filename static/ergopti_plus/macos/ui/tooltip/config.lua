@@ -172,7 +172,7 @@ function M.tint(key)
 
 	local category = TINT_KEY_TO_CATEGORY[key]
 	if category then
-		local ok, hs_cfg = pcall(require, "modules.hotstrings_config")
+		local ok, hs_cfg = pcall(require, "modules.hotstrings.hotstrings_config")
 		if ok and hs_cfg and type(hs_cfg.resolve) == "function" then
 			local resolved = hs_cfg.resolve(category, nil)
 			local rgba = resolved and parse_hex_color(resolved.color)
