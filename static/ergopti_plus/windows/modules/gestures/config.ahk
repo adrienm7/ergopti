@@ -1,4 +1,4 @@
-﻿; modules/gestures_config.ahk
+﻿; modules/gestures/config.ahk
 
 ; ==============================================================================
 ; MODULE: Gesture Configuration & Touchpad Setup (AHK)

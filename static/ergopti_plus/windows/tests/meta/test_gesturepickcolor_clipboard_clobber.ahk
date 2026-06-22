@@ -31,11 +31,6 @@
 
 ; Reads a windows/-relative source file. A_ScriptDir is the runner dir (tests/);
 ; its parent is the windows/ driver root.
-_GPCC_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
-}
 
 
 
@@ -47,7 +42,6 @@ _GPCC_ReadSource(RelPath) {
 ; ==================================================
 
 _GPCC_PastePlainSnapshotsFullClipboard() {
-	Src := _GPCC_ReadSource("modules/gestures.ahk")
 	Seg := _DriverFuncBody("GesturePastePlain")
 	Assert(Seg != "", "GesturePastePlain() declaration must exist in gestures.ahk")
 	Assert(InStr(Seg, "ClipboardAll()") > 0,
@@ -56,7 +50,6 @@ _GPCC_PastePlainSnapshotsFullClipboard() {
 Test("gestures: GesturePastePlain snapshots full clipboard before coercion (gesturepickcolor-clipboard-clobber)", _GPCC_PastePlainSnapshotsFullClipboard)
 
 _GPCC_PastePlainDefersRestore() {
-	Src := _GPCC_ReadSource("modules/gestures.ahk")
 	Seg := _DriverFuncBody("GesturePastePlain")
 	Assert(Seg != "", "GesturePastePlain() declaration must exist in gestures.ahk")
 	Assert(InStr(Seg, "_GesturePastePlainRestore") > 0,

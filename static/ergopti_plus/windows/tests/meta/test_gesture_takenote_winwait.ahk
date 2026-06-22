@@ -23,19 +23,7 @@
 
 #Requires AutoHotkey v2.0
 
-_GTN_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	return FileRead(StrReplace(Root, "/", "\") . "\" . StrReplace(RelPath, "/", "\"), "UTF-8")
-}
 
-_GTN_StripComments(Src) {
-	Out := ""
-	for Line in StrSplit(Src, "`n", "`r") {
-		if !RegExMatch(Line, "^\s*;")
-			Out .= Line . "`n"
-	}
-	return Out
-}
 
 
 
@@ -47,8 +35,6 @@ _GTN_StripComments(Src) {
 ; ===========================================================================
 
 _GTN_WinWaitIsQualified() {
-	Raw := _GTN_ReadSource("modules/gestures.ahk")
-	Src := _GTN_StripComments(Raw)
 	Body := _DriverFuncBody("GestureTakeNote")
 	Assert(Body != "", "GestureTakeNote() must exist in modules/gestures.ahk")
 

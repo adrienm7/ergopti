@@ -1,4 +1,4 @@
-﻿; modules/gestures_window_cycle.ahk
+﻿; modules/gestures/window_cycle.ahk
 
 ; ==============================================================================
 ; MODULE: Gesture Window-Cycle Tracker (AHK)

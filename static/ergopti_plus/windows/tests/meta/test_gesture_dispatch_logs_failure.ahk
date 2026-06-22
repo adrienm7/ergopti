@@ -30,11 +30,6 @@
 ; ==================================================
 ; ==================================================
 
-_GDLF_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
-}
 
 
 
@@ -46,7 +41,6 @@ _GDLF_ReadSource(RelPath) {
 ; ==================================================
 
 _GDLF_DispatchCatchesAndLogs() {
-	Src := _GDLF_ReadSource("modules/gestures.ahk")
 	Body := _DriverFuncBody("GestureDispatch")
 	Assert(Body != "", "GestureDispatch(slot) must exist in modules/gestures.ahk")
 

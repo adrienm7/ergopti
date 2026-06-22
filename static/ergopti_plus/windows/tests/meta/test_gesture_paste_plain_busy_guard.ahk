@@ -32,11 +32,6 @@
 
 ; Reads a windows/-relative source file. A_ScriptDir is the runner dir (tests/);
 ; its parent is the windows/ driver root.
-_GPPBG_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
-}
 
 
 
@@ -48,7 +43,6 @@ _GPPBG_ReadSource(RelPath) {
 ; ==========================================
 
 _GPPBG_AssertGesturePastePlainChecksGuard() {
-	Src := _GPPBG_ReadSource("modules/gestures.ahk")
 	Body := _DriverFuncBody("GesturePastePlain")
 	Assert(Body != "", "GesturePastePlain() declaration must exist in gestures.ahk")
 	Assert(InStr(Body, "_SEND_INSTANT_CLIP_BUSY") > 0,
@@ -57,7 +51,6 @@ _GPPBG_AssertGesturePastePlainChecksGuard() {
 Test("gestures: GesturePastePlain participates in the clipboard reentrancy guard (gesture-paste-plain-bypass-busy-guard)", _GPPBG_AssertGesturePastePlainChecksGuard)
 
 _GPPBG_AssertRestoreClearsGuard() {
-	Src := _GPPBG_ReadSource("modules/gestures.ahk")
 	Body := _DriverFuncBody("_GesturePastePlainRestore")
 	Assert(Body != "", "_GesturePastePlainRestore(OldClip) declaration must exist in gestures.ahk")
 	Assert(InStr(Body, "_SEND_INSTANT_CLIP_BUSY") > 0,
@@ -70,7 +63,6 @@ Test("gestures: deferred restore releases the reentrancy guard (gesture-paste-pl
 ; AND clear _SEND_INSTANT_CLIP_BUSY — otherwise the guard latches true forever and
 ; every subsequent plain-paste silently falls through to the bypass branch.
 _GPPBG_AssertCatchReleasesGuard() {
-	Src := _GPPBG_ReadSource("modules/gestures.ahk")
 	Body := _DriverFuncBody("GesturePastePlain")
 	Assert(Body != "", "GesturePastePlain() declaration must exist in gestures.ahk")
 	Assert(RegExMatch(Body, "catch[\s\S]*?_SEND_INSTANT_CLIP_BUSY := false") > 0,

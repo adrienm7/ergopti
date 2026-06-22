@@ -59,7 +59,7 @@ _PPNC_PasteWithoutFormattingHasTextGuard() {
 Test("ctrl: PasteWithoutFormatting guards strip on non-text clipboard (paste-plain-destroys-nontext-clip)", _PPNC_PasteWithoutFormattingHasTextGuard)
 
 _PPNC_GesturePastePlainHasTextGuard() {
-	Src := _PPNC_ReadSource("modules/gestures.ahk")
+	Src := _DriverDirConcat("modules/gestures")
 	Seg := _DriverFuncBody("GesturePastePlain")
 	Assert(Seg != "", "GesturePastePlain() declaration must exist in modules/gestures.ahk")
 	StripIdx := InStr(Seg, "A_Clipboard := A_Clipboard")

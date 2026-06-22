@@ -78,7 +78,7 @@ Test("hotstring_engine: GetSelection ClipWait timeout is a tight interactive cei
 ; ClipWait timeout cannot trigger a stale paste through SendInstant.
 _GSBlk_CaseChordsNoOpOnEmpty() {
 	WinSrc := _GSBlk_ReadSource("modules/shortcuts/win.ahk")
-	GestSrc := _GSBlk_ReadSource("modules/gestures.ahk")
+	GestSrc := _DriverDirConcat("modules/gestures")
 	EmptyGuard := "if (Text = " . Chr(34) . Chr(34) . ")"
 
 	UpperSeg := _DriverFuncBody("ConvertToUppercase")

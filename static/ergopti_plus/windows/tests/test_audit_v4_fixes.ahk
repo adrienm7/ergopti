@@ -77,11 +77,10 @@ Test("Audit-v4: A_MaxHotkeysPerInterval set at load time, not inside hotkey bodi
 ; ==============================================================
 
 TestAuditV4_CallbackFree() {
-	; _GestureUnhook (with the CallbackFree call) was extracted into
-	; gestures_window_cycle.ahk; the CallbackCreate pointer store stays in
-	; gestures.ahk's hook setup. Read both so the assertions survive the move.
-	Src := _AuditV4_ReadSrc("modules\gestures.ahk")
-		. "`n" . _AuditV4_ReadSrc("modules\gestures_window_cycle.ahk")
+	; _GestureUnhook (with the CallbackFree call) lives in the window_cycle
+	; sub-file; the CallbackCreate pointer store stays in the gestures index.
+	; Concat the whole modules/gestures folder so both survive any further split.
+	Src := _DriverDirConcat("modules/gestures")
 
 	; The bug: CallbackCreate returned directly to SetWinEventHook with no store;
 	; _GestureUnhook only called UnhookWinEvent, leaking the thunk.
