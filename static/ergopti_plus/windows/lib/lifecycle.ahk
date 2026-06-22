@@ -27,6 +27,20 @@ _SuspendDrainPrefix() {
     if !A_IsSuspended and IsSet(_ALTGR_KANA_FIXUP) and _ALTGR_KANA_FIXUP and GetKeyState("SC138", "P")
         KeyWait("SC138", "T1")
 }
+; Releases every modifier + the SC138 (AltGr/Kana) prefix key to clear any
+; OS-level phantom "down" state carried across a Reload. A Reload — the driver's
+; standard apply-settings path, also fired by the layout-change watcher — can
+; land while AltGr (or any modifier) is physically held; the OS then keeps that
+; key latched down for the fresh process, which reads it via GetKeyState and
+; sticks on the AltGr layer until the user cycles the key (the transient
+; « AltGr bloqué » report). Synthetic key-ups for keys that are genuinely up are
+; harmless no-ops, and {Blind} stops AHK injecting its own modifier state. NOTE:
+; this targets the OS phantom-modifier case ONLY — it does NOT clear AHK's
+; internal custom-combination prefix latch (that is prevented at the source by
+; _SuspendDrainPrefix before a Suspend, the one transition that freezes it).
+_ReleasePhantomModifiers() {
+    Send("{Blind}{LCtrl up}{RCtrl up}{LAlt up}{RAlt up}{LShift up}{RShift up}{LWin up}{RWin up}{SC138 up}")
+}
 ToggleSuspend(*) {
     _SuspendDrainPrefix()
     Suspend(-1)

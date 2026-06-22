@@ -104,3 +104,37 @@ _SWNPK_DrainHelperWaitsSc138() {
 		"_SuspendDrainPrefix must KeyWait on SC138 to let the physical AltGr/Kana key lift before suspending — synthetic events cannot clear the latched prefix flag")
 }
 Test("ErgoptiPlus: _SuspendDrainPrefix waits on SC138 (suspend-watchdog-no-prefix-keywait)", _SWNPK_DrainHelperWaitsSc138)
+
+
+
+; ==================================================
+; ==================================================
+; ======= 3/ Boot phantom-modifier release =========
+; ==================================================
+; ==================================================
+
+; Invariant 4: the boot phantom-modifier release exists and clears the AltGr keys.
+; A Reload can land while AltGr is physically held, leaving the OS modifier
+; latched down for the fresh process — stuck on the AltGr layer (transient
+; « AltGr bloqué »). _ReleasePhantomModifiers clears it at boot.
+_SWNPK_BootReleasesPhantomModifiers() {
+	Seg := _DriverFuncBody("_ReleasePhantomModifiers")
+	Assert(Seg != "", "_ReleasePhantomModifiers() must exist in lib/lifecycle.ahk")
+	Assert(InStr(Seg, "{SC138 up}") > 0,
+		"_ReleasePhantomModifiers must release SC138 (the AltGr/Kana prefix key) to clear an OS phantom carried across a Reload")
+	Assert(InStr(Seg, "{RAlt up}") > 0,
+		"_ReleasePhantomModifiers must release RAlt (vanilla AltGr)")
+	Assert(InStr(Seg, "{Blind}") > 0,
+		"_ReleasePhantomModifiers must send with {Blind} so AHK does not inject its own modifier state")
+}
+Test("lifecycle: _ReleasePhantomModifiers releases AltGr/SC138 at boot (suspend-watchdog-no-prefix-keywait)", _SWNPK_BootReleasesPhantomModifiers)
+
+; Invariant 5: the release helper is actually CALLED at boot (not only defined),
+; so a Reload-borne phantom modifier is cleared before the first keystrokes.
+_SWNPK_BootCallsRelease() {
+	Src := _DriverSourceConcat()
+	Calls := _SWNPK_CountOccurrences(Src, "_ReleasePhantomModifiers()")
+	Assert(Calls >= 2,
+		"_ReleasePhantomModifiers() must be CALLED at boot, not only defined — found " . Calls . " occurrence(s) of the bare call token in the driver tree")
+}
+Test("ErgoptiPlus: boot calls _ReleasePhantomModifiers (suspend-watchdog-no-prefix-keywait)", _SWNPK_BootCallsRelease)
