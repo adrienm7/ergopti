@@ -358,15 +358,27 @@ HotstringPrefixWatcherRebuildIndex() {
     NewIndex := Map()
     NewSet := Map()
     _rebuildStart := A_TickCount
+    ; Build each category from the in-memory precompiled cache when available
+    ; (_HS_CACHE_ROWS, populated once at boot for the HSE fast path) instead of
+    ; re-reading + regex-parsing its TOML from disk. The disk rescan was the cost
+    ; of the multi-second deferred rebuild: the SAME 3180-trigger index measured
+    ; 157 ms once the OS file cache was warm but 3031 ms on the cold read right
+    ; after a reload (magickey.toml alone is ~2119 entries), and that 3 s monopolised
+    ; the thread so the tray menu could not open. Personal (never cached — its TOML
+    ; is user-relocatable) and any cache-miss still take the TOML path; both feed the
+    ; identical _AddTriggerVariants pipeline so the index is byte-identical to the
+    ; old behaviour (pinned by test_prefix_index_cache_equiv).
     for _, Category in _PREFIX_WATCHER_CATEGORIES {
-        _RegisterCategoryTriggers(Category, NewIndex, NewSet)
+        if _PrefixWatcherCategoryIsCached(Category)
+            _RegisterCategoryTriggersFromCache(Category, NewIndex, NewSet)
+        else
+            _RegisterCategoryTriggers(Category, NewIndex, NewSet)
     }
     _PrefixIndex := NewIndex
     _TriggerSet := NewSet
-    ; Diagnostic: this rebuild re-reads + regex-parses every category TOML from disk
-    ; (no precompiled-cache fast path, unlike the HSE registration via _GENERATED_HOTSTRINGS),
-    ; so it is the suspected cost of the multi-second deferred emoji/symbol pass. Log the
-    ; trigger count + wall time so a slow rebuild is attributed to this step, not guessed at.
+    ; Bundled categories now rebuild from memory (no FileRead, no regex); only
+    ; personal still parses TOML. Keep logging the trigger count + wall time so a
+    ; regression that reintroduces the cold-disk cost is visible at a glance.
     try LoggerInfo("PrefixWatcher", "Index rebuilt: {1} trigger(s) in {2} ms.", NewSet.Count, A_TickCount - _rebuildStart)
     ; A just-disabled section may still have a tooltip on screen — hide it so the
     ; preview cannot outlive the expansion it was advertising.
@@ -517,6 +529,97 @@ _RegisterCategoryTriggers(Category, IndexTarget := "", SetTarget := "") {
         }
         _AddTriggerVariants(Trigger, Output, Category, CurrentSection, IsCaseSensitive, IsStrict, Individual, IndexTarget, SetTarget)
         Count += 1
+    }
+    return Count
+}
+
+; True when a category's hotstrings live in the precompiled in-memory cache
+; (HS_BUNDLED_CATEGORIES, loaded once at boot via HotstringsCacheEnsure). Personal
+; is deliberately NOT bundled — its TOML can live outside the repo — so it always
+; takes the TOML rebuild path. Returns false until the cache is loaded so an early
+; rebuild (before HotstringsCacheEnsure ran) safely falls back to the TOML scan.
+_PrefixWatcherCategoryIsCached(Category) {
+    global HS_BUNDLED_CATEGORIES, _HS_CACHE_LOADED
+    if (!IsSet(_HS_CACHE_LOADED) or !_HS_CACHE_LOADED or !IsSet(HS_BUNDLED_CATEGORIES))
+        return false
+    LowerCat := StrLower(Category)
+    for Cat in HS_BUNDLED_CATEGORIES {
+        if (StrLower(Cat) == LowerCat)
+            return true
+    }
+    return false
+}
+
+; Build a bundled category's prefix entries from the in-memory _HS_CACHE_ROWS
+; instead of re-reading + regex-parsing its TOML from disk. The bundled hotstrings
+; are already parsed into _HS_CACHE_ROWS at boot (for the HSE fast path), so the
+; index rebuild reuses that work: no FileRead, no per-line regex — the optimisation
+; that collapses the deferred rebuild from a cold-disk multi-second rescan to a few
+; ms. Mirrors _RegisterCategoryTriggers' gating (master gate, V2 category remap,
+; per-section Features "enabled" flag) and feeds the SAME _AddTriggerVariants
+; pipeline so the resulting entries are byte-identical (pinned by
+; test_prefix_index_cache_equiv). Returns the number of entries registered.
+_RegisterCategoryTriggersFromCache(Category, IndexTarget := "", SetTarget := "") {
+    global Features, ScriptInformation, _HS_CACHE_ROWS, _PrefixIndex, _TriggerSet, HS_CACHE_MARKER
+    if !IsObject(IndexTarget)
+        IndexTarget := _PrefixIndex
+    if !IsObject(SetTarget)
+        SetTarget := _TriggerSet
+    ; 1. Master gate — a globally disabled Hotstrings category yields an empty
+    ;    index through this path exactly as through the TOML path.
+    if !IsCategoryGated("Hotstrings") {
+        return 0
+    }
+    ; 2. Category mapping — the cache keys (and _PREFIX_WATCHER_CATEGORIES) use
+    ;    lowercase but Features v2 uses snake_case (same remap as the TOML path).
+    V2Cat := Category
+    if (V2Cat == "distancesreduction")
+        V2Cat := "distances_reduction"
+    else if (V2Cat == "sfbsreduction")
+        V2Cat := "sfbs_reduction"
+    else if (V2Cat == "magickey")
+        V2Cat := "magic_key"
+    if !Features.Has("hotstrings") or !Features["hotstrings"].Has(V2Cat) {
+        return 0
+    }
+    MagicKey := (IsSet(ScriptInformation) and ScriptInformation.Has("MagicKey"))
+        ? ScriptInformation["MagicKey"] : HS_CACHE_MARKER
+    CatPrefix := StrLower(Category) . "."
+    CatPrefixLen := StrLen(CatPrefix)
+    Count := 0
+    for Key, RowList in _HS_CACHE_ROWS {
+        if (SubStr(Key, 1, CatPrefixLen) != CatPrefix) {
+            continue
+        }
+        ; Section is the key remainder after the first dot (limit 2 so a section
+        ; name that itself contains a dot survives — matches _HsCacheRegisterSection).
+        Parts := StrSplit(Key, ".", , 2)
+        SecId := Parts.Length >= 2 ? Parts[2] : ""
+        ; 3. Section-enabled gate — only index sections whose Features flag is set,
+        ;    identical to the TOML path so a live toggle adds/removes them in lockstep.
+        if !Features["hotstrings"][V2Cat].Has(SecId) {
+            continue
+        }
+        FNode := Features["hotstrings"][V2Cat][SecId]
+        if !(IsObject(FNode) and FNode.Has("enabled") and FNode["enabled"]) {
+            continue
+        }
+        for Row in RowList {
+            ; Row layout (hotstrings_cache.ahk): [flags, trigger(★ preserved),
+            ; output, finalResult, isRepeat, isCaseSens, priorityOverride]. The
+            ; watcher index only needs case-sensitivity, strictness (the "C" flag
+            ; == is_case_sensitive_strict) and the per-entry priority override;
+            ; finalResult/isRepeat/is_word/auto_expand do not affect the index.
+            IsCaseSensitive := Row[6]
+            IsStrict := InStr(Row[1], "C") > 0
+            Individual := (Row.Length >= 7 and Row[7] != "") ? (Row[7] + 0) : ""
+            ; ★ marker → the user's configured magic key, exactly as the TOML path
+            ; substitutes it before indexing so the index reflects real keystrokes.
+            Trigger := StrReplace(Row[2], HS_CACHE_MARKER, MagicKey)
+            Output := StrReplace(Row[3], HS_CACHE_MARKER, MagicKey)
+            _AddTriggerVariants(Trigger, Output, Category, SecId, IsCaseSensitive, IsStrict, Individual, IndexTarget, SetTarget)
+            Count += 1
+        }
     }
     return Count
 }
