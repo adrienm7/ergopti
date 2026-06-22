@@ -11,15 +11,13 @@ local M = {}
 local Logger         = require("lib.logger")
 local Notifications  = require("lib.notifications")
 local i18n           = require("lib.i18n")
-local Parser         = require("modules.llm.parser")
 local Profiles       = require("modules.llm.profiles")
 local ApiCommon      = require("modules.llm.api_common")
+local ApiMlxInference = require("modules.llm.api_mlx_inference")  -- request mechanics (post_and_parse / streaming)
 local ApiMlxFetch    = require("modules.llm.api_mlx_fetch")   -- dispatch strategies (batch/parallel/sequential)
-local SharedPromptBuilder = require("llm.prompt_builder")   -- single source for DEFAULT_MAX_TOKENS
 local _warmup_client = require("adapters.http_client").new()  -- Dedicated client for warmup POSTs; isolated so discovery probes cannot cancel an in-flight warmup
 local _probe_client  = require("adapters.http_client").new()  -- Dedicated client for discover_endpoints() POST probes; never shares state with warmup
 local _check_client  = require("adapters.http_client").new()  -- Dedicated client for check_availability() GETs
-local _infer_client  = require("adapters.http_client").new()  -- Dedicated client for non-streaming inference POSTs in post_and_parse
 local JsonCodec      = require("adapters.json_codec")
 local TimerScheduler = require("adapters.timer_scheduler")
 local ShellRunner    = require("adapters.shell_runner")
@@ -27,16 +25,8 @@ local Timings        = require("lib.timings")
 local Paths          = require("lib.paths")
 local LOG            = "llm.api_mlx"
 
-local ok_kl, keylogger = pcall(require, "modules.keylogger")
-if not ok_kl then keylogger = nil end
-
-local _req_counter = 0
-local DEDUPLICATION_ENABLED = false
--- MLX stream/warmup timeouts come from the shared cross-driver registry ([llm]).
-local STREAM_CONNECT_TIMEOUT_SEC = Timings.sec("llm", "stream_connect_timeout_ms") -- Fail fast if the MLX server does not accept the TCP connection
-local STREAM_HARD_TIMEOUT_SEC    = Timings.sec("llm", "stream_hard_timeout_ms")    -- Kill the task if the server accepts but never sends a token
+-- MLX warmup timeout comes from the shared cross-driver registry ([llm]).
 local WARMUP_POST_TIMEOUT_SEC    = Timings.sec("llm", "warmup_post_timeout_ms")    -- Unblock _warmup_in_flight if the single-token POST never returns
-local NON_STREAM_TIMEOUT_SEC     = Timings.sec("llm", "non_stream_timeout_ms")  -- Non-streaming inference hard timeout; prevents a hung server from blocking on_fail indefinitely
 
 -- MLX server bind address — single source of truth in _shared/modules/llm/mlx_server.json
 -- so the port is never hardcoded across api_mlx, the models_manager_mlx launcher,
@@ -253,12 +243,16 @@ kill_zombie_on_mlx_port = function()
 	kill_task.start()
 end
 
--- Holds the current in-flight hs.task; cancelled when a new streaming request starts.
--- The streaming flag itself is owned by modules/llm/init.lua and passed per-call.
-local _active_stream_task       = nil
-local _active_stream_timeout    = nil  -- Hard-timeout timer for the current stream task
-local _stream_generation        = 0    -- Monotonic counter; each new stream gets its own ID
-local _active_stream_has_chunks = false  -- True once the current stream has received at least one SSE chunk
+-- Shared streaming-task state. Mutated both here (cancel_streaming) and by the
+-- request engine in api_mlx_inference.lua (which runs the curl -N task) — passed
+-- to it by reference through ApiMlxInference.init(), so a single table is the one
+-- source of truth for the in-flight stream. The streaming flag itself is owned by
+-- modules/llm/init.lua and passed per-call.
+--   task       — current in-flight hs.task; cancelled when a new stream starts.
+--   timeout    — hard-timeout timer handle for the current stream task.
+--   generation — monotonic counter; each new stream gets its own ID.
+--   has_chunks — true once the current stream has received at least one SSE chunk.
+local _stream = { task = nil, timeout = nil, generation = 0, has_chunks = false }
 
 -- Readiness flag: true once warmup has confirmed the model is loaded and the server
 -- can answer inference requests. perform_check gates on this so the loading tooltip
@@ -738,21 +732,21 @@ end
 --- subsequent requests and causes a deadlock where no prediction ever completes.
 --- Called when a newer request supersedes the current one.
 function M.cancel_streaming()
-	if _active_stream_timeout then
-		TimerScheduler.cancel(_active_stream_timeout)
-		_active_stream_timeout = nil
+	if _stream.timeout then
+		TimerScheduler.cancel(_stream.timeout)
+		_stream.timeout = nil
 	end
 	-- Bump generation so all callbacks from the old stream become no-ops
-	_stream_generation = _stream_generation + 1
+	_stream.generation = _stream.generation + 1
 
-	if _active_stream_task then
+	if _stream.task then
 		-- Always terminate to free the MLX server connection; leaving prefill-phase
 		-- curls running blocks the server from answering the next request
-		_active_stream_task.terminate()
-		local phase = _active_stream_has_chunks and "mid-flight" or "prefill"
+		_stream.task.terminate()
+		local phase = _stream.has_chunks and "mid-flight" or "prefill"
 		Logger.debug(LOG, "Active MLX stream terminated (%s).", phase)
-		_active_stream_task    = nil
-		_active_stream_has_chunks = false
+		_stream.task    = nil
+		_stream.has_chunks = false
 	end
 end
 
@@ -994,644 +988,33 @@ end
 
 
 
--- ======================================
---- ======================================
--- ======= 2/ Core Request Engine =======
---- ======================================
--- ======================================
+--- =================================
+--- =================================
+--- ======= 2/ Request Wiring =======
+--- =================================
+--- =================================
+
+-- The request mechanics (post_and_parse / streaming) live in api_mlx_inference.lua
+-- and the dispatch strategies in api_mlx_fetch.lua — both state-free, fed by
+-- injection from this controller, which owns the discovery / warmup / streaming
+-- state machine. The request engine reads the live endpoint routes, the model
+-- identifiers, and the shared streaming-task table through these accessors
+-- (closures, so a later set_port / discovery / cancel is always seen); the
+-- dispatch layer sits on top of it. The fetch_* functions below delegate into it
+-- so the public controller surface stays on this module.
+ApiMlxInference.init({
+	completions_endpoint  = function() return _completions_endpoint end,
+	chat_endpoint         = function() return _chat_endpoint end,
+	server_model_id       = function() return _server_model_id end,
+	model_hf_path         = function() return _model_hf_path end,
+	read_active_model_arg = read_active_model_arg,
+	stream                = _stream,
+})
 
--- Builds the options payload for the OpenAI API format (MLX Server) - optimized
-local STOP_BASE_MLX  = { "<|eot_id|>", "<|im_end|>", "[/INST]", "PREFIX:" }
-local STOP_LINE_MLX  = { "<|eot_id|>", "<|im_end|>", "[/INST]", "PREFIX:", "\n\n", "</", "Suite finale", "SUITE", "NEXT_WORDS:" }
-
-local function build_options(temperature, num_predict_tokens, is_batch, line_mode)
-    local opts = {
-        temperature = tonumber(temperature) or ApiCommon.DEFAULT_TEMPERATURE,
-        max_tokens  = tonumber(num_predict_tokens),
-        stop        = (line_mode and not is_batch) and STOP_LINE_MLX or STOP_BASE_MLX,
-    }
-    return opts
-end
-
---- Posts data to the local MLX LLM and parses the response.
---- @param model_name string Model identifier.
---- @param system_prompt string System instructions.
---- @param full_text string Context text.
---- @param tail_text string Recent context text.
---- @param temperature number Model temperature.
---- @param num_predict_tokens number Token limits.
---- @param num_predictions number Expected completions count.
---- @param is_batch boolean True if batch format requested.
---- @param on_success function Success callback.
---- @param on_fail function Failure callback.
---- @param dedup_stats table Dedup stats object.
---- @param force_line_mode boolean Force line completion parsing.
-local function post_and_parse(model_name, system_prompt, full_text, tail_text,
-                               temperature, num_predict_tokens, num_predictions, is_batch,
-                               on_success, on_fail, dedup_stats, force_line_mode)
-    _req_counter = _req_counter + 1
-    local req_id = _req_counter
-    local messages = {}
-
-	local final_sys = system_prompt
-	if type(final_sys) == "string" then
-		final_sys = final_sys:gsub("%{n%}", tostring(num_predictions))
-	end
-
-	local user_prompt = ""
-	if type(final_sys) == "string" and final_sys:find("PREFIX") and final_sys:find("TAIL") then
-		user_prompt = string.format("PREFIX: \"%s\"\nTAIL: \"%s\"", full_text or "", tail_text or "")
-	else
-		local context_str = type(full_text) == "string" and full_text or ""
-		if type(final_sys) == "string" and final_sys:find("{context}", 1, true) then
-			final_sys = final_sys:gsub("%{context%}", function() return context_str end)
-			user_prompt = final_sys
-			final_sys = nil
-		else
-			user_prompt = context_str
-		end
-	end
-
-    -- MLX OpenAI-compatible endpoint can reject system roles for some models
-    -- Fold instructions into a single user message to keep compatibility
-    local merged_prompt = user_prompt
-    if type(final_sys) == "string" and final_sys ~= "" then
-        merged_prompt = final_sys .. "\n\n" .. (user_prompt or "")
-    end
-
-    -- Disable reasoning mode globally (Qwen3, DeepSeek-R1, Hermes-3-think,
-    -- etc.). See the streaming path below for the rationale; in short, these
-    -- models otherwise burn the entire token budget on <think>…</think>
-    -- monologue and emit zero final-answer content. /no_think is honoured
-    -- as an in-prompt directive even when the chat template ignores
-    -- chat_template_kwargs.
-    table.insert(messages, { role = "user", content = merged_prompt .. "\n\n/no_think" })
-
-    local t0_req = TimerScheduler.now()
-
-    -- Advanced mode is only the strict correction profile
-    local is_advanced_prompt = type(final_sys) == "string" and final_sys:find("TAIL_CORRECTED", 1, true) ~= nil
-    local line_mode = (force_line_mode == true) or ((not is_batch) and (not is_advanced_prompt))
-
-    local opts = build_options(temperature, num_predict_tokens, is_batch, line_mode)
-    local payload
-    local endpoint = _chat_endpoint
-    local prompt_preview = merged_prompt
-
-    -- See read_active_model_arg() rationale at top of file: must mirror the
-    -- exact --model arg the bash launcher passed to mlx_lm or the server
-    -- treats it as a different model and tries snapshot_download (offline 404).
-    local effective_model = read_active_model_arg() or _server_model_id or _model_hf_path or model_name
-    if line_mode then
-        -- For plain autocomplete, completion endpoint is more reliable than chat formatting
-        local ctx = type(full_text) == "string" and full_text or ""
-        local prompt = (#ctx > 240) and ctx:sub(#ctx - 239) or ctx
-        prompt_preview = prompt
-        endpoint = _completions_endpoint
-        payload = {
-            model       = effective_model,
-            prompt      = prompt,
-            stream      = false,
-            temperature = opts.temperature,
-            -- No literal: unset cap resolves to the one shared DEFAULT_MAX_TOKENS
-            max_tokens  = tonumber(opts.max_tokens) or SharedPromptBuilder.DEFAULT_MAX_TOKENS,
-            stop        = { "\n\n", "</", "\"", "- " }
-        }
-    else
-        payload = {
-            model               = effective_model,
-            messages            = messages,
-            stream              = false,
-            temperature         = opts.temperature,
-            max_tokens          = opts.max_tokens,
-            stop                = opts.stop,
-            chat_template_kwargs = { enable_thinking = false },
-            chat_template_args   = { enable_thinking = false },
-        }
-    end
-
-    Logger.debug(LOG, "[%s] #%d PROMPT (%d chars) -> %s", model_name, req_id, #prompt_preview, prompt_preview:sub(1, 250))
-    Logger.debug(LOG, "[%s] #%d MODE is_batch=%s line_mode=%s max_tokens=%s endpoint=%s", model_name, req_id, tostring(is_batch), tostring(line_mode), tostring(opts.max_tokens), endpoint)
-
-	local encoded, enc_err = JsonCodec.encode(payload)
-	if not encoded then
-		Logger.error(LOG, "Failed to encode MLX payload — %s", tostring(enc_err))
-		if type(on_fail) == "function" then pcall(on_fail) end
-		return
-	end
-
-	local done = false
-	local timeout_handle = TimerScheduler.after(NON_STREAM_TIMEOUT_SEC, function()
-		if done then return end
-		done = true
-		Logger.warn(LOG, "[%s] #%d TIMEOUT after %.0fs", model_name, req_id, NON_STREAM_TIMEOUT_SEC)
-		if type(on_fail) == "function" then pcall(on_fail) end
-	end)
-
-	_infer_client.post(endpoint, { ["Content-Type"] = "application/json" }, encoded,
-		function(r)
-			local status, body = r.status, r.body
-			if done then return end
-			done = true
-			TimerScheduler.cancel(timeout_handle)
-
-			if status ~= 200 then
-				Logger.error(LOG, "MLX HTTP %s :: %s", tostring(status), tostring((body or ""):sub(1, 260)))
-				if type(on_fail) == "function" then pcall(on_fail) end
-				return
-			end
-
-			local resp, _ = JsonCodec.decode(body)
-			if type(resp) ~= "table" or type(resp.choices) ~= "table" or not resp.choices[1] then
-                Logger.debug(LOG, "[%s] #%d Unusable response (decode/choices), body='%s'", model_name, req_id, tostring((body or ""):sub(1, 220)))
-				if type(on_fail) == "function" then pcall(on_fail) end
-				return
-			end
-
-			local choice = resp.choices[1]
-			local content = nil
-
-			-- OpenAI-like format extraction
-			if type(choice.message) == "table" then
-				if type(choice.message.content) == "string" then
-					content = choice.message.content
-				elseif type(choice.message.content) == "table" then
-					local chunks = {}
-					for _, item in ipairs(choice.message.content) do
-						if type(item) == "table" and type(item.text) == "string" then
-							table.insert(chunks, item.text)
-						elseif type(item) == "string" then
-							table.insert(chunks, item)
-						end
-					end
-					if #chunks > 0 then content = table.concat(chunks, "") end
-				end
-			end
-
-			-- Legacy completion fallback execution
-			if not content and type(choice.text) == "string" then
-				content = choice.text
-			end
-
-            if type(content) ~= "string" or content == "" then
-                local has_reasoning = type(choice.message) == "table" and type(choice.message.reasoning) == "string" and choice.message.reasoning ~= ""
-                if has_reasoning then
-                    Logger.debug(LOG, "[%s] #%d Reasoning-only response detected (empty content).", model_name, req_id)
-                end
-                Logger.debug(LOG, "[%s] #%d Empty content in choices[1]", model_name, req_id)
-                if type(on_fail) == "function" then pcall(on_fail) end
-                return
-            end
-
-            local raw     = Parser.strip_thinking(content)
-            local ms_req  = math.floor((TimerScheduler.now() - t0_req) * 1000)
-            Logger.debug(LOG, "[%s] #%d RAW (%dms, %d chars) -> %s", model_name, req_id, ms_req, #raw, raw:sub(1, 250))
-            local results = {}
-
-            if not is_batch then
-                local pred = Parser.process_prediction(full_text, tail_text, raw)
-                if pred then ApiCommon.insert_prediction(results, pred, dedup_stats, DEDUPLICATION_ENABLED, Logger, LOG) end
-            else
-                for _, block in ipairs(Parser.split_blocks(raw)) do
-                    if #results >= num_predictions then break end
-                    local pred = Parser.process_prediction(full_text, tail_text, block)
-                    if pred then ApiCommon.insert_prediction(results, pred, dedup_stats, DEDUPLICATION_ENABLED, Logger, LOG) end
-                end
-            end
-
-            if #results == 0 then
-                Logger.debug(LOG, "[%s] #%d PARSED -> 0 result (parser failure)", model_name, req_id)
-                if type(on_fail) == "function" then pcall(on_fail) end return
-            end
-            Logger.debug(LOG, "[%s] #%d PARSED -> %d result(s)", model_name, req_id, #results)
-            if keylogger and type(keylogger.log_llm) == "function" then
-                pcall(keylogger.log_llm, full_text, results, nil, {
-                    backend       = "mlx",
-                    model         = tostring(model_name),
-                    system_prompt = system_prompt,
-                    user_prompt   = user_prompt,
-                })
-            end
-			if type(on_success) == "function" then pcall(on_success, results) end
-		end
-	)
-end
-
-
-
-
-
---- Streaming variant of post_and_parse using hs.task + curl -N.
---- Calls on_partial(accumulated_raw_text) after each received token so the
---- caller can update the UI incrementally. Calls on_success with the final
---- parsed result when the stream ends.
---- @param model_name string
---- @param system_prompt string
---- @param full_text string
---- @param tail_text string
---- @param temperature number
---- @param num_predict_tokens number
---- @param num_predictions number
---- @param is_batch boolean
---- @param on_success function Called once with final parsed results.
---- @param on_fail function Called on error.
---- @param dedup_stats table
---- @param on_partial function|nil Called with accumulated raw text as each token arrives.
-local function post_and_parse_streaming(model_name, system_prompt, full_text, tail_text,
-                                         temperature, num_predict_tokens, num_predictions, is_batch,
-                                         on_success, on_fail, dedup_stats, on_partial)
-	-- Supersede any previous stream: always terminate to free the MLX server connection
-	if _active_stream_task then
-		_active_stream_task.terminate()
-		_active_stream_task    = nil
-		_active_stream_has_chunks = false
-	end
-
-	_stream_generation = _stream_generation + 1
-	local my_generation = _stream_generation
-
-	_req_counter = _req_counter + 1
-	local req_id = _req_counter
-
-	-- Replicate message/endpoint building from post_and_parse
-	local final_sys = system_prompt
-	if type(final_sys) == "string" then
-		final_sys = final_sys:gsub("%{n%}", tostring(num_predictions))
-	end
-
-	local user_prompt = ""
-	if type(final_sys) == "string" and final_sys:find("PREFIX") and final_sys:find("TAIL") then
-		user_prompt = string.format("PREFIX: \"%s\"\nTAIL: \"%s\"", full_text or "", tail_text or "")
-	else
-		local context_str = type(full_text) == "string" and full_text or ""
-		if type(final_sys) == "string" and final_sys:find("{context}", 1, true) then
-			final_sys = final_sys:gsub("%{context%}", function() return context_str end)
-			user_prompt = final_sys
-			final_sys = nil
-		else
-			user_prompt = context_str
-		end
-	end
-
-	local merged_prompt = user_prompt
-	if type(final_sys) == "string" and final_sys ~= "" then
-		merged_prompt = final_sys .. "\n\n" .. (user_prompt or "")
-	end
-
-	local is_advanced_prompt = type(final_sys) == "string" and final_sys:find("TAIL_CORRECTED", 1, true) ~= nil
-	local line_mode = (not is_batch) and (not is_advanced_prompt)
-	local opts = build_options(temperature, num_predict_tokens, is_batch, line_mode)
-
-	-- See read_active_model_arg() rationale at top of file: must mirror the
-	-- exact --model arg the bash launcher passed to mlx_lm or the server
-	-- treats it as a different model and tries snapshot_download (offline 404).
-	local effective_model = read_active_model_arg() or _server_model_id or model_name
-	local payload, endpoint, prompt_preview
-	if line_mode then
-		local ctx    = type(full_text) == "string" and full_text or ""
-		local prompt = (#ctx > 240) and ctx:sub(#ctx - 239) or ctx
-		prompt_preview = prompt
-		endpoint = _completions_endpoint
-		payload = {
-			model       = effective_model,
-			prompt      = prompt,
-			stream      = true,
-			temperature = opts.temperature,
-			-- No literal: unset cap resolves to the one shared DEFAULT_MAX_TOKENS
-			max_tokens  = tonumber(opts.max_tokens) or SharedPromptBuilder.DEFAULT_MAX_TOKENS,
-			stop        = { "\n\n", "</", "\"", "- " },
-		}
-	else
-		-- Disable reasoning / "thinking" mode globally. Qwen3, DeepSeek-R1,
-		-- Hermes-3-think and other reasoning models otherwise spend their
-		-- entire token budget producing <think>…</think> internal monologue
-		-- and emit zero final-answer content, which surfaces as
-		-- STREAM_DONE → empty raw → "parse yielded 0 result(s)".
-		--
-		-- Belt-and-braces:
-		--   1. chat_template_kwargs / chat_template_args: the standard
-		--      mlx-lm 0.31+ knob to flip Jinja templates that gate
-		--      <think> blocks behind `enable_thinking`.
-		--   2. /no_think suffix on the user message: Qwen3 honours this as
-		--      a literal in-prompt directive even if the chat template
-		--      does not pick up the kwarg (e.g. older snapshots).
-		local user_content    = merged_prompt .. "\n\n/no_think"
-		prompt_preview = user_content
-		endpoint = _chat_endpoint
-		payload = {
-			model               = effective_model,
-			messages            = { { role = "user", content = user_content } },
-			stream              = true,
-			temperature         = opts.temperature,
-			max_tokens          = opts.max_tokens,
-			stop                = opts.stop,
-			chat_template_kwargs = { enable_thinking = false },
-			chat_template_args   = { enable_thinking = false },
-		}
-	end
-
-	Logger.debug(LOG, "[%s] #%d STREAM_PROMPT (%d chars) -> %s",
-		model_name, req_id, #prompt_preview, prompt_preview:sub(1, 250))
-
-	local encoded, enc_err = JsonCodec.encode(payload)
-	if not encoded then
-		Logger.error(LOG, "Failed to encode MLX streaming payload — %s", tostring(enc_err))
-		if type(on_fail) == "function" then pcall(on_fail) end
-		return
-	end
-
-	local accumulated   = ""
-	local line_buf      = ""
-	local in_reasoning  = false  -- Currently accumulating delta.reasoning(_content) tokens — close </think> on transition or end
-	local t0_req        = TimerScheduler.now()
-
-	-- Parse one SSE line (data: {...} or data: [DONE]) and append its token to accumulated
-	local function process_sse_line(line)
-		Logger.debug(LOG, "[%s] #%d SSE line: '%s'", model_name, req_id, line:sub(1, 120))
-		if line:sub(1, 6) ~= "data: " then return end
-		local json_str = line:sub(7)
-		if json_str == "[DONE]" then return end
-		-- Reject structurally incomplete chunks early: a valid JSON object or array
-		-- must end with "}" or "]"; anything shorter is a split TCP chunk that
-		-- JsonCodec.decode cannot reconstruct, so skip rather than log a spurious error
-		local last_char = json_str:sub(-1)
-		if last_char ~= "}" and last_char ~= "]" then
-			Logger.debug(LOG, "process_sse_line: structurally incomplete chunk — skipping.")
-			return
-		end
-		local ok_json, obj = pcall(function() return JsonCodec.decode(json_str) end)
-		if not ok_json or not obj then
-			Logger.debug(LOG, "process_sse_line: JSON parse failed (incomplete chunk?) — skipping.")
-			return
-		end
-		if type(obj) ~= "table" or type(obj.choices) ~= "table" or not obj.choices[1] then
-			Logger.debug(LOG, "[%s] #%d SSE decode fail: type_obj=%s",
-				model_name, req_id, type(obj))
-			return
-		end
-		local choice = obj.choices[1]
-		-- Chat completions streaming. Reasoning models (Qwen3, DeepSeek-R1,
-		-- Hermes-3 in think mode) route their thought tokens through
-		-- delta.reasoning(_content) and the final answer through
-		-- delta.content. We accumulate both into a single string,
-		-- inserting a single <think>…</think> wrapper around the reasoning
-		-- segment so Parser.strip_thinking() can remove it cleanly at the
-		-- end. Without this branch, the reasoning chunks were silently
-		-- dropped and the chat-completions stream finished with "empty
-		-- accumulation" even when the server emitted hundreds of tokens.
-		local reasoning_chunk = nil
-		local content_chunk   = nil
-		if type(choice.delta) == "table" then
-			if type(choice.delta.content) == "string" and choice.delta.content ~= "" then
-				content_chunk = choice.delta.content
-			end
-			if type(choice.delta.reasoning_content) == "string" and choice.delta.reasoning_content ~= "" then
-				reasoning_chunk = choice.delta.reasoning_content
-			elseif type(choice.delta.reasoning) == "string" and choice.delta.reasoning ~= "" then
-				reasoning_chunk = choice.delta.reasoning
-			end
-		elseif type(choice.text) == "string" and choice.text ~= "" then
-			-- Completions endpoint streaming: text directly
-			content_chunk = choice.text
-		end
-
-		local appended = false
-		if reasoning_chunk then
-			if not in_reasoning then
-				accumulated = accumulated .. "<think>"
-				in_reasoning = true
-			end
-			accumulated = accumulated .. reasoning_chunk
-			appended = true
-		end
-		if content_chunk then
-			if in_reasoning then
-				accumulated = accumulated .. "</think>"
-				in_reasoning = false
-			end
-			accumulated = accumulated .. content_chunk
-			appended = true
-		end
-		if appended and type(on_partial) == "function" then
-			pcall(on_partial, accumulated)
-		end
-	end
-
-	-- Drain line_buf, processing every complete SSE line found
-	local function flush_lines()
-		while true do
-			local nl = line_buf:find("\n", 1, true)
-			if not nl then break end
-			local line = line_buf:sub(1, nl - 1)
-			line_buf   = line_buf:sub(nl + 1)
-			if line ~= "" then process_sse_line(line) end
-		end
-	end
-
-	-- Arms (or re-arms) the stream IDLE watchdog: if no further token arrives
-	-- within STREAM_HARD_TIMEOUT_SEC, the server is hung — terminate the task and
-	-- fire on_fail so the UI never freezes and the single-request MLX connection
-	-- is freed. Re-arming on every chunk (rather than cancelling after the first)
-	-- bounds a MID-STREAM stall too: the prior code cancelled the watchdog on the
-	-- first token, leaving a server that sent >=1 token then hung with NO bound at
-	-- all — curl blocked forever, on_done never fired, every later prediction was
-	-- blocked behind the held-open connection.
-	local function arm_stream_idle_watchdog()
-		if _active_stream_timeout then
-			TimerScheduler.cancel(_active_stream_timeout)
-			_active_stream_timeout = nil
-		end
-		_active_stream_timeout = TimerScheduler.after(STREAM_HARD_TIMEOUT_SEC, function()
-			_active_stream_timeout = nil
-			-- Only fire if this stream is still the current one
-			if my_generation ~= _stream_generation then return end
-			if _active_stream_task then
-				Logger.warn(LOG, "[%s] #%d STREAM idle timeout (%gs) — terminating hung task.",
-					model_name, req_id, STREAM_HARD_TIMEOUT_SEC)
-				_active_stream_task.terminate()
-				_active_stream_task       = nil
-				_active_stream_has_chunks = false
-				if type(on_fail) == "function" then pcall(on_fail) end
-			end
-		end)
-	end
-
-	-- Streaming callback: fired each time curl writes a chunk to stdout
-	local function on_chunk(_, chunk, stderr_chunk)
-		if not chunk or chunk == "" then return true end
-		-- Generation check: if a newer request superseded us, discard chunks silently
-		if my_generation ~= _stream_generation then return false end
-		-- First chunk received — server is alive (logged once for diagnostics).
-		if not _active_stream_has_chunks then
-			_active_stream_has_chunks = true
-		end
-		-- Re-arm the idle watchdog on EVERY chunk so a mid-stream stall is bounded,
-		-- not just a pre-first-token hang (the watchdog used to be cancelled here).
-		arm_stream_idle_watchdog()
-		Logger.debug(LOG, "[%s] #%d STREAM chunk (%d bytes): '%s'",
-			model_name, req_id, #chunk, chunk:sub(1, 120))
-		line_buf = line_buf .. chunk
-		flush_lines()
-		return true
-	end
-
-	-- Completion callback: fired when curl exits
-	local function on_done(exit_code, remaining, stderr_out)
-		Logger.debug(LOG, "[%s] #%d STREAM on_done: exit=%s remaining_len=%d stderr='%s'",
-			model_name, req_id, tostring(exit_code),
-			(remaining and #remaining or -1),
-			tostring((stderr_out or ""):sub(1, 200)))
-
-		-- Generation check: a newer request superseded this stream — discard result silently
-		-- and DO NOT touch _active_stream_task: it now belongs to the newer request,
-		-- and clearing it would untrack the active stream so subsequent cancel_streaming
-		-- calls would no-op, leaking curl processes that hold the MLX connection
-		if my_generation ~= _stream_generation then
-			Logger.debug(LOG, "[%s] #%d STREAM: superseded by newer request (gen %d vs %d) — no callbacks.",
-				model_name, req_id, my_generation, _stream_generation)
-			return
-		end
-
-		-- This stream is still the current one — clear active state
-		_active_stream_task    = nil
-		_active_stream_has_chunks = false
-		if _active_stream_timeout then
-			TimerScheduler.cancel(_active_stream_timeout)
-			_active_stream_timeout = nil
-		end
-
-		-- SIGTERM (15) means this stream was explicitly terminated (mid-flight cancel)
-		if exit_code == 15 then
-			Logger.debug(LOG, "[%s] #%d STREAM: terminated mid-flight — no callbacks.", model_name, req_id)
-			return
-		end
-
-		if remaining and remaining ~= "" then
-			line_buf = line_buf .. remaining
-			flush_lines()
-		end
-
-		-- Close any unterminated reasoning segment so Parser.strip_thinking
-		-- can remove the entire <think>…</think> block; without this,
-		-- a reasoning-only stream that never transitions to content would
-		-- leave "<think>…" unbalanced and strip_thinking would no-op.
-		if in_reasoning then
-			accumulated  = accumulated .. "</think>"
-			in_reasoning = false
-		end
-
-		if accumulated == "" then
-			Logger.warn(LOG, "[%s] #%d STREAM: empty accumulation — on_fail.", model_name, req_id)
-			if type(on_fail) == "function" then pcall(on_fail) end
-			return
-		end
-
-		local raw    = Parser.strip_thinking(accumulated)
-		local ms_req = math.floor((TimerScheduler.now() - t0_req) * 1000)
-		Logger.debug(LOG, "[%s] #%d STREAM_DONE (%dms) -> %s", model_name, req_id, ms_req, raw:sub(1, 250))
-
-		local results = {}
-		if not is_batch then
-			local pred = Parser.process_prediction(full_text, tail_text, raw)
-			if pred then ApiCommon.insert_prediction(results, pred, dedup_stats, DEDUPLICATION_ENABLED, Logger, LOG) end
-		else
-			for _, block in ipairs(Parser.split_blocks(raw)) do
-				if #results >= num_predictions then break end
-				local pred = Parser.process_prediction(full_text, tail_text, block)
-				if pred then ApiCommon.insert_prediction(results, pred, dedup_stats, DEDUPLICATION_ENABLED, Logger, LOG) end
-			end
-		end
-
-		if #results == 0 then
-			Logger.debug(LOG, "[%s] #%d STREAM: parse yielded 0 result(s).", model_name, req_id)
-			if type(on_fail) == "function" then pcall(on_fail) end
-			return
-		end
-		Logger.debug(LOG, "[%s] #%d STREAM: %d result(s).", model_name, req_id, #results)
-		if keylogger and type(keylogger.log_llm) == "function" then
-			pcall(keylogger.log_llm, full_text, results, nil, {
-				backend       = "mlx",
-				model         = tostring(model_name),
-				system_prompt = system_prompt,
-				-- mlx streaming builds the user prompt inline (line 798 of
-				-- post_and_parse_streaming uses ``merged_prompt``); fall back
-				-- to that when the local helper variable is in scope.
-				user_prompt   = (type(merged_prompt) == "string" and merged_prompt)
-					or (type(user_prompt) == "string" and user_prompt)
-					or nil,
-			})
-		end
-		if type(on_success) == "function" then pcall(on_success, results) end
-	end
-
-	-- Write payload to a temp file so curl reads it directly — avoids the
-	-- stdin-pipe/streaming-callback conflict in hs.task.
-	-- os.tmpname() creates an empty file at the base path; remove it immediately
-	-- so only the suffixed path (which we own) exists in /tmp.
-	local _tmp_base = os.tmpname()
-	local tmp_path = _tmp_base .. "_mlx_stream.json"
-	os.remove(_tmp_base)
-	local fh = io.open(tmp_path, "w")
-	if not fh then
-		Logger.error(LOG, "Failed to open temp file '%s' for MLX streaming payload.", tmp_path)
-		if type(on_fail) == "function" then pcall(on_fail) end
-		return
-	end
-	fh:write(encoded)
-	fh:close()
-
-	if _active_stream_timeout then
-		TimerScheduler.cancel(_active_stream_timeout)
-		_active_stream_timeout = nil
-	end
-
-	local task = ShellRunner.spawn("/usr/bin/curl", {
-		"-s", "-N", "-X", "POST",
-		"-H", "Content-Type: application/json",
-		"--connect-timeout", tostring(STREAM_CONNECT_TIMEOUT_SEC),
-		-- Hard ceiling on TOTAL stream duration so curl ALWAYS exits and on_done
-		-- runs even if the server stalls mid-stream (mirrors the Ollama backend).
-		-- Without this a post-first-token hang left curl blocked forever, holding
-		-- the single-request MLX connection open against every later prediction.
-		"--max-time", tostring(STREAM_HARD_TIMEOUT_SEC),
-		"--data-binary", "@" .. tmp_path,
-		endpoint,
-	}, on_done, on_chunk)
-	task.start()
-	_active_stream_task    = task
-	_active_stream_has_chunks = false
-	Logger.debug(LOG, "[%s] #%d STREAM task started (payload: %s).", model_name, req_id, tmp_path)
-
-	-- Idle watchdog: bound the stream in-process too (belt-and-suspenders with
-	-- --max-time). Armed now and re-armed on every chunk (see on_chunk), so a hung
-	-- server — connection accepted but no further tokens — is terminated and
-	-- surfaced via on_fail instead of freezing the UI on a stuck spinner.
-	arm_stream_idle_watchdog()
-
-	-- Clean up the temp file once the task has had time to read it
-	TimerScheduler.after(10, function()
-		os.remove(tmp_path)
-	end)
-end
-
-
-
-
--- ===================================
---- ===================================
--- ======= 3/ Fetch Strategies =======
---- ===================================
--- ===================================
-
--- The dispatch strategies live in api_mlx_fetch.lua — a state-free module that
--- receives the request mechanics (post_and_parse / post_and_parse_streaming) and
--- the dedup flag by injection. Wire it up now that the post functions are defined,
--- then re-expose the same public surface through thin delegations so every caller
--- (prediction_engine, init.lua) keeps using ApiMlx.fetch_* unchanged.
 ApiMlxFetch.init({
-	post_and_parse           = post_and_parse,
-	post_and_parse_streaming = post_and_parse_streaming,
-	dedup_enabled            = DEDUPLICATION_ENABLED,
+	post_and_parse           = ApiMlxInference.post_and_parse,
+	post_and_parse_streaming = ApiMlxInference.post_and_parse_streaming,
+	dedup_enabled            = ApiMlxInference.DEDUPLICATION_ENABLED,
 })
 
 --- Dispatches a single request asking for N clustered predictions.

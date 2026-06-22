@@ -40,6 +40,7 @@ local function check_file(rel_path, suffix)
 end
 
 check_file("modules/llm/api_ollama.lua", "_ollama_stream.json")
-check_file("modules/llm/api_mlx.lua",   "_mlx_stream.json")
+-- MLX streaming lives in the request engine.
+check_file("modules/llm/api_mlx_inference.lua", "_mlx_stream.json")
 
 print("[PASS] test_stream_tmpfile_no_orphan")

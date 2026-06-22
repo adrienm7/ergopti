@@ -21,9 +21,10 @@
 local helpers = require("tests.helpers")
 
 local function read_src()
-	local path = helpers.driver_root() .. "modules/llm/api_mlx.lua"
+	-- The streaming path lives in the request engine.
+	local path = helpers.driver_root() .. "modules/llm/api_mlx_inference.lua"
 	local fh = io.open(path, "r")
-	helpers.assert_true(fh ~= nil, "cannot open api_mlx.lua at " .. tostring(path))
+	helpers.assert_true(fh ~= nil, "cannot open api_mlx_inference.lua at " .. tostring(path))
 	local src = fh:read("*a"); fh:close()
 	return src
 end

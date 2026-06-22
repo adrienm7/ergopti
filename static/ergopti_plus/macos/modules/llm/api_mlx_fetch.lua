@@ -4,19 +4,18 @@
 --- MODULE: LLM API Fetch Strategies (Apple MLX)
 --- DESCRIPTION:
 --- The dispatch layer of the MLX controller: turns a single prediction request
---- into the right number of HTTP inferences and aggregates the results. Extracted
---- from api_mlx.lua to separate the "how many requests, in what order, with what
---- retry policy" strategy concern from the request/response mechanics
---- (post_and_parse / post_and_parse_streaming), which remain in api_mlx.lua and
---- are injected here through M.init().
+--- into the right number of HTTP inferences and aggregates the results. It owns
+--- the "how many requests, in what order, with what retry policy" strategy; the
+--- request/response mechanics (post_and_parse / post_and_parse_streaming) live in
+--- api_mlx_inference.lua and are injected here through M.init().
 ---
 --- FEATURES & RATIONALE:
 --- 1. batch / parallel / sequential strategies share one public signature so the
 ---    prediction engine can swap them without caring about the dispatch shape.
 --- 2. State-free: every cross-cutting dependency (the post functions, the dedup
----    flag) is injected by api_mlx via M.init(), so this module owns no MLX state
----    of its own and never re-declares a default — the single source of truth
----    stays in api_mlx.lua.
+---    flag) is injected through M.init(), so this module owns no MLX state of its
+---    own and re-declares no default — the single source of truth is the request
+---    engine in api_mlx_inference.lua.
 --- ==============================================================================
 
 local M = {}
@@ -25,12 +24,12 @@ local Logger         = require("lib.logger")
 local ApiCommon      = require("modules.llm.api_common")
 local Profiles       = require("modules.llm.profiles")
 local TimerScheduler = require("adapters.timer_scheduler")
--- Same log channel as api_mlx so logger routing (ErgoptiPlus_mlx.log) is unchanged.
+-- MLX log channel; every MLX line lands in ErgoptiPlus_mlx.log.
 local LOG            = "llm.api_mlx"
 
 -- Retry policy comes from _shared/modules/llm/inference.json (see api_common.lua),
--- read from the same canonical source api_mlx reads so the fan-out retry budget is
--- never hardcoded or duplicated.
+-- read from the canonical source so the fan-out retry budget is never hardcoded
+-- or duplicated.
 local _RETRY_MAX_MULT = ApiCommon.get_retry_policy()
 local RETRY_FAILED_PREDICTION_ENABLED        = (_RETRY_MAX_MULT or 0) > 1
 local RETRY_FAILED_PREDICTION_MAX_MULTIPLIER = _RETRY_MAX_MULT
