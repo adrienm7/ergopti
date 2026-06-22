@@ -340,6 +340,7 @@ _HSE_DrainFireLog() {
 ; No-op when the watcher is not running (the index is intentionally empty then).
 HotstringPrefixWatcherRebuildIndex() {
     global _PrefixInputHook, _PrefixIndex, _TriggerSet, _PREFIX_WATCHER_CATEGORIES
+    global _HS_CACHE_LOADED, HS_BUNDLED_CATEGORIES, _HS_CACHE_ROWS
     if !_PrefixInputHook {
         return
     }
@@ -378,18 +379,29 @@ HotstringPrefixWatcherRebuildIndex() {
     ; is user-relocatable) and any cache-miss still take the TOML path; both feed the
     ; identical _AddTriggerVariants pipeline so the index is byte-identical to the
     ; old behaviour (pinned by test_prefix_index_cache_equiv).
+    _cachedCats := 0
+    _tomlCats := 0
     for _, Category in _PREFIX_WATCHER_CATEGORIES {
-        if _PrefixWatcherCategoryIsCached(Category)
+        if _PrefixWatcherCategoryIsCached(Category) {
             _RegisterCategoryTriggersFromCache(Category, NewIndex, NewSet)
-        else
+            _cachedCats += 1
+        } else {
             _RegisterCategoryTriggers(Category, NewIndex, NewSet)
+            _tomlCats += 1
+        }
     }
     _PrefixIndex := NewIndex
     _TriggerSet := NewSet
     ; Bundled categories now rebuild from memory (no FileRead, no regex); only
     ; personal still parses TOML. Keep logging the trigger count + wall time so a
-    ; regression that reintroduces the cold-disk cost is visible at a glance.
-    try LoggerInfo("PrefixWatcher", "Index rebuilt: {1} trigger(s) in {2} ms.", NewSet.Count, A_TickCount - _rebuildStart)
+    ; regression that reintroduces the cold-disk cost is visible at a glance. The
+    ; cache/toml tally + cache state are temporary diagnostics to confirm the path.
+    try LoggerInfo("PrefixWatcher",
+        "Index rebuilt: {1} trigger(s) in {2} ms (cache={3} toml={4} loaded={5} bundledSet={6} rows={7}).",
+        NewSet.Count, A_TickCount - _rebuildStart, _cachedCats, _tomlCats,
+        (IsSet(_HS_CACHE_LOADED) ? _HS_CACHE_LOADED : "unset"),
+        (IsSet(HS_BUNDLED_CATEGORIES) ? "yes" : "no"),
+        (IsSet(_HS_CACHE_ROWS) ? _HS_CACHE_ROWS.Count : "unset"))
     ; A just-disabled section may still have a tooltip on screen — hide it so the
     ; preview cannot outlive the expansion it was advertising.
     TooltipHide("LiveToggleRebuild", true)
