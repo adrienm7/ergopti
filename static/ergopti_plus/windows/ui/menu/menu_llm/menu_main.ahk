@@ -103,80 +103,19 @@ LLM_Menu_Build() {
 		RegisterMenuItem(_LLM_Menu_Handle, t("menu.llm.warning_install_ollama"), _LLM_Menu_OnWarningInstallClick)
 	}
 
-	; Backend submenu — NEVER greyed by the off-state. Mirrors the macOS menu
-	; (ui/menu/menu_llm/init.lua: the backend row uses `disabled = paused or nil`,
-	; NOT is_disabled): the user must be able to pick the backend/model while the
-	; feature is off so it is configured before they enable it.
-	backend_menu := LLM_Menu_BuildBackendMenu()
-	_LLM_Menu_AddRow(StrReplace(t("menu.llm.model_backend"), "%s", _LLM_Menu["backend"]), backend_menu, false)
-
-	; Model submenu — prefix the label with a backend-health dot so the user
-	; can tell at a glance whether the active backend is reachable, mirroring
-	; HS's ui/menu/menu_llm/init.lua build_model_item (the "health_dot" block).
-	; 🟢 = backend answered the latest async probe, 🔴 = either not running
-	; or unreachable, "" when the feature is disabled entirely so the dot
-	; does not nag while the user is intentionally off.
-	;
-	; The probe itself fires async every time the menu is rebuilt — the
-	; dot paints with the previously-cached status and the next rebuild
-	; reflects the new one. Same pattern as HS's probe_llm_health.
-	model_menu := LLM_Menu_BuildModelMenu()
-	_LLM_Menu_FireHealthProbe()
-	last_status := _LLM_Menu.Has("last_health_status") ? _LLM_Menu["last_health_status"] : ""
-	health_dot := _llm_is_operational
-		? ((last_status == "ok") ? "🟢 " : (last_status == "ko") ? "🔴 " : "")
-		: ""
-	; Model submenu — NEVER greyed by the off-state either (macOS parity: the model
-	; row uses `disabled = paused or nil`). The curated catalogue is selectable while
-	; the feature is off; the choice is simply recorded until predictions resume.
-	_LLM_Menu_AddRow(
-		health_dot . StrReplace(t("menu.llm.model_label"), "%s", _LLM_Menu["model"]),
-		model_menu, false)
-
-	; Thinking-model warning row — surfaces when the active model has built-in
-	; reasoning ("-r1" suffix, "thinking" / "reasoning" in the name). The
-	; built-in "basic" / "advanced" profiles use short prompts that conflict
-	; with the model's chain-of-thought, so an unattended user wonders why
-	; the predictions are slow and verbose. The row is disabled (info-only)
-	; and mirrors HS's ui/menu/menu_llm/init.lua thinking-info insertion.
-	if _LLM_Menu_IsThinkingModel(_LLM_Menu["model"]) {
-		warning_label := t("menu.llm.thinking_model_info")
-		_LLM_Menu_Handle.Add(warning_label, (*) => 0)
-		_LLM_Menu_Handle.Disable(warning_label)
-	}
-
-	; Profile submenu
-	profile_menu := LLM_Menu_BuildProfileMenu()
-	active_label := LLM_Menu_GetProfileLabel(_LLM_Menu["profile_id"])
-	_LLM_Menu_AddRow(StrReplace(t("menu.profiles.profile_label_prefix"), "%s", active_label), profile_menu, _disabled)
-
-	; Number of predictions submenu — with the same conditional reset row that
-	; HS exposes (ui/menu/menu_llm/init.lua build_menu near num_predictions).
-	n_menu := LLM_Menu_BuildNMenu()
-	_LLM_Menu_AddRow(StrReplace(t("menu.llm.num_predictions_label"), "%s", _LLM_Menu["n_predictions"]), n_menu, _disabled)
-	_LLM_MaybeAddReset(_LLM_Menu_Handle,
-		_LLM_Menu["n_predictions"],
-		_LLM_DefaultFor("llm_num_predictions", 3),
-		(*) => _LLM_AssignAndRebuild("n_predictions",
-			_LLM_DefaultFor("llm_num_predictions", 3)))
-
-	_LLM_Menu_Handle.Add()  ; separator
-
-	; Trigger settings submenu
-	trigger_menu := LLM_Menu_BuildTriggerMenu()
-	_LLM_Menu_AddRow(t("menu.llm.trigger_menu_title"), trigger_menu, _disabled)
-
-	; Generation settings submenu
-	gen_menu := LLM_Menu_BuildGenerationMenu()
-	_LLM_Menu_AddRow(t("menu.llm.generation_menu_title"), gen_menu, _disabled)
-
-	; Display settings submenu
-	disp_menu := LLM_Menu_BuildDisplayMenu()
-	_LLM_Menu_AddRow(t("menu.llm.display_menu_title"), disp_menu, _disabled)
-
-	; Navigation settings submenu
-	nav_menu := LLM_Menu_BuildNavMenu()
-	_LLM_Menu_AddRow(t("menu.llm.nav_menu_title"), nav_menu, _disabled)
+	; ── Settings rows ────────────────────────────────────────────────────────
+	; Row ORDER and the disabled-when-off POLICY come from the shared layout spec
+	; (_shared/modules/llm/menu_layout.json), so the Windows and macOS IA menus can
+	; never drift again (a greying mismatch between them was the bug this prevents).
+	; The per-row native label + submenu builder are dispatched by id inside
+	; _LLM_Menu_EmitRow — those must stay native because they read Win32/tray state;
+	; the spec owns only the order and the greying. backend/model carry
+	; disabled_when_off=false (usable while off, so the user can configure before
+	; enabling); the rest carry true (greyed while off). Conditional/native-only rows
+	; (thinking-model info, the num-predictions reset, the inner separator) are
+	; emitted from inside _LLM_Menu_EmitRow at their anchor row.
+	for _i, _row in _LLM_MenuLayout_Rows()
+		_LLM_Menu_EmitRow(_row["id"], (_row["disabled_when_off"] ? _disabled : false), _llm_is_operational)
 
 	_LLM_Menu_Handle.Add()  ; separator
 	RegisterMenuItem(_LLM_Menu_Handle, t("menu.llm.about"), LLM_Menu_OnAbout)
@@ -219,4 +158,116 @@ _LLM_Menu_AddRow(label, target, disabled) {
 	_LLM_Menu_Handle.Add(label, target)
 	if disabled
 		try _LLM_Menu_Handle.Disable(label)
+}
+
+
+
+
+; =====================================================
+; ===== 1.1) Shared-spec-driven settings row emit =====
+; =====================================================
+
+/**
+ * Returns the ordered settings-row list from the shared layout spec
+ * (_shared/modules/llm/menu_layout.json) — the SINGLE SOURCE OF TRUTH shared with
+ * the macOS renderer so the two IA menus can never drift in row order or greying
+ * policy. Cached after the first read (the layout is static for the session). Falls
+ * back to a built-in mirror of the spec if the file is missing/corrupt so the menu
+ * always renders; the built-in list is pinned to the JSON by the cross-platform
+ * contract test (tests/meta/test_llm_menu_layout_shared.ahk), so it cannot drift.
+ * @returns {Array} Array of Maps, each with "id" (string) and "disabled_when_off" (bool).
+ */
+_LLM_MenuLayout_Rows() {
+	global _SharedDir
+	static _cache := ""
+	if (_cache != "")
+		return _cache
+	rows := _LLM_MenuLayout_Fallback()
+	try {
+		path := _SharedDir . "\modules\llm\menu_layout.json"
+		parsed := JsonParse(FileRead(path, "UTF-8"))
+		if (parsed is Map && parsed.Has("rows") && parsed["rows"] is Array && parsed["rows"].Length > 0)
+			rows := parsed["rows"]
+		else
+			try LoggerWarn("LLM", "menu_layout.json has no usable 'rows' array — using built-in fallback order.")
+	} catch as e {
+		try LoggerWarn("LLM", "menu_layout.json load failed ({1}) — using built-in fallback order.", e.Message)
+	}
+	_cache := rows
+	return rows
+}
+
+/**
+ * Built-in fallback for the shared layout — mirrors menu_layout.json's row order
+ * and disabled-when-off policy. Pinned to the JSON by the contract test so the two
+ * never diverge; exists only so a missing/corrupt spec file still yields a menu.
+ * @returns {Array} The canonical settings-row list.
+ */
+_LLM_MenuLayout_Fallback() {
+	return [
+		Map("id", "backend",         "disabled_when_off", false),
+		Map("id", "model",           "disabled_when_off", false),
+		Map("id", "profile",         "disabled_when_off", true),
+		Map("id", "num_predictions", "disabled_when_off", true),
+		Map("id", "trigger",         "disabled_when_off", true),
+		Map("id", "generation",      "disabled_when_off", true),
+		Map("id", "display",         "disabled_when_off", true),
+		Map("id", "navigation",      "disabled_when_off", true)
+	]
+}
+
+/**
+ * Emits one settings row by its shared-spec id. The spec (_LLM_MenuLayout_Rows)
+ * owns the ORDER and the `disabled` flag; this dispatch owns the platform-native
+ * label formatting and submenu construction (which read Win32/tray state and so
+ * cannot live in shared data). Conditional native-only rows that have no shared
+ * entry — the thinking-model info row, the num-predictions reset row, and the
+ * inner separator — are emitted here at their anchor row to preserve menu order.
+ * @param {String}  id                  Row id from menu_layout.json.
+ * @param {Boolean} disabled            Greying flag already resolved from the spec policy.
+ * @param {Boolean} llm_is_operational  Enabled AND deps ready — gates the health dot.
+ */
+_LLM_Menu_EmitRow(id, disabled, llm_is_operational) {
+	global _LLM_Menu, _LLM_Menu_Handle
+	switch id {
+	case "backend":
+		_LLM_Menu_AddRow(StrReplace(t("menu.llm.model_backend"), "%s", _LLM_Menu["backend"]), LLM_Menu_BuildBackendMenu(), disabled)
+	case "model":
+		; Build the submenu, fire the async health probe, then prefix the label with
+		; the cached backend-health dot (🟢 reachable / 🔴 down / "" when off) —
+		; mirrors HS's build_model_item health_dot block.
+		model_menu := LLM_Menu_BuildModelMenu()
+		_LLM_Menu_FireHealthProbe()
+		last_status := _LLM_Menu.Has("last_health_status") ? _LLM_Menu["last_health_status"] : ""
+		health_dot := llm_is_operational
+			? ((last_status == "ok") ? "🟢 " : (last_status == "ko") ? "🔴 " : "")
+			: ""
+		_LLM_Menu_AddRow(health_dot . StrReplace(t("menu.llm.model_label"), "%s", _LLM_Menu["model"]), model_menu, disabled)
+		; Thinking-model info row — conditional, native-only (mirrors HS thinking-info).
+		if _LLM_Menu_IsThinkingModel(_LLM_Menu["model"]) {
+			warning_label := t("menu.llm.thinking_model_info")
+			_LLM_Menu_Handle.Add(warning_label, (*) => 0)
+			try _LLM_Menu_Handle.Disable(warning_label)
+		}
+	case "profile":
+		_LLM_Menu_AddRow(StrReplace(t("menu.profiles.profile_label_prefix"), "%s", LLM_Menu_GetProfileLabel(_LLM_Menu["profile_id"])), LLM_Menu_BuildProfileMenu(), disabled)
+	case "num_predictions":
+		_LLM_Menu_AddRow(StrReplace(t("menu.llm.num_predictions_label"), "%s", _LLM_Menu["n_predictions"]), LLM_Menu_BuildNMenu(), disabled)
+		; Conditional reset row (native), then the separator before the trigger block.
+		_LLM_MaybeAddReset(_LLM_Menu_Handle,
+			_LLM_Menu["n_predictions"],
+			_LLM_DefaultFor("llm_num_predictions", 3),
+			(*) => _LLM_AssignAndRebuild("n_predictions", _LLM_DefaultFor("llm_num_predictions", 3)))
+		_LLM_Menu_Handle.Add()  ; separator
+	case "trigger":
+		_LLM_Menu_AddRow(t("menu.llm.trigger_menu_title"), LLM_Menu_BuildTriggerMenu(), disabled)
+	case "generation":
+		_LLM_Menu_AddRow(t("menu.llm.generation_menu_title"), LLM_Menu_BuildGenerationMenu(), disabled)
+	case "display":
+		_LLM_Menu_AddRow(t("menu.llm.display_menu_title"), LLM_Menu_BuildDisplayMenu(), disabled)
+	case "navigation":
+		_LLM_Menu_AddRow(t("menu.llm.nav_menu_title"), LLM_Menu_BuildNavMenu(), disabled)
+	default:
+		try LoggerWarn("LLM", "_LLM_Menu_EmitRow: unknown row id '{1}' in shared menu_layout.json — skipped.", id)
+	}
 }
