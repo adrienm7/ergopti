@@ -10,14 +10,9 @@
 
 #Requires AutoHotkey v2.0
 
-_PTME_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
-}
 
 _PTME_PatchTomlMetaHasCatch() {
-	Src := _PTME_ReadSource("lib/hotstrings/hotstrings_config_window.ahk")
+	Src := _DriverDirConcat("ui/hotstrings_config_window")
 	Assert(Src != "", "Source file hotstrings_config_window.ahk must exist")
 
 	Body := _DriverFuncBody("_HCW_PatchTomlMeta")

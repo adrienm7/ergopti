@@ -35,11 +35,6 @@
 ; ==================================================
 
 ; A_ScriptDir is the runner dir (tests/); its parent is the windows/ driver root.
-_CWDW_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
-}
 
 
 
@@ -51,7 +46,7 @@ _CWDW_ReadSource(RelPath) {
 ; ==================================================
 
 _CWDW_Source() {
-	return _CWDW_ReadSource("lib/hotstrings/hotstrings_config_window.ahk")
+	return _DriverDirConcat("ui/hotstrings_config_window")
 }
 
 ; The Change handler must NOT persist directly -- it arms the debounce instead.
