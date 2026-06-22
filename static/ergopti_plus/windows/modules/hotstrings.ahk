@@ -986,11 +986,14 @@ RegisterEmojisSymbolsDeferred() {
 		_emojiStart := A_TickCount
 		_RegisterEmojisSymbolsSections()
 		try LoggerInfo("Hotstrings", "Emoji/symbol HSE sections registered in {1} ms.", A_TickCount - _emojiStart)
-		; No prefix-index rebuild here: the warm-up SetTimer (HS_PREFIX_INDEX_WARM_DELAY_MS)
-		; already built a COMPLETE index from the in-memory cache + Features, which include
-		; the emoji/symbol sections independent of HSE registration timing. A second rebuild
-		; produced the identical 3180-trigger index — pure redundant boot work, removed
-		; (pinned by test_prefix_watcher_deferred + test_prefix_index_cache_equiv).
+		; Build the prefix-watcher PREVIEW index ONCE, here, at the end of the deferred
+		; pass. This is the single index build (the earlier warm-up SetTimer was removed):
+		; by now HotstringsResolve is memoised for every section — including the emoji/
+		; symbol ones just registered above — and the boot has settled, so this rebuild is
+		; reliably ~220 ms instead of the erratic 250 ms–6 s the warm-up saw under boot
+		; contention. The index is built from the in-memory cache + Features, so it covers
+		; every category in one pass (pinned by test_prefix_watcher_deferred).
+		try HotstringPrefixWatcherRebuildIndex()
 		try BootProfile_Mark("Emoji/symbol hotstrings registered (deferred)")
 		try LoggerInfo("Hotstrings", "Deferred emoji/symbol registration complete.")
 	} catch as e {
