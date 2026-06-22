@@ -43,6 +43,7 @@ LLM_Menu_Build() {
 		return
 	_Building := true
 	try {
+	try LoggerInfo("LLM", "LLM_Menu_Build: building IA submenu (enabled={1}, inTray={2}).", _LLM_Menu["enabled"] ? "true" : "false", _LLM_Menu_InTray ? "true" : "false")
 	; Clear all existing items so we can repopulate in place.
 	try _LLM_Menu_Handle.Delete()
 
@@ -187,6 +188,7 @@ LLM_Menu_Build() {
 	} else {
 		try A_TrayMenu.Uncheck(t("menu.llm.title"))
 	}
+	try LoggerInfo("LLM", "LLM_Menu_Build: IA submenu built with {1} item(s).", DllCall("GetMenuItemCount", "ptr", _LLM_Menu_Handle.Handle, "int"))
 	} finally {
 		_Building := false
 	}
