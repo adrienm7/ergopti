@@ -464,7 +464,7 @@ end
 -- file. The resolver routes the personal category through the (possibly
 -- relocated) personal_hotstrings.toml; everything else lives in `hotstrings_dir`.
 do
-	local hotstrings_config = require("modules.hotstrings_config")
+	local hotstrings_config = require("modules.hotstrings.hotstrings_config")
 	local override_path = menu_paths.get_config_dir()
 	if not override_path:match("[/\\]$") then override_path = override_path .. "/" end
 	override_path = override_path .. "hotstrings_config.toml"

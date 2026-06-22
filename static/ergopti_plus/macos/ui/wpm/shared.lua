@@ -51,7 +51,7 @@ local NO_COLOR_SOURCES = {
 --- @return string Hex color string with leading "#".
 local function resolve_source_hex(source)
 	if not NO_COLOR_SOURCES[source] and source ~= "llm" then
-		local ok, hs_cfg = pcall(require, "modules.hotstrings_config")
+		local ok, hs_cfg = pcall(require, "modules.hotstrings.hotstrings_config")
 		if ok and hs_cfg and type(hs_cfg.resolve) == "function" then
 			local resolved = hs_cfg.resolve(source, nil)
 			if resolved and type(resolved.color) == "string" and resolved.color ~= "" then

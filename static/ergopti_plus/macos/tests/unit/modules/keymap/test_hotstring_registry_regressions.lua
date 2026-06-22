@@ -183,9 +183,9 @@ helpers.describe("Registry — section priority from the shared override file", 
 		local Registry = require("modules.keymap.registry")
 
 		local old_toml = package.loaded["lib.toml_reader"]
-		local old_hcfg = package.loaded["modules.hotstrings_config"]
+		local old_hcfg = package.loaded["modules.hotstrings.hotstrings_config"]
 		package.loaded["lib.toml_reader"]          = { parse = function() return toml_data end }
-		package.loaded["modules.hotstrings_config"] = { get_user_override = override_fn }
+		package.loaded["modules.hotstrings.hotstrings_config"] = { get_user_override = override_fn }
 
 		local state = {
 			groups = { rolls = { enabled = true, sections = { sec1 = { enabled = true } } } },
@@ -196,7 +196,7 @@ helpers.describe("Registry — section priority from the shared override file", 
 		Registry.load_toml("rolls", "dummy.toml")
 
 		package.loaded["lib.toml_reader"]          = old_toml
-		package.loaded["modules.hotstrings_config"] = old_hcfg
+		package.loaded["modules.hotstrings.hotstrings_config"] = old_hcfg
 
 		local prio
 		for _, m in ipairs(state.mappings) do

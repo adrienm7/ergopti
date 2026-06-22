@@ -97,7 +97,7 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 	if keymap and type(keymap.set_delay) == "function" then
 		local defs       = keymap.DELAYS_DEFAULT or {}
 		local key_to_cat = keymap.DELAY_KEY_TO_CATEGORY or {}
-		local ok_cfg, hs_cfg = pcall(require, "modules.hotstrings_config")
+		local ok_cfg, hs_cfg = pcall(require, "modules.hotstrings.hotstrings_config")
 		if not ok_cfg then hs_cfg = nil end
 		for k, default_val in pairs(defs) do
 			local resolved = nil

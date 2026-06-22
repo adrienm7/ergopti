@@ -33,7 +33,7 @@ local keymap       = require("modules.keymap")
 -- Per-category delays (magic key, autocorrection) are owned by hotstrings_config
 -- (persisted to hotstrings_config.toml, shared with the config window). The quick
 -- menu items below read/write through it so the two UIs never desync.
-local hotstrings_config = require("modules.hotstrings_config")
+local hotstrings_config = require("modules.hotstrings.hotstrings_config")
 
 
 

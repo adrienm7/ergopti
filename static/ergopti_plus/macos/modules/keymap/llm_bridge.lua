@@ -36,7 +36,7 @@ local keylogger        = require("modules.keylogger")
 local tooltip          = require("ui.tooltip")
 local engine           = require("modules.llm.prediction_engine")
 local Registry         = require("modules.keymap.registry")
-local hotstrings_config = require("modules.hotstrings_config")
+local hotstrings_config = require("modules.hotstrings.hotstrings_config")
 local expander         = require("modules.keymap.expander")
 
 local LOG    = "keymap.llm_bridge"

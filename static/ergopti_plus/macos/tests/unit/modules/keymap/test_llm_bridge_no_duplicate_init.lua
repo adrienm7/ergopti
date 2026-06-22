@@ -38,7 +38,7 @@ local STUB_MODULES = {
 	"ui.tooltip",
 	"modules.llm.prediction_engine",
 	"modules.keymap.registry",
-	"modules.hotstrings_config",
+	"modules.hotstrings.hotstrings_config",
 	"modules.keymap.llm_bridge",
 	"lib.logger",
 }
@@ -164,7 +164,7 @@ package.loaded["modules.keymap.registry"] = {
 }
 
 -- modules.hotstrings_config: no-op stub.
-package.loaded["modules.hotstrings_config"] = {
+package.loaded["modules.hotstrings.hotstrings_config"] = {
 	resolve = function() return nil end,
 }
 
