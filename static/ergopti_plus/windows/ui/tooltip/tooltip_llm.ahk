@@ -1,4 +1,4 @@
-﻿; ui/tooltip_llm.ahk
+﻿; ui/tooltip/tooltip_llm.ahk
 
 ; ==============================================================================
 ; MODULE: LLM Tooltip UI

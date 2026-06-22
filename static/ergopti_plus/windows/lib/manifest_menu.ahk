@@ -1,4 +1,4 @@
-﻿; lib/menu_renderer.ahk
+﻿; lib/manifest_menu.ahk
 
 ; ==============================================================================
 ; MODULE: Menu Renderer
