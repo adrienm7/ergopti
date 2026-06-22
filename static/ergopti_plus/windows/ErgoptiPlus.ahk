@@ -841,6 +841,11 @@ _RegisterScriptAltGrHotkeys()
 ; micro-bench (tests/bench_boot_hotstrings.ahk) shows magic-key text expansion is
 ; the heaviest registration category by a wide margin.
 BootProfile_Mark("Layout/shortcuts/tap-holds + AltGr registered")
+; Clear any phantom modifier carried across a Reload BEFORE the input hook starts
+; observing keystrokes, so a Reload that landed mid-AltGr cannot leave this fresh
+; process stuck on the AltGr layer for the first keystrokes (transient
+; « AltGr bloqué »). See _ReleasePhantomModifiers in lib/lifecycle.ahk.
+_ReleasePhantomModifiers()
 ; DeferHeavy := true — skip ONLY the emoji/symbol categories on the critical boot
 ; path (~3000 regs / ~410 ms); RegisterEmojisSymbolsDeferred (armed below) loads
 ; them off-path a moment later and rebuilds the prefix-watcher index. The magic-key
