@@ -1095,6 +1095,18 @@ Gotchas: (1) `isRepeat` was ALREADY always false in the old generated output —
 
 <sub>slug: `project_hotstrings_self_healing_cache`</sub>
 
+### project-prefix-index-rebuild-cost-is-cold-disk
+
+_The prefix-watcher index rebuild's cost is the cold-disk TOML read, NOT parse CPU — build the index from the in-memory `_HS_CACHE_ROWS`, the same way HSE registration does._
+
+`HotstringPrefixWatcherRebuildIndex` used to rebuild its preview index by re-reading + regex-parsing every category TOML from disk (`_RegisterCategoryTriggers` per category). The smoking gun was in the boot log: the **same 3180-trigger index** measured **157 ms once the OS file cache was warm but 3031–6422 ms on the cold read right after a reload** (magickey.toml alone is ~2119 entries), under boot disk/CPU contention. That multi-second synchronous rebuild monopolised the single AHK thread, so the **tray menu could not open** during the deferred boot pass — the user-visible "menu takes seconds to appear". The parse work itself is cheap; the disk read is what blew up. Two rebuilds run at boot (the boot-tail warm-up `SetTimer(HotstringPrefixWatcherRebuildIndex, -HS_PREFIX_INDEX_WARM_DELAY_MS)` in `ErgoptiPlus.ahk`, and the one in `RegisterEmojisSymbolsDeferred`); both build the identical index, so they showed identical 3180 counts.
+
+Fix: bundled categories now rebuild from the already-parsed in-memory `_HS_CACHE_ROWS` (`_RegisterCategoryTriggersFromCache`) — no `FileRead`, no per-line regex. It mirrors `_RegisterCategoryTriggers`' gating (master gate, V2 snake_case remap, per-section Features `enabled`) and feeds the SAME `_AddTriggerVariants` pipeline, so the index is **byte-identical** (pinned by `tests/test_prefix_index_cache_equiv.ahk`, which builds both ways over case-sensitive / strict / magic-key / priority-override entries and asserts entry-for-entry equality). Personal (never bundled — relocatable TOML) and any cache-miss still parse TOML. Map the cache row `[flags, trigger(★), output, finalResult, isRepeat, isCaseSens, priorityOverride]` to the watcher fields via: `IsCaseSensitive = Row[6]`, `IsStrict = InStr(Row[1],"C")>0`, `Individual = Row[7]`, and `StrReplace(★ → MagicKey)` on trigger+output.
+
+Gotcha: the boot-tail warm-up has its OWN `SetTimer`, so it can race ahead of the cache load and fall back to the cold-disk path (`_PrefixWatcherCategoryIsCached` returns false while `_HS_CACHE_LOADED` is still false). The rebuild therefore calls the idempotent `HotstringsCacheEnsure()` first to guarantee the in-memory path. See [[project-hotstrings-self-healing-cache]].
+
+<sub>slug: `project_prefix_index_rebuild_cost_is_cold_disk`</sub>
+
 ### project-suspend-pause-invariant
 
 _Pause must fully silence ALL features (no tooltip/LLM/keylogger/widget). AHK Suspend only disarms hotkeys — InputHooks/timers/OnMessage bypass it and need explicit A_IsSuspended guards._
