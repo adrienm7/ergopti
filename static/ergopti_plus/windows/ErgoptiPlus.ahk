@@ -882,8 +882,18 @@ _DriverReady := true
 SetTimer(BuildTrayMenuDeferred, -MENU_BUILD_DEFER_MS)
 if _LangMenuBuildPending
 	SetTimer(BuildLanguageMenuDeferred, -LANG_MENU_DEFER_MS)
-if _LLM_Menu_BuildPending
-	SetTimer(LLM_Menu_Build, -LLM_MENU_BUILD_DEFER_MS)
+; Arm the IA-submenu population UNCONDITIONALLY. The LLM tray module is always
+; #Include'd, so LLM_Menu_Init() always runs and its (empty) submenu always needs
+; populating. This MUST NOT be gated on a flag set by LLM_Menu_Init: at boot the
+; full menu — initMenu() → LLM_Menu_Init() — is built only inside the DEFERRED
+; BuildTrayMenuDeferred pass (armed just above), so any such flag is still at its
+; initial value when this synchronous boot-tail line runs. A guard here therefore
+; never fired, leaving the IA submenu empty whenever no other rebuild trigger ran —
+; i.e. whenever the feature is OFF, because the health-probe tick only rebuilds on a
+; backend-status CHANGE, which never happens while disabled. LLM_Menu_Build is
+; self-sufficient (it adds its own tray entry if missing) and reentrancy-guarded, so
+; arming it here unconditionally is safe regardless of which deferred pass runs first.
+SetTimer(LLM_Menu_Build, -LLM_MENU_BUILD_DEFER_MS)
 ; Warm the i18n EN/FR fallback caches off the critical path (the active locale is
 ; already parsed at boot). One JSON parse, only consulted on a missing key; a miss
 ; before this fires triggers a one-time lazy load inside t().

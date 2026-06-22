@@ -230,11 +230,6 @@ global _LLM_Menu_InTray  := false
 ; user's saved LLM settings with module-level defaults.
 global _LLM_Menu_Loaded  := false
 
-; Set by LLM_Menu_Init when the IA submenu has been placed in the tray but its
-; (expensive) population was deferred to the post-"ready" boot tail. Read once
-; there to arm the deferred LLM_Menu_Build. See LLM_MENU_BUILD_DEFER_MS.
-global _LLM_Menu_BuildPending := false
-
 ; Delay (ms) after boot before the deferred IA submenu is populated. Armed from
 ; the boot tail (post-"ready") so it never interrupts the hotstring registration;
 ; short so the dropdown is ready almost immediately for a user who opens it.
