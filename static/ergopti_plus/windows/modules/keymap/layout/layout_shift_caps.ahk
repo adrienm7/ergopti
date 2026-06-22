@@ -1,4 +1,4 @@
-﻿; lib/layout/layout_shift_caps.ahk
+﻿; modules/keymap/layout/layout_shift_caps.ahk
 
 ; ==============================================================================
 ; MODULE: Shift and CapsLock Layer Tables
@@ -24,7 +24,7 @@
 ; DEPENDENCIES:
 ; References ``SendNewResult``, ``WrapTextIfSelected``, ``ActivateHotstrings``,
 ; ``DeadKey``, ``InDeadKeySequence``, ``DeadkeyMappingDiaresis``,
-; ``DeadkeyMappingCircumflex`` defined in modules/layout.ahk and
+; ``DeadkeyMappingCircumflex`` defined in modules/keymap/layout.ahk and
 ; ``GetCapsLockCondition`` in the same file. Lazy resolution at call time
 ; means the include order does not matter.
 ; ==============================================================================
@@ -138,7 +138,7 @@ LayerDispatch(SC, SymbolMap, *) {
 ; (``SCxxx`` gated by ``GetCapsLockCondition``). Iterates the merged set of
 ; SCs (letters ∪ symbols) so every binding is created exactly once.
 ; Scancodes for the digit row (1–0).  When direct_access_digits is enabled and
-; the OS layout puts digits behind Shift, modules/layout.ahk registers global
+; the OS layout puts digits behind Shift, modules/keymap/layout.ahk registers global
 ; +SCxxx passthrough hotkeys for these positions.  Registering them again here
 ; with an ergopti_base criterion would shadow the passthrough because AHK picks
 ; a criterion variant over a global variant whenever the criterion is met.

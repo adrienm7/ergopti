@@ -21,7 +21,7 @@
 ;   fast-typing reorder / expansion interleave silently returns: this test makes
 ;   that loud.
 ;
-; SCOPE: source introspection of modules/layout.ahk, the prefix watcher and the
+; SCOPE: source introspection of modules/keymap/layout.ahk, the prefix watcher and the
 ;   hotstring engine (timing/concurrency cannot be reproduced in the synchronous
 ;   headless harness, so the structural guarantee is what we pin).
 ; ==============================================================================
@@ -42,10 +42,10 @@ _MetaCheckInputSerialization() {
 	SplitPath(A_ScriptDir, , &WindowsDir)
 
 	; --- Layout remaps must serialize each per-key SendEvent via _RemapEmit ---
-	LayoutFile := WindowsDir . "\modules\layout.ahk"
+	LayoutFile := WindowsDir . "\modules\keymap\layout.ahk"
 	Lay := ""
 	try Lay := FileRead(LayoutFile)
-	Assert(Lay != "", "modules\layout.ahk must be readable for the input-serialization meta-test")
+	Assert(Lay != "", "modules\keymap\layout.ahk must be readable for the input-serialization meta-test")
 
 	EmitPos := InStr(Lay, "_RemapEmit(SendStr")
 	Assert(EmitPos > 0, "layout.ahk must define the serialized remap handler _RemapEmit(SendStr, KeyChar, *)")
@@ -119,7 +119,7 @@ Test("meta input: keystroke path is Critical-serialized (no fast-typing reorder 
 _MIS_CheckLayerDispatchCritical() {
 	SplitPath(A_ScriptDir, , &WindowsDir)
 	Src := ""
-	try Src := FileRead(WindowsDir . "\lib\layout\layout_shift_caps.ahk")
+	try Src := FileRead(WindowsDir . "\modules\keymap\layout\layout_shift_caps.ahk")
 	Assert(Src != "", "layout_shift_caps.ahk must be readable")
 
 	Body := _DriverFuncBody("LayerDispatch")
@@ -147,7 +147,7 @@ _MIS_CheckLayerDispatchCritical() {
 _MIS_CheckAltGrShiftDispatchCritical() {
 	SplitPath(A_ScriptDir, , &WindowsDir)
 	Src := ""
-	try Src := FileRead(WindowsDir . "\lib\layout\layout_altgr.ahk")
+	try Src := FileRead(WindowsDir . "\modules\keymap\layout\layout_altgr.ahk")
 	Assert(Src != "", "layout_altgr.ahk must be readable")
 
 	Body := _DriverFuncBody("AltGrShiftDispatch")

@@ -23,8 +23,8 @@ includes.
 |---|---|
 | `ErgoptiPlus.ahk` | Thin entry: directives + include manifest + error net + boot. |
 | `adapters/` | OS-isolation layer — every `DllCall`, `Send*`, `WinGet*`, file/COM call lives here (one file per port of `_shared/core/ports/contracts.json`), so domain code stays OS-agnostic. |
-| `lib/` | Infrastructure & domain helpers (no UI windows). Foldered submodules (`lib/hotstrings/`, `lib/layout/`, `lib/updater/`, …) for the large ones. |
-| `modules/<feature>/` | One folder per feature (`gestures/`, `keylogger/`, `llm/`, `tap_holds/`, `shortcuts/`, …). |
+| `lib/` | Infrastructure & domain helpers (no UI windows). Foldered submodules (`lib/hotstrings/`, `lib/updater/`, …) for the large ones. |
+| `modules/<feature>/` | One folder per feature (`gestures/`, `keylogger/`, `keymap/`, `llm/`, `tap_holds/`, `shortcuts/`, …). |
 | `ui/<window>/` | One folder per UI window (`menu/`, `tooltip/`, `onboarding/`, `healthcheck/`, `changelog/`, `spotlight/`, `wpm/`, `model_browser/`, `hotstrings_config_window/`), each with an `init.ahk` index. |
 | `data/` | Pure data (default TOMLs, etc.). |
 | `_generated/` | Codegen output — never hand-edited (regenerated from `_shared/`). |

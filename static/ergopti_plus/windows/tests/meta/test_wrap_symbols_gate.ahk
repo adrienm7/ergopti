@@ -8,7 +8,7 @@
 ;
 ; ROOT CAUSE ENCODED:
 ; On the Ergopti layout a wrap symbol such as "@" is produced by an AltGr layer
-; key (SC011) bound to WrapTextIfSelected (modules/layout.ahk) - a code path
+; key (SC011) bound to WrapTextIfSelected (modules/keymap/layout.ahk) - a code path
 ; entirely SEPARATE from the PrefixWatcher's _OnPrefixChar handler. The original
 ; WrapTextIfSelected gated only on the master "wrap_text_if_selected" feature
 ; flag and never consulted the per-symbol disabled set, so a symbol the user had
@@ -21,18 +21,18 @@
 
 #Requires AutoHotkey v2.0
 
-; Read the WrapTextIfSelected definition out of modules/layout.ahk and assert it
+; Read the WrapTextIfSelected definition out of modules/keymap/layout.ahk and assert it
 ; consults the per-symbol enable/disable state before wrapping. A bare mention
 ; elsewhere in the file must not satisfy the check, so the assertion runs against
 ; a window scoped to the function body only.
 _MetaWrapSymbolsGateBody() {
 	; Move-resilient: extract WrapTextIfSelected()'s body by name via the framework
-	; helper instead of a pinned modules/layout.ahk read. The helper anchors on the
+	; helper instead of a pinned modules/keymap/layout.ahk read. The helper anchors on the
 	; DEFINITION and scopes to the function body, so a bare mention elsewhere in the
 	; file cannot satisfy the gate check.
 	Snippet := _DriverFuncBody("WrapTextIfSelected")
 	AssertTrue(Snippet != "",
-		"WrapTextIfSelected(Symbol, ...) definition not found in modules/layout.ahk")
+		"WrapTextIfSelected(Symbol, ...) definition not found in modules/keymap/layout.ahk")
 	AssertContains(Snippet, "WrapSymbols_IsEnabled",
 		"WrapTextIfSelected must gate on WrapSymbols_IsEnabled so menu-disabled "
 		. "symbols (e.g. '@') do not wrap the selection")

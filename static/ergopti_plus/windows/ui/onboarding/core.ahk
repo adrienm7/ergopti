@@ -96,7 +96,7 @@ global _ob_s1_lv_hwnd   := 0       ; Hwnd of that ListView, used to filter WM_KE
 global _ob_s1_refs      := unset   ; Map of {headingText, btn, SortedLocales}
 global _ob_s1_debounce_ms := 120   ; delay after last ItemSelect before re-render
 
-; AltGr passthrough switch — read by ``IsRealAltGrPress`` in lib/layout/layout_altgr.ahk
+; AltGr passthrough switch — read by ``IsRealAltGrPress`` in modules/keymap/layout/layout_altgr.ahk
 ; AND by ``IsOnboardingActive`` below. AHK promotes a key to a "prefix key" the
 ; moment any ``SC138 & X::`` combo is parsed, which costs SC138 (= AltGr) its
 ; native function. By making every related #HotIf variant evaluate to false we

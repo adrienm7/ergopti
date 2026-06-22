@@ -29,7 +29,7 @@ _REQUIRE_STATE_ALLOWLIST := Map(
 	"lib/adapters/secure_field_detector.ahk", true,
 	"modules/llm/ollama_deps_checker.ahk", true,
 	"lib/healthcheck.ahk", true,
-	"modules/layout.ahk", true
+	"modules/keymap/layout.ahk", true
 )
 
 _MetaListAhkFilesGuardV2(Dir) {

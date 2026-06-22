@@ -4,7 +4,7 @@
 ; MODULE: Layout Poll Helper pendingHkl Preservation Guard
 ; DESCRIPTION:
 ; Static source guard for the _ShouldReloadForHkl pendingHkl preservation fix
-; in lib/layout_poll_helper.ahk.
+; in modules/keymap/layout_poll_helper.ahk.
 ;
 ; ROOT CAUSE ENCODED:
 ; When curHkl == 0 (the layout is momentarily unreadable, e.g. focus is on a
@@ -42,11 +42,11 @@ _TLPPH_StripLineComments(Src) {
 ; ========================================================================
 
 _TLPPH_ZeroHklPreservesPending() {
-	Src := _TLPPH_StripLineComments(_TLPPH_ReadSource("lib/layout_poll_helper.ahk"))
-	Assert(Src != "", "lib/layout_poll_helper.ahk must be readable")
+	Src := _TLPPH_StripLineComments(_TLPPH_ReadSource("modules/keymap/layout_poll_helper.ahk"))
+	Assert(Src != "", "modules/keymap/layout_poll_helper.ahk must be readable")
 
 	Body := _DriverFuncBody("_ShouldReloadForHkl")
-	Assert(Body != "", "_ShouldReloadForHkl must be defined in lib/layout_poll_helper.ahk")
+	Assert(Body != "", "_ShouldReloadForHkl must be defined in modules/keymap/layout_poll_helper.ahk")
 
 	; The curHkl == 0 early return must be present
 	Assert(InStr(Body, "curHkl == 0") > 0,

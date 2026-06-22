@@ -3,8 +3,8 @@
 ; ==============================================================================
 ; MODULE: Layout Tables Tests
 ; DESCRIPTION:
-; Sanity tests for the data tables produced by lib/layout_altgr.ahk and
-; lib/layout_shift_caps.ahk. Includes a regression test for the AltGr
+; Sanity tests for the data tables produced by modules/keymap/layout/layout_altgr.ahk and
+; modules/keymap/layout/layout_shift_caps.ahk. Includes a regression test for the AltGr
 ; dispatch crash (commit 48369d96) that fired every BoundFunc entry through
 ; AltGrShiftDispatch and asserted no exception bubbles up.
 ; ==============================================================================
@@ -495,9 +495,9 @@ Test("CAPSLOCK_SYMBOLS: every entry runs without crashing", TestLT_CapsLockSymbo
 ; disabled for users who had Ergopti AltGr on but Ergopti base emulation off.
 TestLT_AltGrNumberRowRegistrationNoErgoptiBase() {
 	; Move-resilient: scan the layout module dir via the framework helper instead of
-	; a pinned lib/layout/layout_altgr.ahk read. The ergopti_alt_gr HotIf token is
-	; unique to layout_altgr.ahk within lib/layout, so the scan stays scoped to it.
-	Content := _DriverDirConcat("lib/layout")
+	; a pinned modules/keymap/layout/layout_altgr.ahk read. The ergopti_alt_gr HotIf token is
+	; unique to layout_altgr.ahk within modules/keymap/layout, so the scan stays scoped to it.
+	Content := _DriverDirConcat("modules/keymap/layout")
 	; Locate the HotIf line that gates ALTGR_NUMBER_ROW registration.
 	; That line should contain "ergopti_alt_gr" but must NOT contain "ergopti_base".
 	Pattern := "HotIf\([^)]*ergopti_alt_gr[^)]*\)"

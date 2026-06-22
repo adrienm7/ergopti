@@ -1,4 +1,4 @@
-﻿; modules/layout.ahk
+﻿; modules/keymap/layout.ahk
 
 ; ==============================================================================
 ; MODULE: Layout
@@ -708,7 +708,7 @@ _DigitShiftSend(Symbol, *) {
 }
 
 ; Cannot be HotIf because the remapping is done with Hotkey function and cannot be undone afterwards.
-; The character mapping itself lives in lib/layout_ergopti.ahk so the
+; The character mapping itself lives in modules/keymap/layout/layout_ergopti.ahk so the
 ; keylogger heatmap can read the same source of truth without drifting.
 if Features["layout"]["ergopti_base"] {
 	for sc_int, entry in ErgoptiBaseMapping() {
@@ -762,7 +762,7 @@ Hotkey("#" . ScriptInformation["MagicKeySourceScan"], (*) => OpenPersonalEditor(
 ; ==============================
 ; ==============================
 
-; Shift layer — bindings registered table-driven via lib/layout_shift_caps.ahk.
+; Shift layer — bindings registered table-driven via modules/keymap/layout/layout_shift_caps.ahk.
 RegisterShiftLayer()
 
 
@@ -779,7 +779,7 @@ GetCapsLockCondition() {
 	return GetKeyState("CapsLock", "T") and not LayerEnabled
 }
 
-; CapsLock layer — bindings registered table-driven via lib/layout_shift_caps.ahk.
+; CapsLock layer — bindings registered table-driven via modules/keymap/layout/layout_shift_caps.ahk.
 RegisterCapsLockLayer()
 
 
@@ -864,7 +864,7 @@ _RegisterRollsAltGrHotkeys() {
 ; ─────────────────────────────────────────────────────────────────────────────
 ; AltGr layer (ErgoptiPlus overrides + ErgoptiAltGr Number row + base rows).
 ; The original ~390 lines of repetitive ``SC138 & SCxxx::`` blocks are now
-; defined as data in lib/layout_altgr.ahk and registered here through a
+; defined as data in modules/keymap/layout/layout_altgr.ahk and registered here through a
 ; single dispatcher. Registration order matters: AHK fires the
 ; "most-recently-defined variant" whose #HotIf criterion is true. The AltGr
 ; layer is registered FIRST, then the two rolls (SC138 & SC012 chevron_equal,

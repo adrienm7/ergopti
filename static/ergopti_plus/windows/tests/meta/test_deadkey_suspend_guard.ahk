@@ -43,7 +43,7 @@ _DKSG_ReadSource(RelPath) {
 ; ==================================================
 
 _DKSG_AssertDeadKeyHasSuspendGuard() {
-	Src := _DKSG_ReadSource("modules/layout.ahk")
+	Src := _DKSG_ReadSource("modules/keymap/layout.ahk")
 	Body := _DriverFuncBody("DeadKey")
 	Assert(Body != "", "DeadKey(Mapping) declaration must exist in layout.ahk")
 	Assert(InStr(Body, "A_IsSuspended") > 0,

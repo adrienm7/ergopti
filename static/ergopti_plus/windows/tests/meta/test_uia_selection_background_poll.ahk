@@ -38,11 +38,11 @@ _USBP_ReadSource(RelPath) {
 ; ===================================================
 
 _USBP_SelectionIsPolledInBackground() {
-	Src := _USBP_ReadSource("modules/layout.ahk")
+	Src := _USBP_ReadSource("modules/keymap/layout.ahk")
 	
 	; 1. Verify background tick exists and does the heavy lifting.
 	TickBody := _DriverFuncBody("_UIA_SelectionPollTick")
-	Assert(TickBody != "", "_UIA_SelectionPollTick must exist in modules/layout.ahk")
+	Assert(TickBody != "", "_UIA_SelectionPollTick must exist in modules/keymap/layout.ahk")
 	Assert(InStr(TickBody, "UIA.GetFocusedElement()") > 0,
 		"_UIA_SelectionPollTick must perform the UIA query (uia-selection-blocks-keyboard-thread)")
 	Assert(InStr(TickBody, "_UIA_SelectionCache :=") > 0,
@@ -50,7 +50,7 @@ _USBP_SelectionIsPolledInBackground() {
 	
 	; 2. Verify GetUIASelection is now just a cache reader.
 	GetterBody := _DriverFuncBody("GetUIASelection")
-	Assert(GetterBody != "", "GetUIASelection must exist in modules/layout.ahk")
+	Assert(GetterBody != "", "GetUIASelection must exist in modules/keymap/layout.ahk")
 	Assert(InStr(GetterBody, "return _UIA_SelectionCache") > 0,
 		"GetUIASelection must return the cached value immediately (uia-selection-blocks-keyboard-thread)")
 	Assert(InStr(GetterBody, "UIA.GetFocusedElement()") == 0,
@@ -67,9 +67,9 @@ Test("layout: UIA selection is polled in background (uia-selection-blocks-keyboa
 ; paused (« pause = tout éteint ») and skip the COM work when its only consumer
 ; (WrapTextIfSelected, gated on wrap_text_if_selected) is disabled.
 _USBP_PollTickSuspendAndFeatureGated() {
-	Src := _USBP_ReadSource("modules/layout.ahk")
+	Src := _USBP_ReadSource("modules/keymap/layout.ahk")
 	TickBody := _DriverFuncBody("_UIA_SelectionPollTick")
-	Assert(TickBody != "", "_UIA_SelectionPollTick must exist in modules/layout.ahk")
+	Assert(TickBody != "", "_UIA_SelectionPollTick must exist in modules/keymap/layout.ahk")
 	Assert(InStr(TickBody, "A_IsSuspended") > 0,
 		"_UIA_SelectionPollTick must early-return on A_IsSuspended — SetTimer bypasses native Suspend, so the synchronous UIA COM poll would keep firing on the keyboard thread while paused (uia-poll-bypasses-suspend)")
 	Assert(InStr(TickBody, "wrap_text_if_selected") > 0,
@@ -78,7 +78,7 @@ _USBP_PollTickSuspendAndFeatureGated() {
 Test("layout: UIA selection poll is gated by suspend + the wrap feature flag (uia-poll-bypasses-suspend)", _USBP_PollTickSuspendAndFeatureGated)
 
 _USBP_SelectionCacheInitialized() {
-	Src := _USBP_ReadSource("modules/layout.ahk")
+	Src := _USBP_ReadSource("modules/keymap/layout.ahk")
 	; An unset global causes return _UIA_SelectionCache inside GetUIASelection
 	; to throw "variable has not been assigned" on the first WrapTextIfSelected
 	; call, before the poll timer has fired even once

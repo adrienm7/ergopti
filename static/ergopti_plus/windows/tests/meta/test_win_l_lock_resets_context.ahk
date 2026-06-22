@@ -44,7 +44,7 @@ _WLLR_ReadSource(RelPath) {
 ; ==================================================
 
 _WLLR_AssertLockResetsContext() {
-	Src := _WLLR_ReadSource("modules/layout.ahk")
+	Src := _WLLR_ReadSource("modules/keymap/layout.ahk")
 	Body := _DriverFuncBody("_LockWorkstationEmit")
 	Assert(Body != "", "_LockWorkstationEmit helper must exist in layout.ahk (win-l-lock-no-watcher-reset)")
 	Assert(InStr(Body, "HSE_FeedReset") > 0,
@@ -55,7 +55,7 @@ _WLLR_AssertLockResetsContext() {
 Test("layout: Win+L lock resets HSE feed and prefix buffer (win-l-lock-no-watcher-reset)", _WLLR_AssertLockResetsContext)
 
 _WLLR_AssertNoPhantomLPush() {
-	Src := _WLLR_ReadSource("modules/layout.ahk")
+	Src := _WLLR_ReadSource("modules/keymap/layout.ahk")
 	Body := _DriverFuncBody("_LockWorkstationEmit")
 	Assert(!InStr(Body, "UpdateLastSentCharacter"),
 		"_LockWorkstationEmit must NOT push a phantom 'l' into the last-sent ring - no character is emitted by the OS lock (win-l-lock-no-watcher-reset)")

@@ -17,7 +17,7 @@
 ; wins the shared chord. The roll handlers already replicate the exact base-row /
 ; override fallback, so the non-roll output is unchanged.
 ;
-; Meta-static (scans source text) because modules/layout.ahk registers top-level
+; Meta-static (scans source text) because modules/keymap/layout.ahk registers top-level
 ; hotkeys and is not #Included by the headless runner, and the live SC138-prefix
 ; variant precedence cannot be exercised without a physical AltGr/Kana key. The
 ; regression is locked by asserting the registration ORDER the precedence rule
@@ -51,13 +51,13 @@ _ARP_CallLinePos(Src, Name) {
 }
 
 _ARP_RollsRegisteredLast() {
-	; Move-resilient: both call sites live in modules/layout.ahk; scope to the
+	; Move-resilient: both call sites live in modules/keymap/layout.ahk; scope to the
 	; modules tree so their relative registration order is preserved in the concat
 	Src := _DriverDirConcat("modules")
 	PosLayer := _ARP_CallLinePos(Src, "RegisterAltGrLayer")
 	PosRolls := _ARP_CallLinePos(Src, "_RegisterRollsAltGrHotkeys")
-	Assert(PosLayer > 0, "RegisterAltGrLayer() call site must exist in modules/layout.ahk")
-	Assert(PosRolls > 0, "_RegisterRollsAltGrHotkeys() call site must exist in modules/layout.ahk")
+	Assert(PosLayer > 0, "RegisterAltGrLayer() call site must exist in modules/keymap/layout.ahk")
+	Assert(PosRolls > 0, "_RegisterRollsAltGrHotkeys() call site must exist in modules/keymap/layout.ahk")
 	Assert(PosLayer < PosRolls,
 		"RegisterAltGrLayer() must be called BEFORE _RegisterRollsAltGrHotkeys() so the rolls are the most-recently-registered (highest-precedence) variant on SC138 & SC012 / SC138 & SC017 — otherwise the base rows shadow the rolls and the roll feature is silently dead (altgr-rolls-dead-precedence)")
 }

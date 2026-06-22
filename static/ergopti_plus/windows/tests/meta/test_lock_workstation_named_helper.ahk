@@ -44,7 +44,7 @@ _LWNH_ReadSource(RelPath) {
 ; ==================================================
 
 _LWNH_AssertNamedHelperExists() {
-	Src := _LWNH_ReadSource("modules/layout.ahk")
+	Src := _LWNH_ReadSource("modules/keymap/layout.ahk")
 	Body := _DriverFuncBody("_LockWorkstationEmit")
 	Assert(Body != "", "layout.ahk must define a named _LockWorkstationEmit helper instead of an inline arrow (lock-workstation-lambda-implicit-concat)")
 	Assert(InStr(Body, "LockWorkStation") > 0,
@@ -53,7 +53,7 @@ _LWNH_AssertNamedHelperExists() {
 Test("layout: Win+L lock uses a named _LockWorkstationEmit helper (lock-workstation-lambda-implicit-concat)", _LWNH_AssertNamedHelperExists)
 
 _LWNH_AssertNoImplicitConcatArrow() {
-	Src := _LWNH_ReadSource("modules/layout.ahk")
+	Src := _LWNH_ReadSource("modules/keymap/layout.ahk")
 	; The original implicit-concat arrow placed the two calls back-to-back on one
 	; expression. Guard against its return: DllCall(LockWorkStation) must never be
 	; immediately followed by UpdateLastSentCharacter on the same line.
