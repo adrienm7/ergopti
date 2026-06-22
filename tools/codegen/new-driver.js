@@ -42,8 +42,9 @@ const DRIVERS_DIR = path.join(REPO_ROOT, 'static', 'drivers');
 const PORTS_DIR = path.join(DRIVERS_DIR, '_shared', 'ports');
 const DOMAIN_DIR = path.join(DRIVERS_DIR, '_shared', 'domain');
 
-/** Sub-directories every driver is expected to contain. */
-const DRIVER_SUBDIRS = ['adapters', 'modules', 'tests', 'lib'];
+/** Sub-directories every driver is expected to contain (canonical mirror layout:
+ *  see "Structure cible" in docs/REFACTOR_PLAN.md). */
+const DRIVER_SUBDIRS = ['adapters', 'lib', 'modules', 'ui', 'data', '_generated', 'tests'];
 
 /** Supported target languages. */
 const SUPPORTED_LANGS = ['lua', 'ahk'];
