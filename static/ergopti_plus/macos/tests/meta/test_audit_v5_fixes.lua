@@ -149,16 +149,18 @@ end)
 -- =========================================================================
 -- =========================================================================
 
-helpers.describe("init.lua: grep -c . is guarded with || true (audit-v5)", function()
+helpers.describe("boot_cleanup.lua: grep -c . is guarded with || true (audit-v5)", function()
 
 	helpers.it("grep -c . is followed by || true", function()
-		local fh = io.open(DRIVER_ROOT .. "init.lua", "r")
-		assert(fh, "cannot open init.lua")
+		-- The MLX boot kill_cmd was extracted from init.lua into the
+		-- modules/llm/boot_cleanup.lua sibling; the set -e guard moved with it.
+		local fh = io.open(DRIVER_ROOT .. "modules/llm/boot_cleanup.lua", "r")
+		assert(fh, "cannot open boot_cleanup.lua")
 		local src = fh:read("*a")
 		fh:close()
 		helpers.assert_true(
 			src:find("grep -c . || true", 1, true) ~= nil,
-			"init.lua kill_cmd must use `grep -c . || true` to survive set -e shells")
+			"boot_cleanup.lua kill_cmd must use `grep -c . || true` to survive set -e shells")
 	end)
 
 end)
