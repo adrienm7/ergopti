@@ -51,13 +51,24 @@ _WBPG_ReadSource(RelPath) {
 
 _WBPG_CancelHasResetBackoffParam() {
 	Src := _WBPG_ReadSource("modules/llm/api_ollama.ahk")
-	; Locate the function declaration line — it must include the parameter name
-	DeclPos := InStr(Src, "LLM_OllamaCancelWarmupRetry(")
-	Assert(DeclPos > 0,
-		"LLM_OllamaCancelWarmupRetry must exist in api_ollama.ahk")
-	; Scope the declaration to a single line to avoid false positives in callers
-	DeclEnd := InStr(Src, "`n", false, DeclPos)
-	DeclLine := (DeclEnd > 0) ? SubStr(Src, DeclPos, DeclEnd - DeclPos) : SubStr(Src, DeclPos)
+	; Locate the function DEFINITION line — the one ending in `{` — not a call
+	; site. Callers like `LLM_OllamaCancelWarmupRetry(true)` / `(...)` appear
+	; earlier in the file, so matching the first occurrence picked a caller (no
+	; param) and false-failed; the definition is the occurrence whose line opens
+	; the body with a brace.
+	DeclLine := ""
+	Pos := 1
+	while (Pos := InStr(Src, "LLM_OllamaCancelWarmupRetry(", false, Pos)) {
+		LineEnd := InStr(Src, "`n", false, Pos)
+		ThisLine := (LineEnd > 0) ? SubStr(Src, Pos, LineEnd - Pos) : SubStr(Src, Pos)
+		if (InStr(ThisLine, "{")) {   ; definition lines end with ") {"
+			DeclLine := ThisLine
+			break
+		}
+		Pos += 1
+	}
+	Assert(DeclLine != "",
+		"LLM_OllamaCancelWarmupRetry definition (a line opening the body with `{`) must exist in api_ollama.ahk")
 	Assert(InStr(DeclLine, "reset_backoff") > 0,
 		"LLM_OllamaCancelWarmupRetry declaration must include the reset_backoff parameter "
 		. "— callers rely on a default of false so that ordinary cancels do not reset "

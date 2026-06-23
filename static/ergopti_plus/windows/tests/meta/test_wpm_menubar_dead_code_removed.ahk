@@ -31,10 +31,14 @@
 ; ===========================================
 ; ===========================================
 
-; Reads a source file relative to the repo root (two levels above tests/meta/).
+; Reads a source file relative to the windows/ driver root. A_ScriptDir is the
+; RUNNER's directory (windows/tests) for every #Include'd test — NOT this file's
+; own tests/meta/ dir — so the driver root is ONE level up. The original "\..\..\"
+; assumed A_ScriptDir = tests/meta/ and overshot to static/ergopti_plus/, making
+; every FileRead fail and silently orphaning this test (it never ran in run_all).
 ; Returns the file contents as a string, or an empty string on failure.
 _WMDR_ReadSource(RelPath) {
-	Root := A_ScriptDir . "\..\..\"
+	Root := A_ScriptDir . "\..\"
 	try {
 		return FileRead(Root . RelPath)
 	} catch {
