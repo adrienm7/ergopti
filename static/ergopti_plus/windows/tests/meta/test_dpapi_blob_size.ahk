@@ -16,7 +16,8 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
-#Include ../test_framework.ahk
+; (test_framework.ahk is provided once by run_all.ahk — do not re-include it here
+; or the suite errors on duplicate definitions.)
 
 
 

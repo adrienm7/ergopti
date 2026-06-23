@@ -697,6 +697,11 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 #Include meta/test_stream_handle_type.ahk
 #Include meta/test_warmup_backoff_preserved.ahk
 #Include meta/test_wpm_menubar_dead_code_removed.ahk
+; These three were orphaned with their own (duplicate or pure-scan) includes;
+; the duplicate test_framework.ahk includes were stripped so they integrate.
+#Include meta/test_dpapi_blob_size.ahk
+#Include meta/test_llm_diff_french_accents.ahk
+#Include test_audit_v5_fixes.ahk
 
 ; Watchdog: kill the process if RunTests() never returns (e.g. a corpus
 ; consumer blocks on a synchronous HTTP call, an InputHook with no timeout,
