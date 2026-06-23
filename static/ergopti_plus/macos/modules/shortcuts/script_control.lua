@@ -313,7 +313,8 @@ local function handle_key(e)
 	-- of every genuine KE sentinel — and pass a stray function key through.
 	if code == KEYCODE_BACKSPACE_SENTINEL then
 		if not is_right_modifier_held() then
-			Logger.info(LOG, "Backspace sentinel (F14) seen but no right AltGr held — passing through.")
+			Logger.info(LOG, "Backspace sentinel (F14) seen but no qualifying modifier held (%s) — passing through.",
+				KeyState.describe_held_modifiers())
 			return false
 		end
 		Logger.info(LOG, "Backspace sentinel (F14) — dispatching '%s'.", tostring(_key_actions.backspace))
@@ -323,7 +324,8 @@ local function handle_key(e)
 	end
 	if code == KEYCODE_RETURN_SENTINEL then
 		if not is_right_modifier_held() then
-			Logger.info(LOG, "Return sentinel (F13) seen but no right AltGr held — passing through.")
+			Logger.info(LOG, "Return sentinel (F13) seen but no qualifying modifier held (%s) — passing through.",
+				KeyState.describe_held_modifiers())
 			return false
 		end
 		Logger.info(LOG, "Return sentinel (F13) — dispatching '%s'.", tostring(_key_actions.return_key))
@@ -333,7 +335,8 @@ local function handle_key(e)
 	end
 	if code == KEYCODE_ESCAPE_SENTINEL then
 		if not is_right_modifier_held() then
-			Logger.info(LOG, "Escape sentinel (F15) seen but no right AltGr held — passing through.")
+			Logger.info(LOG, "Escape sentinel (F15) seen but no qualifying modifier held (%s) — passing through.",
+				KeyState.describe_held_modifiers())
 			return false
 		end
 		Logger.info(LOG, "Escape sentinel (F15) — dispatching '%s'.", tostring(_key_actions.escape))
