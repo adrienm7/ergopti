@@ -292,3 +292,40 @@ _AdapterMap_AllFuncsResolvable() {
 	AssertTrue(allOk)
 }
 Test("ADAPTER_* maps: all declared Func() references resolve to non-null", _AdapterMap_AllFuncsResolvable)
+
+
+
+
+; ====================================================
+; ====================================================
+; ======= 6/ KeyState Layout Probes (Windows) ========
+; ====================================================
+; ====================================================
+
+; The boot-time keyboard-layout DllCall probes were extracted from the entry
+; into adapters/key_state.ahk. These Windows-only helpers are not part of the
+; cross-platform KeyState port (isDown/isUp), so they are smoke-tested directly:
+; each must be callable without throwing and return the documented type, so a
+; future rename/deletion breaks here instead of silently at boot on an exotic
+; layout the unit suite cannot reproduce.
+
+_KS_ResolveKeyboardLayout_ReturnsInteger() {
+	local hkl := KS_ResolveKeyboardLayout()
+	AssertTrue(Type(hkl) = "Integer", "KS_ResolveKeyboardLayout must return an Integer HKL (0 when none)")
+}
+Test("KS_ResolveKeyboardLayout: callable, returns an Integer", _KS_ResolveKeyboardLayout_ReturnsInteger)
+
+_KS_ProbeRightAltScancode_ReturnsInteger() {
+	; A dummy HKL of 0 must not crash; the probe returns an Integer scancode (0 = unmapped).
+	local sc := KS_ProbeRightAltScancode(0)
+	AssertTrue(Type(sc) = "Integer", "KS_ProbeRightAltScancode must return an Integer scancode")
+}
+Test("KS_ProbeRightAltScancode: callable with dummy HKL, returns an Integer", _KS_ProbeRightAltScancode_ReturnsInteger)
+
+_KS_ScanScancodeForChar_ReturnsMap() {
+	; With a dummy HKL and an unfindable target the scan must complete and report a miss.
+	local found := KS_ScanScancodeForChar(0, "j")
+	AssertTrue(found is Map, "KS_ScanScancodeForChar must return a Map")
+	AssertTrue(found.Has("scan") && found.Has("vk"), "result Map must carry scan + vk keys")
+}
+Test("KS_ScanScancodeForChar: callable, returns a Map with scan + vk", _KS_ScanScancodeForChar_ReturnsMap)
