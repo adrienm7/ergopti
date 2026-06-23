@@ -4,16 +4,20 @@
 --- MODULE: Tooltip Stacked Panel — Rounded Colored Background (regression)
 --- DESCRIPTION:
 --- Locks down the element structure of the multi-row (hotstring) tooltip: a
---- single ROUNDED background rectangle is the colored panel, and NO clip element
---- is ever emitted.
+--- single ROUNDED background rectangle is the colored panel, the per-row tint
+--- overrides are SQUARE (so the edges between rows are straight lines, with the
+--- corner rounding carried only by the panel and the outer border), and NO clip
+--- element is ever emitted.
 ---
 --- ROOT CAUSE ENCODED: an earlier fix tried to round the colored rectangle with a
 --- rounded action="clip" element. On builds that do not honor the clip action the
 --- element rendered with its DEFAULT fillColor (red), turning the whole tooltip
 --- solid red instead of a translucent red tint. The replacement draws ONE rounded
---- panel background (apply_tint at the canvas alpha) and rounds the per-row
---- override and the border to match. These assertions fail if a clip element is
---- reintroduced or the panel background loses its rounding.
+--- panel background (apply_tint at the canvas alpha) plus a rounded border; the
+--- per-row overrides stay square so multi-row stacks show one rounded box with
+--- straight separators rather than a rounded box per row. These assertions fail if
+--- a clip element is reintroduced, the panel/border loses its rounding, or a
+--- per-row override regains corner rounding.
 ---
 --- NOTE: the stub hs.canvas is a no-op mock, so the element STRUCTURE (not the
 --- rendered pixels) is what is testable; M._build_stacked_elements is pure for
@@ -71,6 +75,21 @@ helpers.describe("tooltip stacked panel: rounded colored background, no clip", f
 		local els = Renderer._build_stacked_elements(2)
 		helpers.assert_eq(els[2].action, "skip")  -- row 1 override
 		helpers.assert_eq(els[5].action, "skip")  -- row 2 override
+	end)
+
+	helpers.it("per-row tint overrides are SQUARE (straight edges between rows)", function()
+		-- The user-facing contract: a multi-row stack is ONE rounded box with straight
+		-- separators, never a rounded card per row. Only the panel (element 1) and the
+		-- outer border may round; every per-row override background must be square.
+		for _, n in ipairs({ 2, 3 }) do
+			local els = Renderer._build_stacked_elements(n)
+			for i = 1, n do
+				local override = els[(i - 1) * 3 + 2]
+				helpers.assert_true(override.roundedRectRadii == nil,
+					"row " .. i .. "/" .. n .. " tint override must be square (no roundedRectRadii) "
+						.. "so the edges between rows are straight lines")
+			end
+		end
 	end)
 end)
 
