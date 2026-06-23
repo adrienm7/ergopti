@@ -4,7 +4,8 @@
 --- MODULE: MLX Discovery All Callbacks Meta Test
 --- DESCRIPTION:
 --- Static source guard for the "mlx-discovery-callbacks-loss" audit finding in
---- modules/llm/api_mlx.lua.
+--- modules/llm/api_mlx_discovery.lua (the discovery probe was extracted there
+--- from api_mlx.lua).
 ---
 --- ROOT CAUSE ENCODED:
 --- `finish_discovery` drained `_discovery_pending_callbacks` but only invoked
@@ -51,7 +52,7 @@ end
 helpers.describe("llm/api_mlx.lua: all discovery callbacks fired (mlx-discovery-callbacks-loss)", function()
 
 	helpers.it("finish_discovery iterates all callbacks with ipairs", function()
-		local src = strip_comments(read_source("modules/llm/api_mlx.lua"))
+		local src = strip_comments(read_source("modules/llm/api_mlx_discovery.lua"))
 		-- The fix uses: for _, cb in ipairs(cbs) do pcall(cb) end
 		helpers.assert_true(
 			src:match("for%s*_%s*,%s*cb%s+in%s+ipairs%(cbs%)") ~= nil,
@@ -59,7 +60,7 @@ helpers.describe("llm/api_mlx.lua: all discovery callbacks fired (mlx-discovery-
 	end)
 
 	helpers.it("finish_discovery does NOT use only-last-callback pattern", function()
-		local src = strip_comments(read_source("modules/llm/api_mlx.lua"))
+		local src = strip_comments(read_source("modules/llm/api_mlx_discovery.lua"))
 		-- The old bug: pcall(cbs[#cbs])
 		helpers.assert_true(
 			src:match("pcall%(cbs%[#cbs%]%)") == nil,

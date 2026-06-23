@@ -11,9 +11,10 @@
 
 local helpers = require("tests.helpers")
 
-local src_path = helpers.driver_root() .. "modules/llm/api_mlx.lua"
+-- The endpoint discovery probe was extracted from api_mlx.lua into api_mlx_discovery.lua.
+local src_path = helpers.driver_root() .. "modules/llm/api_mlx_discovery.lua"
 local fh = io.open(src_path, "r")
-if not fh then error("api_mlx.lua not readable at: " .. src_path) end
+if not fh then error("api_mlx_discovery.lua not readable at: " .. src_path) end
 local src = fh:read("*a") ; fh:close()
 
 -- Test 1: the buggy two-sentinel guard must not appear in the probe callback.
