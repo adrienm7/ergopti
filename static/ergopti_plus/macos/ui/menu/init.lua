@@ -555,6 +555,19 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	end
 
 	Preferences.merge_saved_data(state, saved)
+	-- Sync the core LLM backend from the just-merged persisted state BEFORE
+	-- sync_state_to_modules pushes the model into the engine. sync_state_to_modules
+	-- calls set_llm_model / set_llm_enabled, each of which schedules a warmup against
+	-- whatever backend the core module currently holds. The LLM handler asserts the
+	-- backend later (menu_llm.start), so without this the boot warmup runs against the
+	-- DEFAULT backend: an MLX user warms Ollama, the MLX server is never primed, and
+	-- predictions only start working after a manual model switch re-asserts the backend.
+	if type(state.llm_backend) == "string" and state.llm_backend ~= "" then
+		local ok_llm, core_llm = pcall(require, "modules.llm")
+		if ok_llm and type(core_llm) == "table" and type(core_llm.set_backend) == "function" then
+			pcall(core_llm.set_backend, state.llm_backend)
+		end
+	end
 	sync_state_to_modules(saved, config_absent)
 
 	local llm_handler = nil
