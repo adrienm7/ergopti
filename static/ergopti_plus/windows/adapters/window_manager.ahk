@@ -142,3 +142,15 @@ WMGetFocused() {
 	}
 	return Info
 }
+
+; Port dispatch map (ADAPTER_WINDOW_MANAGER) — the single-source-of-truth contract
+; surface, verified against _shared/core/ports/contracts.json by
+; tools/test/test-port-compliance.cjs.
+global ADAPTER_WINDOW_MANAGER := Map(
+    "activate", WMActivate,
+    "exists", WMExists,
+    "getFocused", WMGetFocused,
+    "getList", WMGetList,
+    "getTitle", WMGetTitle,
+    "kill", WMKill
+)

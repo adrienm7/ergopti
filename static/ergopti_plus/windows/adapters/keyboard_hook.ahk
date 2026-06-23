@@ -170,3 +170,14 @@ _KH_DispatchKey(IH, VK, SC) {
 	Evt := Map("key", Format("{:02X}", VK), "timestamp", A_TickCount, "appId", _KH_CONTEXT["appId"])
 	try _KH_ON_KEY(Evt)
 }
+
+; Port dispatch map (ADAPTER_KEYBOARD_HOOK) — the single-source-of-truth contract
+; surface, verified against _shared/core/ports/contracts.json by
+; tools/test/test-port-compliance.cjs.
+global ADAPTER_KEYBOARD_HOOK := Map(
+    "getContext", KHGetContext,
+    "isRunning", KHIsRunning,
+    "refreshContext", KHRefreshContext,
+    "start", KHStart,
+    "stop", KHStop
+)

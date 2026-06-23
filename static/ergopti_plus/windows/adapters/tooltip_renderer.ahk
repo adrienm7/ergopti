@@ -86,3 +86,13 @@ TooltipRUpdateElement(DrawCall) {
 	Payload := Map("items", [DrawCall], "duration_sec", 0)
 	TooltipRShow(Payload)
 }
+
+; Port dispatch map (ADAPTER_TOOLTIP_RENDERER) — the single-source-of-truth
+; contract surface, verified against _shared/core/ports/contracts.json by
+; tools/test/test-port-compliance.cjs.
+global ADAPTER_TOOLTIP_RENDERER := Map(
+    "hide", TooltipRHide,
+    "isVisible", TooltipRIsVisible,
+    "show", TooltipRShow,
+    "updateElement", TooltipRUpdateElement
+)
