@@ -683,15 +683,20 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 #Include meta/test_g5_updater_download.ahk
 
 ; -- Previously-orphaned regression tests (on disk but never wired into the
-;    runner; re-wired so they actually execute). These six pass against current
-;    code; the four that encoded unfinished cleanups/features are wired back as
-;    each underlying fix lands. --
+;    runner; re-wired so they actually execute). All were silently skipped; the
+;    four that "failed" turned out to be test bugs (wrong A_ScriptDir-relative
+;    path, first-call-vs-definition match, elapsed- vs deadline-form poll, a
+;    comment tripping a substring guard), not real code regressions — fixed. --
 #Include meta/test_bypass_dispatch_arity.ahk
 #Include meta/test_hcw_reset_all_teardown.ahk
+#Include meta/test_healthcheck_sysinfo_git_nonblocking.ahk
+#Include meta/test_keylogger_pause_metrics.ahk
 #Include meta/test_processentry32w_size.ahk
 #Include meta/test_script_altgr_hotkeys.ahk
 #Include meta/test_space_hold_exception_guard.ahk
 #Include meta/test_stream_handle_type.ahk
+#Include meta/test_warmup_backoff_preserved.ahk
+#Include meta/test_wpm_menubar_dead_code_removed.ahk
 
 ; Watchdog: kill the process if RunTests() never returns (e.g. a corpus
 ; consumer blocks on a synchronous HTTP call, an InputHook with no timeout,

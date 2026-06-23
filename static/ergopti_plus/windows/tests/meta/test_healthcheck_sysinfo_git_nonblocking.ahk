@@ -49,7 +49,12 @@ _HCSNB_SysInfoIsNonBlocking() {
 		"_HealthCheck_SysInfo must not use blocking RunWait for git — can freeze the crash handler path")
 	Assert(InStr(Body, "Run(") > 0,
 		"_HealthCheck_SysInfo must use non-blocking Run() for git")
-	Assert(InStr(Body, "A_TickCount + ") > 0,
-		"_HealthCheck_SysInfo must have a bounded poll deadline for the git subprocess")
+	; A bounded poll can be written either as a deadline (`A_TickCount + budget`)
+	; or as an elapsed check (`A_TickCount - StartTick < budget`); both cap the
+	; stall budget. The implementation uses the elapsed form, so accept either.
+	HasBound := (InStr(Body, "A_TickCount + ") > 0) || (InStr(Body, "A_TickCount - ") > 0)
+	Assert(HasBound,
+		"_HealthCheck_SysInfo must bound the git poll by elapsed time — either a deadline "
+		. "(A_TickCount + budget) or an elapsed check (A_TickCount - start < budget)")
 }
 Test("healthcheck: _HealthCheck_SysInfo uses non-blocking Run + bounded deadline for git (healthcheck-sysinfo-git-runwait-freeze)", _HCSNB_SysInfoIsNonBlocking)

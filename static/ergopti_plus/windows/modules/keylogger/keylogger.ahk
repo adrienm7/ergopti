@@ -778,8 +778,8 @@ KL_FlushBuffer() {
     snap_scrolls := Keylogger.session_scrolls
     snap_dist    := Keylogger.mouse_distance
     ; The delay of the first keystroke in the buffer is the inter-burst gap:
-    ; the time elapsed since the previous burst ended. Using the stale
-    ; current_pause_ms field (always 0) was producing null analytics.
+    ; the time elapsed since the previous burst ended. The old stale per-snapshot
+    ; pause field (always 0, never updated) was producing null analytics.
     snap_pause   := (snap_events.Length > 0) ? snap_events[1][2] : 0
     Keylogger.buffer_events    := []
     Keylogger.buffer_text      := ""
