@@ -113,14 +113,6 @@ function M.new(deps, presets)
 
 	local module_source = debug.getinfo(1, "S").source:sub(2)
 	local project_root = module_source:match("^(.*)/static/ergopti_plus/macos/ui/menu/menu_llm/models_manager_mlx%.lua$")
-	local function first_existing_path(candidates)
-		for _, candidate in ipairs(candidates) do
-			if type(candidate) == "string" and candidate ~= "" and hs.fs.attributes(candidate, "mode") then
-				return candidate
-			end
-		end
-		return ""
-	end
 	-- Single, canonical Python interpreter for every Hammerspoon-driven MLX
 	-- invocation. This venv is provisioned by modules/llm/ensure-mlx-deps.sh
 	-- on first launch from the pinned pyproject.toml, so its absolute path is
@@ -151,25 +143,6 @@ function M.new(deps, presets)
 			tostring(project_venv_python))
 	end
 	local project_venv_python_escaped = project_venv_python:gsub("\\", "\\\\"):gsub("\"", "\\\"")
-
-	local function shell_escape_single(value)
-		value = type(value) == "string" and value or ""
-		return "'" .. value:gsub("'", "'\\''") .. "'"
-	end
-
-	local function find_model_entry(model_name)
-		if type(model_name) ~= "string" or model_name == "" then return nil end
-		for _, provider in ipairs(presets) do
-			for _, family in ipairs(provider.families or {}) do
-				for _, m in ipairs(family.models or {}) do
-					if type(m) == "table" and m.name == model_name then
-						return m
-					end
-				end
-			end
-		end
-		return nil
-	end
 
 	local function read_hf_token()
 		local fh = io.open(HF_TOKEN_FILE, "r")
