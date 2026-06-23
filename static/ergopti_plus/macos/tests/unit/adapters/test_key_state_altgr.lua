@@ -31,12 +31,19 @@ local MASKS = {
 	deviceLeftShift      = 0x80,
 }
 
---- Loads key_state with checkKeyboardModifiers returning the given raw flag bits.
-local function load_with_raw(raw_bits)
+--- Loads key_state with checkKeyboardModifiers returning the given raw flag bits
+--- and optional side-agnostic flags (e.g. { alt = true }) merged into the result.
+local function load_with_raw(raw_bits, extra_flags)
 	package.loaded["adapters.key_state"] = nil
 	return helpers.load_with_stubs("adapters.key_state", {
 		eventtap = {
-			checkKeyboardModifiers = function(_) return { _raw = raw_bits } end,
+			checkKeyboardModifiers = function(_)
+				local mods = { _raw = raw_bits }
+				if type(extra_flags) == "table" then
+					for k, v in pairs(extra_flags) do mods[k] = v end
+				end
+				return mods
+			end,
 			event = { rawFlagMasks = MASKS },
 		},
 	})
@@ -47,6 +54,21 @@ helpers.describe("key_state.is_right_altgr_held accepts either-side cmd/option",
 		local KS = load_with_raw(MASKS.deviceLeftAlternate)
 		helpers.assert_true(KS.is_right_altgr_held(),
 			"a held left option must qualify — a remapped right-cmd registers as left/plain option")
+	end)
+
+	helpers.it("returns true for a generic `alt` flag with NO device-side option bit", function()
+		-- A Karabiner right-command→option remap can surface the held key only as the
+		-- side-agnostic `alt` flag, setting no deviceLeftAlternate/deviceRightAlternate
+		-- bit. The device-bit-only check missed it and the sentinel did nothing.
+		local KS = load_with_raw(0, { alt = true })
+		helpers.assert_true(KS.is_right_altgr_held(),
+			"option held as a generic `alt` (no device bit) must still qualify as AltGr")
+	end)
+
+	helpers.it("returns false for a generic `cmd` flag with no device bit (plain Cmd)", function()
+		local KS = load_with_raw(0, { cmd = true })
+		helpers.assert_true(not KS.is_right_altgr_held(),
+			"a generic command flag must not qualify — only option/right-command are AltGr")
 	end)
 
 	helpers.it("returns true for a held RIGHT option (the canonical ergopti remap)", function()
@@ -89,6 +111,16 @@ helpers.describe("key_state.describe_held_modifiers names the held side", functi
 	helpers.it("reports '(none)' when nothing is held", function()
 		local KS = load_with_raw(0)
 		helpers.assert_eq(KS.describe_held_modifiers(), "(none)")
+	end)
+
+	helpers.it("tags a generic option flag with no device bit as 'alt(generic)'", function()
+		local KS = load_with_raw(0, { alt = true })
+		helpers.assert_eq(KS.describe_held_modifiers(), "alt(generic)")
+	end)
+
+	helpers.it("does NOT double-report when a device bit and its generic flag both set", function()
+		local KS = load_with_raw(MASKS.deviceLeftAlternate, { alt = true })
+		helpers.assert_eq(KS.describe_held_modifiers(), "lopt")
 	end)
 
 	helpers.it("lists multiple held modifiers in side order", function()

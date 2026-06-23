@@ -89,9 +89,15 @@ end
 --- rcmd+Escape/Return/Backspace silently did nothing (script-control-altgr-leftmod).
 --- Left COMMAND is deliberately excluded — it is the ordinary ⌘ used for app
 --- shortcuts, so a stray ⌘ + physical-F-key must not be mistaken for a sentinel.
+--- A held OPTION is accepted in ANY form — the device-side right/left option bit,
+--- OR the side-agnostic `alt` flag with no device bit set. Some Karabiner remaps
+--- (right command → option) surface the held key only as the generic `alt` and
+--- never set deviceLeftAlternate/deviceRightAlternate, so the device-bit-only
+--- check still rejected them and the sentinel did nothing. A bare F-key press
+--- carries neither, so this stays a valid genuine-vs-stray discriminator.
 --- Falls back to the side-agnostic cmd/alt flags when the raw masks are
 --- unavailable (never on real macOS).
---- @return boolean True if right command or either-side option is currently down.
+--- @return boolean True if right command or option (any form) is currently down.
 function M.is_right_altgr_held()
 	local ok, result = pcall(function()
 		if not (hs.eventtap and hs.eventtap.checkKeyboardModifiers) then return false end
@@ -101,12 +107,13 @@ function M.is_right_altgr_held()
 		local raw   = mods._raw
 		local masks = hs.eventtap.event and hs.eventtap.event.rawFlagMasks
 		if type(raw) == "number" and type(masks) == "table" then
-			-- AltGr family only: right command + option (either side). Left command
-			-- (plain ⌘) is excluded so app ⌘-shortcuts can never look like a sentinel.
+			-- AltGr family: right command + option (either side), OR a generic `alt`
+			-- flag for remaps that set no device-side option bit. Left command (plain
+			-- ⌘) stays excluded so an app ⌘-shortcut can never look like a sentinel.
 			local altgr = (masks.deviceRightCommand   or 0)
 				| (masks.deviceRightAlternate or 0)
 				| (masks.deviceLeftAlternate  or 0)
-			return (raw & altgr) ~= 0
+			return (raw & altgr) ~= 0 or mods.alt == true
 		end
 		return mods.cmd == true or mods.alt == true
 	end)
@@ -147,6 +154,21 @@ function M.describe_held_modifiers()
 		for _, pair in ipairs(sided) do
 			local mask = pair[2] or 0
 			if mask ~= 0 and (raw & mask) ~= 0 then held[#held + 1] = pair[1] end
+		end
+		-- Append a side-agnostic flag ONLY when its family set no device bit (e.g. a
+		-- KE remap that surfaces option as a generic `alt` with no deviceLeftAlternate).
+		-- Tagged "(generic)" so the log distinguishes that from a genuine sided bit.
+		local family_bits = {
+			cmd = (masks.deviceRightCommand or 0)   | (masks.deviceLeftCommand or 0),
+			alt = (masks.deviceRightAlternate or 0) | (masks.deviceLeftAlternate or 0),
+			ctrl = (masks.deviceRightControl or 0)  | (masks.deviceLeftControl or 0),
+			shift = (masks.deviceRightShift or 0)   | (masks.deviceLeftShift or 0),
+		}
+		for _, name in ipairs({ "cmd", "alt", "ctrl", "shift", "fn" }) do
+			if mods[name] == true then
+				local fam = family_bits[name] or 0
+				if fam == 0 or (raw & fam) == 0 then held[#held + 1] = name .. "(generic)" end
+			end
 		end
 		return #held > 0 and table.concat(held, " ") or "(none)"
 	end)
