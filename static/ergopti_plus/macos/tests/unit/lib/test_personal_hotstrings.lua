@@ -1,0 +1,91 @@
+--- tests/unit/lib/test_personal_hotstrings.lua
+
+--- ==============================================================================
+--- MODULE: lib/personal_hotstrings load contract
+--- DESCRIPTION:
+--- The personal hotstrings loader was extracted from init.lua Section 5.1 into
+--- lib/personal_hotstrings. The Lua suite never loads init.lua, so without this
+--- test a missing require, a renamed dep, or a regression in the load order would
+--- only surface as a boot failure on the maintainer's Mac. This exercises M.load
+--- under stubbed keymap/menu_paths/hotstring_editor/fs_dir and asserts (1) the
+--- personal group is registered FIRST (lowest group_order = highest priority),
+--- (2) extension groups follow in alphabetical-by-stem order, (3) the top-level
+--- personal_hotstrings.toml is never re-registered as an extension, and (4) the
+--- returned list mirrors exactly what was handed to keymap.load_toml.
+--- ==============================================================================
+
+local helpers = require("tests.helpers")
+
+-- Save the real heavy deps so other suite files still get the genuine modules.
+local SAVED = {}
+local function mock(name, mod)
+	SAVED[name] = package.loaded[name]
+	package.loaded[name] = mod
+end
+local function restore_all()
+	for name, prev in pairs(SAVED) do package.loaded[name] = prev end
+	package.loaded["lib.personal_hotstrings"] = nil
+end
+
+helpers.describe("lib/personal_hotstrings — load contract", function()
+	helpers.it("registers personal first, then extensions in stem order, skipping the canonical file", function()
+		-- Record every keymap.load_toml call so we can assert order independently of
+		-- the returned list (the two must agree).
+		local registered = {}
+		mock("modules.keymap", {
+			load_toml = function(name, path) table.insert(registered, { name = name, path = path }) end,
+			source_priority = function(_) return nil end,
+		})
+		mock("ui.hotstring_editor", { init = function() end })
+		mock("ui.menu.menu_paths", {
+			get = function(key)
+				if key == "PersonalTomlPath" then return "/fake/hot/personal_hotstrings.toml" end
+				if key == "PersonalHotstringsDir" then return "/fake/hot/" end
+				return nil
+			end,
+		})
+		-- A flat dir: one canonical file (must be skipped at prefix=="") + two
+		-- extension TOMLs returned out of order to prove the loader sorts them.
+		mock("lib.fs_dir", {
+			entries = function(dir)
+				if dir == "/fake/hot" then
+					return { "zebra.toml", "alpha.toml", "personal_hotstrings.toml", "_index.toml" }
+				end
+				return {}
+			end,
+		})
+
+		-- Stub the OS surface: the scan dir is a directory, every *.toml is a file.
+		local prev_attr, prev_json = hs.fs.attributes, hs.json
+		hs.fs.attributes = function(path)
+			if path == "/fake/hot" then return { mode = "directory" } end
+			if path:match("%.toml$") then return { mode = "file" } end
+			return nil
+		end
+		hs.json = { decode = function(_) return nil end }
+
+		package.loaded["lib.personal_hotstrings"] = nil
+		local PH = require("lib.personal_hotstrings")
+		local ok, loaded = pcall(PH.load, { bundled_hotstrings_dir = "/fake/bundle/" })
+
+		hs.fs.attributes, hs.json = prev_attr, prev_json
+		restore_all()
+
+		helpers.assert_true(ok, "load() must not throw: " .. tostring(loaded))
+		helpers.assert_true(type(loaded) == "table", "load() must return a list")
+
+		-- Expected order: personal, then alphabetical stems (alpha before zebra).
+		local names = {}
+		for _, g in ipairs(loaded) do table.insert(names, g.name) end
+		helpers.assert_eq(table.concat(names, ","),
+			"personal,personal_ext_alpha,personal_ext_zebra",
+			"personal must load first, extensions in alphabetical-by-stem order")
+
+		-- The returned list must mirror exactly what reached keymap.load_toml.
+		helpers.assert_eq(#registered, #loaded, "every returned group must have been registered with keymap")
+		for i, g in ipairs(loaded) do
+			helpers.assert_eq(registered[i].name, g.name, "registration order must match returned order")
+			helpers.assert_eq(registered[i].path, g.path, "registration path must match returned path")
+		end
+	end)
+end)
