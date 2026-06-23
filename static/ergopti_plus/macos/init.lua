@@ -382,11 +382,19 @@ end
 if boot_llm_enabled then
 	local active_backend = backend_detector.effective_backend()
 	Logger.info(LOG, "Bootstrapping default LLM backend: %s", active_backend)
-	if active_backend == backend_detector.BACKEND_MLX then
-		mlx_deps_checker.check_and_install_deps()
-	else
-		ollama_deps_checker.check_and_install_deps()
-	end
+	-- Defer the dependency check off the critical boot path. Its synchronous setup
+	-- (resolving the script, writing the PTY wrapper, chmod via os.execute, and
+	-- hs.task creation) costs hundreds of ms, and nothing on the boot path needs the
+	-- venv to be ready synchronously — the backend server start is itself lazy. A
+	-- doAfter(0) tick runs it right after boot completes, the same pattern
+	-- start_background_network_bootstrap already uses.
+	hs.timer.doAfter(0, function()
+		if active_backend == backend_detector.BACKEND_MLX then
+			pcall(mlx_deps_checker.check_and_install_deps)
+		else
+			pcall(ollama_deps_checker.check_and_install_deps)
+		end
+	end)
 	if ok_core_llm and type(core_llm.start_background_network_bootstrap) == "function" then
 		core_llm.start_background_network_bootstrap()
 	end
