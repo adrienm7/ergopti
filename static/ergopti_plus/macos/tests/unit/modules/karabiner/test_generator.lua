@@ -546,6 +546,22 @@ helpers.describe("Generator.build_paused_script_control_rules (exempt-from-pause
 			"all three script-control keys must be present")
 	end)
 
+	helpers.it("stamps every paused sentinel with the left_control tag (consume-proof guard)", function()
+		-- The paused rules gate on a MANDATORY modifier KE consumes, so HS sees no live
+		-- modifier when it polls. KE therefore tags the emitted sentinel with left_control,
+		-- which HS reads off the event itself to confirm a genuine sentinel and un-pause
+		-- (script-control-altgr-leftmod / paused (none) modifier). Every rule must carry it.
+		for _, rule in ipairs(rules) do
+			local to_ev = rule.manipulators[1].to[1]
+			helpers.assert_true(type(to_ev.modifiers) == "table", "paused sentinel must stamp a tag modifier")
+			local has_tag = false
+			for _, mod in ipairs(to_ev.modifiers) do
+				if mod == "left_control" then has_tag = true end
+			end
+			helpers.assert_true(has_tag, "paused sentinel tag must be left_control so HS recognises it consume-proof")
+		end
+	end)
+
 	helpers.it("right_command + return emits the F13 return sentinel", function()
 		-- With the test keycode stub, F13_KARABINER_RETURN = 105 → to_name → "key_105".
 		local found = false
