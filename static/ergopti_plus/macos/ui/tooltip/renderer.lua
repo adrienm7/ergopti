@@ -360,48 +360,42 @@ M.stacked_canvas = nil
 -- Pure (no canvas side effects) so the structure is unit-testable even though the
 -- stub hs.canvas is a no-op mock.
 --
--- A rounded CLIP mask (element 1) establishes the rounded clipping region that
--- every following element draws inside. Per-row backgrounds are therefore drawn
--- SQUARE and full-height — the clip mask is what rounds the outer corners (top
--- corners of the first row, bottom corners of the last row), while the straight
--- edges between rows stay straight. This lets each row carry its own category
--- color with no bleed: the box reads as ONE rounded rectangle split by straight
--- separators. The clip element's fillColor is transparent so a build that does
--- NOT honor the clip action degrades to an invisible rectangle instead of
--- painting its default (red) fill over the whole tooltip — the failure mode of
--- an earlier rounded-clip attempt. Clipping is reset just before the border so
--- its 1 px rounded stroke is not halved by the clip boundary it traces.
+-- Each row owns its own background, so multi-row stacks carry per-row category
+-- colors with NO bleed. Only the four OUTER box corners are rounded; every edge
+-- between rows is a straight line. hs.canvas cannot round individual corners
+-- (roundedRectRadii rounds all four) and its action="clip" is NOT honored on
+-- every build (it falls back to a solid red fill — a catastrophic all-red
+-- tooltip), so rounding is built WITHOUT clipping:
+--   * a single-row stack is one rounded rectangle (all four corners are box
+--     corners);
+--   * the FIRST row draws a rounded base then a same-color square "cap" over its
+--     bottom corner band, flattening the inner (separator-side) corners while the
+--     top corners stay rounded;
+--   * the LAST row does the mirror (rounded base, square cap over its top band);
+--   * MIDDLE rows are plain squares.
+-- Because each cap is the SAME color as its row, flattening a corner can never
+-- reveal a different color — the bug that an earlier single-panel attempt hit.
 --
--- Element layout (1-based):
---   [1]                      : rounded clip mask (transparent — defines rounding)
---   row i: base = (i-1)*3+2  : [base] per-row square background fill
---                              [base+1] output styled text
---                              [base+2] trigger label styled text
---   separators               : sep_base = row_count*3 + 2, one rectangle per gap
---   resetClip                : row_count*4 + 1, ends the rounded clip region
---   border                   : last element = row_count*4 + 2, rounded stroke
+-- Element layout (1-based), a uniform 4-slot block per row:
+--   row i: base = (i-1)*4+1  : [base]   row background base (rounded or square)
+--                              [base+1] corner-flattening cap (skipped if unused)
+--                              [base+2] output styled text
+--                              [base+3] trigger label styled text
+--   separators               : sep_base = row_count*4 + 1, one rectangle per gap
+--   border                   : last element = row_count*5, rounded stroke
 function M._build_stacked_elements(row_count)
 	local elements = {}
-	-- [1] Rounded clip mask: the rounded clipping region for the whole stack.
-	-- Transparent fill so an unsupported clip action degrades to invisible, never red.
-	elements[#elements + 1] = {
-		type = "rectangle", action = "clip",
-		fillColor = { white = 0, alpha = 0 },
-		roundedRectRadii = { xRadius = CORNER_RADIUS, yRadius = CORNER_RADIUS },
-	}
 	for _ = 1, row_count do
-		-- Per-row background: SQUARE and full-height. The rounded clip mask above
-		-- rounds the outer corners, so row edges between rows stay straight lines.
+		-- Background base + same-color corner cap, then the two text slots. The cap
+		-- starts skipped (middle rows and single-row stacks never need it).
 		elements[#elements + 1] = { type = "rectangle", action = "fill" }
+		elements[#elements + 1] = { type = "rectangle", action = "skip" }
 		elements[#elements + 1] = { type = "text", action = "fill" }
 		elements[#elements + 1] = { type = "text", action = "fill" }
 	end
 	for _ = 1, row_count - 1 do
 		elements[#elements + 1] = { type = "rectangle", action = "fill" }
 	end
-	-- Stop clipping before the border so its 1 px rounded stroke is drawn full-width,
-	-- not clipped to half by the rounded boundary it traces.
-	elements[#elements + 1] = { type = "rectangle", action = "resetClip" }
 	-- Border: strokeAndFill with transparent fill so only the rounded stroke shows.
 	elements[#elements + 1] = {
 		type = "rectangle", action = "strokeAndFill",
@@ -411,6 +405,30 @@ function M._build_stacked_elements(row_count)
 		roundedRectRadii = { xRadius = CORNER_RADIUS, yRadius = CORNER_RADIUS },
 	}
 	return elements
+end
+
+--- Decides how row `i` (1-based) of a `row_count`-row stack rounds. Only the four
+--- OUTER box corners round; a row's inner (separator-side) corners are flattened
+--- by a same-color cap so the edges between rows stay straight. Pure so the corner
+--- logic is unit-testable without a real canvas.
+--- @param i integer 1-based row index.
+--- @param row_count integer Total number of rows.
+--- @return table { rounded = boolean, cap = "none"|"top"|"bottom" }.
+function M._row_corner_plan(i, row_count)
+	local is_first = (i == 1)
+	local is_last  = (i == row_count)
+	if is_first and is_last then
+		-- Single-row stack: the row IS the box, so all four corners are box corners.
+		return { rounded = true, cap = "none" }
+	elseif is_first then
+		-- Top row: round the top (box) corners, flatten the bottom (separator) corners.
+		return { rounded = true, cap = "bottom" }
+	elseif is_last then
+		-- Bottom row: round the bottom (box) corners, flatten the top (separator) corners.
+		return { rounded = true, cap = "top" }
+	end
+	-- Middle row: fully square — every corner abuts a separator.
+	return { rounded = false, cap = "none" }
 end
 
 -- Build or rebuild the stacked canvas with the correct number of elements.
@@ -574,27 +592,45 @@ function M.render_stacked(rows, state, start_watchers_callback)
 
 		M.stacked_canvas:frame({ x = pos_x, y = pos_y, w = canvas_width, h = total_height })
 
-		-- Rounded clip mask spanning the whole stack: it defines the rounded corners
-		-- the per-row square fills below are clipped to. It paints nothing (its fill is
-		-- transparent), so each row carries its own category color with no bleed.
-		M.stacked_canvas[1].frame = { x = 0, y = 0, w = canvas_width, h = total_height }
+		local round_radii = { xRadius = CORNER_RADIUS, yRadius = CORNER_RADIUS }
 
-		-- Fill in per-row elements (offset by the leading clip-mask element).
+		-- Fill in per-row elements (uniform 4-slot block per row).
 		for i, row in ipairs(rows) do
-			local base   = (i - 1) * 3 + 2
+			local base   = (i - 1) * 4 + 1
 			local top_y  = row_top_y[i]
 			local row_h  = row_heights[i] + pad_y * 2
+			local col    = M.apply_tint(row.tint)
+			local plan   = M._row_corner_plan(i, row_count)
 
-			-- Per-row background: SQUARE and full-height. The rounded clip mask rounds
-			-- the outer corners; the straight top/bottom edges between rows stay straight.
+			-- Background base. Only the outer box corners round (plan.rounded); middle
+			-- rows are square. The same-color cap below flattens the inner corners the
+			-- rounded base would otherwise carry into a separator.
 			M.stacked_canvas[base].action    = "fill"
 			M.stacked_canvas[base].frame     = { x = 0, y = top_y, w = canvas_width, h = row_h }
-			M.stacked_canvas[base].fillColor = M.apply_tint(row.tint)
+			M.stacked_canvas[base].fillColor = col
+			M.stacked_canvas[base].roundedRectRadii = plan.rounded and round_radii or nil
+
+			-- Corner-flattening cap (same color as the row): a band over the bottom or
+			-- top CORNER_RADIUS that squares off the inner corners. Same color as the
+			-- row, so flattening can never reveal a different color.
+			local cap = M.stacked_canvas[base + 1]
+			if plan.cap == "bottom" then
+				cap.action    = "fill"
+				cap.fillColor = col
+				cap.frame     = { x = 0, y = top_y + row_h - CORNER_RADIUS,
+					w = canvas_width, h = CORNER_RADIUS }
+			elseif plan.cap == "top" then
+				cap.action    = "fill"
+				cap.fillColor = col
+				cap.frame     = { x = 0, y = top_y, w = canvas_width, h = CORNER_RADIUS }
+			else
+				cap.action = "skip"
+			end
 
 			-- Output text (gray + strikethrough when row.dimmed; see build_text_style).
 			local styled_text = hs.styledtext.new(row.text, build_text_style(row.dimmed))
-			M.stacked_canvas[base + 1].text  = styled_text
-			M.stacked_canvas[base + 1].frame = { x = pad_x, y = top_y + pad_y,
+			M.stacked_canvas[base + 2].text  = styled_text
+			M.stacked_canvas[base + 2].frame = { x = pad_x, y = top_y + pad_y,
 				w = max_text_w, h = row_heights[i] }
 
 			-- Trigger label (dim, smaller font, right-aligned in label zone).
@@ -607,21 +643,21 @@ function M.render_stacked(rows, state, start_watchers_callback)
 				local label_offset = math.floor((row_heights[i] - label_h) / 2)
 				local label_color  = row.dimmed and { white = 0.45, alpha = 0.55 }
 					or { white = 0.45, alpha = 1 }
-				M.stacked_canvas[base + 2].action = "fill"
-				M.stacked_canvas[base + 2].text   = hs.styledtext.new(row.trigger_label, {
+				M.stacked_canvas[base + 3].action = "fill"
+				M.stacked_canvas[base + 3].text   = hs.styledtext.new(row.trigger_label, {
 					font  = { name = Config.fonts.main, size = Config.sizes.hint },
 					color = label_color,
 				})
-				M.stacked_canvas[base + 2].frame = { x = label_x,
+				M.stacked_canvas[base + 3].frame = { x = label_x,
 					y = top_y + pad_y + label_offset,
 					w = max_label_w, h = label_h }
 			else
-				M.stacked_canvas[base + 2].action = "skip"
+				M.stacked_canvas[base + 3].action = "skip"
 			end
 		end
 
-		-- Separators between rows (offset by the leading panel-background element).
-		local sep_base = row_count * 3 + 2
+		-- Separators between rows: a straight 1 px line in each gap.
+		local sep_base = row_count * 4 + 1
 		for i = 1, row_count - 1 do
 			local sep_y = row_top_y[i] + row_heights[i] + pad_y * 2
 			M.stacked_canvas[sep_base + i - 1].frame     = { x = 0, y = sep_y, w = canvas_width, h = 1 }
@@ -629,9 +665,8 @@ function M.render_stacked(rows, state, start_watchers_callback)
 			M.stacked_canvas[sep_base + i - 1].action    = "fill"
 		end
 
-		-- resetClip (row_count*4 + 1) ends the rounded clip region; the border that
-		-- follows is the last element: clip mask + rows + separators + resetClip + border.
-		local border_idx = row_count * 4 + 2
+		-- Rounded border on top (last element): rows + separators + border = 5*row_count.
+		local border_idx = row_count * 5
 		M.stacked_canvas[border_idx].frame = { x = 0, y = 0, w = canvas_width, h = total_height }
 
 		M.stacked_canvas:show()
