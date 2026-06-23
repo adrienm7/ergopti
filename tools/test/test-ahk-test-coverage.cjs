@@ -96,7 +96,7 @@ function includeClosure(rootFile) {
 /** @returns {string[]} Absolute test_*.ahk paths under tests/ and tests/meta/. */
 function discoverTestFiles() {
 	const files = [];
-	for (const dir of [TESTS_DIR, path.join(TESTS_DIR, 'meta')]) {
+	for (const dir of [TESTS_DIR, path.join(TESTS_DIR, 'unit'), path.join(TESTS_DIR, 'meta')]) {
 		let entries = [];
 		try {
 			entries = fs.readdirSync(dir);

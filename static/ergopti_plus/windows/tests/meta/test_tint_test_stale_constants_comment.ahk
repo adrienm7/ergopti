@@ -5,7 +5,7 @@
 ; DESCRIPTION:
 ; Static source guard for the tint-test-stale-constants-comment finding.
 ;
-; tests/test_tooltip_tint_contract.ahk seeds UI_TINT_LIGHTNESS /
+; tests/unit/test_tooltip_tint_contract.ahk seeds UI_TINT_LIGHTNESS /
 ; UI_TINT_SATURATION to the canonical constants.toml [tint] defaults
 ; (lightness=0.13 / saturation=0.85) before computing the expected tint
 ; vectors. Its header comment documents the parameters a maintainer must use
@@ -50,7 +50,7 @@ _TTSCC_ReadSource(RelPath) {
 ; ==================================================
 
 _TTSCC_SeedMatchesComment() {
-	Src := _TTSCC_ReadSource("tests/test_tooltip_tint_contract.ahk")
+	Src := _TTSCC_ReadSource("tests/unit/test_tooltip_tint_contract.ahk")
 
 	; The seed is the single source of truth the actual vectors are computed
 	; against; assert it still uses the canonical constants.toml [tint] values.
