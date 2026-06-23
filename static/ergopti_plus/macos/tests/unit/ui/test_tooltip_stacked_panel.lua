@@ -1,23 +1,27 @@
 --- tests/unit/ui/test_tooltip_stacked_panel.lua
 
 --- ==============================================================================
---- MODULE: Tooltip Stacked Panel — Rounded Colored Background (regression)
+--- MODULE: Tooltip Stacked Panel — Rounded Clip Mask + Per-Row Colors (regression)
 --- DESCRIPTION:
 --- Locks down the element structure of the multi-row (hotstring) tooltip: a
---- single ROUNDED background rectangle is the colored panel, the per-row tint
---- overrides are SQUARE (so the edges between rows are straight lines, with the
---- corner rounding carried only by the panel and the outer border), and NO clip
---- element is ever emitted.
+--- rounded action="clip" mask (element 1) defines the rounded clipping region,
+--- every per-row background is a SQUARE fill clipped to that region (so each row
+--- carries its own category color while the outer corners round and the edges
+--- between rows stay straight), clipping is reset before the border, and the
+--- border is the rounded stroke on top.
 ---
---- ROOT CAUSE ENCODED: an earlier fix tried to round the colored rectangle with a
---- rounded action="clip" element. On builds that do not honor the clip action the
---- element rendered with its DEFAULT fillColor (red), turning the whole tooltip
---- solid red instead of a translucent red tint. The replacement draws ONE rounded
---- panel background (apply_tint at the canvas alpha) plus a rounded border; the
---- per-row overrides stay square so multi-row stacks show one rounded box with
---- straight separators rather than a rounded box per row. These assertions fail if
---- a clip element is reintroduced, the panel/border loses its rounding, or a
---- per-row override regains corner rounding.
+--- ROOT CAUSE ENCODED — TWO distinct bugs this structure must never reintroduce:
+---   1. SOLID RED TOOLTIP: an early rounded action="clip" element with no fill
+---      rendered as its DEFAULT red fill on a build that ignored the clip action,
+---      painting the whole tooltip red. Guard: the clip element's fillColor is
+---      transparent (alpha 0), so an unsupported clip degrades to invisible.
+---   2. COLOR BLEED ("vert rouge tronqué, petite partie verte"): a later no-clip
+---      attempt painted ONE panel rectangle in the FIRST row's color and inset
+---      differing rows by the corner radius — so the last row's corner band bled
+---      the panel color and the inset truncated the fills. Guard: there is NO
+---      single panel fill; every row paints its own full-height square background.
+--- These assertions fail if the clip mask is dropped, its fill turns opaque, a
+--- per-row background regains rounding, or a row stops painting its own color.
 ---
 --- NOTE: the stub hs.canvas is a no-op mock, so the element STRUCTURE (not the
 --- rendered pixels) is what is testable; M._build_stacked_elements is pure for
@@ -35,58 +39,77 @@ package.loaded["lib.toml_reader"]   = nil
 
 local Renderer = helpers.load_with_stubs("ui.tooltip.renderer")
 
-helpers.describe("tooltip stacked panel: rounded colored background, no clip", function()
-	helpers.it("element 1 is a rounded filled rectangle (the colored panel)", function()
+helpers.describe("tooltip stacked panel: rounded clip mask, per-row colors", function()
+	helpers.it("element 1 is a rounded clip mask with a TRANSPARENT fill", function()
 		local els = Renderer._build_stacked_elements(1)
 		helpers.assert_eq(els[1].type, "rectangle")
-		helpers.assert_eq(els[1].action, "fill")
+		helpers.assert_eq(els[1].action, "clip")
 		helpers.assert_true(type(els[1].roundedRectRadii) == "table"
 			and (els[1].roundedRectRadii.xRadius or 0) > 0,
-			"the panel background must be rounded so the colored rectangle matches the border")
+			"the clip mask must be rounded so the outer corners round")
+		-- The transparent fill is the guard against the historical all-red tooltip:
+		-- a build that ignores the clip action must paint nothing, not red.
+		helpers.assert_true(type(els[1].fillColor) == "table" and els[1].fillColor.alpha == 0,
+			"the clip mask fill must be transparent (alpha 0) so an unsupported clip never paints red")
 	end)
 
-	helpers.it("never emits a clip / resetClip element (the all-red tooltip cause)", function()
-		for _, n in ipairs({ 1, 2, 3 }) do
-			for _, el in ipairs(Renderer._build_stacked_elements(n)) do
-				helpers.assert_true(el.action ~= "clip" and el.action ~= "resetClip",
-					"no clip/resetClip action — its default red fill turned the tooltip solid red")
-			end
-		end
-	end)
-
-	helpers.it("has the panel + rows + separators + border element count", function()
+	helpers.it("emits exactly one clip and one resetClip, in that order", function()
 		for _, n in ipairs({ 1, 2, 3 }) do
 			local els = Renderer._build_stacked_elements(n)
-			-- 1 panel + 3*n per-row + (n-1) separators + 1 border = 4n + 1
-			helpers.assert_eq(#els, n * 4 + 1)
+			local clip_idx, reset_idx
+			for i, el in ipairs(els) do
+				if el.action == "clip" then
+					helpers.assert_true(clip_idx == nil, "only one clip mask is allowed")
+					clip_idx = i
+				elseif el.action == "resetClip" then
+					helpers.assert_true(reset_idx == nil, "only one resetClip is allowed")
+					reset_idx = i
+				end
+			end
+			helpers.assert_eq(clip_idx, 1)  -- the clip mask leads the stack
+			helpers.assert_true(reset_idx ~= nil and reset_idx == n * 4 + 1,
+				"resetClip must sit just before the border so its stroke is not clipped")
 		end
 	end)
 
-	helpers.it("ends with a rounded stroked border", function()
+	helpers.it("has the clip + rows + separators + resetClip + border element count", function()
+		for _, n in ipairs({ 1, 2, 3 }) do
+			local els = Renderer._build_stacked_elements(n)
+			-- 1 clip + 3*n per-row + (n-1) separators + 1 resetClip + 1 border = 4n + 2
+			helpers.assert_eq(#els, n * 4 + 2)
+		end
+	end)
+
+	helpers.it("ends with a rounded stroked border AFTER the resetClip", function()
 		local els = Renderer._build_stacked_elements(2)
 		local last = els[#els]
 		helpers.assert_eq(last.action, "strokeAndFill")
 		helpers.assert_true(type(last.roundedRectRadii) == "table",
-			"the border must be rounded to match the panel")
+			"the border must be rounded to match the clip mask")
+		helpers.assert_eq(els[#els - 1].action, "resetClip")
 	end)
 
-	helpers.it("per-row override slots start skipped (panel paints the common case)", function()
-		-- For row i (1-based) the override background lives at (i-1)*3 + 2.
-		local els = Renderer._build_stacked_elements(2)
-		helpers.assert_eq(els[2].action, "skip")  -- row 1 override
-		helpers.assert_eq(els[5].action, "skip")  -- row 2 override
+	helpers.it("every per-row background is a fill (no single panel paints the rows)", function()
+		-- The no-clip bleed bug skipped rows that matched a shared panel color; here
+		-- there is no panel, so each row MUST paint its own background unconditionally.
+		for _, n in ipairs({ 1, 2, 3 }) do
+			local els = Renderer._build_stacked_elements(n)
+			for i = 1, n do
+				helpers.assert_eq(els[(i - 1) * 3 + 2].action, "fill")
+			end
+		end
 	end)
 
-	helpers.it("per-row tint overrides are SQUARE (straight edges between rows)", function()
+	helpers.it("per-row backgrounds are SQUARE (straight edges between rows)", function()
 		-- The user-facing contract: a multi-row stack is ONE rounded box with straight
-		-- separators, never a rounded card per row. Only the panel (element 1) and the
-		-- outer border may round; every per-row override background must be square.
+		-- separators, never a rounded card per row. Only the clip mask (element 1) and
+		-- the outer border may round; every per-row background must be square.
 		for _, n in ipairs({ 2, 3 }) do
 			local els = Renderer._build_stacked_elements(n)
 			for i = 1, n do
-				local override = els[(i - 1) * 3 + 2]
-				helpers.assert_true(override.roundedRectRadii == nil,
-					"row " .. i .. "/" .. n .. " tint override must be square (no roundedRectRadii) "
+				local bg = els[(i - 1) * 3 + 2]
+				helpers.assert_true(bg.roundedRectRadii == nil,
+					"row " .. i .. "/" .. n .. " background must be square (no roundedRectRadii) "
 						.. "so the edges between rows are straight lines")
 			end
 		end
