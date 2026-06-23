@@ -621,10 +621,19 @@ function M.init(file_system)
 
 	-- Load shared data files first — required before load_user_config() can
 	-- call build_default_state() on first launch
-	M.AVAILABLE_ACTIONS    = Config.load_available_actions(ACTIONS_FILE) or {}
-	M.TAP_HOLD_KEYS        = Config.load_tap_hold_keys(TAP_HOLD_FILE)   or {}
-	M.MOD_COMBOS           = Config.load_mod_combos(MOD_COMBOS_FILE)    or {}
-	M.NON_CANONICAL_COMBOS = Config.compute_non_canonical_combos(M.MOD_COMBOS)
+	-- Each phase is timed so the boot log attributes init.lua's "UI: karabiner.init"
+	-- cost to a specific JSON load or the non-canonical combo computation
+	-- (karabiner-init-breakdown).
+	local function timed(label, fn)
+		local t0 = hs.timer.absoluteTime()
+		local result = fn()
+		Logger.info(LOG, "init phase '%s': %.1f ms.", label, (hs.timer.absoluteTime() - t0) / 1e6)
+		return result
+	end
+	M.AVAILABLE_ACTIONS    = timed("load_available_actions", function() return Config.load_available_actions(ACTIONS_FILE) end) or {}
+	M.TAP_HOLD_KEYS        = timed("load_tap_hold_keys",     function() return Config.load_tap_hold_keys(TAP_HOLD_FILE) end)    or {}
+	M.MOD_COMBOS           = timed("load_mod_combos",        function() return Config.load_mod_combos(MOD_COMBOS_FILE) end)     or {}
+	M.NON_CANONICAL_COMBOS = timed("compute_non_canonical_combos", function() return Config.compute_non_canonical_combos(M.MOD_COMBOS) end)
 
 	if #M.AVAILABLE_ACTIONS == 0 or #M.TAP_HOLD_KEYS == 0 or #M.MOD_COMBOS == 0 then
 		Logger.error(LOG, "One or more data files failed to load — aborting initialization.")

@@ -369,6 +369,23 @@ function M.is_ignored_window(ignored_titles, ignored_patterns, now)
 	return false
 end
 
+--- Prewarms the ignored-window watchers OFF the keystroke path.
+--- hs.window.filter.default enumerates every open window on first use — a cold
+--- cost measured at ~3 s on a busy desktop. When that enumeration is paid lazily
+--- inside the FIRST keystroke (is_ignored_window → ensure_ignored_win_watchers),
+--- it blocks the keyDown event tap long enough for macOS to disable the tap
+--- ("macOS disabled the keyDown event tap — re-enabling"), dropping that
+--- keystroke. Calling this from a deferred boot timer pays the enumeration on a
+--- timer callback instead, so the first real keystroke is already warm.
+--- Safe to call repeatedly: ensure_ignored_win_watchers() is idempotent.
+function M.prewarm_ignored_win_watchers()
+	Logger.start(LOG, "Prewarming ignored-window watchers off the keystroke path…")
+	local t0 = hs.timer.absoluteTime()
+	ensure_ignored_win_watchers()
+	Logger.success(LOG, "Ignored-window watchers prewarmed (%.1f ms).",
+		(hs.timer.absoluteTime() - t0) / 1e6)
+end
+
 --- Stops the ignored-window watchers and unsubscribes from the window filter.
 --- Must be called from keymap/init.lua M.stop() to prevent callbacks from firing
 --- after the module is unloaded (watcher-leak-on-reload).
