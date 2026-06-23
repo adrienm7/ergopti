@@ -434,17 +434,10 @@ HotstringsConfigLoadLlmPredictionColor()
 ; SC=0 means VK_RMENU is not mapped → Kana-like remap; non-zero means RAlt
 ; exists on this layout → standard AltGr. The resolved flag also accounts for
 ; any manual TOML override from [Script] AltGrIsKanaRemap.
-_DetectHKL := GetForegroundKeyboardLayout()
-if _DetectHKL = 0
-    _DetectHKL := DllCall("GetKeyboardLayout", "UInt", A_ThreadID, "Ptr")
-if _DetectHKL = 0 {
-    _HklBufDetect := Buffer(A_PtrSize, 0)
-    DllCall("SystemParametersInfo", "UInt", 0x0059, "UInt", 0, "Ptr", _HklBufDetect, "UInt", 0)
-    _DetectHKL := NumGet(_HklBufDetect, 0, "Ptr")
-}
-_DetectSC := DllCall("MapVirtualKeyExW",
-    "UInt", 0xA5, "UInt", 4,
-    "Ptr", _DetectHKL, "UInt")
+; HKL resolution + VK_RMENU reverse-probe live in adapters/key_state.ahk so the
+; layout-detection DllCalls are isolated there, not inlined in the boot sequence.
+_DetectHKL := KS_ResolveKeyboardLayout()
+_DetectSC := KS_ProbeRightAltScancode(_DetectHKL)
 LoggerInfo("AltGrDetect",
     "HKL=0x{1:X}, VK_RMENU→SC=0x{2:X}, _ALTGR_KANA_FIXUP={3}.",
     _DetectHKL, _DetectSC,
@@ -537,51 +530,19 @@ global TapHold := LoadTapHoldToml(_ConfigDir . _AhkSubDir . "tap_hold.toml",
 ; (AHK launches tray-only), so GetForegroundKeyboardLayout() returns 0.
 ; Fallback 1: GetKeyboardLayout(A_ThreadID) — layout of the AHK thread itself.
 ; Fallback 2: SystemParametersInfo(SPI_GETDEFAULTINPUTLANG) — system default.
+; HKL resolution + the no-modifier scancode scan live in adapters/key_state.ahk
+; so the layout-detection DllCalls (MapVirtualKeyExW / ToUnicodeEx) are isolated
+; there; this boot step only interprets the result and updates ScriptInformation.
 if !Features["layout"]["ergopti_base"] {
-	_HKL := GetForegroundKeyboardLayout()
-	if _HKL = 0 {
-		_HKL := DllCall("GetKeyboardLayout", "UInt", A_ThreadID, "Ptr")
-	}
-	if _HKL = 0 {
-		; SPI_GETDEFAULTINPUTLANG = 0x0059; pvParam receives an HKL.
-		_HklBuf := Buffer(A_PtrSize, 0)
-		DllCall("SystemParametersInfo", "UInt", 0x0059, "UInt", 0, "Ptr", _HklBuf, "UInt", 0)
-		_HKL := NumGet(_HklBuf, 0, "Ptr")
-	}
+	_HKL := KS_ResolveKeyboardLayout()
 	if _HKL != 0 {
 		_TargetChar := ScriptInformation["MagicKeySourceChar"]
-		_CharBuf  := Buffer(10, 0)
-		_KeyState := Buffer(256, 0)  ; all modifier keys unpressed
-		_FoundScan := 0
-		_FoundVK   := 0
-		; Probe every base scancode. 0x01–0x58 covers all standard keys;
-		; extend to 0x7F as a safety margin for exotic layouts.
-		Loop 127 {
-			_SC := A_Index
-			; MAPVK_VSC_TO_VK_EX = 3: extended-key-aware SC → VK.
-			_VK := DllCall("MapVirtualKeyExW", "UInt", _SC, "UInt", 3, "Ptr", _HKL, "UInt")
-			if _VK = 0
-				continue
-			; ToUnicodeEx with flat (no-modifier) key state.
-			; Reset buffer before each call — dead-key state can persist across calls.
-			_CharBuf := Buffer(10, 0)
-			_Len := DllCall("ToUnicodeEx",
-				"UInt", _VK, "UInt", _SC, "Ptr", _KeyState,
-				"Ptr", _CharBuf, "Int", 4, "UInt", 0x4, "Ptr", _HKL, "Int")
-			if _Len <= 0
-				continue
-			_Ch := StrGet(_CharBuf, _Len, "UTF-16")
-			if _Ch = _TargetChar {
-				_FoundScan := _SC
-				_FoundVK   := _VK
-				break
-			}
-		}
-		if _FoundScan != 0 {
-			ScriptInformation["MagicKeySourceScan"] := Format("SC{:03X}", _FoundScan)
+		_Found := KS_ScanScancodeForChar(_HKL, _TargetChar)
+		if _Found["scan"] != 0 {
+			ScriptInformation["MagicKeySourceScan"] := Format("SC{:03X}", _Found["scan"])
 			LoggerInfo("ErgoptiPlus",
 				"Magic-key source resolved from layout: char='{1}', VK=0x{2:X}, scan={3} (HKL=0x{4:X}).",
-				_TargetChar, _FoundVK, ScriptInformation["MagicKeySourceScan"], _HKL)
+				_TargetChar, _Found["vk"], ScriptInformation["MagicKeySourceScan"], _HKL)
 		} else {
 			LoggerWarn("ErgoptiPlus",
 				"Magic-key source: char '{1}' not found on any base scancode of layout"
