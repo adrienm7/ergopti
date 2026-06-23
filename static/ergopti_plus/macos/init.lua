@@ -733,6 +733,17 @@ for _, fname in ipairs(toml_fnames) do
 end
 Logger.info(LOG, string.format("Loaded %d TOML hotstring file(s) in %.1fms.",
 	#toml_fnames, (hs.timer.secondsSinceEpoch() - _toml_load_t0) * 1000))
+-- Surface the snapshot-cache hit rate at INFO so the boot log shows whether the
+-- hotstring load took the fast (cached) path. A miss-heavy boot (e.g. right after
+-- an edit, or a stale cache dir) explains a slower "Hotstring groups registered".
+do
+	local ok_cache, toml_cache = pcall(require, "adapters.toml_cache")
+	if ok_cache and type(toml_cache) == "table" and type(toml_cache.stats) == "function" then
+		local s = toml_cache.stats()
+		Logger.info(LOG, string.format("TOML snapshot cache: %d hit(s), %d miss(es), %d write(s) (enabled=%s).",
+			s.hits or 0, s.misses or 0, s.writes or 0, tostring(s.enabled)))
+	end
+end
 Boot.mark("Hotstring groups registered (personal + dynamic + common)")
 
 -- Single final sort covering personal + dynamic + common TOML groups.
