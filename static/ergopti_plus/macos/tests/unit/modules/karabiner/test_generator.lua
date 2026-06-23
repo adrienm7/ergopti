@@ -508,7 +508,7 @@ helpers.describe("Generator.build_paused_script_control_rules (exempt-from-pause
 	-- the paused config so the script-management shortcuts stay exempt from pause.
 	local rules = Generator.build_paused_script_control_rules()
 
-	helpers.it("emits 6 rules — 3 slots × {right_command, right_option}", function()
+	helpers.it("emits 6 rules — 3 slots × {right_command, option}", function()
 		helpers.assert_true(type(rules) == "table", "must return a table")
 		helpers.assert_eq(#rules, 6)
 	end)
@@ -527,7 +527,11 @@ helpers.describe("Generator.build_paused_script_control_rules (exempt-from-pause
 		end
 	end)
 
-	helpers.it("covers both right-hand modifiers and all three script-control keys", function()
+	helpers.it("covers right_command + either-side option and all three script-control keys", function()
+		-- The accepted modifiers must mirror the HS-side guard (right command + option
+		-- on either side). The side-agnostic "option" un-pauses for users who remap
+		-- their right-hand key to a left/plain option (script-control-altgr-leftmod):
+		-- "right_option" alone never matched their held modifier while paused.
 		local mods, keys = {}, {}
 		for _, rule in ipairs(rules) do
 			local m = rule.manipulators[1]
@@ -535,7 +539,9 @@ helpers.describe("Generator.build_paused_script_control_rules (exempt-from-pause
 			keys[m.from.key_code] = true
 		end
 		helpers.assert_true(mods.right_command, "right_command must un-pause")
-		helpers.assert_true(mods.right_option, "right_option must un-pause")
+		helpers.assert_true(mods.option, "either-side option must un-pause (covers a remapped left/plain option)")
+		helpers.assert_true(mods.right_option == nil,
+			"the side-specific right_option is replaced by the side-agnostic option")
 		helpers.assert_true(keys.return_or_enter and keys.delete_or_backspace and keys.escape,
 			"all three script-control keys must be present")
 	end)
