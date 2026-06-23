@@ -183,7 +183,10 @@ jobs:
 
       - name: Run unit + meta tests
         working-directory: static/ergopti_plus/macos
-        run: lua5.4 tests/run.lua
+        # Wrapped in the unified reporter: streams output unchanged, exits with the
+        # runner's code (CI gating preserved), and emits GitHub annotations + a JSON
+        # summary on failure. report.cjs lives at the repo root tools/.
+        run: node ../../../tools/test/report.cjs --name macos-lua --json "${{ runner.temp }}/macos-lua.json" -- lua5.4 tests/run.lua
 
   # ─────────────────────────────────────────────────
   # 2.2) Hammerspoon E2E (virtual-keyboard harness)
@@ -392,6 +395,21 @@ jobs:
           Write-Host $summary
           if ($exit -ne 0) {
               Write-Error "Test suite failed (exit $exit)."; exit $exit
+          }
+
+      # Emit GitHub annotations + a JSON summary from the captured TAP. Purely
+      # additive (continue-on-error): the step above remains the gate, so a
+      # reporter hiccup can never flip a red run green or vice-versa.
+      - name: Annotate AHK results
+        if: always()
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          $resultsFile = "$env:TEMP\ergopti_test_results.txt"
+          if (Test-Path $resultsFile) {
+              node "${{ github.workspace }}\tools\test\report.cjs" --name windows-ahk --json "$env:RUNNER_TEMP\windows-ahk.json" -- PARSE_FILE $resultsFile
+          } else {
+              Write-Host "No AHK results file to annotate."
           }
 
       - name: Check for AHK compiler warnings
