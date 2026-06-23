@@ -702,6 +702,11 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 #Include meta/test_dpapi_blob_size.ahk
 #Include meta/test_llm_diff_french_accents.ahk
 #Include test_audit_v5_fixes.ahk
+; Healthcheck pure formatters (uptime / HTML-escape) — coverage preserved from
+; the deleted P5-stale test_session_regressions orphan. helpers.ahk is
+; headless-safe (function definitions only, no top-level side effects).
+#Include ../ui/healthcheck/helpers.ahk
+#Include meta/test_healthcheck_format_helpers.ahk
 
 ; Watchdog: kill the process if RunTests() never returns (e.g. a corpus
 ; consumer blocks on a synchronous HTTP call, an InputHook with no timeout,
