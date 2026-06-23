@@ -682,6 +682,17 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 #Include meta/test_ollama_installer_sync_winhttp_blocks.ahk
 #Include meta/test_g5_updater_download.ahk
 
+; -- Previously-orphaned regression tests (on disk but never wired into the
+;    runner; re-wired so they actually execute). These six pass against current
+;    code; the four that encoded unfinished cleanups/features are wired back as
+;    each underlying fix lands. --
+#Include meta/test_bypass_dispatch_arity.ahk
+#Include meta/test_hcw_reset_all_teardown.ahk
+#Include meta/test_processentry32w_size.ahk
+#Include meta/test_script_altgr_hotkeys.ahk
+#Include meta/test_space_hold_exception_guard.ahk
+#Include meta/test_stream_handle_type.ahk
+
 ; Watchdog: kill the process if RunTests() never returns (e.g. a corpus
 ; consumer blocks on a synchronous HTTP call, an InputHook with no timeout,
 ; or a blocking dialog in a headless CI context). The CI-level timeout is
