@@ -297,3 +297,13 @@ NI_IsVpnActive() {
         return false
     }
 }
+
+; Port dispatch map (ADAPTER_NETWORK_INFO) — the single-source-of-truth contract
+; surface, verified against _shared/core/ports/contracts.json by
+; tools/test/test-port-compliance.cjs.
+global ADAPTER_NETWORK_INFO := Map(
+    "getSignalStrength", NI_GetSignalStrength,
+    "getSsidHash", NI_GetSsidHash,
+    "isInternetReachable", NI_IsInternetReachable,
+    "isVpnActive", NI_IsVpnActive
+)

@@ -250,3 +250,14 @@ GR_Hide(Handle) {
 		return
 	try DllCall("User32\ShowWindow", "Ptr", Handle, "Int", 0)   ; SW_HIDE
 }
+
+; Port dispatch map (ADAPTER_GRAPHICS_RENDERER) — the single-source-of-truth contract
+; surface, verified against _shared/core/ports/contracts.json by
+; tools/test/test-port-compliance.cjs.
+global ADAPTER_GRAPHICS_RENDERER := Map(
+    "createWindow", GR_CreateWindow,
+    "destroyWindow", GR_DestroyWindow,
+    "drawBitmap", GR_DrawBitmap,
+    "hide", GR_Hide,
+    "show", GR_Show
+)

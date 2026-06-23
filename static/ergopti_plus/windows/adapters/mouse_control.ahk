@@ -111,3 +111,13 @@ MCGetMonitorBounds(N) {
 	}
 	return Bounds
 }
+
+; Port dispatch map (ADAPTER_MOUSE_CONTROL) — the single-source-of-truth contract
+; surface, verified against _shared/core/ports/contracts.json by
+; tools/test/test-port-compliance.cjs.
+global ADAPTER_MOUSE_CONTROL := Map(
+    "getMonitorBounds", MCGetMonitorBounds,
+    "getMonitorCount", MCGetMonitorCount,
+    "getPos", MCGetPos,
+    "setPos", MCSetPos
+)

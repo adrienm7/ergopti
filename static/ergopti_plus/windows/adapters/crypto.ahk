@@ -74,3 +74,10 @@ CryptoSha256(Data) {
         return Format("{:08x}", h)
     }
 }
+
+; Port dispatch map (ADAPTER_CRYPTO) — the single-source-of-truth contract
+; surface, verified against _shared/core/ports/contracts.json by
+; tools/test/test-port-compliance.cjs.
+global ADAPTER_CRYPTO := Map(
+    "sha256", CryptoSha256
+)

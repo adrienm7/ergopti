@@ -157,6 +157,7 @@ const ahkFiles = fs
 	.map((f) => path.join(AHK_ADAPTERS_DIR, f));
 
 let adapterMapCount = 0;
+const coveredPorts = new Set();
 for (const file of ahkFiles) {
 	const src = fs.readFileSync(file, 'utf8');
 	const maps = parseAdapterMaps(src);
@@ -169,7 +170,8 @@ for (const file of ahkFiles) {
 			]);
 			continue;
 		}
-		const contractMethods = Object.keys(contracts[portName].methods);
+		coveredPorts.add(portName);
+			const contractMethods = Object.keys(contracts[portName].methods);
 		const requiredMethods = contractMethods.filter(
 			(mth) => contracts[portName].methods[mth].required
 		);
@@ -198,6 +200,31 @@ for (const file of ahkFiles) {
 
 if (adapterMapCount === 0) {
 	fail('AHK ADAPTER_* maps found', ['no ADAPTER_* Map() definitions parsed — parser or layout drift']);
+}
+
+// Completeness gate: every port whose adapter file exists in adapters/ must
+// declare an ADAPTER_ dispatch map. The original test only validated maps that
+// were present, so a deleted or renamed map passed silently; this catches it.
+// Ports implemented outside adapters/ (e.g. TooltipRenderer lives in ui/tooltip)
+// have no adapter file and are reported as informational, not failures.
+const failBeforeCompleteness = totalFail;
+const portsImplementedElsewhere = [];
+for (const portName of Object.keys(contracts)) {
+	if (coveredPorts.has(portName)) continue;
+	const adapterFile = path.join(AHK_ADAPTERS_DIR, pascalToUpperSnake(portName).toLowerCase() + '.ahk');
+	if (fs.existsSync(adapterFile)) {
+		fail(`${portName}: adapter file declares an ADAPTER_ map`, [
+			`${path.basename(adapterFile)} exists but has no global ADAPTER_${pascalToUpperSnake(portName)} := Map(…) — a missing dispatch map silently weakens the contract gate`
+		]);
+	} else {
+		portsImplementedElsewhere.push(portName);
+	}
+}
+if (totalFail === failBeforeCompleteness) {
+	const elsewhere = portsImplementedElsewhere.length
+		? ` (${portsImplementedElsewhere.length} outside adapters/: ${portsImplementedElsewhere.join(', ')})`
+		: '';
+	pass(`completeness: every adapter file declares its ADAPTER_ map — ${coveredPorts.size}/${Object.keys(contracts).length} ports covered${elsewhere}`);
 }
 
 
