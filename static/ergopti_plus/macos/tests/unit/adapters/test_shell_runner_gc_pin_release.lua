@@ -92,4 +92,64 @@ helpers.describe("ShellRunner: GC pin release", function()
 			"_safe_terminate must remove M._active_tasks[_task] to prevent GC pin leak"
 		)
 	end)
+
+	-- Behavioural regression for the streaming-supersede crash: terminate() nils the
+	-- closure `_task`, then the OS delivers the SIGTERM completion callback. Without a
+	-- nil guard, wrapped_on_done evaluates `M._active_tasks[nil] = nil` and raises
+	-- "table index is nil" on every superseded/cancelled stream (seen on each LLM
+	-- prediction in the field logs).
+	helpers.it("wrapped_on_done tolerates a nil _task after terminate (no 'table index is nil')", function()
+		local captured_done
+		local ShellRunner = helpers.load_with_stubs("adapters.shell_runner", {
+			task = {
+				new = function(_exe, done_cb, _a3, _a4)
+					captured_done = done_cb
+					return { start = function() end, terminate = function() end }
+				end,
+			},
+		})
+
+		local handle = ShellRunner.spawn("/usr/bin/curl", { "-s", "-N" }, function() end)
+		handle.start()
+		handle.terminate()  -- supersede: clears the closure `_task`
+
+		helpers.assert_true(type(captured_done) == "function",
+			"the spawn wrapper must register a completion callback")
+		-- The OS fires the completion callback for the terminated task AFTER _task was nilled.
+		local ok = pcall(captured_done, 15, "", "")  -- 15 = SIGTERM
+		helpers.assert_true(ok,
+			"wrapped_on_done must not raise when _task was already cleared by terminate()")
+	end)
+
+	helpers.it("normal completion releases the GC pin and forwards (exit, out, err)", function()
+		local captured_done, fake_task
+		local ShellRunner = helpers.load_with_stubs("adapters.shell_runner", {
+			task = {
+				new = function(_exe, done_cb, _a3, _a4)
+					captured_done = done_cb
+					fake_task = { start = function() end, terminate = function() end }
+					return fake_task
+				end,
+			},
+		})
+
+		local seen = {}
+		local handle = ShellRunner.spawn("/bin/echo", { "hi" }, function(code, out, err)
+			seen.code, seen.out, seen.err = code, out, err
+		end)
+		handle.start()
+
+		-- The task is pinned while running so the GC cannot kill it mid-flight.
+		helpers.assert_true(ShellRunner._active_tasks[fake_task] == true,
+			"a running task must be pinned in _active_tasks against premature GC")
+
+		-- Normal (non-terminated) completion: pin released, callback forwarded verbatim.
+		local ok = pcall(captured_done, 0, "hi\n", "")
+		helpers.assert_true(ok, "completion callback must not raise on a normal exit")
+		helpers.assert_true(ShellRunner._active_tasks[fake_task] == nil,
+			"wrapped_on_done must release the GC pin once the subprocess exits")
+		helpers.assert_eq(seen.code, 0)
+		helpers.assert_eq(seen.out, "hi\n")
+		helpers.assert_eq(seen.err, "")
+	end)
 end)

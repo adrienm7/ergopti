@@ -99,8 +99,11 @@ function M.spawn(executable, args, on_done, on_chunk)
 	-- hs.task completion callback signature is (exitCode, stdOut, stdErr) — no
 	-- task object is passed. Use the closure upvalue `_task` for the GC-pin release,
 	-- not the first argument (which would be the exit code integer).
+	-- The nil guard is essential: terminate() nils `_task` before the OS delivers
+	-- the SIGTERM completion callback, so without it this fires `M._active_tasks[nil]`
+	-- — a "table index is nil" error on every superseded/cancelled stream.
 	local function wrapped_on_done(exit_code, stdout, stderr)
-		M._active_tasks[_task] = nil
+		if _task then M._active_tasks[_task] = nil end
 		if type(on_done) == "function" then
 			pcall(on_done, exit_code, stdout, stderr)
 		end
