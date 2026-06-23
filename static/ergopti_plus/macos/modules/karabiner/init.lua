@@ -48,6 +48,11 @@ local LOG = "karabiner"
 -- registry (was a bare 0.5 inline literal) so it is tunable cross-driver in one place.
 local LAYOUT_TIS_SETTLE_SEC = Timings.sec("debounce", "layout_tis_settle_ms")
 
+-- Delay before binding the window-management convenience hotkeys (cycle windows,
+-- alt-tab). They are not needed on the boot path, so binding them on a short timer
+-- keeps their hs.hotkey setup off the critical boot sequence.
+local HOTKEY_BIND_DEFER_SEC = 0.5
+
 -- Resolve the directory that contains this init.lua at load time.
 -- Works whether the file is symlinked, run from the project, or deployed.
 local _SELF_DIR = (debug.getinfo(1, "S").source:sub(2):match("^(.*[/\\])") or "./")
@@ -108,6 +113,7 @@ M.MOD_COMBOS = {}
 -- from a menu "Reload") must not re-prompt the user.
 local _wizard_ran_this_session  = false
 local _layout_rebuild_timer     = nil  -- Stored so rapid layout changes cancel the pending rebuild
+local _deferred_hotkeys_timer   = nil  -- Pending convenience-hotkey bind; cancelled by M.stop()
 
 -- Builds the minimal karabiner.json deployed on pause: the same profile structure
 -- as normal but carrying only `rules` (an empty list = full native keyboard). KE's
@@ -641,7 +647,9 @@ function M.init(file_system)
 	end
 
 	local first_launch = not file_exists(resolve_user_config())
-	local user_cfg     = Config.load_user_config(M.TAP_HOLD_KEYS, M.MOD_COMBOS, resolve_user_config())
+	local user_cfg     = timed("load_user_config", function()
+		return Config.load_user_config(M.TAP_HOLD_KEYS, M.MOD_COMBOS, resolve_user_config())
+	end)
 	local tab_cfg      = user_cfg.tap_hold_config and user_cfg.tap_hold_config.tab
 	if type(tab_cfg) == "table" and tab_cfg.tap == "cmd_tab" then
 		tab_cfg.tap = "alt_tab_windows"
@@ -667,7 +675,9 @@ function M.init(file_system)
 	-- which output keycodes to suppress in the HS event tap (preventing double
 	-- counting of remapped keys in the heatmap).
 	if KcBridge then
-		KcBridge.refresh_managed_set(_state.tap_hold_config, M.AVAILABLE_ACTIONS)
+		timed("KcBridge.refresh_managed_set", function()
+			KcBridge.refresh_managed_set(_state.tap_hold_config, M.AVAILABLE_ACTIONS)
+		end)
 	end
 
 	if _state.enabled then
@@ -688,12 +698,24 @@ function M.init(file_system)
 	-- so bare finger contact on the trackpad also deactivates CapsWord.
 	local ok_ge, gestures_engine = pcall(require, "modules.gestures.engine")
 	if not ok_ge then gestures_engine = nil end
-	_state.watcher              = Watchers.start_gesture_watcher(gestures_engine)
-	_state.hotkey_cycle_windows = Watchers.start_cycle_windows_hotkey()
-	_state.hotkey_alt_tab_windows = Watchers.start_alt_tab_windows_hotkey()
-	_state.hotkey_alt_tab_apps = Watchers.start_alt_tab_apps_hotkey()
+	_state.watcher = timed("start_gesture_watcher", function()
+		return Watchers.start_gesture_watcher(gestures_engine)
+	end)
 
-	Watchers.start_input_source_watcher(function(layout_name)
+	-- The window-management hotkeys (cycle windows, alt-tab) are pure convenience
+	-- bindings — nothing on the boot path needs them, so bind them on a short timer
+	-- to keep their hs.hotkey setup off the critical boot path. The timer is tracked
+	-- so M.stop() can cancel it if a reload happens before it fires.
+	_deferred_hotkeys_timer = hs.timer.doAfter(HOTKEY_BIND_DEFER_SEC, function()
+		_deferred_hotkeys_timer = nil
+		if not _state then return end  -- module stopped before the timer fired
+		_state.hotkey_cycle_windows   = Watchers.start_cycle_windows_hotkey()
+		_state.hotkey_alt_tab_windows = Watchers.start_alt_tab_windows_hotkey()
+		_state.hotkey_alt_tab_apps    = Watchers.start_alt_tab_apps_hotkey()
+		Logger.debug(LOG, "Window-management hotkeys bound (deferred).")
+	end)
+
+	timed("start_input_source_watcher", function() Watchers.start_input_source_watcher(function(layout_name)
 		Logger.start(LOG, "Layout change detected — refreshing actions for layout '%s'…", layout_name)
 		-- Delay the rebuild slightly: hs.keycodes.map is updated by the macOS TIS
 		-- subsystem asynchronously after the notification fires. Without the delay,
@@ -743,7 +765,7 @@ function M.init(file_system)
 				Logger.info(LOG, "Shortcuts rebound for layout '%s'.", layout_name)
 			end
 		end)
-	end)
+	end) end)  -- close the input-source callback, then the timed() wrapper
 
 	local active_combos = 0
 	for _, combo_def in ipairs(M.MOD_COMBOS) do
@@ -779,6 +801,12 @@ end
 function M.stop()
 	if not _state then return end
 	Logger.start(LOG, "Stopping Karabiner bridge…")
+	-- Cancel a still-pending deferred hotkey bind so it cannot fire after stop and
+	-- leak a hotkey the matching disable below would have already skipped (nil).
+	if _deferred_hotkeys_timer then
+		pcall(function() _deferred_hotkeys_timer:stop() end)
+		_deferred_hotkeys_timer = nil
+	end
 	if _state.watcher then
 		pcall(function() _state.watcher:stop() end)
 		_state.watcher = nil
