@@ -674,14 +674,19 @@ end
 --- rule — but pause strips every other rule, so that variable would never get set.
 --- Here we gate the sentinels DIRECTLY on the physical modifier instead, so
 --- AltGr+Enter / Backspace / Escape keep emitting F13 / F14 / F15 (consumed by
---- modules/shortcuts/script_control.lua) even while every other remap is off. Both
---- right_command and right_option are accepted so either right-hand « AltGr » key
---- un-pauses the script — the script-control shortcuts stay exempt from pause.
+--- modules/shortcuts/script_control.lua) even while every other remap is off, so
+--- the script-control shortcuts stay identical and working while paused.
+--- The accepted modifiers MUST mirror the HS-side guard (KeyState.is_right_altgr_held):
+--- right_command + option on EITHER side. The side-agnostic "option" is required
+--- for users who remap their right-hand key to a left/plain option via their own
+--- Karabiner rules — `right_option` alone never matched their held modifier, so the
+--- paused sentinel was not emitted and a second AltGr+Enter could not un-pause.
 --- @return table List of Karabiner rule objects (one per modifier × slot).
 function M.build_paused_script_control_rules()
 	local rules = {}
-	-- Either right-hand modifier un-pauses while the script is paused.
-	local mods = { "right_command", "right_option" }
+	-- right_command + option (either side) un-pause while paused — mirrors the
+	-- HS-side AltGr guard so the same physical chord that pauses also resumes.
+	local mods = { "right_command", "option" }
 	for _, slot in ipairs(SCRIPT_CONTROL_SENTINEL_SLOTS) do
 		for _, mod in ipairs(mods) do
 			rules[#rules + 1] = {
