@@ -385,11 +385,13 @@ function M._build_stacked_elements(row_count)
 		roundedRectRadii = { xRadius = CORNER_RADIUS, yRadius = CORNER_RADIUS },
 	}
 	for _ = 1, row_count do
-		-- Per-row tint override: rounded too, so a differing top/bottom row still
-		-- matches the panel corners; skipped unless render_stacked enables it.
+		-- Per-row tint override: SQUARE corners so the edges between rows are straight
+		-- lines — only the panel (element 1) and the outer border carry the corner
+		-- rounding. render_stacked holds a differing first/last row's fill clear of the
+		-- panel's rounded corners so a square corner never pokes outside the rounding;
+		-- skipped entirely unless a row's tint differs from the panel.
 		elements[#elements + 1] = {
 			type = "rectangle", action = "skip",
-			roundedRectRadii = { xRadius = CORNER_RADIUS, yRadius = CORNER_RADIUS },
 		}
 		elements[#elements + 1] = { type = "text", action = "fill" }
 		elements[#elements + 1] = { type = "text", action = "fill" }
@@ -596,13 +598,24 @@ function M.render_stacked(rows, state, start_watchers_callback)
 			local bg_col = M.apply_tint(row.tint)
 
 			-- Per-row background override: only when this row's tint differs from the
-			-- panel (the panel already paints the common case). Rounded so a differing
-			-- top/bottom row still matches the outer corners.
+			-- panel (the panel already paints the common case). The fill is SQUARE so the
+			-- edges between rows are straight; the first row's top and the last row's
+			-- bottom are held CORNER_RADIUS clear of the panel's rounded corners so a
+			-- square corner never pokes outside the rounding (the rounded panel shows
+			-- through that thin corner band instead).
 			if colors_equal(bg_col, panel_col) then
 				M.stacked_canvas[base].action = "skip"
 			else
+				local fill_y, fill_h = top_y, row_h
+				if i == 1 then
+					fill_y = top_y + CORNER_RADIUS
+					fill_h = fill_h - CORNER_RADIUS
+				end
+				if i == row_count then
+					fill_h = fill_h - CORNER_RADIUS
+				end
 				M.stacked_canvas[base].action    = "fill"
-				M.stacked_canvas[base].frame     = { x = 0, y = top_y, w = canvas_width, h = row_h }
+				M.stacked_canvas[base].frame     = { x = 0, y = fill_y, w = canvas_width, h = math.max(0, fill_h) }
 				M.stacked_canvas[base].fillColor = bg_col
 			end
 
