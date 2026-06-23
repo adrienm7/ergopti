@@ -164,56 +164,56 @@ InstallHotstringHooks()
 InstallSendNoOps()
 
 ; ── Per-module test files (each registers Test() cases) ──
-#Include test_adapter_compliance_new.ahk
-#Include test_adapter_contract_vectors.ahk
-#Include test_text_sender_modifiers.ahk
-#Include test_timer_scheduler.ahk
-#Include test_hook_dispatcher.ahk
-#Include test_logger.ahk
-#Include test_logger_contract.ahk
-#Include test_tooltip_tint_contract.ahk
-#Include test_tooltip_border_alpha.ahk
-#Include test_tooltip_dequeue_regression.ahk
-#Include test_llm_tooltip_grace.ahk
-#Include test_llm_tooltip_render.ahk
-#Include test_hotstring_engine.ahk
-#Include test_hotstring_engine_main.ahk
-#Include test_suppress_refcount.ahk
-#Include test_hotstring_live_toggle.ahk
-#Include test_prefix_watcher_index.ahk
-#Include test_prefix_index_cache_equiv.ahk
-#Include test_master_gates.ahk
-#Include test_domain_registry.ahk
-#Include test_domain_expander.ahk
-#Include test_toml_loader.ahk
-#Include test_toml_helpers_roundtrip.ahk
-#Include test_hotstrings_cache.ahk
-#Include test_hotstrings_config.ahk
-#Include test_terminators.ahk
-#Include test_personal_toml_editor.ahk
-#Include test_layout_tables.ahk
+#Include unit/test_adapter_compliance_new.ahk
+#Include unit/test_adapter_contract_vectors.ahk
+#Include unit/test_text_sender_modifiers.ahk
+#Include unit/test_timer_scheduler.ahk
+#Include unit/test_hook_dispatcher.ahk
+#Include unit/test_logger.ahk
+#Include unit/test_logger_contract.ahk
+#Include unit/test_tooltip_tint_contract.ahk
+#Include unit/test_tooltip_border_alpha.ahk
+#Include unit/test_tooltip_dequeue_regression.ahk
+#Include unit/test_llm_tooltip_grace.ahk
+#Include unit/test_llm_tooltip_render.ahk
+#Include unit/test_hotstring_engine.ahk
+#Include unit/test_hotstring_engine_main.ahk
+#Include unit/test_suppress_refcount.ahk
+#Include unit/test_hotstring_live_toggle.ahk
+#Include unit/test_prefix_watcher_index.ahk
+#Include unit/test_prefix_index_cache_equiv.ahk
+#Include unit/test_master_gates.ahk
+#Include unit/test_domain_registry.ahk
+#Include unit/test_domain_expander.ahk
+#Include unit/test_toml_loader.ahk
+#Include unit/test_toml_helpers_roundtrip.ahk
+#Include unit/test_hotstrings_cache.ahk
+#Include unit/test_hotstrings_config.ahk
+#Include unit/test_terminators.ahk
+#Include unit/test_personal_toml_editor.ahk
+#Include unit/test_layout_tables.ahk
 
-#Include test_config.ahk
-#Include test_features_manifest.ahk
-#Include test_hotstrings_full.ahk
-#Include test_tap_hold_loader.ahk
-#Include test_i18n.ahk
-#Include test_window_utils.ahk
-#Include test_string_utils.ahk
-#Include test_registry.ahk
-#Include test_nav_layer_helpers.ahk
-#Include test_updater.ahk
+#Include unit/test_config.ahk
+#Include unit/test_features_manifest.ahk
+#Include unit/test_hotstrings_full.ahk
+#Include unit/test_tap_hold_loader.ahk
+#Include unit/test_i18n.ahk
+#Include unit/test_window_utils.ahk
+#Include unit/test_string_utils.ahk
+#Include unit/test_registry.ahk
+#Include unit/test_nav_layer_helpers.ahk
+#Include unit/test_updater.ahk
 #Include meta/test_updater_load_interval_guard.ahk
 
 ; Shortcuts modules — dispatcher logic is testable without real hotkeys firing;
 ; the module files are #Include'd from within test_shortcuts.ahk itself so the
 ; include paths are resolved relative to the tests/ directory.
-#Include test_shortcuts.ahk
+#Include unit/test_shortcuts.ahk
 
 ; Metrics shortcuts — MS_ToAhkSyntax is pure logic (no OS calls, no hotkeys
 ; registered at top level) so the file is safe to include in the headless runner.
 #Include ../lib/metrics/metrics_shortcuts.ahk
-#Include test_metrics_shortcut_named_key.ahk
+#Include unit/test_metrics_shortcut_named_key.ahk
 
 ; LLM modules — pure-logic subset (profiles, models, api_common, api_ollama,
 ; api_remote, prediction_engine) included here to test JSON parsing, profile
@@ -225,20 +225,20 @@ try FileAppend("# [marker] starting direct include of LLM production modules`r`n
 #Include ../modules/llm/models.ahk
 #Include ../lib/llm_defaults.ahk
 #Include ../modules/llm/profiles.ahk
-#Include test_llm_profiles.ahk
+#Include unit/test_llm_profiles.ahk
 #Include ../modules/llm/api_common.ahk
-#Include test_llm_api_common.ahk
+#Include unit/test_llm_api_common.ahk
 #Include ../modules/llm/api_ollama.ahk
 #Include ../modules/llm/api_remote.ahk
-#Include test_llm_api_ollama.ahk
-#Include test_llm_api_remote.ahk
+#Include unit/test_llm_api_ollama.ahk
+#Include unit/test_llm_api_remote.ahk
 #Include ../modules/llm/prediction_engine.ahk
-#Include test_llm_prediction_engine.ahk
-#Include test_llm_defaults.ahk
+#Include unit/test_llm_prediction_engine.ahk
+#Include unit/test_llm_defaults.ahk
 ; parser.ahk (the AHK semantic-diff parser) was previously exercised by no suite,
 ; which let a crash in its Levenshtein helper survive — include it + its tests.
 #Include ../modules/llm/parser.ahk
-#Include test_llm_parser.ahk
+#Include unit/test_llm_parser.ahk
 #Include meta/test_llm_batch_dedup_stats.ahk
 ; Non-blocking installed-tags cache contract + behaviour (menu-build-sync-api-tags-freeze).
 ; Behavioural cases call the real models.ahk cache funcs included just above.
@@ -269,8 +269,8 @@ global _LLM_Menu := Map(
 try FileAppend("# [marker] about to include menu_llm/persist.ahk (with _LLM_Menu hack)`r`n", A_Temp . "\ergopti_test_results.txt", "UTF-8")
 try FileAppend("# [marker] about to include menu_llm/persist.ahk (with _LLM_Menu hack)`r`n", "*")
 #Include ../ui/menu/menu_llm/persist.ahk
-#Include test_llm_menu_persistence.ahk
-#Include test_llm_menu_regressions.ahk
+#Include unit/test_llm_menu_persistence.ahk
+#Include unit/test_llm_menu_regressions.ahk
 try FileAppend("# [marker] menu_llm persist + tests included`r`n", A_Temp . "\ergopti_test_results.txt", "UTF-8")
 try FileAppend("# [marker] menu_llm persist + tests included`r`n", "*")
 
@@ -284,7 +284,7 @@ try FileAppend("# [marker] about to include gestures.ahk (top-level t() for SLOT
 #Include ../modules/gestures/screenshots.ahk
 #Include ../modules/gestures/window_cycle.ahk
 #Include ../modules/gestures/config.ahk
-#Include test_gestures.ahk
+#Include unit/test_gestures.ahk
 try FileAppend("# [marker] gestures + test included`r`n", A_Temp . "\ergopti_test_results.txt", "UTF-8")
 try FileAppend("# [marker] gestures + test included`r`n", "*")
 
@@ -306,15 +306,15 @@ global _VendorDir := A_ScriptDir . "\..\vendor"
 ; the test's direct call to _KL_Clip_CharCountFromByteSize is a load-time
 ; "nonexistent function" error that hangs the headless runner with no output.
 #Include ../modules/keylogger/keylogger_clipboard.ahk
-#Include test_keylogger_walker.ahk
-#Include test_keylogger_app_categories.ahk
-#Include test_keylogger_reader.ahk
+#Include unit/test_keylogger_walker.ahk
+#Include unit/test_keylogger_app_categories.ahk
+#Include unit/test_keylogger_reader.ahk
 ; Shared timings (A3): tap_holds/constants.ahk defines the tap-hold timing
 ; globals + TapHoldsLoadTimings() and has NO top-level hotkeys, so it is safe to
 ; include here (unlike most modules/). test_timings_config exercises the shared
 ; registry reader plus the keylogger-walker and tap-hold reassign-at-boot loaders.
 #Include ../modules/tap_holds/constants.ahk
-#Include test_timings_config.ahk
+#Include unit/test_timings_config.ahk
 try FileAppend("# [marker] keylogger modules + tests included`r`n", A_Temp . "\ergopti_test_results.txt", "UTF-8")
 try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 
@@ -400,7 +400,7 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 #Include meta/test_prefix_watcher_deferred.ahk
 #Include meta/test_native_hotstrings_migrated.ahk
 #Include meta/test_i18n_fallback_deferred.ahk
-#Include test_hse_conform_double_fire.ahk
+#Include unit/test_hse_conform_double_fire.ahk
 #Include meta/test_llm_menu_deferred_build.ahk
 #Include meta/test_logger_format_placeholders.ahk
 #Include meta/test_logger_sub_files_routing.ahk
@@ -533,22 +533,22 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 #Include meta/test_winorder_unbounded_and_cross_thread.ahk
 #Include meta/test_wpm_push_unguarded_debug_arg_build.ahk
 #Include meta/test_wpm_ring_buffer_cross_thread_race.ahk
-#Include test_coalesced_job_callbacks_dropped.ahk
-#Include test_count_regex_vs_entry_pattern_divergence.ahk
-#Include test_counttoml_overcounts_personal_meta_sections.ahk
-#Include test_delay_edit_non_integer_personal_truncation.ahk
-#Include test_freshness_same_second_edit_window.ahk
-#Include test_inline_autotype_not_synthetic.ahk
-#Include test_json_number_misleading_error.ahk
-#Include test_ollama_curl_temp_pii_plaintext.ahk
-#Include test_parsetomlgroupconfig_missing_file_cache_key.ahk
-#Include test_parsetomlgroupconfig_missing_file_cache_key_mismatch.ahk
-#Include test_per_entry_priority_divergence_cache_vs_toml.ahk
-#Include test_plc_closure_callable.ahk
-#Include test_remote_parse_first_content_match.ahk
-#Include test_stale_cache_survives_reset_and_pause.ahk
-#Include test_time_activation_fails_open_on_missing_prev_char.ahk
-#Include test_uridecode_multibyte_utf8_corruption.ahk
+#Include unit/test_coalesced_job_callbacks_dropped.ahk
+#Include unit/test_count_regex_vs_entry_pattern_divergence.ahk
+#Include unit/test_counttoml_overcounts_personal_meta_sections.ahk
+#Include unit/test_delay_edit_non_integer_personal_truncation.ahk
+#Include unit/test_freshness_same_second_edit_window.ahk
+#Include unit/test_inline_autotype_not_synthetic.ahk
+#Include unit/test_json_number_misleading_error.ahk
+#Include unit/test_ollama_curl_temp_pii_plaintext.ahk
+#Include unit/test_parsetomlgroupconfig_missing_file_cache_key.ahk
+#Include unit/test_parsetomlgroupconfig_missing_file_cache_key_mismatch.ahk
+#Include unit/test_per_entry_priority_divergence_cache_vs_toml.ahk
+#Include unit/test_plc_closure_callable.ahk
+#Include unit/test_remote_parse_first_content_match.ahk
+#Include unit/test_stale_cache_survives_reset_and_pause.ahk
+#Include unit/test_time_activation_fails_open_on_missing_prev_char.ahk
+#Include unit/test_uridecode_multibyte_utf8_corruption.ahk
 
 ; -- Audit finding regression tests (batch-wired) --
 #Include meta/test_generated_substr_minus_one.ahk
@@ -606,19 +606,19 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 #Include meta/test_keylogger_idle_defer_preserves_pending.ahk
 #Include meta/test_keylogger_rollover_force_ingest.ahk
 #Include meta/test_klnet_starter_deref.ahk
-#Include test_audit_v4_fixes.ahk
-#Include test_hotstrings_escape_braces.ahk
+#Include unit/test_audit_v4_fixes.ahk
+#Include unit/test_hotstrings_escape_braces.ahk
 #Include meta/test_hotstrings_combo_auto_escaping.ahk
 #Include meta/test_ergo_flow_gap_end.ahk
 #Include meta/test_config_window_patch_toml_meta_error.ahk
 #Include meta/test_capsword_mouse_clobber.ahk
-#Include test_timer_scheduler_suspend.ahk
+#Include unit/test_timer_scheduler_suspend.ahk
 #Include meta/test_magic_key_probe_deadkey_safe.ahk
 #Include meta/test_script_shortcut_labels_locale.ahk
 #Include meta/test_altgr_chord_debounce_per_slot.ahk
 #Include meta/test_roi_halflife_threshold_reachable.ahk
 #Include meta/test_hse_notepad_consumed_delimiter.ahk
-#Include test_llm_parser_dedup_stats.ahk
+#Include unit/test_llm_parser_dedup_stats.ahk
 #Include meta/test_paste_without_formatting_restore.ahk
 #Include meta/test_hold_layer_release_bounded.ahk
 #Include meta/test_toml_batchwrite_cache_coherence.ahk
@@ -626,9 +626,9 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 #Include meta/test_topology_single_append.ahk
 #Include meta/test_crash_report_unique_filename.ahk
 #Include meta/test_gesture_paste_plain_busy_guard.ahk
-#Include test_llm_deadline_wrap.ahk
+#Include unit/test_llm_deadline_wrap.ahk
 #Include meta/test_gr_drawbitmap_type_guard.ahk
-#Include test_gr_drawbitmap_closure.ahk
+#Include unit/test_gr_drawbitmap_closure.ahk
 #Include meta/test_gestures_action_catalog_deferred.ahk
 #Include meta/test_hse_altgr_kana_sendinput.ahk
 #Include meta/test_text_sender_clipboard_generation_recheck.ahk
@@ -701,7 +701,7 @@ try FileAppend("# [marker] keylogger modules + tests included`r`n", "*")
 ; the duplicate test_framework.ahk includes were stripped so they integrate.
 #Include meta/test_dpapi_blob_size.ahk
 #Include meta/test_llm_diff_french_accents.ahk
-#Include test_audit_v5_fixes.ahk
+#Include unit/test_audit_v5_fixes.ahk
 ; Healthcheck pure formatters (uptime / HTML-escape) — coverage preserved from
 ; the deleted P5-stale test_session_regressions orphan. helpers.ahk is
 ; headless-safe (function definitions only, no top-level side effects).

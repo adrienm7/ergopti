@@ -8,5 +8,5 @@ global _AHK_DRY_RUN := false
 #Include ../modules/llm/models.ahk
 #Include ../modules/llm/api_common.ahk
 #Include ../modules/llm/api_ollama.ahk
-#Include test_llm_api_ollama.ahk
+#Include unit/test_llm_api_ollama.ahk
 RunTests()

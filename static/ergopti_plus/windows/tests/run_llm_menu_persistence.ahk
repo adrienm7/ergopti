@@ -20,8 +20,8 @@ global _LLM_Menu := Map(
 	"trigger_shortcut", "Ctrl+Space", "inline_autotype", false
 )
 #Include ../ui/menu/menu_llm/persist.ahk
-#Include test_llm_menu_persistence.ahk
-#Include test_llm_menu_regressions.ahk
+#Include unit/test_llm_menu_persistence.ahk
+#Include unit/test_llm_menu_regressions.ahk
 
 ; Isolated suite should finish in seconds; exit if a stale lock/hang blocks RunTests.
 _LlmPersistWatchdog(*) {

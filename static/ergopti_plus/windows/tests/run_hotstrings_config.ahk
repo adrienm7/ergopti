@@ -10,6 +10,6 @@ global _AHK_DRY_RUN := false
 #Include ../lib/toml/toml_helpers.ahk
 #Include ../lib/toml/toml_loader.ahk
 #Include ../lib/hotstrings/hotstrings_config.ahk
-#Include test_hotstrings_config.ahk
+#Include unit/test_hotstrings_config.ahk
 
 RunTests()
