@@ -88,6 +88,16 @@ local ACTUAL_MODIFIER_KEY_CODES = {
 -- These values must match the F13/F14/F15 sentinel constants consumed by
 -- modules/shortcuts/script_control.lua.
 local SCRIPT_CONTROL_HOLDER_KEY     = "right_command"
+-- Synthetic modifier KE stamps onto every emitted F13/F14/F15 sentinel. HS reads
+-- it off the EVENT itself (modules/shortcuts/script_control.lua) to confirm a
+-- genuine sentinel without depending on the live keyboard modifier state — which
+-- is unreliable: the paused rules gate on a MANDATORY modifier that KE consumes,
+-- so by the time HS polls, nothing is held (the second AltGr+Enter could not
+-- un-pause). A bare physical F13/F14/F15 press carries no such flag, so this stays
+-- a valid genuine-vs-stray discriminator. left_control is chosen because a real
+-- ctrl+Enter/Backspace/Escape never matches a script-control rule (those gate on
+-- right_command/option), so it is only ever present on a KE-emitted sentinel.
+local SCRIPT_CONTROL_SENTINEL_TAG   = "left_control"
 local SCRIPT_CONTROL_SENTINEL_SLOTS = {
 	{ from_key = "delete_or_backspace", sentinel = Keycodes.to_name(Keycodes.F14_KARABINER_BACKSPACE), slot_label = "backspace" },
 	{ from_key = "return_or_enter",     sentinel = Keycodes.to_name(Keycodes.F13_KARABINER_RETURN),    slot_label = "return"    },
@@ -659,7 +669,7 @@ local function build_script_control_sentinel_rules()
 							value = 1,
 						},
 					},
-					to = { { key_code = slot.sentinel } },
+					to = { { key_code = slot.sentinel, modifiers = { SCRIPT_CONTROL_SENTINEL_TAG } } },
 				},
 			},
 		}
@@ -701,7 +711,7 @@ function M.build_paused_script_control_rules()
 							key_code  = slot.from_key,
 							modifiers = { mandatory = { mod }, optional = { "any" } },
 						},
-						to = { { key_code = slot.sentinel } },
+						to = { { key_code = slot.sentinel, modifiers = { SCRIPT_CONTROL_SENTINEL_TAG } } },
 					},
 				},
 			}

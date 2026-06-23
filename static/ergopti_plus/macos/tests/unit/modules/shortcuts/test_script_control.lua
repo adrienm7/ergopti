@@ -514,6 +514,34 @@ helpers.describe("ScriptControl — physical F13/F14/F15 must not misfire pause/
 		helpers.assert_eq(consumed, true, "a genuine sentinel must be consumed")
 	end)
 
+	helpers.it("a TAGGED sentinel with NO live modifier (paused path) DOES dispatch", function()
+		-- Paused rules gate on a MANDATORY modifier KE consumes, so nothing is held when
+		-- HS polls (the field log showed "(none)"). KE stamps the sentinel with the
+		-- left_control tag, which HS reads off the event to un-pause anyway.
+		dispatched = nil
+		live_mods = { _raw = 0 }  -- nothing held (consumed)
+		local tagged = {
+			getKeyCode = function() return ESCAPE_SENTINEL end,
+			getFlags   = function() return { ctrl = true } end,  -- the KE tag rides on the event
+		}
+		local consumed = handler(tagged)
+		helpers.assert_eq(dispatched, "script_quit",
+			"a KE-tagged sentinel must dispatch even when no live modifier is detectable")
+		helpers.assert_eq(consumed, true)
+	end)
+
+	helpers.it("an UNtagged F15 with no live modifier still does NOT dispatch", function()
+		dispatched = nil
+		live_mods = { _raw = 0 }
+		local untagged = {
+			getKeyCode = function() return ESCAPE_SENTINEL end,
+			getFlags   = function() return {} end,  -- neither tag nor modifier
+		}
+		local consumed = handler(untagged)
+		helpers.assert_eq(dispatched, nil, "no tag and no modifier = stray F15, must not dispatch")
+		helpers.assert_eq(consumed, false)
+	end)
+
 	SC.stop()
 end)
 

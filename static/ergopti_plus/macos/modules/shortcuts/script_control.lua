@@ -139,6 +139,32 @@ local function is_right_modifier_held()
 	return KeyState.is_right_altgr_held()
 end
 
+--- Returns true when the sentinel event carries the synthetic control tag that
+--- Karabiner stamps onto every emitted F13/F14/F15 (generator
+--- SCRIPT_CONTROL_SENTINEL_TAG = "left_control"). This is the remap-independent,
+--- consume-proof signal: the paused rules gate on a MANDATORY modifier that KE
+--- consumes, so the live keyboard state is empty by the time we poll — but the tag
+--- rides on the sentinel event itself. A bare physical F13/F14/F15 press has no
+--- tag. Accepting (live modifier OR tag) keeps the working active path intact while
+--- fixing the paused path, with zero regression if the tag ever fails to propagate.
+--- @param e userdata The hs.eventtap.event for the sentinel keystroke.
+--- @return boolean
+local function sentinel_is_tagged(e)
+	-- Real hs events are userdata; a table is accepted too so the guard is unit-testable.
+	if (type(e) ~= "userdata" and type(e) ~= "table") or type(e.getFlags) ~= "function" then return false end
+	local ok, flags = pcall(function() return e:getFlags() end)
+	return ok and type(flags) == "table" and flags.ctrl == true
+end
+
+--- A genuine sentinel is confirmed by EITHER the live AltGr modifier (active path,
+--- modifier not consumed) OR the KE control tag on the event (paused path, mandatory
+--- modifier consumed). Either is sufficient; a bare F-key press has neither.
+--- @param e userdata The hs.eventtap.event.
+--- @return boolean
+local function sentinel_is_genuine(e)
+	return is_right_modifier_held() or sentinel_is_tagged(e)
+end
+
 
 
 
@@ -312,8 +338,8 @@ local function handle_key(e)
 	-- modifier. Require a right-hand AltGr to be physically held — the invariant
 	-- of every genuine KE sentinel — and pass a stray function key through.
 	if code == KEYCODE_BACKSPACE_SENTINEL then
-		if not is_right_modifier_held() then
-			Logger.info(LOG, "Backspace sentinel (F14) seen but no qualifying modifier held (%s) — passing through.",
+		if not sentinel_is_genuine(e) then
+			Logger.info(LOG, "Backspace sentinel (F14) seen but neither AltGr held (%s) nor tagged — passing through.",
 				KeyState.describe_held_modifiers())
 			return false
 		end
@@ -323,8 +349,8 @@ local function handle_key(e)
 		return true
 	end
 	if code == KEYCODE_RETURN_SENTINEL then
-		if not is_right_modifier_held() then
-			Logger.info(LOG, "Return sentinel (F13) seen but no qualifying modifier held (%s) — passing through.",
+		if not sentinel_is_genuine(e) then
+			Logger.info(LOG, "Return sentinel (F13) seen but neither AltGr held (%s) nor tagged — passing through.",
 				KeyState.describe_held_modifiers())
 			return false
 		end
@@ -334,8 +360,8 @@ local function handle_key(e)
 		return true
 	end
 	if code == KEYCODE_ESCAPE_SENTINEL then
-		if not is_right_modifier_held() then
-			Logger.info(LOG, "Escape sentinel (F15) seen but no qualifying modifier held (%s) — passing through.",
+		if not sentinel_is_genuine(e) then
+			Logger.info(LOG, "Escape sentinel (F15) seen but neither AltGr held (%s) nor tagged — passing through.",
 				KeyState.describe_held_modifiers())
 			return false
 		end
