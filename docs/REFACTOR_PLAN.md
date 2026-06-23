@@ -16,6 +16,16 @@
 3. Chaque phase est un (ou plusieurs) commit conventionnel sur `dev`.
 4. **Règle d'or** (CLAUDE.md §5.9) : tout fix embarque son test de régression dans le même commit.
 
+> **Décision mainteneur 2026-06-23 — on termine TOUT le reste.** Tous les items
+> encore ouverts (y compris ceux marqués *REPORTÉ* / *optionnel* / faible gain)
+> sont désormais à faire, dans cet ordre explicite : **(1)** leftovers P2/P3,
+> **(2)** P6 restant (`scan personal-hotstrings` + `file-watchers` d'`init.lua`,
+> puis `api_mlx.lua`), **(3)** items optionnels P4/P5 + passe `fix:banners`,
+> **(4)** P7 en dernier, sous-étape par sous-étape. Discipline inchangée : chaque
+> incrément vérifié (dry-run AHK / `test:hs` / `test:js` / lint / encoding) avant
+> commit ; ce qui n'est vérifiable qu'au reload (boot Hammerspoon, GUI Windows)
+> est signalé au mainteneur.
+
 ### Harnais de vérification (établi, baseline verte le 2026-06-20)
 
 | Cible | Commande | Sens |
