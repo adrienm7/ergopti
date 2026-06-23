@@ -41,7 +41,9 @@ const ADAPTERS = [
 	'static/ergopti_plus/windows/modules/llm/api_remote.ahk',
 	'static/ergopti_plus/windows/modules/llm/api_ollama.ahk',
 	'static/ergopti_plus/macos/modules/llm/api_remote.lua',
-	'static/ergopti_plus/macos/modules/llm/api_mlx.lua'
+	// The MLX request builder (where max_tokens resolves) moved out of api_mlx.lua
+	// into the api_mlx_inference sibling during the P6 god-file split.
+	'static/ergopti_plus/macos/modules/llm/api_mlx_inference.lua'
 ];
 
 // Each builder file must positively reference the shared constant so the default
