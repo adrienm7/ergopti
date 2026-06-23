@@ -313,28 +313,30 @@ local function handle_key(e)
 	-- of every genuine KE sentinel — and pass a stray function key through.
 	if code == KEYCODE_BACKSPACE_SENTINEL then
 		if not is_right_modifier_held() then
-			Logger.debug(LOG, "Backspace sentinel (F14) seen but no right AltGr held — passing through.")
+			Logger.info(LOG, "Backspace sentinel (F14) seen but no right AltGr held — passing through.")
 			return false
 		end
+		Logger.info(LOG, "Backspace sentinel (F14) — dispatching '%s'.", tostring(_key_actions.backspace))
 		log_shortcut_if_available("Alt+Backspace")
 		dispatch_action(_key_actions.backspace)
 		return true
 	end
 	if code == KEYCODE_RETURN_SENTINEL then
 		if not is_right_modifier_held() then
-			Logger.debug(LOG, "Return sentinel (F13) seen but no right AltGr held — passing through.")
+			Logger.info(LOG, "Return sentinel (F13) seen but no right AltGr held — passing through.")
 			return false
 		end
+		Logger.info(LOG, "Return sentinel (F13) — dispatching '%s'.", tostring(_key_actions.return_key))
 		log_shortcut_if_available("Alt+Enter")
 		dispatch_action(_key_actions.return_key)
 		return true
 	end
 	if code == KEYCODE_ESCAPE_SENTINEL then
 		if not is_right_modifier_held() then
-			Logger.debug(LOG, "Escape sentinel (F15) seen but no right AltGr held — passing through.")
+			Logger.info(LOG, "Escape sentinel (F15) seen but no right AltGr held — passing through.")
 			return false
 		end
-		Logger.debug(LOG, "Escape sentinel (F15) — dispatching '%s'.", tostring(_key_actions.escape))
+		Logger.info(LOG, "Escape sentinel (F15) — dispatching '%s'.", tostring(_key_actions.escape))
 		log_shortcut_if_available("Alt+Escape")
 		dispatch_action(_key_actions.escape)
 		return true
@@ -344,14 +346,17 @@ local function handle_key(e)
 	if not is_right_cmd_only(e) then return false end
 
 	if code == KEYCODE_BACKSPACE then
+		Logger.info(LOG, "Right-cmd + Backspace (KE-paused fallback) — dispatching '%s'.", tostring(_key_actions.backspace))
 		log_shortcut_if_available("Alt+Backspace")
 		return dispatch_action(_key_actions.backspace)
 	end
 	if code == KEYCODE_RETURN then
+		Logger.info(LOG, "Right-cmd + Return (KE-paused fallback) — dispatching '%s'.", tostring(_key_actions.return_key))
 		log_shortcut_if_available("Alt+Enter")
 		return dispatch_action(_key_actions.return_key)
 	end
 	if code == KEYCODE_ESCAPE then
+		Logger.info(LOG, "Right-cmd + Escape (KE-paused fallback) — dispatching '%s'.", tostring(_key_actions.escape))
 		log_shortcut_if_available("Alt+Escape")
 		return dispatch_action(_key_actions.escape)
 	end

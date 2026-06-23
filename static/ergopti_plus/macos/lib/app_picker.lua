@@ -88,6 +88,7 @@ end
 --- @return table The menu structure.
 function M.build_menu(current_apps, on_change, placeholder_text)
 	Logger.debug(LOG, "Building application exclusion menu…")
+	local _build_t0 = hs.timer.absoluteTime()
 	local apps = type(current_apps) == "table" and current_apps or {}
 	-- Sort a shallow copy by display name so the list is always alphabetical
 	local sorted_apps = {}
@@ -207,7 +208,10 @@ function M.build_menu(current_apps, on_change, placeholder_text)
 		end
 	end
 
-	Logger.info(LOG, "Application exclusion menu built successfully.")
+	-- Timing surfaced so the boot log shows the cost of each exclusion-menu build
+	-- (built once per picker per menu tree rebuild — keylogger + LLM = two per tree).
+	Logger.info(LOG, "Application exclusion menu built successfully (%d excluded app(s), %.1f ms).",
+		#sorted_apps, (hs.timer.absoluteTime() - _build_t0) / 1e6)
 	if #menu == 0 then
 		table.insert(menu, { title = i18n.get("app_picker.no_app_excluded"), disabled = true })
 	end

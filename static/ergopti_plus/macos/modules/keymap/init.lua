@@ -1024,6 +1024,11 @@ mouse_tap = eventtap.new(
 local TAP_WATCHDOG_SEC = 5
 local _watchdog_timer  = nil
 
+-- Delay before prewarming the ignored-window watchers off the keystroke path.
+-- Short enough to almost always beat the user's first keystroke, long enough to
+-- clear the heaviest synchronous boot deferrals first (see M.start).
+local WINFILTER_PREWARM_SEC = 1.0
+
 local function tap_watchdog()
 	local function revive(name, t)
 		if t and type(t.isEnabled) == "function" and not t:isEnabled() then
@@ -1055,6 +1060,15 @@ function M.start()
 	if _watchdog_timer then _watchdog_timer:stop() end
 	_watchdog_timer = hs.timer.new(TAP_WATCHDOG_SEC, tap_watchdog)
 	_watchdog_timer:start()
+
+	-- Prewarm the ignored-window watchers off the keystroke path. hs.window.filter
+	-- enumerates every open window on first use (~3 s cold); paid lazily inside the
+	-- first keyDown it blocks the tap long enough for macOS to disable it. A short
+	-- timer pays the cost on the main loop during the quiet post-boot window so the
+	-- user's first keystroke is already warm.
+	hs.timer.doAfter(WINFILTER_PREWARM_SEC, function()
+		pcall(km_utils.prewarm_ignored_win_watchers)
+	end)
 
 	Logger.success(LOG, "Keymap engine started.")
 end
