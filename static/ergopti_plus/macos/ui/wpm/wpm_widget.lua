@@ -179,6 +179,7 @@ local MOUSE_MOVE_THROTTLE_SEC = 0.2
 local _canvas            = nil
 local _timer             = nil
 local _mouse_tap         = nil   -- hs.eventtap watching mouse/touchpad events
+local _running           = false -- true between start() and stop(); guards redundant restarts
 local _wpm_history       = {}
 local _show_graph        = false
 local _use_source_colors = true
@@ -489,8 +490,14 @@ end
 --- Starts the floating widget loop.
 --- @param show_graph boolean Whether to draw the history curve.
 function M.start(show_graph)
+	local want_graph = show_graph or false
+	-- Idempotent: the menu tree rebuild re-invokes start() on every refresh. Skip the
+	-- redundant timer restart and full canvas re-render when already running with the
+	-- same graph mode — the 0.2 s timer already keeps the display fresh. Only a real
+	-- graph-mode change falls through to redraw immediately.
+	if _running and _show_graph == want_graph then return end
 	Logger.debug(LOG, "Starting floating WPM widget…")
-	_show_graph = show_graph or false
+	_show_graph = want_graph
 	if not _timer then _timer = hs.timer.new(0.2, update_widget) end
 	_timer:start()
 	-- Watch all mouse/touchpad events to know when to hide the widget.
@@ -512,13 +519,18 @@ function M.start(show_graph)
 		end)
 		_mouse_tap:start()
 	end
+	_running = true
 	update_widget()
 	Logger.info(LOG, "Floating WPM widget started successfully.")
 end
 
 --- Halts the widget and clears the screen.
 function M.stop()
+	-- Idempotent: a menu rebuild while the widget is off re-invokes stop() repeatedly.
+	-- Nothing to tear down means nothing to log — return before the start/stop banner.
+	if not _running and not _timer and not _mouse_tap and not _canvas then return end
 	Logger.debug(LOG, "Stopping floating WPM widget…")
+	_running = false
 	if _timer then _timer:stop(); _timer = nil end
 	if _mouse_tap then _mouse_tap:stop(); _mouse_tap = nil end
 	if _canvas then _canvas:delete(); _canvas = nil end

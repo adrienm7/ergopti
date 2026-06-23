@@ -23,6 +23,7 @@ local LOG = "wpm_menubar"
 
 local _menubar           = nil
 local _timer             = nil
+local _running           = false -- true between start() and stop(); guards redundant restarts
 local _use_source_colors = true
 
 
@@ -89,16 +90,25 @@ end
 
 --- Starts the menubar monitoring loop.
 function M.start()
+	-- Idempotent: the menu tree rebuild re-invokes start() on every refresh. Skip the
+	-- redundant timer restart and menubar re-render when already polling — the 0.5 s
+	-- timer already keeps the icon fresh.
+	if _running then return end
 	Logger.debug(LOG, "Starting WPM menubar widget…")
 	if not _timer then _timer = hs.timer.new(0.5, update_menubar) end
 	_timer:start()
+	_running = true
 	update_menubar()
 	Logger.info(LOG, "WPM menubar widget started successfully.")
 end
 
 --- Halts the menubar updating and removes the icon.
 function M.stop()
+	-- Idempotent: a menu rebuild while the widget is off re-invokes stop() repeatedly.
+	-- Nothing to tear down means nothing to log — return before the start/stop banner.
+	if not _running and not _timer and not _menubar then return end
 	Logger.debug(LOG, "Stopping WPM menubar widget…")
+	_running = false
 	if _timer then _timer:stop(); _timer = nil end
 	if _menubar then _menubar:delete(); _menubar = nil end
 	Logger.info(LOG, "WPM menubar widget stopped.")
