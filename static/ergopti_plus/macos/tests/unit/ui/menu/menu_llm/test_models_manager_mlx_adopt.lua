@@ -28,8 +28,16 @@ local helpers = require("tests.helpers")
 -- A prior test (e.g. test_backend_detector_respects_user_override) may have
 -- installed a minimal api_mlx stub that lacks get_port, which models_manager_mlx
 -- calls at module level. Clear it so the real implementation is loaded fresh.
-package.loaded["modules.llm.api_mlx"]                = nil
-package.loaded["ui.menu.menu_llm.models_manager_mlx"] = nil
+--
+-- The server-lifecycle sibling (models_manager_mlx_server) must ALSO be cleared:
+-- start_server lives there since the P6 split, and that module captures
+-- `local hs = hs` at load time. A prior load_with_stubs test swaps the _G.hs
+-- TABLE, so a stale server module would call the old hs.execute/hs.task (whose
+-- defaults return ""), and the `hs.execute`/`hs.task.new` stubs this test sets on
+-- the current _G.hs would never be seen. Reloading re-captures the current _G.hs.
+package.loaded["modules.llm.api_mlx"]                      = nil
+package.loaded["ui.menu.menu_llm.models_manager_mlx"]       = nil
+package.loaded["ui.menu.menu_llm.models_manager_mlx_server"] = nil
 local MlxMgr = require("ui.menu.menu_llm.models_manager_mlx")
 
 -- /v1/models payload shape mlx_lm.server returns; id carries the HF repo path.
