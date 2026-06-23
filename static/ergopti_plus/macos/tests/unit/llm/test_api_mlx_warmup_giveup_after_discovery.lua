@@ -7,8 +7,9 @@
 --- marked "load failed" before any warmup POST was ever sent.
 ---
 --- Fix: move the `_warmup_started_at` stamp and give-up check to AFTER the
---- `if not _endpoints_discovered then ... return end` short-circuit, so the
---- clock only starts once the endpoints are confirmed.
+--- `if not ApiMlxDiscovery.is_discovered() then ... return end` short-circuit, so
+--- the clock only starts once the endpoints are confirmed. (Discovery moved into
+--- api_mlx_discovery; warmup now gates on its is_discovered() getter.)
 
 local helpers = require("tests.helpers")
 
@@ -17,14 +18,14 @@ local fh = io.open(src_path, "r")
 if not fh then error("api_mlx.lua not readable at: " .. src_path) end
 local src = fh:read("*a") ; fh:close()
 
--- Test 1: `_endpoints_discovered` short-circuit block must appear BEFORE the
+-- Test 1: the endpoints-discovery short-circuit block must appear BEFORE the
 -- `_warmup_started_at` stamp in source order.
-local discovery_pos   = src:find("if not _endpoints_discovered then", 1, true)
+local discovery_pos   = src:find("if not ApiMlxDiscovery.is_discovered() then", 1, true)
 local stamp_pos       = src:find("_warmup_started_at = TimerScheduler.now()", 1, true)
 
 helpers.assert_true(
 	discovery_pos ~= nil,
-	"api_mlx.lua warmup() must contain `if not _endpoints_discovered then` short-circuit"
+	"api_mlx.lua warmup() must contain `if not ApiMlxDiscovery.is_discovered() then` short-circuit"
 )
 helpers.assert_true(
 	stamp_pos ~= nil,

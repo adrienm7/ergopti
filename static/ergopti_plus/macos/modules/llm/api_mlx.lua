@@ -15,8 +15,8 @@ local Profiles       = require("modules.llm.profiles")
 local ApiCommon      = require("modules.llm.api_common")
 local ApiMlxInference = require("modules.llm.api_mlx_inference")  -- request mechanics (post_and_parse / streaming)
 local ApiMlxFetch    = require("modules.llm.api_mlx_fetch")   -- dispatch strategies (batch/parallel/sequential)
+local ApiMlxDiscovery = require("modules.llm.api_mlx_discovery")  -- endpoint-route discovery + route/identifier cache
 local _warmup_client = require("adapters.http_client").new()  -- Dedicated client for warmup POSTs; isolated so discovery probes cannot cancel an in-flight warmup
-local _probe_client  = require("adapters.http_client").new()  -- Dedicated client for discover_endpoints() POST probes; never shares state with warmup
 local _check_client  = require("adapters.http_client").new()  -- Dedicated client for check_availability() GETs
 local JsonCodec      = require("adapters.json_codec")
 local TimerScheduler = require("adapters.timer_scheduler")
@@ -285,302 +285,17 @@ local _warmup_fail_notified = false -- guards against firing the failure notific
 -- model-agnostic backstop for failures that print no recognizable traceback.
 local WARMUP_GIVE_UP_SEC   = 120
 
--- Discovered endpoint paths. Different mlx-lm releases have shipped completions
--- and chat-completions under different routes (with/without the `/v1/` prefix);
--- a silent route rename in a freshly-pulled wheel turns every request into a
--- 404 with no obvious cause. Rather than hard-coding one set of paths, we probe
--- the live server once per process to discover what it actually exposes, cache
--- the working URLs here, and let everything else resolve through these vars.
--- Initial values are the OpenAI-standard paths used by the long-stable
--- mlx-lm 0.18→0.21 series; discover_endpoints overrides them at runtime
--- whenever a probe finds a different working route.
--- Derived from MLX_HOST/MLX_PORT (loaded at the top of this file from
--- _shared/modules/llm/mlx_server.json). discover_endpoints overrides the routes at runtime.
+-- The MLX server base URL — single source of truth in _shared/modules/llm/mlx_server.json.
+-- Derived from MLX_HOST/MLX_PORT (loaded at the top of this file). Endpoint route
+-- discovery and the cached working URLs now live in api_mlx_discovery; this URL is
+-- handed to it via ApiMlxDiscovery.init() and refreshed on a port change.
 local MLX_BASE_URL          = string.format("http://%s:%d", MLX_HOST, MLX_PORT)
-local _completions_endpoint = MLX_BASE_URL .. "/v1/completions"
-local _chat_endpoint        = MLX_BASE_URL .. "/v1/chat/completions"
-local _endpoints_discovered = false
-local _endpoint_probe_in_flight = false
--- Callbacks waiting for the current discovery probe to complete; each
--- discover_endpoints() call during a probe enqueues its on_done here so no
--- caller is silently dropped when a second warmup fires mid-poll.
-local _discovery_pending_callbacks = {}
--- Canonical model ID reported by the server via GET /v1/models.
--- mlx-lm 0.26+ validates the model field in request payloads against the ID
--- of the loaded model (typically the full HF path, e.g.
--- "mlx-community/Qwen3.5-2B-4bit") and returns 404 when the short local name
--- is sent instead. We read this once during discovery Phase 1 and substitute
--- it everywhere we build a request payload.
-local _server_model_id = nil
--- Short model name we are waiting for (set by warmup() before triggering
--- discovery). The discovery poll rejects a /v1/models 200 whose reported
--- model ID does not contain this string, preventing a stale old server
--- (alive for 2 s after kill -9, during the bash sleep) from satisfying the
--- probe intended for the newly launched server.
-local _expected_model_id = nil
--- Full HuggingFace repository path used to launch the current server (e.g.
--- "mlx-community/Meta-Llama-3.1-8B-Instruct-4bit"). Set by models_manager_mlx
--- immediately after reset_endpoints() so warmup and inference payloads always
--- have a reliable model identifier even when /v1/models reports a stale ID
--- during weight loading (bypass scenario).
-local _model_hf_path = nil
 
--- Reads the runtime model identifier the bash launcher passed to mlx_lm via
--- --model. mlx_lm.server routes every POST request through model_provider.load(),
--- keyed by the payload’s "model" field; if the payload sends the HF repo id
--- but the server was launched with a local snapshot path (or vice-versa),
--- the server tries to snapshot_download that mismatched id and fails offline.
--- The bash launcher writes the exact --model argument it used to this file so
--- payloads can mirror it byte-for-byte and hit the cached model.
-local ACTIVE_MODEL_FILE = "/tmp/mlx_active_model.txt"
-local function read_active_model_arg()
-	local fh = io.open(ACTIVE_MODEL_FILE, "r")
-	if not fh then return nil end
-	local raw = fh:read("*a")
-	fh:close()
-	if type(raw) ~= "string" then return nil end
-	local trimmed = raw:gsub("^%s+", ""):gsub("%s+$", "")
-	return trimmed ~= "" and trimmed or nil
-end
-
--- Candidate paths tried in order. The first probe whose POST returns ANYTHING
--- other than 404 is treated as the live endpoint — 200 is a success, 400 and
--- 422 are validation errors that still prove the route is registered (so a
--- tiny "ping" payload is enough). We do NOT accept -1 as a hit: -1 from
--- hs.http means connection refused / timeout, i.e. the server is not yet
--- listening — that proves nothing about the route and forces us to retry.
-local COMPLETIONS_CANDIDATES = {
-	"/v1/completions",
-	"/completions",
-}
-local CHAT_CANDIDATES = {
-	"/v1/chat/completions",
-	"/chat/completions",
-}
-
-local DISCOVERY_MAX_WAIT_SEC        = 180  -- Stop polling /v1/models after this much real time
-                                           -- (a cold mlx_lm import + 2B model load can take 45-70 s+
-                                           -- on a slow disk; 60 s gave up prematurely. Warmup keeps
-                                           -- retrying regardless, but a longer window keeps the
-                                           -- discovered routes fresh and silences the scary warning).
-local DISCOVERY_POLL_INITIAL_SEC    = Timings.sec("llm", "discovery_poll_initial_ms")  -- First inter-probe delay (doubles each miss, capped below)
-local DISCOVERY_POLL_MAX_SEC        = Timings.sec("llm", "discovery_poll_max_ms")       -- Cap for the exponential backoff interval
--- After this many seconds of persistent model-ID mismatch, bypass the check and
--- proceed to POST probes. A mismatch beyond this window means either (a) the old
--- server's socket lingered in CLOSE_WAIT and the zombie killer couldn't find the
--- process, or (b) the new server itself reports a stale model ID while loading
--- its weights from GPU cache. In both cases waiting longer achieves nothing.
-local DISCOVERY_MODEL_ID_BYPASS_SEC = 20
-
---- Probes the MLX server to discover which endpoint paths are valid in this
---- mlx-lm install. Two phases:
----   1. Wait for /v1/models to return 200 (proof the server is actually
----      listening). A repeating hs.timer drives the poll so it is immune to
----      lost asyncGet callbacks — when the old server is killed mid-request the
----      callback may never fire, which used to leave _endpoint_probe_in_flight
----      stuck at true forever. The timer fires regardless of pending callbacks.
----   2. POST a minimal payload to each candidate, accepting any HTTP status
----      other than 404 / -1 as a live route.
---- Idempotent: the timer runs only once; subsequent calls enqueue their
---- on_done callback and return.
---- @param on_done function|nil Optional callback invoked once the probe finishes.
-local function discover_endpoints(on_done)
-	if _endpoints_discovered then
-		if type(on_done) == "function" then pcall(on_done) end
-		return
-	end
-	-- Enqueue the callback so it fires when the in-flight probe completes —
-	-- previously we returned silently here, dropping the caller's on_done and
-	-- causing every warmup issued during the server boot window to be lost.
-	if type(on_done) == "function" then
-		_discovery_pending_callbacks[#_discovery_pending_callbacks + 1] = on_done
-	end
-	if _endpoint_probe_in_flight then return end
-	_endpoint_probe_in_flight = true
-
-	local probe_completions = JsonCodec.encode({ prompt = " ", max_tokens = 1 })
-	local probe_chat        = JsonCodec.encode({
-		messages   = { { role = "user", content = " " } },
-		max_tokens = 1,
-	})
-	local headers    = { ["Content-Type"] = "application/json" }
-	local started_at = TimerScheduler.now()
-
-	local function finish_discovery(success)
-		-- Stop the poll timer before firing callbacks so a callback that calls
-		-- reset_endpoints() + discover_endpoints() again does not find the timer
-		-- still running and incorrectly skip starting a fresh one.
-		_endpoint_probe_in_flight = false
-		if success then
-			_endpoints_discovered = true
-			Logger.warn(LOG, "MLX endpoints resolved: completions=%s, chat=%s.",
-				_completions_endpoint, _chat_endpoint)
-		end
-		-- Fire all enqueued callbacks — each warmup caller that arrived during
-		-- the discovery probe deserves to be notified so none are silently dropped
-		-- (mlx-discovery-callbacks-loss). All callers requested the same model
-		-- (model switches clear the queue via reset_endpoints()), so firing all
-		-- of them is correct and idempotent.
-		local cbs = _discovery_pending_callbacks
-		_discovery_pending_callbacks = {}
-		for _, cb in ipairs(cbs) do pcall(cb) end
-	end
-
-	local function run_post_probes()
-		-- payloads indexed by kind so each probe uses the correct API format;
-		-- using the wrong format on some mlx-lm versions returns 404 (not 422)
-		local probe_by_kind = { completions = probe_completions, chat = probe_chat }
-
-		local function probe_one(candidates, idx, found_so_far, kind, on_resolved)
-			if idx > #candidates then
-				pcall(on_resolved, found_so_far)
-				return
-			end
-			local path = candidates[idx]
-			local payload = probe_by_kind[kind] or probe_completions
-			_probe_client.post(MLX_BASE_URL .. path, headers, payload, function(r)
-				-- Accept only positive HTTP status codes — NSURLError codes are negative integers
-				-- (e.g. -1 = connection refused/reset); the module comment at the top explicitly
-				-- states we do NOT accept -1 as a hit, but the original guard only rejected 404 and 0.
-				if type(r.status) == "number" and r.status >= 200 and r.status ~= 404 then
-					Logger.info(LOG, "Endpoint discovery (%s): %s -> HTTP %s — accepted as live route.",
-						kind, path, tostring(r.status))
-					pcall(on_resolved, MLX_BASE_URL .. path)
-				else
-					Logger.debug(LOG, "Endpoint discovery (%s): %s -> %s, trying next candidate.",
-						kind, path, tostring(r.status))
-					probe_one(candidates, idx + 1, found_so_far, kind, on_resolved)
-				end
-			end)
-		end
-
-		probe_one(COMPLETIONS_CANDIDATES, 1, nil, "completions", function(found)
-			if found then _completions_endpoint = found end
-			if found then
-				-- Completions route confirmed — resolve immediately. Do NOT wait for
-				-- the chat probe: after a server-side RuntimeError (e.g. mlx-lm batch
-				-- crash), subsequent POST requests may block indefinitely, leaving
-				-- _endpoint_probe_in_flight=true forever and silently starving all
-				-- future warmup attempts. Probing chat opportunistically in the
-				-- background means its URL gets cached when it eventually responds,
-				-- without blocking the critical path.
-				finish_discovery(true)
-				probe_one(CHAT_CANDIDATES, 1, nil, "chat", function(found_chat)
-					-- Only update the cached URL — never call finish_discovery here.
-					-- By the time this fires, reset_endpoints() may have run for a new
-					-- model; calling finish_discovery would corrupt the new server's state.
-					if found_chat then _chat_endpoint = found_chat end
-				end)
-				return
-			end
-			-- Completions route not found — fall through to chat so the user still
-			-- gets predictions on mlx-lm builds that only expose the chat route.
-			probe_one(CHAT_CANDIDATES, 1, nil, "chat", function(found_chat)
-				if found_chat then _chat_endpoint = found_chat end
-				if not found_chat then
-					-- All routes returned 404. The model is likely still loading in
-					-- Thread-1 (mlx-lm lazy-loads on first inference request and returns
-					-- 404 on inference routes until the load completes). Do NOT mark
-					-- discovery done — clear the in-flight flag so the repeating timer
-					-- triggers a fresh attempt on the next warmup.
-					Logger.warn(LOG,
-						"MLX endpoint discovery: all candidates returned 404 — " ..
-						"model may still be loading. Will retry on next warmup.")
-					finish_discovery(false)
-				else
-					finish_discovery(true)
-				end
-			end)
-		end)
-	end
-
-	-- Phase 1: use a repeating hs.timer to poll /v1/models so the loop
-	-- survives dropped asyncGet callbacks (which happen when the old server
-	-- process is killed mid-request — the connection resets and Hammerspoon
-	-- never fires the callback, leaving a recursive doAfter chain dead).
-	-- The inter-probe delay uses exponential backoff (1 s → 2 s → 4 s → … → 10 s)
-	-- so we react quickly on fast starts while not hammering the kernel during a
-	-- slow model load (weights can take 30 s+ to map into GPU memory).
-	local poll_timer       = nil
-	local poll_delay_sec   = DISCOVERY_POLL_INITIAL_SEC
-	local function do_poll()
-		-- Guard: if discovery was reset externally (model switch) while the
-		-- timer was in flight, stop quietly without firing callbacks.
-		if not _endpoint_probe_in_flight then
-			if poll_timer then TimerScheduler.cancel(poll_timer) end
-			poll_timer = nil
-			return
-		end
-		local elapsed = TimerScheduler.now() - started_at
-		if elapsed >= DISCOVERY_MAX_WAIT_SEC then
-			if poll_timer then TimerScheduler.cancel(poll_timer) end
-			poll_timer = nil
-			Logger.warn(LOG,
-				"Endpoint discovery: gave up waiting for MLX server after %.1fs. " ..
-				"Falling back to default routes; warmup will keep retrying.", elapsed)
-			finish_discovery(false)
-			return
-		end
-		Logger.debug(LOG, "Endpoint discovery: polling /v1/models (elapsed=%.1fs)…", elapsed)
-		-- Use curl instead of hs.http.asyncGet so we can pass --no-keepalive.
-		-- Hammerspoon's HTTP client pools TCP connections and will reuse a keep-alive
-		-- socket to a zombie server (whose process was kill -9'd but whose socket
-		-- lingers in CLOSE_WAIT), making the poll see the zombie's stale model ID
-		-- indefinitely. curl --no-keepalive forces a fresh TCP handshake every call,
-		-- so the moment the zombie's socket closes the next poll reaches the new server.
-		local curl_task = ShellRunner.spawn("/usr/bin/curl", {
-			"--silent", "--max-time", "5", "--no-keepalive",
-			"-H", "Connection: close",
-			MLX_BASE_URL .. "/v1/models",
-		}, function(exit_code, stdout, _stderr)
-			if poll_timer then TimerScheduler.cancel(poll_timer) end
-			poll_timer = nil
-			local status = (exit_code == 0) and 200 or -1
-			local body   = stdout or ""
-			Logger.debug(LOG, "Endpoint discovery: /v1/models -> HTTP %s.", tostring(status))
-			if not _endpoint_probe_in_flight then return end  -- reset externally
-			if status == 200 then
-				-- mlx_lm.server's /v1/models endpoint returns the LIST of models
-				-- discoverable in the local HF cache, NOT the currently loaded
-				-- model. data[] can have 30+ entries and their order is dictated
-				-- by cache ordering, not load state. Earlier code read data[1].id
-				-- as if it were the loaded model and then tried to "fix" mismatches
-				-- via zombie kills and forced restarts — all chasing a phantom.
-				-- The right semantic: a 200 here means the server is reachable.
-				-- The model we passed to --model in bash is the one that actually
-				-- gets loaded; trust that and proceed straight to POST probes.
-				-- For the warmup payload’s "model" field, prefer _model_hf_path
-				-- (the canonical --model arg) over anything from /v1/models.
-				_server_model_id = nil
-				if type(body) == "string" and type(_expected_model_id) == "string"
-					and _expected_model_id ~= "" then
-					-- Informational: confirm the expected model is at least
-					-- visible in the cache list. If it is not, the user likely
-					-- has a misconfigured preset; log a warning but do not block.
-					local needle = _expected_model_id:lower()
-					if not body:lower():find(needle, 1, true) then
-						Logger.warn(LOG,
-							"Endpoint discovery: expected model '%s' not visible in /v1/models cache list — POST may 404 if mlx_lm cannot resolve it.",
-							_expected_model_id)
-					end
-				end
-				if not _endpoint_probe_in_flight then return end
-				Logger.info(LOG, "Endpoint discovery: server reachable on /v1/models — starting POST probes.")
-				run_post_probes()
-			else
-				-- Server not ready yet — apply exponential backoff before the next tick
-				-- so we back off gracefully during a slow model-weight load.
-				Logger.debug(LOG,
-					"Endpoint discovery: server not ready — next probe in %.1fs.", poll_delay_sec)
-				poll_timer   = TimerScheduler.after(poll_delay_sec, do_poll)
-				poll_delay_sec = math.min(poll_delay_sec * 2, DISCOVERY_POLL_MAX_SEC)
-			end
-		end)
-		curl_task.start()
-	end
-
-	poll_timer = TimerScheduler.after(0, do_poll)
-end
+-- The endpoint-discovery + route-cache subsystem owns the live route URLs and the
+-- model identifiers a request payload must echo; it is a leaf (depends only on
+-- adapters), so warmup, set_port, reset_endpoints, and the inference ctx all read
+-- routes through its getters.
+ApiMlxDiscovery.init({ base_url = MLX_BASE_URL })
 
 -- M.is_thinking_model is injected by init.lua
 
@@ -672,8 +387,9 @@ function M.set_port(port)
 	end
 	MLX_PORT             = port
 	MLX_BASE_URL         = string.format("http://%s:%d", MLX_HOST, MLX_PORT)
-	_completions_endpoint = MLX_BASE_URL .. "/v1/completions"
-	_chat_endpoint        = MLX_BASE_URL .. "/v1/chat/completions"
+	-- Push the new address into the discovery subsystem so its cached routes are
+	-- rebuilt for the new port; the next warmup re-probes there.
+	ApiMlxDiscovery.set_base_url(MLX_BASE_URL)
 	Logger.info(LOG, "MLX server port set to %d (base URL %s).", MLX_PORT, MLX_BASE_URL)
 	M.reset_endpoints()
 	return true
@@ -686,21 +402,18 @@ end
 --- /v1/models returns a stale model ID during weight loading.
 --- @param hf_path string The full HF repo path passed to `mlx_lm server --model`.
 function M.set_model_hf_path(hf_path)
-	_model_hf_path = type(hf_path) == "string" and hf_path or nil
-	Logger.debug(LOG, "Model HF path set to '%s'.", tostring(_model_hf_path))
+	ApiMlxDiscovery.set_model_hf_path(hf_path)
 end
 
 --- Resets the endpoint discovery state so the next warmup re-probes the live
 --- server. Called after an mlx-lm upgrade, because a new wheel may expose
 --- different route paths than the previously cached ones.
 function M.reset_endpoints()
-	_endpoints_discovered        = false
-	_endpoint_probe_in_flight    = false
-	_discovery_pending_callbacks = {}
+	-- Discovery flags, pending callbacks, and the model identifiers live in the
+	-- discovery subsystem; clear them there. Readiness + zombie-kill state below
+	-- belong to this controller.
+	ApiMlxDiscovery.reset()
 	_is_ready                    = false
-	_server_model_id             = nil
-	_expected_model_id           = nil
-	_model_hf_path               = nil
 	_active_server_pgid          = nil   -- cleared until the new server reports its PGID
 	_server_pgid_pending         = true  -- block zombie kills until set_active_server_pgid() fires
 	_last_zombie_kill_at         = 0     -- allow an immediate kill on the first mismatch after PGID is known
@@ -760,7 +473,7 @@ end
 --- @param profile table|nil The active profile object; falls back to a minimal ping.
 function M.warmup(model_name, profile)
 	Logger.debug(LOG, "warmup() called — model='%s' _is_ready=%s _warmup_in_flight=%s _endpoints_discovered=%s.",
-		tostring(model_name), tostring(_is_ready), tostring(_warmup_in_flight), tostring(_endpoints_discovered))
+		tostring(model_name), tostring(_is_ready), tostring(_warmup_in_flight), tostring(ApiMlxDiscovery.is_discovered()))
 	-- Skip if the backend already answered a previous warmup successfully — the
 	-- model is loaded, no need to re-prime
 	if _is_ready then
@@ -787,12 +500,12 @@ function M.warmup(model_name, profile)
 	-- discovery window (up to DISCOVERY_MAX_WAIT_SEC = 180s) does not eat into
 	-- the warmup budget (WARMUP_GIVE_UP_SEC = 120s) — a large model that takes
 	-- 120-180s to map into GPU would otherwise trigger a false failure.
-	if not _endpoints_discovered then
+	if not ApiMlxDiscovery.is_discovered() then
 		Logger.debug(LOG, "warmup() — endpoints not yet discovered, triggering discovery…")
 		-- Record the model we are waiting for so the discovery poll can reject a
 		-- /v1/models 200 from the old server (still alive for ~2 s during model switch).
-		_expected_model_id = model_name
-		discover_endpoints(function() M.warmup(model_name, profile) end)
+		ApiMlxDiscovery.set_expected_model_id(model_name)
+		ApiMlxDiscovery.discover(function() M.warmup(model_name, profile) end)
 		return
 	end
 
@@ -810,10 +523,10 @@ function M.warmup(model_name, profile)
 	end
 
 	Logger.info(LOG, "warmup() — sending warmup POST to '%s' for model '%s'…",
-		_completions_endpoint, tostring(model_name))
+		ApiMlxDiscovery.get_completions_endpoint(), tostring(model_name))
 
 	local Profiles  = require("modules.llm.profiles")
-	local endpoint  = _completions_endpoint
+	local endpoint  = ApiMlxDiscovery.get_completions_endpoint()
 	local payload
 	-- Use the server's canonical model ID (fetched from /v1/models during discovery).
 	-- Fall back to the HF path stored at server launch time (_model_hf_path) when
@@ -824,7 +537,7 @@ function M.warmup(model_name, profile)
 	-- server was started with a local snapshot path (the common offline case),
 	-- the payload MUST echo that same path or model_provider.load() will
 	-- attempt a fresh snapshot_download on the repo id and fail.
-	local effective_model = read_active_model_arg() or _server_model_id or _model_hf_path or model_name
+	local effective_model = ApiMlxDiscovery.read_active_model_arg() or ApiMlxDiscovery.get_server_model_id() or ApiMlxDiscovery.get_model_hf_path() or model_name
 
 	-- Build the full prompt the server will actually see on real requests so that its
 	-- KV cache entry for the static prefix is immediately useful.
@@ -847,7 +560,7 @@ function M.warmup(model_name, profile)
 			-- user message — prime the full static system block (~350 tokens).
 			local user_msg = uses_pf_tail and 'PREFIX: "Bonjour"\nTAIL: "Bonjour"' or "Bonjour"
 			local merged   = sys .. "\n\n" .. user_msg
-			endpoint = _chat_endpoint
+			endpoint = ApiMlxDiscovery.get_chat_endpoint()
 			local enc, _ = JsonCodec.encode({
 				model       = effective_model,
 				messages    = { { role = "user", content = merged } },
@@ -942,7 +655,7 @@ function M.warmup(model_name, profile)
 				-- in older mlx-lm while completions works — re-discovery picks up
 				-- whichever endpoint actually answers.
 				if status == 404 then
-					_endpoints_discovered = false
+					ApiMlxDiscovery.mark_undiscovered()
 				end
 				Logger.warn(LOG, "MLX warmup returned %s (has_tokens=%s) — model not ready; retrying in 2s.",
 					tostring(status), tostring(has_tokens))
@@ -996,18 +709,18 @@ end
 
 -- The request mechanics (post_and_parse / streaming) live in api_mlx_inference.lua
 -- and the dispatch strategies in api_mlx_fetch.lua — both state-free, fed by
--- injection from this controller, which owns the discovery / warmup / streaming
--- state machine. The request engine reads the live endpoint routes, the model
--- identifiers, and the shared streaming-task table through these accessors
--- (closures, so a later set_port / discovery / cancel is always seen); the
--- dispatch layer sits on top of it. The fetch_* functions below delegate into it
--- so the public controller surface stays on this module.
+-- injection from this controller, which owns the warmup / streaming state machine.
+-- The request engine reads the live endpoint routes and the model identifiers from
+-- the discovery subsystem (its getters are closures, so a later set_port /
+-- discovery / cancel is always seen), plus the shared streaming-task table here;
+-- the dispatch layer sits on top of it. The fetch_* functions below delegate into
+-- it so the public controller surface stays on this module.
 ApiMlxInference.init({
-	completions_endpoint  = function() return _completions_endpoint end,
-	chat_endpoint         = function() return _chat_endpoint end,
-	server_model_id       = function() return _server_model_id end,
-	model_hf_path         = function() return _model_hf_path end,
-	read_active_model_arg = read_active_model_arg,
+	completions_endpoint  = ApiMlxDiscovery.get_completions_endpoint,
+	chat_endpoint         = ApiMlxDiscovery.get_chat_endpoint,
+	server_model_id       = ApiMlxDiscovery.get_server_model_id,
+	model_hf_path         = ApiMlxDiscovery.get_model_hf_path,
+	read_active_model_arg = ApiMlxDiscovery.read_active_model_arg,
 	stream                = _stream,
 })
 
