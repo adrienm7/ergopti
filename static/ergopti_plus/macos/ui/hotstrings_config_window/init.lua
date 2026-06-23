@@ -98,27 +98,10 @@ local COLOR_PRESETS = {
 --- =========================================
 -- =========================================
 
---- Lists the entry names of a directory, surviving an unreadable folder.
---- hs.fs.dir() THROWS on a missing/permission-denied directory AND returns TWO
---- values — the iterator AND a directory state object the iterator REQUIRES as
---- its first argument. Iterating INSIDE the pcall keeps both: the throw is caught
---- and the generic-for receives hs.fs.dir's full return. Capturing only the
---- iterator (`local ok, it = pcall(function() return hs.fs.dir(dir) end)`) drops
---- the state, and real Hammerspoon's iterator then aborts with "directory
---- metatable expected, got nil" on the first step (init-fsdir-drops-state).
---- @param dir string Absolute directory path.
---- @return table Array of entry names; empty when the directory is unreadable.
-local function safe_dir_entries(dir)
-	if type(dir) ~= "string" or dir == "" then return {} end
-	local names = {}
-	local ok = pcall(function()
-		for name in hs.fs.dir(dir) do
-			names[#names + 1] = name
-		end
-	end)
-	if not ok then return {} end
-	return names
-end
+-- Blessed hs.fs.dir wrapper (throw- and state-safe) now lives in lib/fs_dir so
+-- the contract is shared with init.lua's hotstring discovery; see
+-- init-fsdir-drops-state. Aliased locally so every call site below is unchanged.
+local safe_dir_entries = require("lib.fs_dir").entries
 
 --- Lists TOML files in a directory, skipping names that start with `_`.
 --- Returns an array of absolute paths.

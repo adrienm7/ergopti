@@ -163,16 +163,19 @@ end)
 --- ==================================================
 -- =================================================
 
-helpers.describe("init.lua: hs.fs.dir iteration is pcall-protected (init-fsdir-pcall)", function()
-	helpers.it("init.lua wraps an hs.fs.dir loop in pcall so a bad directory cannot abort boot", function()
-		local code = strip_comments(read_file(ENTRY_POINT))
-		-- A pcall'd closure that contains the hs.fs.dir loop. This is the shape that
-		-- both catches the throw AND preserves the state object (the safe_dir_entries
-		-- helper). `.` spans newlines in Lua patterns, so this matches across lines.
+helpers.describe("lib/fs_dir: hs.fs.dir iteration is pcall-protected (init-fsdir-pcall)", function()
+	helpers.it("fs_dir.entries wraps an hs.fs.dir loop in pcall so a bad directory cannot abort boot", function()
+		-- The blessed wrapper (formerly the inline safe_dir_entries in init.lua) now
+		-- lives in lib/fs_dir; init.lua and the hotstrings config window both alias it
+		-- (`local safe_dir_entries = require("lib.fs_dir").entries`), so the protection
+		-- is enforced in exactly one place. A pcall'd closure that contains the
+		-- hs.fs.dir loop is the shape that both catches the throw AND preserves the
+		-- state object. `.` spans newlines in Lua patterns, so this matches across lines.
+		local code = strip_comments(read_file(DRIVER_ROOT .. "lib/fs_dir.lua"))
 		helpers.assert_true(
 			code:match("pcall%s*%(%s*function.-hs%.fs%.dir") ~= nil,
-			"init.lua must iterate hs.fs.dir inside a pcall'd closure (safe_dir_entries) so an "
-				.. "inaccessible hotstrings directory is logged, not fatal (init-fsdir-pcall)")
+			"lib/fs_dir.entries must iterate hs.fs.dir inside a pcall'd closure so an "
+				.. "inaccessible directory is logged, not fatal (init-fsdir-pcall)")
 	end)
 end)
 

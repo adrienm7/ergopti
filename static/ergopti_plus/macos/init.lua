@@ -388,33 +388,10 @@ local HOTSTRINGS_EXCLUDED_STEMS = {
 	paths = true,
 }
 
---- Lists the entry names of a directory, surviving an unreadable folder.
---- hs.fs.dir() has TWO traps: it THROWS on a missing / permission-denied
---- directory, AND it returns TWO values — the iterator function AND a directory
---- state object that the iterator REQUIRES as its first argument. Iterating
---- INSIDE the pcall handles both: the throw is caught, and the generic-for
---- receives hs.fs.dir's full multi-value return. Capturing only the iterator
---- (`local ok, it = pcall(hs.fs.dir, dir)`) silently drops the state object, and
---- real Hammerspoon's iterator then aborts with "directory metatable expected,
---- got nil" on the first step — a boot-time crash the lenient test stub masked
---- (init-fsdir-drops-state). All directory listing in this file MUST go through
---- here so the contract is honoured in exactly one place.
---- @param dir string Absolute directory path.
---- @return table Array of entry names; empty when the directory is unreadable.
-local function safe_dir_entries(dir)
-	local names = {}
-	if type(dir) ~= "string" or dir == "" then return names end
-	local ok, err = pcall(function()
-		for name in hs.fs.dir(dir) do
-			names[#names + 1] = name
-		end
-	end)
-	if not ok then
-		Logger.error(LOG, "Cannot iterate directory '%s' — %s.", tostring(dir), tostring(err))
-		return {}
-	end
-	return names
-end
+-- Blessed hs.fs.dir wrapper (throw- and state-safe) now lives in lib/fs_dir so
+-- the contract is honoured in exactly one place across the driver; see
+-- init-fsdir-drops-state. Aliased locally so every call site below is unchanged.
+local safe_dir_entries = require("lib.fs_dir").entries
 
 local function has_common_hotstring_groups(dir)
 	if type(dir) ~= "string" or dir == "" then return false end
