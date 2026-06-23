@@ -217,7 +217,6 @@ Boot.mark("TOML hotstring cache wired")
 local file_system        = require("adapters.file_system")
 local karabiner          = require("modules.karabiner")
 local menu               = require("ui.menu")
-local hotstring_editor   = require("ui.hotstring_editor")
 local mlx_deps_checker    = require("modules.llm.mlx_deps_checker")
 local ollama_deps_checker = require("modules.llm.ollama_deps_checker")
 local backend_detector    = require("modules.llm.backend_detector")
@@ -595,72 +594,12 @@ Boot.mark("TOML discovery + ordering")
 -- personal_hotstrings.toml lives in <config_dir>/hotstrings/ (configurable via
 -- the paths editor). Additional *.toml files placed in the same folder are loaded
 -- automatically as extra personal extension groups in alphabetical order by stem.
-do
-	local personal_path = menu_paths.get("PersonalTomlPath")
-	-- Personal source-default priority, read from the shared single source
-	-- (_shared/modules/hotstrings/priority.json, copied into the bundle) so the editor
-	-- shows it as the priority field placeholder without hardcoding it. Falls back
-	-- to the engine value (kept identical to that file by the parity gate).
-	local personal_default_priority = keymap.source_priority and keymap.source_priority("personal") or nil
-	do
-		local fh = io.open(bundled_hotstrings_dir .. "priority.json", "r")
-		if fh then
-			local raw = fh:read("*a")
-			fh:close()
-			local ok, parsed = pcall(hs.json.decode, raw)
-			if ok and type(parsed) == "table" and type(parsed.personal) == "number" then
-				personal_default_priority = parsed.personal
-			end
-		end
-	end
-	hotstring_editor.init(personal_path, keymap, nil, personal_default_priority)
-	keymap.load_toml("personal", personal_path)
-	table.insert(hotfiles, "personal")
-	hotfile_paths["personal"] = personal_path
-
-	-- Recursively scan for extra TOML files in the hotstrings folder
-	local hs_dir = menu_paths.get("PersonalHotstringsDir")
-	local function scan_recursive(dir, prefix)
-		local ok_attr, attr = pcall(hs.fs.attributes, dir)
-		if not (ok_attr and type(attr) == "table" and attr.mode == "directory") then return end
-
-		local items = {}
-		for _, fname in ipairs(safe_dir_entries(dir)) do
-			if fname ~= "." and fname ~= ".." and not fname:match("^_") then
-				local fpath = dir .. "/" .. fname
-				local ok_a, a = pcall(hs.fs.attributes, fpath)
-				if ok_a and type(a) == "table" then
-					if a.mode == "directory" then
-						table.insert(items, { type = "dir", name = fname, path = fpath })
-					elseif a.mode == "file" and fname:match("%.toml$") and (prefix ~= "" or fname ~= "personal_hotstrings.toml") then
-						local stem = fname:match("^(.-)%.toml$")
-						if stem and stem ~= "" then
-							table.insert(items, { type = "file", name = fname, stem = stem, path = fpath })
-						end
-					end
-				end
-			end
-		end
-
-		table.sort(items, function(a, b) return a.name < b.name end)
-
-		for _, item in ipairs(items) do
-			if item.type == "file" then
-				local new_prefix = (prefix == "") and item.stem or (prefix .. "__" .. item.stem)
-				local group_name = "personal_ext_" .. new_prefix
-				keymap.load_toml(group_name, item.path)
-				table.insert(hotfiles, group_name)
-				hotfile_paths[group_name] = item.path
-				Logger.info(LOG, "Loaded extra personal hotstrings group '%s' from '%s'.", group_name, item.path)
-			else
-				-- Recurse into subdirectory
-				local new_prefix = (prefix == "") and item.name or (prefix .. "__" .. item.name)
-				scan_recursive(item.path, new_prefix)
-			end
-		end
-	end
-
-	scan_recursive(hs_dir:gsub("[/\\]+$", ""), "")
+-- The personal group + recursive extension scan live in lib/personal_hotstrings;
+-- it registers each group with keymap and returns them in load order so they keep
+-- the lowest group_order (= highest priority). Extracted from init.lua Section 5.1.
+for _, g in ipairs(require("lib.personal_hotstrings").load({ bundled_hotstrings_dir = bundled_hotstrings_dir })) do
+	table.insert(hotfiles, g.name)
+	hotfile_paths[g.name] = g.path
 end
 
 -- Dynamic hotstrings (personal info, date triggers, etc.) — after personal,
