@@ -51,8 +51,12 @@ helpers.describe("GC retention: hs.task pinning", function()
 		assert_gc_pinned("ui/menu/menu_llm/models_manager_ollama.lua")
 	end)
 
-	helpers.it("models_manager_mlx: sweep and probe tasks are pinned", function()
+	helpers.it("models_manager_mlx: download/check tasks are pinned", function()
 		assert_gc_pinned("ui/menu/menu_llm/models_manager_mlx.lua")
+	end)
+
+	helpers.it("models_manager_mlx_server: sweep and probe tasks are pinned", function()
+		assert_gc_pinned("ui/menu/menu_llm/models_manager_mlx_server.lua")
 	end)
 
 	helpers.it("onboarding: shasum / curl / hdiutil / osascript tasks are pinned", function()

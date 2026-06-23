@@ -21,14 +21,16 @@
 
 local helpers = require("tests.helpers")
 
---- Reads the models_manager_mlx.lua source via the active package.path so the test
---- is independent of the runner's working directory.
+--- Reads the models_manager_mlx_server.lua source via the active package.path so
+--- the test is independent of the runner's working directory. The bash launcher
+--- (and its --port flag) lives in the server-lifecycle sibling module since the
+--- start_server extraction; this test follows it there.
 local function read_models_manager_source()
-	local path = package.searchpath("ui.menu.menu_llm.models_manager_mlx", package.path)
+	local path = package.searchpath("ui.menu.menu_llm.models_manager_mlx_server", package.path)
 	helpers.assert_true(type(path) == "string" and path ~= "",
-		"could not resolve ui.menu.menu_llm.models_manager_mlx on package.path")
+		"could not resolve ui.menu.menu_llm.models_manager_mlx_server on package.path")
 	local fh = io.open(path, "r")
-	helpers.assert_true(fh ~= nil, "could not open models_manager_mlx.lua")
+	helpers.assert_true(fh ~= nil, "could not open models_manager_mlx_server.lua")
 	local src = fh:read("*a")
 	fh:close()
 	return src

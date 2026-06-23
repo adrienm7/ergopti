@@ -1,18 +1,19 @@
 --- tests/unit/ui/menu/test_models_manager_mlx_task_forward_declared.lua
 
 --- ==============================================================================
---- MODULE: Regression — models_manager_mlx closure-nil forward declarations
+--- MODULE: Regression — models_manager_mlx_server closure-nil forward declarations
 --- DESCRIPTION:
---- models_manager_mlx.lua has three hs.task sites whose callbacks reference the
---- task handle itself (not a hardcoded string key):
+--- start_server (extracted to models_manager_mlx_server.lua in the P6 split) has
+--- three hs.task sites whose callbacks reference the task handle itself (not a
+--- hardcoded string key):
 ---
----   1. sweep    — pre-launch port sweep; callback clears M._active_tasks[sweep]
----   2. probe_task — HTTP probe loop; callback clears M._active_tasks[probe_task]
+---   1. sweep    — pre-launch port sweep; callback clears _active_tasks[sweep]
+---   2. probe_task — HTTP probe loop; callback clears _active_tasks[probe_task]
 ---   3. task (mlx-server bash kill) — callback compares
 ---      deps.active_tasks["mlx_server"] == task to guard the cleanup
 ---
 --- All three used `local X = hs.task.new(...)`, which binds _G.X (nil) inside the
---- closure. For sweep/probe_task: M._active_tasks[nil] = nil → "table index is
+--- closure. For sweep/probe_task: _active_tasks[nil] = nil → "table index is
 --- nil" (swallowed to HS Console). For the bash-kill task: the comparison would
 --- always be `deps.active_tasks["mlx_server"] == nil`, unconditionally clearing the
 --- active-task slot even when a different MLX process is running.
@@ -28,9 +29,11 @@ local helpers = require("tests.helpers")
 
 helpers.describe("models_manager_mlx: three dangerous hs.task closures forward-declare their handle", function()
 	local function read_src()
-		local path = helpers.driver_root() .. "ui/menu/menu_llm/models_manager_mlx.lua"
+		-- The three dangerous hs.task sites live inside start_server, which moved to
+		-- the server-lifecycle sibling module during the P6 split; assert there.
+		local path = helpers.driver_root() .. "ui/menu/menu_llm/models_manager_mlx_server.lua"
 		local fh = io.open(path, "r")
-		helpers.assert_true(fh ~= nil, "cannot open models_manager_mlx.lua at " .. tostring(path))
+		helpers.assert_true(fh ~= nil, "cannot open models_manager_mlx_server.lua at " .. tostring(path))
 		local src = fh:read("*a"); fh:close()
 		return src
 	end
@@ -51,9 +54,9 @@ helpers.describe("models_manager_mlx: three dangerous hs.task closures forward-d
 	helpers.it("sweep GC-pin release is guarded against nil sweep", function()
 		local src = read_src()
 		helpers.assert_true(
-			src:find("if sweep then M._active_tasks[sweep] = nil end", 1, true) ~= nil,
+			src:find("if sweep then _active_tasks[sweep] = nil end", 1, true) ~= nil,
 			"sweep callback must guard the GC-pin clear with `if sweep then` "
-			.. "(M._active_tasks[nil] = nil raises 'table index is nil')")
+			.. "(_active_tasks[nil] = nil raises 'table index is nil')")
 	end)
 
 
@@ -72,7 +75,7 @@ helpers.describe("models_manager_mlx: three dangerous hs.task closures forward-d
 	helpers.it("probe_task GC-pin release is guarded against nil probe_task", function()
 		local src = read_src()
 		helpers.assert_true(
-			src:find("if probe_task then M._active_tasks[probe_task] = nil end", 1, true) ~= nil,
+			src:find("if probe_task then _active_tasks[probe_task] = nil end", 1, true) ~= nil,
 			"probe_task callback must guard the GC-pin clear with `if probe_task then`")
 	end)
 
