@@ -694,6 +694,8 @@
 	"menu.hotstrings.notify_bubble_star": "Пузырь ★",
 	"menu.hotstrings.off": "❌ Хотстринги отключены (нажмите для включения)",
 	"menu.hotstrings.on": "✅ Хотстринги включены (нажмите для отключения)",
+	"menu.hotstrings.enable_all": "✅ Enable all",
+	"menu.hotstrings.disable_all": "❌ Disable all",
 	"menu.hotstrings.open_editor": "Открыть редактор хотстрингов",
 	"menu.hotstrings.open_file": "Открыть файл…",
 	"menu.hotstrings.params": "⚙️ Настройки хотстрингов",

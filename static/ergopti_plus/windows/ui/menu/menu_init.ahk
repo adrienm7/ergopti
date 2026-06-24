@@ -129,6 +129,10 @@ initMenu() {
 	)
 	BootProfile_Mark("MENU/initMenu: pre-hotstrings render")
 	HotstringsMenu := MenuRenderer_Build("hotstrings_menu", "Hotstrings", _HotDynHandlers, _HotGroupBuilders)
+	; Bulk actions for the whole Hotstrings tree, inserted right after the master
+	; toggle (manifest item 1): force every section on / off in one click.
+	RegisterMenuItemInsert(HotstringsMenu, "2&", t("menu.hotstrings.enable_all"),  ToggleAllHotstringsOn)
+	RegisterMenuItemInsert(HotstringsMenu, "3&", t("menu.hotstrings.disable_all"), ToggleAllHotstringsOff)
 	BootProfile_Mark("MENU/initMenu: hotstrings menu rendered")
 
 	HotstringsMenuTitle := t("menu.hotstrings.title") . " (" . FmtCount(_HS_ComputeGrandTotal()) . ")"

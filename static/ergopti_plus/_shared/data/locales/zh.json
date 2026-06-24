@@ -694,6 +694,8 @@
 	"menu.hotstrings.notify_bubble_star": "气泡 ★",
 	"menu.hotstrings.off": "❌ 热字符串已禁用（点击启用）",
 	"menu.hotstrings.on": "✅ 热字符串已启用（点击禁用）",
+	"menu.hotstrings.enable_all": "✅ Enable all",
+	"menu.hotstrings.disable_all": "❌ Disable all",
 	"menu.hotstrings.open_editor": "打开热字符串编辑器",
 	"menu.hotstrings.open_file": "打开文件…",
 	"menu.hotstrings.params": "⚙️ 热字符串设置",

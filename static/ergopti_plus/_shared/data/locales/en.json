@@ -689,6 +689,8 @@
 	"menu.hotstrings.notify_bubble_star": "Bubble ★",
 	"menu.hotstrings.off": "❌ Hotstrings disabled (click to enable)",
 	"menu.hotstrings.on": "✅ Hotstrings enabled (click to disable)",
+	"menu.hotstrings.enable_all": "✅ Enable all",
+	"menu.hotstrings.disable_all": "❌ Disable all",
 	"menu.hotstrings.open_editor": "Open hotstring editor",
 	"menu.hotstrings.open_file": "Open file…",
 	"menu.hotstrings.params": "⚙️ Hotstring settings",

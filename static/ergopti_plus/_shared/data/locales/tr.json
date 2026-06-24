@@ -694,6 +694,8 @@
 	"menu.hotstrings.notify_bubble_star": "Balon ★",
 	"menu.hotstrings.off": "❌ Kısaltmalar devre dışı (etkinleştirmek için tıklayın)",
 	"menu.hotstrings.on": "✅ Kısaltmalar etkin (devre dışı bırakmak için tıklayın)",
+	"menu.hotstrings.enable_all": "✅ Enable all",
+	"menu.hotstrings.disable_all": "❌ Disable all",
 	"menu.hotstrings.open_editor": "Kısaltma düzenleyicisini aç",
 	"menu.hotstrings.open_file": "Dosya aç…",
 	"menu.hotstrings.params": "⚙️ Kısaltma ayarları",
