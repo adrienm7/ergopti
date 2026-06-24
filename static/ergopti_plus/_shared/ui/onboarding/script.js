@@ -139,7 +139,18 @@ function renderStep1() {
 
 		var flag = document.createElement('span');
 		flag.className = 'lang-flag';
-		flag.textContent = loc.flag;
+		// Windows has no flag-emoji font, so the AHK host injects a flag_url
+		// (file:// PNG from static/img/flags/). Prefer it when present; fall
+		// back to the emoji glyph the macOS WKWebView path renders directly.
+		if (loc.flag_url) {
+			var flagImg = document.createElement('img');
+			flagImg.className = 'lang-flag-img';
+			flagImg.src = loc.flag_url;
+			flagImg.alt = '';
+			flag.appendChild(flagImg);
+		} else {
+			flag.textContent = loc.flag;
+		}
 
 		var name = document.createElement('span');
 		name.className = 'lang-name';
@@ -359,21 +370,27 @@ function renderStep5() {
  * @param {Object} msg
  */
 function _post(msg) {
-	setTimeout(function () {
-		try {
-			if (
-				window.webkit &&
-				window.webkit.messageHandlers &&
-				window.webkit.messageHandlers.hsOnboarding
-			) {
-				window.webkit.messageHandlers.hsOnboarding.postMessage(msg);
-			} else if (window.chrome && window.chrome.webview) {
-				window.chrome.webview.postMessage(JSON.stringify(msg));
-			}
-		} catch (e) {
-			console.error('[onboarding] postMessage failed:', e);
+	// Mirror the proven model_browser bridge: post SYNCHRONOUSLY and probe the
+	// WebView2 (window.chrome.webview) channel FIRST. The previous version
+	// wrapped the call in setTimeout(0) and probed WKWebView first; under
+	// WebView2 that combination silently dropped every message (the host never
+	// received "ready", so the wizard only rendered via the safety fallback and
+	// no interactive message — previewLocale, finish — ever arrived).
+	try {
+		if (window.chrome && window.chrome.webview) {
+			// WebView2 (Windows) takes a string — the AHK host JsonParse-s it.
+			window.chrome.webview.postMessage(JSON.stringify(msg));
+		} else if (
+			window.webkit &&
+			window.webkit.messageHandlers &&
+			window.webkit.messageHandlers.hsOnboarding
+		) {
+			// WKWebView (macOS) accepts a JS object directly.
+			window.webkit.messageHandlers.hsOnboarding.postMessage(msg);
 		}
-	}, 0);
+	} catch (e) {
+		console.error('[onboarding] postMessage failed:', e);
+	}
 }
 
 /**
@@ -555,5 +572,13 @@ document.getElementById('s5-finish').addEventListener('click', function () {
 
 // Signal the host that the page is ready to receive initData. Routed through
 // _post so it works under both the WKWebView (macOS) and WebView2 (Windows)
-// bridges rather than hard-coding the macOS-only channel.
-_post({ action: 'ready' });
+// bridges rather than hard-coding the macOS-only channel. Gated on readyState
+// (mirroring model_browser) so the signal is never posted before the DOM the
+// host's initData render targets actually exists.
+if (document.readyState === 'loading') {
+	document.addEventListener('DOMContentLoaded', function () {
+		_post({ action: 'ready' });
+	});
+} else {
+	_post({ action: 'ready' });
+}

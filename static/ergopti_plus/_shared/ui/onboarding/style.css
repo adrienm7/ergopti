@@ -216,10 +216,22 @@ h1 {
 }
 
 .lang-flag {
+	align-items: center;
+	display: flex;
 	flex-shrink: 0;
 	font-size: 18px;
+	justify-content: center;
 	line-height: 1;
 	width: 24px;
+}
+
+/* PNG flag (Windows path) — sized to sit on the emoji baseline without
+   distorting the source aspect ratio. */
+.lang-flag-img {
+	display: block;
+	height: auto;
+	max-height: 16px;
+	width: 22px;
 }
 
 .lang-name {

@@ -30,6 +30,21 @@
 ; the "u-grave" magic key, matching _Onboarding_PickDefaultMagicKey.
 global ONBOARDING_LANGID_FRENCH := 0x040C
 
+; Virtual host names mapped to local folders so the wizard loads from a stable
+; origin (https://<host>/…) instead of an opaque file:// origin. Chromium treats
+; every file:// document as a UNIQUE security origin, which logs "unsafe attempt
+; to load URL" warnings AND made the chrome.webview JS->AHK channel silently drop
+; every message (the host never received "ready"/previewLocale/finish). Mapping to
+; a virtual host gives the page a normal web origin where postMessage and
+; same-origin resource loading both behave — Microsoft's recommended pattern for
+; packaged local web UI. Mappings are per-CoreWebView2 instance, so this does not
+; affect the model_browser host that shares the same environment.
+global ONBOARDING_VHOST        := "ergopti.onboarding"   ; -> _SharedDir\ui\onboarding
+global ONBOARDING_VHOST_ASSETS := "ergopti.assets"       ; -> _StaticDir (flags, layout jpg)
+; COREWEBVIEW2_HOST_RESOURCE_ACCESS_KIND_ALLOW — let the page load these mapped
+; resources, including cross-origin from the assets host.
+global WEBVIEW_HOST_ACCESS_ALLOW := 1
+
 ; WebView2 host state — kept separate from the native wizard's _ob_gui handle
 ; usage (the host stores its Gui in _ob_gui too, so the Onboarding_Run loop and
 ; the close paths behave identically to the native pages).
@@ -37,6 +52,12 @@ global _OnbWeb_Controller := unset
 global _OnbWeb_WebView    := unset
 global _OnbWeb_Ready       := false
 global _OnbWeb_Queue       := []
+; Subscription handle returned by WebView2.WebMessageReceived(). The thqby
+; binding ties the event subscription to this object's LIFETIME: when it is
+; garbage-collected its __Delete calls remove_WebMessageReceived(token),
+; silently unsubscribing the handler. It MUST be kept alive in a persistent
+; global for the JS->AHK channel to keep delivering messages.
+global _OnbWeb_MsgSub      := unset
 
 
 
@@ -47,12 +68,17 @@ global _OnbWeb_Queue       := []
 ; =========================================
 ; ==============================================================
 
-; Returns true when the WebView2 runtime + loader DLL are present and there is
-; enough free RAM to boot Chromium. Mirrors the model_browser gate.
+; Returns true when the WebView2 runtime binding + loader DLL are present.
+; Unlike the model_browser gate, onboarding intentionally does NOT apply the
+; low-RAM native fallback (WebView_ShouldUseNativeFallback): the first-run wizard
+; is a one-off and the shared webview UX is wanted even on a RAM-starved machine.
+; Chromium may cold-boot slowly under pressure, but that cost is paid once, and
+; WebView2.create is still wrapped in a try/catch that degrades to the native
+; pages if the control genuinely cannot be created.
 _OnbWeb_Available() {
 	global _VendorDir
 	loader := _VendorDir . "\64bit\WebView2Loader.dll"
-	return IsSet(WebView2) && FileExist(loader) && !WebView_ShouldUseNativeFallback()
+	return IsSet(WebView2) && FileExist(loader)
 }
 
 ; Attempts to show the wizard in a WebView2 window. Returns true on success
@@ -63,8 +89,13 @@ _Onboarding_TryWeb() {
 	global _OnbWeb_Controller, _OnbWeb_WebView, _OnbWeb_Ready, _OnbWeb_Queue
 	global _ob_gui, _VendorDir, _SharedDir
 
-	if !_OnbWeb_Available()
+	if !_OnbWeb_Available() {
+		; Log WHY we fall back so the path taken is unambiguous in the logs —
+		; identical-looking native pages otherwise hide which renderer ran.
+		try LoggerInfo("Onboarding", "WebView2 unavailable ({1}) — using native AHK pages.", _OnbWeb_UnavailableReason())
 		return false
+	}
+	try LoggerStart("Onboarding", "Launching wizard via WebView2 (shared frontend)…")
 
 	_OnbWeb_Ready := false
 	_OnbWeb_Queue := []
@@ -77,6 +108,14 @@ _Onboarding_TryWeb() {
 	g.OnEvent("Close",  _OnbWeb_OnClose)
 	g.OnEvent("Size",   _OnbWeb_OnResize)
 
+	; Show the window BEFORE creating the WebView2 controller and calling Fill().
+	; Creating + Fill()-ing against a still-hidden window sizes the control to a
+	; zero/placeholder client rect, so it paints the empty gray default and never
+	; lays out the navigated page — the model_browser host shows first for exactly
+	; this reason.
+	g.Show("w480 h560 Center")
+	_ob_gui := g
+
 	loader := _VendorDir . "\64bit\WebView2Loader.dll"
 	try {
 		_OnbWeb_Controller := WebView2.create(Placeholder.Hwnd, , WebView_SharedEnvironment(loader))
@@ -84,6 +123,9 @@ _Onboarding_TryWeb() {
 		try LoggerError("Onboarding", "WebView2 create failed: {1} — falling back to native pages.", Err.Message)
 		try g.Destroy()
 		_OnbWeb_Reset()
+		; The window was shown before create() — clear the shared sentinel so the
+		; native fallback (which sets its own _ob_gui) starts from a clean slate.
+		_ob_gui := 0
 		return false
 	}
 
@@ -99,19 +141,38 @@ _Onboarding_TryWeb() {
 		s.IsSwipeNavigationEnabled         := false
 	}
 
-	; JS -> AHK bridge.
-	_OnbWeb_WebView.WebMessageReceived(_OnbWeb_OnWebMessage)
+	; JS -> AHK bridge. Store the subscription handle in a persistent global —
+	; discarding it lets the binding GC it and silently unsubscribe the handler.
+	global _OnbWeb_MsgSub := _OnbWeb_WebView.WebMessageReceived(_OnbWeb_OnWebMessage)
+
+	; Map virtual hosts BEFORE navigating so the document and every relative
+	; asset resolve through a real origin (see ONBOARDING_VHOST comment for why
+	; file:// is avoided). The frontend folder serves index.html/script.js/style.css;
+	; the static folder serves the flag PNGs + layout JPG injected as absolute URLs.
+	try _OnbWeb_WebView.SetVirtualHostNameToFolderMapping(ONBOARDING_VHOST, _SharedDir . "\ui\onboarding", WEBVIEW_HOST_ACCESS_ALLOW)
+	try _OnbWeb_WebView.SetVirtualHostNameToFolderMapping(ONBOARDING_VHOST_ASSETS, _StaticDir, WEBVIEW_HOST_ACCESS_ALLOW)
 
 	try _OnbWeb_WebView.Navigate(_OnbWeb_HtmlUrl())
 	try _OnbWeb_Controller.Fill()
 
-	g.Show("w480 h560 Center")
-	_ob_gui := g
+	try LoggerSuccess("Onboarding", "Wizard shown via WebView2 — rendering shared frontend at {1}.", _OnbWeb_HtmlUrl())
 
 	; Safety: if the page never posts "ready" (rare), flush the queue anyway so
 	; the wizard is not left blank.
 	SetTimer(_OnbWeb_SafetyFlush, -2500)
 	return true
+}
+
+; Returns a short human-readable reason why the WebView2 path is unavailable,
+; used purely for the fallback log line so the cause is visible at a glance.
+_OnbWeb_UnavailableReason() {
+	global _VendorDir
+	if !IsSet(WebView2)
+		return "WebView2 binding not loaded"
+	loader := _VendorDir . "\64bit\WebView2Loader.dll"
+	if !FileExist(loader)
+		return "WebView2Loader.dll missing"
+	return "unknown"
 }
 
 
@@ -159,7 +220,14 @@ _OnbWeb_OnWebMessage(Handler, Args) {
 _OnbWeb_Eval(Js) {
 	global _OnbWeb_WebView, _OnbWeb_Ready, _OnbWeb_Queue
 	if (_OnbWeb_Ready && IsSet(_OnbWeb_WebView)) {
-		try _OnbWeb_WebView.ExecuteScript(Js)
+		; Run the ExecuteScript OUTSIDE the current call stack via a one-shot
+		; timer. ExecuteScript is ExecuteScriptAsync().await(), which spins a
+		; NESTED message loop; calling it synchronously from inside the
+		; WebMessageReceived COM callback (as the "ready" handler does) re-enters
+		; the STA apartment and wedges further WebView2 message delivery — the
+		; channel then delivers exactly one message (ready) and goes silent.
+		; Deferring lets the callback return first, keeping event delivery alive.
+		SetTimer(_OnbWeb_RunScript.Bind(Js), -1)
 	} else {
 		_OnbWeb_Queue.Push(Js)
 		if (_OnbWeb_Queue.Length > 50)
@@ -167,12 +235,33 @@ _OnbWeb_Eval(Js) {
 	}
 }
 
+; Executes a queued script on a fresh call stack (scheduled by _OnbWeb_Eval via a
+; -1 timer). Uses ExecuteScriptAsync FIRE-AND-FORGET (no .await()): the convenience
+; ExecuteScript() is ExecuteScriptAsync().await(), and that .await() spins a nested
+; message loop waiting for the script result. Under live message traffic (e.g. the
+; 135 KB locale-string injection on every language switch) that nested loop can
+; fail to complete and wedge the AHK thread — the channel then stops delivering.
+; We do not need the script's return value, so we drop the promise on the floor;
+; WebView2 holds the completion handler and still runs the script.
+_OnbWeb_RunScript(Js) {
+	global _OnbWeb_WebView
+	if !IsSet(_OnbWeb_WebView)
+		return
+	try {
+		_OnbWeb_WebView.ExecuteScriptAsync(Js)
+	} catch as e {
+		try LoggerError("Onboarding", "ExecuteScriptAsync failed (len={1}): {2}.", StrLen(Js), e.Message)
+	}
+}
+
 _OnbWeb_FlushQueue() {
 	global _OnbWeb_Ready, _OnbWeb_Queue, _OnbWeb_WebView
 	_OnbWeb_Ready := true
+	; Defer each queued script (see _OnbWeb_Eval) so none runs re-entrantly inside
+	; the WebMessageReceived callback that typically triggers this flush.
 	for _, Js in _OnbWeb_Queue {
 		if IsSet(_OnbWeb_WebView)
-			try _OnbWeb_WebView.ExecuteScript(Js)
+			SetTimer(_OnbWeb_RunScript.Bind(Js), -1)
 	}
 	_OnbWeb_Queue := []
 }
@@ -180,6 +269,10 @@ _OnbWeb_FlushQueue() {
 _OnbWeb_SafetyFlush() {
 	global _OnbWeb_Ready
 	if (!_OnbWeb_Ready) {
+		; The page did not post "ready" within the timeout — inject initData anyway
+		; so the wizard is never left blank. Reaching here regularly would hint at a
+		; JS->AHK channel problem, so log it.
+		try LoggerWarn("Onboarding", "Page did not signal ready within timeout — SafetyFlush injecting initData.")
 		_OnbWeb_FlushQueue()
 		_OnbWeb_InjectInitData()
 	}
@@ -209,7 +302,7 @@ _OnbWeb_InjectInitData() {
 		. ",default_config_dir:" . _OnbWeb_JsStr(defaultDir)
 		. ",system_layout:" . _OnbWeb_JsStr(_OnbWeb_SystemLayoutHint())
 		. ",layout_image_url:" . _OnbWeb_JsStr(_OnbWeb_LayoutImageUrl())
-		. ",strings:" . _OnbWeb_LocaleStringsJson(_ob_locale)
+		. ",strings:" . _OnbWeb_LocaleStringsExpr(_ob_locale)
 		. "})"
 	_OnbWeb_Eval(js)
 }
@@ -217,11 +310,20 @@ _OnbWeb_InjectInitData() {
 ; Loads the strings for a previewed locale and pushes them as an envelope so
 ; the frontend can discard stale rapid-switch replies.
 _OnbWeb_PreviewLocale(Code) {
+	global _ob_gui
 	if (Code == "")
 		return
 	js := "window.applyStrings({locale:" . _OnbWeb_JsStr(Code)
-		. ",strings:" . _OnbWeb_LocaleStringsJson(Code) . "})"
+		. ",strings:" . _OnbWeb_LocaleStringsExpr(Code) . "})"
+	try LoggerDebug("Onboarding", "Previewing locale '{1}'.", Code)
 	_OnbWeb_Eval(js)
+	; Sync the host window caption too: a WebView2 page's document.title does NOT
+	; propagate to the AHK Gui title bar, so the previewed locale's title is set
+	; here directly. _Onboarding_Translate resolves the key without disturbing the
+	; running script's active locale (it returns the key itself on failure).
+	title := _Onboarding_Translate(Code, "onboarding.welcome.title")
+	if (title != "" && title != "onboarding.welcome.title" && IsSet(_ob_gui) && _ob_gui)
+		try _ob_gui.Title := title
 }
 
 ; Opens the native folder picker and feeds the chosen path back to the page.
@@ -307,11 +409,24 @@ _OnbWeb_LocalesJson() {
 		flag := _OnbWeb_LocaleFlag(Loc.Code)
 		entry := "{code:" . _OnbWeb_JsStr(Loc.Code)
 			. ",name:" . _OnbWeb_JsStr(Loc.Name)
-			. ",flag:" . _OnbWeb_JsStr(flag) . "}"
+			. ",flag:" . _OnbWeb_JsStr(flag)
+			. ",flag_url:" . _OnbWeb_JsStr(_OnbWeb_FlagUrl(Loc.Code)) . "}"
 		out .= (first ? "" : ",") . entry
 		first := false
 	}
 	return "[" . out . "]"
+}
+
+; Returns a file:// URL to the locale's PNG flag (static/img/flags/<code>.png),
+; or "" when the asset is missing. Windows has no flag-emoji font, so the
+; WebView2 frontend renders these PNGs as <img> instead of the emoji glyph the
+; macOS WKWebView path displays from [_meta].flag.
+_OnbWeb_FlagUrl(Code) {
+	global _StaticDir, ONBOARDING_VHOST_ASSETS
+	path := _StaticDir . "\img\flags\" . Code . ".png"
+	if !FileExist(path)
+		return ""
+	return "https://" . ONBOARDING_VHOST_ASSETS . "/img/flags/" . Code . ".png"
 }
 
 ; Reads the [_meta].flag glyph for a locale from its JSON file. Returns "" when
@@ -341,6 +456,26 @@ _OnbWeb_LocaleStringsJson(Code) {
 	return "{}"
 }
 
+; Returns a JS object EXPRESSION (not just a literal) for ``Code``: the raw
+; locale map merged with host-derived keys the frontend expects but that do NOT
+; exist verbatim on disk. Currently that is dialog.metrics.enable_warning_formatted,
+; whose {1} placeholder is filled with the metrics log path — mirroring the native
+; metrics step (steps.ahk) and the macOS webview path (init.lua). Object.assign
+; layers the derived keys onto the parsed locale map at injection time.
+_OnbWeb_LocaleStringsExpr(Code) {
+	global _ConfigDir
+	base := _OnbWeb_LocaleStringsJson(Code)
+	; Forward-slash the path to match the cross-platform locale text (macOS uses
+	; "/"), keeping the red warning block visually identical across drivers.
+	metricsPath := StrReplace((IsSet(_ConfigDir) ? _ConfigDir : "") . "metrics", "\", "/")
+	tpl := _Onboarding_Translate(Code, "dialog.metrics.enable_warning")
+	warn := ""
+	if (tpl != "" && tpl != "dialog.metrics.enable_warning")
+		try warn := Format(tpl, metricsPath)
+	derived := "{" . _OnbWeb_JsStr("dialog.metrics.enable_warning_formatted") . ":" . _OnbWeb_JsStr(warn) . "}"
+	return "Object.assign(" . base . "," . derived . ")"
+}
+
 ; Maps the active OS keyboard layout to the substring the frontend's
 ; _pickDefaultMagicKey matches: "french" for the French LANGID, "" otherwise
 ; (so QWERTY-family layouts fall through to ";" and Ergopti users keep "*").
@@ -355,23 +490,24 @@ _OnbWeb_SystemLayoutHint() {
 	return ""
 }
 
-; Returns a file:// URL to the Ergopti layout preview JPG, or "" when the asset
-; is missing (the frontend then renders step 2 without the image).
+; Returns the layout preview JPG URL via the assets virtual host, or "" when the
+; asset is missing (the frontend then renders step 2 without the image).
 _OnbWeb_LayoutImageUrl() {
-	global _StaticDir
+	global _StaticDir, ONBOARDING_VHOST_ASSETS
 	path := _StaticDir . "\img\ergopti.jpg"
 	if !FileExist(path)
 		return ""
-	return "file:///" . StrReplace(path, "\", "/")
+	return "https://" . ONBOARDING_VHOST_ASSETS . "/img/ergopti.jpg"
 }
 
-; Returns the file:// URL for _shared/ui/onboarding/index.html.
+; Returns the virtual-host URL for _shared/ui/onboarding/index.html. Served from
+; a mapped origin (not file://) so the chrome.webview JS->AHK channel works.
+; A per-launch cache-buster forces a fresh index.html each open (WebView2 caches
+; virtual-host resources); index.html in turn references script.js/style.css with
+; their own ?v= so an edited frontend is never served stale during development.
 _OnbWeb_HtmlUrl() {
-	global _SharedDir
-	base := _SharedDir . "\ui\onboarding\index.html"
-	loop files, base
-		base := A_LoopFileFullPath
-	return "file:///" . StrReplace(base, "\", "/")
+	global ONBOARDING_VHOST
+	return "https://" . ONBOARDING_VHOST . "/index.html?cb=" . A_TickCount
 }
 
 
@@ -432,11 +568,14 @@ _OnbWeb_OnClose(*) {
 ; Tears down the WebView2 controller + host state (NOT the Gui — callers decide
 ; whether to destroy the window). Safe to call repeatedly.
 _OnbWeb_Reset() {
-	global _OnbWeb_Controller, _OnbWeb_WebView, _OnbWeb_Ready, _OnbWeb_Queue
+	global _OnbWeb_Controller, _OnbWeb_WebView, _OnbWeb_Ready, _OnbWeb_Queue, _OnbWeb_MsgSub
 	if IsSet(_OnbWeb_Controller)
 		try _OnbWeb_Controller.Close()
 	_OnbWeb_Controller := unset
 	_OnbWeb_WebView    := unset
+	; Dropping the subscription handle fires its __Delete (unsubscribe) — fine
+	; here since the controller is being torn down anyway.
+	_OnbWeb_MsgSub     := unset
 	_OnbWeb_Ready      := false
 	_OnbWeb_Queue      := []
 }
