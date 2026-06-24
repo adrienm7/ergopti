@@ -112,3 +112,47 @@ _FIL_Unresolved() {
 	))
 }
 Test("feature_io: unknown path returns false", _FIL_Unresolved)
+
+
+
+
+; =================================================================
+; =================================================================
+; ======= 2/ Mutex sibling enumeration (real manifest) ============
+; =================================================================
+; =================================================================
+
+; The mutex enumerator reads the live manifest (not the Features fixture), so it
+; certifies that enabling one modifier-combo key forces exactly the other keys
+; of its [ahk.shortcuts.<group>] section off — the v2-native equivalent of the
+; retired translator's hand-written sibling table.
+
+_FIL_MutexEnumeratesGroupSiblings() {
+	ManifestEnsureLoaded()
+	Siblings := _MutexSiblingPathsForV2("ahk.shortcuts.alt_gr_lalt.backspace")
+	; The alt_gr_lalt group declares 10 keys; enabling one leaves 9 siblings.
+	AssertEqual(9, Siblings.Length, "alt_gr_lalt has 9 siblings of backspace")
+	for _, P in Siblings {
+		AssertTrue(SubStr(P, 1, 25) == "ahk.shortcuts.alt_gr_lalt", "sibling stays in the group: " . P)
+		AssertTrue(P != "ahk.shortcuts.alt_gr_lalt.backspace", "the toggled key is excluded")
+	}
+}
+Test("feature_io: mutex enumerator returns the group's other keys", _FIL_MutexEnumeratesGroupSiblings)
+
+_FIL_MutexStripsAhkPrefix() {
+	ManifestEnsureLoaded()
+	; The bare (ahk-stripped) shape must resolve to the same group + sibling count.
+	Siblings := _MutexSiblingPathsForV2("shortcuts.alt_gr_caps_lock.tab")
+	AssertEqual(9, Siblings.Length, "alt_gr_caps_lock has 9 siblings of tab (bare prefix)")
+}
+Test("feature_io: mutex enumerator strips the ahk. prefix", _FIL_MutexStripsAhkPrefix)
+
+_FIL_MutexEmptyForPlain() {
+	ManifestEnsureLoaded()
+	; A plain (non-mutex) shortcut toggle has no siblings.
+	AssertEqual(0, _MutexSiblingPathsForV2("shortcuts.microsoft_bold").Length,
+		"plain shortcut has no mutex siblings")
+	AssertEqual(0, _MutexSiblingPathsForV2("ahk.layout.ergopti_base").Length,
+		"layout feature has no mutex siblings")
+}
+Test("feature_io: mutex enumerator empty for non-mutex paths", _FIL_MutexEmptyForPlain)

@@ -36,10 +36,10 @@ MenuAddItemFromManifest(MenuParent, ManifestEntry, V1CategoryPath) {
 	; live ``{date}`` for DynamicHotstrings entries) so the manifest-driven
 	; render is visually identical to the v1 Features-driven render.
 	MenuTitle := _ApplyMenuLabelDynamicSubstitutions(MenuTitle, V1Path)
-	RegisterMenuItem(MenuParent, MenuTitle, (*) => ToggleMenuVariableByPath(V1Path))
+	RegisterMenuItem(MenuParent, MenuTitle, (*) => ToggleFeatureV2(V2Path))
 
-	State := GetFeatureState(V1Path)
-	IsEnabled := State.Has("Enabled") and State["Enabled"]
+	State := ReadFeatureStateV2(V2Path)
+	IsEnabled := State.Has("enabled") and State["enabled"]
 	if IsEnabled {
 		MenuParent.Check(MenuTitle)
 	} else {
@@ -386,6 +386,60 @@ ToggleMenuVariableByPath(FullPath) {
 	Batch.Push(Map("v1_path", FullPath . ".Enabled", "value", NewValue))
 	WriteFeatureBatch(Batch)
 	Reload
+}
+
+; v2-native toggle dispatcher — the no-translation replacement for
+; ToggleMenuVariableByPath, driven by a canonical v2 manifest path. Mirrors the
+; v1 dispatcher exactly: a live-eligible hotstring section flips its registration
+; in-process (no Reload); a Shortcuts modifier-combo sub-Map key forces its
+; siblings off in the same atomic batch (mutual exclusion); everything else
+; persists the flip and Reloads. Reads + writes go through lib/feature_io.ahk, so
+; no v1 PascalCase path or rename table is consulted.
+ToggleFeatureV2(V2Path) {
+	; Fast path: live hotstring section toggle, no Reload (see _HS_TryLiveToggleV2).
+	if _HS_TryLiveToggleV2(V2Path) {
+		return
+	}
+
+	CurrentState := ReadFeatureStateV2(V2Path)
+	CurrentEnabled := CurrentState.Has("enabled") and CurrentState["enabled"]
+	NewValue := !CurrentEnabled
+
+	; Force every mutex sibling false in the same write so the persisted state
+	; reflects the picked variant alone (empty for independent toggles).
+	Batch := []
+	for _, SiblingPath in _MutexSiblingPathsForV2(V2Path) {
+		Batch.Push(Map("path", SiblingPath, "value", false))
+	}
+	Batch.Push(Map("path", V2Path, "value", NewValue))
+	WriteFeatureBatchV2(Batch)
+	Reload
+}
+
+; v2-native live-toggle classifier + applier — the no-translation counterpart of
+; _HS_TryLiveToggle. Returns true when V2Path is a live-eligible bundled hotstring
+; section (flag persisted, registration rebuilt in-process); false when it is not
+; a hotstring section or is reload-only, so the caller takes the persist-and-Reload
+; path. Bundled hotstring entries are bare "hotstrings.<cat>.<id>" (no ahk. prefix);
+; personal sections never reach here (they keep the v1 MenuAddItemWithLabel path).
+_HS_TryLiveToggleV2(V2Path) {
+	V2Parts := StrSplit(V2Path, ".")
+	if (V2Parts.Length != 3 or V2Parts[1] != "hotstrings") {
+		try LoggerDebug("Menu", "Live-toggle (v2): '{1}' is not a hotstring section → Reload.", V2Path)
+		return false
+	}
+	Group := _HS_DeriveLiveToggleGroup(V2Parts[2], V2Parts[3])
+	if _HS_IsReloadOnlyGroup(Group) {
+		try LoggerDebug("Menu", "Live-toggle (v2): '{1}' is reload-only → Reload.", Group)
+		return false
+	}
+	State := ReadFeatureStateV2(V2Path)
+	NewEnabled := !(State.Has("enabled") and State["enabled"])
+	; WriteFeatureV2 mutates the in-memory Features node AND persists to disk, so
+	; the rebuild below re-reads the new value with no Reload.
+	WriteFeatureV2(V2Path, NewEnabled)
+	RebuildHotstringsLive()
+	return true
 }
 
 ; Attempt to apply a hotstring section toggle LIVE, without a script Reload.
