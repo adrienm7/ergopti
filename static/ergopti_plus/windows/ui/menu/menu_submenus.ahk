@@ -165,28 +165,6 @@ _CountEnabledForCategory(V1Cat) {
 	return Total
 }
 
-; Sum ALL hotstring entries for a flat category regardless of the per-section
-; enabled flag. Used when the Hotstrings master gate is off: ApplyMasterGatesToFeatures
-; zeroes Features in memory so _CountEnabledForCategory would return 0, but the menu
-; should still display the persisted counts so the user knows what will reactivate.
-_CountAllForCategory(V1Cat) {
-	global Features, _V1CatToV2CatMap
-	if !_V1CatToV2CatMap.Has(V1Cat) {
-		return 0
-	}
-	V2Cat := _V1CatToV2CatMap[V1Cat]
-	if !Features["hotstrings"].Has(V2Cat) {
-		return 0
-	}
-	Total := 0
-	for V2SecId, FNode in Features["hotstrings"][V2Cat] {
-		if IsObject(FNode) {
-			Total += CountTomlSection(V1Cat, V2SecId)
-		}
-	}
-	return Total
-}
-
 
 ; Collect every canonical v2 feature path that belongs to the Hotstrings
 ; category: flat TOML categories (autocorrection, distances_reduction, …),

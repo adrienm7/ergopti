@@ -24,22 +24,18 @@ global ScriptInformation, _ExtTotalPersonalCounterGlobal, _HS_GrandTotalCache
 if (_HS_GrandTotalCache != -1)
 	return _HS_GrandTotalCache
 
-IsGated := IsCategoryGated("Hotstrings")
-CountFn := IsGated ? _CountEnabledForCategory : _CountAllForCategory
+; Count only ACTIVE hotstrings: sum each category's enabled-section count,
+; then zero the whole total when the Hotstrings master gate is off — a
+; disabled menu shows 0, never the full "what would reactivate" count.
 Total := 0
 for _, Cat in HotstringCategoriesStd
-	Total += CountFn(Cat)
+	Total += _CountEnabledForCategory(Cat)
 for _, Cat in HotstringCategoriesErgopti
-	Total += CountFn(Cat)
+	Total += _CountEnabledForCategory(Cat)
 if Features.Has("hotstrings") and Features["hotstrings"].Has("dynamic") {
 	for DKey, DCfg in Features["hotstrings"]["dynamic"] {
-		if IsGated {
-			if (IsObject(DCfg) and DCfg.Has("enabled") and DCfg["enabled"])
-				Total += CountDynamicSection(DKey)
-		} else {
-			if IsObject(DCfg)
-				Total += CountDynamicSection(DKey)
-		}
+		if (IsObject(DCfg) and DCfg.Has("enabled") and DCfg["enabled"])
+			Total += CountDynamicSection(DKey)
 	}
 }
 ; ── Personal hotstrings (standard file + extensions)
@@ -60,8 +56,9 @@ if (PersonalTomlPath != "" and FileExist(PersonalTomlPath)) {
 }
 Total += PersonalActiveCount
 Total += IsObject(_ExtTotalPersonalCounterGlobal) ? _ExtTotalPersonalCounterGlobal.value : 0
-_HS_GrandTotalCache := Total
-return Total
+GrandTotal := _HS_GatedCount(IsCategoryGated("Hotstrings"), Total)
+_HS_GrandTotalCache := GrandTotal
+return GrandTotal
 }
 
 ; Invalidates hotstring-related caches.
@@ -340,7 +337,6 @@ _HS_DelimRemoveCustom(Char) {
 _HS_CategoriesStandard(M, _Cat) {
 	global HotstringCategoriesStd, SubMenus
 	IsGated := IsCategoryGated("Hotstrings")
-	CountFn := IsGated ? _CountEnabledForCategory : _CountAllForCategory
 	; Section header is rendered by the manifest (section_header type), so we
 	; only add the actual category submenus here. The standard + dynamic grand
 	; total is computed once by _HS_ComputeGrandTotal for the menu title —
@@ -348,10 +344,10 @@ _HS_CategoriesStandard(M, _Cat) {
 	for _, Category in HotstringCategoriesStd {
 		if !SubMenus.Has(Category)
 			continue
-		; Count: enabled-only when the category is on; full count when its gate
-		; is off (mirrors the top Hotstrings master) so the user still sees what
-		; would reactivate.
-		Total := IsCategoryGated(Category) ? CountFn(Category) : _CountAllForCategory(Category)
+		; Count: enabled sections only, and 0 when the Hotstrings master or this
+		; category's gate is off — the label shows active hotstrings, never the
+		; full "what would reactivate" count.
+		Total := _HS_GatedCount(IsGated and IsCategoryGated(Category), _CountEnabledForCategory(Category))
 		Title := GetCategoryTitle(Category) . " (" . FmtCount(Total) . ")"
 		M.Add(Title, SubMenus[Category])
 		; Checkmark follows the category's own enable toggle, not whether every
@@ -371,16 +367,14 @@ _HS_CategoriesDynamic(M, _Cat) {
 		return
 	IsGated := IsCategoryGated("Hotstrings")
 	DynMenu := SubMenus["DynamicHotstrings"]
-	DynTotal := 0
+	DynEnabled := 0
 	for DKey, DCfg in Features["hotstrings"]["dynamic"] {
-		if IsGated {
-			if (IsObject(DCfg) and DCfg.Has("enabled") and DCfg["enabled"])
-				DynTotal += CountDynamicSection(DKey)
-		} else {
-			if IsObject(DCfg)
-				DynTotal += CountDynamicSection(DKey)
-		}
+		if (IsObject(DCfg) and DCfg.Has("enabled") and DCfg["enabled"])
+			DynEnabled += CountDynamicSection(DKey)
 	}
+	; Active count only: 0 when the Hotstrings master is off (the DynamicHotstrings
+	; sub-tree has no separate gate, so it follows the master directly).
+	DynTotal := _HS_GatedCount(IsGated, DynEnabled)
 	DynTitle := GetCategoryTitle("DynamicHotstrings") . " (" . FmtCount(DynTotal) . ")"
 	M.Add(DynTitle, DynMenu)
 	DynAllEnabled := true
@@ -398,14 +392,13 @@ _HS_CategoriesDynamic(M, _Cat) {
 _HS_CategoriesErgopti(M, _Cat) {
 	global HotstringCategoriesErgopti, SubMenus
 	IsGated := IsCategoryGated("Hotstrings")
-	CountFn := IsGated ? _CountEnabledForCategory : _CountAllForCategory
 	for _, Category in HotstringCategoriesErgopti {
 		if !SubMenus.Has(Category)
 			continue
-		; Count + checkmark: same rule as the standard categories — the count
-		; falls back to the full count when the category gate is off, and the
+		; Count + checkmark: same rule as the standard categories — enabled
+		; sections only, 0 when the master or this category's gate is off; the
 		; checkmark follows the category's own toggle, not its section states.
-		Total := IsCategoryGated(Category) ? CountFn(Category) : _CountAllForCategory(Category)
+		Total := _HS_GatedCount(IsGated and IsCategoryGated(Category), _CountEnabledForCategory(Category))
 		Title := GetCategoryTitle(Category) . " (" . FmtCount(Total) . ")"
 		M.Add(Title, SubMenus[Category])
 		if IsGated and IsCategoryGated(Category)
