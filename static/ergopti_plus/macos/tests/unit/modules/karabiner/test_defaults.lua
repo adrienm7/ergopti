@@ -58,3 +58,36 @@ helpers.describe("karabiner.defaults: combos table", function()
 		helpers.assert_eq(D.combos.rcmd_lcmd[1], "opt_backspace")
 	end)
 end)
+
+-- Regression: the defaults are loaded in full from the shared
+-- _shared/tap_hold/defaults.toml ([hs_*] sections), not a hardcoded Lua table.
+-- A partial parse (e.g. a malformed inline-table line or a dropped section)
+-- would silently shrink these sets — the shape tests above pass vacuously on an
+-- empty table, so pin the exact counts and a few sentinel values here.
+helpers.describe("karabiner.defaults: full set loaded from shared TOML", function()
+	local function count(t)
+		local n = 0
+		for _ in pairs(t) do n = n + 1 end
+		return n
+	end
+
+	helpers.it("loads all 14 tap/hold keys", function()
+		helpers.assert_eq(count(D.tap_hold), 14)
+	end)
+
+	helpers.it("loads the full 14x13 = 182 combo matrix", function()
+		helpers.assert_eq(count(D.combos), 182)
+	end)
+
+	helpers.it("preserves sentinel tap/hold defaults", function()
+		helpers.assert_eq(D.tap_hold.caps_lock[1], "return")
+		helpers.assert_eq(D.tap_hold.caps_lock[2], "cmd")
+		helpers.assert_eq(D.tap_hold.tab[1], "alt_tab_windows")
+		helpers.assert_eq(D.tap_hold.tab[2], "fn")
+		helpers.assert_eq(D.tap_hold.left_command[2], "layer")
+	end)
+
+	helpers.it("preserves the rcmd_lcmd asymmetric hold (option_shift)", function()
+		helpers.assert_eq(D.combos.rcmd_lcmd[3], "option_shift")
+	end)
+end)
