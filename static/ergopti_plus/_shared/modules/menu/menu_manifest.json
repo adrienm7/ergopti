@@ -367,11 +367,11 @@
 			"i18n": "menu.hotstrings.params"
 		},
 		{
-			"type": "---"
-		},
-		{
 			"type": "dynamic",
 			"id": "hotstring_bulk_actions"
+		},
+		{
+			"type": "---"
 		},
 		{
 			"type": "section_header",
