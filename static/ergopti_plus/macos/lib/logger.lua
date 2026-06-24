@@ -520,9 +520,8 @@ local function _flush_dedup_summary()
 	if _dedup.count == 0 then return end
 	local variant = VARIANTS[_dedup.variant_key] or VARIANTS["INFO"]
 	local word    = _dedup.count == 1 and "line" or "lines"
-	local indent  = (variant.level == 1) and string.rep(" ", 10) or ""
-	local summary = string.format("[%s] [logger] %s\u{2191} %d identical %s suppressed",
-		variant.label, indent, _dedup.count, word)
+	local summary = string.format("[%s] [logger] \u{2191} %d identical %s suppressed",
+		variant.label, _dedup.count, word)
 	_console_out(summary)
 	local stamp = _timestamp()
 	-- Push to ring buffer before writing so the snapshot reflects dedup summaries
@@ -562,9 +561,10 @@ local function _log(variant_key, module_name, msg, ...)
 		text = ok_f and formatted or (text .. " [format error]")
 	end
 
-	-- DEBUG-axis variants are indented so they visually nest under INFO-axis events
-	local indent = (variant.level == 1) and string.rep(" ", 10) or ""
-	local line   = string.format("%s[%s] [%s] %s", indent, variant.label, tostring(module_name), text)
+	-- Canonical line format (no indent) shared with the AHK driver, the shared
+	-- logger core, and the Linux daemon: "[LEVEL] [module] body". The timestamp
+	-- prefix is added by the console/file sinks below.
+	local line = string.format("[%s] [%s] %s", variant.label, tostring(module_name), text)
 
 	-- Deduplication: suppress repeated identical lines
 	if line == _dedup.line then
