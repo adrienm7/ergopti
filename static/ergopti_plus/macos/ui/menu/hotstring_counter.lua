@@ -133,17 +133,22 @@ function M.count_all(ctx, ergopti_groups)
 	and ctx.keymap and type(ctx.keymap.get_sections) == "function" then
 		local is_sec_enabled = type(ctx.keymap.is_section_enabled) == "function"
 			and ctx.keymap.is_section_enabled or nil
+		local is_grp_enabled = type(ctx.keymap.is_group_enabled) == "function"
+			and ctx.keymap.is_group_enabled or nil
 		for _, f in ipairs(ctx.hotfiles) do
 			local name = ctx.get_group_name and ctx.get_group_name(f) or f
 			if name ~= "custom" and name ~= "personal" and name:sub(1, 13) ~= "personal_ext_" then
 				local secs = ctx.keymap.get_sections(name)
+				-- A gated-off group contributes 0 (the menu shows active hotstrings,
+				-- not "what would reactivate") — mirrors the per-section rule below.
+				local group_on = not is_grp_enabled or is_grp_enabled(name)
 				local g_total = 0
 				if type(secs) == "table" then
 					for _, sec in ipairs(secs) do
 						if type(sec) == "table" and sec.name ~= "-" and not sec.is_module_placeholder
 						and sec.count ~= nil then
 							-- Only count sections that are currently enabled
-							local active = not is_sec_enabled or is_sec_enabled(name, sec.name)
+							local active = group_on and (not is_sec_enabled or is_sec_enabled(name, sec.name))
 							if active then
 								local cnt = tonumber(sec.count)
 								g_total = g_total + cnt
@@ -170,6 +175,8 @@ function M.count_all(ctx, ergopti_groups)
 	if ctx and ctx.keymap and type(ctx.keymap.get_sections) == "function" then
 		local is_sec_enabled = type(ctx.keymap.is_section_enabled) == "function"
 			and ctx.keymap.is_section_enabled or nil
+		local is_grp_enabled = type(ctx.keymap.is_group_enabled) == "function"
+			and ctx.keymap.is_group_enabled or nil
 		local personal_group_names = {"personal", "custom"}
 		if ctx.hotfiles then
 			for _, f in ipairs(ctx.hotfiles) do
@@ -181,13 +188,15 @@ function M.count_all(ctx, ergopti_groups)
 		end
 		for _, gname in ipairs(personal_group_names) do
 			local secs = ctx.keymap.get_sections(gname)
+			-- A gated-off personal group contributes 0, like the common groups above.
+			local group_on = not is_grp_enabled or is_grp_enabled(gname)
 			local g_total = 0
 			if type(secs) == "table" then
 				for _, sec in ipairs(secs) do
 					if type(sec) == "table" and sec.name ~= "-" and not sec.is_module_placeholder
 					and sec.count ~= nil then
 						-- Only count sections that are currently enabled
-						local active = not is_sec_enabled or is_sec_enabled(gname, sec.name)
+						local active = group_on and (not is_sec_enabled or is_sec_enabled(gname, sec.name))
 						if active then
 							personal_has_count = true
 							local cnt = tonumber(sec.count)
