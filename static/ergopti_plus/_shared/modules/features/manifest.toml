@@ -2647,3 +2647,651 @@ description_key = "menu.hs.hotstrings.preview_star_enabled"
 # generic feature shape. The first-boot generator must call both sources:
 #   1. This manifest → renders config.toml
 #   2. tap_hold/defaults.toml → renders tap_hold.toml
+
+
+
+
+
+# =================================================
+# =================================================
+# ======= 5. Tray menu structure (codegen) =======
+# =================================================
+# =================================================
+
+# Source of truth for the cross-driver tray-menu tree. Hand-edited here; the
+# codegen tools/build/build-menu-manifest.js emits _shared/modules/menu/
+# menu_manifest.json from these [menu.*] tables, and a drift gate keeps the two
+# in sync. Both drivers read the generated JSON at runtime (unchanged). Item
+# types: toggle / feature / action / dynamic / group / section_header /
+# letter_picker / "---" separator. platforms = ["ahk"|"hs"] gates per driver.
+
+[menu]
+dynamic_hotstrings_order = ["DateLongFr", "DateFr", "Date", "PhonePrefixes", "SsnPrefixes", "IbanPrefixes", "---", "TextExpansionPersonalInformation"]
+
+[menu.gesture_slots]
+2 = ["tap_2", "swipe_2_left", "swipe_2_right", "swipe_2_up", "swipe_2_down", "swipe_2_left_up", "swipe_2_right_up", "swipe_2_left_down", "swipe_2_right_down"]
+3 = ["tap_3", "swipe_3_left", "swipe_3_right", "swipe_3_up", "swipe_3_down", "swipe_3_left_up", "swipe_3_right_up", "swipe_3_left_down", "swipe_3_right_down"]
+4 = ["tap_4", "swipe_4_left", "swipe_4_right", "swipe_4_up", "swipe_4_down", "swipe_4_left_up", "swipe_4_right_up", "swipe_4_left_down", "swipe_4_right_down"]
+5 = ["tap_5", "swipe_5_left", "swipe_5_right", "swipe_5_up", "swipe_5_down", "swipe_5_left_up", "swipe_5_right_up", "swipe_5_left_down", "swipe_5_right_down"]
+
+[menu.hotstring_groups]
+standard = ["distances_reduction", "autocorrection", "magic_key"]
+ergopti = ["sfbs_reduction", "rolls"]
+dynamic = ["dynamic_hotstrings"]
+
+[menu.hotstring_category_keys]
+distances_reduction = "DistancesReduction"
+autocorrection = "Autocorrection"
+magic_key = "MagicKey"
+sfbs_reduction = "SFBsReduction"
+rolls = "Rolls"
+dynamic_hotstrings = "DynamicHotstrings"
+
+[[menu.top_level]]
+id = "keyboard_layout"
+
+[[menu.top_level]]
+id = "hotstrings"
+
+[[menu.top_level]]
+id = "llm"
+
+[[menu.top_level]]
+id = "metrics"
+
+[[menu.top_level]]
+id = "shortcuts"
+
+[[menu.top_level]]
+id = "tap_holds"
+platforms = ["ahk"]
+
+[[menu.top_level]]
+id = "karabiner"
+platforms = ["hs"]
+
+[[menu.top_level]]
+id = "gestures"
+
+[[menu.top_level]]
+id = "apps"
+platforms = ["hs"]
+
+[[menu.top_level]]
+id = "---"
+
+[[menu.top_level]]
+id = "global_actions"
+
+[[menu.top_level]]
+id = "config_folder"
+
+[[menu.top_level]]
+id = "setup_wizard"
+
+[[menu.top_level]]
+id = "---"
+
+[[menu.top_level]]
+id = "edit_shortcuts"
+
+[[menu.top_level]]
+id = "suspend"
+platforms = ["ahk"]
+
+[[menu.top_level]]
+id = "reload"
+
+[[menu.top_level]]
+id = "quit"
+
+[[menu.top_level]]
+id = "debug"
+
+[[menu.global_actions]]
+id = "enable_all"
+
+[[menu.global_actions]]
+id = "disable_all"
+
+[[menu.global_actions]]
+id = "reset_defaults"
+
+[[menu.global_actions]]
+id = "---"
+
+[[menu.global_actions]]
+id = "language"
+
+[[menu.debug_menu]]
+id = "window_spy"
+platforms = ["ahk"]
+
+[[menu.debug_menu]]
+id = "list_vars"
+platforms = ["ahk"]
+
+[[menu.debug_menu]]
+id = "key_history"
+platforms = ["ahk"]
+
+[[menu.debug_menu]]
+id = "console"
+platforms = ["hs"]
+
+[[menu.debug_menu]]
+id = "---"
+
+[[menu.debug_menu]]
+id = "log_level"
+
+[[menu.debug_menu]]
+id = "open_logs"
+
+[[menu.debug_menu]]
+id = "open_today_log"
+
+[[menu.debug_menu]]
+id = "open_error_log"
+
+[[menu.debug_menu]]
+id = "---"
+
+[[menu.debug_menu]]
+id = "healthcheck"
+
+[[menu.shortcuts_menu]]
+type = "toggle"
+i18n_on = "menu.shortcuts.on"
+i18n_off = "menu.shortcuts.off"
+category = "Shortcuts"
+
+[[menu.shortcuts_menu]]
+type = "feature"
+path = "ahk.shortcuts.screen_instant"
+platforms = ["ahk"]
+
+[[menu.shortcuts_menu]]
+type = "feature"
+path = "shortcuts.wrap_text_if_selected"
+
+[[menu.shortcuts_menu]]
+type = "dynamic"
+id = "wrap_symbols_menu"
+platforms = ["ahk"]
+
+[[menu.shortcuts_menu]]
+type = "group"
+id = "modifier_combos"
+i18n = "menu.shortcuts.group_modifiers"
+platforms = ["ahk"]
+
+[[menu.shortcuts_menu]]
+type = "group"
+id = "ctrl_shortcuts"
+i18n = "menu.shortcuts.submenu_ctrl"
+platforms = ["hs"]
+
+[[menu.shortcuts_menu]]
+type = "group"
+id = "cmd_shortcuts"
+i18n = "menu.shortcuts.submenu_cmd"
+platforms = ["hs"]
+
+[[menu.shortcuts_menu]]
+type = "dynamic"
+id = "script_control_shortcuts"
+
+[[menu.shortcuts_menu]]
+type = "dynamic"
+id = "personal_shortcuts"
+
+[[menu.shortcuts_menu]]
+type = "action"
+id = "edit_shortcuts"
+i18n = "menu.global.edit_shortcuts"
+
+[[menu.shortcuts_menu]]
+type = "dynamic"
+id = "extensions_shortcuts"
+
+[[menu.modifier_combos_group]]
+type = "feature"
+path = "ahk.shortcuts.alt_gr_lalt"
+platforms = ["ahk"]
+
+[[menu.modifier_combos_group]]
+type = "feature"
+path = "ahk.shortcuts.alt_gr_caps_lock"
+platforms = ["ahk"]
+
+[[menu.modifier_combos_group]]
+type = "feature"
+path = "ahk.shortcuts.lalt_caps_lock"
+platforms = ["ahk"]
+
+[[menu.metrics_menu]]
+type = "toggle"
+i18n_on = "menu.metrics.on"
+i18n_off = "menu.metrics.off"
+category = "Metrics"
+
+[[menu.metrics_menu]]
+type = "action"
+id = "show_typing"
+i18n = "menu.metrics.show_typing"
+
+[[menu.metrics_menu]]
+type = "action"
+id = "shortcut_typing"
+i18n_dynamic = "menu.metrics.shortcut_prefix"
+
+[[menu.metrics_menu]]
+type = "---"
+
+[[menu.metrics_menu]]
+type = "action"
+id = "show_apps"
+i18n = "menu.metrics.show_apps"
+
+[[menu.metrics_menu]]
+type = "action"
+id = "shortcut_apps"
+i18n_dynamic = "menu.metrics.shortcut_prefix"
+
+[[menu.metrics_menu]]
+type = "---"
+
+[[menu.metrics_menu]]
+type = "feature"
+id = "wpm_menubar"
+i18n = "menu.metrics.show_wpm_menubar"
+platforms = ["hs"]
+
+[[menu.metrics_menu]]
+type = "feature"
+id = "menubar_colors"
+i18n = "menu.metrics.colors_by_source"
+platforms = ["hs"]
+depends_on = "wpm_menubar"
+
+[[menu.metrics_menu]]
+type = "dynamic"
+id = "wpm_widget"
+
+[[menu.metrics_menu]]
+type = "dynamic"
+id = "widget_colors"
+
+[[menu.metrics_menu]]
+type = "dynamic"
+id = "include_realtime"
+
+[[menu.metrics_menu]]
+type = "dynamic"
+id = "reset_wpm_position"
+
+[[menu.metrics_menu]]
+type = "---"
+
+[[menu.metrics_menu]]
+type = "section_header"
+i18n = "menu.metrics.privacy_header"
+
+[[menu.metrics_menu]]
+type = "dynamic"
+id = "filter_private"
+
+[[menu.metrics_menu]]
+type = "dynamic"
+id = "filter_secure"
+
+[[menu.metrics_menu]]
+type = "dynamic"
+id = "filter_sysauth"
+
+[[menu.metrics_menu]]
+type = "dynamic"
+id = "exclude_apps"
+
+[[menu.metrics_menu]]
+type = "---"
+
+[[menu.metrics_menu]]
+type = "dynamic"
+id = "encryption"
+platforms = ["hs"]
+
+[[menu.layout_menu]]
+type = "toggle"
+i18n_on = "menu.layout.on"
+i18n_off = "menu.layout.off"
+category = "Layout"
+
+[[menu.layout_menu]]
+type = "dynamic"
+id = "layout_features_base"
+
+[[menu.layout_menu]]
+type = "group"
+id = "accented_letters"
+i18n = "menu.shortcuts.group_accented"
+platforms = ["ahk"]
+
+[[menu.layout_menu]]
+type = "---"
+
+[[menu.layout_menu]]
+type = "dynamic"
+id = "layout_features_altgr"
+
+[[menu.layout_menu]]
+type = "dynamic"
+id = "active_layouts"
+platforms = ["hs"]
+
+[[menu.layout_menu]]
+type = "---"
+
+[[menu.layout_menu]]
+type = "feature"
+path = "hotstrings.magic_key.replace"
+i18n = "menu.layout.replace"
+
+[[menu.layout_menu]]
+type = "feature"
+path = "ahk.layout.ctrl_magic_save"
+platforms = ["ahk"]
+
+[[menu.accented_letters_group]]
+type = "letter_picker"
+id = "e_grave"
+platforms = ["ahk"]
+
+[[menu.accented_letters_group]]
+type = "letter_picker"
+id = "e_circ"
+platforms = ["ahk"]
+
+[[menu.accented_letters_group]]
+type = "letter_picker"
+id = "e_acute"
+platforms = ["ahk"]
+
+[[menu.accented_letters_group]]
+type = "letter_picker"
+id = "a_grave"
+platforms = ["ahk"]
+
+[[menu.hotstrings_menu]]
+type = "toggle"
+i18n_on = "menu.hotstrings.on"
+i18n_off = "menu.hotstrings.off"
+category = "Hotstrings"
+
+[[menu.hotstrings_menu]]
+type = "group"
+id = "hotstrings_params"
+i18n = "menu.hotstrings.params"
+
+[[menu.hotstrings_menu]]
+type = "dynamic"
+id = "hotstring_bulk_actions"
+
+[[menu.hotstrings_menu]]
+type = "---"
+
+[[menu.hotstrings_menu]]
+type = "section_header"
+i18n = "menu.hotstrings.header_common"
+
+[[menu.hotstrings_menu]]
+type = "dynamic"
+id = "hotstring_categories_standard"
+
+[[menu.hotstrings_menu]]
+type = "dynamic"
+id = "hotstring_categories_dynamic"
+
+[[menu.hotstrings_menu]]
+type = "---"
+
+[[menu.hotstrings_menu]]
+type = "section_header"
+i18n = "menu.hotstrings.header_ergopti"
+
+[[menu.hotstrings_menu]]
+type = "dynamic"
+id = "hotstring_categories_ergopti"
+
+[[menu.hotstrings_menu]]
+type = "---"
+
+[[menu.hotstrings_menu]]
+type = "section_header"
+i18n = "menu.hotstrings.personal_header"
+
+[[menu.hotstrings_menu]]
+type = "dynamic"
+id = "hotstring_personal"
+
+[[menu.hotstrings_menu]]
+type = "---"
+
+[[menu.hotstrings_menu]]
+type = "section_header"
+i18n = "menu.extensions.header"
+
+[[menu.hotstrings_menu]]
+type = "dynamic"
+id = "hotstring_extensions"
+
+[[menu.hotstrings_params_group]]
+type = "dynamic"
+id = "word_expanders"
+
+[[menu.hotstrings_params_group]]
+type = "action"
+id = "delays_colors"
+i18n = "menu.hotstrings.delays_colors"
+
+[[menu.hotstrings_params_group]]
+type = "---"
+
+[[menu.hotstrings_params_group]]
+type = "dynamic"
+id = "magic_key_config"
+
+[[menu.hotstrings_params_group]]
+type = "dynamic"
+id = "repeat_key"
+platforms = ["ahk"]
+
+[[menu.gestures_menu]]
+type = "toggle"
+i18n_on = "menu.gestures.on"
+i18n_off = "menu.gestures.off"
+category = "Gestures"
+platforms = ["hs"]
+
+[[menu.gestures_menu]]
+type = "action"
+id = "auto_configure"
+i18n = "menu.gestures.auto_configure"
+platforms = ["ahk"]
+
+[[menu.gestures_menu]]
+type = "action"
+id = "manual_tutorial"
+i18n = "menu.gestures.manual_tutorial"
+platforms = ["ahk"]
+
+[[menu.gestures_menu]]
+type = "action"
+id = "disable_all"
+i18n = "menu.gestures.disable_all"
+platforms = ["hs"]
+
+[[menu.gestures_menu]]
+type = "action"
+id = "restore_defaults"
+i18n = "menu.gestures.restore_defaults"
+platforms = ["hs"]
+
+[[menu.gestures_menu]]
+type = "---"
+
+[[menu.gestures_menu]]
+type = "feature"
+id = "circular_spaces"
+i18n = "menu.gestures.circular_spaces"
+platforms = ["hs"]
+
+[[menu.gestures_menu]]
+type = "---"
+platforms = ["hs"]
+
+[[menu.gestures_menu]]
+type = "dynamic"
+id = "gesture_slots_2"
+platforms = ["hs"]
+
+[[menu.gestures_menu]]
+type = "---"
+platforms = ["hs"]
+
+[[menu.gestures_menu]]
+type = "dynamic"
+id = "gesture_slots_3"
+platforms = ["hs"]
+
+[[menu.gestures_menu]]
+type = "---"
+platforms = ["hs"]
+
+[[menu.gestures_menu]]
+type = "dynamic"
+id = "gesture_slots_4"
+platforms = ["hs"]
+
+[[menu.gestures_menu]]
+type = "---"
+platforms = ["hs"]
+
+[[menu.gestures_menu]]
+type = "dynamic"
+id = "gesture_slots_5"
+platforms = ["hs"]
+
+[[menu.gestures_menu]]
+type = "dynamic"
+id = "gesture_slots_ahk"
+platforms = ["ahk"]
+
+[[menu.tap_holds_menu]]
+type = "toggle"
+i18n_on = "menu.tapholds.on"
+i18n_off = "menu.tapholds.off"
+category = "TapHolds"
+platforms = ["ahk"]
+
+[[menu.tap_holds_menu]]
+type = "action"
+id = "reset_defaults"
+i18n = "tap_hold.reset_defaults"
+platforms = ["ahk"]
+
+[[menu.tap_holds_menu]]
+type = "action"
+id = "disable_all"
+i18n = "tap_hold.disable_all"
+platforms = ["ahk"]
+
+[[menu.tap_holds_menu]]
+type = "---"
+platforms = ["ahk"]
+
+[[menu.tap_holds_menu]]
+type = "dynamic"
+id = "tap_hold_keys"
+platforms = ["ahk"]
+
+[[menu.word_delimiter_defs]]
+char = " "
+i18n = "hs_config.delim_space"
+
+[[menu.word_delimiter_defs]]
+char = "\t"
+i18n = "hs_config.delim_tab"
+
+[[menu.word_delimiter_defs]]
+char = "."
+label = "."
+
+[[menu.word_delimiter_defs]]
+char = ","
+label = ","
+
+[[menu.word_delimiter_defs]]
+char = ";"
+label = ";"
+
+[[menu.word_delimiter_defs]]
+char = ":"
+label = ":"
+
+[[menu.word_delimiter_defs]]
+char = "?"
+label = "?"
+
+[[menu.word_delimiter_defs]]
+char = "!"
+label = "!"
+
+[[menu.word_delimiter_defs]]
+char = "'"
+label = "' (ASCII)"
+
+[[menu.word_delimiter_defs]]
+char = "’"
+label = "’ (typogr.)"
+
+[[menu.word_delimiter_defs]]
+char = "-"
+label = "-"
+
+[[menu.word_delimiter_defs]]
+char = "="
+label = "="
+
+[[menu.word_delimiter_defs]]
+char = "("
+label = "("
+
+[[menu.word_delimiter_defs]]
+char = ")"
+label = ")"
+
+[[menu.word_delimiter_defs]]
+char = "["
+label = "["
+
+[[menu.word_delimiter_defs]]
+char = "]"
+label = "]"
+
+[[menu.word_delimiter_defs]]
+char = "/"
+label = "/"
+
+[[menu.word_delimiter_defs]]
+char = "\\"
+label = "\\"
+
+[[menu.word_delimiter_defs]]
+char = "+"
+label = "+"
+
+[[menu.word_delimiter_defs]]
+char = "*"
+label = "*"
