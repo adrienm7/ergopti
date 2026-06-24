@@ -396,7 +396,7 @@ if !ManifestEnsureLoaded() {
 global Features := ManifestBuildFeaturesMap()
 ApplyConfigToml(Features, _ConfigDir . _AhkSubDir . "config.toml")
 global TapHold := LoadTapHoldToml(_ConfigDir . _AhkSubDir . "tap_hold.toml",
-	_DriverDir . "\data\tap_hold\defaults.toml")
+	_SharedDir . "\tap_hold\defaults.toml")
 
 ; When Ergopti keyboard emulation is off, MagicKeySourceScan must point to
 ; the physical key that produces MagicKeySourceChar ("j" by default) on the

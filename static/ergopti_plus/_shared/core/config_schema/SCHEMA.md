@@ -165,7 +165,7 @@ It calls [`tools/build/build-features-manifest.js`](../../../../tools/build/buil
    - `hammerspoon/_generated/config_template.toml` — same purpose, HS-filtered.
 
    The tap-hold template is **not** generated: `first_boot.ahk` reads
-   `static/ergopti_plus/windows/data/tap_hold/defaults.toml` directly, eliminating the
+   `static/ergopti_plus/_shared/tap_hold/defaults.toml` directly, eliminating the
    redundant generated copy.
 
 `_generated/` is gitignored on both driver sides; consumers must run `npm run build:manifest` after editing the manifest. CI runs it as a prebuild step.
@@ -182,17 +182,17 @@ If `config/ergopti_plus/<driver>/config.toml` does not exist at first boot:
    - Explicit defaults for every feature.
 4. It writes the file and continues its normal boot.
 
-The same mechanism applies to `tap_hold.toml`: at first boot the driver renders `windows/data/tap_hold/defaults.toml` into `config/ergopti_plus/<driver>/tap_hold.toml`. After that, the per-driver file IS the config — there is no runtime merge with the shared defaults, and the two drivers may diverge freely.
+The same mechanism applies to `tap_hold.toml`: at first boot the driver renders `_shared/tap_hold/defaults.toml` into `config/ergopti_plus/<driver>/tap_hold.toml`. After that, the per-driver file IS the config — there is no runtime merge with the shared defaults, and the two drivers may diverge freely.
 
 ## Tap-hold
 
-`windows/data/tap_hold/defaults.toml` is a **generation template only** — it is read once at first boot to produce each driver's `tap_hold.toml`. After that, the per-driver file is the complete config; the shared file is never read again at runtime.
+`_shared/tap_hold/defaults.toml` is a **generation template only** — it is read once at first boot to produce each driver's `tap_hold.toml`. After that, the per-driver file is the complete config; the shared file is never read again at runtime.
 
 This means:
 
 - There is no per-key fallback to the shared defaults — if a key is missing from the per-driver file, that key simply has no tap-hold behaviour.
 - The two drivers' `tap_hold.toml` files can diverge entirely.
-- Editing `windows/data/tap_hold/defaults.toml` only affects **new installs** (or users who delete their per-driver file and let it regenerate).
+- Editing `_shared/tap_hold/defaults.toml` only affects **new installs** (or users who delete their per-driver file and let it regenerate).
 
 ### Semantics of a tap-hold key
 
@@ -234,4 +234,4 @@ Since we're going clean-state with no backward compatibility, this mapping is **
 - [JSON Schema draft 2020-12](https://json-schema.org/draft/2020-12)
 - [TOML 1.0 spec](https://toml.io/en/v1.0.0)
 - [examples/](./examples/) — Concrete AHK and HS examples
-- [windows/data/tap_hold/defaults.toml](../../windows/data/tap_hold/defaults.toml) — AHK driver tap-hold seed template
+- [_shared/tap_hold/defaults.toml](../../tap_hold/defaults.toml) — AHK driver tap-hold seed template

@@ -20,9 +20,9 @@
 ;    (``<_ConfigDir>/autohotkey/config.toml`` and ``<_ConfigDir>/autohotkey/tap_hold.toml``).
 ;    The universal files at the root of ``<_ConfigDir>`` (personal_info,
 ;    hotstrings_config) are handled separately.
-; 4. Driver-local tap-hold source: ``tap_hold.toml`` is seeded from
-;    ``windows/data/tap_hold/defaults.toml`` directly — no generated copy
-;    in ``_generated/`` is needed.
+; 4. Shared tap-hold source: ``tap_hold.toml`` is seeded from the cross-driver
+;    ``_shared/tap_hold/defaults.toml`` directly — no generated copy in
+;    ``_generated/`` is needed.
 ; ==============================================================================
 
 
@@ -38,13 +38,14 @@
 ; Ensure both driver-local user config files exist. Safe to call on every boot;
 ; behaves as a no-op when the files are already present.
 EnsureUserConfigsExist() {
-	global _DriverDir, _ConfigDir
+	global _DriverDir, _ConfigDir, _SharedDir
 	UserAhkDir      := _ConfigDir . "autohotkey"
 	UserConfigPath  := UserAhkDir . "\config.toml"
 	UserTapHoldPath := UserAhkDir . "\tap_hold.toml"
 	TplConfigPath   := _DriverDir . "\_generated\config_template.toml"
-	; Point directly at the driver-local tap-hold defaults — no copy/generation needed
-	TplTapHoldPath  := _DriverDir . "\data\tap_hold\defaults.toml"
+	; Point at the cross-driver tap-hold defaults in _shared — both drivers seed
+	; their per-driver tap_hold config from this single canonical template.
+	TplTapHoldPath  := _SharedDir . "\tap_hold\defaults.toml"
 
 	; Ensure the destination folder exists. DirCreate is recursive by default
 	; in AHK v2 and a no-op when the directory already exists.
