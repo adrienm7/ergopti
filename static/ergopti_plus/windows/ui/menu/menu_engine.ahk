@@ -169,16 +169,24 @@ _MasterCategoryFor(FeatureCategoryPath) {
 ; "<description><LETTER>" string built by GetMenuTitleByPath.
 MenuAddLetterPicker(MenuParent, FeatureCategoryPath, FeatureName) {
 	FullPath := FeatureCategoryPath "." FeatureName
+	; The canonical v2 path drives the state read + the letter writes; the v1
+	; FullPath still feeds GetMenuTitleByPath (shared with MenuAddItem) for the
+	; label and _MasterCategoryFor for greying until those flip in later increments.
+	V2Path := LegacyPathToManifestPath(FullPath)
+	if (V2Path == "") {
+		try LoggerWarn("Menu", "MenuAddLetterPicker: no v2 path for '{1}' — skipping.", FullPath)
+		return
+	}
 	MenuTitle := GetMenuTitleByPath(FullPath)
-	State := GetFeatureState(FullPath)
-	IsEnabled := _ResolveMenuItemEnabled(FullPath)
-	CurrentLetter := State.Has("Letter") ? StrLower(State["Letter"]) : ""
+	State := ReadFeatureStateV2(V2Path)
+	IsEnabled := State.Has("enabled") and State["enabled"]
+	CurrentLetter := State.Has("letter") ? StrLower(State["letter"]) : ""
 
 	LetterMenu := Menu()
 
-	; Entry that disables the remap without touching Letter
+	; Entry that disables the remap without touching letter
 	DisabledLabel := t("common.disabled")
-	RegisterMenuItem(LetterMenu, DisabledLabel, ((p) => (*) => SetFeatureLetterOff(p))(FullPath))
+	RegisterMenuItem(LetterMenu, DisabledLabel, ((p) => (*) => SetFeatureLetterOff(p))(V2Path))
 	if !IsEnabled {
 		LetterMenu.Check(DisabledLabel)
 	}
@@ -192,7 +200,7 @@ MenuAddLetterPicker(MenuParent, FeatureCategoryPath, FeatureName) {
 		L := Chr(Ord("a") + A_Index - 1)
 		UpperL := StrUpper(L)
 		RegisterMenuItem(LetterMenu, UpperL,
-			((p, l) => (*) => SetFeatureLetter(p, l))(FullPath, L))
+			((p, l) => (*) => SetFeatureLetter(p, l))(V2Path, L))
 		if IsEnabled and CurrentLetter == L {
 			LetterMenu.Check(UpperL)
 		}
@@ -210,23 +218,25 @@ MenuAddLetterPicker(MenuParent, FeatureCategoryPath, FeatureName) {
 	}
 }
 
-; Sets the remap target letter on a feature and enables it. Persists both
-; flags via the v1->v2 path translator so the change survives reload, then
-; reloads to wire the new shortcut at the layer level. The Reload runs
-; the boot pipeline which re-derives the v1 Features Map from Features
-; via lib/master_gates.ahk — no need to mutate v1 in-place.
-SetFeatureLetter(FullPath, Letter) {
-	WriteFeatureBatch([
-		Map("v1_path", FullPath . ".Enabled", "value", true),
-		Map("v1_path", FullPath . ".Letter",  "value", Letter),
+; Sets the remap target letter on a feature and enables it. Persists both the
+; enabled flag and the letter to config.toml via lib/feature_io.ahk so the
+; change survives reload, then reloads to wire the new shortcut at the layer
+; level. The Reload runs the boot pipeline which re-derives the v1 Features Map
+; from Features via lib/master_gates.ahk — no need to mutate v1 in-place.
+; @param V2Path  Canonical v2 alpha path (e.g. "shortcuts.e_grave").
+SetFeatureLetter(V2Path, Letter) {
+	WriteFeatureBatchV2([
+		Map("path", V2Path, "value", true),
+		Map("path", V2Path, "value", Letter, "prop", "letter"),
 	])
 	Reload
 }
 
-; Disables a letter-picker feature without touching its Letter, so the
+; Disables a letter-picker feature without touching its letter, so the
 ; previously-selected mapping is restored on the next picker selection.
-SetFeatureLetterOff(FullPath) {
-	WriteFeatureUpdate(FullPath . ".Enabled", false)
+; @param V2Path  Canonical v2 alpha path (e.g. "shortcuts.e_grave").
+SetFeatureLetterOff(V2Path) {
+	WriteFeatureV2(V2Path, false)
 	Reload
 }
 
