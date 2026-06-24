@@ -596,6 +596,10 @@ _HS_Personal(M, _Cat) {
 			PersonalMenu.Check(CloseOnAddLabel)
 		if (TomlData["sections_order"].Length > 0) {
 			PersonalMenu.Add()
+			; Section-level bulk actions for the personal hotstrings.
+			RegisterMenuItem(PersonalMenu, t("menu.hotstrings.enable_all"),  (*) => HS_TogglePersonalAllSections(true))
+			RegisterMenuItem(PersonalMenu, t("menu.hotstrings.disable_all"), (*) => HS_TogglePersonalAllSections(false))
+			PersonalMenu.Add()
 			for _, SecName in TomlData["sections_order"] {
 				if (SecName == "-") {
 					PersonalMenu.Add()

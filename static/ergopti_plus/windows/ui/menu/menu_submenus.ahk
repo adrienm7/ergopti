@@ -95,6 +95,11 @@ InitSubMenus() {
 			: t("menu.hotstrings.category_off")
 		RegisterMenuItemInsert(SubMenu, "1&", _CatToggleLabel,
 			((c) => (*) => ToggleCategoryAllFeatures(c, !IsCategoryGated(c)))(V1Cat))
+		; Section-level bulk actions for this category, just under its gate toggle.
+		RegisterMenuItemInsert(SubMenu, "2&", t("menu.hotstrings.enable_all"),
+			((c) => (*) => ToggleCategoryAllSections(c, true))(V1Cat))
+		RegisterMenuItemInsert(SubMenu, "3&", t("menu.hotstrings.disable_all"),
+			((c) => (*) => ToggleCategoryAllSections(c, false))(V1Cat))
 		SubMenus[V1Cat] := SubMenu
 	}
 	BootProfile_Mark("MENU/InitSub: flat hotstring submenus")
@@ -118,6 +123,10 @@ InitSubMenus() {
 _BuildDynamicHotstringsSubmenu() {
 	global _LegacyDynamicHotstringsKeyMap, _DYNAMIC_HOTSTRINGS_ORDER
 	SubMenu := Menu()
+	; Section-level bulk actions for the dynamic-hotstrings category.
+	RegisterMenuItem(SubMenu, t("menu.hotstrings.enable_all"),  (*) => ToggleCategoryAllSections("DynamicHotstrings", true))
+	RegisterMenuItem(SubMenu, t("menu.hotstrings.disable_all"), (*) => ToggleCategoryAllSections("DynamicHotstrings", false))
+	SubMenu.Add()
 	for _, V1Id in _DYNAMIC_HOTSTRINGS_ORDER {
 		if (V1Id == "-") {
 			SubMenu.Add()
