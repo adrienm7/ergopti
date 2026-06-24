@@ -433,6 +433,26 @@ local function buildBubbleItem(ctx, label, enabled_key, set_enabled_fn, notify_l
 	}
 end
 
+--- Builds the whole-tree bulk-action items (force every hotstring section on /
+--- off). Rendered in the main Hotstrings menu as siblings of the Paramètres
+--- sub-menu (after its separator), not inside it.
+--- @param ctx table Context.
+--- @return table List of menu items.
+function M.build_bulk_actions(ctx)
+	return {
+		{
+			title    = i18n.get("menu.hotstrings.enable_all"),
+			disabled = ctx.paused or nil,
+			fn       = not ctx.paused and setAllSectionsFn(ctx, true) or nil,
+		},
+		{
+			title    = i18n.get("menu.hotstrings.disable_all"),
+			disabled = ctx.paused or nil,
+			fn       = not ctx.paused and setAllSectionsFn(ctx, false) or nil,
+		},
+	}
+end
+
 --- Builds the management sub-menu.
 --- @param ctx table Context.
 --- @return table
@@ -803,18 +823,6 @@ function M.build_management(ctx)
 	if exp_item then table.insert(menu, exp_item) end
 	if delays_item then table.insert(menu, delays_item) end
 	table.insert(menu, { title = "-" })
-	-- Whole-tree bulk actions, right after the separator (mirrors the AHK
-	-- placement inside the Paramètres group): force every section on / off.
-	table.insert(menu, {
-		title    = i18n.get("menu.hotstrings.enable_all"),
-		disabled = ctx.paused or nil,
-		fn       = not ctx.paused and setAllSectionsFn(ctx, true) or nil,
-	})
-	table.insert(menu, {
-		title    = i18n.get("menu.hotstrings.disable_all"),
-		disabled = ctx.paused or nil,
-		fn       = not ctx.paused and setAllSectionsFn(ctx, false) or nil,
-	})
 	if bubble_item then table.insert(menu, bubble_item) end
 	table.insert(menu, { title = "-" })
 	local hs_state  = ctx and ctx.state
