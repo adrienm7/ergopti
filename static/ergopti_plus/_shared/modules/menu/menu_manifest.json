@@ -430,6 +430,10 @@
 		},
 		{
 			"type": "dynamic",
+			"id": "hotstring_bulk_actions"
+		},
+		{
+			"type": "dynamic",
 			"id": "magic_key_config"
 		},
 		{

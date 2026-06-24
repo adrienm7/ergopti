@@ -73,6 +73,13 @@ _HS_MagicKeyConfig(M, _Cat) {
 	RegisterMenuItem(M, t("menu.hotstrings.magic_key_prefix") . ScriptInformation["MagicKey"], MagicKeyEditor)
 }
 
+; Dynamic handler: whole-tree bulk actions (force every hotstring section on/off).
+; Rendered inside the "⚙️ Paramètres hotstrings" group, just after its separator.
+_HS_BulkActions(M, _Cat) {
+	RegisterMenuItem(M, t("menu.hotstrings.enable_all"),  ToggleAllHotstringsOn)
+	RegisterMenuItem(M, t("menu.hotstrings.disable_all"), ToggleAllHotstringsOff)
+}
+
 ; Dynamic handler: repeat-key toggle (★ as repeat key).
 _HS_RepeatKey(M, _Cat) {
 	global HSE_RepeatEnabled

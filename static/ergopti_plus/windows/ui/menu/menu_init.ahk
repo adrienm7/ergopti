@@ -120,6 +120,7 @@ initMenu() {
 		"hotstring_extensions",          (M, C) => _HS_Extensions(M, C),
 		"magic_key_config",              (M, C) => _HS_MagicKeyConfig(M, C),
 		"repeat_key",                    (M, C) => _HS_RepeatKey(M, C),
+		"hotstring_bulk_actions",        (M, C) => _HS_BulkActions(M, C),
 		"delays_colors",                 (M, C) => _HS_DelaysColors(M, C),
 		"word_expanders",                (M, C) => _HS_WordExpanders(M, C),
 	)
@@ -129,10 +130,6 @@ initMenu() {
 	)
 	BootProfile_Mark("MENU/initMenu: pre-hotstrings render")
 	HotstringsMenu := MenuRenderer_Build("hotstrings_menu", "Hotstrings", _HotDynHandlers, _HotGroupBuilders)
-	; Bulk actions for the whole Hotstrings tree, inserted right after the master
-	; toggle (manifest item 1): force every section on / off in one click.
-	RegisterMenuItemInsert(HotstringsMenu, "2&", t("menu.hotstrings.enable_all"),  ToggleAllHotstringsOn)
-	RegisterMenuItemInsert(HotstringsMenu, "3&", t("menu.hotstrings.disable_all"), ToggleAllHotstringsOff)
 	BootProfile_Mark("MENU/initMenu: hotstrings menu rendered")
 
 	HotstringsMenuTitle := t("menu.hotstrings.title") . " (" . FmtCount(_HS_ComputeGrandTotal()) . ")"
