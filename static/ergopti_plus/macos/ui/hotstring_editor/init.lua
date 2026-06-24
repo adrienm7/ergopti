@@ -22,6 +22,7 @@ local ui_builder    = require("ui.ui_builder")
 local Logger        = require("lib.logger")
 local notifications = require("lib.notifications")
 local i18n          = require("lib.i18n")
+local Paths         = require("lib.paths")
 local LOG           = "hotstring_editor"
 
 
@@ -37,9 +38,11 @@ local LOG           = "hotstring_editor"
 local CUSTOM_GROUP_NAME = "custom"
 local STAR_CANONICAL    = "★"
 
--- Determine absolute path to the assets directory
-local _src  = debug.getinfo(1, "S").source:sub(2)
-local ASSETS_DIR = _src:match("^(.*[/\\])") or "./"
+-- Absolute path to the assets folder. The hotstring-editor frontend (index.html,
+-- script.js, style.css) lives in the cross-driver _shared/ui/ tree so the Windows
+-- WebView2 host and this macOS host render the exact same UI; we resolve it
+-- through Paths.shared (mirrors onboarding / model_browser).
+local ASSETS_DIR = (Paths.shared("ui/hotstring_editor") or "") .. "/"
 
 -- Global module state
 local _toml_path       = nil
