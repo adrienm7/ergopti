@@ -60,18 +60,22 @@ MenuAddItemFromManifest(MenuParent, ManifestEntry, V1CategoryPath) {
 	}
 }
 
-; Add a clickable menu item with a pre-resolved label — bypasses the
-; manifest+i18n lookup chain in GetMenuTitleByPath. Used by render paths
-; that already hold the label string (e.g. personal hotstring sections
-; whose descriptions come from the user's personal_hotstrings.toml).
+; Add a clickable menu item with a pre-resolved label and a canonical v2 path —
+; bypasses the manifest+i18n lookup chain in GetMenuTitleByPath. Used by render
+; paths that already hold the label string (e.g. personal hotstring sections
+; whose descriptions come from the user's personal_hotstrings.toml, and personal
+; shortcuts whose descriptions come from _PersonalShortcutsRegistry).
 ;
-; ``MasterCategory`` is the v1 PascalCase top-level category whose
-; master-gate state controls greying for this item (``Hotstrings``,
-; ``Shortcuts``, ``Layout``, ``TapHolds``).
-MenuAddItemWithLabel(MenuParent, V1Path, MenuTitle, MasterCategory) {
-	RegisterMenuItem(MenuParent, MenuTitle, (*) => ToggleMenuVariableByPath(V1Path))
+; ``V2Path`` is the canonical v2 path of the feature (e.g.
+; "hotstrings.personal.<id>", "ahk.shortcuts.personal.<name>"); toggles and state
+; reads go through lib/feature_io.ahk. ``MasterCategory`` is the v1 PascalCase
+; top-level category whose master-gate state controls greying (``Hotstrings``,
+; ``Shortcuts``).
+MenuAddItemWithLabel(MenuParent, V2Path, MenuTitle, MasterCategory) {
+	RegisterMenuItem(MenuParent, MenuTitle, (*) => ToggleFeatureV2(V2Path))
 
-	IsEnabled := _ResolveMenuItemEnabled(V1Path)
+	State := ReadFeatureStateV2(V2Path)
+	IsEnabled := State.Has("enabled") and State["enabled"]
 	if IsEnabled {
 		MenuParent.Check(MenuTitle)
 	} else {
@@ -79,54 +83,6 @@ MenuAddItemWithLabel(MenuParent, V1Path, MenuTitle, MasterCategory) {
 	}
 
 	if !IsCategoryGated(MasterCategory) {
-		try MenuParent.Disable(MenuTitle)
-	}
-}
-
-; Resolve the .Enabled state of a v1-path feature. TapHolds variants are
-; not in the manifest (their v2 schema condenses mutually-exclusive variant
-; groups into a single resolved tuple), so they are resolved by comparing
-; the variant's (tap, hold) tuple against TapHold["keys"][V2KeyId] via
-; IsTapHoldVariantActive. Everything else is read from Features.
-_ResolveMenuItemEnabled(V1Path) {
-	if (StrLen(V1Path) >= 9 and SubStr(V1Path, 1, 9) == "TapHolds.") {
-		return IsTapHoldVariantActive(V1Path)
-	}
-	State := GetFeatureState(V1Path)
-	if State.Has("Enabled") {
-		return (State["Enabled"] = true)
-	}
-	return false
-}
-
-MenuAddItem(MenuParent, FeatureCategoryPath, FeatureName) {
-	FullPath := FeatureCategoryPath "." FeatureName
-	MenuTitle := GetMenuTitleByPath(FullPath)
-	; Use the menu-dispatcher bypass (lib/menu_dispatcher.ahk) so an AHK
-	; native-dispatch drop is automatically recovered via the WM_COMMAND
-	; retry timer. Falls back to MenuParent.Add internally when the
-	; bypass cannot discover the item's Win32 ID (rare; same dispatch
-	; behavior as before in that case).
-	RegisterMenuItem(MenuParent, MenuTitle, (*) => ToggleMenuVariableByPath(FullPath))
-
-	; Runtime state — read Features via the path translator first; for
-	; features outside the manifest (TapHolds variants) fall back to the
-	; legacy ``Features[X].Enabled`` value which is still kept in sync by
-	; ToggleMenuVariableByPath's mutually-exclusive sub-Map handling.
-	IsEnabled := _ResolveMenuItemEnabled(FullPath)
-	if IsEnabled {
-		MenuParent.Check(MenuTitle)
-	} else {
-		MenuParent.Uncheck(MenuTitle)
-	}
-
-	; Phase 7.5 (UX): grey out the item when its master category gate is
-	; off. The toggle is still visible (so the user can see what would be
-	; available if they re-enabled the master) but clicking it does
-	; nothing — ApplyMasterGatesToFeatures forces every feature in the
-	; category to false in Features, so the HotIf evaluations all
-	; short-circuit regardless of the persisted per-feature state.
-	if !IsCategoryGated(_MasterCategoryFor(FeatureCategoryPath)) {
 		try MenuParent.Disable(MenuTitle)
 	}
 }
@@ -170,8 +126,8 @@ _MasterCategoryFor(FeatureCategoryPath) {
 MenuAddLetterPicker(MenuParent, FeatureCategoryPath, FeatureName) {
 	FullPath := FeatureCategoryPath "." FeatureName
 	; The canonical v2 path drives the state read + the letter writes; the v1
-	; FullPath still feeds GetMenuTitleByPath (shared with MenuAddItem) for the
-	; label and _MasterCategoryFor for greying until those flip in later increments.
+	; FullPath still feeds GetMenuTitleByPath for the label and _MasterCategoryFor
+	; for greying until those flip in later increments.
 	V2Path := LegacyPathToManifestPath(FullPath)
 	if (V2Path == "") {
 		try LoggerWarn("Menu", "MenuAddLetterPicker: no v2 path for '{1}' — skipping.", FullPath)
@@ -366,42 +322,7 @@ _ApplyMenuLabelDynamicSubstitutions(Label, V2Path) {
 	return Label
 }
 
-ToggleMenuVariableByPath(FullPath) {
-	; Fast path: pure hotstring section toggles flip their HSE group live, with
-	; no script Reload (the menu rebuilds in-process). _HS_TryLiveToggle returns
-	; false for anything not on the live whitelist (inline-generated sections,
-	; cross-dependent features, layout / tap-holds / shortcuts), which then take
-	; the persist-and-Reload path below — unchanged.
-	if _HS_TryLiveToggle(FullPath) {
-		return
-	}
-
-	; Resolve current state via Features first, falling back to Features
-	; v1 for non-manifest features (TapHolds variants especially). Without
-	; the fallback, the FIRST click on a TapHolds variant would always see
-	; CurrentEnabled=false and try to "enable" what's already active.
-	CurrentEnabled := _ResolveMenuItemEnabled(FullPath)
-	NewValue := !CurrentEnabled
-
-	; Mutually-exclusive groups (Shortcuts sub-Maps: AltGrLAlt, AltGrCapsLock,
-	; LAltCapsLock) require every sibling to be set to false in the same
-	; atomic batch so the on-disk write reflects the picked variant alone.
-	; ``_MutexSiblingPathsFor(FullPath)`` returns the sibling v1 paths for
-	; the cases that need it; TapHolds mutex resolution is handled inside
-	; ``WriteTapHoldBatch`` itself (last true wins per V1 key) so the writer
-	; doesn't need an enumeration here. Everything else returns an empty
-	; list — toggles are independent.
-	Batch := []
-	for _, SiblingPath in _MutexSiblingPathsFor(FullPath) {
-		Batch.Push(Map("v1_path", SiblingPath . ".Enabled", "value", false))
-	}
-	Batch.Push(Map("v1_path", FullPath . ".Enabled", "value", NewValue))
-	WriteFeatureBatch(Batch)
-	Reload
-}
-
-; v2-native toggle dispatcher — the no-translation replacement for
-; ToggleMenuVariableByPath, driven by a canonical v2 manifest path. Mirrors the
+; v2-native toggle dispatcher — driven by a canonical v2 manifest path. Mirrors the
 ; v1 dispatcher exactly: a live-eligible hotstring section flips its registration
 ; in-process (no Reload); a Shortcuts modifier-combo sub-Map key forces its
 ; siblings off in the same atomic batch (mutual exclusion); everything else
@@ -452,90 +373,6 @@ _HS_TryLiveToggleV2(V2Path) {
 	WriteFeatureV2(V2Path, NewEnabled)
 	RebuildHotstringsLive()
 	return true
-}
-
-; Attempt to apply a hotstring section toggle LIVE, without a script Reload.
-; Returns true when the toggle was fully handled (flag persisted, registration
-; rebuilt in-process); false when FullPath is not a live-eligible hotstring
-; section — the caller then takes the persist-and-Reload path.
-;
-; Since RegisterAllHotstrings() is re-runnable, a live toggle no longer splices a
-; single HSE group: it flips the feature flag and rebuilds the entire hotstring
-; registration in-process (RebuildHotstringsLive). Re-running re-evaluates every
-; Features guard, so cross-dependent and inline-generated sections all resolve
-; with no special cases. Only the reload-only groups (the two native-engine
-; sections and the layout-backed magic_key.replace) stay on Reload — see
-; lib/hotstrings/hotstring_live_toggle.ahk.
-_HS_TryLiveToggle(FullPath) {
-	; Personal sections ("Personal.<id>") are always HSE-backed → live.
-	if _HS_IsPersonalLiveToggle(FullPath) {
-		return _HS_ApplyLiveToggle(FullPath)
-	}
-	; Bundled sections: translate to the v2 manifest path. Anything without a
-	; manifest counterpart (TapHolds, runtime Personal) or outside "hotstrings.*"
-	; is not a hotstring section → let the caller Reload.
-	V2Path := LegacyPathToManifestPath(FullPath)
-	if (V2Path == "") {
-		try LoggerDebug("Menu", "Live-toggle: '{1}' has no manifest path → Reload.", FullPath)
-		return false
-	}
-	V2Parts := StrSplit(V2Path, ".")
-	if (V2Parts.Length != 3 or V2Parts[1] != "hotstrings") {
-		try LoggerDebug("Menu", "Live-toggle: '{1}' is not a hotstring section → Reload.", V2Path)
-		return false
-	}
-	; A few "hotstrings.*" paths are not applied by the live rebuild (the native
-	; deadkey / "…" engines, and magic_key.replace which is a layout remap), so an
-	; in-process rebuild would not apply them — they degrade to the Reload path.
-	Group := _HS_DeriveLiveToggleGroup(V2Parts[2], V2Parts[3])
-	if _HS_IsReloadOnlyGroup(Group) {
-		try LoggerDebug("Menu", "Live-toggle: '{1}' is reload-only → Reload.", Group)
-		return false
-	}
-	return _HS_ApplyLiveToggle(FullPath)
-}
-
-; Persist the flip and rebuild the whole hotstring registration in-process.
-; Always returns true — the toggle is fully handled with no Reload.
-_HS_ApplyLiveToggle(FullPath) {
-	NewEnabled := !_ResolveMenuItemEnabled(FullPath)
-	; WriteFeatureUpdate mutates the in-memory Features Map AND persists to disk,
-	; so the rebuild below re-reads the new value with no Reload.
-	WriteFeatureUpdate(FullPath . ".Enabled", NewEnabled)
-	RebuildHotstringsLive()
-	return true
-}
-
-; Return the list of sibling v1 feature paths that must be force-set to false
-; when the user toggles ``FullPath`` to true. Empty list means no mutex
-; semantics — each toggle in the group is independent.
-_MutexSiblingPathsFor(FullPath) {
-	global _LegacyShortcutsSubMapGroupMap, _LegacyShortcutsSubMapKeyMap
-	Parts := StrSplit(FullPath, ".")
-
-	; Shortcuts sub-Map groups (AltGrLAlt / AltGrCapsLock / LAltCapsLock):
-	; true mutex — only one variant can be active. Siblings come from the
-	; canonical rename table (the v2 schema is authoritative for which keys
-	; the group accepts).
-	if (Parts.Length == 3 and Parts[1] == "Shortcuts"
-		and _LegacyShortcutsSubMapGroupMap.Has(Parts[2])) {
-		Siblings := []
-		for V1Key, _V2Key in _LegacyShortcutsSubMapKeyMap {
-			if (V1Key != Parts[3]) {
-				Siblings.Push(Parts[1] . "." . Parts[2] . "." . V1Key)
-			}
-		}
-		return Siblings
-	}
-
-	; TapHolds variant toggles do not need a sibling-false batch: the v2
-	; schema condenses the mutually-exclusive variants into a single
-	; ``[tap_hold.keys.<id>]`` block, and ``WriteTapHoldBatch`` resolves
-	; which variant is active by picking the last true entry per V1 key.
-	; Sending just the single ``{variant: NewValue}`` entry is enough.
-	;
-	; Every other path is independent — return [].
-	return []
 }
 
 GetCategoryTitle(Category) {
