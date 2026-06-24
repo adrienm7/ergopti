@@ -19,10 +19,10 @@
 ; been migrated to consume the manifest directly (Layout first).
 ;
 ; ``ManifestEntry`` is a Map from ``ManifestFeaturesForSection`` carrying
-; ``path`` (canonical v2), ``id``, ``description_key``, etc.
-; ``V1CategoryPath`` is the dotted v1 prefix used by the tray-write
-; callbacks (``Layout``, ``Shortcuts``, ``Autocorrection``, …); the v1 id
-; comes from the inverse rename table via ``ManifestPathToLegacyPath``.
+; ``path`` (canonical v2), ``id``, ``description_key``, etc. The toggle, state
+; read and label are all driven by that v2 path through lib/feature_io.ahk.
+; ``V1CategoryPath`` is the PascalCase top-level category (``Layout``,
+; ``Shortcuts``, ``Autocorrection``, …) used only for the master-gate greying.
 MenuAddItemFromManifest(MenuParent, ManifestEntry, V1CategoryPath) {
 	V2Path := ManifestEntry["path"]
 	; Skip an item whose feature does not resolve in the live Features Map — it
