@@ -213,6 +213,69 @@ ToggleCategoryAllFeatures(Category, Value) {
     Reload
 }
 
+; Force every section of one hotstring category on/off (bulk action), scoped to
+; a single manifest section. Mirrors ToggleAllHotstrings but per-category:
+; enabling also lifts the Hotstrings master gate and (when the category has one)
+; the category gate, so the activation is immediately effective; disabling just
+; clears the sections. ``V1Cat`` is the PascalCase category id (e.g. "Rolls",
+; "DynamicHotstrings").
+ToggleCategoryAllSections(V1Cat, Enable) {
+    global CategoryEnabled, ConfigurationFile, _LegacyTopCategoryMap
+    Bool := (Enable = true or Enable = 1)
+    V2Section := _LegacyTopCategoryMap.Has(V1Cat) ? _LegacyTopCategoryMap[V1Cat] : ""
+    if (V2Section == "") {
+        try LoggerWarn("Menu", "ToggleCategoryAllSections: no v2 section for '{1}' — skipped.", V1Cat)
+        return
+    }
+    GateUpdates := []
+    if Bool {
+        ; Master gate must be on for any hotstring to fire.
+        if !CategoryEnabled.Has("Hotstrings") or !CategoryEnabled["Hotstrings"] {
+            CategoryEnabled["Hotstrings"] := true
+            GateUpdates.Push({ Section: "ahk.category_enabled", Key: "hotstrings", Value: true })
+        }
+        ; Lift this category's own gate too, when it has one (flat categories do;
+        ; DynamicHotstrings / Personal follow the master directly).
+        if (CategoryEnabled.Has(V1Cat) and !CategoryEnabled[V1Cat]) {
+            CategoryEnabled[V1Cat] := true
+            GateUpdates.Push({ Section: "ahk.category_enabled", Key: _CategoryEnabledKey(V1Cat), Value: true })
+        }
+    }
+    if (GateUpdates.Length > 0)
+        TOML_BatchWrite(ConfigurationFile, GateUpdates)
+    Batch := []
+    for _, Entry in ManifestFeaturesForSection(V2Section)
+        Batch.Push(Map("path", Entry["path"], "value", Bool))
+    if (Batch.Length > 0)
+        WriteFeatureBatchV2(Batch)
+    Reload
+}
+
+; Force every personal hotstring section (from personal_hotstrings.toml) on/off.
+; Personal sections are runtime-discovered, so their v2 paths are built from the
+; TOML section names (hotstrings.personal.<lower(section)>). Enabling lifts the
+; Hotstrings master gate so the sections fire immediately.
+HS_TogglePersonalAllSections(Enable) {
+    global CategoryEnabled, ConfigurationFile, ScriptInformation
+    Bool := (Enable = true or Enable = 1)
+    PersonalTomlPath := IsSet(ScriptInformation) ? ScriptInformation.Get("PersonalTomlPath", "") : ""
+    if (PersonalTomlPath == "" or !FileExist(PersonalTomlPath))
+        return
+    if (Bool and (!CategoryEnabled.Has("Hotstrings") or !CategoryEnabled["Hotstrings"])) {
+        CategoryEnabled["Hotstrings"] := true
+        TOML_Write(true, ConfigurationFile, "ahk.category_enabled", "hotstrings")
+    }
+    Data := ReadPersonalToml()
+    Batch := []
+    for _, SecName in Data["sections_order"] {
+        if (SecName != "-")
+            Batch.Push(Map("path", "hotstrings.personal." . StrLower(SecName), "value", Bool))
+    }
+    if (Batch.Length > 0)
+        WriteFeatureBatchV2(Batch)
+    Reload
+}
+
 _CategoryEnabledKey(Category) {
     switch Category {
         case "Layout":     return "layout"
