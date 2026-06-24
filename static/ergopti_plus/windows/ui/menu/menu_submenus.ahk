@@ -157,7 +157,7 @@ _BuildDynamicHotstringsSubmenu() {
 ; counting only the sections whose feature toggle is enabled in Features.
 ; Uses CountTomlSection per v2 section id so disabled sections contribute 0.
 _CountEnabledForCategory(V1Cat) {
-	global Features, _V1CatToV2CatMap, _V1CatToInverseKeyMap
+	global Features, _V1CatToV2CatMap
 	if !_V1CatToV2CatMap.Has(V1Cat) {
 		return 0
 	}
