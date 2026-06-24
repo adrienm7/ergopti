@@ -335,22 +335,22 @@
 	"accented_letters_group": [
 		{
 			"type": "letter_picker",
-			"id": "EGrave",
+			"id": "e_grave",
 			"platforms": ["ahk"]
 		},
 		{
 			"type": "letter_picker",
-			"id": "ECirc",
+			"id": "e_circ",
 			"platforms": ["ahk"]
 		},
 		{
 			"type": "letter_picker",
-			"id": "EAcute",
+			"id": "e_acute",
 			"platforms": ["ahk"]
 		},
 		{
 			"type": "letter_picker",
-			"id": "AGrave",
+			"id": "a_grave",
 			"platforms": ["ahk"]
 		}
 	],

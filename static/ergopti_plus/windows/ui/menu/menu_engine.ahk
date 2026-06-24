@@ -123,17 +123,15 @@ _MasterCategoryFor(FeatureCategoryPath) {
 ; re-enables via picking any letter). The parent menu entry stays checked
 ; whenever the feature is enabled, and its label remains the canonical
 ; "<description><LETTER>" string built by GetMenuTitleByPath.
-MenuAddLetterPicker(MenuParent, FeatureCategoryPath, FeatureName) {
-	FullPath := FeatureCategoryPath "." FeatureName
-	; The canonical v2 path drives the state read + the letter writes; the v1
-	; FullPath still feeds GetMenuTitleByPath for the label and _MasterCategoryFor
-	; for greying until those flip in later increments.
-	V2Path := LegacyPathToManifestPath(FullPath)
-	if (V2Path == "") {
-		try LoggerWarn("Menu", "MenuAddLetterPicker: no v2 path for '{1}' — skipping.", FullPath)
+MenuAddLetterPicker(MenuParent, V2Path, MasterCategory) {
+	; Everything — label, state read, letter writes — is driven by the canonical
+	; v2 alpha path (e.g. "shortcuts.e_grave"). MasterCategory is the PascalCase
+	; gate category used only for greying.
+	if (FeatureLocateV2(V2Path) == false) {
+		try LoggerWarn("Menu", "MenuAddLetterPicker: '{1}' does not resolve in Features — skipping.", V2Path)
 		return
 	}
-	MenuTitle := GetMenuTitleByPath(FullPath)
+	MenuTitle := GetMenuTitleByPath(V2Path)
 	State := ReadFeatureStateV2(V2Path)
 	IsEnabled := State.Has("enabled") and State["enabled"]
 	CurrentLetter := State.Has("letter") ? StrLower(State["letter"]) : ""
@@ -167,9 +165,8 @@ MenuAddLetterPicker(MenuParent, FeatureCategoryPath, FeatureName) {
 		MenuParent.Check(MenuTitle)
 	}
 
-	; Phase 7.5 (UX): grey out the picker when its master category gate
-	; is off — same rationale as MenuAddItem above.
-	if !IsCategoryGated(_MasterCategoryFor(FeatureCategoryPath)) {
+	; Phase 7.5 (UX): grey out the picker when its master category gate is off.
+	if !IsCategoryGated(MasterCategory) {
 		try MenuParent.Disable(MenuTitle)
 	}
 }
@@ -198,26 +195,21 @@ SetFeatureLetterOff(V2Path) {
 
 global _TrayTitleCache := Map()
 
-; Retrieve a feature title by its path. The label is sourced from the
-; canonical manifest entry's ``description_key`` (resolved against the
-; current i18n locale via ``MenuLabelFromManifestEntry``) whenever a
-; matching entry exists. Non-manifest features fall through to dedicated
-; handlers.
-GetMenuTitleByPath(FullPath) {
+; Retrieve a feature title by its canonical v2 path. The label is sourced from
+; the manifest entry's ``description_key`` (resolved against the current i18n
+; locale via ``TryMenuLabelFromManifestEntry``), with the live letter suffix
+; appended for letter-remap features. Only the letter pickers call this now, so
+; an unresolved path simply falls back to the path itself.
+GetMenuTitleByPath(V2Path) {
 	global _TrayTitleCache
-	if _TrayTitleCache.Has(FullPath)
-		return _TrayTitleCache[FullPath]
+	if _TrayTitleCache.Has(V2Path)
+		return _TrayTitleCache[V2Path]
 
-	; Try the manifest+i18n first
-	V2Path := LegacyPathToManifestPath(FullPath)
-	Entry := false
-	Label := ""
-	if (V2Path != "") {
-		Entry := ManifestFindEntryByPath(V2Path)
-		if (Entry == false) {
-			Entry := ManifestFindEntryByPath(V2Path . ".enabled")
-		}
+	Entry := ManifestFindEntryByPath(V2Path)
+	if (Entry == false) {
+		Entry := ManifestFindEntryByPath(V2Path . ".enabled")
 	}
+	Label := ""
 	if (Entry != false) {
 		Label := TryMenuLabelFromManifestEntry(Entry)
 		if (Label != "") {
@@ -231,30 +223,10 @@ GetMenuTitleByPath(FullPath) {
 		}
 	}
 
-	if (Label == "") {
-		; Personal shortcuts
-		Parts := StrSplit(FullPath, ".")
-		if (Parts.Length == 3 and Parts[1] == "Shortcuts" and Parts[2] == "Personal") {
-			global _PersonalShortcutsRegistry
-			Name := Parts[3]
-			if _PersonalShortcutsRegistry.Has(Name) {
-				Desc := _PersonalShortcutsRegistry[Name]
-				Label := (Desc != "") ? Desc : Name
-			} else {
-				Label := Name
-			}
-		} else if (Parts[1] == "TapHolds") {
-			if Parts.Length == 2
-				Label := TapHoldGroupLabel(Parts[2])
-			else if Parts.Length == 3
-				Label := TapHoldVariantLabel(Parts[2], Parts[3])
-		}
-	}
-
 	if (Label == "")
-		Label := FullPath
+		Label := V2Path
 
-	_TrayTitleCache[FullPath] := Label
+	_TrayTitleCache[V2Path] := Label
 	return Label
 }
 

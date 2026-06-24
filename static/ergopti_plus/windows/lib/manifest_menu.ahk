@@ -286,14 +286,16 @@ _MR_RenderGroup(ResultMenu, Item, CategoryName, GroupBuilders) {
 	}
 }
 
-; Render a letter-picker submenu entry.
-_MR_RenderLetterPicker(ResultMenu, Item, CategoryName) {
+; Render a letter-picker submenu entry. The manifest ``id`` is the v2 alpha id
+; (e.g. "e_grave"); accented-letter pickers live under the shortcuts section and
+; are gated by the Shortcuts master.
+_MR_RenderLetterPicker(ResultMenu, Item, _CategoryName) {
 	Id := _MR_Get(Item, "id")
 	if (Id == "") {
 		try LoggerWarn("MenuRenderer", "letter_picker item missing id — skipped.")
 		return
 	}
-	MenuAddLetterPicker(ResultMenu, CategoryName, Id)
+	MenuAddLetterPicker(ResultMenu, "shortcuts." . Id, "Shortcuts")
 }
 
 ; Build a built-in named group that is always rendered the same way.
@@ -314,8 +316,8 @@ _MR_BuildBuiltinGroup(GroupId, CategoryName) {
 
 	if (GroupId == "accented_letters") {
 		Sub := Menu()
-		for LetterId in ["EGrave", "ECirc", "EAcute", "AGrave"] {
-			MenuAddLetterPicker(Sub, "Shortcuts", LetterId)
+		for V2Path in ["shortcuts.e_grave", "shortcuts.e_circ", "shortcuts.e_acute", "shortcuts.a_grave"] {
+			MenuAddLetterPicker(Sub, V2Path, "Shortcuts")
 		}
 		return Sub
 	}
