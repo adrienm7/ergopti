@@ -24,6 +24,7 @@ local i18n         = require("lib.i18n")
 local toml_writer  = require("lib.toml_writer")
 local toml_codec   = require("lib.toml_codec")
 local notifications = require("lib.notifications")
+local Paths        = require("lib.paths")
 local Logger       = require("lib.logger")
 local LOG          = "onboarding"
 
@@ -36,15 +37,18 @@ local _config_path  = nil
 local _webview      = nil
 local _usercontent  = nil
 
--- Absolute path to the assets folder (same directory as this file)
-local _src       = debug.getinfo(1, "S").source:sub(2)
-local ASSETS_DIR = _src:match("^(.*[/\\])") or "./"
+-- Absolute path to the assets folder. The onboarding frontend (index.html,
+-- script.js, style.css) lives in the cross-driver _shared/ui/ tree so the
+-- Windows driver can consume the same files via its WebView2 host; resolve it
+-- through Paths.shared (mirrors changelog / download_window / model_browser).
+local ASSETS_DIR = (Paths.shared("ui/onboarding") or "") .. "/"
 
 --- Resolve the absolute file:// URL to the Ergopti layout preview JPG so
 --- the webview can <img src="…"> it directly. ASSETS_DIR is
---- static/ergopti_plus/macos/ui/onboarding/ ; the image lives at
---- static/img/ergopti.jpg, four directories above. Returns nil when the
---- file is missing so the JS side keeps the preview hidden gracefully.
+--- static/ergopti_plus/_shared/ui/onboarding/ ; the image lives at
+--- static/img/ergopti.jpg, four directories above (same depth as the former
+--- macos/ui/onboarding/ location, so the relative path is unchanged). Returns
+--- nil when the file is missing so the JS side keeps the preview hidden.
 --- @return string|nil
 local function _layout_image_url()
 	local img_path = ASSETS_DIR .. "../../../../img/ergopti.jpg"
