@@ -694,6 +694,8 @@
 	"menu.hotstrings.notify_bubble_star": "Bolha ★",
 	"menu.hotstrings.off": "❌ Hotstrings desativados (clique para ativar)",
 	"menu.hotstrings.on": "✅ Hotstrings ativados (clique para desativar)",
+	"menu.hotstrings.enable_all": "✅ Enable all",
+	"menu.hotstrings.disable_all": "❌ Disable all",
 	"menu.hotstrings.open_editor": "Abrir editor de hotstrings",
 	"menu.hotstrings.open_file": "Abrir arquivo…",
 	"menu.hotstrings.params": "⚙️ Configurações de hotstring",

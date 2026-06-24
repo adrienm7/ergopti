@@ -694,6 +694,8 @@
 	"menu.hotstrings.notify_bubble_star": "बबल ★",
 	"menu.hotstrings.off": "❌ Hotstrings अक्षम (सक्षम करने के लिए क्लिक करें)",
 	"menu.hotstrings.on": "✅ Hotstrings सक्षम (अक्षम करने के लिए क्लिक करें)",
+	"menu.hotstrings.enable_all": "✅ Enable all",
+	"menu.hotstrings.disable_all": "❌ Disable all",
 	"menu.hotstrings.open_editor": "hotstring संपादक खोलें",
 	"menu.hotstrings.open_file": "फाइल खोलें…",
 	"menu.hotstrings.params": "⚙️ Hotstring सेटिंग्स",

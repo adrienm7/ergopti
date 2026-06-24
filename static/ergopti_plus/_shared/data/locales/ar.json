@@ -694,6 +694,8 @@
 	"menu.hotstrings.notify_bubble_star": "فقاعة ★",
 	"menu.hotstrings.off": "❌ السلاسل النصية مُعطَّلة (انقر للتفعيل)",
 	"menu.hotstrings.on": "✅ السلاسل النصية مُفعَّلة (انقر للتعطيل)",
+	"menu.hotstrings.enable_all": "✅ Enable all",
+	"menu.hotstrings.disable_all": "❌ Disable all",
 	"menu.hotstrings.open_editor": "فتح محرر السلاسل النصية",
 	"menu.hotstrings.open_file": "فتح ملف…",
 	"menu.hotstrings.params": "⚙️ إعدادات السلاسل النصية",

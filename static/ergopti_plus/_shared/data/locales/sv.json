@@ -694,6 +694,8 @@
 	"menu.hotstrings.notify_bubble_star": "Bubbla ★",
 	"menu.hotstrings.off": "❌ Hotstrings inaktiverade (klicka för att aktivera)",
 	"menu.hotstrings.on": "✅ Hotstrings aktiverade (klicka för att inaktivera)",
+	"menu.hotstrings.enable_all": "✅ Enable all",
+	"menu.hotstrings.disable_all": "❌ Disable all",
 	"menu.hotstrings.open_editor": "Öppna hotstring-redigerare",
 	"menu.hotstrings.open_file": "Öppna fil…",
 	"menu.hotstrings.params": "⚙️ Hotstring-inställningar",

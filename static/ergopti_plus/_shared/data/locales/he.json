@@ -694,6 +694,8 @@
 	"menu.hotstrings.notify_bubble_star": "בועה ★",
 	"menu.hotstrings.off": "❌ Hotstrings מושבתים (לחץ להפעלה)",
 	"menu.hotstrings.on": "✅ Hotstrings מופעלים (לחץ להשבתה)",
+	"menu.hotstrings.enable_all": "✅ Enable all",
+	"menu.hotstrings.disable_all": "❌ Disable all",
 	"menu.hotstrings.open_editor": "פתח עורך hotstring",
 	"menu.hotstrings.open_file": "פתח קובץ…",
 	"menu.hotstrings.params": "⚙️ הגדרות Hotstring",

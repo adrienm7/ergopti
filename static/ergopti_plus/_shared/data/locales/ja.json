@@ -694,6 +694,8 @@
 	"menu.hotstrings.notify_bubble_star": "バブル ★",
 	"menu.hotstrings.off": "❌ ホットストリング無効（クリックで有効化）",
 	"menu.hotstrings.on": "✅ ホットストリング有効（クリックで無効化）",
+	"menu.hotstrings.enable_all": "✅ Enable all",
+	"menu.hotstrings.disable_all": "❌ Disable all",
 	"menu.hotstrings.open_editor": "ホットストリングエディターを開く",
 	"menu.hotstrings.open_file": "ファイルを開く…",
 	"menu.hotstrings.params": "⚙️ ホットストリング設定",

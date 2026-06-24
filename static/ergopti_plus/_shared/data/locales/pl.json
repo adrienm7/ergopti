@@ -694,6 +694,8 @@
 	"menu.hotstrings.notify_bubble_star": "Dymek ★",
 	"menu.hotstrings.off": "❌ Hotstring'i wyłączone (kliknij, aby włączyć)",
 	"menu.hotstrings.on": "✅ Hotstring'i włączone (kliknij, aby wyłączyć)",
+	"menu.hotstrings.enable_all": "✅ Enable all",
+	"menu.hotstrings.disable_all": "❌ Disable all",
 	"menu.hotstrings.open_editor": "Otwórz edytor hotstring'ów",
 	"menu.hotstrings.open_file": "Otwórz plik…",
 	"menu.hotstrings.params": "⚙️ Ustawienia hotstring'ów",

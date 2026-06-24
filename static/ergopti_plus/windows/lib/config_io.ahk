@@ -107,15 +107,17 @@ ToggleAllHotstringsOff(*) {
 ToggleAllHotstrings(Value) {
     global CategoryEnabled, ConfigurationFile
     Bool := (Value = true or Value = 1)
+    ; Force every individual section to Bool — "tout activer" turns them all on,
+    ; "tout désactiver" turns them all off (a real bulk action, not just the
+    ; category gate). The Hotstrings master gate follows so the change is
+    ; immediately effective (on) or the whole tree is off (off).
     CategoryEnabled["Hotstrings"] := Bool
     TOML_Write(Bool, ConfigurationFile, "ahk.category_enabled", "hotstrings")
-    if Bool {
-        Batch := []
-        for V2Path in _CollectAllHotstringsV2Paths()
-            Batch.Push(Map("path", V2Path, "value", true))
-        if (Batch.Length > 0)
-            WriteFeatureBatchV2(Batch)
-    }
+    Batch := []
+    for V2Path in _CollectAllHotstringsV2Paths()
+        Batch.Push(Map("path", V2Path, "value", Bool))
+    if (Batch.Length > 0)
+        WriteFeatureBatchV2(Batch)
     Reload
 }
 

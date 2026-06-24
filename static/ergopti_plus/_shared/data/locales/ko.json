@@ -694,6 +694,8 @@
 	"menu.hotstrings.notify_bubble_star": "말풍선 ★",
 	"menu.hotstrings.off": "❌ 핫스트링 비활성화됨 (클릭하여 활성화)",
 	"menu.hotstrings.on": "✅ 핫스트링 활성화됨 (클릭하여 비활성화)",
+	"menu.hotstrings.enable_all": "✅ Enable all",
+	"menu.hotstrings.disable_all": "❌ Disable all",
 	"menu.hotstrings.open_editor": "핫스트링 편집기 열기",
 	"menu.hotstrings.open_file": "파일 열기…",
 	"menu.hotstrings.params": "⚙️ 핫스트링 설정",

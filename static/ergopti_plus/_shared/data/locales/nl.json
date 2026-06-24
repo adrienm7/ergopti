@@ -694,6 +694,8 @@
 	"menu.hotstrings.notify_bubble_star": "Ballon ★",
 	"menu.hotstrings.off": "❌ Hotstrings uitgeschakeld (klik om in te schakelen)",
 	"menu.hotstrings.on": "✅ Hotstrings ingeschakeld (klik om uit te schakelen)",
+	"menu.hotstrings.enable_all": "✅ Enable all",
+	"menu.hotstrings.disable_all": "❌ Disable all",
 	"menu.hotstrings.open_editor": "Hotstring-editor openen",
 	"menu.hotstrings.open_file": "Bestand openen…",
 	"menu.hotstrings.params": "⚙️ Hotstring-instellingen",
