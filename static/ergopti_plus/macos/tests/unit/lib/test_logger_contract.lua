@@ -51,18 +51,18 @@ local function load_vectors()
 	return data.vectors
 end
 
---- Strips the timestamp prefix from a captured log line and normalises whitespace.
---- The timestamp format is "YYYY-MM-DD HH:MM:SS:mmm " (24 chars).
---- DEBUG-axis variants (DEBUG, TRACE, DONE) have a 10-space indent after the
---- timestamp; this is an implementation detail not part of the contract, so we
---- strip it before comparing against the shared expected strings.
+--- Strips the timestamp prefix from a captured log line.
+--- The timestamp format is "YYYY-MM-DD HH:MM:SS:mmm " (24 chars). The line body
+--- that follows is the canonical, indent-free "[LEVEL] [Module] message" shared
+--- with the AHK driver and the shared logger core. The leading-whitespace strip
+--- is kept as a defensive no-op so the contract holds even if a sink ever
+--- re-introduces padding.
 --- @param line string Full captured line including timestamp.
 --- @return string The normalised "[LEVEL] [Module] message" portion.
 local function strip_timestamp(line)
 	-- Match the fixed-width timestamp (YYYY-MM-DD HH:MM:SS:mmm) then take the rest
 	local rest = line:match("^%d%d%d%d%-%d%d%-%d%d %d%d:%d%d:%d%d:%d%d%d (.+)$")
 	if not rest then return line end
-	-- Strip leading whitespace (debug-axis indent)
 	return rest:match("^%s*(.+)$") or rest
 end
 
