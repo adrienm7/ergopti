@@ -91,10 +91,17 @@ SetGestureSlotAction(Slot, ActionName) {
 
 ; Toggles the Gestures enabled state and reloads.
 ToggleGesturesEnabled() {
-	global Features
+	global Features, ConfigurationFile
 	NewVal := !(Features.Has("gestures") and Features["gestures"].Has("enabled")
 		and Features["gestures"]["enabled"] = true)
-	WriteFeatureUpdate("Gestures.Enabled", NewVal)
+	; v2-native write (replaces the v1->v2 path translator for this call site):
+	; mutate the in-memory Features node, then persist to the canonical
+	; [ahk.gestures] enabled key in config.toml. The Features node key ("gestures")
+	; and the TOML section ("ahk.gestures") differ — the ahk. prefix namespaces
+	; driver-specific config — so both are spelled out explicitly here.
+	if Features.Has("gestures")
+		Features["gestures"]["enabled"] := NewVal
+	TOML_Write(NewVal, ConfigurationFile, "ahk.gestures", "enabled")
 	Reload
 }
 
