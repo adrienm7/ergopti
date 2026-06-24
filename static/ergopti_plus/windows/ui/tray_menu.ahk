@@ -66,14 +66,35 @@ global _V1CatToV2CatMap := Map(
 	"MagicKey",           "magic_key",
 )
 
-; Per-category inverse maps (v2 snake_case id -> v1 PascalCase) so that
-; _CountEnabledForCategory can resolve the TOML section name via FoldAsciiLower(v1).
-global _V1CatToInverseKeyMap := Map(
-	"Autocorrection",     _ManifestToLegacyAutocorrectionKeyMap,
-	"DistancesReduction", _ManifestToLegacyDistancesReductionKeyMap,
-	"SFBsReduction",      _ManifestToLegacySFBsReductionKeyMap,
-	"Rolls",              _ManifestToLegacyRollsKeyMap,
-	"MagicKey",           _ManifestToLegacyMagicKeyKeyMap,
+; Menu category id (PascalCase, the tray menu's internal category key) -> v2
+; config/manifest section path. The menu layer still keys categories by these
+; PascalCase ids (CategoryEnabled, _FLAT_HOTSTRING_V1_CATS, …); this map is how
+; the bulk/count/collect helpers reach the v2 section. Relocated here from the
+; retired lib/path_translator.ahk — it is plain menu data, not path translation.
+global _LegacyTopCategoryMap := Map(
+	"Layout",             "ahk.layout",
+	"Gestures",           "ahk.gestures",
+	"Shortcuts",          "shortcuts",
+	"Autocorrection",     "hotstrings.autocorrection",
+	"DistancesReduction", "hotstrings.distances_reduction",
+	"SFBsReduction",      "hotstrings.sfbs_reduction",
+	"Rolls",              "hotstrings.rolls",
+	"MagicKey",           "hotstrings.magic_key",
+	"DynamicHotstrings",  "hotstrings.dynamic",
+	"Personal",           "hotstrings.personal",
+)
+
+; DynamicHotstrings menu id (PascalCase, the curated render order below) -> v2
+; manifest id under [hotstrings.dynamic]. Relocated from path_translator.ahk;
+; consumed only by _BuildDynamicHotstringsSubmenu.
+global _LegacyDynamicHotstringsKeyMap := Map(
+	"Date",                              "date",
+	"DateFr",                            "date_fr",
+	"DateLongFr",                        "date_long_fr",
+	"IbanPrefixes",                      "iban_prefixes",
+	"PhonePrefixes",                     "phone_prefixes",
+	"SsnPrefixes",                       "ssn_prefixes",
+	"TextExpansionPersonalInformation",  "text_expansion_personal_information",
 )
 
 ; Custom render order for the ``DynamicHotstrings`` submenu — the manifest

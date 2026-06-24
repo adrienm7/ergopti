@@ -87,17 +87,6 @@ TapHoldHoldOptions() {
 	return _TH_HoldOptions
 }
 
-; Return the i18n-resolved display label for a physical key group.
-TapHoldGroupLabel(KeyId) {
-	global _TH_KeyDefs
-	for _, Def in _TH_KeyDefs {
-		if (Def["id"] == KeyId) {
-			return t(Def["i18n"])
-		}
-	}
-	return KeyId
-}
-
 ; Return the i18n-resolved short label for the current tap action of a key.
 ; Falls back to _GestureActionLabel() so the gesture-action locale chain is
 ; the single source of truth for action names.
@@ -399,18 +388,6 @@ _TH_WriteTapHoldToml() {
 WriteTapHoldBatch(BatchEntries) {
 	try LoggerDebug("TapHoldWriter", "WriteTapHoldBatch called — no-op in new menu architecture.")
 	return 0
-}
-
-; Stub kept so GetMenuTitleByPath / _ResolveMenuItemEnabled do not crash if
-; reached with a TapHolds.* path from old code. Always returns false because
-; no variant-style TapHolds paths are used by the new picker menu.
-IsTapHoldVariantActive(V1Path) {
-	return false
-}
-
-; Stub kept so GetMenuTitleByPath does not crash on TapHolds.Key.Variant paths.
-TapHoldVariantLabel(V1KeyId, Variant) {
-	return V1KeyId . "." . Variant
 }
 
 ; Format a single ``key = value`` line for tap_hold.toml. Handles strings

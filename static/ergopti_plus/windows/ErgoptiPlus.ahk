@@ -21,7 +21,6 @@ global TapHold := Map("keys", Map(), "layers", Map())
 ; Stores ordered names + per-name descriptions so the tray menu can render them.
 global _PersonalShortcutsRegistry := Map("__Order", [])
 #Include lib/manifest_reader.ahk
-#Include lib/path_translator.ahk
 #Include lib/feature_io.ahk
 
 ; In compiled mode the .exe ships an embedded zip of every runtime asset
@@ -157,10 +156,10 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 #Include _generated/terminators.ahk
 #Include lib/toml/toml_loader.ahk
 #Include lib/toml/toml_config_loader.ahk
-; manifest_reader.ahk + path_translator.ahk are loaded at the top of
-; the file so Features / path-translation functions are available before
-; any #HotIf expression is evaluated. Re-listing them here would cause AHK
-; to complain about the same script being included twice.
+; manifest_reader.ahk + feature_io.ahk are loaded at the top of the file so
+; Features / feature-IO functions are available before any #HotIf expression is
+; evaluated. Re-listing them here would cause AHK to complain about the same
+; script being included twice.
 #Include lib/first_boot.ahk
 #Include lib/tap_hold/tap_hold_loader.ahk
 #Include lib/tap_hold/tap_hold_writer.ahk
