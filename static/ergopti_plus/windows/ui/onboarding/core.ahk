@@ -139,7 +139,11 @@ Onboarding_Run() {
 		return
 	}
 	global _OB_ALTGR_PASSTHROUGH := true
-	_Onboarding_Step1()
+	; Prefer the shared WebView2 frontend (identical to the macOS wizard) when
+	; available; fall back to the native AHK pages otherwise. Both paths set the
+	; _ob_gui sentinel the park-loop below waits on.
+	if !_Onboarding_TryWeb()
+		_Onboarding_Step1()
 	; Loop tick chosen large enough to leave the message pump idle most of
 	; the time, small enough to dismiss the script quickly when the user
 	; closes the wizard.
@@ -160,7 +164,11 @@ Onboarding_Run() {
 ; (Onboarding_Run) where no config exists yet and native AltGr typing in
 ; text fields must be preserved.
 Onboarding_ShowFromMenu(*) {
-	_Onboarding_Navigate(_Onboarding_Step1)
+	; Same web-first preference as first run; the native pages remain the
+	; fallback. _Onboarding_TryWeb shows its own window (setting _ob_gui), so on
+	; success there is nothing more to do here.
+	if !_Onboarding_TryWeb()
+		_Onboarding_Navigate(_Onboarding_Step1)
 }
 
 
