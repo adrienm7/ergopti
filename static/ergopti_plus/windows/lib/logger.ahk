@@ -130,6 +130,15 @@ global _LOGGER_SUB_PENDING := Map()
 ; cleared via LoggerClearTestSink().
 global _LOGGER_TEST_SINK := 0
 
+; Deduplication state (module-level so tests can reset it via _ResetLogger).
+; Suppresses consecutive identical lines within a 5000 ms window; a streak that
+; outlives the window re-surfaces. _LastErrTime keeps its historical name for the
+; logger-dedup-tick regression guard. Mirrors the macOS driver's _dedup table.
+global _LOGGER_DEDUP_KEY := ""
+global _LOGGER_DEDUP_LEVEL := ""
+global _LOGGER_DEDUP_COUNT := 0
+global _LastErrTime := 0
+
 
 
 
@@ -145,7 +154,7 @@ global _LOGGER_TEST_SINK := 0
 ; minimum level (e.g. after the user changes it via the menu).
 LoggerInit() {
     global LOGGER_LOG_PATH, LOGGER_ERRORS_LOG_PATH, LOGGER_MIN_LEVEL, LOGGER_DEFAULT_LEVEL, ConfigurationFile
-    global _LOGGER_FLUSH_TIMER_STARTED, LOGGER_FLUSH_INTERVAL_MS, _ConfigDir, _AhkSubDir
+    global _LOGGER_FLUSH_TIMER_STARTED, LOGGER_FLUSH_INTERVAL_MS, _ConfigDir, _AhkSubDir, _LOGGER_PENDING
 
     ; Daily-rotating log file under <ConfigDir>/autohotkey/logs/. Resolves
     ; _ConfigDir at call time so any later override (paths.toml) is picked up.
@@ -181,6 +190,14 @@ LoggerInit() {
         SetTimer(_LoggerFlush, LOGGER_FLUSH_INTERVAL_MS)
         OnExit(_LoggerOnExitFlush)
         _LOGGER_FLUSH_TIMER_STARTED := True
+        ; Session boundary marker (matches the macOS driver) so tailing the log
+        ; reveals where the driver (re)started. Written once per session to the
+        ; main unified log only — not the ring, errors, or sub-files. The blank
+        ; line precedes the banner; Chr(0x2014) is the em-dash, kept out of the
+        ; source so a UTF-8/BOM regression cannot corrupt it.
+        SessionStamp := FormatTime(A_Now, "yyyy-MM-dd HH:mm:ss") . ":" . Format("{:03}", A_MSec)
+        _LOGGER_PENDING.Push("")
+        _LOGGER_PENDING.Push("===== " . SessionStamp . " " . Chr(0x2014) . " ErgoptiPlus session opened =====")
     }
     ; Drain any lines that were emitted before LoggerInit resolved the log path.
     ; Without this flush, every _LoggerEmit call that fired during early boot
@@ -431,6 +448,7 @@ LoggerRingBufferSnapshot() {
 ; never raises so a logging failure cannot break the driver. Hot-path-safe.
 _LoggerEmit(Level, Tag, Msg, Args*) {
     global LOGGER_LOG_PATH, LOGGER_MIN_LEVEL, LOGGER_SEVERITY, _LOGGER_PENDING
+    global _LOGGER_DEDUP_KEY, _LOGGER_DEDUP_LEVEL, _LOGGER_DEDUP_COUNT, _LastErrTime
     ; Safety net for unknown levels — the public wrappers already short-circuit
     ; on the per-level fast-path flags, so a severity comparison here would be
     ; a redundant second filter. Only guard against a completely unrecognised Level.
@@ -459,22 +477,27 @@ _LoggerEmit(Level, Tag, Msg, Args*) {
         _StampSecStr := FormatTime(SecKey, "yyyy-MM-dd HH:mm:ss")
     }
     Stamp := _StampSecStr . ":" . Format("{:03}", A_MSec)
-    Line := Format("{1} [{2}] [{3}] {4}", Stamp, Level, Tag, Body)
+    ; Timestamp-independent message identity — the dedup key. Matches the macOS
+    ; logger, which dedups on its "[LEVEL] [module] body" line.
+    MsgLine := Format("[{1}] [{2}] {3}", Level, Tag, Body)
+    Line := Stamp . " " . MsgLine
 
-    ; ── ERROR deduplication ──
-    ; Suppress identical consecutive ERROR messages (same tag and body) to
-    ; prevent log flooding during tight loops or repeat failures. The 5000 ms
-    ; window ensures the same error is re-emitted after a cooldown period so
-    ; it is never suppressed forever.
-    static _LastErrTag := "", _LastErrBody := "", _LastErrTime := 0
-    if (Level == "ERROR") {
-        if (Tag == _LastErrTag and Body == _LastErrBody and ((A_TickCount - _LastErrTime + 0x100000000) & 0xFFFFFFFF) < 5000) {
-            return
-        }
-        _LastErrTag := Tag
-        _LastErrBody := Body
-        _LastErrTime := A_TickCount
+    ; ── Deduplication ──
+    ; Suppress consecutive identical lines (any level) within a 5000 ms window so a
+    ; recurring line is de-bounced, not permanently silenced (logger-dedup-tick): a
+    ; streak that outlives the window re-surfaces. When the streak ends a single
+    ; "N identical lines suppressed" summary is emitted. Mirrors the macOS driver.
+    if (MsgLine == _LOGGER_DEDUP_KEY and ((A_TickCount - _LastErrTime + 0x100000000) & 0xFFFFFFFF) < 5000) {
+        _LOGGER_DEDUP_COUNT += 1
+        return
     }
+    if (_LOGGER_DEDUP_COUNT > 0) {
+        _LoggerEmitDedupSummary(_LOGGER_DEDUP_LEVEL, _LOGGER_DEDUP_COUNT)
+    }
+    _LOGGER_DEDUP_KEY := MsgLine
+    _LOGGER_DEDUP_LEVEL := Level
+    _LOGGER_DEDUP_COUNT := 0
+    _LastErrTime := A_TickCount
 
     _LoggerPushRing(Line)
     if _LOGGER_TEST_SINK != 0 {
@@ -505,6 +528,37 @@ _LoggerEmit(Level, Tag, Msg, Args*) {
 		_LoggerFlush(true)
 	}
 	_LoggerFanOut(Tag, Line)
+}
+
+; Emits the "[LEVEL] [logger] (up-arrow) N identical lines suppressed" summary that
+; closes a dedup streak, matching the macOS logger byte-for-byte. Chr(0x2191) keeps
+; the up-arrow out of the source so a UTF-8/BOM encoding regression cannot corrupt it.
+; Takes the same ring / pending / errors / fan-out path as a normal line, but never
+; fires the healthcheck hooks (a suppressed warning/error storm is counted once, on
+; its first occurrence, exactly like the deduped output).
+_LoggerEmitDedupSummary(Level, Count) {
+	global LOGGER_SEVERITY, _LOGGER_PENDING, _LOGGER_PENDING_ERRORS, _LOGGER_TEST_SINK
+	static _SumSecKey := "", _SumSecStr := ""
+	Word := (Count == 1) ? "line" : "lines"
+	MsgLine := Format("[{1}] [logger] {2} {3} identical {4} suppressed", Level, Chr(0x2191), Count, Word)
+	SecKey := A_Now
+	if (SecKey != _SumSecKey) {
+		_SumSecKey := SecKey
+		_SumSecStr := FormatTime(SecKey, "yyyy-MM-dd HH:mm:ss")
+	}
+	Line := _SumSecStr . ":" . Format("{:03}", A_MSec) . " " . MsgLine
+	_LoggerPushRing(Line)
+	if _LOGGER_TEST_SINK != 0 {
+		try _LOGGER_TEST_SINK(Line)
+	}
+	_LOGGER_PENDING.Push(Line)
+	if LOGGER_SEVERITY[Level] >= LOGGER_SEVERITY["WARNING"] {
+		_LOGGER_PENDING_ERRORS.Push(Line)
+	}
+	if LOGGER_SEVERITY[Level] >= LOGGER_SEVERITY["ERROR"] {
+		_LoggerFlush(true)
+	}
+	_LoggerFanOut("logger", Line)
 }
 
 ; Resolves absolute paths for every sub-file and deletes any stale sub-file

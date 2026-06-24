@@ -404,7 +404,9 @@ end
 -- ===================================
 
 -- Deduplication state: suppresses consecutive identical log lines to prevent spam.
-local _dedup = { line = nil, count = 0, variant_key = nil }
+-- `time` stamps the start of the current streak so a recurring line re-surfaces
+-- after the 5 s window instead of being silenced forever (matches the AHK driver).
+local _dedup = { line = nil, count = 0, variant_key = nil, time = 0 }
 
 -- Forward declaration — implementation is in Section 5 (ring buffer).
 -- Must be declared here so _log() captures the variable by reference.
@@ -566,14 +568,19 @@ local function _log(variant_key, module_name, msg, ...)
 	-- prefix is added by the console/file sinks below.
 	local line = string.format("[%s] [%s] %s", variant.label, tostring(module_name), text)
 
-	-- Deduplication: suppress repeated identical lines
-	if line == _dedup.line then
+	-- Deduplication: suppress repeated identical lines within a 5 s window so a
+	-- recurring line is de-bounced rather than permanently silenced — a streak that
+	-- outlives the window re-surfaces. The window matches the AHK driver so both
+	-- drivers dedup identically.
+	local _now = _gettime()
+	if line == _dedup.line and (_now - _dedup.time) < 5 then
 		_dedup.count = _dedup.count + 1
 		return
 	end
 	_flush_dedup_summary()
 	_dedup.line        = line
 	_dedup.variant_key = variant_key
+	_dedup.time        = _now
 
 	local stamp = _timestamp()
 
