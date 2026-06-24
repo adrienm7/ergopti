@@ -185,3 +185,56 @@ ReadFeatureStateV2(V2Path) {
 	}
 	return State
 }
+
+
+
+
+
+; ==============================================================
+; ===========================================
+; ======= 3/ Mutex sibling resolution =======
+; ===========================================
+; ==============================================================
+
+; The three Shortcuts modifier-combo sub-Maps are mutually exclusive: a single
+; chord (AltGr+LAlt, AltGr+CapsLock, LAlt+CapsLock) can be bound to exactly one
+; action, so enabling one key must force every sibling key in the same group
+; off. Their v2 ids match the manifest section headers consumed below.
+global _FEATURE_MUTEX_GROUPS := Map(
+	"alt_gr_lalt",      true,
+	"alt_gr_caps_lock", true,
+	"lalt_caps_lock",   true,
+)
+
+; Return the v2 paths of the sibling keys that must be forced false when the
+; user enables ``V2Path``. Empty list = no mutex semantics (independent toggle).
+; Siblings are enumerated from the manifest section itself, so the set is always
+; exactly the group's declared keys — no hand-maintained sibling table.
+; @param V2Path  Canonical v2 path; may carry a leading "ahk." prefix.
+; @return        Array of sibling v2 paths (ahk.shortcuts.<group>.<key>).
+_MutexSiblingPathsForV2(V2Path) {
+	global _FEATURE_MUTEX_GROUPS
+	Parts := StrSplit(V2Path, ".")
+	; Strip the ahk. driver prefix so the shortcuts sub-Map shape is uniform.
+	if (Parts.Length >= 1 and Parts[1] == "ahk") {
+		Stripped := []
+		Loop Parts.Length - 1 {
+			Stripped.Push(Parts[A_Index + 1])
+		}
+		Parts := Stripped
+	}
+	if (Parts.Length != 3 or Parts[1] != "shortcuts" or !_FEATURE_MUTEX_GROUPS.Has(Parts[2])) {
+		return []
+	}
+	GroupSection := "ahk.shortcuts." . Parts[2]
+	CurrentKey := Parts[3]
+	Siblings := []
+	for _, Entry in ManifestFeaturesForSection(GroupSection) {
+		EParts := StrSplit(Entry["path"], ".")
+		SibKey := EParts[EParts.Length]
+		if (SibKey != CurrentKey) {
+			Siblings.Push(GroupSection . "." . SibKey)
+		}
+	}
+	return Siblings
+}
